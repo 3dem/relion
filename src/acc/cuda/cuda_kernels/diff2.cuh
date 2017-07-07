@@ -5,9 +5,10 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
-#include "src/acc/cuda/cuda_projector.cuh"
+#include "src/acc/acc_projector.h"
+#include "src/acc/acc_projectorkernel_impl.h"
 #include "src/acc/cuda/cuda_settings.h"
-#include "src/acc/cuda/cuda_device_utils.cuh"
+#include "src/acc/cuda/cuda_kernels/cuda_device_utils.cuh"
 
 
 /*
@@ -27,7 +28,7 @@ __global__ void cuda_kernel_diff2_coarse(
 		XFLOAT *trans_z,
 		XFLOAT *g_real,
 		XFLOAT *g_imag,
-		CudaProjectorKernel projector,
+		AccProjectorKernel projector,
 		XFLOAT *g_corr,
 		XFLOAT *g_diff2s,
 		int translation_num,
@@ -196,7 +197,7 @@ __global__ void cuda_kernel_diff2_fine(
 		XFLOAT *trans_x,
 		XFLOAT *trans_y,
 		XFLOAT *trans_z,
-		CudaProjectorKernel projector,
+		AccProjectorKernel projector,
 		XFLOAT *g_corr_img,
 		XFLOAT *g_diff2s,
 		unsigned image_size,
@@ -347,7 +348,7 @@ __global__ void cuda_kernel_diff2_CC_coarse(
 		XFLOAT *g_trans_x,
 		XFLOAT *g_trans_y,
 		XFLOAT *g_trans_z,
-		CudaProjectorKernel projector,
+		AccProjectorKernel projector,
 		XFLOAT *g_corr_img,
 		XFLOAT *g_diff2s,
 		unsigned translation_num,
@@ -467,7 +468,7 @@ __global__ void cuda_kernel_diff2_CC_fine(
 		XFLOAT *g_trans_x,
 		XFLOAT *g_trans_y,
 		XFLOAT *g_trans_z,
-		CudaProjectorKernel projector,
+		AccProjectorKernel projector,
 		XFLOAT *g_corr_img,
 		XFLOAT *g_diff2s,
 		unsigned image_size,

@@ -151,4 +151,151 @@ __device__ __forceinline__ void translatePixel(
 	tImag = c * imag + s * real;
 }
 
+template< typename T>
+__global__ void cuda_kernel_init_complex_value(
+		T *data,
+		XFLOAT value,
+		size_t size,
+        int block_size)
+{
+	size_t idx = blockIdx.x * block_size + threadIdx.x;
+	if (idx < size)
+	{
+		data[idx].x = value;
+		data[idx].y = value;
+	}
+}
+
+template< typename T>
+__global__ void cuda_kernel_init_value(
+		T *data,
+		T value,
+		size_t size,
+        int block_size)
+{
+	size_t idx = blockIdx.x * block_size + threadIdx.x;
+	if (idx < size)
+		data[idx] = value;
+}
+
+template< typename T>
+__global__ void cuda_kernel_array_over_threshold(
+		T *data,
+		bool *passed,
+		T threshold,
+		size_t size,
+        int block_size)
+{
+	size_t idx = blockIdx.x * block_size + threadIdx.x;
+	if (idx < size)
+	{
+		if (data[idx] >= threshold)
+			passed[idx] = true;
+		else
+			passed[idx] = false;
+	}
+}
+
+template< typename T>
+__global__ void cuda_kernel_find_threshold_idx_in_cumulative(
+		T *data,
+		T threshold,
+		size_t size_m1, //data size minus 1
+		size_t *idx,
+        int block_size)
+{
+	size_t i = blockIdx.x * block_size + threadIdx.x;
+	if (i < size_m1 && data[i] <= threshold && threshold < data[i+1])
+		idx[0] = i+1;
+}
+
+template<bool check_max_r2>
+__global__ void cuda_kernel_window_fourier_transform(
+		XFLOAT *g_in_real,
+		XFLOAT *g_in_imag,
+		XFLOAT *g_out_real,
+		XFLOAT *g_out_imag,
+		unsigned iX, unsigned iY, unsigned iZ, unsigned iYX, //Input dimensions
+		unsigned oX, unsigned oY, unsigned oZ, unsigned oYX, //Output dimensions
+		unsigned max_idx,
+        int block_size,
+		unsigned max_r2 = 0
+		)
+{
+	unsigned n = threadIdx.x + block_size * blockIdx.x;
+	long int image_offset = oX*oY*oZ*blockIdx.y;
+	if (n >= max_idx) return;
+
+	int k, i, kp, ip, jp;
+
+	if (check_max_r2)
+	{
+		k = n / (iX * iY);
+		i = (n % (iX * iY)) / iX;
+
+		kp = k < iX ? k : k - iZ;
+		ip = i < iX ? i : i - iY;
+		jp = n % iX;
+
+		if (kp*kp + ip*ip + jp*jp > max_r2)
+			return;
+	}
+	else
+	{
+		k = n / (oX * oY);
+		i = (n % (oX * oY)) / oX;
+
+		kp = k < oX ? k : k - oZ;
+		ip = i < oX ? i : i - oY;
+		jp = n % oX;
+	}
+
+	g_out_real[(kp < 0 ? kp + oZ : kp) * oYX + (ip < 0 ? ip + oY : ip)*oX + jp + image_offset] = g_in_real[(kp < 0 ? kp + iZ : kp)*iYX + (ip < 0 ? ip + iY : ip)*iX + jp + image_offset];
+	g_out_imag[(kp < 0 ? kp + oZ : kp) * oYX + (ip < 0 ? ip + oY : ip)*oX + jp + image_offset] = g_in_imag[(kp < 0 ? kp + iZ : kp)*iYX + (ip < 0 ? ip + iY : ip)*iX + jp + image_offset];
+}
+
+template<bool check_max_r2>
+__global__ void cuda_kernel_window_fourier_transform(
+		CUDACOMPLEX *g_in,
+		CUDACOMPLEX *g_out,
+		size_t iX, size_t iY, size_t iZ, size_t iYX, //Input dimensions
+		size_t oX, size_t oY, size_t oZ, size_t oYX, //Output dimensions
+		size_t max_idx,
+        int block_size,
+        size_t max_r2 = 0
+		)
+{
+	size_t n = threadIdx.x + block_size * blockIdx.x;
+	size_t oOFF = oX*oY*oZ*blockIdx.y;
+	size_t iOFF = iX*iY*iZ*blockIdx.y;
+	if (n >= max_idx) return;
+
+	long int k, i, kp, ip, jp;
+
+	if (check_max_r2)
+	{
+		k = n / (iX * iY);
+		i = (n % (iX * iY)) / iX;
+
+		kp = k < iX ? k : k - iZ;
+		ip = i < iX ? i : i - iY;
+		jp = n % iX;
+
+		if (kp*kp + ip*ip + jp*jp > max_r2)
+			return;
+	}
+	else
+	{
+		k = n / (oX * oY);
+		i = (n % (oX * oY)) / oX;
+
+		kp = k < oX ? k : k - oZ;
+		ip = i < oX ? i : i - oY;
+		jp = n % oX;
+	}
+
+	long int  in_idx = (kp < 0 ? kp + iZ : kp) * iYX + (ip < 0 ? ip + iY : ip)*iX + jp;
+	long int out_idx = (kp < 0 ? kp + oZ : kp) * oYX + (ip < 0 ? ip + oY : ip)*oX + jp;
+	g_out[out_idx + oOFF] =  g_in[in_idx + iOFF];
+}
 #endif

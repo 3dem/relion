@@ -5,10 +5,10 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
-#include "src/acc/cuda/cuda_projector.cuh"
-#include "src/acc/cuda/cuda_backprojector.h"
+#include "src/acc/acc_projector.h"
+#include "src/acc/acc_backprojector.h"
 #include "src/acc/cuda/cuda_settings.h"
-#include "src/acc/cuda/cuda_device_utils.cuh"
+#include "src/acc/cuda/cuda_kernels/cuda_device_utils.cuh"
 
 
 /*
@@ -388,7 +388,7 @@ __global__ void cuda_kernel_backproject3D(
 
 template < bool DATA3D >
 __global__ void cuda_kernel_backprojectSGD(
-		CudaProjectorKernel projector,
+		AccProjectorKernel projector,
 		XFLOAT *g_img_real,
 		XFLOAT *g_img_imag,
 		XFLOAT *g_trans_x,

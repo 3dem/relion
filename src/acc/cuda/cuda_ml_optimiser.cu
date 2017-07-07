@@ -6,24 +6,24 @@
 #include <ctime>
 #include <vector>
 #include <iostream>
+#include "src/ml_optimiser.h"
+#include <cuda_runtime.h>
 #include "src/acc/acc_ptr.h"
-#include "src/acc/cuda/cuda_projector.h"
-#include "src/acc/cuda/cuda_projector.cuh"
+#include "src/acc/acc_projector.h"
+#include "src/acc/acc_backprojector.h"
 #include "src/acc/acc_projector_plan.h"
 #include "src/acc/cuda/cuda_benchmark_utils.h"
 #include "src/acc/cuda/cuda_kernels/helper.cuh"
 #include "src/acc/cuda/cuda_kernels/helper_impl.cuh"
 #include "src/acc/cuda/cuda_kernels/diff2.cuh"
 #include "src/acc/cuda/cuda_kernels/wavg.cuh"
-#include "src/acc/cuda/cuda_helper_functions.cuh"
 #include "src/acc/cuda/cuda_mem_utils.h"
+#include "src/acc/cuda/cuda_fft.h"
 #include "src/acc/data_types.h"
-#include "src/acc/cuda/cuda_ml_optimiser.h"
 #include "src/complex.h"
 #include "src/helix.h"
 #include "src/error.h"
 #include <fstream>
-#include <cuda_runtime.h>
 #include "src/parallel.h"
 #include <signal.h>
 #include <map>
@@ -35,7 +35,11 @@
 #endif
 
 #include "src/acc/utilities.h"
+#include "src/acc/utilities_impl.h"
 
+#include "src/acc/acc_ml_optimiser.h"
+#include "src/acc/cuda/cuda_ml_optimiser.h"
+#include "src/acc/acc_helper_functions.h"
 #include "src/acc/acc_ml_optimiser_impl.h"
 
 // -------------------------------  Some explicit template instantiations

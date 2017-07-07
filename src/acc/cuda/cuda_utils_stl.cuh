@@ -124,7 +124,7 @@ if (in.getAllocator() == NULL)
 	out.cp_to_device();
 	DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 }
-// namespace CudaKernels
+} // namespace CudaKernels
 #endif
 
 

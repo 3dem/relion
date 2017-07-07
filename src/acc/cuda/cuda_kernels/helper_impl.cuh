@@ -1,4 +1,4 @@
-#include "src/acc/cuda/cuda_device_utils.cuh"
+#include "src/acc/cuda/cuda_kernels/cuda_device_utils.cuh"
 #include "src/acc/cuda/cuda_kernels/helper.cuh"
 #include "src/acc/cuda/cuda_settings.h"
 
@@ -119,4 +119,19 @@ __global__ void cuda_kernel_multi( T *A,
 	int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
 	if(pixel<image_size)
 		OUT[pixel] = A[pixel]*B[pixel]*S;
+}
+
+__global__ void cuda_kernel_allweights_to_mweights(
+		unsigned long * d_iorient,
+		XFLOAT * d_allweights,
+		XFLOAT * d_mweights,
+		unsigned long orientation_num,
+		unsigned long translation_num,
+        int block_size
+		)
+{
+	size_t idx = blockIdx.x * block_size + threadIdx.x;
+	if (idx < orientation_num*translation_num)
+		d_mweights[d_iorient[idx/translation_num] * translation_num + idx%translation_num] =
+				d_allweights[idx/translation_num * translation_num + idx%translation_num];
 }

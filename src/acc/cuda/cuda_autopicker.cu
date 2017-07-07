@@ -8,13 +8,16 @@
 #include <fstream>
 #include <cuda_runtime.h>
 #include <signal.h>
-#include "src/acc/cuda/cuda_autopicker.h"
 
+#include "src/ml_optimiser.h"
+#include "src/acc/acc_ptr.h"
+#include "src/acc/acc_projector.h"
+#include "src/acc/acc_backprojector.h"
+#include "src/acc/acc_projector_plan.h"
+#include "src/acc/cuda/cuda_kernels/helper.cuh"
 #include "src/acc/cuda/cuda_mem_utils.h"
-#include "src/acc/cuda/cuda_projector.h"
 #include "src/acc/cuda/cuda_settings.h"
 #include "src/acc/cuda/cuda_benchmark_utils.h"
-#include "src/acc/cuda/cuda_helper_functions.cuh"
 #include "src/acc/cuda/cuda_fft.h"
 
 #include "src/macros.h"
@@ -25,6 +28,11 @@
 #else
 #include "src/acc/cuda/cuda_utils_cub.cuh"
 #endif
+
+#include "src/acc/utilities.h"
+#include "src/acc/acc_helper_functions.h"
+
+#include "src/acc/cuda/cuda_autopicker.h"
 
 
 AutoPickerCuda::AutoPickerCuda(AutoPicker *basePicker, int dev_id, const char * timing_fnm) :
@@ -681,7 +689,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 			CTIC(timer,"mccfInit");
 			deviceInitValue(d_Mccf_best, (XFLOAT)-LARGE_NUMBER);
 			CTOC(timer,"mccfInit");
-			CudaProjectorKernel projKernel = CudaProjectorKernel::makeKernel(
+			AccProjectorKernel projKernel = AccProjectorKernel::makeKernel(
 									cudaProjectors[iref],
 									(int)basePckr->workSize/2+1,
 									(int)basePckr->workSize,

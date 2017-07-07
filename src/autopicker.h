@@ -19,7 +19,7 @@
 #include "src/helix.h"
 #ifdef CUDA
 #include "src/acc/cuda/cuda_mem_utils.h"
-#include "src/acc/cuda/cuda_projector.h"
+#include "src/acc/acc_projector.h"
 #include "src/acc/cuda/cuda_settings.h"
 #include "src/acc/cuda/cuda_fft.h"
 #include "src/acc/cuda/cuda_benchmark_utils.h"

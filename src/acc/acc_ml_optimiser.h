@@ -1,17 +1,5 @@
 #ifndef ACC_ML_OPTIMISER_H_
 #define ACC_ML_OPTIMISER_H_
-#if 0
-#include "src/mpi.h"
-#include "src/ml_optimiser.h"
-#include "src/acc/cuda/cuda_mem_utils.h"
-#include "src/acc/cuda/cuda_projector_plan.h"
-#include "src/acc/cuda/cuda_projector.h"
-#include "src/acc/cuda/cuda_backprojector.h"
-#include "src/acc/cuda/cuda_fft.h"
-#include "src/acc/cuda/cuda_benchmark_utils.h"
-#include <stack>
-//#include <cufft.h>
-#endif
 
 #include "src/acc/acc_ptr.h"
 

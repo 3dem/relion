@@ -14,6 +14,7 @@
 #define BP_REF3D_BLOCK_SIZE 128
 #define BP_DATA3D_BLOCK_SIZE 640
 
+/*
 size_t CpuBackprojector::setMdlDim(
 			int xdim, int ydim, int zdim,
 			int inity, int initz,
@@ -568,11 +569,11 @@ void backprojectRef3D(
 
 				XFLOAT shifted_real = cc * img_real - ss * img_imag;
 				XFLOAT shifted_imag = cc * img_imag + ss * img_real;
-				/*
-				XFLOAT shifted_real, shifted_imag;
-				CpuKernels::translatePixel(x, y,  g_trans_x[itrans], g_trans_y[itrans], 
-							   img_real, img_imag, shifted_real, shifted_imag);
-				*/
+//				|*
+//				XFLOAT shifted_real, shifted_imag;
+//				CpuKernels::translatePixel(x, y,  g_trans_x[itrans], g_trans_y[itrans], 
+//							   img_real, img_imag, shifted_real, shifted_imag);
+//				*|
 				real[x] += shifted_real * my_weight;
 				imag[x] += shifted_imag * my_weight;
 			}
@@ -827,3 +828,5 @@ CpuBackprojector::~CpuBackprojector()
 {
 	clear();
 }
+
+*/

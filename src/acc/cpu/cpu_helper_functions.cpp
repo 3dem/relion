@@ -2,14 +2,21 @@
 
 // Make sure we build for CPU
 #undef CUDA
-typedef void * cudaStream_t;
-typedef void * CudaCustomAllocator;
+typedef float cudaStream_t;
+typedef double CudaCustomAllocator;
+typedef int dim3;
 #define cudaStreamPerThread 0
+#define CUSTOM_ALLOCATOR_REGION_NAME( name ) //Do nothing
+#define LAUNCH_PRIVATE_ERROR(func, status)
+#define LAUNCH_HANDLE_ERROR( err )
+#define DEBUG_HANDLE_ERROR( err )
 
-#include "src/acc/cpu/cpu_helper_functions.h"
+#include "src/acc/utilities.h"
+#include "src/acc/acc_helper_functions.h"
 #include "src/acc/cpu/cpu_settings.h"
-#include <parallel_for.h>
- 
+
+#include "src/acc/acc_helper_functions_impl.h"
+/*
 namespace CpuKernels
 {
 long int makeJobsForDiff2Fine(
@@ -124,9 +131,9 @@ int  makeJobsForCollect(IndexedDataArray &FPW, IndexedDataArrayMask &dataMask, u
 	return (jobid+1);
 }
 
-/*
+|*
  * Maps weights to a decoupled indexing of translations and orientations
- */
+ *|
 void mapWeights(
 		unsigned long orientation_start,
 		XFLOAT *mapped_weights,
@@ -240,14 +247,14 @@ long unsigned generateProjectionSetupFine(
 		unsigned iclass,
 		ProjectionParams &ProjectionData)
 // FIXME : For coarse iteration this is **SLOW**    HERE ARE SOME NOTES FOR PARALLELIZING IT (GPU OFFLOAD):
-/*
+|*
  *    Since it is based on push_back, parallelizing sould be fine given som atomic opreation appends,
  *    what takes time is looping through all this. The job-splitting in collect2jobs-preproccesing and
  *    divideOrientationsIntoBlockjobs() relies on chunks of shared orientations being adjacent in
  *    ProjectionData.rot_id (and thus also .rot_idx), but does not care which order those chunks appear
  *    in. So as long as a parallelilsm and "atomic push_back" is organised to use an orientation as a
  *    minimum unit, the job-splitting should be fine with the output.
- */
+ *|
 {
 	//Local variables
 	std::vector< RFLOAT > oversampled_rot, oversampled_tilt, oversampled_psi;
@@ -534,7 +541,7 @@ void runDiff2KernelCoarse(
 	
 	if(!do_CC)
 	{
-	/*
+	|*
 		if(projector.mdlZ!=0)
 		{
 			const int blocks3D = (data_is_3D? D2C_EULERS_PER_BLOCK_DATA3D :D2C_EULERS_PER_BLOCK_REF3D); 
@@ -683,7 +690,7 @@ void runDiff2KernelCoarse(
 			}
 		}
 		
-		*/
+		*|
 		if(projector.mdlZ!=0)
 		{
 			const int blocks3D = (data_is_3D? D2C_EULERS_PER_BLOCK_DATA3D :D2C_EULERS_PER_BLOCK_REF3D); 
@@ -1256,4 +1263,5 @@ void selfApplyBeamTilt2(MultidimArray<Complex > &Fimg, RFLOAT beamtilt_x, RFLOAT
 
 }
 } // Namespace CpuKernels
+ */
 #endif // ALTCPU

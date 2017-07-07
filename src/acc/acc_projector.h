@@ -1,15 +1,16 @@
-#ifndef CUDA_PROJECTOR_H_
-#define CUDA_PROJECTOR_H_
+#ifndef ACC_PROJECTOR_H_
+#define ACC_PROJECTOR_H_
 
 #include "src/complex.h"
-#include "src/acc/cuda/cuda_settings.h"
-#include "src/acc/cuda/cuda_mem_utils.h"
+//#include "src/acc/cuda/cuda_settings.h"
+//#include "src/acc/cuda/cuda_mem_utils.h"
 #include "src/acc/acc_ptr.h"
-#include <cuda_runtime.h>
+//#include <cuda_runtime.h>
+//#include "src/acc/cuda/cuda_kernels/cuda_device_utils.cuh"
 
-class CudaProjector
+class AccProjector
 {
-	friend class CudaProjectorKernel;
+	friend class AccProjectorKernel;
 
 	int mdlX, mdlY, mdlZ, mdlXYZ, mdlMaxR,
 	    mdlInitY, mdlInitZ,
@@ -31,11 +32,13 @@ class CudaProjector
 
 	size_t pitch2D;
 #else
+	// No CUDA texture case
+	// TODO - convert to mdlComplex
 	XFLOAT *mdlReal, *mdlImag;
-#endif
+#endif  // CUDA_NO_TEXTURES
 
 public:
-	CudaProjector():
+	AccProjector():
 			mdlX(0), mdlY(0), mdlZ(0),
 			mdlXYZ(0), mdlMaxR(0),
 			mdlInitY(0), mdlInitZ(0),
@@ -58,6 +61,7 @@ public:
 #endif
 		pitch2D = 0;
 #else
+		// No CUDA texture
 		mdlReal = 0;
 		mdlImag = 0;
 #endif
@@ -73,11 +77,11 @@ public:
 
 	void clear();
 
-	~CudaProjector()
+	~AccProjector()
 	{
 		clear();
 	};
 
-};
+};  // AccProjector
 
 #endif

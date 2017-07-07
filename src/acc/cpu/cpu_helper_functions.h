@@ -29,7 +29,7 @@ namespace CpuKernels
  * Any contiguous translations with a shared orientation are grouped together into a "job" which is supplied
  * to the difference kernel. If there are more contiguous translations than the specified "chunk" number,
  * these are split into separate jobs, to increase parallelism at the cost of redundant memory reads.
- */
+ *
 long int makeJobsForDiff2Fine(
 		OptimisationParamters &op,  SamplingParameters &sp,
 		long int orientation_num, long int translation_num,
@@ -40,17 +40,17 @@ long int makeJobsForDiff2Fine(
 		IndexedDataArray &FPW, // FPW=FinePassWeights
 		IndexedDataArrayMask &dataMask,
 		int chunk);
-
+*/
 /*
  * This assisting function goes over the weight-array and groups all weights with shared
  * orientations into 'jobs' which are fed into the collect-kenrel, which reduces all translations
  * with computed differences into a reduced object to be back-projected.
- */
+ *
 int  makeJobsForCollect(IndexedDataArray &FPW, IndexedDataArrayMask &dataMask, unsigned long NewJobNum); // FPW=FinePassWeights
-
+*/
 /*
  * Maps weights to a decoupled indexing of translations and orientations
- */
+ *
 void mapWeights(
 		unsigned long orientation_start,
 		XFLOAT *mapped_weights,
@@ -217,7 +217,7 @@ void runDiff2KernelFine(
 		long unsigned job_num_count,
 		bool do_CC,
 		bool data_is_3D);
-
+*/
 #define WINDOW_FT_BLOCK_SIZE 128
 template<bool check_max_r2>
 void window_fourier_transform(
@@ -265,7 +265,7 @@ void window_fourier_transform(
 	g_out_real[(kp < 0 ? kp + oZ : kp) * oYX + (ip < 0 ? ip + oY : ip)*oX + jp + image_offset] = g_in_real[(kp < 0 ? kp + iZ : kp)*iYX + (ip < 0 ? ip + iY : ip)*iX + jp + image_offset];
 	g_out_imag[(kp < 0 ? kp + oZ : kp) * oYX + (ip < 0 ? ip + oY : ip)*oX + jp + image_offset] = g_in_imag[(kp < 0 ? kp + iZ : kp)*iYX + (ip < 0 ? ip + iY : ip)*iX + jp + image_offset];
 }
-
+/*
 void runCollect2jobs(	int      grid_dim,
 						XFLOAT * oo_otrans_x,          // otrans-size -> make const
 						XFLOAT * oo_otrans_y,          // otrans-size -> make const
@@ -693,7 +693,7 @@ void lowPassFilterMapGPU(
 		}
 	}
 }
-
+*/
 // may need to change to parallel reduce if it becomes the bottle neck.
 template <typename T>
 static T getMin(T *data, size_t size)

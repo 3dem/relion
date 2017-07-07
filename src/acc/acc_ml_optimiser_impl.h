@@ -1,40 +1,3 @@
-#if 0
-#include <sys/time.h>
-#include <stdio.h>
-#include <time.h>
-#include <math.h>
-#include <ctime>
-#include <vector>
-#include <iostream>
-#include "src/acc/cuda/cuda_projector.h"
-#include "src/acc/cuda/cuda_projector.cuh"
-#include "src/acc/cuda/cuda_projector_plan.h"
-#include "src/acc/cuda/cuda_benchmark_utils.h"
-#include "src/acc/cuda/cuda_ml_optimiser.h"
-#include "src/acc/cuda/cuda_kernels/helper.cuh"
-#include "src/acc/cuda/cuda_kernels/diff2.cuh"
-#include "src/acc/cuda/cuda_kernels/wavg.cuh"
-#include "src/acc/cuda/cuda_helper_functions.cuh"
-#include "src/acc/cuda/cuda_mem_utils.h"
-#include "src/acc/utilities.h"
-#include "src/acc/data_types.h"
-#include "src/acc/acc_ptr.h"
-#include "src/complex.h"
-#include "src/helix.h"
-#include "src/error.h"
-#include <fstream>
-#include <cuda_runtime.h>
-#include "src/parallel.h"
-#include <signal.h>
-#include <map>
-
-#ifdef CUDA_FORCESTL
-#include "src/acc/cuda/cuda_utils_stl.cuh"
-#else
-#include "src/acc/cuda/cuda_utils_cub.cuh"
-#endif
-#endif // if 0
-
 static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 template <class MlClass, int AccT>
@@ -585,7 +548,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 //			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 
 			XFLOAT sum_bg(0.);
-			dim3 block_dim = 128; //TODO: set balanced (hardware-dep?)
+			int block_dim = 128; //TODO: set balanced (hardware-dep?)
 			AccPtr<XFLOAT> softMaskSum   (SOFTMASK_BLOCK_SIZE,0,accMLO->devBundle->allocator);
 			AccPtr<XFLOAT> softMaskSum_bg(SOFTMASK_BLOCK_SIZE,0,accMLO->devBundle->allocator);
 			softMaskSum.deviceAlloc();
@@ -1014,7 +977,7 @@ void getAllSquaredDifferencesCoarse(
 				    	   Kernel Call
 				======================================*/
 
-				CudaProjectorKernel projKernel = CudaProjectorKernel::makeKernel(
+				AccProjectorKernel projKernel = AccProjectorKernel::makeKernel(
 						accMLO->devBundle->cudaProjectors[exp_iclass],
 						op.local_Minvsigma2s[0].xdim,
 						op.local_Minvsigma2s[0].ydim,
@@ -1316,7 +1279,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 					continue;
 
 				CTIC(accMLO->timer,"Diff2MakeKernel");
-				CudaProjectorKernel projKernel = CudaProjectorKernel::makeKernel(
+				AccProjectorKernel projKernel = AccProjectorKernel::makeKernel(
 						accMLO->devBundle->cudaProjectors[exp_iclass],
 						op.local_Minvsigma2s[0].xdim,
 						op.local_Minvsigma2s[0].ydim,
@@ -2584,7 +2547,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			long unsigned orientation_num(ProjectionData[ipart].orientation_num[exp_iclass]);
 
-			CudaProjectorKernel projKernel = CudaProjectorKernel::makeKernel(
+			AccProjectorKernel projKernel = AccProjectorKernel::makeKernel(
 					accMLO->devBundle->cudaProjectors[exp_iclass],
 					op.local_Minvsigma2s[0].xdim,
 					op.local_Minvsigma2s[0].ydim,

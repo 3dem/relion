@@ -1,5 +1,5 @@
 #include "src/acc/cpu/cpu_settings.h"
-#include "src/acc/cpu/utilities.h"
+#include "src/acc/cpu/cpu_kernels/cpu_utils.h"
 #include "src/acc/cpu/cpu_kernels/helper.h"
 
 
@@ -278,9 +278,9 @@ void cpu_translate3D(T * g_image_in,
 	}
 }
 
-void centerFFT_2D(  int     blockIdx_x,
-					int     blockIdx_y,
-					int     threadIdx_x,
+void centerFFT_2D(  int     blocks,
+					int     batch_size,
+					int     block_size
 					XFLOAT *img_in,
 					int     image_size,
 					int     xdim,
@@ -288,44 +288,51 @@ void centerFFT_2D(  int     blockIdx_x,
 					int     xshift,
 					int     yshift)
 {
+// TODO - any way to collapse to 2 loops - one over pixels < image_size/2, one over batch?
+// TODO - in some places we want this outer loop to run in parallel.  Up-level the
+//        outer loop to utilities.h so we can run in parallel or not as desired?
+	for(int blk=0; blk<blocks; blk++){
+		for(int batch=0; batch<batch_size; batch++) {
+			for(int tid=0; tid<block_size; tid++)  {
+				XFLOAT buffer;
+				int pixel = tid + blk*block_size;
+				long int image_offset = image_size*batch;
+			//	int pixel_pass_num = ceilfracf(image_size, CFTT_BLOCK_SIZE);
 
-	XFLOAT buffer;
-	int tid = threadIdx_x;
-	int pixel = threadIdx_x + blockIdx_x*CFTT_BLOCK_SIZE;
-	long int image_offset = image_size*blockIdx_y;
-//	int pixel_pass_num = ceilfracf(image_size, CFTT_BLOCK_SIZE);
+			//	for (int pass = 0; pass < pixel_pass_num; pass++, pixel+=CFTT_BLOCK_SIZE)
+			//	{
+					if(pixel<(image_size/2))
+					{
+						int y = floorf((XFLOAT)pixel/(XFLOAT)xdim);
+						int x = pixel % xdim;				// also = pixel - y*xdim, but this depends on y having been calculated, i.e. serial evaluation
 
-//	for (int pass = 0; pass < pixel_pass_num; pass++, pixel+=CFTT_BLOCK_SIZE)
-//	{
-		if(pixel<(image_size/2))
-		{
-			int y = floorf((XFLOAT)pixel/(XFLOAT)xdim);
-			int x = pixel % xdim;				// also = pixel - y*xdim, but this depends on y having been calculated, i.e. serial evaluation
+						int yp = y + yshift;
+						if (yp < 0)
+							yp += ydim;
+						else if (yp >= ydim)
+							yp -= ydim;
 
-			int yp = y + yshift;
-			if (yp < 0)
-				yp += ydim;
-			else if (yp >= ydim)
-				yp -= ydim;
+						int xp = x + xshift;
+						if (xp < 0)
+							xp += xdim;
+						else if (xp >= xdim)
+							xp -= xdim;
 
-			int xp = x + xshift;
-			if (xp < 0)
-				xp += xdim;
-			else if (xp >= xdim)
-				xp -= xdim;
+						int n_pixel = yp*xdim + xp;
 
-			int n_pixel = yp*xdim + xp;
-
-			buffer                         = img_in[image_offset + n_pixel];
-			img_in[image_offset + n_pixel] = img_in[image_offset + pixel];
-			img_in[image_offset + pixel]   = buffer;
-		}
+						buffer                         = img_in[image_offset + n_pixel];
+						img_in[image_offset + n_pixel] = img_in[image_offset + pixel];
+						img_in[image_offset + pixel]   = buffer;
+					}
 //	}
+			} // tid
+		} // batch
+	} // blk
 }
 
-void centerFFT_3D(  int       blockIdx_x,
-					int       blockIdx_y,
-					int       threadIdx_x,
+void centerFFT_3D(  int       blocks,
+					int       batch_size,
+					int       block_size
 					XFLOAT   *img_in,
 					int       image_size,
 					int       xdim,
@@ -335,44 +342,51 @@ void centerFFT_3D(  int       blockIdx_x,
 					int       yshift,
 					int       zshift)
 {
+// TODO - any way to collapse to 2 loops - one over pixels < image_size/2, one over batch?
+// TODO - in some places we want this outer loop to run in parallel.  Up-level the
+//        outer loop to utilities.h so we can run in parallel or not as desired?
+	for(int blk=0; blk<blocks; blk++){
+		for(int batch=0; batch<batch_size; batch++) {
+			for(int tid=0; tid<block_size; tid++)  {
+				XFLOAT buffer;
+				int pixel = tid + blk*block_size;
+				long int image_offset = image_size*batch;
+				int xydim = xdim*ydim;
+				
+				if(pixel<(image_size/2))
+				{
+					int z = floorf((XFLOAT)pixel/(XFLOAT)(xydim));
+					int xy = pixel % xydim;
+					int y = floorf((XFLOAT)xy/(XFLOAT)xdim);
+					int x = xy % xdim;
 
-	XFLOAT buffer;
-	int tid = threadIdx_x;
-	int pixel = threadIdx_x + blockIdx_x*CFTT_BLOCK_SIZE;
-	long int image_offset = image_size*blockIdx_y;
+					int yp = y + yshift;
+					if (yp < 0)
+						yp += ydim;
+					else if (yp >= ydim)
+						yp -= ydim;
 
-		int xydim = xdim*ydim;
-		if(pixel<(image_size/2))
-		{
-			int z = floorf((XFLOAT)pixel/(XFLOAT)(xydim));
-			int xy = pixel % xydim;
-			int y = floorf((XFLOAT)xy/(XFLOAT)xdim);
-			int x = xy % xdim;
+					int xp = x + xshift;
+					if (xp < 0)
+						xp += xdim;
+					else if (xp >= xdim)
+						xp -= xdim;
 
-			int yp = y + yshift;
-			if (yp < 0)
-				yp += ydim;
-			else if (yp >= ydim)
-				yp -= ydim;
+					int zp = z + zshift;
+					if (zp < 0)
+						zp += zdim;
+					else if (zp >= zdim)
+						zp -= zdim;
 
-			int xp = x + xshift;
-			if (xp < 0)
-				xp += xdim;
-			else if (xp >= xdim)
-				xp -= xdim;
+					int n_pixel = zp*xydim + yp*xdim + xp;
 
-			int zp = z + zshift;
-			if (zp < 0)
-				zp += zdim;
-			else if (zp >= zdim)
-				zp -= zdim;
-
-			int n_pixel = zp*xydim + yp*xdim + xp;
-
-			buffer                         = img_in[image_offset + n_pixel];
-			img_in[image_offset + n_pixel] = img_in[image_offset + pixel];
-			img_in[image_offset + pixel]   = buffer;
-		}
+					buffer                         = img_in[image_offset + n_pixel];
+					img_in[image_offset + n_pixel] = img_in[image_offset + pixel];
+					img_in[image_offset + pixel]   = buffer;
+				}
+			} // tid
+		} // batch
+	} // blk
 }
 
 

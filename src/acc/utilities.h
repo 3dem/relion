@@ -5,8 +5,12 @@
 #include "src/acc/data_types.h"
 #ifdef CUDA
 #include "src/acc/cuda/cuda_kernels/helper.cuh"
+#include "src/acc/cuda/cuda_kernels/wavg.cuh"
+#include "src/acc/cuda/cuda_kernels/diff2.cuh"
 #else
 #include "src/acc/cpu/cpu_kernels/helper.h"
+#include "src/acc/cpu/cpu_kernels/wavg.h"
+#include "src/acc/cpu/cpu_kernels/diff2.h"
 #endif
 
 namespace AccUtilities
@@ -206,7 +210,7 @@ static void scanOnDevice(AccPtr<T> &in, AccPtr<T> &out)
 }
 
 static void softMaskBackgroundValue(
-		dim3 inblock_dim, 
+		int inblock_dim, 
 		int inblock_size,
 		XFLOAT *vol,
 		Image<RFLOAT> &img,
@@ -215,45 +219,11 @@ static void softMaskBackgroundValue(
 		XFLOAT   radius_p,
 		XFLOAT   cosine_width,
 		XFLOAT  *g_sum,
-		XFLOAT  *g_sum_bg)
-{
-#ifdef CUDA
-	cuda_kernel_softMaskBackgroundValue<<<inblock_dim,inblock_size>>>(	vol,
-																img().nzyxdim,
-																img.data.xdim,
-																img.data.ydim,
-																img.data.zdim,
-																img.data.xdim/2,
-																img.data.ydim/2,
-																img.data.zdim/2, //unused
-																do_Mnoise,
-																radius,
-																radius_p,
-																cosine_width,
-																g_sum,
-																g_sum_bg);
-#else
-	int block_dim = inblock_dim;
-	CpuKernels::softMaskBackgroundValue(block_dim, inblock_size,
-		vol,
-		img().nzyxdim,
-		img.data.xdim,
-		img.data.ydim,
-		img.data.zdim,
-		img.data.xdim/2,
-		img.data.ydim/2,
-		img.data.zdim/2, //unused
-		do_Mnoise,
-		radius,
-		radius_p,
-		cosine_width,
-		g_sum,
-		g_sum_bg);
-#endif
-}
+		XFLOAT  *g_sum_bg);
+
 
 static void cosineFilter(
-		dim3 inblock_dim, 
+		int inblock_dim, 
 		int inblock_size,
 		XFLOAT *vol,
 		long int vol_size,
@@ -267,40 +237,7 @@ static void cosineFilter(
 		XFLOAT radius,
 		XFLOAT radius_p,
 		XFLOAT cosine_width,
-		XFLOAT sum_bg_total)
-{
-#ifdef CUDA
-	cuda_kernel_cosineFilter<<<inblock_dim,inblock_size>>>(	vol,
-															vol_size,
-															xdim,
-															ydim,
-															zdim,
-															xinit,
-															yinit,
-															zinit, //unused
-															do_Mnoise,
-															radius,
-															radius_p,
-															cosine_width,
-															sum_bg_total);
-#else
-	int block_dim = inblock_dim;
-	CpuKernels::cosineFilter(block_dim, inblock_size,
-							vol,
-							vol_size,
-							xdim,
-							ydim,
-							zdim,
-							xinit,
-							yinit,
-							zinit, //unused
-							do_Mnoise,
-							radius,
-							radius_p,
-							cosine_width,
-							sum_bg_total);	
-#endif
-}
+		XFLOAT sum_bg_total);
 
 template<bool DATA3D>
 void powerClass(dim3		in_gridSize,
@@ -385,6 +322,556 @@ void acc_make_eulers_3D(int grid_size, int block_size,
 		eulers,
 		orientation_num,
 		R);
+#endif
+}
+
+#ifdef CUDA
+	#define INIT_VALUE_BLOCK_SIZE 512
+#endif 
+
+template< typename T>
+void InitComplexValue(AccPtr<T> &data, XFLOAT value)
+{
+#ifdef CUDA
+	int grid_size = ceil((float)(data.getSize())/(float)INIT_VALUE_BLOCK_SIZE);
+	cuda_kernel_init_complex_value<T><<< grid_size, INIT_VALUE_BLOCK_SIZE, 0, data.getStream() >>>(
+			~data,
+			value,
+			data.getSize(), INIT_VALUE_BLOCK_SIZE);
+#else
+	int Size = data.getSize();
+	for(size_t i=0; i<Size; i++)
+	{
+		data[i].x = value;
+		data[i].y = value;
+	}
+#endif
+}
+
+template< typename T>
+void InitValue(AccPtr<T> &data, T value)
+{
+#ifdef CUDA
+	int grid_size = ceil((float)data.getSize()/(float)INIT_VALUE_BLOCK_SIZE);
+	cuda_kernel_init_value<T><<< grid_size, INIT_VALUE_BLOCK_SIZE, 0, data.getStream() >>>(
+			~data,
+			value,
+			data.getSize(),
+			INIT_VALUE_BLOCK_SIZE);
+	LAUNCH_HANDLE_ERROR(cudaGetLastError());
+#else
+	int Size = data.getSize();
+	for(size_t i=0; i<Size; i++)
+		data[i] = value;
+#endif
+}
+
+template< typename T>
+void InitValue(AccPtr<T> &data, T value, size_t Size)
+{
+#ifdef CUDA
+	int grid_size = ceil((float)Size/(float)INIT_VALUE_BLOCK_SIZE);
+	cuda_kernel_init_value<T><<< grid_size, INIT_VALUE_BLOCK_SIZE, 0, data.getStream() >>>(
+			~data,
+			value,
+			Size,
+			INIT_VALUE_BLOCK_SIZE);
+#else
+	for(size_t i=0; i<Size; i++)
+		data[i] = value;
+#endif
+}
+
+void centerFFT_2D(int grid_size, int batch_size, int block_size,
+				cudaStream_t stream,
+				XFLOAT *img_in,
+				int image_size,
+				int xdim,
+				int ydim,
+				int xshift,
+				int yshift);
+
+
+void centerFFT_2D(int grid_size, int batch_size, int block_size,
+				XFLOAT *img_in,
+				int image_size,
+				int xdim,
+				int ydim,
+				int xshift,
+				int yshift);
+
+void centerFFT_3D(int grid_size, int batch_size, int block_size,
+				cudaStream_t stream,
+				XFLOAT *img_in,
+				int image_size,
+				int xdim,
+				int ydim,
+				int zdim,
+				int xshift,
+				int yshift,
+				int zshift);
+
+
+template<bool do_highpass>
+void frequencyPass(int grid_size, int block_size,
+				cudaStream_t stream,
+				ACCCOMPLEX *A,
+				long int ori_size,
+				size_t Xdim,
+				size_t Ydim,
+				size_t Zdim,
+				XFLOAT edge_low,
+				XFLOAT edge_width,
+				XFLOAT edge_high,
+				XFLOAT angpix,
+				int image_size)
+{
+#ifdef CUDA
+	dim3 blocks(grid_size);
+	cuda_kernel_frequencyPass<do_highpass><<<blocks,block_size, 0, stream>>>(
+			A,
+			ori_size,
+			Xdim,
+			Ydim,
+			Zdim,
+			edge_low,
+			edge_width,
+			edge_high,
+			angpix,
+			image_size);
+#else
+	CpuKernels::kernel_frequencyPass<do_highpass>(grid_size, block,size,
+			A,
+			ori_size,
+			Xdim,
+			Ydim,
+			Zdim,
+			edge_low,
+			edge_width,
+			edge_high,
+			angpix,
+			image_size);
+#endif
+}
+
+template<bool REFCTF, bool REF3D, bool DATA3D, int block_sz>
+void kernel_wavg(
+		XFLOAT *g_eulers,
+		AccProjectorKernel &projector,
+		unsigned image_size,
+		unsigned long orientation_num,
+		XFLOAT *g_img_real,
+		XFLOAT *g_img_imag,
+		XFLOAT *g_trans_x,
+		XFLOAT *g_trans_y,
+		XFLOAT *g_trans_z,
+		XFLOAT* g_weights,
+		XFLOAT* g_ctfs,
+		XFLOAT *g_wdiff2s_parts,
+		XFLOAT *g_wdiff2s_AA,
+		XFLOAT *g_wdiff2s_XA,
+		unsigned long translation_num,
+		XFLOAT weight_norm,
+		XFLOAT significant_weight,
+		XFLOAT part_scale,
+		cudaStream_t stream)
+{
+#ifdef CUDA
+	//We only want as many blocks as there are chunks of orientations to be treated
+	//within the same block (this is done to reduce memory loads in the kernel).
+	dim3 block_dim = orientation_num;//ceil((float)orientation_num/(float)REF_GROUP_SIZE);
+	
+	cuda_kernel_wavg<REFCTF,REF3D,DATA3D,block_sz><<<block_dim,block_sz,(3*block_sz+9)*sizeof(XFLOAT),stream>>>(
+		g_eulers,
+		projector,
+		image_size,
+		orientation_num,
+		g_img_real,
+		g_img_imag,
+		g_trans_x,
+		g_trans_y,
+		g_trans_z,
+		g_weights,
+		g_ctfs,
+		g_wdiff2s_parts,
+		g_wdiff2s_AA,
+		g_wdiff2s_XA,
+		translation_num,
+		weight_norm,
+		significant_weight,
+		part_scale);
+#else
+	if (DATA3D)
+	{
+		CPUKernels::wavg_3D<REFCTF>(
+			g_eulers,
+			projector,
+			image_size,
+			orientation_num,
+			g_img_real,
+			g_img_imag,
+			g_trans_x,
+			g_trans_y,
+			g_trans_z,
+			g_weights,
+			g_ctfs,
+			g_wdiff2s_parts,
+			g_wdiff2s_AA,
+			g_wdiff2s_XA,
+			translation_num,
+			weight_norm,
+			significant_weight,
+			part_scale);
+	}
+	else
+	{
+		CPUKernels::wavg_ref3D<REFCTF,REF3D>(
+			g_eulers,
+			projector,
+			image_size,
+			orientation_num,
+			g_img_real,
+			g_img_imag,
+			g_trans_x,
+			g_trans_y,
+			g_trans_z,
+			g_weights,
+			g_ctfs,
+			g_wdiff2s_parts,
+			g_wdiff2s_AA,
+			g_wdiff2s_XA,
+			translation_num,
+			weight_norm,
+			significant_weight,
+			part_scale);
+	}
+#endif
+}
+
+template<bool REF3D, bool DATA3D, int block_sz, int eulers_per_block, int prefetch_fraction>
+void diff2_coarse(
+		int grid_size, int block_size,
+		XFLOAT *g_eulers,
+		XFLOAT *trans_x,
+		XFLOAT *trans_y,
+		XFLOAT *trans_z,
+		XFLOAT *g_real,
+		XFLOAT *g_imag,
+		AccProjectorKernel projector,
+		XFLOAT *g_corr,
+		XFLOAT *g_diff2s,
+		int translation_num,
+		int image_size,
+		cudaStream_t stream
+		)
+{
+#ifdef CUDA
+		cuda_kernel_diff2_coarse<REF3D, DATA3D, block_sz, eulers_per_block, prefetch_fraction>
+		<<<grid_size,block_size,0,stream>>>(
+			g_eulers,
+			trans_x,
+			trans_y,
+			trans_z,
+			g_real,
+			g_imag,
+			projector,
+			g_corr,
+			g_diff2s,
+			translation_num,
+			image_size);
+#else
+	#if 1
+		CPUKernels::diff2_coarse<REF3D, DATA3D, block_sz, eulers_per_block, prefetch_fraction>(
+			grid_size,
+			g_eulers,
+			trans_x,
+			trans_y,
+			trans_z,
+			g_real,
+			g_imag,
+			projector,
+			g_corr,
+			g_diff2s,
+			translation_num,
+			image_size
+		);
+	#else
+		if (DATA3D)
+			CPUKernels::diff2_coarse_3D<eulers_per_block>(
+			grid_size,
+			g_eulers,
+			trans_x,
+			trans_y,
+			trans_z,
+			g_real,
+			g_imag,
+			projector,
+			g_corr,
+			g_diff2s,
+			translation_num,
+			image_size);
+		else
+			CPUKernels::diff2_coarse_2D<REF3D, eulers_per_block>(
+			grid_size,
+			g_eulers,
+			trans_x,
+			trans_y,
+			trans_z,
+			g_real,
+			g_imag,
+			projector,
+			g_corr,
+			g_diff2s,
+			translation_num,
+			image_size);
+	#endif
+#endif
+}
+
+template<bool REF3D, bool DATA3D, int block_sz>
+void diff2_CC_coarse(
+		int grid_size, int block_size,
+		XFLOAT *g_eulers,
+		XFLOAT *g_imgs_real,
+		XFLOAT *g_imgs_imag,
+		XFLOAT *g_trans_x,
+		XFLOAT *g_trans_y,
+		XFLOAT *g_trans_z,
+		AccProjectorKernel projector,
+		XFLOAT *g_corr_img,
+		XFLOAT *g_diff2s,
+		unsigned translation_num,
+		int image_size,
+		XFLOAT exp_local_sqrtXi2,
+		cudaStream_t stream
+		)
+{
+#ifdef CUDA
+	dim3 CCblocks(grid_size,translation_num);
+	cuda_kernel_diff2_CC_coarse<REF3D,DATA3D,block_sz>
+		<<<CCblocks,block_size,0,stream>>>(
+			g_eulers,
+			g_imgs_real,
+			g_imgs_imag,
+			g_trans_x,
+			g_trans_y,
+			g_trans_z,
+			projector,
+			g_corr_img,
+			g_diff2s,
+			translation_num,
+			image_size,
+			exp_local_sqrtXi2);
+#else
+	if (DATA3D)
+		CPUKernels::diff2_CC_coarse_3D(
+			grid_size,
+			g_eulers,
+			g_imgs_real,
+			g_imgs_imag,
+			g_trans_x,
+			g_trans_y,
+			g_trans_z,
+			projector,
+			g_corr_img,
+			g_diff2s,
+			translation_num,
+			image_size,
+			exp_local_sqrtXi2);
+	else
+		CPUKernels::diff2_CC_coarse_2D<REF3D>(
+			grid_size,
+			g_eulers,
+			g_imgs_real,
+			g_imgs_imag,
+			g_trans_x,
+			g_trans_y,
+			projector,
+			g_corr_img,
+			g_diff2s,
+			translation_num,
+			image_size,
+			exp_local_sqrtXi2);	
+#endif	
+}
+
+template<bool REF3D, bool DATA3D, int block_sz, int chunk_sz>
+void diff2_fine(
+		int grid_size, int block_size,
+		XFLOAT *g_eulers,
+		XFLOAT *g_imgs_real,
+		XFLOAT *g_imgs_imag,
+		XFLOAT *trans_x,
+		XFLOAT *trans_y,
+		XFLOAT *trans_z,
+		AccProjectorKernel projector,
+		XFLOAT *g_corr_img,
+		XFLOAT *g_diff2s,
+		unsigned image_size,
+		XFLOAT sum_init,
+		unsigned long orientation_num,
+		unsigned long translation_num,
+		unsigned long todo_blocks,
+		unsigned long *d_rot_idx,
+		unsigned long *d_trans_idx,
+		unsigned long *d_job_idx,
+		unsigned long *d_job_num,
+		cudaStream_t stream
+		)
+{
+#ifdef CUDA
+		dim3 block_dim = grid_size;
+		cuda_kernel_diff2_fine<REF3D,DATA3D, block_sz, chunk_sz>
+				<<<block_dim,block_size,0,stream>>>(
+					g_eulers,
+					g_imgs_real,
+					g_imgs_imag,
+					trans_x,
+					trans_y,
+					trans_z,
+					projector,
+					g_corr_img,    // in these non-CC kernels this is effectively an adjusted MinvSigma2
+					g_diff2s,
+					image_size,
+					sum_init,
+					orientation_num,
+					translation_num,
+					todo_blocks, //significant_num,
+					d_rot_idx,
+					d_trans_idx,
+					d_job_idx,
+					d_job_num);
+#else
+		// TODO - plug in use of orientation_num, translation_num,todo_blocks on
+		// CPU side if GPU starts to use
+	if (DATA3D)
+		CPUKernels::diff2_CC_fine_3D(
+			grid_size,
+			g_eulers,
+			g_imgs_real,
+			g_imgs_imag,
+			trans_x,
+			trans_y,
+			trans_z,
+			projector,
+			g_corr_img,    // in these non-CC kernels this is effectively an adjusted MinvSigma2
+			g_diff2s,
+			image_size,
+			sum_init,
+			d_rot_idx,
+			d_trans_idx,
+			d_job_idx,
+			d_job_num);
+	else
+		CPUKernels::diff2_CC_fine_2D<REF3D>(
+			grid_size,
+			g_eulers,
+			g_imgs_real,
+			g_imgs_imag,
+			trans_x,
+			trans_y,
+			trans_z,
+			projector,
+			g_corr_img,    // in these non-CC kernels this is effectively an adjusted MinvSigma2
+			g_diff2s,
+			image_size,
+			sum_init,
+			d_rot_idx,
+			d_trans_idx,
+			d_job_idx,
+			d_job_num);
+#endif
+}
+
+template<bool REF3D, bool DATA3D, int block_sz,int chunk_sz>
+void diff2_CC_fine(
+		int grid_size, int block_size,
+		XFLOAT *g_eulers,
+		XFLOAT *g_imgs_real,
+		XFLOAT *g_imgs_imag,
+		XFLOAT *g_trans_x,
+		XFLOAT *g_trans_y,
+		XFLOAT *g_trans_z,
+		AccProjectorKernel projector,
+		XFLOAT *g_corr_img,
+		XFLOAT *g_diff2s,
+		unsigned image_size,
+		XFLOAT sum_init,
+		XFLOAT exp_local_sqrtXi2,
+		unsigned long orientation_num,
+		unsigned long translation_num,
+		unsigned long todo_blocks,
+		unsigned long *d_rot_idx,
+		unsigned long *d_trans_idx,
+		unsigned long *d_job_idx,
+		unsigned long *d_job_num,
+		cudaStream_t stream
+		)
+{
+#ifdef CUDA
+	dim3 block_dim = grid_size;
+	cuda_kernel_diff2_CC_fine<REF3D,DATA3D,block_sz,chunk_sz>
+			<<<block_dim,block_size,0,stream>>>(
+				g_eulers,
+				g_imgs_real,
+				g_imgs_imag,
+				g_trans_x,
+				g_trans_y,
+				g_trans_z,
+				projector,
+				g_corr_img,
+				g_diff2s,
+				image_size,
+				sum_init,
+				exp_local_sqrtXi2,
+				orientation_num,
+				translation_num,
+				todo_blocks,
+				d_rot_idx,
+				d_trans_idx,
+				d_job_idx,
+				d_job_num);
+#else
+		// TODO - plug in use of orientation_num, translation_num,todo_blocks on
+		// CPU side if GPU starts to use
+	if (DATA3D)
+		CpuKernels::diff2_CC_fine_3D(
+			grid_size,
+			g_eulers,
+			g_imgs_real,
+			g_imgs_imag,
+			g_trans_x,
+			g_trans_y,
+			g_trans_z,
+			projector,
+			g_corr_img,
+			g_diff2s,
+			image_size,
+			sum_init,
+			exp_local_sqrtXi2,
+			d_rot_idx,
+			d_trans_idx,
+			d_job_idx,
+			d_job_num);
+	else
+		CpuKernels::diff2_CC_fine_2D<REF3D>(
+			grid_size,
+			g_eulers,
+			g_imgs_real,
+			g_imgs_imag,
+			g_trans_x,
+			g_trans_y,
+			g_trans_z,
+			projector,
+			g_corr_img,
+			g_diff2s,
+			image_size,
+			sum_init,
+			exp_local_sqrtXi2,
+			d_rot_idx,
+			d_trans_idx,
+			d_job_idx,
+			d_job_num);
 #endif
 }
 

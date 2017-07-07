@@ -1,10 +1,8 @@
 #include "src/acc/acc_projector.h"
 #include <signal.h>
 
-#include "src/acc/acc_projector_impl.h"
 
-/*
-bool CudaProjector::setMdlDim(
+bool AccProjector::setMdlDim(
 		int xdim, int ydim, int zdim,
 		int inity, int initz,
 		int maxr, int paddingFactor)
@@ -157,6 +155,7 @@ bool CudaProjector::setMdlDim(
 	HANDLE_ERROR(cudaCreateTextureObject(mdlImag, &resDesc_imag, &texDesc, NULL));
 #endif
 #else
+// TODO Optimized CPU-only path
 	DEBUG_HANDLE_ERROR(cudaMalloc( (void**) &mdlReal, mdlXYZ * sizeof(XFLOAT)));
 	DEBUG_HANDLE_ERROR(cudaMalloc( (void**) &mdlImag, mdlXYZ * sizeof(XFLOAT)));
 #endif
@@ -164,7 +163,7 @@ bool CudaProjector::setMdlDim(
 }
 
 #if(!COMPLEXTEXTURE)
-void CudaProjector::initMdl(XFLOAT *real, XFLOAT *imag)
+void AccProjector::initMdl(XFLOAT *real, XFLOAT *imag)
 {
 #ifdef CUDA_DEBUG
 	if (mdlXYZ == 0)
@@ -201,6 +200,7 @@ void CudaProjector::initMdl(XFLOAT *real, XFLOAT *imag)
 		DEBUG_HANDLE_ERROR(cudaMemcpy2D(texArrayImag2D, pitch2D, imag, sizeof(XFLOAT) * mdlX, sizeof(XFLOAT) * mdlX, mdlY, cudaMemcpyHostToDevice));
 	}
 #else
+// TODO Optimized CPU-only path
 	DEBUG_HANDLE_ERROR(cudaMemcpy( mdlReal, real, mdlXYZ * sizeof(XFLOAT), cudaMemcpyHostToDevice));
 	DEBUG_HANDLE_ERROR(cudaMemcpy( mdlImag, imag, mdlXYZ * sizeof(XFLOAT), cudaMemcpyHostToDevice));
 #endif
@@ -209,7 +209,7 @@ void CudaProjector::initMdl(XFLOAT *real, XFLOAT *imag)
 #endif
 
 
-void CudaProjector::initMdl(Complex *data)
+void AccProjector::initMdl(Complex *data)
 {
 #if(COMPLEXTEXTURE)
 	if(mdlZ!=0)  // 3D model
@@ -246,7 +246,7 @@ void CudaProjector::initMdl(Complex *data)
 }
 
 #if(COMPLEXTEXTURE)
-void CudaProjector::clear()
+void AccProjector::clear()
 {
 	if (mdlComplex != 0)
 	{
@@ -268,7 +268,7 @@ void CudaProjector::clear()
 
 #else
 
-void CudaProjector::clear()
+void AccProjector::clear()
 {
 	mdlX = 0;
 	mdlY = 0;
@@ -304,6 +304,7 @@ void CudaProjector::clear()
 		texArrayReal = 0;
 		texArrayImag = 0;
 #else
+// TODO Optimized CPU-only path
 		cudaFree(mdlReal);
 		cudaFree(mdlImag);
 #endif
@@ -311,5 +312,4 @@ void CudaProjector::clear()
 		mdlImag = 0;
 	}
 }
-#endif
-*/
+	#endif

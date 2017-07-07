@@ -9,7 +9,7 @@
 #include "src/image.h"
 
 #include "src/acc/cuda/cuda_mem_utils.h"
-#include "src/acc/cuda/cuda_projector.h"
+#include "src/acc/acc_projector.h"
 #include "src/acc/cuda/cuda_settings.h"
 #include "src/acc/cuda/cuda_fft.h"
 #include "src/acc/cuda/cuda_benchmark_utils.h"
@@ -37,7 +37,7 @@ public:
 	CudaFFT cudaTransformer1;
 	CudaFFT cudaTransformer2;
 
-	std::vector< CudaProjector > cudaProjectors;
+	std::vector< AccProjector > cudaProjectors;
 
    //Class streams ( for concurrent scheduling of class-specific kernels)
 	std::vector< cudaStream_t > classStreams;

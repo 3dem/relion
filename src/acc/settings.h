@@ -3,11 +3,15 @@
 
 #ifdef ACC_DOUBLE_PRECISION
 	#define XFLOAT double
-	typedef struct{ XFLOAT x; XFLOAT y;} double2;
+	#ifndef CUDA
+		typedef struct{ XFLOAT x; XFLOAT y;} double2;
+	#endif
 	#define ACCCOMPLEX double2
 #else
 	#define XFLOAT float
-    typedef struct{ XFLOAT x; XFLOAT y;} float2;
+	#ifndef CUDA
+		typedef struct{ XFLOAT x; XFLOAT y;} float2;
+	#endif
 	#define ACCCOMPLEX float2
 #endif
 

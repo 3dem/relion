@@ -6,7 +6,7 @@
 #include <fstream>
 #include "src/macros.h"
 #include "src/acc/cpu/cpu_settings.h"
-#include "src/acc/cpu/utilities.h"
+#include "src/acc/cpu/cpu_kernels/cpu_utils.h"
 #include "src/acc/cpu/cpu_projector.h"
 
 namespace CpuKernels
@@ -78,7 +78,8 @@ void exponentiate_weights_coarse(
 }
 
 template<bool DATA3D>
-void collect2jobs(  int     blockIdx_x,
+void collect2jobs(  int     grid_size,
+					int		block_size,
 					XFLOAT *g_oo_otrans_x,          // otrans-size -> make const
 					XFLOAT *g_oo_otrans_y,          // otrans-size -> make const
 					XFLOAT *g_oo_otrans_z,          // otrans-size -> make const
@@ -102,67 +103,68 @@ void collect2jobs(  int     blockIdx_x,
 					unsigned long *d_job_num
 				)
 {
-	// blockid
-	int bid = blockIdx_x;
+	// block id
+	for (int bid=0; bid < grid_size; bid++) {
 
-	XFLOAT s_o_weights[SUMW_BLOCK_SIZE];
-	XFLOAT s_thr_wsum_sigma2_offset[SUMW_BLOCK_SIZE];;
-	XFLOAT s_thr_wsum_prior_offsetx_class[SUMW_BLOCK_SIZE];
-	XFLOAT s_thr_wsum_prior_offsety_class[SUMW_BLOCK_SIZE];
-	XFLOAT s_thr_wsum_prior_offsetz_class[SUMW_BLOCK_SIZE];
-	
-	long int pos = d_job_idx[bid];
-    int job_size = d_job_num[bid];
+		XFLOAT s_o_weights[block_size];
+		XFLOAT s_thr_wsum_sigma2_offset[block_size];;
+		XFLOAT s_thr_wsum_prior_offsetx_class[block_size];
+		XFLOAT s_thr_wsum_prior_offsety_class[block_size];
+		XFLOAT s_thr_wsum_prior_offsetz_class[block_size];
 
-    int pass_num = ceilfracf(job_size,SUMW_BLOCK_SIZE);
-    
-    for(int tid=0; tid<SUMW_BLOCK_SIZE; tid++) {
-       	s_o_weights[tid]                    	= (XFLOAT)0.0;
-       	s_thr_wsum_sigma2_offset[tid]       	= (XFLOAT)0.0;
-       	s_thr_wsum_prior_offsetx_class[tid] 	= (XFLOAT)0.0;
-       	s_thr_wsum_prior_offsety_class[tid] 	= (XFLOAT)0.0;
-       	if(DATA3D)
-      		s_thr_wsum_prior_offsety_class[tid] = (XFLOAT)0.0;
-    }
-    
-        
-    for (int pass = 0; pass < pass_num; pass++, pos+=SUMW_BLOCK_SIZE) // loop the available warps enough to complete all translations for this orientation
-    {
-        for(int tid=0; tid<SUMW_BLOCK_SIZE; tid++) {
-        	if ((pass*SUMW_BLOCK_SIZE+tid)<job_size) // if there is a translation that needs to be done still for this thread
-        	{
-	    		// index of comparison
-	    		long int iy = d_trans_idx[pos+tid];              // ...and its own trans...
+		long int pos = d_job_idx[bid];
+		int job_size = d_job_num[bid];
 
-	    		XFLOAT weight = g_i_weights[pos+tid];
-	    		if( weight >= op_significant_weight ) //TODO Might be slow (divergent threads)
-	    			weight /= op_sum_weight;
-	    		else
-	    			weight = (XFLOAT)0.0;
-    
-	    		s_o_weights[tid] += weight;
-	    		s_thr_wsum_prior_offsetx_class[tid] += weight *          g_oo_otrans_x[iy];
-	    		s_thr_wsum_prior_offsety_class[tid] += weight *          g_oo_otrans_y[iy];
-	    		s_thr_wsum_sigma2_offset[tid]       += weight * g_myp_oo_otrans_x2y2z2[iy];
-	        }
-    	} 
-    }
-    
-   	for(int tid=1; tid<SUMW_BLOCK_SIZE; tid++)
-    {
-		s_o_weights[0]                    += s_o_weights[tid];
-		s_thr_wsum_sigma2_offset[0]       += s_thr_wsum_sigma2_offset[tid];
-		s_thr_wsum_prior_offsetx_class[0] += s_thr_wsum_prior_offsetx_class[tid];
-		s_thr_wsum_prior_offsety_class[0] += s_thr_wsum_prior_offsety_class[tid];
+		int pass_num = ceilfracf(job_size,block_size);
+
+		for(int tid=0; tid<SUMW_BLOCK_SIZE; tid++) {
+			s_o_weights[tid]                    	= (XFLOAT)0.0;
+			s_thr_wsum_sigma2_offset[tid]       	= (XFLOAT)0.0;
+			s_thr_wsum_prior_offsetx_class[tid] 	= (XFLOAT)0.0;
+			s_thr_wsum_prior_offsety_class[tid] 	= (XFLOAT)0.0;
+			if(DATA3D)
+				s_thr_wsum_prior_offsety_class[tid] = (XFLOAT)0.0;
+		}
+
+
+		for (int pass = 0; pass < pass_num; pass++, pos+=block_size) // loop the available warps enough to complete all translations for this orientation
+		{
+			for(int tid=0; tid<block_size; tid++) {
+				if ((pass*block_size+tid)<job_size) // if there is a translation that needs to be done still for this thread
+				{
+					// index of comparison
+					long int iy = d_trans_idx[pos+tid];              // ...and its own trans...
+
+					XFLOAT weight = g_i_weights[pos+tid];
+					if( weight >= op_significant_weight ) //TODO Might be slow (divergent threads)
+						weight /= op_sum_weight;
+					else
+						weight = (XFLOAT)0.0;
+
+					s_o_weights[tid] += weight;
+					s_thr_wsum_prior_offsetx_class[tid] += weight *          g_oo_otrans_x[iy];
+					s_thr_wsum_prior_offsety_class[tid] += weight *          g_oo_otrans_y[iy];
+					s_thr_wsum_sigma2_offset[tid]       += weight * g_myp_oo_otrans_x2y2z2[iy];
+				}
+			} 
+		}
+
+		for(int tid=1; tid<block_size; tid++)
+		{
+			s_o_weights[0]                    += s_o_weights[tid];
+			s_thr_wsum_sigma2_offset[0]       += s_thr_wsum_sigma2_offset[tid];
+			s_thr_wsum_prior_offsetx_class[0] += s_thr_wsum_prior_offsetx_class[tid];
+			s_thr_wsum_prior_offsety_class[0] += s_thr_wsum_prior_offsety_class[tid];
+			if(DATA3D)
+				s_thr_wsum_prior_offsetz_class[0] += s_thr_wsum_prior_offsetz_class[tid];
+		}
+		g_o_weights[bid]			        = s_o_weights[0];
+		g_thr_wsum_sigma2_offset[bid]       = s_thr_wsum_sigma2_offset[0];
+		g_thr_wsum_prior_offsetx_class[bid] = s_thr_wsum_prior_offsetx_class[0];
+		g_thr_wsum_prior_offsety_class[bid] = s_thr_wsum_prior_offsety_class[0];
 		if(DATA3D)
-			s_thr_wsum_prior_offsetz_class[0] += s_thr_wsum_prior_offsetz_class[tid];
-   	}
-   	g_o_weights[bid]			        = s_o_weights[0];
-    g_thr_wsum_sigma2_offset[bid]       = s_thr_wsum_sigma2_offset[0];
-   	g_thr_wsum_prior_offsetx_class[bid] = s_thr_wsum_prior_offsetx_class[0];
-    g_thr_wsum_prior_offsety_class[bid] = s_thr_wsum_prior_offsety_class[0];
-   	if(DATA3D)
-    	g_thr_wsum_prior_offsetz_class[bid] = s_thr_wsum_prior_offsetz_class[0];       
+			g_thr_wsum_prior_offsetz_class[bid] = s_thr_wsum_prior_offsetz_class[0];
+	} // for bid
 }
 
 void exponentiate_weights_fine(
@@ -236,9 +238,9 @@ void cpu_translate3D(T * g_image_in,
 					int      dz);
 
 //----------------------------------------------------------------------------
-void centerFFT_2D(  int       blockIdx_x,
-					int       blockIdx_y,
-					int       threadIdx_x,
+void centerFFT_2D(  int       blocks,
+					int       batch_size,
+					int       block_size,
 					XFLOAT   *img_in,
 					int       image_size,
 					int       xdim,
@@ -246,9 +248,9 @@ void centerFFT_2D(  int       blockIdx_x,
 					int       xshift,
 					int       yshift);
 
-void centerFFT_3D(  int       blockIdx_x,
-					int       blockIdx_y,
-					int       threadIdx_x,
+void centerFFT_3D(  int       blocks,
+					int       batch_size,
+					int       block_size,
 					XFLOAT   *img_in,
 					int       image_size,
 					int       xdim,
@@ -422,6 +424,7 @@ void cast(  int blockIdx_x,
 template<bool do_highpass>
 void kernel_frequencyPass( int          blockIdx_x,
 					int          threadIdx_x,
+					int grid_size, int block_size,
 					ACCCOMPLEX *A,
 					long int     ori_size,
 					size_t       Xdim,
@@ -433,53 +436,58 @@ void kernel_frequencyPass( int          blockIdx_x,
 					XFLOAT       angpix,
 					int          image_size)
 {
-	int texel = threadIdx_x + blockIdx_x*BLOCK_SIZE;
+	// TODO - why not a single loop over image_size pixels?
+	for(int blk=0; blk<grid_size; blk++) {
+		for(int tid=0; tid<block_size; tid++) {
+			int texel = tid + blk*BLOCK_SIZE;
 
-	int z = texel / (Xdim*Ydim);
-	int xy = (texel - z*Xdim*Ydim);
-	int y = xy / Xdim;
+			int z = texel / (Xdim*Ydim);
+			int xy = (texel - z*Xdim*Ydim);
+			int y = xy / Xdim;
 
-	int xp = xy - y*Xdim;
+			int xp = xy - y*Xdim;
 
-	int zp = ( z<Xdim ? z : z-Zdim );
-	int yp = ( y<Xdim ? y : y-Ydim );
+			int zp = ( z<Xdim ? z : z-Zdim );
+			int yp = ( y<Xdim ? y : y-Ydim );
 
-	int r2 = xp*xp + yp*yp + zp*zp;
+			int r2 = xp*xp + yp*yp + zp*zp;
 
-	RFLOAT res;
-	if(texel<image_size)
-	{
-		res = sqrt((RFLOAT)r2)/(RFLOAT)ori_size;
-
-		if(do_highpass) //highpass
-		{
-			if (res < edge_low) //highpass => lows are dead
+			RFLOAT res;
+			if(texel<image_size)
 			{
-				A[texel].x = 0.;
-				A[texel].y = 0.;
+				res = sqrt((RFLOAT)r2)/(RFLOAT)ori_size;
+
+				if(do_highpass) //highpass
+				{
+					if (res < edge_low) //highpass => lows are dead
+					{
+						A[texel].x = 0.;
+						A[texel].y = 0.;
+					}
+					else if (res < edge_high) //highpass => medium lows are almost dead
+					{
+						XFLOAT mul = 0.5 - 0.5 * cos( PI * (res-edge_low)/edge_width);
+						A[texel].x *= mul;
+						A[texel].y *= mul;
+					}
+				}
+				else //lowpass
+				{
+					if (res > edge_high) //lowpass => highs are dead
+					{
+						A[texel].x = 0.;
+						A[texel].y = 0.;
+					}
+					else if (res > edge_low) //lowpass => medium highs are almost dead
+					{
+						XFLOAT mul = 0.5 + 0.5 * cos( PI * (res-edge_low)/edge_width);
+						A[texel].x *= mul;
+						A[texel].y *= mul;
+					}
+				}
 			}
-			else if (res < edge_high) //highpass => medium lows are almost dead
-			{
-				XFLOAT mul = 0.5 - 0.5 * cos( PI * (res-edge_low)/edge_width);
-				A[texel].x *= mul;
-				A[texel].y *= mul;
-			}
-		}
-		else //lowpass
-		{
-			if (res > edge_high) //lowpass => highs are dead
-			{
-				A[texel].x = 0.;
-				A[texel].y = 0.;
-			}
-			else if (res > edge_low) //lowpass => medium highs are almost dead
-			{
-				XFLOAT mul = 0.5 + 0.5 * cos( PI * (res-edge_low)/edge_width);
-				A[texel].x *= mul;
-				A[texel].y *= mul;
-			}
-		}
-	}
+		} // tid
+	} // blk
 }
 
 template<bool DATA3D>

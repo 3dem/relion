@@ -5,14 +5,15 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
-#include "src/acc/cuda/cuda_projector.cuh"
+#include "src/acc/acc_projector.h"
+#include "src/acc/acc_projectorkernel_impl.h"
 #include "src/acc/cuda/cuda_settings.h"
-#include "src/acc/cuda/cuda_device_utils.cuh"
+#include "src/acc/cuda/cuda_kernels/cuda_device_utils.cuh"
 
 template<bool REFCTF, bool REF3D, bool DATA3D, int block_sz>
 __global__ void cuda_kernel_wavg(
 		XFLOAT *g_eulers,
-		CudaProjectorKernel projector,
+		AccProjectorKernel projector,
 		unsigned image_size,
 		unsigned long orientation_num,
 		XFLOAT *g_img_real,

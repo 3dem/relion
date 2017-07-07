@@ -1,10 +1,5 @@
-#ifndef CUDA_PROJECTOR_CUH_
-#define CUDA_PROJECTOR_CUH_
-
-#include <cuda_runtime.h>
-#include "src/acc/cuda/cuda_projector.h"
-#include "src/acc/cuda/cuda_device_utils.cuh"
-
+#ifndef ACC_PROJECTORKERNELIMPL_H_
+#define ACC_PROJECTORKERNELIMPL_H_
 
 
 #ifndef CUDA_NO_TEXTURES
@@ -13,7 +8,9 @@
 #define PROJECTOR_PTR_TYPE XFLOAT *
 #endif
 
-class CudaProjectorKernel
+// TODO - Accelerated CPU complex2D & complex3D
+
+class AccProjectorKernel
 {
 
 public:
@@ -27,7 +24,7 @@ public:
 	PROJECTOR_PTR_TYPE mdlImag;
 	PROJECTOR_PTR_TYPE mdlComplex;
 
-	CudaProjectorKernel(
+	AccProjectorKernel(
 			int mdlX, int mdlY, int mdlZ,
 			int imgX, int imgY, int imgZ,
 			int mdlInitY, int mdlInitZ,
@@ -43,7 +40,7 @@ public:
 			mdlComplex(mdlComplex)
 		{};
 
-	CudaProjectorKernel(
+	AccProjectorKernel(
 			int mdlX, int mdlY, int mdlZ,
 			int imgX, int imgY, int imgZ,
 			int mdlInitY, int mdlInitZ,
@@ -57,9 +54,20 @@ public:
 				padding_factor(padding_factor),
 				maxR(maxR), maxR2(maxR*maxR),
 				mdlReal(mdlReal), mdlImag(mdlImag)
-			{};
+			{
+#ifdef CUDA_NO_TEXTURES
+				for(int i=0; i<mdlX * mdlY * mdlZ; i++) {
+			        *mdlComplex ++ = *mdlReal ++;
+			        *mdlComplex ++ = *mdlImag ++;			        
+			    }
+#endif
+			};
 
+#ifdef CUDA
 	__device__ __forceinline__ void project3Dmodel(
+#else
+	void project3Dmodel(
+#endif
 			int x,
 			int y,
 			int z,
@@ -85,6 +93,7 @@ public:
 			XFLOAT zp = (e6 * x + e7 * y + e8 * z ) * padding_factor;
 
 #ifdef CUDA_NO_TEXTURES
+// TODO - optimized CPU version for when this isn't running on the GPU
 			if (xp < 0)
 			{
 				// Get complex conjugated hermitian symmetry pair
@@ -157,7 +166,11 @@ public:
 		}
 	}
 
+#ifdef CUDA
 	__device__ __forceinline__ void project3Dmodel(
+#else
+	void project3Dmodel(
+#endif
 			int x,
 			int y,
 			XFLOAT e0,
@@ -179,6 +192,7 @@ public:
 			XFLOAT zp = (e6 * x + e7 * y ) * padding_factor;
 
 #ifdef CUDA_NO_TEXTURES
+// TODO - optimized CPU version for when this isn't running on the GPU
 			if (xp < 0)
 			{
 				// Get complex conjugated hermitian symmetry pair
@@ -251,7 +265,11 @@ public:
 		}
 	}
 
+#ifdef CUDA
 	__device__ __forceinline__ void project2Dmodel(
+#else
+	void project2Dmodel(
+#endif
 				int x,
 				int y,
 				XFLOAT e0,
@@ -269,6 +287,7 @@ public:
 			XFLOAT xp = (e0 * x + e1 * y ) * padding_factor;
 			XFLOAT yp = (e3 * x + e4 * y ) * padding_factor;
 #ifdef CUDA_NO_TEXTURES
+// TODO - optimized CPU version for when this isn't running on the GPU
 			if (xp < 0)
 			{
 				// Get complex conjugated hermitian symmetry pair
@@ -330,11 +349,11 @@ public:
 		}
 	}
 
-	static CudaProjectorKernel makeKernel(CudaProjector &p, int imgX, int imgY, int imgZ, int imgMaxR)
+	static AccProjectorKernel makeKernel(AccProjector &p, int imgX, int imgY, int imgZ, int imgMaxR)
 	{
 		int maxR = p.mdlMaxR >= imgMaxR ? imgMaxR : p.mdlMaxR;
 
-		CudaProjectorKernel k(
+		AccProjectorKernel k(
 					p.mdlX, p.mdlY, p.mdlZ,
 					imgX, imgY, imgZ,
 					p.mdlInitY, p.mdlInitZ,
@@ -347,6 +366,7 @@ public:
 					*p.mdlReal,
 					*p.mdlImag
 #else
+		// TODO - pure CPU version
 					p.mdlReal,
 					p.mdlImag
 #endif
@@ -354,6 +374,7 @@ public:
 				);
 		return k;
 	}
-};
+};  // class AccProjectorKernel
+
 
 #endif

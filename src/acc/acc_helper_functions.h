@@ -1,25 +1,5 @@
-#ifndef CUDA_HELPER_FUNCTIONS_CUH_
-#define CUDA_HELPER_FUNCTIONS_CUH_
-
-#include "src/acc/cuda/cuda_ml_optimiser.h"
-#include "src/acc/cuda/cuda_projector.h"
-#include "src/acc/cuda/cuda_projector.cuh"
-#include "src/acc/cuda/cuda_benchmark_utils.h"
-#include "src/acc/cuda/cuda_mem_utils.h"
-#include "src/acc/cuda/cuda_kernels/helper.cuh"
-#include "src/acc/cuda/cuda_kernels/diff2.cuh"
-#include "src/acc/cuda/cuda_kernels/wavg.cuh"
-#include <sys/time.h>
-#include <stdio.h>
-#include <time.h>
-#include <math.h>
-#include <ctime>
-#include <iostream>
-#include "src/complex.h"
-#include <fstream>
-#include <cuda_runtime.h>
-#include "src/parallel.h"
-#include <signal.h>
+#ifndef ACC_HELPER_FUNCTIONS_H_
+#define ACC_HELPER_FUNCTIONS_H_
 
 #include "src/acc/acc_ml_optimiser.h"
 
@@ -82,7 +62,7 @@ long unsigned generateProjectionSetupFine(
 		ProjectionParams &ProjectionData);
 
 void runWavgKernel(
-		CudaProjectorKernel &projector,
+		AccProjectorKernel &projector,
 		XFLOAT *eulers,
 		XFLOAT *Fimgs_real,
 		XFLOAT *Fimgs_imag,
@@ -107,8 +87,8 @@ void runWavgKernel(
 		cudaStream_t stream);
 
 void runBackProjectKernel(
-		CudaBackprojector &BP,
-		CudaProjectorKernel &projector,
+		AccBackprojector &BP,
+		AccProjectorKernel &projector,
 		XFLOAT *d_img_real,
 		XFLOAT *d_img_imag,
 		XFLOAT *trans_x,
@@ -129,71 +109,23 @@ void runBackProjectKernel(
 		bool do_sgd,
 		cudaStream_t optStream);
 
-#define INIT_VALUE_BLOCK_SIZE 512
-template< typename T>
-__global__ void cuda_kernel_init_complex_value(
-		T *data,
-		XFLOAT value,
-		size_t size)
-{
-	size_t idx = blockIdx.x * INIT_VALUE_BLOCK_SIZE + threadIdx.x;
-	if (idx < size)
-	{
-		data[idx].x = value;
-		data[idx].y = value;
-	}
-}
-
-template< typename T>
-__global__ void cuda_kernel_init_value(
-		T *data,
-		T value,
-		size_t size)
-{
-	size_t idx = blockIdx.x * INIT_VALUE_BLOCK_SIZE + threadIdx.x;
-	if (idx < size)
-		data[idx] = value;
-}
-
 template< typename T>
 void deviceInitComplexValue(AccPtr<T> &data, XFLOAT value)
 {
-	int grid_size = ceil((float)(data.getSize())/(float)INIT_VALUE_BLOCK_SIZE);
-	cuda_kernel_init_complex_value<T><<< grid_size, INIT_VALUE_BLOCK_SIZE, 0, data.getStream() >>>(
-			~data,
-			value,
-			data.getSize());
+	AccUtilities::InitComplexValue<T>(data, value);
 }
 
 template< typename T>
 void deviceInitValue(AccPtr<T> &data, T value)
 {
-	int grid_size = ceil((float)data.getSize()/(float)INIT_VALUE_BLOCK_SIZE);
-	cuda_kernel_init_value<T><<< grid_size, INIT_VALUE_BLOCK_SIZE, 0, data.getStream() >>>(
-			~data,
-			value,
-			data.getSize());
-	LAUNCH_HANDLE_ERROR(cudaGetLastError());
+	AccUtilities::InitValue<T>(data, value);
 }
 
 template< typename T>
 void deviceInitValue(AccPtr<T> &data, T value, size_t Size)
 {
-	int grid_size = ceil((float)Size/(float)INIT_VALUE_BLOCK_SIZE);
-	cuda_kernel_init_value<T><<< grid_size, INIT_VALUE_BLOCK_SIZE, 0, data.getStream() >>>(
-			~data,
-			value,
-			Size);
+	AccUtilities::InitValue<T>(data, value, Size);
 }
-
-#define WEIGHT_MAP_BLOCK_SIZE 512
-__global__ void cuda_kernel_allweights_to_mweights(
-		unsigned long * d_iorient,
-		XFLOAT * d_allweights,
-		XFLOAT * d_mweights,
-		unsigned long orientation_num,
-		unsigned long translation_num
-		);
 
 void mapAllWeightsToMweights(
 		unsigned long * d_iorient, //projectorPlan.iorientclasses
@@ -206,51 +138,33 @@ void mapAllWeightsToMweights(
 
 #define OVER_THRESHOLD_BLOCK_SIZE 512
 template< typename T>
-__global__ void cuda_kernel_array_over_threshold(
-		T *data,
-		bool *passed,
-		T threshold,
-		size_t size)
-{
-	size_t idx = blockIdx.x * OVER_THRESHOLD_BLOCK_SIZE + threadIdx.x;
-	if (idx < size)
-	{
-		if (data[idx] >= threshold)
-			passed[idx] = true;
-		else
-			passed[idx] = false;
-	}
-}
-
-template< typename T>
 void arrayOverThreshold(AccPtr<T> &data, AccPtr<bool> &passed, T threshold)
 {
+#ifdef CUDA
 	int grid_size = ceil((float)data.getSize()/(float)OVER_THRESHOLD_BLOCK_SIZE);
 	cuda_kernel_array_over_threshold<T><<< grid_size, OVER_THRESHOLD_BLOCK_SIZE, 0, data.getStream() >>>(
 			~data,
 			~passed,
 			threshold,
-			data.getSize());
+			data.getSize(),
+			OVER_THRESHOLD_BLOCK_SIZE);
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
-}
-
-#define FIND_IN_CUMULATIVE_BLOCK_SIZE 512
-template< typename T>
-__global__ void cuda_kernel_find_threshold_idx_in_cumulative(
-		T *data,
-		T threshold,
-		size_t size_m1, //data size minus 1
-		size_t *idx)
-{
-	size_t i = blockIdx.x * FIND_IN_CUMULATIVE_BLOCK_SIZE + threadIdx.x;
-	if (i < size_m1 && data[i] <= threshold && threshold < data[i+1])
-		idx[0] = i+1;
+#else
+	int Size = data.getSize();
+	for(size_t i=0; i<Size; i++)
+	{
+		if (data[i] >= threshold)
+			passed[i] = true;
+		else
+			passed[i] = false;
+	}
+#endif
 }
 
 size_t findThresholdIdxInCumulativeSum(AccPtr<XFLOAT> &data, XFLOAT threshold);
 
 void runDiff2KernelCoarse(
-		CudaProjectorKernel &projector,
+		AccProjectorKernel &projector,
 		XFLOAT *trans_x,
 		XFLOAT *trans_y,
 		XFLOAT *trans_z,
@@ -268,7 +182,7 @@ void runDiff2KernelCoarse(
 		bool data_is_3D);
 
 void runDiff2KernelFine(
-		CudaProjectorKernel &projector,
+		AccProjectorKernel &projector,
 		XFLOAT *corr_img,
 		XFLOAT *Fimgs_real,
 		XFLOAT *Fimgs_imag,
@@ -294,51 +208,6 @@ void runDiff2KernelFine(
 		long unsigned job_num_count,
 		bool do_CC,
 		bool data_is_3D);
-
-#define WINDOW_FT_BLOCK_SIZE 128
-template<bool check_max_r2>
-__global__ void cuda_kernel_window_fourier_transform(
-		XFLOAT *g_in_real,
-		XFLOAT *g_in_imag,
-		XFLOAT *g_out_real,
-		XFLOAT *g_out_imag,
-		unsigned iX, unsigned iY, unsigned iZ, unsigned iYX, //Input dimensions
-		unsigned oX, unsigned oY, unsigned oZ, unsigned oYX, //Output dimensions
-		unsigned max_idx,
-		unsigned max_r2 = 0
-		)
-{
-	unsigned n = threadIdx.x + WINDOW_FT_BLOCK_SIZE * blockIdx.x;
-	long int image_offset = oX*oY*oZ*blockIdx.y;
-	if (n >= max_idx) return;
-
-	int k, i, kp, ip, jp;
-
-	if (check_max_r2)
-	{
-		k = n / (iX * iY);
-		i = (n % (iX * iY)) / iX;
-
-		kp = k < iX ? k : k - iZ;
-		ip = i < iX ? i : i - iY;
-		jp = n % iX;
-
-		if (kp*kp + ip*ip + jp*jp > max_r2)
-			return;
-	}
-	else
-	{
-		k = n / (oX * oY);
-		i = (n % (oX * oY)) / oX;
-
-		kp = k < oX ? k : k - oZ;
-		ip = i < oX ? i : i - oY;
-		jp = n % oX;
-	}
-
-	g_out_real[(kp < 0 ? kp + oZ : kp) * oYX + (ip < 0 ? ip + oY : ip)*oX + jp + image_offset] = g_in_real[(kp < 0 ? kp + iZ : kp)*iYX + (ip < 0 ? ip + iY : ip)*iX + jp + image_offset];
-	g_out_imag[(kp < 0 ? kp + oZ : kp) * oYX + (ip < 0 ? ip + oY : ip)*oX + jp + image_offset] = g_in_imag[(kp < 0 ? kp + iZ : kp)*iYX + (ip < 0 ? ip + iY : ip)*iX + jp + image_offset];
-}
 
 void runCollect2jobs(	dim3 grid_dim,
 						XFLOAT * oo_otrans_x,          // otrans-size -> make const
@@ -374,54 +243,9 @@ void windowFourierTransform2(
 		unsigned oX, unsigned oY, unsigned oZ,  //Output dimensions
 		cudaStream_t stream = 0);
 
-#define WINDOW_FT_BLOCK_SIZE 128
-template<bool check_max_r2>
-__global__ void cuda_kernel_window_fourier_transform(
-		CUDACOMPLEX *g_in,
-		CUDACOMPLEX *g_out,
-		size_t iX, size_t iY, size_t iZ, size_t iYX, //Input dimensions
-		size_t oX, size_t oY, size_t oZ, size_t oYX, //Output dimensions
-		size_t max_idx,
-		size_t max_r2 = 0
-		)
-{
-	size_t n = threadIdx.x + WINDOW_FT_BLOCK_SIZE * blockIdx.x;
-	size_t oOFF = oX*oY*oZ*blockIdx.y;
-	size_t iOFF = iX*iY*iZ*blockIdx.y;
-	if (n >= max_idx) return;
-
-	long int k, i, kp, ip, jp;
-
-	if (check_max_r2)
-	{
-		k = n / (iX * iY);
-		i = (n % (iX * iY)) / iX;
-
-		kp = k < iX ? k : k - iZ;
-		ip = i < iX ? i : i - iY;
-		jp = n % iX;
-
-		if (kp*kp + ip*ip + jp*jp > max_r2)
-			return;
-	}
-	else
-	{
-		k = n / (oX * oY);
-		i = (n % (oX * oY)) / oX;
-
-		kp = k < oX ? k : k - oZ;
-		ip = i < oX ? i : i - oY;
-		jp = n % oX;
-	}
-
-	long int  in_idx = (kp < 0 ? kp + iZ : kp) * iYX + (ip < 0 ? ip + iY : ip)*iX + jp;
-	long int out_idx = (kp < 0 ? kp + oZ : kp) * oYX + (ip < 0 ? ip + oY : ip)*oX + jp;
-	g_out[out_idx + oOFF] =  g_in[in_idx + iOFF];
-}
-
 void windowFourierTransform2(
-		AccPtr<CUDACOMPLEX> &d_in,
-		AccPtr<CUDACOMPLEX> &d_out,
+		AccPtr<ACCCOMPLEX> &d_in,
+		AccPtr<ACCCOMPLEX> &d_out,
 		size_t iX, size_t iY, size_t iZ, //Input dimensions
 		size_t oX, size_t oY, size_t oZ,  //Output dimensions
 		size_t Npsi = 1,
@@ -490,13 +314,18 @@ void runCenterFFT(MultidimArray< T >& v, bool forward, CudaCustomAllocator *allo
 		}
 
 
-		dim3 dim(ceilf((float)(v.nzyxdim/(float)(2*CFTT_BLOCK_SIZE))));
-		cuda_kernel_centerFFT_2D<<<dim,CFTT_BLOCK_SIZE>>>(img_in.dPtr,
-										  v.nzyxdim,
-										  XSIZE(v),
-										  YSIZE(v),
-										  xshift,
-										  yshift);
+		int dim=ceilf((float)(v.nzyxdim/(float)(2*CFTT_BLOCK_SIZE)));
+		AccUtilities::centerFFT_2D(dim, 0, CFTT_BLOCK_SIZE,
+#ifdef CUDA
+				img_in.dPtr,
+#else
+				img_in.hPtr,
+#endif
+				v.nzyxdim,
+				XSIZE(v),
+				YSIZE(v),
+				xshift,
+				yshift);
 		LAUNCH_HANDLE_ERROR(cudaGetLastError());
 
 		img_in.cpToHost();
@@ -627,14 +456,16 @@ void runCenterFFT( AccPtr< T > &img_in,
 		yshift = -yshift;
 	}
 
-	dim3 blocks(ceilf((float)((xSize*ySize)/(float)(2*CFTT_BLOCK_SIZE))),batchSize);
-	cuda_kernel_centerFFT_2D<<<blocks,CFTT_BLOCK_SIZE, 0, img_in.getStream()>>>(
-			~img_in,
-			xSize*ySize,
-			xSize,
-			ySize,
-			xshift,
-			yshift);
+	int blocks = ceilf((float)((xSize*ySize)/(float)(2*CFTT_BLOCK_SIZE)));
+	AccUtilities::centerFFT_2D(blocks, batchSize, CFTT_BLOCK_SIZE,
+		img_in.getStream(),
+		~img_in,
+		xSize*ySize,
+		xSize,
+		ySize,
+		xshift,
+		yshift);
+
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 
 //	HANDLE_ERROR(cudaStreamSynchronize(0));
@@ -667,6 +498,7 @@ void runCenterFFT( AccPtr< T > &img_in,
 			zshift = -zshift;
 		}
 
+#ifdef CUDA
 		dim3 blocks(ceilf((float)((xSize*ySize*zSize)/(float)(2*CFTT_BLOCK_SIZE))),batchSize);
 		cuda_kernel_centerFFT_3D<<<blocks,CFTT_BLOCK_SIZE, 0, img_in.getStream()>>>(
 				~img_in,
@@ -678,6 +510,17 @@ void runCenterFFT( AccPtr< T > &img_in,
 				yshift,
 				zshift);
 		LAUNCH_HANDLE_ERROR(cudaGetLastError());
+#else
+		CpuKernels::centerFFT_3D(blocks, batchSize, CFTT_BLOCK_SIZE,
+				~img_in,
+				xSize*ySize*zSize,
+				xSize,
+				ySize,
+				zSize,
+				xshift,
+				yshift,
+				zshift);
+#endif
 
 		//	HANDLE_ERROR(cudaStreamSynchronize(0));
 		//	img_aux.cpOnDevice(img_in.d_ptr); //update input image with centered kernel-output.
@@ -693,15 +536,16 @@ void runCenterFFT( AccPtr< T > &img_in,
 			yshift = -yshift;
 		}
 
-		dim3 blocks(ceilf((float)((xSize*ySize)/(float)(2*CFTT_BLOCK_SIZE))),batchSize);
-		cuda_kernel_centerFFT_2D<<<blocks,CFTT_BLOCK_SIZE, 0, img_in.getStream()>>>(
-				~img_in,
-				xSize*ySize,
-				xSize,
-				ySize,
-				xshift,
-				yshift);
-		LAUNCH_HANDLE_ERROR(cudaGetLastError());
+		int blocks = ceilf((float)((xSize*ySize)/(float)(2*CFTT_BLOCK_SIZE)));
+		AccUtilities::centerFFT_2D(blocks, batchSize, CFTT_BLOCK_SIZE,
+			img_in.getStream(),
+			~img_in,
+			xSize*ySize,
+			xSize,
+			ySize,
+			xshift,
+			yshift);
+			LAUNCH_HANDLE_ERROR(cudaGetLastError());
 	}
 }
 
@@ -730,11 +574,10 @@ void lowPassFilterMapGPU(
 	XFLOAT edge_high = XMIPP_MIN(Xdim, (ires_filter + filter_edge_halfwidth) / (RFLOAT)ori_size); // in 1/pix
 	XFLOAT edge_width = edge_high - edge_low;
 
-	dim3 blocks(ceilf( (float)(Xdim*Ydim*Zdim)/ (float)(CFTT_BLOCK_SIZE) ) );
+	int blocks = ceilf( (float)(Xdim*Ydim*Zdim)/ (float)(CFTT_BLOCK_SIZE) );
 	if (do_highpass)
 	{
-		cuda_kernel_frequencyPass<true><<<blocks,CFTT_BLOCK_SIZE, 0, img_in.getStream()>>>(
-
+		AccUtilities::frequencyPass<true>(blocks,CFTT_BLOCK_SIZE, img_in.getStream(),
 				~img_in,
 				ori_size,
 				Xdim,
@@ -748,8 +591,7 @@ void lowPassFilterMapGPU(
 	}
 	else
 	{
-		cuda_kernel_frequencyPass<false><<<blocks,CFTT_BLOCK_SIZE, 0, img_in.getStream()>>>(
-
+		AccUtilities::frequencyPass<false>(blocks,CFTT_BLOCK_SIZE, img_in.getStream(),
 						~img_in,
 						ori_size,
 						Xdim,
@@ -764,5 +606,5 @@ void lowPassFilterMapGPU(
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 }
 
-#endif //CUDA_HELPER_FUNCTIONS_CUH_
+#endif //ACC_HELPER_FUNCTIONS_H_
 

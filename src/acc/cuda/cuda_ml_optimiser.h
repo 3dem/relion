@@ -1,11 +1,12 @@
 #ifndef CUDA_ML_OPTIMISER_H_
 #define CUDA_ML_OPTIMISER_H_
+
 #include "src/mpi.h"
 #include "src/ml_optimiser.h"
 #include "src/acc/cuda/cuda_mem_utils.h"
 #include "src/acc/acc_projector_plan.h"
-#include "src/acc/cuda/cuda_projector.h"
-#include "src/acc/cuda/cuda_backprojector.h"
+#include "src/acc/acc_projector.h"
+#include "src/acc/acc_backprojector.h"
 #include "src/acc/cuda/cuda_fft.h"
 #include "src/acc/cuda/cuda_benchmark_utils.h"
 #include <stack>
@@ -38,10 +39,10 @@ class MlDeviceBundle
 public:
 
 	//The CUDA accelerated projector set
-	std::vector< CudaProjector > cudaProjectors;
+	std::vector< AccProjector > cudaProjectors;
 
 	//The CUDA accelerated back-projector set
-	std::vector< CudaBackprojector > cudaBackprojectors;
+	std::vector< AccBackprojector > cudaBackprojectors;
 
 	//Used for precalculations of projection setup
 	CudaCustomAllocator *allocator;

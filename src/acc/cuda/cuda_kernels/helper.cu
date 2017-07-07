@@ -1,4 +1,4 @@
-#include "src/acc/cuda/cuda_device_utils.cuh"
+#include "src/acc/cuda/cuda_kernels/cuda_device_utils.cuh"
 #include "src/acc/cuda/cuda_kernels/helper.cuh"
 #include "src/acc/cuda/cuda_settings.h"
 
@@ -497,7 +497,7 @@ __global__ void cuda_kernel_probRatio(  XFLOAT *d_Mccf,
 
 __global__ void cuda_kernel_rotateOnly(   CUDACOMPLEX *d_Faux,
 						  	  	  	  	  XFLOAT psi,
-						  	  			  CudaProjectorKernel projector,
+						  	  			  AccProjectorKernel projector,
 						  	  			  int startPsi
 						  	  			  )
 {
@@ -538,7 +538,7 @@ __global__ void cuda_kernel_rotateOnly(   CUDACOMPLEX *d_Faux,
 __global__ void cuda_kernel_rotateAndCtf( CUDACOMPLEX *d_Faux,
 						  	  	  	  	  XFLOAT *d_ctf,
 						  	  	  	  	  XFLOAT psi,
-						  	  			  CudaProjectorKernel projector,
+						  	  			  AccProjectorKernel projector,
 						  	  			  int startPsi
 						  	  			  )
 {
