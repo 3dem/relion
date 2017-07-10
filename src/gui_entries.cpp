@@ -199,7 +199,7 @@ void GuiEntry::initialise(int x, int y, Fl_Group * deactivate_this_group, int he
 
 
 }
-void GuiEntry::place(JobOption &_joboption, int &y, int _deactivate_option, Fl_Group * deactivate_this_group, int x, int h, int wcol2, int wcol3 )
+void GuiEntry::place(JobOption &_joboption, int &y, int _deactivate_option, Fl_Group * deactivate_this_group, bool _do_oldstyle, int x, int h, int wcol2, int wcol3 )
 {
 
 	// Clear if existing
@@ -209,6 +209,8 @@ void GuiEntry::place(JobOption &_joboption, int &y, int _deactivate_option, Fl_G
 	deactivate_option = _deactivate_option;
 
 	joboption = _joboption;
+
+	do_oldstyle = _do_oldstyle;
 
 	// Add the entry to the window
 	initialise(x, y, deactivate_this_group, h, wcol2, wcol3);
@@ -342,7 +344,7 @@ void GuiEntry::cb_browse_node_i() {
     Fl::scheme("gtk+");
     Fl_File_Chooser * G_chooser = new Fl_File_Chooser("", joboption.pattern.c_str(), Fl_File_Chooser::SINGLE, "");
 
-    std::string fn_dir = ".Nodes/" + integerToString(joboption.node_type);
+    std::string fn_dir = (do_oldstyle) ? "." : ".Nodes/" + integerToString(joboption.node_type);
     G_chooser->directory(fn_dir.c_str());
     G_chooser->color(GUI_BACKGROUND_COLOR);
     G_chooser->show();
