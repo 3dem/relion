@@ -848,3 +848,18 @@ __global__ void cuda_kernel_make_eulers_3D(
 		eulers[9 * oid + 8] = B[8];//22
 	}
 }
+
+__global__ void cuda_kernel_allweights_to_mweights(
+		unsigned long * d_iorient,
+		XFLOAT * d_allweights,
+		XFLOAT * d_mweights,
+		unsigned long orientation_num,
+		unsigned long translation_num,
+        int block_size
+		)
+{
+	size_t idx = blockIdx.x * block_size + threadIdx.x;
+	if (idx < orientation_num*translation_num)
+		d_mweights[d_iorient[idx/translation_num] * translation_num + idx%translation_num] =
+				d_allweights[idx/translation_num * translation_num + idx%translation_num];
+}

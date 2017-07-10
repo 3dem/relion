@@ -14,7 +14,6 @@
 #include "src/acc/acc_projector_plan.h"
 #include "src/acc/cuda/cuda_benchmark_utils.h"
 #include "src/acc/cuda/cuda_kernels/helper.cuh"
-#include "src/acc/cuda/cuda_kernels/helper_impl.cuh"
 #include "src/acc/cuda/cuda_kernels/diff2.cuh"
 #include "src/acc/cuda/cuda_kernels/wavg.cuh"
 #include "src/acc/cuda/cuda_mem_utils.h"
