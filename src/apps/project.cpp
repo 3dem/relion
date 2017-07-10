@@ -61,7 +61,7 @@ public:
        	do_ctf = parser.checkOption("--ctf", "Apply CTF to reference projections");
        	ctf_phase_flipped = parser.checkOption("--ctf_phase_flip", "Flip phases of the CTF in the output projections");
        	do_ctf_intact_1st_peak = parser.checkOption("--ctf_intact_first_peak", "Ignore CTFs until their first peak?");
-       	angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms)", "1"));
+       	angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms)", "-1"));
 		fn_mask = parser.getOption("--mask", "Mask that will be applied to the input map prior to making projections", "");
        	fn_ang = parser.getOption("--ang", "STAR file with orientations for multiple projections (if None, assume single projection)","None");
        	rot = textToFloat(parser.getOption("--rot", "First Euler angle (for a single projection)", "0"));
