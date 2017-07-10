@@ -148,6 +148,9 @@ public:
 	// Flag whether to split data from the beginning into two random halves
 	bool do_split_random_halves;
 
+	// For safe-guarding the gold-standard separation
+	int my_halfset;
+
 	// resolution (in Angstrom) to join the two random halves
 	RFLOAT low_resol_join_halves;
 
