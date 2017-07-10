@@ -214,6 +214,9 @@ public:
     // The slider
     Fl_Slider * slider;
 
+    // oldstyle behaviour
+    bool do_oldstyle;
+
     /** Constructor with x,y-position from top left
 	 *  wcol1, wcol2 and wcol3 are the widths of the three columns described above
 	 *  title is the value displayed in the first column
@@ -230,6 +233,7 @@ public:
 		menu = NULL;
 		my_deactivate_group = NULL;
 		slider = NULL;
+		do_oldstyle = false;
     };
 
     /** Empty destructor
@@ -245,7 +249,7 @@ public:
 
 	/** Place an entry on a window
 	 */
-	void place(JobOption &joboption, int &y, int _deactivate_option = TOGGLE_LEAVE_ACTIVE, Fl_Group * deactivate_this_group = NULL,
+	void place(JobOption &joboption, int &y, int _deactivate_option = TOGGLE_LEAVE_ACTIVE, Fl_Group * deactivate_this_group = NULL, bool _do_oldstyle = false,
 			int x = XCOL2, int h = STEPY, int wcol2 = WCOL2, int wcol3 = WCOL3 );
 
     // Set _value in the Fl_Input on the GUI, and also in the joboptions. Also update menu/slider if necessary
