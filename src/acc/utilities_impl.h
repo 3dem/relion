@@ -205,6 +205,53 @@ void centerFFT_3D(int grid_size, int batch_size, int block_size,
 #endif
 }
 
+void kernel_exponentiate_weights_fine(	int grid_size, 
+										int block_size,
+										XFLOAT *g_pdf_orientation,
+										XFLOAT *g_pdf_offset,
+										XFLOAT *g_weights,
+										XFLOAT avg_diff2,
+										int oversamples_orient,
+										int oversamples_trans,
+										unsigned long *d_rot_id,
+										unsigned long *d_trans_idx,
+										unsigned long *d_job_idx,
+										unsigned long *d_job_num,
+										long int job_num,
+										cudaStream_t stream)
+{
+#ifdef CUDA
+	dim3 block_dim(grid_size);
+	cuda_kernel_exponentiate_weights_fine<<<block_dim,block_size,0,stream>>>(
+		g_pdf_orientation,
+		g_pdf_offset,
+		g_weights,
+		avg_diff2,
+		oversamples_orient,
+		oversamples_trans,
+		d_rot_id,
+		d_trans_idx,
+		d_job_idx,
+		d_job_num,
+		job_num);
+#else
+	CpuKernels::exponentiate_weights_fine(
+		grid_size,
+		block_size,
+		g_pdf_orientation,
+		g_pdf_offset,
+		g_weights,
+		avg_diff2,
+		oversamples_orient,
+		oversamples_trans,
+		d_rot_id,
+		d_trans_idx,
+		d_job_idx,
+		d_job_num,
+		job_num);
+#endif
+}
+
 };  // namespace AccUtilities
 
 

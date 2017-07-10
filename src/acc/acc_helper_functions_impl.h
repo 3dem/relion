@@ -627,43 +627,6 @@ void mapAllWeightsToMweights(
 #endif
 }
 
-#define FIND_IN_CUMULATIVE_BLOCK_SIZE 512
-size_t findThresholdIdxInCumulativeSum(AccPtr<XFLOAT> &data, XFLOAT threshold)
-{
-	int grid_size = ceil((float)(data.getSize()-1)/(float)FIND_IN_CUMULATIVE_BLOCK_SIZE);
-	if(grid_size==0)
-	{
-		return(0);
-	}
-	else
-	{
-		AccPtr<size_t >  idx(1, data.getStream(), data.getAllocator());
-		idx[0] = 0;
-		idx.putOnDevice();
-
-#ifdef CUDA
-		cuda_kernel_find_threshold_idx_in_cumulative<<< grid_size, FIND_IN_CUMULATIVE_BLOCK_SIZE, 0, data.getStream() >>>(
-				~data,
-				threshold,
-				data.getSize()-1,
-				~idx, 
-				FIND_IN_CUMULATIVE_BLOCK_SIZE);
-		idx.cpToHost();
-		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(data.getStream()));
-#else
-		// TODO - do this in single loop?
-		for(int i=blk; blk<grid_size; blk++) {
-			for(int tid=0; tid<FIND_IN_CUMULATIVE_BLOCK_SIZE; tid++) {
-				size_t i = blk * FIND_IN_CUMULATIVE_BLOCK_SIZE + tid;
-				if (i < sizem1 && data[i] <= threshold && threshold < data[i+1])
-					idx[0] = i+1;
-			}
-		}
-#endif
-		return idx[0];
-	}
-}
-
 void runDiff2KernelCoarse(
 		AccProjectorKernel &projector,
 		XFLOAT *trans_x,

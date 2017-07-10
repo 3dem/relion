@@ -1593,9 +1593,15 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				else
 				{
 					weights.deviceAlloc();
+#ifdef CUDA
 					block_num = ceilf((float)Mweight.getSize()/(float)BLOCK_SIZE);
 					cuda_kernel_cast<XFLOAT,weights_t><<<block_num,BLOCK_SIZE,0>>>
 							(~Mweight,~weights,Mweight.getSize());
+#else
+					size = Mweight.getSize();
+					for (int i = 0; i <size; i++)
+						weights[i] = Mweight[i];
+#endif
 				}
 
 				AccPtr<weights_t>  ipartMweight(
@@ -1608,8 +1614,10 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 				if (failsafeMode) //Prevent zero prior products in fail-safe mode
 				{
-					cuda_kernel_exponentiate_weights_coarse<true,weights_t>
-					<<<block_dim,SUMW_BLOCK_SIZE,0>>>(
+					AccUtilities::kernel_exponentiate_weights_coarse<true,weights_t>(
+							block_num,
+							sp.iclass_max-sp.iclass_min+1, 
+							SUMW_BLOCK_SIZE,
 							~pdf_orientation,
 							~pdf_offset,
 							~ipartMweight,
@@ -1620,8 +1628,10 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				}
 				else
 				{
-					cuda_kernel_exponentiate_weights_coarse<false,weights_t>
-					<<<block_dim,SUMW_BLOCK_SIZE,0>>>(
+					AccUtilities::kernel_exponentiate_weights_coarse<false,weights_t>(
+							block_num,
+							sp.iclass_max-sp.iclass_min+1, 
+							SUMW_BLOCK_SIZE,
 							~pdf_orientation,
 							~pdf_offset,
 							~ipartMweight,
@@ -1686,26 +1696,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					op.sum_weight[ipart] = cumulative_sum.getDeviceAt(cumulative_sum.getSize() - 1);
 
 					long int my_nr_significant_coarse_samples;
-					size_t thresholdIdx(0);
-
-					int grid_size = ceil((float)(cumulative_sum.getSize()-1)/(float)FIND_IN_CUMULATIVE_BLOCK_SIZE);
-					if(grid_size > 0)
-					{
-						AccPtr<size_t>  idx(1, cumulative_sum.getStream(), cumulative_sum.getAllocator());
-						idx[0] = 0;
-						idx.putOnDevice();
-						cuda_kernel_find_threshold_idx_in_cumulative<weights_t>
-						<<< grid_size, FIND_IN_CUMULATIVE_BLOCK_SIZE, 0, cumulative_sum.getStream() >>>(
-								~cumulative_sum,
-								(1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart],
-								cumulative_sum.getSize()-1,
-								~idx);
-						idx.cpToHost();
-						DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cumulative_sum.getStream()));
-
-						thresholdIdx = idx[0];
-					}
-
+					size_t thresholdIdx = findThresholdIdxInCumulativeSum<weights_t>(cumulative_sum, 
+							(1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart]);
 
 					my_nr_significant_coarse_samples = filteredSize - thresholdIdx;
 
@@ -1789,7 +1781,9 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 						block_num = ceil((float)FPCMasks[ipart][exp_iclass].jobNum / (float)SUMW_BLOCK_SIZE); //thisClassPassWeights.rot_idx.getSize() / SUM_BLOCK_SIZE;
 						dim3 block_dim(block_num);
 
-						cuda_kernel_exponentiate_weights_fine<<<block_dim,SUMW_BLOCK_SIZE,0,accMLO->classStreams[exp_iclass]>>>(
+						AccUtilities::kernel_exponentiate_weights_fine(
+								block_num,
+								SUMW_BLOCK_SIZE,
 								~pdf_orientation_class,
 								~pdf_offset_class,
 								~thisClassPassWeights.weights,
@@ -1800,7 +1794,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 								~thisClassPassWeights.trans_idx,
 								~FPCMasks[ipart][exp_iclass].jobOrigin,
 								~FPCMasks[ipart][exp_iclass].jobExtent,
-								FPCMasks[ipart][exp_iclass].jobNum);
+								FPCMasks[ipart][exp_iclass].jobNum,
+								accMLO->classStreams[exp_iclass]);
 								LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 					}
 
@@ -1849,7 +1844,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 						CRITICAL(ERRSUMWEIGHTZERO); //"op.sum_weight[ipart]==0"
 					}
 
-					size_t thresholdIdx = findThresholdIdxInCumulativeSum(cumulative_sum, (1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart]);
+					size_t thresholdIdx = findThresholdIdxInCumulativeSum<XFLOAT>(cumulative_sum, (1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart]);
 					my_significant_weight = sorted.getDeviceAt(thresholdIdx);
 
 					CTIC(accMLO->timer,"getArgMaxOnDevice");

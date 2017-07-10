@@ -85,13 +85,13 @@ public:
 
 	inline
 	AccPtr(size_t size, CudaCustomAllocator *allocator):
-		size(size), hPtr(new T[size]), dPtr(NULL), doFreeHost(false),
+		size(size), hPtr(new T[size]), dPtr(NULL), doFreeHost(true),
 		doFreeDevice(false), allocator(allocator), alloc(NULL), stream(cudaStreamPerThread)
 	{}
 
 	inline
 	AccPtr(size_t size, cudaStream_t stream, CudaCustomAllocator *allocator):
-		size(size), hPtr(new T[size]), dPtr(NULL), doFreeHost(false),
+		size(size), hPtr(new T[size]), dPtr(NULL), doFreeHost(true),
 		doFreeDevice(false), allocator(allocator), alloc(NULL), stream(stream)
 	{}
 
@@ -137,13 +137,13 @@ public:
 
 	inline
 	AccPtr(size_t size):
-		size(size), hPtr(new T[size]), dPtr(NULL), doFreeHost(false),
+		size(size), hPtr(new T[size]), dPtr(NULL), doFreeHost(true),
 		doFreeDevice(false), allocator(NULL), alloc(NULL), stream(cudaStreamPerThread)
 	{}
 
 	inline
 	AccPtr(size_t size, cudaStream_t stream):
-		size(size), hPtr(new T[size]), dPtr(NULL), doFreeHost(false),
+		size(size), hPtr(new T[size]), dPtr(NULL), doFreeHost(true),
 		doFreeDevice(false), allocator(NULL), alloc(NULL), stream(stream)
 	{}
 

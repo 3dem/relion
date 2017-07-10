@@ -11,8 +11,8 @@ namespace CpuKernels
  * 
  */
 void exponentiate_weights_fine(
-        int blockIdx_x,
-        int threadIdx_x,
+		int grid_size, 
+		int block_size, 
 		XFLOAT *g_pdf_orientation,
 		XFLOAT *g_pdf_offset,
 		XFLOAT *g_weights,
@@ -28,49 +28,48 @@ void exponentiate_weights_fine(
     // XFLOAT s_weights[SUMW_BLOCK_SIZE];
 	XFLOAT s_weights;
 
-	// blockid
-	int bid  = blockIdx_x;
-	//threadid
-	int tid = threadIdx_x;
+	for (int bid=0; bid < grid_size; bid++) {
+		for (int tid=0; tid < block_size; tid++) {
+			long int jobid = bid*SUMW_BLOCK_SIZE+tid;
 
-	long int jobid = bid*SUMW_BLOCK_SIZE+tid;
+			if (jobid<job_num)
+			{
+				long int pos = d_job_idx[jobid];
+				// index of comparison
+				long int ix =  d_rot_id[   pos];   // each thread gets its own orient...
+				long int iy = d_trans_idx[ pos];   // ...and it's starting trans...
+				long int in =  d_job_num[jobid];    // ...AND the number of translations to go through
 
-	if (jobid<job_num)
-	{
-		long int pos = d_job_idx[jobid];
-		// index of comparison
-		long int ix =  d_rot_id[   pos];   // each thread gets its own orient...
-		long int iy = d_trans_idx[ pos];   // ...and it's starting trans...
-		long int in =  d_job_num[jobid];    // ...AND the number of translations to go through
+				int c_itrans;//, iorient = bid*SUM_BLOCK_SIZE+tid; //, f_itrans;
 
-		int c_itrans;//, iorient = bid*SUM_BLOCK_SIZE+tid; //, f_itrans;
+				// Because the portion of work is so arbitrarily divided in this kernel,
+				// we need to do some brute idex work to get the correct indices.
+				for (int itrans=0; itrans < in; itrans++, iy++)
+				{
+					c_itrans = ( iy - (iy % oversamples_trans))/ oversamples_trans; //floor(x/y) == (x-(x%y))/y  but less sensitive to x>>y and finite precision
+		//			f_itrans = iy % oversamples_trans;
 
-		// Because the portion of work is so arbitrarily divided in this kernel,
-		// we need to do some brute idex work to get the correct indices.
-		for (int itrans=0; itrans < in; itrans++, iy++)
-		{
-			c_itrans = ( iy - (iy % oversamples_trans))/ oversamples_trans; //floor(x/y) == (x-(x%y))/y  but less sensitive to x>>y and finite precision
-//			f_itrans = iy % oversamples_trans;
-
-			XFLOAT prior = g_pdf_orientation[ix] * g_pdf_offset[c_itrans];          	// Same      for all threads - TODO: should be done once for all trans through warp-parallel execution
-			XFLOAT diff2 = g_weights[pos+itrans] - avg_diff2;								// Different for all threads
-			// next line because of numerical precision of exp-function
-	#if defined(ACC_DOUBLE_PRECISION)
-				if (diff2 > 700.)
-					s_weights = 0.;
-				else
-					s_weights = prior * exp(-diff2);
-	#else
-				if (diff2 > 88.)
-					s_weights = 0.f;
-				else
-					s_weights = prior * expf(-diff2);
-	#endif
-				// TODO: use tabulated exp function? / Sjors  TODO: exp, expf, or __exp in CUDA? /Bjorn
-			// Store the weight
-			g_weights[pos+itrans] = s_weights; // TODO put in shared mem
-		}
-	}
+					XFLOAT prior = g_pdf_orientation[ix] * g_pdf_offset[c_itrans];          	// Same      for all threads - TODO: should be done once for all trans through warp-parallel execution
+					XFLOAT diff2 = g_weights[pos+itrans] - avg_diff2;								// Different for all threads
+					// next line because of numerical precision of exp-function
+			#if defined(ACC_DOUBLE_PRECISION)
+						if (diff2 > 700.)
+							s_weights = 0.;
+						else
+							s_weights = prior * exp(-diff2);
+			#else
+						if (diff2 > 88.)
+							s_weights = 0.f;
+						else
+							s_weights = prior * expf(-diff2);
+			#endif
+						// TODO: use tabulated exp function? / Sjors  TODO: exp, expf, or __exp in CUDA? /Bjorn
+					// Store the weight
+					g_weights[pos+itrans] = s_weights; // TODO put in shared mem
+				}
+			}
+		} // for tid
+	} // for bid
 }
 
 void SoftMaskBackgroundValue(	int      block_dim,

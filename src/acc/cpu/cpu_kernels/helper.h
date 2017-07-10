@@ -20,9 +20,9 @@ namespace CpuKernels
 
 template<bool failsafe,typename weights_t>
 void exponentiate_weights_coarse(
-        int blockIdx_x,
-        int blockIdx_y,
-        int threadIdx_x,
+		int grid_size, 
+		int num_classes,
+		int block_size,
 		XFLOAT *g_pdf_orientation,
 		XFLOAT *g_pdf_offset,
 		weights_t *g_Mweight,
@@ -31,50 +31,50 @@ void exponentiate_weights_coarse(
         int nr_coarse_orient,
         int nr_coarse_trans)
 {
-	// blockid
-	int bid  = blockIdx_x;
-	int cid  = blockIdx_y;
-	//threadid
-	int tid = threadIdx_x;
+	for (int bid=0; bid < grid_size; bid++) {
+		for (int cid=0; cid < num_classes; cid++) {
+			for (int tid=0; tid < block_size; tid++) {
+				int pos, iorient = bid*SUMW_BLOCK_SIZE+tid;
 
-	int pos, iorient = bid*SUMW_BLOCK_SIZE+tid;
+				weights_t weight;
+				if(iorient<nr_coarse_orient)
+				{
+					for (int itrans=0; itrans<nr_coarse_trans; itrans++)
+					{
+						pos = cid * nr_coarse_orient * nr_coarse_trans + iorient * nr_coarse_trans + itrans;
+						weights_t diff2 = g_Mweight[pos];
+						if( diff2 < min_diff2 ) //TODO Might be slow (divergent threads)
+							weight = (weights_t)0.0;
+						else
+						{
+							diff2 -= avg_diff2;
+							weight = g_pdf_orientation[iorient] * g_pdf_offset[itrans];          	// Same for all threads - TODO: should be done once for all trans through warp-parallel execution
 
-	weights_t weight;
-	if(iorient<nr_coarse_orient)
-	{
-		for (int itrans=0; itrans<nr_coarse_trans; itrans++)
-		{
-			pos = cid * nr_coarse_orient * nr_coarse_trans + iorient * nr_coarse_trans + itrans;
-			weights_t diff2 = g_Mweight[pos];
-			if( diff2 < min_diff2 ) //TODO Might be slow (divergent threads)
-				weight = (weights_t)0.0;
-			else
-			{
-				diff2 -= avg_diff2;
-				weight = g_pdf_orientation[iorient] * g_pdf_offset[itrans];          	// Same for all threads - TODO: should be done once for all trans through warp-parallel execution
+							if (failsafe && weight < FAILSAFE_PRIOR_MIN_LIM) //Prevent zero priors in fail-safe mode
+								weight = FAILSAFE_PRIOR_MIN_LIM;
 
-				if (failsafe && weight < FAILSAFE_PRIOR_MIN_LIM) //Prevent zero priors in fail-safe mode
-					weight = FAILSAFE_PRIOR_MIN_LIM;
+							// next line because of numerical precision of exp-function
+			#ifdef ACC_DOUBLE_PRECISION
+							if (diff2 > 700.)
+								weight = 0.;
+							else
+								weight *= exp(-diff2);
+			#else
+							if (diff2 > 88.)
+								weight = 0.;
+							else
+								weight *= expf(-diff2);
+			#endif
+							// TODO: use tabulated exp function? / Sjors  TODO: exp, expf, or __exp in CUDA? /Bjorn
+						}
 
-				// next line because of numerical precision of exp-function
-#ifdef ACC_DOUBLE_PRECISION
-				if (diff2 > 700.)
-					weight = 0.;
-				else
-					weight *= exp(-diff2);
-#else
-				if (diff2 > 88.)
-					weight = 0.;
-				else
-					weight *= expf(-diff2);
-#endif
-				// TODO: use tabulated exp function? / Sjors  TODO: exp, expf, or __exp in CUDA? /Bjorn
-			}
-
-			// Store the weight
-			g_Mweight[pos] = weight; // TODO put in shared mem
-		}
-	}
+						// Store the weight
+						g_Mweight[pos] = weight; // TODO put in shared mem
+					}
+				}
+			} // for tid
+		} // for cid
+	} // for bid
 }
 
 template<bool DATA3D>
@@ -168,19 +168,19 @@ void collect2jobs(  int     grid_size,
 }
 
 void exponentiate_weights_fine(
-                   int blockIdx_x,
-                   int threadIdx_x,    
-                   XFLOAT *g_pdf_orientation,
-				   XFLOAT *g_pdf_offset,
-				   XFLOAT *g_weights,
-				   XFLOAT avg_diff2,
-				   int oversamples_orient,
-				   int oversamples_trans,
-				   unsigned long *d_rot_id,
-				   unsigned long *d_trans_idx,
-				   unsigned long *d_job_idx,
-				   unsigned long *d_job_num,
-				   long int job_num);
+				int grid_size, 
+				int block_size, 
+                XFLOAT *g_pdf_orientation,
+				XFLOAT *g_pdf_offset,
+				XFLOAT *g_weights,
+				XFLOAT avg_diff2,
+				int oversamples_orient,
+				int oversamples_trans,
+				unsigned long *d_rot_id,
+				unsigned long *d_trans_idx,
+				unsigned long *d_job_idx,
+				unsigned long *d_job_num,
+				long int job_num);
 
 void softMaskBackgroundValue(	int      block_dim,
                                 int      block_size,

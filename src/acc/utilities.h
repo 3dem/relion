@@ -875,6 +875,63 @@ void diff2_CC_fine(
 #endif
 }
 
+template<bool failsafe,typename weights_t>
+void kernel_exponentiate_weights_coarse(
+		int grid_size, 
+		int num_classes,
+		int block_size,
+		XFLOAT *g_pdf_orientation,
+		XFLOAT *g_pdf_offset,
+		weights_t *g_Mweight,
+		XFLOAT avg_diff2,
+		XFLOAT min_diff2,
+		int nr_coarse_orient,
+		int nr_coarse_trans)
+{
+#ifdef CUDA
+		dim3 block_dim(grid_size,num_classes);
+		cuda_kernel_exponentiate_weights_coarse<failsafe,weights_t>
+		<<<block_dim,block_size,0>>>(
+				g_pdf_orientation,
+				g_pdf_offset,
+				g_Mweight,
+				avg_diff2,
+				min_diff2,
+				nr_coarse_orient,
+				nr_coarse_trans);
+#else
+//						for(int i=0; i<block_num; i++)
+//						for(int j=0; j<sp.iclass_max-sp.iclass_min+1; j++)
+//							 for(int k=0; k<SUMW_BLOCK_SIZE; k++)
+		CpuKernels::exponentiate_weights_coarse(
+				grid_size, 
+				num_classes, 
+				block_size,
+				g_pdf_orientation,
+				g_pdf_offset,
+				g_Mweight,
+				avg_diff2,
+				min_diff2,
+				nr_coarse_orient,
+				nr_coarse_trans);	
+#endif
+}
+
+void kernel_exponentiate_weights_fine(	int grid_size, 
+										int block_size,
+										XFLOAT *g_pdf_orientation,
+										XFLOAT *g_pdf_offset,
+										XFLOAT *g_weights,
+										XFLOAT avg_diff2,
+										int oversamples_orient,
+										int oversamples_trans,
+										unsigned long *d_rot_id,
+										unsigned long *d_trans_idx,
+										unsigned long *d_job_idx,
+										unsigned long *d_job_num,
+										long int job_num,
+										cudaStream_t stream);
+
 };  // namespace AccUtilities
 
 
