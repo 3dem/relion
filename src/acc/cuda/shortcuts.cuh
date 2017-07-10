@@ -1,5 +1,5 @@
-#ifndef ACC_CUDA_SHORTCUTS_CUH_
-#define ACC_CUDA_SHORTCUTS_CUH_
+#ifndef CUDA_SHORTCUTS_CUH_
+#define CUDA_SHORTCUTS_CUH_
 
 namespace CudaShortcuts
 {
@@ -68,4 +68,4 @@ void memInit( T *ptr, T value, size_t size, cudaStream_t &stream)
 };
 
 }
-#endif //ACC_CUDA_SHORTCUTS_CUH_
+#endif //CUDA_SHORTCUTS_CUH_

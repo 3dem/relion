@@ -1,6 +1,6 @@
 static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-template <class MlClass, int AccT>
+template <class MlClass>
 void getFourierTransformsAndCtfs(long int my_ori_particle,
 		OptimisationParamters &op,
 		SamplingParameters &sp,
@@ -327,10 +327,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		AccPtr<XFLOAT> d_img(img_size,accMLO->devBundle->allocator);
 		d_img.deviceAlloc();
 
-//		if (AccT == ACC_CUDA) //This should be avoided in the main code-flow, exception made during merge
-			d_img_.cpOnAcc(~d_img);
-//		else
-//			CudaShortcuts::cpyHostToDevice<XFLOAT>(d_img_.getHostPtr(), ~d_img, img_size, d_img.getStream());
+		d_img_.cpOnAcc(~d_img);
 
 		d_img.streamSync();
 
@@ -792,7 +789,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 	GATHERGPUTIMINGS(accMLO->timer);
 }
 
-template <class MlClass, int AccT>
+template <class MlClass>
 void getAllSquaredDifferencesCoarse(
 		unsigned exp_ipass,
 		OptimisationParamters &op,
@@ -1034,7 +1031,7 @@ void getAllSquaredDifferencesCoarse(
 #endif
 }
 
-template <class MlClass, int AccT>
+template <class MlClass>
 void getAllSquaredDifferencesFine(unsigned exp_ipass,
 		 	 	 	 	 	 	  OptimisationParamters &op,
 		 	 	 	 	 	 	  SamplingParameters &sp,
@@ -1351,7 +1348,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 }
 
 
-template<class MlClass, int AccT, typename weights_t>
+template<class MlClass, typename weights_t>
 void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 											OptimisationParamters &op,
 											SamplingParameters &sp,
@@ -1873,7 +1870,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 #endif
 }
 
-template<class MlClass, int AccT>
+template<class MlClass>
 void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						MlOptimiser *baseMLO,
 						MlClass *accMLO,
@@ -2792,7 +2789,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 #endif
 }
 
-template <class MlClass, int AccT>
+template <class MlClass>
 void accDoExpectationOneParticle(MlClass *myInstance, unsigned long my_ori_particle) 
 {
 	SamplingParameters sp;
@@ -2848,7 +2845,7 @@ if (thread_id == 0)
 baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_A);
 #endif
 	CTIC(timer,"getFourierTransformsAndCtfs");
-	getFourierTransformsAndCtfs<MlClass,AccT>(my_ori_particle, op, sp, baseMLO, myInstance);
+	getFourierTransformsAndCtfs<MlClass>(my_ori_particle, op, sp, baseMLO, myInstance);
 	CTOC(timer,"getFourierTransformsAndCtfs");
 
 	if (baseMLO->do_realign_movies && baseMLO->movie_frame_running_avg_side > 0)
@@ -2948,21 +2945,21 @@ baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_B);
 			Mweight.streamSync();
 
 			CTIC(timer,"getAllSquaredDifferencesCoarse");
-			getAllSquaredDifferencesCoarse<MlClass,AccT>(ipass, op, sp, baseMLO, myInstance, Mweight);
+			getAllSquaredDifferencesCoarse<MlClass>(ipass, op, sp, baseMLO, myInstance, Mweight);
 			CTOC(timer,"getAllSquaredDifferencesCoarse");
 
 			try
 			{
 				CTIC(timer,"convertAllSquaredDifferencesToWeightsCoarse");
-				convertAllSquaredDifferencesToWeights<MlClass,AccT,XFLOAT>(ipass, op, sp, baseMLO, myInstance, CoarsePassWeights, FinePassClassMasks, Mweight);
+				convertAllSquaredDifferencesToWeights<MlClass,XFLOAT>(ipass, op, sp, baseMLO, myInstance, CoarsePassWeights, FinePassClassMasks, Mweight);
 				CTOC(timer,"convertAllSquaredDifferencesToWeightsCoarse");
 			}
 			catch (RelionError XE)
 			{
-				getAllSquaredDifferencesCoarse<MlClass,AccT>(ipass, op, sp, baseMLO, myInstance, Mweight);
+				getAllSquaredDifferencesCoarse<MlClass>(ipass, op, sp, baseMLO, myInstance, Mweight);
 #ifndef ACC_DOUBLE_PRECISION
 				try {
-					convertAllSquaredDifferencesToWeights<MlClass,AccT,double>(ipass, op, sp, baseMLO, myInstance, CoarsePassWeights, FinePassClassMasks, Mweight);
+					convertAllSquaredDifferencesToWeights<MlClass,double>(ipass, op, sp, baseMLO, myInstance, CoarsePassWeights, FinePassClassMasks, Mweight);
 				}
 				catch (RelionError XE)
 #endif
@@ -2971,7 +2968,7 @@ baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_B);
 						CRITICAL(ERRNUMFAILSAFE);
 
 					//Rerun in fail-safe mode
-					convertAllSquaredDifferencesToWeights<MlClass,AccT,XFLOAT>(ipass, op, sp, baseMLO, myInstance, CoarsePassWeights, FinePassClassMasks, Mweight, true);
+					convertAllSquaredDifferencesToWeights<MlClass,XFLOAT>(ipass, op, sp, baseMLO, myInstance, CoarsePassWeights, FinePassClassMasks, Mweight, true);
 					std::cerr << std::endl << "WARNING: Exception (" << XE.msg << ") handled by switching to fail-safe mode." << std::endl;
 					myInstance->failsafe_attempts ++;
 				}
@@ -3020,13 +3017,13 @@ baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_D);
 //					printf("Allocator used space before 'getAllSquaredDifferencesFine': %.2f MiB\n", (float)devBundle->allocator->getTotalUsedSpace()/(1024.*1024.));
 
 			CTIC(timer,"getAllSquaredDifferencesFine");
-			getAllSquaredDifferencesFine<MlClass,AccT>(ipass, op, sp, baseMLO, myInstance, FinePassWeights, FinePassClassMasks, FineProjectionData, stagerD2);
+			getAllSquaredDifferencesFine<MlClass>(ipass, op, sp, baseMLO, myInstance, FinePassWeights, FinePassClassMasks, FineProjectionData, stagerD2);
 			CTOC(timer,"getAllSquaredDifferencesFine");
 			FinePassWeights[0].weights.cpToHost();
 			AccPtr<XFLOAT> Mweight(devBundle->allocator); //DUMMY
 
 			CTIC(timer,"convertAllSquaredDifferencesToWeightsFine");
-			convertAllSquaredDifferencesToWeights<MlClass,AccT,XFLOAT>(ipass, op, sp, baseMLO, myInstance, FinePassWeights, FinePassClassMasks, Mweight);
+			convertAllSquaredDifferencesToWeights<MlClass,XFLOAT>(ipass, op, sp, baseMLO, myInstance, FinePassWeights, FinePassClassMasks, Mweight);
 			CTOC(timer,"convertAllSquaredDifferencesToWeightsFine");
 
 		}
@@ -3052,7 +3049,7 @@ if (thread_id == 0)
 baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_E);
 #endif
 	CTIC(timer,"storeWeightedSums");
-	storeWeightedSums<MlClass,AccT>(op, sp, baseMLO, myInstance, FinePassWeights, FineProjectionData, FinePassClassMasks, stagerSWS);
+	storeWeightedSums<MlClass>(op, sp, baseMLO, myInstance, FinePassWeights, FineProjectionData, FinePassClassMasks, stagerSWS);
 	CTOC(timer,"storeWeightedSums");
 
 	CTOC(timer,"oneParticle");

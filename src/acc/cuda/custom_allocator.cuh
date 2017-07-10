@@ -1,5 +1,5 @@
-#ifndef ACC_CUDA_CUSTOM_ALLOCATOR_CUH_
-#define ACC_CUDA_CUSTOM_ALLOCATOR_CUH_
+#ifndef CUDA_CUSTOM_ALLOCATOR_CUH_
+#define CUDA_CUSTOM_ALLOCATOR_CUH_
 /* This is where custom allocator should be. Commented out for now, to avoid double declaration.
 
 #ifdef CUDA
