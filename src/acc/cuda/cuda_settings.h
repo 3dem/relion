@@ -1,6 +1,18 @@
 #ifndef CUDA_SETTINGS_H_
 #define CUDA_SETTINGS_H_
 
+#include <signal.h>
+#include <fstream>
+#include <iostream>
+#include <vector>
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+#include "src/macros.h"
+#include "src/error.h"
+
 // Required compute capability
 #define CUDA_CC_MAJOR 3
 #define CUDA_CC_MINOR 5
@@ -27,6 +39,75 @@
 #else
 	#define RFLOAT double
 #endif
+
+// Error handling ----------------------
+
+#ifdef LAUNCH_CHECK
+#define LAUNCH_HANDLE_ERROR( err ) (LaunchHandleError( err, __FILE__, __LINE__ ))
+#define LAUNCH_PRIVATE_ERROR(func, status) {  \
+                       (status) = (func); \
+                       LAUNCH_HANDLE_ERROR(status); \
+                   }
+#else
+#define LAUNCH_HANDLE_ERROR( err ) (err) //Do nothing
+#define LAUNCH_PRIVATE_ERROR( err ) (err) //Do nothing
+#endif
+
+#ifdef DEBUG_CUDA
+#define DEBUG_HANDLE_ERROR( err ) (HandleError( err, __FILE__, __LINE__ ))
+#define DEBUG_PRIVATE_ERROR(func, status) {  \
+                       (status) = (func); \
+                       DEBUG_HANDLE_ERROR(status); \
+                   }
+#else
+#define DEBUG_HANDLE_ERROR( err ) (err) //Do nothing
+#define DEBUG_PRIVATE_ERROR( err ) (err) //Do nothing
+#endif
+
+#define HANDLE_ERROR( err ) (HandleError( err, __FILE__, __LINE__ ))
+#define PRIVATE_ERROR(func, status) {  \
+                       (status) = (func); \
+                       HANDLE_ERROR(status); \
+                   }
+
+static void HandleError( cudaError_t err, const char *file, int line )
+{
+
+    if (err != cudaSuccess)
+    {
+    	fprintf(stderr, "ERROR: %s in %s at line %d (error-code %d)\n",
+						cudaGetErrorString( err ), file, line, err );
+		fflush(stdout);
+		raise(SIGSEGV);
+    }
+
+//#ifdef DEBUG_CUDA
+//      cudaError_t peek = cudaPeekAtLastError();
+//    if (peek != cudaSuccess)
+//    {
+//        printf( "DEBUG_ERROR: %s in %s at line %d (error-code %d)\n",
+//                      cudaGetErrorString( peek ), file, line, err );
+//        fflush(stdout);
+//              raise(SIGSEGV);
+//    }
+//#endif
+
+}
+
+#ifdef LAUNCH_CHECK
+static void LaunchHandleError( cudaError_t err, const char *file, int line )
+{
+
+    if (err != cudaSuccess)
+    {
+        printf( "KERNEL_ERROR: %s in %s at line %d (error-code %d)\n",
+                        cudaGetErrorString( err ), file, line, err );
+        fflush(stdout);
+              CRITICAL(ERRGPUKERN);
+    }
+}
+#endif
+
 
 // GENERAL -----------------------------
 #define MAX_RESOL_SHARED_MEM 		32

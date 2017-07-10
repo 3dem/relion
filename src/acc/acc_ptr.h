@@ -1,7 +1,6 @@
 #ifndef ACC_PTR_H_
 #define ACC_PTR_H_
 
-//#ifdef __NVCC__
 #ifdef CUDA
 #include "src/acc/cuda/cuda_settings.h"
 #include <cuda_runtime.h>
@@ -9,7 +8,6 @@
 #include "src/acc/cuda/cuda_mem_utils.h"
 #include "src/acc/cuda/shortcuts.cuh"
 #endif
-//#endif
 
 #include <signal.h>
 #include <fstream>
@@ -24,20 +22,6 @@
 #include "src/macros.h"
 #include "src/error.h"
 #include "src/parallel.h"
-
-// Flags for accelerated code paths available - defined in CMAKE
-//#define ACC_CPU 1
-//#define ACC_CUDA 2
-
-//#ifndef __NVCC__
-//typedef void CudaCustomAllocator;
-//typedef void cudaStream_t;
-//#else
-#ifdef CUDA
-	#include "src/acc/cuda/cuda_mem_utils.h"
-#endif
-//#endif  
-
 
 #define ACC_PTR_DEBUG_FATAL( err ) (HandleAccPtrDebugFatal( err, __FILE__, __LINE__ ))
 static void HandleAccPtrDebugFatal( const char *err, const char *file, int line )

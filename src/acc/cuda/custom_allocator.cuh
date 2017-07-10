@@ -1,6 +1,6 @@
 #ifndef CUDA_CUSTOM_ALLOCATOR_CUH_
 #define CUDA_CUSTOM_ALLOCATOR_CUH_
-/* This is where custom allocator should be. Commented out for now, to avoid double declaration.
+// This is where custom allocator should be. Commented out for now, to avoid double declaration.
 
 #ifdef CUDA
 #include "src/acc/cuda/cuda_settings.h"
@@ -674,6 +674,6 @@ public:
 		_printState();
 	}
 };
-*/
+//
 
 #endif
