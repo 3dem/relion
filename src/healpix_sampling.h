@@ -164,7 +164,8 @@ public:
 			bool do_local_searches = false,
 			bool do_helical_refine = false,
 			RFLOAT rise_pix  = 0.,
-			RFLOAT twist_deg = 0.);
+			RFLOAT twist_deg = 0.,
+			bool do_around_pole = false);
 
     // Reset the random perturbation
     void resetRandomlyPerturbedSampling();
@@ -208,7 +209,7 @@ public:
     		RFLOAT psi_deg = 0.);
 
     /* Set the non-oversampled lists of directions and in-plane rotations */
-    void setOrientations(int _order = -1, RFLOAT _psi_step = -1.);
+    void setOrientations(int _order = -1, RFLOAT _psi_step = -1., bool do_around_pole = false);
 
     /* Add a single orientation */
     void addOneOrientation(RFLOAT rot, RFLOAT tilt, RFLOAT psi, bool do_clear = false);

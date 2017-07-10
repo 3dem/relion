@@ -586,7 +586,10 @@ void MlOptimiserMpi::initialiseWorkLoad()
 
     // Split the data into two random halves
 	if (do_split_random_halves)
+	{
 		mydata.divideOriginalParticlesInRandomHalves(random_seed, do_helical_refine);
+		my_halfset = node->myRandomSubset();
+	}
 
 	if (node->isMaster())
 	{
@@ -1485,7 +1488,10 @@ void MlOptimiserMpi::expectation()
 	exp_metadata.clear();
 
 	if (subset_size < 0 && verb > 0)
+	{
 		progress_bar(mydata.numberOfOriginalParticles());
+		std::cout << std::endl;
+	}
 
 #ifdef TIMING
     // Measure how long I have to wait for the rest

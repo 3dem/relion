@@ -53,7 +53,8 @@ void HealpixSampling::initialise(
 		bool do_local_searches,
 		bool do_helical_refine,
 		RFLOAT rise_pix,
-		RFLOAT twist_deg)
+		RFLOAT twist_deg,
+		bool do_around_pole)
 {
 
 	// Set the prior mode (belongs to mlmodel, but very useful inside this object)
@@ -126,7 +127,7 @@ void HealpixSampling::initialise(
 	setTranslations(-1, -1, do_local_searches, do_helical_refine, -1, rise_pix, twist_deg);
 
 	// Store the non-oversampled projection directions
-	setOrientations();
+	setOrientations(-1, -1., do_around_pole);
 
 	// Random perturbation and filling of the directions, psi_angles and translations vectors
 	resetRandomlyPerturbedSampling();
@@ -431,7 +432,7 @@ void HealpixSampling::addOneTranslation(
 		translations_z.push_back(offset_z);
 }
 
-void HealpixSampling::setOrientations(int _order, RFLOAT _psi_step)
+void HealpixSampling::setOrientations(int _order, RFLOAT _psi_step, bool do_around_pole)
 {
 
 	// Initialise
@@ -440,56 +441,83 @@ void HealpixSampling::setOrientations(int _order, RFLOAT _psi_step)
 	tilt_angles.clear();
 	psi_angles.clear();
 
-	// Setup the HealPix object
-	// For adaptive oversampling only precalculate the COARSE sampling!
 	if (_order >= 0)
-	{
-		healpix_base.Set(_order, NEST);
 		healpix_order = _order;
-	}
 
-	// 3D directions
-	if (is_3D)
+	// This is for local searches in multi-body refinement
+	if (do_around_pole)
 	{
-		RFLOAT rot, tilt;
-		for (long int ipix = 0; ipix < healpix_base.Npix(); ipix++)
-		{
-			getDirectionFromHealPix(ipix, rot, tilt);
-
-			// Push back as Matrix1D's in the vectors
-			rot_angles.push_back(rot);
-			tilt_angles.push_back(tilt);
-			directions_ipix.push_back(ipix);
-
-
-		}
-//#define DEBUG_SAMPLING
-#ifdef  DEBUG_SAMPLING
-		writeAllOrientationsToBild("orients_all.bild", "1 0 0 ", 0.020);
-#endif
-		// Now remove symmetry-related pixels
-		// TODO check size of healpix_base.max_pixrad
-		removeSymmetryEquivalentPoints(0.5 * RAD2DEG(healpix_base.max_pixrad()));
-
-#ifdef  DEBUG_SAMPLING
-		writeAllOrientationsToBild("orients_sym.bild", "0 1 0 ", 0.021);
-#endif
-
-		// Also remove limited tilt angles
-		removePointsOutsideLimitedTiltAngles();
-
-#ifdef  DEBUG_SAMPLING
-		if (ABS(limit_tilt) < 90.)
-			writeAllOrientationsToBild("orients_tilt.bild", "1 1 0 ", 0.022);
-#endif
-
-	}
-	else
-	{
+		RFLOAT _ang_step = getAngularSampling();
 		rot_angles.push_back(0.);
 		tilt_angles.push_back(0.);
 		directions_ipix.push_back(-1);
+		RFLOAT rot_offset = 0.;
+		for (RFLOAT tilt_angle = _ang_step; tilt_angle <= 180.; tilt_angle+= _ang_step)
+		{
+			RFLOAT rot_step = _ang_step / SIND(tilt_angle);
+			int n_rot = CEIL(360./rot_step);
+			rot_step = 360. / n_rot;
+			for (RFLOAT rot_angle = rot_offset; rot_angle < 360.+rot_offset; rot_angle += rot_step)
+			{
+				rot_angles.push_back(rot_angle);
+				tilt_angles.push_back(tilt_angle);
+				directions_ipix.push_back(-1);
+			}
+			rot_offset = rot_step / 2.;
+		}
 	}
+	else
+	{
+
+		// Setup the HealPix object
+		// For adaptive oversampling only precalculate the COARSE sampling!
+		if (_order >= 0)
+			healpix_base.Set(_order, NEST);
+
+		// 3D directions
+		if (is_3D)
+		{
+			RFLOAT rot, tilt;
+			for (long int ipix = 0; ipix < healpix_base.Npix(); ipix++)
+			{
+				getDirectionFromHealPix(ipix, rot, tilt);
+
+				// Push back as Matrix1D's in the vectors
+				rot_angles.push_back(rot);
+				tilt_angles.push_back(tilt);
+				directions_ipix.push_back(ipix);
+
+
+			}
+//#define DEBUG_SAMPLING
+#ifdef  DEBUG_SAMPLING
+			writeAllOrientationsToBild("orients_all.bild", "1 0 0 ", 0.020);
+#endif
+			// Now remove symmetry-related pixels
+			// TODO check size of healpix_base.max_pixrad
+			removeSymmetryEquivalentPoints(0.5 * RAD2DEG(healpix_base.max_pixrad()));
+
+#ifdef  DEBUG_SAMPLING
+			writeAllOrientationsToBild("orients_sym.bild", "0 1 0 ", 0.021);
+#endif
+
+			// Also remove limited tilt angles
+			removePointsOutsideLimitedTiltAngles();
+
+#ifdef  DEBUG_SAMPLING
+			if (ABS(limit_tilt) < 90.)
+				writeAllOrientationsToBild("orients_tilt.bild", "1 1 0 ", 0.022);
+#endif
+
+		}
+		else
+		{
+			rot_angles.push_back(0.);
+			tilt_angles.push_back(0.);
+			directions_ipix.push_back(-1);
+		}
+
+	} // end else do_around_pole
 
 	// 2D in-plane angles
 	// By default in 3D case: use more-or-less same psi-sampling as the 3D healpix object
@@ -505,6 +533,12 @@ void HealpixSampling::setOrientations(int _order, RFLOAT _psi_step)
 		psi = ipsi * psi_step;
 		psi_angles.push_back(psi);
 	}
+
+//#define DEBUG_SAMPLING
+#ifdef  DEBUG_SAMPLING
+	writeAllOrientationsToBild("orients_final.bild", "1 0 0 ", 0.020);
+#endif
+
 }
 
 /* Set only a single orientation */
