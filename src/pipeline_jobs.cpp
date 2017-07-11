@@ -309,7 +309,7 @@ bool RelionJob::saveJobSubmissionScript(std::string newfilename, std::string out
     }
     else
     {
-    	int nmpi = joboptions["nr_mpi"].getNumber();
+    	int nmpi = (joboptions.find("nr_mpi") != joboptions.end()) ? joboptions["nr_mpi"].getNumber() : 1;
     	int nthr = (joboptions.find("nr_threads") != joboptions.end()) ? joboptions["nr_threads"].getNumber() : 1;
     	int ncores = nmpi * nthr;
     	int ndedi = joboptions["min_dedicated"].getNumber();
