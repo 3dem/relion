@@ -3,7 +3,7 @@
 #include <signal.h>
 #include <cassert>
 
-#include "src/acc/cpu/cpu_backprojector.h"
+#include "src/acc/acc_backprojector.h"
 #include "src/acc/cpu/cpu_kernels/helper.h"
 
 

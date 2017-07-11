@@ -7,7 +7,8 @@
 #include "src/macros.h"
 #include "src/acc/cpu/cpu_settings.h"
 #include "src/acc/cpu/cpu_kernels/cpu_utils.h"
-#include "src/acc/cpu/cpu_projector.h"
+#include "src/acc/acc_projector.h"
+#include "src/acc/acc_projectorkernel_impl.h"
 
 namespace CpuKernels
 {
@@ -281,7 +282,7 @@ void rotateOnly(int              blockIdx_x,
 				int              threadIdx_x,
 				ACCCOMPLEX     *d_Faux,
 				XFLOAT           psi,
-				CpuProjectorKernel &projector,
+				AccProjectorKernel &projector,
 				int              startPsi);
 
 void rotateAndCtf(  int              blockIdx_x, 
@@ -290,7 +291,7 @@ void rotateAndCtf(  int              blockIdx_x,
 					ACCCOMPLEX     *d_Faux,
 					XFLOAT          *d_ctf,
 					XFLOAT           psi,
-					CpuProjectorKernel &projector,
+					AccProjectorKernel &projector,
 					int              startPsi = 0);
 
 /*

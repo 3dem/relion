@@ -1,8 +1,11 @@
 #include <stdlib.h>
 #include <string.h>
-#include "src/acc/cpu/cpu_projector.h"
+#include "src/acc/acc_projector.h"
 #include <signal.h>
 
+#include "src/acc/acc_projector_impl.h"
+
+/*
 
 bool CpuProjector::setMdlDim(
 		int xdim, int ydim, int zdim,
@@ -85,3 +88,4 @@ void CpuProjector::clear()
 	}
 }
 
+*/

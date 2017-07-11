@@ -187,10 +187,11 @@ size_t findThresholdIdxInCumulativeSum(AccPtr<T> &data, T threshold)
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(data.getStream()));
 #else
 		// TODO - do this in single loop?
-		for(int i=blk; blk<grid_size; blk++) {
+		size_t size_m1 = data.getSize()-1;
+		for(int blk=0; blk<grid_size; blk++) {
 			for(int tid=0; tid<FIND_IN_CUMULATIVE_BLOCK_SIZE; tid++) {
 				size_t i = blk * FIND_IN_CUMULATIVE_BLOCK_SIZE + tid;
-				if (i < sizem1 && data[i] <= threshold && threshold < data[i+1])
+				if (i < size_m1 && data[i] <= threshold && threshold < data[i+1])
 					idx[0] = i+1;
 			}
 		}
@@ -198,7 +199,7 @@ size_t findThresholdIdxInCumulativeSum(AccPtr<T> &data, T threshold)
 		return idx[0];
 	}
 }
-
+	
 void runDiff2KernelCoarse(
 		AccProjectorKernel &projector,
 		XFLOAT *trans_x,
@@ -245,7 +246,7 @@ void runDiff2KernelFine(
 		bool do_CC,
 		bool data_is_3D);
 
-void runCollect2jobs(	dim3 grid_dim,
+void runCollect2jobs(	int grid_dim,
 						XFLOAT * oo_otrans_x,          // otrans-size -> make const
 						XFLOAT * oo_otrans_y,          // otrans-size -> make const
 						XFLOAT * oo_otrans_z,          // otrans-size -> make const
@@ -534,8 +535,9 @@ void runCenterFFT( AccPtr< T > &img_in,
 			zshift = -zshift;
 		}
 
+		int grid_size = ceilf((float)((xSize*ySize*zSize)/(float)(2*CFTT_BLOCK_SIZE)));
 #ifdef CUDA
-		dim3 blocks(ceilf((float)((xSize*ySize*zSize)/(float)(2*CFTT_BLOCK_SIZE))),batchSize);
+		dim3 blocks(grid_size,batchSize);
 		cuda_kernel_centerFFT_3D<<<blocks,CFTT_BLOCK_SIZE, 0, img_in.getStream()>>>(
 				~img_in,
 				xSize*ySize*zSize,
@@ -547,7 +549,7 @@ void runCenterFFT( AccPtr< T > &img_in,
 				zshift);
 		LAUNCH_HANDLE_ERROR(cudaGetLastError());
 #else
-		CpuKernels::centerFFT_3D(blocks, batchSize, CFTT_BLOCK_SIZE,
+		CpuKernels::centerFFT_3D(grid_size, batchSize, CFTT_BLOCK_SIZE,
 				~img_in,
 				xSize*ySize*zSize,
 				xSize,

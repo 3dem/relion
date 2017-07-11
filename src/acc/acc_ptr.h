@@ -7,6 +7,8 @@
 #include "src/acc/cuda/custom_allocator.cuh"
 #include "src/acc/cuda/cuda_mem_utils.h"
 #include "src/acc/cuda/shortcuts.cuh"
+#else
+#include "src/acc/cpu/cpu_settings.h"
 #endif
 
 #include <signal.h>

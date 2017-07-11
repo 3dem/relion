@@ -639,7 +639,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			spectrumAndXi2.deviceInit(0);
 			spectrumAndXi2.streamSync();
 
-			dim3 gridSize = CEIL((float)(accMLO->transformer1.fouriers.getSize()) / (float)POWERCLASS_BLOCK_SIZE);
+			int gridSize = CEIL((float)(accMLO->transformer1.fouriers.getSize()) / (float)POWERCLASS_BLOCK_SIZE);
 			if(accMLO->dataIs3D)
 				AccUtilities::powerClass<true>(gridSize,POWERCLASS_BLOCK_SIZE,
 					~accMLO->transformer1.fouriers,
@@ -1039,8 +1039,12 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 		 	 	 	 	 	 	  MlClass *accMLO,
 		 	 	 	 	 	 	  std::vector<IndexedDataArray > &FinePassWeights,
 		 	 	 	 	 	 	  std::vector<std::vector< IndexedDataArrayMask > > &FPCMasks,
-		 	 	 	 	 	 	  std::vector<ProjectionParams> &FineProjectionData,
-		 	 	 	 	 	 	  std::vector<cudaStager<unsigned long> > &stagerD2)
+		 	 	 	 	 	 	  std::vector<ProjectionParams> &FineProjectionData
+#ifdef CUDA
+								  ,std::vector<cudaStager<unsigned long> > &stagerD2)
+#else
+									)
+#endif
 {
 #ifdef TIMING
 	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
@@ -1165,8 +1169,10 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 
 		CTOC(accMLO->timer,"kernel_init_1");
 		std::vector< AccPtr<XFLOAT> > eulers((sp.iclass_max-sp.iclass_min+1), accMLO->devBundle->allocator);
+#ifdef CUDA
 		cudaStager<XFLOAT> AllEulers(accMLO->devBundle->allocator,9*FineProjectionData[ipart].orientationNumAllClasses);
 		AllEulers.prepare_device();
+#endif
 		unsigned long newDataSize(0);
 
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
@@ -1234,8 +1240,10 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 				CTIC(accMLO->timer,"IndexedArrayMemCp2");
 //				FPCMasks[ipart][exp_iclass].jobOrigin.cpToDevice();
 //				FPCMasks[ipart][exp_iclass].jobExtent.cpToDevice();
+#ifdef CUDA
 				stagerD2[ipart].stage(FPCMasks[ipart][exp_iclass].jobOrigin);
 				stagerD2[ipart].stage(FPCMasks[ipart][exp_iclass].jobExtent);
+#endif
 				CTOC(accMLO->timer,"IndexedArrayMemCp2");
 
 				CTIC(accMLO->timer,"generateEulerMatrices");
@@ -1246,15 +1254,19 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 						thisClassProjectionData,
 						&(eulers[exp_iclass-sp.iclass_min])[0],
 						!IS_NOT_INV);
+#ifdef CUDA
 				AllEulers.stage(eulers[exp_iclass-sp.iclass_min]);
+#endif
 				CTOC(accMLO->timer,"generateEulerMatrices");
 			}
 		}
 
+#ifdef CUDA
 		// copy stagers to device
 		stagerD2[ipart].cp_to_device();
 		AllEulers.cp_to_device();
-
+#endif
+		
 		FinePassWeights[ipart].rot_id.cpToDevice(); //FIXME this is not used
 		FinePassWeights[ipart].rot_idx.cpToDevice();
 		FinePassWeights[ipart].trans_idx.cpToDevice();
@@ -1595,7 +1607,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					cuda_kernel_cast<XFLOAT,weights_t><<<block_num,BLOCK_SIZE,0>>>
 							(~Mweight,~weights,Mweight.getSize());
 #else
-					size = Mweight.getSize();
+					size_t size = Mweight.getSize();
 					for (int i = 0; i <size; i++)
 						weights[i] = Mweight[i];
 #endif
@@ -1607,7 +1619,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 						(sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi * sp.nr_trans);
 
 				block_num = ceilf((float)(sp.nr_dir*sp.nr_psi)/(float)SUMW_BLOCK_SIZE);
-				dim3 block_dim(block_num,sp.iclass_max-sp.iclass_min+1);
 
 				if (failsafeMode) //Prevent zero prior products in fail-safe mode
 				{
@@ -1776,7 +1787,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 						AccPtr<XFLOAT>  pdf_offset_class(&(pdf_offset[(exp_iclass-sp.iclass_min)*sp.nr_trans]), &( pdf_offset((exp_iclass-sp.iclass_min)*sp.nr_trans) ), sp.nr_trans);
 
 						block_num = ceil((float)FPCMasks[ipart][exp_iclass].jobNum / (float)SUMW_BLOCK_SIZE); //thisClassPassWeights.rot_idx.getSize() / SUM_BLOCK_SIZE;
-						dim3 block_dim(block_num);
 
 						AccUtilities::kernel_exponentiate_weights_fine(
 								block_num,
@@ -1876,8 +1886,12 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						MlClass *accMLO,
 						std::vector<IndexedDataArray > &FinePassWeights,
 						std::vector<ProjectionParams> &ProjectionData,
-						std::vector<std::vector<IndexedDataArrayMask > > &FPCMasks,
-	 	 	 	 	 	std::vector<cudaStager<unsigned long> > &stagerSWS)
+						std::vector<std::vector<IndexedDataArrayMask > > &FPCMasks
+#ifdef CUDA
+						,std::vector<cudaStager<unsigned long> > &stagerSWS)
+#else
+						)
+#endif
 {
 #ifdef TIMING
 	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
@@ -1985,8 +1999,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			// Re-define the job-partition of the indexedArray of weights so that the collect-kernel can work with it.
 			block_nums[nr_fake_classes*ipart + fake_class] = makeJobsForCollect(thisClassFinePassWeights, FPCMasks[ipart][exp_iclass], ProjectionData[ipart].orientation_num[exp_iclass]);
 
+#ifdef CUDA
 			stagerSWS[ipart].stage(FPCMasks[ipart][exp_iclass].jobOrigin);
 			stagerSWS[ipart].stage(FPCMasks[ipart][exp_iclass].jobExtent);
+#endif
 
 			sumBlockNum+=block_nums[nr_fake_classes*ipart + fake_class];
 
@@ -2071,7 +2087,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			}
 		}
 
+#ifdef CUDA
 		stagerSWS[ipart].cp_to_device();
+#endif
 		oo_otrans_x.putOnDevice();
 		oo_otrans_y.putOnDevice();
 		oo_otrans_z.putOnDevice();
@@ -2110,9 +2128,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			int cpos=fake_class*nr_transes;
 			int block_num = block_nums[nr_fake_classes*ipart + fake_class];
-			dim3 grid_dim_collect2 = block_num;
 
-			runCollect2jobs(grid_dim_collect2,
+			runCollect2jobs(block_num,
 						&(oo_otrans_x(cpos) ),          // otrans-size -> make const
 						&(oo_otrans_y(cpos) ),          // otrans-size -> make const
 						&(oo_otrans_z(cpos) ),          // otrans-size -> make const
@@ -2895,7 +2912,9 @@ baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_A);
 	//    coarse pass, declared here to keep scope to storeWS
 	std::vector < ProjectionParams > FineProjectionData(sp.nr_particles, baseMLO->mymodel.nr_classes);
 
+#ifdef CUDA
 	std::vector < cudaStager<unsigned long> > stagerD2(sp.nr_particles,devBundle->allocator), stagerSWS(sp.nr_particles,devBundle->allocator);
+#endif
 
 	for (int ipass = 0; ipass < nr_sampling_passes; ipass++)
 	{
@@ -3006,8 +3025,10 @@ baseMLO->timer.tic(baseMLO->TIMING_ESP_DIFF2_D);
 				//set a maximum possible size for all weights (to be reduced by significance-checks)
 				FinePassWeights[iframe].setDataSize(FineProjectionData[iframe].orientationNumAllClasses*sp.nr_trans*sp.nr_oversampled_trans);
 				FinePassWeights[iframe].dual_alloc_all();
+#ifdef CUDA
 				stagerD2[iframe].size= 2*(FineProjectionData[iframe].orientationNumAllClasses*sp.nr_trans*sp.nr_oversampled_trans);
 				stagerD2[iframe].prepare();
+#endif
 			}
 #ifdef TIMING
 // Only time one thread
@@ -3017,7 +3038,12 @@ baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_D);
 //					printf("Allocator used space before 'getAllSquaredDifferencesFine': %.2f MiB\n", (float)devBundle->allocator->getTotalUsedSpace()/(1024.*1024.));
 
 			CTIC(timer,"getAllSquaredDifferencesFine");
-			getAllSquaredDifferencesFine<MlClass>(ipass, op, sp, baseMLO, myInstance, FinePassWeights, FinePassClassMasks, FineProjectionData, stagerD2);
+			getAllSquaredDifferencesFine<MlClass>(ipass, op, sp, baseMLO, myInstance, FinePassWeights, FinePassClassMasks, FineProjectionData
+#ifdef CUDA
+			, stagerD2);
+#else
+			);
+#endif
 			CTOC(timer,"getAllSquaredDifferencesFine");
 			FinePassWeights[0].weights.cpToHost();
 			AccPtr<XFLOAT> Mweight(devBundle->allocator); //DUMMY
@@ -3038,18 +3064,25 @@ baseMLO->timer.tic(baseMLO->TIMING_ESP_DIFF2_E);
 
 	// For the reconstruction step use mymodel.current_size!
 	sp.current_image_size = baseMLO->mymodel.current_size;
+#ifdef CUDA
 	for (long int iframe = 0; iframe < sp.nr_particles; iframe++)
 	{
 		stagerSWS[iframe].size= 2*(FineProjectionData[iframe].orientationNumAllClasses);
 		stagerSWS[iframe].prepare();
 	}
+#endif
 #ifdef TIMING
 // Only time one thread
 if (thread_id == 0)
 baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_E);
 #endif
 	CTIC(timer,"storeWeightedSums");
-	storeWeightedSums<MlClass>(op, sp, baseMLO, myInstance, FinePassWeights, FineProjectionData, FinePassClassMasks, stagerSWS);
+	storeWeightedSums<MlClass>(op, sp, baseMLO, myInstance, FinePassWeights, FineProjectionData, FinePassClassMasks
+#ifdef CUDA
+	, stagerSWS);
+#else
+	);
+#endif
 	CTOC(timer,"storeWeightedSums");
 
 	CTOC(timer,"oneParticle");

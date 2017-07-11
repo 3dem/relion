@@ -1300,7 +1300,7 @@ void runDiff2KernelFine(
 
 }
 
-void runCollect2jobs(	dim3 grid_dim,
+void runCollect2jobs(	int grid_dim,
 						XFLOAT * oo_otrans_x,          // otrans-size -> make const
 						XFLOAT * oo_otrans_y,          // otrans-size -> make const
 						XFLOAT * oo_otrans_z,          // otrans-size -> make const
@@ -1335,7 +1335,8 @@ void runCollect2jobs(	dim3 grid_dim,
 		shared_buffer = sizeof(XFLOAT)*SUMW_BLOCK_SIZE*4; // x+y+myp+weights
 	}
 #ifdef CUDA
-	cuda_kernel_collect2jobs<false><<<grid_dim,SUMW_BLOCK_SIZE,shared_buffer>>>(
+	dim3 numblocks(grid_dim);
+	cuda_kernel_collect2jobs<false><<<numblocks,SUMW_BLOCK_SIZE,shared_buffer>>>(
 			oo_otrans_x,          // otrans-size -> make const
 			oo_otrans_y,          // otrans-size -> make const
 			oo_otrans_z,          // otrans-size -> make const
@@ -1359,8 +1360,7 @@ void runCollect2jobs(	dim3 grid_dim,
 			jobExtent);
 #else
 	// Interesting - we don't seem to use the shared_buffer
-	int gdim = grid_dim;
-	CpuKernels::collect2jobs<data_is_3D>(gdim, SUMW_BLOCK_SIZE,
+	CpuKernels::collect2jobs<data_is_3D>(grid_dim, SUMW_BLOCK_SIZE,
 			oo_otrans_x,          // otrans-size -> make const
 			oo_otrans_y,          // otrans-size -> make const
 			oo_otrans_z,          // otrans-size -> make const

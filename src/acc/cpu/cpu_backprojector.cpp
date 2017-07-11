@@ -3,7 +3,8 @@
 #include <signal.h>
 #include <cassert>
 
-#include "src/acc/cpu/cpu_backprojector.h"
+#include "src/acc/acc_backprojector.h"
+#include "src/acc/acc_projector.h"
 #include "src/acc/cpu/cpu_kernels/helper.h"
 
 
@@ -13,6 +14,8 @@
 #define BP_2D_BLOCK_SIZE 128
 #define BP_REF3D_BLOCK_SIZE 128
 #define BP_DATA3D_BLOCK_SIZE 640
+
+#include "src/acc/acc_backprojector_impl.h"
 
 /*
 size_t CpuBackprojector::setMdlDim(

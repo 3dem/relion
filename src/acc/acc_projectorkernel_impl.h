@@ -56,6 +56,7 @@ public:
 				mdlReal(mdlReal), mdlImag(mdlImag)
 			{
 #ifdef CUDA_NO_TEXTURES
+		// TODO - something different for CPU?
 				for(int i=0; i<mdlX * mdlY * mdlZ; i++) {
 			        *mdlComplex ++ = *mdlReal ++;
 			        *mdlComplex ++ = *mdlImag ++;			        
@@ -101,13 +102,23 @@ public:
 				yp = -yp;
 				zp = -zp;
 
+#ifdef CUDA
 				real =   no_tex3D(mdlReal, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 				imag = - no_tex3D(mdlImag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
+#else
+				real =   CpuKernels::no_tex3D(mdlReal, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
+				imag = - CpuKernels::no_tex3D(mdlImag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
+#endif
 			}
 			else
 			{
+#ifdef CUDA
 				real =   no_tex3D(mdlReal, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 				imag =   no_tex3D(mdlImag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
+#else
+				real =   CpuKernels::no_tex3D(mdlReal, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
+				imag =   CpuKernels::no_tex3D(mdlImag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);	
+#endif
 			}
 #else
 	#if(!COMPLEXTEXTURE)
@@ -200,13 +211,23 @@ public:
 				yp = -yp;
 				zp = -zp;
 
+#ifdef CUDA
 				real =   no_tex3D(mdlReal, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 				imag = - no_tex3D(mdlImag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
+#else
+				real =   CpuKernels::no_tex3D(mdlReal, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
+				imag = - CpuKernels::no_tex3D(mdlImag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
+#endif
 			}
 			else
 			{
+#ifdef CUDA
 				real =   no_tex3D(mdlReal, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 				imag =   no_tex3D(mdlImag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
+#else
+				real =   CpuKernels::no_tex3D(mdlReal, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
+				imag = - CpuKernels::no_tex3D(mdlImag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
+#endif
 			}
 #else
 	#if(!COMPLEXTEXTURE)
@@ -294,13 +315,23 @@ public:
 				xp = -xp;
 				yp = -yp;
 
+#ifdef CUDA
 				real =   no_tex2D(mdlReal, xp, yp, mdlX, mdlInitY);
 				imag = - no_tex2D(mdlImag, xp, yp, mdlX, mdlInitY);
+#else
+				real =   CpuKernels::no_tex2D(mdlReal, xp, yp, mdlX, mdlInitY);
+				imag = - CpuKernels::no_tex2D(mdlImag, xp, yp, mdlX, mdlInitY);	
+#endif
 			}
 			else
 			{
+#ifdef CUDA
 				real =   no_tex2D(mdlReal, xp, yp, mdlX, mdlInitY);
 				imag =   no_tex2D(mdlImag, xp, yp, mdlX, mdlInitY);
+#else
+				real =   CpuKernels::no_tex2D(mdlReal, xp, yp, mdlX, mdlInitY);
+				imag =   CpuKernels::no_tex2D(mdlImag, xp, yp, mdlX, mdlInitY);
+#endif
 			}
 #else
 #if(!COMPLEXTEXTURE)

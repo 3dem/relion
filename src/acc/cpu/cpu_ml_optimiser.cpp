@@ -34,6 +34,7 @@ typedef int dim3;
 #define LAUNCH_HANDLE_ERROR( err )
 #define DEBUG_HANDLE_ERROR( err )
 
+#include "src/ml_optimiser.h"
 
 #include <sys/time.h>
 #include <stdio.h>
@@ -42,17 +43,16 @@ typedef int dim3;
 #include <ctime>
 #include <vector>
 #include <iostream>
-#include "src/acc/cpu/cpu_projector.h"
+#include "src/acc/acc_ptr.h"
+#include "src/acc/acc_projector.h"
 #include "src/acc/acc_projector_plan.h"
 #include "src/acc/cpu/cpu_benchmark_utils.h"
-#include "src/acc/cpu/cpu_ml_optimiser.h"
+#include "src/acc/cpu/cpu_helper_functions.h"
 #include "src/acc/cpu/cpu_kernels/helper.h"
 #include "src/acc/cpu/cpu_kernels/diff2.h"
 #include "src/acc/cpu/cpu_kernels/wavg.h"
-#include "src/acc/acc_helper_functions.h"
 #include "src/acc/utilities.h"
 #include "src/acc/data_types.h"
-#include "src/acc/acc_ptr.h"
 #include "src/complex.h"
 #include "src/helix.h"
 #include <fstream>
@@ -63,7 +63,11 @@ typedef int dim3;
 #include <parallel_for.h>
 #include <queuing_mutex.h>
 
+#include "src/acc/utilities_impl.h"
+
 #include "src/acc/acc_ml_optimiser.h"
+#include "src/acc/cpu/cpu_ml_optimiser.h"
+#include "src/acc/acc_helper_functions.h"
 #include "src/acc/acc_ml_optimiser_impl.h"
 
 

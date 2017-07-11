@@ -2,7 +2,7 @@
 #define CPU_HELPER_FUNCTIONS_H_
 
 #include "src/acc/cpu/cpu_ml_optimiser.h"
-#include "src/acc/cpu/cpu_projector.h"
+#include "src/acc/acc_projector.h"
 #include "src/acc/cpu/cpu_benchmark_utils.h"
 #include "src/acc/cpu/cpu_kernels/helper.h"
 #include "src/acc/cpu/cpu_kernels/diff2.h"

@@ -6,7 +6,7 @@
 #include <fstream>
 
 #include "src/acc/cpu/cpu_settings.h"
-#include "src/acc/cpu/cpu_projector.h"
+#include "src/acc/acc_projector.h"
 #include "src/acc/cpu/cpu_kernels/cpu_utils.h"
 #include "src/acc/cpu/cpu_kernels/helper.h"
 
@@ -24,7 +24,7 @@ namespace CpuKernels
 template<bool REFCTF, bool REF3D>
 void wavg_ref3D(
 		XFLOAT * RESTRICT   g_eulers,
-		CpuProjectorKernel &projector,
+		AccProjectorKernel &projector,
 		unsigned            image_size,
 		unsigned long       orientation_num,
 		XFLOAT * RESTRICT   g_img_real,
@@ -149,7 +149,7 @@ void wavg_ref3D(
 template<bool REFCTF>
 void wavg_3D(
 		XFLOAT * RESTRICT   g_eulers,
-		CpuProjectorKernel &projector,
+		AccProjectorKernel &projector,
 		unsigned            image_size,
 		unsigned long       orientation_num,
 		XFLOAT * RESTRICT   g_img_real,

@@ -7,7 +7,7 @@
 #include <string.h>
 
 #include "src/acc/cpu/cpu_settings.h"
-#include "src/acc/cpu/cpu_projector.h"
+#include "src/acc/acc_projector.h"
 #include "src/acc/cpu/cpu_kernels/cpu_utils.h"
 #include "src/acc/cpu/cpu_kernels/helper.h"
 
@@ -895,7 +895,7 @@ void diff2_CC_coarse_3D(
 		XFLOAT *g_trans_z,	
 		AccProjectorKernel &projector,
 		XFLOAT *g_corr_img,
-		XFLOAT  *g_diff2
+		XFLOAT  *g_diff2,
 		unsigned trans_num,
 		int      image_size,
 		XFLOAT   exp_local_sqrtXi2

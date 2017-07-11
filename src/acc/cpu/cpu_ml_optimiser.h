@@ -10,15 +10,15 @@
 #define CPU_ML_OPTIMISER_H_
 #include "src/mpi.h"
 #include "src/ml_optimiser.h"
-#include "src/acc/cpu/cpu_projector.h"
-#include "src/acc/cpu/cpu_backprojector.h"
+#include "src/acc/acc_projector_plan.h"
+#include "src/acc/acc_projector.h"
+#include "src/acc/acc_backprojector.h"
 #include "src/acc/cpu/mkl_fft.h"
 #include "src/acc/cpu/cpu_benchmark_utils.h"
 #include <stack>
 
 #include "src/acc/acc_ml_optimiser.h"
 #include "src/acc/acc_ptr.h"
-#include "src/acc/acc_projector_plan.h"
 
 #if 0
 #ifdef CUDA_DOUBLE_PRECISION
@@ -386,10 +386,10 @@ public:
 #endif
 
 	//The CPU accelerated projector set
-	std::vector< CpuProjector > cpuProjectors;
+	std::vector< AccProjector > cpuProjectors;
 
 	//The CPU accelerated back-projector set
-	std::vector< CpuBackprojector > cpuBackprojectors;
+	std::vector< AccBackprojector > cpuBackprojectors;
 
 	//Used for precalculations of projection setup
 	bool generateProjectionPlanOnTheFly;

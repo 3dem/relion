@@ -240,7 +240,7 @@ static void cosineFilter(
 		XFLOAT sum_bg_total);
 
 template<bool DATA3D>
-void powerClass(dim3		in_gridSize,
+void powerClass(int		in_gridSize,
 				int			in_blocksize,
 				ACCCOMPLEX  *g_image,
 				XFLOAT      *g_spectrum,
@@ -253,7 +253,8 @@ void powerClass(dim3		in_gridSize,
 				XFLOAT      *g_highres_Xi2)
 {
 #ifdef CUDA
-	cuda_kernel_powerClass<DATA3D><<<in_gridSize,in_blocksize,0,0>>>(g_image,
+	dim3 grid_size(in_gridSize);
+	cuda_kernel_powerClass<DATA3D><<<grid_size,in_blocksize,0,0>>>(g_image,
 		g_spectrum,
 		image_size,
 		spectrum_size,
@@ -263,8 +264,7 @@ void powerClass(dim3		in_gridSize,
 		res_limit,
 		g_highres_Xi2);
 #else
-	int grid_size = in_gridSize;
-	CpuKernels::powerClass<DATA3D>(grid_size,
+	CpuKernels::powerClass<DATA3D>(in_gridSize,
 		g_image,
 		g_spectrum,
 		image_size,
@@ -440,7 +440,7 @@ void frequencyPass(int grid_size, int block_size,
 			angpix,
 			image_size);
 #else
-	CpuKernels::kernel_frequencyPass<do_highpass>(grid_size, block,size,
+	CpuKernels::kernel_frequencyPass<do_highpass>(grid_size, block_size,
 			A,
 			ori_size,
 			Xdim,
@@ -503,7 +503,7 @@ void kernel_wavg(
 #else
 	if (DATA3D)
 	{
-		CPUKernels::wavg_3D<REFCTF>(
+		CpuKernels::wavg_3D<REFCTF>(
 			g_eulers,
 			projector,
 			image_size,
@@ -525,7 +525,7 @@ void kernel_wavg(
 	}
 	else
 	{
-		CPUKernels::wavg_ref3D<REFCTF,REF3D>(
+		CpuKernels::wavg_ref3D<REFCTF,REF3D>(
 			g_eulers,
 			projector,
 			image_size,
@@ -581,7 +581,7 @@ void diff2_coarse(
 			image_size);
 #else
 	#if 1
-		CPUKernels::diff2_coarse<REF3D, DATA3D, block_sz, eulers_per_block, prefetch_fraction>(
+		CpuKernels::diff2_coarse<REF3D, DATA3D, block_sz, eulers_per_block, prefetch_fraction>(
 			grid_size,
 			g_eulers,
 			trans_x,
@@ -597,7 +597,7 @@ void diff2_coarse(
 		);
 	#else
 		if (DATA3D)
-			CPUKernels::diff2_coarse_3D<eulers_per_block>(
+			CpuKernels::diff2_coarse_3D<eulers_per_block>(
 			grid_size,
 			g_eulers,
 			trans_x,
@@ -611,7 +611,7 @@ void diff2_coarse(
 			translation_num,
 			image_size);
 		else
-			CPUKernels::diff2_coarse_2D<REF3D, eulers_per_block>(
+			CpuKernels::diff2_coarse_2D<REF3D, eulers_per_block>(
 			grid_size,
 			g_eulers,
 			trans_x,
@@ -664,7 +664,7 @@ void diff2_CC_coarse(
 			exp_local_sqrtXi2);
 #else
 	if (DATA3D)
-		CPUKernels::diff2_CC_coarse_3D(
+		CpuKernels::diff2_CC_coarse_3D(
 			grid_size,
 			g_eulers,
 			g_imgs_real,
@@ -679,7 +679,7 @@ void diff2_CC_coarse(
 			image_size,
 			exp_local_sqrtXi2);
 	else
-		CPUKernels::diff2_CC_coarse_2D<REF3D>(
+		CpuKernels::diff2_CC_coarse_2D<REF3D>(
 			grid_size,
 			g_eulers,
 			g_imgs_real,
@@ -745,7 +745,7 @@ void diff2_fine(
 		// TODO - plug in use of orientation_num, translation_num,todo_blocks on
 		// CPU side if GPU starts to use
 	if (DATA3D)
-		CPUKernels::diff2_CC_fine_3D(
+		CpuKernels::diff2_fine_3D(
 			grid_size,
 			g_eulers,
 			g_imgs_real,
@@ -763,7 +763,7 @@ void diff2_fine(
 			d_job_idx,
 			d_job_num);
 	else
-		CPUKernels::diff2_CC_fine_2D<REF3D>(
+		CpuKernels::diff2_fine_2D<REF3D>(
 			grid_size,
 			g_eulers,
 			g_imgs_real,
