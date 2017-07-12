@@ -366,16 +366,24 @@ void GuiEntry::cb_browse_node_i() {
     fl_filename_relative(relname,sizeof(relname),G_chooser->value());
 
     // Get rid of the .Nodes/type/ directory-name again
-    std::string replace = std::string(relname);
-    std::string replace2 = (std::string::npos == replace.find(fn_dir.c_str())) ? replace : replace.substr(fn_dir.length()+1, replace.length());
-    char relname2[FL_PATH_MAX];
-    strcpy(relname2, replace2.c_str());
+    if (do_oldstyle)
+    {
+    	inp->value(relname);
+    }
+    else
+    {
+		std::string replace = std::string(relname);
+		std::string replace2 = (std::string::npos == replace.find(fn_dir.c_str())) ? replace : replace.substr(fn_dir.length()+1, replace.length());
+		char relname2[FL_PATH_MAX];
+		strcpy(relname2, replace2.c_str());
 
-    FileName fn_pre, fn_jobnr, fn_post, fn_out;
-    decomposePipelineSymlinkName(replace2, fn_pre, fn_jobnr, fn_post);
-    fn_out = fn_pre + fn_jobnr + fn_post;
+		FileName fn_pre, fn_jobnr, fn_post, fn_out;
+	    decomposePipelineSymlinkName(replace2, fn_pre, fn_jobnr, fn_post);
+	    fn_out = fn_pre + fn_jobnr + fn_post;
 
-    inp->value(fn_out.c_str());
+	    inp->value(fn_out.c_str());
+    }
+
 }
 
 void GuiEntry::cb_menu(Fl_Widget* o, void* v) {
