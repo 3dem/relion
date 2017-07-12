@@ -217,7 +217,7 @@ void runDiff2KernelFine(
 		long unsigned job_num_count,
 		bool do_CC,
 		bool data_is_3D);
-*/
+
 #define WINDOW_FT_BLOCK_SIZE 128
 template<bool check_max_r2>
 void window_fourier_transform(
@@ -265,7 +265,7 @@ void window_fourier_transform(
 	g_out_real[(kp < 0 ? kp + oZ : kp) * oYX + (ip < 0 ? ip + oY : ip)*oX + jp + image_offset] = g_in_real[(kp < 0 ? kp + iZ : kp)*iYX + (ip < 0 ? ip + iY : ip)*iX + jp + image_offset];
 	g_out_imag[(kp < 0 ? kp + oZ : kp) * oYX + (ip < 0 ? ip + oY : ip)*oX + jp + image_offset] = g_in_imag[(kp < 0 ? kp + iZ : kp)*iYX + (ip < 0 ? ip + iY : ip)*iX + jp + image_offset];
 }
-/*
+
 void runCollect2jobs(	int      grid_dim,
 						XFLOAT * oo_otrans_x,          // otrans-size -> make const
 						XFLOAT * oo_otrans_y,          // otrans-size -> make const
@@ -299,13 +299,13 @@ void windowFourierTransform2(
 		unsigned iX, unsigned iY, unsigned iZ, //Input dimensions
 		unsigned oX, unsigned oY, unsigned oZ  //Output dimensions
 					);
-
+*/
 #define WINDOW_FT_BLOCK_SIZE 128
 template<bool check_max_r2>
 void window_fourier_transform(
-		int blockIdx_x,
-		int blockIdx_y,  
-		int threadIdx_x,
+		int grid_dim, 
+		int Npsi, 
+		int block_size,
 		ACCCOMPLEX *g_in,
 		ACCCOMPLEX *g_out,
 		size_t iX, size_t iY, size_t iZ, size_t iYX, //Input dimensions
@@ -314,40 +314,46 @@ void window_fourier_transform(
 		size_t max_r2 = 0
 		)
 {
-	size_t n = threadIdx_x + WINDOW_FT_BLOCK_SIZE * blockIdx_x;
-	size_t oOFF = oX*oY*oZ*blockIdx_y;
-	size_t iOFF = iX*iY*iZ*blockIdx_y;
-	if (n >= max_idx) return;
+	for(int blk=0; blk<grid_dim; blk++) {
+		for(int psi=0; psi<Npsi; psi++) {
+			for(int tid=0; tid< block_size; tid++) {
+				size_t n = tid + block_size * blk;
+				size_t oOFF = oX*oY*oZ*psi;
+				size_t iOFF = iX*iY*iZ*psi;
+				if (n >= max_idx) return;
 
-	long int k, i, kp, ip, jp;
+				long int k, i, kp, ip, jp;
 
-	if (check_max_r2)
-	{
-		k = n / (iX * iY);
-		i = (n % (iX * iY)) / iX;
+				if (check_max_r2)
+				{
+					k = n / (iX * iY);
+					i = (n % (iX * iY)) / iX;
 
-		kp = k < iX ? k : k - iZ;
-		ip = i < iX ? i : i - iY;
-		jp = n % iX;
+					kp = k < iX ? k : k - iZ;
+					ip = i < iX ? i : i - iY;
+					jp = n % iX;
 
-		if (kp*kp + ip*ip + jp*jp > max_r2)
-			return;
-	}
-	else
-	{
-		k = n / (oX * oY);
-		i = (n % (oX * oY)) / oX;
+					if (kp*kp + ip*ip + jp*jp > max_r2)
+						return;
+				}
+				else
+				{
+					k = n / (oX * oY);
+					i = (n % (oX * oY)) / oX;
 
-		kp = k < oX ? k : k - oZ;
-		ip = i < oX ? i : i - oY;
-		jp = n % oX;
-	}
+					kp = k < oX ? k : k - oZ;
+					ip = i < oX ? i : i - oY;
+					jp = n % oX;
+				}
 
-	long int  in_idx = (kp < 0 ? kp + iZ : kp) * iYX + (ip < 0 ? ip + iY : ip)*iX + jp;
-	long int out_idx = (kp < 0 ? kp + oZ : kp) * oYX + (ip < 0 ? ip + oY : ip)*oX + jp;
-	g_out[out_idx + oOFF] =  g_in[in_idx + iOFF];
+				long int  in_idx = (kp < 0 ? kp + iZ : kp) * iYX + (ip < 0 ? ip + iY : ip)*iX + jp;
+				long int out_idx = (kp < 0 ? kp + oZ : kp) * oYX + (ip < 0 ? ip + oY : ip)*oX + jp;
+				g_out[out_idx + oOFF] =  g_in[in_idx + iOFF];
+			} // for tid
+		} // for psi
+	} // for blk
 }
-
+/*
 void windowFourierTransform2(
 		std::vector<ACCCOMPLEX > &d_in,
 		std::vector<ACCCOMPLEX > &d_out,

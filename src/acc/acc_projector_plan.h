@@ -14,6 +14,10 @@ public:
 	AccPtr<XFLOAT> eulers;
 	long unsigned orientation_num;
 
+	AccProjectorPlan():
+		orientation_num(0)
+    {};
+	
 	AccProjectorPlan(CudaCustomAllocator *allocator):
 		iorientclasses(allocator),
 		eulers(allocator),

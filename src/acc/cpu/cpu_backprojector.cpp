@@ -3,10 +3,33 @@
 #include <signal.h>
 #include <cassert>
 
-#include "src/acc/acc_backprojector.h"
-#include "src/acc/acc_projector.h"
-#include "src/acc/cpu/cpu_kernels/helper.h"
+#undef CUDA
+typedef float cudaStream_t;
+typedef double CudaCustomAllocator;
+typedef int dim3;
+#define cudaStreamPerThread 0
+#define CUSTOM_ALLOCATOR_REGION_NAME( name ) //Do nothing
+#define LAUNCH_PRIVATE_ERROR(func, status)
+#define LAUNCH_HANDLE_ERROR( err )
+#define DEBUG_HANDLE_ERROR( err )
+#define HANDLE_ERROR( err )
 
+#include "src/acc/acc_ptr.h"
+#include "src/acc/acc_projector.h"
+#include "src/acc/acc_backprojector.h"
+#include "src/acc/acc_projector_plan.h"
+#include "src/acc/cpu/cpu_benchmark_utils.h"
+#include "src/acc/cpu/cpu_helper_functions.h"
+#include "src/acc/cpu/cpu_kernels/helper.h"
+#include "src/acc/cpu/cpu_kernels/diff2.h"
+#include "src/acc/cpu/cpu_kernels/wavg.h"
+#define CPU_BP_INITIALIZE 1
+#include "src/acc/cpu/cpu_kernels/BP.h"
+#include "src/acc/utilities.h"
+#include "src/acc/data_types.h"
+
+#include "src/acc/acc_helper_functions.h"
+#include "src/acc/cpu/cpu_settings.h"
 
 #define BACKPROJECTION4_BLOCK_SIZE 64
 #define BACKPROJECTION4_GROUP_SIZE 16

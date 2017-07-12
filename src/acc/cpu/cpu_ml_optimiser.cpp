@@ -51,7 +51,8 @@ typedef int dim3;
 #include "src/acc/cpu/cpu_kernels/helper.h"
 #include "src/acc/cpu/cpu_kernels/diff2.h"
 #include "src/acc/cpu/cpu_kernels/wavg.h"
-#include "src/acc/utilities.h"
+#include "src/acc/cpu/cpu_kernels/BP.h"
+#include "src/acc/cpu/mkl_fft.h"
 #include "src/acc/data_types.h"
 #include "src/complex.h"
 #include "src/helix.h"
@@ -63,6 +64,7 @@ typedef int dim3;
 #include <parallel_for.h>
 #include <queuing_mutex.h>
 
+#include "src/acc/utilities.h"
 #include "src/acc/utilities_impl.h"
 
 #include "src/acc/acc_ml_optimiser.h"
@@ -2653,7 +2655,7 @@ void MlOptimiserCpu::setupFixedSizedObjects()
 
 void MlOptimiserCpu::setupTunableSizedObjects()
 {
-	unsigned nr_classes = baseMLO->mymodel.nr_classes;
+	int nr_classes = baseMLO->mymodel.nr_classes;
 
 	/*======================================================
 						PROJECTION PLAN
@@ -2716,7 +2718,7 @@ void MlOptimiserCpu::resetData()
 
 void MlOptimiserCpu::expectationOneParticle(unsigned long my_ori_particle)
 {
-	accDoExpectationOneParticle<MlOptimiserCpu, ACC_CPU>(this, my_ori_particle);
+	accDoExpectationOneParticle<MlOptimiserCpu>(this, my_ori_particle);
 };
 
 #if 0

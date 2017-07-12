@@ -16,6 +16,33 @@
 namespace CpuKernels
 {
 
+#ifndef CPU_BP_INITIALIZE
+	void backproject2D(
+		unsigned long imageCount,
+		int     block_size,
+		XFLOAT *g_img_real,
+		XFLOAT *g_img_imag,
+		XFLOAT *g_trans_x,
+		XFLOAT *g_trans_y,
+		XFLOAT* g_weights,
+		XFLOAT* g_Minvsigma2s,
+		XFLOAT* g_ctfs,
+		unsigned long translation_num,
+		XFLOAT significant_weight,
+		XFLOAT weight_norm,
+		XFLOAT *g_eulers,
+		XFLOAT *g_model_real,
+		XFLOAT *g_model_imag,
+		XFLOAT *g_model_weight,
+		int max_r,
+		int max_r2,
+		XFLOAT padding_factor,
+		unsigned img_x,
+		unsigned img_y,
+		unsigned img_xy,
+		unsigned mdl_x,
+		int mdl_inity);
+#else
 void backproject2D(
 		unsigned long imageCount,
 		int     block_size,
@@ -162,6 +189,7 @@ void backproject2D(
 		}  // for tid
 	} // img
 }
+#endif // CPU_BP_INITIALIZE
 
 template < bool DATA3D >
 void backproject3D(
@@ -415,6 +443,35 @@ void backproject3D(
 // translation index. Since sin(a+B) = sin(A) * cos(B) + cos(A) * sin(B), and 
 // cos(A+B) = cos(A) * cos(B) - sin(A) * sin(B), we can use lookup table to 
 // compute sin(x*tx + y*ty) and cos(x*tx + y*ty). 
+#ifndef CPU_BP_INITIALIZE
+void backprojectRef3D(
+		int     img,
+		XFLOAT *g_img_real,
+		XFLOAT *g_img_imag,
+		XFLOAT *g_trans_x,
+		XFLOAT *g_trans_y,
+		XFLOAT* g_weights,
+		XFLOAT* g_Minvsigma2s,
+		XFLOAT* g_ctfs,
+		unsigned long trans_num,
+		XFLOAT significant_weight,
+		XFLOAT weight_norm,
+		XFLOAT *g_eulers,
+		XFLOAT *g_model_real,
+		XFLOAT *g_model_imag,
+		XFLOAT *g_model_weight,
+		int     max_r,
+		int     max_r2,
+		XFLOAT   padding_factor,
+		unsigned img_x,
+		unsigned img_y,
+		unsigned img_z,
+		unsigned img_xyz,
+		unsigned mdl_x,
+		unsigned mdl_y,
+		int      mdl_inity,
+		int      mdl_initz);
+#else
 void backprojectRef3D(
 		int     img,
 		XFLOAT *g_img_real,
@@ -626,6 +683,7 @@ void backprojectRef3D(
 		pixel += img_x;
 	} // for y direction
 }
+#endif
 
 //TODO - port optimizations into this/merge with backprojectRef3d and phase that one out
 template < bool DATA3D >
@@ -661,9 +719,6 @@ void backprojectSGD(
 		int mdl_initz)
 {
 	for (unsigned long img=0; img<imageCount; img++) {
-		unsigned tid = threadIdx.x;
-		unsigned img = blockIdx.x;
-
 		XFLOAT s_eulers[9];
 		XFLOAT minvsigma2, ctf, img_real, img_imag, Fweight, real, imag, weight;
 
@@ -745,10 +800,10 @@ void backprojectSGD(
 						ref_real, ref_imag);
 
 				//WAVG
-				minvsigma2 = &g_Minvsigma2s[pixel];
-				ctf = &g_ctfs[pixel];
-				img_real = &g_img_real[pixel];
-				img_imag = &g_img_imag[pixel];
+				minvsigma2 = g_Minvsigma2s[pixel];
+				ctf = g_ctfs[pixel];
+				img_real = g_img_real[pixel];
+				img_imag = g_img_imag[pixel];
 				Fweight = (XFLOAT) 0.0;
 				real = (XFLOAT) 0.0;
 				imag = (XFLOAT) 0.0;

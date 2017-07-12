@@ -1360,7 +1360,31 @@ void runCollect2jobs(	int grid_dim,
 			jobExtent);
 #else
 	// Interesting - we don't seem to use the shared_buffer
-	CpuKernels::collect2jobs<data_is_3D>(grid_dim, SUMW_BLOCK_SIZE,
+	if (data_is_3D)
+		CpuKernels::collect2jobs<true>(grid_dim, SUMW_BLOCK_SIZE,
+				oo_otrans_x,          // otrans-size -> make const
+				oo_otrans_y,          // otrans-size -> make const
+				oo_otrans_z,          // otrans-size -> make const
+				myp_oo_otrans_x2y2z2, // otrans-size -> make const
+				weights,
+				significant_weight,
+				sum_weight,
+				nr_trans,
+				nr_oversampled_trans,
+				nr_oversampled_rot,
+				oversamples,
+				skip_rots,
+				p_weights,
+				p_thr_wsum_prior_offsetx_class,
+				p_thr_wsum_prior_offsety_class,
+				p_thr_wsum_prior_offsetz_class,
+				p_thr_wsum_sigma2_offset,
+				rot_idx,
+				trans_idx,
+				jobOrigin,
+				jobExtent);
+	else
+	CpuKernels::collect2jobs<false>(grid_dim, SUMW_BLOCK_SIZE,
 			oo_otrans_x,          // otrans-size -> make const
 			oo_otrans_y,          // otrans-size -> make const
 			oo_otrans_z,          // otrans-size -> make const
@@ -1382,7 +1406,6 @@ void runCollect2jobs(	int grid_dim,
 			trans_idx,
 			jobOrigin,
 			jobExtent);
-			
 #endif
 }
 //void windowFourierTransform2(
@@ -1480,17 +1503,17 @@ void windowFourierTransform2(
 				max_r2);
 		LAUNCH_HANDLE_ERROR(cudaGetLastError());
 #else
-		window_fourier_transform<true>(
-				&d_in.dPtr[pos],
-				d_out.dPtr,
+		int grid_dim = (int)( ceil((float)(iX*iY*iZ) / (float) WINDOW_FT_BLOCK_SIZE));
+		CpuKernels::window_fourier_transform<true>(
+				grid_dim,
+				Npsi,
+				WINDOW_FT_BLOCK_SIZE,
+				&d_in.hPtr[pos],
+				d_out.hPtr,
 				iX, iY, iZ, iX * iY, //Input dimensions
 				oX, oY, oZ, oX * oY, //Output dimensions
 				iX*iY*iZ,
-				grid_dim,
-				Nspi,
-				WINDOW_FT_BLOCK_SIZE,
 				max_r2);
-		}
 #endif
 	}
 	else
@@ -1507,15 +1530,16 @@ void windowFourierTransform2(
 		LAUNCH_HANDLE_ERROR(cudaGetLastError());
 #else
 		int grid_dim = (int)( ceil((float)(oX*oY*oZ) / (float) WINDOW_FT_BLOCK_SIZE));
-		window_fourier_transform<false>(
-				&d_in.dPtr[pos],
-				d_out.dPtr,
+		CpuKernels::window_fourier_transform<false>(
+				grid_dim,
+				Npsi,
+				WINDOW_FT_BLOCK_SIZE,
+				&d_in.hPtr[pos],
+				d_out.hPtr,
 				iX, iY, iZ, iX * iY, //Input dimensions
 				oX, oY, oZ, oX * oY, //Output dimensions
-				oX*oY*oZ,
-				grid_dim,
-				Nspi,
-				WINDOW_FT_BLOCK_SIZE);
+				oX*oY*oZ
+				);
 #endif
 	}
 }

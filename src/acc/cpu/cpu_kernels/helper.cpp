@@ -1,7 +1,30 @@
-#include "src/acc/cpu/cpu_settings.h"
-#include "src/acc/cpu/cpu_kernels/cpu_utils.h"
-#include "src/acc/cpu/cpu_kernels/helper.h"
+#undef CUDA
+typedef float cudaStream_t;
+typedef double CudaCustomAllocator;
+typedef int dim3;
+#define cudaStreamPerThread 0
+#define CUSTOM_ALLOCATOR_REGION_NAME( name ) //Do nothing
+#define LAUNCH_PRIVATE_ERROR(func, status)
+#define LAUNCH_HANDLE_ERROR( err )
+#define DEBUG_HANDLE_ERROR( err )
+#define HANDLE_ERROR( err )
 
+#include "src/acc/acc_ptr.h"
+#include "src/acc/acc_projector.h"
+#include "src/acc/acc_backprojector.h"
+#include "src/acc/acc_projector_plan.h"
+#include "src/acc/cpu/cpu_benchmark_utils.h"
+#include "src/acc/cpu/cpu_helper_functions.h"
+#include "src/acc/cpu/cpu_kernels/helper.h"
+#include "src/acc/cpu/cpu_kernels/diff2.h"
+#include "src/acc/cpu/cpu_kernels/wavg.h"
+#include "src/acc/cpu/cpu_kernels/BP.h"
+#include "src/acc/utilities.h"
+#include "src/acc/data_types.h"
+
+#include "src/acc/acc_helper_functions.h"
+
+#include "src/acc/cpu/cpu_kernels/cpu_utils.h"
 
 namespace CpuKernels
 {
@@ -72,7 +95,7 @@ void exponentiate_weights_fine(
 	} // for bid
 }
 
-void SoftMaskBackgroundValue(	int      block_dim,
+void softMaskBackgroundValue(	int      block_dim,
                                 int      block_size,
                                 XFLOAT  *vol,
 								long int vol_size,
@@ -89,7 +112,6 @@ void SoftMaskBackgroundValue(	int      block_dim,
 								XFLOAT  *g_sum,
 								XFLOAT  *g_sum_bg)
 {
-	int     gridDim_x = block_dim;	
 	for(int bid=0; bid<block_dim; bid++) 
 	{
 		for(int tid=0; tid<block_size; tid++) 
@@ -99,10 +121,10 @@ void SoftMaskBackgroundValue(	int      block_dim,
 			int x,y,z;
 			XFLOAT     img_pixels;
 
-			long int texel_pass_num = ceilfracf(vol_size,SOFTMASK_BLOCK_SIZE*gridDim_x);
-			int texel = bid*SOFTMASK_BLOCK_SIZE*texel_pass_num + tid;
+			long int texel_pass_num = ceilfracf(vol_size,block_size*block_dim);
+			int texel = bid*block_size*texel_pass_num + tid;
 
-			for (int pass = 0; pass < texel_pass_num; pass++, texel+=SOFTMASK_BLOCK_SIZE) // loop the available warps enough to complete all translations for this orientation
+			for (int pass = 0; pass < texel_pass_num; pass++, texel+=block_size) // loop the available warps enough to complete all translations for this orientation
 			{
 				if(texel<vol_size)
 				{
@@ -158,7 +180,6 @@ void cosineFilter(	int      block_dim,
 					XFLOAT   cosine_width,
 					XFLOAT   bg_value)
 {
-	int     gridDim_x = block_dim;	
 	for(int bid=0; bid<block_dim; bid++) 
 	{
 		for(int tid=0; tid<block_size; tid++) 
@@ -168,10 +189,10 @@ void cosineFilter(	int      block_dim,
 			int x,y,z;
 			XFLOAT     img_pixels;
 
-			long int texel_pass_num = ceilfracf(vol_size,SOFTMASK_BLOCK_SIZE*gridDim_x);
-			int texel = bid*SOFTMASK_BLOCK_SIZE*texel_pass_num + tid;
+			long int texel_pass_num = ceilfracf(vol_size,block_size*block_dim);
+			int texel = bid*block_size*texel_pass_num + tid;
 
-			for (int pass = 0; pass < texel_pass_num; pass++, texel+=SOFTMASK_BLOCK_SIZE) // loop the available warps enough to complete all translations for this orientation
+			for (int pass = 0; pass < texel_pass_num; pass++, texel+=block_size) // loop the available warps enough to complete all translations for this orientation
 			{
 				if(texel<vol_size)
 				{
@@ -279,7 +300,7 @@ void cpu_translate3D(T * g_image_in,
 
 void centerFFT_2D(  int     blocks,
 					int     batch_size,
-					int     block_size
+					int     block_size,
 					XFLOAT *img_in,
 					int     image_size,
 					int     xdim,
@@ -331,7 +352,7 @@ void centerFFT_2D(  int     blocks,
 
 void centerFFT_3D(  int       blocks,
 					int       batch_size,
-					int       block_size
+					int       block_size,
 					XFLOAT   *img_in,
 					int       image_size,
 					int       xdim,
@@ -885,4 +906,30 @@ void cpu_kernel_make_eulers_3D(int grid_size, int block_size,
 }
 
 } // end of namespace CpuKernels
+
+
+// -------------------------------  Some explicit template instantiations
+template void CpuKernels::cpu_translate2D<XFLOAT>(XFLOAT *,
+    XFLOAT*, int, int, int, int, int);
+
+template void CpuKernels::cpu_translate3D<XFLOAT>(XFLOAT *,
+    XFLOAT *, int, int, int, int, int, int, int);
+
+template void CpuKernels::cpu_kernel_multi<XFLOAT>( XFLOAT *,
+	XFLOAT, int);
+
+template void CpuKernels::cpu_kernel_make_eulers_3D<true,true>(int, int,
+		XFLOAT *, XFLOAT *, XFLOAT *, XFLOAT *, unsigned, XFLOAT *);
+template void CpuKernels::cpu_kernel_make_eulers_3D<true,false>(int, int,
+		XFLOAT *, XFLOAT *, XFLOAT *, XFLOAT *, unsigned, XFLOAT *);
+template void CpuKernels::cpu_kernel_make_eulers_3D<false,true>(int, int,
+		XFLOAT *, XFLOAT *, XFLOAT *, XFLOAT *, unsigned, XFLOAT *);
+template void CpuKernels::cpu_kernel_make_eulers_3D<false,false>(int, int,
+		XFLOAT *, XFLOAT *, XFLOAT *, XFLOAT *, unsigned, XFLOAT *);
+
+template void CpuKernels::cpu_kernel_make_eulers_2D<true>(int, int, 
+		XFLOAT *, XFLOAT *, unsigned);
+template void CpuKernels::cpu_kernel_make_eulers_2D<false>(int, int, 
+		XFLOAT *, XFLOAT *, unsigned);
+// ----------------------------------------------------------------------
 

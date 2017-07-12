@@ -792,7 +792,7 @@ void diff2_CC_fine(
 		XFLOAT *g_trans_x,
 		XFLOAT *g_trans_y,
 		XFLOAT *g_trans_z,
-		AccProjectorKernel projector,
+		AccProjectorKernel &projector,
 		XFLOAT *g_corr_img,
 		XFLOAT *g_diff2s,
 		unsigned image_size,
@@ -861,7 +861,6 @@ void diff2_CC_fine(
 			g_imgs_imag,
 			g_trans_x,
 			g_trans_y,
-			g_trans_z,
 			projector,
 			g_corr_img,
 			g_diff2s,
@@ -903,7 +902,7 @@ void kernel_exponentiate_weights_coarse(
 //						for(int i=0; i<block_num; i++)
 //						for(int j=0; j<sp.iclass_max-sp.iclass_min+1; j++)
 //							 for(int k=0; k<SUMW_BLOCK_SIZE; k++)
-		CpuKernels::exponentiate_weights_coarse(
+		CpuKernels::exponentiate_weights_coarse<failsafe,weights_t>(
 				grid_size, 
 				num_classes, 
 				block_size,

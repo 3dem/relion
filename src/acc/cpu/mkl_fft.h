@@ -171,8 +171,8 @@ extern tbb::spin_mutex      mkl_mutex;
 class MklFFT
 {
 public:
-	std::vector<XFLOAT>      reals;
-	std::vector<ACCCOMPLEX> fouriers;
+	AccPtr<XFLOAT>      reals;
+	AccPtr<ACCCOMPLEX> fouriers;
 
 	int    direction;
 	int    dimension;
@@ -234,8 +234,8 @@ public:
 	     yFSize = y;
 	     zFSize = z;
 
-	     reals.resize(xSize * ySize * zSize);
-	     fouriers.resize(xFSize * yFSize * zFSize);
+	     reals.resizeHost(xSize * ySize * zSize);
+	     fouriers.resizeHost(xFSize * yFSize * zFSize);
 	    
 	    
          int N[3];  
@@ -251,17 +251,17 @@ public:
          {
              tbb::spin_mutex::scoped_lock lock(mkl_mutex);
 #ifdef CUDA_DOUBLE_PRECISION
-            fPlanForward = fftw_plan_dft_r2c(dimension, N,  &reals[0],
-                                         (fftw_complex*) &fouriers[0], FFTW_ESTIMATE);
+            fPlanForward = fftw_plan_dft_r2c(dimension, N,  reals(),
+                                         (fftw_complex*) fouriers(), FFTW_ESTIMATE);
             fPlanBackward = fftw_plan_dft_c2r(dimension, N,
-                                          (fftw_complex*) &fouriers[0],  &reals[0],
+                                          (fftw_complex*) fouriers(),  reals(),
                                           FFTW_ESTIMATE);
 
 #else
-            fPlanForward = fftwf_plan_dft_r2c(dimension, N, &reals[0],
-                                         (fftwf_complex*) &fouriers[0], FFTW_ESTIMATE);
+            fPlanForward = fftwf_plan_dft_r2c(dimension, N, reals(),
+                                         (fftwf_complex*) fouriers(), FFTW_ESTIMATE);
             fPlanBackward = fftwf_plan_dft_c2r(dimension, N,
-                                          (fftwf_complex*) &fouriers[0], &reals[0], FFTW_ESTIMATE);
+                                          (fftwf_complex*) fouriers(), reals(), FFTW_ESTIMATE);
 #endif
         }
 	}
@@ -274,9 +274,9 @@ public:
 	        return;
 	     }
 #ifdef CUDA_DOUBLE_PRECISION
-        fftw_execute_dft_r2c(fPlanForward,&reals[0], (fftw_complex*) &fouriers[0]);
+        fftw_execute_dft_r2c(fPlanForward, reals(), (fftw_complex*) fouriers());
 #else
-        fftwf_execute_dft_r2c(fPlanForward,&reals[0],  (fftwf_complex*) &fouriers[0]);
+        fftwf_execute_dft_r2c(fPlanForward, reals(),  (fftwf_complex*) fouriers());
 #endif
      
 	}
@@ -290,16 +290,16 @@ public:
 	    }	     
 
 #ifdef CUDA_DOUBLE_PRECISION
-        fftw_execute_dft_c2r(fPlanBackward, (fftw_complex*) &fouriers[0], &reals[0]);
+        fftw_execute_dft_c2r(fPlanBackward, (fftw_complex*) fouriers(), reals());
 #else
-        fftwf_execute_dft_c2r(fPlanBackward, (fftwf_complex*) &fouriers[0], &reals[0]);
+        fftwf_execute_dft_c2r(fPlanBackward, (fftwf_complex*) fouriers(), reals());
 #endif	
 	}
 
 	void clear()
 	{
-        reals.clear();
-        fouriers.clear();
+        reals.freeHost();
+        fouriers.freeHost();
         
         tbb::spin_mutex::scoped_lock lock(mkl_mutex);        
 #ifdef CUDA_DOUBLE_PRECISION

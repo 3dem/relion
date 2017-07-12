@@ -575,15 +575,22 @@ public:
 #endif
 	};
 
-// TODO - is this appropriate on the host?
 	inline
 	T* operator~() 
 	{
+#ifdef CUDA
 #ifdef DEBUG_CUDA
 		if ( dPtr == 0)
 			printf("DEBUG_WARNING: \"kernel cast\" on null pointer.\n");
 #endif
 		return dPtr;
+#else
+#ifdef DEBUG_CUDA
+		if ( hPtr == 0)
+			printf("DEBUG_WARNING: \"kernel cast\" on null pointer.\n");
+#endif
+		return hPtr;
+#endif
 	};
 	
 	inline
@@ -678,7 +685,8 @@ public:
 			ACC_PTR_DEBUG_FATAL("free_host() called on NULL pointer.\n");
 #endif
 		doFreeHost = false;
-		delete [] hPtr;
+		if (NULL != hPtr)
+			delete [] hPtr;
 		hPtr = NULL;
 	}
 

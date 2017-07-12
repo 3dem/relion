@@ -305,8 +305,11 @@ void AccProjector::clear()
 		texArrayImag = 0;
 #else
 // TODO Optimized CPU-only path
+#ifdef CUDA
 		cudaFree(mdlReal);
 		cudaFree(mdlImag);
+#else
+#endif
 #endif
 		mdlReal = 0;
 		mdlImag = 0;

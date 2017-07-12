@@ -282,8 +282,13 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		 * Example usage of AccPtr and AccUtilities library function
 		 */
 
+#ifdef CUDA
 		AccDataTypes::Image<XFLOAT> temp(img.data, accMLO->devBundle->allocator);
 		AccDataTypes::Image<XFLOAT> d_img_(img.data,accMLO->devBundle->allocator);
+#else
+		AccDataTypes::Image<XFLOAT> temp(img.data);
+		AccDataTypes::Image<XFLOAT> d_img_(img.data);
+#endif
 
 		d_img_.accAlloc();
 		d_img_.accInit(0);
@@ -324,7 +329,11 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 		DEBUG_HANDLE_ERROR(cudaDeviceSynchronize());
 
+#ifdef CUDA
 		AccPtr<XFLOAT> d_img(img_size,accMLO->devBundle->allocator);
+#else
+		AccPtr<XFLOAT> d_img(img_size);
+#endif
 		d_img.deviceAlloc();
 
 		d_img_.cpOnAcc(~d_img);
@@ -367,8 +376,9 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 //		accMLO->transformer1.reals.streamSync();
 //		accMLO->transformer1.fouriers.streamSync();
 
+#ifdef CUDA
 		d_img.cpOnAcc(accMLO->transformer1.reals);
-
+#endif
 		runCenterFFT(
 				accMLO->transformer1.reals,
 				(int)accMLO->transformer1.xSize,
@@ -390,8 +400,12 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 						accMLO->transformer1.fouriers.getSize()*2);
 
 		LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
-				
+		
+#ifdef CUDA		
 		AccPtr<ACCCOMPLEX> d_Fimg(current_size_x * current_size_y * current_size_z, accMLO->devBundle->allocator);
+#else
+		AccPtr<ACCCOMPLEX> d_Fimg(current_size_x * current_size_y * current_size_z);
+#endif
 		d_Fimg.deviceAlloc();
 
 		accMLO->transformer1.fouriers.streamSync();
@@ -546,8 +560,13 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 			XFLOAT sum_bg(0.);
 			int block_dim = 128; //TODO: set balanced (hardware-dep?)
+#ifdef CUDA
 			AccPtr<XFLOAT> softMaskSum   (SOFTMASK_BLOCK_SIZE,0,accMLO->devBundle->allocator);
 			AccPtr<XFLOAT> softMaskSum_bg(SOFTMASK_BLOCK_SIZE,0,accMLO->devBundle->allocator);
+#else
+			AccPtr<XFLOAT> softMaskSum   ((size_t)SOFTMASK_BLOCK_SIZE);
+			AccPtr<XFLOAT> softMaskSum_bg((size_t)SOFTMASK_BLOCK_SIZE);
+#endif
 			softMaskSum.deviceAlloc();
 			softMaskSum_bg.deviceAlloc();
 			softMaskSum.deviceInit(0.f);
@@ -634,7 +653,11 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		// Store the power_class spectrum of the whole image (to fill sigma2_noise between current_size and ori_size
 		if (baseMLO->mymodel.current_size < baseMLO->mymodel.ori_size)
 		{
+#ifdef CUDA
 			AccPtr<XFLOAT> spectrumAndXi2((baseMLO->mymodel.ori_size/2+1)+1,0,accMLO->devBundle->allocator); // last +1 is the Xi2, to remove an expensive memcpy
+#else
+			AccPtr<XFLOAT> spectrumAndXi2((size_t)((baseMLO->mymodel.ori_size/2+1)+1)); // last +1 is the Xi2, to remove an expensive memcpy
+#endif
 			spectrumAndXi2.deviceAlloc();
 			spectrumAndXi2.deviceInit(0);
 			spectrumAndXi2.streamSync();
@@ -818,14 +841,26 @@ void getAllSquaredDifferencesCoarse(
 
 	CTOC(accMLO->timer,"diff_pre_gpu");
 
+#ifdef CUDA
 	std::vector<AccProjectorPlan> projectorPlans(0, accMLO->devBundle->allocator);
+#else
+	std::vector< AccProjectorPlan > projectorPlans;
+#endif
 
 	//If particle specific sampling plan required
+#ifdef CUDA
 	if (accMLO->devBundle->generateProjectionPlanOnTheFly)
+#else
+	if (accMLO->generateProjectionPlanOnTheFly)
+#endif
 	{
 		CTIC(accMLO->timer,"generateProjectionSetupCoarse");
 
+#ifdef CUDA
 		projectorPlans.resize(baseMLO->mymodel.nr_classes, accMLO->devBundle->allocator);
+#else
+		projectorPlans.resize(baseMLO->mymodel.nr_classes);
+#endif
 
 		for (int iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
 		{
@@ -862,14 +897,22 @@ void getAllSquaredDifferencesCoarse(
 		CTOC(accMLO->timer,"generateProjectionSetupCoarse");
 	}
 	else
+#ifdef CUDA
 		projectorPlans = accMLO->devBundle->coarseProjectionPlans;
+#else
+		projectorPlans = accMLO->coarseProjectionPlans;
+#endif
 
 	// Loop only from sp.iclass_min to sp.iclass_max to deal with seed generation in first iteration
 	size_t allWeights_size(0);
 	for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		allWeights_size += projectorPlans[exp_iclass].orientation_num * sp.nr_trans*sp.nr_oversampled_trans;
 
+#ifdef CUDA
 	AccPtr<XFLOAT> allWeights(allWeights_size,accMLO->devBundle->allocator);
+#else
+	AccPtr<XFLOAT> allWeights(allWeights_size);
+#endif
 	allWeights.deviceAlloc();
 
 	long int allWeights_pos=0;	bool do_CC = (baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc;
@@ -887,12 +930,21 @@ void getAllSquaredDifferencesCoarse(
 
 		long unsigned translation_num((sp.itrans_max - sp.itrans_min + 1) * sp.nr_oversampled_trans);
 
+#ifdef CUDA
 		AccPtr<XFLOAT> trans_x(translation_num, accMLO->devBundle->allocator);
 		AccPtr<XFLOAT> trans_y(translation_num, accMLO->devBundle->allocator);
 		AccPtr<XFLOAT> trans_z(translation_num, accMLO->devBundle->allocator);
 
 		AccPtr<XFLOAT> Fimg_real(image_size, accMLO->devBundle->allocator);
 		AccPtr<XFLOAT> Fimg_imag(image_size, accMLO->devBundle->allocator);
+#else
+		AccPtr<XFLOAT> trans_x((size_t)translation_num);
+		AccPtr<XFLOAT> trans_y((size_t)translation_num);
+		AccPtr<XFLOAT> trans_z((size_t)translation_num);
+
+		AccPtr<XFLOAT> Fimg_real((size_t)image_size);
+		AccPtr<XFLOAT> Fimg_imag((size_t)image_size);
+#endif
 
 		std::vector<RFLOAT> oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
 
@@ -953,7 +1005,11 @@ void getAllSquaredDifferencesCoarse(
 		CTOC(accMLO->timer,"translation_1");
 
 		// To speed up calculation, several image-corrections are grouped into a single pixel-wise "filter", or image-correciton
+#ifdef CUDA
 		AccPtr<XFLOAT> corr_img(image_size, accMLO->devBundle->allocator);
+#else
+		AccPtr<XFLOAT> corr_img((size_t)image_size);
+#endif
 		corr_img.deviceAlloc();
 
 		buildCorrImage(baseMLO,op,corr_img,ipart,group_id);
@@ -975,7 +1031,11 @@ void getAllSquaredDifferencesCoarse(
 				======================================*/
 
 				AccProjectorKernel projKernel = AccProjectorKernel::makeKernel(
+#ifdef CUDA
 						accMLO->devBundle->cudaProjectors[exp_iclass],
+#else
+						accMLO->cpuProjectors[exp_iclass],
+#endif
 						op.local_Minvsigma2s[0].xdim,
 						op.local_Minvsigma2s[0].ydim,
 						op.local_Minvsigma2s[0].zdim,
@@ -995,7 +1055,11 @@ void getAllSquaredDifferencesCoarse(
 						projectorPlans[exp_iclass].orientation_num,
 						translation_num,
 						image_size,
+#ifdef CUDA
 						accMLO->classStreams[exp_iclass],
+#else
+						0,
+#endif
 						do_CC,
 						accMLO->dataIs3D);
 
@@ -1005,7 +1069,11 @@ void getAllSquaredDifferencesCoarse(
 						&Mweight(ipart*weightsPerPart),
 						projectorPlans[exp_iclass].orientation_num,
 						translation_num,
+#ifdef CUDA
 						accMLO->classStreams[exp_iclass]
+#else
+						0
+#endif
 						);
 
 				/*====================================
@@ -1086,12 +1154,21 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 
 		long unsigned translation_num((sp.itrans_max - sp.itrans_min + 1) * sp.nr_oversampled_trans);
 
+#ifdef CUDA
 		AccPtr<XFLOAT> Fimg_real(image_size, accMLO->devBundle->allocator);
 		AccPtr<XFLOAT> Fimg_imag(image_size, accMLO->devBundle->allocator);
 
 		AccPtr<XFLOAT> trans_x(translation_num, accMLO->devBundle->allocator);
 		AccPtr<XFLOAT> trans_y(translation_num, accMLO->devBundle->allocator);
 		AccPtr<XFLOAT> trans_z(translation_num, accMLO->devBundle->allocator);
+#else
+		AccPtr<XFLOAT> Fimg_real((size_t)image_size);
+		AccPtr<XFLOAT> Fimg_imag((size_t)image_size);
+
+		AccPtr<XFLOAT> trans_x((size_t)translation_num);
+		AccPtr<XFLOAT> trans_y((size_t)translation_num);
+		AccPtr<XFLOAT> trans_z((size_t)translation_num);
+#endif
 
 
 		std::vector<RFLOAT> oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
@@ -1154,7 +1231,11 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 
 		CTIC(accMLO->timer,"kernel_init_1");
 
+#ifdef CUDA
 		AccPtr<XFLOAT> corr_img(image_size, accMLO->devBundle->allocator);
+#else
+		AccPtr<XFLOAT> corr_img((size_t)image_size);
+#endif
 		corr_img.deviceAlloc();
 		buildCorrImage(baseMLO,op,corr_img,ipart,group_id);
 
@@ -1168,10 +1249,12 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 		corr_img.cpToDevice();
 
 		CTOC(accMLO->timer,"kernel_init_1");
-		std::vector< AccPtr<XFLOAT> > eulers((sp.iclass_max-sp.iclass_min+1), accMLO->devBundle->allocator);
 #ifdef CUDA
+		std::vector< AccPtr<XFLOAT> > eulers((sp.iclass_max-sp.iclass_min+1), accMLO->devBundle->allocator);
 		cudaStager<XFLOAT> AllEulers(accMLO->devBundle->allocator,9*FineProjectionData[ipart].orientationNumAllClasses);
 		AllEulers.prepare_device();
+#else
+		std::vector< AccPtr<XFLOAT> > eulers((size_t)(sp.iclass_max-sp.iclass_min+1));
 #endif
 		unsigned long newDataSize(0);
 
@@ -1289,7 +1372,11 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 
 				CTIC(accMLO->timer,"Diff2MakeKernel");
 				AccProjectorKernel projKernel = AccProjectorKernel::makeKernel(
+#ifdef CUDA
 						accMLO->devBundle->cudaProjectors[exp_iclass],
+#else
+						accMLO->cpuProjectors[exp_iclass],
+#endif
 						op.local_Minvsigma2s[0].xdim,
 						op.local_Minvsigma2s[0].ydim,
 						op.local_Minvsigma2s[0].zdim,
@@ -1297,7 +1384,11 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 				CTOC(accMLO->timer,"Diff2MakeKernel");
 
 				// Use the constructed mask to construct a partial class-specific input
+#ifdef CUDA
 				IndexedDataArray thisClassFinePassWeights(FinePassWeights[ipart],FPCMasks[ipart][exp_iclass], accMLO->devBundle->allocator);
+#else
+				IndexedDataArray thisClassFinePassWeights(FinePassWeights[ipart],FPCMasks[ipart][exp_iclass]);
+#endif
 
 				CTIC(accMLO->timer,"Diff2CALL");
 
@@ -1324,7 +1415,11 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 						image_size,
 						ipart,
 						exp_iclass,
+#ifdef CUDA
 						accMLO->classStreams[exp_iclass],
+#else
+						0,
+#endif
 						FPCMasks[ipart][exp_iclass].jobOrigin.getSize(),
 						((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc),
 						accMLO->dataIs3D
@@ -1380,8 +1475,13 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 #endif
 
 	// Ready the "prior-containers" for all classes (remake every ipart)
+#ifdef CUDA
 	AccPtr<XFLOAT>  pdf_orientation((sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi, accMLO->devBundle->allocator);
 	AccPtr<XFLOAT>  pdf_offset((sp.iclass_max-sp.iclass_min+1)*sp.nr_trans, accMLO->devBundle->allocator);
+#else
+	AccPtr<XFLOAT>  pdf_orientation((size_t)(sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi);
+	AccPtr<XFLOAT>  pdf_offset((size_t)((sp.iclass_max-sp.iclass_min+1)*sp.nr_trans));
+#endif
 
 	RFLOAT pdf_orientation_mean(0);
 	unsigned pdf_orientation_count(0);
@@ -1661,7 +1761,11 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 							ipart * op.Mweight.xdim + sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.iclass_min,
 							ipart_length);
 
+#ifdef CUDA
 					AccPtr<weights_t> filtered(unsorted_ipart.getSize(), accMLO->devBundle->allocator);
+#else
+					AccPtr<weights_t> filtered((size_t)unsorted_ipart.getSize());
+#endif
 
 					CUSTOM_ALLOCATOR_REGION_NAME("CASDTW_SORTSUM");
 
@@ -1691,8 +1795,13 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					}
 					filtered.setSize(filteredSize);
 
+#ifdef CUDA
 					AccPtr<weights_t> sorted(filteredSize, accMLO->devBundle->allocator);
 					AccPtr<weights_t> cumulative_sum(filteredSize, accMLO->devBundle->allocator);
+#else
+					AccPtr<weights_t> sorted((size_t)filteredSize);
+					AccPtr<weights_t> cumulative_sum((size_t)filteredSize);
+#endif
 					sorted.deviceAlloc();
 					cumulative_sum.deviceAlloc();
 
@@ -1751,8 +1860,12 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 					AccPtr<bool> Mcoarse_significant(
 							&op.Mcoarse_significant.data[ipart * op.Mweight.xdim + sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.iclass_min],
-							(sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi * sp.nr_trans,
-							accMLO->devBundle->allocator);
+							(sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi * sp.nr_trans
+#ifdef CUDA
+							, accMLO->devBundle->allocator);
+#else
+							);
+#endif
 
 					CUSTOM_ALLOCATOR_REGION_NAME("CASDTW_SIG");
 					Mcoarse_significant.deviceAlloc();
@@ -1781,8 +1894,12 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					if ((baseMLO->mymodel.pdf_class[exp_iclass] > 0.) && (FPCMasks[ipart][exp_iclass].weightNum > 0) )
 					{
 						// Use the constructed mask to build a partial (class-specific) input
-						// (until now, PassWeights has been an empty placeholder. We now create class-paritals pointing at it, and start to fill it with stuff)
+						// (until now, PassWeights has been an empty placeholder. We now create class-partials pointing at it, and start to fill it with stuff)
+#ifdef CUDA
 						IndexedDataArray thisClassPassWeights(PassWeights[ipart],FPCMasks[ipart][exp_iclass], accMLO->devBundle->allocator);
+#else
+						IndexedDataArray thisClassPassWeights(PassWeights[ipart],FPCMasks[ipart][exp_iclass]);
+#endif
 						AccPtr<XFLOAT>  pdf_orientation_class(&(pdf_orientation[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]), &( pdf_orientation((exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi) ), sp.nr_dir*sp.nr_psi);
 						AccPtr<XFLOAT>  pdf_offset_class(&(pdf_offset[(exp_iclass-sp.iclass_min)*sp.nr_trans]), &( pdf_offset((exp_iclass-sp.iclass_min)*sp.nr_trans) ), sp.nr_trans);
 
@@ -1802,7 +1919,11 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 								~FPCMasks[ipart][exp_iclass].jobOrigin,
 								~FPCMasks[ipart][exp_iclass].jobExtent,
 								FPCMasks[ipart][exp_iclass].jobNum,
+#ifdef CUDA
 								accMLO->classStreams[exp_iclass]);
+#else
+								0);
+#endif
 								LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 					}
 
@@ -1819,8 +1940,13 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 				size_t weightSize = PassWeights[ipart].weights.getSize();
 
+#ifdef CUDA
 				AccPtr<XFLOAT> sorted(weightSize, accMLO->devBundle->allocator);
 				AccPtr<XFLOAT> cumulative_sum(weightSize, accMLO->devBundle->allocator);
+#else
+				AccPtr<XFLOAT> sorted((size_t)weightSize);
+				AccPtr<XFLOAT> cumulative_sum((size_t)weightSize);
+#endif
 
 				CUSTOM_ALLOCATOR_REGION_NAME("CASDTW_FINE");
 
@@ -1976,10 +2102,18 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
 	{
 		// Allocate space for all classes, so that we can pre-calculate data for all classes, copy in one operation, call kenrels on all classes, and copy back in one operation
+#ifdef CUDA
 		AccPtr<XFLOAT>          oo_otrans_x(nr_fake_classes*nr_transes, accMLO->devBundle->allocator); // old_offset_oversampled_trans_x
 		AccPtr<XFLOAT>          oo_otrans_y(nr_fake_classes*nr_transes, accMLO->devBundle->allocator);
 		AccPtr<XFLOAT>          oo_otrans_z(nr_fake_classes*nr_transes, accMLO->devBundle->allocator);
 		AccPtr<XFLOAT> myp_oo_otrans_x2y2z2(nr_fake_classes*nr_transes, accMLO->devBundle->allocator); // my_prior_old_offs....x^2*y^2*z^2
+#else
+		AccPtr<XFLOAT>          oo_otrans_x((size_t)nr_fake_classes*nr_transes); // old_offset_oversampled_trans_x
+		AccPtr<XFLOAT>          oo_otrans_y((size_t)nr_fake_classes*nr_transes);
+		AccPtr<XFLOAT>          oo_otrans_z((size_t)nr_fake_classes*nr_transes);
+		AccPtr<XFLOAT> myp_oo_otrans_x2y2z2((size_t)nr_fake_classes*nr_transes); // my_prior_old_offs....x^2*y^2*z^2
+
+#endif
 
 		myp_oo_otrans_x2y2z2.deviceAlloc();
 
@@ -1994,8 +2128,11 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				continue;
 
 			// Use the constructed mask to construct a partial class-specific input
+#ifdef CUDA
 			IndexedDataArray thisClassFinePassWeights(FinePassWeights[ipart],FPCMasks[ipart][exp_iclass], accMLO->devBundle->allocator);
-
+#else
+			IndexedDataArray thisClassFinePassWeights(FinePassWeights[ipart],FPCMasks[ipart][exp_iclass]);
+#endif
 			// Re-define the job-partition of the indexedArray of weights so that the collect-kernel can work with it.
 			block_nums[nr_fake_classes*ipart + fake_class] = makeJobsForCollect(thisClassFinePassWeights, FPCMasks[ipart][exp_iclass], ProjectionData[ipart].orientation_num[exp_iclass]);
 
@@ -2097,11 +2234,19 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		myp_oo_otrans_x2y2z2.cpToDevice();
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
+#ifdef CUDA
 		AccPtr<XFLOAT>                      p_weights(sumBlockNum, accMLO->devBundle->allocator);
 		AccPtr<XFLOAT> p_thr_wsum_prior_offsetx_class(sumBlockNum, accMLO->devBundle->allocator);
 		AccPtr<XFLOAT> p_thr_wsum_prior_offsety_class(sumBlockNum, accMLO->devBundle->allocator);
 		AccPtr<XFLOAT> p_thr_wsum_prior_offsetz_class(sumBlockNum, accMLO->devBundle->allocator);
 		AccPtr<XFLOAT>       p_thr_wsum_sigma2_offset(sumBlockNum, accMLO->devBundle->allocator);
+#else
+		AccPtr<XFLOAT>                      p_weights((size_t)sumBlockNum);
+		AccPtr<XFLOAT> p_thr_wsum_prior_offsetx_class((size_t)sumBlockNum);
+		AccPtr<XFLOAT> p_thr_wsum_prior_offsety_class((size_t)sumBlockNum);
+		AccPtr<XFLOAT> p_thr_wsum_prior_offsetz_class((size_t)sumBlockNum);
+		AccPtr<XFLOAT>       p_thr_wsum_sigma2_offset((size_t)sumBlockNum);
+#endif
 		p_weights.deviceAlloc();
 		p_thr_wsum_prior_offsetx_class.deviceAlloc();
 		p_thr_wsum_prior_offsety_class.deviceAlloc();
@@ -2123,7 +2268,11 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				continue;
 
 			// Use the constructed mask to construct a partial class-specific input
+#ifdef CUDA
 			IndexedDataArray thisClassFinePassWeights(FinePassWeights[ipart],FPCMasks[ipart][exp_iclass], accMLO->devBundle->allocator);
+#else
+			IndexedDataArray thisClassFinePassWeights(FinePassWeights[ipart],FPCMasks[ipart][exp_iclass]);
+#endif
 
 
 			int cpos=fake_class*nr_transes;
@@ -2322,9 +2471,15 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 		long unsigned translation_num((sp.itrans_max - sp.itrans_min + 1) * sp.nr_oversampled_trans);
 
+#ifdef CUDA
 		AccPtr<XFLOAT> trans_x(translation_num, accMLO->devBundle->allocator);
 		AccPtr<XFLOAT> trans_y(translation_num, accMLO->devBundle->allocator);
 		AccPtr<XFLOAT> trans_z(translation_num, accMLO->devBundle->allocator);
+#else
+		AccPtr<XFLOAT> trans_x((size_t)translation_num);
+		AccPtr<XFLOAT> trans_y((size_t)translation_num);
+		AccPtr<XFLOAT> trans_z((size_t)translation_num);
+#endif
 
 		int j = 0;
 		for (long int itrans = 0; itrans < (sp.itrans_max - sp.itrans_min + 1); itrans++)
@@ -2370,10 +2525,17 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 		CTIC(accMLO->timer,"translation_3");
 
+#ifdef CUDA
 		AccPtr<XFLOAT> Fimgs_real(image_size, accMLO->devBundle->allocator);
 		AccPtr<XFLOAT> Fimgs_imag(image_size, accMLO->devBundle->allocator);
 		AccPtr<XFLOAT> Fimgs_nomask_real(image_size, accMLO->devBundle->allocator);
 		AccPtr<XFLOAT> Fimgs_nomask_imag(image_size, accMLO->devBundle->allocator);
+#else
+		AccPtr<XFLOAT> Fimgs_real((size_t)image_size);
+		AccPtr<XFLOAT> Fimgs_imag((size_t)image_size);
+		AccPtr<XFLOAT> Fimgs_nomask_real((size_t)image_size);
+		AccPtr<XFLOAT> Fimgs_nomask_imag((size_t)image_size);
+#endif
 
 		MultidimArray<Complex > Fimg, Fimg_nonmask;
 		windowFourierTransform(op.Fimgs[ipart], Fimg, sp.current_image_size);
@@ -2421,7 +2583,11 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			}
 		}
 
+#ifdef CUDA
 		AccPtr<XFLOAT> ctfs(image_size, accMLO->devBundle->allocator);
+#else
+		AccPtr<XFLOAT> ctfs((size_t)image_size);
+#endif
 
 		if (baseMLO->do_ctf_correction)
 		{
@@ -2438,7 +2604,11 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		                       MINVSIGMA
 		======================================================*/
 
+#ifdef CUDA	
 		AccPtr<XFLOAT> Minvsigma2s(image_size, accMLO->devBundle->allocator);
+#else
+		AccPtr<XFLOAT> Minvsigma2s((size_t)image_size);
+#endif
 
 		if (baseMLO->do_map)
 			for (unsigned i = 0; i < image_size; i++)
@@ -2455,9 +2625,15 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 		CUSTOM_ALLOCATOR_REGION_NAME("wdiff2s");
 
+#ifdef CUDA
 		AccPtr<XFLOAT> wdiff2s_AA(baseMLO->mymodel.nr_classes*image_size, 0, accMLO->devBundle->allocator);
 		AccPtr<XFLOAT> wdiff2s_XA(baseMLO->mymodel.nr_classes*image_size, 0, accMLO->devBundle->allocator);
 		AccPtr<XFLOAT> wdiff2s_sum(image_size, 0, accMLO->devBundle->allocator);
+#else
+		AccPtr<XFLOAT> wdiff2s_AA((size_t)(baseMLO->mymodel.nr_classes*image_size));
+		AccPtr<XFLOAT> wdiff2s_XA((size_t)(baseMLO->mymodel.nr_classes*image_size));
+		AccPtr<XFLOAT> wdiff2s_sum((size_t)image_size);
+#endif
 
 		wdiff2s_AA.deviceAlloc();
 		wdiff2s_AA.deviceInit(0.f);
@@ -2472,8 +2648,13 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		CUSTOM_ALLOCATOR_REGION_NAME("BP_data");
 
 		// Loop from iclass_min to iclass_max to deal with seed generation in first iteration
+#ifdef CUDA
 		AccPtr<XFLOAT> sorted_weights(ProjectionData[ipart].orientationNumAllClasses * translation_num, 0, accMLO->devBundle->allocator);
 		std::vector<AccPtr<XFLOAT> > eulers(baseMLO->mymodel.nr_classes, accMLO->devBundle->allocator);
+#else
+		AccPtr<XFLOAT> sorted_weights((size_t)(ProjectionData[ipart].orientationNumAllClasses * translation_num));
+		std::vector<AccPtr<XFLOAT> > eulers(baseMLO->mymodel.nr_classes);
+#endif
 
 		int classPos = 0;
 
@@ -2487,7 +2668,11 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				continue;
 
 			// Use the constructed mask to construct a partial class-specific input
+#ifdef CUDA
 			IndexedDataArray thisClassFinePassWeights(FinePassWeights[ipart],FPCMasks[ipart][exp_iclass], accMLO->devBundle->allocator);
+#else
+			IndexedDataArray thisClassFinePassWeights(FinePassWeights[ipart],FPCMasks[ipart][exp_iclass]);
+#endif
 
 			CTIC(accMLO->timer,"thisClassProjectionSetupCoarse");
 			// use "slice" constructor with class-specific parameters to retrieve a temporary ProjectionParams with data for this class
@@ -2505,7 +2690,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			======================================================*/
 
 			eulers[exp_iclass].setSize(orientation_num * 9);
+#ifdef CUDA
 			eulers[exp_iclass].setStream(accMLO->classStreams[exp_iclass]);
+#endif
 			eulers[exp_iclass].hostAlloc();
 
 			CTIC(accMLO->timer,"generateEulerMatricesProjector");
@@ -2557,7 +2744,11 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			long unsigned orientation_num(ProjectionData[ipart].orientation_num[exp_iclass]);
 
 			AccProjectorKernel projKernel = AccProjectorKernel::makeKernel(
+#ifdef CUDA
 					accMLO->devBundle->cudaProjectors[exp_iclass],
+#else
+					accMLO->cpuProjectors[exp_iclass],
+#endif
 					op.local_Minvsigma2s[0].xdim,
 					op.local_Minvsigma2s[0].ydim,
 					op.local_Minvsigma2s[0].zdim,
@@ -2586,7 +2777,11 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					part_scale,
 					baseMLO->refs_are_ctf_corrected,
 					accMLO->dataIs3D,
+#ifdef CUDA
 					accMLO->classStreams[exp_iclass]);
+#else
+					0);
+#endif
 
 			/*======================================================
 								BACKPROJECTION
@@ -2600,7 +2795,11 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			CTIC(accMLO->timer,"backproject");
 
 			runBackProjectKernel(
+#ifdef CUDA
 				accMLO->devBundle->cudaBackprojectors[exp_iclass],
+#else
+				accMLO->cpuBackprojectors[exp_iclass],
+#endif
 				projKernel,
 				~Fimgs_nomask_real,
 				~Fimgs_nomask_imag,
@@ -2620,7 +2819,11 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				orientation_num,
 				accMLO->dataIs3D,
 				baseMLO->do_sgd,
+#ifdef CUDA
 				accMLO->classStreams[exp_iclass]);
+#else
+				0);
+#endif
 
 			CTOC(accMLO->timer,"backproject");
 
@@ -2811,7 +3014,9 @@ void accDoExpectationOneParticle(MlClass *myInstance, unsigned long my_ori_parti
 {
 	SamplingParameters sp;
 	MlOptimiser *baseMLO = myInstance->baseMLO;
+#ifdef CUDA
 	MlDeviceBundle *devBundle = myInstance->devBundle;
+#endif
 
 	CTIC(timer,"oneParticle");
 	sp.nr_particles = baseMLO->mydata.ori_particles[my_ori_particle].particles_id.size();
@@ -2904,10 +3109,18 @@ baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_A);
 
 	/// -- This is a iframe-indexed vector, each entry of which is a dense data-array. These are replacements to using
 	//    Mweight in the sparse (Fine-sampled) pass, coarse is unused but created empty input for convert ( FIXME )
+#ifdef CUDA
 	std::vector <IndexedDataArray > CoarsePassWeights(1, devBundle->allocator) ,FinePassWeights(sp.nr_particles, devBundle->allocator);
+#else
+	std::vector <IndexedDataArray > CoarsePassWeights(1) ,FinePassWeights(sp.nr_particles);
+#endif
 	// -- This is a iframe-indexed vector, each entry of which is a class-indexed vector of masks, one for each
 	//    class in FinePassWeights
+#ifdef CUDA
 	std::vector < std::vector <IndexedDataArrayMask > > FinePassClassMasks(sp.nr_particles, std::vector <IndexedDataArrayMask >(baseMLO->mymodel.nr_classes, devBundle->allocator));
+#else
+	std::vector < std::vector <IndexedDataArrayMask > > FinePassClassMasks(sp.nr_particles, std::vector <IndexedDataArrayMask >(baseMLO->mymodel.nr_classes));
+#endif
 	// -- This is a iframe-indexed vector, each entry of which is parameters used in the projection-operations *after* the
 	//    coarse pass, declared here to keep scope to storeWS
 	std::vector < ProjectionParams > FineProjectionData(sp.nr_particles, baseMLO->mymodel.nr_classes);
@@ -2956,7 +3169,11 @@ baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_B);
 
 			op.Mweight.resizeNoCp(1,1,sp.nr_particles, weightsPerPart);
 
+#ifdef CUDA
 			AccPtr<XFLOAT> Mweight(devBundle->allocator);
+#else
+			AccPtr<XFLOAT> Mweight;
+#endif
 			Mweight.setSize(sp.nr_particles * weightsPerPart);
 			Mweight.setHostPtr(op.Mweight.data);
 			Mweight.deviceAlloc();
@@ -3046,7 +3263,11 @@ baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_D);
 #endif
 			CTOC(timer,"getAllSquaredDifferencesFine");
 			FinePassWeights[0].weights.cpToHost();
+#ifdef CUDA
 			AccPtr<XFLOAT> Mweight(devBundle->allocator); //DUMMY
+#else
+			AccPtr<XFLOAT> Mweight; //DUMMY
+#endif
 
 			CTIC(timer,"convertAllSquaredDifferencesToWeightsFine");
 			convertAllSquaredDifferencesToWeights<MlClass,XFLOAT>(ipass, op, sp, baseMLO, myInstance, FinePassWeights, FinePassClassMasks, Mweight);
