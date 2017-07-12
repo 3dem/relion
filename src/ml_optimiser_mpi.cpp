@@ -29,8 +29,6 @@
 //#define PRINT_GPU_MEM_INFO
 //#define DEBUG
 //#define DEBUG_MPIEXP2
-//#define DEBUG_SEQUENTIAL
-//#define DEBUG_SEQUENTIAL2
 
 #ifdef TIMING
         int TIMING_MPIPACK, TIMING_MPIWAIT, TIMING_MPICOMBINEDISC, TIMING_MPICOMBINENETW, TIMING_MPISLAVEWORK;
@@ -56,6 +54,7 @@ void MlOptimiserMpi::read(int argc, char **argv)
 
     int mpi_section = parser.addSection("MPI options");
     only_do_unfinished_movies = parser.checkOption("--only_do_unfinished_movies", "When processing movies on a per-micrograph basis, ignore those movies for which the output STAR file already exists.");
+    halt_all_slaves_except_this = textToInteger(parser.getOption("--halt_all_slaves_except", "For debugging: keep all slaves except this one waiting", "-1"));
 
     // Don't put any output to screen for mpi slaves
     ori_verb = verb;
@@ -1255,19 +1254,13 @@ void MlOptimiserMpi::expectation()
     	try
     	{
 
-#ifdef DEBUG_SEQUENTIAL
-    		// Let all slaves except the first one sleep forever
-    		if (node->rank != first_slave)
-    			while (true)
-    				sleep(1000);
-#endif
-#ifdef DEBUG_SEQUENTIAL2
-    		// Let all slaves except the first one sleep forever
-    		if (node->rank != 2)
-    			while (true)
-    				sleep(1000);
-#endif
-
+    		if (halt_all_slaves_except_this > 0)
+    		{
+    			// Let all slaves except this one sleep forever
+        		if (node->rank != halt_all_slaves_except_this)
+        			while (true)
+        				sleep(1000);
+    		}
 
     		// Slaves do the real work (The slave does not need to know to which random_halfset he belongs)
     		// Start off with an empty job request

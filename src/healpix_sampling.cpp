@@ -653,7 +653,7 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
     	std::vector<int> &pointer_dir_nonzeroprior, std::vector<RFLOAT> &directions_prior,
     	std::vector<int> &pointer_psi_nonzeroprior, std::vector<RFLOAT> &psi_prior,
 		bool do_bimodal_search_psi,
-		RFLOAT sigma_cutoff, RFLOAT sigma_tilt_from_zero, RFLOAT sigma_psi_from_zero)
+		RFLOAT sigma_cutoff, RFLOAT sigma_tilt_from_zero)
 {
 	pointer_dir_nonzeroprior.clear();
 	directions_prior.clear();
@@ -871,6 +871,9 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 	for (long int ipsi = 0; ipsi < psi_angles.size(); ipsi++)
 	{
 		bool is_nonzero_pdf = false;
+		// Sjors 12jul2017: for small tilt-angles, rot-angle may become anything, psi-angle then follows that
+		// Therefore, psi-prior may be completely wrong.... The following line would however be a very expensive fix....
+		//if (sigma_psi > 0. && prior_tilt > 10.)
 		if (sigma_psi > 0.)
 		{
 			RFLOAT diffpsi = ABS(psi_angles[ipsi] - prior_psi);
@@ -913,36 +916,10 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 			is_nonzero_pdf = true;
 		}
 
-		// For priors on deviations from 0 psi angles in multi-body refinement
-		if (sigma_psi_from_zero > 0. && is_nonzero_pdf)
-		{
-			long int mypos = pointer_psi_nonzeroprior.size() - 1;
-			// Check psi angle is within 3*sigma_psi_from_zero
-			RFLOAT abs_psi = ABS(psi_angles[ipsi]);
-			if (abs_psi > sigma_cutoff * sigma_psi_from_zero)
-			{
-				pointer_psi_nonzeroprior.pop_back();
-				psi_prior.pop_back();
-			}
-			else
-			{
-				RFLOAT prior = gaussian1D(abs_psi, sigma_psi_from_zero, 0.);
-				psi_prior[mypos] *= prior;
-				sumprior_withsigmafromzero += psi_prior[mypos];
-			}
-		}
-
-
-
 	} // end for ipsi
 	// Normalise the prior probability distribution to have sum 1 over all psi-angles
 	for (long int ipsi = 0; ipsi < psi_prior.size(); ipsi++)
-	{
-		if (sigma_psi_from_zero > 0.)
-			psi_prior[ipsi] /= sumprior_withsigmafromzero;
-		else
-			psi_prior[ipsi] /= sumprior;
-	}
+		psi_prior[ipsi] /= sumprior;
 
 	// If there were no directions at all, just select the single nearest one:
 	if (psi_prior.size() == 0)

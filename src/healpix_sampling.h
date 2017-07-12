@@ -235,8 +235,7 @@ public:
     		std::vector<int> &pointer_dir_nonzeroprior, std::vector<RFLOAT> &directions_prior,
     		std::vector<int> &pointer_psi_nonzeroprior, std::vector<RFLOAT> &psi_prior,
 			bool do_bimodal_search_psi = false,
-    		RFLOAT sigma_cutoff = 3.,
-			RFLOAT sigma_from_zero = -1., RFLOAT sigma_psi_from_zero = -1.);
+    		RFLOAT sigma_cutoff = 3., RFLOAT sigma_from_zero = -1.);
 
     void selectOrientationsWithNonZeroPriorProbabilityFor3DHelicalReconstruction(
     		RFLOAT prior_rot, RFLOAT prior_tilt, RFLOAT prior_psi,

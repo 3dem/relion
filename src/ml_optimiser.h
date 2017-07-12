@@ -136,6 +136,9 @@ public:
 	// Use subtracted images for reconstructions in multi-body refinement?
 	bool do_reconstruct_subtracted_bodies;
 
+	// Precalculated rotation matrix for (0,90,0) rotation, and its transpose
+	Matrix2D<RFLOAT> A_rot90, A_rot90T;
+
 	// Flag to keep tau-spectrum constant
 	bool fix_tau;
 

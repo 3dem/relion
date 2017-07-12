@@ -47,6 +47,9 @@ public:
     // Only process unfinished micrographs in movie-refinement on a per-micrograph basis
     bool only_do_unfinished_movies;
 
+    // For debugging: halt all slaves except this one
+    int halt_all_slaves_except_this;
+
     // Original verb
     int ori_verb;
 
