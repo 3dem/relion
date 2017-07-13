@@ -188,7 +188,7 @@ if(intel_c_compiler_test)
     SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -tbb -limf ")
     SET(MPI_C_COMPILER ${CMAKE_C_COMPILER})
 else()
-    SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -ltbb ")
+    SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -ltbb -lfftw3_threads")
 endif()
 
 string(REGEX MATCH "(.*)mpiicpc(.*)" intel_cxx_compiler_test ${CMAKE_CXX_COMPILER})
