@@ -110,9 +110,16 @@ void Localsym_outputOperator(
 	if (scale_angpix < 0.001)
 		REPORT_ERROR("ERROR: Invalid scale of pixel size!");
 
+	// Enable bold fonts in Unix OS
+#ifdef __unix__
+	(*o_ptr) << "Angles (rot, tilt, psi) = (" << "\e[1m" << VEC_ELEM(op, AA_POS) << ", " << VEC_ELEM(op, BB_POS) << ", " << VEC_ELEM(op, GG_POS)
+			<< "\e[0m" << ") degree(s). Translations (dx, dy, dz) = (" << "\e[1m" << scale_angpix * VEC_ELEM(op, DX_POS) << ", "
+			<< scale_angpix * VEC_ELEM(op, DY_POS) << ", " << scale_angpix * VEC_ELEM(op, DZ_POS) << "\e[0m" << ") Angstrom(s)." << std::flush;
+#else
 	(*o_ptr) << "Angles (rot, tilt, psi) = (" << VEC_ELEM(op, AA_POS) << ", " << VEC_ELEM(op, BB_POS) << ", " << VEC_ELEM(op, GG_POS)
 			<< ") degree(s). Translations (dx, dy, dz) = (" << scale_angpix * VEC_ELEM(op, DX_POS) << ", "
 			<< scale_angpix * VEC_ELEM(op, DY_POS) << ", " << scale_angpix * VEC_ELEM(op, DZ_POS) << ") Angstrom(s)." << std::flush;
+#endif
 }
 
 void Localsym_composeOperator(
@@ -496,6 +503,7 @@ void readRelionFormatMasksWithoutOperators(
 		std::vector<FileName>& fn_mask_list,
 		std::vector<std::vector<Matrix1D<RFLOAT> > >& ops,
 		std::vector<std::vector<FileName> >& op_masks,
+		bool all_angular_search_ranges_are_global,
 		bool verb)
 {
 	FileName fn;
@@ -590,7 +598,7 @@ void readRelionFormatMasksWithoutOperators(
 	fn_mask_list.clear();
 	ops.clear();
 	op_masks.clear();
-	Localsym_composeOperator(op_empty, 0., 90., 0.);
+	Localsym_composeOperator(op_empty, 0., (all_angular_search_ranges_are_global) ? (90.) : (0.), 0.);
 	fns_empty.clear();
 	ops_empty.clear();
 	for (int ii = 1; ii <= ide; ii++)
@@ -1428,9 +1436,16 @@ void getLocalSearchOperatorSamplings(
 	// Angular searching ranges
 	if (!use_healpix)
 	{
-		aa_range = ( (aa_range > 180.) || (aa_range < 0.) ) ? (180.) : aa_range;
-		bb_range = ( (bb_range >  90.) || (bb_range < 0.) ) ? ( 90.) : bb_range;
-		gg_range = ( (gg_range > 180.) || (gg_range < 0.) ) ? (180.) : gg_range;
+		//aa_range = ( (aa_range > 180.) || (aa_range < 0.) ) ? (180.) : aa_range;
+		//bb_range = ( (bb_range >  90.) || (bb_range < 0.) ) ? ( 90.) : bb_range;
+		//gg_range = ( (gg_range > 180.) || (gg_range < 0.) ) ? (180.) : gg_range;
+
+		aa_range = (aa_range > 180.) ? (180.) : aa_range;
+		bb_range = (bb_range >  90.) ? ( 90.) : bb_range;
+		gg_range = (gg_range > 180.) ? (180.) : gg_range;
+		aa_range = (aa_range > 0.) ? aa_range : 0.;
+		bb_range = (bb_range > 0.) ? bb_range : 0.;
+		gg_range = (gg_range > 0.) ? gg_range : 0.;
 	}
 	if ( ( (aa_range < ang_search_step) && (aa_range > XMIPP_EQUAL_ACCURACY) )
 			|| ( (bb_range < ang_search_step) && (bb_range > XMIPP_EQUAL_ACCURACY) )
@@ -1459,9 +1474,9 @@ void getLocalSearchOperatorSamplings(
 
 	if (verb)
 	{
-		std::cout << " + Local searches of local symmetry operator: Angles (rot, tilt, psi) = ("
-				<< aa_init << ", " << bb_init << ", " << gg_init << ") degree(s), center of mass (x, y, z; cropped, rescaled, binned) = ("
-				<< dx_init << ", " << dy_init << ", " << dz_init << ") pixel(s)..." << std::endl;
+		//std::cout << " + Local searches of local symmetry operator: Angles (rot, tilt, psi) = ("
+		//		<< aa_init << ", " << bb_init << ", " << gg_init << ") degree(s), center of mass (x, y, z; cropped, rescaled, binned) = ("
+		//		<< dx_init << ", " << dy_init << ", " << dz_init << ") pixel(s)..." << std::endl;
 		std::cout << " + Generating sampling points with ranges: Angles (rot, tilt, psi) = +/- ("
 				<< aa_range << ", " << bb_range << ", " << gg_range << ") degree(s), center of mass (x, y, z; cropped, rescaled, binned) = +/- ("
 				<< dx_range << ", " << dy_range << ", " << dz_range << ") pixel(s)." << std::endl;
@@ -1681,7 +1696,14 @@ void getLocalSearchOperatorSamplings(
 	}
 
 	if (verb)
-		std::cout << " + Total sampling points = " << op_samplings.size() << std::endl;
+	{
+#ifdef __unix__
+		std::cout << " + Total sampling points = " << "\e[1m" << op_samplings.size() << "\e[0m" << std::flush;
+#else
+		std::cout << " + Total sampling points = " << op_samplings.size() << std::flush;
+#endif
+		std::cout << ", calculating cross-correlation (CC) values ..." << std::endl;
+	}
 
 	if (op_samplings.size() < 1)
 		REPORT_ERROR("ERROR: No sampling points!");
@@ -1716,7 +1738,7 @@ void calculateOperatorCC(
 	// Calculate all CCs
 	if (verb)
 	{
-		std::cout << " + Calculate CCs for all sampling points ..." << std::endl;
+		//std::cout << " + Calculate CCs for all sampling points ..." << std::endl;
 		init_progress_bar(op_samplings.size());
 		barstep = op_samplings.size() / 100;
 		updatebar = totalbar = 0;
@@ -2136,7 +2158,7 @@ void local_symmetry_parameters::read(int argc, char **argv)
 	parser.setCommandLine(argc, argv);
 
 	int init_section = parser.addSection("Show usage");
-	show_usage_for_an_option = parser.checkOption("--help", "Show usage for the selected function (JUN 15, 2017)");
+	show_usage_for_an_option = parser.checkOption("--help", "Show usage for the selected function (JUN 30, 2017)");
 
 	int options_section = parser.addSection("Options");
 	do_apply_local_symmetry = parser.checkOption("--apply", "Apply local symmetry to a 3D cryo-EM density map");
@@ -2355,8 +2377,21 @@ void local_symmetry_parameters::run()
 			REPORT_ERROR("Invalid pixel size!");
 		if (fn_op_mask_info_in != "None")
 		{
-			ang_range = 180.;
-			std::cout << " Global searches: reset angular searching ranges to +/-180 degrees." << std::endl;
+			if ( (ang_range < (XMIPP_EQUAL_ACCURACY) )
+					&& (ang_rot_range < (XMIPP_EQUAL_ACCURACY) )
+					&& (ang_tilt_range < (XMIPP_EQUAL_ACCURACY) )
+					&& (ang_psi_range < (XMIPP_EQUAL_ACCURACY) ) )
+			{
+				ang_range = 180.;
+				std::cout << " Initial searches: reset searching ranges of all 3 Euler angles to +/-180 degrees." << std::endl;
+			}
+			else
+			{
+				if (ang_range > (XMIPP_EQUAL_ACCURACY) )
+					std::cout << " User-defined initial searches: searching ranges of all 3 Euler angles are set to +/-" << ang_range << " degree(s)." << std::endl;
+				else
+					std::cout << " User-defined initial searches: (rot, tilt, psi) ranges are +/- (" << ang_rot_range << ", " << ang_tilt_range << ", " << ang_psi_range << ") degree(s)." << std::endl;
+			}
 		}
 		Localsym_composeOperator(
 				op_search_ranges,
@@ -2388,7 +2423,7 @@ void local_symmetry_parameters::run()
 		{
 			// Global searches
 			std::cout << " Global searches: option --i_mask_info " << fn_info_in << " is ignored." << std::endl;
-			readRelionFormatMasksWithoutOperators(fn_op_mask_info_in, fn_mask_list, op_list, op_mask_list, true);
+			readRelionFormatMasksWithoutOperators(fn_op_mask_info_in, fn_mask_list, op_list, op_mask_list, (ang_range > 179.99), true);
 		}
 
 		// Master reads input map
@@ -2549,6 +2584,13 @@ void local_symmetry_parameters::run()
 					offset_step *= 1. / tmp_binning_factor;
 					Localsym_scaleTranslations(op, 1. / tmp_binning_factor);
 				}
+#ifdef __unix__
+				std::cout << " + Refining " << "\e[1m" << "Mask #" << imask + 1 << " Operator #" << iop + 1 << "\e[0m" << ": " << std::flush;
+#else
+				std::cout << " + Refining Mask #" << imask + 1 << " Operator #" << iop + 1 << ": " << std::flush;
+#endif
+				Localsym_outputOperator(op_list[imask][iop], &std::cout, angpix_image);
+				std::cout << std::endl;
 				getLocalSearchOperatorSamplings(
 						op,
 						op_search_ranges,
@@ -2602,11 +2644,11 @@ void local_symmetry_parameters::run()
 				fn_tmp = fn_tmp.withoutExtension(); // "*_cc_mask001"
 				fn_searched_op_samplings.compose(fn_tmp + "_op", iop + 1, "star", 3); // "*_cc_mask001_op001.star"
 				writeRelionFormatLocalSearchOperatorResults(fn_searched_op_samplings, op_samplings, angpix_image);
-				std::cout << " + List of sampling points for this local symmetry opeartor: " << fn_searched_op_samplings << std::endl;
+				std::cout << " + List of sampling points for this local symmetry operator: " << fn_searched_op_samplings << std::endl;
 
 				// Master updates this operator and do screen output
 				op_list[imask][iop] = op_samplings[0];
-				std::cout << " + Done! Local refined local symmetry operator: " << std::flush;
+				std::cout << " + Done! Refined operator: " << std::flush;
 				Localsym_outputOperator(op_samplings[0], &std::cout, angpix_image);
 				std::cout << std::endl;
 			}
@@ -2619,7 +2661,11 @@ void local_symmetry_parameters::run()
 			writeDMFormatMasksAndOperators(fn_info_out, fn_mask_list, op_list, angpix_image);
 
 		displayEmptyLine();
+#ifdef __unix__
+		std::cout << " Done! New local symmetry description file: " << "\e[1m" << fn_info_out << "\e[0m" << std::endl;
+#else
 		std::cout << " Done! New local symmetry description file: " << fn_info_out << std::endl;
+#endif
 	}
 	else if (do_txt2rln)
 	{
