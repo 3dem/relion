@@ -144,6 +144,7 @@ void readRelionFormatMasksWithoutOperators(
 		std::vector<FileName>& fn_mask_list,
 		std::vector<std::vector<Matrix1D<RFLOAT> > >& ops,
 		std::vector<std::vector<FileName> >& op_masks,
+		bool all_angular_search_ranges_are_global = true,
 		bool verb = false);
 
 void writeRelionFormatMasksAndOperators(

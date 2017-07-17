@@ -74,8 +74,21 @@ void local_symmetry_parameters_mpi::run()
 			REPORT_ERROR("Invalid pixel size!");
 		if (fn_op_mask_info_in != "None")
 		{
-			ang_range = 180.;
-			std::cout << " Global searches: reset angular searching ranges to +/-180 degrees." << std::endl;
+			if ( (ang_range < (XMIPP_EQUAL_ACCURACY) )
+					&& (ang_rot_range < (XMIPP_EQUAL_ACCURACY) )
+					&& (ang_tilt_range < (XMIPP_EQUAL_ACCURACY) )
+					&& (ang_psi_range < (XMIPP_EQUAL_ACCURACY) ) )
+			{
+				ang_range = 180.;
+				std::cout << " Initial searches: reset searching ranges of all 3 Euler angles to +/-180 degrees." << std::endl;
+			}
+			else
+			{
+				if (ang_range > (XMIPP_EQUAL_ACCURACY) )
+					std::cout << " User-defined initial searches: searching ranges of all 3 Euler angles are set to +/-" << ang_range << " degree(s)." << std::endl;
+				else
+					std::cout << " User-defined initial searches: (rot, tilt, psi) ranges are +/- (" << ang_rot_range << ", " << ang_tilt_range << ", " << ang_psi_range << ") degree(s)." << std::endl;
+			}
 		}
 		Localsym_composeOperator(
 				op_search_ranges,
@@ -107,7 +120,7 @@ void local_symmetry_parameters_mpi::run()
 		{
 			// Global searches
 			std::cout << " Global searches: option --i_mask_info " << fn_info_in << " is ignored." << std::endl;
-			readRelionFormatMasksWithoutOperators(fn_op_mask_info_in, fn_mask_list, op_list, op_mask_list, true);
+			readRelionFormatMasksWithoutOperators(fn_op_mask_info_in, fn_mask_list, op_list, op_mask_list, (ang_range > 179.99), true);
 		}
 
 		// Master set total number of masks
@@ -341,6 +354,13 @@ void local_symmetry_parameters_mpi::run()
 					offset_step *= 1. / tmp_binning_factor;
 					Localsym_scaleTranslations(op, 1. / tmp_binning_factor);
 				}
+#ifdef __unix__
+				std::cout << " + Refining " << "\e[1m" << "Mask #" << imask + 1 << " Operator #" << iop + 1 << "\e[0m" << ": " << std::flush;
+#else
+				std::cout << " + Refining Mask #" << imask + 1 << " Operator #" << iop + 1 << ": " << std::flush;
+#endif
+				Localsym_outputOperator(op_list[imask][iop], &std::cout, angpix_image);
+				std::cout << std::endl;
 				getLocalSearchOperatorSamplings(
 						op,
 						op_search_ranges,
@@ -490,11 +510,11 @@ void local_symmetry_parameters_mpi::run()
 				fn_tmp = fn_tmp.withoutExtension(); // "*_cc_mask001"
 				fn_searched_op_samplings.compose(fn_tmp + "_op", iop + 1, "star", 3); // "*_cc_mask001_op001.star"
 				writeRelionFormatLocalSearchOperatorResults(fn_searched_op_samplings, op_samplings, angpix_image);
-				std::cout << " + List of sampling points for this local symmetry opeartor: " << fn_searched_op_samplings << std::endl;
+				std::cout << " + List of sampling points for this local symmetry operator: " << fn_searched_op_samplings << std::endl;
 
 				// Master updates this operator and do screen output
 				op_list[imask][iop] = op_samplings[0];
-				std::cout << " + Done! Local refined local symmetry operator: " << std::flush;
+				std::cout << " + Done! Refined operator: " << std::flush;
 				Localsym_outputOperator(op_samplings[0], &std::cout, angpix_image);
 				std::cout << std::endl;
 			}
@@ -513,7 +533,11 @@ void local_symmetry_parameters_mpi::run()
 			writeDMFormatMasksAndOperators(fn_info_out, fn_mask_list, op_list, angpix_image);
 
 		displayEmptyLine();
+#ifdef __unix__
+		std::cout << " Done! New local symmetry description file: " << "\e[1m" << fn_info_out << "\e[0m" << std::endl;
+#else
 		std::cout << " Done! New local symmetry description file: " << fn_info_out << std::endl;
+#endif
 	}
 	MPI_Barrier(MPI_COMM_WORLD);
 }
