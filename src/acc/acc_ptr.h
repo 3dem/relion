@@ -25,6 +25,10 @@
 #include "src/error.h"
 #include "src/parallel.h"
 
+#ifndef MEM_ALIGN
+	#define MEM_ALIGN               64
+#endif
+
 #define ACC_PTR_DEBUG_FATAL( err ) (HandleAccPtrDebugFatal( err, __FILE__, __LINE__ ))
 static void HandleAccPtrDebugFatal( const char *err, const char *file, int line )
 {
@@ -71,15 +75,19 @@ public:
 
 	inline
 	AccPtr(size_t size, CudaCustomAllocator *allocator):
-		size(size), hPtr(new T[size]), dPtr(NULL), doFreeHost(true),
+		size(size), dPtr(NULL), doFreeHost(true),
 		doFreeDevice(false), allocator(allocator), alloc(NULL), stream(cudaStreamPerThread)
-	{}
+	{
+		posix_memalign((void **)&hPtr, MEM_ALIGN, sizeof(T) * size);
+	}
 
 	inline
 	AccPtr(size_t size, cudaStream_t stream, CudaCustomAllocator *allocator):
-		size(size), hPtr(new T[size]), dPtr(NULL), doFreeHost(true),
+		size(size), dPtr(NULL), doFreeHost(true),
 		doFreeDevice(false), allocator(allocator), alloc(NULL), stream(stream)
-	{}
+	{
+		posix_memalign((void **)&hPtr, MEM_ALIGN, sizeof(T) * size);
+	}
 
 	inline
 	AccPtr(T * h_start, size_t size, CudaCustomAllocator *allocator):
@@ -123,15 +131,19 @@ public:
 
 	inline
 	AccPtr(size_t size):
-		size(size), hPtr(new T[size]), dPtr(NULL), doFreeHost(true),
+		size(size), dPtr(NULL), doFreeHost(true),
 		doFreeDevice(false), allocator(NULL), alloc(NULL), stream(cudaStreamPerThread)
-	{}
+	{
+		posix_memalign((void **)&hPtr, MEM_ALIGN, sizeof(T) * size);
+	}
 
 	inline
 	AccPtr(size_t size, cudaStream_t stream):
-		size(size), hPtr(new T[size]), dPtr(NULL), doFreeHost(true),
+		size(size), dPtr(NULL), doFreeHost(true),
 		doFreeDevice(false), allocator(NULL), alloc(NULL), stream(stream)
-	{}
+	{
+		posix_memalign((void **)&hPtr, MEM_ALIGN, sizeof(T) * size);
+	}
 
 	inline
 	AccPtr(T * h_start, size_t size):
@@ -236,8 +248,7 @@ public:
 #endif
 		doFreeHost = true;
 		// TODO - consider making this std::vector
-		// TODO - explicitly align
-		hPtr = new T[size];
+		posix_memalign((void **)&hPtr, MEM_ALIGN, sizeof(T) * size);
 	}
 
 	/**
@@ -293,10 +304,16 @@ public:
 			ACC_PTR_DEBUG_FATAL("Resizing from size zero (permitted).\n");
 #endif
 		// TODO - consider making this std::vector
-		// TODO - explicitly align
-	    T* newArr = new T[newSize];
-	    memcpy( newArr, hPtr, newSize * sizeof(T) );
-
+		T* newArr;
+		posix_memalign((void **)&newArr, MEM_ALIGN, sizeof(T) * newSize);
+		
+		// Avoid memory overrun
+		if (newSize < size)
+			memcpy( newArr, hPtr, newSize * sizeof(T) );
+		else
+			// WARNING - unknown data in final array elements
+			memcpy( newArr, hPtr, size * sizeof(T) );  
+		
 	    size = newSize;
 #ifdef DEBUG_CUDA
 		if (dPtr!=NULL)
@@ -686,7 +703,7 @@ public:
 #endif
 		doFreeHost = false;
 		if (NULL != hPtr)
-			delete [] hPtr;
+			free(hPtr);
 		hPtr = NULL;
 	}
 
@@ -708,7 +725,7 @@ public:
 	 * Delete both device and host data
 	 */
 	inline
-	void free()
+	void freeBoth()
 	{
 		freeDevice();
 		freeHost();

@@ -48,8 +48,6 @@
 #define POWERCLASS_BLOCK_SIZE 	128
 #define PROJDIFF_CHUNK_SIZE 	14
 
-#define MEM_ALIGN               64
-
 #ifdef __INTEL_COMPILER
 #  include <mathimf.h>
 #  define RESTRICT __restrict__
