@@ -111,6 +111,12 @@ foreach (_target ${RELION_TARGETS})
         include_directories("${FLTK_INCLUDE_DIR}")
 		target_link_libraries(${_target} ${FLTK_LIBRARIES} ${X11})
 	endif(GUI)
+
+	set_target_properties(${_target} PROPERTIES
+		CXX_STANDARD 11
+		CXX_STANDARD_REQUIRED ON
+		CXX_EXTENSIONS OFF
+	)
 	
 	message(STATUS "added ${_target}...")
 	
