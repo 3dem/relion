@@ -3112,7 +3112,6 @@ void MlOptimiser::expectationSomeParticles(long int my_first_ori_particle, long 
     
         // process all passed particles in parallel
         //for(unsigned long i=my_first_ori_particle; i<=my_last_ori_particle; i++) {
-/*
         tbb::parallel_for(my_first_ori_particle, my_last_ori_particle+1, [&](int i) {
             CpuOptimiserType::reference ref = tbbCpuOptimiser.local();
             MlOptimiserCpu *cpuOptimiser = (MlOptimiserCpu *)ref;
@@ -3125,12 +3124,9 @@ void MlOptimiser::expectationSomeParticles(long int my_first_ori_particle, long 
             }
 
 			cpuOptimiser->expectationOneParticle(i);
-        //}
         });
-*/
-		tbb::parallel_for(tbb::blocked_range<size_t>(my_first_ori_particle, my_last_ori_particle+1), 
-			cpuThreadExpectationSomeParticles(this));
-		
+        //}
+
         // Now collect the results from each thread
         for (CpuOptimiserType::const_iterator i = tbbCpuOptimiser.begin();
               i != tbbCpuOptimiser.end();  ++i) {

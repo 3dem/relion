@@ -439,8 +439,10 @@ public:
         my_a(a)
     {}
 };
-*/
 
+// Called as follows:  
+// tbb::parallel_for(tbb::blocked_range<size_t>(my_first_ori_particle, my_last_ori_particle+1), 
+//     cpuThreadExpectationSomeParticles(this));
 class cpuThreadExpectationSomeParticles {
 	MlOptimiser *const my_optimiser;
 public:
@@ -465,4 +467,5 @@ public:
 		my_optimiser(optimiser)
 	{}
 };
+ */
 #endif
