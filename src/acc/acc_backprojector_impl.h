@@ -31,13 +31,15 @@ size_t AccBackprojector::setMdlDim(
 		maxR2 = max_r*max_r;
 		padding_factor = paddingFactor;
 
-#ifdef CUDA
 		//Allocate space for model
+#ifdef CUDA
 		HANDLE_ERROR(cudaMalloc( (void**) &d_mdlReal,   mdlXYZ * sizeof(XFLOAT)));
 		HANDLE_ERROR(cudaMalloc( (void**) &d_mdlImag,   mdlXYZ * sizeof(XFLOAT)));
 		HANDLE_ERROR(cudaMalloc( (void**) &d_mdlWeight, mdlXYZ * sizeof(XFLOAT)));
 #else
-//TODO CPU version
+		posix_memalign((void **)&d_mdlReal,   MEM_ALIGN, mdlXYZ * sizeof(XFLOAT));
+		posix_memalign((void **)&d_mdlImag,   MEM_ALIGN, mdlXYZ * sizeof(XFLOAT));
+		posix_memalign((void **)&d_mdlWeight, MEM_ALIGN, mdlXYZ * sizeof(XFLOAT));
 #endif
 
 		allocaton_size = mdlXYZ * sizeof(XFLOAT) * 3;
@@ -67,7 +69,9 @@ void AccBackprojector::initMdl()
 	DEBUG_HANDLE_ERROR(cudaMemset( d_mdlImag,   0, mdlXYZ * sizeof(XFLOAT)));
 	DEBUG_HANDLE_ERROR(cudaMemset( d_mdlWeight, 0, mdlXYZ * sizeof(XFLOAT)));
 #else
-	// TODO - CPU version
+	memset(d_mdlReal,     0, mdlXYZ * sizeof(XFLOAT));
+	memset(d_mdlImag,     0, mdlXYZ * sizeof(XFLOAT));
+	memset(d_mdlWeight,   0, mdlXYZ * sizeof(XFLOAT));
 #endif
 
     voxelCount = mdlXYZ;
@@ -85,7 +89,9 @@ void AccBackprojector::getMdlData(XFLOAT *r, XFLOAT *i, XFLOAT * w)
 
 	DEBUG_HANDLE_ERROR(cudaStreamSynchronize(stream)); //Wait for copy
 #else
-	// TODO - CPU version?
+	memcpy(r, d_mdlReal,   mdlXYZ * sizeof(XFLOAT));
+	memcpy(i, d_mdlImag,   mdlXYZ * sizeof(XFLOAT));
+	memcpy(w, d_mdlWeight, mdlXYZ * sizeof(XFLOAT));
 #endif
 }
 
@@ -109,7 +115,9 @@ void AccBackprojector::clear()
 		DEBUG_HANDLE_ERROR(cudaFree(d_mdlImag));
 		DEBUG_HANDLE_ERROR(cudaFree(d_mdlWeight));
 #else
-		// TODO CPU version
+		free(d_mdlReal);
+		free(d_mdlImag);
+		free(d_mdlWeight);
 #endif 
 
 		d_mdlReal = d_mdlImag = d_mdlWeight = NULL;

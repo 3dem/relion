@@ -1,6 +1,6 @@
 #ifndef CPU_BACKPROJECTOR_H_
 #define CPU_BACKPROJECTOR_H_
-
+/*
 #include "src/acc/cpu/cpu_settings.h"
 
 
@@ -59,5 +59,5 @@ public:
 
 	~CpuBackprojector();
 };
-
+*/
 #endif

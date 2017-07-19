@@ -268,7 +268,7 @@ void wavg_3D(
 					XFLOAT *trans_sin_x = &sin_x[itrans][0];     
 
 					for(int x = xstart_y; x < xend_y; x++) {
-						// SFU_TODO check the math
+						// TODO check the math
 						XFLOAT s  = trans_sin_x[x] * trans_cos_y + trans_cos_x[x] * trans_sin_y;
 						XFLOAT c  = trans_cos_x[x] * trans_cos_y - trans_sin_x[x] * trans_sin_y;
 
@@ -282,6 +282,10 @@ void wavg_3D(
 						translatePixel(x, y,  g_trans_x[itrans], g_trans_y[itrans], 
 									   img_real[x], img_imag[x], trans_real, trans_imag);
 
+						where translatePixel is:
+							sincosf( x * tx + y * ty , &s, &c );
+							tReal = c * real - s * imag;
+							tImag = c * imag + s * real;
 						*/
 						XFLOAT diff_real = ref_real[x] - trans_real;
 						XFLOAT diff_imag = ref_imag[x] - trans_imag;

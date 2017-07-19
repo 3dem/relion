@@ -155,9 +155,12 @@ bool AccProjector::setMdlDim(
 	HANDLE_ERROR(cudaCreateTextureObject(mdlImag, &resDesc_imag, &texDesc, NULL));
 #endif
 #else
-// TODO Optimized CPU-only path
+#ifdef CUDA
 	DEBUG_HANDLE_ERROR(cudaMalloc( (void**) &mdlReal, mdlXYZ * sizeof(XFLOAT)));
 	DEBUG_HANDLE_ERROR(cudaMalloc( (void**) &mdlImag, mdlXYZ * sizeof(XFLOAT)));
+#else
+	posix_memalign((void **)&mdlComplex, MEM_ALIGN, mdlXYZ * 2 * sizeof(XFLOAT));
+#endif
 #endif
 	return true;
 }
@@ -200,9 +203,16 @@ void AccProjector::initMdl(XFLOAT *real, XFLOAT *imag)
 		DEBUG_HANDLE_ERROR(cudaMemcpy2D(texArrayImag2D, pitch2D, imag, sizeof(XFLOAT) * mdlX, sizeof(XFLOAT) * mdlX, mdlY, cudaMemcpyHostToDevice));
 	}
 #else
-// TODO Optimized CPU-only path
+#ifdef CUDA
 	DEBUG_HANDLE_ERROR(cudaMemcpy( mdlReal, real, mdlXYZ * sizeof(XFLOAT), cudaMemcpyHostToDevice));
 	DEBUG_HANDLE_ERROR(cudaMemcpy( mdlImag, imag, mdlXYZ * sizeof(XFLOAT), cudaMemcpyHostToDevice));
+#else
+	XFLOAT *pData = mdlComplex;
+    for(int i=0; i<mdlXYZ; i++) {
+	    *pData ++ = *real ++;
+		*pData ++ = *imag ++;			        
+    }
+#endif
 #endif
 
 }
@@ -229,8 +239,14 @@ void AccProjector::initMdl(Complex *data)
 		DEBUG_HANDLE_ERROR(cudaMemcpy2D(texArrayComplex2D, pitch2D, data, sizeof(CUDACOMPLEX) * mdlX, sizeof(CUDACOMPLEX) * mdlX, mdlY, cudaMemcpyHostToDevice));
 	}
 #else
-	XFLOAT *tmpReal = new XFLOAT[mdlXYZ];
-	XFLOAT *tmpImag = new XFLOAT[mdlXYZ];
+//	XFLOAT *tmpReal = new XFLOAT[mdlXYZ];
+//	XFLOAT *tmpImag = new XFLOAT[mdlXYZ];
+
+	XFLOAT *tmpReal;
+	XFLOAT *tmpImag;
+	posix_memalign((void **)&tmpReal, MEM_ALIGN, mdlXYZ * sizeof(XFLOAT));
+	posix_memalign((void **)&tmpImag, MEM_ALIGN, mdlXYZ * sizeof(XFLOAT));
+
 
 	for (unsigned long i = 0; i < mdlXYZ; i ++)
 	{
@@ -240,8 +256,8 @@ void AccProjector::initMdl(Complex *data)
 
 	initMdl(tmpReal, tmpImag);
 
-	delete [] tmpReal;
-	delete [] tmpImag;
+	free(tmpReal);
+	free(tmpImag);
 #endif
 }
 
@@ -280,6 +296,7 @@ void AccProjector::clear()
 	padding_factor = 0;
 	allocaton_size = 0;
 
+#ifdef CUDA
 	if (mdlReal != 0)
 	{
 #ifndef CUDA_NO_TEXTURES
@@ -304,15 +321,18 @@ void AccProjector::clear()
 		texArrayReal = 0;
 		texArrayImag = 0;
 #else
-// TODO Optimized CPU-only path
-#ifdef CUDA
 		cudaFree(mdlReal);
 		cudaFree(mdlImag);
-#else
-#endif
 #endif
 		mdlReal = 0;
 		mdlImag = 0;
 	}
+#else // ifdef CUDA
+	if (mdlComplex != 0)
+	{
+        free(mdlComplex);
+	    mdlComplex = NULL;
+	}
+#endif  // ifdef CUDA
 }
-	#endif
+	#endif  // #if(COMPLEXTEXTURE)

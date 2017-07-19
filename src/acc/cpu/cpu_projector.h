@@ -1,6 +1,6 @@
 #ifndef CPU_PROJECTOR_H_
 #define CPU_PROJECTOR_H_
-
+/*
 #include "src/complex.h"
 #include "src/acc/cpu/cpu_settings.h"
 
@@ -349,6 +349,6 @@ public:
 		return k;
 	}
 };
-
+*/
 
 #endif

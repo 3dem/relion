@@ -168,7 +168,8 @@ void backproject2D(
 					XFLOAT dd10 =  fy * mfx;
 					XFLOAT dd11 =  fy *  fx;
 
-
+					// No locking necessary since multiple threads are not
+					// updating the same particle
 					g_model_real  [y0 * mdl_x + x0]+=dd00 * real;
 					g_model_imag  [y0 * mdl_x + x0]+=dd00 * imag;
 					g_model_weight[y0 * mdl_x + x0]+=dd00 * Fweight;
@@ -222,10 +223,8 @@ void backproject3D(
 		int mdl_inity,
 		int mdl_initz)
 {
-// TODO - verify still correct
 	for (unsigned long img=0; img<imageCount; img++) {
 		XFLOAT s_eulers[9];
-		XFLOAT minvsigma2, ctf, img_real, img_imag, weight;
 
 		 for (int i = 0; i < 9; i++)
 			 s_eulers[i] = g_eulers[img*9+i];
@@ -238,6 +237,8 @@ void backproject3D(
 		else
 			pixel_pass_num = (ceilf((float)img_xyz/(float)block_size));
 
+		// We collect block_size number of values before storing the results to
+		// help vectorization and control memory accesses
 		XFLOAT real[block_size], imag[block_size], Fweight[block_size];
 		XFLOAT xp[block_size], yp[block_size], zp[block_size];
 
@@ -247,7 +248,8 @@ void backproject3D(
 			#pragma simd
 			for(int tid=0; tid<block_size; tid++)
 			{
-				int ok_for_next(1);
+				int ok_for_next(1);  // This flag avoids continues, helping the vectorizer
+				
 				unsigned pixel(0);
 				if(DATA3D)
 					pixel = (pass * block_size) + tid;
@@ -255,9 +257,10 @@ void backproject3D(
 					pixel = (pass * block_size) + tid;
 
 				if (pixel >= img_xyz)
-					continue;
+					continue; // just doesn't make sense to proceed in this case
 
 				int x,y,z,xy;
+				XFLOAT minvsigma2, ctf, img_real, img_imag, weight;
 
 				if(DATA3D)
 				{
@@ -299,9 +302,10 @@ void backproject3D(
 					if ( ( x * x + y * y ) > max_r2)
 						ok_for_next=0;
 				}
-				//WAVG
+
 				if(ok_for_next)
 				{
+					//WAVG
 					minvsigma2 = g_Minvsigma2s[pixel];
 					ctf = g_ctfs[pixel];
 					img_real = g_img_real[pixel];
@@ -312,6 +316,7 @@ void backproject3D(
 					XFLOAT inv_minsigma_ctf = weight_norm_inverse * ctf * minvsigma2;
 
 					XFLOAT temp_real, temp_imag;
+					
 					for (unsigned long itrans = 0; itrans < translation_num; itrans++)
 					{
 						weight = g_weights[img * translation_num + itrans];
@@ -383,7 +388,7 @@ void backproject3D(
 					XFLOAT mfy = (XFLOAT)1.0 - fy;
 					XFLOAT mfz = (XFLOAT)1.0 - fz;
 
-
+					// No locking since each thread working on a different particle
 					XFLOAT dd000 = mfz * mfy * mfx;
 
 					g_model_real  [z0 * mdl_x * mdl_y + y0 * mdl_x + x0]+=dd000 * real[tid];
@@ -500,7 +505,6 @@ void backprojectRef3D(
 		int      mdl_inity,
 		int      mdl_initz)
 {
-	// TODO - adapt to new scheme (this SGD???)
 	XFLOAT s_eulers[9];
 	for(int i = 0; i < 9; i++)
 		s_eulers[i] = g_eulers[img*9+i];
@@ -685,7 +689,6 @@ void backprojectRef3D(
 }
 #endif
 
-//TODO - port optimizations into this/merge with backprojectRef3d and phase that one out
 template < bool DATA3D >
 void backprojectSGD(
 		unsigned long imageCount,
@@ -720,19 +723,32 @@ void backprojectSGD(
 {
 	for (unsigned long img=0; img<imageCount; img++) {
 		XFLOAT s_eulers[9];
-		XFLOAT minvsigma2, ctf, img_real, img_imag, Fweight, real, imag, weight;
 
 		for (int i = 0; i < 9; i++)
 			s_eulers[i] = g_eulers[img*9+i];
+		
+		XFLOAT weight_norm_inverse = (XFLOAT) 1.0 / weight_norm;
 
 		int pixel_pass_num(0);
 		if(DATA3D)
 			pixel_pass_num = (ceilf((float)img_xyz/(float)block_size));
 		else
 			pixel_pass_num = (ceilf((float)img_xyz/(float)block_size));
-	//TODO - do this the better way
-		for(int tid=0; tid<block_size; tid++) {
-			for (unsigned pass = 0; pass < pixel_pass_num; pass++)   {
+		
+		// TODO - does this really help with the call to the projector in here?
+		//
+		// We collect block_size number of values before storing the results to
+		// help vectorization and control memory accesses
+		XFLOAT real[block_size], imag[block_size], Fweight[block_size];
+		XFLOAT ref_real[block_size], ref_imag[block_size];
+		XFLOAT xp[block_size], yp[block_size], zp[block_size];
+
+		for (unsigned pass = 0; pass < pixel_pass_num; pass++)   {
+			memset(Fweight,0,sizeof(XFLOAT)*block_size);
+//			#pragma simd
+			for(int tid=0; tid<block_size; tid++) {
+				int ok_for_next(1);  // This flag avoids continues, helping the vectorizer
+				
 				unsigned pixel(0);
 				if(DATA3D)
 					pixel = (pass * block_size) + tid;
@@ -740,9 +756,10 @@ void backprojectSGD(
 					pixel = (pass * block_size) + tid;
 
 				if (pixel >= img_xyz)
-					continue;
+					continue;  // just doesn't make sense to proceed in this case
 
 				int x,y,z,xy;
+				XFLOAT minvsigma2, ctf, img_real, img_imag, weight;
 
 				if(DATA3D)
 				{
@@ -755,10 +772,10 @@ void backprojectSGD(
 						if (z >= img_z - max_r)
 							z = z - img_z;
 						else
-							continue;
+							ok_for_next=0;
 
 						if(x==0)
-							continue;
+							ok_for_next=0;
 					}
 				}
 				else
@@ -771,105 +788,114 @@ void backprojectSGD(
 					if (y >= img_y - max_r)
 						y = y - img_y;
 					else
-						continue;
+						ok_for_next=0;
 				}
 
 				if(DATA3D)
 					if ( ( x * x + y * y  + z * z ) > max_r2)
-						continue;
+						ok_for_next=0;
 				else
 					if ( ( x * x + y * y ) > max_r2)
-						continue;
+						ok_for_next=0;
 
-				XFLOAT ref_real = (XFLOAT) 0.0;
-				XFLOAT ref_imag = (XFLOAT) 0.0;
+				if(ok_for_next)
+				{	
+					ref_real[tid] = (XFLOAT) 0.0;
+					ref_imag[tid] = (XFLOAT) 0.0;
 
-				if(DATA3D)
-					projector.project3Dmodel(
-						x,y,z,
-						s_eulers[0], s_eulers[1], s_eulers[2],
-						s_eulers[3], s_eulers[4], s_eulers[5],
-						s_eulers[6], s_eulers[7], s_eulers[8],
-						ref_real, ref_imag);
-				else
-					projector.project3Dmodel(
-						x,y,
-						s_eulers[0], s_eulers[1],
-						s_eulers[3], s_eulers[4],
-						s_eulers[6], s_eulers[7],
-						ref_real, ref_imag);
+					if(DATA3D)
+						projector.project3Dmodel(
+							x,y,z,
+							s_eulers[0], s_eulers[1], s_eulers[2],
+							s_eulers[3], s_eulers[4], s_eulers[5],
+							s_eulers[6], s_eulers[7], s_eulers[8],
+							ref_real[tid], ref_imag[tid]);
+					else
+						projector.project3Dmodel(
+							x,y,
+							s_eulers[0], s_eulers[1],
+							s_eulers[3], s_eulers[4],
+							s_eulers[6], s_eulers[7],
+							ref_real[tid], ref_imag[tid]);
 
-				//WAVG
-				minvsigma2 = g_Minvsigma2s[pixel];
-				ctf = g_ctfs[pixel];
-				img_real = g_img_real[pixel];
-				img_imag = g_img_imag[pixel];
-				Fweight = (XFLOAT) 0.0;
-				real = (XFLOAT) 0.0;
-				imag = (XFLOAT) 0.0;
-				ref_real *= ctf;
-				ref_imag *= ctf;
+					//WAVG
+					minvsigma2 = g_Minvsigma2s[pixel];
+					ctf = g_ctfs[pixel];
+					img_real = g_img_real[pixel];
+					img_imag = g_img_imag[pixel];
+					Fweight[tid] = (XFLOAT) 0.0;
+					real[tid] = (XFLOAT) 0.0;
+					imag[tid] = (XFLOAT) 0.0;
+					ref_real[tid] *= ctf;
+					ref_imag[tid] *= ctf;
+					XFLOAT inv_minsigma_ctf = weight_norm_inverse * ctf * minvsigma2;
 
-				XFLOAT temp_real, temp_imag;
+					XFLOAT temp_real, temp_imag;
 
-				for (unsigned long itrans = 0; itrans < translation_num; itrans++)
-				{
-					weight = g_weights[img * translation_num + itrans];
-
-					if (weight >= significant_weight)
+					for (unsigned long itrans = 0; itrans < translation_num; itrans++)
 					{
-						weight = (weight / weight_norm) * ctf * minvsigma2;
-						Fweight += weight * ctf;
+						weight = g_weights[img * translation_num + itrans];
+
+						if (weight >= significant_weight)
+						{
+							weight = weight * inv_minsigma_ctf;
+							Fweight[tid] += weight * ctf;
+
+							if(DATA3D)
+								CpuKernels::translatePixel(x, y, z, g_trans_x[itrans], g_trans_y[itrans], g_trans_z[itrans], img_real, img_imag, temp_real, temp_imag);
+							else
+								CpuKernels::translatePixel(x, y,    g_trans_x[itrans], g_trans_y[itrans],                    img_real, img_imag, temp_real, temp_imag);
+
+							real[tid] += (temp_real-ref_real[tid]) * weight;
+							imag[tid] += (temp_imag-ref_imag[tid]) * weight;
+						}
+					}
+
+					//BP
+					if (Fweight[tid] > (XFLOAT) 0.0)
+					{
+						// Get logical coordinates in the 3D map
 
 						if(DATA3D)
-							CpuKernels::translatePixel(x, y, z, g_trans_x[itrans], g_trans_y[itrans], g_trans_z[itrans], img_real, img_imag, temp_real, temp_imag);
+						{
+							xp[tid] = (s_eulers[0] * x + s_eulers[1] * y + s_eulers[2] * z) * padding_factor;
+							yp[tid] = (s_eulers[3] * x + s_eulers[4] * y + s_eulers[5] * z) * padding_factor;
+							zp[tid] = (s_eulers[6] * x + s_eulers[7] * y + s_eulers[8] * z) * padding_factor;
+						}
 						else
-							CpuKernels::translatePixel(x, y,    g_trans_x[itrans], g_trans_y[itrans],                    img_real, img_imag, temp_real, temp_imag);
-
-						real += (temp_real-ref_real) * weight;
-						imag += (temp_imag-ref_imag) * weight;
-					}
-				}
-
-				//BP
-				if (Fweight > (XFLOAT) 0.0)
+						{
+							xp[tid] = (s_eulers[0] * x + s_eulers[1] * y ) * padding_factor;
+							yp[tid] = (s_eulers[3] * x + s_eulers[4] * y ) * padding_factor;
+							zp[tid] = (s_eulers[6] * x + s_eulers[7] * y ) * padding_factor;
+						}
+						// Only asymmetric half is stored
+						if (xp[tid] < (XFLOAT) 0.0)
+						{
+							// Get complex conjugated hermitian symmetry pair
+							xp[tid] = -xp[tid];
+							yp[tid] = -yp[tid];
+							zp[tid] = -zp[tid];
+							imag[tid] = -imag[tid];
+						}
+					} // if (Fweight[tid] > (XFLOAT) 0.0)
+				} //if(ok_for_next)
+			} // for tid
+			
+			for(int tid=0; tid<block_size; tid++)
+			{
+				if (Fweight[tid] > (XFLOAT) 0.0)
 				{
-					// Get logical coordinates in the 3D map
-
-					XFLOAT xp,yp,zp;
-					if(DATA3D)
-					{
-						xp = (s_eulers[0] * x + s_eulers[1] * y + s_eulers[2] * z) * padding_factor;
-						yp = (s_eulers[3] * x + s_eulers[4] * y + s_eulers[5] * z) * padding_factor;
-						zp = (s_eulers[6] * x + s_eulers[7] * y + s_eulers[8] * z) * padding_factor;
-					}
-					else
-					{
-						xp = (s_eulers[0] * x + s_eulers[1] * y ) * padding_factor;
-						yp = (s_eulers[3] * x + s_eulers[4] * y ) * padding_factor;
-						zp = (s_eulers[6] * x + s_eulers[7] * y ) * padding_factor;
-					}
-					// Only asymmetric half is stored
-					if (xp < (XFLOAT) 0.0)
-					{
-						// Get complex conjugated hermitian symmetry pair
-						xp = -xp;
-						yp = -yp;
-						zp = -zp;
-						imag = -imag;
-					}
-
-					int x0 = floorf(xp);
-					XFLOAT fx = xp - x0;
+					int x0 = floorf(xp[tid]);
+					XFLOAT fx = xp[tid] - x0;
 					int x1 = x0 + 1;
 
-					int y0 = floorf(yp);
-					XFLOAT fy = yp - y0;
+					int y0 = floorf(yp[tid]);
+					XFLOAT fy = yp[tid] - y0;
 					y0 -= mdl_inity;
 					int y1 = y0 + 1;
 
-					int z0 = floorf(zp);
-					XFLOAT fz = zp - z0;
+					int z0 = floorf(zp[tid]);
+					XFLOAT fz = zp[tid] - z0;
 					z0 -= mdl_initz;
 					int z1 = z0 + 1;
 
@@ -879,55 +905,55 @@ void backprojectSGD(
 
 					XFLOAT dd000 = mfz * mfy * mfx;
 
-					g_model_real  [z0 * mdl_x * mdl_y + y0 * mdl_x + x0] = dd000 * real;
-					g_model_imag  [z0 * mdl_x * mdl_y + y0 * mdl_x + x0] = dd000 * imag;
-					g_model_weight[z0 * mdl_x * mdl_y + y0 * mdl_x + x0] = dd000 * Fweight;
+					g_model_real  [z0 * mdl_x * mdl_y + y0 * mdl_x + x0] = dd000 * real[tid];
+					g_model_imag  [z0 * mdl_x * mdl_y + y0 * mdl_x + x0] = dd000 * imag[tid];
+					g_model_weight[z0 * mdl_x * mdl_y + y0 * mdl_x + x0] = dd000 * Fweight[tid];
 
 					XFLOAT dd001 = mfz * mfy *  fx;
 
-					g_model_real  [z0 * mdl_x * mdl_y + y0 * mdl_x + x1] = dd001 * real;
-					g_model_imag  [z0 * mdl_x * mdl_y + y0 * mdl_x + x1] = dd001 * imag;
-					g_model_weight[z0 * mdl_x * mdl_y + y0 * mdl_x + x1] = dd001 * Fweight;
+					g_model_real  [z0 * mdl_x * mdl_y + y0 * mdl_x + x1] = dd001 * real[tid];
+					g_model_imag  [z0 * mdl_x * mdl_y + y0 * mdl_x + x1] = dd001 * imag[tid];
+					g_model_weight[z0 * mdl_x * mdl_y + y0 * mdl_x + x1] = dd001 * Fweight[tid];
 
 					XFLOAT dd010 = mfz *  fy * mfx;
 
-					g_model_real  [z0 * mdl_x * mdl_y + y1 * mdl_x + x0] = dd010 * real;
-					g_model_imag  [z0 * mdl_x * mdl_y + y1 * mdl_x + x0] = dd010 * imag;
-					g_model_weight[z0 * mdl_x * mdl_y + y1 * mdl_x + x0] = dd010 * Fweight;
+					g_model_real  [z0 * mdl_x * mdl_y + y1 * mdl_x + x0] = dd010 * real[tid];
+					g_model_imag  [z0 * mdl_x * mdl_y + y1 * mdl_x + x0] = dd010 * imag[tid];
+					g_model_weight[z0 * mdl_x * mdl_y + y1 * mdl_x + x0] = dd010 * Fweight[tid];
 
 					XFLOAT dd011 = mfz *  fy *  fx;
 
-					g_model_real  [z0 * mdl_x * mdl_y + y1 * mdl_x + x1] = dd011 * real;
-					g_model_imag  [z0 * mdl_x * mdl_y + y1 * mdl_x + x1] = dd011 * imag;
-					g_model_weight[z0 * mdl_x * mdl_y + y1 * mdl_x + x1] = dd011 * Fweight;
+					g_model_real  [z0 * mdl_x * mdl_y + y1 * mdl_x + x1] = dd011 * real[tid];
+					g_model_imag  [z0 * mdl_x * mdl_y + y1 * mdl_x + x1] = dd011 * imag[tid];
+					g_model_weight[z0 * mdl_x * mdl_y + y1 * mdl_x + x1] = dd011 * Fweight[tid];
 
 					XFLOAT dd100 =  fz * mfy * mfx;
 
-					g_model_real  [z1 * mdl_x * mdl_y + y0 * mdl_x + x0] = dd100 * real;
-					g_model_imag  [z1 * mdl_x * mdl_y + y0 * mdl_x + x0] = dd100 * imag;
-					g_model_weight[z1 * mdl_x * mdl_y + y0 * mdl_x + x0] = dd100 * Fweight;
+					g_model_real  [z1 * mdl_x * mdl_y + y0 * mdl_x + x0] = dd100 * real[tid];
+					g_model_imag  [z1 * mdl_x * mdl_y + y0 * mdl_x + x0] = dd100 * imag[tid];
+					g_model_weight[z1 * mdl_x * mdl_y + y0 * mdl_x + x0] = dd100 * Fweight[tid];
 
 					XFLOAT dd101 =  fz * mfy *  fx;
 
-					g_model_real  [z1 * mdl_x * mdl_y + y0 * mdl_x + x1] = dd101 * real;
-					g_model_imag  [z1 * mdl_x * mdl_y + y0 * mdl_x + x1] = dd101 * imag;
-					g_model_weight[z1 * mdl_x * mdl_y + y0 * mdl_x + x1] = dd101 * Fweight;
+					g_model_real  [z1 * mdl_x * mdl_y + y0 * mdl_x + x1] = dd101 * real[tid];
+					g_model_imag  [z1 * mdl_x * mdl_y + y0 * mdl_x + x1] = dd101 * imag[tid];
+					g_model_weight[z1 * mdl_x * mdl_y + y0 * mdl_x + x1] = dd101 * Fweight[tid];
 
 					XFLOAT dd110 =  fz *  fy * mfx;
 
-					g_model_real  [z1 * mdl_x * mdl_y + y1 * mdl_x + x0] = dd110 * real;
-					g_model_imag  [z1 * mdl_x * mdl_y + y1 * mdl_x + x0] = dd110 * imag;
-					g_model_weight[z1 * mdl_x * mdl_y + y1 * mdl_x + x0] = dd110 * Fweight;
+					g_model_real  [z1 * mdl_x * mdl_y + y1 * mdl_x + x0] = dd110 * real[tid];
+					g_model_imag  [z1 * mdl_x * mdl_y + y1 * mdl_x + x0] = dd110 * imag[tid];
+					g_model_weight[z1 * mdl_x * mdl_y + y1 * mdl_x + x0] = dd110 * Fweight[tid];
 
 					XFLOAT dd111 =  fz *  fy *  fx;
 
-					g_model_real  [z1 * mdl_x * mdl_y + y1 * mdl_x + x1] = dd111 * real;
-					g_model_imag  [z1 * mdl_x * mdl_y + y1 * mdl_x + x1] = dd111 * imag;
-					g_model_weight[z1 * mdl_x * mdl_y + y1 * mdl_x + x1] = dd111 * Fweight;
+					g_model_real  [z1 * mdl_x * mdl_y + y1 * mdl_x + x1] = dd111 * real[tid];
+					g_model_imag  [z1 * mdl_x * mdl_y + y1 * mdl_x + x1] = dd111 * imag[tid];
+					g_model_weight[z1 * mdl_x * mdl_y + y1 * mdl_x + x1] = dd111 * Fweight[tid];
 
-				}
-			} // for pass
-		} // for tid
+				} // Fweight[tid] > (RFLOAT) 0.0
+			} // for tid
+		} // for pass
 	} // for img
 }
 

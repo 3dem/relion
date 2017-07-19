@@ -32,9 +32,11 @@ class AccProjector
 
 	size_t pitch2D;
 #else
-	// No CUDA texture case
-	// TODO - convert to mdlComplex
+#ifdef CUDA
 	XFLOAT *mdlReal, *mdlImag;
+#else
+	XFLOAT *mdlComplex;
+#endif
 #endif  // CUDA_NO_TEXTURES
 
 public:
@@ -61,9 +63,12 @@ public:
 #endif
 		pitch2D = 0;
 #else
-		// No CUDA texture
+#ifdef CUDA
 		mdlReal = 0;
 		mdlImag = 0;
+#else
+		mdlComplex = 0;
+#endif
 #endif
 	}
 
