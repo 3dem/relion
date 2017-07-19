@@ -63,7 +63,7 @@ bool AccProjector::setMdlDim(
 	}
 	else // 2D model
 	{
-		HANDLE_ERROR(cudaMallocPitch(&texArrayComplex2D, &pitch2D, sizeof(CUDACOMPLEX)*mdlX,mdlY));
+		HANDLE_ERROR(cudaMallocPitch(&texArrayComplex2D, &pitch2D, sizeof(ACCCOMPLEX)*mdlX,mdlY));
 
 		// -- Descriptors of the channel(s) in the texture(s)
 		resDesc_complex.resType = cudaResourceTypePitch2D;
@@ -231,12 +231,12 @@ void AccProjector::initMdl(Complex *data)
 
 		// -- Copy data
 		copyParams.dstArray = *texArrayComplex;
-		copyParams.srcPtr   = make_cudaPitchedPtr(data, mdlX * sizeof(CUDACOMPLEX), mdlY, mdlZ);
+		copyParams.srcPtr   = make_cudaPitchedPtr(data, mdlX * sizeof(ACCCOMPLEX), mdlY, mdlZ);
 		DEBUG_HANDLE_ERROR(cudaMemcpy3D(&copyParams));
 	}
 	else // 2D model
 	{
-		DEBUG_HANDLE_ERROR(cudaMemcpy2D(texArrayComplex2D, pitch2D, data, sizeof(CUDACOMPLEX) * mdlX, sizeof(CUDACOMPLEX) * mdlX, mdlY, cudaMemcpyHostToDevice));
+		DEBUG_HANDLE_ERROR(cudaMemcpy2D(texArrayComplex2D, pitch2D, data, sizeof(ACCCOMPLEX) * mdlX, sizeof(ACCCOMPLEX) * mdlX, mdlY, cudaMemcpyHostToDevice));
 	}
 #else
 //	XFLOAT *tmpReal = new XFLOAT[mdlXYZ];

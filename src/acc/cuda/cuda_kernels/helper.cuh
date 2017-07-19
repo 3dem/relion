@@ -323,7 +323,7 @@ __global__ void cuda_kernel_translate3D(	T * g_image_in,
 //												int dy,
 //												int dz);
 //----------------------------------------------------------------------------
-//__global__ void cuda_kernel_powerClass2D(	CUDACOMPLEX * g_image,
+//__global__ void cuda_kernel_powerClass2D(	ACCCOMPLEX * g_image,
 //											XFLOAT * g_spectrum,
 //											int image_size,
 //											int spectrum_size,
@@ -332,7 +332,7 @@ __global__ void cuda_kernel_translate3D(	T * g_image_in,
 //											int res_limit,
 //											XFLOAT * g_highres_Xi2);
 //
-//__global__ void cuda_kernel_powerClass3D(	CUDACOMPLEX * g_image,
+//__global__ void cuda_kernel_powerClass3D(	ACCCOMPLEX * g_image,
 //											XFLOAT * g_spectrum,
 //											int image_size,
 //											int spectrum_size,
@@ -373,12 +373,12 @@ __global__ void cuda_kernel_probRatio(  XFLOAT *d_Mccf,
 										int startPsi,
 										int totalPsis);
 
-__global__ void cuda_kernel_rotateOnly(   CUDACOMPLEX *d_Faux,
+__global__ void cuda_kernel_rotateOnly(   ACCCOMPLEX *d_Faux,
 						  	  	  	  	  XFLOAT psi,
 						  	  			  AccProjectorKernel projector,
 						  	  			  int startPsi);
 
-__global__ void cuda_kernel_rotateAndCtf( CUDACOMPLEX *d_Faux,
+__global__ void cuda_kernel_rotateAndCtf( ACCCOMPLEX *d_Faux,
 						  	  	  	  	  XFLOAT *d_ctf,
 						  	  	  	  	  XFLOAT psi,
 						  	  			  AccProjectorKernel projector,
@@ -387,52 +387,52 @@ __global__ void cuda_kernel_rotateAndCtf( CUDACOMPLEX *d_Faux,
 /*
  * Multiplies complex array A (in-place) by B, pixel-by-pixel, after conjugating A
  */
-__global__ void cuda_kernel_convol_A(	 CUDACOMPLEX *d_A,
-									 	 CUDACOMPLEX *d_B,
+__global__ void cuda_kernel_convol_A(	 ACCCOMPLEX *d_A,
+									 	 ACCCOMPLEX *d_B,
 									 	 int image_size);
 
 /*
  * Multiplies complex array A (in-place) by B, pixel-by-pixel, after conjugating A, writes to C
  */
-__global__ void cuda_kernel_convol_A(	 CUDACOMPLEX *d_A,
-									 	 CUDACOMPLEX *d_B,
-									 	 CUDACOMPLEX *d_C,
+__global__ void cuda_kernel_convol_A(	 ACCCOMPLEX *d_A,
+									 	 ACCCOMPLEX *d_B,
+									 	 ACCCOMPLEX *d_C,
 									 	 int image_size);
 
 /*
  * Multiplies many complex arrays A (in-place) by a single B, pixel-by-pixel, after conjugating A
  */
-__global__ void cuda_kernel_batch_convol_A(	 CUDACOMPLEX *d_A,
-									 	 	 CUDACOMPLEX *d_B,
+__global__ void cuda_kernel_batch_convol_A(	 ACCCOMPLEX *d_A,
+									 	 	 ACCCOMPLEX *d_B,
 									 	 	 int image_size);
 
 /*
 * Multiplies many complex arrays A (not in-place) by a single B, pixel-by-pixel, after conjugating A
 */
-__global__ void cuda_kernel_batch_convol_A( CUDACOMPLEX *d_A,
-								CUDACOMPLEX *d_B,
-								CUDACOMPLEX *d_C,
+__global__ void cuda_kernel_batch_convol_A( ACCCOMPLEX *d_A,
+								ACCCOMPLEX *d_B,
+								ACCCOMPLEX *d_C,
 								int image_size);
 
 /*
  * Multiplies complex array A (in-place) by B, pixel-by-pixel, after conjugating B
  */
-__global__ void cuda_kernel_convol_B(	 CUDACOMPLEX *d_A,
-									 	 CUDACOMPLEX *d_B,
+__global__ void cuda_kernel_convol_B(	 ACCCOMPLEX *d_A,
+									 	 ACCCOMPLEX *d_B,
 									 	 int image_size);
 
 /*
  * Multiplies complex array A (in-place) by B, pixel-by-pixel, after conjugating B, writes to C
  */
-__global__ void cuda_kernel_convol_B(	 CUDACOMPLEX *d_A,
-									 	 CUDACOMPLEX *d_B,
-									 	 CUDACOMPLEX *d_C,
+__global__ void cuda_kernel_convol_B(	 ACCCOMPLEX *d_A,
+									 	 ACCCOMPLEX *d_B,
+									 	 ACCCOMPLEX *d_C,
 									 	 int image_size);
 /*
  * Multiplies many complex arrays A (in-place) by a single one B, pixel-by-pixel, after conjugating B
  */
-__global__ void cuda_kernel_batch_convol_B(	 CUDACOMPLEX *d_A,
-									 	 	 CUDACOMPLEX *d_B,
+__global__ void cuda_kernel_batch_convol_B(	 ACCCOMPLEX *d_A,
+									 	 	 ACCCOMPLEX *d_B,
 									 	 	 int image_size);
 
 /*
@@ -516,7 +516,7 @@ __global__ void cuda_kernel_cast(
 
 template<bool do_highpass>
 __global__ void cuda_kernel_frequencyPass(
-										CUDACOMPLEX *A,
+										ACCCOMPLEX *A,
 										long int ori_size,
 										size_t Xdim,
 										size_t Ydim,
@@ -577,7 +577,7 @@ __global__ void cuda_kernel_frequencyPass(
 }
 
 template<bool DATA3D>
-__global__ void cuda_kernel_powerClass(		CUDACOMPLEX * g_image,
+__global__ void cuda_kernel_powerClass(		ACCCOMPLEX * g_image,
 											XFLOAT * g_spectrum,
 											int image_size,
 											int spectrum_size,
@@ -780,8 +780,8 @@ __global__ void cuda_kernel_window_fourier_transform(
 #define WINDOW_FT_BLOCK_SIZE 128
 template<bool check_max_r2>
 __global__ void cuda_kernel_window_fourier_transform(
-		CUDACOMPLEX *g_in,
-		CUDACOMPLEX *g_out,
+		ACCCOMPLEX *g_in,
+		ACCCOMPLEX *g_out,
 		size_t iX, size_t iY, size_t iZ, size_t iYX, //Input dimensions
 		size_t oX, size_t oY, size_t oZ, size_t oYX, //Output dimensions
 		size_t max_idx,

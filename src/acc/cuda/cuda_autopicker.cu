@@ -170,9 +170,9 @@ void AutoPickerCuda::run()
 
 }
 
-void AutoPickerCuda::calculateStddevAndMeanUnderMask(AccPtr< CUDACOMPLEX > &d_Fmic, 
-        AccPtr< CUDACOMPLEX > &d_Fmic2, 
-        AccPtr< CUDACOMPLEX > &d_Fmsk,
+void AutoPickerCuda::calculateStddevAndMeanUnderMask(AccPtr< ACCCOMPLEX > &d_Fmic, 
+        AccPtr< ACCCOMPLEX > &d_Fmic2, 
+        AccPtr< ACCCOMPLEX > &d_Fmsk,
 		int nr_nonzero_pixels_mask, AccPtr< XFLOAT > &d_Mstddev, 
         AccPtr< XFLOAT > &d_Mmean,
 		size_t x, size_t y, size_t mic_size, size_t workSize)
@@ -183,7 +183,7 @@ void AutoPickerCuda::calculateStddevAndMeanUnderMask(AccPtr< CUDACOMPLEX > &d_Fm
 
 	RFLOAT normfft = (RFLOAT)(mic_size * mic_size) / (RFLOAT)nr_nonzero_pixels_mask;
 
-	AccPtr< CUDACOMPLEX > d_Fcov(d_Fmic.getAllocator());
+	AccPtr< ACCCOMPLEX > d_Fcov(d_Fmic.getAllocator());
 	d_Fcov.deviceAlloc(d_Fmic.getSize());
 
 	CTIC(timer,"PRE-multi_0");
@@ -428,7 +428,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 #ifdef TIMING
 	basePckr->timer.toc(basePckr->TIMING_A9);
 #endif
-	AccPtr< CUDACOMPLEX > d_Fmic(allocator);
+	AccPtr< ACCCOMPLEX > d_Fmic(allocator);
 	AccPtr<XFLOAT > d_Mmean(allocator);
 	AccPtr<XFLOAT > d_Mstddev(allocator);
 
@@ -510,7 +510,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 		}
 
 		CTIC(timer,"F_cp");
-		AccPtr< CUDACOMPLEX > Ftmp(allocator);
+		AccPtr< ACCCOMPLEX > Ftmp(allocator);
 		Ftmp.setSize(micTransformer.fouriers.getSize());
 		Ftmp.deviceAlloc();
 		micTransformer.fouriers.cpOnAcc(Ftmp);
@@ -543,7 +543,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 
 
 		//TODO Do this only once further up in scope
-		AccPtr< CUDACOMPLEX > d_Fmsk(basePckr->Finvmsk.nzyxdim, allocator);
+		AccPtr< ACCCOMPLEX > d_Fmsk(basePckr->Finvmsk.nzyxdim, allocator);
 		for(int i = 0; i< d_Fmsk.size ; i++)
 		{
 			d_Fmsk[i].x = basePckr->Finvmsk.data[i].real;

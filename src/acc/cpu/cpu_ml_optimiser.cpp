@@ -463,7 +463,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 					 cpuMLO->transformer1.fouriers.size()*2);
 		}
 
-		std::vector<CUDACOMPLEX> d_Fimg(current_size_x * current_size_y * current_size_z);                     
+		std::vector<ACCCOMPLEX> d_Fimg(current_size_x * current_size_y * current_size_z);                     
 
 		windowFourierTransform2(
 				cpuMLO->transformer1.fouriers,

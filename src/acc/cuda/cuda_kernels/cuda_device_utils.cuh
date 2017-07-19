@@ -256,8 +256,8 @@ __global__ void cuda_kernel_window_fourier_transform(
 
 template<bool check_max_r2>
 __global__ void cuda_kernel_window_fourier_transform(
-		CUDACOMPLEX *g_in,
-		CUDACOMPLEX *g_out,
+		ACCCOMPLEX *g_in,
+		ACCCOMPLEX *g_out,
 		size_t iX, size_t iY, size_t iZ, size_t iYX, //Input dimensions
 		size_t oX, size_t oY, size_t oZ, size_t oYX, //Output dimensions
 		size_t max_idx,

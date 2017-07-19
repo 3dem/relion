@@ -495,7 +495,7 @@ __global__ void cuda_kernel_probRatio(  XFLOAT *d_Mccf,
 	}
 }
 
-__global__ void cuda_kernel_rotateOnly(   CUDACOMPLEX *d_Faux,
+__global__ void cuda_kernel_rotateOnly(   ACCCOMPLEX *d_Faux,
 						  	  	  	  	  XFLOAT psi,
 						  	  			  AccProjectorKernel projector,
 						  	  			  int startPsi
@@ -519,7 +519,7 @@ __global__ void cuda_kernel_rotateOnly(   CUDACOMPLEX *d_Faux,
 
 		XFLOAT sa, ca;
 		sincos((proj+startPsi)*psi, &sa, &ca);
-		CUDACOMPLEX val;
+		ACCCOMPLEX val;
 
 		projector.project2Dmodel(	 x,y,
 									 ca,
@@ -535,7 +535,7 @@ __global__ void cuda_kernel_rotateOnly(   CUDACOMPLEX *d_Faux,
 	}
 }
 
-__global__ void cuda_kernel_rotateAndCtf( CUDACOMPLEX *d_Faux,
+__global__ void cuda_kernel_rotateAndCtf( ACCCOMPLEX *d_Faux,
 						  	  	  	  	  XFLOAT *d_ctf,
 						  	  	  	  	  XFLOAT psi,
 						  	  			  AccProjectorKernel projector,
@@ -560,7 +560,7 @@ __global__ void cuda_kernel_rotateAndCtf( CUDACOMPLEX *d_Faux,
 
 		XFLOAT sa, ca;
 		sincos((proj+startPsi)*psi, &sa, &ca);
-		CUDACOMPLEX val;
+		ACCCOMPLEX val;
 
 		projector.project2Dmodel(	 x,y,
 									 ca,
@@ -578,8 +578,8 @@ __global__ void cuda_kernel_rotateAndCtf( CUDACOMPLEX *d_Faux,
 }
 
 
-__global__ void cuda_kernel_convol_A( CUDACOMPLEX *d_A,
-									 CUDACOMPLEX *d_B,
+__global__ void cuda_kernel_convol_A( ACCCOMPLEX *d_A,
+									 ACCCOMPLEX *d_B,
 									 int image_size)
 {
 	int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
@@ -592,9 +592,9 @@ __global__ void cuda_kernel_convol_A( CUDACOMPLEX *d_A,
 	}
 }
 
-__global__ void cuda_kernel_convol_A( CUDACOMPLEX *d_A,
-									 CUDACOMPLEX *d_B,
-									 CUDACOMPLEX *d_C,
+__global__ void cuda_kernel_convol_A( ACCCOMPLEX *d_A,
+									 ACCCOMPLEX *d_B,
+									 ACCCOMPLEX *d_C,
 									 int image_size)
 {
 	int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
@@ -607,8 +607,8 @@ __global__ void cuda_kernel_convol_A( CUDACOMPLEX *d_A,
 	}
 }
 
-__global__ void cuda_kernel_batch_convol_A( CUDACOMPLEX *d_A,
-									 	 	CUDACOMPLEX *d_B,
+__global__ void cuda_kernel_batch_convol_A( ACCCOMPLEX *d_A,
+									 	 	ACCCOMPLEX *d_B,
 									 	 	int image_size)
 {
 	int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
@@ -622,9 +622,9 @@ __global__ void cuda_kernel_batch_convol_A( CUDACOMPLEX *d_A,
 	}
 }
 
-__global__ void cuda_kernel_batch_convol_A( CUDACOMPLEX *d_A,
-									 	 	CUDACOMPLEX *d_B,
-									 	 	CUDACOMPLEX *d_C,
+__global__ void cuda_kernel_batch_convol_A( ACCCOMPLEX *d_A,
+									 	 	ACCCOMPLEX *d_B,
+									 	 	ACCCOMPLEX *d_C,
 									 	 	int image_size)
 {
 	int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
@@ -638,8 +638,8 @@ __global__ void cuda_kernel_batch_convol_A( CUDACOMPLEX *d_A,
 	}
 }
 
-__global__ void cuda_kernel_convol_B(	 CUDACOMPLEX *d_A,
-									 	 CUDACOMPLEX *d_B,
+__global__ void cuda_kernel_convol_B(	 ACCCOMPLEX *d_A,
+									 	 ACCCOMPLEX *d_B,
 									 	 int image_size)
 {
 	int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
@@ -652,9 +652,9 @@ __global__ void cuda_kernel_convol_B(	 CUDACOMPLEX *d_A,
 	}
 }
 
-__global__ void cuda_kernel_convol_B(	 CUDACOMPLEX *d_A,
-									 	 CUDACOMPLEX *d_B,
-									 	 CUDACOMPLEX *d_C,
+__global__ void cuda_kernel_convol_B(	 ACCCOMPLEX *d_A,
+									 	 ACCCOMPLEX *d_B,
+									 	 ACCCOMPLEX *d_C,
 									 	 int image_size)
 {
 	int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;
@@ -667,8 +667,8 @@ __global__ void cuda_kernel_convol_B(	 CUDACOMPLEX *d_A,
 	}
 }
 
-__global__ void cuda_kernel_batch_convol_B(	 CUDACOMPLEX *d_A,
-									 	 	 CUDACOMPLEX *d_B,
+__global__ void cuda_kernel_batch_convol_B(	 ACCCOMPLEX *d_A,
+									 	 	 ACCCOMPLEX *d_B,
 									 	 	 int image_size)
 {
 	long int pixel = threadIdx.x + blockIdx.x*BLOCK_SIZE;

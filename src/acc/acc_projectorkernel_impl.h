@@ -152,7 +152,7 @@ public:
 				imag =   tex3D<XFLOAT>(mdlImag, xp + (XFLOAT)0.5, yp + (XFLOAT)0.5, zp + (XFLOAT)0.5);
 			}
 	#else
-			CUDACOMPLEX val;
+			ACCCOMPLEX val;
 			if (xp < 0)
 			{
 				// Get complex conjugated hermitian symmetry pair
@@ -163,7 +163,7 @@ public:
 				yp -= mdlInitY;
 				zp -= mdlInitZ;
 
-				val =   tex3D<CUDACOMPLEX>(mdlComplex, xp + (XFLOAT)0.5, yp + (XFLOAT)0.5, zp + (XFLOAT)0.5);
+				val =   tex3D<ACCCOMPLEX>(mdlComplex, xp + (XFLOAT)0.5, yp + (XFLOAT)0.5, zp + (XFLOAT)0.5);
 				val.y = -val.y;
 			}
 			else
@@ -171,7 +171,7 @@ public:
 				yp -= mdlInitY;
 				zp -= mdlInitZ;
 
-				val =   tex3D<CUDACOMPLEX>(mdlComplex, xp + (XFLOAT)0.5, yp + (XFLOAT)0.5, zp + (XFLOAT)0.5);
+				val =   tex3D<ACCCOMPLEX>(mdlComplex, xp + (XFLOAT)0.5, yp + (XFLOAT)0.5, zp + (XFLOAT)0.5);
 			}
 			real=val.x;
 			imag=val.y;
@@ -270,7 +270,7 @@ public:
 				imag =   tex3D<XFLOAT>(mdlImag, xp + (XFLOAT)0.5, yp + (XFLOAT)0.5, zp + (XFLOAT)0.5);
 			}
 	#else
-			CUDACOMPLEX val;
+			ACCCOMPLEX val;
 			if (xp < 0)
 			{
 				// Get complex conjugated hermitian symmetry pair
@@ -281,7 +281,7 @@ public:
 				yp -= mdlInitY;
 				zp -= mdlInitZ;
 
-				val =   tex3D<CUDACOMPLEX>(mdlComplex, xp + (XFLOAT)0.5, yp + (XFLOAT)0.5, zp + (XFLOAT)0.5);
+				val =   tex3D<ACCCOMPLEX>(mdlComplex, xp + (XFLOAT)0.5, yp + (XFLOAT)0.5, zp + (XFLOAT)0.5);
 				val.y = -val.y;
 			}
 			else
@@ -289,7 +289,7 @@ public:
 				yp -= mdlInitY;
 				zp -= mdlInitZ;
 
-				val =   tex3D<CUDACOMPLEX>(mdlComplex, xp + (XFLOAT)0.5, yp + (XFLOAT)0.5, zp + (XFLOAT)0.5);
+				val =   tex3D<ACCCOMPLEX>(mdlComplex, xp + (XFLOAT)0.5, yp + (XFLOAT)0.5, zp + (XFLOAT)0.5);
 			}
 			real=val.x;
 			imag=val.y;
@@ -378,7 +378,7 @@ public:
 				imag =   tex2D<XFLOAT>(mdlImag, xp + (XFLOAT)0.5, yp + (XFLOAT)0.5);
 			}
 #else
-			CUDACOMPLEX val;
+			ACCCOMPLEX val;
 			if (xp < 0)
 			{
 				// Get complex conjugated hermitian symmetry pair
@@ -386,13 +386,13 @@ public:
 				yp = -yp;
 				yp -= mdlInitY;
 
-				val = tex2D<CUDACOMPLEX>(mdlComplex, xp + (XFLOAT)0.5, yp + (XFLOAT)0.5);
+				val = tex2D<ACCCOMPLEX>(mdlComplex, xp + (XFLOAT)0.5, yp + (XFLOAT)0.5);
 				val.y = -val.y;
 			}
 			else
 			{
 				yp -= mdlInitY;
-				val = tex2D<CUDACOMPLEX>(mdlComplex, xp + (XFLOAT)0.5, yp + (XFLOAT)0.5);
+				val = tex2D<ACCCOMPLEX>(mdlComplex, xp + (XFLOAT)0.5, yp + (XFLOAT)0.5);
 			}
 			real=val.x;
 			imag=val.y;
