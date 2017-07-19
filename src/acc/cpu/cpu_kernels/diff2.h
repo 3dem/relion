@@ -901,7 +901,6 @@ void diff2_CC_coarse_3D(
 		XFLOAT   exp_local_sqrtXi2
 		)
 {   
-// TODO - GPU reference code has changed - check that this still matches the result
 	for (int iorient = 0; iorient < grid_size; iorient++) {
 		XFLOAT e0, e1, e2, e3, e4, e5, e6, e7, e8;
 		e0 = g_eulers[iorient*9  ];
@@ -1054,7 +1053,6 @@ void diff2_CC_fine_2D(
 		unsigned long *d_job_num
 		)
 {     
-// TODO - GPU reference code has changed - check that this still matches the result
 	for (int bid = 0; bid < grid_size; bid++) {
 
 		unsigned trans_num   = d_job_num[bid]; //how many transes we have for this rot

@@ -186,15 +186,10 @@ size_t findThresholdIdxInCumulativeSum(AccPtr<T> &data, T threshold)
 		idx.cpToHost();
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(data.getStream()));
 #else
-		// TODO - do this in single loop?
 		size_t size_m1 = data.getSize()-1;
-		for(int blk=0; blk<grid_size; blk++) {
-			for(int tid=0; tid<FIND_IN_CUMULATIVE_BLOCK_SIZE; tid++) {
-				size_t i = blk * FIND_IN_CUMULATIVE_BLOCK_SIZE + tid;
-				if (i < size_m1 && data[i] <= threshold && threshold < data[i+1])
-					idx[0] = i+1;
-			}
-		}
+		for (size_t i = 0; i < size_m1; i++)
+			if (data[i] <= threshold && threshold < data[i+1])
+				idx[0] = i+1;
 #endif
 		return idx[0];
 	}

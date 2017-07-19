@@ -603,7 +603,8 @@ void mapAllWeightsToMweights(
 		cudaStream_t stream
 		)
 {
-	int grid_size = ceil((float)(orientation_num*translation_num)/(float)WEIGHT_MAP_BLOCK_SIZE);
+	size_t combinations = orientation_num*translation_num;
+	int grid_size = ceil((float)(combinations)/(float)WEIGHT_MAP_BLOCK_SIZE);
 #ifdef CUDA
 	cuda_kernel_allweights_to_mweights<<< grid_size, WEIGHT_MAP_BLOCK_SIZE, 0, stream >>>(
 			d_iorient,
@@ -614,16 +615,10 @@ void mapAllWeightsToMweights(
 			WEIGHT_MAP_BLOCK_SIZE);
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 #else
-	// TODO - do this in single loop?
-	for(int blk=0; blk<grid_size; blk++) {
-		for(int tid=0; tid<WEIGHT_MAP_BLOCK_SIZE; tid++)
-		{
-			size_t idx = blk * WEIGHT_MAP_BLOCK_SIZE + tid;
-			if (idx < orientation_num*translation_num)
-				d_mweights[d_iorient[idx/translation_num] * translation_num + idx%translation_num] =
-					d_allweights[idx/translation_num * translation_num + idx%translation_num];
-		}
-	}
+	for (size_t i=0; i < combinations; i++)
+		d_mweights[d_iorient[i/translation_num] * translation_num + i%translation_num] =
+			d_allweights[i/translation_num * translation_num + i%translation_num];
+			// TODO - isn't this just d_allweights[idx + idx%translation_num]?   Really?
 #endif
 }
 

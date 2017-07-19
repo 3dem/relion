@@ -72,8 +72,9 @@ void exponentiate_weights_fine(
 					c_itrans = ( iy - (iy % oversamples_trans))/ oversamples_trans; //floor(x/y) == (x-(x%y))/y  but less sensitive to x>>y and finite precision
 		//			f_itrans = iy % oversamples_trans;
 
-					XFLOAT prior = g_pdf_orientation[ix] * g_pdf_offset[c_itrans];          	// Same      for all threads - TODO: should be done once for all trans through warp-parallel execution
-					XFLOAT diff2 = g_weights[pos+itrans] - avg_diff2;								// Different for all threads
+					// Same  for all threads - TODO: should be done once for all trans through warp-parallel execution
+					XFLOAT prior = g_pdf_orientation[ix] * g_pdf_offset[c_itrans];          	
+					XFLOAT diff2 = g_weights[pos+itrans] - avg_diff2; // Different for all threads
 					// next line because of numerical precision of exp-function
 			#if defined(ACC_DOUBLE_PRECISION)
 						if (diff2 > 700.)

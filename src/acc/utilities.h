@@ -742,8 +742,8 @@ void diff2_fine(
 					d_job_idx,
 					d_job_num);
 #else
-		// TODO - plug in use of orientation_num, translation_num,todo_blocks on
-		// CPU side if GPU starts to use
+		// TODO - make use of orientation_num, translation_num,todo_blocks on
+		// CPU side if CUDA starts to use
 	if (DATA3D)
 		CpuKernels::diff2_fine_3D(
 			grid_size,
@@ -832,8 +832,8 @@ void diff2_CC_fine(
 				d_job_idx,
 				d_job_num);
 #else
-		// TODO - plug in use of orientation_num, translation_num,todo_blocks on
-		// CPU side if GPU starts to use
+		// TODO - Make use of orientation_num, translation_num, todo_blocks on
+		// CPU side if CUDA starts to use
 	if (DATA3D)
 		CpuKernels::diff2_CC_fine_3D(
 			grid_size,

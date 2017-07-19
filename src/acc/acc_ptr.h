@@ -1,6 +1,7 @@
 #ifndef ACC_PTR_H_
 #define ACC_PTR_H_
 
+#include "src/acc/settings.h"
 #ifdef CUDA
 #include "src/acc/cuda/cuda_settings.h"
 #include <cuda_runtime.h>
@@ -247,7 +248,7 @@ public:
 			ACC_PTR_DEBUG_FATAL("Host double allocation.\n");
 #endif
 		doFreeHost = true;
-		// TODO - consider making this std::vector
+		// TODO - alternatively, this could be aligned std::vector
 		posix_memalign((void **)&hPtr, MEM_ALIGN, sizeof(T) * size);
 	}
 
@@ -303,7 +304,7 @@ public:
 		if (size==0)
 			ACC_PTR_DEBUG_FATAL("Resizing from size zero (permitted).\n");
 #endif
-		// TODO - consider making this std::vector
+		// TODO - alternatively, this could be aligned std::vector
 		T* newArr;
 		posix_memalign((void **)&newArr, MEM_ALIGN, sizeof(T) * newSize);
 		
