@@ -274,7 +274,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		size_t img_size = img.data.nzyxdim;
 
 
-
+/// TODO - Dari - Clean this up - we no longer need an example of how to use AccPtr and AccUtilities 
 
 
 
@@ -1565,6 +1565,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
 			//Set all device-located weights to zero, and only the smallest one to 1.
+#ifdef CUDA
 			DEBUG_HANDLE_ERROR(cudaMemsetAsync(~(PassWeights[ipart].weights), 0.f, PassWeights[ipart].weights.getSize()*sizeof(XFLOAT),0));
 
 			XFLOAT unity=1;
@@ -1572,6 +1573,10 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 			PassWeights[ipart].weights.cpToHost();
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
+#else
+			deviceInitValue<XFLOAT>(PassWeights[ipart].weights, (XFLOAT)0.0);
+			PassWeights[ipart].weights[min_pair.first] = (XFLOAT)1.0;
+#endif
 
 			my_significant_weight = 0.999;
 			DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_NR_SIGN) = (RFLOAT) 1.;
@@ -1701,6 +1706,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				}
 				else
 				{
+					// Downcast from RFLOAT to XFLOAT
 					weights.deviceAlloc();
 #ifdef CUDA
 					block_num = ceilf((float)Mweight.getSize()/(float)BLOCK_SIZE);
@@ -1810,7 +1816,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 					CTOC(accMLO->timer,"sort");
 
-					op.sum_weight[ipart] = cumulative_sum.getDeviceAt(cumulative_sum.getSize() - 1);
+					op.sum_weight[ipart] = cumulative_sum.getAccValueAt(cumulative_sum.getSize() - 1);
 
 					long int my_nr_significant_coarse_samples;
 					size_t thresholdIdx = findThresholdIdxInCumulativeSum<weights_t>(cumulative_sum, 
@@ -1847,7 +1853,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 						thresholdIdx = filteredSize - my_nr_significant_coarse_samples;
 					}
 
-					weights_t significant_weight = sorted.getDeviceAt(thresholdIdx);
+					weights_t significant_weight = sorted.getAccValueAt(thresholdIdx);
 
 					CTIC(accMLO->timer,"getArgMaxOnDevice");
 					std::pair<int, weights_t> max_pair = AccUtilities::getArgMaxOnDevice<weights_t>(unsorted_ipart);
@@ -1900,8 +1906,12 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 #else
 						IndexedDataArray thisClassPassWeights(PassWeights[ipart],FPCMasks[ipart][exp_iclass]);
 #endif
-						AccPtr<XFLOAT>  pdf_orientation_class(&(pdf_orientation[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]), &( pdf_orientation((exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi) ), sp.nr_dir*sp.nr_psi);
-						AccPtr<XFLOAT>  pdf_offset_class(&(pdf_offset[(exp_iclass-sp.iclass_min)*sp.nr_trans]), &( pdf_offset((exp_iclass-sp.iclass_min)*sp.nr_trans) ), sp.nr_trans);
+						AccPtr<XFLOAT>  pdf_orientation_class(&(pdf_orientation[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]), 
+								                              &( pdf_orientation((exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi) ), 
+								                              sp.nr_dir*sp.nr_psi);
+						AccPtr<XFLOAT>  pdf_offset_class(&(pdf_offset[(exp_iclass-sp.iclass_min)*sp.nr_trans]), 
+								                         &( pdf_offset((exp_iclass-sp.iclass_min)*sp.nr_trans) ), 
+								                         sp.nr_trans);
 
 						block_num = ceil((float)FPCMasks[ipart][exp_iclass].jobNum / (float)SUMW_BLOCK_SIZE); //thisClassPassWeights.rot_idx.getSize() / SUM_BLOCK_SIZE;
 
@@ -1959,7 +1969,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 				if(baseMLO->adaptive_oversampling!=0)
 				{
-					op.sum_weight[ipart] = cumulative_sum.getDeviceAt(cumulative_sum.getSize() - 1);
+					op.sum_weight[ipart] = cumulative_sum.getAccValueAt(cumulative_sum.getSize() - 1);
 
 					if (op.sum_weight[ipart]==0)
 					{
@@ -1978,7 +1988,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					}
 
 					size_t thresholdIdx = findThresholdIdxInCumulativeSum<XFLOAT>(cumulative_sum, (1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart]);
-					my_significant_weight = sorted.getDeviceAt(thresholdIdx);
+					my_significant_weight = sorted.getAccValueAt(thresholdIdx);
 
 					CTIC(accMLO->timer,"getArgMaxOnDevice");
 					std::pair<int, XFLOAT> max_pair = AccUtilities::getArgMaxOnDevice<XFLOAT>(PassWeights[ipart].weights);
@@ -1988,7 +1998,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				}
 				else
 				{
-					my_significant_weight = sorted.getDeviceAt(0);
+					my_significant_weight = sorted.getAccValueAt(0);
 				}
 			}
 			CTOC(accMLO->timer,"sumweight1");
@@ -2254,6 +2264,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		if (accMLO->dataIs3D)
 			p_thr_wsum_prior_offsetz_class.deviceAlloc();
 		else
+			// TODO - Dari - should the CPU also have the same pointer for offsety and offsetz?
 			p_thr_wsum_prior_offsetz_class.dPtr  = p_thr_wsum_prior_offsety_class.dPtr;
 
 		p_thr_wsum_sigma2_offset.deviceAlloc();
@@ -3020,6 +3031,12 @@ void accDoExpectationOneParticle(MlClass *myInstance, unsigned long my_ori_parti
 #endif
 
 	CTIC(timer,"oneParticle");
+#ifdef TIMING
+	// Only time one thread
+	if (thread_id == 0)
+		baseMLO->timer.tic(baseMLO->TIMING_ESP_DIFF2_A);
+#endif
+	
 	sp.nr_particles = baseMLO->mydata.ori_particles[my_ori_particle].particles_id.size();
 
 	OptimisationParamters op(sp.nr_particles, my_ori_particle);

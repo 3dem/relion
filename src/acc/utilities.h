@@ -166,13 +166,18 @@ static int filterGreaterZeroOnDevice(AccPtr<T> &in, AccPtr<T> &out)
 #else
 	size_t arr_size = in.getSize();
 	size_t filt_size = 0;
+	size_t outindex = 0;
+	// Find how many entries the output array will have
 	for(int i=0; i<arr_size; i++)
 		if(in[i] > 0.0)
 			filt_size++;
 	out.resizeHost(filt_size);
+	// Now populate output array
 	for(int i=0; i<arr_size; i++)
-		if(in[i] > 0.0)
-			out[i] = in[i];
+		if(in[i] > 0.0) {
+			out[outindex] = in[i];
+			outindex++;
+		}
 	return filt_size;
 #endif
 }
@@ -361,8 +366,7 @@ void InitValue(AccPtr<T> &data, T value)
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 #else
 	int Size = data.getSize();
-	for(size_t i=0; i<Size; i++)
-		data[i] = value;
+	memset(data(), value, Size);
 #endif
 }
 

@@ -48,6 +48,7 @@
 #define RELION_VERSION "devel"
 
 #include <math.h>
+#include <signal.h>
 #include "src/error.h"
 
 #ifndef _CYGWIN

@@ -298,7 +298,29 @@ public:
 #endif
 	}
 
+	// Allocate storage of a new size for the array
 	void resizeHost(size_t newSize)
+	{
+#ifdef DEBUG_CUDA
+		if (size==0)
+			ACC_PTR_DEBUG_FATAL("Resizing from size zero (permitted).\n");
+#endif
+		// TODO - alternatively, this could be aligned std::vector
+		T* newArr;
+		posix_memalign((void **)&newArr, MEM_ALIGN, sizeof(T) * newSize);
+		
+	    size = newSize;
+#ifdef DEBUG_CUDA
+		if (dPtr!=NULL)
+			ACC_PTR_DEBUG_FATAL("Resizing host with present device allocation.\n");
+#endif
+	    freeHost();
+	    setHostPtr(newArr);
+	    doFreeHost=true;
+	}
+	
+	// Resize retaining as much of the original contents as possible
+	void resizeHostCopy(size_t newSize)
 	{
 #ifdef DEBUG_CUDA
 		if (size==0)
@@ -324,7 +346,7 @@ public:
 	    setHostPtr(newArr);
 	    doFreeHost=true;
 	}
-
+	
 	/**
 	 * Initiate device memory with provided value
 	 */

@@ -658,7 +658,7 @@ void runDiff2KernelCoarse(
 			unsigned rest = orientation_num % blocks3D;
 			long unsigned even_orientation_num = orientation_num - rest;
 // TODO - find a more compact way to represent these combinations resulting in
-// a single call to diff2_course
+// a single call to diff2_course?
 			if (translation_num <= blocks3D)
 			{
 				if (even_orientation_num != 0)
@@ -739,7 +739,7 @@ void runDiff2KernelCoarse(
 				{
 					if(data_is_3D)
 						AccUtilities::diff2_coarse<true,true, D2C_BLOCK_SIZE_DATA3D*2, D2C_EULERS_PER_BLOCK_DATA3D, 4>(
-							even_orientation_num/D2C_EULERS_PER_BLOCK_DATA3D,
+							even_orientation_num/D2C_EULERS_PER_BLOCK_DATA3D*2,
 							D2C_BLOCK_SIZE_DATA3D,
 							d_eulers,
 							trans_x,
@@ -755,7 +755,7 @@ void runDiff2KernelCoarse(
 							stream);
 					else
 						AccUtilities::diff2_coarse<true,false, D2C_BLOCK_SIZE_REF3D*2, D2C_EULERS_PER_BLOCK_REF3D, 4>(
-							even_orientation_num/D2C_EULERS_PER_BLOCK_REF3D,
+							even_orientation_num/D2C_EULERS_PER_BLOCK_REF3D*2,
 							D2C_BLOCK_SIZE_REF3D*2,
 							d_eulers,
 							trans_x,
@@ -814,7 +814,7 @@ void runDiff2KernelCoarse(
 				{
 					if(data_is_3D)
 						AccUtilities::diff2_coarse<true,true, D2C_BLOCK_SIZE_DATA3D*4, D2C_EULERS_PER_BLOCK_DATA3D, 4>(
-							even_orientation_num/D2C_EULERS_PER_BLOCK_DATA3D,
+							even_orientation_num/D2C_EULERS_PER_BLOCK_DATA3D*4,
 							D2C_BLOCK_SIZE_DATA3D*4,
 							d_eulers,
 							trans_x,
@@ -830,7 +830,7 @@ void runDiff2KernelCoarse(
 							stream);
 					else
 						AccUtilities::diff2_coarse<true,false, D2C_BLOCK_SIZE_REF3D*4, D2C_EULERS_PER_BLOCK_REF3D, 4>(
-							even_orientation_num/D2C_EULERS_PER_BLOCK_REF3D,
+							even_orientation_num/D2C_EULERS_PER_BLOCK_REF3D*4,
 							D2C_BLOCK_SIZE_REF3D*4,
 							d_eulers,
 							trans_x,
@@ -889,7 +889,7 @@ void runDiff2KernelCoarse(
 				{
 					if(data_is_3D)
 						AccUtilities::diff2_coarse<true,true, D2C_BLOCK_SIZE_DATA3D*8, D2C_EULERS_PER_BLOCK_DATA3D, 4>(
-							even_orientation_num/D2C_EULERS_PER_BLOCK_DATA3D,
+							even_orientation_num/D2C_EULERS_PER_BLOCK_DATA3D*8,
 							D2C_BLOCK_SIZE_DATA3D*8,
 							d_eulers,
 							trans_x,
@@ -905,7 +905,7 @@ void runDiff2KernelCoarse(
 							stream);
 					else
 						AccUtilities::diff2_coarse<true,false, D2C_BLOCK_SIZE_REF3D*8, D2C_EULERS_PER_BLOCK_REF3D, 4>(
-							even_orientation_num/D2C_EULERS_PER_BLOCK_REF3D,
+							even_orientation_num/D2C_EULERS_PER_BLOCK_REF3D*8,
 							D2C_BLOCK_SIZE_REF3D*8,
 							d_eulers,
 							trans_x,
@@ -1051,7 +1051,7 @@ void runDiff2KernelCoarse(
 	else
 	{
 // TODO - find a more compact way to represent these combinations resulting in
-// a single call to diff2_CC_course
+// a single call to diff2_CC_course?
 		// dim3 CCblocks(orientation_num,translation_num);
 		if(data_is_3D)
 			AccUtilities::diff2_CC_coarse<true,true,D2C_BLOCK_SIZE_DATA3D>(
@@ -1142,7 +1142,7 @@ void runDiff2KernelFine(
     if(!do_CC)
     {
 // TODO - find a more compact way to represent these combinations resulting in
-// a single call to diff2_fine
+// a single call to diff2_fine?
 			if(data_is_3D)
 				AccUtilities::diff2_fine<true,true, D2F_BLOCK_SIZE_DATA3D, D2F_CHUNK_DATA3D>(
 					block_dim,
@@ -1217,7 +1217,7 @@ void runDiff2KernelFine(
     else
     {
 // TODO - find a more compact way to represent these combinations resulting in
-// a single call to diff2_CC_fine
+// a single call to diff2_CC_fine?
     	if(data_is_3D)
 			AccUtilities::diff2_CC_fine<true,true,D2F_BLOCK_SIZE_DATA3D,D2F_CHUNK_DATA3D>(
 				block_dim,
@@ -1320,17 +1320,62 @@ void runCollect2jobs(	int grid_dim,
 						bool data_is_3D
 						)
 {
-	size_t shared_buffer;
-	if(data_is_3D)
-	{
-		shared_buffer = sizeof(XFLOAT)*SUMW_BLOCK_SIZE*5; // x+y+z+myp+weights
+	if (data_is_3D) {
+#ifdef CUDA
+	dim3 numblocks(grid_dim);
+	size_t shared_buffer = sizeof(XFLOAT)*SUMW_BLOCK_SIZE*5; // x+y+z+myp+weights
+	cuda_kernel_collect2jobs<true><<<numblocks,SUMW_BLOCK_SIZE,shared_buffer>>>(
+			oo_otrans_x,          // otrans-size -> make const
+			oo_otrans_y,          // otrans-size -> make const
+			oo_otrans_z,          // otrans-size -> make const
+			myp_oo_otrans_x2y2z2, // otrans-size -> make const
+			weights,
+			significant_weight,
+			sum_weight,
+			nr_trans,
+			nr_oversampled_trans,
+			nr_oversampled_rot,
+			oversamples,
+			skip_rots,
+			p_weights,
+			p_thr_wsum_prior_offsetx_class,
+			p_thr_wsum_prior_offsety_class,
+			p_thr_wsum_prior_offsetz_class,
+			p_thr_wsum_sigma2_offset,
+			rot_idx,
+			trans_idx,
+			jobOrigin,
+			jobExtent);
+#else
+		CpuKernels::collect2jobs<true>(grid_dim, SUMW_BLOCK_SIZE,
+				oo_otrans_x,          // otrans-size -> make const
+				oo_otrans_y,          // otrans-size -> make const
+				oo_otrans_z,          // otrans-size -> make const
+				myp_oo_otrans_x2y2z2, // otrans-size -> make const
+				weights,
+				significant_weight,
+				sum_weight,
+				nr_trans,
+				nr_oversampled_trans,
+				nr_oversampled_rot,
+				oversamples,
+				skip_rots,
+				p_weights,
+				p_thr_wsum_prior_offsetx_class,
+				p_thr_wsum_prior_offsety_class,
+				p_thr_wsum_prior_offsetz_class,
+				p_thr_wsum_sigma2_offset,
+				rot_idx,
+				trans_idx,
+				jobOrigin,
+				jobExtent);
+#endif
 	}
 	else
 	{
-		shared_buffer = sizeof(XFLOAT)*SUMW_BLOCK_SIZE*4; // x+y+myp+weights
-	}
 #ifdef CUDA
 	dim3 numblocks(grid_dim);
+	size_t shared_buffer = sizeof(XFLOAT)*SUMW_BLOCK_SIZE*4; // x+y+myp+weights
 	cuda_kernel_collect2jobs<false><<<numblocks,SUMW_BLOCK_SIZE,shared_buffer>>>(
 			oo_otrans_x,          // otrans-size -> make const
 			oo_otrans_y,          // otrans-size -> make const
@@ -1354,31 +1399,6 @@ void runCollect2jobs(	int grid_dim,
 			jobOrigin,
 			jobExtent);
 #else
-	// Interesting - we don't seem to use the shared_buffer
-	if (data_is_3D)
-		CpuKernels::collect2jobs<true>(grid_dim, SUMW_BLOCK_SIZE,
-				oo_otrans_x,          // otrans-size -> make const
-				oo_otrans_y,          // otrans-size -> make const
-				oo_otrans_z,          // otrans-size -> make const
-				myp_oo_otrans_x2y2z2, // otrans-size -> make const
-				weights,
-				significant_weight,
-				sum_weight,
-				nr_trans,
-				nr_oversampled_trans,
-				nr_oversampled_rot,
-				oversamples,
-				skip_rots,
-				p_weights,
-				p_thr_wsum_prior_offsetx_class,
-				p_thr_wsum_prior_offsety_class,
-				p_thr_wsum_prior_offsetz_class,
-				p_thr_wsum_sigma2_offset,
-				rot_idx,
-				trans_idx,
-				jobOrigin,
-				jobExtent);
-	else
 	CpuKernels::collect2jobs<false>(grid_dim, SUMW_BLOCK_SIZE,
 			oo_otrans_x,          // otrans-size -> make const
 			oo_otrans_y,          // otrans-size -> make const
@@ -1402,6 +1422,7 @@ void runCollect2jobs(	int grid_dim,
 			jobOrigin,
 			jobExtent);
 #endif
+	}
 }
 //void windowFourierTransform2(
 //		XFLOAT *d_in_real,

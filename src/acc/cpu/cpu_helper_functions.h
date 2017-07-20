@@ -22,6 +22,112 @@
 
 namespace CpuKernels
 {
+#define WINDOW_FT_BLOCK_SIZE 128
+template<bool check_max_r2>
+void window_fourier_transform(
+		int grid_dim, 
+		int Npsi, 
+		int block_size,
+		ACCCOMPLEX *g_in,
+		ACCCOMPLEX *g_out,
+		size_t iX, size_t iY, size_t iZ, size_t iYX, //Input dimensions
+		size_t oX, size_t oY, size_t oZ, size_t oYX, //Output dimensions
+		size_t max_idx,
+		size_t max_r2 = 0
+		)
+{
+	for(int blk=0; blk<grid_dim; blk++) {
+		for(int psi=0; psi<Npsi; psi++) {
+			for(int tid=0; tid< block_size; tid++) {
+				size_t n = tid + block_size * blk;
+				size_t oOFF = oX*oY*oZ*psi;
+				size_t iOFF = iX*iY*iZ*psi;
+				if (n >= max_idx) return;
+
+				long int k, i, kp, ip, jp;
+
+				if (check_max_r2)
+				{
+					k = n / (iX * iY);
+					i = (n % (iX * iY)) / iX;
+
+					kp = k < iX ? k : k - iZ;
+					ip = i < iX ? i : i - iY;
+					jp = n % iX;
+
+					if (kp*kp + ip*ip + jp*jp > max_r2)
+						return;
+				}
+				else
+				{
+					k = n / (oX * oY);
+					i = (n % (oX * oY)) / oX;
+
+					kp = k < oX ? k : k - oZ;
+					ip = i < oX ? i : i - oY;
+					jp = n % oX;
+				}
+
+				long int  in_idx = (kp < 0 ? kp + iZ : kp) * iYX + (ip < 0 ? ip + iY : ip)*iX + jp;
+				long int out_idx = (kp < 0 ? kp + oZ : kp) * oYX + (ip < 0 ? ip + oY : ip)*oX + jp;
+				g_out[out_idx + oOFF] =  g_in[in_idx + iOFF];
+			} // for tid
+		} // for psi
+	} // for blk
+}
+
+// may need to change to parallel reduce if it becomes the bottle neck.
+template <typename T>
+static T getMin(T *data, size_t size)
+{
+	T min = data[0];
+	for(int i=1; i<size; i++)
+		min = data[i] < min ? data[i] : min;
+	 
+	return min;
+}
+
+template <typename T>
+static T getSum(T *data, size_t size)
+{
+	T sum = data[0];
+	for(int i=1; i<size; i++)
+		sum += data[i];
+	 
+	return sum;
+}
+
+template <typename T>
+static std::pair<int, T> getArgMin(T *data, size_t size)
+{
+	std::pair<int, T> pair;
+	pair.first = 0;
+	pair.second = data[0];
+	
+	for(int i=1; i<size; i++)
+		if( data[i] < pair.second) {
+			pair.first = i;
+			pair.second = data[i];
+		}
+		
+	return pair;
+}
+
+template <typename T>
+static std::pair<int, T> getArgMax(T *data, size_t size)
+{
+	std::pair<int, T> pair;
+	pair.first = 0;
+	pair.second = data[0];
+	
+	for(int i=1; i<size; i++)
+		if( data[i] > pair.second) {
+			pair.first = i;
+			pair.second = data[i];
+		}
+		
+	return pair;
+}
 /*
  * This assisting function goes over the orientations determined as significant for this image, and checks
  * which translations should be included in the list of those which differences will be calculated for.
@@ -299,61 +405,7 @@ void windowFourierTransform2(
 		unsigned iX, unsigned iY, unsigned iZ, //Input dimensions
 		unsigned oX, unsigned oY, unsigned oZ  //Output dimensions
 					);
-*/
-#define WINDOW_FT_BLOCK_SIZE 128
-template<bool check_max_r2>
-void window_fourier_transform(
-		int grid_dim, 
-		int Npsi, 
-		int block_size,
-		ACCCOMPLEX *g_in,
-		ACCCOMPLEX *g_out,
-		size_t iX, size_t iY, size_t iZ, size_t iYX, //Input dimensions
-		size_t oX, size_t oY, size_t oZ, size_t oYX, //Output dimensions
-		size_t max_idx,
-		size_t max_r2 = 0
-		)
-{
-	for(int blk=0; blk<grid_dim; blk++) {
-		for(int psi=0; psi<Npsi; psi++) {
-			for(int tid=0; tid< block_size; tid++) {
-				size_t n = tid + block_size * blk;
-				size_t oOFF = oX*oY*oZ*psi;
-				size_t iOFF = iX*iY*iZ*psi;
-				if (n >= max_idx) return;
 
-				long int k, i, kp, ip, jp;
-
-				if (check_max_r2)
-				{
-					k = n / (iX * iY);
-					i = (n % (iX * iY)) / iX;
-
-					kp = k < iX ? k : k - iZ;
-					ip = i < iX ? i : i - iY;
-					jp = n % iX;
-
-					if (kp*kp + ip*ip + jp*jp > max_r2)
-						return;
-				}
-				else
-				{
-					k = n / (oX * oY);
-					i = (n % (oX * oY)) / oX;
-
-					kp = k < oX ? k : k - oZ;
-					ip = i < oX ? i : i - oY;
-					jp = n % oX;
-				}
-
-				long int  in_idx = (kp < 0 ? kp + iZ : kp) * iYX + (ip < 0 ? ip + iY : ip)*iX + jp;
-				long int out_idx = (kp < 0 ? kp + oZ : kp) * oYX + (ip < 0 ? ip + oY : ip)*oX + jp;
-				g_out[out_idx + oOFF] =  g_in[in_idx + iOFF];
-			} // for tid
-		} // for psi
-	} // for blk
-}
-/*
 void windowFourierTransform2(
 		std::vector<ACCCOMPLEX > &d_in,
 		std::vector<ACCCOMPLEX > &d_out,
@@ -700,58 +752,6 @@ void lowPassFilterMapGPU(
 	}
 }
 */
-// may need to change to parallel reduce if it becomes the bottle neck.
-template <typename T>
-static T getMin(T *data, size_t size)
-{
-	T min = data[0];
-	for(int i=1; i<size; i++)
-		min = data[i] < min ? data[i] : min;
-	 
-	return min;
-}
-
-template <typename T>
-static T getSum(T *data, size_t size)
-{
-	T sum = data[0];
-	for(int i=1; i<size; i++)
-		sum += data[i];
-	 
-	return sum;
-}
-
-template <typename T>
-static std::pair<int, T> getArgMin(T *data, size_t size)
-{
-	std::pair<int, T> pair;
-	pair.first = 0;
-	pair.second = data[0];
-	
-	for(int i=1; i<size; i++)
-		if( data[i] < pair.second) {
-			pair.first = i;
-			pair.second = data[i];
-		}
-		
-	return pair;
-}
-
-template <typename T>
-static std::pair<int, T> getArgMax(T *data, size_t size)
-{
-	std::pair<int, T> pair;
-	pair.first = 0;
-	pair.second = data[0];
-	
-	for(int i=1; i<size; i++)
-		if( data[i] > pair.second) {
-			pair.first = i;
-			pair.second = data[i];
-		}
-		
-	return pair;
-}
 } // Namespace CpuKernels
 
 #endif //CPU_HELPER_FUNCTIONS_H_
