@@ -293,7 +293,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		d_img_.accAlloc();
 		d_img_.accInit(0);
 
-		temp.hostAlloc();
+		// Error - already allocated - temp.hostAlloc();
 
 		if (baseMLO->has_converged && baseMLO->do_use_reconstruct_images)
 		{
