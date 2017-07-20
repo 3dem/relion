@@ -72,7 +72,9 @@ void globalThreadExpectationSomeParticles(ThreadArgument &thArg)
 	}
 	catch (RelionError XE)
 	{
-		MLO->threadException = &XE;
+		RelionError *gE = new RelionError(XE.msg, XE.file, XE.line);
+		gE->msg = XE.msg;
+		MLO->threadException = gE;
 	}
 }
 
