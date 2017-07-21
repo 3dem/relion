@@ -56,7 +56,7 @@ public:
 #ifdef CUDA_NO_TEXTURES
 				for(int i=0; i<mdlX * mdlY * mdlZ; i++) {
 			        *mdlComplex ++ = *mdlReal ++;
-			        *mdlComplex ++ = *mdlImag ++;			        
+			        *mdlComplex ++ = *mdlImag ++;
 			    }
 #endif
 			};
@@ -94,7 +94,6 @@ public:
 			XFLOAT zp = (e6 * x + e7 * y + e8 * z ) * padding_factor;
 
 #ifdef CUDA_NO_TEXTURES
-			int neg = 0;
 			if (xp < 0)
 			{
 				// Get complex conjugated hermitian symmetry pair
@@ -214,38 +213,23 @@ public:
 			XFLOAT zp = (e6 * x + e7 * y ) * padding_factor;
 
 #ifdef CUDA_NO_TEXTURES
-			int neg = 0;
-			if (xp < 0)
+			bool invers(xp < 0);
+			if (invers)
 			{
-				// Get complex conjugated hermitian symmetry pair
 				xp = -xp;
 				yp = -yp;
 				zp = -zp;
-
-#ifdef CUDA
-				real =   no_tex3D(mdlReal, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
-				imag = - no_tex3D(mdlImag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
-#else
-				neg = 1;
-//				real =   CpuKernels::no_tex3D(mdlReal, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
-//				imag = - CpuKernels::no_tex3D(mdlImag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
-#endif
-			}
-			else
-			{
-#ifdef CUDA
-				real =   no_tex3D(mdlReal, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
-				imag =   no_tex3D(mdlImag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
-#else
-//				real =   CpuKernels::no_tex3D(mdlReal, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
-//				imag = - CpuKernels::no_tex3D(mdlImag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
-#endif
 			}
 			
-			CpuKernels::complex3D(mdlComplex, real, imag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
-			if(neg)
-			    imag = -imag;		
+	#ifdef CUDA
+			real = no_tex3D(mdlReal, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
+			imag = no_tex3D(mdlImag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
+	#else
+				CpuKernels::complex3D(mdlComplex, real, imag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
+	#endif
 			
+			if(invers)
+			    imag = -imag;
 #else
 	#if(!COMPLEXTEXTURE)
 			if (xp < 0)
@@ -328,35 +312,21 @@ public:
 			XFLOAT xp = (e0 * x + e1 * y ) * padding_factor;
 			XFLOAT yp = (e3 * x + e4 * y ) * padding_factor;
 #ifdef CUDA_NO_TEXTURES
-			int neg = 0;
-			if (xp < 0)
+			bool invers(xp < 0);
+			if (invers)
 			{
-				// Get complex conjugated hermitian symmetry pair
 				xp = -xp;
 				yp = -yp;
-
-#ifdef CUDA
-				real =   no_tex2D(mdlReal, xp, yp, mdlX, mdlInitY);
-				imag = - no_tex2D(mdlImag, xp, yp, mdlX, mdlInitY);
-#else
-                neg = 1;
-//				real =   CpuKernels::no_tex2D(mdlReal, xp, yp, mdlX, mdlInitY);
-//				imag = - CpuKernels::no_tex2D(mdlImag, xp, yp, mdlX, mdlInitY);	
-#endif
-			}
-			else
-			{
-#ifdef CUDA
-				real =   no_tex2D(mdlReal, xp, yp, mdlX, mdlInitY);
-				imag =   no_tex2D(mdlImag, xp, yp, mdlX, mdlInitY);
-#else
-//				real =   CpuKernels::no_tex2D(mdlReal, xp, yp, mdlX, mdlInitY);
-//				imag =   CpuKernels::no_tex2D(mdlImag, xp, yp, mdlX, mdlInitY);
-#endif
 			}
 			
-			CpuKernels::complex2D(mdlComplex, real, imag, xp, yp, mdlX, mdlInitY);		
-			if(neg)
+	#ifdef CUDA
+			real = no_tex2D(mdlReal, xp, yp, mdlX, mdlInitY);
+			imag = no_tex2D(mdlImag, xp, yp, mdlX, mdlInitY);
+	#else
+			CpuKernels::complex2D(mdlComplex, real, imag, xp, yp, mdlX, mdlInitY);	
+	#endif
+			
+			if(invers)
 			    imag = -imag;
 			
 #else
