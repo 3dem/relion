@@ -38,6 +38,13 @@ static void HandleAccPtrDebugFatal( const char *err, const char *file, int line 
 		raise(SIGSEGV);
 }
 
+#define ACC_PTR_DEBUG_INFO( err ) (HandleAccPtrDebugInformational( err, __FILE__, __LINE__ ))
+static void HandleAccPtrDebugInformational( const char *err, const char *file, int line )
+{
+    	fprintf(stderr, "POSSIBLE ISSUE: %s in %s:%d\n", err, file, line );
+		fflush(stdout);
+}
+
 template <typename T>
 class AccPtr
 {
@@ -277,33 +284,12 @@ public:
 		hostAlloc();
 	}
 
-	inline
-	void accAlloc()
-	{
-#ifdef CUDA
-			deviceAlloc();
-#else
-			hostAlloc();
-#endif
-	}
-
-	inline
-	void accAlloc(size_t newSize)
-	{
-		size = newSize;
-#ifdef CUDA
-			deviceAlloc(newSize);
-#else
-			hostAlloc(newSize);
-#endif
-	}
-
 	// Allocate storage of a new size for the array
 	void resizeHost(size_t newSize)
 	{
 #ifdef DEBUG_CUDA
 		if (size==0)
-			ACC_PTR_DEBUG_FATAL("Resizing from size zero (permitted).\n");
+			ACC_PTR_DEBUG_INFO("Resizing from size zero (permitted).\n");
 #endif
 		// TODO - alternatively, this could be aligned std::vector
 		T* newArr;
@@ -313,8 +299,10 @@ public:
 #ifdef DEBUG_CUDA
 		if (dPtr!=NULL)
 			ACC_PTR_DEBUG_FATAL("Resizing host with present device allocation.\n");
+		if (newSize==0)
+			ACC_PTR_DEBUG_FATAL("Array resized to size zero.\n");
 #endif
-	    freeHost();
+	    freeHostIfSet();
 	    setHostPtr(newArr);
 	    doFreeHost=true;
 	}
@@ -324,7 +312,7 @@ public:
 	{
 #ifdef DEBUG_CUDA
 		if (size==0)
-			ACC_PTR_DEBUG_FATAL("Resizing from size zero (permitted).\n");
+			ACC_PTR_DEBUG_INFO("Resizing from size zero (permitted).\n");
 #endif
 		// TODO - alternatively, this could be aligned std::vector
 		T* newArr;
@@ -369,19 +357,6 @@ public:
 	void hostInit(int value)
 	{
 		memset(hPtr, value, size * sizeof(T));
-	}
-
-	/**
-	 * Initiate accelerator memory with provided value
-	 */
-	inline
-	void accInit(int value)
-	{
-#ifdef CUDA
-			deviceInit(value);
-#else
-			hostInit(value);
-#endif
 	}
 
 	/**
@@ -585,31 +560,47 @@ public:
 	 * Device data quick access
 	 */
 	inline
-	T& operator()(size_t idx) { return dPtr[idx]; };
+	T& operator()(size_t idx) 
+	{ 
+#ifdef DEBUG_CUDA
+			if (dPtr == NULL)
+				ACC_PTR_DEBUG_FATAL("operator(idx) called with NULL acc pointer.\n");
+#endif
+		return dPtr[idx]; 
+	};
 
 
 	/**
 	 * Device data quick access
 	 */
 	inline
-	const T& operator()(size_t idx) const { return dPtr[idx]; };
+	const T& operator()(size_t idx) const 
+	{ 
+#ifdef DEBUG_CUDA
+			if (dPtr == NULL)
+				ACC_PTR_DEBUG_FATAL("operator(idx) called with NULL acc pointer.\n");
+#endif
+		return dPtr[idx]; 
+	};
 	
 	/**
-	 * Acc pointer quick access
+	 * Raw data pointer quick access
 	 */
 	inline
 	T* operator()()
 	{
+// TODO - this could cause considerable confusion given the above operators.  But it
+// also simplifies code that uses it.   What to do...
 #ifdef CUDA
 #ifdef DEBUG_CUDA
 			if (dPtr == NULL)
-				ACC_PTR_DEBUG_FATAL("operator~ called with NULL acc pointer.\n");
+				ACC_PTR_DEBUG_FATAL("operator() called with NULL acc pointer.\n");
 #endif
 			return dPtr;
 #else
 #ifdef DEBUG_CUDA
 			if (hPtr == NULL)
-				ACC_PTR_DEBUG_FATAL("operator~ called with NULL acc pointer.\n");
+				ACC_PTR_DEBUG_FATAL("operator() called with NULL acc pointer.\n");
 #endif
 			return hPtr;
 #endif
@@ -618,6 +609,8 @@ public:
 	inline
 	T* operator~() 
 	{
+// TODO - this could cause considerable confusion given the above operators.  But it
+// also simplifies code that uses it.   What to do...
 #ifdef CUDA
 #ifdef DEBUG_CUDA
 		if ( dPtr == 0)

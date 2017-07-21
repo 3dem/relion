@@ -366,7 +366,7 @@ void InitValue(AccPtr<T> &data, T value)
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 #else
 	int Size = data.getSize();
-	memset(data(), value, Size);
+	memset(data.hPtr, value, Size);
 #endif
 }
 
@@ -381,8 +381,7 @@ void InitValue(AccPtr<T> &data, T value, size_t Size)
 			Size,
 			INIT_VALUE_BLOCK_SIZE);
 #else
-	for(size_t i=0; i<Size; i++)
-		data[i] = value;
+	memset(data.hPtr, value, Size);
 #endif
 }
 

@@ -170,6 +170,7 @@ extern tbb::spin_mutex      mkl_mutex;
 
 class MklFFT
 {
+	bool planSet;
 public:
 	AccPtr<XFLOAT>      reals;
 	AccPtr<ACCCOMPLEX> fouriers;
@@ -194,8 +195,9 @@ public:
 #endif
 
 	MklFFT(int transformDimension = 2):
-	    direction(0),
+	    direction(0), 
 	    dimension((int)transformDimension),
+		planSet(false),
 	    xSize(0), ySize(0), zSize(0)
 	{
         fPlanForward = fPlanBackward = NULL;
@@ -203,7 +205,7 @@ public:
 
 	void setSize(size_t x, size_t y, size_t z, int setDirection = 0)
 	{
-	     if( x == xSize && y == ySize && z == zSize && setDirection == direction)
+	     if( x == xSize && y == ySize && z == zSize && setDirection == direction && planSet)
 	         return;
 	         
          int checkDim;
@@ -263,6 +265,7 @@ public:
             fPlanBackward = fftwf_plan_dft_c2r(dimension, N,
                                           (fftwf_complex*) fouriers(), reals(), FFTW_ESTIMATE);
 #endif
+			planSet = true;
         }
 	}
 
@@ -298,18 +301,21 @@ public:
 
 	void clear()
 	{
-        reals.freeHost();
-        fouriers.freeHost();
-        
-        tbb::spin_mutex::scoped_lock lock(mkl_mutex);        
+		if (planSet)
+		{
+			reals.freeIfSet();
+			fouriers.freeIfSet();
+
+			tbb::spin_mutex::scoped_lock lock(mkl_mutex);        
 #ifdef CUDA_DOUBLE_PRECISION
-    	fftw_destroy_plan(fPlanForward);
-    	fftw_destroy_plan(fPlanBackward);
+			fftw_destroy_plan(fPlanForward);
+			fftw_destroy_plan(fPlanBackward);
 #else
-    	fftwf_destroy_plan(fPlanForward);
-    	fftwf_destroy_plan(fPlanBackward);
+			fftwf_destroy_plan(fPlanForward);
+			fftwf_destroy_plan(fPlanBackward);
 #endif          
-        fPlanForward = fPlanBackward = NULL;
+			fPlanForward = fPlanBackward = NULL;
+		}
 	}
 
 	~MklFFT()

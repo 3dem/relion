@@ -323,11 +323,19 @@ public:
 	// constructor which takes a parent IndexedDataArray and a mask to create a child
 	inline
 	 IndexedDataArray(IndexedDataArray &parent, IndexedDataArrayMask &mask):
+#ifdef CUDA
 		weights(		&(parent.weights.hPtr[mask.firstPos])		,&(parent.weights.dPtr[mask.firstPos])			,mask.weightNum),
 		rot_id(			&(parent.rot_id.hPtr[mask.firstPos])		,&(parent.rot_id.dPtr[mask.firstPos])			,mask.weightNum),
 		rot_idx(		&(parent.rot_idx.hPtr[mask.firstPos])		,&(parent.rot_idx.dPtr[mask.firstPos])			,mask.weightNum),
 		trans_idx(		&(parent.trans_idx.hPtr[mask.firstPos])	,&(parent.trans_idx.dPtr[mask.firstPos])		,mask.weightNum),
 		ihidden_overs(	&(parent.ihidden_overs.hPtr[mask.firstPos]),&(parent.ihidden_overs.dPtr[mask.firstPos])	,mask.weightNum)
+#else
+		weights(		&(parent.weights.hPtr[mask.firstPos])		,NULL			,mask.weightNum),
+		rot_id(			&(parent.rot_id.hPtr[mask.firstPos])		,NULL			,mask.weightNum),
+		rot_idx(		&(parent.rot_idx.hPtr[mask.firstPos])		,NULL			,mask.weightNum),
+		trans_idx(		&(parent.trans_idx.hPtr[mask.firstPos])	    ,NULL			,mask.weightNum),
+		ihidden_overs(	&(parent.ihidden_overs.hPtr[mask.firstPos]) ,NULL			,mask.weightNum)
+#endif
 	{
 		weights.doFreeDevice=false;
 		rot_id.doFreeDevice=false;
@@ -344,11 +352,20 @@ public:
 	
 	inline
 	 IndexedDataArray(IndexedDataArray &parent, IndexedDataArrayMask &mask, CudaCustomAllocator *allocator):
+#ifdef CUDA
 		weights(		&(parent.weights.hPtr[mask.firstPos])		,&(parent.weights.dPtr[mask.firstPos])			,mask.weightNum, allocator),
 		rot_id(			&(parent.rot_id.hPtr[mask.firstPos])		,&(parent.rot_id.dPtr[mask.firstPos])			,mask.weightNum, allocator),
 		rot_idx(		&(parent.rot_idx.hPtr[mask.firstPos])		,&(parent.rot_idx.dPtr[mask.firstPos])			,mask.weightNum, allocator),
 		trans_idx(		&(parent.trans_idx.hPtr[mask.firstPos])	,&(parent.trans_idx.dPtr[mask.firstPos])		,mask.weightNum, allocator),
 		ihidden_overs(	&(parent.ihidden_overs.hPtr[mask.firstPos]),&(parent.ihidden_overs.dPtr[mask.firstPos])	,mask.weightNum, allocator)
+#else
+		weights(		&(parent.weights.hPtr[mask.firstPos])		,NULL			,mask.weightNum, allocator),
+		rot_id(			&(parent.rot_id.hPtr[mask.firstPos])		,NULL			,mask.weightNum, allocator),
+		rot_idx(		&(parent.rot_idx.hPtr[mask.firstPos])		,NULL			,mask.weightNum, allocator),
+		trans_idx(		&(parent.trans_idx.hPtr[mask.firstPos])		,NULL			,mask.weightNum, allocator),
+		ihidden_overs(	&(parent.ihidden_overs.hPtr[mask.firstPos])	,NULL			,mask.weightNum, allocator)
+
+#endif
 	{
 		weights.doFreeDevice=false;
 		rot_id.doFreeDevice=false;

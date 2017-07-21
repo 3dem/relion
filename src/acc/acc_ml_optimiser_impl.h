@@ -290,8 +290,9 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		AccDataTypes::Image<XFLOAT> d_img_(img.data);
 #endif
 
-		d_img_.accAlloc();
-		d_img_.accInit(0);
+		d_img_.deviceAlloc();
+		d_img_.hostInit(0);
+		d_img_.deviceInit(0);
 
 		// Error - already allocated - temp.hostAlloc();
 
@@ -673,7 +674,11 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 					accMLO->transformer1.yFSize,
 					accMLO->transformer1.zFSize,
 					(baseMLO->mymodel.current_size/2)+1, // note: NOT baseMLO->mymodel.ori_size/2+1
+#ifdef CUDA
 					&spectrumAndXi2.dPtr[spectrumAndXi2.getSize()-1]); // last element is the hihgres_Xi2
+#else
+					&spectrumAndXi2.hPtr[spectrumAndXi2.getSize()-1]); // last element is the hihgres_Xi2
+#endif
 			else
 				AccUtilities::powerClass<false>(gridSize,POWERCLASS_BLOCK_SIZE,
 					~accMLO->transformer1.fouriers,
@@ -684,7 +689,11 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 					accMLO->transformer1.yFSize,
 					accMLO->transformer1.zFSize,
 					(baseMLO->mymodel.current_size/2)+1, // note: NOT baseMLO->mymodel.ori_size/2+1
+#ifdef CUDA
 					&spectrumAndXi2.dPtr[spectrumAndXi2.getSize()-1]); // last element is the hihgres_Xi2
+#else
+					&spectrumAndXi2.hPtr[spectrumAndXi2.getSize()-1]); // last element is the hihgres_Xi2
+#endif
 
 			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 			
@@ -1050,7 +1059,11 @@ void getAllSquaredDifferencesCoarse(
 						~Fimg_real,
 						~Fimg_imag,
 						~projectorPlans[exp_iclass].eulers,
+#ifdef CUDA
 						&allWeights(allWeights_pos),
+#else
+						&allWeights[allWeights_pos],
+#endif
 						(XFLOAT) op.local_sqrtXi2[ipart],
 						projectorPlans[exp_iclass].orientation_num,
 						translation_num,
@@ -1065,8 +1078,13 @@ void getAllSquaredDifferencesCoarse(
 
 				mapAllWeightsToMweights(
 						~projectorPlans[exp_iclass].iorientclasses,
+#ifdef CUDA
 						&allWeights(allWeights_pos),
 						&Mweight(ipart*weightsPerPart),
+#else
+						&allWeights[allWeights_pos],
+						&Mweight[ipart*weightsPerPart],
+#endif
 						projectorPlans[exp_iclass].orientation_num,
 						translation_num,
 #ifdef CUDA
@@ -1554,7 +1572,9 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			if(exp_ipass==0)
 			{
 				int nr_coarse_weights = (sp.iclass_max-sp.iclass_min+1)*sp.nr_particles * sp.nr_dir * sp.nr_psi * sp.nr_trans;
+#ifdef CUDA
 				PassWeights[ipart].weights.setDevicePtr(&Mweight(ipart*nr_coarse_weights));
+#endif
 				PassWeights[ipart].weights.setHostPtr(&Mweight[ipart*nr_coarse_weights]);
 				PassWeights[ipart].weights.setSize(nr_coarse_weights);
 			}
@@ -1903,15 +1923,19 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 						// (until now, PassWeights has been an empty placeholder. We now create class-partials pointing at it, and start to fill it with stuff)
 #ifdef CUDA
 						IndexedDataArray thisClassPassWeights(PassWeights[ipart],FPCMasks[ipart][exp_iclass], accMLO->devBundle->allocator);
-#else
-						IndexedDataArray thisClassPassWeights(PassWeights[ipart],FPCMasks[ipart][exp_iclass]);
-#endif
 						AccPtr<XFLOAT>  pdf_orientation_class(&(pdf_orientation[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]), 
 								                              &( pdf_orientation((exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi) ), 
 								                              sp.nr_dir*sp.nr_psi);
 						AccPtr<XFLOAT>  pdf_offset_class(&(pdf_offset[(exp_iclass-sp.iclass_min)*sp.nr_trans]), 
 								                         &( pdf_offset((exp_iclass-sp.iclass_min)*sp.nr_trans) ), 
 								                         sp.nr_trans);
+#else
+						IndexedDataArray thisClassPassWeights(PassWeights[ipart],FPCMasks[ipart][exp_iclass]);
+						AccPtr<XFLOAT>  pdf_orientation_class(&(pdf_orientation[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]), 
+								                              NULL, sp.nr_dir*sp.nr_psi);
+						AccPtr<XFLOAT>  pdf_offset_class(&(pdf_offset[(exp_iclass-sp.iclass_min)*sp.nr_trans]), 
+								                         NULL, sp.nr_trans);
+#endif
 
 						block_num = ceil((float)FPCMasks[ipart][exp_iclass].jobNum / (float)SUMW_BLOCK_SIZE); //thisClassPassWeights.rot_idx.getSize() / SUM_BLOCK_SIZE;
 
@@ -2290,10 +2314,17 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			int block_num = block_nums[nr_fake_classes*ipart + fake_class];
 
 			runCollect2jobs(block_num,
+#ifdef CUDA
 						&(oo_otrans_x(cpos) ),          // otrans-size -> make const
 						&(oo_otrans_y(cpos) ),          // otrans-size -> make const
 						&(oo_otrans_z(cpos) ),          // otrans-size -> make const
 						&(myp_oo_otrans_x2y2z2(cpos) ), // otrans-size -> make const
+#else
+						&(oo_otrans_x[cpos] ),          // otrans-size -> make const
+						&(oo_otrans_y[cpos] ),          // otrans-size -> make const
+						&(oo_otrans_z[cpos] ),          // otrans-size -> make const
+						&(myp_oo_otrans_x2y2z2[cpos] ), // otrans-size -> make const
+#endif
 						~thisClassFinePassWeights.weights,
 						(XFLOAT)op.significant_weight[ipart],
 						(XFLOAT)op.sum_weight[ipart],
@@ -2302,11 +2333,19 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						sp.nr_oversampled_rot,
 						oversamples,
 						(baseMLO->do_skip_align || baseMLO->do_skip_rotate ),
+#ifdef CUDA
 						&p_weights(partial_pos),
 						&p_thr_wsum_prior_offsetx_class(partial_pos),
 						&p_thr_wsum_prior_offsety_class(partial_pos),
 						&p_thr_wsum_prior_offsetz_class(partial_pos),
 						&p_thr_wsum_sigma2_offset(partial_pos),
+#else
+						&p_weights[partial_pos],
+						&p_thr_wsum_prior_offsetx_class[partial_pos],
+						&p_thr_wsum_prior_offsety_class[partial_pos],
+						&p_thr_wsum_prior_offsetz_class[partial_pos],
+						&p_thr_wsum_sigma2_offset[partial_pos],
+#endif
 						~thisClassFinePassWeights.rot_idx,
 						~thisClassFinePassWeights.trans_idx,
 						~FPCMasks[ipart][exp_iclass].jobOrigin,
@@ -2774,11 +2813,20 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					~trans_x,
 					~trans_y,
 					~trans_z,
+#ifdef CUDA
 					&sorted_weights.dPtr[classPos],
+#else
+					&sorted_weights.hPtr[classPos],
+#endif
 					~ctfs,
 					~wdiff2s_sum,
+#ifdef CUDA
 					&wdiff2s_AA(AAXA_pos),
 					&wdiff2s_XA(AAXA_pos),
+#else
+					&wdiff2s_AA[AAXA_pos],
+					&wdiff2s_XA[AAXA_pos],
+#endif
 					op,
 					orientation_num,
 					translation_num,
@@ -2818,7 +2866,11 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				~trans_x,
 				~trans_y,
 				~trans_z,
+#ifdef CUDA
 				&sorted_weights.dPtr[classPos],
+#else
+				&sorted_weights.hPtr[classPos],
+#endif
 				~Minvsigma2s,
 				~ctfs,
 				translation_num,
