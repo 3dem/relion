@@ -164,8 +164,7 @@ public:
 			bool do_local_searches = false,
 			bool do_helical_refine = false,
 			RFLOAT rise_pix  = 0.,
-			RFLOAT twist_deg = 0.,
-			bool do_around_pole = false);
+			RFLOAT twist_deg = 0.);
 
     // Reset the random perturbation
     void resetRandomlyPerturbedSampling();
@@ -209,7 +208,7 @@ public:
     		RFLOAT psi_deg = 0.);
 
     /* Set the non-oversampled lists of directions and in-plane rotations */
-    void setOrientations(int _order = -1, RFLOAT _psi_step = -1., bool do_around_pole = false);
+    void setOrientations(int _order = -1, RFLOAT _psi_step = -1.);
 
     /* Add a single orientation */
     void addOneOrientation(RFLOAT rot, RFLOAT tilt, RFLOAT psi, bool do_clear = false);
@@ -235,7 +234,7 @@ public:
     		std::vector<int> &pointer_dir_nonzeroprior, std::vector<RFLOAT> &directions_prior,
     		std::vector<int> &pointer_psi_nonzeroprior, std::vector<RFLOAT> &psi_prior,
 			bool do_bimodal_search_psi = false,
-    		RFLOAT sigma_cutoff = 3., RFLOAT sigma_from_zero = -1.);
+    		RFLOAT sigma_cutoff = 3., RFLOAT sigma_tilt_from_ninety = -1., RFLOAT sigma_psi_from_zero = -1.);
 
     void selectOrientationsWithNonZeroPriorProbabilityFor3DHelicalReconstruction(
     		RFLOAT prior_rot, RFLOAT prior_tilt, RFLOAT prior_psi,

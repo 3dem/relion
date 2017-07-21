@@ -53,8 +53,7 @@ void HealpixSampling::initialise(
 		bool do_local_searches,
 		bool do_helical_refine,
 		RFLOAT rise_pix,
-		RFLOAT twist_deg,
-		bool do_around_pole)
+		RFLOAT twist_deg)
 {
 
 	// Set the prior mode (belongs to mlmodel, but very useful inside this object)
@@ -127,7 +126,7 @@ void HealpixSampling::initialise(
 	setTranslations(-1, -1, do_local_searches, do_helical_refine, -1, rise_pix, twist_deg);
 
 	// Store the non-oversampled projection directions
-	setOrientations(-1, -1., do_around_pole);
+	setOrientations(-1, -1.);
 
 	// Random perturbation and filling of the directions, psi_angles and translations vectors
 	resetRandomlyPerturbedSampling();
@@ -432,7 +431,7 @@ void HealpixSampling::addOneTranslation(
 		translations_z.push_back(offset_z);
 }
 
-void HealpixSampling::setOrientations(int _order, RFLOAT _psi_step, bool do_around_pole)
+void HealpixSampling::setOrientations(int _order, RFLOAT _psi_step)
 {
 
 	// Initialise
@@ -444,80 +443,53 @@ void HealpixSampling::setOrientations(int _order, RFLOAT _psi_step, bool do_arou
 	if (_order >= 0)
 		healpix_order = _order;
 
-	// This is for local searches in multi-body refinement
-	if (do_around_pole)
+	// Setup the HealPix object
+	// For adaptive oversampling only precalculate the COARSE sampling!
+	if (_order >= 0)
+		healpix_base.Set(_order, NEST);
+
+	// 3D directions
+	if (is_3D)
 	{
-		RFLOAT _ang_step = getAngularSampling();
-		rot_angles.push_back(0.);
-		tilt_angles.push_back(0.);
-		directions_ipix.push_back(-1);
-		RFLOAT rot_offset = 0.;
-		for (RFLOAT tilt_angle = _ang_step; tilt_angle <= 180.; tilt_angle+= _ang_step)
+		RFLOAT rot, tilt;
+		for (long int ipix = 0; ipix < healpix_base.Npix(); ipix++)
 		{
-			RFLOAT rot_step = _ang_step / SIND(tilt_angle);
-			int n_rot = CEIL(360./rot_step);
-			rot_step = 360. / n_rot;
-			for (RFLOAT rot_angle = rot_offset; rot_angle < 360.+rot_offset; rot_angle += rot_step)
-			{
-				rot_angles.push_back(rot_angle);
-				tilt_angles.push_back(tilt_angle);
-				directions_ipix.push_back(-1);
-			}
-			rot_offset = rot_step / 2.;
+			getDirectionFromHealPix(ipix, rot, tilt);
+
+			// Push back as Matrix1D's in the vectors
+			rot_angles.push_back(rot);
+			tilt_angles.push_back(tilt);
+			directions_ipix.push_back(ipix);
+
+
 		}
+//#define DEBUG_SAMPLING
+#ifdef  DEBUG_SAMPLING
+		writeAllOrientationsToBild("orients_all.bild", "1 0 0 ", 0.020);
+#endif
+		// Now remove symmetry-related pixels
+		// TODO check size of healpix_base.max_pixrad
+		removeSymmetryEquivalentPoints(0.5 * RAD2DEG(healpix_base.max_pixrad()));
+
+#ifdef  DEBUG_SAMPLING
+		writeAllOrientationsToBild("orients_sym.bild", "0 1 0 ", 0.021);
+#endif
+
+		// Also remove limited tilt angles
+		removePointsOutsideLimitedTiltAngles();
+
+#ifdef  DEBUG_SAMPLING
+		if (ABS(limit_tilt) < 90.)
+			writeAllOrientationsToBild("orients_tilt.bild", "1 1 0 ", 0.022);
+#endif
+
 	}
 	else
 	{
-
-		// Setup the HealPix object
-		// For adaptive oversampling only precalculate the COARSE sampling!
-		if (_order >= 0)
-			healpix_base.Set(_order, NEST);
-
-		// 3D directions
-		if (is_3D)
-		{
-			RFLOAT rot, tilt;
-			for (long int ipix = 0; ipix < healpix_base.Npix(); ipix++)
-			{
-				getDirectionFromHealPix(ipix, rot, tilt);
-
-				// Push back as Matrix1D's in the vectors
-				rot_angles.push_back(rot);
-				tilt_angles.push_back(tilt);
-				directions_ipix.push_back(ipix);
-
-
-			}
-//#define DEBUG_SAMPLING
-#ifdef  DEBUG_SAMPLING
-			writeAllOrientationsToBild("orients_all.bild", "1 0 0 ", 0.020);
-#endif
-			// Now remove symmetry-related pixels
-			// TODO check size of healpix_base.max_pixrad
-			removeSymmetryEquivalentPoints(0.5 * RAD2DEG(healpix_base.max_pixrad()));
-
-#ifdef  DEBUG_SAMPLING
-			writeAllOrientationsToBild("orients_sym.bild", "0 1 0 ", 0.021);
-#endif
-
-			// Also remove limited tilt angles
-			removePointsOutsideLimitedTiltAngles();
-
-#ifdef  DEBUG_SAMPLING
-			if (ABS(limit_tilt) < 90.)
-				writeAllOrientationsToBild("orients_tilt.bild", "1 1 0 ", 0.022);
-#endif
-
-		}
-		else
-		{
-			rot_angles.push_back(0.);
-			tilt_angles.push_back(0.);
-			directions_ipix.push_back(-1);
-		}
-
-	} // end else do_around_pole
+		rot_angles.push_back(0.);
+		tilt_angles.push_back(0.);
+		directions_ipix.push_back(-1);
+	}
 
 	// 2D in-plane angles
 	// By default in 3D case: use more-or-less same psi-sampling as the 3D healpix object
@@ -653,13 +625,20 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
     	std::vector<int> &pointer_dir_nonzeroprior, std::vector<RFLOAT> &directions_prior,
     	std::vector<int> &pointer_psi_nonzeroprior, std::vector<RFLOAT> &psi_prior,
 		bool do_bimodal_search_psi,
-		RFLOAT sigma_cutoff, RFLOAT sigma_tilt_from_zero)
+		RFLOAT sigma_cutoff, RFLOAT sigma_tilt_from_ninety, RFLOAT sigma_psi_from_zero)
 {
 	pointer_dir_nonzeroprior.clear();
 	directions_prior.clear();
 
 	if (is_3D)
 	{
+		Matrix1D<RFLOAT> prior90_direction;
+		if (sigma_tilt_from_ninety > 0.)
+		{
+			// pre-calculate original (0,90) direction
+			Euler_angles2direction(0., 90., prior90_direction);
+		}
+
 		// Loop over all directions
 		RFLOAT sumprior = 0.;
 		RFLOAT sumprior_withsigmafromzero = 0.;
@@ -669,12 +648,12 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 		for (long int idir = 0; idir < rot_angles.size(); idir++)
 		{
 			bool is_nonzero_pdf = false;
+
 			// Any prior involving BOTH rot and tilt.
 			if ( (sigma_rot > 0.) && (sigma_tilt > 0.) )
 			{
-				Matrix1D<RFLOAT> prior_direction, my_direction, sym_direction, best_direction;
-
 				// Get the direction of the prior
+				Matrix1D<RFLOAT> prior_direction, my_direction, sym_direction, best_direction;
 				Euler_angles2direction(prior_rot, prior_tilt, prior_direction);
 
 				// Get the current direction in the loop
@@ -804,20 +783,42 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 				is_nonzero_pdf = true;
 			}
 
-			// For priors on deviations from 0 tilt angles in multi-body refinement
-			if (sigma_tilt_from_zero > 0. && is_nonzero_pdf)
+			// For priors on deviations from (0,90)-degree (rot,tilt) angles in multi-body refinement
+			if (sigma_tilt_from_ninety > 0. && is_nonzero_pdf)
 			{
+				// Get the current direction in the loop (re-do, as sometimes sigma_rot and sigma_tilt are both zero!
+				Matrix1D<RFLOAT> my_direction, best_direction, sym_direction;
+				Euler_angles2direction(rot_angles[idir], tilt_angles[idir], my_direction);
+
+				// Loop over all symmetry operators to find the operator that brings this direction nearest to the prior
+				RFLOAT best_dotProduct = dotProduct(prior90_direction, my_direction);
+				best_direction = my_direction;
+				for (int j = 0; j < R_repository.size(); j++)
+				{
+					sym_direction =  L_repository[j] * (my_direction.transpose() * R_repository[j]).transpose();
+					RFLOAT my_dotProduct = dotProduct(prior90_direction, sym_direction);
+					if (my_dotProduct > best_dotProduct)
+					{
+						best_direction = sym_direction;
+						best_dotProduct = my_dotProduct;
+					}
+				}
+
+				// Now that we have the best direction, find the corresponding prior probability
+				RFLOAT diffang = ACOSD( dotProduct(best_direction, prior90_direction) );
+				if (diffang > 180.)
+					diffang = ABS(diffang - 360.);
+
 				long int mypos = pointer_dir_nonzeroprior.size() - 1;
-				// Check tilt angle is within 3*sigma_tilt_from_zero
-				RFLOAT abs_tilt = ABS(tilt_angles[idir]);
-				if (abs_tilt > sigma_cutoff * sigma_tilt_from_zero)
+				// Check tilt angle is within 3*sigma_tilt_from_ninety
+				if (diffang > sigma_cutoff * sigma_tilt_from_ninety)
 				{
 					pointer_dir_nonzeroprior.pop_back();
 					directions_prior.pop_back();
 				}
 				else
 				{
-					RFLOAT prior = gaussian1D(abs_tilt, sigma_tilt_from_zero, 0.);
+					RFLOAT prior = gaussian1D(diffang, sigma_tilt_from_ninety, 0.);
 					directions_prior[mypos] *= prior;
 					sumprior_withsigmafromzero += directions_prior[mypos];
 				}
@@ -829,7 +830,7 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 		//Normalise the prior probability distribution to have sum 1 over all psi-angles
 		for (long int idir = 0; idir < directions_prior.size(); idir++)
 		{
-			if (sigma_tilt_from_zero > 0.)
+			if (sigma_tilt_from_ninety > 0.)
 				directions_prior[idir] /= sumprior_withsigmafromzero;
 			else
 				directions_prior[idir] /= sumprior;
@@ -916,10 +917,34 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 			is_nonzero_pdf = true;
 		}
 
+		// For priors on deviations from 0 psi angles in multi-body refinement
+		if (sigma_psi_from_zero > 0. && is_nonzero_pdf)
+		{
+			long int mypos = pointer_psi_nonzeroprior.size() - 1;
+			// Check psi angle is within 3*sigma_psi_from_zero
+			RFLOAT abs_psi = ABS(psi_angles[ipsi]);
+			if (abs_psi > sigma_cutoff * sigma_psi_from_zero)
+			{
+				pointer_psi_nonzeroprior.pop_back();
+				psi_prior.pop_back();
+			}
+			else
+			{
+				RFLOAT prior = gaussian1D(abs_psi, sigma_psi_from_zero, 0.);
+				psi_prior[mypos] *= prior;
+				sumprior_withsigmafromzero += psi_prior[mypos];
+			}
+		}
+
 	} // end for ipsi
 	// Normalise the prior probability distribution to have sum 1 over all psi-angles
 	for (long int ipsi = 0; ipsi < psi_prior.size(); ipsi++)
-		psi_prior[ipsi] /= sumprior;
+	{
+		if (sigma_psi_from_zero > 0.)
+			psi_prior[ipsi] /= sumprior_withsigmafromzero;
+		else
+			psi_prior[ipsi] /= sumprior;
+	}
 
 	// If there were no directions at all, just select the single nearest one:
 	if (psi_prior.size() == 0)
@@ -1861,7 +1886,12 @@ void HealpixSampling::writeBildFileOrientationalDistribution(MultidimArray<RFLOA
 			Euler_angles2direction(rot_angles[iang], tilt_angles[iang], v);
 
 			if (Aorient != NULL)
-				v = (*Aorient).transpose() * v;
+			{
+				// In multi-body refinement, the rotations are relative to (rot,tilt)=(0,90) to prevent problems with psi-prior!!!
+				Matrix2D<RFLOAT> A;
+				rotation3DMatrix(90., 'Y', A, false);
+				v = (*Aorient).transpose() * A * v;
+			}
 
 			Matrix1D<RFLOAT> offsetp(3);
 			if (Acom != NULL)

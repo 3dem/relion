@@ -407,6 +407,7 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 				RFLOAT offset = ori_size * pixel_size / 2.;
 				if (nr_bodies > 1)
 				{
+					// 14jul2017: rotations are all relative to (rot,tilt)=(0,90) to prevent problems with psi-prior around  tilt=0!
 					sampling.writeBildFileOrientationalDistribution(pdf_direction[iclass], fn_bild, offset, offset,
 							&orient_bodies[iclass], &com_bodies[iclass]);
 				}
@@ -1185,13 +1186,13 @@ void MlWsumModel::initZeros()
     for (int iclass = 0; iclass < nr_classes * nr_bodies; iclass++)
     {
     	BPref[iclass].initZeros(current_size);
+        // Assume pdf_direction is already of the right size...
+        pdf_direction[iclass].initZeros();
     }
 
     for (int iclass = 0; iclass < nr_classes; iclass++)
     {
         pdf_class[iclass] = 0.;
-        // Assume pdf_direction is already of the right size...
-        pdf_direction[iclass].initZeros();
         if (ref_dim == 2)
         	prior_offset_class[iclass].initZeros();
     }
@@ -1291,13 +1292,13 @@ void MlWsumModel::pack(MultidimArray<RFLOAT> &packed)
             DIRECT_MULTIDIM_ELEM(packed, idx++) = DIRECT_MULTIDIM_ELEM(BPref[iclass].weight, n);
         }
         BPref[iclass].weight.clear();
-    }
-    for (int iclass = 0; iclass < nr_classes; iclass++)
-    {
         FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pdf_direction[iclass])
         {
             DIRECT_MULTIDIM_ELEM(packed, idx++) = DIRECT_MULTIDIM_ELEM(pdf_direction[iclass], n);
         }
+    }
+    for (int iclass = 0; iclass < nr_classes; iclass++)
+    {
         pdf_direction[iclass].clear();
 
         DIRECT_MULTIDIM_ELEM(packed, idx++) = pdf_class[iclass];
@@ -1366,14 +1367,14 @@ void MlWsumModel::unpack(MultidimArray<RFLOAT> &packed)
         {
     		DIRECT_MULTIDIM_ELEM(BPref[iclass].weight, n) = DIRECT_MULTIDIM_ELEM(packed, idx++);
         }
-    }
-    for (int iclass = 0; iclass < nr_classes; iclass++)
-    {
     	pdf_direction[iclass].resize(nr_directions);
         FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pdf_direction[iclass])
         {
         	DIRECT_MULTIDIM_ELEM(pdf_direction[iclass], n) = DIRECT_MULTIDIM_ELEM(packed, idx++);
         }
+    }
+    for (int iclass = 0; iclass < nr_classes; iclass++)
+    {
         pdf_class[iclass] = DIRECT_MULTIDIM_ELEM(packed, idx++);
 
         if (ref_dim==2)

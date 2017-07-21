@@ -23,7 +23,7 @@
 //#define DEBUG_HELICAL_ORIENTATIONAL_SEARCH
 //#define PRINT_GPU_MEM_INFO
 
-#define DEBUG_BODIES
+//#define DEBUG_BODIES
 
 #ifdef TIMING
 		#define RCTIC(timer,label) (timer.tic(label))
@@ -304,6 +304,11 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	if (fnt != "OLD")
 	{
 		helical_tube_outer_diameter = textToFloat(fnt);
+	}
+	fnt = parser.getOption("--perturb", "Perturbation factor for the angular sampling (0=no perturb; 0.5=perturb)", "OLD");
+	if (fnt != "OLD")
+	{
+		sampling.perturbation_factor = textToFloat(fnt);
 	}
 
 	if (parser.checkOption("--skip_align", "Skip orientational assignment (only classify)?"))
@@ -1481,15 +1486,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 		if (verb > 0)
 			std::cout << " + Initialising multi-body refinement ..." << std::endl;
 
-		// This creates a rotation matrix for (rot,tilt,psi) = (0,90,0)
-		// It will be used to make all Abody orientation matrices relative to (0,90,0) instead of the more logical (0,0,0)
-		// This is useful, as psi-priors are ill-defined around tilt=0, as rot becomes the same as -psi!!
-		A_rot90.initIdentity(3);
-		A_rot90(0,0) = A_rot90(2,2) = 0.;
-		A_rot90(0,2) = -1.;
-		A_rot90(2,0) = 1.;
-		A_rot90T = A_rot90.transpose();
-
 		if (mymodel.nr_classes > 1)
 			REPORT_ERROR("ERROR: One cannot use multiple classes with multi-body refinement!");
 		if (do_sgd)
@@ -1526,7 +1522,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 	    //do_norm_correction = false;
 
 		// don't perturb angles anymore
-		// sampling.perturbation_factor = 0.;
+		sampling.perturbation_factor = 0.;
 	    // Only do a single pass through the local-search orientations
 		adaptive_oversampling = 0;
 
@@ -1537,6 +1533,15 @@ void MlOptimiser::initialiseGeneral(int rank)
 	else if (fn_body_masks == "")
 	{
 		mymodel.nr_bodies = 1;
+	}
+
+	if (mymodel.nr_bodies > 1)
+	{
+		// This creates a rotation matrix for (rot,tilt,psi) = (0,90,0)
+		// It will be used to make all Abody orientation matrices relative to (0,90,0) instead of the more logical (0,0,0)
+		// This is useful, as psi-priors are ill-defined around tilt=0, as rot becomes the same as -psi!!
+		rotation3DMatrix(-90., 'Y', A_rot90, false);
+		A_rot90T = A_rot90.transpose();
 	}
 
 	// Jun09, 2015 - Shaoda, Helical refinement
@@ -1657,7 +1662,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 	bool do_local_searches = ((do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches));
 	sampling.initialise(mymodel.orientational_prior_mode, mymodel.ref_dim, (mymodel.data_dim == 3), do_gpu, (verb>0),
 			do_local_searches, (do_helical_refine) && (!ignore_helical_symmetry),
-			helical_rise_initial / mymodel.pixel_size, helical_twist_initial, (mymodel.nr_bodies > 1));
+			helical_rise_initial / mymodel.pixel_size, helical_twist_initial);
 
 	// Default max_coarse_size is original size
 	if (max_coarse_size < 0)
@@ -2229,7 +2234,6 @@ void MlOptimiser::iterate()
 	updateCurrentResolution();
 
 	// If we're doing a restart from subsets, then do not increment the iteration number in the restart!
-	std::cerr << " iter= " << iter << std::endl;
 	if (subset > 0)
 	{
 
@@ -2772,7 +2776,8 @@ void MlOptimiser::expectationSetupCheckMemory(int myverb)
 		RFLOAT ran_rot, ran_tilt, ran_psi;
 		if (mymodel.nr_bodies > 1)
 		{
-			ran_rot = ran_tilt = ran_psi = 0.;
+			ran_rot = ran_psi = 0.;
+			ran_tilt = 90.;
 		}
 		else
 		{
@@ -2799,8 +2804,7 @@ void MlOptimiser::expectationSetupCheckMemory(int myverb)
 			sampling.selectOrientationsWithNonZeroPriorProbability(ran_rot, ran_tilt, ran_psi,
 									sqrt(mymodel.sigma2_rot), sqrt(mymodel.sigma2_tilt), sqrt(mymodel.sigma2_psi),
 									pointer_dir_nonzeroprior, directions_prior, pointer_psi_nonzeroprior, psi_prior,
-									//false, 3., mymodel.sigma_tilt_bodies[0], mymodel.sigma_psi_bodies[0]);
-									false, 3., mymodel.sigma_tilt_bodies[0]);
+									false, 3., mymodel.sigma_tilt_bodies[0], mymodel.sigma_psi_bodies[0]);
 		}
 		else
 		{
@@ -4369,7 +4373,6 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 			YY(my_old_body_offset) = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, icol_yoff);
 			if (mymodel.data_dim == 3)
 				ZZ(my_old_body_offset) = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, icol_zoff);
-			// (I tested subtracting my_old_body_offset and that was significantly worse... Sjors 11jul17)
 			my_old_offset += my_old_body_offset;
 
 			// For multi-body refinement: set the priors of the translations to zero (i.e. everything centred around consensus offset)
@@ -4411,9 +4414,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 									sqrt(mymodel.sigma2_rot), sqrt(mymodel.sigma2_tilt), sqrt(mymodel.sigma2_psi),
 									exp_pointer_dir_nonzeroprior, exp_directions_prior,
 									exp_pointer_psi_nonzeroprior, exp_psi_prior, false, 3.,
-									//mymodel.sigma_tilt_bodies[ibody], mymodel.sigma_psi_bodies[ibody]);
-									// the problem with a psi-prior is that low-tilts may get completely different rot, that then needs different psi!!!
-									mymodel.sigma_tilt_bodies[ibody]);
+									mymodel.sigma_tilt_bodies[ibody], mymodel.sigma_psi_bodies[ibody]);
 
 		}
 		else if (mymodel.orientational_prior_mode != NOPRIOR && !(do_skip_align || do_skip_rotate || do_only_sample_tilt))
@@ -4984,7 +4985,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 										DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_tilt),
 										DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_psi), Aresi, false);
 					// The real orientation to be applied is the obody transformation applied and the original one
-					Abody = (mymodel.orient_bodies[obody]).transpose() * Aresi * mymodel.orient_bodies[obody] * Aori;
+					Abody = Aori * (mymodel.orient_bodies[obody]).transpose() * A_rot90 * Aresi * mymodel.orient_bodies[obody];
 
 					// Get the FT of the projection in the right direction
 					MultidimArray<Complex> FTo;
@@ -4994,6 +4995,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 #ifdef DEBUG_BODIES
 					if (my_ori_particle == ROUND(debug1))
 					{
+
 						for (int j = 0; j < XSIZE(exp_metadata); j++)
 							std::cerr << " j= " << j << " DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, j)= " << DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, j) << std::endl;
 						Matrix2D<RFLOAT> B;
@@ -5556,7 +5558,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int ibody, 
 							// For multi-body refinements, A are only 'residual' orientations, Abody is the complete Euler matrix
 							if (mymodel.nr_bodies > 1)
 							{
-								Abody =  (mymodel.orient_bodies[ibody]).transpose() * A * mymodel.orient_bodies[ibody] * Aori;
+								Abody =  Aori * (mymodel.orient_bodies[ibody]).transpose() * A_rot90 * A * mymodel.orient_bodies[ibody];
 								(mymodel.PPref[ibody]).get2DFourierTransform(Fref, Abody, IS_NOT_INV);
 							}
 							else
@@ -5809,7 +5811,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int ibody, 
 //#define DEBUG_GETALLDIFF2
 #ifdef DEBUG_GETALLDIFF2
 											pthread_mutex_lock(&global_mutex);
-											if (ibody==1 && my_ori_particle == 0 && exp_ipass==0 && ihidden_over == 34592)
+											if (ibody==1 && my_ori_particle == 0 && exp_ipass==0 && ihidden_over == 40217)
 											{
 												//std::cerr << " iover_rot= "<<iover_rot << "exp_nr_oversampled_rot= " << exp_nr_oversampled_rot << " oversampled_rot[iover_rot]= " << oversampled_rot[iover_rot]
 												//		  << " oversampled_tilt[iover_rot]= " << oversampled_tilt[iover_rot]
@@ -5819,7 +5821,9 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int ibody, 
 												std::cerr << " ihidden_over= " << ihidden_over << " diff2= " << diff2
 														<< " rot= " << rrot
 										                << " tilt= " << ttilt
-												        << " psi= " << ppsi;
+												        << " psi= " << ppsi
+														// non-oversampling correct only!!
+														<< " x= " << oversampled_translations_x[0] << " y=" << oversampled_translations_y[0];
 												//std::cerr << " A= " << A << std::endl;
 												Euler_matrix2angles(Abody, rrot,ttilt,ppsi);
 												std::cerr << " Brot= " << rrot
@@ -5857,8 +5861,8 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int ibody, 
 												RFLOAT myscale = mymodel.scale_correction[group_id];
 												//std::cerr << " oversampled_rot[iover_rot]= " << oversampled_rot[iover_rot] << " oversampled_tilt[iover_rot]= " << oversampled_tilt[iover_rot] << " oversampled_psi[iover_rot]= " << oversampled_psi[iover_rot] << std::endl;
 												//std::cerr << " group_id= " << group_id << " myscale= " << myscale <<std::endl;
-												//std::cerr << " itrans= " << itrans << " itrans * exp_nr_oversampled_trans +  iover_trans= " << itrans * exp_nr_oversampled_trans +  iover_trans << " ihidden= " << ihidden << std::endl;
-												//std::cerr <<" my_ori_particle= "<<my_ori_particle<<" name= "<< mydata.ori_particles[my_ori_particle].name << std::endl;
+												std::cerr << " itrans= " << itrans << " itrans * exp_nr_oversampled_trans +  iover_trans= " << itrans * exp_nr_oversampled_trans +  iover_trans << " ihidden= " << ihidden << std::endl;
+												std::cerr <<" my_ori_particle= "<<my_ori_particle<<" name= "<< mydata.ori_particles[my_ori_particle].name << std::endl;
 												//std::cerr << " myrank= "<< myrank<<std::endl;
 												//std::cerr << "Written Fimg_shift.spi and Fref.spi. Press any key to continue... my_ori_particle= " << my_ori_particle<< std::endl;
 												char c;
@@ -6714,7 +6718,9 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 
 						// For multi-body refinements, A are only 'residual' orientations, Abody is the complete Euler matrix
 						if (mymodel.nr_bodies > 1)
-							Abody = (mymodel.orient_bodies[ibody]).transpose() * A * mymodel.orient_bodies[ibody] * Aori;
+						{
+							Abody = Aori * (mymodel.orient_bodies[ibody]).transpose() * A_rot90 * A * mymodel.orient_bodies[ibody];
+						}
 
 #ifdef TIMING
 						// Only time one thread, as I also only time one MPI process
@@ -7174,8 +7180,6 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 
 											//XXXXXXXXXXXX
 											/*
-											std::cerr << ihidden_over << " weight= " << weight;
-											std::cerr << " SET: rot= " << rot << " tilt= " << tilt << " psi= " << psi;
 											RFLOAT rrot, ttilt, ppsi;
 											Euler_matrix2angles(A, rrot,ttilt,ppsi);
 											std::cerr << " A: "
@@ -7210,14 +7214,15 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 												ZZ(shifts) = ZZ(exp_old_offset[ipart]) + oversampled_translations_z[iover_trans];
 											}
 
-											//XXXXXXXXXXXX
 											/*
-											std::cerr << " XX(exp_old_offset[ipart])= " << XX(exp_old_offset[ipart]);
-											std::cerr << " YY(exp_old_offset[ipart])= " << YY(exp_old_offset[ipart]);
-											std::cerr << " oversampled_translations_x[iover_trans]= " << oversampled_translations_x[iover_trans];
-											std::cerr << " oversampled_translations_y[iover_trans]= " << oversampled_translations_y[iover_trans];
-											std::cerr << " XX(shifts)= " << XX(shifts) << std::endl;
-											std::cerr << " YY(shifts)= " << YY(shifts) << std::endl;
+											std::cerr << ihidden_over << " weight= " << weight;
+											std::cerr << " SET: rot= " << rot << " tilt= " << tilt << " psi= " << psi;
+											std::cerr << " xx-old= " << XX(exp_old_offset[ipart]);
+											std::cerr << " yy-old= " << YY(exp_old_offset[ipart]);
+											std::cerr << " add-xx= " << oversampled_translations_x[iover_trans];
+											std::cerr << " add-yy= " << oversampled_translations_y[iover_trans];
+											std::cerr << " xnew= " << XX(shifts);
+											std::cerr << " ynew= " << YY(shifts) << std::endl;
 											*/
 
 #ifdef DEBUG_HELICAL_ORIENTATIONAL_SEARCH
@@ -7332,13 +7337,7 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 							int my_mutex = exp_iclass % NR_CLASS_MUTEXES;
 							pthread_mutex_lock(&global_mutex2[my_mutex]);
 							if (mymodel.nr_bodies > 1)
-							{
-								//19may2015: place Fimg so that it is centered at the COM of the body
-								//Matrix1D<RFLOAT> comp(3);
-								//comp = Abody * (-mymodel.com_bodies[ibody]);
-								//shiftImageInFourierTransform(Fimg, Fimg, (RFLOAT)mymodel.ori_size, XX(comp), YY(comp), ZZ(comp));
 								(wsum_model.BPref[ibody]).set2DFourierTransform(Fimg, Abody, IS_NOT_INV, &Fweight);
-							}
 							else
 								(wsum_model.BPref[exp_iclass]).set2DFourierTransform(Fimg, A, IS_NOT_INV, &Fweight);
 							pthread_mutex_unlock(&global_mutex2[my_mutex]);
@@ -8118,13 +8117,13 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 			if (new_hp_order != sampling.healpix_order)
 			{
 				// Set the new sampling in the sampling-object
-				sampling.setOrientations(new_hp_order, new_ang_step * std::pow(2., adaptive_oversampling), (mymodel.nr_bodies > 1));
+				sampling.setOrientations(new_hp_order, new_ang_step * std::pow(2., adaptive_oversampling));
 				// Resize the pdf_direction arrays to the correct size and fill with an even distribution
 				mymodel.initialisePdfDirection(sampling.NrDirections());
 				// Also reset the nr_directions in wsum_model
 				wsum_model.nr_directions = mymodel.nr_directions;
 				// Also resize and initialise wsum_model.pdf_direction for each class!
-				for (int iclass=0; iclass < mymodel.nr_classes; iclass++)
+				for (int iclass=0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++)
 					wsum_model.pdf_direction[iclass].initZeros(mymodel.nr_directions);
 			}
 		}
@@ -8201,7 +8200,7 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 					new_rottilt_step = new_psi_step = 360. / (6 * ROUND(std::pow(2., new_hp_order + adaptive_oversampling)));
 
 					// Set the new sampling in the sampling-object
-					sampling.setOrientations(new_hp_order, new_psi_step * std::pow(2., adaptive_oversampling), (mymodel.nr_bodies > 1));
+					sampling.setOrientations(new_hp_order, new_psi_step * std::pow(2., adaptive_oversampling));
 
 					// Resize the pdf_direction arrays to the correct size and fill with an even distribution
 					mymodel.initialisePdfDirection(sampling.NrDirections());
