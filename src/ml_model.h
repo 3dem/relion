@@ -406,6 +406,9 @@ public:
 	/** Read in the binary masks provided by the user and then make a soft edge on those */
 	void initialiseBodies(FileName fn_masks, FileName fn_root_out, bool also_initialise_rest = false);
 
+	/** Write out a Bild file with the COMs and directions or rotation for each body */
+	void writeBildFileBodies(FileName fn_bild);
+
 	// Set FourierTransforms in Projector of each class
 	// current_size will determine the size of the transform (in number of Fourier shells) to be held in the projector ( thisClass == -1  => do all classes this call)
 	void setFourierTransformMaps(bool update_tau2_spectra, int nr_threads = 1, bool do_gpu = false);

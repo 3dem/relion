@@ -1497,6 +1497,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 		// This reads the masks, calculates com_bodies and orient_bodies
 		mymodel.initialiseBodies(fn_body_masks, fn_out, true);
+		mymodel.writeBildFileBodies(fn_out + "_bodies.bild");
 
 		// For multi-body refinement: expand the MetaDataTables with orientations for all bodies
 		mydata.initialiseBodies(mymodel.nr_bodies);

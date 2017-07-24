@@ -468,6 +468,13 @@ float rnd_log(float a, float b);
  */
 void swapbytes(char* v, unsigned long n);
 
+
+/** Conversion from HSL (hue-saturation-lightness) to RGB colors
+ *  all values are in [0,1] (including hue!!)
+ *   according to: http://www.niwa.nu/2013/05/math-behind-colorspace-conversions-rgb-hsl/
+ */
+void HSL2RGB(RFLOAT H, RFLOAT S, RFLOAT L, RFLOAT &R, RFLOAT &G, RFLOAT &B);
+
 //@}
 
 //@}
