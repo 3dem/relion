@@ -923,6 +923,10 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 			long int mypos = pointer_psi_nonzeroprior.size() - 1;
 			// Check psi angle is within 3*sigma_psi_from_zero
 			RFLOAT abs_psi = ABS(psi_angles[ipsi]);
+			if (abs_psi > 180.)
+				abs_psi -= 360.;
+			else if (abs_psi < -180.)
+				abs_psi += 360.;
 			if (abs_psi > sigma_cutoff * sigma_psi_from_zero)
 			{
 				pointer_psi_nonzeroprior.pop_back();

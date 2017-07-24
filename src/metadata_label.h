@@ -66,8 +66,11 @@ enum EMDLabel
     EMDL_COMMENT, // The EMDL_COMMENT is handled specially as well
 
     EMDL_BODY_MASK_NAME, ///< For multi-body refinements
+	EMDL_BODY_ROTATE_DIRECTION_X,
+	EMDL_BODY_ROTATE_DIRECTION_Y,
+	EMDL_BODY_ROTATE_DIRECTION_Z,
     EMDL_BODY_ROTATE_RELATIVE_TO,
-    EMDL_BODY_SIGMA_ANG,
+	EMDL_BODY_SIGMA_ANG,
     EMDL_BODY_SIGMA_OFFSET,
     EMDL_BODY_SIGMA_ROT,
     EMDL_BODY_SIGMA_TILT,
@@ -470,7 +473,10 @@ private:
         EMDL::addLabel(EMDL_AREA_NAME, EMDL_STRING, "rlnAreaName", "Name of an area (i.e. field-of-view)");
 
         EMDL::addLabel(EMDL_BODY_MASK_NAME, EMDL_STRING, "rlnBodyMaskName", "Name of an image that contains a [0,1] body mask for multi-body refinement");
-        EMDL::addLabel(EMDL_BODY_ROTATE_RELATIVE_TO, EMDL_INT, "rlnBodyRotateRelativeTo", "Number of the body relative to which this body rotates (or is connected to)");
+        EMDL::addLabel(EMDL_BODY_ROTATE_DIRECTION_X, EMDL_DOUBLE, "rlnBodyRotateDirectionX", "X-component of axis around which to rotate this body");
+        EMDL::addLabel(EMDL_BODY_ROTATE_DIRECTION_Y, EMDL_DOUBLE, "rlnBodyRotateDirectionY", "Y-component of axis around which to rotate this body");
+        EMDL::addLabel(EMDL_BODY_ROTATE_DIRECTION_Z, EMDL_DOUBLE, "rlnBodyRotateDirectionZ", "Z-component of axis around which to rotate this body");
+        EMDL::addLabel(EMDL_BODY_ROTATE_RELATIVE_TO, EMDL_INT, "rlnBodyRotateRelativeTo", "Number of the body relative to which this body rotates (if negative, use rlnBodyRotateDirectionXYZ)");
         EMDL::addLabel(EMDL_BODY_SIGMA_ANG, EMDL_DOUBLE, "rlnBodySigmaAngles", "Width of prior on all three Euler angles of a body in multibody refinement (in degrees)");
         EMDL::addLabel(EMDL_BODY_SIGMA_OFFSET, EMDL_DOUBLE, "rlnBodySigmaOffset", "Width of prior on origin offsets of a body in multibody refinement (in pixels)");
 		EMDL::addLabel(EMDL_BODY_SIGMA_ROT, EMDL_DOUBLE, "rlnBodySigmaRot", "Width of prior on rot angles of a body in multibody refinement (in degrees)");

@@ -109,6 +109,9 @@ public:
 	// Vector with 2D matrices that pre-orient all bodies in multi-body refinement
 	std::vector<Matrix2D<RFLOAT> > orient_bodies;
 
+	// Vector with directions around which to rotate each body in multi-body refinement
+	std::vector<Matrix1D<RFLOAT> > rotate_direction_bodies;
+
 	// One projector for each class;
 	std::vector<Projector > PPref;
 	std::vector<bool> PPrefRank;

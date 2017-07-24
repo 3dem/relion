@@ -40,6 +40,7 @@ void MlModel::initialise(bool _do_sgd)
     Iref.resize(nr_classes * nr_bodies);
     masks_bodies.resize(nr_bodies);
     com_bodies.resize(nr_bodies);
+    rotate_direction_bodies.resize(nr_bodies);
     orient_bodies.resize(nr_bodies);
 	sigma_tilt_bodies.resize(nr_bodies, 0.);
 	sigma_psi_bodies.resize(nr_bodies, 0.);
@@ -520,6 +521,12 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 		MDclass.setValue(EMDL_MLMODEL_ACCURACY_TRANS, acc_trans[iclass]);
 		MDclass.setValue(EMDL_MLMODEL_ESTIM_RESOL_REF, estimated_resolution[iclass]);
 		MDclass.setValue(EMDL_MLMODEL_FOURIER_COVERAGE_TOTAL_REF, total_fourier_coverage[iclass]);
+		if (nr_bodies > 1)
+		{
+			MDclass.setValue(EMDL_BODY_ROTATE_DIRECTION_X, XX(rotate_direction_bodies[iclass]));
+			MDclass.setValue(EMDL_BODY_ROTATE_DIRECTION_Y, YY(rotate_direction_bodies[iclass]));
+			MDclass.setValue(EMDL_BODY_ROTATE_DIRECTION_Z, ZZ(rotate_direction_bodies[iclass]));
+		}
 
 		if (ref_dim==2)
 		{
@@ -831,6 +838,7 @@ void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool als
 	nr_bodies = 0;
 	masks_bodies.resize(MD.numberOfObjects());
 	com_bodies.resize(MD.numberOfObjects());
+	rotate_direction_bodies.resize(MD.numberOfObjects());
 	orient_bodies.resize(MD.numberOfObjects());
 	sigma_tilt_bodies.resize(MD.numberOfObjects());
 	sigma_psi_bodies.resize(MD.numberOfObjects());
@@ -839,6 +847,8 @@ void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool als
 	FileName fn_mask;
 	Image<RFLOAT> Imask;
 	std::vector<int> relatives_to;
+	Matrix1D<RFLOAT> one_direction(3);
+	bool has_rotate_directions = false;
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
 	{
 		MD.getValue(EMDL_BODY_MASK_NAME, fn_mask);
@@ -865,6 +875,17 @@ void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool als
 			relative_to--;// numbering in STAR file starts with 1
 		}
 		relatives_to.push_back(relative_to);
+
+		if (MD.containsLabel(EMDL_BODY_ROTATE_DIRECTION_X) &&
+				MD.containsLabel(EMDL_BODY_ROTATE_DIRECTION_Y) &&
+				MD.containsLabel(EMDL_BODY_ROTATE_DIRECTION_Z))
+		{
+			has_rotate_directions = true;
+			MD.getValue(EMDL_BODY_ROTATE_DIRECTION_X, XX(one_direction));
+			MD.getValue(EMDL_BODY_ROTATE_DIRECTION_Y, YY(one_direction));
+			MD.getValue(EMDL_BODY_ROTATE_DIRECTION_Z, ZZ(one_direction));
+			rotate_direction_bodies.push_back(one_direction);
+		}
 
 		RFLOAT val;
 		if (MD.containsLabel(EMDL_BODY_SIGMA_ANG))
@@ -906,19 +927,27 @@ void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool als
 		nr_bodies++;
 	}
 
-	// Now that we have the COMs, also get the orientation matrix for each body
-	int relative_to = -1;
+	// Now that we have the COMs, also get the orientation matrix and the direction of rotation for each body
 	for (int ibody = 0; ibody < nr_bodies; ibody++)
 	{
-		int relative_to = relatives_to[ibody];
-		Matrix1D<RFLOAT> vec_relative_to(3);
-		if (relative_to >= 0)
-			vec_relative_to = com_bodies[relative_to];
+		if (relatives_to[ibody] >= 0)
+		{
+			// If another body was given in the input STAR file, rotate this body wrt the COM of the other body
+			rotate_direction_bodies[ibody] = com_bodies[relatives_to[ibody]];
+			rotate_direction_bodies[ibody] -= com_bodies[ibody];
+		}
+		else if (has_rotate_directions)
+		{
+			// If the rotation vector is specified directly, just use this one
+		}
 		else
-			vec_relative_to.initZeros(); // if no relative-bodies are specified in the STAR file, then rotate relative to (0,0,0)
+		{
+			// if no relative-bodies, nor explicit rotation directions are specified in the STAR file, then rotate relative to (0,0,0)
+			rotate_direction_bodies[ibody].initZeros();
+			rotate_direction_bodies[ibody] -= com_bodies[ibody];
+		}
 
-		vec_relative_to -= com_bodies[ibody];
-		alignWithZ(-vec_relative_to, orient_bodies[ibody], false);
+		alignWithZ(-rotate_direction_bodies[ibody], orient_bodies[ibody], false);
 	}
 
 
@@ -1072,7 +1101,7 @@ void MlModel::initialiseHelicalParametersLists(RFLOAT _helical_twist, RFLOAT _he
 
 void MlModel::calculateTotalFourierCoverage()
 {
-	for (int iclass = 0; iclass < nr_classes; iclass++)
+	for (int iclass = 0; iclass < nr_classes * nr_bodies; iclass++)
 	{
 		int maxres = 0;
 		for (int ires = 0; ires < XSIZE(data_vs_prior_class[iclass]); ires++)
@@ -1083,6 +1112,7 @@ void MlModel::calculateTotalFourierCoverage()
 		}
 
 		estimated_resolution[iclass] = 1./getResolution(maxres);
+		std::cerr << " iclass= " << iclass << " estimated_resolution[iclass]= " << estimated_resolution[iclass] << std::endl;
 		total_fourier_coverage[iclass] = 0.;
 		RFLOAT count = 0;
 		for (long int k=FIRST_XMIPP_INDEX(maxres+2); k<=FIRST_XMIPP_INDEX(maxres+2) + maxres+1; k++) \
@@ -1420,7 +1450,7 @@ void MlWsumModel::pack(MultidimArray<RFLOAT> &packed, int &piece, int &nr_pieces
     // data is complex: multiply by two!
     packed_size += nr_classes_bodies * 2 * BPref[0].getSize();
     packed_size += nr_classes_bodies * BPref[0].getSize();
-    packed_size += nr_classes * nr_directions;
+    packed_size += nr_classes_bodies * nr_directions;
     // for pdf_class
     packed_size += nr_classes;
     // for priors for each class
@@ -1527,17 +1557,18 @@ void MlWsumModel::pack(MultidimArray<RFLOAT> &packed, int &piece, int &nr_pieces
         }
         if (idx == ori_idx && do_clear)
             BPref[iclass].weight.clear();
-    }
 
-    for (int iclass = 0; iclass < nr_classes; iclass++)
-    {
-    	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pdf_direction[iclass])
+        FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pdf_direction[iclass])
         {
             if (ori_idx >= idx_start && ori_idx < idx_stop) DIRECT_MULTIDIM_ELEM(packed, idx++) = DIRECT_MULTIDIM_ELEM(pdf_direction[iclass], n);
             ori_idx++;
         }
         if (idx == ori_idx && do_clear)
         	pdf_direction[iclass].clear();
+    }
+
+    for (int iclass = 0; iclass < nr_classes; iclass++)
+    {
 
         if (ori_idx >= idx_start && ori_idx < idx_stop) DIRECT_MULTIDIM_ELEM(packed, idx++) = pdf_class[iclass];
         ori_idx++;
@@ -1666,10 +1697,7 @@ void MlWsumModel::unpack(MultidimArray<RFLOAT> &packed, int piece, bool do_clear
 				DIRECT_MULTIDIM_ELEM(BPref[iclass].weight, n) = DIRECT_MULTIDIM_ELEM(packed, idx++);
             ori_idx++;
         }
-    }
 
-    for (int iclass = 0; iclass < nr_classes; iclass++)
-    {
     	if (idx == ori_idx)
     		pdf_direction[iclass].resize(nr_directions);
         FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(pdf_direction[iclass])
@@ -1679,6 +1707,10 @@ void MlWsumModel::unpack(MultidimArray<RFLOAT> &packed, int piece, bool do_clear
             ori_idx++;
         }
 
+    }
+
+    for (int iclass = 0; iclass < nr_classes; iclass++)
+    {
         if (ori_idx >= idx_start && ori_idx < idx_stop)
         	pdf_class[iclass] = DIRECT_MULTIDIM_ELEM(packed, idx++);
         ori_idx++;

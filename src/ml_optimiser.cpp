@@ -1522,7 +1522,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 	    //do_norm_correction = false;
 
 		// don't perturb angles anymore
-		sampling.perturbation_factor = 0.;
+		//sampling.perturbation_factor = 0.;
 	    // Only do a single pass through the local-search orientations
 		adaptive_oversampling = 0;
 
@@ -4054,56 +4054,59 @@ void MlOptimiser::updateCurrentResolution()
 	std::cerr << "Entering MlOptimiser::updateCurrentResolution" << std::endl;
 #endif
 
-
-	int maxres = 0;
-	if (do_map)
+	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 	{
-		// Set current resolution
-		if (ini_high > 0. && (iter == 0 || (iter == 1 && do_firstiter_cc)))
+
+		int maxres = 0;
+		if (do_map)
 		{
-			maxres = ROUND(mymodel.ori_size * mymodel.pixel_size / ini_high);
+			// Set current resolution
+			if (ini_high > 0. && (iter == 0 || (iter == 1 && do_firstiter_cc)))
+			{
+				maxres = ROUND(mymodel.ori_size * mymodel.pixel_size / ini_high);
+			}
+			else
+			{
+				// Calculate at which resolution shell the data_vs_prior drops below 1
+				int ires;
+				for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
+				{
+					for (ires = 1; ires < mymodel.ori_size/2; ires++)
+					{
+						if (DIRECT_A1D_ELEM(mymodel.data_vs_prior_class[iclass], ires) < 1.)
+							break;
+					}
+					// Subtract one shell to be back on the safe side
+					ires--;
+					if (ires > maxres)
+						maxres = ires;
+				}
+
+				// Never allow smaller maxres than minres_map
+				maxres = XMIPP_MAX(maxres, minres_map);
+			}
 		}
 		else
 		{
-			// Calculate at which resolution shell the data_vs_prior drops below 1
-			int ires;
-			for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
-			{
-				for (ires = 1; ires < mymodel.ori_size/2; ires++)
-				{
-					if (DIRECT_A1D_ELEM(mymodel.data_vs_prior_class[iclass], ires) < 1.)
-						break;
-				}
-				// Subtract one shell to be back on the safe side
-				ires--;
-				if (ires > maxres)
-					maxres = ires;
-			}
-
-			// Never allow smaller maxres than minres_map
-			maxres = XMIPP_MAX(maxres, minres_map);
+			// If we are not doing MAP-estimation, set maxres to Nyquist
+			maxres = mymodel.ori_size/2;
 		}
-	}
-	else
-	{
-		// If we are not doing MAP-estimation, set maxres to Nyquist
-		maxres = mymodel.ori_size/2;
-	}
-    RFLOAT newres = mymodel.getResolution(maxres);
+		RFLOAT newres = mymodel.getResolution(maxres);
 
-    // Check whether resolution improved, if not increase nr_iter_wo_resol_gain
-    //if (newres <= best_resol_thus_far)
-    if (newres <= mymodel.current_resolution+0.0001) // Add 0.0001 to avoid problems due to rounding error
-    	nr_iter_wo_resol_gain++;
-    else
-    	nr_iter_wo_resol_gain = 0;
+		// Check whether resolution improved, if not increase nr_iter_wo_resol_gain
+		//if (newres <= best_resol_thus_far)
+		if (newres <= mymodel.current_resolution+0.0001) // Add 0.0001 to avoid problems due to rounding error
+			nr_iter_wo_resol_gain++;
+		else
+			nr_iter_wo_resol_gain = 0;
 
-    // Store best resolution thus far (but no longer do anything with it anymore...)
-    if (newres > best_resol_thus_far)
-    	best_resol_thus_far = newres;
+		// Store best resolution thus far (but no longer do anything with it anymore...)
+		if (newres > best_resol_thus_far)
+			best_resol_thus_far = newres;
 
-    mymodel.current_resolution = newres;
+		mymodel.current_resolution = newres;
 
+	} // end for ibody
 }
 
 void MlOptimiser::updateImageSizeAndResolutionPointers()
@@ -4312,7 +4315,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 		MultidimArray<Complex > Fimg, Faux;
 		MultidimArray<RFLOAT> Fctf;
 		Matrix2D<RFLOAT> Aori;
-		Matrix1D<RFLOAT> my_projected_com(3), my_old_body_offset(3);
+		Matrix1D<RFLOAT> my_projected_com(3), my_refined_ibody_offset(3);
 
 		// Get the right line in the exp_fn_img strings (also exp_fn_recimg and exp_fn_ctfs)
 		int istop = 0;
@@ -4362,21 +4365,48 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 								DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_PSI), Aori, false);
 			my_projected_com = Aori * mymodel.com_bodies[ibody];
 
-			// Subtract the projected COM offset, to position this body in the center
+
+#ifdef DEBUG_BODIES
+					if (my_ori_particle == ROUND(debug1))
+					{
+						std::cerr << "ibody: " << ibody+1 << " projected COM: " << XX(my_projected_com) << " , " << YY(my_projected_com) << std::endl;
+						std::cerr << "ibody: " << ibody+1 << " consensus offset: " << XX(my_old_offset) << " , " << YY(my_old_offset) << std::endl;
+					}
+#endif
+
+					// Subtract the projected COM offset, to position this body in the center
 			my_old_offset -= my_projected_com;
 
-			// Also add refined offset for this body
+			// 23jul2017: be careful below, as my_old_offset is selfROUND, but refined_ibody_offset wasn't.
+			// Now selfRound(old_offset - projectedCOM) AND selfROUND(my_refined_ibody_offset)
+			//my_old_offset.selfROUND();
+
+			// Also get refined offset for this body
 			icol_xoff = 3 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
 			icol_yoff = 4 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
 			icol_zoff = 5 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
-			XX(my_old_body_offset) = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, icol_xoff);
-			YY(my_old_body_offset) = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, icol_yoff);
+			XX(my_refined_ibody_offset) = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, icol_xoff);
+			YY(my_refined_ibody_offset) = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, icol_yoff);
 			if (mymodel.data_dim == 3)
-				ZZ(my_old_body_offset) = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, icol_zoff);
-			my_old_offset += my_old_body_offset;
+				ZZ(my_refined_ibody_offset) = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, icol_zoff);
+
+			// 23jul2017: also selfROUND(my_refined_ibody_offset)!
+			//my_refined_ibody_offset.selfROUND();
+
+			//my_old_offset += my_refined_ibody_offset;
 
 			// For multi-body refinement: set the priors of the translations to zero (i.e. everything centred around consensus offset)
 			my_prior.initZeros();
+
+#ifdef DEBUG_BODIES
+					if (my_ori_particle == ROUND(debug1))
+					{
+						std::cerr << "ibody: " << ibody+1 << " refined x,y= " << DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, icol_xoff)
+								<< "  , " << DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, icol_yoff) << std::endl;
+						std::cerr << "FINAL translation ibody: " << ibody+1 << " : " << XX(my_old_offset) << " , " << YY(my_old_offset) << std::endl;
+					}
+#endif
+
 
 		}
 
@@ -4400,16 +4430,6 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 			RFLOAT prior_rot  = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, icol_rot);
 			RFLOAT prior_tilt = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, icol_tilt);
 			RFLOAT prior_psi =  DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, icol_psi);
-#ifdef DEBUG_BODIES
-			if (my_ori_particle == ROUND(debug1))
-			{
-				std::cerr << " prior_rot= " << prior_rot << " prior_tilt= " << prior_tilt << " prior_psi= " << prior_psi << std::endl;
-				std::cerr << " sqrt(mymodel.sigma2_rot)= " << sqrt(mymodel.sigma2_rot);
-				std::cerr << " sqrt(mymodel.sigma2_tilt)= " << sqrt(mymodel.sigma2_tilt);
-				std::cerr << " sqrt(mymodel.sigma2_psi)= " << sqrt(mymodel.sigma2_psi) << std::endl;
-				std::cerr << " mymodel.sigma_tilt_bodies[ibody]= " << mymodel.sigma_tilt_bodies[ibody] << " mymodel.sigma_psi_bodies[ibody]= " << mymodel.sigma_psi_bodies[ibody] << std::endl;
-			}
-#endif
 			sampling.selectOrientationsWithNonZeroPriorProbability(prior_rot, prior_tilt, prior_psi,
 									sqrt(mymodel.sigma2_rot), sqrt(mymodel.sigma2_tilt), sqrt(mymodel.sigma2_psi),
 									exp_pointer_dir_nonzeroprior, exp_directions_prior,
@@ -4713,7 +4733,10 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 		{
 			// For multi-bodies: store only the old refined offset, not the constant consensus offset or the projected COM of this body
 			if (mymodel.nr_bodies > 1)
-				exp_old_offset[ipart] = my_old_body_offset;
+			{
+				// 23jul2017: my_refined_ibody_offset was selfROUNDED above. Otherwise, inconsistent
+				exp_old_offset[ipart] = my_refined_ibody_offset;
+			}
 			else
 				exp_old_offset[ipart] = my_old_offset;  // Not doing helical refinement. Rounded Cartesian offsets are stored.
 		}
@@ -4995,7 +5018,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 #ifdef DEBUG_BODIES
 					if (my_ori_particle == ROUND(debug1))
 					{
-
+						/*
 						for (int j = 0; j < XSIZE(exp_metadata); j++)
 							std::cerr << " j= " << j << " DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, j)= " << DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, j) << std::endl;
 						Matrix2D<RFLOAT> B;
@@ -5005,11 +5028,12 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 						std::cerr << " mymodel.orient_bodies[obody]= " << mymodel.orient_bodies[obody] << std::endl;
 						std::cerr << " Aori= " << Aori << std::endl;
 						std::cerr << " Abody= " << Abody << std::endl;
-						std::cerr << " obody= " << obody << "ocol_rot= " << DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_rot)
-								<< " obody= " << obody << "ocol_tilt= " << DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_tilt)
-								<< " obody= " << obody << "ocol_psi= " << DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_psi)
+						std::cerr << " obody= " << obody+1 << "ocol_rot= " << DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_rot)
+								<< " obody= " << obody+1 << "ocol_tilt= " << DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_tilt)
+								<< " obody= " << obody+1 << "ocol_psi= " << DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_psi)
 								<< " ocol_xoff= " << DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_xoff)
 								<< " ocol_yoff= " << DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_yoff) << std::endl;
+						*/
 						windowFourierTransform(FTo, Faux, mymodel.ori_size);
 						transformer.inverseFourierTransform(Faux, img());
 						CenterFFT(img(), false);
@@ -5028,10 +5052,12 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 					other_projected_com = Aori * (mymodel.com_bodies[obody]);
 #ifdef DEBUG_BODIES
 					if (my_ori_particle == ROUND(debug1))
-						std::cerr << " other_projected_com= " << other_projected_com << std::endl;
+						std::cerr << " obody: " << obody+1 << " projected COM= " << other_projected_com.transpose() << std::endl;
+						std::cerr << " obody: " << obody+1 << " refined (x,y)= " << DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_xoff)
+							<< "  , " << DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_yoff) << std::endl;
 #endif
 
-					// Subtract refined obody-displacement
+						// Subtract refined obody-displacement
 					XX(other_projected_com) -= DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_xoff);
 					YY(other_projected_com) -= DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_yoff);
 					if (mymodel.data_dim == 3)
@@ -5040,16 +5066,12 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 					// Subtract the projected COM already applied to this image for ibody
 					other_projected_com -= my_projected_com;
 					// And add the refined displacement to this image for ibody
-					other_projected_com += my_old_body_offset;
+					//other_projected_com += my_refined_ibody_offset;
 
 #ifdef DEBUG_BODIES
 					if (my_ori_particle == ROUND(debug1))
 					{
-						std::cerr << " refined << " << DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_xoff) << " "
-							<< DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_yoff) << std::endl;
-						std::cerr << " my_projected_com= " << my_projected_com << std::endl;
-						std::cerr << " my_old_body_offset= " << my_old_body_offset << std::endl;
-						std::cerr << " APPLIED translation= " << other_projected_com << std::endl;
+						std::cerr << " obody: " << obody+1 << " APPLIED translation obody= " << other_projected_com.transpose() << std::endl;
 					}
 #endif
 					shiftImageInFourierTransform(FTo, Faux, (RFLOAT)mymodel.ori_size,
@@ -5109,6 +5131,15 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 
 			// Subtract the other-body FT from the masked exp_Fimgs
 			exp_Fimgs.at(ipart) -= Fsum_obody;
+
+			// 23jul17: NEW: as we haven't applied the (nonROUNDED!!)  my_refined_ibody_offset yet, do this now in the FourierTransform
+			Faux = exp_Fimgs.at(ipart);
+			shiftImageInFourierTransform(Faux, exp_Fimgs.at(ipart), (RFLOAT)mymodel.ori_size,
+					XX(my_refined_ibody_offset), YY(my_refined_ibody_offset), ZZ(my_refined_ibody_offset));
+			Faux = exp_Fimgs_nomask.at(ipart);
+			shiftImageInFourierTransform(Faux, exp_Fimgs_nomask.at(ipart), (RFLOAT)mymodel.ori_size,
+					XX(my_refined_ibody_offset), YY(my_refined_ibody_offset), ZZ(my_refined_ibody_offset));
+
 
 #ifdef DEBUG_BODIES
 			if (my_ori_particle == ROUND(debug1))
@@ -7105,8 +7136,7 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 											{
 												Fimg_store = Fimg_shift_nomask;
 											}
-//#define DEBUG_SGD3
-#ifdef DEBUG_SGD3
+#ifdef DEBUG_BODIES2
 											FourierTransformer transformer;
 											MultidimArray<Complex> Ftt(Frefctf);
 											FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Ftt)
@@ -7116,12 +7146,21 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 											tt().resize(exp_current_image_size, exp_current_image_size);
 											transformer.inverseFourierTransform(Ftt, tt());
 											CenterFFT(tt(),false);
-											tt.write("BPimg.spi");
+											FileName fnt;
+											fnt= "BPimg_body"+integerToString(ibody+1,1)+"_ihidden"+integerToString(ihidden_over)+".spi";
+											tt.write(fnt);
+											Ftt = Frefctf;
+											tt().resize(exp_current_image_size, exp_current_image_size);
+											transformer.inverseFourierTransform(Ftt, tt());
+											CenterFFT(tt(),false);
+											fnt= "Fref_body"+integerToString(ibody+1,1)+"_ihidden"+integerToString(ihidden_over)+".spi";
+											tt.write(fnt);
+
+
 											std::cerr << " rot= " << rot << " tilt= " << tilt << " psi= " << psi << std::endl;
 											std::cerr << " itrans= " << itrans << " iover_trans= " << iover_trans << std::endl;
-											std::cerr << "written BPimg.spi, press any key to continue" << std::endl;
-											char c;
-											std::cin >> c;
+											std::cerr << " ihidden_over= " << ihidden_over << " weight= " << weight << std::endl;
+											std::cerr << "written " << fnt <<std::endl;
 #endif
 
 											// Store sum of weight*SSNR*Fimg in data and sum of weight*SSNR in weight
@@ -7205,6 +7244,7 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 											RFLOAT old_psi = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, icol_psi);
 											DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, icol_psi) = psi;
 											Matrix1D<RFLOAT> shifts(2);
+
 											// include old_offsets for normal refinement (i.e. non multi-body)
 											XX(shifts) = XX(exp_old_offset[ipart]) + oversampled_translations_x[iover_trans];
 											YY(shifts) = YY(exp_old_offset[ipart]) + oversampled_translations_y[iover_trans];
@@ -7213,7 +7253,11 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 												shifts.resize(3);
 												ZZ(shifts) = ZZ(exp_old_offset[ipart]) + oversampled_translations_z[iover_trans];
 											}
-
+#ifdef DEBUG_BODIES
+											std::cerr << " weight= " << weight << " ihidden_over= " << ihidden_over << " shifts= " << shifts.transpose() << std::endl;
+											std::cerr << " exp_old_offset[ipart]= " << exp_old_offset[ipart].transpose() << std::endl;
+											std::cerr << " oversampled_translations= " << oversampled_translations_x[iover_trans] << " , " << oversampled_translations_y[iover_trans] << std::endl;
+#endif
 											/*
 											std::cerr << ihidden_over << " weight= " << weight;
 											std::cerr << " SET: rot= " << rot << " tilt= " << tilt << " psi= " << psi;
