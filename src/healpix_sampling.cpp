@@ -921,20 +921,21 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 		if (sigma_psi_from_zero > 0. && is_nonzero_pdf)
 		{
 			long int mypos = pointer_psi_nonzeroprior.size() - 1;
-			// Check psi angle is within 3*sigma_psi_from_zero
-			RFLOAT abs_psi = ABS(psi_angles[ipsi]);
-			if (abs_psi > 180.)
-				abs_psi -= 360.;
-			else if (abs_psi < -180.)
-				abs_psi += 360.;
-			if (abs_psi > sigma_cutoff * sigma_psi_from_zero)
+			// Check psi angle is within sigma_cutoff*sigma_psi_from_zero
+			RFLOAT diff_psi = psi_angles[ipsi];
+			if (diff_psi > 180.)
+				diff_psi -= 360.;
+			else if (diff_psi < -180.)
+				diff_psi += 360.;
+			diff_psi = ABS(diff_psi);
+			if (diff_psi > sigma_cutoff * sigma_psi_from_zero)
 			{
 				pointer_psi_nonzeroprior.pop_back();
 				psi_prior.pop_back();
 			}
 			else
 			{
-				RFLOAT prior = gaussian1D(abs_psi, sigma_psi_from_zero, 0.);
+				RFLOAT prior = gaussian1D(diff_psi, sigma_psi_from_zero, 0.);
 				psi_prior[mypos] *= prior;
 				sumprior_withsigmafromzero += psi_prior[mypos];
 			}
