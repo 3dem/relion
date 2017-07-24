@@ -53,11 +53,13 @@ public:
 				maxR(maxR), maxR2(maxR*maxR),
 				mdlReal(mdlReal), mdlImag(mdlImag)
 			{
+#ifndef CUDA			
 #ifdef CUDA_NO_TEXTURES
 				for(int i=0; i<mdlX * mdlY * mdlZ; i++) {
 			        *mdlComplex ++ = *mdlReal ++;
 			        *mdlComplex ++ = *mdlImag ++;
 			    }
+#endif
 #endif
 			};
 
