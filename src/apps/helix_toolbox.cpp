@@ -252,7 +252,7 @@ public:
 		parser.setCommandLine(argc, argv);
 
 		int init_section = parser.addSection("Show usage");
-		show_usage_for_an_option = parser.checkOption("--help", "Show usage for the selected function (FEB 19, 2017)");
+		show_usage_for_an_option = parser.checkOption("--function_help", "Show usage for the selected function (FEB 19, 2017)");
 
 		int options_section = parser.addSection("List of functions (alphabetically ordered)");
 		do_check_parameters = parser.checkOption("--check", "Check parameters for 3D helical reconstruction in RELION");
