@@ -309,7 +309,7 @@ bool RelionJob::saveJobSubmissionScript(std::string newfilename, std::string out
     }
     else
     {
-    	int nmpi = joboptions["nr_mpi"].getNumber();
+    	int nmpi = (joboptions.find("nr_mpi") != joboptions.end()) ? joboptions["nr_mpi"].getNumber() : 1;
     	int nthr = (joboptions.find("nr_threads") != joboptions.end()) ? joboptions["nr_threads"].getNumber() : 1;
     	int ncores = nmpi * nthr;
     	int ndedi = joboptions["min_dedicated"].getNumber();
@@ -1000,11 +1000,10 @@ void RelionJob::initialiseMotioncorrJob()
 	joboptions["fn_motioncor2_exe"] = JobOption("MOTIONCOR2 executable:", std::string(default_location), "*.*", ".", "Location of the MOTIONCOR2 executable. You can control the default of this field by setting environment variable RELION_MOTIONCOR2_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
 	joboptions["fn_gain_ref"] = JobOption("Gain-reference image:", "", "*.mrc", ".", "Location of the gain-reference file to be applied to the input micrographs. Leave this empty if the movies are already gain-corrected.");
 	joboptions["fn_defect"] = JobOption("Defect file:", "", "*", ".", "Location of the MOTIONCOR2-style ASCII file that describes the defect pixels on the detector (using the -DefectFile option). Leave empty if you don't have any defects, or don't want to correct for defects on your detector.");
-	joboptions["fn_archive"] = JobOption("Archive directory:", "", "*", ".", "Location of the directory to which movies will be archived in 4-byte MRC format (using MOTIONCOR2's -ArcDir option). Leave empty if you don't want to archive your movies at this point.");
 	joboptions["patch_x"] = JobOption("Number of patches X:", std::string("1"), "Number of patches (in X and Y direction) to apply motioncor2.");
 	joboptions["patch_y"] = JobOption("Number of patches Y:", std::string("1"), "Number of patches (in X and Y direction) to apply motioncor2.");
 	joboptions["group_frames"] = JobOption("Group frames:", 1, 1, 5, 1, "Average together this many frames before calculating the beam-induced shifts.");
-	joboptions["bin_factor"] = JobOption("Bining factor:", 1, 1, 2, 1, "Bin the micrographs this much by a windowing operation in the Fourier Tranform. Bining at this level is hard to un-do later on, but may be useful to down-scale super-resolution images. Float-values may be used for MOTIONCOR2. Do make sure though that the resulting micrograph size is even.");
+	joboptions["bin_factor"] = JobOption("Binning factor:", 1, 1, 2, 1, "Bin the micrographs this much by a windowing operation in the Fourier Tranform. Binning at this level is hard to un-do later on, but may be useful to down-scale super-resolution images. Float-values may be used for MOTIONCOR2. Do make sure though that the resulting micrograph size is even.");
 	joboptions["bfactor"] = JobOption("Bfactor:", 150, 0, 1500, 50, "The B-factor (-bft) that MOTIONCOR2 will apply to the micrographs.");
 	joboptions["gpu_ids"] = JobOption("Which GPUs to use: ", std::string("0"), "Provide a list of which GPUs (0,1,2,3, etc) to use. MPI-processes are separated by ':'. For example, to place two ranks on device 0 and one rank on device 1, provide '0:0:1'");
 	joboptions["other_motioncor2_args"] = JobOption("Other MOTIONCOR2 arguments", std::string(""), "Additional arguments that need to be passed to MOTIONCOR2.");
@@ -1107,8 +1106,6 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 			command += " --gainref " + joboptions["fn_gain_ref"].getString();
 		if ((joboptions["fn_defect"].getString()).length() > 0)
 			command += " --defect_file " + joboptions["fn_defect"].getString();
-		if ((joboptions["fn_archive"].getString()).length() > 0)
-			command += " --archive " + joboptions["fn_archive"].getString();
 
 
 		if ((joboptions["other_motioncor2_args"].getString()).length() > 0)
@@ -1315,7 +1312,7 @@ void RelionJob::initialiseManualpickJob()
 
 	joboptions["fn_in"] = JobOption("Input micrographs:", NODE_MICS, "", "Input micrographs (*.{star,mrc})", "Input STAR file (with or without CTF information), OR a unix-type wildcard with all micrographs in MRC format (in this case no CTFs can be used).");
 
-	joboptions["diameter"] = JobOption("Particle diameter (A):", 100, 0, 500, 50, "The radius of the circle used around picked particles (in original pixels). Only used for display." );
+	joboptions["diameter"] = JobOption("Particle diameter (A):", 100, 0, 500, 50, "The radius of the circle used around picked particles (in Angstroms). Only used for display." );
 	joboptions["micscale"] = JobOption("Scale for micrographs:", 0.2, 0.1, 1, 0.05, "The micrographs will be displayed at this relative scale, i.e. a value of 0.5 means that only every second pixel will be displayed." );
 	joboptions["sigma_contrast"] = JobOption("Sigma contrast:", 3, 0, 10, 0.5, "The micrographs will be displayed with the black value set to the average of all values MINUS this values times the standard deviation of all values in the micrograph, and the white value will be set \
 to the average PLUS this value times the standard deviation. Use zero to set the minimum value in the micrograph to black, and the maximum value to white ");
@@ -1325,6 +1322,8 @@ to the average PLUS this value times the standard deviation. Use zero to set the
 	joboptions["lowpass"] = JobOption("Lowpass filter (A)", 20, 10, 100, 5, "Lowpass filter that will be applied to the micrographs. Give a negative value to skip the lowpass filter.");
 	joboptions["highpass"] = JobOption("Highpass filter (A)", -1, 100, 1000, 100, "Highpass filter that will be applied to the micrographs. This may be useful to get rid of background ramps due to uneven ice distributions. Give a negative value to skip the highpass filter. Useful values are often in the range of 200-400 Angstroms.");
 	joboptions["angpix"] = JobOption("Pixel size (A)", -1, 0.3, 5, 0.1, "Pixel size in Angstroms. This will be used to calculate the filters and the particle diameter in pixels. If a CTF-containing STAR file is input, then the value given here will be ignored, and the pixel size will be calculated from the values in the STAR file. A negative value can then be given here.");
+
+	joboptions["do_startend"] = JobOption("Pick start-end coordinates helices?", false, "If set to true, start and end coordinates are picked subsequently and a line will be drawn between each pair");
 
 	joboptions["ctfscale"] = JobOption("Scale for CTF image:", 1, 0.1, 2, 0.1, "CTFFINDs CTF image (with the Thonrings) will be displayed at this relative scale, i.e. a value of 0.5 means that only every second pixel will be displayed." );
 
@@ -1387,6 +1386,11 @@ bool RelionJob::getCommandsManualpickJob(std::string &outputname, std::vector<st
 	command += " --ctf_scale " + joboptions["ctfscale"].getString();
 
 	command += " --particle_diameter " + joboptions["diameter"].getString();
+
+	if (joboptions["do_startend"].getBoolean())
+	{
+		command += " --pick_start_end ";
+	}
 
 	if (joboptions["do_color"].getBoolean())
 	{
@@ -4068,7 +4072,7 @@ void RelionJob::initialiseLocalresJob()
 		default_location = mydefault;
 	}
 
-	joboptions["do_resmap_locres"] = JobOption("Use ResMap for local-resolution estimation?", true, "If set to Yes, then ResMap will be used for local resolution estimation.");
+	joboptions["do_resmap_locres"] = JobOption("Use ResMap?", true, "If set to Yes, then ResMap will be used for local resolution estimation.");
 	joboptions["fn_resmap"] = JobOption("ResMap executable:", std::string(default_location), "ResMap*", ".", "Location of the ResMap executable. You can control the default of this field by setting environment variable RELION_RESMAP_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code. \n \n Note that the ResMap wrapper cannot use MPI.");
 	joboptions["fn_mask"] = JobOption("User-provided solvent mask:", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide a mask with values between 0 and 1 around all domains of the complex.");
 	joboptions["pval"] = JobOption("P-value:", 0.05, 0., 1., 0.01, "This value is typically left at 0.05. If you change it, report the modified value in your paper!");
@@ -4076,7 +4080,7 @@ void RelionJob::initialiseLocalresJob()
 	joboptions["maxres"] = JobOption("Lowest resolution (A): ", 0., 0., 10., 0.1, "ResMaps maxRes parameter. By default (0), the program will stop at 4x the pixel size");
 	joboptions["stepres"] = JobOption("Resolution step size (A)", 1., 0.1, 3, 0.1, "ResMaps stepSize parameter." );
 
-	joboptions["do_relion_locres"] = JobOption("Use Relion for local-resolution estimation?", false, "If set to Yes, then relion_postprocess will be used for local-rtesolution estimation. This program basically performs a series of post-processing operations with a small soft, spherical mask that is moved over the entire map, while using phase-randomisation to estimate the convolution effects of that mask. \
+	joboptions["do_relion_locres"] = JobOption("Use Relion?", false, "If set to Yes, then relion_postprocess will be used for local-rtesolution estimation. This program basically performs a series of post-processing operations with a small soft, spherical mask that is moved over the entire map, while using phase-randomisation to estimate the convolution effects of that mask. \
 \n \n The output relion_locres.mrc map can be used to color the surface of a map in UCSF Chimera according to its local resolution. The output relion_locres_filtered.mrc is a composite map that is locally filtered to the estimated resolution. \
 This is a developmental feature in need of further testing, but initial results indicate it may be useful. \n \n Note that only this program can use MPI, the ResMap wrapper cannot use MPI.");
 
