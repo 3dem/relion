@@ -1000,7 +1000,6 @@ void RelionJob::initialiseMotioncorrJob()
 	joboptions["fn_motioncor2_exe"] = JobOption("MOTIONCOR2 executable:", std::string(default_location), "*.*", ".", "Location of the MOTIONCOR2 executable. You can control the default of this field by setting environment variable RELION_MOTIONCOR2_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
 	joboptions["fn_gain_ref"] = JobOption("Gain-reference image:", "", "*.mrc", ".", "Location of the gain-reference file to be applied to the input micrographs. Leave this empty if the movies are already gain-corrected.");
 	joboptions["fn_defect"] = JobOption("Defect file:", "", "*", ".", "Location of the MOTIONCOR2-style ASCII file that describes the defect pixels on the detector (using the -DefectFile option). Leave empty if you don't have any defects, or don't want to correct for defects on your detector.");
-	joboptions["fn_archive"] = JobOption("Archive directory:", "", "*", ".", "Location of the directory to which movies will be archived in 4-byte MRC format (using MOTIONCOR2's -ArcDir option). Leave empty if you don't want to archive your movies at this point.");
 	joboptions["patch_x"] = JobOption("Number of patches X:", std::string("1"), "Number of patches (in X and Y direction) to apply motioncor2.");
 	joboptions["patch_y"] = JobOption("Number of patches Y:", std::string("1"), "Number of patches (in X and Y direction) to apply motioncor2.");
 	joboptions["group_frames"] = JobOption("Group frames:", 1, 1, 5, 1, "Average together this many frames before calculating the beam-induced shifts.");
@@ -1107,8 +1106,6 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 			command += " --gainref " + joboptions["fn_gain_ref"].getString();
 		if ((joboptions["fn_defect"].getString()).length() > 0)
 			command += " --defect_file " + joboptions["fn_defect"].getString();
-		if ((joboptions["fn_archive"].getString()).length() > 0)
-			command += " --archive " + joboptions["fn_archive"].getString();
 
 
 		if ((joboptions["other_motioncor2_args"].getString()).length() > 0)
