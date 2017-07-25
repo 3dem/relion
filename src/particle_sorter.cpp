@@ -71,7 +71,7 @@ void ParticleSorter::initialise()
 	}
     else if (verb > 0)
     {
-    	std::cout << " Warning: input STAR file does not contain information about pixel size!" << std::endl;
+    	std::cout << " Warning: input (particle) STAR file does not contain information about pixel size!" << std::endl;
     	std::cout << " Warning: use --angpix to provide the correct value. Now using " << angpix << " Angstroms" << std::endl;
     }
 

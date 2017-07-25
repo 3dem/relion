@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2016, NVIDIA CORPORATION.  All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -114,7 +114,7 @@ struct BlockHistogramSort
 
     // Thread fields
     _TempStorage &temp_storage;
-    int linear_tid;
+    unsigned int linear_tid;
 
 
     /// Constructor
@@ -161,7 +161,7 @@ struct BlockHistogramSort
         typename            CounterT     >
     __device__ __forceinline__ void Composite(
         T                   (&items)[ITEMS_PER_THREAD],     ///< [in] Calling thread's input values to histogram
-        CounterT            histogram[BINS])                 ///< [out] Reference to shared/global memory histogram
+        CounterT            histogram[BINS])                 ///< [out] Reference to shared/device-accessible memory histogram
     {
         enum { TILE_SIZE = BLOCK_THREADS * ITEMS_PER_THREAD };
 

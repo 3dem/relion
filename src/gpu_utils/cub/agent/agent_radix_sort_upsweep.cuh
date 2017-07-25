@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -186,8 +186,8 @@ struct AgentRadixSortUpsweep
     {
         // BucketKeys
         static __device__ __forceinline__ void BucketKeys(
-            AgentRadixSortUpsweep     &cta,
-            UnsignedBits                    keys[KEYS_PER_THREAD])
+            AgentRadixSortUpsweep       &cta,
+            UnsignedBits                keys[KEYS_PER_THREAD])
         {
             cta.Bucket(keys[COUNT]);
 
@@ -201,7 +201,7 @@ struct AgentRadixSortUpsweep
     struct Iterate<MAX, MAX>
     {
         // BucketKeys
-        static __device__ __forceinline__ void BucketKeys(AgentRadixSortUpsweep &cta, UnsignedBits keys[KEYS_PER_THREAD]) {}
+        static __device__ __forceinline__ void BucketKeys(AgentRadixSortUpsweep &/*cta*/, UnsignedBits /*keys*/[KEYS_PER_THREAD]) {}
     };
 
 
@@ -375,12 +375,12 @@ struct AgentRadixSortUpsweep
      */
     __device__ __forceinline__ AgentRadixSortUpsweep(
         TempStorage &temp_storage,
-        KeyT        *d_keys_in,
+        const KeyT  *d_keys_in,
         int         current_bit,
         int         num_bits)
     :
         temp_storage(temp_storage.Alias()),
-        d_keys_in(reinterpret_cast<UnsignedBits*>(d_keys_in)),
+        d_keys_in(reinterpret_cast<const UnsignedBits*>(d_keys_in)),
         current_bit(current_bit),
         num_bits(num_bits)
     {}

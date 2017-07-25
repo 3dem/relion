@@ -102,6 +102,29 @@ void runWavgKernel(
 		bool data_is_3D,
 		cudaStream_t stream);
 
+void runBackProjectKernel(
+		CudaBackprojector &BP,
+		CudaProjectorKernel &projector,
+		XFLOAT *d_img_real,
+		XFLOAT *d_img_imag,
+		XFLOAT *trans_x,
+		XFLOAT *trans_y,
+		XFLOAT *trans_z,
+		XFLOAT* d_weights,
+		XFLOAT* d_Minvsigma2s,
+		XFLOAT* d_ctfs,
+		unsigned long translation_num,
+		XFLOAT significant_weight,
+		XFLOAT weight_norm,
+		XFLOAT *d_eulers,
+		int imgX,
+		int imgY,
+		int imgZ,
+		unsigned long imageCount,
+		bool data_is_3D,
+		bool do_sgd,
+		cudaStream_t optStream);
+
 #define INIT_VALUE_BLOCK_SIZE 512
 template< typename T>
 __global__ void cuda_kernel_init_complex_value(
