@@ -1532,10 +1532,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 			sampling.orientational_prior_mode = PRIOR_ROTTILT_PSI;
 			RFLOAT rottilt_step = sampling.getAngularSampling(adaptive_oversampling);
 			mymodel.sigma2_rot = mymodel.sigma2_tilt = mymodel.sigma2_psi = 2. * 2. * rottilt_step * rottilt_step;
-
-			// Aug20,2015 - Shaoda, Helical refinement
-			if ( (do_helical_refine) && (!ignore_helical_symmetry) )
-				mymodel.sigma2_rot = getHelicalSigma2Rot((helical_rise_initial / mymodel.pixel_size), helical_twist_initial, sampling.helical_offset_step, rottilt_step, mymodel.sigma2_rot);
 		}
 
 		// If this is a normal (non-movie) auto-refinement run: check whether we had converged already
@@ -1558,6 +1554,14 @@ void MlOptimiser::initialiseGeneral(int rank)
 	bool do_local_searches = ((do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches));
 	sampling.initialise(mymodel.orientational_prior_mode, mymodel.ref_dim, (mymodel.data_dim == 3), do_gpu, (verb>0),
 			do_local_searches, (do_helical_refine) && (!ignore_helical_symmetry), helical_rise_initial / mymodel.pixel_size, helical_twist_initial);
+
+	// Now that sampling is initialised, also modify sigma2_rot for the helical refinement
+        if (do_auto_refine && do_helical_refine && !ignore_helical_symmetry && iter == 0 && sampling.healpix_order >= autosampling_hporder_local_searches)
+	{
+		// Aug20,2015 - Shaoda, Helical refinement
+		RFLOAT rottilt_step = sampling.getAngularSampling(adaptive_oversampling);
+		mymodel.sigma2_rot = getHelicalSigma2Rot((helical_rise_initial / mymodel.pixel_size), helical_twist_initial, sampling.helical_offset_step, rottilt_step, mymodel.sigma2_rot);
+	}
 
 	// Default max_coarse_size is original size
 	if (max_coarse_size < 0)
