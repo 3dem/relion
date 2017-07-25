@@ -583,7 +583,6 @@ void JobWindow::initialiseMotioncorrWindow()
 	place("fn_motioncor2_exe", TOGGLE_DEACTIVATE);
 	place("fn_gain_ref", TOGGLE_DEACTIVATE);
 	place("fn_defect", TOGGLE_DEACTIVATE);
-	place("fn_archive", TOGGLE_DEACTIVATE);
 
 	// Add a little spacer
 	current_y += STEPY/2;
