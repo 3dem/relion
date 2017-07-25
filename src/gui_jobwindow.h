@@ -39,6 +39,9 @@ public:
 	// All the GuiEntries of this job
 	std::map<std::string, GuiEntry> guientries;
 
+	// oldstyle GUI
+	bool do_oldstyle;
+
 	// Sizes
 	int x, y, w, h;
 
@@ -66,7 +69,7 @@ public:
 	void setupTabs(int nr_tabs);
 
 	// General initialise
-	void initialise(int my_job_type);
+	void initialise(int my_job_type, bool _do_oldstyle = false);
 
     void resetHeight();
 

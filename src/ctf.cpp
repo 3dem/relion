@@ -174,9 +174,7 @@ void CTF::initialise()
     K2 = PI / 2 * local_Cs * lambda * lambda * lambda;
     K3 = sqrt(1-Q0*Q0);
 
-    //K4 = -Bfac / 4.;
-    // For now switch off B-factor weighting on the CTF!
-    K4 = 0.;
+    K4 = -Bfac / 4.;
 
     // Phase shift in radian
     K5 = DEG2RAD(phase_shift);

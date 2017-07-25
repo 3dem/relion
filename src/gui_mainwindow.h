@@ -87,6 +87,8 @@ static void Gui_Timer_CB(void *userdata);
 
 // Read-only GUI?
 static bool maingui_do_read_only;
+// Old-style GUI?
+static bool maingui_do_old_style;
 
 // Store all the history
 static PipeLine pipeline;
@@ -184,7 +186,7 @@ public:
     std::vector<std::string> commands;
 
     // Constructor with w x h size of the window and a title
-	GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, int _update_every_sec, int _exit_after_sec, bool _do_read_only = false);
+	GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, int _update_every_sec, int _exit_after_sec, bool _do_read_only = false, bool _do_oldstyle= false);
 
     // Destructor
     ~GuiMainWindow(){ clear(); };
@@ -252,6 +254,9 @@ private:
 
     static void cb_display(Fl_Widget*, void*);
     inline void cb_display_i();
+
+    static void cb_toggle_continue_oldstyle(Fl_Widget*, void*);
+    inline void cb_toggle_continue_oldstyle_i();
 
     inline void cb_toggle_continue_i();
 

@@ -415,7 +415,8 @@ void makeHelicalReference3DWithPolarity(
 		RFLOAT particle_diameter_A,
 		RFLOAT cyl_diameter_A,
 		RFLOAT topbottom_ratio,
-		int sym_Cn);
+		int sym_Cn = 1,
+		int nr_filaments_helix_with_seam = -1);
 
 /*
 void makeHelicalReconstructionStarFileFromSingle2DClassAverage(

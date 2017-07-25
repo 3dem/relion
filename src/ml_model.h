@@ -106,6 +106,12 @@ public:
 	// Vector with center-of-mass coordinates for all bodies in multi-body refinement
 	std::vector<Matrix1D<RFLOAT> > com_bodies;
 
+	// Vector with 2D matrices that pre-orient all bodies in multi-body refinement
+	std::vector<Matrix2D<RFLOAT> > orient_bodies;
+
+	// Vector with directions around which to rotate each body in multi-body refinement
+	std::vector<Matrix1D<RFLOAT> > rotate_direction_bodies;
+
 	// One projector for each class;
 	std::vector<Projector > PPref;
 	std::vector<bool> PPrefRank;
@@ -128,8 +134,8 @@ public:
 	// Radial average of the estimated variance in the reconstruction (inverse of left-hand side in Wiener-filter-like update formula)
 	std::vector<MultidimArray<RFLOAT > > sigma2_class;
 
-	// FSC spectra between random halves of the data
-	MultidimArray<RFLOAT > fsc_halves_class;
+	// FSC spectra between random halves of the data (multiple ones for each body in multibody-refinement)
+	std::vector< MultidimArray<RFLOAT > > fsc_halves_class;
 
 	// One likelihood vs prior ratio spectrum for each class
 	std::vector<MultidimArray<RFLOAT > > data_vs_prior_class;
@@ -157,6 +163,18 @@ public:
 
 	// Variance in psi angle for the orientational pdf
 	RFLOAT sigma2_psi;
+
+	// Stddev in tilt angle for the orientational pdf of each body
+	std::vector<RFLOAT> sigma_tilt_bodies;
+
+	// Stddev in psi angle for the orientational pdf of each body
+	std::vector<RFLOAT> sigma_psi_bodies;
+
+	// Stddev in offsets for the orientational pdf of each body
+	std::vector<RFLOAT> sigma_offset_bodies;
+
+	// Is this body kept fixed in refinement?
+	std::vector<bool> keep_fixed_bodies;
 
 	// Estimated accuracy at which rotations can be assigned, one for each class
 	std::vector<RFLOAT> acc_rot;
@@ -278,6 +296,11 @@ public:
     		Igrad = MD.Igrad;
     		masks_bodies = MD.masks_bodies;
     		com_bodies = MD.com_bodies;
+    		orient_bodies = MD.orient_bodies;
+    		sigma_tilt_bodies = MD.sigma_tilt_bodies;
+    		sigma_psi_bodies = MD.sigma_psi_bodies;
+    		sigma_offset_bodies = MD.sigma_offset_bodies;
+    		keep_fixed_bodies = MD.keep_fixed_bodies;
     		PPref = MD.PPref;
     		PPrefRank = MD.PPrefRank;
     		group_names = MD.group_names;
@@ -312,6 +335,11 @@ public:
 		Igrad.clear();
 		masks_bodies.clear();
 		com_bodies.clear();
+		orient_bodies.clear();
+		sigma_tilt_bodies.clear();
+		sigma_psi_bodies.clear();
+		sigma_offset_bodies.clear();
+		keep_fixed_bodies.clear();
 		PPref.clear();
 		PPrefRank.clear();
 		group_names.clear();
@@ -376,7 +404,7 @@ public:
 	void initialisePdfDirection(int newsize);
 
 	/** Read in the binary masks provided by the user and then make a soft edge on those */
-	void initialiseBodyMasks(FileName fn_masks, FileName fn_root_out);
+	void initialiseBodies(FileName fn_masks, FileName fn_root_out, bool also_initialise_rest = false);
 
 	// Set FourierTransforms in Projector of each class
 	// current_size will determine the size of the transform (in number of Fourier shells) to be held in the projector ( thisClass == -1  => do all classes this call)

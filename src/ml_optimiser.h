@@ -67,7 +67,7 @@
 #define METADATA_BEAMTILT_X 26
 #define METADATA_BEAMTILT_Y 27
 #define METADATA_LINE_LENGTH_BEFORE_BODIES 28
-#define METADATA_NR_BODY_PARAMS 7
+#define METADATA_NR_BODY_PARAMS 6
 
 #define DO_WRITE_DATA true
 #define DONT_WRITE_DATA false
@@ -130,6 +130,15 @@ public:
 	// Filename for input masks for multi-body refinement
 	FileName fn_body_masks;
 
+	// Initialise bodies for a new multi-body refinement
+	bool do_initialise_bodies;
+
+	// Use subtracted images for reconstructions in multi-body refinement?
+	bool do_reconstruct_subtracted_bodies;
+
+	// Precalculated rotation matrix for (0,90,0) rotation, and its transpose
+	Matrix2D<RFLOAT> A_rot90, A_rot90T;
+
 	// Flag to keep tau-spectrum constant
 	bool fix_tau;
 
@@ -147,6 +156,9 @@ public:
 
 	// Flag whether to split data from the beginning into two random halves
 	bool do_split_random_halves;
+
+	// For safe-guarding the gold-standard separation
+	int my_halfset;
 
 	// resolution (in Angstrom) to join the two random halves
 	RFLOAT low_resol_join_halves;
@@ -863,7 +875,7 @@ public:
 
 	// Convert all squared difference terms to weights.
 	// Also calculates exp_sum_weight and, for adaptive approach, also exp_significant_weight
-	void convertAllSquaredDifferencesToWeights(long int my_ori_particle, int exp_ipass,
+	void convertAllSquaredDifferencesToWeights(long int my_ori_particle, int ibody, int exp_ipass,
 			int exp_current_oversampling, int metadata_offset,
 			int exp_idir_min, int exp_idir_max, int exp_ipsi_min, int exp_ipsi_max,
 			int exp_itrans_min, int exp_itrans_max, int my_iclass_min, int my_iclass_max,

@@ -234,7 +234,7 @@ public:
     		std::vector<int> &pointer_dir_nonzeroprior, std::vector<RFLOAT> &directions_prior,
     		std::vector<int> &pointer_psi_nonzeroprior, std::vector<RFLOAT> &psi_prior,
 			bool do_bimodal_search_psi = false,
-    		RFLOAT sigma_cutoff = 3.);
+    		RFLOAT sigma_cutoff = 3., RFLOAT sigma_tilt_from_ninety = -1., RFLOAT sigma_psi_from_zero = -1.);
 
     void selectOrientationsWithNonZeroPriorProbabilityFor3DHelicalReconstruction(
     		RFLOAT prior_rot, RFLOAT prior_tilt, RFLOAT prior_psi,
@@ -372,7 +372,9 @@ public:
      *  width_frac determines how broad each cylinder is. frac=1 means they touch each other
      * */
     void writeBildFileOrientationalDistribution(MultidimArray<RFLOAT> &pdf_direction,
-    		FileName &fn_bild, RFLOAT R, RFLOAT offset = 0., RFLOAT Rmax_frac = 0.3, RFLOAT width_frac = 0.5);
+    		FileName &fn_bild, RFLOAT R, RFLOAT offset = 0.,
+			const Matrix2D<RFLOAT> *Aorient = NULL, const Matrix1D<RFLOAT> *Acom = NULL,
+			RFLOAT Rmax_frac = 0.3, RFLOAT width_frac = 0.5);
 
 private:
 

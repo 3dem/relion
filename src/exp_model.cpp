@@ -527,12 +527,12 @@ void Experiment::initialiseBodies(int _nr_bodies)
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDimg)
 		{
 			MDbody.addObject();
-			RFLOAT norm, zero=0.;
+			RFLOAT norm, zero=0., ninety=90.;
 			MDimg.getValue(EMDL_IMAGE_NORM_CORRECTION, norm);
 			MDbody.setValue(EMDL_ORIENT_ORIGIN_X, zero);
 			MDbody.setValue(EMDL_ORIENT_ORIGIN_Y, zero);
 			MDbody.setValue(EMDL_ORIENT_ROT, zero);
-			MDbody.setValue(EMDL_ORIENT_TILT, zero);
+			MDbody.setValue(EMDL_ORIENT_TILT, ninety);
 			MDbody.setValue(EMDL_ORIENT_PSI, zero);
 			MDbody.setValue(EMDL_IMAGE_NORM_CORRECTION, norm);
 			if (is_3d)
