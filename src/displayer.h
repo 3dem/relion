@@ -140,7 +140,7 @@ public:
 			bool do_allow_save = false, FileName fn_selected_imgs="", FileName fn_selected_parts="", int max_nr_parts_per_class = -1);
 	int fillSingleViewerCanvas(MultidimArray<RFLOAT> image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale);
 	int fillPickerViewerCanvas(MultidimArray<RFLOAT> image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale,
-			int _particle_radius, FileName _fn_coords = "",
+			int _particle_radius, bool do_startend = false, FileName _fn_coords = "",
 			FileName _fn_color = "", FileName _fn_mic= "", FileName _color_label = "", RFLOAT _color_blue_value = 0., RFLOAT _color_red_value = 1.);
 
 
@@ -315,6 +315,9 @@ public:
 	// Red->Blue is true; blue->red is false
 	bool do_blue_to_red;
 
+	// Draw lines between start-end coordinates?
+	bool do_startend;
+
 	// Micrograph name (useful to search relevant particles in fn_color)
 	FileName fn_mic;
 
@@ -486,6 +489,9 @@ public:
 
 	// Flag to pick
 	bool do_pick;
+
+	// Flag to pick start-end
+	bool do_pick_startend;
 
 	// Flag for looking at classes
 	bool do_class;

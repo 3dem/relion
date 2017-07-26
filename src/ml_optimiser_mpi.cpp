@@ -27,7 +27,6 @@
 
 
 //#define PRINT_GPU_MEM_INFO
-
 //#define DEBUG
 //#define DEBUG_MPIEXP2
 
@@ -55,6 +54,7 @@ void MlOptimiserMpi::read(int argc, char **argv)
 
     int mpi_section = parser.addSection("MPI options");
     only_do_unfinished_movies = parser.checkOption("--only_do_unfinished_movies", "When processing movies on a per-micrograph basis, ignore those movies for which the output STAR file already exists.");
+    halt_all_slaves_except_this = textToInteger(parser.getOption("--halt_all_slaves_except", "For debugging: keep all slaves except this one waiting", "-1"));
 
     // Don't put any output to screen for mpi slaves
     ori_verb = verb;
@@ -497,7 +497,7 @@ will still yield good performance and possibly a more stable execution. \n" << s
 	MlOptimiser::initialLowPassFilterReferences();
 
 	// Initialise the data_versus_prior ratio to get the initial current_size right
-	if (iter == 0)
+	if (iter == 0 && !do_initialise_bodies && !node->isMaster())
 		mymodel.initialiseDataVersusPrior(fix_tau); // fix_tau was set in initialiseGeneral
 
 	//std::cout << " Hello world! I am node " << node->rank << " out of " << node->size <<" and my hostname= "<< getenv("HOSTNAME")<< std::endl;
@@ -531,6 +531,8 @@ will still yield good performance and possibly a more stable execution. \n" << s
             std:: cout << "         It is then best to join micrographs with similar defocus values and similar apparent signal-to-noise ratios. " << std::endl;
 		}
 	}
+	/// tmp
+	MPI_Barrier(MPI_COMM_WORLD);
 
 	// Do this after writing out the model, so that still the random halves are written in separate files.
 	if (do_realign_movies)
@@ -583,7 +585,10 @@ void MlOptimiserMpi::initialiseWorkLoad()
 
     // Split the data into two random halves
 	if (do_split_random_halves)
+	{
 		mydata.divideOriginalParticlesInRandomHalves(random_seed, do_helical_refine);
+		my_halfset = node->myRandomSubset();
+	}
 
 	if (node->isMaster())
 	{
@@ -770,7 +775,6 @@ void MlOptimiserMpi::expectation()
 		}
 
 	MPI_Barrier(MPI_COMM_WORLD);
-
 #ifdef DEBUG
 	if(node->rank==2)
 	{
@@ -1249,7 +1253,16 @@ void MlOptimiserMpi::expectation()
 #endif
     	try
     	{
-			// Slaves do the real work (The slave does not need to know to which random_halfset he belongs)
+
+    		if (halt_all_slaves_except_this > 0)
+    		{
+    			// Let all slaves except this one sleep forever
+        		if (node->rank != halt_all_slaves_except_this)
+        			while (true)
+        				sleep(1000);
+    		}
+
+    		// Slaves do the real work (The slave does not need to know to which random_halfset he belongs)
     		// Start off with an empty job request
 			JOB_FIRST = 0;
 			JOB_LAST = -1; // So that initial nr_particles (=JOB_LAST-JOB_FIRST+1) is zero!
@@ -1468,7 +1481,10 @@ void MlOptimiserMpi::expectation()
 	exp_metadata.clear();
 
 	if (subset_size < 0 && verb > 0)
+	{
 		progress_bar(mydata.numberOfOriginalParticles());
+		std::cout << std::endl;
+	}
 
 #ifdef TIMING
     // Measure how long I have to wait for the rest
@@ -1899,6 +1915,10 @@ void MlOptimiserMpi::maximization()
 	// First reconstruct all classes in parallel
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 	{
+
+		if (mymodel.keep_fixed_bodies[ibody])
+			continue;
+
 		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 		{
 			RCTIC(timer,RCT_1);
@@ -1917,7 +1937,7 @@ void MlOptimiserMpi::maximization()
 				if (node->rank == reconstruct_rank1)
 				{
 
-					if (do_sgd)
+					if (do_sgd && (wsum_model.BPref[iclass].weight).sum() > XMIPP_EQUAL_ACCURACY)
 					{
 
 						MultidimArray<RFLOAT> Iref_old = mymodel.Iref[ith_recons];
@@ -1933,7 +1953,7 @@ void MlOptimiserMpi::maximization()
 						(wsum_model.BPref[ith_recons]).reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
 								sgd_tau2_fudge, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
 								mymodel.data_vs_prior_class[ith_recons], mymodel.fourier_coverage_class[ith_recons],
-								mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
+								mymodel.fsc_halves_class[ibody], wsum_model.pdf_class[iclass],
 								do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map);
 
 						// Now update formula: dV_kl^(n) = (mu) * dV_kl^(n-1) + (1-mu)*step_size*G_kl^(n)
@@ -1955,15 +1975,16 @@ void MlOptimiserMpi::maximization()
 						wsum_model.BPref[ith_recons].reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
 								mymodel.tau2_fudge_factor, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
 								mymodel.data_vs_prior_class[ith_recons], mymodel.fourier_coverage_class[ith_recons],
-								mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
+								mymodel.fsc_halves_class[ibody], wsum_model.pdf_class[iclass],
 								do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map, &timer);
 #else
 						wsum_model.BPref[ith_recons].reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
 								mymodel.tau2_fudge_factor, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
 								mymodel.data_vs_prior_class[ith_recons], mymodel.fourier_coverage_class[ith_recons],
-								mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
+								mymodel.fsc_halves_class[ibody], wsum_model.pdf_class[iclass],
 								do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map);
 #endif
+
 					}
 
 					// Also perform the unregularized reconstruction
@@ -1974,16 +1995,16 @@ void MlOptimiserMpi::maximization()
 					if (mymodel.nr_bodies > 1)
 					{
 						// 19may2015 translate the reconstruction back to its C.O.M.
-						selfTranslate(mymodel.Iref[ith_recons], mymodel.com_bodies[ibody], DONT_WRAP);
+						selfTranslate(mymodel.Iref[ibody], mymodel.com_bodies[ibody], DONT_WRAP);
 
-						// Also write out unmasked body recontruction
+						// Also write out unmasked body reconstruction
 						FileName fn_tmp;
-						fn_tmp.compose(fn_out + "_unmasked_half1_body", ibody+1,"mrc");
+						fn_tmp.compose(fn_out + "_unmasked_half1_body", ibody+1,"spi");
 						Image<RFLOAT> Itmp;
-						Itmp()=mymodel.Iref[ith_recons];
+						Itmp()=mymodel.Iref[ibody];
 						Itmp.write(fn_tmp);
-						mymodel.Iref[ith_recons].setXmippOrigin();
-						mymodel.Iref[ith_recons] *= mymodel.masks_bodies[ith_recons];
+						mymodel.Iref[ibody].setXmippOrigin();
+						mymodel.Iref[ibody] *= mymodel.masks_bodies[ibody];
 					}
 
 					// Apply local symmetry according to a list of masks and their operators
@@ -2058,7 +2079,7 @@ void MlOptimiserMpi::maximization()
 								(wsum_model.BPref[ith_recons]).reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
 										sgd_tau2_fudge, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
 										mymodel.data_vs_prior_class[ith_recons], mymodel.fourier_coverage_class[ith_recons],
-										mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
+										mymodel.fsc_halves_class[ibody], wsum_model.pdf_class[iclass],
 										do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map);
 
 								// Now update formula: dV_kl^(n) = (mu) * dV_kl^(n-1) + (1-mu)*step_size*G_kl^(n)
@@ -2079,7 +2100,7 @@ void MlOptimiserMpi::maximization()
 								wsum_model.BPref[ith_recons].reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
 									mymodel.tau2_fudge_factor, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
 									mymodel.data_vs_prior_class[ith_recons], mymodel.fourier_coverage_class[ith_recons],
-									mymodel.fsc_halves_class, wsum_model.pdf_class[iclass],
+									mymodel.fsc_halves_class[ibody], wsum_model.pdf_class[iclass],
 									do_split_random_halves, do_join_random_halves, nr_threads, minres_map);
 							}
 						}
@@ -2092,15 +2113,15 @@ void MlOptimiserMpi::maximization()
 						if (mymodel.nr_bodies > 1)
 						{
 							// 19may2015 translate the reconstruction back to its C.O.M.
-							selfTranslate(mymodel.Iref[ith_recons], mymodel.com_bodies[ibody], DONT_WRAP);
+							selfTranslate(mymodel.Iref[ibody], mymodel.com_bodies[ibody], DONT_WRAP);
 
 							FileName fn_tmp;
-							fn_tmp.compose(fn_out + "_unmasked_half2_body", ibody+1,"mrc");
+							fn_tmp.compose(fn_out + "_unmasked_half2_body", ibody+1,"spi");
 							Image<RFLOAT> Itmp;
-							Itmp()=mymodel.Iref[ith_recons];
+							Itmp()=mymodel.Iref[ibody];
 							Itmp.write(fn_tmp);
-							mymodel.Iref[ith_recons].setXmippOrigin();
-							mymodel.Iref[ith_recons] *= mymodel.masks_bodies[ith_recons];
+							mymodel.Iref[ibody].setXmippOrigin();
+							mymodel.Iref[ibody] *= mymodel.masks_bodies[ibody];
 						}
 
 						// Apply local symmetry according to a list of masks and their operators
@@ -2174,6 +2195,10 @@ void MlOptimiserMpi::maximization()
 	// This cannot be done in the reconstruction loop itself because then it will be executed sequentially
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 	{
+
+		if (mymodel.keep_fixed_bodies[ibody])
+			continue;
+
 		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 		{
 			// either ibody or iclass can be larger than 0, never 2 at the same time!
@@ -2200,19 +2225,19 @@ void MlOptimiserMpi::maximization()
 								std::cerr << "ihalfset= "<<ihalfset<<" Sending iclass="<<iclass<<" from node "<<reconstruct_rank<<" to node "<<recv_node << std::endl;
 #endif
 								node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.Iref[ith_recons]), MULTIDIM_SIZE(mymodel.Iref[ith_recons]), MY_MPI_DOUBLE, recv_node, MPITAG_IMAGE, MPI_COMM_WORLD);
-								node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[iclass]), MULTIDIM_SIZE(mymodel.data_vs_prior_class[iclass]), MY_MPI_DOUBLE, recv_node, MPITAG_METADATA, MPI_COMM_WORLD);
-								node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.fourier_coverage_class[iclass]), MULTIDIM_SIZE(mymodel.fourier_coverage_class[iclass]), MY_MPI_DOUBLE, recv_node, MPITAG_METADATA, MPI_COMM_WORLD);
-								node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.sigma2_class[iclass]), MULTIDIM_SIZE(mymodel.sigma2_class[iclass]), MY_MPI_DOUBLE, recv_node, MPITAG_RFLOAT, MPI_COMM_WORLD);
-								node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.fsc_halves_class), MULTIDIM_SIZE(mymodel.fsc_halves_class), MY_MPI_DOUBLE, recv_node, MPITAG_RANDOMSEED, MPI_COMM_WORLD);
+								node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[ith_recons]), MULTIDIM_SIZE(mymodel.data_vs_prior_class[ith_recons]), MY_MPI_DOUBLE, recv_node, MPITAG_METADATA, MPI_COMM_WORLD);
+								node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.fourier_coverage_class[ith_recons]), MULTIDIM_SIZE(mymodel.fourier_coverage_class[ith_recons]), MY_MPI_DOUBLE, recv_node, MPITAG_METADATA, MPI_COMM_WORLD);
+								node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.sigma2_class[ith_recons]), MULTIDIM_SIZE(mymodel.sigma2_class[ith_recons]), MY_MPI_DOUBLE, recv_node, MPITAG_RFLOAT, MPI_COMM_WORLD);
+								node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.fsc_halves_class[ibody]), MULTIDIM_SIZE(mymodel.fsc_halves_class[ibody]), MY_MPI_DOUBLE, recv_node, MPITAG_RANDOMSEED, MPI_COMM_WORLD);
 							}
 							else if (node->rank != reconstruct_rank && node->rank == recv_node)
 							{
 								//std::cerr << "ihalfset= "<<ihalfset<< " Receiving iclass="<<iclass<<" from node "<<reconstruct_rank<<" at node "<<node->rank<< std::endl;
 								node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.Iref[ith_recons]), MULTIDIM_SIZE(mymodel.Iref[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_IMAGE, MPI_COMM_WORLD, status);
-								node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[iclass]), MULTIDIM_SIZE(mymodel.data_vs_prior_class[iclass]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_METADATA, MPI_COMM_WORLD, status);
-								node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.fourier_coverage_class[iclass]), MULTIDIM_SIZE(mymodel.fourier_coverage_class[iclass]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_METADATA, MPI_COMM_WORLD, status);
-								node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.sigma2_class[iclass]), MULTIDIM_SIZE(mymodel.sigma2_class[iclass]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_RFLOAT, MPI_COMM_WORLD, status);
-								node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.fsc_halves_class), MULTIDIM_SIZE(mymodel.fsc_halves_class), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_RANDOMSEED, MPI_COMM_WORLD, status);
+								node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[ith_recons]), MULTIDIM_SIZE(mymodel.data_vs_prior_class[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_METADATA, MPI_COMM_WORLD, status);
+								node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.fourier_coverage_class[ith_recons]), MULTIDIM_SIZE(mymodel.fourier_coverage_class[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_METADATA, MPI_COMM_WORLD, status);
+								node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.sigma2_class[ith_recons]), MULTIDIM_SIZE(mymodel.sigma2_class[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_RFLOAT, MPI_COMM_WORLD, status);
+								node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.fsc_halves_class[ibody]), MULTIDIM_SIZE(mymodel.fsc_halves_class[ibody]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_RANDOMSEED, MPI_COMM_WORLD, status);
 #ifdef DEBUG
 								std::cerr << "ihalfset= "<<ihalfset<< " Received!!!="<<iclass<<" from node "<<reconstruct_rank<<" at node "<<node->rank<< std::endl;
 #endif
@@ -2237,14 +2262,14 @@ void MlOptimiserMpi::maximization()
 					node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.Igrad[ith_recons]),
 						MULTIDIM_SIZE(mymodel.Igrad[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
 				// Broadcast the data_vs_prior spectra to all other MPI nodes
-				node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[iclass]),
-						MULTIDIM_SIZE(mymodel.data_vs_prior_class[iclass]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
+				node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[ith_recons]),
+						MULTIDIM_SIZE(mymodel.data_vs_prior_class[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
 				// Broadcast the fourier_coverage spectra to all other MPI nodes
-				node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.fourier_coverage_class[iclass]),
-						MULTIDIM_SIZE(mymodel.fourier_coverage_class[iclass]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
+				node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.fourier_coverage_class[ith_recons]),
+						MULTIDIM_SIZE(mymodel.fourier_coverage_class[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
 				// Broadcast the sigma2_class spectra to all other MPI nodes
-				node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.sigma2_class[iclass]),
-						MULTIDIM_SIZE(mymodel.sigma2_class[iclass]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
+				node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.sigma2_class[ith_recons]),
+						MULTIDIM_SIZE(mymodel.sigma2_class[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPI_COMM_WORLD);
 				// Broadcast helical rise and twist of this 3D class
 				if ( (do_helical_refine) && (!ignore_helical_symmetry) )
 				{
@@ -2357,13 +2382,17 @@ void MlOptimiserMpi::joinTwoHalvesAtLowResolution()
 	RFLOAT myres = XMIPP_MAX(low_resol_join_halves, 1./mymodel.current_resolution);
 	int lowres_r_max = CEIL(mymodel.ori_size * mymodel.pixel_size / myres);
 
-	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++ )
+	for (int ibody = 0; ibody< mymodel.nr_bodies; ibody++ )
 	{
+
+		if (mymodel.keep_fixed_bodies[ibody])
+			continue;
+
 		if (node->rank == 1 || node->rank == 2)
 		{
 			MultidimArray<Complex > lowres_data;
 			MultidimArray<RFLOAT > lowres_weight;
-			wsum_model.BPref[iclass].getLowResDataAndWeight(lowres_data, lowres_weight, lowres_r_max);
+			wsum_model.BPref[ibody].getLowResDataAndWeight(lowres_data, lowres_weight, lowres_r_max);
 
 			if (node->rank == 2)
 			{
@@ -2419,7 +2448,7 @@ void MlOptimiserMpi::joinTwoHalvesAtLowResolution()
 			}
 
 			// Now that both slaves have the average lowres arrays, set them back into the backprojector
-			wsum_model.BPref[iclass].setLowResDataAndWeight(lowres_data, lowres_weight, lowres_r_max);
+			wsum_model.BPref[ibody].setLowResDataAndWeight(lowres_data, lowres_weight, lowres_r_max);
 		}
 	}
 
@@ -2439,149 +2468,186 @@ void MlOptimiserMpi::reconstructUnregularisedMapAndCalculateSolventCorrectedFSC(
 	if (fn_mask == "")
 		return;
 
-	if (mymodel.ref_dim == 3 && (node->rank == 1 || (do_split_random_halves && node->rank == 2) ) )
+	// TODO: Rank 0 and 1 reconstruct all bodies sequentially here... That parallelisation could be improved...
+	for (int ibody = 0; ibody< mymodel.nr_bodies; ibody++ )
 	{
-		Image<RFLOAT> Iunreg;
-		MultidimArray<RFLOAT> dummy;
-		FileName fn_root;
-		if (iter > -1)
-			fn_root.compose(fn_out+"_it", iter, "", 3);
-		else
-			fn_root = fn_out;
-		fn_root += "_half" + integerToString(node->rank);;
-		fn_root.compose(fn_root+"_class", 1, "", 3);
 
-		// This only works for do_auto_refine, so iclass=0
-		BackProjector BPextra(wsum_model.BPref[0]);
+		if (mymodel.keep_fixed_bodies[ibody])
+			continue;
 
-		BPextra.reconstruct(Iunreg(), gridding_nr_iter, false, 1., dummy, dummy, dummy, dummy, dummy, 1., false, true, nr_threads, -1);
-
-		// Update header information
-		RFLOAT avg, stddev, minval, maxval;
-	    Iunreg().setXmippOrigin();
-		Iunreg().computeStats(avg, stddev, minval, maxval);
-	    Iunreg.MDMainHeader.setValue(EMDL_IMAGE_STATS_MIN, minval);
-	    Iunreg.MDMainHeader.setValue(EMDL_IMAGE_STATS_MAX, maxval);
-	    Iunreg.MDMainHeader.setValue(EMDL_IMAGE_STATS_AVG, avg);
-	    Iunreg.MDMainHeader.setValue(EMDL_IMAGE_STATS_STDDEV, stddev);
-		Iunreg.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X, mymodel.pixel_size);
-		Iunreg.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y, mymodel.pixel_size);
-		Iunreg.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z, mymodel.pixel_size);
-		// And write the resulting model to disc
-		Iunreg.write(fn_root+"_unfil.mrc");
-
-	}
-
-	// rank1 also sends the current_size to the master, so that it knows where to cut the FSC to zero
-	MPI_Status status;
-	if (node->rank == 1)
-		node->relion_MPI_Send(&mymodel.current_size, 1, MPI_INT, 0, MPITAG_INT, MPI_COMM_WORLD);
-	if (node->rank == 0)
-		node->relion_MPI_Recv(&mymodel.current_size, 1, MPI_INT, 1, MPITAG_INT, MPI_COMM_WORLD, status);
-
-	MPI_Barrier(MPI_COMM_WORLD);
-
-	if (node->rank == 0) // Let's do this on the master (hopefully it has more memory)
-	{
-		std::cout << " Calculating solvent-corrected gold-standard FSC ..."<< std::endl;
-
-		// Read in the half-reconstruction from rank2 and perform the postprocessing-like FSC correction
-		Image<RFLOAT> Iunreg1, Iunreg2;
-		FileName fn_root1, fn_root2;
-		if (iter > -1)
-			fn_root1.compose(fn_out+"_it", iter, "", 3);
-		else
-			fn_root1 = fn_out;
-		fn_root2.compose(fn_root1+"_half2_class", 1, "", 3);
-		fn_root1.compose(fn_root1+"_half1_class", 1, "", 3);
-		fn_root1 += "_unfil.mrc";
-		fn_root2 += "_unfil.mrc";
-		Iunreg1.read(fn_root1);
-		Iunreg2.read(fn_root2);
-		Iunreg1().setXmippOrigin();
-		Iunreg2().setXmippOrigin();
-
-		// Now do phase-randomisation FSC-correction for the solvent mask
-		MultidimArray<RFLOAT> fsc_unmasked, fsc_masked, fsc_random_masked, fsc_true;
-
-		// Calculate FSC of the unmasked maps
-		getFSC(Iunreg1(), Iunreg2(), fsc_unmasked);
-
-		Image<RFLOAT> Imask;
-		Imask.read(fn_mask);
-		Imask().setXmippOrigin();
-		Iunreg1() *= Imask();
-		Iunreg2() *= Imask();
-		getFSC(Iunreg1(), Iunreg2(), fsc_masked);
-
-		// To save memory re-read the same input maps again and randomize phases before masking
-		Iunreg1.read(fn_root1);
-		Iunreg2.read(fn_root2);
-		Iunreg1().setXmippOrigin();
-		Iunreg2().setXmippOrigin();
-
-		// Check at which resolution shell the FSC drops below 0.8
-		int randomize_at = -1;
-		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(fsc_unmasked)
+		if (mymodel.ref_dim == 3 && (node->rank == 1 || (do_split_random_halves && node->rank == 2) ) )
 		{
-			if (i > 0 && DIRECT_A1D_ELEM(fsc_unmasked, i) < 0.8)
+			Image<RFLOAT> Iunreg;
+			MultidimArray<RFLOAT> dummy;
+			FileName fn_root;
+			if (iter > -1)
+				fn_root.compose(fn_out+"_it", iter, "", 3);
+			else
+				fn_root = fn_out;
+			fn_root += "_half" + integerToString(node->rank);;
+			if (mymodel.nr_bodies > 1)
+				fn_root.compose(fn_root+"_body", ibody+1, "", 3);
+			else
+				fn_root.compose(fn_root+"_class", 1, "", 3);
+
+			BackProjector BPextra(wsum_model.BPref[ibody]);
+
+			BPextra.reconstruct(Iunreg(), gridding_nr_iter, false, 1., dummy, dummy, dummy, dummy, dummy, 1., false, true, nr_threads, -1);
+
+			if (mymodel.nr_bodies > 1)
 			{
-				randomize_at = i;
-				break;
+				// 19may2015 translate the reconstruction back to its C.O.M.
+				selfTranslate(Iunreg(), mymodel.com_bodies[ibody], DONT_WRAP);
 			}
+
+			// Update header information
+			RFLOAT avg, stddev, minval, maxval;
+			Iunreg().setXmippOrigin();
+			Iunreg().computeStats(avg, stddev, minval, maxval);
+			Iunreg.MDMainHeader.setValue(EMDL_IMAGE_STATS_MIN, minval);
+			Iunreg.MDMainHeader.setValue(EMDL_IMAGE_STATS_MAX, maxval);
+			Iunreg.MDMainHeader.setValue(EMDL_IMAGE_STATS_AVG, avg);
+			Iunreg.MDMainHeader.setValue(EMDL_IMAGE_STATS_STDDEV, stddev);
+			Iunreg.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X, mymodel.pixel_size);
+			Iunreg.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y, mymodel.pixel_size);
+			Iunreg.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z, mymodel.pixel_size);
+			// And write the resulting model to disc
+			Iunreg.write(fn_root+"_unfil.mrc");
 		}
-		if (randomize_at > 0)
+
+		// rank1 also sends the current_size to the master, so that it knows where to cut the FSC to zero
+		MPI_Status status;
+		if (node->rank == 1)
+			node->relion_MPI_Send(&mymodel.current_size, 1, MPI_INT, 0, MPITAG_INT, MPI_COMM_WORLD);
+		if (node->rank == 0)
+			node->relion_MPI_Recv(&mymodel.current_size, 1, MPI_INT, 1, MPITAG_INT, MPI_COMM_WORLD, status);
+
+		MPI_Barrier(MPI_COMM_WORLD);
+
+		if (node->rank == 0) // Let's do this on the master (hopefully it has more memory)
 		{
-			if (verb > 0)
+			if (mymodel.nr_bodies > 1)
+				std::cout << " Calculating solvent-corrected gold-standard FSC for " << ibody+1 << "th body ..."<< std::endl;
+			else
+				std::cout << " Calculating solvent-corrected gold-standard FSC ..."<< std::endl;
+
+			// Read in the half-reconstruction from rank2 and perform the postprocessing-like FSC correction
+			Image<RFLOAT> Iunreg1, Iunreg2;
+			FileName fn_root1, fn_root2;
+			if (iter > -1)
+				fn_root1.compose(fn_out+"_it", iter, "", 3);
+			else
+				fn_root1 = fn_out;
+			if (mymodel.nr_bodies > 1)
 			{
-				std::cout.width(35); std::cout << std::left << "  + randomize phases beyond: "; std::cout << XSIZE(Iunreg1())* mymodel.pixel_size / randomize_at << " Angstroms" << std::endl;
+				fn_root2.compose(fn_root1+"_half2_body", ibody+1, "", 3);
+				fn_root1.compose(fn_root1+"_half1_body", ibody+1, "", 3);
 			}
-			randomizePhasesBeyond(Iunreg1(), randomize_at);
-			randomizePhasesBeyond(Iunreg2(), randomize_at);
-			// Mask randomized phases maps and calculated fsc_random_masked
+			else
+			{
+				fn_root2.compose(fn_root1+"_half2_class", 1, "", 3);
+				fn_root1.compose(fn_root1+"_half1_class", 1, "", 3);
+			}
+			fn_root1 += "_unfil.mrc";
+			fn_root2 += "_unfil.mrc";
+			Iunreg1.read(fn_root1);
+			Iunreg2.read(fn_root2);
+			Iunreg1().setXmippOrigin();
+			Iunreg2().setXmippOrigin();
+
+			// Now do phase-randomisation FSC-correction for the solvent mask
+			MultidimArray<RFLOAT> fsc_unmasked, fsc_masked, fsc_random_masked, fsc_true;
+
+			// Calculate FSC of the unmasked maps
+			getFSC(Iunreg1(), Iunreg2(), fsc_unmasked);
+
+			Image<RFLOAT> Imask;
+			if (mymodel.nr_bodies > 1)
+			{
+				Imask() = mymodel.masks_bodies[ibody];
+			}
+			else
+			{
+				Imask.read(fn_mask);
+			}
+			Imask().setXmippOrigin();
 			Iunreg1() *= Imask();
 			Iunreg2() *= Imask();
-			getFSC(Iunreg1(), Iunreg2(), fsc_random_masked);
 
-			// Now that we have fsc_masked and fsc_random_masked, calculate fsc_true according to Richard's formula
-			// FSC_true = FSC_t - FSC_n / ( )
-			fsc_true.resize(fsc_masked);
-			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(fsc_true)
+			Iunreg1.write("test1.spi");
+			Iunreg1.write("test2.spi");
+
+			getFSC(Iunreg1(), Iunreg2(), fsc_masked);
+
+			// To save memory re-read the same input maps again and randomize phases before masking
+			Iunreg1.read(fn_root1);
+			Iunreg2.read(fn_root2);
+			Iunreg1().setXmippOrigin();
+			Iunreg2().setXmippOrigin();
+
+			// Check at which resolution shell the FSC drops below 0.8
+			int randomize_at = -1;
+			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(fsc_unmasked)
 			{
-				// 29jan2015: let's move this 2 shells upwards, because of small artefacts near the resolution of randomisation!
-				if (i < randomize_at + 2)
+				if (i > 0 && DIRECT_A1D_ELEM(fsc_unmasked, i) < 0.8)
 				{
-					DIRECT_A1D_ELEM(fsc_true, i) = DIRECT_A1D_ELEM(fsc_masked, i);
-				}
-				else
-				{
-					RFLOAT fsct = DIRECT_A1D_ELEM(fsc_masked, i);
-					RFLOAT fscn = DIRECT_A1D_ELEM(fsc_random_masked, i);
-					if (fscn > fsct)
-						DIRECT_A1D_ELEM(fsc_true, i) = 0.;
-					else
-						DIRECT_A1D_ELEM(fsc_true, i) = (fsct - fscn) / (1. - fscn);
+					randomize_at = i;
+					break;
 				}
 			}
-			mymodel.fsc_halves_class = fsc_true;
+			if (randomize_at > 0)
+			{
+				if (verb > 0)
+				{
+					std::cout.width(35); std::cout << std::left << "  + randomize phases beyond: "; std::cout << XSIZE(Iunreg1())* mymodel.pixel_size / randomize_at << " Angstroms" << std::endl;
+				}
+				randomizePhasesBeyond(Iunreg1(), randomize_at);
+				randomizePhasesBeyond(Iunreg2(), randomize_at);
+				// Mask randomized phases maps and calculated fsc_random_masked
+				Iunreg1() *= Imask();
+				Iunreg2() *= Imask();
+				getFSC(Iunreg1(), Iunreg2(), fsc_random_masked);
+
+				// Now that we have fsc_masked and fsc_random_masked, calculate fsc_true according to Richard's formula
+				// FSC_true = FSC_t - FSC_n / ( )
+				fsc_true.resize(fsc_masked);
+				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(fsc_true)
+				{
+					// 29jan2015: let's move this 2 shells upwards, because of small artefacts near the resolution of randomisation!
+					if (i < randomize_at + 2)
+					{
+						DIRECT_A1D_ELEM(fsc_true, i) = DIRECT_A1D_ELEM(fsc_masked, i);
+					}
+					else
+					{
+						RFLOAT fsct = DIRECT_A1D_ELEM(fsc_masked, i);
+						RFLOAT fscn = DIRECT_A1D_ELEM(fsc_random_masked, i);
+						if (fscn > fsct)
+							DIRECT_A1D_ELEM(fsc_true, i) = 0.;
+						else
+							DIRECT_A1D_ELEM(fsc_true, i) = (fsct - fscn) / (1. - fscn);
+					}
+				}
+				mymodel.fsc_halves_class[ibody] = fsc_true;
+			}
+			else
+			{
+				std::cerr << " WARNING: FSC curve between unmasked maps never drops below 0.8. Using unmasked FSC as FSC_true... "<<std::endl;
+				std::cerr << " WARNING: This message should go away during the later stages of refinement!" << std::endl;
+
+				mymodel.fsc_halves_class[ibody] = fsc_unmasked;
+			}
+
+			// Set fsc_halves_class explicitly to zero beyond the current_size
+			for (int idx = mymodel.current_size / 2 + 1; idx < MULTIDIM_SIZE(mymodel.fsc_halves_class[ibody]); idx++)
+				DIRECT_A1D_ELEM(mymodel.fsc_halves_class[ibody], idx) = 0.;
+
 		}
-		else
-		{
-			std::cerr << " WARNING: FSC curve between unmasked maps never drops below 0.8. Using unmasked FSC as FSC_true... "<<std::endl;
-			std::cerr << " WARNING: This message should go away during the later stages of refinement!" << std::endl;
 
-			mymodel.fsc_halves_class = fsc_unmasked;
-		}
+		// Now the master sends the fsc curve to everyone else
+		node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.fsc_halves_class[ibody]), MULTIDIM_SIZE(mymodel.fsc_halves_class[ibody]), MY_MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
-		// Set fsc_halves_class explicitly to zero beyond the current_size
-		for (int idx = mymodel.current_size / 2 + 1; idx < MULTIDIM_SIZE(mymodel.fsc_halves_class); idx++)
-			DIRECT_A1D_ELEM(mymodel.fsc_halves_class, idx) = 0.;
-
-	}
-
-	// Now the master sends the fsc curve to everyone else
-	node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.fsc_halves_class), MULTIDIM_SIZE(mymodel.fsc_halves_class), MY_MPI_DOUBLE, 0, MPI_COMM_WORLD);
-
+	} // end loop over all bodies
 
 }
 
@@ -2602,7 +2668,10 @@ void MlOptimiserMpi::writeTemporaryDataAndWeightArrays()
 		for (int iclass = 0; iclass < mymodel.nr_bodies * mymodel.nr_classes; iclass++)
 		{
 			FileName fn_tmp;
-			fn_tmp.compose(fn_root+"_class", iclass+1, "", 3);
+			if (mymodel.nr_bodies > 1)
+				fn_tmp.compose(fn_root+"_body", iclass+1, "", 3);
+			else
+				fn_tmp.compose(fn_root+"_class", iclass+1, "", 3);
 			if (mymodel.pdf_class[iclass] > 0.)
 			{
 				It().resize(wsum_model.BPref[iclass].data);
@@ -2622,6 +2691,8 @@ void MlOptimiserMpi::writeTemporaryDataAndWeightArrays()
 		}
     }
 
+	MPI_Barrier(MPI_COMM_WORLD);
+
 }
 
 void MlOptimiserMpi::readTemporaryDataAndWeightArraysAndReconstruct(int iclass, int ihalf)
@@ -2634,7 +2705,10 @@ void MlOptimiserMpi::readTemporaryDataAndWeightArraysAndReconstruct(int iclass, 
 #else
 	FileName fn_root = fn_out + "_half" + integerToString(ihalf);;
 #endif
-	fn_root.compose(fn_root+"_class", iclass+1, "", 3);
+	if (mymodel.nr_bodies > 1)
+		fn_root.compose(fn_root+"_body", iclass+1, "", 3);
+	else
+		fn_root.compose(fn_root+"_class", iclass+1, "", 3);
 
 	// Read temporary arrays back in
 	Itmp.read(fn_root+"_data_real.mrc");
@@ -2682,6 +2756,12 @@ void MlOptimiserMpi::readTemporaryDataAndWeightArraysAndReconstruct(int iclass, 
 	// Now perform the unregularized reconstruction
 	wsum_model.BPref[iclass].reconstruct(Iunreg(), gridding_nr_iter, false, 1., dummy, dummy, dummy, dummy, dummy, 1., false, true, nr_threads, -1);
 
+	if (mymodel.nr_bodies > 1)
+	{
+		// 19may2015 translate the reconstruction back to its C.O.M.
+		selfTranslate(Iunreg(), mymodel.com_bodies[iclass], DONT_WRAP);
+	}
+
 	// Update header information
 	RFLOAT avg, stddev, minval, maxval;
 	Iunreg().computeStats(avg, stddev, minval, maxval);
@@ -2717,106 +2797,71 @@ void MlOptimiserMpi::compareTwoHalves()
 	if (mymodel.nr_classes > 1)
 		REPORT_ERROR("ERROR: you should not be in MlOptimiserMpi::compareTwoHalves if mymodel.nr_classes > 1");
 
+	if (do_sgd)
+		REPORT_ERROR("ERROR: you should not be in MlOptimiserMpi::compareTwoHalves if doing SGD");
+
 	// Only do gold-standard FSC comparisons for single-class refinements
-	int iclass = 0;
-	// The first two slaves calculate the sum of the downsampled average of all bodies
-	if (node->rank == 1 || node->rank == 2)
+	// TODO: Rank 0 and 1 do all bodies sequentially here... That parallelisation could be improved...
+	for (int ibody = 0; ibody< mymodel.nr_bodies; ibody++ )
 	{
-		MultidimArray<Complex > avg1;
 
-		if (do_sgd)
+		if (mymodel.keep_fixed_bodies[ibody])
+			continue;
+
+		// The first two slaves calculate the sum of the downsampled average of all bodies
+		if (node->rank == 1 || node->rank == 2)
 		{
-			FourierTransformer transformer;
-			transformer.FourierTransform(mymodel.Iref[iclass], avg1);
-		}
-		else
-		{
-
-			// Sum over all bodies
-			for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++ )
-			{
-				MultidimArray<Complex > tmp1;
-				wsum_model.BPref[ibody].getDownsampledAverage(tmp1);
-
-				if (mymodel.nr_bodies > 1)
-				{
-					// 19may2015 Shift each downsampled avg in the FourierTransform to its original COM!!
-					// shiftImageInFourierTransform, but tmp1 is already centered (ie not in FFTW-arrangement)
-					RFLOAT dotp, a, b, c, d, ac, bd, ab_cd, x, y, z;
-					RFLOAT xshift = -XX(mymodel.com_bodies[ibody])/(RFLOAT)mymodel.ori_size;
-					RFLOAT yshift = -YY(mymodel.com_bodies[ibody])/(RFLOAT)mymodel.ori_size;
-					RFLOAT zshift = -ZZ(mymodel.com_bodies[ibody])/(RFLOAT)mymodel.ori_size;
-					FOR_ALL_ELEMENTS_IN_ARRAY3D(tmp1)
-					{
-						dotp = 2 * PI * (j * xshift + i * yshift + k * zshift);
-						a = cos(dotp);
-						b = sin(dotp);
-						c = A3D_ELEM(tmp1, k, i, j).real;
-						d = A3D_ELEM(tmp1, k, i, j).imag;
-						ac = a * c;
-						bd = b * d;
-						ab_cd = (a + b) * (c + d);
-						A3D_ELEM(tmp1, k, i, j) = Complex(ac - bd, ab_cd - ac - bd);
-					}
-				}
-
-				if (ibody == 0)
-					avg1 = tmp1;
-				else
-					avg1 += tmp1;
-			}
-		}
+			MultidimArray<Complex > avg1;
+			wsum_model.BPref[ibody].getDownsampledAverage(avg1);
 
 //#define DEBUG_FSC
 #ifdef DEBUG_FSC
-		MultidimArray<Complex > avg;
-		MultidimArray<RFLOAT> Mavg;
-		if (mymodel.ref_dim == 2)
-			Mavg.resize(mymodel.ori_size, mymodel.ori_size);
-		else
-			Mavg.resize(mymodel.ori_size, mymodel.ori_size, mymodel.ori_size);
+			MultidimArray<Complex > avg;
+			MultidimArray<RFLOAT> Mavg;
+			if (mymodel.ref_dim == 2)
+				Mavg.resize(mymodel.ori_size, mymodel.ori_size);
+			else
+				Mavg.resize(mymodel.ori_size, mymodel.ori_size, mymodel.ori_size);
 
-		FourierTransformer transformer_debug;
-		transformer_debug.setReal(Mavg);
-		transformer_debug.getFourierAlias(avg);
-		wsum_model.BPref[0].decenter(avg1, avg, wsum_model.BPref[0].r_max * wsum_model.BPref[0].r_max);
-		transformer_debug.inverseFourierTransform();
-		FileName fnt;
-		fnt.compose("downsampled_avg_half",node->rank,"spi");
-		Image<RFLOAT> It;
-		CenterFFT(Mavg, true);
-		It()=Mavg;
-		It.write(fnt);
+			FourierTransformer transformer_debug;
+			transformer_debug.setReal(Mavg);
+			transformer_debug.getFourierAlias(avg);
+			wsum_model.BPref[0].decenter(avg1, avg, wsum_model.BPref[0].r_max * wsum_model.BPref[0].r_max);
+			transformer_debug.inverseFourierTransform();
+			FileName fnt;
+			fnt.compose("downsampled_avg_half",node->rank,"spi");
+			Image<RFLOAT> It;
+			CenterFFT(Mavg, true);
+			It()=Mavg;
+			It.write(fnt);
 #endif
 
-		if (node->rank == 2)
-		{
-			// The second slave sends its average to the first slave
-			node->relion_MPI_Send(MULTIDIM_ARRAY(avg1), 2*MULTIDIM_SIZE(avg1), MY_MPI_DOUBLE, 1, MPITAG_IMAGE, MPI_COMM_WORLD);
-		}
-		else if (node->rank == 1)
-		{
+			if (node->rank == 2)
+			{
+				// The second slave sends its average to the first slave
+				node->relion_MPI_Send(MULTIDIM_ARRAY(avg1), 2*MULTIDIM_SIZE(avg1), MY_MPI_DOUBLE, 1, MPITAG_IMAGE, MPI_COMM_WORLD);
+			}
+			else if (node->rank == 1)
+			{
 
-			std::cout << " Calculating gold-standard FSC ..."<< std::endl;
-			// The first slave receives the average from the second slave and calculates the FSC between them
-			MPI_Status status;
-			MultidimArray<Complex > avg2;
-			avg2.resize(avg1);
-			node->relion_MPI_Recv(MULTIDIM_ARRAY(avg2), 2*MULTIDIM_SIZE(avg2), MY_MPI_DOUBLE, 2, MPITAG_IMAGE, MPI_COMM_WORLD, status);
-			if (do_sgd)
-			{
-				getFSC(avg1, avg2, mymodel.fsc_halves_class);
+				if (mymodel.nr_bodies > 1)
+					std::cout << " Calculating gold-standard FSC for " << ibody+1 << "th body ..."<< std::endl;
+				else
+					std::cout << " Calculating gold-standard FSC ..."<< std::endl;
+				// The first slave receives the average from the second slave and calculates the FSC between them
+				MPI_Status status;
+				MultidimArray<Complex > avg2;
+				avg2.resize(avg1);
+				node->relion_MPI_Recv(MULTIDIM_ARRAY(avg2), 2*MULTIDIM_SIZE(avg2), MY_MPI_DOUBLE, 2, MPITAG_IMAGE, MPI_COMM_WORLD, status);
+				wsum_model.BPref[ibody].calculateDownSampledFourierShellCorrelation(avg1, avg2, mymodel.fsc_halves_class[ibody]);
 			}
-			else
-			{
-				wsum_model.BPref[iclass].calculateDownSampledFourierShellCorrelation(avg1, avg2, mymodel.fsc_halves_class);
-			}
+
 		}
 
-	}
+		// Now slave 1 sends the fsc curve to everyone else
+		node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.fsc_halves_class[ibody]), MULTIDIM_SIZE(mymodel.fsc_halves_class[ibody]), MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
 
-	// Now slave 1 sends the fsc curve to everyone else
-	node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.fsc_halves_class), MULTIDIM_SIZE(mymodel.fsc_halves_class), MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
+	} // end loop over bodies
 
 #ifdef DEBUG
 	std::cerr << "MlOptimiserMpi::compareTwoHalves: done" << std::endl;
@@ -2936,7 +2981,7 @@ void MlOptimiserMpi::iterate()
 
 				// Sjors 27-oct-2015
 				// Calculate gold-standard FSC curve
-				if (do_phase_random_fsc && fn_mask != "None")
+				if (do_phase_random_fsc && (fn_mask != "None" || mymodel.nr_bodies > 1) )
 					reconstructUnregularisedMapAndCalculateSolventCorrectedFSC();
 				else
 					compareTwoHalves();
@@ -2944,19 +2989,28 @@ void MlOptimiserMpi::iterate()
 				// For automated sampling procedure
 				if (!node->isMaster()) // the master does not have the correct mymodel.current_size, it only handles metadata!
 				{
+
 					// Check that incr_size is at least the number of shells as between FSC=0.5 and FSC=0.143
-					int fsc05   = -1;
-					int fsc0143 = -1;
-					FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(mymodel.fsc_halves_class)
+					for (int ibody = 0; ibody< mymodel.nr_bodies; ibody++)
 					{
-						if (DIRECT_A1D_ELEM(mymodel.fsc_halves_class, i) < 0.5 && fsc05 < 0)
-							fsc05 = i;
-						if (DIRECT_A1D_ELEM(mymodel.fsc_halves_class, i) < 0.143 && fsc0143 < 0)
-							fsc0143 = i;
+
+						if (mymodel.keep_fixed_bodies[ibody])
+							continue;
+
+						int fsc05   = -1;
+						int fsc0143 = -1;
+						FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(mymodel.fsc_halves_class[ibody])
+						{
+							if (DIRECT_A1D_ELEM(mymodel.fsc_halves_class[ibody], i) < 0.5 && fsc05 < 0)
+								fsc05 = i;
+							if (DIRECT_A1D_ELEM(mymodel.fsc_halves_class[ibody], i) < 0.143 && fsc0143 < 0)
+								fsc0143 = i;
+						}
+						// At least fsc05 - fsc0143 + 5 shells as incr_size
+						incr_size = XMIPP_MAX(incr_size, fsc0143 - fsc05 + 5);
+						if (!has_high_fsc_at_limit)
+							has_high_fsc_at_limit = (DIRECT_A1D_ELEM(mymodel.fsc_halves_class[ibody], mymodel.current_size/2 - 1) > 0.2);
 					}
-					// At least fsc05 - fsc0143 + 5 shells as incr_size
-					incr_size = XMIPP_MAX(incr_size, fsc0143 - fsc05 + 5);
-					has_high_fsc_at_limit = (DIRECT_A1D_ELEM(mymodel.fsc_halves_class, mymodel.current_size/2 - 1) > 0.2);
 				}
 
 				// Upon convergence join the two random halves
@@ -2982,7 +3036,7 @@ void MlOptimiserMpi::iterate()
 			if (do_split_random_halves)
 			{
 				node->relion_MPI_Bcast(&mymodel.ave_Pmax, 1, MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
-				for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
+				for (int iclass = 0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++)
 					node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[iclass]), MULTIDIM_SIZE(mymodel.data_vs_prior_class[iclass]), MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
 			}
 

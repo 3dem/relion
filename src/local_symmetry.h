@@ -32,6 +32,7 @@
 #include "src/transformations.h"
 #include "src/healpix_sampling.h"
 #include "src/time.h"
+#include <queue>
 
 // DM (ccp4) operator types
 // http://www.ccp4.ac.uk/html/rotationmatrices.html
@@ -53,6 +54,37 @@
 #define LOCALSYM_OP_DO_INVERT (true)
 #define LOCALSYM_OP_DONT_INVERT (false)
 
+template <typename T>
+bool isMultidimArray3DCubic(const MultidimArray<T>& v)
+{
+	if ( (NSIZE(v) != 1) || (ZSIZE(v) <= 1) || (YSIZE(v) <= 1) || (XSIZE(v) <= 1)
+			|| (ZSIZE(v) != YSIZE(v)) || (ZSIZE(v) != XSIZE(v))
+			|| (ZSIZE(v) % 2) )
+		return false;
+	return true;
+}
+
+void sum3DCubicMask(
+		const MultidimArray<RFLOAT> v,
+		RFLOAT& val_sum,
+		RFLOAT& val_ctr);
+
+bool similar3DCubicMasks(
+		RFLOAT mask1_sum,
+		RFLOAT mask1_ctr,
+		RFLOAT mask2_sum,
+		RFLOAT mask2_ctr);
+
+void truncateMultidimArray(
+		MultidimArray<RFLOAT>& v,
+		RFLOAT minval = 0.,
+		RFLOAT maxval = 0.);
+
+void Localsym_outputOperator(
+		const Matrix1D<RFLOAT>& op,
+		std::ostream* o_ptr,
+		RFLOAT scale_angpix = 1.);
+
 void Localsym_composeOperator(
 		Matrix1D<RFLOAT>& op,
 		RFLOAT aa = 0., RFLOAT bb = 0., RFLOAT gg = 0.,
@@ -68,6 +100,10 @@ void Localsym_decomposeOperator(
 void Localsym_scaleTranslations(
 		Matrix1D<RFLOAT>& op,
 		RFLOAT factor = 1.);
+
+void Localsym_shiftTranslations(
+		Matrix1D<RFLOAT>& op,
+		const Matrix1D<RFLOAT>& voffset);
 
 void Localsym_translations2vector(
 		const Matrix1D<RFLOAT>& vec,
@@ -101,6 +137,14 @@ void readRelionFormatMasksAndOperators(
 		std::vector<FileName>& fn_mask_list,
 		std::vector<std::vector<Matrix1D<RFLOAT> > >& ops,
 		RFLOAT angpix = 1.,
+		bool verb = false);
+
+void readRelionFormatMasksWithoutOperators(
+		FileName fn_info,
+		std::vector<FileName>& fn_mask_list,
+		std::vector<std::vector<Matrix1D<RFLOAT> > >& ops,
+		std::vector<std::vector<FileName> >& op_masks,
+		bool all_angular_search_ranges_are_global = true,
 		bool verb = false);
 
 void writeRelionFormatMasksAndOperators(
@@ -149,28 +193,15 @@ void applyLocalSymmetry(
 		RFLOAT radius = -1.,
 		RFLOAT cosine_width_pix = 5.);
 
-/*
-void getMaxSizeOfMask(
-		const MultidimArray<RFLOAT>& mask,
-		long int& xcen,
-		long int& ycen,
-		long int& zcen,
-		long int& newdim);
-*/
-
-void getSmallerSizeOfMask(
-		const MultidimArray<RFLOAT>& mask,
-		const Matrix1D<RFLOAT>& op_search_ranges,
-		long int& newdim);
+void getMinCropSize(
+		MultidimArray<RFLOAT>& vol,
+		Matrix1D<RFLOAT>& center,
+		long int& mindim,
+		RFLOAT edge = 0.);
 
 bool compareOperatorsByCC(
 		const Matrix1D<RFLOAT>& lhs,
 		const Matrix1D<RFLOAT>& rhs);
-
-bool useHealpixAngularSamplings(
-		const Matrix1D<RFLOAT>& op,
-		const Matrix1D<RFLOAT>& op_search_ranges,
-		RFLOAT use_healpix_tilt_min = -1.);
 
 void getLocalSearchOperatorSamplings(
 		const Matrix1D<RFLOAT>& op_old,
@@ -181,17 +212,25 @@ void getLocalSearchOperatorSamplings(
 		bool use_healpix = false,
 		bool verb = true);
 
-void checkSamplingRatesForMask(
-		const MultidimArray<RFLOAT>& mask,
-		RFLOAT ang_search_step,
-		RFLOAT trans_search_step);
-
 void calculateOperatorCC(
-		const MultidimArray<RFLOAT>& map,
+		const MultidimArray<RFLOAT>& src,
+		const MultidimArray<RFLOAT>& dest,
 		const MultidimArray<RFLOAT>& mask,
 		std::vector<Matrix1D<RFLOAT> >& op_samplings,
 		bool do_sort = true,
 		bool verb = true);
+
+void separateMasksBFS(
+		const FileName& fn_in,
+		const int K = 2,
+		RFLOAT val_thres = XMIPP_EQUAL_ACCURACY);
+
+/*
+void separateMasksKMeans(
+		const FileName& fn_in,
+		const int K = 2,
+		int random_seed = -1);
+*/
 
 class local_symmetry_parameters
 {
@@ -207,15 +246,15 @@ public:
 	bool do_duplicate_local_symmetry;
 	bool do_local_search_local_symmetry_ops;
 	bool do_txt2rln;
+	bool do_transform;
 	bool do_debug;
 
 	FileName fn_unsym, fn_sym, fn_mask;
 
 	// Input file with mask filenames and rotational / translational operators
-	FileName fn_info_in, fn_info_out, fn_info_in_parsed_ext;
+	FileName fn_info_in, fn_op_mask_info_in, fn_info_out, fn_info_in_parsed_ext;
 
 	// Manually reset pixel size (in Angstroms)
-	//RFLOAT angpix_ops, angpix_image;
 	RFLOAT angpix_image;
 
 	// Local searches of local symmetry operators
@@ -223,15 +262,21 @@ public:
 
 	RFLOAT offset_x_range, offset_y_range, offset_z_range, offset_range, offset_step;
 
-	RFLOAT binning_factor;
+	RFLOAT rot, tilt, psi, xoff, yoff, zoff;
 
-	RFLOAT use_healpix_tilt_min;
+	RFLOAT binning_factor;
 
 	// Width of soft edge
 	RFLOAT width_edge_pix;
 
 	// % of box size as the 2D / 3D spherical mask
 	RFLOAT sphere_percentage;
+
+	int nr_masks;
+
+	RFLOAT ini_threshold;
+
+	bool use_healpix_sampling;
 
 	// Verbose output?
 	bool verb;
@@ -247,6 +292,8 @@ public:
 	void read(int argc, char **argv);
 
 	void run();
+
+	void writeCommand(FileName fn_cmd, std::string str_executable_name);
 
 	local_symmetry_parameters() { clear(); };
 

@@ -36,6 +36,7 @@ int last_ctf_viewed;
 
 
 bool   global_has_ctf;
+bool   global_pick_startend;
 RFLOAT global_angpix;
 RFLOAT global_lowpass;
 RFLOAT global_highpass;
@@ -103,6 +104,8 @@ void cb_viewmic(Fl_Widget* w, void* data)
 	command += " --lowpass " + floatToString(global_lowpass);
 	command += " --highpass " + floatToString(global_highpass);
 	command += " --angpix " + floatToString(global_angpix);
+	if (global_pick_startend)
+		command += " --pick_start_end ";
 
 	if (global_color_label != "")
 	{
@@ -523,6 +526,7 @@ void ManualPicker::read(int argc, char **argv)
 	global_pickname = parser.getOption("--pickname", "Rootname for the picked coordinate files", "manualpick");
 	global_angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms", "-1."));
 	global_particle_diameter = textToFloat(parser.getOption("--particle_diameter", "Diameter of the circles that will be drawn around each picked particle (in Angstroms)"));
+	global_pick_startend = parser.checkOption("--pick_start_end", "Pick start-end coordinates of helices");
 	do_allow_save = parser.checkOption("--allow_save", "Allow saving of the selected micrographs");
 	do_fast_save = parser.checkOption("--fast_save", "Save a default selection of all micrographs immediately");
 
