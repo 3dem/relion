@@ -267,15 +267,6 @@ void runCollect2jobs(	int grid_dim,
 						);
 
 void windowFourierTransform2(
-		XFLOAT *d_in_real,
-		XFLOAT *d_in_imag,
-		XFLOAT *d_out_real,
-		XFLOAT *d_out_imag,
-		unsigned iX, unsigned iY, unsigned iZ, //Input dimensions
-		unsigned oX, unsigned oY, unsigned oZ,  //Output dimensions
-		cudaStream_t stream = 0);
-
-void windowFourierTransform2(
 		AccPtr<ACCCOMPLEX> &d_in,
 		AccPtr<ACCCOMPLEX> &d_out,
 		size_t iX, size_t iY, size_t iZ, //Input dimensions

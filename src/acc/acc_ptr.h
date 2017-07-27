@@ -298,9 +298,9 @@ public:
 	    size = newSize;
 #ifdef DEBUG_CUDA
 		if (dPtr!=NULL)
-			ACC_PTR_DEBUG_FATAL("Resizing host with present device allocation.\n");
+			ACC_PTR_DEBUG_FATAL("resizeHost: Resizing host with present device allocation.\n");
 		if (newSize==0)
-			ACC_PTR_DEBUG_FATAL("Array resized to size zero.\n");
+			ACC_PTR_DEBUG_INFO("resizeHost: Array resized to size zero (permitted with fear).  Something may break downstream\n");
 #endif
 	    freeHostIfSet();
 	    setHostPtr(newArr);
@@ -318,19 +318,27 @@ public:
 		T* newArr;
 		posix_memalign((void **)&newArr, MEM_ALIGN, sizeof(T) * newSize);
 		
-		// Avoid memory overrun
+		// Copy in what we can from the original matrix
 		if (newSize < size)
 			memcpy( newArr, hPtr, newSize * sizeof(T) );
 		else
-			// WARNING - unknown data in final array elements
 			memcpy( newArr, hPtr, size * sizeof(T) );  
+		
+		// Initialize remaining memory if any
+		if (newSize > size)
+		{
+			size_t theRest = sizeof(T) * (newSize - size);
+			memset( newArr, 0x0, theRest);
+		}
 		
 	    size = newSize;
 #ifdef DEBUG_CUDA
 		if (dPtr!=NULL)
-			ACC_PTR_DEBUG_FATAL("Resizing host with present device allocation.\n");
+			ACC_PTR_DEBUG_FATAL("resizeHostCopy: Resizing host with present device allocation.\n");
+		if (newSize==0)
+			ACC_PTR_DEBUG_INFO("resizeHostCopy: Array resized to size zero (permitted with fear).  Something may break downstream\n");
 #endif
-	    freeHost();
+	    freeHostIfSet();
 	    setHostPtr(newArr);
 	    doFreeHost=true;
 	}
@@ -348,6 +356,7 @@ public:
 #endif
 		cudaMemInit<T>( dPtr, value, size, stream);
 #endif
+// TODO - should this have an #else clause that initializes the memory on the host?
 	}
 
 	/**

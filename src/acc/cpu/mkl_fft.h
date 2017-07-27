@@ -205,81 +205,95 @@ public:
 
 	void setSize(size_t x, size_t y, size_t z, int setDirection = 0)
 	{
-	     if( x == xSize && y == ySize && z == zSize && setDirection == direction && planSet)
-	         return;
+		/* Optional direction input restricts transformer to
+		 * forwards or backwards tranformation only,
+		 * which reduces memory requirements, especially
+		 * for large batches of simulatanous transforms.
+		 *
+		 * FFTW_FORWARDS  === -1
+		 * FFTW_BACKWARDS === +1
+		 *
+		 * The default direction is 0 === forwards AND backwards
+		 */
 	         
-         int checkDim;
-	     if(z>1)
-	         checkDim=3;
-	     else if(y>1)
-	         checkDim=2;
-	     else
-		 checkDim=1;
-	     if(checkDim != dimension)
-		 REPORT_ERROR("You are trying to change the dimesion of a MklFFT transformer, which is not allowed");
+		int checkDim;
+		if(z>1)
+			checkDim=3;
+		else if(y>1)
+			checkDim=2;
+		else
+			checkDim=1;
+		if(checkDim != dimension)
+			REPORT_ERROR("You are trying to change the dimesion of a MklFFT transformer, which is not allowed");
 
-	     if( !( (setDirection==-1)||(setDirection==0)||(setDirection==1) ) )
-	     {
-		      std::cerr << "*ERROR : Setting a cuda transformer direction to non-defined value" << std::endl;
-	              return;
-	     }
+		if( !( (setDirection==-1)||(setDirection==0)||(setDirection==1) ) )
+		{
+			std::cerr << "*ERROR : Setting a MklFFT transformer direction to non-defined value" << std::endl;
+			return;
+		}
 
-	     direction = setDirection;
+		direction = setDirection;
 
-	     clear();
+		if( x == xSize && y == ySize && z == zSize && planSet)
+			return;
+		
+		clear();
 
-	     xSize = x;
-	     ySize = y;
-	     zSize = z;
+		xSize = x;
+		ySize = y;
+		zSize = z;
 
-	     xFSize = x/2 + 1;
-	     yFSize = y;
-	     zFSize = z;
+		xFSize = x/2 + 1;
+		yFSize = y;
+		zFSize = z;
 
-	     reals.resizeHost(xSize * ySize * zSize);
-	     fouriers.resizeHost(xFSize * yFSize * zFSize);
-	    
-	    
-         int N[3];  
-         if(dimension == 1)
-             N[0] = xSize;
-         else  if(dimension == 2){
-             N[0] = ySize;  N[1] = xSize;	    
-         }
-         else {
-             N[0] = zSize;  N[1] = ySize; N[2] = xSize;	    
-         }
+		if ((xSize * ySize * zSize)==0)
+			ACC_PTR_DEBUG_FATAL("Reals array resized to size zero.\n");
+		reals.resizeHostCopy(xSize * ySize * zSize);
+		if ((xFSize * yFSize * zFSize)==0)
+			ACC_PTR_DEBUG_FATAL("Fouriers array resized to size zero.\n");
+		fouriers.resizeHostCopy(xFSize * yFSize * zFSize);
 
-         {
-             tbb::spin_mutex::scoped_lock lock(mkl_mutex);
-#ifdef CUDA_DOUBLE_PRECISION
-            fPlanForward = fftw_plan_dft_r2c(dimension, N,  reals(),
-                                         (fftw_complex*) fouriers(), FFTW_ESTIMATE);
-            fPlanBackward = fftw_plan_dft_c2r(dimension, N,
-                                          (fftw_complex*) fouriers(),  reals(),
-                                          FFTW_ESTIMATE);
+		int N[3];  
+		if(dimension == 1)
+			N[0] = xSize;
+		else  if(dimension == 2){
+			N[0] = ySize;  N[1] = xSize;	    
+		}
+		else {
+			N[0] = zSize;  N[1] = ySize; N[2] = xSize;	    
+		}
+
+		{
+			tbb::spin_mutex::scoped_lock lock(mkl_mutex);
+#ifdef ACC_DOUBLE_PRECISION
+			fPlanForward = fftw_plan_dft_r2c(dimension, N,  reals(),
+										 (fftw_complex*) fouriers(), FFTW_ESTIMATE);
+			fPlanBackward = fftw_plan_dft_c2r(dimension, N,
+										  (fftw_complex*) fouriers(),  reals(),
+										  FFTW_ESTIMATE);
 
 #else
-            fPlanForward = fftwf_plan_dft_r2c(dimension, N, reals(),
-                                         (fftwf_complex*) fouriers(), FFTW_ESTIMATE);
-            fPlanBackward = fftwf_plan_dft_c2r(dimension, N,
-                                          (fftwf_complex*) fouriers(), reals(), FFTW_ESTIMATE);
+			fPlanForward = fftwf_plan_dft_r2c(dimension, N, reals(),
+										 (fftwf_complex*) fouriers(), FFTW_ESTIMATE);
+			fPlanBackward = fftwf_plan_dft_c2r(dimension, N,
+										  (fftwf_complex*) fouriers(), reals(), FFTW_ESTIMATE);
 #endif
 			planSet = true;
-        }
+		}
 	}
 
 	void forward()
 	{
-	    if(direction==1)
-	    {
-	        std::cout << "trying to execute a forward plan for a MKL FFT transformer which is backwards-only" << std::endl;
-	        return;
-	     }
+		if(direction==1)
+		{
+			std::cout << "trying to execute a forward plan for a MKL FFT transformer which is backwards-only" << std::endl;
+			return;
+		}
 #ifdef CUDA_DOUBLE_PRECISION
-        fftw_execute_dft_r2c(fPlanForward, reals(), (fftw_complex*) fouriers());
+		fftw_execute_dft_r2c(fPlanForward, reals(), (fftw_complex*) fouriers());
 #else
-        fftwf_execute_dft_r2c(fPlanForward, reals(),  (fftwf_complex*) fouriers());
+		fftwf_execute_dft_r2c(fPlanForward, reals(),  (fftwf_complex*) fouriers());
 #endif
      
 	}
@@ -315,6 +329,7 @@ public:
 			fftwf_destroy_plan(fPlanBackward);
 #endif          
 			fPlanForward = fPlanBackward = NULL;
+			planSet = false;
 		}
 	}
 

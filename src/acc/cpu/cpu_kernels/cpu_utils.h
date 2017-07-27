@@ -192,7 +192,7 @@ void complex3D(XFLOAT* mdlComplex, XFLOAT &real, XFLOAT &imag,
 	real = dxy0[0] + (dxy1[0] - dxy0[0])*fz;
 	imag = dxy0[1] + (dxy1[1] - dxy0[1])*fz;	
 }
-
+/*
 template<bool check_max_r2>
 void window_fourier_transform(
 		XFLOAT *g_in_real,
@@ -299,7 +299,7 @@ void window_fourier_transform(
 		} // blk
 	} // grd
 }
-
+*/
 } // end of namespace CpuKernels
 
 #endif //CPU_UTILITIES_H

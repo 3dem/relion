@@ -411,6 +411,7 @@ void centerFFT_3D(  int       blocks,
 }
 
 
+/* TODO - if create optimized CPU version of autopicker
 void probRatio( int       blockIdx_x,  
 				int       threadIdx_x,
 				XFLOAT   *d_Mccf,
@@ -427,7 +428,7 @@ void probRatio( int       blockIdx_x,
 				int       startPsi,
 				int       totalPsis)
 {
-	/* PLAN TO:
+	|* PLAN TO:
 	 *
 	 * 1) Pre-filter
 	 * 		d_Mstddev[i] = 1 / (2*d_Mstddev[i])   ( if d_Mstddev[pixel] > 1E-10 )
@@ -441,7 +442,7 @@ void probRatio( int       blockIdx_x,
 	 * 	  where
 	 * 	  	k = (normfft * d_Maux[pixel] + d_Mmean[pixel] * sum_ref_under_circ_mask)*d_Mstddev[i] + sum_ref2_under_circ_mask
 	 *
-	 */
+	 *|
 
 	int pixel = threadIdx_x + blockIdx_x*(int)PROBRATIO_BLOCK_SIZE;
 	if(pixel<image_size)
@@ -695,7 +696,7 @@ void batch_convol_B(int          blockIdx_x,
 		d_A[pixel + A_off].y =   ti*d_B[pixel].x - tr*d_B[pixel].y;
 	}
 }
-
+*/
 template <typename T>
 void cpu_kernel_multi( T *A,
 			T *OUT,
@@ -725,7 +726,7 @@ void cpu_kernel_multi( T *A,
 	for (int i = 0; i < image_size; i ++)
 		OUT[i] = A[i]*B[i]*S;
 }
-
+/*
 void batch_multi(   int     blockIdx_x,
 					int     blockIdx_y,
 					int     threadIdx_x,
@@ -739,7 +740,8 @@ void batch_multi(   int     blockIdx_x,
 	if(pixel<image_size)
 		OUT[pixel + blockIdx_y*image_size] = A[pixel + blockIdx_y*image_size]*B[pixel + blockIdx_y*image_size]*S;
 }
-
+ */
+/* TODO - CPU-optimized autopicker 
 void finalizeMstddev(   int     blockIdx_x,
 						int     threadIdx_x,
 						XFLOAT *Mstddev,
@@ -767,7 +769,7 @@ void square(int     blockIdx_x,
 	if(pixel<image_size)
 		A[pixel] = A[pixel]*A[pixel];
 }
-
+*/
 template<bool invert>
 void cpu_kernel_make_eulers_2D(int grid_size, int block_size,
 		XFLOAT *alphas,

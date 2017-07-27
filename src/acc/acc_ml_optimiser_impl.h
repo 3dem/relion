@@ -311,17 +311,29 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			// Apply the norm_correction term
 			if (baseMLO->do_norm_correction)
 			{
-				AccUtilities::multiply(BLOCK_SIZE, temp,(XFLOAT)(baseMLO->mymodel.avg_norm_correction / normcorr) );
+				AccUtilities::multiply<XFLOAT>(BLOCK_SIZE, temp,(XFLOAT)(baseMLO->mymodel.avg_norm_correction / normcorr) );
 				LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 			}
 		}
 
-		AccUtilities::translate(BLOCK_SIZE,
-			temp,  // translate from temp...
-			d_img_, // ... into d_img
-			XX(my_old_offset),
-			YY(my_old_offset),
-			ZZ(my_old_offset));
+		if (accMLO->dataIs3D)
+		{
+			AccUtilities::translate<XFLOAT>(BLOCK_SIZE,
+				temp,  // translate from temp...
+				d_img_, // ... into d_img
+				XX(my_old_offset),
+				YY(my_old_offset),
+				ZZ(my_old_offset));
+		}
+		else
+		{
+				AccUtilities::translate<XFLOAT>(BLOCK_SIZE,
+				temp,  // translate from temp...
+				d_img_, // ... into d_img
+				XX(my_old_offset),
+				YY(my_old_offset),
+				0);		
+		}
 
 
 		/*
@@ -334,6 +346,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		AccPtr<XFLOAT> d_img(img_size,accMLO->devBundle->allocator);
 #else
 		AccPtr<XFLOAT> d_img(img_size);
+		d_img.hostInit(0.f);
 #endif
 		d_img.deviceAlloc();
 
@@ -370,6 +383,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		size_t current_size_z = (accMLO->dataIs3D) ? baseMLO->mymodel.current_size : 1;
 
 		accMLO->transformer1.setSize(img().xdim,img().ydim,img().zdim);
+		// The resize is assumed to keep the contents of transformer1 in-tact (if possible)
 
 		//FIXME What is this?
 //		deviceInitValue(accMLO->transformer1.reals, (XFLOAT)0.);
@@ -377,9 +391,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 //		accMLO->transformer1.reals.streamSync();
 //		accMLO->transformer1.fouriers.streamSync();
 
-#ifdef CUDA
 		d_img.cpOnAcc(accMLO->transformer1.reals);
-#endif
 		runCenterFFT(
 				accMLO->transformer1.reals,
 				(int)accMLO->transformer1.xSize,
@@ -395,8 +407,8 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 		int FMultiBsize = ( (int) ceilf(( float)accMLO->transformer1.fouriers.getSize()*2/(float)BLOCK_SIZE));
 
-		AccUtilities::multiply(FMultiBsize, BLOCK_SIZE, accMLO->transformer1.fouriers.getStream(),
-						(XFLOAT*)~accMLO->transformer1.fouriers,
+		AccUtilities::multiply<XFLOAT>(FMultiBsize, BLOCK_SIZE, accMLO->transformer1.fouriers.getStream(),
+						(XFLOAT*)~accMLO->transformer1.fouriers, 
 						(XFLOAT)1/((XFLOAT)(accMLO->transformer1.reals.getSize())),
 						accMLO->transformer1.fouriers.getSize()*2);
 
@@ -567,10 +579,12 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 #else
 			AccPtr<XFLOAT> softMaskSum   ((size_t)SOFTMASK_BLOCK_SIZE);
 			AccPtr<XFLOAT> softMaskSum_bg((size_t)SOFTMASK_BLOCK_SIZE);
+			softMaskSum.hostInit(0.f);
+			softMaskSum_bg.hostInit(0.f);
 #endif
 			softMaskSum.deviceAlloc();
 			softMaskSum_bg.deviceAlloc();
-			softMaskSum.deviceInit(0.f);
+			softMaskSum.deviceInit(0.f);  // TODO - consider deviceInitValue?
 			softMaskSum_bg.deviceInit(0.f);
 			AccUtilities::softMaskBackgroundValue(block_dim, SOFTMASK_BLOCK_SIZE,
 					~d_img,
@@ -619,6 +633,8 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 		CTIC(accMLO->timer,"setSize");
 		accMLO->transformer1.setSize(img().xdim,img().ydim,img().zdim);
+		// The resize is assumed to keep the contents of transformer1 in-tact (if possible)
+		
 //		deviceInitValue(accMLO->transformer1.reals, (XFLOAT)0.);
 //		deviceInitComplexValue(accMLO->transformer1.fouriers, (XFLOAT)0.);
 //		accMLO->transformer1.reals.streamSync();
@@ -627,7 +643,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 		CTIC(accMLO->timer,"transform");
 		d_img.cpOnAcc(accMLO->transformer1.reals);
-
+		
 		runCenterFFT(								// runs on input GlobalPtr.stream
 				accMLO->transformer1.reals,
 				(int)accMLO->transformer1.xSize,
@@ -640,7 +656,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		accMLO->transformer1.fouriers.streamSync();
 
 		int FMultiBsize2 = ( (int) ceilf(( float)accMLO->transformer1.fouriers.getSize()*2/(float)BLOCK_SIZE));
-		AccUtilities::multiply(FMultiBsize2, BLOCK_SIZE, accMLO->transformer1.fouriers.getStream(),
+		AccUtilities::multiply<XFLOAT>(FMultiBsize2, BLOCK_SIZE, accMLO->transformer1.fouriers.getStream(),
 						(XFLOAT*)~accMLO->transformer1.fouriers,
 						(XFLOAT)1/((XFLOAT)(accMLO->transformer1.reals.getSize())),
 						accMLO->transformer1.fouriers.getSize()*2);
@@ -658,6 +674,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			AccPtr<XFLOAT> spectrumAndXi2((baseMLO->mymodel.ori_size/2+1)+1,0,accMLO->devBundle->allocator); // last +1 is the Xi2, to remove an expensive memcpy
 #else
 			AccPtr<XFLOAT> spectrumAndXi2((size_t)((baseMLO->mymodel.ori_size/2+1)+1)); // last +1 is the Xi2, to remove an expensive memcpy
+			spectrumAndXi2.hostInit(0);
 #endif
 			spectrumAndXi2.deviceAlloc();
 			spectrumAndXi2.deviceInit(0);
@@ -922,6 +939,7 @@ void getAllSquaredDifferencesCoarse(
 #else
 	AccPtr<XFLOAT> allWeights(allWeights_size);
 #endif
+	deviceInitValue<XFLOAT>(allWeights, 0);  // Make sure entire array initialized
 	allWeights.deviceAlloc();
 
 	long int allWeights_pos=0;	bool do_CC = (baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc;
@@ -1024,7 +1042,7 @@ void getAllSquaredDifferencesCoarse(
 		buildCorrImage(baseMLO,op,corr_img,ipart,group_id);
 		corr_img.cpToDevice();
 
-		deviceInitValue(allWeights, (XFLOAT) (op.highres_Xi2_imgs[ipart] / 2.));
+		deviceInitValue<XFLOAT>(allWeights, (XFLOAT) (op.highres_Xi2_imgs[ipart] / 2.));
 		allWeights_pos = 0;
 
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
@@ -1727,12 +1745,13 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				else
 				{
 					// Downcast from RFLOAT to XFLOAT
-					weights.deviceAlloc();
 #ifdef CUDA
+					weights.deviceAlloc();
 					block_num = ceilf((float)Mweight.getSize()/(float)BLOCK_SIZE);
 					cuda_kernel_cast<XFLOAT,weights_t><<<block_num,BLOCK_SIZE,0>>>
 							(~Mweight,~weights,Mweight.getSize());
 #else
+					weights.hostAlloc();
 					size_t size = Mweight.getSize();
 					for (int i = 0; i <size; i++)
 						weights[i] = Mweight[i];
@@ -1745,7 +1764,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 						(sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi * sp.nr_trans);
 
 				block_num = ceilf((float)(sp.nr_dir*sp.nr_psi)/(float)SUMW_BLOCK_SIZE);
-
+			
 				if (failsafeMode) //Prevent zero prior products in fail-safe mode
 				{
 					AccUtilities::kernel_exponentiate_weights_coarse<true,weights_t>(
@@ -1799,6 +1818,10 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 					//MoreThanCubOpt<weights_t> moreThanOpt(0.);
 					//size_t filteredSize = filterOnDevice(unsorted_ipart, filtered, moreThanOpt);
+#ifdef DEBUG_CUDA					
+					if (unsorted_ipart.getSize()==0)
+						ACC_PTR_DEBUG_FATAL("Unsorted array size zero.\n");  // Hopefully Impossible
+#endif
 					size_t filteredSize = AccUtilities::filterGreaterZeroOnDevice<weights_t>(unsorted_ipart, filtered);
 
 					if (filteredSize == 0)
@@ -1810,9 +1833,15 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 							std::cerr << " ipart= " << ipart << " adaptive_fraction= " << baseMLO->adaptive_fraction << std::endl;
 							std::cerr << " min_diff2= " << op.min_diff2[ipart] << std::endl;
 
+#ifdef CUDA
 							pdf_orientation.dumpDeviceToFile("error_dump_pdf_orientation");
 							pdf_offset.dumpDeviceToFile("error_dump_pdf_offset");
 							unsorted_ipart.dumpDeviceToFile("error_dump_filtered");
+#else
+							pdf_orientation.dumpHostToFile("error_dump_pdf_orientation");
+							pdf_offset.dumpHostToFile("error_dump_pdf_offset");
+							unsorted_ipart.dumpHostToFile("error_dump_filtered");
+#endif
 
 							std::cerr << "Dumped data: error_dump_pdf_orientation, error_dump_pdf_orientation and error_dump_unsorted." << std::endl;
 						}
@@ -1855,10 +1884,17 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 							std::cerr << " op.sum_weight[ipart]= " << op.sum_weight[ipart] << std::endl;
 							std::cerr << " min_diff2= " << op.min_diff2[ipart] << std::endl;
 
+#ifdef CUDA
 							unsorted_ipart.dumpDeviceToFile("error_dump_unsorted");
 							filtered.dumpDeviceToFile("error_dump_filtered");
 							sorted.dumpDeviceToFile("error_dump_sorted");
 							cumulative_sum.dumpDeviceToFile("error_dump_cumulative_sum");
+#else
+							unsorted_ipart.dumpHostToFile("error_dump_unsorted");
+							filtered.dumpHostToFile("error_dump_filtered");
+							sorted.dumpHostToFile("error_dump_sorted");
+							cumulative_sum.dumpHostToFile("error_dump_cumulative_sum");
+#endif
 
 							std::cerr << "Written error_dump_unsorted, error_dump_filtered, error_dump_sorted, and error_dump_cumulative_sum." << std::endl;
 						}
@@ -2684,6 +2720,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		AccPtr<XFLOAT> wdiff2s_AA((size_t)(baseMLO->mymodel.nr_classes*image_size));
 		AccPtr<XFLOAT> wdiff2s_XA((size_t)(baseMLO->mymodel.nr_classes*image_size));
 		AccPtr<XFLOAT> wdiff2s_sum((size_t)image_size);
+		wdiff2s_AA.hostInit(0.f);
+		wdiff2s_XA.hostInit(0.f);
+		wdiff2s_sum.hostInit(0.f);
 #endif
 
 		wdiff2s_AA.deviceAlloc();

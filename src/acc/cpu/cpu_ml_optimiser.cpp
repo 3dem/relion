@@ -70,11 +70,86 @@ typedef int dim3;
 #include "src/acc/acc_ml_optimiser.h"
 #include "src/acc/cpu/cpu_ml_optimiser.h"
 #include "src/acc/acc_helper_functions.h"
+
+void dump_array(char *name, float *ptr, size_t size);
+void dump_double_array(char *name, float *ptr, float *ptr2, size_t size);
+void dump_triple_array(char *name, float *ptr, float *ptr2, float *ptr3, size_t size);
+void dump_array(char *name, double *ptr, size_t size);
+void dump_double_array(char *name, double *ptr, double *ptr2, size_t size);
+void dump_triple_array(char *name, double *ptr, double *ptr2, double *ptr3, size_t size);
+
 #include "src/acc/acc_ml_optimiser_impl.h"
 
 
 #include <tbb/spin_mutex.h>
 tbb::spin_mutex      mkl_mutex;
+
+void dump_array(char *name, float *ptr, size_t size)
+{
+	FILE *fp = fopen(name, "w");
+	fprintf(fp, "Array size:  %ld\n", size);
+	for (size_t i=0; i < size; i++)
+		fprintf(fp, "%f ", ptr[i]);
+	fprintf(fp, "\n");
+	fflush(fp);	
+	fclose(fp);
+}
+
+void dump_double_array(char *name, float *ptr, float *ptr2, size_t size)
+{
+	FILE *fp = fopen(name, "w");
+	fprintf(fp, "Array size:  %ld\n", size);
+	for (size_t i=0; i < size; i++) 
+		fprintf(fp, "%f,%f, ", ptr[i], ptr2[i]);
+	fprintf(fp, "\n");
+	fflush(fp);	
+	fclose(fp);
+}
+
+void dump_triple_array(char *name, float *ptr, float *ptr2, float *ptr3, size_t size)
+{
+	FILE *fp = fopen(name, "w");
+	fprintf(fp, "Array size:  %ld\n", size);
+	for (size_t i=0; i < size; i++) 
+		fprintf(fp, "%f,%f,%f, ", ptr[i], ptr2[i], ptr3[i]);
+	fprintf(fp, "\n");
+	fflush(fp);	
+	fclose(fp);
+}
+
+void dump_array(char *name, double *ptr, size_t size)
+{
+	FILE *fp = fopen(name, "w");
+	fprintf(fp, "Array size:  %ld\n", size);
+	for (size_t i=0; i < size; i++) 
+		fprintf(fp, "%f ", ptr[i]);
+	fprintf(fp, "\n");
+	fflush(fp);	
+	fclose(fp);
+}
+
+void dump_double_array(char *name, double *ptr, double *ptr2, size_t size)
+{
+	FILE *fp = fopen(name, "w");
+	fprintf(fp, "Array size:  %ld\n", size);
+	for (size_t i=0; i < size; i++) 
+		fprintf(fp, "%f,%f, ", ptr[i], ptr2[i]);
+	fprintf(fp, "\n");
+	fflush(fp);	
+	fclose(fp);
+}
+
+void dump_triple_array(char *name, double *ptr, double *ptr2, double *ptr3, size_t size)
+{
+	FILE *fp = fopen(name, "w");
+	fprintf(fp, "Array size:  %ld\n", size);
+	for (size_t i=0; i < size; i++)
+		fprintf(fp, "%f,%f,%f, ", ptr[i], ptr2[i], ptr3[i]);
+	fprintf(fp, "\n");
+	fflush(fp);	
+	fclose(fp);
+}
+
 
 #if 0
 static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;

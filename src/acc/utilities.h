@@ -119,8 +119,14 @@ static T getSumOnDevice(AccPtr<T> &ptr)
 #ifdef CUDA
 	return CudaKernels::getSumOnDevice<T>(ptr);
 #else
+#ifdef DEBUG_CUDA
+	if (ptr.size == 0)
+		printf("DEBUG_ERROR: getSumOnDevice called with pointer of zero size.\n");
+	if (ptr.hPtr == NULL)
+		printf("DEBUG_ERROR: getSumOnDevice called with null device pointer.\n");
+#endif
 	size_t size = ptr.getSize();
-	T sum;
+	T sum = 0;
 	for (int i=0; i<size; i++)
 		sum += ptr[i];
 	return sum;
@@ -133,6 +139,12 @@ static T getMinOnDevice(AccPtr<T> &ptr)
 #ifdef CUDA
 	return CudaKernels::getMinOnDevice<T>(ptr);
 #else
+#ifdef DEBUG_CUDA
+	if (ptr.size == 0)
+		printf("DEBUG_ERROR: getMinOnDevice called with pointer of zero size.\n");
+	if (ptr.hPtr == NULL)
+		printf("DEBUG_ERROR: getMinOnDevice called with null device pointer.\n");
+#endif
 	return CpuKernels::getMin<T>(ptr(), ptr.getSize());
 #endif
 }
@@ -143,6 +155,12 @@ static std::pair<int, T> getArgMinOnDevice(AccPtr<T> &ptr)
 #ifdef CUDA
 	return CudaKernels::getArgMinOnDevice<T>(ptr);
 #else
+#ifdef DEBUG_CUDA
+	if (ptr.size == 0)
+		printf("DEBUG_ERROR: getArgMinOnDevice called with pointer of zero size.\n");
+	if (ptr.hPtr == NULL)
+		printf("DEBUG_ERROR: getArgMinOnDevice called with null device pointer.\n");
+#endif
 	return CpuKernels::getArgMin<T>(ptr(), ptr.getSize());
 #endif
 }
@@ -153,6 +171,12 @@ static std::pair<int, T> getArgMaxOnDevice(AccPtr<T> &ptr)
 #ifdef CUDA
 	return CudaKernels::getArgMaxOnDevice<T>(ptr);
 #else
+#ifdef DEBUG_CUDA
+	if (ptr.size == 0)
+		printf("DEBUG_ERROR: getArgMaxOnDevice called with pointer of zero size.\n");
+	if (ptr.hPtr == NULL)
+		printf("DEBUG_ERROR: getArgMaxOnDevice called with null device pointer.\n");
+#endif
 	return CpuKernels::getArgMax<T>(ptr(), ptr.getSize());
 #endif
 }
@@ -169,8 +193,14 @@ static int filterGreaterZeroOnDevice(AccPtr<T> &in, AccPtr<T> &out)
 	size_t outindex = 0;
 	// Find how many entries the output array will have
 	for(int i=0; i<arr_size; i++)
-		if(in[i] > 0.0)
+	{
+		if(in[i] > (T)0.0)
 			filt_size++;
+	}
+#ifdef DEBUG_CUDA
+	if (filt_size==0)
+		ACC_PTR_DEBUG_FATAL("filterGreaterZeroOnDevice - No filtered values greater than 0.\n");
+#endif
 	out.resizeHost(filt_size);
 	// Now populate output array
 	for(int i=0; i<arr_size; i++)
@@ -366,7 +396,8 @@ void InitValue(AccPtr<T> &data, T value)
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 #else
 	int Size = data.getSize();
-	memset(data.hPtr, value, Size);
+	for (size_t i=0; i < Size; i++)
+		data.hPtr[i] = value;
 #endif
 }
 
@@ -381,7 +412,8 @@ void InitValue(AccPtr<T> &data, T value, size_t Size)
 			Size,
 			INIT_VALUE_BLOCK_SIZE);
 #else
-	memset(data.hPtr, value, Size);
+	for (size_t i=0; i < Size; i++)
+		data.hPtr[i] = value;
 #endif
 }
 

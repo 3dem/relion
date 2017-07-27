@@ -1116,7 +1116,7 @@ void MlOptimiser::initialise()
 	{
 		// Set the size of the TBB thread pool for the entire run
 		tbbSchedulerInit.initialize(nr_threads);
-
+/*  TODO
 		// Enable threaded FFTW
 		int success = fftw_init_threads();
 		if (0 == success)
@@ -1125,6 +1125,7 @@ void MlOptimiser::initialise()
 		// And allow plans before expectation to run using allowed
 		// number of threads
 		fftw_plan_with_nthreads(nr_threads);
+ */
 	}
 #endif
 
@@ -2438,7 +2439,7 @@ void MlOptimiser::expectation()
 		
 #ifdef ALTCPU
 	// Allow parallel FFTW execution
-	fftw_plan_with_nthreads(nr_threads);
+	//TODO fftw_plan_with_nthreads(nr_threads);
 #endif
 		
 	// Initialise some stuff
@@ -2561,7 +2562,7 @@ void MlOptimiser::expectation()
 
 #ifdef ALTCPU
 	// Single-threaded FFTW execution for code inside parallel processing loop
-	fftw_plan_with_nthreads(1);
+	// TODO fftw_plan_with_nthreads(1);
 #endif
 
 	// Now perform real expectation over all particles
@@ -2733,7 +2734,7 @@ void MlOptimiser::expectation()
 #ifdef ALTCPU
 	// Allow parallel FFTW execution to continue now that we are outside the parallel
 	// portion of expectation
-	fftw_plan_with_nthreads(nr_threads);
+	// TODO fftw_plan_with_nthreads(nr_threads);
 #endif
 	
 	// Set back verb
@@ -3154,6 +3155,10 @@ void MlOptimiser::expectationSomeParticles(long int my_first_ori_particle, long 
                 delete [] reals;
                 delete [] imags;
                 delete [] weights;
+				
+				b->cpuProjectors[j].clear();
+				b->cpuBackprojectors[j].clear();
+				b->coarseProjectionPlans[j].clear();
             }
 
             delete b;

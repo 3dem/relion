@@ -577,6 +577,7 @@ void runBackProjectKernel(
 					imgX, imgY, imgZ, imgX*imgY*imgZ,
 					BP.mdlX, BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ);
 #else
+#if 0
 				CpuKernels::backprojectRef3D(imageCount,
 					d_img_real, d_img_imag,
 					trans_x, trans_y,
@@ -586,6 +587,17 @@ void runBackProjectKernel(
 					BP.maxR, BP.maxR2, BP.padding_factor,
 					imgX, imgY, imgZ, imgX*imgY*imgZ,
 					BP.mdlX, BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ);
+#else
+				CpuKernels::backproject3D<false>(imageCount,BP_DATA3D_BLOCK_SIZE,
+					d_img_real, d_img_imag,
+					trans_x, trans_y, trans_z,
+					d_weights, d_Minvsigma2s, d_ctfs,
+					translation_num, significant_weight, weight_norm, d_eulers,
+					BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
+					BP.maxR, BP.maxR2, BP.padding_factor,
+					imgX, imgY, imgZ, imgX*imgY*imgZ,
+					BP.mdlX, BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ);
+#endif
 #endif
 		} // do_sgd is false
 		LAUNCH_HANDLE_ERROR(cudaGetLastError());

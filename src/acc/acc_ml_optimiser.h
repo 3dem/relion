@@ -390,7 +390,7 @@ public:
 		trans_idx.setSize(newSize);
 		ihidden_overs.setSize(newSize);
 	}
-
+/*  Since we are looking into another data structure, actually resizing would be bad!
 	void resize_host_all(size_t newSize)
 	{
 		weights.resizeHost(newSize);
@@ -399,7 +399,7 @@ public:
 		trans_idx.resizeHost(newSize);
 		ihidden_overs.resizeHost(newSize);
 	}
-
+*/
 	void host_alloc_all()
 	{
 		weights.hostAlloc();

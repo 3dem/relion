@@ -118,7 +118,7 @@ void collect2jobs(  int     grid_size,
 
 		int pass_num = ceilfracf(job_size,block_size);
 
-		for(int tid=0; tid<SUMW_BLOCK_SIZE; tid++) {
+		for(int tid=0; tid<block_size; tid++) {
 			s_o_weights[tid]                    	= (XFLOAT)0.0;
 			s_thr_wsum_sigma2_offset[tid]       	= (XFLOAT)0.0;
 			s_thr_wsum_prior_offsetx_class[tid] 	= (XFLOAT)0.0;
@@ -261,7 +261,7 @@ void centerFFT_3D(  int       blocks,
 					int       yshift,
 					int       zshift);
 //----------------------------------------------------------------------------
-void probRatio( int       blockIdx_x, 
+/*void probRatio( int       blockIdx_x, 
 				int       threadIdx_x,
 				XFLOAT *d_Mccf,
 				XFLOAT *d_Mpsi,
@@ -283,8 +283,7 @@ void rotateOnly(int              blockIdx_x,
 				ACCCOMPLEX     *d_Faux,
 				XFLOAT           psi,
 				AccProjectorKernel &projector,
-				int              startPsi);
-
+	
 void rotateAndCtf(  int              blockIdx_x, 
 					int              blockIdx_y, 
 					int              threadIdx_x,
@@ -294,18 +293,18 @@ void rotateAndCtf(  int              blockIdx_x,
 					AccProjectorKernel &projector,
 					int              startPsi = 0);
 
-/*
+|*
  * Multiplies complex array A (in-place) by B, pixel-by-pixel, after conjugating A
- */
+ *|
 void convol_A(  int          blockIdx_x,
 				int          threadIdx_x,
 				ACCCOMPLEX *d_A,
 				ACCCOMPLEX *d_B,
 				int          image_size);
 
-/*
+|*
  * Multiplies complex array A (in-place) by B, pixel-by-pixel, after conjugating A, writes to C
- */
+ *|
 void convol_A(  int          blockIdx_x,
 				int          threadIdx_x,
 				ACCCOMPLEX *d_A,
@@ -313,18 +312,18 @@ void convol_A(  int          blockIdx_x,
 				ACCCOMPLEX *d_C,
 				int          image_size);
 
-/*
+|*
  * Multiplies many complex arrays A (in-place) by a single B, pixel-by-pixel, after conjugating A
- */
+ *|
 void batch_convol_A(int           blockIdx_x,
 					int           threadIdx_x,
 					ACCCOMPLEX  *d_A,
 					ACCCOMPLEX  *d_B,
 					int           image_size);
 
-/*
+|*
 * Multiplies many complex arrays A (not in-place) by a single B, pixel-by-pixel, after conjugating A
-*/
+*|
 void batch_convol_A(int          blockIdx_x,
 					int          threadIdx_x,
 					ACCCOMPLEX *d_A,
@@ -332,43 +331,43 @@ void batch_convol_A(int          blockIdx_x,
 					ACCCOMPLEX *d_C,
 					int          image_size);
 
-/*
+|*
  * Multiplies complex array A (in-place) by B, pixel-by-pixel, after conjugating B
- */
+ *|
 void convol_B(  int          blockIdx_x, 
 				int          threadIdx_x,
 				ACCCOMPLEX *d_A,
 				ACCCOMPLEX *d_B,
 				int          image_size);
 
-/*
+|*
  * Multiplies complex array A (in-place) by B, pixel-by-pixel, after conjugating B, writes to C
- */
+ *|
 void convol_B(  int       blockIdx_x, 
 				int       threadIdx_x,
 				ACCCOMPLEX *d_A,
 				ACCCOMPLEX *d_B,
 				ACCCOMPLEX *d_C,
 				int      image_size);
-/*
+|*
  * Multiplies many complex arrays A (in-place) by a single one B, pixel-by-pixel, after conjugating B
- */
+ *|
 void batch_convol_B(int           blockIdx_x, 
 					int           threadIdx_x,
 					ACCCOMPLEX  *d_A,
 					ACCCOMPLEX  *d_B,
 					int           image_size);
-/*
+|*
  * Multiplies scalar array A by a scalar S
  *
  *  OUT[i] = A[i]*S
- */
+ *|
 template <typename T>
 void cpu_kernel_multi( T   *A,
 			T   *OUT,
 			T    S,
 			int       image_size);
-
+*/
 /*
  * In place multiplies scalar array A by a scalar S
  *
@@ -389,7 +388,7 @@ void cpu_kernel_multi( T *A,
 			T *OUT,
 			T  S,
 			int     image_size);
-
+/*
 void finalizeMstddev(   int       blockIdx_x, 
 						int       threadIdx_x,
 						XFLOAT   *Mstddev,
@@ -397,19 +396,19 @@ void finalizeMstddev(   int       blockIdx_x,
 						XFLOAT    S,
 						int       image_size);
 
-/*
+|*
  * In place squares array in place
  *
  *  A[i] = A[i]*A[i]
- */
+ *|
 void square(int       blockIdx_x, 
 			int       threadIdx_x,
 			XFLOAT   *A,
 			int       image_size);
-
+*/
 /*
  * Casts on device so we can copy_to_host directly into a multidimarray.
- */
+ *
 template <typename T1, typename T2 >
 void cast(  int blockIdx_x,
 			int threadIdx_x,
@@ -421,11 +420,9 @@ void cast(  int blockIdx_x,
 	if(pixel<size)
 		OUT[pixel] = IN[pixel];
 }
-
+*/
 template<bool do_highpass>
-void kernel_frequencyPass( int          blockIdx_x,
-					int          threadIdx_x,
-					int grid_size, int block_size,
+void kernel_frequencyPass( int grid_size, int block_size,
 					ACCCOMPLEX *A,
 					long int     ori_size,
 					size_t       Xdim,
@@ -440,7 +437,7 @@ void kernel_frequencyPass( int          blockIdx_x,
 	// TODO - why not a single loop over image_size pixels?
 	for(int blk=0; blk<grid_size; blk++) {
 		for(int tid=0; tid<block_size; tid++) {
-			int texel = tid + blk*BLOCK_SIZE;
+			int texel = tid + blk*block_size;
 
 			int z = texel / (Xdim*Ydim);
 			int xy = (texel - z*Xdim*Ydim);
