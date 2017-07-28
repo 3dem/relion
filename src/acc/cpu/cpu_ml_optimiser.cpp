@@ -24,15 +24,7 @@
 #ifdef ALTCPU
 
 // Make sure we build for CPU
-#undef CUDA
-typedef float cudaStream_t;
-typedef double CudaCustomAllocator;
-typedef int dim3;
-#define cudaStreamPerThread 0
-#define CUSTOM_ALLOCATOR_REGION_NAME( name ) //Do nothing
-#define LAUNCH_PRIVATE_ERROR(func, status)
-#define LAUNCH_HANDLE_ERROR( err )
-#define DEBUG_HANDLE_ERROR( err )
+#include "src/acc/cpu/cuda_stubs.h"
 
 #include "src/ml_optimiser.h"
 
