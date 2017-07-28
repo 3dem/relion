@@ -541,7 +541,7 @@ void diff2_fine_2D(
 
 			#pragma simd
 			for(int x = xstart; x < xend; x++) {
-	#ifdef CUDA_DOUBLE_PRECISION        
+	#ifdef ACC_DOUBLE_PRECISION        
 				XFLOAT half_corr = sqrt (g_corr_img[pixel + x] * (XFLOAT)0.5);
 	#else
 				XFLOAT half_corr = sqrtf(g_corr_img[pixel + x] * (XFLOAT)0.5);
@@ -687,7 +687,7 @@ void diff2_fine_3D(
 
 				#pragma simd
 				for(int x = xstart_y; x < xend_y; x++) {
-	#ifdef CUDA_DOUBLE_PRECISION        
+	#ifdef ACC_DOUBLE_PRECISION        
 					XFLOAT half_corr = sqrt (g_corr_img[pixel + x] * (XFLOAT)0.5);
 	#else
 					XFLOAT half_corr = sqrtf(g_corr_img[pixel + x] * (XFLOAT)0.5);

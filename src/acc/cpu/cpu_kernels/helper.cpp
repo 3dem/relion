@@ -777,7 +777,7 @@ void cpu_kernel_make_eulers_2D(int grid_size, int block_size,
 			XFLOAT ca, sa;
 			XFLOAT a = alphas[oid] * (XFLOAT)PI / (XFLOAT)180.0;
 
-#ifdef CUDA_DOUBLE_PRECISION
+#ifdef ACC_DOUBLE_PRECISION
 			sincos(a, &sa, &ca);
 #else
 			sincosf(a, &sa, &ca);
@@ -837,7 +837,7 @@ void cpu_kernel_make_eulers_3D(int grid_size, int block_size,
 			b = betas[oid]  * (XFLOAT)PI / (XFLOAT)180.0;
 			g = gammas[oid] * (XFLOAT)PI / (XFLOAT)180.0;
 
-#ifdef CUDA_DOUBLE_PRECISION
+#ifdef ACC_DOUBLE_PRECISION
 			sincos(a, &sa, &ca);
 			sincos(b,  &sb, &cb);
 			sincos(g, &sg, &cg);

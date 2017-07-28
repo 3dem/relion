@@ -290,7 +290,7 @@ public:
 			std::cout << "trying to execute a forward plan for a MKL FFT transformer which is backwards-only" << std::endl;
 			return;
 		}
-#ifdef CUDA_DOUBLE_PRECISION
+#ifdef ACC_DOUBLE_PRECISION
 		fftw_execute_dft_r2c(fPlanForward, reals(), (fftw_complex*) fouriers());
 #else
 		fftwf_execute_dft_r2c(fPlanForward, reals(),  (fftwf_complex*) fouriers());
@@ -306,7 +306,7 @@ public:
 	        return;
 	    }	     
 
-#ifdef CUDA_DOUBLE_PRECISION
+#ifdef ACC_DOUBLE_PRECISION
         fftw_execute_dft_c2r(fPlanBackward, (fftw_complex*) fouriers(), reals());
 #else
         fftwf_execute_dft_c2r(fPlanBackward, (fftwf_complex*) fouriers(), reals());
@@ -321,7 +321,7 @@ public:
 			fouriers.freeIfSet();
 
 			tbb::spin_mutex::scoped_lock lock(mkl_mutex);        
-#ifdef CUDA_DOUBLE_PRECISION
+#ifdef ACC_DOUBLE_PRECISION
 			fftw_destroy_plan(fPlanForward);
 			fftw_destroy_plan(fPlanBackward);
 #else
