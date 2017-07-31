@@ -185,6 +185,12 @@ public:
 				REPORT_ERROR("Backprojector::set3DFourierTransform%%ERROR: Dimension of the data array should be 3");
 			backrotate3D(img_in, A, inv, Mweight);
 		}
+		else if (img_in.getDim() == 1)
+		{
+			if (ref_dim != 2)
+				REPORT_ERROR("Backprojector::set1DFourierTransform%%ERROR: Dimension of the data array should be 2");
+			backproject1Dto2D(img_in, A, inv, Mweight);
+		}
 		else
 		{
 			switch (ref_dim)
@@ -193,7 +199,7 @@ public:
 				backrotate2D(img_in, A, inv, Mweight);
 				break;
 			case 3:
-				backproject(img_in, A, inv, Mweight);
+				backproject2Dto3D(img_in, A, inv, Mweight);
 				break;
 			default:
 				REPORT_ERROR("Backprojector::set2DSlice%%ERROR: Dimension of the data array should be 2 or 3");
@@ -221,7 +227,15 @@ public:
 	* Set a 2D slice in the 3D map (backward projection)
 	* If a exp_Mweight is given, rather than adding 1 to all relevant pixels in the weight array, we use exp_Mweight
 	*/
-	void backproject(const MultidimArray<Complex > &img_in,
+	void backproject2Dto3D(const MultidimArray<Complex > &img_in,
+			         const Matrix2D<RFLOAT> &A, bool inv,
+			         const MultidimArray<RFLOAT> *Mweight = NULL);
+
+	/*
+	* Set a 1D slice in the 2D map (backward projection)
+	* If a exp_Mweight is given, rather than adding 1 to all relevant pixels in the weight array, we use exp_Mweight
+	*/
+	void backproject1Dto2D(const MultidimArray<Complex > &img_in,
 			         const Matrix2D<RFLOAT> &A, bool inv,
 			         const MultidimArray<RFLOAT> *Mweight = NULL);
 

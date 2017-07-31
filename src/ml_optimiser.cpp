@@ -1494,6 +1494,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 		// This reads the masks, calculates com_bodies and orient_bodies
 		mymodel.initialiseBodies(fn_body_masks, fn_out, true);
+		mymodel.writeBildFileBodies(fn_out + "_bodies.bild");
 
 		// For multi-body refinement: expand the MetaDataTables with orientations for all bodies
 		mydata.initialiseBodies(mymodel.nr_bodies);
@@ -3207,7 +3208,8 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
     for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
     {
 
-		if (mymodel.keep_fixed_bodies[ibody])
+		// Skip this body if keep_fixed_bodies[ibody] or if it's angular accuracy is worse than 3x the sampling rate
+		if (mymodel.keep_fixed_bodies[ibody] || mymodel.acc_rot[ibody] > 3. * sampling.getAngularSampling(adaptive_oversampling) )
 			continue;
 
     	// Here define all kind of local arrays that will be needed
@@ -4786,6 +4788,8 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 
 		MultidimArray<RFLOAT> Mnoise;
 		bool is_helical_segment = (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
+		// For multibodies: have the mask radius equal to maximum radius within body mask plus the translational offset search range
+		RFLOAT my_mask_radius = (mymodel.nr_bodies > 1 ) ? mymodel.max_radius_mask_bodies[ibody] + sampling.offset_range: (particle_diameter / (2. * mymodel.pixel_size));
 		if (!do_zero_mask)
 		{
 			// Make a noisy background image with the same spectrum as the sigma2_noise
@@ -4831,22 +4835,22 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 			// May24,2014 - Shaoda & Sjors, Helical refinement
 			if (is_helical_segment)
 			{
-				softMaskOutsideMapForHelix(img(), psi_deg, tilt_deg, (particle_diameter / (2. * mymodel.pixel_size)),
+				softMaskOutsideMapForHelix(img(), psi_deg, tilt_deg, my_mask_radius,
 						(helical_tube_outer_diameter / (2. * mymodel.pixel_size)), width_mask_edge, &Mnoise);
 			}
 			else
-				softMaskOutsideMap(img(), particle_diameter / (2. * mymodel.pixel_size), (RFLOAT)width_mask_edge, &Mnoise);
+				softMaskOutsideMap(img(), my_mask_radius, (RFLOAT)width_mask_edge, &Mnoise);
 		}
 		else
 		{
 			// May24,2014 - Shaoda & Sjors, Helical refinement
 			if (is_helical_segment)
 			{
-				softMaskOutsideMapForHelix(img(), psi_deg, tilt_deg, (particle_diameter / (2. * mymodel.pixel_size)),
+				softMaskOutsideMapForHelix(img(), psi_deg, tilt_deg, my_mask_radius,
 						(helical_tube_outer_diameter / (2. * mymodel.pixel_size)), width_mask_edge);
 			}
 			else
-				softMaskOutsideMap(img(), particle_diameter / (2. * mymodel.pixel_size), (RFLOAT)width_mask_edge);
+				softMaskOutsideMap(img(), my_mask_radius, (RFLOAT)width_mask_edge);
 		}
 #ifdef DEBUG_SOFTMASK
 		tt()=img();
@@ -5114,7 +5118,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 				std::cerr << "Written::: " << fn_img << std::endl;
 			}
 #endif
-			softMaskOutsideMap(img(), particle_diameter / (2. * mymodel.pixel_size), (RFLOAT)width_mask_edge);
+			softMaskOutsideMap(img(), my_mask_radius, (RFLOAT)width_mask_edge);
 
 #ifdef DEBUG_BODIES
 			if (my_ori_particle == ROUND(debug1))

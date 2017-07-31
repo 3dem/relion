@@ -46,6 +46,7 @@ void MlModel::initialise(bool _do_sgd)
 	sigma_psi_bodies.resize(nr_bodies, 0.);
 	sigma_offset_bodies.resize(nr_bodies, 0.);
 	keep_fixed_bodies.resize(nr_bodies, false);
+	max_radius_mask_bodies.resize(nr_bodies, -1);
 	pdf_class.resize(nr_classes, 1./(RFLOAT)nr_classes);
     pdf_direction.resize(nr_classes * nr_bodies);
     group_names.resize(nr_groups, "");
@@ -622,9 +623,6 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 
 }
 
-
-
-
 void  MlModel::readTauSpectrum(FileName fn_tau, int verb)
 {
 	MetaDataTable MDtau;
@@ -844,6 +842,7 @@ void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool als
 	sigma_psi_bodies.resize(MD.numberOfObjects());
 	sigma_offset_bodies.resize(MD.numberOfObjects());
 	keep_fixed_bodies.resize(MD.numberOfObjects());
+	max_radius_mask_bodies.resize(MD.numberOfObjects());
 	FileName fn_mask;
 	Image<RFLOAT> Imask;
 	std::vector<int> relatives_to;
@@ -854,6 +853,7 @@ void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool als
 		MD.getValue(EMDL_BODY_MASK_NAME, fn_mask);
 		Imask.read(fn_mask);
 		Imask().setXmippOrigin();
+		Imask.setSamplingRateInHeader(pixel_size);
 		masks_bodies[nr_bodies] = Imask();
 		// find center-of-mass for rotations around it
 		int mydim = Imask().getDim();
@@ -866,6 +866,17 @@ void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool als
 			ZZ(com_bodies[nr_bodies]) = ROUND(ZZ(com));
 		else
 			ZZ(com_bodies[nr_bodies]) = 0.;
+		// find maximum radius of mask around it's COM
+		int max_d2 = 0.;
+		FOR_ALL_ELEMENTS_IN_ARRAY3D(Imask())
+		{
+			if (A3D_ELEM(Imask(), k, i, j) > 0.05)
+			{
+				int d2 = (k - ZZ(com)) * (k - ZZ(com)) + (i - YY(com)) * (i - YY(com)) + (j - XX(com)) * (j - XX(com));
+				max_d2 = XMIPP_MAX(max_d2, d2);
+			}
+		}
+		max_radius_mask_bodies[nr_bodies] = CEIL(sqrt((RFLOAT)max_d2));
 
 		// Get which body to rotate relative to
 		int relative_to = -1;
@@ -947,6 +958,7 @@ void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool als
 			rotate_direction_bodies[ibody] -= com_bodies[ibody];
 		}
 
+		rotate_direction_bodies[ibody].selfNormalize();
 		alignWithZ(-rotate_direction_bodies[ibody], orient_bodies[ibody], false);
 	}
 
@@ -984,6 +996,52 @@ void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool als
 
 }
 
+
+void MlModel::writeBildFileBodies(FileName fn_bild)
+{
+
+	std::ofstream fh_bild;
+    fh_bild.open(fn_bild.c_str(), std::ios::out);
+    if (!fh_bild)
+    	REPORT_ERROR("HealpixSampling::writeBildFileOrientationalDistribution: cannot open " + fn_bild);
+
+    RFLOAT xcen = -STARTINGX(Iref[0]) * pixel_size;
+    RFLOAT ycen = -STARTINGY(Iref[0]) * pixel_size;
+    RFLOAT zcen = -STARTINGZ(Iref[0]) * pixel_size;
+	// Place a black sphere in the centre of the box
+    fh_bild << ".color 0 0 0 " << std::endl;
+    fh_bild << ".sphere " << xcen << " " << ycen << " " << zcen << " 3 "  << std::endl;
+    for (int ibody = 0; ibody < nr_bodies; ibody++)
+    {
+    	// Sample evenly colors from the rainbow
+    	RFLOAT r, g, b;
+    	HSL2RGB((RFLOAT)ibody/(RFLOAT)nr_bodies, 1.0, 0.5, r, g, b);
+    	fh_bild << ".color " << r << " " << g << " " << b << std::endl;
+
+    	// Place a sphere at the centre-of-mass
+    	RFLOAT x = XX(com_bodies[ibody]) * pixel_size;
+    	RFLOAT y = YY(com_bodies[ibody]) * pixel_size;
+    	RFLOAT z = ZZ(com_bodies[ibody]) * pixel_size;
+    	// Add the center of the box to the coordinates
+    	x += pixel_size + xcen;
+    	y += pixel_size + ycen;
+    	z += pixel_size + zcen;
+    	fh_bild << ".sphere " << x << " " << y << " " << z << " 3 "  << std::endl;
+    	// Add a label
+    	fh_bild << ".cmov " << x+5 << " " << y+5 << " " << z+5 << std::endl;
+    	fh_bild << "body " << ibody+1 << std::endl;
+    	// Add an arrow for the direction of the rotation
+    	RFLOAT length = 10.;
+    	fh_bild << ".arrow " << x << " " << y << " " << z << " "
+    			<< x + length*XX(rotate_direction_bodies[ibody]) * pixel_size << " "
+    			<< y + length*YY(rotate_direction_bodies[ibody]) * pixel_size << " "
+    			<< z + length*ZZ(rotate_direction_bodies[ibody]) * pixel_size << " 1 " << std::endl;
+    }
+
+    // Close and write file to disc
+    fh_bild.close();
+
+}
 
 
 void MlModel::setFourierTransformMaps(bool update_tau2_spectra, int nr_threads, bool do_gpu)
@@ -1112,7 +1170,6 @@ void MlModel::calculateTotalFourierCoverage()
 		}
 
 		estimated_resolution[iclass] = 1./getResolution(maxres);
-		std::cerr << " iclass= " << iclass << " estimated_resolution[iclass]= " << estimated_resolution[iclass] << std::endl;
 		total_fourier_coverage[iclass] = 0.;
 		RFLOAT count = 0;
 		for (long int k=FIRST_XMIPP_INDEX(maxres+2); k<=FIRST_XMIPP_INDEX(maxres+2) + maxres+1; k++) \
