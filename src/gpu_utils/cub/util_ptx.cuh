@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2016, NVIDIA CORPORATION.  All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -128,7 +128,7 @@ __device__ __forceinline__ unsigned int BFE(
     UnsignedBits            source,
     unsigned int            bit_start,
     unsigned int            num_bits,
-    Int2Type<BYTE_LEN>      byte_len)
+    Int2Type<BYTE_LEN>      /*byte_len*/)
 {
     unsigned int bits;
 #if CUB_PTX_ARCH >= 200
@@ -149,7 +149,7 @@ __device__ __forceinline__ unsigned int BFE(
     UnsignedBits            source,
     unsigned int            bit_start,
     unsigned int            num_bits,
-    Int2Type<8>             byte_len)
+    Int2Type<8>             /*byte_len*/)
 {
     const unsigned long long MASK = (1ull << num_bits) - 1;
     return (source >> bit_start) & MASK;
@@ -282,6 +282,14 @@ __device__ __forceinline__ void ThreadExit() {
 
 
 /**
+ * \brief  Abort execution and generate an interrupt to the host CPU
+ */
+__device__ __forceinline__ void ThreadTrap() {
+    asm volatile("trap;");
+}
+
+
+/**
  * \brief Returns the row-major linear thread identifier for a multidimensional threadblock
  */
 __device__ __forceinline__ int RowMajorTid(int block_dim_x, int block_dim_y, int block_dim_z)
@@ -298,7 +306,7 @@ __device__ __forceinline__ int RowMajorTid(int block_dim_x, int block_dim_y, int
 __device__ __forceinline__ unsigned int LaneId()
 {
     unsigned int ret;
-    asm volatile("mov.u32 %0, %laneid;" : "=r"(ret) );
+    asm volatile("mov.u32 %0, %%laneid;" : "=r"(ret) );
     return ret;
 }
 
@@ -309,7 +317,7 @@ __device__ __forceinline__ unsigned int LaneId()
 __device__ __forceinline__ unsigned int WarpId()
 {
     unsigned int ret;
-    asm volatile("mov.u32 %0, %warpid;" : "=r"(ret) );
+    asm volatile("mov.u32 %0, %%warpid;" : "=r"(ret) );
     return ret;
 }
 
@@ -319,7 +327,7 @@ __device__ __forceinline__ unsigned int WarpId()
 __device__ __forceinline__ unsigned int LaneMaskLt()
 {
     unsigned int ret;
-    asm volatile("mov.u32 %0, %lanemask_lt;" : "=r"(ret) );
+    asm volatile("mov.u32 %0, %%lanemask_lt;" : "=r"(ret) );
     return ret;
 }
 
@@ -329,7 +337,7 @@ __device__ __forceinline__ unsigned int LaneMaskLt()
 __device__ __forceinline__ unsigned int LaneMaskLe()
 {
     unsigned int ret;
-    asm volatile("mov.u32 %0, %lanemask_le;" : "=r"(ret) );
+    asm volatile("mov.u32 %0, %%lanemask_le;" : "=r"(ret) );
     return ret;
 }
 
@@ -339,7 +347,7 @@ __device__ __forceinline__ unsigned int LaneMaskLe()
 __device__ __forceinline__ unsigned int LaneMaskGt()
 {
     unsigned int ret;
-    asm volatile("mov.u32 %0, %lanemask_gt;" : "=r"(ret) );
+    asm volatile("mov.u32 %0, %%lanemask_gt;" : "=r"(ret) );
     return ret;
 }
 
@@ -349,7 +357,7 @@ __device__ __forceinline__ unsigned int LaneMaskGt()
 __device__ __forceinline__ unsigned int LaneMaskGe()
 {
     unsigned int ret;
-    asm volatile("mov.u32 %0, %lanemask_ge;" : "=r"(ret) );
+    asm volatile("mov.u32 %0, %%lanemask_ge;" : "=r"(ret) );
     return ret;
 }
 
@@ -369,7 +377,7 @@ __device__ __forceinline__ void ShuffleUp(
     ShuffleWordT*   output,
     int             src_offset,
     int             first_lane,
-    Int2Type<STEP>  step)
+    Int2Type<STEP>  /*step*/)
 {
     unsigned int word = input[STEP];
     asm volatile("shfl.up.b32 %0, %1, %2, %3;"
@@ -385,11 +393,11 @@ __device__ __forceinline__ void ShuffleUp(
  */
 template <typename ShuffleWordT>
 __device__ __forceinline__ void ShuffleUp(
-    ShuffleWordT*   input, 
-    ShuffleWordT*   output,
-    int             src_offset,
-    int             first_lane,
-    Int2Type<-1>    step)
+    ShuffleWordT*   /*input*/, 
+    ShuffleWordT*   /*output*/,
+    int             /*src_offset*/,
+    int             /*first_lane*/,
+    Int2Type<-1>    /*step*/)
 {}
 
 
@@ -403,7 +411,7 @@ __device__ __forceinline__ void ShuffleDown(
     ShuffleWordT*   output,
     int             src_offset,
     int             last_lane,
-    Int2Type<STEP>  step)
+    Int2Type<STEP>  /*step*/)
 {
     unsigned int word = input[STEP];
     asm volatile("shfl.down.b32 %0, %1, %2, %3;"
@@ -419,11 +427,11 @@ __device__ __forceinline__ void ShuffleDown(
  */
 template <typename ShuffleWordT>
 __device__ __forceinline__ void ShuffleDown(
-    ShuffleWordT*   input, 
-    ShuffleWordT*   output,
-    int             src_offset,
-    int             last_lane,
-    Int2Type<-1>    step)
+    ShuffleWordT*   /*input*/, 
+    ShuffleWordT*   /*output*/,
+    int             /*src_offset*/,
+    int             /*last_lane*/,
+    Int2Type<-1>    /*step*/)
 {}
 
 
@@ -436,7 +444,7 @@ __device__ __forceinline__ void ShuffleIdx(
     ShuffleWordT*   output,
     int             src_lane,
     int             last_lane,
-    Int2Type<STEP>  step)
+    Int2Type<STEP>  /*step*/)
 {
     unsigned int word = input[STEP];
     asm volatile("shfl.idx.b32 %0, %1, %2, %3;"
@@ -452,11 +460,11 @@ __device__ __forceinline__ void ShuffleIdx(
  */
 template <typename ShuffleWordT>
 __device__ __forceinline__ void ShuffleIdx(
-    ShuffleWordT*   input, 
-    ShuffleWordT*   output,
-    int             src_lane,
-    int             last_lane,
-    Int2Type<-1>    step)
+    ShuffleWordT*   /*input*/, 
+    ShuffleWordT*   /*output*/,
+    int             /*src_lane*/,
+    int             /*last_lane*/,
+    Int2Type<-1>    /*step*/)
 {}
 
 
@@ -679,7 +687,7 @@ __device__ __forceinline__ int WarpAll(int cond)
 {
 #if CUB_PTX_ARCH < 120
 
-    __shared__ volatile int warp_signals[CUB_PTX_MAX_SM_THREADS / CUB_PTX_WARP_THREADS];
+    __shared__ volatile int warp_signals[32];
 
     if (LaneId() == 0)
         warp_signals[WarpId()] = 1;
@@ -691,7 +699,7 @@ __device__ __forceinline__ int WarpAll(int cond)
 
 #else
 
-    return __all(cond);
+    return ::__all(cond);
 
 #endif
 }
@@ -705,7 +713,7 @@ __device__ __forceinline__ int WarpAny(int cond)
 {
 #if CUB_PTX_ARCH < 120
 
-    __shared__ volatile int warp_signals[CUB_PTX_MAX_SM_THREADS / CUB_PTX_WARP_THREADS];
+    __shared__ volatile int warp_signals[32];
 
     if (LaneId() == 0)
         warp_signals[WarpId()] = 0;
@@ -717,7 +725,7 @@ __device__ __forceinline__ int WarpAny(int cond)
 
 #else
 
-    return __any(cond);
+    return ::__any(cond);
 
 #endif
 }

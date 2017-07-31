@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -99,7 +99,7 @@ struct AgentHistogramPolicy
  */
 template <
     typename    AgentHistogramPolicyT,     ///< Parameterized AgentHistogramPolicy tuning policy type
-    int         PRIVATIZED_SMEM_BINS,           ///< Number of privatized shared-memory histogram bins of any channel.  Zero indicates privatized counters to be maintained in global memory.
+    int         PRIVATIZED_SMEM_BINS,           ///< Number of privatized shared-memory histogram bins of any channel.  Zero indicates privatized counters to be maintained in device-accessible memory.
     int         NUM_CHANNELS,                   ///< Number of channels interleaved in the input data.  Supports up to four channels.
     int         NUM_ACTIVE_CHANNELS,            ///< Number of channels actively being histogrammed
     typename    SampleIteratorT,                ///< Random-access input iterator type for reading samples
@@ -164,7 +164,7 @@ struct AgentHistogram
 
     /// Parameterized BlockLoad type for samples
     typedef BlockLoad<
-            WrappedSampleIteratorT,
+            SampleT,
             BLOCK_THREADS,
             SAMPLES_PER_THREAD,
             AgentHistogramPolicyT::LOAD_ALGORITHM>
@@ -172,7 +172,7 @@ struct AgentHistogram
 
     /// Parameterized BlockLoad type for pixels
     typedef BlockLoad<
-            WrappedPixelIteratorT,
+            PixelT,
             BLOCK_THREADS,
             PIXELS_PER_THREAD,
             AgentHistogramPolicyT::LOAD_ALGORITHM>
@@ -180,7 +180,7 @@ struct AgentHistogram
 
     /// Parameterized BlockLoad type for quads
     typedef BlockLoad<
-            WrappedQuadIteratorT,
+            QuadT,
             BLOCK_THREADS,
             QUADS_PER_THREAD,
             AgentHistogramPolicyT::LOAD_ALGORITHM>
@@ -762,7 +762,7 @@ struct AgentHistogram
 
 
     /**
-     * Store privatized histogram to global memory.  Specialized for privatized shared-memory counters
+     * Store privatized histogram to device-accessible memory.  Specialized for privatized shared-memory counters
      */
     __device__ __forceinline__ void StoreOutput()
     {

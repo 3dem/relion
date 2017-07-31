@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2016, NVIDIA CORPORATION.  All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -51,10 +51,10 @@ namespace cub {
  * \brief The BlockRadixSort class provides [<em>collective</em>](index.html#sec0) methods for sorting items partitioned across a CUDA thread block using a radix sorting method.  ![](sorting_logo.png)
  * \ingroup BlockModule
  *
- * \tparam KeyT                  KeyT type
+ * \tparam KeyT                 KeyT type
  * \tparam BLOCK_DIM_X          The thread block length in threads along the X dimension
  * \tparam ITEMS_PER_THREAD     The number of items per thread
- * \tparam ValueT                <b>[optional]</b> ValueT type (default: cub::NullType, which indicates a keys-only sort)
+ * \tparam ValueT               <b>[optional]</b> ValueT type (default: cub::NullType, which indicates a keys-only sort)
  * \tparam RADIX_BITS           <b>[optional]</b> The number of radix bits per digit place (default: 4 bits)
  * \tparam MEMOIZE_OUTER_SCAN   <b>[optional]</b> Whether or not to buffer outer raking scan partials to incur fewer shared memory reads at the expense of higher register pressure (default: true for architectures SM35 and newer, false otherwise).
  * \tparam INNER_SCAN_ALGORITHM <b>[optional]</b> The cub::BlockScanAlgorithm algorithm to use (default: cub::BLOCK_SCAN_WARP_SCANS)
@@ -146,7 +146,7 @@ private:
     };
 
     // KeyT traits and unsigned bits type
-    typedef NumericTraits<KeyT>                  KeyTraits;
+    typedef Traits<KeyT>                        KeyTraits;
     typedef typename KeyTraits::UnsignedBits    UnsignedBits;
 
     /// Ascending BlockRadixRank utility type
@@ -202,7 +202,7 @@ private:
     _TempStorage &temp_storage;
 
     /// Linear thread-id
-    int linear_tid;
+    unsigned int linear_tid;
 
     /******************************************************************************
      * Utility methods
@@ -221,7 +221,7 @@ private:
         int             (&ranks)[ITEMS_PER_THREAD],
         int             begin_bit,
         int             pass_bits,
-        Int2Type<false> is_descending)
+        Int2Type<false> /*is_descending*/)
     {
         AscendingBlockRadixRank(temp_storage.asending_ranking_storage).RankKeys(
             unsigned_keys,
@@ -236,7 +236,7 @@ private:
         int             (&ranks)[ITEMS_PER_THREAD],
         int             begin_bit,
         int             pass_bits,
-        Int2Type<true>  is_descending)
+        Int2Type<true>  /*is_descending*/)
     {
         DescendingBlockRadixRank(temp_storage.descending_ranking_storage).RankKeys(
             unsigned_keys,
@@ -249,8 +249,8 @@ private:
     __device__ __forceinline__ void ExchangeValues(
         ValueT          (&values)[ITEMS_PER_THREAD],
         int             (&ranks)[ITEMS_PER_THREAD],
-        Int2Type<false> is_keys_only,
-        Int2Type<true>  is_blocked)
+        Int2Type<false> /*is_keys_only*/,
+        Int2Type<true>  /*is_blocked*/)
     {
         __syncthreads();
 
@@ -262,8 +262,8 @@ private:
     __device__ __forceinline__ void ExchangeValues(
         ValueT          (&values)[ITEMS_PER_THREAD],
         int             (&ranks)[ITEMS_PER_THREAD],
-        Int2Type<false> is_keys_only,
-        Int2Type<false> is_blocked)
+        Int2Type<false> /*is_keys_only*/,
+        Int2Type<false> /*is_blocked*/)
     {
         __syncthreads();
 
@@ -274,10 +274,10 @@ private:
     /// ExchangeValues (specialized for keys-only sort)
     template <int IS_BLOCKED>
     __device__ __forceinline__ void ExchangeValues(
-        ValueT                  (&values)[ITEMS_PER_THREAD],
-        int                     (&ranks)[ITEMS_PER_THREAD],
-        Int2Type<true>          is_keys_only,
-        Int2Type<IS_BLOCKED>    is_blocked)
+        ValueT                  (&/*values*/)[ITEMS_PER_THREAD],
+        int                     (&/*ranks*/)[ITEMS_PER_THREAD],
+        Int2Type<true>          /*is_keys_only*/,
+        Int2Type<IS_BLOCKED>    /*is_blocked*/)
     {}
 
     /// Sort blocked arrangement
@@ -400,7 +400,7 @@ public:
 
 #endif // DOXYGEN_SHOULD_SKIP_THIS
 
-    /// \smemstorage{BlockScan}
+    /// \smemstorage{BlockRadixSort}
     struct TempStorage : Uninitialized<_TempStorage> {};
 
 

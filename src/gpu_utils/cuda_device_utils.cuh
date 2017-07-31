@@ -106,4 +106,49 @@ __device__ XFLOAT no_tex3D(XFLOAT* mdl, XFLOAT xp, XFLOAT yp, XFLOAT zp, int mdl
 	//-----------------------------
 	return dxy0 + (dxy1 - dxy0)*fz;
 }
+
+__device__ __forceinline__ void translatePixel(
+		int x,
+		int y,
+		XFLOAT tx,
+		XFLOAT ty,
+		XFLOAT &real,
+		XFLOAT &imag,
+		XFLOAT &tReal,
+		XFLOAT &tImag)
+{
+	XFLOAT s, c;
+#ifdef CUDA_DOUBLE_PRECISION
+	sincos( x * tx + y * ty , &s, &c );
+#else
+	sincosf( x * tx + y * ty , &s, &c );
+#endif
+
+	tReal = c * real - s * imag;
+	tImag = c * imag + s * real;
+}
+
+__device__ __forceinline__ void translatePixel(
+		int x,
+		int y,
+		int z,
+		XFLOAT tx,
+		XFLOAT ty,
+		XFLOAT tz,
+		XFLOAT &real,
+		XFLOAT &imag,
+		XFLOAT &tReal,
+		XFLOAT &tImag)
+{
+	XFLOAT s, c;
+#ifdef CUDA_DOUBLE_PRECISION
+	sincos( x * tx + y * ty + z * tz, &s, &c );
+#else
+	sincosf( x * tx + y * ty + z * tz, &s, &c );
+#endif
+
+	tReal = c * real - s * imag;
+	tImag = c * imag + s * real;
+}
+
 #endif

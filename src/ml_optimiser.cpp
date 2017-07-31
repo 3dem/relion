@@ -1317,6 +1317,10 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 #endif
 
+	// Check for errors in the command-line option
+	if (parser.checkForErrors(verb))
+		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
+
 #ifdef RELION_SINGLE_PRECISION
         if (verb > 0)
             std::cout << " Running CPU instructions in single precision. Runs might not be exactly reproducible." << std::endl;
@@ -1336,9 +1340,6 @@ void MlOptimiser::initialiseGeneral(int rank)
     // Just die if trying to use GPUs and skipping alignments
     if (do_skip_align && do_gpu)
     	REPORT_ERROR("ERROR: you cannot use GPUs when skipping alignments");
-
-    if (do_gpu && do_sgd)
-    	REPORT_ERROR("ERROR: SGD has not been implemented on the GPU yet... If you use several thousands, downscaled particles it will be very quick anyway.");
 
 	if (do_always_cc)
 		do_calculate_initial_sigma_noise = false;
@@ -1360,10 +1361,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 		}
 		exit(0);
 	}
-
-	// Check for errors in the command-line option
-	if (parser.checkForErrors(verb))
-		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 
 	// If we are not continuing an old run, now read in the data and the reference images
 	if (iter == 0)
@@ -1637,10 +1634,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 			sampling.is_3D = (mymodel.ref_dim == 3);
 			RFLOAT rottilt_step = sampling.getAngularSampling(adaptive_oversampling);
 			mymodel.sigma2_rot = mymodel.sigma2_tilt = mymodel.sigma2_psi = 2. * 2. * rottilt_step * rottilt_step;
-
-			// Aug20,2015 - Shaoda, Helical refinement
-			if ( (do_helical_refine) && (!ignore_helical_symmetry) )
-				mymodel.sigma2_rot = getHelicalSigma2Rot((helical_rise_initial / mymodel.pixel_size), helical_twist_initial, sampling.helical_offset_step, rottilt_step, mymodel.sigma2_rot);
 		}
 
 		// If this is a normal (non-movie) auto-refinement run: check whether we had converged already
@@ -1664,6 +1657,14 @@ void MlOptimiser::initialiseGeneral(int rank)
 	sampling.initialise(mymodel.orientational_prior_mode, mymodel.ref_dim, (mymodel.data_dim == 3), do_gpu, (verb>0),
 			do_local_searches, (do_helical_refine) && (!ignore_helical_symmetry),
 			helical_rise_initial / mymodel.pixel_size, helical_twist_initial);
+
+	// Now that sampling is initialised, also modify sigma2_rot for the helical refinement
+        if (do_auto_refine && do_helical_refine && !ignore_helical_symmetry && iter == 0 && sampling.healpix_order >= autosampling_hporder_local_searches)
+	{
+		// Aug20,2015 - Shaoda, Helical refinement
+		RFLOAT rottilt_step = sampling.getAngularSampling(adaptive_oversampling);
+		mymodel.sigma2_rot = getHelicalSigma2Rot((helical_rise_initial / mymodel.pixel_size), helical_twist_initial, sampling.helical_offset_step, rottilt_step, mymodel.sigma2_rot);
+	}
 
 	// Default max_coarse_size is original size
 	if (max_coarse_size < 0)
@@ -6508,12 +6509,26 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int my_ori_particle
 		long int my_nr_significant_coarse_samples = 0;
 		for (long int i = XSIZE(sorted_weight) - 1; i >= 0; i--)
 		{
-			if (exp_ipass==0) my_nr_significant_coarse_samples++;
-			my_significant_weight = DIRECT_A1D_ELEM(sorted_weight, i);
-			frac_weight += my_significant_weight;
+			if (maximum_significants > 0 )
+			{
+				if(my_nr_significant_coarse_samples < maximum_significants)
+				{
+					if (exp_ipass==0)
+						my_nr_significant_coarse_samples++;
+					my_significant_weight = DIRECT_A1D_ELEM(sorted_weight, i);
+				}
+			}
+			else
+			{
+				if (exp_ipass==0)
+					my_nr_significant_coarse_samples++;
+				my_significant_weight = DIRECT_A1D_ELEM(sorted_weight, i);
+			}
+			frac_weight += DIRECT_A1D_ELEM(sorted_weight, i);
 			if (frac_weight > adaptive_fraction * exp_sum_weight[ipart])
 				break;
 		}
+
 
 #ifdef DEBUG_SORT
 		// Check sorted array is really sorted

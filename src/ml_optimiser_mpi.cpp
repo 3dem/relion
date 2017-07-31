@@ -429,7 +429,7 @@ void MlOptimiserMpi::initialise()
 use an estimated image-size of " << LowBoxLim << " pixels during the last iteration...\n\n\
 ...but your input box-size (image_size) is however " << t_ori_size << ". This means that \n\
 you will likely run out of memory on the GPU(s), and will have to then re-start \n\
-from the last completed iteration (i.e. continue from it) with the use of GPUs.\n " << std::endl;
+from the last completed iteration (i.e. continue from it) *without* the use of GPUs.\n " << std::endl;
 
 					if(is_split)
 					{
@@ -3159,6 +3159,7 @@ void MlOptimiserMpi::iterate()
 
 		// In the next iteration, start again from the first subset
 		subset_start = 1;
+
 
 		// Stop subsets after sgd_max_subsets has been reached
 		if (nr_subsets > 1 && sgd_max_subsets > 0 && subset > sgd_max_subsets)

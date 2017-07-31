@@ -290,7 +290,8 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	if (exists(fn_bg))
 	{
 		// Initial screen picture with some explanation on how to use the GUI
-		image_box = new Fl_Box(WCOL0-10, 0 ,w-WCOL0, h-55); // widget that will contain image
+            //image_box = new Fl_Box(WCOL0-8, 0 ,w-WCOL0, h-35); // widget that will contain image
+		image_box = new Fl_Box(WCOL0-8, 45 ,w-WCOL0, h-120); // widget that will contain image
 		xpm_image = new Fl_XPM_Image(fn_bg.c_str());
 		image_box->image(xpm_image); // attach xpm image to box
 		//forgot_button = new Fl_Button(450, 143, 10, 32, "?");
@@ -1333,7 +1334,7 @@ void GuiMainWindow::cb_print_cl_i()
 	std::string error_message;
 	if (!pipeline.getCommandLineJob(gui_jobwindows[iwin]->myjob, current_job, is_main_continue, false, DONT_MKDIR, commands, final_command, error_message))
 	{
-		fl_message(error_message.c_str());
+		fl_message("%s",error_message.c_str());
 	}
 	else
 	{
@@ -1387,7 +1388,7 @@ void GuiMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 	std::string error_message;
 	if (!pipeline.runJob(gui_jobwindows[iwin]->myjob, current_job, only_schedule, is_main_continue, false, error_message))
 	{
-		fl_message(error_message.c_str());
+		fl_message("%s",error_message.c_str());
 		return;
 	}
 
@@ -1527,7 +1528,7 @@ e.g. by using \"touch Polish/job045/NO_HARSH_CLEAN\". Below is a list of current
 
 		std::string error_message;
 		if (!pipeline.cleanupAllJobs(do_harsh, error_message))
-			fl_message(error_message.c_str());
+			fl_message("%s",error_message.c_str());
 
 		fl_message("Done cleaning! Don't forget the files are all still in the Trash folder. Use the \"Empty Trash\" option from the File menu to permanently delete them.");
 	}
@@ -1564,7 +1565,7 @@ void GuiMainWindow::cb_cleanup_i(int myjob, bool do_verb, bool do_harsh)
 	{
 		std::string error_message;
 		if (!pipeline.cleanupJob(myjob, do_harsh, error_message))
-			fl_message(error_message.c_str());
+			fl_message("%s",error_message.c_str());
 	}
 
 }
@@ -1616,7 +1617,7 @@ void GuiMainWindow::cb_set_alias_i(std::string alias)
 		else
 		{
 			alias = "";
-			fl_message(error_message.c_str());
+			fl_message("%s",error_message.c_str());
 		}
 	}
 
@@ -1642,7 +1643,7 @@ void GuiMainWindow::cb_mark_as_finished_i()
 
 	std::string error_message;
 	if (!pipeline.markAsFinishedJob(current_job, error_message))
-		fl_message(error_message.c_str());
+		fl_message("%s",error_message.c_str());
 	else
 		updateJobLists();
 
@@ -1660,7 +1661,7 @@ void GuiMainWindow::cb_make_flowchart_i()
 
 	std::string error_message;
 	if (!pipeline.makeFlowChart(current_job, true, error_message))
-		fl_message(error_message.c_str());
+		fl_message("%s",error_message.c_str());
 	else
 		updateJobLists();
 
@@ -1792,7 +1793,7 @@ void GuiMainWindow::cb_export_jobs_i()
 
 	std::string error_message;
 	if (!pipeline.exportAllScheduledJobs(mydir, error_message))
-		fl_message(error_message.c_str());
+		fl_message("%s",error_message.c_str());
 
 }
 

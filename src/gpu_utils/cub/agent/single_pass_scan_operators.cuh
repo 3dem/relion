@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2016, NVIDIA CORPORATION.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -64,8 +64,8 @@ template <
     typename ScanOpT>            ///< Wrapped scan operator type
 struct BlockScanRunningPrefixOp
 {
-    ScanOpT  op;                 ///< Wrapped scan operator
-    T       running_total;      ///< Running block-wide prefix
+    ScanOpT     op;                 ///< Wrapped scan operator
+    T           running_total;      ///< Running block-wide prefix
 
     /// Constructor
     __device__ __forceinline__ BlockScanRunningPrefixOp(ScanOpT op)
@@ -105,7 +105,7 @@ struct BlockScanRunningPrefixOp
 enum ScanTileStatus
 {
     SCAN_TILE_OOB,          // Out-of-bounds (e.g., padding)
-    SCAN_TILE_INVALID,      // Not yet processed
+    SCAN_TILE_INVALID = 99, // Not yet processed
     SCAN_TILE_PARTIAL,      // Tile aggregate is available
     SCAN_TILE_INCLUSIVE,    // Inclusive tile prefix is available
 };
@@ -178,9 +178,9 @@ struct ScanTileState<T, true>
     /// Initializer
     __host__ __device__ __forceinline__
     cudaError_t Init(
-        int     num_tiles,                          ///< [in] Number of tiles
-        void    *d_temp_storage,                    ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
-        size_t  temp_storage_bytes)                 ///< [in] Size in bytes of \t d_temp_storage allocation
+        int     /*num_tiles*/,                      ///< [in] Number of tiles
+        void    *d_temp_storage,                    ///< [in] %Device-accessible allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
+        size_t  /*temp_storage_bytes*/)             ///< [in] Size in bytes of \t d_temp_storage allocation
     {
         d_tile_status = reinterpret_cast<TileDescriptor*>(d_temp_storage);
         return cudaSuccess;
@@ -257,15 +257,14 @@ struct ScanTileState<T, true>
         StatusWord      &status,
         T               &value)
     {
-        // Use warp-any to determine when all threads have valid status
-        TxnWord alias = ThreadLoad<LOAD_CG>(reinterpret_cast<TxnWord*>(d_tile_status + TILE_STATUS_PADDING + tile_idx));
-        TileDescriptor tile_descriptor = reinterpret_cast<TileDescriptor&>(alias);
-
-        while ((tile_descriptor.status == SCAN_TILE_INVALID))
+        TileDescriptor  tile_descriptor;
+        do
         {
-            alias = ThreadLoad<LOAD_CG>(reinterpret_cast<TxnWord*>(d_tile_status + TILE_STATUS_PADDING + tile_idx));
+            __threadfence_block(); // prevent hoisting loads from loop
+            TxnWord alias = ThreadLoad<LOAD_CG>(reinterpret_cast<TxnWord*>(d_tile_status + TILE_STATUS_PADDING + tile_idx));
             tile_descriptor = reinterpret_cast<TileDescriptor&>(alias);
-        }
+
+        } while (WarpAny(tile_descriptor.status == SCAN_TILE_INVALID));
 
         status = tile_descriptor.status;
         value = tile_descriptor.value;
@@ -310,7 +309,7 @@ struct ScanTileState<T, false>
     __host__ __device__ __forceinline__
     cudaError_t Init(
         int     num_tiles,                          ///< [in] Number of tiles
-        void    *d_temp_storage,                    ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
+        void    *d_temp_storage,                    ///< [in] %Device-accessible allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
         size_t  temp_storage_bytes)                 ///< [in] Size in bytes of \t d_temp_storage allocation
     {
         cudaError_t error = cudaSuccess;
@@ -416,19 +415,17 @@ struct ScanTileState<T, false>
         StatusWord      &status,
         T               &value)
     {
-        status = ThreadLoad<LOAD_CG>(d_tile_status + TILE_STATUS_PADDING + tile_idx);
-        while (status == SCAN_TILE_INVALID)
-        {
+        do {
             status = ThreadLoad<LOAD_CG>(d_tile_status + TILE_STATUS_PADDING + tile_idx);
-        }
 
-        T partial = ThreadLoad<LOAD_CG>(d_tile_partial + TILE_STATUS_PADDING + tile_idx);
-        T inclusive = ThreadLoad<LOAD_CG>(d_tile_inclusive + TILE_STATUS_PADDING + tile_idx);
+            __threadfence();    // prevent hoisting loads from loop or loads below above this one
 
-        value = (status == StatusWord(SCAN_TILE_PARTIAL)) ?
-            partial :
-            inclusive;
+        } while (status == SCAN_TILE_INVALID);
 
+        if (status == StatusWord(SCAN_TILE_PARTIAL)) 
+            value = ThreadLoad<LOAD_CG>(d_tile_partial + TILE_STATUS_PADDING + tile_idx);
+        else
+            value = ThreadLoad<LOAD_CG>(d_tile_inclusive + TILE_STATUS_PADDING + tile_idx);
     }
 };
 
@@ -542,9 +539,9 @@ struct ReduceByKeyScanTileState<ValueT, KeyT, true>
     /// Initializer
     __host__ __device__ __forceinline__
     cudaError_t Init(
-        int     num_tiles,                          ///< [in] Number of tiles
-        void    *d_temp_storage,                    ///< [in] %Device allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
-        size_t  temp_storage_bytes)                 ///< [in] Size in bytes of \t d_temp_storage allocation
+        int     /*num_tiles*/,                      ///< [in] Number of tiles
+        void    *d_temp_storage,                    ///< [in] %Device-accessible allocation of temporary storage.  When NULL, the required allocation size is written to \p temp_storage_bytes and no work is done.
+        size_t  /*temp_storage_bytes*/)             ///< [in] Size in bytes of \t d_temp_storage allocation
     {
         d_tile_status = reinterpret_cast<TileDescriptor*>(d_temp_storage);
         return cudaSuccess;
@@ -623,19 +620,20 @@ struct ReduceByKeyScanTileState<ValueT, KeyT, true>
         StatusWord              &status,
         KeyValuePairT           &value)
     {
-        // Use warp-any to determine when all threads have valid status
-        TxnWord alias = ThreadLoad<LOAD_CG>(reinterpret_cast<TxnWord*>(d_tile_status + TILE_STATUS_PADDING + tile_idx));
-        TileDescriptor tile_descriptor = reinterpret_cast<TileDescriptor&>(alias);
+        TxnWord         alias           = ThreadLoad<LOAD_CG>(reinterpret_cast<TxnWord*>(d_tile_status + TILE_STATUS_PADDING + tile_idx));
+        TileDescriptor  tile_descriptor = reinterpret_cast<TileDescriptor&>(alias);
 
         while (tile_descriptor.status == SCAN_TILE_INVALID)
         {
-            alias = ThreadLoad<LOAD_CG>(reinterpret_cast<TxnWord*>(d_tile_status + TILE_STATUS_PADDING + tile_idx));
+            __threadfence_block();  // prevent hoisting loads from loop
+
+            alias           = ThreadLoad<LOAD_CG>(reinterpret_cast<TxnWord*>(d_tile_status + TILE_STATUS_PADDING + tile_idx));
             tile_descriptor = reinterpret_cast<TileDescriptor&>(alias);
         }
 
-        status = tile_descriptor.status;
+        status      = tile_descriptor.status;
         value.value = tile_descriptor.value;
-        value.key = tile_descriptor.key;
+        value.key   = tile_descriptor.key;
     }
 
 };
@@ -652,13 +650,14 @@ struct ReduceByKeyScanTileState<ValueT, KeyT, true>
  * aggregates/prefixes from predecessor tiles to become available.
  */
 template <
-    typename T,
-    typename ScanOpT,
-    typename ScanTileStateT>
+    typename    T,
+    typename    ScanOpT,
+    typename    ScanTileStateT,
+    int         PTX_ARCH = CUB_PTX_ARCH>
 struct TilePrefixCallbackOp
 {
     // Parameterized warp reduce
-    typedef WarpReduce<T> WarpReduceT;
+    typedef WarpReduce<T, CUB_PTX_WARP_THREADS, PTX_ARCH> WarpReduceT;
 
     // Temporary storage type
     struct _TempStorage
@@ -666,6 +665,7 @@ struct TilePrefixCallbackOp
         typename WarpReduceT::TempStorage   warp_reduce;
         T                                   exclusive_prefix;
         T                                   inclusive_prefix;
+        T                                   block_aggregate;
     };
 
     // Alias wrapper allowing temporary storage to be unioned
@@ -721,6 +721,8 @@ struct TilePrefixCallbackOp
     __device__ __forceinline__
     T operator()(T block_aggregate)
     {
+        temp_storage.block_aggregate = block_aggregate;
+
         // Update our status with our tile-aggregate
         if (threadIdx.x == 0)
         {
@@ -773,6 +775,13 @@ struct TilePrefixCallbackOp
     T GetInclusivePrefix()
     {
         return temp_storage.inclusive_prefix;
+    }
+
+    // Get the block aggregate stored in temporary storage
+    __device__ __forceinline__
+    T GetBlockAggregate()
+    {
+        return temp_storage.block_aggregate;
     }
 
 };

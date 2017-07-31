@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2015, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2016, NVIDIA CORPORATION.  All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -62,7 +62,7 @@ __device__ __forceinline__ T ThreadScanExclusive(
     T                   *input,                 ///< [in] Input array
     T                   *output,                ///< [out] Output array (may be aliased to \p input)
     ScanOp              scan_op,                ///< [in] Binary scan operator
-    Int2Type<LENGTH>    length)
+    Int2Type<LENGTH>    /*length*/)
 {
     T addend = *input;
     inclusive = scan_op(exclusive, addend);
@@ -77,11 +77,11 @@ template <
     typename    ScanOp>
 __device__ __forceinline__ T ThreadScanExclusive(
     T                   inclusive,
-    T                   exclusive,
-    T                   *input,                 ///< [in] Input array
-    T                   *output,                ///< [out] Output array (may be aliased to \p input)
-    ScanOp              scan_op,                ///< [in] Binary scan operator
-    Int2Type<0>         length)
+    T                   /*exclusive*/,
+    T                   * /*input*/,                ///< [in] Input array
+    T                   * /*output*/,               ///< [out] Output array (may be aliased to \p input)
+    ScanOp              /*scan_op*/,                ///< [in] Binary scan operator
+    Int2Type<0>         /*length*/)
 {
     return inclusive;
 }
@@ -155,7 +155,7 @@ __device__ __forceinline__ T ThreadScanInclusive(
     T                   *input,                 ///< [in] Input array
     T                   *output,                ///< [out] Output array (may be aliased to \p input)
     ScanOp              scan_op,                ///< [in] Binary scan operator
-    Int2Type<LENGTH>    length)
+    Int2Type<LENGTH>    /*length*/)
 {
     T addend = *input;
     inclusive = scan_op(inclusive, addend);
@@ -169,10 +169,10 @@ template <
     typename    ScanOp>
 __device__ __forceinline__ T ThreadScanInclusive(
     T                   inclusive,
-    T                   *input,                 ///< [in] Input array
-    T                   *output,                ///< [out] Output array (may be aliased to \p input)
-    ScanOp              scan_op,                ///< [in] Binary scan operator
-    Int2Type<0>         length)
+    T                   * /*input*/,                ///< [in] Input array
+    T                   * /*output*/,               ///< [out] Output array (may be aliased to \p input)
+    ScanOp              /*scan_op*/,                ///< [in] Binary scan operator
+    Int2Type<0>         /*length*/)
 {
     return inclusive;
 }
