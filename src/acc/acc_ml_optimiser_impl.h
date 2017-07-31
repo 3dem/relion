@@ -939,8 +939,9 @@ void getAllSquaredDifferencesCoarse(
 #else
 	AccPtr<XFLOAT> allWeights(allWeights_size);
 #endif
-	deviceInitValue<XFLOAT>(allWeights, 0);  // Make sure entire array initialized
+
 	allWeights.deviceAlloc();
+	deviceInitValue<XFLOAT>(allWeights, 0);  // Make sure entire array initialized
 
 	long int allWeights_pos=0;	bool do_CC = (baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc;
 
