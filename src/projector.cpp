@@ -462,6 +462,97 @@ void Projector::project(MultidimArray<Complex > &f2d, Matrix2D<RFLOAT> &A, bool 
     std::cerr << "done with project..." << std::endl;
 #endif
 }
+void Projector::project2Dto1D(MultidimArray<Complex > &f1d, Matrix2D<RFLOAT> &A, bool inv)
+{
+	RFLOAT fx, fy, xp, yp;
+	int x0, x1, y0, y1, y, y2, r2;
+	bool is_neg_x;
+	Complex d00, d01, d10, d11;
+	Complex dx0, dx1;
+	Matrix2D<RFLOAT> Ainv;
+
+    // f1d should already be in the right size (ori_size,orihalfdim)
+    // AND the points outside r_max should already be zero...
+    // f1d.initZeros();
+
+	// Use the inverse matrix
+    if (inv)
+    	Ainv = A;
+    else
+    	Ainv = A.transpose();
+
+    // The f2d image may be smaller than r_max, in that case also make sure not to fill the corners!
+    int my_r_max = XMIPP_MIN(r_max, XSIZE(f1d) - 1);
+
+    // Go from the 2D slice coordinates to the 3D coordinates
+    Ainv *= (RFLOAT)padding_factor;  // take scaling into account directly
+
+	for (int x=0; x <= my_r_max; x++)
+	{
+
+		// Get logical coordinates in the 2D map
+		xp = Ainv(0,0) * x;
+		yp = Ainv(1,0) * x;
+		if (interpolator == TRILINEAR || x < r_min_nn)
+		{
+			// Only asymmetric half is stored
+			if (xp < 0)
+			{
+				// Get complex conjugated hermitian symmetry pair
+				xp = -xp;
+				yp = -yp;
+				is_neg_x = true;
+			}
+			else
+			{
+				is_neg_x = false;
+			}
+
+			// Trilinear interpolation (with physical coords)
+			// Subtract STARTINGY to accelerate access to data (STARTINGX=0)
+			// In that way use DIRECT_A3D_ELEM, rather than A3D_ELEM
+			x0 = FLOOR(xp);
+			fx = xp - x0;
+			x1 = x0 + 1;
+
+			y0 = FLOOR(yp);
+			fy = yp - y0;
+			y0 -=  STARTINGY(data);
+			y1 = y0 + 1;
+
+			// Matrix access can be accelerated through pre-calculation of z0*xydim etc.
+			d00 = DIRECT_A2D_ELEM(data, y0, x0);
+			d01 = DIRECT_A2D_ELEM(data, y0, x1);
+			d10 = DIRECT_A2D_ELEM(data, y1, x0);
+			d11 = DIRECT_A2D_ELEM(data, y1, x1);
+
+			// Set the interpolated value in the 2D output array
+			dx0 = LIN_INTERP(fx, d00, d01);
+			dx1 = LIN_INTERP(fx, d10, d11);
+			DIRECT_A1D_ELEM(f1d, x) = LIN_INTERP(fy, dx0, dx1);
+			// Take complex conjugated for half with negative x
+			if (is_neg_x)
+				DIRECT_A1D_ELEM(f1d, x) = conj(DIRECT_A1D_ELEM(f1d, x));
+
+		} // endif TRILINEAR
+		else if (interpolator == NEAREST_NEIGHBOUR )
+		{
+
+			x0 = ROUND(xp);
+			y0 = ROUND(yp);
+			if (x0 < 0)
+				DIRECT_A1D_ELEM(f1d, x) = conj(A2D_ELEM(data, -y0, -x0));
+			else
+				DIRECT_A1D_ELEM(f1d, x) = A2D_ELEM(data, y0, x0);
+
+		} // endif NEAREST_NEIGHBOUR
+		else
+			REPORT_ERROR("Unrecognized interpolator in Projector::project2Dto1D");
+
+	} // endif x-loop
+
+
+}
 
 void Projector::rotate2D(MultidimArray<Complex > &f2d, Matrix2D<RFLOAT> &A, bool inv)
 {
