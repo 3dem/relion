@@ -176,6 +176,9 @@ public:
 	// Is this body kept fixed in refinement?
 	std::vector<bool> keep_fixed_bodies;
 
+	// Maximum radius of mask
+	std::vector<int> max_radius_mask_bodies;
+
 	// Estimated accuracy at which rotations can be assigned, one for each class
 	std::vector<RFLOAT> acc_rot;
 
@@ -301,7 +304,8 @@ public:
     		sigma_psi_bodies = MD.sigma_psi_bodies;
     		sigma_offset_bodies = MD.sigma_offset_bodies;
     		keep_fixed_bodies = MD.keep_fixed_bodies;
-    		PPref = MD.PPref;
+    		max_radius_mask_bodies = MD.max_radius_mask_bodies;
+			PPref = MD.PPref;
     		PPrefRank = MD.PPrefRank;
     		group_names = MD.group_names;
     		sigma2_noise = MD.sigma2_noise;
@@ -340,6 +344,7 @@ public:
 		sigma_psi_bodies.clear();
 		sigma_offset_bodies.clear();
 		keep_fixed_bodies.clear();
+		max_radius_mask_bodies.clear();
 		PPref.clear();
 		PPrefRank.clear();
 		group_names.clear();

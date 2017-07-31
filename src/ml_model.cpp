@@ -46,6 +46,7 @@ void MlModel::initialise(bool _do_sgd)
 	sigma_psi_bodies.resize(nr_bodies, 0.);
 	sigma_offset_bodies.resize(nr_bodies, 0.);
 	keep_fixed_bodies.resize(nr_bodies, false);
+	max_radius_mask_bodies.resize(nr_bodies, -1);
 	pdf_class.resize(nr_classes, 1./(RFLOAT)nr_classes);
     pdf_direction.resize(nr_classes * nr_bodies);
     group_names.resize(nr_groups, "");
@@ -841,6 +842,7 @@ void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool als
 	sigma_psi_bodies.resize(MD.numberOfObjects());
 	sigma_offset_bodies.resize(MD.numberOfObjects());
 	keep_fixed_bodies.resize(MD.numberOfObjects());
+	max_radius_mask_bodies.resize(MD.numberOfObjects());
 	FileName fn_mask;
 	Image<RFLOAT> Imask;
 	std::vector<int> relatives_to;
@@ -864,6 +866,17 @@ void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool als
 			ZZ(com_bodies[nr_bodies]) = ROUND(ZZ(com));
 		else
 			ZZ(com_bodies[nr_bodies]) = 0.;
+		// find maximum radius of mask around it's COM
+		int max_d2 = 0.;
+		FOR_ALL_ELEMENTS_IN_ARRAY3D(Imask())
+		{
+			if (A3D_ELEM(Imask(), k, i, j) > 0.05)
+			{
+				int d2 = (k - ZZ(com)) * (k - ZZ(com)) + (i - YY(com)) * (i - YY(com)) + (j - XX(com)) * (j - XX(com));
+				max_d2 = XMIPP_MAX(max_d2, d2);
+			}
+		}
+		max_radius_mask_bodies[nr_bodies] = CEIL(sqrt((RFLOAT)max_d2));
 
 		// Get which body to rotate relative to
 		int relative_to = -1;
