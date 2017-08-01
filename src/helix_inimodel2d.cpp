@@ -90,8 +90,8 @@ void HelixAligner::parseInitial(int argc, char **argv)
 	extract_width = textToInteger(parser.getOption("--extract_width", "Width (in pixels) of the images for the helices to be extracted ", "100"));
 
     int param_section = parser.addSection("Parameters");
-    crossover_distance = textToFloat(parser.getOption("--crossover_distance", "Distance in Angstroms between 2 cross-overs","0"));
-    nr_iter = textToInteger(parser.getOption("--iter", "Maximum number of iterations to perform", "25"));
+    crossover_distance = textToFloat(parser.getOption("--crossover_distance", "Distance in Angstroms between 2 cross-overs",""));
+    nr_iter = textToInteger(parser.getOption("--iter", "Maximum number of iterations to perform", "10"));
     nr_classes = textToInteger(parser.getOption("--K", "Number of classes", "1"));
     angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms (default take from STAR file)", "-1"));
     maxres = textToFloat(parser.getOption("--maxres", "Limit calculations to approximately this resolution in Angstroms", "-1"));
@@ -104,7 +104,8 @@ void HelixAligner::parseInitial(int argc, char **argv)
     random_seed = textToInteger(parser.getOption("--random_seed", "Random seed (default is with clock)", "-1"));
     search_size = textToInteger(parser.getOption("--search_size", "Search this many pixels up/down of the target downscaled size to fit best crossover distance", "5"));
     verb = 1;
-	if (parser.checkForErrors(verb))
+
+    if (parser.checkForErrors(verb))
 		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 }
 
@@ -128,7 +129,12 @@ void HelixAligner::initialise()
 		MD.firstObject();
 		FileName fn_img;
 		Image<RFLOAT> img;
-		MD.getValue(EMDL_IMAGE_NAME, fn_img);
+		if (MD.containsLabel(EMDL_IMAGE_NAME))
+			MD.getValue(EMDL_IMAGE_NAME, fn_img);
+		else if (MD.containsLabel(EMDL_MLMODEL_REF_IMAGE))
+			MD.getValue(EMDL_MLMODEL_REF_IMAGE, fn_img);
+		else
+			REPORT_ERROR("ERROR: input STAR file does not contain rlnImageName or rlnReferenceImage!");
 		img.read(fn_img, false); // only read the header
 		int xdim=XSIZE(img());
 		int ydim = YSIZE(img());
@@ -262,7 +268,12 @@ void HelixAligner::readImages()
 
 		FileName fn_img;
 		Image<RFLOAT> img;
-		MD.getValue(EMDL_IMAGE_NAME, fn_img);
+		if (MD.containsLabel(EMDL_IMAGE_NAME))
+			MD.getValue(EMDL_IMAGE_NAME, fn_img);
+		else if (MD.containsLabel(EMDL_MLMODEL_REF_IMAGE))
+			MD.getValue(EMDL_MLMODEL_REF_IMAGE, fn_img);
+		else
+			REPORT_ERROR("ERROR: input STAR file does not contain rlnImageName or rlnReferenceImage!");
 		img.read(fn_img);
 		img().setXmippOrigin();
 		// Rethink this when expanding program to 3D!
@@ -601,6 +612,9 @@ void HelixAligner::initialiseClasses()
 	if (model.Aref.size() == 0)
 		REPORT_ERROR("BUG: non-initialised model!");
 
+	if (verb > 0)
+		std::cout << " Initialising reference(s) ..." << std::endl;
+
 	if (fn_inimodel != "")
 	{
 
@@ -611,6 +625,8 @@ void HelixAligner::initialiseClasses()
 		Iref.read(fn_inimodel);
 		resizeMap(Iref(), YSIZE(model.Aref[0]));
 		Iref().setXmippOrigin();
+		std::cerr << " model.Arec.size()= " << model.Arec.size() << std::endl;
+		model.Arec[0] = Iref();
 	    // Now project the reconstruction back out into the model.Aref[iclass]
 	    Projector PP(YSIZE(model.Aref[0]), TRILINEAR, 2, 1, 1);
 	    // Set the FT of img inside the Projector
@@ -649,6 +665,9 @@ void HelixAligner::initialiseClasses()
 		// Randomly position all particles along the X-direction
 		model.initZeroSums();
 		// Loop over all particles
+		if (verb > 0)
+			init_progress_bar(Xrects.size());
+
 		for (int ipart = 0; ipart < Xrects.size(); ipart++)
 		{
 			// Set into a random class
@@ -686,7 +705,12 @@ void HelixAligner::initialiseClasses()
 				}
 			}
 			model.pdf[myclass] += 1.;
+			if (verb > 0)
+				progress_bar(ipart);
 		}
+
+		if (verb > 0)
+			progress_bar(Xrects.size());
 
 		// After all images have been set, maximise the references in the model
 		maximisation();

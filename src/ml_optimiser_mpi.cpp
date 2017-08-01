@@ -531,8 +531,6 @@ will still yield good performance and possibly a more stable execution. \n" << s
             std:: cout << "         It is then best to join micrographs with similar defocus values and similar apparent signal-to-noise ratios. " << std::endl;
 		}
 	}
-	/// tmp
-	MPI_Barrier(MPI_COMM_WORLD);
 
 	// Do this after writing out the model, so that still the random halves are written in separate files.
 	if (do_realign_movies)
@@ -1916,7 +1914,7 @@ void MlOptimiserMpi::maximization()
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 	{
 
-		if (mymodel.keep_fixed_bodies[ibody])
+		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody])
 			continue;
 
 		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
@@ -2196,7 +2194,7 @@ void MlOptimiserMpi::maximization()
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 	{
 
-		if (mymodel.keep_fixed_bodies[ibody])
+		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody])
 			continue;
 
 		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
@@ -2385,7 +2383,7 @@ void MlOptimiserMpi::joinTwoHalvesAtLowResolution()
 	for (int ibody = 0; ibody< mymodel.nr_bodies; ibody++ )
 	{
 
-		if (mymodel.keep_fixed_bodies[ibody])
+		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody])
 			continue;
 
 		if (node->rank == 1 || node->rank == 2)
@@ -2472,7 +2470,7 @@ void MlOptimiserMpi::reconstructUnregularisedMapAndCalculateSolventCorrectedFSC(
 	for (int ibody = 0; ibody< mymodel.nr_bodies; ibody++ )
 	{
 
-		if (mymodel.keep_fixed_bodies[ibody])
+		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody])
 			continue;
 
 		if (mymodel.ref_dim == 3 && (node->rank == 1 || (do_split_random_halves && node->rank == 2) ) )
@@ -2805,7 +2803,7 @@ void MlOptimiserMpi::compareTwoHalves()
 	for (int ibody = 0; ibody< mymodel.nr_bodies; ibody++ )
 	{
 
-		if (mymodel.keep_fixed_bodies[ibody])
+		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody])
 			continue;
 
 		// The first two slaves calculate the sum of the downsampled average of all bodies
@@ -2994,7 +2992,7 @@ void MlOptimiserMpi::iterate()
 					for (int ibody = 0; ibody< mymodel.nr_bodies; ibody++)
 					{
 
-						if (mymodel.keep_fixed_bodies[ibody])
+						if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody])
 							continue;
 
 						int fsc05   = -1;
