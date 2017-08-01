@@ -3079,6 +3079,7 @@ void MlOptimiser::expectationSomeParticles(long int my_first_ori_particle, long 
 	} //end loop over ori_part_id
 
 
+//#define DEBUG_EXPSOME
 #ifdef DEBUG_EXPSOME
 	std::cerr << " exp_my_first_ori_particle= " << exp_my_first_ori_particle << " exp_my_last_ori_particle= " << exp_my_last_ori_particle << std::endl;
 	std::cerr << " exp_nr_images= " << exp_nr_images << std::endl;
@@ -3209,7 +3210,7 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
     {
 
 		// Skip this body if keep_fixed_bodies[ibody] or if it's angular accuracy is worse than 3x the sampling rate
-		if (mymodel.keep_fixed_bodies[ibody] || mymodel.acc_rot[ibody] > 3. * sampling.getAngularSampling(adaptive_oversampling) )
+    	if ( mymodel.nr_bodies > 1 && (mymodel.keep_fixed_bodies[ibody] || mymodel.acc_rot[ibody] > 3. * sampling.getAngularSampling(adaptive_oversampling)) )
 			continue;
 
     	// Here define all kind of local arrays that will be needed
@@ -3523,7 +3524,7 @@ void MlOptimiser::symmetriseReconstructions()
 {
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 	{
-		if (mymodel.keep_fixed_bodies[ibody])
+		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody])
 			continue;
 
 		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
@@ -3552,7 +3553,7 @@ void MlOptimiser::applyLocalSymmetryForEachRef()
 
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 	{
-		if (mymodel.keep_fixed_bodies[ibody])
+		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody])
 			continue;
 
 		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
@@ -3571,7 +3572,7 @@ void MlOptimiser::makeGoodHelixForEachRef()
 
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 	{
-		if (mymodel.keep_fixed_bodies[ibody])
+		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody])
 			continue;
 
 		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
@@ -4310,7 +4311,6 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 {
 
 	FourierTransformer transformer;
-
 	for (int ipart = 0; ipart < mydata.ori_particles[my_ori_particle].particles_id.size(); ipart++)
 	{
 		FileName fn_img;
@@ -7619,7 +7619,7 @@ void MlOptimiser::monitorHiddenVariableChanges(long int my_first_ori_particle, l
 			for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 			{
 
-				if (mymodel.keep_fixed_bodies[ibody])
+				if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody])
 					continue;
 
 				RFLOAT old_rot, old_tilt, old_psi, old_xoff, old_yoff, old_zoff = 0.;
