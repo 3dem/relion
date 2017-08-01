@@ -126,14 +126,17 @@ void Projector::computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, Multid
 			Mpad.initZeros(padoridim, padoridim);
 		else
 			Mpad.reshape(padoridim, padoridim);
-	   normfft = (RFLOAT)(padding_factor * padding_factor);
+		if (data_dim == 2)
+			normfft = (RFLOAT)(padding_factor * padding_factor);
+		else
+			normfft = (RFLOAT)(padding_factor * padding_factor * ori_size);
 	   break;
 	case 3:
 		if(do_heavy)
 			Mpad.initZeros(padoridim, padoridim, padoridim);
 		else
 			Mpad.reshape(padoridim, padoridim, padoridim);
-	   if (data_dim ==3)
+	   if (data_dim == 3)
 		   normfft = (RFLOAT)(padding_factor * padding_factor * padding_factor);
 	   else
 		   normfft = (RFLOAT)(padding_factor * padding_factor * padding_factor * ori_size);

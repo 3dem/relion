@@ -1834,7 +1834,10 @@ void BackProjector::windowToOridimRealSpace(FourierTransformer &transformer, Mul
  	if (ref_dim == 2)
 	{
 		Mout.reshape(padoridim, padoridim);
-		normfft = (RFLOAT)(padding_factor * padding_factor);
+		if (data_dim == 2)
+			normfft = (RFLOAT)(padding_factor * padding_factor);
+		else
+			normfft = (RFLOAT)(padding_factor * padding_factor * ori_size);
 	}
 	else
 	{
