@@ -516,7 +516,7 @@ public:
 		if (dstDevPtr == NULL)
 			ACC_PTR_DEBUG_FATAL("NULL-pointer given in cp_on_host(dstDevPtr).\n");
 #endif
-		memcpy ( dstDevPtr, hPtr, size );
+		memcpy ( dstDevPtr, hPtr, size * sizeof(T));
 	}
 
 	inline

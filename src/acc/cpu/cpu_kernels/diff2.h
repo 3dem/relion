@@ -875,9 +875,9 @@ template<bool REF3D>
 			}
 
 	#ifdef RELION_SINGLE_PRECISION                  
-			g_diff2[itrans] = - ( sum_weight / sqrtf(sum_norm));
+			g_diff2[iorient*trans_num + itrans] = - ( sum_weight / sqrtf(sum_norm));
 	#else                   
-			g_diff2[itrans] = - ( sum_weight / sqrt(sum_norm));
+			g_diff2[iorient*trans_num + itrans] = - ( sum_weight / sqrt(sum_norm));
 	#endif
 		}
 	} // for iorient
@@ -1024,9 +1024,9 @@ void diff2_CC_coarse_3D(
 			}
 
 	#ifdef RELION_SINGLE_PRECISION                  
-			g_diff2[itrans] = - ( sum_weight / sqrtf(sum_norm));
+			g_diff2[iorient*trans_num + itrans] = - ( sum_weight / sqrtf(sum_norm));
 	#else                   
-			g_diff2[itrans] = - ( sum_weight / sqrt(sum_norm));
+			g_diff2[iorient*trans_num + itrans] = - ( sum_weight / sqrt(sum_norm));
 	#endif
 		}
 	} // for iorient
