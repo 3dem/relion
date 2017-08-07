@@ -1013,6 +1013,7 @@ void GuiMainWindow::cb_select_browsegroup_i(bool show_initial_screen)
 		background_grp->hide();
 
 	int iwin = (browser->value() - 1);
+	if (iwin < 0 || iwin >= NR_BROWSE_TABS) return;
 	// Show the 'selected' group, hide the others
 	for ( int t=0; t<NR_BROWSE_TABS; t++ )
     {
@@ -1740,6 +1741,7 @@ void GuiMainWindow::cb_load_i()
 {
 	int iwin = browser->value() - 1;
 	gui_jobwindows[iwin]->myjob.read("", is_main_continue);
+	alias_current_job->value("Give_alias_here");
 	gui_jobwindows[iwin]->updateMyGui();
 
 	// Make the current continue-setting active
