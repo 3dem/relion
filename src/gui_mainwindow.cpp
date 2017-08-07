@@ -1012,6 +1012,7 @@ void GuiMainWindow::cb_select_browsegroup_i(bool show_initial_screen)
 		background_grp->hide();
 
 	int iwin = (browser->value() - 1);
+	if (iwin < 0 || iwin >= NR_BROWSE_TABS) return;
 	// Show the 'selected' group, hide the others
 	for ( int t=0; t<NR_BROWSE_TABS; t++ )
     {
