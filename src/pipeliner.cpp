@@ -754,8 +754,8 @@ void PipeLine::deleteJobGetNodesAndProcesses(int this_job, bool do_recursive, st
 			istart = imax;
 			long int idel = to_delete_processes[i];
 			deleteProcesses[idel] = true;
-                        is_done = true;
-                        for (size_t inode = 0; inode < (processList[idel]).outputNodeList.size(); inode++)
+			is_done = true;
+			for (size_t inode = 0; inode < (processList[idel]).outputNodeList.size(); inode++)
 			{
 				long int mynode = (processList[idel]).outputNodeList[inode];
 				deleteNodes[mynode] = true;
@@ -793,7 +793,13 @@ void PipeLine::deleteNodesAndProcesses(std::vector<bool> &deleteNodes, std::vect
 	read(DO_LOCK);
 
 	// Write new pipeline without the deleted processes and nodes to disc and read in again
-	FileName fn_del = processList[deleteProcesses[0]].name;
+	FileName fn_del;
+	for (int i = 0; i < deleteProcesses.size(); i++)
+		if (deleteProcesses[i])
+		{
+			fn_del = processList[i].name;
+			break;
+		}
 	write(DO_LOCK, fn_del, deleteNodes, deleteProcesses);
 
 	// Delete the output directories for all selected processes from the hard disk
@@ -818,7 +824,6 @@ void PipeLine::deleteNodesAndProcesses(std::vector<bool> &deleteNodes, std::vect
 			}
 
 			deleteTemporaryNodeFiles(processList[i]);
-
 		}
 	}
 
