@@ -599,6 +599,8 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 		textbuff_stdout = new Fl_Text_Buffer();
 		textbuff_stderr = new Fl_Text_Buffer();
 		// Disable warning message about UTF-8 transcoding
+		textbuff_stdout->transcoding_warning_action=NULL;
+		textbuff_stderr->transcoding_warning_action=NULL;
 		disp_stdout = new StdOutDisplay(XJOBCOL1, GUIHEIGHT_EXT_START2 + JOBHEIGHT + STDOUT_Y-5, w-20, 105);
 		disp_stderr = new StdOutDisplay(XJOBCOL1, GUIHEIGHT_EXT_START2 + JOBHEIGHT + STDERR_Y-5, w-20, 50);
 		disp_stdout->fn_file = "run.out";
