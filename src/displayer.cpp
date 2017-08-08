@@ -825,12 +825,13 @@ void multiViewerCanvas::printMetaData(int ipos)
 	
 	boxes[ipos]->MDimg.write(stream);
 	FileName str =  stream.str();
-	// Grrr: somehow fl_message sometimes does not display the @ character (nor anything that comes after it)
+
+	// @ starts special symbol code in FLTK; we must escape it
 	size_t pos = str.find('@', 0);
 	while (pos != std::string::npos)
 	{
-		str.replace(pos, 1, (std::string)"(at)" );
-		pos = str.find('@', pos);
+		str.replace(pos, 1, (std::string)"@@" );
+		pos = str.find('@', pos + 2);
 	}
 	fl_message("%s",str.c_str());
 }
