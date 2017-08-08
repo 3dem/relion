@@ -801,7 +801,7 @@ void multiViewerCanvas::selectFromHereAbove(int iposp)
 	}
 
 }
-void multiViewerCanvas::printMetaData(int ipos)
+void multiViewerCanvas::printMetaData(int main_ipos)
 {
 	std::ostringstream stream;
 	
@@ -823,7 +823,7 @@ void multiViewerCanvas::printMetaData(int ipos)
 	stream << "Selected " << nselected_particles << " particles in " << nselected_classes << " classes.\n";
 	stream << "Below is the metadata table for the clicked class/particle.\n";
 	
-	boxes[ipos]->MDimg.write(stream);
+	boxes[main_ipos]->MDimg.write(stream);
 	FileName str =  stream.str();
 
 	// @ starts special symbol code in FLTK; we must escape it
