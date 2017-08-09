@@ -799,6 +799,7 @@ public:
 	{
 		size = s;
 	}
+	
 	size_t getSize()
 	{
 		return size;

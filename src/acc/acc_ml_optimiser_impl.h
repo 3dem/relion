@@ -1,5 +1,8 @@
 static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+// ----------------------------------------------------------------------------
+// -------------------- getFourierTransformsAndCtfs ---------------------------
+// ----------------------------------------------------------------------------
 template <class MlClass>
 void getFourierTransformsAndCtfs(long int my_ori_particle,
 		OptimisationParamters &op,
@@ -301,7 +304,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			temp.setHost(rec_img.data);
 			temp.putOnDevice();
 
-			// rec_img is NOT norm_corrected in the non-accelerated-code, so nor do we. TODO Dari: But should we?
+			// rec_img is NOT norm_corrected in the non-accelerated-code, so neither do we. TODO Dari: But should we?
 		}
 		else
 		{
@@ -838,6 +841,9 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 	GATHERGPUTIMINGS(accMLO->timer);
 }
 
+// ----------------------------------------------------------------------------
+// ------------------ getAllSquaredDifferencesCoarse --------------------------
+// ----------------------------------------------------------------------------
 template <class MlClass>
 void getAllSquaredDifferencesCoarse(
 		unsigned exp_ipass,
@@ -862,7 +868,7 @@ void getAllSquaredDifferencesCoarse(
 	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, op.my_ori_particle, sp.current_image_size, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
 			sp.itrans_min, sp.itrans_max, op.Fimgs, dummy, op.Fctfs, dummy, dummy,
 			op.local_Fctfs, op.local_sqrtXi2, op.local_Minvsigma2s);
-
+	
 	unsigned image_size = op.local_Minvsigma2s[0].nzyxdim;
 
 	CTOC(accMLO->timer,"diff_pre_gpu");
@@ -1022,7 +1028,7 @@ void getAllSquaredDifferencesCoarse(
 			Fimg_real[i] = Fimg.data[i].real * pixel_correction;
 			Fimg_imag[i] = Fimg.data[i].imag * pixel_correction;
 		}
-
+		
 		trans_x.putOnDevice();
 		trans_y.putOnDevice();
 		trans_z.putOnDevice();
@@ -1039,17 +1045,17 @@ void getAllSquaredDifferencesCoarse(
 		AccPtr<XFLOAT> corr_img((size_t)image_size);
 #endif
 		corr_img.deviceAlloc();
-
+	
 		buildCorrImage(baseMLO,op,corr_img,ipart,group_id);
 		corr_img.cpToDevice();
-
+		
 		deviceInitValue<XFLOAT>(allWeights, (XFLOAT) (op.highres_Xi2_imgs[ipart] / 2.));
 		allWeights_pos = 0;
 
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
-
+		
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		{
 			if ( projectorPlans[exp_iclass].orientation_num > 0 )
@@ -1094,7 +1100,7 @@ void getAllSquaredDifferencesCoarse(
 #endif
 						do_CC,
 						accMLO->dataIs3D);
-
+				
 				mapAllWeightsToMweights(
 						~projectorPlans[exp_iclass].iorientclasses,
 #ifdef CUDA
@@ -1136,6 +1142,9 @@ void getAllSquaredDifferencesCoarse(
 #endif
 }
 
+// ----------------------------------------------------------------------------
+// -------------------- getAllSquaredDifferencesFine --------------------------
+// ----------------------------------------------------------------------------
 template <class MlClass>
 void getAllSquaredDifferencesFine(unsigned exp_ipass,
 		 	 	 	 	 	 	  OptimisationParamters &op,
@@ -1350,7 +1359,6 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 														FinePassWeights[ipart],
 														FPCMasks[ipart][exp_iclass],   // ..and output into index-arrays mask...
 														chunkSize);                    // ..based on a given maximum chunk-size
-
 				// extend size by number of significants found this class
 				newDataSize += significant_num;
 				FPCMasks[ipart][exp_iclass].weightNum = significant_num;
@@ -1491,7 +1499,9 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 #endif
 }
 
-
+// ----------------------------------------------------------------------------
+// -------------- convertAllSquaredDifferencesToWeights -----------------------
+// ----------------------------------------------------------------------------
 template<class MlClass, typename weights_t>
 void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 											OptimisationParamters &op,
@@ -1763,7 +1773,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 						weights,
 						ipart * op.Mweight.xdim + sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.iclass_min,
 						(sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi * sp.nr_trans);
-
+				
 				block_num = ceilf((float)(sp.nr_dir*sp.nr_psi)/(float)SUMW_BLOCK_SIZE);
 			
 				if (failsafeMode) //Prevent zero prior products in fail-safe mode
@@ -1873,7 +1883,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 							(1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart]);
 
 					my_nr_significant_coarse_samples = filteredSize - thresholdIdx;
-
+			
 					if (my_nr_significant_coarse_samples == 0)
 					{
 						if (failsafeMode) //Only print error if not managed to recover through fail-safe mode
@@ -2064,7 +2074,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			}
 			CTOC(accMLO->timer,"sumweight1");
 		}
-
+				
 		op.significant_weight[ipart] = (RFLOAT) my_significant_weight;
 	} // end loop ipart
 
@@ -2077,6 +2087,9 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 #endif
 }
 
+// ----------------------------------------------------------------------------
+// -------------------------- storeWeightedSums -------------------------------
+// ----------------------------------------------------------------------------
 template<class MlClass>
 void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						MlOptimiser *baseMLO,
@@ -2349,7 +2362,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			int cpos=fake_class*nr_transes;
 			int block_num = block_nums[nr_fake_classes*ipart + fake_class];
-
+			
 			runCollect2jobs(block_num,
 #ifdef CUDA
 						&(oo_otrans_x(cpos) ),          // otrans-size -> make const
@@ -2389,7 +2402,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						~FPCMasks[ipart][exp_iclass].jobExtent,
 						accMLO->dataIs3D);
 			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
-
+		
 			partial_pos+=block_num;
 		}
 
@@ -2882,7 +2895,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 #else
 					0);
 #endif
-
+		
 			/*======================================================
 								BACKPROJECTION
 			======================================================*/
@@ -2928,7 +2941,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 #else
 				0);
 #endif
-
+				
 			CTOC(accMLO->timer,"backproject");
 
 #ifdef TIMING
@@ -3113,6 +3126,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 #endif
 }
 
+// ----------------------------------------------------------------------------
+// -------------------- accDoExpectationOneParticle ---------------------------
+// ----------------------------------------------------------------------------
 template <class MlClass>
 void accDoExpectationOneParticle(MlClass *myInstance, unsigned long my_ori_particle) 
 {
@@ -3272,7 +3288,7 @@ baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_B);
 
 		op.min_diff2.resize(sp.nr_particles, 0);
 		op.avg_diff2.resize(sp.nr_particles, 0);
-
+		
 		if (ipass == 0)
 		{
 			unsigned long weightsPerPart(baseMLO->mymodel.nr_classes * sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.nr_oversampled_rot * sp.nr_oversampled_trans);
@@ -3296,7 +3312,7 @@ baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_B);
 
 			try
 			{
-				CTIC(timer,"convertAllSquaredDifferencesToWeightsCoarse");
+				CTIC(timer,"convertAllSquaredDifferencesToWeightsCoarse");		
 				convertAllSquaredDifferencesToWeights<MlClass,XFLOAT>(ipass, op, sp, baseMLO, myInstance, CoarsePassWeights, FinePassClassMasks, Mweight);
 				CTOC(timer,"convertAllSquaredDifferencesToWeightsCoarse");
 			}
@@ -3350,7 +3366,8 @@ baseMLO->timer.tic(baseMLO->TIMING_ESP_DIFF2_D);
 
 				}
 				//set a maximum possible size for all weights (to be reduced by significance-checks)
-				FinePassWeights[iframe].setDataSize(FineProjectionData[iframe].orientationNumAllClasses*sp.nr_trans*sp.nr_oversampled_trans);
+				size_t dataSize = FineProjectionData[iframe].orientationNumAllClasses*sp.nr_trans*sp.nr_oversampled_trans;
+				FinePassWeights[iframe].setDataSize(dataSize);
 				FinePassWeights[iframe].dual_alloc_all();
 #ifdef CUDA
 				stagerD2[iframe].size= 2*(FineProjectionData[iframe].orientationNumAllClasses*sp.nr_trans*sp.nr_oversampled_trans);

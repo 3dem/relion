@@ -487,9 +487,9 @@ void runBackProjectKernel(
 				d_weights, d_Minvsigma2s, d_ctfs,
 				translation_num, significant_weight, weight_norm, d_eulers, 
 				BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
-				BP.maxR, BP.maxR2, BP.padding_factor,
-				imgX, imgY, imgX*imgY,
-				BP.mdlX, BP.mdlInitY);
+				BP.maxR, BP.maxR2, (XFLOAT)BP.padding_factor,
+				(unsigned)imgX, (unsigned)imgY, (unsigned)imgX*imgY,
+				(unsigned)BP.mdlX, BP.mdlInitY);
 #endif
 	}
 	else
@@ -536,9 +536,9 @@ void runBackProjectKernel(
 					d_weights, d_Minvsigma2s, d_ctfs,
 					translation_num, significant_weight, weight_norm, d_eulers,
 					BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
-					BP.maxR, BP.maxR2, BP.padding_factor,
-					imgX, imgY, imgZ, imgX*imgY*imgZ,
-					BP.mdlX, BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ);
+					BP.maxR, BP.maxR2, (XFLOAT)BP.padding_factor,
+					(unsigned)imgX, (unsigned)imgY, (unsigned)imgZ, (unsigned)imgX*imgY*imgZ,
+					(unsigned)BP.mdlX, (unsigned)BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ);
 #endif
 		}
 		else
@@ -561,9 +561,9 @@ void runBackProjectKernel(
 					d_weights, d_Minvsigma2s, d_ctfs,
 					translation_num, significant_weight, weight_norm, d_eulers,
 					BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
-					BP.maxR, BP.maxR2, BP.padding_factor,
-					imgX, imgY, imgZ, imgX*imgY*imgZ,
-					BP.mdlX, BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ);
+					BP.maxR, BP.maxR2, (XFLOAT)BP.padding_factor,
+					(unsigned)imgX, (unsigned)imgY, (unsigned)imgZ, (unsigned)imgX*imgY*imgZ,
+					(unsigned)BP.mdlX, (unsigned)BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ);
 #endif
 			else
 #ifdef CUDA
@@ -577,26 +577,26 @@ void runBackProjectKernel(
 					imgX, imgY, imgZ, imgX*imgY*imgZ,
 					BP.mdlX, BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ);
 #else
-#if 1
+#if 0
 				CpuKernels::backprojectRef3D(imageCount,
 					d_img_real, d_img_imag,
 					trans_x, trans_y,
 					d_weights, d_Minvsigma2s, d_ctfs,
 					translation_num, significant_weight, weight_norm, d_eulers,
 					BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
-					BP.maxR, BP.maxR2, BP.padding_factor,
-					imgX, imgY, imgZ, imgX*imgY*imgZ,
-					BP.mdlX, BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ);
+					BP.maxR, BP.maxR2, (XFLOAT)BP.padding_factor,
+					(unsigned)imgX, (unsigned)imgY, (unsigned)imgZ, (unsigned)imgX*imgY*imgZ,
+					(unsigned)BP.mdlX, (unsigned)BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ);
 #else
-				CpuKernels::backproject3D<false>(imageCount,BP_DATA3D_BLOCK_SIZE,
+				CpuKernels::backproject3D<false>(imageCount,BP_REF3D_BLOCK_SIZE,
 					d_img_real, d_img_imag,
 					trans_x, trans_y, trans_z,
 					d_weights, d_Minvsigma2s, d_ctfs,
 					translation_num, significant_weight, weight_norm, d_eulers,
 					BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
-					BP.maxR, BP.maxR2, BP.padding_factor,
-					imgX, imgY, imgZ, imgX*imgY*imgZ,
-					BP.mdlX, BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ);
+					BP.maxR, BP.maxR2, (XFLOAT)BP.padding_factor,
+					(unsigned)imgX, (unsigned)imgY, (unsigned)imgZ, (unsigned)imgX*imgY*imgZ,
+					(unsigned)BP.mdlX, (unsigned)BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ);
 #endif
 #endif
 		} // do_sgd is false
@@ -970,7 +970,7 @@ void runDiff2KernelCoarse(
 				}
 			}
 #endif
-		}
+		}  // projector.mdlZ!=0
 		else
 		{
 
@@ -1058,10 +1058,10 @@ void runDiff2KernelCoarse(
 						stream);
 				LAUNCH_HANDLE_ERROR(cudaGetLastError());
 			}
-		}
-	}
-	else
-	{
+		}  // projector.mdlZ==0
+	}  // !do_CC
+	else  
+	{  // do_CC
 // TODO - find a more compact way to represent these combinations resulting in
 // a single call to diff2_CC_course?
 		// dim3 CCblocks(orientation_num,translation_num);
@@ -1117,7 +1117,7 @@ void runDiff2KernelCoarse(
 				local_sqrtXi2,
 				stream);
 		LAUNCH_HANDLE_ERROR(cudaGetLastError());
-	}
+	} // do_CC
 }
 
 

@@ -63,7 +63,10 @@
 #include "src/acc/cpu/cpu_ml_optimiser.h"
 #include "src/acc/acc_helper_functions.h"
 
+void dump_array(char *name, int *ptr, size_t size);
 void dump_array(char *name, float *ptr, size_t size);
+void dump_complex_array(char *name, ACCCOMPLEX *ptr, size_t size);
+void dump_complex_array(char *name, Complex *ptr, size_t size);
 void dump_double_array(char *name, float *ptr, float *ptr2, size_t size);
 void dump_triple_array(char *name, float *ptr, float *ptr2, float *ptr3, size_t size);
 void dump_array(char *name, double *ptr, size_t size);
@@ -76,12 +79,74 @@ void dump_triple_array(char *name, double *ptr, double *ptr2, double *ptr3, size
 #include <tbb/spin_mutex.h>
 tbb::spin_mutex      mkl_mutex;
 
-void dump_array(char *name, float *ptr, size_t size)
+
+void dump_array(char *name, int *ptr, size_t size)
 {
+	int count = 0;
 	FILE *fp = fopen(name, "w");
 	fprintf(fp, "Array size:  %ld\n", size);
-	for (size_t i=0; i < size; i++)
-		fprintf(fp, "%f ", ptr[i]);
+	for (size_t i=0; i < size; i++) {
+		fprintf(fp, "%d, ", ptr[i]);
+		count++;
+		if (count > 10) {
+			fprintf(fp, "\n");
+			count = 0;
+		}
+	}
+	fprintf(fp, "\n");
+	fflush(fp);	
+	fclose(fp);
+}
+
+void dump_array(char *name, float *ptr, size_t size)
+{
+	int count = 0;
+	FILE *fp = fopen(name, "w");
+	fprintf(fp, "Array size:  %ld\n", size);
+	for (size_t i=0; i < size; i++) {
+		fprintf(fp, "%f, ", ptr[i]);
+		count++;
+		if (count > 10) {
+			fprintf(fp, "\n");
+			count = 0;
+		}
+	}
+	fprintf(fp, "\n");
+	fflush(fp);	
+	fclose(fp);
+}
+
+void dump_complex_array(char *name, ACCCOMPLEX *ptr, size_t size)
+{
+	int count = 0;
+	FILE *fp = fopen(name, "w");
+	fprintf(fp, "Array size:  %ld\n", size);
+	for (size_t i=0; i < size; i++) {
+		fprintf(fp, "%f,%f, ", ptr[i].x, ptr[i].y);
+		count++;
+		if (count > 10) {
+			fprintf(fp, "\n");
+			count = 0;
+		}
+	}
+	fprintf(fp, "\n");
+	fflush(fp);	
+	fclose(fp);
+}
+
+void dump_complex_array(char *name, Complex *ptr, size_t size)
+{
+	int count = 0;
+	FILE *fp = fopen(name, "w");
+	fprintf(fp, "Array size:  %ld\n", size);
+	for (size_t i=0; i < size; i++) {
+		fprintf(fp, "%f,%f, ", ptr[i].real, ptr[i].imag);
+		count++;
+		if (count > 10) {
+			fprintf(fp, "\n");
+			count = 0;
+		}
+	}
 	fprintf(fp, "\n");
 	fflush(fp);	
 	fclose(fp);
@@ -89,10 +154,17 @@ void dump_array(char *name, float *ptr, size_t size)
 
 void dump_double_array(char *name, float *ptr, float *ptr2, size_t size)
 {
+	int count = 0;
 	FILE *fp = fopen(name, "w");
 	fprintf(fp, "Array size:  %ld\n", size);
-	for (size_t i=0; i < size; i++) 
+	for (size_t i=0; i < size; i++) {
 		fprintf(fp, "%f,%f, ", ptr[i], ptr2[i]);
+		count++;
+		if (count > 10) {
+			fprintf(fp, "\n");
+			count = 0;
+		}
+	}
 	fprintf(fp, "\n");
 	fflush(fp);	
 	fclose(fp);
@@ -100,10 +172,17 @@ void dump_double_array(char *name, float *ptr, float *ptr2, size_t size)
 
 void dump_triple_array(char *name, float *ptr, float *ptr2, float *ptr3, size_t size)
 {
+	int count = 0;
 	FILE *fp = fopen(name, "w");
 	fprintf(fp, "Array size:  %ld\n", size);
-	for (size_t i=0; i < size; i++) 
+	for (size_t i=0; i < size; i++) {
 		fprintf(fp, "%f,%f,%f, ", ptr[i], ptr2[i], ptr3[i]);
+		count++;
+		if (count > 10) {
+			fprintf(fp, "\n");
+			count = 0;
+		}
+	}
 	fprintf(fp, "\n");
 	fflush(fp);	
 	fclose(fp);
@@ -111,10 +190,17 @@ void dump_triple_array(char *name, float *ptr, float *ptr2, float *ptr3, size_t 
 
 void dump_array(char *name, double *ptr, size_t size)
 {
+	int count = 0;
 	FILE *fp = fopen(name, "w");
 	fprintf(fp, "Array size:  %ld\n", size);
-	for (size_t i=0; i < size; i++) 
-		fprintf(fp, "%f ", ptr[i]);
+	for (size_t i=0; i < size; i++) {
+		fprintf(fp, "%f, ", ptr[i]);
+		count++;
+		if (count > 10) {
+			fprintf(fp, "\n");
+			count = 0;
+		}
+	}
 	fprintf(fp, "\n");
 	fflush(fp);	
 	fclose(fp);
@@ -122,10 +208,17 @@ void dump_array(char *name, double *ptr, size_t size)
 
 void dump_double_array(char *name, double *ptr, double *ptr2, size_t size)
 {
+	int count = 0;
 	FILE *fp = fopen(name, "w");
 	fprintf(fp, "Array size:  %ld\n", size);
-	for (size_t i=0; i < size; i++) 
+	for (size_t i=0; i < size; i++) {
 		fprintf(fp, "%f,%f, ", ptr[i], ptr2[i]);
+			count++;
+		if (count > 10) {
+			fprintf(fp, "\n");
+			count = 0;
+		}
+	}
 	fprintf(fp, "\n");
 	fflush(fp);	
 	fclose(fp);
@@ -133,10 +226,17 @@ void dump_double_array(char *name, double *ptr, double *ptr2, size_t size)
 
 void dump_triple_array(char *name, double *ptr, double *ptr2, double *ptr3, size_t size)
 {
+	int count = 0;
 	FILE *fp = fopen(name, "w");
 	fprintf(fp, "Array size:  %ld\n", size);
-	for (size_t i=0; i < size; i++)
+	for (size_t i=0; i < size; i++) {
 		fprintf(fp, "%f,%f,%f, ", ptr[i], ptr2[i], ptr3[i]);
+		count++;
+		if (count > 10) {
+			fprintf(fp, "\n");
+			count = 0;
+		}
+	}
 	fprintf(fp, "\n");
 	fflush(fp);	
 	fclose(fp);

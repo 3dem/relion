@@ -229,20 +229,20 @@ void AccProjectorPlan::setup(
 	}
 	TIMING_TOC(TIMING_SAMPLING);
 
-	iorientclasses.setSize(orientation_num);
+	iorientclasses.resizeHostCopy(orientation_num);
 	iorientclasses.putOnDevice();
 
-	eulers.setSize(orientation_num * 9);
+	eulers.resizeHostCopy(orientation_num * 9);
 	eulers.deviceAlloc();
 
-	alphas.setSize(orientation_num);
+	alphas.resizeHostCopy(orientation_num);
 	alphas.putOnDevice();
 
 	if(sampling.is_3D)
 	{
-		betas.setSize(orientation_num);
+		betas.resizeHostCopy(orientation_num);
 		betas.putOnDevice();
-		gammas.setSize(orientation_num);
+		gammas.resizeHostCopy(orientation_num);
 		gammas.putOnDevice();
 	}
 

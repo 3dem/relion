@@ -35,7 +35,7 @@ void exponentiate_weights_coarse(
 	for (int bid=0; bid < grid_size; bid++) {
 		for (int cid=0; cid < num_classes; cid++) {
 			for (int tid=0; tid < block_size; tid++) {
-				int pos, iorient = bid*SUMW_BLOCK_SIZE+tid;
+				int pos, iorient = bid*block_size+tid;
 
 				weights_t weight;
 				if(iorient<nr_coarse_orient)

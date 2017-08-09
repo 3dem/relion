@@ -172,10 +172,10 @@ size_t findThresholdIdxInCumulativeSum(AccPtr<T> &data, T threshold)
 	}
 	else
 	{
+#ifdef CUDA
 		AccPtr<size_t >  idx(1, data.getStream(), data.getAllocator());
 		idx[0] = 0;
 
-#ifdef CUDA
 		idx.putOnDevice();
 		cuda_kernel_find_threshold_idx_in_cumulative<<< grid_size, FIND_IN_CUMULATIVE_BLOCK_SIZE, 0, data.getStream() >>>(
 				~data,
@@ -185,13 +185,16 @@ size_t findThresholdIdxInCumulativeSum(AccPtr<T> &data, T threshold)
 				FIND_IN_CUMULATIVE_BLOCK_SIZE);
 		idx.cpToHost();
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(data.getStream()));
-#else
-		size_t size_m1 = data.getSize()-1;
-		for (size_t i = 0; i < size_m1; i++)
-			if (data[i] <= threshold && threshold < data[i+1])
-				idx[0] = i+1;
-#endif
 		return idx[0];
+#else
+		size_t idx = 0;
+		size_t size_m1 = data.getSize()-1;
+		for (size_t i = 0; i < size_m1; i++) {
+			if (data[i] <= threshold && threshold < data[i+1])
+				idx = i+1;
+		}
+		return idx;
+#endif
 	}
 }
 	

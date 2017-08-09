@@ -21,13 +21,6 @@
 #include "src/acc/acc_helper_functions.h"
 #include "src/acc/cpu/cpu_settings.h"
 
-#define BACKPROJECTION4_BLOCK_SIZE 64
-#define BACKPROJECTION4_GROUP_SIZE 16
-#define BACKPROJECTION4_PREFETCH_COUNT 3
-#define BP_2D_BLOCK_SIZE 128
-#define BP_REF3D_BLOCK_SIZE 128
-#define BP_DATA3D_BLOCK_SIZE 640
-
 #include "src/acc/acc_backprojector_impl.h"
 
 /*

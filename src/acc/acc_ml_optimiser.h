@@ -402,19 +402,29 @@ public:
 */
 	void host_alloc_all()
 	{
+		weights.freeHostIfSet();
 		weights.hostAlloc();
+		rot_id.freeHostIfSet();
 		rot_id.hostAlloc();
+		rot_idx.freeHostIfSet();
 		rot_idx.hostAlloc();
+		trans_idx.freeHostIfSet();
 		trans_idx.hostAlloc();
+		ihidden_overs.freeHostIfSet();
 		ihidden_overs.hostAlloc();
 	}
 
 	void device_alloc_all()
 	{
+		weights.freeDeviceIfSet();
 		weights.deviceAlloc();
+		rot_id.freeDeviceIfSet();
 		rot_id.deviceAlloc();
+		rot_idx.freeDeviceIfSet();
 		rot_idx.deviceAlloc();
+		trans_idx.freeDeviceIfSet();
 		trans_idx.deviceAlloc();
+		ihidden_overs.freeDeviceIfSet();
 		ihidden_overs.deviceAlloc();
 	}
 

@@ -204,7 +204,7 @@ static int filterGreaterZeroOnDevice(AccPtr<T> &in, AccPtr<T> &out)
 	out.resizeHost(filt_size);
 	// Now populate output array
 	for(int i=0; i<arr_size; i++)
-		if(in[i] > 0.0) {
+		if(in[i] > (T)0.0) {
 			out[outindex] = in[i];
 			outindex++;
 		}
@@ -934,9 +934,6 @@ void kernel_exponentiate_weights_coarse(
 				nr_coarse_orient,
 				nr_coarse_trans);
 #else
-//						for(int i=0; i<block_num; i++)
-//						for(int j=0; j<sp.iclass_max-sp.iclass_min+1; j++)
-//							 for(int k=0; k<SUMW_BLOCK_SIZE; k++)
 		CpuKernels::exponentiate_weights_coarse<failsafe,weights_t>(
 				grid_size, 
 				num_classes, 

@@ -44,7 +44,7 @@ void exponentiate_weights_fine(
 
 	for (int bid=0; bid < grid_size; bid++) {
 		for (int tid=0; tid < block_size; tid++) {
-			long int jobid = bid*SUMW_BLOCK_SIZE+tid;
+			long int jobid = bid*block_size+tid;
 
 			if (jobid<job_num)
 			{
@@ -769,7 +769,7 @@ void cpu_kernel_make_eulers_2D(int grid_size, int block_size,
 {
 	for(int blockIdx_x=0; blockIdx_x<(int)(grid_size); blockIdx_x++) {
 		for(int threadIdx_x=0; threadIdx_x<block_size; threadIdx_x++)  {							
-			unsigned oid = blockIdx_x * BLOCK_SIZE + threadIdx_x; //Orientation id
+			unsigned oid = blockIdx_x * block_size + threadIdx_x; //Orientation id
 
 			if (oid >= orientation_num)
 				return;
@@ -825,7 +825,7 @@ void cpu_kernel_make_eulers_3D(int grid_size, int block_size,
 			XFLOAT a(0.f),b(0.f),g(0.f), A[9],B[9];
 			XFLOAT ca, sa, cb, sb, cg, sg, cc, cs, sc, ss;
 
-			unsigned oid = blockIdx_x * BLOCK_SIZE + threadIdx_x; //Orientation id
+			unsigned oid = blockIdx_x * block_size + threadIdx_x; //Orientation id
 
 			if (oid >= orientation_num)
 				return;
