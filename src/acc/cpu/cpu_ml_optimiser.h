@@ -423,6 +423,11 @@ public:
 	void setupFixedSizedObjects();
 
 	void setupTunableSizedObjects();
+	
+	CudaCustomAllocator *getAllocator()	
+	{
+		return ((CudaCustomAllocator *)0);
+	};
 
 };
 

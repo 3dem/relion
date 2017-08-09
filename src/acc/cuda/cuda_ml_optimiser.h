@@ -150,6 +150,11 @@ public:
 				HANDLE_ERROR(cudaStreamDestroy(classStreams[i]));
 	}
 
+	CudaCustomAllocator *getAllocator()	
+	{
+		return (devBundle->allocator);
+	};
+	
 };
 
 #endif

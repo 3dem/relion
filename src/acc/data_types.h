@@ -52,7 +52,7 @@ public:
 
 	template <typename T1>
 	Image(MultidimArray<T1> img, CudaCustomAllocator *allocator):
-		AccPtr<T>(img.nzyxdim, allocator),
+		AccPtr<T>((size_t)img.nzyxdim, allocator),
 		x(img.xdim), y(img.ydim), z(img.zdim), fourier(false)
 	{}
 	
@@ -64,7 +64,7 @@ public:
 
 	template <typename T1>
 	Image(MultidimArray<T1> img, cudaStream_t stream, CudaCustomAllocator *allocator):
-		 AccPtr<T>(img.nzyxdim, stream, allocator),
+		 AccPtr<T>((size_t)img.nzyxdim, stream, allocator),
 		x(img.xdim), y(img.ydim), z(img.zdim), fourier(false)
 	{}
 
