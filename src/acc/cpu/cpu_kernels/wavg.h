@@ -10,8 +10,6 @@
 #include "src/acc/cpu/cpu_kernels/cpu_utils.h"
 #include "src/acc/cpu/cpu_kernels/helper.h"
 
-#define RESTRICT
-
 namespace CpuKernels
 {
 
