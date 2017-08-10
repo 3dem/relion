@@ -52,14 +52,14 @@ int StdOutDisplay::handle(int ev)
 					{
 						std::string command = "awk -F\"\r\" '{if (NF>1) {print $NF} else {print}}' < " + fn + " > .gui_tmpstd";
 						int res = system(command.c_str());
-						NoteEditorWindow* w = new NoteEditorWindow(800, 400, fn.c_str(), ".gui_tmpstd", true); // true means allow_save, this is useful to remove past errors
+						NoteEditorWindow* w = new NoteEditorWindow(800, 400, fn.c_str(), ".gui_tmpstd", false); //false means dont_allow_save, as its temp file anyway
 						w->show();
 						return 1;
 					}
 				}
 				else
 				{
-					NoteEditorWindow* w = new NoteEditorWindow(800, 400, fn.c_str(), fn, true); // false means dont_allow_save
+					NoteEditorWindow* w = new NoteEditorWindow(800, 400, fn.c_str(), fn, true); // true means allow_save, this is useful to remove past errors
 					w->show();
 					return 1;
 				}
