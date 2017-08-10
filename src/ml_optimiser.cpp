@@ -5020,7 +5020,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 					MultidimArray<Complex> FTo;
 					FTo.initZeros(Fimg);
 					// The following line gets the correct pointer to account for overlap in the bodies
-					int oobody = DIRECT_A2D_ELEM(mymodel.pointer_body_overlap, obody, ibody);
+					int oobody = DIRECT_A2D_ELEM(mymodel.pointer_body_overlap, ibody, obody);
 					mymodel.PPref[oobody].get2DFourierTransform(FTo, Abody, IS_NOT_INV);
 
 #ifdef DEBUG_BODIES
@@ -5046,6 +5046,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 						transformer.inverseFourierTransform(Faux, img());
 						CenterFFT(img(), false);
 						FileName fn_img = "unshifted.spi";
+						fn_img = fn_img.insertBeforeExtension("_ibody" + integerToString(ibody+1));
 						fn_img = fn_img.insertBeforeExtension("_obody" + integerToString(obody+1));
 						img.write(fn_img);
 						std::cerr << "written " << fn_img << std::endl;
