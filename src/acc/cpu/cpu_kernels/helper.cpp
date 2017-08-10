@@ -403,6 +403,8 @@ void centerFFT_3D(  int       blocks,
 
 
 /* TODO - if create optimized CPU version of autopicker
+ * All these functions need to be converted to use internal loops rather than
+ * block and thread indices to operate like other active functions seen in this file
 void probRatio( int       blockIdx_x,  
 				int       threadIdx_x,
 				XFLOAT   *d_Mccf,
