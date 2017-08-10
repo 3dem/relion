@@ -18,11 +18,9 @@
  * author citations must be preserved.
  ***************************************************************************/
 
-//#define DEBUG
 //#define DEBUG_CHECKSIZES
 //#define DEBUG_HELICAL_ORIENTATIONAL_SEARCH
 //#define PRINT_GPU_MEM_INFO
-
 //#define DEBUG_BODIES
 
 #ifdef TIMING
@@ -79,7 +77,6 @@ void globalThreadExpectationSomeParticles(ThreadArgument &thArg)
 
 
 /** ========================== I/O operations  =========================== */
-
 
 void MlOptimiser::usage()
 {
@@ -146,6 +143,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 		ini_high = textToFloat(parser.getOption("--ini_high", "Resolution (in Angstroms) to which to limit refinement in the first iteration ", "-1"));
 
 	do_reconstruct_subtracted_bodies = parser.checkOption("--reconstruct_subtracted_bodies", "Use this flag to perform reconstructions with the subtracted images in multi-body refinement");
+	mymodel.body_minimum_overlap = textToFloat(parser.getOption("--minimum_body_overlap", "If bodies overlap more than this fraction, the body overlap will be taken into account when subtracting", "0.05"));
 
 	fnt = parser.getOption("--iter", "Maximum number of iterations to perform", "OLD");
 	if (fnt != "OLD")
@@ -1242,6 +1240,7 @@ void MlOptimiser::initialise()
 
 void MlOptimiser::initialiseGeneral(int rank)
 {
+
 #ifdef DEBUG
 	std::cerr << "Entering initialiseGeneral" << std::endl;
 #endif
@@ -1526,6 +1525,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 		// Start at iteration 1 again
 		iter = 0;
+		std::cerr << "end initialising bodies .." << std::endl;
 
 	}
 	else if (fn_body_masks == "")
@@ -1659,7 +1659,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 			helical_rise_initial / mymodel.pixel_size, helical_twist_initial);
 
 	// Now that sampling is initialised, also modify sigma2_rot for the helical refinement
-        if (do_auto_refine && do_helical_refine && !ignore_helical_symmetry && iter == 0 && sampling.healpix_order >= autosampling_hporder_local_searches)
+	if (do_auto_refine && do_helical_refine && !ignore_helical_symmetry && iter == 0 && sampling.healpix_order >= autosampling_hporder_local_searches)
 	{
 		// Aug20,2015 - Shaoda, Helical refinement
 		RFLOAT rottilt_step = sampling.getAngularSampling(adaptive_oversampling);
@@ -1734,7 +1734,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 	// Initialise the wsum_model according to the mymodel
 	wsum_model.initialise(mymodel, sampling.symmetryGroup(), asymmetric_padding, skip_gridding);
-
 	// Initialise sums of hidden variable changes
 	// In later iterations, this will be done in updateOverallChangesInHiddenVariables
 	sum_changes_optimal_orientations = 0.;
@@ -3064,7 +3063,6 @@ void MlOptimiser::expectationSomeParticles(long int my_first_ori_particle, long 
 					fn_open_stack = fn_stack;
 				}
 			    Image<RFLOAT> img;
-//#define DEBUG_BODIES
 #ifdef DEBUG_BODIES
 			    std::cerr << " fn_img= " << fn_img << " my_ori_particle= " << ori_part_id << std::endl;
 #endif
@@ -4053,7 +4051,6 @@ void MlOptimiser::solventFlatten()
 
 void MlOptimiser::updateCurrentResolution()
 {
-//#define DEBUG
 #ifdef DEBUG
 	std::cerr << "Entering MlOptimiser::updateCurrentResolution" << std::endl;
 #endif
@@ -4111,6 +4108,10 @@ void MlOptimiser::updateCurrentResolution()
 		mymodel.current_resolution = newres;
 
 	} // end for ibody
+#ifdef DEBUG
+	std::cerr << "Leaving MlOptimiser::updateCurrentResolution" << std::endl;
+#endif
+
 }
 
 void MlOptimiser::updateImageSizeAndResolutionPointers()
@@ -5018,7 +5019,9 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 					// Get the FT of the projection in the right direction
 					MultidimArray<Complex> FTo;
 					FTo.initZeros(Fimg);
-					mymodel.PPref[obody].get2DFourierTransform(FTo, Abody, IS_NOT_INV);
+					// The following line gets the correct pointer to account for overlap in the bodies
+					int oobody = DIRECT_A2D_ELEM(mymodel.pointer_body_overlap, obody, ibody);
+					mymodel.PPref[oobody].get2DFourierTransform(FTo, Abody, IS_NOT_INV);
 
 #ifdef DEBUG_BODIES
 					if (my_ori_particle == ROUND(debug1))

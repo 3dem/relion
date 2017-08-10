@@ -179,6 +179,14 @@ public:
 	// Maximum radius of mask
 	std::vector<int> max_radius_mask_bodies;
 
+	// 2D Matrix with pointers to the PPrefs for overlapping bodies
+	MultidimArray<int> pointer_body_overlap;
+
+	std::vector<int> pointer_body_overlap_inv;
+
+	// Minimum percentage of overlap between two masks, before the overlap is taken into account
+	RFLOAT body_minimum_overlap;
+
 	// Estimated accuracy at which rotations can be assigned, one for each class
 	std::vector<RFLOAT> acc_rot;
 

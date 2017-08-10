@@ -198,7 +198,6 @@ void Euler_matrix2angles(const Matrix2D<RFLOAT> &A, RFLOAT &alpha,
 #endif
 }
 #undef CHECK
-#undef DEBUG
 
 #ifdef NEVERDEFINED
 // Michael's method

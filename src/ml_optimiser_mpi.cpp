@@ -715,7 +715,6 @@ void MlOptimiserMpi::expectation()
 #ifdef TIMING
 		timer.tic(TIMING_EXP_1);
 #endif
-
 #ifdef DEBUG
 	std::cerr << "MlOptimiserMpi::expectation: Entering " << std::endl;
 #endif
@@ -767,8 +766,10 @@ void MlOptimiserMpi::expectation()
 				// Communicating over all slaves means we don't have to allocate on the master.
 				node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.PPref[i].data),
 						MULTIDIM_SIZE(mymodel.PPref[0].data), MY_MPI_COMPLEX, sender, node->slaveC);
-				node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.tau2_class[i]),
-						MULTIDIM_SIZE(mymodel.tau2_class[0]), MY_MPI_DOUBLE, sender, node->slaveC);
+				// For multibody refinement with overlapping bodies, there may be more PPrefs than bodies!
+				if (i < mymodel.nr_classes * mymodel.nr_bodies)
+					node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.tau2_class[i]),
+							MULTIDIM_SIZE(mymodel.tau2_class[0]), MY_MPI_DOUBLE, sender, node->slaveC);
 			}
 		}
 
@@ -1995,14 +1996,16 @@ void MlOptimiserMpi::maximization()
 						// 19may2015 translate the reconstruction back to its C.O.M.
 						selfTranslate(mymodel.Iref[ibody], mymodel.com_bodies[ibody], DONT_WRAP);
 
+#define DEBUG_BODIES_SPI
+#ifdef DEBUG_BODIES_SPI
 						// Also write out unmasked body reconstruction
 						FileName fn_tmp;
 						fn_tmp.compose(fn_out + "_unmasked_half1_body", ibody+1,"spi");
 						Image<RFLOAT> Itmp;
 						Itmp()=mymodel.Iref[ibody];
 						Itmp.write(fn_tmp);
-						mymodel.Iref[ibody].setXmippOrigin();
-						mymodel.Iref[ibody] *= mymodel.masks_bodies[ibody];
+#endif
+
 					}
 
 					// Apply local symmetry according to a list of masks and their operators
@@ -2113,13 +2116,13 @@ void MlOptimiserMpi::maximization()
 							// 19may2015 translate the reconstruction back to its C.O.M.
 							selfTranslate(mymodel.Iref[ibody], mymodel.com_bodies[ibody], DONT_WRAP);
 
+#ifdef DEBUG_BODIES_SPI
 							FileName fn_tmp;
 							fn_tmp.compose(fn_out + "_unmasked_half2_body", ibody+1,"spi");
 							Image<RFLOAT> Itmp;
 							Itmp()=mymodel.Iref[ibody];
 							Itmp.write(fn_tmp);
-							mymodel.Iref[ibody].setXmippOrigin();
-							mymodel.Iref[ibody] *= mymodel.masks_bodies[ibody];
+#endif
 						}
 
 						// Apply local symmetry according to a list of masks and their operators
@@ -2571,10 +2574,6 @@ void MlOptimiserMpi::reconstructUnregularisedMapAndCalculateSolventCorrectedFSC(
 			Imask().setXmippOrigin();
 			Iunreg1() *= Imask();
 			Iunreg2() *= Imask();
-
-			Iunreg1.write("test1.spi");
-			Iunreg1.write("test2.spi");
-
 			getFSC(Iunreg1(), Iunreg2(), fsc_masked);
 
 			// To save memory re-read the same input maps again and randomize phases before masking
@@ -2878,7 +2877,6 @@ void MlOptimiserMpi::iterate()
 	TIMING_MPISLAVEWAIT2= timer.setNew("mpiSlaveWaiting2");
 	TIMING_MPISLAVEWAIT3= timer.setNew("mpiSlaveWaiting3");
 #endif
-
 
 	// Launch threads etc.
 	MlOptimiser::iterateSetup();
