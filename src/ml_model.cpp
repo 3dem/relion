@@ -46,6 +46,8 @@ void MlModel::initialise(bool _do_sgd)
 	sigma_psi_bodies.resize(nr_bodies, 0.);
 	sigma_offset_bodies.resize(nr_bodies, 0.);
 	keep_fixed_bodies.resize(nr_bodies, false);
+	pointer_body_overlap.resize(nr_bodies, nr_bodies);
+	body_minimum_overlap = 1.0;
 	max_radius_mask_bodies.resize(nr_bodies, -1);
 	pdf_class.resize(nr_classes, 1./(RFLOAT)nr_classes);
     pdf_direction.resize(nr_classes * nr_bodies);
@@ -132,6 +134,8 @@ void MlModel::read(FileName fn_in)
 		data_dim = 2;
 	if (!MDlog.getValue(EMDL_MLMODEL_NR_BODIES, nr_bodies))
 		nr_bodies = 1;
+	if (!MDlog.getValue(EMDL_BODY_MINIMUM_OVERLAP, body_minimum_overlap))
+		body_minimum_overlap = 1.0;
 	if (!MDlog.getValue(EMDL_MLMODEL_IS_HELIX, is_helix))
 		is_helix = false;
 	if (is_helix)
@@ -208,6 +212,7 @@ void MlModel::read(FileName fn_in)
 
 		// Read in actual reference image
 		img.read(fn_tmp);
+		img().setXmippOrigin();
 		Iref[iclass] = img();
 
 		// Check to see whether there is a SGD-gradient entry as well
@@ -374,13 +379,17 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 		img.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z, pixel_size);
     	for (int iclass = 0; iclass < nr_classes_bodies; iclass++)
     	{
+       		img() = Iref[iclass];
     		if (nr_bodies > 1)
+    		{
     			fn_tmp.compose(fn_out+"_body", iclass+1, "mrc", 3);
+    			// apply the body mask for output to the user
+    			img() *= masks_bodies[iclass];
+    		}
     		else
     			fn_tmp.compose(fn_out+"_class", iclass+1, "mrc", 3);
 
-    		img() = Iref[iclass];
-    		img.write(fn_tmp);
+     		img.write(fn_tmp);
     	}
     	if (do_sgd)
     	{
@@ -454,6 +463,7 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 	MDlog.setValue(EMDL_MLMODEL_PIXEL_SIZE, pixel_size);
 	MDlog.setValue(EMDL_MLMODEL_NR_CLASSES, nr_classes);
 	MDlog.setValue(EMDL_MLMODEL_NR_BODIES, nr_bodies);
+	MDlog.setValue(EMDL_BODY_MINIMUM_OVERLAP, body_minimum_overlap);
 	MDlog.setValue(EMDL_MLMODEL_NR_GROUPS, nr_groups);
 	MDlog.setValue(EMDL_MLMODEL_TAU2_FUDGE_FACTOR, tau2_fudge_factor);
 	MDlog.setValue(EMDL_MLMODEL_NORM_CORRECTION_AVG, avg_norm_correction);
@@ -685,6 +695,7 @@ void MlModel::readImages(FileName fn_ref, bool _is_3d_model, int _ori_size, Expe
 			{
 				MDref.getValue(EMDL_MLMODEL_REF_IMAGE, fn_tmp);
 				img.read(fn_tmp);
+				img().setXmippOrigin();
 				ref_dim = img().getDim();
 				if (ori_size != XSIZE(img()) || ori_size != YSIZE(img()))
 				{
@@ -720,7 +731,6 @@ void MlModel::readImages(FileName fn_ref, bool _is_3d_model, int _ori_size, Expe
 					Iref.push_back(img());
 					if (masks_bodies.size() <= ibody)
 						REPORT_ERROR("BUG: masks_bodies.size() < ibody. Did you initialise the body masks before reading the references?");
-					Iref[ibody] *= masks_bodies[ibody];
 				}
 			}
 			else
@@ -757,6 +767,7 @@ void MlModel::readImages(FileName fn_ref, bool _is_3d_model, int _ori_size, Expe
 			ref_dim = 2;
 			img().initZeros(ori_size, ori_size);
 		}
+		img().setXmippOrigin();
 		Iref.clear();
 		Igrad.clear();
 		for (int iclass = 0; iclass < nr_classes; iclass++)
@@ -962,11 +973,10 @@ void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool als
 		alignWithZ(-rotate_direction_bodies[ibody], orient_bodies[ibody], false);
 	}
 
-
 	if (also_initialise_rest)
 	{
 		if (Iref.size() != 1)
-			REPORT_ERROR("BIG: at this point, there should only be a single reference!");
+			REPORT_ERROR("BUG: at this point, there should only be a single reference!");
 
 		for (int ibody = 1; ibody < nr_bodies; ibody++)
 		{
@@ -986,11 +996,77 @@ void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool als
 			PPref.push_back(PPref[0]);
 			pdf_direction.push_back(pdf_direction[0]);
 		}
-		// Also apply all bodymasks to the initial reference, which is now stored everywhere in Iref
-		for (int ibody = 0; ibody < nr_bodies; ibody++)
+	}
+
+	// Find the overlap of the bodies, and extend the Iref, PPref and masks_bodies vectors
+	pointer_body_overlap.resize(nr_bodies, nr_bodies);
+	pointer_body_overlap_inv.resize(nr_bodies);
+	for (int ibody = 0; ibody < nr_bodies; ibody++)
+	{
+		RFLOAT sum_ibody = masks_bodies[ibody].sum();
+//#define DEBUG_OVERLAP
+#ifdef DEBUG_OVERLAP
+		std::cerr << " ibody= " << ibody << " sum_ibody= " << sum_ibody << std::endl;
+		Image<RFLOAT> It;
+		FileName fnt;
+		It()= masks_bodies[ibody];
+		fnt = "mask_ibody"+integerToString(ibody)+".spi";
+		It.write(fnt);
+#endif
+		for (int obody = 0; obody < nr_bodies; obody++)
 		{
-			Iref[ibody].setXmippOrigin();
-			Iref[ibody] *= masks_bodies[ibody];
+			if (ibody == obody)
+			{
+				DIRECT_A2D_ELEM(pointer_body_overlap, ibody, obody) = obody;
+				pointer_body_overlap_inv[obody] = obody;
+			}
+			else if (body_minimum_overlap > 0. && body_minimum_overlap < 1.)
+			{
+				// Sum all the previously done obody masks to see whether there is also overlap with any of them
+				MultidimArray<RFLOAT> overlap_mask = masks_bodies[ibody];
+				for (int oldobody = 0; oldobody < obody; oldobody++)
+				{
+					if (oldobody != ibody)
+					{
+						int ii = DIRECT_A2D_ELEM(pointer_body_overlap, ibody, oldobody);
+						overlap_mask += masks_bodies[ii];
+					}
+				}
+				// Calculate the overlap between the sum of ibody and all the old obodies until now
+				overlap_mask *= masks_bodies[obody]; // element-wise multiplication
+
+				RFLOAT sum_overlap = overlap_mask.sum();
+#ifdef DEBUG_OVERLAP
+				std::cerr << " obody= " << obody << " sum_overlap= " << sum_overlap << " overlap ratio= " << sum_overlap/sum_ibody << std::endl;
+#endif
+				if (sum_overlap/sum_ibody > body_minimum_overlap)
+				{
+					// Calculate the mask that has the overlap subtracted from the obody mask
+					overlap_mask = masks_bodies[obody] - overlap_mask;
+					// set the right pointer in the 2D matrix
+					DIRECT_A2D_ELEM(pointer_body_overlap, ibody, obody) = PPref.size();
+					// Extend the two vectors here!
+					PPref.push_back(PPref[obody]);
+					masks_bodies.push_back(overlap_mask);
+					// And keep track of which ibody this entry belonged to
+					pointer_body_overlap_inv.push_back(obody);
+
+#ifdef DEBUG_OVERLAP
+					It()= overlap_mask;
+					fnt = "mask_ibody"+integerToString(ibody)+"_obody"+integerToString(obody)+"_overlap.spi";
+					It.write(fnt);
+					std::cerr << " PPref.size()= " << PPref.size() << std::endl;
+#endif
+				}
+				else
+				{
+					// if too small overlap: just use obody pointer
+					DIRECT_A2D_ELEM(pointer_body_overlap, ibody, obody) = obody;
+				}
+			}
+			else
+				// if no minimum_overlap was set: just use obody pointer
+				DIRECT_A2D_ELEM(pointer_body_overlap, ibody, obody) = obody;
 		}
 	}
 
@@ -1046,16 +1122,23 @@ void MlModel::writeBildFileBodies(FileName fn_bild)
 
 void MlModel::setFourierTransformMaps(bool update_tau2_spectra, int nr_threads, bool do_gpu)
 {
+
 	bool do_heavy(true);
-	int nr_classes_bodies = nr_classes * nr_bodies; // also set multiple bodies!
-	for (int iclass = 0; iclass < nr_classes_bodies; iclass++)
+
+	// Note that PPref.size() can be bigger than nr_bodies in multi-body refinement, due to extra PPrefs needed for overlapping bodies
+	// These only exist in PPref form, they are not needed for reconstructions, only for subtractions in getFourierTransformsAndCtfs
+	for (int iclass = 0; iclass < PPref.size(); iclass++)
     {
 
 		MultidimArray<RFLOAT> Irefp;
-		//19may2015: if multi-body refinement: place each body with its center-of-mass in the center
 		if (nr_bodies > 1)
 		{
-			translate(Iref[iclass], Irefp, -com_bodies[iclass], DONT_WRAP);
+			// ibody deals with overlapping bodies here, as iclass can be larger than nr_bodies when bodies overlap,
+			// but there are only nr_bodies Iref
+			int ibody = pointer_body_overlap_inv[iclass];
+			Irefp = Iref[ibody] * masks_bodies[iclass];
+			// Place each body with its center-of-mass in the center of the box
+			selfTranslate(Irefp, -com_bodies[ibody], DONT_WRAP);
 		}
 		else
 		{
@@ -1065,7 +1148,7 @@ void MlModel::setFourierTransformMaps(bool update_tau2_spectra, int nr_threads, 
 		if(PPrefRank.size() > 1)
 			do_heavy = PPrefRank[iclass];
 
-        if (update_tau2_spectra)
+        if (update_tau2_spectra && iclass < nr_classes * nr_bodies)
         {
         	PPref[iclass].computeFourierTransformMap(Irefp, tau2_class[iclass], current_size, nr_threads, true, do_heavy);
         }

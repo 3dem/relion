@@ -1021,7 +1021,6 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 			DIRECT_A1D_ELEM(tau2, i) = fsc_based_tau;
 			// data_vs_prior is merely for reporting: it is not used for anything in the reconstruction
 			DIRECT_A1D_ELEM(data_vs_prior, i) = myssnr;
-
 		}
 	}
     RCTOC(ReconTimer,ReconS_2);
@@ -1121,6 +1120,19 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 				DIRECT_MULTIDIM_ELEM(Fconv, n) /= DIRECT_MULTIDIM_ELEM(Fweight, n);
 		}
 		RCTOC(ReconTimer,ReconS_3);
+#ifdef DEBUG_RECONSTRUCT
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fconv)
+		{
+			DIRECT_MULTIDIM_ELEM(ttt(), n) = DIRECT_MULTIDIM_ELEM(Fweight, n);
+		}
+		ttt.write("reconstruct_skipgridding_correction_term.spi");
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fconv)
+		{
+			if (DIRECT_MULTIDIM_ELEM(Fweight, n) > 0.)
+				DIRECT_MULTIDIM_ELEM(ttt(), n) = 1./DIRECT_MULTIDIM_ELEM(Fweight, n);
+		}
+		ttt.write("reconstruct_skipgridding_correction_term_inverse.spi");
+#endif
 	}
 	else
 	{
