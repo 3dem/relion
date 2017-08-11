@@ -313,7 +313,7 @@ void SymList::compute_subgroup()
             << "chain length=" << new_chain_length << std::endl;
             std::cout << "Result R Sh\n" << newR;
 #endif
-#undef DEBUG
+//#undef DEBUG
             newR.setSmallValuesToZero();
             newL.setSmallValuesToZero();
             add_matrices(newL, newR, new_chain_length);

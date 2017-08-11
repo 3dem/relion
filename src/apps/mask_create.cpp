@@ -62,12 +62,13 @@ class mask_create_parameters
 	    angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms) for the lowpass filter", "1"));
 	    helical_z_percentage = textToFloat(parser.getOption("--z_percentage", "This box length along the center of Z axis contains good information of the helix", "0.3"));
 
-	    if (fn_thr=="" && fn_apply_in == "")
-	    	REPORT_ERROR("Either provide --i to apply a mask, OR --create_from to create a new mask");
-
 	    // Check for errors in the command-line option
     	if (parser.checkForErrors())
     		REPORT_ERROR("Errors encountered on the command line, exiting...");
+
+    	if (fn_thr=="" && fn_apply_in == "")
+	    	REPORT_ERROR("Either provide --i to apply a mask, OR --create_from to create a new mask");
+
 	}
 
 

@@ -176,6 +176,17 @@ public:
 	// Is this body kept fixed in refinement?
 	std::vector<bool> keep_fixed_bodies;
 
+	// Maximum radius of mask
+	std::vector<int> max_radius_mask_bodies;
+
+	// 2D Matrix with pointers to the PPrefs for overlapping bodies
+	MultidimArray<int> pointer_body_overlap;
+
+	std::vector<int> pointer_body_overlap_inv;
+
+	// Minimum percentage of overlap between two masks, before the overlap is taken into account
+	RFLOAT body_minimum_overlap;
+
 	// Estimated accuracy at which rotations can be assigned, one for each class
 	std::vector<RFLOAT> acc_rot;
 
@@ -301,7 +312,8 @@ public:
     		sigma_psi_bodies = MD.sigma_psi_bodies;
     		sigma_offset_bodies = MD.sigma_offset_bodies;
     		keep_fixed_bodies = MD.keep_fixed_bodies;
-    		PPref = MD.PPref;
+    		max_radius_mask_bodies = MD.max_radius_mask_bodies;
+			PPref = MD.PPref;
     		PPrefRank = MD.PPrefRank;
     		group_names = MD.group_names;
     		sigma2_noise = MD.sigma2_noise;
@@ -340,6 +352,7 @@ public:
 		sigma_psi_bodies.clear();
 		sigma_offset_bodies.clear();
 		keep_fixed_bodies.clear();
+		max_radius_mask_bodies.clear();
 		PPref.clear();
 		PPrefRank.clear();
 		group_names.clear();
@@ -405,6 +418,9 @@ public:
 
 	/** Read in the binary masks provided by the user and then make a soft edge on those */
 	void initialiseBodies(FileName fn_masks, FileName fn_root_out, bool also_initialise_rest = false);
+
+	/** Write out a Bild file with the COMs and directions or rotation for each body */
+	void writeBildFileBodies(FileName fn_bild);
 
 	// Set FourierTransforms in Projector of each class
 	// current_size will determine the size of the transform (in number of Fourier shells) to be held in the projector ( thisClass == -1  => do all classes this call)

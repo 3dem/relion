@@ -52,14 +52,14 @@ int StdOutDisplay::handle(int ev)
 					{
 						std::string command = "awk -F\"\r\" '{if (NF>1) {print $NF} else {print}}' < " + fn + " > .gui_tmpstd";
 						int res = system(command.c_str());
-						NoteEditorWindow* w = new NoteEditorWindow(800, 400, fn.c_str(), ".gui_tmpstd", true); // true means allow_save, this is useful to remove past errors
+						NoteEditorWindow* w = new NoteEditorWindow(800, 400, fn.c_str(), ".gui_tmpstd", false); //false means dont_allow_save, as its temp file anyway
 						w->show();
 						return 1;
 					}
 				}
 				else
 				{
-					NoteEditorWindow* w = new NoteEditorWindow(800, 400, fn.c_str(), fn, true); // false means dont_allow_save
+					NoteEditorWindow* w = new NoteEditorWindow(800, 400, fn.c_str(), fn, true); // true means allow_save, this is useful to remove past errors
 					w->show();
 					return 1;
 				}
@@ -599,6 +599,8 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 		textbuff_stdout = new Fl_Text_Buffer();
 		textbuff_stderr = new Fl_Text_Buffer();
 		// Disable warning message about UTF-8 transcoding
+		textbuff_stdout->transcoding_warning_action=NULL;
+		textbuff_stderr->transcoding_warning_action=NULL;
 		disp_stdout = new StdOutDisplay(XJOBCOL1, GUIHEIGHT_EXT_START2 + JOBHEIGHT + STDOUT_Y-5, w-20, 105);
 		disp_stderr = new StdOutDisplay(XJOBCOL1, GUIHEIGHT_EXT_START2 + JOBHEIGHT + STDERR_Y-5, w-20, 50);
 		disp_stdout->fn_file = "run.out";
@@ -1013,6 +1015,7 @@ void GuiMainWindow::cb_select_browsegroup_i(bool show_initial_screen)
 		background_grp->hide();
 
 	int iwin = (browser->value() - 1);
+	if (iwin < 0 || iwin >= NR_BROWSE_TABS) return;
 	// Show the 'selected' group, hide the others
 	for ( int t=0; t<NR_BROWSE_TABS; t++ )
     {
@@ -1740,6 +1743,7 @@ void GuiMainWindow::cb_load_i()
 {
 	int iwin = browser->value() - 1;
 	gui_jobwindows[iwin]->myjob.read("", is_main_continue);
+	alias_current_job->value("Give_alias_here");
 	gui_jobwindows[iwin]->updateMyGui();
 
 	// Make the current continue-setting active

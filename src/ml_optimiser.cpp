@@ -18,11 +18,9 @@
  * author citations must be preserved.
  ***************************************************************************/
 
-//#define DEBUG
 //#define DEBUG_CHECKSIZES
 //#define DEBUG_HELICAL_ORIENTATIONAL_SEARCH
 //#define PRINT_GPU_MEM_INFO
-
 //#define DEBUG_BODIES
 
 #ifdef TIMING
@@ -81,7 +79,6 @@ void globalThreadExpectationSomeParticles(ThreadArgument &thArg)
 
 
 /** ========================== I/O operations  =========================== */
-
 
 void MlOptimiser::usage()
 {
@@ -148,6 +145,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 		ini_high = textToFloat(parser.getOption("--ini_high", "Resolution (in Angstroms) to which to limit refinement in the first iteration ", "-1"));
 
 	do_reconstruct_subtracted_bodies = parser.checkOption("--reconstruct_subtracted_bodies", "Use this flag to perform reconstructions with the subtracted images in multi-body refinement");
+	mymodel.body_minimum_overlap = textToFloat(parser.getOption("--minimum_body_overlap", "If bodies overlap more than this fraction, the body overlap will be taken into account when subtracting", "0.05"));
 
 	fnt = parser.getOption("--iter", "Maximum number of iterations to perform", "OLD");
 	if (fnt != "OLD")
@@ -1244,6 +1242,7 @@ void MlOptimiser::initialise()
 
 void MlOptimiser::initialiseGeneral(int rank)
 {
+
 #ifdef DEBUG
 	std::cerr << "Entering initialiseGeneral" << std::endl;
 #endif
@@ -1496,6 +1495,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 		// This reads the masks, calculates com_bodies and orient_bodies
 		mymodel.initialiseBodies(fn_body_masks, fn_out, true);
+		mymodel.writeBildFileBodies(fn_out + "_bodies.bild");
 
 		// For multi-body refinement: expand the MetaDataTables with orientations for all bodies
 		mydata.initialiseBodies(mymodel.nr_bodies);
@@ -1527,6 +1527,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 		// Start at iteration 1 again
 		iter = 0;
+		std::cerr << "end initialising bodies .." << std::endl;
 
 	}
 	else if (fn_body_masks == "")
@@ -1660,7 +1661,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 			helical_rise_initial / mymodel.pixel_size, helical_twist_initial);
 
 	// Now that sampling is initialised, also modify sigma2_rot for the helical refinement
-        if (do_auto_refine && do_helical_refine && !ignore_helical_symmetry && iter == 0 && sampling.healpix_order >= autosampling_hporder_local_searches)
+	if (do_auto_refine && do_helical_refine && !ignore_helical_symmetry && iter == 0 && sampling.healpix_order >= autosampling_hporder_local_searches)
 	{
 		// Aug20,2015 - Shaoda, Helical refinement
 		RFLOAT rottilt_step = sampling.getAngularSampling(adaptive_oversampling);
@@ -1735,7 +1736,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 	// Initialise the wsum_model according to the mymodel
 	wsum_model.initialise(mymodel, sampling.symmetryGroup(), asymmetric_padding, skip_gridding);
-
 	// Initialise sums of hidden variable changes
 	// In later iterations, this will be done in updateOverallChangesInHiddenVariables
 	sum_changes_optimal_orientations = 0.;
@@ -3094,7 +3094,6 @@ void MlOptimiser::expectationSomeParticles(long int my_first_ori_particle, long 
 					fn_open_stack = fn_stack;
 				}
 			    Image<RFLOAT> img;
-//#define DEBUG_BODIES
 #ifdef DEBUG_BODIES
 			    std::cerr << " fn_img= " << fn_img << " my_ori_particle= " << ori_part_id << std::endl;
 #endif
@@ -3109,6 +3108,7 @@ void MlOptimiser::expectationSomeParticles(long int my_first_ori_particle, long 
 	} //end loop over ori_part_id
 
 
+//#define DEBUG_EXPSOME
 #ifdef DEBUG_EXPSOME
 	std::cerr << " exp_my_first_ori_particle= " << exp_my_first_ori_particle << " exp_my_last_ori_particle= " << exp_my_last_ori_particle << std::endl;
 	std::cerr << " exp_nr_images= " << exp_nr_images << std::endl;
@@ -3238,7 +3238,8 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
     for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
     {
 
-		if (mymodel.keep_fixed_bodies[ibody])
+		// Skip this body if keep_fixed_bodies[ibody] or if it's angular accuracy is worse than 3x the sampling rate
+    	if ( mymodel.nr_bodies > 1 && (mymodel.keep_fixed_bodies[ibody] || mymodel.acc_rot[ibody] > 3. * sampling.getAngularSampling(adaptive_oversampling)) )
 			continue;
 
     	// Here define all kind of local arrays that will be needed
@@ -3552,7 +3553,7 @@ void MlOptimiser::symmetriseReconstructions()
 {
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 	{
-		if (mymodel.keep_fixed_bodies[ibody])
+		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody])
 			continue;
 
 		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
@@ -3581,7 +3582,7 @@ void MlOptimiser::applyLocalSymmetryForEachRef()
 
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 	{
-		if (mymodel.keep_fixed_bodies[ibody])
+		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody])
 			continue;
 
 		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
@@ -3600,7 +3601,7 @@ void MlOptimiser::makeGoodHelixForEachRef()
 
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 	{
-		if (mymodel.keep_fixed_bodies[ibody])
+		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody])
 			continue;
 
 		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
@@ -4081,7 +4082,6 @@ void MlOptimiser::solventFlatten()
 
 void MlOptimiser::updateCurrentResolution()
 {
-//#define DEBUG
 #ifdef DEBUG
 	std::cerr << "Entering MlOptimiser::updateCurrentResolution" << std::endl;
 #endif
@@ -4139,6 +4139,10 @@ void MlOptimiser::updateCurrentResolution()
 		mymodel.current_resolution = newres;
 
 	} // end for ibody
+#ifdef DEBUG
+	std::cerr << "Leaving MlOptimiser::updateCurrentResolution" << std::endl;
+#endif
+
 }
 
 void MlOptimiser::updateImageSizeAndResolutionPointers()
@@ -4339,7 +4343,6 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 {
 
 	FourierTransformer transformer;
-
 	for (int ipart = 0; ipart < mydata.ori_particles[my_ori_particle].particles_id.size(); ipart++)
 	{
 		FileName fn_img;
@@ -4817,6 +4820,8 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 
 		MultidimArray<RFLOAT> Mnoise;
 		bool is_helical_segment = (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
+		// For multibodies: have the mask radius equal to maximum radius within body mask plus the translational offset search range
+		RFLOAT my_mask_radius = (mymodel.nr_bodies > 1 ) ? mymodel.max_radius_mask_bodies[ibody] + sampling.offset_range: (particle_diameter / (2. * mymodel.pixel_size));
 		if (!do_zero_mask)
 		{
 			// Make a noisy background image with the same spectrum as the sigma2_noise
@@ -4862,22 +4867,22 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 			// May24,2014 - Shaoda & Sjors, Helical refinement
 			if (is_helical_segment)
 			{
-				softMaskOutsideMapForHelix(img(), psi_deg, tilt_deg, (particle_diameter / (2. * mymodel.pixel_size)),
+				softMaskOutsideMapForHelix(img(), psi_deg, tilt_deg, my_mask_radius,
 						(helical_tube_outer_diameter / (2. * mymodel.pixel_size)), width_mask_edge, &Mnoise);
 			}
 			else
-				softMaskOutsideMap(img(), particle_diameter / (2. * mymodel.pixel_size), (RFLOAT)width_mask_edge, &Mnoise);
+				softMaskOutsideMap(img(), my_mask_radius, (RFLOAT)width_mask_edge, &Mnoise);
 		}
 		else
 		{
 			// May24,2014 - Shaoda & Sjors, Helical refinement
 			if (is_helical_segment)
 			{
-				softMaskOutsideMapForHelix(img(), psi_deg, tilt_deg, (particle_diameter / (2. * mymodel.pixel_size)),
+				softMaskOutsideMapForHelix(img(), psi_deg, tilt_deg, my_mask_radius,
 						(helical_tube_outer_diameter / (2. * mymodel.pixel_size)), width_mask_edge);
 			}
 			else
-				softMaskOutsideMap(img(), particle_diameter / (2. * mymodel.pixel_size), (RFLOAT)width_mask_edge);
+				softMaskOutsideMap(img(), my_mask_radius, (RFLOAT)width_mask_edge);
 		}
 #ifdef DEBUG_SOFTMASK
 		tt()=img();
@@ -5045,7 +5050,9 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 					// Get the FT of the projection in the right direction
 					MultidimArray<Complex> FTo;
 					FTo.initZeros(Fimg);
-					mymodel.PPref[obody].get2DFourierTransform(FTo, Abody, IS_NOT_INV);
+					// The following line gets the correct pointer to account for overlap in the bodies
+					int oobody = DIRECT_A2D_ELEM(mymodel.pointer_body_overlap, ibody, obody);
+					mymodel.PPref[oobody].get2DFourierTransform(FTo, Abody, IS_NOT_INV);
 
 #ifdef DEBUG_BODIES
 					if (my_ori_particle == ROUND(debug1))
@@ -5070,6 +5077,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 						transformer.inverseFourierTransform(Faux, img());
 						CenterFFT(img(), false);
 						FileName fn_img = "unshifted.spi";
+						fn_img = fn_img.insertBeforeExtension("_ibody" + integerToString(ibody+1));
 						fn_img = fn_img.insertBeforeExtension("_obody" + integerToString(obody+1));
 						img.write(fn_img);
 						std::cerr << "written " << fn_img << std::endl;
@@ -5145,7 +5153,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 				std::cerr << "Written::: " << fn_img << std::endl;
 			}
 #endif
-			softMaskOutsideMap(img(), particle_diameter / (2. * mymodel.pixel_size), (RFLOAT)width_mask_edge);
+			softMaskOutsideMap(img(), my_mask_radius, (RFLOAT)width_mask_edge);
 
 #ifdef DEBUG_BODIES
 			if (my_ori_particle == ROUND(debug1))
@@ -7646,7 +7654,7 @@ void MlOptimiser::monitorHiddenVariableChanges(long int my_first_ori_particle, l
 			for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 			{
 
-				if (mymodel.keep_fixed_bodies[ibody])
+				if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody])
 					continue;
 
 				RFLOAT old_rot, old_tilt, old_psi, old_xoff, old_yoff, old_zoff = 0.;

@@ -806,8 +806,11 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 
 				// Now that we have the best direction, find the corresponding prior probability
 				RFLOAT diffang = ACOSD( dotProduct(best_direction, prior90_direction) );
-				if (diffang > 180.)
+				if (diffang < -180.)
+					diffang = ABS(diffang + 360.);
+				else if (diffang > 180.)
 					diffang = ABS(diffang - 360.);
+				diffang = ABS(diffang);
 
 				long int mypos = pointer_dir_nonzeroprior.size() - 1;
 				// Check tilt angle is within 3*sigma_tilt_from_ninety
