@@ -1,6 +1,8 @@
 include_directories("${CMAKE_SOURCE_DIR}")
 
-include_directories("${FFTW_INCLUDES}")
+if(NOT MKLFFT)
+    include_directories("${FFTW_INCLUDES}")
+endif(NOT MKLFFT)
 #include_directories(${CMAKE_BINARY_DIR}/include)
 
 find_path (X11_INCLUDES Xdbe.h)
@@ -41,10 +43,12 @@ else()
     add_library(relion_lib STATIC ${REL_SRC} ${REL_SRC_H} ${REL_HP})
 endif()
 
-target_link_libraries(relion_lib ${FFTW_LIBRARIES})
-if(BUILD_OWN_FFTW)
-    add_dependencies(relion_lib OWN_FFTW)
-endif()
+if(NOT MKLFFT)
+    target_link_libraries(relion_lib ${FFTW_LIBRARIES})
+    if(BUILD_OWN_FFTW)
+        add_dependencies(relion_lib OWN_FFTW)
+    endif()
+endif(NOT MKLFFT)
 
 if(GUI)
     target_link_libraries(relion_lib ${FLTK_LIBRARIES})
@@ -100,8 +104,12 @@ foreach (_target ${RELION_TARGETS})
  	add_dependencies(${_target} relion_lib)
 	
 	set_target_properties(${_target} PROPERTIES PREFIX "relion_")
-	
-	target_link_libraries(${_target} ${LIB} ${FFTW_LIBRARIES} ${EXTRA_LIBS} ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
+
+	if(NOT MKLFFT)
+	    target_link_libraries(${_target} ${LIB} ${EXTRA_LIBS} ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
+	else()	
+	    target_link_libraries(${_target} ${LIB} ${FFTW_LIBRARIES} ${EXTRA_LIBS} ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
+	endif(NOT MKLFFT)
 	
 	if(CUDA_FOUND)
 	    target_link_libraries(${_target} relion_gpu_util)

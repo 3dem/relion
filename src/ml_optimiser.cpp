@@ -1116,17 +1116,17 @@ void MlOptimiser::initialise()
 	{
 		// Set the size of the TBB thread pool for the entire run
 		tbbSchedulerInit.initialize(nr_threads);
-/*  TODO
-		// Enable threaded FFTW
-		int success = fftw_init_threads();
-		if (0 == success)
-				REPORT_ERROR("Multithreaded FFTW failed to initialize");
-
-		// And allow plans before expectation to run using allowed
-		// number of threads
-		fftw_plan_with_nthreads(nr_threads);
- */
 	}
+#endif
+#ifdef MKLFFT
+	// Enable multi-threaded FFTW
+	int success = fftw_init_threads();
+	if (0 == success)
+		REPORT_ERROR("Multithreaded FFTW failed to initialize");
+
+	// And allow plans before expectation to run using allowed
+	// number of threads
+	fftw_plan_with_nthreads(nr_threads);
 #endif
 
 	if (fn_sigma != "")
@@ -2437,9 +2437,9 @@ void MlOptimiser::expectation()
 		timer.tic(TIMING_EXP_SETUP);
 #endif
 		
-#ifdef ALTCPU
+#ifdef MKLFFT
 	// Allow parallel FFTW execution
-	//TODO fftw_plan_with_nthreads(nr_threads);
+	fftw_plan_with_nthreads(nr_threads);
 #endif
 		
 	// Initialise some stuff
@@ -2560,9 +2560,9 @@ void MlOptimiser::expectation()
 
 	/************************************************************************/
 
-#ifdef ALTCPU
+#ifdef MKLFFT
 	// Single-threaded FFTW execution for code inside parallel processing loop
-	// TODO fftw_plan_with_nthreads(1);
+	fftw_plan_with_nthreads(1);
 #endif
 
 	// Now perform real expectation over all particles
@@ -2731,10 +2731,10 @@ void MlOptimiser::expectation()
 		cudaDeviceBundles.clear();
 	}
 #endif
-#ifdef ALTCPU
+#ifdef  MKLFFT
 	// Allow parallel FFTW execution to continue now that we are outside the parallel
 	// portion of expectation
-	// TODO fftw_plan_with_nthreads(nr_threads);
+	fftw_plan_with_nthreads(nr_threads);
 #endif
 	
 	// Set back verb
@@ -3112,21 +3112,25 @@ void MlOptimiser::expectationSomeParticles(long int my_first_ori_particle, long 
 		// particles in parallel.  Like the GPU implementation, the lower-
 		// level parallelism is implemented by compiler vectorization
 		// (roughly equivalent to GPU "threads").
+	int tCount = 0;  
     
         // process all passed particles in parallel
         //for(unsigned long i=my_first_ori_particle; i<=my_last_ori_particle; i++) {
         tbb::parallel_for(my_first_ori_particle, my_last_ori_particle+1, [&](int i) {
             CpuOptimiserType::reference ref = tbbCpuOptimiser.local();
             MlOptimiserCpu *cpuOptimiser = (MlOptimiserCpu *)ref;
-            if(cpuOptimiser == NULL) {           
-                 cpuOptimiser = new MlOptimiserCpu(this, "cpu_optimiser");
-                 cpuOptimiser->resetData();
-                 cpuOptimiser->setupFixedSizedObjects();
-                 cpuOptimiser->setupTunableSizedObjects();
-                 ref = cpuOptimiser;
-            }
+            if(cpuOptimiser == NULL) {
+                cpuOptimiser = new MlOptimiserCpu(this, "cpu_optimiser");
+                cpuOptimiser->resetData();
+                cpuOptimiser->setupFixedSizedObjects();
+                cpuOptimiser->setupTunableSizedObjects();
+                ref = cpuOptimiser;
 
-			cpuOptimiser->expectationOneParticle(i);
+		cpuOptimiser->thread_id = tCount;
+		tCount++;  // Race condition!
+            }  // cpuOptimiser == NULL
+
+		cpuOptimiser->expectationOneParticle(i, cpuOptimiser->thread_id);
         });
         //}
 
@@ -3135,6 +3139,10 @@ void MlOptimiser::expectationSomeParticles(long int my_first_ori_particle, long 
               i != tbbCpuOptimiser.end();  ++i) {
             MlOptimiserCpu* b = (MlOptimiserCpu*)(*i);
             if(!b) continue;
+
+#ifdef DEBUG
+            std::cerr << "Faux thread id: " << b->thread_id << std::endl;
+#endif
 
             for (int j = 0; j < b->cpuProjectors.size(); j++)
             {

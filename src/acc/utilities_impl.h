@@ -132,7 +132,7 @@ void centerFFT_2D(int grid_size, int batch_size, int block_size,
 				xshift,
 				yshift);
 #else
-	CpuKernels::centerFFT_2D(grid_size, batch_size, block_size,
+	CpuKernels::centerFFT_2D<XFLOAT>(grid_size, batch_size, block_size,
 				img_in,
 				image_size,
 				xdim,
@@ -160,7 +160,8 @@ void centerFFT_2D(int grid_size, int batch_size, int block_size,
 				xshift,
 				yshift);
 #else
-	CpuKernels::centerFFT_2D(grid_size, batch_size, block_size,
+        for (int i = 0; i < grid_size; i++)
+		CpuKernels::centerFFT_2D<XFLOAT>(i, batch_size, block_size,
 				img_in,
 				image_size,
 				xdim,
@@ -193,7 +194,8 @@ void centerFFT_3D(int grid_size, int batch_size, int block_size,
 				yshift,
 				zshift);
 #else
-	CpuKernels::centerFFT_3D(grid_size, batch_size, block_size,
+	for (int i = 0; i < grid_size; i++)
+		CpuKernels::centerFFT_3D<XFLOAT>(i, batch_size, block_size,
 				img_in,
 				image_size,
 				xdim,

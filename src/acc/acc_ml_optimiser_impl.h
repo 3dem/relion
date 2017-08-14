@@ -2998,7 +2998,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 // -------------------- accDoExpectationOneParticle ---------------------------
 // ----------------------------------------------------------------------------
 template <class MlClass>
-void accDoExpectationOneParticle(MlClass *myInstance, unsigned long my_ori_particle) 
+void accDoExpectationOneParticle(MlClass *myInstance, unsigned long my_ori_particle, int thread_id) 
 {
 	SamplingParameters sp;
 	MlOptimiser *baseMLO = myInstance->baseMLO;

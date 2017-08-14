@@ -290,23 +290,22 @@ void cpu_translate3D(T * g_image_in,
 	}
 }
 
-void centerFFT_2D(  int     blocks,
-					int     batch_size,
-					int     block_size,
-					XFLOAT *img_in,
-					int     image_size,
-					int     xdim,
-					int     ydim,
-					int     xshift,
-					int     yshift)
+template <typename T>
+void centerFFT_2D(  	int     blk,
+			int     batch_size,
+			int     block_size,
+			T       *img_in,
+			int     image_size,
+			int     xdim,
+			int     ydim,
+			int     xshift,
+			int     yshift)
 {
 // TODO - any way to collapse to 2 loops - one over pixels < image_size/2, one over batch?
-// TODO - in some places we want this outer loop to run in parallel.  Up-level the
-//        outer loop to utilities.h so we can run in parallel or not as desired?
-	for(int blk=0; blk<blocks; blk++){
+//	for(int blk=0; blk<blocks; blk++){
 		for(int batch=0; batch<batch_size; batch++) {
 			for(int tid=0; tid<block_size; tid++)  {
-				XFLOAT buffer;
+				T buffer;
 				int pixel = tid + blk*block_size;
 				long int image_offset = image_size*batch;
 			//	int pixel_pass_num = ceilfracf(image_size, CFTT_BLOCK_SIZE);
@@ -339,28 +338,48 @@ void centerFFT_2D(  int     blocks,
 //	}
 			} // tid
 		} // batch
-	} // blk
+//	} // blk
 }
 
-void centerFFT_3D(  int       blocks,
-					int       batch_size,
-					int       block_size,
-					XFLOAT   *img_in,
-					int       image_size,
-					int       xdim,
-					int       ydim,
-					int       zdim,
-					int       xshift,
-					int       yshift,
-					int       zshift)
+
+template void centerFFT_2D<float>(  	int     blk,
+                                        int     batch_size,
+                                        int     block_size,
+                                        float   *img_in,
+                                        int     image_size,
+                                        int     xdim,
+                                        int     ydim,
+                                        int     xshift,
+                                        int     yshift);
+template void centerFFT_2D<double>(  	int     blk,
+                                        int     batch_size,
+                                        int     block_size,
+                                        double  *img_in,
+                                        int     image_size,
+                                        int     xdim,
+                                        int     ydim,
+                                        int     xshift,
+                                        int     yshift);
+
+
+template <typename T>
+void centerFFT_3D(  	int       blk,
+			int       batch_size,
+			int       block_size,
+			T         *img_in,
+			int       image_size,
+			int       xdim,
+			int       ydim,
+			int       zdim,
+			int       xshift,
+			int       yshift,
+			int       zshift)
 {
 // TODO - any way to collapse to 2 loops - one over pixels < image_size/2, one over batch?
-// TODO - in some places we want this outer loop to run in parallel.  Up-level the
-//        outer loop to utilities.h so we can run in parallel or not as desired?
-	for(int blk=0; blk<blocks; blk++){
+//	for(int blk=0; blk<blocks; blk++){
 		for(int batch=0; batch<batch_size; batch++) {
 			for(int tid=0; tid<block_size; tid++)  {
-				XFLOAT buffer;
+				T buffer;
 				int pixel = tid + blk*block_size;
 				long int image_offset = image_size*batch;
 				int xydim = xdim*ydim;
@@ -398,9 +417,32 @@ void centerFFT_3D(  int       blocks,
 				}
 			} // tid
 		} // batch
-	} // blk
+//	} // blk
 }
 
+
+template void centerFFT_3D<float>(  	int       blk,
+					int       batch_size,
+					int       block_size,
+					float     *img_in,
+					int       image_size,
+					int       xdim,
+					int       ydim,
+					int       zdim,
+					int       xshift,
+					int       yshift,
+					int       zshift);
+template void centerFFT_3D<double>(  	int       blk,
+					int       batch_size,
+					int       block_size,
+					double    *img_in,
+					int       image_size,
+					int       xdim,
+					int       ydim,
+					int       zdim,
+					int       xshift,
+					int       yshift,
+					int       zshift);
 
 /* TODO - if create optimized CPU version of autopicker
  * All these functions need to be converted to use internal loops rather than

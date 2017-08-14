@@ -324,8 +324,9 @@ bool MetaDataContainer::getValue( const EMDLabel name, std::string &value)
 
 bool MetaDataContainer::valueExists(EMDLabel name)
 {
-	if (! EMDL::isValidLabel(name))
+	if (! EMDL::isValidLabel(name)) {
 		REPORT_ERROR("Unrecognised label type in MetaDataContainer valueExists");
+	}
 
 	if (find(labels.begin(), labels.end(), name) != labels.end())
 		return true;

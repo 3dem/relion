@@ -239,20 +239,22 @@ void cpu_translate3D(T * g_image_in,
 					int      dz);
 
 //----------------------------------------------------------------------------
+template <typename T>
 void centerFFT_2D(  int       blocks,
-					int       batch_size,
+					int       batch,
 					int       block_size,
-					XFLOAT   *img_in,
+					T         *img_in,
 					int       image_size,
 					int       xdim,
 					int       ydim,
 					int       xshift,
 					int       yshift);
 
+template <typename T>
 void centerFFT_3D(  int       blocks,
-					int       batch_size,
+					int       batch,
 					int       block_size,
-					XFLOAT   *img_in,
+					T         *img_in,
 					int       image_size,
 					int       xdim,
 					int       ydim,

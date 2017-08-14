@@ -34,6 +34,8 @@ public:
 	bool refIs3D;
 	bool dataIs3D;
 
+	int thread_id;
+
 	unsigned failsafe_attempts;
 
 #ifdef TIMING_FILES
@@ -62,14 +64,15 @@ public:
 			timer(timing_fnm),
 #endif
 			failsafe_attempts(0),
-			generateProjectionPlanOnTheFly(false)
+			generateProjectionPlanOnTheFly(false),
+			thread_id(-1)
 	{};
 	
 	void resetData();
 
 //	void doThreadExpectationSomeParticles(int thread_id);
 
-    void expectationOneParticle(unsigned long my_ori_particle);
+    void expectationOneParticle(unsigned long my_ori_particle, int thread_id);
     
 	~MlOptimiserCpu()
 	{
