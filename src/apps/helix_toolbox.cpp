@@ -351,6 +351,10 @@ public:
 			SWAP(rise_min_A, rise_max_A, tmp_RFLOAT);
 		if (twist_min_deg > twist_max_deg)
 			SWAP(twist_min_deg, twist_max_deg, tmp_RFLOAT);
+
+		// Check for errors in the command-line option
+		if (parser.checkForErrors())
+			REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 	};
 
 	void clear()

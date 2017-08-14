@@ -28,6 +28,7 @@
 //#define OUTPUT_STDDEV_MAP_ONLY 2
 //#define OUTPUT_BOTH_MEAN_AND_STDDEV_MAPS 3
 
+//#define TIMING
 class ccfPixel
 {
 public:

@@ -2895,8 +2895,12 @@ public:
                                     char operation)
     {
         if (!op1.sameShape(op2))
-            REPORT_ERROR( (std::string) "Array_by_array: different shapes (" +
-                         operation + ")");
+        {
+        	op1.printShape();
+        	op2.printShape();
+        	REPORT_ERROR( (std::string) "Array_by_array: different shapes (" +
+        			operation + ")");
+        }
         if (result.data == NULL || !result.sameShape(op1))
             result.resize(op1);
         coreArrayByArray(op1, op2, result, operation);

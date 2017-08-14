@@ -110,13 +110,13 @@ extern std::string current_browse_directory;
 //version-2.0 #define GUI_BUTTON_DARK_COLOR (fl_rgb_color(0, 160, 200))
 //version-2.0 #define GUI_RUNBUTTON_COLOR (fl_rgb_color(70, 120, 255))
 //version-2.1
-#define GUI_BUTTON_COLOR (fl_rgb_color(100, 200, 50))
-#define GUI_BUTTON_DARK_COLOR (fl_rgb_color(70, 140, 30))
-#define GUI_RUNBUTTON_COLOR (fl_rgb_color(0, 130, 0))
+//#define GUI_BUTTON_COLOR (fl_rgb_color(100, 200, 50))
+//#define GUI_BUTTON_DARK_COLOR (fl_rgb_color(70, 140, 30))
+//#define GUI_RUNBUTTON_COLOR (fl_rgb_color(0, 130, 0))
 // devel-version
-//#define GUI_BUTTON_COLOR (fl_rgb_color(255, 150, 150))
-//#define GUI_BUTTON_DARK_COLOR (fl_rgb_color(200, 120, 120))
-//#define GUI_RUNBUTTON_COLOR (fl_rgb_color(170, 0, 0))
+#define GUI_BUTTON_COLOR (fl_rgb_color(255, 150, 150))
+#define GUI_BUTTON_DARK_COLOR (fl_rgb_color(200, 120, 120))
+#define GUI_RUNBUTTON_COLOR (fl_rgb_color(170, 0, 0))
 //possible?#define GUI_BUTTON_COLOR (fl_rgb_color(50, 200, 255))
 //devel-version
 //possible #define GUI_RUNBUTTON_COLOR (fl_rgb_color(205,0,155))

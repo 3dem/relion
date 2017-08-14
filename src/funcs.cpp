@@ -760,5 +760,55 @@ void swapbytes(char* v, unsigned long n)
     }
 }
 
+void HSL2RGB(RFLOAT H, RFLOAT S, RFLOAT L, RFLOAT &R, RFLOAT &G, RFLOAT &B)
+{
+	if (S < XMIPP_EQUAL_ACCURACY)
+	{
+		R = G = B = L;
+	}
+	else
+	{
+
+		RFLOAT temp1 = (L < 0.5) ? L * (1.0 + S) : L + S - L * S;
+		RFLOAT temp2 = 2 * L - temp1;
+		RFLOAT tR = H + 0.33333;
+		RFLOAT tG = H;
+		RFLOAT tB = H - 0.33333;
+		realWRAP(tR, 0., 1.);
+		realWRAP(tG, 0., 1.);
+		realWRAP(tB, 0., 1.);
+
+		// Red
+		if (6*tR < 1.)
+			R = temp2 + (temp1 - temp2) * 6 * tR;
+		else if (2*tR < 1.)
+			R = temp1;
+		else if (3*tR < 2.)
+			R = temp2 + (temp1 - temp2) * (0.6666 - tR) * 6;
+		else
+			R = temp2;
+
+		// Green
+		if (6*tG < 1.)
+			G = temp2 + (temp1 - temp2) * 6 * tG;
+		else if (2*tG < 1.)
+			G = temp1;
+		else if (3*tG < 2.)
+			G = temp2 + (temp1 - temp2) * (0.6666 - tG) * 6;
+		else
+			G = temp2;
+
+		// Blue
+		if (6*tB < 1.)
+			B = temp2 + (temp1 - temp2) * 6 * tB;
+		else if (2*tB < 1.)
+			B = temp1;
+		else if (3*tB < 2.)
+			B = temp2 + (temp1 - temp2) * (0.6666 - tB) * 6;
+		else
+			B = temp2;
+
+	}
+}
 
 
