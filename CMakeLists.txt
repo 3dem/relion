@@ -137,11 +137,6 @@ else(CUDA_FOUND)
     message(STATUS "Using non-cuda compilation....")
 endif(CUDA_FOUND)
 
-# ---------------------------------------------------------------USE TEXTURES OR NOT--
-if(NOT CudaTexture)
-    add_definitions(-DCUDA_NO_TEXTURES)
-    message(STATUS "Texture interpolation is omitted.")
-endif(NOT CudaTexture)
 # ------------------------------------------------------------------ALLOCATOR CHOICE--
 option(CachedAlloc "CachedAlloc" ON)
 if(NOT CachedAlloc)
@@ -192,9 +187,14 @@ if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
     else(MKLFFT)
         SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -limf ")
     endif(MKLFFT)
+    if(ALTCPU)
+        add_definitions(-DFAST_CENTERFFT)
+    endif()
+    SET(CudaTexture OFF)
     SET(MPI_C_COMPILER ${CMAKE_C_COMPILER})
     SET(MPI_CXX_COMPILER ${CMAKE_CXX_COMPILER})
 else()
+    SET(MKLFFT OFF)
     SET(CMAKE_C_COMPILER ${MPI_C_COMPILER})
     SET(CMAKE_CXX_COMPILER ${MPI_CXX_COMPILER})
     SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -lfftw3_threads")
@@ -204,6 +204,11 @@ if(ALTCPU)
     add_definitions(-DALTCPU)
 endif()
 
+# ---------------------------------------------------------------USE TEXTURES OR NOT--
+if(NOT CudaTexture)
+    add_definitions(-DCUDA_NO_TEXTURES)
+    message(STATUS "Texture interpolation is omitted.")
+endif(NOT CudaTexture)
 # -------------------------------------------------------------------------------MPI--
 find_package(MPI REQUIRED)
 
@@ -315,6 +320,13 @@ endif()
 
 
 ADD_SUBDIRECTORY(src/apps)
+
+message(STATUS "CUDA option = ${CUDA}")
+message(STATUS "ALTCPU option = ${ALTCPU}")
+message(STATUS "DoublePrec_CPU option = ${DoublePrec_CPU}")
+message(STATUS "DoublePrec_ACC option = ${DoublePrec_ACC}")
+message(STATUS "MKLFFT option = ${MKLFFT}")
+message(STATUS "CudaTexture option = ${CudaTexture}")
 
 get_directory_property( DirDefs COMPILE_DEFINITIONS )
 message(STATUS "COMPILE_DEFINITIONS = ${DirDefs}" )

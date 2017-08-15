@@ -53,7 +53,7 @@
 #include "src/complex.h"
 #include "src/CPlot2D.h"
 
-#ifdef ALTCPU
+#ifdef FAST_CENTERFFT   // defined if ALTCPU=on *AND* Intel Compiler used
 #include "src/acc/cpu/cuda_stubs.h"
 #include "src/acc/settings.h"
 #include "src/acc/cpu/cpu_settings.h"
@@ -381,7 +381,7 @@ void randomizePhasesBeyond(MultidimArray<RFLOAT> &I, int index);
 template <typename T>
 void CenterFFT(MultidimArray< T >& v, bool forward)
 {
-#ifndef ALTCPU
+#ifndef FAST_CENTERFFT
     if ( v.getDim() == 1 )
     {
         // 1D
@@ -571,7 +571,7 @@ void CenterFFT(MultidimArray< T >& v, bool forward)
     	v.printShape();
     	REPORT_ERROR("CenterFFT ERROR: Dimension should be 1, 2 or 3");
     }
-#else // ALTCPU
+#else // FAST_CENTERFFT
 	if ( v.getDim() == 1 )
 	{
         // 1D
@@ -701,7 +701,7 @@ void CenterFFT(MultidimArray< T >& v, bool forward)
     	v.printShape();
     	REPORT_ERROR("CenterFFT ERROR: Dimension should be 1, 2 or 3");
     }
-#endif  // ALTCPU
+#endif  // FAST_CENTERFFT
 }
 
 
