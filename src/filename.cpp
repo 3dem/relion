@@ -301,7 +301,7 @@ FileName FileName::getFileFormat() const
     else if ( (first = rfind("."))!=std::string::npos)
         result = substr(first + 1);
     else
-        result="spi";
+        result="";
     return result.toLowercase();
 
 }
