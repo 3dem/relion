@@ -617,12 +617,20 @@ void CenterFFT(MultidimArray< T >& v, bool forward)
 			yshift = -yshift;
 		}
 		
-		int blocks = ceilf((float)((xSize*ySize)/(float)(2*CFTT_BLOCK_SIZE)));
+		int image_size = xSize*ySize;
+		int isize2 = image_size/2;
+		int blocks = ceilf((float)(image_size/(float)(2*CFTT_BLOCK_SIZE)));
+
 //		for(int i=0; i<blocks; i++) {
 		tbb::parallel_for(0, blocks, [&](int i) {
-			CpuKernels::centerFFT_2D<T>(i,
-				batchSize,
-				CFTT_BLOCK_SIZE,
+			int pixel_start = i*(CFTT_BLOCK_SIZE);
+			int pixel_end = (i+1)*(CFTT_BLOCK_SIZE);
+			if (pixel_end > isize2)
+				pixel_end = isize2;
+			
+			CpuKernels::centerFFT_2D<T>(batchSize,
+				pixel_start,
+				pixel_end,
 				MULTIDIM_ARRAY(v),
 				xSize*ySize,
 				xSize,
@@ -652,12 +660,19 @@ void CenterFFT(MultidimArray< T >& v, bool forward)
 				zshift = -zshift;
 			}
 
-			int block =ceilf((float)((xSize*ySize*zSize)/(float)(2*CFTT_BLOCK_SIZE)));
+			int image_size = xSize*ySize*zSize;
+			int isize2 = image_size/2;
+			int block =ceilf((float)(image_size/(float)(2*CFTT_BLOCK_SIZE)));
 //			for(int i=0; i<block; i++){
 			tbb::parallel_for(0, block, [&](int i) {
-				CpuKernels::centerFFT_3D<T>(i,
-					batchSize,
-					CFTT_BLOCK_SIZE,
+				int pixel_start = i*(CFTT_BLOCK_SIZE);
+				int pixel_end = (i+1)*(CFTT_BLOCK_SIZE);
+				if (pixel_end > isize2)
+					pixel_end = isize2;
+			
+				CpuKernels::centerFFT_3D<T>(batchSize,
+					pixel_start,
+					pixel_end,
 					MULTIDIM_ARRAY(v),
 					xSize*ySize*zSize,
 					xSize,
@@ -680,12 +695,19 @@ void CenterFFT(MultidimArray< T >& v, bool forward)
 				yshift = -yshift;
 			}
 
-			int blocks = ceilf((float)((xSize*ySize)/(float)(2*CFTT_BLOCK_SIZE)));
+			int image_size = xSize*ySize;
+			int isize2 = image_size/2;
+			int blocks = ceilf((float)(image_size/(float)(2*CFTT_BLOCK_SIZE)));
 //			for(int i=0; i<blocks; i++) {
 			tbb::parallel_for(0, blocks, [&](int i) {
-				CpuKernels::centerFFT_2D<T>(i,
-					batchSize,
-					CFTT_BLOCK_SIZE,
+				int pixel_start = i*(CFTT_BLOCK_SIZE);
+				int pixel_end = (i+1)*(CFTT_BLOCK_SIZE);
+				if (pixel_end > isize2)
+					pixel_end = isize2;
+
+				CpuKernels::centerFFT_2D<T>(batchSize,
+					pixel_start,
+					pixel_end,
 					MULTIDIM_ARRAY(v),
 					xSize*ySize,
 					xSize,

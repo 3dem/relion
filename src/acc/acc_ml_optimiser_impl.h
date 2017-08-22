@@ -1754,12 +1754,13 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
 				long ipart_length = (sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi * sp.nr_trans;
+				size_t offset = ipart * op.Mweight.xdim + sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.iclass_min;
 
 				if (ipart_length > 1)
 				{
 					//Wrap the current ipart data in a new pointer
 					AccPtr<weights_t> unsorted_ipart(weights,
-							ipart * op.Mweight.xdim + sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.iclass_min,
+							offset,
 							ipart_length);
 
 					AccPtr<weights_t> filtered((size_t)unsorted_ipart.getSize(), (CudaCustomAllocator *)accMLO->getAllocator());
@@ -1820,7 +1821,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 							(1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart]);
 
 					my_nr_significant_coarse_samples = filteredSize - thresholdIdx;
-			
+
 					if (my_nr_significant_coarse_samples == 0)
 					{
 						if (failsafeMode) //Only print error if not managed to recover through fail-safe mode
@@ -1869,8 +1870,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_NR_SIGN) = (RFLOAT) my_nr_significant_coarse_samples;
 
 					AccPtr<bool> Mcoarse_significant(
-							&op.Mcoarse_significant.data[ipart * op.Mweight.xdim + sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.iclass_min],
-							(sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi * sp.nr_trans,
+							&op.Mcoarse_significant.data[offset],
+							ipart_length,
 							(CudaCustomAllocator *)accMLO->getAllocator());
 
 					CUSTOM_ALLOCATOR_REGION_NAME("CASDTW_SIG");
@@ -3169,7 +3170,7 @@ baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_B);
 			CTIC(timer,"getAllSquaredDifferencesCoarse");
 			getAllSquaredDifferencesCoarse<MlClass>(ipass, op, sp, baseMLO, myInstance, Mweight);
 			CTOC(timer,"getAllSquaredDifferencesCoarse");
-
+			
 			try
 			{
 				CTIC(timer,"convertAllSquaredDifferencesToWeightsCoarse");		

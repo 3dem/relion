@@ -291,19 +291,21 @@ void cpu_translate3D(T * g_image_in,
 }
 
 template <typename T>
-void centerFFT_2D(  	int     blk,
-			int     batch_size,
-			int     block_size,
-			T       *img_in,
-			int     image_size,
-			int     xdim,
-			int     ydim,
-			int     xshift,
-			int     yshift)
+void centerFFT_2D(	int     batch_size,
+			int		pixel_start,	// long int?
+			int		pixel_end,		// long int?
+			T		*img_in,
+			int		image_size,		// long int?
+			int		xdim,
+			int		ydim,
+			int		xshift,
+			int		yshift)
 {
+	int pix_start = pixel_start;
+	int pix_end = pixel_end;
 	for(int batch=0; batch<batch_size; batch++)
 	{
-		for(int pixel=0; pixel<image_size/2; pixel++)
+		for(int pixel=pix_start; pixel < pix_end; pixel++)
 		{
 			long int image_offset = image_size*batch;
 			int y = floorf((XFLOAT)pixel/(XFLOAT)xdim);
@@ -331,44 +333,46 @@ void centerFFT_2D(  	int     blk,
 }
 
 
-template void centerFFT_2D<float>(  	int     blk,
-                                        int     batch_size,
-                                        int     block_size,
-                                        float   *img_in,
-                                        int     image_size,
-                                        int     xdim,
-                                        int     ydim,
-                                        int     xshift,
-                                        int     yshift);
-template void centerFFT_2D<double>(  	int     blk,
-                                        int     batch_size,
-                                        int     block_size,
-                                        double  *img_in,
-                                        int     image_size,
-                                        int     xdim,
-                                        int     ydim,
-                                        int     xshift,
-                                        int     yshift);
+template void centerFFT_2D<float>(  	int		batch_size,
+										int		pixel_start,
+										int		pixel_end,
+                                        float	*img_in,
+                                        int		image_size,
+                                        int		xdim,
+                                        int		ydim,
+                                        int		xshift,
+                                        int		yshift);
+template void centerFFT_2D<double>(  	int		batch_size,
+										int		pixel_start,
+										int		pixel_end,
+                                        double	*img_in,
+                                        int		image_size,
+                                        int		xdim,
+                                        int		ydim,
+                                        int		xshift,
+                                        int		yshift);
 
 
 template <typename T>
-void centerFFT_3D(  	int       blk,
-			int       batch_size,
-			int       block_size,
-			T         *img_in,
-			int       image_size,
-			int       xdim,
-			int       ydim,
-			int       zdim,
-			int       xshift,
-			int       yshift,
-			int       zshift)
+void centerFFT_3D(	int     batch_size,
+			int		pixel_start,	// long int?
+			int		pixel_end,		// long int?
+			T		*img_in,
+			int		image_size,		// long int?
+			int		xdim,
+			int		ydim,
+			int		zdim,
+			int		xshift,
+			int		yshift,
+			int		zshift)
 {
+	int pix_start = pixel_start;
+	int pix_end = pixel_end;
 	int xydim = xdim*ydim;
 	for(int batch=0; batch<batch_size; batch++)
 	{
 		long int image_offset = image_size*batch;
-		for(int pixel = 0; pixel < image_size/2; pixel++)
+		for(int pixel = pix_start; pixel < pix_end; pixel++)
 		{
 			int z = floorf((XFLOAT)pixel/(XFLOAT)(xydim));
 			int xy = pixel % xydim;
@@ -403,28 +407,28 @@ void centerFFT_3D(  	int       blk,
 }
 
 
-template void centerFFT_3D<float>(  	int       blk,
-					int       batch_size,
-					int       block_size,
-					float     *img_in,
-					int       image_size,
-					int       xdim,
-					int       ydim,
-					int       zdim,
-					int       xshift,
-					int       yshift,
-					int       zshift);
-template void centerFFT_3D<double>(  	int       blk,
-					int       batch_size,
-					int       block_size,
-					double    *img_in,
-					int       image_size,
-					int       xdim,
-					int       ydim,
-					int       zdim,
-					int       xshift,
-					int       yshift,
-					int       zshift);
+template void centerFFT_3D<float>(	int     batch_size,
+					int		pixel_start,
+					int		pixel_end,
+					float	*img_in,
+					int		image_size,
+					int		xdim,
+					int		ydim,
+					int		zdim,
+					int		xshift,
+					int		yshift,
+					int		zshift);
+template void centerFFT_3D<double>(  	int     batch_size,
+					int		pixel_start,
+					int		pixel_end,
+					double	*img_in,
+					int		image_size,
+					int		xdim,
+					int		ydim,
+					int		zdim,
+					int		xshift,
+					int		yshift,
+					int		zshift);
 
 /* TODO - if create optimized CPU version of autopicker
  * All these functions need to be converted to use internal loops rather than

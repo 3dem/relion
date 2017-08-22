@@ -240,28 +240,28 @@ void cpu_translate3D(T * g_image_in,
 
 //----------------------------------------------------------------------------
 template <typename T>
-void centerFFT_2D(  int       blocks,
-					int       batch,
-					int       block_size,
-					T         *img_in,
-					int       image_size,
-					int       xdim,
-					int       ydim,
-					int       xshift,
-					int       yshift);
+void centerFFT_2D(  int		batch_size,
+					int		pixel_start,
+					int		pixel_end,
+					T		*img_in,
+					int		image_size,
+					int		xdim,
+					int		ydim,
+					int		xshift,
+					int		yshift);
 
 template <typename T>
-void centerFFT_3D(  int       blocks,
-					int       batch,
-					int       block_size,
-					T         *img_in,
-					int       image_size,
-					int       xdim,
-					int       ydim,
-					int       zdim,
-					int       xshift,
-					int       yshift,
-					int       zshift);
+void centerFFT_3D(  int		batch_size,
+					int		pixel_start,
+					int		pixel_end,
+					T		*img_in,
+					int		image_size,
+					int		xdim,
+					int		ydim,
+					int		zdim,
+					int		xshift,
+					int		yshift,
+					int		zshift);
 //----------------------------------------------------------------------------
 /*void probRatio( int       blockIdx_x, 
 				int       threadIdx_x,

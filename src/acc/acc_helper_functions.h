@@ -364,6 +364,8 @@ void runCenterFFT(MultidimArray< T >& v, bool forward, CudaCustomAllocator *allo
 	}
 	else if ( v.getDim() == 3 )
 	{
+		// TODO - convert this to use the faster AccUtilities::centerFFT_3D like the 2D case above
+		// and in fftw.h when FAST_CENTERFFT is defined
 		std::cerr << "CenterFFT on gpu reverts to cpu for dim!=2 (now dim=3)" <<std::endl;
 		// 3D
 		MultidimArray< T > aux;
@@ -380,7 +382,7 @@ void runCenterFFT(MultidimArray< T >& v, bool forward, CudaCustomAllocator *allo
 		for (int k = 0; k < ZSIZE(v); k++)
 			for (int i = 0; i < YSIZE(v); i++)
 			{
-				// Shift the input in an auxiliar vector
+				// Shift the input in an auxiliary vector
 				for (int j = 0; j < l; j++)
 				{
 					int jp = j + shift;
@@ -409,7 +411,7 @@ void runCenterFFT(MultidimArray< T >& v, bool forward, CudaCustomAllocator *allo
 		for (int k = 0; k < ZSIZE(v); k++)
 			for (int j = 0; j < XSIZE(v); j++)
 			{
-				// Shift the input in an auxiliar vector
+				// Shift the input in an auxiliary vector
 				for (int i = 0; i < l; i++)
 				{
 					int ip = i + shift;
@@ -438,7 +440,7 @@ void runCenterFFT(MultidimArray< T >& v, bool forward, CudaCustomAllocator *allo
 		for (int i = 0; i < YSIZE(v); i++)
 			for (int j = 0; j < XSIZE(v); j++)
 			{
-				// Shift the input in an auxiliar vector
+				// Shift the input in an auxiliary vector
 				for (int k = 0; k < l; k++)
 				{
 					int kp = k + shift;
@@ -525,30 +527,17 @@ void runCenterFFT( AccPtr< T > &img_in,
 		}
 
 		int grid_size = ceilf((float)((xSize*ySize*zSize)/(float)(2*CFTT_BLOCK_SIZE)));
-#ifdef CUDA
-		dim3 blocks(grid_size,batchSize);
-		cuda_kernel_centerFFT_3D<<<blocks,CFTT_BLOCK_SIZE, 0, img_in.getStream()>>>(
-				~img_in,
-				xSize*ySize*zSize,
-				xSize,
-				ySize,
-				zSize,
-				xshift,
-				yshift,
-				zshift);
-		LAUNCH_HANDLE_ERROR(cudaGetLastError());
-#else
-		CpuKernels::centerFFT_3D(grid_size, batchSize, CFTT_BLOCK_SIZE,
-				~img_in,
-				xSize*ySize*zSize,
-				xSize,
-				ySize,
-				zSize,
-				xshift,
-				yshift,
-				zshift);
-#endif
-
+		AccUtilities::centerFFT_3D(grid_size, batchSize, CFTT_BLOCK_SIZE,
+			img_in.getStream(),
+			~img_in,
+			xSize*ySize*zSize,
+			xSize,
+			ySize,
+			zSize,
+			xshift,
+			yshift,
+			zshift);
+			LAUNCH_HANDLE_ERROR(cudaGetLastError());
 		//	HANDLE_ERROR(cudaStreamSynchronize(0));
 		//	img_aux.cpOnDevice(img_in.d_ptr); //update input image with centered kernel-output.
 	}

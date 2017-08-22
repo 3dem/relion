@@ -63,7 +63,9 @@
 #include "src/acc/cpu/cpu_ml_optimiser.h"
 #include "src/acc/acc_helper_functions.h"
 
+void dump_array(char *name, bool *ptr, size_t size);
 void dump_array(char *name, int *ptr, size_t size);
+void dump_array(char *name, size_t *ptr, size_t size);
 void dump_array(char *name, float *ptr, size_t size);
 void dump_complex_array(char *name, ACCCOMPLEX *ptr, size_t size);
 void dump_complex_array(char *name, Complex *ptr, size_t size);
@@ -80,7 +82,43 @@ void dump_triple_array(char *name, double *ptr, double *ptr2, double *ptr3, size
 tbb::spin_mutex      mkl_mutex;
 
 
+void dump_array(char *name, bool *ptr, size_t size)
+{
+	int count = 0;
+	FILE *fp = fopen(name, "w");
+	fprintf(fp, "Array size:  %ld\n", size);
+	for (size_t i=0; i < size; i++) {
+		fprintf(fp, "%d, ", ptr[i]);
+		count++;
+		if (count > 10) {
+			fprintf(fp, "\n");
+			count = 0;
+		}
+	}
+	fprintf(fp, "\n");
+	fflush(fp);	
+	fclose(fp);
+}
+
 void dump_array(char *name, int *ptr, size_t size)
+{
+	int count = 0;
+	FILE *fp = fopen(name, "w");
+	fprintf(fp, "Array size:  %ld\n", size);
+	for (size_t i=0; i < size; i++) {
+		fprintf(fp, "%d, ", ptr[i]);
+		count++;
+		if (count > 10) {
+			fprintf(fp, "\n");
+			count = 0;
+		}
+	}
+	fprintf(fp, "\n");
+	fflush(fp);	
+	fclose(fp);
+}
+
+void dump_array(char *name, size_t *ptr, size_t size)
 {
 	int count = 0;
 	FILE *fp = fopen(name, "w");
