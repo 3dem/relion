@@ -301,44 +301,33 @@ void centerFFT_2D(  	int     blk,
 			int     xshift,
 			int     yshift)
 {
-// TODO - any way to collapse to 2 loops - one over pixels < image_size/2, one over batch?
-//	for(int blk=0; blk<blocks; blk++){
-		for(int batch=0; batch<batch_size; batch++) {
-			for(int tid=0; tid<block_size; tid++)  {
-				T buffer;
-				int pixel = tid + blk*block_size;
-				long int image_offset = image_size*batch;
-			//	int pixel_pass_num = ceilfracf(image_size, CFTT_BLOCK_SIZE);
+	for(int batch=0; batch<batch_size; batch++)
+	{
+		for(int pixel=0; pixel<image_size/2; pixel++)
+		{
+			long int image_offset = image_size*batch;
+			int y = floorf((XFLOAT)pixel/(XFLOAT)xdim);
+			int x = pixel % xdim;				// also = pixel - y*xdim, but this depends on y having been calculated, i.e. serial evaluation
 
-			//	for (int pass = 0; pass < pixel_pass_num; pass++, pixel+=CFTT_BLOCK_SIZE)
-			//	{
-					if(pixel<(image_size/2))
-					{
-						int y = floorf((XFLOAT)pixel/(XFLOAT)xdim);
-						int x = pixel % xdim;				// also = pixel - y*xdim, but this depends on y having been calculated, i.e. serial evaluation
+			int yp = y + yshift;
+			if (yp < 0)
+				yp += ydim;
+			else if (yp >= ydim)
+				yp -= ydim;
 
-						int yp = y + yshift;
-						if (yp < 0)
-							yp += ydim;
-						else if (yp >= ydim)
-							yp -= ydim;
+			int xp = x + xshift;
+			if (xp < 0)
+				xp += xdim;
+			else if (xp >= xdim)
+				xp -= xdim;
 
-						int xp = x + xshift;
-						if (xp < 0)
-							xp += xdim;
-						else if (xp >= xdim)
-							xp -= xdim;
+			int n_pixel = yp*xdim + xp;
 
-						int n_pixel = yp*xdim + xp;
-
-						buffer                         = img_in[image_offset + n_pixel];
-						img_in[image_offset + n_pixel] = img_in[image_offset + pixel];
-						img_in[image_offset + pixel]   = buffer;
-					}
-//	}
-			} // tid
-		} // batch
-//	} // blk
+			T buffer                       = img_in[image_offset + n_pixel];
+			img_in[image_offset + n_pixel] = img_in[image_offset + pixel];
+			img_in[image_offset + pixel]   = buffer;
+		} // tid
+	} // batch
 }
 
 
@@ -375,49 +364,42 @@ void centerFFT_3D(  	int       blk,
 			int       yshift,
 			int       zshift)
 {
-// TODO - any way to collapse to 2 loops - one over pixels < image_size/2, one over batch?
-//	for(int blk=0; blk<blocks; blk++){
-		for(int batch=0; batch<batch_size; batch++) {
-			for(int tid=0; tid<block_size; tid++)  {
-				T buffer;
-				int pixel = tid + blk*block_size;
-				long int image_offset = image_size*batch;
-				int xydim = xdim*ydim;
-				
-				if(pixel<(image_size/2))
-				{
-					int z = floorf((XFLOAT)pixel/(XFLOAT)(xydim));
-					int xy = pixel % xydim;
-					int y = floorf((XFLOAT)xy/(XFLOAT)xdim);
-					int x = xy % xdim;
+	int xydim = xdim*ydim;
+	for(int batch=0; batch<batch_size; batch++)
+	{
+		long int image_offset = image_size*batch;
+		for(int pixel = 0; pixel < image_size/2; pixel++)
+		{
+			int z = floorf((XFLOAT)pixel/(XFLOAT)(xydim));
+			int xy = pixel % xydim;
+			int y = floorf((XFLOAT)xy/(XFLOAT)xdim);
+			int x = xy % xdim;
 
-					int yp = y + yshift;
-					if (yp < 0)
-						yp += ydim;
-					else if (yp >= ydim)
-						yp -= ydim;
+			int xp = x + xshift;
+			if (xp < 0)
+				xp += xdim;
+			else if (xp >= xdim)
+				xp -= xdim;
 
-					int xp = x + xshift;
-					if (xp < 0)
-						xp += xdim;
-					else if (xp >= xdim)
-						xp -= xdim;
+			int yp = y + yshift;
+			if (yp < 0)
+				yp += ydim;
+			else if (yp >= ydim)
+				yp -= ydim;
 
-					int zp = z + zshift;
-					if (zp < 0)
-						zp += zdim;
-					else if (zp >= zdim)
-						zp -= zdim;
+			int zp = z + zshift;
+			if (zp < 0)
+				zp += zdim;
+			else if (zp >= zdim)
+				zp -= zdim;
 
-					int n_pixel = zp*xydim + yp*xdim + xp;
+			int n_pixel = zp*xydim + yp*xdim + xp;
 
-					buffer                         = img_in[image_offset + n_pixel];
-					img_in[image_offset + n_pixel] = img_in[image_offset + pixel];
-					img_in[image_offset + pixel]   = buffer;
-				}
-			} // tid
-		} // batch
-//	} // blk
+			T buffer                       = img_in[image_offset + n_pixel];
+			img_in[image_offset + n_pixel] = img_in[image_offset + pixel];
+			img_in[image_offset + pixel]   = buffer;
+		} // tid
+	} // batch
 }
 
 

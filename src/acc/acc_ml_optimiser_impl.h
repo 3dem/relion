@@ -634,6 +634,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		CTIC(accMLO->timer,"transform");
 		d_img.cpOnAcc(accMLO->transformer1.reals);
 		
+
 		runCenterFFT(								// runs on input GlobalPtr.stream
 				accMLO->transformer1.reals,
 				(int)accMLO->transformer1.xSize,
@@ -1089,6 +1090,8 @@ void getAllSquaredDifferencesCoarse(
 
 			}
 		}
+
+
 
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));

@@ -404,18 +404,17 @@ __global__ void cuda_kernel_centerFFT_3D(XFLOAT *img_in,
 			int y = floorf((XFLOAT)xy/(XFLOAT)xdim);
 			int x = xy % xdim;
 
+			int xp = x + xshift;
+			if (xp < 0)
+				xp += xdim;
+			else if (xp >= xdim)
+				xp -= xdim;
 
 			int yp = y + yshift;
 			if (yp < 0)
 				yp += ydim;
 			else if (yp >= ydim)
 				yp -= ydim;
-
-			int xp = x + xshift;
-			if (xp < 0)
-				xp += xdim;
-			else if (xp >= xdim)
-				xp -= xdim;
 
 			int zp = z + zshift;
 			if (zp < 0)
