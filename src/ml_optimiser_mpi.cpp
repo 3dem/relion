@@ -661,21 +661,24 @@ void MlOptimiserMpi::initialiseWorkLoad()
 
     MPI_Barrier(MPI_COMM_WORLD);
 
-	if(!node->isMaster())
+    if(!do_split_random_halves)
 	{
-		/* Set up a bool-array with reference responsibilities for each rank. That is;
-		 * if(PPrefRank[i]==true)  //on this rank
-		 * 		(set up reference vol and MPI_Bcast)
-		 * else()
-		 * 		(prepare to receive from MPI_Bcast)
-		 */
-		mymodel.PPrefRank.assign(mymodel.PPref.size(),true);
+    	if(!node->isMaster())
+    	{
+			/* Set up a bool-array with reference responsibilities for each rank. That is;
+			 * if(PPrefRank[i]==true)  //on this rank
+			 * 		(set up reference vol and MPI_Bcast)
+			 * else()
+			 * 		(prepare to receive from MPI_Bcast)
+			 */
+			mymodel.PPrefRank.assign(mymodel.PPref.size(),true);
 
-		for(int i=0; i<mymodel.PPref.size(); i++)
-			mymodel.PPrefRank[i] = ((i)%(node->size-1) == node->rank-1);
+			for(int i=0; i<mymodel.PPref.size(); i++)
+				mymodel.PPrefRank[i] = ((i)%(node->size-1) == node->rank-1);
+		}
+		MPI_Barrier(MPI_COMM_WORLD);
 	}
 
-	 MPI_Barrier(MPI_COMM_WORLD);
 //#define DEBUG_WORKLOAD
 #ifdef DEBUG_WORKLOAD
 	std::cerr << " node->rank= " << node->rank << " my_first_ori_particle_id= " << my_first_ori_particle_id << " my_last_ori_particle_id= " << my_last_ori_particle_id << std::endl;
@@ -751,26 +754,31 @@ void MlOptimiserMpi::expectation()
 		timer.toc(TIMING_EXP_1a);
 #endif
 
-	if (!node->isMaster())
-		for(int i=0; i<mymodel.PPref.size(); i++)
+	if(!do_split_random_halves)
+	{
+		if (!node->isMaster())
 		{
-			/* NOTE: the first slave has rank 0 on the slave communicator node->slaveC,
-			 *       that's why we don't have to add 1, like this;
-			 *       int sender = (i)%(node->size - 1)+1 ;
-			 */
-
-			int sender = (i)%(node->size - 1); // which rank did the heavy lifting? -> sender of information
+			for(int i=0; i<mymodel.PPref.size(); i++)
 			{
-				// Communicating over all slaves means we don't have to allocate on the master.
-				node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.PPref[i].data),
-						MULTIDIM_SIZE(mymodel.PPref[0].data), MY_MPI_COMPLEX, sender, node->slaveC);
-				node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.tau2_class[i]),
-						MULTIDIM_SIZE(mymodel.tau2_class[0]), MY_MPI_DOUBLE, sender, node->slaveC);
+				/* NOTE: the first slave has rank 0 on the slave communicator node->slaveC,
+				 *       that's why we don't have to add 1, like this;
+				 *       int sender = (i)%(node->size - 1)+1 ;
+				 */
+
+				int sender = (i)%(node->size - 1); // which rank did the heavy lifting? -> sender of information
+				{
+					// Communicating over all slaves means we don't have to allocate on the master.
+					node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.PPref[i].data),
+							MULTIDIM_SIZE(mymodel.PPref[0].data), MY_MPI_COMPLEX, sender, node->slaveC);
+					// For multibody refinement with overlapping bodies, there may be more PPrefs than bodies!
+					if (i < mymodel.nr_classes * mymodel.nr_bodies)
+						node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.tau2_class[i]),
+								MULTIDIM_SIZE(mymodel.tau2_class[0]), MY_MPI_DOUBLE, sender, node->slaveC);
+				}
 			}
 		}
-
-	MPI_Barrier(MPI_COMM_WORLD);
-
+		MPI_Barrier(MPI_COMM_WORLD);
+	}
 #ifdef DEBUG
 	if(node->rank==2)
 	{
