@@ -3215,7 +3215,7 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 						catch (RelionError XE)
 #endif
 						{
-							if (failsafe_attempts > 40)
+							if (failsafe_attempts > baseMLO->failsafe_threshold)
 								CRITICAL(ERRNUMFAILSAFE);
 
 							//Rerun in fail-safe mode
