@@ -577,7 +577,7 @@ void runBackProjectKernel(
 					imgX, imgY, imgZ, imgX*imgY*imgZ,
 					BP.mdlX, BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ);
 #else
-#if 1
+#if 0
 				CpuKernels::backprojectRef3D(imageCount,
 					d_img_real, d_img_imag,
 					trans_x, trans_y,
