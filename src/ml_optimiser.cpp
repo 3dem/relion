@@ -71,7 +71,9 @@ void globalThreadExpectationSomeParticles(ThreadArgument &thArg)
 	}
 	catch (RelionError XE)
 	{
-		MLO->threadException = &XE;
+		RelionError *gE = new RelionError(XE.msg, XE.file, XE.line);
+		gE->msg = XE.msg;
+		MLO->threadException = gE;
 	}
 }
 
@@ -354,6 +356,9 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	keep_free_scratch_Gb = textToInteger(parser.getOption("--keep_free_scratch", "Space available for copying particle stacks (in Gb)", "10"));
 	do_reuse_scratch = parser.checkOption("--reuse_scratch", "Re-use data on scratchdir, instead of wiping it and re-copying all data.");
 
+
+	failsafe_threshold = textToInteger(parser.getOption("--failsafe_threshold", "Maximum number of particles permitted to be drop, due to zero sum of weights, before exiting with an error (GPU only).", "40"));
+
 	do_gpu = parser.checkOption("--gpu", "Use available gpu resources for some calculations");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","default");
 #ifndef CUDA
@@ -618,6 +623,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	do_always_cc  = parser.checkOption("--always_cc", "Perform CC-calculation in all iterations (useful for faster denovo model generation?)");
 	do_phase_random_fsc = parser.checkOption("--solvent_correct_fsc", "Correct FSC curve for the effects of the solvent mask?");
 	do_skip_maximization = parser.checkOption("--skip_maximize", "Skip maximization step (only write out data.star file)?");
+	failsafe_threshold = textToInteger(parser.getOption("--failsafe_threshold", "Maximum number of particles permitted to be handled by fail-safe mode, due to zero sum of weights, before exiting with an error (GPU only).", "40"));
 	///////////////// Special stuff for first iteration (only accessible via CL, not through readSTAR ////////////////////
 
 	// When reading from the CL: always start at iteration 1 and subset 1
@@ -1800,6 +1806,35 @@ void MlOptimiser::initialiseGeneral(int rank)
 	{
 	    mu = 0.;
 	}
+
+	// Check first mask [0,1] compliance right away.
+	Image<RFLOAT> Isolvent;
+	Isolvent().resize(mymodel.Iref[0]);
+	bool mask1(false),mask2(false);
+	if(!fn_mask.contains("None"))
+	{
+			Isolvent.read(fn_mask);
+			if (Isolvent().computeMin() < 0. || Isolvent().computeMax() > 1.)
+				mask1=true;
+	}
+
+	// Check second mask [0,1] compliance right away.
+	if(!fn_mask2.contains("None"))
+	{
+			Isolvent.read(fn_mask2);
+			if (Isolvent().computeMin() < 0. || Isolvent().computeMax() > 1.)
+				mask2=true;
+	}
+
+	std::string errstr = "MlOptimiser::initialiseGeneral: ERROR a solvent mask should contain values between 0 and 1 only. Fix the input for \n ";
+	if(mask1)
+		errstr += " \n\t --solvent_mask ";
+	if(mask2)
+		errstr += " \n\t --solvent_mask2 ";
+	errstr += " \n";
+
+	if(mask1 || mask2)
+		REPORT_ERROR(errstr);
 
 #ifdef DEBUG
 	std::cerr << "Leaving initialiseGeneral" << std::endl;
@@ -3692,7 +3727,7 @@ void MlOptimiser::maximization()
 
 
 			}
-			else
+			else if((wsum_model.BPref[iclass].weight).sum() > XMIPP_EQUAL_ACCURACY)
 			{
 				(wsum_model.BPref[iclass]).reconstruct(mymodel.Iref[iclass], gridding_nr_iter, do_map,
 						mymodel.tau2_fudge_factor, mymodel.tau2_class[iclass], mymodel.sigma2_class[iclass],
