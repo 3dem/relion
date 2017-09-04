@@ -698,6 +698,10 @@ class image_handler_parameters
 				FileName my_fn_out;
 				if (fn_out == "")
 					my_fn_out = fn_img;
+				else if(fn_out.getExtension() == "mrcs" && !fn_out.contains("@"))
+				{
+					my_fn_out.compose(current_object,fn_out);
+				}
 				else
 				{
 					if (fn_in.getExtension() == "star" || (fn_in.getExtension() == "mrcs" && !fn_in.contains("@")))

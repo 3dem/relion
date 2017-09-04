@@ -82,7 +82,10 @@ void MlModel::initialise(bool _do_sgd)
 	Projector ref(ori_size, interpolator, padding_factor, r_min_nn, data_dim);
     PPref.clear();
     PPrefRank.clear();
+
     // Now fill the entire vector with instances of "ref"
+    if(nr_classes != 1 && nr_bodies !=1)
+    	REPORT_ERROR("MlModel::initialise() - nr_bodies or nr_classes must be 1");
     PPref.resize(nr_classes * nr_bodies, ref);
 
     do_sgd = _do_sgd;
