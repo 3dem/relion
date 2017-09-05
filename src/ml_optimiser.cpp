@@ -145,7 +145,6 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 		ini_high = textToFloat(parser.getOption("--ini_high", "Resolution (in Angstroms) to which to limit refinement in the first iteration ", "-1"));
 
 	do_reconstruct_subtracted_bodies = parser.checkOption("--reconstruct_subtracted_bodies", "Use this flag to perform reconstructions with the subtracted images in multi-body refinement");
-	mymodel.body_minimum_overlap = textToFloat(parser.getOption("--minimum_body_overlap", "If bodies overlap more than this fraction, the body overlap will be taken into account when subtracting", "0.05"));
 
 	fnt = parser.getOption("--iter", "Maximum number of iterations to perform", "OLD");
 	if (fnt != "OLD")
@@ -4413,12 +4412,8 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 					}
 #endif
 
-					// Subtract the projected COM offset, to position this body in the center
+			// Subtract the projected COM offset, to position this body in the center
 			my_old_offset -= my_projected_com;
-
-			// 23jul2017: be careful below, as my_old_offset is selfROUND, but refined_ibody_offset wasn't.
-			// Now selfRound(old_offset - projectedCOM) AND selfROUND(my_refined_ibody_offset)
-			//my_old_offset.selfROUND();
 
 			// Also get refined offset for this body
 			icol_xoff = 3 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
@@ -4428,11 +4423,6 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 			YY(my_refined_ibody_offset) = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, icol_yoff);
 			if (mymodel.data_dim == 3)
 				ZZ(my_refined_ibody_offset) = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, icol_zoff);
-
-			// 23jul2017: also selfROUND(my_refined_ibody_offset)!
-			//my_refined_ibody_offset.selfROUND();
-
-			//my_old_offset += my_refined_ibody_offset;
 
 			// For multi-body refinement: set the priors of the translations to zero (i.e. everything centred around consensus offset)
 			my_prior.initZeros();
@@ -4772,10 +4762,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 		{
 			// For multi-bodies: store only the old refined offset, not the constant consensus offset or the projected COM of this body
 			if (mymodel.nr_bodies > 1)
-			{
-				// 23jul2017: my_refined_ibody_offset was selfROUNDED above. Otherwise, inconsistent
 				exp_old_offset[ipart] = my_refined_ibody_offset;
-			}
 			else
 				exp_old_offset[ipart] = my_old_offset;  // Not doing helical refinement. Rounded Cartesian offsets are stored.
 		}
@@ -5109,8 +5096,6 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 
 					// Subtract the projected COM already applied to this image for ibody
 					other_projected_com -= my_projected_com;
-					// And add the refined displacement to this image for ibody
-					//other_projected_com += my_refined_ibody_offset;
 
 #ifdef DEBUG_BODIES
 					if (my_ori_particle == ROUND(debug1))
@@ -7265,7 +7250,7 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 											// Store optimal image parameters
 											exp_max_weight[ipart] = weight;
 
-											//This is not necessary as rot, tilt and psi remain unchanged?
+											//This is not necessary as rot, tilt and psi remain unchanged!
 											//Euler_matrix2angles(A, rot, tilt, psi);
 
 											int icol_rot  = (mymodel.nr_bodies == 1) ? METADATA_ROT  : 0 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;

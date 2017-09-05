@@ -1,0 +1,111 @@
+/***************************************************************************
+ *
+ * Author: "Sjors H.W. Scheres"
+ * MRC Laboratory of Molecular Biology
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * This complete copyright notice must be included in any revised version of the
+ * source code. Additional authorship citations may be added, but existing
+ * author citations must be preserved.
+ ***************************************************************************/
+
+#ifndef SRC_FLEX_ANALYSER_H_
+#define SRC_FLEX_ANALYSER_H_
+
+#include "src/exp_model.h"
+#include "src/ml_model.h"
+#include "src/ctf.h"
+#include "src/time.h"
+#include "src/parallel.h"
+
+class FlexAnalyser
+{
+public:
+
+	// I/O Parser
+	IOParser parser;
+
+	//verbosity
+	int verb;
+
+	// Output rootname
+	FileName fn_out;
+
+	// CTF settings
+	bool do_ctf;
+	bool intact_ctf_first_peak;
+	bool ctf_phase_flipped;
+	bool ctf_premultiplied;
+
+	// The model and the data from the refinement to be analysed
+	FileName fn_model, fn_data;
+	MlModel model;
+	Experiment data;
+
+	// The body STAR file
+	FileName fn_bodies;
+
+	// Write out 3D models
+	bool do_3dmodels;
+
+	// Box size of the output 3D models
+	int size_3dmodels;
+
+	// Perform a PCA on the 3D models
+	bool do_PCA_3dmodels;
+
+	// Perform a PCA on the multibody orientations
+	bool do_PCA_orient;
+
+	// Write out subtracted particles
+	bool do_subtract;
+
+	// Which orientations/masks to use for the subtraction, i.e. relative to which body?
+	int subtract_body;
+
+	// Boxsize of the output particles
+	int boxsize;
+
+	// Perform norm and scale corrections in the subtraction?
+	bool do_norm;
+	bool do_scale;
+
+	// Mask with density to keep when doing subtractions
+	FileName fn_keepmask;
+
+	// Pre-calculated rotation matrix for (0,90,0) rotation, and its transpose
+	Matrix2D<RFLOAT> A_rot90, A_rot90T;
+
+	MetaDataTable DFo;
+
+	void read(int argc, char **argv);
+
+	void initialise();
+
+	void run();
+
+	void setupSubtractionMasksAndProjectors();
+
+	void setup3DModels();
+
+	void loopThroughParticles(int rank = 0, int size = 1);
+
+	void subtractOneParticle(long int ori_particle, long int imgno, int rank = 0, int size = 1);
+	void make3DModelOneParticle(long int ori_particle, long int imgno, int rank = 0, int size = 1);
+
+};
+
+
+
+
+
+#endif /* SRC_FLEX_ANALYSER_H_ */
