@@ -1050,7 +1050,7 @@ void Preprocessing::runOperateOnInputFile()
 
 		RFLOAT tilt_deg, psi_deg;
 		tilt_deg = psi_deg = 0.;
-		performPerImageOperations(Ipart, fn_stack, 1, i, Nimg,
+		performPerImageOperations(Ipart, fn_operate_out.withoutExtension(), 1, i, Nimg,
 				tilt_deg, psi_deg,
 				all_avg, all_stddev, all_minval, all_maxval);
 
