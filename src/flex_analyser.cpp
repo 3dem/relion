@@ -719,6 +719,8 @@ void FlexAnalyser::makePCAhistograms(std::vector< std::vector<double> > &project
 	for (int i = 0; i < nr_components; i++)
 		explain_variance += eigenvalues[i]*100./sum;
 
+	std::cout << " The first " << nr_components << " eigenvectors explain " << explain_variance << " % of the variance in the data." << std::endl;
+
 	// Output histograms of all eigenvalues
 	for (int k = 0; k < eigenvalues.size(); k++)
 	{
@@ -806,71 +808,68 @@ void FlexAnalyser::make3DModelsAlongPrincipalComponents(std::vector< std::vector
 
 
 
-			if (do_3dmodels)
+			std::cout << " Calculating 3D models for principal component " << k+1 << " ... " << std::endl;
+
+			// Now we have the average value for ther PCA values for this bin: make the 3D model...
+			std::vector<double> orients;
+			for (int j = 0; j < means.size(); j++)
 			{
-				std::cout << " Calculating 3D models for principal component " << k+1 << " ... " << std::endl;
+				orients.push_back(avg * eigenvectors[k][j] + means[j]);
+				//std::cerr << " orients[j]= " << orients[j] << " means[j]= " << means[j] << std::endl;
+			}
 
-				// Now we have the average value for ther PCA values for this bin: make the 3D model...
-				std::vector<double> orients;
-				for (int j = 0; j < means.size(); j++)
-				{
-					orients.push_back(avg * eigenvectors[k][j] + means[j]);
-					//std::cerr << " orients[j]= " << orients[j] << " means[j]= " << means[j] << std::endl;
-				}
+			Image<RFLOAT> img;
+			MultidimArray<RFLOAT> sumw;
+			img().initZeros(model.Iref[0]);
+			sumw.initZeros(model.Iref[0]);
+			for (int ibody = 0; ibody < model.nr_bodies; ibody++)
+			{
 
-				Image<RFLOAT> img;
-				MultidimArray<RFLOAT> sumw;
-				img().initZeros(model.Iref[0]);
-				sumw.initZeros(model.Iref[0]);
-				for (int ibody = 0; ibody < model.nr_bodies; ibody++)
-				{
+				MultidimArray<RFLOAT> Mbody, Mmask;
+				Matrix1D<RFLOAT> body_offset_3d(3);
+				RFLOAT body_rot, body_tilt, body_psi;
+				body_rot            = orients[ibody * 6 + 0];
+				body_tilt           = orients[ibody * 6 + 1];
+				body_psi            = orients[ibody * 6 + 2];
+				XX(body_offset_3d)  = orients[ibody * 6 + 3];
+				YY(body_offset_3d)  = orients[ibody * 6 + 4];
+				ZZ(body_offset_3d)  = orients[ibody * 6 + 5];
+				//std::cerr << " body_rot= " << body_rot << " body_tilt= " << body_tilt << " body_psi= " << body_psi << std::endl;
+				//std::cerr << " XX(body_offset_3d)= " << XX(body_offset_3d) << " YY(body_offset_3d)= " << YY(body_offset_3d) << " ZZ(body_offset_3d)= " << ZZ(body_offset_3d) << std::endl;
 
-					MultidimArray<RFLOAT> Mbody, Mmask;
-					Matrix1D<RFLOAT> body_offset_3d(3);
-					RFLOAT body_rot, body_tilt, body_psi;
-					body_rot            = orients[ibody * 6 + 0];
-					body_tilt           = orients[ibody * 6 + 1];
-					body_psi            = orients[ibody * 6 + 2];
-					XX(body_offset_3d)  = orients[ibody * 6 + 3];
-					YY(body_offset_3d)  = orients[ibody * 6 + 4];
-					ZZ(body_offset_3d)  = orients[ibody * 6 + 5];
-					//std::cerr << " body_rot= " << body_rot << " body_tilt= " << body_tilt << " body_psi= " << body_psi << std::endl;
-					//std::cerr << " XX(body_offset_3d)= " << XX(body_offset_3d) << " YY(body_offset_3d)= " << YY(body_offset_3d) << " ZZ(body_offset_3d)= " << ZZ(body_offset_3d) << std::endl;
+				Matrix2D<RFLOAT> Aresi,  Abody;
+				// Aresi is the residual orientation for this ibody
+				Euler_angles2matrix(body_rot, body_tilt, body_psi, Aresi);
+				// Only apply the residual orientation now!!!
+				Abody = (model.orient_bodies[ibody]).transpose() * A_rot90 * Aresi * model.orient_bodies[ibody];
 
-					Matrix2D<RFLOAT> Aresi,  Abody;
-					// Aresi is the residual orientation for this ibody
-					Euler_angles2matrix(body_rot, body_tilt, body_psi, Aresi);
-					// Only apply the residual orientation now!!!
-					Abody = (model.orient_bodies[ibody]).transpose() * A_rot90 * Aresi * model.orient_bodies[ibody];
+				// Also put back at the centre-of-mass of this body
+				Abody.resize(4,4);
+				MAT_ELEM(Abody, 0, 3) = XX(body_offset_3d);
+				MAT_ELEM(Abody, 1, 3) = YY(body_offset_3d);
+				MAT_ELEM(Abody, 2, 3) = ZZ(body_offset_3d);
+				MAT_ELEM(Abody, 3, 3) = 1.;
 
-					// Also put back at the centre-of-mass of this body
-					Abody.resize(4,4);
-					MAT_ELEM(Abody, 0, 3) = XX(body_offset_3d);
-					MAT_ELEM(Abody, 1, 3) = YY(body_offset_3d);
-					MAT_ELEM(Abody, 2, 3) = ZZ(body_offset_3d);
-					MAT_ELEM(Abody, 3, 3) = 1.;
+				Mbody.resize(model.Iref[ibody]);
+				Mmask.resize(model.masks_bodies[ibody]);
+				applyGeometry(model.Iref[ibody], Mbody, Abody, IS_NOT_INV, DONT_WRAP);
+				applyGeometry(model.masks_bodies[ibody], Mmask, Abody, IS_NOT_INV, DONT_WRAP);
 
-					Mbody.resize(model.Iref[ibody]);
-					Mmask.resize(model.masks_bodies[ibody]);
-					applyGeometry(model.Iref[ibody], Mbody, Abody, IS_NOT_INV, DONT_WRAP);
-					applyGeometry(model.masks_bodies[ibody], Mmask, Abody, IS_NOT_INV, DONT_WRAP);
+				img() += Mbody;
+				sumw += Mmask;
+			}
 
-					img() += Mbody;
-					sumw += Mmask;
-				}
+			// Divide the img by sumw to deal with overlapping bodies: just take average
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(img())
+			{
+				if (DIRECT_MULTIDIM_ELEM(sumw, n) > 1.)
+					DIRECT_MULTIDIM_ELEM(img(), n) /= DIRECT_MULTIDIM_ELEM(sumw, n);
+			}
 
-				// Divide the img by sumw to deal with overlapping bodies: just take average
-				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(img())
-				{
-					if (DIRECT_MULTIDIM_ELEM(sumw, n) > 1.)
-						DIRECT_MULTIDIM_ELEM(img(), n) /= DIRECT_MULTIDIM_ELEM(sumw, n);
-				}
-
-				// Write the image to disk
-				FileName fn_img = fn_out + "_component" + integerToString(k+1, 3) + "_bin" + integerToString(ibin+1, 3) + ".mrc";
-				img.setSamplingRateInHeader(model.pixel_size);
-				img.write(fn_img);
-			} // end if do_3dmodels
+			// Write the image to disk
+			FileName fn_img = fn_out + "_component" + integerToString(k+1, 3) + "_bin" + integerToString(ibin+1, 3) + ".mrc";
+			img.setSamplingRateInHeader(model.pixel_size);
+			img.write(fn_img);
 
 		} // end loop ibin
 
