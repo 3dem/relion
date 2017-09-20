@@ -60,11 +60,30 @@ public:
 	// Box size of the output 3D models
 	int size_3dmodels;
 
-	// Perform a PCA on the 3D models
-	bool do_PCA_3dmodels;
-
 	// Perform a PCA on the multibody orientations
 	bool do_PCA_orient;
+
+	// How many components to make movies from?
+	int nr_components;
+
+	// How much variance to explain with the movies?
+	double explain_variance;
+
+	// How many maps to use for the movie of each principal component?
+	int nr_maps_per_component;
+
+	// How many bins in a histogram
+	int nr_bins;
+
+	// Select particles based on this eigenvalue
+	int select_eigenvalue;
+
+	// Select particles based on this eigenvalue minimim
+	float select_eigenvalue_min;
+
+	// Select particles based on this eigenvalue minimim
+	float select_eigenvalue_max;
+
 
 	// Write out subtracted particles
 	bool do_subtract;
@@ -100,11 +119,25 @@ public:
 	void loopThroughParticles(int rank = 0, int size = 1);
 
 	void subtractOneParticle(long int ori_particle, long int imgno, int rank = 0, int size = 1);
-	void make3DModelOneParticle(long int ori_particle, long int imgno, int rank = 0, int size = 1);
+	void make3DModelOneParticle(long int ori_particle, long int imgno, std::vector<double> &datarow, int rank = 0, int size = 1);
+
+	// Output logfile.pdf with histograms of all eigenvalues
+	void makePCAhistograms(std::vector< std::vector<double> > &projected_input,
+			std::vector<double> &eigenvalues, std::vector<double> &means);
+
+	// Generate maps to make movies of the variance along the most significant eigenvectors
+	void make3DModelsAlongPrincipalComponents(std::vector< std::vector<double> > &projected_input,
+			std::vector< std::vector<double> > &eigenvectors, std::vector<double> &means);
+
+	// Output a particle.star file with a selection based on eigenvalues
+	void outputSelectedParticles(std::vector< std::vector<double> > &projected_input);
 
 };
 
-
+void principalComponentsAnalysis(const std::vector< std::vector<double> > &input,
+		std::vector< std::vector<double> > &eigenvectors,
+		std::vector<double> &eigenvalues, std::vector<double> &means,
+		std::vector< std::vector<double> > &projected_input);
 
 
 
