@@ -1049,8 +1049,14 @@ void Postprocessing::run_locres(int rank, int size)
 		}
 
 		fn_tmp = fn_out + "_locres.mrc";
+		I1.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X, angpix);
+		I1.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y, angpix);
+		I1.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z, angpix);
 		I1.write(fn_tmp);
 		fn_tmp = fn_out + "_locres_filtered.mrc";
+		I2.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X, angpix);
+		I2.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y, angpix);
+		I2.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z, angpix);
 		I2.write(fn_tmp);
 
 		// for debugging
