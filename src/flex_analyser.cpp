@@ -790,6 +790,9 @@ void FlexAnalyser::make3DModelsAlongPrincipalComponents(std::vector< std::vector
 		std::sort (project.begin(), project.end());
 
 		long int binwidth = ROUND((double)project.size() / (double)nr_maps_per_component);
+
+		std::cout << " Calculating 3D models for principal component " << k+1 << " ... " << std::endl;
+
 		for (int ibin = 0; ibin < nr_maps_per_component; ibin++)
 		{
 			long int istart = ibin * binwidth;
@@ -805,10 +808,6 @@ void FlexAnalyser::make3DModelsAlongPrincipalComponents(std::vector< std::vector
 			}
 			if (nn > 0.)
 				avg /= nn;
-
-
-
-			std::cout << " Calculating 3D models for principal component " << k+1 << " ... " << std::endl;
 
 			// Now we have the average value for ther PCA values for this bin: make the 3D model...
 			std::vector<double> orients;

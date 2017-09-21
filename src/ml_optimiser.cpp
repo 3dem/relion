@@ -135,6 +135,15 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	if (fnt != "OLD")
 		fn_body_masks = fnt;
 
+	// Also allow change of padding...
+	fnt = parser.getOption("--pad", "Oversampling factor for the Fourier transforms of the references", "OLD");
+	if (fnt != "OLD")
+	{
+		mymodel.padding_factor = textToInteger(fnt);
+		// Re-initialise the model to get the right padding factors in the PPref vectors
+		mymodel.initialise();
+	}
+
 	// Is this a new multi-body refinement?
 	if (fn_body_masks_was_empty && fn_body_masks != "None")
 		do_initialise_bodies = true;
@@ -231,7 +240,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 
 	// Check whether angular sampling has changed
 	// Do not do this for auto_refine, but make sure to do this when realigning movies and when initialising multi-body refinement!
-	if (!do_auto_refine || fn_data_movie != ""|| do_initialise_bodies)
+	if (!do_auto_refine || fn_data_movie != "" || do_initialise_bodies)
 	{
 		directions_have_changed = false;
 		fnt = parser.getOption("--healpix_order", "Healpix order for the angular sampling rate on the sphere (before oversampling): hp2=15deg, hp3=7.5deg, etc", "OLD");
@@ -857,10 +866,9 @@ void MlOptimiser::read(FileName fn_in, int rank)
 	{
 		mymodel.read(fn_model);
 	}
-
-    if (fn_body_masks != "None")
+	// Set up the bodies in the model, if this is a continuation of a multibody refinement (otherwise this is done in initialiseGeneral)
+    if (fn_body_masks != "None" && !do_initialise_bodies)
     {
-    	// Set up the bodies in the model
     	mymodel.initialiseBodies(fn_body_masks, fn_out);
 
     	if (mymodel.nr_bodies != mydata.nr_bodies)
@@ -1530,7 +1538,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 		// Start at iteration 1 again
 		iter = 0;
-		std::cerr << "end initialising bodies .." << std::endl;
 
 	}
 	else if (fn_body_masks == "")
@@ -5088,7 +5095,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 							<< "  , " << DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_yoff) << std::endl;
 #endif
 
-						// Subtract refined obody-displacement
+				    // Subtract refined obody-displacement
 					XX(other_projected_com) -= DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_xoff);
 					YY(other_projected_com) -= DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_yoff);
 					if (mymodel.data_dim == 3)

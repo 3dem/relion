@@ -1663,7 +1663,6 @@ void MlOptimiserMpi::combineAllWeightedSums()
 
 			// Loop through all slaves: each slave sends its Msum to the next slave for its subset.
 			// Each next slave sums its own Mpack to the received Msum and sends it on to the next slave
-
 			for (int this_slave = 1; this_slave < node->size; this_slave++ )
 			{
 				// Find out who is the first slave in this subset
@@ -1989,7 +1988,6 @@ void MlOptimiserMpi::maximization()
 								mymodel.fsc_halves_class[ibody], wsum_model.pdf_class[iclass],
 								do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map);
 #endif
-
 					}
 
 					// Also perform the unregularized reconstruction
@@ -2229,7 +2227,7 @@ void MlOptimiserMpi::maximization()
 							if (node->rank == reconstruct_rank && recv_node != node->rank)
 							{
 #ifdef DEBUG
-								std::cerr << "ihalfset= "<<ihalfset<<" Sending iclass="<<iclass<<" from node "<<reconstruct_rank<<" to node "<<recv_node << std::endl;
+								std::cerr << "ihalfset= "<<ihalfset<<" Sending iclass="<<iclass<<" Sending ibody="<<ibody<<" from node "<<reconstruct_rank<<" to node "<<recv_node << std::endl;
 #endif
 								node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.Iref[ith_recons]), MULTIDIM_SIZE(mymodel.Iref[ith_recons]), MY_MPI_DOUBLE, recv_node, MPITAG_IMAGE, MPI_COMM_WORLD);
 								node->relion_MPI_Send(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[ith_recons]), MULTIDIM_SIZE(mymodel.data_vs_prior_class[ith_recons]), MY_MPI_DOUBLE, recv_node, MPITAG_METADATA, MPI_COMM_WORLD);
@@ -2246,7 +2244,7 @@ void MlOptimiserMpi::maximization()
 								node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.sigma2_class[ith_recons]), MULTIDIM_SIZE(mymodel.sigma2_class[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_RFLOAT, MPI_COMM_WORLD, status);
 								node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.fsc_halves_class[ibody]), MULTIDIM_SIZE(mymodel.fsc_halves_class[ibody]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_RANDOMSEED, MPI_COMM_WORLD, status);
 #ifdef DEBUG
-								std::cerr << "ihalfset= "<<ihalfset<< " Received!!!="<<iclass<<" from node "<<reconstruct_rank<<" at node "<<node->rank<< std::endl;
+								std::cerr << "ihalfset= "<<ihalfset<< " Received!!!="<<iclass<<" ibody="<<ibody<<" from node "<<reconstruct_rank<<" at node "<<node->rank<< std::endl;
 #endif
 							}
 						}
@@ -2395,29 +2393,32 @@ void MlOptimiserMpi::joinTwoHalvesAtLowResolution()
 		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody])
 			continue;
 
-		if (node->rank == 1 || node->rank == 2)
+		int reconstruct_rank1 = 2 * (ibody % ( (node->size - 1)/2 ) ) + 1;
+		int reconstruct_rank2 = 2 * (ibody % ( (node->size - 1)/2 ) ) + 2;
+
+		if (node->rank == reconstruct_rank1 || node->rank == reconstruct_rank2)
 		{
 			MultidimArray<Complex > lowres_data;
 			MultidimArray<RFLOAT > lowres_weight;
 			wsum_model.BPref[ibody].getLowResDataAndWeight(lowres_data, lowres_weight, lowres_r_max);
 
-			if (node->rank == 2)
+			if (node->rank == reconstruct_rank2)
 			{
 				MPI_Status status;
 
 				// The second slave sends its lowres_data and lowres_weight to the first slave
-				node->relion_MPI_Send(MULTIDIM_ARRAY(lowres_data), 2*MULTIDIM_SIZE(lowres_data), MY_MPI_DOUBLE, 1, MPITAG_IMAGE, MPI_COMM_WORLD);
-				node->relion_MPI_Send(MULTIDIM_ARRAY(lowres_weight), MULTIDIM_SIZE(lowres_weight), MY_MPI_DOUBLE, 1, MPITAG_RFLOAT, MPI_COMM_WORLD);
+				node->relion_MPI_Send(MULTIDIM_ARRAY(lowres_data), 2*MULTIDIM_SIZE(lowres_data), MY_MPI_DOUBLE, reconstruct_rank1, MPITAG_IMAGE, MPI_COMM_WORLD);
+				node->relion_MPI_Send(MULTIDIM_ARRAY(lowres_weight), MULTIDIM_SIZE(lowres_weight), MY_MPI_DOUBLE, reconstruct_rank1, MPITAG_RFLOAT, MPI_COMM_WORLD);
 
 				// Now the first slave is calculating the average....
 
 				// Then the second slave receives the average back from the first slave
-				node->relion_MPI_Recv(MULTIDIM_ARRAY(lowres_data), 2*MULTIDIM_SIZE(lowres_data), MY_MPI_DOUBLE, 1, MPITAG_IMAGE, MPI_COMM_WORLD, status);
-				node->relion_MPI_Recv(MULTIDIM_ARRAY(lowres_weight), MULTIDIM_SIZE(lowres_weight), MY_MPI_DOUBLE, 1, MPITAG_RFLOAT, MPI_COMM_WORLD, status);
+				node->relion_MPI_Recv(MULTIDIM_ARRAY(lowres_data), 2*MULTIDIM_SIZE(lowres_data), MY_MPI_DOUBLE, reconstruct_rank1, MPITAG_IMAGE, MPI_COMM_WORLD, status);
+				node->relion_MPI_Recv(MULTIDIM_ARRAY(lowres_weight), MULTIDIM_SIZE(lowres_weight), MY_MPI_DOUBLE, reconstruct_rank1, MPITAG_RFLOAT, MPI_COMM_WORLD, status);
 
 
 			}
-			else if (node->rank == 1)
+			else if (node->rank == reconstruct_rank1)
 			{
 
 				std::cout << " Averaging half-reconstructions up to " << myres << " Angstrom resolution to prevent diverging orientations ..." << std::endl;
@@ -2432,8 +2433,8 @@ void MlOptimiserMpi::joinTwoHalvesAtLowResolution()
 				std::cerr << "AAArank=1 lowresdata_half2: "; lowres_data_half2.printShape();
 #endif
 				// The first slave receives the average from the second slave
-				node->relion_MPI_Recv(MULTIDIM_ARRAY(lowres_data_half2), 2*MULTIDIM_SIZE(lowres_data_half2), MY_MPI_DOUBLE, 2, MPITAG_IMAGE, MPI_COMM_WORLD, status);
-				node->relion_MPI_Recv(MULTIDIM_ARRAY(lowres_weight_half2), MULTIDIM_SIZE(lowres_weight_half2), MY_MPI_DOUBLE, 2, MPITAG_RFLOAT, MPI_COMM_WORLD, status);
+				node->relion_MPI_Recv(MULTIDIM_ARRAY(lowres_data_half2), 2*MULTIDIM_SIZE(lowres_data_half2), MY_MPI_DOUBLE, reconstruct_rank2, MPITAG_IMAGE, MPI_COMM_WORLD, status);
+				node->relion_MPI_Recv(MULTIDIM_ARRAY(lowres_weight_half2), MULTIDIM_SIZE(lowres_weight_half2), MY_MPI_DOUBLE, reconstruct_rank2, MPITAG_RFLOAT, MPI_COMM_WORLD, status);
 
 				// The first slave calculates the average of the two lowres_data and lowres_weight arrays
 #ifdef DEBUG
@@ -2449,8 +2450,8 @@ void MlOptimiserMpi::joinTwoHalvesAtLowResolution()
 				}
 
 				// The first slave sends the average lowres_data and lowres_weight also back to the second slave
-				node->relion_MPI_Send(MULTIDIM_ARRAY(lowres_data), 2*MULTIDIM_SIZE(lowres_data), MY_MPI_DOUBLE, 2, MPITAG_IMAGE, MPI_COMM_WORLD);
-				node->relion_MPI_Send(MULTIDIM_ARRAY(lowres_weight), MULTIDIM_SIZE(lowres_weight), MY_MPI_DOUBLE, 2, MPITAG_RFLOAT, MPI_COMM_WORLD);
+				node->relion_MPI_Send(MULTIDIM_ARRAY(lowres_data), 2*MULTIDIM_SIZE(lowres_data), MY_MPI_DOUBLE, reconstruct_rank2, MPITAG_IMAGE, MPI_COMM_WORLD);
+				node->relion_MPI_Send(MULTIDIM_ARRAY(lowres_weight), MULTIDIM_SIZE(lowres_weight), MY_MPI_DOUBLE, reconstruct_rank2, MPITAG_RFLOAT, MPI_COMM_WORLD);
 
 			}
 
@@ -2475,14 +2476,15 @@ void MlOptimiserMpi::reconstructUnregularisedMapAndCalculateSolventCorrectedFSC(
 	if (fn_mask == "")
 		return;
 
-	// TODO: Rank 0 and 1 reconstruct all bodies sequentially here... That parallelisation could be improved...
 	for (int ibody = 0; ibody< mymodel.nr_bodies; ibody++ )
 	{
 
 		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody])
 			continue;
 
-		if (mymodel.ref_dim == 3 && (node->rank == 1 || (do_split_random_halves && node->rank == 2) ) )
+		int reconstruct_rank1 = 2 * (ibody % ( (node->size - 1)/2 ) ) + 1;
+		int reconstruct_rank2 = 2 * (ibody % ( (node->size - 1)/2 ) ) + 2;
+		if (mymodel.ref_dim == 3 && (node->rank == reconstruct_rank1 || (do_split_random_halves && node->rank == reconstruct_rank2) ) )
 		{
 			Image<RFLOAT> Iunreg;
 			MultidimArray<RFLOAT> dummy;
@@ -2491,7 +2493,8 @@ void MlOptimiserMpi::reconstructUnregularisedMapAndCalculateSolventCorrectedFSC(
 				fn_root.compose(fn_out+"_it", iter, "", 3);
 			else
 				fn_root = fn_out;
-			fn_root += "_half" + integerToString(node->rank);;
+			int random_halfset = (node->rank % 2 == 1) ? 1 : 2;
+			fn_root += "_half" + integerToString(random_halfset);;
 			if (mymodel.nr_bodies > 1)
 				fn_root.compose(fn_root+"_body", ibody+1, "", 3);
 			else
@@ -2522,12 +2525,12 @@ void MlOptimiserMpi::reconstructUnregularisedMapAndCalculateSolventCorrectedFSC(
 			Iunreg.write(fn_root+"_unfil.mrc");
 		}
 
-		// rank1 also sends the current_size to the master, so that it knows where to cut the FSC to zero
+		// reconstruct_rank1 also sends the current_size to the master, so that it knows where to cut the FSC to zero
 		MPI_Status status;
-		if (node->rank == 1)
+		if (node->rank == reconstruct_rank1)
 			node->relion_MPI_Send(&mymodel.current_size, 1, MPI_INT, 0, MPITAG_INT, MPI_COMM_WORLD);
 		if (node->rank == 0)
-			node->relion_MPI_Recv(&mymodel.current_size, 1, MPI_INT, 1, MPITAG_INT, MPI_COMM_WORLD, status);
+			node->relion_MPI_Recv(&mymodel.current_size, 1, MPI_INT, reconstruct_rank1, MPITAG_INT, MPI_COMM_WORLD, status);
 
 		MPI_Barrier(MPI_COMM_WORLD);
 
@@ -2932,7 +2935,7 @@ void MlOptimiserMpi::iterate()
 			}
 
 			// Now combine all weighted sums
-			// Leave the option ot both for a while. Then, if there are no problems with the system via files keep that one and remove the MPI version from the code
+			// Leave the option to both for a while. Then, if there are no problems with the system via files keep that one and remove the MPI version from the code
 			if (combine_weights_thru_disc)
 				combineAllWeightedSumsViaFile();
 			else
