@@ -1088,6 +1088,8 @@ void Preprocessing::performPerImageOperations(
 
 	if (do_rewindow) rewindow(Ipart, window);
 
+        Ipart().setXmippOrigin();
+
 	TIMING_TIC(TIMING_NORMALIZE);
 	// Jun24,2015 - Shaoda, helical segments
 	if (do_normalise)
