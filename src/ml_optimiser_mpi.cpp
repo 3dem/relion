@@ -2671,28 +2671,33 @@ void MlOptimiserMpi::writeTemporaryDataAndWeightArrays()
 #endif
 
 		// Write out temporary arrays for all classes
-		for (int iclass = 0; iclass < mymodel.nr_bodies * mymodel.nr_classes; iclass++)
+		for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 		{
-			FileName fn_tmp;
-			if (mymodel.nr_bodies > 1)
-				fn_tmp.compose(fn_root+"_body", iclass+1, "", 3);
-			else
-				fn_tmp.compose(fn_root+"_class", iclass+1, "", 3);
-			if (mymodel.pdf_class[iclass] > 0.)
+			for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 			{
-				It().resize(wsum_model.BPref[iclass].data);
-				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(It())
+				int ith_recons = (mymodel.nr_bodies > 1) ? ibody : iclass;
+
+				FileName fn_tmp;
+				if (mymodel.nr_bodies > 1)
+					fn_tmp.compose(fn_root+"_body", ibody+1, "", 3);
+				else
+					fn_tmp.compose(fn_root+"_class", iclass+1, "", 3);
+				if (mymodel.pdf_class[iclass] > 0.)
 				{
-					DIRECT_MULTIDIM_ELEM(It(), n) = (DIRECT_MULTIDIM_ELEM(wsum_model.BPref[iclass].data, n)).real;
+					It().resize(wsum_model.BPref[ith_recons].data);
+					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(It())
+					{
+						DIRECT_MULTIDIM_ELEM(It(), n) = (DIRECT_MULTIDIM_ELEM(wsum_model.BPref[ith_recons].data, n)).real;
+					}
+					It.write(fn_tmp+"_data_real.mrc");
+					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(It())
+					{
+						DIRECT_MULTIDIM_ELEM(It(), n) = (DIRECT_MULTIDIM_ELEM(wsum_model.BPref[ith_recons].data, n)).imag;
+					}
+					It.write(fn_tmp+"_data_imag.mrc");
+					It()=wsum_model.BPref[ith_recons].weight;
+					It.write(fn_tmp+"_weight.mrc");
 				}
-				It.write(fn_tmp+"_data_real.mrc");
-				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(It())
-				{
-					DIRECT_MULTIDIM_ELEM(It(), n) = (DIRECT_MULTIDIM_ELEM(wsum_model.BPref[iclass].data, n)).imag;
-				}
-				It.write(fn_tmp+"_data_imag.mrc");
-				It()=wsum_model.BPref[iclass].weight;
-				It.write(fn_tmp+"_weight.mrc");
 			}
 		}
     }
