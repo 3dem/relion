@@ -63,6 +63,9 @@ public:
 	// Perform a PCA on the multibody orientations
 	bool do_PCA_orient;
 
+	// Generate maps for movies along principal components
+	bool do_generate_maps;
+
 	// How many components to make movies from?
 	int nr_components;
 

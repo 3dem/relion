@@ -37,8 +37,9 @@ void FlexAnalyser::read(int argc, char **argv)
 
 	int pca_section = parser.addSection("PCA options");
 	do_PCA_orient = parser.checkOption("--PCA_orient", "Perform a principal components analysis on the multibody orientations");
-	explain_variance  = textToFloat(parser.getOption("--v", "Use as many principal components to explain this fraction of variance", "0.75"));
+	do_generate_maps = parser.checkOption("--do_maps", "Generate maps along the principal components");
 	nr_components = textToInteger(parser.getOption("--k", "Number of principal components to generate maps for", "-1"));
+	explain_variance  = textToFloat(parser.getOption("--v", "Or use as many principal components to explain this fraction of variance (<0,1])", "0.75"));
 	nr_maps_per_component = textToInteger(parser.getOption("--maps_per_movie", "Number of maps to use for the movie of each principal component", "10"));
 	nr_bins = textToInteger(parser.getOption("--bins", "Number of bins in histograms of the eigenvalues for each principal component", "100"));
 	select_eigenvalue = textToInteger(parser.getOption("--select_eigenvalue", "Output a selection particle.star file based on eigenvalues along this eigenvector", "-1"));
@@ -113,7 +114,7 @@ void FlexAnalyser::initialise()
 	if (boxsize > 0)
 		boxsize -= boxsize%2;
 
-	if (do_PCA_orient)
+	if (do_PCA_orient && do_generate_maps)
 	{
 		if (explain_variance > 1.)
 			REPORT_ERROR("ERROR: --v should be expressed as a fraction, i.e. between 0 and 1.");
@@ -304,7 +305,8 @@ void FlexAnalyser::loopThroughParticles(int rank, int size)
 		makePCAhistograms(projected_data, eigenvalues, means);
 
 		// Make movies for the most significant eigenvectors
-		make3DModelsAlongPrincipalComponents(projected_data, eigenvectors, means);
+		if (do_generate_maps)
+			make3DModelsAlongPrincipalComponents(projected_data, eigenvectors, means);
 
 		// Output a particle selection, if requested
 		if (select_eigenvalue > 0)
