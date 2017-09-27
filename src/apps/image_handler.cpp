@@ -31,7 +31,7 @@ class image_handler_parameters
    	FileName fn_in, fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_mult, fn_div, fn_add, fn_subtract, fn_fsc, fn_adjust_power, fn_correct_ampl, fn_fourfilter;
 	int bin_avg, avg_first, avg_last, edge_x0, edge_xF, edge_y0, edge_yF, filter_edge_width, new_box, minr_ampl_corr;
     bool do_add_edge, do_flipXY, do_flipmXY, do_flipZ, do_flipX, do_flipY, do_shiftCOM, do_stats, do_avg_ampl, do_avg_ampl2, do_avg_ampl2_ali, do_average, do_remove_nan;
-	RFLOAT multiply_constant, divide_constant, add_constant, subtract_constant, threshold_above, threshold_below, angpix, new_angpix, lowpass, highpass, bfactor, shift_x, shift_y, shift_z, replace_nan;
+	RFLOAT multiply_constant, divide_constant, add_constant, subtract_constant, threshold_above, threshold_below, angpix, new_angpix, lowpass, highpass, bfactor, shift_x, shift_y, shift_z, replace_nan, randomize_at;
    	int verb;
 	// I/O Parser
 	IOParser parser;
@@ -101,6 +101,7 @@ class image_handler_parameters
 	    minr_ampl_corr = textToInteger(parser.getOption("--minr_ampl_corr", "Minimum radius (in Fourier pixels) to apply average amplitudes", "0"));
 	    do_remove_nan = parser.checkOption("--remove_nan", "Replace non-numerical values (NaN, inf, etc) in the image(s)");
 	    replace_nan = textToFloat(parser.getOption("--replace_nan", "Replace non-numerical values (NaN, inf, etc) with this value", "0"));
+	    randomize_at = textToFloat(parser.getOption("--phase_randomise", "Randomise phases beyond this resolution (in Angstroms)", "-1"));
 
 	    int three_d_section = parser.addSection("3D operations");
 	    fn_sym = parser.getOption("--sym", "Symmetrise 3D map with this point group (e.g. D6)", "");
@@ -189,6 +190,11 @@ class image_handler_parameters
 			}
 		}
 
+		if (randomize_at > 0.)
+		{
+			int iran = XSIZE(Iin())* angpix / randomize_at;
+			randomizePhasesBeyond(Iin(), iran);
+		}
 		if (fabs(multiply_constant - 1.) > 0.)
 		{
 			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Iin())
