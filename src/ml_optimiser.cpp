@@ -8236,13 +8236,27 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 
 		// Only use a finer angular sampling is the angular accuracy is still above 75% of the estimated accuracy
 		// If it is already below, nothing will change and eventually nr_iter_wo_resol_gain or nr_iter_wo_large_hidden_variable_changes will go above MAX_NR_ITER_WO_RESOL_GAIN
-		//std::cerr << "iter= " << iter << " nr_iter_wo_resol_gain= " << nr_iter_wo_resol_gain << " nr_iter_wo_large_hidden_variable_changes= " << nr_iter_wo_large_hidden_variable_changes << " acc_rot= " << acc_rot << std::endl;
-		//std::cerr  << "iter= " << iter << " acc_trans= " << acc_trans << " minimum_angular_sampling= " << minimum_angular_sampling << " current_changes_optimal_offsets= " << current_changes_optimal_offsets << std::endl;
 		if (nr_iter_wo_resol_gain >= MAX_NR_ITER_WO_RESOL_GAIN && nr_iter_wo_large_hidden_variable_changes >= MAX_NR_ITER_WO_LARGE_HIDDEN_VARIABLE_CHANGES)
 		{
+
+			bool all_bodies_are_done = false;
+			// For multi-body refinement: switch off those bodies that don't have high enough angular accuracy
+			if (mymodel.nr_bodies > 1)
+			{
+				all_bodies_are_done = true;
+				for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
+				{
+					// Stop multi-body refinements a bit earlier than normal ones: no 75%, but 100% of accuracy
+					if (old_rottilt_step < mymodel.acc_rot[ibody])
+						mymodel.keep_fixed_bodies[ibody] = true;
+					else
+						all_bodies_are_done = false;
+				}
+			}
+
 			// Old rottilt step is already below 75% of estimated accuracy: have to stop refinement?
 			// If a minimum_angular_sampling is given and we're not there yet, also just continue
-			if (old_rottilt_step < 0.75 * acc_rot && !(minimum_angular_sampling > 0. && old_rottilt_step > minimum_angular_sampling) )
+			if (all_bodies_are_done || (old_rottilt_step < 0.75 * acc_rot && !(minimum_angular_sampling > 0. && old_rottilt_step > minimum_angular_sampling)) )
 			{
 				// don't change angular sampling, as it is already fine enough
 				has_fine_enough_angular_sampling = true;
@@ -8250,16 +8264,6 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 			else
 			{
 				has_fine_enough_angular_sampling = false;
-
-				// For multi-body refinement: switch off those bodies that don't have high enough angular accuracy
-				if (mymodel.nr_bodies > 1)
-				{
-					for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
-					{
-						if (old_rottilt_step < 0.75 * mymodel.acc_rot[ibody])
-							 mymodel.keep_fixed_bodies[ibody] = true;
-					}
-				}
 
 				// A. Use translational sampling as suggested by acc_trans
 
