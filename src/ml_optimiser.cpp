@@ -3248,8 +3248,8 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
     for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
     {
 
-		// Skip this body if keep_fixed_bodies[ibody] or if it's angular accuracy is worse than 3x the sampling rate
-    	if ( mymodel.nr_bodies > 1 && (mymodel.keep_fixed_bodies[ibody] || mymodel.acc_rot[ibody] > 3. * sampling.getAngularSampling(adaptive_oversampling)) )
+		// Skip this body if keep_fixed_bodies[ibody] or if it's angular accuracy is worse than 1.5x the sampling rate
+    	if ( mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody] )
 			continue;
 
     	// Here define all kind of local arrays that will be needed
@@ -8251,6 +8251,16 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 			{
 				has_fine_enough_angular_sampling = false;
 
+				// For multi-body refinement: switch off those bodies that don't have high enough angular accuracy
+				if (mymodel.nr_bodies > 1)
+				{
+					for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
+					{
+						if (old_rottilt_step < 0.75 * mymodel.acc_rot[ibody])
+							 mymodel.keep_fixed_bodies[ibody] = true;
+					}
+				}
+
 				// A. Use translational sampling as suggested by acc_trans
 
 				// Prevent very coarse translational samplings: max 1.5
@@ -8349,7 +8359,6 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 					if ( (do_helical_refine) && (!ignore_helical_symmetry) )
 						mymodel.sigma2_rot = getHelicalSigma2Rot((helical_rise_initial / mymodel.pixel_size), helical_twist_initial, sampling.helical_offset_step, new_rottilt_step, mymodel.sigma2_rot);
 				}
-
 			}
 		}
 	}
