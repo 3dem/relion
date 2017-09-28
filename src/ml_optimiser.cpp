@@ -135,6 +135,15 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	if (fnt != "OLD")
 		fn_body_masks = fnt;
 
+	// Also allow change of padding...
+	fnt = parser.getOption("--pad", "Oversampling factor for the Fourier transforms of the references", "OLD");
+	if (fnt != "OLD")
+	{
+		mymodel.padding_factor = textToInteger(fnt);
+		// Re-initialise the model to get the right padding factors in the PPref vectors
+		mymodel.initialise();
+	}
+
 	// Is this a new multi-body refinement?
 	if (fn_body_masks_was_empty && fn_body_masks != "None")
 		do_initialise_bodies = true;
@@ -231,7 +240,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 
 	// Check whether angular sampling has changed
 	// Do not do this for auto_refine, but make sure to do this when realigning movies and when initialising multi-body refinement!
-	if (!do_auto_refine || fn_data_movie != ""|| do_initialise_bodies)
+	if (!do_auto_refine || fn_data_movie != "" || do_initialise_bodies)
 	{
 		directions_have_changed = false;
 		fnt = parser.getOption("--healpix_order", "Healpix order for the angular sampling rate on the sphere (before oversampling): hp2=15deg, hp3=7.5deg, etc", "OLD");
@@ -857,10 +866,9 @@ void MlOptimiser::read(FileName fn_in, int rank)
 	{
 		mymodel.read(fn_model);
 	}
-
+	// Set up the bodies in the model, if this is a continuation of a multibody refinement (otherwise this is done in initialiseGeneral)
     if (fn_body_masks != "None")
     {
-    	// Set up the bodies in the model
     	mymodel.initialiseBodies(fn_body_masks, fn_out);
 
     	if (mymodel.nr_bodies != mydata.nr_bodies)
@@ -1530,7 +1538,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 		// Start at iteration 1 again
 		iter = 0;
-		std::cerr << "end initialising bodies .." << std::endl;
 
 	}
 	else if (fn_body_masks == "")
@@ -3241,8 +3248,8 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
     for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
     {
 
-		// Skip this body if keep_fixed_bodies[ibody] or if it's angular accuracy is worse than 3x the sampling rate
-    	if ( mymodel.nr_bodies > 1 && (mymodel.keep_fixed_bodies[ibody] || mymodel.acc_rot[ibody] > 3. * sampling.getAngularSampling(adaptive_oversampling)) )
+		// Skip this body if keep_fixed_bodies[ibody] or if it's angular accuracy is worse than 1.5x the sampling rate
+    	if ( mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody] )
 			continue;
 
     	// Here define all kind of local arrays that will be needed
@@ -4382,7 +4389,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 		}
 
 		// Get the old offsets and the priors on the offsets
-		Matrix1D<RFLOAT> my_old_offset(3), my_prior(3);
+		Matrix1D<RFLOAT> my_old_offset(3), my_prior(3), my_old_offset_ori;
 		int icol_rot, icol_tilt, icol_psi, icol_xoff, icol_yoff, icol_zoff;
 		XX(my_old_offset) = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_XOFF);
 		XX(my_prior)      = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_XOFF_PRIOR);
@@ -4413,6 +4420,8 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 #endif
 
 			// Subtract the projected COM offset, to position this body in the center
+			// Also keep the my_old_offset in my_old_offset_ori
+			my_old_offset_ori = my_old_offset;
 			my_old_offset -= my_projected_com;
 
 			// Also get refined offset for this body
@@ -5081,6 +5090,10 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 
 					// Projected COM for this body (using Aori, just like above for ibody and my_projected_com!!!)
 					other_projected_com = Aori * (mymodel.com_bodies[obody]);
+
+					// Do the exact same as was done for the ibody, but DONT selfROUND here, as later phaseShift applied to ibody below!!!
+					other_projected_com -= my_old_offset_ori;
+
 #ifdef DEBUG_BODIES
 					if (my_ori_particle == ROUND(debug1))
 						std::cerr << " obody: " << obody+1 << " projected COM= " << other_projected_com.transpose() << std::endl;
@@ -5088,14 +5101,14 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 							<< "  , " << DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_yoff) << std::endl;
 #endif
 
-						// Subtract refined obody-displacement
+				    // Subtract refined obody-displacement
 					XX(other_projected_com) -= DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_xoff);
 					YY(other_projected_com) -= DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_yoff);
 					if (mymodel.data_dim == 3)
 						ZZ(other_projected_com) -= DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_zoff);
 
-					// Subtract the projected COM already applied to this image for ibody
-					other_projected_com -= my_projected_com;
+					// Add the my_old_offset=selfRound(my_old_offset_ori - my_projected_com) already applied to this image for ibody
+					other_projected_com += my_old_offset;
 
 #ifdef DEBUG_BODIES
 					if (my_ori_particle == ROUND(debug1))
@@ -5168,7 +5181,6 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 			Faux = exp_Fimgs_nomask.at(ipart);
 			shiftImageInFourierTransform(Faux, exp_Fimgs_nomask.at(ipart), (RFLOAT)mymodel.ori_size,
 					XX(my_refined_ibody_offset), YY(my_refined_ibody_offset), ZZ(my_refined_ibody_offset));
-
 
 #ifdef DEBUG_BODIES
 			if (my_ori_particle == ROUND(debug1))
@@ -6030,7 +6042,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int ibody, 
 												REPORT_ERROR("ihidden_over >= XSIZE(Mweight)");
 											}
 #endif
-											//std::cerr << " my_ori_particle= " << my_ori_particle<< " ipart= " << ipart << " ihidden_over= " << ihidden_over << " diff2= " << diff2 << std::endl;
+											//std::cerr << " my_ori_particle= " << my_ori_particle<< " ipart= " << ipart << " ihidden_over= " << ihidden_over << " diff2= " << diff2 << " x= " << oversampled_translations_x[iover_trans] << " y=" <<oversampled_translations_x[iover_trans] <<std::endl;
 											DIRECT_A2D_ELEM(exp_Mweight, ipart, ihidden_over) = diff2;
 #ifdef DEBUG_CHECKSIZES
 											if (ipart >= exp_min_diff2.size())
@@ -7179,6 +7191,7 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 											{
 												Fimg_store = Fimg_shift_nomask;
 											}
+//#define DEBUG_BODIES2
 #ifdef DEBUG_BODIES2
 											FourierTransformer transformer;
 											MultidimArray<Complex> Ftt(Frefctf);
@@ -7296,13 +7309,9 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 												shifts.resize(3);
 												ZZ(shifts) = ZZ(exp_old_offset[ipart]) + oversampled_translations_z[iover_trans];
 											}
-#ifdef DEBUG_BODIES
-											std::cerr << " weight= " << weight << " ihidden_over= " << ihidden_over << " shifts= " << shifts.transpose() << std::endl;
-											std::cerr << " exp_old_offset[ipart]= " << exp_old_offset[ipart].transpose() << std::endl;
-											std::cerr << " oversampled_translations= " << oversampled_translations_x[iover_trans] << " , " << oversampled_translations_y[iover_trans] << std::endl;
-#endif
-											/*
+#ifdef DEBUG_BODIES2
 											std::cerr << ihidden_over << " weight= " << weight;
+											std::cerr << " exp_old_offset[ipart]= " << exp_old_offset[ipart].transpose() << std::endl;
 											std::cerr << " SET: rot= " << rot << " tilt= " << tilt << " psi= " << psi;
 											std::cerr << " xx-old= " << XX(exp_old_offset[ipart]);
 											std::cerr << " yy-old= " << YY(exp_old_offset[ipart]);
@@ -7310,7 +7319,7 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 											std::cerr << " add-yy= " << oversampled_translations_y[iover_trans];
 											std::cerr << " xnew= " << XX(shifts);
 											std::cerr << " ynew= " << YY(shifts) << std::endl;
-											*/
+#endif
 
 #ifdef DEBUG_HELICAL_ORIENTATIONAL_SEARCH
 											std::cerr << "MlOptimiser::storeWeightedSums()" << std::endl;
@@ -8242,6 +8251,16 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 			{
 				has_fine_enough_angular_sampling = false;
 
+				// For multi-body refinement: switch off those bodies that don't have high enough angular accuracy
+				if (mymodel.nr_bodies > 1)
+				{
+					for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
+					{
+						if (old_rottilt_step < 0.75 * mymodel.acc_rot[ibody])
+							 mymodel.keep_fixed_bodies[ibody] = true;
+					}
+				}
+
 				// A. Use translational sampling as suggested by acc_trans
 
 				// Prevent very coarse translational samplings: max 1.5
@@ -8340,7 +8359,6 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 					if ( (do_helical_refine) && (!ignore_helical_symmetry) )
 						mymodel.sigma2_rot = getHelicalSigma2Rot((helical_rise_initial / mymodel.pixel_size), helical_twist_initial, sampling.helical_offset_step, new_rottilt_step, mymodel.sigma2_rot);
 				}
-
 			}
 		}
 	}
@@ -8786,7 +8804,7 @@ void MlOptimiser::getMetaAndImageDataSubset(int first_ori_particle_id, int last_
 					int icol_xoff = 3 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
 					int icol_yoff = 4 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
 					int icol_zoff = 5 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
-					RFLOAT rot, tilt, psi, xoff, yoff, zoff;
+					RFLOAT rot, tilt, psi, xoff, yoff, zoff=0.;
 					mydata.MDbodies[ibody].getValue(EMDL_ORIENT_ROT, rot, part_id);
 					mydata.MDbodies[ibody].getValue(EMDL_ORIENT_TILT, tilt, part_id);
 					mydata.MDbodies[ibody].getValue(EMDL_ORIENT_PSI,  psi, part_id);
