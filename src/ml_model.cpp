@@ -1043,6 +1043,7 @@ void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool als
 					overlap_mask = masks_bodies[obody] - overlap_mask;
 					// set the right pointer in the 2D matrix
 					DIRECT_A2D_ELEM(pointer_body_overlap, ibody, obody) = PPref.size();
+					//std::cerr << " ibody= " << ibody << " obody= " << obody << " overlap= " << overlap_mask.sum() << " icc= " << PPref.size() << std::endl;
 					// Extend the two vectors here!
 					PPref.push_back(PPref[obody]);
 					masks_bodies.push_back(overlap_mask);
@@ -1127,7 +1128,7 @@ void MlModel::setFourierTransformMaps(bool update_tau2_spectra, int nr_threads, 
 		if (nr_bodies > 1)
 		{
 			// ibody deals with overlapping bodies here, as iclass can be larger than nr_bodies when bodies overlap,
-			// but there are only nr_bodies Iref
+			// but there are only nr_bodies Iref; ibody is the number of the original body (max nr_bodies)
 			int ibody = pointer_body_overlap_inv[iclass];
 			Irefp = Iref[ibody] * masks_bodies[iclass];
 			// Place each body with its center-of-mass in the center of the box
@@ -1395,7 +1396,7 @@ void MlWsumModel::pack(MultidimArray<RFLOAT> &packed)
     // data is complex: multiply by two!
     packed_size += nr_classes * nr_bodies * 2 * BPref[0].getSize();
     packed_size += nr_classes * nr_bodies * BPref[0].getSize();
-    packed_size += nr_classes * nr_directions;
+    packed_size += nr_classes * nr_bodies * nr_directions;
     // for pdf_class
     packed_size += nr_classes;
     // for priors for each class

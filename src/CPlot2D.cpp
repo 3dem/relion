@@ -47,7 +47,8 @@ void joinMultipleEPSIntoSinglePDF(FileName fn_pdf, std::vector<FileName> fn_eps)
 
 CPlot2D::CPlot2D(std::string title)
 {
-    m_dXAxisSize=809.0; // Golden Ratio
+    //m_dXAxisSize=809.0; // Golden Ratio
+    m_dXAxisSize=600.0; // Golden Ratio
     m_dYAxisSize=500.0;
 
     m_dBottomFrameSize=90.0;

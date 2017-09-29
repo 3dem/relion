@@ -297,9 +297,6 @@ std::string integerToString(int I, int _width, char fill_with)
     int width = _width;
     int Iaux = ABS(I);
 
-    if (SGN(I) < 0)
-        width--;
-
     if (width == 0)
         do
         {
@@ -307,6 +304,8 @@ std::string integerToString(int I, int _width, char fill_with)
             width++;
         }
         while (Iaux != 0);
+    else if (SGN(I) < 0)
+        width--;
 
     // Fill the number with the fill character
     for (int i = 0; i < width; i++)

@@ -2006,7 +2006,7 @@ void displayerGuiWindow::cb_display_i()
 		cl += " --ori_scale " + (std::string)ori_scale_input->value();
 		if (textToInteger(max_nr_images_input->value()) > 0)
 		{
-			if (sort_button->value())
+			if (is_star && sort_button->value())
 				std::cerr << " WARNING: you cannot sort particles and use a maximum number of images. Ignoring the latter..." << std::endl;
 			else
 				cl += " --max_nr_images " + (std::string)max_nr_images_input->value();

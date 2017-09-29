@@ -184,9 +184,6 @@ public:
 
 	std::vector<int> pointer_body_overlap_inv;
 
-	// Minimum percentage of overlap between two masks, before the overlap is taken into account
-	RFLOAT body_minimum_overlap;
-
 	// Estimated accuracy at which rotations can be assigned, one for each class
 	std::vector<RFLOAT> acc_rot;
 

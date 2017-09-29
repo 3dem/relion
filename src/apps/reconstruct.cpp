@@ -153,11 +153,32 @@ class reconstruct_parameters
 				A3D_ELEM(backprojector.weight, k, i, j) = A3D_ELEM(It(), k, i, j);
 			}
 
+	   		bool do_use_fsc = false;
+	   		bool do_map = false;
+	   		MultidimArray<RFLOAT> fsc;
+	   		fsc.resize(debug_ori_size/2+1);
+	   		if (fn_fsc != "")
+	   		{
+	   			do_map = true;
+	   			do_use_fsc =true;
+	   			MetaDataTable MDfsc;
+	   			MDfsc.read(fn_fsc);
+	   			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDfsc)
+	   			{
+	   				int idx;
+	   				RFLOAT val;
+	   				MDfsc.getValue(EMDL_SPECTRAL_IDX, idx);
+	   				MDfsc.getValue(EMDL_MLMODEL_TAU2_REF, val);
+	   				fsc(idx) =  val;
+	   			}
+	   			std::cerr << "Using FSC to regularise reconstruction!" << std::endl;
+	   		}
+	   		std::cerr << "Starting the reconstruction ..." << std::endl;
 			MultidimArray<RFLOAT> dummy;
-			backprojector.reconstruct(It(), iter, false, 1., dummy, dummy, dummy, dummy, dummy, 1., false, true, nr_threads, -1);
+			backprojector.reconstruct(It(), iter, do_map, 1., fsc, dummy, dummy, dummy, dummy, 1., false, true, nr_threads, -1);
 	    	It.write(fn_out);
 	    	std::cerr<<" Done writing map in "<<fn_out<<std::endl;
-                exit(1);
+	    	exit(1);
 
 		}
 		else

@@ -66,7 +66,6 @@ enum EMDLabel
     EMDL_COMMENT, // The EMDL_COMMENT is handled specially as well
 
     EMDL_BODY_MASK_NAME, ///< For multi-body refinements
-	EMDL_BODY_MINIMUM_OVERLAP,
 	EMDL_BODY_ROTATE_DIRECTION_X,
 	EMDL_BODY_ROTATE_DIRECTION_Y,
 	EMDL_BODY_ROTATE_DIRECTION_Z,
@@ -474,7 +473,6 @@ private:
         EMDL::addLabel(EMDL_AREA_NAME, EMDL_STRING, "rlnAreaName", "Name of an area (i.e. field-of-view)");
 
         EMDL::addLabel(EMDL_BODY_MASK_NAME, EMDL_STRING, "rlnBodyMaskName", "Name of an image that contains a [0,1] body mask for multi-body refinement");
-        EMDL::addLabel(EMDL_BODY_MINIMUM_OVERLAP, EMDL_DOUBLE, "rlnBodyMinimumOverlap", "Minimum overlap between two bodies to consider their overlap in the multi-body refinement");
         EMDL::addLabel(EMDL_BODY_ROTATE_DIRECTION_X, EMDL_DOUBLE, "rlnBodyRotateDirectionX", "X-component of axis around which to rotate this body");
         EMDL::addLabel(EMDL_BODY_ROTATE_DIRECTION_Y, EMDL_DOUBLE, "rlnBodyRotateDirectionY", "Y-component of axis around which to rotate this body");
         EMDL::addLabel(EMDL_BODY_ROTATE_DIRECTION_Z, EMDL_DOUBLE, "rlnBodyRotateDirectionZ", "Z-component of axis around which to rotate this body");
