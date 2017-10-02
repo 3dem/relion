@@ -276,21 +276,12 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 		size_t img_size = img.data.nzyxdim;
 
-
-/// TODO - Dari - Clean this up - we no longer need an example of how to use AccPtr and AccUtilities 
-
-
-
-		/*
-		 * Example usage of AccPtr and AccUtilities library function
-		 */
-
 		AccDataTypes::Image<XFLOAT> temp(img.data, (CudaCustomAllocator *)accMLO->getAllocator());
-		AccDataTypes::Image<XFLOAT> d_img_(img.data, (CudaCustomAllocator *)accMLO->getAllocator());
+		AccDataTypes::Image<XFLOAT> d_img(img.data, (CudaCustomAllocator *)accMLO->getAllocator());
 
-		d_img_.deviceAlloc();
-		d_img_.hostInit(0);
-		d_img_.deviceInit(0);
+		d_img.deviceAlloc();
+		d_img.hostInit(0);
+		d_img.deviceInit(0);
 
 		// Error - already allocated - temp.hostAlloc();
 
@@ -318,7 +309,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		{
 			AccUtilities::translate<XFLOAT>(BLOCK_SIZE,
 				temp,  // translate from temp...
-				d_img_, // ... into d_img
+				d_img, // ... into d_img
 				XX(my_old_offset),
 				YY(my_old_offset),
 				ZZ(my_old_offset));
@@ -327,35 +318,11 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		{
 				AccUtilities::translate<XFLOAT>(BLOCK_SIZE,
 				temp,  // translate from temp...
-				d_img_, // ... into d_img
+				d_img, // ... into d_img
 				XX(my_old_offset),
 				YY(my_old_offset),
 				0);		
 		}
-
-
-		/*
-		 * Setup continuation into ordinary GPU pipeline
-		 */
-
-		DEBUG_HANDLE_ERROR(cudaDeviceSynchronize());
-
-		AccPtr<XFLOAT> d_img(img_size, (CudaCustomAllocator *)accMLO->getAllocator());
-		d_img.hostInit(0.f);
-
-		d_img.deviceAlloc();
-
-		d_img_.cpOnAcc(~d_img);
-
-		d_img.streamSync();
-
-		/*
-		 * Continue ordinary pipeline
-		 */
-
-
-
-
 
 		if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) )
 		{
@@ -379,12 +346,6 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 		accMLO->transformer1.setSize(img().xdim,img().ydim,img().zdim);
 		// The resize is assumed to keep the contents of transformer1 in-tact (if possible)
-
-		//FIXME What is this?
-//		deviceInitValue(accMLO->transformer1.reals, (XFLOAT)0.);
-//		deviceInitComplexValue(accMLO->transformer1.fouriers, (XFLOAT)0.);
-//		accMLO->transformer1.reals.streamSync();
-//		accMLO->transformer1.fouriers.streamSync();
 
 		d_img.cpOnAcc(accMLO->transformer1.reals);
 		runCenterFFT(
@@ -548,21 +509,6 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 				radius = ((RFLOAT)img.data.xdim)/2.;
 			XFLOAT radius_p = radius + cosine_width;
 
-//			dim3 block_dim = 1; //TODO
-//			cuda_kernel_softMaskOutsideMap<<<block_dim,SOFTMASK_BLOCK_SIZE>>>(	~d_img,
-//																				img().nzyxdim,
-//																				img.data.xdim,
-//																				img.data.ydim,
-//																				img.data.zdim,
-//																				img.data.xdim/2,
-//																				img.data.ydim/2,
-//																				img.data.zdim/2, //unused
-//																				true,
-//																				radius,
-//																				radius_p,
-//																				cosine_width);
-//			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
-
 			XFLOAT sum_bg(0.);
 			int block_dim = 128; //TODO: set balanced (hardware-dep?)
 
@@ -609,13 +555,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 										sum_bg);
 			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 
-//			d_img.streamSync();
-//			d_img.cpToHost();
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
-//			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(img())
-//			{
-//				img.data.data[n]=(RFLOAT)d_img[n];
-//			}
 
 			CTOC(accMLO->timer,"softMaskOutsideMap");
 		}
@@ -625,10 +565,6 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		accMLO->transformer1.setSize(img().xdim,img().ydim,img().zdim);
 		// The resize is assumed to keep the contents of transformer1 in-tact (if possible)
 		
-//		deviceInitValue(accMLO->transformer1.reals, (XFLOAT)0.);
-//		deviceInitComplexValue(accMLO->transformer1.fouriers, (XFLOAT)0.);
-//		accMLO->transformer1.reals.streamSync();
-//		accMLO->transformer1.fouriers.streamSync();
 		CTOC(accMLO->timer,"setSize");
 
 		CTIC(accMLO->timer,"transform");
