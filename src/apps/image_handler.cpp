@@ -193,7 +193,8 @@ class image_handler_parameters
 		if (randomize_at > 0.)
 		{
 			int iran = XSIZE(Iin())* angpix / randomize_at;
-			randomizePhasesBeyond(Iin(), iran);
+			Iout = Iin;
+			randomizePhasesBeyond(Iout(), iran);
 		}
 		if (fabs(multiply_constant - 1.) > 0.)
 		{
