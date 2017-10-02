@@ -139,9 +139,14 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	fnt = parser.getOption("--pad", "Oversampling factor for the Fourier transforms of the references", "OLD");
 	if (fnt != "OLD")
 	{
-		mymodel.padding_factor = textToInteger(fnt);
-		// Re-initialise the model to get the right padding factors in the PPref vectors
-		mymodel.initialise();
+		if (textToInteger(fnt) != mymodel.padding_factor)
+		{
+			if (mymodel.nr_bodies > 1)
+				REPORT_ERROR("ERROR: cannot change padding factor in a continuation of a multi-body refinement...");
+			mymodel.padding_factor = textToInteger(fnt);
+			// Re-initialise the model to get the right padding factors in the PPref vectors
+			mymodel.initialise();
+		}
 	}
 
 	// Is this a new multi-body refinement?
@@ -867,6 +872,7 @@ void MlOptimiser::read(FileName fn_in, int rank)
 		mymodel.read(fn_model);
 	}
 	// Set up the bodies in the model, if this is a continuation of a multibody refinement (otherwise this is done in initialiseGeneral)
+    std::cerr << " fn_body_masks= " << fn_body_masks << std::endl;
     if (fn_body_masks != "None")
     {
     	mymodel.initialiseBodies(fn_body_masks, fn_out);
