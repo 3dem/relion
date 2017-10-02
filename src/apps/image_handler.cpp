@@ -30,8 +30,8 @@ class image_handler_parameters
 	public:
    	FileName fn_in, fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_mult, fn_div, fn_add, fn_subtract, fn_fsc, fn_adjust_power, fn_correct_ampl, fn_fourfilter;
 	int bin_avg, avg_first, avg_last, edge_x0, edge_xF, edge_y0, edge_yF, filter_edge_width, new_box, minr_ampl_corr;
-    bool do_add_edge, do_flipXY, do_flipmXY, do_flipZ, do_flipX, do_flipY, do_shiftCOM, do_stats, do_avg_ampl, do_average, do_remove_nan;
-	RFLOAT multiply_constant, divide_constant, add_constant, subtract_constant, threshold_above, threshold_below, angpix, new_angpix, lowpass, highpass, bfactor, shift_x, shift_y, shift_z, replace_nan;
+    bool do_add_edge, do_flipXY, do_flipmXY, do_flipZ, do_flipX, do_flipY, do_shiftCOM, do_stats, do_avg_ampl, do_avg_ampl2, do_avg_ampl2_ali, do_average, do_remove_nan;
+	RFLOAT multiply_constant, divide_constant, add_constant, subtract_constant, threshold_above, threshold_below, angpix, new_angpix, lowpass, highpass, bfactor, shift_x, shift_y, shift_z, replace_nan, randomize_at;
    	int verb;
 	// I/O Parser
 	IOParser parser;
@@ -94,11 +94,14 @@ class image_handler_parameters
 	    shift_y = textToFloat(parser.getOption("--shift_y", "Shift images this many pixels in the Y-direction", "0."));
 	    shift_z = textToFloat(parser.getOption("--shift_z", "Shift images this many pixels in the Z-direction", "0."));
 	    do_avg_ampl = parser.checkOption("--avg_ampl", "Calculate average amplitude spectrum for all images?");
+	    do_avg_ampl2 = parser.checkOption("--avg_ampl2", "Calculate average amplitude spectrum for all images?");
+	    do_avg_ampl2_ali = parser.checkOption("--avg_ampl2_ali", "Calculate average amplitude spectrum for all aligned images?");
 	    do_average = parser.checkOption("--average", "Calculate average of all images (without alignment)");
 	    fn_correct_ampl = parser.getOption("--correct_avg_ampl", "Correct all images with this average amplitude spectrum", "");
 	    minr_ampl_corr = textToInteger(parser.getOption("--minr_ampl_corr", "Minimum radius (in Fourier pixels) to apply average amplitudes", "0"));
 	    do_remove_nan = parser.checkOption("--remove_nan", "Replace non-numerical values (NaN, inf, etc) in the image(s)");
 	    replace_nan = textToFloat(parser.getOption("--replace_nan", "Replace non-numerical values (NaN, inf, etc) with this value", "0"));
+	    randomize_at = textToFloat(parser.getOption("--phase_randomise", "Randomise phases beyond this resolution (in Angstroms)", "-1"));
 
 	    int three_d_section = parser.addSection("3D operations");
 	    fn_sym = parser.getOption("--sym", "Symmetrise 3D map with this point group (e.g. D6)", "");
@@ -187,6 +190,11 @@ class image_handler_parameters
 			}
 		}
 
+		if (randomize_at > 0.)
+		{
+			int iran = XSIZE(Iin())* angpix / randomize_at;
+			randomizePhasesBeyond(Iin(), iran);
+		}
 		if (fabs(multiply_constant - 1.) > 0.)
 		{
 			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Iin())
@@ -584,7 +592,7 @@ class image_handler_parameters
 					if (XSIZE(Iop()) != xdim || YSIZE(Iop()) != ydim || ZSIZE(Iop()) != zdim)
 						REPORT_ERROR("Error: operate-image is not of the correct size");
 
-				if (do_avg_ampl)
+				if (do_avg_ampl || do_avg_ampl2 || do_avg_ampl2_ali)
 				{
 					avg_ampl.initZeros(zdim, ydim, xdim/2+1);
 				}
@@ -603,14 +611,42 @@ class image_handler_parameters
 				Iin().computeStats(avg, stddev, minval, maxval);
 				std::cout << fn_img << " : (x,y,z,n)= " << XSIZE(Iin()) << " x "<< YSIZE(Iin()) << " x "<< ZSIZE(Iin()) << " x "<< NSIZE(Iin()) << " ; avg= " << avg << " stddev= " << stddev << " minval= " <<minval << " maxval= " << maxval << std::endl;
 			}
-			else if (do_avg_ampl)
+			else if (do_avg_ampl || do_avg_ampl2 || do_avg_ampl2_ali)
 			{
 				Iin.read(fn_img);
+
+				if (do_avg_ampl2_ali)
+				{
+					RFLOAT xoff = 0.;
+					RFLOAT yoff = 0.;
+					RFLOAT psi = 0.;
+					MD.getValue(EMDL_ORIENT_ORIGIN_X, xoff);
+					MD.getValue(EMDL_ORIENT_ORIGIN_Y, yoff);
+					MD.getValue(EMDL_ORIENT_PSI, psi);
+					// Apply the actual transformation
+					Matrix2D<RFLOAT> A;
+					rotation2DMatrix(psi, A);
+				    MAT_ELEM(A,0, 2) = xoff;
+				    MAT_ELEM(A,1, 2) = yoff;
+				    selfApplyGeometry(Iin(), A, IS_NOT_INV, DONT_WRAP);
+				}
+
 				MultidimArray<Complex> FT;
 				transformer.FourierTransform(Iin(), FT);
-				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(FT)
+
+				if (do_avg_ampl)
 				{
-					DIRECT_MULTIDIM_ELEM(avg_ampl, n) +=  abs(DIRECT_MULTIDIM_ELEM(FT, n));
+					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(FT)
+					{
+						DIRECT_MULTIDIM_ELEM(avg_ampl, n) +=  abs(DIRECT_MULTIDIM_ELEM(FT, n));
+					}
+				}
+				else if (do_avg_ampl2 || do_avg_ampl2_ali)
+				{
+					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(FT)
+					{
+						DIRECT_MULTIDIM_ELEM(avg_ampl, n) +=  norm(DIRECT_MULTIDIM_ELEM(FT, n));
+					}
 				}
 			}
 			else if (do_average)
@@ -694,7 +730,7 @@ class image_handler_parameters
 		}
 
 
-		if (do_avg_ampl || do_average)
+		if (do_avg_ampl || do_avg_ampl2 || do_avg_ampl2_ali || do_average)
 		{
 			avg_ampl /= (RFLOAT)i_img;
 			Iout() = avg_ampl;

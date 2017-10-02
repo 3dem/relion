@@ -277,7 +277,7 @@ void JobWindow::place(std::string key, int deactivate_option, Fl_Group * deactiv
 	if (myjob.joboptions.find(key) == myjob.joboptions.end())
 		std::cerr << "WARNING: cannot find " << key << " in the defined joboptions of jobtype= " << myjob.type << std::endl;
 
-	guientries[key].place(myjob.joboptions[key], current_y, deactivate_option, deactivate_this_group);
+	guientries[key].place(myjob.joboptions[key], current_y, deactivate_option, deactivate_this_group, do_oldstyle);
 }
 
 void JobWindow::place2(std::string key1, std::string key2, std::string label, int deactivate_option)
@@ -290,10 +290,10 @@ void JobWindow::place2(std::string key1, std::string key2, std::string label, in
 	myjob.joboptions[key1].label_gui = label;
 	myjob.joboptions[key2].label_gui = "";
 	int old_y = current_y;
-	guientries[key1].place(myjob.joboptions[key1], current_y, deactivate_option, NULL,
+	guientries[key1].place(myjob.joboptions[key1], current_y, deactivate_option, NULL, do_oldstyle,
 			XCOL2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
 	current_y = old_y;
-	guientries[key2].place(myjob.joboptions[key2], current_y, deactivate_option, NULL,
+	guientries[key2].place(myjob.joboptions[key2], current_y, deactivate_option, NULL, do_oldstyle,
 			XCOL2 + (WCOL2 + COLUMN_SEPARATION) / 2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
 }
 
@@ -310,13 +310,13 @@ void JobWindow::place3(std::string key1, std::string key2, std::string key3, std
 	myjob.joboptions[key2].label_gui = "";
 	myjob.joboptions[key3].label_gui = "";
 	int old_y = current_y;
-	guientries[key1].place(myjob.joboptions[key1], current_y, deactivate_option, NULL,
+	guientries[key1].place(myjob.joboptions[key1], current_y, deactivate_option, NULL, do_oldstyle,
 			XCOL2, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
 	current_y = old_y;
-	guientries[key2].place(myjob.joboptions[key2], current_y, deactivate_option, NULL,
+	guientries[key2].place(myjob.joboptions[key2], current_y, deactivate_option, NULL, do_oldstyle,
 			XCOL2 + 1 + (WCOL2 + COLUMN_SEPARATION) / 3, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
 	current_y = old_y;
-	guientries[key3].place(myjob.joboptions[key3], current_y, deactivate_option, NULL,
+	guientries[key3].place(myjob.joboptions[key3], current_y, deactivate_option, NULL, do_oldstyle,
 			XCOL2 + 1 + 2 * (WCOL2 + COLUMN_SEPARATION) / 3, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
 
 }
@@ -394,9 +394,10 @@ void JobWindow::updateMyJob()
 
 }
 
-void JobWindow::initialise(int my_job_type)
+void JobWindow::initialise(int my_job_type, bool _do_oldstyle)
 {
 
+	do_oldstyle = _do_oldstyle;
 	switch (my_job_type)
 	{
 	case PROC_IMPORT:
@@ -582,7 +583,6 @@ void JobWindow::initialiseMotioncorrWindow()
 	place("fn_motioncor2_exe", TOGGLE_DEACTIVATE);
 	place("fn_gain_ref", TOGGLE_DEACTIVATE);
 	place("fn_defect", TOGGLE_DEACTIVATE);
-	place("fn_archive", TOGGLE_DEACTIVATE);
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -790,6 +790,9 @@ void JobWindow::initialiseManualpickWindow()
 	place("angpix");
 
 	current_y += STEPY/2;
+	place ("do_startend");
+
+	current_y += STEPY/2;
 	place("ctfscale");
 
 	tab2->end();
@@ -895,7 +898,7 @@ void JobWindow::initialiseAutopickWindow()
 
 	group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
     group3->end();
-    place("use_gpu", TOGGLE_DEACTIVATE, group3);
+    place("use_gpu", TOGGLE_LEAVE_ACTIVE, group3);
 
     group3->begin();
 	place("gpu_ids");
@@ -1322,10 +1325,9 @@ void JobWindow::initialiseInimodelWindow()
 
 	place("nr_iter");
 	place("sgd_subset_size");
-	place("sgd_max_subsets");
 	place("sgd_write_subsets");
-	place("sgd_sigma2fudge_halflife");
 	place("sgd_highres_limit");
+	place("sgd_sigma2fudge_halflife");
 
 	tab3->end();
 	tab4->begin();
@@ -1348,6 +1350,22 @@ void JobWindow::initialiseInimodelWindow()
 	place("do_preread_images");
 	place("scratch_dir");
 	place("do_combine_thru_disc");
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	// Set up queue groups for running tab
+    group5 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group5->end();
+
+    place("use_gpu", TOGGLE_LEAVE_ACTIVE, group5);
+
+    group5->begin();
+	place("gpu_ids", TOGGLE_LEAVE_ACTIVE);
+    group5->end();
+
+    guientries["use_gpu"].cb_menu_i();
+
 
 	tab5->end();
 
@@ -1476,8 +1494,20 @@ void JobWindow::initialiseClass3DWindow()
 
 	group5->begin();
 	place2("helical_tube_inner_diameter", "helical_tube_outer_diameter", "Tube diameter - inner, outer (A):", TOGGLE_DEACTIVATE);
+	place2("range_tilt", "range_psi", "Angular search range - tilt, psi (deg):", TOGGLE_DEACTIVATE);
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	group8 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group8->end();
+	place("do_apply_helical_symmetry", TOGGLE_DEACTIVATE, group8);
+	group8->begin();
 	place("helical_nr_asu", TOGGLE_DEACTIVATE);
 	place2("helical_twist_initial", "helical_rise_initial", "Initial twist (deg), rise (A):", TOGGLE_DEACTIVATE);
+	place("helical_z_percentage", TOGGLE_DEACTIVATE);
+	group8->end();
+	guientries["do_apply_helical_symmetry"].cb_menu_i(); // to make default effective
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -1494,8 +1524,6 @@ void JobWindow::initialiseClass3DWindow()
 	// Add a little spacer
 	current_y += STEPY/2;
 
-	place("helical_z_percentage", TOGGLE_DEACTIVATE);
-	place2("range_tilt", "range_psi", "Angular search range - tilt, psi (deg):", TOGGLE_DEACTIVATE);
 	place("helical_range_distance", TOGGLE_DEACTIVATE);
 	group5->end();
 	guientries["do_helix"].cb_menu_i(); // to make default effective
@@ -1603,8 +1631,20 @@ void JobWindow::initialiseAutorefineWindow()
 	place("do_helix", TOGGLE_DEACTIVATE, group2);
 	group2->begin();
 	place2("helical_tube_inner_diameter", "helical_tube_outer_diameter", "Tube diameter - inner, outer (A):",TOGGLE_DEACTIVATE);
+	place2("range_tilt", "range_psi", "Angular search range - tilt, psi (deg):", TOGGLE_DEACTIVATE);
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	group5 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group5->end();
+	place("do_apply_helical_symmetry", TOGGLE_DEACTIVATE, group5);
+	group5->begin();
 	place("helical_nr_asu", TOGGLE_DEACTIVATE);
 	place2("helical_twist_initial", "helical_rise_initial", "Initial twist (deg), rise (A):",TOGGLE_DEACTIVATE);
+	place("helical_z_percentage", TOGGLE_DEACTIVATE);
+	group5->end();
+	guientries["do_apply_helical_symmetry"].cb_menu_i(); // to make default effective
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -1621,10 +1661,6 @@ void JobWindow::initialiseAutorefineWindow()
 	// Add a little spacer
 	current_y += STEPY/2;
 
-	place("helical_z_percentage", TOGGLE_DEACTIVATE);
-	place2("range_tilt", "range_psi", "Angular search range - tilt, psi (deg):", TOGGLE_DEACTIVATE);
-
-	current_y += STEPY + 2;
 	place("helical_range_distance", TOGGLE_DEACTIVATE);
 	group2->end();
 	guientries["do_helix"].cb_menu_i(); // to make default effective

@@ -1812,7 +1812,7 @@ void convertHelicalTubeCoordsToMetaDataTable(
 	if ( (box_size_pix < 2) || (Xdim < box_size_pix) || (Ydim < box_size_pix))
 		REPORT_ERROR("helix.cpp::convertHelicalTubeCoordsToMetaDataTable(): Wrong dimensions or box size!");
     if (fn_in.getExtension() != "star")
-    	REPORT_ERROR("helix.cpp::convertHelicalTubeCoordsToMetaDataTable(): MetadataTable should have .star extension.");
+    	REPORT_ERROR("helix.cpp::convertHelicalTubeCoordsToMetaDataTable(): MetadataTable should have .star extension. Error(s) in " + fn_in);
 
     half_box_size_pix = box_size_pix / 2.;
     psi_prior_flip_ratio = UNIMODAL_PSI_PRIOR_FLIP_RATIO;
@@ -1827,9 +1827,9 @@ void convertHelicalTubeCoordsToMetaDataTable(
 		return;
 
     if ( (!MD_in.containsLabel(EMDL_IMAGE_COORD_X)) || (!MD_in.containsLabel(EMDL_IMAGE_COORD_Y)) )
-    	REPORT_ERROR("helix.cpp::convertHelicalTubeCoordsToMetaDataTable(): Input STAR file does not contain X and Y coordinates!");
+    	REPORT_ERROR("helix.cpp::convertHelicalTubeCoordsToMetaDataTable(): Input STAR file does not contain X and Y coordinates! Error(s) in " + fn_in);
     if (MD_in.numberOfObjects() % 2)
-    	REPORT_ERROR("helix.cpp::convertHelicalTubeCoordsToMetaDataTable(): Input coordinates should be in pairs!");
+    	REPORT_ERROR("helix.cpp::convertHelicalTubeCoordsToMetaDataTable(): Input coordinates should be in pairs! Error(s) in" + fn_in);
 
     // Sjors added MDin_has_id and MDin_has_pitch to allow manual calculation of different cross-over distances to be carried onto the extracted segments...
     bool MDin_has_id = MD_in.containsLabel(EMDL_PARTICLE_HELICAL_TUBE_ID);
@@ -1871,7 +1871,7 @@ void convertHelicalTubeCoordsToMetaDataTable(
     		|| (x2_coord_list.size() != y1_coord_list.size())
 			|| (y1_coord_list.size() != y2_coord_list.size())
 			|| (y2_coord_list.size() != x1_coord_list.size()) )
-    	REPORT_ERROR("helix.cpp::convertHelicalTubeCoordsToMetaDataTable(): BUG in reading input STAR file!");
+    	REPORT_ERROR("helix.cpp::convertHelicalTubeCoordsToMetaDataTable(): BUG in reading input STAR file " + fn_in);
     MD_in.clear();
 
     // Init output STAR file
@@ -2471,7 +2471,7 @@ void convertHelicalSegmentCoordsToMetaDataTable(
 			|| (!MD_in.containsLabel(EMDL_ORIENT_PSI_PRIOR))
 			|| (!MD_in.containsLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH))
 			|| (!MD_in.containsLabel(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO)) )
-		REPORT_ERROR("helix.cpp::convertHelicalSegmentCoordsToMetaDataTable(): Prior information of helical segments is missing!");
+		REPORT_ERROR("helix.cpp::convertHelicalSegmentCoordsToMetaDataTable(): Prior information of helical segments is missing in " + fn_in);
 
 	int nr_segments = 0;
 	z = 1.;
@@ -2540,7 +2540,7 @@ void convertXimdispHelicalSegmentCoordsToMetaDataTable(
 
 	fin.open(fn_in.c_str(), std::ios_base::in);
 	if (fin.fail())
-		REPORT_ERROR("helix.cpp::convertXimdispHelicalSegmentCoordsToMetaDataTable(): Cannot open input file!");
+		REPORT_ERROR("helix.cpp::convertXimdispHelicalSegmentCoordsToMetaDataTable(): Cannot open input file " + fn_in);
 	line.clear();
 	getline(fin, line, '\n');
 	psi_deg_old = 999999.;
@@ -2554,7 +2554,7 @@ void convertXimdispHelicalSegmentCoordsToMetaDataTable(
 		words.clear();
 		tokenize(line, words);
 		if (words.size() != 3)
-			REPORT_ERROR("helix.cpp::convertXimdispHelicalSegmentCoordsToMetaDataTable(): Invalid input file!");
+			REPORT_ERROR("helix.cpp::convertXimdispHelicalSegmentCoordsToMetaDataTable(): Invalid input file " + fn_in);
 		x = textToFloat(words[0]);
 		y = textToFloat(words[1]);
 		psi_deg = textToFloat(words[2]);
@@ -2653,7 +2653,7 @@ void convertXimdispHelicalTubeCoordsToMetaDataTable(
 
 	fin.open(fn_in.c_str(), std::ios_base::in);
 	if (fin.fail())
-		REPORT_ERROR("helix.cpp::convertXimdispHelicalTubeCoordsToMetaDataTable(): Cannot open input file!");
+		REPORT_ERROR("helix.cpp::convertXimdispHelicalTubeCoordsToMetaDataTable(): Cannot open input file " + fn_in);
 	nr_tubes = nr_segments = 0;
 	while (getline(fin, line, '\n'))
 	{
@@ -2663,7 +2663,7 @@ void convertXimdispHelicalTubeCoordsToMetaDataTable(
 		words.clear();
 		tokenize(line, words);
 		if (words.size() != 2)
-			REPORT_ERROR("helix.cpp::convertXimdispHelicalTubeCoordsToMetaDataTable(): Invalid input file!");
+			REPORT_ERROR("helix.cpp::convertXimdispHelicalTubeCoordsToMetaDataTable(): Invalid input file " + fn_in);
 		nr_tubes++;
 
 		// Read in starting and end points for this helical tube
@@ -2674,7 +2674,7 @@ void convertXimdispHelicalTubeCoordsToMetaDataTable(
 			words.clear();
 			tokenize(line, words);
 			if (words.size() != 2)
-				REPORT_ERROR("helix.cpp::convertXimdispHelicalTubeCoordsToMetaDataTable(): Invalid input file!");
+				REPORT_ERROR("helix.cpp::convertXimdispHelicalTubeCoordsToMetaDataTable(): Invalid input file " + fn_in);
 			x[iline] = textToFloat(words[0]);
 			y[iline] = textToFloat(words[1]);
 		}
@@ -2790,7 +2790,7 @@ void convertEmanHelicalSegmentCoordsToMetaDataTable(
 
 	fin.open(fn_in.c_str(), std::ios_base::in);
 	if (fin.fail())
-		REPORT_ERROR("helix.cpp::convertEmanHelicalSegmentCoordsToMetaDataTable(): Cannot open input file!");
+		REPORT_ERROR("helix.cpp::convertEmanHelicalSegmentCoordsToMetaDataTable(): Cannot open input file " + fn_in);
 	line.clear();
 	len_pix = 0.;
 	nr_segments_on_edges = nr_segments = nr_tubes = 0;
@@ -2825,7 +2825,7 @@ void convertEmanHelicalSegmentCoordsToMetaDataTable(
 		words.clear();
 		tokenize(line, words);
 		if (words.size() != 2)
-			REPORT_ERROR("helix.cpp::convertEmanHelicalSegmentCoordsToMetaDataTable(): Invalid input file!");
+			REPORT_ERROR("helix.cpp::convertEmanHelicalSegmentCoordsToMetaDataTable(): Invalid input file " + fn_in);
 		x = textToFloat(words[0]);
 		y = textToFloat(words[1]);
 
@@ -2912,7 +2912,7 @@ void convertEmanHelicalTubeCoordsToMetaDataTable(
 
 	fin.open(fn_in.c_str(), std::ios_base::in);
 	if (fin.fail())
-		REPORT_ERROR("helix.cpp::convertEmanHelicalTubeCoordsToMetaDataTable(): Cannot open input file!");
+		REPORT_ERROR("helix.cpp::convertEmanHelicalTubeCoordsToMetaDataTable(): Cannot open input file " + fn_in);
 	nr_tubes = nr_segments = 0;
 	line.clear();
 	while (getline(fin, line, '\n'))
@@ -2928,14 +2928,14 @@ void convertEmanHelicalTubeCoordsToMetaDataTable(
 		words.clear();
 		tokenize(line, words);
 		if (words.size() != 5)
-			REPORT_ERROR("helix.cpp::convertEmanHelicalTubeCoordsToMetaDataTable(): Invalid input file!");
+			REPORT_ERROR("helix.cpp::convertEmanHelicalTubeCoordsToMetaDataTable(): Invalid input file " + fn_in);
 		x1 = textToFloat(words[0]);
 		y1 = textToFloat(words[1]);
 		width1 = textToFloat(words[2]);
 		width2 = textToFloat(words[3]);
 		tag = textToInteger(words[4]);
 		if ( (tag != (-1)) || (fabs(width1 - width2) > 0.01) )
-			REPORT_ERROR("helix.cpp::convertEmanHelicalTubeCoordsToMetaDataTable(): Invalid input file!");
+			REPORT_ERROR("helix.cpp::convertEmanHelicalTubeCoordsToMetaDataTable(): Invalid input file " + fn_in);
 		x1 += width1 / 2.;
 		y1 += width1 / 2.;
 
@@ -2945,14 +2945,14 @@ void convertEmanHelicalTubeCoordsToMetaDataTable(
 		words.clear();
 		tokenize(line, words);
 		if (words.size() != 5)
-			REPORT_ERROR("helix.cpp::convertEmanHelicalTubeCoordsToMetaDataTable(): Invalid input file!");
+			REPORT_ERROR("helix.cpp::convertEmanHelicalTubeCoordsToMetaDataTable(): Invalid input file " + fn_in);
 		x2 = textToFloat(words[0]);
 		y2 = textToFloat(words[1]);
 		width3 = textToFloat(words[2]);
 		width4 = textToFloat(words[3]);
 		tag = textToInteger(words[4]);
 		if ( (tag != (-2)) || (fabs(width3 - width4) > 0.01) || (fabs(width3 - width1) > 0.01) )
-			REPORT_ERROR("helix.cpp::convertEmanHelicalTubeCoordsToMetaDataTable(): Invalid input file!");
+			REPORT_ERROR("helix.cpp::convertEmanHelicalTubeCoordsToMetaDataTable(): Invalid input file " + fn_in);
 		x2 += width3 / 2.;
 		y2 += width3 / 2.;
 
@@ -3335,10 +3335,12 @@ void makeHelicalReference3DWithPolarity(
 		RFLOAT particle_diameter_A,
 		RFLOAT cyl_diameter_A,
 		RFLOAT topbottom_ratio,
-		int sym_Cn)
+		int sym_Cn,
+		int nr_filaments_helix_with_seam)
 {
 	RFLOAT rise_pix, tube_diameter_pix, particle_diameter_pix, particle_radius_pix, cyl_radius_pix, top_radius_pix, bottom_radius_pix;
 	int particle_radius_max_pix;
+	bool append_additional_densities = false;
 	Matrix2D<RFLOAT> matrix1, matrix2;
 	Matrix1D<RFLOAT> vec0, vec1, vec2;
 	out.clear();
@@ -3347,12 +3349,16 @@ void makeHelicalReference3DWithPolarity(
 		REPORT_ERROR("helix.cpp::makeHelicalReference3DWithPolarity(): Box size should be larger than 5!");
 	if (pixel_size_A < 0.001)
 		REPORT_ERROR("helix.cpp::makeHelicalReference3DWithPolarity(): Pixel size (in Angstroms) should be larger than 0.001!");
-	if ( (fabs(twist_deg) < 0.01) || (fabs(twist_deg) > 179.99) || ((rise_A / pixel_size_A) < 0.001) )
+	if ( (fabs(twist_deg) > 179.99) || ((rise_A / pixel_size_A) < 0.001) )
 		REPORT_ERROR("helix.cpp::makeHelicalReference3DWithPolarity(): Wrong helical twist or rise!");
 	if (sym_Cn < 1)
 		REPORT_ERROR("helix.cpp::makeHelicalReference3DWithPolarity(): Rotation symmetry Cn is invalid (n should be positive integer)!");
 	if ( (topbottom_ratio < 0.) || (topbottom_ratio > 1.) )
 		REPORT_ERROR("helix.cpp::makeHelicalReference3DWithPolarity(): Top-bottom width ratio should be 0~1!");
+	if ( (nr_filaments_helix_with_seam > 1) && (sym_Cn != 1) )
+		REPORT_ERROR("helix.cpp::makeHelicalReference3DWithPolarity(): Set Cn point group symmetry to 1 for a helix with seam!");
+	if ( (nr_filaments_helix_with_seam > 1) && (!(topbottom_ratio > 0.9999)) )
+		REPORT_ERROR("helix.cpp::makeHelicalReference3DWithPolarity(): Set top-bottom width ratio to 1 for a helix with seam!");
 
 	rise_pix = rise_A / pixel_size_A;
 	tube_diameter_pix = tube_diameter_A / pixel_size_A;
@@ -3390,6 +3396,7 @@ void makeHelicalReference3DWithPolarity(
 	vec2.clear();
 	vec2.resize(2);
 
+	append_additional_densities = false;
 	for (int id = 0; ;id++)
 	{
 		RFLOAT rot1_deg, x1, y1, z1;
@@ -3465,6 +3472,55 @@ void makeHelicalReference3DWithPolarity(
 				}
 			}
 		}
+
+		if (nr_filaments_helix_with_seam > 1)
+		{
+			if (id % nr_filaments_helix_with_seam == 0)
+				append_additional_densities = (append_additional_densities == true) ? (false) : (true);
+
+			if (append_additional_densities)
+			{
+				x1 *= (tube_diameter_pix + particle_diameter_pix) / tube_diameter_pix;
+				y1 *= (tube_diameter_pix + particle_diameter_pix) / tube_diameter_pix;
+				z1 += particle_diameter_pix / 2.;
+
+				for (int dz = -particle_radius_max_pix / 2.; dz <= particle_radius_max_pix / 2.; dz++)
+				{
+					for (int dy = -particle_radius_max_pix / 2.; dy <= particle_radius_max_pix / 2.; dy++)
+					{
+						for (int dx = -particle_radius_max_pix / 2.; dx <= particle_radius_max_pix / 2.; dx++)
+						{
+							RFLOAT _x, _y, _z, dist, val_old, val_new;
+							int x2, y2, z2;
+
+							x2 = ROUND(x1 + dx);
+							y2 = ROUND(y1 + dy);
+							z2 = ROUND(z1 + dz);
+
+							if ( (x2 < FIRST_XMIPP_INDEX(box_size)) || (x2 > LAST_XMIPP_INDEX(box_size))
+									|| (y2 < FIRST_XMIPP_INDEX(box_size)) || (y2 > LAST_XMIPP_INDEX(box_size))
+									|| (z2 < FIRST_XMIPP_INDEX(box_size)) || (z2 > LAST_XMIPP_INDEX(box_size)) )
+								continue;
+
+							_x = (RFLOAT)(x2) - x1;
+							_y = (RFLOAT)(y2) - y1;
+							_z = (RFLOAT)(z2) - z1;
+
+							dist = sqrt(_x * _x + _y * _y + _z * _z);
+							if (dist > (particle_radius_pix / 2.))
+								continue;
+
+							val_old = A3D_ELEM(out, z2, y2, x2);
+							val_new = 0.;
+
+							val_new = 0.5 + 0.5 * cos(2. * PI * dist / particle_radius_pix);
+							if (val_new > val_old)
+								A3D_ELEM(out, z2, y2, x2) = val_new;
+						}
+					}
+				}// End of looping over x,y,z
+			}
+		}// End of nr_filaments_helix_with_seam > 1
 	}
 	return;
 }

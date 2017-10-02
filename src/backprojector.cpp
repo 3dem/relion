@@ -52,7 +52,7 @@ void BackProjector::initZeros(int current_size)
 	weight.initZeros();
 }
 
-void BackProjector::backproject(const MultidimArray<Complex > &f2d,
+void BackProjector::backproject2Dto3D(const MultidimArray<Complex > &f2d,
 		                        const Matrix2D<RFLOAT> &A, bool inv,
 		                        const MultidimArray<RFLOAT> *Mweight)
 {
@@ -228,6 +228,122 @@ void BackProjector::backproject(const MultidimArray<Complex > &f2d,
 			} // endif weight>0.
 		} // endif x-loop
 	} // endif y-loop
+}
+
+void BackProjector::backproject1Dto2D(const MultidimArray<Complex > &f1d,
+		                        const Matrix2D<RFLOAT> &A, bool inv,
+		                        const MultidimArray<RFLOAT> *Mweight)
+{
+
+	RFLOAT fx, fy, mfx, mfy, xp, yp;
+	int first_x, x0, x1, y0, y1, y, y2, r2;
+	bool is_neg_x;
+	RFLOAT dd00, dd01, dd10, dd11;
+	Complex my_val;
+	Matrix2D<RFLOAT> Ainv;
+	RFLOAT my_weight = 1.;
+
+	// f1d should already be in the right size (ori_size,orihalfdim)
+    // AND the points outside max_r should already be zero...
+
+	// Use the inverse matrix
+    if (inv)
+    	Ainv = A;
+    else
+    	Ainv = A.transpose();
+
+    // Go from the 1D slice coordinates to the data-array coordinates
+    Ainv *= (RFLOAT)padding_factor;  // take scaling into account directly
+
+	for (int x=first_x; x <= r_max; x++)
+	{
+		// Get the relevant value in the input image
+		my_val = DIRECT_A1D_ELEM(f1d, x);
+
+		// Get the weight
+		if (Mweight != NULL)
+			my_weight = DIRECT_A1D_ELEM(*Mweight, x);
+		// else: my_weight was already initialised to 1.
+
+		if (my_weight > 0.)
+		{
+			// Get logical coordinates in the 3D map
+			xp = Ainv(0,0) * x;
+			yp = Ainv(1,0) * x;
+
+			if (interpolator == TRILINEAR)
+			{
+				// Only asymmetric half is stored
+				if (xp < 0)
+				{
+					// Get complex conjugated hermitian symmetry pair
+					xp = -xp;
+					yp = -yp;
+					is_neg_x = true;
+				}
+				else
+				{
+					is_neg_x = false;
+				}
+
+				// Trilinear interpolation (with physical coords)
+				// Subtract STARTINGY to accelerate access to data (STARTINGX=0)
+				// In that way use DIRECT_A2D_ELEM, rather than A2D_ELEM
+				x0 = FLOOR(xp);
+				fx = xp - x0;
+				x1 = x0 + 1;
+
+				y0 = FLOOR(yp);
+				fy = yp - y0;
+				y0 -=  STARTINGY(data);
+				y1 = y0 + 1;
+
+				mfx = 1. - fx;
+				mfy = 1. - fy;
+
+				dd00 = mfy * mfx;
+				dd01 = mfy *  fx;
+				dd10 =  fy * mfx;
+				dd11 =  fy *  fx;
+
+				if (is_neg_x)
+					my_val = conj(my_val);
+
+				// Store slice in 3D weighted sum
+				DIRECT_A2D_ELEM(data, y0, x0) += dd00 * my_val;
+				DIRECT_A2D_ELEM(data, y0, x1) += dd01 * my_val;
+				DIRECT_A2D_ELEM(data, y1, x0) += dd10 * my_val;
+				DIRECT_A2D_ELEM(data, y1, x1) += dd11 * my_val;
+
+				// Store corresponding weights
+				DIRECT_A2D_ELEM(weight, y0, x0) += dd00 * my_weight;
+				DIRECT_A2D_ELEM(weight, y0, x1) += dd01 * my_weight;
+				DIRECT_A2D_ELEM(weight, y1, x0) += dd10 * my_weight;
+				DIRECT_A2D_ELEM(weight, y1, x1) += dd11 * my_weight;
+
+			} // endif TRILINEAR
+			else if (interpolator == NEAREST_NEIGHBOUR )
+			{
+				x0 = ROUND(xp);
+				y0 = ROUND(yp);
+				if (x0 < 0)
+				{
+					A2D_ELEM(data, -y0, -x0) += conj(my_val);
+					A2D_ELEM(weight, -y0, -x0) += my_weight;
+				}
+				else
+				{
+					A2D_ELEM(data, y0, x0) += my_val;
+					A2D_ELEM(weight, y0, x0) += my_weight;
+				}
+			} // endif NEAREST_NEIGHBOUR
+			else
+			{
+				REPORT_ERROR("FourierInterpolator::backproject1Dto2D%%ERROR: unrecognized interpolator ");
+			}
+		} // endif weight > 0.
+	} // endif x-loop
+
 }
 
 void BackProjector::backrotate2D(const MultidimArray<Complex > &f2d,
@@ -757,7 +873,6 @@ void BackProjector::calculateDownSampledFourierShellCorrelation(MultidimArray<Co
 
 }
 
-
 void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
                                 int max_iter_preweight,
                                 bool do_map,
@@ -765,6 +880,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
                                 MultidimArray<RFLOAT> &tau2,
                                 MultidimArray<RFLOAT> &sigma2,
                                 MultidimArray<RFLOAT> &data_vs_prior,
+                                MultidimArray<RFLOAT> &fourier_coverage,
                                 MultidimArray<RFLOAT> fsc, // only input
                                 RFLOAT normalise,
                                 bool update_tau2_with_fsc,
@@ -905,18 +1021,19 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 			DIRECT_A1D_ELEM(tau2, i) = fsc_based_tau;
 			// data_vs_prior is merely for reporting: it is not used for anything in the reconstruction
 			DIRECT_A1D_ELEM(data_vs_prior, i) = myssnr;
-
 		}
 	}
     RCTOC(ReconTimer,ReconS_2);
 	// Apply MAP-additional term to the Fnewweight array
 	// This will regularise the actual reconstruction
-	if (do_map)
+    if (do_map)
 	{
-		// Then, add the inverse of tau2-spectrum values to the weight
+
+    	// Then, add the inverse of tau2-spectrum values to the weight
 		// and also calculate spherical average of data_vs_prior ratios
 		if (!update_tau2_with_fsc)
 			data_vs_prior.initZeros(ori_size/2 + 1);
+		fourier_coverage.initZeros(ori_size/2 + 1);
 		counter.initZeros(ori_size/2 + 1);
 		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fconv)
  		{
@@ -948,6 +1065,11 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 				// Keep track of spectral evidence-to-prior ratio and remaining noise in the reconstruction
 				if (!update_tau2_with_fsc)
 					DIRECT_A1D_ELEM(data_vs_prior, ires) += invw / invtau2;
+
+				// Keep track of the coverage in Fourier space
+				if (invw / invtau2 >= 1.)
+					DIRECT_A1D_ELEM(fourier_coverage, ires) += 1.;
+
 				DIRECT_A1D_ELEM(counter, ires) += 1.;
 
 				// Only for (ires >= minres_map) add Wiener-filter like term
@@ -975,6 +1097,13 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 			}
 		}
 
+		// Calculate Fourier coverage in each shell
+		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(fourier_coverage)
+		{
+			if (DIRECT_A1D_ELEM(counter, i) > 0.)
+				DIRECT_A1D_ELEM(fourier_coverage, i) /= DIRECT_A1D_ELEM(counter, i);
+		}
+
 	} //end if do_map
 
     RCTOC(ReconTimer,ReconS_2);
@@ -991,6 +1120,19 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 				DIRECT_MULTIDIM_ELEM(Fconv, n) /= DIRECT_MULTIDIM_ELEM(Fweight, n);
 		}
 		RCTOC(ReconTimer,ReconS_3);
+#ifdef DEBUG_RECONSTRUCT
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fconv)
+		{
+			DIRECT_MULTIDIM_ELEM(ttt(), n) = DIRECT_MULTIDIM_ELEM(Fweight, n);
+		}
+		ttt.write("reconstruct_skipgridding_correction_term.spi");
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fconv)
+		{
+			if (DIRECT_MULTIDIM_ELEM(Fweight, n) > 0.)
+				DIRECT_MULTIDIM_ELEM(ttt(), n) = 1./DIRECT_MULTIDIM_ELEM(Fweight, n);
+		}
+		ttt.write("reconstruct_skipgridding_correction_term_inverse.spi");
+#endif
 	}
 	else
 	{
@@ -1077,6 +1219,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 		}
 		ttt.write("reconstruct_gridding_correction_term.spi");
 	#endif
+
 
 		// Clear memory
 		Fweight.clear();
@@ -1254,6 +1397,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
     if(printTimes)
     	ReconTimer.printTimes(true);
 #endif
+
 
 #ifdef DEBUG_RECONSTRUCT
     std::cerr<<"done with reconstruct"<<std::endl;
@@ -1696,13 +1840,16 @@ void BackProjector::windowToOridimRealSpace(FourierTransformer &transformer, Mul
 #endif
 
     // Resize incoming complex array to the correct size
-    windowFourierTransform(Fin, padoridim);
+	windowFourierTransform(Fin, padoridim);
 	RCTOC(OriDimTimer,OriDim2);
 	RCTIC(OriDimTimer,OriDim3);
  	if (ref_dim == 2)
 	{
 		Mout.reshape(padoridim, padoridim);
-		normfft = (RFLOAT)(padding_factor * padding_factor);
+		if (data_dim == 2)
+			normfft = (RFLOAT)(padding_factor * padding_factor);
+		else
+			normfft = (RFLOAT)(padding_factor * padding_factor * ori_size);
 	}
 	else
 	{

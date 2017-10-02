@@ -821,7 +821,7 @@ void ParticlePolisher::calculateSingleFrameReconstruction(int iframe, int this_h
 	// Now do the reconstruction
 	MultidimArray<RFLOAT> dummy;
 	Image<RFLOAT> vol;
-	backprojector.reconstruct(vol(), 10, false, 1., dummy, dummy, dummy, dummy);
+	backprojector.reconstruct(vol(), 10, false, 1., dummy, dummy, dummy, dummy, dummy);
 
 	vol.write(fn_vol);
 
@@ -1338,7 +1338,7 @@ void ParticlePolisher::reconstructShinyParticlesOneHalf(int this_half, Experimen
 
 	// Now do the reconstruction
 	MultidimArray<RFLOAT> dummy;
-	backprojector.reconstruct(vol(), 10, false, 1., dummy, dummy, dummy, dummy);
+	backprojector.reconstruct(vol(), 10, false, 1., dummy, dummy, dummy, dummy, dummy);
 
 	vol.write(fn_vol);
 

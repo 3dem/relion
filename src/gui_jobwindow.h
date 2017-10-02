@@ -39,6 +39,9 @@ public:
 	// All the GuiEntries of this job
 	std::map<std::string, GuiEntry> guientries;
 
+	// oldstyle GUI
+	bool do_oldstyle;
+
 	// Sizes
 	int x, y, w, h;
 
@@ -50,7 +53,7 @@ public:
 	Fl_Group *tab1, *tab2, *tab3, *tab4, *tab5, *tab6, *tab7, *runtab;
 
 	// Groups
-	Fl_Group *group1, *group2, *group3, *group4, *group5, *group6, *group7, *queue_group;
+	Fl_Group *group1, *group2, *group3, *group4, *group5, *group6, *group7, *group8, *queue_group;
 
 public:
 	// Constructor with x, y, w, h and a title
@@ -66,7 +69,7 @@ public:
 	void setupTabs(int nr_tabs);
 
 	// General initialise
-	void initialise(int my_job_type);
+	void initialise(int my_job_type, bool _do_oldstyle = false);
 
     void resetHeight();
 

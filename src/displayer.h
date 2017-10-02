@@ -44,9 +44,9 @@
 
 #define GUI_BACKGROUND_COLOR (fl_rgb_color(240,240,240))
 #define GUI_INPUT_COLOR (fl_rgb_color(255,255,230))
-// 2.0 #define GUI_RUNBUTTON_COLOR (fl_rgb_color(70, 120, 255))
+#define GUI_RUNBUTTON_COLOR (fl_rgb_color(0, 130, 0))
 // devel-version
-#define GUI_RUNBUTTON_COLOR (fl_rgb_color(170, 0, 0))
+//#define GUI_RUNBUTTON_COLOR (fl_rgb_color(170, 0, 0))
 
 #define SELECTED true
 #define NOTSELECTED false
@@ -134,12 +134,13 @@ public:
 
 	int fillCanvas(int viewer_type, MetaDataTable &MDin, EMDLabel display_label, bool _do_read_whole_stacks, bool _do_apply_orient,
 			RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast,
-			RFLOAT _scale, RFLOAT _ori_scale, int _ncol, long int max_nr_images = -1, bool do_class = false, MetaDataTable *MDdata = NULL,
+			RFLOAT _scale, RFLOAT _ori_scale, int _ncol, long int max_nr_images = -1, RFLOAT lowpass = -1.0 , RFLOAT highpass = -1.0,
+			bool do_class = false, MetaDataTable *MDdata = NULL,
 			int _nr_regroup = -1, bool do_recenter = false, bool _is_data = false, MetaDataTable *MDgroups = NULL,
-			bool do_allow_save = false, FileName fn_selected_imgs="", FileName fn_selected_parts="");
+			bool do_allow_save = false, FileName fn_selected_imgs="", FileName fn_selected_parts="", int max_nr_parts_per_class = -1);
 	int fillSingleViewerCanvas(MultidimArray<RFLOAT> image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale);
 	int fillPickerViewerCanvas(MultidimArray<RFLOAT> image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale,
-			int _particle_radius, FileName _fn_coords = "",
+			int _particle_radius, bool do_startend = false, FileName _fn_coords = "",
 			FileName _fn_color = "", FileName _fn_mic= "", FileName _color_label = "", RFLOAT _color_blue_value = 0., RFLOAT _color_red_value = 1.);
 
 
@@ -175,7 +176,8 @@ public:
 	void SetScroll(Fl_Scroll *val) { scroll = val; }
 
 	int fill(MetaDataTable &MDin, EMDLabel display_label, bool _do_apply_orient, RFLOAT _minval, RFLOAT _maxval,
-			RFLOAT _sigma_contrast, RFLOAT _scale, int _ncol, bool do_recenter = false, long int max_images = -1);
+			RFLOAT _sigma_contrast, RFLOAT _scale, int _ncol, bool do_recenter = false, long int max_images = -1,
+			RFLOAT lowpass = -1.0, RFLOAT highpass = -1.0);
 	int fill(MultidimArray<RFLOAT> &image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale = 1.);
 
 private:
@@ -199,6 +201,9 @@ public:
 
 	// Filenames with the selected class averages and the particles from the selected classes
 	FileName fn_selected_imgs, fn_selected_parts;
+
+	// Maximum number of selected particles per class
+	int max_nr_parts_per_class;
 
 	// Flag to indicate whether this is a viewer for a data.star (to also allow regrouping)
 	bool is_data;
@@ -310,6 +315,9 @@ public:
 	// Red->Blue is true; blue->red is false
 	bool do_blue_to_red;
 
+	// Draw lines between start-end coordinates?
+	bool do_startend;
+
 	// Micrograph name (useful to search relevant particles in fn_color)
 	FileName fn_mic;
 
@@ -399,7 +407,7 @@ public:
 
 	// Input for the display parameters
 	Fl_Input *black_input, *white_input, *sigma_contrast_input, *scale_input, *lowpass_input, *highpass_input, *angpix_input;
-	Fl_Input *col_input, *ori_scale_input, *max_nr_images_input;
+	Fl_Input *col_input, *ori_scale_input, *max_nr_images_input, *max_parts_per_class_input;
 	Fl_Check_Button *sort_button, *reverse_sort_button, *apply_orient_button, *read_whole_stack_button;
 	Fl_Choice *display_choice, *sort_choice;
 
@@ -433,6 +441,9 @@ public:
 
 	// Which metadatalabel to display
 	EMDLabel display_label, sort_label;
+
+	// Use random sort
+	bool random_sort;
 
 	// use reverse order for sorting?
 	bool reverse_sort;
@@ -479,6 +490,9 @@ public:
 	// Flag to pick
 	bool do_pick;
 
+	// Flag to pick start-end
+	bool do_pick_startend;
+
 	// Flag for looking at classes
 	bool do_class;
 
@@ -487,6 +501,9 @@ public:
 
 	// Filenames for selected particles and selected images
 	FileName fn_selected_imgs, fn_selected_parts;
+
+	// Select maximum this number of particles from each selected classes
+	int max_nr_parts_per_class;
 
 	// Number of groups for regrouping (negative number is no regrouping)
 	int nr_regroups;

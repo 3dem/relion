@@ -106,6 +106,12 @@ public:
 	// Vector with center-of-mass coordinates for all bodies in multi-body refinement
 	std::vector<Matrix1D<RFLOAT> > com_bodies;
 
+	// Vector with 2D matrices that pre-orient all bodies in multi-body refinement
+	std::vector<Matrix2D<RFLOAT> > orient_bodies;
+
+	// Vector with directions around which to rotate each body in multi-body refinement
+	std::vector<Matrix1D<RFLOAT> > rotate_direction_bodies;
+
 	// One projector for each class;
 	std::vector<Projector > PPref;
 	std::vector<bool> PPrefRank;
@@ -128,11 +134,14 @@ public:
 	// Radial average of the estimated variance in the reconstruction (inverse of left-hand side in Wiener-filter-like update formula)
 	std::vector<MultidimArray<RFLOAT > > sigma2_class;
 
-	// FSC spectra between random halves of the data
-	MultidimArray<RFLOAT > fsc_halves_class;
+	// FSC spectra between random halves of the data (multiple ones for each body in multibody-refinement)
+	std::vector< MultidimArray<RFLOAT > > fsc_halves_class;
 
 	// One likelihood vs prior ratio spectrum for each class
 	std::vector<MultidimArray<RFLOAT > > data_vs_prior_class;
+
+	// One Fourier-coverage spectrum for each class
+	std::vector<MultidimArray<RFLOAT > > fourier_coverage_class;
 
 	// One value for each class
 	std::vector<RFLOAT > pdf_class;
@@ -155,11 +164,37 @@ public:
 	// Variance in psi angle for the orientational pdf
 	RFLOAT sigma2_psi;
 
+	// Stddev in tilt angle for the orientational pdf of each body
+	std::vector<RFLOAT> sigma_tilt_bodies;
+
+	// Stddev in psi angle for the orientational pdf of each body
+	std::vector<RFLOAT> sigma_psi_bodies;
+
+	// Stddev in offsets for the orientational pdf of each body
+	std::vector<RFLOAT> sigma_offset_bodies;
+
+	// Is this body kept fixed in refinement?
+	std::vector<bool> keep_fixed_bodies;
+
+	// Maximum radius of mask
+	std::vector<int> max_radius_mask_bodies;
+
+	// 2D Matrix with pointers to the PPrefs for overlapping bodies
+	MultidimArray<int> pointer_body_overlap;
+
+	std::vector<int> pointer_body_overlap_inv;
+
 	// Estimated accuracy at which rotations can be assigned, one for each class
 	std::vector<RFLOAT> acc_rot;
 
 	// Estimated accuracy at which translations can be assigned, one for each class
 	std::vector<RFLOAT> acc_trans;
+
+	// The estimate resolution, one for each class
+	std::vector<RFLOAT> estimated_resolution;
+
+	// Fourier coverage up to the estimate resolution, one  for each class
+	std::vector<RFLOAT> total_fourier_coverage;
 
 	// Spectral contribution to orientability of individual particles, one for each class
 	std::vector<MultidimArray<RFLOAT > > orientability_contrib;
@@ -269,7 +304,13 @@ public:
     		Igrad = MD.Igrad;
     		masks_bodies = MD.masks_bodies;
     		com_bodies = MD.com_bodies;
-    		PPref = MD.PPref;
+    		orient_bodies = MD.orient_bodies;
+    		sigma_tilt_bodies = MD.sigma_tilt_bodies;
+    		sigma_psi_bodies = MD.sigma_psi_bodies;
+    		sigma_offset_bodies = MD.sigma_offset_bodies;
+    		keep_fixed_bodies = MD.keep_fixed_bodies;
+    		max_radius_mask_bodies = MD.max_radius_mask_bodies;
+			PPref = MD.PPref;
     		PPrefRank = MD.PPrefRank;
     		group_names = MD.group_names;
     		sigma2_noise = MD.sigma2_noise;
@@ -279,12 +320,15 @@ public:
     		sigma2_class = MD.sigma2_class;
     		fsc_halves_class = MD.fsc_halves_class;
     		data_vs_prior_class = MD.data_vs_prior_class;
+    		fourier_coverage_class = MD.fourier_coverage_class;
     		pdf_class = MD.pdf_class;
     		pdf_direction = MD.pdf_direction;
     		prior_offset_class = MD.prior_offset_class;
     		nr_particles_group = MD.nr_particles_group;
     		acc_rot = MD.acc_rot;
     		acc_trans = MD.acc_trans;
+    		estimated_resolution = MD.estimated_resolution;
+    		total_fourier_coverage = MD.total_fourier_coverage;
     		orientability_contrib = MD.orientability_contrib;
     		helical_twist = MD.helical_twist;
     		helical_rise = MD.helical_rise;
@@ -300,6 +344,12 @@ public:
 		Igrad.clear();
 		masks_bodies.clear();
 		com_bodies.clear();
+		orient_bodies.clear();
+		sigma_tilt_bodies.clear();
+		sigma_psi_bodies.clear();
+		sigma_offset_bodies.clear();
+		keep_fixed_bodies.clear();
+		max_radius_mask_bodies.clear();
 		PPref.clear();
 		PPrefRank.clear();
 		group_names.clear();
@@ -310,6 +360,7 @@ public:
 		fsc_halves_class.clear();
 		sigma2_class.clear();
 		data_vs_prior_class.clear();
+		fourier_coverage_class.clear();
 		prior_offset_class.clear();
 		pdf_class.clear();
 		pdf_direction.clear();
@@ -320,6 +371,8 @@ public:
 		sigma2_rot = sigma2_tilt = sigma2_psi = 0.;
 		acc_rot.clear();
 		acc_trans.clear();
+		estimated_resolution.clear();
+		total_fourier_coverage.clear();
 		orientability_contrib.clear();
 		helical_twist.clear();
 		helical_rise.clear();
@@ -361,7 +414,10 @@ public:
 	void initialisePdfDirection(int newsize);
 
 	/** Read in the binary masks provided by the user and then make a soft edge on those */
-	void initialiseBodyMasks(FileName fn_masks, FileName fn_root_out);
+	void initialiseBodies(FileName fn_masks, FileName fn_root_out, bool also_initialise_rest = false);
+
+	/** Write out a Bild file with the COMs and directions or rotation for each body */
+	void writeBildFileBodies(FileName fn_bild);
 
 	// Set FourierTransforms in Projector of each class
 	// current_size will determine the size of the transform (in number of Fourier shells) to be held in the projector ( thisClass == -1  => do all classes this call)
@@ -376,6 +432,7 @@ public:
 
 	void initialiseHelicalParametersLists(RFLOAT _helical_twist, RFLOAT _helical_rise);
 
+	void calculateTotalFourierCoverage();
 };
 
 class MlWsumModel: public MlModel

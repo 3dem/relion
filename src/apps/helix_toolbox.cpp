@@ -101,6 +101,9 @@ public:
 	// Rotational symmetry - Cn
 	int sym_Cn;
 
+	// Number of filaments in a helix with seam (>= 2)
+	int nr_filaments_helix_with_seam;
+
 	// Helical rise and its local searches
 	RFLOAT rise_A, rise_min_A, rise_max_A, rise_inistep_A;
 
@@ -252,7 +255,7 @@ public:
 		parser.setCommandLine(argc, argv);
 
 		int init_section = parser.addSection("Show usage");
-		show_usage_for_an_option = parser.checkOption("--help", "Show usage for the selected function (FEB 19, 2017)");
+		show_usage_for_an_option = parser.checkOption("--function_help", "Show usage for the selected function (FEB 19, 2017)");
 
 		int options_section = parser.addSection("List of functions (alphabetically ordered)");
 		do_check_parameters = parser.checkOption("--check", "Check parameters for 3D helical reconstruction in RELION");
@@ -321,6 +324,7 @@ public:
 		rise_inistep_A = textToFloat(parser.getOption("--rise_inistep", "Initial step of helical rise search (in Angstroms)", "-1"));
 		rise_min_A = textToFloat(parser.getOption("--rise_min", "Minimum helical rise (in Angstroms)", "-1"));
 		rise_max_A = textToFloat(parser.getOption("--rise_max", "Maximum helical rise (in Angstroms)", "-1"));
+		nr_filaments_helix_with_seam = textToInteger(parser.getOption("--seam_nr_filaments", "Number of filaments in a helix with seam (>= 2)", "-1"));
 		do_helical_symmetry_local_refinement = parser.checkOption("--search_sym", "Perform local searches of helical symmetry in 3D reconstruction?");
 		do_cut_into_segments = parser.checkOption("--segments", "Cut helical tubes into segments?");
 		sigma_offset = textToFloat(parser.getOption("--sigma_offset", "Sigma of translational offsets (in pixels)", "5."));
@@ -347,6 +351,10 @@ public:
 			SWAP(rise_min_A, rise_max_A, tmp_RFLOAT);
 		if (twist_min_deg > twist_max_deg)
 			SWAP(twist_min_deg, twist_max_deg, tmp_RFLOAT);
+
+		// Check for errors in the command-line option
+		if (parser.checkForErrors())
+			REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 	};
 
 	void clear()
@@ -627,7 +635,7 @@ public:
 			{
 				displayEmptyLine();
 				std::cout << " Create a helical 3D reference of spheres" << std::endl;
-				std::cout << "  USAGE: --simulate_helix --o ref.mrc --subunit_diameter 30 --cyl_outer_diameter 200 --angpix 1.126 --rise 1.408 --twist 22.03 --boxdim 300 (--sym_Cn 1) (--polar --topbottom_ratio 0.5 --cyl_inner_diameter 20) (--sphere_percentage 0.9 --width 5)" << std::endl;
+				std::cout << "  USAGE: --simulate_helix --o ref.mrc --subunit_diameter 30 --cyl_outer_diameter 200 --angpix 1.126 --rise 1.408 --twist 22.03 --boxdim 300 (--sym_Cn 1) (--polar --topbottom_ratio 0.5 --cyl_inner_diameter 20) (--sphere_percentage 0.9 --width 5) (--seam_nr_filaments 13)" << std::endl;
 				displayEmptyLine();
 				return;
 			}
@@ -650,7 +658,8 @@ public:
 					subunit_diameter_A,
 					(do_polar_reference) ? (cyl_inner_diameter_A) : (subunit_diameter_A),
 					(do_polar_reference) ? (topbottom_ratio) : (1.),
-					sym_Cn);
+					sym_Cn,
+					nr_filaments_helix_with_seam);
 			applySoftSphericalMask(
 					img(),
 					(RFLOAT(boxdim) * sphere_percentage),

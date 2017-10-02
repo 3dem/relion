@@ -523,10 +523,7 @@ void Postprocessing::calculateFSCtrue(MultidimArray<RFLOAT> &fsc_true, MultidimA
 		{
 			RFLOAT fsct = DIRECT_A1D_ELEM(fsc_masked, i);
 			RFLOAT fscn = DIRECT_A1D_ELEM(fsc_random_masked, i);
-			if (fscn > fsct)
-				DIRECT_A1D_ELEM(fsc_true, i) = 0.;
-			else
-				DIRECT_A1D_ELEM(fsc_true, i) = (fsct - fscn) / (1. - fscn);
+			DIRECT_A1D_ELEM(fsc_true, i) = (fsct - fscn) / (1. - fscn);
 		}
 	}
 }
@@ -548,9 +545,10 @@ void Postprocessing::applyFscWeighting(MultidimArray<Complex > &FT, MultidimArra
 		if (ires <= ires_max)
 		{
 	        RFLOAT fsc = DIRECT_A1D_ELEM(my_fsc, ires);
-	        if (fsc < 0.0001)
-	        	REPORT_ERROR("Postprocessing::applyFscWeighting BUG: fsc <= 0");
-	        DIRECT_A3D_ELEM(FT, k, i, j) *= sqrt((2 * fsc) / (1 + fsc));
+	        if (fsc > 0.)
+	        	DIRECT_A3D_ELEM(FT, k, i, j) *= sqrt((2 * fsc) / (1 + fsc));
+	        else
+	        	DIRECT_A3D_ELEM(FT, k, i, j) *= 0.;
 		}
 		else
 		{
@@ -1051,8 +1049,14 @@ void Postprocessing::run_locres(int rank, int size)
 		}
 
 		fn_tmp = fn_out + "_locres.mrc";
+		I1.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X, angpix);
+		I1.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y, angpix);
+		I1.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z, angpix);
 		I1.write(fn_tmp);
 		fn_tmp = fn_out + "_locres_filtered.mrc";
+		I2.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X, angpix);
+		I2.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y, angpix);
+		I2.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z, angpix);
 		I2.write(fn_tmp);
 
 		// for debugging

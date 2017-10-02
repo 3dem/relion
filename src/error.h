@@ -229,14 +229,18 @@ has very special characteristics. Please report this error to \n\
 the relion developers at \n\n\
 			 github.com/3dem/relion/issues   ")
 
-#define ERRNUMFAILSAFE ("Relion had to use extra-precision fallbacks too often.\n\n\
+#define ERRNUMFAILSAFE ("Relion had to use extra-precision fallbacks too many times.\n\n\
 In some cases relion find it difficult to reconcile the data with the\n\
 assumptions and axioms for the refinement procedure. If you e.g. have very\n\
 strong preferred orientations, or very noisy data or small molecules, \n\
 alignment can become sensitive to numerical accuracies, and if relion \n\
 detects this, it uses higher-precision fallback functions. This error \n\
-indicates that this had to be used more often than what is judged \n\
-acceptable. Assess your data and if in doubt, report this error to \n\
+indicates that this had to be used more times than indicated by the threshold,\n\
+which can be manually adjusted by the user with the flag --failsafe_threshold. \n\\n\
+Before doing anything else, however, we recommend going back and re-extracting\n\
+your particle images with the re-centering option enabled and\n\
+picking up refinement anew with that dataset.\n\\n\
+Assess your data and if in doubt, report this error to \n\
 the relion developers at \n\n\
 	         github.com/3dem/relion/issues   ")
 

@@ -773,6 +773,9 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 		long int ori_xsize = XSIZE(Imic());
 		long int ori_ysize = YSIZE(Imic());
 
+		// First set XmippOrigin for window operations
+		Imic().setXmippOrigin();
+
 		if (ori_xsize > ori_ysize)
 			rewindow(Imic, ori_xsize);
 		else if (ori_ysize > ori_xsize)
@@ -798,6 +801,9 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 		if (ori_xsize != ori_ysize)
 			Imic().window(FIRST_XMIPP_INDEX(ori_ysize), FIRST_XMIPP_INDEX(ori_xsize),
 					LAST_XMIPP_INDEX(ori_ysize),  LAST_XMIPP_INDEX(ori_xsize));
+
+		// Set back original origin for particle window operations
+		Imic().xinit = Imic().yinit = Imic().zinit = 0;
 	}
 
 	// Now window all particles from the micrograph
@@ -1044,7 +1050,7 @@ void Preprocessing::runOperateOnInputFile()
 
 		RFLOAT tilt_deg, psi_deg;
 		tilt_deg = psi_deg = 0.;
-		performPerImageOperations(Ipart, fn_stack, 1, i, Nimg,
+		performPerImageOperations(Ipart, fn_operate_out.withoutExtension(), 1, i, Nimg,
 				tilt_deg, psi_deg,
 				all_avg, all_stddev, all_minval, all_maxval);
 
@@ -1081,6 +1087,8 @@ void Preprocessing::performPerImageOperations(
 	if (do_rescale) rescale(Ipart, scale);
 
 	if (do_rewindow) rewindow(Ipart, window);
+
+        Ipart().setXmippOrigin();
 
 	TIMING_TIC(TIMING_NORMALIZE);
 	// Jun24,2015 - Shaoda, helical segments

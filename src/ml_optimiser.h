@@ -37,6 +37,7 @@
 #include "src/mask.h"
 #include "src/healpix_sampling.h"
 #include "src/helix.h"
+#include "src/local_symmetry.h"
 
 #define ML_SIGNIFICANT_WEIGHT 1.e-8
 #define METADATA_LINE_LENGTH METADATA_LINE_LENGTH_ALL
@@ -73,7 +74,7 @@
 #define METADATA_BEAMTILT_X 26
 #define METADATA_BEAMTILT_Y 27
 #define METADATA_LINE_LENGTH_BEFORE_BODIES 28
-#define METADATA_NR_BODY_PARAMS 7
+#define METADATA_NR_BODY_PARAMS 6
 
 #define DO_WRITE_DATA true
 #define DONT_WRITE_DATA false
@@ -147,6 +148,15 @@ public:
 	// Filename for input masks for multi-body refinement
 	FileName fn_body_masks;
 
+	// Initialise bodies for a new multi-body refinement
+	bool do_initialise_bodies;
+
+	// Use subtracted images for reconstructions in multi-body refinement?
+	bool do_reconstruct_subtracted_bodies;
+
+	// Precalculated rotation matrix for (0,90,0) rotation, and its transpose
+	Matrix2D<RFLOAT> A_rot90, A_rot90T;
+
 	// Flag to keep tau-spectrum constant
 	bool fix_tau;
 
@@ -164,6 +174,9 @@ public:
 
 	// Flag whether to split data from the beginning into two random halves
 	bool do_split_random_halves;
+
+	// For safe-guarding the gold-standard separation
+	int my_halfset;
 
 	// resolution (in Angstrom) to join the two random halves
 	RFLOAT low_resol_join_halves;
@@ -557,6 +570,18 @@ public:
 	TabSine tab_sin;
 	TabCosine tab_cos;
 
+	// Local symmetry information (STAR or plain-text format)
+	FileName fn_local_symmetry;
+
+	// Local symmetry - list of masks
+	std::vector<FileName> fn_local_symmetry_masks;
+
+	// Local symmetry - list of operators
+	std::vector<std::vector<Matrix1D<RFLOAT> > > fn_local_symmetry_operators;
+
+	//Maximum number of particles permitted to be drop, due to zero sum of weights, before exiting with an error (GPU only).
+	int failsafe_threshold;
+
 #ifdef TIMING
 	Timer timer;
 	int TIMING_DIFF_PROJ, TIMING_DIFF_SHIFT, TIMING_DIFF_DIFF2;
@@ -685,10 +710,11 @@ public:
 		helical_keep_tilt_prior_fixed(0),
 		asymmetric_padding(false),
 		maximum_significants(0),
+		threadException(NULL),
 #ifdef ALTCPU
 		tbbSchedulerInit(tbb::task_scheduler_init::deferred ),
 #endif
-		threadException(NULL)
+		failsafe_threshold(40)
 	{
 #ifdef ALTCPU
 		tbbCpuOptimiser = CpuOptimiserType((void*)NULL);
@@ -785,6 +811,10 @@ public:
 	 * Do rise and twist for all asymmetrical units in Fourier space
 	 * */
 	void symmetriseReconstructions();
+
+	/* Apply local symmetry according to a list of masks and their operators
+	 * */
+	void applyLocalSymmetryForEachRef();
 
 	/* Apply helical symmetry (twist and rise) to the central Z slices of real space references. (Do average for every particle)
 	 * Then elongate and fill the perfect helix along Z axis.
@@ -883,7 +913,7 @@ public:
 
 	// Convert all squared difference terms to weights.
 	// Also calculates exp_sum_weight and, for adaptive approach, also exp_significant_weight
-	void convertAllSquaredDifferencesToWeights(long int my_ori_particle, int exp_ipass,
+	void convertAllSquaredDifferencesToWeights(long int my_ori_particle, int ibody, int exp_ipass,
 			int exp_current_oversampling, int metadata_offset,
 			int exp_idir_min, int exp_idir_max, int exp_ipsi_min, int exp_ipsi_max,
 			int exp_itrans_min, int exp_itrans_max, int my_iclass_min, int my_iclass_max,

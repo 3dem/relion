@@ -65,6 +65,18 @@ enum EMDLabel
     EMDL_AREA_NAME, ///< Name for the area (or field of view). If one does not use (tilt) series, area would be the same as micrograph...
     EMDL_COMMENT, // The EMDL_COMMENT is handled specially as well
 
+    EMDL_BODY_MASK_NAME, ///< For multi-body refinements
+	EMDL_BODY_ROTATE_DIRECTION_X,
+	EMDL_BODY_ROTATE_DIRECTION_Y,
+	EMDL_BODY_ROTATE_DIRECTION_Z,
+    EMDL_BODY_ROTATE_RELATIVE_TO,
+	EMDL_BODY_SIGMA_ANG,
+    EMDL_BODY_SIGMA_OFFSET,
+    EMDL_BODY_SIGMA_ROT,
+    EMDL_BODY_SIGMA_TILT,
+    EMDL_BODY_SIGMA_PSI,
+	EMDL_BODY_STAR_FILE,
+
     EMDL_CTF_BFACTOR, ///< B-factor
     EMDL_CTF_MAXRES, ///< Maximum resolution with Thon rings
     EMDL_CTF_VALIDATIONSCORE, ///< Gctf-based validation score for CTF fit
@@ -122,8 +134,6 @@ enum EMDLabel
     EMDL_IMAGE_STATS_KURT,
     EMDL_IMAGE_WEIGHT,
 
-    EMDL_MASK_NAME,
-
     EMDL_MATRIX_1_1,
     EMDL_MATRIX_1_2,
     EMDL_MATRIX_1_3,
@@ -142,6 +152,8 @@ enum EMDLabel
     EMDL_MICROGRAPH_TILT_AXIS_DIRECTION,
     EMDL_MICROGRAPH_TILT_AXIS_OUTOFPLANE,
 
+	EMDL_MASK_NAME,
+
     EMDL_MLMODEL_ACCURACY_ROT,
     EMDL_MLMODEL_ACCURACY_TRANS,
     EMDL_MLMODEL_AVE_PMAX,
@@ -151,6 +163,9 @@ enum EMDLabel
     EMDL_MLMODEL_DIMENSIONALITY,
     EMDL_MLMODEL_DIMENSIONALITY_DATA,
     EMDL_MLMODEL_DIFF2_HALVES_REF,
+    EMDL_MLMODEL_ESTIM_RESOL_REF,
+	EMDL_MLMODEL_FOURIER_COVERAGE_REF,
+    EMDL_MLMODEL_FOURIER_COVERAGE_TOTAL_REF,
     EMDL_MLMODEL_FSC_HALVES_REF,
     EMDL_MLMODEL_GROUP_NAME,
     EMDL_MLMODEL_GROUP_NO,
@@ -225,8 +240,10 @@ enum EMDLabel
     EMDL_OPTIMISER_SGD_SUBSET_SIZE,
     EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET,
     EMDL_OPTIMISER_SGD_MAX_SUBSETS,
+    EMDL_OPTIMISER_SGD_STEPSIZE,
     EMDL_OPTIMISER_DO_SOLVENT_FLATTEN,
-    EMDL_OPTIMISER_DO_SKIP_ALIGN,
+	EMDL_OPTIMISER_DO_SOLVENT_FSC,
+	EMDL_OPTIMISER_DO_SKIP_ALIGN,
     EMDL_OPTIMISER_DO_SKIP_ROTATE,
     EMDL_OPTIMISER_DO_SPLIT_RANDOM_HALVES,
     EMDL_OPTIMISER_DO_ZERO_MASK,
@@ -251,6 +268,7 @@ enum EMDLabel
     EMDL_OPTIMISER_IGNORE_CTF_UNTIL_FIRST_PEAK,
     EMDL_OPTIMISER_INCR_SIZE,
     EMDL_OPTIMISER_ITERATION_NO,
+    EMDL_OPTIMISER_LOCAL_SYMMETRY_FILENAME,
     EMDL_OPTIMISER_LOWRES_JOIN_RANDOM_HALVES,
     EMDL_OPTIMISER_MAGNIFICATION_RANGE,
     EMDL_OPTIMISER_MAGNIFICATION_STEP,
@@ -454,6 +472,18 @@ private:
         EMDL::addLabel(EMDL_AREA_ID, EMDL_LONG, "rlnAreaId", "ID (i.e. a unique number) of an area (i.e. field-of-view)");
         EMDL::addLabel(EMDL_AREA_NAME, EMDL_STRING, "rlnAreaName", "Name of an area (i.e. field-of-view)");
 
+        EMDL::addLabel(EMDL_BODY_MASK_NAME, EMDL_STRING, "rlnBodyMaskName", "Name of an image that contains a [0,1] body mask for multi-body refinement");
+        EMDL::addLabel(EMDL_BODY_ROTATE_DIRECTION_X, EMDL_DOUBLE, "rlnBodyRotateDirectionX", "X-component of axis around which to rotate this body");
+        EMDL::addLabel(EMDL_BODY_ROTATE_DIRECTION_Y, EMDL_DOUBLE, "rlnBodyRotateDirectionY", "Y-component of axis around which to rotate this body");
+        EMDL::addLabel(EMDL_BODY_ROTATE_DIRECTION_Z, EMDL_DOUBLE, "rlnBodyRotateDirectionZ", "Z-component of axis around which to rotate this body");
+        EMDL::addLabel(EMDL_BODY_ROTATE_RELATIVE_TO, EMDL_INT, "rlnBodyRotateRelativeTo", "Number of the body relative to which this body rotates (if negative, use rlnBodyRotateDirectionXYZ)");
+        EMDL::addLabel(EMDL_BODY_SIGMA_ANG, EMDL_DOUBLE, "rlnBodySigmaAngles", "Width of prior on all three Euler angles of a body in multibody refinement (in degrees)");
+        EMDL::addLabel(EMDL_BODY_SIGMA_OFFSET, EMDL_DOUBLE, "rlnBodySigmaOffset", "Width of prior on origin offsets of a body in multibody refinement (in pixels)");
+		EMDL::addLabel(EMDL_BODY_SIGMA_ROT, EMDL_DOUBLE, "rlnBodySigmaRot", "Width of prior on rot angles of a body in multibody refinement (in degrees)");
+        EMDL::addLabel(EMDL_BODY_SIGMA_TILT, EMDL_DOUBLE, "rlnBodySigmaTilt", "Width of prior on tilt angles of a body in multibody refinement (in degrees)");
+        EMDL::addLabel(EMDL_BODY_SIGMA_PSI, EMDL_DOUBLE, "rlnBodySigmaPsi", "Width of prior on psi angles of a body in multibody refinement (in degrees)");
+        EMDL::addLabel(EMDL_BODY_STAR_FILE, EMDL_STRING, "rlnBodyStarFile", "Name of STAR file with body masks and metadata");
+
     	EMDL::addLabel(EMDL_CTF_BFACTOR, EMDL_DOUBLE, "rlnCtfBfactor", "B-factor (in A^2) that describes CTF power spectrum fall-off");
     	EMDL::addLabel(EMDL_CTF_MAXRES, EMDL_DOUBLE, "rlnCtfMaxResolution", "Estimated maximum resolution (in A) of significant CTF Thon rings");
     	EMDL::addLabel(EMDL_CTF_VALIDATIONSCORE, EMDL_DOUBLE, "rlnCtfValidationScore", "Gctf-based validation score for the quality of the CTF fit");
@@ -538,6 +568,9 @@ private:
         EMDL::addLabel(EMDL_MLMODEL_DIMENSIONALITY, EMDL_INT, "rlnReferenceDimensionality", "Dimensionality of the references (2D/3D)");
         EMDL::addLabel(EMDL_MLMODEL_DIMENSIONALITY_DATA, EMDL_INT, "rlnDataDimensionality", "Dimensionality of the data (2D/3D)");
         EMDL::addLabel(EMDL_MLMODEL_DIFF2_HALVES_REF, EMDL_DOUBLE, "rlnDiff2RandomHalves", "Power of the differences between two independent reconstructions from random halves of the data");
+        EMDL::addLabel(EMDL_MLMODEL_ESTIM_RESOL_REF, EMDL_DOUBLE, "rlnEstimatedResolution", "Estimated resolution (in A) for a reference");
+        EMDL::addLabel(EMDL_MLMODEL_FOURIER_COVERAGE_REF, EMDL_DOUBLE, "rlnFourierCompleteness", "Fraction of Fourier components (per resolution shell) with SNR>1");
+        EMDL::addLabel(EMDL_MLMODEL_FOURIER_COVERAGE_TOTAL_REF, EMDL_DOUBLE, "rlnOverallFourierCompleteness", "Fraction of all Fourier components up to the current resolution with SNR>1");
         EMDL::addLabel(EMDL_MLMODEL_FSC_HALVES_REF, EMDL_DOUBLE, "rlnGoldStandardFsc", "Fourier shell correlation between two independent reconstructions from random halves of the data");
         EMDL::addLabel(EMDL_MLMODEL_GROUP_NAME, EMDL_STRING, "rlnGroupName", "The name of a group of images (e.g. all images from a micrograph)");
         EMDL::addLabel(EMDL_MLMODEL_GROUP_NO, EMDL_LONG, "rlnGroupNumber", "The number of a group of images");
@@ -610,9 +643,11 @@ private:
         EMDL::addLabel(EMDL_OPTIMISER_SGD_SUBSET_SIZE, EMDL_LONG, "rlnSgdSubsetSize", "The number of particles in the random subsets for SGD");
         EMDL::addLabel(EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET, EMDL_INT, "rlnSgdWriteEverySubset", "Every this many subsets the model is written to disk");
         EMDL::addLabel(EMDL_OPTIMISER_SGD_MAX_SUBSETS, EMDL_LONG, "rlnSgdMaxSubsets", "Stop SGD after doing this many subsets (possibly spanning more than 1 iteration)");
+        EMDL::addLabel(EMDL_OPTIMISER_SGD_STEPSIZE, EMDL_DOUBLE, "rlnSgdStepsize", "Stepsize in SGD updates)");
         EMDL::addLabel(EMDL_OPTIMISER_DO_AUTO_REFINE, EMDL_BOOL, "rlnDoAutoRefine", "Flag to indicate that 3D auto-refine procedure is being used");
         EMDL::addLabel(EMDL_OPTIMISER_DO_ONLY_FLIP_CTF_PHASES, EMDL_BOOL, "rlnDoOnlyFlipCtfPhases", "Flag to indicate that CTF-correction should only comprise phase-flipping");
         EMDL::addLabel(EMDL_OPTIMISER_DO_SOLVENT_FLATTEN, EMDL_BOOL, "rlnDoSolventFlattening", "Flag to indicate that the references should be masked to set their solvent areas to a constant density");
+        EMDL::addLabel(EMDL_OPTIMISER_DO_SOLVENT_FSC, EMDL_BOOL, "rlnDoSolventFscCorrection", "Flag to indicate that the FSCs should be solvent-corrected during refinement");
         EMDL::addLabel(EMDL_OPTIMISER_DO_SKIP_ALIGN, EMDL_BOOL, "rlnDoSkipAlign", "Flag to indicate that orientational (i.e. rotational and translational) searches will be omitted from the refinement, only marginalisation over classes will take place");
         EMDL::addLabel(EMDL_OPTIMISER_DO_SKIP_ROTATE, EMDL_BOOL, "rlnDoSkipRotate", "Flag to indicate that rotational searches will be omitted from the refinement, only marginalisation over classes and translations will take place");
         EMDL::addLabel(EMDL_OPTIMISER_DO_SPLIT_RANDOM_HALVES, EMDL_BOOL, "rlnDoSplitRandomHalves", "Flag to indicate that the data should be split into two completely separate, random halves");
@@ -638,6 +673,7 @@ private:
         EMDL::addLabel(EMDL_OPTIMISER_IGNORE_CTF_UNTIL_FIRST_PEAK, EMDL_BOOL, "rlnDoIgnoreCtfUntilFirstPeak", "Flag to indicate that the CTFs should be ignored until their first peak");
         EMDL::addLabel(EMDL_OPTIMISER_INCR_SIZE, EMDL_INT, "rlnIncrementImageSize", "Number of Fourier shells to be included beyond the resolution where SSNR^MAP drops below 1");
         EMDL::addLabel(EMDL_OPTIMISER_ITERATION_NO, EMDL_INT, "rlnCurrentIteration", "The number of the current iteration");
+        EMDL::addLabel(EMDL_OPTIMISER_LOCAL_SYMMETRY_FILENAME, EMDL_STRING, "rlnLocalSymmetryFile", "Local symmetry description file containing list of masks and their operators");
         EMDL::addLabel(EMDL_OPTIMISER_LOWRES_JOIN_RANDOM_HALVES, EMDL_DOUBLE, "rlnJoinHalvesUntilThisResolution", "Resolution (in Angstrom) to join the two random half-reconstructions to prevent their diverging orientations (for C-symmetries)");
         EMDL::addLabel(EMDL_OPTIMISER_MAGNIFICATION_RANGE, EMDL_DOUBLE, "rlnMagnificationSearchRange", "Search range for magnification correction");
         EMDL::addLabel(EMDL_OPTIMISER_MAGNIFICATION_STEP, EMDL_DOUBLE, "rlnMagnificationSearchStep", "Step size  for magnification correction");

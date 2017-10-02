@@ -33,7 +33,8 @@ class reconstruct_parameters
 	MetaDataTable DF;
 	int r_max, r_min_nn, blob_order, ref_dim, interpolator, iter, nr_threads, debug_ori_size, debug_size, ctf_dim, nr_helical_asu;
 	RFLOAT blob_radius, blob_alpha, angular_error, shift_error, angpix, maxres, beamtilt_x, beamtilt_y, helical_rise, helical_twist;
-	bool do_ctf, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, do_fom_weighting, do_3d_rot, do_reconstruct_ctf, do_beamtilt, skip_gridding, do_reconstruct_ctf2;
+	bool do_ctf, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, do_fom_weighting, do_3d_rot, do_reconstruct_ctf, do_beamtilt;
+	bool skip_gridding, do_reconstruct_ctf2, do_reconstruct_meas;
 	float padding_factor;
 	// I/O Parser
 	IOParser parser;
@@ -49,11 +50,6 @@ class reconstruct_parameters
 		parser.setCommandLine(argc, argv);
 
 		int general_section = parser.addSection("General options");
-
-		fn_debug = parser.getOption("--debug", "Rootname for debug reconstruction files", "");
-		debug_ori_size =  textToInteger(parser.getOption("--debug_ori_size", "Rootname for debug reconstruction files", "1"));
-		debug_size =  textToInteger(parser.getOption("--debug_size", "Rootname for debug reconstruction files", "1"));
-
 		fn_sel = parser.getOption("--i", "Input STAR file with the projection images and their orientations", "");
 	    fn_out = parser.getOption("--o", "Name for output reconstruction","relion.mrc");
 	    fn_sym = parser.getOption("--sym", "Symmetry group", "c1");
@@ -94,10 +90,15 @@ class reconstruct_parameters
     	do_3d_rot = parser.checkOption("--3d_rot", "Perform 3D rotations instead of backprojections from 2D images");
     	ctf_dim  = textToInteger(parser.getOption("--reconstruct_ctf", "Perform a 3D reconstruction from 2D CTF-images, with the given size in pixels", "-1"));
     	do_reconstruct_ctf2 = parser.checkOption("--ctf2", "Reconstruct CTF^2 and then take the sqrt of that");
+    	do_reconstruct_meas = parser.checkOption("--measured", "Fill Hermitian half of the CTF reconstruction with how often each voxel was measured.");
     	skip_gridding = parser.checkOption("--skip_gridding", "Skip gridding part of the reconstruction");
     	do_reconstruct_ctf = (ctf_dim > 0);
     	if (do_reconstruct_ctf)
     		do_ctf = false;
+		fn_debug = parser.getOption("--debug", "Rootname for debug reconstruction files", "");
+		debug_ori_size =  textToInteger(parser.getOption("--debug_ori_size", "Rootname for debug reconstruction files", "1"));
+		debug_size =  textToInteger(parser.getOption("--debug_size", "Rootname for debug reconstruction files", "1"));
+
 
     	// Hidden
        	r_min_nn = textToInteger(getParameter(argc, argv, "--r_min_nn", "10"));
@@ -152,11 +153,32 @@ class reconstruct_parameters
 				A3D_ELEM(backprojector.weight, k, i, j) = A3D_ELEM(It(), k, i, j);
 			}
 
+	   		bool do_use_fsc = false;
+	   		bool do_map = false;
+	   		MultidimArray<RFLOAT> fsc;
+	   		fsc.resize(debug_ori_size/2+1);
+	   		if (fn_fsc != "")
+	   		{
+	   			do_map = true;
+	   			do_use_fsc =true;
+	   			MetaDataTable MDfsc;
+	   			MDfsc.read(fn_fsc);
+	   			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDfsc)
+	   			{
+	   				int idx;
+	   				RFLOAT val;
+	   				MDfsc.getValue(EMDL_SPECTRAL_IDX, idx);
+	   				MDfsc.getValue(EMDL_MLMODEL_TAU2_REF, val);
+	   				fsc(idx) =  val;
+	   			}
+	   			std::cerr << "Using FSC to regularise reconstruction!" << std::endl;
+	   		}
+	   		std::cerr << "Starting the reconstruction ..." << std::endl;
 			MultidimArray<RFLOAT> dummy;
-			backprojector.reconstruct(It(), iter, false, 1., dummy, dummy, dummy, dummy, 1., false, true, nr_threads, -1);
+			backprojector.reconstruct(It(), iter, do_map, 1., fsc, dummy, dummy, dummy, dummy, 1., false, true, nr_threads, -1);
 	    	It.write(fn_out);
 	    	std::cerr<<" Done writing map in "<<fn_out<<std::endl;
-                exit(1);
+	    	exit(1);
 
 		}
 		else
@@ -210,7 +232,7 @@ class reconstruct_parameters
 		}
 		backprojectort.weight = Iw();
   		std::cerr << "Starting the reconstruction ..." << std::endl;
-   		backprojectort.reconstruct(tvol(), iter, false, 1., dummy, dummy, dummy, dummy, 1., false, false, nr_threads, -1);
+   		backprojectort.reconstruct(tvol(), iter, false, 1., dummy, dummy, dummy, dummy, dummy, 1., false, false, nr_threads, -1);
     	tvol.write(fn_out);
     	std::cerr<<" Done writing TMPPPPPPPPPPPPPPPPP debugging!!!c map in "<<fn_out<<std::endl;
 		exit(0);
@@ -243,6 +265,8 @@ class reconstruct_parameters
     	}
 
    		BackProjector backprojector(mysize, ref_dim, fn_sym, interpolator, padding_factor, r_min_nn, blob_order, blob_radius, blob_alpha, data_dim, skip_gridding);
+   		// This one is only needed for do_reconstruct_meas, but non-empty constructor does not exist...
+   		BackProjector backprojector2(mysize, ref_dim, fn_sym, interpolator, padding_factor, r_min_nn, blob_order, blob_radius, blob_alpha, data_dim, skip_gridding);
 
    		if (maxres < 0.)
    			r_max = -1;
@@ -259,7 +283,7 @@ class reconstruct_parameters
    		}
 
 		// Check for beam-tilt parameters in the input star file
-   		if (do_beamtilt && ( DF.containsLabel(EMDL_IMAGE_BEAMTILT_X) || DF.containsLabel(EMDL_IMAGE_BEAMTILT_Y) ) )
+   		if (do_beamtilt || ( DF.containsLabel(EMDL_IMAGE_BEAMTILT_X) || DF.containsLabel(EMDL_IMAGE_BEAMTILT_Y) ) )
    				std::cout << " + Using the beamtilt parameters in the input STAR file" << std::endl;
 
 		std::cerr << "Back-projecting all images ..." << std::endl;
@@ -433,6 +457,17 @@ class reconstruct_parameters
 
 
 				backprojector.set2DFourierTransform(F2D, A3D, IS_NOT_INV, &Fctf);
+
+
+				if (do_reconstruct_meas)
+				{
+					// Reconstruct from all-one F2Ds
+					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F2D)
+					{
+						DIRECT_MULTIDIM_ELEM(F2D, n) = 1.;
+					}
+					backprojector.set2DFourierTransform(F2D, A3D, IS_NOT_INV, &Fctf);
+				}
 			}
 
 
@@ -464,7 +499,7 @@ class reconstruct_parameters
    		}
    		std::cerr << "Starting the reconstruction ..." << std::endl;
    		backprojector.symmetrise(nr_helical_asu, helical_twist, helical_rise);
-   		backprojector.reconstruct(vol(), iter, do_map, 1., dummy, dummy, dummy, fsc, 1., do_use_fsc, true, nr_threads, -1);
+   		backprojector.reconstruct(vol(), iter, do_map, 1., dummy, dummy, dummy, dummy, fsc, 1., do_use_fsc, true, nr_threads, -1);
 
    		if (do_reconstruct_ctf)
    		{
@@ -500,6 +535,57 @@ class reconstruct_parameters
    					else
    						DIRECT_MULTIDIM_ELEM(vol(), n) = 0.;
 				}
+   			}
+
+
+   			if (do_reconstruct_meas)
+   			{
+   				backprojector2.reconstruct(vol(), iter, do_map, 1., dummy, dummy, dummy, dummy, fsc, 1., do_use_fsc, true, nr_threads, -1);
+   	   			F2D.clear();
+   	   			transformer.FourierTransform(vol(), F2D);
+
+   	   			// CenterOriginFFT: Set the center of the FFT in the FFTW origin
+   				Matrix1D<RFLOAT> shift(3);
+   				XX(shift)=-(RFLOAT)(int)(ctf_dim / 2);
+   				YY(shift)=-(RFLOAT)(int)(ctf_dim / 2);
+   				ZZ(shift)=-(RFLOAT)(int)(ctf_dim / 2);
+   				shiftImageInFourierTransform(F2D, F2D, (RFLOAT)ctf_dim, XX(shift), YY(shift), ZZ(shift));
+
+   				// Divide each value by the average in each resolution shell.
+   				// This is the multiplicative correction that will later be applied to sigma2_noise
+   				MultidimArray<RFLOAT> sum, count;
+   				sum.initZeros(ctf_dim / 2);
+   				count.initZeros(ctf_dim / 2);
+   				FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(F2D)
+   	   			{
+					int ires = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
+					DIRECT_A1D_ELEM(sum, ires) += DIRECT_A3D_ELEM(F2D, k, i, j).real;
+					DIRECT_A1D_ELEM(count, ires) += 1.;
+   	   			}
+   				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(sum)
+   				{
+   					if (DIRECT_A1D_ELEM(count, i) > 0.)
+   						DIRECT_A1D_ELEM(sum, i) /= DIRECT_A1D_ELEM(count, i);
+   				}
+  				FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(F2D)
+   	   			{
+					int ires = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
+   					if (DIRECT_A1D_ELEM(count, ires) > 0.)
+   						DIRECT_A3D_ELEM(F2D, k, i, j) /=  DIRECT_A1D_ELEM(sum, ires);
+   	   			}
+
+   				FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(F2D)
+   	   			{
+   	   				// Take care of kp==dim/2, as XmippOrigin lies just right off center of image...
+   	   				if ( kp > FINISHINGZ(vol()) || ip > FINISHINGY(vol()) || jp > FINISHINGX(vol()))
+   	   					continue;
+   	   				if (kp == 0 && ip == 0 && jp == 0)
+   	   					continue;
+   	   				//A3D_ELEM(vol(), kp, ip, jp)    = FFTW_ELEM(F2D, kp, ip, jp).real;
+   	   				//NOW only set one Hermitian half to the number of measured components!
+   	   				A3D_ELEM(vol(), -kp, -ip, -jp) = FFTW_ELEM(F2D, kp, ip, jp).real;
+   	   			}
+   	   			vol() *= (RFLOAT)ctf_dim;
    			}
 
    		}
