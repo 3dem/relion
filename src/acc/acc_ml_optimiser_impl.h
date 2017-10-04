@@ -1388,7 +1388,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 // ----------------------------------------------------------------------------
 // -------------- convertAllSquaredDifferencesToWeights -----------------------
 // ----------------------------------------------------------------------------
-template<class MlClass, typename weights_t>
+template<class MlClass>
 void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 											OptimisationParamters &op,
 											SamplingParameters &sp,
@@ -1409,15 +1409,12 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 	// Ready the "prior-containers" for all classes (remake every ipart)
 	AccPtr<XFLOAT>  pdf_orientation((size_t)((sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi), (CudaCustomAllocator *)accMLO->getAllocator());
-	AccPtr<XFLOAT>  pdf_offset((size_t)((sp.iclass_max-sp.iclass_min+1)*sp.nr_trans), (CudaCustomAllocator *)accMLO->getAllocator());
+	AccPtr<XFLOAT>  pdf_offset     ((size_t)((sp.iclass_max-sp.iclass_min+1)*sp.nr_trans), (CudaCustomAllocator *)accMLO->getAllocator());
 
-	RFLOAT pdf_orientation_mean(0);
-	unsigned pdf_orientation_count(0);
+	AccPtr<bool> pdf_orientation_zeros(pdf_orientation.getSize(), (CudaCustomAllocator *)accMLO->getAllocator());
+	AccPtr<bool> pdf_offset_zeros     (pdf_offset.getSize(), (CudaCustomAllocator *)accMLO->getAllocator());
 
 	CUSTOM_ALLOCATOR_REGION_NAME("CASDTW_PDF");
-
-	pdf_orientation.deviceAlloc();
-	pdf_offset.deviceAlloc();
 
 	// pdf_orientation is ipart-independent, so we keep it above ipart scope
 	CTIC(accMLO->timer,"get_orient_priors");
@@ -1434,21 +1431,20 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				else
 					pdf = op.directions_prior[idir] * op.psi_prior[ipsi];
 
-				pdf_orientation[iorientclass] = pdf;
-				pdf_orientation_mean += pdf;
-				pdf_orientation_count ++;
+				if (pdf == 0)
+				{
+					pdf_orientation[iorientclass] = 0.f;
+					pdf_orientation_zeros[iorientclass] = true;
+				}
+				else
+				{
+					pdf_orientation[iorientclass] = log(pdf);
+					pdf_orientation_zeros[iorientclass] = false;
+				}
 			}
 
-
-	pdf_orientation_mean /= (RFLOAT) pdf_orientation_count;
-
-	//If mean is non-zero bring all values closer to 1 to improve numerical accuracy
-	//This factor is over all classes and is thus removed in the final normalization
-	if (pdf_orientation_mean != 0.)
-		for (int i = 0; i < pdf_orientation.getSize(); i ++)
-			pdf_orientation[i] /= pdf_orientation_mean;
-
-	pdf_orientation.cpToDevice();
+	pdf_orientation_zeros.putOnDevice();
+	pdf_orientation.putOnDevice();
 	CTOC(accMLO->timer,"get_orient_priors");
 
 	if(exp_ipass==0 || baseMLO->adaptive_oversampling!=0)
@@ -1535,10 +1531,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			// loop through making translational priors for all classes this ipart - then copy all at once - then loop through kernel calls ( TODO: group kernel calls into one big kernel)
 			CTIC(accMLO->timer,"get_offset_priors");
 
-			double pdf_offset_mean(0);
-			std::vector<double> pdf_offset_t(pdf_offset.getSize());
-			unsigned pdf_offset_count(0);
-
 			for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			{
 				/*=========================================
@@ -1576,7 +1568,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 					// To speed things up, only calculate pdf_offset at the coarse sampling.
 					// That should not matter much, and that way one does not need to calculate all the OversampledTranslations
-					double pdf(0);
+					double pdf(0), pdf_zeros(0);
 					RFLOAT offset_x = old_offset_x + baseMLO->sampling.translations_x[itrans];
 					RFLOAT offset_y = old_offset_y + baseMLO->sampling.translations_y[itrans];
 					double tdiff2 = 0.;
@@ -1594,29 +1586,27 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					// P(offset|sigma2_offset)
 					// This is the probability of the offset, given the model offset and variance.
 					if (baseMLO->mymodel.sigma2_offset < 0.0001)
-						pdf = ( tdiff2 > 0.) ? 0. : 1.;
-					else
-						pdf = exp ( tdiff2 / (-2. * baseMLO->mymodel.sigma2_offset) ) / ( 2. * PI * baseMLO->mymodel.sigma2_offset );
+					{
+						pdf_zeros = tdiff2 > 0.;
+						pdf = pdf_zeros ? 0. : 1.;
 
-					pdf_offset_t[(exp_iclass-sp.iclass_min)*sp.nr_trans + itrans] = pdf;
-					pdf_offset_mean += pdf;
-					pdf_offset_count ++;
+					}
+					else
+					{
+						pdf_zeros = false;
+						pdf = tdiff2 / (-2. * baseMLO->mymodel.sigma2_offset);
+					}
+
+					pdf_offset_zeros[(exp_iclass-sp.iclass_min)*sp.nr_trans + itrans] = pdf_zeros;
+					pdf_offset     [(exp_iclass-sp.iclass_min)*sp.nr_trans + itrans] = pdf;
 				}
 			}
 
-			pdf_offset_mean /= (double) pdf_offset_count;
+			pdf_offset_zeros.putOnDevice();
+			pdf_offset.putOnDevice();
 
-			//If mean is non-zero bring all values closer to 1 to improve numerical accuracy
-			//This factor is over all classes and is thus removed in the final normalization
-			if (pdf_offset_mean != 0.)
-				for (int i = 0; i < pdf_offset.getSize(); i ++)
-					pdf_offset[i] = pdf_offset_t[i] /  pdf_offset_mean;
-
-			pdf_offset.cpToDevice();
 			CTOC(accMLO->timer,"get_offset_priors");
 			CTIC(accMLO->timer,"sumweight1");
-
-			long int block_num;
 
 			//Make sure most significant value is at least within single precision limit and some slack to distinguish peaks after prior multiplication
 			XFLOAT local_norm = (XFLOAT)op.avg_diff2[ipart];
@@ -1625,66 +1615,34 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 			if(exp_ipass==0)
 			{
-				AccPtr<weights_t> weights(Mweight.getAllocator());
+				AccPtr<XFLOAT> weights(Mweight.getAllocator());
 				weights.setSize(Mweight.getSize());
 
-				if (sizeof(weights_t) == sizeof(XFLOAT))
-				{
-					weights.setHostPtr((weights_t*) Mweight.hPtr);
-					weights.setDevicePtr((weights_t*) Mweight.dPtr);
-					weights.setAllocator(Mweight.getAllocator());
-				}
-				else
-				{
-					// Downcast from RFLOAT to XFLOAT
-#ifdef CUDA
-					weights.deviceAlloc();
-					block_num = ceilf((float)Mweight.getSize()/(float)BLOCK_SIZE);
-					cuda_kernel_cast<XFLOAT,weights_t><<<block_num,BLOCK_SIZE,0>>>
-							(~Mweight,~weights,Mweight.getSize());
-#else
-					weights.hostAlloc();
-					size_t size = Mweight.getSize();
-					for (int i = 0; i <size; i++)
-						weights[i] = Mweight[i];
-#endif
-				}
+				weights.setHostPtr((XFLOAT*) Mweight.hPtr);
+				weights.setDevicePtr((XFLOAT*) Mweight.dPtr);
+				weights.setAllocator(Mweight.getAllocator());
 
-				AccPtr<weights_t>  ipartMweight(
+				AccPtr<XFLOAT>  ipartMweight(
 						weights,
 						ipart * op.Mweight.xdim + sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.iclass_min,
 						(sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi * sp.nr_trans);
-				
-				block_num = ceilf((float)(sp.nr_dir*sp.nr_psi)/(float)SUMW_BLOCK_SIZE);
-			
-				if (failsafeMode) //Prevent zero prior products in fail-safe mode
-				{
-					AccUtilities::kernel_exponentiate_weights_coarse<true,weights_t>(
-							block_num,
-							sp.iclass_max-sp.iclass_min+1, 
-							SUMW_BLOCK_SIZE,
-							~pdf_orientation,
-							~pdf_offset,
-							~ipartMweight,
-							local_norm,
-							(XFLOAT)op.min_diff2[ipart],
-							sp.nr_dir*sp.nr_psi,
-							sp.nr_trans);
-				}
-				else
-				{
-					AccUtilities::kernel_exponentiate_weights_coarse<false,weights_t>(
-							block_num,
-							sp.iclass_max-sp.iclass_min+1, 
-							SUMW_BLOCK_SIZE,
-							~pdf_orientation,
-							~pdf_offset,
-							~ipartMweight,
-							local_norm,
-							(XFLOAT)op.min_diff2[ipart],
-							sp.nr_dir*sp.nr_psi,
-							sp.nr_trans);
-				}
+
+				pdf_offset.streamSync();
+
+				AccUtilities::kernel_weights_exponent_coarse(
+						sp.iclass_max-sp.iclass_min+1,
+						pdf_orientation,
+						pdf_orientation_zeros,
+						pdf_offset,
+						pdf_offset_zeros,
+						ipartMweight,
+						(XFLOAT)op.min_diff2[ipart],
+						sp.nr_dir*sp.nr_psi,
+						sp.nr_trans);
+
+				XFLOAT weights_max = AccUtilities::getMaxOnDevice<XFLOAT>(ipartMweight);
+
+				AccUtilities::kernel_exponentiate( ipartMweight, 86 - weights_max); //Add 86 since e^88 approaches the single precision limit
 
 				CTIC(accMLO->timer,"sort");
 				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
@@ -1695,23 +1653,22 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				if (ipart_length > 1)
 				{
 					//Wrap the current ipart data in a new pointer
-					AccPtr<weights_t> unsorted_ipart(weights,
+					AccPtr<XFLOAT> unsorted_ipart(
+							weights,
 							offset,
 							ipart_length);
 
-					AccPtr<weights_t> filtered((size_t)unsorted_ipart.getSize(), (CudaCustomAllocator *)accMLO->getAllocator());
+					AccPtr<XFLOAT> filtered((size_t)unsorted_ipart.getSize(), (CudaCustomAllocator *)accMLO->getAllocator());
 
 					CUSTOM_ALLOCATOR_REGION_NAME("CASDTW_SORTSUM");
 
 					filtered.deviceAlloc();
 
-					//MoreThanCubOpt<weights_t> moreThanOpt(0.);
-					//size_t filteredSize = filterOnDevice(unsorted_ipart, filtered, moreThanOpt);
 #ifdef DEBUG_CUDA					
 					if (unsorted_ipart.getSize()==0)
 						ACC_PTR_DEBUG_FATAL("Unsorted array size zero.\n");  // Hopefully Impossible
 #endif
-					size_t filteredSize = AccUtilities::filterGreaterZeroOnDevice<weights_t>(unsorted_ipart, filtered);
+					size_t filteredSize = AccUtilities::filterGreaterZeroOnDevice<XFLOAT>(unsorted_ipart, filtered);
 
 					if (filteredSize == 0)
 					{
@@ -1739,21 +1696,21 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					}
 					filtered.setSize(filteredSize);
 
-					AccPtr<weights_t> sorted((size_t)filteredSize, (CudaCustomAllocator *)accMLO->getAllocator());
-					AccPtr<weights_t> cumulative_sum((size_t)filteredSize, (CudaCustomAllocator *)accMLO->getAllocator());
+					AccPtr<XFLOAT> sorted((size_t)filteredSize, (CudaCustomAllocator *)accMLO->getAllocator());
+					AccPtr<XFLOAT> cumulative_sum((size_t)filteredSize, (CudaCustomAllocator *)accMLO->getAllocator());
 
 					sorted.deviceAlloc();
 					cumulative_sum.deviceAlloc();
 
-					AccUtilities::sortOnDevice<weights_t>(filtered, sorted);
-					AccUtilities::scanOnDevice<weights_t>(sorted, cumulative_sum);
+					AccUtilities::sortOnDevice<XFLOAT>(filtered, sorted);
+					AccUtilities::scanOnDevice<XFLOAT>(sorted, cumulative_sum);
 
 					CTOC(accMLO->timer,"sort");
 
 					op.sum_weight[ipart] = cumulative_sum.getAccValueAt(cumulative_sum.getSize() - 1);
 
 					long int my_nr_significant_coarse_samples;
-					size_t thresholdIdx = findThresholdIdxInCumulativeSum<weights_t>(cumulative_sum, 
+					size_t thresholdIdx = findThresholdIdxInCumulativeSum<XFLOAT>(cumulative_sum,
 							(1 - baseMLO->adaptive_fraction) * op.sum_weight[ipart]);
 
 					my_nr_significant_coarse_samples = filteredSize - thresholdIdx;
@@ -1794,10 +1751,10 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 						thresholdIdx = filteredSize - my_nr_significant_coarse_samples;
 					}
 
-					weights_t significant_weight = sorted.getAccValueAt(thresholdIdx);
+					XFLOAT significant_weight = sorted.getAccValueAt(thresholdIdx);
 
 					CTIC(accMLO->timer,"getArgMaxOnDevice");
-					std::pair<int, weights_t> max_pair = AccUtilities::getArgMaxOnDevice<weights_t>(unsorted_ipart);
+					std::pair<int, XFLOAT> max_pair = AccUtilities::getArgMaxOnDevice<XFLOAT>(unsorted_ipart);
 					CTOC(accMLO->timer,"getArgMaxOnDevice");
 					op.max_index[ipart].coarseIdx = max_pair.first;
 					op.max_weight[ipart] = max_pair.second;
@@ -1814,7 +1771,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					Mcoarse_significant.deviceAlloc();
 
 					DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
-					arrayOverThreshold<weights_t>(unsorted_ipart, Mcoarse_significant, significant_weight);
+					arrayOverThreshold<XFLOAT>(unsorted_ipart, Mcoarse_significant, significant_weight);
 					Mcoarse_significant.cpToHost();
 					DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 				}
@@ -1842,25 +1799,41 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 						IndexedDataArray thisClassPassWeights(PassWeights[ipart],FPCMasks[ipart][exp_iclass], (CudaCustomAllocator *)accMLO->getAllocator());
 #ifdef CUDA
 						AccPtr<XFLOAT>  pdf_orientation_class(&(pdf_orientation[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]), 
-								                              &( pdf_orientation((exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi) ), 
-								                              sp.nr_dir*sp.nr_psi);
+														 &( pdf_orientation((exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi) ),
+														 sp.nr_dir*sp.nr_psi);
 						AccPtr<XFLOAT>  pdf_offset_class(&(pdf_offset[(exp_iclass-sp.iclass_min)*sp.nr_trans]), 
 								                         &( pdf_offset((exp_iclass-sp.iclass_min)*sp.nr_trans) ), 
 								                         sp.nr_trans);
+						AccPtr<bool>  pdf_orientation_zeros_class(&(pdf_orientation_zeros[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]),
+														 &( pdf_orientation_zeros((exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi) ),
+														 sp.nr_dir*sp.nr_psi);
+						AccPtr<bool>  pdf_offset_zeros_class(&(pdf_offset_zeros[(exp_iclass-sp.iclass_min)*sp.nr_trans]),
+								                         &( pdf_offset_zeros((exp_iclass-sp.iclass_min)*sp.nr_trans) ),
+								                         sp.nr_trans);
 #else
 						AccPtr<XFLOAT>  pdf_orientation_class(&(pdf_orientation[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]), 
-								                              NULL, sp.nr_dir*sp.nr_psi);
+														 NULL, sp.nr_dir*sp.nr_psi);
 						AccPtr<XFLOAT>  pdf_offset_class(&(pdf_offset[(exp_iclass-sp.iclass_min)*sp.nr_trans]), 
+								                         NULL, sp.nr_trans);
+						AccPtr<bool>  pdf_orientation_zeros_class(&(pdf_orientation_zeros[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]),
+														 NULL, sp.nr_dir*sp.nr_psi);
+						AccPtr<bool>  pdf_offset_zeros_class(&(pdf_offset_zeros[(exp_iclass-sp.iclass_min)*sp.nr_trans]),
 								                         NULL, sp.nr_trans);
 #endif
 
-						block_num = ceil((float)FPCMasks[ipart][exp_iclass].jobNum / (float)SUMW_BLOCK_SIZE); //thisClassPassWeights.rot_idx.getSize() / SUM_BLOCK_SIZE;
+						long block_num = ceil((float)FPCMasks[ipart][exp_iclass].jobNum / (float)SUMW_BLOCK_SIZE); //thisClassPassWeights.rot_idx.getSize() / SUM_BLOCK_SIZE;
+
+						pdf_offset.streamSync();
+
+						thisClassPassWeights.weights.setStream(accMLO->classStreams[exp_iclass]);
 
 						AccUtilities::kernel_exponentiate_weights_fine(
 								block_num,
 								SUMW_BLOCK_SIZE,
 								~pdf_orientation_class,
+								~pdf_orientation_zeros_class,
 								~pdf_offset_class,
+								~pdf_offset_zeros_class,
 								~thisClassPassWeights.weights,
 								(XFLOAT)local_norm,
 								sp.nr_oversampled_rot,
@@ -1875,9 +1848,10 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 #else
 								0);
 #endif
-								LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
-					}
 
+						XFLOAT weights_max = AccUtilities::getMaxOnDevice<XFLOAT>(thisClassPassWeights.weights);
+						AccUtilities::kernel_exponentiate( thisClassPassWeights.weights, 86 - weights_max); //Add 86 since e^88 approaches the single precision limit
+					}
 				}
 
 				for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
@@ -2875,14 +2849,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		}
 		RFLOAT dLL;
 
-		XFLOAT local_norm = (XFLOAT)op.avg_diff2[ipart];
-		if (local_norm - op.min_diff2[ipart] > 50)
-			local_norm = op.min_diff2[ipart] + 50;
-
 		if ((baseMLO->iter==1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
 			dLL = -op.min_diff2[ipart];
 		else
-			dLL = log(op.sum_weight[ipart]) - local_norm - logsigma2;
+			dLL = log(op.sum_weight[ipart]) - logsigma2;
 
 		// Store dLL of each image in the output array, and keep track of total sum
 		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_DLL) = dLL;
@@ -3107,31 +3077,9 @@ baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_B);
 			getAllSquaredDifferencesCoarse<MlClass>(ipass, op, sp, baseMLO, myInstance, Mweight);
 			CTOC(timer,"getAllSquaredDifferencesCoarse");
 			
-			try
-			{
-				CTIC(timer,"convertAllSquaredDifferencesToWeightsCoarse");		
-				convertAllSquaredDifferencesToWeights<MlClass,XFLOAT>(ipass, op, sp, baseMLO, myInstance, CoarsePassWeights, FinePassClassMasks, Mweight);
-				CTOC(timer,"convertAllSquaredDifferencesToWeightsCoarse");
-			}
-			catch (RelionError XE)
-			{
-				getAllSquaredDifferencesCoarse<MlClass>(ipass, op, sp, baseMLO, myInstance, Mweight);
-#ifndef ACC_DOUBLE_PRECISION
-				try {
-					convertAllSquaredDifferencesToWeights<MlClass,double>(ipass, op, sp, baseMLO, myInstance, CoarsePassWeights, FinePassClassMasks, Mweight);
-				}
-				catch (RelionError XE)
-#endif
-				{
-					if (myInstance->failsafe_attempts > 40)
-						CRITICAL(ERRNUMFAILSAFE);
-
-					//Rerun in fail-safe mode
-					convertAllSquaredDifferencesToWeights<MlClass,XFLOAT>(ipass, op, sp, baseMLO, myInstance, CoarsePassWeights, FinePassClassMasks, Mweight, true);
-					std::cerr << std::endl << "WARNING: Exception (" << XE.msg << ") handled by switching to fail-safe mode." << std::endl;
-					myInstance->failsafe_attempts ++;
-				}
-			}
+			CTIC(timer,"convertAllSquaredDifferencesToWeightsCoarse");
+			convertAllSquaredDifferencesToWeights<MlClass>(ipass, op, sp, baseMLO, myInstance, CoarsePassWeights, FinePassClassMasks, Mweight);
+			CTOC(timer,"convertAllSquaredDifferencesToWeightsCoarse");
 		}
 		else
 		{
@@ -3191,7 +3139,7 @@ baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_D);
 			AccPtr<XFLOAT> Mweight((CudaCustomAllocator *)myInstance->getAllocator()); //DUMMY
 
 			CTIC(timer,"convertAllSquaredDifferencesToWeightsFine");
-			convertAllSquaredDifferencesToWeights<MlClass,XFLOAT>(ipass, op, sp, baseMLO, myInstance, FinePassWeights, FinePassClassMasks, Mweight);
+			convertAllSquaredDifferencesToWeights<MlClass>(ipass, op, sp, baseMLO, myInstance, FinePassWeights, FinePassClassMasks, Mweight);
 			CTOC(timer,"convertAllSquaredDifferencesToWeightsFine");
 
 		}

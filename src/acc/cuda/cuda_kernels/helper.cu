@@ -24,9 +24,10 @@ template __global__ void cuda_kernel_make_eulers_3D<false, false>(XFLOAT *,
  */
 __global__ void cuda_kernel_exponentiate_weights_fine(
 		XFLOAT *g_pdf_orientation,
+		bool *g_pdf_orientation_zeros,
 		XFLOAT *g_pdf_offset,
+		bool *g_pdf_offset_zeros,
 		XFLOAT *g_weights,
-		XFLOAT avg_diff2,
 		int oversamples_orient,
 		int oversamples_trans,
 		unsigned long *d_rot_id,
@@ -35,8 +36,6 @@ __global__ void cuda_kernel_exponentiate_weights_fine(
 		unsigned long *d_job_num,
 		long int job_num)
 {
-	__shared__ XFLOAT s_weights[SUMW_BLOCK_SIZE];
-
 	// blockid
 	int bid  = blockIdx.x;
 	//threadid
@@ -48,39 +47,69 @@ __global__ void cuda_kernel_exponentiate_weights_fine(
 	{
 		long int pos = d_job_idx[jobid];
 		// index of comparison
-		long int ix =  d_rot_id[   pos];   // each thread gets its own orient...
-		long int iy = d_trans_idx[ pos];   // ...and it's starting trans...
-		long int in =  d_job_num[jobid];    // ...AND the number of translations to go through
+		long int ix = d_rot_id   [pos];   // each thread gets its own orient...
+		long int iy = d_trans_idx[pos];   // ...and it's starting trans...
+		long int in = d_job_num  [jobid]; // ...AND the number of translations to go through
 
-		int c_itrans;//, iorient = bid*SUM_BLOCK_SIZE+tid; //, f_itrans;
-
-		// Bacause the partion of work is so arbitrarily divided in this kernel,
-		// we need to do some brute idex work to get the correct indices.
+		int c_itrans;
 		for (int itrans=0; itrans < in; itrans++, iy++)
 		{
-			c_itrans = ( iy - (iy % oversamples_trans))/ oversamples_trans; //floor(x/y) == (x-(x%y))/y  but less sensitive to x>>y and finite precision
-//			f_itrans = iy % oversamples_trans;
+			c_itrans = ( iy - (iy % oversamples_trans))/ oversamples_trans;
 
-			XFLOAT prior = g_pdf_orientation[ix] * g_pdf_offset[c_itrans];          	// Same      for all threads - TODO: should be done once for all trans through warp-parallel execution
-			XFLOAT diff2 = g_weights[pos+itrans] - avg_diff2;								// Different for all threads
-			// next line because of numerical precision of exp-function
-	#if defined(ACC_DOUBLE_PRECISION)
-				if (diff2 > 700.)
-					s_weights[tid] = 0.;
-				else
-					s_weights[tid] = prior * exp(-diff2);
-	#else
-				if (diff2 > 88.)
-					s_weights[tid] = 0.f;
-				else
-					s_weights[tid] = prior * expf(-diff2);
-	#endif
-				// TODO: use tabulated exp function? / Sjors  TODO: exp, expf, or __exp in CUDA? /Bjorn
-			// Store the weight
-			g_weights[pos+itrans] = s_weights[tid]; // TODO put in shared mem
+			if( g_weights[pos+itrans] < 0 || g_pdf_orientation_zeros[ix] || g_pdf_offset_zeros[c_itrans])
+				g_weights[pos+itrans] = -99999.f; //large negative number
+			else
+				g_weights[pos+itrans] = g_pdf_orientation[ix] + g_pdf_offset[c_itrans] - g_weights[pos+itrans];
 		}
 	}
 }
+
+//__global__ void cuda_kernel_exponentiate_weights_fine2(
+//		XFLOAT *g_pdf_orientation,
+//		XFLOAT *g_pdf_offset,
+//		XFLOAT *g_weights,
+//		XFLOAT avg_diff2,
+//		int oversamples_orient,
+//		int oversamples_trans,
+//		unsigned long *d_rot_id,
+//		unsigned long *d_trans_idx,
+//		unsigned long *d_job_idx,
+//		unsigned long *d_job_num,
+//		long int job_num)
+//{
+//	// blockid
+//	int bid  = blockIdx.x;
+//	//threadid
+//	int tid = threadIdx.x;
+//
+//	long int jobid = bid*SUMW_BLOCK_SIZE+tid;
+//
+//	if (jobid<job_num)
+//	{
+//		long int pos = d_job_idx[jobid];
+//		// index of comparison
+//		long int iy = d_trans_idx[ pos];
+//		long int in =  d_job_num[jobid];
+//
+//		int c_itrans;
+//		for (int itrans=0; itrans < in; itrans++, iy++)
+//		{
+//			XFLOAT a = g_weights[pos+itrans] + avg_diff2;
+//
+//#if defined(ACC_DOUBLE_PRECISION)
+//			if (a < -700.)
+//				g_weights[pos+itrans] = 0.;
+//			else
+//				g_weights[pos+itrans] = exp(a);
+//#else
+//			if (a < -88.)
+//				g_weights[pos+itrans] = 0.f;
+//			else
+//				g_weights[pos+itrans] = expf(a);
+//#endif
+//		}
+//	}
+//}
 
 __global__ void cuda_kernel_softMaskOutsideMap(	XFLOAT *vol,
 												long int vol_size,

@@ -150,6 +150,22 @@ static T getMinOnDevice(AccPtr<T> &ptr)
 }
 
 template <typename T>
+static T getMaxOnDevice(AccPtr<T> &ptr)
+{
+#ifdef CUDA
+	return CudaKernels::getMaxOnDevice<T>(ptr);
+#else
+#ifdef DEBUG_CUDA
+	if (ptr.size == 0)
+		printf("DEBUG_ERROR: getMaxOnDevice called with pointer of zero size.\n");
+	if (ptr.hPtr == NULL)
+		printf("DEBUG_ERROR: getMaxOnDevice called with null device pointer.\n");
+#endif
+	return CpuKernels::getMax<T>(ptr(), ptr.getSize());
+#endif
+}
+
+template <typename T>
 static std::pair<int, T> getArgMinOnDevice(AccPtr<T> &ptr)
 {
 #ifdef CUDA
@@ -909,43 +925,58 @@ void diff2_CC_fine(
 #endif
 }
 
-template<bool failsafe,typename weights_t>
-void kernel_exponentiate_weights_coarse(
-		int grid_size, 
+template<typename T>
+void kernel_weights_exponent_coarse(
 		int num_classes,
-		int block_size,
-		XFLOAT *g_pdf_orientation,
-		XFLOAT *g_pdf_offset,
-		weights_t *g_Mweight,
-		XFLOAT avg_diff2,
-		XFLOAT min_diff2,
+		AccPtr<T> &g_pdf_orientation,
+		AccPtr<bool> &g_pdf_orientation_zeros,
+		AccPtr<T> &g_pdf_offset,
+		AccPtr<bool> &g_pdf_offset_zeros,
+		AccPtr<T> &g_Mweight,
+		T g_min_diff2,
 		int nr_coarse_orient,
 		int nr_coarse_trans)
 {
+	long int block_num = ceilf( ((double)nr_coarse_orient*nr_coarse_trans*num_classes) / (double)SUMW_BLOCK_SIZE );
+
 #ifdef CUDA
-		dim3 block_dim(grid_size,num_classes);
-		cuda_kernel_exponentiate_weights_coarse<failsafe,weights_t>
-		<<<block_dim,block_size,0>>>(
-				g_pdf_orientation,
-				g_pdf_offset,
-				g_Mweight,
-				avg_diff2,
-				min_diff2,
+		cuda_kernel_weights_exponent_coarse<T>
+		<<<block_num,SUMW_BLOCK_SIZE,0,g_Mweight.getStream()>>>(
+				~g_pdf_orientation,
+				~g_pdf_orientation_zeros,
+				~g_pdf_offset,
+				~g_pdf_offset_zeros,
+				~g_Mweight,
+				g_min_diff2,
 				nr_coarse_orient,
-				nr_coarse_trans);
+				nr_coarse_trans,
+				nr_coarse_orient*nr_coarse_trans*num_classes);
 #else
-		CpuKernels::exponentiate_weights_coarse<failsafe,weights_t>(
-				grid_size, 
-				num_classes, 
-				block_size,
-				g_pdf_orientation,
-				g_pdf_offset,
-				g_Mweight,
-				avg_diff2,
-				min_diff2,
-				nr_coarse_orient,
-				nr_coarse_trans);	
+//		CpuKernels::weights_exponent_coarse(
+//				grid_size,
+//				num_classes,
+//				block_size,
+//				g_pdf_orientation,
+//				g_pdf_orientation_zeros,
+//				g_pdf_offset,
+//				g_pdf_offset_zeros,
+//				g_Mweight,
+//				avg_diff2,
+//				min_diff2,
+//				nr_coarse_orient,
+//				nr_coarse_trans);
 #endif
+}
+
+template<typename T>
+void kernel_exponentiate(
+		AccPtr<T> &array,
+		T add)
+{
+	int blockDim = (int) ceilf( (double)array.getSize() / (double)BLOCK_SIZE );
+	cuda_kernel_exponentiate<T>
+	<<< blockDim,BLOCK_SIZE,0,array.getStream()>>>
+	(~array, add, array.getSize());
 }
 
 void kernel_exponentiate_weights_fine(	int grid_size, 

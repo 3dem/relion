@@ -87,6 +87,17 @@ static T getMin(T *data, size_t size)
 	return min;
 }
 
+// may need to change to parallel reduce if it becomes the bottle neck.
+template <typename T>
+static T getMax(T *data, size_t size)
+{
+	T max = data[0];
+	for(int i=1; i<size; i++)
+		max = data[i] > max ? data[i] : max;
+
+	return max;
+}
+
 template <typename T>
 static T getSum(T *data, size_t size)
 {

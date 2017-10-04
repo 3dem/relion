@@ -10,65 +10,57 @@
 #include "src/acc/acc_projector.h"
 #include "src/acc/acc_projectorkernel_impl.h"
 
-#ifdef ACC_DOUBLE_PRECISION
-#define FAILSAFE_PRIOR_MIN_LIM 1e-300
-#else
-#define FAILSAFE_PRIOR_MIN_LIM 1e-30
-#endif
-
-template<bool failsafe,typename weights_t>
-__global__ void cuda_kernel_exponentiate_weights_coarse(
-		XFLOAT *g_pdf_orientation,
-		XFLOAT *g_pdf_offset,
-		weights_t *g_Mweight,
-		XFLOAT avg_diff2,
-		XFLOAT min_diff2,
+template<typename T>
+__global__ void cuda_kernel_weights_exponent_coarse(
+		T *g_pdf_orientation,
+		bool *g_pdf_orientation_zeros,
+		T *g_pdf_offset,
+		bool *g_pdf_offset_zeros,
+		T *g_Mweight,
+		T g_min_diff2,
 		int nr_coarse_orient,
-		int nr_coarse_trans)
+		int nr_coarse_trans,
+		int max_idx)
 {
-	// blockid
-	int bid  = blockIdx.x;
-	int cid  = blockIdx.y;
-	//threadid
+	int bid = blockIdx.x;
 	int tid = threadIdx.x;
 
-	int pos, iorient = bid*SUMW_BLOCK_SIZE+tid;
+	int idx = bid*SUMW_BLOCK_SIZE+tid;
 
-	weights_t weight;
-	if(iorient<nr_coarse_orient)
+	if(idx < max_idx)
 	{
-		for (int itrans=0; itrans<nr_coarse_trans; itrans++)
-		{
-			pos = cid * nr_coarse_orient * nr_coarse_trans + iorient * nr_coarse_trans + itrans;
-			weights_t diff2 = g_Mweight[pos];
-			if( diff2 < min_diff2 ) //TODO Might be slow (divergent threads)
-				weight = (weights_t)0.0;
-			else
-			{
-				diff2 -= avg_diff2;
-				weight = g_pdf_orientation[iorient] * g_pdf_offset[itrans];          	// Same for all threads - TODO: should be done once for all trans through warp-parallel execution
+		int itrans = idx % nr_coarse_trans;
+		int iorient = (idx - itrans) / nr_coarse_trans;
 
-				if (failsafe && weight < FAILSAFE_PRIOR_MIN_LIM) //Prevent zero priors in fail-safe mode
-					weight = FAILSAFE_PRIOR_MIN_LIM;
+		T diff2 = g_Mweight[idx];
+		if( diff2 < g_min_diff2 || g_pdf_orientation_zeros[iorient] || g_pdf_offset_zeros[itrans])
+			g_Mweight[idx] = -99999.f; //large negative number
+		else
+			g_Mweight[idx] = g_pdf_orientation[iorient] + g_pdf_offset[itrans] - diff2;
+	}
+}
 
-				// next line because of numerical precision of exp-function
-#ifdef ACC_DOUBLE_PRECISION
-				if (diff2 > 700.)
-					weight = 0.;
-				else
-					weight *= exp(-diff2);
+template<typename T>
+__global__ void cuda_kernel_exponentiate(
+		T *g_array,
+		T add,
+		size_t size)
+{
+	int idx = threadIdx.x + blockIdx.x*BLOCK_SIZE;
+	if(idx < size)
+	{
+		T a = g_array[idx] + add;
+#ifdef CUDA_DOUBLE_PRECISION
+		if (a < -700.)
+			g_array[idx] = 0.f;
+		else
+			g_array[idx] = exp(a);
 #else
-				if (diff2 > 88.)
-					weight = 0.;
-				else
-					weight *= expf(-diff2);
+		if (a < -88.f)
+			g_array[idx] = 0.;
+		else
+			g_array[idx] = expf(a);
 #endif
-				// TODO: use tabulated exp function? / Sjors  TODO: exp, expf, or __exp in CUDA? /Bjorn
-			}
-
-			// Store the weight
-			g_Mweight[pos] = weight; // TODO put in shared mem
-		}
 	}
 }
 
@@ -171,17 +163,19 @@ __global__ void cuda_kernel_collect2jobs(	XFLOAT *g_oo_otrans_x,          // otr
 		g_thr_wsum_prior_offsetz_class[bid] = s_thr_wsum_prior_offsetz_class[0];
 }
 
-__global__ void cuda_kernel_exponentiate_weights_fine(    XFLOAT *g_pdf_orientation,
-											  XFLOAT *g_pdf_offset,
-											  XFLOAT *g_weights,
-											  XFLOAT avg_diff2,
-											  int oversamples_orient,
-											  int oversamples_trans,
-									     	  unsigned long *d_rot_id,
-											  unsigned long *d_trans_idx,
-											  unsigned long *d_job_idx,
-											  unsigned long *d_job_num,
-									     	  long int job_num);
+__global__ void cuda_kernel_exponentiate_weights_fine(
+		XFLOAT *g_pdf_orientation,
+		bool *g_pdf_orientation_zeros,
+		XFLOAT *g_pdf_offset,
+		bool *g_pdf_offset_zeros,
+		XFLOAT *g_weights,
+		int oversamples_orient,
+		int oversamples_trans,
+		unsigned long *d_rot_id,
+		unsigned long *d_trans_idx,
+		unsigned long *d_job_idx,
+		unsigned long *d_job_num,
+		long int job_num);
 
 __global__ void cuda_kernel_softMaskOutsideMap(	XFLOAT *vol,
 												long int vol_size,
@@ -468,7 +462,9 @@ __global__ void cuda_kernel_multi(
 	if(pixel<image_size)
 		A[pixel] = A[pixel]*S;
 }
+
 }
+
 /*
  * Multiplies scalar array A by scalar array B and a scalar S, pixel-by-pixel
  *
