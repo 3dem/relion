@@ -25,12 +25,12 @@ namespace CpuKernels
  * 
  */
 void exponentiate_weights_fine(
-		int grid_size, 
-		int block_size, 
+		int grid_size,
 		XFLOAT *g_pdf_orientation,
+		bool *g_pdf_orientation_zeros,
 		XFLOAT *g_pdf_offset,
+		bool *g_pdf_offset_zeros,
 		XFLOAT *g_weights,
-		XFLOAT avg_diff2,
 		int oversamples_orient,
 		int oversamples_trans,
 		unsigned long *d_rot_id,
@@ -39,48 +39,29 @@ void exponentiate_weights_fine(
 		unsigned long *d_job_num,
 		long int job_num)
 {
-    // XFLOAT s_weights[SUMW_BLOCK_SIZE];
-	XFLOAT s_weights;
-
-	for (int bid=0; bid < grid_size; bid++) {
-		for (int tid=0; tid < block_size; tid++) {
-			long int jobid = bid*block_size+tid;
+	for (int bid=0; bid < grid_size; bid++)
+	{
+		for (int tid=0; tid < SUMW_BLOCK_SIZE; tid++)
+		{
+			long int jobid = bid*SUMW_BLOCK_SIZE+tid;
 
 			if (jobid<job_num)
 			{
 				long int pos = d_job_idx[jobid];
 				// index of comparison
-				long int ix =  d_rot_id[   pos];   // each thread gets its own orient...
-				long int iy = d_trans_idx[ pos];   // ...and it's starting trans...
-				long int in =  d_job_num[jobid];    // ...AND the number of translations to go through
+				long int ix = d_rot_id   [pos];   // each thread gets its own orient...
+				long int iy = d_trans_idx[pos];   // ...and it's starting trans...
+				long int in = d_job_num  [jobid]; // ...AND the number of translations to go through
 
-				int c_itrans;//, iorient = bid*SUM_BLOCK_SIZE+tid; //, f_itrans;
-
-				// Because the portion of work is so arbitrarily divided in this kernel,
-				// we need to do some brute idex work to get the correct indices.
+				int c_itrans;
 				for (int itrans=0; itrans < in; itrans++, iy++)
 				{
-					c_itrans = ( iy - (iy % oversamples_trans))/ oversamples_trans; //floor(x/y) == (x-(x%y))/y  but less sensitive to x>>y and finite precision
-		//			f_itrans = iy % oversamples_trans;
+					c_itrans = ( iy - (iy % oversamples_trans))/ oversamples_trans;
 
-					// Same  for all threads - TODO: should be done once for all trans through warp-parallel execution
-					XFLOAT prior = g_pdf_orientation[ix] * g_pdf_offset[c_itrans];          	
-					XFLOAT diff2 = g_weights[pos+itrans] - avg_diff2; // Different for all threads
-					// next line because of numerical precision of exp-function
-			#if defined(ACC_DOUBLE_PRECISION)
-						if (diff2 > 700.)
-							s_weights = 0.;
-						else
-							s_weights = prior * exp(-diff2);
-			#else
-						if (diff2 > 88.)
-							s_weights = 0.f;
-						else
-							s_weights = prior * expf(-diff2);
-			#endif
-						// TODO: use tabulated exp function? / Sjors  TODO: exp, expf, or __exp in CUDA? /Bjorn
-					// Store the weight
-					g_weights[pos+itrans] = s_weights; // TODO put in shared mem
+					if( g_weights[pos+itrans] < 0 || g_pdf_orientation_zeros[ix] || g_pdf_offset_zeros[c_itrans])
+						g_weights[pos+itrans] = -99999.f; //large negative number
+					else
+						g_weights[pos+itrans] = g_pdf_orientation[ix] + g_pdf_offset[c_itrans] - g_weights[pos+itrans];
 				}
 			}
 		} // for tid

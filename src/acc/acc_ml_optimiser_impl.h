@@ -1034,7 +1034,6 @@ void getAllSquaredDifferencesCoarse(
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread)); // does not appear to be NEEDED FOR NON-BLOCKING CLASS STREAMS in tests, but should be to sync against classStreams
 
 		op.min_diff2[ipart] = AccUtilities::getMinOnDevice<XFLOAT>(allWeights);
-		op.avg_diff2[ipart] = (RFLOAT) AccUtilities::getSumOnDevice<XFLOAT>(allWeights) / (RFLOAT) allWeights_size;
 
 	} // end loop ipart
 
@@ -1372,8 +1371,6 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 		if(baseMLO->adaptive_oversampling!=0)
 		{
 			op.min_diff2[ipart] = (RFLOAT) AccUtilities::getMinOnDevice<XFLOAT>(FinePassWeights[ipart].weights);
-			op.avg_diff2[ipart] = (RFLOAT) AccUtilities::getSumOnDevice<XFLOAT>(FinePassWeights[ipart].weights) /
-					(RFLOAT) FinePassWeights[ipart].weights.size;
 		}
 		CTOC(accMLO->timer,"collect_data_1");
 //		std::cerr << "  fine pass minweight  =  " << op.min_diff2[ipart] << std::endl;
@@ -1608,11 +1605,6 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			CTOC(accMLO->timer,"get_offset_priors");
 			CTIC(accMLO->timer,"sumweight1");
 
-			//Make sure most significant value is at least within single precision limit and some slack to distinguish peaks after prior multiplication
-			XFLOAT local_norm = (XFLOAT)op.avg_diff2[ipart];
-			if (local_norm - op.min_diff2[ipart] > 50)
-				local_norm = op.min_diff2[ipart] + 50;
-
 			if(exp_ipass==0)
 			{
 				AccPtr<XFLOAT> weights(Mweight.getAllocator());
@@ -1640,9 +1632,15 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 						sp.nr_dir*sp.nr_psi,
 						sp.nr_trans);
 
+
 				XFLOAT weights_max = AccUtilities::getMaxOnDevice<XFLOAT>(ipartMweight);
 
-				AccUtilities::kernel_exponentiate( ipartMweight, 86 - weights_max); //Add 86 since e^88 approaches the single precision limit
+				/*
+				 * Add 50 since we want to stay away from e^88, which approaches the single precision limit.
+				 * We still want as high numbers as possible to utilize most of the single precision span.
+				 * Dari - 201710
+				*/
+				AccUtilities::kernel_exponentiate( ipartMweight, 50 - weights_max);
 
 				CTIC(accMLO->timer,"sort");
 				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
@@ -1789,6 +1787,10 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
+				XFLOAT weights_max = -9999;
+
+				pdf_offset.streamSync();
+
 				for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++) // TODO could use classStreams
 				{
 					if ((baseMLO->mymodel.pdf_class[exp_iclass] > 0.) && (FPCMasks[ipart][exp_iclass].weightNum > 0) )
@@ -1821,21 +1823,16 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 								                         NULL, sp.nr_trans);
 #endif
 
-						long block_num = ceil((float)FPCMasks[ipart][exp_iclass].jobNum / (float)SUMW_BLOCK_SIZE); //thisClassPassWeights.rot_idx.getSize() / SUM_BLOCK_SIZE;
-
-						pdf_offset.streamSync();
-
+#ifdef CUDA
 						thisClassPassWeights.weights.setStream(accMLO->classStreams[exp_iclass]);
+#endif
 
 						AccUtilities::kernel_exponentiate_weights_fine(
-								block_num,
-								SUMW_BLOCK_SIZE,
 								~pdf_orientation_class,
 								~pdf_orientation_zeros_class,
 								~pdf_offset_class,
 								~pdf_offset_zeros_class,
 								~thisClassPassWeights.weights,
-								(XFLOAT)local_norm,
 								sp.nr_oversampled_rot,
 								sp.nr_oversampled_trans,
 								~thisClassPassWeights.rot_id,
@@ -1849,10 +1846,32 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 								0);
 #endif
 
-						XFLOAT weights_max = AccUtilities::getMaxOnDevice<XFLOAT>(thisClassPassWeights.weights);
-						AccUtilities::kernel_exponentiate( thisClassPassWeights.weights, 86 - weights_max); //Add 86 since e^88 approaches the single precision limit
+						XFLOAT m = AccUtilities::getMaxOnDevice<XFLOAT>(thisClassPassWeights.weights);
+
+						if (m > weights_max)
+							weights_max = m;
 					}
 				}
+
+				for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++) // TODO could use classStreams
+				{
+					if ((baseMLO->mymodel.pdf_class[exp_iclass] > 0.) && (FPCMasks[ipart][exp_iclass].weightNum > 0) )
+					{
+						IndexedDataArray thisClassPassWeights(PassWeights[ipart],FPCMasks[ipart][exp_iclass], (CudaCustomAllocator *)accMLO->getAllocator());
+
+#ifdef CUDA
+						thisClassPassWeights.weights.setStream(accMLO->classStreams[exp_iclass]);
+#endif
+						/*
+						 * Add 50 since we want to stay away from e^88, which approaches the single precision limit.
+						 * We still want as high numbers as possible to utilize most of the single precision span.
+						 * Dari - 201710
+						*/
+						AccUtilities::kernel_exponentiate( thisClassPassWeights.weights, 50 - weights_max);
+					}
+				}
+
+				op.min_diff2[ipart] = 50 - weights_max;
 
 				for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 					DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
@@ -2852,7 +2871,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		if ((baseMLO->iter==1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
 			dLL = -op.min_diff2[ipart];
 		else
-			dLL = log(op.sum_weight[ipart]) - logsigma2;
+			dLL = log(op.sum_weight[ipart]) -op.min_diff2[ipart] - logsigma2;
 
 		// Store dLL of each image in the output array, and keep track of total sum
 		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_DLL) = dLL;
@@ -3057,7 +3076,6 @@ baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_B);
 #endif
 
 		op.min_diff2.resize(sp.nr_particles, 0);
-		op.avg_diff2.resize(sp.nr_particles, 0);
 		
 		if (ipass == 0)
 		{

@@ -692,6 +692,15 @@ public:
 		f.close();
 	}
 
+	void dumpAccToFile(std::string fileName)
+	{
+#ifdef CUDA
+		dumpDeviceToFile(fileName);
+#else
+		dumpHostToFile(fileName);
+#endif
+	}
+
 	/**
 	 * Delete device data
 	 */

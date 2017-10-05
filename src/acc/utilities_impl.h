@@ -205,14 +205,11 @@ void centerFFT_3D(int grid_size, int batch_size, int block_size,
 #endif
 }
 
-void kernel_exponentiate_weights_fine(	int grid_size, 
-										int block_size,
-										XFLOAT *g_pdf_orientation,
+void kernel_exponentiate_weights_fine(	XFLOAT *g_pdf_orientation,
 										bool *g_pdf_orientation_zeros,
 										XFLOAT *g_pdf_offset,
 										bool *g_pdf_offset_zeros,
 										XFLOAT *g_weights,
-										XFLOAT avg_diff2,
 										int oversamples_orient,
 										int oversamples_trans,
 										unsigned long *d_rot_id,
@@ -222,9 +219,10 @@ void kernel_exponentiate_weights_fine(	int grid_size,
 										long int job_num,
 										cudaStream_t stream)
 {
+	long block_num = ceil((double)job_num / (double)SUMW_BLOCK_SIZE);
+
 #ifdef CUDA
-	dim3 block_dim(grid_size);
-	cuda_kernel_exponentiate_weights_fine<<<block_dim,block_size,0,stream>>>(
+	cuda_kernel_exponentiate_weights_fine<<<block_num,SUMW_BLOCK_SIZE,0,stream>>>(
 		g_pdf_orientation,
 		g_pdf_orientation_zeros,
 		g_pdf_offset,
@@ -239,12 +237,12 @@ void kernel_exponentiate_weights_fine(	int grid_size,
 		job_num);
 #else
 	CpuKernels::exponentiate_weights_fine(
-		grid_size,
-		block_size,
+		block_num,
 		g_pdf_orientation,
+		g_pdf_orientation_zeros,
 		g_pdf_offset,
+		g_pdf_offset_zeros,
 		g_weights,
-		avg_diff2,
 		oversamples_orient,
 		oversamples_trans,
 		d_rot_id,

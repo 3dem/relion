@@ -16,7 +16,7 @@ __global__ void cuda_kernel_weights_exponent_coarse(
 		bool *g_pdf_orientation_zeros,
 		T *g_pdf_offset,
 		bool *g_pdf_offset_zeros,
-		T *g_Mweight,
+		T *g_weights,
 		T g_min_diff2,
 		int nr_coarse_orient,
 		int nr_coarse_trans,
@@ -32,11 +32,11 @@ __global__ void cuda_kernel_weights_exponent_coarse(
 		int itrans = idx % nr_coarse_trans;
 		int iorient = (idx - itrans) / nr_coarse_trans;
 
-		T diff2 = g_Mweight[idx];
+		T diff2 = g_weights[idx];
 		if( diff2 < g_min_diff2 || g_pdf_orientation_zeros[iorient] || g_pdf_offset_zeros[itrans])
-			g_Mweight[idx] = -99999.f; //large negative number
+			g_weights[idx] = -99999.f; //large negative number
 		else
-			g_Mweight[idx] = g_pdf_orientation[iorient] + g_pdf_offset[itrans] - diff2;
+			g_weights[idx] = g_pdf_orientation[iorient] + g_pdf_offset[itrans] - diff2;
 	}
 }
 

@@ -940,31 +940,29 @@ void kernel_weights_exponent_coarse(
 	long int block_num = ceilf( ((double)nr_coarse_orient*nr_coarse_trans*num_classes) / (double)SUMW_BLOCK_SIZE );
 
 #ifdef CUDA
-		cuda_kernel_weights_exponent_coarse<T>
-		<<<block_num,SUMW_BLOCK_SIZE,0,g_Mweight.getStream()>>>(
-				~g_pdf_orientation,
-				~g_pdf_orientation_zeros,
-				~g_pdf_offset,
-				~g_pdf_offset_zeros,
-				~g_Mweight,
-				g_min_diff2,
-				nr_coarse_orient,
-				nr_coarse_trans,
-				nr_coarse_orient*nr_coarse_trans*num_classes);
+	cuda_kernel_weights_exponent_coarse<T>
+	<<<block_num,SUMW_BLOCK_SIZE,0,g_Mweight.getStream()>>>(
+			~g_pdf_orientation,
+			~g_pdf_orientation_zeros,
+			~g_pdf_offset,
+			~g_pdf_offset_zeros,
+			~g_Mweight,
+			g_min_diff2,
+			nr_coarse_orient,
+			nr_coarse_trans,
+			nr_coarse_orient*nr_coarse_trans*num_classes);
 #else
-//		CpuKernels::weights_exponent_coarse(
-//				grid_size,
-//				num_classes,
-//				block_size,
-//				g_pdf_orientation,
-//				g_pdf_orientation_zeros,
-//				g_pdf_offset,
-//				g_pdf_offset_zeros,
-//				g_Mweight,
-//				avg_diff2,
-//				min_diff2,
-//				nr_coarse_orient,
-//				nr_coarse_trans);
+	CpuKernels::weights_exponent_coarse(
+			block_num,
+			~g_pdf_orientation,
+			~g_pdf_orientation_zeros,
+			~g_pdf_offset,
+			~g_pdf_offset_zeros,
+			~g_Mweight,
+			g_min_diff2,
+			nr_coarse_orient,
+			nr_coarse_trans,
+			nr_coarse_orient*nr_coarse_trans*num_classes);
 #endif
 }
 
@@ -974,9 +972,14 @@ void kernel_exponentiate(
 		T add)
 {
 	int blockDim = (int) ceilf( (double)array.getSize() / (double)BLOCK_SIZE );
+#ifdef CUDA
 	cuda_kernel_exponentiate<T>
 	<<< blockDim,BLOCK_SIZE,0,array.getStream()>>>
 	(~array, add, array.getSize());
+#else
+	CpuKernels::exponentiate<T>
+	(blockDim, ~array, add, array.getSize());
+#endif
 }
 
 void kernel_exponentiate_weights_fine(	int grid_size, 
@@ -984,7 +987,6 @@ void kernel_exponentiate_weights_fine(	int grid_size,
 										XFLOAT *g_pdf_orientation,
 										XFLOAT *g_pdf_offset,
 										XFLOAT *g_weights,
-										XFLOAT avg_diff2,
 										int oversamples_orient,
 										int oversamples_trans,
 										unsigned long *d_rot_id,
