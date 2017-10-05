@@ -61,6 +61,13 @@ public:
 		CFallocator(allocator)
 	{};
 
+	void setAllocator(CudaCustomAllocator *allocator)
+	{
+		reals.setAllocator(allocator);
+		fouriers.setAllocator(allocator);
+		CFallocator = allocator;
+	}
+
 	size_t estimate(int batch)
 	{
 		size_t needed(0);

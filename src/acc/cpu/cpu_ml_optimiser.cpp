@@ -292,8 +292,8 @@ void MlOptimiserCpu::setupFixedSizedObjects()
 
 	// clear() called on std::vector appears to set size=0, even if we have an explicit
 	// destructor for each member, so we need to set the size to what is was before
-	cpuProjectors.resize(nr_classes);
-	cpuBackprojectors.resize(nr_classes);
+	bundle->projectors.resize(nr_classes);
+	bundle->backprojectors.resize(nr_classes);
 
 	/*======================================================
 				  PROJECTOR AND BACKPROJECTOR
@@ -302,7 +302,7 @@ void MlOptimiserCpu::setupFixedSizedObjects()
 	//Loop over classes
 	for (int iclass = 0; iclass < nr_classes; iclass++)
 	{
-		cpuProjectors[iclass].setMdlDim(
+		bundle->projectors[iclass].setMdlDim(
 				baseMLO->mymodel.PPref[iclass].data.xdim,
 				baseMLO->mymodel.PPref[iclass].data.ydim,
 				baseMLO->mymodel.PPref[iclass].data.zdim,
@@ -311,9 +311,9 @@ void MlOptimiserCpu::setupFixedSizedObjects()
 				baseMLO->mymodel.PPref[iclass].r_max,
 				baseMLO->mymodel.PPref[iclass].padding_factor);
 
-		cpuProjectors[iclass].initMdl(baseMLO->mymodel.PPref[iclass].data.data);
+		bundle->projectors[iclass].initMdl(baseMLO->mymodel.PPref[iclass].data.data);
 
-		cpuBackprojectors[iclass].setMdlDim(
+		bundle->backprojectors[iclass].setMdlDim(
 				baseMLO->wsum_model.BPref[iclass].data.xdim,
 				baseMLO->wsum_model.BPref[iclass].data.ydim,
 				baseMLO->wsum_model.BPref[iclass].data.zdim,
@@ -322,7 +322,7 @@ void MlOptimiserCpu::setupFixedSizedObjects()
 				baseMLO->wsum_model.BPref[iclass].r_max,
 				baseMLO->wsum_model.BPref[iclass].padding_factor);
 
-		cpuBackprojectors[iclass].initMdl();
+		bundle->backprojectors[iclass].initMdl();
 	}
 }
 
@@ -334,7 +334,7 @@ void MlOptimiserCpu::setupTunableSizedObjects()
 						PROJECTION PLAN
 	======================================================*/
 
-	coarseProjectionPlans.resize(nr_classes);
+	bundle->coarseProjectionPlans.resize(nr_classes);
 
 	for (int iclass = 0; iclass < nr_classes; iclass++)
 	{
@@ -350,7 +350,7 @@ void MlOptimiserCpu::setupTunableSizedObjects()
 			long unsigned nr_idir = baseMLO->sampling.NrDirections(0, &exp_pointer_dir_nonzeroprior);
 			long unsigned nr_ipsi = baseMLO->sampling.NrPsiSamplings(0, &exp_pointer_psi_nonzeroprior );
 
-			coarseProjectionPlans[iclass].setup(
+			bundle->coarseProjectionPlans[iclass].setup(
 					baseMLO->sampling,
 					exp_directions_prior,
 					exp_psi_prior,
@@ -385,8 +385,6 @@ void MlOptimiserCpu::resetData()
 {
 	transformer1.clear();
 	transformer2.clear();
-
-	failsafe_attempts = 0;
 };
 
 void MlOptimiserCpu::expectationOneParticle(unsigned long my_ori_particle, int thread_id)

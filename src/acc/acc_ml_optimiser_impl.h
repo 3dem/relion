@@ -598,11 +598,8 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		if (baseMLO->mymodel.current_size < baseMLO->mymodel.ori_size)
 		{
 			AccPtr<XFLOAT> spectrumAndXi2((size_t)((baseMLO->mymodel.ori_size/2+1)+1), 0, (CudaCustomAllocator *)accMLO->getAllocator()); // last +1 is the Xi2, to remove an expensive memcpy
-#ifndef CUDA
-			spectrumAndXi2.hostInit(0);
-#endif
 			spectrumAndXi2.deviceAlloc();
-			spectrumAndXi2.deviceInit(0);
+			spectrumAndXi2.accInit(0);
 			spectrumAndXi2.streamSync();
 
 			int gridSize = CEIL((float)(accMLO->transformer1.fouriers.getSize()) / (float)POWERCLASS_BLOCK_SIZE);
@@ -616,11 +613,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 					accMLO->transformer1.yFSize,
 					accMLO->transformer1.zFSize,
 					(baseMLO->mymodel.current_size/2)+1, // note: NOT baseMLO->mymodel.ori_size/2+1
-#ifdef CUDA
-					&spectrumAndXi2.dPtr[spectrumAndXi2.getSize()-1]); // last element is the hihgres_Xi2
-#else
-					&spectrumAndXi2.hPtr[spectrumAndXi2.getSize()-1]); // last element is the hihgres_Xi2
-#endif
+					&(~spectrumAndXi2)[spectrumAndXi2.getSize()-1]); // last element is the hihgres_Xi2
 			else
 				AccUtilities::powerClass<false>(gridSize,POWERCLASS_BLOCK_SIZE,
 					~accMLO->transformer1.fouriers,
@@ -631,11 +624,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 					accMLO->transformer1.yFSize,
 					accMLO->transformer1.zFSize,
 					(baseMLO->mymodel.current_size/2)+1, // note: NOT baseMLO->mymodel.ori_size/2+1
-#ifdef CUDA
-					&spectrumAndXi2.dPtr[spectrumAndXi2.getSize()-1]); // last element is the hihgres_Xi2
-#else
-					&spectrumAndXi2.hPtr[spectrumAndXi2.getSize()-1]); // last element is the hihgres_Xi2
-#endif
+					&(~spectrumAndXi2)[spectrumAndXi2.getSize()-1]); // last element is the hihgres_Xi2
 
 			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 			
@@ -798,11 +787,7 @@ void getAllSquaredDifferencesCoarse(
 	std::vector< AccProjectorPlan > projectorPlans(0, (CudaCustomAllocator *)accMLO->getAllocator());
 
 	//If particle specific sampling plan required
-#ifdef CUDA
-	if (accMLO->devBundle->generateProjectionPlanOnTheFly)
-#else
 	if (accMLO->generateProjectionPlanOnTheFly)
-#endif
 	{
 		CTIC(accMLO->timer,"generateProjectionSetupCoarse");
 
@@ -844,11 +829,7 @@ void getAllSquaredDifferencesCoarse(
 		CTOC(accMLO->timer,"generateProjectionSetupCoarse");
 	}
 	else
-#ifdef CUDA
-		projectorPlans = accMLO->devBundle->coarseProjectionPlans;
-#else
-		projectorPlans = accMLO->coarseProjectionPlans;
-#endif
+		projectorPlans = accMLO->bundle->coarseProjectionPlans;
 
 	// Loop only from sp.iclass_min to sp.iclass_max to deal with seed generation in first iteration
 	size_t allWeights_size(0);
@@ -965,11 +946,7 @@ void getAllSquaredDifferencesCoarse(
 				======================================*/
 
 				AccProjectorKernel projKernel = AccProjectorKernel::makeKernel(
-#ifdef CUDA
-						accMLO->devBundle->cudaProjectors[exp_iclass],
-#else
-						accMLO->cpuProjectors[exp_iclass],
-#endif
+						accMLO->bundle->projectors[exp_iclass],
 						op.local_Minvsigma2s[0].xdim,
 						op.local_Minvsigma2s[0].ydim,
 						op.local_Minvsigma2s[0].zdim,
@@ -984,11 +961,7 @@ void getAllSquaredDifferencesCoarse(
 						~Fimg_real,
 						~Fimg_imag,
 						~projectorPlans[exp_iclass].eulers,
-#ifdef CUDA
-						&allWeights(allWeights_pos),
-#else
-						&allWeights[allWeights_pos],
-#endif
+						&(~allWeights)[allWeights_pos],
 						(XFLOAT) op.local_sqrtXi2[ipart],
 						projectorPlans[exp_iclass].orientation_num,
 						translation_num,
@@ -1003,13 +976,8 @@ void getAllSquaredDifferencesCoarse(
 				
 				mapAllWeightsToMweights(
 						~projectorPlans[exp_iclass].iorientclasses,
-#ifdef CUDA
-						&allWeights(allWeights_pos),
-						&Mweight(ipart*weightsPerPart),
-#else
-						&allWeights[allWeights_pos],
-						&Mweight[ipart*weightsPerPart],
-#endif
+						&(~allWeights)[allWeights_pos],
+						&(~Mweight)[ipart*weightsPerPart],
 						projectorPlans[exp_iclass].orientation_num,
 						translation_num,
 #ifdef CUDA
@@ -1306,11 +1274,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 
 				CTIC(accMLO->timer,"Diff2MakeKernel");
 				AccProjectorKernel projKernel = AccProjectorKernel::makeKernel(
-#ifdef CUDA
-						accMLO->devBundle->cudaProjectors[exp_iclass],
-#else
-						accMLO->cpuProjectors[exp_iclass],
-#endif
+						accMLO->bundle->projectors[exp_iclass],
 						op.local_Minvsigma2s[0].xdim,
 						op.local_Minvsigma2s[0].ydim,
 						op.local_Minvsigma2s[0].zdim,
@@ -1677,15 +1641,9 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 							std::cerr << " ipart= " << ipart << " adaptive_fraction= " << baseMLO->adaptive_fraction << std::endl;
 							std::cerr << " min_diff2= " << op.min_diff2[ipart] << std::endl;
 
-#ifdef CUDA
-							pdf_orientation.dumpDeviceToFile("error_dump_pdf_orientation");
-							pdf_offset.dumpDeviceToFile("error_dump_pdf_offset");
-							unsorted_ipart.dumpDeviceToFile("error_dump_filtered");
-#else
-							pdf_orientation.dumpHostToFile("error_dump_pdf_orientation");
-							pdf_offset.dumpHostToFile("error_dump_pdf_offset");
-							unsorted_ipart.dumpHostToFile("error_dump_filtered");
-#endif
+							pdf_orientation.dumpAccToFile("error_dump_pdf_orientation");
+							pdf_offset.dumpAccToFile("error_dump_pdf_offset");
+							unsorted_ipart.dumpAccToFile("error_dump_filtered");
 
 							std::cerr << "Dumped data: error_dump_pdf_orientation, error_dump_pdf_orientation and error_dump_unsorted." << std::endl;
 						}
@@ -1724,17 +1682,10 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 							std::cerr << " op.sum_weight[ipart]= " << op.sum_weight[ipart] << std::endl;
 							std::cerr << " min_diff2= " << op.min_diff2[ipart] << std::endl;
 
-#ifdef CUDA
-							unsorted_ipart.dumpDeviceToFile("error_dump_unsorted");
-							filtered.dumpDeviceToFile("error_dump_filtered");
-							sorted.dumpDeviceToFile("error_dump_sorted");
-							cumulative_sum.dumpDeviceToFile("error_dump_cumulative_sum");
-#else
-							unsorted_ipart.dumpHostToFile("error_dump_unsorted");
-							filtered.dumpHostToFile("error_dump_filtered");
-							sorted.dumpHostToFile("error_dump_sorted");
-							cumulative_sum.dumpHostToFile("error_dump_cumulative_sum");
-#endif
+							unsorted_ipart.dumpAccToFile("error_dump_unsorted");
+							filtered.dumpAccToFile("error_dump_filtered");
+							sorted.dumpAccToFile("error_dump_sorted");
+							cumulative_sum.dumpAccToFile("error_dump_cumulative_sum");
 
 							std::cerr << "Written error_dump_unsorted, error_dump_filtered, error_dump_sorted, and error_dump_cumulative_sum." << std::endl;
 						}
@@ -2199,17 +2150,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			int block_num = block_nums[nr_fake_classes*ipart + fake_class];
 			
 			runCollect2jobs(block_num,
-#ifdef CUDA
-						&(oo_otrans_x(cpos) ),          // otrans-size -> make const
-						&(oo_otrans_y(cpos) ),          // otrans-size -> make const
-						&(oo_otrans_z(cpos) ),          // otrans-size -> make const
-						&(myp_oo_otrans_x2y2z2(cpos) ), // otrans-size -> make const
-#else
-						&(oo_otrans_x[cpos] ),          // otrans-size -> make const
-						&(oo_otrans_y[cpos] ),          // otrans-size -> make const
-						&(oo_otrans_z[cpos] ),          // otrans-size -> make const
-						&(myp_oo_otrans_x2y2z2[cpos] ), // otrans-size -> make const
-#endif
+						&(~oo_otrans_x)[cpos],          // otrans-size -> make const
+						&(~oo_otrans_y)[cpos],          // otrans-size -> make const
+						&(~oo_otrans_z)[cpos],          // otrans-size -> make const
+						&(~myp_oo_otrans_x2y2z2)[cpos], // otrans-size -> make const
 						~thisClassFinePassWeights.weights,
 						(XFLOAT)op.significant_weight[ipart],
 						(XFLOAT)op.sum_weight[ipart],
@@ -2218,19 +2162,11 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						sp.nr_oversampled_rot,
 						oversamples,
 						(baseMLO->do_skip_align || baseMLO->do_skip_rotate ),
-#ifdef CUDA
-						&p_weights(partial_pos),
-						&p_thr_wsum_prior_offsetx_class(partial_pos),
-						&p_thr_wsum_prior_offsety_class(partial_pos),
-						&p_thr_wsum_prior_offsetz_class(partial_pos),
-						&p_thr_wsum_sigma2_offset(partial_pos),
-#else
-						&p_weights[partial_pos],
-						&p_thr_wsum_prior_offsetx_class[partial_pos],
-						&p_thr_wsum_prior_offsety_class[partial_pos],
-						&p_thr_wsum_prior_offsetz_class[partial_pos],
-						&p_thr_wsum_sigma2_offset[partial_pos],
-#endif
+						&(~p_weights)[partial_pos],
+						&(~p_thr_wsum_prior_offsetx_class)[partial_pos],
+						&(~p_thr_wsum_prior_offsety_class)[partial_pos],
+						&(~p_thr_wsum_prior_offsetz_class)[partial_pos],
+						&(~p_thr_wsum_sigma2_offset)[partial_pos],
 						~thisClassFinePassWeights.rot_idx,
 						~thisClassFinePassWeights.trans_idx,
 						~FPCMasks[ipart][exp_iclass].jobOrigin,
@@ -2649,11 +2585,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			long unsigned orientation_num(ProjectionData[ipart].orientation_num[exp_iclass]);
 
 			AccProjectorKernel projKernel = AccProjectorKernel::makeKernel(
-#ifdef CUDA
-					accMLO->devBundle->cudaProjectors[exp_iclass],
-#else
-					accMLO->cpuProjectors[exp_iclass],
-#endif
+					accMLO->bundle->projectors[exp_iclass],
 					op.local_Minvsigma2s[0].xdim,
 					op.local_Minvsigma2s[0].ydim,
 					op.local_Minvsigma2s[0].zdim,
@@ -2667,20 +2599,11 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					~trans_x,
 					~trans_y,
 					~trans_z,
-#ifdef CUDA
-					&sorted_weights.dPtr[classPos],
-#else
-					&sorted_weights.hPtr[classPos],
-#endif
+					&(~sorted_weights)[classPos],
 					~ctfs,
 					~wdiff2s_sum,
-#ifdef CUDA
-					&wdiff2s_AA(AAXA_pos),
-					&wdiff2s_XA(AAXA_pos),
-#else
-					&wdiff2s_AA[AAXA_pos],
-					&wdiff2s_XA[AAXA_pos],
-#endif
+					&(~wdiff2s_AA)[AAXA_pos],
+					&(~wdiff2s_XA)[AAXA_pos],
 					op,
 					orientation_num,
 					translation_num,
@@ -2709,22 +2632,14 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			CTIC(accMLO->timer,"backproject");
 
 			runBackProjectKernel(
-#ifdef CUDA
-				accMLO->devBundle->cudaBackprojectors[exp_iclass],
-#else
-				accMLO->cpuBackprojectors[exp_iclass],
-#endif
+				accMLO->bundle->backprojectors[exp_iclass],
 				projKernel,
 				~Fimgs_nomask_real,
 				~Fimgs_nomask_imag,
 				~trans_x,
 				~trans_y,
 				~trans_z,
-#ifdef CUDA
-				&sorted_weights.dPtr[classPos],
-#else
-				&sorted_weights.hPtr[classPos],
-#endif
+				&(~sorted_weights)[classPos],
 				~Minvsigma2s,
 				~ctfs,
 				translation_num,
@@ -3142,7 +3057,6 @@ baseMLO->timer.tic(baseMLO->TIMING_ESP_DIFF2_D);
 if (thread_id == 0)
 baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_D);
 #endif
-//					printf("Allocator used space before 'getAllSquaredDifferencesFine': %.2f MiB\n", (float)devBundle->allocator->getTotalUsedSpace()/(1024.*1024.));
 
 			CTIC(timer,"getAllSquaredDifferencesFine");
 			getAllSquaredDifferencesFine<MlClass>(ipass, op, sp, baseMLO, myInstance, FinePassWeights, FinePassClassMasks, FineProjectionData

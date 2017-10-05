@@ -401,9 +401,9 @@ void MlOptimiserMpi::initialise()
 				size_t boxLim (10000);
 				for (int i = 0; i < cudaDevices.size(); i ++)
 				{
-					MlDeviceBundle *b = new MlDeviceBundle(this);
-					b->setDevice(cudaDevices[i]);
-					size_t t = b->checkFixedSizedObjects(cudaDeviceShares[i]);
+					MlDeviceBundle b(this);
+					b.setDevice(cudaDevices[i]);
+					size_t t = b.checkFixedSizedObjects(cudaDeviceShares[i]);
 					boxLim = ((t < boxLim) ? t : boxLim );
 				}
 				node->relion_MPI_Send(&boxLim, sizeof(size_t), MPI_INT, 0, MPITAG_INT, MPI_COMM_WORLD);
@@ -1405,14 +1405,14 @@ void MlOptimiserMpi::expectation()
 					MlDeviceBundle* b = ((MlDeviceBundle*)cudaDeviceBundles[i]);
 					b->syncAllBackprojects();
 
-					for (int j = 0; j < b->cudaProjectors.size(); j++)
+					for (int j = 0; j < b->projectors.size(); j++)
 					{
 						unsigned long s = wsum_model.BPref[j].data.nzyxdim;
 						XFLOAT *reals = new XFLOAT[s];
 						XFLOAT *imags = new XFLOAT[s];
 						XFLOAT *weights = new XFLOAT[s];
 
-						b->cudaBackprojectors[j].getMdlData(reals, imags, weights);
+						b->backprojectors[j].getMdlData(reals, imags, weights);
 
 						for (unsigned long n = 0; n < s; n++)
 						{
@@ -1425,8 +1425,8 @@ void MlOptimiserMpi::expectation()
 						delete [] imags;
 						delete [] weights;
 
-						b->cudaProjectors[j].clear();
-						b->cudaBackprojectors[j].clear();
+						b->projectors[j].clear();
+						b->backprojectors[j].clear();
 						b->coarseProjectionPlans[j].clear();
 					}
 #ifdef TIMING

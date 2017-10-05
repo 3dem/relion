@@ -25,7 +25,7 @@ namespace CpuKernels
  * 
  */
 void exponentiate_weights_fine(
-		int grid_size,
+		int block_num,
 		XFLOAT *g_pdf_orientation,
 		bool *g_pdf_orientation_zeros,
 		XFLOAT *g_pdf_offset,
@@ -39,7 +39,7 @@ void exponentiate_weights_fine(
 		unsigned long *d_job_num,
 		long int job_num)
 {
-	for (int bid=0; bid < grid_size; bid++)
+	for (int bid=0; bid < block_num; bid++)
 	{
 		for (int tid=0; tid < SUMW_BLOCK_SIZE; tid++)
 		{

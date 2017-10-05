@@ -47,7 +47,7 @@ AutoPickerCuda::AutoPickerCuda(AutoPicker *basePicker, int dev_id, const char * 
 	cudaTransformer2(0, allocator)
 
 {
-	cudaProjectors.resize(basePckr->Mrefs.size());
+	projectors.resize(basePckr->Mrefs.size());
 	have_warned_batching=false;
 	/*======================================================
 	                    DEVICE SETTINGS
@@ -79,7 +79,7 @@ AutoPickerCuda::AutoPickerCuda(AutoPickerMpi *basePicker, int dev_id, const char
 	node = basePicker->getNode();
 	basePicker->verb = (node->isMaster()) ? 1 : 0;
 
-	cudaProjectors.resize(basePckr->Mrefs.size());
+	projectors.resize(basePckr->Mrefs.size());
 	have_warned_batching=false;
 	/*======================================================
 	                    DEVICE SETTINGS
@@ -125,7 +125,7 @@ void AutoPickerCuda::run()
 		CTIC(timer,"setupProjectors");
 		for (int iref = 0; iref < (basePckr->Mrefs.size()); iref++)
 		{
-			cudaProjectors[iref].setMdlDim(
+			projectors[iref].setMdlDim(
 							basePckr->PPref[iref].data.xdim,
 							basePckr->PPref[iref].data.ydim,
 							basePckr->PPref[iref].data.zdim,
@@ -133,7 +133,7 @@ void AutoPickerCuda::run()
 							basePckr->PPref[iref].data.zinit,
 							basePckr->PPref[iref].r_max,
 							basePckr->PPref[iref].padding_factor);
-			cudaProjectors[iref].initMdl(&(basePckr->PPref[iref].data.data[0]));
+			projectors[iref].initMdl(&(basePckr->PPref[iref].data.data[0]));
 		}
 		CTOC(timer,"setupProjectors");
 	}
@@ -690,7 +690,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 			deviceInitValue(d_Mccf_best, (XFLOAT)-LARGE_NUMBER);
 			CTOC(timer,"mccfInit");
 			AccProjectorKernel projKernel = AccProjectorKernel::makeKernel(
-									cudaProjectors[iref],
+									projectors[iref],
 									(int)basePckr->workSize/2+1,
 									(int)basePckr->workSize,
 									1, // Zdim, always 1 in autopicker.

@@ -37,7 +37,7 @@ public:
 	CudaFFT cudaTransformer1;
 	CudaFFT cudaTransformer2;
 
-	std::vector< AccProjector > cudaProjectors;
+	std::vector< AccProjector > projectors;
 
    //Class streams ( for concurrent scheduling of class-specific kernels)
 	std::vector< cudaStream_t > classStreams;

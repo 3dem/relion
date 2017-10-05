@@ -101,8 +101,8 @@ void MlDeviceBundle::setupFixedSizedObjects()
 
 	// clear() called on std::vector appears to set size=0, even if we have an explicit
 	// destructor for each member, so we need to set the size to what is was before
-	cudaProjectors.resize(nr_classes);
-	cudaBackprojectors.resize(nr_classes);
+	projectors.resize(nr_classes);
+	backprojectors.resize(nr_classes);
 
 	/*======================================================
 	              PROJECTOR AND BACKPROJECTOR
@@ -111,7 +111,7 @@ void MlDeviceBundle::setupFixedSizedObjects()
 	//Loop over classes
 	for (int iclass = 0; iclass < nr_classes; iclass++)
 	{
-		cudaProjectors[iclass].setMdlDim(
+		projectors[iclass].setMdlDim(
 				baseMLO->mymodel.PPref[iclass].data.xdim,
 				baseMLO->mymodel.PPref[iclass].data.ydim,
 				baseMLO->mymodel.PPref[iclass].data.zdim,
@@ -120,9 +120,9 @@ void MlDeviceBundle::setupFixedSizedObjects()
 				baseMLO->mymodel.PPref[iclass].r_max,
 				baseMLO->mymodel.PPref[iclass].padding_factor);
 
-		cudaProjectors[iclass].initMdl(baseMLO->mymodel.PPref[iclass].data.data);
+		projectors[iclass].initMdl(baseMLO->mymodel.PPref[iclass].data.data);
 
-		cudaBackprojectors[iclass].setMdlDim(
+		backprojectors[iclass].setMdlDim(
 				baseMLO->wsum_model.BPref[iclass].data.xdim,
 				baseMLO->wsum_model.BPref[iclass].data.ydim,
 				baseMLO->wsum_model.BPref[iclass].data.zdim,
@@ -131,7 +131,7 @@ void MlDeviceBundle::setupFixedSizedObjects()
 				baseMLO->wsum_model.BPref[iclass].r_max,
 				baseMLO->wsum_model.BPref[iclass].padding_factor);
 
-		cudaBackprojectors[iclass].initMdl();
+		backprojectors[iclass].initMdl();
 	}
 
 	/*======================================================
@@ -237,8 +237,6 @@ void MlOptimiserCuda::resetData()
 
 	transformer1.clear();
 	transformer2.clear();
-
-	failsafe_attempts = 0;
 };
 
 void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)

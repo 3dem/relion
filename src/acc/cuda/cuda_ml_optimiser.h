@@ -12,37 +12,18 @@
 #include <stack>
 //#include <cufft.h>
 
-
 #include "src/acc/acc_ml_optimiser.h"
 #include "src/acc/acc_ptr.h"
 
-//#ifdef DEBUG_CUDA
-//#define HANDLE_CUFFT_ERROR( err ) (CufftHandleError( err, __FILE__, __LINE__ ))
-//#else
-//#define HANDLE_CUFFT_ERROR( err ) (err) //Do nothing
-//#endif
-//static void CufftHandleError( cufftResult err, const char *file, int line )
-//{
-//    if (err != CUFFT_SUCCESS)
-//    {
-//        fprintf(stderr, "Cufft error in file '%s' in line %i : %s.\n",
-//                __FILE__, __LINE__, "error" );
-//		raise(SIGSEGV);
-//    }
-//}
-
-/*
- * Bundle of device-objects
- */
 class MlDeviceBundle
 {
 public:
 
 	//The CUDA accelerated projector set
-	std::vector< AccProjector > cudaProjectors;
+	std::vector< AccProjector > projectors;
 
 	//The CUDA accelerated back-projector set
-	std::vector< AccBackprojector > cudaBackprojectors;
+	std::vector< AccBackprojector > backprojectors;
 
 	//Used for precalculations of projection setup
 	CudaCustomAllocator *allocator;
@@ -85,8 +66,8 @@ public:
 
 	~MlDeviceBundle()
 	{
-		cudaProjectors.clear();
-		cudaBackprojectors.clear();
+		projectors.clear();
+		backprojectors.clear();
 		coarseProjectionPlans.clear();
 		//Delete this lastly
 		delete allocator;
@@ -95,7 +76,6 @@ public:
 	}
 
 };
-
 class MlOptimiserCuda
 {
 public:
@@ -116,9 +96,14 @@ public:
 
 	int device_id;
 
-	unsigned failsafe_attempts;
+	MlDeviceBundle *bundle;
 
-	MlDeviceBundle *devBundle;
+	//Used for precalculations of projection setup
+	CudaCustomAllocator *allocator;
+
+	//Used for precalculations of projection setup
+	bool generateProjectionPlanOnTheFly;
+
 
 #ifdef TIMING_FILES
 	relion_timer timer;
@@ -130,13 +115,14 @@ public:
 			transformer2(cudaStreamPerThread, bundle->allocator, baseMLOptimiser->mymodel.data_dim),
 			refIs3D(baseMLO->mymodel.ref_dim == 3),
 			dataIs3D(baseMLO->mymodel.data_dim == 3),
-			devBundle(bundle),
+			bundle(bundle),
 			device_id(bundle->device_id),
 #ifdef TIMING_FILES
 			timer(timing_fnm),
 #endif
 			errorStatus((cudaError_t)0),
-			failsafe_attempts(0)
+			allocator(bundle->allocator),
+			generateProjectionPlanOnTheFly(bundle->generateProjectionPlanOnTheFly)
 	{};
 
 	void resetData();
@@ -152,7 +138,7 @@ public:
 
 	CudaCustomAllocator *getAllocator()	
 	{
-		return (devBundle->allocator);
+		return (bundle->allocator);
 	};
 	
 };

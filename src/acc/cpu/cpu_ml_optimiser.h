@@ -20,6 +20,14 @@
 #include "src/acc/acc_ml_optimiser.h"
 #include "src/acc/acc_ptr.h"
 
+class MlDataBundle
+{
+public:
+	std::vector< AccProjector > projectors;
+	std::vector< AccBackprojector > backprojectors;
+	std::vector< AccProjectorPlan > coarseProjectionPlans;
+};
+
 class MlOptimiserCpu
 {
 public:
@@ -36,22 +44,15 @@ public:
 
 	int thread_id;
 
-	unsigned failsafe_attempts;
+	MlDataBundle *bundle;
+
 
 #ifdef TIMING_FILES
 	relion_timer timer;
 #endif
 
-	//The CPU accelerated projector set
-	std::vector< AccProjector > cpuProjectors;
-
-	//The CPU accelerated back-projector set
-	std::vector< AccBackprojector > cpuBackprojectors;
-
 	//Used for precalculations of projection setup
 	bool generateProjectionPlanOnTheFly;
-	
-	std::vector< AccProjectorPlan > coarseProjectionPlans;
 	
 
 	MlOptimiserCpu(MlOptimiser *baseMLOptimiser, const char * timing_fnm) :
@@ -63,20 +64,14 @@ public:
 #ifdef TIMING_FILES
 			timer(timing_fnm),
 #endif
-			failsafe_attempts(0),
 			generateProjectionPlanOnTheFly(false),
-			thread_id(-1)
+			thread_id(-1),
+			bundle(new MlDataBundle())
 	{};
 	
 	void resetData();
 
-//	void doThreadExpectationSomeParticles(int thread_id);
-
     void expectationOneParticle(unsigned long my_ori_particle, int thread_id);
-    
-	~MlOptimiserCpu()
-	{
-	}
 
 	void setupFixedSizedObjects();
 
@@ -86,6 +81,11 @@ public:
 	{
 		return ((CudaCustomAllocator *)0);
 	};
+
+	~MlOptimiserCpu()
+	{
+		delete bundle;
+	}
 
 };
 

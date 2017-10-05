@@ -369,6 +369,19 @@ public:
 	}
 
 	/**
+	 * Initiate host memory with provided value
+	 */
+	inline
+	void accInit(int value)
+	{
+#ifdef CUDA
+		deviceInit(value);
+#else
+		hostInit(value);
+#endif
+	}
+
+	/**
 	 * Copy a number (size) of bytes to device stored in the host pointer
 	 */
 	inline

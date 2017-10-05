@@ -2748,14 +2748,14 @@ void MlOptimiser::expectation()
 			MlDeviceBundle* b = ((MlDeviceBundle*)cudaDeviceBundles[i]);
 			b->syncAllBackprojects();
 
-			for (int j = 0; j < b->cudaProjectors.size(); j++)
+			for (int j = 0; j < b->projectors.size(); j++)
 			{
 				unsigned long s = wsum_model.BPref[j].data.nzyxdim;
 				XFLOAT *reals = new XFLOAT[s];
 				XFLOAT *imags = new XFLOAT[s];
 				XFLOAT *weights = new XFLOAT[s];
 
-				b->cudaBackprojectors[j].getMdlData(reals, imags, weights);
+				b->backprojectors[j].getMdlData(reals, imags, weights);
 
 				for (unsigned long n = 0; n < s; n++)
 				{
@@ -2768,8 +2768,8 @@ void MlOptimiser::expectation()
 				delete [] imags;
 				delete [] weights;
 
-				b->cudaProjectors[j].clear();
-				b->cudaBackprojectors[j].clear();
+				b->projectors[j].clear();
+				b->backprojectors[j].clear();
 				b->coarseProjectionPlans[j].clear();
 			}
 		}
@@ -3209,8 +3209,8 @@ void MlOptimiser::expectationSomeParticles(long int my_first_ori_particle, long 
         //}
 
         // Now collect the results from each thread
-        for (CpuOptimiserType::const_iterator i = tbbCpuOptimiser.begin();
-              i != tbbCpuOptimiser.end();  ++i) {
+        for (CpuOptimiserType::const_iterator i = tbbCpuOptimiser.begin(); i != tbbCpuOptimiser.end();  ++i)
+        {
             MlOptimiserCpu* b = (MlOptimiserCpu*)(*i);
             if(!b) continue;
 
@@ -3218,14 +3218,14 @@ void MlOptimiser::expectationSomeParticles(long int my_first_ori_particle, long 
             std::cerr << "Faux thread id: " << b->thread_id << std::endl;
 #endif
 
-            for (int j = 0; j < b->cpuProjectors.size(); j++)
+            for (int j = 0; j < b->bundle->projectors.size(); j++)
             {
                 unsigned long s = wsum_model.BPref[j].data.nzyxdim;
                 XFLOAT *reals = new XFLOAT[s];
                 XFLOAT *imags = new XFLOAT[s];
                 XFLOAT *weights = new XFLOAT[s];
 
-                b->cpuBackprojectors[j].getMdlData(reals, imags, weights);
+                b->bundle->backprojectors[j].getMdlData(reals, imags, weights);
 
                 for (unsigned long n = 0; n < s; n++)
                 {
@@ -3238,9 +3238,9 @@ void MlOptimiser::expectationSomeParticles(long int my_first_ori_particle, long 
                 delete [] imags;
                 delete [] weights;
 				
-				b->cpuProjectors[j].clear();
-				b->cpuBackprojectors[j].clear();
-				b->coarseProjectionPlans[j].clear();
+				b->bundle->projectors[j].clear();
+				b->bundle->backprojectors[j].clear();
+				b->bundle->coarseProjectionPlans[j].clear();
             }
 
             delete b;
