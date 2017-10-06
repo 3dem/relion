@@ -385,6 +385,8 @@ void MlOptimiserCpu::resetData()
 {
 	transformer1.clear();
 	transformer2.clear();
+
+	classStreams.resize(baseMLO->mymodel.nr_classes, 0);
 };
 
 void MlOptimiserCpu::expectationOneParticle(unsigned long my_ori_particle, int thread_id)

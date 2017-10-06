@@ -514,14 +514,10 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 			AccPtr<XFLOAT> softMaskSum   ((size_t)SOFTMASK_BLOCK_SIZE, 0, (CudaCustomAllocator *)accMLO->getAllocator());
 			AccPtr<XFLOAT> softMaskSum_bg((size_t)SOFTMASK_BLOCK_SIZE, 0, (CudaCustomAllocator *)accMLO->getAllocator());
-#ifndef CUDA
-			softMaskSum.hostInit(0.f);
-			softMaskSum_bg.hostInit(0.f);
-#endif
 			softMaskSum.deviceAlloc();
 			softMaskSum_bg.deviceAlloc();
-			softMaskSum.deviceInit(0.f);  // TODO - consider deviceInitValue?
-			softMaskSum_bg.deviceInit(0.f);
+			softMaskSum.accInit(0.f);
+			softMaskSum_bg.accInit(0.f);
 			AccUtilities::softMaskBackgroundValue(block_dim, SOFTMASK_BLOCK_SIZE,
 					~d_img,
 					img,
@@ -966,11 +962,7 @@ void getAllSquaredDifferencesCoarse(
 						projectorPlans[exp_iclass].orientation_num,
 						translation_num,
 						image_size,
-#ifdef CUDA
 						accMLO->classStreams[exp_iclass],
-#else
-						0,
-#endif
 						do_CC,
 						accMLO->dataIs3D);
 				
@@ -980,11 +972,7 @@ void getAllSquaredDifferencesCoarse(
 						&(~Mweight)[ipart*weightsPerPart],
 						projectorPlans[exp_iclass].orientation_num,
 						translation_num,
-#ifdef CUDA
 						accMLO->classStreams[exp_iclass]
-#else
-						0
-#endif
 						);
 
 				/*====================================
@@ -1309,11 +1297,7 @@ void getAllSquaredDifferencesFine(unsigned exp_ipass,
 						image_size,
 						ipart,
 						exp_iclass,
-#ifdef CUDA
 						accMLO->classStreams[exp_iclass],
-#else
-						0,
-#endif
 						FPCMasks[ipart][exp_iclass].jobOrigin.getSize(),
 						((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc),
 						accMLO->dataIs3D
@@ -1439,9 +1423,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			if(exp_ipass==0)
 			{
 				int nr_coarse_weights = (sp.iclass_max-sp.iclass_min+1)*sp.nr_particles * sp.nr_dir * sp.nr_psi * sp.nr_trans;
-#ifdef CUDA
-				PassWeights[ipart].weights.setDevicePtr(&Mweight(ipart*nr_coarse_weights));
-#endif
+				PassWeights[ipart].weights.setAccPtr(&(~Mweight)[ipart*nr_coarse_weights]);
 				PassWeights[ipart].weights.setHostPtr(&Mweight[ipart*nr_coarse_weights]);
 				PassWeights[ipart].weights.setSize(nr_coarse_weights);
 			}
@@ -1750,33 +1732,21 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 						// (until now, PassWeights has been an empty placeholder. We now create class-partials pointing at it, and start to fill it with stuff)
 						
 						IndexedDataArray thisClassPassWeights(PassWeights[ipart],FPCMasks[ipart][exp_iclass], (CudaCustomAllocator *)accMLO->getAllocator());
-#ifdef CUDA
-						AccPtr<XFLOAT>  pdf_orientation_class(&(pdf_orientation[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]), 
-														 &( pdf_orientation((exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi) ),
-														 sp.nr_dir*sp.nr_psi);
-						AccPtr<XFLOAT>  pdf_offset_class(&(pdf_offset[(exp_iclass-sp.iclass_min)*sp.nr_trans]), 
-								                         &( pdf_offset((exp_iclass-sp.iclass_min)*sp.nr_trans) ), 
-								                         sp.nr_trans);
-						AccPtr<bool>  pdf_orientation_zeros_class(&(pdf_orientation_zeros[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]),
-														 &( pdf_orientation_zeros((exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi) ),
-														 sp.nr_dir*sp.nr_psi);
-						AccPtr<bool>  pdf_offset_zeros_class(&(pdf_offset_zeros[(exp_iclass-sp.iclass_min)*sp.nr_trans]),
-								                         &( pdf_offset_zeros((exp_iclass-sp.iclass_min)*sp.nr_trans) ),
-								                         sp.nr_trans);
-#else
-						AccPtr<XFLOAT>  pdf_orientation_class(&(pdf_orientation[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]), 
-														 NULL, sp.nr_dir*sp.nr_psi);
-						AccPtr<XFLOAT>  pdf_offset_class(&(pdf_offset[(exp_iclass-sp.iclass_min)*sp.nr_trans]), 
-								                         NULL, sp.nr_trans);
-						AccPtr<bool>  pdf_orientation_zeros_class(&(pdf_orientation_zeros[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]),
-														 NULL, sp.nr_dir*sp.nr_psi);
-						AccPtr<bool>  pdf_offset_zeros_class(&(pdf_offset_zeros[(exp_iclass-sp.iclass_min)*sp.nr_trans]),
-								                         NULL, sp.nr_trans);
-#endif
 
-#ifdef CUDA
+						AccPtr<XFLOAT> pdf_orientation_class, pdf_offset_class;
+						AccPtr<bool>   pdf_orientation_zeros_class, pdf_offset_zeros_class;
+
+						pdf_orientation_class      .setSize(sp.nr_dir*sp.nr_psi);
+						pdf_orientation_zeros_class.setSize(sp.nr_dir*sp.nr_psi);
+						pdf_orientation_class      .setAccPtr(&((~pdf_orientation)      [(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]));
+						pdf_orientation_zeros_class.setAccPtr(&((~pdf_orientation_zeros)[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]));
+
+						pdf_offset_class           .setSize(sp.nr_trans);
+						pdf_offset_zeros_class     .setSize(sp.nr_trans);
+						pdf_offset_class           .setAccPtr(&((~pdf_offset)           [(exp_iclass-sp.iclass_min)*sp.nr_trans]));
+						pdf_offset_zeros_class     .setAccPtr(&((~pdf_offset_zeros)     [(exp_iclass-sp.iclass_min)*sp.nr_trans]));
+
 						thisClassPassWeights.weights.setStream(accMLO->classStreams[exp_iclass]);
-#endif
 
 						AccUtilities::kernel_exponentiate_weights_fine(
 								~pdf_orientation_class,
@@ -1791,11 +1761,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 								~FPCMasks[ipart][exp_iclass].jobOrigin,
 								~FPCMasks[ipart][exp_iclass].jobExtent,
 								FPCMasks[ipart][exp_iclass].jobNum,
-#ifdef CUDA
 								accMLO->classStreams[exp_iclass]);
-#else
-								0);
-#endif
 
 						XFLOAT m = AccUtilities::getMaxOnDevice<XFLOAT>(thisClassPassWeights.weights);
 
@@ -1810,9 +1776,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					{
 						IndexedDataArray thisClassPassWeights(PassWeights[ipart],FPCMasks[ipart][exp_iclass], (CudaCustomAllocator *)accMLO->getAllocator());
 
-#ifdef CUDA
 						thisClassPassWeights.weights.setStream(accMLO->classStreams[exp_iclass]);
-#endif
 						/*
 						 * Add 50 since we want to stay away from e^88, which approaches the single precision limit.
 						 * We still want as high numbers as possible to utilize most of the single precision span.
@@ -2531,9 +2495,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			======================================================*/
 
 			eulers[exp_iclass].setSize(orientation_num * 9);
-#ifdef CUDA
 			eulers[exp_iclass].setStream(accMLO->classStreams[exp_iclass]);
-#endif
 			eulers[exp_iclass].hostAlloc();
 
 			CTIC(accMLO->timer,"generateEulerMatricesProjector");
@@ -2614,12 +2576,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					part_scale,
 					baseMLO->refs_are_ctf_corrected,
 					accMLO->dataIs3D,
-#ifdef CUDA
 					accMLO->classStreams[exp_iclass]);
-#else
-					0);
-#endif
-		
+
 			/*======================================================
 								BACKPROJECTION
 			======================================================*/
@@ -2652,11 +2610,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				orientation_num,
 				accMLO->dataIs3D,
 				baseMLO->do_sgd,
-#ifdef CUDA
 				accMLO->classStreams[exp_iclass]);
-#else
-				0);
-#endif
 				
 			CTOC(accMLO->timer,"backproject");
 

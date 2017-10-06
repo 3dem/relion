@@ -827,6 +827,11 @@ public:
 		return size;
 	}
 
+	T *getDevicePtr()
+	{
+		return dPtr;
+	}
+
 	T *getHostPtr()
 	{
 		return hPtr;
@@ -850,11 +855,6 @@ public:
 				ACC_PTR_DEBUG_FATAL("Device pointer set without freeing the old one.\n");
 #endif
 		dPtr = ptr;
-	}
-
-	T *getDevicePtr()
-	{
-		return dPtr;
 	}
 
 	void setDevicePtr(const AccPtr<T> &ptr)
@@ -882,6 +882,24 @@ public:
 			ACC_PTR_DEBUG_FATAL("Host pointer is not set.\n");
 #endif
 		setHostPtr(ptr.hPtr);
+	};
+
+	void setAccPtr(const AccPtr<T> &ptr)
+	{
+#ifdef CUDA
+		setDevicePtr(ptr.hPtr);
+#else
+		setHostPtr(ptr.hPtr);
+#endif
+	};
+
+	void setAccPtr(T *ptr)
+	{
+#ifdef CUDA
+		setDevicePtr(ptr);
+#else
+		setHostPtr(ptr);
+#endif
 	};
 
 };

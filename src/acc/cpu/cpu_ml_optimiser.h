@@ -45,6 +45,7 @@ public:
 	int thread_id;
 
 	MlDataBundle *bundle;
+	std::vector< int > classStreams;
 
 
 #ifdef TIMING_FILES
@@ -66,7 +67,8 @@ public:
 #endif
 			generateProjectionPlanOnTheFly(false),
 			thread_id(-1),
-			bundle(new MlDataBundle())
+			bundle(new MlDataBundle()),
+			classStreams(0)
 	{};
 	
 	void resetData();
