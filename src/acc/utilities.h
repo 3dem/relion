@@ -120,9 +120,9 @@ static T getSumOnDevice(AccPtr<T> &ptr)
 	return CudaKernels::getSumOnDevice<T>(ptr);
 #else
 #ifdef DEBUG_CUDA
-	if (ptr.size == 0)
+	if (ptr.getSize() == 0)
 		printf("DEBUG_ERROR: getSumOnDevice called with pointer of zero size.\n");
-	if (ptr.hPtr == NULL)
+	if (ptr.getHostPtr() == NULL)
 		printf("DEBUG_ERROR: getSumOnDevice called with null device pointer.\n");
 #endif
 	size_t size = ptr.getSize();
@@ -140,9 +140,9 @@ static T getMinOnDevice(AccPtr<T> &ptr)
 	return CudaKernels::getMinOnDevice<T>(ptr);
 #else
 #ifdef DEBUG_CUDA
-	if (ptr.size == 0)
+	if (ptr.getSize() == 0)
 		printf("DEBUG_ERROR: getMinOnDevice called with pointer of zero size.\n");
-	if (ptr.hPtr == NULL)
+	if (ptr.getHostPtr() == NULL)
 		printf("DEBUG_ERROR: getMinOnDevice called with null device pointer.\n");
 #endif
 	return CpuKernels::getMin<T>(ptr(), ptr.getSize());
@@ -156,9 +156,9 @@ static T getMaxOnDevice(AccPtr<T> &ptr)
 	return CudaKernels::getMaxOnDevice<T>(ptr);
 #else
 #ifdef DEBUG_CUDA
-	if (ptr.size == 0)
+	if (ptr.getSize() == 0)
 		printf("DEBUG_ERROR: getMaxOnDevice called with pointer of zero size.\n");
-	if (ptr.hPtr == NULL)
+	if (ptr.getHostPtr() == NULL)
 		printf("DEBUG_ERROR: getMaxOnDevice called with null device pointer.\n");
 #endif
 	return CpuKernels::getMax<T>(ptr(), ptr.getSize());
@@ -172,9 +172,9 @@ static std::pair<int, T> getArgMinOnDevice(AccPtr<T> &ptr)
 	return CudaKernels::getArgMinOnDevice<T>(ptr);
 #else
 #ifdef DEBUG_CUDA
-	if (ptr.size == 0)
+	if (ptr.getSize() == 0)
 		printf("DEBUG_ERROR: getArgMinOnDevice called with pointer of zero size.\n");
-	if (ptr.hPtr == NULL)
+	if (ptr.getHostPtr() == NULL)
 		printf("DEBUG_ERROR: getArgMinOnDevice called with null device pointer.\n");
 #endif
 	return CpuKernels::getArgMin<T>(ptr(), ptr.getSize());
@@ -188,9 +188,9 @@ static std::pair<int, T> getArgMaxOnDevice(AccPtr<T> &ptr)
 	return CudaKernels::getArgMaxOnDevice<T>(ptr);
 #else
 #ifdef DEBUG_CUDA
-	if (ptr.size == 0)
+	if (ptr.getSize() == 0)
 		printf("DEBUG_ERROR: getArgMaxOnDevice called with pointer of zero size.\n");
-	if (ptr.hPtr == NULL)
+	if (ptr.getHostPtr() == NULL)
 		printf("DEBUG_ERROR: getArgMaxOnDevice called with null device pointer.\n");
 #endif
 	return CpuKernels::getArgMax<T>(ptr(), ptr.getSize());
@@ -413,7 +413,7 @@ void InitValue(AccPtr<T> &data, T value)
 #else
 	int Size = data.getSize();
 	for (size_t i=0; i < Size; i++)
-		data.hPtr[i] = value;
+		data[i] = value;
 #endif
 }
 
@@ -429,7 +429,7 @@ void InitValue(AccPtr<T> &data, T value, size_t Size)
 			INIT_VALUE_BLOCK_SIZE);
 #else
 	for (size_t i=0; i < Size; i++)
-		data.hPtr[i] = value;
+		data[i] = value;
 #endif
 }
 

@@ -99,7 +99,7 @@ int  makeJobsForCollect(IndexedDataArray &FPW,
 	dataMask.jobOrigin[jobid]=0;
 	dataMask.jobExtent[jobid]=1;
 	long int crot =FPW.rot_idx[jobid]; // set current rot
-	for(long int n=1; n<FPW.rot_idx.size; n++)
+	for(long int n=1; n<FPW.rot_idx.getSize(); n++)
 	{
 		if(FPW.rot_idx[n]==crot)
 		{
@@ -1508,7 +1508,7 @@ void windowFourierTransform2(
 	{
 		HANDLE_ERROR(cudaStreamSynchronize(d_in.getStream()));
 #ifdef CUDA
-		cudaCpyDeviceToDevice(&d_in.dPtr[pos], ~d_out, oX*oY*oZ*Npsi, d_out.getStream() );
+		cudaCpyDeviceToDevice(&d_in(pos), ~d_out, oX*oY*oZ*Npsi, d_out.getStream() );
 #else
 		memcpy(&d_out[0], &d_in[0], oX*oY*oZ*Npsi*sizeof(ACCCOMPLEX));
 #endif
@@ -1522,8 +1522,8 @@ void windowFourierTransform2(
 #ifdef CUDA
 		dim3 grid_dim(ceil((float)(iX*iY*iZ) / (float) WINDOW_FT_BLOCK_SIZE),Npsi);
 		cuda_kernel_window_fourier_transform<true><<< grid_dim, WINDOW_FT_BLOCK_SIZE, 0, d_out.getStream() >>>(
-				&d_in.dPtr[pos],
-				d_out.dPtr,
+				&d_in(pos),
+				~d_out,
 				iX, iY, iZ, iX * iY, //Input dimensions
 				oX, oY, oZ, oX * oY, //Output dimensions
 				iX*iY*iZ,
@@ -1536,8 +1536,8 @@ void windowFourierTransform2(
 				grid_dim,
 				Npsi,
 				WINDOW_FT_BLOCK_SIZE,
-				&d_in.hPtr[pos],
-				d_out.hPtr,
+				&d_in[pos],
+				&d_out[0],
 				iX, iY, iZ, iX * iY, //Input dimensions
 				oX, oY, oZ, oX * oY, //Output dimensions
 				iX*iY*iZ,
@@ -1549,8 +1549,8 @@ void windowFourierTransform2(
 #ifdef CUDA
 		dim3 grid_dim(ceil((float)(oX*oY*oZ) / (float) WINDOW_FT_BLOCK_SIZE),Npsi);
 		cuda_kernel_window_fourier_transform<false><<< grid_dim, WINDOW_FT_BLOCK_SIZE, 0, d_out.getStream() >>>(
-				&d_in.dPtr[pos],
-				d_out.dPtr,
+				&d_in(pos),
+				~d_out,
 				iX, iY, iZ, iX * iY, //Input dimensions
 				oX, oY, oZ, oX * oY, //Output dimensions
 				oX*oY*oZ,
@@ -1562,8 +1562,8 @@ void windowFourierTransform2(
 				grid_dim,
 				Npsi,
 				WINDOW_FT_BLOCK_SIZE,
-				&d_in.hPtr[pos],
-				d_out.hPtr,
+				&d_in[pos],
+				&d_out[0],
 				iX, iY, iZ, iX * iY, //Input dimensions
 				oX, oY, oZ, oX * oY, //Output dimensions
 				oX*oY*oZ

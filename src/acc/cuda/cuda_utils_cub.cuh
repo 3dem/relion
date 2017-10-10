@@ -23,9 +23,9 @@ template <typename T>
 static std::pair<int, T> getArgMaxOnDevice(AccPtr<T> &ptr)
 {
 #ifdef DEBUG_CUDA
-if (ptr.size == 0)
+if (ptr.getSize() == 0)
 	printf("DEBUG_WARNING: getArgMaxOnDevice called with pointer of zero size.\n");
-if (ptr.dPtr == NULL)
+if (ptr.getDevicePtr() == NULL)
 	printf("DEBUG_WARNING: getArgMaxOnDevice called with null device pointer.\n");
 if (ptr.getAllocator() == NULL)
 	printf("DEBUG_WARNING: getArgMaxOnDevice called with null allocator.\n");
@@ -34,14 +34,14 @@ if (ptr.getAllocator() == NULL)
 	max_pair.deviceAlloc();
 	size_t temp_storage_size = 0;
 
-	DEBUG_HANDLE_ERROR(cub::DeviceReduce::ArgMax( NULL, temp_storage_size, ~ptr, ~max_pair, ptr.size));
+	DEBUG_HANDLE_ERROR(cub::DeviceReduce::ArgMax( NULL, temp_storage_size, ~ptr, ~max_pair, ptr.getSize()));
 
 	if(temp_storage_size==0)
 		temp_storage_size=1;
 
 	CudaCustomAllocator::Alloc* alloc = ptr.getAllocator()->alloc(temp_storage_size);
 
-	DEBUG_HANDLE_ERROR(cub::DeviceReduce::ArgMax( alloc->getPtr(), temp_storage_size, ~ptr, ~max_pair, ptr.size, ptr.getStream()));
+	DEBUG_HANDLE_ERROR(cub::DeviceReduce::ArgMax( alloc->getPtr(), temp_storage_size, ~ptr, ~max_pair, ptr.getSize(), ptr.getStream()));
 
 	max_pair.cpToHost();
 	ptr.streamSync();
@@ -59,9 +59,9 @@ template <typename T>
 static std::pair<int, T> getArgMinOnDevice(AccPtr<T> &ptr)
 {
 #ifdef DEBUG_CUDA
-if (ptr.size == 0)
+if (ptr.getSize() == 0)
 	printf("DEBUG_WARNING: getArgMinOnDevice called with pointer of zero size.\n");
-if (ptr.dPtr == NULL)
+if (ptr.getDevicePtr() == NULL)
 	printf("DEBUG_WARNING: getArgMinOnDevice called with null device pointer.\n");
 if (ptr.getAllocator() == NULL)
 	printf("DEBUG_WARNING: getArgMinOnDevice called with null allocator.\n");
@@ -70,14 +70,14 @@ if (ptr.getAllocator() == NULL)
 	min_pair.deviceAlloc();
 	size_t temp_storage_size = 0;
 
-	DEBUG_HANDLE_ERROR(cub::DeviceReduce::ArgMin( NULL, temp_storage_size, ~ptr, ~min_pair, ptr.size));
+	DEBUG_HANDLE_ERROR(cub::DeviceReduce::ArgMin( NULL, temp_storage_size, ~ptr, ~min_pair, ptr.getSize()));
 
 	if(temp_storage_size==0)
 		temp_storage_size=1;
 
 	CudaCustomAllocator::Alloc* alloc = ptr.getAllocator()->alloc(temp_storage_size);
 
-	DEBUG_HANDLE_ERROR(cub::DeviceReduce::ArgMin( alloc->getPtr(), temp_storage_size, ~ptr, ~min_pair, ptr.size, ptr.getStream()));
+	DEBUG_HANDLE_ERROR(cub::DeviceReduce::ArgMin( alloc->getPtr(), temp_storage_size, ~ptr, ~min_pair, ptr.getSize(), ptr.getStream()));
 
 	min_pair.cpToHost();
 	ptr.streamSync();
@@ -95,9 +95,9 @@ template <typename T>
 static T getMaxOnDevice(AccPtr<T> &ptr)
 {
 #ifdef DEBUG_CUDA
-if (ptr.size == 0)
+if (ptr.getSize() == 0)
 	printf("DEBUG_ERROR: getMaxOnDevice called with pointer of zero size.\n");
-if (ptr.dPtr == NULL)
+if (ptr.getDevicePtr() == NULL)
 	printf("DEBUG_ERROR: getMaxOnDevice called with null device pointer.\n");
 if (ptr.getAllocator() == NULL)
 	printf("DEBUG_ERROR: getMaxOnDevice called with null allocator.\n");
@@ -106,14 +106,14 @@ if (ptr.getAllocator() == NULL)
 	max_val.deviceAlloc();
 	size_t temp_storage_size = 0;
 
-	DEBUG_HANDLE_ERROR(cub::DeviceReduce::Max( NULL, temp_storage_size, ~ptr, ~max_val, ptr.size));
+	DEBUG_HANDLE_ERROR(cub::DeviceReduce::Max( NULL, temp_storage_size, ~ptr, ~max_val, ptr.getSize()));
 
 	if(temp_storage_size==0)
 		temp_storage_size=1;
 
 	CudaCustomAllocator::Alloc* alloc = ptr.getAllocator()->alloc(temp_storage_size);
 
-	DEBUG_HANDLE_ERROR(cub::DeviceReduce::Max( alloc->getPtr(), temp_storage_size, ~ptr, ~max_val, ptr.size, ptr.getStream()));
+	DEBUG_HANDLE_ERROR(cub::DeviceReduce::Max( alloc->getPtr(), temp_storage_size, ~ptr, ~max_val, ptr.getSize(), ptr.getStream()));
 
 	max_val.cpToHost();
 	ptr.streamSync();
@@ -127,9 +127,9 @@ template <typename T>
 static T getMinOnDevice(AccPtr<T> &ptr)
 {
 #ifdef DEBUG_CUDA
-if (ptr.size == 0)
+if (ptr.getSize() == 0)
 	printf("DEBUG_ERROR: getMinOnDevice called with pointer of zero size.\n");
-if (ptr.dPtr == NULL)
+if (ptr.getDevicePtr() == NULL)
 	printf("DEBUG_ERROR: getMinOnDevice called with null device pointer.\n");
 if (ptr.getAllocator() == NULL)
 	printf("DEBUG_ERROR: getMinOnDevice called with null allocator.\n");
@@ -138,14 +138,14 @@ if (ptr.getAllocator() == NULL)
 	min_val.deviceAlloc();
 	size_t temp_storage_size = 0;
 
-	DEBUG_HANDLE_ERROR(cub::DeviceReduce::Min( NULL, temp_storage_size, ~ptr, ~min_val, ptr.size));
+	DEBUG_HANDLE_ERROR(cub::DeviceReduce::Min( NULL, temp_storage_size, ~ptr, ~min_val, ptr.getSize()));
 
 	if(temp_storage_size==0)
 		temp_storage_size=1;
 
 	CudaCustomAllocator::Alloc* alloc = ptr.getAllocator()->alloc(temp_storage_size);
 
-	DEBUG_HANDLE_ERROR(cub::DeviceReduce::Min( alloc->getPtr(), temp_storage_size, ~ptr, ~min_val, ptr.size, ptr.getStream()));
+	DEBUG_HANDLE_ERROR(cub::DeviceReduce::Min( alloc->getPtr(), temp_storage_size, ~ptr, ~min_val, ptr.getSize(), ptr.getStream()));
 
 	min_val.cpToHost();
 	ptr.streamSync();
@@ -159,9 +159,9 @@ template <typename T>
 static T getSumOnDevice(AccPtr<T> &ptr)
 {
 #ifdef DEBUG_CUDA
-if (ptr.size == 0)
+if (ptr.getSize() == 0)
 	printf("DEBUG_ERROR: getSumOnDevice called with pointer of zero size.\n");
-if (ptr.dPtr == NULL)
+if (ptr.getDevicePtr() == NULL)
 	printf("DEBUG_ERROR: getSumOnDevice called with null device pointer.\n");
 if (ptr.getAllocator() == NULL)
 	printf("DEBUG_ERROR: getSumOnDevice called with null allocator.\n");
@@ -170,14 +170,14 @@ if (ptr.getAllocator() == NULL)
 	val.deviceAlloc();
 	size_t temp_storage_size = 0;
 
-	DEBUG_HANDLE_ERROR(cub::DeviceReduce::Sum( NULL, temp_storage_size, ~ptr, ~val, ptr.size));
+	DEBUG_HANDLE_ERROR(cub::DeviceReduce::Sum( NULL, temp_storage_size, ~ptr, ~val, ptr.getSize()));
 
 	if(temp_storage_size==0)
 		temp_storage_size=1;
 
 	CudaCustomAllocator::Alloc* alloc = ptr.getAllocator()->alloc(temp_storage_size);
 
-	DEBUG_HANDLE_ERROR(cub::DeviceReduce::Sum( alloc->getPtr(), temp_storage_size, ~ptr, ~val, ptr.size, ptr.getStream()));
+	DEBUG_HANDLE_ERROR(cub::DeviceReduce::Sum( alloc->getPtr(), temp_storage_size, ~ptr, ~val, ptr.getSize(), ptr.getStream()));
 
 	val.cpToHost();
 	ptr.streamSync();
@@ -191,9 +191,9 @@ template <typename T>
 static void sortOnDevice(AccPtr<T> &in, AccPtr<T> &out)
 {
 #ifdef DEBUG_CUDA
-if (in.size == 0 || out.size == 0)
+if (in.getSize() == 0 || out.getSize() == 0)
 	printf("DEBUG_ERROR: sortOnDevice called with pointer of zero size.\n");
-if (in.dPtr == NULL || out.dPtr == NULL)
+if (in.getDevicePtr() == NULL || out.getDevicePtr() == NULL)
 	printf("DEBUG_ERROR: sortOnDevice called with null device pointer.\n");
 if (in.getAllocator() == NULL)
 	printf("DEBUG_ERROR: sortOnDevice called with null allocator.\n");
@@ -202,14 +202,14 @@ if (in.getAllocator() == NULL)
 
 	cudaStream_t stream = in.getStream();
 
-	DEBUG_HANDLE_ERROR(cub::DeviceRadixSort::SortKeys( NULL, temp_storage_size, ~in, ~out, in.size));
+	DEBUG_HANDLE_ERROR(cub::DeviceRadixSort::SortKeys( NULL, temp_storage_size, ~in, ~out, in.getSize()));
 
 	if(temp_storage_size==0)
 		temp_storage_size=1;
 
 	CudaCustomAllocator::Alloc* alloc = in.getAllocator()->alloc(temp_storage_size);
 
-	DEBUG_HANDLE_ERROR(cub::DeviceRadixSort::SortKeys( alloc->getPtr(), temp_storage_size, ~in, ~out, in.size, 0, sizeof(T) * 8, stream));
+	DEBUG_HANDLE_ERROR(cub::DeviceRadixSort::SortKeys( alloc->getPtr(), temp_storage_size, ~in, ~out, in.getSize(), 0, sizeof(T) * 8, stream));
 
 	alloc->markReadyEvent(stream);
 	alloc->doFreeWhenReady();
@@ -219,9 +219,9 @@ template <typename T>
 static void sortDescendingOnDevice(AccPtr<T> &in, AccPtr<T> &out)
 {
 #ifdef DEBUG_CUDA
-if (in.size == 0 || out.size == 0)
+if (in.getSize() == 0 || out.getSize() == 0)
 	printf("DEBUG_ERROR: sortDescendingOnDevice called with pointer of zero size.\n");
-if (in.dPtr == NULL || out.dPtr == NULL)
+if (in.getDevicePtr() == NULL || out.getDevicePtr() == NULL)
 	printf("DEBUG_ERROR: sortDescendingOnDevice called with null device pointer.\n");
 if (in.getAllocator() == NULL)
 	printf("DEBUG_ERROR: sortDescendingOnDevice called with null allocator.\n");
@@ -230,14 +230,14 @@ if (in.getAllocator() == NULL)
 
 	cudaStream_t stream = in.getStream();
 
-	DEBUG_HANDLE_ERROR(cub::DeviceRadixSort::SortKeysDescending( NULL, temp_storage_size, ~in, ~out, in.size));
+	DEBUG_HANDLE_ERROR(cub::DeviceRadixSort::SortKeysDescending( NULL, temp_storage_size, ~in, ~out, in.getSize()));
 
 	if(temp_storage_size==0)
 		temp_storage_size=1;
 
 	CudaCustomAllocator::Alloc* alloc = in.getAllocator()->alloc(temp_storage_size);
 
-	DEBUG_HANDLE_ERROR(cub::DeviceRadixSort::SortKeysDescending( alloc->getPtr(), temp_storage_size, ~in, ~out, in.size, 0, sizeof(T) * 8, stream));
+	DEBUG_HANDLE_ERROR(cub::DeviceRadixSort::SortKeysDescending( alloc->getPtr(), temp_storage_size, ~in, ~out, in.getSize(), 0, sizeof(T) * 8, stream));
 
 	alloc->markReadyEvent(stream);
 	alloc->doFreeWhenReady();
@@ -290,9 +290,9 @@ template <typename T, typename SelectOp>
 static int filterOnDevice(AccPtr<T> &in, AccPtr<T> &out, SelectOp select_op)
 {
 #ifdef DEBUG_CUDA
-if (in.size == 0 || out.size == 0)
+if (in.getSize() == 0 || out.getSize() == 0)
 	printf("DEBUG_ERROR: filterOnDevice called with pointer of zero size.\n");
-if (in.dPtr == NULL || out.dPtr == NULL)
+if (in.getDevicePtr() == NULL || out.getDevicePtr() == NULL)
 	printf("DEBUG_ERROR: filterOnDevice called with null device pointer.\n");
 if (in.getAllocator() == NULL)
 	printf("DEBUG_ERROR: filterOnDevice called with null allocator.\n");
@@ -304,14 +304,14 @@ if (in.getAllocator() == NULL)
 	AccPtr<int>  num_selected_out(1, stream, in.getAllocator());
 	num_selected_out.deviceAlloc();
 
-	DEBUG_HANDLE_ERROR(cub::DeviceSelect::If(NULL, temp_storage_size, ~in, ~out, ~num_selected_out, in.size, select_op, stream));
+	DEBUG_HANDLE_ERROR(cub::DeviceSelect::If(NULL, temp_storage_size, ~in, ~out, ~num_selected_out, in.getSize(), select_op, stream));
 
 	if(temp_storage_size==0)
 		temp_storage_size=1;
 
 	CudaCustomAllocator::Alloc* alloc = in.getAllocator()->alloc(temp_storage_size);
 
-	DEBUG_HANDLE_ERROR(cub::DeviceSelect::If(alloc->getPtr(), temp_storage_size, ~in, ~out, ~num_selected_out, in.size, select_op, stream));
+	DEBUG_HANDLE_ERROR(cub::DeviceSelect::If(alloc->getPtr(), temp_storage_size, ~in, ~out, ~num_selected_out, in.getSize(), select_op, stream));
 
 	num_selected_out.cpToHost();
 	DEBUG_HANDLE_ERROR(cudaStreamSynchronize(stream));
@@ -324,9 +324,9 @@ template <typename T>
 static void scanOnDevice(AccPtr<T> &in, AccPtr<T> &out)
 {
 #ifdef DEBUG_CUDA
-if (in.size == 0 || out.size == 0)
+if (in.getSize() == 0 || out.getSize() == 0)
 	printf("DEBUG_ERROR: scanOnDevice called with pointer of zero size.\n");
-if (in.dPtr == NULL || out.dPtr == NULL)
+if (in.getDevicePtr() == NULL || out.getDevicePtr() == NULL)
 	printf("DEBUG_ERROR: scanOnDevice called with null device pointer.\n");
 if (in.getAllocator() == NULL)
 	printf("DEBUG_ERROR: scanOnDevice called with null allocator.\n");
@@ -335,14 +335,14 @@ if (in.getAllocator() == NULL)
 
 	cudaStream_t stream = in.getStream();
 
-	DEBUG_HANDLE_ERROR(cub::DeviceScan::InclusiveSum( NULL, temp_storage_size, ~in, ~out, in.size));
+	DEBUG_HANDLE_ERROR(cub::DeviceScan::InclusiveSum( NULL, temp_storage_size, ~in, ~out, in.getSize()));
 
 	if(temp_storage_size==0)
 		temp_storage_size=1;
 
 	CudaCustomAllocator::Alloc* alloc = in.getAllocator()->alloc(temp_storage_size);
 
-	DEBUG_HANDLE_ERROR(cub::DeviceScan::InclusiveSum( alloc->getPtr(), temp_storage_size, ~in, ~out, in.size, stream));
+	DEBUG_HANDLE_ERROR(cub::DeviceScan::InclusiveSum( alloc->getPtr(), temp_storage_size, ~in, ~out, in.getSize(), stream));
 
 	alloc->markReadyEvent(stream);
 	alloc->doFreeWhenReady();

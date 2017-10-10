@@ -118,7 +118,6 @@ private:
 
 
 	//Look for the first suited space
-	inline
 	Alloc *_getFirstSuitedFree(size_t size)
 	{
 		Alloc *a = first;
@@ -130,7 +129,6 @@ private:
 	}
 
 	//Free allocs with recorded ready events
-	inline
 	bool _syncReadyEvents()
 	{
 		bool somethingReady(false);
@@ -151,7 +149,6 @@ private:
 	}
 
 	//Free allocs with recorded ready events
-	inline
 	bool _freeReadyAllocs()
 	{
 		bool somethingFreed(false);
@@ -183,7 +180,6 @@ private:
 		return somethingFreed;
 	}
 
-	inline
 	size_t _getTotalFreeSpace()
 	{
 		if (cache)
@@ -208,7 +204,6 @@ private:
 		}
 	}
 
-	inline
 	size_t _getTotalUsedSpace()
 	{
 		size_t total = 0;
@@ -240,7 +235,6 @@ private:
 		return total;
 	}
 
-	inline
 	size_t _getLargestContinuousFreeSpace()
 	{
 		if (cache)
@@ -261,7 +255,6 @@ private:
 			return _getTotalFreeSpace();
 	}
 
-	inline
 	void _printState()
 	{
 		size_t total = 0;
@@ -284,7 +277,6 @@ private:
 		fflush(stdout);
 	}
 
-	inline
 	void _free(Alloc* a)
 	{
 //		printf("free: %u ", a->size);
@@ -491,7 +483,6 @@ public:
 	}
 
 
-	inline
 	Alloc* alloc(size_t requestedSize)
 	{
 		Lock ml(&mutex);
@@ -619,21 +610,18 @@ public:
 
 	//Thread-safe wrapper functions
 
-	inline
 	void free(Alloc* a)
 	{
 		Lock ml(&mutex);
 		_free(a);
 	}
 
-	inline
 	void syncReadyEvents()
 	{
 		Lock ml(&mutex);
 		_syncReadyEvents();
 	}
 
-	inline
 	void freeReadyAllocs()
 	{
 		Lock ml(&mutex);

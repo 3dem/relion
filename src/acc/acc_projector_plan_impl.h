@@ -301,7 +301,7 @@ void AccProjectorPlan::setup(
 void AccProjectorPlan::printTo(std::ostream &os) // print
 {
 	os << "orientation_num = " << orientation_num << std::endl;
-	os << "iorientclasses.size = " << iorientclasses.getSize() << std::endl;
+	os << "iorientclasses.getSize() = " << iorientclasses.getSize() << std::endl;
 	os << std::endl << "iorientclasses\tiover_rots\teulers" << std::endl;
 
 	for (int i = 0; i < iorientclasses.getSize(); i ++)

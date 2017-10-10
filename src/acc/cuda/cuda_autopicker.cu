@@ -187,7 +187,7 @@ void AutoPickerCuda::calculateStddevAndMeanUnderMask(AccPtr< ACCCOMPLEX > &d_Fmi
 	d_Fcov.deviceAlloc(d_Fmic.getSize());
 
 	CTIC(timer,"PRE-multi_0");
-	int Bsize( (int) ceilf(( float)d_Fmic.size/(float)BLOCK_SIZE));
+	int Bsize( (int) ceilf(( float)d_Fmic.getSize()/(float)BLOCK_SIZE));
 	cuda_kernel_convol_B<<<Bsize,BLOCK_SIZE>>>(   ~d_Fmic,
 												  ~d_Fmsk,
 												  ~d_Fcov,
@@ -207,18 +207,20 @@ void AutoPickerCuda::calculateStddevAndMeanUnderMask(AccPtr< ACCCOMPLEX > &d_Fmi
 	cudaTransformer2.backward();
 	CTOC(timer,"PRE-Transform_0");
 
-	Bsize = ( (int) ceilf(( float)cudaTransformer2.reals.size/(float)BLOCK_SIZE));
-	cuda_kernel_multi<XFLOAT><<<Bsize,BLOCK_SIZE>>>( cudaTransformer2.reals.dPtr,
-											 cudaTransformer2.reals.dPtr,
-										     (XFLOAT) normfft,
-										     cudaTransformer2.reals.size);
+	Bsize = ( (int) ceilf(( float)cudaTransformer2.reals.getSize()/(float)BLOCK_SIZE));
+	cuda_kernel_multi<XFLOAT><<<Bsize,BLOCK_SIZE>>>(
+			~cudaTransformer2.reals,
+			~cudaTransformer2.reals,
+			(XFLOAT) normfft,
+			cudaTransformer2.reals.getSize());
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 	CTIC(timer,"PRE-multi_1");
-	cuda_kernel_multi<XFLOAT><<<Bsize,BLOCK_SIZE>>>( cudaTransformer2.reals.dPtr,
-											 cudaTransformer2.reals.dPtr,
-											 d_Mstddev.dPtr,
-											 (XFLOAT) -1,
-										     cudaTransformer2.reals.size);
+	cuda_kernel_multi<XFLOAT><<<Bsize,BLOCK_SIZE>>>(
+			~cudaTransformer2.reals,
+			~cudaTransformer2.reals,
+			~d_Mstddev,
+			(XFLOAT) -1,
+			cudaTransformer2.reals.getSize());
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 	CTOC(timer,"PRE-multi_1");
 
@@ -233,11 +235,11 @@ void AutoPickerCuda::calculateStddevAndMeanUnderMask(AccPtr< ACCCOMPLEX > &d_Fmi
 	cudaTransformer2.reals.cpOnAcc(d_Mmean); //TODO remove the need for this
 
 	CTIC(timer,"PRE-multi_2");
-	Bsize = ( (int) ceilf(( float)d_Fmsk.size/(float)BLOCK_SIZE));
+	Bsize = ( (int) ceilf(( float)d_Fmsk.getSize()/(float)BLOCK_SIZE));
 	cuda_kernel_convol_A<<<Bsize,BLOCK_SIZE>>>( 	  ~d_Fmsk,
 													  ~d_Fmic2,
 													  ~d_Fcov,
-													  d_Fmsk.size);
+													  d_Fmsk.getSize());
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 	CTOC(timer,"PRE-multi_2");
 
@@ -256,11 +258,12 @@ void AutoPickerCuda::calculateStddevAndMeanUnderMask(AccPtr< ACCCOMPLEX > &d_Fmi
 	CTOC(timer,"PRE-Transform_1");
 
 	CTIC(timer,"PRE-multi_3");
-	Bsize = ( (int) ceilf(( float)d_Mstddev.size/(float)BLOCK_SIZE));
-	cuda_kernel_finalizeMstddev<<<Bsize,BLOCK_SIZE>>>( 	  d_Mstddev.dPtr,
-														  cudaTransformer2.reals.dPtr,
-														  normfft,
-														  d_Mstddev.size);
+	Bsize = ( (int) ceilf(( float)d_Mstddev.getSize()/(float)BLOCK_SIZE));
+		cuda_kernel_finalizeMstddev<<<Bsize,BLOCK_SIZE>>>(
+		~d_Mstddev,
+		~cudaTransformer2.reals,
+		normfft,
+		d_Mstddev.getSize());
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 	CTOC(timer,"PRE-multi_3");
 
@@ -544,7 +547,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 
 		//TODO Do this only once further up in scope
 		AccPtr< ACCCOMPLEX > d_Fmsk(basePckr->Finvmsk.nzyxdim, allocator);
-		for(int i = 0; i< d_Fmsk.size ; i++)
+		for(int i = 0; i< d_Fmsk.getSize() ; i++)
 		{
 			d_Fmsk[i].x = basePckr->Finvmsk.data[i].real;
 			d_Fmsk[i].y = basePckr->Finvmsk.data[i].imag;
@@ -563,7 +566,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 		Mstddev.resizeNoCp(1, basePckr->workSize, basePckr->workSize);
 
 		//TODO put this in a kernel
-		for(int i = 0; i < d_Mstddev.size ; i ++)
+		for(int i = 0; i < d_Mstddev.getSize() ; i ++)
 		{
 			Mstddev.data[i] = d_Mstddev[i];
 			if (d_Mstddev[i] > (XFLOAT)1E-10)
@@ -645,7 +648,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 	AccPtr< XFLOAT >  d_ctf(Fctf.nzyxdim, allocator);
 	if(basePckr->do_ctf)
 	{
-		for(int i = 0; i< d_ctf.size ; i++)
+		for(int i = 0; i< d_ctf.getSize() ; i++)
 			d_ctf[i]=Fctf.data[i];
 		d_ctf.putOnDevice();
 	}
@@ -763,7 +766,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 			Maux.resizeNoCp(1,basePckr->micrograph_size, basePckr->micrograph_size);
 
 			micTransformer.reals.streamSync();
-			for (int i = 0; i < micTransformer.reals.size ; i ++)
+			for (int i = 0; i < micTransformer.reals.getSize() ; i ++)
 				Maux.data[i] = micTransformer.reals[i];
 
 			CTIC(timer,"setXmippOrigin_FP_0");
@@ -832,9 +835,10 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 				// Now multiply template and micrograph to calculate the cross-correlation
 				CTIC(timer,"convol");
 				dim3 blocks2( (int) ceilf(( float)FauxStride/(float)BLOCK_SIZE),cudaTransformer1.batchSize[psiIter]);
-				cuda_kernel_batch_convol_A<<<blocks2,BLOCK_SIZE>>>(   cudaTransformer1.fouriers.dPtr,
-																	  d_Fmic.dPtr,
-																	  FauxStride);
+				cuda_kernel_batch_convol_A<<<blocks2,BLOCK_SIZE>>>(
+					~cudaTransformer1.fouriers,
+					~d_Fmic,
+					FauxStride);
 				LAUNCH_HANDLE_ERROR(cudaGetLastError());
 				CTOC(timer,"convol");
 
@@ -858,14 +862,14 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 				// Still to do (per reference): - 2/sig*Sum(AX) + 2*mu/sig*Sum(A) + Sum(A^2)
 				CTIC(timer,"probRatio");
 				HANDLE_ERROR(cudaDeviceSynchronize());
-				dim3 PR_blocks(ceilf((float)(cudaTransformer1.reals.size/cudaTransformer1.batchSize[psiIter])/(float)PROBRATIO_BLOCK_SIZE));
+				dim3 PR_blocks(ceilf((float)(cudaTransformer1.reals.getSize()/cudaTransformer1.batchSize[psiIter])/(float)PROBRATIO_BLOCK_SIZE));
 				cuda_kernel_probRatio<<<PR_blocks,PROBRATIO_BLOCK_SIZE>>>(
-						d_Mccf_best.dPtr,
-						d_Mpsi_best.dPtr,
-						cudaTransformer1.reals.dPtr,
-						d_Mmean.dPtr,
-						d_Mstddev.dPtr,
-						cudaTransformer1.reals.size/cudaTransformer1.batchSize[0],
+						~d_Mccf_best,
+						~d_Mpsi_best,
+						~cudaTransformer1.reals,
+						~d_Mmean,
+						~d_Mstddev,
+						cudaTransformer1.reals.getSize()/cudaTransformer1.batchSize[0],
 						(XFLOAT) -2*normfft,
 						(XFLOAT) 2*sum_ref_under_circ_mask,
 						(XFLOAT) sum_ref2_under_circ_mask,

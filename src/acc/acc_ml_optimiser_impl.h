@@ -1556,8 +1556,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				AccPtr<XFLOAT> weights(Mweight.getAllocator());
 				weights.setSize(Mweight.getSize());
 
-				weights.setHostPtr((XFLOAT*) Mweight.hPtr);
-				weights.setDevicePtr((XFLOAT*) Mweight.dPtr);
+				weights.setHostPtr((XFLOAT*) Mweight.getHostPtr());
+				weights.setDevicePtr((XFLOAT*) Mweight.getDevicePtr());
 				weights.setAllocator(Mweight.getAllocator());
 
 				AccPtr<XFLOAT>  ipartMweight(
@@ -2094,7 +2094,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			p_thr_wsum_prior_offsetz_class.deviceAlloc();
 		else
 			// TODO - Dari - should the CPU also have the same pointer for offsety and offsetz?
-			p_thr_wsum_prior_offsetz_class.dPtr  = p_thr_wsum_prior_offsety_class.dPtr;
+			p_thr_wsum_prior_offsetz_class.setDevicePtr(p_thr_wsum_prior_offsety_class.getDevicePtr());
 
 		p_thr_wsum_sigma2_offset.deviceAlloc();
 		CTOC(accMLO->timer,"collect_data_2_pre_kernel");

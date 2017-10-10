@@ -90,7 +90,7 @@ class cudaStager
 {
 public:
 	AccPtr<T> AllData;
-	size_t size; // size of allocated host-space (AllData.size dictates the amount of memory copied to/from the device)
+	size_t size; // size of allocated host-space (AllData.getSize() dictates the amount of memory copied to/from the device)
 
 	/*======================================================
 				CONSTRUCTORS WITH ALLOCATORS
@@ -105,7 +105,7 @@ public:
 	cudaStager(CudaCustomAllocator *allocator, size_t newSize):
 		AllData(newSize,allocator), size(newSize)
 	{
-		AllData.size=0;
+		AllData.setSize(0);
 	};
 
 	/*======================================================
@@ -121,7 +121,7 @@ public:
 	cudaStager(size_t newSize):
 		AllData(newSize), size(newSize)
 	{
-		AllData.size=0;
+		AllData.setSize(0);
 	};
 
 public:
@@ -134,13 +134,13 @@ public:
 			printf("trying to host-alloc a stager with size=0");
 			CRITICAL(ERR_STAGEMEM);
 		}
-		size_t temp_size=AllData.size;
-		AllData.size=size;
-		if(AllData.hPtr==NULL)
+		size_t temp_size=AllData.getSize();
+		AllData.setSize(size);
+		if(AllData.getHostPtr()==NULL)
 			AllData.hostAlloc();
 		else
 			printf("WARNING : host_alloc when host-ptr is non-null");
-		AllData.size=temp_size;
+		AllData.setSize(temp_size);
 	}
 	void prepare_host(size_t alloc_size)
 	{
@@ -149,13 +149,13 @@ public:
 			printf("trying to device-alloc a stager with size=0");
 			CRITICAL(ERR_STAGEMEM);
 		}
-		size_t temp_size=AllData.size;
-		AllData.size=alloc_size;
-		if(AllData.hPtr==NULL)
+		size_t temp_size=AllData.getSize();
+		AllData.setSize(alloc_size);
+		if(AllData.getHostPtr()==NULL)
 			AllData.hostAlloc();
 		else
 			printf("WARNING : host_alloc when host-ptr is non-null");
-		AllData.size=temp_size;
+		AllData.setSize(temp_size);
 	}
 	void prepare_device()
 	{
@@ -164,13 +164,13 @@ public:
 			printf("trying to host-alloc a stager with size=0");
 			CRITICAL(ERR_STAGEMEM);
 		}
-		size_t temp_size=AllData.size;
-		AllData.size=size;
-		if(AllData.dPtr==NULL)
+		size_t temp_size=AllData.getSize();
+		AllData.setSize(size);
+		if(AllData.getDevicePtr()==NULL)
 			AllData.deviceAlloc();
 		else
 			printf("WARNING : device_alloc when dev-ptr is non-null");
-		AllData.size=temp_size;
+		AllData.setSize(temp_size);
 	}
 	void prepare_device(size_t alloc_size)
 	{
@@ -179,13 +179,13 @@ public:
 			printf("trying to device-alloc a stager with size=0");
 			CRITICAL(ERR_STAGEMEM);
 		}
-		size_t temp_size=AllData.size;
-		AllData.size=alloc_size;
-		if(AllData.dPtr==NULL)
+		size_t temp_size=AllData.getSize();
+		AllData.setSize(alloc_size);
+		if(AllData.getDevicePtr()==NULL)
 			AllData.deviceAlloc();
 		else
 			printf("WARNING : device_alloc when dev-ptr is non-null");
-		AllData.size=temp_size;
+		AllData.setSize(temp_size);
 	}
 	void prepare()
 	{
@@ -202,23 +202,23 @@ public:
 
 	void stage(AccPtr<T> &input)
 	{
-		if(AllData.size+input.size>size)
+		if(AllData.getSize()+input.getSize()>size)
 		{
 			printf("trying to stage more than stager can fit");
-			printf(" (attempted to stage %lu addtionally to the allready staged %lu, and total host-allocated capacity is %lu ",input.size,AllData.size,size);
+			printf(" (attempted to stage %lu addtionally to the allready staged %lu, and total host-allocated capacity is %lu ",input.getSize(),AllData.getSize(),size);
 			exit( EXIT_FAILURE );
 		}
 
-		for(size_t i=0 ; i<input.size; i++)
-			AllData.hPtr[AllData.size+i] = input.hPtr[i];
+		for(size_t i=0 ; i<input.getSize(); i++)
+			AllData[AllData.getSize()+i] = input[i];
 
 		// reset the staged object to this new position (TODO: disable for pinned mem)
-		if(input.hPtr!=NULL && input.doFreeHost)
+		if(&input[0]!=NULL && input.willFreeHost())
 			input.freeHostIfSet();
-		input.hPtr=&AllData.hPtr[AllData.size];
-		input.dPtr=&AllData.dPtr[AllData.size];
+		input.setHostPtr(&AllData[AllData.getSize()]);
+		input.setDevicePtr(&AllData(AllData.getSize()));
 
-		AllData.size+=input.size;
+		AllData.setSize(AllData.getSize()+input.getSize());
 	}
 
 	void cp_to_device()

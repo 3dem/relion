@@ -343,9 +343,9 @@ void runCenterFFT(MultidimArray< T >& v, bool forward, CudaCustomAllocator *allo
 		int dim=ceilf((float)(v.nzyxdim/(float)(2*CFTT_BLOCK_SIZE)));
 		AccUtilities::centerFFT_2D(dim, 0, CFTT_BLOCK_SIZE,
 #ifdef CUDA
-				img_in.dPtr,
+				~img_in,
 #else
-				img_in.hPtr,
+				&img_in[0],
 #endif
 				v.nzyxdim,
 				XSIZE(v),
@@ -355,8 +355,6 @@ void runCenterFFT(MultidimArray< T >& v, bool forward, CudaCustomAllocator *allo
 		LAUNCH_HANDLE_ERROR(cudaGetLastError());
 
 		img_in.cpToHost();
-
-//		HANDLE_ERROR(cudaStreamSynchronize(0));
 
 		for (unsigned i = 0; i < v.nzyxdim; i ++)
 			v.data[i] = (T) img_in[i];
@@ -472,7 +470,7 @@ void runCenterFFT( AccPtr< T > &img_in,
 				  bool forward,
 				  int batchSize = 1)
 {
-//	AccPtr<XFLOAT >  img_aux(img_in.h_ptr, img_in.size, allocator);   // temporary holder
+//	AccPtr<XFLOAT >  img_aux(img_in.h_ptr, img_in.getSize(), allocator);   // temporary holder
 //	img_aux.deviceAlloc();
 
 	int xshift = (xSize / 2);
@@ -510,7 +508,7 @@ void runCenterFFT( AccPtr< T > &img_in,
 				  bool forward,
 				  int batchSize = 1)
 {
-//	AccPtr<XFLOAT >  img_aux(img_in.h_ptr, img_in.size, allocator);   // temporary holder
+//	AccPtr<XFLOAT >  img_aux(img_in.h_ptr, img_in.getSize(), allocator);   // temporary holder
 //	img_aux.deviceAlloc();
 
 	if(zSize>1)

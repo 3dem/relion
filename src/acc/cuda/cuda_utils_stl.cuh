@@ -17,7 +17,7 @@ template <typename T>
 static T getMaxOnDevice(AccPtr<T> &ptr)
 {
 #ifdef DEBUG_CUDA
-if (ptr.size == 0)
+if (ptr.getSize() == 0)
 	printf("DEBUG_ERROR: getMaxOnDevice called with pointer of zero size.\n");
 if (ptr.d_ptr == NULL)
 	printf("DEBUG_ERROR: getMaxOnDevice called with null device pointer.\n");
@@ -26,7 +26,7 @@ if (ptr.getAllocator() == NULL)
 #endif
 	ptr.cp_to_host();
 	DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
-	return (T)*std::max_element(ptr.h_ptr,ptr.h_ptr + ptr.size);
+	return (T)*std::max_element(ptr.h_ptr,ptr.h_ptr + ptr.getSize());
 }
 
 template <typename T>
@@ -43,7 +43,7 @@ if (ptr.getAllocator() == NULL)
 	std::pair<int, T> max_pair;
 	ptr.cp_to_host();
 	DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
-	max_pair.first  = std::distance(ptr.h_ptr,std::max_element(ptr.h_ptr,ptr.h_ptr + ptr.size));
+	max_pair.first  = std::distance(ptr.h_ptr,std::max_element(ptr.h_ptr,ptr.h_ptr + ptr.getSize()));
 	max_pair.second = ptr.h_ptr[max_pair.first];
 
 	return max_pair;
@@ -62,7 +62,7 @@ if (ptr.getAllocator() == NULL)
 #endif
 	ptr.cp_to_host();
 	DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
-	return (T)*std::min_element(ptr.h_ptr,ptr.h_ptr + ptr.size);
+	return (T)*std::min_element(ptr.h_ptr,ptr.h_ptr + ptr.getSize());
 }
 
 
@@ -80,7 +80,7 @@ if (ptr.getAllocator() == NULL)
 	std::pair<int, T> min_pair;
 	ptr.cp_to_host();
 	DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
-	min_pair.first  = std::distance(ptr.h_ptr,std::min_element(ptr.h_ptr,ptr.h_ptr + ptr.size));
+	min_pair.first  = std::distance(ptr.h_ptr,std::min_element(ptr.h_ptr,ptr.h_ptr + ptr.getSize()));
 	min_pair.second = ptr.h_ptr[min_pair.first];
 
 	return min_pair;
@@ -100,7 +100,7 @@ if (ptr.getAllocator() == NULL)
 	ptr.cp_to_host();
 	DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
 	T sum(0);
-	for(long int i =0; i<ptr.size; i++)
+	for(long int i =0; i<ptr.getSize(); i++)
 		sum+=ptr.h_ptr[i];
 	return sum;
 }
@@ -118,8 +118,8 @@ if (in.getAllocator() == NULL)
 #endif
 	in.cp_to_host();
 	DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
-	std::sort(in.h_ptr,in.h_ptr + in.size);
-	for(long int i =0; i<in.size; i++)
+	std::sort(in.h_ptr,in.h_ptr + in.getSize());
+	for(long int i =0; i<in.getSize(); i++)
 		out.h_ptr[i]=in.h_ptr[i];
 	out.cp_to_device();
 	DEBUG_HANDLE_ERROR(cudaStreamSynchronize(0));
