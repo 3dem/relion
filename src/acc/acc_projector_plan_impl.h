@@ -113,11 +113,15 @@ void AccProjectorPlan::setup(
 
 	std::vector< RFLOAT > oversampled_rot, oversampled_tilt, oversampled_psi;
 
-	AccPtr<XFLOAT> alphas(nr_dir * nr_psi * nr_oversampled_rot * 9, eulers.getAllocator());
-	AccPtr<XFLOAT> betas (nr_dir * nr_psi * nr_oversampled_rot * 9, eulers.getAllocator());
-	AccPtr<XFLOAT> gammas(nr_dir * nr_psi * nr_oversampled_rot * 9, eulers.getAllocator());
+	AccPtr<XFLOAT> alphas =  eulers.make<XFLOAT>(nr_dir * nr_psi * nr_oversampled_rot * 9);
+	AccPtr<XFLOAT> betas =   eulers.make<XFLOAT>(nr_dir * nr_psi * nr_oversampled_rot * 9);
+	AccPtr<XFLOAT> gammas =  eulers.make<XFLOAT>(nr_dir * nr_psi * nr_oversampled_rot * 9);
+	AccPtr<XFLOAT> perturb = eulers.make<XFLOAT>((size_t)9);
 
-	AccPtr<XFLOAT> perturb((size_t)9, eulers.getAllocator());
+	alphas.hostAlloc();
+	betas.hostAlloc();
+	gammas.hostAlloc();
+	perturb.hostAlloc();
 
 	eulers.freeIfSet();
 	eulers.setSize(nr_dir * nr_psi * nr_oversampled_rot * 9);

@@ -255,16 +255,13 @@ public:
 	
 
 public:
-
-	IndexedDataArrayMask() :
-		jobOrigin(), 	jobExtent(), 	firstPos(), 	lastPos(),
-		weightNum(), 	jobNum()
-	{}
 		
-	IndexedDataArrayMask(CudaCustomAllocator *allocator) :
-		jobOrigin(allocator), 	jobExtent(allocator), 	firstPos(), 	lastPos(),
-		weightNum(), 	jobNum()
-	{}
+	IndexedDataArrayMask(AccPtrFactory ptrFactory) :
+		firstPos(), lastPos(), weightNum(), jobNum()
+	{
+		jobOrigin = ptrFactory.make<size_t>();
+		jobExtent = ptrFactory.make<size_t>();
+	}
 	
 	void setNumberOfJobs(size_t newSize)
 	{
@@ -301,59 +298,24 @@ public:
 	//   ihidden_overs  =  mapping to MWeight-based indexing for compatibility
 	AccPtr<size_t> rot_id, rot_idx, trans_idx, ihidden_overs;
 
-public:	
-	inline
-	 IndexedDataArray():
-		weights(),
-		rot_id(),
-		rot_idx(),
-		trans_idx(),
-		ihidden_overs()
-	{};
+public:
 	
 	inline
-	 IndexedDataArray(CudaCustomAllocator *allocator):
-		weights(allocator),
-		rot_id(allocator),
-		rot_idx(allocator),
-		trans_idx(allocator),
-		ihidden_overs(allocator)
+	 IndexedDataArray(AccPtrFactory ptrFactory):
+	 	weights(ptrFactory.make<XFLOAT>()),
+		rot_id(ptrFactory.make<size_t>()),
+		rot_idx(ptrFactory.make<size_t>()),
+		trans_idx(ptrFactory.make<size_t>()),
+		ihidden_overs(ptrFactory.make<size_t>())
 	{};
 
-	// constructor which takes a parent IndexedDataArray and a mask to create a child
 	inline
 	 IndexedDataArray(IndexedDataArray &parent, IndexedDataArrayMask &mask):
-#ifdef CUDA
-		weights(		&(parent.weights[mask.firstPos]),       &(parent.weights(mask.firstPos)),       mask.weightNum),
-		rot_id(			&(parent.rot_id[mask.firstPos]),        &(parent.rot_id(mask.firstPos)),        mask.weightNum),
-		rot_idx(		&(parent.rot_idx[mask.firstPos]),       &(parent.rot_idx(mask.firstPos)),       mask.weightNum),
-		trans_idx(		&(parent.trans_idx[mask.firstPos]),     &(parent.trans_idx(mask.firstPos)),     mask.weightNum),
-		ihidden_overs(	&(parent.ihidden_overs[mask.firstPos]), &(parent.ihidden_overs(mask.firstPos)), mask.weightNum)
-#else
-		weights(		&(parent.weights[mask.firstPos]),       NULL, mask.weightNum),
-		rot_id(			&(parent.rot_id[mask.firstPos]),        NULL, mask.weightNum),
-		rot_idx(		&(parent.rot_idx[mask.firstPos]),       NULL, mask.weightNum),
-		trans_idx(		&(parent.trans_idx[mask.firstPos]),     NULL, mask.weightNum),
-		ihidden_overs(	&(parent.ihidden_overs[mask.firstPos]), NULL, mask.weightNum)
-#endif
-	{};
-	
-	inline
-	 IndexedDataArray(IndexedDataArray &parent, IndexedDataArrayMask &mask, CudaCustomAllocator *allocator):
-#ifdef CUDA
-		weights(		&(parent.weights[mask.firstPos]),      &(parent.weights(mask.firstPos)),        mask.weightNum, allocator),
-		rot_id(			&(parent.rot_id[mask.firstPos]),        &(parent.rot_id(mask.firstPos)),        mask.weightNum, allocator),
-		rot_idx(		&(parent.rot_idx[mask.firstPos]),       &(parent.rot_idx(mask.firstPos)),       mask.weightNum, allocator),
-		trans_idx(		&(parent.trans_idx[mask.firstPos]),     &(parent.trans_idx(mask.firstPos)),     mask.weightNum, allocator),
-		ihidden_overs(	&(parent.ihidden_overs[mask.firstPos]), &(parent.ihidden_overs(mask.firstPos)), mask.weightNum, allocator)
-#else
-		weights(		&(parent.weights[mask.firstPos]),        NULL, mask.weightNum, allocator),
-		rot_id(			&(parent.rot_id[mask.firstPos]),         NULL, mask.weightNum, allocator),
-		rot_idx(		&(parent.rot_idx[mask.firstPos]),        NULL, mask.weightNum, allocator),
-		trans_idx(		&(parent.trans_idx[mask.firstPos]),      NULL, mask.weightNum, allocator),
-		ihidden_overs(	&(parent.ihidden_overs[mask.firstPos]),  NULL, mask.weightNum, allocator)
-
-#endif
+		weights(      parent.weights, mask.firstPos, mask.weightNum),
+		rot_id(       parent.rot_id, mask.firstPos, mask.weightNum),
+		rot_idx(      parent.rot_idx, mask.firstPos, mask.weightNum),
+		trans_idx(    parent.trans_idx, mask.firstPos, mask.weightNum),
+		ihidden_overs(parent.ihidden_overs, mask.firstPos, mask.weightNum)
 	{};
 
 public:
@@ -366,16 +328,7 @@ public:
 		trans_idx.setSize(newSize);
 		ihidden_overs.setSize(newSize);
 	}
-/*  Since we are looking into another data structure, actually resizing would be bad!
-	void resize_host_all(size_t newSize)
-	{
-		weights.resizeHost(newSize);
-		rot_id.resizeHost(newSize);
-		rot_idx.resizeHost(newSize);
-		trans_idx.resizeHost(newSize);
-		ihidden_overs.resizeHost(newSize);
-	}
-*/
+
 	void host_alloc_all()
 	{
 		weights.freeHostIfSet();

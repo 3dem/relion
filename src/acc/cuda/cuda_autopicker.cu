@@ -183,7 +183,7 @@ void AutoPickerCuda::calculateStddevAndMeanUnderMask(AccPtr< ACCCOMPLEX > &d_Fmi
 
 	RFLOAT normfft = (RFLOAT)(mic_size * mic_size) / (RFLOAT)nr_nonzero_pixels_mask;
 
-	AccPtr< ACCCOMPLEX > d_Fcov(d_Fmic.getAllocator());
+	AccPtr< ACCCOMPLEX > d_Fcov = d_Fmic.make< ACCCOMPLEX >();
 	d_Fcov.deviceAlloc(d_Fmic.getSize());
 
 	CTIC(timer,"PRE-multi_0");
@@ -286,8 +286,8 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 
 	AccPtr<XFLOAT >  d_Mccf_best(basePckr->workSize*basePckr->workSize, allocator);
 	AccPtr<XFLOAT >  d_Mpsi_best(basePckr->workSize*basePckr->workSize, allocator);
-	d_Mccf_best.deviceAlloc();
-	d_Mpsi_best.deviceAlloc();
+	d_Mccf_best.allAlloc();
+	d_Mpsi_best.allAlloc();
 
 	// Always use the same random seed
 	init_random_generator(basePckr->random_seed + imic);
@@ -547,12 +547,13 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 
 		//TODO Do this only once further up in scope
 		AccPtr< ACCCOMPLEX > d_Fmsk(basePckr->Finvmsk.nzyxdim, allocator);
+		d_Fmsk.allAlloc();
 		for(int i = 0; i< d_Fmsk.getSize() ; i++)
 		{
 			d_Fmsk[i].x = basePckr->Finvmsk.data[i].real;
 			d_Fmsk[i].y = basePckr->Finvmsk.data[i].imag;
 		}
-		d_Fmsk.putOnDevice();
+		d_Fmsk.cpToDevice();
 		d_Fmsk.streamSync();
 
 		calculateStddevAndMeanUnderMask(Ftmp, micTransformer.fouriers, d_Fmsk, basePckr->nr_pixels_circular_invmask, d_Mstddev, d_Mmean, micTransformer.xFSize, micTransformer.yFSize, basePckr->micrograph_size, basePckr->workSize);
@@ -646,11 +647,12 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 	}
 
 	AccPtr< XFLOAT >  d_ctf(Fctf.nzyxdim, allocator);
+	d_ctf.allAlloc();
 	if(basePckr->do_ctf)
 	{
 		for(int i = 0; i< d_ctf.getSize() ; i++)
 			d_ctf[i]=Fctf.data[i];
-		d_ctf.putOnDevice();
+		d_ctf.cpToDevice();
 	}
 
 	for (int iref = 0; iref < basePckr->Mrefs.size(); iref++)

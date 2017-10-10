@@ -391,7 +391,8 @@ void MlOptimiserCpu::resetData()
 
 void MlOptimiserCpu::expectationOneParticle(unsigned long my_ori_particle, int thread_id)
 {
-	accDoExpectationOneParticle<MlOptimiserCpu>(this, my_ori_particle, thread_id);
+	AccPtrFactory ptrFactory;
+	accDoExpectationOneParticle<MlOptimiserCpu>(this, my_ori_particle, thread_id, ptrFactory);
 };
 
 #endif // ALTCPU
