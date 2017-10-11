@@ -53,6 +53,8 @@
 #include "src/funcs.h"
 //#include "src/xmipp/strings.h"
 #include "src/metadata_label.h"
+#include <iostream>   // std::cout
+#include <string>     // std::string, std::to_string
 
 //useful to init values to zero
 //static RFLOAT zeroD=0.;
@@ -223,19 +225,19 @@ public:
        return msg_.c_str();
     }
 
-    const std::string what_s() const throw (){
+    std::string what_s(){
        return msg_;
     }
 
-    const int what_line() const throw (){
+    int what_line(){
        return line_nr_;
     }
 
-    const std::string what_line_s() const throw (){
+    std::string what_line_s(){
        return std::to_string(line_nr_);
     }
 
-   void add_line_nr(int line_nr) {
+    void add_line_nr(int line_nr) {
        line_nr_ += line_nr;
     }
 };
