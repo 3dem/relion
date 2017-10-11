@@ -169,7 +169,7 @@ void MetaDataContainer::addValue(EMDLabel name, const RFLOAT &value)
 		RFLOATs[name] = new RFLOAT(value);
     }
     else
-    	REPORT_ERROR("addValue for RFLOAT: label " + EMDL::label2Str(name) + " is not of type RFLOAT!");
+    	throw MetadataException("addValue for RFLOAT: label " + EMDL::label2Str(name) + " is not of type RFLOAT!");
 }
 
 void MetaDataContainer::addValue(EMDLabel name, const int &value)
@@ -184,7 +184,7 @@ void MetaDataContainer::addValue(EMDLabel name, const int &value)
 		ints[name] = new int(value);
     }
     else
-    	REPORT_ERROR("addValue for int: label " + EMDL::label2Str(name) + " is not of type int!");
+    	throw MetadataException("addValue for int: label " + EMDL::label2Str(name) + " is not of type int!");
 }
 
 void MetaDataContainer::addValue(EMDLabel name, const long int &value)
@@ -199,7 +199,7 @@ void MetaDataContainer::addValue(EMDLabel name, const long int &value)
 		longs[name] = new long(value);
     }
     else
-    	REPORT_ERROR("addValue for long: label " + EMDL::label2Str(name) + " is not of type long!");
+    	throw MetadataException("addValue for long: label " + EMDL::label2Str(name) + " is not of type long!");
 }
 
 void MetaDataContainer::addValue(EMDLabel name, const bool value)
@@ -214,7 +214,7 @@ void MetaDataContainer::addValue(EMDLabel name, const bool value)
 		bools[name] = new bool(value);
     }
     else
-    	REPORT_ERROR("addValue for bool: label " + EMDL::label2Str(name) + " is not of type bool!");
+    	throw MetadataException("addValue for bool: label " + EMDL::label2Str(name) + " is not of type bool!");
 }
 
 void MetaDataContainer::addValue(EMDLabel name, const std::string &value)
@@ -229,7 +229,7 @@ void MetaDataContainer::addValue(EMDLabel name, const std::string &value)
 		strings[name] = new std::string(value);
     }
     else
-    	REPORT_ERROR("addValue for string: label " + EMDL::label2Str(name) + " is not of type string!");
+    	throw MetadataException("addValue for string: label " + EMDL::label2Str(name) + " is not of type string!");
 }
 
 /** Creates a new label-value pair, with the default value for the corresponding type */
@@ -269,7 +269,7 @@ void MetaDataContainer::addDefaultValue(EMDLabel name)
 		strings[name] = new std::string("");
     }
     else
-    	REPORT_ERROR("MetaDataContainer::addDefaultValu: unrecognised data type for label " + EMDL::label2Str(name));
+    	throw MetadataException("MetaDataContainer::addDefaultValu: unrecognised data type for label " + EMDL::label2Str(name));
 }
 
 bool MetaDataContainer::getValue( const EMDLabel name, RFLOAT &value)
@@ -325,7 +325,7 @@ bool MetaDataContainer::getValue( const EMDLabel name, std::string &value)
 bool MetaDataContainer::valueExists(EMDLabel name)
 {
 	if (! EMDL::isValidLabel(name)) {
-		REPORT_ERROR("Unrecognised label type in MetaDataContainer valueExists");
+		throw MetadataException("Unrecognised label type in MetaDataContainer valueExists");
 	}
 
 	if (find(labels.begin(), labels.end(), name) != labels.end())
@@ -346,7 +346,7 @@ bool MetaDataContainer::writeValueToStream(std::ostream &outstream, EMDLabel inp
         {
             RFLOAT d;
             if (! getValue(inputLabel, d))
-        		REPORT_ERROR("Double value not found in writeValueToStream.");
+            	throw MetadataException("Double value not found in writeValueToStream.");
             if ((ABS(d) > 0. && ABS(d) < 0.001) || ABS(d) > 100000.)
                 outstream << std::setw(12) << std::scientific;
             else
@@ -357,14 +357,14 @@ bool MetaDataContainer::writeValueToStream(std::ostream &outstream, EMDLabel inp
         {
         	std::string s;
         	if (! getValue(inputLabel, s))
-        		REPORT_ERROR("String value not found in writeValueToStream.");
+        		throw MetadataException("String value not found in writeValueToStream.");
             outstream << s;
         }
         else if (EMDL::isInt(inputLabel))
         {
         	int i;
         	if (! getValue(inputLabel, i))
-    			REPORT_ERROR("Integer value not found in writeValueToStream.");
+        		throw MetadataException("Integer value not found in writeValueToStream.");
         	outstream << std::setw(12) << std::fixed;
             outstream << i;
         }
@@ -372,7 +372,7 @@ bool MetaDataContainer::writeValueToStream(std::ostream &outstream, EMDLabel inp
         {
         	long l;
         	if (! getValue(inputLabel, l))
-        		REPORT_ERROR("Long value not found in writeValueToStream.");
+        		throw MetadataException("Long value not found in writeValueToStream.");
         	outstream << std::setw(12) << std::fixed;
             outstream << l;
         }
@@ -380,7 +380,7 @@ bool MetaDataContainer::writeValueToStream(std::ostream &outstream, EMDLabel inp
         {
         	bool b;
         	if (! getValue(inputLabel, b))
-        		REPORT_ERROR("Boolean value not found in writeValueToStream.");
+        		throw MetadataException("Boolean value not found in writeValueToStream.");
         	outstream << std::setw(12) << std::fixed;
         	outstream << b;
         }

@@ -203,4 +203,41 @@ public:
     bool writeValueToString(std::string &outString, EMDLabel inputLabel);
 };
 
+class MetadataException: public std::exception
+{
+protected:
+    std::string msg_;
+    int line_nr_;
+
+public:
+
+    explicit MetadataException(const std::string& message):
+      msg_(message), line_nr_(0)
+      {}
+
+    explicit MetadataException(const std::string& message, int line_nr):
+      msg_(message), line_nr_(line_nr)
+      {}
+
+    virtual const char* what() const throw (){
+       return msg_.c_str();
+    }
+
+    const std::string what_s() const throw (){
+       return msg_;
+    }
+
+    const int what_line() const throw (){
+       return line_nr_;
+    }
+
+    const std::string what_line_s() const throw (){
+       return std::to_string(line_nr_);
+    }
+
+   void add_line_nr(int line_nr) {
+       line_nr_ += line_nr;
+    }
+};
+
 #endif

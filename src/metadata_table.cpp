@@ -102,7 +102,7 @@ void MetaDataTable::newSort(const EMDLabel label, bool do_reverse, bool do_sort_
 	else if (EMDL::isLong(label))
 		std::stable_sort(objects.begin(), objects.end(), compareLong);
 	else
-		REPORT_ERROR("Cannot sort this label: " + EMDL::label2Str(label));
+		throw MetadataException("Cannot sort this label: " + EMDL::label2Str(label));
 
 	if (do_reverse)
 		std::reverse(objects.begin(), objects.end());
@@ -226,7 +226,7 @@ bool MetaDataTable::setValueFromString(const EMDLabel &label, const std::string 
 		objectID = current_objectID;
 
 	if (objectID >= objects.size())
-		REPORT_ERROR("MetaDataTable::setValueFromString: objectID >= objects.size()");
+		throw MetadataException("MetaDataTable::setValueFromString: objectID >= objects.size()");
 
 	objects[objectID]->addValueFromString(label, value);
 
@@ -285,7 +285,7 @@ void MetaDataTable::append(MetaDataTable &app)
 	}
 
 	if (!have_all_labels)
-		REPORT_ERROR("ERROR in appending metadata tables with not the same columns!");
+		throw MetadataException("ERROR in appending metadata tables with not the same columns!");
 
 	// Go to the end of the table
 	current_objectID = objects.size();
@@ -318,7 +318,7 @@ long int MetaDataTable::addObject(MetaDataContainer * data, long int objectID)
     else
     {
         if (objectID >= objects.size())
-        	REPORT_ERROR("MetaDataTable::addObject: objectID >= objects.size()");
+        	throw MetadataException("MetaDataTable::addObject: objectID >= objects.size()");
 
         result = objectID;
         // First free memory of old container if it existed
@@ -394,7 +394,7 @@ MetaDataContainer * MetaDataTable::getObject(const long int objectID) const
     if (isEmpty())
     {
         // The objects map is empty, error
-        REPORT_ERROR("Requested objectID not found (no objects stored). Exiting... ");
+    	throw MetadataException("Requested objectID not found (no objects stored). Exiting... ");
     }
 
     MetaDataContainer * aux;
@@ -406,7 +406,7 @@ MetaDataContainer * MetaDataTable::getObject(const long int objectID) const
 		if (objectID >= objects.size())
 		{
 			std::cerr<< "objectID= "<<objectID<<" objects.size()= "<< objects.size() <<std::endl;
-			REPORT_ERROR("MetaDataTable::getObject: objectID >= objects.size()");
+			throw MetadataException("MetaDataTable::getObject: objectID >= objects.size()");
 		}
 #endif
     	aux = objects[objectID];
@@ -415,7 +415,7 @@ MetaDataContainer * MetaDataTable::getObject(const long int objectID) const
     if (aux == NULL)
     {
         // This objectID does not exist, finish execution
-        REPORT_ERROR("Requested objectID not found. Exiting... ");
+    	throw MetadataException("Requested objectID not found. Exiting... ");
     }
 
     return aux;
@@ -428,7 +428,7 @@ void MetaDataTable::setObject(MetaDataContainer * data, long int objectID)
 
 #ifdef DEBUG_CHECKSIZES
 	if (idx >= objects.size())
-		REPORT_ERROR("MetaDataTable::setObject: idx >= objects.size()");
+		throw MetadataException("MetaDataTable::setObject: idx >= objects.size()");
 #endif
 
         // First delete old container if it exists
@@ -536,7 +536,7 @@ long int MetaDataTable::goToObject(long int objectID)
 	}
 	else
 	{
-		REPORT_ERROR("MetaDataTable::goToObject: objectID >= objects.size()");
+		throw MetadataException("MetaDataTable::goToObject: objectID >= objects.size()");
 	}
 }
 
@@ -549,83 +549,95 @@ long int MetaDataTable::readStarLoop(std::ifstream& in, std::vector<EMDLabel> *d
     EMDLabel label;
     std::string line, token, value;
 
-    // First read all the column labels
-    while (getline(in, line, '\n'))
+    int line_nr(0);
+
+    try
     {
-		line = simplify(line);
-		// TODO: handle comments...
-		if (line[0] == '#' || line[0] == '\0' || line[0] == ';')
-			continue;
-
-		if (line[0] == '_') // label definition line
+		// First read all the column labels
+		while (getline(in, line, '\n'))
 		{
-			//Only take string from "_" until "#"
-			token = line.substr(line.find("_") + 1, line.find("#") - 2);
-			label = EMDL::str2Label(token);
-			//std::cerr << " label= XX" << label << "XX token= XX" << token<<"XX" << std::endl;
-			if (desiredLabels != NULL && !vectorContainsLabel(*desiredLabels, label))
-				label = EMDL_UNDEFINED; //ignore if not present in desiredLabels
+			line_nr ++;
+			line = simplify(line);
+			// TODO: handle comments...
+			if (line[0] == '#' || line[0] == '\0' || line[0] == ';')
+				continue;
 
-			if (label == EMDL_UNDEFINED)
+			if (line[0] == '_') // label definition line
 			{
-				//std::cerr << "Warning: ignoring the following (undefined) label:" <<token << std::endl;
-				REPORT_ERROR("ERROR: Unrecognised metadata label: " + token);
-				ignoreLabels.push_back(labelPosition);
-			}
-			else
-				activeLabels.push_back(label);
+				//Only take string from "_" until "#"
+				token = line.substr(line.find("_") + 1, line.find("#") - 2);
+				label = EMDL::str2Label(token);
+				//std::cerr << " label= XX" << label << "XX token= XX" << token<<"XX" << std::endl;
+				if (desiredLabels != NULL && !vectorContainsLabel(*desiredLabels, label))
+					label = EMDL_UNDEFINED; //ignore if not present in desiredLabels
 
-			labelPosition++;
-		}
-		else // found first data line
-		{
-			break;
-		}
-    }
-
-    // Then fill the table (dont read another line until the one from above has been handled)
-    bool is_first= true;
-    long int nr_objects = 0;
-    while (is_first || getline(in, line, '\n'))
-    {
-		is_first=false;
-
-    	if (grep_pattern == "" || line.find(grep_pattern) !=  std::string::npos )
-    	{
-    		line = simplify(line);
-			// Stop at empty line
-			if (line[0] == '\0')
-				break;
-
-			nr_objects++;
-			if (!do_only_count)
-			{
-				// Add a new line to the table
-				addObject();
-
-				// Parse data values
-				std::stringstream os2(line);
-				std::string value;
-				labelPosition = 0;
-				int counterIgnored = 0;
-				while (os2 >> value)
+				if (label == EMDL_UNDEFINED)
 				{
-					// TODO: handle comments here...
-					if (std::find(ignoreLabels.begin(), ignoreLabels.end(), labelPosition) != ignoreLabels.end())
-					{
-						// Ignore this column
-						counterIgnored++;
-						labelPosition++;
-						continue;
-					}
-					setValueFromString(activeLabels[labelPosition - counterIgnored], value);
-					labelPosition++;
+					//std::cerr << "Warning: ignoring the following (undefined) label:" <<token << std::endl;
+					throw MetadataException("ERROR: Unrecognised metadata label: " + token);
+					ignoreLabels.push_back(labelPosition);
 				}
-			}
-    	} // end if grep_pattern
-    }
+				else
+					activeLabels.push_back(label);
 
-    return nr_objects;
+				labelPosition++;
+			}
+			else // found first data line
+			{
+				break;
+			}
+		}
+
+		// Then fill the table (dont read another line until the one from above has been handled)
+		bool is_first= true;
+		long int nr_objects = 0;
+		while (is_first || getline(in, line, '\n'))
+		{
+			line_nr ++;
+			is_first=false;
+
+			if (grep_pattern == "" || line.find(grep_pattern) !=  std::string::npos )
+			{
+				line = simplify(line);
+				// Stop at empty line
+				if (line[0] == '\0')
+					break;
+
+				nr_objects++;
+				if (!do_only_count)
+				{
+					// Add a new line to the table
+					addObject();
+
+					// Parse data values
+					std::stringstream os2(line);
+					std::string value;
+					labelPosition = 0;
+					int counterIgnored = 0;
+					while (os2 >> value)
+					{
+						// TODO: handle comments here...
+						if (std::find(ignoreLabels.begin(), ignoreLabels.end(), labelPosition) != ignoreLabels.end())
+						{
+							// Ignore this column
+							counterIgnored++;
+							labelPosition++;
+							continue;
+						}
+						setValueFromString(activeLabels[labelPosition - counterIgnored], value);
+						labelPosition++;
+					}
+				}
+			} // end if grep_pattern
+		}
+
+		return nr_objects;
+    }
+    catch(MetadataException &e)
+    {
+    	e.add_line_nr(line_nr);
+    	throw e;
+    }
 }
 
 bool MetaDataTable::readStarList(std::ifstream& in, std::vector<EMDLabel> *desiredLabels)
@@ -654,7 +666,7 @@ bool MetaDataTable::readStarList(std::ifstream& in, std::vector<EMDLabel> *desir
     	 {
     		 label = EMDL::str2Label(firstword.substr(1)); // get rid of leading underscore
         	 if (words.size() != 2)
-        		 REPORT_ERROR("MetaDataTable::readStarList: did not encounter a single word after "+firstword);
+        		 throw MetadataException("MetaDataTable::readStarList: did not encounter a single word after "+firstword);
     		 value = words[1];
 
     		 if (desiredLabels != NULL && !vectorContainsLabel(*desiredLabels, label))
@@ -697,39 +709,49 @@ long int MetaDataTable::readStar(std::ifstream& in, const std::string &name, std
 
     // Start reading the ifstream at the top
     in.seekg(0);
+    int line_nr(0);
 
-    // Proceed until the next data_ or _loop statement
-    // The loop statement may be necessary for data blocks that have a list AND a table inside them
-    while (getline(in, line, '\n'))
+    try
     {
-    	// Find data_ lines
-    	if (line.find("data_") != std::string::npos)
-    	{
-    		token = line.substr(line.find("data_") + 5);
-    		// If a name has been given, only read data_thatname
-    		// Otherwise, just read the first data_ block
-    		if (name == "" || name == token)
-    		{
-    			setName(token);
-    			// Get the next item that starts with "_somelabel" or with "loop_"
-    			int current_pos = in.tellg();
-    			while (getline(in, line, '\n'))
-    			{
-    				trim(line);
-    				if (line.find("loop_") != std::string::npos)
-    				{
-    					return readStarLoop(in, desiredLabels, grep_pattern, do_only_count);
-    				}
-    				else if (line[0] == '_')
-    				{
-    					// go back one line in the ifstream
-    					in.seekg(current_pos);
-    					also_has_loop = readStarList(in, desiredLabels);
-    					return (also_has_loop) ? 0 : 1;
-    				}
-    			}
-    		}
-    	}
+		// Proceed until the next data_ or _loop statement
+		// The loop statement may be necessary for data blocks that have a list AND a table inside them
+		while (getline(in, line, '\n'))
+		{
+			line_nr ++;
+			// Find data_ lines
+			if (line.find("data_") != std::string::npos)
+			{
+				token = line.substr(line.find("data_") + 5);
+				// If a name has been given, only read data_thatname
+				// Otherwise, just read the first data_ block
+				if (name == "" || name == token)
+				{
+					setName(token);
+					// Get the next item that starts with "_somelabel" or with "loop_"
+					int current_pos = in.tellg();
+					while (getline(in, line, '\n'))
+					{
+						trim(line);
+						if (line.find("loop_") != std::string::npos)
+						{
+							return readStarLoop(in, desiredLabels, grep_pattern, do_only_count);
+						}
+						else if (line[0] == '_')
+						{
+							// go back one line in the ifstream
+							in.seekg(current_pos);
+							also_has_loop = readStarList(in, desiredLabels);
+							return (also_has_loop) ? 0 : 1;
+						}
+					}
+				}
+			}
+		}
+    }
+    catch(MetadataException &e)
+    {
+    	e.add_line_nr(line_nr);
+    	throw e;
     }
 
     // Clear the eofbit so we can perform more actions on the stream.
@@ -749,17 +771,24 @@ long int MetaDataTable::read(const FileName &filename, const std::string &name, 
 
     std::ifstream in(fn_read.data(), std::ios_base::in);
     if (in.fail())
-        REPORT_ERROR( (std::string) "MetaDataTable::read: File " + fn_read + " does not exists" );
+    	throw MetadataException( (std::string) "MetaDataTable::read: File " + fn_read + " does not exists" );
 
     FileName ext = filename.getFileFormat();
     if (ext =="star")
     {
-        //REPORT_ERROR("readSTAR not implemented yet...");
-        return readStar(in, name, desiredLabels, grep_pattern, do_only_count);
+        try
+        {
+			//REPORT_ERROR("readSTAR not implemented yet...");
+			return readStar(in, name, desiredLabels, grep_pattern, do_only_count);
+        }
+        catch(MetadataException &e)
+        {
+        	throw MetadataException("ERROR:" + e.what_s() + "\n   Found in '" + filename + "' on line "+ e.what_line_s());
+        }
     }
     else
     {
-        REPORT_ERROR("MetaDataTable::read ERROR: metadatatable should have .star extension");
+    	throw MetadataException("MetaDataTable::read ERROR: metadatatable should have .star extension");
     }
 
     in.close();
@@ -869,7 +898,7 @@ void MetaDataTable::write(const FileName &fn_out)
     std::ofstream  fh;
     fh.open((fn_out).c_str(), std::ios::out);
     if (!fh)
-        REPORT_ERROR( (std::string)"MetaDataTable::write Cannot write to file: " + fn_out);
+    	throw MetadataException( (std::string)"MetaDataTable::write Cannot write to file: " + fn_out);
     write(fh);
     fh.close();
 
@@ -921,7 +950,7 @@ void MetaDataTable::addToCPlot2D(CPlot2D *plot2D, EMDLabel xaxis, EMDLabel yaxis
     		xval = mylong;
     	}
     	else
-    		REPORT_ERROR("MetaDataTable::addToCPlot2D ERROR: can only plot xaxis double, int or long int");
+    		throw MetadataException("MetaDataTable::addToCPlot2D ERROR: can only plot xaxis double, int or long int");
 
     	if (EMDL::isDouble(yaxis))
     	{
@@ -939,7 +968,7 @@ void MetaDataTable::addToCPlot2D(CPlot2D *plot2D, EMDLabel xaxis, EMDLabel yaxis
     		yval = mylong;
     	}
     	else
-    		REPORT_ERROR("MetaDataTable::addToCPlot2D ERROR: can only plot yaxis double, int or long int");
+    		throw MetadataException("MetaDataTable::addToCPlot2D ERROR: can only plot yaxis double, int or long int");
 
     	CDataPoint point(xval, yval);
 		dataSet.AddDataPoint(point);
@@ -955,28 +984,28 @@ void compareMetaDataTable(MetaDataTable &MD1, MetaDataTable &MD2,
 		EMDLabel label1, RFLOAT eps, EMDLabel label2, EMDLabel label3)
 {
 	if (!MD1.containsLabel(label1))
-		REPORT_ERROR("compareMetaDataTableEqualLabel::ERROR MD1 does not contain the specified label1.");
+		throw MetadataException("compareMetaDataTableEqualLabel::ERROR MD1 does not contain the specified label1.");
 	if (!MD2.containsLabel(label1))
-		REPORT_ERROR("compareMetaDataTableEqualLabel::ERROR MD2 does not contain the specified label1.");
+		throw MetadataException("compareMetaDataTableEqualLabel::ERROR MD2 does not contain the specified label1.");
 
 	if (label2 != EMDL_UNDEFINED)
 	{
 		if (!EMDL::isDouble(label1) || !EMDL::isDouble(label2))
-			REPORT_ERROR("compareMetaDataTableEqualLabel::ERROR 2D or 3D distances are only allowed for RFLOATs.");
+			throw MetadataException("compareMetaDataTableEqualLabel::ERROR 2D or 3D distances are only allowed for RFLOATs.");
 		if (!MD1.containsLabel(label2))
-			REPORT_ERROR("compareMetaDataTableEqualLabel::ERROR MD1 does not contain the specified label2.");
+			throw MetadataException("compareMetaDataTableEqualLabel::ERROR MD1 does not contain the specified label2.");
 		if (!MD2.containsLabel(label2))
-			REPORT_ERROR("compareMetaDataTableEqualLabel::ERROR MD2 does not contain the specified label2.");
+			throw MetadataException("compareMetaDataTableEqualLabel::ERROR MD2 does not contain the specified label2.");
 	}
 
 	if (label3 != EMDL_UNDEFINED)
 	{
 		if (!EMDL::isDouble(label3))
-			REPORT_ERROR("compareMetaDataTableEqualLabel::ERROR 3D distances are only allowed for RFLOATs.");
+			throw MetadataException("compareMetaDataTableEqualLabel::ERROR 3D distances are only allowed for RFLOATs.");
 		if (!MD1.containsLabel(label3))
-			REPORT_ERROR("compareMetaDataTableEqualLabel::ERROR MD1 does not contain the specified label3.");
+			throw MetadataException("compareMetaDataTableEqualLabel::ERROR MD1 does not contain the specified label3.");
 		if (!MD2.containsLabel(label3))
-			REPORT_ERROR("compareMetaDataTableEqualLabel::ERROR MD2 does not contain the specified label3.");
+			throw MetadataException("compareMetaDataTableEqualLabel::ERROR MD2 does not contain the specified label3.");
 	}
 
 	MDboth.clear();
@@ -1007,7 +1036,7 @@ void compareMetaDataTable(MetaDataTable &MD1, MetaDataTable &MD2,
 				MD1.getValue(label3, mydz1);
 		}
 		else
-			REPORT_ERROR("compareMetaDataTableEqualLabel ERROR: only implemented for strings, integers or RFLOATs");
+			throw MetadataException("compareMetaDataTableEqualLabel ERROR: only implemented for strings, integers or RFLOATs");
 
 		// loop over MD2
 		bool have_in_2 = false;
@@ -1100,7 +1129,7 @@ MetaDataTable combineMetaDataTables(std::vector<MetaDataTable> &MDin)
 	MetaDataTable MDc;
 
 	if (MDin.size() == 0)
-		REPORT_ERROR("combineMetaDataTables ERROR: No input STAR files selected!");
+		throw MetadataException("combineMetaDataTables ERROR: No input STAR files selected!");
 	else if (MDin.size() == 1 )
 		MDc = MDin[0];
 	else
