@@ -872,7 +872,6 @@ void MlOptimiser::read(FileName fn_in, int rank)
 		mymodel.read(fn_model);
 	}
 	// Set up the bodies in the model, if this is a continuation of a multibody refinement (otherwise this is done in initialiseGeneral)
-    std::cerr << " fn_body_masks= " << fn_body_masks << std::endl;
     if (fn_body_masks != "None")
     {
     	mymodel.initialiseBodies(fn_body_masks, fn_out);
@@ -3255,7 +3254,7 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
     {
 
 		// Skip this body if keep_fixed_bodies[ibody] or if it's angular accuracy is worse than 1.5x the sampling rate
-    	if ( mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody] )
+    	if ( mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody] > 0)
 			continue;
 
     	// Here define all kind of local arrays that will be needed
@@ -3569,7 +3568,7 @@ void MlOptimiser::symmetriseReconstructions()
 {
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 	{
-		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody])
+		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody] > 0)
 			continue;
 
 		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
@@ -3598,7 +3597,7 @@ void MlOptimiser::applyLocalSymmetryForEachRef()
 
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 	{
-		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody])
+		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody] > 0)
 			continue;
 
 		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
@@ -3617,7 +3616,7 @@ void MlOptimiser::makeGoodHelixForEachRef()
 
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 	{
-		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody])
+		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody] > 0)
 			continue;
 
 		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
@@ -4102,6 +4101,7 @@ void MlOptimiser::updateCurrentResolution()
 	std::cerr << "Entering MlOptimiser::updateCurrentResolution" << std::endl;
 #endif
 
+	int nr_iter_wo_resol_gain_sum_bodies = 0;
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 	{
 
@@ -4144,7 +4144,7 @@ void MlOptimiser::updateCurrentResolution()
 		// Check whether resolution improved, if not increase nr_iter_wo_resol_gain
 		//if (newres <= best_resol_thus_far)
 		if (newres <= mymodel.current_resolution+0.0001) // Add 0.0001 to avoid problems due to rounding error
-			nr_iter_wo_resol_gain++;
+			nr_iter_wo_resol_gain_sum_bodies++;
 		else
 			nr_iter_wo_resol_gain = 0;
 
@@ -4155,6 +4155,10 @@ void MlOptimiser::updateCurrentResolution()
 		mymodel.current_resolution = newres;
 
 	} // end for ibody
+
+	if (nr_iter_wo_resol_gain_sum_bodies == mymodel.nr_bodies)
+		nr_iter_wo_resol_gain++;
+
 #ifdef DEBUG
 	std::cerr << "Leaving MlOptimiser::updateCurrentResolution" << std::endl;
 #endif
@@ -7658,7 +7662,7 @@ void MlOptimiser::monitorHiddenVariableChanges(long int my_first_ori_particle, l
 			for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 			{
 
-				if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody])
+				if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody] > 0)
 					continue;
 
 				RFLOAT old_rot, old_tilt, old_psi, old_xoff, old_yoff, old_zoff = 0.;
@@ -8254,7 +8258,7 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 				{
 					// Stop multi-body refinements a bit earlier than normal ones: no 75%, but 100% of accuracy
 					if (old_rottilt_step < mymodel.acc_rot[ibody])
-						mymodel.keep_fixed_bodies[ibody] = true;
+						mymodel.keep_fixed_bodies[ibody] = 1;
 					else
 						all_bodies_are_done = false;
 				}
@@ -8410,6 +8414,22 @@ void MlOptimiser::checkConvergence(bool myverb)
 		do_join_random_halves = true;
 		// In the last iteration, include all data until Nyquist
 		do_use_all_data = true;
+	}
+
+	// For multibody refinement: check whether all bodies are fixed: then stop
+	if (mymodel.nr_bodies > 1)
+	{
+		bool all_fixed = true;
+		for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
+		{
+			if (mymodel.keep_fixed_bodies[ibody] == 0)
+			{
+				all_fixed = false;
+				break;
+			}
+		}
+		has_converged = all_fixed;
+
 	}
 
         if (myverb)
