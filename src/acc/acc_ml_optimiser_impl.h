@@ -1730,7 +1730,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
-				XFLOAT weights_max = -9999;
+				XFLOAT weights_max = -99e99;
 
 				pdf_offset.streamSync();
 
