@@ -2465,7 +2465,8 @@ void MlOptimiser::iterate()
 			// Write out without a _sub in the name
 			nr_subsets = 1;
 			write(DO_WRITE_SAMPLING, DO_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, 0);
-
+			// We must reset mu to zero, otherwise ClassDistributions do not sum to 1.
+			mu = 0;
 
 			if (do_sgd)
 			{
