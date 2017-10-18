@@ -34,9 +34,9 @@ __global__ void cuda_kernel_weights_exponent_coarse(
 
 		T diff2 = g_weights[idx];
 		if( diff2 < g_min_diff2 || g_pdf_orientation_zeros[iorient] || g_pdf_offset_zeros[itrans])
-			g_weights[idx] = -99999.f; //large negative number
+			g_weights[idx] = -99e99; //large negative number
 		else
-			g_weights[idx] = g_pdf_orientation[iorient] + g_pdf_offset[itrans] - diff2;
+			g_weights[idx] = g_pdf_orientation[iorient] + g_pdf_offset[itrans] + g_min_diff2 - diff2;
 	}
 }
 
@@ -169,6 +169,7 @@ __global__ void cuda_kernel_exponentiate_weights_fine(
 		XFLOAT *g_pdf_offset,
 		bool *g_pdf_offset_zeros,
 		XFLOAT *g_weights,
+		XFLOAT min_diff2,
 		int oversamples_orient,
 		int oversamples_trans,
 		unsigned long *d_rot_id,

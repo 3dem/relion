@@ -1730,7 +1730,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
-				XFLOAT weights_max = -99e99;
+				XFLOAT weights_max = std::numeric_limits<float>::min();
 
 				pdf_offset.streamSync();
 
@@ -1743,18 +1743,14 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 						
 						IndexedDataArray thisClassPassWeights(PassWeights[ipart],FPCMasks[ipart][exp_iclass]);
 
-						AccPtr<XFLOAT> pdf_orientation_class =       ptrFactory.make<XFLOAT>(),
-						               pdf_offset_class =            ptrFactory.make<XFLOAT>();
-						AccPtr<bool>   pdf_orientation_zeros_class = ptrFactory.make<bool>(),
-						               pdf_offset_zeros_class =      ptrFactory.make<bool>();
+						AccPtr<XFLOAT> pdf_orientation_class =       ptrFactory.make<XFLOAT>(sp.nr_dir*sp.nr_psi),
+						               pdf_offset_class =            ptrFactory.make<XFLOAT>(sp.nr_trans);
+						AccPtr<bool>   pdf_orientation_zeros_class = ptrFactory.make<bool>(sp.nr_dir*sp.nr_psi),
+						               pdf_offset_zeros_class =      ptrFactory.make<bool>(sp.nr_trans);
 
-						pdf_orientation_class      .setSize(sp.nr_dir*sp.nr_psi);
-						pdf_orientation_zeros_class.setSize(sp.nr_dir*sp.nr_psi);
 						pdf_orientation_class      .setAccPtr(&((~pdf_orientation)      [(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]));
 						pdf_orientation_zeros_class.setAccPtr(&((~pdf_orientation_zeros)[(exp_iclass-sp.iclass_min)*sp.nr_dir*sp.nr_psi]));
 
-						pdf_offset_class           .setSize(sp.nr_trans);
-						pdf_offset_zeros_class     .setSize(sp.nr_trans);
 						pdf_offset_class           .setAccPtr(&((~pdf_offset)           [(exp_iclass-sp.iclass_min)*sp.nr_trans]));
 						pdf_offset_zeros_class     .setAccPtr(&((~pdf_offset_zeros)     [(exp_iclass-sp.iclass_min)*sp.nr_trans]));
 
@@ -1766,6 +1762,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 								~pdf_offset_class,
 								~pdf_offset_zeros_class,
 								~thisClassPassWeights.weights,
+								(XFLOAT)op.min_diff2[ipart],
 								sp.nr_oversampled_rot,
 								sp.nr_oversampled_trans,
 								~thisClassPassWeights.rot_id,
@@ -1794,11 +1791,11 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 						 * We still want as high numbers as possible to utilize most of the single precision span.
 						 * Dari - 201710
 						*/
-						AccUtilities::kernel_exponentiate( thisClassPassWeights.weights, 50 - weights_max);
+						AccUtilities::kernel_exponentiate( thisClassPassWeights.weights, 50 - weights_max );
 					}
 				}
 
-				op.min_diff2[ipart] = 50 - weights_max;
+				op.min_diff2[ipart] += 50 - weights_max;
 
 				for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 					DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
@@ -2760,9 +2757,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		RFLOAT dLL;
 
 		if ((baseMLO->iter==1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
-			dLL = -op.min_diff2[ipart];
+			dLL = op.min_diff2[ipart];
 		else
-			dLL = log(op.sum_weight[ipart]) -op.min_diff2[ipart] - logsigma2;
+			dLL = log(op.sum_weight[ipart]) + op.min_diff2[ipart] - logsigma2;
 
 		// Store dLL of each image in the output array, and keep track of total sum
 		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_DLL) = dLL;
