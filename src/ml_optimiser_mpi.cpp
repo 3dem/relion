@@ -438,7 +438,7 @@ might be the limiting factor, since each mpi-slave that shares a GPU increases t
 use of memory. In this case we recommend running a single mpi-slave per GPU, which \n\
 will still yield good performance and possibly a more stable execution. \n" << std::endl;
 					}
-#ifdef CUDA_DOUBLE_PRECISION
+#ifdef ACC_DOUBLE_PRECISION
 					int sLowBoxLim = (int)((float)LowBoxLim*pow(2,1.0/3.0));
 					std::cerr << "You are also using double precison on the GPU. If you were using single precision\n\
 (which in all tested cases is perfectly fine), then you could use an box-size of ~"  << sLowBoxLim << "." << std::endl;

@@ -4,7 +4,7 @@
 // which has a few different data members and methods from MlOptimiserCuda to
 // support the different implementation
 // Note the the CPU implementation defines the floating point precision used
-// for XFLOAT using CUDA_DOUBLE_PRECISION (CUDA_DOUBLE_PRECISION is also used
+// for XFLOAT using ACC_DOUBLE_PRECISION (ACC_DOUBLE_PRECISION is also used
 // for the equivalent purpose throughout the code)
 #ifndef CPU_ML_OPTIMISER_H_
 #define CPU_ML_OPTIMISER_H_
