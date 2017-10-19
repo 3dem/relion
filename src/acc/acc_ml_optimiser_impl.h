@@ -508,7 +508,6 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			XFLOAT radius_p = radius + cosine_width;
 
 			XFLOAT sum_bg(0.);
-			int block_dim = 128; //TODO: set balanced (hardware-dep?)
 
 			AccPtr<XFLOAT> softMaskSum    = ptrFactory.make<XFLOAT>((size_t)SOFTMASK_BLOCK_SIZE, 0);
 			AccPtr<XFLOAT> softMaskSum_bg = ptrFactory.make<XFLOAT>((size_t)SOFTMASK_BLOCK_SIZE, 0);
@@ -516,15 +515,15 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			softMaskSum_bg.accAlloc();
 			softMaskSum.accInit(0.f);
 			softMaskSum_bg.accInit(0.f);
-			AccUtilities::softMaskBackgroundValue(block_dim, SOFTMASK_BLOCK_SIZE,
-					~d_img,
-					img,
+
+			AccUtilities::softMaskBackgroundValue(
+					d_img,
 					true,
 					radius,
 					radius_p,
 					cosine_width,
-					~softMaskSum,
-					~softMaskSum_bg);
+					softMaskSum,
+					softMaskSum_bg);
 
 			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 
@@ -533,20 +532,14 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 					 (RFLOAT) AccUtilities::getSumOnDevice<XFLOAT>(softMaskSum);
 			softMaskSum.streamSync();
 			
-			AccUtilities::cosineFilter(block_dim,SOFTMASK_BLOCK_SIZE,
-										~d_img,
-										img().nzyxdim,
-										img.data.xdim,
-										img.data.ydim,
-										img.data.zdim,
-										img.data.xdim/2,
-										img.data.ydim/2,
-										img.data.zdim/2, //unused
-										true,
-										radius,
-										radius_p,
-										cosine_width,
-										sum_bg);
+			AccUtilities::cosineFilter(
+					d_img,
+					true,
+					radius,
+					radius_p,
+					cosine_width,
+					sum_bg);
+
 			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
