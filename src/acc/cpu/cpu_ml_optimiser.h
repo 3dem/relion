@@ -75,7 +75,7 @@ public:
 
     void expectationOneParticle(unsigned long my_ori_particle, int thread_id);
 
-	void setupFixedSizedObjects();
+	void setupFixedSizedObjects(XFLOAT **mdlClassComplex);
 
 	void setupTunableSizedObjects();
 	

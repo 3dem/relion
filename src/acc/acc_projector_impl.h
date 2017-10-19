@@ -159,7 +159,8 @@ bool AccProjector::setMdlDim(
 	DEBUG_HANDLE_ERROR(cudaMalloc( (void**) &mdlReal, mdlXYZ * sizeof(XFLOAT)));
 	DEBUG_HANDLE_ERROR(cudaMalloc( (void**) &mdlImag, mdlXYZ * sizeof(XFLOAT)));
 #else
-	posix_memalign((void **)&mdlComplex, MEM_ALIGN, mdlXYZ * 2 * sizeof(XFLOAT));
+	mdlComplex = NULL;
+	// posix_memalign((void **)&mdlComplex, MEM_ALIGN, mdlXYZ * 2 * sizeof(XFLOAT));
 #endif
 #endif
 	return true;
@@ -218,6 +219,11 @@ void AccProjector::initMdl(XFLOAT *real, XFLOAT *imag)
 }
 #endif
 
+void AccProjector::initMdl(XFLOAT *data)
+{
+	mdlComplex = data;  // No copy needed - everyone shares the complex reference arrays
+	externalFree = 1;   // This is shared memory freed outside the projector
+}
 
 void AccProjector::initMdl(Complex *data)
 {
@@ -328,10 +334,10 @@ void AccProjector::clear()
 		mdlImag = 0;
 	}
 #else // ifdef CUDA
-	if (mdlComplex != 0)
+	if ((mdlComplex != 0) && (externalFree == 0))
 	{
-        free(mdlComplex);
-	    mdlComplex = NULL;
+		free(mdlComplex);
+		mdlComplex = NULL;
 	}
 #endif  // ifdef CUDA
 }

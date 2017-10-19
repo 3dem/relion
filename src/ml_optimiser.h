@@ -112,6 +112,8 @@ public:
 
 	CpuOptimiserType   tbbCpuOptimiser;
 	tbb::task_scheduler_init tbbSchedulerInit;
+	
+	XFLOAT **mdlClassComplex __attribute__((aligned(64)));
 #endif
 
 	
@@ -713,6 +715,7 @@ public:
 		threadException(NULL),
 #ifdef ALTCPU
 		tbbSchedulerInit(tbb::task_scheduler_init::deferred ),
+		mdlClassComplex(NULL),
 #endif
 		failsafe_threshold(40)
 	{

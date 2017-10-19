@@ -280,7 +280,7 @@ void dump_triple_array(char *name, double *ptr, double *ptr2, double *ptr3, size
 	fclose(fp);
 }
 
-void MlOptimiserCpu::setupFixedSizedObjects()
+void MlOptimiserCpu::setupFixedSizedObjects(XFLOAT **mdlClassComplex)
 {
 	unsigned nr_classes = baseMLO->mymodel.nr_classes;
 
@@ -311,7 +311,8 @@ void MlOptimiserCpu::setupFixedSizedObjects()
 				baseMLO->mymodel.PPref[iclass].r_max,
 				baseMLO->mymodel.PPref[iclass].padding_factor);
 
-		bundle->projectors[iclass].initMdl(baseMLO->mymodel.PPref[iclass].data.data);
+//		bundle->projectors[iclass].initMdl(baseMLO->mymodel.PPref[iclass].data.data);
+		bundle->projectors[iclass].initMdl(mdlClassComplex[iclass]);
 
 		bundle->backprojectors[iclass].setMdlDim(
 				baseMLO->wsum_model.BPref[iclass].data.xdim,

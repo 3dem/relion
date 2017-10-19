@@ -22,6 +22,10 @@
 #ifdef CUDA
 #include "src/acc/cuda/cuda_ml_optimiser.h"
 #endif
+#ifdef ALTCPU
+	#include <tbb/tbb.h>
+	#include "src/acc/cpu/cpu_ml_optimiser.h"
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -989,8 +993,43 @@ void MlOptimiserMpi::expectation()
 		for (int i = 0; i < cudaDeviceBundles.size(); i ++)
 			((MlDeviceBundle*)cudaDeviceBundles[i])->setupTunableSizedObjects(allocationSizes[i]);
 	}
-	/************************************************************************/
 #endif // CUDA
+#ifdef ALTCPU	
+	MPI_Barrier(MPI_COMM_WORLD);
+	if (do_cpu  && ! node->isMaster())
+	{	
+		unsigned nr_classes = mymodel.nr_classes;
+		// Allocate Array of complex arrays for this class
+		posix_memalign((void **)&mdlClassComplex, MEM_ALIGN, nr_classes * sizeof (XFLOAT *));
+		
+		// Set up XFLOAT complex array shared by all threads for each class
+		for (int iclass = 0; iclass < nr_classes; iclass++)
+		{
+			int mdlX = mymodel.PPref[iclass].data.xdim;
+			int mdlY = mymodel.PPref[iclass].data.ydim;
+			int mdlZ = mymodel.PPref[iclass].data.zdim;
+			int mdlXYZ;
+			if(mdlZ == 0)
+				mdlXYZ = mdlX*mdlY;
+			else
+				mdlXYZ = mdlX*mdlY*mdlZ;
+			
+			posix_memalign((void **)&mdlClassComplex[iclass], MEM_ALIGN, mdlXYZ * 2 * sizeof(XFLOAT));
+			
+			XFLOAT *pData = mdlClassComplex[iclass];
+			
+			for (unsigned long i = 0; i < mdlXYZ; i ++)
+			{
+				*pData ++ = (XFLOAT) mymodel.PPref[iclass].data.data[i].real;
+				*pData ++ = (XFLOAT) mymodel.PPref[iclass].data.data[i].imag;
+			} 
+		}
+		
+		MPI_Barrier(MPI_COMM_WORLD);
+	}  // do_cpu
+#endif // ALTCPU
+	/************************************************************************/
+	
 #ifdef TIMING
 		timer.toc(TIMING_EXP_4);
 #endif
@@ -1251,7 +1290,7 @@ void MlOptimiserMpi::expectation()
 		timer.toc(TIMING_EXP_5);
 #endif
     }
-    else
+    else  // if not Master
     {
 #ifdef TIMING
 		timer.tic(TIMING_EXP_6);
@@ -1468,6 +1507,59 @@ void MlOptimiserMpi::expectation()
 #endif
 			}
 #endif // CUDA
+#ifdef ALTCPU
+			if (do_cpu)
+			{
+				// Now collect the results from each thread
+				for (CpuOptimiserType::const_iterator i = tbbCpuOptimiser.begin(); i != tbbCpuOptimiser.end();  ++i)
+				{
+					MlOptimiserCpu* b = (MlOptimiserCpu*)(*i);
+					if(!b) continue;
+
+		#ifdef DEBUG
+					std::cerr << "Faux thread id: " << b->thread_id << std::endl;
+		#endif
+
+					for (int j = 0; j < b->bundle->projectors.size(); j++)
+					{
+		//TODO - do away with the extra copies - don't need reals, imags, weights arrays
+						unsigned long s = wsum_model.BPref[j].data.nzyxdim;
+						XFLOAT *reals = new XFLOAT[s];
+						XFLOAT *imags = new XFLOAT[s];
+						XFLOAT *weights = new XFLOAT[s];
+
+						b->bundle->backprojectors[j].getMdlData(reals, imags, weights);
+
+						for (unsigned long n = 0; n < s; n++)
+						{
+							wsum_model.BPref[j].data.data[n].real += (RFLOAT) reals[n];
+							wsum_model.BPref[j].data.data[n].imag += (RFLOAT) imags[n];
+							wsum_model.BPref[j].weight.data[n] += (RFLOAT) weights[n];
+						}
+
+						delete [] reals;
+						delete [] imags;
+						delete [] weights;
+
+						b->bundle->projectors[j].clear();
+						b->bundle->backprojectors[j].clear();
+						b->bundle->coarseProjectionPlans[j].clear();
+					}
+
+					delete b;
+				}
+
+				// Now clean up
+				unsigned nr_classes = mymodel.nr_classes;
+				for (int iclass = 0; iclass < nr_classes; iclass++)
+				{
+					free(mdlClassComplex[iclass]);
+				}
+				free(mdlClassComplex);
+
+				tbbCpuOptimiser.clear();
+			}
+#endif  // ALTCPU			
 
     	}
         catch (RelionError XE)
@@ -1479,7 +1571,7 @@ void MlOptimiserMpi::expectation()
 #ifdef TIMING
 		timer.toc(TIMING_EXP_6);
 #endif
-    }
+    }  // Slave node
 
     // Just make sure the temporary arrays are empty...
 	exp_imagedata.clear();

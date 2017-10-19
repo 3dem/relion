@@ -36,6 +36,7 @@ class AccProjector
 	XFLOAT *mdlReal, *mdlImag;
 #else
 	XFLOAT *mdlComplex;
+	int externalFree;
 #endif
 #endif  // CUDA_NO_TEXTURES
 
@@ -68,6 +69,7 @@ public:
 		mdlImag = 0;
 #else
 		mdlComplex = 0;
+		externalFree = 0;
 #endif
 #endif
 	}
@@ -79,6 +81,7 @@ public:
 
 	void initMdl(XFLOAT *real, XFLOAT *imag);
 	void initMdl(Complex *data);
+	void initMdl(XFLOAT *data);
 
 	void clear();
 

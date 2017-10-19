@@ -2634,7 +2634,37 @@ void MlOptimiser::expectation()
 		}
 	}
 #endif
-
+#ifdef ALTCPU	
+	if (do_cpu)
+	{	
+		unsigned nr_classes = mymodel.nr_classes;
+		// Allocate Array of complex arrays for this class
+		posix_memalign((void **)&mdlClassComplex, MEM_ALIGN, nr_classes * sizeof (XFLOAT *));
+		
+		// Set up XFLOAT complex array shared by all threads for each class
+		for (int iclass = 0; iclass < nr_classes; iclass++)
+		{
+			int mdlX = mymodel.PPref[iclass].data.xdim;
+			int mdlY = mymodel.PPref[iclass].data.ydim;
+			int mdlZ = mymodel.PPref[iclass].data.zdim;
+			int mdlXYZ;
+			if(mdlZ == 0)
+				mdlXYZ = mdlX*mdlY;
+			else
+				mdlXYZ = mdlX*mdlY*mdlZ;
+			
+			posix_memalign((void **)&mdlClassComplex[iclass], MEM_ALIGN, mdlXYZ * 2 * sizeof(XFLOAT));
+			
+			XFLOAT *pData = mdlClassComplex[iclass];
+			
+			for (unsigned long i = 0; i < mdlXYZ; i ++)
+			{
+				*pData ++ = (XFLOAT) mymodel.PPref[iclass].data.data[i].real;
+				*pData ++ = (XFLOAT) mymodel.PPref[iclass].data.data[i].imag;
+			} 
+		}
+	}  // do_cpu
+#endif // ALTCPU
 	/************************************************************************/
 
 #ifdef MKLFFT
@@ -2804,6 +2834,59 @@ void MlOptimiser::expectation()
 		cudaDeviceBundles.clear();
 	}
 #endif
+#ifdef ALTCPU
+	if (do_cpu)
+	{
+        // Now collect the results from each thread
+        for (CpuOptimiserType::const_iterator i = tbbCpuOptimiser.begin(); i != tbbCpuOptimiser.end();  ++i)
+        {
+            MlOptimiserCpu* b = (MlOptimiserCpu*)(*i);
+            if(!b) continue;
+
+#ifdef DEBUG
+            std::cerr << "Faux thread id: " << b->thread_id << std::endl;
+#endif
+
+            for (int j = 0; j < b->bundle->projectors.size(); j++)
+            {
+//TODO - do away with the extra copies - don't need reals, imags, weights arrays
+                unsigned long s = wsum_model.BPref[j].data.nzyxdim;
+                XFLOAT *reals = new XFLOAT[s];
+                XFLOAT *imags = new XFLOAT[s];
+                XFLOAT *weights = new XFLOAT[s];
+
+                b->bundle->backprojectors[j].getMdlData(reals, imags, weights);
+
+                for (unsigned long n = 0; n < s; n++)
+                {
+                    wsum_model.BPref[j].data.data[n].real += (RFLOAT) reals[n];
+                    wsum_model.BPref[j].data.data[n].imag += (RFLOAT) imags[n];
+                    wsum_model.BPref[j].weight.data[n] += (RFLOAT) weights[n];
+                }
+
+                delete [] reals;
+                delete [] imags;
+                delete [] weights;
+				
+				b->bundle->projectors[j].clear();
+				b->bundle->backprojectors[j].clear();
+				b->bundle->coarseProjectionPlans[j].clear();
+            }
+
+            delete b;
+        }
+
+		// Now clean up
+		unsigned nr_classes = mymodel.nr_classes;
+		for (int iclass = 0; iclass < nr_classes; iclass++)
+		{
+			free(mdlClassComplex[iclass]);
+		}
+		free(mdlClassComplex);
+
+        tbbCpuOptimiser.clear();
+	}
+#endif  // ALTCPU
 #ifdef  MKLFFT
 	// Allow parallel FFTW execution to continue now that we are outside the parallel
 	// portion of expectation
@@ -3186,7 +3269,7 @@ void MlOptimiser::expectationSomeParticles(long int my_first_ori_particle, long 
 		// particles in parallel.  Like the GPU implementation, the lower-
 		// level parallelism is implemented by compiler vectorization
 		// (roughly equivalent to GPU "threads").
-	int tCount = 0;  
+		int tCount = 0;  
     
         // process all passed particles in parallel
         //for(unsigned long i=my_first_ori_particle; i<=my_last_ori_particle; i++) {
@@ -3196,57 +3279,17 @@ void MlOptimiser::expectationSomeParticles(long int my_first_ori_particle, long 
             if(cpuOptimiser == NULL) {
                 cpuOptimiser = new MlOptimiserCpu(this, "cpu_optimiser");
                 cpuOptimiser->resetData();
-                cpuOptimiser->setupFixedSizedObjects();
+                cpuOptimiser->setupFixedSizedObjects(mdlClassComplex);
                 cpuOptimiser->setupTunableSizedObjects();
                 ref = cpuOptimiser;
 
-		cpuOptimiser->thread_id = tCount;
-		tCount++;  // Race condition!
+				cpuOptimiser->thread_id = tCount;
+				tCount++;  // Race condition!
             }  // cpuOptimiser == NULL
 
-		cpuOptimiser->expectationOneParticle(i, cpuOptimiser->thread_id);
+			cpuOptimiser->expectationOneParticle(i, cpuOptimiser->thread_id);
         });
         //}
-
-        // Now collect the results from each thread
-        for (CpuOptimiserType::const_iterator i = tbbCpuOptimiser.begin(); i != tbbCpuOptimiser.end();  ++i)
-        {
-            MlOptimiserCpu* b = (MlOptimiserCpu*)(*i);
-            if(!b) continue;
-
-#ifdef DEBUG
-            std::cerr << "Faux thread id: " << b->thread_id << std::endl;
-#endif
-
-            for (int j = 0; j < b->bundle->projectors.size(); j++)
-            {
-                unsigned long s = wsum_model.BPref[j].data.nzyxdim;
-                XFLOAT *reals = new XFLOAT[s];
-                XFLOAT *imags = new XFLOAT[s];
-                XFLOAT *weights = new XFLOAT[s];
-
-                b->bundle->backprojectors[j].getMdlData(reals, imags, weights);
-
-                for (unsigned long n = 0; n < s; n++)
-                {
-                    wsum_model.BPref[j].data.data[n].real += (RFLOAT) reals[n];
-                    wsum_model.BPref[j].data.data[n].imag += (RFLOAT) imags[n];
-                    wsum_model.BPref[j].weight.data[n] += (RFLOAT) weights[n];
-                }
-
-                delete [] reals;
-                delete [] imags;
-                delete [] weights;
-				
-				b->bundle->projectors[j].clear();
-				b->bundle->backprojectors[j].clear();
-				b->bundle->coarseProjectionPlans[j].clear();
-            }
-
-            delete b;
-        }
-
-        tbbCpuOptimiser.clear();
     }  // do_cpu
 #endif  // ifdef ALTCPU
     
