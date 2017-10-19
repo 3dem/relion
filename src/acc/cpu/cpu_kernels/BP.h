@@ -901,51 +901,51 @@ void backprojectSGD(
 
 					XFLOAT dd000 = mfz * mfy * mfx;
 
-					g_model_real  [z0 * mdl_x * mdl_y + y0 * mdl_x + x0] = dd000 * real[tid];
-					g_model_imag  [z0 * mdl_x * mdl_y + y0 * mdl_x + x0] = dd000 * imag[tid];
-					g_model_weight[z0 * mdl_x * mdl_y + y0 * mdl_x + x0] = dd000 * Fweight[tid];
+					g_model_real  [z0 * mdl_x * mdl_y + y0 * mdl_x + x0] += dd000 * real[tid];
+					g_model_imag  [z0 * mdl_x * mdl_y + y0 * mdl_x + x0] += dd000 * imag[tid];
+					g_model_weight[z0 * mdl_x * mdl_y + y0 * mdl_x + x0] += dd000 * Fweight[tid];
 
 					XFLOAT dd001 = mfz * mfy *  fx;
 
-					g_model_real  [z0 * mdl_x * mdl_y + y0 * mdl_x + x1] = dd001 * real[tid];
-					g_model_imag  [z0 * mdl_x * mdl_y + y0 * mdl_x + x1] = dd001 * imag[tid];
-					g_model_weight[z0 * mdl_x * mdl_y + y0 * mdl_x + x1] = dd001 * Fweight[tid];
+					g_model_real  [z0 * mdl_x * mdl_y + y0 * mdl_x + x1] += dd001 * real[tid];
+					g_model_imag  [z0 * mdl_x * mdl_y + y0 * mdl_x + x1] += dd001 * imag[tid];
+					g_model_weight[z0 * mdl_x * mdl_y + y0 * mdl_x + x1] += dd001 * Fweight[tid];
 
 					XFLOAT dd010 = mfz *  fy * mfx;
 
-					g_model_real  [z0 * mdl_x * mdl_y + y1 * mdl_x + x0] = dd010 * real[tid];
-					g_model_imag  [z0 * mdl_x * mdl_y + y1 * mdl_x + x0] = dd010 * imag[tid];
-					g_model_weight[z0 * mdl_x * mdl_y + y1 * mdl_x + x0] = dd010 * Fweight[tid];
+					g_model_real  [z0 * mdl_x * mdl_y + y1 * mdl_x + x0] += dd010 * real[tid];
+					g_model_imag  [z0 * mdl_x * mdl_y + y1 * mdl_x + x0] += dd010 * imag[tid];
+					g_model_weight[z0 * mdl_x * mdl_y + y1 * mdl_x + x0] += dd010 * Fweight[tid];
 
 					XFLOAT dd011 = mfz *  fy *  fx;
 
-					g_model_real  [z0 * mdl_x * mdl_y + y1 * mdl_x + x1] = dd011 * real[tid];
-					g_model_imag  [z0 * mdl_x * mdl_y + y1 * mdl_x + x1] = dd011 * imag[tid];
-					g_model_weight[z0 * mdl_x * mdl_y + y1 * mdl_x + x1] = dd011 * Fweight[tid];
+					g_model_real  [z0 * mdl_x * mdl_y + y1 * mdl_x + x1] += dd011 * real[tid];
+					g_model_imag  [z0 * mdl_x * mdl_y + y1 * mdl_x + x1] += dd011 * imag[tid];
+					g_model_weight[z0 * mdl_x * mdl_y + y1 * mdl_x + x1] += dd011 * Fweight[tid];
 
 					XFLOAT dd100 =  fz * mfy * mfx;
 
-					g_model_real  [z1 * mdl_x * mdl_y + y0 * mdl_x + x0] = dd100 * real[tid];
-					g_model_imag  [z1 * mdl_x * mdl_y + y0 * mdl_x + x0] = dd100 * imag[tid];
-					g_model_weight[z1 * mdl_x * mdl_y + y0 * mdl_x + x0] = dd100 * Fweight[tid];
+					g_model_real  [z1 * mdl_x * mdl_y + y0 * mdl_x + x0] += dd100 * real[tid];
+					g_model_imag  [z1 * mdl_x * mdl_y + y0 * mdl_x + x0] += dd100 * imag[tid];
+					g_model_weight[z1 * mdl_x * mdl_y + y0 * mdl_x + x0] += dd100 * Fweight[tid];
 
 					XFLOAT dd101 =  fz * mfy *  fx;
 
-					g_model_real  [z1 * mdl_x * mdl_y + y0 * mdl_x + x1] = dd101 * real[tid];
-					g_model_imag  [z1 * mdl_x * mdl_y + y0 * mdl_x + x1] = dd101 * imag[tid];
-					g_model_weight[z1 * mdl_x * mdl_y + y0 * mdl_x + x1] = dd101 * Fweight[tid];
+					g_model_real  [z1 * mdl_x * mdl_y + y0 * mdl_x + x1] += dd101 * real[tid];
+					g_model_imag  [z1 * mdl_x * mdl_y + y0 * mdl_x + x1] += dd101 * imag[tid];
+					g_model_weight[z1 * mdl_x * mdl_y + y0 * mdl_x + x1] += dd101 * Fweight[tid];
 
 					XFLOAT dd110 =  fz *  fy * mfx;
 
-					g_model_real  [z1 * mdl_x * mdl_y + y1 * mdl_x + x0] = dd110 * real[tid];
-					g_model_imag  [z1 * mdl_x * mdl_y + y1 * mdl_x + x0] = dd110 * imag[tid];
-					g_model_weight[z1 * mdl_x * mdl_y + y1 * mdl_x + x0] = dd110 * Fweight[tid];
+					g_model_real  [z1 * mdl_x * mdl_y + y1 * mdl_x + x0] += dd110 * real[tid];
+					g_model_imag  [z1 * mdl_x * mdl_y + y1 * mdl_x + x0] += dd110 * imag[tid];
+					g_model_weight[z1 * mdl_x * mdl_y + y1 * mdl_x + x0] += dd110 * Fweight[tid];
 
 					XFLOAT dd111 =  fz *  fy *  fx;
 
-					g_model_real  [z1 * mdl_x * mdl_y + y1 * mdl_x + x1] = dd111 * real[tid];
-					g_model_imag  [z1 * mdl_x * mdl_y + y1 * mdl_x + x1] = dd111 * imag[tid];
-					g_model_weight[z1 * mdl_x * mdl_y + y1 * mdl_x + x1] = dd111 * Fweight[tid];
+					g_model_real  [z1 * mdl_x * mdl_y + y1 * mdl_x + x1] += dd111 * real[tid];
+					g_model_imag  [z1 * mdl_x * mdl_y + y1 * mdl_x + x1] += dd111 * imag[tid];
+					g_model_weight[z1 * mdl_x * mdl_y + y1 * mdl_x + x1] += dd111 * Fweight[tid];
 
 				} // Fweight[tid] > (RFLOAT) 0.0
 			} // for tid
