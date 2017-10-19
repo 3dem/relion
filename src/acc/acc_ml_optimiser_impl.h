@@ -277,10 +277,10 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 		size_t img_size = img.data.nzyxdim;
 
-		AccDataTypes::Image<XFLOAT> temp(img.data, (CudaCustomAllocator *)accMLO->getAllocator());
-		AccDataTypes::Image<XFLOAT> d_img(img.data, (CudaCustomAllocator *)accMLO->getAllocator());
+		AccDataTypes::Image<XFLOAT> temp(img.data, ptrFactory);
+		AccDataTypes::Image<XFLOAT> d_img(img.data, ptrFactory);
 
-		d_img.deviceAlloc();
+		d_img.allAlloc();
 		d_img.hostInit(0);
 		d_img.deviceInit(0);
 
@@ -469,8 +469,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			CTIC(accMLO->timer,"softMaskOutsideMap");
 			d_img.cpToHost();
 			d_img.streamSync();
-			for (int i=0; i<img_size; i++)
-				img.data.data[i] = d_img[i];
+			d_img.getHost(img());
 
 			if (is_helical_segment)
 			{
@@ -490,14 +489,12 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		{
 			d_img.cpToHost();
 			d_img.streamSync();
-			for (int i=0; i<img_size; i++)
-				img.data.data[i] = d_img[i];
+			d_img.getHost(img());
 
 			softMaskOutsideMapForHelix(img(), psi_deg, tilt_deg, (baseMLO->particle_diameter / (2. * baseMLO->mymodel.pixel_size)),
 					(baseMLO->helical_tube_outer_diameter / (2. * baseMLO->mymodel.pixel_size)), baseMLO->width_mask_edge);
 
-			for (int i=0; i<img_size; i++)
-				d_img[i] = img.data.data[i];
+			d_img.setHost(img());
 			d_img.cpToDevice();
 		}
 		else
@@ -511,7 +508,6 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			XFLOAT radius_p = radius + cosine_width;
 
 			XFLOAT sum_bg(0.);
-			int block_dim = 128; //TODO: set balanced (hardware-dep?)
 
 			AccPtr<XFLOAT> softMaskSum    = ptrFactory.make<XFLOAT>((size_t)SOFTMASK_BLOCK_SIZE, 0);
 			AccPtr<XFLOAT> softMaskSum_bg = ptrFactory.make<XFLOAT>((size_t)SOFTMASK_BLOCK_SIZE, 0);
@@ -519,15 +515,15 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			softMaskSum_bg.accAlloc();
 			softMaskSum.accInit(0.f);
 			softMaskSum_bg.accInit(0.f);
-			AccUtilities::softMaskBackgroundValue(block_dim, SOFTMASK_BLOCK_SIZE,
-					~d_img,
-					img,
+
+			AccUtilities::softMaskBackgroundValue(
+					d_img,
 					true,
 					radius,
 					radius_p,
 					cosine_width,
-					~softMaskSum,
-					~softMaskSum_bg);
+					softMaskSum,
+					softMaskSum_bg);
 
 			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 
@@ -536,20 +532,14 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 					 (RFLOAT) AccUtilities::getSumOnDevice<XFLOAT>(softMaskSum);
 			softMaskSum.streamSync();
 			
-			AccUtilities::cosineFilter(block_dim,SOFTMASK_BLOCK_SIZE,
-										~d_img,
-										img().nzyxdim,
-										img.data.xdim,
-										img.data.ydim,
-										img.data.zdim,
-										img.data.xdim/2,
-										img.data.ydim/2,
-										img.data.zdim/2, //unused
-										true,
-										radius,
-										radius_p,
-										cosine_width,
-										sum_bg);
+			AccUtilities::cosineFilter(
+					d_img,
+					true,
+					radius,
+					radius_p,
+					cosine_width,
+					sum_bg);
+
 			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
@@ -2757,9 +2747,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		RFLOAT dLL;
 
 		if ((baseMLO->iter==1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
-			dLL = op.min_diff2[ipart];
+			dLL = -op.min_diff2[ipart];
 		else
-			dLL = log(op.sum_weight[ipart]) + op.min_diff2[ipart] - logsigma2;
+			dLL = log(op.sum_weight[ipart]) - op.min_diff2[ipart] - logsigma2;
 
 		// Store dLL of each image in the output array, and keep track of total sum
 		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_DLL) = dLL;

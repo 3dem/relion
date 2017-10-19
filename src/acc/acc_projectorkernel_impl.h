@@ -114,7 +114,6 @@ public:
 
 			
 #else
-	#if(!COMPLEXTEXTURE)
 			if (xp < 0)
 			{
 				// Get complex conjugated hermitian symmetry pair
@@ -136,31 +135,6 @@ public:
 				real =   tex3D<XFLOAT>(mdlReal, xp + (XFLOAT)0.5, yp + (XFLOAT)0.5, zp + (XFLOAT)0.5);
 				imag =   tex3D<XFLOAT>(mdlImag, xp + (XFLOAT)0.5, yp + (XFLOAT)0.5, zp + (XFLOAT)0.5);
 			}
-	#else
-			ACCCOMPLEX val;
-			if (xp < 0)
-			{
-				// Get complex conjugated hermitian symmetry pair
-				xp = -xp;
-				yp = -yp;
-				zp = -zp;
-
-				yp -= mdlInitY;
-				zp -= mdlInitZ;
-
-				val =   tex3D<ACCCOMPLEX>(mdlComplex, xp + (XFLOAT)0.5, yp + (XFLOAT)0.5, zp + (XFLOAT)0.5);
-				val.y = -val.y;
-			}
-			else
-			{
-				yp -= mdlInitY;
-				zp -= mdlInitZ;
-
-				val =   tex3D<ACCCOMPLEX>(mdlComplex, xp + (XFLOAT)0.5, yp + (XFLOAT)0.5, zp + (XFLOAT)0.5);
-			}
-			real=val.x;
-			imag=val.y;
-	#endif
 #endif
 		}
 		else
@@ -217,7 +191,6 @@ public:
 			if(invers)
 			    imag = -imag;
 #else
-	#if(!COMPLEXTEXTURE)
 			if (xp < 0)
 			{
 				// Get complex conjugated hermitian symmetry pair
@@ -239,31 +212,6 @@ public:
 				real =   tex3D<XFLOAT>(mdlReal, xp + (XFLOAT)0.5, yp + (XFLOAT)0.5, zp + (XFLOAT)0.5);
 				imag =   tex3D<XFLOAT>(mdlImag, xp + (XFLOAT)0.5, yp + (XFLOAT)0.5, zp + (XFLOAT)0.5);
 			}
-	#else
-			ACCCOMPLEX val;
-			if (xp < 0)
-			{
-				// Get complex conjugated hermitian symmetry pair
-				xp = -xp;
-				yp = -yp;
-				zp = -zp;
-
-				yp -= mdlInitY;
-				zp -= mdlInitZ;
-
-				val =   tex3D<ACCCOMPLEX>(mdlComplex, xp + (XFLOAT)0.5, yp + (XFLOAT)0.5, zp + (XFLOAT)0.5);
-				val.y = -val.y;
-			}
-			else
-			{
-				yp -= mdlInitY;
-				zp -= mdlInitZ;
-
-				val =   tex3D<ACCCOMPLEX>(mdlComplex, xp + (XFLOAT)0.5, yp + (XFLOAT)0.5, zp + (XFLOAT)0.5);
-			}
-			real=val.x;
-			imag=val.y;
-	#endif
 #endif
 		}
 		else
@@ -316,7 +264,6 @@ public:
 			    imag = -imag;
 			
 #else
-#if(!COMPLEXTEXTURE)
 			if (xp < 0)
 			{
 				// Get complex conjugated hermitian symmetry pair
@@ -333,26 +280,6 @@ public:
 				real =   tex2D<XFLOAT>(mdlReal, xp + (XFLOAT)0.5, yp + (XFLOAT)0.5);
 				imag =   tex2D<XFLOAT>(mdlImag, xp + (XFLOAT)0.5, yp + (XFLOAT)0.5);
 			}
-#else
-			ACCCOMPLEX val;
-			if (xp < 0)
-			{
-				// Get complex conjugated hermitian symmetry pair
-				xp = -xp;
-				yp = -yp;
-				yp -= mdlInitY;
-
-				val = tex2D<ACCCOMPLEX>(mdlComplex, xp + (XFLOAT)0.5, yp + (XFLOAT)0.5);
-				val.y = -val.y;
-			}
-			else
-			{
-				yp -= mdlInitY;
-				val = tex2D<ACCCOMPLEX>(mdlComplex, xp + (XFLOAT)0.5, yp + (XFLOAT)0.5);
-			}
-			real=val.x;
-			imag=val.y;
-#endif
 #endif
 		}
 		else
@@ -372,9 +299,6 @@ public:
 					p.mdlInitY, p.mdlInitZ,
 					p.padding_factor,
 					maxR,
-#if(COMPLEXTEXTURE)
-					*p.mdlComplex
-#else
 #ifndef CUDA_NO_TEXTURES
 					*p.mdlReal,
 					*p.mdlImag
@@ -384,7 +308,6 @@ public:
 					p.mdlImag
 #else
 					p.mdlComplex
-#endif
 #endif
 #endif
 				);

@@ -403,8 +403,8 @@ public:
 	void resizeHostCopy(size_t newSize)
 	{
 #ifdef DEBUG_CUDA
-		if (size==0)
-			ACC_PTR_DEBUG_INFO("Resizing from size zero (permitted).\n");
+//		if (size==0)
+//			ACC_PTR_DEBUG_INFO("Resizing from size zero (permitted).\n");
 #endif
 		// TODO - alternatively, this could be aligned std::vector
 		T* newArr;
@@ -1017,6 +1017,11 @@ public:
 			setDevicePtr(ptr);
 		else
 			setHostPtr(ptr);
+	}
+
+	AccType getAccType()
+	{
+		return accType;
 	}
 
 	template <typename Tn>

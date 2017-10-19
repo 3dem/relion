@@ -16,100 +16,94 @@
 namespace AccUtilities
 {
 	
- static void softMaskBackgroundValue(
-		int inblock_dim, 
-		int inblock_size,
-		XFLOAT *vol,
-		Image<RFLOAT> &img,
-		bool     do_Mnoise,
-		XFLOAT   radius,
-		XFLOAT   radius_p,
-		XFLOAT   cosine_width,
-		XFLOAT  *g_sum,
-		XFLOAT  *g_sum_bg)
+static void softMaskBackgroundValue(
+	AccDataTypes::Image<XFLOAT> &vol,
+	bool     do_Mnoise,
+	XFLOAT   radius,
+	XFLOAT   radius_p,
+	XFLOAT   cosine_width,
+	AccPtr<XFLOAT> &g_sum,
+	AccPtr<XFLOAT> &g_sum_bg)
 {
+	int block_dim = 128; //TODO: set balanced (hardware-dep?)
 #ifdef CUDA
-	dim3 block_dim = inblock_dim;
-	cuda_kernel_softMaskBackgroundValue<<<block_dim,inblock_size>>>(	vol,
-																img().nzyxdim,
-																img.data.xdim,
-																img.data.ydim,
-																img.data.zdim,
-																img.data.xdim/2,
-																img.data.ydim/2,
-																img.data.zdim/2, //unused
-																do_Mnoise,
-																radius,
-																radius_p,
-																cosine_width,
-																g_sum,
-																g_sum_bg);
+		cuda_kernel_softMaskBackgroundValue<<<block_dim,SOFTMASK_BLOCK_SIZE,0, vol.getStream()>>>(
+				~vol,
+				vol.getxyz(),
+				vol.getx(),
+				vol.gety(),
+				vol.getz(),
+				vol.getx()/2,
+				vol.gety()/2,
+				vol.getz()/2,
+				do_Mnoise,
+				radius,
+				radius_p,
+				cosine_width,
+				~g_sum,
+				~g_sum_bg);
 #else
-	CpuKernels::softMaskBackgroundValue(inblock_dim, inblock_size,
-		vol,
-		img().nzyxdim,
-		img.data.xdim,
-		img.data.ydim,
-		img.data.zdim,
-		img.data.xdim/2,
-		img.data.ydim/2,
-		img.data.zdim/2, //unused
-		do_Mnoise,
-		radius,
-		radius_p,
-		cosine_width,
-		g_sum,
-		g_sum_bg);
+	CpuKernels::softMaskBackgroundValue(
+			block_dim,
+			SOFTMASK_BLOCK_SIZE,
+			~vol,
+			vol.getxyz(),
+			vol.getx(),
+			vol.gety(),
+			vol.getz(),
+			vol.getx()/2,
+			vol.gety()/2,
+			vol.getz()/2,
+			do_Mnoise,
+			radius,
+			radius_p,
+			cosine_width,
+			~g_sum,
+			~g_sum_bg);
 #endif
 }
 
 static void cosineFilter(
-		int inblock_dim, 
-		int inblock_size,
-		XFLOAT *vol,
-		long int vol_size,
-		long int xdim,
-		long int ydim,
-		long int zdim,
-		long int xinit,
-		long int yinit,
-		long int zinit,
+		AccDataTypes::Image<XFLOAT> &vol,
 		bool do_Mnoise,
 		XFLOAT radius,
 		XFLOAT radius_p,
 		XFLOAT cosine_width,
 		XFLOAT sum_bg_total)
 {
+	int block_dim = 128; //TODO: set balanced (hardware-dep?)
 #ifdef CUDA
-	dim3 block_dim = inblock_dim;
-	cuda_kernel_cosineFilter<<<block_dim,inblock_size>>>(	vol,
-															vol_size,
-															xdim,
-															ydim,
-															zdim,
-															xinit,
-															yinit,
-															zinit, //unused
-															do_Mnoise,
-															radius,
-															radius_p,
-															cosine_width,
-															sum_bg_total);
+	cuda_kernel_cosineFilter<<<block_dim,SOFTMASK_BLOCK_SIZE,0,vol.getStream()>>>(
+			~vol,
+			vol.getxyz(),
+			vol.getx(),
+			vol.gety(),
+			vol.getz(),
+			vol.getx()/2,
+			vol.gety()/2,
+			vol.getz()/2,
+			do_Mnoise,
+			radius,
+			radius_p,
+			cosine_width,
+			sum_bg_total);
 #else
-	CpuKernels::cosineFilter(inblock_dim, inblock_size,
-							vol,
-							vol_size,
-							xdim,
-							ydim,
-							zdim,
-							xinit,
-							yinit,
-							zinit, //unused
-							do_Mnoise,
-							radius,
-							radius_p,
-							cosine_width,
-							sum_bg_total);	
+	CpuKernels::cosineFilter(
+			block_dim,
+			SOFTMASK_BLOCK_SIZE,
+			~vol,
+			vol.getxyz(),
+			vol.getx(),
+			vol.gety(),
+			vol.getz(),
+			vol.getx()/2,
+			vol.gety()/2,
+			vol.getz()/2,
+			do_Mnoise,
+			radius,
+			radius_p,
+			cosine_width,
+			sum_bg_total);
 #endif
 }
 
