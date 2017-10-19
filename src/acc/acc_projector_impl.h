@@ -33,59 +33,6 @@ bool AccProjector::setMdlDim(
 	padding_factor = paddingFactor;
 
 #ifndef CUDA_NO_TEXTURES
-#if(COMPLEXTEXTURE)
-	mdlComplex = new cudaTextureObject_t();
-
-	// create channel to describe data type (bits,bits,bits,bits,type)
-	cudaChannelFormatDesc desc;
-
-	desc = cudaCreateChannelDesc(32, 32, 0, 0, cudaChannelFormatKindFloat);
-
-	struct cudaResourceDesc resDesc_complex;
-	struct cudaTextureDesc  texDesc;
-	// -- Zero all data in objects handlers
-	memset(&resDesc_complex, 0, sizeof(cudaResourceDesc));
-	memset(&texDesc, 0, sizeof(cudaTextureDesc));
-
-	if(mdlZ!=0)  // 3D model
-	{
-		texArrayComplex = new cudaArray_t();
-
-		// -- make extents for automatic pitch:ing (aligment) of allocated 3D arrays
-		cudaExtent volumeSize = make_cudaExtent(mdlX, mdlY, mdlZ);
-
-		// -- Allocate and copy data using very celver CUDA memcpy-functions
-		HANDLE_ERROR(cudaMalloc3DArray(texArrayComplex, &desc, volumeSize));
-
-		// -- Descriptors of the channel(s) in the texture(s)
-		resDesc_complex.res.array.array = *texArrayComplex;
-		resDesc_complex.resType = cudaResourceTypeArray;
-	}
-	else // 2D model
-	{
-		HANDLE_ERROR(cudaMallocPitch(&texArrayComplex2D, &pitch2D, sizeof(ACCCOMPLEX)*mdlX,mdlY));
-
-		// -- Descriptors of the channel(s) in the texture(s)
-		resDesc_complex.resType = cudaResourceTypePitch2D;
-		resDesc_complex.res.pitch2D.devPtr = texArrayComplex2D;
-		resDesc_complex.res.pitch2D.pitchInBytes =  pitch2D;
-		resDesc_complex.res.pitch2D.width = mdlX;
-		resDesc_complex.res.pitch2D.height = mdlY;
-		resDesc_complex.res.pitch2D.desc = desc;
-	}
-
-	// -- Decriptors of the texture(s) and methods used for reading it(them) --
-	texDesc.filterMode       = cudaFilterModeLinear;
-	texDesc.readMode         = cudaReadModeElementType;
-	texDesc.normalizedCoords = false;
-
-	for(int n=0; n<3; n++)
-		texDesc.addressMode[n]=cudaAddressModeClamp;
-
-	// -- Create texture object(s)
-	HANDLE_ERROR(cudaCreateTextureObject(mdlComplex, &resDesc_complex, &texDesc, NULL));
-
-#else
 
 	mdlReal = new cudaTextureObject_t();
 	mdlImag = new cudaTextureObject_t();
@@ -153,7 +100,7 @@ bool AccProjector::setMdlDim(
 	// -- Create texture object(s)
 	HANDLE_ERROR(cudaCreateTextureObject(mdlReal, &resDesc_real, &texDesc, NULL));
 	HANDLE_ERROR(cudaCreateTextureObject(mdlImag, &resDesc_imag, &texDesc, NULL));
-#endif
+
 #else
 #ifdef CUDA
 	DEBUG_HANDLE_ERROR(cudaMalloc( (void**) &mdlReal, mdlXYZ * sizeof(XFLOAT)));
@@ -165,7 +112,6 @@ bool AccProjector::setMdlDim(
 	return true;
 }
 
-#if(!COMPLEXTEXTURE)
 void AccProjector::initMdl(XFLOAT *real, XFLOAT *imag)
 {
 #ifdef CUDA_DEBUG
@@ -216,32 +162,10 @@ void AccProjector::initMdl(XFLOAT *real, XFLOAT *imag)
 #endif
 
 }
-#endif
 
 
 void AccProjector::initMdl(Complex *data)
 {
-#if(COMPLEXTEXTURE)
-	if(mdlZ!=0)  // 3D model
-	{
-		// -- make extents for automatic pitching (aligment) of allocated 3D arrays
-		cudaMemcpy3DParms copyParams = {0};
-		copyParams.extent = make_cudaExtent(mdlX, mdlY, mdlZ);
-		copyParams.kind   = cudaMemcpyHostToDevice;
-
-		// -- Copy data
-		copyParams.dstArray = *texArrayComplex;
-		copyParams.srcPtr   = make_cudaPitchedPtr(data, mdlX * sizeof(ACCCOMPLEX), mdlY, mdlZ);
-		DEBUG_HANDLE_ERROR(cudaMemcpy3D(&copyParams));
-	}
-	else // 2D model
-	{
-		DEBUG_HANDLE_ERROR(cudaMemcpy2D(texArrayComplex2D, pitch2D, data, sizeof(ACCCOMPLEX) * mdlX, sizeof(ACCCOMPLEX) * mdlX, mdlY, cudaMemcpyHostToDevice));
-	}
-#else
-//	XFLOAT *tmpReal = new XFLOAT[mdlXYZ];
-//	XFLOAT *tmpImag = new XFLOAT[mdlXYZ];
-
 	XFLOAT *tmpReal;
 	XFLOAT *tmpImag;
 	posix_memalign((void **)&tmpReal, MEM_ALIGN, mdlXYZ * sizeof(XFLOAT));
@@ -258,31 +182,7 @@ void AccProjector::initMdl(Complex *data)
 
 	free(tmpReal);
 	free(tmpImag);
-#endif
 }
-
-#if(COMPLEXTEXTURE)
-void AccProjector::clear()
-{
-	if (mdlComplex != 0)
-	{
-		cudaDestroyTextureObject(*mdlComplex);
-		delete mdlComplex;
-
-		if(mdlZ!=0) //3D case
-		{
-			cudaFreeArray(*texArrayComplex);
-			delete texArrayComplex;
-		}
-		else //2D case
-			cudaFree(texArrayComplex2D);
-
-		texArrayComplex= 0;
-		mdlComplex = 0;
-	}
-}
-
-#else
 
 void AccProjector::clear()
 {
@@ -335,4 +235,3 @@ void AccProjector::clear()
 	}
 #endif  // ifdef CUDA
 }
-	#endif  // #if(COMPLEXTEXTURE)
