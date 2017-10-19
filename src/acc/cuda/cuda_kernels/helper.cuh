@@ -50,7 +50,7 @@ __global__ void cuda_kernel_exponentiate(
 	if(idx < size)
 	{
 		T a = g_array[idx] + add;
-#ifdef CUDA_DOUBLE_PRECISION
+#ifdef ACC_DOUBLE_PRECISION
 		if (a < -700.)
 			g_array[idx] = 0.f;
 		else
