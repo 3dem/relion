@@ -64,7 +64,7 @@ public:
 			cudaStream_t optStream);
 
 	void getMdlData(XFLOAT *real, XFLOAT *imag, XFLOAT * weights);
-	void getMdlDataPtrs(XFLOAT *real, XFLOAT *imag, XFLOAT * weights);
+	void getMdlDataPtrs(XFLOAT *& real, XFLOAT *& imag, XFLOAT *& weights);
 
 	void setStream(cudaStream_t s) { stream = s; }
 	cudaStream_t getStream() { return stream; }

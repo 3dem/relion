@@ -95,7 +95,7 @@ void AccBackprojector::getMdlData(XFLOAT *r, XFLOAT *i, XFLOAT * w)
 #endif
 }
 
-void AccBackprojector::getMdlDataPtrs(XFLOAT *r, XFLOAT *i, XFLOAT * w)
+void AccBackprojector::getMdlDataPtrs(XFLOAT *& r, XFLOAT *& i, XFLOAT *& w)
 {
 #ifndef CUDA
 	r = d_mdlReal;
