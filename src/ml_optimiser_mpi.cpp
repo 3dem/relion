@@ -1522,13 +1522,12 @@ void MlOptimiserMpi::expectation()
 
 					for (int j = 0; j < b->bundle->projectors.size(); j++)
 					{
-		//TODO - do away with the extra copies - don't need reals, imags, weights arrays
 						unsigned long s = wsum_model.BPref[j].data.nzyxdim;
-						XFLOAT *reals = new XFLOAT[s];
-						XFLOAT *imags = new XFLOAT[s];
-						XFLOAT *weights = new XFLOAT[s];
+						XFLOAT *reals = NULL;
+						XFLOAT *imags = NULL;
+						XFLOAT *weights = NULL;
 
-						b->bundle->backprojectors[j].getMdlData(reals, imags, weights);
+						b->bundle->backprojectors[j].getMdlDataPtrs(reals, imags, weights);
 
 						for (unsigned long n = 0; n < s; n++)
 						{
@@ -1536,10 +1535,6 @@ void MlOptimiserMpi::expectation()
 							wsum_model.BPref[j].data.data[n].imag += (RFLOAT) imags[n];
 							wsum_model.BPref[j].weight.data[n] += (RFLOAT) weights[n];
 						}
-
-						delete [] reals;
-						delete [] imags;
-						delete [] weights;
 
 						b->bundle->projectors[j].clear();
 						b->bundle->backprojectors[j].clear();

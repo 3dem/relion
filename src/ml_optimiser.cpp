@@ -2837,44 +2837,39 @@ void MlOptimiser::expectation()
 #ifdef ALTCPU
 	if (do_cpu)
 	{
-        // Now collect the results from each thread
-        for (CpuOptimiserType::const_iterator i = tbbCpuOptimiser.begin(); i != tbbCpuOptimiser.end();  ++i)
-        {
-            MlOptimiserCpu* b = (MlOptimiserCpu*)(*i);
-            if(!b) continue;
+		// Now collect the results from each thread
+		for (CpuOptimiserType::const_iterator i = tbbCpuOptimiser.begin(); i != tbbCpuOptimiser.end();  ++i)
+		{
+			MlOptimiserCpu* b = (MlOptimiserCpu*)(*i);
+			if(!b) continue;
 
 #ifdef DEBUG
-            std::cerr << "Faux thread id: " << b->thread_id << std::endl;
+			std::cerr << "Faux thread id: " << b->thread_id << std::endl;
 #endif
 
-            for (int j = 0; j < b->bundle->projectors.size(); j++)
-            {
-//TODO - do away with the extra copies - don't need reals, imags, weights arrays
-                unsigned long s = wsum_model.BPref[j].data.nzyxdim;
-                XFLOAT *reals = new XFLOAT[s];
-                XFLOAT *imags = new XFLOAT[s];
-                XFLOAT *weights = new XFLOAT[s];
+			for (int j = 0; j < b->bundle->projectors.size(); j++)
+			{
+				unsigned long s = wsum_model.BPref[j].data.nzyxdim;
+				XFLOAT *reals = NULL; 
+				XFLOAT *imags = NULL;
+				XFLOAT *weights = NULL; 
 
-                b->bundle->backprojectors[j].getMdlData(reals, imags, weights);
+				b->bundle->backprojectors[j].getMdlDataPtrs(reals, imags, weights);
 
-                for (unsigned long n = 0; n < s; n++)
-                {
-                    wsum_model.BPref[j].data.data[n].real += (RFLOAT) reals[n];
-                    wsum_model.BPref[j].data.data[n].imag += (RFLOAT) imags[n];
-                    wsum_model.BPref[j].weight.data[n] += (RFLOAT) weights[n];
-                }
-
-                delete [] reals;
-                delete [] imags;
-                delete [] weights;
+				for (unsigned long n = 0; n < s; n++)
+				{
+					wsum_model.BPref[j].data.data[n].real += (RFLOAT) reals[n];
+					wsum_model.BPref[j].data.data[n].imag += (RFLOAT) imags[n];
+					wsum_model.BPref[j].weight.data[n] += (RFLOAT) weights[n];
+				}
 				
 				b->bundle->projectors[j].clear();
 				b->bundle->backprojectors[j].clear();
 				b->bundle->coarseProjectionPlans[j].clear();
-            }
+            		}
 
-            delete b;
-        }
+            		delete b;
+        	}
 
 		// Now clean up
 		unsigned nr_classes = mymodel.nr_classes;
@@ -2884,7 +2879,7 @@ void MlOptimiser::expectation()
 		}
 		free(mdlClassComplex);
 
-        tbbCpuOptimiser.clear();
+		tbbCpuOptimiser.clear();
 	}
 #endif  // ALTCPU
 #ifdef  MKLFFT
