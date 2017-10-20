@@ -995,7 +995,9 @@ void MlOptimiserMpi::expectation()
 	}
 #endif // CUDA
 #ifdef ALTCPU	
-	MPI_Barrier(MPI_COMM_WORLD);
+	/************************************************************************/
+	//CPU memory setup
+	MPI_Barrier(MPI_COMM_WORLD);   // Is this really necessary?
 	if (do_cpu  && ! node->isMaster())
 	{	
 		unsigned nr_classes = mymodel.nr_classes;
@@ -1024,8 +1026,6 @@ void MlOptimiserMpi::expectation()
 				*pData ++ = (XFLOAT) mymodel.PPref[iclass].data.data[i].imag;
 			} 
 		}
-		
-		MPI_Barrier(MPI_COMM_WORLD);
 	}  // do_cpu
 #endif // ALTCPU
 	/************************************************************************/
