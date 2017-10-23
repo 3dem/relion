@@ -166,8 +166,10 @@ void AccProjector::initMdl(XFLOAT *real, XFLOAT *imag)
 
 void AccProjector::initMdl(XFLOAT *data)
 {
+#ifndef CUDA
 	mdlComplex = data;  // No copy needed - everyone shares the complex reference arrays
 	externalFree = 1;   // This is shared memory freed outside the projector
+#endif
 }
 
 void AccProjector::initMdl(Complex *data)
