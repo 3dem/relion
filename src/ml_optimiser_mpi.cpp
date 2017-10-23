@@ -460,6 +460,25 @@ will still yield good performance and possibly a more stable execution. \n" << s
 
     initialiseWorkLoad();
 
+#ifdef ALTCPU
+	// Don't start threading until after most I/O is over
+	if (do_cpu)
+	{
+		// Set the size of the TBB thread pool for the entire run
+		tbbSchedulerInit.initialize(nr_threads);
+	}
+#endif
+#ifdef MKLFFT
+	// Enable multi-threaded FFTW
+	int success = fftw_init_threads();
+	if (0 == success)
+		REPORT_ERROR("Multithreaded FFTW failed to initialize");
+
+	// And allow plans before expectation to run using allowed
+	// number of threads
+	fftw_plan_with_nthreads(nr_threads);
+#endif
+	
 	if (fn_sigma != "")
 	{
 		// Read in sigma_noise spetrum from file DEVELOPMENTAL!!! FOR DEBUGGING ONLY....
@@ -732,6 +751,11 @@ void MlOptimiserMpi::expectation()
 	int n_trials_acc = (mymodel.ref_dim==3 && mymodel.data_dim != 3) ? 100 : 10;
 	n_trials_acc = XMIPP_MIN(n_trials_acc, mydata.numberOfOriginalParticles());
 	MPI_Status status;
+	
+#ifdef MKLFFT
+	// Allow parallel FFTW execution
+	fftw_plan_with_nthreads(nr_threads);
+#endif
 
 	// Initialise some stuff
 	// A. Update current size (may have been changed to ori_size in autoAdjustAngularSampling) and resolution pointers
@@ -1029,6 +1053,11 @@ void MlOptimiserMpi::expectation()
 	}  // do_cpu
 #endif // ALTCPU
 	/************************************************************************/
+
+#ifdef MKLFFT
+	// Single-threaded FFTW execution for code inside parallel processing loop
+	fftw_plan_with_nthreads(1);
+#endif
 	
 #ifdef TIMING
 		timer.toc(TIMING_EXP_4);
@@ -1568,6 +1597,12 @@ void MlOptimiserMpi::expectation()
 #endif
     }  // Slave node
 
+#ifdef  MKLFFT
+	// Allow parallel FFTW execution to continue now that we are outside the parallel
+	// portion of expectation
+	fftw_plan_with_nthreads(nr_threads);
+#endif
+	
     // Just make sure the temporary arrays are empty...
 	exp_imagedata.clear();
 	exp_metadata.clear();
