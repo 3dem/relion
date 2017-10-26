@@ -188,7 +188,7 @@ public:
 	{}
 
 	AccPtr(size_t size):
-		size(size), hPtr(NULL), dPtr(NULL), doFreeHost(true),
+		size(size), dPtr(NULL), doFreeHost(true),
 		doFreeDevice(false), allocator(NULL), alloc(NULL), stream(cudaStreamPerThread),
 #ifdef CUDA
 		accType(accCUDA)
@@ -200,7 +200,7 @@ public:
 	}
 
 	AccPtr(size_t size, StreamType stream):
-		size(size), hPtr(NULL), dPtr(NULL), doFreeHost(true),
+		size(size), dPtr(NULL), doFreeHost(true),
 		doFreeDevice(false), allocator(NULL), alloc(NULL), stream(stream),
 #ifdef CUDA
 		accType(accCUDA)
@@ -327,15 +327,18 @@ public:
 	 */
 	void hostAlloc()
 	{
+		if (accType == accCPU)
+		{
 #ifdef DEBUG_CUDA
-		if(size==0)
-			ACC_PTR_DEBUG_FATAL("deviceAlloc called with size == 0");
-		if (doFreeHost)
-			ACC_PTR_DEBUG_FATAL("Host double allocation.\n");
+			if(size==0)
+				ACC_PTR_DEBUG_FATAL("deviceAlloc called with size == 0");
+			if (doFreeHost)
+				ACC_PTR_DEBUG_FATAL("Host double allocation.\n");
 #endif
-		doFreeHost = true;
-		// TODO - alternatively, this could be aligned std::vector
-		posix_memalign((void **)&hPtr, MEM_ALIGN, sizeof(T) * size);
+			doFreeHost = true;
+			// TODO - alternatively, this could be aligned std::vector
+			posix_memalign((void **)&hPtr, MEM_ALIGN, sizeof(T) * size);
+		}
 	}
 
 	/**
@@ -386,15 +389,16 @@ public:
 		// TODO - alternatively, this could be aligned std::vector
 		T* newArr;
 		posix_memalign((void **)&newArr, MEM_ALIGN, sizeof(T) * newSize);
-		
-	    size = newSize;
+		memset( newArr, 0x0, sizeof(T) * newSize);
+
 #ifdef DEBUG_CUDA
 		if (dPtr!=NULL)
 			ACC_PTR_DEBUG_FATAL("resizeHost: Resizing host with present device allocation.\n");
 		if (newSize==0)
 			ACC_PTR_DEBUG_INFO("resizeHost: Array resized to size zero (permitted with fear).  Something may break downstream\n");
 #endif
-	    freeHostIfSet();
+		freeHostIfSet();	
+	    setSize(newSize);
 	    setHostPtr(newArr);
 	    doFreeHost=true;
 	}
@@ -411,26 +415,35 @@ public:
 		posix_memalign((void **)&newArr, MEM_ALIGN, sizeof(T) * newSize);
 		
 		// Copy in what we can from the original matrix
-		if (newSize < size)
-			memcpy( newArr, hPtr, newSize * sizeof(T) );
-		else
-			memcpy( newArr, hPtr, size * sizeof(T) );  
-		
-		// Initialize remaining memory if any
-		if (newSize > size)
+		if ((size > 0) && (hPtr != NULL))
 		{
-			size_t theRest = sizeof(T) * (newSize - size);
-			memset( newArr, 0x0, theRest);
+			if (newSize < size)
+				memcpy( newArr, hPtr, newSize * sizeof(T) );
+			else
+				memcpy( newArr, hPtr, size * sizeof(T) );  
+			
+			// Initialize remaining memory if any
+			if (newSize > size)
+			{
+				size_t theRest = sizeof(T) * (newSize - size);
+				memset( newArr, 0x0, theRest);
+			}
 		}
 		
-	    size = newSize;
+		// There was nothing from before to copy - clear new memory
+		if (hPtr == NULL)
+		{
+			memset( newArr, 0x0, sizeof(T) * newSize);
+		}
+
 #ifdef DEBUG_CUDA
 		if (dPtr!=NULL)
 			ACC_PTR_DEBUG_FATAL("resizeHostCopy: Resizing host with present device allocation.\n");
 		if (newSize==0)
 			ACC_PTR_DEBUG_INFO("resizeHostCopy: Array resized to size zero (permitted with fear).  Something may break downstream\n");
 #endif
-	    freeHostIfSet();
+		freeHostIfSet();
+	    setSize(newSize);
 	    setHostPtr(newArr);
 	    doFreeHost=true;
 	}
@@ -457,15 +470,24 @@ public:
 	 */
 	void hostInit(int value)
 	{
+		if (accType == accCPU)
+		{
 #ifdef DEBUG_CUDA
 		if (hPtr == NULL)
 			ACC_PTR_DEBUG_FATAL("Memset requested before allocation in hostInit().\n");
 #endif
 		memset(hPtr, value, size * sizeof(T));
+		}
+#ifdef DEBUG_CUDA
+		else
+		{
+			ACC_PTR_DEBUG_FATAL("hostInit called for accType != accCPU.\n");
+		}
+#endif
 	}
 
 	/**
-	 * Initiate host memory with provided value
+	 * Initiate memory with provided value
 	 */
 	void accInit(int value)
 	{
@@ -631,6 +653,8 @@ public:
 #ifdef DEBUG_CUDA
 		if (dstDevPtr == NULL)
 			ACC_PTR_DEBUG_FATAL("NULL-pointer given in cp_on_host(dstDevPtr).\n");
+		if (hPtr == NULL)
+			ACC_PTR_DEBUG_FATAL("NULL input pointer given in cp_on_host(hPtr).\n");
 #endif
 		memcpy ( dstDevPtr, hPtr, size * sizeof(T));
 	}
@@ -711,7 +735,7 @@ public:
 		{
 #ifdef DEBUG_CUDA
 			if (dPtr == NULL)
-				ACC_PTR_DEBUG_FATAL("operator() called with NULL acc pointer.\n");
+				ACC_PTR_DEBUG_FATAL("operator() called with NULL device pointer.\n");
 #endif
 			return dPtr;
 		}
@@ -719,7 +743,7 @@ public:
 		{
 #ifdef DEBUG_CUDA
 			if (hPtr == NULL)
-				ACC_PTR_DEBUG_FATAL("operator() called with NULL acc pointer.\n");
+				ACC_PTR_DEBUG_FATAL("operator() called with NULL host pointer.\n");
 #endif
 			return hPtr;
 		}
@@ -733,7 +757,7 @@ public:
 		{
 #ifdef DEBUG_CUDA
 			if ( dPtr == 0)
-				ACC_PTR_DEBUG_FATAL("DEBUG_WARNING: \"kernel cast\" on null pointer.\n");
+				ACC_PTR_DEBUG_FATAL("DEBUG_WARNING: \"kernel cast\" on null device pointer.\n");
 #endif
 			return dPtr;
 		}
@@ -741,7 +765,7 @@ public:
 		{
 #ifdef DEBUG_CUDA
 		if ( hPtr == 0)
-			ACC_PTR_DEBUG_FATAL("DEBUG_WARNING: \"kernel cast\" on null pointer.\n");
+			ACC_PTR_DEBUG_FATAL("DEBUG_WARNING: \"kernel cast\" on null host pointer.\n");
 #endif
 		return hPtr;
 		}
@@ -885,7 +909,7 @@ public:
 	/**
 	 * Delete both device and host data
 	 */
-	void bothBoth()
+	void freeBoth()
 	{
 		freeDevice();
 		freeHost();

@@ -284,8 +284,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		d_img.hostInit(0);
 		d_img.deviceInit(0);
 
-		// Error - already allocated - temp.hostAlloc();
-
+		// Copy data from RFLOAT image to XFLOAT image
 		if (baseMLO->has_converged && baseMLO->do_use_reconstruct_images)
 		{
 			temp.setHost(rec_img.data);
@@ -346,8 +345,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		size_t current_size_z = (accMLO->dataIs3D) ? baseMLO->mymodel.current_size : 1;
 
 		accMLO->transformer1.setSize(img().xdim,img().ydim,img().zdim);
-		// The resize is assumed to keep the contents of transformer1 in-tact (if possible)
-
+	
 		d_img.cpOnAcc(accMLO->transformer1.reals);
 		runCenterFFT(
 				accMLO->transformer1.reals,
@@ -511,10 +509,10 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 			AccPtr<XFLOAT> softMaskSum    = ptrFactory.make<XFLOAT>((size_t)SOFTMASK_BLOCK_SIZE, 0);
 			AccPtr<XFLOAT> softMaskSum_bg = ptrFactory.make<XFLOAT>((size_t)SOFTMASK_BLOCK_SIZE, 0);
-			softMaskSum.accAlloc();
-			softMaskSum_bg.accAlloc();
-			softMaskSum.accInit(0.f);
-			softMaskSum_bg.accInit(0.f);
+			softMaskSum.allAlloc();
+			softMaskSum_bg.allAlloc();
+			softMaskSum.accInit(0);
+			softMaskSum_bg.accInit(0);
 
 			AccUtilities::softMaskBackgroundValue(
 					d_img,
@@ -826,7 +824,7 @@ void getAllSquaredDifferencesCoarse(
 
 	AccPtr<XFLOAT> allWeights = ptrFactory.make<XFLOAT>(allWeights_size);
 
-	allWeights.accAlloc();
+	allWeights.allAlloc();
 	deviceInitValue<XFLOAT>(allWeights, 0);  // Make sure entire array initialized
 
 	long int allWeights_pos=0;	bool do_CC = (baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc;
@@ -1208,6 +1206,7 @@ void getAllSquaredDifferencesFine(
 														FinePassWeights[ipart],
 														FPCMasks[ipart][exp_iclass],   // ..and output into index-arrays mask...
 														chunkSize);                    // ..based on a given maximum chunk-size
+
 				// extend size by number of significants found this class
 				newDataSize += significant_num;
 				FPCMasks[ipart][exp_iclass].weightNum = significant_num;
@@ -1642,8 +1641,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					AccPtr<XFLOAT> sorted =         ptrFactory.make<XFLOAT>((size_t)filteredSize);
 					AccPtr<XFLOAT> cumulative_sum = ptrFactory.make<XFLOAT>((size_t)filteredSize);
 
-					sorted.accAlloc();
-					cumulative_sum.accAlloc();
+					sorted.allAlloc();
+					cumulative_sum.allAlloc();
 
 					AccUtilities::sortOnDevice<XFLOAT>(filtered, sorted);
 					AccUtilities::scanOnDevice<XFLOAT>(sorted, cumulative_sum);
@@ -1803,8 +1802,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 				CUSTOM_ALLOCATOR_REGION_NAME("CASDTW_FINE");
 
-				sorted.accAlloc();
-				cumulative_sum.accAlloc();
+				sorted.allAlloc();
+				cumulative_sum.allAlloc();
 
 				AccUtilities::sortOnDevice<XFLOAT>(PassWeights[ipart].weights, sorted);
 				AccUtilities::scanOnDevice<XFLOAT>(sorted, cumulative_sum);
@@ -2461,9 +2460,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		wdiff2s_XA.allAlloc();
 		wdiff2s_sum.allAlloc();
 
-		wdiff2s_AA.accInit(0.f);
-		wdiff2s_XA.accInit(0.f);
-		wdiff2s_sum.accInit(0.f);
+		wdiff2s_AA.accInit(0);
+		wdiff2s_XA.accInit(0);
+		wdiff2s_sum.accInit(0);
 
 		unsigned long AAXA_pos=0;
 

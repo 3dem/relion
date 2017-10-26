@@ -50,7 +50,7 @@ size_t AccBackprojector::setMdlDim(
 
 void AccBackprojector::initMdl()
 {
-#ifdef CUDA_DEBUG
+#ifdef DEBUG_CUDA
 	if (mdlXYZ == 0)
 	{
         printf("Model dimensions must be set with setMdlDim before call to initMdl.");

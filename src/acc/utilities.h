@@ -13,6 +13,18 @@
 #include "src/acc/cpu/cpu_kernels/diff2.h"
 #endif
 
+void dump_array(char *name, bool *ptr, size_t size);
+void dump_array(char *name, int *ptr, size_t size);
+void dump_array(char *name, size_t *ptr, size_t size);
+void dump_array(char *name, float *ptr, size_t size);
+void dump_complex_array(char *name, ACCCOMPLEX *ptr, size_t size);
+void dump_complex_array(char *name, Complex *ptr, size_t size);
+void dump_double_array(char *name, float *ptr, float *ptr2, size_t size);
+void dump_triple_array(char *name, float *ptr, float *ptr2, float *ptr3, size_t size);
+void dump_array(char *name, double *ptr, size_t size);
+void dump_double_array(char *name, double *ptr, double *ptr2, size_t size);
+void dump_triple_array(char *name, double *ptr, double *ptr2, double *ptr3, size_t size);
+
 namespace AccUtilities
 {
 	
@@ -953,7 +965,6 @@ void kernel_weights_exponent_coarse(
 			nr_coarse_orient*nr_coarse_trans*num_classes);
 #else
 	CpuKernels::weights_exponent_coarse(
-			block_num,
 			~g_pdf_orientation,
 			~g_pdf_orientation_zeros,
 			~g_pdf_offset,
@@ -962,7 +973,7 @@ void kernel_weights_exponent_coarse(
 			g_min_diff2,
 			nr_coarse_orient,
 			nr_coarse_trans,
-			nr_coarse_orient*nr_coarse_trans*num_classes);
+			((size_t)nr_coarse_orient)*((size_t)nr_coarse_trans)*((size_t)num_classes));
 #endif
 }
 
@@ -978,7 +989,7 @@ void kernel_exponentiate(
 	(~array, add, array.getSize());
 #else
 	CpuKernels::exponentiate<T>
-	(blockDim, ~array, add, array.getSize());
+	(~array, add, array.getSize());
 #endif
 }
 

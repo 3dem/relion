@@ -15,7 +15,6 @@ namespace CpuKernels
 
 template<typename T>
 void weights_exponent_coarse(
-		int grid_size,
 		T *g_pdf_orientation,
 		bool *g_pdf_orientation_zeros,
 		T *g_pdf_offset,
@@ -24,59 +23,42 @@ void weights_exponent_coarse(
 		T g_min_diff2,
 		int nr_coarse_orient,
 		int nr_coarse_trans,
-		int max_idx)
+		size_t max_idx)
 {
-	for (int bid=0; bid < grid_size; bid++)
+	for (size_t idx = 0; idx < max_idx; idx++)
 	{
-		for (int tid=0; tid < SUMW_BLOCK_SIZE; tid++)
-		{
-			int idx = bid*SUMW_BLOCK_SIZE+tid;
+		int itrans = idx % nr_coarse_trans;
+		int iorient = (idx - itrans) / nr_coarse_trans;
 
-			if(idx < max_idx)
-			{
-				int itrans = idx % nr_coarse_trans;
-				int iorient = (idx - itrans) / nr_coarse_trans;
-
-				T diff2 = g_weights[idx];
-				if( diff2 < g_min_diff2 || g_pdf_orientation_zeros[iorient] || g_pdf_offset_zeros[itrans])
-					g_weights[idx] = std::numeric_limits<float>::min(); //large negative number
-				else
-					g_weights[idx] = g_pdf_orientation[iorient] + g_pdf_offset[itrans] + g_min_diff2 - diff2;
-			}
-		} // for tid
-	} // for bid
+		T diff2 = g_weights[idx];
+		if( diff2 < g_min_diff2 || g_pdf_orientation_zeros[iorient] || g_pdf_offset_zeros[itrans])
+			g_weights[idx] = std::numeric_limits<float>::min(); //large negative number
+		else
+			g_weights[idx] = g_pdf_orientation[iorient] + g_pdf_offset[itrans] + g_min_diff2 - diff2;
+	}
 }
 
 
 template<typename T>
 void exponentiate(
-		int grid_size,
 		T *g_array,
 		T add,
 		size_t size)
 {
-
-	for (int bid=0; bid < grid_size; bid++)
+	for (size_t idx = 0; idx < size; idx++)
 	{
-		for (int tid=0; tid < BLOCK_SIZE; tid++)
-		{
-			int idx = tid + bid*BLOCK_SIZE;
-			if(idx < size)
-			{
-				T a = g_array[idx] + add;
+		T a = g_array[idx] + add;
 #ifdef ACC_DOUBLE_PRECISION
-				if (a < -700.)
-					g_array[idx] = 0.f;
-				else
-					g_array[idx] = exp(a);
+		if (a < -700.)
+			g_array[idx] = 0.;
+		else
+			g_array[idx] = exp(a);
 #else
-				if (a < -88.f)
-					g_array[idx] = 0.;
-				else
-					g_array[idx] = expf(a);
+		if (a < -88.f)
+			g_array[idx] = 0.f;
+		else
+			g_array[idx] = expf(a);
 #endif
-			}
-		}
 	}
 }
 
@@ -171,7 +153,6 @@ void collect2jobs(  int     grid_size,
 }
 
 void exponentiate_weights_fine(
-		int block_num,
 		XFLOAT *g_pdf_orientation,
 		bool *g_pdf_orientation_zeros,
 		XFLOAT *g_pdf_offset,

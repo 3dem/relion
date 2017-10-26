@@ -25,7 +25,6 @@ namespace CpuKernels
  * 
  */
 void exponentiate_weights_fine(
-		int block_num,
 		XFLOAT *g_pdf_orientation,
 		bool *g_pdf_orientation_zeros,
 		XFLOAT *g_pdf_offset,
@@ -40,33 +39,25 @@ void exponentiate_weights_fine(
 		unsigned long *d_job_num,
 		long int job_num)
 {
-	for (int bid=0; bid < block_num; bid++)
+	for (long int jobid=0; jobid<job_num; jobid++)
 	{
-		for (int tid=0; tid < SUMW_BLOCK_SIZE; tid++)
+		long int pos = d_job_idx[jobid];
+		// index of comparison
+		long int ix = d_rot_id   [pos];   // each thread gets its own orient...
+		long int iy = d_trans_idx[pos];   // ...and it's starting trans...
+		long int in = d_job_num  [jobid]; // ...AND the number of translations to go through
+
+		int c_itrans;
+		for (int itrans=0; itrans < in; itrans++, iy++)
 		{
-			long int jobid = bid*SUMW_BLOCK_SIZE+tid;
+			c_itrans = ( iy - (iy % oversamples_trans))/ oversamples_trans;
 
-			if (jobid<job_num)
-			{
-				long int pos = d_job_idx[jobid];
-				// index of comparison
-				long int ix = d_rot_id   [pos];   // each thread gets its own orient...
-				long int iy = d_trans_idx[pos];   // ...and it's starting trans...
-				long int in = d_job_num  [jobid]; // ...AND the number of translations to go through
-
-				int c_itrans;
-				for (int itrans=0; itrans < in; itrans++, iy++)
-				{
-					c_itrans = ( iy - (iy % oversamples_trans))/ oversamples_trans;
-
-					if( g_weights[pos+itrans] < min_diff2 || g_pdf_orientation_zeros[ix] || g_pdf_offset_zeros[c_itrans])
-						g_weights[pos+itrans] = std::numeric_limits<float>::min(); //large negative number
-					else
-						g_weights[pos+itrans] = g_pdf_orientation[ix] + g_pdf_offset[c_itrans] + min_diff2 - g_weights[pos+itrans];
-				}
-			}
-		} // for tid
-	} // for bid
+			if( g_weights[pos+itrans] < min_diff2 || g_pdf_orientation_zeros[ix] || g_pdf_offset_zeros[c_itrans])
+				g_weights[pos+itrans] = std::numeric_limits<float>::min(); //large negative number
+			else
+				g_weights[pos+itrans] = g_pdf_orientation[ix] + g_pdf_offset[c_itrans] + min_diff2 - g_weights[pos+itrans];
+		}
+	}
 }
 
 void softMaskBackgroundValue(	int      block_dim,

@@ -115,17 +115,25 @@ bool AccProjector::setMdlDim(
 
 void AccProjector::initMdl(XFLOAT *real, XFLOAT *imag)
 {
-#ifdef CUDA_DEBUG
+#ifdef DEBUG_CUDA
 	if (mdlXYZ == 0)
 	{
         printf("DEBUG_ERROR: Model dimensions must be set with setMdlDim before call to setMdlData.");
 		CRITICAL(ERR_MDLDIM);
 	}
+#ifdef CUDA
 	if (mdlReal != 0)
 	{
         printf("DEBUG_ERROR: Duplicated call to setMdlData.");
 		CRITICAL(ERR_MDLSET);
 	}
+#else
+	if (mdlComplex != 0)
+	{
+        printf("DEBUG_ERROR: Duplicated call to setMdlData.");
+		CRITICAL(ERR_MDLSET);
+	}
+#endif
 #endif
 
 #ifndef CUDA_NO_TEXTURES
@@ -166,8 +174,10 @@ void AccProjector::initMdl(XFLOAT *real, XFLOAT *imag)
 
 void AccProjector::initMdl(XFLOAT *data)
 {
+#ifndef CUDA
 	mdlComplex = data;  // No copy needed - everyone shares the complex reference arrays
 	externalFree = 1;   // This is shared memory freed outside the projector
+#endif
 }
 
 void AccProjector::initMdl(Complex *data)

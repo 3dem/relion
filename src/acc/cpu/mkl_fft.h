@@ -249,10 +249,17 @@ public:
 
 		if ((xSize * ySize * zSize)==0)
 			ACC_PTR_DEBUG_FATAL("Reals array resized to size zero.\n");
-		reals.resizeHostCopy(xSize * ySize * zSize);
+//		reals.resizeHostCopy(xSize * ySize * zSize);
+		reals.freeHostIfSet();
+		reals.setSize(xSize * ySize * zSize);
+		reals.hostAlloc();
+		
 		if ((xFSize * yFSize * zFSize)==0)
 			ACC_PTR_DEBUG_FATAL("Fouriers array resized to size zero.\n");
-		fouriers.resizeHostCopy(xFSize * yFSize * zFSize);
+//		fouriers.resizeHostCopy(xFSize * yFSize * zFSize);
+		fouriers.freeHostIfSet();
+		fouriers.setSize(xFSize * yFSize * zFSize);
+		fouriers.hostAlloc();
 
 		int N[3];  
 		if(dimension == 1)
