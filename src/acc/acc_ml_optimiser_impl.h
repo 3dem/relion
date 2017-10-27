@@ -1560,15 +1560,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 			if(exp_ipass==0)
 			{
-				AccPtr<XFLOAT> weights = ptrFactory.make<XFLOAT>();
-				weights.setSize(Mweight.getSize());
-
-				weights.setHostPtr((XFLOAT*) Mweight.getHostPtr());
-				weights.setDevicePtr((XFLOAT*) Mweight.getDevicePtr());
-				weights.setAllocator(Mweight.getAllocator());
-
 				AccPtr<XFLOAT>  ipartMweight(
-						weights,
+						Mweight,
 						ipart * op.Mweight.xdim + sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.iclass_min,
 						(sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi * sp.nr_trans);
 
@@ -1605,7 +1598,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				{
 					//Wrap the current ipart data in a new pointer
 					AccPtr<XFLOAT> unsorted_ipart(
-							weights,
+							Mweight,
 							offset,
 							ipart_length);
 
@@ -1719,7 +1712,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
-				XFLOAT weights_max = std::numeric_limits<float>::min();
+				XFLOAT weights_max = -std::numeric_limits<XFLOAT>::max();
 
 				pdf_offset.streamSync();
 
