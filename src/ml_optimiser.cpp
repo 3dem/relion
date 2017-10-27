@@ -47,11 +47,6 @@
 #include "src/acc/cuda/cuda_ml_optimiser.h"
 #endif
 #ifdef ALTCPU
-	#ifndef CUDA
-		typedef float cudaStream_t;
-		typedef double CudaCustomAllocator;
-		#define cudaStreamPerThread 0
-	#endif
 	#include <tbb/tbb.h>
 	#include <tbb/parallel_for.h>
 	#include <tbb/task_scheduler_init.h>

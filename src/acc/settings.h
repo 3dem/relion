@@ -1,6 +1,8 @@
 #ifndef ACC_SETTINGS_H_
 #define ACC_SETTINGS_H_
 
+#include "src/macros.h"
+
 #ifdef ACC_DOUBLE_PRECISION
 	#define XFLOAT double
 	#ifndef CUDA
@@ -14,11 +16,12 @@
 	#endif
 	#define ACCCOMPLEX float2
 #endif
-
-#ifdef RELION_SINGLE_PRECISION
-	#define RFLOAT float
-#else
-	#define RFLOAT double
+#ifdef ALTCPU
+	#ifndef CUDA
+		typedef float cudaStream_t;
+		typedef double CudaCustomAllocator;
+		#define cudaStreamPerThread 0
+	#endif
 #endif
 
 #endif /* ACC_SETTINGS_H_ */
