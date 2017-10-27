@@ -509,8 +509,8 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 			AccPtr<XFLOAT> softMaskSum    = ptrFactory.make<XFLOAT>((size_t)SOFTMASK_BLOCK_SIZE, 0);
 			AccPtr<XFLOAT> softMaskSum_bg = ptrFactory.make<XFLOAT>((size_t)SOFTMASK_BLOCK_SIZE, 0);
-			softMaskSum.allAlloc();
-			softMaskSum_bg.allAlloc();
+			softMaskSum.accAlloc();
+			softMaskSum_bg.accAlloc();
 			softMaskSum.accInit(0);
 			softMaskSum_bg.accInit(0);
 
@@ -824,7 +824,7 @@ void getAllSquaredDifferencesCoarse(
 
 	AccPtr<XFLOAT> allWeights = ptrFactory.make<XFLOAT>(allWeights_size);
 
-	allWeights.allAlloc();
+	allWeights.accAlloc();
 	deviceInitValue<XFLOAT>(allWeights, 0);  // Make sure entire array initialized
 
 	long int allWeights_pos=0;	bool do_CC = (baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc;
@@ -1641,8 +1641,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					AccPtr<XFLOAT> sorted =         ptrFactory.make<XFLOAT>((size_t)filteredSize);
 					AccPtr<XFLOAT> cumulative_sum = ptrFactory.make<XFLOAT>((size_t)filteredSize);
 
-					sorted.allAlloc();
-					cumulative_sum.allAlloc();
+					sorted.accAlloc();
+					cumulative_sum.accAlloc();
 
 					AccUtilities::sortOnDevice<XFLOAT>(filtered, sorted);
 					AccUtilities::scanOnDevice<XFLOAT>(sorted, cumulative_sum);
@@ -1802,8 +1802,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 				CUSTOM_ALLOCATOR_REGION_NAME("CASDTW_FINE");
 
-				sorted.allAlloc();
-				cumulative_sum.allAlloc();
+				sorted.accAlloc();
+				cumulative_sum.accAlloc();
 
 				AccUtilities::sortOnDevice<XFLOAT>(PassWeights[ipart].weights, sorted);
 				AccUtilities::scanOnDevice<XFLOAT>(sorted, cumulative_sum);
