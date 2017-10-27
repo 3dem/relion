@@ -289,6 +289,7 @@ bool MotioncorrRunner::executeMotioncor2(FileName fn_mic, std::vector<float> &xs
 		command += " -InMrc " + fn_mic;
 
 	command += " -OutMrc " + fn_avg;
+        command += " -LogFile " + fn_avg.withoutExtension();
 	command += " -Bft " + floatToString(bfactor);
 	command += " -PixSize " + floatToString(angpix);
 
