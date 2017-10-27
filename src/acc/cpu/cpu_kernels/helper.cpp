@@ -53,7 +53,7 @@ void exponentiate_weights_fine(
 			c_itrans = ( iy - (iy % oversamples_trans))/ oversamples_trans;
 
 			if( g_weights[pos+itrans] < min_diff2 || g_pdf_orientation_zeros[ix] || g_pdf_offset_zeros[c_itrans])
-				g_weights[pos+itrans] = -std::numeric_limits<XFLOAT>::max(); //large negative number
+				g_weights[pos+itrans] = std::numeric_limits<XFLOAT>::lowest(); //large negative number
 			else
 				g_weights[pos+itrans] = g_pdf_orientation[ix] + g_pdf_offset[c_itrans] + min_diff2 - g_weights[pos+itrans];
 		}
@@ -241,24 +241,21 @@ void cpu_translate3D(T * g_image_in,
 	{
 		int xydim = xdim*ydim;
 
-		if(voxel<image_size)
+		z =  voxel / xydim;
+		zp = z + dz;
+
+		xy = voxel % xydim;
+		y =  xy / xdim;
+		yp = y + dy;
+
+		x =  xy % xdim;
+		xp = x + dx;
+
+		if( zp>=0 && yp>=0 && xp>=0 && zp<zdim && yp<ydim && xp<xdim)
 		{
-			z =  voxel / xydim;
-			zp = z + dz;
-
-			xy = voxel % xydim;
-			y =  xy / xdim;
-			yp = y + dy;
-
-			x =  xy % xdim;
-			xp = x + dx;
-
-			if( zp>=0 && yp>=0 && xp>=0 && zp<zdim && yp<ydim && xp<xdim)
-			{
-				new_voxel = zp*xydim +  yp*xdim + xp;
-				if(new_voxel>=0 && new_voxel<image_size) // if displacement is negative, new_pixel could be less than 0
-					g_image_out[new_voxel] = g_image_in[voxel];
-			}
+			new_voxel = zp*xydim +  yp*xdim + xp;
+			if(new_voxel>=0 && new_voxel<image_size) // if displacement is negative, new_pixel could be less than 0
+				g_image_out[new_voxel] = g_image_in[voxel];
 		}
 	}
 }

@@ -32,7 +32,7 @@ void weights_exponent_coarse(
 
 		T diff2 = g_weights[idx];
 		if( diff2 < g_min_diff2 || g_pdf_orientation_zeros[iorient] || g_pdf_offset_zeros[itrans])
-			g_weights[idx] = -std::numeric_limits<T>::max(); //large negative number
+			g_weights[idx] = std::numeric_limits<T>::lowest(); //large negative number
 		else
 			g_weights[idx] = g_pdf_orientation[iorient] + g_pdf_offset[itrans] + g_min_diff2 - diff2;
 	}
