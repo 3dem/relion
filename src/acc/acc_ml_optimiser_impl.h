@@ -2520,7 +2520,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			CTIC(accMLO->timer,"pre_wavg_map");
 
 			for (long unsigned i = 0; i < orientation_num*translation_num; i++)
-				sorted_weights[classPos+i] = -999.;
+				sorted_weights[classPos+i] = std::numeric_limits<XFLOAT>::lowest();
 
 			for (long unsigned i = 0; i < thisClassFinePassWeights.weights.getSize(); i++)
 				sorted_weights[classPos+(thisClassFinePassWeights.rot_idx[i]) * translation_num + thisClassFinePassWeights.trans_idx[i] ]
@@ -2958,7 +2958,7 @@ baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_B);
 			Mweight.setSize(sp.nr_particles * weightsPerPart);
 			Mweight.setHostPtr(op.Mweight.data);
 			Mweight.deviceAlloc();
-			deviceInitValue<XFLOAT>(Mweight, -999.);
+			deviceInitValue<XFLOAT>(Mweight, std::numeric_limits<XFLOAT>::lowest());
 			Mweight.streamSync();
 
 			CTIC(timer,"getAllSquaredDifferencesCoarse");
@@ -3062,5 +3062,10 @@ baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_E);
 #endif
 	CTOC(timer,"storeWeightedSums");
 
+	for (long int iframe = 0; iframe < sp.nr_particles; iframe++)
+	{
+		FinePassWeights[iframe].dual_free_all();
+	}
+	
 	CTOC(timer,"oneParticle");
 }

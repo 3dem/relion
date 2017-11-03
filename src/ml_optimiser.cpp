@@ -2287,6 +2287,9 @@ void MlOptimiser::iterateWrapUp()
     // Delete volatile space on scratch
     mydata.deleteDataOnScratch();
 
+#ifdef MKLFFT
+	fftw_cleanup_threads();
+#endif	
 }
 
 void MlOptimiser::iterate()
@@ -3244,47 +3247,47 @@ void MlOptimiser::expectationSomeParticles(long int my_first_ori_particle, long 
 	std::cerr << " exp_my_first_ori_particle= " << exp_my_first_ori_particle << " exp_my_last_ori_particle= " << exp_my_last_ori_particle << std::endl;
 	std::cerr << " exp_nr_images= " << exp_nr_images << std::endl;
 #endif
-    if (!do_cpu)
-    {
-        // GPU and traditional CPU case - use RELION's built-in task manager to
+	if (!do_cpu)
+	{
+		// GPU and traditional CPU case - use RELION's built-in task manager to
 		// process multiple particles at once
-        exp_ipart_ThreadTaskDistributor->resize(my_last_ori_particle - my_first_ori_particle + 1, 1);
-        exp_ipart_ThreadTaskDistributor->reset();
-        global_ThreadManager->run(globalThreadExpectationSomeParticles);
-    }
+		exp_ipart_ThreadTaskDistributor->resize(my_last_ori_particle - my_first_ori_particle + 1, 1);
+		exp_ipart_ThreadTaskDistributor->reset();
+		global_ThreadManager->run(globalThreadExpectationSomeParticles);
+	}
 #ifdef ALTCPU
-    else
-    {
+	else
+	{
 		// "New" CPU case - use TBB's tasking system to process multiple
 		// particles in parallel.  Like the GPU implementation, the lower-
 		// level parallelism is implemented by compiler vectorization
 		// (roughly equivalent to GPU "threads").
 		int tCount = 0;  
-    
-        // process all passed particles in parallel
-        //for(unsigned long i=my_first_ori_particle; i<=my_last_ori_particle; i++) {
-        tbb::parallel_for(my_first_ori_particle, my_last_ori_particle+1, [&](int i) {
-            CpuOptimiserType::reference ref = tbbCpuOptimiser.local();
-            MlOptimiserCpu *cpuOptimiser = (MlOptimiserCpu *)ref;
-            if(cpuOptimiser == NULL) {
-                cpuOptimiser = new MlOptimiserCpu(this, "cpu_optimiser");
-                cpuOptimiser->resetData();
-                cpuOptimiser->setupFixedSizedObjects(mdlClassComplex);
-                cpuOptimiser->setupTunableSizedObjects();
-                ref = cpuOptimiser;
+
+		// process all passed particles in parallel
+		//for(unsigned long i=my_first_ori_particle; i<=my_last_ori_particle; i++) {
+		tbb::parallel_for(my_first_ori_particle, my_last_ori_particle+1, [&](int i) {
+			CpuOptimiserType::reference ref = tbbCpuOptimiser.local();
+			MlOptimiserCpu *cpuOptimiser = (MlOptimiserCpu *)ref;
+			if(cpuOptimiser == NULL) {
+				cpuOptimiser = new MlOptimiserCpu(this, "cpu_optimiser");
+				cpuOptimiser->resetData();
+				cpuOptimiser->setupFixedSizedObjects();
+				cpuOptimiser->setupTunableSizedObjects();
+				ref = cpuOptimiser;
 
 				cpuOptimiser->thread_id = tCount;
 				tCount++;  // Race condition!
-            }  // cpuOptimiser == NULL
+			}  // cpuOptimiser == NULL
 
 			cpuOptimiser->expectationOneParticle(i, cpuOptimiser->thread_id);
-        });
-        //}
-    }  // do_cpu
+		});
+		//}
+	}  // do_cpu
 #endif  // ifdef ALTCPU
-    
-    if (threadException != NULL)
-    	throw *threadException;
+
+	if (threadException != NULL)
+		throw *threadException;
 
 #ifdef TIMING
     timer.toc(TIMING_ESP);

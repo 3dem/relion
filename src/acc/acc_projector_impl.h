@@ -244,7 +244,7 @@ void AccProjector::clear()
 		mdlImag = 0;
 	}
 #else // ifdef CUDA
-	if ((mdlComplex != 0) && (externalFree == 0))
+	if ((mdlComplex != NULL) && (externalFree == 0))
 	{
 		free(mdlComplex);
 		mdlComplex = NULL;

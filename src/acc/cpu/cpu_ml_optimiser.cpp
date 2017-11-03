@@ -70,7 +70,7 @@
 tbb::spin_mutex      mkl_mutex;
 
 
-void MlOptimiserCpu::setupFixedSizedObjects(XFLOAT **mdlClassComplex)
+void MlOptimiserCpu::setupFixedSizedObjects()
 {
 	unsigned nr_classes = baseMLO->mymodel.nr_classes;
 
@@ -102,7 +102,7 @@ void MlOptimiserCpu::setupFixedSizedObjects(XFLOAT **mdlClassComplex)
 				baseMLO->mymodel.PPref[iclass].padding_factor);
 
 //		bundle->projectors[iclass].initMdl(baseMLO->mymodel.PPref[iclass].data.data);
-		bundle->projectors[iclass].initMdl(mdlClassComplex[iclass]);
+		bundle->projectors[iclass].initMdl(baseMLO->mdlClassComplex[iclass]);
 
 		bundle->backprojectors[iclass].setMdlDim(
 				baseMLO->wsum_model.BPref[iclass].data.xdim,

@@ -362,6 +362,27 @@ public:
 		host_alloc_all();
 		device_alloc_all();
 	}
+	
+	void dual_free_all()
+	{
+		weights.freeDeviceIfSet();
+		rot_id.freeDeviceIfSet();
+		rot_idx.freeDeviceIfSet();
+		trans_idx.freeDeviceIfSet();
+		ihidden_overs.freeDeviceIfSet();
+		weights.freeHostIfSet();
+		rot_id.freeHostIfSet();
+		rot_idx.freeHostIfSet();
+		trans_idx.freeHostIfSet();
+		ihidden_overs.freeHostIfSet();
+	}
+	
+	~IndexedDataArray()
+	{
+		dual_free_all();
+	}
+
+
 };
 
 #endif
