@@ -174,7 +174,7 @@ public:
 	std::vector<RFLOAT> sigma_offset_bodies;
 
 	// Is this body kept fixed in refinement?
-	std::vector<bool> keep_fixed_bodies;
+	std::vector<int> keep_fixed_bodies;
 
 	// Maximum radius of mask
 	std::vector<int> max_radius_mask_bodies;
