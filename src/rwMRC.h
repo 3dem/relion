@@ -184,9 +184,9 @@ int readMRC(long int img_select, bool isStack=false, const FileName &name="")
         replaceNsize=_nDim;
         std::stringstream Num;
         std::stringstream Num2;
-        if ( img_select > (int)_nDim )
+        if ( img_select >= (int)_nDim ) // img_select starts from 0, while _nDim from 1
         {
-        	Num  << img_select;
+            Num  << (img_select + 1);
             Num2 << _nDim;
             REPORT_ERROR((std::string)"readMRC: Image number " + Num.str() + " exceeds stack size " + Num2.str() + " of image " + name);
         }
