@@ -327,18 +327,15 @@ public:
 	 */
 	void hostAlloc()
 	{
-		if (accType == accCPU)
-		{
 #ifdef DEBUG_CUDA
-			if(size==0)
-				ACC_PTR_DEBUG_FATAL("deviceAlloc called with size == 0");
-			if (doFreeHost)
-				ACC_PTR_DEBUG_FATAL("Host double allocation.\n");
+		if(size==0)
+			ACC_PTR_DEBUG_FATAL("deviceAlloc called with size == 0");
+		if (doFreeHost)
+			ACC_PTR_DEBUG_FATAL("Host double allocation.\n");
 #endif
-			doFreeHost = true;
-			// TODO - alternatively, this could be aligned std::vector
-			posix_memalign((void **)&hPtr, MEM_ALIGN, sizeof(T) * size);
-		}
+		doFreeHost = true;
+		// TODO - alternatively, this could be aligned std::vector
+		posix_memalign((void **)&hPtr, MEM_ALIGN, sizeof(T) * size);
 	}
 
 	/**
@@ -470,20 +467,11 @@ public:
 	 */
 	void hostInit(int value)
 	{
-		if (accType == accCPU)
-		{
 #ifdef DEBUG_CUDA
 		if (hPtr == NULL)
 			ACC_PTR_DEBUG_FATAL("Memset requested before allocation in hostInit().\n");
 #endif
 		memset(hPtr, value, size * sizeof(T));
-		}
-#ifdef DEBUG_CUDA
-		else
-		{
-			ACC_PTR_DEBUG_FATAL("hostInit called for accType != accCPU.\n");
-		}
-#endif
 	}
 
 	/**

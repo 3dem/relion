@@ -122,15 +122,15 @@ void AccProjector::initMdl(XFLOAT *real, XFLOAT *imag)
 		CRITICAL(ERR_MDLDIM);
 	}
 #ifdef CUDA
-	if (mdlReal != 0)
+	if (mdlReal == NULL)
 	{
-        printf("DEBUG_ERROR: Duplicated call to setMdlData.");
+        printf("DEBUG_ERROR: initMdl called before call to setMdlData.");
 		CRITICAL(ERR_MDLSET);
 	}
 #else
-	if (mdlComplex != 0)
+	if (mdlComplex == NULL)
 	{
-        printf("DEBUG_ERROR: Duplicated call to setMdlData.");
+        printf("DEBUG_ERROR: initMdl called before call to setMdlData.");
 		CRITICAL(ERR_MDLSET);
 	}
 #endif
