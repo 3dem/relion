@@ -388,7 +388,9 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	else
 		requested_free_gpu_memory =  temp_reqSize;
 
-	do_phase_random_fsc = parser.checkOption("--solvent_correct_fsc", "Correct FSC curve for the effects of the solvent mask?");
+	// only allow switching ON solvent_fsc, not off
+	if (parser.checkOption("--solvent_correct_fsc", "Correct FSC curve for the effects of the solvent mask?"))
+		do_phase_random_fsc = true;
 	verb = textToInteger(parser.getOption("--verb", "Verbosity (1=normal, 0=silent)", "1"));
 
 	int expert_section = parser.addSection("Expert options");
@@ -4126,6 +4128,32 @@ void MlOptimiser::updateCurrentResolution()
 					}
 					// Subtract one shell to be back on the safe side
 					ires--;
+
+					if (do_split_random_halves && do_auto_refine)
+					{
+						// Let's also try and check from the high-res side. Sometimes phase-randomisation gives artefacts
+						int ires2;
+						for (ires2 = mymodel.ori_size/2-1; ires2 >= ires; ires2--)
+						{
+							if (DIRECT_A1D_ELEM(mymodel.data_vs_prior_class[iclass], ires2) > 1.)
+								break;
+						}
+						if (ires2 > ires + 3)
+						{
+							if (verb > 0)
+							{
+								float higher = mymodel.getResolutionAngstrom(ires2);
+								float lower  = mymodel.getResolutionAngstrom(ires);
+								if (mymodel.nr_bodies > 1)
+									std::cerr << " WARNING: For the " << ibody+1 << "th body:" << std::endl;
+								std::cerr << " WARNING: FSC dipped below 0.5 and rose again. Using higher resolution of "
+										  << higher << " A, instead of " << lower << " A." << std::endl;
+								std::cerr << "          This is not necessarily a bad thing. Often it is caused by too tight masks." << std::endl;
+							}
+							ires = ires2;
+						}
+					}
+
 					if (ires > maxres)
 						maxres = ires;
 				}
@@ -7735,9 +7763,18 @@ void MlOptimiser::updateOverallChangesInHiddenVariables()
 {
 
 	// Calculate hidden variable changes
-	current_changes_optimal_classes = sum_changes_optimal_classes / sum_changes_count;
-	current_changes_optimal_orientations = sum_changes_optimal_orientations / sum_changes_count;
-	current_changes_optimal_offsets = sqrt(sum_changes_optimal_offsets / (2. * sum_changes_count));
+	if (sum_changes_count > 0.)
+	{
+		current_changes_optimal_classes = sum_changes_optimal_classes / sum_changes_count;
+		current_changes_optimal_orientations = sum_changes_optimal_orientations / sum_changes_count;
+		current_changes_optimal_offsets = sqrt(sum_changes_optimal_offsets / (2. * sum_changes_count));
+	}
+	else
+	{
+		current_changes_optimal_classes = 0.;
+		current_changes_optimal_orientations = 0.;
+		current_changes_optimal_offsets = 0.;
+	}
 
 	// Reset the sums
 	sum_changes_optimal_classes = 0.;
@@ -7911,9 +7948,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_ori_particle,
 						else
 							ang_step = 5.0;
 
-						if (sh_error < 0.2)
-							sh_step = 0.05;
-						else if (sh_error < 1.)
+						if (sh_error < 1.)
 							sh_step = 0.1;
 						else if (sh_error < 2.)
 							sh_step = 0.2;
@@ -8065,7 +8100,8 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_ori_particle,
 						}
 //#define DEBUG_ANGACC
 #ifdef DEBUG_ANGACC
-							if (imode==0)
+						std::cerr << " ori_part_id= " << ori_part_id << " iclass= " << iclass << std::endl;
+						if (imode==0)
 							{
 								std::cerr << " ang_error= " << ang_error << std::endl;
 								std::cerr << " rot1= " << rot1 << " tilt1= " << tilt1 << " psi1= " << psi1 << std::endl;
@@ -8184,8 +8220,7 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 		RFLOAT new_range = 3. * sqrt(mymodel.sigma2_offset);
 
 		// Prevent too narrow searches: always at least 3x3 pixels in the coarse search
-		if (new_range < 1.5 * new_step)
-			new_range = 1.5 * new_step;
+		new_range= XMIPP_MAX(new_range, 1.5 * new_step);
 
 		// Also prevent too wide searches: that will lead to memory problems:
 		// Just use coarser step size and hope things will settle down later...
@@ -8256,9 +8291,14 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 				all_bodies_are_done = true;
 				for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 				{
-					// Stop multi-body refinements a bit earlier than normal ones: no 75%, but 100% of accuracy
-					if (old_rottilt_step < mymodel.acc_rot[ibody])
+					// Stop multi-body refinements a bit earlier than normal ones: no 75%, but 90% of accuracy
+					// if has_converged: in the final iteration include all bodies again!
+					if (old_rottilt_step < 0.90 * mymodel.acc_rot[ibody] && !has_converged)
+					{
+						if (myverb)
+							std::cout << " Body: " <<ibody << " with rotational accuracy of " << mymodel.acc_rot[ibody] << " will be kept fixed " << std::endl;
 						mymodel.keep_fixed_bodies[ibody] = 1;
+					}
 					else
 						all_bodies_are_done = false;
 				}
@@ -8280,24 +8320,30 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 				// Prevent very coarse translational samplings: max 1.5
 				// Also stay a bit on the safe side with the translational sampling: 75% of estimated accuracy
 				RFLOAT new_step = XMIPP_MIN(1.5, 0.75 * acc_trans) * std::pow(2., adaptive_oversampling);
+
 				// For subtomogram averaging: use at least half times previous step size
 				if (mymodel.data_dim == 3) // TODO: check: this might just as well work for 2D data...
 					new_step = XMIPP_MAX(sampling.offset_step / 2., new_step);
+
 				// Search ranges are five times the last observed changes in offsets
 				// Only 3x for subtomogram averaging....
 				RFLOAT new_range = (mymodel.data_dim == 2) ? 5. * current_changes_optimal_offsets : 3 * current_changes_optimal_offsets;
+
 				// New range can only become 30% bigger than the previous range (to prevent very slow iterations in the beginning)
 				new_range = XMIPP_MIN(1.3*sampling.offset_range, new_range);
+
 				// Prevent too narrow searches: always at least 3x3 pixels in the coarse search
-				if (new_range < 1.5 * new_step)
-					new_range = 1.5 * new_step;
+				new_range= XMIPP_MAX(new_range, 1.5 * new_step);
+
 				// Also prevent too wide searches: that will lead to memory problems:
 				// If steps size < 1/4th of search range, then decrease search range by 50%
 				if (new_range > 4. * new_step)
 					new_range /= 2.;
-				//If even that was not enough: use coarser step size and hope things will settle down later...
+
+				// If even that was not enough: use coarser step size and hope things will settle down later...
 				if (new_range > 4. * new_step)
 					new_step = new_range / 4.;
+
 				// Jun08,2015 Shaoda & Sjors, Helical refinement
 				RFLOAT new_helical_offset_step = sampling.helical_offset_step;
 				if (mymodel.ref_dim == 3)
@@ -8414,37 +8460,36 @@ void MlOptimiser::checkConvergence(bool myverb)
 		do_join_random_halves = true;
 		// In the last iteration, include all data until Nyquist
 		do_use_all_data = true;
-	}
 
-	// For multibody refinement: check whether all bodies are fixed: then stop
-	if (mymodel.nr_bodies > 1)
-	{
-		bool all_fixed = true;
-		for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
+		// For multibody refinement: set all bodies to not-fixed (if they were originally) for the final iteration with all data to Nyquist
+		if (mymodel.nr_bodies > 1)
 		{
-			if (mymodel.keep_fixed_bodies[ibody] == 0)
+			for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 			{
-				all_fixed = false;
-				break;
+				if (mymodel.sigma_tilt_bodies[ibody] < 0.001 &&
+					mymodel.sigma_psi_bodies[ibody] < 0.001 &&
+					mymodel.sigma_offset_bodies[ibody] < 0.001)
+					mymodel.keep_fixed_bodies[ibody] = 1;
+				else
+					mymodel.keep_fixed_bodies[ibody] = 0;
 			}
 		}
-		has_converged = all_fixed;
-
 	}
 
-        if (myverb)
-        {
-            std::cout << " Auto-refine: Iteration= "<< iter<< std::endl;
-            std::cout << " Auto-refine: Resolution= "<< 1./mymodel.current_resolution<< " (no gain for " << nr_iter_wo_resol_gain << " iter) "<< std::endl;
-            std::cout << " Auto-refine: Changes in angles= " << current_changes_optimal_orientations << " degrees; and in offsets= " << current_changes_optimal_offsets
-			<< " pixels (no gain for " << nr_iter_wo_large_hidden_variable_changes << " iter) "<< std::endl;
 
-            if (has_converged)
-            {
-		std::cout << " Auto-refine: Refinement has converged, entering last iteration where two halves will be combined..."<<std::endl;
-		std::cout << " Auto-refine: The last iteration will use data to Nyquist frequency, which may take more CPU and RAM."<<std::endl;
-            }
-        }
+	if (myverb)
+	{
+		std::cout << " Auto-refine: Iteration= "<< iter<< std::endl;
+		std::cout << " Auto-refine: Resolution= "<< 1./mymodel.current_resolution<< " (no gain for " << nr_iter_wo_resol_gain << " iter) "<< std::endl;
+		std::cout << " Auto-refine: Changes in angles= " << current_changes_optimal_orientations << " degrees; and in offsets= " << current_changes_optimal_offsets
+		<< " pixels (no gain for " << nr_iter_wo_large_hidden_variable_changes << " iter) "<< std::endl;
+
+		if (has_converged)
+		{
+			std::cout << " Auto-refine: Refinement has converged, entering last iteration where two halves will be combined..."<<std::endl;
+			std::cout << " Auto-refine: The last iteration will use data to Nyquist frequency, which may take more CPU and RAM."<<std::endl;
+		}
+	}
 
 }
 
