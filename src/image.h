@@ -1290,7 +1290,7 @@ private:
             err = readMRC(select_img, true, name);
 	else if (ext_name.contains("tif"))
 #ifdef HAVE_TIFF
-	    err = readTIFF(hFile.ftiff, select_img, true, name);
+	    err = readTIFF(hFile.ftiff, select_img, readdata, true, name);
 #else
             REPORT_ERROR("TIFF support was not enabled during compilation");
 #endif

@@ -31,7 +31,7 @@
 /** TIFF Reader
   * @ingroup TIFF
 */
-int readTIFF(TIFF* ftiff, long int img_select, bool isStack=false, const FileName &name="")
+int readTIFF(TIFF* ftiff, long int img_select, bool readdata=false, bool isStack=false, const FileName &name="")
 {
 #undef DEBUG
 //#define DEBUG
@@ -121,13 +121,15 @@ int readTIFF(TIFF* ftiff, long int img_select, bool isStack=false, const FileNam
         MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z,(RFLOAT)header->c/header->mz);
     */
 
-    if (img_select != -1) TIFFSetDirectory(ftiff, img_select); // img_select starts from 0
-    size_t readsize_n = stripSize * 8 / bitsPerSample;
-    size_t haveread_n = 0;
-    for (tstrip_t strip = 0; strip < numberOfStrips; strip++) {
-        TIFFReadEncodedStrip(ftiff, strip, buf, stripSize);
-        castPage2T((char*)buf, MULTIDIM_ARRAY(data) + haveread_n, datatype, readsize_n);
-        haveread_n += readsize_n;
+    if (readdata) {
+        if (img_select != -1) TIFFSetDirectory(ftiff, img_select); // img_select starts from 0
+        size_t readsize_n = stripSize * 8 / bitsPerSample;
+        size_t haveread_n = 0;
+        for (tstrip_t strip = 0; strip < numberOfStrips; strip++) {
+            TIFFReadEncodedStrip(ftiff, strip, buf, stripSize);
+            castPage2T((char*)buf, MULTIDIM_ARRAY(data) + haveread_n, datatype, readsize_n);
+            haveread_n += readsize_n;
+        }
     }
 
     _TIFFfree(buf);
