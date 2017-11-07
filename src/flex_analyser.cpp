@@ -114,12 +114,71 @@ void FlexAnalyser::initialise()
 	if (boxsize > 0)
 		boxsize -= boxsize%2;
 
-	if (do_PCA_orient && do_generate_maps)
+	if (do_PCA_orient)
 	{
-		if (explain_variance > 1.)
-			REPORT_ERROR("ERROR: --v should be expressed as a fraction, i.e. between 0 and 1.");
-		if (explain_variance < 0. && nr_components < 0)
-			REPORT_ERROR("ERROR: --v or --k should be larger than zero.");
+
+		if (do_generate_maps)
+		{
+			if (explain_variance > 1.)
+				REPORT_ERROR("ERROR: --v should be expressed as a fraction, i.e. between 0 and 1.");
+			if (explain_variance < 0. && nr_components < 0)
+				REPORT_ERROR("ERROR: --v or --k should be larger than zero.");
+		}
+
+		// Calculate effect of 1 degree rotations and 1 pixel translations on the bodies, in order to normalise vectors for PCA
+		norm_pca.clear();
+
+		std::cout << " Normalise PCA columns: " << std::endl;
+		for (int ibody = 0; ibody < model.nr_bodies; ibody++)
+		{
+			MultidimArray<RFLOAT> Mbody, Irefp;
+			Irefp = model.Iref[ibody] * model.masks_bodies[ibody];
+			// Place each body with its center-of-mass in the center of the box
+			selfTranslate(Irefp, -model.com_bodies[ibody], DONT_WRAP);
+
+			std::cout << " body: " << ibody;
+			Matrix2D<RFLOAT> Aresi,  Abody;
+			// rot
+			Euler_angles2matrix(1., 90., 0., Aresi);
+			Abody = (model.orient_bodies[ibody]).transpose() * A_rot90 * Aresi * model.orient_bodies[ibody];
+			Abody.resize(4,4);
+			MAT_ELEM(Abody, 3, 3) = 1.;
+			applyGeometry(Irefp, Mbody, Abody, IS_NOT_INV, DONT_WRAP);
+			Mbody -= Irefp;
+			norm_pca.push_back(sqrt(Mbody.sum2()));
+			std::cout << " rot: " << sqrt(Mbody.sum2());
+			// tilt
+			Euler_angles2matrix(0., 91., 0., Aresi);
+			Abody = (model.orient_bodies[ibody]).transpose() * A_rot90 * Aresi * model.orient_bodies[ibody];
+			Abody.resize(4,4);
+			MAT_ELEM(Abody, 3, 3) = 1.;
+			applyGeometry(Irefp, Mbody, Abody, IS_NOT_INV, DONT_WRAP);
+			Mbody -= Irefp;
+			norm_pca.push_back(sqrt(Mbody.sum2()));
+			std::cout << " tilt: " << sqrt(Mbody.sum2());
+			// psi
+			Euler_angles2matrix(0., 90., 1., Aresi);
+			Abody = (model.orient_bodies[ibody]).transpose() * A_rot90 * Aresi * model.orient_bodies[ibody];
+			Abody.resize(4,4);
+			MAT_ELEM(Abody, 3, 3) = 1.;
+			applyGeometry(Irefp, Mbody, Abody, IS_NOT_INV, DONT_WRAP);
+			Mbody -= Irefp;
+			norm_pca.push_back(sqrt(Mbody.sum2()));
+			std::cout << " psi: " << sqrt(Mbody.sum2());
+			// translation x & y (considered the same)
+			Euler_angles2matrix(0., 90., 0., Aresi);
+			Abody = (model.orient_bodies[ibody]).transpose() * A_rot90 * Aresi * model.orient_bodies[ibody];
+			Abody.resize(4,4);
+			MAT_ELEM(Abody, 0, 3) = 1.;
+			MAT_ELEM(Abody, 3, 3) = 1.;
+			applyGeometry(Irefp, Mbody, Abody, IS_NOT_INV, DONT_WRAP);
+			Mbody -= Irefp;
+			norm_pca.push_back(sqrt(Mbody.sum2()));
+			std::cout << " offset: " << sqrt(Mbody.sum2()) << std::endl;
+
+		}
+
+
 	}
 
 
@@ -619,12 +678,12 @@ void FlexAnalyser::make3DModelOneParticle(long int ori_particle, long int imgno,
 		Anew = Aori * Abody;
 		body_offset_3d = Anew.inv() * (-body_offset);
 
-		datarow.push_back(body_rot);
-		datarow.push_back(body_tilt);
-		datarow.push_back(body_psi);
-		datarow.push_back(XX(body_offset_3d));
-		datarow.push_back(YY(body_offset_3d));
-		datarow.push_back(ZZ(body_offset_3d));
+		datarow.push_back(norm_pca[ibody*4+0] * body_rot);
+		datarow.push_back(norm_pca[ibody*4+1] * body_tilt);
+		datarow.push_back(norm_pca[ibody*4+2] * body_psi);
+		datarow.push_back(norm_pca[ibody*4+3] * XX(body_offset_3d));
+		datarow.push_back(norm_pca[ibody*4+3] * YY(body_offset_3d));
+		datarow.push_back(norm_pca[ibody*4+3] * ZZ(body_offset_3d));
 
 		if (do_3dmodels)
 		{
@@ -687,10 +746,10 @@ void FlexAnalyser::makePCAhistograms(std::vector< std::vector<double> > &project
 	for (int i = 0; i < eigenvalues.size(); i++)
 	{
 		std::cout << "  + Component " << i+1 << " explains " << eigenvalues[i]*100./sum << "% of variance." << std::endl;
-		CDataPoint point1((double)i-0.5, (double)0.);
-		CDataPoint point2((double)i-0.5, (double)eigenvalues[i]*100./sum);
-		CDataPoint point3((double)i+0.5, (double)eigenvalues[i]*100./sum);
-		CDataPoint point4((double)i+0.5, (double)0.);
+		CDataPoint point1((double)i+0.5, (double)0.);
+		CDataPoint point2((double)i+0.5, (double)eigenvalues[i]*100./sum);
+		CDataPoint point3((double)i+1.5, (double)eigenvalues[i]*100./sum);
+		CDataPoint point4((double)i+1.5, (double)0.);
 		dataSet.AddDataPoint(point1);
 		dataSet.AddDataPoint(point2);
 		dataSet.AddDataPoint(point3);
@@ -811,12 +870,12 @@ void FlexAnalyser::make3DModelsAlongPrincipalComponents(std::vector< std::vector
 			if (nn > 0.)
 				avg /= nn;
 
-			// Now we have the average value for ther PCA values for this bin: make the 3D model...
+			// Now we have the average value for the PCA values for this bin: make the 3D model...
 			std::vector<double> orients;
 			for (int j = 0; j < means.size(); j++)
 			{
 				orients.push_back(avg * eigenvectors[k][j] + means[j]);
-				//std::cerr << " orients[j]= " << orients[j] << " means[j]= " << means[j] << std::endl;
+				//std::cerr << "j= "<<j<< " orients[j]= " << orients[j]<< " === "<<avg<< "  * " <<eigenvectors[k][j] << "  + " << means[j] << std::endl;
 			}
 
 			Image<RFLOAT> img;
@@ -829,12 +888,13 @@ void FlexAnalyser::make3DModelsAlongPrincipalComponents(std::vector< std::vector
 				MultidimArray<RFLOAT> Mbody, Mmask;
 				Matrix1D<RFLOAT> body_offset_3d(3);
 				RFLOAT body_rot, body_tilt, body_psi;
-				body_rot            = orients[ibody * 6 + 0];
-				body_tilt           = orients[ibody * 6 + 1];
-				body_psi            = orients[ibody * 6 + 2];
-				XX(body_offset_3d)  = orients[ibody * 6 + 3];
-				YY(body_offset_3d)  = orients[ibody * 6 + 4];
-				ZZ(body_offset_3d)  = orients[ibody * 6 + 5];
+				body_rot            = orients[ibody * 6 + 0] / norm_pca[ibody*4+0];
+				body_tilt           = orients[ibody * 6 + 1] / norm_pca[ibody*4+1];
+				body_psi            = orients[ibody * 6 + 2] / norm_pca[ibody*4+2];
+				XX(body_offset_3d)  = orients[ibody * 6 + 3] / norm_pca[ibody*4+3];
+				YY(body_offset_3d)  = orients[ibody * 6 + 4] / norm_pca[ibody*4+3];
+				ZZ(body_offset_3d)  = orients[ibody * 6 + 5] / norm_pca[ibody*4+3];
+				//std::cerr << " norm_pca[ibody*4+0]= " << norm_pca[ibody*4+0] << " norm_pca[ibody*4+1]= " << norm_pca[ibody*4+1] << " norm_pca[ibody*4+2]= " << norm_pca[ibody*4+2] << " norm_pca[ibody*4+3]= " << norm_pca[ibody*4+3] << std::endl;
 				//std::cerr << " body_rot= " << body_rot << " body_tilt= " << body_tilt << " body_psi= " << body_psi << std::endl;
 				//std::cerr << " XX(body_offset_3d)= " << XX(body_offset_3d) << " YY(body_offset_3d)= " << YY(body_offset_3d) << " ZZ(body_offset_3d)= " << ZZ(body_offset_3d) << std::endl;
 
