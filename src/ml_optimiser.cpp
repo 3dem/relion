@@ -1541,7 +1541,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		// don't perturb angles anymore
 		//sampling.perturbation_factor = 0.;
 	    // Only do a single pass through the local-search orientations
-		adaptive_oversampling = 0;
+		//adaptive_oversampling = 0;
 
 		// Start at iteration 1 again
 		iter = 0;
@@ -3792,6 +3792,11 @@ void MlOptimiser::maximizationOtherParameters()
 	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 		sum_weight += wsum_model.pdf_class[iclass];
 
+	// For multi-body refinement: it is possible we haven't done any bodies anymore, so sum_weight is zero
+	// in that case we need to leave all parameters as they were
+	if (sum_weight < XMIPP_EQUAL_ACCURACY)
+		return;
+
 	// Update average norm_correction, don't update norm corrections anymore for multi-body refinements!
 	if (do_norm_correction  && mymodel.nr_bodies == 1)
 	{
@@ -4103,6 +4108,7 @@ void MlOptimiser::updateCurrentResolution()
 	std::cerr << "Entering MlOptimiser::updateCurrentResolution" << std::endl;
 #endif
 
+	RFLOAT best_current_resolution = 0.;
 	int nr_iter_wo_resol_gain_sum_bodies = 0;
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 	{
@@ -4169,6 +4175,9 @@ void MlOptimiser::updateCurrentResolution()
 		}
 		RFLOAT newres = mymodel.getResolution(maxres);
 
+		// best resolution over all bodies
+		best_current_resolution = XMIPP_MAX(best_current_resolution, newres);
+
 		// Check whether resolution improved, if not increase nr_iter_wo_resol_gain
 		//if (newres <= best_resol_thus_far)
 		if (newres <= mymodel.current_resolution+0.0001) // Add 0.0001 to avoid problems due to rounding error
@@ -4180,9 +4189,10 @@ void MlOptimiser::updateCurrentResolution()
 		if (newres > best_resol_thus_far)
 			best_resol_thus_far = newres;
 
-		mymodel.current_resolution = newres;
-
 	} // end for ibody
+
+	// Set the new resolution to be the highest resolution over all bodies
+	mymodel.current_resolution = best_current_resolution;
 
 	if (nr_iter_wo_resol_gain_sum_bodies == mymodel.nr_bodies)
 		nr_iter_wo_resol_gain++;
@@ -8461,7 +8471,7 @@ void MlOptimiser::checkConvergence(bool myverb)
 		// In the last iteration, include all data until Nyquist
 		do_use_all_data = true;
 
-		// For multibody refinement: set all bodies to not-fixed (if they were originally) for the final iteration with all data to Nyquist
+		// For multibody refinement: reset all bodies to not-fixed (if they were originally) for the final iteration with all data to Nyquist
 		if (mymodel.nr_bodies > 1)
 		{
 			for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
