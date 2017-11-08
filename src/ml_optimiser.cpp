@@ -146,9 +146,14 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	fnt = parser.getOption("--pad", "Oversampling factor for the Fourier transforms of the references", "OLD");
 	if (fnt != "OLD")
 	{
-		mymodel.padding_factor = textToInteger(fnt);
-		// Re-initialise the model to get the right padding factors in the PPref vectors
-		mymodel.initialise();
+		if (textToInteger(fnt) != mymodel.padding_factor)
+		{
+			if (mymodel.nr_bodies > 1)
+				REPORT_ERROR("ERROR: cannot change padding factor in a continuation of a multi-body refinement...");
+			mymodel.padding_factor = textToInteger(fnt);
+			// Re-initialise the model to get the right padding factors in the PPref vectors
+			mymodel.initialise();
+		}
 	}
 
 	// Is this a new multi-body refinement?
@@ -2491,7 +2496,8 @@ void MlOptimiser::iterate()
 			// Write out without a _sub in the name
 			nr_subsets = 1;
 			write(DO_WRITE_SAMPLING, DO_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, 0);
-
+			// We must reset mu to zero, otherwise ClassDistributions do not sum to 1.
+			mu = 0;
 
 			if (do_sgd)
 			{
@@ -3407,7 +3413,7 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
     {
 
 		// Skip this body if keep_fixed_bodies[ibody] or if it's angular accuracy is worse than 1.5x the sampling rate
-    	if ( mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody] )
+    	if ( mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody] > 0)
 			continue;
 
     	// Here define all kind of local arrays that will be needed
@@ -3715,7 +3721,7 @@ void MlOptimiser::symmetriseReconstructions()
 {
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 	{
-		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody])
+		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody] > 0)
 			continue;
 
 		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
@@ -3744,7 +3750,7 @@ void MlOptimiser::applyLocalSymmetryForEachRef()
 
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 	{
-		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody])
+		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody] > 0)
 			continue;
 
 		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
@@ -3763,7 +3769,7 @@ void MlOptimiser::makeGoodHelixForEachRef()
 
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 	{
-		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody])
+		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody] > 0)
 			continue;
 
 		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
@@ -4248,6 +4254,7 @@ void MlOptimiser::updateCurrentResolution()
 	std::cerr << "Entering MlOptimiser::updateCurrentResolution" << std::endl;
 #endif
 
+	int nr_iter_wo_resol_gain_sum_bodies = 0;
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 	{
 
@@ -4290,7 +4297,7 @@ void MlOptimiser::updateCurrentResolution()
 		// Check whether resolution improved, if not increase nr_iter_wo_resol_gain
 		//if (newres <= best_resol_thus_far)
 		if (newres <= mymodel.current_resolution+0.0001) // Add 0.0001 to avoid problems due to rounding error
-			nr_iter_wo_resol_gain++;
+			nr_iter_wo_resol_gain_sum_bodies++;
 		else
 			nr_iter_wo_resol_gain = 0;
 
@@ -4301,6 +4308,10 @@ void MlOptimiser::updateCurrentResolution()
 		mymodel.current_resolution = newres;
 
 	} // end for ibody
+
+	if (nr_iter_wo_resol_gain_sum_bodies == mymodel.nr_bodies)
+		nr_iter_wo_resol_gain++;
+
 #ifdef DEBUG
 	std::cerr << "Leaving MlOptimiser::updateCurrentResolution" << std::endl;
 #endif
@@ -7804,7 +7815,7 @@ void MlOptimiser::monitorHiddenVariableChanges(long int my_first_ori_particle, l
 			for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 			{
 
-				if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody])
+				if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody] > 0)
 					continue;
 
 				RFLOAT old_rot, old_tilt, old_psi, old_xoff, old_yoff, old_zoff = 0.;
@@ -8388,13 +8399,27 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 
 		// Only use a finer angular sampling is the angular accuracy is still above 75% of the estimated accuracy
 		// If it is already below, nothing will change and eventually nr_iter_wo_resol_gain or nr_iter_wo_large_hidden_variable_changes will go above MAX_NR_ITER_WO_RESOL_GAIN
-		//std::cerr << "iter= " << iter << " nr_iter_wo_resol_gain= " << nr_iter_wo_resol_gain << " nr_iter_wo_large_hidden_variable_changes= " << nr_iter_wo_large_hidden_variable_changes << " acc_rot= " << acc_rot << std::endl;
-		//std::cerr  << "iter= " << iter << " acc_trans= " << acc_trans << " minimum_angular_sampling= " << minimum_angular_sampling << " current_changes_optimal_offsets= " << current_changes_optimal_offsets << std::endl;
 		if (nr_iter_wo_resol_gain >= MAX_NR_ITER_WO_RESOL_GAIN && nr_iter_wo_large_hidden_variable_changes >= MAX_NR_ITER_WO_LARGE_HIDDEN_VARIABLE_CHANGES)
 		{
+
+			bool all_bodies_are_done = false;
+			// For multi-body refinement: switch off those bodies that don't have high enough angular accuracy
+			if (mymodel.nr_bodies > 1)
+			{
+				all_bodies_are_done = true;
+				for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
+				{
+					// Stop multi-body refinements a bit earlier than normal ones: no 75%, but 100% of accuracy
+					if (old_rottilt_step < mymodel.acc_rot[ibody])
+						mymodel.keep_fixed_bodies[ibody] = 1;
+					else
+						all_bodies_are_done = false;
+				}
+			}
+
 			// Old rottilt step is already below 75% of estimated accuracy: have to stop refinement?
 			// If a minimum_angular_sampling is given and we're not there yet, also just continue
-			if (old_rottilt_step < 0.75 * acc_rot && !(minimum_angular_sampling > 0. && old_rottilt_step > minimum_angular_sampling) )
+			if (all_bodies_are_done || (old_rottilt_step < 0.75 * acc_rot && !(minimum_angular_sampling > 0. && old_rottilt_step > minimum_angular_sampling)) )
 			{
 				// don't change angular sampling, as it is already fine enough
 				has_fine_enough_angular_sampling = true;
@@ -8402,16 +8427,6 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 			else
 			{
 				has_fine_enough_angular_sampling = false;
-
-				// For multi-body refinement: switch off those bodies that don't have high enough angular accuracy
-				if (mymodel.nr_bodies > 1)
-				{
-					for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
-					{
-						if (old_rottilt_step < 0.75 * mymodel.acc_rot[ibody])
-							 mymodel.keep_fixed_bodies[ibody] = true;
-					}
-				}
 
 				// A. Use translational sampling as suggested by acc_trans
 
@@ -8552,6 +8567,22 @@ void MlOptimiser::checkConvergence(bool myverb)
 		do_join_random_halves = true;
 		// In the last iteration, include all data until Nyquist
 		do_use_all_data = true;
+	}
+
+	// For multibody refinement: check whether all bodies are fixed: then stop
+	if (mymodel.nr_bodies > 1)
+	{
+		bool all_fixed = true;
+		for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
+		{
+			if (mymodel.keep_fixed_bodies[ibody] == 0)
+			{
+				all_fixed = false;
+				break;
+			}
+		}
+		has_converged = all_fixed;
+
 	}
 
         if (myverb)

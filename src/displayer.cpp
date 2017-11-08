@@ -1265,10 +1265,8 @@ int singleViewerCanvas::handle(int ev)
 {
 	if (ev==FL_PUSH && Fl::event_button() == FL_LEFT_MOUSE)
 	{
-		int xc = (int)Fl::event_x() - scroll->x() + scroll->hscrollbar.value();
-		int yc = (int)Fl::event_y() - scroll->y() + scroll->scrollbar.value();
-		int rx = xc - x() - boxes[0]->xoff;
-		int ry = yc - y() - boxes[0]->yoff;
+		int rx = (int)Fl::event_x() - scroll->x() + scroll->hscrollbar.value();
+		int ry = (int)Fl::event_y() - scroll->y() + scroll->scrollbar.value();
 		// Left mouse click writes value and coordinates to screen
 
 		if (rx < boxes[0]->xsize_data && ry < boxes[0]->ysize_data && rx >= 0 && ry >=0)

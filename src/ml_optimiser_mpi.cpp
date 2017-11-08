@@ -875,9 +875,8 @@ void MlOptimiserMpi::expectation()
 #endif
 	// D. Update the angular sampling (all nodes except master)
 	if (!node->isMaster() && do_auto_refine && iter > 1 && subset == 1)
-	{
 		updateAngularSampling(node->rank == 1);
-	}
+
 	// The master needs to know about the updated parameters from updateAngularSampling
 	node->relion_MPI_Bcast(&has_fine_enough_angular_sampling, 1, MPI_INT, first_slave, MPI_COMM_WORLD);
 	node->relion_MPI_Bcast(&nr_iter_wo_resol_gain, 1, MPI_INT, first_slave, MPI_COMM_WORLD);
@@ -885,7 +884,9 @@ void MlOptimiserMpi::expectation()
 	node->relion_MPI_Bcast(&smallest_changes_optimal_classes, 1, MPI_INT, first_slave, MPI_COMM_WORLD);
 	node->relion_MPI_Bcast(&smallest_changes_optimal_offsets, 1, MY_MPI_DOUBLE, first_slave, MPI_COMM_WORLD);
 	node->relion_MPI_Bcast(&smallest_changes_optimal_orientations, 1, MY_MPI_DOUBLE, first_slave, MPI_COMM_WORLD);
-
+	if (mymodel.nr_bodies > 1)
+		for (int ibody=0; ibody < mymodel.nr_bodies; ibody++)
+			node->relion_MPI_Bcast(&mymodel.keep_fixed_bodies[ibody], 1, MPI_INT, first_slave, MPI_COMM_WORLD);
 
 	// Feb15,2016 - Shaoda - copy the following variables to the master
 	if ( (do_helical_refine) && (!(helical_sigma_distance < 0.)) )
@@ -1759,6 +1760,9 @@ void MlOptimiserMpi::combineAllWeightedSums()
 	// When splitting the data into two random halves, perform two passes: one for each subset
 	int nr_halfsets = (do_split_random_halves) ? 2 : 1;
 
+#ifdef DEBUG
+	std::cerr << " starting combineAllWeightedSums..." << std::endl;
+#endif
 	// Only combine weighted sums if there are more than one slaves per subset!
 	if ((node->size - 1)/nr_halfsets > 1)
 	{
@@ -2042,7 +2046,7 @@ void MlOptimiserMpi::maximization()
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 	{
 
-		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody])
+		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody] > 0)
 			continue;
 
 		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
@@ -2323,7 +2327,7 @@ void MlOptimiserMpi::maximization()
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 	{
 
-		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody])
+		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody] > 0)
 			continue;
 
 		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
@@ -2511,12 +2515,18 @@ void MlOptimiserMpi::joinTwoHalvesAtLowResolution()
 
 	for (int ibody = 0; ibody< mymodel.nr_bodies; ibody++ )
 	{
+#ifdef DEBUG
+		std::cerr << " ibody= " << ibody << " node->rank= " << node->rank << " mymodel.keep_fixed_bodies[ibody]= " << mymodel.keep_fixed_bodies[ibody] << std::endl;
+#endif
 
-		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody])
+		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody] > 0)
 			continue;
 
 		int reconstruct_rank1 = 2 * (ibody % ( (node->size - 1)/2 ) ) + 1;
 		int reconstruct_rank2 = 2 * (ibody % ( (node->size - 1)/2 ) ) + 2;
+#ifdef DEBUG
+		std::cerr << " ibody= " << ibody << " node->rank= " << node->rank << " reconstruct_rank1= " << reconstruct_rank1 << " reconstruct_rank2= " << reconstruct_rank2 << std::endl;
+#endif
 
 		if (node->rank == reconstruct_rank1 || node->rank == reconstruct_rank2)
 		{
@@ -2528,11 +2538,19 @@ void MlOptimiserMpi::joinTwoHalvesAtLowResolution()
 			{
 				MPI_Status status;
 
+#ifdef DEBUG
+				std::cerr << " RANK2A: node->rank= " << node->rank << std::endl;
+				std::cerr << "AAArank=2 lowresdata: "; lowres_data.printShape();
+#endif
 				// The second slave sends its lowres_data and lowres_weight to the first slave
 				node->relion_MPI_Send(MULTIDIM_ARRAY(lowres_data), 2*MULTIDIM_SIZE(lowres_data), MY_MPI_DOUBLE, reconstruct_rank1, MPITAG_IMAGE, MPI_COMM_WORLD);
 				node->relion_MPI_Send(MULTIDIM_ARRAY(lowres_weight), MULTIDIM_SIZE(lowres_weight), MY_MPI_DOUBLE, reconstruct_rank1, MPITAG_RFLOAT, MPI_COMM_WORLD);
 
 				// Now the first slave is calculating the average....
+#ifdef DEBUG
+				std::cerr << " RANK2B: node->rank= " << node->rank << std::endl;
+				std::cerr << "BBBrank=2 lowresdata: "; lowres_data.printShape();
+#endif
 
 				// Then the second slave receives the average back from the first slave
 				node->relion_MPI_Recv(MULTIDIM_ARRAY(lowres_data), 2*MULTIDIM_SIZE(lowres_data), MY_MPI_DOUBLE, reconstruct_rank1, MPITAG_IMAGE, MPI_COMM_WORLD, status);
@@ -2543,6 +2561,9 @@ void MlOptimiserMpi::joinTwoHalvesAtLowResolution()
 			else if (node->rank == reconstruct_rank1)
 			{
 
+#ifdef DEBUG
+				std::cerr << " RANK1A: node->rank= " << node->rank << std::endl;
+#endif
 				std::cout << " Averaging half-reconstructions up to " << myres << " Angstrom resolution to prevent diverging orientations ..." << std::endl;
 				std::cout << " Note that only for higher resolutions the FSC-values are according to the gold-standard!" << std::endl;
 				MPI_Status status;
@@ -2553,6 +2574,7 @@ void MlOptimiserMpi::joinTwoHalvesAtLowResolution()
 #ifdef DEBUG
 				std::cerr << "AAArank=1 lowresdata: "; lowres_data.printShape();
 				std::cerr << "AAArank=1 lowresdata_half2: "; lowres_data_half2.printShape();
+				std::cerr << "RANK1B: node->rank= " << node->rank << std::endl;
 #endif
 				// The first slave receives the average from the second slave
 				node->relion_MPI_Recv(MULTIDIM_ARRAY(lowres_data_half2), 2*MULTIDIM_SIZE(lowres_data_half2), MY_MPI_DOUBLE, reconstruct_rank2, MPITAG_IMAGE, MPI_COMM_WORLD, status);
@@ -2601,7 +2623,7 @@ void MlOptimiserMpi::reconstructUnregularisedMapAndCalculateSolventCorrectedFSC(
 	for (int ibody = 0; ibody< mymodel.nr_bodies; ibody++ )
 	{
 
-		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody])
+		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody] > 0)
 			continue;
 
 		int reconstruct_rank1 = 2 * (ibody % ( (node->size - 1)/2 ) ) + 1;
@@ -2938,7 +2960,7 @@ void MlOptimiserMpi::compareTwoHalves()
 	for (int ibody = 0; ibody< mymodel.nr_bodies; ibody++ )
 	{
 
-		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody])
+		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody] > 0)
 			continue;
 
 		// The first two slaves calculate the sum of the downsampled average of all bodies
@@ -3040,6 +3062,9 @@ void MlOptimiserMpi::iterate()
 				checkConvergence(node->rank == 1);
 
 			expectation();
+#ifdef DEBUG
+			std::cerr << " finished expectation..." << std::endl;
+#endif
 
 			int old_verb = verb;
 			if (nr_subsets > 1) // be quiet
@@ -3063,10 +3088,16 @@ void MlOptimiserMpi::iterate()
 
 			// Now combine all weighted sums
 			// Leave the option to both for a while. Then, if there are no problems with the system via files keep that one and remove the MPI version from the code
+#ifdef DEBUG
+			std::cerr << " before combineAllWeightedSums..." << std::endl;
+#endif
 			if (combine_weights_thru_disc)
 				combineAllWeightedSumsViaFile();
 			else
 				combineAllWeightedSums();
+#ifdef DEBUG
+			std::cerr << " after combineAllWeightedSums..." << std::endl;
+#endif
 
 			MPI_Barrier(MPI_COMM_WORLD);
 
@@ -3111,12 +3142,18 @@ void MlOptimiserMpi::iterate()
 				if (low_resol_join_halves > 0.)
 					joinTwoHalvesAtLowResolution();
 
+#ifdef DEBUG
+				std::cerr << " before compareHalves..." << std::endl;
+#endif
 				// Sjors 27-oct-2015
 				// Calculate gold-standard FSC curve
 				if (do_phase_random_fsc && (fn_mask != "None" || mymodel.nr_bodies > 1) )
 					reconstructUnregularisedMapAndCalculateSolventCorrectedFSC();
 				else
 					compareTwoHalves();
+#ifdef DEBUG
+				std::cerr << " after compareHalves..." << std::endl;
+#endif
 
 				// For automated sampling procedure
 				if (!node->isMaster()) // the master does not have the correct mymodel.current_size, it only handles metadata!
@@ -3126,7 +3163,7 @@ void MlOptimiserMpi::iterate()
 					for (int ibody = 0; ibody< mymodel.nr_bodies; ibody++)
 					{
 
-						if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody])
+						if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody] > 0)
 							continue;
 
 						int fsc05   = -1;

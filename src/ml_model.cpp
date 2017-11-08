@@ -45,7 +45,7 @@ void MlModel::initialise(bool _do_sgd)
 	sigma_tilt_bodies.resize(nr_bodies, 0.);
 	sigma_psi_bodies.resize(nr_bodies, 0.);
 	sigma_offset_bodies.resize(nr_bodies, 0.);
-	keep_fixed_bodies.resize(nr_bodies, false);
+	keep_fixed_bodies.resize(nr_bodies, 0);
 	pointer_body_overlap.resize(nr_bodies, nr_bodies);
 	max_radius_mask_bodies.resize(nr_bodies, -1);
 	pdf_class.resize(nr_classes, 1./(RFLOAT)nr_classes);
@@ -939,9 +939,12 @@ void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool als
 		}
 
 		// If all sigmas are zero, ignore this body in the refinement
-		keep_fixed_bodies[nr_bodies] = (sigma_tilt_bodies[nr_bodies] < 0.001 &&
-				                        sigma_psi_bodies[nr_bodies] < 0.001 &&
-										sigma_offset_bodies[nr_bodies] < 0.001);
+		if (sigma_tilt_bodies[nr_bodies] < 0.001 &&
+				sigma_psi_bodies[nr_bodies] < 0.001 &&
+				sigma_offset_bodies[nr_bodies] < 0.001)
+			keep_fixed_bodies[nr_bodies] = 1;
+		else
+			keep_fixed_bodies[nr_bodies] = 0;
 
 		// Also write the mask with the standard name to disk
 		fn_mask.compose(fn_root_out + "_body", nr_bodies + 1, "", 3); // body number from 1 to K!
