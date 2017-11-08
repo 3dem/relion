@@ -131,7 +131,7 @@ class stack_create_parameters
 
 			// Resize the output image
 			std::cout << "Resizing the output stack to "<< ndim<<" images of size: "<<xdim<<"x"<<ydim<<"x"<<zdim << std::endl;
-			RFLOAT Gb = (ndim*zdim*ydim*xdim*sizeof(RFLOAT))/(1024.*1024.*1024.);
+			RFLOAT Gb = (RFLOAT)ndim * zdim * ydim * xdim * sizeof(RFLOAT) / (1024. * 1024. * 1024.);
 			std::cout << "This will require " << Gb << "Gb of memory...."<< std::endl;
 			Image<RFLOAT> out(xdim, ydim, zdim, ndim);
 
