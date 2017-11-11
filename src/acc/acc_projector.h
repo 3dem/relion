@@ -18,7 +18,7 @@ class AccProjector
 
 	size_t allocaton_size;
 
-#ifndef CUDA_NO_TEXTURES
+#ifndef PROJECTOR_NO_TEXTURES
 
 	XFLOAT *texArrayReal2D, *texArrayImag2D;
 	cudaArray_t *texArrayReal, *texArrayImag;
@@ -32,7 +32,7 @@ class AccProjector
 	XFLOAT *mdlComplex;
 	int externalFree;
 #endif
-#endif  // CUDA_NO_TEXTURES
+#endif  // PROJECTOR_NO_TEXTURES
 
 public:
 	AccProjector():
@@ -42,7 +42,7 @@ public:
 			padding_factor(0),
 			allocaton_size(0)
 	{
-#ifndef CUDA_NO_TEXTURES
+#ifndef PROJECTOR_NO_TEXTURES
 
 		texArrayReal2D = 0;
 		texArrayImag2D = 0;

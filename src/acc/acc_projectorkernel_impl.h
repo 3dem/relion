@@ -2,7 +2,7 @@
 #define ACC_PROJECTORKERNELIMPL_H_
 
 
-#ifndef CUDA_NO_TEXTURES
+#ifndef PROJECTOR_NO_TEXTURES
 #define PROJECTOR_PTR_TYPE cudaTextureObject_t
 #else
 #define PROJECTOR_PTR_TYPE XFLOAT *
@@ -62,10 +62,9 @@ public:
 			};
 
 #ifdef CUDA
-	__device__ __forceinline__ void project3Dmodel(
-#else
-	void project3Dmodel(
+	__device__ __forceinline__
 #endif
+	void project3Dmodel(
 			int x,
 			int y,
 			int z,
@@ -93,7 +92,7 @@ public:
 			XFLOAT yp = (e3 * x + e4 * y + e5 * z ) * padding_factor;
 			XFLOAT zp = (e6 * x + e7 * y + e8 * z ) * padding_factor;
 
-#ifdef CUDA_NO_TEXTURES
+#ifdef PROJECTOR_NO_TEXTURES
 			bool invers(xp < 0);
 			if (invers)
 			{
@@ -145,10 +144,9 @@ public:
 	}
 
 #ifdef CUDA
-	__device__ __forceinline__ void project3Dmodel(
-#else
-	void project3Dmodel(
+	__device__ __forceinline__
 #endif
+	void project3Dmodel(
 			int x,
 			int y,
 			XFLOAT e0,
@@ -172,7 +170,7 @@ public:
 			XFLOAT yp = (e3 * x + e4 * y ) * padding_factor;
 			XFLOAT zp = (e6 * x + e7 * y ) * padding_factor;
 
-#ifdef CUDA_NO_TEXTURES
+#ifdef PROJECTOR_NO_TEXTURES
 			bool invers(xp < 0);
 			if (invers)
 			{
@@ -222,10 +220,9 @@ public:
 	}
 
 #ifdef CUDA
-	__device__ __forceinline__ void project2Dmodel(
-#else
-	void project2Dmodel(
+	__device__ __forceinline__
 #endif
+	void project2Dmodel(
 				int x,
 				int y,
 				XFLOAT e0,
@@ -245,7 +242,7 @@ public:
 		{
 			XFLOAT xp = (e0 * x + e1 * y ) * padding_factor;
 			XFLOAT yp = (e3 * x + e4 * y ) * padding_factor;
-#ifdef CUDA_NO_TEXTURES
+#ifdef PROJECTOR_NO_TEXTURES
 			bool invers(xp < 0);
 			if (invers)
 			{
@@ -299,7 +296,7 @@ public:
 					p.mdlInitY, p.mdlInitZ,
 					p.padding_factor,
 					maxR,
-#ifndef CUDA_NO_TEXTURES
+#ifndef PROJECTOR_NO_TEXTURES
 					*p.mdlReal,
 					*p.mdlImag
 #else

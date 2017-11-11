@@ -205,8 +205,8 @@ if(ALTCPU)
 endif()
 
 # ---------------------------------------------------------------USE TEXTURES OR NOT--
-if(NOT CudaTexture)
-    add_definitions(-DCUDA_NO_TEXTURES)
+if(NOT CudaTexture OR ALTCPU)
+    add_definitions(-DPROJECTOR_NO_TEXTURES)
     message(STATUS "Texture interpolation is omitted.")
 endif(NOT CudaTexture)
 # -------------------------------------------------------------------------------MPI--

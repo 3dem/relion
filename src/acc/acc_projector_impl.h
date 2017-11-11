@@ -32,7 +32,7 @@ bool AccProjector::setMdlDim(
 	mdlMaxR = maxr;
 	padding_factor = paddingFactor;
 
-#ifndef CUDA_NO_TEXTURES
+#ifndef PROJECTOR_NO_TEXTURES
 
 	mdlReal = new cudaTextureObject_t();
 	mdlImag = new cudaTextureObject_t();
@@ -136,7 +136,7 @@ void AccProjector::initMdl(XFLOAT *real, XFLOAT *imag)
 #endif
 #endif
 
-#ifndef CUDA_NO_TEXTURES
+#ifndef PROJECTOR_NO_TEXTURES
 	if(mdlZ!=0)  // 3D model
 	{
 		// -- make extents for automatic pitching (aligment) of allocated 3D arrays
@@ -215,7 +215,7 @@ void AccProjector::clear()
 #ifdef CUDA
 	if (mdlReal != 0)
 	{
-#ifndef CUDA_NO_TEXTURES
+#ifndef PROJECTOR_NO_TEXTURES
 		cudaDestroyTextureObject(*mdlReal);
 		cudaDestroyTextureObject(*mdlImag);
 		delete mdlReal;
