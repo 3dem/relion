@@ -23,9 +23,20 @@
 class MlDataBundle
 {
 public:
+	tbb::spin_mutex backproject_mutex;
 	std::vector< AccProjector > projectors;
 	std::vector< AccBackprojector > backprojectors;
 	std::vector< AccProjectorPlan > coarseProjectionPlans;
+
+	void setupFixedSizedObjects(MlOptimiser *baseMLO);
+
+	void setupTunableSizedObjects(MlOptimiser *baseMLO);
+
+	~MlDataBundle()
+	{
+		projectors.clear();
+		backprojectors.clear();
+	}
 };
 
 class MlOptimiserCpu
@@ -54,9 +65,8 @@ public:
 
 	//Used for precalculations of projection setup
 	bool generateProjectionPlanOnTheFly;
-	
 
-	MlOptimiserCpu(MlOptimiser *baseMLOptimiser, const char * timing_fnm) :
+	MlOptimiserCpu(MlOptimiser *baseMLOptimiser, MlDataBundle *b, const char * timing_fnm) :
 			baseMLO(baseMLOptimiser),
 			transformer1(baseMLOptimiser->mymodel.data_dim),
 			transformer2(baseMLOptimiser->mymodel.data_dim),
@@ -67,17 +77,19 @@ public:
 #endif
 			generateProjectionPlanOnTheFly(false),
 			thread_id(-1),
-			bundle(new MlDataBundle()),
+			bundle(b),
 			classStreams(0)
-	{};
+	{
+		//Can we pre-generate projector plan and corresponding euler matrices for all particles
+		if (baseMLO->do_skip_align || baseMLO->do_skip_rotate || baseMLO->do_auto_refine || baseMLO->mymodel.orientational_prior_mode != NOPRIOR)
+			generateProjectionPlanOnTheFly = true;
+		else
+			generateProjectionPlanOnTheFly = false;
+	};
 	
 	void resetData();
 
     void expectationOneParticle(unsigned long my_ori_particle, int thread_id);
-
-	void setupFixedSizedObjects();
-
-	void setupTunableSizedObjects();
 	
 	CudaCustomAllocator *getAllocator()	
 	{
@@ -85,9 +97,7 @@ public:
 	};
 
 	~MlOptimiserCpu()
-	{
-		delete bundle;
-	}
+	{}
 
 };
 

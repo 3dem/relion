@@ -70,20 +70,14 @@
 tbb::spin_mutex      mkl_mutex;
 
 
-void MlOptimiserCpu::setupFixedSizedObjects()
+void MlDataBundle::setupFixedSizedObjects(MlOptimiser *baseMLO)
 {
 	unsigned nr_classes = baseMLO->mymodel.nr_classes;
 
-	//Can we pre-generate projector plan and corresponding euler matrices for all particles
-	if (baseMLO->do_skip_align || baseMLO->do_skip_rotate || baseMLO->do_auto_refine || baseMLO->mymodel.orientational_prior_mode != NOPRIOR)
-		generateProjectionPlanOnTheFly = true;
-	else
-		generateProjectionPlanOnTheFly = false;
-
 	// clear() called on std::vector appears to set size=0, even if we have an explicit
 	// destructor for each member, so we need to set the size to what is was before
-	bundle->projectors.resize(nr_classes);
-	bundle->backprojectors.resize(nr_classes);
+	projectors.resize(nr_classes);
+	backprojectors.resize(nr_classes);
 
 	/*======================================================
 				  PROJECTOR AND BACKPROJECTOR
@@ -92,7 +86,7 @@ void MlOptimiserCpu::setupFixedSizedObjects()
 	//Loop over classes
 	for (int iclass = 0; iclass < nr_classes; iclass++)
 	{
-		bundle->projectors[iclass].setMdlDim(
+		projectors[iclass].setMdlDim(
 				baseMLO->mymodel.PPref[iclass].data.xdim,
 				baseMLO->mymodel.PPref[iclass].data.ydim,
 				baseMLO->mymodel.PPref[iclass].data.zdim,
@@ -101,10 +95,9 @@ void MlOptimiserCpu::setupFixedSizedObjects()
 				baseMLO->mymodel.PPref[iclass].r_max,
 				baseMLO->mymodel.PPref[iclass].padding_factor);
 
-//		bundle->projectors[iclass].initMdl(baseMLO->mymodel.PPref[iclass].data.data);
-		bundle->projectors[iclass].initMdl(baseMLO->mdlClassComplex[iclass]);
+		projectors[iclass].initMdl(baseMLO->mdlClassComplex[iclass]);
 
-		bundle->backprojectors[iclass].setMdlDim(
+		backprojectors[iclass].setMdlDim(
 				baseMLO->wsum_model.BPref[iclass].data.xdim,
 				baseMLO->wsum_model.BPref[iclass].data.ydim,
 				baseMLO->wsum_model.BPref[iclass].data.zdim,
@@ -113,11 +106,11 @@ void MlOptimiserCpu::setupFixedSizedObjects()
 				baseMLO->wsum_model.BPref[iclass].r_max,
 				baseMLO->wsum_model.BPref[iclass].padding_factor);
 
-		bundle->backprojectors[iclass].initMdl();
+		backprojectors[iclass].initMdl();
 	}
 }
 
-void MlOptimiserCpu::setupTunableSizedObjects()
+void MlDataBundle::setupTunableSizedObjects(MlOptimiser *baseMLO)
 {
 	int nr_classes = baseMLO->mymodel.nr_classes;
 
@@ -125,50 +118,52 @@ void MlOptimiserCpu::setupTunableSizedObjects()
 						PROJECTION PLAN
 	======================================================*/
 
-	bundle->coarseProjectionPlans.resize(nr_classes);
-
-	for (int iclass = 0; iclass < nr_classes; iclass++)
-	{
-		//If doing predefined projector plan at all and is this class significant
-		if (!generateProjectionPlanOnTheFly && baseMLO->mymodel.pdf_class[iclass] > 0.)
+	coarseProjectionPlans.resize(nr_classes);
+	
+	//Can we pre-generate projector plan and corresponding euler matrices for all particles
+	if (!baseMLO->do_skip_align && !baseMLO->do_skip_rotate && !baseMLO->do_auto_refine && baseMLO->mymodel.orientational_prior_mode == NOPRIOR)
+		for (int iclass = 0; iclass < nr_classes; iclass++)
 		{
-			std::vector<int> exp_pointer_dir_nonzeroprior;
-			std::vector<int> exp_pointer_psi_nonzeroprior;
-			std::vector<RFLOAT> exp_directions_prior;
-			std::vector<RFLOAT> exp_psi_prior;
+			//If doing predefined projector plan at all and is this class significant
+			if (baseMLO->mymodel.pdf_class[iclass] > 0.)
+			{
+				std::vector<int> exp_pointer_dir_nonzeroprior;
+				std::vector<int> exp_pointer_psi_nonzeroprior;
+				std::vector<RFLOAT> exp_directions_prior;
+				std::vector<RFLOAT> exp_psi_prior;
 
-			long unsigned itrans_max = baseMLO->sampling.NrTranslationalSamplings() - 1;
-			long unsigned nr_idir = baseMLO->sampling.NrDirections(0, &exp_pointer_dir_nonzeroprior);
-			long unsigned nr_ipsi = baseMLO->sampling.NrPsiSamplings(0, &exp_pointer_psi_nonzeroprior );
+				long unsigned itrans_max = baseMLO->sampling.NrTranslationalSamplings() - 1;
+				long unsigned nr_idir = baseMLO->sampling.NrDirections(0, &exp_pointer_dir_nonzeroprior);
+				long unsigned nr_ipsi = baseMLO->sampling.NrPsiSamplings(0, &exp_pointer_psi_nonzeroprior );
 
-			bundle->coarseProjectionPlans[iclass].setup(
-					baseMLO->sampling,
-					exp_directions_prior,
-					exp_psi_prior,
-					exp_pointer_dir_nonzeroprior,
-					exp_pointer_psi_nonzeroprior,
-					NULL, //Mcoarse_significant
-					baseMLO->mymodel.pdf_class,
-					baseMLO->mymodel.pdf_direction,
-					nr_idir,
-					nr_ipsi,
-					0, //idir_min
-					nr_idir - 1, //idir_max
-					0, //ipsi_min
-					nr_ipsi - 1, //ipsi_max
-					0, //itrans_min
-					itrans_max,
-					0, //current_oversampling
-					1, //nr_oversampled_rot
-					iclass,
-					true, //coarse
-					!IS_NOT_INV,
-					baseMLO->do_skip_align,
-					baseMLO->do_skip_rotate,
-					baseMLO->mymodel.orientational_prior_mode
-					);
+				coarseProjectionPlans[iclass].setup(
+						baseMLO->sampling,
+						exp_directions_prior,
+						exp_psi_prior,
+						exp_pointer_dir_nonzeroprior,
+						exp_pointer_psi_nonzeroprior,
+						NULL, //Mcoarse_significant
+						baseMLO->mymodel.pdf_class,
+						baseMLO->mymodel.pdf_direction,
+						nr_idir,
+						nr_ipsi,
+						0, //idir_min
+						nr_idir - 1, //idir_max
+						0, //ipsi_min
+						nr_ipsi - 1, //ipsi_max
+						0, //itrans_min
+						itrans_max,
+						0, //current_oversampling
+						1, //nr_oversampled_rot
+						iclass,
+						true, //coarse
+						!IS_NOT_INV,
+						baseMLO->do_skip_align,
+						baseMLO->do_skip_rotate,
+						baseMLO->mymodel.orientational_prior_mode
+						);
+			}
 		}
-	}
 };
 
 

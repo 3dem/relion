@@ -2589,29 +2589,36 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 #endif
 
 			CTIC(accMLO->timer,"backproject");
-
-			runBackProjectKernel(
-				accMLO->bundle->backprojectors[exp_iclass],
-				projKernel,
-				~Fimgs_nomask_real,
-				~Fimgs_nomask_imag,
-				~trans_x,
-				~trans_y,
-				~trans_z,
-				&(~sorted_weights)[classPos],
-				~Minvsigma2s,
-				~ctfs,
-				translation_num,
-				(XFLOAT) op.significant_weight[ipart],
-				(XFLOAT) op.sum_weight[ipart],
-				~eulers[exp_iclass],
-				op.local_Minvsigma2s[0].xdim,
-				op.local_Minvsigma2s[0].ydim,
-				op.local_Minvsigma2s[0].zdim,
-				orientation_num,
-				accMLO->dataIs3D,
-				baseMLO->do_sgd,
-				accMLO->classStreams[exp_iclass]);
+			
+			{
+			
+#ifndef CUDA
+				tbb::spin_mutex::scoped_lock lock(accMLO->bundle->backproject_mutex);
+#endif		
+				
+				runBackProjectKernel(
+					accMLO->bundle->backprojectors[exp_iclass],
+					projKernel,
+					~Fimgs_nomask_real,
+					~Fimgs_nomask_imag,
+					~trans_x,
+					~trans_y,
+					~trans_z,
+					&(~sorted_weights)[classPos],
+					~Minvsigma2s,
+					~ctfs,
+					translation_num,
+					(XFLOAT) op.significant_weight[ipart],
+					(XFLOAT) op.sum_weight[ipart],
+					~eulers[exp_iclass],
+					op.local_Minvsigma2s[0].xdim,
+					op.local_Minvsigma2s[0].ydim,
+					op.local_Minvsigma2s[0].zdim,
+					orientation_num,
+					accMLO->dataIs3D,
+					baseMLO->do_sgd,
+					accMLO->classStreams[exp_iclass]);
+				}
 				
 			CTOC(accMLO->timer,"backproject");
 
