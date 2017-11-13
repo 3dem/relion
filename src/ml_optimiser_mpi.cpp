@@ -1051,6 +1051,11 @@ void MlOptimiserMpi::expectation()
 				*pData ++ = (XFLOAT) mymodel.PPref[iclass].data.data[i].imag;
 			} 
 		}
+
+		MlDataBundle *b = new MlDataBundle();
+		b->setupFixedSizedObjects(this);
+		b->setupTunableSizedObjects(this);
+		cudaDeviceBundles.push_back((void*)b);
 	}  // do_cpu
 #endif // ALTCPU
 	/************************************************************************/
@@ -1543,21 +1548,20 @@ void MlOptimiserMpi::expectation()
 				// Now collect the results from each thread
 				for (CpuOptimiserType::const_iterator i = tbbCpuOptimiser.begin(); i != tbbCpuOptimiser.end();  ++i)
 				{
-					MlOptimiserCpu* b = (MlOptimiserCpu*)(*i);
-					if(!b) continue;
+					MlDataBundle* b = (MlDataBundle*) cudaDeviceBundles[0];
 
-		#ifdef DEBUG
+#ifdef DEBUG
 					std::cerr << "Faux thread id: " << b->thread_id << std::endl;
-		#endif
+#endif
 
-					for (int j = 0; j < b->bundle->projectors.size(); j++)
+					for (int j = 0; j < b->projectors.size(); j++)
 					{
 						unsigned long s = wsum_model.BPref[j].data.nzyxdim;
 						XFLOAT *reals = NULL;
 						XFLOAT *imags = NULL;
 						XFLOAT *weights = NULL;
 
-						b->bundle->backprojectors[j].getMdlDataPtrs(reals, imags, weights);
+						b->backprojectors[j].getMdlDataPtrs(reals, imags, weights);
 
 						for (unsigned long n = 0; n < s; n++)
 						{
@@ -1566,12 +1570,13 @@ void MlOptimiserMpi::expectation()
 							wsum_model.BPref[j].weight.data[n] += (RFLOAT) weights[n];
 						}
 
-						b->bundle->projectors[j].clear();
-						b->bundle->backprojectors[j].clear();
-						b->bundle->coarseProjectionPlans[j].clear();
+						b->projectors[j].clear();
+						b->backprojectors[j].clear();
+						b->coarseProjectionPlans[j].clear();
 					}
 
 					delete b;
+					cudaDeviceBundles.clear();
 				}
 
 				// Now clean up

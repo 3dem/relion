@@ -2869,7 +2869,7 @@ void MlOptimiser::expectation()
 			b->coarseProjectionPlans[j].clear();
 		}
 		
-		delete (MlDataBundle*) cudaDeviceBundles[0];
+		delete b;
 		cudaDeviceBundles.clear();
 
 		// Now clean up
