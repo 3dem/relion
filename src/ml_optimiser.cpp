@@ -6664,7 +6664,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int my_ori_particle
 			// Store nr_significant_coarse_samples for this particle
 			// Don't do this for multibody, as it would be overwritten for each body,
 			// and we also use METADATA_NR_SIGN in the new safeguard for the gold-standard separation
-			if (!mymodel.nr_bodies > 1)
+			if (mymodel.nr_bodies == 1)
 				DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_NR_SIGN) = (RFLOAT)my_nr_significant_coarse_samples;
 
 			// Keep track of which coarse samplings were significant were significant for this particle
