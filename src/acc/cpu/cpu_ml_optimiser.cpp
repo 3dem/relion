@@ -70,7 +70,7 @@
 tbb::spin_mutex      mkl_mutex;
 
 
-void MlDataBundle::setupFixedSizedObjects(MlOptimiser *baseMLO)
+void MlDataBundle::setup(MlOptimiser *baseMLO)
 {
 	unsigned nr_classes = baseMLO->mymodel.nr_classes;
 
@@ -108,11 +108,6 @@ void MlDataBundle::setupFixedSizedObjects(MlOptimiser *baseMLO)
 
 		backprojectors[iclass].initMdl();
 	}
-}
-
-void MlDataBundle::setupTunableSizedObjects(MlOptimiser *baseMLO)
-{
-	int nr_classes = baseMLO->mymodel.nr_classes;
 
 	/*======================================================
 						PROJECTION PLAN

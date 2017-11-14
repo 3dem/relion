@@ -2585,16 +2585,16 @@ void MlOptimiser::expectation()
 			MlDeviceBundle *b = new MlDeviceBundle(this);
 			b->setDevice(cudaDevices[i]);
 			b->setupFixedSizedObjects();
-			cudaDeviceBundles.push_back((void*)b);
+			accDataBundles.push_back((void*)b);
 		}
 
-		std::vector<unsigned> threadcountOnDevice(cudaDeviceBundles.size(),0);
+		std::vector<unsigned> threadcountOnDevice(accDataBundles.size(),0);
 
 		for (int i = 0; i < cudaOptimiserDeviceMap.size(); i ++)
 		{
 			std::stringstream didSs;
 			didSs << "RRt" << i;
-			MlOptimiserCuda *b = new MlOptimiserCuda(this, (MlDeviceBundle*) cudaDeviceBundles[cudaOptimiserDeviceMap[i]], didSs.str().c_str());
+			MlOptimiserCuda *b = new MlOptimiserCuda(this, (MlDeviceBundle*) accDataBundles[cudaOptimiserDeviceMap[i]], didSs.str().c_str());
 			b->resetData();
 			cudaOptimisers.push_back((void*)b);
 			threadcountOnDevice[cudaOptimiserDeviceMap[i]] ++;
@@ -2603,15 +2603,15 @@ void MlOptimiser::expectation()
 		int devCount;
 		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
 		HANDLE_ERROR(cudaDeviceSynchronize());
-		for (int i = 0; i < cudaDeviceBundles.size(); i ++)
+		for (int i = 0; i < accDataBundles.size(); i ++)
 		{
-			if(((MlDeviceBundle*)cudaDeviceBundles[i])->device_id >= devCount || ((MlDeviceBundle*)cudaDeviceBundles[i])->device_id < 0 )
+			if(((MlDeviceBundle*)accDataBundles[i])->device_id >= devCount || ((MlDeviceBundle*)accDataBundles[i])->device_id < 0 )
 			{
-				//std::cerr << " using device_id=" << ((MlDeviceBundle*)cudaDeviceBundles[i])->device_id << " (device no. " << ((MlDeviceBundle*)cudaDeviceBundles[i])->device_id+1 << ") which is not within the available device range" << devCount << std::endl;
+				//std::cerr << " using device_id=" << ((MlDeviceBundle*)accDataBundles[i])->device_id << " (device no. " << ((MlDeviceBundle*)accDataBundles[i])->device_id+1 << ") which is not within the available device range" << devCount << std::endl;
 				CRITICAL(ERR_GPUID);
 			}
 			else
-				HANDLE_ERROR(cudaSetDevice(((MlDeviceBundle*)cudaDeviceBundles[i])->device_id));
+				HANDLE_ERROR(cudaSetDevice(((MlDeviceBundle*)accDataBundles[i])->device_id));
 
 			size_t free, total, allocationSize;
 			HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
@@ -2634,7 +2634,7 @@ void MlOptimiser::expectation()
 			printf("INFO: Free memory for Custom Allocator of device bundle %d is %d MB\n", i, (int) ( ((float)allocationSize)/1000000.0 ) );
 #endif
 
-			((MlDeviceBundle*)cudaDeviceBundles[i])->setupTunableSizedObjects(allocationSize);
+			((MlDeviceBundle*)accDataBundles[i])->setupTunableSizedObjects(allocationSize);
 		}
 	}
 #endif
@@ -2669,9 +2669,8 @@ void MlOptimiser::expectation()
 		}
 		
 		MlDataBundle *b = new MlDataBundle();
-		b->setupFixedSizedObjects(this);
-		b->setupTunableSizedObjects(this);
-		cudaDeviceBundles.push_back((void*)b);
+		b->setup(this);
+		accDataBundles.push_back((void*)b);
 	}  // do_cpu
 #endif // ALTCPU
 	/************************************************************************/
@@ -2782,9 +2781,9 @@ void MlOptimiser::expectation()
 #ifdef CUDA
 	if (do_gpu)
 	{
-		for (int i = 0; i < cudaDeviceBundles.size(); i ++)
+		for (int i = 0; i < accDataBundles.size(); i ++)
 		{
-			MlDeviceBundle* b = ((MlDeviceBundle*)cudaDeviceBundles[i]);
+			MlDeviceBundle* b = ((MlDeviceBundle*)accDataBundles[i]);
 			b->syncAllBackprojects();
 
 			for (int j = 0; j < b->projectors.size(); j++)
@@ -2819,17 +2818,17 @@ void MlOptimiser::expectation()
 		cudaOptimisers.clear();
 
 
-		for (int i = 0; i < cudaDeviceBundles.size(); i ++)
+		for (int i = 0; i < accDataBundles.size(); i ++)
 		{
 
-			((MlDeviceBundle*)cudaDeviceBundles[i])->allocator->syncReadyEvents();
-			((MlDeviceBundle*)cudaDeviceBundles[i])->allocator->freeReadyAllocs();
+			((MlDeviceBundle*)accDataBundles[i])->allocator->syncReadyEvents();
+			((MlDeviceBundle*)accDataBundles[i])->allocator->freeReadyAllocs();
 
 #ifdef DEBUG_CUDA
-			if (((MlDeviceBundle*) cudaDeviceBundles[i])->allocator->getNumberOfAllocs() != 0)
+			if (((MlDeviceBundle*) accDataBundles[i])->allocator->getNumberOfAllocs() != 0)
 			{
 				printf("DEBUG_ERROR: Non-zero allocation count encountered in custom allocator between iterations.\n");
-				((MlDeviceBundle*) cudaDeviceBundles[i])->allocator->printState();
+				((MlDeviceBundle*) accDataBundles[i])->allocator->printState();
 				fflush(stdout);
 				CRITICAL(ERR_CANZ);
 			}
@@ -2837,16 +2836,16 @@ void MlOptimiser::expectation()
 #endif
 		}
 
-		for (int i = 0; i < cudaDeviceBundles.size(); i ++)
-			delete (MlDeviceBundle*) cudaDeviceBundles[i];
+		for (int i = 0; i < accDataBundles.size(); i ++)
+			delete (MlDeviceBundle*) accDataBundles[i];
 
-		cudaDeviceBundles.clear();
+		accDataBundles.clear();
 	}
 #endif
 #ifdef ALTCPU
 	if (do_cpu)
 	{
-		MlDataBundle* b = (MlDataBundle*) cudaDeviceBundles[0];
+		MlDataBundle* b = (MlDataBundle*) accDataBundles[0];
 
 		for (int j = 0; j < b->projectors.size(); j++)
 		{
@@ -2870,7 +2869,7 @@ void MlOptimiser::expectation()
 		}
 		
 		delete b;
-		cudaDeviceBundles.clear();
+		accDataBundles.clear();
 
 		// Now clean up
 		unsigned nr_classes = mymodel.nr_classes;
@@ -3273,7 +3272,7 @@ void MlOptimiser::expectationSomeParticles(long int my_first_ori_particle, long 
 			CpuOptimiserType::reference ref = tbbCpuOptimiser.local();
 			MlOptimiserCpu *cpuOptimiser = (MlOptimiserCpu *)ref;
 			if(cpuOptimiser == NULL) {
-				cpuOptimiser = new MlOptimiserCpu(this, (MlDataBundle*)cudaDeviceBundles[0], "cpu_optimiser");
+				cpuOptimiser = new MlOptimiserCpu(this, (MlDataBundle*)accDataBundles[0], "cpu_optimiser");
 				cpuOptimiser->resetData();
 				ref = cpuOptimiser;
 

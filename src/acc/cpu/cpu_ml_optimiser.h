@@ -28,9 +28,7 @@ public:
 	std::vector< AccBackprojector > backprojectors;
 	std::vector< AccProjectorPlan > coarseProjectionPlans;
 
-	void setupFixedSizedObjects(MlOptimiser *baseMLO);
-
-	void setupTunableSizedObjects(MlOptimiser *baseMLO);
+	void setup(MlOptimiser *baseMLO);
 
 	~MlDataBundle()
 	{

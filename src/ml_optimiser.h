@@ -103,7 +103,7 @@ public:
 	std::vector<int> cudaDevices;
 	std::vector<int> cudaOptimiserDeviceMap;
 	std::vector<void*> cudaOptimisers;
-	std::vector<void*> cudaDeviceBundles;
+	std::vector<void*> accDataBundles;
 
 #ifdef ALTCPU
 	std::vector<void*> cpuOptimisers;
