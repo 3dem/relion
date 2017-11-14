@@ -361,6 +361,42 @@ void FlexAnalyser::loopThroughParticles(int rank, int size)
 		std::vector<double> eigenvalues, means;
 		// Do the PCA and make histograms
 		principalComponentsAnalysis(inputdata, eigenvectors, eigenvalues, means, projected_data);
+
+		// TMP
+		std::cout << " Eigenvectors (only rotations): " << std::endl;
+		for (int j =0; j < eigenvectors[0].size(); j++)
+		{
+			std::string stro="";
+			if (j%6==0)
+				stro="rot";
+			else if (j%6==1)
+				stro="tilt";
+			else if (j%6==2)
+				stro="psi";
+			if (stro != "")
+			{
+				stro+= "-body-"+integerToString(1+(j/6));
+				std::cout << std::setw(12) << std::right << std::fixed;
+				std::cout << stro;
+			}
+		}
+		std::cout << std::endl;
+		for (int k= 0; k < eigenvectors.size(); k++)
+		{
+			if (k%6<3)
+			{
+				for (int j =0; j < eigenvectors[0].size(); j++)
+				{
+					if (j%6<3)
+					{
+						std::cout << std::setw(12) << std::fixed;
+						std::cout << eigenvectors[k][j];
+					}
+				}
+				std::cout << std::endl;
+			}
+		}
+
 		makePCAhistograms(projected_data, eigenvalues, means);
 
 		// Make movies for the most significant eigenvectors
@@ -916,7 +952,7 @@ void FlexAnalyser::make3DModelsAlongPrincipalComponents(std::vector< std::vector
 				applyGeometry(model.Iref[ibody], Mbody, Abody, IS_NOT_INV, DONT_WRAP);
 				applyGeometry(model.masks_bodies[ibody], Mmask, Abody, IS_NOT_INV, DONT_WRAP);
 
-				img() += Mbody;
+				img() += Mbody * Mmask;
 				sumw += Mmask;
 			}
 
