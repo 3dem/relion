@@ -1544,50 +1544,46 @@ void MlOptimiserMpi::expectation()
 #ifdef ALTCPU
 			if (do_cpu)
 			{
-				// Now collect the results from each thread
-				for (CpuOptimiserType::const_iterator i = tbbCpuOptimiser.begin(); i != tbbCpuOptimiser.end();  ++i)
-				{
-					MlDataBundle* b = (MlDataBundle*) accDataBundles[0];
+				MlDataBundle* b = (MlDataBundle*) accDataBundles[0];
 
 #ifdef DEBUG
-					std::cerr << "Faux thread id: " << b->thread_id << std::endl;
+				std::cerr << "Faux thread id: " << b->thread_id << std::endl;
 #endif
 
-					for (int j = 0; j < b->projectors.size(); j++)
+				for (int j = 0; j < b->projectors.size(); j++)
+				{
+					unsigned long s = wsum_model.BPref[j].data.nzyxdim;
+					XFLOAT *reals = NULL;
+					XFLOAT *imags = NULL;
+					XFLOAT *weights = NULL;
+
+					b->backprojectors[j].getMdlDataPtrs(reals, imags, weights);
+
+					for (unsigned long n = 0; n < s; n++)
 					{
-						unsigned long s = wsum_model.BPref[j].data.nzyxdim;
-						XFLOAT *reals = NULL;
-						XFLOAT *imags = NULL;
-						XFLOAT *weights = NULL;
-
-						b->backprojectors[j].getMdlDataPtrs(reals, imags, weights);
-
-						for (unsigned long n = 0; n < s; n++)
-						{
-							wsum_model.BPref[j].data.data[n].real += (RFLOAT) reals[n];
-							wsum_model.BPref[j].data.data[n].imag += (RFLOAT) imags[n];
-							wsum_model.BPref[j].weight.data[n] += (RFLOAT) weights[n];
-						}
-
-						b->projectors[j].clear();
-						b->backprojectors[j].clear();
-						b->coarseProjectionPlans[j].clear();
+						wsum_model.BPref[j].data.data[n].real += (RFLOAT) reals[n];
+						wsum_model.BPref[j].data.data[n].imag += (RFLOAT) imags[n];
+						wsum_model.BPref[j].weight.data[n] += (RFLOAT) weights[n];
 					}
 
-					delete b;
-					accDataBundles.clear();
+					b->projectors[j].clear();
+					b->backprojectors[j].clear();
+					b->coarseProjectionPlans[j].clear();
 				}
 
-				// Now clean up
-				unsigned nr_classes = mymodel.nr_classes;
-				for (int iclass = 0; iclass < nr_classes; iclass++)
-				{
-					free(mdlClassComplex[iclass]);
-				}
-				free(mdlClassComplex);
-
-				tbbCpuOptimiser.clear();
+				delete b;
+				accDataBundles.clear();
 			}
+
+			// Now clean up
+			unsigned nr_classes = mymodel.nr_classes;
+			for (int iclass = 0; iclass < nr_classes; iclass++)
+			{
+				free(mdlClassComplex[iclass]);
+			}
+			free(mdlClassComplex);
+
+			tbbCpuOptimiser.clear();
 #endif  // ALTCPU			
 
     	}
