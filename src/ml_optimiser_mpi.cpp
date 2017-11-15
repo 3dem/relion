@@ -1573,17 +1573,17 @@ void MlOptimiserMpi::expectation()
 
 				delete b;
 				accDataBundles.clear();
-			}
 
-			// Now clean up
-			unsigned nr_classes = mymodel.nr_classes;
-			for (int iclass = 0; iclass < nr_classes; iclass++)
-			{
-				free(mdlClassComplex[iclass]);
-			}
-			free(mdlClassComplex);
+				// Now clean up
+				unsigned nr_classes = mymodel.nr_classes;
+				for (int iclass = 0; iclass < nr_classes; iclass++)
+				{
+					free(mdlClassComplex[iclass]);
+				}
+				free(mdlClassComplex);
 
-			tbbCpuOptimiser.clear();
+				tbbCpuOptimiser.clear();
+			}
 #endif  // ALTCPU			
 
     	}
