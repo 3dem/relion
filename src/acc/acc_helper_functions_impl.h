@@ -489,7 +489,7 @@ void runBackProjectKernel(
 				BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
 				BP.maxR, BP.maxR2, (XFLOAT)BP.padding_factor,
 				(unsigned)imgX, (unsigned)imgY, (unsigned)imgX*imgY,
-				(unsigned)BP.mdlX, BP.mdlInitY);
+				(unsigned)BP.mdlX, BP.mdlInitY, &BP.mutexes[0]);
 #endif
 	}
 	else
@@ -516,7 +516,7 @@ void runBackProjectKernel(
 					BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
 					BP.maxR, BP.maxR2, BP.padding_factor,
 					imgX, imgY, imgZ, imgX*imgY*imgZ,
-					BP.mdlX, BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ);
+					BP.mdlX, BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ, &BP.mutexes[0]);
 #endif
 			else
 #ifdef CUDA
@@ -538,7 +538,7 @@ void runBackProjectKernel(
 					BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
 					BP.maxR, BP.maxR2, (XFLOAT)BP.padding_factor,
 					(unsigned)imgX, (unsigned)imgY, (unsigned)imgZ, (unsigned)imgX*imgY*imgZ,
-					(unsigned)BP.mdlX, (unsigned)BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ);
+					(unsigned)BP.mdlX, (unsigned)BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ, &BP.mutexes[0]);
 #endif
 		}
 		else
@@ -563,7 +563,7 @@ void runBackProjectKernel(
 					BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
 					BP.maxR, BP.maxR2, (XFLOAT)BP.padding_factor,
 					(unsigned)imgX, (unsigned)imgY, (unsigned)imgZ, (unsigned)imgX*imgY*imgZ,
-					(unsigned)BP.mdlX, (unsigned)BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ);
+					(unsigned)BP.mdlX, (unsigned)BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ, &BP.mutexes[0]);
 #endif
 			else
 #ifdef CUDA
@@ -577,7 +577,7 @@ void runBackProjectKernel(
 					imgX, imgY, imgZ, imgX*imgY*imgZ,
 					BP.mdlX, BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ);
 #else
-#if 1 
+#if 1 //TODO Clean this up
 				CpuKernels::backprojectRef3D(imageCount,
 					d_img_real, d_img_imag,
 					trans_x, trans_y,
@@ -586,7 +586,7 @@ void runBackProjectKernel(
 					BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
 					BP.maxR, BP.maxR2, (XFLOAT)BP.padding_factor,
 					(unsigned)imgX, (unsigned)imgY, (unsigned)imgZ, (unsigned)imgX*imgY*imgZ,
-					(unsigned)BP.mdlX, (unsigned)BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ);
+					(unsigned)BP.mdlX, (unsigned)BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ, &BP.mutexes[0]);
 #else
 				CpuKernels::backproject3D<false>(imageCount,BP_REF3D_BLOCK_SIZE,
 					d_img_real, d_img_imag,
@@ -596,7 +596,7 @@ void runBackProjectKernel(
 					BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
 					BP.maxR, BP.maxR2, (XFLOAT)BP.padding_factor,
 					(unsigned)imgX, (unsigned)imgY, (unsigned)imgZ, (unsigned)imgX*imgY*imgZ,
-					(unsigned)BP.mdlX, (unsigned)BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ);
+					(unsigned)BP.mdlX, (unsigned)BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ, &BP.mutexes[0]);
 #endif
 #endif
 		} // do_sgd is false

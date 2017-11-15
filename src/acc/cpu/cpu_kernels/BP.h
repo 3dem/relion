@@ -9,7 +9,7 @@
 namespace CpuKernels
 {
 
-#ifndef CPU_BP_INITIALIZE
+#ifndef CPU_BP_INITIALIZE //TODO Clean this up
 	void backproject2D(
 		unsigned long imageCount,
 		int     block_size,
@@ -34,7 +34,8 @@ namespace CpuKernels
 		unsigned img_y,
 		unsigned img_xy,
 		unsigned mdl_x,
-		int mdl_inity);
+		int mdl_inity,
+		tbb::spin_mutex *mutexes);
 #else
 void backproject2D(
 		unsigned long imageCount,
@@ -60,7 +61,8 @@ void backproject2D(
 		unsigned img_y,
 		unsigned img_xy,
 		unsigned mdl_x,
-		int mdl_inity)
+		int mdl_inity,
+		tbb::spin_mutex *mutexes)
 {
 	for (unsigned long img=0; img<imageCount; img++) {
 		XFLOAT s_eulers[4];
@@ -163,21 +165,27 @@ void backproject2D(
 
 					// No locking necessary since multiple threads are not
 					// updating the same particle
-					g_model_real  [y0 * mdl_x + x0]+=dd00 * real;
-					g_model_imag  [y0 * mdl_x + x0]+=dd00 * imag;
-					g_model_weight[y0 * mdl_x + x0]+=dd00 * Fweight;
+					{
+						tbb::spin_mutex::scoped_lock lock(mutexes[y0]);
+						g_model_real  [y0 * mdl_x + x0]+=dd00 * real;
+						g_model_imag  [y0 * mdl_x + x0]+=dd00 * imag;
+						g_model_weight[y0 * mdl_x + x0]+=dd00 * Fweight;
 
-					g_model_real  [y0 * mdl_x + x1]+=dd01 * real;
-					g_model_imag  [y0 * mdl_x + x1]+=dd01 * imag;
-					g_model_weight[y0 * mdl_x + x1]+=dd01 * Fweight;
+						g_model_real  [y0 * mdl_x + x1]+=dd01 * real;
+						g_model_imag  [y0 * mdl_x + x1]+=dd01 * imag;
+						g_model_weight[y0 * mdl_x + x1]+=dd01 * Fweight;
+					}
 
-					g_model_real  [y1 * mdl_x + x0]+=dd10 * real;
-					g_model_imag  [y1 * mdl_x + x0]+=dd10 * imag;
-					g_model_weight[y1 * mdl_x + x0]+=dd10 * Fweight;
+					{
+						tbb::spin_mutex::scoped_lock lock(mutexes[y1]);
+						g_model_real  [y1 * mdl_x + x0]+=dd10 * real;
+						g_model_imag  [y1 * mdl_x + x0]+=dd10 * imag;
+						g_model_weight[y1 * mdl_x + x0]+=dd10 * Fweight;
 
-					g_model_real  [y1 * mdl_x + x1]+=dd11 * real;
-					g_model_imag  [y1 * mdl_x + x1]+=dd11 * imag;
-					g_model_weight[y1 * mdl_x + x1]+=dd11 * Fweight;
+						g_model_real  [y1 * mdl_x + x1]+=dd11 * real;
+						g_model_imag  [y1 * mdl_x + x1]+=dd11 * imag;
+						g_model_weight[y1 * mdl_x + x1]+=dd11 * Fweight;
+					}
 				}  // Fweight > (RFLOAT) 0.0
 			} // for pass
 		}  // for tid
@@ -214,7 +222,8 @@ void backproject3D(
 		unsigned mdl_x,
 		unsigned mdl_y,
 		int mdl_inity,
-		int mdl_initz)
+		int mdl_initz,
+		tbb::spin_mutex *mutexes)
 {
 	for (unsigned img=0; img<imageCount; img++) {
 		XFLOAT s_eulers[9];
@@ -383,52 +392,64 @@ void backproject3D(
 
 					// No locking since each thread working on a different particle
 					XFLOAT dd000 = mfz * mfy * mfx;
-
-					g_model_real  [z0 * mdl_x * mdl_y + y0 * mdl_x + x0]+=dd000 * real[tid];
-					g_model_imag  [z0 * mdl_x * mdl_y + y0 * mdl_x + x0]+=dd000 * imag[tid];
-					g_model_weight[z0 * mdl_x * mdl_y + y0 * mdl_x + x0]+=dd000 * Fweight[tid];
-
 					XFLOAT dd001 = mfz * mfy *  fx;
 
-					g_model_real  [z0 * mdl_x * mdl_y + y0 * mdl_x + x1]+=dd001 * real[tid];
-					g_model_imag  [z0 * mdl_x * mdl_y + y0 * mdl_x + x1]+=dd001 * imag[tid];
-					g_model_weight[z0 * mdl_x * mdl_y + y0 * mdl_x + x1]+=dd001 * Fweight[tid];
+					{
+						tbb::spin_mutex::scoped_lock lock(mutexes[z0 * mdl_y + y0]);
+
+						g_model_real  [z0 * mdl_x * mdl_y + y0 * mdl_x + x0]+=dd000 * real[tid];
+						g_model_imag  [z0 * mdl_x * mdl_y + y0 * mdl_x + x0]+=dd000 * imag[tid];
+						g_model_weight[z0 * mdl_x * mdl_y + y0 * mdl_x + x0]+=dd000 * Fweight[tid];
+
+						g_model_real  [z0 * mdl_x * mdl_y + y0 * mdl_x + x1]+=dd001 * real[tid];
+						g_model_imag  [z0 * mdl_x * mdl_y + y0 * mdl_x + x1]+=dd001 * imag[tid];
+						g_model_weight[z0 * mdl_x * mdl_y + y0 * mdl_x + x1]+=dd001 * Fweight[tid];
+					}
 
 					XFLOAT dd010 = mfz *  fy * mfx;
-
-					g_model_real  [z0 * mdl_x * mdl_y + y1 * mdl_x + x0]+=dd010 * real[tid];
-					g_model_imag  [z0 * mdl_x * mdl_y + y1 * mdl_x + x0]+=dd010 * imag[tid];
-					g_model_weight[z0 * mdl_x * mdl_y + y1 * mdl_x + x0]+=dd010 * Fweight[tid];
-
 					XFLOAT dd011 = mfz *  fy *  fx;
 
-					g_model_real  [z0 * mdl_x * mdl_y + y1 * mdl_x + x1]+=dd011 * real[tid];
-					g_model_imag  [z0 * mdl_x * mdl_y + y1 * mdl_x + x1]+=dd011 * imag[tid];
-					g_model_weight[z0 * mdl_x * mdl_y + y1 * mdl_x + x1]+=dd011 * Fweight[tid];
+					{
+						tbb::spin_mutex::scoped_lock lock(mutexes[z0 * mdl_y + y1]);
+
+						g_model_real  [z0 * mdl_x * mdl_y + y1 * mdl_x + x0]+=dd010 * real[tid];
+						g_model_imag  [z0 * mdl_x * mdl_y + y1 * mdl_x + x0]+=dd010 * imag[tid];
+						g_model_weight[z0 * mdl_x * mdl_y + y1 * mdl_x + x0]+=dd010 * Fweight[tid];
+
+						g_model_real  [z0 * mdl_x * mdl_y + y1 * mdl_x + x1]+=dd011 * real[tid];
+						g_model_imag  [z0 * mdl_x * mdl_y + y1 * mdl_x + x1]+=dd011 * imag[tid];
+						g_model_weight[z0 * mdl_x * mdl_y + y1 * mdl_x + x1]+=dd011 * Fweight[tid];
+					}
 
 					XFLOAT dd100 =  fz * mfy * mfx;
-
-					g_model_real  [z1 * mdl_x * mdl_y + y0 * mdl_x + x0]+=dd100 * real[tid];
-					g_model_imag  [z1 * mdl_x * mdl_y + y0 * mdl_x + x0]+=dd100 * imag[tid];
-					g_model_weight[z1 * mdl_x * mdl_y + y0 * mdl_x + x0]+=dd100 * Fweight[tid];
-
 					XFLOAT dd101 =  fz * mfy *  fx;
 
-					g_model_real  [z1 * mdl_x * mdl_y + y0 * mdl_x + x1]+=dd101 * real[tid];
-					g_model_imag  [z1 * mdl_x * mdl_y + y0 * mdl_x + x1]+=dd101 * imag[tid];
-					g_model_weight[z1 * mdl_x * mdl_y + y0 * mdl_x + x1]+=dd101 * Fweight[tid];
+					{
+						tbb::spin_mutex::scoped_lock lock(mutexes[z1 * mdl_y + y0]);
+
+						g_model_real  [z1 * mdl_x * mdl_y + y0 * mdl_x + x0]+=dd100 * real[tid];
+						g_model_imag  [z1 * mdl_x * mdl_y + y0 * mdl_x + x0]+=dd100 * imag[tid];
+						g_model_weight[z1 * mdl_x * mdl_y + y0 * mdl_x + x0]+=dd100 * Fweight[tid];
+
+						g_model_real  [z1 * mdl_x * mdl_y + y0 * mdl_x + x1]+=dd101 * real[tid];
+						g_model_imag  [z1 * mdl_x * mdl_y + y0 * mdl_x + x1]+=dd101 * imag[tid];
+						g_model_weight[z1 * mdl_x * mdl_y + y0 * mdl_x + x1]+=dd101 * Fweight[tid];
+					}
 
 					XFLOAT dd110 =  fz *  fy * mfx;
-
-					g_model_real  [z1 * mdl_x * mdl_y + y1 * mdl_x + x0]+=dd110 * real[tid];
-					g_model_imag  [z1 * mdl_x * mdl_y + y1 * mdl_x + x0]+=dd110 * imag[tid];
-					g_model_weight[z1 * mdl_x * mdl_y + y1 * mdl_x + x0]+=dd110 * Fweight[tid];
-
 					XFLOAT dd111 =  fz *  fy *  fx;
 
-					g_model_real  [z1 * mdl_x * mdl_y + y1 * mdl_x + x1]+=dd111 * real[tid];
-					g_model_imag  [z1 * mdl_x * mdl_y + y1 * mdl_x + x1]+=dd111 * imag[tid];
-					g_model_weight[z1 * mdl_x * mdl_y + y1 * mdl_x + x1]+=dd111 * Fweight[tid];
+					{
+						tbb::spin_mutex::scoped_lock lock(mutexes[z1 * mdl_y + y1]);
+
+						g_model_real  [z1 * mdl_x * mdl_y + y1 * mdl_x + x0]+=dd110 * real[tid];
+						g_model_imag  [z1 * mdl_x * mdl_y + y1 * mdl_x + x0]+=dd110 * imag[tid];
+						g_model_weight[z1 * mdl_x * mdl_y + y1 * mdl_x + x0]+=dd110 * Fweight[tid];
+
+						g_model_real  [z1 * mdl_x * mdl_y + y1 * mdl_x + x1]+=dd111 * real[tid];
+						g_model_imag  [z1 * mdl_x * mdl_y + y1 * mdl_x + x1]+=dd111 * imag[tid];
+						g_model_weight[z1 * mdl_x * mdl_y + y1 * mdl_x + x1]+=dd111 * Fweight[tid];
+					}
 				}  // Fweight[tid] > (RFLOAT) 0.0
 			}  // for tid
 		} // for pass
@@ -441,7 +462,7 @@ void backproject3D(
 // translation index. Since sin(a+B) = sin(A) * cos(B) + cos(A) * sin(B), and 
 // cos(A+B) = cos(A) * cos(B) - sin(A) * sin(B), we can use lookup table to 
 // compute sin(x*tx + y*ty) and cos(x*tx + y*ty). 
-#ifndef CPU_BP_INITIALIZE
+#ifndef CPU_BP_INITIALIZE //TODO Clean this up
 void backprojectRef3D(
 		unsigned long imageCount,
 		XFLOAT *g_img_real,
@@ -468,7 +489,8 @@ void backprojectRef3D(
 		unsigned mdl_x,
 		unsigned mdl_y,
 		int      mdl_inity,
-		int      mdl_initz);
+		int      mdl_initz,
+		tbb::spin_mutex *mutexes);
 #else
 void backprojectRef3D(
 		unsigned long imageCount,
@@ -496,7 +518,8 @@ void backprojectRef3D(
 		unsigned mdl_x,
 		unsigned mdl_y,
 		int      mdl_inity,
-		int      mdl_initz)
+		int      mdl_initz,
+		tbb::spin_mutex *mutexes)
 {
 	for (unsigned long img=0; img<imageCount; img++) {
 		XFLOAT s_eulers[9];
@@ -623,60 +646,73 @@ void backprojectRef3D(
 				int idx_tmp;
 
 				XFLOAT dd000 = mfz_mfy * mfx; // mfz *  mfy *  mfx
-
-				idx_tmp = z0_mdl_x_mdl_y + y0_mdl_x + x0; // z0 * mdl_x * mdl_y + y0 * mdl_x + x0;
-				g_model_real  [idx_tmp]+=dd000 * real[x];
-				g_model_imag  [idx_tmp]+=dd000 * imag[x];
-				g_model_weight[idx_tmp]+=dd000 * Fweight[x];
-
 				XFLOAT dd001 = mfz_mfy - dd000; // mfz *  mfy *  fx
 
-				idx_tmp = idx_tmp + 1; // z0 * mdl_x * mdl_y + y0 * mdl_x + x1;
-				g_model_real  [idx_tmp]+=dd001 * real[x];
-				g_model_imag  [idx_tmp]+=dd001 * imag[x];
-				g_model_weight[idx_tmp]+=dd001 * Fweight[x];
+				{
+					tbb::spin_mutex::scoped_lock lock(mutexes[z0 * mdl_y + y0]);
+
+					idx_tmp = z0_mdl_x_mdl_y + y0_mdl_x + x0; // z0 * mdl_x * mdl_y + y0 * mdl_x + x0;
+					g_model_real  [idx_tmp]+=dd000 * real[x];
+					g_model_imag  [idx_tmp]+=dd000 * imag[x];
+					g_model_weight[idx_tmp]+=dd000 * Fweight[x];
+
+					idx_tmp = idx_tmp + 1; // z0 * mdl_x * mdl_y + y0 * mdl_x + x1;
+					g_model_real  [idx_tmp]+=dd001 * real[x];
+					g_model_imag  [idx_tmp]+=dd001 * imag[x];
+					g_model_weight[idx_tmp]+=dd001 * Fweight[x];
+				}
 
 				XFLOAT dd010 = (mfz - mfz_mfy) * mfx; // mfz *  fy *  mfx
-
-				idx_tmp = z0_mdl_x_mdl_y + y0_mdl_x + mdl_x + x0; // z0 * mdl_x * mdl_y + y1 * mdl_x + x0;
-				g_model_real  [idx_tmp]+=dd010 * real[x];
-				g_model_imag  [idx_tmp]+=dd010 * imag[x];
-				g_model_weight[idx_tmp]+=dd010 * Fweight[x];
-
 				XFLOAT dd011 = (mfz - mfz_mfy) - dd010; // mfz *  fy *  fx
 
-				idx_tmp = idx_tmp + 1; // z0 * mdl_x * mdl_y + y1 * mdl_x + x1;
-				g_model_real  [idx_tmp]+=dd011 * real[x];
-				g_model_imag  [idx_tmp]+=dd011 * imag[x];
-				g_model_weight[idx_tmp]+=dd011 * Fweight[x];
+				{
+					tbb::spin_mutex::scoped_lock lock(mutexes[z0 * mdl_y + y0 + 1]);
+
+					idx_tmp = z0_mdl_x_mdl_y + y0_mdl_x + mdl_x + x0; // z0 * mdl_x * mdl_y + y1 * mdl_x + x0;
+					g_model_real  [idx_tmp]+=dd010 * real[x];
+					g_model_imag  [idx_tmp]+=dd010 * imag[x];
+					g_model_weight[idx_tmp]+=dd010 * Fweight[x];
+
+					idx_tmp = idx_tmp + 1; // z0 * mdl_x * mdl_y + y1 * mdl_x + x1;
+					g_model_real  [idx_tmp]+=dd011 * real[x];
+					g_model_imag  [idx_tmp]+=dd011 * imag[x];
+					g_model_weight[idx_tmp]+=dd011 * Fweight[x];
+				}
 
 				XFLOAT dd100 = (mfy - mfz_mfy) * mfx; // fz *  mfy *  mfx
-
-				idx_tmp = z0_mdl_x_mdl_y + mdl_x_mdl_y + y0_mdl_x + x0; // z1 * mdl_x * mdl_y + y0 * mdl_x + x0;
-				g_model_real  [idx_tmp]+=dd100 * real[x];
-				g_model_imag  [idx_tmp]+=dd100 * imag[x];
-				g_model_weight[idx_tmp]+=dd100 * Fweight[x];
-
 				XFLOAT dd101 = (mfy - mfz_mfy) - dd100; // fz *  mfy *  fx
+				int z1 = z0 + 1;
 
-				idx_tmp = idx_tmp + 1; // z1 * mdl_x * mdl_y + y0 * mdl_x + x1;
-				g_model_real  [idx_tmp]+=dd101 * real[x];
-				g_model_imag  [idx_tmp]+=dd101 * imag[x];
-				g_model_weight[idx_tmp]+=dd101 * Fweight[x];
+				{
+					tbb::spin_mutex::scoped_lock lock(mutexes[z1 * mdl_y + y0]);
+
+					idx_tmp = z0_mdl_x_mdl_y + mdl_x_mdl_y + y0_mdl_x + x0; // z1 * mdl_x * mdl_y + y0 * mdl_x + x0;
+					g_model_real  [idx_tmp]+=dd100 * real[x];
+					g_model_imag  [idx_tmp]+=dd100 * imag[x];
+					g_model_weight[idx_tmp]+=dd100 * Fweight[x];
+
+					idx_tmp = idx_tmp + 1; // z1 * mdl_x * mdl_y + y0 * mdl_x + x1;
+					g_model_real  [idx_tmp]+=dd101 * real[x];
+					g_model_imag  [idx_tmp]+=dd101 * imag[x];
+					g_model_weight[idx_tmp]+=dd101 * Fweight[x];
+
+				}
 
 				XFLOAT dd110 = (1 - mfz - mfy + mfz_mfy) * mfx; // fz *  fy *  mfx
-
-				idx_tmp = z0_mdl_x_mdl_y + mdl_x_mdl_y + y0_mdl_x + mdl_x + x0; // z1 * mdl_x * mdl_y + y1 * mdl_x + x0;
-				g_model_real  [idx_tmp]+=dd110 * real[x];
-				g_model_imag  [idx_tmp]+=dd110 * imag[x];
-				g_model_weight[idx_tmp]+=dd110 * Fweight[x];
-
 				XFLOAT dd111 = (1 - mfz - mfy + mfz_mfy) - dd110; // fz *  fy *  fx
 
-				idx_tmp = idx_tmp + 1; // z1 * mdl_x * mdl_y + y1 * mdl_x + x1;
-				g_model_real  [idx_tmp]+=dd111 * real[x];
-				g_model_imag  [idx_tmp]+=dd111 * imag[x];
-				g_model_weight[idx_tmp]+=dd111 * Fweight[x];
+				{
+					tbb::spin_mutex::scoped_lock lock(mutexes[z1 * mdl_y + y0 + 1]);
+					idx_tmp = z0_mdl_x_mdl_y + mdl_x_mdl_y + y0_mdl_x + mdl_x + x0; // z1 * mdl_x * mdl_y + y1 * mdl_x + x0;
+					g_model_real  [idx_tmp]+=dd110 * real[x];
+					g_model_imag  [idx_tmp]+=dd110 * imag[x];
+					g_model_weight[idx_tmp]+=dd110 * Fweight[x];
+
+					idx_tmp = idx_tmp + 1; // z1 * mdl_x * mdl_y + y1 * mdl_x + x1;
+					g_model_real  [idx_tmp]+=dd111 * real[x];
+					g_model_imag  [idx_tmp]+=dd111 * imag[x];
+					g_model_weight[idx_tmp]+=dd111 * Fweight[x];
+				}
 			}  // for x direction
 
 			pixel += img_x;
@@ -715,7 +751,8 @@ void backprojectSGD(
 		unsigned mdl_x,
 		unsigned mdl_y,
 		int mdl_inity,
-		int mdl_initz)
+		int mdl_initz,
+		tbb::spin_mutex *mutexes)
 {
 	for (unsigned long img=0; img<imageCount; img++) {
 		XFLOAT s_eulers[9];
@@ -900,52 +937,65 @@ void backprojectSGD(
 					XFLOAT mfz = (XFLOAT)1.0 - fz;
 
 					XFLOAT dd000 = mfz * mfy * mfx;
-
-					g_model_real  [z0 * mdl_x * mdl_y + y0 * mdl_x + x0] += dd000 * real[tid];
-					g_model_imag  [z0 * mdl_x * mdl_y + y0 * mdl_x + x0] += dd000 * imag[tid];
-					g_model_weight[z0 * mdl_x * mdl_y + y0 * mdl_x + x0] += dd000 * Fweight[tid];
-
 					XFLOAT dd001 = mfz * mfy *  fx;
 
-					g_model_real  [z0 * mdl_x * mdl_y + y0 * mdl_x + x1] += dd001 * real[tid];
-					g_model_imag  [z0 * mdl_x * mdl_y + y0 * mdl_x + x1] += dd001 * imag[tid];
-					g_model_weight[z0 * mdl_x * mdl_y + y0 * mdl_x + x1] += dd001 * Fweight[tid];
+					{
+						tbb::spin_mutex::scoped_lock lock(mutexes[z0 * mdl_y + y0]);
+
+						g_model_real  [z0 * mdl_x * mdl_y + y0 * mdl_x + x0] += dd000 * real[tid];
+						g_model_imag  [z0 * mdl_x * mdl_y + y0 * mdl_x + x0] += dd000 * imag[tid];
+						g_model_weight[z0 * mdl_x * mdl_y + y0 * mdl_x + x0] += dd000 * Fweight[tid];
+
+						g_model_real  [z0 * mdl_x * mdl_y + y0 * mdl_x + x1] += dd001 * real[tid];
+						g_model_imag  [z0 * mdl_x * mdl_y + y0 * mdl_x + x1] += dd001 * imag[tid];
+						g_model_weight[z0 * mdl_x * mdl_y + y0 * mdl_x + x1] += dd001 * Fweight[tid];
+					}
 
 					XFLOAT dd010 = mfz *  fy * mfx;
-
-					g_model_real  [z0 * mdl_x * mdl_y + y1 * mdl_x + x0] += dd010 * real[tid];
-					g_model_imag  [z0 * mdl_x * mdl_y + y1 * mdl_x + x0] += dd010 * imag[tid];
-					g_model_weight[z0 * mdl_x * mdl_y + y1 * mdl_x + x0] += dd010 * Fweight[tid];
-
 					XFLOAT dd011 = mfz *  fy *  fx;
 
-					g_model_real  [z0 * mdl_x * mdl_y + y1 * mdl_x + x1] += dd011 * real[tid];
-					g_model_imag  [z0 * mdl_x * mdl_y + y1 * mdl_x + x1] += dd011 * imag[tid];
-					g_model_weight[z0 * mdl_x * mdl_y + y1 * mdl_x + x1] += dd011 * Fweight[tid];
+					{
+						tbb::spin_mutex::scoped_lock lock(mutexes[z0 * mdl_y + y1]);
+
+						g_model_real  [z0 * mdl_x * mdl_y + y1 * mdl_x + x0] += dd010 * real[tid];
+						g_model_imag  [z0 * mdl_x * mdl_y + y1 * mdl_x + x0] += dd010 * imag[tid];
+						g_model_weight[z0 * mdl_x * mdl_y + y1 * mdl_x + x0] += dd010 * Fweight[tid];
+
+						g_model_real  [z0 * mdl_x * mdl_y + y1 * mdl_x + x1] += dd011 * real[tid];
+						g_model_imag  [z0 * mdl_x * mdl_y + y1 * mdl_x + x1] += dd011 * imag[tid];
+						g_model_weight[z0 * mdl_x * mdl_y + y1 * mdl_x + x1] += dd011 * Fweight[tid];
+					}
 
 					XFLOAT dd100 =  fz * mfy * mfx;
-
-					g_model_real  [z1 * mdl_x * mdl_y + y0 * mdl_x + x0] += dd100 * real[tid];
-					g_model_imag  [z1 * mdl_x * mdl_y + y0 * mdl_x + x0] += dd100 * imag[tid];
-					g_model_weight[z1 * mdl_x * mdl_y + y0 * mdl_x + x0] += dd100 * Fweight[tid];
-
 					XFLOAT dd101 =  fz * mfy *  fx;
 
-					g_model_real  [z1 * mdl_x * mdl_y + y0 * mdl_x + x1] += dd101 * real[tid];
-					g_model_imag  [z1 * mdl_x * mdl_y + y0 * mdl_x + x1] += dd101 * imag[tid];
-					g_model_weight[z1 * mdl_x * mdl_y + y0 * mdl_x + x1] += dd101 * Fweight[tid];
+					{
+						tbb::spin_mutex::scoped_lock lock(mutexes[z1 * mdl_y + y0]);
+
+						g_model_real  [z1 * mdl_x * mdl_y + y0 * mdl_x + x0] += dd100 * real[tid];
+						g_model_imag  [z1 * mdl_x * mdl_y + y0 * mdl_x + x0] += dd100 * imag[tid];
+						g_model_weight[z1 * mdl_x * mdl_y + y0 * mdl_x + x0] += dd100 * Fweight[tid];
+
+						g_model_real  [z1 * mdl_x * mdl_y + y0 * mdl_x + x1] += dd101 * real[tid];
+						g_model_imag  [z1 * mdl_x * mdl_y + y0 * mdl_x + x1] += dd101 * imag[tid];
+						g_model_weight[z1 * mdl_x * mdl_y + y0 * mdl_x + x1] += dd101 * Fweight[tid];
+
+					}
 
 					XFLOAT dd110 =  fz *  fy * mfx;
-
-					g_model_real  [z1 * mdl_x * mdl_y + y1 * mdl_x + x0] += dd110 * real[tid];
-					g_model_imag  [z1 * mdl_x * mdl_y + y1 * mdl_x + x0] += dd110 * imag[tid];
-					g_model_weight[z1 * mdl_x * mdl_y + y1 * mdl_x + x0] += dd110 * Fweight[tid];
-
 					XFLOAT dd111 =  fz *  fy *  fx;
 
-					g_model_real  [z1 * mdl_x * mdl_y + y1 * mdl_x + x1] += dd111 * real[tid];
-					g_model_imag  [z1 * mdl_x * mdl_y + y1 * mdl_x + x1] += dd111 * imag[tid];
-					g_model_weight[z1 * mdl_x * mdl_y + y1 * mdl_x + x1] += dd111 * Fweight[tid];
+					{
+						tbb::spin_mutex::scoped_lock lock(mutexes[z1 * mdl_y + y1]);
+
+						g_model_real  [z1 * mdl_x * mdl_y + y1 * mdl_x + x0] += dd110 * real[tid];
+						g_model_imag  [z1 * mdl_x * mdl_y + y1 * mdl_x + x0] += dd110 * imag[tid];
+						g_model_weight[z1 * mdl_x * mdl_y + y1 * mdl_x + x0] += dd110 * Fweight[tid];
+
+						g_model_real  [z1 * mdl_x * mdl_y + y1 * mdl_x + x1] += dd111 * real[tid];
+						g_model_imag  [z1 * mdl_x * mdl_y + y1 * mdl_x + x1] += dd111 * imag[tid];
+						g_model_weight[z1 * mdl_x * mdl_y + y1 * mdl_x + x1] += dd111 * Fweight[tid];
+					}
 
 				} // Fweight[tid] > (RFLOAT) 0.0
 			} // for tid

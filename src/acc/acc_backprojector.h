@@ -8,6 +8,8 @@
 #include "src/acc/settings.h"
 #include "src/acc/acc_ptr.h"
 
+#include <tbb/spin_mutex.h>
+
 class AccBackprojector
 {
 
@@ -16,6 +18,8 @@ public:
 	    mdlInitY, mdlInitZ,
 	    maxR, maxR2,
 	    padding_factor;
+
+	std::vector<tbb::spin_mutex> mutexes;
 
 	size_t allocaton_size;
 	int voxelCount;
@@ -33,7 +37,8 @@ public:
 				padding_factor(0),
 				allocaton_size(0), voxelCount(0),
 				d_mdlReal(NULL), d_mdlImag(NULL), d_mdlWeight(NULL),
-				stream(0)
+				stream(0),
+				mutexes(0)
 	{}
 
 	size_t setMdlDim(

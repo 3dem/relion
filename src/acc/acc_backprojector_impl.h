@@ -40,6 +40,9 @@ size_t AccBackprojector::setMdlDim(
 		posix_memalign((void **)&d_mdlReal,   MEM_ALIGN, mdlXYZ * sizeof(XFLOAT));
 		posix_memalign((void **)&d_mdlImag,   MEM_ALIGN, mdlXYZ * sizeof(XFLOAT));
 		posix_memalign((void **)&d_mdlWeight, MEM_ALIGN, mdlXYZ * sizeof(XFLOAT));
+
+		mutexes.resize(mdlZ*mdlY);
+
 #endif
 
 		allocaton_size = mdlXYZ * sizeof(XFLOAT) * 3;

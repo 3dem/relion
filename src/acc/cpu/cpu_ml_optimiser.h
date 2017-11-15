@@ -23,7 +23,6 @@
 class MlDataBundle
 {
 public:
-	tbb::spin_mutex backproject_mutex;
 	std::vector< AccProjector > projectors;
 	std::vector< AccBackprojector > backprojectors;
 	std::vector< AccProjectorPlan > coarseProjectionPlans;
