@@ -19,7 +19,7 @@ public:
 	    maxR, maxR2,
 	    padding_factor;
 
-	std::vector<tbb::spin_mutex> mutexes;
+	tbb::spin_mutex *mutexes;
 
 	size_t allocaton_size;
 	int voxelCount;

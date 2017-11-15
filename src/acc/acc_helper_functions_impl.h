@@ -489,7 +489,7 @@ void runBackProjectKernel(
 				BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
 				BP.maxR, BP.maxR2, (XFLOAT)BP.padding_factor,
 				(unsigned)imgX, (unsigned)imgY, (unsigned)imgX*imgY,
-				(unsigned)BP.mdlX, BP.mdlInitY, &BP.mutexes[0]);
+				(unsigned)BP.mdlX, BP.mdlInitY, BP.mutexes);
 #endif
 	}
 	else
@@ -516,7 +516,7 @@ void runBackProjectKernel(
 					BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
 					BP.maxR, BP.maxR2, BP.padding_factor,
 					imgX, imgY, imgZ, imgX*imgY*imgZ,
-					BP.mdlX, BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ, &BP.mutexes[0]);
+					BP.mdlX, BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ, BP.mutexes);
 #endif
 			else
 #ifdef CUDA
@@ -538,7 +538,7 @@ void runBackProjectKernel(
 					BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
 					BP.maxR, BP.maxR2, (XFLOAT)BP.padding_factor,
 					(unsigned)imgX, (unsigned)imgY, (unsigned)imgZ, (unsigned)imgX*imgY*imgZ,
-					(unsigned)BP.mdlX, (unsigned)BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ, &BP.mutexes[0]);
+					(unsigned)BP.mdlX, (unsigned)BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ, BP.mutexes);
 #endif
 		}
 		else
@@ -563,7 +563,7 @@ void runBackProjectKernel(
 					BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
 					BP.maxR, BP.maxR2, (XFLOAT)BP.padding_factor,
 					(unsigned)imgX, (unsigned)imgY, (unsigned)imgZ, (unsigned)imgX*imgY*imgZ,
-					(unsigned)BP.mdlX, (unsigned)BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ, &BP.mutexes[0]);
+					(unsigned)BP.mdlX, (unsigned)BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ, BP.mutexes);
 #endif
 			else
 #ifdef CUDA
@@ -586,7 +586,7 @@ void runBackProjectKernel(
 					BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
 					BP.maxR, BP.maxR2, (XFLOAT)BP.padding_factor,
 					(unsigned)imgX, (unsigned)imgY, (unsigned)imgZ, (unsigned)imgX*imgY*imgZ,
-					(unsigned)BP.mdlX, (unsigned)BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ, &BP.mutexes[0]);
+					(unsigned)BP.mdlX, (unsigned)BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ, BP.mutexes);
 #else
 				CpuKernels::backproject3D<false>(imageCount,BP_REF3D_BLOCK_SIZE,
 					d_img_real, d_img_imag,
@@ -596,7 +596,7 @@ void runBackProjectKernel(
 					BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
 					BP.maxR, BP.maxR2, (XFLOAT)BP.padding_factor,
 					(unsigned)imgX, (unsigned)imgY, (unsigned)imgZ, (unsigned)imgX*imgY*imgZ,
-					(unsigned)BP.mdlX, (unsigned)BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ, &BP.mutexes[0]);
+					(unsigned)BP.mdlX, (unsigned)BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ, BP.mutexes);
 #endif
 #endif
 		} // do_sgd is false

@@ -41,7 +41,7 @@ size_t AccBackprojector::setMdlDim(
 		posix_memalign((void **)&d_mdlImag,   MEM_ALIGN, mdlXYZ * sizeof(XFLOAT));
 		posix_memalign((void **)&d_mdlWeight, MEM_ALIGN, mdlXYZ * sizeof(XFLOAT));
 
-		mutexes.resize(mdlZ*mdlY);
+		mutexes = new tbb::spin_mutex[mdlZ*mdlY];
 
 #endif
 
@@ -130,6 +130,7 @@ void AccBackprojector::clear()
 		free(d_mdlReal);
 		free(d_mdlImag);
 		free(d_mdlWeight);
+		delete [] mutexes;
 #endif 
 
 		d_mdlReal = d_mdlImag = d_mdlWeight = NULL;
