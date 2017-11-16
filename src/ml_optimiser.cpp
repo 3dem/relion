@@ -4022,6 +4022,11 @@ void MlOptimiser::solventFlatten()
 #ifdef DEBUG
 	std::cerr << "Entering MlOptimiser::solventFlatten" << std::endl;
 #endif
+
+	// If we're doing multibody refinement: don't do solvent flattening anymore. This is already done per body
+	if (mymodel.nr_bodies > 1)
+		return;
+
 	// First read solvent mask from disc, or pre-calculate it
 	Image<RFLOAT> Isolvent, Isolvent2;
     Isolvent().resize(mymodel.Iref[0]);
