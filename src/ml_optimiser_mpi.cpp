@@ -53,6 +53,19 @@ void MlOptimiserMpi::read(int argc, char **argv)
     // Define a new MpiNode
     node = new MpiNode(argc, argv);
 
+    if (node->isMaster())
+    {
+      std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
+      std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
+      std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
+      std::cout << "  "<< std::endl;
+      std::cout << " The output from this binary should not be used for research or publication "<< std::endl;
+      std::cout << "  "<< std::endl;
+      std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
+      std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
+      std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
+    }
+
     // First read in non-parallelisation-dependent variables
     MlOptimiser::read(argc, argv, node->rank);
 
@@ -3364,6 +3377,19 @@ void MlOptimiserMpi::iterate()
 
 	// Hopefully this barrier will prevent some bus errors
 	MPI_Barrier(MPI_COMM_WORLD);
+
+    if (node->isMaster())
+    {
+      std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
+      std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
+      std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
+      std::cout << "  "<< std::endl;
+      std::cout << " The output from this binary should not be used for research or publication "<< std::endl;
+      std::cout << "  "<< std::endl;
+      std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
+      std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
+      std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
+    }
 
 	// delete threads etc.
 	MlOptimiser::iterateWrapUp();
