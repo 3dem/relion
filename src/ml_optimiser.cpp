@@ -4985,6 +4985,10 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 		// So resize the Fourier transforms
 		windowFourierTransform(Faux, Fimg, mymodel.current_size);
 
+		// Also perform beamtilt correction on the masked image (which will be used for alignment)
+		if (ABS(beamtilt_x) > 0. || ABS(beamtilt_y) > 0.)
+			selfApplyBeamTilt(Fimg, beamtilt_x, beamtilt_y, lambda, Cs, mymodel.pixel_size, mymodel.ori_size);
+
 		// Store Fimg
 		exp_Fimgs.at(ipart) = Fimg;
 
