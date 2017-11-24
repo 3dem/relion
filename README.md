@@ -1,6 +1,5 @@
-
-
-#RELION
+RELION
+======
 
 
 RELION (for REgularised LIkelihood OptimisatioN) is a stand-alone computer 
@@ -14,7 +13,7 @@ The underlying theory of MAP refinement is given in a [scientific publication](h
 
 The more comprehensive documentation of RELION is stored on the [Wiki](http://www2.mrc-lmb.cam.ac.uk/relion)
 
-##Installation
+## Installation
 
 
 More extensive options and configurations are available 
@@ -24,20 +23,21 @@ through [cmake](https://en.wikipedia.org/wiki/CMake).
 
 On ubuntu machines, installing cmake is as easy as 
 
-```
+```shell
 sudo apt install cmake
 ```
 
 On other systems it is typically just as easy, you simply have to modify "apt" to
 the appropriate package manager. You will also need [git](https://en.wikipedia.org/wiki/Git), which is just as easy;
 
-```
+```shell
 sudo apt install git
 ```
 
 
 Once git and cmake are installed, relion can be easily installed through
-```
+
+```shell
 git clone https://github.com/3dem/relion.git
 cd relion
 mkdir build
@@ -52,16 +52,15 @@ then configure and build relion, and lastely install it to be generally
 available on the system.
 
 
-##Updating 
+## Updating 
 
 
 RELION is intermittently updated, with both minor and major features.
 To update an existing installation, simply use the following commands
 
-```
+```shell
 cd relion/build
 git pull
 make -j4
 make
-
 ```
