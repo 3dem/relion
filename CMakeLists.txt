@@ -1,16 +1,7 @@
-cmake_minimum_required(VERSION 2.8.12)
-set(RELION_CMAKE_MINIMUM_REQUIRED_VERSION "2.8.12")
+cmake_minimum_required(VERSION 3.3)
+set(RELION_CMAKE_MINIMUM_REQUIRED_VERSION "3.3")
 
-#
-#if(POLICY CMP0048)
-#  cmake_policy(SET CMP0048 NEW)
-#endif()
 project(Relion)
-
-# Use new policy for OS X @rpath
-if(POLICY CMP0042)
-    cmake_policy(SET CMP0042 NEW)
-endif()
 
 # Add the path to the additional Find<module>.cmake files 
 # which are included with the distributed RLEION-code
