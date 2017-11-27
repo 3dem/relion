@@ -1917,7 +1917,7 @@ void MlOptimiserMpi::maximization()
 				if (node->rank == reconstruct_rank1)
 				{
 
-					if (do_sgd)
+					if (do_sgd && (wsum_model.BPref[iclass].weight).sum() > XMIPP_EQUAL_ACCURACY)
 					{
 
 						MultidimArray<RFLOAT> Iref_old = mymodel.Iref[ith_recons];
@@ -2621,6 +2621,8 @@ void MlOptimiserMpi::writeTemporaryDataAndWeightArrays()
 			}
 		}
     }
+
+	MPI_Barrier(MPI_COMM_WORLD);
 
 }
 

@@ -2129,8 +2129,13 @@ void MlOptimiser::iterate()
 	updateCurrentResolution();
 
 	// If we're doing a restart from subsets, then do not increment the iteration number in the restart!
+	std::cerr << " iter= " << iter << std::endl;
 	if (subset > 0)
+	{
+
 		iter--;
+		std::cerr << " iter= " << iter << std::endl;
+	}
 
 	bool has_already_reached_convergence = false;
 	for (iter = iter + 1; iter <= nr_iter; iter++)
@@ -3520,7 +3525,6 @@ void MlOptimiser::maximization()
 				RFLOAT number_of_effective_particles = (iter == 1) ? subset * subset_size : mydata.numberOfParticles();
 				number_of_effective_particles *= (1. - total_mu_fraction);
 				RFLOAT sgd_tau2_fudge = number_of_effective_particles * mymodel.tau2_fudge_factor / subset_size;
-
 				(wsum_model.BPref[iclass]).reconstruct(mymodel.Iref[iclass], gridding_nr_iter, do_map,
 						sgd_tau2_fudge, mymodel.tau2_class[iclass], mymodel.sigma2_class[iclass],
 						mymodel.data_vs_prior_class[iclass], mymodel.fourier_coverage_class[iclass],
@@ -5629,10 +5633,11 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int ibody, 
 																											iover_rot, iover_trans);
 //#define DEBUG_DIFF2_ISNAN
 #ifdef DEBUG_DIFF2_ISNAN
-											//if (std::isnan(diff2))
+											if (std::isnan(diff2))
 											{
 												pthread_mutex_lock(&global_mutex);
 												std::cerr << " ipart= " << ipart << std::endl;
+												std::cerr << " exp_iclass= " << exp_iclass << std::endl;
 												std::cerr << " diff2= " << diff2 << " ipart= " << ipart << std::endl;
 												std::cerr << " exp_highres_Xi2_imgs[ipart]= " << exp_highres_Xi2_imgs[ipart] << std::endl;
 												std::cerr<< " exp_nr_oversampled_trans="<<exp_nr_oversampled_trans<<std::endl;
@@ -5681,10 +5686,22 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int ibody, 
 												std::cerr << "written Fref.spi" << std::endl;
 												std::cerr << " A= " << A << std::endl;
 												std::cerr << "written Frefctf.spi" << std::endl;
-												std::cerr << " press any ket to continue.. " << std::endl;
-												char c;
-												std::cin >> c;
-												//REPORT_ERROR("diff2 is not a number");
+
+												std::cerr << " exp_iclass= " << exp_iclass << std::endl;
+												Fref.resize(exp_local_Minvsigma2s[0]);
+												(mymodel.PPref[exp_iclass]).get2DFourierTransform(Fref, A, IS_NOT_INV);
+												transformer3.inverseFourierTransform(Fref, tt());
+												CenterFFT(tt(),false);
+												tt.write("Fref2.spi");
+												std::cerr << "written Fref2.spi" << std::endl;
+												Image<RFLOAT> Itt;
+												Itt().resize(ZSIZE(mymodel.PPref[exp_iclass].data), YSIZE(mymodel.PPref[exp_iclass].data), XSIZE(mymodel.PPref[exp_iclass].data));
+												FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Itt())
+												{
+													DIRECT_MULTIDIM_ELEM(Itt(), n) = abs(DIRECT_MULTIDIM_ELEM(mymodel.PPref[exp_iclass].data, n));
+												}
+												Itt.write("PPref_data.spi");
+												REPORT_ERROR("diff2 is not a number");
 												pthread_mutex_unlock(&global_mutex);
 											}
 #endif
@@ -6120,6 +6137,17 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int my_ori_particle
 				It.write("Mcoarse_significant.spi");
 			}
 			std::cerr << " part_id= " << part_id << std::endl;
+			std::cerr << " ipart= " << ipart << std::endl;
+			/*
+			MultidimArray<Complex> Faux;
+			FourierTransformer transformer;
+			windowFourierTransform(exp_Fimgs[ipart], Faux, mymodel.ori_size);
+			It().resize(mymodel.ori_size, mymodel.ori_size);
+			transformer.inverseFourierTransform(Faux, It());
+			CenterFFT(It(), false);
+			It.write("exp_Fimgs.spi");
+			std::cerr << "written exp_Fimgs.spi " << std::endl;
+		    */
 			int group_id = mydata.getGroupId(part_id);
 			std::cerr << " group_id= " << group_id << " mymodel.scale_correction[group_id]= " << mymodel.scale_correction[group_id] << std::endl;
 			std::cerr << " exp_ipass= " << exp_ipass << std::endl;
@@ -6127,10 +6155,8 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int my_ori_particle
 					<< " sampling.NrDirections(0, false)= " << sampling.NrDirections(0, &exp_pointer_dir_nonzeroprior) << std::endl;
 			std::cerr << " sampling.NrPsiSamplings(0, true)= " << sampling.NrPsiSamplings()
 					<< " sampling.NrPsiSamplings(0, false)= " << sampling.NrPsiSamplings(0, &exp_pointer_psi_nonzeroprior) << std::endl;
-			std::cerr << " mymodel.sigma2_noise[ipart]= " << mymodel.sigma2_noise[ipart] << std::endl;
-			std::cerr << " wsum_model.sigma2_noise[ipart]= " << wsum_model.sigma2_noise[ipart] << std::endl;
-			if (mymodel.orientational_prior_mode == NOPRIOR)
-				std::cerr << " wsum_model.pdf_direction[ipart]= " << wsum_model.pdf_direction[ipart] << std::endl;
+			std::cerr << " mymodel.sigma2_noise[group_id]= " << mymodel.sigma2_noise[group_id] << std::endl;
+			//std::cerr << " wsum_model.sigma2_noise[group_id]= " << wsum_model.sigma2_noise[group_id] << std::endl;
 			if (do_norm_correction)
 			{
 				std::cerr << " mymodel.avg_norm_correction= " << mymodel.avg_norm_correction << std::endl;
