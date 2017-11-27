@@ -871,6 +871,16 @@ void MlOptimiserMpi::expectation()
 		node->relion_MPI_Bcast(&mymodel.orientational_prior_mode, 1, MPI_INT, first_slave, MPI_COMM_WORLD);
 	}
 
+	// For multi-body refinement: check if all bodies are fixed. If so, don't loop over all particles, but just return
+	if (mymodel.nr_bodies > 1)
+	{
+		int all_fixed = 1;
+		for (int ibody=0; ibody < mymodel.nr_bodies; ibody++)
+			all_fixed *= mymodel.keep_fixed_bodies[ibody];
+		if (all_fixed > 0)
+			return;
+	}
+
 	// E. All nodes, except the master, check memory and precalculate AB-matrices for on-the-fly shifts
 	if (!node->isMaster())
 	{
@@ -1909,6 +1919,16 @@ void MlOptimiserMpi::maximization()
 #ifdef TIMING
 		timer.tic(TIMING_RECONS);
 #endif
+
+	// For multi-body refinement: check if all bodies are fixed. If so, just return
+	if (mymodel.nr_bodies > 1)
+	{
+		int all_fixed = 1;
+		for (int ibody=0; ibody < mymodel.nr_bodies; ibody++)
+			all_fixed *= mymodel.keep_fixed_bodies[ibody];
+		if (all_fixed > 0)
+			return;
+	}
 
 	if (verb > 0)
 	{

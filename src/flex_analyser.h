@@ -63,6 +63,9 @@ public:
 	// Perform a PCA on the multibody orientations
 	bool do_PCA_orient;
 
+	// Normalisation of the rotations and translations for PCA normalisation
+	std::vector<float> norm_pca;
+
 	// Generate maps for movies along principal components
 	bool do_generate_maps;
 
