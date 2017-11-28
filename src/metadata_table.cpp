@@ -43,113 +43,76 @@
  ***************************************************************************/
 
 #include "src/metadata_table.h"
-
-// Label for sorting
-static EMDLabel sortlabel;
-bool compareString(MetaDataContainer *lh, MetaDataContainer *rh)
-{
-	std::string lhstr, rhstr;
-	lh->getValue(sortlabel, lhstr);
-	rh->getValue(sortlabel, rhstr);
-	return lhstr < rhstr;
-}
-bool compareStringNoAt(MetaDataContainer *lh, MetaDataContainer *rh)
-{
-	std::string lhstr, rhstr;
-	lh->getValue(sortlabel, lhstr);
-	rh->getValue(sortlabel, rhstr);
-	lhstr = lhstr.substr(lhstr.find("@")+1);
-	rhstr = rhstr.substr(rhstr.find("@")+1);
-	return lhstr < rhstr;
-}
-bool compareDouble(MetaDataContainer *lh, MetaDataContainer *rh)
-{
-	RFLOAT lhstr, rhstr;
-	lh->getValue(sortlabel, lhstr);
-	rh->getValue(sortlabel, rhstr);
-	return lhstr < rhstr;
-}
-bool compareInteger(MetaDataContainer *lh, MetaDataContainer *rh)
-{
-	int lhstr, rhstr;
-	lh->getValue(sortlabel, lhstr);
-	rh->getValue(sortlabel, rhstr);
-	return lhstr < rhstr;
-}
-bool compareLong(MetaDataContainer *lh, MetaDataContainer *rh)
-{
-	long lhstr, rhstr;
-	lh->getValue(sortlabel, lhstr);
-	rh->getValue(sortlabel, rhstr);
-	return lhstr < rhstr;
-}
-
-void MetaDataTable::newSort(const EMDLabel label, bool do_reverse, bool do_sort_after_at)
-{
-
-	sortlabel = label;
-	if (EMDL::isString(label))
-	{
-		if (do_sort_after_at)
-			std::stable_sort(objects.begin(), objects.end(), compareStringNoAt);
-		else
-			std::stable_sort(objects.begin(), objects.end(), compareString);
-	}
-	else if (EMDL::isDouble(label))
-		std::stable_sort(objects.begin(), objects.end(), compareDouble);
-	else if (EMDL::isInt(label))
-		std::stable_sort(objects.begin(), objects.end(), compareInteger);
-	else if (EMDL::isLong(label))
-		std::stable_sort(objects.begin(), objects.end(), compareLong);
-	else
-		REPORT_ERROR("Cannot sort this label: " + EMDL::label2Str(label));
-
-	if (do_reverse)
-		std::reverse(objects.begin(), objects.end());
-
-}
+#include "src/metadata_label.h"
 
 
 MetaDataTable::MetaDataTable()
+:   objects(0),
+    label2offset(EMDL_LAST_LABEL, -1),
+    current_objectID(0),
+    RFLOATLabels(0),
+    intLabels(0),
+    longLabels(0),
+    boolLabels(0),
+    stringLabels(0),
+    isList(false),
+    name(""),
+    comment(""),
+    activeLabels(0),
+    ignoreLabels(0)
 {
-    clear();
 }
 
 MetaDataTable::MetaDataTable(const MetaDataTable &MD)
+:   objects(MD.objects.size()),
+    label2offset(MD.label2offset),
+    current_objectID(0),
+    RFLOATLabels(MD.RFLOATLabels),
+    intLabels(MD.intLabels),
+    longLabels(MD.longLabels),
+    boolLabels(MD.boolLabels),
+    stringLabels(MD.stringLabels),
+    isList(MD.isList),
+    name(MD.name),
+    comment(MD.comment),
+    activeLabels(MD.activeLabels),
+    ignoreLabels(MD.ignoreLabels)
 {
-    clear();
-    this->setComment(MD.getComment());
-    this->setName(MD.getName());
-    this->isList = MD.isList;
-    this->activeLabels = MD.activeLabels;
-    this->objects.clear();
-    this->objects.resize(MD.objects.size());
-    for (unsigned long int idx = 0; idx < MD.objects.size(); idx++)
+    for (size_t idx = 0; idx < MD.objects.size(); idx++)
     {
-    	 //long int idx = this->addObject();
-    	this->objects[idx] = new MetaDataContainer(*(MD.objects[idx]));
+        objects[idx] = new MetaDataContainer(*(MD.objects[idx]));
+        objects[idx]->table = this;
     }
-	current_objectID = 0;
-
 }
 
-MetaDataTable& MetaDataTable::operator =(const MetaDataTable &MD)
+MetaDataTable& MetaDataTable::operator = (const MetaDataTable &MD)
 {
     if (this != &MD)
     {
         clear();
-        this->setComment(MD.getComment());
-        this->setName(MD.getName());
-        this->isList = MD.isList;
-        this->activeLabels = MD.activeLabels;
-        this->objects.resize(MD.objects.size());
+
+        objects.resize(MD.objects.size());
+        label2offset = MD.label2offset;
+        current_objectID = 0;
+        RFLOATLabels = MD.RFLOATLabels;
+        intLabels = MD.intLabels;
+        longLabels = MD.longLabels;
+        boolLabels = MD.boolLabels;
+        stringLabels = MD.stringLabels;
+        isList = MD.isList;
+        name = MD.name;
+        comment = MD.comment;
+
+        activeLabels = MD.activeLabels;
+        ignoreLabels = MD.ignoreLabels;
+
         for (long int idx = 0; idx < MD.objects.size(); idx++)
         {
-        	//long int idx = this->addObject();
-        	this->objects[idx] = new MetaDataContainer(*(MD.objects[idx]));
+            objects[idx] = new MetaDataContainer(this, MD.objects[idx]);
+            objects[idx]->table = this;
         }
-    	current_objectID = 0;
     }
+
     return *this;
 }
 
@@ -160,7 +123,10 @@ void MetaDataTable::setIsList(bool is_list)
 
 MetaDataTable::~MetaDataTable()
 {
-    clear();
+    for (long i = 0; i < objects.size(); i++)
+    {
+        delete objects[i];
+    }
 }
 
 bool MetaDataTable::isEmpty() const
@@ -168,29 +134,34 @@ bool MetaDataTable::isEmpty() const
     return (objects.size()==0);
 }
 
-long int MetaDataTable::numberOfObjects() const
+size_t MetaDataTable::numberOfObjects() const
 {
 	return objects.size();
 }
 
 void MetaDataTable::clear()
 {
-    for (long int i = 0; i < objects.size(); i++)
+    for (long i = 0; i < objects.size(); i++)
     {
-    	objects[i]->clear();
-    	delete objects[i];
+        delete objects[i];
     }
-
     objects.clear();
-    comment.clear();
-    name.clear();
 
-    current_objectID = -1;
-    activeLabels.clear();
-    ignoreLabels.clear();
+    label2offset = std::vector<long>(EMDL_LAST_LABEL, -1);
+    current_objectID = 0;
+
+    RFLOATLabels = 0;
+    intLabels = 0;
+    longLabels = 0;
+    boolLabels = 0;
+    stringLabels = 0;
 
     isList = false;
+    name = "";
+    comment = "";
 
+    activeLabels.clear();
+    ignoreLabels.clear();
 }
 
 void MetaDataTable::setComment(const std::string newComment)
@@ -218,22 +189,299 @@ std::string MetaDataTable::getName() const
     return name;
 }
 
-bool MetaDataTable::setValueFromString(const EMDLabel &label, const std::string &value,
-                        long int objectID)
+bool MetaDataTable::getValueToString(EMDLabel label, std::string &value, long objectID) const
 {
+    if (EMDL::isString(label))
+    {
+        getValue(label, value, objectID);
+    }
+    else
+    {
+        std::stringstream sts(value);
 
-	if (objectID == -1)
-		objectID = current_objectID;
+        if (EMDL::isDouble(label))
+        {
+            RFLOAT v;
+            getValue(label, v, objectID);
+            if ((ABS(v) > 0. && ABS(v) < 0.001) || ABS(v) > 100000.)
+                 sts << std::setw(12) << std::scientific;
+             else
+                 sts << std::setw(12) << std::fixed;
+              sts << v;
+        }
+        else if (EMDL::isInt(label))
+        {
+            int v;
+            getValue(label, v, objectID);
+            sts << std::setw(12) << std::fixed;
+            sts << v;
+        }
+        else if (EMDL::isLong(label))
+        {
+            long v;
+            getValue(label, v, objectID);
+            sts << std::setw(12) << std::fixed;
+            sts << v;
+        }
+        else if (EMDL::isBool(label))
+        {
+            bool v;
+            getValue(label, v, objectID);
+            sts << std::setw(12) << std::fixed;
+            sts << v;
+        }
 
-	if (objectID >= objects.size())
-		REPORT_ERROR("MetaDataTable::setValueFromString: objectID >= objects.size()");
-
-	objects[objectID]->addValueFromString(label, value);
-
-	return true;
+        value = sts.str();
+    }
 
 }
 
+size_t MetaDataTable::size()
+{
+    return objects.size();
+}
+
+bool MetaDataTable::setValueFromString(EMDLabel label, const std::string &value,
+                        long int objectID)
+{
+    if (EMDL::isString(label))
+    {
+        return setValue(label, value, objectID);
+    }
+    else
+    {
+        std::istringstream i(value);
+
+        if (EMDL::isDouble(label))
+        {
+            RFLOAT v;
+            i >> v;
+            return setValue(label, v, objectID);
+        }
+        else if (EMDL::isInt(label))
+        {
+            int v;
+            i >> v;
+            return setValue(label, v, objectID);
+        }
+        else if (EMDL::isLong(label))
+        {
+            long v;
+            i >> v;
+            return setValue(label, v, objectID);
+        }
+        else if (EMDL::isBool(label))
+        {
+            bool v;
+            i >> v;
+            return setValue(label, v, objectID);
+        }
+    }
+}
+
+    // comparators used for sorting
+
+    struct MdRFLOATComparator
+    {
+        MdRFLOATComparator(long index) : index(index) {}
+
+        bool operator()(MetaDataContainer *lh, MetaDataContainer *rh) const
+        {
+            return lh->RFLOATs[index] < rh->RFLOATs[index];
+        }
+
+        long index;
+    };
+
+    struct MdIntComparator
+    {
+        MdIntComparator(long index) : index(index) {}
+
+        bool operator()(MetaDataContainer *lh, MetaDataContainer *rh) const
+        {
+            return lh->ints[index] < rh->ints[index];
+        }
+
+        long index;
+    };
+
+    struct MdLongComparator
+    {
+        MdLongComparator(long index) : index(index) {}
+
+        bool operator()(MetaDataContainer *lh, MetaDataContainer *rh) const
+        {
+            return lh->longs[index] < rh->longs[index];
+        }
+
+        long index;
+    };
+
+    struct MdStringComparator
+    {
+        MdStringComparator(long index) : index(index) {}
+
+        bool operator()(MetaDataContainer *lh, MetaDataContainer *rh) const
+        {
+            return lh->strings[index] < rh->strings[index];
+        }
+
+        long index;
+    };
+
+    struct MdStringAfterAtComparator
+    {
+        MdStringAfterAtComparator(long index) : index(index) {}
+
+        bool operator()(MetaDataContainer *lh, MetaDataContainer *rh) const
+        {
+            std::string slh = lh->strings[index];
+            std::string srh = rh->strings[index];
+            slh = slh.substr(slh.find("@")+1);
+            srh = srh.substr(srh.find("@")+1);
+            return slh < srh;
+        }
+
+        long index;
+    };
+
+    struct MdStringBeforeAtComparator
+    {
+        MdStringBeforeAtComparator(long index) : index(index) {}
+
+        bool operator()(MetaDataContainer *lh, MetaDataContainer *rh) const
+        {
+            std::string slh = lh->strings[index];
+            std::string srh = rh->strings[index];
+            slh = slh.substr(0, slh.find("@"));
+            srh = srh.substr(0, srh.find("@"));
+            std::stringstream stslh, stsrh;
+            stslh << slh;
+            stsrh << srh;
+            long ilh, irh;
+            stslh >> ilh;
+            stsrh >> irh;
+
+            return ilh < irh;
+        }
+
+        long index;
+    };
+
+void MetaDataTable::sort(EMDLabel name, bool do_reverse, bool only_set_index, bool do_random)
+{
+
+    if (do_random)
+        srand (time(NULL));    		  /* initialize random seed: */
+    else if (!(EMDL::isInt(name) || EMDL::isLong(name) || EMDL::isDouble(name)) )
+        REPORT_ERROR("MetadataTable::sort%% ERROR: can only sorted numbers");
+
+    std::vector<std::pair<RFLOAT,long int> > vp;
+    vp.reserve(objects.size());
+    long int i = 0;
+    FOR_ALL_OBJECTS_IN_METADATA_TABLE(*this)
+    {
+        RFLOAT dval;
+        if (do_random)
+        {
+            dval = (RFLOAT)rand();
+        }
+        else if (EMDL::isInt(name))
+        {
+            int val;
+            getValue(name, val);
+            dval = (RFLOAT) val;
+        }
+        else if (EMDL::isLong(name))
+        {
+            long int val;
+            getValue(name, val);
+            dval = (RFLOAT) val;
+        }
+        else // EMDL::isDouble(name)
+        {
+            getValue(name, dval);
+        }
+
+        vp.push_back(std::make_pair(dval, i));
+        i++;
+    }
+
+    std::sort(vp.begin(), vp.end());
+    if (do_reverse && !do_random)
+        std::reverse(vp.begin(), vp.end());
+
+    if (only_set_index)
+    {
+        // Add an extra column with the sorted position of each entry
+        for (long j = 0; j < vp.size(); j++)
+        {
+            (*this).setValue(EMDL_SORTED_IDX, j, vp[j].second);
+        }
+    }
+    else
+    {
+        // Change the actual order in the MetaDataTable
+        std::vector<MetaDataContainer*> objs(objects.size());
+
+        for (long j = 0; j < vp.size(); j++)
+        {
+            objs[j] = objects[vp[j].second];
+        }
+
+        objects = objs;
+    }
+    // reset pointer to the beginning of the table
+    firstObject();
+}
+
+void MetaDataTable::newSort(const EMDLabel label, bool do_reverse, bool do_sort_after_at, bool do_sort_before_at)
+{
+    if (EMDL::isString(label))
+    {
+        if (do_sort_after_at)
+        {
+            std::stable_sort(objects.begin(), objects.end(),
+                             MdStringAfterAtComparator(label2offset[label]));
+        }
+        else if (do_sort_before_at)
+        {
+            std::stable_sort(objects.begin(), objects.end(),
+                             MdStringBeforeAtComparator(label2offset[label]));
+        }
+        else
+        {
+            std::stable_sort(objects.begin(), objects.end(), MdStringComparator(label2offset[label]));
+        }
+    }
+    else if (EMDL::isDouble(label))
+    {
+        std::stable_sort(objects.begin(), objects.end(), MdRFLOATComparator(label2offset[label]));
+    }
+    else if (EMDL::isInt(label))
+    {
+        std::stable_sort(objects.begin(), objects.end(), MdIntComparator(label2offset[label]));
+    }
+    else if (EMDL::isLong(label))
+    {
+        std::stable_sort(objects.begin(), objects.end(), MdLongComparator(label2offset[label]));
+    }
+    else
+    {
+        REPORT_ERROR("Cannot sort this label: " + EMDL::label2Str(label));
+    }
+
+    if (do_reverse)
+    {
+        std::reverse(objects.begin(), objects.end());
+    }
+}
+
+bool MetaDataTable::labelExists(EMDLabel name) const
+{
+    if (name < 0 || name >= EMDL_LAST_LABEL) return false;
+    else return (label2offset[name] >= 0);
+}
 
 bool MetaDataTable::containsLabel(const EMDLabel label) const
 {
@@ -247,297 +495,265 @@ std::vector<EMDLabel> MetaDataTable::getActiveLabels() const
 
 void MetaDataTable::deactivateLabel(EMDLabel label)
 {
-    if (containsLabel(label))
+    std::vector<EMDLabel>::iterator location
+            = std::find(activeLabels.begin(), activeLabels.end(), label);
+
+    if (location != activeLabels.end())
     {
-    	std::vector<EMDLabel>::iterator location;
-    	location = std::find(activeLabels.begin(), activeLabels.end(), label);
-    	activeLabels.erase(location);
+        activeLabels.erase(location);
     }
 }
 
-void MetaDataTable::append(MetaDataTable &app)
+void MetaDataTable::addLabel(EMDLabel label)
 {
-
-	bool some_labels_missing = false;
-	// Find which labels occur in all input tables
-	std::vector<EMDLabel> mylabels = (*this).getActiveLabels();
-	std::vector<EMDLabel> labelsin = app.getActiveLabels();
-
-	// Loop over all labels to see whether they are the same in the two tables
-	bool have_all_labels = false;
-	if (mylabels.size() == 0)
-	{
-		// empty curent one, just append
-		have_all_labels = true;
-	}
-	else if (mylabels.size() == labelsin.size())
-	{
-		// non-empty current one: need same number of labels and all labels overlap
-		have_all_labels = true;
-		for (size_t i = 0; i < mylabels.size(); i++)
-		{
-			if (!vectorContainsLabel(labelsin, mylabels[i]))
-			{
-				have_all_labels = false;
-				break;
-			}
-		}
-	}
-
-	if (!have_all_labels)
-		REPORT_ERROR("ERROR in appending metadata tables with not the same columns!");
-
-	// Go to the end of the table
-	current_objectID = objects.size();
-	FOR_ALL_OBJECTS_IN_METADATA_TABLE(app)
-	{
-		addObject(app.getObject());
-	}
-	// Reset pointer to the beginning of the table
-	current_objectID = 0;
-
-}
-
-bool MetaDataTable::addLabel(const EMDLabel label)
-{
-    if (containsLabel(label))
-        return false;
-    activeLabels.push_back(label);
-    return true;
-}
-
-long int MetaDataTable::addObject(MetaDataContainer * data, long int objectID)
-{
-    long int result;
-
-    if (objectID == -1)
+    if (label < 0 || label >= EMDL_LAST_LABEL)
     {
-    	result = objects.size();
-        objects.resize(result+1);
+        std::stringstream sts;
+        sts << label;
+        REPORT_ERROR("MetaDataTable::addLabel: unrecognised label: " + sts.str());
     }
-    else
-    {
-        if (objectID >= objects.size())
-        	REPORT_ERROR("MetaDataTable::addObject: objectID >= objects.size()");
 
-        result = objectID;
-        // First free memory of old container if it existed
-        if (objects[result])
+    if (label2offset[label] < 0)
+    {
+        activeLabels.push_back(label);
+        long id;
+
+        if (EMDL::isDouble(label))
         {
-        	objects[result]->clear();
-        	delete objects[result];
+            id = RFLOATLabels;
+
+            for (long i = 0; i < objects.size(); i++)
+            {
+                objects[i]->RFLOATs.push_back(0);
+            }
+
+            RFLOATLabels++;
+        }
+        else if (EMDL::isInt(label))
+        {
+            id = intLabels;
+
+            for (long i = 0; i < objects.size(); i++)
+            {
+                objects[i]->ints.push_back(0);
+            }
+
+            intLabels++;
+        }
+        else if (EMDL::isLong(label))
+        {
+            id = longLabels;
+
+            for (long i = 0; i < objects.size(); i++)
+            {
+                objects[i]->longs.push_back(0);
+            }
+
+            longLabels++;
+        }
+        else if (EMDL::isBool(label))
+        {
+            id = boolLabels;
+
+            for (long i = 0; i < objects.size(); i++)
+            {
+                objects[i]->bools.push_back(false);
+            }
+
+            boolLabels++;
+        }
+        else if (EMDL::isString(label))
+        {
+            id = stringLabels;
+
+            for (long i = 0; i < objects.size(); i++)
+            {
+                objects[i]->strings.push_back("empty");
+            }
+
+            stringLabels++;
+        }
+
+        label2offset[label] = id;
+    }
+}
+
+void MetaDataTable::addMissingLabels(const MetaDataTable* mdt)
+{
+    for (long i = 0; i < mdt->activeLabels.size(); i++)
+    {
+        EMDLabel l = mdt->activeLabels[i];
+
+        if (label2offset[l] < 0)
+        {
+            addLabel(l);
         }
     }
-
-    if (data == NULL)
-        objects[result] = new MetaDataContainer();
-    else
-        objects[result] = new MetaDataContainer(*(data));
-
-    // Set iterator pointing to the newly added object
-    current_objectID = result;
-
-    // Set default values for the existing labels
-    if (data == NULL)
-    {
-    	/* Sjors 21nov2014: I don't see why this would be necessary...
-    	std::vector<EMDLabel>::iterator It;
-		for (It = activeLabels.begin(); It != activeLabels.end(); It++)
-		{
-			(objects[result])->addDefaultValue(*It);
-		}
-		*/
-    }
-    else
-    {
-    	// Set all the labels from the data MDC as active
-    	std::vector<EMDLabel> newlabels;
-    	newlabels = data->getLabels();
-    	for (int i = 0; i < newlabels.size(); i++)
-    	{
-    		std::vector<EMDLabel>::iterator location;
-    		EMDLabel label = newlabels[i];
-    		location = std::find(activeLabels.begin(), activeLabels.end(), label);
-    		if (location == activeLabels.end())
-    		{
-    			activeLabels.push_back(label);
-
-                // Add this label to the rest of the objects in this class
-                for (long int idx = 0; idx < objects.size(); idx++ )
-                {
-                    if (idx != result)
-                    	objects[idx]->addDefaultValue(label);
-                }
-    		}
-    	}
-    }
-
-    return result;
 }
 
-long int MetaDataTable::removeObject(long int objectID)
+void MetaDataTable::append(const MetaDataTable& mdt)
 {
-	long int i = (objectID == -1) ? current_objectID : objectID;
 
-    if (objects[i])
+	if (activeLabels.size() == 0)
+	{
+		// If the current one is empty, add missing labels and append the new one:
+		addMissingLabels(&mdt);
+	}
+	else
+	{
+		// If the current one is not-empty, check all labels are the same before appending. Otherwise, raise error
+		if (!compareLabels(*this, mdt))
+			REPORT_ERROR("ERROR in appending metadata tables with not the same columns!");
+	}
+
+	// Now append
+    objects.reserve(objects.size() + mdt.numberOfObjects());
+    for (long i = 0; i < mdt.objects.size(); i++)
     {
-    	objects[i]->clear();
-        delete objects[i];
+        objects.push_back(new MetaDataContainer(
+            this, RFLOATLabels, intLabels, longLabels, boolLabels, stringLabels));
+
+        setObjectUnsafe(mdt.getObject(i), objects.size() - 1);
     }
+
+    // reset pointer to the beginning of the table
+    firstObject();
+}
+
+
+MetaDataContainer* MetaDataTable::getObject(long objectID) const
+{
+    if (objectID < 0) objectID = current_objectID;
+
+    checkObjectID(objectID,  "MetaDataTable::getObject");
+
+    return objects[objectID];
+}
+
+void MetaDataTable::setObject(MetaDataContainer* data, long objectID)
+{
+    if (objectID < 0) objectID = current_objectID;
+
+    checkObjectID(objectID,  "MetaDataTable::setObject");
+    addMissingLabels(data->table);
+
+    setObjectUnsafe(data, objectID);
+}
+
+void MetaDataTable::setValuesOfDefinedLabels(MetaDataContainer* data, long objectID)
+{
+    if (objectID < 0) objectID = current_objectID;
+
+    checkObjectID(objectID,  "MetaDataTable::setValuesOfDefinedLabels");
+
+    setObjectUnsafe(data, objectID);
+}
+
+void MetaDataTable::reserve(size_t capacity)
+{
+    objects.reserve(capacity);
+}
+
+void MetaDataTable::setObjectUnsafe(MetaDataContainer* data, long objectID)
+{
+    MetaDataContainer* obj = objects[objectID];
+
+    for (long i = 0; i < data->table->activeLabels.size(); i++)
+    {
+        EMDLabel label = data->table->activeLabels[i];
+
+        long myOff = label2offset[label];
+        long srcOff = data->table->label2offset[label];
+
+        if (myOff < 0) continue;
+
+        if (EMDL::isDouble(label))
+        {
+            obj->RFLOATs[myOff] = data->RFLOATs[srcOff];
+        }
+        else if (EMDL::isInt(label))
+        {
+            obj->ints[myOff] = data->ints[srcOff];
+        }
+        else if (EMDL::isLong(label))
+        {
+            obj->longs[myOff] = data->longs[srcOff];
+        }
+        else if (EMDL::isBool(label))
+        {
+            obj->bools[myOff] = data->bools[srcOff];
+        }
+        else if (EMDL::isString(label))
+        {
+            obj->strings[myOff] = data->strings[srcOff];
+        }
+    }
+}
+
+void MetaDataTable::addObject()
+{
+    objects.push_back(new MetaDataContainer(
+        this, RFLOATLabels, intLabels, longLabels, boolLabels, stringLabels));
+
+    current_objectID = objects.size()-1;
+}
+
+void MetaDataTable::addObject(MetaDataContainer* data)
+{
+    objects.push_back(new MetaDataContainer(
+        this, RFLOATLabels, intLabels, longLabels, boolLabels, stringLabels));
+
+    setObject(data, objects.size()-1);
+    current_objectID = objects.size()-1;
+}
+
+void MetaDataTable::addValuesOfDefinedLabels(MetaDataContainer* data)
+{
+    objects.push_back(new MetaDataContainer(
+        this, RFLOATLabels, intLabels, longLabels, boolLabels, stringLabels));
+
+    setValuesOfDefinedLabels(data, objects.size()-1);
+    current_objectID = objects.size()-1;
+}
+
+void MetaDataTable::removeObject(long objectID)
+{
+    long i = (objectID < 0) ? current_objectID : objectID;
+
+    checkObjectID(i,  "MetaDataTable::removeObject");
+
+    delete objects[i];
     objects.erase(objects.begin() + i);
 
-    return lastObject();
-}
-
-MetaDataContainer * MetaDataTable::getObject(const long int objectID) const
-{
-    if (isEmpty())
-    {
-        // The objects map is empty, error
-        REPORT_ERROR("Requested objectID not found (no objects stored). Exiting... ");
-    }
-
-    MetaDataContainer * aux;
-    if (objectID == -1)
-        aux = objects[current_objectID];
-    else
-    {
-#ifdef DEBUG_CHECKSIZES
-		if (objectID >= objects.size())
-		{
-			std::cerr<< "objectID= "<<objectID<<" objects.size()= "<< objects.size() <<std::endl;
-			REPORT_ERROR("MetaDataTable::getObject: objectID >= objects.size()");
-		}
-#endif
-    	aux = objects[objectID];
-    }
-
-    if (aux == NULL)
-    {
-        // This objectID does not exist, finish execution
-        REPORT_ERROR("Requested objectID not found. Exiting... ");
-    }
-
-    return aux;
-}
-
-void MetaDataTable::setObject(MetaDataContainer * data, long int objectID)
-{
-
-	long int idx = (objectID == -1) ? current_objectID : objectID;
-
-#ifdef DEBUG_CHECKSIZES
-	if (idx >= objects.size())
-		REPORT_ERROR("MetaDataTable::setObject: idx >= objects.size()");
-#endif
-
-        // First delete old container if it exists
-        if (this->objects[idx])
-        {
-        	this->objects[idx]->clear();
-        	delete this->objects[idx];
-        }
-	this->objects[idx] = new MetaDataContainer(*data);
-
-	// Set all the labels from the data MDC as active
-	std::vector<EMDLabel>::iterator location;
-	std::vector<EMDLabel> newlabels;
-	newlabels = data->getLabels();
-	for (int i = 0; i < newlabels.size(); i++)
-	{
-		EMDLabel label = newlabels[i];
-		location = std::find(activeLabels.begin(), activeLabels.end(), label);
-		if (location == activeLabels.end())
-		{
-			activeLabels.push_back(label);
-
-            // Add this label with default values to the rest of the objects in this class
-            for (long int idx2 = 0; idx2 < objects.size(); idx2++ )
-            {
-               if (idx2 != idx)
-              	objects[idx2]->addDefaultValue(label);
-            }
-		}
-	}
-
-
+    current_objectID = objects.size() - 1;
 }
 
 long int MetaDataTable::firstObject()
 {
-    long int result = 0;
-
-    if (!isEmpty())
-    {
-    	current_objectID = 0;
-        result = 0;
-    }
-    else
-    {
-        result = NO_OBJECTS_STORED; // Map is empty
-    }
-
-    return result;
+    current_objectID = 0;
+    return 0;
 }
 
 long int MetaDataTable::nextObject()
 {
-    long int result = 0;
+    current_objectID++;
 
-    if (!isEmpty())
+    if (current_objectID >= objects.size())
     {
-    	current_objectID++;
-
-        if (current_objectID < objects.size())
-        {
-            result = current_objectID;
-        }
-        else
-        {
-            result = NO_MORE_OBJECTS;
-            current_objectID = lastObject();
-        }
+        return NO_MORE_OBJECTS;
     }
     else
     {
-        result = NO_OBJECTS_STORED;
-        current_objectID = -1;
+        return current_objectID;
     }
-
-    return result;
 }
-
-
-long int MetaDataTable::lastObject()
-{
-    long int result = 0;
-
-    if (!isEmpty())
-    {
-        result = objects.size() - 1;
-        current_objectID = result;
-    }
-    else
-    {
-        result = NO_OBJECTS_STORED;
-        current_objectID = -1;
-    }
-
-    return result;
-}
-
 
 long int MetaDataTable::goToObject(long int objectID)
 {
-	if (objectID < objects.size())
-	{
-		current_objectID = objectID;
-		return current_objectID;
-	}
-	else
-	{
-		REPORT_ERROR("MetaDataTable::goToObject: objectID >= objects.size()");
-	}
+    checkObjectID(objectID, "MetaDataTable::goToObject");
+
+    current_objectID = objectID;
+    return current_objectID;
 }
 
 long int MetaDataTable::readStarLoop(std::ifstream& in, std::vector<EMDLabel> *desiredLabels, std::string grep_pattern, bool do_only_count)
@@ -546,8 +762,7 @@ long int MetaDataTable::readStarLoop(std::ifstream& in, std::vector<EMDLabel> *d
 
 	//Read column labels
     int labelPosition = 0;
-    EMDLabel label;
-    std::string line, token, value;
+    std::string line, token;
 
     // First read all the column labels
     while (getline(in, line, '\n'))
@@ -560,8 +775,13 @@ long int MetaDataTable::readStarLoop(std::ifstream& in, std::vector<EMDLabel> *d
 		if (line[0] == '_') // label definition line
 		{
 			//Only take string from "_" until "#"
-			token = line.substr(line.find("_") + 1, line.find("#") - 2);
-			label = EMDL::str2Label(token);
+            size_t pos0 = line.find("_");
+            size_t pos1 = line.find("#");
+
+            token = line.substr(pos0 + 1, pos1 - pos0 - 2);
+
+            EMDLabel label = EMDL::str2Label(token);
+
 			//std::cerr << " label= XX" << label << "XX token= XX" << token<<"XX" << std::endl;
 			if (desiredLabels != NULL && !vectorContainsLabel(*desiredLabels, label))
 				label = EMDL_UNDEFINED; //ignore if not present in desiredLabels
@@ -573,7 +793,9 @@ long int MetaDataTable::readStarLoop(std::ifstream& in, std::vector<EMDLabel> *d
 				ignoreLabels.push_back(labelPosition);
 			}
 			else
-				activeLabels.push_back(label);
+            {
+                addLabel(label);
+            }
 
 			labelPosition++;
 		}
@@ -584,13 +806,14 @@ long int MetaDataTable::readStarLoop(std::ifstream& in, std::vector<EMDLabel> *d
     }
 
     // Then fill the table (dont read another line until the one from above has been handled)
-    bool is_first= true;
+    bool is_first = true;
     long int nr_objects = 0;
+
     while (is_first || getline(in, line, '\n'))
     {
-		is_first=false;
+        is_first = false;
 
-    	if (grep_pattern == "" || line.find(grep_pattern) !=  std::string::npos )
+        if (grep_pattern == "" || line.find(grep_pattern) != std::string::npos)
     	{
     		line = simplify(line);
 			// Stop at empty line
@@ -618,7 +841,7 @@ long int MetaDataTable::readStarLoop(std::ifstream& in, std::vector<EMDLabel> *d
 						labelPosition++;
 						continue;
 					}
-					setValueFromString(activeLabels[labelPosition - counterIgnored], value);
+                    setValueFromString(activeLabels[labelPosition - counterIgnored], value);
 					labelPosition++;
 				}
 			}
@@ -631,11 +854,12 @@ long int MetaDataTable::readStarLoop(std::ifstream& in, std::vector<EMDLabel> *d
 bool MetaDataTable::readStarList(std::ifstream& in, std::vector<EMDLabel> *desiredLabels)
 {
 	setIsList(true);
-    long int objectID = addObject();
-    EMDLabel label;
+    addObject();
+    long int objectID = objects.size() - 1;
+
     std::string line, firstword, value;
     std::vector<std::string> words;
-    std::stringstream ss;
+
     bool also_has_loop = false;
 
     // Read data and fill structures accordingly
@@ -652,16 +876,18 @@ bool MetaDataTable::readStarList(std::ifstream& in, std::vector<EMDLabel> *desir
     	 // Get label-value pairs
     	 if (firstword[0] == '_')
     	 {
-    		 label = EMDL::str2Label(firstword.substr(1)); // get rid of leading underscore
+             EMDLabel label = EMDL::str2Label(firstword.substr(1)); // get rid of leading underscore
         	 if (words.size() != 2)
         		 REPORT_ERROR("MetaDataTable::readStarList: did not encounter a single word after "+firstword);
     		 value = words[1];
 
-    		 if (desiredLabels != NULL && !vectorContainsLabel(*desiredLabels, label))
-				label = EMDL_UNDEFINED; //ignore if not present in desiredLabels
+             if (desiredLabels != NULL && !vectorContainsLabel(*desiredLabels, label))
+             {
+                 label = EMDL_UNDEFINED; //ignore if not present in desiredLabels
+             }
     		 if (label != EMDL_UNDEFINED)
-			 {
-				 activeLabels.push_back(label);
+             {
+                 addLabel(label);
 				 setValueFromString(label, value, objectID);
 			 }
     	 }
@@ -766,15 +992,11 @@ long int MetaDataTable::read(const FileName &filename, const std::string &name, 
 
 }
 
-void MetaDataTable::write(std::ostream& out)
+void MetaDataTable::write(std::ostream& out) const
 {
-
     // Only write tables that have something in them
     if (isEmpty())
         return;
-
-    std::vector<EMDLabel>::iterator strIt;
-    std::string entryComment;
 
     out << "\n";
     out << "data_" << getName() <<"\n";
@@ -785,34 +1007,36 @@ void MetaDataTable::write(std::ostream& out)
     if (!isList)
     {
         // Write loop header structure
-    	out << "loop_ \n";
-        int ii = 0;
-    	for (strIt = activeLabels.begin(); strIt != activeLabels.end(); strIt++)
+        out << "loop_ \n";
+        for (long i = 0; i < activeLabels.size(); i++)
         {
-            ii++;
-            if (*strIt != EMDL_COMMENT && *strIt != EMDL_SORTED_IDX) // EMDL_SORTED_IDX is only for internal use, never write it out!
-    		//if (*strIt != EMDL_COMMENT)
+            EMDLabel l = activeLabels[i];
+
+            if (l != EMDL_COMMENT && l != EMDL_SORTED_IDX) // EMDL_SORTED_IDX is only for internal use, never write it out!
             {
-                out << "_" << EMDL::label2Str(*strIt) << " #" << ii << " \n";
+                out << "_" << EMDL::label2Str(l) << " #" << i+1 << " \n";
             }
         }
 
         // Write actual data block
         for (long int idx = 0; idx < objects.size(); idx++)
         {
-        	entryComment = "";
-        	for (strIt = activeLabels.begin(); strIt != activeLabels.end(); strIt++)
+            std::string entryComment = "";
+
+            for (long i = 0; i < activeLabels.size(); i++)
             {
-        		if (*strIt != EMDL_COMMENT && *strIt != EMDL_SORTED_IDX)
-            	//if (*strIt != EMDL_COMMENT)
+                EMDLabel l = activeLabels[i];
+
+                if (l != EMDL_COMMENT && l != EMDL_SORTED_IDX)
                 {
                     out.width(10);
-                    objects[idx]->writeValueToStream(out, *strIt);
-                    out << " ";
+                    std::string val;
+                    getValueToString(l, val, idx);
+                    out << val << " ";
                 }
-            	if (*strIt == EMDL_COMMENT)
+                if (l == EMDL_COMMENT)
                 {
-                	objects[idx]->getValue(EMDL_COMMENT, entryComment);
+                    getValue(EMDL_COMMENT, entryComment, idx);
                 }
             }
             if (entryComment != std::string(""))
@@ -828,30 +1052,37 @@ void MetaDataTable::write(std::ostream& out)
     else
     {
         // Get first object. In this case (row format) there is a single object
-        MetaDataContainer * object = getObject();
-
-        entryComment = "";
+        std::string entryComment = "";
         int maxWidth=10;
-        for (strIt = activeLabels.begin(); strIt != activeLabels.end(); strIt++)
+
+        for (long i = 0; i < activeLabels.size(); i++)
         {
-            if (*strIt != EMDL_COMMENT)
+            EMDLabel l = activeLabels[i];
+
+            if (l != EMDL_COMMENT)
             {
-                int w=EMDL::label2Str(*strIt).length();
-                if (w>maxWidth)
-                    maxWidth=w;
+                int w = EMDL::label2Str(l).length();
+
+                if (w > maxWidth) maxWidth = w;
             }
             else
-            	object->getValue(EMDL_COMMENT, entryComment);
+            {
+                getValue(EMDL_COMMENT, entryComment, 0);
+            }
         }
 
-        for (strIt = activeLabels.begin(); strIt != activeLabels.end(); strIt++)
+        for (long i = 0; i < activeLabels.size(); i++)
         {
-            if (*strIt != EMDL_COMMENT)
+            EMDLabel l = activeLabels[i];
+
+            if (l != EMDL_COMMENT)
             {
-            	int w = EMDL::label2Str(*strIt).length();
-            	out << "_" << EMDL::label2Str(*strIt) << std::setw(12 + maxWidth - w) << " ";
-                object->writeValueToStream(out, *strIt);
-                out << "\n";
+                int w = EMDL::label2Str(l).length();
+                out << "_" << EMDL::label2Str(l) << std::setw(12 + maxWidth - w) << " ";
+
+                std::string val;
+                getValueToString(l, val, 0);
+                out << val << "\n";
             }
         }
         if (entryComment != std::string(""))
@@ -864,7 +1095,7 @@ void MetaDataTable::write(std::ostream& out)
     }
 }
 
-void MetaDataTable::write(const FileName &fn_out)
+void MetaDataTable::write(const FileName &fn_out) const
 {
     std::ofstream  fh;
     fh.open((fn_out).c_str(), std::ios::out);
@@ -873,13 +1104,6 @@ void MetaDataTable::write(const FileName &fn_out)
     write(fh);
     fh.close();
 
-}
-
-void MetaDataTable::writeValueToString(std::string & result,
-                                  const std::string &inputLabel)
-{
-    MetaDataContainer * aux = getObject();
-    aux->writeValueToString(result, EMDL::str2Label(inputLabel));
 }
 
 void MetaDataTable::addToCPlot2D(CPlot2D *plot2D, EMDLabel xaxis, EMDLabel yaxis,
@@ -905,37 +1129,46 @@ void MetaDataTable::addToCPlot2D(CPlot2D *plot2D, EMDLabel xaxis, EMDLabel yaxis
 	double xval, yval;
 	for (long int idx = 0; idx < objects.size(); idx++)
     {
-    	if (EMDL::isDouble(xaxis))
+		const long offx = label2offset[xaxis];
+		if (offx < 0)
+			REPORT_ERROR("MetaDataTable::addToCPlot2D ERROR: cannot find xaxis label");
+
+
+		if (EMDL::isDouble(xaxis))
     	{
-    		objects[idx]->getValue(xaxis, mydbl);
+    		objects[idx]->getValue(offx, mydbl);
     		xval = mydbl;
     	}
     	else if (EMDL::isInt(xaxis))
     	{
-    		objects[idx]->getValue(xaxis, myint);
+    		objects[idx]->getValue(offx, myint);
     		xval = myint;
     	}
     	else if (EMDL::isLong(xaxis))
     	{
-    		objects[idx]->getValue(xaxis, mylong);
+    		objects[idx]->getValue(offx, mylong);
     		xval = mylong;
     	}
     	else
     		REPORT_ERROR("MetaDataTable::addToCPlot2D ERROR: can only plot xaxis double, int or long int");
 
-    	if (EMDL::isDouble(yaxis))
+		const long offy = label2offset[yaxis];
+		if (offy < 0)
+			REPORT_ERROR("MetaDataTable::addToCPlot2D ERROR: cannot find yaxis label");
+
+		if (EMDL::isDouble(yaxis))
     	{
-    		objects[idx]->getValue(yaxis, mydbl);
+    		objects[idx]->getValue(offy, mydbl);
     		yval = mydbl;
     	}
     	else if (EMDL::isInt(yaxis))
     	{
-    		objects[idx]->getValue(yaxis, myint);
+    		objects[idx]->getValue(offy, myint);
     		yval = myint;
     	}
     	else if (EMDL::isLong(yaxis))
     	{
-    		objects[idx]->getValue(yaxis, mylong);
+    		objects[idx]->getValue(offy, mylong);
     		yval = mylong;
     	}
     	else
@@ -948,6 +1181,26 @@ void MetaDataTable::addToCPlot2D(CPlot2D *plot2D, EMDLabel xaxis, EMDLabel yaxis
 
     plot2D->AddDataSet(dataSet);
 
+}
+
+void MetaDataTable::printLabels(std::ostream &ost)
+{
+    for (int i = 0; i < activeLabels.size(); i++)
+    {
+        ost << EMDL::label2Str(activeLabels[i]) << "\n";
+    }
+}
+
+void MetaDataTable::checkObjectID(long id, std::string caller) const
+{
+    if (id >= objects.size() || id < 0)
+    {
+        std::stringstream sts0, sts1;
+        sts0 << id;
+        sts1 << objects.size();
+        REPORT_ERROR(caller+": object " + sts0.str()
+                     + " out of bounds! (" + sts1.str() + " objects present)");
+    }
 }
 
 void compareMetaDataTable(MetaDataTable &MD1, MetaDataTable &MD2,
@@ -1096,16 +1349,18 @@ void compareMetaDataTable(MetaDataTable &MD1, MetaDataTable &MD2,
 
 MetaDataTable combineMetaDataTables(std::vector<MetaDataTable> &MDin)
 {
-
 	MetaDataTable MDc;
 
 	if (MDin.size() == 0)
+    {
 		REPORT_ERROR("combineMetaDataTables ERROR: No input STAR files selected!");
+    }
 	else if (MDin.size() == 1 )
+    {
 		MDc = MDin[0];
+    }
 	else
 	{
-
 		bool some_labels_missing = false;
 		// Find which labels occur in all input tables
 		std::vector<EMDLabel> labelsc;
@@ -1116,15 +1371,18 @@ MetaDataTable combineMetaDataTables(std::vector<MetaDataTable> &MDin)
 		{
 			// Check their presence in each of the input files
 			bool is_present = true;
-			for (size_t j = 0; j < MDin.size(); j++)
+
+            for (size_t j = 1; j < MDin.size(); j++)
 			{
 				is_present = vectorContainsLabel(MDin[j].getActiveLabels(), labels1[i]);
+
 				if (!is_present)
 				{
 					some_labels_missing = true;
 					break;
 				}
 			}
+
 			if (is_present)
 			{
 				labelsc.push_back(labels1[i]);
@@ -1141,20 +1399,32 @@ MetaDataTable combineMetaDataTables(std::vector<MetaDataTable> &MDin)
 		}
 		else
 		{
-			// Select only the labels in common, do this per line!
-			for (size_t j = 0; j < MDin.size(); j++)
+            // Select only the labels in common, do this per line!
+
+            for (size_t i = 0; i < labelsc.size(); i++)
+            {
+                MDc.addLabel(labelsc[i]);
+            }
+
+            long totalLines = 0;
+
+            for (size_t i = 0; i < MDin.size(); i++)
 			{
-				FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin[j])
-				{
-					MetaDataContainer *aux =  MDin[j].getObject();
-					aux->keepOnlyLabels(labelsc);
-					MDc.addObject(aux);
-				}
+                totalLines += MDin[i].numberOfObjects();
+            }
+
+            MDc.reserve(totalLines);
+
+            for (size_t i = 0; i < MDin.size(); i++)
+            {
+                for (size_t j = 0; j < MDin[i].numberOfObjects(); j++)
+                {
+                    MDc.addValuesOfDefinedLabels(MDin[j].getObject(j));
+                }
 			}
 		}
-
-
 	}
+
 	return MDc;
 }
 
@@ -1165,33 +1435,11 @@ bool compareLabels(const MetaDataTable &MD1, const MetaDataTable &MD2)
 	labels1 = MD1.getActiveLabels();
 	labels2 = MD2.getActiveLabels();
 
-	// DEBUG
-	//std::cout << " label1.size() & label2.size() = " << labels1.size() << ", " << labels2.size() << std::endl;
 	if (labels1.size() != labels2.size())
 		return false;
 
-	// DEBUG
-	//std::cout << " before_stable_sort: labels1[]: " << std::flush;
-	//for (size_t id = 0; id < labels1.size(); id++)
-	//	std::cout << labels1[id] << ", " << std::flush;
-	//std::cout << std::endl;
-	//std::cout << " before_stable_sort: labels2[]: " << std::flush;
-	//for (size_t id = 0; id < labels2.size(); id++)
-	//	std::cout << labels2[id] << ", " << std::flush;
-	//std::cout << std::endl;
-
 	std::stable_sort(labels1.begin(), labels1.end());
 	std::stable_sort(labels2.begin(), labels2.end());
-
-	// DEBUG
-	//std::cout << "  after_stable_sort: labels1[]: " << std::flush;
-	//for (size_t id = 0; id < labels1.size(); id++)
-	//	std::cout << labels1[id] << ", " << std::flush;
-	//std::cout << std::endl;
-	//std::cout << "  after_stable_sort: labels2[]: " << std::flush;
-	//for (size_t id = 0; id < labels2.size(); id++)
-	//	std::cout << labels2[id] << ", " << std::flush;
-	//std::cout << std::endl;
 
 	for (size_t id = 0; id < labels1.size(); id++)
 	{
@@ -1199,4 +1447,4 @@ bool compareLabels(const MetaDataTable &MD1, const MetaDataTable &MD2)
 			return false;
 	}
 	return true;
-};
+}
