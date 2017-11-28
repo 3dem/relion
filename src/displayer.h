@@ -412,7 +412,7 @@ public:
 	Fl_Choice *display_choice, *sort_choice;
 
 	// Constructor with w x h size of the window and a title
-	displayerGuiWindow(int W, int H, const char* title=0): Fl_Window(W, H, title){}
+	displayerGuiWindow(int W, int H, const char* title=0): Fl_Window(W, H, title),sort_button(NULL){}
 
 	// Fill all except for the browser
 	int fill(FileName &fn_in);
