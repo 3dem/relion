@@ -1,7 +1,3 @@
-message(STATUS "-------------------------------------------------")
-message(STATUS "------- WILL USE LOCALLY BUILT FFTW LIBS --------")
-message(STATUS "-------------------------------------------------")
-
 set(FFTW_EXTERNAL_PATH "${CMAKE_SOURCE_DIR}/external/fftw")
 
 if (NOT DEFINED TARGET_X86)
@@ -30,12 +26,21 @@ endif(DoublePrec_CPU)
 find_path(FFTW_INCLUDES     NAMES fftw3.h         PATHS ${FFTW_EXTERNAL_PATH}/include NO_DEFAULT_PATH) 
 find_library(FFTW_LIBRARIES NAMES ${libfft}       PATHS ${FFTW_EXTERNAL_PATH}/lib     NO_DEFAULT_PATH)
 
+message(STATUS "--------------------------------------------------------")
 if(FFTW_INCLUDES AND FFTW_LIBRARIES)
     set(FFTW_FOUND TRUE)
-    message( STATUS "Found previously built external (non-system) FFTW library")
+	message(STATUS "------- FOUND PREVIOUSLY LOCAL BUILD (NON-SYSTEM) ------")
+	message(STATUS "------- FFTW LIBS THAT WILL BE USED AT LINK-TIME. ------")
 else()
     set(FFTW_FOUND FALSE)
+	message(STATUS "-------- NO PREVIOUSLY LOCAL BUILD (NON-SYSTEM) --------")
+	message(STATUS "---------------- FFTW LIBS WHERE FOUND. ----------------")
+	message(STATUS "-------------- FFTW WILL BE DOWNLOADED AND -------------")
+	message(STATUS "--------------- BUILT DURING COMPILE-TIME. -------------")
+	message(STATUS "--------------------------------------------------------")
+	message(STATUS "----- YOU WILL NEED A WORKING INTERNET CONNECTION. -----")
 endif()
+message(STATUS "--------------------------------------------------------")
 
 ## ----------------------------------------------------------------- NEW EXT LIBS? --
 
