@@ -184,7 +184,7 @@ if(GUI)
 				message(STATUS "X11 and FLTK were found")
 				message(STATUS "FLTK_LIBRARIES: ${FLTK_LIBRARIES}")
 		    else()
-		        message(STATUS "FLTK was NOT found")
+				message(STATUS "No FLTK installation was found")
 		    endif() 
         endif(NOT FORCE_OWN_FLTK)
         
@@ -210,6 +210,7 @@ if(NOT FORCE_OWN_FFTW)
 endif(NOT FORCE_OWN_FFTW)
 	
 if(NOT FFTW_FOUND)
+	message(STATUS "No FFTW installation was found")
 	include(${CMAKE_SOURCE_DIR}/cmake/BuildFFTW.cmake)
 endif(NOT FFTW_FOUND)
 
