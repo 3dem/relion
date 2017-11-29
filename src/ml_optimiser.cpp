@@ -1646,6 +1646,12 @@ void MlOptimiser::initialiseGeneral(int rank)
 		has_fine_enough_angular_sampling = false;
 		has_converged = false;
 
+		if (mymodel.tau2_fudge_factor > 1. && verb > 0)
+		{
+			std::cerr << " WARNING: Using tau2_fudge of " <<mymodel.tau2_fudge_factor << ", which will lead to inflated resolution estimates during refinement." << std::endl;
+			std::cerr << " WARNING: You have to run postprocessing afterwards to get a reliable, gold-standard resolution estimate! " << std::endl;
+		}
+
 		if (iter == 0 && sampling.healpix_order >= autosampling_hporder_local_searches)
 		{
 			mymodel.orientational_prior_mode = PRIOR_ROTTILT_PSI;
