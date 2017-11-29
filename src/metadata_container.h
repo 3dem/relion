@@ -54,7 +54,9 @@ class MetaDataContainer
         void getValue(long offset, bool& dest) const;
         void getValue(long offset, std::string& dest) const;
 
-        void setValue(long offset, const RFLOAT& src);
+	// Even when RELION_SINGLE_PRECISION, this must be double
+	// as floating point literals are double
+        void setValue(long offset, const double& src);
         void setValue(long offset, const int& src);
         void setValue(long offset, const long& src);
         void setValue(long offset, const bool& src);

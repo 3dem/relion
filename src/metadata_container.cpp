@@ -71,7 +71,7 @@ void MetaDataContainer::getValue(long offset, std::string& dest) const
 }
 
 
-void MetaDataContainer::setValue(long offset, const RFLOAT& src)
+void MetaDataContainer::setValue(long offset, const double& src)
 {
     RFLOATs[offset] = src;
 }
