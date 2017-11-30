@@ -1333,7 +1333,7 @@ void MlWsumModel::pack(MultidimArray<RFLOAT> &packed, int &piece, int &nr_pieces
     }
     else if (packed_size > MAX_PACK_SIZE)
     {
-        idx_start = piece * MAX_PACK_SIZE;
+        idx_start = (unsigned long long)piece * MAX_PACK_SIZE;
         idx_stop = XMIPP_MIN(idx_start + MAX_PACK_SIZE, packed_size);
         nr_pieces = CEIL((RFLOAT)packed_size/(RFLOAT)MAX_PACK_SIZE);
     }
@@ -1482,8 +1482,8 @@ void MlWsumModel::unpack(MultidimArray<RFLOAT> &packed, int piece, bool do_clear
     }
     else
     {
-    	idx_start = piece * MAX_PACK_SIZE;
-    	idx_stop  = idx_start + MULTIDIM_SIZE(packed);
+    	idx_start = (unsigned long long)piece * MAX_PACK_SIZE;
+    	idx_stop  = idx_start + (unsigned long long)MULTIDIM_SIZE(packed);
     }
     unsigned long long ori_idx = 0;
     unsigned long long idx = 0;
