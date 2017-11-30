@@ -412,11 +412,19 @@ public:
 	Fl_Choice *display_choice, *sort_choice;
 
 	// Constructor with w x h size of the window and a title
-	displayerGuiWindow(int W, int H, const char* title=0): Fl_Window(W, H, title),sort_button(NULL){}
+	displayerGuiWindow(int W, int H, const char* title=0): Fl_Window(W, H, title),	sort_button(NULL), reverse_sort_button(NULL), apply_orient_button(NULL), read_whole_stack_button(NULL) {}
 
 	// Fill all except for the browser
 	int fill(FileName &fn_in);
 
+	// NUll-check value-fetch
+	bool getValue(Fl_Check_Button * button)
+	{
+		if(button != NULL)
+			return(button->value());
+		else
+			return(false);
+	}
 private:
 
 	static void cb_display(Fl_Widget*, void*);
