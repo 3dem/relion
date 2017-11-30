@@ -558,6 +558,9 @@ public:
 	// Local symmetry - list of operators
 	std::vector<std::vector<Matrix1D<RFLOAT> > > fn_local_symmetry_operators;
 
+	//Maximum number of particles permitted to be drop, due to zero sum of weights, before exiting with an error (GPU only).
+	int failsafe_threshold;
+
 #ifdef TIMING
     Timer timer;
 	int TIMING_DIFF_PROJ, TIMING_DIFF_SHIFT, TIMING_DIFF_DIFF2;
@@ -680,7 +683,8 @@ public:
 		helical_keep_tilt_prior_fixed(0),
 		asymmetric_padding(false),
 		maximum_significants(0),
-		threadException(NULL)
+		threadException(NULL),
+		failsafe_threshold(40)
 	{};
 
 	/** ========================== I/O operations  =========================== */

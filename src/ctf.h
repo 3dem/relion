@@ -161,7 +161,7 @@ public:
         RFLOAT u4 = u2 * u2;
         // if (u2>=ua2) return 0;
         RFLOAT deltaf = getDeltaF(X, Y);
-        RFLOAT argument = K1 * deltaf * u2 + K2 * u4 - K5;
+        RFLOAT argument = K1 * deltaf * u2 + K2 * u4 - K5 - K3;
         RFLOAT retval;
         if (do_intact_until_first_peak && ABS(argument) < PI/2.)
         {
@@ -169,7 +169,7 @@ public:
         }
         else
         {
-            retval = -(K3*sin(argument) - Q0*cos(argument)); // Q0 should be positive
+            retval = -sin(argument);
         }
         if (do_damping)
         {
@@ -185,6 +185,30 @@ public:
         	retval = (retval < 0.) ? -1. : 1.;
         }
         return scale * retval;
+    }
+
+    inline Complex getCTFP(RFLOAT X, RFLOAT Y, bool is_positive) const
+    {
+        RFLOAT u2 = X * X + Y * Y;
+        RFLOAT u = sqrt(u2);
+        RFLOAT u4 = u2 * u2;
+        // if (u2>=ua2) return 0;
+        RFLOAT deltaf = getDeltaF(X, Y);
+        RFLOAT argument = K1 * deltaf * u2 + K2 * u4 - K5 - K3;
+        // Add half pi phase shift
+        argument += PI/2.;
+        RFLOAT sinx, cosx;
+#ifdef RELION_SINGLE_PRECISION
+        sincosf( argument, &sinx, &cosx );
+#else
+        sincos( argument, &sinx, &cosx );
+#endif
+        Complex retval;
+        retval.real = cosx;
+        retval.imag = (is_positive) ? sinx : -sinx;
+
+        return retval;
+
     }
 
     /// Compute Deltaf at a given direction
@@ -213,6 +237,10 @@ public:
     void getFftwImage(MultidimArray < RFLOAT > &result, int orixdim, int oriydim, RFLOAT angpix,
     		bool do_abs = false, bool do_only_flip_phases = false, bool do_intact_until_first_peak = false, bool do_damping = true);
 
+    // Get a complex image with the CTFP/Q values, where the angle is in degrees between the Y-axis and the CTFP/Q sector line
+    void getCTFPImage(MultidimArray<Complex> &result, int orixdim, int oriydim, RFLOAT angpix,
+    					bool is_positive, float angle);
+
     /// Generate a centered image (with hermitian symmetry)
     /// The dimensions of the result array should have been set correctly already
     void getCenteredImage(MultidimArray < RFLOAT > &result, RFLOAT angpix,
@@ -223,6 +251,8 @@ public:
     void get1DProfile(MultidimArray < RFLOAT > &result, RFLOAT angle, RFLOAT angpix,
     		bool do_abs = false, bool do_only_flip_phases = false, bool do_intact_until_first_peak = false, bool do_damping = true);
 
+    // Calculate weight W for Ewald-sphere curvature correction: apply this to the result from getFftwImage
+    void applyWeightEwaldSphereCurvature(MultidimArray < RFLOAT > &result, int orixdim, int oriydim, RFLOAT angpix, RFLOAT particle_diameter);
 
 };
 //@}

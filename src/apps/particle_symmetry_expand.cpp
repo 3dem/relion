@@ -65,6 +65,10 @@ public:
         frac_sampling = textToFloat(parser.getOption("--frac_sampling", "Number of samplings in between a single asymmetrical unit", "1"));
         frac_range = textToFloat(parser.getOption("--frac_range", "Range of the rise [-0.5, 0.5> to be sampled", "0.5"));
 
+       	// Check for errors in the command-line option
+    	if (parser.checkForErrors())
+    		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
+
         if (do_helix)
         {
         	if (fn_sym != "C1")
@@ -74,10 +78,6 @@ public:
         		REPORT_ERROR("Provide either --asu OR --frac_sampling, but not both!");
 
         }
-
-       	// Check for errors in the command-line option
-    	if (parser.checkForErrors())
-    		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 
 	}
 

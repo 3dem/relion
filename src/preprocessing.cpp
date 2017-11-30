@@ -1050,7 +1050,7 @@ void Preprocessing::runOperateOnInputFile()
 
 		RFLOAT tilt_deg, psi_deg;
 		tilt_deg = psi_deg = 0.;
-		performPerImageOperations(Ipart, fn_stack, 1, i, Nimg,
+		performPerImageOperations(Ipart, fn_operate_out.withoutExtension(), 1, i, Nimg,
 				tilt_deg, psi_deg,
 				all_avg, all_stddev, all_minval, all_maxval);
 
@@ -1087,6 +1087,8 @@ void Preprocessing::performPerImageOperations(
 	if (do_rescale) rescale(Ipart, scale);
 
 	if (do_rewindow) rewindow(Ipart, window);
+
+        Ipart().setXmippOrigin();
 
 	TIMING_TIC(TIMING_NORMALIZE);
 	// Jun24,2015 - Shaoda, helical segments

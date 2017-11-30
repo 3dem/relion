@@ -72,7 +72,8 @@ FourierTransformer::~FourierTransformer()
 #endif
 }
 
-FourierTransformer::FourierTransformer(const FourierTransformer& op)
+FourierTransformer::FourierTransformer(const FourierTransformer& op) :
+		plans_are_set(false)
 {
 	// Clear current object
 	clear();
@@ -156,8 +157,8 @@ void FourierTransformer::setReal(MultidimArray<RFLOAT> &input)
     bool recomputePlan=false;
     if (fReal==NULL)
         recomputePlan=true;
-    else if (dataPtr!=MULTIDIM_ARRAY(input))
-        recomputePlan=true;
+    //else if (dataPtr!=MULTIDIM_ARRAY(input))
+    //    recomputePlan=true;
     else
         recomputePlan=!(fReal->sameShape(input));
 
@@ -229,8 +230,8 @@ void FourierTransformer::setReal(MultidimArray<Complex > &input)
     bool recomputePlan=false;
     if (fComplex==NULL)
         recomputePlan=true;
-    else if (complexDataPtr!=MULTIDIM_ARRAY(input))
-        recomputePlan=true;
+    //else if (complexDataPtr!=MULTIDIM_ARRAY(input))
+    //    recomputePlan=true;
     else
         recomputePlan=!(fComplex->sameShape(input));
     fFourier.resize(input);

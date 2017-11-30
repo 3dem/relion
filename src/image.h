@@ -863,7 +863,7 @@ public:
             }
             //if ( pad > 0 )
             //    freeMemory(padpage, pad*sizeof(char));
-            if ( page > 0 )
+            if ( page != NULL )
                 freeMemory(page, pagesize*sizeof(char));
 
 #ifdef DEBUG

@@ -806,20 +806,41 @@ void multiViewerCanvas::selectFromHereAbove(int iposp)
 	}
 
 }
-void multiViewerCanvas::printMetaData(int ipos)
+void multiViewerCanvas::printMetaData(int main_ipos)
 {
-	 std::ostringstream stream;
-	 boxes[ipos]->MDimg.write(stream);
-	 FileName str =  stream.str();
-	 // Grrr: somehow fl_message sometimes does not display the @ character (nor anything that comes after it)
-	 size_t pos = str.find('@', 0);
-	 while (pos != std::string::npos)
-	 {
-		 str.replace(pos, 1, (std::string)"(at)" );
-		 pos = str.find('@', pos);
-	 }
-	 fl_message("%s",str.c_str());
+	std::ostringstream stream;
 
+	if (do_class) {	
+		int myclass, iclass, nselected_classes = 0, nselected_particles = 0; 
+		for (long int ipos = 0; ipos < boxes.size(); ipos++)
+		{
+			if (boxes[ipos]->selected == SELECTED)
+			{
+				nselected_classes++;
+				// Get class number (may not be ipos+1 if resorted!)
+				boxes[ipos]->MDimg.getValue(EMDL_PARTICLE_CLASS, myclass);
+				FOR_ALL_OBJECTS_IN_METADATA_TABLE(*MDdata)
+				{
+					MDdata->getValue(EMDL_PARTICLE_CLASS, iclass);
+					if (iclass == myclass) nselected_particles++;
+				}
+			}
+		}
+		stream << "Selected " << nselected_particles << " particles in " << nselected_classes << " classes.\n";
+	}
+	stream << "Below is the metadata table for the last clicked class/particle.\n";
+	
+	boxes[main_ipos]->MDimg.write(stream);
+	FileName str =  stream.str();
+
+	// @ starts special symbol code in FLTK; we must escape it
+	size_t pos = str.find('@', 0);
+	while (pos != std::string::npos)
+	{
+		str.replace(pos, 1, (std::string)"@@" );
+		pos = str.find('@', pos + 2);
+	}
+	fl_message("%s",str.c_str());
 }
 
 void multiViewerCanvas::showAverage(bool selected, bool show_stddev)
@@ -1265,10 +1286,8 @@ int singleViewerCanvas::handle(int ev)
 {
 	if (ev==FL_PUSH && Fl::event_button() == FL_LEFT_MOUSE)
 	{
-		int xc = (int)Fl::event_x() - scroll->x() + scroll->hscrollbar.value();
-		int yc = (int)Fl::event_y() - scroll->y() + scroll->scrollbar.value();
-		int rx = xc - x() - boxes[0]->xoff;
-		int ry = yc - y() - boxes[0]->yoff;
+		int rx = (int)Fl::event_x() - scroll->x() + scroll->hscrollbar.value();
+		int ry = (int)Fl::event_y() - scroll->y() + scroll->scrollbar.value();
 		// Left mouse click writes value and coordinates to screen
 
 		if (rx < boxes[0]->xsize_data && ry < boxes[0]->ysize_data && rx >= 0 && ry >=0)
@@ -1978,7 +1997,7 @@ void displayerGuiWindow::cb_display_i()
 		const Fl_Menu_Item* m = display_choice->mvalue();
 		cl += " --display " + (std::string)m->label();
 
-		if (sort_button->value())
+		if (sort_button != NULL && sort_button->value())
 		{
 			const Fl_Menu_Item* m2 = sort_choice->mvalue();
 			if ((std::string)m2->label() == "RANDOMLY")
@@ -2006,7 +2025,7 @@ void displayerGuiWindow::cb_display_i()
 		cl += " --ori_scale " + (std::string)ori_scale_input->value();
 		if (textToInteger(max_nr_images_input->value()) > 0)
 		{
-			if (sort_button->value())
+			if (is_star && sort_button != NULL &&  sort_button->value())
 				std::cerr << " WARNING: you cannot sort particles and use a maximum number of images. Ignoring the latter..." << std::endl;
 			else
 				cl += " --max_nr_images " + (std::string)max_nr_images_input->value();

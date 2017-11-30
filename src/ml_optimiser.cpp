@@ -135,6 +135,20 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	if (fnt != "OLD")
 		fn_body_masks = fnt;
 
+	// Also allow change of padding...
+	fnt = parser.getOption("--pad", "Oversampling factor for the Fourier transforms of the references", "OLD");
+	if (fnt != "OLD")
+	{
+		if (textToInteger(fnt) != mymodel.padding_factor)
+		{
+			if (mymodel.nr_bodies > 1)
+				REPORT_ERROR("ERROR: cannot change padding factor in a continuation of a multi-body refinement...");
+			mymodel.padding_factor = textToInteger(fnt);
+			// Re-initialise the model to get the right padding factors in the PPref vectors
+			mymodel.initialise();
+		}
+	}
+
 	// Is this a new multi-body refinement?
 	if (fn_body_masks_was_empty && fn_body_masks != "None")
 		do_initialise_bodies = true;
@@ -145,7 +159,6 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 		ini_high = textToFloat(parser.getOption("--ini_high", "Resolution (in Angstroms) to which to limit refinement in the first iteration ", "-1"));
 
 	do_reconstruct_subtracted_bodies = parser.checkOption("--reconstruct_subtracted_bodies", "Use this flag to perform reconstructions with the subtracted images in multi-body refinement");
-	mymodel.body_minimum_overlap = textToFloat(parser.getOption("--minimum_body_overlap", "If bodies overlap more than this fraction, the body overlap will be taken into account when subtracting", "0.05"));
 
 	fnt = parser.getOption("--iter", "Maximum number of iterations to perform", "OLD");
 	if (fnt != "OLD")
@@ -232,7 +245,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 
 	// Check whether angular sampling has changed
 	// Do not do this for auto_refine, but make sure to do this when realigning movies and when initialising multi-body refinement!
-	if (!do_auto_refine || fn_data_movie != ""|| do_initialise_bodies)
+	if (!do_auto_refine || fn_data_movie != "" || do_initialise_bodies)
 	{
 		directions_have_changed = false;
 		fnt = parser.getOption("--healpix_order", "Healpix order for the angular sampling rate on the sphere (before oversampling): hp2=15deg, hp3=7.5deg, etc", "OLD");
@@ -356,6 +369,9 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	keep_free_scratch_Gb = textToInteger(parser.getOption("--keep_free_scratch", "Space available for copying particle stacks (in Gb)", "10"));
 	do_reuse_scratch = parser.checkOption("--reuse_scratch", "Re-use data on scratchdir, instead of wiping it and re-copying all data.");
 
+
+	failsafe_threshold = textToInteger(parser.getOption("--failsafe_threshold", "Maximum number of particles permitted to be drop, due to zero sum of weights, before exiting with an error (GPU only).", "40"));
+
 	do_gpu = parser.checkOption("--gpu", "Use available gpu resources for some calculations");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","default");
 #ifndef CUDA
@@ -372,7 +388,9 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	else
 		requested_free_gpu_memory =  temp_reqSize;
 
-	do_phase_random_fsc = parser.checkOption("--solvent_correct_fsc", "Correct FSC curve for the effects of the solvent mask?");
+	// only allow switching ON solvent_fsc, not off
+	if (parser.checkOption("--solvent_correct_fsc", "Correct FSC curve for the effects of the solvent mask?"))
+		do_phase_random_fsc = true;
 	verb = textToInteger(parser.getOption("--verb", "Verbosity (1=normal, 0=silent)", "1"));
 
 	int expert_section = parser.addSection("Expert options");
@@ -620,6 +638,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	do_always_cc  = parser.checkOption("--always_cc", "Perform CC-calculation in all iterations (useful for faster denovo model generation?)");
 	do_phase_random_fsc = parser.checkOption("--solvent_correct_fsc", "Correct FSC curve for the effects of the solvent mask?");
 	do_skip_maximization = parser.checkOption("--skip_maximize", "Skip maximization step (only write out data.star file)?");
+	failsafe_threshold = textToInteger(parser.getOption("--failsafe_threshold", "Maximum number of particles permitted to be handled by fail-safe mode, due to zero sum of weights, before exiting with an error (GPU only).", "40"));
 	///////////////// Special stuff for first iteration (only accessible via CL, not through readSTAR ////////////////////
 
 	// When reading from the CL: always start at iteration 1 and subset 1
@@ -854,10 +873,9 @@ void MlOptimiser::read(FileName fn_in, int rank)
 	{
 		mymodel.read(fn_model);
 	}
-
+	// Set up the bodies in the model, if this is a continuation of a multibody refinement (otherwise this is done in initialiseGeneral)
     if (fn_body_masks != "None")
     {
-    	// Set up the bodies in the model
     	mymodel.initialiseBodies(fn_body_masks, fn_out);
 
     	if (mymodel.nr_bodies != mydata.nr_bodies)
@@ -1523,11 +1541,10 @@ void MlOptimiser::initialiseGeneral(int rank)
 		// don't perturb angles anymore
 		//sampling.perturbation_factor = 0.;
 	    // Only do a single pass through the local-search orientations
-		adaptive_oversampling = 0;
+		//adaptive_oversampling = 0;
 
 		// Start at iteration 1 again
 		iter = 0;
-		std::cerr << "end initialising bodies .." << std::endl;
 
 	}
 	else if (fn_body_masks == "")
@@ -2449,7 +2466,8 @@ void MlOptimiser::iterate()
 			// Write out without a _sub in the name
 			nr_subsets = 1;
 			write(DO_WRITE_SAMPLING, DO_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, 0);
-
+			// We must reset mu to zero, otherwise ClassDistributions do not sum to 1.
+			mu = 0;
 
 			if (do_sgd)
 			{
@@ -3238,8 +3256,8 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
     for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
     {
 
-		// Skip this body if keep_fixed_bodies[ibody] or if it's angular accuracy is worse than 3x the sampling rate
-    	if ( mymodel.nr_bodies > 1 && (mymodel.keep_fixed_bodies[ibody] || mymodel.acc_rot[ibody] > 3. * sampling.getAngularSampling(adaptive_oversampling)) )
+		// Skip this body if keep_fixed_bodies[ibody] or if it's angular accuracy is worse than 1.5x the sampling rate
+    	if ( mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody] > 0)
 			continue;
 
     	// Here define all kind of local arrays that will be needed
@@ -3553,7 +3571,7 @@ void MlOptimiser::symmetriseReconstructions()
 {
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 	{
-		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody])
+		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody] > 0)
 			continue;
 
 		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
@@ -3582,7 +3600,7 @@ void MlOptimiser::applyLocalSymmetryForEachRef()
 
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 	{
-		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody])
+		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody] > 0)
 			continue;
 
 		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
@@ -3601,7 +3619,7 @@ void MlOptimiser::makeGoodHelixForEachRef()
 
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 	{
-		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody])
+		if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody] > 0)
 			continue;
 
 		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
@@ -3774,6 +3792,11 @@ void MlOptimiser::maximizationOtherParameters()
 	RFLOAT sum_weight = 0.;
 	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 		sum_weight += wsum_model.pdf_class[iclass];
+
+	// For multi-body refinement: it is possible we haven't done any bodies anymore, so sum_weight is zero
+	// in that case we need to leave all parameters as they were
+	if (sum_weight < XMIPP_EQUAL_ACCURACY)
+		return;
 
 	// Update average norm_correction, don't update norm corrections anymore for multi-body refinements!
 	if (do_norm_correction  && mymodel.nr_bodies == 1)
@@ -3999,6 +4022,11 @@ void MlOptimiser::solventFlatten()
 #ifdef DEBUG
 	std::cerr << "Entering MlOptimiser::solventFlatten" << std::endl;
 #endif
+
+	// If we're doing multibody refinement: don't do solvent flattening anymore. This is already done per body
+	if (mymodel.nr_bodies > 1)
+		return;
+
 	// First read solvent mask from disc, or pre-calculate it
 	Image<RFLOAT> Isolvent, Isolvent2;
     Isolvent().resize(mymodel.Iref[0]);
@@ -4086,6 +4114,8 @@ void MlOptimiser::updateCurrentResolution()
 	std::cerr << "Entering MlOptimiser::updateCurrentResolution" << std::endl;
 #endif
 
+	RFLOAT best_current_resolution = 0.;
+	int nr_iter_wo_resol_gain_sum_bodies = 0;
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 	{
 
@@ -4110,6 +4140,32 @@ void MlOptimiser::updateCurrentResolution()
 					}
 					// Subtract one shell to be back on the safe side
 					ires--;
+
+					if (do_split_random_halves && do_auto_refine)
+					{
+						// Let's also try and check from the high-res side. Sometimes phase-randomisation gives artefacts
+						int ires2;
+						for (ires2 = mymodel.ori_size/2-1; ires2 >= ires; ires2--)
+						{
+							if (DIRECT_A1D_ELEM(mymodel.data_vs_prior_class[iclass], ires2) > 1.)
+								break;
+						}
+						if (ires2 > ires + 3)
+						{
+							if (verb > 0)
+							{
+								float higher = mymodel.getResolutionAngstrom(ires2);
+								float lower  = mymodel.getResolutionAngstrom(ires);
+								if (mymodel.nr_bodies > 1)
+									std::cerr << " WARNING: For the " << ibody+1 << "th body:" << std::endl;
+								std::cerr << " WARNING: FSC dipped below 0.5 and rose again. Using higher resolution of "
+										  << higher << " A, instead of " << lower << " A." << std::endl;
+								std::cerr << "          This is not necessarily a bad thing. Often it is caused by too tight masks." << std::endl;
+							}
+							ires = ires2;
+						}
+					}
+
 					if (ires > maxres)
 						maxres = ires;
 				}
@@ -4125,10 +4181,13 @@ void MlOptimiser::updateCurrentResolution()
 		}
 		RFLOAT newres = mymodel.getResolution(maxres);
 
+		// best resolution over all bodies
+		best_current_resolution = XMIPP_MAX(best_current_resolution, newres);
+
 		// Check whether resolution improved, if not increase nr_iter_wo_resol_gain
 		//if (newres <= best_resol_thus_far)
 		if (newres <= mymodel.current_resolution+0.0001) // Add 0.0001 to avoid problems due to rounding error
-			nr_iter_wo_resol_gain++;
+			nr_iter_wo_resol_gain_sum_bodies++;
 		else
 			nr_iter_wo_resol_gain = 0;
 
@@ -4136,9 +4195,14 @@ void MlOptimiser::updateCurrentResolution()
 		if (newres > best_resol_thus_far)
 			best_resol_thus_far = newres;
 
-		mymodel.current_resolution = newres;
-
 	} // end for ibody
+
+	// Set the new resolution to be the highest resolution over all bodies
+	mymodel.current_resolution = best_current_resolution;
+
+	if (nr_iter_wo_resol_gain_sum_bodies == mymodel.nr_bodies)
+		nr_iter_wo_resol_gain++;
+
 #ifdef DEBUG
 	std::cerr << "Leaving MlOptimiser::updateCurrentResolution" << std::endl;
 #endif
@@ -4379,7 +4443,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 		}
 
 		// Get the old offsets and the priors on the offsets
-		Matrix1D<RFLOAT> my_old_offset(3), my_prior(3);
+		Matrix1D<RFLOAT> my_old_offset(3), my_prior(3), my_old_offset_ori;
 		int icol_rot, icol_tilt, icol_psi, icol_xoff, icol_yoff, icol_zoff;
 		XX(my_old_offset) = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_XOFF);
 		XX(my_prior)      = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_XOFF_PRIOR);
@@ -4409,12 +4473,10 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 					}
 #endif
 
-					// Subtract the projected COM offset, to position this body in the center
+			// Subtract the projected COM offset, to position this body in the center
+			// Also keep the my_old_offset in my_old_offset_ori
+			my_old_offset_ori = my_old_offset;
 			my_old_offset -= my_projected_com;
-
-			// 23jul2017: be careful below, as my_old_offset is selfROUND, but refined_ibody_offset wasn't.
-			// Now selfRound(old_offset - projectedCOM) AND selfROUND(my_refined_ibody_offset)
-			//my_old_offset.selfROUND();
 
 			// Also get refined offset for this body
 			icol_xoff = 3 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
@@ -4424,11 +4486,6 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 			YY(my_refined_ibody_offset) = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, icol_yoff);
 			if (mymodel.data_dim == 3)
 				ZZ(my_refined_ibody_offset) = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, icol_zoff);
-
-			// 23jul2017: also selfROUND(my_refined_ibody_offset)!
-			//my_refined_ibody_offset.selfROUND();
-
-			//my_old_offset += my_refined_ibody_offset;
 
 			// For multi-body refinement: set the priors of the translations to zero (i.e. everything centred around consensus offset)
 			my_prior.initZeros();
@@ -4768,10 +4825,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 		{
 			// For multi-bodies: store only the old refined offset, not the constant consensus offset or the projected COM of this body
 			if (mymodel.nr_bodies > 1)
-			{
-				// 23jul2017: my_refined_ibody_offset was selfROUNDED above. Otherwise, inconsistent
 				exp_old_offset[ipart] = my_refined_ibody_offset;
-			}
 			else
 				exp_old_offset[ipart] = my_old_offset;  // Not doing helical refinement. Rounded Cartesian offsets are stored.
 		}
@@ -4930,6 +4984,10 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 		// We never need any resolutions higher than current_size
 		// So resize the Fourier transforms
 		windowFourierTransform(Faux, Fimg, mymodel.current_size);
+
+		// Also perform beamtilt correction on the masked image (which will be used for alignment)
+		if (ABS(beamtilt_x) > 0. || ABS(beamtilt_y) > 0.)
+			selfApplyBeamTilt(Fimg, beamtilt_x, beamtilt_y, lambda, Cs, mymodel.pixel_size, mymodel.ori_size);
 
 		// Store Fimg
 		exp_Fimgs.at(ipart) = Fimg;
@@ -5090,6 +5148,10 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 
 					// Projected COM for this body (using Aori, just like above for ibody and my_projected_com!!!)
 					other_projected_com = Aori * (mymodel.com_bodies[obody]);
+
+					// Do the exact same as was done for the ibody, but DONT selfROUND here, as later phaseShift applied to ibody below!!!
+					other_projected_com -= my_old_offset_ori;
+
 #ifdef DEBUG_BODIES
 					if (my_ori_particle == ROUND(debug1))
 						std::cerr << " obody: " << obody+1 << " projected COM= " << other_projected_com.transpose() << std::endl;
@@ -5097,16 +5159,14 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 							<< "  , " << DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_yoff) << std::endl;
 #endif
 
-						// Subtract refined obody-displacement
+				    // Subtract refined obody-displacement
 					XX(other_projected_com) -= DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_xoff);
 					YY(other_projected_com) -= DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_yoff);
 					if (mymodel.data_dim == 3)
 						ZZ(other_projected_com) -= DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, ocol_zoff);
 
-					// Subtract the projected COM already applied to this image for ibody
-					other_projected_com -= my_projected_com;
-					// And add the refined displacement to this image for ibody
-					//other_projected_com += my_refined_ibody_offset;
+					// Add the my_old_offset=selfRound(my_old_offset_ori - my_projected_com) already applied to this image for ibody
+					other_projected_com += my_old_offset;
 
 #ifdef DEBUG_BODIES
 					if (my_ori_particle == ROUND(debug1))
@@ -5179,7 +5239,6 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 			Faux = exp_Fimgs_nomask.at(ipart);
 			shiftImageInFourierTransform(Faux, exp_Fimgs_nomask.at(ipart), (RFLOAT)mymodel.ori_size,
 					XX(my_refined_ibody_offset), YY(my_refined_ibody_offset), ZZ(my_refined_ibody_offset));
-
 
 #ifdef DEBUG_BODIES
 			if (my_ori_particle == ROUND(debug1))
@@ -6041,7 +6100,7 @@ void MlOptimiser::getAllSquaredDifferences(long int my_ori_particle, int ibody, 
 												REPORT_ERROR("ihidden_over >= XSIZE(Mweight)");
 											}
 #endif
-											//std::cerr << " my_ori_particle= " << my_ori_particle<< " ipart= " << ipart << " ihidden_over= " << ihidden_over << " diff2= " << diff2 << std::endl;
+											//std::cerr << " my_ori_particle= " << my_ori_particle<< " ipart= " << ipart << " ihidden_over= " << ihidden_over << " diff2= " << diff2 << " x= " << oversampled_translations_x[iover_trans] << " y=" <<oversampled_translations_x[iover_trans] <<std::endl;
 											DIRECT_A2D_ELEM(exp_Mweight, ipart, ihidden_over) = diff2;
 #ifdef DEBUG_CHECKSIZES
 											if (ipart >= exp_min_diff2.size())
@@ -6614,7 +6673,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int my_ori_particle
 			// Store nr_significant_coarse_samples for this particle
 			// Don't do this for multibody, as it would be overwritten for each body,
 			// and we also use METADATA_NR_SIGN in the new safeguard for the gold-standard separation
-			if (!mymodel.nr_bodies > 1)
+			if (mymodel.nr_bodies == 1)
 				DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_NR_SIGN) = (RFLOAT)my_nr_significant_coarse_samples;
 
 			// Keep track of which coarse samplings were significant were significant for this particle
@@ -7190,6 +7249,7 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 											{
 												Fimg_store = Fimg_shift_nomask;
 											}
+//#define DEBUG_BODIES2
 #ifdef DEBUG_BODIES2
 											FourierTransformer transformer;
 											MultidimArray<Complex> Ftt(Frefctf);
@@ -7261,7 +7321,7 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 											// Store optimal image parameters
 											exp_max_weight[ipart] = weight;
 
-											//This is not necessary as rot, tilt and psi remain unchanged?
+											//This is not necessary as rot, tilt and psi remain unchanged!
 											//Euler_matrix2angles(A, rot, tilt, psi);
 
 											int icol_rot  = (mymodel.nr_bodies == 1) ? METADATA_ROT  : 0 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
@@ -7307,13 +7367,9 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 												shifts.resize(3);
 												ZZ(shifts) = ZZ(exp_old_offset[ipart]) + oversampled_translations_z[iover_trans];
 											}
-#ifdef DEBUG_BODIES
-											std::cerr << " weight= " << weight << " ihidden_over= " << ihidden_over << " shifts= " << shifts.transpose() << std::endl;
-											std::cerr << " exp_old_offset[ipart]= " << exp_old_offset[ipart].transpose() << std::endl;
-											std::cerr << " oversampled_translations= " << oversampled_translations_x[iover_trans] << " , " << oversampled_translations_y[iover_trans] << std::endl;
-#endif
-											/*
+#ifdef DEBUG_BODIES2
 											std::cerr << ihidden_over << " weight= " << weight;
+											std::cerr << " exp_old_offset[ipart]= " << exp_old_offset[ipart].transpose() << std::endl;
 											std::cerr << " SET: rot= " << rot << " tilt= " << tilt << " psi= " << psi;
 											std::cerr << " xx-old= " << XX(exp_old_offset[ipart]);
 											std::cerr << " yy-old= " << YY(exp_old_offset[ipart]);
@@ -7321,7 +7377,7 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 											std::cerr << " add-yy= " << oversampled_translations_y[iover_trans];
 											std::cerr << " xnew= " << XX(shifts);
 											std::cerr << " ynew= " << YY(shifts) << std::endl;
-											*/
+#endif
 
 #ifdef DEBUG_HELICAL_ORIENTATIONAL_SEARCH
 											std::cerr << "MlOptimiser::storeWeightedSums()" << std::endl;
@@ -7654,7 +7710,7 @@ void MlOptimiser::monitorHiddenVariableChanges(long int my_first_ori_particle, l
 			for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 			{
 
-				if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody])
+				if (mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody] > 0)
 					continue;
 
 				RFLOAT old_rot, old_tilt, old_psi, old_xoff, old_yoff, old_zoff = 0.;
@@ -7727,9 +7783,18 @@ void MlOptimiser::updateOverallChangesInHiddenVariables()
 {
 
 	// Calculate hidden variable changes
-	current_changes_optimal_classes = sum_changes_optimal_classes / sum_changes_count;
-	current_changes_optimal_orientations = sum_changes_optimal_orientations / sum_changes_count;
-	current_changes_optimal_offsets = sqrt(sum_changes_optimal_offsets / (2. * sum_changes_count));
+	if (sum_changes_count > 0.)
+	{
+		current_changes_optimal_classes = sum_changes_optimal_classes / sum_changes_count;
+		current_changes_optimal_orientations = sum_changes_optimal_orientations / sum_changes_count;
+		current_changes_optimal_offsets = sqrt(sum_changes_optimal_offsets / (2. * sum_changes_count));
+	}
+	else
+	{
+		current_changes_optimal_classes = 0.;
+		current_changes_optimal_orientations = 0.;
+		current_changes_optimal_offsets = 0.;
+	}
 
 	// Reset the sums
 	sum_changes_optimal_classes = 0.;
@@ -7903,9 +7968,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_ori_particle,
 						else
 							ang_step = 5.0;
 
-						if (sh_error < 0.2)
-							sh_step = 0.05;
-						else if (sh_error < 1.)
+						if (sh_error < 1.)
 							sh_step = 0.1;
 						else if (sh_error < 2.)
 							sh_step = 0.2;
@@ -8057,7 +8120,8 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_ori_particle,
 						}
 //#define DEBUG_ANGACC
 #ifdef DEBUG_ANGACC
-							if (imode==0)
+						std::cerr << " ori_part_id= " << ori_part_id << " iclass= " << iclass << std::endl;
+						if (imode==0)
 							{
 								std::cerr << " ang_error= " << ang_error << std::endl;
 								std::cerr << " rot1= " << rot1 << " tilt1= " << tilt1 << " psi1= " << psi1 << std::endl;
@@ -8176,8 +8240,7 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 		RFLOAT new_range = 3. * sqrt(mymodel.sigma2_offset);
 
 		// Prevent too narrow searches: always at least 3x3 pixels in the coarse search
-		if (new_range < 1.5 * new_step)
-			new_range = 1.5 * new_step;
+		new_range= XMIPP_MAX(new_range, 1.5 * new_step);
 
 		// Also prevent too wide searches: that will lead to memory problems:
 		// Just use coarser step size and hope things will settle down later...
@@ -8238,13 +8301,32 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 
 		// Only use a finer angular sampling is the angular accuracy is still above 75% of the estimated accuracy
 		// If it is already below, nothing will change and eventually nr_iter_wo_resol_gain or nr_iter_wo_large_hidden_variable_changes will go above MAX_NR_ITER_WO_RESOL_GAIN
-		//std::cerr << "iter= " << iter << " nr_iter_wo_resol_gain= " << nr_iter_wo_resol_gain << " nr_iter_wo_large_hidden_variable_changes= " << nr_iter_wo_large_hidden_variable_changes << " acc_rot= " << acc_rot << std::endl;
-		//std::cerr  << "iter= " << iter << " acc_trans= " << acc_trans << " minimum_angular_sampling= " << minimum_angular_sampling << " current_changes_optimal_offsets= " << current_changes_optimal_offsets << std::endl;
 		if (nr_iter_wo_resol_gain >= MAX_NR_ITER_WO_RESOL_GAIN && nr_iter_wo_large_hidden_variable_changes >= MAX_NR_ITER_WO_LARGE_HIDDEN_VARIABLE_CHANGES)
 		{
+
+			bool all_bodies_are_done = false;
+			// For multi-body refinement: switch off those bodies that don't have high enough angular accuracy
+			if (mymodel.nr_bodies > 1)
+			{
+				all_bodies_are_done = true;
+				for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
+				{
+					// Stop multi-body refinements a bit earlier than normal ones: no 75%, but 90% of accuracy
+					// if has_converged: in the final iteration include all bodies again!
+					if (old_rottilt_step < 0.90 * mymodel.acc_rot[ibody] && !has_converged)
+					{
+						if (myverb)
+							std::cout << " Body: " <<ibody << " with rotational accuracy of " << mymodel.acc_rot[ibody] << " will be kept fixed " << std::endl;
+						mymodel.keep_fixed_bodies[ibody] = 1;
+					}
+					else
+						all_bodies_are_done = false;
+				}
+			}
+
 			// Old rottilt step is already below 75% of estimated accuracy: have to stop refinement?
 			// If a minimum_angular_sampling is given and we're not there yet, also just continue
-			if (old_rottilt_step < 0.75 * acc_rot && !(minimum_angular_sampling > 0. && old_rottilt_step > minimum_angular_sampling) )
+			if (all_bodies_are_done || (old_rottilt_step < 0.75 * acc_rot && !(minimum_angular_sampling > 0. && old_rottilt_step > minimum_angular_sampling)) )
 			{
 				// don't change angular sampling, as it is already fine enough
 				has_fine_enough_angular_sampling = true;
@@ -8258,24 +8340,30 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 				// Prevent very coarse translational samplings: max 1.5
 				// Also stay a bit on the safe side with the translational sampling: 75% of estimated accuracy
 				RFLOAT new_step = XMIPP_MIN(1.5, 0.75 * acc_trans) * std::pow(2., adaptive_oversampling);
+
 				// For subtomogram averaging: use at least half times previous step size
 				if (mymodel.data_dim == 3) // TODO: check: this might just as well work for 2D data...
 					new_step = XMIPP_MAX(sampling.offset_step / 2., new_step);
+
 				// Search ranges are five times the last observed changes in offsets
 				// Only 3x for subtomogram averaging....
 				RFLOAT new_range = (mymodel.data_dim == 2) ? 5. * current_changes_optimal_offsets : 3 * current_changes_optimal_offsets;
+
 				// New range can only become 30% bigger than the previous range (to prevent very slow iterations in the beginning)
 				new_range = XMIPP_MIN(1.3*sampling.offset_range, new_range);
+
 				// Prevent too narrow searches: always at least 3x3 pixels in the coarse search
-				if (new_range < 1.5 * new_step)
-					new_range = 1.5 * new_step;
+				new_range= XMIPP_MAX(new_range, 1.5 * new_step);
+
 				// Also prevent too wide searches: that will lead to memory problems:
 				// If steps size < 1/4th of search range, then decrease search range by 50%
 				if (new_range > 4. * new_step)
 					new_range /= 2.;
-				//If even that was not enough: use coarser step size and hope things will settle down later...
+
+				// If even that was not enough: use coarser step size and hope things will settle down later...
 				if (new_range > 4. * new_step)
 					new_step = new_range / 4.;
+
 				// Jun08,2015 Shaoda & Sjors, Helical refinement
 				RFLOAT new_helical_offset_step = sampling.helical_offset_step;
 				if (mymodel.ref_dim == 3)
@@ -8351,7 +8439,6 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 					if ( (do_helical_refine) && (!ignore_helical_symmetry) )
 						mymodel.sigma2_rot = getHelicalSigma2Rot((helical_rise_initial / mymodel.pixel_size), helical_twist_initial, sampling.helical_offset_step, new_rottilt_step, mymodel.sigma2_rot);
 				}
-
 			}
 		}
 	}
@@ -8393,21 +8480,36 @@ void MlOptimiser::checkConvergence(bool myverb)
 		do_join_random_halves = true;
 		// In the last iteration, include all data until Nyquist
 		do_use_all_data = true;
+
+		// For multibody refinement: reset all bodies to not-fixed (if they were originally) for the final iteration with all data to Nyquist
+		if (mymodel.nr_bodies > 1)
+		{
+			for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
+			{
+				if (mymodel.sigma_tilt_bodies[ibody] < 0.001 &&
+					mymodel.sigma_psi_bodies[ibody] < 0.001 &&
+					mymodel.sigma_offset_bodies[ibody] < 0.001)
+					mymodel.keep_fixed_bodies[ibody] = 1;
+				else
+					mymodel.keep_fixed_bodies[ibody] = 0;
+			}
+		}
 	}
 
-        if (myverb)
-        {
-            std::cout << " Auto-refine: Iteration= "<< iter<< std::endl;
-            std::cout << " Auto-refine: Resolution= "<< 1./mymodel.current_resolution<< " (no gain for " << nr_iter_wo_resol_gain << " iter) "<< std::endl;
-            std::cout << " Auto-refine: Changes in angles= " << current_changes_optimal_orientations << " degrees; and in offsets= " << current_changes_optimal_offsets
-			<< " pixels (no gain for " << nr_iter_wo_large_hidden_variable_changes << " iter) "<< std::endl;
 
-            if (has_converged)
-            {
-		std::cout << " Auto-refine: Refinement has converged, entering last iteration where two halves will be combined..."<<std::endl;
-		std::cout << " Auto-refine: The last iteration will use data to Nyquist frequency, which may take more CPU and RAM."<<std::endl;
-            }
-        }
+	if (myverb)
+	{
+		std::cout << " Auto-refine: Iteration= "<< iter<< std::endl;
+		std::cout << " Auto-refine: Resolution= "<< 1./mymodel.current_resolution<< " (no gain for " << nr_iter_wo_resol_gain << " iter) "<< std::endl;
+		std::cout << " Auto-refine: Changes in angles= " << current_changes_optimal_orientations << " degrees; and in offsets= " << current_changes_optimal_offsets
+		<< " pixels (no gain for " << nr_iter_wo_large_hidden_variable_changes << " iter) "<< std::endl;
+
+		if (has_converged)
+		{
+			std::cout << " Auto-refine: Refinement has converged, entering last iteration where two halves will be combined..."<<std::endl;
+			std::cout << " Auto-refine: The last iteration will use data to Nyquist frequency, which may take more CPU and RAM."<<std::endl;
+		}
+	}
 
 }
 
@@ -8797,7 +8899,7 @@ void MlOptimiser::getMetaAndImageDataSubset(int first_ori_particle_id, int last_
 					int icol_xoff = 3 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
 					int icol_yoff = 4 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
 					int icol_zoff = 5 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
-					RFLOAT rot, tilt, psi, xoff, yoff, zoff;
+					RFLOAT rot, tilt, psi, xoff, yoff, zoff=0.;
 					mydata.MDbodies[ibody].getValue(EMDL_ORIENT_ROT, rot, part_id);
 					mydata.MDbodies[ibody].getValue(EMDL_ORIENT_TILT, tilt, part_id);
 					mydata.MDbodies[ibody].getValue(EMDL_ORIENT_PSI,  psi, part_id);

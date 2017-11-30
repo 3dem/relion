@@ -45,9 +45,8 @@ void MlModel::initialise(bool _do_sgd)
 	sigma_tilt_bodies.resize(nr_bodies, 0.);
 	sigma_psi_bodies.resize(nr_bodies, 0.);
 	sigma_offset_bodies.resize(nr_bodies, 0.);
-	keep_fixed_bodies.resize(nr_bodies, false);
+	keep_fixed_bodies.resize(nr_bodies, 0);
 	pointer_body_overlap.resize(nr_bodies, nr_bodies);
-	body_minimum_overlap = 1.0;
 	max_radius_mask_bodies.resize(nr_bodies, -1);
 	pdf_class.resize(nr_classes, 1./(RFLOAT)nr_classes);
     pdf_direction.resize(nr_classes * nr_bodies);
@@ -82,7 +81,6 @@ void MlModel::initialise(bool _do_sgd)
 	Projector ref(ori_size, interpolator, padding_factor, r_min_nn, data_dim);
     PPref.clear();
     PPrefRank.clear();
-
     // Now fill the entire vector with instances of "ref"
     if(nr_classes != 1 && nr_bodies !=1)
     	REPORT_ERROR("MlModel::initialise() - nr_bodies or nr_classes must be 1");
@@ -110,7 +108,6 @@ void MlModel::read(FileName fn_in)
 
     // Read general stuff
     MDlog.readStar(in, "model_general");
-
 	if (!MDlog.getValue(EMDL_MLMODEL_DIMENSIONALITY, ref_dim) ||
 		!MDlog.getValue(EMDL_MLMODEL_ORIGINAL_SIZE, ori_size) ||
 		!MDlog.getValue(EMDL_MLMODEL_CURRENT_RESOLUTION, current_resolution) ||
@@ -137,8 +134,6 @@ void MlModel::read(FileName fn_in)
 		data_dim = 2;
 	if (!MDlog.getValue(EMDL_MLMODEL_NR_BODIES, nr_bodies))
 		nr_bodies = 1;
-	if (!MDlog.getValue(EMDL_BODY_MINIMUM_OVERLAP, body_minimum_overlap))
-		body_minimum_overlap = 1.0;
 	if (!MDlog.getValue(EMDL_MLMODEL_IS_HELIX, is_helix))
 		is_helix = false;
 	if (is_helix)
@@ -187,6 +182,7 @@ void MlModel::read(FileName fn_in)
 		MDclass.readStar(in, "model_bodies");
 	else
 		MDclass.readStar(in, "model_classes");
+
 	int iclass = 0;
 	do_sgd = false;
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDclass)
@@ -204,13 +200,21 @@ void MlModel::read(FileName fn_in)
 			if (!MDclass.getValue(EMDL_MLMODEL_PRIOR_OFFX_CLASS, XX(prior_offset_class[iclass])) ||
 				!MDclass.getValue(EMDL_MLMODEL_PRIOR_OFFY_CLASS, YY(prior_offset_class[iclass])) )
 				REPORT_ERROR("MlModel::readStar: incorrect model_classes/bodies table: no offset priors for 2D classes");
-		if (!MDclass.getValue(EMDL_MLMODEL_PDF_CLASS, pdf_class[iclass]) )
-			REPORT_ERROR("MlModel::readStar: incorrect model_classes table: no pdf_class");
+		if (iclass == 0 || nr_bodies == 1) // there is only one pdf_class for multibody, but multiple for classification!
+			if (!MDclass.getValue(EMDL_MLMODEL_PDF_CLASS, pdf_class[iclass]) )
+				REPORT_ERROR("MlModel::readStar: incorrect model_classes table: no pdf_class");
 		if (is_helix)
 		{
 			if (!MDclass.getValue(EMDL_MLMODEL_HELICAL_RISE, helical_rise[iclass]) ||
 			    !MDclass.getValue(EMDL_MLMODEL_HELICAL_TWIST, helical_twist[iclass]) )
 				REPORT_ERROR("MlModel::readStar: incorrect helical parameters");
+		}
+		if (nr_bodies > 1)
+		{
+			if (MDclass.containsLabel(EMDL_BODY_KEEP_FIXED))
+				MDclass.getValue(EMDL_BODY_KEEP_FIXED, keep_fixed_bodies[iclass]);
+			else
+				keep_fixed_bodies[iclass] = 0;
 		}
 
 		// Read in actual reference image
@@ -387,7 +391,8 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
     		{
     			fn_tmp.compose(fn_out+"_body", iclass+1, "mrc", 3);
     			// apply the body mask for output to the user
-    			img() *= masks_bodies[iclass];
+    			// No! That interferes with a clean continuation of multibody refinement, as ref will be masked 2x then!
+    			// img() *= masks_bodies[iclass];
     		}
     		else
     			fn_tmp.compose(fn_out+"_class", iclass+1, "mrc", 3);
@@ -466,7 +471,6 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 	MDlog.setValue(EMDL_MLMODEL_PIXEL_SIZE, pixel_size);
 	MDlog.setValue(EMDL_MLMODEL_NR_CLASSES, nr_classes);
 	MDlog.setValue(EMDL_MLMODEL_NR_BODIES, nr_bodies);
-	MDlog.setValue(EMDL_BODY_MINIMUM_OVERLAP, body_minimum_overlap);
 	MDlog.setValue(EMDL_MLMODEL_NR_GROUPS, nr_groups);
 	MDlog.setValue(EMDL_MLMODEL_TAU2_FUDGE_FACTOR, tau2_fudge_factor);
 	MDlog.setValue(EMDL_MLMODEL_NORM_CORRECTION_AVG, avg_norm_correction);
@@ -540,6 +544,7 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 			MDclass.setValue(EMDL_BODY_ROTATE_DIRECTION_X, XX(rotate_direction_bodies[iclass]));
 			MDclass.setValue(EMDL_BODY_ROTATE_DIRECTION_Y, YY(rotate_direction_bodies[iclass]));
 			MDclass.setValue(EMDL_BODY_ROTATE_DIRECTION_Z, ZZ(rotate_direction_bodies[iclass]));
+			MDclass.setValue(EMDL_BODY_KEEP_FIXED, keep_fixed_bodies[iclass]);
 		}
 
 		if (ref_dim==2)
@@ -866,6 +871,11 @@ void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool als
 	{
 		MD.getValue(EMDL_BODY_MASK_NAME, fn_mask);
 		Imask.read(fn_mask);
+		RFLOAT minval, maxval;
+		Imask().computeDoubleMinMax(minval, maxval);
+		if (minval < 0. || maxval > 1.)
+			REPORT_ERROR("ERROR: the mask " + fn_mask + " has values outside the range [0,1]");
+
 		Imask().setXmippOrigin();
 		Imask.setSamplingRateInHeader(pixel_size);
 		masks_bodies[nr_bodies] = Imask();
@@ -937,11 +947,6 @@ void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool als
 			sigma_offset_bodies[nr_bodies] = val;
 		}
 
-		// If all sigmas are zero, ignore this body in the refinement
-		keep_fixed_bodies[nr_bodies] = (sigma_tilt_bodies[nr_bodies] < 0.001 &&
-				                        sigma_psi_bodies[nr_bodies] < 0.001 &&
-										sigma_offset_bodies[nr_bodies] < 0.001);
-
 		// Also write the mask with the standard name to disk
 		fn_mask.compose(fn_root_out + "_body", nr_bodies + 1, "", 3); // body number from 1 to K!
 		fn_mask += "_mask.mrc";
@@ -983,6 +988,7 @@ void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool als
 
 		for (int ibody = 1; ibody < nr_bodies; ibody++)
 		{
+
 			Iref.push_back(Iref[0]);
 			tau2_class.push_back(tau2_class[0]);
 			fsc_halves_class.push_back(fsc_halves_class[0]);
@@ -998,6 +1004,33 @@ void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool als
 			orientability_contrib.push_back(orientability_contrib[0]);
 			PPref.push_back(PPref[0]);
 			pdf_direction.push_back(pdf_direction[0]);
+
+			// If all sigmas are zero, ignore this body in the refinement
+			if (sigma_tilt_bodies[ibody] < 0.001 &&
+					sigma_psi_bodies[ibody] < 0.001 &&
+					sigma_offset_bodies[ibody] < 0.001)
+				keep_fixed_bodies[ibody] = 1;
+			else
+				keep_fixed_bodies[ibody] = 0;
+		}
+
+		// If provided a specific reference, re-set the corresponding Iref entry
+		if (MD.containsLabel(EMDL_BODY_REFERENCE_NAME))
+		{
+			int ibody = 0;
+			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
+			{
+				FileName fn_ref;
+				MD.getValue(EMDL_BODY_REFERENCE_NAME, fn_ref);
+				if (fn_ref != "None")
+				{
+					Image<RFLOAT> img;
+					img.read(fn_ref);
+					img().setXmippOrigin();
+					Iref[ibody] = img();
+				}
+				ibody++;
+			}
 		}
 	}
 
@@ -1006,10 +1039,8 @@ void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool als
 	pointer_body_overlap_inv.resize(nr_bodies);
 	for (int ibody = 0; ibody < nr_bodies; ibody++)
 	{
-		RFLOAT sum_ibody = masks_bodies[ibody].sum();
 //#define DEBUG_OVERLAP
 #ifdef DEBUG_OVERLAP
-		std::cerr << " ibody= " << ibody << " sum_ibody= " << sum_ibody << std::endl;
 		Image<RFLOAT> It;
 		FileName fnt;
 		It()= masks_bodies[ibody];
@@ -1023,7 +1054,7 @@ void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool als
 				DIRECT_A2D_ELEM(pointer_body_overlap, ibody, obody) = obody;
 				pointer_body_overlap_inv[obody] = obody;
 			}
-			else if (body_minimum_overlap > 0. && body_minimum_overlap < 1.)
+			else
 			{
 				// Sum all the previously done obody masks to see whether there is also overlap with any of them
 				MultidimArray<RFLOAT> overlap_mask = masks_bodies[ibody];
@@ -1037,17 +1068,14 @@ void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool als
 				}
 				// Calculate the overlap between the sum of ibody and all the old obodies until now
 				overlap_mask *= masks_bodies[obody]; // element-wise multiplication
-
-				RFLOAT sum_overlap = overlap_mask.sum();
-#ifdef DEBUG_OVERLAP
-				std::cerr << " obody= " << obody << " sum_overlap= " << sum_overlap << " overlap ratio= " << sum_overlap/sum_ibody << std::endl;
-#endif
-				if (sum_overlap/sum_ibody > body_minimum_overlap)
+				// If there is overlap, generate another PPref
+				if (overlap_mask.sum() > 0.)
 				{
 					// Calculate the mask that has the overlap subtracted from the obody mask
 					overlap_mask = masks_bodies[obody] - overlap_mask;
 					// set the right pointer in the 2D matrix
 					DIRECT_A2D_ELEM(pointer_body_overlap, ibody, obody) = PPref.size();
+					//std::cerr << " ibody= " << ibody << " obody= " << obody << " overlap= " << overlap_mask.sum() << " icc= " << PPref.size() << std::endl;
 					// Extend the two vectors here!
 					PPref.push_back(PPref[obody]);
 					masks_bodies.push_back(overlap_mask);
@@ -1062,14 +1090,9 @@ void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool als
 #endif
 				}
 				else
-				{
-					// if too small overlap: just use obody pointer
+					// if there is no overlap: just point to the original obody
 					DIRECT_A2D_ELEM(pointer_body_overlap, ibody, obody) = obody;
-				}
 			}
-			else
-				// if no minimum_overlap was set: just use obody pointer
-				DIRECT_A2D_ELEM(pointer_body_overlap, ibody, obody) = obody;
 		}
 	}
 
@@ -1137,7 +1160,7 @@ void MlModel::setFourierTransformMaps(bool update_tau2_spectra, int nr_threads, 
 		if (nr_bodies > 1)
 		{
 			// ibody deals with overlapping bodies here, as iclass can be larger than nr_bodies when bodies overlap,
-			// but there are only nr_bodies Iref
+			// but there are only nr_bodies Iref; ibody is the number of the original body (max nr_bodies)
 			int ibody = pointer_body_overlap_inv[iclass];
 			Irefp = Iref[ibody] * masks_bodies[iclass];
 			// Place each body with its center-of-mass in the center of the box
@@ -1405,7 +1428,7 @@ void MlWsumModel::pack(MultidimArray<RFLOAT> &packed)
     // data is complex: multiply by two!
     packed_size += nr_classes * nr_bodies * 2 * BPref[0].getSize();
     packed_size += nr_classes * nr_bodies * BPref[0].getSize();
-    packed_size += nr_classes * nr_directions;
+    packed_size += nr_classes * nr_bodies * nr_directions;
     // for pdf_class
     packed_size += nr_classes;
     // for priors for each class

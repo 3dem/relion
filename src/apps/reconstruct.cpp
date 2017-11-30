@@ -31,11 +31,11 @@ class reconstruct_parameters
 	public:
    	FileName fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_fsc, fn_debug;
 	MetaDataTable DF;
-	int r_max, r_min_nn, blob_order, ref_dim, interpolator, iter, nr_threads, debug_ori_size, debug_size, ctf_dim, nr_helical_asu;
+	int r_max, r_min_nn, blob_order, ref_dim, interpolator, iter, nr_threads, debug_ori_size, debug_size, ctf_dim, nr_helical_asu, newbox, width_mask_edge, nr_sectors;
 	RFLOAT blob_radius, blob_alpha, angular_error, shift_error, angpix, maxres, beamtilt_x, beamtilt_y, helical_rise, helical_twist;
-	bool do_ctf, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, do_fom_weighting, do_3d_rot, do_reconstruct_ctf, do_beamtilt;
-	bool skip_gridding, do_reconstruct_ctf2, do_reconstruct_meas;
-	float padding_factor;
+	bool do_ctf, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, do_fom_weighting, do_3d_rot, do_reconstruct_ctf, do_beamtilt, do_ewald;
+	bool skip_gridding, do_reconstruct_ctf2, do_reconstruct_meas, is_positive;
+	float padding_factor, mask_diameter;
 	// I/O Parser
 	IOParser parser;
 
@@ -66,6 +66,12 @@ class reconstruct_parameters
     	beamtilt_x = textToFloat(parser.getOption("--beamtilt_x", "Beamtilt in the X-direction (in mrad)", "0."));
     	beamtilt_y = textToFloat(parser.getOption("--beamtilt_y", "Beamtilt in the Y-direction (in mrad)", "0."));
     	do_beamtilt = (ABS(beamtilt_x) > 0. || ABS(beamtilt_y) > 0.);
+    	do_ewald = parser.checkOption("--ewald", "Correct for Ewald-sphere curvature (developmental)");
+    	mask_diameter  = textToFloat(parser.getOption("--mask_diameter", "Diameter (in A) of mask for Ewald-sphere curvature correction", "-1."));
+    	width_mask_edge = textToInteger(parser.getOption("--width_mask_edge", "Width (in pixels) of the soft edge on the mask", "3"));
+		is_positive = !parser.checkOption("--reverse_curvature", "Try curvature the other way around");
+    	newbox = textToInteger(parser.getOption("--newbox", "Box size of reconstruction after Ewald sphere correction", "-1"));
+    	nr_sectors = textToInteger(parser.getOption("--sectors", "Number of sectors for Ewald sphere correction", "2"));
 
     	int helical_section = parser.addSection("Helical options");
     	nr_helical_asu = textToInteger(parser.getOption("--nr_helical_asu", "Number of helical asymmetrical units", "1"));
@@ -113,10 +119,208 @@ class reconstruct_parameters
 
      	randomize_random_generator();
 
-     	if (do_beamtilt && ! do_ctf)
-     		REPORT_ERROR("ERROR: one can only correct for beamtilt in combination with CTF correction!");
+     	if (do_beamtilt || do_ewald)
+     		do_ctf = true;
 
 	}
+
+	void applyCTFPandCTFQ(MultidimArray<Complex> &Fin, CTF &ctf, FourierTransformer &transformer,
+			MultidimArray<Complex> &outP, MultidimArray<Complex> &outQ)
+	{
+//#define DEBUG
+#ifdef DEBUG
+		Image<RFLOAT> It;
+		FileName fnt;
+		char c;
+#endif
+		//FourierTransformer transformer;
+		outP.resize(Fin);
+		outQ.resize(Fin);
+		float angle_step = 180./nr_sectors;
+		for (float angle = 0.; angle < 180.;  angle +=angle_step)
+		{
+			MultidimArray<Complex> CTFP(Fin), Fapp(Fin);
+			MultidimArray<RFLOAT> Iapp(YSIZE(Fin), YSIZE(Fin));
+			// Two passes: one for CTFP, one for CTFQ
+			for (int ipass = 0; ipass < 2; ipass++)
+			{
+				bool is_my_positive = (ipass == 1) ? is_positive : !is_positive;
+
+				// Get CTFP and multiply the Fapp with it
+				ctf.getCTFPImage(CTFP, YSIZE(Fin), YSIZE(Fin), angpix, is_my_positive, angle);
+//#define DEBUG2
+#ifdef DEBUG2
+				It().resize(YSIZE(CTFP), XSIZE(CTFP));
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(CTFP)
+				{
+					DIRECT_MULTIDIM_ELEM(It(), n) = DIRECT_MULTIDIM_ELEM(CTFP, n).real;
+				}
+				fnt = "CTFP_angle"+floatToString(angle)+"_ipass"+integerToString(ipass)+"_real.spi";
+				It.write(fnt);
+				std::cerr << "written: "<<fnt << std::endl;
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(CTFP)
+				{
+					DIRECT_MULTIDIM_ELEM(It(), n) = DIRECT_MULTIDIM_ELEM(CTFP, n).imag;
+				}
+				fnt = "CTFP_angle"+floatToString(angle)+"_ipass"+integerToString(ipass)+"_imag.spi";
+				It.write(fnt);
+				std::cerr << "written: "<<fnt << std::endl;
+				std::cin >> c;
+#endif
+
+
+				Fapp = Fin * CTFP; // element-wise complex multiplication!
+
+				// inverse transform and mask out the particle....
+				transformer.inverseFourierTransform(Fapp, Iapp);
+				CenterFFT(Iapp, false);
+
+#ifdef DEBUG2
+				It()=Iapp;
+				fnt = "IPQ_angle"+floatToString(angle)+"_ipass"+integerToString(ipass)+".spi";
+				It.write(fnt);
+				std::cerr << "written: "<<fnt << std::endl;
+				char c;
+				std::cin >> c;
+#endif
+				softMaskOutsideMap(Iapp, ROUND(mask_diameter/(angpix*2.)), (RFLOAT)width_mask_edge);
+
+#ifdef DEBUG2
+				It()=Iapp;
+				fnt = "IPQ_angle"+floatToString(angle)+"_ipass"+integerToString(ipass)+"_masked.spi";
+				It.write(fnt);
+				std::cerr << "written: "<<fnt << std::endl;
+				std::cin >> c;
+#endif
+
+
+				// Re-box to a smaller size if necessary....
+				if (newbox > 0 && newbox < YSIZE(Fin))
+				{
+					Iapp.setXmippOrigin();
+					Iapp.window(FIRST_XMIPP_INDEX(newbox), FIRST_XMIPP_INDEX(newbox),
+								   LAST_XMIPP_INDEX(newbox),  LAST_XMIPP_INDEX(newbox));
+
+#ifdef DEBUG2
+					fnt = "IPQ_angle"+floatToString(angle)+"_ipass"+integerToString(ipass)+"_masked_newbox.spi";
+					It()=Iapp;
+					It.write(fnt);
+					std::cerr << "written: "<<fnt << std::endl;
+					std::cin >> c;
+#endif
+
+				}
+
+				// Back into Fourier-space
+				CenterFFT(Iapp, true);
+				transformer.FourierTransform(Iapp, Fapp, false); // false means: leave Fapp in the transformer
+
+				// First time round: resize the output arrays
+				if (ipass == 0 && fabs(angle) < XMIPP_EQUAL_ACCURACY)
+				{
+					outP.resize(Fapp);
+					outQ.resize(Fapp);
+				}
+
+				// Now set back the right parts into outP (first pass) or outQ (second pass)
+				float anglemin = angle + 90. - (0.5*angle_step);
+				float anglemax = angle + 90. + (0.5*angle_step);
+#ifdef DEBUG
+				std::cerr << "AAA  angle= " << angle << " anglemin= " <<anglemin << " anglemax= " << anglemax << std::endl;
+#endif
+				// angles larger than 180
+				bool is_reverse = false;
+				if (anglemin >= 180.)
+				{
+					anglemin -= 180.;
+					anglemax -= 180.;
+					is_reverse = true;
+				}
+				MultidimArray<Complex> *myCTFPorQ, *myCTFPorQb;
+				if (is_reverse)
+				{
+					myCTFPorQ  = (ipass == 0) ? &outQ : &outP;
+					myCTFPorQb = (ipass == 0) ? &outP : &outQ;
+				}
+				else
+				{
+					myCTFPorQ  = (ipass == 0) ? &outP : &outQ;
+					myCTFPorQb = (ipass == 0) ? &outQ : &outP;
+				}
+
+				// Deal with sectors with the Y-axis in the middle of the sector...
+				bool do_wrap_max = false;
+				if (anglemin < 180. && anglemax > 180.)
+				{
+					anglemax -= 180.;
+					do_wrap_max = true;
+				}
+
+				// use radians instead of degrees
+				anglemin = DEG2RAD(anglemin);
+				anglemax = DEG2RAD(anglemax);
+				FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(CTFP)
+				{
+					RFLOAT x = (RFLOAT)jp;
+					RFLOAT y = (RFLOAT)ip;
+					RFLOAT myangle = (x*x+y*y > 0) ? acos(y/sqrt(x*x+y*y)) : 0; // dot-product with Y-axis: (0,1)
+					// Only take the relevant sector now...
+					if (do_wrap_max)
+					{
+						if (myangle >= anglemin)
+							DIRECT_A2D_ELEM(*myCTFPorQ, i, j) = DIRECT_A2D_ELEM(Fapp, i, j);
+						else if (myangle < anglemax)
+							DIRECT_A2D_ELEM(*myCTFPorQb, i, j) = DIRECT_A2D_ELEM(Fapp, i, j);
+					}
+					else
+					{
+						if (myangle >= anglemin && myangle < anglemax)
+							DIRECT_A2D_ELEM(*myCTFPorQ, i, j) = DIRECT_A2D_ELEM(Fapp, i, j);
+					}
+				}
+#ifdef DEBUG
+				It().resize(YSIZE(outP), XSIZE(outP));
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(outP)
+				{
+					DIRECT_MULTIDIM_ELEM(It(), n) = DIRECT_MULTIDIM_ELEM(outP, n).real;
+				}
+				fnt = "sumOutP_angle"+floatToString(angle)+"_ipass"+integerToString(ipass)+"_real.spi";
+				It.write(fnt);
+				std::cerr << "written: "<<fnt << std::endl;
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(outQ)
+				{
+					DIRECT_MULTIDIM_ELEM(It(), n) = DIRECT_MULTIDIM_ELEM(outQ, n).real;
+				}
+				fnt = "sumOutQ_angle"+floatToString(angle)+"_ipass"+integerToString(ipass)+"_real.spi";
+				It.write(fnt);
+				std::cerr << "written: "<<fnt << std::endl;
+				std::cerr << "BBB  angle= " << angle << " anglemin= " << RAD2DEG(anglemin) << " anglemax= " << RAD2DEG(anglemax) << std::endl;
+				std::cerr << " is_reverse= " << is_reverse << " do_wrap_max= " << do_wrap_max << std::endl;
+				std::cin >> c;
+#endif
+			}
+
+		}
+#ifdef DEBUG
+		It().resize(YSIZE(Fin), YSIZE(Fin));
+		transformer.inverseFourierTransform(outP, It());
+		CenterFFT(It(), false);
+		fnt = "invCTFP.spi";
+		It.write(fnt);
+		std::cerr << "written: "<<fnt << std::endl;
+		transformer.inverseFourierTransform(outQ, It());
+		CenterFFT(It(), false);
+		fnt = "invCTFQ.spi";
+		It.write(fnt);
+		std::cerr << "written: "<<fnt << std::endl;
+		std::cin >> c;
+#endif
+
+
+
+
+	}
+
 
 	void reconstruct()
 	{
@@ -153,19 +357,40 @@ class reconstruct_parameters
 				A3D_ELEM(backprojector.weight, k, i, j) = A3D_ELEM(It(), k, i, j);
 			}
 
+	   		bool do_use_fsc = false;
+	   		bool do_map = false;
+	   		MultidimArray<RFLOAT> fsc;
+	   		fsc.resize(debug_ori_size/2+1);
+	   		if (fn_fsc != "")
+	   		{
+	   			do_map = true;
+	   			do_use_fsc =true;
+	   			MetaDataTable MDfsc;
+	   			MDfsc.read(fn_fsc);
+	   			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDfsc)
+	   			{
+	   				int idx;
+	   				RFLOAT val;
+	   				MDfsc.getValue(EMDL_SPECTRAL_IDX, idx);
+	   				MDfsc.getValue(EMDL_MLMODEL_TAU2_REF, val);
+	   				fsc(idx) =  val;
+	   			}
+	   			std::cerr << "Using FSC to regularise reconstruction!" << std::endl;
+	   		}
+	   		std::cerr << "Starting the reconstruction ..." << std::endl;
 			MultidimArray<RFLOAT> dummy;
-			backprojector.reconstruct(It(), iter, false, 1., dummy, dummy, dummy, dummy, dummy, 1., false, true, nr_threads, -1);
+			backprojector.reconstruct(It(), iter, do_map, 1., fsc, dummy, dummy, dummy, dummy, 1., false, true, nr_threads, -1);
 	    	It.write(fn_out);
 	    	std::cerr<<" Done writing map in "<<fn_out<<std::endl;
-                exit(1);
+	    	exit(1);
 
 		}
 		else
 		{
 
-		RFLOAT rot, tilt, psi, fom;
+		RFLOAT rot, tilt, psi, fom, r_ewald_sphere;
 		Matrix2D<RFLOAT> A3D;
-		MultidimArray<Complex > Faux, F2D, Fsub;
+		MultidimArray<Complex > Faux, F2D, Fsub, F2DP, F2DQ;
 		MultidimArray<RFLOAT> Fweight, Fctf, dummy;
 		Image<RFLOAT> vol, img, sub;
 		FourierTransformer transformer;
@@ -231,6 +456,9 @@ class reconstruct_parameters
 			DF.getValue(EMDL_IMAGE_NAME, fn_img);
 			img.read(fn_img);
 			mysize=(int)XSIZE(img());
+			// When doing Ewald-curvature correction: allow reconstructing smaller box than the input images (which should have large boxes!!)
+			if (do_ewald && newbox > 0)
+				mysize = newbox;
    		}
 
 
@@ -242,6 +470,7 @@ class reconstruct_parameters
    			angpix = 10000. * dstep / mag;
    			std::cout << " + Using pixel size calculated from magnification and detector pixel size in the input STAR file: " << angpix << std::endl;
     	}
+
 
    		BackProjector backprojector(mysize, ref_dim, fn_sym, interpolator, padding_factor, r_min_nn, blob_order, blob_radius, blob_alpha, data_dim, skip_gridding);
    		// This one is only needed for do_reconstruct_meas, but non-empty constructor does not exist...
@@ -334,7 +563,7 @@ class reconstruct_parameters
    					shiftImageInFourierTransform(F2D, F2D, XSIZE(img()), XX(trans), YY(trans));
    			}
 
-			Fctf.resize(F2D);
+   			Fctf.resize(F2D);
 			Fctf.initConstant(1.);
 			// Apply CTF if necessary
 			if (do_ctf || do_reconstruct_ctf)
@@ -352,7 +581,38 @@ class reconstruct_parameters
 					selfApplyBeamTilt(F2D, beamtilt_x, beamtilt_y, ctf.lambda, ctf.Cs, angpix, mysize);
 				}
 
+				// Ewald-sphere curvature correction
+				if (do_ewald)
+				{
+					applyCTFPandCTFQ(F2D, ctf, transformer, F2DP, F2DQ);
+
+					// Also calculate W, store again in Fctf
+					//std::cerr << " temporarily using very large diameter for weight for debugging...." << std::endl;
+					//ctf.applyWeightEwaldSphereCurvature(Fctf, mysize, mysize, angpix, 100000.*mask_diameter);
+					ctf.applyWeightEwaldSphereCurvature(Fctf, mysize, mysize, angpix, mask_diameter);
+//#define DEBUGW
+#ifdef DEBUGW
+				Image<RFLOAT> It;
+				It().resize(YSIZE(Fctf), XSIZE(Fctf));
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
+				{
+					DIRECT_MULTIDIM_ELEM(It(), n) = DIRECT_MULTIDIM_ELEM(Fctf, n);
+				}
+				FileName fnt = "W.spi";
+				It.write(fnt);
+				std::cerr << "written: "<<fnt << std::endl;
+				char c;
+				std::cin >> c;
+#endif
+
+					// Also calculate the radius of the Ewald sphere (in pixels)
+					//std::cerr << " temporarily switching off Ewald sphere curvature for debugging...." << std::endl;
+					//r_ewald_sphere = -1.;
+					r_ewald_sphere = mysize * angpix / ctf.lambda;
+				}
 			}
+
+
 
 			// Subtract reference projection
 			if (fn_sub != "")
@@ -387,6 +647,13 @@ class reconstruct_parameters
 						if (do_reconstruct_ctf2)
 							DIRECT_MULTIDIM_ELEM(F2D, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
 						DIRECT_MULTIDIM_ELEM(Fctf, n) = 1.;
+					}
+				}
+				else if (do_ewald)
+				{
+					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F2D)
+					{
+						DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
 					}
 				}
 				else if (do_ctf)
@@ -435,7 +702,15 @@ class reconstruct_parameters
 #endif
 
 
-				backprojector.set2DFourierTransform(F2D, A3D, IS_NOT_INV, &Fctf);
+				if (do_ewald)
+				{
+					backprojector.set2DFourierTransform(F2DP, A3D, IS_NOT_INV, &Fctf, r_ewald_sphere, true);
+					backprojector.set2DFourierTransform(F2DQ, A3D, IS_NOT_INV, &Fctf, r_ewald_sphere, false);
+				}
+				else
+				{
+					backprojector.set2DFourierTransform(F2D, A3D, IS_NOT_INV, &Fctf);
+				}
 
 
 				if (do_reconstruct_meas)

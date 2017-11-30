@@ -3215,12 +3215,20 @@ void MlOptimiserCuda::doThreadExpectationSomeParticles(int thread_id)
 						catch (RelionError XE)
 #endif
 						{
-							if (failsafe_attempts > 40)
+							if (failsafe_attempts > baseMLO->failsafe_threshold)
 								CRITICAL(ERRNUMFAILSAFE);
 
 							//Rerun in fail-safe mode
 							convertAllSquaredDifferencesToWeights<XFLOAT>(ipass, op, sp, baseMLO, this, CoarsePassWeights, FinePassClassMasks, Mweight, true);
-							std::cerr << std::endl << "WARNING: Exception (" << XE.msg << ") handled by switching to fail-safe mode." << std::endl;
+
+							if (failsafe_attempts <= 10)
+							{
+								std::cerr << std::endl << "WARNING: Exception (" << XE.msg << ") handled by switching to fail-safe mode." << std::endl;
+
+								if (failsafe_attempts == 10)
+									std::cerr << "NOTE: No more fail-safe warnings will be issued." << std::endl;
+							}
+
 							failsafe_attempts ++;
 						}
 					}
