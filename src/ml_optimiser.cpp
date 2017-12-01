@@ -3567,7 +3567,7 @@ void MlOptimiser::maximization()
 				(wsum_model.BPref[iclass]).reconstruct(mymodel.Iref[iclass], gridding_nr_iter, do_map,
 								tau2_fudge, mymodel.tau2_class[iclass], mymodel.sigma2_class[iclass],
 								mymodel.data_vs_prior_class[iclass], mymodel.fourier_coverage_class[iclass],
-								mymodel.fsc_halves_class[0], wsum_model.pdf_class[iclass], false, false, nr_threads, minres_map, (iclass==0));
+								mymodel.fsc_halves_class, wsum_model.pdf_class[iclass], false, false, nr_threads, minres_map, (iclass==0));
 
 				if(do_sgd)
 				{
