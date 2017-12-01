@@ -1972,10 +1972,10 @@ void MlOptimiserMpi::maximization()
 						long int total_nr_subsets;
 						RFLOAT total_mu_fraction, number_of_effective_particles, tau2_fudge;
 
-						if(nr_subsets > 1)
+						if(do_sgd)
 						{
-							if(do_sgd)
-								Iref_old = mymodel.Iref[ith_recons];
+
+							Iref_old = mymodel.Iref[ith_recons];
 							// Still regularise here. tau2 comes from the reconstruction, sum of sigma2 is only over a single subset
 							// Gradually increase tau2_fudge to account for ever increasing number of effective particles in the reconstruction
 							total_nr_subsets = ((iter - 1) * nr_subsets) + subset;
@@ -2099,10 +2099,9 @@ void MlOptimiserMpi::maximization()
 							long int total_nr_subsets;
 							RFLOAT total_mu_fraction, number_of_effective_particles, tau2_fudge;
 
-							if(nr_subsets > 1)
+							if(do_sgd)
 							{
-								if(do_sgd)
-									Iref_old = mymodel.Iref[ith_recons];
+								Iref_old = mymodel.Iref[ith_recons];
 								// Still regularise here. tau2 comes from the reconstruction, sum of sigma2 is only over a single subset
 								// Gradually increase tau2_fudge to account for ever increasing number of effective particles in the reconstruction
 								total_nr_subsets = ((iter - 1) * nr_subsets) + subset;
