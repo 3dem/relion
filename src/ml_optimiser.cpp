@@ -429,7 +429,8 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	do_solvent = parser.checkOption("--flatten_solvent", "Perform masking on the references as well?");
 	fn_mask = parser.getOption("--solvent_mask", "User-provided mask for the references (default is to use spherical mask with particle_diameter)", "None");
 	fn_mask2 = parser.getOption("--solvent_mask2", "User-provided secondary mask (with its own average density)", "None");
-    fn_body_masks = parser.getOption("--multibody_masks", "STAR file with binary masks for multi-body refinement", "");
+        //fn_body_masks = parser.getOption("--multibody_masks", "STAR file with binary masks for multi-body refinement", "");
+        fn_body_masks = "";
     fn_tau = parser.getOption("--tau", "STAR file with input tau2-spectrum (to be kept constant)", "None");
 	fn_local_symmetry = parser.getOption("--local_symmetry", "Local symmetry description file containing list of masks and their operators", "None");
     do_split_random_halves = parser.checkOption("--split_random_halves", "Refine two random halves of the data completely separately");
