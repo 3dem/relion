@@ -8,31 +8,41 @@ find_path (X11_INCLUDES Xdbe.h)
 message(STATUS "CMAKE_BINARY_DIR:" ${CMAKE_BINARY_DIR})
 
 file(GLOB REL_SRC "${CMAKE_SOURCE_DIR}/src/*.cpp" "${CMAKE_SOURCE_DIR}/src/*.c" "${CMAKE_SOURCE_DIR}/src/gpu_utils/*.cpp")
+file(GLOB REL_GUI_SRC "${CMAKE_SOURCE_DIR}/src/manualpicker.cpp" "${CMAKE_SOURCE_DIR}/src/gui_*.cpp" "${CMAKE_SOURCE_DIR}/src/displayer.cpp")
+# Remove GUI files from relion_lib
+foreach(GUI_SRC_FILE ${REL_GUI_SRC})
+	list(REMOVE_ITEM REL_SRC "${GUI_SRC_FILE}")
+endforeach()
 file(GLOB REL_SRC_H "${CMAKE_SOURCE_DIR}/src/*.h" "${CMAKE_SOURCE_DIR}/src/gpu_utils/*.h")
 file(GLOB REL_HP "${CMAKE_SOURCE_DIR}/src/Healpix_2.15a/*.cc")
 
 file(GLOB RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/*.cpp")
 
+set(GUI_TARGETS display maingui manualpick pipeliner)
+
 #--Remove apps using X11 if no GUI--
 if(NOT GUI)
-    list(REMOVE_ITEM REL_SRC "${CMAKE_SOURCE_DIR}/src/manualpicker.cpp")
-    list(REMOVE_ITEM REL_SRC "${CMAKE_SOURCE_DIR}/src/gui_entries.cpp")
-    list(REMOVE_ITEM REL_SRC "${CMAKE_SOURCE_DIR}/src/gui_jobwindow.cpp")
-    list(REMOVE_ITEM REL_SRC "${CMAKE_SOURCE_DIR}/src/gui_mainwindow.cpp")
-    list(REMOVE_ITEM REL_SRC "${CMAKE_SOURCE_DIR}/src/displayer.cpp")
-    list(REMOVE_ITEM RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/display.cpp")
-    list(REMOVE_ITEM RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/maingui.cpp")
-    list(REMOVE_ITEM RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/manualpick.cpp")
-    list(REMOVE_ITEM RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/pipeliner.cpp")
+    foreach(TARGET ${GUI_TARGETS})
+        list(REMOVE_ITEM RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/${TARGET}.cpp")
+    endforeach()
 endif(NOT GUI)
 
 
 # relion_lib is STATIC or SHARED type based on BUILD_SHARED_LIBS=ON/OFF
+# relion_lib only contains non-X11 parts
+# relion_gui_lib is where the X11 code is placed
 if(BUILD_SHARED_LIBS)
     add_library(relion_lib SHARED ${REL_SRC} ${REL_SRC_H} ${REL_HP})
     install(TARGETS relion_lib LIBRARY DESTINATION lib)
+    if(GUI)
+        add_library(relion_gui_lib SHARED ${REL_GUI_SRC} ${REL_SRC_H} ${REL_HP})
+        install(TARGETS relion_gui_lib LIBRARY DESTINATION lib)
+    endif(GUI)
 else()
     add_library(relion_lib STATIC ${REL_SRC} ${REL_SRC_H} ${REL_HP})
+    if(GUI)
+        add_library(relion_gui_lib STATIC ${REL_GUI_SRC} ${REL_SRC_H} ${REL_HP})
+    endif(GUI)
 endif()
 
 target_link_libraries(relion_lib ${FFTW_LIBRARIES})
@@ -41,9 +51,10 @@ if(BUILD_OWN_FFTW)
 endif()
 
 if(GUI)
-    target_link_libraries(relion_lib ${FLTK_LIBRARIES})
+    include_directories("${FLTK_INCLUDE_DIR}")
+    target_link_libraries(relion_gui_lib relion_lib ${FLTK_LIBRARIES})
     if(BUILD_OWN_FLTK)
-        add_dependencies(relion_lib OWN_FLTK)
+        add_dependencies(relion_gui_lib OWN_FLTK)
     endif()
 endif(GUI)
 
@@ -101,11 +112,17 @@ foreach (_target ${RELION_TARGETS})
 	    target_link_libraries(${_target} relion_gpu_util)
 	endif(CUDA_FOUND)
 	
-	if(GUI)
-        include_directories("${FLTK_INCLUDE_DIR}")
-		target_link_libraries(${_target} ${FLTK_LIBRARIES} ${X11})
-	endif(GUI)
+#	if(${_target} IN_LIST GUI_TARGETS)
+#        add_dependencies(${_target} relion_gui_lib)
+#		target_link_libraries(${_target} relion_gui_lib ${FLTK_LIBRARIES} ${X11})
+#	endif()
 	
+	list(FIND GUI_TARGETS ${_target} IS_GUI_TARGET)
+	if(NOT ${IS_GUI_TARGET} LESS 0)
+        add_dependencies(${_target} relion_gui_lib)
+        target_link_libraries(${_target} relion_gui_lib ${FLTK_LIBRARIES} ${X11})
+    endif()
+    
 	message(STATUS "added ${_target}...")
 	
 	install (TARGETS ${_target} RUNTIME DESTINATION bin)
@@ -118,5 +135,6 @@ if(GUI)
 	      COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_BINARY_DIR}/bin/relion_qsub.csh ${PROJECT_BINARY_DIR}/bin/qsub.csh
     )
 endif(GUI)
+
 
 
