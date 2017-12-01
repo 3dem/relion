@@ -901,6 +901,8 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 			}
 			myfsc = XMIPP_MIN(0.999, myfsc);
 			RFLOAT myssnr = myfsc / (1. - myfsc);
+			// Sjors 29nov2017 try tau2_fudge for pulling harder on Refine3D runs...
+			myssnr *= tau2_fudge;
 			RFLOAT fsc_based_tau = myssnr * DIRECT_A1D_ELEM(sigma2, i);
 			DIRECT_A1D_ELEM(tau2, i) = fsc_based_tau;
 			// data_vs_prior is merely for reporting: it is not used for anything in the reconstruction

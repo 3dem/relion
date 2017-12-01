@@ -1541,6 +1541,12 @@ void MlOptimiser::initialiseGeneral(int rank)
 		has_fine_enough_angular_sampling = false;
 		has_converged = false;
 
+		if (mymodel.tau2_fudge_factor > 1. && verb > 0)
+		{
+			std::cerr << " WARNING: Using tau2_fudge of " <<mymodel.tau2_fudge_factor << ", which will lead to inflated resolution estimates during refinement." << std::endl;
+			std::cerr << " WARNING: You have to run postprocessing afterwards to get a reliable, gold-standard resolution estimate! " << std::endl;
+		}
+
 		if (iter == 0 && sampling.healpix_order >= autosampling_hporder_local_searches)
 		{
 			mymodel.orientational_prior_mode = PRIOR_ROTTILT_PSI;
@@ -2293,15 +2299,24 @@ void MlOptimiser::iterate()
 					std::cout << " Auto-refine: + Final reconstruction from all particles is saved as: " <<  fn_out << "_class001.mrc" << std::endl;
 					std::cout << " Auto-refine: + Final model parameters are stored in: " << fn_out << "_model.star" << std::endl;
 					std::cout << " Auto-refine: + Final data parameters are stored in: " << fn_out << "_data.star" << std::endl;
-					std::cout << " Auto-refine: + Final resolution (without masking) is: " << 1./mymodel.current_resolution << std::endl;
-					if (acc_rot < 10.)
-						std::cout << " Auto-refine: + But you may want to run relion_postprocess to mask the unfil.mrc maps and calculate a higher resolution FSC" << std::endl;
-					else
+                                        if (mymodel.tau2_fudge_factor > 1.)
+                                        {
+                                            std::cout << " Auto-refine: + SEVERE WARNING: Because you used a tau2_fudge of " << mymodel.tau2_fudge_factor << " your resolution during this refinement will be inflated!" << std::endl;
+                                            std::cout << " Auto-refine: + SEVERE WARNING: You have to run a postprocessing on the unfil.mrc maps to get a gold-standard resolution estimate!"  << std::endl;
+                                        }
+                                        else if (do_phase_random_fsc)
+                                            std::cout << " Auto-refine: + Final resolution (already with masking) is: " << 1./mymodel.current_resolution << std::endl;
+                                        else
+                                        {
+                                            std::cout << " Auto-refine: + Final resolution (without masking) is: " << 1./mymodel.current_resolution << std::endl;
+                                            std::cout << " Auto-refine: + But you may want to run relion_postprocess to mask the unfil.mrc maps and calculate a higher resolution FSC" << std::endl;
+                                        }
+					if (acc_rot > 10.)
 					{
-						std::cout << " Auto-refine: + WARNING: The angular accuracy is worse than 10 degrees, so basically you cannot align your particles!" << std::endl;
-						std::cout << " Auto-refine: + WARNING: This has been observed to lead to spurious FSC curves, so be VERY wary of inflated resolution estimates..." << std::endl;
-						std::cout << " Auto-refine: + WARNING: You most probably do NOT want to publish these results!" << std::endl;
-						std::cout << " Auto-refine: + WARNING: Sometimes it is better to tune resolution yourself by adjusting T in a 3D-classification with a single class." << std::endl;
+						std::cout << " Auto-refine: + SEVERE WARNING: The angular accuracy is worse than 10 degrees, so basically you cannot align your particles!" << std::endl;
+						std::cout << " Auto-refine: + SEVERE WARNING: This has been observed to lead to spurious FSC curves, so be VERY wary of inflated resolution estimates..." << std::endl;
+						std::cout << " Auto-refine: + SEVERE WARNING: You most probably do NOT want to publish these results!" << std::endl;
+						std::cout << " Auto-refine: + SEVERE WARNING: Sometimes it is better to tune resolution yourself by adjusting T in a 3D-classification with a single class." << std::endl;
 					}
 				}
 				break;
