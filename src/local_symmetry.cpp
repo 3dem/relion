@@ -1425,10 +1425,10 @@ void getLocalSearchOperatorSamplings(
 	if ( (VEC_XSIZE(op_old) != NR_LOCALSYM_PARAMETERS) || (VEC_XSIZE(op_search_ranges) != NR_LOCALSYM_PARAMETERS) )
 		REPORT_ERROR("ERROR: Input operator contains syntax error!");
 
-	if ( (ang_search_step < 0.01) || (ang_search_step > 30.) )
-		REPORT_ERROR("ERROR: Angular searching step should be within range (+0.01, +30.00) degrees!");
-	if ( (trans_search_step < 0.01) || (trans_search_step > 5.) )
-		REPORT_ERROR("ERROR: Translational searching step should be within range (+0.01, +5.00) rescaled / binned pixels!");
+	if ( (ang_search_step < 0.0001) || (ang_search_step > 30.) )
+		REPORT_ERROR("ERROR: Angular searching step should be within range (+0.0001, +30.0000) degrees!");
+	if ( (trans_search_step < 0.0001) || (trans_search_step > 5.) )
+		REPORT_ERROR("ERROR: Translational searching step should be within range (+0.0001, +5.0000) rescaled / binned pixels!");
 
 	Localsym_decomposeOperator(op_old, aa_init, bb_init, gg_init, dx_init, dy_init, dz_init, cc);
 	Localsym_decomposeOperator(op_search_ranges, aa_range, bb_range, gg_range, dx_range, dy_range, dz_range, cc);
@@ -2158,7 +2158,7 @@ void local_symmetry_parameters::read(int argc, char **argv)
 	parser.setCommandLine(argc, argv);
 
 	int init_section = parser.addSection("Show usage");
-	show_usage_for_an_option = parser.checkOption("--help", "Show usage for the selected function (JUN 30, 2017)");
+	show_usage_for_an_option = parser.checkOption("--function_help", "Show usage for the selected function (JUN 30, 2017)");
 
 	int options_section = parser.addSection("Options");
 	do_apply_local_symmetry = parser.checkOption("--apply", "Apply local symmetry to a 3D cryo-EM density map");
