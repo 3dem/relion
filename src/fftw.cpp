@@ -157,8 +157,8 @@ void FourierTransformer::setReal(MultidimArray<RFLOAT> &input)
     bool recomputePlan=false;
     if (fReal==NULL)
         recomputePlan=true;
-    //else if (dataPtr!=MULTIDIM_ARRAY(input))
-    //    recomputePlan=true;
+    else if (dataPtr!=MULTIDIM_ARRAY(input))
+        recomputePlan=true;
     else
         recomputePlan=!(fReal->sameShape(input));
 
@@ -195,6 +195,8 @@ void FourierTransformer::setReal(MultidimArray<RFLOAT> &input)
         destroyPlans();
 
         // Make new plans
+        plans_are_set = true;
+
         pthread_mutex_lock(&fftw_plan_mutex);
 #ifdef RELION_SINGLE_PRECISION
         fPlanForward = fftwf_plan_dft_r2c(ndim, N, MULTIDIM_ARRAY(*fReal),
@@ -203,8 +205,6 @@ void FourierTransformer::setReal(MultidimArray<RFLOAT> &input)
                                           (fftwf_complex*) MULTIDIM_ARRAY(fFourier), MULTIDIM_ARRAY(*fReal),
                                           FFTW_ESTIMATE);
 #else
-        plans_are_set = true;
-
         fPlanForward = fftw_plan_dft_r2c(ndim, N, MULTIDIM_ARRAY(*fReal),
                                          (fftw_complex*) MULTIDIM_ARRAY(fFourier), FFTW_ESTIMATE);
         fPlanBackward = fftw_plan_dft_c2r(ndim, N,
@@ -230,10 +230,11 @@ void FourierTransformer::setReal(MultidimArray<Complex > &input)
     bool recomputePlan=false;
     if (fComplex==NULL)
         recomputePlan=true;
-    //else if (complexDataPtr!=MULTIDIM_ARRAY(input))
-    //    recomputePlan=true;
+    else if (complexDataPtr!=MULTIDIM_ARRAY(input))
+        recomputePlan=true;
     else
         recomputePlan=!(fComplex->sameShape(input));
+
     fFourier.resize(input);
     fComplex=&input;
 
@@ -266,45 +267,27 @@ void FourierTransformer::setReal(MultidimArray<Complex > &input)
         // Destroy both forward and backward plans if they already exist
         destroyPlans();
 
-        pthread_mutex_lock(&fftw_plan_mutex);
-#ifdef RELION_SINGLE_PRECISION
-        if (fPlanForward!=NULL)
-            fftwf_destroy_plan(fPlanForward);
-        fPlanForward=NULL;
-        fPlanForward = fftwf_plan_dft(ndim, N, (fftwf_complex*) MULTIDIM_ARRAY(*fComplex),
-                                     (fftwf_complex*) MULTIDIM_ARRAY(fFourier), FFTW_FORWARD, FFTW_ESTIMATE);
-        if (fPlanBackward!=NULL)
-            fftwf_destroy_plan(fPlanBackward);
-        fPlanBackward=NULL;
-        fPlanBackward = fftwf_plan_dft(ndim, N, (fftwf_complex*) MULTIDIM_ARRAY(fFourier),
-                                      (fftwf_complex*) MULTIDIM_ARRAY(*fComplex), FFTW_BACKWARD, FFTW_ESTIMATE);
-        if (fPlanForward == NULL || fPlanBackward == NULL)
-            REPORT_ERROR("FFTW plans cannot be created");
-        delete [] N;
-        complexDataPtr=MULTIDIM_ARRAY(*fComplex);
-#else
-        if (plans_are_set)
-        {
-            fftw_destroy_plan(fPlanBackward);
-            fftw_destroy_plan(fPlanForward);
-        }
-
-        fPlanForward=NULL;
-        fPlanForward = fftw_plan_dft(ndim, N, (fftw_complex*) MULTIDIM_ARRAY(*fComplex),
-                                     (fftw_complex*) MULTIDIM_ARRAY(fFourier), FFTW_FORWARD, FFTW_ESTIMATE);
-
-        fPlanBackward=NULL;
-        fPlanBackward = fftw_plan_dft(ndim, N, (fftw_complex*) MULTIDIM_ARRAY(fFourier),
-                                      (fftw_complex*) MULTIDIM_ARRAY(*fComplex), FFTW_BACKWARD, FFTW_ESTIMATE);
-
         plans_are_set = true;
 
-        if (fPlanForward == NULL || fPlanBackward == NULL)
-            REPORT_ERROR("FFTW plans cannot be created");
-        delete [] N;
-        complexDataPtr=MULTIDIM_ARRAY(*fComplex);
+        pthread_mutex_lock(&fftw_plan_mutex);
+#ifdef RELION_SINGLE_PRECISION
+        fPlanForward = fftwf_plan_dft(ndim, N, (fftwf_complex*) MULTIDIM_ARRAY(*fComplex),
+                                     (fftwf_complex*) MULTIDIM_ARRAY(fFourier), FFTW_FORWARD, FFTW_ESTIMATE);
+        fPlanBackward = fftwf_plan_dft(ndim, N, (fftwf_complex*) MULTIDIM_ARRAY(fFourier),
+                                      (fftwf_complex*) MULTIDIM_ARRAY(*fComplex), FFTW_BACKWARD, FFTW_ESTIMATE);
+#else
+        fPlanForward = fftw_plan_dft(ndim, N, (fftw_complex*) MULTIDIM_ARRAY(*fComplex),
+                                     (fftw_complex*) MULTIDIM_ARRAY(fFourier), FFTW_FORWARD, FFTW_ESTIMATE);
+        fPlanBackward = fftw_plan_dft(ndim, N, (fftw_complex*) MULTIDIM_ARRAY(fFourier),
+                                      (fftw_complex*) MULTIDIM_ARRAY(*fComplex), FFTW_BACKWARD, FFTW_ESTIMATE);
 #endif
         pthread_mutex_unlock(&fftw_plan_mutex);
+
+        if (fPlanForward == NULL || fPlanBackward == NULL)
+            REPORT_ERROR("FFTW plans cannot be created");
+
+        delete [] N;
+        complexDataPtr=MULTIDIM_ARRAY(*fComplex);
     }
 }
 
