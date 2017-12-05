@@ -578,7 +578,8 @@ void windowFourierTransform(MultidimArray<T > &in,
     long int newhdim = newdim/2 + 1;
 
     // If same size, just return input
-    if (newhdim == XSIZE(in))
+    // Sjors 5dec2017: only check for xdim is not enough, even/off ydim leaves ambiguity for dim>1
+    if ( newdim == YSIZE(in) && newhdim == XSIZE(in) )
     {
         out = in;
         return;
@@ -630,7 +631,8 @@ void windowFourierTransform(MultidimArray<T > &V,
     long int newhdim = newdim/2 + 1;
 
     // If same size, just return input
-    if (newhdim == XSIZE(V))
+    // Sjors 5dec2017: only check for xdim is not enough, even/off ydim leaves ambiguity for dim>1
+    if ( newdim == YSIZE(V) && newhdim == XSIZE(V) )
     {
         return;
     }
