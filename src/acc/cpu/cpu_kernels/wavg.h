@@ -25,7 +25,11 @@ void wavg_ref3D(
 		AccProjectorKernel &projector,
 		unsigned            image_size,
 		unsigned long       orientation_num,
-		XFLOAT * RESTRICT   g_img_real,
+#ifdef DEBUG_CUDA
+		XFLOAT * RESTRICT   _g_img_real,
+#else
+		XFLOAT * RESTRICT   g_img_real,	
+#endif
 		XFLOAT * RESTRICT   g_img_imag,
 		XFLOAT * RESTRICT   g_trans_x,
 		XFLOAT * RESTRICT   g_trans_y,
@@ -40,6 +44,10 @@ void wavg_ref3D(
 		XFLOAT              significant_weight,
 		XFLOAT              part_scale)
 {
+#ifdef DEBUG_CUDA
+	checkedArray<XFLOAT> g_img_real;
+	g_img_real.initCheckedArray(_g_img_real);
+#endif
 	XFLOAT ref_real, ref_imag, img_real, img_imag, trans_real, trans_imag;
 
 	for(int bid=0; bid<orientation_num; bid++) {
@@ -150,7 +158,11 @@ void wavg_3D(
 		AccProjectorKernel &projector,
 		unsigned            image_size,
 		unsigned long       orientation_num,
-		XFLOAT * RESTRICT   g_img_real,
+#ifdef DEBUG_CUDA
+		XFLOAT * RESTRICT   _g_img_real,
+#else
+		XFLOAT * RESTRICT   g_img_real,	
+#endif
 		XFLOAT * RESTRICT   g_img_imag,
 		XFLOAT * RESTRICT   g_trans_x,
 		XFLOAT * RESTRICT   g_trans_y,
@@ -165,6 +177,10 @@ void wavg_3D(
 		XFLOAT              significant_weight,
 		XFLOAT              part_scale)
 {
+#ifdef DEBUG_CUDA
+	checkedArray<XFLOAT> g_img_real;
+	g_img_real.initCheckedArray(_g_img_real);
+#endif
 	XFLOAT ref_real, ref_imag, img_real, img_imag, trans_real, trans_imag;
 
 	for(int bid=0; bid<orientation_num; bid++) {

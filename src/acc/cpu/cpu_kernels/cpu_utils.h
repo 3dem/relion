@@ -4,9 +4,43 @@
 #include <src/macros.h>
 #include <math.h>
 #include "src/acc/cpu/cpu_settings.h"
+#include <cassert>
 
 namespace CpuKernels
 {
+	
+#define CHECK_INDEX_DEBUG_FATAL( err ) (HandleCheckIndexPtrDebugFatal( err, __FILE__, __LINE__ ))
+static void HandleCheckIndexPtrDebugFatal( const char *err, const char *file, int line )
+{
+    	fprintf(stderr, "DEBUG ERROR: %s in %s:%d\n", err, file, line );
+		fflush(stdout);
+		raise(SIGSEGV);
+}
+template <typename T> 
+class checkedArray
+{
+	private:
+		T *underlyingData;
+      
+	public:
+		void initCheckedArray(T *dataToCheck)
+		{
+			underlyingData = dataToCheck;
+		}
+		
+		T& operator[](size_t idx)
+		{
+			if (idx > std::numeric_limits<int>::max())
+				CHECK_INDEX_DEBUG_FATAL("array index > std::numeric_limits<int>::max()");
+			return underlyingData[idx];
+		}
+		const T& operator[](size_t idx) const
+  		{
+			if (idx > std::numeric_limits<int>::max())
+				CHECK_INDEX_DEBUG_FATAL("const: array index > std::numeric_limits<int>::max()");
+			return underlyingData[idx];
+		}       
+};
 
 /*
  * For the following functions always use fast, low-precision intrinsics
@@ -94,8 +128,19 @@ void complex2D(XFLOAT* mdlComplex, XFLOAT &real, XFLOAT &imag,
 }
 
 static inline
-XFLOAT no_tex3D(XFLOAT* mdl, XFLOAT xp, XFLOAT yp, XFLOAT zp, int mdlX, int mdlXY, int mdlInitY, int mdlInitZ)
+XFLOAT no_tex3D(
+#ifdef DEBUG_CUDA
+				XFLOAT* _mdl, 
+#else
+				XFLOAT* mdl, 
+#endif
+				XFLOAT xp, XFLOAT yp, XFLOAT zp, 
+				int mdlX, int mdlXY, int mdlInitY, int mdlInitZ)
 {
+#ifdef DEBUG_CUDA
+	checkedArray<XFLOAT> mdl;
+	mdl.initCheckedArray(_mdl);
+#endif
 	int x0 = floorf(xp);
 	XFLOAT fx = xp - x0;
 	int x1 = x0 + 1;
@@ -133,9 +178,19 @@ XFLOAT no_tex3D(XFLOAT* mdl, XFLOAT xp, XFLOAT yp, XFLOAT zp, int mdlX, int mdlX
 // 3D linear interpolation for complex data that interleaves real and
 // imaginary data, rather than storing them in a separate array
 static inline
-void complex3D(XFLOAT* mdlComplex, XFLOAT &real, XFLOAT &imag,
-               XFLOAT xp, XFLOAT yp, XFLOAT zp, int mdlX, int mdlXY, int mdlInitY, int mdlInitZ)
+void complex3D(
+#ifdef DEBUG_CUDA
+				XFLOAT* _mdlComplex, 
+#else
+				XFLOAT* mdlComplex, 
+#endif
+				XFLOAT &real, XFLOAT &imag,
+				XFLOAT xp, XFLOAT yp, XFLOAT zp, int mdlX, int mdlXY, int mdlInitY, int mdlInitZ)
 {
+#ifdef DEBUG_CUDA
+	checkedArray<XFLOAT> mdlComplex;
+	mdlComplex.initCheckedArray(_mdlComplex);
+#endif
 	int x0 = floorf(xp);
 	XFLOAT fx = xp - x0;
 

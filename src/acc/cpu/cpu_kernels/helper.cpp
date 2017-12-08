@@ -86,10 +86,10 @@ void softMaskBackgroundValue(	int      block_dim,
 			int x,y,z;
 			XFLOAT     img_pixels;
 
-			long int texel_pass_num = ceilfracf(vol_size,block_size*block_dim);
-			int texel = bid*block_size*texel_pass_num + tid;
+			size_t texel_pass_num = ceilfracf(vol_size,block_size*block_dim);
+			size_t texel = bid*block_size*texel_pass_num + tid;
 
-			for (int pass = 0; pass < texel_pass_num; pass++, texel+=block_size) // loop the available warps enough to complete all translations for this orientation
+			for (int pass = 0; pass < texel_pass_num; pass++, texel+=block_size) // loop through all translations for this orientation
 			{
 				if(texel<vol_size)
 				{
@@ -154,8 +154,8 @@ void cosineFilter(	int      block_dim,
 			int x,y,z;
 			XFLOAT     img_pixels;
 
-			long int texel_pass_num = ceilfracf(vol_size,block_size*block_dim);
-			int texel = bid*block_size*texel_pass_num + tid;
+			size_t texel_pass_num = ceilfracf(vol_size,block_size*block_dim);
+			size_t texel = bid*block_size*texel_pass_num + tid;
 
 			for (int pass = 0; pass < texel_pass_num; pass++, texel+=block_size) // loop the available warps enough to complete all translations for this orientation
 			{
@@ -195,18 +195,22 @@ void cosineFilter(	int      block_dim,
 }
 
 template <typename T>
-void cpu_translate2D(T * g_image_in,
-					T * g_image_out,
-					int      image_size,
-					int      xdim,
-					int      ydim,
-					int      dx,
-					int      dy)
+void cpu_translate2D(T *	g_image_in,
+					T *		g_image_out,
+					size_t	image_size,
+					int		xdim,
+					int		ydim,
+					int		dx,
+					int		dy)
 {
 	int x,y,xp,yp;
-	int new_pixel;
-
-	for(int pixel=0; pixel<image_size; pixel++)
+	size_t new_pixel;
+	
+#ifdef DEBUG_CUDA
+	if (image_size > (size_t)std::numeric_limits<int>::max())
+		ACC_PTR_DEBUG_INFO("cpu_translate2D: image_size > std::numeric_limits<int>::max()");
+#endif
+	for(size_t pixel=0; pixel<image_size; pixel++)
 	{
 		x = pixel % xdim;
 		y = (pixel-x) / (xdim);
@@ -224,20 +228,24 @@ void cpu_translate2D(T * g_image_in,
 }
 
 template <typename T>
-void cpu_translate3D(T * g_image_in,
-					T * g_image_out,
-					int      image_size,
-					int      xdim,
-					int      ydim,
-					int      zdim,
-					int      dx,
-					int      dy,
-					int      dz)
+void cpu_translate3D(T *	g_image_in,
+					T*		g_image_out,
+					size_t	image_size,
+					int		xdim,
+					int		ydim,
+					int		zdim,
+					int		dx,
+					int		dy,
+					int		dz)
 {
 	int x,y,z,xp,yp,zp,xy;
-	int new_voxel;
+	size_t new_voxel;
 
-	for(int voxel=0; voxel<image_size; voxel++)
+#ifdef DEBUG_CUDA
+	if (image_size > (size_t)std::numeric_limits<int>::max())
+		ACC_PTR_DEBUG_INFO("cpu_translate3D: image_size > std::numeric_limits<int>::max()");
+#endif	
+	for(size_t voxel=0; voxel<image_size; voxel++)
 	{
 		int xydim = xdim*ydim;
 
@@ -262,22 +270,30 @@ void cpu_translate3D(T * g_image_in,
 
 template <typename T>
 void centerFFT_2D(	int     batch_size,
-			int		pixel_start,	// long int?
-			int		pixel_end,		// long int?
+			size_t	pixel_start,
+			size_t	pixel_end,
 			T		*img_in,
-			int		image_size,		// long int?
+			size_t	image_size,
 			int		xdim,
 			int		ydim,
 			int		xshift,
 			int		yshift)
 {
-	int pix_start = pixel_start;
-	int pix_end = pixel_end;
+#ifdef DEBUG_CUDA
+	if (image_size > (size_t)std::numeric_limits<int>::max())
+		ACC_PTR_DEBUG_INFO("centerFFT_2D: image_size > std::numeric_limits<int>::max()");
+	if (image_size*(size_t)batch_size > (size_t)std::numeric_limits<int>::max())
+		ACC_PTR_DEBUG_INFO("centerFFT_2D: image_size*batch_size > std::numeric_limits<int>::max()");
+	if (pixel_end > image_size)
+		ACC_PTR_DEBUG_INFO("centerFFT_2D: pixel_end > image_size");
+#endif
+	size_t pix_start = pixel_start;
+	size_t pix_end = pixel_end;
 	for(int batch=0; batch<batch_size; batch++)
 	{
-		for(int pixel=pix_start; pixel < pix_end; pixel++)
+		for(size_t pixel=pix_start; pixel < pix_end; pixel++)
 		{
-			long int image_offset = image_size*batch;
+			size_t image_offset = image_size*batch;
 			int y = floorf((XFLOAT)pixel/(XFLOAT)xdim);
 			int x = pixel % xdim;				// also = pixel - y*xdim, but this depends on y having been calculated, i.e. serial evaluation
 
@@ -293,7 +309,7 @@ void centerFFT_2D(	int     batch_size,
 			else if (xp >= xdim)
 				xp -= xdim;
 
-			int n_pixel = yp*xdim + xp;
+			size_t n_pixel = (size_t)yp*(size_t)xdim + (size_t)xp;
 
 			T buffer                       = img_in[image_offset + n_pixel];
 			img_in[image_offset + n_pixel] = img_in[image_offset + pixel];
@@ -304,19 +320,19 @@ void centerFFT_2D(	int     batch_size,
 
 
 template void centerFFT_2D<float>(  	int		batch_size,
-										int		pixel_start,
-										int		pixel_end,
+										size_t	pixel_start,
+										size_t	pixel_end,
                                         float	*img_in,
-                                        int		image_size,
+                                        size_t	image_size,
                                         int		xdim,
                                         int		ydim,
                                         int		xshift,
                                         int		yshift);
 template void centerFFT_2D<double>(  	int		batch_size,
-										int		pixel_start,
-										int		pixel_end,
+										size_t	pixel_start,
+										size_t	pixel_end,
                                         double	*img_in,
-                                        int		image_size,
+                                        size_t	image_size,
                                         int		xdim,
                                         int		ydim,
                                         int		xshift,
@@ -325,10 +341,10 @@ template void centerFFT_2D<double>(  	int		batch_size,
 
 template <typename T>
 void centerFFT_3D(	int     batch_size,
-			int		pixel_start,	// long int?
-			int		pixel_end,		// long int?
-			T		*img_in,
-			int		image_size,		// long int?
+			size_t	pixel_start,
+			size_t	pixel_end,
+			T        *img_in,
+			size_t	image_size,
 			int		xdim,
 			int		ydim,
 			int		zdim,
@@ -336,13 +352,21 @@ void centerFFT_3D(	int     batch_size,
 			int		yshift,
 			int		zshift)
 {
-	int pix_start = pixel_start;
-	int pix_end = pixel_end;
+#ifdef DEBUG_CUDA
+	if (image_size > (size_t)std::numeric_limits<int>::max())
+		ACC_PTR_DEBUG_INFO("centerFFT_3D: image_size > std::numeric_limits<int>::max()");
+	if (image_size*(size_t)batch_size > (size_t)std::numeric_limits<int>::max())
+		ACC_PTR_DEBUG_INFO("centerFFT_3D: image_size*batch_size > std::numeric_limits<int>::max()");
+	if (pixel_end > image_size)
+		ACC_PTR_DEBUG_INFO("centerFFT_3D: pixel_end > image_size");
+#endif
+	size_t pix_start = pixel_start;
+	size_t pix_end = pixel_end;
 	int xydim = xdim*ydim;
 	for(int batch=0; batch<batch_size; batch++)
 	{
-		long int image_offset = image_size*batch;
-		for(int pixel = pix_start; pixel < pix_end; pixel++)
+		size_t image_offset = image_size*batch;
+		for(size_t pixel = pix_start; pixel < pix_end; pixel++)
 		{
 			int z = floorf((XFLOAT)pixel/(XFLOAT)(xydim));
 			int xy = pixel % xydim;
@@ -367,7 +391,8 @@ void centerFFT_3D(	int     batch_size,
 			else if (zp >= zdim)
 				zp -= zdim;
 
-			int n_pixel = zp*xydim + yp*xdim + xp;
+			size_t n_pixel = (size_t)zp*(size_t)xydim + (size_t)yp*(size_t)xdim 
+					+ (size_t)xp;
 
 			T buffer                       = img_in[image_offset + n_pixel];
 			img_in[image_offset + n_pixel] = img_in[image_offset + pixel];
@@ -378,10 +403,10 @@ void centerFFT_3D(	int     batch_size,
 
 
 template void centerFFT_3D<float>(	int     batch_size,
-					int		pixel_start,
-					int		pixel_end,
-					float	*img_in,
-					int		image_size,
+					size_t	pixel_start,
+					size_t	pixel_end,
+					float    *img_in,
+					size_t	image_size,
 					int		xdim,
 					int		ydim,
 					int		zdim,
@@ -389,10 +414,10 @@ template void centerFFT_3D<float>(	int     batch_size,
 					int		yshift,
 					int		zshift);
 template void centerFFT_3D<double>(  	int     batch_size,
-					int		pixel_start,
-					int		pixel_end,
+					size_t	pixel_start,
+					size_t	pixel_end,
 					double	*img_in,
-					int		image_size,
+					size_t	image_size,
 					int		xdim,
 					int		ydim,
 					int		zdim,
@@ -694,6 +719,10 @@ void cpu_kernel_multi( T *A,
 			T  S,
 			int     image_size)
 {
+#ifdef DEBUG_CUDA
+	if (image_size < 0)
+		ACC_PTR_DEBUG_INFO("cpu_kernel_multi:  image_size < 0");
+#endif
 	for (int i = 0; i < image_size; i ++)
 		OUT[i] = A[i]*S;
 }
@@ -703,6 +732,10 @@ void cpu_kernel_multi( T *A,
 			T  S,
 			int     image_size)
 {
+#ifdef DEBUG_CUDA
+	if (image_size < 0)
+		ACC_PTR_DEBUG_INFO("cpu_kernel_multi2:  image_size < 0");
+#endif
 	for (int i = 0; i < image_size; i ++)
 		A[i] *= S;
 }
@@ -714,6 +747,10 @@ void cpu_kernel_multi( T *A,
 			T  S,
 			int     image_size)
 {
+#ifdef DEBUG_CUDA
+	if (image_size < 0)
+		ACC_PTR_DEBUG_INFO("cpu_kernel_multi3:  image_size < 0");
+#endif
 	for (int i = 0; i < image_size; i ++)
 		OUT[i] = A[i]*B[i]*S;
 }
@@ -767,6 +804,10 @@ void cpu_kernel_make_eulers_2D(int grid_size, int block_size,
 		XFLOAT *eulers,
 		unsigned orientation_num)
 {
+#ifdef DEBUG_CUDA
+	if ((size_t)grid_size*(size_t)block_size > (size_t)std::numeric_limits<int>::max())
+		ACC_PTR_DEBUG_INFO("cpu_kernel_make_eulers_2D: grid_size*block_size > std::numeric_limits<int>::max()");
+#endif
 	for(int blockIdx_x=0; blockIdx_x<(int)(grid_size); blockIdx_x++) {
 		for(int threadIdx_x=0; threadIdx_x<block_size; threadIdx_x++)  {							
 			unsigned oid = blockIdx_x * block_size + threadIdx_x; //Orientation id
@@ -820,6 +861,10 @@ void cpu_kernel_make_eulers_3D(int grid_size, int block_size,
 		unsigned orientation_num,
 		XFLOAT *R)
 {
+#ifdef DEBUG_CUDA
+	if ((size_t)grid_size*(size_t)block_size > (size_t)std::numeric_limits<int>::max())
+		ACC_PTR_DEBUG_INFO("cpu_kernel_make_eulers_3D: grid_size*block_size > std::numeric_limits<int>::max()");
+#endif
 	for(int blockIdx_x=0; blockIdx_x<(int)(grid_size); blockIdx_x++) {
         for(int threadIdx_x=0; threadIdx_x<block_size; threadIdx_x++) {
 			XFLOAT a(0.f),b(0.f),g(0.f), A[9],B[9];
@@ -904,10 +949,10 @@ void cpu_kernel_make_eulers_3D(int grid_size, int block_size,
 
 // -------------------------------  Some explicit template instantiations
 template void CpuKernels::cpu_translate2D<XFLOAT>(XFLOAT *,
-    XFLOAT*, int, int, int, int, int);
+    XFLOAT*, size_t, int, int, int, int);
 
 template void CpuKernels::cpu_translate3D<XFLOAT>(XFLOAT *,
-    XFLOAT *, int, int, int, int, int, int, int);
+    XFLOAT *, size_t, int, int, int, int, int, int);
 
 template void CpuKernels::cpu_kernel_multi<XFLOAT>( XFLOAT *,
 	XFLOAT, int);

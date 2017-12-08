@@ -204,8 +204,8 @@ void cosineFilter(	int      block_dim,
 
 template <typename T>
 void cpu_translate2D(T * g_image_in,
-					T * g_image_out,
-					int      image_size,
+					T *      g_image_out,
+					size_t   image_size,
 					int      xdim,
 					int      ydim, //not used
 					int      dx,
@@ -213,8 +213,8 @@ void cpu_translate2D(T * g_image_in,
 
 template <typename T>
 void cpu_translate3D(T * g_image_in,
-					T * g_image_out,
-					int      image_size,
+					T *      g_image_out,
+					size_t   image_size,
 					int      xdim,
 					int      ydim,
 					int      zdim, //not used
@@ -225,10 +225,10 @@ void cpu_translate3D(T * g_image_in,
 //----------------------------------------------------------------------------
 template <typename T>
 void centerFFT_2D(  int		batch_size,
-					int		pixel_start,
-					int		pixel_end,
+					size_t		pixel_start,
+					size_t		pixel_end,
 					T		*img_in,
-					int		image_size,
+					size_t	image_size,
 					int		xdim,
 					int		ydim,
 					int		xshift,
@@ -236,10 +236,10 @@ void centerFFT_2D(  int		batch_size,
 
 template <typename T>
 void centerFFT_3D(  int		batch_size,
-					int		pixel_start,
-					int		pixel_end,
+					size_t	pixel_start,
+					size_t	pixel_end,
 					T		*img_in,
-					int		image_size,
+					size_t	image_size,
 					int		xdim,
 					int		ydim,
 					int		zdim,
@@ -420,6 +420,12 @@ void kernel_frequencyPass( int grid_size, int block_size,
 					XFLOAT       angpix,
 					int          image_size)
 {
+#ifdef DEBUG_CUDA
+	if((size_t)grid_size*(size_t)block_size > (size_t)std::numeric_limits<int>::max())
+		CHECK_INDEX_DEBUG_FATAL("kernel_frequencyPass:  grid_size*(size_t)block_size > (size_t)std::numeric_limits<int>::max()");
+	if (image_size < 0)
+		CHECK_INDEX_DEBUG_FATAL("kernel_frequencyPass:  image_size < 0");
+#endif
 	// TODO - why not a single loop over image_size pixels?
 	for(int blk=0; blk<grid_size; blk++) {
 		for(int tid=0; tid<block_size; tid++) {
@@ -486,6 +492,12 @@ void powerClass(int          gridSize,
 				int          res_limit,
 				XFLOAT      *g_highres_Xi2)
 {
+#ifdef DEBUG_CUDA
+	if((size_t)gridSize*(size_t)POWERCLASS_BLOCK_SIZE > (size_t)std::numeric_limits<int>::max())
+		CHECK_INDEX_DEBUG_FATAL("kernel_frequencyPass:  gridSize*(size_t)POWERCLASS_BLOCK_SIZE > (size_t)std::numeric_limits<int>::max()");
+	if (image_size < 0)
+		CHECK_INDEX_DEBUG_FATAL("kernel_frequencyPass:  image_size < 0");
+#endif
 	for(int bid=0; bid<gridSize; bid++)
 	{
 		XFLOAT normFaux;

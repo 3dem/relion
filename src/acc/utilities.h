@@ -27,7 +27,7 @@ void dump_triple_array(char *name, double *ptr, double *ptr2, double *ptr3, size
 
 namespace AccUtilities
 {
-	
+	 
 template <typename T>
 static void multiply(int block_size, AccDataTypes::Image<T> &ptr, T value)
 {
@@ -466,7 +466,7 @@ void centerFFT_2D(int grid_size, int batch_size, int block_size,
 void centerFFT_3D(int grid_size, int batch_size, int block_size,
 				cudaStream_t stream,
 				XFLOAT *img_in,
-				int image_size,
+				size_t image_size,
 				int xdim,
 				int ydim,
 				int zdim,

@@ -327,8 +327,12 @@ void diff2_coarse(
 		XFLOAT *g_eulers,
 		XFLOAT *trans_x,
 		XFLOAT *trans_y,
-		XFLOAT *trans_z,		
-		XFLOAT *g_real,
+		XFLOAT *trans_z,
+#ifdef DEBUG_CUDA		
+		XFLOAT *_g_real,
+#else
+		XFLOAT *g_real,	
+#endif
 		XFLOAT *g_imag,
 		AccProjectorKernel &projector,
 		XFLOAT *g_corr,
@@ -336,7 +340,11 @@ void diff2_coarse(
 		int translation_num,
 		int image_size
 		)
-{           
+{ 
+#ifdef DEBUG_CUDA
+	checkedArray<XFLOAT> g_real;
+	g_real.initCheckedArray(_g_real);
+#endif
 	//Prefetch euler matrices
 	XFLOAT s_eulers[eulers_per_block * 9];
 
@@ -469,7 +477,11 @@ template<bool REF3D>
 void diff2_fine_2D(
 		int     grid_size,
 		XFLOAT *g_eulers,
-		XFLOAT *g_imgs_real,
+#ifdef DEBUG_CUDA
+		XFLOAT *_g_imgs_real,
+#else
+		XFLOAT *g_imgs_real,		
+#endif
 		XFLOAT *g_imgs_imag,
 		XFLOAT *g_trans_x,
 		XFLOAT *g_trans_y,
@@ -485,6 +497,10 @@ void diff2_fine_2D(
 		unsigned long *d_job_num
 		)
 {   
+#ifdef DEBUG_CUDA
+	checkedArray<XFLOAT> g_imgs_real;
+	g_imgs_real.initCheckedArray(_g_imgs_real);
+#endif
 	for (unsigned long bid = 0; bid < grid_size; bid++) {
 		unsigned trans_num        = (unsigned)d_job_num[bid];     
 		unsigned long int iy_part = d_trans_idx[d_job_idx[bid]];  
@@ -599,7 +615,11 @@ inline
 void diff2_fine_3D(
 		int     grid_size,
 		XFLOAT *g_eulers,
+#ifdef DEBUG_CUDA
+		XFLOAT *_g_imgs_real,
+#else
 		XFLOAT *g_imgs_real,
+#endif
 		XFLOAT *g_imgs_imag,
 		XFLOAT *g_trans_x,
 		XFLOAT *g_trans_y,
@@ -614,7 +634,11 @@ void diff2_fine_3D(
 		unsigned long *d_job_idx,
 		unsigned long *d_job_num
 		)
-{   
+{ 
+#ifdef DEBUG_CUDA
+	checkedArray<XFLOAT> g_imgs_real;
+	g_imgs_real.initCheckedArray(_g_imgs_real);
+#endif
 	for (unsigned long bid = 0; bid < grid_size; bid++) {
 		unsigned trans_num        = (unsigned)d_job_num[bid];     
 		unsigned long int iy_part = d_trans_idx[d_job_idx[bid]];  
@@ -763,7 +787,11 @@ template<bool REF3D>
  void diff2_CC_coarse_2D(
 		int     grid_size,
 		XFLOAT *g_eulers,
+#ifdef DEBUG_CUDA
+		XFLOAT *_g_imgs_real,
+#else
 		XFLOAT *g_imgs_real,
+#endif
 		XFLOAT *g_imgs_imag,
 		XFLOAT *g_trans_x,
 		XFLOAT *g_trans_y,
@@ -774,7 +802,11 @@ template<bool REF3D>
 		int      image_size,
 		XFLOAT   exp_local_sqrtXi2
 		)
-{   
+{  
+#ifdef DEBUG_CUDA
+	checkedArray<XFLOAT> g_imgs_real;
+	g_imgs_real.initCheckedArray(_g_imgs_real);
+#endif
 	for (int iorient = 0; iorient < grid_size; iorient++) {
 	
 		XFLOAT e0,e1,e3,e4,e6,e7;
@@ -888,7 +920,11 @@ inline
 void diff2_CC_coarse_3D(
 		int     grid_size,
 		XFLOAT *g_eulers,
+#ifdef DEBUG_CUDA
+		XFLOAT *_g_imgs_real,
+#else
 		XFLOAT *g_imgs_real,
+#endif
 		XFLOAT *g_imgs_imag,
 		XFLOAT *g_trans_x,
 		XFLOAT *g_trans_y,
@@ -900,7 +936,11 @@ void diff2_CC_coarse_3D(
 		int      image_size,
 		XFLOAT   exp_local_sqrtXi2
 		)
-{   
+{ 
+#ifdef DEBUG_CUDA
+	checkedArray<XFLOAT> g_imgs_real;
+	g_imgs_real.initCheckedArray(_g_imgs_real);
+#endif
 	for (int iorient = 0; iorient < grid_size; iorient++) {
 		XFLOAT e0, e1, e2, e3, e4, e5, e6, e7, e8;
 		e0 = g_eulers[iorient*9  ];
@@ -1037,7 +1077,11 @@ template<bool REF3D>
 void diff2_CC_fine_2D(
 		int     grid_size,
 		XFLOAT *g_eulers,
+#ifdef DEBUG_CUDA
+		XFLOAT *_g_imgs_real,
+#else
 		XFLOAT *g_imgs_real,
+#endif
 		XFLOAT *g_imgs_imag,
 		XFLOAT *g_trans_x,
 		XFLOAT *g_trans_y,
@@ -1052,7 +1096,11 @@ void diff2_CC_fine_2D(
 		unsigned long *d_job_idx,
 		unsigned long *d_job_num
 		)
-{     
+{ 
+#ifdef DEBUG_CUDA
+	checkedArray<XFLOAT> g_imgs_real;
+	g_imgs_real.initCheckedArray(_g_imgs_real);
+#endif
 	for (int bid = 0; bid < grid_size; bid++) {
 
 		unsigned trans_num   = d_job_num[bid]; //how many transes we have for this rot
@@ -1174,7 +1222,11 @@ inline
 void diff2_CC_fine_3D(
 		int     grid_size,
 		XFLOAT *g_eulers,
+#ifdef DEBUG_CUDA
+		XFLOAT *_g_imgs_real,
+#else
 		XFLOAT *g_imgs_real,
+#endif
 		XFLOAT *g_imgs_imag,
 		XFLOAT *g_trans_x,
 		XFLOAT *g_trans_y,
@@ -1190,7 +1242,12 @@ void diff2_CC_fine_3D(
 		unsigned long *d_job_idx,
 		unsigned long *d_job_num
 		)
-{                                   
+{  
+#ifdef DEBUG_CUDA
+	checkedArray<XFLOAT> g_imgs_real;
+	g_imgs_real.initCheckedArray(_g_imgs_real);
+#endif
+
 	for (int bid = 0; bid < grid_size; bid++) {
 
 		unsigned trans_num   = d_job_num[bid]; //how many transes we have for this rot

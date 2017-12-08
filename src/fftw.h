@@ -585,7 +585,7 @@ void CenterFFT(MultidimArray< T >& v, bool forward)
         if (!forward)
             shift = -shift;
 
-        // Shift the input in an auxiliar vector
+        // Shift the input in an auxiliary vector
         for (int i = 0; i < l; i++)
         {
             int ip = i + shift;
@@ -617,14 +617,14 @@ void CenterFFT(MultidimArray< T >& v, bool forward)
 			yshift = -yshift;
 		}
 		
-		int image_size = xSize*ySize;
-		int isize2 = image_size/2;
+		size_t image_size = xSize*ySize;
+		size_t isize2 = image_size/2;
 		int blocks = ceilf((float)(image_size/(float)(2*CFTT_BLOCK_SIZE)));
 
 //		for(int i=0; i<blocks; i++) {
 		tbb::parallel_for(0, blocks, [&](int i) {
-			int pixel_start = i*(CFTT_BLOCK_SIZE);
-			int pixel_end = (i+1)*(CFTT_BLOCK_SIZE);
+			size_t pixel_start = i*(CFTT_BLOCK_SIZE);
+			size_t pixel_end = (i+1)*(CFTT_BLOCK_SIZE);
 			if (pixel_end > isize2)
 				pixel_end = isize2;
 			
@@ -632,7 +632,7 @@ void CenterFFT(MultidimArray< T >& v, bool forward)
 				pixel_start,
 				pixel_end,
 				MULTIDIM_ARRAY(v),
-				xSize*ySize,
+				(size_t)xSize*ySize,
 				xSize,
 				ySize,
 				xshift,
@@ -660,13 +660,13 @@ void CenterFFT(MultidimArray< T >& v, bool forward)
 				zshift = -zshift;
 			}
 
-			int image_size = xSize*ySize*zSize;
-			int isize2 = image_size/2;
+			size_t image_size = xSize*ySize*zSize;
+			size_t isize2 = image_size/2;
 			int block =ceilf((float)(image_size/(float)(2*CFTT_BLOCK_SIZE)));
 //			for(int i=0; i<block; i++){
 			tbb::parallel_for(0, block, [&](int i) {
-				int pixel_start = i*(CFTT_BLOCK_SIZE);
-				int pixel_end = (i+1)*(CFTT_BLOCK_SIZE);
+				size_t pixel_start = i*(CFTT_BLOCK_SIZE);
+				size_t pixel_end = (i+1)*(CFTT_BLOCK_SIZE);
 				if (pixel_end > isize2)
 					pixel_end = isize2;
 			
@@ -674,7 +674,7 @@ void CenterFFT(MultidimArray< T >& v, bool forward)
 					pixel_start,
 					pixel_end,
 					MULTIDIM_ARRAY(v),
-					xSize*ySize*zSize,
+					(size_t)xSize*ySize*zSize,
 					xSize,
 					ySize,
 					zSize,
@@ -695,13 +695,13 @@ void CenterFFT(MultidimArray< T >& v, bool forward)
 				yshift = -yshift;
 			}
 
-			int image_size = xSize*ySize;
-			int isize2 = image_size/2;
+			size_t image_size = xSize*ySize;
+			size_t isize2 = image_size/2;
 			int blocks = ceilf((float)(image_size/(float)(2*CFTT_BLOCK_SIZE)));
 //			for(int i=0; i<blocks; i++) {
 			tbb::parallel_for(0, blocks, [&](int i) {
-				int pixel_start = i*(CFTT_BLOCK_SIZE);
-				int pixel_end = (i+1)*(CFTT_BLOCK_SIZE);
+				size_t pixel_start = i*(CFTT_BLOCK_SIZE);
+				size_t pixel_end = (i+1)*(CFTT_BLOCK_SIZE);
 				if (pixel_end > isize2)
 					pixel_end = isize2;
 
@@ -709,7 +709,7 @@ void CenterFFT(MultidimArray< T >& v, bool forward)
 					pixel_start,
 					pixel_end,
 					MULTIDIM_ARRAY(v),
-					xSize*ySize,
+					(size_t)xSize*ySize,
 					xSize,
 					ySize,
 					xshift,
