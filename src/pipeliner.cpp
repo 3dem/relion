@@ -891,6 +891,7 @@ bool PipeLine::markAsFinishedJob(int this_job, std::string &error_message)
 		{
 			error_message = "You are trying to mark a relion_refine job as finished that hasn't even started. \n This will be ignored. Perhaps you wanted to delete it instead?";
 			processList[this_job].status = PROC_RUNNING;
+	                write(DO_LOCK);
 			return false;
 		}
 	}
