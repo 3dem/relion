@@ -2306,12 +2306,20 @@ void MlOptimiser::iterate()
 
 	// launch threads etc
 	iterateSetup();
+	
+#ifdef TIMING
+	timer.tic(TIMING_ITER_UPDATERES);
+#endif
 
 	// Update the current resolution and image sizes, and precalculate resolution pointers
 	// The rest of the time this will be done after maximization and before writing output files,
 	// so that current resolution is in the output files of the current iteration
 	updateCurrentResolution();
 
+#ifdef TIMING
+	timer.toc(TIMING_ITER_UPDATERES);
+#endif
+			
 	// If we're doing a restart from subsets, then do not increment the iteration number in the restart!
 	if (subset > 0)
 	{
@@ -2394,11 +2402,16 @@ void MlOptimiser::iterate()
 
 #ifdef TIMING
 			timer.toc(TIMING_MAX);
+			timer.tic(TIMING_ITER_LOCALSYM);
 #endif
 
 			// Apply local symmetry according to a list of masks and their operators
 			applyLocalSymmetryForEachRef();
 
+#ifdef TIMING
+			timer.toc(TIMING_ITER_LOCALSYM);
+			timer.tic(TIMING_ITER_HELICALREFINE);
+#endif			
 			// Shaoda Jul26,2015
 			// Helical symmetry refinement and imposition of real space helical symmetry.
 			if (do_helical_refine)
@@ -2443,17 +2456,32 @@ void MlOptimiser::iterate()
 				}
 			}
 
+#ifdef TIMING
+			timer.toc(TIMING_ITER_HELICALREFINE);
+			timer.tic(TIMING_ITER_SOLVFLAT);
+#endif	
 			// Apply masks to the reference images
 			// At the last iteration, do not mask the map for validation purposes
 			if (do_solvent && !has_converged)
 				solventFlatten();
-
+			
+#ifdef TIMING
+			timer.toc(TIMING_ITER_SOLVFLAT);
+			timer.tic(TIMING_ITER_UPDATERES);
+#endif	
 			// Re-calculate the current resolution, do this before writing to get the correct values in the output files
 			updateCurrentResolution();
 
+#ifdef TIMING
+			timer.toc(TIMING_ITER_UPDATERES);
+			timer.tic(TIMING_ITER_WRITE);
+#endif	
 			// Write output files
 			write(DO_WRITE_SAMPLING, DO_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, 0);
 
+#ifdef TIMING
+			timer.toc(TIMING_ITER_WRITE);
+#endif	
 			if (do_auto_refine && has_converged)
 			{
 				if (verb > 0)
@@ -2517,8 +2545,14 @@ void MlOptimiser::iterate()
 
     } // end loop iters
 
+#ifdef TIMING
+	timer.tic(TIMING_ITER_WRAPUP);
+#endif
 	// delete threads etc
 	iterateWrapUp();
+#ifdef TIMING
+	timer.toc(TIMING_ITER_WRAPUP);
+#endif
 }
 
 void MlOptimiser::expectation()
@@ -4087,8 +4121,8 @@ void MlOptimiser::maximizationOtherParameters()
 			}
 		}
 	}
-	RCTIC(timer,RCT_7);
-	RCTOC(timer,RCT_8);
+	RCTOC(timer,RCT_7);
+	RCTIC(timer,RCT_8);
 	// After the first iteration the references are always CTF-corrected
     if (do_ctf_correction)
     	refs_are_ctf_corrected = true;
