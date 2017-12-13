@@ -1346,6 +1346,13 @@ void MlOptimiser::initialiseGeneral(int rank)
 	TIMING_WSUM_LOCALSUMS =timer.setNew(" -  - EOPwsum: localsums");
 	TIMING_WSUM_SUMSHIFT = timer.setNew(" -  - EOPwsum: shiftimg");
 	TIMING_WSUM_BACKPROJ = timer.setNew(" -  - EOPwsum: backproject");
+	
+	TIMING_ITER_WRAPUP        = timer.setNew("iterate:  iterateWrapup");
+	TIMING_ITER_HELICALREFINE = timer.setNew("iterate:  helicalRefinement");
+	TIMING_ITER_SOLVFLAT      = timer.setNew("iterate:  solventFlatten");
+	TIMING_ITER_UPDATERES     = timer.setNew("iterate:  updateCurrentResolution");
+	TIMING_ITER_WRITE         = timer.setNew("iterate:  writeOutput");
+	TIMING_ITER_LOCALSYM      = timer.setNew("iterate:  ApplyLocalSymmetry"); 
 
 	TIMING_EXTRA1= timer.setNew(" -extra1");
 	TIMING_EXTRA2= timer.setNew(" -extra2");
