@@ -1349,10 +1349,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 	TIMING_WSUM_SUMSHIFT = timer.setNew(" -  - EOPwsum: shiftimg");
 	TIMING_WSUM_BACKPROJ = timer.setNew(" -  - EOPwsum: backproject");
 	
-	TIMING_ITER_WRAPUP        = timer.setNew("iterate:  iterateWrapup");
 	TIMING_ITER_HELICALREFINE = timer.setNew("iterate:  helicalRefinement");
-	TIMING_ITER_SOLVFLAT      = timer.setNew("iterate:  solventFlatten");
-	TIMING_ITER_UPDATERES     = timer.setNew("iterate:  updateCurrentResolution");
 	TIMING_ITER_WRITE         = timer.setNew("iterate:  writeOutput");
 	TIMING_ITER_LOCALSYM      = timer.setNew("iterate:  ApplyLocalSymmetry"); 
 
@@ -2322,18 +2319,11 @@ void MlOptimiser::iterate()
 	// launch threads etc
 	iterateSetup();
 	
-#ifdef TIMING
-	timer.tic(TIMING_ITER_UPDATERES);
-#endif
 
 	// Update the current resolution and image sizes, and precalculate resolution pointers
 	// The rest of the time this will be done after maximization and before writing output files,
 	// so that current resolution is in the output files of the current iteration
 	updateCurrentResolution();
-
-#ifdef TIMING
-	timer.toc(TIMING_ITER_UPDATERES);
-#endif
 			
 	// If we're doing a restart from subsets, then do not increment the iteration number in the restart!
 	if (subset > 0)
@@ -2473,7 +2463,7 @@ void MlOptimiser::iterate()
 
 #ifdef TIMING
 			timer.toc(TIMING_ITER_HELICALREFINE);
-			timer.tic(TIMING_ITER_SOLVFLAT);
+			timer.tic(TIMING_SOLVFLAT);
 #endif	
 			// Apply masks to the reference images
 			// At the last iteration, do not mask the map for validation purposes
@@ -2481,14 +2471,14 @@ void MlOptimiser::iterate()
 				solventFlatten();
 			
 #ifdef TIMING
-			timer.toc(TIMING_ITER_SOLVFLAT);
-			timer.tic(TIMING_ITER_UPDATERES);
+			timer.toc(TIMING_SOLVFLAT);
+			timer.tic(TIMING_UPDATERES);
 #endif	
 			// Re-calculate the current resolution, do this before writing to get the correct values in the output files
 			updateCurrentResolution();
 
 #ifdef TIMING
-			timer.toc(TIMING_ITER_UPDATERES);
+			timer.toc(TIMING_UPDATERES);
 			timer.tic(TIMING_ITER_WRITE);
 #endif	
 			// Write output files
@@ -2569,14 +2559,9 @@ void MlOptimiser::iterate()
 
     } // end loop iters
 
-#ifdef TIMING
-	timer.tic(TIMING_ITER_WRAPUP);
-#endif
 	// delete threads etc
 	iterateWrapUp();
-#ifdef TIMING
-	timer.toc(TIMING_ITER_WRAPUP);
-#endif
+	
 }
 
 void MlOptimiser::expectation()
