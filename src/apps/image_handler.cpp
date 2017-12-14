@@ -425,7 +425,7 @@ class image_handler_parameters
 		// Thresholding (can be done after any other operation)
 		if (fabs(threshold_above - 999.) > 0.)
 		{
-			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Iin())
+			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Iout())
 			{
 				if (DIRECT_A3D_ELEM(Iout(), k, i, j) > threshold_above)
 					DIRECT_A3D_ELEM(Iout(), k, i, j) = threshold_above;
@@ -433,7 +433,7 @@ class image_handler_parameters
 		}
 		if (fabs(threshold_below + 999.) > 0.)
 		{
-			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Iin())
+			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Iout())
 			{
 				if (DIRECT_A3D_ELEM(Iout(), k, i, j) < threshold_below)
 					DIRECT_A3D_ELEM(Iout(), k, i, j) = threshold_below;
