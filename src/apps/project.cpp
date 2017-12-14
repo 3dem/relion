@@ -37,9 +37,9 @@ class project_parameters
 public:
 
 	FileName fn_map, fn_ang, fn_out, fn_img, fn_model, fn_sym, fn_mask;
-	RFLOAT rot, tilt, psi, xoff, yoff, zoff, angpix, maxres, stddev_white_noise, particle_diameter, ana_prob_range, ana_prob_step, sigma_offset;
+	RFLOAT rot, tilt, psi, xoff, yoff, zoff, angpix, maxres, stddev_white_noise, particle_diameter, ana_prob_range, ana_prob_step;
 	int padding_factor;
-	int r_max, r_min_nn, interpolator, nr_uniform;
+	int r_max, r_min_nn, interpolator;
     bool do_only_one, do_ctf, do_ctf2, ctf_phase_flipped, do_ctf_intact_1st_peak, do_timing, do_add_noise, do_subtract_exp, do_ignore_particle_name, do_3d_rot;
 	// I/O Parser
 	IOParser parser;
@@ -64,8 +64,6 @@ public:
        	angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms)", "1"));
 		fn_mask = parser.getOption("--mask", "Mask that will be applied to the input map prior to making projections", "");
        	fn_ang = parser.getOption("--ang", "STAR file with orientations for multiple projections (if None, assume single projection)","None");
-       	nr_uniform = textToInteger(parser.getOption("--nr_uniform", " OR get this many samples from a uniform angular distribution", "-1"));
-       	sigma_offset = textToFloat(parser.getOption("--sigma_offset", "Apply Gaussian errors with this stddev to the XY-offsets", "0"));
        	rot = textToFloat(parser.getOption("--rot", "First Euler angle (for a single projection)", "0"));
        	tilt = textToFloat(parser.getOption("--tilt", "Second Euler angle (for a single projection)", "0"));
        	psi = textToFloat(parser.getOption("--psi", "Third Euler angle (for a single projection)", "0"));
@@ -77,7 +75,7 @@ public:
        	fn_model = parser.getOption("--model_noise", "Model STAR file with power spectra for coloured Gaussian noise", "");
        	do_subtract_exp = parser.checkOption("--subtract_exp", "Subtract projections from experimental images (in --ang)");
        	do_ignore_particle_name = parser.checkOption("--ignore_particle_name", "Ignore the rlnParticleName column (in --ang)");
-       	do_only_one = (fn_ang == "None" && nr_uniform < 0);
+       	do_only_one = (fn_ang == "None");
        	do_3d_rot = parser.checkOption("--3d_rot", "Perform 3D rotations instead of projection into 2D images");
 
        	maxres = textToFloat(parser.getOption("--maxres", "Maximum resolution (in Angstrom) to consider in Fourier space (default Nyquist)", "-1"));
@@ -123,35 +121,7 @@ public:
     		DIRECT_MULTIDIM_ELEM(vol(), n) *= DIRECT_MULTIDIM_ELEM(msk(), n);
     	}
 
-    	if (nr_uniform > 0)
-    	{
-
-    		std::cout << " Generating " << nr_uniform << " projections taken randomly from a uniform angular distribution ..." << std::endl;
-    		MDang.clear();
-    		randomize_random_generator();
-    		for (long int i = 0; i < nr_uniform; i++)
-    		{
-				RFLOAT rot, tilt, psi, xoff, yoff;
-				rot = rnd_unif() * 360.;
-				bool ok_tilt = false;
-				while (!ok_tilt)
-				{
-					tilt = rnd_unif() * 180.;
-					if (rnd_unif() < fabs(SIND(tilt)))
-						ok_tilt = true;
-				}
-				psi = rnd_unif() * 360.;
-				xoff = rnd_gaus(0., sigma_offset);
-				yoff = rnd_gaus(0., sigma_offset);
-				MDang.addObject();
-				MDang.setValue(EMDL_ORIENT_ROT, rot);
-				MDang.setValue(EMDL_ORIENT_TILT, tilt);
-				MDang.setValue(EMDL_ORIENT_PSI, psi);
-				MDang.setValue(EMDL_ORIENT_ORIGIN_X, xoff);
-				MDang.setValue(EMDL_ORIENT_ORIGIN_Y, yoff);
-    		}
-    	}
-    	else if (!do_only_one)
+    	if (!do_only_one)
     	{
     		std::cout << " Reading STAR file with all angles " << fn_ang << std::endl;
     		MDang.read(fn_ang);
@@ -449,7 +419,7 @@ int main(int argc, char *argv[])
 
     catch (RelionError XE)
     {
-        prm.usage();
+        //prm.usage();
         std::cerr << XE;
         exit(1);
     }

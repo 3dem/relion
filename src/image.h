@@ -132,10 +132,6 @@ public:
     		closeFile();
 
     	FileName fileName, headName = "";
-    	// get the format, checking for possible format specifier before suffix
-    	// getFileFormat("file.spi")    	will return "spi"
-    	// getFileFormat("file.spi:mrc") 	will return "mrc"
-    	// getFileFormat("file") 			will return ""
 		ext_name = name.getFileFormat();
 
 		long int dump;
@@ -144,8 +140,6 @@ public:
 		if (dump > 0)
 			dump--;
 
-		// create the filename from a possible input format specifier (file.spi:mrc means "it's called .spi, but it's really a .mrc")
-		// file.spi:mrc -> file.spi
 		fileName = fileName.removeFileFormat();
 
 		size_t found = fileName.find_first_of("%");
@@ -182,11 +176,6 @@ public:
 			fileName = fileName.withoutExtension();
 			headName = fileName.addExtension("hed");
 			fileName = fileName.addExtension("img");
-		}
-		else if(ext_name=="")
-		{
-			ext_name="spi"; // SPIDER is default format if none is specified
-			fileName = fileName.addExtension(ext_name);
 		}
 
 		// Open image file

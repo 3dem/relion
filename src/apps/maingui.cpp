@@ -72,21 +72,11 @@ int main(int argc, char *argv[])
 	try
 	{
 		// Fill the window
-		if (checkParameter(argc, argv, "--help"))
-		{
-			std::cerr << " [--refresh=2]  : refresh rate in seconds" << std::endl;
-			std::cerr << " [--idle=3600]  : quit GUI after this many second" << std::endl;
-			std::cerr << " [--readonly]   : limited version of GUI that does not touch any files" << std::endl;
-			std::cerr << " [--oldstyle]   : old-style GUI without pipeline functionality, only print commands" << std::endl;
-			exit(0);
-		}
 		FileName fn_pipe = getParameter(argc, argv, "--pipeline", "default");
 		int _update_every_sec = textToInteger(getParameter(argc, argv, "--refresh", "2"));
 		int _exit_after_sec = textToInteger(getParameter(argc, argv, "--idle", "3600"));
 		bool _do_read_only = checkParameter(argc, argv, "--readonly");
-		bool _do_old_style = checkParameter(argc, argv, "--oldstyle");
-		int height = _do_old_style ? GUIHEIGHT_OLD : GUIHEIGHT_EXT;
-		GuiMainWindow window(GUIWIDTH, height, titletext, fn_pipe, _update_every_sec, _exit_after_sec, _do_read_only, _do_old_style);
+		GuiMainWindow window(GUIWIDTH, GUIHEIGHT_EXT, titletext, fn_pipe, _update_every_sec, _exit_after_sec, _do_read_only);
 
 		// Show and run the window
 		window.show();

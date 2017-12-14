@@ -309,18 +309,13 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 
 	int corrections_section = parser.addSection("Corrections");
 
-
-	// Can also switch the following option OFF
+	// Can only switch the following option ON, not OFF
 	if (parser.checkOption("--scale", "Switch on intensity-scale corrections on image groups", "OLD"))
 		do_scale_correction = true;
-	if (parser.checkOption("--no_scale", "Switch off intensity-scale corrections on image groups", "OLD"))
-		do_scale_correction = false;
 
-	// Can also switch the following option OFF
+	// Can only switch the following option ON, not OFF
 	if (parser.checkOption("--norm", "Switch on normalisation-error correction","OLD"))
 		do_norm_correction = true;
-	if (parser.checkOption("--no_norm", "Switch off normalisation-error correction","OLD"))
-		do_norm_correction = false;
 
 	int computation_section = parser.addSection("Computation");
 
@@ -532,11 +527,6 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	only_flip_phases = parser.checkOption("--only_flip_phases", "Only perform CTF phase-flipping? (default is full amplitude-correction)");
 	do_norm_correction = parser.checkOption("--norm", "Perform normalisation-error correction?");
 	do_scale_correction = parser.checkOption("--scale", "Perform intensity-scale corrections on image groups?");
-	// Allow switching off norm and scale (which is on by default in the GUI)
-	if (parser.checkOption("--no_norm", "Switch off normalisation-error correction?"))
-		do_norm_correction = false;
-	if (parser.checkOption("--no_scale", "Switch off intensity-scale corrections on image groups?"))
-		do_scale_correction = false;
 
 	// SGD stuff
 	int sgd_section = parser.addSection("Stochastic Gradient Descent");
@@ -1287,9 +1277,6 @@ void MlOptimiser::initialiseGeneral(int rank)
             std::cout << " Running CPU instructions in double precision. " << std::endl;
 #endif
 
-    // For safeguarding the gold-standard separation
-    my_halfset = -1;
-
     // Check if output directory exists
     FileName fn_dir = fn_out.beforeLastOf("/");
     if (!exists(fn_dir))
@@ -1545,6 +1532,10 @@ void MlOptimiser::initialiseGeneral(int rank)
 			sampling.orientational_prior_mode = PRIOR_ROTTILT_PSI;
 			RFLOAT rottilt_step = sampling.getAngularSampling(adaptive_oversampling);
 			mymodel.sigma2_rot = mymodel.sigma2_tilt = mymodel.sigma2_psi = 2. * 2. * rottilt_step * rottilt_step;
+
+			// Aug20,2015 - Shaoda, Helical refinement
+			if ( (do_helical_refine) && (!ignore_helical_symmetry) )
+				mymodel.sigma2_rot = getHelicalSigma2Rot((helical_rise_initial / mymodel.pixel_size), helical_twist_initial, sampling.helical_offset_step, rottilt_step, mymodel.sigma2_rot);
 		}
 
 		// If this is a normal (non-movie) auto-refinement run: check whether we had converged already
@@ -1567,14 +1558,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 	bool do_local_searches = ((do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches));
 	sampling.initialise(mymodel.orientational_prior_mode, mymodel.ref_dim, (mymodel.data_dim == 3), do_gpu, (verb>0),
 			do_local_searches, (do_helical_refine) && (!ignore_helical_symmetry), helical_rise_initial / mymodel.pixel_size, helical_twist_initial);
-
-	// Now that sampling is initialised, also modify sigma2_rot for the helical refinement
-        if (do_auto_refine && do_helical_refine && !ignore_helical_symmetry && iter == 0 && sampling.healpix_order >= autosampling_hporder_local_searches)
-	{
-		// Aug20,2015 - Shaoda, Helical refinement
-		RFLOAT rottilt_step = sampling.getAngularSampling(adaptive_oversampling);
-		mymodel.sigma2_rot = getHelicalSigma2Rot((helical_rise_initial / mymodel.pixel_size), helical_twist_initial, sampling.helical_offset_step, rottilt_step, mymodel.sigma2_rot);
-	}
 
 	// Default max_coarse_size is original size
 	if (max_coarse_size < 0)
@@ -4200,18 +4183,6 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 		// Get the norm_correction
 		int icol_norm = (mymodel.nr_bodies == 1) ? METADATA_NORM : 6 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
 		RFLOAT normcorr = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, icol_norm);
-
-		// Safeguard against gold-standard separation
-		if (do_split_random_halves)
-		{
-			int halfset = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_NR_SIGN);
-			if (halfset != my_halfset)
-			{
-				std::cerr << " halfset= " << halfset << " my_halfset= " << my_halfset << " part_id= " << part_id << std::endl;
-				REPORT_ERROR("BUG! Mixing gold-standard separation!!!!");
-			}
-
-		}
 
 		// Get the old offsets and the priors on the offsets
 		Matrix1D<RFLOAT> my_old_offset(mymodel.data_dim), my_prior(mymodel.data_dim);
@@ -8336,11 +8307,7 @@ void MlOptimiser::getMetaAndImageDataSubset(int first_ori_particle_id, int last_
 			DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_CLASS) = (RFLOAT)iaux;
 			mydata.MDimg.getValue(EMDL_PARTICLE_DLL,  DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_DLL), part_id);
 			mydata.MDimg.getValue(EMDL_PARTICLE_PMAX, DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_PMAX), part_id);
-			// 5jul17: we do not need EMDL_PARTICLE_NR_SIGNIFICANT_SAMPLES for calculations. Send randomsubset instead!
-			if (do_split_random_halves)
-				mydata.MDimg.getValue(EMDL_PARTICLE_RANDOM_SUBSET, iaux, part_id);
-			else
-				mydata.MDimg.getValue(EMDL_PARTICLE_NR_SIGNIFICANT_SAMPLES, iaux, part_id);
+			mydata.MDimg.getValue(EMDL_PARTICLE_NR_SIGNIFICANT_SAMPLES, iaux, part_id);
 			DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_NR_SIGN) = (RFLOAT)iaux;
 			if (!mydata.MDimg.getValue(EMDL_IMAGE_NORM_CORRECTION, DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_NORM), part_id))
 				DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_NORM) = 1.;

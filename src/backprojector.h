@@ -97,9 +97,7 @@ public:
     	r_min_nn = _r_min_nn;
 
     	// Precalculate tabulated ftblob values
-    	//tab_ftblob.initialise(_blob_radius * padding_factor, _blob_alpha, _blob_order, 10000);
-    	// Sjors 8aug2017: try to fix problems with pad1 reconstrctions
-    	tab_ftblob.initialise(_blob_radius * 2., _blob_alpha, _blob_order, 10000);
+    	tab_ftblob.initialise(_blob_radius * padding_factor, _blob_alpha, _blob_order, 10000);
 
 	}
 

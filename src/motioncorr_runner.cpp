@@ -312,7 +312,7 @@ bool MotioncorrRunner::executeMotioncor2(FileName fn_mic, std::vector<float> &xs
 	{
 		// Cannot read TIFFs here...
 		if (fn_mic.getExtension() == "tif" || fn_mic.getExtension() == "tiff")
-			REPORT_ERROR("ERROR: you cannot use --last_frame_sum > 0 when reading TIFFs. Try using -Trunc in the --other_motioncor2_args instead.");
+			REPORT_ERROR("ERROR: you cannot use --last_frame_sum > 0 when reading TIFFs. Try using -Trunk in the --other_motioncor2_args instead.");
 
 		// Read in header of the movie, to see how many frames it has
 		Image<RFLOAT> Ihead;
