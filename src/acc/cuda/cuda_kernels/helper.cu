@@ -9,14 +9,22 @@ template __global__ void cuda_kernel_make_eulers_2D<true>(XFLOAT *,
 template __global__ void cuda_kernel_make_eulers_2D<false>(XFLOAT *,
 	XFLOAT *, unsigned);
 
-template __global__ void cuda_kernel_make_eulers_3D<true, true>(XFLOAT *,
-		XFLOAT *, XFLOAT *, XFLOAT *, unsigned, XFLOAT *);
-template __global__ void cuda_kernel_make_eulers_3D<true, false>(XFLOAT *,
-		XFLOAT *, XFLOAT *, XFLOAT *, unsigned, XFLOAT *);
-template __global__ void cuda_kernel_make_eulers_3D<false, true>(XFLOAT *,
-		XFLOAT *, XFLOAT *, XFLOAT *, unsigned, XFLOAT *);
-template __global__ void cuda_kernel_make_eulers_3D<false, false>(XFLOAT *,
-		XFLOAT *, XFLOAT *, XFLOAT *, unsigned, XFLOAT *);
+template __global__ void cuda_kernel_make_eulers_3D<true, true, true>(XFLOAT *,
+		XFLOAT *, XFLOAT *, XFLOAT *, unsigned, XFLOAT *, XFLOAT *);
+template __global__ void cuda_kernel_make_eulers_3D<true, true, false>(XFLOAT *,
+		XFLOAT *, XFLOAT *, XFLOAT *, unsigned, XFLOAT *, XFLOAT *);
+template __global__ void cuda_kernel_make_eulers_3D<true, false,true>(XFLOAT *,
+		XFLOAT *, XFLOAT *, XFLOAT *, unsigned, XFLOAT *, XFLOAT *);
+template __global__ void cuda_kernel_make_eulers_3D<true, false,false>(XFLOAT *,
+		XFLOAT *, XFLOAT *, XFLOAT *, unsigned, XFLOAT *, XFLOAT *);
+template __global__ void cuda_kernel_make_eulers_3D<false,true, true>(XFLOAT *,
+		XFLOAT *, XFLOAT *, XFLOAT *, unsigned, XFLOAT *, XFLOAT *);
+template __global__ void cuda_kernel_make_eulers_3D<false,true, false>(XFLOAT *,
+		XFLOAT *, XFLOAT *, XFLOAT *, unsigned, XFLOAT *, XFLOAT *);
+template __global__ void cuda_kernel_make_eulers_3D<false,false,true>(XFLOAT *,
+		XFLOAT *, XFLOAT *, XFLOAT *, unsigned, XFLOAT *, XFLOAT *);
+template __global__ void cuda_kernel_make_eulers_3D<false,false,false>(XFLOAT *,
+		XFLOAT *, XFLOAT *, XFLOAT *, unsigned, XFLOAT *, XFLOAT *);
 
 /*
  * This draft of a kernel assumes input that has jobs which have a single orientation and sequential translations within each job.
@@ -794,13 +802,14 @@ __global__ void cuda_kernel_make_eulers_2D(
 	}
 }
 
-template<bool invert,bool perturb>
+template<bool invert, bool doL, bool doR>
 __global__ void cuda_kernel_make_eulers_3D(
 		XFLOAT *alphas,
 		XFLOAT *betas,
 		XFLOAT *gammas,
 		XFLOAT *eulers,
 		unsigned orientation_num,
+		XFLOAT *L,
 		XFLOAT *R)
 {
 	XFLOAT a(0.f),b(0.f),g(0.f), A[9],B[9];
@@ -843,8 +852,7 @@ __global__ void cuda_kernel_make_eulers_3D(
 	A[7] = ( ss )              ;//21
 	A[8] = ( cb )              ;//22
 
-
-	if (perturb)
+	if (doR)
 		for (int i = 0; i < 3; i++)
 			for (int j = 0; j < 3; j++)
 				for (int k = 0; k < 3; k++)
@@ -852,6 +860,17 @@ __global__ void cuda_kernel_make_eulers_3D(
 	else
 		for (int i = 0; i < 9; i++)
 			B[i] = A[i];
+
+	if (doL)
+	{
+		for (int i = 0; i < 9; i++)
+			A[i] = B[i];
+
+		for (int i = 0; i < 3; i++)
+			for (int j = 0; j < 3; j++)
+				for (int k = 0; k < 3; k++)
+					B[i * 3 + j] += L[i * 3 + k] * A[k * 3 + j];
+	}
 
 	if(invert)
 	{

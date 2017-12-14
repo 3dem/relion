@@ -27,7 +27,7 @@ void dump_triple_array(char *name, double *ptr, double *ptr2, double *ptr3, size
 
 namespace AccUtilities
 {
-	 
+	
 template <typename T>
 static void multiply(int block_size, AccDataTypes::Image<T> &ptr, T value)
 {
@@ -359,7 +359,7 @@ void acc_make_eulers_2D(int grid_size, int block_size,
 #endif
 }
 
-template<bool invert,bool perturb>
+template<bool invert,bool doL,bool doR>
 void acc_make_eulers_3D(int grid_size, int block_size,
 		cudaStream_t stream,
 		XFLOAT *alphas,
@@ -367,23 +367,26 @@ void acc_make_eulers_3D(int grid_size, int block_size,
 		XFLOAT *gammas,
 		XFLOAT *eulers,
 		unsigned orientation_num,
+		XFLOAT *L,
 		XFLOAT *R)
 {
 #ifdef CUDA
-	cuda_kernel_make_eulers_3D<invert,perturb><<<grid_size,block_size,0,stream>>>(
+	cuda_kernel_make_eulers_3D<invert,doL,doR><<<grid_size,block_size,0,stream>>>(
 		alphas,
 		betas,
 		gammas,
 		eulers,
 		orientation_num,
+		L,
 		R);
 #else
-	CpuKernels::cpu_kernel_make_eulers_3D<invert,perturb>(grid_size, block_size,
+	CpuKernels::cpu_kernel_make_eulers_3D<invert,doL,doR>(grid_size, block_size,
 		alphas,
 		betas,
 		gammas,
 		eulers,
 		orientation_num,
+		L,
 		R);
 #endif
 }

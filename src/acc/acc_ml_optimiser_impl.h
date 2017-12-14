@@ -9,17 +9,16 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		SamplingParameters &sp,
 		MlOptimiser *baseMLO,
 		MlClass *accMLO,
-		AccPtrFactory ptrFactory
+		AccPtrFactory ptrFactory,
+		int ibody = 0
 		)
 {
 		GTIC(accMLO->timer,"getFourierTransformsAndCtfs");
-		//accMLO->timer.cuda_gpu_tic("getFourierTransformsAndCtfs");
 #ifdef TIMING
 	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
 		baseMLO->timer.tic(baseMLO->TIMING_ESP_FT);
 #endif
 
-	//FourierTransformer transformer;
 	CUSTOM_ALLOCATOR_REGION_NAME("GFTCTF");
 	
 	for (int ipart = 0; ipart < baseMLO->mydata.ori_particles[my_ori_particle].particles_id.size(); ipart++)
@@ -30,6 +29,8 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		MultidimArray<Complex > Fimg;
 		MultidimArray<Complex > Faux(accMLO->transformer.fFourier,true);
 		MultidimArray<RFLOAT> Fctf;
+		Matrix2D<RFLOAT> Aori;
+		Matrix1D<RFLOAT> my_projected_com(3), my_refined_ibody_offset(3);
 
 		// What is my particle_id?
 		long int part_id = baseMLO->mydata.ori_particles[my_ori_particle].particles_id[ipart];
@@ -54,7 +55,8 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		RFLOAT normcorr = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_NORM);
 
 		// Get the optimal origin offsets from the previous iteration
-		Matrix1D<RFLOAT> my_old_offset(2), my_prior(2);
+		Matrix1D<RFLOAT> my_old_offset(3), my_prior(3), my_old_offset_ori;
+		int icol_rot, icol_tilt, icol_psi, icol_xoff, icol_yoff, icol_zoff;
 		XX(my_old_offset) = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_XOFF);
 		YY(my_old_offset) = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_YOFF);
 		XX(my_prior)      = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_XOFF_PRIOR);
@@ -67,18 +69,64 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 		if (accMLO->dataIs3D)
 		{
-			my_old_offset.resize(3);
-			my_prior.resize(3);
 			ZZ(my_old_offset) = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ZOFF);
 			ZZ(my_prior)      = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ZOFF_PRIOR);
 			// Unitialised priors were set to 999.
 			if (ZZ(my_prior) > 998.99 && ZZ(my_prior) < 999.01)
 				ZZ(my_prior) = 0.;
 		}
+
+		if (baseMLO->mymodel.nr_bodies > 1)
+		{
+
+			// 17May2017: Shift image to the projected COM for this body!
+			// Aori is the original transformation matrix of the consensus refinement
+			Euler_angles2matrix(DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ROT),
+					            DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT),
+								DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI), Aori, false);
+			my_projected_com = Aori * baseMLO->mymodel.com_bodies[ibody];
+
+			// Subtract the projected COM offset, to position this body in the center
+			// Also keep the my_old_offset in my_old_offset_ori
+			my_old_offset_ori = my_old_offset;
+			my_old_offset -= my_projected_com;
+
+			// Also get refined offset for this body
+			icol_xoff = 3 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
+			icol_yoff = 4 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
+			icol_zoff = 5 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
+			XX(my_refined_ibody_offset) = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, icol_xoff);
+			YY(my_refined_ibody_offset) = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, icol_yoff);
+			if (baseMLO->mymodel.data_dim == 3)
+				ZZ(my_refined_ibody_offset) = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, icol_zoff);
+
+			// For multi-body refinement: set the priors of the translations to zero (i.e. everything centred around consensus offset)
+			my_prior.initZeros();
+		}
+
 		CTOC(accMLO->timer,"init");
 
 		CTIC(accMLO->timer,"nonZeroProb");
-		if (baseMLO->mymodel.orientational_prior_mode != NOPRIOR && !(baseMLO->do_skip_align ||baseMLO-> do_skip_rotate))
+		// Orientational priors
+		if (baseMLO->mymodel.nr_bodies > 1 )
+		{
+
+			// Centre local searches around the orientation from the previous iteration, this one goes with overall sigma2_ang
+			// On top of that, apply prior on the deviation from (0,0,0) with mymodel.sigma_tilt_bodies[ibody] and mymodel.sigma_psi_bodies[ibody]
+			icol_rot  = 0 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
+			icol_tilt = 1 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
+			icol_psi  = 2 + METADATA_LINE_LENGTH_BEFORE_BODIES + (ibody) * METADATA_NR_BODY_PARAMS;
+			RFLOAT prior_rot  = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, icol_rot);
+			RFLOAT prior_tilt = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, icol_tilt);
+			RFLOAT prior_psi =  DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, icol_psi);
+			baseMLO->sampling.selectOrientationsWithNonZeroPriorProbability(prior_rot, prior_tilt, prior_psi,
+									sqrt(baseMLO->mymodel.sigma2_rot), sqrt(baseMLO->mymodel.sigma2_tilt), sqrt(baseMLO->mymodel.sigma2_psi),
+									op.pointer_dir_nonzeroprior, op.directions_prior,
+									op.pointer_psi_nonzeroprior, op.psi_prior, false, 3.,
+									baseMLO->mymodel.sigma_tilt_bodies[ibody], baseMLO->mymodel.sigma_psi_bodies[ibody]);
+
+		}
+		else if (baseMLO->mymodel.orientational_prior_mode != NOPRIOR && !(baseMLO->do_skip_align ||baseMLO-> do_skip_rotate))
 		{
 			// First try if there are some fixed prior angles
 			RFLOAT prior_rot = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ROT_PRIOR);
@@ -332,7 +380,11 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		}
 		else
 		{
-			op.old_offset[ipart] = my_old_offset;  // Not doing helical refinement. Rounded Cartesian offsets are stored.
+			// For multi-bodies: store only the old refined offset, not the constant consensus offset or the projected COM of this body
+			if (baseMLO->mymodel.nr_bodies > 1)
+				op.old_offset[ipart] = my_refined_ibody_offset;
+			else
+				op.old_offset[ipart] = my_old_offset;  // Not doing helical refinement. Rounded Cartesian offsets are stored.
 		}
 		// Also store priors on translations
 		op.prior[ipart] = my_prior;
@@ -417,6 +469,11 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		MultidimArray<RFLOAT> Mnoise;
 		bool is_helical_segment = (baseMLO->do_helical_refine) || ((baseMLO->mymodel.ref_dim == 2) && (baseMLO->helical_tube_outer_diameter > 0.));
 
+		// For multibodies: have the mask radius equal to maximum radius within body mask plus the translational offset search range
+		RFLOAT my_mask_radius = (baseMLO->mymodel.nr_bodies > 1 ) ?
+				baseMLO->mymodel.max_radius_mask_bodies[ibody] + baseMLO->sampling.offset_range:
+				baseMLO->particle_diameter / (2. * baseMLO->mymodel.pixel_size);
+
 		if (!baseMLO->do_zero_mask)
 		{
 			// Make a noisy background image with the same spectrum as the sigma2_noise
@@ -471,11 +528,12 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 			if (is_helical_segment)
 			{
-				softMaskOutsideMapForHelix(img(), psi_deg, tilt_deg, (baseMLO->particle_diameter / (2. * baseMLO->mymodel.pixel_size)),
-						(baseMLO->helical_tube_outer_diameter / (2. * baseMLO->mymodel.pixel_size)), baseMLO->width_mask_edge, &Mnoise);
+				softMaskOutsideMapForHelix(img(), psi_deg, tilt_deg, my_mask_radius,
+						(baseMLO->helical_tube_outer_diameter / (2. * baseMLO->mymodel.pixel_size)),
+						baseMLO->width_mask_edge, &Mnoise);
 			}
 			else
-				softMaskOutsideMap(img(), baseMLO->particle_diameter / (2. * baseMLO->mymodel.pixel_size), (RFLOAT)baseMLO->width_mask_edge, &Mnoise);
+				softMaskOutsideMap(img(), my_mask_radius, (RFLOAT)baseMLO->width_mask_edge, &Mnoise);
 
 			for (int i=0; i<img_size; i++)
 				d_img[i] = img.data.data[i];
@@ -489,7 +547,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			d_img.streamSync();
 			d_img.getHost(img());
 
-			softMaskOutsideMapForHelix(img(), psi_deg, tilt_deg, (baseMLO->particle_diameter / (2. * baseMLO->mymodel.pixel_size)),
+			softMaskOutsideMapForHelix(img(), psi_deg, tilt_deg, my_mask_radius,
 					(baseMLO->helical_tube_outer_diameter / (2. * baseMLO->mymodel.pixel_size)), baseMLO->width_mask_edge);
 
 			d_img.setHost(img());
@@ -500,7 +558,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			CTIC(accMLO->timer,"softMaskOutsideMap");
 
 			XFLOAT cosine_width = baseMLO->width_mask_edge;
-			XFLOAT radius = (XFLOAT)((RFLOAT)baseMLO->particle_diameter / (2. *baseMLO-> mymodel.pixel_size));
+			XFLOAT radius = (XFLOAT) my_mask_radius;
 			if (radius < 0)
 				radius = ((RFLOAT)img.data.xdim)/2.;
 			XFLOAT radius_p = radius + cosine_width;
@@ -727,6 +785,109 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		op.Fimgs.at(ipart) = Fimg;
 		op.Fctfs.at(ipart) = Fctf;
 
+		// If we're doing multibody refinement, now subtract projections of the other bodies from both the masked and the unmasked particle
+		if (baseMLO->mymodel.nr_bodies > 1)
+		{
+			MultidimArray<Complex> Fsum_obody;
+			Fsum_obody.initZeros(Fimg);
+
+			for (int obody = 0; obody < baseMLO->mymodel.nr_bodies; obody++)
+			{
+				if (obody != ibody) // Only subtract if other body is not this body....
+				{
+					// Get the right metadata
+					int ocol_rot  = 0 + METADATA_LINE_LENGTH_BEFORE_BODIES + (obody) * METADATA_NR_BODY_PARAMS;
+					int ocol_tilt = 1 + METADATA_LINE_LENGTH_BEFORE_BODIES + (obody) * METADATA_NR_BODY_PARAMS;
+					int ocol_psi  = 2 + METADATA_LINE_LENGTH_BEFORE_BODIES + (obody) * METADATA_NR_BODY_PARAMS;
+					int ocol_xoff = 3 + METADATA_LINE_LENGTH_BEFORE_BODIES + (obody) * METADATA_NR_BODY_PARAMS;
+					int ocol_yoff = 4 + METADATA_LINE_LENGTH_BEFORE_BODIES + (obody) * METADATA_NR_BODY_PARAMS;
+					int ocol_zoff = 5 + METADATA_LINE_LENGTH_BEFORE_BODIES + (obody) * METADATA_NR_BODY_PARAMS;
+					int ocol_norm = 6 + METADATA_LINE_LENGTH_BEFORE_BODIES + (obody) * METADATA_NR_BODY_PARAMS;
+
+					Matrix2D<RFLOAT> Aresi,  Abody;
+					// Aresi is the residual orientation for this obody
+					Euler_angles2matrix(DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, ocol_rot),
+										DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, ocol_tilt),
+										DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, ocol_psi), Aresi, false);
+					// The real orientation to be applied is the obody transformation applied and the original one
+					Abody = Aori * (baseMLO->mymodel.orient_bodies[obody]).transpose() * baseMLO->A_rot90 * Aresi * baseMLO->mymodel.orient_bodies[obody];
+
+					// Get the FT of the projection in the right direction
+					MultidimArray<Complex> FTo;
+					FTo.initZeros(Fimg);
+					// The following line gets the correct pointer to account for overlap in the bodies
+					int oobody = DIRECT_A2D_ELEM(baseMLO->mymodel.pointer_body_overlap, ibody, obody);
+					baseMLO->mymodel.PPref[oobody].get2DFourierTransform(FTo, Abody, IS_NOT_INV);
+
+					// 17May2017: Body is centered at its own COM
+					// move it back to its place in the original particle image
+					Matrix1D<RFLOAT> other_projected_com(3);
+
+					// Projected COM for this body (using Aori, just like above for ibody and my_projected_com!!!)
+					other_projected_com = Aori * (baseMLO->mymodel.com_bodies[obody]);
+
+					// Do the exact same as was done for the ibody, but DONT selfROUND here, as later phaseShift applied to ibody below!!!
+					other_projected_com -= my_old_offset_ori;
+
+					// Subtract refined obody-displacement
+					XX(other_projected_com) -= DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, ocol_xoff);
+					YY(other_projected_com) -= DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, ocol_yoff);
+					if (baseMLO->mymodel.data_dim == 3)
+						ZZ(other_projected_com) -= DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, ocol_zoff);
+
+					// Add the my_old_offset=selfRound(my_old_offset_ori - my_projected_com) already applied to this image for ibody
+					other_projected_com += my_old_offset;
+
+					shiftImageInFourierTransform(FTo, Faux, (RFLOAT)baseMLO->mymodel.ori_size,
+							XX(other_projected_com), YY(other_projected_com), ZZ(other_projected_com));
+
+					// Sum the Fourier transforms of all the obodies
+					Fsum_obody += Faux;
+
+				} // end if obody != ibody
+			} // end for obody
+
+			// Now that we have all the summed projections of the obodies, apply CTF, masks etc
+			// Apply the CTF to this reference projection
+			if (baseMLO->do_ctf_correction)
+			{
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fsum_obody)
+				{
+					DIRECT_MULTIDIM_ELEM(Fsum_obody, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
+				}
+			}
+
+			// Subtract the other-body FT from the current image FT
+			// First the unmasked one, which will be used for reconstruction
+			// Only do this if the flag below is true. Otherwise, use the original particles for reconstruction
+			if (baseMLO->do_reconstruct_subtracted_bodies)
+				op.Fimgs_nomask.at(ipart) -= Fsum_obody;
+
+			// For the masked one, have to mask outside the circular mask to prevent negative values outside the mask in the subtracted image!
+			windowFourierTransform(Fsum_obody, Faux, baseMLO->mymodel.ori_size);
+			accMLO->transformer.inverseFourierTransform(Faux, img());
+			CenterFFT(img(), false);
+
+			softMaskOutsideMap(img(), my_mask_radius, (RFLOAT)baseMLO->width_mask_edge);
+
+			// And back to Fourier space now
+			CenterFFT(img(), true);
+			accMLO->transformer.FourierTransform(img(), Faux);
+			windowFourierTransform(Faux, Fsum_obody, baseMLO->mymodel.current_size);
+
+			// Subtract the other-body FT from the masked exp_Fimgs
+			op.Fimgs.at(ipart) -= Fsum_obody;
+
+			// 23jul17: NEW: as we haven't applied the (nonROUNDED!!)  my_refined_ibody_offset yet, do this now in the FourierTransform
+			Faux = op.Fimgs.at(ipart);
+			shiftImageInFourierTransform(Faux, op.Fimgs.at(ipart), (RFLOAT)baseMLO->mymodel.ori_size,
+					XX(my_refined_ibody_offset), YY(my_refined_ibody_offset), ZZ(my_refined_ibody_offset));
+			Faux = op.Fimgs_nomask.at(ipart);
+			shiftImageInFourierTransform(Faux, op.Fimgs_nomask.at(ipart), (RFLOAT)baseMLO->mymodel.ori_size,
+					XX(my_refined_ibody_offset), YY(my_refined_ibody_offset), ZZ(my_refined_ibody_offset));
+		} // end if mymodel.nr_bodies > 1
+
+
 	} // end loop ipart
 	//accMLO->transformer.clear();
 #ifdef TIMING
@@ -777,7 +938,7 @@ void getAllSquaredDifferencesCoarse(
 	{
 		CTIC(accMLO->timer,"generateProjectionSetupCoarse");
 
-	projectorPlans.resize(baseMLO->mymodel.nr_classes, (CudaCustomAllocator *)accMLO->getAllocator());
+		projectorPlans.resize(baseMLO->mymodel.nr_classes, (CudaCustomAllocator *)accMLO->getAllocator());
 
 
 		for (int iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
@@ -808,7 +969,9 @@ void getAllSquaredDifferencesCoarse(
 						!IS_NOT_INV,
 						baseMLO->do_skip_align,
 						baseMLO->do_skip_rotate,
-						baseMLO->mymodel.orientational_prior_mode
+						baseMLO->mymodel.orientational_prior_mode,
+						NULL,
+						NULL
 						);
 			}
 		}
@@ -2844,133 +3007,144 @@ void accDoExpectationOneParticle(MlClass *myInstance, unsigned long my_ori_parti
 			sp.iclass_min = sp.iclass_max = baseMLO->exp_random_class_some_particles[idx];
 		}
 	}
+    // Loop over all bodies of the multi-body refinement
+    // Basically, subsequently align and store weighted sums for each body
+    for (int ibody = 0; ibody < baseMLO->mymodel.nr_bodies; ibody++)
+    {
 
-	// Global exp_metadata array has metadata of all ori_particles. Where does my_ori_particle start?
-	for (long int iori = baseMLO->exp_my_first_ori_particle; iori <= baseMLO->exp_my_last_ori_particle; iori++)
-	{
-		if (iori == my_ori_particle) break;
-		op.metadata_offset += baseMLO->mydata.ori_particles[iori].particles_id.size();
-	}
+    	OptimisationParamters op(sp.nr_particles, my_ori_particle);
+
+		// Skip this body if keep_fixed_bodies[ibody] or if it's angular accuracy is worse than 1.5x the sampling rate
+    	if ( baseMLO->mymodel.nr_bodies > 1 && baseMLO->mymodel.keep_fixed_bodies[ibody] > 0)
+			continue;
+
+
+		// Global exp_metadata array has metadata of all ori_particles. Where does my_ori_particle start?
+		for (long int iori = baseMLO->exp_my_first_ori_particle; iori <= baseMLO->exp_my_last_ori_particle; iori++)
+		{
+			if (iori == my_ori_particle) break;
+			op.metadata_offset += baseMLO->mydata.ori_particles[iori].particles_id.size();
+		}
 #ifdef TIMING
 // Only time one thread
 if (thread_id == 0)
 baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_A);
 #endif
-	CTIC(timer,"getFourierTransformsAndCtfs");
-	getFourierTransformsAndCtfs<MlClass>(my_ori_particle, op, sp, baseMLO, myInstance, ptrFactory);
-	CTOC(timer,"getFourierTransformsAndCtfs");
+		CTIC(timer,"getFourierTransformsAndCtfs");
+		getFourierTransformsAndCtfs<MlClass>(my_ori_particle, op, sp, baseMLO, myInstance, ptrFactory);
+		CTOC(timer,"getFourierTransformsAndCtfs");
 
-	if (baseMLO->do_realign_movies && baseMLO->movie_frame_running_avg_side > 0)
-	{
-		baseMLO->calculateRunningAveragesOfMovieFrames(my_ori_particle, op.Fimgs, op.power_imgs, op.highres_Xi2_imgs);
-	}
-
-	// To deal with skipped alignments/rotations
-	if (baseMLO->do_skip_align)
-	{
-		sp.itrans_min = sp.itrans_max = sp.idir_min = sp.idir_max = sp.ipsi_min = sp.ipsi_max =
-				my_ori_particle - baseMLO->exp_my_first_ori_particle;
-	}
-	else
-	{
-		sp.itrans_min = 0;
-		sp.itrans_max = baseMLO->sampling.NrTranslationalSamplings() - 1;
-
-		if (baseMLO->do_skip_rotate)
+		if (baseMLO->do_realign_movies && baseMLO->movie_frame_running_avg_side > 0)
 		{
-			sp.idir_min = sp.idir_max = sp.ipsi_min = sp.ipsi_max =
+			baseMLO->calculateRunningAveragesOfMovieFrames(my_ori_particle, op.Fimgs, op.power_imgs, op.highres_Xi2_imgs);
+		}
+
+		// To deal with skipped alignments/rotations
+		if (baseMLO->do_skip_align)
+		{
+			sp.itrans_min = sp.itrans_max = sp.idir_min = sp.idir_max = sp.ipsi_min = sp.ipsi_max =
 					my_ori_particle - baseMLO->exp_my_first_ori_particle;
 		}
 		else
 		{
-			sp.idir_min = sp.ipsi_min = 0;
-			sp.idir_max = baseMLO->sampling.NrDirections(0, &op.pointer_dir_nonzeroprior) - 1;
-			sp.ipsi_max = baseMLO->sampling.NrPsiSamplings(0, &op.pointer_psi_nonzeroprior ) - 1;
+			sp.itrans_min = 0;
+			sp.itrans_max = baseMLO->sampling.NrTranslationalSamplings() - 1;
+
+			if (baseMLO->do_skip_rotate)
+			{
+				sp.idir_min = sp.idir_max = sp.ipsi_min = sp.ipsi_max =
+						my_ori_particle - baseMLO->exp_my_first_ori_particle;
+			}
+			else
+			{
+				sp.idir_min = sp.ipsi_min = 0;
+				sp.idir_max = baseMLO->sampling.NrDirections(0, &op.pointer_dir_nonzeroprior) - 1;
+				sp.ipsi_max = baseMLO->sampling.NrPsiSamplings(0, &op.pointer_psi_nonzeroprior ) - 1;
+			}
 		}
-	}
 
-	// Initialise significant weight to minus one, so that all coarse sampling points will be handled in the first pass
-	op.significant_weight.resize(sp.nr_particles, -1.);
+		// Initialise significant weight to minus one, so that all coarse sampling points will be handled in the first pass
+		op.significant_weight.resize(sp.nr_particles, -1.);
 
-	// Only perform a second pass when using adaptive oversampling
-	//int nr_sampling_passes = (baseMLO->adaptive_oversampling > 0) ? 2 : 1;
-	// But on the gpu the data-structures are different between passes, so we need to make a symbolic pass to set the weights up for storeWS
-	int nr_sampling_passes = 2;
+		// Only perform a second pass when using adaptive oversampling
+		//int nr_sampling_passes = (baseMLO->adaptive_oversampling > 0) ? 2 : 1;
+		// But on the gpu the data-structures are different between passes, so we need to make a symbolic pass to set the weights up for storeWS
+		int nr_sampling_passes = 2;
 
-	/// -- This is a iframe-indexed vector, each entry of which is a dense data-array. These are replacements to using
-	//    Mweight in the sparse (Fine-sampled) pass, coarse is unused but created empty input for convert ( FIXME )
-	std::vector <IndexedDataArray > CoarsePassWeights(1, ptrFactory);
-	std::vector <IndexedDataArray > FinePassWeights(sp.nr_particles, ptrFactory);
+		/// -- This is a iframe-indexed vector, each entry of which is a dense data-array. These are replacements to using
+		//    Mweight in the sparse (Fine-sampled) pass, coarse is unused but created empty input for convert ( FIXME )
+		std::vector <IndexedDataArray > CoarsePassWeights(1, ptrFactory);
+		std::vector <IndexedDataArray > FinePassWeights(sp.nr_particles, ptrFactory);
 
-	// -- This is a iframe-indexed vector, each entry of which is a class-indexed vector of masks, one for each
-	//    class in FinePassWeights
-	std::vector < std::vector <IndexedDataArrayMask > > FinePassClassMasks(sp.nr_particles, std::vector <IndexedDataArrayMask >(baseMLO->mymodel.nr_classes, ptrFactory));
+		// -- This is a iframe-indexed vector, each entry of which is a class-indexed vector of masks, one for each
+		//    class in FinePassWeights
+		std::vector < std::vector <IndexedDataArrayMask > > FinePassClassMasks(sp.nr_particles, std::vector <IndexedDataArrayMask >(baseMLO->mymodel.nr_classes, ptrFactory));
 
-	// -- This is a iframe-indexed vector, each entry of which is parameters used in the projection-operations *after* the
-	//    coarse pass, declared here to keep scope to storeWS
-	std::vector < ProjectionParams > FineProjectionData(sp.nr_particles, baseMLO->mymodel.nr_classes);
+		// -- This is a iframe-indexed vector, each entry of which is parameters used in the projection-operations *after* the
+		//    coarse pass, declared here to keep scope to storeWS
+		std::vector < ProjectionParams > FineProjectionData(sp.nr_particles, baseMLO->mymodel.nr_classes);
 
 #ifdef CUDA
 	std::vector < cudaStager<unsigned long> > stagerD2(sp.nr_particles,(CudaCustomAllocator *)myInstance->getAllocator()), stagerSWS(sp.nr_particles, (CudaCustomAllocator *)myInstance->getAllocator());
 #endif
 
-	for (int ipass = 0; ipass < nr_sampling_passes; ipass++)
-	{
-		CTIC(timer,"weightPass");
+		for (int ipass = 0; ipass < nr_sampling_passes; ipass++)
+		{
+			CTIC(timer,"weightPass");
 #ifdef TIMING
 // Only time one thread
 if (thread_id == 0)
 baseMLO->timer.tic(baseMLO->TIMING_ESP_DIFF2_B);
 #endif
-		if (baseMLO->strict_highres_exp > 0.)
-			// Use smaller images in both passes and keep a maximum on coarse_size, just like in FREALIGN
-			sp.current_image_size = baseMLO->coarse_size;
-		else if (baseMLO->adaptive_oversampling > 0)
-			// Use smaller images in the first pass, larger ones in the second pass
-			sp.current_image_size = (ipass == 0) ? baseMLO->coarse_size : baseMLO->mymodel.current_size;
-		else
-			sp.current_image_size = baseMLO->mymodel.current_size;
+			if (baseMLO->strict_highres_exp > 0.)
+				// Use smaller images in both passes and keep a maximum on coarse_size, just like in FREALIGN
+				sp.current_image_size = baseMLO->coarse_size;
+			else if (baseMLO->adaptive_oversampling > 0)
+				// Use smaller images in the first pass, larger ones in the second pass
+				sp.current_image_size = (ipass == 0) ? baseMLO->coarse_size : baseMLO->mymodel.current_size;
+			else
+				sp.current_image_size = baseMLO->mymodel.current_size;
 
-		// Use coarse sampling in the first pass, oversampled one the second pass
-		sp.current_oversampling = (ipass == 0) ? 0 : baseMLO->adaptive_oversampling;
+			// Use coarse sampling in the first pass, oversampled one the second pass
+			sp.current_oversampling = (ipass == 0) ? 0 : baseMLO->adaptive_oversampling;
 
-		sp.nr_dir = (baseMLO->do_skip_align || baseMLO->do_skip_rotate) ? 1 : baseMLO->sampling.NrDirections(0, &op.pointer_dir_nonzeroprior);
-		sp.nr_psi = (baseMLO->do_skip_align || baseMLO->do_skip_rotate) ? 1 : baseMLO->sampling.NrPsiSamplings(0, &op.pointer_psi_nonzeroprior);
-		sp.nr_trans = (baseMLO->do_skip_align) ? 1 : baseMLO->sampling.NrTranslationalSamplings();
-		sp.nr_oversampled_rot = baseMLO->sampling.oversamplingFactorOrientations(sp.current_oversampling);
-		sp.nr_oversampled_trans = baseMLO->sampling.oversamplingFactorTranslations(sp.current_oversampling);
+			sp.nr_dir = (baseMLO->do_skip_align || baseMLO->do_skip_rotate) ? 1 : baseMLO->sampling.NrDirections(0, &op.pointer_dir_nonzeroprior);
+			sp.nr_psi = (baseMLO->do_skip_align || baseMLO->do_skip_rotate) ? 1 : baseMLO->sampling.NrPsiSamplings(0, &op.pointer_psi_nonzeroprior);
+			sp.nr_trans = (baseMLO->do_skip_align) ? 1 : baseMLO->sampling.NrTranslationalSamplings();
+			sp.nr_oversampled_rot = baseMLO->sampling.oversamplingFactorOrientations(sp.current_oversampling);
+			sp.nr_oversampled_trans = baseMLO->sampling.oversamplingFactorTranslations(sp.current_oversampling);
 #ifdef TIMING
 // Only time one thread
 if (thread_id == 0)
 baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_B);
 #endif
 
-		op.min_diff2.resize(sp.nr_particles, 0);
-		
-		if (ipass == 0)
-		{
-			unsigned long weightsPerPart(baseMLO->mymodel.nr_classes * sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.nr_oversampled_rot * sp.nr_oversampled_trans);
-
-			op.Mweight.resizeNoCp(1,1,sp.nr_particles, weightsPerPart);
-
-			AccPtr<XFLOAT> Mweight = ptrFactory.make<XFLOAT>();
-
-			Mweight.setSize(sp.nr_particles * weightsPerPart);
-			Mweight.setHostPtr(op.Mweight.data);
-			Mweight.deviceAlloc();
-			deviceInitValue<XFLOAT>(Mweight, std::numeric_limits<XFLOAT>::lowest());
-			Mweight.streamSync();
-
-			CTIC(timer,"getAllSquaredDifferencesCoarse");
-			getAllSquaredDifferencesCoarse<MlClass>(ipass, op, sp, baseMLO, myInstance, Mweight, ptrFactory);
-			CTOC(timer,"getAllSquaredDifferencesCoarse");
+			op.min_diff2.resize(sp.nr_particles, 0);
 			
-			CTIC(timer,"convertAllSquaredDifferencesToWeightsCoarse");
-			convertAllSquaredDifferencesToWeights<MlClass>(ipass, op, sp, baseMLO, myInstance, CoarsePassWeights, FinePassClassMasks, Mweight, ptrFactory);
-			CTOC(timer,"convertAllSquaredDifferencesToWeightsCoarse");
-		}
-		else
-		{
+			if (ipass == 0)
+			{
+				unsigned long weightsPerPart(baseMLO->mymodel.nr_classes * sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.nr_oversampled_rot * sp.nr_oversampled_trans);
+
+				op.Mweight.resizeNoCp(1,1,sp.nr_particles, weightsPerPart);
+
+				AccPtr<XFLOAT> Mweight = ptrFactory.make<XFLOAT>();
+
+				Mweight.setSize(sp.nr_particles * weightsPerPart);
+				Mweight.setHostPtr(op.Mweight.data);
+				Mweight.deviceAlloc();
+				deviceInitValue<XFLOAT>(Mweight, std::numeric_limits<XFLOAT>::lowest());
+				Mweight.streamSync();
+
+				CTIC(timer,"getAllSquaredDifferencesCoarse");
+				getAllSquaredDifferencesCoarse<MlClass>(ipass, op, sp, baseMLO, myInstance, Mweight, ptrFactory);
+				CTOC(timer,"getAllSquaredDifferencesCoarse");
+
+				CTIC(timer,"convertAllSquaredDifferencesToWeightsCoarse");
+				convertAllSquaredDifferencesToWeights<MlClass>(ipass, op, sp, baseMLO, myInstance, CoarsePassWeights, FinePassClassMasks, Mweight, ptrFactory);
+				CTOC(timer,"convertAllSquaredDifferencesToWeightsCoarse");
+			}
+			else
+			{
 #ifdef TIMING
 // Only time one thread
 if (thread_id == 0)
@@ -2979,68 +3153,68 @@ baseMLO->timer.tic(baseMLO->TIMING_ESP_DIFF2_D);
 //					// -- go through all classes and generate projectionsetups for all classes - to be used in getASDF and storeWS below --
 //					// the reason to do this globally is subtle - we want the orientation_num of all classes to estimate a largest possible
 //					// weight-array, which would be insanely much larger than necessary if we had to assume the worst.
-			for (long int iframe = 0; iframe < sp.nr_particles; iframe++)
-			{
-				FineProjectionData[iframe].orientationNumAllClasses = 0;
-				for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+				for (long int iframe = 0; iframe < sp.nr_particles; iframe++)
 				{
-					if(exp_iclass>0)
-						FineProjectionData[iframe].class_idx[exp_iclass] = FineProjectionData[iframe].rots.size();
-					FineProjectionData[iframe].class_entries[exp_iclass] = 0;
+					FineProjectionData[iframe].orientationNumAllClasses = 0;
+					for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+					{
+						if(exp_iclass>0)
+							FineProjectionData[iframe].class_idx[exp_iclass] = FineProjectionData[iframe].rots.size();
+						FineProjectionData[iframe].class_entries[exp_iclass] = 0;
 
-					CTIC(timer,"generateProjectionSetup");
-					FineProjectionData[iframe].orientationNumAllClasses += generateProjectionSetupFine(
-							op,
-							sp,
-							baseMLO,
-							exp_iclass,
-							FineProjectionData[iframe]);
-					CTOC(timer,"generateProjectionSetup");
+						CTIC(timer,"generateProjectionSetup");
+						FineProjectionData[iframe].orientationNumAllClasses += generateProjectionSetupFine(
+								op,
+								sp,
+								baseMLO,
+								exp_iclass,
+								FineProjectionData[iframe]);
+						CTOC(timer,"generateProjectionSetup");
 
-				}
-				//set a maximum possible size for all weights (to be reduced by significance-checks)
-				size_t dataSize = FineProjectionData[iframe].orientationNumAllClasses*sp.nr_trans*sp.nr_oversampled_trans;
-				FinePassWeights[iframe].setDataSize(dataSize);
-				FinePassWeights[iframe].dual_alloc_all();
+					}
+					//set a maximum possible size for all weights (to be reduced by significance-checks)
+					size_t dataSize = FineProjectionData[iframe].orientationNumAllClasses*sp.nr_trans*sp.nr_oversampled_trans;
+					FinePassWeights[iframe].setDataSize(dataSize);
+					FinePassWeights[iframe].dual_alloc_all();
 #ifdef CUDA
 				stagerD2[iframe].size= 2*(FineProjectionData[iframe].orientationNumAllClasses*sp.nr_trans*sp.nr_oversampled_trans);
 				stagerD2[iframe].prepare();
 #endif
-			}
+				}
 #ifdef TIMING
 // Only time one thread
 if (thread_id == 0)
 baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_D);
 #endif
 
-			CTIC(timer,"getAllSquaredDifferencesFine");
-			getAllSquaredDifferencesFine<MlClass>(ipass, op, sp, baseMLO, myInstance, FinePassWeights, FinePassClassMasks, FineProjectionData, ptrFactory
+				CTIC(timer,"getAllSquaredDifferencesFine");
+				getAllSquaredDifferencesFine<MlClass>(ipass, op, sp, baseMLO, myInstance, FinePassWeights, FinePassClassMasks, FineProjectionData, ptrFactory
 #ifdef CUDA
-			, stagerD2);
+				, stagerD2);
 #else
-			);
+				);
 #endif
-			CTOC(timer,"getAllSquaredDifferencesFine");
-			FinePassWeights[0].weights.cpToHost();
+				CTOC(timer,"getAllSquaredDifferencesFine");
+				FinePassWeights[0].weights.cpToHost();
 
-			AccPtr<XFLOAT> Mweight = ptrFactory.make<XFLOAT>(); //DUMMY
+				AccPtr<XFLOAT> Mweight = ptrFactory.make<XFLOAT>(); //DUMMY
 
-			CTIC(timer,"convertAllSquaredDifferencesToWeightsFine");
-			convertAllSquaredDifferencesToWeights<MlClass>(ipass, op, sp, baseMLO, myInstance, FinePassWeights, FinePassClassMasks, Mweight, ptrFactory);
-			CTOC(timer,"convertAllSquaredDifferencesToWeightsFine");
+				CTIC(timer,"convertAllSquaredDifferencesToWeightsFine");
+				convertAllSquaredDifferencesToWeights<MlClass>(ipass, op, sp, baseMLO, myInstance, FinePassWeights, FinePassClassMasks, Mweight, ptrFactory);
+				CTOC(timer,"convertAllSquaredDifferencesToWeightsFine");
 
+			}
+
+			CTOC(timer,"weightPass");
 		}
-
-		CTOC(timer,"weightPass");
-	}
 #ifdef TIMING
 // Only time one thread
 if (thread_id == 0)
 baseMLO->timer.tic(baseMLO->TIMING_ESP_DIFF2_E);
 #endif
 
-	// For the reconstruction step use mymodel.current_size!
-	sp.current_image_size = baseMLO->mymodel.current_size;
+		// For the reconstruction step use mymodel.current_size!
+		sp.current_image_size = baseMLO->mymodel.current_size;
 #ifdef CUDA
 	for (long int iframe = 0; iframe < sp.nr_particles; iframe++)
 	{
@@ -3053,19 +3227,20 @@ baseMLO->timer.tic(baseMLO->TIMING_ESP_DIFF2_E);
 if (thread_id == 0)
 baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_E);
 #endif
-	CTIC(timer,"storeWeightedSums");
-	storeWeightedSums<MlClass>(op, sp, baseMLO, myInstance, FinePassWeights, FineProjectionData, FinePassClassMasks, ptrFactory
+		CTIC(timer,"storeWeightedSums");
+		storeWeightedSums<MlClass>(op, sp, baseMLO, myInstance, FinePassWeights, FineProjectionData, FinePassClassMasks, ptrFactory
 #ifdef CUDA
 	, stagerSWS);
 #else
 	);
 #endif
-	CTOC(timer,"storeWeightedSums");
+		CTOC(timer,"storeWeightedSums");
 
-	for (long int iframe = 0; iframe < sp.nr_particles; iframe++)
-	{
-		FinePassWeights[iframe].dual_free_all();
-	}
+		for (long int iframe = 0; iframe < sp.nr_particles; iframe++)
+		{
+			FinePassWeights[iframe].dual_free_all();
+		}
+    }
 	
 	CTOC(timer,"oneParticle");
 }

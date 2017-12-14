@@ -852,13 +852,14 @@ void cpu_kernel_make_eulers_2D(int grid_size, int block_size,
 	} // blockIdx_x
 }
 
-template<bool invert,bool perturb>
+template<bool invert,bool doL, bool doR>
 void cpu_kernel_make_eulers_3D(int grid_size, int block_size,
 		XFLOAT *alphas,
 		XFLOAT *betas,
 		XFLOAT *gammas,
 		XFLOAT *eulers,
 		unsigned orientation_num,
+		XFLOAT *L,
 		XFLOAT *R)
 {
 #ifdef DEBUG_CUDA
@@ -907,7 +908,7 @@ void cpu_kernel_make_eulers_3D(int grid_size, int block_size,
 			A[7] = ( ss )              ;//21
 			A[8] = ( cb )              ;//22
 
-			if (perturb)
+			if (doR)
 				for (int i = 0; i < 3; i++)
 					for (int j = 0; j < 3; j++)
 						for (int k = 0; k < 3; k++)
@@ -915,6 +916,17 @@ void cpu_kernel_make_eulers_3D(int grid_size, int block_size,
 			else
 				for (int i = 0; i < 9; i++)
 					B[i] = A[i];
+
+			if (doL)
+			{
+				for (int i = 0; i < 9; i++)
+					A[i] = B[i];
+
+				for (int i = 0; i < 3; i++)
+					for (int j = 0; j < 3; j++)
+						for (int k = 0; k < 3; k++)
+							B[i * 3 + j] += L[i * 3 + k] * A[k * 3 + j];
+			}
 
 			if(invert)
 			{
@@ -949,22 +961,30 @@ void cpu_kernel_make_eulers_3D(int grid_size, int block_size,
 
 // -------------------------------  Some explicit template instantiations
 template void CpuKernels::cpu_translate2D<XFLOAT>(XFLOAT *,
-    XFLOAT*, size_t, int, int, int, int);
+    XFLOAT*, int, int, int, int, int);
 
 template void CpuKernels::cpu_translate3D<XFLOAT>(XFLOAT *,
-    XFLOAT *, size_t, int, int, int, int, int, int);
+    XFLOAT *, int, int, int, int, int, int, int);
 
 template void CpuKernels::cpu_kernel_multi<XFLOAT>( XFLOAT *,
 	XFLOAT, int);
 
-template void CpuKernels::cpu_kernel_make_eulers_3D<true,true>(int, int,
-		XFLOAT *, XFLOAT *, XFLOAT *, XFLOAT *, unsigned, XFLOAT *);
-template void CpuKernels::cpu_kernel_make_eulers_3D<true,false>(int, int,
-		XFLOAT *, XFLOAT *, XFLOAT *, XFLOAT *, unsigned, XFLOAT *);
-template void CpuKernels::cpu_kernel_make_eulers_3D<false,true>(int, int,
-		XFLOAT *, XFLOAT *, XFLOAT *, XFLOAT *, unsigned, XFLOAT *);
-template void CpuKernels::cpu_kernel_make_eulers_3D<false,false>(int, int,
-		XFLOAT *, XFLOAT *, XFLOAT *, XFLOAT *, unsigned, XFLOAT *);
+template void CpuKernels::cpu_kernel_make_eulers_3D<true, true, true>(int, int,
+		XFLOAT *, XFLOAT *, XFLOAT *, XFLOAT *, unsigned, XFLOAT *, XFLOAT *);
+template void CpuKernels::cpu_kernel_make_eulers_3D<true, true, false>(int, int,
+		XFLOAT *, XFLOAT *, XFLOAT *, XFLOAT *, unsigned, XFLOAT *, XFLOAT *);
+template void CpuKernels::cpu_kernel_make_eulers_3D<true, false,true>(int, int,
+		XFLOAT *, XFLOAT *, XFLOAT *, XFLOAT *, unsigned, XFLOAT *, XFLOAT *);
+template void CpuKernels::cpu_kernel_make_eulers_3D<true, false,false>(int, int,
+		XFLOAT *, XFLOAT *, XFLOAT *, XFLOAT *, unsigned, XFLOAT *, XFLOAT *);
+template void CpuKernels::cpu_kernel_make_eulers_3D<false,true, true>(int, int,
+		XFLOAT *, XFLOAT *, XFLOAT *, XFLOAT *, unsigned, XFLOAT *, XFLOAT *);
+template void CpuKernels::cpu_kernel_make_eulers_3D<false,true, false>(int, int,
+		XFLOAT *, XFLOAT *, XFLOAT *, XFLOAT *, unsigned, XFLOAT *, XFLOAT *);
+template void CpuKernels::cpu_kernel_make_eulers_3D<false,false,true>(int, int,
+		XFLOAT *, XFLOAT *, XFLOAT *, XFLOAT *, unsigned, XFLOAT *, XFLOAT *);
+template void CpuKernels::cpu_kernel_make_eulers_3D<false,false,false>(int, int,
+		XFLOAT *, XFLOAT *, XFLOAT *, XFLOAT *, unsigned, XFLOAT *, XFLOAT *);
 
 template void CpuKernels::cpu_kernel_make_eulers_2D<true>(int, int, 
 		XFLOAT *, XFLOAT *, unsigned);

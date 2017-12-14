@@ -107,7 +107,9 @@ void AccProjectorPlan::setup(
 		bool inverseMatrix,
 		bool do_skip_align,
 		bool do_skip_rotate,
-		int orientational_prior_mode)
+		int orientational_prior_mode,
+		Matrix2D<RFLOAT> *MBL,
+		Matrix2D<RFLOAT> *MBR)
 {
 	TIMING_TIC(TIMING_TOP);
 
@@ -117,11 +119,12 @@ void AccProjectorPlan::setup(
 	AccPtr<XFLOAT> betas =   eulers.make<XFLOAT>(nr_dir * nr_psi * nr_oversampled_rot * 9);
 	AccPtr<XFLOAT> gammas =  eulers.make<XFLOAT>(nr_dir * nr_psi * nr_oversampled_rot * 9);
 	AccPtr<XFLOAT> perturb = eulers.make<XFLOAT>((size_t)9);
+	AccPtr<XFLOAT> adjustL = eulers.make<XFLOAT>((size_t)9);
+	AccPtr<XFLOAT> adjustR = eulers.make<XFLOAT>((size_t)9);
 
 	alphas.hostAlloc();
 	betas.hostAlloc();
 	gammas.hostAlloc();
-	perturb.hostAlloc();
 
 	eulers.freeIfSet();
 	eulers.setSize(nr_dir * nr_psi * nr_oversampled_rot * 9);
@@ -133,8 +136,20 @@ void AccProjectorPlan::setup(
 
 	orientation_num = 0;
 
+	Matrix2D<RFLOAT> L(3,3);
 	Matrix2D<RFLOAT> R(3,3);
+
+	L.initIdentity();
+	R.initIdentity();
+
+	bool doL(false), doR(false);
 	RFLOAT myperturb(0.);
+
+	if (MBL != NULL)
+	{
+		doL = true;
+		L = (*MBL) * L;
+	}
 
 	if (ABS(sampling.random_perturbation) > 0.)
 	{
@@ -142,10 +157,14 @@ void AccProjectorPlan::setup(
 		if (sampling.is_3D)
 		{
 			Euler_angles2matrix(myperturb, myperturb, myperturb, R);
-			for (int i = 0; i < 9; i ++)
-				perturb[i] = (XFLOAT) R.mdata[i];
-			perturb.putOnDevice();
 		}
+		doR = true;
+	}
+
+	if (MBR != NULL)
+	{
+		doR = true;
+		R = R * (*MBR);
 	}
 
 	TIMING_TIC(TIMING_SAMPLING);
@@ -250,54 +269,127 @@ void AccProjectorPlan::setup(
 		gammas.putOnDevice();
 	}
 
+	if (doL)
+	{
+		adjustL.hostAlloc();
+		for (int i = 0; i < 9; i ++)
+			adjustL[i] = (XFLOAT) L.mdata[i];
+		adjustL.putOnDevice();
+	}
+
+	if (doR)
+	{
+		adjustR.hostAlloc();
+		for (int i = 0; i < 9; i ++)
+			adjustR[i] = (XFLOAT) R.mdata[i];
+		adjustR.putOnDevice();
+	}
+
 	int grid_size = ceil((float)orientation_num/(float)BLOCK_SIZE);
 
 	if(inverseMatrix)
+	{
 		if(sampling.is_3D)
-			if (ABS(sampling.random_perturbation) > 0.)
-				AccUtilities::acc_make_eulers_3D<true,true>(grid_size,BLOCK_SIZE,eulers.getStream(),
+		{
+			if (doL && doR)
+				AccUtilities::acc_make_eulers_3D<true,true,true>(
+						grid_size,BLOCK_SIZE,eulers.getStream(),
 						~alphas,
 						~betas,
 						~gammas,
 						~eulers,
 						orientation_num,
-						~perturb);
-			else
-				AccUtilities::acc_make_eulers_3D<true,false>(grid_size,BLOCK_SIZE,eulers.getStream(),
+						~adjustL,
+						~adjustR);
+			else if (doL)
+				AccUtilities::acc_make_eulers_3D<true,true,false>(
+						grid_size,BLOCK_SIZE,eulers.getStream(),
 						~alphas,
 						~betas,
 						~gammas,
 						~eulers,
 						orientation_num,
+						~adjustL,
 						NULL);
+			else if (doR)
+				AccUtilities::acc_make_eulers_3D<true,false,true>(
+						grid_size,BLOCK_SIZE,eulers.getStream(),
+						~alphas,
+						~betas,
+						~gammas,
+						~eulers,
+						orientation_num,
+						NULL,
+						~adjustR);
+			else
+				AccUtilities::acc_make_eulers_3D<true,false,false>(
+						grid_size,BLOCK_SIZE,eulers.getStream(),
+						~alphas,
+						~betas,
+						~gammas,
+						~eulers,
+						orientation_num,
+						NULL,
+						NULL);
+		}
 		else
-			AccUtilities::acc_make_eulers_2D<true>(grid_size,BLOCK_SIZE,eulers.getStream(),
+			AccUtilities::acc_make_eulers_2D<true>(
+					grid_size,BLOCK_SIZE,eulers.getStream(),
 					~alphas,
 					~eulers,
 					orientation_num);
+	}
 	else
+	{
 		if(sampling.is_3D)
-			if (ABS(sampling.random_perturbation) > 0.)
-				AccUtilities::acc_make_eulers_3D<false,true>(grid_size,BLOCK_SIZE,eulers.getStream(),
+		{
+			if (doL && doR)
+				AccUtilities::acc_make_eulers_3D<false,true,true>(
+						grid_size,BLOCK_SIZE,eulers.getStream(),
 						~alphas,
 						~betas,
 						~gammas,
 						~eulers,
 						orientation_num,
-						~perturb);
-			else
-				AccUtilities::acc_make_eulers_3D<false,false>(grid_size,BLOCK_SIZE,eulers.getStream(),
+						~adjustL,
+						~adjustR);
+			else if (doL)
+				AccUtilities::acc_make_eulers_3D<false,true,false>(
+						grid_size,BLOCK_SIZE,eulers.getStream(),
 						~alphas,
 						~betas,
 						~gammas,
 						~eulers,
 						orientation_num,
+						~adjustL,
 						NULL);
+			else if (doR)
+				AccUtilities::acc_make_eulers_3D<false,false,true>(
+						grid_size,BLOCK_SIZE,eulers.getStream(),
+						~alphas,
+						~betas,
+						~gammas,
+						~eulers,
+						orientation_num,
+						NULL,
+						~adjustR);
+			else
+				AccUtilities::acc_make_eulers_3D<false,false,false>(
+						grid_size,BLOCK_SIZE,eulers.getStream(),
+						~alphas,
+						~betas,
+						~gammas,
+						~eulers,
+						orientation_num,
+						NULL,
+						NULL);
+		}
 		else
 			AccUtilities::acc_make_eulers_2D<false>(grid_size,BLOCK_SIZE,eulers.getStream(),
 					~alphas,
 					~eulers,
 					orientation_num);
+	}
 
 	TIMING_TOC(TIMING_TOP);
 }

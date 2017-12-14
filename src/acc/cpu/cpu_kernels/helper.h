@@ -697,13 +697,14 @@ void cpu_kernel_make_eulers_2D(int grid_size, int block_size,
 		XFLOAT *eulers,
 		unsigned orientation_num);
 
-template<bool invert,bool perturb>
+template<bool invert,bool doL, bool doR>
 void cpu_kernel_make_eulers_3D(int grid_size, int block_size,
 		XFLOAT *alphas,
 		XFLOAT *betas,
 		XFLOAT *gammas,
 		XFLOAT *eulers,
 		unsigned orientation_num,
+		XFLOAT *L,
 		XFLOAT *R);
 
 } // end of namespace CpuKernels

@@ -55,7 +55,9 @@ public:
 			bool inverseMatrix,
 			bool do_skip_align,
 			bool do_skip_rotate,
-			int orientational_prior_mode);
+			int orientational_prior_mode,
+			Matrix2D<RFLOAT> *MBL = NULL,
+			Matrix2D<RFLOAT> *MBR = NULL);
 
 	void printTo(std::ostream &os); // print
 

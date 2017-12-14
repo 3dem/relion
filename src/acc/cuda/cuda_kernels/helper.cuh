@@ -653,13 +653,14 @@ __global__ void cuda_kernel_make_eulers_2D(
 		XFLOAT *eulers,
 		unsigned orientation_num);
 
-template<bool invert,bool perturb>
+template<bool invert,bool doL, bool doR>
 __global__ void cuda_kernel_make_eulers_3D(
 		XFLOAT *alphas,
 		XFLOAT *betas,
 		XFLOAT *gammas,
 		XFLOAT *eulers,
 		unsigned orientation_num,
+		XFLOAT *L,
 		XFLOAT *R);
 
 #define INIT_VALUE_BLOCK_SIZE 512
