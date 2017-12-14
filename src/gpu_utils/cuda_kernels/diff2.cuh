@@ -579,8 +579,8 @@ __global__ void cuda_kernel_diff2_CC_fine(
 					s[   itrans*block_sz + tid] += (ref_real * shifted_real + ref_imag * shifted_imag) * __ldg(&g_corr_img[pixel]);
 					s_cc[itrans*block_sz + tid] += (ref_real*ref_real + ref_imag*ref_imag) * __ldg(&g_corr_img[pixel]);
 				}
-				__syncthreads();
 			}
+			__syncthreads();
 		}
 		for(int j=(block_sz/2); j>0; j/=2)
 		{
