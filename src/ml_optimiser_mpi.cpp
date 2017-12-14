@@ -20,7 +20,11 @@
 #include "src/ml_optimiser_mpi.h"
 #include "src/ml_optimiser.h"
 #ifdef CUDA
-#include "src/gpu_utils/cuda_ml_optimiser.h"
+#include "src/acc/cuda/cuda_ml_optimiser.h"
+#endif
+#ifdef ALTCPU
+	#include <tbb/tbb.h>
+	#include "src/acc/cpu/cpu_ml_optimiser.h"
 #endif
 #include <stdio.h>
 #include <stdlib.h>
@@ -48,6 +52,19 @@ void MlOptimiserMpi::read(int argc, char **argv)
 
     // Define a new MpiNode
     node = new MpiNode(argc, argv);
+
+    if (node->isMaster())
+    {
+      std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
+      std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
+      std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
+      std::cout << "  "<< std::endl;
+      std::cout << " The output from this binary should not be used for research or publication "<< std::endl;
+      std::cout << "  "<< std::endl;
+      std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
+      std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
+      std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
+    }
 
     // First read in non-parallelisation-dependent variables
     MlOptimiser::read(argc, argv, node->rank);
@@ -401,9 +418,9 @@ void MlOptimiserMpi::initialise()
 				size_t boxLim (10000);
 				for (int i = 0; i < cudaDevices.size(); i ++)
 				{
-					MlDeviceBundle *b = new MlDeviceBundle(this);
-					b->setDevice(cudaDevices[i]);
-					size_t t = b->checkFixedSizedObjects(cudaDeviceShares[i]);
+					MlDeviceBundle b(this);
+					b.setDevice(cudaDevices[i]);
+					size_t t = b.checkFixedSizedObjects(cudaDeviceShares[i]);
 					boxLim = ((t < boxLim) ? t : boxLim );
 				}
 				node->relion_MPI_Send(&boxLim, sizeof(size_t), MPI_INT, 0, MPITAG_INT, MPI_COMM_WORLD);
@@ -438,7 +455,7 @@ might be the limiting factor, since each mpi-slave that shares a GPU increases t
 use of memory. In this case we recommend running a single mpi-slave per GPU, which \n\
 will still yield good performance and possibly a more stable execution. \n" << std::endl;
 					}
-#ifdef CUDA_DOUBLE_PRECISION
+#ifdef ACC_DOUBLE_PRECISION
 					int sLowBoxLim = (int)((float)LowBoxLim*pow(2,1.0/3.0));
 					std::cerr << "You are also using double precison on the GPU. If you were using single precision\n\
 (which in all tested cases is perfectly fine), then you could use an box-size of ~"  << sLowBoxLim << "." << std::endl;
@@ -456,6 +473,25 @@ will still yield good performance and possibly a more stable execution. \n" << s
 
     initialiseWorkLoad();
 
+#ifdef ALTCPU
+	// Don't start threading until after most I/O is over
+	if (do_cpu)
+	{
+		// Set the size of the TBB thread pool for the entire run
+		tbbSchedulerInit.initialize(nr_threads);
+	}
+#endif
+#ifdef MKLFFT
+	// Enable multi-threaded FFTW
+	int success = fftw_init_threads();
+	if (0 == success)
+		REPORT_ERROR("Multithreaded FFTW failed to initialize");
+
+	// And allow plans before expectation to run using allowed
+	// number of threads
+	fftw_plan_with_nthreads(nr_threads);
+#endif
+	
 	if (fn_sigma != "")
 	{
 		// Read in sigma_noise spetrum from file DEVELOPMENTAL!!! FOR DEBUGGING ONLY....
@@ -728,6 +764,11 @@ void MlOptimiserMpi::expectation()
 	int n_trials_acc = (mymodel.ref_dim==3 && mymodel.data_dim != 3) ? 100 : 10;
 	n_trials_acc = XMIPP_MIN(n_trials_acc, mydata.numberOfOriginalParticles());
 	MPI_Status status;
+	
+#ifdef MKLFFT
+	// Allow parallel FFTW execution
+	fftw_plan_with_nthreads(nr_threads);
+#endif
 
 	// Initialise some stuff
 	// A. Update current size (may have been changed to ori_size in autoAdjustAngularSampling) and resolution pointers
@@ -936,19 +977,19 @@ void MlOptimiserMpi::expectation()
 			MlDeviceBundle *b = new MlDeviceBundle(this);
 			b->setDevice(cudaDevices[i]);
 			b->setupFixedSizedObjects();
-			cudaDeviceBundles.push_back((void*)b);
+			accDataBundles.push_back((void*)b);
 #ifdef TIMING
 		timer.toc(TIMING_EXP_4b);
 #endif
 		}
 
-		std::vector<unsigned> threadcountOnDevice(cudaDeviceBundles.size(),0);
+		std::vector<unsigned> threadcountOnDevice(accDataBundles.size(),0);
 
 		for (int i = 0; i < cudaOptimiserDeviceMap.size(); i ++)
 		{
 			std::stringstream didSs;
 			didSs << "RRr" << node->rank << "t" << i;
-			MlOptimiserCuda *b = new MlOptimiserCuda(this, (MlDeviceBundle*) cudaDeviceBundles[cudaOptimiserDeviceMap[i]],didSs.str().c_str());
+			MlOptimiserCuda *b = new MlOptimiserCuda(this, (MlDeviceBundle*) accDataBundles[cudaOptimiserDeviceMap[i]],didSs.str().c_str());
 			b->resetData();
 			cudaOptimisers.push_back((void*)b);
 			threadcountOnDevice[cudaOptimiserDeviceMap[i]] ++;
@@ -958,15 +999,15 @@ void MlOptimiserMpi::expectation()
 		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
 		HANDLE_ERROR(cudaDeviceSynchronize());
 
-		for (int i = 0; i < cudaDeviceBundles.size(); i ++)
+		for (int i = 0; i < accDataBundles.size(); i ++)
 		{
-			if(((MlDeviceBundle*)cudaDeviceBundles[i])->device_id >= devCount || ((MlDeviceBundle*)cudaDeviceBundles[i])->device_id < 0 )
+			if(((MlDeviceBundle*)accDataBundles[i])->device_id >= devCount || ((MlDeviceBundle*)accDataBundles[i])->device_id < 0 )
 			{
-				//std::cerr << " using device_id=" << ((MlDeviceBundle*)cudaDeviceBundles[i])->device_id << " (device no. " << ((MlDeviceBundle*)cudaDeviceBundles[i])->device_id+1 << ") which is not within the available device range" << devCount << std::endl;
+				//std::cerr << " using device_id=" << ((MlDeviceBundle*)accDataBundles[i])->device_id << " (device no. " << ((MlDeviceBundle*)accDataBundles[i])->device_id+1 << ") which is not within the available device range" << devCount << std::endl;
 				CRITICAL(ERR_GPUID);
 			}
 			else
-				HANDLE_ERROR(cudaSetDevice(((MlDeviceBundle*)cudaDeviceBundles[i])->device_id));
+				HANDLE_ERROR(cudaSetDevice(((MlDeviceBundle*)accDataBundles[i])->device_id));
 
 			size_t free, total, allocationSize;
 			HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
@@ -997,11 +1038,55 @@ void MlOptimiserMpi::expectation()
 
 	if (do_gpu && ! node->isMaster())
 	{
-		for (int i = 0; i < cudaDeviceBundles.size(); i ++)
-			((MlDeviceBundle*)cudaDeviceBundles[i])->setupTunableSizedObjects(allocationSizes[i]);
+		for (int i = 0; i < accDataBundles.size(); i ++)
+			((MlDeviceBundle*)accDataBundles[i])->setupTunableSizedObjects(allocationSizes[i]);
 	}
-	/************************************************************************/
 #endif // CUDA
+#ifdef ALTCPU	
+	/************************************************************************/
+	//CPU memory setup
+	MPI_Barrier(MPI_COMM_WORLD);   // Is this really necessary?
+	if (do_cpu  && ! node->isMaster())
+	{	
+		unsigned nr_classes = mymodel.nr_classes;
+		// Allocate Array of complex arrays for this class
+		posix_memalign((void **)&mdlClassComplex, MEM_ALIGN, nr_classes * sizeof (XFLOAT *));
+		
+		// Set up XFLOAT complex array shared by all threads for each class
+		for (int iclass = 0; iclass < nr_classes; iclass++)
+		{
+			int mdlX = mymodel.PPref[iclass].data.xdim;
+			int mdlY = mymodel.PPref[iclass].data.ydim;
+			int mdlZ = mymodel.PPref[iclass].data.zdim;
+			int mdlXYZ;
+			if(mdlZ == 0)
+				mdlXYZ = mdlX*mdlY;
+			else
+				mdlXYZ = mdlX*mdlY*mdlZ;
+			
+			posix_memalign((void **)&mdlClassComplex[iclass], MEM_ALIGN, mdlXYZ * 2 * sizeof(XFLOAT));
+			
+			XFLOAT *pData = mdlClassComplex[iclass];
+			
+			for (unsigned long i = 0; i < mdlXYZ; i ++)
+			{
+				*pData ++ = (XFLOAT) mymodel.PPref[iclass].data.data[i].real;
+				*pData ++ = (XFLOAT) mymodel.PPref[iclass].data.data[i].imag;
+			} 
+		}
+
+		MlDataBundle *b = new MlDataBundle();
+		b->setup(this);
+		accDataBundles.push_back((void*)b);
+	}  // do_cpu
+#endif // ALTCPU
+	/************************************************************************/
+
+#ifdef MKLFFT
+	// Single-threaded FFTW execution for code inside parallel processing loop
+	fftw_plan_with_nthreads(1);
+#endif
+	
 #ifdef TIMING
 		timer.toc(TIMING_EXP_4);
 #endif
@@ -1262,7 +1347,7 @@ void MlOptimiserMpi::expectation()
 		timer.toc(TIMING_EXP_5);
 #endif
     }
-    else
+    else  // if not Master
     {
 #ifdef TIMING
 		timer.tic(TIMING_EXP_6);
@@ -1408,22 +1493,22 @@ void MlOptimiserMpi::expectation()
 #ifdef CUDA
 			if (do_gpu)
 			{
-				for (int i = 0; i < cudaDeviceBundles.size(); i ++)
+				for (int i = 0; i < accDataBundles.size(); i ++)
 				{
 #ifdef TIMING
 		timer.tic(TIMING_EXP_7);
 #endif
-					MlDeviceBundle* b = ((MlDeviceBundle*)cudaDeviceBundles[i]);
+					MlDeviceBundle* b = ((MlDeviceBundle*)accDataBundles[i]);
 					b->syncAllBackprojects();
 
-					for (int j = 0; j < b->cudaProjectors.size(); j++)
+					for (int j = 0; j < b->projectors.size(); j++)
 					{
 						unsigned long s = wsum_model.BPref[j].data.nzyxdim;
 						XFLOAT *reals = new XFLOAT[s];
 						XFLOAT *imags = new XFLOAT[s];
 						XFLOAT *weights = new XFLOAT[s];
 
-						b->cudaBackprojectors[j].getMdlData(reals, imags, weights);
+						b->backprojectors[j].getMdlData(reals, imags, weights);
 
 						for (unsigned long n = 0; n < s; n++)
 						{
@@ -1436,8 +1521,8 @@ void MlOptimiserMpi::expectation()
 						delete [] imags;
 						delete [] weights;
 
-						b->cudaProjectors[j].clear();
-						b->cudaBackprojectors[j].clear();
+						b->projectors[j].clear();
+						b->backprojectors[j].clear();
 						b->coarseProjectionPlans[j].clear();
 					}
 #ifdef TIMING
@@ -1453,32 +1538,76 @@ void MlOptimiserMpi::expectation()
 				cudaOptimisers.clear();
 
 
-				for (int i = 0; i < cudaDeviceBundles.size(); i ++)
+				for (int i = 0; i < accDataBundles.size(); i ++)
 				{
 
-					((MlDeviceBundle*)cudaDeviceBundles[i])->allocator->syncReadyEvents();
-					((MlDeviceBundle*)cudaDeviceBundles[i])->allocator->freeReadyAllocs();
+					((MlDeviceBundle*)accDataBundles[i])->allocator->syncReadyEvents();
+					((MlDeviceBundle*)accDataBundles[i])->allocator->freeReadyAllocs();
 
 #ifdef DEBUG_CUDA
-					if (((MlDeviceBundle*) cudaDeviceBundles[i])->allocator->getNumberOfAllocs() != 0)
+					if (((MlDeviceBundle*) accDataBundles[i])->allocator->getNumberOfAllocs() != 0)
 					{
 						printf("DEBUG_ERROR: Non-zero allocation count encountered in custom allocator between iterations.\n");
-						((MlDeviceBundle*) cudaDeviceBundles[i])->allocator->printState();
+						((MlDeviceBundle*) accDataBundles[i])->allocator->printState();
 						fflush(stdout);
 						CRITICAL(ERR_CANZ);
 					}
 #endif
 				}
 
-				for (int i = 0; i < cudaDeviceBundles.size(); i ++)
-					delete (MlDeviceBundle*) cudaDeviceBundles[i];
+				for (int i = 0; i < accDataBundles.size(); i ++)
+					delete (MlDeviceBundle*) accDataBundles[i];
 
-				cudaDeviceBundles.clear();
+				accDataBundles.clear();
 #ifdef TIMING
 		timer.toc(TIMING_EXP_8);
 #endif
 			}
 #endif // CUDA
+#ifdef ALTCPU
+			if (do_cpu)
+			{
+				MlDataBundle* b = (MlDataBundle*) accDataBundles[0];
+
+#ifdef DEBUG
+				std::cerr << "Faux thread id: " << b->thread_id << std::endl;
+#endif
+
+				for (int j = 0; j < b->projectors.size(); j++)
+				{
+					unsigned long s = wsum_model.BPref[j].data.nzyxdim;
+					XFLOAT *reals = NULL;
+					XFLOAT *imags = NULL;
+					XFLOAT *weights = NULL;
+
+					b->backprojectors[j].getMdlDataPtrs(reals, imags, weights);
+
+					for (unsigned long n = 0; n < s; n++)
+					{
+						wsum_model.BPref[j].data.data[n].real += (RFLOAT) reals[n];
+						wsum_model.BPref[j].data.data[n].imag += (RFLOAT) imags[n];
+						wsum_model.BPref[j].weight.data[n] += (RFLOAT) weights[n];
+					}
+
+					b->projectors[j].clear();
+					b->backprojectors[j].clear();
+					b->coarseProjectionPlans[j].clear();
+				}
+
+				delete b;
+				accDataBundles.clear();
+
+				// Now clean up
+				unsigned nr_classes = mymodel.nr_classes;
+				for (int iclass = 0; iclass < nr_classes; iclass++)
+				{
+					free(mdlClassComplex[iclass]);
+				}
+				free(mdlClassComplex);
+
+				tbbCpuOptimiser.clear();
+			}
+#endif  // ALTCPU			
 
     	}
         catch (RelionError XE)
@@ -1490,8 +1619,14 @@ void MlOptimiserMpi::expectation()
 #ifdef TIMING
 		timer.toc(TIMING_EXP_6);
 #endif
-    }
+    }  // Slave node
 
+#ifdef  MKLFFT
+	// Allow parallel FFTW execution to continue now that we are outside the parallel
+	// portion of expectation
+	fftw_plan_with_nthreads(nr_threads);
+#endif
+	
     // Just make sure the temporary arrays are empty...
 	exp_imagedata.clear();
 	exp_metadata.clear();
@@ -3265,6 +3400,19 @@ void MlOptimiserMpi::iterate()
 
 	// Hopefully this barrier will prevent some bus errors
 	MPI_Barrier(MPI_COMM_WORLD);
+
+    if (node->isMaster())
+    {
+      std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
+      std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
+      std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
+      std::cout << "  "<< std::endl;
+      std::cout << " The output from this binary should not be used for research or publication "<< std::endl;
+      std::cout << "  "<< std::endl;
+      std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
+      std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
+      std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
+    }
 
 	// delete threads etc.
 	MlOptimiser::iterateWrapUp();

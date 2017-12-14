@@ -53,6 +53,14 @@
 #include "src/complex.h"
 #include "src/CPlot2D.h"
 
+#ifdef FAST_CENTERFFT   // defined if ALTCPU=on *AND* Intel Compiler used
+#include "src/acc/cpu/cuda_stubs.h"
+#include "src/acc/settings.h"
+#include "src/acc/cpu/cpu_settings.h"
+#include "src/acc/cpu/cpu_kernels/helper.h"
+#include <tbb/parallel_for.h>
+#endif
+
 /** @defgroup FourierW FFTW Fourier transforms
   * @ingroup DataLibrary
   */
@@ -373,6 +381,7 @@ void randomizePhasesBeyond(MultidimArray<RFLOAT> &I, int index);
 template <typename T>
 void CenterFFT(MultidimArray< T >& v, bool forward)
 {
+#ifndef FAST_CENTERFFT
     if ( v.getDim() == 1 )
     {
         // 1D
@@ -562,6 +571,159 @@ void CenterFFT(MultidimArray< T >& v, bool forward)
     	v.printShape();
     	REPORT_ERROR("CenterFFT ERROR: Dimension should be 1, 2 or 3");
     }
+#else // FAST_CENTERFFT
+	if ( v.getDim() == 1 )
+	{
+        // 1D
+        MultidimArray< T > aux;
+        int l, shift;
+
+        l = XSIZE(v);
+        aux.reshape(l);
+        shift = (int)(l / 2);
+
+        if (!forward)
+            shift = -shift;
+
+        // Shift the input in an auxiliary vector
+        for (int i = 0; i < l; i++)
+        {
+            int ip = i + shift;
+
+            if (ip < 0)
+                ip += l;
+            else if (ip >= l)
+                ip -= l;
+
+            aux(ip) = DIRECT_A1D_ELEM(v, i);
+        }
+
+        // Copy the vector
+        for (int i = 0; i < l; i++)
+            DIRECT_A1D_ELEM(v, i) = DIRECT_A1D_ELEM(aux, i);
+    }
+    else if ( v.getDim() == 2 )
+    {
+		int  batchSize = 1;
+		int xSize = XSIZE(v);
+		int ySize = YSIZE(v);
+		
+		int xshift = (xSize / 2);
+		int yshift = (ySize / 2);
+		
+		if (!forward)
+		{
+			xshift = -xshift;
+			yshift = -yshift;
+		}
+		
+		size_t image_size = xSize*ySize;
+		size_t isize2 = image_size/2;
+		int blocks = ceilf((float)(image_size/(float)(2*CFTT_BLOCK_SIZE)));
+
+//		for(int i=0; i<blocks; i++) {
+		tbb::parallel_for(0, blocks, [&](int i) {
+			size_t pixel_start = i*(CFTT_BLOCK_SIZE);
+			size_t pixel_end = (i+1)*(CFTT_BLOCK_SIZE);
+			if (pixel_end > isize2)
+				pixel_end = isize2;
+			
+			CpuKernels::centerFFT_2D<T>(batchSize,
+				pixel_start,
+				pixel_end,
+				MULTIDIM_ARRAY(v),
+				(size_t)xSize*ySize,
+				xSize,
+				ySize,
+				xshift,
+				yshift);
+		}
+		);
+	}
+    else if ( v.getDim() == 3 )
+    {
+		int  batchSize = 1;
+		int xSize = XSIZE(v);
+		int ySize = YSIZE(v);
+		int zSize = ZSIZE(v);
+		
+		if(zSize>1)
+		{
+			int xshift = (xSize / 2);
+			int yshift = (ySize / 2);
+			int zshift = (zSize / 2);
+
+			if (!forward)
+			{
+				xshift = -xshift;
+				yshift = -yshift;
+				zshift = -zshift;
+			}
+
+			size_t image_size = xSize*ySize*zSize;
+			size_t isize2 = image_size/2;
+			int block =ceilf((float)(image_size/(float)(2*CFTT_BLOCK_SIZE)));
+//			for(int i=0; i<block; i++){
+			tbb::parallel_for(0, block, [&](int i) {
+				size_t pixel_start = i*(CFTT_BLOCK_SIZE);
+				size_t pixel_end = (i+1)*(CFTT_BLOCK_SIZE);
+				if (pixel_end > isize2)
+					pixel_end = isize2;
+			
+				CpuKernels::centerFFT_3D<T>(batchSize,
+					pixel_start,
+					pixel_end,
+					MULTIDIM_ARRAY(v),
+					(size_t)xSize*ySize*zSize,
+					xSize,
+					ySize,
+					zSize,
+					xshift,
+					yshift,
+					zshift);
+			}
+			);
+		}
+		else
+		{
+			int xshift = (xSize / 2);
+			int yshift = (ySize / 2);
+
+			if (!forward)
+			{
+				xshift = -xshift;
+				yshift = -yshift;
+			}
+
+			size_t image_size = xSize*ySize;
+			size_t isize2 = image_size/2;
+			int blocks = ceilf((float)(image_size/(float)(2*CFTT_BLOCK_SIZE)));
+//			for(int i=0; i<blocks; i++) {
+			tbb::parallel_for(0, blocks, [&](int i) {
+				size_t pixel_start = i*(CFTT_BLOCK_SIZE);
+				size_t pixel_end = (i+1)*(CFTT_BLOCK_SIZE);
+				if (pixel_end > isize2)
+					pixel_end = isize2;
+
+				CpuKernels::centerFFT_2D<T>(batchSize,
+					pixel_start,
+					pixel_end,
+					MULTIDIM_ARRAY(v),
+					(size_t)xSize*ySize,
+					xSize,
+					ySize,
+					xshift,
+					yshift);
+			}
+			);
+		}
+	}
+    else
+    {
+    	v.printShape();
+    	REPORT_ERROR("CenterFFT ERROR: Dimension should be 1, 2 or 3");
+    }
+#endif  // FAST_CENTERFFT
 }
 
 

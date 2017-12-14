@@ -18,6 +18,7 @@
  * author citations must be preserved.
  ***************************************************************************/
 
+//#define DEBUG
 //#define DEBUG_CHECKSIZES
 //#define DEBUG_HELICAL_ORIENTATIONAL_SEARCH
 //#define PRINT_GPU_MEM_INFO
@@ -43,7 +44,13 @@
 #include "src/error.h"
 #include "src/ml_optimiser.h"
 #ifdef CUDA
-#include "src/gpu_utils/cuda_ml_optimiser.h"
+#include "src/acc/cuda/cuda_ml_optimiser.h"
+#endif
+#ifdef ALTCPU
+	#include <tbb/tbb.h>
+	#include <tbb/parallel_for.h>
+	#include <tbb/task_scheduler_init.h>
+	#include "src/acc/cpu/cpu_ml_optimiser.h"
 #endif
 
 #define NR_CLASS_MUTEXES 5
@@ -131,9 +138,9 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	// For multi-body refinement
 	bool fn_body_masks_was_empty = (fn_body_masks == "None");
 	std::string fnt;
-	fnt = parser.getOption("--multibody_masks", "STAR file with masks and metadata for multi-body refinement", "OLD");
-	if (fnt != "OLD")
-		fn_body_masks = fnt;
+//	fnt = parser.getOption("--multibody_masks", "STAR file with masks and metadata for multi-body refinement", "OLD");
+//	if (fnt != "OLD")
+//		fn_body_masks = fnt;
 
 	// Also allow change of padding...
 	fnt = parser.getOption("--pad", "Oversampling factor for the Fourier transforms of the references", "OLD");
@@ -369,6 +376,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	keep_free_scratch_Gb = textToInteger(parser.getOption("--keep_free_scratch", "Space available for copying particle stacks (in Gb)", "10"));
 	do_reuse_scratch = parser.checkOption("--reuse_scratch", "Re-use data on scratchdir, instead of wiping it and re-copying all data.");
 
+	do_cpu = parser.checkOption("--cpu", "Use new implementation for CPU");	
 
 	failsafe_threshold = textToInteger(parser.getOption("--failsafe_threshold", "Maximum number of particles permitted to be drop, due to zero sum of weights, before exiting with an error (GPU only).", "40"));
 
@@ -602,6 +610,8 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	keep_free_scratch_Gb = textToInteger(parser.getOption("--keep_free_scratch", "Space available for copying particle stacks (in Gb)", "10"));
 	do_reuse_scratch = parser.checkOption("--reuse_scratch", "Re-use data on scratchdir, instead of wiping it and re-copying all data.");
 
+    do_cpu = parser.checkOption("--cpu", "Use new implementation for CPU");
+    
 	do_gpu = parser.checkOption("--gpu", "Use available gpu resources for some calculations");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","default");
 #ifndef CUDA
@@ -1068,7 +1078,6 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 
 void MlOptimiser::initialise()
 {
-//#define DEBUG
 #ifdef DEBUG
     std::cerr<<"MlOptimiser::initialise Entering"<<std::endl;
 #endif
@@ -1166,10 +1175,29 @@ void MlOptimiser::initialise()
         REPORT_ERROR("GPU usage requested, but RELION was compiled without CUDA support");
 #endif
 	}
-
+	
     initialiseGeneral();
 
     initialiseWorkLoad();
+	
+#ifdef ALTCPU
+	// Don't start threading until after most I/O is over
+	if (do_cpu)
+	{
+		// Set the size of the TBB thread pool for the entire run
+		tbbSchedulerInit.initialize(nr_threads);
+	}
+#endif
+#ifdef MKLFFT
+	// Enable multi-threaded FFTW
+	int success = fftw_init_threads();
+	if (0 == success)
+		REPORT_ERROR("Multithreaded FFTW failed to initialize");
+
+	// And allow plans before expectation to run using allowed
+	// number of threads
+	fftw_plan_with_nthreads(nr_threads);
+#endif
 
 	if (fn_sigma != "")
 	{
@@ -1204,7 +1232,7 @@ void MlOptimiser::initialise()
 		// Set sigma2_noise and Iref from averaged poser spectra and Mavg
 		setSigmaNoiseEstimatesAndSetAverageImage(Mavg);
 	}
-
+   	
 	// First low-pass filter the initial references
 	if (iter == 0)
 		initialLowPassFilterReferences();
@@ -1320,6 +1348,13 @@ void MlOptimiser::initialiseGeneral(int rank)
 	TIMING_WSUM_LOCALSUMS =timer.setNew(" -  - EOPwsum: localsums");
 	TIMING_WSUM_SUMSHIFT = timer.setNew(" -  - EOPwsum: shiftimg");
 	TIMING_WSUM_BACKPROJ = timer.setNew(" -  - EOPwsum: backproject");
+	
+	TIMING_ITER_WRAPUP        = timer.setNew("iterate:  iterateWrapup");
+	TIMING_ITER_HELICALREFINE = timer.setNew("iterate:  helicalRefinement");
+	TIMING_ITER_SOLVFLAT      = timer.setNew("iterate:  solventFlatten");
+	TIMING_ITER_UPDATERES     = timer.setNew("iterate:  updateCurrentResolution");
+	TIMING_ITER_WRITE         = timer.setNew("iterate:  writeOutput");
+	TIMING_ITER_LOCALSYM      = timer.setNew("iterate:  ApplyLocalSymmetry"); 
 
 	TIMING_EXTRA1= timer.setNew(" -extra1");
 	TIMING_EXTRA2= timer.setNew(" -extra2");
@@ -1356,9 +1391,9 @@ void MlOptimiser::initialiseGeneral(int rank)
     if (!exists(fn_dir))
     	REPORT_ERROR("ERROR: output directory does not exist!");
 
-    // Just die if trying to use GPUs and skipping alignments
-    if (do_skip_align && do_gpu)
-    	REPORT_ERROR("ERROR: you cannot use GPUs when skipping alignments");
+    // Just die if trying to use accelerators and skipping alignments
+    if (do_skip_align && (do_gpu || do_cpu))
+    	REPORT_ERROR("ERROR: you cannot use accelerators when skipping alignments");
 
 	if (do_always_cc)
 		do_calculate_initial_sigma_noise = false;
@@ -1754,11 +1789,12 @@ void MlOptimiser::initialiseGeneral(int rank)
     	std::cout << " Using bimodal priors on the psi angle..." << std::endl;
 
 	// Resize the pdf_direction arrays to the correct size and fill with an even distribution
-    if (directions_have_changed)
+	if (directions_have_changed)
 		mymodel.initialisePdfDirection(sampling.NrDirections());
 
 	// Initialise the wsum_model according to the mymodel
 	wsum_model.initialise(mymodel, sampling.symmetryGroup(), asymmetric_padding, skip_gridding);
+
 	// Initialise sums of hidden variable changes
 	// In later iterations, this will be done in updateOverallChangesInHiddenVariables
 	sum_changes_optimal_orientations = 0.;
@@ -1962,7 +1998,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 						REPORT_ERROR("ml_optimiser.cpp::calculateSumOfPowerSpectraAndAverageImage: Tilt priors of helical segments are missing!");
 				}
 			}
-
+			
 			// Read image from disc
             Image<RFLOAT> img;
 			if (do_preread_images && do_parallel_disc_io)
@@ -2271,6 +2307,9 @@ void MlOptimiser::iterateWrapUp()
     // Delete volatile space on scratch
     mydata.deleteDataOnScratch();
 
+#ifdef MKLFFT
+	fftw_cleanup_threads();
+#endif	
 }
 
 void MlOptimiser::iterate()
@@ -2282,12 +2321,20 @@ void MlOptimiser::iterate()
 
 	// launch threads etc
 	iterateSetup();
+	
+#ifdef TIMING
+	timer.tic(TIMING_ITER_UPDATERES);
+#endif
 
 	// Update the current resolution and image sizes, and precalculate resolution pointers
 	// The rest of the time this will be done after maximization and before writing output files,
 	// so that current resolution is in the output files of the current iteration
 	updateCurrentResolution();
 
+#ifdef TIMING
+	timer.toc(TIMING_ITER_UPDATERES);
+#endif
+			
 	// If we're doing a restart from subsets, then do not increment the iteration number in the restart!
 	if (subset > 0)
 	{
@@ -2370,11 +2417,16 @@ void MlOptimiser::iterate()
 
 #ifdef TIMING
 			timer.toc(TIMING_MAX);
+			timer.tic(TIMING_ITER_LOCALSYM);
 #endif
 
 			// Apply local symmetry according to a list of masks and their operators
 			applyLocalSymmetryForEachRef();
 
+#ifdef TIMING
+			timer.toc(TIMING_ITER_LOCALSYM);
+			timer.tic(TIMING_ITER_HELICALREFINE);
+#endif			
 			// Shaoda Jul26,2015
 			// Helical symmetry refinement and imposition of real space helical symmetry.
 			if (do_helical_refine)
@@ -2419,17 +2471,32 @@ void MlOptimiser::iterate()
 				}
 			}
 
+#ifdef TIMING
+			timer.toc(TIMING_ITER_HELICALREFINE);
+			timer.tic(TIMING_ITER_SOLVFLAT);
+#endif	
 			// Apply masks to the reference images
 			// At the last iteration, do not mask the map for validation purposes
 			if (do_solvent && !has_converged)
 				solventFlatten();
-
+			
+#ifdef TIMING
+			timer.toc(TIMING_ITER_SOLVFLAT);
+			timer.tic(TIMING_ITER_UPDATERES);
+#endif	
 			// Re-calculate the current resolution, do this before writing to get the correct values in the output files
 			updateCurrentResolution();
 
+#ifdef TIMING
+			timer.toc(TIMING_ITER_UPDATERES);
+			timer.tic(TIMING_ITER_WRITE);
+#endif	
 			// Write output files
 			write(DO_WRITE_SAMPLING, DO_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, 0);
 
+#ifdef TIMING
+			timer.toc(TIMING_ITER_WRITE);
+#endif	
 			if (do_auto_refine && has_converged)
 			{
 				if (verb > 0)
@@ -2502,8 +2569,14 @@ void MlOptimiser::iterate()
 
     } // end loop iters
 
+#ifdef TIMING
+	timer.tic(TIMING_ITER_WRAPUP);
+#endif
 	// delete threads etc
 	iterateWrapUp();
+#ifdef TIMING
+	timer.toc(TIMING_ITER_WRAPUP);
+#endif
 }
 
 void MlOptimiser::expectation()
@@ -2514,6 +2587,11 @@ void MlOptimiser::expectation()
 	std::cerr << "Entering expectation" << std::endl;
 #endif
 
+#ifdef MKLFFT
+	// Allow parallel FFTW execution
+	fftw_plan_with_nthreads(nr_threads);
+#endif
+		
 	// Initialise some stuff
 	// A. Update current size (may have been changed to ori_size in autoAdjustAngularSampling) and resolution pointers
 	updateImageSizeAndResolutionPointers();
@@ -2565,16 +2643,16 @@ void MlOptimiser::expectation()
 			MlDeviceBundle *b = new MlDeviceBundle(this);
 			b->setDevice(cudaDevices[i]);
 			b->setupFixedSizedObjects();
-			cudaDeviceBundles.push_back((void*)b);
+			accDataBundles.push_back((void*)b);
 		}
 
-		std::vector<unsigned> threadcountOnDevice(cudaDeviceBundles.size(),0);
+		std::vector<unsigned> threadcountOnDevice(accDataBundles.size(),0);
 
 		for (int i = 0; i < cudaOptimiserDeviceMap.size(); i ++)
 		{
 			std::stringstream didSs;
 			didSs << "RRt" << i;
-			MlOptimiserCuda *b = new MlOptimiserCuda(this, (MlDeviceBundle*) cudaDeviceBundles[cudaOptimiserDeviceMap[i]], didSs.str().c_str());
+			MlOptimiserCuda *b = new MlOptimiserCuda(this, (MlDeviceBundle*) accDataBundles[cudaOptimiserDeviceMap[i]], didSs.str().c_str());
 			b->resetData();
 			cudaOptimisers.push_back((void*)b);
 			threadcountOnDevice[cudaOptimiserDeviceMap[i]] ++;
@@ -2583,15 +2661,15 @@ void MlOptimiser::expectation()
 		int devCount;
 		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
 		HANDLE_ERROR(cudaDeviceSynchronize());
-		for (int i = 0; i < cudaDeviceBundles.size(); i ++)
+		for (int i = 0; i < accDataBundles.size(); i ++)
 		{
-			if(((MlDeviceBundle*)cudaDeviceBundles[i])->device_id >= devCount || ((MlDeviceBundle*)cudaDeviceBundles[i])->device_id < 0 )
+			if(((MlDeviceBundle*)accDataBundles[i])->device_id >= devCount || ((MlDeviceBundle*)accDataBundles[i])->device_id < 0 )
 			{
-				//std::cerr << " using device_id=" << ((MlDeviceBundle*)cudaDeviceBundles[i])->device_id << " (device no. " << ((MlDeviceBundle*)cudaDeviceBundles[i])->device_id+1 << ") which is not within the available device range" << devCount << std::endl;
+				//std::cerr << " using device_id=" << ((MlDeviceBundle*)accDataBundles[i])->device_id << " (device no. " << ((MlDeviceBundle*)accDataBundles[i])->device_id+1 << ") which is not within the available device range" << devCount << std::endl;
 				CRITICAL(ERR_GPUID);
 			}
 			else
-				HANDLE_ERROR(cudaSetDevice(((MlDeviceBundle*)cudaDeviceBundles[i])->device_id));
+				HANDLE_ERROR(cudaSetDevice(((MlDeviceBundle*)accDataBundles[i])->device_id));
 
 			size_t free, total, allocationSize;
 			HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
@@ -2614,12 +2692,51 @@ void MlOptimiser::expectation()
 			printf("INFO: Free memory for Custom Allocator of device bundle %d is %d MB\n", i, (int) ( ((float)allocationSize)/1000000.0 ) );
 #endif
 
-			((MlDeviceBundle*)cudaDeviceBundles[i])->setupTunableSizedObjects(allocationSize);
+			((MlDeviceBundle*)accDataBundles[i])->setupTunableSizedObjects(allocationSize);
 		}
 	}
 #endif
-
+#ifdef ALTCPU	
+	if (do_cpu)
+	{	
+		unsigned nr_classes = mymodel.nr_classes;
+		// Allocate Array of complex arrays for this class
+		posix_memalign((void **)&mdlClassComplex, MEM_ALIGN, nr_classes * sizeof (XFLOAT *));
+		
+		// Set up XFLOAT complex array shared by all threads for each class
+		for (int iclass = 0; iclass < nr_classes; iclass++)
+		{
+			int mdlX = mymodel.PPref[iclass].data.xdim;
+			int mdlY = mymodel.PPref[iclass].data.ydim;
+			int mdlZ = mymodel.PPref[iclass].data.zdim;
+			int mdlXYZ;
+			if(mdlZ == 0)
+				mdlXYZ = mdlX*mdlY;
+			else
+				mdlXYZ = mdlX*mdlY*mdlZ;
+			
+			posix_memalign((void **)&mdlClassComplex[iclass], MEM_ALIGN, mdlXYZ * 2 * sizeof(XFLOAT));
+			
+			XFLOAT *pData = mdlClassComplex[iclass];
+			
+			for (unsigned long i = 0; i < mdlXYZ; i ++)
+			{
+				*pData ++ = (XFLOAT) mymodel.PPref[iclass].data.data[i].real;
+				*pData ++ = (XFLOAT) mymodel.PPref[iclass].data.data[i].imag;
+			} 
+		}
+		
+		MlDataBundle *b = new MlDataBundle();
+		b->setup(this);
+		accDataBundles.push_back((void*)b);
+	}  // do_cpu
+#endif // ALTCPU
 	/************************************************************************/
+
+#ifdef MKLFFT
+	// Single-threaded FFTW execution for code inside parallel processing loop
+	fftw_plan_with_nthreads(1);
+#endif
 
 	// Now perform real expectation over all particles
 	// Use local parameters here, as also done in the same overloaded function in MlOptimiserMpi
@@ -2722,19 +2839,19 @@ void MlOptimiser::expectation()
 #ifdef CUDA
 	if (do_gpu)
 	{
-		for (int i = 0; i < cudaDeviceBundles.size(); i ++)
+		for (int i = 0; i < accDataBundles.size(); i ++)
 		{
-			MlDeviceBundle* b = ((MlDeviceBundle*)cudaDeviceBundles[i]);
+			MlDeviceBundle* b = ((MlDeviceBundle*)accDataBundles[i]);
 			b->syncAllBackprojects();
 
-			for (int j = 0; j < b->cudaProjectors.size(); j++)
+			for (int j = 0; j < b->projectors.size(); j++)
 			{
 				unsigned long s = wsum_model.BPref[j].data.nzyxdim;
 				XFLOAT *reals = new XFLOAT[s];
 				XFLOAT *imags = new XFLOAT[s];
 				XFLOAT *weights = new XFLOAT[s];
 
-				b->cudaBackprojectors[j].getMdlData(reals, imags, weights);
+				b->backprojectors[j].getMdlData(reals, imags, weights);
 
 				for (unsigned long n = 0; n < s; n++)
 				{
@@ -2747,8 +2864,8 @@ void MlOptimiser::expectation()
 				delete [] imags;
 				delete [] weights;
 
-				b->cudaProjectors[j].clear();
-				b->cudaBackprojectors[j].clear();
+				b->projectors[j].clear();
+				b->backprojectors[j].clear();
 				b->coarseProjectionPlans[j].clear();
 			}
 		}
@@ -2759,17 +2876,17 @@ void MlOptimiser::expectation()
 		cudaOptimisers.clear();
 
 
-		for (int i = 0; i < cudaDeviceBundles.size(); i ++)
+		for (int i = 0; i < accDataBundles.size(); i ++)
 		{
 
-			((MlDeviceBundle*)cudaDeviceBundles[i])->allocator->syncReadyEvents();
-			((MlDeviceBundle*)cudaDeviceBundles[i])->allocator->freeReadyAllocs();
+			((MlDeviceBundle*)accDataBundles[i])->allocator->syncReadyEvents();
+			((MlDeviceBundle*)accDataBundles[i])->allocator->freeReadyAllocs();
 
 #ifdef DEBUG_CUDA
-			if (((MlDeviceBundle*) cudaDeviceBundles[i])->allocator->getNumberOfAllocs() != 0)
+			if (((MlDeviceBundle*) accDataBundles[i])->allocator->getNumberOfAllocs() != 0)
 			{
 				printf("DEBUG_ERROR: Non-zero allocation count encountered in custom allocator between iterations.\n");
-				((MlDeviceBundle*) cudaDeviceBundles[i])->allocator->printState();
+				((MlDeviceBundle*) accDataBundles[i])->allocator->printState();
 				fflush(stdout);
 				CRITICAL(ERR_CANZ);
 			}
@@ -2777,13 +2894,58 @@ void MlOptimiser::expectation()
 #endif
 		}
 
-		for (int i = 0; i < cudaDeviceBundles.size(); i ++)
-			delete (MlDeviceBundle*) cudaDeviceBundles[i];
+		for (int i = 0; i < accDataBundles.size(); i ++)
+			delete (MlDeviceBundle*) accDataBundles[i];
 
-		cudaDeviceBundles.clear();
+		accDataBundles.clear();
 	}
 #endif
+#ifdef ALTCPU
+	if (do_cpu)
+	{
+		MlDataBundle* b = (MlDataBundle*) accDataBundles[0];
 
+		for (int j = 0; j < b->projectors.size(); j++)
+		{
+			unsigned long s = wsum_model.BPref[j].data.nzyxdim;
+			XFLOAT *reals = NULL; 
+			XFLOAT *imags = NULL;
+			XFLOAT *weights = NULL; 
+
+			b->backprojectors[j].getMdlDataPtrs(reals, imags, weights);
+
+			for (unsigned long n = 0; n < s; n++)
+			{
+				wsum_model.BPref[j].data.data[n].real += (RFLOAT) reals[n];
+				wsum_model.BPref[j].data.data[n].imag += (RFLOAT) imags[n];
+				wsum_model.BPref[j].weight.data[n] += (RFLOAT) weights[n];
+			}
+			
+			b->projectors[j].clear();
+			b->backprojectors[j].clear();
+			b->coarseProjectionPlans[j].clear();
+		}
+		
+		delete b;
+		accDataBundles.clear();
+
+		// Now clean up
+		unsigned nr_classes = mymodel.nr_classes;
+		for (int iclass = 0; iclass < nr_classes; iclass++)
+		{
+			free(mdlClassComplex[iclass]);
+		}
+		free(mdlClassComplex);
+
+		tbbCpuOptimiser.clear();
+	}
+#endif  // ALTCPU
+#ifdef  MKLFFT
+	// Allow parallel FFTW execution to continue now that we are outside the parallel
+	// portion of expectation
+	fftw_plan_with_nthreads(nr_threads);
+#endif
+	
 	// Set back verb
 	verb = old_verb;
 
@@ -3141,18 +3303,49 @@ void MlOptimiser::expectationSomeParticles(long int my_first_ori_particle, long 
 	} //end loop over ori_part_id
 
 
-//#define DEBUG_EXPSOME
 #ifdef DEBUG_EXPSOME
 	std::cerr << " exp_my_first_ori_particle= " << exp_my_first_ori_particle << " exp_my_last_ori_particle= " << exp_my_last_ori_particle << std::endl;
 	std::cerr << " exp_nr_images= " << exp_nr_images << std::endl;
 #endif
+	if (!do_cpu)
+	{
+		// GPU and traditional CPU case - use RELION's built-in task manager to
+		// process multiple particles at once
+		exp_ipart_ThreadTaskDistributor->resize(my_last_ori_particle - my_first_ori_particle + 1, 1);
+		exp_ipart_ThreadTaskDistributor->reset();
+		global_ThreadManager->run(globalThreadExpectationSomeParticles);
+	}
+#ifdef ALTCPU
+	else
+	{
+		// "New" CPU case - use TBB's tasking system to process multiple
+		// particles in parallel.  Like the GPU implementation, the lower-
+		// level parallelism is implemented by compiler vectorization
+		// (roughly equivalent to GPU "threads").
+		int tCount = 0;  
 
-	exp_ipart_ThreadTaskDistributor->resize(my_last_ori_particle - my_first_ori_particle + 1, 1);
-	exp_ipart_ThreadTaskDistributor->reset();
-    global_ThreadManager->run(globalThreadExpectationSomeParticles);
+		// process all passed particles in parallel
+		//for(unsigned long i=my_first_ori_particle; i<=my_last_ori_particle; i++) {
+		tbb::parallel_for(my_first_ori_particle, my_last_ori_particle+1, [&](int i) {
+			CpuOptimiserType::reference ref = tbbCpuOptimiser.local();
+			MlOptimiserCpu *cpuOptimiser = (MlOptimiserCpu *)ref;
+			if(cpuOptimiser == NULL) {
+				cpuOptimiser = new MlOptimiserCpu(this, (MlDataBundle*)accDataBundles[0], "cpu_optimiser");
+				cpuOptimiser->resetData();
+				ref = cpuOptimiser;
 
-    if (threadException != NULL)
-    	throw *threadException;
+				cpuOptimiser->thread_id = tCount;
+				tCount++;  // Race condition!
+			}  // cpuOptimiser == NULL
+
+			cpuOptimiser->expectationOneParticle(i, cpuOptimiser->thread_id);
+		});
+		//}
+	}  // do_cpu
+#endif  // ifdef ALTCPU
+
+	if (threadException != NULL)
+		throw *threadException;
 
 #ifdef TIMING
     timer.toc(TIMING_ESP);
@@ -3318,11 +3511,9 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 			timer.tic(TIMING_ESP_FT);
 		}
 #endif
-		//std::cerr << "before getFour" << std::endl;
 		getFourierTransformsAndCtfs(my_ori_particle, ibody, metadata_offset, exp_Fimgs, exp_Fimgs_nomask, exp_Fctfs,
 				exp_old_offset, exp_prior, exp_power_imgs, exp_highres_Xi2_imgs,
 				exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior);
-		//std::cerr << "after getFour" << std::endl;
 
 #ifdef TIMING
 		if (my_ori_particle == exp_my_first_ori_particle)
@@ -3418,7 +3609,6 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 					exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior,
 					exp_local_Fimgs_shifted, exp_local_Minvsigma2s, exp_local_Fctfs, exp_local_sqrtXi2);
 
-			//std::cerr << "after getDelta2" << std::endl;
 
 #ifdef DEBUG_ESP_MEM
 			if (thread_id==0)
@@ -3438,7 +3628,6 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 					exp_Mweight, exp_Mcoarse_significant, exp_significant_weight,
 					exp_sum_weight, exp_old_offset, exp_prior, exp_min_diff2,
 					exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior);
-			//std::cerr << "after convW" << std::endl;
 
 #ifdef DEBUG_ESP_MEM
 		if (thread_id==0)
@@ -3451,7 +3640,6 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 #endif
 
 		}// end loop over 2 exp_ipass iterations
-		//std::cerr << "after exp_ipass loop" << std::endl;
 
 #ifdef RELION_TESTING
 		std::string mode;
@@ -3530,7 +3718,6 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 				exp_significant_weight, exp_sum_weight, exp_max_weight,
 				exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior,
 				exp_local_Fimgs_shifted, exp_local_Fimgs_shifted_nomask, exp_local_Minvsigma2s, exp_local_Fctfs, exp_local_sqrtXi2);
-		//std::cerr << "after storeWsums" << std::endl;
 
 #ifdef RELION_TESTING
 //		std::string mode;
@@ -3962,8 +4149,8 @@ void MlOptimiser::maximizationOtherParameters()
 			}
 		}
 	}
-	RCTIC(timer,RCT_7);
-	RCTOC(timer,RCT_8);
+	RCTOC(timer,RCT_7);
+	RCTIC(timer,RCT_8);
 	// After the first iteration the references are always CTF-corrected
     if (do_ctf_correction)
     	refs_are_ctf_corrected = true;

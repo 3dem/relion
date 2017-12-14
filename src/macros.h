@@ -45,7 +45,7 @@
 #ifndef MACROS_H
 #define MACROS_H
 
-#define RELION_VERSION "2.1-beta-1 devel branch"
+#define RELION_VERSION "3.0-alpha-1 devel branch"
 
 #include <math.h>
 #include <signal.h>
@@ -78,7 +78,7 @@
 #define MY_MPI_COMPLEX MPI_DOUBLE_COMPLEX
 #endif
 
-#ifdef DEBUG_CUDA
+#if defined CUDA and DEBUG_CUDA
 #define CRITICAL(string) raise(SIGSEGV);
 #else
 #define CRITICAL(string) REPORT_ERROR(string);

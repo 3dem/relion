@@ -1,21 +1,30 @@
 include_directories("${CMAKE_SOURCE_DIR}")
 
-include_directories("${FFTW_INCLUDES}")
+if(NOT MKLFFT)
+    include_directories("${FFTW_INCLUDES}")
+endif(NOT MKLFFT)
 #include_directories(${CMAKE_BINARY_DIR}/include)
 
 find_path (X11_INCLUDES Xdbe.h)
 
 message(STATUS "CMAKE_BINARY_DIR:" ${CMAKE_BINARY_DIR})
 
-file(GLOB REL_SRC "${CMAKE_SOURCE_DIR}/src/*.cpp" "${CMAKE_SOURCE_DIR}/src/*.c" "${CMAKE_SOURCE_DIR}/src/gpu_utils/*.cpp")
 file(GLOB REL_GUI_SRC "${CMAKE_SOURCE_DIR}/src/manualpicker.cpp" "${CMAKE_SOURCE_DIR}/src/gui_*.cpp" "${CMAKE_SOURCE_DIR}/src/displayer.cpp")
+
+if (ALTCPU)
+    file(GLOB REL_SRC "${CMAKE_SOURCE_DIR}/src/*.cpp" "${CMAKE_SOURCE_DIR}/src/*.c" "${CMAKE_SOURCE_DIR}/src/acc/cpu/*.cpp" "${CMAKE_SOURCE_DIR}/src/acc/cpu/cpu_kernels/*.cpp" )
+    file(GLOB REL_SRC_H "${CMAKE_SOURCE_DIR}/src/*.h" "${CMAKE_SOURCE_DIR}/src/acc/*.h" "${CMAKE_SOURCE_DIR}/src/acc/cpu/*.h" "${CMAKE_SOURCE_DIR}/src/acc/cpu/cpu_kernels/*.h" ) 
+else()
+    file(GLOB REL_SRC "${CMAKE_SOURCE_DIR}/src/*.cpp" "${CMAKE_SOURCE_DIR}/src/*.c" "${CMAKE_SOURCE_DIR}/src/acc/*.cpp" )
+    file(GLOB REL_SRC_H "${CMAKE_SOURCE_DIR}/src/*.h" "${CMAKE_SOURCE_DIR}/src/acc/*.h" ) 
+endif(ALTCPU)
+
 # Remove GUI files from relion_lib
 foreach(GUI_SRC_FILE ${REL_GUI_SRC})
 	list(REMOVE_ITEM REL_SRC "${GUI_SRC_FILE}")
 endforeach()
-file(GLOB REL_SRC_H "${CMAKE_SOURCE_DIR}/src/*.h" "${CMAKE_SOURCE_DIR}/src/gpu_utils/*.h")
-file(GLOB REL_HP "${CMAKE_SOURCE_DIR}/src/Healpix_2.15a/*.cc")
 
+file(GLOB REL_HP "${CMAKE_SOURCE_DIR}/src/Healpix_2.15a/*.cc")
 file(GLOB RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/*.cpp")
 
 set(GUI_TARGETS display maingui manualpick pipeliner)
@@ -45,10 +54,12 @@ else()
     endif(GUI)
 endif()
 
-target_link_libraries(relion_lib ${FFTW_LIBRARIES})
-if(BUILD_OWN_FFTW)
-    add_dependencies(relion_lib OWN_FFTW)
-endif()
+if(NOT MKLFFT)
+    target_link_libraries(relion_lib ${FFTW_LIBRARIES})
+    if(BUILD_OWN_FFTW)
+        add_dependencies(relion_lib OWN_FFTW)
+    endif()
+endif(NOT MKLFFT)
 
 if(GUI)
     include_directories("${FLTK_INCLUDE_DIR}")
@@ -62,7 +73,7 @@ endif(GUI)
 
 if (CUDA_FOUND)
 
-    file(GLOB REL_CUDA_SRC "${CMAKE_SOURCE_DIR}/src/gpu_utils/*.cu" "${CMAKE_SOURCE_DIR}/src/gpu_utils/cuda_kernels/*.cu")
+    file(GLOB REL_CUDA_SRC "${CMAKE_SOURCE_DIR}/src/acc/cuda/*.cu" "${CMAKE_SOURCE_DIR}/src/acc/cuda/cuda_kernels/*.cu" )
     cuda_add_library(relion_gpu_util ${REL_CUDA_SRC})
 
     if (${CMAKE_BUILD_TYPE_LOWER} STREQUAL "profiling")
@@ -105,23 +116,31 @@ foreach (_target ${RELION_TARGETS})
  	add_dependencies(${_target} relion_lib)
 	
 	set_target_properties(${_target} PROPERTIES PREFIX "relion_")
-	
-	target_link_libraries(${_target} ${LIB} ${FFTW_LIBRARIES} ${EXTRA_LIBS} ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
+
+	if(NOT MKLFFT)
+	    target_link_libraries(${_target} ${LIB} ${EXTRA_LIBS} ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
+	else()	
+	    target_link_libraries(${_target} ${LIB} ${FFTW_LIBRARIES} ${EXTRA_LIBS} ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
+	endif(NOT MKLFFT)
 	
 	if(CUDA_FOUND)
 	    target_link_libraries(${_target} relion_gpu_util)
 	endif(CUDA_FOUND)
 	
-#	if(${_target} IN_LIST GUI_TARGETS)
-#        add_dependencies(${_target} relion_gui_lib)
-#		target_link_libraries(${_target} relion_gui_lib ${FLTK_LIBRARIES} ${X11})
-#	endif()
+
+	target_link_libraries(${_target} ${TBB_LIBRARIES})
+
+	set_target_properties(${_target} PROPERTIES
+		CXX_STANDARD 11
+		CXX_STANDARD_REQUIRED ON
+		CXX_EXTENSIONS OFF
+	)
 	
 	list(FIND GUI_TARGETS ${_target} IS_GUI_TARGET)
 	if(NOT ${IS_GUI_TARGET} LESS 0)
-        add_dependencies(${_target} relion_gui_lib)
-        target_link_libraries(${_target} relion_gui_lib ${FLTK_LIBRARIES} ${X11})
-    endif()
+		add_dependencies(${_target} relion_gui_lib)
+		target_link_libraries(${_target} relion_gui_lib ${FLTK_LIBRARIES} ${X11})
+	endif()
     
 	message(STATUS "added ${_target}...")
 	

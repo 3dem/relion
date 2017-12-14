@@ -1,5 +1,9 @@
-cmake_minimum_required(VERSION 2.8.12)
-set(RELION_CMAKE_MINIMUM_REQUIRED_VERSION "2.8.12")
+cmake_minimum_required(VERSION 3.1.0 FATAL_ERROR)
+set(CMAKE_CXX_STANDARD 11) # C++11...
+set(CMAKE_CXX_STANDARD_REQUIRED ON) #...is required...
+set(CMAKE_CXX_EXTENSIONS OFF)
+add_compile_options(-std=c++11)
+message(STATUS "Setting CXX supported standared '${CMAKE_CXX_STANDARD}'")
 
 #
 #if(POLICY CMP0048)
@@ -80,9 +84,15 @@ endif(NOT DEFINED CUDA_ARCH)
 
 # -------------------------------------------------------------------FURTHER OPTIONS--
 option(CUDA "Enable CUDA GPU acceleration" ON)
+option(ALTCPU "Enable Accelerated CPU version" OFF)
 option(DoublePrec_CPU "DoublePrec_CPU" ON)
-option(DoublePrec_GPU "DoublePrec_GPU" OFF)
+option(DoublePrec_ACC "Accelerated Code use double-precision" OFF)
+option(MKLFFT "Use MKL rather than FFTW for FFT" OFF)
 option(CudaTexture "CudaTexture" ON)
+
+if(CUDA OR ALTCPU)
+    add_definitions(-DACC_CUDA=2 -DACC_CPU=1)
+endif()
 
 # -----------------------------------------------DOUBLE PRECISION (CUDA-CODE) OR NOT--
 if(DoublePrec_CPU)
@@ -92,13 +102,13 @@ else(DoublePrec_CPU)
     add_definitions(-DRELION_SINGLE_PRECISION)
 endif(DoublePrec_CPU)
 
-if(DoublePrec_GPU)
-    message(STATUS "Setting gpu precision to double")
-    add_definitions(-DCUDA_DOUBLE_PRECISION)
+if(DoublePrec_ACC)
+    message(STATUS "Setting accelerated code precision to double")
+    add_definitions(-DACC_DOUBLE_PRECISION)
 	set(CudaTexture FALSE)
-else(DoublePrec_GPU)
-    message(STATUS "Setting gpu precision to single")
-endif(DoublePrec_GPU)
+else(DoublePrec_ACC)
+    message(STATUS "Setting accelerated code precision to single")
+endif(DoublePrec_ACC)
 
 # ----------------------------------------------------------INCLUDE ALL BUILD TYPES--
  #This *has* to be AFTER project()
@@ -112,7 +122,7 @@ endif()
 
 if(CUDA_FOUND)
     message(STATUS "Using cuda wrapper to compile....")
-    if( (NOT ${CUDA_VERSION} VERSION_LESS "7.5") AND (NOT DoublePrec_GPU) )
+    if( (NOT ${CUDA_VERSION} VERSION_LESS "7.5") AND (NOT DoublePrec_ACC) )
         message(STATUS "Cuda version is >= 7.5 and single-precision build, enable double usage warning.")
 		set(WARN_DBL "--ptxas-options=-warn-double-usage") # cuda>=7.5
 	elseif( ${CUDA_VERSION} VERSION_LESS "7.0")
@@ -121,17 +131,12 @@ if(CUDA_FOUND)
     endif()
     
     if(CUDA)
-    	add_definitions(-DCUDA)
+        add_definitions(-DCUDA)
     endif()
 else(CUDA_FOUND)
     message(STATUS "Using non-cuda compilation....")
 endif(CUDA_FOUND)
 
-# ---------------------------------------------------------------USE TEXTURES OR NOT--
-if(NOT CudaTexture)
-    add_definitions(-DCUDA_NO_TEXTURES)
-    message(STATUS "Texture interpolation is omitted.")
-endif(NOT CudaTexture)
 # ------------------------------------------------------------------ALLOCATOR CHOICE--
 option(CachedAlloc "CachedAlloc" ON)
 if(NOT CachedAlloc)
@@ -157,6 +162,53 @@ if(NOT GUI)
     message(STATUS "Omitting GUI targets as per your request")
 endif()
 
+# ---------------------------------------------------------------------------TBB --
+find_package(TBB)
+
+message(STATUS "TBB_FOUND :        ${TBB_FOUND}")
+message(STATUS "TBB_INCLUDE_DIRS : ${TBB_INCLUDE_DIRS}")
+message(STATUS "TBB_VERSION :      ${TBB_VERSION}")
+message(STATUS "TBB_LIBRARIES :    ${TBB_LIBRARIES}")
+include_directories("${TBB_INCLUDE_DIRS}/tbb")
+
+# ----------------------------------------------------------Intel Compiler support --
+# ----------------------------------  and build flags including MKL and TBB ---------
+#
+message(STATUS "CMAKE_C_COMPILER : ${CMAKE_C_COMPILER}")
+message(STATUS "CMAKE_CXX_COMPILER : ${CMAKE_CXX_COMPILER}")
+message(STATUS "MPI_C_COMPILER : ${MPI_C_COMPILER}")
+message(STATUS "MPI_CXX_COMPILER : ${MPI_CXX_COMPILER}")
+
+message(STATUS "CMAKE_CXX_COMPILER_ID : ${CMAKE_CXX_COMPILER_ID}")
+if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
+    if(MKLFFT)
+        SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fopenmp -mkl -limf ")
+    	add_definitions(-DMKLFFT)
+    else(MKLFFT)
+        SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -limf ")
+    endif(MKLFFT)
+    if(ALTCPU)
+        add_definitions(-DFAST_CENTERFFT)
+    endif()
+    SET(CudaTexture OFF)
+    SET(MPI_C_COMPILER ${CMAKE_C_COMPILER})
+    SET(MPI_CXX_COMPILER ${CMAKE_CXX_COMPILER})
+else()
+    SET(MKLFFT OFF)
+    SET(CMAKE_C_COMPILER ${MPI_C_COMPILER})
+    SET(CMAKE_CXX_COMPILER ${MPI_CXX_COMPILER})
+    SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ")
+endif()
+
+if(ALTCPU)
+    add_definitions(-DALTCPU)
+endif()
+
+# ---------------------------------------------------------------USE TEXTURES OR NOT--
+if(NOT CudaTexture OR ALTCPU)
+    add_definitions(-DPROJECTOR_NO_TEXTURES)
+    message(STATUS "Texture interpolation is omitted.")
+endif(NOT CudaTexture OR ALTCPU)
 # -------------------------------------------------------------------------------MPI--
 find_package(MPI REQUIRED)
 
@@ -203,16 +255,17 @@ if(GUI)
 endif(GUI)
 
 # ------------------------------------------------------------------------------FFTW--
-option(FORCE_OWN_FFTW "FORCE_OWN_FFTW" OFF)
+if(NOT MKLFFT)
+    option(FORCE_OWN_FFTW "FORCE_OWN_FFTW" OFF)
 
-if(NOT FORCE_OWN_FFTW)
+    if(NOT FORCE_OWN_FFTW)
 	FIND_PACKAGE(FFTW)
-endif(NOT FORCE_OWN_FFTW)
+    endif(NOT FORCE_OWN_FFTW)
 	
-if(NOT FFTW_FOUND)
-	message(STATUS "No FFTW installation was found")
+    if(NOT FFTW_FOUND)
 	include(${CMAKE_SOURCE_DIR}/cmake/BuildFFTW.cmake)
-endif(NOT FFTW_FOUND)
+    endif(NOT FFTW_FOUND)
+endif(NOT MKLFFT)
 
 include(CheckCXXSymbolExists)
 check_cxx_symbol_exists(sincos    math.h   HAVE_SINCOS)
@@ -269,6 +322,23 @@ endif()
 
 
 ADD_SUBDIRECTORY(src/apps)
+
+#message(STATUS "CUDA option = ${CUDA}")
+#message(STATUS "ALTCPU option = ${ALTCPU}")
+#message(STATUS "DoublePrec_CPU option = ${DoublePrec_CPU}")
+#message(STATUS "DoublePrec_ACC option = ${DoublePrec_ACC}")
+#message(STATUS "MKLFFT option = ${MKLFFT}")
+#message(STATUS "CudaTexture option = ${CudaTexture}")
+
+#get_directory_property( DirDefs COMPILE_DEFINITIONS )
+#message(STATUS "COMPILE_DEFINITIONS = ${DirDefs}" )
+#message(STATUS "CMAKE_C_FLAGS : ${CMAKE_C_FLAGS}")
+#message(STATUS "CMAKE_CXX_FLAGS : ${CMAKE_CXX_FLAGS}")
+#message(STATUS "CMAKE_C_COMPILER : ${CMAKE_C_COMPILER}")
+#message(STATUS "CMAKE_CXX_COMPILER : ${CMAKE_CXX_COMPILER}")
+#message(STATUS "MPI_C_COMPILER : ${MPI_C_COMPILER}")
+#message(STATUS "MPI_CXX_COMPILER : ${MPI_CXX_COMPILER}")
+#message(STATUS "CMAKE_EXE_LINKER_FLAGS : ${CMAKE_EXE_LINKER_FLAGS}")
 
 # -----------------------------------------------------------------------------TESTS--
 # Include testing flag(s) as precomiler 
