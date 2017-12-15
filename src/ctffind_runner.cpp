@@ -67,7 +67,7 @@ void CtffindRunner::read(int argc, char **argv, int rank)
 	phase_max  = textToFloat(parser.getOption("--phase_max", "Maximum phase shift (in degrees)", "180."));
 	phase_step = textToFloat(parser.getOption("--phase_step", "Step in phase shift (in degrees)", "10."));
 	nr_threads = textToInteger(parser.getOption("--j", "Number of threads (for CTFIND4 only)", "1"));
-	do_large_astigmatism = parser.checkOption("--large_astigmatism", "Do you expect large astigmatism?");
+	do_fast_search = parser.checkOption("--fast_search", "Disable \"Slower, more exhaustive search\" in CTFFIND4.1 (faster but less accurate)");
 
 	int gctf_section = parser.addSection("Gctf parameters");
 	do_use_gctf = parser.checkOption("--use_gctf", "Use Gctf instead of CTFFIND to estimate the CTF parameters");
@@ -585,8 +585,12 @@ void CtffindRunner::executeCtffind4(long int imic)
 	fh << step_defocus << std::endl;
 	// Do you know what astigmatism is present?
 	fh << "no" << std::endl;
-	// Do you expect very large astigmatism?
-	if (do_large_astigmatism)
+	// Slower, more exhaustive search?
+	// The default was "no" in CTFFIND 4.1.5, but turned out to be less accurate.
+	// The default was changed to "yes" in CTFFIND 4.1.8. 
+	// Ref: http://grigoriefflab.janelia.org/ctffind4
+	// So, we say "yes" regardless of the version unless "--fast_search" is specified.
+	if (!do_fast_search)
 		fh << "yes" << std::endl;
 	else
 		fh << "no" << std::endl;
