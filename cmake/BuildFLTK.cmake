@@ -1,6 +1,4 @@
-message(STATUS "-------------------------------------------------")
-message(STATUS "------- WILL USE LOCALLY BUILT FLTK LIBS --------")
-message(STATUS "-------------------------------------------------")
+
 
 set(FLTK_EXTERNAL_PATH "${CMAKE_SOURCE_DIR}/external/fltk")
 set(ext_conf_flags_fltk --enable-shared --prefix=${FLTK_EXTERNAL_PATH})
@@ -13,10 +11,18 @@ find_path(FLTK_INCLUDES     NAMES FL/Fl.H   PATHS  "${FLTK_EXTERNAL_PATH}/includ
 
 if(FLTK_INCLUDE_DIR AND FLTK_LIBRARIES)
     set(FLTK_FOUND TRUE)
-    message( STATUS "Found previously built external (non-system) FLTK library")
+	message(STATUS "Found previously built non-system FLTK libraries that will be used.")
 else()
     set(FLTK_FOUND FALSE)
+	message(STATUS "--------------------------------------------------------")
+	message(STATUS "-------- NO EXISTING FLTK LIBRARIES WHERE FOUND. -------")
+	message(STATUS "-------------- FLTK WILL BE DOWNLOADED AND -------------")
+	message(STATUS "--------------- BUILT DURING COMPILE-TIME. -------------")
+	message(STATUS "--------------------------------------------------------")
+	message(STATUS "---- A WORKING INTERNET CONNECTION WILL BE REQUIRED. ---")
+	message(STATUS "--------------------------------------------------------")
 endif()
+
 ## ----------------------------------------------------------------- NEW EXT LIBS? --  
  
 if(NOT FLTK_FOUND)

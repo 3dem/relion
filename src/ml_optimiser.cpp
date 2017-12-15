@@ -388,7 +388,9 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	else
 		requested_free_gpu_memory =  temp_reqSize;
 
-	do_phase_random_fsc = parser.checkOption("--solvent_correct_fsc", "Correct FSC curve for the effects of the solvent mask?");
+	// only allow switching ON solvent_fsc, not off
+	if (parser.checkOption("--solvent_correct_fsc", "Correct FSC curve for the effects of the solvent mask?"))
+		do_phase_random_fsc = true;
 	verb = textToInteger(parser.getOption("--verb", "Verbosity (1=normal, 0=silent)", "1"));
 
 	int expert_section = parser.addSection("Expert options");
@@ -1539,7 +1541,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		// don't perturb angles anymore
 		//sampling.perturbation_factor = 0.;
 	    // Only do a single pass through the local-search orientations
-		adaptive_oversampling = 0;
+		//adaptive_oversampling = 0;
 
 		// Start at iteration 1 again
 		iter = 0;
@@ -1643,6 +1645,12 @@ void MlOptimiser::initialiseGeneral(int rank)
 		nr_iter = 999;
 		has_fine_enough_angular_sampling = false;
 		has_converged = false;
+
+		if (mymodel.tau2_fudge_factor > 1. && verb > 0)
+		{
+			std::cerr << " WARNING: Using tau2_fudge of " <<mymodel.tau2_fudge_factor << ", which will lead to inflated resolution estimates during refinement." << std::endl;
+			std::cerr << " WARNING: You have to run postprocessing afterwards to get a reliable, gold-standard resolution estimate! " << std::endl;
+		}
 
 		if (iter == 0 && sampling.healpix_order >= autosampling_hporder_local_searches)
 		{
@@ -2430,15 +2438,24 @@ void MlOptimiser::iterate()
 					std::cout << " Auto-refine: + Final reconstruction from all particles is saved as: " <<  fn_out << "_class001.mrc" << std::endl;
 					std::cout << " Auto-refine: + Final model parameters are stored in: " << fn_out << "_model.star" << std::endl;
 					std::cout << " Auto-refine: + Final data parameters are stored in: " << fn_out << "_data.star" << std::endl;
-					std::cout << " Auto-refine: + Final resolution (without masking) is: " << 1./mymodel.current_resolution << std::endl;
-					if (acc_rot < 10.)
-						std::cout << " Auto-refine: + But you may want to run relion_postprocess to mask the unfil.mrc maps and calculate a higher resolution FSC" << std::endl;
-					else
+                                        if (mymodel.tau2_fudge_factor > 1.)
+                                        {
+                                            std::cout << " Auto-refine: + SEVERE WARNING: Because you used a tau2_fudge of " << mymodel.tau2_fudge_factor << " your resolution during this refinement will be inflated!" << std::endl;
+                                            std::cout << " Auto-refine: + SEVERE WARNING: You have to run a postprocessing on the unfil.mrc maps to get a gold-standard resolution estimate!"  << std::endl;
+                                        }
+                                        else if (do_phase_random_fsc)
+                                            std::cout << " Auto-refine: + Final resolution (already with masking) is: " << 1./mymodel.current_resolution << std::endl;
+                                        else
+                                        {
+                                            std::cout << " Auto-refine: + Final resolution (without masking) is: " << 1./mymodel.current_resolution << std::endl;
+                                            std::cout << " Auto-refine: + But you may want to run relion_postprocess to mask the unfil.mrc maps and calculate a higher resolution FSC" << std::endl;
+                                        }
+					if (acc_rot > 10.)
 					{
-						std::cout << " Auto-refine: + WARNING: The angular accuracy is worse than 10 degrees, so basically you cannot align your particles!" << std::endl;
-						std::cout << " Auto-refine: + WARNING: This has been observed to lead to spurious FSC curves, so be VERY wary of inflated resolution estimates..." << std::endl;
-						std::cout << " Auto-refine: + WARNING: You most probably do NOT want to publish these results!" << std::endl;
-						std::cout << " Auto-refine: + WARNING: Sometimes it is better to tune resolution yourself by adjusting T in a 3D-classification with a single class." << std::endl;
+						std::cout << " Auto-refine: + SEVERE WARNING: The angular accuracy is worse than 10 degrees, so basically you cannot align your particles!" << std::endl;
+						std::cout << " Auto-refine: + SEVERE WARNING: This has been observed to lead to spurious FSC curves, so be VERY wary of inflated resolution estimates..." << std::endl;
+						std::cout << " Auto-refine: + SEVERE WARNING: You most probably do NOT want to publish these results!" << std::endl;
+						std::cout << " Auto-refine: + SEVERE WARNING: Sometimes it is better to tune resolution yourself by adjusting T in a 3D-classification with a single class." << std::endl;
 					}
 				}
 				break;
@@ -3694,62 +3711,61 @@ void MlOptimiser::maximization()
 		if (mymodel.pdf_class[iclass] > 0. || mymodel.nr_bodies > 1 )
 		{
 
-			if (do_sgd && (wsum_model.BPref[iclass].weight).sum() > XMIPP_EQUAL_ACCURACY)
+			if ((wsum_model.BPref[iclass].weight).sum() > XMIPP_EQUAL_ACCURACY)
 			{
-
-				MultidimArray<RFLOAT> Iref_old = mymodel.Iref[iclass];
-
-				// Still regularise here. tau2 comes from the reconstruction, sum of sigma2 is only over a single subset
-				// Gradually increase tau2_fudge to account for ever increasing number of effective particles in the reconstruction
-				long int total_nr_subsets = ((iter - 1) * nr_subsets) + subset;
-				RFLOAT total_mu_fraction = pow (mu, (RFLOAT)total_nr_subsets);
-				RFLOAT number_of_effective_particles = (iter == 1) ? subset * subset_size : mydata.numberOfParticles();
-				number_of_effective_particles *= (1. - total_mu_fraction);
-				RFLOAT sgd_tau2_fudge = number_of_effective_particles * mymodel.tau2_fudge_factor / subset_size;
-				(wsum_model.BPref[iclass]).reconstruct(mymodel.Iref[iclass], gridding_nr_iter, do_map,
-						sgd_tau2_fudge, mymodel.tau2_class[iclass], mymodel.sigma2_class[iclass],
-						mymodel.data_vs_prior_class[iclass], mymodel.fourier_coverage_class[iclass],
-						mymodel.fsc_halves_class[0], wsum_model.pdf_class[iclass], false, false, nr_threads, minres_map, (iclass==0));
-
-				// Now update formula: dV_kl^(n) = (mu) * dV_kl^(n-1) + (1-mu)*step_size*G_kl^(n)
-				// where G_kl^(n) is now in mymodel.Iref[iclass]!!!
-				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.Igrad[iclass])
-					DIRECT_MULTIDIM_ELEM(mymodel.Igrad[iclass], n) = mu * DIRECT_MULTIDIM_ELEM(mymodel.Igrad[iclass], n) +
-							(1. - mu) * sgd_stepsize * DIRECT_MULTIDIM_ELEM(mymodel.Iref[iclass], n);
-
-				// update formula: V_kl^(n+1) = V_kl^(n) + dV_kl^(n)
-				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.Iref[iclass])
+				MultidimArray<RFLOAT> Iref_old;
+				long int total_nr_subsets;
+				RFLOAT total_mu_fraction, number_of_effective_particles, tau2_fudge;
+				if(do_sgd)
 				{
-					DIRECT_MULTIDIM_ELEM(mymodel.Iref[iclass], n) = DIRECT_MULTIDIM_ELEM(Iref_old, n) + DIRECT_MULTIDIM_ELEM(mymodel.Igrad[iclass], n);
+					Iref_old = mymodel.Iref[iclass];
+					// Still regularise here. tau2 comes from the reconstruction, sum of sigma2 is only over a single subset
+					// Gradually increase tau2_fudge to account for ever increasing number of effective particles in the reconstruction
+					total_nr_subsets = ((iter - 1) * nr_subsets) + subset;
+					total_mu_fraction = pow (mu, (RFLOAT)total_nr_subsets);
+					number_of_effective_particles = (iter == 1) ? subset * subset_size : mydata.numberOfParticles();
+					number_of_effective_particles *= (1. - total_mu_fraction);
+					tau2_fudge = number_of_effective_particles * mymodel.tau2_fudge_factor / subset_size;
 				}
+				else
+				{
+					tau2_fudge = mymodel.tau2_fudge_factor;
+				}
+
+				(wsum_model.BPref[iclass]).reconstruct(mymodel.Iref[iclass], gridding_nr_iter, do_map,
+								tau2_fudge, mymodel.tau2_class[iclass], mymodel.sigma2_class[iclass],
+								mymodel.data_vs_prior_class[iclass], mymodel.fourier_coverage_class[iclass],
+								mymodel.fsc_halves_class[0], wsum_model.pdf_class[iclass], false, false, nr_threads, minres_map, (iclass==0));
+
+				if(do_sgd)
+				{
+					// Now update formula: dV_kl^(n) = (mu) * dV_kl^(n-1) + (1-mu)*step_size*G_kl^(n)
+					// where G_kl^(n) is now in mymodel.Iref[iclass]!!!
+					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.Igrad[iclass])
+						DIRECT_MULTIDIM_ELEM(mymodel.Igrad[iclass], n) = mu * DIRECT_MULTIDIM_ELEM(mymodel.Igrad[iclass], n) + (1. - mu) * sgd_stepsize * DIRECT_MULTIDIM_ELEM(mymodel.Iref[iclass], n);
+
+					// update formula: V_kl^(n+1) = V_kl^(n) + dV_kl^(n)
+					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.Iref[iclass])
+					{
+						DIRECT_MULTIDIM_ELEM(mymodel.Iref[iclass], n) = DIRECT_MULTIDIM_ELEM(Iref_old, n) + DIRECT_MULTIDIM_ELEM(mymodel.Igrad[iclass], n);
+					}
 
 //#define DEBUG_SGD
 #ifdef DEBUG_SGD
-				FileName fn_tmp="grad_class"+integerToString(iclass)+".spi";
-				Image<RFLOAT> It;
-				It()=mymodel.Igrad[iclass];
-				It.write(fn_tmp);
-				fn_tmp="ref_class"+integerToString(iclass)+".spi";
-				It()=mymodel.Iref[iclass];
-				It.write(fn_tmp);
+					FileName fn_tmp="grad_class"+integerToString(iclass)+".spi";
+					Image<RFLOAT> It;
+					It()=mymodel.Igrad[iclass];
+					It.write(fn_tmp);
+					fn_tmp="ref_class"+integerToString(iclass)+".spi";
+					It()=mymodel.Iref[iclass];
+					It.write(fn_tmp);
 #endif
-				// Enforce positivity?
-				// Low-pass filter according to current resolution??
-				// Some sort of regularisation may be necessary....?
+					// Enforce positivity?
+					// Low-pass filter according to current resolution??
+					// Some sort of regularisation may be necessary....?
 
-
+				}
 			}
-			else if((wsum_model.BPref[iclass].weight).sum() > XMIPP_EQUAL_ACCURACY)
-			{
-				(wsum_model.BPref[iclass]).reconstruct(mymodel.Iref[iclass], gridding_nr_iter, do_map,
-						mymodel.tau2_fudge_factor, mymodel.tau2_class[iclass], mymodel.sigma2_class[iclass],
-						mymodel.data_vs_prior_class[iclass], mymodel.fourier_coverage_class[iclass],
-						mymodel.fsc_halves_class[0], wsum_model.pdf_class[iclass], false, false, nr_threads, minres_map, (iclass==0));
-
-				// For multi-body refinements: place each body back at its COM
-				if (mymodel.nr_bodies > 1)
-					selfTranslate(mymodel.Iref[iclass], mymodel.com_bodies[iclass], DONT_WRAP);
-            }
 		}
 		else
 		{
@@ -3790,6 +3806,11 @@ void MlOptimiser::maximizationOtherParameters()
 	RFLOAT sum_weight = 0.;
 	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 		sum_weight += wsum_model.pdf_class[iclass];
+
+	// For multi-body refinement: it is possible we haven't done any bodies anymore, so sum_weight is zero
+	// in that case we need to leave all parameters as they were
+	if (sum_weight < XMIPP_EQUAL_ACCURACY)
+		return;
 
 	// Update average norm_correction, don't update norm corrections anymore for multi-body refinements!
 	if (do_norm_correction  && mymodel.nr_bodies == 1)
@@ -4015,6 +4036,11 @@ void MlOptimiser::solventFlatten()
 #ifdef DEBUG
 	std::cerr << "Entering MlOptimiser::solventFlatten" << std::endl;
 #endif
+
+	// If we're doing multibody refinement: don't do solvent flattening anymore. This is already done per body
+	if (mymodel.nr_bodies > 1)
+		return;
+
 	// First read solvent mask from disc, or pre-calculate it
 	Image<RFLOAT> Isolvent, Isolvent2;
     Isolvent().resize(mymodel.Iref[0]);
@@ -4102,6 +4128,7 @@ void MlOptimiser::updateCurrentResolution()
 	std::cerr << "Entering MlOptimiser::updateCurrentResolution" << std::endl;
 #endif
 
+	RFLOAT best_current_resolution = 0.;
 	int nr_iter_wo_resol_gain_sum_bodies = 0;
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 	{
@@ -4127,6 +4154,32 @@ void MlOptimiser::updateCurrentResolution()
 					}
 					// Subtract one shell to be back on the safe side
 					ires--;
+
+					if (do_split_random_halves && do_auto_refine)
+					{
+						// Let's also try and check from the high-res side. Sometimes phase-randomisation gives artefacts
+						int ires2;
+						for (ires2 = mymodel.ori_size/2-1; ires2 >= ires; ires2--)
+						{
+							if (DIRECT_A1D_ELEM(mymodel.data_vs_prior_class[iclass], ires2) > 1.)
+								break;
+						}
+						if (ires2 > ires + 3)
+						{
+							if (verb > 0)
+							{
+								float higher = mymodel.getResolutionAngstrom(ires2);
+								float lower  = mymodel.getResolutionAngstrom(ires);
+								if (mymodel.nr_bodies > 1)
+									std::cerr << " WARNING: For the " << ibody+1 << "th body:" << std::endl;
+								std::cerr << " WARNING: FSC dipped below 0.5 and rose again. Using higher resolution of "
+										  << higher << " A, instead of " << lower << " A." << std::endl;
+								std::cerr << "          This is not necessarily a bad thing. Often it is caused by too tight masks." << std::endl;
+							}
+							ires = ires2;
+						}
+					}
+
 					if (ires > maxres)
 						maxres = ires;
 				}
@@ -4142,6 +4195,9 @@ void MlOptimiser::updateCurrentResolution()
 		}
 		RFLOAT newres = mymodel.getResolution(maxres);
 
+		// best resolution over all bodies
+		best_current_resolution = XMIPP_MAX(best_current_resolution, newres);
+
 		// Check whether resolution improved, if not increase nr_iter_wo_resol_gain
 		//if (newres <= best_resol_thus_far)
 		if (newres <= mymodel.current_resolution+0.0001) // Add 0.0001 to avoid problems due to rounding error
@@ -4153,9 +4209,10 @@ void MlOptimiser::updateCurrentResolution()
 		if (newres > best_resol_thus_far)
 			best_resol_thus_far = newres;
 
-		mymodel.current_resolution = newres;
-
 	} // end for ibody
+
+	// Set the new resolution to be the highest resolution over all bodies
+	mymodel.current_resolution = best_current_resolution;
 
 	if (nr_iter_wo_resol_gain_sum_bodies == mymodel.nr_bodies)
 		nr_iter_wo_resol_gain++;
@@ -4941,6 +4998,10 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 		// We never need any resolutions higher than current_size
 		// So resize the Fourier transforms
 		windowFourierTransform(Faux, Fimg, mymodel.current_size);
+
+		// Also perform beamtilt correction on the masked image (which will be used for alignment)
+		if (ABS(beamtilt_x) > 0. || ABS(beamtilt_y) > 0.)
+			selfApplyBeamTilt(Fimg, beamtilt_x, beamtilt_y, lambda, Cs, mymodel.pixel_size, mymodel.ori_size);
 
 		// Store Fimg
 		exp_Fimgs.at(ipart) = Fimg;
@@ -6626,7 +6687,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int my_ori_particle
 			// Store nr_significant_coarse_samples for this particle
 			// Don't do this for multibody, as it would be overwritten for each body,
 			// and we also use METADATA_NR_SIGN in the new safeguard for the gold-standard separation
-			if (!mymodel.nr_bodies > 1)
+			if (mymodel.nr_bodies == 1)
 				DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_NR_SIGN) = (RFLOAT)my_nr_significant_coarse_samples;
 
 			// Keep track of which coarse samplings were significant were significant for this particle
@@ -7736,9 +7797,18 @@ void MlOptimiser::updateOverallChangesInHiddenVariables()
 {
 
 	// Calculate hidden variable changes
-	current_changes_optimal_classes = sum_changes_optimal_classes / sum_changes_count;
-	current_changes_optimal_orientations = sum_changes_optimal_orientations / sum_changes_count;
-	current_changes_optimal_offsets = sqrt(sum_changes_optimal_offsets / (2. * sum_changes_count));
+	if (sum_changes_count > 0.)
+	{
+		current_changes_optimal_classes = sum_changes_optimal_classes / sum_changes_count;
+		current_changes_optimal_orientations = sum_changes_optimal_orientations / sum_changes_count;
+		current_changes_optimal_offsets = sqrt(sum_changes_optimal_offsets / (2. * sum_changes_count));
+	}
+	else
+	{
+		current_changes_optimal_classes = 0.;
+		current_changes_optimal_orientations = 0.;
+		current_changes_optimal_offsets = 0.;
+	}
 
 	// Reset the sums
 	sum_changes_optimal_classes = 0.;
@@ -7912,9 +7982,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_ori_particle,
 						else
 							ang_step = 5.0;
 
-						if (sh_error < 0.2)
-							sh_step = 0.05;
-						else if (sh_error < 1.)
+						if (sh_error < 1.)
 							sh_step = 0.1;
 						else if (sh_error < 2.)
 							sh_step = 0.2;
@@ -8066,7 +8134,8 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_ori_particle,
 						}
 //#define DEBUG_ANGACC
 #ifdef DEBUG_ANGACC
-							if (imode==0)
+						std::cerr << " ori_part_id= " << ori_part_id << " iclass= " << iclass << std::endl;
+						if (imode==0)
 							{
 								std::cerr << " ang_error= " << ang_error << std::endl;
 								std::cerr << " rot1= " << rot1 << " tilt1= " << tilt1 << " psi1= " << psi1 << std::endl;
@@ -8185,8 +8254,7 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 		RFLOAT new_range = 3. * sqrt(mymodel.sigma2_offset);
 
 		// Prevent too narrow searches: always at least 3x3 pixels in the coarse search
-		if (new_range < 1.5 * new_step)
-			new_range = 1.5 * new_step;
+		new_range= XMIPP_MAX(new_range, 1.5 * new_step);
 
 		// Also prevent too wide searches: that will lead to memory problems:
 		// Just use coarser step size and hope things will settle down later...
@@ -8257,9 +8325,14 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 				all_bodies_are_done = true;
 				for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 				{
-					// Stop multi-body refinements a bit earlier than normal ones: no 75%, but 100% of accuracy
-					if (old_rottilt_step < mymodel.acc_rot[ibody])
+					// Stop multi-body refinements a bit earlier than normal ones: no 75%, but 90% of accuracy
+					// if has_converged: in the final iteration include all bodies again!
+					if (old_rottilt_step < 0.90 * mymodel.acc_rot[ibody] && !has_converged)
+					{
+						if (myverb)
+							std::cout << " Body: " <<ibody << " with rotational accuracy of " << mymodel.acc_rot[ibody] << " will be kept fixed " << std::endl;
 						mymodel.keep_fixed_bodies[ibody] = 1;
+					}
 					else
 						all_bodies_are_done = false;
 				}
@@ -8281,24 +8354,30 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 				// Prevent very coarse translational samplings: max 1.5
 				// Also stay a bit on the safe side with the translational sampling: 75% of estimated accuracy
 				RFLOAT new_step = XMIPP_MIN(1.5, 0.75 * acc_trans) * std::pow(2., adaptive_oversampling);
+
 				// For subtomogram averaging: use at least half times previous step size
 				if (mymodel.data_dim == 3) // TODO: check: this might just as well work for 2D data...
 					new_step = XMIPP_MAX(sampling.offset_step / 2., new_step);
+
 				// Search ranges are five times the last observed changes in offsets
 				// Only 3x for subtomogram averaging....
 				RFLOAT new_range = (mymodel.data_dim == 2) ? 5. * current_changes_optimal_offsets : 3 * current_changes_optimal_offsets;
+
 				// New range can only become 30% bigger than the previous range (to prevent very slow iterations in the beginning)
 				new_range = XMIPP_MIN(1.3*sampling.offset_range, new_range);
+
 				// Prevent too narrow searches: always at least 3x3 pixels in the coarse search
-				if (new_range < 1.5 * new_step)
-					new_range = 1.5 * new_step;
+				new_range= XMIPP_MAX(new_range, 1.5 * new_step);
+
 				// Also prevent too wide searches: that will lead to memory problems:
 				// If steps size < 1/4th of search range, then decrease search range by 50%
 				if (new_range > 4. * new_step)
 					new_range /= 2.;
-				//If even that was not enough: use coarser step size and hope things will settle down later...
+
+				// If even that was not enough: use coarser step size and hope things will settle down later...
 				if (new_range > 4. * new_step)
 					new_step = new_range / 4.;
+
 				// Jun08,2015 Shaoda & Sjors, Helical refinement
 				RFLOAT new_helical_offset_step = sampling.helical_offset_step;
 				if (mymodel.ref_dim == 3)
@@ -8415,37 +8494,36 @@ void MlOptimiser::checkConvergence(bool myverb)
 		do_join_random_halves = true;
 		// In the last iteration, include all data until Nyquist
 		do_use_all_data = true;
-	}
 
-	// For multibody refinement: check whether all bodies are fixed: then stop
-	if (mymodel.nr_bodies > 1)
-	{
-		bool all_fixed = true;
-		for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
+		// For multibody refinement: reset all bodies to not-fixed (if they were originally) for the final iteration with all data to Nyquist
+		if (mymodel.nr_bodies > 1)
 		{
-			if (mymodel.keep_fixed_bodies[ibody] == 0)
+			for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 			{
-				all_fixed = false;
-				break;
+				if (mymodel.sigma_tilt_bodies[ibody] < 0.001 &&
+					mymodel.sigma_psi_bodies[ibody] < 0.001 &&
+					mymodel.sigma_offset_bodies[ibody] < 0.001)
+					mymodel.keep_fixed_bodies[ibody] = 1;
+				else
+					mymodel.keep_fixed_bodies[ibody] = 0;
 			}
 		}
-		has_converged = all_fixed;
-
 	}
 
-        if (myverb)
-        {
-            std::cout << " Auto-refine: Iteration= "<< iter<< std::endl;
-            std::cout << " Auto-refine: Resolution= "<< 1./mymodel.current_resolution<< " (no gain for " << nr_iter_wo_resol_gain << " iter) "<< std::endl;
-            std::cout << " Auto-refine: Changes in angles= " << current_changes_optimal_orientations << " degrees; and in offsets= " << current_changes_optimal_offsets
-			<< " pixels (no gain for " << nr_iter_wo_large_hidden_variable_changes << " iter) "<< std::endl;
 
-            if (has_converged)
-            {
-		std::cout << " Auto-refine: Refinement has converged, entering last iteration where two halves will be combined..."<<std::endl;
-		std::cout << " Auto-refine: The last iteration will use data to Nyquist frequency, which may take more CPU and RAM."<<std::endl;
-            }
-        }
+	if (myverb)
+	{
+		std::cout << " Auto-refine: Iteration= "<< iter<< std::endl;
+		std::cout << " Auto-refine: Resolution= "<< 1./mymodel.current_resolution<< " (no gain for " << nr_iter_wo_resol_gain << " iter) "<< std::endl;
+		std::cout << " Auto-refine: Changes in angles= " << current_changes_optimal_orientations << " degrees; and in offsets= " << current_changes_optimal_offsets
+		<< " pixels (no gain for " << nr_iter_wo_large_hidden_variable_changes << " iter) "<< std::endl;
+
+		if (has_converged)
+		{
+			std::cout << " Auto-refine: Refinement has converged, entering last iteration where two halves will be combined..."<<std::endl;
+			std::cout << " Auto-refine: The last iteration will use data to Nyquist frequency, which may take more CPU and RAM."<<std::endl;
+		}
+	}
 
 }
 

@@ -209,6 +209,13 @@ void MlModel::read(FileName fn_in)
 			    !MDclass.getValue(EMDL_MLMODEL_HELICAL_TWIST, helical_twist[iclass]) )
 				REPORT_ERROR("MlModel::readStar: incorrect helical parameters");
 		}
+		if (nr_bodies > 1)
+		{
+			if (MDclass.containsLabel(EMDL_BODY_KEEP_FIXED))
+				MDclass.getValue(EMDL_BODY_KEEP_FIXED, keep_fixed_bodies[iclass]);
+			else
+				keep_fixed_bodies[iclass] = 0;
+		}
 
 		// Read in actual reference image
 		img.read(fn_tmp);
@@ -384,7 +391,8 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
     		{
     			fn_tmp.compose(fn_out+"_body", iclass+1, "mrc", 3);
     			// apply the body mask for output to the user
-    			img() *= masks_bodies[iclass];
+    			// No! That interferes with a clean continuation of multibody refinement, as ref will be masked 2x then!
+    			// img() *= masks_bodies[iclass];
     		}
     		else
     			fn_tmp.compose(fn_out+"_class", iclass+1, "mrc", 3);
@@ -536,6 +544,7 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 			MDclass.setValue(EMDL_BODY_ROTATE_DIRECTION_X, XX(rotate_direction_bodies[iclass]));
 			MDclass.setValue(EMDL_BODY_ROTATE_DIRECTION_Y, YY(rotate_direction_bodies[iclass]));
 			MDclass.setValue(EMDL_BODY_ROTATE_DIRECTION_Z, ZZ(rotate_direction_bodies[iclass]));
+			MDclass.setValue(EMDL_BODY_KEEP_FIXED, keep_fixed_bodies[iclass]);
 		}
 
 		if (ref_dim==2)
@@ -938,14 +947,6 @@ void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool als
 			sigma_offset_bodies[nr_bodies] = val;
 		}
 
-		// If all sigmas are zero, ignore this body in the refinement
-		if (sigma_tilt_bodies[nr_bodies] < 0.001 &&
-				sigma_psi_bodies[nr_bodies] < 0.001 &&
-				sigma_offset_bodies[nr_bodies] < 0.001)
-			keep_fixed_bodies[nr_bodies] = 1;
-		else
-			keep_fixed_bodies[nr_bodies] = 0;
-
 		// Also write the mask with the standard name to disk
 		fn_mask.compose(fn_root_out + "_body", nr_bodies + 1, "", 3); // body number from 1 to K!
 		fn_mask += "_mask.mrc";
@@ -987,6 +988,7 @@ void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool als
 
 		for (int ibody = 1; ibody < nr_bodies; ibody++)
 		{
+
 			Iref.push_back(Iref[0]);
 			tau2_class.push_back(tau2_class[0]);
 			fsc_halves_class.push_back(fsc_halves_class[0]);
@@ -1002,6 +1004,33 @@ void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool als
 			orientability_contrib.push_back(orientability_contrib[0]);
 			PPref.push_back(PPref[0]);
 			pdf_direction.push_back(pdf_direction[0]);
+
+			// If all sigmas are zero, ignore this body in the refinement
+			if (sigma_tilt_bodies[ibody] < 0.001 &&
+					sigma_psi_bodies[ibody] < 0.001 &&
+					sigma_offset_bodies[ibody] < 0.001)
+				keep_fixed_bodies[ibody] = 1;
+			else
+				keep_fixed_bodies[ibody] = 0;
+		}
+
+		// If provided a specific reference, re-set the corresponding Iref entry
+		if (MD.containsLabel(EMDL_BODY_REFERENCE_NAME))
+		{
+			int ibody = 0;
+			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
+			{
+				FileName fn_ref;
+				MD.getValue(EMDL_BODY_REFERENCE_NAME, fn_ref);
+				if (fn_ref != "None")
+				{
+					Image<RFLOAT> img;
+					img.read(fn_ref);
+					img().setXmippOrigin();
+					Iref[ibody] = img();
+				}
+				ibody++;
+			}
 		}
 	}
 
@@ -1602,7 +1631,7 @@ void MlWsumModel::pack(MultidimArray<RFLOAT> &packed, int &piece, int &nr_pieces
     }
     else if (packed_size > MAX_PACK_SIZE)
     {
-        idx_start = piece * MAX_PACK_SIZE;
+        idx_start = (unsigned long long)piece * MAX_PACK_SIZE;
         idx_stop = XMIPP_MIN(idx_start + MAX_PACK_SIZE, packed_size);
         nr_pieces = CEIL((RFLOAT)packed_size/(RFLOAT)MAX_PACK_SIZE);
     }
@@ -1752,8 +1781,8 @@ void MlWsumModel::unpack(MultidimArray<RFLOAT> &packed, int piece, bool do_clear
     }
     else
     {
-    	idx_start = piece * MAX_PACK_SIZE;
-    	idx_stop  = idx_start + MULTIDIM_SIZE(packed);
+    	idx_start = (unsigned long long)piece * MAX_PACK_SIZE;
+    	idx_stop  = idx_start + (unsigned long long)MULTIDIM_SIZE(packed);
     }
     unsigned long long ori_idx = 0;
     unsigned long long idx = 0;

@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
- * Copyright (c) 2011-2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2017, NVIDIA CORPORATION.  All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -335,13 +335,6 @@ __device__ __forceinline__ void ThreadStoreVolatilePtr(
     T                           val,
     Int2Type<false>             /*is_primitive*/)
 {
-#if CUB_PTX_ARCH <= 130
-
-    *ptr = val;
-    __threadfence_block();
-
-#else
-
     // Create a temporary using shuffle-words, then store using volatile-words
     typedef typename UnitWord<T>::VolatileWord  VolatileWord;  
     typedef typename UnitWord<T>::ShuffleWord   ShuffleWord;
@@ -358,9 +351,6 @@ __device__ __forceinline__ void ThreadStoreVolatilePtr(
     IterateThreadStore<0, VOLATILE_MULTIPLE>::template Dereference(
         reinterpret_cast<volatile VolatileWord*>(ptr),
         words);
-
-#endif  // CUB_PTX_ARCH <= 130
-
 }
 
 

@@ -871,6 +871,16 @@ void MlOptimiserMpi::expectation()
 		node->relion_MPI_Bcast(&mymodel.orientational_prior_mode, 1, MPI_INT, first_slave, MPI_COMM_WORLD);
 	}
 
+	// For multi-body refinement: check if all bodies are fixed. If so, don't loop over all particles, but just return
+	if (mymodel.nr_bodies > 1)
+	{
+		int all_fixed = 1;
+		for (int ibody=0; ibody < mymodel.nr_bodies; ibody++)
+			all_fixed *= mymodel.keep_fixed_bodies[ibody];
+		if (all_fixed > 0)
+			return;
+	}
+
 	// E. All nodes, except the master, check memory and precalculate AB-matrices for on-the-fly shifts
 	if (!node->isMaster())
 	{
@@ -1245,7 +1255,6 @@ void MlOptimiserMpi::expectation()
         catch (RelionError XE)
         {
             std::cerr << "master encountered error: " << XE;
-            MlOptimiser::usage();
             MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
         }
 #ifdef TIMING
@@ -1474,7 +1483,6 @@ void MlOptimiserMpi::expectation()
         catch (RelionError XE)
         {
             std::cerr << "slave "<< node->rank << " encountered error: " << XE;
-            MlOptimiser::usage();
             MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
         }
 #ifdef TIMING
@@ -1910,6 +1918,16 @@ void MlOptimiserMpi::maximization()
 		timer.tic(TIMING_RECONS);
 #endif
 
+	// For multi-body refinement: check if all bodies are fixed. If so, just return
+	if (mymodel.nr_bodies > 1)
+	{
+		int all_fixed = 1;
+		for (int ibody=0; ibody < mymodel.nr_bodies; ibody++)
+			all_fixed *= mymodel.keep_fixed_bodies[ibody];
+		if (all_fixed > 0)
+			return;
+	}
+
 	if (verb > 0)
 	{
 		std::cout << " Maximization ..."<< std::endl;
@@ -1945,53 +1963,56 @@ void MlOptimiserMpi::maximization()
 				if (node->rank == reconstruct_rank1)
 				{
 
-					if (do_sgd && (wsum_model.BPref[iclass].weight).sum() > XMIPP_EQUAL_ACCURACY)
+					if ((wsum_model.BPref[iclass].weight).sum() > XMIPP_EQUAL_ACCURACY)
 					{
 
-						MultidimArray<RFLOAT> Iref_old = mymodel.Iref[ith_recons];
+						MultidimArray<RFLOAT> Iref_old;
+						long int total_nr_subsets;
+						RFLOAT total_mu_fraction, number_of_effective_particles, tau2_fudge;
 
-						// Still regularise here. tau2 comes from the reconstruction, sum of sigma2 is only over a single subset
-						// Gradually increase tau2_fudge to account for ever increasing number of effective particles in the reconstruction
-						long int total_nr_subsets = ((iter - 1) * nr_subsets) + subset;
-						RFLOAT total_mu_fraction = pow (mu, (RFLOAT)total_nr_subsets);
-						RFLOAT number_of_effective_particles = (iter == 1) ? subset * subset_size : mydata.numberOfParticles();
-						number_of_effective_particles *= (1. - total_mu_fraction);
-						RFLOAT sgd_tau2_fudge = number_of_effective_particles * mymodel.tau2_fudge_factor / subset_size;
-
-						(wsum_model.BPref[ith_recons]).reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
-								sgd_tau2_fudge, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
-								mymodel.data_vs_prior_class[ith_recons], mymodel.fourier_coverage_class[ith_recons],
-								mymodel.fsc_halves_class[ibody], wsum_model.pdf_class[iclass],
-								do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map);
-
-						// Now update formula: dV_kl^(n) = (mu) * dV_kl^(n-1) + (1-mu)*step_size*G_kl^(n)
-						// where G_kl^(n) is now in mymodel.Iref[iclass]!!!
-						FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.Igrad[ith_recons])
-							DIRECT_MULTIDIM_ELEM(mymodel.Igrad[ith_recons], n) = mu * DIRECT_MULTIDIM_ELEM(mymodel.Igrad[ith_recons], n) +
-									(1. - mu) * sgd_stepsize * DIRECT_MULTIDIM_ELEM(mymodel.Iref[ith_recons], n);
-
-						// update formula: V_kl^(n+1) = V_kl^(n) + dV_kl^(n)
-						FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.Iref[ith_recons])
+						if(do_sgd)
 						{
-							DIRECT_MULTIDIM_ELEM(mymodel.Iref[ith_recons], n) = DIRECT_MULTIDIM_ELEM(Iref_old, n) + DIRECT_MULTIDIM_ELEM(mymodel.Igrad[ith_recons], n);
-						}
 
-					}
-					else
-					{
+							Iref_old = mymodel.Iref[ith_recons];
+							// Still regularise here. tau2 comes from the reconstruction, sum of sigma2 is only over a single subset
+							// Gradually increase tau2_fudge to account for ever increasing number of effective particles in the reconstruction
+							total_nr_subsets = ((iter - 1) * nr_subsets) + subset;
+							total_mu_fraction = pow (mu, (RFLOAT)total_nr_subsets);
+							number_of_effective_particles = (iter == 1) ? subset * subset_size : mydata.numberOfParticles();
+							number_of_effective_particles *= (1. - total_mu_fraction);
+							tau2_fudge = number_of_effective_particles * mymodel.tau2_fudge_factor / subset_size;
+						}
+						else
+						{
+							tau2_fudge = mymodel.tau2_fudge_factor;
+						}
 #ifdef TIMING
-						wsum_model.BPref[ith_recons].reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
-								mymodel.tau2_fudge_factor, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
+						(wsum_model.BPref[ith_recons]).reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
+								tau2_fudge, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
 								mymodel.data_vs_prior_class[ith_recons], mymodel.fourier_coverage_class[ith_recons],
 								mymodel.fsc_halves_class[ibody], wsum_model.pdf_class[iclass],
 								do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map, &timer);
 #else
-						wsum_model.BPref[ith_recons].reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
-								mymodel.tau2_fudge_factor, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
+						(wsum_model.BPref[ith_recons]).reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
+								tau2_fudge, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
 								mymodel.data_vs_prior_class[ith_recons], mymodel.fourier_coverage_class[ith_recons],
 								mymodel.fsc_halves_class[ibody], wsum_model.pdf_class[iclass],
 								do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map);
 #endif
+						if(do_sgd)
+						{
+							// Now update formula: dV_kl^(n) = (mu) * dV_kl^(n-1) + (1-mu)*step_size*G_kl^(n)
+							// where G_kl^(n) is now in mymodel.Iref[iclass]!!!
+							FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.Igrad[ith_recons])
+								DIRECT_MULTIDIM_ELEM(mymodel.Igrad[ith_recons], n) = mu * DIRECT_MULTIDIM_ELEM(mymodel.Igrad[ith_recons], n) +
+										(1. - mu) * sgd_stepsize * DIRECT_MULTIDIM_ELEM(mymodel.Iref[ith_recons], n);
+
+							// update formula: V_kl^(n+1) = V_kl^(n) + dV_kl^(n)
+							FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.Iref[ith_recons])
+							{
+								DIRECT_MULTIDIM_ELEM(mymodel.Iref[ith_recons], n) = DIRECT_MULTIDIM_ELEM(Iref_old, n) + DIRECT_MULTIDIM_ELEM(mymodel.Igrad[ith_recons], n);
+							}
+						}
 					}
 
 					// Also perform the unregularized reconstruction
@@ -2072,25 +2093,34 @@ void MlOptimiserMpi::maximization()
 						// Rank 2 does not need to do the joined reconstruction
 						if (!do_join_random_halves)
 						{
-							if (do_sgd)
+							MultidimArray<RFLOAT> Iref_old;
+							long int total_nr_subsets;
+							RFLOAT total_mu_fraction, number_of_effective_particles, tau2_fudge;
+
+							if(do_sgd)
 							{
-
-								MultidimArray<RFLOAT> Iref_old = mymodel.Iref[ith_recons];
-
+								Iref_old = mymodel.Iref[ith_recons];
 								// Still regularise here. tau2 comes from the reconstruction, sum of sigma2 is only over a single subset
 								// Gradually increase tau2_fudge to account for ever increasing number of effective particles in the reconstruction
-								long int total_nr_subsets = ((iter - 1) * nr_subsets) + subset;
-								RFLOAT total_mu_fraction = pow (mu, (RFLOAT)total_nr_subsets);
-								RFLOAT number_of_effective_particles = (iter == 1) ? subset * subset_size : mydata.numberOfParticles();
+								total_nr_subsets = ((iter - 1) * nr_subsets) + subset;
+								total_mu_fraction = pow (mu, (RFLOAT)total_nr_subsets);
+								number_of_effective_particles = (iter == 1) ? subset * subset_size : mydata.numberOfParticles();
 								number_of_effective_particles *= (1. - total_mu_fraction);
-								RFLOAT sgd_tau2_fudge = number_of_effective_particles * mymodel.tau2_fudge_factor / subset_size;
+								tau2_fudge = number_of_effective_particles * mymodel.tau2_fudge_factor / subset_size;
+							}
+							else
+							{
+								tau2_fudge = mymodel.tau2_fudge_factor;
+							}
 
-								(wsum_model.BPref[ith_recons]).reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
-										sgd_tau2_fudge, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
-										mymodel.data_vs_prior_class[ith_recons], mymodel.fourier_coverage_class[ith_recons],
-										mymodel.fsc_halves_class[ibody], wsum_model.pdf_class[iclass],
-										do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map);
+							(wsum_model.BPref[ith_recons]).reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
+									tau2_fudge, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
+									mymodel.data_vs_prior_class[ith_recons], mymodel.fourier_coverage_class[ith_recons],
+									mymodel.fsc_halves_class[ibody], wsum_model.pdf_class[iclass],
+									do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map);
 
+							if (do_sgd)
+							{
 								// Now update formula: dV_kl^(n) = (mu) * dV_kl^(n-1) + (1-mu)*step_size*G_kl^(n)
 								// where G_kl^(n) is now in mymodel.Iref[iclass]!!!
 								FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.Igrad[ith_recons])
@@ -2102,15 +2132,6 @@ void MlOptimiserMpi::maximization()
 								{
 									DIRECT_MULTIDIM_ELEM(mymodel.Iref[ith_recons], n) = DIRECT_MULTIDIM_ELEM(Iref_old, n) + DIRECT_MULTIDIM_ELEM(mymodel.Igrad[ith_recons], n);
 								}
-
-							}
-							else
-							{
-								wsum_model.BPref[ith_recons].reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
-									mymodel.tau2_fudge_factor, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
-									mymodel.data_vs_prior_class[ith_recons], mymodel.fourier_coverage_class[ith_recons],
-									mymodel.fsc_halves_class[ibody], wsum_model.pdf_class[iclass],
-									do_split_random_halves, do_join_random_halves, nr_threads, minres_map);
 							}
 						}
 

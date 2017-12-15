@@ -2020,6 +2020,9 @@ RELION is is developed in the groups of\n\n \
 Sjors H.W. Scheres at the MRC Laboratory of Molecular Biology\n \n \
 - Sjors H.W. Scheres\n \
 - Shaoda He\n \
+- Takanori Nakane\n \
+- Jasenko Zivanov\n \
+- Liyi Dong\n \
 \n \n \
 and Erik Lindahl at Stockholm University\n \n \
 - Erik Lindahl\n \
@@ -2051,14 +2054,10 @@ If RELION is useful in your work, please cite us. Relevant papers are:\n \n \
  * Helical reconstruction : \n \
      He & Scheres (2017) J, Struct. Biol. (PMID: 28193500) \n \n \
 Please also cite the following EXTERNAL programs: \n \n \
-* MOTIONCORR for beam-induced motion correction: \n \
-    Li et al (2013) Nat. Methods (PMID: 23644547) \n \n\
-* UNBLUR for beam-induced motion correction: \n \
-    Grabnt & Grigorieff eLife (PMID: 26023829) \n \n\
 * MOTIONCOR2 for beam-induced motion correction: \n \
     Zheng et al (2017) Nat. Meth. (PMID: 28250466) \n \n\
-* CTFFIND for CTF-estimation: \n \
-    Mindell & Grigorieff (2003) J. Mol. Biol. (PMID: 12781660) \n \n\
+* UNBLUR for beam-induced motion correction: \n \
+    Grabnt & Grigorieff eLife (PMID: 26023829) \n \n\
 * CTFFIND4 for CTF-estimation: \n \
     Rohou & Grigorieff (2015) J. Struct. Biol. (PMID: 26278980) \n \n\
 * Gctf for CTF-estimation: \n \
