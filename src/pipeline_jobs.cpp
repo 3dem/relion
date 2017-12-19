@@ -662,12 +662,11 @@ Any occurrences of XXXextra2XXX will be changed by this value.");
 
 	// Check for environment variable RELION_QSUB_TEMPLATE
 	char * default_location = getenv ("RELION_QSUB_TEMPLATE");
+	char mydefault[]=DEFAULTQSUBLOCATION;
 	if (default_location==NULL)
 	{
-		char mydefault[]=DEFAULTQSUBLOCATION;
 		default_location=mydefault;
 	}
-
     joboptions["qsubscript"] = JobOption("Standard submission script:", std::string(default_location), "Script Files (*.{csh,sh,bash,script})", ".",
 "The template for your standard queue job submission script. \
 Its default location may be changed by setting the environment variable RELION_QSUB_TEMPLATE. \
@@ -990,9 +989,9 @@ void RelionJob::initialiseMotioncorrJob()
 
 	// Check for environment variable RELION_MOTIONCOR2_EXECUTABLE
 	char * default_location = getenv ("RELION_MOTIONCOR2_EXECUTABLE");
+	char mydefault[]=DEFAULTMOTIONCOR2LOCATION;
 	if (default_location == NULL)
 	{
-		char mydefault[]=DEFAULTMOTIONCOR2LOCATION;
 		default_location=mydefault;
 	}
 
@@ -1014,18 +1013,18 @@ void RelionJob::initialiseMotioncorrJob()
 
 	// Check for environment variable RELION_UNBLUR_EXECUTABL
 	char * default_location2 = getenv ("RELION_UNBLUR_EXECUTABLE");
+	char mydefault2[]=DEFAULTUNBLURLOCATION;
 	if (default_location2 == NULL)
 	{
-		char mydefault2[]=DEFAULTUNBLURLOCATION;
 		default_location2=mydefault2;
 	}
 	joboptions["fn_unblur_exe"] = JobOption("UNBLUR executable:", std::string(default_location2), "*.*", ".", "Location of the UNBLUR executable. You can control the default of this field by setting environment variable RELION_UNBLUR_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code. Note that this wrapper was tested with unblur version 1.0.2.");
 
 	// Check for environment variable RELION_SUMMOVIE_EXECUTABL
 	char * default_location3 = getenv ("RELION_SUMMOVIE_EXECUTABLE");
+	char mydefault3[]=DEFAULTSUMMOVIELOCATION;
 	if (default_location3 == NULL)
 	{
-		char mydefault3[]=DEFAULTSUMMOVIELOCATION;
 		default_location3=mydefault3;
 	}
 	joboptions["fn_summovie_exe"] = JobOption("SUMMOVIE executable:", std::string(default_location3), "*.*", ".", "Location of the SUMMOVIE executable. You can control the default of this field by setting environment variable RELION_SUMMOVIE_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code. Note that this wrapper was tested with summovie version 1.0.2.");
@@ -1177,9 +1176,9 @@ void RelionJob::initialiseCtffindJob()
 	joboptions["use_ctffind4"] = JobOption("Use CTFFIND-4.1?", false, "If set to Yes, the wrapper will use CTFFIND4 (version 4.1) for CTF estimation. This includes thread-support, calculation of Thon rings from movie frames and phase-shift estimation for phase-plate data.");
 
 	default_location = getenv ("RELION_CTFFIND_EXECUTABLE");
+	char mydefault[]=DEFAULTCTFFINDLOCATION;
 	if (default_location == NULL)
 	{
-		char mydefault[]=DEFAULTCTFFINDLOCATION;
 		default_location=mydefault;
 	}
 	joboptions["fn_ctffind_exe"] = JobOption("CTFFIND-4.1 executable:", std::string(default_location), "*.exe", ".", "Location of the CTFFIND (release 4.1 or later) executable. You can control the default of this field by setting environment variable RELION_CTFFIND_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
@@ -1192,10 +1191,10 @@ void RelionJob::initialiseCtffindJob()
 	joboptions["use_gctf"] = JobOption("Use Gctf instead?", false, "If set to Yes, Kai Zhang's Gctf program (which runs on NVIDIA GPUs) will be used instead of Niko Grigorieff's CTFFIND4.");
 	// Check for environment variable RELION_CTFFIND_EXECUTABLE
 	default_location = getenv ("RELION_GCTF_EXECUTABLE");
+	char mydefault2[]=DEFAULTGCTFLOCATION;
 	if (default_location == NULL)
 	{
-		char mydefault[]=DEFAULTGCTFLOCATION;
-		default_location=mydefault;
+		default_location=mydefault2;
 	}
 	joboptions["fn_gctf_exe"] = JobOption("Gctf executable:", std::string(default_location), "*", ".", "Location of the Gctf executable. You can control the default of this field by setting environment variable RELION_GCTF_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
 	joboptions["do_ignore_ctffind_params"] = JobOption("Ignore 'Searches' parameters?", true, "If set to Yes, all parameters on the 'Searches' tab will be ignored, and Gctf's default parameters will be used (box.size=1024; min.resol=50; max.resol=4; min.defocus=500; max.defocus=90000; step.defocus=500; astigm=1000) \n \
@@ -4066,9 +4065,9 @@ void RelionJob::initialiseLocalresJob()
 
 	// Check for environment variable RELION_RESMAP_TEMPLATE
 	char * default_location = getenv ("RELION_RESMAP_EXECUTABLE");
+	char mydefault[] = DEFAULTRESMAPLOCATION;
 	if (default_location == NULL)
 	{
-		char mydefault[] = DEFAULTRESMAPLOCATION;
 		default_location = mydefault;
 	}
 

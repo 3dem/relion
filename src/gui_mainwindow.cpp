@@ -1239,9 +1239,9 @@ void GuiMainWindow::cb_display_io_node_i()
 	else if (pipeline.nodeList[mynode].type == NODE_PDF_LOGFILE)
 	{
 		const char * default_pdf_viewer = getenv ("RELION_PDFVIEWER_EXECUTABLE");
+		char mydefault[]=DEFAULTPDFVIEWER;
 		if (default_pdf_viewer == NULL)
 		{
-			char mydefault[]=DEFAULTPDFVIEWER;
 			default_pdf_viewer=mydefault;
 		}
 		std::string myviewer(default_pdf_viewer);
