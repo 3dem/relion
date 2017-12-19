@@ -132,6 +132,9 @@ void Preprocessing::initialise()
 
 			if (extract_size < 0)
 				REPORT_ERROR("Preprocessing::initialise ERROR: please provide the size of the box to extract particle using --extract_size ");
+
+			if (extract_size % 2 != 0)
+				REPORT_ERROR("Preprocessing::initialise ERROR: only extracting to even-sized images is allowed in RELION...");
 		}
 
 		// Read in the micrographs STAR file
