@@ -3251,6 +3251,9 @@ void MlOptimiserMpi::iterate()
 
 			MPI_Barrier(MPI_COMM_WORLD);
 
+#ifdef TIMING
+			timer.tic(TIMING_ITER_HELICALREFINE);
+#endif	
 			if (node->isMaster())
 			{
 				if ( (do_helical_refine) && (!do_skip_align) && (!do_skip_rotate) )
@@ -3295,6 +3298,7 @@ void MlOptimiserMpi::iterate()
 			// Mask the reconstructions to get rid of noisy solvent areas
 			// Skip masking upon convergence (for validation purposes)
 #ifdef TIMING
+				timer.toc(TIMING_ITER_HELICALREFINE);
 		        timer.tic(TIMING_SOLVFLAT);
 #endif
 		        if (do_solvent && !has_converged)
@@ -3307,6 +3311,7 @@ void MlOptimiserMpi::iterate()
 		        updateCurrentResolution();
 #ifdef TIMING
 		        timer.toc(TIMING_UPDATERES);
+				timer.tic(TIMING_ITER_WRITE);
 #endif
 
 			// If we are joining random halves, then do not write an optimiser file so that it cannot be restarted!
@@ -3321,6 +3326,10 @@ void MlOptimiserMpi::iterate()
 			else if (node->isMaster())
 				// The master only writes the data file (he's the only one who has and manages these data!)
 				MlOptimiser::write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DONT_WRITE_OPTIMISER, DONT_WRITE_MODEL, node->rank);
+
+#ifdef TIMING
+			timer.toc(TIMING_ITER_WRITE);
+#endif
 
 			if (do_auto_refine && has_converged)
 			{
