@@ -108,8 +108,8 @@ void AccProjectorPlan::setup(
 		bool do_skip_align,
 		bool do_skip_rotate,
 		int orientational_prior_mode,
-		Matrix2D<RFLOAT> *MBL,
-		Matrix2D<RFLOAT> *MBR)
+		Matrix2D<RFLOAT> &L_,
+		Matrix2D<RFLOAT> &R_)
 {
 	TIMING_TIC(TIMING_TOP);
 
@@ -145,10 +145,10 @@ void AccProjectorPlan::setup(
 	bool doL(false), doR(false);
 	RFLOAT myperturb(0.);
 
-	if (MBL != NULL)
+	if (L_.mdimx == L.mdimx && L_.mdimy == L.mdimy)
 	{
 		doL = true;
-		L = (*MBL) * L;
+		L = L_ * L;
 	}
 
 	if (ABS(sampling.random_perturbation) > 0.)
@@ -161,10 +161,10 @@ void AccProjectorPlan::setup(
 		doR = true;
 	}
 
-	if (MBR != NULL)
+	if (R_.mdimx == R.mdimx && R_.mdimy == R.mdimy)
 	{
 		doR = true;
-		R = R * (*MBR);
+		R = R * R_;
 	}
 
 	TIMING_TIC(TIMING_SAMPLING);

@@ -909,7 +909,8 @@ void getAllSquaredDifferencesCoarse(
 		MlOptimiser *baseMLO,
 		MlClass *accMLO,
 	 	AccPtr<XFLOAT> &Mweight,
-	 	AccPtrFactory ptrFactory)
+	 	AccPtrFactory ptrFactory,
+	 	int ibody = 0)
 {
 
 #ifdef TIMING
@@ -945,6 +946,20 @@ void getAllSquaredDifferencesCoarse(
 		{
 			if (baseMLO->mymodel.pdf_class[iclass] > 0.)
 			{
+				Matrix2D<RFLOAT> MBL, MBR, Aori;
+
+				if (baseMLO->mymodel.nr_bodies > 1)
+				{
+					// ipart=0 because in multi-body refinement we do not do movie frames!
+					RFLOAT rot_ori = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_ROT);
+					RFLOAT tilt_ori = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_TILT);
+					RFLOAT psi_ori = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset, METADATA_PSI);
+					Euler_angles2matrix(rot_ori, tilt_ori, psi_ori, Aori, false);
+
+					MBL = Aori * (baseMLO->mymodel.orient_bodies[ibody]).transpose() * baseMLO->A_rot90;
+					MBR = baseMLO->mymodel.orient_bodies[ibody];
+				}
+
 				projectorPlans[iclass].setup(
 						baseMLO->sampling,
 						op.directions_prior,
@@ -970,8 +985,8 @@ void getAllSquaredDifferencesCoarse(
 						baseMLO->do_skip_align,
 						baseMLO->do_skip_rotate,
 						baseMLO->mymodel.orientational_prior_mode,
-						NULL,
-						NULL
+						MBL,
+						MBL
 						);
 			}
 		}
@@ -3031,7 +3046,7 @@ if (thread_id == 0)
 baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_A);
 #endif
 		CTIC(timer,"getFourierTransformsAndCtfs");
-		getFourierTransformsAndCtfs<MlClass>(my_ori_particle, op, sp, baseMLO, myInstance, ptrFactory);
+		getFourierTransformsAndCtfs<MlClass>(my_ori_particle, op, sp, baseMLO, myInstance, ptrFactory, ibody);
 		CTOC(timer,"getFourierTransformsAndCtfs");
 
 		if (baseMLO->do_realign_movies && baseMLO->movie_frame_running_avg_side > 0)
@@ -3136,7 +3151,7 @@ baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_B);
 				Mweight.streamSync();
 
 				CTIC(timer,"getAllSquaredDifferencesCoarse");
-				getAllSquaredDifferencesCoarse<MlClass>(ipass, op, sp, baseMLO, myInstance, Mweight, ptrFactory);
+				getAllSquaredDifferencesCoarse<MlClass>(ipass, op, sp, baseMLO, myInstance, Mweight, ptrFactory, ibody);
 				CTOC(timer,"getAllSquaredDifferencesCoarse");
 
 				CTIC(timer,"convertAllSquaredDifferencesToWeightsCoarse");
