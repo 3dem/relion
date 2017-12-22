@@ -961,10 +961,10 @@ void cpu_kernel_make_eulers_3D(int grid_size, int block_size,
 
 // -------------------------------  Some explicit template instantiations
 template void CpuKernels::cpu_translate2D<XFLOAT>(XFLOAT *,
-    XFLOAT*, int, int, int, int, int);
+    XFLOAT*, size_t, int, int, int, int);
 
 template void CpuKernels::cpu_translate3D<XFLOAT>(XFLOAT *,
-    XFLOAT *, int, int, int, int, int, int, int);
+    XFLOAT *, size_t, int, int, int, int, int, int);
 
 template void CpuKernels::cpu_kernel_multi<XFLOAT>( XFLOAT *,
 	XFLOAT, int);
