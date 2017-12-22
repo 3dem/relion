@@ -49,10 +49,11 @@ void mapWeights(
 void buildCorrImage(MlOptimiser *baseMLO, OptimisationParamters &op, AccPtr<XFLOAT> &corr_img, long int ipart, long int group_id);
 
 void generateEulerMatrices(
-		XFLOAT padding_factor,
 		ProjectionParams &ProjectionData,
 		XFLOAT *eulers,
-		bool inverse);
+		bool inverse,
+		Matrix2D<RFLOAT> &L,
+		Matrix2D<RFLOAT> &R);
 
 long unsigned generateProjectionSetupFine(
 		OptimisationParamters &op,

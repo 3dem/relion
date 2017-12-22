@@ -169,14 +169,20 @@ void buildCorrImage(MlOptimiser *baseMLO, OptimisationParamters &op, AccPtr<XFLO
 }
 
 void generateEulerMatrices(
-		XFLOAT padding_factor,
 		ProjectionParams &ProjectionData,
 		XFLOAT *eulers,
-		bool inverse)
+		bool inverse,
+		Matrix2D<RFLOAT> &L,
+		Matrix2D<RFLOAT> &R)
 {
 	RFLOAT alpha, beta, gamma;
     RFLOAT ca, sa, cb, sb, cg, sg;
     RFLOAT cc, cs, sc, ss;
+
+    Matrix2D<RFLOAT> A(3,3);
+
+    bool doL = (L.mdimx == 3 && L.mdimy == 3);
+    bool doR = (R.mdimx == 3 && R.mdimy == 3);
 
 	for (long int i = 0; i < ProjectionData.rots.size(); i++)
 	{
@@ -196,30 +202,28 @@ void generateEulerMatrices(
 	    sc = sb * ca;
 	    ss = sb * sa;
 
+	    A(0, 0) =  cg * cc - sg * sa;
+	    A(0, 1) =  cg * cs + sg * ca;
+	    A(0, 2) = -cg * sb;
+	    A(1, 0) = -sg * cc - cg * sa;
+	    A(1, 1) = -sg * cs + cg * ca;
+	    A(1, 2) = sg * sb;
+	    A(2, 0) = sc;
+	    A(2, 1) = ss;
+	    A(2, 2) = cb;
+
 		if(inverse)
-		{
-		    eulers[9 * i + 0] = ( cg * cc - sg * sa) ;// * padding_factor; //00
-		    eulers[9 * i + 1] = (-sg * cc - cg * sa) ;// * padding_factor; //10
-		    eulers[9 * i + 2] = ( sc )               ;// * padding_factor; //20
-		    eulers[9 * i + 3] = ( cg * cs + sg * ca) ;// * padding_factor; //01
-		    eulers[9 * i + 4] = (-sg * cs + cg * ca) ;// * padding_factor; //11
-		    eulers[9 * i + 5] = ( ss )               ;// * padding_factor; //21
-		    eulers[9 * i + 6] = (-cg * sb )          ;// * padding_factor; //02
-		    eulers[9 * i + 7] = ( sg * sb )          ;// * padding_factor; //12
-		    eulers[9 * i + 8] = ( cb )               ;// * padding_factor; //22
-		}
-		else
-		{
-		    eulers[9 * i + 0] = ( cg * cc - sg * sa) ;// * padding_factor; //00
-		    eulers[9 * i + 1] = ( cg * cs + sg * ca) ;// * padding_factor; //01
-		    eulers[9 * i + 2] = (-cg * sb )          ;// * padding_factor; //02
-		    eulers[9 * i + 3] = (-sg * cc - cg * sa) ;// * padding_factor; //10
-		    eulers[9 * i + 4] = (-sg * cs + cg * ca) ;// * padding_factor; //11
-		    eulers[9 * i + 5] = ( sg * sb )          ;// * padding_factor; //12
-		    eulers[9 * i + 6] = ( sc )               ;// * padding_factor; //20
-		    eulers[9 * i + 7] = ( ss )               ;// * padding_factor; //21
-		    eulers[9 * i + 8] = ( cb )               ;// * padding_factor; //22
-		}
+			A = A.transpose();
+
+		if (doL)
+			A = L * A;
+
+		if (doR)
+			A = A * R;
+
+		for (int m = 0; m < 3; m ++)
+			for (int n = 0; n < 3; n ++)
+				eulers[9 * i + (m*3 + n)] = A(m, n);
 	}
 }
 
