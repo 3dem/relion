@@ -135,8 +135,8 @@ public:
 	// Current working directory to make absolute-path symlinks
 	std::string currdir;
 
-	// Expect large astigmatism for CTFFIND4.1?
-	bool do_large_astigmatism;
+	// Disable "Slower, more exhaustive search?" in CTFFIND 4.1.5-
+	bool do_fast_search;
 
 	// Which GPU devices to use?
 	std::string gpu_ids;
