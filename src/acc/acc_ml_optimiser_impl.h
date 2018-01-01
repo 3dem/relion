@@ -1186,12 +1186,8 @@ void getAllSquaredDifferencesFine(
 	std::vector<std::vector< IndexedDataArrayMask > > &FPCMasks,
 	std::vector<ProjectionParams> &FineProjectionData,
 	AccPtrFactory ptrFactory,
-	int ibody
-#ifdef CUDA
-	,std::vector<cudaStager<unsigned long> > &stagerD2)
-#else
-	)
-#endif
+	int ibody,
+	std::vector<AccPtrBundle > &bundleD2)
 {
 #ifdef TIMING
 	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
@@ -1323,10 +1319,9 @@ void getAllSquaredDifferencesFine(
 		
 		std::vector< AccPtr<XFLOAT> > eulers((size_t)(sp.iclass_max-sp.iclass_min+1), ptrFactory.make<XFLOAT>());
 
-#ifdef CUDA
-		cudaStager<XFLOAT> AllEulers((CudaCustomAllocator *)accMLO->getAllocator(),9*FineProjectionData[ipart].orientationNumAllClasses);
-		AllEulers.prepare_device();
-#endif
+		AccPtrBundle AllEulers = ptrFactory.makeBundle();
+		AllEulers.setSize(9*FineProjectionData[ipart].orientationNumAllClasses*sizeof(XFLOAT));
+		AllEulers.allAlloc();
 
 		unsigned long newDataSize(0);
 
@@ -1393,10 +1388,8 @@ void getAllSquaredDifferencesFine(
 				CTOC(accMLO->timer,"pair_list_1");
 
 				CTIC(accMLO->timer,"IndexedArrayMemCp2");
-#ifdef CUDA
-				stagerD2[ipart].stage(FPCMasks[ipart][exp_iclass].jobOrigin);
-				stagerD2[ipart].stage(FPCMasks[ipart][exp_iclass].jobExtent);
-#endif
+				bundleD2[ipart].pack(FPCMasks[ipart][exp_iclass].jobOrigin);
+				bundleD2[ipart].pack(FPCMasks[ipart][exp_iclass].jobExtent);
 				CTOC(accMLO->timer,"IndexedArrayMemCp2");
 
 				Matrix2D<RFLOAT> MBL, MBR;
@@ -1423,18 +1416,14 @@ void getAllSquaredDifferencesFine(
 						MBL,
 						MBR);
 
-#ifdef CUDA
-				AllEulers.stage(eulers[exp_iclass-sp.iclass_min]);
-#endif
+				AllEulers.pack(eulers[exp_iclass-sp.iclass_min]);
+				
 				CTOC(accMLO->timer,"generateEulerMatrices");
 			}
 		}
 
-#ifdef CUDA
-		// copy stagers to device
-		stagerD2[ipart].cp_to_device();
-		AllEulers.cp_to_device();
-#endif
+		bundleD2[ipart].cpToDevice();
+		AllEulers.cpToDevice();
 		
 		FinePassWeights[ipart].rot_id.cpToDevice(); //FIXME this is not used
 		FinePassWeights[ipart].rot_idx.cpToDevice();
@@ -2072,12 +2061,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						std::vector<ProjectionParams> &ProjectionData,
 						std::vector<std::vector<IndexedDataArrayMask > > &FPCMasks,
 						AccPtrFactory ptrFactory,
-						int ibody
-#ifdef CUDA
-						,std::vector<cudaStager<unsigned long> > &stagerSWS)
-#else
-						)
-#endif
+						int ibody,
+						std::vector< AccPtrBundle > &bundleSWS)
 {
 #ifdef TIMING
 	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
@@ -2186,10 +2171,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			// Re-define the job-partition of the indexedArray of weights so that the collect-kernel can work with it.
 			block_nums[nr_fake_classes*ipart + fake_class] = makeJobsForCollect(thisClassFinePassWeights, FPCMasks[ipart][exp_iclass], ProjectionData[ipart].orientation_num[exp_iclass]);
 
-#ifdef CUDA
-			stagerSWS[ipart].stage(FPCMasks[ipart][exp_iclass].jobOrigin);
-			stagerSWS[ipart].stage(FPCMasks[ipart][exp_iclass].jobExtent);
-#endif
+			bundleSWS[ipart].pack(FPCMasks[ipart][exp_iclass].jobOrigin);
+			bundleSWS[ipart].pack(FPCMasks[ipart][exp_iclass].jobExtent);
 
 			sumBlockNum+=block_nums[nr_fake_classes*ipart + fake_class];
 
@@ -2273,9 +2256,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			}
 		}
 
-#ifdef CUDA
-		stagerSWS[ipart].cp_to_device();
-#endif
+		bundleSWS[ipart].cpToDevice();
 		oo_otrans_x.cpToDevice();
 		oo_otrans_y.cpToDevice();
 		oo_otrans_z.cpToDevice();
@@ -3152,9 +3133,8 @@ baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_A);
 		//    coarse pass, declared here to keep scope to storeWS
 		std::vector < ProjectionParams > FineProjectionData(sp.nr_particles, baseMLO->mymodel.nr_classes);
 
-#ifdef CUDA
-	std::vector < cudaStager<unsigned long> > stagerD2(sp.nr_particles,(CudaCustomAllocator *)myInstance->getAllocator()), stagerSWS(sp.nr_particles, (CudaCustomAllocator *)myInstance->getAllocator());
-#endif
+		std::vector < AccPtrBundle > bundleD2(sp.nr_particles, ptrFactory.makeBundle());
+		std::vector < AccPtrBundle > bundleSWS(sp.nr_particles, ptrFactory.makeBundle());
 
 		for (int ipass = 0; ipass < nr_sampling_passes; ipass++)
 		{
@@ -3244,10 +3224,9 @@ baseMLO->timer.tic(baseMLO->TIMING_ESP_DIFF2_D);
 					size_t dataSize = FineProjectionData[iframe].orientationNumAllClasses*sp.nr_trans*sp.nr_oversampled_trans;
 					FinePassWeights[iframe].setDataSize(dataSize);
 					FinePassWeights[iframe].dual_alloc_all();
-#ifdef CUDA
-				stagerD2[iframe].size= 2*(FineProjectionData[iframe].orientationNumAllClasses*sp.nr_trans*sp.nr_oversampled_trans);
-				stagerD2[iframe].prepare();
-#endif
+
+					bundleD2[iframe].setSize(2*(FineProjectionData[iframe].orientationNumAllClasses*sp.nr_trans*sp.nr_oversampled_trans)*sizeof(unsigned long));
+					bundleD2[iframe].allAlloc();
 				}
 #ifdef TIMING
 // Only time one thread
@@ -3256,12 +3235,7 @@ baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_D);
 #endif
 
 				CTIC(timer,"getAllSquaredDifferencesFine");
-				getAllSquaredDifferencesFine<MlClass>(ipass, op, sp, baseMLO, myInstance, FinePassWeights, FinePassClassMasks, FineProjectionData, ptrFactory, ibody
-#ifdef CUDA
-				, stagerD2);
-#else
-				);
-#endif
+				getAllSquaredDifferencesFine<MlClass>(ipass, op, sp, baseMLO, myInstance, FinePassWeights, FinePassClassMasks, FineProjectionData, ptrFactory, ibody, bundleD2);
 				CTOC(timer,"getAllSquaredDifferencesFine");
 				FinePassWeights[0].weights.cpToHost();
 
@@ -3283,25 +3257,20 @@ baseMLO->timer.tic(baseMLO->TIMING_ESP_DIFF2_E);
 
 		// For the reconstruction step use mymodel.current_size!
 		sp.current_image_size = baseMLO->mymodel.current_size;
-#ifdef CUDA
+
 	for (long int iframe = 0; iframe < sp.nr_particles; iframe++)
 	{
-		stagerSWS[iframe].size= 2*(FineProjectionData[iframe].orientationNumAllClasses);
-		stagerSWS[iframe].prepare();
+		bundleSWS[iframe].setSize(2*(FineProjectionData[iframe].orientationNumAllClasses)*sizeof(unsigned long));
+		bundleSWS[iframe].allAlloc();
 	}
-#endif
+
 #ifdef TIMING
 // Only time one thread
 if (thread_id == 0)
 baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_E);
 #endif
 		CTIC(timer,"storeWeightedSums");
-		storeWeightedSums<MlClass>(op, sp, baseMLO, myInstance, FinePassWeights, FineProjectionData, FinePassClassMasks, ptrFactory, ibody
-#ifdef CUDA
-	, stagerSWS);
-#else
-	);
-#endif
+		storeWeightedSums<MlClass>(op, sp, baseMLO, myInstance, FinePassWeights, FineProjectionData, FinePassClassMasks, ptrFactory, ibody, bundleSWS);
 		CTOC(timer,"storeWeightedSums");
 
 		for (long int iframe = 0; iframe < sp.nr_particles; iframe++)

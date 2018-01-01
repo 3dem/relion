@@ -61,7 +61,7 @@ typedef double AllocationType;  //Dummy type
 template <typename T>
 class AccPtr
 {
-private:
+protected:
 	AllocatorType *allocator;
 	AllocationType *alloc;
 	StreamType stream;
@@ -1054,7 +1054,81 @@ public:
 
 		return ptr;
 	}
+};
 
+typedef unsigned char AccPtrBundleByte;
+
+class AccPtrBundle: public AccPtr<AccPtrBundleByte>
+{
+private:
+	size_t current_packed_pos;
+
+public:
+	AccPtrBundle(StreamType stream, AllocatorType *allocator):
+		AccPtr<AccPtrBundleByte>(stream, allocator),
+		current_packed_pos(0)
+	{}
+
+	AccPtrBundle(size_t size, StreamType stream, AllocatorType *allocator):
+		AccPtr<AccPtrBundleByte>(stream, allocator),
+		current_packed_pos(0)
+	{
+		setSize(size);
+	}
+
+	template <typename T>
+	void pack(AccPtr<T> &ptr)
+	{
+#ifdef CUDA
+	#ifdef DEBUG_CUDA
+		if (current_packed_pos + ptr.getSize() > size)
+			ACC_PTR_DEBUG_FATAL("Packing exceeds bundle total size.\n");
+		if (hPtr == NULL)
+			ACC_PTR_DEBUG_FATAL("Pack called on null host pointer.\n");
+	#endif
+		if (ptr.getHostPtr() != NULL)
+			memcpy ( &hPtr[current_packed_pos], ptr.getHostPtr(), ptr.getSize() * sizeof(T));
+		ptr.freeHostIfSet();
+		ptr.setHostPtr((T*) &hPtr[current_packed_pos]);
+		ptr.setDevicePtr((T*) &dPtr[current_packed_pos]);
+
+		current_packed_pos += ptr.getSize() * sizeof(T);
+#else
+		if (ptr.getHostPtr() == NULL)
+			ptr.hostAlloc();
+#endif
+	}
+	
+	//Overwrite allocation methods and block for no device
+	
+	void allAlloc()
+	{
+#ifdef CUDA
+		AccPtr<AccPtrBundleByte>::allAlloc();
+#endif
+	}
+	
+	void allAlloc(size_t size)
+	{
+#ifdef CUDA
+		AccPtr<AccPtrBundleByte>::allAlloc(size);
+#endif
+	}
+	
+	void hostAlloc()
+	{
+#ifdef CUDA
+		AccPtr<AccPtrBundleByte>::hostAlloc();
+#endif
+	}
+	
+	void hostAlloc(size_t size)
+	{
+#ifdef CUDA
+		AccPtr<AccPtrBundleByte>::hostAlloc(size);
+#endif
+	}
+	
 };
 
 class AccPtrFactory
@@ -1110,6 +1184,22 @@ public:
 		ptr.setSize(size);
 
 		return ptr;
+	}
+
+	AccPtrBundle makeBundle()
+	{
+		AccPtrBundle bundle(stream, allocator);
+		bundle.setAccType(accType);
+
+		return bundle;
+	}
+
+	AccPtrBundle makeBundle(size_t size)
+	{
+		AccPtrBundle bundle(size, stream, allocator);
+		bundle.setAccType(accType);
+
+		return bundle;
 	}
 };
 
