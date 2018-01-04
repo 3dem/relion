@@ -297,24 +297,30 @@ void HelixAligner::readImages()
 		Xrects.push_back(dummy);
 
 		// Calculate all rotated versions
-		for (RFLOAT ang = 0; ang <= max_rotate; ang += step_rotate)
+		for (int iflip =0; iflip < 2; iflip++)
 		{
-			Matrix2D<RFLOAT> Arot;
-			MultidimArray<RFLOAT> Irot;
-			Irot.initZeros(img());
-			rotation2DMatrix(ang, Arot);
-			applyGeometry(img(), Irot, Arot, true, false);
-			resizeMap(Irot, down_size);
-			Irot.setXmippOrigin();
-			Xrects[Xrects.size()-1].push_back(Irot);
-			if (ang > 0.)
+			for (RFLOAT ang = 0; ang <= max_rotate; ang += step_rotate)
 			{
-				// Also rotate in the opposite direction
+				Matrix2D<RFLOAT> Arot;
+				MultidimArray<RFLOAT> Irot;
 				Irot.initZeros(img());
-				applyGeometry(img(), Irot, Arot, false, false);
+				if (iflip == 1)
+					rotation2DMatrix(ang+180., Arot);
+				else
+					rotation2DMatrix(ang, Arot);
+				applyGeometry(img(), Irot, Arot, true, false);
 				resizeMap(Irot, down_size);
 				Irot.setXmippOrigin();
 				Xrects[Xrects.size()-1].push_back(Irot);
+				if (ang > 0.)
+				{
+					// Also rotate in the opposite direction
+					Irot.initZeros(img());
+					applyGeometry(img(), Irot, Arot, false, false);
+					resizeMap(Irot, down_size);
+					Irot.setXmippOrigin();
+					Xrects[Xrects.size()-1].push_back(Irot);
+				}
 			}
 		}
 
@@ -1071,29 +1077,25 @@ void HelixAligner::reconstruct3D()
 		MultidimArray<RFLOAT> Mori = Ic();
 		std::cout << " * Written " << fn_class << std::endl;
 
-		// The 3D reconstructions in both hands
+		// The 3D reconstruction
 		float deg_per_pixel = 180. * angpix / (crossover_distance);
 		Ic().resize(ori_size, ori_size, ori_size);
-		for (int ihand = 0; ihand < 2; ihand++)
+		for (int k = 0; k < ZSIZE(Ic()); k++)
 		{
-			for (int k = 0; k < ZSIZE(Ic()); k++)
-			{
-				float ang = deg_per_pixel * k;
-				Matrix2D<RFLOAT> Arot;
-				rotation2DMatrix(ang, Arot);
+			float ang = deg_per_pixel * k;
+			Matrix2D<RFLOAT> Arot;
+			rotation2DMatrix(ang, Arot);
 
-				MultidimArray<RFLOAT> Mrot;
-				Mrot.initZeros(Mori);
-				bool is_inv = (ihand == 0) ? true : false;
-				applyGeometry(Mori, Mrot, Arot, is_inv, false);
-				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(Mrot)
-					DIRECT_A3D_ELEM(Ic(), k, i, j) = DIRECT_A2D_ELEM(Mrot, i, j);
-			}
-			fn_class = fn_out + "_class" + integerToString(iclass+1, 3)+"_rec3d_hand" + integerToString(ihand,1 ) + ".mrc";
-			Ic.setSamplingRateInHeader(angpix);
-			Ic.write(fn_class);
-			std::cout << " * Written " << fn_class << std::endl;
+			MultidimArray<RFLOAT> Mrot;
+			Mrot.initZeros(Mori);
+			applyGeometry(Mori, Mrot, Arot, true, false);
+			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(Mrot)
+				DIRECT_A3D_ELEM(Ic(), k, i, j) = DIRECT_A2D_ELEM(Mrot, i, j);
 		}
+		fn_class = fn_out + "_class" + integerToString(iclass+1, 3)+"_rec3d.mrc";
+		Ic.setSamplingRateInHeader(angpix);
+		Ic.write(fn_class);
+		std::cout << " * Written " << fn_class << std::endl;
 	}
 
 }
