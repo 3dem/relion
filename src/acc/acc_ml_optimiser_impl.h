@@ -2116,7 +2116,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	thr_wsum_sigma2_noise.resize(baseMLO->mymodel.nr_groups, zeroArray);
 	// wsum_pdf_direction is a 1D-array (of length sampling.NrDirections()) for each class
 	zeroArray.initZeros(baseMLO->sampling.NrDirections());
-	thr_wsum_pdf_direction.resize(baseMLO->mymodel.nr_classes, zeroArray);
+	thr_wsum_pdf_direction.resize(baseMLO->mymodel.nr_classes * baseMLO->mymodel.nr_bodies, zeroArray);
 	// sumw_group is a RFLOAT for each group
 	thr_sumw_group.resize(baseMLO->mymodel.nr_groups, 0.);
 	// wsum_pdf_class is a RFLOAT for each class
@@ -2335,16 +2335,16 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 		int iorient = 0;
 		partial_pos=0;
-		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+		for (int iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
 		{
-			int fake_class = exp_iclass-sp.iclass_min; // if we only have the third class to do, the third class will be the "first" we do, i.e. the "fake" first.
-			if ((baseMLO->mymodel.pdf_class[exp_iclass] == 0.) || (ProjectionData[ipart].class_entries[exp_iclass] == 0) )
+			int fake_class = iclass-sp.iclass_min; // if we only have the third class to do, the third class will be the "first" we do, i.e. the "fake" first.
+			if ((baseMLO->mymodel.pdf_class[iclass] == 0.) || (ProjectionData[ipart].class_entries[iclass] == 0) )
 				continue;
 			int block_num = block_nums[nr_fake_classes*ipart + fake_class];
 
 			for (long int n = partial_pos; n < partial_pos+block_num; n++)
 			{
-				iorient= FinePassWeights[ipart].rot_id[FPCMasks[ipart][exp_iclass].jobOrigin[n-partial_pos]+FPCMasks[ipart][exp_iclass].firstPos];
+				iorient= FinePassWeights[ipart].rot_id[FPCMasks[ipart][iclass].jobOrigin[n-partial_pos]+FPCMasks[ipart][iclass].firstPos];
 
 				long int mydir, idir=floor(iorient/sp.nr_psi);
 				if (baseMLO->mymodel.orientational_prior_mode == NOPRIOR)
@@ -2353,15 +2353,16 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					mydir = op.pointer_dir_nonzeroprior[idir];
 
 				// store partials according to indices of the relevant dimension
-				DIRECT_MULTIDIM_ELEM(thr_wsum_pdf_direction[exp_iclass], mydir) += p_weights[n];
-				thr_sumw_group[group_id]                 						+= p_weights[n];
-				thr_wsum_pdf_class[exp_iclass]           						+= p_weights[n];
-				thr_wsum_sigma2_offset                   						+= p_thr_wsum_sigma2_offset[n];
+				unsigned ithr_wsum_pdf_direction = baseMLO->mymodel.nr_bodies > 1 ? ibody : iclass;
+				DIRECT_MULTIDIM_ELEM(thr_wsum_pdf_direction[ithr_wsum_pdf_direction], mydir) += p_weights[n];
+				thr_sumw_group[group_id]                                                     += p_weights[n];
+				thr_wsum_pdf_class[iclass]                                                   += p_weights[n];
+				thr_wsum_sigma2_offset                                                       += p_thr_wsum_sigma2_offset[n];
 
 				if (baseMLO->mymodel.ref_dim == 2)
 				{
-					thr_wsum_prior_offsetx_class[exp_iclass] += p_thr_wsum_prior_offsetx_class[n];
-					thr_wsum_prior_offsety_class[exp_iclass] += p_thr_wsum_prior_offsety_class[n];
+					thr_wsum_prior_offsetx_class[iclass] += p_thr_wsum_prior_offsetx_class[n];
+					thr_wsum_prior_offsety_class[iclass] += p_thr_wsum_prior_offsety_class[n];
 				}
 			}
 			partial_pos+=block_num;
