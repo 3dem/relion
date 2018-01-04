@@ -119,20 +119,25 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			RFLOAT prior_rot  = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, icol_rot);
 			RFLOAT prior_tilt = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, icol_tilt);
 			RFLOAT prior_psi =  DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, icol_psi);
-			baseMLO->sampling.selectOrientationsWithNonZeroPriorProbability(prior_rot, prior_tilt, prior_psi,
-									sqrt(baseMLO->mymodel.sigma2_rot), sqrt(baseMLO->mymodel.sigma2_tilt), sqrt(baseMLO->mymodel.sigma2_psi),
-									op.pointer_dir_nonzeroprior, op.directions_prior,
-									op.pointer_psi_nonzeroprior, op.psi_prior, false, 3.,
-									baseMLO->mymodel.sigma_tilt_bodies[ibody], baseMLO->mymodel.sigma_psi_bodies[ibody]);
+			baseMLO->sampling.selectOrientationsWithNonZeroPriorProbability(
+					prior_rot, prior_tilt, prior_psi,
+					sqrt(baseMLO->mymodel.sigma2_rot),
+					sqrt(baseMLO->mymodel.sigma2_tilt),
+					sqrt(baseMLO->mymodel.sigma2_psi),
+					op.pointer_dir_nonzeroprior, op.directions_prior,
+					op.pointer_psi_nonzeroprior, op.psi_prior, false, 3.,
+					baseMLO->mymodel.sigma_tilt_bodies[ibody],
+					baseMLO->mymodel.sigma_psi_bodies[ibody]);
 
 		}
 		else if (baseMLO->mymodel.orientational_prior_mode != NOPRIOR && !(baseMLO->do_skip_align ||baseMLO-> do_skip_rotate))
 		{
 			// First try if there are some fixed prior angles
+			// For multi-body refinements, ignore the original priors and get the refined residual angles from the previous iteration
 			RFLOAT prior_rot = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_ROT_PRIOR);
 			RFLOAT prior_tilt = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_TILT_PRIOR);
 			RFLOAT prior_psi = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI_PRIOR);
-			RFLOAT prior_psi_flip_ratio =  (baseMLO->mymodel.nr_bodies > 1 ) ? 0. : DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI_PRIOR_FLIP_RATIO);
+			RFLOAT prior_psi_flip_ratio = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_PSI_PRIOR_FLIP_RATIO);
 
 			bool do_auto_refine_local_searches = (baseMLO->do_auto_refine) && (baseMLO->sampling.healpix_order >= baseMLO->autosampling_hporder_local_searches);
 			bool do_classification_local_searches = (! baseMLO->do_auto_refine) && (baseMLO->mymodel.orientational_prior_mode == PRIOR_ROTTILT_PSI)
@@ -691,6 +696,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		CTIC(accMLO->timer,"windowFourierTransform2");
 		//windowFourierTransform(Faux, Fimg, baseMLO->mymodel.current_size);
 		accMLO->transformer1.fouriers.streamSync();
+
 		windowFourierTransform2(
 				accMLO->transformer1.fouriers,
 				d_Fimg,
@@ -986,7 +992,7 @@ void getAllSquaredDifferencesCoarse(
 						baseMLO->do_skip_rotate,
 						baseMLO->mymodel.orientational_prior_mode,
 						MBL,
-						MBL
+						MBR
 						);
 			}
 		}
@@ -1063,7 +1069,7 @@ void getAllSquaredDifferencesCoarse(
 		XFLOAT scale_correction = baseMLO->do_scale_correction ? baseMLO->mymodel.scale_correction[group_id] : 1;
 
 		MultidimArray<Complex > Fimg;
-		windowFourierTransform(op.Fimgs[ipart], Fimg, sp.current_image_size);
+		windowFourierTransform(op.Fimgs[ipart], Fimg, sp.current_image_size); //TODO PO isen't this already done in getFourierTransformsAndCtfs?
 
 		for (unsigned i = 0; i < image_size; i ++)
 		{
@@ -1277,7 +1283,7 @@ void getAllSquaredDifferencesFine(
 		XFLOAT scale_correction = baseMLO->do_scale_correction ? baseMLO->mymodel.scale_correction[group_id] : 1;
 
 		MultidimArray<Complex > Fimg, Fimg_nomask;
-		windowFourierTransform(op.Fimgs[ipart], Fimg, sp.current_image_size);
+		windowFourierTransform(op.Fimgs[ipart], Fimg, sp.current_image_size); //TODO PO isen't this already done in getFourierTransformsAndCtfs?
 
 		for (unsigned i = 0; i < image_size; i ++)
 		{
@@ -2554,7 +2560,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		Fimgs_nomask_imag.allAlloc();
 
 		MultidimArray<Complex > Fimg, Fimg_nonmask;
-		windowFourierTransform(op.Fimgs[ipart], Fimg, sp.current_image_size);
+		windowFourierTransform(op.Fimgs[ipart], Fimg, sp.current_image_size); //TODO PO isen't this already done in getFourierTransformsAndCtfs?
 		windowFourierTransform(op.Fimgs_nomask[ipart], Fimg_nonmask, sp.current_image_size);
 
 		for (unsigned i = 0; i < image_size; i ++)

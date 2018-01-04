@@ -853,18 +853,27 @@ __global__ void cuda_kernel_make_eulers_3D(
 	A[8] = ( cb )              ;//22
 
 	if (doR)
+	{
+		for (int i = 0; i < 9; i++)
+			B[i] = 0.f;
+
 		for (int i = 0; i < 3; i++)
 			for (int j = 0; j < 3; j++)
 				for (int k = 0; k < 3; k++)
 					B[i * 3 + j] += A[i * 3 + k] * R[k * 3 + j];
+	}
 	else
 		for (int i = 0; i < 9; i++)
 			B[i] = A[i];
 
 	if (doL)
 	{
+		if (doR)
+			for (int i = 0; i < 9; i++)
+				A[i] = B[i];
+
 		for (int i = 0; i < 9; i++)
-			A[i] = B[i];
+			B[i] = 0.f;
 
 		for (int i = 0; i < 3; i++)
 			for (int j = 0; j < 3; j++)
