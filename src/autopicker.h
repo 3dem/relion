@@ -127,6 +127,30 @@ public:
 	// FTs of the reference images (either for autopicking or for feature calculation)
 	std::vector<Projector > PPref;
 
+	// Use Laplacian-of-Gaussian filters instead of template-based picking
+	bool do_LoG;
+
+	// Minimum diameter for features to be detected by the LoG filter
+	RFLOAT LoG_diameter, LoG_min_diameter, LoG_max_diameter;
+
+	// Maximum diameter for features to be detected by the LoG filter
+	RFLOAT LoG_diameter_fracrange;
+
+	// How many times the LoG_max_diameter is searched?
+	RFLOAT LoG_max_search;
+
+	// How many sigma to adjust the FOM threshold?
+	RFLOAT LoG_adjust_threshold;
+
+	// Input signal is white
+	bool LoG_invert;
+
+	// Vector with all LoG filter FFTs
+	std::vector<MultidimArray<Complex> > FT_LoGs;
+
+	// Vector with all diameters to be sampled
+	std::vector<RFLOAT> diams_LoG;
+
 	///// Autopicking stuff
 
 	// Re-read precalculated best_localCCF and SPI arrays from disc
@@ -238,6 +262,7 @@ public:
 
 	void pickCCFPeaks(
 			const MultidimArray<RFLOAT>& Mccf,
+			const MultidimArray<RFLOAT>& Mstddev,
 			const MultidimArray<int>& Mclass,
 			RFLOAT threshold_value,
 			int peak_r_min,
@@ -269,6 +294,7 @@ public:
 			RFLOAT tube_length_min_pix,
 			int skip_side, float scale);
 
+	void autoPickLoGOneMicrograph(FileName &fn_mic, long int imic);
 	void autoPickOneMicrograph(FileName &fn_mic, long int imic);
 
 	// Get the output coordinate filename given the micrograph filename

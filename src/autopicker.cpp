@@ -20,7 +20,7 @@
 #include "src/autopicker.h"
 
 //#define DEBUG
-//#define DEBUG_HELIX
+#define DEBUG_HELIX
 
 void ccfPeak::clear()
 {
@@ -116,7 +116,7 @@ void AutoPicker::read(int argc, char **argv)
 	}
 #endif
 	int ref_section = parser.addSection("References options");
-	fn_ref = parser.getOption("--ref", "STAR file with the reference names, or an MRC stack with all references, or \"gauss\" for blob-picking");
+	fn_ref = parser.getOption("--ref", "STAR file with the reference names, or an MRC stack with all references, or \"gauss\" for blob-picking","");
 	angpix_ref = textToFloat(parser.getOption("--angpix_ref", "Pixel size of the references in Angstroms (default is same as micrographs)", "-1"));
 	do_invert = parser.checkOption("--invert", "Density in micrograph is inverted w.r.t. density in template");
 	psi_sampling = textToFloat(parser.getOption("--ang", "Angular sampling (in degrees); use 360 for no rotations", "10"));
@@ -125,6 +125,13 @@ void AutoPicker::read(int argc, char **argv)
 	do_ctf = parser.checkOption("--ctf", "Perform CTF correction on the references?");
 	intact_ctf_first_peak = parser.checkOption("--ctf_intact_first_peak", "Ignore CTFs until their first peak?");
 	gauss_max_value = textToFloat(parser.getOption("--gauss_max", "Value of the peak in the Gaussian blob reference","0.1"));
+
+	int log_section = parser.addSection("Laplacian-of-Gaussian options");
+	do_LoG = parser.checkOption("--LoG", "Use Laplacian-of-Gaussian filter-based picking, instead of template matching");
+	LoG_diameter = textToFloat(parser.getOption("--LoG_diam", "Diameter (in Angstroms) for blob-detection by Laplacian-of-Gaussian filter", "-1"));
+	LoG_diameter_fracrange = textToFloat(parser.getOption("--LoG_diam_range", "Min and max diameter change by this fraction of the diameter above", "0.2"));
+	LoG_invert = parser.checkOption("--Log_invert", "Use this option if the particles are white instead of black");
+	LoG_adjust_threshold = textToFloat(parser.getOption("--Log_adjust_threshold", "Use this option to adjust the picking threshold: positive for more particles, negative for fewer", "0."));
 
 	int helix_section = parser.addSection("Helix options");
 	autopick_helical_segments = parser.checkOption("--helix", "Are the references 2D helical segments? If so, in-plane rotation angles (psi) are estimated for the references.");
@@ -142,6 +149,7 @@ void AutoPicker::read(int argc, char **argv)
 	verb = textToInteger(parser.getOption("--verb", "Verbosity", "1"));
 	random_seed = textToInteger(parser.getOption("--random_seed", "Number for the random seed generator", "1"));
 	workFrac = textToFloat(parser.getOption("--shrink", "Reduce micrograph to this fraction size, during correlation calc (saves memory and time)", "1.0"));
+	LoG_max_search = textToFloat(parser.getOption("--Log_max_search", "Maximum diameter in LoG-picking multi-scale approach is this many times the min/max diameter", "5."));
 
 	// Check for errors in the command-line option
 	if (parser.checkForErrors())
@@ -283,7 +291,47 @@ void AutoPicker::initialise()
 
 	// Read in the references
 	Mrefs.clear();
-	if (fn_ref == "gauss")
+	if (do_LoG)
+	{
+		if (LoG_diameter < 0)
+			REPORT_ERROR("ERROR: Provide --Log_diam when using the LoG-filter for autopicking");
+		if (LoG_diameter_fracrange < 0 || LoG_diameter_fracrange > 1)
+			REPORT_ERROR("ERROR: --LoG_diam_range should be between 0 and 1");
+
+		// Always use skip_side, as algorithms tends to pick on the sides of micrographs
+		autopick_skip_side = XMIPP_MAX(autopick_skip_side, 0.5*LoG_diameter/angpix);
+
+		// Fill vector with diameters to be searched
+		LoG_min_diameter = ROUND(LoG_diameter - LoG_diameter_fracrange * LoG_diameter);
+		LoG_max_diameter = ROUND(LoG_diameter + LoG_diameter_fracrange * LoG_diameter);
+		diams_LoG.clear();
+		for (int i = LoG_max_search; i > 2; i--)
+			diams_LoG.push_back(ROUND(LoG_min_diameter/(RFLOAT)(i)));
+		diams_LoG.push_back(LoG_min_diameter);
+		diams_LoG.push_back(LoG_diameter);
+		diams_LoG.push_back(LoG_max_diameter);
+		for (int i = 3; i <= LoG_max_search; i++)
+			diams_LoG.push_back(ROUND(LoG_max_diameter*(RFLOAT)(i)));
+
+		std::cout << " + Will use following diameters for Laplacian-of-Gaussian filter: " << std::endl;
+		for (int i = 0; i < diams_LoG.size(); i++)
+		{
+			RFLOAT myd = diams_LoG[i];
+			if (myd < LoG_min_diameter)
+				std::cout << "   * " << myd << " (too low)" << std::endl;
+			else if (myd > LoG_max_diameter)
+				std::cout << "   * " << myd << " (too high)" << std::endl;
+			else
+				std::cout << "   * " << myd << " (ok)" << std::endl;
+
+		}
+
+	}
+	else if (fn_ref == "")
+	{
+		REPORT_ERROR("ERROR: Provide either --ref or use --LoG.");
+	}
+	else if (fn_ref == "gauss")
 	{
 		if (verb > 0)
 			std::cout << " + Will use Gaussian blob as reference, with peak value of " << gauss_max_value << std::endl;
@@ -351,107 +399,111 @@ void AutoPicker::initialise()
 	timer.tic(TIMING_A3);
 #endif
 
-
-	// Re-scale references if necessary
-	if (angpix_ref < 0)
-		angpix_ref = angpix;
-
-	// Automated determination of bg_radius (same code as in particle_sorter.cpp!)
-	if (particle_diameter < 0.)
+	if (!do_LoG)
 	{
-		RFLOAT sumr=0.;
-		for (int iref = 0; iref < Mrefs.size(); iref++)
+
+		// Re-scale references if necessary
+		if (angpix_ref < 0)
+			angpix_ref = angpix;
+
+		// Automated determination of bg_radius (same code as in particle_sorter.cpp!)
+		if (particle_diameter < 0.)
 		{
-			RFLOAT cornerval = DIRECT_MULTIDIM_ELEM(Mrefs[iref], 0);
-			// Look on the central X-axis, which first and last values are NOT equal to the corner value
-			bool has_set_first=false;
-			bool has_set_last=false;
-			int last_corner=FINISHINGX(Mrefs[iref]), first_corner=STARTINGX(Mrefs[iref]);
-			for (long int j=STARTINGX(Mrefs[iref]); j<=FINISHINGX(Mrefs[iref]); j++)
+			RFLOAT sumr=0.;
+			for (int iref = 0; iref < Mrefs.size(); iref++)
 			{
-				if (!has_set_first)
+				RFLOAT cornerval = DIRECT_MULTIDIM_ELEM(Mrefs[iref], 0);
+				// Look on the central X-axis, which first and last values are NOT equal to the corner value
+				bool has_set_first=false;
+				bool has_set_last=false;
+				int last_corner=FINISHINGX(Mrefs[iref]), first_corner=STARTINGX(Mrefs[iref]);
+				for (long int j=STARTINGX(Mrefs[iref]); j<=FINISHINGX(Mrefs[iref]); j++)
 				{
-					if (fabs(A3D_ELEM(Mrefs[iref], 0,0,j) - cornerval) > 1e-6)
+					if (!has_set_first)
 					{
-						first_corner = j;
-						has_set_first = true;
+						if (fabs(A3D_ELEM(Mrefs[iref], 0,0,j) - cornerval) > 1e-6)
+						{
+							first_corner = j;
+							has_set_first = true;
+						}
+					}
+					else if (!has_set_last)
+					{
+						if (fabs(A3D_ELEM(Mrefs[iref], 0,0,j) - cornerval) < 1e-6)
+						{
+							last_corner = j - 1;
+							has_set_last = true;
+						}
 					}
 				}
-				else if (!has_set_last)
-				{
-					if (fabs(A3D_ELEM(Mrefs[iref], 0,0,j) - cornerval) < 1e-6)
-					{
-						last_corner = j - 1;
-						has_set_last = true;
-					}
-				}
+				sumr += (last_corner - first_corner);
 			}
-			sumr += (last_corner - first_corner);
+			particle_diameter = sumr / Mrefs.size();
+			// diameter is in Angstroms
+			particle_diameter *= angpix_ref;
+			if (verb>0)
+			{
+				std::cout << " + Automatically set the background diameter to " << particle_diameter << " Angstrom" << std::endl;
+				std::cout << " + You can override this by providing --particle_diameter (in Angstroms)" << std::endl;
+			}
 		}
-		particle_diameter = sumr / Mrefs.size();
-		// diameter is in Angstroms
-		particle_diameter *= angpix_ref;
-		if (verb>0)
+
+		if (fabs(angpix_ref - angpix) > 1e-3)
 		{
-			std::cout << " + Automatically set the background diameter to " << particle_diameter << " Angstrom" << std::endl;
-			std::cout << " + You can override this by providing --particle_diameter (in Angstroms)" << std::endl;
+			int halfoldsize = XSIZE(Mrefs[0]) / 2;
+			int newsize = ROUND(halfoldsize * (angpix_ref/angpix));
+			newsize *= 2;
+			RFLOAT rescale_greyvalue = 1.;
+			// If the references came from downscaled particles, then those were normalised differently
+			// (the stddev is N times smaller after downscaling N times)
+			// This needs to be corrected again
+			RFLOAT rescale_factor = 1.;
+			if (newsize > XSIZE(Mrefs[0]))
+				rescale_factor *= (RFLOAT)(XSIZE(Mrefs[0]))/(RFLOAT)newsize;
+			for (int iref = 0; iref < Mrefs.size(); iref++)
+			{
+				resizeMap(Mrefs[iref], newsize);
+				Mrefs[iref] *= rescale_factor;
+				Mrefs[iref].setXmippOrigin();
+			}
 		}
-	}
 
-	if (fabs(angpix_ref - angpix) > 1e-3)
-	{
-		int halfoldsize = XSIZE(Mrefs[0]) / 2;
-		int newsize = ROUND(halfoldsize * (angpix_ref/angpix));
-		newsize *= 2;
-		RFLOAT rescale_greyvalue = 1.;
-		// If the references came from downscaled particles, then those were normalised differently
-		// (the stddev is N times smaller after downscaling N times)
-		// This needs to be corrected again
-		RFLOAT rescale_factor = 1.;
-		if (newsize > XSIZE(Mrefs[0]))
-			rescale_factor *= (RFLOAT)(XSIZE(Mrefs[0]))/(RFLOAT)newsize;
-		for (int iref = 0; iref < Mrefs.size(); iref++)
+		// Get particle boxsize from the input reference images
+		particle_size = XSIZE(Mrefs[0]);
+
+		if (particle_diameter > particle_size * angpix_ref)
 		{
-			resizeMap(Mrefs[iref], newsize);
-			Mrefs[iref] *= rescale_factor;
-			Mrefs[iref].setXmippOrigin();
+			std::cerr << " particle_diameter (A): " << particle_diameter << " box_size (pix): " << particle_size << " pixel size (A): " << angpix_ref << std::endl;
+			REPORT_ERROR("ERROR: the particle diameter is larger than the size of the box.");
 		}
-	}
-
-	// Get particle boxsize from the input reference images
-	particle_size = XSIZE(Mrefs[0]);
-
-	if (particle_diameter > particle_size * angpix_ref)
-	{
-		std::cerr << " particle_diameter (A): " << particle_diameter << " box_size (pix): " << particle_size << " pixel size (A): " << angpix_ref << std::endl;
-		REPORT_ERROR("ERROR: the particle diameter is larger than the size of the box.");
-	}
 
 
-	if ( (verb > 0) && (autopick_helical_segments))
-	{
-		std::cout << " + Helical tube diameter = " << helical_tube_diameter << " Angstroms " << std::endl;
-		std::cout << " + Helical tube diameter should be smaller than the particle (background) diameter" << std::endl;
-	}
-	if ( (autopick_helical_segments) && (helical_tube_diameter > particle_diameter) )
-		REPORT_ERROR("Error: Helical tube diameter should be smaller than the particle (background) diameter!");
+		if ( (verb > 0) && (autopick_helical_segments))
+		{
+			std::cout << " + Helical tube diameter = " << helical_tube_diameter << " Angstroms " << std::endl;
+			std::cout << " + Helical tube diameter should be smaller than the particle (background) diameter" << std::endl;
+		}
+		if ( (autopick_helical_segments) && (helical_tube_diameter > particle_diameter) )
+			REPORT_ERROR("Error: Helical tube diameter should be smaller than the particle (background) diameter!");
 
 
-	// Get the squared particle radius (in integer pixels)
-	particle_radius2 = ROUND(particle_diameter/(2. * angpix));
-	particle_radius2 -= decrease_radius;
-	particle_radius2*= particle_radius2;
+		// Get the squared particle radius (in integer pixels)
+		particle_radius2 = ROUND(particle_diameter/(2. * angpix));
+		particle_radius2 -= decrease_radius;
+		particle_radius2*= particle_radius2;
 #ifdef DEBUG
-	std::cerr << " particle_size= " << particle_size << " sqrt(particle_radius2)= " << sqrt(particle_radius2) << std::endl;
+		std::cerr << " particle_size= " << particle_size << " sqrt(particle_radius2)= " << sqrt(particle_radius2) << std::endl;
 #endif
-	// Invert references if necessary (do this AFTER automasking them!)
-	if (do_invert)
-	{
-		for (int iref = 0; iref < Mrefs.size(); iref++)
+		// Invert references if necessary (do this AFTER automasking them!)
+		if (do_invert)
 		{
-			Mrefs[iref] *= -1.;
+			for (int iref = 0; iref < Mrefs.size(); iref++)
+			{
+				Mrefs[iref] *= -1.;
+			}
 		}
-	}
+
+	} // end if !do_LoG
 
 	// Get micrograph_size
 	Image<RFLOAT> Imic;
@@ -529,7 +581,7 @@ void AutoPicker::initialise()
 #endif
 
 	// Pre-calculate and store Projectors for all references at the right size
-	if (!do_read_fom_maps)
+	if (!do_read_fom_maps && !do_LoG)
 	{
 		if (verb > 0)
 		{
@@ -683,7 +735,10 @@ void AutoPicker::run()
 #ifdef TIMING
 		timer.tic(TIMING_A5);
 #endif
-		autoPickOneMicrograph(fn_micrographs[imic], imic);
+		if (do_LoG)
+			autoPickLoGOneMicrograph(fn_micrographs[imic], imic);
+		else
+			autoPickOneMicrograph(fn_micrographs[imic], imic);
 #ifdef TIMING
 		timer.toc(TIMING_A5);
 #endif
@@ -696,6 +751,7 @@ void AutoPicker::run()
 
 void AutoPicker::pickCCFPeaks(
 		const MultidimArray<RFLOAT>& Mccf,
+		const MultidimArray<RFLOAT>& Mstddev,
 		const MultidimArray<int>& Mclass,
 		RFLOAT threshold_value,
 		int peak_r_min,
@@ -753,6 +809,10 @@ void AutoPicker::pickCCFPeaks(
 	{
 		for (int jj = FIRST_XMIPP_INDEX(new_micrograph_xsize) + skip_side; jj <= LAST_XMIPP_INDEX(new_micrograph_xsize) - skip_side; jj++)
 		{
+			// Only check stddev in the noise areas if max_stddev_noise is positive!
+			if (max_stddev_noise > 0. && A2D_ELEM(Mstddev, ii, jj) > max_stddev_noise)
+				continue;
+
 			RFLOAT fom = A2D_ELEM(Mccf, ii, jj);
 			nr_pixels++;
 			if (fom > threshold_value)
@@ -774,7 +834,12 @@ void AutoPicker::pickCCFPeaks(
 		return;
 	}
 	ratio = ((RFLOAT)(ccf_pixel_list.size())) / ((RFLOAT)(nr_pixels));
-	if (ratio > 0.1)
+#ifdef DEBUG_HELIX
+	std::cout << " ratio= " << ratio << std::endl;
+#endif
+	// Sjors changed ratio threshold to 0.5 on 21nov2017 for tau filaments
+	//if (ratio > 0.1)
+	if (ratio > 0.5)
 	{
 		ccf_peak_list.clear();
 		return;
@@ -810,8 +875,9 @@ void AutoPicker::pickCCFPeaks(
 		ccf_peak_small.clear();
 		ccf_peak_big.clear();
 		rmax_max = ROUND(particle_diameter_pix / 2.); // Sep29,2015 ????????????
-		if (rmax_max < 100)
-			rmax_max = 100;
+		// Sjors 21nov2017 try to adapt for tau fibrils ....
+		//if (rmax_max < 100)
+		//	rmax_max = 100;
 		for (rmax = rmax_min; rmax < rmax_max; rmax++)
 		{
 			// Record the smaller peak
@@ -861,7 +927,7 @@ void AutoPicker::pickCCFPeaks(
 				if (ccf_peak_big.refresh() == false)
 				{
 					//std::cout << " x_old, y_old = " << x_old << ", " << y_old << std::endl;
-					//REPORT_ERROR("autopicker.cpp::pickCCFPeaks(): BUG No ccf pixels found within the small circle!");
+					//REPORT_ERROR("autopicker.cpp::CFFPeaks(): BUG No ccf pixels found within the small circle!");
 					break;
 				}
 				x_new = ROUND(ccf_peak_big.x);
@@ -1748,6 +1814,281 @@ void AutoPicker::exportHelicalTubes(
 	return;
 }
 
+void AutoPicker::autoPickLoGOneMicrograph(FileName &fn_mic, long int imic)
+{
+	Image<RFLOAT> Imic;
+	MultidimArray<Complex > Fmic, Faux;
+	FourierTransformer transformer;
+	MultidimArray<float> Mbest_size, Mbest_fom;
+	float scale = (float)workSize / (float)micrograph_size;
+
+	Mbest_size.resize(workSize, workSize);
+	Mbest_size.initConstant(-999.);
+	Mbest_size.setXmippOrigin();
+	Mbest_fom.resize(workSize, workSize);
+	Mbest_fom.initConstant(-999.);
+	Mbest_fom.setXmippOrigin();
+
+	if (!do_read_fom_maps)
+	{
+		// Always use the same random seed
+		init_random_generator(random_seed + imic);
+
+		// Read in the micrograph
+		Imic.read(fn_mic);
+		Imic().setXmippOrigin();
+
+		// Let's just check the square size again....
+		RFLOAT my_size, my_xsize, my_ysize;
+		my_xsize = XSIZE(Imic());
+		my_ysize = YSIZE(Imic());
+		my_size = (my_xsize != my_ysize) ? XMIPP_MAX(my_xsize, my_ysize) : my_xsize;
+
+		if (my_size != micrograph_size || my_xsize != micrograph_xsize || my_ysize != micrograph_ysize)
+		{
+			Imic().printShape();
+			std::cerr << " micrograph_size= " << micrograph_size << " micrograph_xsize= " << micrograph_xsize << " micrograph_ysize= " << micrograph_ysize << std::endl;
+			REPORT_ERROR("AutoPicker::autoPickOneMicrograph ERROR: No differently sized micrographs are allowed in one run, sorry you will have to run separately for each size...");
+		}
+
+		// Set mean to zero and stddev to 1 to prevent numerical problems with one-sweep stddev calculations....
+		RFLOAT avg0, stddev0, minval0, maxval0;
+		Imic().computeStats(avg0, stddev0, minval0, maxval0);
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Imic())
+		{
+			// Remove pixel values that are too far away from the mean
+			if ( ABS(DIRECT_MULTIDIM_ELEM(Imic(), n) - avg0) / stddev0 > outlier_removal_zscore)
+				DIRECT_MULTIDIM_ELEM(Imic(), n) = avg0;
+
+			DIRECT_MULTIDIM_ELEM(Imic(), n) = (DIRECT_MULTIDIM_ELEM(Imic(), n) - avg0) / stddev0;
+		}
+
+		// Have positive LoG maps
+		if (!LoG_invert)
+			Imic() *= -1.;
+
+		if (micrograph_xsize != micrograph_ysize)
+		{
+			// Window non-square micrographs to be a square with the largest side
+			rewindow(Imic, micrograph_size);
+
+			// Fill region outside the original window with white Gaussian noise to prevent all-zeros in Mstddev
+			FOR_ALL_ELEMENTS_IN_ARRAY2D(Imic())
+			{
+				if (i < FIRST_XMIPP_INDEX(micrograph_ysize)
+						|| i > LAST_XMIPP_INDEX(micrograph_ysize)
+						|| j < FIRST_XMIPP_INDEX(micrograph_xsize)
+						|| j > LAST_XMIPP_INDEX(micrograph_xsize) )
+					A2D_ELEM(Imic(), i, j) = rnd_gaus(0.,1.);
+			}
+		}
+
+		// Fourier Transform (and downscale) Imic()
+		transformer.FourierTransform(Imic(), Faux);
+
+		// Use downsized FFTs
+		windowFourierTransform(Faux, Fmic, workSize);
+
+		Image<RFLOAT> Maux(workSize, workSize);
+
+		// Make the diameter of the LoG filter larger in steps of LoG_incr_search (=1.5)
+		// Search sizes from LoG_min_diameter to LoG_max_search (=5) * LoG_max_diameter
+		for (int i = 0; i < diams_LoG.size(); i++)
+		{
+			RFLOAT myd = diams_LoG[i];
+
+			Faux = Fmic;
+			LoGFilterMap(Faux, micrograph_size, myd, angpix);
+			transformer.inverseFourierTransform(Faux, Maux());
+
+			if (do_write_fom_maps)
+			{
+				// TMP output
+				FileName fn_tmp=getOutputRootName(fn_mic)+"_"+fn_out+"_LoG"+integerToString(ROUND(myd))+".spi";
+				Maux.write(fn_tmp);
+			}
+
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Maux())
+			{
+				if (DIRECT_MULTIDIM_ELEM(Maux(), n) > DIRECT_MULTIDIM_ELEM(Mbest_fom, n))
+				{
+					DIRECT_MULTIDIM_ELEM(Mbest_fom, n) = DIRECT_MULTIDIM_ELEM(Maux(), n);
+					DIRECT_MULTIDIM_ELEM(Mbest_size, n) = myd;
+				}
+			}
+
+		}
+
+	} // end if !do_read_fom_maps
+	else
+	{
+		Image<RFLOAT> Maux;
+
+		// Read back in pre-calculated LoG maps
+		for (int i = 0; i < diams_LoG.size(); i++)
+		{
+			RFLOAT myd = diams_LoG[i];
+
+			// TMP output
+			FileName fn_tmp=getOutputRootName(fn_mic)+"_"+fn_out+"_LoG"+integerToString(ROUND(myd))+".spi";
+			Maux.read(fn_tmp);
+
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Maux())
+			{
+				if (DIRECT_MULTIDIM_ELEM(Maux(), n) > DIRECT_MULTIDIM_ELEM(Mbest_fom, n))
+				{
+					DIRECT_MULTIDIM_ELEM(Mbest_fom, n) = DIRECT_MULTIDIM_ELEM(Maux(), n);
+					DIRECT_MULTIDIM_ELEM(Mbest_size, n) = myd;
+				}
+			}
+
+		}
+	}
+
+	Image<float> Maux2;
+	FileName fn_tmp;
+	if (do_write_fom_maps)
+	{
+		Maux2() = Mbest_fom;
+		fn_tmp=getOutputRootName(fn_mic)+"_"+fn_out+"_bestLoG.spi";
+		Maux2.write(fn_tmp);
+		Maux2() = Mbest_size;
+		fn_tmp=getOutputRootName(fn_mic)+"_"+fn_out+"_bestSize.spi";
+		Maux2.write(fn_tmp);
+	}
+
+	// Skip the sides if necessary
+	int my_skip_side = (int)((float)autopick_skip_side*scale);
+	if (my_skip_side > 0)
+	{
+		MultidimArray<float> Mbest_fom_new(Mbest_fom);
+		Mbest_fom_new.initZeros();
+		for (int i = FIRST_XMIPP_INDEX((int)((float)micrograph_ysize*scale)) + my_skip_side; i <= LAST_XMIPP_INDEX((int)((float)micrograph_ysize*scale)) - my_skip_side; i++)
+		{
+			for (int j = FIRST_XMIPP_INDEX((int)((float)micrograph_xsize*scale)) + my_skip_side; j <= LAST_XMIPP_INDEX((int)((float)micrograph_xsize*scale)) - my_skip_side; j++)
+			{
+				A2D_ELEM(Mbest_fom_new, i, j) = A2D_ELEM(Mbest_fom, i, j);
+			}
+		}
+		Mbest_fom = Mbest_fom_new;
+	}
+
+	// See which pixels have the best diameters within the desired diameter range
+	// Also store average and stddev of FOMs outside that range, in order to idea of the noise in the FOMs
+	RFLOAT sum_fom_low = 0.;
+	RFLOAT sum_fom_high = 0.;
+	RFLOAT sum_fom_ok = 0.;
+	RFLOAT sum2_fom_low = 0.;
+	RFLOAT sum2_fom_high = 0.;
+	RFLOAT sum2_fom_ok = 0.;
+	RFLOAT count_low = 0.;
+	RFLOAT count_high = 0.;
+	RFLOAT count_ok = 0.;
+	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mbest_size)
+	{
+		if (DIRECT_MULTIDIM_ELEM(Mbest_size, n) > LoG_max_diameter )
+		{
+			sum_fom_high += DIRECT_MULTIDIM_ELEM(Mbest_fom, n);
+			sum2_fom_high += DIRECT_MULTIDIM_ELEM(Mbest_fom, n)*DIRECT_MULTIDIM_ELEM(Mbest_fom, n);
+			count_high += 1.;
+			DIRECT_MULTIDIM_ELEM(Mbest_fom, n) = 0.;
+		}
+		else if (DIRECT_MULTIDIM_ELEM(Mbest_size, n) < LoG_min_diameter)
+		{
+			sum_fom_low += DIRECT_MULTIDIM_ELEM(Mbest_fom, n);
+			sum2_fom_low += DIRECT_MULTIDIM_ELEM(Mbest_fom, n)*DIRECT_MULTIDIM_ELEM(Mbest_fom, n);
+			count_low += 1.;
+			DIRECT_MULTIDIM_ELEM(Mbest_fom, n) = 0.;
+		}
+		else
+		{
+			sum_fom_ok += DIRECT_MULTIDIM_ELEM(Mbest_fom, n);
+			sum2_fom_ok += DIRECT_MULTIDIM_ELEM(Mbest_fom, n)*DIRECT_MULTIDIM_ELEM(Mbest_fom, n);
+			count_ok += 1.;
+		}
+	}
+
+	if (do_write_fom_maps)
+	{
+		Maux2() = Mbest_fom;
+		fn_tmp=getOutputRootName(fn_mic)+"_"+fn_out+"_bestLoGb.spi";
+		Maux2.write(fn_tmp);
+	}
+
+	// Average of FOMs outside desired diameter range
+	RFLOAT sum_fom_outside = (sum_fom_low + sum_fom_high) / (count_low +  count_high);
+	sum_fom_low /= count_low;
+	sum_fom_high /= count_high;
+	sum_fom_ok /= count_ok;
+	// Variance of FOMs outside desired diameter range
+	sum2_fom_low = sum2_fom_low/count_low - sum_fom_low*sum_fom_low;
+	sum2_fom_high = sum2_fom_high/count_high - sum_fom_high*sum_fom_high;
+	sum2_fom_ok = sum2_fom_ok/count_ok - sum_fom_ok*sum_fom_ok;
+	float my_threshold =  sum_fom_low - LoG_adjust_threshold * sqrt(sum2_fom_low);
+
+	std::cerr << " avg_fom_low= " << sum_fom_low << " stddev_fom_low= " << sqrt(sum2_fom_low) << " N= "<< count_low << std::endl;
+	std::cerr << " avg_fom_high= " << sum_fom_high<< " stddev_fom_high= " << sqrt(sum2_fom_high) << " N= "<< count_high << std::endl;
+	std::cerr << " avg_fom_ok= " << sum_fom_ok<< " stddev_fom_ok= " << sqrt(sum2_fom_ok) << " N= "<< count_ok<< std::endl;
+	std::cerr << " avg_fom_outside= " << sum_fom_outside << std::endl;
+	std::cerr << " my_threshold= " << my_threshold << " LoG_adjust_threshold= "<< LoG_adjust_threshold << std::endl;
+
+	// Threshold the best_fom map
+	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mbest_fom)
+	{
+		if (DIRECT_MULTIDIM_ELEM(Mbest_fom, n) < my_threshold)
+		{
+			DIRECT_MULTIDIM_ELEM(Mbest_fom, n) = 0.;
+		}
+	}
+
+	if (do_write_fom_maps)
+	{
+		Maux2() = Mbest_fom;
+		fn_tmp=getOutputRootName(fn_mic)+"_"+fn_out+"_bestLoGc.spi";
+		Maux2.write(fn_tmp);
+	}
+
+	// Now just start from the biggest peak: put a particle coordinate there, remove all neighbouring pixels within corresponding Mbest_size and loop
+	MetaDataTable MDout;
+	long int imax, jmax;
+	while (Mbest_fom.maxIndex(imax, jmax) > 0.)
+	{
+		MDout.addObject();
+		long int xx = jmax - FIRST_XMIPP_INDEX((int)((float)micrograph_xsize*scale));
+		long int yy = imax - FIRST_XMIPP_INDEX((int)((float)micrograph_ysize*scale));
+		MDout.setValue(EMDL_IMAGE_COORD_X, (RFLOAT)(xx) / scale);
+		MDout.setValue(EMDL_IMAGE_COORD_Y, (RFLOAT)(yy) / scale);
+		MDout.setValue(EMDL_PARTICLE_AUTOPICK_FOM, A2D_ELEM(Mbest_fom, imax, jmax));
+
+		// Now set all pixels of Mbest_fom within a distance of 0.5* the corresponding Mbest_size to zero
+		// Exclude a bit more radius, such that no very close neighbours are allowed: 20% more
+		long int myrad = ROUND(scale * 1.2 * A2D_ELEM(Mbest_size, imax, jmax) / 2.);
+		long int myrad2 = myrad * myrad;
+		for (long int ii = imax - myrad; ii <= imax + myrad; ii++)
+		{
+			for (long int jj = jmax - myrad; jj <= jmax + myrad; jj++)
+			{
+				long int r2 = (imax - ii)*(imax - ii) + (jmax - jj)*(jmax - jj);
+				if (r2 < myrad2 && ii >= STARTINGY(Mbest_fom) && jj >= STARTINGX(Mbest_fom) &&
+						ii <= FINISHINGY(Mbest_fom) && jj <= FINISHINGX(Mbest_fom))
+					A2D_ELEM(Mbest_fom, ii, jj) = 0.;
+			}
+		}
+
+	}
+
+	std::cerr << "Picked " << MDout.numberOfObjects() << " of particles " << std::endl;
+	fn_tmp = getOutputRootName(fn_mic) + "_" + fn_out + ".star";
+	MDout.write(fn_tmp);
+
+
+}
+
+
+
+
+
+
 void AutoPicker::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 {
 
@@ -2261,7 +2602,8 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 
 		Mccf_best_combined.setXmippOrigin();
 		Mclass_best_combined.setXmippOrigin();
-		pickCCFPeaks(Mccf_best_combined, Mclass_best_combined, thres, peak_r_min, (particle_diameter / angpix),
+		Mstddev.setXmippOrigin();
+		pickCCFPeaks(Mccf_best_combined, Mstddev, Mclass_best_combined, thres, peak_r_min, (particle_diameter / angpix),
 				ccf_peak_list, Mccfplot, my_skip_side, scale);
 		extractHelicalTubes(ccf_peak_list, tube_coord_list, tube_len_list, tube_track_list,
 				(particle_diameter / angpix), helical_tube_curvature_factor_max,

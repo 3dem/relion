@@ -820,34 +820,33 @@ void JobWindow::initialiseManualpickWindow()
 }
 void JobWindow::initialiseAutopickWindow()
 {
-	setupTabs(4);
+	setupTabs(5);
 
 	tab1->begin();
 	tab1->label("I/O");
 	resetHeight();
 
 	place("fn_input_autopick", TOGGLE_DEACTIVATE);
-	place("fn_refs_autopick", TOGGLE_DEACTIVATE);
-
-	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group1->end();
-	place("do_gauss_ref", TOGGLE_DEACTIVATE, group1);
-
-	group1->begin();
-
-	place("gauss_max", TOGGLE_DEACTIVATE);
-	group1->end();
-
-	guientries["do_gauss_ref"].cb_menu_i();
-
-	// Add a little spacer
-	current_y += STEPY/2;
 	place("angpix", TOGGLE_DEACTIVATE);
-	place("particle_diameter", TOGGLE_DEACTIVATE);
+
+	current_y += STEPY/2;
+
+	place("fn_refs_autopick", TOGGLE_DEACTIVATE);
+	place("do_log", TOGGLE_DEACTIVATE);
 
 	tab1->end();
 	tab2->begin();
-	tab2->label("References");
+	tab2->label("Laplacian");
+	resetHeight();
+
+	place("log_diam", TOGGLE_DEACTIVATE);
+	place("log_diam_range", TOGGLE_DEACTIVATE);
+	place("log_maxres", TOGGLE_DEACTIVATE);
+	place("log_invert", TOGGLE_DEACTIVATE);
+
+	tab2->end();
+	tab3->begin();
+	tab3->label("References");
 	resetHeight();
 
 	//set up group
@@ -857,6 +856,7 @@ void JobWindow::initialiseAutopickWindow()
 	place("lowpass", TOGGLE_DEACTIVATE);
 	place("highpass", TOGGLE_DEACTIVATE);
 	place("angpix_ref", TOGGLE_DEACTIVATE);
+	place("particle_diameter", TOGGLE_DEACTIVATE);
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -876,9 +876,9 @@ void JobWindow::initialiseAutopickWindow()
 	group2->end();
 	guientries["do_ctf_autopick"].cb_menu_i();
 
-	tab2->end();
-	tab3->begin();
-	tab3->label("autopicking");
+	tab3->end();
+	tab4->begin();
+	tab4->label("autopicking");
 	resetHeight();
 
 	place("threshold_autopick");
@@ -896,6 +896,7 @@ void JobWindow::initialiseAutopickWindow()
 	// Set up queue groups for running tab
 	place("shrink", TOGGLE_DEACTIVATE);
 
+
 	group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
     group3->end();
     place("use_gpu", TOGGLE_LEAVE_ACTIVE, group3);
@@ -906,9 +907,9 @@ void JobWindow::initialiseAutopickWindow()
 
     guientries["use_gpu"].cb_menu_i();
 
-	tab3->end();
-	tab4->begin();
-	tab4->label("Helix");
+	tab4->end();
+	tab5->begin();
+	tab5->label("Helix");
 	resetHeight();
 
 	group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
@@ -934,7 +935,7 @@ void JobWindow::initialiseAutopickWindow()
 
 	guientries["do_pick_helical_segments"].cb_menu_i();
 
-	tab4->end();
+	tab5->end();
 
 }
 void JobWindow::initialiseExtractWindow()
