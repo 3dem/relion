@@ -254,18 +254,43 @@ if(GUI)
     
 endif(GUI)
 
-# ------------------------------------------------------------------------------FFTW--
-if(NOT MKLFFT)
-    option(FORCE_OWN_FFTW "FORCE_OWN_FFTW" OFF)
+# -------------------------------------------------------------------------------FFT--
 
-    if(NOT FORCE_OWN_FFTW)
-	FIND_PACKAGE(FFTW)
-    endif(NOT FORCE_OWN_FFTW)
+if(NOT MKLFFT)
+	option(FORCE_OWN_FFTW "FORCE_OWN_FFTW" OFF)
 	
-    if(NOT FFTW_FOUND)
-	include(${CMAKE_SOURCE_DIR}/cmake/BuildFFTW.cmake)
-    endif(NOT FFTW_FOUND)
+	if(DoublePrec_CPU OR DoublePrec_ACC)
+		set(FFTW_DOUBLE_REQUIRED TRUE)
+		message(STATUS "Double-precision FFT is required.")
+	else()
+		set(FFTW_DOUBLE_REQUIRED FALSE)
+		message(STATUS "Double-precision FFT is NOT required.")
+	endif()
+	
+	if(NOT DoublePrec_CPU OR NOT DoublePrec_ACC)
+		set(FFTW_SINGLE_REQUIRED TRUE)
+		message(STATUS "Single-precision FFT is required.")
+	else()
+		set(FFTW_SINGLE_REQUIRED FALSE)
+		message(STATUS "Single-precision FFT is NOT required.")
+	endif()
+	
+	if(NOT FORCE_OWN_FFTW)
+		if(FFTW_SINGLE_REQUIRED AND FFTW_DOUBLE_REQUIRED)
+			FIND_PACKAGE(FFTW COMPONENTS SINGLE DOUBLE)
+		elseif(FFTW_DOUBLE_REQUIRED)
+			FIND_PACKAGE(FFTW COMPONENTS DOUBLE)
+		elseif(FFTW_SINGLE_REQUIRED)
+			FIND_PACKAGE(FFTW COMPONENTS SINGLE)
+		endif()
+	endif(NOT FORCE_OWN_FFTW)
+
+	if(NOT FFTW_FOUND)
+		include(${CMAKE_SOURCE_DIR}/cmake/BuildFFTW.cmake)
+	endif(NOT FFTW_FOUND)
 endif(NOT MKLFFT)
+
+# ---------------------------------------------------------------------------SIN/COS--
 
 include(CheckCXXSymbolExists)
 check_cxx_symbol_exists(sincos    math.h   HAVE_SINCOS)
