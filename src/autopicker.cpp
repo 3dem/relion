@@ -131,7 +131,7 @@ void AutoPicker::read(int argc, char **argv)
 	LoG_diameter = textToFloat(parser.getOption("--LoG_diam", "Diameter (in Angstroms) for blob-detection by Laplacian-of-Gaussian filter", "-1"));
 	LoG_diameter_fracrange = textToFloat(parser.getOption("--LoG_diam_range", "Min and max diameter change by this fraction of the diameter above", "0.2"));
 	LoG_invert = parser.checkOption("--Log_invert", "Use this option if the particles are white instead of black");
-	LoG_adjust_threshold = textToFloat(parser.getOption("--Log_adjust_threshold", "Use this option to adjust the picking threshold: positive for more particles, negative for fewer", "0."));
+	LoG_adjust_threshold = textToFloat(parser.getOption("--LoG_adjust_threshold", "Use this option to adjust the picking threshold: positive for more particles, negative for fewer", "0."));
 
 	int helix_section = parser.addSection("Helix options");
 	autopick_helical_segments = parser.checkOption("--helix", "Are the references 2D helical segments? If so, in-plane rotation angles (psi) are estimated for the references.");
@@ -146,7 +146,7 @@ void AutoPicker::read(int argc, char **argv)
 	autopick_skip_side = textToInteger(parser.getOption("--skip_side", "Keep this many extra pixels (apart from particle_size/2) away from the edge of the micrograph ","0"));
 
 	int expert_section = parser.addSection("Expert options");
-	verb = textToInteger(parser.getOption("--verb", "Verbosity", "1"));
+	verb = textToInteger(parser.getOption("--verb", "Verbosity", "0"));
 	random_seed = textToInteger(parser.getOption("--random_seed", "Number for the random seed generator", "1"));
 	workFrac = textToFloat(parser.getOption("--shrink", "Reduce micrograph to this fraction size, during correlation calc (saves memory and time)", "1.0"));
 	LoG_max_search = textToFloat(parser.getOption("--Log_max_search", "Maximum diameter in LoG-picking multi-scale approach is this many times the min/max diameter", "5."));
@@ -2026,11 +2026,14 @@ void AutoPicker::autoPickLoGOneMicrograph(FileName &fn_mic, long int imic)
 	sum2_fom_ok = sum2_fom_ok/count_ok - sum_fom_ok*sum_fom_ok;
 	float my_threshold =  sum_fom_low - LoG_adjust_threshold * sqrt(sum2_fom_low);
 
-	std::cerr << " avg_fom_low= " << sum_fom_low << " stddev_fom_low= " << sqrt(sum2_fom_low) << " N= "<< count_low << std::endl;
-	std::cerr << " avg_fom_high= " << sum_fom_high<< " stddev_fom_high= " << sqrt(sum2_fom_high) << " N= "<< count_high << std::endl;
-	std::cerr << " avg_fom_ok= " << sum_fom_ok<< " stddev_fom_ok= " << sqrt(sum2_fom_ok) << " N= "<< count_ok<< std::endl;
-	std::cerr << " avg_fom_outside= " << sum_fom_outside << std::endl;
-	std::cerr << " my_threshold= " << my_threshold << " LoG_adjust_threshold= "<< LoG_adjust_threshold << std::endl;
+	if (verb > 0)
+	{
+		std::cerr << " avg_fom_low= " << sum_fom_low << " stddev_fom_low= " << sqrt(sum2_fom_low) << " N= "<< count_low << std::endl;
+		std::cerr << " avg_fom_high= " << sum_fom_high<< " stddev_fom_high= " << sqrt(sum2_fom_high) << " N= "<< count_high << std::endl;
+		std::cerr << " avg_fom_ok= " << sum_fom_ok<< " stddev_fom_ok= " << sqrt(sum2_fom_ok) << " N= "<< count_ok<< std::endl;
+		std::cerr << " avg_fom_outside= " << sum_fom_outside << std::endl;
+		std::cerr << " my_threshold= " << my_threshold << " LoG_adjust_threshold= "<< LoG_adjust_threshold << std::endl;
+	}
 
 	// Threshold the best_fom map
 	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mbest_fom)
@@ -2077,7 +2080,8 @@ void AutoPicker::autoPickLoGOneMicrograph(FileName &fn_mic, long int imic)
 
 	}
 
-	std::cerr << "Picked " << MDout.numberOfObjects() << " of particles " << std::endl;
+	if (verb > 0)
+		std::cerr << "Picked " << MDout.numberOfObjects() << " of particles " << std::endl;
 	fn_tmp = getOutputRootName(fn_mic) + "_" + fn_out + ".star";
 	MDout.write(fn_tmp);
 
