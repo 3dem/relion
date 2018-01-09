@@ -974,8 +974,9 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 		MultidimArray<RFLOAT> Mccfplot;
 
 		Mccf_best_combined.setXmippOrigin();
+		Mstddev.setXmippOrigin();
 		Mclass_best_combined.setXmippOrigin();
-		basePckr->pickCCFPeaks(Mccf_best_combined, Mclass_best_combined, thres, peak_r_min, (basePckr->particle_diameter / basePckr->angpix),
+		basePckr->pickCCFPeaks(Mccf_best_combined, Mstddev, Mclass_best_combined, thres, peak_r_min, (basePckr->particle_diameter / basePckr->angpix),
 				ccf_peak_list, Mccfplot, my_skip_side, scale);
 		basePckr->extractHelicalTubes(ccf_peak_list, tube_coord_list, tube_len_list, tube_track_list,
 				(basePckr->particle_diameter / basePckr->angpix), basePckr->helical_tube_curvature_factor_max,
