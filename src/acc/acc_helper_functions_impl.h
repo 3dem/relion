@@ -212,14 +212,14 @@ void generateEulerMatrices(
 	    A(2, 1) = ss;
 	    A(2, 2) = cb;
 
-		if(inverse)
-			A = A.transpose();
-
 		if (doL)
 			A = L * A;
 
 		if (doR)
 			A = A * R;
+
+		if(inverse)
+			A = A.transpose();
 
 		for (int m = 0; m < 3; m ++)
 			for (int n = 0; n < 3; n ++)
