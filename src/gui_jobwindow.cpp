@@ -394,130 +394,108 @@ void JobWindow::updateMyJob()
 
 }
 
-void JobWindow::initialise(int my_job_type, bool _do_oldstyle)
+void JobWindow::initialise(std::string my_job_type, bool _do_oldstyle)
 {
 
 	do_oldstyle = _do_oldstyle;
-	switch (my_job_type)
-	{
-	case PROC_IMPORT:
+	if (my_job_type == PROC_IMPORT)
 	{
 		myjob.initialise(my_job_type);
 		initialiseImportWindow();
-		break;
 	}
-	case PROC_MOTIONCORR:
+	else if (my_job_type == PROC_MOTIONCORR)
 	{
 		myjob.initialise(my_job_type);
 		initialiseMotioncorrWindow();
-		break;
 	}
-	case PROC_CTFFIND:
+	else if (my_job_type == PROC_CTFFIND)
 	{
 		myjob.initialise(my_job_type);
 		initialiseCtffindWindow();
-		break;
 	}
-	case PROC_MANUALPICK:
+	else if (my_job_type == PROC_MANUALPICK)
 	{
 		myjob.initialise(my_job_type);
 		initialiseManualpickWindow();
-		break;
 	}
-	case PROC_AUTOPICK:
+	else if (my_job_type == PROC_AUTOPICK)
 	{
 		myjob.initialise(my_job_type);
 		initialiseAutopickWindow();
-		break;
 	}
-	case PROC_EXTRACT:
+	else if (my_job_type == PROC_EXTRACT)
 	{
 		myjob.initialise(my_job_type);
 		initialiseExtractWindow();
-		break;
 	}
-	case PROC_SORT:
+	else if (my_job_type == PROC_SORT)
 	{
 		myjob.initialise(my_job_type);
 		initialiseSortWindow();
-		break;
 	}
-	case PROC_CLASSSELECT:
+	else if (my_job_type == PROC_CLASSSELECT)
 	{
 		myjob.initialise(my_job_type);
 		initialiseSelectWindow();
-		break;
 	}
-	case PROC_2DCLASS:
+	else if (my_job_type == PROC_2DCLASS)
 	{
 		myjob.initialise(my_job_type);
 		initialiseClass2DWindow();
-		break;
 	}
-	case PROC_INIMODEL:
+	else if (my_job_type == PROC_INIMODEL)
 	{
 		myjob.initialise(my_job_type);
 		initialiseInimodelWindow();
-		break;
 	}
-	case PROC_3DCLASS:
+	else if (my_job_type == PROC_3DCLASS)
 	{
 		myjob.initialise(my_job_type);
 		initialiseClass3DWindow();
-		break;
 	}
-	case PROC_3DAUTO:
+	else if (my_job_type == PROC_3DAUTO)
 	{
 		myjob.initialise(my_job_type);
 		initialiseAutorefineWindow();
-		break;
 	}
-	case PROC_MOVIEREFINE:
+	else if (my_job_type == PROC_MOVIEREFINE)
 	{
 		myjob.initialise(my_job_type);
 		initialiseMovierefineWindow();
-		break;
 	}
-	case PROC_POLISH:
+	else if (my_job_type == PROC_POLISH)
 	{
 		myjob.initialise(my_job_type);
 		initialisePolishWindow();
-		break;
 	}
-	case PROC_MASKCREATE:
+	else if (my_job_type == PROC_MASKCREATE)
 	{
 		myjob.initialise(my_job_type);
 		initialiseMaskcreateWindow();
-		break;
 	}
-	case PROC_JOINSTAR:
+	else if (my_job_type == PROC_JOINSTAR)
 	{
 		myjob.initialise(my_job_type);
 		initialiseJoinstarWindow();
-		break;
 	}
-	case PROC_SUBTRACT:
+	else if (my_job_type == PROC_SUBTRACT)
 	{
 		myjob.initialise(my_job_type);
 		initialiseSubtractWindow();
-		break;
 	}
-	case PROC_POST:
+	else if (my_job_type == PROC_POST)
 	{
 		myjob.initialise(my_job_type);
 		initialisePostprocessWindow();
-		break;
 	}
-	case PROC_RESMAP:
+	else if (my_job_type == PROC_RESMAP)
 	{
 		myjob.initialise(my_job_type);
 		initialiseLocresWindow();
-		break;
 	}
-	default:
+	else
 	{
 		REPORT_ERROR("ERROR: unrecognised job-type to add to the GUI");
-	}
 	}
 
 	// read settings if hidden file exists
@@ -841,8 +819,12 @@ void JobWindow::initialiseAutopickWindow()
 
 	place("log_diam", TOGGLE_DEACTIVATE);
 	place("log_diam_range", TOGGLE_DEACTIVATE);
-	place("log_maxres", TOGGLE_DEACTIVATE);
 	place("log_invert", TOGGLE_DEACTIVATE);
+
+	// Add a little spacer
+	current_y += STEPY/2;
+	place("log_maxres", TOGGLE_DEACTIVATE);
+	place("log_adjust_thr", TOGGLE_DEACTIVATE);
 
 	tab2->end();
 	tab3->begin();

@@ -69,7 +69,7 @@ public:
 	void setupTabs(int nr_tabs);
 
 	// General initialise
-	void initialise(int my_job_type, bool _do_oldstyle = false);
+	void initialise(std::string my_job_type, bool _do_oldstyle = false);
 
     void resetHeight();
 

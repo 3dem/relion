@@ -375,10 +375,9 @@ bool PipeLine::checkProcessCompletion()
 bool PipeLine::getCommandLineJob(RelionJob &thisjob, int current_job, bool is_main_continue, bool is_scheduled, bool do_makedir, std::vector<std::string> &commands,
 			std::string &final_command, std::string &error_message)
 {
-
 	// Except for continuation or scheduled jobs, all jobs get a new unique directory
 	std::string my_outputname;
-	if (is_main_continue || is_scheduled)
+	if ((is_main_continue || is_scheduled) && current_job < processList.size())
 	{
 		if (current_job < 0)
 			REPORT_ERROR("BUG: current_job < 0");
@@ -395,7 +394,7 @@ bool PipeLine::getCommandLineJob(RelionJob &thisjob, int current_job, bool is_ma
 
 	if (result && commands.size()==0)
 	{
-		error_message = " Nothing to do...";
+		error_message = " PipeLine::getCommandLineJob: Nothing to do...";
 		return false;
 	}
 
@@ -531,6 +530,7 @@ bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, boo
 	// Add the job to the pipeline, and set current_job to the new one
 	current_job = addJob(_job, mynewstatus, allow_overwrite);
 
+
 	// Write out the new pipeline
 	write(DO_LOCK);
 
@@ -563,20 +563,42 @@ bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, boo
 	return true;
 }
 
+// Adds a scheduled job to the pipeline from the command line
+void PipeLine::addScheduledJob(std::string job_type, std::string fn_options)
+{
+	RelionJob job;
+	job.initialise(job_type);
+	std::vector<std::string> options;
+	splitString(fn_options, ";", options);
+	for (long int iopt = 0; iopt < options.size(); iopt++)
+		job.setOption(options[iopt]);
+
+	// Always add Pre-processing jobs as continuation ones (for convenient on-the-fly processing)
+	if (job_type == PROC_MOTIONCORR || job_type == PROC_CTFFIND || job_type == PROC_AUTOPICK  || job_type == PROC_EXTRACT)
+		job.is_continue = true;
+
+	std::string error_message;
+	int current_job = processList.size();
+	if (!runJob(job, current_job, true, job.is_continue, false, error_message)) // true is only_schedule, false means !is_scheduled
+		REPORT_ERROR(error_message.c_str());
+
+}
+
 void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_repeat, long int minutes_wait)
 {
 
-	std::vector<long int> my_scheduled_processes;
+	std::vector<FileName> my_scheduled_processes;
 	std::vector<std::string> jobids;
+	std::cerr << " fn_jobids= " << fn_jobids << std::endl;
 	int njobs = splitString(fn_jobids, " ", jobids);
 	if (njobs == 0)
 	{
-		REPORT_ERROR("Nothing to do...");
+		REPORT_ERROR("PipeLine::runScheduledJobs: Nothing to do...");
 	}
 	else
 	{
 		for (int i = 0; i < njobs; i++)
-			my_scheduled_processes.push_back(textToInteger(jobids[i]));
+			my_scheduled_processes.push_back(jobids[i]);
 	}
 
 	FileName fn_log = "pipeline_" + name + "_" + fn_sched + ".log";
@@ -594,7 +616,7 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 	fh << " Starting a new scheduler execution called " << fn_sched << std::endl;
 	fh << " The scheduled jobs are: " << std::endl;
 	for (long int i = 0; i < my_scheduled_processes.size(); i++)
-		fh << " - " << processList[my_scheduled_processes[i]].name << std::endl;
+		fh << " - " << my_scheduled_processes[i] << std::endl;
 	fh << " Will execute the scheduled jobs " << nr_repeat << " times." << std::endl;
 	if (nr_repeat > 1)
 		fh << " Will wait until at least " << minutes_wait << " minutes have passed between each repeat." << std::endl;
@@ -613,7 +635,14 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 
 		for (long int i = 0; i < my_scheduled_processes.size(); i++)
 		{
-			int current_job = my_scheduled_processes[i];
+			int current_job = findProcessByName(my_scheduled_processes[i]);
+			if (current_job < 0)
+			{
+				// Also try finding it by alias
+				current_job = findProcessByAlias(my_scheduled_processes[i]);
+				if (current_job < 0)
+					REPORT_ERROR("ERROR: cannot find process with name: " + my_scheduled_processes[i]);
+			}
 			RelionJob myjob;
 			bool is_continue;
 			if (!myjob.read(processList[current_job].name, is_continue, true)) // true means also initialise the job
@@ -655,7 +684,7 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 					// Will we do another repeat?
 					if (repeat + 1 != nr_repeat)
 					{
-						int mytype = processList[current_job].type;
+						std::string mytype = processList[current_job].type;
 						// The following jobtypes have functionality to only do the unfinished part of the job
 						if (mytype == PROC_MOTIONCORR || mytype == PROC_CTFFIND || mytype == PROC_AUTOPICK || mytype == PROC_EXTRACT || mytype == PROC_MOVIEREFINE)
 						{
@@ -709,7 +738,8 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 		// After breaking out of repeat, set status of the jobs to finished
 		for (long int i = 0; i < my_scheduled_processes.size(); i++)
 		{
-			processList[my_scheduled_processes[i]].status = PROC_FINISHED;
+			int current_job = findProcessByName(my_scheduled_processes[i]);
+			processList[current_job].status = PROC_FINISHED;
 		}
 
 		// Write the pipeline to an updated STAR file
@@ -1606,7 +1636,6 @@ void PipeLine::read(bool do_lock)
         MDgen.getValue(EMDL_PIPELINE_JOB_COUNTER, job_counter);
     }
 
-
     MDnode.readStar(in, "pipeline_nodes");
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDnode)
 	{
@@ -1623,13 +1652,53 @@ void PipeLine::read(bool do_lock)
     MDproc.readStar(in, "pipeline_processes");
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDproc)
 	{
-		std::string name, alias;
-		int type, status;
+		std::string name, alias, type;
+		int status;
 		if (!MDproc.getValue(EMDL_PIPELINE_PROCESS_NAME, name) ||
 			!MDproc.getValue(EMDL_PIPELINE_PROCESS_ALIAS, alias) ||
 			!MDproc.getValue(EMDL_PIPELINE_PROCESS_TYPE, type) ||
 			!MDproc.getValue(EMDL_PIPELINE_PROCESS_STATUS, status)	)
 			REPORT_ERROR("PipeLine::read: cannot find name or type in pipeline_processes table");
+
+		// For compatibility with RELION-2.x
+		if (type == PROC_IMPORT2)
+			type = PROC_IMPORT;
+		else if (type == PROC_MOTIONCORR2)
+			type = PROC_MOTIONCORR;
+		else if (type == PROC_CTFFIND2)
+			type = PROC_CTFFIND;
+		else if (type == PROC_MANUALPICK2)
+			type = PROC_MANUALPICK;
+		else if (type == PROC_AUTOPICK2)
+			type = PROC_AUTOPICK;
+		else if (type == PROC_EXTRACT2)
+			type = PROC_EXTRACT;
+		else if (type == PROC_SORT2)
+			type = PROC_SORT;
+		else if (type == PROC_CLASSSELECT2)
+			type = PROC_CLASSSELECT;
+		else if (type == PROC_2DCLASS2)
+			type = PROC_2DCLASS;
+		else if (type == PROC_3DCLASS2)
+			type = PROC_3DCLASS;
+		else if (type == PROC_3DAUTO2)
+			type = PROC_3DAUTO;
+		else if (type == PROC_POLISH2)
+			type = PROC_POLISH;
+		else if (type == PROC_MASKCREATE2)
+			type = PROC_MASKCREATE;
+		else if (type == PROC_JOINSTAR2)
+			type = PROC_JOINSTAR;
+		else if (type == PROC_SUBTRACT2)
+			type = PROC_SUBTRACT;
+		else if (type == PROC_POST2)
+			type = PROC_POST;
+		else if (type == PROC_RESMAP2)
+			type = PROC_RESMAP;
+		else if (type == PROC_MOVIEREFINE2)
+			type = PROC_MOVIEREFINE;
+		else if (type == PROC_INIMODEL2)
+			type = PROC_INIMODEL;
 
 		Process newProcess(name, type, status, alias);
 		processList.push_back(newProcess);
@@ -1725,7 +1794,6 @@ void PipeLine::read(bool do_lock)
 
 void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode, std::vector<bool> deleteProcess)
 {
-
 	if (do_read_only)
 		return;
 
@@ -2074,15 +2142,12 @@ long int PipeLineFlowChart::addProcessToUpwardsFlowChart(std::ofstream &fh, Pipe
 			long int inputnode = pipeline.processList[new_process].inputNodeList[inode];
 			int mynodetype = pipeline.nodeList[inputnode].type;
 
-	        switch (pipeline.processList[new_process].type)
-	        {
-	        case PROC_AUTOPICK:
+	        if (pipeline.processList[new_process].type == PROC_AUTOPICK)
 	        {
 	        	is_right = (mynodetype == NODE_2DREFS);
 	        	right_label="2D refs";
-	            break;
 	        }
-	        case PROC_EXTRACT:
+	        else if (pipeline.processList[new_process].type == PROC_EXTRACT)
 	        {
 
 	        	// If the coordinates come from NODE_MIC_COORDS, then straight up is the CTF info
@@ -2108,43 +2173,37 @@ long int PipeLineFlowChart::addProcessToUpwardsFlowChart(std::ofstream &fh, Pipe
 					is_right = (mynodetype == NODE_MIC_COORDS);
 					right_label = "coords";
 	        	}
-	        	break;
 	        }
-	        case PROC_SORT:
+	        else if (pipeline.processList[new_process].type == PROC_SORT)
 	        {
 	        	is_right = (mynodetype == NODE_MODEL || mynodetype == NODE_2DREFS);
 	        	right_label = "refs";
-	        	break;
 	        }
-	        case PROC_3DCLASS:
+	        else if (pipeline.processList[new_process].type == PROC_3DCLASS)
 	        {
 	        	is_right = (mynodetype == NODE_3DREF);
 	        	right_label = "3D ref";
 	        	is_left = (mynodetype == NODE_MASK);
 	        	left_label = "mask";
-	        	break;
 	        }
-	        case PROC_3DAUTO:
+	        else if (pipeline.processList[new_process].type == PROC_3DAUTO)
 	        {
 	        	is_right = (mynodetype == NODE_3DREF);
 	        	right_label = "3D ref";
 	        	is_left = (mynodetype == NODE_MASK);
 	        	left_label = "mask";
-	        	break;
 	        }
-	        case PROC_MOVIEREFINE:
+	        else if (pipeline.processList[new_process].type == PROC_MOVIEREFINE)
 	        {
 	        	is_right = (mynodetype == NODE_MOVIES);
 	        	right_label = "movies";
-	        	break;
 	        }
-	        case PROC_POLISH:
+	        else if (pipeline.processList[new_process].type == PROC_POLISH)
 	        {
 	        	is_left = (mynodetype == NODE_MASK);
 	        	left_label = "mask";
-	        	break;
 	        }
-	        case PROC_JOINSTAR:
+	        else if (pipeline.processList[new_process].type == PROC_JOINSTAR)
 	        {
 	        	// For joinstar: there will be no parent process that returns a postive value!
 	        	// Thereby, joinstar will always end in the 2-4 input processes, each of for which a new flowchart will be made on a new tikZpicture
@@ -2156,33 +2215,24 @@ long int PipeLineFlowChart::addProcessToUpwardsFlowChart(std::ofstream &fh, Pipe
 	        	is_left = (inode == 1);
 	        	is_upper_right = (inode == 2);
 	        	is_upper_left = (inode == 3);
-	        	break;
 	        }
-	        case PROC_SUBTRACT:
+	        else if (pipeline.processList[new_process].type == PROC_SUBTRACT)
 	        {
 	        	is_right = (mynodetype == NODE_3DREF);
 	        	right_label = "3D ref";
 	        	is_left = (mynodetype == NODE_MASK);
 	        	left_label = "mask";
-	        	break;
 	        }
-	        case PROC_POST:
+	        else if (pipeline.processList[new_process].type == PROC_POST)
 	        {
 	        	is_left = (mynodetype == NODE_MASK);
 	        	left_label = "mask";
-	        	break;
 	        }
-	        case PROC_RESMAP:
+	        else if (pipeline.processList[new_process].type == PROC_RESMAP)
 	        {
 	        	is_left = (mynodetype == NODE_MASK);
 	        	left_label = "mask";
-	        	break;
 	        }
-	    	default:
-	    	{
-	    		break;
-	    	}
-			}
 
 			if (is_right || is_left || is_upper_right || is_upper_left)
 			{

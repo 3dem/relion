@@ -157,6 +157,12 @@ std::string JobOption::getString()
 	return value;
 }
 
+// Set a string value
+void JobOption::setString(std::string set_to)
+{
+	value = set_to;
+}
+
 // Get a numbered value
 float JobOption::getNumber()
 {
@@ -208,6 +214,35 @@ void JobOption::writeValue(std::ostream& out)
 	out << label << " == " << value << std::endl;
 }
 
+bool RelionJob::containsLabel(std::string _label, std::string &option)
+{
+	for (std::map<std::string,JobOption>::iterator it=joboptions.begin(); it!=joboptions.end(); ++it)
+	{
+		if ((it->second).label == _label)
+		{
+			option = it->first;
+			return true;
+		}
+	}
+	return false;
+}
+
+void RelionJob::setOption(std::string setOptionLine)
+{
+	std::size_t equalsigns = setOptionLine.find("==");
+	if (equalsigns == std::string::npos)
+		REPORT_ERROR(" ERROR: no '==' entry on JobOptionLine: " + setOptionLine);
+
+	std::string label, value, option;
+	label = setOptionLine.substr(0, equalsigns - 1);
+	value = setOptionLine.substr(equalsigns + 3, setOptionLine.length() - equalsigns - 3);
+
+	if (!containsLabel(label, option))
+		REPORT_ERROR(" ERROR: Job does not contain label: " + label);
+
+	joboptions[option].setString(value);
+
+}
 
 bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 {
@@ -227,9 +262,66 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 		getline(fh, line, '\n');
 		size_t idx = line.find("==");
 		idx++;
-		type = (int)textToFloat((line.substr(idx+1,line.length()-idx)).c_str());
-		if (!(type >= 0 && type < NR_BROWSE_TABS))
-			REPORT_ERROR("ERROR: cannot find job type in " + myfilename + "run.job");
+		// For compatibility with RELION-2.x
+		type = simplify((line.substr(idx+1,line.length()-idx)).c_str());
+		if (type == PROC_IMPORT2)
+			type = PROC_IMPORT;
+		else if (type == PROC_MOTIONCORR2)
+			type = PROC_MOTIONCORR;
+		else if (type == PROC_CTFFIND2)
+			type = PROC_CTFFIND;
+		else if (type == PROC_MANUALPICK2)
+			type = PROC_MANUALPICK;
+		else if (type == PROC_AUTOPICK2)
+			type = PROC_AUTOPICK;
+		else if (type == PROC_EXTRACT2)
+			type = PROC_EXTRACT;
+		else if (type == PROC_SORT2)
+			type = PROC_SORT;
+		else if (type == PROC_CLASSSELECT2)
+			type = PROC_CLASSSELECT;
+		else if (type == PROC_2DCLASS2)
+			type = PROC_2DCLASS;
+		else if (type == PROC_3DCLASS2)
+			type = PROC_3DCLASS;
+		else if (type == PROC_3DAUTO2)
+			type = PROC_3DAUTO;
+		else if (type == PROC_POLISH2)
+			type = PROC_POLISH;
+		else if (type == PROC_MASKCREATE2)
+			type = PROC_MASKCREATE;
+		else if (type == PROC_JOINSTAR2)
+			type = PROC_JOINSTAR;
+		else if (type == PROC_SUBTRACT2)
+			type = PROC_SUBTRACT;
+		else if (type == PROC_POST2)
+			type = PROC_POST;
+		else if (type == PROC_RESMAP2)
+			type = PROC_RESMAP;
+		else if (type == PROC_MOVIEREFINE2)
+			type = PROC_MOVIEREFINE;
+		else if (type == PROC_INIMODEL2)
+			type = PROC_INIMODEL;
+		else if (type != PROC_IMPORT &&
+				type != PROC_MOTIONCORR &&
+				type != PROC_CTFFIND &&
+				type != PROC_MANUALPICK &&
+				type != PROC_AUTOPICK &&
+				type != PROC_EXTRACT &&
+				type != PROC_SORT &&
+				type != PROC_CLASSSELECT &&
+				type != PROC_2DCLASS &&
+				type != PROC_3DCLASS &&
+				type != PROC_3DAUTO &&
+				type != PROC_POLISH &&
+				type != PROC_MASKCREATE &&
+				type != PROC_JOINSTAR &&
+				type != PROC_SUBTRACT &&
+				type != PROC_POST &&
+				type != PROC_RESMAP &&
+				type != PROC_MOVIEREFINE &&
+				type != PROC_INIMODEL)
+			REPORT_ERROR("ERROR: cannot find correct job type in " + myfilename + "run.job, with type= " + type);
 
 		// Get is_continue from second line
 		getline(fh, line, '\n');
@@ -488,137 +580,112 @@ bool RelionJob::prepareFinalCommand(std::string &outputname, std::vector<std::st
 
 
 // Initialise
-void RelionJob::initialise(int _job_type)
+void RelionJob::initialise(std::string _job_type)
 {
 	type = _job_type;
 
 	bool has_mpi, has_thread;
-	switch (type)
-	{
-	case PROC_IMPORT:
+	if (type == PROC_IMPORT)
 	{
 		has_mpi = has_thread = false;
 		initialiseImportJob();
-		break;
 	}
-	case PROC_MOTIONCORR:
+	else if (type == PROC_MOTIONCORR)
 	{
 		has_mpi = has_thread = true;
 		initialiseMotioncorrJob();
-		break;
 	}
-	case PROC_CTFFIND:
+	else if (type == PROC_CTFFIND)
 	{
 		has_mpi = true;
 		has_thread = false;
 		initialiseCtffindJob();
-		break;
 	}
-	case PROC_MANUALPICK:
+	else if (type == PROC_MANUALPICK)
 	{
 		has_mpi = has_thread = false;
 		initialiseManualpickJob();
-		break;
 	}
-	case PROC_AUTOPICK:
+	else if (type == PROC_AUTOPICK)
 	{
 		has_mpi = true;
 		has_thread = false;
 		initialiseAutopickJob();
-		break;
 	}
-	case PROC_EXTRACT:
+	else if (type == PROC_EXTRACT)
 	{
 		has_mpi = true;
 		has_thread = false;
 		initialiseExtractJob();
-		break;
 	}
-	case PROC_SORT:
+	else if (type == PROC_SORT)
 	{
 		has_mpi = true;
 		has_thread = false;
 		initialiseSortJob();
-		break;
 	}
-	case PROC_CLASSSELECT:
+	else if (type == PROC_CLASSSELECT)
 	{
 		has_mpi = has_thread = false;
 		initialiseSelectJob();
-		break;
 	}
-	case PROC_2DCLASS:
+	else if (type == PROC_2DCLASS)
 	{
 		has_mpi = has_thread = true;
 		initialiseClass2DJob();
-		break;
 	}
-	case PROC_INIMODEL:
+	else if (type == PROC_INIMODEL)
 	{
 		has_mpi = has_thread = true;
 		initialiseInimodelJob();
-		break;
 	}
-	case PROC_3DCLASS:
+	else if (type == PROC_3DCLASS)
 	{
 		has_mpi = has_thread = true;
 		initialiseClass3DJob();
-		break;
 	}
-	case PROC_3DAUTO:
+	else if (type == PROC_3DAUTO)
 	{
 		has_mpi = has_thread = true;
 		initialiseAutorefineJob();
-		break;
 	}
-	case PROC_MOVIEREFINE:
+	else if (type == PROC_MOVIEREFINE)
 	{
 		has_mpi = has_thread = true;
 		initialiseMovierefineJob();
-		break;
 	}
-	case PROC_POLISH:
+	else if (type == PROC_POLISH)
 	{
 		has_mpi = has_thread = true;
 		initialisePolishJob();
-		break;
 	}
-	case PROC_MASKCREATE:
+	else if (type == PROC_MASKCREATE)
 	{
 		has_mpi = has_thread = false;
 		initialiseMaskcreateJob();
-		break;
 	}
-	case PROC_JOINSTAR:
+	else if (type == PROC_JOINSTAR)
 	{
 		has_mpi = has_thread = false;
 		initialiseJoinstarJob();
-		break;
 	}
-	case PROC_SUBTRACT:
+	else if (type == PROC_SUBTRACT)
 	{
 		has_mpi = has_thread = false;
 		initialiseSubtractJob();
-		break;
 	}
-	case PROC_POST:
+	else if (type == PROC_POST)
 	{
 		has_mpi = has_thread = false;
 		initialisePostprocessJob();
-		break;
 	}
-	case PROC_RESMAP:
+	else if (type == PROC_RESMAP)
 	{
 		has_mpi = has_thread = true;
 		initialiseLocalresJob();
-		break;
 	}
-	default:
-	{
+	else
 		REPORT_ERROR("ERROR: unrecognised job-type");
-	}
-	}
-
 
 	if (has_mpi)
 		joboptions["nr_mpi"] = JobOption("Number of MPI procs:", 1, 1, 64, 1, "Number of MPI nodes to use in parallel. When set to 1, MPI will not be used.");
@@ -704,107 +771,85 @@ bool RelionJob::getCommands(std::string &outputname, std::vector<std::string> &c
 
 	bool result = false;
 
-	switch (type)
-	{
-	case PROC_IMPORT:
+	if (type == PROC_IMPORT)
 	{
 		result = getCommandsImportJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
-		break;
 	}
-	case PROC_MOTIONCORR:
+	else if (type == PROC_MOTIONCORR)
 	{
 		result = getCommandsMotioncorrJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
-		break;
 	}
-	case PROC_CTFFIND:
+	else if (type == PROC_CTFFIND)
 	{
 		result = getCommandsCtffindJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
-		break;
 	}
-	case PROC_MANUALPICK:
+	else if (type == PROC_MANUALPICK)
 	{
 		result = getCommandsManualpickJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
-		break;
 	}
-	case PROC_AUTOPICK:
+	else if (type == PROC_AUTOPICK)
 	{
 		result = getCommandsAutopickJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
-		break;
 	}
-	case PROC_EXTRACT:
+	else if (type == PROC_EXTRACT)
 	{
 		result = getCommandsExtractJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
-		break;
 	}
-	case PROC_SORT:
+	else if (type == PROC_SORT)
 	{
 		result = getCommandsSortJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
-		break;
 	}
-	case PROC_CLASSSELECT:
+	else if (type == PROC_CLASSSELECT)
 	{
 		result = getCommandsSelectJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
-		break;
 	}
-	case PROC_2DCLASS:
+	else if (type == PROC_2DCLASS)
 	{
 		result = getCommandsClass2DJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
-		break;
 	}
-	case PROC_INIMODEL:
+	else if (type == PROC_INIMODEL)
 	{
 		result = getCommandsInimodelJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
-		break;
 	}
-	case PROC_3DCLASS:
+	else if (type == PROC_3DCLASS)
 	{
 		result = getCommandsClass3DJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
-		break;
 	}
-	case PROC_3DAUTO:
+	else if (type == PROC_3DAUTO)
 	{
 		result = getCommandsAutorefineJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
-		break;
 	}
-	case PROC_MOVIEREFINE:
+	else if (type == PROC_MOVIEREFINE)
 	{
 		result = getCommandsMovierefineJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
-		break;
 	}
-	case PROC_POLISH:
+	else if (type == PROC_POLISH)
 	{
 		result = getCommandsPolishJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
-		break;
 	}
-	case PROC_MASKCREATE:
+	else if (type == PROC_MASKCREATE)
 	{
 		result = getCommandsMaskcreateJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
-		break;
 	}
-	case PROC_JOINSTAR:
+	else if (type == PROC_JOINSTAR)
 	{
 		result = getCommandsJoinstarJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
-		break;
 	}
-	case PROC_SUBTRACT:
+	else if (type == PROC_SUBTRACT)
 	{
 		result = getCommandsSubtractJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
-		break;
 	}
-	case PROC_POST:
+	else if (type == PROC_POST)
 	{
 		result = getCommandsPostprocessJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
-		break;
 	}
-	case PROC_RESMAP:
+	else if (type == PROC_RESMAP)
 	{
 		result = getCommandsLocalresJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
-		break;
 	}
-	default:
+	else
 	{
 		REPORT_ERROR("ERROR: unrecognised job-type");
-	}
 	}
 
 	return result;
@@ -834,7 +879,7 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 {
 
 	commands.clear();
-	initialisePipeline(outputname, "Import", job_counter);
+	initialisePipeline(outputname, PROC_IMPORT, job_counter);
 
 	commands.push_back("echo importing...");
 
@@ -1042,7 +1087,7 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
 	commands.clear();
-	initialisePipeline(outputname, "MotionCorr", job_counter);
+	initialisePipeline(outputname, PROC_MOTIONCORR, job_counter);
 
 	std::string command;
 	if (joboptions["nr_mpi"].getNumber() > 1)
@@ -1209,7 +1254,7 @@ bool RelionJob::getCommandsCtffindJob(std::string &outputname, std::vector<std::
 {
 
 	commands.clear();
-	initialisePipeline(outputname, "CtfFind", job_counter);
+	initialisePipeline(outputname, PROC_CTFFIND, job_counter);
 	std::string command;
 
 	FileName fn_outstar = outputname + "micrographs_ctf.star";
@@ -1342,7 +1387,7 @@ bool RelionJob::getCommandsManualpickJob(std::string &outputname, std::vector<st
 {
 
 	commands.clear();
-	initialisePipeline(outputname, "ManualPick", job_counter);
+	initialisePipeline(outputname, PROC_MANUALPICK, job_counter);
 	std::string command;
 
 	command="`which relion_manualpick`";
@@ -1429,6 +1474,7 @@ void RelionJob::initialiseAutopickJob()
 	joboptions["log_diam_range"] = JobOption("Variation in diameter", 0.2, 0, 1, 0.05, "The minimum and maximum diameter for the blob-detection algorithm are calculated as (1 -/+ this_param) x the diameter above. Increase this values if some views of your particles are much larger than others. Allowed range: <0,1>");
 	joboptions["log_invert"] = JobOption("Are the particles white?", false, "Set this option to No if the particles are black, and to Yes if the particles are white.");
 	joboptions["log_maxres"] = JobOption("Maximum resolution to consider (A)", 20, 10, 100, 5, "The Laplacian-of-Gaussian filter will be applied to downscaled micrographs with the corresponding size. Give a negative value to skip downscaling.");
+	joboptions["log_adjust_thr"] = JobOption("Adjust default threshold", 0, -1., 1., 0.05, "Use this to pick more (positive number) or less (negative number) particles compared to the default setting.");
 
 	joboptions["fn_refs_autopick"] = JobOption("References:", NODE_2DREFS, "", "Input references (*.{star,mrcs})", "Input STAR file or MRC stack with the 2D references to be used for picking. Note that the absolute greyscale needs to be correct, so only use images created by RELION itself, e.g. by 2D class averaging or projecting a RELION reconstruction.");
 	joboptions["particle_diameter"] = JobOption("Mask diameter (A)", -1, 0, 2000, 20, "Diameter of the circular mask that will be applied around the templates in Angstroms. When set to a negative value, this value is estimated automatically from the templates themselves.");
@@ -1470,7 +1516,7 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 {
 
 	commands.clear();
-	initialisePipeline(outputname, "AutoPick", job_counter);
+	initialisePipeline(outputname, PROC_AUTOPICK, job_counter);
 	std::string command;
 	if (joboptions["nr_mpi"].getNumber() > 1)
 		command="`which relion_autopick_mpi`";
@@ -1500,6 +1546,7 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 		command += " --LoG_diam " + joboptions["log_diam"].getString();
 		command += " --LoG_diam_range " + joboptions["log_diam_range"].getString();
 		command += " --shrink 0 --lowpass " + joboptions["log_maxres"].getString();
+		command += " --LoG_adjust_threshold " + joboptions["log_adjust_thr"].getString();
 		if (joboptions["log_invert"].getBoolean())
 			command += " --Log_invert ";
 	}
@@ -1635,7 +1682,7 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 {
 
 	commands.clear();
-	initialisePipeline(outputname, "Extract", job_counter);
+	initialisePipeline(outputname, PROC_EXTRACT, job_counter);
 	std::string command;
 	if (joboptions["nr_mpi"].getNumber() > 1)
 		command="`which relion_preprocess_mpi`";
@@ -1775,7 +1822,7 @@ bool RelionJob::getCommandsSortJob(std::string &outputname, std::vector<std::str
 {
 
 	commands.clear();
-	initialisePipeline(outputname, "Sort", job_counter);
+	initialisePipeline(outputname, PROC_SORT, job_counter);
 	std::string command;
 
 	if (joboptions["nr_mpi"].getNumber() > 1)
@@ -1876,7 +1923,7 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 {
 
 	commands.clear();
-	initialisePipeline(outputname, "Select", job_counter);
+	initialisePipeline(outputname, PROC_CLASSSELECT, job_counter);
 	std::string command;
 	command="`which relion_display`";
 
@@ -2147,7 +2194,7 @@ bool RelionJob::getCommandsClass2DJob(std::string &outputname, std::vector<std::
 {
 
 	commands.clear();
-	initialisePipeline(outputname, "Class2D", job_counter);
+	initialisePipeline(outputname, PROC_2DCLASS, job_counter);
 	std::string command;
 
 	if (joboptions["nr_mpi"].getNumber() > 1)
@@ -2383,7 +2430,7 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 
 	commands.clear();
 
-	initialisePipeline(outputname, "InitialModel", job_counter);
+	initialisePipeline(outputname, PROC_INIMODEL, job_counter);
 
 	std::string command;
 	if (joboptions["nr_mpi"].getNumber() > 1)
@@ -2699,7 +2746,7 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 {
 
 	commands.clear();
-	initialisePipeline(outputname, "Class3D", job_counter);
+	initialisePipeline(outputname, PROC_3DCLASS, job_counter);
 	std::string command;
 
 	if (joboptions["nr_mpi"].getNumber() > 1)
@@ -3081,7 +3128,7 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 {
 
 	commands.clear();
-	initialisePipeline(outputname, "Refine3D", job_counter);
+	initialisePipeline(outputname, PROC_3DAUTO, job_counter);
 	std::string command;
 
 	if (joboptions["nr_mpi"].getNumber() > 1)
@@ -3334,7 +3381,7 @@ bool RelionJob::getCommandsMovierefineJob(std::string &outputname, std::vector<s
 {
 
 	commands.clear();
-	initialisePipeline(outputname, "MovieRefine", job_counter);
+	initialisePipeline(outputname, PROC_MOVIEREFINE, job_counter);
 	std::string command;
 
 	// A. First get the extract command
@@ -3540,7 +3587,7 @@ bool RelionJob::getCommandsPolishJob(std::string &outputname, std::vector<std::s
 {
 
 	commands.clear();
-	initialisePipeline(outputname, "Polish", job_counter);
+	initialisePipeline(outputname, PROC_POLISH, job_counter);
 	std::string command;
 
 	if (joboptions["nr_mpi"].getNumber() > 1)
@@ -3650,7 +3697,7 @@ bool RelionJob::getCommandsMaskcreateJob(std::string &outputname, std::vector<st
 {
 
 	commands.clear();
-	initialisePipeline(outputname, "MaskCreate", job_counter);
+	initialisePipeline(outputname, PROC_MASKCREATE, job_counter);
 	std::string command;
 
 	command="`which relion_mask_create`";
@@ -3723,7 +3770,7 @@ bool RelionJob::getCommandsJoinstarJob(std::string &outputname, std::vector<std:
 {
 
 	commands.clear();
-	initialisePipeline(outputname, "JoinStar", job_counter);
+	initialisePipeline(outputname, PROC_JOINSTAR, job_counter);
 	std::string command;
 	command="`which relion_star_combine`";
 
@@ -3885,7 +3932,7 @@ bool RelionJob::getCommandsSubtractJob(std::string &outputname, std::vector<std:
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
 	commands.clear();
-	initialisePipeline(outputname, "Subtract", job_counter);
+	initialisePipeline(outputname, PROC_SUBTRACT, job_counter);
 	std::string command;
 
 	if (joboptions["do_subtract"].getBoolean())
@@ -3989,7 +4036,7 @@ bool RelionJob::getCommandsPostprocessJob(std::string &outputname, std::vector<s
 {
 
 	commands.clear();
-	initialisePipeline(outputname, "PostProcess", job_counter);
+	initialisePipeline(outputname, PROC_POST, job_counter);
 	std::string command;
 
 	command="`which relion_postprocess`";
@@ -4106,7 +4153,7 @@ bool RelionJob::getCommandsLocalresJob(std::string &outputname, std::vector<std:
 {
 
 	commands.clear();
-	initialisePipeline(outputname, "LocalRes", job_counter);
+	initialisePipeline(outputname, PROC_RESMAP, job_counter);
 	std::string command;
 
 	if (joboptions["do_resmap_locres"].getBoolean() == joboptions["do_relion_locres"].getBoolean())
