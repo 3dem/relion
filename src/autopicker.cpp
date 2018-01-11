@@ -146,7 +146,7 @@ void AutoPicker::read(int argc, char **argv)
 	autopick_skip_side = textToInteger(parser.getOption("--skip_side", "Keep this many extra pixels (apart from particle_size/2) away from the edge of the micrograph ","0"));
 
 	int expert_section = parser.addSection("Expert options");
-	verb = textToInteger(parser.getOption("--verb", "Verbosity", "0"));
+	verb = textToInteger(parser.getOption("--verb", "Verbosity", "1"));
 	random_seed = textToInteger(parser.getOption("--random_seed", "Number for the random seed generator", "1"));
 	workFrac = textToFloat(parser.getOption("--shrink", "Reduce micrograph to this fraction size, during correlation calc (saves memory and time)", "1.0"));
 	LoG_max_search = textToFloat(parser.getOption("--Log_max_search", "Maximum diameter in LoG-picking multi-scale approach is this many times the min/max diameter", "5."));
@@ -2026,7 +2026,7 @@ void AutoPicker::autoPickLoGOneMicrograph(FileName &fn_mic, long int imic)
 	sum2_fom_ok = sum2_fom_ok/count_ok - sum_fom_ok*sum_fom_ok;
 	float my_threshold =  sum_fom_low - LoG_adjust_threshold * sqrt(sum2_fom_low);
 
-	if (verb > 0)
+	if (verb > 1)
 	{
 		std::cerr << " avg_fom_low= " << sum_fom_low << " stddev_fom_low= " << sqrt(sum2_fom_low) << " N= "<< count_low << std::endl;
 		std::cerr << " avg_fom_high= " << sum_fom_high<< " stddev_fom_high= " << sqrt(sum2_fom_high) << " N= "<< count_high << std::endl;
@@ -2080,7 +2080,7 @@ void AutoPicker::autoPickLoGOneMicrograph(FileName &fn_mic, long int imic)
 
 	}
 
-	if (verb > 0)
+	if (verb > 1)
 		std::cerr << "Picked " << MDout.numberOfObjects() << " of particles " << std::endl;
 	fn_tmp = getOutputRootName(fn_mic) + "_" + fn_out + ".star";
 	MDout.write(fn_tmp);
