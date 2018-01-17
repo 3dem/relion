@@ -311,6 +311,9 @@ bool MotioncorrRunner::executeMotioncor2(FileName fn_mic, std::vector<float> &xs
 	if (first_frame_sum > 1)
 		command += " -Throw " + integerToString(first_frame_sum - 1);
 
+	// Always take the first frame to be aligned as the origin of the motion
+	command += " -FmRef 0";
+
 	// Throw away last few frames?
 	if (last_frame_sum > 0)
 	{
