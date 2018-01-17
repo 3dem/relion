@@ -72,7 +72,7 @@ void Micrograph::read(FileName fn_in)
 	globalShiftX.resize(nFrame, 0);
 	globalShiftY.resize(nFrame, 0);
 
-	// TOOD: read gain
+	MDglobal.getValue(EMDL_MICROGRAPH_GAIN_NAME, fnGain);
 	
 	// Read global shifts
 	int frame;
@@ -114,6 +114,9 @@ void Micrograph::write(FileName filename) {
         MD.setValue(EMDL_IMAGE_SIZEY, height);
         MD.setValue(EMDL_IMAGE_SIZEZ, nFrame);
         MD.setValue(EMDL_MICROGRAPH_MOVIE_NAME, fnMovie);
+	if (fnGain != "") {
+		MD.setValue(EMDL_MICROGRAPH_GAIN_NAME, fnGain);
+	}
 	MD.write(fh);
 
 	MD.clear();
@@ -130,18 +133,34 @@ void Micrograph::write(FileName filename) {
 }
 
 // Get motion at frame and (x, y)
-int Micrograph::getShiftAt(int frame, RFLOAT x, RFLOAT y, RFLOAT *shiftx, RFLOAT *shifty) {
-	model->getShiftAt(frame, x, y, shiftx, shifty);
+int Micrograph::getShiftAt(int frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty) {
+	if (model != NULL) {
+		model->getShiftAt(frame, x, y, shiftx, shifty);
+	} else {
+		shiftx = 0;
+		shifty = 0;	
+	}
 
 	// frame is 1-indexed!
-	*shiftx += globalShiftX[frame - 1];
-	*shifty += globalShiftY[frame - 1];
+	shiftx += globalShiftX[frame - 1];
+	shifty += globalShiftY[frame - 1];
+}
+
+void Micrograph::setGlobalShift(int frame, RFLOAT shiftx, RFLOAT shifty) {
+	if (frame <= 0 || frame > nFrame) {
+		std::cout << "Frame: " << frame << " nFrame: " << nFrame << std::endl;
+		REPORT_ERROR("Micrograph::setGlobalShift() frame out of range");
+	}
+
+	frame--;
+	globalShiftX[frame] = shiftx;
+	globalShiftY[frame] = shifty;
 }
 
 // TODO: Implement
-int MotionModel::getShiftAt(int frame, RFLOAT x, RFLOAT y, RFLOAT *shiftx, RFLOAT *shifty) {
-	*shiftx = 0.0;
-	*shifty = 0.0;
+int MotionModel::getShiftAt(int frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty) {
+	shiftx = 0.0;
+	shifty = 0.0;
 
 	return 0;
 }

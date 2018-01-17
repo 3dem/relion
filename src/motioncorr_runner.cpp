@@ -21,6 +21,7 @@
 #ifdef CUDA
 #include "src/gpu_utils/cuda_mem_utils.h"
 #endif
+#include "src/micrograph_model.h"
 
 void MotioncorrRunner::read(int argc, char **argv, int rank)
 {
@@ -36,6 +37,7 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	first_frame_ali =  textToInteger(parser.getOption("--first_frame_ali", "First movie frame used in alignment (start at 1)", "1"));
 	last_frame_ali =  textToInteger(parser.getOption("--last_frame_ali", "Last movie frame used in alignment (0: use all)", "0"));
 	first_frame_sum =  textToInteger(parser.getOption("--first_frame_sum", "First movie frame used in output sum (start at 1)", "1"));
+	if (first_frame_sum < 1) first_frame_sum = 1;
 	last_frame_sum =  textToInteger(parser.getOption("--last_frame_sum", "Last movie frame used in output sum (0: use all)", "0"));
 
 	int motioncor2_section = parser.addSection("MOTIONCOR2 options");
@@ -255,9 +257,23 @@ void MotioncorrRunner::run()
 		else
 			REPORT_ERROR("Bug: by now it should be clear whether to use MotionCor2 or Unblur...");
 
-		if (result)
-			plotShifts(fn_micrographs[imic], xshifts, yshifts);
+		if (result) {
+			Micrograph m(fn_micrographs[imic], fn_gain_reference);	
+			for (int i = 0, ilim = xshifts.size(); i < ilim; i++) {
+				int frame = i + 1;
 
+				// UNBLUR processes all frames, but MotionCor2 not.
+				// So we have to adjust...
+				if (do_motioncor2) frame += (first_frame_sum - 1);
+				
+				m.setGlobalShift(frame, xshifts[i], yshifts[i]);
+			}
+			FileName fn_avg, fn_mov;
+			getOutputFileNames(fn_ori_micrographs[imic], fn_avg, fn_mov);
+			m.write(fn_avg.withoutExtension() + ".star");
+
+			plotShifts(fn_micrographs[imic], xshifts, yshifts);
+		}
 	}
 
 	if (verb > 0)
@@ -501,7 +517,7 @@ bool MotioncorrRunner::executeUnblur(FileName fn_mic, std::vector<float> &xshift
 	if (!fh)
 	 REPORT_ERROR( (std::string)"executeUnblur cannot create file: " + fn_com);
 
-	// Write script to run ctffind
+	// Write script to run Unblur
 	fh << "#!/usr/bin/env csh"<<std::endl;
 	fh << "setenv  OMP_NUM_THREADS " << integerToString(nr_threads)<<std::endl;
 	fh << fn_unblur_exe << " > " << fn_log << "  << EOF"<<std::endl;

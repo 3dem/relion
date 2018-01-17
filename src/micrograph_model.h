@@ -30,7 +30,7 @@ public:
 	virtual void fit();
 
 	// Get motion at frame and (x, y)
-	virtual int getShiftAt(int frame, RFLOAT x, RFLOAT y, RFLOAT *shiftx, RFLOAT *shifty);
+	virtual int getShiftAt(int frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty);
 };
 
 class Micrograph
@@ -80,14 +80,17 @@ public:
 	void setMovie(FileName fnMovie, FileName fnGain="");
 
 	// Get shift vector at (x, y, frame)
-	int getShiftAt(int frame, RFLOAT x, RFLOAT y, RFLOAT *shiftx, RFLOAT *shifty);
+	int getShiftAt(int frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty);
+
+	// Set global shift for frame
+	void setGlobalShift(int frame, RFLOAT shiftx, RFLOAT shifty);
 
 private:
 	int width, height, nFrame;
 	FileName fnGain;
 	FileName fnMovie;
 	
-	std::vector<RFLOAT> globalShiftX, globalShiftY, coeffs;
+	std::vector<RFLOAT> globalShiftX, globalShiftY;
 	MotionModel *model;
 };
 
