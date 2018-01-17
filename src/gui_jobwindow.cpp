@@ -824,7 +824,7 @@ void JobWindow::initialiseAutopickWindow()
 	// Add a little spacer
 	current_y += STEPY/2;
 	place("log_maxres", TOGGLE_DEACTIVATE);
-	place("log_adjust_thr", TOGGLE_DEACTIVATE);
+	place("log_adjust_thr");
 
 	tab2->end();
 	tab3->begin();
@@ -866,6 +866,7 @@ void JobWindow::initialiseAutopickWindow()
 	place("threshold_autopick");
 	place("mindist_autopick");
 	place("maxstddevnoise_autopick");
+	place("minavgnoise_autopick");
 
 	current_y += STEPY/2;
 
@@ -901,6 +902,7 @@ void JobWindow::initialiseAutopickWindow()
 
 	group4->begin();
 
+	place("do_amyloid");
 	place("helical_tube_outer_diameter");
 
 	current_y += STEPY/2;
