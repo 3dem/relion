@@ -24,7 +24,8 @@
 
 /* Work in progress!
  *
- * Refactor relion_preprocess (windowing) & particle_polished (weighted sum) 
+ * Implement position-dependent motion model
+ * Refactor relion_preprocess (windowing) & particle_polished (dose-weighted sum)
  * Should we allow extrapolation? Probably not.
  * Use factory pattern?
  * Where is the origin? Recent versions of MotionCor2 use the MIDDLE frame, not the first frame.
@@ -138,7 +139,7 @@ int Micrograph::getShiftAt(int frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT
 		model->getShiftAt(frame, x, y, shiftx, shifty);
 	} else {
 		shiftx = 0;
-		shifty = 0;	
+		shifty = 0;
 	}
 
 	// frame is 1-indexed!

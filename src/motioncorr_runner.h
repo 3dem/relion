@@ -146,6 +146,9 @@ public:
 	// Plot the shifts
     void plotShifts(FileName fn_eps, std::vector<float> &xshifts, std::vector<float> &yshifts);
 
+	// Save micrograph model
+	void saveModel(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts);
+
 	// Make a PDF file with all the shifts and write output STAR files
 	void generateLogFilePDFAndWriteStarFiles();
 

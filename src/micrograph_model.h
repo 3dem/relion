@@ -41,6 +41,8 @@ public:
 
 	// Create from a movie or a STAR file
 	Micrograph(FileName filename, FileName fnGain="") {
+		model = NULL;
+
 		clear();
 
 		if (filename.getExtension() == "star" && fnGain == "") {

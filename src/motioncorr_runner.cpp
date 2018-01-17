@@ -258,20 +258,7 @@ void MotioncorrRunner::run()
 			REPORT_ERROR("Bug: by now it should be clear whether to use MotionCor2 or Unblur...");
 
 		if (result) {
-			Micrograph m(fn_micrographs[imic], fn_gain_reference);	
-			for (int i = 0, ilim = xshifts.size(); i < ilim; i++) {
-				int frame = i + 1;
-
-				// UNBLUR processes all frames, but MotionCor2 not.
-				// So we have to adjust...
-				if (do_motioncor2) frame += (first_frame_sum - 1);
-				
-				m.setGlobalShift(frame, xshifts[i], yshifts[i]);
-			}
-			FileName fn_avg, fn_mov;
-			getOutputFileNames(fn_ori_micrographs[imic], fn_avg, fn_mov);
-			m.write(fn_avg.withoutExtension() + ".star");
-
+			saveModel(fn_micrographs[imic], xshifts, yshifts);
 			plotShifts(fn_micrographs[imic], xshifts, yshifts);
 		}
 	}
@@ -751,6 +738,21 @@ void MotioncorrRunner::plotShifts(FileName fn_mic, std::vector<float> &xshifts, 
 
 }
 
+void MotioncorrRunner::saveModel(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts) {
+	Micrograph m(fn_mic, fn_gain_reference);
+
+	for (int i = 0, ilim = xshifts.size(); i < ilim; i++) {
+		int frame = i + 1;
+
+		// UNBLUR processes all frames, but MotionCor2 not.
+		// So we have to adjust...
+		if (do_motioncor2) frame += (first_frame_sum - 1);
+
+		m.setGlobalShift(frame, xshifts[i], yshifts[i]);
+	}
+
+	m.write(fn_out + fn_mic.withoutExtension() + ".star");
+}
 
 void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 {

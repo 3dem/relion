@@ -74,8 +74,10 @@ void MotioncorrRunnerMpi::run()
 		else
 			REPORT_ERROR("Bug: by now it should be clear whether to use MotionCor2 or Unblur...");
 
-		if (result)
+		if (result) {
+			saveModel(fn_micrographs[imic], xshifts, yshifts);
 			plotShifts(fn_micrographs[imic], xshifts, yshifts);
+		}
 	}
 	if (verb > 0)
 		progress_bar(my_nr_micrographs);
