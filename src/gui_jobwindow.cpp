@@ -944,6 +944,7 @@ void JobWindow::initialiseExtractWindow()
 
 	place("fndata_reextract", TOGGLE_DEACTIVATE);
 	place("do_recenter", TOGGLE_DEACTIVATE);
+	place3("recenter_x","recenter_y", "recenter_z", "Recenter on - X, Y, Z (pix):", TOGGLE_DEACTIVATE);
 
 	group1->end();
 	guientries["do_reextract"].cb_menu_i();

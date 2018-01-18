@@ -1654,6 +1654,9 @@ void RelionJob::initialiseExtractJob()
 	joboptions["do_reextract"] = JobOption("OR re-extract refined particles? ", false, "If set to Yes, the input Coordinates above will be ignored. Instead, one uses a _data.star file from a previous 2D or 3D refinement to re-extract the particles in that refinement, possibly re-centered with their refined origin offsets. This is particularly useful when going from binned to unbinned particles.");
 	joboptions["fndata_reextract"] = JobOption("Refined particles STAR file: ", NODE_PART_DATA, "", "Input STAR file (*.{star})", "Filename of the STAR file with the refined particle coordinates, e.g. from a previous 2D or 3D classification or auto-refine run.");
 	joboptions["do_recenter"] = JobOption("Re-center refined coordinates? ", true, "If set to Yes, the input coordinates will be re-centered according to the refined origin offsets in the provided _data.star file .");
+	joboptions["recenter_x"] = JobOption("Re-center on X-coordinate (in pix): ", std::string("0"), "Re-extract particles centered on this X-coordinate (in pixels in the reference)");
+	joboptions["recenter_y"] = JobOption("Re-center on Y-coordinate (in pix): ", std::string("0"), "Re-extract particles centered on this Y-coordinate (in pixels in the reference)");
+	joboptions["recenter_z"] = JobOption("Re-center on Z-coordinate (in pix): ", std::string("0"), "Re-extract particles centered on this Z-coordinate (in pixels in the reference)");
 	joboptions["do_set_angpix"] = JobOption("Manually set pixel size? ", false, "If set to Yes, the rlnMagnification and rlnDetectorPixelSize will be set in the resulting STAR file. Only use this option if CTF information is NOT coming from the input coordinate STAR file(s). For example, because you decided not to estimate the CTF for your micrographs.");
 	joboptions["angpix"] = JobOption("Pixel size (A)", 1, 0.3, 5, 0.1, "Provide the pixel size in Angstroms in the micrograph (so before any re-scaling).  If you provide input CTF parameters, then leave this value to the default of -1.");
 
@@ -1719,6 +1722,9 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 		if (joboptions["do_recenter"].getBoolean())
 		{
 			command += " --recenter";
+			command += " --recenter_x " + joboptions["recenter_x"].getString();
+			command += " --recenter_y " + joboptions["recenter_y"].getString();
+			command += " --recenter_z " + joboptions["recenter_z"].getString();
 		}
 	}
 	else

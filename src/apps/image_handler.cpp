@@ -368,7 +368,7 @@ class image_handler_parameters
 
 		// Shifting
 		if (do_shiftCOM)
-			selfTranslateCenterOfMassToCenter(Iout(), DONT_WRAP);
+			selfTranslateCenterOfMassToCenter(Iout(), DONT_WRAP, true); // verbose=true!
 		else if (fabs(shift_x) > 0. || fabs(shift_y) > 0. || fabs(shift_z) > 0.)
 		{
 			Matrix1D<RFLOAT> shift(2);
