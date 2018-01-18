@@ -744,6 +744,9 @@ void MotioncorrRunner::plotShifts(FileName fn_mic, std::vector<float> &xshifts, 
 void MotioncorrRunner::saveModel(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts) {
 	Micrograph m(fn_mic, fn_gain_reference);
 
+	FileName fn_avg, fn_mov;
+        getOutputFileNames(fn_mic, fn_avg, fn_mov);
+
 	for (int i = 0, ilim = xshifts.size(); i < ilim; i++) {
 		int frame = i + 1;
 
@@ -754,7 +757,7 @@ void MotioncorrRunner::saveModel(FileName fn_mic, std::vector<float> &xshifts, s
 		m.setGlobalShift(frame, xshifts[i], yshifts[i]);
 	}
 
-	m.write(fn_out + fn_mic.withoutExtension() + ".star");
+	m.write(fn_avg.withoutExtension() + ".star");
 }
 
 void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
