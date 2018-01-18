@@ -36,6 +36,8 @@ public:
 class Micrograph
 {
 public:
+	static const RFLOAT NOT_OBSERVED = -9999;
+
 	// Empty Constructor is not allowed
 	Micrograph(); // = delete in C++11
 

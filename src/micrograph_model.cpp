@@ -26,9 +26,7 @@
  *
  * Implement position-dependent motion model
  * Refactor relion_preprocess (windowing) & particle_polished (dose-weighted sum)
- * Should we allow extrapolation? Probably not.
  * Use factory pattern?
- * Where is the origin? Recent versions of MotionCor2 use the MIDDLE frame, not the first frame.
  */
 
 void Micrograph::setMovie(FileName fnMovie, FileName fnGain) {
@@ -39,8 +37,8 @@ void Micrograph::setMovie(FileName fnMovie, FileName fnGain) {
 	height = YSIZE(Ihead());
 	nFrame = NSIZE(Ihead());
 
-	globalShiftX.resize(nFrame, 0);
-	globalShiftY.resize(nFrame, 0);
+	globalShiftX.resize(nFrame, NOT_OBSERVED);
+	globalShiftY.resize(nFrame, NOT_OBSERVED);
 
 	this->fnMovie = fnMovie;
 	this->fnGain = fnGain;
@@ -70,8 +68,8 @@ void Micrograph::read(FileName fn_in)
 		REPORT_ERROR("MicrographModel::read: insufficient general information");
 	}
 
-	globalShiftX.resize(nFrame, 0);
-	globalShiftY.resize(nFrame, 0);
+	globalShiftX.resize(nFrame, NOT_OBSERVED);
+	globalShiftY.resize(nFrame, NOT_OBSERVED);
 
 	MDglobal.getValue(EMDL_MICROGRAPH_GAIN_NAME, fnGain);
 	
