@@ -1896,7 +1896,10 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					op.max_weight[ipart] = max_pair.second;
 
 					// Store nr_significant_coarse_samples for this particle
-					DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_NR_SIGN) = (RFLOAT) my_nr_significant_coarse_samples;
+					// Don't do this for multibody, as it would be overwritten for each body,
+					// and we also use METADATA_NR_SIGN in the new safeguard for the gold-standard separation
+					if (baseMLO->mymodel.nr_bodies == 1)
+						DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_NR_SIGN) = (RFLOAT) my_nr_significant_coarse_samples;
 
 					AccPtr<bool> Mcoarse_significant = ptrFactory.make<bool>(ipart_length);
 					Mcoarse_significant.setHostPtr(&op.Mcoarse_significant.data[offset]);
