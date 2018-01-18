@@ -27,6 +27,16 @@ int main(int argc, char **argv)
 {
 	MlOptimiser optimiser;
 
+    std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
+    std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
+    std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
+    std::cout << "  "<< std::endl;
+    std::cout << " The output from this binary should not be used for research or publication "<< std::endl;
+    std::cout << "  "<< std::endl;
+    std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
+    std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
+    std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
+
     try
     {
     	// Read in parameters from the command line
@@ -47,6 +57,16 @@ int main(int argc, char **argv)
 
         return EXIT_FAILURE;
     }
+
+    std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
+    std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
+    std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
+    std::cout << "  "<< std::endl;
+    std::cout << " The output from this binary should not be used for research or publication "<< std::endl;
+    std::cout << "  "<< std::endl;
+    std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
+    std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
+    std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
 
     return EXIT_SUCCESS;
 }
