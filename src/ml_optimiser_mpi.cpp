@@ -1048,7 +1048,7 @@ void MlOptimiserMpi::expectation()
 	MPI_Barrier(MPI_COMM_WORLD);   // Is this really necessary?
 	if (do_cpu  && ! node->isMaster())
 	{	
-		unsigned nr_classes = mymodel.nr_classes;
+		unsigned nr_classes = mymodel.PPref.size();
 		// Allocate Array of complex arrays for this class
 		posix_memalign((void **)&mdlClassComplex, MEM_ALIGN, nr_classes * sizeof (XFLOAT *));
 		
@@ -1522,8 +1522,10 @@ void MlOptimiserMpi::expectation()
 
 						b->projectors[j].clear();
 						b->backprojectors[j].clear();
-						b->coarseProjectionPlans[j].clear();
 					}
+
+					for (int j = 0; j < b->coarseProjectionPlans.size(); j++)
+						b->coarseProjectionPlans[j].clear();
 #ifdef TIMING
 		timer.toc(TIMING_EXP_7);
 #endif
@@ -1590,8 +1592,10 @@ void MlOptimiserMpi::expectation()
 
 					b->projectors[j].clear();
 					b->backprojectors[j].clear();
-					b->coarseProjectionPlans[j].clear();
 				}
+
+				for (int j = 0; j < b->coarseProjectionPlans.size(); j++)
+					b->coarseProjectionPlans[j].clear();
 
 				delete b;
 				accDataBundles.clear();

@@ -81,7 +81,7 @@ size_t MlDeviceBundle::checkFixedSizedObjects(int shares)
 }
 void MlDeviceBundle::setupFixedSizedObjects()
 {
-	unsigned nr_classes = baseMLO->mymodel.nr_classes;
+	unsigned nr_models = baseMLO->mymodel.PPref.size();
 
 	int devCount;
 	HANDLE_ERROR(cudaGetDeviceCount(&devCount));
@@ -101,37 +101,37 @@ void MlDeviceBundle::setupFixedSizedObjects()
 
 	// clear() called on std::vector appears to set size=0, even if we have an explicit
 	// destructor for each member, so we need to set the size to what is was before
-	projectors.resize(nr_classes);
-	backprojectors.resize(nr_classes);
+	projectors.resize(nr_models);
+	backprojectors.resize(nr_models);
 
 	/*======================================================
 	              PROJECTOR AND BACKPROJECTOR
 	======================================================*/
 
 	//Loop over classes
-	for (int iclass = 0; iclass < nr_classes; iclass++)
+	for (int imodel = 0; imodel < nr_models; imodel++)
 	{
-		projectors[iclass].setMdlDim(
-				baseMLO->mymodel.PPref[iclass].data.xdim,
-				baseMLO->mymodel.PPref[iclass].data.ydim,
-				baseMLO->mymodel.PPref[iclass].data.zdim,
-				baseMLO->mymodel.PPref[iclass].data.yinit,
-				baseMLO->mymodel.PPref[iclass].data.zinit,
-				baseMLO->mymodel.PPref[iclass].r_max,
-				baseMLO->mymodel.PPref[iclass].padding_factor);
+		projectors[imodel].setMdlDim(
+				baseMLO->mymodel.PPref[imodel].data.xdim,
+				baseMLO->mymodel.PPref[imodel].data.ydim,
+				baseMLO->mymodel.PPref[imodel].data.zdim,
+				baseMLO->mymodel.PPref[imodel].data.yinit,
+				baseMLO->mymodel.PPref[imodel].data.zinit,
+				baseMLO->mymodel.PPref[imodel].r_max,
+				baseMLO->mymodel.PPref[imodel].padding_factor);
 
-		projectors[iclass].initMdl(baseMLO->mymodel.PPref[iclass].data.data);
+		projectors[imodel].initMdl(baseMLO->mymodel.PPref[imodel].data.data);
 
-		backprojectors[iclass].setMdlDim(
-				baseMLO->wsum_model.BPref[iclass].data.xdim,
-				baseMLO->wsum_model.BPref[iclass].data.ydim,
-				baseMLO->wsum_model.BPref[iclass].data.zdim,
-				baseMLO->wsum_model.BPref[iclass].data.yinit,
-				baseMLO->wsum_model.BPref[iclass].data.zinit,
-				baseMLO->wsum_model.BPref[iclass].r_max,
-				baseMLO->wsum_model.BPref[iclass].padding_factor);
+		backprojectors[imodel].setMdlDim(
+				baseMLO->wsum_model.BPref[imodel].data.xdim,
+				baseMLO->wsum_model.BPref[imodel].data.ydim,
+				baseMLO->wsum_model.BPref[imodel].data.zdim,
+				baseMLO->wsum_model.BPref[imodel].data.yinit,
+				baseMLO->wsum_model.BPref[imodel].data.zinit,
+				baseMLO->wsum_model.BPref[imodel].r_max,
+				baseMLO->wsum_model.BPref[imodel].padding_factor);
 
-		backprojectors[iclass].initMdl();
+		backprojectors[imodel].initMdl();
 	}
 
 	/*======================================================
@@ -145,7 +145,7 @@ void MlDeviceBundle::setupFixedSizedObjects()
 
 void MlDeviceBundle::setupTunableSizedObjects(size_t allocationSize)
 {
-	unsigned nr_classes = baseMLO->mymodel.nr_classes;
+	unsigned nr_models = baseMLO->mymodel.nr_classes;
 	int devCount;
 	HANDLE_ERROR(cudaGetDeviceCount(&devCount));
 	if(device_id >= devCount)
@@ -171,9 +171,9 @@ void MlDeviceBundle::setupTunableSizedObjects(size_t allocationSize)
 	                    PROJECTION PLAN
 	======================================================*/
 
-	coarseProjectionPlans.resize(nr_classes, allocator);
+	coarseProjectionPlans.resize(nr_models, allocator);
 
-	for (int iclass = 0; iclass < nr_classes; iclass++)
+	for (int iclass = 0; iclass < nr_models; iclass++)
 	{
 		//If doing predefined projector plan at all and is this class significant
 		if (!generateProjectionPlanOnTheFly && baseMLO->mymodel.pdf_class[iclass] > 0.)

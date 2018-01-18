@@ -1,5 +1,7 @@
 static pthread_mutex_t global_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+#include "src/ml_optimiser_mpi.h"
+
 // ----------------------------------------------------------------------------
 // -------------------- getFourierTransformsAndCtfs ---------------------------
 // ----------------------------------------------------------------------------
@@ -1111,17 +1113,17 @@ void getAllSquaredDifferencesCoarse(
 		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
-		
-		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-		{
-			if ( projectorPlans[exp_iclass].orientation_num > 0 )
-			{
-				/*====================================
-				    	   Kernel Call
-				======================================*/
 
+		for (int iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
+		{
+			int iproj;
+			if (baseMLO->mymodel.nr_bodies > 1) iproj = ibody;
+			else                                iproj = iclass;
+
+			if ( projectorPlans[iclass].orientation_num > 0 )
+			{
 				AccProjectorKernel projKernel = AccProjectorKernel::makeKernel(
-						accMLO->bundle->projectors[exp_iclass],
+						accMLO->bundle->projectors[iproj],
 						op.local_Minvsigma2s[0].xdim,
 						op.local_Minvsigma2s[0].ydim,
 						op.local_Minvsigma2s[0].zdim,
@@ -1135,29 +1137,29 @@ void getAllSquaredDifferencesCoarse(
 						~corr_img,
 						~Fimg_real,
 						~Fimg_imag,
-						~projectorPlans[exp_iclass].eulers,
+						~projectorPlans[iclass].eulers,
 						&(~allWeights)[allWeights_pos],
 						(XFLOAT) op.local_sqrtXi2[ipart],
-						projectorPlans[exp_iclass].orientation_num,
+						projectorPlans[iclass].orientation_num,
 						translation_num,
 						image_size,
-						accMLO->classStreams[exp_iclass],
+						accMLO->classStreams[iclass],
 						do_CC,
 						accMLO->dataIs3D);
 				
 				mapAllWeightsToMweights(
-						~projectorPlans[exp_iclass].iorientclasses,
+						~projectorPlans[iclass].iorientclasses,
 						&(~allWeights)[allWeights_pos],
 						&(~Mweight)[ipart*weightsPerPart],
-						projectorPlans[exp_iclass].orientation_num,
+						projectorPlans[iclass].orientation_num,
 						translation_num,
-						accMLO->classStreams[exp_iclass]
+						accMLO->classStreams[iclass]
 						);
 
 				/*====================================
 				    	   Retrieve Results
 				======================================*/
-				allWeights_pos += projectorPlans[exp_iclass].orientation_num*translation_num;
+				allWeights_pos += projectorPlans[iclass].orientation_num*translation_num;
 
 			}
 		}
@@ -1439,21 +1441,25 @@ void getAllSquaredDifferencesFine(
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
-		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+		for (int iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
 		{
-			if ((baseMLO->mymodel.pdf_class[exp_iclass] > 0.) && (FineProjectionData[ipart].class_entries[exp_iclass] > 0) )
+			int iproj;
+			if (baseMLO->mymodel.nr_bodies > 1) iproj = ibody;
+			else                                iproj = iclass;
+
+			if ((baseMLO->mymodel.pdf_class[iclass] > 0.) && (FineProjectionData[ipart].class_entries[iclass] > 0) )
 			{
-				long unsigned orientation_num  = FineProjectionData[ipart].class_entries[exp_iclass];
+				long unsigned orientation_num  = FineProjectionData[ipart].class_entries[iclass];
 				if(orientation_num==0)
 					continue;
 
-				long unsigned significant_num(FPCMasks[ipart][exp_iclass].weightNum);
+				long unsigned significant_num(FPCMasks[ipart][iclass].weightNum);
 				if(significant_num==0)
 					continue;
 
 				CTIC(accMLO->timer,"Diff2MakeKernel");
 				AccProjectorKernel projKernel = AccProjectorKernel::makeKernel(
-						accMLO->bundle->projectors[exp_iclass],
+						accMLO->bundle->projectors[iproj],
 						op.local_Minvsigma2s[0].xdim,
 						op.local_Minvsigma2s[0].ydim,
 						op.local_Minvsigma2s[0].zdim,
@@ -1461,7 +1467,7 @@ void getAllSquaredDifferencesFine(
 				CTOC(accMLO->timer,"Diff2MakeKernel");
 
 				// Use the constructed mask to construct a partial class-specific input
-				IndexedDataArray thisClassFinePassWeights(FinePassWeights[ipart],FPCMasks[ipart][exp_iclass]);
+				IndexedDataArray thisClassFinePassWeights(FinePassWeights[ipart],FPCMasks[ipart][iclass]);
 
 				CTIC(accMLO->timer,"Diff2CALL");
 
@@ -1473,12 +1479,12 @@ void getAllSquaredDifferencesFine(
 						~trans_x,
 						~trans_y,
 						~trans_z,
-						~eulers[exp_iclass-sp.iclass_min],
+						~eulers[iclass-sp.iclass_min],
 						~thisClassFinePassWeights.rot_id,
 						~thisClassFinePassWeights.rot_idx,
 						~thisClassFinePassWeights.trans_idx,
-						~FPCMasks[ipart][exp_iclass].jobOrigin,
-						~FPCMasks[ipart][exp_iclass].jobExtent,
+						~FPCMasks[ipart][iclass].jobOrigin,
+						~FPCMasks[ipart][iclass].jobExtent,
 						~thisClassFinePassWeights.weights,
 						op,
 						baseMLO,
@@ -1487,9 +1493,9 @@ void getAllSquaredDifferencesFine(
 						significant_num,
 						image_size,
 						ipart,
-						exp_iclass,
-						accMLO->classStreams[exp_iclass],
-						FPCMasks[ipart][exp_iclass].jobOrigin.getSize(),
+						iclass,
+						accMLO->classStreams[iclass],
+						FPCMasks[ipart][iclass].jobOrigin.getSize(),
 						((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc),
 						accMLO->dataIs3D
 						);
@@ -2233,11 +2239,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 						transformCartesianAndHelicalCoords(myprior_x, myprior_y, myprior_z, myprior_x, myprior_y, myprior_z, rot_deg, tilt_deg, psi_deg, (accMLO->dataIs3D) ? (3) : (2), CART_TO_HELICAL_COORDS);
 					}
 
-					// TODO: Feb20,2017 - Shaoda does not understand what you are doing here ... ???
-					// Please check whether the following is compatible with 3D reconstructions of 2D helical segments AND 3D helical subtomograms ???
-					// Preliminary tests show that the code from Shaoda gave worse reconstructions of VipA/VipB (EMPIAR-10019)
-					// While TMV (EMPIAR-10020) and BtubAB subtomo results are not affected
-					// ========= OLD ===========
 					if ( (! baseMLO->do_helical_refine) || (baseMLO->ignore_helical_symmetry) )
 						RFLOAT diffx = myprior_x - oo_otrans_x[fake_class*nr_transes+iitrans];
 					RFLOAT diffx = myprior_x - oo_otrans_x[fake_class*nr_transes+iitrans];
@@ -2245,17 +2246,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					RFLOAT diffz = 0;
 					if (accMLO->dataIs3D)
 						diffz = myprior_z - (old_offset_z + oversampled_translations_z[iover_trans]);
-					// ======= SHAODA ==========
-					//RFLOAT diffx = 0.;
-					//if ( (! baseMLO->do_helical_refine) || (baseMLO->ignore_helical_symmetry) || (accMLO->dataIs3D) )
-					//	diffx = myprior_x - oo_otrans_x[fake_class*nr_transes+iitrans];
-					//RFLOAT diffy = myprior_y - oo_otrans_y[fake_class*nr_transes+iitrans];
-					//RFLOAT diffz = 0;
-					//if (accMLO->dataIs3D)
-					//{
-					//	if ( (! baseMLO->do_helical_refine) || (baseMLO->ignore_helical_symmetry) )
-					//		diffz = myprior_z - (old_offset_z + oversampled_translations_z[iover_trans]);
-					//}
 
 					myp_oo_otrans_x2y2z2[fake_class*nr_transes+iitrans] = diffx*diffx + diffy*diffy + diffz*diffz;
 				}
@@ -2384,16 +2374,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
 	{
 		CTIC(accMLO->timer,"setMetadata");
-
-//		CTIC(accMLO->timer,"getArgMaxOnDevice");
-//		std::pair<int, XFLOAT> max_pair = getArgMaxOnDevice(FinePassWeights[ipart].weights);
-//		CTOC(accMLO->timer,"getArgMaxOnDevice");
-//		op.max_index.fineIdx = FinePassWeights[ipart].ihidden_overs[max_pair.first];
-//		op.max_weight[ipart] = max_pair.second;
-
-
-		//std::cerr << "max val = " << op.max_weight[ipart] << std::endl;
-		//std::cerr << "max index = " << max_index.fineIdx << std::endl;
 
 		if(baseMLO->adaptive_oversampling!=0)
 			op.max_index[ipart].fineIndexToFineIndices(sp); // set partial indices corresponding to the found max_index, to be used below
@@ -2752,6 +2732,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		classPos = 0;
 		for (int iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
 		{
+			int iproj;
+			if (baseMLO->mymodel.nr_bodies > 1) iproj = ibody;
+			else                                iproj = iclass;
+
 			if((baseMLO->mymodel.pdf_class[iclass] == 0.) || (ProjectionData[ipart].class_entries[iclass] == 0))
 				continue;
 			/*======================================================
@@ -2761,7 +2745,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			long unsigned orientation_num(ProjectionData[ipart].orientation_num[iclass]);
 
 			AccProjectorKernel projKernel = AccProjectorKernel::makeKernel(
-					accMLO->bundle->projectors[iclass],
+					accMLO->bundle->projectors[iproj],
 					op.local_Minvsigma2s[0].xdim,
 					op.local_Minvsigma2s[0].ydim,
 					op.local_Minvsigma2s[0].zdim,
@@ -2804,7 +2788,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			CTIC(accMLO->timer,"backproject");
 			
 			runBackProjectKernel(
-				accMLO->bundle->backprojectors[iclass],
+				accMLO->bundle->backprojectors[iproj],
 				projKernel,
 				~Fimgs_nomask_real,
 				~Fimgs_nomask_imag,
