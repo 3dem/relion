@@ -138,9 +138,9 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	// For multi-body refinement
 	bool fn_body_masks_was_empty = (fn_body_masks == "None");
 	std::string fnt;
-	fnt = parser.getOption("--multibody_masks", "STAR file with masks and metadata for multi-body refinement", "OLD");
-	if (fnt != "OLD")
-		fn_body_masks = fnt;
+//	fnt = parser.getOption("--multibody_masks", "STAR file with masks and metadata for multi-body refinement", "OLD");
+//	if (fnt != "OLD")
+//		fn_body_masks = fnt;
 
 	// Also allow change of padding...
 	fnt = parser.getOption("--pad", "Oversampling factor for the Fourier transforms of the references", "OLD");
