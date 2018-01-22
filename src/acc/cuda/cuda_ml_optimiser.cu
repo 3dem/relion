@@ -122,6 +122,13 @@ void MlDeviceBundle::setupFixedSizedObjects()
 
 		projectors[imodel].initMdl(baseMLO->mymodel.PPref[imodel].data.data);
 
+		/***********************************************************************************************
+		 * Remove the following condition when projections for multibody are done by the ACC projector
+		 ***********************************************************************************************/
+
+		if (baseMLO->mymodel.nr_bodies > 1)
+			baseMLO->mymodel.PPref[imodel].data.coreDeallocate();
+
 		backprojectors[imodel].setMdlDim(
 				baseMLO->wsum_model.BPref[imodel].data.xdim,
 				baseMLO->wsum_model.BPref[imodel].data.ydim,

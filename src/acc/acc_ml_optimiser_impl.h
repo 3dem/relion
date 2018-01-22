@@ -827,6 +827,11 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 					int oobody = DIRECT_A2D_ELEM(baseMLO->mymodel.pointer_body_overlap, ibody, obody);
 					baseMLO->mymodel.PPref[oobody].get2DFourierTransform(FTo, Abody, IS_NOT_INV);
 
+					/********************************************************************************
+					 * Currently CPU-memory for projectors is not deallocated when doing multibody
+					 * due to the previous line. See cpu_ml_optimiser.cpp and cuda_ml_optimiser.cu
+					 ********************************************************************************/
+
 					// 17May2017: Body is centered at its own COM
 					// move it back to its place in the original particle image
 					Matrix1D<RFLOAT> other_projected_com(3);
