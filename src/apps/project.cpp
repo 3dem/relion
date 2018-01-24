@@ -338,7 +338,11 @@ public:
                         {
                             if (MDang.containsLabel(EMDL_MICROGRAPH_NAME))
                             {
-                                MDang.getValue(EMDL_MICROGRAPH_NAME, fn_group);
+                                FileName fn_orig, fn_pre, fn_jobnr;
+                                MDang.getValue(EMDL_MICROGRAPH_NAME, fn_orig);
+                                if (!decomposePipelineFileName(fn_orig, fn_pre, fn_jobnr, fn_group)) {
+                                    fn_group = fn_orig; // Not a pipeline filename; use as is
+                                }
                             }
                             else
                             {
