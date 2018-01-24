@@ -396,6 +396,10 @@ public:
      * select_img= which slice should I replace
      * overwrite = 0, append slice
      * overwrite = 1 overwrite slice
+     *
+     * NOTE:
+     *  select_img has higher priority than the number before "@" in the name.
+     *  select_img counts from 0, while the number before "@" in the name from 1!
      */
     void write(FileName name="",
                long int select_img=-1,
