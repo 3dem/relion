@@ -87,6 +87,10 @@ public:
     friend std::ostream& operator<<(std::ostream& o, RelionError& XE);
 };
 
+#define RAMERR "\n\
+There was an issue allocating CPU memory (RAM). \n\
+Likely maximum memory size was exceeded."
+
 #define DEVERR "\n\
 This is a developer error message which you cannot fix \n\
 through changing the run config. Either your data is broken or\n\

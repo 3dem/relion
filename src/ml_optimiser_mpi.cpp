@@ -1056,7 +1056,8 @@ void MlOptimiserMpi::expectation()
 
 		unsigned nr_classes = mymodel.PPref.size();
 		// Allocate Array of complex arrays for this class
-		posix_memalign((void **)&mdlClassComplex, MEM_ALIGN, nr_classes * sizeof (XFLOAT *));
+		if(posix_memalign((void **)&mdlClassComplex, MEM_ALIGN, nr_classes * sizeof (XFLOAT *)))
+			CRITICAL(RAMERR);
 		
 		// Set up XFLOAT complex array shared by all threads for each class
 		for (int iclass = 0; iclass < nr_classes; iclass++)
@@ -1070,7 +1071,8 @@ void MlOptimiserMpi::expectation()
 			else
 				mdlXYZ = mdlX*mdlY*mdlZ;
 			
-			posix_memalign((void **)&mdlClassComplex[iclass], MEM_ALIGN, mdlXYZ * 2 * sizeof(XFLOAT));
+			if(posix_memalign((void **)&mdlClassComplex[iclass], MEM_ALIGN, mdlXYZ * 2 * sizeof(XFLOAT)))
+				CRITICAL(RAMERR);
 			
 			XFLOAT *pData = mdlClassComplex[iclass];
 			
