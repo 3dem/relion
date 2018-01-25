@@ -169,7 +169,7 @@ message(STATUS "TBB_FOUND :        ${TBB_FOUND}")
 message(STATUS "TBB_INCLUDE_DIRS : ${TBB_INCLUDE_DIRS}")
 message(STATUS "TBB_VERSION :      ${TBB_VERSION}")
 message(STATUS "TBB_LIBRARIES :    ${TBB_LIBRARIES}")
-include_directories("${TBB_INCLUDE_DIRS}/tbb")
+include_directories("${TBB_INCLUDE_DIRS}")
 
 # ----------------------------------------------------------Intel Compiler support --
 # ----------------------------------  and build flags including MKL and TBB ---------
