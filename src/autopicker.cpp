@@ -815,94 +815,213 @@ void AutoPicker::run()
 }
 
 
-Peak AutoPicker::findNextAmyloidCoordinate(Peak &mycoord, RFLOAT threshold_value, RFLOAT max_psidiff, RFLOAT amyloid_diameter_pix,
-		int skip_side, float scale,
+std::vector<AmyloidCoord> AutoPicker::findNextCandidateCoordinates(AmyloidCoord &mycoord, std::vector<AmyloidCoord> &circle,
+		RFLOAT threshold_value, RFLOAT max_psidiff, int skip_side, float scale,
 		MultidimArray<RFLOAT> &Mccf, MultidimArray<RFLOAT> &Mpsi)
 {
 
-	int myrad = ROUND(amyloid_diameter_pix*scale);
-	int myradb = myrad + 2;
-	float myrad2 = (float)myrad * (float)myrad;
-	float myradb2 = (float)myradb * (float)myradb;
+    std::vector<AmyloidCoord> result;
+
 	int new_micrograph_xsize = (int)((float)micrograph_xsize*scale);
-	int new_micrograph_ysize = (int)((float)micrograph_ysize*scale);
-	int skip_side_pix = ROUND(skip_side * scale);
+    int new_micrograph_ysize = (int)((float)micrograph_ysize*scale);
+    int skip_side_pix = ROUND(skip_side * scale);
+	Matrix2D<double> A2D;
+	Matrix1D<double> vec_c(2), vec_p(2);
+	rotation2DMatrix(-mycoord.psi, A2D, false);
 
-	Peak result;
-	result.x = result.y = -1;
-	result.fom = result.psi = -999.;
-
-	float best_ccf = -999.;
-	float best_psidiff = 999.;
-	for (int ii = mycoord.y - myradb; ii <= mycoord.y + myradb; ii++)
+	for (int icoor = 0; icoor < circle.size(); icoor++)
 	{
-		for (int jj = mycoord.x - myradb; jj <= mycoord.x + myradb; jj++)
-		{
-			// Stay inside Mccf!
-			if ( jj >= FIRST_XMIPP_INDEX(XSIZE(Mccf)) && ii >= FIRST_XMIPP_INDEX(YSIZE(Mccf))
-				&& jj <= LAST_XMIPP_INDEX(XSIZE(Mccf)) && ii <= LAST_XMIPP_INDEX(YSIZE(Mccf)) )
+		// Rotate the circle-vector coordinates along the mycoord.psi
+		XX(vec_c) = (circle[icoor]).x;
+		YY(vec_c) = (circle[icoor]).y;
+		vec_p = A2D * vec_c;
+
+		long int jj = ROUND(mycoord.x + XX(vec_p));
+		long int ii = ROUND(mycoord.y + YY(vec_p));
+
+        if ( (jj >= (FIRST_XMIPP_INDEX(new_micrograph_xsize) + skip_side_pix + 1))
+          && (jj <  (LAST_XMIPP_INDEX(new_micrograph_xsize) - skip_side_pix - 1))
+          && (ii >= (FIRST_XMIPP_INDEX(new_micrograph_ysize) + skip_side_pix + 1))
+          && (ii <  (LAST_XMIPP_INDEX(new_micrograph_ysize) - skip_side_pix - 1)) )
+        {
+        	RFLOAT myccf = A2D_ELEM(Mccf, ii, jj);
+        	RFLOAT mypsi = A2D_ELEM(Mpsi, ii, jj);
+
+        	// Small difference in psi-angle with mycoord
+			RFLOAT psidiff = fabs(mycoord.psi - mypsi);
+			psidiff = realWRAP(psidiff, 0., 360.);
+			if (psidiff > 180.)
+					psidiff -= 180.;
+			if (psidiff > 90.)
+					psidiff -= 180.;
+
+			if (fabs(psidiff) < max_psidiff && myccf > threshold_value)
 			{
-				float r2 = (float)(mycoord.y - ii)*(mycoord.y - ii) + (float)(mycoord.x - jj)*(mycoord.x - jj);
-				if (r2 < myrad2)
+        		AmyloidCoord newcoord;
+        		newcoord.x = mycoord.x + XX(vec_p);
+        		newcoord.y = mycoord.y + YY(vec_p);
+        		newcoord.psi = A2D_ELEM(Mpsi, ii, jj);
+        		newcoord.fom = myccf;
+        		//std::cerr << " myccf= " << myccf << " psi= " << newcoord.psi << std::endl;
+        		result.push_back(newcoord);
+        	}
+        }
+	}
+
+	return result;
+
+}
+
+
+
+AmyloidCoord AutoPicker::findNextAmyloidCoordinate(AmyloidCoord &mycoord, std::vector<AmyloidCoord> &circle, RFLOAT threshold_value,
+		RFLOAT max_psidiff, RFLOAT amyloid_diameter_pix, int skip_side, float scale,
+		MultidimArray<RFLOAT> &Mccf, MultidimArray<RFLOAT> &Mpsi)
+{
+
+	int new_micrograph_xsize = (int)((float)micrograph_xsize*scale);
+    int new_micrograph_ysize = (int)((float)micrograph_ysize*scale);
+    int skip_side_pix = ROUND(skip_side * scale);
+
+	// Return if this one has been done already..
+	AmyloidCoord result;
+	result.x = result.y = result.psi = 0.;
+	result.fom = -999.;
+	if (A2D_ELEM(Mccf, ROUND(mycoord.y), ROUND(mycoord.x)) < threshold_value)
+		return result;
+
+	// Set FOM to small value in circle around mycoord
+	int myrad = ROUND(0.5*helical_tube_diameter/angpix*scale);
+    float myrad2 = (float)myrad * (float)myrad;
+    for (int ii = -myrad; ii <= myrad; ii++)
+    {
+    	for (int jj = -myrad; jj <= myrad; jj++)
+    	{
+    		float r2 = (float)(ii*ii) + (float)(jj*jj);
+    		if (r2 < myrad2)
+    		{
+
+    			long int jp = ROUND(mycoord.x + jj);
+    			long int ip = ROUND(mycoord.y + ii);
+    			//std::cerr << " jp= " << jp << " ip= " << ip << " jj= " << jj  << " ii= " << ii<< std::endl;
+    	        //std::cerr << " FIRST_XMIPP_INDEX(new_micrograph_xsize)= " << FIRST_XMIPP_INDEX(new_micrograph_xsize) + skip_side_pix + 1<< " LAST_XMIPP_INDEX(new_micrograph_xsize)= " << LAST_XMIPP_INDEX(new_micrograph_xsize)- skip_side_pix - 1 << std::endl;
+    	        //std::cerr << " FIRST_XMIPP_INDEX(new_micrograph_ysize)= " << FIRST_XMIPP_INDEX(new_micrograph_ysize) + skip_side_pix + 1<< " LAST_XMIPP_INDEX(new_micrograph_ysize)= " << LAST_XMIPP_INDEX(new_micrograph_ysize)- skip_side_pix - 1 << std::endl;
+    			if ( (jp >= (FIRST_XMIPP_INDEX(XSIZE(Mccf)) ))
+    	          && (jp <=  (LAST_XMIPP_INDEX(XSIZE(Mccf)) ))
+    	          && (ip >= (FIRST_XMIPP_INDEX(YSIZE(Mccf)) ))
+    	          && (ip <=  (LAST_XMIPP_INDEX(YSIZE(Mccf)) )) )
+    	        	 A2D_ELEM(Mccf, ip, jp) = -999.;
+    		}
+    	}
+    }
+
+	// See how far we can grow in any of the circle directions....
+	// Recursive call to findNextCandidateCoordinates....
+	// Let's search 3 layers deep...
+	std::vector<AmyloidCoord> new1coords;
+	new1coords = findNextCandidateCoordinates(mycoord, circle, threshold_value, max_psidiff, skip_side, scale, Mccf, Mpsi);
+
+	long int N = new1coords.size();
+	std::vector<int> max_depths(N, 0);
+	std::vector<RFLOAT> max_sumfoms(N, -9999.);
+
+	RFLOAT sumfom = 0.;
+	RFLOAT max_sumfom = -9999.;
+	int best_inew1=-1;
+	for (int inew1 = 0; inew1 < new1coords.size(); inew1++)
+	{
+		sumfom = new1coords[inew1].fom;
+		if (sumfom > max_sumfom)
+		{
+			max_sumfom = sumfom;
+			best_inew1 = inew1;
+		}
+
+		std::vector<AmyloidCoord> new2coords;
+		new2coords = findNextCandidateCoordinates(new1coords[inew1], circle, threshold_value, max_psidiff, skip_side, scale, Mccf, Mpsi);
+		for (int inew2 = 0; inew2 < new2coords.size(); inew2++)
+		{
+
+			sumfom = new1coords[inew1].fom + new2coords[inew2].fom;
+			if (sumfom > max_sumfom)
+			{
+				max_sumfom = sumfom;
+				best_inew1 = inew1;
+			}
+
+			std::vector<AmyloidCoord> new3coords;
+			new3coords = findNextCandidateCoordinates(new2coords[inew2], circle, threshold_value, max_psidiff, skip_side, scale, Mccf, Mpsi);
+			for (int inew3 = 0; inew3 < new3coords.size(); inew3++)
+			{
+				sumfom = new1coords[inew1].fom + new2coords[inew2].fom + new3coords[inew3].fom;
+				if (sumfom > max_sumfom)
 				{
-					A2D_ELEM(Mccf, ii, jj) = -999.;
+					max_sumfom = sumfom;
+					best_inew1 = inew1;
 				}
-				else if (r2 < myradb2)
+
+				std::vector<AmyloidCoord> new4coords;
+				new4coords = findNextCandidateCoordinates(new3coords[inew3], circle, threshold_value, max_psidiff, skip_side, scale, Mccf, Mpsi);
+				for (int inew4 = 0; inew4 < new4coords.size(); inew4++)
 				{
-					// Find neighbouring pixel with matching psi, ccf>minccf, and highest ccf
-					float mypsi = A2D_ELEM(Mpsi, ii, jj);
-					float myccf = A2D_ELEM(Mccf, ii, jj);
-
-					// At least min_ccf, and also inside the original micrograph, with its skip_side
-					if (myccf > threshold_value
-					&& (jj >= (FIRST_XMIPP_INDEX(new_micrograph_xsize) + skip_side_pix + 1))
-					&& (jj < (LAST_XMIPP_INDEX(new_micrograph_xsize) - skip_side_pix - 1))
-					&& (ii >= (FIRST_XMIPP_INDEX(new_micrograph_ysize) + skip_side_pix + 1))
-					&& (ii < (LAST_XMIPP_INDEX(new_micrograph_ysize) - skip_side_pix - 1)) )
+					sumfom = new1coords[inew1].fom + new2coords[inew2].fom + new3coords[inew3].fom + new4coords[inew4].fom;
+					if (sumfom > max_sumfom)
 					{
-
-						// Small difference in psi-angle with mycoord
-						RFLOAT psidiff = fabs(mycoord.psi - mypsi);
-						psidiff = realWRAP(psidiff, 0., 360.);
-						if (psidiff > 180.)
-							psidiff -= 180.;
-						if (psidiff > 90.)
-							psidiff -= 180.;
-						if (fabs(psidiff) < max_psidiff)
-						{
-
-							// The angle of the vector between the coordinates and the PSI angle of a should also be less than max_psidiff
-							float myang = -1. * RAD2DEG(atan2((mycoord.y-ii),(mycoord.x-jj)));
-							myang = realWRAP(myang, 0., 360.);
-							float mydiff = fabs(myang - mycoord.psi);
-							mydiff = realWRAP(mydiff, 0., 360.);
-							if (mydiff > 180.)
-								mydiff -= 180.;
-							if (mydiff > 90.)
-								mydiff -= 180.;
-							if (fabs(mydiff) < max_psidiff)
-							{
-								// Of all the pixels that remain: take the one with the highest ccf value
-								//if (myccf > best_ccf)
-								// No: better to take the one with the smallest mydiff: that gives longer and straighter filaments
-								if (fabs(mydiff) < best_psidiff)
-								{
-									best_ccf = myccf;
-									best_psidiff = fabs(mydiff);
-									result.x = jj;
-									result.y = ii;
-									result.fom = myccf;
-									result.psi = mypsi;
-								}
-							}
-						}
+						max_sumfom = sumfom;
+						best_inew1 = inew1;
 					}
-				} // end if (r2 < myradb2)
+				}
 			}
 		}
 	}
 
-	return result;
+	if (best_inew1 < 0)
+	{
+		return result;
+	}
+	else
+	{
+		/*
+		RFLOAT prevpsi = (best_inew1 > 0) ? new1coords[best_inew1-1].psi : -99999.;
+		RFLOAT nextpsi = (new1coords.size() - best_inew1 > 1) ? new1coords[best_inew1+1].psi : -99999.;
+
+		RFLOAT nextpsidiff = -9999., prevpsidiff=-9999.;
+		if (prevpsi > -999.)
+		{
+			RFLOAT psidiff = fabs(mycoord.psi - prevpsi);
+			psidiff = realWRAP(psidiff, 0., 360.);
+			if (psidiff > 180.)
+					psidiff -= 180.;
+			if (psidiff > 90.)
+					psidiff -= 180.;
+			prevpsidiff = psidiff;
+		}
+		if (nextpsi > -999.)
+		{
+			RFLOAT psidiff = fabs(mycoord.psi - nextpsi);
+			psidiff = realWRAP(psidiff, 0., 360.);
+			if (psidiff > 180.)
+					psidiff -= 180.;
+			if (psidiff > 90.)
+					psidiff -= 180.;
+			nextpsidiff = psidiff;
+		}
+
+
+
+		std::cerr << " new1coords[best_inew1].fom= " << new1coords[best_inew1].fom
+				<< " x= " << new1coords[best_inew1].x
+				<< " y= " << new1coords[best_inew1].y
+				<< " myx= " << mycoord.x
+				<< " myy= " << mycoord.y
+				<< " mypsi= " << mycoord.psi
+				<< " new1coords[best_inew1].psi= " << new1coords[best_inew1].psi
+				<< " prevpsi= " << prevpsi << " prevpsidiff= " << prevpsidiff
+				<< " nextpsi= " << nextpsi << " nextpsidiff= " << nextpsidiff
+				<< std::endl;
+		*/
+		return new1coords[best_inew1];
+	}
 }
 
 
@@ -920,7 +1039,40 @@ void AutoPicker::pickAmyloids(
 		int skip_side, float scale)
 {
 
-	std::vector< std::vector <Peak> > helices;
+
+	// Set up a vector with coordinates of feasible next coordinates regarding distance and psi-angle
+    std::vector<AmyloidCoord> circle;
+	int myrad = ROUND(0.5*helical_tube_diameter/angpix*scale);
+    int myradb = myrad + 1;
+    float myrad2 = (float)myrad * (float)myrad;
+    float myradb2 = (float)myradb * (float)myradb;
+    for (int ii = -myradb; ii <= myradb; ii++)
+    {
+    	for (int jj = -myradb; jj <= myradb; jj++)
+    	{
+    		float r2 = (float)(ii*ii) + (float)(jj*jj);
+    		if (r2 > myrad2 && r2 <= myradb2)
+    		{
+                float myang = RAD2DEG(atan2((float)(ii),(float)(jj)));
+                if (myang > 90.)
+                    myang -= 180.;
+                if (myang < -90.)
+                    myang += 180.;
+                if (fabs(myang) < max_psidiff)
+                {
+                	AmyloidCoord circlecoord;
+                	circlecoord.x = (RFLOAT)jj;
+                	circlecoord.y = (RFLOAT)ii;
+                	circlecoord.fom =0.;
+                	circlecoord.psi =myang;
+                	circle.push_back(circlecoord);
+                	//std::cerr << " circlecoord.x= " << circlecoord.x << " circlecoord.y= " << circlecoord.y << " psi= " << circlecoord.psi << std::endl;
+                }
+    		}
+    	}
+    }
+
+	std::vector< std::vector <AmyloidCoord> > helices;
 	bool no_more_ccf_peaks = false;
 	while (!no_more_ccf_peaks)
 	{
@@ -929,52 +1081,70 @@ void AutoPicker::pickAmyloids(
 		float mypsi = Mpsi(imax, jmax);
 
 		// Stop searching if all pixels are below min_ccf!
+		//std::cerr << " myccf= " << myccf << " imax= " << imax << " jmax= " << jmax << std::endl;
+		//std::cerr << " helices.size()= " << helices.size() << " threshold_value= " << threshold_value << " mypsi= " << mypsi << std::endl;
 		if (myccf < threshold_value)
 			no_more_ccf_peaks = true;
 
-		std::vector<Peak> helix;
-		Peak coord, newcoord;
+		std::vector<AmyloidCoord> helix;
+		AmyloidCoord coord, newcoord;
 		coord.x = jmax;
 		coord.y = imax;
 		coord.fom = myccf;
 		coord.psi = mypsi;
 		helix.push_back(coord);
+
 		bool is_done_start = false;
 		bool is_done_end = false;
-
-
 		while ( (!is_done_start) || (!is_done_end) )
 		{
 			if (!is_done_start)
 			{
-				newcoord = findNextAmyloidCoordinate(helix[0], threshold_value, max_psidiff,
+				newcoord = findNextAmyloidCoordinate(helix[0], circle, threshold_value, max_psidiff,
 						helical_tube_diameter/angpix, ROUND(skip_side), scale, Mccf, Mpsi);
-				//std::cerr << " START newcoord.x= " << newcoord.x << " newcoord.y= " << newcoord.y << " newcoord.fom= " << newcoord.fom << std::endl;
+				//std::cerr << " START newcoord.x= " << newcoord.x << " newcoord.y= " << newcoord.y << " newcoord.fom= " << newcoord.fom
+				//		<< " stddev = " << A2D_ELEM(Mstddev, ROUND(newcoord.y), ROUND(newcoord.x))
+				//		<< " avg= " <<	A2D_ELEM(Mavg, ROUND(newcoord.y), ROUND(newcoord.x))	<< std::endl;
 				// Also check for Mstddev value
 				if (newcoord.fom > threshold_value &&
-						!(max_stddev_noise > 0. && A2D_ELEM(Mstddev, newcoord.y, newcoord.x) > max_stddev_noise) &&
-						!(min_avg_noise > -900. && A2D_ELEM(Mavg, newcoord.y, newcoord.x) < min_avg_noise) )
+						!(max_stddev_noise > 0. && A2D_ELEM(Mstddev, ROUND(newcoord.y), ROUND(newcoord.x)) > max_stddev_noise) &&
+						!(min_avg_noise > -900. && A2D_ELEM(Mavg, ROUND(newcoord.y), ROUND(newcoord.x)) < min_avg_noise) )
 					helix.insert(helix.begin(), newcoord);
 				else
 					is_done_start = true;
 			}
 			if (!is_done_end)
 			{
-				newcoord = findNextAmyloidCoordinate(helix[helix.size()-1], threshold_value, max_psidiff,
+				newcoord = findNextAmyloidCoordinate(helix[helix.size()-1], circle, threshold_value, max_psidiff,
 						helical_tube_diameter/angpix, ROUND(skip_side), scale, Mccf, Mpsi);
 				//std::cerr << " END newcoord.x= " << newcoord.x << " newcoord.y= " << newcoord.y << " newcoord.fom= " << newcoord.fom << std::endl;
 				if (newcoord.fom > threshold_value &&
-						!(max_stddev_noise > 0. && A2D_ELEM(Mstddev, newcoord.y, newcoord.x) > max_stddev_noise) &&
-						!(min_avg_noise > -900. && A2D_ELEM(Mavg, newcoord.y, newcoord.x) < min_avg_noise) )
+						!(max_stddev_noise > 0. && A2D_ELEM(Mstddev, ROUND(newcoord.y), ROUND(newcoord.x)) > max_stddev_noise) &&
+						!(min_avg_noise > -900. && A2D_ELEM(Mavg, ROUND(newcoord.y), ROUND(newcoord.x)) < min_avg_noise) )
 					helix.push_back(newcoord);
 				else
 					is_done_end = true;
 			}
+			//std::cerr << " is_done_start= " << is_done_start << " is_done_end= " << is_done_end << std::endl;
 		}
 
+		//std::cerr << " helix.size()= " << helix.size() << std::endl;
 		if (helical_tube_diameter*0.5*helix.size() > helical_tube_length_min)
 		{
 			helices.push_back(helix);
+			/*
+			std::cerr << "PUSHING BACK HELIX " << helices.size() << " << WITH SIZE= " << helix.size() << std::endl;
+			char c;
+			std::cerr << " helices.size()= " << helices.size() << std::endl;
+			std::cerr << "press any key" << std::endl;
+			//std::cin >> c;
+			Image<RFLOAT> It;
+			It()=Mccf;
+			It.write("Mccf.spi");
+
+			// TMP
+			//no_more_ccf_peaks=true;
+			 */
 		}
 
 	} // end while (!no_more_ccf_peaks)
@@ -1008,12 +1178,15 @@ void AutoPicker::pickAmyloids(
 		{
 
 			/*
-				RFLOAT xval =  (helices[ihelix][iseg].x / scale) - (RFLOAT)(FIRST_XMIPP_INDEX(micrograph_xsize));
+
+ 				RFLOAT xval =  (helices[ihelix][iseg].x / scale) - (RFLOAT)(FIRST_XMIPP_INDEX(micrograph_xsize));
 				RFLOAT yval =  (helices[ihelix][iseg].y / scale) - (RFLOAT)(FIRST_XMIPP_INDEX(micrograph_ysize));
 				MDout.addObject();
 				MDout.setValue(EMDL_IMAGE_COORD_X, xval);
 				MDout.setValue(EMDL_IMAGE_COORD_Y, yval);
-			*/
+				MDout.setValue(EMDL_PARTICLE_HELICAL_TUBE_ID, ihelix+1); // start counting at 1
+				MDout.setValue(EMDL_ORIENT_PSI_PRIOR, helices[ihelix][iseg].psi);
+ 	 	 	 */
 
 			// Distance to next segment
 			float dx = (float)(helices[ihelix][iseg+1].x - helices[ihelix][iseg].x)/ scale;

@@ -70,6 +70,11 @@ struct Peak
 	RFLOAT psi, fom, relative_fom;
 };
 
+struct AmyloidCoord
+{
+	RFLOAT x, y, psi, fom;
+};
+
 class AutoPicker
 {
 public:
@@ -278,8 +283,13 @@ public:
 	// General function to decide what to do
 	void run();
 
-	Peak findNextAmyloidCoordinate(Peak &mycoord, RFLOAT threshold_value, RFLOAT max_psidiff, RFLOAT amyloid_diameter_pix,
-			int skip_side, float scale, MultidimArray<RFLOAT> &Mccf, MultidimArray<RFLOAT> &Mpsi);
+	std::vector<AmyloidCoord> findNextCandidateCoordinates(AmyloidCoord &mycoord, std::vector<AmyloidCoord> &circle,
+			RFLOAT threshold_value, RFLOAT max_psidiff, int skip_side, float scale,
+			MultidimArray<RFLOAT> &Mccf, MultidimArray<RFLOAT> &Mpsi);
+
+	AmyloidCoord findNextAmyloidCoordinate(AmyloidCoord &mycoord, std::vector<AmyloidCoord> &circle, RFLOAT threshold_value,
+			RFLOAT max_psidiff, RFLOAT amyloid_diameter_pix, int skip_side, float scale,
+			MultidimArray<RFLOAT> &Mccf, MultidimArray<RFLOAT> &Mpsi);
 
 	void pickAmyloids(
 			MultidimArray<RFLOAT>& Mccf,
