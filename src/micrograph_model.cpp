@@ -29,6 +29,8 @@
  * Use factory pattern?
  */
 
+const RFLOAT Micrograph::NOT_OBSERVED = -9999.0;
+
 void Micrograph::setMovie(FileName fnMovie, FileName fnGain) {
 	Image<RFLOAT> Ihead;
 	Ihead.read(fnMovie, false);

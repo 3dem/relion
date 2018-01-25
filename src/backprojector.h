@@ -60,6 +60,8 @@ public:
 
 public:
 
+    BackProjector(){}
+
     /** Empty constructor
 	 *
 	 * A BackProjector is created.
