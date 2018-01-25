@@ -1508,7 +1508,7 @@ void MlOptimiserMpi::expectation()
 					MlDeviceBundle* b = ((MlDeviceBundle*)accDataBundles[i]);
 					b->syncAllBackprojects();
 
-					for (int j = 0; j < b->projectors.size(); j++)
+					for (int j = 0; j < b->backprojectors.size(); j++)
 					{
 						unsigned long s = wsum_model.BPref[j].data.nzyxdim;
 						XFLOAT *reals = new XFLOAT[s];
@@ -1584,7 +1584,7 @@ void MlOptimiserMpi::expectation()
 				std::cerr << "Faux thread id: " << b->thread_id << std::endl;
 #endif
 
-				for (int j = 0; j < b->projectors.size(); j++)
+				for (int j = 0; j < b->backprojectors.size(); j++)
 				{
 					unsigned long s = wsum_model.BPref[j].data.nzyxdim;
 					XFLOAT *reals = NULL;

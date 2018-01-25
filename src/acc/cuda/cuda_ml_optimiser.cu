@@ -81,8 +81,6 @@ size_t MlDeviceBundle::checkFixedSizedObjects(int shares)
 }
 void MlDeviceBundle::setupFixedSizedObjects()
 {
-	unsigned nr_models = baseMLO->mymodel.PPref.size();
-
 	int devCount;
 	HANDLE_ERROR(cudaGetDeviceCount(&devCount));
 	if(device_id >= devCount)
@@ -99,17 +97,17 @@ void MlDeviceBundle::setupFixedSizedObjects()
 	else
 		generateProjectionPlanOnTheFly = false;
 
-	// clear() called on std::vector appears to set size=0, even if we have an explicit
-	// destructor for each member, so we need to set the size to what is was before
-	projectors.resize(nr_models);
-	backprojectors.resize(nr_models);
+	unsigned nr_proj = baseMLO->mymodel.PPref.size();
+	unsigned nr_bproj = baseMLO->wsum_model.BPref.size();
+
+	projectors.resize(nr_proj);
+	backprojectors.resize(nr_bproj);
 
 	/*======================================================
 	              PROJECTOR AND BACKPROJECTOR
 	======================================================*/
 
-	//Loop over classes
-	for (int imodel = 0; imodel < nr_models; imodel++)
+	for (int imodel = 0; imodel < nr_proj; imodel++)
 	{
 		projectors[imodel].setMdlDim(
 				baseMLO->mymodel.PPref[imodel].data.xdim,
@@ -126,9 +124,12 @@ void MlDeviceBundle::setupFixedSizedObjects()
 		 * Remove the following condition when projections for multibody are done by the ACC projector
 		 ***********************************************************************************************/
 
-		if (baseMLO->mymodel.nr_bodies > 1)
+		if (baseMLO->mymodel.nr_bodies == 1)
 			baseMLO->mymodel.PPref[imodel].data.coreDeallocate();
+	}
 
+	for (int imodel = 0; imodel < nr_bproj; imodel++)
+	{
 		backprojectors[imodel].setMdlDim(
 				baseMLO->wsum_model.BPref[imodel].data.xdim,
 				baseMLO->wsum_model.BPref[imodel].data.ydim,

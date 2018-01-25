@@ -2837,7 +2837,7 @@ void MlOptimiser::expectation()
 			MlDeviceBundle* b = ((MlDeviceBundle*)accDataBundles[i]);
 			b->syncAllBackprojects();
 
-			for (int j = 0; j < b->projectors.size(); j++)
+			for (int j = 0; j < b->backprojectors.size(); j++)
 			{
 				unsigned long s = wsum_model.BPref[j].data.nzyxdim;
 				XFLOAT *reals = new XFLOAT[s];
@@ -2902,7 +2902,7 @@ void MlOptimiser::expectation()
 	{
 		MlDataBundle* b = (MlDataBundle*) accDataBundles[0];
 
-		for (int j = 0; j < b->projectors.size(); j++)
+		for (int j = 0; j < b->backprojectors.size(); j++)
 		{
 			unsigned long s = wsum_model.BPref[j].data.nzyxdim;
 			XFLOAT *reals = NULL; 
