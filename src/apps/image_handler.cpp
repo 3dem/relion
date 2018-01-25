@@ -715,7 +715,8 @@ class image_handler_parameters
 					my_fn_out = fn_img;
 				else if(fn_out.getExtension() == "mrcs" && !fn_out.contains("@"))
 				{
-					my_fn_out.compose(current_object,fn_out);
+					// current_object starts counting from 0, thus needs to be incremented.
+					my_fn_out.compose(current_object + 1, fn_out);
 				}
 				else
 				{
