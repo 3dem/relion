@@ -825,8 +825,8 @@ std::vector<AmyloidCoord> AutoPicker::findNextCandidateCoordinates(AmyloidCoord 
 	int new_micrograph_xsize = (int)((float)micrograph_xsize*scale);
     int new_micrograph_ysize = (int)((float)micrograph_ysize*scale);
     int skip_side_pix = ROUND(skip_side * scale);
-	Matrix2D<double> A2D;
-	Matrix1D<double> vec_c(2), vec_p(2);
+	Matrix2D<RFLOAT> A2D;
+	Matrix1D<RFLOAT> vec_c(2), vec_p(2);
 	rotation2DMatrix(-mycoord.psi, A2D, false);
 
 	for (int icoor = 0; icoor < circle.size(); icoor++)

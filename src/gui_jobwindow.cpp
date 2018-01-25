@@ -394,7 +394,7 @@ void JobWindow::updateMyJob()
 
 }
 
-void JobWindow::initialise(std::string my_job_type, bool _do_oldstyle)
+void JobWindow::initialise(int my_job_type, bool _do_oldstyle)
 {
 
 	do_oldstyle = _do_oldstyle;

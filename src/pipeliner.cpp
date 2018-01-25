@@ -564,7 +564,57 @@ bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, boo
 }
 
 // Adds a scheduled job to the pipeline from the command line
-void PipeLine::addScheduledJob(std::string job_type, std::string fn_options)
+void PipeLine::addScheduledJob(std::string typestring, std::string fn_options)
+{
+
+	int type;
+	if (typestring == PROC_IMPORT_NAME)
+            type = PROC_IMPORT;
+    else if (typestring == PROC_MOTIONCORR_NAME)
+            type = PROC_MOTIONCORR;
+    else if (typestring == PROC_CTFFIND_NAME)
+            type = PROC_CTFFIND;
+    else if (typestring == PROC_MANUALPICK_NAME)
+            type = PROC_MANUALPICK;
+    else if (typestring == PROC_AUTOPICK_NAME)
+            type = PROC_AUTOPICK;
+    else if (typestring == PROC_EXTRACT_NAME)
+            type = PROC_EXTRACT;
+    else if (typestring == PROC_SORT_NAME)
+            type = PROC_SORT;
+    else if (typestring == PROC_CLASSSELECT_NAME)
+            type = PROC_CLASSSELECT;
+    else if (typestring == PROC_2DCLASS_NAME)
+            type = PROC_2DCLASS;
+    else if (typestring == PROC_3DCLASS_NAME)
+            type = PROC_3DCLASS;
+    else if (typestring == PROC_3DAUTO_NAME)
+            type = PROC_3DAUTO;
+    else if (typestring == PROC_POLISH_NAME)
+            type = PROC_POLISH;
+    else if (typestring == PROC_MASKCREATE_NAME)
+            typestring = PROC_MASKCREATE;
+    else if (typestring == PROC_JOINSTAR_NAME)
+            type = PROC_JOINSTAR;
+    else if (typestring == PROC_SUBTRACT_NAME)
+            type = PROC_SUBTRACT;
+    else if (typestring == PROC_POST_NAME)
+            type = PROC_POST;
+    else if (typestring == PROC_RESMAP_NAME)
+            type = PROC_RESMAP;
+    else if (typestring == PROC_MOVIEREFINE_NAME)
+            type = PROC_MOVIEREFINE;
+    else if (typestring == PROC_INIMODEL_NAME)
+            type = PROC_INIMODEL;
+    else
+    	REPORT_ERROR("ERROR: unrecognised string for job type: " + typestring);
+
+	addScheduledJob(type, fn_options);
+
+}
+
+// Adds a scheduled job to the pipeline from the command line
+void PipeLine::addScheduledJob(int job_type, std::string fn_options)
 {
 	RelionJob job;
 	job.initialise(job_type);
@@ -684,7 +734,7 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 					// Will we do another repeat?
 					if (repeat + 1 != nr_repeat)
 					{
-						std::string mytype = processList[current_job].type;
+						int mytype = processList[current_job].type;
 						// The following jobtypes have functionality to only do the unfinished part of the job
 						if (mytype == PROC_MOTIONCORR || mytype == PROC_CTFFIND || mytype == PROC_AUTOPICK || mytype == PROC_EXTRACT || mytype == PROC_MOVIEREFINE)
 						{
@@ -1652,53 +1702,13 @@ void PipeLine::read(bool do_lock)
     MDproc.readStar(in, "pipeline_processes");
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDproc)
 	{
-		std::string name, alias, type;
-		int status;
+		std::string name, alias;
+		int type, status;
 		if (!MDproc.getValue(EMDL_PIPELINE_PROCESS_NAME, name) ||
 			!MDproc.getValue(EMDL_PIPELINE_PROCESS_ALIAS, alias) ||
 			!MDproc.getValue(EMDL_PIPELINE_PROCESS_TYPE, type) ||
 			!MDproc.getValue(EMDL_PIPELINE_PROCESS_STATUS, status)	)
 			REPORT_ERROR("PipeLine::read: cannot find name or type in pipeline_processes table");
-
-		// For compatibility with RELION-2.x
-		if (type == PROC_IMPORT2)
-			type = PROC_IMPORT;
-		else if (type == PROC_MOTIONCORR2)
-			type = PROC_MOTIONCORR;
-		else if (type == PROC_CTFFIND2)
-			type = PROC_CTFFIND;
-		else if (type == PROC_MANUALPICK2)
-			type = PROC_MANUALPICK;
-		else if (type == PROC_AUTOPICK2)
-			type = PROC_AUTOPICK;
-		else if (type == PROC_EXTRACT2)
-			type = PROC_EXTRACT;
-		else if (type == PROC_SORT2)
-			type = PROC_SORT;
-		else if (type == PROC_CLASSSELECT2)
-			type = PROC_CLASSSELECT;
-		else if (type == PROC_2DCLASS2)
-			type = PROC_2DCLASS;
-		else if (type == PROC_3DCLASS2)
-			type = PROC_3DCLASS;
-		else if (type == PROC_3DAUTO2)
-			type = PROC_3DAUTO;
-		else if (type == PROC_POLISH2)
-			type = PROC_POLISH;
-		else if (type == PROC_MASKCREATE2)
-			type = PROC_MASKCREATE;
-		else if (type == PROC_JOINSTAR2)
-			type = PROC_JOINSTAR;
-		else if (type == PROC_SUBTRACT2)
-			type = PROC_SUBTRACT;
-		else if (type == PROC_POST2)
-			type = PROC_POST;
-		else if (type == PROC_RESMAP2)
-			type = PROC_RESMAP;
-		else if (type == PROC_MOVIEREFINE2)
-			type = PROC_MOVIEREFINE;
-		else if (type == PROC_INIMODEL2)
-			type = PROC_INIMODEL;
 
 		Process newProcess(name, type, status, alias);
 		processList.push_back(newProcess);

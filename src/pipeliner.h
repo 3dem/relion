@@ -35,13 +35,13 @@ class Process
 	public:
 	std::string name;
 	std::string alias;
-	std::string type;
+	int type;
 	int status;
 	std::vector<long int> inputNodeList;  // List of Nodes of input to this process
 	std::vector<long int> outputNodeList; // List of Nodes of output from this process
 
 	// Constructor
-	Process(std::string _name, std::string _type, int _status, std::string _alias="None")
+	Process(std::string _name, int _type, int _status, std::string _alias="None")
 	{
 		name = _name;
 		type = _type;
@@ -149,8 +149,11 @@ class PipeLine
 	// Runs a job and adds it to the pipeline
 	bool runJob(RelionJob &_job, int &current_job, bool only_schedule, bool is_main_continue, bool is_scheduled, std::string &error_message);
 
-	// Adds a scheduled job to the pipeline from the command line
+	// Adds a scheduled job to the pipeline from the command line (with a name for job type)
 	void addScheduledJob(std::string job_type, std::string fn_options);
+
+	// Adds a scheduled job to the pipeline from the command line (with integer job type)
+	void addScheduledJob(int job_type, std::string fn_options);
 
 	// Runs a series of scheduled jobs, possibly in a loop, from the command line
 	void runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_repeat, long int minutes_wait);
