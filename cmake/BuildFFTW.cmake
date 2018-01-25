@@ -6,13 +6,21 @@ if (NOT DEFINED TARGET_X86)
 endif()
 
 find_path(   OWN_FFTW_INCLUDES NAMES fftw3.h PATHS ${FFTW_EXTERNAL_PATH}/include NO_DEFAULT_PATH) 
-find_library(OWN_FFTW_SINGLE   NAMES fftw3   PATHS ${FFTW_EXTERNAL_PATH}/lib     NO_DEFAULT_PATH)
-find_library(OWN_FFTW_DOUBLE   NAMES fftw3f  PATHS ${FFTW_EXTERNAL_PATH}/lib     NO_DEFAULT_PATH)
+find_library(OWN_FFTW_SINGLE   NAMES fftw3f  PATHS ${FFTW_EXTERNAL_PATH}/lib     NO_DEFAULT_PATH)
+find_library(OWN_FFTW_DOUBLE   NAMES fftw3   PATHS ${FFTW_EXTERNAL_PATH}/lib     NO_DEFAULT_PATH)
 
 if(OWN_FFTW_INCLUDES AND (OWN_FFTW_SINGLE OR NOT FFTW_SINGLE_REQUIRED) AND (OWN_FFTW_DOUBLE OR NOT FFTW_DOUBLE_REQUIRED))
 
-	message(STATUS "Found previously built non-system FFTW libraries that will be used.")
+	if (OWN_FFTW_SINGLE AND FFTW_SINGLE_REQUIRED)
+		message(STATUS "Found previously built non-system single precision FFTW libraries that will be used.")
+		#message(STATUS "OWN_FFTW_SINGLE:    ${OWN_FFTW_SINGLE}")
+	endif()
 
+	if (OWN_FFTW_DOUBLE AND FFTW_DOUBLE_REQUIRED)
+		message(STATUS "Found previously built non-system double precision FFTW libraries that will be used.")
+		#message(STATUS "OWN_FFTW_DOUBLE:    ${OWN_FFTW_DOUBLE}")
+	endif()
+	
 	set(FFTW_FOUND TRUE)
 	set(BUILD_OWN_FFTW FALSE)
 	set(BUILD_OWN_FFTWF FALSE)
@@ -106,7 +114,11 @@ if (FFTW_DOUBLE_REQUIRED)
 	set(FFTW_LIBRARIES ${OWN_FFTW_DOUBLE} ${FFTW_LIBRARIES})
 endif()
 
-set(FFTW_INCLUDES ${OWN_FFTW_INCLUDES} ${FFTW_INCLUDES})
+if (FFTW_INCLUDES)
+	set(FFTW_INCLUDES ${OWN_FFTW_INCLUDES} ${FFTW_INCLUDES})
+else()
+	set(FFTW_INCLUDES ${OWN_FFTW_INCLUDES})
+endif()
 
 #message(STATUS "FFTW_INCLUDES:     ${FFTW_INCLUDES}")
 #message(STATUS "FFTW_LIBRARIES:    ${FFTW_LIBRARIES}")
