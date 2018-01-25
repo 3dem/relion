@@ -1121,6 +1121,85 @@ void applyBFactorToMap(MultidimArray<RFLOAT > &img, RFLOAT bfactor, RFLOAT angpi
 }
 
 
+
+void LoGFilterMap(MultidimArray<Complex > &FT, int ori_size, RFLOAT sigma, RFLOAT angpix)
+{
+
+	// Calculation sigma in reciprocal pixels (input is in Angstroms) and pre-calculate its square
+	RFLOAT isigma2 = (0.5*ori_size * angpix)/sigma;
+	isigma2 *= isigma2;
+
+	// Put a raised cosine from edge_low to edge_high
+	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT)
+	{
+    	int r2 = kp * kp + ip * ip + jp * jp;
+    	DIRECT_A3D_ELEM(FT, k, i, j) *= r2 * exp(-0.5*r2/isigma2) / isigma2;
+	}
+
+}
+
+void LoGFilterMap(MultidimArray<RFLOAT > &img, RFLOAT sigma, RFLOAT angpix)
+{
+	FourierTransformer transformer;
+	MultidimArray<Complex > FT;
+
+	// Make this work for maps (or more likely 2D images) that have unequal X and Y dimensions
+	img.setXmippOrigin();
+	int my_xsize = XSIZE(img);
+	int my_ysize = YSIZE(img);
+	int my_size = (my_xsize != my_ysize) ? XMIPP_MAX(my_xsize, my_ysize) : my_xsize;
+	if (my_xsize != my_ysize)
+	{
+		if (img.getDim() == 2)
+		{
+			int my_small_size = XMIPP_MIN(my_xsize, my_ysize);
+			RFLOAT avg,stddev,minn,maxx;
+			img.computeStats(avg,stddev,minn,maxx);
+			img.window(FIRST_XMIPP_INDEX(my_size), FIRST_XMIPP_INDEX(my_size),
+					   LAST_XMIPP_INDEX(my_size),  LAST_XMIPP_INDEX(my_size));
+			if (my_small_size == my_xsize)
+			{
+				FOR_ALL_ELEMENTS_IN_ARRAY2D(img)
+				{
+					if (j <  FIRST_XMIPP_INDEX(my_small_size) || j >  LAST_XMIPP_INDEX(my_small_size))
+						A2D_ELEM(img, i, j) = rnd_gaus(avg, stddev);
+				}
+			}
+			else
+			{
+				FOR_ALL_ELEMENTS_IN_ARRAY2D(img)
+				{
+					if (i <  FIRST_XMIPP_INDEX(my_small_size) || i >  LAST_XMIPP_INDEX(my_small_size))
+						A2D_ELEM(img, i, j) = rnd_gaus(avg, stddev);
+				}
+
+			}
+		}
+		else
+		{
+			REPORT_ERROR("lowPassFilterMap: filtering of non-cube maps is not implemented...");
+		}
+	}
+	transformer.FourierTransform(img, FT, false);
+	LoGFilterMap(FT, XSIZE(img), sigma, angpix);
+	transformer.inverseFourierTransform();
+	img.setXmippOrigin();
+	if (my_xsize != my_ysize)
+	{
+		if (img.getDim() == 2)
+		{
+			img.window(FIRST_XMIPP_INDEX(my_ysize), FIRST_XMIPP_INDEX(my_xsize),
+					   LAST_XMIPP_INDEX(my_ysize),  LAST_XMIPP_INDEX(my_xsize));
+		}
+		else
+		{
+			REPORT_ERROR("lowPassFilterMap: filtering of non-cube maps is not implemented...");
+		}
+	}
+
+
+}
+
 void lowPassFilterMap(MultidimArray<Complex > &FT, int ori_size,
 		RFLOAT low_pass, RFLOAT angpix, int filter_edge_width, bool do_highpass_instead)
 {

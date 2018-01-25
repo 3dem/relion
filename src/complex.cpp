@@ -125,40 +125,42 @@ void operator-=(Complex& lhs, const Complex& rhs)
 	lhs.imag -= rhs.imag;
 }
 
-Complex Complex::conj()
+Complex Complex::conj() const
 {
     return Complex(real, -imag);
 }
+
 Complex conj(const Complex& op)
 {
-	return Complex(op.real, -op.imag);
+    return Complex(op.real, -op.imag);
 }
 
-
-RFLOAT Complex::abs()
+RFLOAT Complex::abs() const
 {
     return sqrt(real*real + imag*imag);
 }
+
 RFLOAT abs(const Complex& op)
 {
-	return sqrt(op.real*op.real + op.imag*op.imag);
+    return sqrt(op.real*op.real + op.imag*op.imag);
 }
 
-RFLOAT Complex::norm()
+RFLOAT Complex::norm() const
 {
     return real*real + imag*imag;
 }
+
 RFLOAT norm(const Complex& op)
 {
-	return op.real*op.real + op.imag*op.imag;
+    return op.real*op.real + op.imag*op.imag;
 }
 
-RFLOAT Complex::arg()
+RFLOAT Complex::arg() const
 {
     return atan2(imag, real);
 }
 
 RFLOAT arg(const Complex& op)
 {
-	return atan2(op.imag, op.real);
+    return atan2(op.imag, op.real);
 }
