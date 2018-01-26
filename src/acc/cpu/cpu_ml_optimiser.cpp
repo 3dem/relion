@@ -53,8 +53,8 @@
 #include <signal.h>
 #include <map>
 
-#include <parallel_for.h>
-#include <queuing_mutex.h>
+#include <tbb/parallel_for.h>
+#include <tbb/queuing_mutex.h>
 
 #include "src/acc/utilities.h"
 #include "src/acc/utilities_impl.h"
@@ -72,41 +72,51 @@ tbb::spin_mutex      mkl_mutex;
 
 void MlDataBundle::setup(MlOptimiser *baseMLO)
 {
-	unsigned nr_models = baseMLO->mymodel.PPref.size();
-
-	// clear() called on std::vector appears to set size=0, even if we have an explicit
-	// destructor for each member, so we need to set the size to what is was before
-	projectors.resize(nr_models);
-	backprojectors.resize(nr_models);
-
 	/*======================================================
 				  PROJECTOR AND BACKPROJECTOR
 	======================================================*/
 
+	unsigned nr_proj = baseMLO->mymodel.PPref.size();
+	unsigned nr_bproj = baseMLO->wsum_model.BPref.size();
+
+	projectors.resize(nr_proj);
+	backprojectors.resize(nr_bproj);
+
 	//Loop over classes
-	for (int iclass = 0; iclass < nr_models; iclass++)
+	for (int imodel = 0; imodel < nr_proj; imodel++)
 	{
-		projectors[iclass].setMdlDim(
-				baseMLO->mymodel.PPref[iclass].data.xdim,
-				baseMLO->mymodel.PPref[iclass].data.ydim,
-				baseMLO->mymodel.PPref[iclass].data.zdim,
-				baseMLO->mymodel.PPref[iclass].data.yinit,
-				baseMLO->mymodel.PPref[iclass].data.zinit,
-				baseMLO->mymodel.PPref[iclass].r_max,
-				baseMLO->mymodel.PPref[iclass].padding_factor);
+		projectors[imodel].setMdlDim(
+				baseMLO->mymodel.PPref[imodel].data.xdim,
+				baseMLO->mymodel.PPref[imodel].data.ydim,
+				baseMLO->mymodel.PPref[imodel].data.zdim,
+				baseMLO->mymodel.PPref[imodel].data.yinit,
+				baseMLO->mymodel.PPref[imodel].data.zinit,
+				baseMLO->mymodel.PPref[imodel].r_max,
+				baseMLO->mymodel.PPref[imodel].padding_factor);
 
-		projectors[iclass].initMdl(baseMLO->mdlClassComplex[iclass]);
+		projectors[imodel].initMdl(baseMLO->mdlClassComplex[imodel]);
 
-		backprojectors[iclass].setMdlDim(
-				baseMLO->wsum_model.BPref[iclass].data.xdim,
-				baseMLO->wsum_model.BPref[iclass].data.ydim,
-				baseMLO->wsum_model.BPref[iclass].data.zdim,
-				baseMLO->wsum_model.BPref[iclass].data.yinit,
-				baseMLO->wsum_model.BPref[iclass].data.zinit,
-				baseMLO->wsum_model.BPref[iclass].r_max,
-				baseMLO->wsum_model.BPref[iclass].padding_factor);
+		/***********************************************************************************************
+		 * Remove the following condition when projections for multibody are done by the ACC projector
+		 ***********************************************************************************************/
 
-		backprojectors[iclass].initMdl();
+		if (baseMLO->mymodel.nr_bodies == 1)
+			baseMLO->mymodel.PPref[imodel].data.coreDeallocate();
+
+	}
+
+	for (int imodel = 0; imodel < nr_bproj; imodel++)
+	{
+		backprojectors[imodel].setMdlDim(
+				baseMLO->wsum_model.BPref[imodel].data.xdim,
+				baseMLO->wsum_model.BPref[imodel].data.ydim,
+				baseMLO->wsum_model.BPref[imodel].data.zdim,
+				baseMLO->wsum_model.BPref[imodel].data.yinit,
+				baseMLO->wsum_model.BPref[imodel].data.zinit,
+				baseMLO->wsum_model.BPref[imodel].r_max,
+				baseMLO->wsum_model.BPref[imodel].padding_factor);
+
+		backprojectors[imodel].initMdl();
 	}
 
 	/*======================================================

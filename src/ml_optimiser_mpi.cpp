@@ -969,6 +969,9 @@ void MlOptimiserMpi::expectation()
 
 	if (do_gpu && ! node->isMaster())
 	{
+		for (int i = 0; i < wsum_model.BPref.size(); i ++)
+			wsum_model.BPref[i].data.coreDeallocate();
+
 		for (int i = 0; i < cudaDevices.size(); i ++)
 		{
 #ifdef TIMING
@@ -1047,10 +1050,14 @@ void MlOptimiserMpi::expectation()
 	//CPU memory setup
 	MPI_Barrier(MPI_COMM_WORLD);   // Is this really necessary?
 	if (do_cpu  && ! node->isMaster())
-	{	
+	{
+		for (int i = 0; i < wsum_model.BPref.size(); i ++)
+			wsum_model.BPref[i].data.coreDeallocate();
+
 		unsigned nr_classes = mymodel.PPref.size();
 		// Allocate Array of complex arrays for this class
-		posix_memalign((void **)&mdlClassComplex, MEM_ALIGN, nr_classes * sizeof (XFLOAT *));
+		if(posix_memalign((void **)&mdlClassComplex, MEM_ALIGN, nr_classes * sizeof (XFLOAT *)))
+			CRITICAL(RAMERR);
 		
 		// Set up XFLOAT complex array shared by all threads for each class
 		for (int iclass = 0; iclass < nr_classes; iclass++)
@@ -1064,7 +1071,8 @@ void MlOptimiserMpi::expectation()
 			else
 				mdlXYZ = mdlX*mdlY*mdlZ;
 			
-			posix_memalign((void **)&mdlClassComplex[iclass], MEM_ALIGN, mdlXYZ * 2 * sizeof(XFLOAT));
+			if(posix_memalign((void **)&mdlClassComplex[iclass], MEM_ALIGN, mdlXYZ * 2 * sizeof(XFLOAT)))
+				CRITICAL(RAMERR);
 			
 			XFLOAT *pData = mdlClassComplex[iclass];
 			
@@ -1500,7 +1508,7 @@ void MlOptimiserMpi::expectation()
 					MlDeviceBundle* b = ((MlDeviceBundle*)accDataBundles[i]);
 					b->syncAllBackprojects();
 
-					for (int j = 0; j < b->projectors.size(); j++)
+					for (int j = 0; j < b->backprojectors.size(); j++)
 					{
 						unsigned long s = wsum_model.BPref[j].data.nzyxdim;
 						XFLOAT *reals = new XFLOAT[s];
@@ -1508,6 +1516,8 @@ void MlOptimiserMpi::expectation()
 						XFLOAT *weights = new XFLOAT[s];
 
 						b->backprojectors[j].getMdlData(reals, imags, weights);
+
+						wsum_model.BPref[j].data.coreAllocate();
 
 						for (unsigned long n = 0; n < s; n++)
 						{
@@ -1574,7 +1584,7 @@ void MlOptimiserMpi::expectation()
 				std::cerr << "Faux thread id: " << b->thread_id << std::endl;
 #endif
 
-				for (int j = 0; j < b->projectors.size(); j++)
+				for (int j = 0; j < b->backprojectors.size(); j++)
 				{
 					unsigned long s = wsum_model.BPref[j].data.nzyxdim;
 					XFLOAT *reals = NULL;
@@ -1582,6 +1592,8 @@ void MlOptimiserMpi::expectation()
 					XFLOAT *weights = NULL;
 
 					b->backprojectors[j].getMdlDataPtrs(reals, imags, weights);
+
+					wsum_model.BPref[j].data.coreAllocate();
 
 					for (unsigned long n = 0; n < s; n++)
 					{

@@ -107,7 +107,6 @@ bool AccProjector::setMdlDim(
 	DEBUG_HANDLE_ERROR(cudaMalloc( (void**) &mdlImag, mdlXYZ * sizeof(XFLOAT)));
 #else
 	mdlComplex = NULL;
-	// posix_memalign((void **)&mdlComplex, MEM_ALIGN, mdlXYZ * 2 * sizeof(XFLOAT));
 #endif
 #endif
 	return true;
@@ -184,8 +183,8 @@ void AccProjector::initMdl(Complex *data)
 {
 	XFLOAT *tmpReal;
 	XFLOAT *tmpImag;
-	posix_memalign((void **)&tmpReal, MEM_ALIGN, mdlXYZ * sizeof(XFLOAT));
-	posix_memalign((void **)&tmpImag, MEM_ALIGN, mdlXYZ * sizeof(XFLOAT));
+	if (posix_memalign((void **)&tmpReal, MEM_ALIGN, mdlXYZ * sizeof(XFLOAT))) CRITICAL(RAMERR);
+	if (posix_memalign((void **)&tmpImag, MEM_ALIGN, mdlXYZ * sizeof(XFLOAT))) CRITICAL(RAMERR);
 
 
 	for (unsigned long i = 0; i < mdlXYZ; i ++)

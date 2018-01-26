@@ -17,8 +17,8 @@
 #include <signal.h>
 #include "src/complex.h"
 #include "src/parallel.h"
-#include <parallel_for.h>
-#include <queuing_mutex.h>
+#include <tbb/parallel_for.h>
+#include <tbb/queuing_mutex.h>
 
 namespace CpuKernels
 {

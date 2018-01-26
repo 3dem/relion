@@ -108,7 +108,8 @@ public:
 		accType(accCPU)
 #endif
 	{
-		posix_memalign((void **)&hPtr, MEM_ALIGN, sizeof(T) * size);
+		if(posix_memalign((void **)&hPtr, MEM_ALIGN, sizeof(T) * size))
+			CRITICAL(RAMERR);
 	}
 
 	AccPtr(size_t size, StreamType stream, AllocatorType *allocator):
@@ -120,7 +121,8 @@ public:
 		accType(accCPU)
 #endif
 	{
-		posix_memalign((void **)&hPtr, MEM_ALIGN, sizeof(T) * size);
+		if(posix_memalign((void **)&hPtr, MEM_ALIGN, sizeof(T) * size))
+			CRITICAL(RAMERR);
 	}
 
 	AccPtr(T * h_start, size_t size, AllocatorType *allocator):
@@ -196,7 +198,8 @@ public:
 		accType(accCPU)
 #endif
 	{
-		posix_memalign((void **)&hPtr, MEM_ALIGN, sizeof(T) * size);
+		if(posix_memalign((void **)&hPtr, MEM_ALIGN, sizeof(T) * size))
+			CRITICAL(RAMERR);
 	}
 
 	AccPtr(size_t size, StreamType stream):
@@ -208,7 +211,8 @@ public:
 		accType(accCPU)
 #endif
 	{
-		posix_memalign((void **)&hPtr, MEM_ALIGN, sizeof(T) * size);
+		if(posix_memalign((void **)&hPtr, MEM_ALIGN, sizeof(T) * size))
+			CRITICAL(RAMERR);
 	}
 
 	AccPtr(T * h_start, size_t size):
@@ -335,7 +339,8 @@ public:
 #endif
 		doFreeHost = true;
 		// TODO - alternatively, this could be aligned std::vector
-		posix_memalign((void **)&hPtr, MEM_ALIGN, sizeof(T) * size);
+		if(posix_memalign((void **)&hPtr, MEM_ALIGN, sizeof(T) * size))
+			CRITICAL(RAMERR);
 	}
 
 	/**
@@ -385,7 +390,8 @@ public:
 #endif
 		// TODO - alternatively, this could be aligned std::vector
 		T* newArr;
-		posix_memalign((void **)&newArr, MEM_ALIGN, sizeof(T) * newSize);
+		if(posix_memalign((void **)&newArr, MEM_ALIGN, sizeof(T) * newSize))
+			CRITICAL(RAMERR);
 		memset( newArr, 0x0, sizeof(T) * newSize);
 
 #ifdef DEBUG_CUDA
@@ -409,7 +415,8 @@ public:
 #endif
 		// TODO - alternatively, this could be aligned std::vector
 		T* newArr;
-		posix_memalign((void **)&newArr, MEM_ALIGN, sizeof(T) * newSize);
+		if(posix_memalign((void **)&newArr, MEM_ALIGN, sizeof(T) * newSize))
+			CRITICAL(RAMERR);
 		
 		// Copy in what we can from the original matrix
 		if ((size > 0) && (hPtr != NULL))
