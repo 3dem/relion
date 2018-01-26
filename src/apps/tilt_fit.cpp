@@ -143,7 +143,7 @@ int main(int argc, char *argv[])
 
     if (useFsc)
     {
-        RefinementHelper::computeSNR(&fscMdt, imgSnr);
+        RefinementHelper::drawFSC(&fscMdt, imgSnr);
     }
 
     double t0 = omp_get_wtime();
