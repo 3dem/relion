@@ -20,16 +20,16 @@ int RefinementProgram::init(int argc, char *argv[])
 
         parser.addSection("General options");
 
-        starFn = parser.getOption("--i", "Input STAR file", "");
+        starFn = parser.getOption("--i", "Input STAR file");
 
         if (singleReference)
         {
-            reconFn0 = parser.getOption("--m", "Reference map", "");
+            reconFn0 = parser.getOption("--m", "Reference map");
         }
         else
         {
-            reconFn0 = parser.getOption("--m0", "Reference map, half 1", "");
-            reconFn1 = parser.getOption("--m1", "Reference map, half 2", "");
+            reconFn0 = parser.getOption("--m1", "Reference map, half 1");
+            reconFn1 = parser.getOption("--m2", "Reference map, half 2");
         }
 
         maskFn = parser.getOption("--mask", "Reference mask", "");
@@ -45,8 +45,8 @@ int RefinementProgram::init(int argc, char *argv[])
         applyTilt = (ABS(beamtilt_x) > 0. || ABS(beamtilt_y) > 0.);
 
         nr_omp_threads = textToInteger(parser.getOption("--jomp", "Number of OMP threads", "1"));
-        maxMG = textToInteger(parser.getOption("--max_MG", "First micrograph index", "-1"));
-        minMG = textToInteger(parser.getOption("--min_MG", "Last micrograph index", "0"));
+        minMG = textToInteger(parser.getOption("--min_MG", "First micrograph index", "0"));
+        maxMG = textToInteger(parser.getOption("--max_MG", "Last micrograph index", "-1"));
 
         debug = parser.checkOption("--debug", "Write debugging data");
 

@@ -8,7 +8,7 @@
 
 using namespace gravis;
 
-void RefinementHelper::drawFSC(const MetaDataTable *mdt, Image<double> &dest)
+void RefinementHelper::drawFSC(const MetaDataTable *mdt, Image<double> &dest, double thresh)
 {
     const int n = mdt->numberOfObjects();
     const int w = 2*(n-1);
@@ -21,6 +21,8 @@ void RefinementHelper::drawFSC(const MetaDataTable *mdt, Image<double> &dest)
         int idx;
         mdt->getValue(EMDL_SPECTRAL_IDX, idx, i);
         mdt->getValue(EMDL_POSTPROCESS_FSC_TRUE, fsc[i], i);
+
+        if (fsc[i] < thresh) fsc[i] = 0.0;
     }
 
     dest = Image<RFLOAT>(n,h);

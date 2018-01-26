@@ -70,7 +70,7 @@ void CsFit::readMoreOptions(IOParser& parser, int argc, char *argv[])
     range = textToFloat(parser.getOption("--range", "C_s scan range", "0.5"));
     baseCs = textToFloat(parser.getOption("--base", "C_s base value", "2.7"));
     sectors = textToInteger(parser.getOption("--sec", "Number of radial sectors", "8"));
-    samples = textToInteger(parser.getOption("--n", "Number C_s samples", "31"));
+    samples = textToInteger(parser.getOption("--n", "Number of C_s samples", "31"));
     defocusRange = textToFloat(parser.getOption("--range", "Defocus scan range (in A)", "500."));
 }
 

@@ -54,17 +54,17 @@ int main(int argc, char *argv[])
 
         parser.addSection("General options");
 
-        starFn = parser.getOption("--i", "Input STAR file with the projection images and their orientations", "");
-        reconFn = parser.getOption("--m", "Input MRC file of a initial reconstruction", "");
-        fscFn = parser.getOption("--f", "Input STAR file with the FSC of the initial reconstruction (optional)", "");
-        maskFn = parser.getOption("--mask", "Mask for the initial reconstruction", "");
+        starFn = parser.getOption("--i", "Input STAR file with the projection images and their orientations");
+        reconFn = parser.getOption("--m", "Input MRC file of a initial reconstruction");
+        fscFn = parser.getOption("--f", "Input STAR file with the FSC of the initial reconstruction (optional)");
+        maskFn = parser.getOption("--mask", "Mask for the initial reconstruction");
 
-        precomp = parser.getOption("--precomp", "Precomputed *_xy and *_w files from previous run (optional)", "");
+        precomp = parser.getOption("--precomp", "Precomputed *_xy and *_w files from previous run (optional)");
         precomputed = precomp != "";
 
         useFsc = fscFn != "";
 
-        tiltFn = parser.getOption("--out", "Output filename prefix", "");
+        tiltFn = parser.getOption("--out", "Output filename prefix");
         inPath = parser.getOption("--img", "Path to images", "");
 
         angpix = textToFloat(parser.getOption("--angpix", "Pixel resolution (angst/pix)", "0."));
