@@ -26,7 +26,7 @@ class RefinementProgram
 
             // options:
 
-            bool singleReference, debug, applyTilt, useFsc;
+            bool singleReference, debug, applyTilt, useFsc, noReference, noTilt;
 
             long maxMG, minMG;
             RFLOAT angpix, paddingFactor, beamtilt_x, beamtilt_y;

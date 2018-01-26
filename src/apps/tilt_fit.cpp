@@ -27,147 +27,82 @@
 #include <src/jaz/tilt_refinement.h>
 #include <src/jaz/motion_refinement.h>
 #include <src/jaz/image_op.h>
+#include <src/jaz/refinement_program.h>
 
 #include <omp.h>
 
 using namespace gravis;
 
-#define BILLION 1000000000L
+class TiltFit : public RefinementProgram
+{
+    public:
+
+        TiltFit();
+
+            RFLOAT kmin;
+            bool precomputed;
+            std::string precomp;
+
+            Image<Complex> lastXY;
+            Image<RFLOAT> lastW;
+
+        void readMoreOptions(IOParser& parser, int argc, char *argv[]);
+        int _init();
+        int _run();
+};
+
+TiltFit :: TiltFit()
+:   RefinementProgram(true)
+{
+    noTilt = true;
+}
 
 int main(int argc, char *argv[])
 {
-    std::string starFn, reconFn, tiltFn, inPath, fscFn, maskFn, precomp;
-    long maxMG = -1;
-    int nr_omp_threads;
-    bool useFsc, precomputed;
-    RFLOAT angpix, pad, kmin;
+    TiltFit tf;
 
-    Image<RFLOAT> map, dummy, lastW;
-    Image<Complex> lastXY;
-    MetaDataTable fscMdt;
+    int rc0 = tf.init(argc, argv);
+    if (rc0 != 0) return rc0;
 
-    IOParser parser;
+    int rc1 = tf.run();
+    if (rc1 != 0) return rc1;
+}
 
-    try
+void TiltFit::readMoreOptions(IOParser& parser, int argc, char *argv[])
+{
+    kmin = textToFloat(parser.getOption("--kmin", "Inner freq. threshold [Angst]", "30.0"));
+
+    precomp = parser.getOption("--precomp", "Precomputed *_xy and *_w files from previous run (optional)", "");
+    precomputed = precomp != "";
+
+    noReference = precomputed;
+}
+
+int TiltFit::_init()
+{
+    if (precomputed)
     {
-        parser.setCommandLine(argc, argv);
+        ComplexIO::read(lastXY, precomp+"_xy", ".mrc");
+        lastW.read(precomp+"_w.mrc");
 
-        parser.addSection("General options");
-
-        starFn = parser.getOption("--i", "Input STAR file with the projection images and their orientations");
-        reconFn = parser.getOption("--m", "Input MRC file of a initial reconstruction");
-        fscFn = parser.getOption("--f", "Input STAR file with the FSC of the initial reconstruction (optional)");
-        maskFn = parser.getOption("--mask", "Mask for the initial reconstruction");
-
-        precomp = parser.getOption("--precomp", "Precomputed *_xy and *_w files from previous run (optional)");
-        precomputed = precomp != "";
-
-        useFsc = fscFn != "";
-
-        tiltFn = parser.getOption("--out", "Output filename prefix");
-        inPath = parser.getOption("--img", "Path to images", "");
-
-        angpix = textToFloat(parser.getOption("--angpix", "Pixel resolution (angst/pix)", "0."));
-        pad = textToFloat(parser.getOption("--pad", "Padding factor", "2.0"));
-        kmin = textToFloat(parser.getOption("--kmin", "Inner freq. threshold [Angst]", "30.0"));
-
-        nr_omp_threads = textToInteger(parser.getOption("--jomp", "Number of OMP threads", "1"));
-
-        maxMG = textToInteger(getParameter(argc, argv, "--max_MG", "-1"));
-
-        if (!precomputed)
-        {
-            try
-            {
-                map.read(reconFn);
-            }
-            catch (RelionError XE)
-            {
-                std::cout << "Unable to read map: " << reconFn << "\n";
-                exit(1);
-            }
-        }
-
-        if (useFsc)
-        {
-            fscMdt.read(fscFn, "fsc");
-
-            bool allGood = true;
-
-            if (!fscMdt.containsLabel(EMDL_SPECTRAL_IDX))
-            {
-                std::cerr << fscFn << " does not contain a value for " << EMDL::label2Str(EMDL_SPECTRAL_IDX) << ".\n";
-                allGood = false;
-            }
-            if (!fscMdt.containsLabel(EMDL_POSTPROCESS_FSC_TRUE))
-            {
-                std::cerr << fscFn << " does not contain a value for " << EMDL::label2Str(EMDL_POSTPROCESS_FSC_TRUE) << ".\n";
-                allGood = false;
-            }
-        }
-
-        if (precomputed)
-        {
-            ComplexIO::read(lastXY, precomp+"_xy", ".mrc");
-            lastW.read(precomp+"_w.mrc");
-        }
-    }
-    catch (RelionError XE)
-    {
-        parser.writeUsage(std::cout);
-        std::cerr << XE;
-        exit(1);
+        s = lastXY.data.ydim;
+        sh = s/2 + 1;
     }
 
-    if (!precomputed && (map.data.xdim != map.data.ydim || map.data.ydim != map.data.zdim))
-    {
-        REPORT_ERROR(reconFn + " is not cubical.\n");
-    }
+    return 0;
+}
 
-    const int s = precomputed? lastXY.data.ydim : map.data.xdim;
-    const int sh = s/2 + 1;
-
-    if (!precomputed && maskFn != "")
-    {
-        Image<RFLOAT> mask, maskedRef;
-        mask.read(maskFn);
-
-        ImageOp::multiply(mask, map, maskedRef);
-        map = maskedRef;
-    }
-
+int TiltFit::_run()
+{
     Image<Complex> xyAccSum(sh,s);
     Image<RFLOAT> wAccSum(sh,s);
 
-    Image<RFLOAT> imgSnr;
-
-    if (useFsc)
-    {
-        RefinementHelper::drawFSC(&fscMdt, imgSnr);
-    }
-
     double t0 = omp_get_wtime();
-
-
-    MetaDataTable mdt0;
-    mdt0.read(starFn);
-
-    RFLOAT Cs, lambda, kV;
-
-    mdt0.getValue(EMDL_CTF_CS, Cs, 0);
-    mdt0.getValue(EMDL_CTF_VOLTAGE, kV, 0);
-
-    RFLOAT V = kV * 1e3;
-    lambda = 12.2643247 / sqrt(V * (1.0 + V * 0.978466e-6));
-
 
     if (!precomputed)
     {
         xyAccSum.data.initZeros();
         wAccSum.data.initZeros();
-
-        Projector projector(s, TRILINEAR, pad, 10, 2);
-        projector.computeFourierTransformMap(map.data, dummy.data, 2*s);
 
         std::vector<Image<Complex>> xyAcc(nr_omp_threads);
         std::vector<Image<RFLOAT>> wAcc(nr_omp_threads);
@@ -183,19 +118,11 @@ int main(int argc, char *argv[])
 
         std::vector<MetaDataTable> mdts = StackHelper::splitByStack(&mdt0);
 
-        if (angpix <= 0.0)
-        {
-            RFLOAT mag, dstep;
-            mdts[0].getValue(EMDL_CTF_MAGNIFICATION, mag, 0);
-            mdts[0].getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep, 0);
-            angpix = 10000 * dstep / mag;
-        }
-
         std::vector<FourierTransformer> fts(nr_omp_threads);
 
-        const long gc = maxMG >= 0? maxMG : mdts.size();
+        const long gc = maxMG >= 0? maxMG+1 : mdts.size();
 
-        for (long g = 0; g < gc; g++)
+        for (long g = minMG; g < gc; g++)
         {
             std::cout << "micrograph " << g << " / " << mdts.size() <<"\n";
 
@@ -207,14 +134,14 @@ int main(int argc, char *argv[])
 
             if (nr_omp_threads > 1)
             {
-                pred = StackHelper::projectStackPar(&projector, &mdts[g], nr_omp_threads);
+                pred = StackHelper::projectStackPar(&projectors[0], &mdts[g], nr_omp_threads);
             }
             else
             {
-                pred = StackHelper::projectStack(&projector, &mdts[g]);
+                pred = StackHelper::projectStack(&projectors[0], &mdts[g]);
             }
 
-            obsF = StackHelper::loadStackFS(&mdts[g], inPath, nr_omp_threads, &fts);
+            obsF = StackHelper::loadStackFS(&mdts[g], imgPath, nr_omp_threads, &fts);
 
             #pragma omp parallel for num_threads(nr_omp_threads)
             for (long p = 0; p < pred.size(); p++)
@@ -232,8 +159,8 @@ int main(int argc, char *argv[])
             ImageOp::linearCombination(wAccSum, wAcc[i], 1.0, 1.0, wAccSum);
         }
 
-        ComplexIO::write(xyAccSum(), tiltFn+"_xy", ".mrc");
-        wAccSum.write(tiltFn+"_w.mrc");
+        ComplexIO::write(xyAccSum(), outPath+"_xy", ".mrc");
+        wAccSum.write(outPath+"_w.mrc");
     }
     else
     {
@@ -247,7 +174,7 @@ int main(int argc, char *argv[])
 
     if (useFsc)
     {
-        FilterHelper::multiply(wAccSum, imgSnr, wgh);
+        FilterHelper::multiply(wAccSum, freqWeight, wgh);
     }
     else
     {
@@ -271,18 +198,18 @@ int main(int argc, char *argv[])
         debug(y,x) = r == 0? 0.0 : sh/(2.0*angpix*r) - kmin;
     }
 
-    VtkHelper::writeVTK(debug, tiltFn+"_debug.vtk");
+    VtkHelper::writeVTK(debug, outPath+"_debug.vtk");
 
     Image<RFLOAT> wghFull;
     FftwHelper::decenterDouble2D(wgh(), wghFull());
-    VtkHelper::writeVTK(wghFull, tiltFn+"_weight.vtk");
+    VtkHelper::writeVTK(wghFull, outPath+"_weight.vtk");
 
 
     FftwHelper::decenterUnflip2D(phase.data, phaseFull.data);
 
-    VtkHelper::writeVTK(phaseFull, tiltFn+"_delta_phase.vtk");
-    phaseFull.write(tiltFn+"_delta_phase.mrc");
-    wgh.write(tiltFn+"_weight.mrc");
+    VtkHelper::writeVTK(phaseFull, outPath+"_delta_phase.vtk");
+    phaseFull.write(outPath+"_delta_phase.mrc");
+    wgh.write(outPath+"_weight.mrc");
 
 
     RFLOAT shift_x, shift_y, tilt_x, tilt_y;
@@ -291,10 +218,10 @@ int main(int argc, char *argv[])
                                  &shift_x, &shift_y, &tilt_x, &tilt_y, &fit);
 
     FftwHelper::decenterUnflip2D(fit.data, fitFull.data);
-    VtkHelper::writeVTK(fitFull, tiltFn+"_delta_phase_fit.vtk");
-    fitFull.write(tiltFn+"_delta_phase_fit.mrc");
+    VtkHelper::writeVTK(fitFull, outPath+"_delta_phase_fit.vtk");
+    fitFull.write(outPath+"_delta_phase_fit.mrc");
 
-    std::ofstream os(tiltFn+"_beam_tilt.txt");
+    std::ofstream os(outPath+"_beam_tilt.txt");
     os << "beamtilt_x = " << tilt_x << "\n";
     os << "beamtilt_y = " << tilt_y << "\n";
     os.close();

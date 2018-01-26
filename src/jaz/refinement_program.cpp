@@ -6,7 +6,9 @@
 #include <src/jaz/vtk_helper.h>
 
 RefinementProgram::RefinementProgram(bool singleReference)
-:   singleReference(singleReference)
+:   singleReference(singleReference),
+    noReference(false),
+    noTilt(false)
 {
 }
 
@@ -34,15 +36,22 @@ int RefinementProgram::init(int argc, char *argv[])
 
         maskFn = parser.getOption("--mask", "Reference mask", "");
         fscFn = parser.getOption("--f", "Input STAR file with the FSC of the reference", "");
-        outPath = parser.getOption("--out", "Output path", "");
+        outPath = parser.getOption("--out", "Output path");
         imgPath = parser.getOption("--img", "Path to images", "");
 
         angpix = textToFloat(parser.getOption("--angpix", "Pixel resolution (angst/pix)", "0.0"));
         paddingFactor = textToFloat(parser.getOption("--pad", "Padding factor", "2"));
 
-        beamtilt_x = textToFloat(parser.getOption("--beamtilt_x", "Beamtilt in the X-direction (in mrad)", "0."));
-        beamtilt_y = textToFloat(parser.getOption("--beamtilt_y", "Beamtilt in the Y-direction (in mrad)", "0."));
-        applyTilt = (ABS(beamtilt_x) > 0. || ABS(beamtilt_y) > 0.);
+        if (noTilt)
+        {
+            applyTilt = false;
+        }
+        else
+        {
+            beamtilt_x = textToFloat(parser.getOption("--beamtilt_x", "Beamtilt in X-direction (in mrad)", "0."));
+            beamtilt_y = textToFloat(parser.getOption("--beamtilt_y", "Beamtilt in Y-direction (in mrad)", "0."));
+            applyTilt = (ABS(beamtilt_x) > 0. || ABS(beamtilt_y) > 0.);
+        }
 
         nr_omp_threads = textToInteger(parser.getOption("--jomp", "Number of OMP threads", "1"));
         minMG = textToInteger(parser.getOption("--min_MG", "First micrograph index", "0"));
@@ -63,90 +72,91 @@ int RefinementProgram::init(int argc, char *argv[])
 
     bool allGood = true;
 
-
-
-    try
-    {
-        maps[0].read(reconFn0);
-    }
-    catch (RelionError XE)
-    {
-        std::cout << "Unable to read map: " << reconFn0 << "\n";
-        return 2;
-    }
-
-    if (!singleReference)
+    if (!noReference)
     {
         try
         {
-            maps[1].read(reconFn1);
+            maps[0].read(reconFn0);
         }
         catch (RelionError XE)
         {
-            std::cout << "Unable to read map: " << reconFn1 << "\n";
-            return 3;
+            std::cout << "Unable to read map: " << reconFn0 << "\n";
+            return 2;
         }
-    }
-
-    if (maps[0].data.xdim != maps[0].data.ydim || maps[0].data.ydim != maps[0].data.zdim)
-    {
-        REPORT_ERROR(reconFn0 + " is not cubical.\n");
-    }
-
-    if (!singleReference)
-    {
-        if (maps[1].data.xdim != maps[1].data.ydim || maps[1].data.ydim != maps[1].data.zdim)
-        {
-            REPORT_ERROR(reconFn1 + " is not cubical.\n");
-        }
-
-        if (   maps[0].data.xdim != maps[1].data.xdim
-            || maps[0].data.ydim != maps[1].data.ydim
-            || maps[0].data.zdim != maps[1].data.zdim)
-        {
-            REPORT_ERROR(reconFn0 + " and " + reconFn1 + " are of unequal size.\n");
-        }
-    }
-
-    if (maskFn != "")
-    {
-        std::cout << "masking references...\n";
-        Image<RFLOAT> mask, maskedRef;
-
-        try
-        {
-            mask.read(maskFn);
-        }
-        catch (RelionError XE)
-        {
-            std::cout << "Unable to read mask: " << maskFn << "\n";
-            return 4;
-        }
-
-        mask.read(maskFn);
-
-        ImageOp::multiply(mask, maps[0], maskedRef);
-        maps[0] = maskedRef;
 
         if (!singleReference)
         {
-            ImageOp::multiply(mask, maps[1], maskedRef);
-            maps[1] = maskedRef;
+            try
+            {
+                maps[1].read(reconFn1);
+            }
+            catch (RelionError XE)
+            {
+                std::cout << "Unable to read map: " << reconFn1 << "\n";
+                return 3;
+            }
         }
-    }
 
-    s = maps[0].data.xdim;
-    sh = s/2 + 1;
+        if (maps[0].data.xdim != maps[0].data.ydim || maps[0].data.ydim != maps[0].data.zdim)
+        {
+            REPORT_ERROR(reconFn0 + " is not cubical.\n");
+        }
 
-    std::cout << "transforming references...\n";
+        if (!singleReference)
+        {
+            if (maps[1].data.xdim != maps[1].data.ydim || maps[1].data.ydim != maps[1].data.zdim)
+            {
+                REPORT_ERROR(reconFn1 + " is not cubical.\n");
+            }
 
-    projectors[0] = Projector(s, TRILINEAR, paddingFactor, 10, 2);
-    projectors[0].computeFourierTransformMap(maps[0].data, powSpec[0].data, maps[0].data.xdim);
+            if (   maps[0].data.xdim != maps[1].data.xdim
+                || maps[0].data.ydim != maps[1].data.ydim
+                || maps[0].data.zdim != maps[1].data.zdim)
+            {
+                REPORT_ERROR(reconFn0 + " and " + reconFn1 + " are of unequal size.\n");
+            }
+        }
 
-    if (!singleReference)
-    {
-        projectors[1] = Projector(s, TRILINEAR, paddingFactor, 10, 2);
-        projectors[1].computeFourierTransformMap(maps[1].data, powSpec[1].data, maps[1].data.xdim);
+        if (maskFn != "")
+        {
+            std::cout << "masking references...\n";
+            Image<RFLOAT> mask, maskedRef;
+
+            try
+            {
+                mask.read(maskFn);
+            }
+            catch (RelionError XE)
+            {
+                std::cout << "Unable to read mask: " << maskFn << "\n";
+                return 4;
+            }
+
+            mask.read(maskFn);
+
+            ImageOp::multiply(mask, maps[0], maskedRef);
+            maps[0] = maskedRef;
+
+            if (!singleReference)
+            {
+                ImageOp::multiply(mask, maps[1], maskedRef);
+                maps[1] = maskedRef;
+            }
+        }
+
+        s = maps[0].data.xdim;
+        sh = s/2 + 1;
+
+        std::cout << "transforming references...\n";
+
+        projectors[0] = Projector(s, TRILINEAR, paddingFactor, 10, 2);
+        projectors[0].computeFourierTransformMap(maps[0].data, powSpec[0].data, maps[0].data.xdim);
+
+        if (!singleReference)
+        {
+            projectors[1] = Projector(s, TRILINEAR, paddingFactor, 10, 2);
+            projectors[1].computeFourierTransformMap(maps[1].data, powSpec[1].data, maps[1].data.xdim);
+        }
     }
 
     useFsc = fscFn != "";
@@ -166,16 +176,6 @@ int RefinementProgram::init(int argc, char *argv[])
             std::cerr << fscFn << " does not contain a value for " << EMDL::label2Str(EMDL_POSTPROCESS_FSC_TRUE) << ".\n";
             allGood = false;
         }
-    }
-
-    if (useFsc)
-    {
-        RefinementHelper::drawFSC(&fscMdt, freqWeight);
-    }
-    else
-    {
-        freqWeight = Image<RFLOAT>(sh,s);
-        freqWeight.data.initConstant(1.0);
     }
 
     if (!allGood)
@@ -214,7 +214,19 @@ int RefinementProgram::init(int argc, char *argv[])
 
     std::cout << "mg range: " << g0 << ".." << gc << "\n";
 
-    return _init();
+    int rc0 = _init();
+
+    if (useFsc)
+    {
+        RefinementHelper::drawFSC(&fscMdt, freqWeight);
+    }
+    else
+    {
+        freqWeight = Image<RFLOAT>(sh,s);
+        freqWeight.data.initConstant(1.0);
+    }
+
+    return rc0;
 }
 
 int RefinementProgram::run()
