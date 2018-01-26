@@ -209,7 +209,7 @@ public:
         matrix is already resized to the right size before entering
         in this function. */
     template <typename T, typename T1>
-        void inverseFourierTransform(T& V, T1& v)
+        void inverseFourierTransform(const T& V, T1& v)
         {
             setReal(v);
             setFourier(V);
@@ -361,7 +361,7 @@ public:
         It is assumed that the container for the real image as well as
         the one for the Fourier array are already resized.
         No plan is updated. */
-    void setFourier(MultidimArray<Complex > &imgFourier);
+    void setFourier(const MultidimArray<Complex> &imgFourier);
 };
 
 // Randomize phases beyond the given shell (index)

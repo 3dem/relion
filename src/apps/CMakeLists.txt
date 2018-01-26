@@ -33,6 +33,7 @@ if(NOT GUI)
     endforeach()
 endif(NOT GUI)
 
+set(BUILD_SHARED_LIBS, 0)
 
 # relion_lib is STATIC or SHARED type based on BUILD_SHARED_LIBS=ON/OFF
 # relion_lib only contains non-X11 parts

@@ -291,7 +291,7 @@ void FourierTransformer::setReal(MultidimArray<Complex > &input)
     }
 }
 
-void FourierTransformer::setFourier(MultidimArray<Complex > &inputFourier)
+void FourierTransformer::setFourier(const MultidimArray<Complex> &inputFourier)
 {
     memcpy(MULTIDIM_ARRAY(fFourier),MULTIDIM_ARRAY(inputFourier),
            MULTIDIM_SIZE(inputFourier)*2*sizeof(RFLOAT));
