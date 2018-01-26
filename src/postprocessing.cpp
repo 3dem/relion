@@ -621,15 +621,8 @@ void Postprocessing::writeOutput()
 	FileName fn_tmp;
 	fn_tmp = fn_out + ".mrc";
 
-	RFLOAT avg, stddev, minval, maxval;
-    I1().computeStats(avg, stddev, minval, maxval);
-    I1.MDMainHeader.setValue(EMDL_IMAGE_STATS_MIN, minval);
-    I1.MDMainHeader.setValue(EMDL_IMAGE_STATS_MAX, maxval);
-    I1.MDMainHeader.setValue(EMDL_IMAGE_STATS_AVG, avg);
-    I1.MDMainHeader.setValue(EMDL_IMAGE_STATS_STDDEV, stddev);
-    I1.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X, angpix);
-    I1.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y, angpix);
-    I1.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z, angpix);
+	I1.setStatisticsInHeader();
+	I1.setSamplingRateInHeader(angpix);
 	I1.write(fn_tmp);
 	if (verb > 0)
 	{
@@ -641,11 +634,7 @@ void Postprocessing::writeOutput()
 	{
 		fn_tmp = fn_out + "_masked.mrc";
 		I1() *= Im();
-	    I1().computeStats(avg, stddev, minval, maxval);
-	    I1.MDMainHeader.setValue(EMDL_IMAGE_STATS_MIN, minval);
-	    I1.MDMainHeader.setValue(EMDL_IMAGE_STATS_MAX, maxval);
-	    I1.MDMainHeader.setValue(EMDL_IMAGE_STATS_AVG, avg);
-	    I1.MDMainHeader.setValue(EMDL_IMAGE_STATS_STDDEV, stddev);
+		I1.setStatisticsInHeader();
 		I1.write(fn_tmp);
 		if (verb > 0)
 		{
@@ -657,11 +646,8 @@ void Postprocessing::writeOutput()
 	if (do_auto_mask)
 	{
 		fn_tmp = fn_out + "_automask.mrc";
-		Im().computeStats(avg, stddev, minval, maxval);
-		Im.MDMainHeader.setValue(EMDL_IMAGE_STATS_MIN, minval);
-		Im.MDMainHeader.setValue(EMDL_IMAGE_STATS_MAX, maxval);
-		Im.MDMainHeader.setValue(EMDL_IMAGE_STATS_AVG, avg);
-		Im.MDMainHeader.setValue(EMDL_IMAGE_STATS_STDDEV, stddev);
+		Im.setStatisticsInHeader();
+		Im.setSamplingRateInHeader(angpix);
 		Im.write(fn_tmp);
 		if (verb > 0)
 		{
@@ -1049,14 +1035,10 @@ void Postprocessing::run_locres(int rank, int size)
 		}
 
 		fn_tmp = fn_out + "_locres.mrc";
-		I1.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X, angpix);
-		I1.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y, angpix);
-		I1.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z, angpix);
+		I1.setSamplingRateInHeader(angpix);
 		I1.write(fn_tmp);
 		fn_tmp = fn_out + "_locres_filtered.mrc";
-		I2.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X, angpix);
-		I2.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y, angpix);
-		I2.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z, angpix);
+		I2.setSamplingRateInHeader(angpix);
 		I2.write(fn_tmp);
 
 		// for debugging

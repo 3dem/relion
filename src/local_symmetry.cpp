@@ -1903,9 +1903,8 @@ void separateMasksBFS(
 				DIRECT_A3D_ELEM(img_out(), k, i, j) = 1.;
 		}
 
-		img_out.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X, x_angpix);
-		img_out.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y, y_angpix);
-		img_out.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z, z_angpix);
+		img_out.setStatisticsInHeader();
+		img_out.setSamplingRateInHeader(x_angpix, y_angpix, z_angpix);
 		img_out.write(fn_out);
 
 		MD.addObject();

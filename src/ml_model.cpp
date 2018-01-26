@@ -381,9 +381,7 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
     {
     	Image<RFLOAT> img;
     	// Set correct voxel size in the header
-		img.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X, pixel_size);
-		img.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y, pixel_size);
-		img.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z, pixel_size);
+    	img.setSamplingRateInHeader(pixel_size);
     	for (int iclass = 0; iclass < nr_classes_bodies; iclass++)
     	{
        		img() = Iref[iclass];

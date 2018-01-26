@@ -413,10 +413,7 @@ class image_handler_parameters
 			}
 
 			// Also reset the sampling rate in the header
-			Iout.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X, new_angpix);
-			Iout.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y, new_angpix);
-			if (Iout().getDim() == 3)
-				Iout.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z, new_angpix);
+			Iout.setSamplingRateInHeader(new_angpix);
 		}
 		// Re-window
 		if (new_box > 0)
