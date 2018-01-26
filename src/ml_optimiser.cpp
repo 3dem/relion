@@ -3786,7 +3786,16 @@ void MlOptimiser::symmetriseReconstructions()
 			{
 				// Immediately after expectation process. Do rise and twist for all asymmetrical units in Fourier space
 				// Also convert helical rise to pixels for BPref object
-				wsum_model.BPref[ith_recons].symmetrise(mymodel.helical_nr_asu, mymodel.helical_twist[ith_recons], mymodel.helical_rise[ith_recons] / mymodel.pixel_size);
+				wsum_model.BPref[ith_recons].enforceHermitianSymmetry();
+
+				// Then apply helical and point group symmetry (order irrelevant?)
+				if (mymodel.nr_bodies == 1)
+					wsum_model.BPref[ith_recons].applyHelicalSymmetry(
+							mymodel.helical_nr_asu,
+							mymodel.helical_twist[ith_recons],
+							mymodel.helical_rise[ith_recons] / mymodel.pixel_size);
+
+				wsum_model.BPref[ith_recons].applyPointGroupSymmetry();
 			}
 		}
 	}
