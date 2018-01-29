@@ -312,7 +312,7 @@ class reconstruct_parameters
 
         std::vector<BackProjector> backprojectors(nr_omp_threads);
 
-        for (int i = 1; i < nr_omp_threads; i++)
+        for (int i = 0; i < nr_omp_threads; i++)
         {
             backprojectors[i] = BackProjector(
                         mysize, ref_dim, fn_sym, interpolator,
