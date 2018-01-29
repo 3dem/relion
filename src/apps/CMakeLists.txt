@@ -130,8 +130,9 @@ foreach (_target ${RELION_TARGETS})
 	    target_link_libraries(${_target} relion_gpu_util)
 	endif(CUDA_FOUND)
 	
-
-	target_link_libraries(${_target} ${TBB_LIBRARIES})
+	if (ALTCPU)
+		target_link_libraries(${_target} ${TBB_LIBRARIES})
+	endif(ALTCPU)
 
 	set_target_properties(${_target} PROPERTIES
 		CXX_STANDARD 11
@@ -145,7 +146,7 @@ foreach (_target ${RELION_TARGETS})
 		target_link_libraries(${_target} relion_gui_lib ${FLTK_LIBRARIES} ${X11})
 	endif()
     
-	message(STATUS "added ${_target}...")
+	#message(STATUS "added ${_target}...")
 	
 	install (TARGETS ${_target} RUNTIME DESTINATION bin)
 endforeach()

@@ -163,13 +163,16 @@ if(NOT GUI)
 endif()
 
 # ---------------------------------------------------------------------------TBB --
-find_package(TBB)
 
-message(STATUS "TBB_FOUND :        ${TBB_FOUND}")
-message(STATUS "TBB_INCLUDE_DIRS : ${TBB_INCLUDE_DIRS}")
-message(STATUS "TBB_VERSION :      ${TBB_VERSION}")
-message(STATUS "TBB_LIBRARIES :    ${TBB_LIBRARIES}")
-include_directories("${TBB_INCLUDE_DIRS}")
+if (ALTCPU)
+	find_package(TBB REQUIRED)
+	include_directories("${TBB_INCLUDE_DIRS}")
+	
+	message(STATUS "TBB_FOUND :        ${TBB_FOUND}")
+	message(STATUS "TBB_INCLUDE_DIRS : ${TBB_INCLUDE_DIRS}")
+	message(STATUS "TBB_VERSION :      ${TBB_VERSION}")
+	message(STATUS "TBB_LIBRARIES :    ${TBB_LIBRARIES}")
+endif()
 
 # ----------------------------------------------------------Intel Compiler support --
 # ----------------------------------  and build flags including MKL and TBB ---------
