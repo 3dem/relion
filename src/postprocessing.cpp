@@ -28,6 +28,7 @@ void Postprocessing::read(int argc, char **argv)
 	fn_in = parser.getOption("--i", "Input rootname, e.g. run1");
 	fn_out = parser.getOption("--o", "Output rootname", "postprocess");
 	angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms"));
+	write_halfmaps = parser.checkOption("--half_maps", "Write post-processed half maps for validation");
 
 	int mask_section = parser.addSection("Masking options");
 	do_auto_mask = parser.checkOption("--auto_mask", "Perform automated masking, based on a density threshold");
@@ -417,7 +418,7 @@ void Postprocessing::correctRadialAmplitudeDistribution(MultidimArray<RFLOAT > &
 }
 
 
-void Postprocessing::sharpenMap()
+RFLOAT Postprocessing::sharpenMap()
 {
 
 	MultidimArray<Complex > FT;
@@ -487,15 +488,16 @@ void Postprocessing::sharpenMap()
 	{
 		std::cout << "== Low-pass filtering final map ... " << std::endl;
 	}
-	RFLOAT my_filter = (low_pass_freq > 0.) ? low_pass_freq : global_resol;
+	RFLOAT applied_filter = (low_pass_freq > 0.) ? low_pass_freq : global_resol;
 	if (verb > 0)
 	{
-		std::cout.width(35); std::cout << std::left  <<"  + filter frequency: "; std::cout << my_filter << std::endl;
+		std::cout.width(35); std::cout << std::left  <<"  + filter frequency: "; std::cout << applied_filter << std::endl;
 	}
-	lowPassFilterMap(FT, XSIZE(I1()), my_filter, angpix, filter_edge_width);
+	lowPassFilterMap(FT, XSIZE(I1()), applied_filter, angpix, filter_edge_width);
 
 	transformer.inverseFourierTransform(FT, I1());
 
+	return applied_filter;
 }
 
 void Postprocessing::calculateFSCtrue(MultidimArray<RFLOAT> &fsc_true, MultidimArray<RFLOAT> &fsc_unmasked,
@@ -612,36 +614,14 @@ void Postprocessing::makeGuinierPlot(MultidimArray<Complex > &FT, std::vector<fi
 
 void Postprocessing::writeOutput()
 {
-
-	if (verb > 0)
-	{
-		std::cout <<"== Writing out put files ..." <<std::endl;
-	}
-	// Write all relevant output information
 	FileName fn_tmp;
-	fn_tmp = fn_out + ".mrc";
 
-	I1.setStatisticsInHeader();
-	I1.setSamplingRateInHeader(angpix);
-	I1.write(fn_tmp);
 	if (verb > 0)
 	{
-		std::cout.width(35); std::cout << std::left   <<"  + Processed map: "; std::cout << fn_tmp<< std::endl;
+		std::cout <<"== Writing output files ..." <<std::endl;
 	}
 
-	// Also write the masked postprocessed map
-	if (do_auto_mask || fn_mask != "")
-	{
-		fn_tmp = fn_out + "_masked.mrc";
-		I1() *= Im();
-		I1.setStatisticsInHeader();
-		I1.write(fn_tmp);
-		if (verb > 0)
-		{
-			std::cout.width(35); std::cout << std::left   <<"  + Processed masked map: "; std::cout << fn_tmp<< std::endl;
-		}
-	}
-
+	writeMaps(fn_out);
 	// Also write mask
 	if (do_auto_mask)
 	{
@@ -654,7 +634,6 @@ void Postprocessing::writeOutput()
 			std::cout.width(35); std::cout << std::left   <<"  + Auto-mask: "; std::cout << fn_tmp<< std::endl;
 		}
 	}
-
 	// Write an output STAR file with FSC curves, Guinier plots etc
 	std::ofstream  fh;
 	fn_tmp = fn_out + ".star";
@@ -805,6 +784,32 @@ void Postprocessing::writeOutput()
 		std::cout.width(35); std::cout << std::left   <<"  + FINAL RESOLUTION: "; std::cout << global_resol<< std::endl;
 	}
 
+}
+
+// This masks I1!
+void Postprocessing::writeMaps(FileName fn_root) {
+	FileName fn_tmp = fn_root + ".mrc";
+
+	I1.setStatisticsInHeader();
+	I1.setSamplingRateInHeader(angpix);
+	I1.write(fn_tmp);
+	if (verb > 0)
+	{
+		std::cout.width(35); std::cout << std::left   <<"  + Processed map: "; std::cout << fn_tmp<< std::endl;
+	}
+
+	// Also write the masked postprocessed map
+	if (do_auto_mask || fn_mask != "")
+	{
+		fn_tmp = fn_out + "_masked.mrc";
+		I1() *= Im();
+		I1.setStatisticsInHeader();
+		I1.write(fn_tmp);
+		if (verb > 0)
+		{
+			std::cout.width(35); std::cout << std::left   <<"  + Processed masked map: "; std::cout << fn_tmp<< std::endl;
+		}
+	}
 }
 
 void Postprocessing::writeFscXml(MetaDataTable &MDfsc)
@@ -1161,9 +1166,29 @@ void Postprocessing::run()
 
 	// Divide by MTF and perform FSC-weighted B-factor sharpening, as in Rosenthal and Henderson, 2003
 	// also low-pass filters...
-	sharpenMap();
+	RFLOAT applied_filter = sharpenMap();
 
 	// Write original and corrected FSC curve, Guinier plot, etc.
 	writeOutput();
 
+	if (write_halfmaps) {
+		std::cout << "== Writing half maps after applying same sharpening and low-pass filter" << std::endl;
+		// Force the filtering as merged map
+		do_auto_bfac = false;
+		adhoc_bfac = global_bfactor;
+		low_pass_freq = applied_filter;
+		verb = 0;
+
+		std::cout << "  + half1" << std::endl;
+		I1.read(fn_I1);
+		I1().setXmippOrigin();
+		sharpenMap();
+		writeMaps(fn_out + "_half1");
+
+		std::cout << "  + half2" << std::endl;
+		I1.read(fn_I2);
+		I1().setXmippOrigin();
+		sharpenMap();
+		writeMaps(fn_out + "_half2");
+	}
 }
