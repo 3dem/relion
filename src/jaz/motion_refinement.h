@@ -4,10 +4,13 @@
 #include <src/ctf.h>
 #include <src/image.h>
 #include <src/metadata_table.h>
+#include <src/projector.h>
+#include <src/complex.h>
 #include <src/jaz/optimization.h>
 #include <src/jaz/volume.h>
 #include <src/jaz/gravis/t2Matrix.h>
 #include <src/jaz/gravis/t3Vector.h>
+#include <src/jaz/obs_model.h>
 #include <vector>
 
 class ParticleMotionFit : public Optimization
@@ -60,6 +63,19 @@ class MotionRefinement
         static Image<RFLOAT> averageStack(const std::vector<Image<RFLOAT> >& obs);
 
         static Image<RFLOAT> averageStack(const std::vector<Image<Complex> >& obs);
+
+        static std::vector<std::vector<Image<RFLOAT>>> movieCC(
+                Projector& projector0,
+                Projector& projector1,
+                const ObservationModel& obsModel,
+                MetaDataTable& viewParams,
+                const std::vector<std::vector<Image<Complex>>>& movie,
+                const std::vector<double>& sigma2,
+                const std::vector<Image<RFLOAT>>& damageWeights,
+                std::vector<FourierTransformer>& fts, int threads);
+
+        static std::vector<gravis::d2Vector> getGlobalTrack(
+                const std::vector<std::vector<Image<RFLOAT>>>& movieCC);
 
         static Image<float> crossCorrelation2D(const Image<Complex>& obs,
                 const Image<Complex>& predConj,

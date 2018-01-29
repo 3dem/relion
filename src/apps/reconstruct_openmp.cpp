@@ -34,24 +34,26 @@
 
 class reconstruct_parameters
 {
-public:
+    public:
 
-    FileName fn_out, fn_sel, fn_sym, fn_sub, fn_fsc, fn_debug, fn_vol;
-    std::string image_path;
+    FileName fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_fsc, fn_debug, image_path;
 
-    MetaDataTable DF0;
+    MetaDataTable DF;
 
-    int r_max, r_min_nn, blob_order, ref_dim, interpolator, iter, nr_fft_threads,
-    nr_omp_threads, debug_ori_size, debug_size, ctf_dim, nr_helical_asu, subset;
+    int r_max, r_min_nn, blob_order, ref_dim, interpolator, iter,
+    nr_fft_threads, nr_omp_threads, debug_ori_size, debug_size,
+    ctf_dim, nr_helical_asu, newbox, width_mask_edge, nr_sectors, subset;
 
     RFLOAT blob_radius, blob_alpha, angular_error, shift_error, angpix, maxres,
     beamtilt_x, beamtilt_y, helical_rise, helical_twist;
 
     bool do_ctf, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak,
-    do_fom_weighting, do_3d_rot, do_reconstruct_ctf, do_beamtilt, skip_gridding,
-    read_weights, ctf_nyq_wgh;
+    do_fom_weighting, do_3d_rot, do_reconstruct_ctf, do_beamtilt, do_ewald;
 
-    float padding_factor;
+    bool skip_gridding, do_reconstruct_ctf2, do_reconstruct_meas, is_positive, read_weights;
+
+    float padding_factor, mask_diameter;
+
     // I/O Parser
     IOParser parser;
 
@@ -65,107 +67,200 @@ public:
 
         parser.setCommandLine(argc, argv);
 
-        parser.addSection("General options");
-
+        int general_section = parser.addSection("General options");
         fn_sel = parser.getOption("--i", "Input STAR file with the projection images and their orientations", "");
         fn_out = parser.getOption("--o", "Name for output reconstruction","relion.mrc");
         fn_sym = parser.getOption("--sym", "Symmetry group", "c1");
-        fn_vol = parser.getOption("--ov", "Name for output volume prior to gridding","");
-       	angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms)", "1"));
-       	maxres = textToFloat(parser.getOption("--maxres", "Maximum resolution (in Angstrom) to consider in Fourier space (default Nyquist)", "-1"));
-       	padding_factor = textToFloat(parser.getOption("--pad", "Padding factor", "2"));
+        angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms)", "1"));
+        maxres = textToFloat(parser.getOption("--maxres", "Maximum resolution (in Angstrom) to consider in Fourier space (default Nyquist)", "-1"));
+        padding_factor = textToFloat(parser.getOption("--pad", "Padding factor", "2"));
         nr_fft_threads = textToInteger(parser.getOption("--jfft", "Number of threads to use for FFTs", "1"));
         nr_omp_threads = textToInteger(parser.getOption("--jomp", "Number of open-mp threads to use. Memory footprint is multiplied by this value.", "16"));
-        image_path = parser.getOption("--ipath", "Image path", "");
+        image_path = parser.getOption("--img", "Image path", "");
         subset = textToInteger(parser.getOption("--subset", "Subset of images to consider (0: even; 1: odd; other: all)", "-1"));
 
-        if (subset > 1)
-        {
-            subset = -1;
-        }
-
-        parser.addSection("CTF options");
-
-       	do_ctf = parser.checkOption("--ctf", "Apply CTF correction");
-    	intact_ctf_first_peak = parser.checkOption("--ctf_intact_first_peak", "Leave CTFs intact until first peak");
-    	ctf_phase_flipped = parser.checkOption("--ctf_phase_flipped", "Images have been phase flipped");
-    	only_flip_phases = parser.checkOption("--only_flip_phases", "Do not correct CTF-amplitudes, only flip phases");
-    	beamtilt_x = textToFloat(parser.getOption("--beamtilt_x", "Beamtilt in the X-direction (in mrad)", "0."));
-    	beamtilt_y = textToFloat(parser.getOption("--beamtilt_y", "Beamtilt in the Y-direction (in mrad)", "0."));
-    	do_beamtilt = (ABS(beamtilt_x) > 0. || ABS(beamtilt_y) > 0.);
+        int ctf_section = parser.addSection("CTF options");
+        do_ctf = parser.checkOption("--ctf", "Apply CTF correction");
+        intact_ctf_first_peak = parser.checkOption("--ctf_intact_first_peak", "Leave CTFs intact until first peak");
+        ctf_phase_flipped = parser.checkOption("--ctf_phase_flipped", "Images have been phase flipped");
+        only_flip_phases = parser.checkOption("--only_flip_phases", "Do not correct CTF-amplitudes, only flip phases");
+        beamtilt_x = textToFloat(parser.getOption("--beamtilt_x", "Beamtilt in the X-direction (in mrad)", "0."));
+        beamtilt_y = textToFloat(parser.getOption("--beamtilt_y", "Beamtilt in the Y-direction (in mrad)", "0."));
+        do_beamtilt = (ABS(beamtilt_x) > 0. || ABS(beamtilt_y) > 0.);
         read_weights = parser.checkOption("--read_weights", "Read freq. weight files");
-        ctf_nyq_wgh = parser.checkOption("--ctf_nyq", "Downweight pixels where the CTF-freq. apporaches nyquist");
+        do_ewald = parser.checkOption("--ewald", "Correct for Ewald-sphere curvature (developmental)");
+        mask_diameter  = textToFloat(parser.getOption("--mask_diameter", "Diameter (in A) of mask for Ewald-sphere curvature correction", "-1."));
+        width_mask_edge = textToInteger(parser.getOption("--width_mask_edge", "Width (in pixels) of the soft edge on the mask", "3"));
+        is_positive = !parser.checkOption("--reverse_curvature", "Try curvature the other way around");
+        newbox = textToInteger(parser.getOption("--newbox", "Box size of reconstruction after Ewald sphere correction", "-1"));
+        nr_sectors = textToInteger(parser.getOption("--sectors", "Number of sectors for Ewald sphere correction", "2"));
 
-        parser.addSection("Helical options");
+        int helical_section = parser.addSection("Helical options");
+        nr_helical_asu = textToInteger(parser.getOption("--nr_helical_asu", "Number of helical asymmetrical units", "1"));
+        helical_rise = textToFloat(parser.getOption("--helical_rise", "Helical rise (in Angstroms)", "0."));
+        helical_twist = textToFloat(parser.getOption("--helical_twist", "Helical twist (in degrees, + for right-handedness)", "0."));
 
-    	nr_helical_asu = textToInteger(parser.getOption("--nr_helical_asu", "Number of helical asymmetrical units", "1"));
-    	helical_rise = textToFloat(parser.getOption("--helical_rise", "Helical rise (in Angstroms)", "0."));
-    	helical_twist = textToFloat(parser.getOption("--helical_twist", "Helical twist (in degrees, + for right-handedness)", "0."));
-
-        parser.addSection("Expert options");
-
-       	fn_sub = parser.getOption("--subtract","Subtract projections of this map from the images used for reconstruction", "");
-
+        int expert_section = parser.addSection("Expert options");
+        fn_sub = parser.getOption("--subtract","Subtract projections of this map from the images used for reconstruction", "");
         if (parser.checkOption("--NN", "Use nearest-neighbour instead of linear interpolation before gridding correction"))
-        {
             interpolator = NEAREST_NEIGHBOUR;
-        }
-       	else
-        {
+        else
             interpolator = TRILINEAR;
-        }
-
         blob_radius   = textToFloat(parser.getOption("--blob_r", "Radius of blob for gridding interpolation", "1.9"));
         blob_order    = textToInteger(parser.getOption("--blob_m", "Order of blob for gridding interpolation", "0"));
         blob_alpha    = textToFloat(parser.getOption("--blob_a", "Alpha-value of blob for gridding interpolation", "15"));
-       	iter = textToInteger(parser.getOption("--iter", "Number of gridding-correction iterations", "10"));
-       	ref_dim = textToInteger(parser.getOption("--refdim", "Dimension of the reconstruction (2D or 3D)", "3"));
-    	angular_error = textToFloat(parser.getOption("--angular_error", "Apply random deviations with this standard deviation (in degrees) to each of the 3 Euler angles", "0."));
-    	shift_error = textToFloat(parser.getOption("--shift_error", "Apply random deviations with this standard deviation (in pixels) to each of the 2 translations", "0."));
-    	do_fom_weighting = parser.checkOption("--fom_weighting", "Weight particles according to their figure-of-merit (_rlnParticleFigureOfMerit)");
-    	fn_fsc = parser.getOption("--fsc", "FSC-curve for regularized reconstruction", "");
-    	do_3d_rot = parser.checkOption("--3d_rot", "Perform 3D rotations instead of backprojections from 2D images");
-    	ctf_dim  = textToInteger(parser.getOption("--reconstruct_ctf", "Perform a 3D reconstruction from 2D CTF-images, with the given size in pixels", "-1"));
-    	skip_gridding = parser.checkOption("--skip_gridding", "Skip gridding part of the reconstruction");
-    	do_reconstruct_ctf = (ctf_dim > 0);
-
-    	if (do_reconstruct_ctf)
-        {
+        iter = textToInteger(parser.getOption("--iter", "Number of gridding-correction iterations", "10"));
+        ref_dim = textToInteger(parser.getOption("--refdim", "Dimension of the reconstruction (2D or 3D)", "3"));
+        angular_error = textToFloat(parser.getOption("--angular_error", "Apply random deviations with this standard deviation (in degrees) to each of the 3 Euler angles", "0."));
+        shift_error = textToFloat(parser.getOption("--shift_error", "Apply random deviations with this standard deviation (in pixels) to each of the 2 translations", "0."));
+        do_fom_weighting = parser.checkOption("--fom_weighting", "Weight particles according to their figure-of-merit (_rlnParticleFigureOfMerit)");
+        fn_fsc = parser.getOption("--fsc", "FSC-curve for regularized reconstruction", "");
+        do_3d_rot = parser.checkOption("--3d_rot", "Perform 3D rotations instead of backprojections from 2D images");
+        ctf_dim  = textToInteger(parser.getOption("--reconstruct_ctf", "Perform a 3D reconstruction from 2D CTF-images, with the given size in pixels", "-1"));
+        do_reconstruct_ctf2 = parser.checkOption("--ctf2", "Reconstruct CTF^2 and then take the sqrt of that");
+        do_reconstruct_meas = parser.checkOption("--measured", "Fill Hermitian half of the CTF reconstruction with how often each voxel was measured.");
+        skip_gridding = parser.checkOption("--skip_gridding", "Skip gridding part of the reconstruction");
+        do_reconstruct_ctf = (ctf_dim > 0);
+        if (do_reconstruct_ctf)
             do_ctf = false;
-        }
+        fn_debug = parser.getOption("--debug", "Rootname for debug reconstruction files", "");
+        debug_ori_size =  textToInteger(parser.getOption("--debug_ori_size", "Rootname for debug reconstruction files", "1"));
+        debug_size =  textToInteger(parser.getOption("--debug_size", "Rootname for debug reconstruction files", "1"));
 
-    	// Hidden
-       	r_min_nn = textToInteger(getParameter(argc, argv, "--r_min_nn", "10"));
 
-    	// Check for errors in the command-line option
-    	if (parser.checkForErrors())
-        {
+        // Hidden
+        r_min_nn = textToInteger(getParameter(argc, argv, "--r_min_nn", "10"));
+
+        // Check for errors in the command-line option
+        if (parser.checkForErrors())
             REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
-        }
 
-    	// Read MetaData file, which should have the image names and their angles!
-    	if (fn_debug == "")
-        {
-            DF0.read(fn_sel);
-        }
+        // Read MetaData file, which should have the image names and their angles!
+        if (fn_debug == "")
+            DF.read(fn_sel);
 
-     	randomize_random_generator();
+        randomize_random_generator();
 
-     	if (do_beamtilt && ! do_ctf)
-        {
-            REPORT_ERROR("ERROR: one can only correct for beamtilt in combination with CTF correction!");
-        }
+        if (do_beamtilt || do_ewald)
+            do_ctf = true;
 
     }
 
+    void applyCTFPandCTFQ(MultidimArray<Complex> &Fin, CTF &ctf, FourierTransformer &transformer,
+            MultidimArray<Complex> &outP, MultidimArray<Complex> &outQ)
+    {
+        //FourierTransformer transformer;
+        outP.resize(Fin);
+        outQ.resize(Fin);
+        float angle_step = 180./nr_sectors;
+        for (float angle = 0.; angle < 180.;  angle +=angle_step)
+        {
+            MultidimArray<Complex> CTFP(Fin), Fapp(Fin);
+            MultidimArray<RFLOAT> Iapp(YSIZE(Fin), YSIZE(Fin));
+            // Two passes: one for CTFP, one for CTFQ
+            for (int ipass = 0; ipass < 2; ipass++)
+            {
+                bool is_my_positive = (ipass == 1) ? is_positive : !is_positive;
+
+                // Get CTFP and multiply the Fapp with it
+                ctf.getCTFPImage(CTFP, YSIZE(Fin), YSIZE(Fin), angpix, is_my_positive, angle);
+
+                Fapp = Fin * CTFP; // element-wise complex multiplication!
+
+                // inverse transform and mask out the particle....
+                transformer.inverseFourierTransform(Fapp, Iapp);
+                CenterFFT(Iapp, false);
+
+                softMaskOutsideMap(Iapp, ROUND(mask_diameter/(angpix*2.)), (RFLOAT)width_mask_edge);
+
+                // Re-box to a smaller size if necessary....
+                if (newbox > 0 && newbox < YSIZE(Fin))
+                {
+                    Iapp.setXmippOrigin();
+                    Iapp.window(FIRST_XMIPP_INDEX(newbox), FIRST_XMIPP_INDEX(newbox),
+                                   LAST_XMIPP_INDEX(newbox),  LAST_XMIPP_INDEX(newbox));
+
+                }
+
+                // Back into Fourier-space
+                CenterFFT(Iapp, true);
+                transformer.FourierTransform(Iapp, Fapp, false); // false means: leave Fapp in the transformer
+
+                // First time round: resize the output arrays
+                if (ipass == 0 && fabs(angle) < XMIPP_EQUAL_ACCURACY)
+                {
+                    outP.resize(Fapp);
+                    outQ.resize(Fapp);
+                }
+
+                // Now set back the right parts into outP (first pass) or outQ (second pass)
+                float anglemin = angle + 90. - (0.5*angle_step);
+                float anglemax = angle + 90. + (0.5*angle_step);
+
+                // angles larger than 180
+                bool is_reverse = false;
+                if (anglemin >= 180.)
+                {
+                    anglemin -= 180.;
+                    anglemax -= 180.;
+                    is_reverse = true;
+                }
+                MultidimArray<Complex> *myCTFPorQ, *myCTFPorQb;
+                if (is_reverse)
+                {
+                    myCTFPorQ  = (ipass == 0) ? &outQ : &outP;
+                    myCTFPorQb = (ipass == 0) ? &outP : &outQ;
+                }
+                else
+                {
+                    myCTFPorQ  = (ipass == 0) ? &outP : &outQ;
+                    myCTFPorQb = (ipass == 0) ? &outQ : &outP;
+                }
+
+                // Deal with sectors with the Y-axis in the middle of the sector...
+                bool do_wrap_max = false;
+                if (anglemin < 180. && anglemax > 180.)
+                {
+                    anglemax -= 180.;
+                    do_wrap_max = true;
+                }
+
+                // use radians instead of degrees
+                anglemin = DEG2RAD(anglemin);
+                anglemax = DEG2RAD(anglemax);
+                FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(CTFP)
+                {
+                    RFLOAT x = (RFLOAT)jp;
+                    RFLOAT y = (RFLOAT)ip;
+                    RFLOAT myangle = (x*x+y*y > 0) ? acos(y/sqrt(x*x+y*y)) : 0; // dot-product with Y-axis: (0,1)
+                    // Only take the relevant sector now...
+                    if (do_wrap_max)
+                    {
+                        if (myangle >= anglemin)
+                            DIRECT_A2D_ELEM(*myCTFPorQ, i, j) = DIRECT_A2D_ELEM(Fapp, i, j);
+                        else if (myangle < anglemax)
+                            DIRECT_A2D_ELEM(*myCTFPorQb, i, j) = DIRECT_A2D_ELEM(Fapp, i, j);
+                    }
+                    else
+                    {
+                        if (myangle >= anglemin && myangle < anglemax)
+                            DIRECT_A2D_ELEM(*myCTFPorQ, i, j) = DIRECT_A2D_ELEM(Fapp, i, j);
+                    }
+                }
+            }
+        }
+    }
+
+
     void reconstruct()
     {
-
         int data_dim = (do_3d_rot) ? 3 : 2;
 
+        MultidimArray<RFLOAT> dummy;
+        Matrix1D<RFLOAT> trans(2);
         Image<RFLOAT> vol, img0, sub;
+        Projector proj;
         int mysize;
-        //#define DEBUG_WW
 
         // Get dimension of the images
         if (do_reconstruct_ctf)
@@ -176,23 +271,26 @@ public:
         }
         else
         {
-            FileName fn_img;
-            DF0.getValue(EMDL_IMAGE_NAME, fn_img, 0);
+            (DF).firstObject();
+            DF.getValue(EMDL_IMAGE_NAME, fn_img);
             img0.read(fn_img);
             mysize=(int)XSIZE(img0());
+            // When doing Ewald-curvature correction: allow reconstructing smaller box than the input images (which should have large boxes!!)
+            if (do_ewald && newbox > 0)
+                mysize = newbox;
         }
 
-        if (DF0.containsLabel(EMDL_CTF_MAGNIFICATION) && DF0.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
+
+        if (DF.containsLabel(EMDL_CTF_MAGNIFICATION) && DF.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
         {
             RFLOAT mag, dstep;
-            DF0.getValue(EMDL_CTF_MAGNIFICATION, mag, 0);
-            DF0.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep, 0);
+            DF.getValue(EMDL_CTF_MAGNIFICATION, mag);
+            DF.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
             angpix = 10000. * dstep / mag;
             std::cout << " + Using pixel size calculated from magnification and detector pixel size in the input STAR file: " << angpix << std::endl;
         }
 
-        Projector projector0(mysize, interpolator, padding_factor, r_min_nn);
-        MultidimArray<RFLOAT> dummy;
+        Projector projector(mysize, interpolator, padding_factor, r_min_nn);
 
         if (maxres < 0.)
             r_max = -1;
@@ -202,28 +300,33 @@ public:
         if (fn_sub != "")
         {
             sub.read(fn_sub);
-            projector0.computeFourierTransformMap(sub(), dummy, 2 * r_max);
+            projector.computeFourierTransformMap(sub(), dummy, 2 * r_max);
+        }
+
+        // Check for beam-tilt parameters in the input star file
+        if (do_beamtilt || ( DF.containsLabel(EMDL_IMAGE_BEAMTILT_X)
+                             || DF.containsLabel(EMDL_IMAGE_BEAMTILT_Y) ) )
+        {
+            std::cout << " + Using the beamtilt parameters in the input STAR file" << std::endl;
         }
 
         std::vector<BackProjector> backprojectors(nr_omp_threads);
 
-        backprojectors[0] = BackProjector(
-                mysize, ref_dim, fn_sym, interpolator,
-                padding_factor, r_min_nn, blob_order,
-                blob_radius, blob_alpha, data_dim, skip_gridding);
-
         for (int i = 1; i < nr_omp_threads; i++)
         {
-            backprojectors[i] = backprojectors[0];
+            backprojectors[i] = BackProjector(
+                        mysize, ref_dim, fn_sym, interpolator,
+                        padding_factor, r_min_nn, blob_order,
+                        blob_radius, blob_alpha, data_dim, skip_gridding);
         }
 
-        std::vector<MetaDataTable> mdts = StackHelper::splitByStack(&DF0);
+        std::vector<MetaDataTable> mdts = StackHelper::splitByStack(&DF);
         const long gc = mdts.size();
 
-        std::cerr << "Back-projecting all images ..." << std::endl;
+        std::cout << "Back-projecting all images ..." << std::endl;
 
         time_config();
-        init_progress_bar(gc/nr_omp_threads);
+        init_progress_bar(DF.size());
 
         #pragma omp parallel num_threads(nr_omp_threads)
         {
@@ -232,13 +335,12 @@ public:
             BackProjector& backprojector = backprojectors[threadnum];
             backprojector.initZeros(2 * r_max);
 
-            RFLOAT rot, tilt, psi, fom;
+            RFLOAT rot, tilt, psi, fom, r_ewald_sphere;
             Matrix2D<RFLOAT> A3D;
-            MultidimArray<Complex> Fsub;
             MultidimArray<RFLOAT> Fctf;
             Matrix1D<RFLOAT> trans(2);
-
-            Projector projector(mysize, interpolator, padding_factor, r_min_nn);
+            FourierTransformer transformer;
+            Image<RFLOAT> img;
 
             #pragma omp for
             for (int g = 0; g < gc; g++)
@@ -255,6 +357,13 @@ public:
 
                     if (subset >= 0 && randSubset != subset) continue;
 
+                    /*if (!do_reconstruct_ctf)
+                    {
+                        mdts[g].getValue(EMDL_IMAGE_NAME, fn_img, p);
+                        img.read(fn_img);
+                        img().setXmippOrigin();
+                    }*/
+
                     // Rotations
                     if (ref_dim == 2)
                     {
@@ -267,7 +376,7 @@ public:
                     }
 
                     psi = 0.;
-                    mdts[g].getValue( EMDL_ORIENT_PSI, psi, p);
+                    mdts[g].getValue(EMDL_ORIENT_PSI, psi, p);
 
                     if (angular_error > 0.)
                     {
@@ -281,8 +390,8 @@ public:
 
                     // Translations (either through phase-shifts or in real space
                     trans.initZeros();
-                    mdts[g].getValue(EMDL_ORIENT_ORIGIN_X, XX(trans), p);
-                    mdts[g].getValue(EMDL_ORIENT_ORIGIN_Y, YY(trans), p);
+                    mdts[g].getValue( EMDL_ORIENT_ORIGIN_X, XX(trans), p);
+                    mdts[g].getValue( EMDL_ORIENT_ORIGIN_Y, YY(trans), p);
 
                     if (shift_error > 0.)
                     {
@@ -308,10 +417,10 @@ public:
 
                     // Use either selfTranslate OR shiftImageInFourierTransform!!
                     //selfTranslate(img(), trans, WRAP);
-                    MultidimArray<Complex> F2D;
+
+                    MultidimArray<Complex> Fsub, F2D, F2DP, F2DQ;
                     CenterFFT(obsR[p](), true);
 
-                    FourierTransformer transformer;
                     transformer.FourierTransform(obsR[p](), F2D);
 
                     if (ABS(XX(trans)) > 0. || ABS(YY(trans)) > 0.)
@@ -357,24 +466,20 @@ public:
                                               ctf.lambda, ctf.Cs, angpix, mysize);
                         }
 
-                        if (ctf_nyq_wgh)
+                        // Ewald-sphere curvature correction
+                        if (do_ewald)
                         {
-                            RFLOAT as = (RFLOAT)Fctf.ydim * angpix;
+                            applyCTFPandCTFQ(F2D, ctf, transformer, F2DP, F2DQ);
 
-                            for (long int y = 0; y < Fctf.ydim; y++)
-                            for (long int x = 0; x < Fctf.xdim; x++)
-                            {
-                                RFLOAT cf = ctf.getCtfFreq(x/as, y/as) / (as * PI);
+                            // Also calculate W, store again in Fctf
+                            //std::cerr << " temporarily using very large diameter for weight for debugging...." << std::endl;
+                            //ctf.applyWeightEwaldSphereCurvature(Fctf, mysize, mysize, angpix, 100000.*mask_diameter);
+                            ctf.applyWeightEwaldSphereCurvature(Fctf, mysize, mysize, angpix, mask_diameter);
 
-                                if (cf > 0.5)
-                                {
-                                    RFLOAT t = 2.0 * (1.0 - cf);
-                                    if (t < 0.0) t = 0.0;
-
-                                    DIRECT_NZYX_ELEM(Fctf, 0, 0, y, x) *= t;
-                                    DIRECT_NZYX_ELEM(F2D, 0, 0, y, x) *= t;
-                                }
-                            }
+                            // Also calculate the radius of the Ewald sphere (in pixels)
+                            //std::cerr << " temporarily switching off Ewald sphere curvature for debugging...." << std::endl;
+                            //r_ewald_sphere = -1.;
+                            r_ewald_sphere = mysize * angpix / ctf.lambda;
                         }
                     }
 
@@ -402,15 +507,24 @@ public:
                     }
                     else
                     {
-                        // "Normal" reconstruction, multiply X by CTF, and W by CTF^2
                         if (do_reconstruct_ctf)
                         {
                             FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F2D)
                             {
                                 DIRECT_MULTIDIM_ELEM(F2D, n)  = DIRECT_MULTIDIM_ELEM(Fctf, n);
+                                if (do_reconstruct_ctf2)
+                                    DIRECT_MULTIDIM_ELEM(F2D, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
                                 DIRECT_MULTIDIM_ELEM(Fctf, n) = 1.;
                             }
                         }
+                        else if (do_ewald)
+                        {
+                            FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F2D)
+                            {
+                                DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
+                            }
+                        }
+                        // "Normal" reconstruction, multiply X by CTF, and W by CTF^2
                         else if (do_ctf)
                         {
                             FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F2D)
@@ -468,7 +582,15 @@ public:
 
                         DIRECT_A2D_ELEM(F2D, 0, 0) = 0.0;
 
-                        backprojector.set2DFourierTransform(F2D, A3D, IS_NOT_INV, &Fctf);
+                        if (do_ewald)
+                        {
+                            backprojector.set2DFourierTransform(F2DP, A3D, IS_NOT_INV, &Fctf, r_ewald_sphere, true);
+                            backprojector.set2DFourierTransform(F2DQ, A3D, IS_NOT_INV, &Fctf, r_ewald_sphere, false);
+                        }
+                        else
+                        {
+                            backprojector.set2DFourierTransform(F2D, A3D, IS_NOT_INV, &Fctf);
+                        }
                     }
 
                     if (threadnum == 0)
@@ -479,10 +601,9 @@ public:
             }
         }
 
-        //progress_bar(DF0.size());
+        //progress_bar(DF.size());
 
         std::cerr << "\nMerging volumes..." << std::endl;
-        MultidimArray<Complex > F2D0;
 
         BackProjector& backprojector = backprojectors[0];
 
@@ -516,7 +637,6 @@ public:
             do_use_fsc =true;
             MetaDataTable MDfsc;
             MDfsc.read(fn_fsc);
-
             FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDfsc)
             {
                 int idx;
@@ -527,55 +647,54 @@ public:
             }
         }
 
-        backprojector.symmetrise(nr_helical_asu, helical_twist, helical_rise);
-
-        if (fn_vol != "")
-        {
-            VtkHelper::writeVTK_Complex(backprojector.data, fn_vol+"_data.vtk");
-            VtkHelper::writeVTK(backprojector.weight, fn_vol+"_weight.vtk");
-
-            ComplexIO::write(backprojector.data, fn_vol+"_data", ".mrc");
-            Image<RFLOAT> wt;
-            wt.data = backprojector.weight;
-            wt.write(fn_vol+"_weight.mrc");
-        }
-
         std::cerr << "Starting the reconstruction ..." << std::endl;
-        backprojector.reconstruct(vol(), iter, do_map, 1.,
-            dummy, dummy, dummy, fsc, 1., do_use_fsc, true, nr_fft_threads, -1);
+        backprojector.symmetrise(nr_helical_asu, helical_twist, helical_rise);
+        backprojector.reconstruct(vol(), iter, do_map, 1., dummy, dummy, dummy, dummy,
+                                  fsc, 1., do_use_fsc, true, nr_fft_threads, -1);
+
+        MultidimArray<Complex> F2D;
 
         if (do_reconstruct_ctf)
         {
-
-            F2D0.clear();
             FourierTransformer transformer;
-            transformer.FourierTransform(vol(), F2D0);
+
+            F2D.clear();
+            transformer.FourierTransform(vol(), F2D);
 
             // CenterOriginFFT: Set the center of the FFT in the FFTW origin
             Matrix1D<RFLOAT> shift(3);
             XX(shift)=-(RFLOAT)(int)(ctf_dim / 2);
             YY(shift)=-(RFLOAT)(int)(ctf_dim / 2);
             ZZ(shift)=-(RFLOAT)(int)(ctf_dim / 2);
-            shiftImageInFourierTransform(F2D0, F2D0, (RFLOAT)ctf_dim,
-                                         XX(shift), YY(shift), ZZ(shift));
+            shiftImageInFourierTransform(F2D, F2D, (RFLOAT)ctf_dim, XX(shift), YY(shift), ZZ(shift));
             vol().setXmippOrigin();
             vol().initZeros();
-            FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(F2D0)
+            FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(F2D)
             {
                 // Take care of kp==dim/2, as XmippOrigin lies just right off center of image...
                 if ( kp > FINISHINGZ(vol()) || ip > FINISHINGY(vol()) || jp > FINISHINGX(vol()))
                     continue;
-                A3D_ELEM(vol(), kp, ip, jp)    = FFTW_ELEM(F2D0, kp, ip, jp).real;
-                A3D_ELEM(vol(), -kp, -ip, -jp) = FFTW_ELEM(F2D0, kp, ip, jp).real;
+                A3D_ELEM(vol(), kp, ip, jp)    = FFTW_ELEM(F2D, kp, ip, jp).real;
+                A3D_ELEM(vol(), -kp, -ip, -jp) = FFTW_ELEM(F2D, kp, ip, jp).real;
             }
             vol() *= (RFLOAT)ctf_dim;
+
+            // Take sqrt(CTF^2)
+            if (do_reconstruct_ctf2)
+            {
+                FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(vol())
+                {
+                    if (DIRECT_MULTIDIM_ELEM(vol(), n) > 0.)
+                        DIRECT_MULTIDIM_ELEM(vol(), n) = sqrt(DIRECT_MULTIDIM_ELEM(vol(), n));
+                    else
+                        DIRECT_MULTIDIM_ELEM(vol(), n) = 0.;
+                }
+            }
         }
 
         vol.write(fn_out);
         std::cerr<<" Done writing map in "<<fn_out<<std::endl;
     }
-
-
 };
 
 
@@ -593,7 +712,7 @@ int main(int argc, char *argv[])
     }
     catch (RelionError XE)
     {
-        prm.usage();
+        //prm.usage();
         std::cerr << XE;
         exit(1);
     }

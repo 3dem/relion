@@ -100,9 +100,6 @@ void MotionEM::computeInitial()
 
     for (int p = 0; p < pc; p++)
     {
-        std::stringstream stsp;
-        stsp << p;
-
         initialCC[p] = std::vector<Image<RFLOAT>>(fc, Image<RFLOAT>(s_full,s_full));
         posProb[p] = std::vector<Image<RFLOAT>>(fc);
         velProb[p] = std::vector<Image<RFLOAT>>(fc-1);
