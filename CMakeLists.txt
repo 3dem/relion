@@ -1,9 +1,5 @@
-cmake_minimum_required(VERSION 3.1.0 FATAL_ERROR)
-set(CMAKE_CXX_STANDARD 11) # C++11...
-set(CMAKE_CXX_STANDARD_REQUIRED ON) #...is required...
-set(CMAKE_CXX_EXTENSIONS OFF)
+cmake_minimum_required(VERSION 2.8 FATAL_ERROR)
 add_compile_options(-std=c++11)
-message(STATUS "Setting CXX supported standared '${CMAKE_CXX_STANDARD}'")
 
 #
 #if(POLICY CMP0048)
@@ -163,13 +159,16 @@ if(NOT GUI)
 endif()
 
 # ---------------------------------------------------------------------------TBB --
-find_package(TBB)
 
-message(STATUS "TBB_FOUND :        ${TBB_FOUND}")
-message(STATUS "TBB_INCLUDE_DIRS : ${TBB_INCLUDE_DIRS}")
-message(STATUS "TBB_VERSION :      ${TBB_VERSION}")
-message(STATUS "TBB_LIBRARIES :    ${TBB_LIBRARIES}")
-include_directories("${TBB_INCLUDE_DIRS}")
+if (ALTCPU)
+	find_package(TBB REQUIRED)
+	include_directories("${TBB_INCLUDE_DIRS}")
+	
+	message(STATUS "TBB_FOUND :        ${TBB_FOUND}")
+	message(STATUS "TBB_INCLUDE_DIRS : ${TBB_INCLUDE_DIRS}")
+	message(STATUS "TBB_VERSION :      ${TBB_VERSION}")
+	message(STATUS "TBB_LIBRARIES :    ${TBB_LIBRARIES}")
+endif()
 
 # ----------------------------------------------------------Intel Compiler support --
 # ----------------------------------  and build flags including MKL and TBB ---------

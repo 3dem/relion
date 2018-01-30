@@ -2,7 +2,10 @@
 #define ACC_ML_OPTIMISER_H_
 
 #include "src/acc/acc_ptr.h"
+
+#ifdef ALTCPU
 #include <tbb/spin_mutex.h>
+#endif
 
 /*
 #ifdef ACC_DOUBLE_PRECISION
