@@ -2422,26 +2422,13 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, icol_psi) = psi;
 
 		Matrix1D<RFLOAT> shifts(2);
-		//21may2015
-		if (baseMLO->mymodel.nr_bodies == 1)
-		{
-			// include old_offsets for normal refinement (i.e. non multi-body)
-			XX(shifts) = XX(op.old_offset[ipart]) + oversampled_translations_x[op.max_index[ipart].iovertrans];
-			YY(shifts) = YY(op.old_offset[ipart]) + oversampled_translations_y[op.max_index[ipart].iovertrans];
-		}
-		else
-		{
-			// For multi-body refinements, only store 'residual' translations
-			XX(shifts) = oversampled_translations_x[op.max_index[ipart].iovertrans];
-			YY(shifts) = oversampled_translations_y[op.max_index[ipart].iovertrans];
-		}
+
+		XX(shifts) = XX(op.old_offset[ipart]) + oversampled_translations_x[op.max_index[ipart].iovertrans];
+		YY(shifts) = YY(op.old_offset[ipart]) + oversampled_translations_y[op.max_index[ipart].iovertrans];
 		if (accMLO->dataIs3D)
 		{
 			shifts.resize(3);
-			if (baseMLO->mymodel.nr_bodies == 1)
-				ZZ(shifts) = ZZ(op.old_offset[ipart]) + oversampled_translations_z[op.max_index[ipart].iovertrans];
-			else
-				ZZ(shifts) = oversampled_translations_z[op.max_index[ipart].iovertrans];
+			ZZ(shifts) = oversampled_translations_z[op.max_index[ipart].iovertrans];
 		}
 
 		// Use oldpsi-angle to rotate back the XX(exp_old_offset[ipart]) + oversampled_translations_x[iover_trans] and
