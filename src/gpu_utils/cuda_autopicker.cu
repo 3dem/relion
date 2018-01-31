@@ -1029,30 +1029,6 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 		}
 	} // end for iref
 
-	if (basePckr->do_write_fom_maps)
-	{
-		FileName fn_tmp;
-		Image<RFLOAT> It_float;
-		Image<int> It_int;
-
-		It_float() = Mccf_best_combined;
-		fn_tmp = basePckr->getOutputRootName(fn_mic) + "_" + basePckr->fn_out + "_combinedCCF.spi";
-		It_float.write(fn_tmp);
-
-		if (basePckr->do_amyloid)
-		{
-			It_float() = Mpsi_best_combined;
-			fn_tmp = basePckr->getOutputRootName(fn_mic) + "_" + basePckr->fn_out + "_combinedPSI.spi";
-			It_float.write(fn_tmp);
-		}
-		else
-		{
-			It_int() = Mclass_best_combined;
-			fn_tmp = basePckr->getOutputRootName(fn_mic) + + "_" + basePckr->fn_out + "_combinedCLASS.spi";
-			It_int.write(fn_tmp);
-		}
-	} // end if do_write_fom_maps
-
 	if (basePckr->autopick_helical_segments)
 	{
 		RFLOAT thres = basePckr->min_fraction_expected_Pratio;
@@ -1086,6 +1062,30 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 						(basePckr->helical_tube_length_min / basePckr->angpix),
 						my_skip_side, scale);
 		}
+
+		if (basePckr->do_write_fom_maps)
+		{
+			FileName fn_tmp;
+			Image<RFLOAT> It_float;
+			Image<int> It_int;
+
+			It_float() = Mccf_best_combined;
+			fn_tmp = basePckr->getOutputRootName(fn_mic) + "_" + basePckr->fn_out + "_combinedCCF.spi";
+			It_float.write(fn_tmp);
+
+			if (basePckr->do_amyloid)
+			{
+				It_float() = Mpsi_best_combined;
+				fn_tmp = basePckr->getOutputRootName(fn_mic) + "_" + basePckr->fn_out + "_combinedPSI.spi";
+				It_float.write(fn_tmp);
+			}
+			else
+			{
+				It_int() = Mclass_best_combined;
+				fn_tmp = basePckr->getOutputRootName(fn_mic) + + "_" + basePckr->fn_out + "_combinedCLASS.spi";
+				It_int.write(fn_tmp);
+			}
+		} // end if do_write_fom_maps
 
 		if ((basePckr->do_write_fom_maps || basePckr->do_read_fom_maps) && !basePckr->do_amyloid)
 		{
