@@ -154,6 +154,7 @@ enum EMDLabel
     EMDL_MICROGRAPH_TILT_ANGLE,
     EMDL_MICROGRAPH_TILT_AXIS_DIRECTION,
     EMDL_MICROGRAPH_TILT_AXIS_OUTOFPLANE,
+    EMDL_MICROGRAPH_BINNING,
     EMDL_MICROGRAPH_FRAME_NUMBER,
     EMDL_MICROGRAPH_MOTION_MODEL_IDX,
     EMDL_MICROGRAPH_MOTION_MODEL_VERSION,
@@ -573,6 +574,7 @@ private:
         EMDL::addLabel(EMDL_MICROGRAPH_TILT_ANGLE, EMDL_DOUBLE, "rlnMicrographTiltAngle", "Tilt angle (in degrees) used to collect a micrograph");
         EMDL::addLabel(EMDL_MICROGRAPH_TILT_AXIS_DIRECTION, EMDL_DOUBLE, "rlnMicrographTiltAxisDirection", "Direction of the tilt-axis (in degrees) used to collect a micrograph");
         EMDL::addLabel(EMDL_MICROGRAPH_TILT_AXIS_OUTOFPLANE, EMDL_DOUBLE, "rlnMicrographTiltAxisOutOfPlane", "Out-of-plane angle (in degrees) of the tilt-axis used to collect a micrograph (90=in-plane)");
+	EMDL::addLabel(EMDL_MICROGRAPH_BINNING, EMDL_DOUBLE, "rlnMicrographBinning", "Micrograph binning factor");
         EMDL::addLabel(EMDL_MICROGRAPH_FRAME_NUMBER, EMDL_INT, "rlnMicrographFrameNumber", "Micrograph frame number");
         EMDL::addLabel(EMDL_MICROGRAPH_MOTION_MODEL_IDX, EMDL_INT, "rlnMotionModelIdx", "Micrograph motion model index");
         EMDL::addLabel(EMDL_MICROGRAPH_MOTION_MODEL_VERSION, EMDL_INT, "rlnMotionModelVersion", "Version of micrograph motion model");

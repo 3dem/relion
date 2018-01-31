@@ -42,7 +42,7 @@ public:
 	Micrograph(); // = delete in C++11
 
 	// Create from a movie or a STAR file
-	Micrograph(FileName filename, FileName fnGain="") {
+	Micrograph(FileName filename, FileName fnGain="", RFLOAT binning=1.0) {
 		model = NULL;
 
 		clear();
@@ -50,7 +50,7 @@ public:
 		if (filename.getExtension() == "star" && fnGain == "") {
 			read(filename);
 		} else {
-			setMovie(filename, fnGain);
+			setMovie(filename, fnGain, binning);
 		}
 	}
 
@@ -65,6 +65,7 @@ public:
 		width = 0;
 		height = 0;
 		nFrame = 0;
+		binning = 1;
 
 		fnMovie = "";
 		fnGain = "";
@@ -78,19 +79,34 @@ public:
 
 	// Read micrograph model from a STAR file
 	void read(FileName filename);
+
 	// Write micrograph model from a STAR file
 	void write(FileName filename);
+
 	// Set target movie file
-	void setMovie(FileName fnMovie, FileName fnGain="");
+	void setMovie(FileName fnMovie, FileName fnGain="", RFLOAT binning=1.0);
+
+	// Get gain reference file name
+	FileName getGainFilename() {
+		return fnGain;
+	}
+
+	// Get binning factor
+	RFLOAT getBinningFactor() {
+		return binning;
+	}
 
 	// Get shift vector at (x, y, frame)
+	// (x, y) and (shiftx, shifty) are UNBINNED pixels in the original movie
 	int getShiftAt(int frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty);
 
 	// Set global shift for frame
+	// (shiftx, shifty) is UNBINNED pixels in the original movie
 	void setGlobalShift(int frame, RFLOAT shiftx, RFLOAT shifty);
 
 private:
 	int width, height, nFrame;
+	RFLOAT binning;
 	FileName fnGain;
 	FileName fnMovie;
 	

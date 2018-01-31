@@ -742,7 +742,7 @@ void MotioncorrRunner::plotShifts(FileName fn_mic, std::vector<float> &xshifts, 
 }
 
 void MotioncorrRunner::saveModel(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts) {
-	Micrograph m(fn_mic, fn_gain_reference);
+	Micrograph m(fn_mic, fn_gain_reference, bin_factor);
 
 	FileName fn_avg, fn_mov;
         getOutputFileNames(fn_mic, fn_avg, fn_mov);

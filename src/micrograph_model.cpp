@@ -27,15 +27,20 @@
  * Implement position-dependent motion model
  * Refactor relion_preprocess (windowing) & particle_polished (dose-weighted sum)
  * Use factory pattern?
+ *
+ * Gain correction (with rotation & flip)
+ * Defect correction
  */
 
-void Micrograph::setMovie(FileName fnMovie, FileName fnGain) {
+void Micrograph::setMovie(FileName fnMovie, FileName fnGain, RFLOAT binning) {
 	Image<RFLOAT> Ihead;
 	Ihead.read(fnMovie, false);
         
 	width = XSIZE(Ihead());
 	height = YSIZE(Ihead());
 	nFrame = NSIZE(Ihead());
+
+	this->binning = binning;
 
 	globalShiftX.resize(nFrame, NOT_OBSERVED);
 	globalShiftY.resize(nFrame, NOT_OBSERVED);
@@ -71,7 +76,12 @@ void Micrograph::read(FileName fn_in)
 	globalShiftX.resize(nFrame, NOT_OBSERVED);
 	globalShiftY.resize(nFrame, NOT_OBSERVED);
 
-	MDglobal.getValue(EMDL_MICROGRAPH_GAIN_NAME, fnGain);
+	if (!MDglobal.getValue(EMDL_MICROGRAPH_GAIN_NAME, fnGain)) {
+		fnGain = "";
+	}
+	if (!MDglobal.getValue(EMDL_MICROGRAPH_BINNING, binning)) {
+		binning = 1.0;
+	}
 	
 	// Read global shifts
 	int frame;
@@ -116,6 +126,7 @@ void Micrograph::write(FileName filename) {
 	if (fnGain != "") {
 		MD.setValue(EMDL_MICROGRAPH_GAIN_NAME, fnGain);
 	}
+	MD.setValue(EMDL_MICROGRAPH_BINNING, binning);
 	MD.write(fh);
 
 	MD.clear();
@@ -131,7 +142,6 @@ void Micrograph::write(FileName filename) {
 	fh.close();
 }
 
-// Get motion at frame and (x, y)
 int Micrograph::getShiftAt(int frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty) {
 	if (model != NULL) {
 		model->getShiftAt(frame, x, y, shiftx, shifty);
