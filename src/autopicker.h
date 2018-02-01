@@ -70,6 +70,11 @@ struct Peak
 	RFLOAT psi, fom, relative_fom;
 };
 
+struct AmyloidCoord
+{
+	RFLOAT x, y, psi, fom;
+};
+
 class AutoPicker
 {
 public:
@@ -106,6 +111,9 @@ public:
 	RFLOAT particle_diameter;
 	int particle_radius2, decrease_radius;
 
+	// Maximum diameter for local average density calculation
+	RFLOAT max_local_avg_diameter;
+
 	// Low pass filter cutoff (in Angstroms)
 	RFLOAT lowpass;
 
@@ -126,6 +134,36 @@ public:
 
 	// FTs of the reference images (either for autopicking or for feature calculation)
 	std::vector<Projector > PPref;
+
+	// Use Laplacian-of-Gaussian filters instead of template-based picking
+	bool do_LoG;
+
+	// Minimum diameter for features to be detected by the LoG filter
+	RFLOAT LoG_diameter, LoG_min_diameter, LoG_max_diameter;
+
+	// Maximum diameter for features to be detected by the LoG filter
+	RFLOAT LoG_diameter_fracrange;
+
+	// How many times the LoG_max_diameter is searched?
+	RFLOAT LoG_max_search;
+
+	// How many sigma to adjust the FOM threshold?
+	RFLOAT LoG_adjust_threshold;
+
+	// Input signal is white
+	bool LoG_invert;
+
+	// Vector with all LoG filter FFTs
+	std::vector<MultidimArray<Complex> > FT_LoGs;
+
+	// Vector with all diameters to be sampled
+	std::vector<RFLOAT> diams_LoG;
+
+	//// Specific amyloid picker
+	bool do_amyloid;
+
+	/// Maximum psi-angle difference in subsequent amyloid segments (in degrees)
+	RFLOAT amyloid_max_psidiff;
 
 	///// Autopicking stuff
 
@@ -180,6 +218,9 @@ public:
 	// Apart from keeping particle_size/2 away from the sides, should we exclude more? E.g. to get rid of Polara bar code?
 	int autopick_skip_side;
 
+	// Extra padding around the micrographs, of this many pixels
+	int extra_padding;
+
 	// In-plane rotational sampling (in degrees)
 	RFLOAT psi_sampling;
 
@@ -192,6 +233,9 @@ public:
 	// Maximum standard deviation of the noise prior to normalization to pick peaks from
 	RFLOAT max_stddev_noise;
 
+	// Minimum average background density of the noise  to pick peaks from
+	RFLOAT min_avg_noise;
+
 	// Removal of outlier pixel values
 	RFLOAT outlier_removal_zscore;
 
@@ -199,10 +243,13 @@ public:
 	int downsize_mic;
 
 	// Number of non-zero pixels in the circular mask, and of its inverse (for background normalisation in do_diff2)
-	int nr_pixels_circular_mask, nr_pixels_circular_invmask;
+	int nr_pixels_circular_mask, nr_pixels_avg_mask, nr_pixels_circular_invmask;
 
 	// Array with Fourier-transform of the inverse of the (circular) mask
 	MultidimArray<Complex > Finvmsk;
+
+	// Array with Fourier-transform of the mask to calculate average density
+	MultidimArray<Complex > Favgmsk;
 
 	// Perform optimisation of the scale factor?
 	bool do_optimise_scale;
@@ -236,8 +283,30 @@ public:
 	// General function to decide what to do
 	void run();
 
+	std::vector<AmyloidCoord> findNextCandidateCoordinates(AmyloidCoord &mycoord, std::vector<AmyloidCoord> &circle,
+			RFLOAT threshold_value, RFLOAT max_psidiff, int skip_side, float scale,
+			MultidimArray<RFLOAT> &Mccf, MultidimArray<RFLOAT> &Mpsi);
+
+	AmyloidCoord findNextAmyloidCoordinate(AmyloidCoord &mycoord, std::vector<AmyloidCoord> &circle, RFLOAT threshold_value,
+			RFLOAT max_psidiff, RFLOAT amyloid_diameter_pix, int skip_side, float scale,
+			MultidimArray<RFLOAT> &Mccf, MultidimArray<RFLOAT> &Mpsi);
+
+	void pickAmyloids(
+			MultidimArray<RFLOAT>& Mccf,
+			MultidimArray<RFLOAT>& Mpsi,
+			MultidimArray<RFLOAT>& Mstddev,
+			MultidimArray<RFLOAT>& Mavg,
+			RFLOAT threshold_value,
+			RFLOAT max_psidiff,
+			FileName& fn_mic_in,
+			FileName& fn_star_out,
+			RFLOAT amyloid_width,
+			int skip_side, float scale);
+
 	void pickCCFPeaks(
 			const MultidimArray<RFLOAT>& Mccf,
+			const MultidimArray<RFLOAT>& Mstddev,
+			const MultidimArray<RFLOAT>& Mavg,
 			const MultidimArray<int>& Mclass,
 			RFLOAT threshold_value,
 			int peak_r_min,
@@ -269,6 +338,7 @@ public:
 			RFLOAT tube_length_min_pix,
 			int skip_side, float scale);
 
+	void autoPickLoGOneMicrograph(FileName &fn_mic, long int imic);
 	void autoPickOneMicrograph(FileName &fn_mic, long int imic);
 
 	// Get the output coordinate filename given the micrograph filename
@@ -285,7 +355,9 @@ public:
 			MultidimArray<RFLOAT> &Mmean);
 
 	// Peak search for all pixels above a given threshold in the map
-	void peakSearch(const MultidimArray<RFLOAT> &Mccf, const MultidimArray<RFLOAT> &Mpsi, const MultidimArray<RFLOAT> &Mstddev, int iref, int skip_side, std::vector<Peak> &peaks, float scale);
+	void peakSearch(const MultidimArray<RFLOAT> &Mccf, const MultidimArray<RFLOAT> &Mpsi,
+			const MultidimArray<RFLOAT> &Mstddev, const MultidimArray<RFLOAT> &Mmean,
+			int iref, int skip_side, std::vector<Peak> &peaks, float scale);
 
 	// Now prune the coordinates: within min_particle_distance: all peaks are the same cluster
 	// From each cluster, take the single peaks with the highest ccf

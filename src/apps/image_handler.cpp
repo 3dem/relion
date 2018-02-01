@@ -31,7 +31,7 @@ class image_handler_parameters
    	FileName fn_in, fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_mult, fn_div, fn_add, fn_subtract, fn_fsc, fn_adjust_power, fn_correct_ampl, fn_fourfilter;
 	int bin_avg, avg_first, avg_last, edge_x0, edge_xF, edge_y0, edge_yF, filter_edge_width, new_box, minr_ampl_corr;
     bool do_add_edge, do_flipXY, do_flipmXY, do_flipZ, do_flipX, do_flipY, do_shiftCOM, do_stats, do_avg_ampl, do_avg_ampl2, do_avg_ampl2_ali, do_average, do_remove_nan;
-	RFLOAT multiply_constant, divide_constant, add_constant, subtract_constant, threshold_above, threshold_below, angpix, new_angpix, lowpass, highpass, bfactor, shift_x, shift_y, shift_z, replace_nan, randomize_at;
+	RFLOAT multiply_constant, divide_constant, add_constant, subtract_constant, threshold_above, threshold_below, angpix, new_angpix, lowpass, highpass, logfilter, bfactor, shift_x, shift_y, shift_z, replace_nan, randomize_at;
    	int verb;
 	// I/O Parser
 	IOParser parser;
@@ -82,6 +82,7 @@ class image_handler_parameters
 	    bfactor = textToFloat(parser.getOption("--bfactor", "Apply a B-factor (in A^2)", "0."));
 	    lowpass = textToFloat(parser.getOption("--lowpass", "Low-pass filter frequency (in A)", "-1."));
 	    highpass = textToFloat(parser.getOption("--highpass", "High-pass filter frequency (in A)", "-1."));
+	    logfilter = textToFloat(parser.getOption("--LoG", "Sigma for Laplacian of Gaussian filter (in A)", "-1."));
 	    angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in A)", "1."));
 	    new_angpix = textToFloat(parser.getOption("--rescale_angpix", "Scale input image(s) to this new pixel size (in A)", "-1."));
 	    new_box = textToInteger(parser.getOption("--new_box", "Resize the image(s) to this new box size (in pixel) ", "-1"));
@@ -327,6 +328,13 @@ class image_handler_parameters
 		if (fabs(bfactor) > 0.)
 			applyBFactorToMap(Iout(), bfactor, angpix);
 
+		if (logfilter > 0.)
+		{
+			LoGFilterMap(Iout(), logfilter, angpix);
+			RFLOAT avg, stddev, minval, maxval;
+			//Iout().statisticsAdjust(0,1);
+		}
+
 		if (lowpass > 0.)
 			lowPassFilterMap(Iout(), lowpass, angpix, filter_edge_width);
 
@@ -360,7 +368,7 @@ class image_handler_parameters
 
 		// Shifting
 		if (do_shiftCOM)
-			selfTranslateCenterOfMassToCenter(Iout(), DONT_WRAP);
+			selfTranslateCenterOfMassToCenter(Iout(), DONT_WRAP, true); // verbose=true!
 		else if (fabs(shift_x) > 0. || fabs(shift_y) > 0. || fabs(shift_z) > 0.)
 		{
 			Matrix1D<RFLOAT> shift(2);
@@ -405,10 +413,7 @@ class image_handler_parameters
 			}
 
 			// Also reset the sampling rate in the header
-			Iout.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X, new_angpix);
-			Iout.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y, new_angpix);
-			if (Iout().getDim() == 3)
-				Iout.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z, new_angpix);
+			Iout.setSamplingRateInHeader(new_angpix);
 		}
 		// Re-window
 		if (new_box > 0)
@@ -707,7 +712,8 @@ class image_handler_parameters
 					my_fn_out = fn_img;
 				else if(fn_out.getExtension() == "mrcs" && !fn_out.contains("@"))
 				{
-					my_fn_out.compose(current_object,fn_out);
+					// current_object starts counting from 0, thus needs to be incremented.
+					my_fn_out.compose(current_object + 1, fn_out);
 				}
 				else
 				{

@@ -834,6 +834,12 @@ void applyBFactorToMap(MultidimArray<Complex > &FT, int ori_size, RFLOAT bfactor
 // Apply a B-factor to a map (given it's real-space array)
 void applyBFactorToMap(MultidimArray<RFLOAT > &img, RFLOAT bfactor, RFLOAT angpix);
 
+// Apply a Laplacian-of-Gaussian filter to a map (given it's Fourier transform)
+void LoGFilterMap(MultidimArray<Complex > &FT, int ori_size, RFLOAT sigma, RFLOAT angpix);
+
+// Apply a Laplacian-of-Gaussian filter to a map (given it's real-space array)
+void LoGFilterMap(MultidimArray<RFLOAT > &img, RFLOAT sigma, RFLOAT angpix);
+
 // Low-pass filter a map (given it's Fourier transform)
 void lowPassFilterMap(MultidimArray<Complex > &FT, int ori_size,
 		RFLOAT low_pass, RFLOAT angpix, int filter_edge_width = 2, bool do_highpass_instead = false);

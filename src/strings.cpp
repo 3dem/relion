@@ -435,7 +435,10 @@ int splitString(const std::string& input,
     newPos = input.find(delimiter, 0);
 
     if (newPos < 0)
-        return 0;
+    {
+    	results.push_back(input);
+    	return 1;
+    }
 
     int numFound = 0;
     while (newPos >= iPos)

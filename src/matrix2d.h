@@ -1281,20 +1281,20 @@ void svdcmp(const Matrix2D< T >& a,
 /** Solve system of linear equations (Ax=b) through SVD Decomposition (through numerical recipes)
  */
 template<typename T>
-void solve(const Matrix2D< RFLOAT >& A, const Matrix1D< RFLOAT >& b,
+void solve(const Matrix2D< T >& A, const Matrix1D< T >& b,
                   Matrix1D< RFLOAT >& result, RFLOAT tolerance)
 {
     if (A.mdimx == 0)
         REPORT_ERROR("Solve: Matrix is empty");
 
-    if (A.mdimx != A.mdimy)
-        REPORT_ERROR("Solve: Matrix is not squared");
+    /*if (A.mdimx != A.mdimy)
+        REPORT_ERROR("Solve: Matrix is not squared");*/
 
-    if (A.mdimx != b.vdim)
+    if (A.mdimy != b.vdim)
         REPORT_ERROR("Solve: Different sizes of Matrix and Vector");
 
-    if (b.isRow())
-        REPORT_ERROR("Solve: Not correct vector shape");
+    /*if (b.isRow())
+        REPORT_ERROR("Solve: Not correct vector shape");*/
 
     // First perform de single value decomposition
     // Xmipp interface that calls to svdcmp of numerical recipes

@@ -2554,16 +2554,9 @@ void MlOptimiserMpi::reconstructUnregularisedMapAndCalculateSolventCorrectedFSC(
 			}
 
 			// Update header information
-			RFLOAT avg, stddev, minval, maxval;
 			Iunreg().setXmippOrigin();
-			Iunreg().computeStats(avg, stddev, minval, maxval);
-			Iunreg.MDMainHeader.setValue(EMDL_IMAGE_STATS_MIN, minval);
-			Iunreg.MDMainHeader.setValue(EMDL_IMAGE_STATS_MAX, maxval);
-			Iunreg.MDMainHeader.setValue(EMDL_IMAGE_STATS_AVG, avg);
-			Iunreg.MDMainHeader.setValue(EMDL_IMAGE_STATS_STDDEV, stddev);
-			Iunreg.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X, mymodel.pixel_size);
-			Iunreg.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y, mymodel.pixel_size);
-			Iunreg.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z, mymodel.pixel_size);
+			Iunreg.setStatisticsInHeader();
+			Iunreg.setSamplingRateInHeader(mymodel.pixel_size);
 			// And write the resulting model to disc
 			Iunreg.write(fn_root+"_unfil.mrc");
 		}
@@ -2817,15 +2810,8 @@ void MlOptimiserMpi::readTemporaryDataAndWeightArraysAndReconstruct(int iclass, 
 	}
 
 	// Update header information
-	RFLOAT avg, stddev, minval, maxval;
-	Iunreg().computeStats(avg, stddev, minval, maxval);
-	Iunreg.MDMainHeader.setValue(EMDL_IMAGE_STATS_MIN, minval);
-	Iunreg.MDMainHeader.setValue(EMDL_IMAGE_STATS_MAX, maxval);
-	Iunreg.MDMainHeader.setValue(EMDL_IMAGE_STATS_AVG, avg);
-	Iunreg.MDMainHeader.setValue(EMDL_IMAGE_STATS_STDDEV, stddev);
-	Iunreg.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X, mymodel.pixel_size);
-	Iunreg.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y, mymodel.pixel_size);
-	Iunreg.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z, mymodel.pixel_size);
+	Iunreg.setStatisticsInHeader();
+	Iunreg.setSamplingRateInHeader(mymodel.pixel_size);
 	// And write the resulting model to disc
 	Iunreg.write(fn_root+"_unfil.mrc");
 

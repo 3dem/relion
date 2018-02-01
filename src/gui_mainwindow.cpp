@@ -71,7 +71,7 @@ int StdOutDisplay::handle(int ev)
 	return 0;
 }
 
-int SchedulerWindow::fill(FileName _pipeline_name, std::vector<FileName> _scheduled_jobs, std::vector<long int> _scheduled_job_ids)
+int SchedulerWindow::fill(FileName _pipeline_name, std::vector<FileName> _scheduled_jobs)
 {
 	//color(GUI_BACKGROUND_COLOR);
     int current_y = 2, max_y = 2;
@@ -87,7 +87,7 @@ int SchedulerWindow::fill(FileName _pipeline_name, std::vector<FileName> _schedu
     pipeline_name = _pipeline_name;
     for (int ijob = 0; ijob < _scheduled_jobs.size(); ijob++)
     {
-    	my_jobs.push_back(_scheduled_job_ids[ijob]);
+    	my_jobs.push_back(_scheduled_jobs[ijob]);
     	int xcoor = (ijob < 1+_scheduled_jobs.size()/2) ? 20 : w()-170;
     	if (ijob == 1+_scheduled_jobs.size()/2)
     		current_y = 2;
@@ -169,7 +169,7 @@ void SchedulerWindow::cb_execute_i()
 		for (int ijob = 0; ijob < my_jobs.size(); ijob++)
 		{
 			if (check_buttons[ijob]->value())
-				jobids += integerToString(my_jobs[ijob]) + " ";
+				jobids += my_jobs[ijob] + " ";
 		}
 		jobids += "\"";
 
@@ -180,7 +180,7 @@ void SchedulerWindow::cb_execute_i()
 		command += " --schedule " + fn_sched;
 		command += " --repeat " + myrepeat;
 		command += " --min_wait " + mywait;
-		command += " --jobids " + jobids;
+		command += " --RunJobs " + jobids;
 		// Run this in the background, so control returns to the window
 		command += " &";
 		int res = system(command.c_str());
@@ -255,7 +255,6 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	maingui_do_read_only = _do_read_only;
 	maingui_do_old_style = _do_oldstyle;
 	pipeline.do_read_only = _do_read_only;
-
 	do_order_alphabetically = false;
 
 	FileName fn_lock=".gui_projectdir";
@@ -946,7 +945,6 @@ void GuiMainWindow::loadJobFromPipeline(int this_job)
 	// Set the "static int" to which job we're currently pointing
 	current_job = this_job;
 	int itype = pipeline.processList[current_job].type;
-
 	// The following line allows certain browse buttons to only open the current directory (using CURRENT_ODIR)
 	current_browse_directory = pipeline.processList[current_job].name;
 
@@ -1239,9 +1237,9 @@ void GuiMainWindow::cb_display_io_node_i()
 	else if (pipeline.nodeList[mynode].type == NODE_PDF_LOGFILE)
 	{
 		const char * default_pdf_viewer = getenv ("RELION_PDFVIEWER_EXECUTABLE");
+		char mydefault[]=DEFAULTPDFVIEWER;
 		if (default_pdf_viewer == NULL)
 		{
-			char mydefault[]=DEFAULTPDFVIEWER;
 			default_pdf_viewer=mydefault;
 		}
 		std::string myviewer(default_pdf_viewer);
@@ -1966,17 +1964,14 @@ void GuiMainWindow::cb_start_pipeliner_i()
 {
 
 	std::vector<FileName> job_names;
-	std::vector<long int> job_ids;
 
 	for (long int ii =0; ii < scheduled_processes.size(); ii++)
 	{
 		long int id = scheduled_processes[ii];
-		job_ids.push_back(id);
 		job_names.push_back(pipeline.processList[id].name);
 	}
-	std::vector<long int> my_scheduled_processes = scheduled_processes;
 	SchedulerWindow* w = new SchedulerWindow(400, 300, "Select which jobs to execute");
-	w->fill(pipeline.name, job_names, job_ids);
+	w->fill(pipeline.name, job_names);
 
 }
 

@@ -990,6 +990,9 @@ long int MetaDataTable::read(const FileName &filename, const std::string &name, 
 
     in.close();
 
+    // Go to the first object
+    firstObject();
+
 }
 
 void MetaDataTable::write(std::ostream& out) const

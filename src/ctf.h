@@ -187,6 +187,10 @@ public:
         return scale * retval;
     }
 
+    // compute the local frequency of the ctf (i.e. the rate of change of
+    // 'double argument' in getCTF()
+    RFLOAT getCtfFreq(RFLOAT X, RFLOAT Y);
+
     inline Complex getCTFP(RFLOAT X, RFLOAT Y, bool is_positive) const
     {
         RFLOAT u2 = X * X + Y * Y;

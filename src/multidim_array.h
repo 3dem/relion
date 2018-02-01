@@ -2338,12 +2338,12 @@ public:
      * This function returns the index of the minimum element of an array.
      * array(l,k,i,j). Returns -1 if the array is empty
      */
-    void minIndex(long int &lmin, long int& kmin, long int& imin, long int& jmin) const
+    T minIndex(long int &lmin, long int& kmin, long int& imin, long int& jmin) const
     {
         if (XSIZE(*this) == 0)
         {
             lmin = kmin = imin = jmin = -1;
-            return;
+            return 0;
         }
 
         kmin = STARTINGZ(*this);
@@ -2363,36 +2363,37 @@ public:
             jmin = j;
         }
 
+        return minval;
     }
 
     /** 3D Indices for the minimum element.
      *
      * This function just calls to the 4D function
      */
-    void minIndex(long int& kmin, long int& imin, long int& jmin) const
+    T minIndex(long int& kmin, long int& imin, long int& jmin) const
     {
         long int zeroInt=0;
-        minIndex(zeroInt,kmin,imin,jmin);
+        return minIndex(zeroInt,kmin,imin,jmin);
     }
 
     /** 2D Indices for the minimum element.
      *
      * This function just calls to the 4D function
      */
-    void minIndex(long int& imin, long int& jmin) const
+    T minIndex(long int& imin, long int& jmin) const
     {
         long int zeroInt=0;
-        minIndex(zeroInt,zeroInt,imin,jmin);
+        return minIndex(zeroInt,zeroInt,imin,jmin);
     }
 
     /** 1D Indices for the minimum element.
      *
      * This function just calls to the 4D function
      */
-    void minIndex(long int& jmin) const
+    T minIndex(long int& jmin) const
     {
         long int zeroInt=0;
-        minIndex(zeroInt,zeroInt,zeroInt,jmin);
+        return minIndex(zeroInt,zeroInt,zeroInt,jmin);
     }
 
     /** 4D Indices for the maximum element.
@@ -2400,12 +2401,12 @@ public:
      * This function returns the index of the maximum element of an array.
      * array(l,k,i,j). Returns -1 if the array is empty
      */
-    void maxIndex(long int &lmax, long int& kmax, long int& imax, long int& jmax) const
+    T maxIndex(long int &lmax, long int& kmax, long int& imax, long int& jmax) const
     {
         if (XSIZE(*this) == 0)
         {
             lmax = kmax = imax = jmax = -1;
-            return;
+            return 0;
         }
 
         kmax = STARTINGZ(*this);
@@ -2423,36 +2424,38 @@ public:
             imax = i;
             jmax = j;
         }
+
+        return maxval;
     }
 
     /** 3D Indices for the maximum element.
      *
      * This function just calls to the 4D function
      */
-    void maxIndex(long int& kmax, long int& imax, long int& jmax) const
+    T maxIndex(long int& kmax, long int& imax, long int& jmax) const
     {
         long int dum;
-        maxIndex(dum, kmax, imax, jmax);
+        return maxIndex(dum, kmax, imax, jmax);
     }
 
     /** 2D Indices for the maximum element.
      *
      * This function just calls to the 4D function
      */
-    void maxIndex(long int& imax, long int& jmax) const
+    T maxIndex(long int& imax, long int& jmax) const
     {
         long int dum;
-        maxIndex(dum, dum, imax, jmax);
+        return maxIndex(dum, dum, imax, jmax);
     }
 
     /** 1D Indices for the maximum element.
      *
      * This function just calls to the 4D function
      */
-    void maxIndex(long int& jmax) const
+    T maxIndex(long int& jmax) const
     {
         long int dum;
-        maxIndex(dum, dum, dum, jmax);
+        return maxIndex(dum, dum, dum, jmax);
     }
 
     /** Minimum and maximum of the values in the array.
