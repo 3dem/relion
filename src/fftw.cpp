@@ -1241,7 +1241,6 @@ void lowPassFilterMap(MultidimArray<Complex > &FT, int ori_size,
 
 
 }
-
 void lowPassFilterMap(MultidimArray<RFLOAT > &img, RFLOAT low_pass, RFLOAT angpix, int filter_edge_width)
 {
 	FourierTransformer transformer;

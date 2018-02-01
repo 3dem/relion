@@ -55,6 +55,9 @@ void Preprocessing::read(int argc, char **argv, int rank)
 	fn_list_star = parser.getOption("--list_star", "Output STAR file with a list to the output STAR files of individual micrographs", "");
 	fn_data = parser.getOption("--reextract_data_star", "A _data.star file from a refinement to re-extract, e.g. with different binning or re-centered (instead of --coord_suffix)", "");
 	do_recenter = parser.checkOption("--recenter", "Re-center particle according to rlnOriginX/Y in --reextract_data_star STAR file");
+	recenter_x = textToFloat(parser.getOption("--recenter_x", "X-coordinate (in pixel inside the reference) to recenter re-extracted data on", "0."));
+	recenter_y = textToFloat(parser.getOption("--recenter_y", "Y-coordinate (in pixel inside the reference) to recenter re-extracted data on", "0."));
+	recenter_z = textToFloat(parser.getOption("--recenter_z", "Z-coordinate (in pixel inside the reference) to recenter re-extracted data on", "0."));
 	set_angpix = textToFloat(parser.getOption("--set_angpix", "Manually set pixel size in Angstroms (only necessary if magnification and detector pixel size are not in the input STAR file)", "-1."));
 
 	int extract_section = parser.addSection("Particle extraction");
@@ -132,6 +135,9 @@ void Preprocessing::initialise()
 
 			if (extract_size < 0)
 				REPORT_ERROR("Preprocessing::initialise ERROR: please provide the size of the box to extract particle using --extract_size ");
+
+			if (extract_size % 2 != 0)
+				REPORT_ERROR("Preprocessing::initialise ERROR: only extracting to even-sized images is allowed in RELION...");
 		}
 
 		// Read in the micrographs STAR file
@@ -1229,10 +1235,33 @@ MetaDataTable Preprocessing::getCoordinateMetaDataTable(FileName fn_mic)
 				// re-scale or re-center
 				if (ABS(rescale_fndata - 1.) > 1e-6 || do_recenter)
 				{
+					Matrix1D<RFLOAT>  my_projected_center(3);
+					my_projected_center.initZeros();
+
 					MDresult.getValue(EMDL_ORIENT_ORIGIN_X, xoff);
 					MDresult.getValue(EMDL_ORIENT_ORIGIN_Y, yoff);
+
+					if (do_recenter && (fabs(recenter_x) > 0. || fabs(recenter_y) > 0. || fabs(recenter_z) > 0.))
+					{
+						MDresult.getValue(EMDL_ORIENT_ROT, rot);
+						MDresult.getValue(EMDL_ORIENT_TILT, tilt);
+						MDresult.getValue(EMDL_ORIENT_PSI, psi);
+
+						// Project the center-coordinates
+						Matrix1D<RFLOAT> my_center(3);
+						Matrix2D<RFLOAT> A3D;
+						XX(my_center) = recenter_x;
+						YY(my_center) = recenter_y;
+						ZZ(my_center) = recenter_z;
+						Euler_angles2matrix(rot, tilt, psi, A3D, false);
+						my_projected_center = A3D * my_center;
+					}
+
+					xoff -= XX(my_projected_center);
+					yoff -= YY(my_projected_center);
 					xoff *= rescale_fndata;
 					yoff *= rescale_fndata;
+
 					if (do_recenter)
 					{
 						MDresult.getValue(EMDL_IMAGE_COORD_X, xcoord);
@@ -1246,11 +1275,13 @@ MetaDataTable Preprocessing::getCoordinateMetaDataTable(FileName fn_mic)
 						MDresult.setValue(EMDL_IMAGE_COORD_X, xcoord);
 						MDresult.setValue(EMDL_IMAGE_COORD_Y, ycoord);
 					}
+
 					MDresult.setValue(EMDL_ORIENT_ORIGIN_X, xoff);
 					MDresult.setValue(EMDL_ORIENT_ORIGIN_Y, yoff);
 					if (do_contains_z)
 					{
 						MDresult.getValue(EMDL_ORIENT_ORIGIN_Z, zoff);
+						zoff -= ZZ(my_projected_center);
 						zoff *= rescale_fndata;
 						if (do_recenter)
 						{

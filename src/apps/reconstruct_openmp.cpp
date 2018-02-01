@@ -648,7 +648,7 @@ class reconstruct_parameters
         }
 
         std::cerr << "Starting the reconstruction ..." << std::endl;
-        backprojector.symmetrise(nr_helical_asu, helical_twist, helical_rise);
+        backprojector.symmetrise(nr_helical_asu, helical_twist, helical_rise/angpix);
         backprojector.reconstruct(vol(), iter, do_map, 1., dummy, dummy, dummy, dummy,
                                   fsc, 1., do_use_fsc, true, nr_fft_threads, -1);
 

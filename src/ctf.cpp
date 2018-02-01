@@ -302,4 +302,3 @@ void CTF::applyWeightEwaldSphereCurvature(MultidimArray < RFLOAT > &result, int 
 	}
 
 }
-

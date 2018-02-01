@@ -113,25 +113,46 @@ static bool do_allow_change_minimum_dedicated;
 #define NODE_PDF_LOGFILE    13//PDF logfile
 
 // All the different types of jobs defined inside the pipeline
-#define PROC_IMPORT         0 // Import any file as a Node of a given type
-#define PROC_MOTIONCORR 	1 // Import any file as a Node of a given type
-#define PROC_CTFFIND	    2 // Estimate CTF parameters from micrographs for either entire micrographs and/or particles
-#define PROC_MANUALPICK		3 // Manually pick particle coordinates from micrographs
-#define PROC_AUTOPICK		4 // Automatically pick particle coordinates from micrographs, their CTF and 2D references
-#define PROC_EXTRACT		5 // Window particles, normalize, downsize etc from micrographs (also combine CTF into metadata file)
-#define PROC_SORT           6 // Sort particles based on their Z-scores
-#define PROC_CLASSSELECT    7 // Read in model.star file, and let user interactively select classes through the display (later: auto-selection as well)
-#define PROC_2DCLASS		8 // 2D classification (from input particles)
-#define PROC_3DCLASS		9 // 3D classification (from input 2D/3D particles, an input 3D-reference, and possibly a 3D mask)
-#define PROC_3DAUTO	        10 // 3D auto-refine (from input particles, an input 3Dreference, and possibly a 3D mask)
-#define PROC_POLISH			11// Particle-polishing (from movie-particles)
-#define PROC_MASKCREATE     12// Process to create masks from input maps
-#define PROC_JOINSTAR       13// Process to create masks from input maps
-#define PROC_SUBTRACT       14// Process to subtract projections of parts of the reference from experimental images
-#define PROC_POST			15// Post-processing (from unfiltered half-maps and a possibly a 3D mask)
-#define PROC_RESMAP			16// Local resolution estimation (from unfiltered half-maps and a 3D mask)
-#define PROC_MOVIEREFINE    17// Movie-particle extraction and refinement combined
-#define PROC_INIMODEL		18// De-novo generation of 3D initial model (using SGD)
+#define PROC_IMPORT        "Import"       // Import any file as a Node of a given type
+#define PROC_MOTIONCORR 	"MotionCorr"   // Import any file as a Node of a given type
+#define PROC_CTFFIND	    "CtfFind"  	   // Estimate CTF parameters from micrographs for either entire micrographs and/or particles
+#define PROC_MANUALPICK	    "ManualPick"   // Manually pick particle coordinates from micrographs
+#define PROC_AUTOPICK		"AutoPick"     // Automatically pick particle coordinates from micrographs, their CTF and 2D references
+#define PROC_EXTRACT		"Extract"      // Window particles, normalize, downsize etc from micrographs (also combine CTF into metadata file)
+#define PROC_SORT           "Sort"         // Sort particles based on their Z-scores
+#define PROC_CLASSSELECT    "Select" 	   // Read in model.star file, and let user interactively select classes through the display (later: auto-selection as well)
+#define PROC_2DCLASS 		"Class2D"      // 2D classification (from input particles)
+#define PROC_3DCLASS		"Class3D"      // 3D classification (from input 2D/3D particles, an input 3D-reference, and possibly a 3D mask)
+#define PROC_3DAUTO	        "Refine3D"     // 3D auto-refine (from input particles, an input 3Dreference, and possibly a 3D mask)
+#define PROC_POLISH		    "Polish"       // Particle-polishing (from movie-particles)
+#define PROC_MASKCREATE     "MaskCreate"   // Process to create masks from input maps
+#define PROC_JOINSTAR       "JoinStar"     // Process to create masks from input maps
+#define PROC_SUBTRACT       "Subtract"     // Process to subtract projections of parts of the reference from experimental images
+#define PROC_POST			"PostProcess"  // Post-processing (from unfiltered half-maps and a possibly a 3D mask)
+#define PROC_RESMAP  	    "LocalRes"     // Local resolution estimation (from unfiltered half-maps and a 3D mask)
+#define PROC_MOVIEREFINE    "MovieRefine"  // Movie-particle extraction and refinement combined
+#define PROC_INIMODEL		"InitialModel" // De-novo generation of 3D initial model (using SGD)
+
+// For backwards compatibility with RELION-2.x
+#define PROC_IMPORT2        "0" // Import any file as a Node of a given type
+#define PROC_MOTIONCORR2 	"1" // Import any file as a Node of a given type
+#define PROC_CTFFIND2	    "2" // Estimate CTF parameters from micrographs for either entire micrographs and/or particles
+#define PROC_MANUALPICK2	"3" // Manually pick particle coordinates from micrographs
+#define PROC_AUTOPICK2		"4" // Automatically pick particle coordinates from micrographs, their CTF and 2D references
+#define PROC_EXTRACT2		"5" // Window particles, normalize, downsize etc from micrographs (also combine CTF into metadata file)
+#define PROC_SORT2          "6" // Sort particles based on their Z-scores
+#define PROC_CLASSSELECT2   "7" // Read in model.star file, and let user interactively select classes through the display (later: auto-selection as well)
+#define PROC_2DCLASS2		"8" // 2D classification (from input particles)
+#define PROC_3DCLASS2		"9" // 3D classification (from input 2D/3D particles, an input 3D-reference, and possibly a 3D mask)
+#define PROC_3DAUTO2        "10" // 3D auto-refine (from input particles, an input 3Dreference, and possibly a 3D mask)
+#define PROC_POLISH2		"11"// Particle-polishing (from movie-particles)
+#define PROC_MASKCREATE2    "12"// Process to create masks from input maps
+#define PROC_JOINSTAR2      "13"// Process to create masks from input maps
+#define PROC_SUBTRACT2      "14"// Process to subtract projections of parts of the reference from experimental images
+#define PROC_POST2			"15"// Post-processing (from unfiltered half-maps and a possibly a 3D mask)
+#define PROC_RESMAP2		"16"// Local resolution estimation (from unfiltered half-maps and a 3D mask)
+#define PROC_MOVIEREFINE2   "17"// Movie-particle extraction and refinement combined
+#define PROC_INIMODEL2		"18"// De-novo generation of 3D initial model (using SGD)
 #define NR_BROWSE_TABS      19
 
 // Status a Process may have
@@ -221,6 +242,9 @@ public:
     // Get a string value
     std::string getString();
 
+    // Set a string value
+    void setString(std::string set_to);
+
     // Get a string value
     Node getNode();
 
@@ -253,7 +277,7 @@ public:
 	std::string hidden_name;
 
 	// Which job type is this?
-	int type;
+	std::string type;
 
 	// Is this a continuation job?
 	bool is_continue;
@@ -287,10 +311,10 @@ public:
     }
 
     // Returns true if the option is present in joboptions
-    bool containsOption(std::string option)
-    {
-    	return (joboptions.find(option) != joboptions.end());
-    }
+    bool containsLabel(std::string label, std::string &option);
+
+    // Set this option in the job
+    void setOption(std::string setOptionLine);
 
     // write/read settings to disc
 	bool read(std::string fn, bool &_is_continue, bool do_initialise = false); // return false if unsuccessful
@@ -308,7 +332,7 @@ public:
 			bool do_makedir, std::string &warning_message);
 
 	// Initialise the generic RelionJob
-    void initialise(int job_type);
+    void initialise(std::string job_type);
 
     // Generic getCommands
     bool getCommands(std::string &outputname, std::vector<std::string> &commands,
