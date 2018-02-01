@@ -47,6 +47,9 @@ public:
 	// Filenames of all the micrographs to run Motioncorr on
 	std::vector<FileName> fn_micrographs, fn_ori_micrographs;
 
+	// Use our own implementation
+	bool do_own;
+
 	// Use MOTIONCOR2 instead of UNBLUR?
 	bool do_motioncor2;
 
@@ -128,23 +131,23 @@ public:
 	// Given an input fn_mic filename, this function will determine the names of the output corrected image (fn_avg) and the corrected movie (fn_mov).
 	void getOutputFileNames(FileName fn_mic, FileName &fn_avg, FileName &fn_mov);
 
-    // Execute MOTIONCOR2 for a single micrograph
-    bool executeMotioncor2(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts, int rank = 0);
+	// Execute MOTIONCOR2 for a single micrograph
+	bool executeMotioncor2(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts, int rank = 0);
 
-    // Get the shifts from MOTIONCOR2
-    void getShiftsMotioncor2(FileName fn_log, std::vector<float> &xshifts, std::vector<float> &yshifts);
+	// Get the shifts from MOTIONCOR2
+	void getShiftsMotioncor2(FileName fn_log, std::vector<float> &xshifts, std::vector<float> &yshifts);
 
 	// Execute UNBLUR for a single micrograph
-    bool executeUnblur(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts);
+	bool executeUnblur(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts);
 
 	// Get the shifts from UNBLUR
-    void getShiftsUnblur(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts);
+	void getShiftsUnblur(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts);
 
 	// Plot the FRC curve from SUMMOVIE
 	void plotFRC(FileName fn_frc);
 
 	// Plot the shifts
-    void plotShifts(FileName fn_eps, std::vector<float> &xshifts, std::vector<float> &yshifts);
+	void plotShifts(FileName fn_eps, std::vector<float> &xshifts, std::vector<float> &yshifts);
 
 	// Save micrograph model
 	void saveModel(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts);
@@ -155,6 +158,12 @@ public:
 	// Write out final STAR file
 	void writeSTAR();
 
+private:
+	// Execute our own implementation for a single micrograph
+	bool executeOwnMotionCorrection(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts);
+
+	// shiftx, shifty is relative to the (real space) image size
+	void shiftNonSquareImageInFourierTransform(MultidimArray<Complex> &frame, RFLOAT shiftx, RFLOAT shifty);
 };
 
 
