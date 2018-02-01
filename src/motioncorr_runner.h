@@ -164,6 +164,8 @@ private:
 
 	// shiftx, shifty is relative to the (real space) image size
 	void shiftNonSquareImageInFourierTransform(MultidimArray<Complex> &frame, RFLOAT shiftx, RFLOAT shifty);
+
+	void alignPatch(std::vector<MultidimArray<Complex> > &Fframes, const int pnx, const int pny, std::vector<float> &xshifts, std::vector<float> &yshifts);
 };
 
 
