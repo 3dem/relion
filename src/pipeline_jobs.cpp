@@ -630,10 +630,24 @@ void RelionJob::initialise(int _job_type)
     joboptions["do_queue"] = JobOption("Submit to queue?", false, "If set to Yes, the job will be submit to a queue, otherwise \
 the job will be executed locally. Note that only MPI jobs may be sent to a queue.");
 
-    // Need the std::string(), as otherwise it will be overloaded and passed as a boolean....
-    joboptions["queuename"] = JobOption("Queue name: ", std::string("openmpi"), "Name of the queue to which to submit the job.");
+	// Check for environment variable RELION_QUEUE_NAME
+	const char * default_queue = getenv ("RELION_QUEUE_NAME");
+	if (default_queue==NULL)
+	{
+		default_queue = DEFAULTQUEUENAME;
+	}
 
-    joboptions["qsub"] = JobOption("Queue submit command:", std::string("qsub"), "Name of the command used to submit scripts to the queue, e.g. qsub or bsub.\n\n\
+    // Need the std::string(), as otherwise it will be overloaded and passed as a boolean....
+    joboptions["queuename"] = JobOption("Queue name: ", std::string(default_queue), "Name of the queue to which to submit the job.");
+
+	// Check for environment variable RELION_QSUB_COMMAND
+	const char * default_command = getenv ("RELION_QSUB_COMMAND");
+	if (default_command==NULL)
+	{
+		default_command = DEFAULTQSUBCOMMAND;
+	}
+
+    joboptions["qsub"] = JobOption("Queue submit command:", std::string(default_command), "Name of the command used to submit scripts to the queue, e.g. qsub or bsub.\n\n\
 Note that the person who installed RELION should have made a custom script for your cluster/queue setup. Check this is the case \
 (or create your own script following the RELION WIKI) if you have trouble submitting jobs.");
 
