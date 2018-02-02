@@ -23,6 +23,8 @@
 #endif
 #include "src/micrograph_model.h"
 #include "src/fftw.h"
+#include "src/matrix2d.h"
+#include "src/matrix1d.h"
 
 void MotioncorrRunner::read(int argc, char **argv, int rank)
 {
@@ -822,10 +824,8 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 
 // TODO:
 // - defect
-// - fitting
 // - dose weighting
 // - real space interpolation
-// - binning
 // - grouping
 
 bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts) {
@@ -900,10 +900,12 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 		}
 	}
 
-	// Determine patches
+	// Patch based alignment
 	std::cout << "Full Size: X = " << nx << " Y = " << ny << std::endl;
 	std::cout << "Patches: X = " << patch_x << " Y = " << patch_y << std::endl;
-	const int patch_nx = nx / patch_x, patch_ny = ny / patch_y;
+	const int patch_nx = nx / patch_x, patch_ny = ny / patch_y, n_patches = patch_x * patch_y;
+	std::vector<RFLOAT> patch_xshifts, patch_yshifts, patch_frames, patch_xs, patch_ys;
+
 	int ipatch = 1;
 	for (int iy = 0; iy < patch_y; iy++) {
 		for (int ix = 0; ix < patch_x; ix++) {
@@ -918,7 +920,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 			std::cout << ", Center = (" << x_center << ", " << y_center << ")" << std::endl;
 			ipatch++;
 
-			std::vector<float> patch_xshifts(n_frames), patch_yshifts(n_frames);
+			std::vector<float> local_xshifts(n_frames), local_yshifts(n_frames);
 			MultidimArray<RFLOAT> Iframe(y_end - y_start + 1, x_end - x_start + 1);
 			for (int iframe = 0; iframe < n_frames; iframe++) {
 				for (int ipy = y_start; ipy < y_end; ipy++) {
@@ -928,13 +930,96 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 				}
 				transformer.FourierTransform(Iframe, Fframes[iframe]);
 			}
-			alignPatch(Fframes, x_end - x_start + 1, y_end - y_start + 1, patch_xshifts, patch_yshifts);
+			alignPatch(Fframes, x_end - x_start + 1, y_end - y_start + 1, local_xshifts, local_yshifts);
+
+			for (int iframe = 0; iframe < n_frames; iframe++) {
+				patch_xshifts.push_back(local_xshifts[iframe]);
+				patch_yshifts.push_back(local_yshifts[iframe]);
+				patch_frames.push_back(iframe);
+				patch_xs.push_back((float)x_center / nx);
+				patch_ys.push_back((float)y_center / ny);
+			}
 		}
+	}
+
+	// Fit polynomial model
+
+	// TODO: outlier rejection
+	
+	const int n_obs = patch_frames.size();
+	const int n_params = 18;
+	Matrix2D <RFLOAT> matA(n_obs, n_params);
+	Matrix1D <RFLOAT> vecX(n_obs), vecY(n_obs), coeffX(n_params), coeffY(n_params);
+	for (int i = 0; i < n_obs; i++) {
+		VEC_ELEM(vecX, i) = patch_xs[i]; VEC_ELEM(vecY, i) = patch_ys[i];
+
+		const RFLOAT x = patch_xs[i];
+		const RFLOAT y = patch_ys[i];
+		const RFLOAT z = patch_frames[i];
+		const RFLOAT x2 = x * x, y2 = y * y, xy = x * y, z2 = z * z;
+		const RFLOAT z3 = z2 * z;		
+
+		MAT_ELEM(matA, i, 0) = z;
+		MAT_ELEM(matA, i, 1) = z2; 
+		MAT_ELEM(matA, i, 2) = z3;
+ 
+		MAT_ELEM(matA, i, 3) = x * z;
+		MAT_ELEM(matA, i, 4) = x * z2;
+		MAT_ELEM(matA, i, 5) = z * z3;
+
+		MAT_ELEM(matA, i, 6) = x2 * z;
+		MAT_ELEM(matA, i, 7) = x2 * z2;
+		MAT_ELEM(matA, i, 8) = x2 * z3;
+
+		MAT_ELEM(matA, i, 9) = y * z;
+		MAT_ELEM(matA, i, 10) = y * z2;
+		MAT_ELEM(matA, i, 11) = y * z3;
+
+		MAT_ELEM(matA, i, 12) = y2 * z;
+		MAT_ELEM(matA, i, 13) = y2 * z2;
+		MAT_ELEM(matA, i, 14) = y2 * z3;
+
+		MAT_ELEM(matA, i, 15) = xy * z;
+		MAT_ELEM(matA, i, 16) = xy * z2;
+		MAT_ELEM(matA, i, 17) = xy * z3;
+	}
+
+	const RFLOAT EPS = 1e-10;
+	solve(matA, vecX, coeffX, EPS);
+	solve(matA, vecY, coeffY, EPS);
+
+	std::cout << "Polynomial fitting coefficients for X and Y:" << std::endl;
+	for (int i = 0; i < n_params; i++) {
+		std::cout << i << " " << coeffX(i) << " " << coeffY(i) << std::endl;
 	}
 
 	// TODO: dose weight
 
-	// TODO: binning
+	// TODO: real space fitting
+
+	// Apply binning
+	if (bin_factor != 1) {
+		int new_nx = nx / bin_factor, new_ny = ny / bin_factor;
+		new_nx -= new_nx % 2; new_ny -= new_ny % 2; // force it to be even
+//		std::cout << "Binning from X = " << nx << " Y = " << ny << " to X = " << new_nx << " Y = " << new_ny << std::endl;
+
+		const int half_new_ny = new_ny / 2, new_nfx = new_nx / 2 + 1;
+		MultidimArray<Complex> Fref, Fbinned(new_ny, new_nfx);
+		transformer.FourierTransform(Iref(), Fref);
+
+		for (int y = 0; y <= half_new_ny; y++) {
+			for (int x = 0; x < new_nfx; x++) {
+				DIRECT_A2D_ELEM(Fbinned, y, x) =  DIRECT_A2D_ELEM(Fref, y, x);
+			}
+		}
+		for (int y = half_new_ny + 1; y < new_ny; y++) {
+			for (int x = 0; x < new_nfx; x++) {
+				DIRECT_A2D_ELEM(Fbinned, y, x) =  DIRECT_A2D_ELEM(Fref, ny - 1 - new_ny + y, x);
+			}
+		}
+		Iref().reshape(new_ny, new_nx);
+		transformer.inverseFourierTransform(Fbinned, Iref());
+	}
 	
 	// Final output
 	FileName fn_avg, fn_mov;
@@ -944,12 +1029,13 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 	return true;
 }
 
-void MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes, const int pnx, const int pny, std::vector<float> &xshifts, std::vector<float> &yshifts) {
+bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes, const int pnx, const int pny, std::vector<float> &xshifts, std::vector<float> &yshifts) {
 	Image<RFLOAT> Iref, Icc;
 	MultidimArray<Complex> Fref, Fcc;
 	MultidimArray<RFLOAT> weight;
 	std::vector<RFLOAT> cur_xshifts, cur_yshifts;
 	FourierTransformer transformer;
+	bool converged = false;
 
 	// Parameters TODO: make an option
 	const int max_iter = 5;
@@ -969,11 +1055,11 @@ void MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes,
 	Fref.reshape(nfy, nfx);
 	Fcc.reshape(Fref);
 
-#ifdef DEBUG
+//#ifdef DEBUG
 	std::cout << "Patch Size X = " << pnx << " Y  = " << pny << std::endl;
 	std::cout << "Fframes X = " << nfx << " Y = " << nfy << std::endl;
 	std::cout << "Trajectory size: " << xshifts.size() << std::endl;
-#endif
+//#endif
 
 	// Initialize B factor weight
 	weight.reshape(Fref);
@@ -1077,12 +1163,19 @@ void MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes,
 		// Test convergence
 		RFLOAT rmsd = std::sqrt((x_sumsq + y_sumsq) / n_frames);
 		std::cout << "Iteration " << iter << ": RMSD = " << rmsd << " px" << std::endl;
-		if (rmsd < tolerance) break;
+		if (rmsd < tolerance) {
+			converged = true;
+			break;
+		}
 	}
 
+#ifdef DEBUG
 	for (int iframe = 0; iframe < n_frames; iframe++) {
 		std::cout << iframe << " " << xshifts[iframe] << " " << yshifts[iframe] << std::endl;
 	}
+#endif
+
+	return converged;
 }
 
 // shiftx, shifty is relative to the (real space) image size
