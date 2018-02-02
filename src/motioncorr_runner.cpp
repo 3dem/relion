@@ -69,6 +69,9 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	pre_exposure = textToFloat(parser.getOption("--preexposure", "Pre-exposure (in electrons/A2) for dose-weighting inside UNBLUR", "0"));
 
 	do_own = parser.checkOption("--use_own","Use our own implementation of motion correction");
+	if (do_own) {
+		std::cout << "!!! WARNING !!!" << std::endl << "Our own implementation of motion correction is under development!" << std::endl;
+	}
 	// Initialise verb for non-parallel execution
 	verb = 1;
 
@@ -1037,25 +1040,13 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 #endif
 
 	RFLOAT rms_x = 0, rms_y = 0;
+	RFLOAT x_fitted, y_fitted;
         for (int i = 0; i < n_obs; i++) {
-                const RFLOAT x = patch_xs[i] / nx - 0.5;
-                const RFLOAT y = patch_ys[i] / ny - 0.5;
-                const RFLOAT z = patch_frames[i];
-                const RFLOAT x2 = x * x, y2 = y * y, xy = x * y, z2 = z * z;
-                const RFLOAT z3 = z2 * z;
+		const RFLOAT x = patch_xs[i] / nx - 0.5;
+		const RFLOAT y = patch_ys[i] / ny - 0.5;
+		const RFLOAT z = patch_frames[i];
 
-		RFLOAT x_fitted = (coeffX(0)  * z + coeffX(1)  * z2 + coeffX(2)  * z3) \
-		                + (coeffX(3)  * z + coeffX(4)  * z2 + coeffX(5)  * z3) * x \
-		                + (coeffX(6)  * z + coeffX(7)  * z2 + coeffX(8)  * z3) * x2 \
-		                + (coeffX(9)  * z + coeffX(10) * z2 + coeffX(11) * z3) * y \
-		                + (coeffX(12) * z + coeffX(13) * z2 + coeffX(14) * z3) * y2 \
-		                + (coeffX(15) * z + coeffX(16) * z2 + coeffX(17) * z3) * xy;
-		RFLOAT y_fitted = (coeffY(0)  * z + coeffY(1)  * z2 + coeffY(2)  * z3)\
-		                + (coeffY(3)  * z + coeffY(4)  * z2 + coeffY(5)  * z3) * x \
-		                + (coeffY(6)  * z + coeffY(7)  * z2 + coeffY(8)  * z3) * x2 \
-		                + (coeffY(9)  * z + coeffY(10) * z2 + coeffY(11) * z3) * y \
-		                + (coeffY(12) * z + coeffY(13) * z2 + coeffY(14) * z3) * y2 \
-		                + (coeffY(15) * z + coeffY(16) * z2 + coeffY(17) * z3) * xy;
+		getFittedXY(x, y, z, coeffX, coeffY, x_fitted, y_fitted);
 		rms_x += (patch_xshifts[i] - x_fitted) * (patch_xshifts[i] - x_fitted);
 		rms_y += (patch_yshifts[i] - y_fitted) * (patch_yshifts[i] - y_fitted);
 #ifdef DEBUG
@@ -1070,7 +1061,56 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 	// TODO: dose weight
 
 	// TODO: real space fitting
-	//
+	std::cout << "Real space interpolation: ";
+	Iref().initZeros();
+	for (int iframe = 0; iframe < n_frames; iframe++) {
+		std::cout << "." << std::flush;
+		#pragma omp parallel for
+		for (int ix = 0; ix < nx; ix++) {
+			for (int iy = 0; iy < ny; iy++) {
+				bool valid = true;
+				const RFLOAT x = (float)ix / nx - 0.5;
+				const RFLOAT y = (float)iy / ny - 0.5;
+				getFittedXY(x, y, iframe, coeffX, coeffY, x_fitted, y_fitted);
+				x_fitted = ix - x_fitted; y_fitted = iy - y_fitted;
+
+				int x0 = FLOOR(x_fitted);
+				int y0 = FLOOR(y_fitted);
+				const int x1 = x0 + 1;
+				const int y1 = y0 + 1;
+
+				if (x0 < 0) {x0 = 0; valid = false;}
+				if (y0 < 0) {y0 = 0; valid = false;}
+				if (x1 >= nx) {x0 = nx - 1; valid = false;}
+				if (y1 >= ny) {y0 = ny - 1; valid = false;}
+				if (!valid) {
+					DIRECT_A2D_ELEM(Iref(), iy, ix) += DIRECT_A2D_ELEM(Iframes[iframe](), y0, x0);
+					if (std::isnan(DIRECT_A2D_ELEM(Iref(), iy, ix))) {
+						std::cout << "ix = " << ix << " xfit = " << x_fitted << " iy = " << iy << " ifit = " << y_fitted << std::endl;
+					}
+					continue;
+				}
+
+				const RFLOAT fx = x_fitted - x0;
+				const RFLOAT fy = y_fitted - y0;
+
+//				std::cout << "ix = " << ix << " xfit = " << x_fitted << " iy = " << iy << " ifit = " << y_fitted << std::endl;
+				const RFLOAT d00 = DIRECT_A2D_ELEM(Iframes[iframe](), y0, x0);
+				const RFLOAT d01 = DIRECT_A2D_ELEM(Iframes[iframe](), y0, x1);
+				const RFLOAT d10 = DIRECT_A2D_ELEM(Iframes[iframe](), y1, x0);
+				const RFLOAT d11 = DIRECT_A2D_ELEM(Iframes[iframe](), y1, x1);
+
+				const RFLOAT dx0 = LIN_INTERP(fx, d00, d01);
+				const RFLOAT dx1 = LIN_INTERP(fx, d10, d11);
+				const RFLOAT val = LIN_INTERP(fy, dx0, dx1);
+
+				if (std::isnan(val)) { std::cout << "ix = " << ix << " xfit = " << x_fitted << " iy = " << iy << " ifit = " << y_fitted << " d00 " << d00 << " d01 " << d01 << " d10 " << d10 << " d11 " << d11 << " dx0 " << dx0 << " dx1 " << dx1 << std::endl;}
+				DIRECT_A2D_ELEM(Iref(), iy, ix) += val;
+			}
+		}
+	}
+	std::cout << " done" << std::endl;
+	
 	// Apply binning
 	if (bin_factor != 1) {
 		int new_nx = nx / bin_factor, new_ny = ny / bin_factor;
