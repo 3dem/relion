@@ -619,16 +619,26 @@ void RelionJob::initialise(int _job_type)
 	}
 	}
 
+	// Check for environment variable RELION_MPI_MAX
+	const char * mpi_max_input = getenv ("RELION_MPI_MAX");
+	int mpi_max = (mpi_max_input == NULL) ? DEFAULTMPIMAX : textToInteger(mpi_max_input);
 
 	if (has_mpi)
-		joboptions["nr_mpi"] = JobOption("Number of MPI procs:", 1, 1, 64, 1, "Number of MPI nodes to use in parallel. When set to 1, MPI will not be used.");
+		joboptions["nr_mpi"] = JobOption("Number of MPI procs:", 1, 1, mpi_max, 1, "Number of MPI nodes to use in parallel. When set to 1, MPI will not be used.");
 
+	// Check for environment variable RELION_THREAD_MAX
+	const char * thread_max_input = getenv ("RELION_THREAD_MAX");
+	int thread_max = (thread_max_input == NULL) ? DEFAULTTHREADMAX : textToInteger(thread_max_input);
 	if (has_thread)
-		joboptions["nr_threads"] = JobOption("Number of threads:", 1, 1, 16, 1, "Number of shared-memory (POSIX) threads to use in parallel. \
+		joboptions["nr_threads"] = JobOption("Number of threads:", 1, 1, thread_max, 1, "Number of shared-memory (POSIX) threads to use in parallel. \
 		When set to 1, no multi-threading will be used. Multi-threading is often useful in 3D refinements to have more memory. 2D class averaging often proceeds more efficiently without threads.");
 
-    joboptions["do_queue"] = JobOption("Submit to queue?", false, "If set to Yes, the job will be submit to a queue, otherwise \
+	// Check for environment variable RELION_QUEUE_USE
+	const char * use_queue_input = getenv ("RELION_QUEUE_USE");
+	bool use_queue = (use_queue_input == NULL) ? DEFAULTQUEUEUSE : textToBool(use_queue_input);
+	joboptions["do_queue"] = JobOption("Submit to queue?", use_queue, "If set to Yes, the job will be submit to a queue, otherwise \
 the job will be executed locally. Note that only MPI jobs may be sent to a queue.");
+	
 
 	// Check for environment variable RELION_QUEUE_NAME
 	const char * default_queue = getenv ("RELION_QUEUE_NAME");

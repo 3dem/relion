@@ -200,6 +200,31 @@ int textToInteger(const char* str, int _errno, std::string errmsg)
     return 0;
 }
 
+bool textToBool(const char* str, int _errno, std::string errmsg)
+{
+    bool retval;
+    int ok;
+
+    if (str == NULL)
+    	REPORT_ERROR( errmsg);
+
+    if (strcasecmp(str, "true") == 0)
+    {
+	retval = true;
+    } 
+    else if (strcasecmp(str, "false") == 0)
+    {
+	retval = false;
+    }
+    else
+    {
+	REPORT_ERROR( errmsg);
+	return false;
+    }
+    
+    return retval;
+}
+
 long long textToLongLong(const char* str, int _errno, std::string errmsg)
 {
     long long int retval;

@@ -61,6 +61,9 @@
 #define DEFAULTMININIMUMDEDICATED 1
 #define DEFAULTWARNINGLOCALMPI 32
 #define DEFAULTALLOWCHANGEMINDEDICATED true
+#define DEFAULTQUEUEUSE false
+#define DEFAULTMPIMAX 64
+#define DEFAULTTHREADMAX 16
 
 static const char* job_sampling_options[] = {
 		      "30 degrees",
