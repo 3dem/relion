@@ -3,6 +3,9 @@
 #include "src/acc/cuda/cuda_kernels/helper.cuh"
 #include "src/acc/cuda/cuda_settings.h"
 
+#include <curand.h>
+#include <curand_kernel.h>
+
 /// Needed explicit template instantiations
 template __global__ void cuda_kernel_make_eulers_2D<true>(XFLOAT *,
 	XFLOAT *, unsigned);
@@ -72,6 +75,54 @@ __global__ void cuda_kernel_exponentiate_weights_fine(
 		}
 	}
 }
+
+__global__ void cuda_kernel_initRND(unsigned long seed, curandState *States)
+{
+       int tid = threadIdx.x;
+       int bid = blockIdx.x;
+
+       int id    = bid*RND_BLOCK_SIZE + tid;
+       int pixel = bid*RND_BLOCK_SIZE + tid;
+
+       curand_init(seed, pixel, 0, &States[id]);
+}
+
+__global__ void cuda_kernel_RNDnormalDitributionComplexWithPowerModulation( ACCCOMPLEX *Image,
+																		    curandState *States,
+																		    long int xdim,
+																			XFLOAT * spectra)
+{
+       int tid = threadIdx.x;
+       int bid = blockIdx.x;
+
+       int id    = bid*RND_BLOCK_SIZE + tid;
+       int pixel = bid*RND_BLOCK_SIZE + tid;
+
+       //curand_init(1234, pixel, 0, &States[id]);
+
+       int x,y;
+       int size = xdim*((xdim-1)*2);
+       int passes = size/(RND_BLOCK_NUM*RND_BLOCK_SIZE) + 1;
+       for(int i=0; i<passes; i++)
+       {
+               if(pixel<size)
+               {
+                       y = ( pixel / xdim ); // fftshift in one of two dims;
+                       if(y>=xdim)
+                               y -= (xdim-1)*2;
+                       x = pixel % xdim;
+
+                       int ires = rintf(sqrtf(x*x + y*y));
+                       XFLOAT scale = 0.f;
+                       if(ires<xdim)
+                               scale =  spectra[ires];
+
+                       Image[pixel] = (curand_normal2(&States[id]))*scale;
+               }
+               pixel += RND_BLOCK_NUM*RND_BLOCK_SIZE;
+       }
+}
+
 
 //__global__ void cuda_kernel_exponentiate_weights_fine2(
 //		XFLOAT *g_pdf_orientation,
@@ -250,7 +301,6 @@ __global__ void cuda_kernel_softMaskBackgroundValue(	XFLOAT *vol,
 														long int xinit,
 														long int yinit,
 														long int zinit,
-														bool do_Mnoise,
 														XFLOAT radius,
 														XFLOAT radius_p,
 														XFLOAT cosine_width,
@@ -323,7 +373,8 @@ __global__ void cuda_kernel_cosineFilter(	XFLOAT *vol,
 											long int xinit,
 											long int yinit,
 											long int zinit,
-											bool do_Mnoise,
+											bool do_noise,
+											XFLOAT *noise,
 											XFLOAT radius,
 											XFLOAT radius_p,
 											XFLOAT cosine_width,
@@ -334,13 +385,14 @@ __global__ void cuda_kernel_cosineFilter(	XFLOAT *vol,
 	int bid = blockIdx.x;
 
 //		vol.setXmippOrigin(); // sets xinit=xdim , also for y z
-	XFLOAT r, raisedcos;
+	XFLOAT r, raisedcos, defVal;
 	int x,y,z;
 	__shared__ XFLOAT     img_pixels[SOFTMASK_BLOCK_SIZE];
 
 	long int texel_pass_num = ceilfracf(vol_size,SOFTMASK_BLOCK_SIZE*gridDim.x);
 	int texel = bid*SOFTMASK_BLOCK_SIZE*texel_pass_num + tid;
 
+	defVal = bg_value;
 	for (int pass = 0; pass < texel_pass_num; pass++, texel+=SOFTMASK_BLOCK_SIZE) // loop the available warps enough to complete all translations for this orientation
 	{
 		if(texel<vol_size)
@@ -357,10 +409,13 @@ __global__ void cuda_kernel_cosineFilter(	XFLOAT *vol,
 
 			r = sqrt(XFLOAT(x*x + y*y + z*z));
 
+			if(do_noise)
+				defVal = noise[texel];
+
 			if (r < radius)
 				continue;
 			else if (r > radius_p)
-				img_pixels[tid]=bg_value;
+				img_pixels[tid]=defVal;
 			else
 			{
 #if defined(ACC_DOUBLE_PRECISION)
@@ -368,7 +423,7 @@ __global__ void cuda_kernel_cosineFilter(	XFLOAT *vol,
 #else
 				raisedcos = 0.5f + 0.5f * cospif((radius_p - r) / cosine_width );
 #endif
-				img_pixels[tid]= img_pixels[tid]*(1-raisedcos) + bg_value*raisedcos;
+				img_pixels[tid]= img_pixels[tid]*(1-raisedcos) + defVal*raisedcos;
 
 			}
 			vol[texel]=img_pixels[tid];

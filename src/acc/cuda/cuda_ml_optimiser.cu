@@ -8,6 +8,9 @@
 #include <iostream>
 #include "src/ml_optimiser.h"
 #include <cuda_runtime.h>
+#include <curand.h>
+#include <curand_kernel.h>
+
 #include "src/acc/acc_ptr.h"
 #include "src/acc/acc_projector.h"
 #include "src/acc/acc_backprojector.h"

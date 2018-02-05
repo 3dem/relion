@@ -50,6 +50,12 @@
 
 // -------------------------------------
 
+// RANDOMIZATION -----------------------
+#define RND_BLOCK_NUM                   64
+#define RND_BLOCK_SIZE                      64
+// -------------------------------------
+
+
 #define BACKPROJECTION4_BLOCK_SIZE 64
 #define BACKPROJECTION4_GROUP_SIZE 16
 #define BACKPROJECTION4_PREFETCH_COUNT 3

@@ -107,6 +107,7 @@ if (CUDA_FOUND)
     endif()
     
     target_link_libraries(relion_lib relion_gpu_util ${CUDA_CUFFT_LIBRARIES})
+    target_link_libraries(relion_lib relion_gpu_util ${CUDA_CUFFT_LIBRARIES} ${CUDA_curand_LIBRARY})
     
 endif(CUDA_FOUND)
 

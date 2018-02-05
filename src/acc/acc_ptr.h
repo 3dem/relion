@@ -633,7 +633,7 @@ public:
 		{
 #ifdef DEBUG_CUDA
 			if (dstDevPtr == NULL)
-				ACC_PTR_DEBUG_FATAL("NULL-pointer given in cp_on_device(dstDevPtr).\n");
+				ACC_PTR_DEBUG_FATAL("NULL-pointer given in cpOnDevice(dstDevPtr).\n");
 #endif
 			CudaShortcuts::cpyDeviceToDevice(dPtr, dstDevPtr, size, stream);
 		}

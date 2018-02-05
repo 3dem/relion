@@ -3,6 +3,7 @@
 
 #ifdef CUDA
 #include <cuda_runtime.h>
+#include <curand.h>
 #include "src/acc/cuda/cuda_settings.h"
 #include "src/acc/cuda/custom_allocator.cuh"
 #endif
@@ -18,6 +19,7 @@
 #include <unistd.h>
 
 #include "src/parallel.h"
+#include "src/complex.h"
 
 // Forward definition
 template <typename T>  class AccPtr;

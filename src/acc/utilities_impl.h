@@ -7,6 +7,8 @@
 #include "src/acc/cuda/cuda_kernels/helper.cuh"
 #include "src/acc/cuda/cuda_kernels/wavg.cuh"
 #include "src/acc/cuda/cuda_kernels/diff2.cuh"
+#include "src/acc/cuda/cuda_fft.h"
+
 #else
 #include "src/acc/cpu/cpu_kernels/helper.h"
 #include "src/acc/cpu/cpu_kernels/wavg.h"
@@ -214,9 +216,60 @@ void dump_triple_array(char *name, double *ptr, double *ptr2, double *ptr3, size
 namespace AccUtilities
 {
 	
+static void makeNoiseImage(XFLOAT sigmaFudgeFactor,
+		MultidimArray<RFLOAT > sigmaNoiseSpectra,
+		long int seed,
+		CudaFFT transformer,
+		AccPtr<XFLOAT> &RandomImage)
+{
+
+#ifdef CUDA
+    // Set up states to seeda and run randomization on the GPU
+    // AccDataTypes::Image<curandState > RandomStates(RND_BLOCK_NUM*RND_BLOCK_SIZE,ptrFactory);
+    AccPtr<curandState> RandomStates = RandomImage.make<curandState>(RND_BLOCK_NUM*RND_BLOCK_SIZE);
+    RandomStates.deviceAlloc();
+
+    // Make a holder for the spectral profile and copy to the GPU
+    //AccDataTypes::Image<XFLOAT> NoiseSpectra(sigmaNoiseSpectra, ptrFactory);
+    AccPtr<XFLOAT> d_NoiseSpectra = RandomImage.make<XFLOAT>(sigmaNoiseSpectra.nzyxdim);
+    d_NoiseSpectra.allAlloc();
+
+    FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(sigmaNoiseSpectra)
+            d_NoiseSpectra[n] = (XFLOAT)sqrt(sigmaFudgeFactor*sigmaNoiseSpectra.data[n]);
+
+    d_NoiseSpectra.cpToDevice();
+    d_NoiseSpectra.streamSync();
+
+    // Initialize randomization by particle ID, like on the CPU-side
+    cuda_kernel_initRND<<<RND_BLOCK_NUM,RND_BLOCK_SIZE>>>(
+                                     seed,
+                                    ~RandomStates);
+
+    // Create noise image with the correct spectral profile
+    cuda_kernel_RNDnormalDitributionComplexWithPowerModulation<<<RND_BLOCK_NUM,RND_BLOCK_SIZE>>>(
+                                    ~transformer.fouriers,
+                                    ~RandomStates,
+                                    transformer.xFSize,
+                                    ~d_NoiseSpectra);
+
+    //LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
+
+    // Transform to real-space, to get something which look like
+    // the particle image without actual signal (a particle)
+    transformer.backward();
+
+    // Copy the randomized image to A separate device-array, so that the
+    // transformer can be used to set up the actual particle image
+    transformer.reals.cpOnDevice(~RandomImage);
+    //cudaMLO->transformer1.reals.streamSync();
+#else
+	//CPU-option
+#endif
+}
+
+
 static void softMaskBackgroundValue(
 	AccDataTypes::Image<XFLOAT> &vol,
-	bool     do_Mnoise,
 	XFLOAT   radius,
 	XFLOAT   radius_p,
 	XFLOAT   cosine_width,
@@ -234,7 +287,6 @@ static void softMaskBackgroundValue(
 				vol.getx()/2,
 				vol.gety()/2,
 				vol.getz()/2,
-				do_Mnoise,
 				radius,
 				radius_p,
 				cosine_width,
@@ -252,7 +304,6 @@ static void softMaskBackgroundValue(
 			vol.getx()/2,
 			vol.gety()/2,
 			vol.getz()/2,
-			do_Mnoise,
 			radius,
 			radius_p,
 			cosine_width,
@@ -264,6 +315,7 @@ static void softMaskBackgroundValue(
 static void cosineFilter(
 		AccDataTypes::Image<XFLOAT> &vol,
 		bool do_Mnoise,
+		XFLOAT *Noise,
 		XFLOAT radius,
 		XFLOAT radius_p,
 		XFLOAT cosine_width,
@@ -280,7 +332,8 @@ static void cosineFilter(
 			vol.getx()/2,
 			vol.gety()/2,
 			vol.getz()/2,
-			do_Mnoise,
+			!do_Mnoise,
+			Noise,
 			radius,
 			radius_p,
 			cosine_width,
@@ -297,7 +350,8 @@ static void cosineFilter(
 			vol.getx()/2,
 			vol.gety()/2,
 			vol.getz()/2,
-			do_Mnoise,
+			!do_Mnoise,
+			Noise,
 			radius,
 			radius_p,
 			cosine_width,
