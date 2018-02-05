@@ -169,6 +169,8 @@ private:
 
 	void binNonSquareImage(Image<RFLOAT> &Iwork, RFLOAT bin_factor);
 
+	void doseWeighting(std::vector<MultidimArray<Complex> > &Fframes, std::vector<RFLOAT> doses);
+
 	inline void getFittedXY(const RFLOAT x, const RFLOAT y, const RFLOAT z, Matrix1D<RFLOAT> &coeffX, Matrix1D<RFLOAT> &coeffY, RFLOAT &x_fitted, RFLOAT &y_fitted) {
 		const RFLOAT x2 = x * x, y2 = y * y, xy = x * y, z2 = z * z;
 		const RFLOAT z3 = z2 * z;

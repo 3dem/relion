@@ -69,9 +69,6 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	pre_exposure = textToFloat(parser.getOption("--preexposure", "Pre-exposure (in electrons/A2) for dose-weighting inside UNBLUR", "0"));
 
 	do_own = parser.checkOption("--use_own","Use our own implementation of motion correction");
-	if (do_own) {
-		std::cout << "!!! WARNING !!!" << std::endl << "Our own implementation of motion correction is under development!" << std::endl;
-	}
 	// Initialise verb for non-parallel execution
 	verb = 1;
 
@@ -122,12 +119,15 @@ void MotioncorrRunner::initialise()
 				fn_motioncor2_exe = (std::string)penv;
 		}
 	}
-	else
+	else if (do_own) {
+		std::cout << "     !!! WARNING !!!" << std::endl << " Our own implementation of motion correction is under development!" << std::endl;
+	} else {
 		REPORT_ERROR(" ERROR: You have to specify which programme to use through either --use_motioncor2 or --use_unblur");
+	}
 
 	if (do_dose_weighting)
 	{
-		if (!(do_unblur || do_motioncor2))
+		if (!(do_unblur || do_motioncor2 || do_own))
 			REPORT_ERROR("ERROR: Dose-weighting can only be done by UNBLUR or MOTIONCOR2.");
 		if (angpix < 0)
 			REPORT_ERROR("ERROR: For dose-weighting it is mandatory to provide the pixel size in Angstroms through --angpix.");
@@ -827,7 +827,6 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 
 // TODO:
 // - defect
-// - dose weighting
 // - grouping
 
 bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts) {
@@ -936,9 +935,11 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 	Iref().initZeros();
 	for (int iframe = 0; iframe < n_frames; iframe++) {
 		transformer.inverseFourierTransform(Fframes[iframe], Iframes[iframe]());
+#ifdef DEBUG
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iref()) {
 			DIRECT_MULTIDIM_ELEM(Iref(), n) += DIRECT_MULTIDIM_ELEM(Iframes[iframe](), n);
 		}
+#endif
 	}
 
 	// Patch based alignment
@@ -946,6 +947,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 	std::cout << "Patches: X = " << patch_x << " Y = " << patch_y << std::endl;
 	const int patch_nx = nx / patch_x, patch_ny = ny / patch_y, n_patches = patch_x * patch_y;
 	std::vector<RFLOAT> patch_xshifts, patch_yshifts, patch_frames, patch_xs, patch_ys;
+	std::vector<MultidimArray<Complex> > Fpatches(n_frames);
 
 	int ipatch = 1;
 	for (int iy = 0; iy < patch_y; iy++) {
@@ -969,9 +971,9 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 						DIRECT_A2D_ELEM(Iframe, ipy - y_start, ipx - x_start) = DIRECT_A2D_ELEM(Iframes[iframe](), ipy, ipx);
 					}
 				}
-				transformer.FourierTransform(Iframe, Fframes[iframe]);
+				transformer.FourierTransform(Iframe, Fpatches[iframe]);
 			}
-			bool converged = alignPatch(Fframes, x_end - x_start + 1, y_end - y_start + 1, local_xshifts, local_yshifts);
+			bool converged = alignPatch(Fpatches, x_end - x_start + 1, y_end - y_start + 1, local_xshifts, local_yshifts);
 			if (!converged) continue;
 
 			for (int iframe = 0; iframe < n_frames; iframe++) {
@@ -983,11 +985,11 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 			}
 		}
 	}
+	Fpatches.clear();
 
 	// Fit polynomial model
 
 	// TODO: outlier rejection
-	
 	const int n_obs = patch_frames.size();
 	const int n_params = 18;
 	Matrix2D <RFLOAT> matA(n_obs, n_params);
@@ -1056,7 +1058,29 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 	rms_x = std::sqrt(rms_x / n_obs); rms_y = std::sqrt(rms_y / n_obs);
 	std::cout << "Polynomial fit RMSD X = " << rms_x << " px, Y = " << rms_y << " px" << std::endl;
 
-	// TODO: dose weight
+	// Dose weighting
+	if (do_dose_weighting) {
+		std::cout << "WARNING: Dose weighting not tested yet!!!" << std::endl;
+		if (std::abs(voltage - 300) > 2 && std::abs(voltage - 200) > 2) {
+			REPORT_ERROR("Sorry, dose weighting is supported only for 300 kV or 200 kV");
+		}
+
+		std::vector <RFLOAT> doses(n_frames);
+		for (int iframe = 0; iframe < n_frames; iframe++) {
+			// dose AFTER each frame.
+			doses[iframe] = pre_exposure + dose_per_frame * (frames[iframe] + 1);
+			if (std::abs(voltage = 200) <= 5) {
+				doses[iframe] /= 0.8; // 200 kV electron is more damaging.
+			}
+		}
+
+		doseWeighting(Fframes, doses);
+
+		// Update real space images
+		for (int iframe = 0; iframe < n_frames; iframe++) {
+			transformer.inverseFourierTransform(Fframes[iframe], Iframes[iframe]());
+		}
+	}
 
 	std::cout << "Real space interpolation: ";
 	Iref().initZeros();
@@ -1100,8 +1124,11 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 				const RFLOAT dx0 = LIN_INTERP(fx, d00, d01);
 				const RFLOAT dx1 = LIN_INTERP(fx, d10, d11);
 				const RFLOAT val = LIN_INTERP(fy, dx0, dx1);
-
-				if (std::isnan(val)) { std::cout << "ix = " << ix << " xfit = " << x_fitted << " iy = " << iy << " ifit = " << y_fitted << " d00 " << d00 << " d01 " << d01 << " d10 " << d10 << " d11 " << d11 << " dx0 " << dx0 << " dx1 " << dx1 << std::endl;}
+#ifdef DEBUG
+				if (std::isnan(val)) {
+					std::cout << "ix = " << ix << " xfit = " << x_fitted << " iy = " << iy << " ifit = " << y_fitted << " d00 " << d00 << " d01 " << d01 << " d10 " << d10 << " d11 " << d11 << " dx0 " << dx0 << " dx1 " << dx1 << std::endl;
+				}
+#endif
 				DIRECT_A2D_ELEM(Iref(), iy, ix) += val;
 			}
 		}
@@ -1175,9 +1202,8 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes,
 				DIRECT_MULTIDIM_ELEM(Fref, n) += DIRECT_MULTIDIM_ELEM(Fframes[iframe], n);
 			}
 		}
-
-		transformer.inverseFourierTransform(Fref, Icc());
 #ifdef DEBUG
+		transformer.inverseFourierTransform(Fref, Icc());
 		Icc.write("ref.spi");
 		std::cout << "Done Fref." << std::endl;
 #endif
@@ -1268,6 +1294,51 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes,
 #endif
 
 	return converged;
+}
+
+// dose is equivalent dose at 300 kV at the END of the frame.
+// This implements the model by Timothy Grant & Nikolaus Grigorieff on eLife, 2015
+// doi: 10.7554/eLife.06980
+void MotioncorrRunner::doseWeighting(std::vector<MultidimArray<Complex> > &Fframes, std::vector<RFLOAT> doses) {
+	const int nfx = XSIZE(Fframes[0]), nfy = YSIZE(Fframes[0]);
+	const int nfy_half = nfy / 2;
+	const RFLOAT nfy2 = (RFLOAT)nfy * nfy;
+	const RFLOAT nfx2 = (RFLOAT)(nfx - 1) * (nfx - 1) * 4; // assuming nx is even
+	const int n_frames= Fframes.size();
+	const RFLOAT A = 0.245, B = -1.665, C = 2.81;
+
+	#pragma omp parallel for
+	for (int y = 0; y < nfy; y++) {
+		int ly = y;
+		if (y > nfy_half) ly = y - nfy;
+
+		RFLOAT dinv2 = ly * ly / nfy2;
+		for (int x = 0; x < nfx; x++) {
+			dinv2 += x * x / nfx2;
+			const RFLOAT dinv = std::sqrt(dinv2) / angpix; // d = N * angpix / dist, thus dinv = dist / N / angpix
+			const RFLOAT Ne = (A * std::pow(dinv, B) + C) * 0.5; // Eq. 3. 0.5 comes from Eq. 5
+			RFLOAT sum_weight_sq = 0;
+//			std::cout << " Ne = " << Ne << " lx = " << x << " ly = " << ly << " reso = " << 1 / dinv << std::endl;
+
+			for (int iframe = 0; iframe < n_frames; iframe++) {
+				const RFLOAT weight = std::exp(- doses[iframe] / Ne); // Eq. 5. 0.5 is factored out to Ne.
+				if (isnan(weight)) {
+					std::cout << "dose = " <<  doses[iframe] << " Ne = " << Ne << " frm = " << iframe << " lx = " << x << " ly = " << ly << " reso = " << 1 / dinv << " weight = " << weight << std::endl;
+				}
+				sum_weight_sq += weight * weight;
+				DIRECT_A2D_ELEM(Fframes[iframe], y, x) *= weight;
+			}
+
+			sum_weight_sq = std::sqrt(sum_weight_sq);
+			if (isnan(sum_weight_sq)) {
+				std::cout << " Ne = " << Ne << " lx = " << x << " ly = " << ly << " reso = " << 1 / dinv << " sum_weight_sq NaN" << std::endl;
+				REPORT_ERROR("1");
+			}
+			for (int iframe = 0; iframe < n_frames; iframe++) {
+				DIRECT_A2D_ELEM(Fframes[iframe], y, x) /= sum_weight_sq; // Eq. 9
+			}
+		}
+	}
 }
 
 // shiftx, shifty is relative to the (real space) image size
