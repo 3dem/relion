@@ -167,6 +167,8 @@ private:
 
 	bool alignPatch(std::vector<MultidimArray<Complex> > &Fframes, const int pnx, const int pny, std::vector<float> &xshifts, std::vector<float> &yshifts);
 
+	void binNonSquareImage(Image<RFLOAT> &Iwork, RFLOAT bin_factor);
+
 	inline void getFittedXY(const RFLOAT x, const RFLOAT y, const RFLOAT z, Matrix1D<RFLOAT> &coeffX, Matrix1D<RFLOAT> &coeffY, RFLOAT &x_fitted, RFLOAT &y_fitted) {
 		const RFLOAT x2 = x * x, y2 = y * y, xy = x * y, z2 = z * z;
 		const RFLOAT z3 = z2 * z;

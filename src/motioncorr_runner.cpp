@@ -828,7 +828,6 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 // TODO:
 // - defect
 // - dose weighting
-// - real space interpolation
 // - grouping
 
 bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts) {
@@ -921,8 +920,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 			n_bad++;
 		}
 	}
-	std::cout << "Detected " << n_bad << " hot pixels to be corrected." << std::endl;
-
+	std::cout << "Detected " << n_bad << " hot pixels to be corrected. (BUT correction not implemented yet)" << std::endl;
 	// TODO: fix defects
 
 	// FFT	
@@ -1060,7 +1058,6 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 
 	// TODO: dose weight
 
-	// TODO: real space fitting
 	std::cout << "Real space interpolation: ";
 	Iref().initZeros();
 	for (int iframe = 0; iframe < n_frames; iframe++) {
@@ -1113,26 +1110,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 	
 	// Apply binning
 	if (bin_factor != 1) {
-		int new_nx = nx / bin_factor, new_ny = ny / bin_factor;
-		new_nx -= new_nx % 2; new_ny -= new_ny % 2; // force it to be even
-//		std::cout << "Binning from X = " << nx << " Y = " << ny << " to X = " << new_nx << " Y = " << new_ny << std::endl;
-
-		const int half_new_ny = new_ny / 2, new_nfx = new_nx / 2 + 1;
-		MultidimArray<Complex> Fref, Fbinned(new_ny, new_nfx);
-		transformer.FourierTransform(Iref(), Fref);
-
-		for (int y = 0; y <= half_new_ny; y++) {
-			for (int x = 0; x < new_nfx; x++) {
-				DIRECT_A2D_ELEM(Fbinned, y, x) =  DIRECT_A2D_ELEM(Fref, y, x);
-			}
-		}
-		for (int y = half_new_ny + 1; y < new_ny; y++) {
-			for (int x = 0; x < new_nfx; x++) {
-				DIRECT_A2D_ELEM(Fbinned, y, x) =  DIRECT_A2D_ELEM(Fref, ny - 1 - new_ny + y, x);
-			}
-		}
-		Iref().reshape(new_ny, new_nx);
-		transformer.inverseFourierTransform(Fbinned, Iref());
+		binNonSquareImage(Iref, bin_factor);
 	}
 	
 	// Final output
@@ -1213,7 +1191,7 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes,
 			}
 
 			transformer.inverseFourierTransform(Fcc, Icc());
-			CenterFFT(Icc(), false); // TODO: Remove
+			CenterFFT(Icc(), false); // TODO: Remove for performance
 			Icc().setXmippOrigin();
 
 			RFLOAT maxval = -9999;
@@ -1318,4 +1296,32 @@ void MotioncorrRunner::shiftNonSquareImageInFourierTransform(MultidimArray<Compl
 			DIRECT_A2D_ELEM(frame, y, x) = Complex(ac - bd, ab_cd - ac - bd);	
 		}
 	}
+}
+
+// Iwork is overwritten
+void MotioncorrRunner::binNonSquareImage(Image<RFLOAT> &Iwork, RFLOAT bin_factor) {
+	FourierTransformer transformer;
+
+	const int nx = XSIZE(Iwork()), ny = YSIZE(Iwork());
+	int new_nx = nx / bin_factor, new_ny = ny / bin_factor;
+	new_nx -= new_nx % 2; new_ny -= new_ny % 2; // force it to be even
+//	std::cout << "Binning from X = " << nx << " Y = " << ny << " to X = " << new_nx << " Y = " << new_ny << std::endl;
+
+	const int half_new_ny = new_ny / 2, new_nfx = new_nx / 2 + 1;
+	MultidimArray<Complex> Fref, Fbinned(new_ny, new_nfx);
+	transformer.FourierTransform(Iwork(), Fref);
+
+	for (int y = 0; y <= half_new_ny; y++) {
+		for (int x = 0; x < new_nfx; x++) {
+			DIRECT_A2D_ELEM(Fbinned, y, x) =  DIRECT_A2D_ELEM(Fref, y, x);
+		}
+	}
+	for (int y = half_new_ny + 1; y < new_ny; y++) {
+		for (int x = 0; x < new_nfx; x++) {
+			DIRECT_A2D_ELEM(Fbinned, y, x) =  DIRECT_A2D_ELEM(Fref, ny - 1 - new_ny + y, x);
+		}
+	}
+
+	Iwork().reshape(new_ny, new_nx);
+	transformer.inverseFourierTransform(Fbinned, Iwork());
 }
