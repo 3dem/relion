@@ -398,92 +398,39 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 		CTOC(accMLO->timer,"selfTranslate");
 
-		CTIC(accMLO->timer,"calcFimg");
 		size_t current_size_x = baseMLO->mymodel.current_size / 2 + 1;
 		size_t current_size_y = baseMLO->mymodel.current_size;
 		size_t current_size_z = (accMLO->dataIs3D) ? baseMLO->mymodel.current_size : 1;
 
 		accMLO->transformer1.setSize(img().xdim,img().ydim,img().zdim);
 	
+		CTIC(cudaMLO->timer,"makeNoiseMask");
+
         // Either mask with zeros or noise. Here, make a noise-image that will be optional in the softMask-kernel.
 		AccDataTypes::Image<XFLOAT> RandomImage(img(),ptrFactory);
 
-		CTIC(cudaMLO->timer,"zeroMask_P1");
-        if (!baseMLO->do_zero_mask) // NEW code - prepare a acc-side Random image
+
+        if (!baseMLO->do_zero_mask) // prepare a acc-side Random image
         {
                 // Make a F-space image to hold generate and modulate noise
                 RandomImage.accAlloc();
 
-// ---------
-                // Set up states to seeda and run randomization on the GPU
-                AccDataTypes::Image<curandState > RandomStates(RND_BLOCK_NUM*RND_BLOCK_SIZE,ptrFactory);
-                RandomStates.deviceAlloc();
-
-                // Make a holder for the spectral profile and copy to the GPU
-                AccDataTypes::Image<XFLOAT> NoiseSpectra(baseMLO->mymodel.sigma2_noise[group_id],ptrFactory);
-                NoiseSpectra.allAlloc();
-
-                // Set up scalar adjustment factor
-                XFLOAT sigmaFudgeFactor = baseMLO->sigma2_fudge;
-                if (baseMLO->do_realign_movies)
-                        sigmaFudgeFactor = (2. * baseMLO->movie_frame_running_avg_side + 1.);
-                FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(baseMLO->mymodel.sigma2_noise[group_id])
-                        NoiseSpectra[n] = (XFLOAT)sqrt(sigmaFudgeFactor*baseMLO->mymodel.sigma2_noise[group_id].data[n]);
-                NoiseSpectra.cpToDevice();
-                NoiseSpectra.streamSync();
-
-
-                // Initialize randomization by particle ID, like on the CPU-side
-                cuda_kernel_initRND<<<RND_BLOCK_NUM,RND_BLOCK_SIZE>>>(
-                                                 baseMLO->random_seed + my_ori_particle,
-                                                ~RandomStates);
-                LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
-
-
-                // Create noise image with the correct spectral profile
-                cuda_kernel_RNDnormalDitributionComplexWithPowerModulation<<<RND_BLOCK_NUM,RND_BLOCK_SIZE>>>(
-                                                ~accMLO->transformer1.fouriers,
-                                                ~RandomStates,
-                                                accMLO->transformer1.xFSize,
-                                                ~NoiseSpectra);
-                LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
-
-                // Transform to real-space, to get something which look like
-                // the particle image without actual signal (a particle)
-                accMLO->transformer1.backward();
-
-                // Copy the randomized image to A separate device-array, so that the
-                // transformer can be used to set up the actual particle image
-                accMLO->transformer1.reals.cpOnDevice(~RandomImage);
-                //cudaMLO->transformer1.reals.streamSync();
-// ---------
-
-               /*
                 // Set up scalar adjustment factor
                 XFLOAT temp_sigmaFudgeFactor = baseMLO->sigma2_fudge;
                 if (baseMLO->do_realign_movies)
                         temp_sigmaFudgeFactor = (2. * baseMLO->movie_frame_running_avg_side + 1.);
 
+                // construct the noise-image
                 AccUtilities::makeNoiseImage(	temp_sigmaFudgeFactor,
                 								baseMLO->mymodel.sigma2_noise[group_id],
 												baseMLO->random_seed + my_ori_particle,
 												accMLO->transformer1,
 												RandomImage);
-                */
+
         }
-        CTOC(cudaMLO->timer,"zeroMask_P1");
+        CTOC(cudaMLO->timer,"makeNoiseMask");
 
-
-        RandomImage.hostAlloc();
-		RandomImage.cpToHost();
-		for (int i = 0; i < img.data.nzyxdim; i++)
-			img.data.data[i] = RandomImage[i];
-
-		//RandomImage.getHost(img.data);
-        img.write("GPU_noise_image.mrc");
-
-        //             exit(0);
-
+        CTIC(cudaMLO->timer,"normalizeAndTransform");
 		d_img.cpOnAcc(accMLO->transformer1.reals);
 		runCenterFFT(
 				accMLO->transformer1.reals,
@@ -492,40 +439,33 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 				(int)accMLO->transformer1.zSize,
 				false
 				);
-
 		accMLO->transformer1.reals.streamSync();
-
 		accMLO->transformer1.forward();
 		accMLO->transformer1.fouriers.streamSync();
 
 		int FMultiBsize = ( (int) ceilf(( float)accMLO->transformer1.fouriers.getSize()*2/(float)BLOCK_SIZE));
-
 		AccUtilities::multiply<XFLOAT>(FMultiBsize, BLOCK_SIZE, accMLO->transformer1.fouriers.getStream(),
 						(XFLOAT*)~accMLO->transformer1.fouriers, 
 						(XFLOAT)1/((XFLOAT)(accMLO->transformer1.reals.getSize())),
 						accMLO->transformer1.fouriers.getSize()*2);
-
 		LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 		
 		AccPtr<ACCCOMPLEX> d_Fimg = ptrFactory.make<ACCCOMPLEX>(current_size_x * current_size_y * current_size_z);
-
 		d_Fimg.allAlloc();
-
 		accMLO->transformer1.fouriers.streamSync();
-
 		windowFourierTransform2(
 				accMLO->transformer1.fouriers,
 				d_Fimg,
 				accMLO->transformer1.xFSize,accMLO->transformer1.yFSize, accMLO->transformer1.zFSize, //Input dimensions
 				current_size_x, current_size_y, current_size_z  //Output dimensions
 				);
-		CTOC(accMLO->timer,"calcFimg");
 		accMLO->transformer1.fouriers.streamSync();
+		CTIC(cudaMLO->timer,"normalizeAndTransform");
+
 
 		CTIC(accMLO->timer,"cpFimg2Host");
 		d_Fimg.cpToHost();
 		d_Fimg.streamSync();
-
 		Fimg.initZeros(current_size_z, current_size_y, current_size_x);
 		for (int i = 0; i < Fimg.nzyxdim; i ++)
 		{
@@ -533,6 +473,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			Fimg.data[i].imag = (RFLOAT) d_Fimg[i].y;
 		}
 		CTOC(accMLO->timer,"cpFimg2Host");
+
 
 		CTIC(accMLO->timer,"selfApplyBeamTilt");
 		// Here apply the beamtilt correction if necessary
@@ -546,101 +487,12 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		RFLOAT lambda = 12.2643247 / sqrt(V * (1. + V * 0.978466e-6));
 		if (ABS(beamtilt_x) > 0. || ABS(beamtilt_y) > 0.) //FIXME beam-tilt on GPUs: copy up new or make kernel.
 			selfApplyBeamTilt(Fimg, beamtilt_x, beamtilt_y, lambda, Cs,baseMLO->mymodel.pixel_size, baseMLO->mymodel.ori_size);
-
 		op.Fimgs_nomask.at(ipart) = Fimg;
-
-//             cudaMLO->transformer1.backward();
-//             cudaMLO->transformer1.reals.host_alloc();
-//             cudaMLO->transformer1.reals.cp_to_host();
-//             for (int i=0; i<img_size; i++)
-//                     img.data.data[i] = cudaMLO->transformer1.reals[i];
-//             img.write("Fimg_nomask.mrc");
-//             exit(0);
-
 		CTOC(accMLO->timer,"selfApplyBeamTilt");
 
-		CTIC(accMLO->timer,"zeroMask");
 		MultidimArray<RFLOAT> Mnoise;
 		bool is_helical_segment = (baseMLO->do_helical_refine) || ((baseMLO->mymodel.ref_dim == 2) && (baseMLO->helical_tube_outer_diameter > 0.));
 
-		bool use_random_noise_masking 	= !baseMLO->do_zero_mask;
-		bool use_old_noise_image 		= true;
-
-		if (use_random_noise_masking)
-		{
-			CTIC(accMLO->timer,"noiseImagePrep");
-			if(use_old_noise_image)
-			{
-				// Make a noisy background image with the same spectrum as the sigma2_noise
-
-				// Different MPI-distributed subsets may otherwise have different instances of the random noise below,
-				// because work is on an on-demand basis and therefore variable with the timing of distinct nodes...
-				// Have the seed based on the part_id, so that each particle has a different instant of the noise
-				if (baseMLO->do_realign_movies)
-					init_random_generator(baseMLO->random_seed + part_id);
-				else
-					init_random_generator(baseMLO->random_seed + my_ori_particle); // This only serves for exact reproducibility tests with 1.3-code...
-
-				// If we're doing running averages, then the sigma2_noise was already adjusted for the running averages.
-				// Undo this adjustment here in order to get the right noise in the individual frames
-				MultidimArray<RFLOAT> power_noise = baseMLO->sigma2_fudge * baseMLO->mymodel.sigma2_noise[group_id];
-				if (baseMLO->do_realign_movies)
-					power_noise *= (2. * baseMLO->movie_frame_running_avg_side + 1.);
-
-				// Create noisy image for outside the mask
-				MultidimArray<Complex > Fnoise;
-				Mnoise.resize(img());
-				accMLO->transformer.setReal(Mnoise);
-				accMLO->transformer.getFourierAlias(Fnoise);
-				// Fill Fnoise with random numbers, use power spectrum of the noise for its variance
-				FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fnoise)
-				{
-					int ires = ROUND( sqrt( (RFLOAT)(kp * kp + ip * ip + jp * jp) ) );
-					if (ires >= 0 && ires < XSIZE(Fnoise))
-					{
-						RFLOAT sigma = sqrt(DIRECT_A1D_ELEM(power_noise, ires));
-						DIRECT_A3D_ELEM(Fnoise, k, i, j).real = rnd_gaus(0., sigma);
-						DIRECT_A3D_ELEM(Fnoise, k, i, j).imag = rnd_gaus(0., sigma);
-					}
-					else
-					{
-						DIRECT_A3D_ELEM(Fnoise, k, i, j) = 0.;
-					}
-				}
-				// Back to real space Mnoise
-				CTIC(accMLO->timer,"inverseFourierTransform");
-				accMLO->transformer.inverseFourierTransform();
-				CTOC(accMLO->timer,"inverseFourierTransform");
-
-				// set RandomImage to Mnoise
-				//RandomImage.hostAlloc();
-				RandomImage.setHost(Mnoise);
-				RandomImage.cpToDevice();
-				RandomImage.streamSync();
-
-				for (int i = 0; i < img.data.nzyxdim; i++)
-					img.data.data[i] = RandomImage[i];
-
-				//RandomImage.getHost(img.data);
-		        img.write("CPU_noise_image.mrc");
-
-			}
-			else // set Mnoise to RandomImage
-			{
-				Mnoise.resize(img());
-				//RandomImage.hostAlloc();
-				RandomImage.cpToHost();
-				RandomImage.streamSync();
-				RandomImage.getHost(Mnoise);
-				Mnoise.setXmippOrigin();
-			}
-			CTOC(accMLO->timer,"noiseImagePrep");
-		}
-		else // don't use noise-image for masking
-		{
-			RandomImage.setDevicePtr(d_img); //avoid kernel-calls warning about null-pointer for RandomImage
-		}
-		CTIC(accMLO->timer,"zeroOrNoiseSoftMasking");
 		// For multibodies: have the mask radius equal to maximum radius within body mask plus the translational offset search range
 		RFLOAT my_mask_radius = (baseMLO->mymodel.nr_bodies > 1 ) ?
 						baseMLO->mymodel.max_radius_mask_bodies[ibody] + baseMLO->sampling.offset_range:
@@ -648,6 +500,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 		if (is_helical_segment)
 		{
+			CTIC(accMLO->timer,"applyHelicalMask");
 			d_img.cpToHost();
 			d_img.streamSync();
 			d_img.getHost(img());
@@ -664,15 +517,20 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 			d_img.setHost(img());
 			d_img.cpToDevice();
+			CTOC(accMLO->timer,"applyHelicalMask");
 		}
 		else // this is not a helical segment
 		{
+			CTIC(accMLO->timer,"applyMask");
+
+			// Shared parameters for noise/zero masking
 			XFLOAT cosine_width = baseMLO->width_mask_edge;
 			XFLOAT radius = (XFLOAT) my_mask_radius;
 			if (radius < 0)
 				radius = ((RFLOAT)img.data.xdim)/2.;
 			XFLOAT radius_p = radius + cosine_width;
 
+			// For zero-masking, we need the background-value
 			XFLOAT bg_val(0.);
 			if(baseMLO->do_zero_mask)
 			{
@@ -701,6 +559,10 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 				softMaskSum.streamSync();
 			}
 
+			//avoid kernel-calls warning about null-pointer for RandomImage
+			if (baseMLO->do_zero_mask)
+						RandomImage.setDevicePtr(d_img);
+
 			// Apply a cosine-softened mask, using either the background value or the noise-image outside of the radius
 			AccUtilities::cosineFilter(
 					d_img,
@@ -714,19 +576,17 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
+			CTOC(accMLO->timer,"applyMask");
 		}
-		CTOC(accMLO->timer,"zeroOrNoiseSoftMasking");
 
 		CTIC(accMLO->timer,"setSize");
 		accMLO->transformer1.setSize(img().xdim,img().ydim,img().zdim);
 		// The resize is assumed to keep the contents of transformer1 in-tact (if possible)
-		
 		CTOC(accMLO->timer,"setSize");
 
 		CTIC(accMLO->timer,"transform");
 		d_img.cpOnAcc(accMLO->transformer1.reals);
 		
-
 		runCenterFFT(								// runs on input GlobalPtr.stream
 				accMLO->transformer1.reals,
 				(int)accMLO->transformer1.xSize,

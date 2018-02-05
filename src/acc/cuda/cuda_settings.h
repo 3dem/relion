@@ -151,7 +151,7 @@ static void HandleError( curandStatus_t err)
 
 // RANDOMIZATION -----------------------
 #define RND_BLOCK_NUM                   64
-#define RND_BLOCK_SIZE                      64
+#define RND_BLOCK_SIZE                  32
 // -------------------------------------
 
 
