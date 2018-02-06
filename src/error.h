@@ -83,6 +83,12 @@ public:
     /** Line number */
     long line;
 
+#ifdef __GNUC__
+    /** Backtrace **/
+    void **backtrace_buffer;
+    size_t size;
+#endif
+
     RelionError(const std::string& what, const std::string &fileArg, const long lineArg);
     friend std::ostream& operator<<(std::ostream& o, RelionError& XE);
 };
