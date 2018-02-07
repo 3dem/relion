@@ -32,6 +32,7 @@ class image_handler_parameters
 	int bin_avg, avg_first, avg_last, edge_x0, edge_xF, edge_y0, edge_yF, filter_edge_width, new_box, minr_ampl_corr;
     bool do_add_edge, do_flipXY, do_flipmXY, do_flipZ, do_flipX, do_flipY, do_shiftCOM, do_stats, do_avg_ampl, do_avg_ampl2, do_avg_ampl2_ali, do_average, do_remove_nan;
 	RFLOAT multiply_constant, divide_constant, add_constant, subtract_constant, threshold_above, threshold_below, angpix, new_angpix, lowpass, highpass, logfilter, bfactor, shift_x, shift_y, shift_z, replace_nan, randomize_at;
+	std::string directional;
    	int verb;
 	// I/O Parser
 	IOParser parser;
@@ -82,6 +83,7 @@ class image_handler_parameters
 	    bfactor = textToFloat(parser.getOption("--bfactor", "Apply a B-factor (in A^2)", "0."));
 	    lowpass = textToFloat(parser.getOption("--lowpass", "Low-pass filter frequency (in A)", "-1."));
 	    highpass = textToFloat(parser.getOption("--highpass", "High-pass filter frequency (in A)", "-1."));
+	    directional = parser.getOption("--directional", "Directionality of low-pass filter frequency ('X', 'Y' or 'Z', default non-directional)", "");
 	    logfilter = textToFloat(parser.getOption("--LoG", "Sigma for Laplacian of Gaussian filter (in A)", "-1."));
 	    angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in A)", "1."));
 	    new_angpix = textToFloat(parser.getOption("--rescale_angpix", "Scale input image(s) to this new pixel size (in A)", "-1."));
@@ -336,7 +338,12 @@ class image_handler_parameters
 		}
 
 		if (lowpass > 0.)
-			lowPassFilterMap(Iout(), lowpass, angpix, filter_edge_width);
+		{
+			if (directional != "")
+				directionalFilterMap(Iout(), lowpass, angpix, directional, filter_edge_width);
+			else
+				lowPassFilterMap(Iout(), lowpass, angpix, filter_edge_width);
+		}
 
 		if (highpass > 0.)
 			highPassFilterMap(Iout(), highpass, angpix, filter_edge_width);
