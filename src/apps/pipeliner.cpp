@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
 		// Fill the window, but don't show it!
 		FileName fn_pipe = getParameter(argc, argv, "--pipeline", "default");
 		FileName fn_sched = getParameter(argc, argv, "--schedule", "");
-		int nr_repeat = textToInteger(getParameter(argc, argv, "--repeat", "0"));
+		int nr_repeat = textToInteger(getParameter(argc, argv, "--repeat", "1"));
 		long int minutes_wait =  textToInteger(getParameter(argc, argv, "--min_wait", "10"));
 		FileName fn_jobids  = getParameter(argc, argv, "--RunJobs", "");
 		std::string add_type = getParameter(argc, argv, "--addJob", "");
