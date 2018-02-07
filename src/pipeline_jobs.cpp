@@ -624,20 +624,20 @@ void RelionJob::initialise(int _job_type)
 	int mpi_max = (mpi_max_input == NULL) ? DEFAULTMPIMAX : textToInteger(mpi_max_input);
 
 	if (has_mpi)
-		joboptions["nr_mpi"] = JobOption("Number of MPI procs:", 1, 1, mpi_max, 1, "Number of MPI nodes to use in parallel. When set to 1, MPI will not be used.");
+		joboptions["nr_mpi"] = JobOption("Number of MPI procs:", 1, 1, mpi_max, 1, "Number of MPI nodes to use in parallel. When set to 1, MPI will not be used. The maximum can be set through the environment variable RELION_MPI_MAX.");
 
 	// Check for environment variable RELION_THREAD_MAX
 	const char * thread_max_input = getenv ("RELION_THREAD_MAX");
 	int thread_max = (thread_max_input == NULL) ? DEFAULTTHREADMAX : textToInteger(thread_max_input);
 	if (has_thread)
 		joboptions["nr_threads"] = JobOption("Number of threads:", 1, 1, thread_max, 1, "Number of shared-memory (POSIX) threads to use in parallel. \
-		When set to 1, no multi-threading will be used. Multi-threading is often useful in 3D refinements to have more memory. 2D class averaging often proceeds more efficiently without threads.");
+		When set to 1, no multi-threading will be used. Multi-threading is often useful in 3D refinements to have more memory. 2D class averaging often proceeds more efficiently without threads. The maximum can be set through the environment variable RELION_THREAD_MAX.");
 
 	// Check for environment variable RELION_QUEUE_USE
 	const char * use_queue_input = getenv ("RELION_QUEUE_USE");
 	bool use_queue = (use_queue_input == NULL) ? DEFAULTQUEUEUSE : textToBool(use_queue_input);
 	joboptions["do_queue"] = JobOption("Submit to queue?", use_queue, "If set to Yes, the job will be submit to a queue, otherwise \
-the job will be executed locally. Note that only MPI jobs may be sent to a queue.");
+the job will be executed locally. Note that only MPI jobs may be sent to a queue. The default can be set through the environment variable RELION_QUEUE_USE.");
 	
 
 	// Check for environment variable RELION_QUEUE_NAME
@@ -648,7 +648,7 @@ the job will be executed locally. Note that only MPI jobs may be sent to a queue
 	}
 
     // Need the std::string(), as otherwise it will be overloaded and passed as a boolean....
-    joboptions["queuename"] = JobOption("Queue name: ", std::string(default_queue), "Name of the queue to which to submit the job.");
+    joboptions["queuename"] = JobOption("Queue name: ", std::string(default_queue), "Name of the queue to which to submit the job. The default name can be set through the environment variable RELION_QUEUE_NAME.");
 
 	// Check for environment variable RELION_QSUB_COMMAND
 	const char * default_command = getenv ("RELION_QSUB_COMMAND");
@@ -659,7 +659,7 @@ the job will be executed locally. Note that only MPI jobs may be sent to a queue
 
     joboptions["qsub"] = JobOption("Queue submit command:", std::string(default_command), "Name of the command used to submit scripts to the queue, e.g. qsub or bsub.\n\n\
 Note that the person who installed RELION should have made a custom script for your cluster/queue setup. Check this is the case \
-(or create your own script following the RELION WIKI) if you have trouble submitting jobs.");
+(or create your own script following the RELION WIKI) if you have trouble submitting jobs. The default command can be set through the environment variable RELION_QSUB_COMMAND.");
 
 	// Two additional options that may be set through environment variables RELION_QSUB_EXTRA1 and RELION_QSUB_EXTRA2 (for more flexibility)
 	char * extra1_text = getenv ("RELION_QSUB_EXTRA1");
