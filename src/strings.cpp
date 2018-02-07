@@ -208,11 +208,13 @@ bool textToBool(const char* str, int _errno, std::string errmsg)
     if (str == NULL)
     	REPORT_ERROR( errmsg);
 
-    if (strcasecmp(str, "true") == 0)
+    if ((strcasecmp(str, "true") == 0) ||
+	(strcasecmp(str, "yes") == 0))
     {
 	retval = true;
     } 
-    else if (strcasecmp(str, "false") == 0)
+    else if ((strcasecmp(str, "false") == 0) ||
+             (strcasecmp(str, "no") == 0))
     {
 	retval = false;
     }
