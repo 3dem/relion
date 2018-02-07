@@ -140,6 +140,9 @@ public:
 	// Execute UNBLUR for a single micrograph
 	bool executeUnblur(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts);
 
+	// Execute our own implementation for a single micrograph
+	bool executeOwnMotionCorrection(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts);
+
 	// Get the shifts from UNBLUR
 	void getShiftsUnblur(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts);
 
@@ -159,9 +162,6 @@ public:
 	void writeSTAR();
 
 private:
-	// Execute our own implementation for a single micrograph
-	bool executeOwnMotionCorrection(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts);
-
 	// shiftx, shifty is relative to the (real space) image size
 	void shiftNonSquareImageInFourierTransform(MultidimArray<Complex> &frame, RFLOAT shiftx, RFLOAT shifty);
 

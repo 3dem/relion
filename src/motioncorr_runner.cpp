@@ -135,7 +135,7 @@ void MotioncorrRunner::initialise()
 	}
 
 #ifdef CUDA
-	if (!do_unblur)
+	if (do_motioncor2)
 	{
 		if (gpu_ids.length() > 0)
 			untangleDeviceIDs(gpu_ids, allThreadIDs);
