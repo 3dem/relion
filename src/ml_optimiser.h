@@ -688,7 +688,7 @@ public:
 		do_helical_symmetry_local_refinement(0),
 		helical_sigma_distance(0),
 		helical_keep_tilt_prior_fixed(0),
-		directional_lowpass(0),
+		//directional_lowpass(0),
 		asymmetric_padding(false),
 		maximum_significants(0),
 		threadException(NULL),
