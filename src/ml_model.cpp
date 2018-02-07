@@ -339,7 +339,7 @@ void MlModel::read(FileName fn_in)
 
 }
 
-void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bild)
+void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bild, bool only_write_images)
 {
 
 	MetaDataTable MDclass, MDgroup, MDlog, MDsigma, MDbodies;
@@ -436,6 +436,9 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
     	}
 
 	}
+
+    if (only_write_images)
+    	return;
 
     // B. Write STAR file with metadata
     fn_tmp = fn_out + "_model.star";

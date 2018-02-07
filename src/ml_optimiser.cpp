@@ -545,6 +545,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
     do_helical_symmetry_local_refinement = parser.checkOption("--helical_symmetry_search", "Perform local refinement of helical symmetry?");
     helical_sigma_distance = textToFloat(parser.getOption("--helical_sigma_distance", "Sigma of distance along the helical tracks", "-1."));
     helical_keep_tilt_prior_fixed = parser.checkOption("--helical_keep_tilt_prior_fixed", "Keep helical tilt priors fixed (at 90 degrees) in global angular searches?");
+    //directional_lowpass = textToFloat(parser.getOption("--directional_lowpass", "Apply directional lowpass filter along X with this many Angstroms cutoff frequency", "-1."));
     if (ignore_helical_symmetry)
     {
     	mymodel.helical_nr_asu = 1; // IMPORTANT !
@@ -1855,6 +1856,9 @@ void MlOptimiser::initialiseGeneral(int rank)
 	if(mask1 || mask2)
 		REPORT_ERROR(errstr);
 
+	// Write out unmasked 2D class averages
+	do_write_unmasked_refs = (mymodel.ref_dim == 2);
+
 #ifdef DEBUG
 	std::cerr << "Leaving initialiseGeneral" << std::endl;
 #endif
@@ -2418,6 +2422,10 @@ void MlOptimiser::iterate()
 					}
 				}
 			}
+
+			// Directly use fn_out, without "_it" specifier, so unmasked refs will be overwritten at every iteration
+			if (do_write_unmasked_refs)
+				mymodel.write(fn_out+"_unmasked", sampling, false, true);
 
 			// Apply masks to the reference images
 			// At the last iteration, do not mask the map for validation purposes
@@ -3973,6 +3981,15 @@ void MlOptimiser::maximizationOtherParameters()
 	if ((iter==1 && do_firstiter_cc) || do_always_cc)
 		mymodel.LL /= sum_weight; // this now stores the average ccf
 	mymodel.ave_Pmax = wsum_model.ave_Pmax / sum_weight;
+
+	// 1Feb2018 developmental: apply directional filter to references
+	/*
+	if (directional_lowpass > 0.)
+	{
+		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
+			directionalFilterMap(mymodel.Iref[iclass], directional_lowpass, mymodel.pixel_size, "X");
+	}
+	*/
 
 	// After the first, special iteration, apply low-pass filter of -ini_high again
 	if (iter == 1 && do_firstiter_cc)
