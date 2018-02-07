@@ -43,11 +43,8 @@ int readTIFF(TIFF* ftiff, long int img_select, bool readdata=false, bool isStack
     long int _nDim;
 
     // libtiff's types
-    tsize_t stripSize;
-    tstrip_t numberOfStrips;
-    uint32 rowsPerStrip, width, length;
+    uint32 width, length;
     uint16 sampleFormat, bitsPerSample;
-    tdata_t buf;
     
     TIFFGetField(ftiff, TIFFTAG_IMAGEWIDTH, &width);
     TIFFGetField(ftiff, TIFFTAG_IMAGELENGTH, &length);
@@ -56,10 +53,6 @@ int readTIFF(TIFF* ftiff, long int img_select, bool readdata=false, bool isStack
     _nDim = 1;
     TIFFGetField(ftiff, TIFFTAG_BITSPERSAMPLE, &bitsPerSample);
     TIFFGetField(ftiff, TIFFTAG_SAMPLEFORMAT, &sampleFormat);
-    TIFFGetField(ftiff, TIFFTAG_ROWSPERSTRIP, &rowsPerStrip);
-    stripSize = TIFFStripSize(ftiff);
-    numberOfStrips = TIFFNumberOfStrips(ftiff);
-    buf = _TIFFmalloc(stripSize);
 
     // Find the number of frames
     while (TIFFSetDirectory(ftiff, _nDim) != 0) _nDim++;
@@ -67,8 +60,8 @@ int readTIFF(TIFF* ftiff, long int img_select, bool readdata=false, bool isStack
     TIFFSetDirectory(ftiff, 0);
 
 #ifdef DEBUG
-    printf("TIFF width %d, length %d, nDim %d, number of strips %d, strip size %d, sample format %d, bits per sample %d\n", 
-           width, length, _nDim, numberOfStrips, stripSize, sampleFormat, bitsPerSample);
+    printf("TIFF width %d, length %d, nDim %d, sample format %d, bits per sample %d\n", 
+           width, length, _nDim, sampleFormat, bitsPerSample);
 #endif
 
     if(isStack)
@@ -107,7 +100,7 @@ int readTIFF(TIFF* ftiff, long int img_select, bool readdata=false, bool isStack
     } else if (bitsPerSample == 32 && sampleFormat == 3) {
         datatype = Float;
     } else {
-        REPORT_ERROR("Unsupport TIFF format\n");
+        REPORT_ERROR("Unsupported TIFF format\n");
     }
     
     MDMainHeader.setValue(EMDL_IMAGE_DATATYPE,(int)datatype);
@@ -121,18 +114,41 @@ int readTIFF(TIFF* ftiff, long int img_select, bool readdata=false, bool isStack
         MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z,(RFLOAT)header->c/header->mz);
     */
 
+
     if (readdata) {
-        if (img_select != -1) TIFFSetDirectory(ftiff, img_select); // img_select starts from 0
-        size_t readsize_n = stripSize * 8 / bitsPerSample;
+        if (img_select == -1) img_select = 0; // img_select starts from 0
+
         size_t haveread_n = 0;
-        for (tstrip_t strip = 0; strip < numberOfStrips; strip++) {
-            TIFFReadEncodedStrip(ftiff, strip, buf, stripSize);
-            castPage2T((char*)buf, MULTIDIM_ARRAY(data) + haveread_n, datatype, readsize_n);
-            haveread_n += readsize_n;
+        for (int i = 0; i < _nDim; i++) {
+            TIFFSetDirectory(ftiff, img_select);
+
+            // Make sure image property is consistent for all frames
+            uint32 cur_width, cur_length;
+            uint16 cur_sampleFormat, cur_bitsPerSample;
+            TIFFGetField(ftiff, TIFFTAG_IMAGEWIDTH, &cur_width);
+            TIFFGetField(ftiff, TIFFTAG_IMAGELENGTH, &cur_length);
+            TIFFGetField(ftiff, TIFFTAG_BITSPERSAMPLE, &cur_bitsPerSample);
+            TIFFGetField(ftiff, TIFFTAG_SAMPLEFORMAT, &cur_sampleFormat);
+            if ((cur_width != width) || (cur_length != length) || (cur_bitsPerSample != bitsPerSample) ||
+                (cur_sampleFormat != sampleFormat)) {
+                REPORT_ERROR("All frames in a TIFF should have same width, height and pixel format.\n");
+            }
+
+            tsize_t stripSize = TIFFStripSize(ftiff);
+            tstrip_t numberOfStrips = TIFFNumberOfStrips(ftiff);
+            tdata_t buf = _TIFFmalloc(stripSize);
+
+            size_t readsize_n = stripSize * 8 / bitsPerSample;
+            for (tstrip_t strip = 0; strip < numberOfStrips; strip++) {
+                TIFFReadEncodedStrip(ftiff, strip, buf, stripSize);
+                castPage2T((char*)buf, MULTIDIM_ARRAY(data) + haveread_n, datatype, readsize_n);
+                haveread_n += readsize_n;
+	    }
+
+            _TIFFfree(buf);
+            img_select++;
         }
     }
-
-    _TIFFfree(buf);
 
     return 0;
 }
