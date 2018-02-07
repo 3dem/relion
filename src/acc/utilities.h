@@ -3,6 +3,7 @@
 
 #include "src/acc/acc_ptr.h"
 #include "src/acc/data_types.h"
+#include "src/error.h"
 #ifdef CUDA
 #include "src/acc/cuda/cuda_kernels/helper.cuh"
 #include "src/acc/cuda/cuda_kernels/wavg.cuh"
@@ -70,6 +71,8 @@ static void translate(int block_size,
 	int dy,
 	int dz=0)
 {
+	if(in.getAccPtr()==out.getAccPtr())
+		CRITICAL(UNSAFEPOINTERREUSE);
 #ifdef CUDA
 int BSZ = ( (int) ceilf(( float)in.getxyz() /(float)block_size));
 

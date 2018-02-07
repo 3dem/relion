@@ -360,24 +360,14 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			}
 		}
 
-		if (accMLO->dataIs3D)
-		{
-			AccUtilities::translate<XFLOAT>(BLOCK_SIZE,
-				temp,  // translate from temp...
-				d_img, // ... into d_img
-				XX(my_old_offset),
-				YY(my_old_offset),
-				ZZ(my_old_offset));
-		}
-		else
-		{
-				AccUtilities::translate<XFLOAT>(BLOCK_SIZE,
-				temp,  // translate from temp...
-				d_img, // ... into d_img
-				XX(my_old_offset),
-				YY(my_old_offset),
-				0);		
-		}
+		RFLOAT Zt = accMLO->dataIs3D ? ZZ(my_old_offset) : 0;
+		AccUtilities::translate<XFLOAT>(BLOCK_SIZE,
+			temp,  // translate from temp...
+			d_img, // ... into d_img
+			XX(my_old_offset),
+			YY(my_old_offset),
+			Zt);
+
 
 		if ( (baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry) )
 		{
@@ -408,7 +398,6 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
         // Either mask with zeros or noise. Here, make a noise-image that will be optional in the softMask-kernel.
 		AccDataTypes::Image<XFLOAT> RandomImage(img(),ptrFactory);
-
 
         if (!baseMLO->do_zero_mask) // prepare a acc-side Random image
         {
