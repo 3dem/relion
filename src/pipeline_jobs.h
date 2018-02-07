@@ -56,9 +56,14 @@
 #define DEFAULTSUMMOVIELOCATION "/public/EM/SUMMOVIE/summovie.exe"
 #define DEFAULTGCTFLOCATION "/public/EM/Gctf/bin/Gctf"
 #define DEFAULTRESMAPLOCATION "/public/EM/ResMap/ResMap-1.1.4-linux64"
+#define DEFAULTQSUBCOMMAND "qsub"
+#define DEFAULTQUEUENAME "openmpi"
 #define DEFAULTMININIMUMDEDICATED 1
 #define DEFAULTWARNINGLOCALMPI 32
 #define DEFAULTALLOWCHANGEMINDEDICATED true
+#define DEFAULTQUEUEUSE false
+#define DEFAULTMPIMAX 64
+#define DEFAULTTHREADMAX 16
 
 static const char* job_sampling_options[] = {
 		      "30 degrees",

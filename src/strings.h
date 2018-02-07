@@ -175,6 +175,29 @@ inline int textToInteger(const std::string& str,
     return textToInteger(str.c_str(), _errno, errmsg);
 }
 
+/** String (char*) to boolean conversion.
+ *
+ * @code
+ * bool param_no = textToBool(nextToken(), 1602, "Error reading boolean parameters")
+ * @endcode
+ */
+bool textToBool(const char* str,
+                  int _errno = 2102,
+                  std::string errmsg = "Error in textToBool");
+
+/** String (STL) to boolean conversion.
+ *
+ * @code
+ * int param_no = textToBool(str, 1602, "Error reading boolean parameters")
+ * @endcode
+ */
+inline int textToBool(const std::string& str,
+                         int _errno = 2102,
+                         std::string errmsg = "Error in textToBool")
+{
+    return textToBool(str.c_str(), _errno, errmsg);
+}
+
 /** String (char*) to long long integer conversion.
  *
  * @code
