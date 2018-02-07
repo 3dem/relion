@@ -501,6 +501,9 @@ void JobWindow::initialise(int my_job_type, bool _do_oldstyle)
 	// read settings if hidden file exists
 	myjob.read("", is_continue);
 
+	// update the window
+	updateMyGui();
+
 }
 
 void JobWindow::initialiseImportWindow()
