@@ -43,11 +43,13 @@ class MotionFitProg : public RefinementProgram
 {
     public:
 
-        int evalFrames;
+        int evalFrames, bin, coords_bin, movie_bin;
         RFLOAT dmga, dmgb, dmgc, totalDose,
                 sig_pos, sig_vel, sig_div, sig_acc,
                 sig_cutoff, k_cutoff;
-        bool evaluate;
+        bool evaluate, preextracted, nogain;
+        std::string meta_path;
+        StackHelper::BinningType binType;
 
         void readMoreOptions(IOParser& parser, int argc, char *argv[]);
         int _init();
@@ -56,6 +58,26 @@ class MotionFitProg : public RefinementProgram
 
 int main(int argc, char *argv[])
 {
+    /*{
+        Image<short> test;
+        test.read("Micrograph/EMD-2984_0000_frames.tiff");
+
+        Image<RFLOAT> f0(test.data.xdim, test.data.ydim);
+        Image<RFLOAT> f1(test.data.xdim, test.data.ydim);
+
+        for (int y = 0; y < test.data.ydim; y++)
+        for (int x = 0; x < test.data.xdim; x++)
+        {
+            DIRECT_NZYX_ELEM(f0(), 0, 0, y, x) = (RFLOAT)DIRECT_NZYX_ELEM(test(), 0, 0, y, x);
+            DIRECT_NZYX_ELEM(f1(), 0, 0, y, x) = (RFLOAT)DIRECT_NZYX_ELEM(test(), 1, 0, y, x);
+        }
+
+        VtkHelper::writeVTK(f0, "debug/f0_short.vtk");
+        VtkHelper::writeVTK(f1, "debug/f1_short.vtk");
+
+        return 0;
+    }*/
+
     MotionFitProg mt;
 
     int rc0 = mt.init(argc, argv);
@@ -67,9 +89,9 @@ int main(int argc, char *argv[])
 
 void MotionFitProg::readMoreOptions(IOParser& parser, int argc, char *argv[])
 {
-    dmga = textToFloat(parser.getOption("--dmg_a", "Damage model, parameter a", " 3.40406"));
-    dmgb = textToFloat(parser.getOption("--dmg_b", "                        b", "-1.06027"));
-    dmgc = textToFloat(parser.getOption("--dmg_c", "                        c", "-0.540896"));
+    dmga = textToFloat(parser.getOption("--dmg_a", "Damage model, parameter a", " 3.40"));
+    dmgb = textToFloat(parser.getOption("--dmg_b", "                        b", "-1.06"));
+    dmgc = textToFloat(parser.getOption("--dmg_c", "                        c", "-0.54"));
 
     totalDose = textToFloat(parser.getOption("--dose", "Total electron dose (in e^-/A^2)", "1"));
 
@@ -83,6 +105,25 @@ void MotionFitProg::readMoreOptions(IOParser& parser, int argc, char *argv[])
 
     evalFrames = textToInteger(parser.getOption("--eval", "Measure FSC for this many initial frames", "0"));
     evaluate = evalFrames > 0;
+
+    preextracted = parser.checkOption("--preex", "Preextracted movie stacks");
+
+    bin = textToInteger(parser.getOption("--bin", "Binning level for optimization and output (e.g. 2 for 2x2)", "1"));
+    coords_bin = textToInteger(parser.getOption("--cbin", "Binning level of input coordinates", "1"));
+    movie_bin = textToInteger(parser.getOption("--mbin", "Binning level of input movies", "1"));
+    std::string binTypeStr = parser.getOption("--bintype", "Binning method (box, gauss or fourier)", "box");
+
+    nogain = parser.checkOption("--nogain", "Ignore gain reference");
+
+    meta_path = parser.getOption("--meta", "Path to per-movie metadata star files", "");
+
+    if (binTypeStr == "box") binType = StackHelper::BoxBin;
+    else if (binTypeStr == "gauss") binType = StackHelper::GaussBin;
+    else if (binTypeStr == "fourier") binType = StackHelper::FourierCrop;
+    else
+    {
+        REPORT_ERROR("Illegal binning type: " + binTypeStr + " (supported: box, gauss or fourier)");
+    }
 }
 
 int MotionFitProg::_init()
@@ -95,30 +136,44 @@ int MotionFitProg::_run()
     const long gc = maxMG >= 0? maxMG : mdts.size()-1;
     const long g0 = minMG;
 
+    int fc;
+    std::vector<FourierTransformer> fts(nr_omp_threads);
 
-    std::string name, fullName, movieName;
-    mdts[0].getValue(EMDL_IMAGE_NAME, fullName, 0);
-    mdts[0].getValue(EMDL_MICROGRAPH_NAME, movieName, 0);
-    name = fullName.substr(fullName.find("@")+1);
-
-    std::string finName;
-
-    if (imgPath == "")
+    if (preextracted)
     {
-        finName = name;
+        std::string name, fullName, movieName;
+        mdts[0].getValue(EMDL_IMAGE_NAME, fullName, 0);
+        mdts[0].getValue(EMDL_MICROGRAPH_NAME, movieName, 0);
+        name = fullName.substr(fullName.find("@")+1);
+
+        std::string finName;
+
+        if (imgPath == "")
+        {
+            finName = name;
+        }
+        else
+        {
+            finName = imgPath + "/" + movieName.substr(movieName.find_last_of("/")+1);
+        }
+
+        Image<RFLOAT> stack0;
+        stack0.read(finName, false);
+
+        const int pc0 = mdts[0].numberOfObjects();
+        const bool zstack = stack0.data.zdim > 1;
+        const int stackSize = zstack? stack0.data.zdim : stack0.data.ndim;
+
+        fc = stackSize / pc0;
     }
     else
     {
-        finName = imgPath + "/" + movieName.substr(movieName.find_last_of("/")+1);
+        std::vector<std::vector<Image<Complex>>> movie = StackHelper::extractMovieStackFS(
+            &mdts[0], meta_path, imgPath, bin, coords_bin, movie_bin, s,
+            fts, !nogain, binType, false, debug);
+
+        fc = movie[0].size();
     }
-
-    Image<RFLOAT> stack0;
-    stack0.read(finName, false);
-
-    const int pc0 = mdts[0].numberOfObjects();
-    const bool zstack = stack0.data.zdim > 1;
-    const int stackSize = zstack? stack0.data.zdim : stack0.data.ndim;
-    const int fc = stackSize / pc0;
 
     std::vector<Image<RFLOAT> > dmgWeight = DamageHelper::damageWeights(
                 s, angpix, fc, totalDose, dmga, dmgb, dmgc);
@@ -138,14 +193,10 @@ int MotionFitProg::_run()
         }
     }
 
-    std::vector<FourierTransformer> fts(nr_omp_threads);
 
     double t0 = omp_get_wtime();
 
     int pctot = 0;
-
-    const bool writeDebugImages = false;
-    const bool measureFCC = true;
 
     std::vector<Image<RFLOAT> > tables(nr_omp_threads);
     std::vector<Image<RFLOAT> > weights0(nr_omp_threads);
@@ -153,12 +204,9 @@ int MotionFitProg::_run()
 
     if (evaluate)
     {
-        if (measureFCC)
+        for (int i = 0; i < nr_omp_threads; i++)
         {
-            for (int i = 0; i < nr_omp_threads; i++)
-            {
-                FscHelper::initFscTable(sh, fc, tables[i], weights0[i], weights1[i]);
-            }
+            FscHelper::initFscTable(sh, fc, tables[i], weights0[i], weights1[i]);
         }
     }
 
@@ -176,11 +224,23 @@ int MotionFitProg::_run()
 
         try
         {
-            movie = StackHelper::loadMovieStackFS(
+            if (preextracted)
+            {
+                movie = StackHelper::loadMovieStackFS(
                     &mdts[g], imgPath, false, nr_omp_threads, &fts);
+            }
+            else
+            {
+                movie = StackHelper::extractMovieStackFS(
+                    &mdts[g], meta_path, imgPath,
+                    bin, coords_bin, movie_bin, s,
+                    fts, !nogain, binType,
+                    true, debug);
+            }
         }
         catch (RelionError XE)
         {
+            std::cerr << "warning: unable to load micrograph #" << (g+1) << "\n";
             continue;
         }
 
@@ -213,18 +273,16 @@ int MotionFitProg::_run()
         std::vector<RFLOAT> sig_vel_vec(1, sig_vel);
         std::vector<RFLOAT> sig_div_vec(1, sig_div);
 
-        /*MotionEM motEM(
-                projectors[0], projectors[1], obsModel, mdts[g], movie, positions,
-                sigma2, dmgWeight, sig_pos, sig_vel_vec, sig_div_vec, sig_cutoff, nr_omp_threads);
-
-
-            motEM.computeInitial();*/
-
         std::cout << "    computing initial correlations...\n";
 
         std::vector<std::vector<Image<RFLOAT>>> movieCC = MotionRefinement::movieCC(
                 projectors[0], projectors[1], obsModel, mdts[g], movie,
                 sigma2, dmgWeight, fts, nr_omp_threads);
+
+        {
+            VtkHelper::write(movieCC[0], "debug/cc_0.vtk");
+            VtkHelper::write(movieCC[1], "debug/cc_1.vtk");
+        }
 
         std::vector<std::vector<gravis::d2Vector>> tracks(pc);
 
@@ -332,51 +390,45 @@ int MotionFitProg::_run()
 
         if (evaluate)
         {
-            if (measureFCC)
+            #pragma omp parallel for num_threads(nr_omp_threads)
+            for (int p = 0; p < pc; p++)
             {
-                #pragma omp parallel for num_threads(nr_omp_threads)
-                for (int p = 0; p < pc; p++)
+                int threadnum = omp_get_thread_num();
+
+                Image<Complex> pred;
+                std::vector<Image<Complex>> obs = movie[p];
+
+                for (int f = 0; f < fc; f++)
                 {
-                    int threadnum = omp_get_thread_num();
-
-                    Image<Complex> pred;
-                    std::vector<Image<Complex>> obs = movie[p];
-
-                    //if (it_number > 0)
-                    {
-                        for (int f = 0; f < fc; f++)
-                        {
-                            shiftImageInFourierTransform(obs[f](), obs[f](), s, -tracks[p][f].x, -tracks[p][f].y);
-                        }
-                    }
-
-                    int randSubset;
-                    mdts[g].getValue(EMDL_PARTICLE_RANDOM_SUBSET, randSubset, p);
-                    randSubset -= 1;
-
-                    if (randSubset == 0)
-                    {
-                        pred = obsModel.predictObservation(projectors[1], mdts[g], p, true, true);
-                    }
-                    else
-                    {
-                        pred = obsModel.predictObservation(projectors[0], mdts[g], p, true, true);
-                    }
-
-                    FscHelper::updateFscTable(obs, pred, tables[threadnum],
-                                              weights0[threadnum], weights1[threadnum]);
-
-                    std::vector<d2Vector> vel(fc);
-
-                    vel[0] = tracks[p][1] - tracks[p][0];
-
-                    for (int f = 1; f < fc-1; f++)
-                    {
-                        vel[f] = 0.5*(tracks[p][f+1] - tracks[p][f-1]);
-                    }
-
-                    vel[fc-1] = tracks[p][fc-1] - tracks[p][fc-2];
+                    shiftImageInFourierTransform(obs[f](), obs[f](), s, -tracks[p][f].x, -tracks[p][f].y);
                 }
+
+                int randSubset;
+                mdts[g].getValue(EMDL_PARTICLE_RANDOM_SUBSET, randSubset, p);
+                randSubset -= 1;
+
+                if (randSubset == 0)
+                {
+                    pred = obsModel.predictObservation(projectors[1], mdts[g], p, true, true);
+                }
+                else
+                {
+                    pred = obsModel.predictObservation(projectors[0], mdts[g], p, true, true);
+                }
+
+                FscHelper::updateFscTable(obs, pred, tables[threadnum],
+                                          weights0[threadnum], weights1[threadnum]);
+
+                std::vector<d2Vector> vel(fc);
+
+                vel[0] = tracks[p][1] - tracks[p][0];
+
+                for (int f = 1; f < fc-1; f++)
+                {
+                    vel[f] = 0.5*(tracks[p][f+1] - tracks[p][f-1]);
+                }
+
+                vel[fc-1] = tracks[p][fc-1] - tracks[p][fc-2];
             }
         }
 
@@ -449,42 +501,39 @@ int MotionFitProg::_run()
 
     if (evaluate)
     {
-        if (measureFCC)
+        Image<RFLOAT> table, weight;
+
+        FscHelper::mergeFscTables(tables, weights0, weights1, table, weight);
+
+        int f_max = fc;
+        double total = 0.0;
+
+        std::ofstream fccOut(outPath + "_FCC_perFrame.dat");
+
+        for (int y = 0; y < f_max; y++)
         {
-            Image<RFLOAT> table, weight;
+            double avg = 0.0;
 
-            FscHelper::mergeFscTables(tables, weights0, weights1, table, weight);
-
-            int f_max = fc;
-            double total = 0.0;
-
-            std::ofstream fccOut(outPath + "_FCC_perFrame.dat");
-
-            for (int y = 0; y < f_max; y++)
+            for (int k = k_cutoff+2; k < k_out; k++)
             {
-                double avg = 0.0;
-
-                for (int k = k_cutoff+2; k < k_out; k++)
-                {
-                    avg += table(y,k);
-                }
-
-                avg /= k_out - k_cutoff - 1;
-
-                fccOut << y << " " << avg << "\n";
-
-                total += avg;
+                avg += table(y,k);
             }
 
-            total /= f_max;
+            avg /= k_out - k_cutoff - 1;
 
-            std::cout << "total: " << total << "\n";
+            fccOut << y << " " << avg << "\n";
 
-            table.write(outPath + "_FCC_data.mrc");
-            /*weight.write(outPath + "_FCC_weight.mrc");*/
-
-            VtkHelper::writeVTK(table, outPath + "_FCC_data.vtk");
+            total += avg;
         }
+
+        total /= f_max;
+
+        std::cout << "total: " << total << "\n";
+
+        table.write(outPath + "_FCC_data.mrc");
+        /*weight.write(outPath + "_FCC_weight.mrc");*/
+
+        VtkHelper::writeVTK(table, outPath + "_FCC_data.vtk");
     }
 
     double t1 = omp_get_wtime();

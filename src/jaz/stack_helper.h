@@ -15,6 +15,8 @@ class StackHelper
 {
     public:
 
+        typedef enum {BoxBin, GaussBin, FourierCrop} BinningType;
+
         static std::vector<MetaDataTable> splitByStack(const MetaDataTable* mdt);
         static std::vector<Image<RFLOAT> > loadStack(const MetaDataTable* mdt, std::string path = "", int threads = 1);
         static std::vector<Image<Complex> > loadStackFS(const MetaDataTable* mdt, std::string path = "",
@@ -23,9 +25,18 @@ class StackHelper
         static void saveStack(std::vector<Image<RFLOAT> >& stack, std::string fn);
 
         static std::vector<std::vector<Image<RFLOAT> > > loadMovieStack(const MetaDataTable* mdt, std::string moviePath);
+
         static std::vector<std::vector<Image<Complex> > > loadMovieStackFS(
                 const MetaDataTable* mdt, std::string moviePath, bool center = false, int threads = 1,
                 std::vector<FourierTransformer>* fts = 0);
+
+        static std::vector<std::vector<Image<Complex> > > extractMovieStackFS(
+                const MetaDataTable* mdt,
+                std::string metaPath, std::string moviePath,
+                int outBin, int coordsBin, int movieBin,
+                int squareSize, std::vector<FourierTransformer>& fts,
+                bool useGain = true, BinningType binningType = BoxBin,
+                bool loadData = true, bool verbose = false);
 
         static Image<Complex> projectView(Projector* projector, const MetaDataTable* mdt, int index);
         //static Image<Complex> projectView2(Projector* projector, const MetaDataTable* mdt, int index);

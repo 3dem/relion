@@ -125,9 +125,9 @@ enum EMDLabel
     EMDL_IMAGE_SAMPLINGRATE_Y,
     EMDL_IMAGE_SAMPLINGRATE_Z,
     EMDL_IMAGE_SIZE,
-    EMDL_IMAGE_SIZEX,
-    EMDL_IMAGE_SIZEY,
-    EMDL_IMAGE_SIZEZ,
+    EMDL_IMAGE_SIZE_X,
+    EMDL_IMAGE_SIZE_Y,
+    EMDL_IMAGE_SIZE_Z,
     EMDL_IMAGE_STATS_MIN,
     EMDL_IMAGE_STATS_MAX,
     EMDL_IMAGE_STATS_AVG,
@@ -542,9 +542,9 @@ private:
         EMDL::addLabel(EMDL_IMAGE_SAMPLINGRATE_Y, EMDL_DOUBLE, "rlnSamplingRateY", "Sampling rate in Y-direction of an image (in Angstrom/pixel)");
         EMDL::addLabel(EMDL_IMAGE_SAMPLINGRATE_Z, EMDL_DOUBLE, "rlnSamplingRateZ", "Sampling rate in Z-direction of an image (in Angstrom/pixel)");
         EMDL::addLabel(EMDL_IMAGE_SIZE, EMDL_INT, "rlnImageSize", "Size of an image (in pixels)");
-        EMDL::addLabel(EMDL_IMAGE_SIZEX, EMDL_INT, "rlnImageSizeX", "Size of an image in the X-direction (in pixels)");
-        EMDL::addLabel(EMDL_IMAGE_SIZEY, EMDL_INT, "rlnImageSizeY", "Size of an image in the Y-direction (in pixels)");
-        EMDL::addLabel(EMDL_IMAGE_SIZEZ, EMDL_INT, "rlnImageSizeZ", "Size of an image in the Z-direction (in pixels)");
+        EMDL::addLabel(EMDL_IMAGE_SIZE_X, EMDL_INT, "rlnImageSizeX", "Size of an image in the X-direction (in pixels)");
+        EMDL::addLabel(EMDL_IMAGE_SIZE_Y, EMDL_INT, "rlnImageSizeY", "Size of an image in the Y-direction (in pixels)");
+        EMDL::addLabel(EMDL_IMAGE_SIZE_Z, EMDL_INT, "rlnImageSizeZ", "Size of an image in the Z-direction (in pixels)");
         EMDL::addLabel(EMDL_IMAGE_STATS_MIN, EMDL_DOUBLE, "rlnMinimumValue", "Minimum value for the pixels in an image");
         EMDL::addLabel(EMDL_IMAGE_STATS_MAX, EMDL_DOUBLE, "rlnMaximumValue", "Maximum value for the pixels in an image");
         EMDL::addLabel(EMDL_IMAGE_STATS_AVG, EMDL_DOUBLE, "rlnAverageValue", "Average value for the pixels in an image");
@@ -567,7 +567,7 @@ private:
 
         EMDL::addLabel(EMDL_MICROGRAPH_ID, EMDL_LONG, "rlnMicrographId", "ID (i.e. a unique number) of a micrograph");
         EMDL::addLabel(EMDL_MICROGRAPH_NAME, EMDL_STRING, "rlnMicrographName", "Name of a micrograph");
-	EMDL::addLabel(EMDL_MICROGRAPH_GAIN_NAME, EMDL_STRING, "rlnMicrographGainName", "Name of a gain reference");
+        EMDL::addLabel(EMDL_MICROGRAPH_GAIN_NAME, EMDL_STRING, "rlnMicrographGainName", "Name of a gain reference");
         EMDL::addLabel(EMDL_MICROGRAPH_NAME_WODOSE, EMDL_STRING, "rlnMicrographNameNoDW", "Name of a micrograph without dose weighting");
         EMDL::addLabel(EMDL_MICROGRAPH_MOVIE_NAME, EMDL_STRING, "rlnMicrographMovieName", "Name of a micrograph movie stack");
         EMDL::addLabel(EMDL_MICROGRAPH_TILT_ANGLE, EMDL_DOUBLE, "rlnMicrographTiltAngle", "Tilt angle (in degrees) used to collect a micrograph");

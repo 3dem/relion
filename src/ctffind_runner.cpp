@@ -132,7 +132,7 @@ void CtffindRunner::initialise()
 			FileName fn_mic, fn_mic2;
 			if (do_use_without_doseweighting)
 			{
-				MDin.getValue(EMDL_MICROGRAPH_NAME_WODOSE, fn_mic);
+                MDin.getValue(EMDL_MICROGRAPH_NAME_WODOSE, fn_mic);
 				MDin.getValue(EMDL_MICROGRAPH_NAME, fn_mic2);
 				fn_micrographs_all.push_back(fn_mic);
 				fn_micrographs_widose_all.push_back(fn_mic2);
@@ -308,7 +308,7 @@ void CtffindRunner::joinCtffindResults()
 			MDctf.addObject();
 			if (do_use_without_doseweighting)
 			{
-				MDctf.setValue(EMDL_MICROGRAPH_NAME_WODOSE, fn_micrographs_all[imic]);
+                MDctf.setValue(EMDL_MICROGRAPH_NAME_WODOSE, fn_micrographs_all[imic]);
 				MDctf.setValue(EMDL_MICROGRAPH_NAME, fn_micrographs_widose_all[imic]);
 			}
 			else

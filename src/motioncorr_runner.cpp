@@ -797,7 +797,7 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 			if (do_dose_weighting && do_motioncor2)
 			{
 				FileName fn_avg_wodose = fn_avg.withoutExtension() + "_noDW.mrc";
-				MDavg.setValue(EMDL_MICROGRAPH_NAME_WODOSE, fn_avg_wodose);
+                MDavg.setValue(EMDL_MICROGRAPH_NAME_WODOSE, fn_avg_wodose);
 			}
 			MDavg.setValue(EMDL_MICROGRAPH_NAME, fn_avg);
 			if (do_save_movies && exists(fn_mov))

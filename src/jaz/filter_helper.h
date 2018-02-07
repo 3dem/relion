@@ -42,8 +42,9 @@ class FilterHelper
         static Image<RFLOAT> logImg(Image<RFLOAT>& img, double thresh = 1e-20, double scale = 1.0);
         static Image<RFLOAT> padCorner2D(Image<RFLOAT>& img, double factor);
         static Image<Complex> padCorner2D(Image<Complex>& img, double factor);
-        static Image<RFLOAT> padCorner2D(const Image<double> &img, int w, int h);
-        static Image<RFLOAT> cropCorner2D(const Image<double> &img, int w, int h);
+        static Image<RFLOAT> padCorner2D(const Image<RFLOAT> &img, int w, int h);
+        static Image<RFLOAT> cropCorner2D(const Image<RFLOAT> &img, int w, int h);
+        static Image<Complex> cropCorner2D(const Image<Complex> &img, int w, int h);
         static Image<RFLOAT> zeroOutsideCorner2D(Image<RFLOAT>& img, double radius);
         static void GaussianEnvelopeCorner2D(Image<RFLOAT>& img, double sigma);
         static Image<RFLOAT> ButterworthEnvCorner2D(Image<RFLOAT>& img, double radIn, double radOut);

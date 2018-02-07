@@ -63,9 +63,9 @@ void Micrograph::read(FileName fn_in)
 	// Read Image metadata
 	MDglobal.readStar(in, "general");
 
-	if (!MDglobal.getValue(EMDL_IMAGE_SIZEX, width) ||
-	    !MDglobal.getValue(EMDL_IMAGE_SIZEY, height) ||
-	    !MDglobal.getValue(EMDL_IMAGE_SIZEZ, nFrame) ||
+    if (!MDglobal.getValue(EMDL_IMAGE_SIZE_X, width) ||
+        !MDglobal.getValue(EMDL_IMAGE_SIZE_Y, height) ||
+        !MDglobal.getValue(EMDL_IMAGE_SIZE_Z, nFrame) ||
 	    !MDglobal.getValue(EMDL_MICROGRAPH_MOVIE_NAME, fnMovie)) {
 		REPORT_ERROR("MicrographModel::read: insufficient general information");
 	}
@@ -111,9 +111,9 @@ void Micrograph::write(FileName filename) {
         MD.setName("general");
         MD.setIsList(true);
         MD.addObject();
-	MD.setValue(EMDL_IMAGE_SIZEX, width);
-        MD.setValue(EMDL_IMAGE_SIZEY, height);
-        MD.setValue(EMDL_IMAGE_SIZEZ, nFrame);
+    MD.setValue(EMDL_IMAGE_SIZE_X, width);
+        MD.setValue(EMDL_IMAGE_SIZE_Y, height);
+        MD.setValue(EMDL_IMAGE_SIZE_Z, nFrame);
         MD.setValue(EMDL_MICROGRAPH_MOVIE_NAME, fnMovie);
 	if (fnGain != "") {
 		MD.setValue(EMDL_MICROGRAPH_GAIN_NAME, fnGain);

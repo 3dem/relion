@@ -362,6 +362,33 @@ Image<RFLOAT> FilterHelper::cropCorner2D(const Image<RFLOAT>& img, int w, int h)
     return out;
 }
 
+Image<Complex> FilterHelper::cropCorner2D(const Image<Complex>& img, int w, int h)
+{
+    const int w1 = img.data.xdim;
+    const int h1 = img.data.ydim;
+
+    if (w > w1 || h > h1) return img;
+
+    Image<Complex> out(w,h);
+
+    for (int y = 0; y < h1; y++)
+    for (int x = 0; x < w1; x++)
+    {
+        int x1 = x < w1/2? x : x - w1;
+        int y1 = y < h1/2? y : y - h1;
+
+        if (x1 < w/2 && y1 < h/2 && x1 >= -w/2 && y1 >= -h/2)
+        {
+            int x0 = x1 < 0? x1 + w : x1;
+            int y0 = y1 < 0? y1 + h : y1;
+
+            DIRECT_A2D_ELEM(out.data, y0, x0) = DIRECT_A2D_ELEM(img.data, y, x);
+        }
+    }
+
+    return out;
+}
+
 Image<double> FilterHelper::zeroOutsideCorner2D(Image<double> &img, double radius)
 {
     const int w = img.data.xdim;
@@ -2749,7 +2776,10 @@ void FilterHelper::separableGaussianXYZ(const Image<RFLOAT>& src, Image<RFLOAT>&
 void FilterHelper::separableGaussianXY(const Image<RFLOAT>& src, Image<RFLOAT>& dest,
                                        RFLOAT sigma, int k, bool wrap)
 {
-    dest.data.resize(src.data);
+    if (!dest.data.sameShape(src.data))
+    {
+        dest.data.resize(src.data);
+    }
 
     if (sigma <= 0.0)
     {

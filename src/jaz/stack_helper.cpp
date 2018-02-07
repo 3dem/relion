@@ -7,6 +7,8 @@
 #include <src/jaz/gravis/t4Matrix.h>
 #include <src/jaz/vtk_helper.h>
 #include <src/fftw.h>
+#include <src/micrograph_model.h>
+#include <src/jaz/resampling_helper.h>
 
 #include <omp.h>
 
@@ -270,6 +272,266 @@ std::vector<std::vector<Image<Complex> > > StackHelper::loadMovieStackFS(const M
                 SliceHelper::extractStackSlice(in, aux, f*pc + p);
                 if (center) CenterFFT(aux(), true);
                 ft.FourierTransform(aux(), out[p][f]());
+            }
+        }
+    }
+
+    return out;
+}
+
+std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
+    const MetaDataTable *mdt,
+    std::string metaPath, std::string moviePath,
+    int outBin, int coordsBin, int movieBin, int squareSize,
+    std::vector<FourierTransformer>& fts,
+    bool useGain, BinningType binningType,
+    bool loadData, bool verbose)
+{
+    std::vector<std::vector<Image<Complex>>> out(mdt->numberOfObjects());
+    const long pc = mdt->numberOfObjects();
+
+    std::string name0;
+    mdt->getValue(EMDL_MICROGRAPH_NAME, name0, 0);
+
+    std::string ending = name0.substr(name0.find_last_of(".")+1);
+
+    if (verbose)
+    {
+        std::cout << "orig. name: " << name0 << "\n";
+        std::cout << "ending: " << ending << "\n";
+    }
+
+    Image<RFLOAT> mgStack;
+
+    if (ending == "star")
+    {
+        std::string metaNameAct;
+
+        if (metaPath == "")
+        {
+            metaNameAct = name0;
+        }
+        else
+        {
+            metaNameAct = metaPath + "/" + name0.substr(name0.find_last_of("/")+1);
+        }
+
+        if (verbose)
+        {
+            std::cout << "loading: " << metaNameAct << "\n";
+        }
+
+        MetaDataTable metaMdt;
+        metaMdt.read(metaNameAct, "general");
+
+        std::string mgName0;
+
+        if (!metaMdt.containsLabel(EMDL_MICROGRAPH_MOVIE_NAME))
+        {
+            REPORT_ERROR("StackHelper::extractMovieStackFS: " + metaNameAct
+                         + " does not contain a rlnMicrographMovieName field.");
+        }
+
+        metaMdt.getValue(EMDL_MICROGRAPH_MOVIE_NAME, mgName0, 0);
+
+        std::string mgNameAct, gainNameAct;
+
+        if (moviePath == "")
+        {
+            mgNameAct = mgName0;
+        }
+        else
+        {
+            mgNameAct = moviePath + "/" + mgName0.substr(mgName0.find_last_of("/")+1);
+        }
+
+        if (verbose)
+        {
+            std::cout << "loading: " << mgNameAct << "\n";
+        }
+
+        mgStack.read(mgNameAct, loadData);
+
+        if (useGain)
+        {
+            if (!metaMdt.containsLabel(EMDL_MICROGRAPH_GAIN_NAME))
+            {
+                std::cerr << "warning: " << metaNameAct
+                          << " does not contain a rlnMicrographGainName field.\n";
+            }
+            else
+            {
+                std::string gainName0;
+                metaMdt.getValue(EMDL_MICROGRAPH_GAIN_NAME, gainName0, 0);
+
+                if (moviePath == "")
+                {
+                    gainNameAct = gainName0;
+                }
+                else
+                {
+                    gainNameAct = moviePath + "/" + gainName0.substr(gainName0.find_last_of("/")+1);
+                }
+
+                Image<RFLOAT> gainRef;
+                gainRef.read(gainNameAct, loadData);
+
+                if (loadData)
+                {
+                    if (gainRef.data.xdim != mgStack.data.xdim
+                        || gainRef.data.ydim != mgStack.data.ydim)
+                    {
+                        std::stringstream stsm;
+                        stsm << mgStack.data.xdim << "x" << mgStack.data.ydim;
+                        std::stringstream stsg;
+                        stsg << gainRef.data.xdim << "x" << gainRef.data.ydim;
+
+                        REPORT_ERROR("StackHelper::extractMovieStackFS: gain reference ("
+                                     + gainNameAct + ") and movie stack (" + mgNameAct
+                                     + ") are of unequal size ("+stsg.str()+" vs. "+stsm.str()+").");
+                    }
+
+                    for (int n = 0; n < mgStack().ndim; n++)
+                    for (int z = 0; z < mgStack().zdim; z++)
+                    for (int y = 0; y < mgStack().ydim; y++)
+                    for (int x = 0; x < mgStack().xdim; x++)
+                    {
+                        DIRECT_NZYX_ELEM(mgStack(), n, z, y, x)
+                            /= DIRECT_NZYX_ELEM(gainRef(), 0, 0, y, x);
+                    }
+                }
+            }
+        }
+    }
+    else
+    {
+        if (useGain)
+        {
+            std::cerr << "Warning: unable to load gain reference - rlnMicrographName (" << name0 << ") is not a .star file.\n";
+        }
+
+        std::string mgNameAct;
+
+        if (moviePath == "")
+        {
+            mgNameAct = name0;
+        }
+        else
+        {
+            mgNameAct = moviePath + "/" + name0.substr(name0.find_last_of("/")+1);
+        }
+
+        if (verbose)
+        {
+            std::cout << "loading: " << mgNameAct << "\n";
+        }
+
+        mgStack.read(mgNameAct, loadData);
+    }
+
+    if (verbose)
+    {
+        std::cout << "size: "
+            << mgStack().xdim << "x"
+            << mgStack().ydim << "x"
+            << mgStack().zdim << "x"
+            << mgStack().ndim << "\n";
+    }
+
+    const bool dataInZ = mgStack.data.zdim > 1;
+
+    const int w0 = mgStack.data.xdim;
+    const int h0 = mgStack.data.ydim;
+    const int fc = dataInZ? mgStack.data.zdim : mgStack.data.ndim;
+
+    const int nsc = dataInZ? 0 : 1;
+    const int zsc = dataInZ? 1 : 0;
+
+    if (verbose)
+    {
+        if (dataInZ) std::cout << "data in Z\n";
+        else std::cout << "data in N\n";
+
+        std::cout << "frame count = " << fc << "\n";
+    }
+
+    const int sqMg = squareSize * outBin / movieBin;
+
+    for (long p = 0; p < pc; p++)
+    {
+        out[p] = std::vector<Image<Complex>>(fc);
+
+        if (!loadData) continue;
+
+        double xp0, yp0;
+
+        mdt->getValue(EMDL_IMAGE_COORD_X, xp0, p);
+        mdt->getValue(EMDL_IMAGE_COORD_Y, yp0, p);
+
+        const double xpm = xp0 * coordsBin / (double)movieBin;
+        const double ypm = yp0 * coordsBin / (double)movieBin;
+
+        const int threads = fts.size();
+
+        #pragma omp parallel for num_threads(threads)
+        for (long f = 0; f < fc; f++)
+        {
+            int threadnum = omp_get_thread_num();
+
+            Image<RFLOAT> aux0(sqMg, sqMg), aux1(squareSize, squareSize);
+            Image<Complex> aux2;
+
+            // @TODO: read whole-image shifts from micrograph class
+
+            const int x0 = (int)xpm;
+            const int y0 = (int)ypm;
+
+            for (long int y = 0; y < sqMg; y++)
+            for (long int x = 0; x < sqMg; x++)
+            {
+                int xx = x0 + x;
+                int yy = y0 + y;
+
+                if (xx < 0) xx = 0;
+                else if (xx >= w0) xx = w0 - 1;
+
+                if (yy < 0) yy = 0;
+                else if (yy >= h0) yy = h0 - 1;
+
+                DIRECT_NZYX_ELEM(aux0.data, 0, 0, y, x)
+                    = DIRECT_NZYX_ELEM(mgStack.data, nsc*f, zsc*f, yy, xx);
+            }
+
+            if (outBin == movieBin)
+            {
+                fts[threadnum].FourierTransform(aux0(), out[p][f]());
+            }
+            else if (binningType != FourierCrop)
+            {
+                if (binningType == BoxBin)
+                {
+                    ResamplingHelper::downsampleBox2D(aux0, outBin/(double)movieBin, aux1);
+
+                    if (p == 0 && f < 2)
+                    {
+                        std::stringstream sts;
+                        sts << p << "_" << f;
+                        VtkHelper::writeVTK(aux0, "debug/aux0_"+sts.str()+".vtk");
+                        VtkHelper::writeVTK(aux1, "debug/aux1_"+sts.str()+".vtk");
+                    }
+                }
+                else if (binningType == GaussBin)
+                {
+                    ResamplingHelper::downsampleGauss2D(aux0, outBin/(double)movieBin, aux1);
+                }
+
+                fts[threadnum].FourierTransform(aux1(), out[p][f]());
+            }
+            else
+            {
+                fts[threadnum].FourierTransform(aux0(), aux2());
+
+                out[p][f] = FilterHelper::cropCorner2D(aux2, squareSize, squareSize);
             }
         }
     }
