@@ -50,6 +50,7 @@ int readTIFF(TIFF* ftiff, long int img_select, bool readdata=false, bool isStack
     TIFFGetField(ftiff, TIFFTAG_IMAGELENGTH, &length);
     _xDim = width;
     _yDim = length;
+    _zDim = 1;
     _nDim = 1;
     TIFFGetField(ftiff, TIFFTAG_BITSPERSAMPLE, &bitsPerSample);
     TIFFGetField(ftiff, TIFFTAG_SAMPLEFORMAT, &sampleFormat);
@@ -64,6 +65,7 @@ int readTIFF(TIFF* ftiff, long int img_select, bool readdata=false, bool isStack
            width, length, _nDim, sampleFormat, bitsPerSample);
 #endif
 
+    // TODO: TIFF is always a stack, isn't it?
     if(isStack)
     {
         _zDim = 1;
@@ -148,6 +150,35 @@ int readTIFF(TIFF* ftiff, long int img_select, bool readdata=false, bool isStack
             _TIFFfree(buf);
             img_select++;
         }
+
+        /* Flip the Y axis.
+ 
+           In an MRC file, the origin is bottom-left, +X to the right, +Y to the top.
+           (c.f. Fig. 2 of Heymann et al, JSB 2005 https://doi.org/10.1016/j.jsb.2005.06.001
+                 IMOD's interpretation http://bio3d.colorado.edu/imod/doc/mrc_format.txt)
+           3dmod (from IMOD) and e2display.py (from EMAN2) displays like this.
+
+           relion_display has the origin at top-left, +X to the right, +Y to the bottom.
+           GIMP and ImageJ display in this way as well.
+           A TIFF file, with TIFFTAG_ORIENTATION = 1 (default), shares this convention.
+
+           So, the origin and the direction of the Y axis are the opposite between MRC and TIFF.
+           IMOD, EMAN2, SerialEM and MotionCor2 flip the Y axis whenever they read or write a TIFF file.
+           We follow this.
+        */
+
+        T tmp;
+        const int ylim = _yDim / 2, z = 0;
+        for (int n = 0; n < _nDim; n++) {
+            for (int y1 = 0; y1 < ylim; y1++) {
+                const int y2 = _yDim - 1 - y1;
+                for (int x = 0; x < _xDim; x++) { // TODO: memcpy or pointer arithmetic is probably faster
+                    tmp = DIRECT_NZYX_ELEM(data, n, z, y1, x);
+                    DIRECT_NZYX_ELEM(data, n, z, y1, x) = DIRECT_NZYX_ELEM(data, n, z, y2, x);
+                    DIRECT_NZYX_ELEM(data, n, z, y2, x) = tmp;
+                }
+            }
+        } 
     }
 
     return 0;
