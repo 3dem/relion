@@ -334,6 +334,16 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 
         metaMdt.getValue(EMDL_MICROGRAPH_MOVIE_NAME, mgName0, 0);
 
+        std::string mgEnd = mgName0.substr(mgName0.find_last_of(".")+1);
+
+        bool flipy = false;
+
+        if (mgEnd == "tiff")
+        {
+            std::cout << "Tiff ending detected - flipping y-axis.\n";
+            flipy = true;
+        }
+
         std::string mgNameAct, gainNameAct;
 
         if (moviePath == "")
@@ -351,6 +361,20 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
         }
 
         mgStack.read(mgNameAct, loadData);
+
+        if (flipy)
+        {
+            for (int n = 0; n < mgStack.data.ndim; n++)
+            for (int z = 0; z < mgStack.data.zdim; z++)
+            for (int y = 0; y < mgStack.data.ydim/2; y++)
+            for (int x = 0; x < mgStack.data.xdim; x++)
+            {
+                int yy = mgStack.data.ydim - y - 1;
+                RFLOAT sw = DIRECT_NZYX_ELEM(mgStack(), n, z, yy, x);
+                DIRECT_NZYX_ELEM(mgStack(), n, z, yy, x) = DIRECT_NZYX_ELEM(mgStack(), n, z, y, x);
+                DIRECT_NZYX_ELEM(mgStack(), n, z, y, x) = sw;
+            }
+        }
 
         if (useGain)
         {
@@ -455,6 +479,43 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
         std::cout << "frame count = " << fc << "\n";
     }
 
+
+    double mean = 0.0, var = 0.0, valScale = 1.0;
+
+    if (loadData)
+    {
+        for (int n = 0; n < mgStack().ndim; n++)
+        for (int z = 0; z < mgStack().zdim; z++)
+        for (int y = 0; y < mgStack().ydim; y++)
+        for (int x = 0; x < mgStack().xdim; x++)
+        {
+            mean += DIRECT_NZYX_ELEM(mgStack(), n, z, y, x);
+        }
+
+        mean /= (mgStack().xdim * mgStack().ydim * mgStack().zdim * mgStack().ndim);
+
+        for (int n = 0; n < mgStack().ndim; n++)
+        for (int z = 0; z < mgStack().zdim; z++)
+        for (int y = 0; y < mgStack().ydim; y++)
+        for (int x = 0; x < mgStack().xdim; x++)
+        {
+            double d = DIRECT_NZYX_ELEM(mgStack(), n, z, y, x) - mean;
+            var += d*d;
+        }
+
+        var /= (mgStack().xdim * mgStack().ydim * mgStack().zdim * mgStack().ndim - 1);
+
+        // scale data so that the average over all frames for a binned pixel has unit variance:
+        valScale = sqrt((fc * outBin * outBin) / (var * movieBin * movieBin));
+
+        if (verbose)
+        {
+            std::cout << "mean = " << mean << "\n";
+            std::cout << "var = " << var << "\n";
+            std::cout << "val. scale = " << valScale << "\n";
+        }
+    }
+
     const int sqMg = squareSize * outBin / movieBin;
 
     for (long p = 0; p < pc; p++)
@@ -468,8 +529,14 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
         mdt->getValue(EMDL_IMAGE_COORD_X, xp0, p);
         mdt->getValue(EMDL_IMAGE_COORD_Y, yp0, p);
 
-        const double xpm = xp0 * coordsBin / (double)movieBin;
-        const double ypm = yp0 * coordsBin / (double)movieBin;
+        const double xpo = (int)(outBin * xp0 / coordsBin) - squareSize/2;
+        const double ypo = (int)(outBin * yp0 / coordsBin) - squareSize/2;
+
+        /*const double xpm = xp0 * coordsBin / (double)movieBin - sqMg/2;
+        const double ypm = yp0 * coordsBin / (double)movieBin - sqMg/2;*/
+
+        const int x0 = xpo * outBin / movieBin;
+        const int y0 = ypo * outBin / movieBin;
 
         const int threads = fts.size();
 
@@ -483,8 +550,8 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 
             // @TODO: read whole-image shifts from micrograph class
 
-            const int x0 = (int)xpm;
-            const int y0 = (int)ypm;
+            /*const int x0 = (int)(xpm);
+            const int y0 = (int)(ypm);*/
 
             for (long int y = 0; y < sqMg; y++)
             for (long int x = 0; x < sqMg; x++)
@@ -498,8 +565,10 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
                 if (yy < 0) yy = 0;
                 else if (yy >= h0) yy = h0 - 1;
 
-                DIRECT_NZYX_ELEM(aux0.data, 0, 0, y, x)
-                    = DIRECT_NZYX_ELEM(mgStack.data, nsc*f, zsc*f, yy, xx);
+                RFLOAT val0 = DIRECT_NZYX_ELEM(mgStack.data, nsc*f, zsc*f, yy, xx);
+                RFLOAT val = -valScale * (val0 - mean);
+
+                DIRECT_NZYX_ELEM(aux0.data, 0, 0, y, x) = val;
             }
 
             if (outBin == movieBin)
@@ -511,14 +580,6 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
                 if (binningType == BoxBin)
                 {
                     ResamplingHelper::downsampleBox2D(aux0, outBin/(double)movieBin, aux1);
-
-                    if (p == 0 && f < 2)
-                    {
-                        std::stringstream sts;
-                        sts << p << "_" << f;
-                        VtkHelper::writeVTK(aux0, "debug/aux0_"+sts.str()+".vtk");
-                        VtkHelper::writeVTK(aux1, "debug/aux1_"+sts.str()+".vtk");
-                    }
                 }
                 else if (binningType == GaussBin)
                 {

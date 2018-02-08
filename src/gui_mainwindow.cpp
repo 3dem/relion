@@ -944,8 +944,7 @@ void GuiMainWindow::loadJobFromPipeline(int this_job)
 
 	// Set the "static int" to which job we're currently pointing
 	current_job = this_job;
-	std::string itype = pipeline.processList[current_job].type;
-
+	int itype = pipeline.processList[current_job].type;
 	// The following line allows certain browse buttons to only open the current directory (using CURRENT_ODIR)
 	current_browse_directory = pipeline.processList[current_job].name;
 

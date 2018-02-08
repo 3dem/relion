@@ -48,7 +48,9 @@ void MotioncorrRunnerMpi::run()
 	int barstep;
 	if (verb > 0)
 	{
-		if (do_unblur)
+		if (do_own)
+			 std::cout << " Correcting beam-induced motions using our own implementation ..." << std::endl;
+		else if (do_unblur)
 			std::cout << " Correcting beam-induced motions using Tim Grant's UNBLUR ..." << std::endl;
 		else if (do_motioncor2)
 			std::cout << " Correcting beam-induced motions using Shawn Zheng's MOTIONCOR2 ..." << std::endl;
@@ -67,7 +69,9 @@ void MotioncorrRunnerMpi::run()
 			progress_bar(imic);
 
 		bool result;
-		if (do_unblur)
+		if (do_own)
+			result = executeOwnMotionCorrection(fn_micrographs[imic], xshifts, yshifts);
+		else if (do_unblur)
 			result = executeUnblur(fn_micrographs[imic], xshifts, yshifts);
 		else if (do_motioncor2)
 			result = executeMotioncor2(fn_micrographs[imic], xshifts, yshifts, node->rank);

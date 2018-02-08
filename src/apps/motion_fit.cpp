@@ -68,12 +68,14 @@ int main(int argc, char *argv[])
         for (int y = 0; y < test.data.ydim; y++)
         for (int x = 0; x < test.data.xdim; x++)
         {
-            DIRECT_NZYX_ELEM(f0(), 0, 0, y, x) = (RFLOAT)DIRECT_NZYX_ELEM(test(), 0, 0, y, x);
-            DIRECT_NZYX_ELEM(f1(), 0, 0, y, x) = (RFLOAT)DIRECT_NZYX_ELEM(test(), 1, 0, y, x);
+            int yy = test.data.ydim - y - 1;
+
+            DIRECT_NZYX_ELEM(f0(), 0, 0, y, x) = (RFLOAT)DIRECT_NZYX_ELEM(test(), 0, 0, yy, x);
+            DIRECT_NZYX_ELEM(f1(), 0, 0, y, x) = (RFLOAT)DIRECT_NZYX_ELEM(test(), 1, 0, yy, x);
         }
 
-        VtkHelper::writeVTK(f0, "debug/f0_short.vtk");
-        VtkHelper::writeVTK(f1, "debug/f1_short.vtk");
+        VtkHelper::writeVTK(f0, "debug/f0_flip.vtk");
+        VtkHelper::writeVTK(f1, "debug/f0_flip.vtk");
 
         return 0;
     }*/
