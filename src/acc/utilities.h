@@ -72,7 +72,7 @@ static void translate(int block_size,
 	int dz=0)
 {
 	if(in.getAccPtr()==out.getAccPtr())
-		CRITICAL(UNSAFEPOINTERREUSE);
+		CRITICAL(ERRUNSAFEOBJECTREUSE);
 #ifdef CUDA
 int BSZ = ( (int) ceilf(( float)in.getxyz() /(float)block_size));
 

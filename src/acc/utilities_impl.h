@@ -314,7 +314,7 @@ static void TranslateAndNormCorrect(MultidimArray<RFLOAT > &img_in,
 	//LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 
 	if(temp.getAccPtr()==img_out.getAccPtr())
-		CRITICAL(UNSAFEPOINTERREUSE);
+		CRITICAL(ERRUNSAFEOBJECTREUSE);
 #ifdef CUDA
 	int BSZ = ( (int) ceilf(( float)temp.getSize() /(float)BLOCK_SIZE));
 	if (DATA3D)
