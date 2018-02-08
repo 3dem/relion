@@ -276,12 +276,13 @@ static void scanOnDevice(AccPtr<T> &in, AccPtr<T> &out)
 #endif
 }
 
-static void makeNoiseImage(
-		XFLOAT sigmaFudgeFactor,
-		MultidimArray<RFLOAT > sigmaNoiseSpectra,
-		long int seed,
-		CudaFFT transformer,
-		AccPtr<XFLOAT> &RandomImage);
+static void TranslateAndNormCorrect(MultidimArray<RFLOAT > &img_in,
+		AccPtr<XFLOAT> &img_out,
+		XFLOAT normcorr,
+		RFLOAT xOff,
+		RFLOAT yOff,
+		RFLOAT zOff,
+		bool DATA3D);
 
 static void softMaskBackgroundValue(
 		int inblock_dim, 

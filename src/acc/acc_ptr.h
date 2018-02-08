@@ -493,6 +493,16 @@ public:
 	}
 
 	/**
+	 * Initiate all used memory with provided value
+	 */
+	void allInit(int value)
+	{
+		hostInit(value);
+		if (accType == accCUDA)
+			deviceInit(value);
+	}
+
+	/**
 	 * Copy a number (size) of bytes to device stored in the host pointer
 	 */
 	void cpToDevice()

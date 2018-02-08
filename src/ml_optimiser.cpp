@@ -2569,11 +2569,6 @@ void MlOptimiser::iterate()
 void MlOptimiser::expectation()
 {
 
-#ifdef CUDA
-		int devCount;
-		HANDLE_ERROR(cudaProfilerStart());
-#endif
-
 //#define DEBUG_EXP
 #ifdef DEBUG_EXP
 	std::cerr << "Entering expectation" << std::endl;
@@ -2963,12 +2958,6 @@ void MlOptimiser::expectation()
 #ifdef DEBUG_EXP
 	std::cerr << "Expectation: done " << std::endl;
 #endif
-
-#ifdef CUDA
-	HANDLE_ERROR(cudaProfilerStop());
-	exit(0);
-#endif
-
 
 }
 

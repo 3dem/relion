@@ -3,12 +3,12 @@
 
 #include "src/acc/acc_ptr.h"
 #include "src/acc/data_types.h"
+#include "src/acc/acc_helper_functions.h"
 #ifdef CUDA
 #include "src/acc/cuda/cuda_kernels/helper.cuh"
 #include "src/acc/cuda/cuda_kernels/wavg.cuh"
 #include "src/acc/cuda/cuda_kernels/diff2.cuh"
 #include "src/acc/cuda/cuda_fft.h"
-
 #else
 #include "src/acc/cpu/cpu_kernels/helper.h"
 #include "src/acc/cpu/cpu_kernels/wavg.h"
@@ -215,13 +215,25 @@ void dump_triple_array(char *name, double *ptr, double *ptr2, double *ptr3, size
 
 namespace AccUtilities
 {
-	
-static void makeNoiseImage(XFLOAT sigmaFudgeFactor,
-		MultidimArray<RFLOAT > sigmaNoiseSpectra,
+template <class MlClass>
+void makeNoiseImage(XFLOAT sigmaFudgeFactor,
+		MultidimArray<RFLOAT > &sigmaNoiseSpectra,
 		long int seed,
-		CudaFFT transformer,
+		MlClass *accMLO,
 		AccPtr<XFLOAT> &RandomImage)
 {
+    // Different MPI-distributed subsets may otherwise have different instances of the random noise below,
+    // because work is on an on-demand basis and therefore variable with the timing of distinct nodes...
+    // Have the seed based on the part_id, so that each particle has a different instant of the noise
+    init_random_generator(seed);
+
+    // Make a holder for the spectral profile and copy to the GPU
+    // AccDataTypes::Image<XFLOAT> NoiseSpectra(sigmaNoiseSpectra, ptrFactory);
+    AccPtr<XFLOAT> NoiseSpectra = RandomImage.make<XFLOAT>(sigmaNoiseSpectra.nzyxdim);
+    NoiseSpectra.allAlloc();
+
+    FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(sigmaNoiseSpectra)
+            NoiseSpectra[n] = (XFLOAT)sqrt(sigmaFudgeFactor*sigmaNoiseSpectra.data[n]);
 
 #ifdef CUDA
     // Set up states to seeda and run randomization on the GPU
@@ -229,16 +241,8 @@ static void makeNoiseImage(XFLOAT sigmaFudgeFactor,
     AccPtr<curandState> RandomStates = RandomImage.make<curandState>(RND_BLOCK_NUM*RND_BLOCK_SIZE);
     RandomStates.deviceAlloc();
 
-    // Make a holder for the spectral profile and copy to the GPU
-    //AccDataTypes::Image<XFLOAT> NoiseSpectra(sigmaNoiseSpectra, ptrFactory);
-    AccPtr<XFLOAT> d_NoiseSpectra = RandomImage.make<XFLOAT>(sigmaNoiseSpectra.nzyxdim);
-    d_NoiseSpectra.allAlloc();
-
-    FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(sigmaNoiseSpectra)
-            d_NoiseSpectra[n] = (XFLOAT)sqrt(sigmaFudgeFactor*sigmaNoiseSpectra.data[n]);
-
-    d_NoiseSpectra.cpToDevice();
-    d_NoiseSpectra.streamSync();
+    NoiseSpectra.cpToDevice();
+    NoiseSpectra.streamSync();
 
     // Initialize randomization by particle ID, like on the CPU-side
     cuda_kernel_initRND<<<RND_BLOCK_NUM,RND_BLOCK_SIZE>>>(
@@ -247,26 +251,132 @@ static void makeNoiseImage(XFLOAT sigmaFudgeFactor,
 
     // Create noise image with the correct spectral profile
     cuda_kernel_RNDnormalDitributionComplexWithPowerModulation<<<RND_BLOCK_NUM,RND_BLOCK_SIZE>>>(
-                                    ~transformer.fouriers,
+                                    ~accMLO->transformer1.fouriers,
                                     ~RandomStates,
-                                    transformer.xFSize,
-                                    ~d_NoiseSpectra);
+									accMLO->transformer1.xFSize,
+                                    ~NoiseSpectra);
 
     //LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 
     // Transform to real-space, to get something which look like
     // the particle image without actual signal (a particle)
-    transformer.backward();
+    accMLO->transformer1.backward();
 
     // Copy the randomized image to A separate device-array, so that the
     // transformer can be used to set up the actual particle image
-    transformer.reals.cpOnDevice(~RandomImage);
+    accMLO->transformer1.reals.cpOnDevice(~RandomImage);
     //cudaMLO->transformer1.reals.streamSync();
 #else
-	//CPU-option
+
+    // Create noise image with the correct spectral profile
+    CpuKernels::RNDnormalDitributionComplexWithPowerModulation(accMLO->transformer1.fouriers(), accMLO->transformer1.xFSize, NoiseSpectra);
+
+    // Transform to real-space, to get something which look like
+	// the particle image without actual signal (a particle)
+    accMLO->transformer1.backward();
+
+	// Copy the randomized image to A separate device-array, so that the
+	// transformer can be used to set up the actual particle image
+	for(int i=0; i<RandomImage.getSize(); i++)
+		RandomImage[i]=accMLO->transformer1.reals[i];
+
 #endif
 }
 
+static void TranslateAndNormCorrect(MultidimArray<RFLOAT > &img_in,
+		AccPtr<XFLOAT> &img_out,
+		XFLOAT normcorr,
+		RFLOAT xOff,
+		RFLOAT yOff,
+		RFLOAT zOff,
+		bool DATA3D)
+{
+	//Temporary array because translate is out-of-place
+	AccPtr<XFLOAT> temp = img_out.make<XFLOAT>(img_in.nzyxdim);
+	temp.allAlloc();
+
+	for (int i = 0; i < img_in.nzyxdim; i++)
+		temp[i] = (XFLOAT) img_in.data[i];
+
+	temp.cpToDevice();
+	temp.streamSync();
+
+	// Apply the norm_correction term
+	if (normcorr!=1)
+	{
+#ifdef CUDA
+		int BSZ = ( (int) ceilf(( float)temp.getSize() /(float)BLOCK_SIZE));
+		CudaKernels::cuda_kernel_multi<XFLOAT><<<BSZ,BLOCK_SIZE,0,temp.getStream()>>>(temp(),normcorr,temp.getSize());
+#else
+		CpuKernels::cpu_kernel_multi<XFLOAT>(temp(),normcorr, temp.getSize());
+#endif
+	}
+	//LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
+
+	if(temp.getAccPtr()==img_out.getAccPtr())
+		CRITICAL(UNSAFEPOINTERREUSE);
+#ifdef CUDA
+	int BSZ = ( (int) ceilf(( float)temp.getSize() /(float)BLOCK_SIZE));
+	if (DATA3D)
+		CudaKernels::cuda_kernel_translate3D<XFLOAT><<<BSZ,BLOCK_SIZE,0,temp.getStream()>>>(temp(),img_out(),img_in.zyxdim,img_in.xdim,img_in.ydim,img_in.zdim,xOff,yOff,zOff);
+	else
+		CudaKernels::cuda_kernel_translate2D<XFLOAT><<<BSZ,BLOCK_SIZE,0,temp.getStream()>>>(temp(),img_out(),img_in.zyxdim,img_in.xdim,img_in.ydim,xOff,yOff);
+	//LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
+#else
+	if (DATA3D)
+		CpuKernels::cpu_translate3D<XFLOAT>(temp(),img_out(),img_in.zyxdim,img_in.xdim,img_in.ydim,img_in.zdim,xOff,yOff,zOff);
+	else
+		CpuKernels::cpu_translate2D<XFLOAT>(temp(),img_out(),img_in.zyxdim,img_in.xdim,img_in.ydim,xOff,yOff;
+#endif
+}
+template <class MlClass>
+void normalizeAndTransformImage(	AccPtr<XFLOAT> &img_in,
+									MultidimArray<Complex > &img_out,
+									MlClass *accMLO,
+									size_t xSize,
+									size_t ySize,
+									size_t zSize)
+{
+			img_in.cpOnAcc(accMLO->transformer1.reals);
+			runCenterFFT(
+					accMLO->transformer1.reals,
+					(int)accMLO->transformer1.xSize,
+					(int)accMLO->transformer1.ySize,
+					(int)accMLO->transformer1.zSize,
+					false
+					);
+			accMLO->transformer1.reals.streamSync();
+			accMLO->transformer1.forward();
+			accMLO->transformer1.fouriers.streamSync();
+
+			int FMultiBsize = ( (int) ceilf(( float)accMLO->transformer1.fouriers.getSize()*2/(float)BLOCK_SIZE));
+			AccUtilities::multiply<XFLOAT>(FMultiBsize, BLOCK_SIZE, accMLO->transformer1.fouriers.getStream(),
+							(XFLOAT*)~accMLO->transformer1.fouriers,
+							(XFLOAT)1/((XFLOAT)(accMLO->transformer1.reals.getSize())),
+							accMLO->transformer1.fouriers.getSize()*2);
+			//LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
+
+			AccPtr<ACCCOMPLEX> d_Fimg = img_in.make<ACCCOMPLEX>(xSize * ySize * zSize);
+			d_Fimg.allAlloc();
+			accMLO->transformer1.fouriers.streamSync();
+			windowFourierTransform2(
+					accMLO->transformer1.fouriers,
+					d_Fimg,
+					accMLO->transformer1.xFSize,accMLO->transformer1.yFSize, accMLO->transformer1.zFSize, //Input dimensions
+					xSize, ySize, zSize  //Output dimensions
+					);
+			accMLO->transformer1.fouriers.streamSync();
+
+			d_Fimg.cpToHost();
+			d_Fimg.streamSync();
+			img_out.initZeros(zSize, ySize, xSize);
+			for (int i = 0; i < img_out.nzyxdim; i ++)
+			{
+				img_out.data[i].real = (RFLOAT) d_Fimg[i].x;
+				img_out.data[i].imag = (RFLOAT) d_Fimg[i].y;
+			}
+
+}
 
 static void softMaskBackgroundValue(
 	AccDataTypes::Image<XFLOAT> &vol,
