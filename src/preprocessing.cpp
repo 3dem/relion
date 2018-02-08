@@ -1291,7 +1291,7 @@ MetaDataTable Preprocessing::getCoordinateMetaDataTable(FileName fn_mic)
 							zoff = diffz;
 							MDresult.setValue(EMDL_IMAGE_COORD_Z, zcoord);
 						}
-						MDresult.setValue(EMDL_ORIENT_ORIGIN_Y, zoff);
+						MDresult.setValue(EMDL_ORIENT_ORIGIN_Z, zoff);
 					}
 				} // end if recenter
 			} // end if do_movie_extract
