@@ -7,6 +7,7 @@
 #include <src/complex.h>
 #include <src/jaz/obs_model.h>
 #include <src/jaz/gravis/t2Vector.h>
+#include <src/jaz/parallel_ft.h>
 #include <vector>
 
 class MotionEM
@@ -40,7 +41,7 @@ class MotionEM
             std::vector<double> sig_vel, sig_div;
 
             int threads;
-            std::vector<FourierTransformer> fts_full, fts_pos, fts_vel;
+            std::vector<ParFourierTransformer> fts_full, fts_pos, fts_vel;
 
             int pc, fc,
                 s_full, sh_full,

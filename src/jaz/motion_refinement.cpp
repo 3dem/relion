@@ -116,7 +116,7 @@ std::vector<std::vector<Image<RFLOAT>>> MotionRefinement::movieCC(
         const std::vector<std::vector<Image<Complex> > > &movie,
         const std::vector<double> &sigma2,
         const std::vector<Image<RFLOAT> > &damageWeights,
-        std::vector<FourierTransformer>& fts, int threads)
+        std::vector<ParFourierTransformer>& fts, int threads)
 {
     const int pc = movie.size();
     const int fc = movie[0].size();
@@ -169,9 +169,6 @@ std::vector<std::vector<Image<RFLOAT>>> MotionRefinement::movieCC(
         #pragma omp parallel for num_threads(threads)
         for (int f = 0; f < fc; f++)
         {
-            std::stringstream stsf;
-            stsf << f;
-
             int t = omp_get_thread_num();
 
             for (int y = 0; y < s; y++)

@@ -37,6 +37,7 @@
 #include <src/jaz/motion_em.h>
 #include <src/jaz/local_motion_fit.h>
 #include <src/jaz/gradient_descent.h>
+#include <src/jaz/parallel_ft.h>
 
 #include <omp.h>
 
@@ -325,7 +326,7 @@ int main(int argc, char *argv[])
 
     std::cout << "mg range: " << g0 << ".." << gc << "\n";
 
-    std::vector<FourierTransformer> fts(nr_omp_threads);
+    std::vector<ParFourierTransformer> fts(nr_omp_threads);
 
     double t0 = omp_get_wtime();
 

@@ -28,6 +28,7 @@
 #include <src/jaz/motion_refinement.h>
 #include <src/jaz/image_op.h>
 #include <src/jaz/refinement_program.h>
+#include <src/jaz/parallel_ft.h>
 
 #include <omp.h>
 
@@ -83,7 +84,7 @@ int CsFit::_run()
 {
     double t0 = omp_get_wtime();
 
-    std::vector<FourierTransformer> fts(nr_omp_threads);
+    std::vector<ParFourierTransformer> fts(nr_omp_threads);
 
     std::vector<double> csVals(samples);
 

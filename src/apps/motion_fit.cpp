@@ -32,6 +32,8 @@
 #include <src/jaz/fsc_helper.h>
 #include <src/jaz/local_motion_fit.h>
 #include <src/jaz/gradient_descent.h>
+#include <src/jaz/distribution_helper.h>
+#include <src/jaz/parallel_ft.h>
 
 #include <src/jaz/motion_em.h>
 
@@ -48,7 +50,7 @@ class MotionFitProg : public RefinementProgram
                 sig_pos, sig_vel, sig_div, sig_acc,
                 sig_cutoff, k_cutoff;
         bool evaluate, preextracted, nogain;
-        std::string meta_path;
+        std::string meta_path, bin_type_str;
         StackHelper::BinningType binType;
 
         void readMoreOptions(IOParser& parser, int argc, char *argv[]);
@@ -76,6 +78,37 @@ int main(int argc, char *argv[])
 
         VtkHelper::writeVTK(f0, "debug/f0_flip.vtk");
         VtkHelper::writeVTK(f1, "debug/f0_flip.vtk");
+
+        return 0;
+    }*/
+
+    /*{
+
+        const int fc = 38;
+        const int s = 384;
+        const int sh = s/2 + 1;
+
+        std::vector<Image<Complex>> test(fc);
+
+        Image<RFLOAT> real(384,384);
+
+        FourierTransformer ft;
+
+        for (int i = 0; i < 3; i++)
+        {
+            for (int f = 0; f < fc; f++)
+            {
+                for (int y = 0; y < s; y++)
+                for (int x = 0; x < s; x++)
+                {
+                    real(y,x) = DistributionHelper::sampleGauss(0,sqrt((double)fc));
+                }
+
+                ft.FourierTransform(real(), test[f]());
+            }
+
+            StackHelper::varianceNormalize(test, false);
+        }
 
         return 0;
     }*/
@@ -113,18 +146,18 @@ void MotionFitProg::readMoreOptions(IOParser& parser, int argc, char *argv[])
     bin = textToInteger(parser.getOption("--bin", "Binning level for optimization and output (e.g. 2 for 2x2)", "1"));
     coords_bin = textToInteger(parser.getOption("--cbin", "Binning level of input coordinates", "1"));
     movie_bin = textToInteger(parser.getOption("--mbin", "Binning level of input movies", "1"));
-    std::string binTypeStr = parser.getOption("--bintype", "Binning method (box, gauss or fourier)", "box");
+    bin_type_str = parser.getOption("--bintype", "Binning method (box, gauss or fourier)", "box");
 
     nogain = parser.checkOption("--nogain", "Ignore gain reference");
 
     meta_path = parser.getOption("--meta", "Path to per-movie metadata star files", "");
 
-    if (binTypeStr == "box") binType = StackHelper::BoxBin;
-    else if (binTypeStr == "gauss") binType = StackHelper::GaussBin;
-    else if (binTypeStr == "fourier") binType = StackHelper::FourierCrop;
+    if (bin_type_str == "box") binType = StackHelper::BoxBin;
+    else if (bin_type_str == "gauss") binType = StackHelper::GaussBin;
+    else if (bin_type_str == "fourier") binType = StackHelper::FourierCrop;
     else
     {
-        REPORT_ERROR("Illegal binning type: " + binTypeStr + " (supported: box, gauss or fourier)");
+        REPORT_ERROR("Illegal binning type: " + bin_type_str + " (supported: box, gauss or fourier)");
     }
 }
 
@@ -139,7 +172,7 @@ int MotionFitProg::_run()
     const long g0 = minMG;
 
     int fc;
-    std::vector<FourierTransformer> fts(nr_omp_threads);
+    std::vector<ParFourierTransformer> fts(nr_omp_threads);
 
     if (preextracted)
     {
@@ -172,7 +205,7 @@ int MotionFitProg::_run()
     {
         std::vector<std::vector<Image<Complex>>> movie = StackHelper::extractMovieStackFS(
             &mdts[0], meta_path, imgPath, bin, coords_bin, movie_bin, s,
-            fts, !nogain, binType, false, debug);
+            nr_omp_threads, !nogain, binType, false, debug);
 
         fc = movie[0].size();
     }
@@ -212,6 +245,8 @@ int MotionFitProg::_run()
         }
     }
 
+    Image<RFLOAT> debugImg(s,s);
+
     for (long g = g0; g <= gc; g++)
     {
         std::cout << "micrograph " << g << " / " << mdts.size() <<"\n";
@@ -230,14 +265,24 @@ int MotionFitProg::_run()
             {
                 movie = StackHelper::loadMovieStackFS(
                     &mdts[g], imgPath, false, nr_omp_threads, &fts);
+
+                Image<RFLOAT> img00r(s,s);
+                fts[0].inverseFourierTransform(movie[0][0](), img00r());
+                VtkHelper::writeVTK(img00r, "debug/img00_old.vtk");
             }
             else
             {
                 movie = StackHelper::extractMovieStackFS(
                     &mdts[g], meta_path, imgPath,
                     bin, coords_bin, movie_bin, s,
-                    fts, !nogain, binType,
+                    nr_omp_threads, !nogain, binType,
                     true, debug);
+
+                #pragma omp parallel for num_threads(nr_omp_threads)
+                for (int p = 0; p < pc; p++)
+                {
+                    StackHelper::varianceNormalize(movie[p], false);
+                }
             }
         }
         catch (RelionError XE)
@@ -280,11 +325,6 @@ int MotionFitProg::_run()
         std::vector<std::vector<Image<RFLOAT>>> movieCC = MotionRefinement::movieCC(
                 projectors[0], projectors[1], obsModel, mdts[g], movie,
                 sigma2, dmgWeight, fts, nr_omp_threads);
-
-        {
-            VtkHelper::write(movieCC[0], "debug/cc_0.vtk");
-            VtkHelper::write(movieCC[1], "debug/cc_1.vtk");
-        }
 
         std::vector<std::vector<gravis::d2Vector>> tracks(pc);
 

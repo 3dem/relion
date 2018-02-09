@@ -25,7 +25,7 @@ class NoiseHelper
 
         static void testVariance(Image<double> img);
         static void testColorVariance(Image<double> img, std::vector<double> sig2);
-        static void testPerseval();
+        static void testParseval();
 
 
 

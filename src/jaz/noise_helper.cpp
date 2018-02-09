@@ -763,7 +763,7 @@ void NoiseHelper::testColorVariance(Image<double> img, std::vector<double> sig2)
 
 }
 
-void NoiseHelper::testPerseval()
+void NoiseHelper::testParseval()
 {
     const int s = 512;
     const int sh = s/2+1;

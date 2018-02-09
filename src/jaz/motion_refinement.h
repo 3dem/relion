@@ -11,6 +11,7 @@
 #include <src/jaz/gravis/t2Matrix.h>
 #include <src/jaz/gravis/t3Vector.h>
 #include <src/jaz/obs_model.h>
+#include <src/jaz/parallel_ft.h>
 #include <vector>
 
 class ParticleMotionFit : public Optimization
@@ -72,7 +73,7 @@ class MotionRefinement
                 const std::vector<std::vector<Image<Complex>>>& movie,
                 const std::vector<double>& sigma2,
                 const std::vector<Image<RFLOAT>>& damageWeights,
-                std::vector<FourierTransformer>& fts, int threads);
+                std::vector<ParFourierTransformer>& fts, int threads);
 
         static std::vector<gravis::d2Vector> getGlobalTrack(
                 const std::vector<std::vector<Image<RFLOAT>>>& movieCC);

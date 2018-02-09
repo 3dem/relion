@@ -367,19 +367,17 @@ Image<Complex> FilterHelper::cropCorner2D(const Image<Complex>& img, int w, int 
     const int w1 = img.data.xdim;
     const int h1 = img.data.ydim;
 
-    if (w > w1 || h > h1) return img;
-
     Image<Complex> out(w,h);
 
     for (int y = 0; y < h1; y++)
     for (int x = 0; x < w1; x++)
     {
-        int x1 = x < w1/2? x : x - w1;
+        int x1 = x;
         int y1 = y < h1/2? y : y - h1;
 
-        if (x1 < w/2 && y1 < h/2 && x1 >= -w/2 && y1 >= -h/2)
+        if (x1 < w && y1 < h/2 && y1 >= -h/2)
         {
-            int x0 = x1 < 0? x1 + w : x1;
+            int x0 = x1;
             int y0 = y1 < 0? y1 + h : y1;
 
             DIRECT_A2D_ELEM(out.data, y0, x0) = DIRECT_A2D_ELEM(img.data, y, x);

@@ -9,6 +9,7 @@
 #include <src/fftw.h>
 #include <src/micrograph_model.h>
 #include <src/jaz/resampling_helper.h>
+#include <src/jaz/parallel_ft.h>
 
 #include <omp.h>
 
@@ -101,7 +102,7 @@ std::vector<Image<RFLOAT> > StackHelper::loadStack(const MetaDataTable* mdt, std
 }
 
 std::vector<Image<Complex> > StackHelper::loadStackFS(const MetaDataTable *mdt, std::string path,
-                                                     int threads, std::vector<FourierTransformer> *fts)
+                                                     int threads, std::vector<ParFourierTransformer> *fts)
 {
     std::vector<Image<Complex> > out(mdt->numberOfObjects());
     const long ic = mdt->numberOfObjects();
@@ -209,7 +210,7 @@ std::vector<std::vector<Image<RFLOAT> > > StackHelper::loadMovieStack(const Meta
 std::vector<std::vector<Image<Complex> > > StackHelper::loadMovieStackFS(const MetaDataTable* mdt,
                                                                          std::string moviePath,
                                                                          bool center, int threads,
-                                                                         std::vector<FourierTransformer> *fts)
+                                                                         std::vector<ParFourierTransformer> *fts)
 {
     std::vector<std::vector<Image<Complex> > > out(mdt->numberOfObjects());
     const long pc = mdt->numberOfObjects();
@@ -283,7 +284,7 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
     const MetaDataTable *mdt,
     std::string metaPath, std::string moviePath,
     int outBin, int coordsBin, int movieBin, int squareSize,
-    std::vector<FourierTransformer>& fts,
+    int threads,
     bool useGain, BinningType binningType,
     bool loadData, bool verbose)
 {
@@ -301,7 +302,7 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
         std::cout << "ending: " << ending << "\n";
     }
 
-    Image<RFLOAT> mgStack;
+    Image<float> mgStack;
 
     if (ending == "star")
     {
@@ -415,13 +416,14 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
                                      + ") are of unequal size ("+stsg.str()+" vs. "+stsm.str()+").");
                     }
 
+                    #pragma omp parallel for num_threads(threads)
                     for (int n = 0; n < mgStack().ndim; n++)
                     for (int z = 0; z < mgStack().zdim; z++)
                     for (int y = 0; y < mgStack().ydim; y++)
                     for (int x = 0; x < mgStack().xdim; x++)
                     {
                         DIRECT_NZYX_ELEM(mgStack(), n, z, y, x)
-                            /= DIRECT_NZYX_ELEM(gainRef(), 0, 0, y, x);
+                            *= DIRECT_NZYX_ELEM(gainRef(), 0, 0, y, x);
                     }
                 }
             }
@@ -479,44 +481,29 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
         std::cout << "frame count = " << fc << "\n";
     }
 
+    const int sqMg = squareSize * outBin / movieBin;
 
-    double mean = 0.0, var = 0.0, valScale = 1.0;
+    std::vector<ParFourierTransformer> fts(threads);
 
-    if (loadData)
+    std::vector<Image<RFLOAT>> aux0(threads), aux1(threads);
+    std::vector<Image<Complex>> aux2(threads);
+
+    for (int t = 0; t < threads; t++)
     {
-        for (int n = 0; n < mgStack().ndim; n++)
-        for (int z = 0; z < mgStack().zdim; z++)
-        for (int y = 0; y < mgStack().ydim; y++)
-        for (int x = 0; x < mgStack().xdim; x++)
+        aux0[t] = Image<RFLOAT>(sqMg, sqMg);
+
+        if (outBin != movieBin)
         {
-            mean += DIRECT_NZYX_ELEM(mgStack(), n, z, y, x);
-        }
-
-        mean /= (mgStack().xdim * mgStack().ydim * mgStack().zdim * mgStack().ndim);
-
-        for (int n = 0; n < mgStack().ndim; n++)
-        for (int z = 0; z < mgStack().zdim; z++)
-        for (int y = 0; y < mgStack().ydim; y++)
-        for (int x = 0; x < mgStack().xdim; x++)
-        {
-            double d = DIRECT_NZYX_ELEM(mgStack(), n, z, y, x) - mean;
-            var += d*d;
-        }
-
-        var /= (mgStack().xdim * mgStack().ydim * mgStack().zdim * mgStack().ndim - 1);
-
-        // scale data so that the average over all frames for a binned pixel has unit variance:
-        valScale = sqrt((fc * outBin * outBin) / (var * movieBin * movieBin));
-
-        if (verbose)
-        {
-            std::cout << "mean = " << mean << "\n";
-            std::cout << "var = " << var << "\n";
-            std::cout << "val. scale = " << valScale << "\n";
+            if (binningType == FourierCrop)
+            {
+                aux2[t] = Image<Complex>(sqMg/2+1,sqMg);
+            }
+            else
+            {
+                aux1[t] = Image<RFLOAT>(squareSize, squareSize);
+            }
         }
     }
-
-    const int sqMg = squareSize * outBin / movieBin;
 
     for (long p = 0; p < pc; p++)
     {
@@ -532,26 +519,15 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
         const double xpo = (int)(outBin * xp0 / coordsBin) - squareSize/2;
         const double ypo = (int)(outBin * yp0 / coordsBin) - squareSize/2;
 
-        /*const double xpm = xp0 * coordsBin / (double)movieBin - sqMg/2;
-        const double ypm = yp0 * coordsBin / (double)movieBin - sqMg/2;*/
-
         const int x0 = xpo * outBin / movieBin;
         const int y0 = ypo * outBin / movieBin;
-
-        const int threads = fts.size();
 
         #pragma omp parallel for num_threads(threads)
         for (long f = 0; f < fc; f++)
         {
-            int threadnum = omp_get_thread_num();
-
-            Image<RFLOAT> aux0(sqMg, sqMg), aux1(squareSize, squareSize);
-            Image<Complex> aux2;
+            int t = omp_get_thread_num();
 
             // @TODO: read whole-image shifts from micrograph class
-
-            /*const int x0 = (int)(xpm);
-            const int y0 = (int)(ypm);*/
 
             for (long int y = 0; y < sqMg; y++)
             for (long int x = 0; x < sqMg; x++)
@@ -565,35 +541,35 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
                 if (yy < 0) yy = 0;
                 else if (yy >= h0) yy = h0 - 1;
 
-                RFLOAT val0 = DIRECT_NZYX_ELEM(mgStack.data, nsc*f, zsc*f, yy, xx);
-                RFLOAT val = -valScale * (val0 - mean);
-
-                DIRECT_NZYX_ELEM(aux0.data, 0, 0, y, x) = val;
+                RFLOAT val = DIRECT_NZYX_ELEM(mgStack.data, nsc*f, zsc*f, yy, xx);
+                DIRECT_NZYX_ELEM(aux0[t].data, 0, 0, y, x) = -val;
             }
 
             if (outBin == movieBin)
             {
-                fts[threadnum].FourierTransform(aux0(), out[p][f]());
+                fts[t].FourierTransform(aux0[t](), out[p][f]());
             }
             else if (binningType != FourierCrop)
             {
                 if (binningType == BoxBin)
                 {
-                    ResamplingHelper::downsampleBox2D(aux0, outBin/(double)movieBin, aux1);
+                    ResamplingHelper::downsampleBox2D(aux0[t], outBin/(double)movieBin, aux1[t]);
                 }
                 else if (binningType == GaussBin)
                 {
-                    ResamplingHelper::downsampleGauss2D(aux0, outBin/(double)movieBin, aux1);
+                    ResamplingHelper::downsampleGauss2D(aux0[t], outBin/(double)movieBin, aux1[t]);
                 }
 
-                fts[threadnum].FourierTransform(aux1(), out[p][f]());
+                fts[t].FourierTransform(aux1[t](), out[p][f]());
             }
             else
             {
-                fts[threadnum].FourierTransform(aux0(), aux2());
+                fts[t].FourierTransform(aux0[t](), aux2[t]());
 
-                out[p][f] = FilterHelper::cropCorner2D(aux2, squareSize, squareSize);
+                out[p][f] = FilterHelper::cropCorner2D(aux2[t], squareSize/2+1, squareSize);
             }
+
+            out[p][f](0,0) = Complex(0.0,0.0);
         }
     }
 
@@ -762,6 +738,54 @@ std::vector<Image<Complex> > StackHelper::applyBeamTiltPar(std::vector<Image<Com
 
     return out;
 
+}
+
+void StackHelper::varianceNormalize(std::vector<Image<Complex>>& movie, bool circleCropped)
+{
+    const int fc = movie.size();
+    const int w = movie[0].data.xdim;
+    const int h = movie[0].data.ydim;
+    const int wt = 2*(w-1);
+
+    double var = 0.0;
+    double cnt = 0.0;
+
+    const double rr = (w-2)*(w-2);
+
+    for (int f = 0; f < fc; f++)
+    {
+        for (int y = 0; y < h; y++)
+        for (int x = 0; x < w; x++)
+        {
+            if (x == 0 && y == 0) continue;
+
+            if (circleCropped)
+            {
+                const double yy = y < w? y : y - h;
+                const double xx = x;
+
+                if (xx*xx + yy*yy > rr) continue;
+            }
+
+            double scale = x > 0? 2.0 : 1.0;
+
+            var += scale * movie[f](y,x).norm();
+            cnt += scale;
+        }
+    }
+
+    const double scale = sqrt(wt*h*var/(cnt*fc));
+
+    //std::cout << "scale: " << scale << "\n";
+
+    for (int f = 0; f < fc; f++)
+    {
+        for (int y = 0; y < h; y++)
+        for (int x = 0; x < w; x++)
+        {
+            movie[f](y,x) /= scale;
+        }
+    }
 }
 
 std::vector<double> StackHelper::powerSpectrum(const std::vector<std::vector<Image<Complex>>> &stack)

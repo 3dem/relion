@@ -37,6 +37,7 @@
 #include <src/jaz/motion_em.h>
 #include <src/jaz/local_motion_fit.h>
 #include <src/jaz/gradient_descent.h>
+#include <src/jaz/parallel_ft.h>
 
 #include <omp.h>
 
@@ -382,7 +383,7 @@ int main(int argc, char *argv[])
     std::cout << "fc = " << fc << "\n";
     std::cout << "mg range: " << g0 << ".." << gc << "\n";
 
-    std::vector<FourierTransformer> fts(nr_omp_threads);
+    std::vector<ParFourierTransformer> fts(nr_omp_threads);
     std::vector<Image<RFLOAT> > tables(nr_omp_threads),
             weights0(nr_omp_threads), weights1(nr_omp_threads);
 
