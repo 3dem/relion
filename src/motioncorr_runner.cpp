@@ -26,6 +26,44 @@
 #include "src/matrix2d.h"
 #include "src/matrix1d.h"
 
+#define TIMING
+#ifdef TIMING
+	#define RCTIC(label) (timer.tic(label))
+	#define RCTOC(label) (timer.toc(label))
+
+	Timer timer;
+	int TIMING_READ_GAIN = timer.setNew("read gain");
+	int TIMING_READ_MOVIE = timer.setNew("read movie");
+	int TIMING_APPLY_GAIN = timer.setNew("apply gain");
+	int TIMING_INITIAL_SUM = timer.setNew("initial sum");
+	int TIMING_DETECT_HOT = timer.setNew("detect hot pixels");
+	int TIMING_GLOBAL_FFT = timer.setNew("global FFT");
+	int TIMING_GLOBAL_ALIGNMENT = timer.setNew("global alignment");
+	int TIMING_GLOBAL_IFFT = timer.setNew("global iFFT");
+	int TIMING_PREP_PATCH = timer.setNew("prepare patch");
+	int TIMING_CLIP_PATCH = timer.setNew("prepare patch - real space clip");
+	int TIMING_PATCH_FFT = timer.setNew("prepare patch - FFT");
+	int TIMING_PATCH_ALIGN = timer.setNew("patch alignment");
+	int TIMING_PREP_WEIGHT = timer.setNew("align - prep weight");
+	int TIMING_MAKE_REF = timer.setNew("align - make reference");
+	int TIMING_CCF_CALC = timer.setNew("align - calc CCF");
+	int TIMING_CCF_IFFT = timer.setNew("align - iFFT CCF");
+	int TIMING_CCF_RECENTRE = timer.setNew("align - recentre CCF");
+	int TIMING_CCF_FIND_MAX = timer.setNew("align - argmax CCF");
+	int TIMING_FOURIER_SHIFT = timer.setNew("align - shift in Fourier space");
+	int TIMING_FIT_POLYNOMIAL = timer.setNew("fit polynomial");
+	int TIMING_DOSE_WEIGHTING = timer.setNew("dose weighting");
+	int TIMING_DW_WEIGHT = timer.setNew("dose weighting - calc weight");
+	int TIMING_DW_IFFT = timer.setNew("dose weighting - iFFT");
+	int TIMING_REAL_SPACE_INTERPOLATION = timer.setNew("real space interpolation");
+	int TIMING_BINNING = timer.setNew("binning");
+//	int TIMING_ = timer.setNew("");
+
+#else
+	#define RCTIC(timer,label)
+	#define RCTOC(timer,label)
+#endif
+
 void MotioncorrRunner::read(int argc, char **argv, int rank)
 {
 
@@ -278,7 +316,9 @@ void MotioncorrRunner::run()
 	// Make a logfile with the shifts in pdf format and write output STAR files
 	generateLogFilePDFAndWriteStarFiles();
 
-
+#ifdef TIMING
+        timer.printTimes(false);
+#endif
 }
 
 bool MotioncorrRunner::executeMotioncor2(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts, int rank)
@@ -864,20 +904,25 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 	xshifts.resize(n_frames);
 	yshifts.resize(n_frames);
 
+	RCTIC(TIMING_READ_GAIN);
 	if (fn_gain_reference != "") {
 		Igain.read(fn_gain_reference);
 		if (XSIZE(Igain()) != nx || YSIZE(Igain()) != ny) {
 			REPORT_ERROR("The size of the image and the size of the gain reference do not match.");
 		}
 	}
+	RCTOC(TIMING_READ_GAIN);
 
 	// Read images
+	RCTIC(TIMING_READ_MOVIE);
 	#pragma omp parallel for
 	for (int iframe = 0; iframe < n_frames; iframe++) {
 		Iframes[iframe].read(fn_mic, true, frames[iframe]);
 	}
+	RCTOC(TIMING_READ_MOVIE);
 
 	// Apply gain
+	RCTIC(TIMING_APPLY_GAIN);
 	if (fn_gain_reference != "") {
 		for (int iframe = 0; iframe < n_frames; iframe++) {
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Igain()) {
@@ -885,18 +930,22 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 			}
 		}
 	}
+	RCTOC(TIMING_APPLY_GAIN);
 
 	MultidimArray<RFLOAT> Iframe(ny, nx);
 	Iframe.initZeros();
 
 	// Simple unaligned sum
+	RCTIC(TIMING_INITIAL_SUM);
 	for (int iframe = 0; iframe < n_frames; iframe++) {
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iframe) {
 			DIRECT_MULTIDIM_ELEM(Iframe, n) += DIRECT_MULTIDIM_ELEM(Iframes[iframe](), n);
 		}
 	}
+	RCTOC(TIMING_INITIAL_SUM);
 
 	// Hot pixel
+	RCTIC(TIMING_DETECT_HOT);
 	RFLOAT mean = 0, std = 0;
 	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iframe) {
 		mean += DIRECT_MULTIDIM_ELEM(Iframe, n);
@@ -920,19 +969,25 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 		}
 	}
 	std::cout << "Detected " << n_bad << " hot pixels to be corrected. (BUT correction not implemented yet)" << std::endl;
+	RCTOC(TIMING_DETECT_HOT);
 	// TODO: fix defects
 
-	// FFT	
+	// FFT
+	RCTIC(TIMING_GLOBAL_FFT);
 	for (int iframe = 0; iframe < n_frames; iframe++) {
 		transformer.FourierTransform(Iframes[iframe](), Fframes[iframe]);
 	}
+	RCTOC(TIMING_GLOBAL_FFT);
 
 	// Global alignment
+	RCTIC(TIMING_GLOBAL_ALIGNMENT);
 	alignPatch(Fframes, nx, ny, xshifts, yshifts);
+	RCTOC(TIMING_GLOBAL_ALIGNMENT);
 
 	std::cout << "Global alignment done." << std::endl;	
 	Iref().reshape(Iframes[0]());
 	Iref().initZeros();
+	RCTIC(TIMING_GLOBAL_IFFT);
 	for (int iframe = 0; iframe < n_frames; iframe++) {
 		transformer.inverseFourierTransform(Fframes[iframe], Iframes[iframe]());
 #ifdef DEBUG
@@ -941,6 +996,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 		}
 #endif
 	}
+	RCTOC(TIMING_GLOBAL_IFFT);
 
 	// Patch based alignment
 	std::cout << "Full Size: X = " << nx << " Y = " << ny << std::endl;
@@ -964,16 +1020,26 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 			ipatch++;
 
 			std::vector<float> local_xshifts(n_frames), local_yshifts(n_frames);
+			RCTIC(TIMING_PREP_PATCH);
 			MultidimArray<RFLOAT> Iframe(y_end - y_start + 1, x_end - x_start + 1);
 			for (int iframe = 0; iframe < n_frames; iframe++) {
+				RCTIC(TIMING_CLIP_PATCH);
 				for (int ipy = y_start; ipy < y_end; ipy++) {
 					for (int ipx = x_start; ipx < x_end; ipx++) {
 						DIRECT_A2D_ELEM(Iframe, ipy - y_start, ipx - x_start) = DIRECT_A2D_ELEM(Iframes[iframe](), ipy, ipx);
 					}
 				}
+				RCTOC(TIMING_CLIP_PATCH);
+
+				RCTIC(TIMING_PATCH_FFT);
 				transformer.FourierTransform(Iframe, Fpatches[iframe]);
+				RCTOC(TIMING_PATCH_FFT);
 			}
+			RCTOC(TIMING_PREP_PATCH);
+			
+			RCTIC(TIMING_PATCH_ALIGN);
 			bool converged = alignPatch(Fpatches, x_end - x_start + 1, y_end - y_start + 1, local_xshifts, local_yshifts);
+			RCTOC(TIMING_PATCH_ALIGN);
 			if (!converged) continue;
 
 			for (int iframe = 0; iframe < n_frames; iframe++) {
@@ -990,6 +1056,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 	// Fit polynomial model
 
 	// TODO: outlier rejection
+	RCTIC(TIMING_FIT_POLYNOMIAL);
 	const int n_obs = patch_frames.size();
 	const int n_params = 18;
 	Matrix2D <RFLOAT> matA(n_obs, n_params);
@@ -1057,8 +1124,10 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 	}
 	rms_x = std::sqrt(rms_x / n_obs); rms_y = std::sqrt(rms_y / n_obs);
 	std::cout << "Polynomial fit RMSD X = " << rms_x << " px, Y = " << rms_y << " px" << std::endl;
+	RCTOC(TIMING_FIT_POLYNOMIAL);
 
 	// Dose weighting
+	RCTIC(TIMING_DOSE_WEIGHTING);
 	if (do_dose_weighting) {
 		std::cout << "WARNING: Dose weighting not tested yet!!!" << std::endl;
 		if (std::abs(voltage - 300) > 2 && std::abs(voltage - 200) > 2) {
@@ -1074,14 +1143,20 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 			}
 		}
 
+		RCTIC(TIMING_DW_WEIGHT);
 		doseWeighting(Fframes, doses);
+		RCTOC(TIMING_DW_WEIGHT);
 
 		// Update real space images
+		RCTIC(TIMING_DW_IFFT);
 		for (int iframe = 0; iframe < n_frames; iframe++) {
 			transformer.inverseFourierTransform(Fframes[iframe], Iframes[iframe]());
 		}
+		RCTOC(TIMING_DW_IFFT);
 	}
+	RCTOC(TIMING_DOSE_WEIGHTING);
 
+	RCTIC(TIMING_REAL_SPACE_INTERPOLATION);
 	std::cout << "Real space interpolation: ";
 	Iref().initZeros();
 	for (int iframe = 0; iframe < n_frames; iframe++) {
@@ -1134,11 +1209,14 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 		}
 	}
 	std::cout << " done" << std::endl;
+	RCTOC(TIMING_REAL_SPACE_INTERPOLATION);
 	
 	// Apply binning
+	RCTIC(TIMING_BINNING);
 	if (bin_factor != 1) {
 		binNonSquareImage(Iref, bin_factor);
 	}
+	RCTOC(TIMING_BINNING);
 	
 	// Final output
 	FileName fn_avg, fn_mov;
@@ -1182,6 +1260,7 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes,
 
 	// Initialize B factor weight
 	weight.reshape(Fref);
+	RCTIC(TIMING_PREP_WEIGHT);
 	#pragma omp parallel for
 	for (int y = 0; y < nfy; y++) {
 		int ly = y;
@@ -1193,8 +1272,10 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes,
 			DIRECT_A2D_ELEM(weight, y, x) = exp(- 2 * dist2 * bfactor); // 2 for Fref and Fframe
 		}
 	}
+	RCTOC(TIMING_PREP_WEIGHT);
 
 	for (int iter = 1; iter	<= max_iter; iter++) {
+		RCTIC(TIMING_MAKE_REF);
 		Fref.initZeros();
 		#pragma omp parallel for 
 		for (int iframe = 0; iframe < n_frames; iframe++) {
@@ -1207,24 +1288,38 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes,
 		Icc.write("ref.spi");
 		std::cout << "Done Fref." << std::endl;
 #endif
+		RCTOC(TIMING_MAKE_REF);
 
 		for (int iframe = 0; iframe < n_frames; iframe++) {
 			Fcc.initZeros();
 			
+			RCTIC(TIMING_CCF_CALC);
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fcc) {
 				DIRECT_MULTIDIM_ELEM(Fcc, n) = (DIRECT_MULTIDIM_ELEM(Fref, n) - DIRECT_MULTIDIM_ELEM(Fframes[iframe], n)) * 
 				                                DIRECT_MULTIDIM_ELEM(Fframes[iframe], n).conj() * DIRECT_MULTIDIM_ELEM(weight, n);
 			}
+			RCTOC(TIMING_CCF_CALC);
 
+			RCTIC(TIMING_CCF_IFFT);
 			transformer.inverseFourierTransform(Fcc, Icc());
+			RCTOC(TIMING_CCF_IFFT);
+			
+			RCTIC(TIMING_CCF_RECENTRE);
 			CenterFFT(Icc(), false); // TODO: Remove for performance
 			Icc().setXmippOrigin();
+			RCTOC(TIMING_CCF_RECENTRE);
 
+			RCTIC(TIMING_CCF_FIND_MAX);
 			RFLOAT maxval = -9999;
 			int posx, posy;
 			for (int y = -search_range; y < search_range; y++) {
+				int iy = y;
+//				if (y < 0) iy = pny - y;
 				for (int x = -search_range; x < search_range; x++) {
-					RFLOAT val = A2D_ELEM(Icc(), y, x);
+					int ix = x;
+//					if (x < 0) ix = pnx - x;
+					RFLOAT val = A2D_ELEM(Icc(), iy, ix);
+//					std::cout << "(x, y) = " << x << ", " << y << ", (ix, iy) = " << ix << " , " << iy << " val = " << val << std::endl;
 					if (val > maxval) {
 						posx = x; posy = y;
 						maxval = val;
@@ -1232,27 +1327,36 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes,
 				}
 			}
 
+			int ipx_n = posx - 1, ipx = posx, ipx_p = posx + 1, ipy_n = posy - 1, ipy = posy, ipy_p = posy + 1;
+/*			if (ipx_n < 0) ipx_n = pnx - ipx_n;
+			if (ipx < 0) ipx = pnx - ipx;
+			if (ipx_p < 0) ipx_p = pnx - ipx_p;
+			if (ipy_n < 0) ipy_n = pny - ipy_n;
+			if (ipy < 0) ipy = pny - ipy;
+			if (ipy_p < 0) ipy_p = pny - ipy_p;
+*/
 			// Quadratic interpolation by Jasenko
 			RFLOAT vp, vn;
-			vp = A2D_ELEM(Icc(), posy, posx + 1);
-			vn = A2D_ELEM(Icc(), posy, posx - 1);
+			vp = A2D_ELEM(Icc(), ipy, ipx_p);
+			vn = A2D_ELEM(Icc(), ipy, ipx_n);
  			if (std::abs(vp + vn - 2.0 * maxval) > EPS) {
 				cur_xshifts[iframe] = posx - 0.5 * (vp - vn) / (vp + vn - 2.0 * maxval);
 			} else {
 				cur_xshifts[iframe] = posx;
 			}
 
-			vp = A2D_ELEM(Icc(), posy + 1, posx);
-			vn = A2D_ELEM(Icc(), posy - 1, posx);
+			vp = A2D_ELEM(Icc(), ipy_p, ipx);
+			vn = A2D_ELEM(Icc(), ipy_n, ipx);
  			if (std::abs(vp + vn - 2.0 * maxval) > EPS) {
 				cur_yshifts[iframe] = posy - 0.5 * (vp - vn) / (vp + vn - 2.0 * maxval);
 			} else {
 				cur_yshifts[iframe] = posy;
 			}
-#ifdef DEBUG
-			Icc.write("test.spi");
+//#ifdef DEBUG
+			//Icc.write("test.spi");
 			std::cout << "Frame " << 1 + iframe << ": raw shift x = " << posx << " y = " << posy << " cc = " << maxval << " interpolated x = " << cur_xshifts[iframe] << " y = " << cur_yshifts[iframe] << std::endl;
-#endif
+//#endif
+			RCTOC(TIMING_CCF_FIND_MAX);
 		}
 
 		// Set origin
@@ -1273,10 +1377,12 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes,
 
 		// Apply shifts
 		// Since the image is not necessarily square, we cannot use the method in fftw.cpp
+		RCTIC(TIMING_FOURIER_SHIFT);
 		#pragma omp parallel for
 		for (int iframe = 1; iframe < n_frames; iframe++) {
 			shiftNonSquareImageInFourierTransform(Fframes[iframe], -cur_xshifts[iframe] / pnx, -cur_yshifts[iframe] / pny);
 		}
+		RCTOC(TIMING_FOURIER_SHIFT);
 
 		// Test convergence
 		RFLOAT rmsd = std::sqrt((x_sumsq + y_sumsq) / n_frames);
