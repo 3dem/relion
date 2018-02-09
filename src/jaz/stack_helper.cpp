@@ -337,14 +337,6 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 
         std::string mgEnd = mgName0.substr(mgName0.find_last_of(".")+1);
 
-        bool flipy = false;
-
-        if (mgEnd == "tiff")
-        {
-            std::cout << "Tiff ending detected - flipping y-axis.\n";
-            flipy = true;
-        }
-
         std::string mgNameAct, gainNameAct;
 
         if (moviePath == "")
@@ -362,20 +354,6 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
         }
 
         mgStack.read(mgNameAct, loadData);
-
-        if (flipy)
-        {
-            for (int n = 0; n < mgStack.data.ndim; n++)
-            for (int z = 0; z < mgStack.data.zdim; z++)
-            for (int y = 0; y < mgStack.data.ydim/2; y++)
-            for (int x = 0; x < mgStack.data.xdim; x++)
-            {
-                int yy = mgStack.data.ydim - y - 1;
-                RFLOAT sw = DIRECT_NZYX_ELEM(mgStack(), n, z, yy, x);
-                DIRECT_NZYX_ELEM(mgStack(), n, z, yy, x) = DIRECT_NZYX_ELEM(mgStack(), n, z, y, x);
-                DIRECT_NZYX_ELEM(mgStack(), n, z, y, x) = sw;
-            }
-        }
 
         if (useGain)
         {
