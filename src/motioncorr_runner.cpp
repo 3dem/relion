@@ -1305,8 +1305,8 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes,
 			RCTOC(TIMING_CCF_IFFT);
 			
 			RCTIC(TIMING_CCF_RECENTRE);
-			CenterFFT(Icc(), false); // TODO: Remove for performance
-			Icc().setXmippOrigin();
+//			CenterFFT(Icc(), false);
+//			Icc().setXmippOrigin();
 			RCTOC(TIMING_CCF_RECENTRE);
 
 			RCTIC(TIMING_CCF_FIND_MAX);
@@ -1314,10 +1314,11 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes,
 			int posx, posy;
 			for (int y = -search_range; y < search_range; y++) {
 				int iy = y;
-//				if (y < 0) iy = pny - y;
+				if (y < 0) iy = pny + y;
+
 				for (int x = -search_range; x < search_range; x++) {
 					int ix = x;
-//					if (x < 0) ix = pnx - x;
+					if (x < 0) ix = pnx + x;
 					RFLOAT val = A2D_ELEM(Icc(), iy, ix);
 //					std::cout << "(x, y) = " << x << ", " << y << ", (ix, iy) = " << ix << " , " << iy << " val = " << val << std::endl;
 					if (val > maxval) {
@@ -1328,13 +1329,13 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes,
 			}
 
 			int ipx_n = posx - 1, ipx = posx, ipx_p = posx + 1, ipy_n = posy - 1, ipy = posy, ipy_p = posy + 1;
-/*			if (ipx_n < 0) ipx_n = pnx - ipx_n;
-			if (ipx < 0) ipx = pnx - ipx;
-			if (ipx_p < 0) ipx_p = pnx - ipx_p;
-			if (ipy_n < 0) ipy_n = pny - ipy_n;
-			if (ipy < 0) ipy = pny - ipy;
-			if (ipy_p < 0) ipy_p = pny - ipy_p;
-*/
+			if (ipx_n < 0) ipx_n = pnx + ipx_n;
+			if (ipx < 0) ipx = pnx + ipx;
+			if (ipx_p < 0) ipx_p = pnx + ipx_p;
+			if (ipy_n < 0) ipy_n = pny + ipy_n;
+			if (ipy < 0) ipy = pny + ipy;
+			if (ipy_p < 0) ipy_p = pny + ipy_p;
+
 			// Quadratic interpolation by Jasenko
 			RFLOAT vp, vn;
 			vp = A2D_ELEM(Icc(), ipy, ipx_p);
@@ -1352,10 +1353,10 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes,
 			} else {
 				cur_yshifts[iframe] = posy;
 			}
-//#ifdef DEBUG
-			//Icc.write("test.spi");
+#ifdef DEBUG
+			Icc.write("test.spi");
 			std::cout << "Frame " << 1 + iframe << ": raw shift x = " << posx << " y = " << posy << " cc = " << maxval << " interpolated x = " << cur_xshifts[iframe] << " y = " << cur_yshifts[iframe] << std::endl;
-//#endif
+#endif
 			RCTOC(TIMING_CCF_FIND_MAX);
 		}
 
