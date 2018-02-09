@@ -58,7 +58,7 @@ void Preprocessing::read(int argc, char **argv, int rank)
 	recenter_x = textToFloat(parser.getOption("--recenter_x", "X-coordinate (in pixel inside the reference) to recenter re-extracted data on", "0."));
 	recenter_y = textToFloat(parser.getOption("--recenter_y", "Y-coordinate (in pixel inside the reference) to recenter re-extracted data on", "0."));
 	recenter_z = textToFloat(parser.getOption("--recenter_z", "Z-coordinate (in pixel inside the reference) to recenter re-extracted data on", "0."));
-	set_angpix = textToFloat(parser.getOption("--set_angpix", "Manually set pixel size in Angstroms (only necessary if magnification and detector pixel size are not in the input STAR file)", "-1."));
+	set_angpix = textToFloat(parser.getOption("--set_angpix", "Manually set pixel size in Angstroms (only necessary if magnification and detector pixel size are not in the input micrograph STAR file)", "-1."));
 
 	int extract_section = parser.addSection("Particle extraction");
 	do_extract = parser.checkOption("--extract", "Extract all particles from the micrographs");
@@ -183,9 +183,9 @@ void Preprocessing::initialise()
 				std::cout << " + Using pixel size from input STAR file of " << angpix << " Angstroms" << std::endl;
 
 		}
-		else if (do_recenter)
+		else if (do_recenter || fn_data != "")
 		{
-			REPORT_ERROR("Preprocessing:: ERROR: cannot --recenter  without providing angpix info in the input STAR file or using --set_angpix!");
+			REPORT_ERROR("Preprocessing:: ERROR: cannot use --recenter or --reextract_data_star without providing angpix info in the input micrograph STAR file or by using --set_angpix!");
 		}
 
 		if (fn_data != "")
@@ -1188,14 +1188,18 @@ MetaDataTable Preprocessing::getCoordinateMetaDataTable(FileName fn_mic)
 		REPORT_ERROR("Preprocessing::initialise ERROR: input _data.star should contain rlnMagnification and rlnDetectorPixelSize.");
 	}
 
-	RFLOAT mag2, dstep2, angpix2;
+	RFLOAT mag2, dstep2, angpix2, rescale_fndata = 1.0;
 	if (MDresult.numberOfObjects() > 0)
 	{
 		MDresult.goToObject(0);
-		MDresult.getValue(EMDL_CTF_MAGNIFICATION, mag2);
-		MDresult.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep2);
-		angpix2 = 10000. * dstep2 / mag2;
-		RFLOAT rescale_fndata = (do_movie_extract) ? 1.0 : angpix2 / angpix;
+
+		if (!do_movie_extract && (MDresult.containsLabel(EMDL_CTF_MAGNIFICATION) && MDresult.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE)))
+		{
+			MDresult.getValue(EMDL_CTF_MAGNIFICATION, mag2);
+			MDresult.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep2);
+			angpix2 = 10000. * dstep2 / mag2;
+			rescale_fndata = angpix2 / angpix;
+		}
 
 		bool do_contains_xy = (MDresult.containsLabel(EMDL_ORIENT_ORIGIN_X) && MDresult.containsLabel(EMDL_ORIENT_ORIGIN_Y));
 		bool do_contains_z = (MDresult.containsLabel(EMDL_ORIENT_ORIGIN_Z));
@@ -1223,7 +1227,7 @@ MetaDataTable Preprocessing::getCoordinateMetaDataTable(FileName fn_mic)
 				MDresult.getValue(EMDL_ORIENT_PSI, psi);
 				MDresult.getValue(EMDL_ORIENT_ORIGIN_X, xoff);
 				MDresult.getValue(EMDL_ORIENT_ORIGIN_Y, yoff);
-
+				std::cerr << " xoff= " << xoff << " yoff= " << yoff << std::endl;
 				MDresult.setValue(EMDL_ORIENT_ROT_PRIOR, rot);
 				MDresult.setValue(EMDL_ORIENT_TILT_PRIOR, tilt);
 				MDresult.setValue(EMDL_ORIENT_PSI_PRIOR, psi);
@@ -1291,7 +1295,7 @@ MetaDataTable Preprocessing::getCoordinateMetaDataTable(FileName fn_mic)
 							zoff = diffz;
 							MDresult.setValue(EMDL_IMAGE_COORD_Z, zcoord);
 						}
-						MDresult.setValue(EMDL_ORIENT_ORIGIN_Y, zoff);
+						MDresult.setValue(EMDL_ORIENT_ORIGIN_Z, zoff);
 					}
 				} // end if recenter
 			} // end if do_movie_extract

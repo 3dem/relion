@@ -848,6 +848,12 @@ void lowPassFilterMap(MultidimArray<Complex > &FT, int ori_size,
 void lowPassFilterMap(MultidimArray<RFLOAT > &img, RFLOAT low_pass, RFLOAT angpix, int filter_edge_width = 2);
 void highPassFilterMap(MultidimArray<RFLOAT > &img, RFLOAT low_pass, RFLOAT angpix, int filter_edge_width = 2);
 
+// Directional filter a map (given it's Fourier transform)
+void directionalFilterMap(MultidimArray<Complex > &FT, int ori_size,
+		RFLOAT low_pass, RFLOAT angpix, std::string axis = "x", int filter_edge_width = 2);
+void directionalFilterMap(MultidimArray<RFLOAT > &img, RFLOAT low_pass, RFLOAT angpix, std::string axis = "x", int filter_edge_width = 2);
+
+
 /*
  *  Beamtilt x and y are given in mradians
  *  Wavelength in Angstrom, Cs in mm

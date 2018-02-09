@@ -339,7 +339,7 @@ void MlModel::read(FileName fn_in)
 
 }
 
-void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bild)
+void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bild, bool only_write_images)
 {
 
 	MetaDataTable MDclass, MDgroup, MDlog, MDsigma, MDbodies;
@@ -381,10 +381,10 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
     {
     	Image<RFLOAT> img;
     	// Set correct voxel size in the header
-    	img.setSamplingRateInHeader(pixel_size);
     	for (int iclass = 0; iclass < nr_classes_bodies; iclass++)
     	{
        		img() = Iref[iclass];
+    		img.setSamplingRateInHeader(pixel_size);
     		if (nr_bodies > 1)
     		{
     			fn_tmp.compose(fn_out+"_body", iclass+1, "mrc", 3);
@@ -436,6 +436,9 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
     	}
 
 	}
+
+    if (only_write_images)
+    	return;
 
     // B. Write STAR file with metadata
     fn_tmp = fn_out + "_model.star";
@@ -875,8 +878,8 @@ void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool als
 			REPORT_ERROR("ERROR: the mask " + fn_mask + " has values outside the range [0,1]");
 
 		Imask().setXmippOrigin();
-		Imask.setSamplingRateInHeader(pixel_size);
 		masks_bodies[nr_bodies] = Imask();
+		Imask.setSamplingRateInHeader(pixel_size);
 		// find center-of-mass for rotations around it
 		int mydim = Imask().getDim();
 		Matrix1D<RFLOAT> com(mydim);

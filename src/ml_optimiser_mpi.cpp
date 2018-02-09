@@ -3141,21 +3141,25 @@ void MlOptimiserMpi::iterate()
 			}
 			MPI_Barrier(MPI_COMM_WORLD);
 
+			// Directly use fn_out, without "_it" specifier, so unmasked refs will be overwritten at every iteration
+			if (do_write_unmasked_refs && node->rank == 1)
+				mymodel.write(fn_out+"_unmasked", sampling, false, true);
+
 			// Mask the reconstructions to get rid of noisy solvent areas
 			// Skip masking upon convergence (for validation purposes)
 #ifdef TIMING
-		        timer.tic(TIMING_SOLVFLAT);
+		    timer.tic(TIMING_SOLVFLAT);
 #endif
-		        if (do_solvent && !has_converged)
-			        solventFlatten();
+		    if (do_solvent && !has_converged)
+		    	solventFlatten();
 #ifdef TIMING
-		        timer.toc(TIMING_SOLVFLAT);
-         		timer.tic(TIMING_UPDATERES);
+		    timer.toc(TIMING_SOLVFLAT);
+		    timer.tic(TIMING_UPDATERES);
 #endif
-		        // Re-calculate the current resolution, do this before writing to get the correct values in the output files
-		        updateCurrentResolution();
+         	// Re-calculate the current resolution, do this before writing to get the correct values in the output files
+		    updateCurrentResolution();
 #ifdef TIMING
-		        timer.toc(TIMING_UPDATERES);
+		    timer.toc(TIMING_UPDATERES);
 #endif
 
 			// If we are joining random halves, then do not write an optimiser file so that it cannot be restarted!
