@@ -1312,13 +1312,12 @@ void MotioncorrRunner::doseWeighting(std::vector<MultidimArray<Complex> > &Ffram
 		int ly = y;
 		if (y > nfy_half) ly = y - nfy;
 
-		RFLOAT dinv2 = ly * ly / nfy2;
+		const RFLOAT ly2 = (RFLOAT)ly * ly / nfy2;
 		for (int x = 0; x < nfx; x++) {
-			dinv2 += x * x / nfx2;
+			const RFLOAT dinv2 = ly2 + (RFLOAT)x * x / nfx2;
 			const RFLOAT dinv = std::sqrt(dinv2) / angpix; // d = N * angpix / dist, thus dinv = dist / N / angpix
-			const RFLOAT Ne = (A * std::pow(dinv, B) + C) * 0.5; // Eq. 3. 0.5 comes from Eq. 5
+			const RFLOAT Ne = (A * std::pow(dinv, B) + C) * 2; // Eq. 3. 2 comes from Eq. 5
 			RFLOAT sum_weight_sq = 0;
-//			std::cout << " Ne = " << Ne << " lx = " << x << " ly = " << ly << " reso = " << 1 / dinv << std::endl;
 
 			for (int iframe = 0; iframe < n_frames; iframe++) {
 				const RFLOAT weight = std::exp(- doses[iframe] / Ne); // Eq. 5. 0.5 is factored out to Ne.
@@ -1332,7 +1331,7 @@ void MotioncorrRunner::doseWeighting(std::vector<MultidimArray<Complex> > &Ffram
 			sum_weight_sq = std::sqrt(sum_weight_sq);
 			if (isnan(sum_weight_sq)) {
 				std::cout << " Ne = " << Ne << " lx = " << x << " ly = " << ly << " reso = " << 1 / dinv << " sum_weight_sq NaN" << std::endl;
-				REPORT_ERROR("1");
+				REPORT_ERROR("Shouldn't happen.");
 			}
 			for (int iframe = 0; iframe < n_frames; iframe++) {
 				DIRECT_A2D_ELEM(Fframes[iframe], y, x) /= sum_weight_sq; // Eq. 9
