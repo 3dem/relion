@@ -45,7 +45,7 @@ class CsFit : public RefinementProgram
         int sectors, samples;
         RFLOAT defocusRange;
 
-        void readMoreOptions(IOParser& parser, int argc, char *argv[]);
+        int readMoreOptions(IOParser& parser, int argc, char *argv[]);
         int _init();
         int _run();
 };
@@ -65,7 +65,7 @@ CsFit::CsFit()
 : RefinementProgram(true)
 {}
 
-void CsFit::readMoreOptions(IOParser& parser, int argc, char *argv[])
+int CsFit::readMoreOptions(IOParser& parser, int argc, char *argv[])
 {
     aniso = parser.checkOption("--aniso", "Anisotropic C_s");
     range = textToFloat(parser.getOption("--range", "C_s scan range", "0.5"));

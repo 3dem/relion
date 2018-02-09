@@ -5,10 +5,11 @@
 #include <src/jaz/stack_helper.h>
 #include <src/jaz/vtk_helper.h>
 
-RefinementProgram::RefinementProgram(bool singleReference)
+RefinementProgram::RefinementProgram(bool singleReference, bool doesMovies)
 :   singleReference(singleReference),
     noReference(false),
-    noTilt(false)
+    noTilt(false),
+    doesMovies(doesMovies)
 {
 }
 
@@ -37,7 +38,23 @@ int RefinementProgram::init(int argc, char *argv[])
         maskFn = parser.getOption("--mask", "Reference mask", "");
         fscFn = parser.getOption("--f", "Input STAR file with the FSC of the reference", "");
         outPath = parser.getOption("--out", "Output path");
-        imgPath = parser.getOption("--img", "Path to images", "");
+
+        if (doesMovies)
+        {
+            imgPath = parser.getOption("--mov", "Path to movies", "");
+            preextracted = parser.checkOption("--preex", "Preextracted movie stacks");
+            meta_path = parser.getOption("--meta", "Path to per-movie metadata star files", "");
+            nogain = parser.checkOption("--nogain", "Ignore gain reference");
+
+            bin = textToInteger(parser.getOption("--bin", "Binning level for optimization and output (e.g. 2 for 2x2)", "1"));
+            coords_bin = textToInteger(parser.getOption("--cbin", "Binning level of input coordinates", "1"));
+            movie_bin = textToInteger(parser.getOption("--mbin", "Binning level of input movies", "1"));
+            bin_type_str = parser.getOption("--bintype", "Binning method (box, gauss or fourier)", "fourier");
+        }
+        else
+        {
+            imgPath = parser.getOption("--img", "Path to images", "");
+        }
 
         angpix = textToFloat(parser.getOption("--angpix", "Pixel resolution (angst/pix)", "0.0"));
         paddingFactor = textToFloat(parser.getOption("--pad", "Padding factor", "2"));
@@ -59,9 +76,21 @@ int RefinementProgram::init(int argc, char *argv[])
 
         debug = parser.checkOption("--debug", "Write debugging data");
 
-        readMoreOptions(parser, argc, argv);
+        int rco = readMoreOptions(parser, argc, argv);
+        if (rco != 0) return rco;
 
         if (parser.checkForErrors()) return 1;
+
+        if (doesMovies)
+        {
+            if (bin_type_str == "box") binType = StackHelper::BoxBin;
+            else if (bin_type_str == "gauss") binType = StackHelper::GaussBin;
+            else if (bin_type_str == "fourier") binType = StackHelper::FourierCrop;
+            else
+            {
+                REPORT_ERROR("Illegal binning type: " + bin_type_str + " (supported: box, gauss or fourier)");
+            }
+        }
     }
     catch (RelionError XE)
     {

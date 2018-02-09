@@ -15,6 +15,7 @@
 #include <src/backprojector.h>
 
 #include <src/jaz/obs_model.h>
+#include <src/jaz/stack_helper.h>
 
 #include <omp.h>
 
@@ -22,17 +23,25 @@ class RefinementProgram
 {
     public:
 
-        RefinementProgram(bool singleReference = false);
+        RefinementProgram(bool singleReference = false, bool doesMovies = false);
 
             // options:
 
-            bool singleReference, debug, applyTilt, useFsc, noReference, noTilt;
+            bool singleReference, debug, applyTilt, useFsc,
+                noReference, noTilt, doesMovies, preextracted, nogain;
 
             long maxMG, minMG;
-            RFLOAT angpix, paddingFactor, beamtilt_x, beamtilt_y;
-            int nr_omp_threads;
 
-            std::string starFn, reconFn0, reconFn1, maskFn, outPath, imgPath, fscFn;
+            RFLOAT angpix, paddingFactor, beamtilt_x, beamtilt_y;
+
+            int nr_omp_threads, bin, coords_bin, movie_bin;
+
+            std::string
+                starFn, reconFn0, reconFn1, maskFn,
+                outPath, imgPath, fscFn,
+                meta_path, bin_type_str;
+
+            StackHelper::BinningType binType;
 
             // data:
 
@@ -46,14 +55,14 @@ class RefinementProgram
             RFLOAT Cs, lambda, kV;
             ObservationModel obsModel;
 
-            int s, sh;
+            int s, sh, fc;
             long g0, gc;
 
 
         int init(int argc, char *argv[]);
         int run();
 
-        virtual void readMoreOptions(IOParser& parser, int argc, char *argv[]) {}
+        virtual int readMoreOptions(IOParser& parser, int argc, char *argv[]) {}
         virtual int _init(){return 0;}
         virtual int _run() = 0;
 };

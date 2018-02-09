@@ -45,15 +45,15 @@ class MotionFitProg : public RefinementProgram
 {
     public:
 
-        int evalFrames, bin, coords_bin, movie_bin;
-        RFLOAT dmga, dmgb, dmgc, totalDose,
+        MotionFitProg();
+
+            int evalFrames;
+            RFLOAT dmga, dmgb, dmgc, totalDose,
                 sig_pos, sig_vel, sig_div, sig_acc,
                 sig_cutoff, k_cutoff;
-        bool evaluate, preextracted, nogain;
-        std::string meta_path, bin_type_str;
-        StackHelper::BinningType binType;
+            bool evaluate;
 
-        void readMoreOptions(IOParser& parser, int argc, char *argv[]);
+        int readMoreOptions(IOParser& parser, int argc, char *argv[]);
         int _init();
         int _run();
 };
@@ -122,7 +122,12 @@ int main(int argc, char *argv[])
     if (rc1 != 0) return rc1;
 }
 
-void MotionFitProg::readMoreOptions(IOParser& parser, int argc, char *argv[])
+MotionFitProg::MotionFitProg()
+:   RefinementProgram(false, true)
+{
+}
+
+int MotionFitProg::readMoreOptions(IOParser& parser, int argc, char *argv[])
 {
     dmga = textToFloat(parser.getOption("--dmg_a", "Damage model, parameter a", " 3.40"));
     dmgb = textToFloat(parser.getOption("--dmg_b", "                        b", "-1.06"));
@@ -140,25 +145,6 @@ void MotionFitProg::readMoreOptions(IOParser& parser, int argc, char *argv[])
 
     evalFrames = textToInteger(parser.getOption("--eval", "Measure FSC for this many initial frames", "0"));
     evaluate = evalFrames > 0;
-
-    preextracted = parser.checkOption("--preex", "Preextracted movie stacks");
-
-    bin = textToInteger(parser.getOption("--bin", "Binning level for optimization and output (e.g. 2 for 2x2)", "1"));
-    coords_bin = textToInteger(parser.getOption("--cbin", "Binning level of input coordinates", "1"));
-    movie_bin = textToInteger(parser.getOption("--mbin", "Binning level of input movies", "1"));
-    bin_type_str = parser.getOption("--bintype", "Binning method (box, gauss or fourier)", "box");
-
-    nogain = parser.checkOption("--nogain", "Ignore gain reference");
-
-    meta_path = parser.getOption("--meta", "Path to per-movie metadata star files", "");
-
-    if (bin_type_str == "box") binType = StackHelper::BoxBin;
-    else if (bin_type_str == "gauss") binType = StackHelper::GaussBin;
-    else if (bin_type_str == "fourier") binType = StackHelper::FourierCrop;
-    else
-    {
-        REPORT_ERROR("Illegal binning type: " + bin_type_str + " (supported: box, gauss or fourier)");
-    }
 }
 
 int MotionFitProg::_init()
@@ -171,7 +157,6 @@ int MotionFitProg::_run()
     const long gc = maxMG >= 0? maxMG : mdts.size()-1;
     const long g0 = minMG;
 
-    int fc;
     std::vector<ParFourierTransformer> fts(nr_omp_threads);
 
     if (preextracted)
@@ -265,10 +250,6 @@ int MotionFitProg::_run()
             {
                 movie = StackHelper::loadMovieStackFS(
                     &mdts[g], imgPath, false, nr_omp_threads, &fts);
-
-                Image<RFLOAT> img00r(s,s);
-                fts[0].inverseFourierTransform(movie[0][0](), img00r());
-                VtkHelper::writeVTK(img00r, "debug/img00_old.vtk");
             }
             else
             {

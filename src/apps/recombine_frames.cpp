@@ -37,13 +37,107 @@
 #include <src/jaz/motion_em.h>
 #include <src/jaz/local_motion_fit.h>
 #include <src/jaz/gradient_descent.h>
+#include <src/jaz/refinement_program.h>
 #include <src/jaz/parallel_ft.h>
 
 #include <omp.h>
 
 using namespace gravis;
 
+class FrameRecomb : public RefinementProgram
+{
+    public:
+
+        FrameRecomb();
+
+            RFLOAT dmga, dmgb, dmgc, totalDose;
+
+            bool perMgBFacs, globBfac, hybridBfac,
+                dataWeight, writeNumbers, fccOnly, writeWeights, eval,
+                hasRef, hasCC;
+
+            int k0, k1;
+
+            std::string trackFn, fccFn;
+
+        int readMoreOptions(IOParser& parser, int argc, char *argv[]);
+        int _init();
+        int _run();
+};
+
 int main(int argc, char *argv[])
+{
+    FrameRecomb mt;
+
+    int rc0 = mt.init(argc, argv);
+    if (rc0 != 0) return rc0;
+
+    int rc1 = mt.run();
+    if (rc1 != 0) return rc1;
+}
+
+FrameRecomb::FrameRecomb()
+: RefinementProgram(false, true)
+{}
+
+int FrameRecomb::readMoreOptions(IOParser& parser, int argc, char *argv[])
+{
+    trackFn = parser.getOption("--t", "Input tracks", "");
+    fccFn = parser.getOption("--cc", "Input MRC file of per-micrograph Fourier cross-correlations (for global B-factors)", "");
+    writeWeights = parser.checkOption("--write_weights", "Write out freq. weights instead of normalizing them");
+
+    k0 = textToInteger(parser.getOption("--k0", "Min. frequency used in B-factor fit", "20"));
+    k1 = textToInteger(parser.getOption("--k1", "Max. frequency used in B-factor fit", "100"));
+
+    dmga = textToFloat(parser.getOption("--dmg_a", "Damage model, parameter a", " 2.9"));
+    dmgb = textToFloat(parser.getOption("--dmg_b", "                        b", "-1.1"));
+    dmgc = textToFloat(parser.getOption("--dmg_c", "                        c", "-1.2"));
+
+    totalDose = textToFloat(parser.getOption("--dose", "Total electron dose (in e^-/A^2)", "0"));
+
+    dataWeight = parser.checkOption("--data_weight", "Use FCC as a weight");
+    writeNumbers = parser.checkOption("--write_numbers", "Write B/k-factors to bfacs/");
+    fccOnly = parser.checkOption("--fcc_only", "Only compute the global FCC");
+    eval = parser.checkOption("--eval", "Evaluate recombined images");
+    globBfac = parser.checkOption("--global", "Use global B/k-factors");
+    hybridBfac = parser.checkOption("--hybrid", "Use hybrid B/k-factors");
+
+    hasCC = (fccFn != "");
+    hasRef = (reconFn0 != "" && reconFn1 != "");
+
+    if (!hasCC && !hasRef)
+    {
+        std::cout << "Either a CC map for global B-factors (--cc) or an initial reconstruction for per-micrograph B-factors (--m) is required.\n";
+        return 666;
+    }
+
+    if (eval && !hasRef)
+    {
+        std::cout << "A reference is required for evaluation (--eval).\n";
+        return 667;
+    }
+
+    if (globBfac && !hasCC)
+    {
+        std::cout << "An FCC is required for global B/k-factors (--global).\n";
+        return 667;
+    }
+
+    if (hybridBfac && !(hasCC && hasRef))
+    {
+        std::cout << "Both an FCC and a reference are required for hybrid B/k-factors (--hybrid).\n";
+        return 667;
+    }
+
+    noReference = !hasRef;
+}
+
+int FrameRecomb::_init()
+{
+    return 0;
+}
+
+int FrameRecomb::_run()
 {
     /*{
         std::string tag = "0-1529";
@@ -82,182 +176,18 @@ int main(int argc, char *argv[])
         return 0;
     }*/
 
-    std::string starFn, reconFn0, reconFn1, maskFn, trackFn, moviePath, outPath, fccFn;
-
-    bool perMgBFacs, globBfac, hybridBfac,
-            debug, dataWeight, writeNumbers, fccOnly, applyTilt, writeWeights, eval;
-    bool hasRef, hasCC;
-
-    long maxMG = -1, minMG = 0;
-    RFLOAT angpix, paddingFactor, beamtilt_x, beamtilt_y,
-            dmga, dmgb, dmgc, totalDose;
-    int nr_omp_threads, k0, k1;
-
-    IOParser parser;
-
-    try
-    {
-        parser.setCommandLine(argc, argv);
-
-        parser.addSection("General options");
-
-        starFn = parser.getOption("--i", "Input STAR file", "");
-        trackFn = parser.getOption("--t", "Input tracks", "");
-        reconFn0 = parser.getOption("--m0", "Reference, half 1", "");
-        reconFn1 = parser.getOption("--m1", "Reference, half 2", "");
-        maskFn = parser.getOption("--mask", "Reference mask", "");
-        fccFn = parser.getOption("--cc", "Input MRC file of per-micrograph Fourier cross-correlations (for global B-factors)", "");
-        writeWeights = parser.checkOption("--write_weights", "Write out freq. weights instead of normalizing them");
-
-        moviePath = parser.getOption("--movies", "Input path to movie files", "");
-        outPath = parser.getOption("--out", "Output path", "");
-
-        angpix = textToFloat(parser.getOption("--angpix", "Pixel resolution (angst/pix)", "0."));
-        paddingFactor = textToFloat(parser.getOption("--pad", "Padding factor", "2"));
-
-        beamtilt_x = textToFloat(parser.getOption("--beamtilt_x", "Beamtilt in the X-direction (in mrad)", "0."));
-        beamtilt_y = textToFloat(parser.getOption("--beamtilt_y", "Beamtilt in the Y-direction (in mrad)", "0."));
-        applyTilt = (ABS(beamtilt_x) > 0. || ABS(beamtilt_y) > 0.);
-
-        k0 = textToInteger(parser.getOption("--k0", "Min. frequency used in B-factor fit", "20"));
-        k1 = textToInteger(parser.getOption("--k1", "Max. frequency used in B-factor fit", "100"));
-
-        dmga = textToFloat(parser.getOption("--dmg_a", "Damage model, parameter a", " 2.9"));
-        dmgb = textToFloat(parser.getOption("--dmg_b", "                        b", "-1.1"));
-        dmgc = textToFloat(parser.getOption("--dmg_c", "                        c", "-1.2"));
-
-        totalDose = textToFloat(parser.getOption("--dose", "Total electron dose (in e^-/A^2)", "0"));
-
-        nr_omp_threads = textToInteger(parser.getOption("--jomp", "Number of OMP threads", "1"));
-        maxMG = textToInteger(parser.getOption("--max_MG", "first micrograph index", "-1"));
-        minMG = textToInteger(parser.getOption("--min_MG", "last micrograph index", "0"));
-
-        debug = parser.checkOption("--debug", "Write out debug images");
-        dataWeight = parser.checkOption("--data_weight", "Use FCC as a weight");
-        writeNumbers = parser.checkOption("--write_numbers", "Write B/k-factors to bfacs/");
-        fccOnly = parser.checkOption("--fcc_only", "Only compute the global FCC");
-        eval = parser.checkOption("--eval", "Evaluate recombined images");
-        globBfac = parser.checkOption("--global", "Use global B/k-factors");
-        hybridBfac = parser.checkOption("--hybrid", "Use hybrid B/k-factors");
-
-        parser.checkForErrors();
-
-        hasCC = (fccFn != "");
-        hasRef = (reconFn0 != "" && reconFn1 != "");
-
-        if (!hasCC && !hasRef)
-        {
-            std::cout << "Either a CC map for global B-factors (--cc) or an initial reconstruction for per-micrograph B-factors (--m) is required.\n";
-            return 666;
-        }
-
-        if (eval && !hasRef)
-        {
-            std::cout << "A reference is required for evaluation (--eval).\n";
-            return 667;
-        }
-
-        if (globBfac && !hasCC)
-        {
-            std::cout << "An FCC is required for global B/k-factors (--global).\n";
-            return 667;
-        }
-
-        if (hybridBfac && !(hasCC && hasRef))
-        {
-            std::cout << "Both an FCC and a reference are required for hybrid B/k-factors (--hybrid).\n";
-            return 667;
-        }
-    }
-    catch (RelionError XE)
-    {
-        parser.writeUsage(std::cout);
-        std::cerr << XE;
-        exit(1);
-    }
-
-    Image<RFLOAT> map0, map1, dummy;
-    Projector projector0, projector1;
-
     Image<RFLOAT> fcc;
 
     std::vector<Image<RFLOAT>> freqWeights;
     Image<RFLOAT> dmgTable, wghTable;
 
-    if (hasRef)
-    {
-        try
-        {
-            map0.read(reconFn0);
-        }
-        catch (RelionError XE)
-        {
-            std::cout << "Unable to read map: " << reconFn0 << "\n";
-            exit(1);
-        }
-        try
-        {
-            map1.read(reconFn1);
-        }
-        catch (RelionError XE)
-        {
-            std::cout << "Unable to read map: " << reconFn1 << "\n";
-            exit(1);
-        }
-
-        if (map0.data.xdim != map0.data.ydim || map0.data.ydim != map0.data.zdim)
-        {
-            REPORT_ERROR(reconFn0 + " is not cubical.\n");
-        }
-
-        if (map1.data.xdim != map1.data.ydim || map1.data.ydim != map1.data.zdim)
-        {
-            REPORT_ERROR(reconFn1 + " is not cubical.\n");
-        }
-
-        if (   map0.data.xdim != map1.data.xdim
-            || map0.data.ydim != map1.data.ydim
-            || map0.data.zdim != map1.data.zdim)
-        {
-            REPORT_ERROR(reconFn0 + " and " + reconFn1 + " are of unequal size.\n");
-        }
-
-        if (maskFn != "")
-        {
-            std::cout << "masking references...\n";
-            Image<RFLOAT> mask, maskedRef;
-
-            try
-            {
-                mask.read(maskFn);
-            }
-            catch (RelionError XE)
-            {
-                std::cout << "Unable to read mask: " << maskFn << "\n";
-                exit(1);
-            }
-
-            mask.read(maskFn);
-
-            ImageOp::multiply(mask, map0, maskedRef);
-            map0 = maskedRef;
-
-            ImageOp::multiply(mask, map1, maskedRef);
-            map1 = maskedRef;
-        }
-
-        std::cout << "transforming references...\n";
-
-        projector0 = Projector(map0.data.xdim, TRILINEAR, paddingFactor, 10, 2);
-        projector0.computeFourierTransformMap(map0.data, dummy.data, map0.data.xdim);
-
-        projector1 = Projector(map1.data.xdim, TRILINEAR, paddingFactor, 10, 2);
-        projector1.computeFourierTransformMap(map1.data, dummy.data, map1.data.xdim);
-    }
-
     if (hasCC)
     {
-        fcc.read(fccFn);
+        fcc.read(fccFn);        
+
+        sh = fcc.data.xdim;
+        s = 2 * (sh-1);
+        fc = fcc.data.ydim;
 
         if (dataWeight)
         {
@@ -270,82 +200,61 @@ int main(int argc, char *argv[])
             std::pair<std::vector<d2Vector>,std::vector<double>> bkFacs
                     = DamageHelper::fitBkFactors(fcc, k0, k1);
 
-            const int kc = fcc.data.xdim;
-            const int fc = fcc.data.ydim;
+            freqWeights = DamageHelper::computeWeights(bkFacs.first, sh);
 
             if (debug)
             {
-                Image<RFLOAT> bfacFit = DamageHelper::renderBkFit(bkFacs, kc, fc);
-                Image<RFLOAT> bfacFitNoScale = DamageHelper::renderBkFit(bkFacs, kc, fc, true);
+                Image<RFLOAT> bfacFit = DamageHelper::renderBkFit(bkFacs, sh, fc);
+                Image<RFLOAT> bfacFitNoScale = DamageHelper::renderBkFit(bkFacs, sh, fc, true);
 
                 VtkHelper::writeVTK(bfacFit, "bfacs/glob_Bk-fit.vtk");
                 VtkHelper::writeVTK(bfacFitNoScale, "bfacs/glob_Bk-fit_noScale.vtk");
                 VtkHelper::writeVTK(fcc, "bfacs/glob_Bk-data.vtk");
+                VtkHelper::write(freqWeights, "bfacs/freqWeights.vtk");
             }
 
-            freqWeights = DamageHelper::computeWeights(bkFacs.first, kc);
         }
-
     }
-
-    MetaDataTable mdt0;
-    mdt0.read(starFn);
-
-    std::vector<MetaDataTable> mdts = StackHelper::splitByStack(&mdt0);
-
-
-    RFLOAT Cs, lambda, kV;
-
-    mdt0.getValue(EMDL_CTF_CS, Cs, 0);
-    mdt0.getValue(EMDL_CTF_VOLTAGE, kV, 0);
-
-    RFLOAT V = kV * 1e3;
-    lambda = 12.2643247 / sqrt(V * (1.0 + V * 0.978466e-6));
-
-    if (angpix <= 0.0)
-    {
-        RFLOAT mag, dstep;
-        mdts[0].getValue(EMDL_CTF_MAGNIFICATION, mag, 0);
-        mdts[0].getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep, 0);
-        angpix = 10000 * dstep / mag;
-    }
-
-    ObservationModel obsModel(angpix);
-
-    if (applyTilt)
-    {
-        obsModel = ObservationModel(angpix, Cs, kV * 1e3, beamtilt_x, beamtilt_y);
-    }
-
-    const long gc = maxMG >= 0? maxMG : mdts.size()-1;
-    const long g0 = minMG;
 
     std::string name, fullName, movieName;
     mdts[0].getValue(EMDL_IMAGE_NAME, fullName, 0);
     mdts[0].getValue(EMDL_MICROGRAPH_NAME, movieName, 0);
     name = fullName.substr(fullName.find("@")+1);
 
-    std::string finName;
-
-    if (moviePath == "")
+    if (preextracted)
     {
-        finName = name;
+        std::string finName;
+
+        if (imgPath == "")
+        {
+            finName = name;
+        }
+        else
+        {
+            finName = imgPath + "/" + movieName.substr(movieName.find_last_of("/")+1);
+        }
+
+        Image<RFLOAT> stack0;
+        stack0.read(finName, false);
+
+        const int pc0 = mdts[0].numberOfObjects();
+        const bool zstack = stack0.data.zdim > 1;
+        const int stackSize = zstack? stack0.data.zdim : stack0.data.ndim;
+
+        fc = stackSize / pc0;
+
+        s = stack0.data.xdim;
+        sh = s/2 + 1;
     }
     else
     {
-        finName = moviePath + "/" + movieName.substr(movieName.find_last_of("/")+1);
+        std::vector<std::vector<Image<Complex>>> movie = StackHelper::extractMovieStackFS(
+            &mdts[0], meta_path, imgPath, bin, coords_bin, movie_bin, s,
+            nr_omp_threads, !nogain, binType, false, debug);
+
+        fc = movie[0].size();
     }
 
-    Image<RFLOAT> stack0;
-    stack0.read(finName, false);
-
-    const int pc0 = mdts[0].numberOfObjects();
-    const bool zstack = stack0.data.zdim > 1;
-    const int stackSize = zstack? stack0.data.zdim : stack0.data.ndim;
-    const int fc = stackSize / pc0;
-
-    const int s = stack0.data.xdim;
-    const int sh = s/2 + 1;
 
     Image<RFLOAT> totTable(sh,fc), totWeight0(sh,fc), totWeight1(sh,fc);
     totTable.data.initZeros();
@@ -379,12 +288,11 @@ int main(int argc, char *argv[])
         }
     }
 
-    std::cout << "pc0 = " << pc0 << "\n";
     std::cout << "fc = " << fc << "\n";
     std::cout << "mg range: " << g0 << ".." << gc << "\n";
 
     std::vector<ParFourierTransformer> fts(nr_omp_threads);
-    std::vector<Image<RFLOAT> > tables(nr_omp_threads),
+    std::vector<Image<RFLOAT>> tables(nr_omp_threads),
             weights0(nr_omp_threads), weights1(nr_omp_threads);
 
     std::vector<std::vector<double>> finalFCC(nr_omp_threads),
@@ -412,23 +320,48 @@ int main(int argc, char *argv[])
 
         try
         {
-            movie = StackHelper::loadMovieStackFS(
-                    &mdts[g], moviePath, false, nr_omp_threads, &fts);
+            if (preextracted)
+            {
+                movie = StackHelper::loadMovieStackFS(
+                    &mdts[g], imgPath, false, nr_omp_threads, &fts);
+            }
+            else
+            {
+                movie = StackHelper::extractMovieStackFS(
+                    &mdts[g], meta_path, imgPath,
+                    bin, coords_bin, movie_bin, s,
+                    nr_omp_threads, !nogain, binType,
+                    true, debug);
+
+                #pragma omp parallel for num_threads(nr_omp_threads)
+                for (int p = 0; p < pc; p++)
+                {
+                    StackHelper::varianceNormalize(movie[p], false);
+                }
+            }
         }
         catch (RelionError XE)
         {
+            std::cerr << "warning: unable to load micrograph #" << (g+1) << "\n";
             continue;
         }
 
         const int sh = movie[0][0]().xdim;
         const int s = movie[0][0]().ydim;
 
-        std::ifstream trackIn(trackFn + "_mg" + stsg.str() + "_tracks.dat");
+        std::string tfn = trackFn + "_mg" + stsg.str() + "_tracks.dat";
+        std::ifstream trackIn(tfn);
 
         std::vector<std::vector<d2Vector>> shift(pc);
 
         for (int p = 0; p < pc; p++)
         {
+            if (!trackIn.good())
+            {
+                std::cerr << "relion_recombine_frames: error reading tracks in " << tfn << "\n";
+                return 5;
+            }
+
             shift[p] = std::vector<d2Vector>(fc);
 
             char dummy[4069];
@@ -475,14 +408,7 @@ int main(int argc, char *argv[])
                 mdts[g].getValue(EMDL_PARTICLE_RANDOM_SUBSET, randSubset, p);
                 randSubset -= 1;
 
-                if (randSubset == 0)
-                {
-                    pred = obsModel.predictObservation(projector0, mdts[g], p, true, true);
-                }
-                else
-                {
-                    pred = obsModel.predictObservation(projector1, mdts[g], p, true, true);
-                }
+                pred = obsModel.predictObservation(projectors[randSubset], mdts[g], p, true, true);
 
                 CTF ctf;
                 ctf.read(mdts[g], mdts[g], p);
@@ -612,7 +538,7 @@ int main(int argc, char *argv[])
                 for (int y = 0; y < s; y++)
                 for (int x = 0; x < sh; x++)
                 {
-                    sum(y,x) += freqWeights[f](y,x) * freqWeights[f](y,x) * obs(y,x);
+                    sum(y,x) += freqWeights[f](y,x) * obs(y,x);
                 }
             }
 
@@ -624,14 +550,7 @@ int main(int argc, char *argv[])
                 mdts[g].getValue(EMDL_PARTICLE_RANDOM_SUBSET, randSubset, p);
                 randSubset -= 1;
 
-                if (randSubset == 0)
-                {
-                    pred = obsModel.predictObservation(projector1, mdts[g], p, true, true);
-                }
-                else
-                {
-                    pred = obsModel.predictObservation(projector0, mdts[g], p, true, true);
-                }
+                pred = obsModel.predictObservation(projectors[1-randSubset], mdts[g], p, true, true);
 
                 CTF ctf;
                 ctf.read(mdts[g], mdts[g], p);

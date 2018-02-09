@@ -47,7 +47,7 @@ class TiltFit : public RefinementProgram
             Image<Complex> lastXY;
             Image<RFLOAT> lastW;
 
-        void readMoreOptions(IOParser& parser, int argc, char *argv[]);
+        int readMoreOptions(IOParser& parser, int argc, char *argv[]);
         int _init();
         int _run();
 };
@@ -69,7 +69,7 @@ int main(int argc, char *argv[])
     if (rc1 != 0) return rc1;
 }
 
-void TiltFit::readMoreOptions(IOParser& parser, int argc, char *argv[])
+int TiltFit::readMoreOptions(IOParser& parser, int argc, char *argv[])
 {
     kmin = textToFloat(parser.getOption("--kmin", "Inner freq. threshold [Angst]", "30.0"));
 
