@@ -1059,17 +1059,8 @@ void JobWindow::initialiseSortWindow()
 	// Add a little spacer
 	current_y += STEPY/2;
 
-	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group1->end();
-
-	place("is_autopick", TOGGLE_DEACTIVATE, group1);
-
-	group1->begin();
-
+	place("model_refs", TOGGLE_DEACTIVATE);
 	place("autopick_refs", TOGGLE_DEACTIVATE);
-
-	group1->end();
-	guientries["is_autopick"].cb_menu_i();
 
 	tab1->end();
 

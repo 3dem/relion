@@ -1823,8 +1823,8 @@ void RelionJob::initialiseSortJob()
 	hidden_name = ".gui_sort";
 
 	joboptions["input_star"] = JobOption("Input particles to be sorted:", NODE_PART_DATA, "", "Input particles(*.{star})", "This STAR file should contain in-plane rotations, in-plane translations and a class number that were obtained by alignment (class2D/class3D or auto3D) OR auto-picking. A column called rlnParticleSelectZScore will be added to this same STAR file with the sorting result. This column can then be used in the display programs to sort the particles on.");
-	joboptions["is_autopick"] = JobOption("Are these from an Extract job?", false, "Set the particles are from an Extract job (as opposed to a 2D/3D Classification or 3D auto-refine job), then you can only perform sorting if you used coordinates from Auto-picking in the particle extraction. In that case, provide the 2D references from the auto-pick run below.");
-	joboptions["autopick_refs"] = JobOption("Autopicking references:", NODE_2DREFS, "", "References(*.{star})", "This STAR file should contain the 2D references that were used for the auto-picking.");
+	joboptions["model_refs"] = JobOption("References from model.star:", NODE_MODEL, "", "References(*.{star})", "This model.STAR file should correspond to the refinement/classification performed with the input particles");
+	joboptions["autopick_refs"] = JobOption("OR autopicking references:", NODE_2DREFS, "", "References(*.{star})", "This STAR file should contain the 2D references that were used for the auto-picking");
 
 	joboptions["angpix_ref"] = JobOption("Pixel size in references (A)", -1, 0.3, 5, 0.1, "Pixel size in Angstroms for the provided reference images. This will be used to calculate the filters and the particle diameter in pixels. If a negative value is given here, the pixel size in the references will be assumed to be the same as the one in the micrographs, i.e. the particles that were used to make the references were not rescaled upon extraction.");
 	joboptions["do_ctf"] = JobOption("Are References CTF corrected?", true, "Set to Yes if the references were created with CTF-correction inside RELION. \n ");
@@ -1851,52 +1851,47 @@ bool RelionJob::getCommandsSortJob(std::string &outputname, std::vector<std::str
 		error_message = "ERROR: empty field for input STAR file...";
 		return false;
 	}
+
+	if (joboptions["input_star"].getString() == "")
+	{
+		error_message = "ERROR: empty field for continuation STAR file...";
+		return false;
+	}
+	if (joboptions["model_refs"].getString() == "" && joboptions["autopick_refs"].getString() == "")
+	{
+		error_message = "ERROR: provide either model.star or autopicking references...";
+		return false;
+	}
+
+	if (joboptions["model_refs"].getString() != "" && joboptions["autopick_refs"].getString() != "")
+	{
+		error_message = "ERROR: you cannot provide both a model.star and autopicking references...";
+		return false;
+	}
+
 	command += " --i " + joboptions["input_star"].getString();
 	Node node(joboptions["input_star"].getString(), joboptions["input_star"].node_type);
 	inputNodes.push_back(node);
 
-	if (joboptions["angpix_ref"].getNumber() > 0.)
-		command += " --angpix_ref " + joboptions["angpix_ref"].getString();
-
-	// Determine the --ref automatically, from the particle input filename
-	FileName fn_ref, fn_in = joboptions["input_star"].getString();
+	FileName fn_ref;
 	int node_type;
-	if (fn_in.contains("_data.star") && (fn_in.contains("Class2D/") || fn_in.contains("Class3D/")) )
+	if (joboptions["model_refs"].getString() != "")
 	{
-		fn_ref = fn_in.without("_data.star") + "_model.star";
-		node_type= NODE_MODEL;
+		node_type = NODE_MODEL;
+		fn_ref = joboptions["model_refs"].getString();
 	}
-	else if (fn_in.contains("_data.star") && fn_in.contains("Refine3D/"))
+	else if (joboptions["autopick_refs"].getString() != "")
 	{
-		if (fn_in.contains("_it0") || fn_in.contains("_it1"))
-			fn_ref = fn_in.without("_data.star") + "_half1_model.star";
-		else
-			fn_ref = fn_in.without("_data.star") + "_model.star";
-		node_type= NODE_MODEL;
-	}
-	else if (fn_in.contains("Extract/"))
-	{
-		if (joboptions["is_autopick"].getBoolean())
-		{
 
-			if (joboptions["autopick_refs"].getString() == "")
-			{
-				error_message = "ERROR: empty field for autopicking references. This is compulsory for Extract jobs...";
-				return false;
-			}
-
-			fn_ref = joboptions["autopick_refs"].getString();
-			node_type= NODE_2DREFS;
-		}
-		else
-		{
-			error_message = "ERROR: these particles are from an Extract job. Without auto-picking references you cannot run sorting!";
-			return false;
-		}
+		node_type = NODE_2DREFS;
+		fn_ref = joboptions["autopick_refs"].getString();
 	}
 	command += " --ref " + fn_ref;
 	Node node2(fn_ref, node_type);
 	inputNodes.push_back(node2);
+
+	if (joboptions["angpix_ref"].getNumber() > 0.)
+		command += " --angpix_ref " + joboptions["angpix_ref"].getString();
 
 	command += " --o " + outputname + "particles_sort.star";
 	Node node3(outputname + "particles_sort.star", NODE_PART_DATA);
