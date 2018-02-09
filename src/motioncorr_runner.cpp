@@ -1161,7 +1161,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 	Iref().initZeros();
 	for (int iframe = 0; iframe < n_frames; iframe++) {
 		std::cout << "." << std::flush;
-		#pragma omp parallel for
+		#pragma omp parallel for schedule(static)
 		for (int ix = 0; ix < nx; ix++) {
 			for (int iy = 0; iy < ny; iy++) {
 				bool valid = true;
@@ -1261,7 +1261,7 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes,
 	// Initialize B factor weight
 	weight.reshape(Fref);
 	RCTIC(TIMING_PREP_WEIGHT);
-	#pragma omp parallel for
+	#pragma omp parallel for schedule(static)
 	for (int y = 0; y < nfy; y++) {
 		int ly = y;
 		if (y > nfy_half) ly = y - nfy;
@@ -1277,7 +1277,7 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes,
 	for (int iter = 1; iter	<= max_iter; iter++) {
 		RCTIC(TIMING_MAKE_REF);
 		Fref.initZeros();
-		#pragma omp parallel for 
+		
 		for (int iframe = 0; iframe < n_frames; iframe++) {
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fref) {
 				DIRECT_MULTIDIM_ELEM(Fref, n) += DIRECT_MULTIDIM_ELEM(Fframes[iframe], n);
@@ -1414,7 +1414,7 @@ void MotioncorrRunner::doseWeighting(std::vector<MultidimArray<Complex> > &Ffram
 	const int n_frames= Fframes.size();
 	const RFLOAT A = 0.245, B = -1.665, C = 2.81;
 
-	#pragma omp parallel for
+	#pragma omp parallel for schedule(static)
 	for (int y = 0; y < nfy; y++) {
 		int ly = y;
 		if (y > nfy_half) ly = y - nfy;
