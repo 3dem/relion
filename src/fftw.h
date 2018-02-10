@@ -53,6 +53,12 @@
 #include "src/complex.h"
 #include "src/CPlot2D.h"
 
+#define TIMING_FFTW
+#ifdef TIMING_FFTW
+	#include "src/time.h"
+	extern Timer timer_fftw;
+#endif
+
 /** @defgroup FourierW FFTW Fourier transforms
   * @ingroup DataLibrary
   */

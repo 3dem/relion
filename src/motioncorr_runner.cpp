@@ -319,6 +319,9 @@ void MotioncorrRunner::run()
 #ifdef TIMING
         timer.printTimes(false);
 #endif
+#ifdef TIMING_FFTW
+	timer_fftw.printTimes(false);
+#endif
 }
 
 bool MotioncorrRunner::executeMotioncor2(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts, int rank)
