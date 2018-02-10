@@ -130,6 +130,8 @@ int FrameRecomb::readMoreOptions(IOParser& parser, int argc, char *argv[])
     }
 
     noReference = !hasRef;
+
+    return 0;
 }
 
 int FrameRecomb::_init()

@@ -7,6 +7,9 @@
 
 RefinementProgram::RefinementProgram(bool singleReference, bool doesMovies)
 :   singleReference(singleReference),
+    optStar(false),
+    noStar(false),
+    optReference(false),
     noReference(false),
     noTilt(false),
     doesMovies(doesMovies)
@@ -23,16 +26,16 @@ int RefinementProgram::init(int argc, char *argv[])
 
         parser.addSection("General options");
 
-        starFn = parser.getOption("--i", "Input STAR file");
+        starFn = parser.getOption("--i", "Input STAR file", optStar? "" : "NULL");
 
         if (singleReference)
         {
-            reconFn0 = parser.getOption("--m", "Reference map");
+            reconFn0 = parser.getOption("--m", "Reference map", optReference? "" : "NULL");
         }
         else
         {
-            reconFn0 = parser.getOption("--m1", "Reference map, half 1");
-            reconFn1 = parser.getOption("--m2", "Reference map, half 2");
+            reconFn0 = parser.getOption("--m1", "Reference map, half 1", optReference? "" : "NULL");
+            reconFn1 = parser.getOption("--m2", "Reference map, half 2", optReference? "" : "NULL");
         }
 
         maskFn = parser.getOption("--mask", "Reference mask", "");
@@ -56,7 +59,10 @@ int RefinementProgram::init(int argc, char *argv[])
             imgPath = parser.getOption("--img", "Path to images", "");
         }
 
-        angpix = textToFloat(parser.getOption("--angpix", "Pixel resolution (angst/pix)", "0.0"));
+        angpix = textToFloat(parser.getOption("--angpix", "Pixel resolution (angst/pix) - read from STAR file by default", "0.0"));
+        Cs = textToFloat(parser.getOption("--Cs", "Spherical aberration - read from STAR file by default", "-1"));
+        kV = textToFloat(parser.getOption("--kV", "Electron energy (keV) - read from STAR file by default", "-1"));
+
         paddingFactor = textToFloat(parser.getOption("--pad", "Padding factor", "2"));
 
         if (noTilt)
@@ -77,9 +83,15 @@ int RefinementProgram::init(int argc, char *argv[])
         debug = parser.checkOption("--debug", "Write debugging data");
 
         int rco = readMoreOptions(parser, argc, argv);
-        if (rco != 0) return rco;
+
+        if (argc == 1)
+        {
+            parser.writeUsage(std::cerr);
+            return 1;
+        }
 
         if (parser.checkForErrors()) return 1;
+        if (rco != 0) return rco;
 
         if (doesMovies)
         {
@@ -212,24 +224,58 @@ int RefinementProgram::init(int argc, char *argv[])
         return 1;
     }
 
-    std::cout << "reading " << starFn << "...\n";
+    if (!noStar)
+    {
+        std::cout << "reading " << starFn << "...\n";
 
-    mdt0.read(starFn);
-    mdts = StackHelper::splitByStack(&mdt0);
+        mdt0.read(starFn);
 
-    mdt0.getValue(EMDL_CTF_CS, Cs, 0);
-    mdt0.getValue(EMDL_CTF_VOLTAGE, kV, 0);
+        if (Cs < 0.0)
+        {
+            mdt0.getValue(EMDL_CTF_CS, Cs, 0);
+            std::cout << " + Using spherical aberration from the input STAR file: " << Cs << "\n";
+        }
+        else
+        {
+            for (int i = 0; i < mdt0.numberOfObjects(); i++)
+            {
+                mdt0.setValue(EMDL_CTF_CS, Cs, i);
+            }
+        }
+
+        if (kV < 0.0)
+        {
+            mdt0.getValue(EMDL_CTF_VOLTAGE, kV, 0);
+            std::cout << " + Using voltage from the input STAR file: " << kV << " kV\n";
+        }
+        else
+        {
+            for (int i = 0; i < mdt0.numberOfObjects(); i++)
+            {
+                mdt0.setValue(EMDL_CTF_VOLTAGE, kV, i);
+            }
+        }
+
+        if (angpix <= 0.0)
+        {
+            RFLOAT mag, dstep;
+            mdt0.getValue(EMDL_CTF_MAGNIFICATION, mag, 0);
+            mdt0.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep, 0);
+            angpix = 10000 * dstep / mag;
+
+            std::cout << " + Using pixel size calculated from magnification and detector pixel size in the input STAR file: " << angpix << "\n";
+        }
+
+        mdts = StackHelper::splitByStack(&mdt0);
+
+        gc = maxMG >= 0? maxMG : mdts.size()-1;
+        g0 = minMG;
+
+        std::cout << "mg range: " << g0 << ".." << gc << "\n";
+    }
 
     RFLOAT V = kV * 1e3;
     lambda = 12.2643247 / sqrt(V * (1.0 + V * 0.978466e-6));
-
-    if (angpix <= 0.0)
-    {
-        RFLOAT mag, dstep;
-        mdts[0].getValue(EMDL_CTF_MAGNIFICATION, mag, 0);
-        mdts[0].getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep, 0);
-        angpix = 10000 * dstep / mag;
-    }
 
     obsModel = ObservationModel(angpix);
 
@@ -237,11 +283,6 @@ int RefinementProgram::init(int argc, char *argv[])
     {
         obsModel = ObservationModel(angpix, Cs, kV * 1e3, beamtilt_x, beamtilt_y);
     }
-
-    gc = maxMG >= 0? maxMG : mdts.size()-1;
-    g0 = minMG;
-
-    std::cout << "mg range: " << g0 << ".." << gc << "\n";
 
     int rc0 = _init();
 

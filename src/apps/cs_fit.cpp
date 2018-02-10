@@ -73,6 +73,8 @@ int CsFit::readMoreOptions(IOParser& parser, int argc, char *argv[])
     sectors = textToInteger(parser.getOption("--sec", "Number of radial sectors", "8"));
     samples = textToInteger(parser.getOption("--n", "Number of C_s samples", "31"));
     defocusRange = textToFloat(parser.getOption("--range", "Defocus scan range (in A)", "500."));
+
+    return 0;
 }
 
 int CsFit::_init()

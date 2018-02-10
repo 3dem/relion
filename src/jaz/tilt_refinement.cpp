@@ -173,7 +173,7 @@ void TiltRefinement::fitTiltShift(const Image<RFLOAT>& phase,
         for (long xi = 0; xi < w; xi++)
         {
             double x = xi;
-            double y = yi < w? yi : ((yi-h));
+            double y = yi < w? yi : yi-h;
 
             d2Vector p = magCorr * d2Vector(x,y);
             x = p.x/as;
@@ -185,3 +185,57 @@ void TiltRefinement::fitTiltShift(const Image<RFLOAT>& phase,
         }
     }
 }
+
+TiltOptimization::TiltOptimization(const Image<Complex> &xy,
+    const Image<double> &weight, double angpix,
+    bool L1,
+    bool anisotropic)
+    :   xy(xy),
+        weight(weight),
+        angpix(angpix),
+        L1(L1),
+        anisotropic(anisotropic)
+{
+}
+
+double TiltOptimization::f(const std::vector<double> &x) const
+{
+    double out = 0.0;
+
+    const int w = xy.data.xdim;
+    const int h = xy.data.ydim;
+
+    const double as = (double)h * angpix;
+
+    for (long yi = 0; yi < h; yi++)
+    for (long xi = 0; xi < w; xi++)
+    {
+        const double xd = xi/as;
+        const double yd = yi < w? yi/as : (yi-h)/as;
+        double rr;
+
+        if (anisotropic)
+        {
+            rr = x[4]*xd*xd + 2.0*x[5]*xd*yd + x[6]*yd*yd;
+        }
+        else
+        {
+            rr = xd*xd + yd*yd;
+        }
+
+        const double phi = x[0]*xd + x[1]*yd + rr*x[2]*xd + rr*x[3]*yd;
+        const double e = (xy(yi,xi) - Complex(cos(phi), sin(phi))).norm();
+
+        if (L1)
+        {
+            out += weight(yi,xi) * sqrt(e);
+        }
+        else
+        {
+            out += weight(yi,xi) * e;
+        }
+    }
+
+    return out;
+}
+

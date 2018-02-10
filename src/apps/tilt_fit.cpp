@@ -56,6 +56,8 @@ TiltFit :: TiltFit()
 :   RefinementProgram(true)
 {
     noTilt = true;
+    optStar = true;
+    optReference = true;
 }
 
 int main(int argc, char *argv[])
@@ -77,6 +79,30 @@ int TiltFit::readMoreOptions(IOParser& parser, int argc, char *argv[])
     precomputed = precomp != "";
 
     noReference = precomputed;
+    noStar = starFn == "";
+
+    bool allGood = true;
+
+    if (starFn == "" && !precomputed)
+    {
+        std::cerr << "A .star file (--i) is required if no precomputed pixel-fit is available (--precomp).\n";
+        allGood = false;
+    }
+
+    if (reconFn0 == "" && !precomputed)
+    {
+        std::cerr << "A reference map (--m) is required if no precomputed pixel-fit is available (--precomp).\n";
+        allGood = false;
+    }
+
+    if (starFn == "" && angpix == 0)
+    {
+        std::cerr << "Pixel resolution (--angpix) is required if no .star file is provided (--i).\n";
+        allGood = false;
+    }
+
+    if (!allGood) return 13;
+    else return 0;
 }
 
 int TiltFit::_init()
@@ -217,6 +243,8 @@ int TiltFit::_run()
 
     TiltRefinement::fitTiltShift(phase, wgh, Cs, lambda, angpix,
                                  &shift_x, &shift_y, &tilt_x, &tilt_y, &fit);
+
+
 
     FftwHelper::decenterUnflip2D(fit.data, fitFull.data);
     VtkHelper::writeVTK(fitFull, outPath+"_delta_phase_fit.vtk");

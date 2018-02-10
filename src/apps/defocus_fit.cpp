@@ -38,8 +38,8 @@ class DefocusFit : public RefinementProgram
 {
     public:
 
-        RFLOAT defocusRange, Cs;
-        bool fitAstigmatism, diag, ownCs;
+        RFLOAT defocusRange;
+        bool fitAstigmatism, diag;
 
         int readMoreOptions(IOParser& parser, int argc, char *argv[]);
         int _init();
@@ -61,9 +61,9 @@ int DefocusFit::readMoreOptions(IOParser& parser, int argc, char *argv[])
 {
     fitAstigmatism = parser.checkOption("--astig", "Estimate independent astigmatism for each particle");
     diag = parser.checkOption("--diag", "Write out defocus errors");
-    Cs = textToFloat(parser.getOption("--Cs", "Spherical aberration", "-1"));
-    ownCs = Cs != -1;
     defocusRange = textToFloat(parser.getOption("--range", "Defocus scan range (in A)", "2000."));
+
+    return 0;
 }
 
 int DefocusFit::_init()
@@ -74,7 +74,6 @@ int DefocusFit::_init()
 int DefocusFit::_run()
 {
     if (diag) std::cout << "running in diagnostic mode\n";
-    if (ownCs) std::cout << "assuming Cs = " << Cs << "\n";
 
     double t0 = omp_get_wtime();
 
@@ -122,12 +121,6 @@ int DefocusFit::_run()
                 CTF ctf0;
                 ctf0.read(mdts[g], mdts[g], p);
 
-                if (ownCs)
-                {
-                    ctf0.Cs = Cs;
-                    ctf0.initialise();
-                }
-
                 int randSubset;
                 mdts[g].getValue(EMDL_PARTICLE_RANDOM_SUBSET, randSubset, p);
                 randSubset -= 1;
@@ -171,12 +164,6 @@ int DefocusFit::_run()
                 CTF ctf0;
                 ctf0.read(mdts[g], mdts[g], p);
 
-                if (ownCs)
-                {
-                    ctf0.Cs = Cs;
-                    ctf0.initialise();
-                }
-
                 int randSubset;
                 mdts[g].getValue(EMDL_PARTICLE_RANDOM_SUBSET, randSubset, p);
                 randSubset -= 1;
@@ -213,11 +200,6 @@ int DefocusFit::_run()
                     ctf.DeltafU = u;
                     ctf.DeltafV = v;
                     ctf.initialise();
-                }
-
-                if (ownCs)
-                {
-                    mdts[g].setValue(EMDL_CTF_CS, Cs, p);
                 }
             }
 

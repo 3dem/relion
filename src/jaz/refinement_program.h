@@ -27,8 +27,9 @@ class RefinementProgram
 
             // options:
 
-            bool singleReference, debug, applyTilt, useFsc,
-                noReference, noTilt, doesMovies, preextracted, nogain;
+            bool singleReference, doesMovies, debug, applyTilt, useFsc,
+                optStar, noStar, optReference, noReference, noTilt,
+                preextracted, nogain;
 
             long maxMG, minMG;
 

@@ -145,6 +145,8 @@ int MotionFitProg::readMoreOptions(IOParser& parser, int argc, char *argv[])
 
     evalFrames = textToInteger(parser.getOption("--eval", "Measure FSC for this many initial frames", "0"));
     evaluate = evalFrames > 0;
+
+    return 0;
 }
 
 int MotionFitProg::_init()

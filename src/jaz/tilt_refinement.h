@@ -9,6 +9,27 @@
 #include <src/jaz/gravis/t2Matrix.h>
 #include <vector>
 
+class TiltOptimization : public Optimization
+{
+    public:
+
+        TiltOptimization(
+                const Image<Complex>& xy,
+                const Image<RFLOAT>& weight,
+                double angpix,
+                bool L1 = false,
+                bool anisotropic = false);
+
+        double f(const std::vector<double>& x) const;
+
+    private:
+
+        const Image<Complex>& xy;
+        const Image<RFLOAT>& weight;
+        const double angpix;
+        const bool L1, anisotropic;
+};
+
 class TiltRefinement
 {
     public:
