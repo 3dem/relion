@@ -38,24 +38,23 @@
 	int TIMING_APPLY_GAIN = timer.setNew("apply gain");
 	int TIMING_INITIAL_SUM = timer.setNew("initial sum");
 	int TIMING_DETECT_HOT = timer.setNew("detect hot pixels");
-	int TIMING_GLOBAL_FFT = timer.setNew("global FFT");
+	int TIMING_GLOBAL_FFT = timer.setNew("global FFT (thread)");
 	int TIMING_GLOBAL_ALIGNMENT = timer.setNew("global alignment");
-	int TIMING_GLOBAL_IFFT = timer.setNew("global iFFT");
+	int TIMING_GLOBAL_IFFT = timer.setNew("global iFFT (thread)");
 	int TIMING_PREP_PATCH = timer.setNew("prepare patch");
-	int TIMING_CLIP_PATCH = timer.setNew("prepare patch - real space clip");
-	int TIMING_PATCH_FFT = timer.setNew("prepare patch - FFT");
+	int TIMING_CLIP_PATCH = timer.setNew("prep patch - clip (thread)");
+	int TIMING_PATCH_FFT = timer.setNew("prep patch - FFT (thread)");
 	int TIMING_PATCH_ALIGN = timer.setNew("patch alignment");
 	int TIMING_PREP_WEIGHT = timer.setNew("align - prep weight");
 	int TIMING_MAKE_REF = timer.setNew("align - make reference");
-	int TIMING_CCF_CALC = timer.setNew("align - calc CCF");
-	int TIMING_CCF_IFFT = timer.setNew("align - iFFT CCF");
-	int TIMING_CCF_RECENTRE = timer.setNew("align - recentre CCF");
-	int TIMING_CCF_FIND_MAX = timer.setNew("align - argmax CCF");
+	int TIMING_CCF_CALC = timer.setNew("align - calc CCF (thread)");
+	int TIMING_CCF_IFFT = timer.setNew("align - iFFT CCF (thread)");
+	int TIMING_CCF_FIND_MAX = timer.setNew("align - argmax CCF (thread)");
 	int TIMING_FOURIER_SHIFT = timer.setNew("align - shift in Fourier space");
 	int TIMING_FIT_POLYNOMIAL = timer.setNew("fit polynomial");
 	int TIMING_DOSE_WEIGHTING = timer.setNew("dose weighting");
-	int TIMING_DW_WEIGHT = timer.setNew("dose weighting - calc weight");
-	int TIMING_DW_IFFT = timer.setNew("dose weighting - iFFT");
+	int TIMING_DW_WEIGHT = timer.setNew("dw - calc weight (thread)");
+	int TIMING_DW_IFFT = timer.setNew("dw - iFFT (thread)");
 	int TIMING_REAL_SPACE_INTERPOLATION = timer.setNew("real space interpolation");
 	int TIMING_BINNING = timer.setNew("binning");
 //	int TIMING_ = timer.setNew("");
@@ -1026,18 +1025,22 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 
 			std::vector<float> local_xshifts(n_frames), local_yshifts(n_frames);
 			RCTIC(TIMING_PREP_PATCH);
-			MultidimArray<RFLOAT> Iframe(y_end - y_start + 1, x_end - x_start + 1);
+			std::vector<MultidimArray<RFLOAT> >Ipatches(n_threads);
+			#pragma omp parallel for
 			for (int iframe = 0; iframe < n_frames; iframe++) {
+				const int tid = omp_get_thread_num();
+				Ipatches[tid].reshape(y_end - y_start + 1, x_end - x_start + 1);
+
 				RCTIC(TIMING_CLIP_PATCH);
 				for (int ipy = y_start; ipy < y_end; ipy++) {
 					for (int ipx = x_start; ipx < x_end; ipx++) {
-						DIRECT_A2D_ELEM(Iframe, ipy - y_start, ipx - x_start) = DIRECT_A2D_ELEM(Iframes[iframe](), ipy, ipx);
+						DIRECT_A2D_ELEM(Ipatches[tid], ipy - y_start, ipx - x_start) = DIRECT_A2D_ELEM(Iframes[iframe](), ipy, ipx);
 					}
 				}
 				RCTOC(TIMING_CLIP_PATCH);
 
 				RCTIC(TIMING_PATCH_FFT);
-				transformer.FourierTransform(Iframe, Fpatches[iframe]);
+				transformers[tid].FourierTransform(Ipatches[tid], Fpatches[iframe]);
 				RCTOC(TIMING_PATCH_FFT);
 			}
 			RCTOC(TIMING_PREP_PATCH);
@@ -1284,7 +1287,8 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes,
 	for (int iter = 1; iter	<= max_iter; iter++) {
 		RCTIC(TIMING_MAKE_REF);
 		Fref.initZeros();
-		
+
+		// Changing the loop order to parallelise does not help
 		for (int iframe = 0; iframe < n_frames; iframe++) {
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fref) {
 				DIRECT_MULTIDIM_ELEM(Fref, n) += DIRECT_MULTIDIM_ELEM(Fframes[iframe], n);
@@ -1313,8 +1317,8 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes,
 			RCTOC(TIMING_CCF_IFFT);
 			
 			RCTIC(TIMING_CCF_FIND_MAX);
-			RFLOAT maxval = -9999;
-			int posx, posy;
+			RFLOAT maxval = -1E30;
+			int posx = 0, posy = 0;
 			for (int y = -search_range; y < search_range; y++) {
 				int iy = y;
 				if (y < 0) iy = pny + y;
