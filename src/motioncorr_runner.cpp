@@ -1012,10 +1012,19 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 	int ipatch = 1;
 	for (int iy = 0; iy < patch_y; iy++) {
 		for (int ix = 0; ix < patch_x; ix++) {
-			int x_start = ix * patch_nx, y_start = iy * patch_ny;
-			int x_end = x_start + patch_nx, y_end = y_start + patch_ny;
+			int x_start = ix * patch_nx, y_start = iy * patch_ny; // Inclusive
+			int x_end = x_start + patch_nx, y_end = y_start + patch_ny; // Exclusive
 			if (x_end > nx) x_end = nx;
 			if (y_end > ny) y_end = ny;
+			// make patch size even
+			if ((x_end - x_start) % 2 == 1) { 
+				if (x_end == nx) x_start++;
+				else x_end--;
+			}
+			if ((y_end - y_start) % 2 == 1) { 
+				if (y_end == ny) y_start++;
+				else y_end--;
+			}
 
 			int x_center = (x_start + x_end - 1) / 2, y_center = (y_start + y_end - 1) / 2;
 			std::cout << "Patch (" << iy + 1 << ", " << ix + 1 << ") " << ipatch << " / " << patch_x * patch_y;
@@ -1029,7 +1038,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 			#pragma omp parallel for
 			for (int iframe = 0; iframe < n_frames; iframe++) {
 				const int tid = omp_get_thread_num();
-				Ipatches[tid].reshape(y_end - y_start + 1, x_end - x_start + 1);
+				Ipatches[tid].reshape(y_end - y_start, x_end - x_start); // end is not included
 
 				RCTIC(TIMING_CLIP_PATCH);
 				for (int ipy = y_start; ipy < y_end; ipy++) {
@@ -1046,7 +1055,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 			RCTOC(TIMING_PREP_PATCH);
 			
 			RCTIC(TIMING_PATCH_ALIGN);
-			bool converged = alignPatch(Fpatches, x_end - x_start + 1, y_end - y_start + 1, local_xshifts, local_yshifts);
+			bool converged = alignPatch(Fpatches, x_end - x_start, y_end - y_start, local_xshifts, local_yshifts);
 			RCTOC(TIMING_PATCH_ALIGN);
 			if (!converged) continue;
 
@@ -1254,6 +1263,9 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes,
 	cur_xshifts.resize(n_frames);
 	cur_yshifts.resize(n_frames);
 
+	if (pny % 2 == 1 || pnx % 2 == 1) {
+		REPORT_ERROR("Patch size must be even");
+	}
 	const int nfx = XSIZE(Fframes[0]), nfy = YSIZE(Fframes[0]);
 	const int nfy_half = nfy / 2;
 	Fref.reshape(nfy, nfx);
