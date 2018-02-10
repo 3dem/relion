@@ -72,6 +72,7 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	int gen_section = parser.addSection("General options");
 	fn_in = parser.getOption("--i", "STAR file with all input micrographs, or a Linux wildcard with all micrographs to operate on");
 	fn_out = parser.getOption("--o", "Name for the output directory", "MotionCorr");
+	n_threads = textToInteger(parser.getOption("--j", "Number of threads per movie (= process)", "1"));
 	fn_movie = parser.getOption("--movie", "Rootname to identify movies", "movie");
 	continue_old = parser.checkOption("--only_do_unfinished", "Only run motion correction for those micrographs for which there is not yet an output micrograph.");
 	do_save_movies  = parser.checkOption("--save_movies", "Also save the motion-corrected movies.");
@@ -874,13 +875,9 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 // - grouping
 
 bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts) {
-	int n_threads = 0;
-	// In a sequential section of the program, omp_get_num_threads returns 1.
-	#pragma omp parallel
-	{ n_threads = omp_get_num_threads(); }
-
 	std::cout << std::endl;
 	std::cout << "Now working on " << fn_mic << " nthreads = " << n_threads << std::endl;
+	omp_set_num_threads(n_threads);
 
 	Image<RFLOAT> Ihead, Igain, Iref;
 	std::vector<MultidimArray<Complex> > Fframes;
@@ -1137,7 +1134,6 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 	// Dose weighting
 	RCTIC(TIMING_DOSE_WEIGHTING);
 	if (do_dose_weighting) {
-		std::cout << "WARNING: Dose weighting not tested yet!!!" << std::endl;
 		if (std::abs(voltage - 300) > 2 && std::abs(voltage - 200) > 2) {
 			REPORT_ERROR("Sorry, dose weighting is supported only for 300 kV or 200 kV");
 		}
@@ -1236,11 +1232,12 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 }
 
 bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes, const int pnx, const int pny, std::vector<float> &xshifts, std::vector<float> &yshifts) {
-	Image<RFLOAT> Iref, Icc;
-	MultidimArray<Complex> Fref, Fcc;
+	std::vector<Image<RFLOAT> > Iccs(n_threads);
+	MultidimArray<Complex> Fref;
+	std::vector<MultidimArray<Complex> > Fccs(n_threads);
 	MultidimArray<RFLOAT> weight;
 	std::vector<RFLOAT> cur_xshifts, cur_yshifts;
-	FourierTransformer transformer;
+	std::vector<FourierTransformer> transformers(n_threads);
 	bool converged = false;
 
 	// Parameters TODO: make an option
@@ -1256,10 +1253,11 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes,
 
 	const int nfx = XSIZE(Fframes[0]), nfy = YSIZE(Fframes[0]);
 	const int nfy_half = nfy / 2;
-	Icc().reshape(pny, pnx);
-	Iref().reshape(pny, pnx);
 	Fref.reshape(nfy, nfx);
-	Fcc.reshape(Fref);
+	for (int i = 0; i < n_threads; i++) {
+		Iccs[i]().reshape(pny, pnx);
+		Fccs[i].reshape(Fref);
+	}
 
 #ifdef DEBUG
 	std::cout << "Patch Size X = " << pnx << " Y  = " << pny << std::endl;
@@ -1293,31 +1291,27 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes,
 			}
 		}
 #ifdef DEBUG
-		transformer.inverseFourierTransform(Fref, Icc());
+		transformers[tid].inverseFourierTransform(Fref, Icc());
 		Icc.write("ref.spi");
 		std::cout << "Done Fref." << std::endl;
 #endif
 		RCTOC(TIMING_MAKE_REF);
 
+		#pragma omp parallel for
 		for (int iframe = 0; iframe < n_frames; iframe++) {
-			Fcc.initZeros();
+			const int tid = omp_get_thread_num();
 			
 			RCTIC(TIMING_CCF_CALC);
-			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fcc) {
-				DIRECT_MULTIDIM_ELEM(Fcc, n) = (DIRECT_MULTIDIM_ELEM(Fref, n) - DIRECT_MULTIDIM_ELEM(Fframes[iframe], n)) * 
-				                                DIRECT_MULTIDIM_ELEM(Fframes[iframe], n).conj() * DIRECT_MULTIDIM_ELEM(weight, n);
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fref) {
+				DIRECT_MULTIDIM_ELEM(Fccs[tid], n) = (DIRECT_MULTIDIM_ELEM(Fref, n) - DIRECT_MULTIDIM_ELEM(Fframes[iframe], n)) * 
+				                                     DIRECT_MULTIDIM_ELEM(Fframes[iframe], n).conj() * DIRECT_MULTIDIM_ELEM(weight, n);
 			}
 			RCTOC(TIMING_CCF_CALC);
 
 			RCTIC(TIMING_CCF_IFFT);
-			transformer.inverseFourierTransform(Fcc, Icc());
+			transformers[tid].inverseFourierTransform(Fccs[tid], Iccs[tid]());
 			RCTOC(TIMING_CCF_IFFT);
 			
-			RCTIC(TIMING_CCF_RECENTRE);
-//			CenterFFT(Icc(), false);
-//			Icc().setXmippOrigin();
-			RCTOC(TIMING_CCF_RECENTRE);
-
 			RCTIC(TIMING_CCF_FIND_MAX);
 			RFLOAT maxval = -9999;
 			int posx, posy;
@@ -1328,7 +1322,7 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes,
 				for (int x = -search_range; x < search_range; x++) {
 					int ix = x;
 					if (x < 0) ix = pnx + x;
-					RFLOAT val = A2D_ELEM(Icc(), iy, ix);
+					RFLOAT val = DIRECT_A2D_ELEM(Iccs[tid](), iy, ix);
 //					std::cout << "(x, y) = " << x << ", " << y << ", (ix, iy) = " << ix << " , " << iy << " val = " << val << std::endl;
 					if (val > maxval) {
 						posx = x; posy = y;
@@ -1347,24 +1341,23 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes,
 
 			// Quadratic interpolation by Jasenko
 			RFLOAT vp, vn;
-			vp = A2D_ELEM(Icc(), ipy, ipx_p);
-			vn = A2D_ELEM(Icc(), ipy, ipx_n);
+			vp = DIRECT_A2D_ELEM(Iccs[tid](), ipy, ipx_p);
+			vn = DIRECT_A2D_ELEM(Iccs[tid](), ipy, ipx_n);
  			if (std::abs(vp + vn - 2.0 * maxval) > EPS) {
 				cur_xshifts[iframe] = posx - 0.5 * (vp - vn) / (vp + vn - 2.0 * maxval);
 			} else {
 				cur_xshifts[iframe] = posx;
 			}
 
-			vp = A2D_ELEM(Icc(), ipy_p, ipx);
-			vn = A2D_ELEM(Icc(), ipy_n, ipx);
+			vp = DIRECT_A2D_ELEM(Iccs[tid](), ipy_p, ipx);
+			vn = DIRECT_A2D_ELEM(Iccs[tid](), ipy_n, ipx);
  			if (std::abs(vp + vn - 2.0 * maxval) > EPS) {
 				cur_yshifts[iframe] = posy - 0.5 * (vp - vn) / (vp + vn - 2.0 * maxval);
 			} else {
 				cur_yshifts[iframe] = posy;
 			}
 #ifdef DEBUG
-			Icc.write("test.spi");
-			std::cout << "Frame " << 1 + iframe << ": raw shift x = " << posx << " y = " << posy << " cc = " << maxval << " interpolated x = " << cur_xshifts[iframe] << " y = " << cur_yshifts[iframe] << std::endl;
+			std::cout << "tid " << tid << " Frame " << 1 + iframe << ": raw shift x = " << posx << " y = " << posy << " cc = " << maxval << " interpolated x = " << cur_xshifts[iframe] << " y = " << cur_yshifts[iframe] << std::endl;
 #endif
 			RCTOC(TIMING_CCF_FIND_MAX);
 		}

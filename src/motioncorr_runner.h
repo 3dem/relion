@@ -41,6 +41,9 @@ public:
 	// Verbosity
 	int verb;
 
+	// Number of threads per process
+	int n_threads;
+
 	// Output rootname
 	FileName fn_in, fn_out, fn_movie;
 
