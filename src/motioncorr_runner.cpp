@@ -25,6 +25,7 @@
 #include "src/fftw.h"
 #include "src/matrix2d.h"
 #include "src/matrix1d.h"
+#include <omp.h>
 
 #define TIMING
 #ifdef TIMING
@@ -873,13 +874,19 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 // - grouping
 
 bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts) {
+	int n_threads = 0;
+	// In a sequential section of the program, omp_get_num_threads returns 1.
+	#pragma omp parallel
+	{ n_threads = omp_get_num_threads(); }
+
 	std::cout << std::endl;
-	std::cout << "Now working on " << fn_mic << std::endl;
+	std::cout << "Now working on " << fn_mic << " nthreads = " << n_threads << std::endl;
 
 	Image<RFLOAT> Ihead, Igain, Iref;
 	std::vector<MultidimArray<Complex> > Fframes;
 	std::vector<Image<RFLOAT> > Iframes;
 	std::vector<int> frames;
+	std::vector<FourierTransformer> transformers(n_threads);
 	FourierTransformer transformer;
 
 	const int hotpixel_sigma = 6;
@@ -977,8 +984,10 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 
 	// FFT
 	RCTIC(TIMING_GLOBAL_FFT);
+	#pragma omp parallel for
 	for (int iframe = 0; iframe < n_frames; iframe++) {
-		transformer.FourierTransform(Iframes[iframe](), Fframes[iframe]);
+//		std::cout << iframe << " thread " << omp_get_thread_num() << std::endl;
+		transformers[omp_get_thread_num()].FourierTransform(Iframes[iframe](), Fframes[iframe]);
 	}
 	RCTOC(TIMING_GLOBAL_FFT);
 
@@ -991,13 +1000,9 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 	Iref().reshape(Iframes[0]());
 	Iref().initZeros();
 	RCTIC(TIMING_GLOBAL_IFFT);
+	#pragma omp parallel for
 	for (int iframe = 0; iframe < n_frames; iframe++) {
-		transformer.inverseFourierTransform(Fframes[iframe], Iframes[iframe]());
-#ifdef DEBUG
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iref()) {
-			DIRECT_MULTIDIM_ELEM(Iref(), n) += DIRECT_MULTIDIM_ELEM(Iframes[iframe](), n);
-		}
-#endif
+		transformers[omp_get_thread_num()].inverseFourierTransform(Fframes[iframe], Iframes[iframe]());
 	}
 	RCTOC(TIMING_GLOBAL_IFFT);
 
@@ -1152,8 +1157,9 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 
 		// Update real space images
 		RCTIC(TIMING_DW_IFFT);
+		#pragma omp parallel for
 		for (int iframe = 0; iframe < n_frames; iframe++) {
-			transformer.inverseFourierTransform(Fframes[iframe], Iframes[iframe]());
+			transformers[omp_get_thread_num()].inverseFourierTransform(Fframes[iframe], Iframes[iframe]());
 		}
 		RCTOC(TIMING_DW_IFFT);
 	}
