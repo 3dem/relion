@@ -250,10 +250,25 @@ int TiltFit::_run()
     VtkHelper::writeVTK(fitFull, outPath+"_delta_phase_fit.vtk");
     fitFull.write(outPath+"_delta_phase_fit.mrc");
 
-    std::ofstream os(outPath+"_beam_tilt.txt");
+    std::ofstream os(outPath+"_beam_tilt_0.txt");
     os << "beamtilt_x = " << tilt_x << "\n";
     os << "beamtilt_y = " << tilt_y << "\n";
     os.close();
+
+    TiltRefinement::optimizeTilt(
+        xyAccSum, wgh, Cs, lambda, angpix, false,
+        shift_x, shift_y, tilt_x, tilt_y,
+        &shift_x, &shift_y, &tilt_x, &tilt_y, &fit);
+
+
+    FftwHelper::decenterUnflip2D(fit.data, fitFull.data);
+    VtkHelper::writeVTK(fitFull, outPath+"_delta_phase_iter_fit.vtk");
+    fitFull.write(outPath+"_delta_phase_iter_fit.mrc");
+
+    std::ofstream os2(outPath+"_beam_tilt_1.txt");
+    os2 << "beamtilt_x = " << tilt_x << "\n";
+    os2 << "beamtilt_y = " << tilt_y << "\n";
+    os2.close();
 
     double t1 = omp_get_wtime();
 
