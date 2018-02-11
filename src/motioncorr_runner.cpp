@@ -1493,20 +1493,51 @@ void MotioncorrRunner::doseWeighting(std::vector<MultidimArray<Complex> > &Ffram
 void MotioncorrRunner::shiftNonSquareImageInFourierTransform(MultidimArray<Complex> &frame, RFLOAT shiftx, RFLOAT shifty) {
 	const int nfx = XSIZE(frame), nfy = YSIZE(frame);
 	const int nfy_half = nfy / 2;
-	RFLOAT twoPI = 2 * PI;
+	const RFLOAT twoPI = 2 * PI;
 
+// Reduce calls to SINCOS from nfx * nfy to nfx + nfy
+#define USE_TABLE
+#ifdef USE_TABLE
+	std::vector<RFLOAT> sinx(nfx), cosx(nfx), siny(nfy), cosy(nfy);
 	for (int y = 0; y < nfy; y++) {
 		int ly = y;
 		if (y > nfy_half) ly = y - nfy;
 
+		const RFLOAT phase_y = twoPI * ly * shifty;
+		#ifdef RELION_SINGLE_PRECISION
+		SINCOSF(phase_y, &siny[y], &cosy[y]);
+		#else
+		SINCOS(phase_y, &siny[y], &cosy[y]);
+		#endif
+	}
+	for (int x = 0; x < nfx; x++) {
+		const RFLOAT phase_x = twoPI * x * shiftx;
+		#ifdef RELION_SINGLE_PRECISION
+		SINCOSF(phase_x, &sinx[x], &cosx[x]);
+		#else
+		SINCOS(phase_x, &sinx[x], &cosx[x]);
+		#endif
+	}
+#endif
+
+	for (int y = 0; y < nfy; y++) {
+#ifndef USE_TABLE
+		int ly = y;
+		if (y > nfy_half) ly = y - nfy;
+#endif
 		for (int x = 0; x < nfx; x++) {
-			RFLOAT phase_shift = twoPI * (x * shiftx + ly * shifty);
 			RFLOAT a, b, c, d, ac, bd, ab_cd;
-			// TODO: test tabulation
-#ifdef RELION_SINGLE_PRECISION
-			SINCOSF(phase_shift, &b, &a);
+#ifdef USE_TABLE
+			b = sinx[x] * cosy[y] + cosx[x] * siny[y];
+			a = cosx[x] * cosy[y] - sinx[x] * siny[y];
 #else
+			RFLOAT phase_shift = twoPI * (x * shiftx + ly * shifty);
+			// TODO: test tabulation
+			#ifdef RELION_SINGLE_PRECISION
+			SINCOSF(phase_shift, &b, &a);
+			#else
 			SINCOS(phase_shift, &b, &a);
+			#endif
 #endif
 			c = DIRECT_A2D_ELEM(frame, y, x).real;
 			d = DIRECT_A2D_ELEM(frame, y, x).imag;
