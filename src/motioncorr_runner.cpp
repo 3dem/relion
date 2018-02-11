@@ -1124,8 +1124,8 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 #endif
 
 	RFLOAT rms_x = 0, rms_y = 0;
-	RFLOAT x_fitted, y_fitted;
         for (int i = 0; i < n_obs; i++) {
+		RFLOAT x_fitted, y_fitted;
 		const RFLOAT x = patch_xs[i] / nx - 0.5;
 		const RFLOAT y = patch_ys[i] / ny - 0.5;
 		const RFLOAT z = patch_frames[i];
@@ -1178,13 +1178,37 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 	Iref().initZeros();
 	for (int iframe = 0; iframe < n_frames; iframe++) {
 		std::cout << "." << std::flush;
+		const RFLOAT z = iframe, z2 = iframe * iframe;
+		const RFLOAT z3 = z * z2;
+		// Common terms
+		const RFLOAT x_C0 = coeffX(0)  * z + coeffX(1)  * z2 + coeffX(2)  * z3;
+		const RFLOAT x_C1 = coeffX(3)  * z + coeffX(4)  * z2 + coeffX(5)  * z3;
+		const RFLOAT x_C2 = coeffX(6)  * z + coeffX(7)  * z2 + coeffX(8)  * z3;
+		const RFLOAT x_C3 = coeffX(9)  * z + coeffX(10) * z2 + coeffX(11) * z3;
+		const RFLOAT x_C4 = coeffX(12) * z + coeffX(13) * z2 + coeffX(14) * z3;
+		const RFLOAT x_C5 = coeffX(15) * z + coeffX(16) * z2 + coeffX(17) * z3;
+		const RFLOAT y_C0 = coeffY(0)  * z + coeffY(1)  * z2 + coeffY(2)  * z3;
+		const RFLOAT y_C1 = coeffY(3)  * z + coeffY(4)  * z2 + coeffY(5)  * z3;
+		const RFLOAT y_C2 = coeffY(6)  * z + coeffY(7)  * z2 + coeffY(8)  * z3;
+		const RFLOAT y_C3 = coeffY(9)  * z + coeffY(10) * z2 + coeffY(11) * z3;
+		const RFLOAT y_C4 = coeffY(12) * z + coeffY(13) * z2 + coeffY(14) * z3;
+		const RFLOAT y_C5 = coeffY(15) * z + coeffY(16) * z2 + coeffY(17) * z3;
+
 		#pragma omp parallel for schedule(static)
 		for (int ix = 0; ix < nx; ix++) {
+			const RFLOAT x = (RFLOAT)ix / nx - 0.5;
 			for (int iy = 0; iy < ny; iy++) {
 				bool valid = true;
-				const RFLOAT x = (float)ix / nx - 0.5;
-				const RFLOAT y = (float)iy / ny - 0.5;
-				getFittedXY(x, y, iframe, coeffX, coeffY, x_fitted, y_fitted);
+				const RFLOAT y = (RFLOAT)iy / ny - 0.5;
+				RFLOAT x_fitted = x_C0 + (x_C1 + x_C2 * x) * x + (x_C3 + x_C4 * y + x_C5 * x) * y;
+				RFLOAT y_fitted = y_C0 + (y_C1 + y_C2 * x) * x + (y_C3 + y_C4 * y + y_C5 * x) * y;
+#ifdef VALIDATE_OPTIMISED_CODE
+				RFLOAT x_fitted2, y_fitted2;
+				getFittedXY(x, y, iframe, coeffX, coeffY, x_fitted2, y_fitted2);
+				if (abs(x_fitted - x_fitted2) > 1E-4 || abs(y_fitted - y_fitted2) > 1E-4) {
+					std::cout << "error at " << x << ", " << y << " : " << x_fitted << " " << x_fitted2 << " " << y_fitted << " " << y_fitted2 << std::endl;
+				}
+#endif
 				x_fitted = ix - x_fitted; y_fitted = iy - y_fitted;
 
 				int x0 = FLOOR(x_fitted);
@@ -1300,9 +1324,9 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes,
 		RCTIC(TIMING_MAKE_REF);
 		Fref.initZeros();
 
-		// Changing the loop order to parallelise does not help
-		for (int iframe = 0; iframe < n_frames; iframe++) {
-			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fref) {
+		#pragma omp parallel for
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fref) {
+			for (int iframe = 0; iframe < n_frames; iframe++) {
 				DIRECT_MULTIDIM_ELEM(Fref, n) += DIRECT_MULTIDIM_ELEM(Fframes[iframe], n);
 			}
 		}
@@ -1478,6 +1502,7 @@ void MotioncorrRunner::shiftNonSquareImageInFourierTransform(MultidimArray<Compl
 		for (int x = 0; x < nfx; x++) {
 			RFLOAT phase_shift = twoPI * (x * shiftx + ly * shifty);
 			RFLOAT a, b, c, d, ac, bd, ab_cd;
+			// TODO: test tabulation
 #ifdef RELION_SINGLE_PRECISION
 			SINCOSF(phase_shift, &b, &a);
 #else
