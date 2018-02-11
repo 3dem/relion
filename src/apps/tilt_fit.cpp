@@ -41,7 +41,7 @@ class TiltFit : public RefinementProgram
         TiltFit();
 
             RFLOAT kmin;
-            bool precomputed;
+            bool precomputed, aniso;
             std::string precomp;
 
             Image<Complex> lastXY;
@@ -76,6 +76,7 @@ int TiltFit::readMoreOptions(IOParser& parser, int argc, char *argv[])
     kmin = textToFloat(parser.getOption("--kmin", "Inner freq. threshold [Angst]", "30.0"));
 
     precomp = parser.getOption("--precomp", "Precomputed *_xy and *_w files from previous run (optional)", "");
+    aniso = parser.checkOption("--aniso", "Use anisotropic coma model");
     precomputed = precomp != "";
 
     noReference = precomputed;
@@ -199,6 +200,8 @@ int TiltFit::_run()
 
     FilterHelper::getPhase(xyAccSum, phase);
 
+    Image<Complex> xyNrm(sh,s);
+
     if (useFsc)
     {
         FilterHelper::multiply(wAccSum, freqWeight, wgh);
@@ -223,6 +226,8 @@ int TiltFit::_run()
         }
 
         debug(y,x) = r == 0? 0.0 : sh/(2.0*angpix*r) - kmin;
+
+        xyNrm(y,x) = wAccSum(y,x) > 0.0? xyAccSum(y,x)/wAccSum(y,x) : Complex(0.0, 0.0);
     }
 
     VtkHelper::writeVTK(debug, outPath+"_debug.vtk");
@@ -237,7 +242,6 @@ int TiltFit::_run()
     VtkHelper::writeVTK(phaseFull, outPath+"_delta_phase.vtk");
     phaseFull.write(outPath+"_delta_phase.mrc");
     wgh.write(outPath+"_weight.mrc");
-
 
     RFLOAT shift_x, shift_y, tilt_x, tilt_y;
 
@@ -255,10 +259,23 @@ int TiltFit::_run()
     os << "beamtilt_y = " << tilt_y << "\n";
     os.close();
 
-    TiltRefinement::optimizeTilt(
-        xyAccSum, wgh, Cs, lambda, angpix, false,
-        shift_x, shift_y, tilt_x, tilt_y,
-        &shift_x, &shift_y, &tilt_x, &tilt_y, &fit);
+    double tilt_xx, tilt_xy, tilt_yy;
+
+    if (aniso)
+    {
+        TiltRefinement::optimizeAnisoTilt(
+            xyNrm, wgh, Cs, lambda, angpix, false,
+            shift_x, shift_y, tilt_x, tilt_y,
+            &shift_x, &shift_y, &tilt_x, &tilt_y,
+            &tilt_xx, &tilt_xy, &tilt_yy, &fit);
+    }
+    else
+    {
+        TiltRefinement::optimizeTilt(
+            xyNrm, wgh, Cs, lambda, angpix, false,
+            shift_x, shift_y, tilt_x, tilt_y,
+            &shift_x, &shift_y, &tilt_x, &tilt_y, &fit);
+    }
 
 
     FftwHelper::decenterUnflip2D(fit.data, fitFull.data);

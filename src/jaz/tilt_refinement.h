@@ -68,9 +68,29 @@ class TiltRefinement
                 RFLOAT* tilt_x, RFLOAT* tilt_y,
                 Image<RFLOAT>* fit);
 
+        static void optimizeAnisoTilt(
+                const Image<Complex>& xy,
+                const Image<RFLOAT>& weight,
+                RFLOAT Cs, RFLOAT lambda, RFLOAT angpix,
+                bool L1,
+                RFLOAT shift0_x, RFLOAT shift0_y,
+                RFLOAT tilt0_x, RFLOAT tilt0_y,
+                RFLOAT* shift_x, RFLOAT* shift_y,
+                RFLOAT* tilt_x, RFLOAT* tilt_y,
+                RFLOAT* tilt_xx, RFLOAT* tilt_xy, RFLOAT* tilt_yy,
+                Image<RFLOAT>* fit);
+
         static void drawPhaseShift(
                 RFLOAT shift_x, RFLOAT shift_y,
                 RFLOAT tilt_x, RFLOAT tilt_y,
+                int w, int h, double as,
+                gravis::d2Matrix magCorr,
+                Image<RFLOAT>* tgt);
+
+        static void drawPhaseShift(
+                RFLOAT shift_x, RFLOAT shift_y,
+                RFLOAT tilt_x, RFLOAT tilt_y,
+                double tilt_xx, double tilt_xy, double tilt_yy,
                 int w, int h, double as,
                 gravis::d2Matrix magCorr,
                 Image<RFLOAT>* tgt);
