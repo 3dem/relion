@@ -45,6 +45,8 @@
 #include "src/ml_optimiser.h"
 #ifdef CUDA
 #include "src/acc/cuda/cuda_ml_optimiser.h"
+#include <nvToolsExt.h>
+#include <cuda_profiler_api.h>
 #endif
 #ifdef ALTCPU
 	#include <tbb/tbb.h>

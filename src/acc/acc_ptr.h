@@ -493,6 +493,16 @@ public:
 	}
 
 	/**
+	 * Initiate all used memory with provided value
+	 */
+	void allInit(int value)
+	{
+		hostInit(value);
+		if (accType == accCUDA)
+			deviceInit(value);
+	}
+
+	/**
 	 * Copy a number (size) of bytes to device stored in the host pointer
 	 */
 	void cpToDevice()
@@ -633,7 +643,7 @@ public:
 		{
 #ifdef DEBUG_CUDA
 			if (dstDevPtr == NULL)
-				ACC_PTR_DEBUG_FATAL("NULL-pointer given in cp_on_device(dstDevPtr).\n");
+				ACC_PTR_DEBUG_FATAL("NULL-pointer given in cpOnDevice(dstDevPtr).\n");
 #endif
 			CudaShortcuts::cpyDeviceToDevice(dPtr, dstDevPtr, size, stream);
 		}

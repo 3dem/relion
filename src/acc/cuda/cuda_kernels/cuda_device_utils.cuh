@@ -151,6 +151,12 @@ __device__ __forceinline__ void translatePixel(
 	tImag = c * imag + s * real;
 }
 
+
+inline __device__ float2 operator*(float2 a, float b)
+{
+    return make_float2(a.x * b, a.y * b);
+}
+
 template< typename T>
 __global__ void cuda_kernel_init_complex_value(
 		T *data,

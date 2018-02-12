@@ -3,10 +3,12 @@
 
 #include "src/acc/acc_ptr.h"
 #include "src/acc/data_types.h"
+#include "src/error.h"
 #ifdef CUDA
 #include "src/acc/cuda/cuda_kernels/helper.cuh"
 #include "src/acc/cuda/cuda_kernels/wavg.cuh"
 #include "src/acc/cuda/cuda_kernels/diff2.cuh"
+#include "src/acc/cuda/cuda_fft.h"
 #else
 #include "src/acc/cpu/cpu_kernels/helper.h"
 #include "src/acc/cpu/cpu_kernels/wavg.h"
@@ -69,6 +71,8 @@ static void translate(int block_size,
 	int dy,
 	int dz=0)
 {
+	if(in.getAccPtr()==out.getAccPtr())
+		CRITICAL(ERRUNSAFEOBJECTREUSE);
 #ifdef CUDA
 int BSZ = ( (int) ceilf(( float)in.getxyz() /(float)block_size));
 
@@ -272,12 +276,19 @@ static void scanOnDevice(AccPtr<T> &in, AccPtr<T> &out)
 #endif
 }
 
+static void TranslateAndNormCorrect(MultidimArray<RFLOAT > &img_in,
+		AccPtr<XFLOAT> &img_out,
+		XFLOAT normcorr,
+		RFLOAT xOff,
+		RFLOAT yOff,
+		RFLOAT zOff,
+		bool DATA3D);
+
 static void softMaskBackgroundValue(
 		int inblock_dim, 
 		int inblock_size,
 		XFLOAT *vol,
 		Image<RFLOAT> &img,
-		bool     do_Mnoise,
 		XFLOAT   radius,
 		XFLOAT   radius_p,
 		XFLOAT   cosine_width,

@@ -13,6 +13,9 @@
 #include "src/macros.h"
 #include "src/error.h"
 
+
+#include <curand.h>
+
 // Required compute capability
 #define CUDA_CC_MAJOR 3
 #define CUDA_CC_MINOR 5
@@ -88,6 +91,18 @@ static void LaunchHandleError( cudaError_t err, const char *file, int line )
 }
 #endif
 
+static void HandleError( curandStatus_t err)
+{
+
+    if (err != cudaSuccess)
+    {
+       fprintf(stderr, "CURAND ERROR");
+               fflush(stdout);
+               raise(SIGSEGV);
+    }
+
+}
+
 
 // GENERAL -----------------------------
 #define MAX_RESOL_SHARED_MEM 		32
@@ -133,6 +148,12 @@ static void LaunchHandleError( cudaError_t err, const char *file, int line )
 #define POWERCLASS_BLOCK_SIZE 	128
 #define PROJDIFF_CHUNK_SIZE 	14
 // -------------------------------------
+
+// RANDOMIZATION -----------------------
+#define RND_BLOCK_NUM                   64
+#define RND_BLOCK_SIZE                  32
+// -------------------------------------
+
 
 #define BACKPROJECTION4_BLOCK_SIZE 64
 #define BACKPROJECTION4_GROUP_SIZE 16

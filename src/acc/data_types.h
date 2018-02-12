@@ -25,6 +25,11 @@ public:
 		x(0), y(0), z(0), fourier(false)
 	{}
 
+	Image(int xdim, AccPtrFactory &f):
+		AccPtr<T>(f.make<T>(xdim)),
+		x(xdim), y(1), z(1), fourier(false)
+	{}
+
 	Image(int xdim, int ydim, AccPtrFactory &f):
 		AccPtr<T>(f.make<T>(xdim*ydim)),
 		x(xdim), y(ydim), z(1), fourier(false)
@@ -82,10 +87,20 @@ public:
 		AccPtr<T>::setSize(x*y*z);
 	}
 
+	void setSize(int xdim)
+	{
+		x = xdim;
+		y = 1;
+		z = 1;
+
+		AccPtr<T>::setSize(x);
+	}
+
 	void setSize(int xdim, int ydim)
 	{
 		x = xdim;
 		y = ydim;
+		z = 1;
 
 		AccPtr<T>::setSize(x*y);
 	}

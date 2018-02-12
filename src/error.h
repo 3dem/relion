@@ -257,4 +257,7 @@ the relion developers at \n\n\
 		  -  through the command-line, add --particle_diameter <d> [A] \n\
 		both methods specify a diameter in Angstroms \n\n")
 
+#define ERRUNSAFEOBJECTREUSE ("An unsafe combination of pointers was found as input to a \n\
+		  function. You probably supplied the same object as both input \n\
+		  and output, which is not always safe, depending on the function design.")
 #endif

@@ -372,8 +372,12 @@ public:
     void setFourier(MultidimArray<Complex > &imgFourier);
 };
 
-// Randomize phases beyond the given shell (index)
+// Randomize phases beyond the given F-space shell (index) of R-space input image
 void randomizePhasesBeyond(MultidimArray<RFLOAT> &I, int index);
+
+// // Randomize phases beyond the given F-space shell (index) of F-space input image
+// void randomizePhasesBeyond(MultidimArray<Complex> &v, int index);
+
 
 /** Center an array, to have its origin at the origin of the FFTW
  *

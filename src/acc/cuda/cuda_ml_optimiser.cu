@@ -8,6 +8,9 @@
 #include <iostream>
 #include "src/ml_optimiser.h"
 #include <cuda_runtime.h>
+#include <curand.h>
+#include <curand_kernel.h>
+
 #include "src/acc/acc_ptr.h"
 #include "src/acc/acc_projector.h"
 #include "src/acc/acc_backprojector.h"
@@ -120,12 +123,6 @@ void MlDeviceBundle::setupFixedSizedObjects()
 
 		projectors[imodel].initMdl(baseMLO->mymodel.PPref[imodel].data.data);
 
-		/***********************************************************************************************
-		 * Remove the following condition when projections for multibody are done by the ACC projector
-		 ***********************************************************************************************/
-
-		if (baseMLO->mymodel.nr_bodies == 1)
-			baseMLO->mymodel.PPref[imodel].data.coreDeallocate();
 	}
 
 	for (int imodel = 0; imodel < nr_bproj; imodel++)

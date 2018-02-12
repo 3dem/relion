@@ -2,6 +2,8 @@
 #define CUDA_HELPER_KERNELS_CUH_
 
 #include <cuda_runtime.h>
+#include <curand.h>
+#include <curand_kernel.h>
 #include <vector>
 #include <iostream>
 #include <fstream>
@@ -178,6 +180,14 @@ __global__ void cuda_kernel_exponentiate_weights_fine(
 		unsigned long *d_job_num,
 		long int job_num);
 
+__global__ void cuda_kernel_initRND(unsigned long seed,
+                                    curandState *States);
+
+__global__ void cuda_kernel_RNDnormalDitributionComplexWithPowerModulation( ACCCOMPLEX *Image,
+                                                                            curandState *States,
+                                                                            long int xdim,
+                                                                            XFLOAT * spectra);
+
 __global__ void cuda_kernel_softMaskOutsideMap(	XFLOAT *vol,
 												long int vol_size,
 												long int xdim,
@@ -199,7 +209,6 @@ __global__ void cuda_kernel_softMaskBackgroundValue(	XFLOAT *vol,
 														long int xinit,
 														long int yinit,
 														long int zinit,
-														bool do_Mnoise,
 														XFLOAT radius,
 														XFLOAT radius_p,
 														XFLOAT cosine_width,
@@ -214,7 +223,8 @@ __global__ void cuda_kernel_cosineFilter(	XFLOAT *vol,
 											long int xinit,
 											long int yinit,
 											long int zinit,
-											bool do_Mnoise,
+											bool do_snoise,
+											XFLOAT *noise,
 											XFLOAT radius,
 											XFLOAT radius_p,
 											XFLOAT cosine_width,

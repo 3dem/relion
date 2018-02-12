@@ -96,13 +96,6 @@ void MlDataBundle::setup(MlOptimiser *baseMLO)
 
 		projectors[imodel].initMdl(baseMLO->mdlClassComplex[imodel]);
 
-		/***********************************************************************************************
-		 * Remove the following condition when projections for multibody are done by the ACC projector
-		 ***********************************************************************************************/
-
-		if (baseMLO->mymodel.nr_bodies == 1)
-			baseMLO->mymodel.PPref[imodel].data.coreDeallocate();
-
 	}
 
 	for (int imodel = 0; imodel < nr_bproj; imodel++)

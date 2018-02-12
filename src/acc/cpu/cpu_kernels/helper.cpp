@@ -59,7 +59,31 @@ void exponentiate_weights_fine(
 		}
 	}
 }
+void RNDnormalDitributionComplexWithPowerModulation(ACCCOMPLEX* Image, size_t xdim, XFLOAT *spectra)
+{
+	int x,y,size;
+	size = xdim*((xdim-1)*2)
+	for(int i=0; i<size; i++)
+    {
+		y = ( i / xdim ); // fftshift in one of two dims;
+		if(y>=xdim)
+			y -= (xdim-1)*2;
+		x = i % xdim;
 
+		int ires = (int)(sqrtf(x*x + y*y));
+
+		if(ires<xdim)
+		{
+			Image[i].x = rnd_gaus(0., spectra[ires]);
+			Image[i].y = rnd_gaus(0., spectra[ires]);
+		}
+		else
+		{
+			Image[i].x = 0;
+			Image[i].y = 0;
+		}
+    }
+}
 void softMaskBackgroundValue(	int      block_dim,
                                 int      block_size,
                                 XFLOAT  *vol,
@@ -70,7 +94,6 @@ void softMaskBackgroundValue(	int      block_dim,
 								long int xinit,
 								long int yinit,
 								long int zinit,
-								bool     do_Mnoise,
 								XFLOAT   radius,
 								XFLOAT   radius_p,
 								XFLOAT   cosine_width,
