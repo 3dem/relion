@@ -25,7 +25,6 @@
  */
 
 #include "src/backprojector.h"
-#include <omp.h>
 
 #define TIMING
 
@@ -1177,6 +1176,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 		// or Eq. (4) in Matej (2001)
 		for (int iter = 0; iter < max_iter_preweight; iter++)
 		{
+            std::cout << "    iteration " << (iter+1) << "/" << max_iter_preweight << "\n";
 			RCTIC(ReconTimer,ReconS_6);
 			// Set Fnewweight * Fweight in the transformer
 			// In Matej et al (2001), weights w_P^i are convoluted with the kernel,
@@ -1185,7 +1185,6 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 			// but each "sampling point" counts "Fweight" times!
 			// That is why Fnewweight is multiplied by Fweight prior to the convolution
 
-            #pragma omp parallel for num_threads(nr_threads)
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fconv)
 			{
 				DIRECT_MULTIDIM_ELEM(Fconv, n) = DIRECT_MULTIDIM_ELEM(Fnewweight, n) * DIRECT_MULTIDIM_ELEM(Fweight, n);
@@ -1197,16 +1196,8 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 
 			RFLOAT w, corr_min = LARGE_NUMBER, corr_max = -LARGE_NUMBER, corr_avg=0., corr_nn=0.;
 
-            #pragma omp parallel for num_threads(nr_threads)
-            //FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fconv)
-            for (long int k = 0; k < ZSIZE(Fconv); k++)
-            for (long int i = 0; i < YSIZE(Fconv); i++)
-            for (long int j = 0; j < XSIZE(Fconv); j++)
-			{
-                long int kp = (k < XSIZE(Fconv)) ? k : k - ZSIZE(Fconv);
-                long int ip = (i < XSIZE(Fconv)) ? i : i - YSIZE(Fconv);
-                long int jp = j;
-
+            FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fconv)
+            {
 				if (kp * kp + ip * ip + jp * jp < max_r2)
 				{
 
@@ -1802,8 +1793,7 @@ void BackProjector::convoluteBlobRealSpace(FourierTransformer &transformer, bool
 	//blob.radius = 1.9 * padding_factor;
 	//blob.alpha = 15;
 
-	// Multiply with FT of the blob kernel    
-    #pragma omp parallel for num_threads(threads)
+    // Multiply with FT of the blob kernel
 	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Mconv)
     {
 		int kp = (k < padhdim) ? k : k - pad_size;
