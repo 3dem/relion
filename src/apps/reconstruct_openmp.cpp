@@ -314,7 +314,7 @@ class reconstruct_parameters
         // Check for beam-tilt parameters in the input star file
         if (cl_beamtilt)
         {
-            std::cout << " + Using the beamtilt parameters from command line" << std::endl;
+            std::cout << " + Using the beamtilt parameters from the command line" << std::endl;
             do_beamtilt = true;
         }
         else if ( DF.containsLabel(EMDL_IMAGE_BEAMTILT_X) || DF.containsLabel(EMDL_IMAGE_BEAMTILT_Y) )
@@ -326,6 +326,15 @@ class reconstruct_parameters
         {
             std::cout << " + Assuming zero beamtilt" << std::endl;
             do_beamtilt = false;
+        }
+
+        if (anisoTilt)
+        {
+            std::cout << " + Assuming anisotropic coma model" << std::endl;
+        }
+        else
+        {
+            std::cout << " + Assuming isotropic coma model" << std::endl;
         }
 
         std::vector<BackProjector> backprojectors(nr_omp_threads);
@@ -681,7 +690,7 @@ class reconstruct_parameters
         std::cerr << "Starting the reconstruction ..." << std::endl;
         backprojector.symmetrise(nr_helical_asu, helical_twist, helical_rise/angpix);
         backprojector.reconstruct(vol(), iter, do_map, 1., dummy, dummy, dummy, dummy,
-                                  fsc, 1., do_use_fsc, true, nr_omp_threads, -1, true);
+                                  fsc, 1., do_use_fsc, true, nr_omp_threads, -1, false);
 
         MultidimArray<Complex> F2D;
 

@@ -1357,7 +1357,7 @@ void selfApplyBeamTilt(MultidimArray<Complex > &Fimg,
 
     FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(Fimg)
     {
-        RFLOAT q = beamtilt_xx * jp * jp + beamtilt_xy * ip * jp + beamtilt_yy * ip * ip;
+        RFLOAT q = beamtilt_xx * jp * jp + 2.0 * beamtilt_xy * ip * jp + beamtilt_yy * ip * ip;
         RFLOAT delta_phase = factor * q * (ip * beamtilt_y + jp * beamtilt_x);
         RFLOAT realval = DIRECT_A2D_ELEM(Fimg, i, j).real;
         RFLOAT imagval = DIRECT_A2D_ELEM(Fimg, i, j).imag;
