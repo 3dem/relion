@@ -50,7 +50,7 @@ class reconstruct_parameters
         helical_rise, helical_twist;
 
     bool do_ctf, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak,
-        do_fom_weighting, do_3d_rot, do_reconstruct_ctf, do_beamtilt, anisoTilt, do_ewald;
+        do_fom_weighting, do_3d_rot, do_reconstruct_ctf, do_beamtilt, cl_beamtilt, anisoTilt, do_ewald;
 
     bool skip_gridding, do_reconstruct_ctf2, do_reconstruct_meas, is_positive, read_weights;
 
@@ -88,7 +88,7 @@ class reconstruct_parameters
         only_flip_phases = parser.checkOption("--only_flip_phases", "Do not correct CTF-amplitudes, only flip phases");
         beamtilt_x = textToFloat(parser.getOption("--beamtilt_x", "Beamtilt in the X-direction (in mrad)", "0."));
         beamtilt_y = textToFloat(parser.getOption("--beamtilt_y", "Beamtilt in the Y-direction (in mrad)", "0."));
-        do_beamtilt = (ABS(beamtilt_x) > 0. || ABS(beamtilt_y) > 0.);
+        cl_beamtilt = (ABS(beamtilt_x) > 0. || ABS(beamtilt_y) > 0.);
 
         beamtilt_xx = textToFloat(parser.getOption("--beamtilt_xx", "Anisotropic beamtilt, XX-coefficient", "1."));
         beamtilt_xy = textToFloat(parser.getOption("--beamtilt_xy", "Anisotropic beamtilt, XY-coefficient", "0."));
@@ -150,7 +150,7 @@ class reconstruct_parameters
 
         randomize_random_generator();
 
-        if (do_beamtilt || do_ewald)
+        if (cl_beamtilt || do_ewald)
             do_ctf = true;
 
     }
@@ -313,10 +313,20 @@ class reconstruct_parameters
         }
 
         // Check for beam-tilt parameters in the input star file
-        if (do_beamtilt || ( DF.containsLabel(EMDL_IMAGE_BEAMTILT_X)
-                             || DF.containsLabel(EMDL_IMAGE_BEAMTILT_Y) ) )
+        if (cl_beamtilt)
+        {
+            std::cout << " + Using the beamtilt parameters from command line" << std::endl;
+            do_beamtilt = true;
+        }
+        else if ( DF.containsLabel(EMDL_IMAGE_BEAMTILT_X) || DF.containsLabel(EMDL_IMAGE_BEAMTILT_Y) )
         {
             std::cout << " + Using the beamtilt parameters in the input STAR file" << std::endl;
+            do_beamtilt = true;
+        }
+        else
+        {
+            std::cout << " + Assuming zero beamtilt" << std::endl;
+            do_beamtilt = false;
         }
 
         std::vector<BackProjector> backprojectors(nr_omp_threads);
@@ -458,17 +468,19 @@ class reconstruct_parameters
                                          ctf_phase_flipped, only_flip_phases,
                                          intact_ctf_first_peak, true);
 
-                        if (do_beamtilt || (   mdts[g].containsLabel(EMDL_IMAGE_BEAMTILT_X)
-                                            && mdts[g].containsLabel(EMDL_IMAGE_BEAMTILT_Y) ))
+                        if (do_beamtilt)
                         {
-                            if (mdts[g].containsLabel(EMDL_IMAGE_BEAMTILT_X))
+                            if (!cl_beamtilt)
                             {
-                                mdts[g].getValue(EMDL_IMAGE_BEAMTILT_X, beamtilt_x, p);
-                            }
+                                if (mdts[g].containsLabel(EMDL_IMAGE_BEAMTILT_X))
+                                {
+                                    mdts[g].getValue(EMDL_IMAGE_BEAMTILT_X, beamtilt_x, p);
+                                }
 
-                            if (mdts[g].containsLabel(EMDL_IMAGE_BEAMTILT_Y))
-                            {
-                                mdts[g].getValue(EMDL_IMAGE_BEAMTILT_Y, beamtilt_y, p);
+                                if (mdts[g].containsLabel(EMDL_IMAGE_BEAMTILT_Y))
+                                {
+                                    mdts[g].getValue(EMDL_IMAGE_BEAMTILT_Y, beamtilt_y, p);
+                                }
                             }
 
                             if (anisoTilt)

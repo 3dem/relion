@@ -25,6 +25,7 @@
  */
 
 #include "src/backprojector.h"
+#include <omp.h>
 
 #define TIMING
 
@@ -1162,7 +1163,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 		}
 		RCTOC(ReconTimer,ReconS_4);
 		RCTIC(ReconTimer,ReconS_5);
-		// Initialise Fnewweight with 1's and 0's. (also see comments below)
+        // Initialise Fnewweight with 1's and 0's. (also see comments below)
 		FOR_ALL_ELEMENTS_IN_ARRAY3D(weight)
 		{
 			if (k * k + i * i + j * j < max_r2)
@@ -1183,6 +1184,8 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 			// Here the initial weights are also 1 (see initialisation Fnewweight above),
 			// but each "sampling point" counts "Fweight" times!
 			// That is why Fnewweight is multiplied by Fweight prior to the convolution
+
+            #pragma omp parallel for num_threads(nr_threads)
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fconv)
 			{
 				DIRECT_MULTIDIM_ELEM(Fconv, n) = DIRECT_MULTIDIM_ELEM(Fnewweight, n) * DIRECT_MULTIDIM_ELEM(Fweight, n);
@@ -1190,11 +1193,20 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 
 			// convolute through Fourier-transform (as both grids are rectangular)
 			// Note that convoluteRealSpace acts on the complex array inside the transformer
-			convoluteBlobRealSpace(transformer);
+            convoluteBlobRealSpace(transformer, false, nr_threads);
 
 			RFLOAT w, corr_min = LARGE_NUMBER, corr_max = -LARGE_NUMBER, corr_avg=0., corr_nn=0.;
-			FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fconv)
+
+            #pragma omp parallel for num_threads(nr_threads)
+            //FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fconv)
+            for (long int k = 0; k < ZSIZE(Fconv); k++)
+            for (long int i = 0; i < YSIZE(Fconv); i++)
+            for (long int j = 0; j < XSIZE(Fconv); j++)
 			{
+                long int kp = (k < XSIZE(Fconv)) ? k : k - ZSIZE(Fconv);
+                long int ip = (i < XSIZE(Fconv)) ? i : i - YSIZE(Fconv);
+                long int jp = j;
+
 				if (kp * kp + ip * ip + jp * jp < max_r2)
 				{
 
@@ -1764,7 +1776,7 @@ void BackProjector::applyPointGroupSymmetry()
 
 }
 
-void BackProjector::convoluteBlobRealSpace(FourierTransformer &transformer, bool do_mask)
+void BackProjector::convoluteBlobRealSpace(FourierTransformer &transformer, bool do_mask, int threads)
 {
 
 	MultidimArray<RFLOAT> Mconv;
@@ -1790,7 +1802,8 @@ void BackProjector::convoluteBlobRealSpace(FourierTransformer &transformer, bool
 	//blob.radius = 1.9 * padding_factor;
 	//blob.alpha = 15;
 
-	// Multiply with FT of the blob kernel
+	// Multiply with FT of the blob kernel    
+    #pragma omp parallel for num_threads(threads)
 	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Mconv)
     {
 		int kp = (k < padhdim) ? k : k - pad_size;
