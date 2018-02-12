@@ -975,7 +975,7 @@ long int MetaDataTable::read(const FileName &filename, const std::string &name, 
 
     std::ifstream in(fn_read.data(), std::ios_base::in);
     if (in.fail())
-        REPORT_ERROR( (std::string) "MetaDataTable::read: File " + fn_read + " does not exists" );
+        REPORT_ERROR( (std::string) "MetaDataTable::read: File " + fn_read + " does not exist" );
 
     FileName ext = filename.getFileFormat();
     if (ext =="star")
@@ -985,7 +985,7 @@ long int MetaDataTable::read(const FileName &filename, const std::string &name, 
     }
     else
     {
-        REPORT_ERROR("MetaDataTable::read ERROR: metadatatable should have .star extension");
+        REPORT_ERROR("MetaDataTable::read ERROR: metadata table should have a .star extension");
     }
 
     in.close();
@@ -1103,7 +1103,7 @@ void MetaDataTable::write(const FileName &fn_out) const
     std::ofstream  fh;
     fh.open((fn_out).c_str(), std::ios::out);
     if (!fh)
-        REPORT_ERROR( (std::string)"MetaDataTable::write Cannot write to file: " + fn_out);
+        REPORT_ERROR( (std::string)"MetaDataTable::write: cannot write to file: " + fn_out);
     write(fh);
     fh.close();
 
@@ -1134,7 +1134,7 @@ void MetaDataTable::addToCPlot2D(CPlot2D *plot2D, EMDLabel xaxis, EMDLabel yaxis
     {
 		const long offx = label2offset[xaxis];
 		if (offx < 0)
-			REPORT_ERROR("MetaDataTable::addToCPlot2D ERROR: cannot find xaxis label");
+            REPORT_ERROR("MetaDataTable::addToCPlot2D ERROR: cannot find x-axis label");
 
 
 		if (EMDL::isDouble(xaxis))
@@ -1153,11 +1153,11 @@ void MetaDataTable::addToCPlot2D(CPlot2D *plot2D, EMDLabel xaxis, EMDLabel yaxis
     		xval = mylong;
     	}
     	else
-    		REPORT_ERROR("MetaDataTable::addToCPlot2D ERROR: can only plot xaxis double, int or long int");
+            REPORT_ERROR("MetaDataTable::addToCPlot2D ERROR: can only plot x-axis double, int or long int");
 
 		const long offy = label2offset[yaxis];
 		if (offy < 0)
-			REPORT_ERROR("MetaDataTable::addToCPlot2D ERROR: cannot find yaxis label");
+            REPORT_ERROR("MetaDataTable::addToCPlot2D ERROR: cannot find y-axis label");
 
 		if (EMDL::isDouble(yaxis))
     	{
@@ -1175,7 +1175,7 @@ void MetaDataTable::addToCPlot2D(CPlot2D *plot2D, EMDLabel xaxis, EMDLabel yaxis
     		yval = mylong;
     	}
     	else
-    		REPORT_ERROR("MetaDataTable::addToCPlot2D ERROR: can only plot yaxis double, int or long int");
+            REPORT_ERROR("MetaDataTable::addToCPlot2D ERROR: can only plot y-axis double, int or long int");
 
     	CDataPoint point(xval, yval);
 		dataSet.AddDataPoint(point);

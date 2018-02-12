@@ -41,14 +41,16 @@ class reconstruct_parameters
     MetaDataTable DF;
 
     int r_max, r_min_nn, blob_order, ref_dim, interpolator, iter,
-    nr_fft_threads, nr_omp_threads, debug_ori_size, debug_size,
-    ctf_dim, nr_helical_asu, newbox, width_mask_edge, nr_sectors, subset;
+        nr_fft_threads, nr_omp_threads, debug_ori_size, debug_size,
+        ctf_dim, nr_helical_asu, newbox, width_mask_edge, nr_sectors, subset;
 
     RFLOAT blob_radius, blob_alpha, angular_error, shift_error, angpix, maxres,
-    beamtilt_x, beamtilt_y, helical_rise, helical_twist;
+        beamtilt_x, beamtilt_y,
+        beamtilt_xx, beamtilt_xy, beamtilt_yy,
+        helical_rise, helical_twist;
 
     bool do_ctf, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak,
-    do_fom_weighting, do_3d_rot, do_reconstruct_ctf, do_beamtilt, do_ewald;
+        do_fom_weighting, do_3d_rot, do_reconstruct_ctf, do_beamtilt, anisoTilt, do_ewald;
 
     bool skip_gridding, do_reconstruct_ctf2, do_reconstruct_meas, is_positive, read_weights;
 
@@ -87,6 +89,13 @@ class reconstruct_parameters
         beamtilt_x = textToFloat(parser.getOption("--beamtilt_x", "Beamtilt in the X-direction (in mrad)", "0."));
         beamtilt_y = textToFloat(parser.getOption("--beamtilt_y", "Beamtilt in the Y-direction (in mrad)", "0."));
         do_beamtilt = (ABS(beamtilt_x) > 0. || ABS(beamtilt_y) > 0.);
+
+        beamtilt_xx = textToFloat(parser.getOption("--beamtilt_xx", "Anisotropic beamtilt, XX-coefficient", "1."));
+        beamtilt_xy = textToFloat(parser.getOption("--beamtilt_xy", "Anisotropic beamtilt, XY-coefficient", "0."));
+        beamtilt_yy = textToFloat(parser.getOption("--beamtilt_yy", "Anisotropic beamtilt, YY-coefficient", "1."));
+
+        anisoTilt = beamtilt_xx != 1.0 || beamtilt_xy != 0.0 || beamtilt_yy != 1.0;
+
         read_weights = parser.checkOption("--read_weights", "Read freq. weight files");
         do_ewald = parser.checkOption("--ewald", "Correct for Ewald-sphere curvature (developmental)");
         mask_diameter  = textToFloat(parser.getOption("--mask_diameter", "Diameter (in A) of mask for Ewald-sphere curvature correction", "-1."));
@@ -462,8 +471,19 @@ class reconstruct_parameters
                                 mdts[g].getValue(EMDL_IMAGE_BEAMTILT_Y, beamtilt_y, p);
                             }
 
-                            selfApplyBeamTilt(F2D, beamtilt_x, beamtilt_y,
-                                              ctf.lambda, ctf.Cs, angpix, mysize);
+                            if (anisoTilt)
+                            {
+                                selfApplyBeamTilt(
+                                    F2D, beamtilt_x, beamtilt_xy,
+                                    beamtilt_xx, beamtilt_xy, beamtilt_yy,
+                                    ctf.lambda, ctf.Cs, angpix, mysize);
+                            }
+                            else
+                            {
+                                selfApplyBeamTilt(
+                                    F2D, beamtilt_x, beamtilt_y,
+                                    ctf.lambda, ctf.Cs, angpix, mysize);
+                            }
                         }
 
                         // Ewald-sphere curvature correction
@@ -650,7 +670,7 @@ class reconstruct_parameters
         std::cerr << "Starting the reconstruction ..." << std::endl;
         backprojector.symmetrise(nr_helical_asu, helical_twist, helical_rise/angpix);
         backprojector.reconstruct(vol(), iter, do_map, 1., dummy, dummy, dummy, dummy,
-                                  fsc, 1., do_use_fsc, true, nr_fft_threads, -1);
+                                  fsc, 1., do_use_fsc, true, nr_fft_threads, -1, true);
 
         MultidimArray<Complex> F2D;
 

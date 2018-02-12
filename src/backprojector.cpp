@@ -26,6 +26,8 @@
 
 #include "src/backprojector.h"
 
+#define TIMING
+
 #ifdef TIMING
 	#define RCTIC(timer,label) (timer.tic(label))
     #define RCTOC(timer,label) (timer.toc(label))
