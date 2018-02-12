@@ -41,7 +41,7 @@ class reconstruct_parameters
     MetaDataTable DF;
 
     int r_max, r_min_nn, blob_order, ref_dim, interpolator, iter,
-        nr_fft_threads, nr_omp_threads, debug_ori_size, debug_size,
+        nr_omp_threads, debug_ori_size, debug_size,
         ctf_dim, nr_helical_asu, newbox, width_mask_edge, nr_sectors, subset;
 
     RFLOAT blob_radius, blob_alpha, angular_error, shift_error, angpix, maxres,
@@ -76,7 +76,6 @@ class reconstruct_parameters
         angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms)", "1"));
         maxres = textToFloat(parser.getOption("--maxres", "Maximum resolution (in Angstrom) to consider in Fourier space (default Nyquist)", "-1"));
         padding_factor = textToFloat(parser.getOption("--pad", "Padding factor", "2"));
-        nr_fft_threads = textToInteger(parser.getOption("--jfft", "Number of threads to use for FFTs", "1"));
         nr_omp_threads = textToInteger(parser.getOption("--jomp", "Number of open-mp threads to use. Memory footprint is multiplied by this value.", "16"));
         image_path = parser.getOption("--img", "Image path", "");
         subset = textToInteger(parser.getOption("--subset", "Subset of images to consider (0: even; 1: odd; other: all)", "-1"));
@@ -682,7 +681,7 @@ class reconstruct_parameters
         std::cerr << "Starting the reconstruction ..." << std::endl;
         backprojector.symmetrise(nr_helical_asu, helical_twist, helical_rise/angpix);
         backprojector.reconstruct(vol(), iter, do_map, 1., dummy, dummy, dummy, dummy,
-                                  fsc, 1., do_use_fsc, true, nr_fft_threads, -1, true);
+                                  fsc, 1., do_use_fsc, true, nr_omp_threads, -1, true);
 
         MultidimArray<Complex> F2D;
 
