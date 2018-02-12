@@ -145,14 +145,11 @@ int CsFit::_run()
 
         if (applyTilt)
         {
-            if (nr_omp_threads > 1)
-            {
-                obsF = StackHelper::applyBeamTiltPar(obsF, Cs, lambda, angpix, beamtilt_x, beamtilt_y, nr_omp_threads);
-            }
-            else
-            {
-                obsF = StackHelper::applyBeamTilt(obsF, Cs, lambda, angpix, beamtilt_x, beamtilt_y);
-            }
+            obsF = StackHelper::applyBeamTiltPar(
+                        obsF, Cs, lambda, angpix,
+                        beamtilt_x, beamtilt_y,
+                        beamtilt_xx, beamtilt_xy, beamtilt_yy,
+                        nr_omp_threads);
         }
 
         #pragma omp parallel for num_threads(nr_omp_threads)

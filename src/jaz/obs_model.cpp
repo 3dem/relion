@@ -5,20 +5,23 @@
 
 ObservationModel::ObservationModel()
 :   angpix(-1),
-    hasTilt(false)
+    hasTilt(false),
+    anisoTilt(false)
 {
 }
 
 ObservationModel::ObservationModel(double angpix)
 :   angpix(angpix),
-    hasTilt(false)
+    hasTilt(false),
+    anisoTilt(false)
 {
 }
 
 ObservationModel::ObservationModel(double angpix, double Cs, double voltage, double beamtilt_x, double beamtilt_y)
 :   angpix(angpix),
     lambda(12.2643247 / sqrt(voltage * (1.0 + voltage * 0.978466e-6))),
-    Cs(Cs), beamtilt_x(beamtilt_x), beamtilt_y(beamtilt_y), hasTilt(true)
+    Cs(Cs), beamtilt_x(beamtilt_x), beamtilt_y(beamtilt_y), hasTilt(true),
+    anisoTilt(false)
 {
 }
 
@@ -63,7 +66,16 @@ Image<Complex> ObservationModel::predictObservation(
 
     if (applyTilt && hasTilt)
     {
-        selfApplyBeamTilt(pred.data, -beamtilt_x, -beamtilt_y, lambda, Cs, angpix, s);
+        if (anisoTilt)
+        {
+            selfApplyBeamTilt(pred.data, -beamtilt_x, -beamtilt_y,
+                              beamtilt_xx, beamtilt_xy, beamtilt_yy,
+                              lambda, Cs, angpix, s);
+        }
+        else
+        {
+            selfApplyBeamTilt(pred.data, -beamtilt_x, -beamtilt_y, lambda, Cs, angpix, s);
+        }
     }
 
     return pred;
@@ -133,4 +145,12 @@ void ObservationModel::insertObservation(const Image<Complex>& img, BackProjecto
     }
 
     bproj.set2DFourierTransform(F2D, A3D, IS_NOT_INV, &Fctf);
+}
+
+void ObservationModel::setAnisoTilt(double xx, double xy, double yy)
+{
+    beamtilt_xx = xx;
+    beamtilt_xy = xy;
+    beamtilt_yy = yy;
+    anisoTilt = true;
 }

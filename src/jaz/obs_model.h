@@ -19,7 +19,8 @@ class ObservationModel
 
             double angpix, lambda, Cs;
             double beamtilt_x, beamtilt_y;
-            bool hasTilt;
+            double beamtilt_xx, beamtilt_xy, beamtilt_yy;
+            bool hasTilt, anisoTilt;
 
         Image<Complex> predictObservation(
                 Projector &proj, MetaDataTable &mdt, int particle,
@@ -33,6 +34,8 @@ class ObservationModel
                 MetaDataTable& mdt, int particle,
                 bool applyCtf, bool applyTilt,
                 double shift_x = 0.0, double shift_y = 0.0);
+
+        void setAnisoTilt(double xx, double xy, double yy);
 
 };
 

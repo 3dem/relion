@@ -854,7 +854,13 @@ void highPassFilterMap(MultidimArray<RFLOAT > &img, RFLOAT low_pass, RFLOAT angp
  *  Phase shifts caused by the beamtilt will be calculated and applied to Fimg
  */
 void selfApplyBeamTilt(MultidimArray<Complex > &Fimg, RFLOAT beamtilt_x, RFLOAT beamtilt_y,
-		RFLOAT wavelength, RFLOAT Cs, RFLOAT angpix, int ori_size);
+        RFLOAT wavelength, RFLOAT Cs, RFLOAT angpix, int ori_size);
+
+/* same as above, but for the anisotropic coma model*/
+void selfApplyBeamTilt(MultidimArray<Complex > &Fimg,
+        RFLOAT beamtilt_x, RFLOAT beamtilt_y,
+        RFLOAT beamtilt_xx, RFLOAT beamtilt_xy, RFLOAT beamtilt_yy,
+        RFLOAT wavelength, RFLOAT Cs, RFLOAT angpix, int ori_size);
 
 void applyBeamTilt(const MultidimArray<Complex > &Fin, MultidimArray<Complex > &Fout, RFLOAT beamtilt_x, RFLOAT beamtilt_y,
 		RFLOAT wavelength, RFLOAT Cs, RFLOAT angpix, int ori_size);

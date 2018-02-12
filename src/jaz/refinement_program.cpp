@@ -73,8 +73,14 @@ int RefinementProgram::init(int argc, char *argv[])
         {
             beamtilt_x = textToFloat(parser.getOption("--beamtilt_x", "Beamtilt in X-direction (in mrad)", "0."));
             beamtilt_y = textToFloat(parser.getOption("--beamtilt_y", "Beamtilt in Y-direction (in mrad)", "0."));
-            applyTilt = (ABS(beamtilt_x) > 0. || ABS(beamtilt_y) > 0.);
+            applyTilt = ABS(beamtilt_x) > 0. || ABS(beamtilt_y) > 0.;
         }
+
+        beamtilt_xx = textToFloat(parser.getOption("--beamtilt_xx", "Anisotropic beamtilt, XX-coefficient", "1."));
+        beamtilt_xy = textToFloat(parser.getOption("--beamtilt_xy", "Anisotropic beamtilt, XY-coefficient", "0."));
+        beamtilt_yy = textToFloat(parser.getOption("--beamtilt_yy", "Anisotropic beamtilt, YY-coefficient", "1."));
+
+        anisoTilt = beamtilt_xx != 1.0 || beamtilt_xy != 0.0 || beamtilt_yy != 1.0;
 
         nr_omp_threads = textToInteger(parser.getOption("--jomp", "Number of OMP threads", "1"));
         minMG = textToInteger(parser.getOption("--min_MG", "First micrograph index", "0"));
@@ -282,6 +288,11 @@ int RefinementProgram::init(int argc, char *argv[])
     if (applyTilt)
     {
         obsModel = ObservationModel(angpix, Cs, kV * 1e3, beamtilt_x, beamtilt_y);
+
+        if (anisoTilt)
+        {
+            obsModel.setAnisoTilt(beamtilt_xx, beamtilt_xy, beamtilt_yy);
+        }
     }
 
     int rc0 = _init();

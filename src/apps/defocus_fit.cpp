@@ -39,7 +39,7 @@ class DefocusFit : public RefinementProgram
     public:
 
         RFLOAT defocusRange;
-        bool fitAstigmatism, diag;
+        bool fitAstigmatism, noGlobAstig, diag;
 
         int readMoreOptions(IOParser& parser, int argc, char *argv[]);
         int _init();
@@ -60,6 +60,7 @@ int main(int argc, char *argv[])
 int DefocusFit::readMoreOptions(IOParser& parser, int argc, char *argv[])
 {
     fitAstigmatism = parser.checkOption("--astig", "Estimate independent astigmatism for each particle");
+    noGlobAstig = parser.checkOption("--no_glob_astig", "Skip per-micrograph astigmatism estimation");
     diag = parser.checkOption("--diag", "Write out defocus errors");
     defocusRange = textToFloat(parser.getOption("--range", "Defocus scan range (in A)", "2000."));
 
@@ -99,13 +100,74 @@ int DefocusFit::_run()
 
         if (applyTilt)
         {
-            if (nr_omp_threads > 1)
+            obsF = StackHelper::applyBeamTiltPar(
+                        obsF, Cs, lambda, angpix,
+                        beamtilt_x, beamtilt_y,
+                        beamtilt_xx, beamtilt_xy, beamtilt_yy,
+                        nr_omp_threads);
+        }
+
+        std::vector<Image<Complex>> preds(pc);
+
+        #pragma omp parallel for num_threads(nr_omp_threads)
+        for (long p = 0; p < pc; p++)
+        {
+            int randSubset;
+            mdts[g].getValue(EMDL_PARTICLE_RANDOM_SUBSET, randSubset, p);
+            randSubset -= 1;
+
+            preds[p] = obsModel.predictObservation(
+                projectors[randSubset], mdts[g], p, false, true);
+        }
+
+        if (!noGlobAstig)
+        {
+            CTF ctf0;
+            ctf0.read(mdts[g], mdts[g], 0);
+
+            if (diag)
             {
-                obsF = StackHelper::applyBeamTiltPar(obsF, Cs, lambda, angpix, beamtilt_x, beamtilt_y, nr_omp_threads);
+                Image<RFLOAT> ctfFit(s,s);
+                ctf0.getCenteredImage(ctfFit.data, angpix, false, false, false, false);
+                VtkHelper::writeVTK(ctfFit, outPath+"_astig0_m"+stsg.str()+".vtk");
+
+                Image<RFLOAT> dotp0(sh,s), dotp0_full(s,s);
+                dotp0.data.initZeros();
+
+                for (long p = 0; p < pc; p++)
+                {
+                    for (long y = 0; y < s; y++)
+                    for (long x = 0; x < sh; x++)
+                    {
+                        Complex vx = DIRECT_A2D_ELEM(preds[p].data, y, x);
+                        const Complex vy = DIRECT_A2D_ELEM(obsF[p].data, y, x);
+
+                        dotp0(y,x) += vy.real*vx.real + vy.imag*vx.imag;
+                    }
+                }
+
+                FftwHelper::decenterDouble2D(dotp0.data, dotp0_full.data);
+                VtkHelper::writeVTK(dotp0_full, outPath+"_astig_data_m"+stsg.str()+".vtk");
             }
-            else
+
+            double u, v, phi;
+            DefocusRefinement::findAstigmatismNM(preds, obsF, freqWeight, ctf0, angpix, &u, &v, &phi);
+
+            for (long p = 0; p < pc; p++)
             {
-                obsF = StackHelper::applyBeamTilt(obsF, Cs, lambda, angpix, beamtilt_x, beamtilt_y);
+                mdts[g].setValue(EMDL_CTF_DEFOCUSU, u, p);
+                mdts[g].setValue(EMDL_CTF_DEFOCUSV, v, p);
+                mdts[g].setValue(EMDL_CTF_DEFOCUS_ANGLE, phi, p);
+            }
+
+            if (diag)
+            {
+                CTF ctf1;
+                ctf1.read(mdts[g], mdts[g], 0);
+
+                Image<RFLOAT> ctfFit(s,s);
+                ctf1.getCenteredImage(ctfFit.data, angpix, false, false, false, false);
+                VtkHelper::writeVTK(ctfFit, outPath+"_astig1_m"+stsg.str()+".vtk");
             }
         }
 
@@ -121,17 +183,8 @@ int DefocusFit::_run()
                 CTF ctf0;
                 ctf0.read(mdts[g], mdts[g], p);
 
-                int randSubset;
-                mdts[g].getValue(EMDL_PARTICLE_RANDOM_SUBSET, randSubset, p);
-                randSubset -= 1;
-
-                Image<Complex> pred;
-
-                pred = obsModel.predictObservation(
-                    projectors[randSubset], mdts[g], p, false, true);
-
                 std::vector<d2Vector> cost = DefocusRefinement::diagnoseDefocus(
-                    pred, obsF[p], freqWeight,
+                    preds[p], obsF[p], freqWeight,
                     ctf0, angpix, defocusRange, 100, nr_omp_threads);
 
                 double cMin = cost[0][1];
@@ -164,21 +217,12 @@ int DefocusFit::_run()
                 CTF ctf0;
                 ctf0.read(mdts[g], mdts[g], p);
 
-                int randSubset;
-                mdts[g].getValue(EMDL_PARTICLE_RANDOM_SUBSET, randSubset, p);
-                randSubset -= 1;
-
-                Image<Complex> pred;
-
-                pred = obsModel.predictObservation(
-                    projectors[randSubset], mdts[g], p, false, true);
-
                 CTF ctf(ctf0);
 
                 if (fitAstigmatism)
                 {
                     double u, v, phi;
-                    DefocusRefinement::findAstigmatismNM(pred, obsF[p], freqWeight, ctf0, angpix, &u, &v, &phi);
+                    DefocusRefinement::findAstigmatismNM(preds[p], obsF[p], freqWeight, ctf0, angpix, &u, &v, &phi);
 
                     mdts[g].setValue(EMDL_CTF_DEFOCUSU, u, p);
                     mdts[g].setValue(EMDL_CTF_DEFOCUSV, v, p);
@@ -192,7 +236,7 @@ int DefocusFit::_run()
                 else
                 {
                     double u, v;
-                    DefocusRefinement::findDefocus1D(pred, obsF[p], freqWeight, ctf0, angpix, &u, &v, defocusRange);
+                    DefocusRefinement::findDefocus1D(preds[p], obsF[p], freqWeight, ctf0, angpix, &u, &v, defocusRange);
 
                     mdts[g].setValue(EMDL_CTF_DEFOCUSU, u, p);
                     mdts[g].setValue(EMDL_CTF_DEFOCUSV, v, p);

@@ -1323,24 +1323,50 @@ void applyBeamTilt(const MultidimArray<Complex > &Fin, MultidimArray<Complex > &
 }
 
 void selfApplyBeamTilt(MultidimArray<Complex > &Fimg, RFLOAT beamtilt_x, RFLOAT beamtilt_y,
-		RFLOAT wavelength, RFLOAT Cs, RFLOAT angpix, int ori_size)
+        RFLOAT wavelength, RFLOAT Cs, RFLOAT angpix, int ori_size)
 {
-	if (Fimg.getDim() != 2)
-		REPORT_ERROR("applyBeamTilt can only be done on 2D Fourier Transforms!");
+    if (Fimg.getDim() != 2)
+        REPORT_ERROR("applyBeamTilt can only be done on 2D Fourier Transforms!");
 
-	RFLOAT boxsize = angpix * ori_size;
-	RFLOAT factor = 0.360 * Cs * 10000000 * wavelength * wavelength / (boxsize * boxsize * boxsize);
-	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(Fimg)
-	{
-		RFLOAT delta_phase = factor * (ip * ip + jp * jp) * (ip * beamtilt_y + jp * beamtilt_x);
-		RFLOAT realval = DIRECT_A2D_ELEM(Fimg, i, j).real;
-		RFLOAT imagval = DIRECT_A2D_ELEM(Fimg, i, j).imag;
-		RFLOAT mag = sqrt(realval * realval + imagval * imagval);
-		RFLOAT phas = atan2(imagval, realval) + DEG2RAD(delta_phase); // apply phase shift!
-		realval = mag * cos(phas);
-		imagval = mag * sin(phas);
-		DIRECT_A2D_ELEM(Fimg, i, j) = Complex(realval, imagval);
-	}
+    RFLOAT boxsize = angpix * ori_size;
+    RFLOAT factor = 0.360 * Cs * 10000000 * wavelength * wavelength / (boxsize * boxsize * boxsize);
+    FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(Fimg)
+    {
+        RFLOAT delta_phase = factor * (ip * ip + jp * jp) * (ip * beamtilt_y + jp * beamtilt_x);
+        RFLOAT realval = DIRECT_A2D_ELEM(Fimg, i, j).real;
+        RFLOAT imagval = DIRECT_A2D_ELEM(Fimg, i, j).imag;
+        RFLOAT mag = sqrt(realval * realval + imagval * imagval);
+        RFLOAT phas = atan2(imagval, realval) + DEG2RAD(delta_phase); // apply phase shift!
+        realval = mag * cos(phas);
+        imagval = mag * sin(phas);
+        DIRECT_A2D_ELEM(Fimg, i, j) = Complex(realval, imagval);
+    }
+
+}
+
+void selfApplyBeamTilt(MultidimArray<Complex > &Fimg,
+        RFLOAT beamtilt_x, RFLOAT beamtilt_y,
+        RFLOAT beamtilt_xx, RFLOAT beamtilt_xy, RFLOAT beamtilt_yy,
+        RFLOAT wavelength, RFLOAT Cs, RFLOAT angpix, int ori_size)
+{
+    if (Fimg.getDim() != 2)
+        REPORT_ERROR("applyBeamTilt can only be done on 2D Fourier Transforms!");
+
+    RFLOAT boxsize = angpix * ori_size;
+    RFLOAT factor = 0.360 * Cs * 10000000 * wavelength * wavelength / (boxsize * boxsize * boxsize);
+
+    FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(Fimg)
+    {
+        RFLOAT q = beamtilt_xx * jp * jp + beamtilt_xy * ip * jp + beamtilt_yy * ip * ip;
+        RFLOAT delta_phase = factor * q * (ip * beamtilt_y + jp * beamtilt_x);
+        RFLOAT realval = DIRECT_A2D_ELEM(Fimg, i, j).real;
+        RFLOAT imagval = DIRECT_A2D_ELEM(Fimg, i, j).imag;
+        RFLOAT mag = sqrt(realval * realval + imagval * imagval);
+        RFLOAT phas = atan2(imagval, realval) + DEG2RAD(delta_phase); // apply phase shift!
+        realval = mag * cos(phas);
+        imagval = mag * sin(phas);
+        DIRECT_A2D_ELEM(Fimg, i, j) = Complex(realval, imagval);
+    }
 
 }
 

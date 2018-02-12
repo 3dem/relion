@@ -42,6 +42,14 @@ class AstigmatismOptimizationAcc : public Optimization
                 RFLOAT angpix,
                 RFLOAT phiScale = 10);
 
+        AstigmatismOptimizationAcc(
+                const std::vector<Image<Complex>>& prediction,
+                const std::vector<Image<Complex>>& observation,
+                const Image<RFLOAT>& weight,
+                const CTF& ctf0,
+                RFLOAT angpix,
+                RFLOAT phiScale = 10);
+
         double f(const std::vector<double>& x) const;
 
         double getU(const std::vector<double> &x);
@@ -73,6 +81,13 @@ class DefocusRefinement
         static void findAstigmatismNM(
             const Image<Complex>& prediction,
             const Image<Complex>& observation,
+            const Image<RFLOAT>& weight,
+            const CTF& ctf0, RFLOAT angpix,
+            RFLOAT* destU, RFLOAT* destV, RFLOAT* destPhi);
+
+        static void findAstigmatismNM(
+            const std::vector<Image<Complex>>& prediction,
+            const std::vector<Image<Complex>>& observation,
             const Image<RFLOAT>& weight,
             const CTF& ctf0, RFLOAT angpix,
             RFLOAT* destU, RFLOAT* destV, RFLOAT* destPhi);

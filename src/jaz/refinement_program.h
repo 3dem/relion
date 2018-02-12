@@ -27,13 +27,15 @@ class RefinementProgram
 
             // options:
 
-            bool singleReference, doesMovies, debug, applyTilt, useFsc,
+            bool singleReference, doesMovies, debug, applyTilt, anisoTilt, useFsc,
                 optStar, noStar, optReference, noReference, noTilt,
                 preextracted, nogain;
 
             long maxMG, minMG;
 
-            RFLOAT angpix, paddingFactor, beamtilt_x, beamtilt_y;
+            RFLOAT angpix, paddingFactor,
+                beamtilt_x, beamtilt_y,
+                beamtilt_xx, beamtilt_xy, beamtilt_yy;
 
             int nr_omp_threads, bin, coords_bin, movie_bin;
 

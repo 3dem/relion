@@ -48,11 +48,14 @@ class StackHelper
 
         static std::vector<Image<Complex> > applyBeamTilt(std::vector<Image<Complex> >& stack,
                                   RFLOAT Cs, RFLOAT lambda, RFLOAT angpix,
-                                  RFLOAT tilt_x, RFLOAT tilt_y);
+                                  RFLOAT tilt_x, RFLOAT tilt_y,
+                                  RFLOAT tilt_xx, RFLOAT tilt_xy, RFLOAT tilt_yy);
 
         static std::vector<Image<Complex> > applyBeamTiltPar(std::vector<Image<Complex> >& stack,
                                   RFLOAT Cs, RFLOAT lambda, RFLOAT angpix,
-                                  RFLOAT tilt_x, RFLOAT tilt_y, int numThreads);
+                                  RFLOAT tilt_x, RFLOAT tilt_y,
+                                  RFLOAT tilt_xx, RFLOAT tilt_xy, RFLOAT tilt_yy,
+                                  int numThreads);
 
         static void varianceNormalize(std::vector<Image<Complex>>& movie, bool circleCropped = false);
 

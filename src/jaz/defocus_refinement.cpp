@@ -81,6 +81,24 @@ void DefocusRefinement::findAstigmatismNM(
     *destPhi = opt.getPhi(params);
 }
 
+void DefocusRefinement::findAstigmatismNM(
+        const std::vector<Image<Complex>>& prediction,
+        const std::vector<Image<Complex>>& observation,
+        const Image<RFLOAT> &weight,
+        const CTF &ctf0, RFLOAT angpix,
+        double *destU, double *destV, double *destPhi)
+{
+    AstigmatismOptimizationAcc opt(prediction, observation, weight, ctf0, angpix);
+
+    std::vector<double> initial = opt.getInitialParams();
+
+    std::vector<double> params = NelderMead::optimize(initial, opt, 50.0, 1.0, 1000);
+
+    *destU = opt.getU(params);
+    *destV = opt.getV(params);
+    *destPhi = opt.getPhi(params);
+}
+
 std::vector<d2Vector> DefocusRefinement::diagnoseDefocus(
         const Image<Complex> &prediction,
         const Image<Complex> &observation,
@@ -156,6 +174,38 @@ AstigmatismOptimizationAcc::AstigmatismOptimizationAcc(
         const RFLOAT wp = vw * x2;
 
         DIRECT_A2D_ELEM(data.data, y, x) = Complex(yxb, wp);
+    }
+}
+
+AstigmatismOptimizationAcc::AstigmatismOptimizationAcc(
+        const std::vector<Image<Complex>>& prediction,
+        const std::vector<Image<Complex>>& observation,
+        const Image<RFLOAT>& weight,
+        const CTF& ctf0, RFLOAT angpix, RFLOAT phiScale)
+:   ctf0(ctf0), angpix(angpix), phiScale(phiScale)
+{
+    const long w = prediction[0].data.xdim;
+    const long h = prediction[0].data.ydim;
+
+    data = Image<Complex>(w,h);
+    data.data.initZeros();
+
+    for (int i = 0; i < prediction.size(); i++)
+    {
+        for (long y = 0; y < h; y++)
+        for (long x = 0; x < w; x++)
+        {
+            Complex vx = DIRECT_A2D_ELEM(prediction[i].data, y, x);
+            const Complex vy = DIRECT_A2D_ELEM(observation[i].data, y, x);
+            const RFLOAT vw = DIRECT_A2D_ELEM(weight.data, y, x);
+
+            const RFLOAT x2 = vx.real*vx.real + vx.imag*vx.imag;
+
+            const RFLOAT yxb = x2 > 0.0? (vy.real*vx.real + vy.imag*vx.imag)/x2 : 0.0;
+            const RFLOAT wp = vw * x2;
+
+            DIRECT_A2D_ELEM(data.data, y, x) += Complex(yxb, wp);
+        }
     }
 }
 
