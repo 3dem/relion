@@ -98,14 +98,14 @@ int DefocusFit::_run()
 
         obsF = StackHelper::loadStackFS(&mdts[g], imgPath, nr_omp_threads, &fts);
 
-        if (applyTilt)
+        /*if (applyTilt)
         {
             obsF = StackHelper::applyBeamTiltPar(
                         obsF, Cs, lambda, angpix,
                         beamtilt_x, beamtilt_y,
                         beamtilt_xx, beamtilt_xy, beamtilt_yy,
                         nr_omp_threads);
-        }
+        }*/
 
         std::vector<Image<Complex>> preds(pc);
 
@@ -222,7 +222,9 @@ int DefocusFit::_run()
                 if (fitAstigmatism)
                 {
                     double u, v, phi;
-                    DefocusRefinement::findAstigmatismNM(preds[p], obsF[p], freqWeight, ctf0, angpix, &u, &v, &phi);
+                    DefocusRefinement::findAstigmatismNM(
+                                preds[p], obsF[p], freqWeight, ctf0,
+                                angpix, &u, &v, &phi);
 
                     mdts[g].setValue(EMDL_CTF_DEFOCUSU, u, p);
                     mdts[g].setValue(EMDL_CTF_DEFOCUSV, v, p);
@@ -236,7 +238,9 @@ int DefocusFit::_run()
                 else
                 {
                     double u, v;
-                    DefocusRefinement::findDefocus1D(preds[p], obsF[p], freqWeight, ctf0, angpix, &u, &v, defocusRange);
+                    DefocusRefinement::findDefocus1D(
+                                preds[p], obsF[p], freqWeight, ctf0,
+                                angpix, &u, &v, defocusRange);
 
                     mdts[g].setValue(EMDL_CTF_DEFOCUSU, u, p);
                     mdts[g].setValue(EMDL_CTF_DEFOCUSV, v, p);
