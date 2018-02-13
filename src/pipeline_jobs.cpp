@@ -2065,14 +2065,8 @@ Therefore, the calculations will need to be stopped by the user if further itera
 Also note that upon restarting, the iteration number continues to be increased, starting from the final iteration in the previous run. \
 The number given here is the TOTAL number of iterations. For example, if 10 iterations have been performed previously and one restarts to perform \
 an additional 5 iterations (for example with a finer angular sampling), then the number given here should be 10+5=15.");
+	joboptions["do_fast_subsets"] = JobOption("Use fast subsets (for large data sets)?", false, "If set to Yes, the first 5 iterations will be done with random subsets of only K*100 particles (K being the number of classes); the next 5 with K*300 particles, the next 5 with 30% of the data set; and the final ones with all data. This was inspired by a cisTEM implementation by Niko Grigorieff et al.");
 
-	joboptions["do_subsets"] = JobOption("Use subsets for initial updates?", false, "If set to True, multiple maximization updates (as many as defined by the 'Number of subset updates') will be performed during the first iteration(s): each time after the number of particles in a subset has been processed. \
-By using subsets with much fewer particles than the entire data set, the initial updates will be much faster, while the very low resolution class averages will not be notably worse than with the entire data set. \n\n \
-This will greatly speed up 2D classifications with very many (hundreds of thousands or more) particles. A useful subset size is probably in the order of ten thousand particles. If the data set only comprises (tens of) thousands of particles, this option may be less useful.");
-	joboptions["subset_size"] = JobOption("Initial subset size:", 10000, 1000, 50000, 1000, "Number of individual particles after which one will perform a maximization update in the first iteration(s). \
-A useful subset size is probably in the order of ten thousand particles.");
-	joboptions["max_subsets"] = JobOption("Number of subset updates:", 3, 1, 10, 1, "This option is only used when a positive number is given for the 'Initial subset size'. In that case, in the first iteration, maximization updates are performed over a smaller subset of the particles to speed up calculations.\
-Useful values are probably in the range of 2-5 subset updates. Using more might speed up further, but with the risk of affecting the results. If the number of subsets times the subset size is larger than the number of particles in the data set, then more than 1 iteration will be split into subsets.");
 	joboptions["particle_diameter"] = JobOption("Mask diameter (A):", 200, 0, 1000, 10, "The experimental images will be masked with a soft \
 circular mask with this diameter. Make sure this radius is not set too small because that may mask away part of the signal! \
 If set to a value larger than the image size no masking will be performed.\n\n\
@@ -2210,11 +2204,8 @@ bool RelionJob::getCommandsClass2DJob(std::string &outputname, std::vector<std::
 
 	// Optimisation
 	command += " --iter " + joboptions["nr_iter"].getString();
-	if (joboptions["do_subsets"].getBoolean())
-	{
-		command += " --write_subsets 1 --subset_size " + joboptions["subset_size"].getString();
-		command += " --max_subsets " + joboptions["max_subsets"].getString();
-	}
+	if (joboptions["do_fast_subsets"].getBoolean())
+		command += " --fast_subsets ";
 
 	command += " --tau2_fudge " + joboptions["tau_fudge"].getString();
     command += " --particle_diameter " + joboptions["particle_diameter"].getString();
@@ -2419,7 +2410,6 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 
     outputNodes = getOutputNodesRefine(outputname + fn_run, total_nr_iter, 1, 3, 1);
 
-	command += " --sgd ";
 	command += " --sgd_ini_iter " + joboptions["sgd_ini_iter"].getString();
 	command += " --sgd_inbetween_iter " + joboptions["sgd_inbetween_iter"].getString();
 	command += " --sgd_fin_iter " + joboptions["sgd_fin_iter"].getString();
@@ -2431,6 +2421,8 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 
 	if (!is_continue)
 	{
+		command += " --sgd ";
+
 		if (joboptions["fn_img"].getString() == "")
 		{
 			error_message = "ERROR: empty field for input STAR file...";
@@ -2591,13 +2583,8 @@ Therefore, the calculations will need to be stopped by the user if further itera
 Also note that upon restarting, the iteration number continues to be increased, starting from the final iteration in the previous run. \
 The number given here is the TOTAL number of iterations. For example, if 10 iterations have been performed previously and one restarts to perform \
 an additional 5 iterations (for example with a finer angular sampling), then the number given here should be 10+5=15.");
-	joboptions["do_subsets"] = JobOption("Use subsets for initial updates?", false, "If set to True, multiple maximization updates (as many as defined by the 'Number of subset updates') will be performed during the first iteration(s): each time after the number of particles in a subset has been processed. \
-By using subsets with much fewer particles than the entire data set, the initial updates will be much faster, while the very low resolution class averages will not be notably worse than with the entire data set. \n\n \
-This will greatly speed up classifications with very many (hundreds of thousands or more) particles. A useful subset size is probably in the order of ten thousand particles. If the data set only comprises (tens of) thousands of particles, this option may be less useful.");
-	joboptions["subset_size"] = JobOption("Initial subset size:", 10000, 1000, 50000, 1000, "Number of individual particles after which one will perform a maximization update in the first iteration(s). \
-A useful subset size is probably in the order of ten thousand particles.");
-	joboptions["max_subsets"] = JobOption("Number of subset updates:", 3, 1, 10, 1, "This option is only used when a positive number is given for the 'Initial subset size'. In that case, in the first iteration, maximization updates are performed over a smaller subset of the particles to speed up calculations.\
-Useful values are probably in the range of 2-5 subset updates. Using more might speed up further, but with the risk of affecting the results. If the number of subsets times the subset size is larger than the number of particles in the data set, then more than 1 iteration will be split into subsets.");
+	joboptions["do_fast_subsets"] = JobOption("Use fast subsets (for large data sets)?", false, "If set to Yes, the first 5 iterations will be done with random subsets of only K*1500 particles (K being the number of classes); the next 5 with K*4500 particles, the next 5 with 30% of the data set; and the final ones with all data. This was inspired by a cisTEM implementation by Niko Grigorieff et al.");
+
 	joboptions["particle_diameter"] = JobOption("Mask diameter (A):", 200, 0, 1000, 10, "The experimental images will be masked with a soft \
 circular mask with this diameter. Make sure this radius is not set too small because that may mask away part of the signal! \
 If set to a value larger than the image size no masking will be performed.\n\n\
@@ -2805,11 +2792,8 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 
 	// Optimisation
 	command += " --iter " + joboptions["nr_iter"].getString();
-	if (joboptions["do_subsets"].getBoolean())
-	{
-		command += " --write_subsets 1 --subset_size " + joboptions["subset_size"].getString();
-		command += " --max_subsets " + joboptions["max_subsets"].getString();
-	}
+	if (joboptions["do_fast_subsets"].getBoolean())
+		command += " --fast_subsets ";
 	command += " --tau2_fudge " + joboptions["tau_fudge"].getString();
     command += " --particle_diameter " + joboptions["particle_diameter"].getString();
 	if (!is_continue)
@@ -4034,16 +4018,7 @@ bool RelionJob::getCommandsPostprocessJob(std::string &outputname, std::vector<s
 	}
 	Node node(joboptions["fn_in"].getString(), joboptions["fn_in"].node_type);
 	inputNodes.push_back(node);
-	int pos_half = joboptions["fn_in"].getString().rfind("_half");
-	if (pos_half < joboptions["fn_in"].getString().size())
-	{
-		command += " --i " + joboptions["fn_in"].getString().substr(0, pos_half);
-	}
-	else
-	{
-		error_message = "PostJobWindow::getCommands ERROR: cannot find _half substring in input filename!";
-		return false;
-	}
+	command += " --i " + joboptions["fn_in"].getString();
 
 	// The output name contains a directory: use it for output
 	command += " --o " + outputname + "postprocess";

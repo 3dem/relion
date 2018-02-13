@@ -1187,15 +1187,7 @@ void JobWindow::initialiseClass2DWindow()
 	current_y += STEPY/2;
 
 	place("nr_iter");
-	place("do_subsets", TOGGLE_DEACTIVATE, group2);
-
-	group2->begin();
-
-	place("subset_size", TOGGLE_DEACTIVATE);
-	place("max_subsets", TOGGLE_DEACTIVATE);
-	group2->end();
-
-	guientries["do_subsets"].cb_menu_i(); // to make default effective
+	place("do_fast_subsets", TOGGLE_DEACTIVATE);
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -1454,13 +1446,7 @@ void JobWindow::initialiseClass3DWindow()
 	current_y += STEPY/2;
 
 	place("nr_iter");
-	place("do_subsets", TOGGLE_DEACTIVATE, group2);
-
-	group2->begin();
-	place("subset_size", TOGGLE_DEACTIVATE);
-	place("max_subsets", TOGGLE_DEACTIVATE);
-	group2->end();
-	guientries["do_subsets"].cb_menu_i(); // to make default effective
+	place("do_fast_subsets", TOGGLE_DEACTIVATE);
 
 	// Add a little spacer
 	current_y += STEPY/2;
