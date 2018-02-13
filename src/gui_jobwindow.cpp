@@ -1259,6 +1259,7 @@ void JobWindow::initialiseClass2DWindow()
 
 	place("do_parallel_discio");
 	place("nr_pool");
+	place("do_pad1");
 	place("do_preread_images");
 	place("scratch_dir");
 	place("do_combine_thru_disc");
@@ -1314,30 +1315,52 @@ void JobWindow::initialiseInimodelWindow()
 	tab2->end();
 
 	tab3->begin();
-	tab3->label("SGD");
+	tab3->label("Optimisation");
 	resetHeight();
 
+	place("nr_classes", TOGGLE_DEACTIVATE);
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
 	place("particle_diameter");
+	place("do_solvent", TOGGLE_DEACTIVATE);
 	place("sym_name", TOGGLE_DEACTIVATE);
 
 	// Add a little spacer
 	current_y += STEPY/2;
 
-	place("nr_iter");
-	place("sgd_subset_size");
-	place("sgd_write_subsets");
-	place("sgd_highres_limit");
-	place("sgd_sigma2fudge_halflife");
-
-	tab3->end();
-	tab4->begin();
-	tab4->label("Sampling");
-
-	resetHeight();
-
 	place("sampling");
 	place("offset_range");
 	place("offset_step");
+
+	tab3->end();
+	tab4->begin();
+	tab4->label("SGD");
+
+	resetHeight();
+
+	place("sgd_ini_iter");
+	place("sgd_inbetween_iter");
+	place("sgd_fin_iter");
+	place("sgd_write_iter");
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	place("sgd_ini_resol");
+	place("sgd_fin_resol");
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	place("sgd_ini_subset_size");
+	place("sgd_fin_subset_size");
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	place("sgd_sigma2fudge_halflife", TOGGLE_DEACTIVATE);
 
 	tab4->end();
 
@@ -1347,6 +1370,7 @@ void JobWindow::initialiseInimodelWindow()
 
 	place("do_parallel_discio");
 	place("nr_pool");
+	place("do_pad1");
 	place("do_preread_images");
 	place("scratch_dir");
 	place("do_combine_thru_disc");
@@ -1535,6 +1559,7 @@ void JobWindow::initialiseClass3DWindow()
 
 	place("do_parallel_discio");
 	place("nr_pool");
+	place("do_pad1");
 	place("do_preread_images");
 	place("scratch_dir");
 	place("do_combine_thru_disc");
@@ -1673,6 +1698,7 @@ void JobWindow::initialiseAutorefineWindow()
 
 	place("do_parallel_discio");
 	place("nr_pool");
+	place("do_pad1");
 	place("do_preread_images");
 	place("scratch_dir");
 	place("do_combine_thru_disc");

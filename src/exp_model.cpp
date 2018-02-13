@@ -416,11 +416,11 @@ void Experiment::divideOriginalParticlesInRandomHalves(int seed, bool do_helical
 
 }
 
-void Experiment::randomiseOriginalParticlesOrder(int seed, bool do_split_random_halves)
+void Experiment::randomiseOriginalParticlesOrder(int seed, bool do_split_random_halves, bool do_subsets)
 {
 	//This static flag is for only randomize once
 	static bool randomised = false;
-	if (!randomised)
+	if (!randomised || do_subsets)
 	{
 
 		srand(seed);
