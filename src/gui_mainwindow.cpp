@@ -469,46 +469,52 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
     browse_grp[11]->end();
 
     browse_grp[12] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-	browser->add("Movie refinement");
+	browser->add("3D multi-body");
 	gui_jobwindows[12] = new JobWindow();
-	gui_jobwindows[12]->initialise(PROC_MOVIEREFINE, maingui_do_old_style);
+	gui_jobwindows[12]->initialise(PROC_MULTIBODY, maingui_do_old_style);
     browse_grp[12]->end();
 
     browse_grp[13] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-	browser->add("Particle polishing");
+	browser->add("Movie refinement");
 	gui_jobwindows[13] = new JobWindow();
-	gui_jobwindows[13]->initialise(PROC_POLISH, maingui_do_old_style);
+	gui_jobwindows[13]->initialise(PROC_MOVIEREFINE, maingui_do_old_style);
     browse_grp[13]->end();
 
     browse_grp[14] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-	browser->add("Mask creation");
+	browser->add("Particle polishing");
 	gui_jobwindows[14] = new JobWindow();
-	gui_jobwindows[14]->initialise(PROC_MASKCREATE, maingui_do_old_style);
+	gui_jobwindows[14]->initialise(PROC_POLISH, maingui_do_old_style);
     browse_grp[14]->end();
 
     browse_grp[15] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-	browser->add("Join star files");
+	browser->add("Mask creation");
 	gui_jobwindows[15] = new JobWindow();
-	gui_jobwindows[15]->initialise(PROC_JOINSTAR, maingui_do_old_style);
+	gui_jobwindows[15]->initialise(PROC_MASKCREATE, maingui_do_old_style);
     browse_grp[15]->end();
 
     browse_grp[16] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-	browser->add("Particle subtraction");
+	browser->add("Join star files");
 	gui_jobwindows[16] = new JobWindow();
-	gui_jobwindows[16]->initialise(PROC_SUBTRACT, maingui_do_old_style);
+	gui_jobwindows[16]->initialise(PROC_JOINSTAR, maingui_do_old_style);
     browse_grp[16]->end();
 
     browse_grp[17] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-	browser->add("Post-processing");
+	browser->add("Particle subtraction");
 	gui_jobwindows[17] = new JobWindow();
-	gui_jobwindows[17]->initialise(PROC_POST, maingui_do_old_style);
+	gui_jobwindows[17]->initialise(PROC_SUBTRACT, maingui_do_old_style);
     browse_grp[17]->end();
 
     browse_grp[18] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-	browser->add("Local resolution");
+	browser->add("Post-processing");
 	gui_jobwindows[18] = new JobWindow();
-	gui_jobwindows[18]->initialise(PROC_RESMAP, maingui_do_old_style);
+	gui_jobwindows[18]->initialise(PROC_POST, maingui_do_old_style);
     browse_grp[18]->end();
+
+    browse_grp[19] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+	browser->add("Local resolution");
+	gui_jobwindows[19] = new JobWindow();
+	gui_jobwindows[19]->initialise(PROC_RESMAP, maingui_do_old_style);
+    browse_grp[19]->end();
 
     browser->callback(cb_select_browsegroup);
     browser->textsize(RLN_FONTSIZE);

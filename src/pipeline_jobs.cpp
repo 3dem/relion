@@ -652,6 +652,11 @@ void RelionJob::initialise(int _job_type)
 		has_mpi = has_thread = true;
 		initialiseAutorefineJob();
 	}
+	else if (type == PROC_MULTIBODY)
+	{
+		has_mpi = has_thread = true;
+		initialiseMultiBodyJob();
+	}
 	else if (type == PROC_MOVIEREFINE)
 	{
 		has_mpi = has_thread = true;
@@ -1044,6 +1049,7 @@ void RelionJob::initialiseMotioncorrJob()
 	}
 
 	joboptions["do_motioncor2"] = JobOption("Use MOTIONCOR2?", true ,"If set to Yes, Shawn Zheng's MOTIONCOR2 will be used instead of UNBLUR.");
+	joboptions["do_3rd_motioncor"] = JobOption("Wrap to UCSF-implementation?", true ,"If set to No, use RELION's own implementation of MotionCor2 by Takanori Nakane, instead of wrapping to the UCSF implementation.");
 	joboptions["fn_motioncor2_exe"] = JobOption("MOTIONCOR2 executable:", std::string(default_location), "*.*", ".", "Location of the MOTIONCOR2 executable. You can control the default of this field by setting environment variable RELION_MOTIONCOR2_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
 	joboptions["fn_gain_ref"] = JobOption("Gain-reference image:", "", "*.mrc", ".", "Location of the gain-reference file to be applied to the input micrographs. Leave this empty if the movies are already gain-corrected.");
 	joboptions["fn_defect"] = JobOption("Defect file:", "", "*", ".", "Location of the MOTIONCOR2-style ASCII file that describes the defect pixels on the detector (using the -DefectFile option). Leave empty if you don't have any defects, or don't want to correct for defects on your detector.");
@@ -1140,9 +1146,16 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 	else if (joboptions["do_motioncor2"].getBoolean())
 	{
 		// Motioncor2-specific stuff
-		command += " --use_motioncor2";
+		if (joboptions["do_3rd_motioncor"].getBoolean())
+		{
+			command += " --use_motioncor2";
+			command += " --motioncor2_exe " + joboptions["fn_motioncor2_exe"].getString();
+		}
+		else
+		{
+			command += " --use_own ";
+		}
 		command += " --bin_factor " + joboptions["bin_factor"].getString();
-		command += " --motioncor2_exe " + joboptions["fn_motioncor2_exe"].getString();
 		command += " --bfactor " + joboptions["bfactor"].getString();
 		command += " --angpix " +  joboptions["angpix"].getString();
 		command += " --patch_x " + joboptions["patch_x"].getString();
@@ -2469,13 +2482,13 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
     command += " --o " + outputname + fn_run;
 	outputNodes = getOutputNodesRefine(outputname + fn_run, (int)joboptions["nr_iter"].getNumber(), 1, 3, 1);
 
-	command += " --sgd ";
 	command += " --subset_size " + joboptions["sgd_subset_size"].getString();
 	command += " --strict_highres_sgd " + joboptions["sgd_highres_limit"].getString();
 	command += " --write_subsets " + joboptions["sgd_write_subsets"].getString();
 
 	if (!is_continue)
 	{
+		command += " --sgd ";
 		if (joboptions["fn_img"].getString() == "")
 		{
 			error_message = "ERROR: empty field for input STAR file...";
@@ -3318,6 +3331,172 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 				command += " --helical_sigma_distance " + floatToString(joboptions["helical_range_distance"].getNumber() / 3.);
 		}
 	}
+
+	// Running stuff
+	command += " --j " + joboptions["nr_threads"].getString();
+
+	// GPU-stuff
+	if (joboptions["use_gpu"].getBoolean())
+	{
+		command += " --gpu \"" + joboptions["gpu_ids"].getString() + "\"";
+	}
+
+	// Other arguments
+	command += " " + joboptions["other_args"].getString();
+
+	commands.push_back(command);
+
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
+
+
+}
+
+void RelionJob::initialiseMultiBodyJob()
+{
+	type = PROC_MULTIBODY;
+
+	hidden_name = ".gui_multibody";
+
+	joboptions["fn_in"] = JobOption("Consensus refinement optimiser.star: ", std::string(""), "STAR Files (*_optimiser.star)", "Refine3D/", "Select the *_optimiser.star file for the iteration of the consensus refinement \
+from which you want to start multi-body refinement.");
+
+	joboptions["fn_cont"] = JobOption("Continue from here: ", std::string(""), "STAR Files (*_optimiser.star)", "CURRENT_ODIR", "Select the *_optimiser.star file for the iteration \
+from which you want to continue this multi-body refinement. \
+Note that the Output rootname of the continued run and the rootname of the previous run cannot be the same. \
+If they are the same, the program will automatically add a '_ctX' to the output rootname, \
+with X being the iteration from which one continues the previous run.");
+
+	joboptions["fn_bodies"] = JobOption("Body STAR file:", std::string(""), "STAR Files (*.{star})", ".", " Provide the STAR file with all information about the bodies to be used in multi-body refinement. \
+An example for a three-body refinement would look like this: \n\
+ \n \
+data_ \n \
+loop_ \n \
+_rlnBodyMaskName \n \
+_rlnBodyRotateRelativeTo \n \
+_rlnBodySigmaAngles \n \
+_rlnBodySigmaOffset \n \
+large_body_mask.mrc 2 10 2 \n \
+small_body_mask.mrc 1 10 2 \n \
+head_body_mask.mrc 2 10 2 \n \
+ \n \
+Where each data line represents a different body, and: \n \
+ - rlnBodyMaskName contains the name of a soft-edged mask with values in [0,1] that define the body; \n\
+ - rlnBodyRotateRelativeTo defines relative to which other body this body rotates (first body is number 1); \n\
+ - rlnBodySigmaAngles and _rlnBodySigmaOffset are the standard deviations (widths) of Gaussian priors on the consensus rotations and translations; \n\
+\n \
+Also note that larger bodies should be above smaller bodies in the STAR file. For more information, see the multi-body paper.");
+
+	joboptions["do_subtracted_bodies"] = JobOption("Reconstruct subtracted bodies?", true, "If set to Yes, then the reconstruction of each of the bodies will use the subtracted images. This may give \
+useful insights about how well the subtraction worked. If set to No, the original particles are used for reconstruction (while the subtracted ones are still used for alignment). This will result in fuzzy densities for bodies outside the one used for refinement.");
+
+	joboptions["sampling"] = JobOption("Initial angular sampling:", RADIO_SAMPLING, 2, "There are only a few discrete \
+angular samplings possible because we use the HealPix library to generate the sampling of the first two Euler angles on the sphere. \
+The samplings are approximate numbers and vary slightly over the sphere.\n\n \
+Note that this will only be the value for the first few iteration(s): the sampling rate will be increased automatically after that.");
+	joboptions["offset_range"] = JobOption("Initial offset range (pix):", 5, 0, 30, 1, "Probabilities will be calculated only for translations \
+in a circle with this radius (in pixels). The center of this circle changes at every iteration and is placed at the optimal translation \
+for each image in the previous iteration.\n\n \
+Note that this will only be the value for the first few iteration(s): the sampling rate will be increased automatically after that.");
+	joboptions["offset_step"] = JobOption("Initial offset step (pix):", 1, 0.1, 5, 0.1, "Translations will be sampled with this step-size (in pixels).\
+Translational sampling is also done using the adaptive approach. \
+Therefore, if adaptive=1, the translations will first be evaluated on a 2x coarser grid.\n\n \
+Note that this will only be the value for the first few iteration(s): the sampling rate will be increased automatically after that.");
+
+	joboptions["do_parallel_discio"] = JobOption("Use parallel disc I/O?", true, "If set to Yes, all MPI slaves will read their own images from disc. \
+Otherwise, only the master will read images and send them through the network to the slaves. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many slaves reading in parallel.");
+	joboptions["nr_pool"] = JobOption("Number of pooled particles:", 3, 1, 16, 1, "Particles are processed in individual batches by MPI slaves. During each batch, a stack of particle images is only opened and closed once to improve disk access times. \
+All particle images of a single batch are read into memory together. The size of these batches is at least one particle per thread used. The nr_pooled_particles parameter controls how many particles are read together for each thread. If it is set to 3 and one uses 8 threads, batches of 3x8=24 particles will be read together. \
+This may improve performance on systems where disk access, and particularly metadata handling of disk access, is a problem. It has a modest cost of increased RAM usage.");
+	joboptions["do_preread_images"] = JobOption("Pre-read all particles into RAM?", false, "If set to Yes, all particle images will be read into computer memory, which will greatly speed up calculations on systems with slow disk access. However, one should of course be careful with the amount of RAM available. \
+Because particles are read in float-precision, it will take ( N * box_size * box_size * 8 / (1024 * 1024 * 1024) ) Giga-bytes to read N particles into RAM. For 100 thousand 200x200 images, that becomes 15Gb, or 60 Gb for the same number of 400x400 particles. \
+Remember that running a single MPI slave on each node that runs as many threads as available cores will have access to all available RAM. \n \n If parallel disc I/O is set to No, then only the master reads all particles into RAM and sends those particles through the network to the MPI slaves during the refinement iterations.");
+	joboptions["scratch_dir"] = JobOption("Copy particles to scratch directory:", std::string(""), "If a directory is provided here, then the job will create a sub-directory in it called relion_volatile. If that relion_volatile directory already exists, it will be wiped. Then, the program will copy all input particles into a large stack inside the relion_volatile subdirectory. \
+Provided this directory is on a fast local drive (e.g. an SSD drive), processing in all the iterations will be faster. If the job finishes correctly, the relion_volatile directory will be wiped. If the job crashes, you may want to remove it yourself.");
+	joboptions["do_combine_thru_disc"] = JobOption("Combine iterations through disc?", false, "If set to Yes, at the end of every iteration all MPI slaves will write out a large file with their accumulated results. The MPI master will read in all these files, combine them all, and write out a new file with the combined results. \
+All MPI salves will then read in the combined results. This reduces heavy load on the network, but increases load on the disc I/O. \
+This will affect the time it takes between the progress-bar in the expectation step reaching its end (the mouse gets to the cheese) and the start of the ensuing maximisation step. It will depend on your system setup which is most efficient.");
+	joboptions["use_gpu"] = JobOption("Use GPU acceleration?", false, "If set to Yes, the job will try to use GPU acceleration.");
+	joboptions["gpu_ids"] = JobOption("Which GPUs to use:", std::string(""), "This argument is not necessary. If left empty, the job itself will try to allocate available GPU resources. You can override the default allocation by providing a list of which GPUs (0,1,2,3, etc) to use. MPI-processes are separated by ':', threads by ','.  For example: '0,0:1,1:0,0:1,1'");
+
+
+}
+
+bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std::string> &commands,
+		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
+{
+
+	commands.clear();
+	initialisePipeline(outputname, PROC_MULTIBODY_NAME, job_counter);
+	std::string command;
+
+	if (joboptions["nr_mpi"].getNumber() > 1)
+		command="`which relion_refine_mpi`";
+	else
+		command="`which relion_refine`";
+
+    MetaDataTable MD;
+    MD.read(joboptions["fn_bodies"].getString());
+    int nr_bodies = MD.numberOfObjects();
+
+	FileName fn_run = "run";
+	if (is_continue)
+    {
+		if (joboptions["fn_cont"].getString() == "")
+		{
+			error_message = "ERROR: empty field for continuation STAR file...";
+			return false;
+		}
+		int pos_it = joboptions["fn_cont"].getString().rfind("_it");
+		int pos_op = joboptions["fn_cont"].getString().rfind("_optimiser");
+		if (pos_it < 0 || pos_op < 0)
+			std::cerr << "Warning: invalid optimiser.star filename provided for continuation run: " << joboptions["fn_cont"].getString() << std::endl;
+		int it = (int)textToFloat((joboptions["fn_cont"].getString().substr(pos_it+3, 6)).c_str());
+		fn_run += "_ct" + floatToString(it);
+		command += " --continue " + joboptions["fn_cont"].getString();
+	    command += " --o " + outputname + fn_run;
+
+    }
+	else
+	{
+		command += " --solvent_correct_fsc --continue " + joboptions["fn_in"].getString();
+		command += " --multibody_masks " + joboptions["fn_bodies"].getString();
+
+		if (joboptions["do_subtracted_bodies"].getBoolean())
+			command += " --reconstruct_subtracted_bodies ";
+
+		// Sampling
+		int iover = 1;
+		command += " --oversampling " + floatToString((float)iover);
+		for (int i = 0; i < 10; i++)
+		{
+			if (strcmp((joboptions["sampling"].getString()).c_str(), job_sampling_options[i]) == 0)
+			{
+				// The sampling given in the GUI will be the oversampled one!
+				command += " --healpix_order " + floatToString((float)i + 1 - iover);
+				// Always perform local searches!
+				command += " --auto_local_healpix_order " + floatToString((float)i + 1 - iover);
+				break;
+			}
+		}
+
+		// Offset range
+		command += " --offset_range " + joboptions["offset_range"].getString();
+		// The sampling given in the GUI will be the oversampled one!
+		command += " --offset_step " + floatToString(joboptions["offset_step"].getNumber() * pow(2., iover));
+
+    }
+	outputNodes = getOutputNodesRefine(outputname + fn_run, -1, 1, 3, nr_bodies, false, false); // false false means dont do movies
+
+	// Always do compute stuff
+	if (!joboptions["do_combine_thru_disc"].getBoolean())
+		command += " --dont_combine_weights_via_disc";
+	if (!joboptions["do_parallel_discio"].getBoolean())
+		command += " --no_parallel_disc_io";
+	if (joboptions["do_preread_images"].getBoolean())
+		command += " --preread_images " ;
+	else if (joboptions["scratch_dir"].getString() != "")
+                command += " --scratch_dir " +  joboptions["scratch_dir"].getString();
+	command += " --pool " + joboptions["nr_pool"].getString();
 
 	// Running stuff
 	command += " --j " + joboptions["nr_threads"].getString();

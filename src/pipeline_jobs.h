@@ -132,6 +132,7 @@ static bool do_allow_change_minimum_dedicated;
 #define PROC_RESMAP_NAME  	    "LocalRes"     // Local resolution estimation (from unfiltered half-maps and a 3D mask)
 #define PROC_MOVIEREFINE_NAME   "MovieRefine"  // Movie-particle extraction and refinement combined
 #define PROC_INIMODEL_NAME		"InitialModel" // De-novo generation of 3D initial model (using SGD)
+#define PROC_MULTIBODY_NAME		"MultiBody"    // Multi-body refinement
 
 #define PROC_IMPORT         0 // Import any file as a Node of a given type
 #define PROC_MOTIONCORR 	1 // Import any file as a Node of a given type
@@ -152,7 +153,8 @@ static bool do_allow_change_minimum_dedicated;
 #define PROC_RESMAP 		16// Local resolution estimation (from unfiltered half-maps and a 3D mask)
 #define PROC_MOVIEREFINE    17// Movie-particle extraction and refinement combined
 #define PROC_INIMODEL		18// De-novo generation of 3D initial model (using SGD)
-#define NR_BROWSE_TABS      19
+#define PROC_MULTIBODY      19// Multi-body refinement
+#define NR_BROWSE_TABS      20
 
 // Status a Process may have
 #define PROC_RUNNING   0
@@ -384,6 +386,10 @@ public:
 
 	void initialiseAutorefineJob();
 	bool getCommandsAutorefineJob(std::string &outputname, std::vector<std::string> &commands,
+			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
+
+	void initialiseMultiBodyJob();
+	bool getCommandsMultiBodyJob(std::string &outputname, std::vector<std::string> &commands,
 			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
 
 	void initialiseMovierefineJob();

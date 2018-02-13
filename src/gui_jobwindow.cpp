@@ -458,6 +458,11 @@ void JobWindow::initialise(int my_job_type, bool _do_oldstyle)
 		myjob.initialise(my_job_type);
 		initialiseAutorefineWindow();
 	}
+	else if (my_job_type == PROC_MULTIBODY)
+	{
+		myjob.initialise(my_job_type);
+		initialiseMultiBodyWindow();
+	}
 	else if (my_job_type == PROC_MOVIEREFINE)
 	{
 		myjob.initialise(my_job_type);
@@ -561,7 +566,18 @@ void JobWindow::initialiseMotioncorrWindow()
 
 	group1->begin();
 
+	group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group4->end();
+
+	place("do_3rd_motioncor", TOGGLE_DEACTIVATE, group4);
+
+	group4->begin();
+
 	place("fn_motioncor2_exe", TOGGLE_DEACTIVATE);
+
+	group4->end();
+	guientries["do_3rd_motioncor"].cb_menu_i(); // make default active
+
 	place("fn_gain_ref", TOGGLE_DEACTIVATE);
 	place("fn_defect", TOGGLE_DEACTIVATE);
 
@@ -1672,6 +1688,62 @@ void JobWindow::initialiseAutorefineWindow()
 	tab7->end();
 
 }
+
+void JobWindow::initialiseMultiBodyWindow()
+{
+	setupTabs(3);
+	tab1->begin();
+	tab1->label("I/O");
+	resetHeight();
+
+	place("fn_in", TOGGLE_DEACTIVATE);
+	place("fn_cont", TOGGLE_REACTIVATE);
+	place("fn_bodies", TOGGLE_DEACTIVATE);
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	place("do_subtracted_bodies", TOGGLE_DEACTIVATE);
+
+	tab1->end();
+	tab2->begin();
+	tab2->label("Auto-sampling");
+	resetHeight();
+
+	place("sampling", TOGGLE_DEACTIVATE);
+	place("offset_range", TOGGLE_DEACTIVATE);
+	place("offset_step", TOGGLE_DEACTIVATE);
+
+
+	tab2->end();
+
+	tab3->begin();
+	tab3->label("Compute");
+	resetHeight();
+
+	place("do_parallel_discio");
+	place("nr_pool");
+	place("do_preread_images");
+	place("scratch_dir");
+	place("do_combine_thru_disc");
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	// Set up queue groups for running tab
+    group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group4->end();
+	place("use_gpu", TOGGLE_LEAVE_ACTIVE, group4);
+	group4->begin();
+	place("gpu_ids");
+    group4->end();
+	guientries["use_gpu"].cb_menu_i(); // This is to make the default effective
+
+	tab3->end();
+
+}
+
+
 void JobWindow::initialiseMovierefineWindow()
 {
 	setupTabs(4);
