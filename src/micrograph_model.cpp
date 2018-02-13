@@ -32,6 +32,9 @@
  * Defect correction
  */
 
+const RFLOAT Micrograph::NOT_OBSERVED = -9999;
+
+
 void Micrograph::setMovie(FileName fnMovie, FileName fnGain, RFLOAT binning) {
 	Image<RFLOAT> Ihead;
 	Ihead.read(fnMovie, false);
