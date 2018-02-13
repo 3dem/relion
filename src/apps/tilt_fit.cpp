@@ -40,7 +40,10 @@ class TiltFit : public RefinementProgram
 
         TiltFit();
 
-            RFLOAT kmin;
+            RFLOAT kmin,
+                testtilt_x, testtilt_y,
+                testtilt_xx, testtilt_xy, testtilt_yy;
+
             bool precomputed, aniso;
             std::string precomp;
 
@@ -77,6 +80,14 @@ int TiltFit::readMoreOptions(IOParser& parser, int argc, char *argv[])
 
     precomp = parser.getOption("--precomp", "Precomputed *_xy and *_w files from previous run (optional)", "");
     aniso = parser.checkOption("--aniso", "Use anisotropic coma model");
+
+    testtilt_x = textToFloat(parser.getOption("--testtilt_x", "Test value", "0.0"));
+    testtilt_y = textToFloat(parser.getOption("--testtilt_y", "Test value", "0.0"));
+
+    testtilt_xx = textToFloat(parser.getOption("--testtilt_xx", "Test value", "0.0"));
+    testtilt_xy = textToFloat(parser.getOption("--testtilt_xy", "Test value", "0.0"));
+    testtilt_yy = textToFloat(parser.getOption("--testtilt_yy", "Test value", "0.0"));
+
     precomputed = precomp != "";
 
     noReference = precomputed;
@@ -170,6 +181,15 @@ int TiltFit::_run()
             }
 
             obsF = StackHelper::loadStackFS(&mdts[g], imgPath, nr_omp_threads, &fts);
+
+            if (ABS(testtilt_x) > 0.0 || ABS(testtilt_y) > 0.0)
+            {
+                obsF = StackHelper::applyBeamTiltPar(
+                            obsF, Cs, lambda, angpix,
+                            testtilt_x, testtilt_y,
+                            testtilt_xx, testtilt_xy, testtilt_yy,
+                            nr_omp_threads);
+            }
 
             #pragma omp parallel for num_threads(nr_omp_threads)
             for (long p = 0; p < pred.size(); p++)
