@@ -494,7 +494,7 @@ class reconstruct_parameters
                             if (anisoTilt)
                             {
                                 selfApplyBeamTilt(
-                                    F2D, beamtilt_x, beamtilt_xy,
+                                    F2D, beamtilt_x, beamtilt_y,
                                     beamtilt_xx, beamtilt_xy, beamtilt_yy,
                                     ctf.lambda, ctf.Cs, angpix, mysize);
                             }

@@ -184,6 +184,13 @@ int TiltFit::_run()
 
             if (ABS(testtilt_x) > 0.0 || ABS(testtilt_y) > 0.0)
             {
+                if (g == minMG)
+                {
+                    std::cout << "applying test tilt: "
+                              << testtilt_x << ", " << testtilt_y << " / "
+                              << testtilt_xx << ", " << testtilt_xy << ", " << testtilt_yy << "\n";
+                }
+
                 obsF = StackHelper::applyBeamTiltPar(
                             obsF, Cs, lambda, angpix,
                             testtilt_x, testtilt_y,

@@ -166,7 +166,9 @@ int RefinementProgram::init(int argc, char *argv[])
 
         if (maskFn != "")
         {
-            std::cout << "masking references...\n";
+            if (singleReference) std::cout << "masking reference...\n";
+            else std::cout << "masking references...\n";
+
             Image<RFLOAT> mask, maskedRef;
 
             try
@@ -194,7 +196,9 @@ int RefinementProgram::init(int argc, char *argv[])
         s = maps[0].data.xdim;
         sh = s/2 + 1;
 
-        std::cout << "transforming references...\n";
+
+        if (singleReference) std::cout << "transforming reference...\n";
+        else std::cout << "transforming references...\n";
 
         projectors[0] = Projector(s, TRILINEAR, paddingFactor, 10, 2);
         projectors[0].computeFourierTransformMap(maps[0].data, powSpec[0].data, maps[0].data.xdim);
