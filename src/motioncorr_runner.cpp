@@ -853,6 +853,7 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 				MDavg.setValue(EMDL_MICROGRAPH_NAME_WODOSE, fn_avg_wodose);
 			}
 			MDavg.setValue(EMDL_MICROGRAPH_NAME, fn_avg);
+			MDavg.setValue(EMDL_MICROGRAPH_METADATA_NAME, fn_avg.withoutExtension() + ".star");
 			if (do_save_movies && exists(fn_mov))
 			{
 				MDmov.addObject();

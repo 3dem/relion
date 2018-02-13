@@ -151,6 +151,7 @@ enum EMDLabel
     EMDL_MICROGRAPH_GAIN_NAME,
     EMDL_MICROGRAPH_NAME_WODOSE,
     EMDL_MICROGRAPH_MOVIE_NAME,
+    EMDL_MICROGRAPH_METADATA_NAME,
     EMDL_MICROGRAPH_TILT_ANGLE,
     EMDL_MICROGRAPH_TILT_AXIS_DIRECTION,
     EMDL_MICROGRAPH_TILT_AXIS_OUTOFPLANE,
@@ -571,6 +572,7 @@ private:
 	EMDL::addLabel(EMDL_MICROGRAPH_GAIN_NAME, EMDL_STRING, "rlnMicrographGainName", "Name of a gain reference");
         EMDL::addLabel(EMDL_MICROGRAPH_NAME_WODOSE, EMDL_STRING, "rlnMicrographNameNoDW", "Name of a micrograph without dose weighting");
         EMDL::addLabel(EMDL_MICROGRAPH_MOVIE_NAME, EMDL_STRING, "rlnMicrographMovieName", "Name of a micrograph movie stack");
+	EMDL::addLabel(EMDL_MICROGRAPH_METADATA_NAME, EMDL_STRING, "rlnMicrographMetadata", "Name of a micrograph metadata file");
         EMDL::addLabel(EMDL_MICROGRAPH_TILT_ANGLE, EMDL_DOUBLE, "rlnMicrographTiltAngle", "Tilt angle (in degrees) used to collect a micrograph");
         EMDL::addLabel(EMDL_MICROGRAPH_TILT_AXIS_DIRECTION, EMDL_DOUBLE, "rlnMicrographTiltAxisDirection", "Direction of the tilt-axis (in degrees) used to collect a micrograph");
         EMDL::addLabel(EMDL_MICROGRAPH_TILT_AXIS_OUTOFPLANE, EMDL_DOUBLE, "rlnMicrographTiltAxisOutOfPlane", "Out-of-plane angle (in degrees) of the tilt-axis used to collect a micrograph (90=in-plane)");
