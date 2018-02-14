@@ -121,16 +121,17 @@ int AberrationPlot::_run()
                 const double sg = sin(gamma);
 
                 double cx = cg*cg;
-                double cy = 2.0*sg*cg;
+                double cy = sg*cg;
 
                 Complex zobs = obsF[p](y,x);
                 Complex zprd = pred[p](y,x);
 
                 double zz = zobs.real*zprd.imag + zobs.imag*zprd.real;
+                double nr = zprd.norm();
 
-                Axx[t](y,x) += cx*cx;
-                Axy[t](y,x) += cx*cy;
-                Ayy[t](y,x) += cy*cy;
+                Axx[t](y,x) += nr*cx*cx;
+                Axy[t](y,x) += nr*cx*cy;
+                Ayy[t](y,x) += nr*cy*cy;
 
                 bx[t](y,x) += zz*cx;
                 by[t](y,x) += zz*cy;
@@ -163,13 +164,18 @@ int AberrationPlot::_run()
 
         d2Vector b(bx[0](y,x), by[0](y,x));
 
-        d2Matrix Ai = A;
-        Ai.invert();
+        double det = A(0,0)*A(1,1) - A(1,0)*A(0,1);
 
-        d2Vector opt = Ai*b;
+        if (det != 0.0)
+        {
+            d2Matrix Ai = A;
+            Ai.invert();
 
-        xx(y,x) = opt.x;
-        xy(y,x) = opt.y;
+            d2Vector opt = Ai*b;
+
+            xx(y,x) = opt.x;
+            xy(y,x) = opt.y;
+        }
     }
 
     VtkHelper::writeVTK(xx, outPath+"_sin.vtk");
