@@ -281,7 +281,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 {
 	Image<RFLOAT> Imic;
 	MultidimArray<Complex > Faux, Faux2, Fmic;
-	MultidimArray<RFLOAT> Maux, Mstddev, Mccf_best, Mpsi_best, Fctf, Mccf_best_combined;
+	MultidimArray<RFLOAT> Maux, Mstddev, Mmean, Mstddev2, Mavg, Mccf_best, Mpsi_best, Fctf, Mccf_best_combined;
 	MultidimArray<int> Mclass_best_combined;
 
 	AccPtr<XFLOAT >  d_Mccf_best(basePckr->workSize*basePckr->workSize, allocator);
@@ -320,6 +320,8 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 	my_xsize = XSIZE(Imic());
 	my_ysize = YSIZE(Imic());
 	my_size = (my_xsize != my_ysize) ? XMIPP_MAX(my_xsize, my_ysize) : my_xsize;
+	if (basePckr->extra_padding > 0)
+		my_size += 2 * basePckr->extra_padding;
 
 	if (my_size != basePckr->micrograph_size || my_xsize != basePckr->micrograph_xsize || my_ysize != basePckr->micrograph_ysize)
 	{
@@ -445,7 +447,16 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 		FileName fn_tmp=basePckr->getOutputRootName(fn_mic)+"_"+basePckr->fn_out+"_stddevNoise.spi";
 		Image<RFLOAT> It;
 		It.read(fn_tmp);
-		Mstddev = It();
+		if (basePckr->autopick_helical_segments)
+			Mstddev2 = It();
+		else
+			Mstddev = It();
+		fn_tmp=basePckr->getOutputRootName(fn_mic)+"_"+basePckr->fn_out+"_avgNoise.spi";
+		It.read(fn_tmp);
+		if (basePckr->autopick_helical_segments)
+			Mavg = It();
+		else
+			Mmean = It();
 		CTOC(timer,"readFromFomMaps_0");
 	}
 	else
@@ -544,6 +555,40 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 		d_Mstddev.deviceAlloc(basePckr->workSize*basePckr->workSize);
 		d_Mmean.deviceAlloc(basePckr->workSize*basePckr->workSize);
 
+		if (basePckr->autopick_helical_segments)
+		{
+			CudaGlobalPtr< ACCCOMPLEX > d_Fmsk2(basePckr->Favgmsk.nzyxdim, allocator);
+			CudaGlobalPtr<XFLOAT > d_Mavg(allocator);
+			CudaGlobalPtr<XFLOAT > d_Mstddev2(allocator);
+			d_Mstddev2.device_alloc(basePckr->workSize*basePckr->workSize);
+			d_Mavg.device_alloc(basePckr->workSize*basePckr->workSize);
+
+			//TODO Do this only once further up in scope
+			for(int i = 0; i< d_Fmsk2.size ; i++)
+			{
+				d_Fmsk2[i].x = basePckr->Favgmsk.data[i].real;
+				d_Fmsk2[i].y = basePckr->Favgmsk.data[i].imag;
+			}
+			d_Fmsk2.put_on_device();
+			d_Fmsk2.streamSync();
+
+			calculateStddevAndMeanUnderMask(Ftmp, micTransformer.fouriers, d_Fmsk2, basePckr->nr_pixels_avg_mask, d_Mstddev2, d_Mavg, micTransformer.xFSize, micTransformer.yFSize, basePckr->micrograph_size, basePckr->workSize);
+
+			d_Mstddev2.host_alloc();
+			d_Mstddev2.cp_to_host();
+			d_Mstddev2.streamSync();
+			Mstddev2.resizeNoCp(1, basePckr->workSize, basePckr->workSize);
+			for(int i = 0; i < d_Mstddev2.size ; i ++)
+				Mstddev2.data[i] = d_Mstddev2[i];
+
+			d_Mavg.host_alloc();
+			d_Mavg.cp_to_host();
+			d_Mavg.streamSync();
+			Mavg.resizeNoCp(1, basePckr->workSize, basePckr->workSize);
+			for(int i = 0; i < d_Mavg.size ; i ++)
+				Mavg.data[i] = d_Mavg[i];
+
+		}
 
 		//TODO Do this only once further up in scope
 		AccPtr< ACCCOMPLEX > d_Fmsk(basePckr->Finvmsk.nzyxdim, allocator);
@@ -579,7 +624,12 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 		d_Mstddev.cpToDevice();
 		d_Mstddev.streamSync();
 
-
+		d_Mmean.host_alloc();
+		d_Mmean.cp_to_host();
+		d_Mmean.streamSync();
+		Mmean.resizeNoCp(1, basePckr->workSize, basePckr->workSize);
+		for(int i = 0; i < d_Mmean.size ; i ++)
+			Mmean.data[i] = d_Mmean[i];
 
 		CTOC(timer,"calculateStddevAndMeanUnderMask");
 
@@ -602,7 +652,10 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 			// TMP output
 			FileName fn_tmp=basePckr->getOutputRootName(fn_mic)+"_"+basePckr->fn_out+"_stddevNoise.spi";
 			Image<RFLOAT> It;
-			It() = Mstddev;
+			It() = (basePckr->autopick_helical_segments) ? Mstddev2 : Mstddev;
+			It.write(fn_tmp);
+			fn_tmp=basePckr->getOutputRootName(fn_mic)+"_"+basePckr->fn_out+"_avgNoise.spi";
+			It() = (basePckr->autopick_helical_segments) ? Mavg : Mmean;
 			It.write(fn_tmp);
 			CTOC(timer,"writeToFomMaps");
 		}
@@ -631,9 +684,18 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 			It_float.read(fn_tmp);
 			Mccf_best_combined = It_float();
 
-			fn_tmp = basePckr->getOutputRootName(fn_mic)+"_"+basePckr->fn_out+"_combinedCLASS.spi";
-			It_int.read(fn_tmp);
-			Mclass_best_combined = It_int();
+			if (basePckr->do_amyloid)
+			{
+				fn_tmp = basePckr->getOutputRootName(fn_mic)+"_"+basePckr->fn_out+"_combinedPSI.spi";
+				It_float.read(fn_tmp);
+				Mpsi_best_combined = It_float();
+			}
+			else
+			{
+				fn_tmp = basePckr->getOutputRootName(fn_mic)+"_"+basePckr->fn_out+"_combinedCLASS.spi";
+				It_int.read(fn_tmp);
+				Mclass_best_combined = It_int();
+			}
 		}
 		else
 		{
@@ -643,6 +705,9 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 			Mclass_best_combined.clear();
 			Mclass_best_combined.resize(basePckr->workSize, basePckr->workSize);
 			Mclass_best_combined.initConstant(-1);
+			Mpsi_best_combined.clear();
+			Mpsi_best_combined.resize(basePckr->workSize, basePckr->workSize);
+			Mpsi_best_combined.initConstant(-99.e99);
 		}
 	}
 
@@ -943,7 +1008,10 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 					if (new_ccf > old_ccf)
 					{
 						DIRECT_MULTIDIM_ELEM(Mccf_best_combined, n) = new_ccf;
-						DIRECT_MULTIDIM_ELEM(Mclass_best_combined, n) = iref;
+						if (basePckr->do_amyloid)
+							DIRECT_MULTIDIM_ELEM(Mpsi_best_combined, n) = DIRECT_MULTIDIM_ELEM(Mpsi_best, n);
+						else
+							DIRECT_MULTIDIM_ELEM(Mclass_best_combined, n) = iref;
 					}
 				}
 			}
@@ -957,12 +1025,13 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 			std::vector<Peak> my_ref_peaks;
 			CTIC(timer,"setXmippOriginX3");
 			Mstddev.setXmippOrigin();
+			Mmean.setXmippOrigin();
 			Mccf_best.setXmippOrigin();
 			Mpsi_best.setXmippOrigin();
 			CTOC(timer,"setXmippOriginX3");
 
 			CTIC(timer,"peakSearch");
-			basePckr->peakSearch(Mccf_best, Mpsi_best, Mstddev, iref, my_skip_side, my_ref_peaks, scale);
+			basePckr->peakSearch(Mccf_best, Mpsi_best, Mstddev, Mmean, iref, my_skip_side, my_ref_peaks, scale);
 			CTOC(timer,"peakSearch");
 
 			CTIC(timer,"peakPrune");
@@ -981,7 +1050,6 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 		}
 	} // end for iref
 
-
 	if (basePckr->autopick_helical_segments)
 	{
 		RFLOAT thres = basePckr->min_fraction_expected_Pratio;
@@ -992,18 +1060,29 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 		MultidimArray<RFLOAT> Mccfplot;
 
 		Mccf_best_combined.setXmippOrigin();
+		Mpsi_best_combined.setXmippOrigin();
+		Mstddev2.setXmippOrigin();
+		Mavg.setXmippOrigin();
 		Mclass_best_combined.setXmippOrigin();
-		basePckr->pickCCFPeaks(Mccf_best_combined, Mclass_best_combined, thres, peak_r_min, (basePckr->particle_diameter / basePckr->angpix),
-				ccf_peak_list, Mccfplot, my_skip_side, scale);
-		basePckr->extractHelicalTubes(ccf_peak_list, tube_coord_list, tube_len_list, tube_track_list,
-				(basePckr->particle_diameter / basePckr->angpix), basePckr->helical_tube_curvature_factor_max,
-				(basePckr->min_particle_distance / basePckr->angpix), (basePckr->helical_tube_diameter / basePckr->angpix), scale);
-		basePckr->exportHelicalTubes(Mccf_best_combined, Mccfplot, Mclass_best_combined,
-					tube_coord_list, tube_track_list, tube_len_list,
-					fn_mic, basePckr->fn_out,
-					(basePckr->particle_diameter / basePckr->angpix),
-					(basePckr->helical_tube_length_min / basePckr->angpix),
-					my_skip_side, scale);
+		if (basePckr->do_amyloid)
+		{
+			basePckr->pickAmyloids(Mccf_best_combined, Mpsi_best_combined, Mstddev2, Mavg, thres, basePckr->amyloid_max_psidiff, fn_mic, basePckr->fn_out,
+					(basePckr->helical_tube_diameter / basePckr->angpix), basePckr->autopick_skip_side, scale);
+		}
+		else
+		{
+			basePckr->pickCCFPeaks(Mccf_best_combined, Mstddev2, Mavg, Mclass_best_combined, thres, peak_r_min, (basePckr->particle_diameter / basePckr->angpix),
+					ccf_peak_list, Mccfplot, my_skip_side, scale);
+			basePckr->extractHelicalTubes(ccf_peak_list, tube_coord_list, tube_len_list, tube_track_list,
+					(basePckr->particle_diameter / basePckr->angpix), basePckr->helical_tube_curvature_factor_max,
+					(basePckr->min_particle_distance / basePckr->angpix), (basePckr->helical_tube_diameter / basePckr->angpix), scale);
+			basePckr->exportHelicalTubes(Mccf_best_combined, Mccfplot, Mclass_best_combined,
+						tube_coord_list, tube_track_list, tube_len_list,
+						fn_mic, basePckr->fn_out,
+						(basePckr->particle_diameter / basePckr->angpix),
+						(basePckr->helical_tube_length_min / basePckr->angpix),
+						my_skip_side, scale);
+		}
 
 		if (basePckr->do_write_fom_maps)
 		{
@@ -1015,12 +1094,21 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 			fn_tmp = basePckr->getOutputRootName(fn_mic) + "_" + basePckr->fn_out + "_combinedCCF.spi";
 			It_float.write(fn_tmp);
 
-			It_int() = Mclass_best_combined;
-			fn_tmp = basePckr->getOutputRootName(fn_mic) + + "_" + basePckr->fn_out + "_combinedCLASS.spi";
-			It_int.write(fn_tmp);
+			if (basePckr->do_amyloid)
+			{
+				It_float() = Mpsi_best_combined;
+				fn_tmp = basePckr->getOutputRootName(fn_mic) + "_" + basePckr->fn_out + "_combinedPSI.spi";
+				It_float.write(fn_tmp);
+			}
+			else
+			{
+				It_int() = Mclass_best_combined;
+				fn_tmp = basePckr->getOutputRootName(fn_mic) + + "_" + basePckr->fn_out + "_combinedCLASS.spi";
+				It_int.write(fn_tmp);
+			}
 		} // end if do_write_fom_maps
 
-		if (basePckr->do_write_fom_maps || basePckr->do_read_fom_maps)
+		if ((basePckr->do_write_fom_maps || basePckr->do_read_fom_maps) && !basePckr->do_amyloid)
 		{
 			FileName fn_tmp;
 			Image<RFLOAT> It;
