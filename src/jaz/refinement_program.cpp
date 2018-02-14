@@ -28,18 +28,22 @@ int RefinementProgram::init(int argc, char *argv[])
 
         starFn = parser.getOption("--i", "Input STAR file", optStar? "" : "NULL");
 
-        if (singleReference)
+        if (!noReference)
         {
-            reconFn0 = parser.getOption("--m", "Reference map", optReference? "" : "NULL");
-        }
-        else
-        {
-            reconFn0 = parser.getOption("--m1", "Reference map, half 1", optReference? "" : "NULL");
-            reconFn1 = parser.getOption("--m2", "Reference map, half 2", optReference? "" : "NULL");
+            if (singleReference)
+            {
+                reconFn0 = parser.getOption("--m", "Reference map", optReference? "" : "NULL");
+            }
+            else
+            {
+                reconFn0 = parser.getOption("--m1", "Reference map, half 1", optReference? "" : "NULL");
+                reconFn1 = parser.getOption("--m2", "Reference map, half 2", optReference? "" : "NULL");
+            }
+
+            maskFn = parser.getOption("--mask", "Reference mask", "");
+            fscFn = parser.getOption("--f", "Input STAR file with the FSC of the reference", "");
         }
 
-        maskFn = parser.getOption("--mask", "Reference mask", "");
-        fscFn = parser.getOption("--f", "Input STAR file with the FSC of the reference", "");
         outPath = parser.getOption("--out", "Output path");
 
         if (doesMovies)
@@ -59,11 +63,14 @@ int RefinementProgram::init(int argc, char *argv[])
             imgPath = parser.getOption("--img", "Path to images", "");
         }
 
-        angpix = textToFloat(parser.getOption("--angpix", "Pixel resolution (angst/pix) - read from STAR file by default", "0.0"));
-        Cs = textToFloat(parser.getOption("--Cs", "Spherical aberration - read from STAR file by default", "-1"));
-        kV = textToFloat(parser.getOption("--kV", "Electron energy (keV) - read from STAR file by default", "-1"));
+        if (!noReference)
+        {
+            angpix = textToFloat(parser.getOption("--angpix", "Pixel resolution (angst/pix) - read from STAR file by default", "0.0"));
+            Cs = textToFloat(parser.getOption("--Cs", "Spherical aberration - read from STAR file by default", "-1"));
+            kV = textToFloat(parser.getOption("--kV", "Electron energy (keV) - read from STAR file by default", "-1"));
 
-        paddingFactor = textToFloat(parser.getOption("--pad", "Padding factor", "2"));
+            paddingFactor = textToFloat(parser.getOption("--pad", "Padding factor", "2"));
+        }
 
         if (noTilt)
         {
@@ -74,11 +81,11 @@ int RefinementProgram::init(int argc, char *argv[])
             beamtilt_x = textToFloat(parser.getOption("--beamtilt_x", "Beamtilt in X-direction (in mrad)", "0."));
             beamtilt_y = textToFloat(parser.getOption("--beamtilt_y", "Beamtilt in Y-direction (in mrad)", "0."));
             applyTilt = ABS(beamtilt_x) > 0. || ABS(beamtilt_y) > 0.;
-        }
 
-        beamtilt_xx = textToFloat(parser.getOption("--beamtilt_xx", "Anisotropic beamtilt, XX-coefficient", "1."));
-        beamtilt_xy = textToFloat(parser.getOption("--beamtilt_xy", "Anisotropic beamtilt, XY-coefficient", "0."));
-        beamtilt_yy = textToFloat(parser.getOption("--beamtilt_yy", "Anisotropic beamtilt, YY-coefficient", "1."));
+            beamtilt_xx = textToFloat(parser.getOption("--beamtilt_xx", "Anisotropic beamtilt, XX-coefficient", "1."));
+            beamtilt_xy = textToFloat(parser.getOption("--beamtilt_xy", "Anisotropic beamtilt, XY-coefficient", "0."));
+            beamtilt_yy = textToFloat(parser.getOption("--beamtilt_yy", "Anisotropic beamtilt, YY-coefficient", "1."));
+        }
 
         anisoTilt = beamtilt_xx != 1.0 || beamtilt_xy != 0.0 || beamtilt_yy != 1.0;
 

@@ -49,8 +49,8 @@ class MotionFitProg : public RefinementProgram
 
             int evalFrames;
             RFLOAT dmga, dmgb, dmgc, totalDose,
-                sig_pos, sig_vel, sig_div, sig_acc,
-                sig_cutoff, k_cutoff;
+                sig_vel, sig_div, sig_acc,
+                k_cutoff;
             bool evaluate;
 
         int readMoreOptions(IOParser& parser, int argc, char *argv[]);
@@ -60,59 +60,6 @@ class MotionFitProg : public RefinementProgram
 
 int main(int argc, char *argv[])
 {
-    /*{
-        Image<short> test;
-        test.read("Micrograph/EMD-2984_0000_frames.tiff");
-
-        Image<RFLOAT> f0(test.data.xdim, test.data.ydim);
-        Image<RFLOAT> f1(test.data.xdim, test.data.ydim);
-
-        for (int y = 0; y < test.data.ydim; y++)
-        for (int x = 0; x < test.data.xdim; x++)
-        {
-            int yy = test.data.ydim - y - 1;
-
-            DIRECT_NZYX_ELEM(f0(), 0, 0, y, x) = (RFLOAT)DIRECT_NZYX_ELEM(test(), 0, 0, yy, x);
-            DIRECT_NZYX_ELEM(f1(), 0, 0, y, x) = (RFLOAT)DIRECT_NZYX_ELEM(test(), 1, 0, yy, x);
-        }
-
-        VtkHelper::writeVTK(f0, "debug/f0_flip.vtk");
-        VtkHelper::writeVTK(f1, "debug/f0_flip.vtk");
-
-        return 0;
-    }*/
-
-    /*{
-
-        const int fc = 38;
-        const int s = 384;
-        const int sh = s/2 + 1;
-
-        std::vector<Image<Complex>> test(fc);
-
-        Image<RFLOAT> real(384,384);
-
-        FourierTransformer ft;
-
-        for (int i = 0; i < 3; i++)
-        {
-            for (int f = 0; f < fc; f++)
-            {
-                for (int y = 0; y < s; y++)
-                for (int x = 0; x < s; x++)
-                {
-                    real(y,x) = DistributionHelper::sampleGauss(0,sqrt((double)fc));
-                }
-
-                ft.FourierTransform(real(), test[f]());
-            }
-
-            StackHelper::varianceNormalize(test, false);
-        }
-
-        return 0;
-    }*/
-
     MotionFitProg mt;
 
     int rc0 = mt.init(argc, argv);
@@ -135,12 +82,10 @@ int MotionFitProg::readMoreOptions(IOParser& parser, int argc, char *argv[])
 
     totalDose = textToFloat(parser.getOption("--dose", "Total electron dose (in e^-/A^2)", "1"));
 
-    sig_pos = textToFloat(parser.getOption("--s_pos", "Position sigma", "30.0"));
     sig_vel = textToFloat(parser.getOption("--s_vel", "Velocity sigma, other frames", "2.0"));
     sig_div = textToFloat(parser.getOption("--s_div", "Divergence sigma, other frames", "0.01"));
     sig_acc = textToFloat(parser.getOption("--s_acc", "Acceleration sigma", "-1.0"));
 
-    sig_cutoff = textToFloat(parser.getOption("--s_cut", "Crop range (in sigma)", "3.0"));
     k_cutoff = textToFloat(parser.getOption("--k_cut", "Freq. cutoff (in pixels)", "-1.0"));
 
     evalFrames = textToInteger(parser.getOption("--eval", "Measure FSC for this many initial frames", "0"));
@@ -228,8 +173,6 @@ int MotionFitProg::_run()
             FscHelper::initFscTable(sh, fc, tables[i], weights0[i], weights1[i]);
         }
     }
-
-    Image<RFLOAT> debugImg(s,s);
 
     for (long g = g0; g <= gc; g++)
     {
@@ -410,51 +353,36 @@ int MotionFitProg::_run()
             }
         }
 
-        if (evaluate)
+        #pragma omp parallel for num_threads(nr_omp_threads)
+        for (int p = 0; p < pc; p++)
         {
-            #pragma omp parallel for num_threads(nr_omp_threads)
-            for (int p = 0; p < pc; p++)
+            int threadnum = omp_get_thread_num();
+
+            Image<Complex> pred;
+            std::vector<Image<Complex>> obs = movie[p];
+
+            for (int f = 0; f < fc; f++)
             {
-                int threadnum = omp_get_thread_num();
-
-                Image<Complex> pred;
-                std::vector<Image<Complex>> obs = movie[p];
-
-                for (int f = 0; f < fc; f++)
-                {
-                    shiftImageInFourierTransform(obs[f](), obs[f](), s, -tracks[p][f].x, -tracks[p][f].y);
-                }
-
-                int randSubset;
-                mdts[g].getValue(EMDL_PARTICLE_RANDOM_SUBSET, randSubset, p);
-                randSubset -= 1;
-
-                if (randSubset == 0)
-                {
-                    pred = obsModel.predictObservation(projectors[1], mdts[g], p, true, true);
-                }
-                else
-                {
-                    pred = obsModel.predictObservation(projectors[0], mdts[g], p, true, true);
-                }
-
-                FscHelper::updateFscTable(obs, pred, tables[threadnum],
-                                          weights0[threadnum], weights1[threadnum]);
-
-                std::vector<d2Vector> vel(fc);
-
-                vel[0] = tracks[p][1] - tracks[p][0];
-
-                for (int f = 1; f < fc-1; f++)
-                {
-                    vel[f] = 0.5*(tracks[p][f+1] - tracks[p][f-1]);
-                }
-
-                vel[fc-1] = tracks[p][fc-1] - tracks[p][fc-2];
+                shiftImageInFourierTransform(obs[f](), obs[f](), s, -tracks[p][f].x, -tracks[p][f].y);
             }
+
+            int randSubset;
+            mdts[g].getValue(EMDL_PARTICLE_RANDOM_SUBSET, randSubset, p);
+            randSubset -= 1;
+
+            if (randSubset == 0)
+            {
+                pred = obsModel.predictObservation(projectors[1], mdts[g], p, true, true);
+            }
+            else
+            {
+                pred = obsModel.predictObservation(projectors[0], mdts[g], p, true, true);
+            }
+
+            FscHelper::updateFscTable(obs, pred, tables[threadnum],
+                                      weights0[threadnum], weights1[threadnum]);
         }
 
-        //if (it_number > 0)
         {
             std::vector<std::vector<gravis::d2Vector>>
                     centTracks(pc), visTracks(pc), centVisTracks(pc);
@@ -521,12 +449,14 @@ int MotionFitProg::_run()
 
     } // micrographs
 
+    Image<RFLOAT> table, weight;
+
+    FscHelper::mergeFscTables(tables, weights0, weights1, table, weight);
+    table.write(outPath + "_FCC_data.mrc");
+    VtkHelper::writeVTK(table, outPath + "_FCC_data.vtk");
+
     if (evaluate)
     {
-        Image<RFLOAT> table, weight;
-
-        FscHelper::mergeFscTables(tables, weights0, weights1, table, weight);
-
         int f_max = fc;
         double total = 0.0;
 
@@ -551,11 +481,6 @@ int MotionFitProg::_run()
         total /= f_max;
 
         std::cout << "total: " << total << "\n";
-
-        table.write(outPath + "_FCC_data.mrc");
-        /*weight.write(outPath + "_FCC_weight.mrc");*/
-
-        VtkHelper::writeVTK(table, outPath + "_FCC_data.vtk");
     }
 
     double t1 = omp_get_wtime();
