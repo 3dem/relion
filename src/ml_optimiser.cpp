@@ -110,6 +110,7 @@ void MlOptimiser::read(int argc, char **argv, int rank)
 		// Read in previously calculated parameters
 		if (fn_in != "")
 			read(fn_in, rank);
+
 		// And look for additional command-line options...
 		parseContinue(argc, argv);
 	}
@@ -749,7 +750,10 @@ void MlOptimiser::read(FileName fn_in, int rank)
     std::cerr<<"MlOptimiser::readStar entering ..."<<std::endl;
 #endif
 
-    // Open input file
+	if (verb > 0)
+		std::cout << " Reading in optimiser.star ..." << std::endl;
+
+	// Open input file
     std::ifstream in(fn_in.data(), std::ios_base::in);
     if (in.fail())
         REPORT_ERROR( (std::string) "MlOptimiser::readStar: File " + fn_in + " cannot be read." );

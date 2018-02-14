@@ -286,10 +286,12 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
                 type = PROC_3DCLASS;
         else if (typestring == PROC_3DAUTO_NAME)
                 type = PROC_3DAUTO;
+        else if (typestring == PROC_MULTIBODY_NAME)
+                type = PROC_MULTIBODY;
         else if (typestring == PROC_POLISH_NAME)
                 type = PROC_POLISH;
         else if (typestring == PROC_MASKCREATE_NAME)
-                typestring = PROC_MASKCREATE;
+                type = PROC_MASKCREATE;
         else if (typestring == PROC_JOINSTAR_NAME)
                 type = PROC_JOINSTAR;
         else if (typestring == PROC_SUBTRACT_NAME)
@@ -316,6 +318,7 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 				type != PROC_2DCLASS &&
 				type != PROC_3DCLASS &&
 				type != PROC_3DAUTO &&
+				type != PROC_MULTIBODY &&
 				type != PROC_POLISH &&
 				type != PROC_MASKCREATE &&
 				type != PROC_JOINSTAR &&
@@ -826,6 +829,10 @@ bool RelionJob::getCommands(std::string &outputname, std::vector<std::string> &c
 	else if (type == PROC_3DAUTO)
 	{
 		result = getCommandsAutorefineJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
+	}
+	else if (type == PROC_MULTIBODY)
+	{
+		result = getCommandsMultiBodyJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
 	}
 	else if (type == PROC_MOVIEREFINE)
 	{
@@ -3415,15 +3422,15 @@ Also note that larger bodies should be above smaller bodies in the STAR file. Fo
 	joboptions["do_subtracted_bodies"] = JobOption("Reconstruct subtracted bodies?", true, "If set to Yes, then the reconstruction of each of the bodies will use the subtracted images. This may give \
 useful insights about how well the subtraction worked. If set to No, the original particles are used for reconstruction (while the subtracted ones are still used for alignment). This will result in fuzzy densities for bodies outside the one used for refinement.");
 
-	joboptions["sampling"] = JobOption("Initial angular sampling:", RADIO_SAMPLING, 2, "There are only a few discrete \
+	joboptions["sampling"] = JobOption("Initial angular sampling:", RADIO_SAMPLING, 4, "There are only a few discrete \
 angular samplings possible because we use the HealPix library to generate the sampling of the first two Euler angles on the sphere. \
 The samplings are approximate numbers and vary slightly over the sphere.\n\n \
 Note that this will only be the value for the first few iteration(s): the sampling rate will be increased automatically after that.");
-	joboptions["offset_range"] = JobOption("Initial offset range (pix):", 5, 0, 30, 1, "Probabilities will be calculated only for translations \
+	joboptions["offset_range"] = JobOption("Initial offset range (pix):", 3, 0, 30, 1, "Probabilities will be calculated only for translations \
 in a circle with this radius (in pixels). The center of this circle changes at every iteration and is placed at the optimal translation \
 for each image in the previous iteration.\n\n \
 Note that this will only be the value for the first few iteration(s): the sampling rate will be increased automatically after that.");
-	joboptions["offset_step"] = JobOption("Initial offset step (pix):", 1, 0.1, 5, 0.1, "Translations will be sampled with this step-size (in pixels).\
+	joboptions["offset_step"] = JobOption("Initial offset step (pix):", 0.75, 0.1, 5, 0.1, "Translations will be sampled with this step-size (in pixels).\
 Translational sampling is also done using the adaptive approach. \
 Therefore, if adaptive=1, the translations will first be evaluated on a 2x coarser grid.\n\n \
 Note that this will only be the value for the first few iteration(s): the sampling rate will be increased automatically after that.");
@@ -3478,15 +3485,18 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 		if (pos_it < 0 || pos_op < 0)
 			std::cerr << "Warning: invalid optimiser.star filename provided for continuation run: " << joboptions["fn_cont"].getString() << std::endl;
 		int it = (int)textToFloat((joboptions["fn_cont"].getString().substr(pos_it+3, 6)).c_str());
-		fn_run += "_ct" + floatToString(it);
+		FileName fn_run = "run_ct" + floatToString(it);
 		command += " --continue " + joboptions["fn_cont"].getString();
 	    command += " --o " + outputname + fn_run;
+		outputNodes = getOutputNodesRefine(outputname + fn_run, -1, 1, 3, nr_bodies, false, false); // false false means dont do movies
 
     }
 	else
 	{
-		command += " --solvent_correct_fsc --continue " + joboptions["fn_in"].getString();
-		command += " --multibody_masks " + joboptions["fn_bodies"].getString();
+		command += " --continue " + joboptions["fn_in"].getString();
+	    command += " --o " + outputname + "run";
+		outputNodes = getOutputNodesRefine(outputname + "run", -1, 1, 3, nr_bodies, false, false); // false false means dont do movies
+		command += " --solvent_correct_fsc --multibody_masks " + joboptions["fn_bodies"].getString();
 
 		if (joboptions["do_subtracted_bodies"].getBoolean())
 			command += " --reconstruct_subtracted_bodies ";
@@ -3512,7 +3522,6 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 		command += " --offset_step " + floatToString(joboptions["offset_step"].getNumber() * pow(2., iover));
 
     }
-	outputNodes = getOutputNodesRefine(outputname + fn_run, -1, 1, 3, nr_bodies, false, false); // false false means dont do movies
 
 	// Always do compute stuff
 	if (!joboptions["do_combine_thru_disc"].getBoolean())
