@@ -796,6 +796,12 @@ void MotioncorrRunner::plotShifts(FileName fn_mic, std::vector<float> &xshifts, 
 
 void MotioncorrRunner::saveModel(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts) {
 	Micrograph m(fn_mic, fn_gain_reference, bin_factor);
+	if (do_dose_weighting) {
+		m.angpix = angpix;
+		m.voltage = voltage;
+		m.dose_per_frame = dose_per_frame;
+		m.pre_exposure = pre_exposure;
+	}
 
 	FileName fn_avg, fn_mov;
         getOutputFileNames(fn_mic, fn_avg, fn_mov);
@@ -989,7 +995,6 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 	RCTIC(TIMING_GLOBAL_FFT);
 	#pragma omp parallel for
 	for (int iframe = 0; iframe < n_frames; iframe++) {
-//		std::cout << iframe << " thread " << omp_get_thread_num() << std::endl;
 		transformers[omp_get_thread_num()].FourierTransform(Iframes[iframe](), Fframes[iframe]);
 	}
 	RCTOC(TIMING_GLOBAL_FFT);
@@ -1180,7 +1185,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 		for (int iframe = 0; iframe < n_frames; iframe++) {
 			// dose AFTER each frame.
 			doses[iframe] = pre_exposure + dose_per_frame * (frames[iframe] + 1);
-			if (std::abs(voltage = 200) <= 5) {
+			if (std::abs(voltage - 200) <= 5) {
 				doses[iframe] /= 0.8; // 200 kV electron is more damaging.
 			}
 		}
@@ -1270,7 +1275,7 @@ void MotioncorrRunner::realSpaceInterpolation(Image <RFLOAT> &Iref, std::vector<
 				if (!valid) {
 					DIRECT_A2D_ELEM(Iref(), iy, ix) += DIRECT_A2D_ELEM(Iframes[iframe](), y0, x0);
 					if (std::isnan(DIRECT_A2D_ELEM(Iref(), iy, ix))) {
-						std::cout << "ix = " << ix << " xfit = " << x_fitted << " iy = " << iy << " ifit = " << y_fitted << std::endl;
+						std::cerr << "ix = " << ix << " xfit = " << x_fitted << " iy = " << iy << " ifit = " << y_fitted << std::endl;
 					}
 					continue;
 				}
@@ -1289,7 +1294,7 @@ void MotioncorrRunner::realSpaceInterpolation(Image <RFLOAT> &Iref, std::vector<
 				const RFLOAT val = LIN_INTERP(fy, dx0, dx1);
 #ifdef DEBUG
 				if (std::isnan(val)) {
-					std::cout << "ix = " << ix << " xfit = " << x_fitted << " iy = " << iy << " ifit = " << y_fitted << " d00 " << d00 << " d01 " << d01 << " d10 " << d10 << " d11 " << d11 << " dx0 " << dx0 << " dx1 " << dx1 << std::endl;
+					std::cerr << "ix = " << ix << " xfit = " << x_fitted << " iy = " << iy << " ifit = " << y_fitted << " d00 " << d00 << " d01 " << d01 << " d10 " << d10 << " d11 " << d11 << " dx0 " << dx0 << " dx1 " << dx1 << std::endl;
 				}
 #endif
 				DIRECT_A2D_ELEM(Iref(), iy, ix) += val;
@@ -1460,7 +1465,7 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes,
 
 		// Test convergence
 		RFLOAT rmsd = std::sqrt((x_sumsq + y_sumsq) / n_frames);
-		std::cout << "Iteration " << iter << ": RMSD = " << rmsd << " px" << std::endl;
+		std::cout << " Iteration " << iter << ": RMSD = " << rmsd << " px" << std::endl;
 		if (rmsd < tolerance) {
 			converged = true;
 			break;

@@ -85,7 +85,19 @@ void Micrograph::read(FileName fn_in)
 	if (!MDglobal.getValue(EMDL_MICROGRAPH_BINNING, binning)) {
 		binning = 1.0;
 	}
-	
+	if (!MDglobal.getValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, angpix)) {
+		angpix = -1;
+	}
+	if (!MDglobal.getValue(EMDL_MICROGRAPH_PRE_EXPOSURE, pre_exposure)) {
+		pre_exposure = -1;
+	}
+	if (!MDglobal.getValue(EMDL_MICROGRAPH_DOSE_RATE, dose_per_frame)) {
+		dose_per_frame = -1;
+	}
+	if (!MDglobal.getValue(EMDL_CTF_VOLTAGE, voltage)) {
+		voltage = -1;
+	}
+
 	// Read global shifts
 	int frame;
 	RFLOAT shiftX, shiftY;
@@ -130,6 +142,18 @@ void Micrograph::write(FileName filename) {
 		MD.setValue(EMDL_MICROGRAPH_GAIN_NAME, fnGain);
 	}
 	MD.setValue(EMDL_MICROGRAPH_BINNING, binning);
+	if (angpix != -1) {
+		MD.setValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, angpix);
+        }
+	if (dose_per_frame != -1) {
+		MD.setValue(EMDL_MICROGRAPH_DOSE_RATE, dose_per_frame);
+        }
+	if (pre_exposure != -1) {
+		MD.setValue(EMDL_MICROGRAPH_PRE_EXPOSURE, pre_exposure);
+        }
+	if (voltage != -1) {
+		MD.setValue(EMDL_CTF_VOLTAGE, voltage);
+        }
 	MD.write(fh);
 
 	MD.clear();

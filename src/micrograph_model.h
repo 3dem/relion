@@ -37,6 +37,7 @@ class Micrograph
 {
 public:
 	static const RFLOAT NOT_OBSERVED;
+	RFLOAT angpix, voltage, dose_per_frame, pre_exposure;
 
 	// Empty Constructor is not allowed
 	Micrograph(); // = delete in C++11
@@ -67,6 +68,11 @@ public:
 		nFrame = 0;
 		binning = 1;
 
+		angpix = -1;
+		voltage = -1;
+		dose_per_frame = -1;
+		pre_exposure = -1;
+
 		fnMovie = "";
 		fnGain = "";
 
@@ -94,6 +100,11 @@ public:
 	// Get binning factor
 	RFLOAT getBinningFactor() {
 		return binning;
+	}
+
+	// Get original movie name
+	FileName getMovieFilename() {
+		return fnMovie;
 	}
 
 	// Get shift vector at (x, y, frame)
