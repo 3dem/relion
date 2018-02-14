@@ -53,6 +53,12 @@
 #include "src/complex.h"
 #include "src/CPlot2D.h"
 
+//#define TIMING_FFTW
+#ifdef TIMING_FFTW
+	#include "src/time.h"
+	extern Timer timer_fftw;
+#endif
+
 #ifdef FAST_CENTERFFT   // defined if ALTCPU=on *AND* Intel Compiler used
 #include "src/acc/cpu/cuda_stubs.h"
 #include "src/acc/settings.h"

@@ -302,6 +302,13 @@ if(HAVE___SINCOS)
     add_definitions(-DHAVE___SINCOS)
 endif()
 
+# ------------------------------------------------------------------------------TIFF--
+
+find_package(TIFF)
+if(TIFF_FOUND)
+    add_definitions(-DHAVE_TIFF)
+endif()
+
 # ----------------------------------------------------------------------COPY SCRIPTS--
 
 if(FORCE_OWN_FFTW)
