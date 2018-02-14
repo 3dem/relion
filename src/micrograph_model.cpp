@@ -25,15 +25,30 @@
 /* Work in progress!
  *
  * Implement position-dependent motion model
- * Refactor relion_preprocess (windowing) & particle_polished (dose-weighted sum)
  * Use factory pattern?
  *
  * Gain correction (with rotation & flip)
- * Defect correction
  */
 
 const RFLOAT Micrograph::NOT_OBSERVED = -9999;
 
+int ThirdOrderPolynomialModel::getShiftAt(RFLOAT z, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty) const {
+	const RFLOAT x2 = x * x, y2 = y * y, xy = x * y, z2 = z * z;
+	const RFLOAT z3 = z2 * z;
+
+	shiftx = (coeffX(0)  * z + coeffX(1)  * z2 + coeffX(2)  * z3) \
+	         + (coeffX(3)  * z + coeffX(4)  * z2 + coeffX(5)  * z3) * x \
+	         + (coeffX(6)  * z + coeffX(7)  * z2 + coeffX(8)  * z3) * x2 \
+	         + (coeffX(9)  * z + coeffX(10) * z2 + coeffX(11) * z3) * y \
+	         + (coeffX(12) * z + coeffX(13) * z2 + coeffX(14) * z3) * y2 \
+	         + (coeffX(15) * z + coeffX(16) * z2 + coeffX(17) * z3) * xy;
+	shifty = (coeffY(0)  * z + coeffY(1)  * z2 + coeffY(2)  * z3)\
+	         + (coeffY(3)  * z + coeffY(4)  * z2 + coeffY(5)  * z3) * x \
+	         + (coeffY(6)  * z + coeffY(7)  * z2 + coeffY(8)  * z3) * x2 \
+	       	 + (coeffY(9)  * z + coeffY(10) * z2 + coeffY(11) * z3) * y \
+	         + (coeffY(12) * z + coeffY(13) * z2 + coeffY(14) * z3) * y2 \
+	         + (coeffY(15) * z + coeffY(16) * z2 + coeffY(17) * z3) * xy;
+}
 
 void Micrograph::setMovie(FileName fnMovie, FileName fnGain, RFLOAT binning) {
 	Image<RFLOAT> Ihead;
@@ -118,7 +133,7 @@ void Micrograph::read(FileName fn_in)
 		std::cout << " global shift: frame #" << frame << " x " << shiftX << " Y " << shiftY << std::endl;
 	}
 
-	model = new MotionModel();	
+	model = NULL; // new MotionModel();
 }
 
 // Write to a STAR file
@@ -169,7 +184,7 @@ void Micrograph::write(FileName filename) {
 	fh.close();
 }
 
-int Micrograph::getShiftAt(int frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty) {
+int Micrograph::getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty) const {
 	if (model != NULL) {
 		model->getShiftAt(frame, x, y, shiftx, shifty);
 	} else {
@@ -191,16 +206,4 @@ void Micrograph::setGlobalShift(int frame, RFLOAT shiftx, RFLOAT shifty) {
 	frame--;
 	globalShiftX[frame] = shiftx;
 	globalShiftY[frame] = shifty;
-}
-
-// TODO: Implement
-int MotionModel::getShiftAt(int frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty) {
-	shiftx = 0.0;
-	shifty = 0.0;
-
-	return 0;
-}
-
-void MotionModel::fit() {
-	REPORT_ERROR("MotionModel::fit() Not implemented!");
 }

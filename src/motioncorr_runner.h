@@ -21,15 +21,16 @@
 #ifndef MOTIONCORR_RUNNER_H_
 #define MOTIONCORR_RUNNER_H_
 
-#include  <glob.h>
-#include  <vector>
-#include  <string>
-#include  <stdlib.h>
-#include  <stdio.h>
+#include <glob.h>
+#include <vector>
+#include <string>
+#include <stdlib.h>
+#include <stdio.h>
+#include <algorithm>
 #include <src/time.h>
 #include "src/metadata_table.h"
 #include "src/image.h"
-#include <algorithm>
+#include "src/micrograph_model.h"
 
 class MotioncorrRunner
 {
@@ -178,25 +179,7 @@ private:
 
 	void doseWeighting(std::vector<MultidimArray<Complex> > &Fframes, std::vector<RFLOAT> doses);
 
-	void realSpaceInterpolation(Image <RFLOAT> &Iref, std::vector<Image<RFLOAT> > &Iframes, Matrix1D<RFLOAT> &coeffX, Matrix1D<RFLOAT> &coeffY);
-
-	inline void getFittedXY(const RFLOAT x, const RFLOAT y, const RFLOAT z, Matrix1D<RFLOAT> &coeffX, Matrix1D<RFLOAT> &coeffY, RFLOAT &x_fitted, RFLOAT &y_fitted) {
-		const RFLOAT x2 = x * x, y2 = y * y, xy = x * y, z2 = z * z;
-		const RFLOAT z3 = z2 * z;
-
-		x_fitted = (coeffX(0)  * z + coeffX(1)  * z2 + coeffX(2)  * z3) \
-		         + (coeffX(3)  * z + coeffX(4)  * z2 + coeffX(5)  * z3) * x \
-		         + (coeffX(6)  * z + coeffX(7)  * z2 + coeffX(8)  * z3) * x2 \
-		         + (coeffX(9)  * z + coeffX(10) * z2 + coeffX(11) * z3) * y \
-		         + (coeffX(12) * z + coeffX(13) * z2 + coeffX(14) * z3) * y2 \
-		         + (coeffX(15) * z + coeffX(16) * z2 + coeffX(17) * z3) * xy;
-		y_fitted = (coeffY(0)  * z + coeffY(1)  * z2 + coeffY(2)  * z3)\
-		         + (coeffY(3)  * z + coeffY(4)  * z2 + coeffY(5)  * z3) * x \
-		         + (coeffY(6)  * z + coeffY(7)  * z2 + coeffY(8)  * z3) * x2 \
-		         + (coeffY(9)  * z + coeffY(10) * z2 + coeffY(11) * z3) * y \
-		         + (coeffY(12) * z + coeffY(13) * z2 + coeffY(14) * z3) * y2 \
-		         + (coeffY(15) * z + coeffY(16) * z2 + coeffY(17) * z3) * xy;
-	}
+	void realSpaceInterpolation(Image <RFLOAT> &Iref, std::vector<Image<RFLOAT> > &Iframes, Matrix1D<RFLOAT> &coeffX, Matrix1D<RFLOAT> &coeffY, MotionModel &model);
 };
 
 

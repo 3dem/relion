@@ -27,7 +27,7 @@
 #include "src/matrix1d.h"
 #include <omp.h>
 
-//#define TIMING
+#define TIMING
 #ifdef TIMING
 	#define RCTIC(label) (timer.tic(label))
 	#define RCTOC(label) (timer.toc(label))
@@ -790,8 +790,6 @@ void MotioncorrRunner::plotShifts(FileName fn_mic, std::vector<float> &xshifts, 
 		plot2D->SetYAxisTitle("Y-shift (in pixels)");
 	}
 	plot2D->OutputPostScriptPlot(fn_eps);
-
-
 }
 
 void MotioncorrRunner::saveModel(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts) {
@@ -1134,6 +1132,9 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 	}
 #endif
 
+	ThirdOrderPolynomialModel model;
+	model.coeffX = coeffX; model.coeffY = coeffY;
+
 	RFLOAT rms_x = 0, rms_y = 0;
         for (int i = 0; i < n_obs; i++) {
 		RFLOAT x_fitted, y_fitted;
@@ -1141,7 +1142,8 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 		const RFLOAT y = patch_ys[i] / ny - 0.5;
 		const RFLOAT z = patch_frames[i];
 
-		getFittedXY(x, y, z, coeffX, coeffY, x_fitted, y_fitted);
+		model.getShiftAt(z, x, y, x_fitted, y_fitted);
+		//getFittedXY(x, y, z, coeffX, coeffY, x_fitted, y_fitted);
 		rms_x += (patch_xshifts[i] - x_fitted) * (patch_xshifts[i] - x_fitted);
 		rms_y += (patch_yshifts[i] - y_fitted) * (patch_yshifts[i] - y_fitted);
 #ifdef DEBUG
@@ -1158,7 +1160,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 		RCTIC(TIMING_REAL_SPACE_INTERPOLATION);
 		std::cout << "Real space interpolation (before dose weighting): ";
 		Iref().initZeros();
-		realSpaceInterpolation(Iref, Iframes, coeffX, coeffY);
+		realSpaceInterpolation(Iref, Iframes, coeffX, coeffY, model);
 		std::cout << " done" << std::endl;
 		RCTOC(TIMING_REAL_SPACE_INTERPOLATION);
 	
@@ -1207,7 +1209,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 	RCTIC(TIMING_REAL_SPACE_INTERPOLATION);
 	std::cout << "Real space interpolation (after dose weighting): ";
 	Iref().initZeros();
-	realSpaceInterpolation(Iref, Iframes, coeffX, coeffY);
+	realSpaceInterpolation(Iref, Iframes, coeffX, coeffY, model);
 	std::cout << " done" << std::endl;
 	RCTOC(TIMING_REAL_SPACE_INTERPOLATION);
 	
@@ -1224,7 +1226,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 	return true;
 }
 
-void MotioncorrRunner::realSpaceInterpolation(Image <RFLOAT> &Iref, std::vector<Image<RFLOAT> > &Iframes, Matrix1D<RFLOAT> &coeffX, Matrix1D<RFLOAT> &coeffY) {
+void MotioncorrRunner::realSpaceInterpolation(Image <RFLOAT> &Iref, std::vector<Image<RFLOAT> > &Iframes, Matrix1D<RFLOAT> &coeffX, Matrix1D<RFLOAT> &coeffY, MotionModel &model) {
 	const int n_frames = Iframes.size();
 	const int nx = XSIZE(Iframes[0]()), ny = YSIZE(Iframes[0]());
 
@@ -1252,11 +1254,13 @@ void MotioncorrRunner::realSpaceInterpolation(Image <RFLOAT> &Iref, std::vector<
 			for (int iy = 0; iy < ny; iy++) {
 				bool valid = true;
 				const RFLOAT y = (RFLOAT)iy / ny - 0.5;
+
 				RFLOAT x_fitted = x_C0 + (x_C1 + x_C2 * x) * x + (x_C3 + x_C4 * y + x_C5 * x) * y;
 				RFLOAT y_fitted = y_C0 + (y_C1 + y_C2 * x) * x + (y_C3 + y_C4 * y + y_C5 * x) * y;
+
 #ifdef VALIDATE_OPTIMISED_CODE
 				RFLOAT x_fitted2, y_fitted2;
-				getFittedXY(x, y, iframe, coeffX, coeffY, x_fitted2, y_fitted2);
+				model.getShiftAt(z, x, y, x_fitted2, y_fitted2);
 				if (abs(x_fitted - x_fitted2) > 1E-4 || abs(y_fitted - y_fitted2) > 1E-4) {
 					std::cout << "error at " << x << ", " << y << " : " << x_fitted << " " << x_fitted2 << " " << y_fitted << " " << y_fitted2 << std::endl;
 				}
@@ -1507,7 +1511,7 @@ void MotioncorrRunner::doseWeighting(std::vector<MultidimArray<Complex> > &Ffram
 			for (int iframe = 0; iframe < n_frames; iframe++) {
 				const RFLOAT weight = std::exp(- doses[iframe] / Ne); // Eq. 5. 0.5 is factored out to Ne.
 				if (isnan(weight)) {
-					std::cout << "dose = " <<  doses[iframe] << " Ne = " << Ne << " frm = " << iframe << " lx = " << x << " ly = " << ly << " reso = " << 1 / dinv << " weight = " << weight << std::endl;
+					std::cerr << "dose = " <<  doses[iframe] << " Ne = " << Ne << " frm = " << iframe << " lx = " << x << " ly = " << ly << " reso = " << 1 / dinv << " weight = " << weight << std::endl;
 				}
 				sum_weight_sq += weight * weight;
 				DIRECT_A2D_ELEM(Fframes[iframe], y, x) *= weight;
@@ -1515,7 +1519,7 @@ void MotioncorrRunner::doseWeighting(std::vector<MultidimArray<Complex> > &Ffram
 
 			sum_weight_sq = std::sqrt(sum_weight_sq);
 			if (isnan(sum_weight_sq)) {
-				std::cout << " Ne = " << Ne << " lx = " << x << " ly = " << ly << " reso = " << 1 / dinv << " sum_weight_sq NaN" << std::endl;
+				std::cerr << " Ne = " << Ne << " lx = " << x << " ly = " << ly << " reso = " << 1 / dinv << " sum_weight_sq NaN" << std::endl;
 				REPORT_ERROR("Shouldn't happen.");
 			}
 			for (int iframe = 0; iframe < n_frames; iframe++) {

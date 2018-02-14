@@ -22,15 +22,33 @@
 
 #include <vector>
 #include "src/filename.h"
+#include "src/matrix1d.h"
 
 class MotionModel
 {
 public:
 	// Fit model based on observations
-	virtual void fit();
+	virtual void fit() = 0;
+
+	virtual void read(FileName fn, std::string block_name) = 0;
 
 	// Get motion at frame and (x, y)
-	virtual int getShiftAt(int frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty);
+	virtual int getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty) const = 0;
+};
+
+class ThirdOrderPolynomialModel: public MotionModel {
+public:
+	Matrix1D <RFLOAT> coeffX, coeffY;
+
+	void fit() {
+		REPORT_ERROR("Not implemented yet.");
+	}
+
+	void read(FileName fn, std::string block_name) {
+		REPORT_ERROR("Not implemented yet.");
+	}
+
+	int getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty) const;
 };
 
 class Micrograph
@@ -93,23 +111,23 @@ public:
 	void setMovie(FileName fnMovie, FileName fnGain="", RFLOAT binning=1.0);
 
 	// Get gain reference file name
-	FileName getGainFilename() {
+	FileName getGainFilename() const {
 		return fnGain;
 	}
 
 	// Get binning factor
-	RFLOAT getBinningFactor() {
+	RFLOAT getBinningFactor() const {
 		return binning;
 	}
 
 	// Get original movie name
-	FileName getMovieFilename() {
+	FileName getMovieFilename() const {
 		return fnMovie;
 	}
 
 	// Get shift vector at (x, y, frame)
 	// (x, y) and (shiftx, shifty) are UNBINNED pixels in the original movie
-	int getShiftAt(int frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty);
+	int getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty) const;
 
 	// Set global shift for frame
 	// (shiftx, shifty) is UNBINNED pixels in the original movie
