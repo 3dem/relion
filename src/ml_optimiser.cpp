@@ -750,7 +750,7 @@ void MlOptimiser::read(FileName fn_in, int rank)
     std::cerr<<"MlOptimiser::readStar entering ..."<<std::endl;
 #endif
 
-	if (verb > 0)
+	if (rank == 0)
 		std::cout << " Reading in optimiser.star ..." << std::endl;
 
 	// Open input file
