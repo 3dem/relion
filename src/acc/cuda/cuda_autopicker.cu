@@ -170,10 +170,10 @@ void AutoPickerCuda::run()
 
 }
 
-void AutoPickerCuda::calculateStddevAndMeanUnderMask(AccPtr< ACCCOMPLEX > &d_Fmic, 
-        AccPtr< ACCCOMPLEX > &d_Fmic2, 
+void AutoPickerCuda::calculateStddevAndMeanUnderMask(AccPtr< ACCCOMPLEX > &d_Fmic,
+        AccPtr< ACCCOMPLEX > &d_Fmic2,
         AccPtr< ACCCOMPLEX > &d_Fmsk,
-		int nr_nonzero_pixels_mask, AccPtr< XFLOAT > &d_Mstddev, 
+		int nr_nonzero_pixels_mask, AccPtr< XFLOAT > &d_Mstddev,
         AccPtr< XFLOAT > &d_Mmean,
 		size_t x, size_t y, size_t mic_size, size_t workSize)
 {
@@ -557,44 +557,38 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 
 		if (basePckr->autopick_helical_segments)
 		{
-			/*
+
 			AccPtr< ACCCOMPLEX > d_Fmsk2(basePckr->Favgmsk.nzyxdim, allocator);
 			AccPtr<XFLOAT > d_Mavg(allocator);
 			AccPtr<XFLOAT > d_Mstddev2(allocator);
 
-			d_Fmsk2.setSize(micTransformer.fouriers.getSize());
-			d_Mavg.setSize(micTransformer.fouriers.getSize());
-			d_Mstddev2.setSize(micTransformer.fouriers.getSize());
-
-			d_Mavg.deviceAlloc();
-			d_Mstddev2.deviceAlloc();
+			d_Mavg.deviceAlloc(basePckr->workSize*basePckr->workSize);
+			d_Mstddev2.deviceAlloc(basePckr->workSize*basePckr->workSize);
 
 			//TODO Do this only once further up in scope
-			for(int i = 0; i< d_Fmsk2.size ; i++)
+			for(int i = 0; i< d_Fmsk2.getSize() ; i++)
 			{
 				d_Fmsk2[i].x = basePckr->Favgmsk.data[i].real;
 				d_Fmsk2[i].y = basePckr->Favgmsk.data[i].imag;
 			}
-			d_Fmsk2.put_on_device();
+			d_Fmsk2.cpToDevice();
 			d_Fmsk2.streamSync();
 
 			calculateStddevAndMeanUnderMask(Ftmp, micTransformer.fouriers, d_Fmsk2, basePckr->nr_pixels_avg_mask, d_Mstddev2, d_Mavg, micTransformer.xFSize, micTransformer.yFSize, basePckr->micrograph_size, basePckr->workSize);
 
-			d_Mstddev2.host_alloc();
-			d_Mstddev2.cp_to_host();
+			d_Mstddev2.hostAlloc();
+			d_Mstddev2.cpToHost();
 			d_Mstddev2.streamSync();
 			Mstddev2.resizeNoCp(1, basePckr->workSize, basePckr->workSize);
-			for(int i = 0; i < d_Mstddev2.size ; i ++)
+			for(int i = 0; i < d_Mstddev2.getSize() ; i ++)
 				Mstddev2.data[i] = d_Mstddev2[i];
 
-			d_Mavg.host_alloc();
-			d_Mavg.cp_to_host();
+			d_Mavg.hostAlloc();
+			d_Mavg.cpToHost();
 			d_Mavg.streamSync();
 			Mavg.resizeNoCp(1, basePckr->workSize, basePckr->workSize);
-			for(int i = 0; i < d_Mavg.size ; i ++)
+			for(int i = 0; i < d_Mavg.getSize() ; i ++)
 				Mavg.data[i] = d_Mavg[i];
-
-			*/
 
 		}
 
@@ -632,14 +626,12 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 		d_Mstddev.cpToDevice();
 		d_Mstddev.streamSync();
 
-		/*
-		d_Mmean.host_alloc();
-		d_Mmean.cp_to_host();
+		d_Mmean.hostAlloc();
+		d_Mmean.cpToHost();
 		d_Mmean.streamSync();
 		Mmean.resizeNoCp(1, basePckr->workSize, basePckr->workSize);
-		for(int i = 0; i < d_Mmean.size ; i ++)
+		for(int i = 0; i < d_Mmean.getSize() ; i ++)
 			Mmean.data[i] = d_Mmean[i];
-		*/
 
 		CTOC(timer,"calculateStddevAndMeanUnderMask");
 
