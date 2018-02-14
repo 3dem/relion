@@ -377,7 +377,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 	}
     CTOC(timer,"middlePassFilter");
 
-	if (basePckr->micrograph_xsize !=basePckr->micrograph_ysize)
+	if (basePckr->micrograph_xsize != basePckr->micrograph_size || basePckr->micrograph_ysize != basePckr->micrograph_size)
 	{
 		CTIC(timer,"rewindow");
 		// Window non-square micrographs to be a square with the largest side
@@ -562,6 +562,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 			AccPtr<XFLOAT > d_Mavg(allocator);
 			AccPtr<XFLOAT > d_Mstddev2(allocator);
 
+			d_Fmsk2.allAlloc();
 			d_Mavg.deviceAlloc(basePckr->workSize*basePckr->workSize);
 			d_Mstddev2.deviceAlloc(basePckr->workSize*basePckr->workSize);
 
