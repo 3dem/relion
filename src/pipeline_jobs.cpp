@@ -1154,6 +1154,7 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 		else
 		{
 			command += " --use_own ";
+			command += " --j " + joboptions["nr_threads"].getString();
 		}
 		command += " --bin_factor " + joboptions["bin_factor"].getString();
 		command += " --bfactor " + joboptions["bfactor"].getString();
