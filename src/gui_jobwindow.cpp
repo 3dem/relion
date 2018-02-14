@@ -1735,6 +1735,7 @@ void JobWindow::initialiseMultiBodyWindow()
 
 	place("do_parallel_discio");
 	place("nr_pool");
+	place("do_pad1");
 	place("do_preread_images");
 	place("scratch_dir");
 	place("do_combine_thru_disc");

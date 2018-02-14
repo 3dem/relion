@@ -2265,9 +2265,9 @@ bool RelionJob::getCommandsClass2DJob(std::string &outputname, std::vector<std::
 		command += " --preread_images " ;
 	else if (joboptions["scratch_dir"].getString() != "")
             command += " --scratch_dir " +  joboptions["scratch_dir"].getString();
-        command += " --pool " + joboptions["nr_pool"].getString();
-        if (joboptions["do_pad1"].getBoolean())
-    	    command += " --pad 1 ";
+	command += " --pool " + joboptions["nr_pool"].getString();
+	if (joboptions["do_pad1"].getBoolean())
+		command += " --pad 1 ";
 
 	// CTF stuff
 	if (!is_continue)
@@ -3424,6 +3424,7 @@ Otherwise, only the master will read images and send them through the network to
 	joboptions["nr_pool"] = JobOption("Number of pooled particles:", 3, 1, 16, 1, "Particles are processed in individual batches by MPI slaves. During each batch, a stack of particle images is only opened and closed once to improve disk access times. \
 All particle images of a single batch are read into memory together. The size of these batches is at least one particle per thread used. The nr_pooled_particles parameter controls how many particles are read together for each thread. If it is set to 3 and one uses 8 threads, batches of 3x8=24 particles will be read together. \
 This may improve performance on systems where disk access, and particularly metadata handling of disk access, is a problem. It has a modest cost of increased RAM usage.");
+	joboptions["do_pad1"] = JobOption("Skip padding?", true, "If set to Yes, the calculations will not use padding in Fourier space for better interpolation in the references. Otherwise, references are padded 2x before Fourier transforms are calculated. Skipping padding (i.e. use --pad 1) gives nearly as good results as using --pad 2, but some artifacts may appear in the corners from signal that is folded back.");
 	joboptions["do_preread_images"] = JobOption("Pre-read all particles into RAM?", false, "If set to Yes, all particle images will be read into computer memory, which will greatly speed up calculations on systems with slow disk access. However, one should of course be careful with the amount of RAM available. \
 Because particles are read in float-precision, it will take ( N * box_size * box_size * 8 / (1024 * 1024 * 1024) ) Giga-bytes to read N particles into RAM. For 100 thousand 200x200 images, that becomes 15Gb, or 60 Gb for the same number of 400x400 particles. \
 Remember that running a single MPI slave on each node that runs as many threads as available cores will have access to all available RAM. \n \n If parallel disc I/O is set to No, then only the master reads all particles into RAM and sends those particles through the network to the MPI slaves during the refinement iterations.");
@@ -3514,6 +3515,8 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 	else if (joboptions["scratch_dir"].getString() != "")
                 command += " --scratch_dir " +  joboptions["scratch_dir"].getString();
 	command += " --pool " + joboptions["nr_pool"].getString();
+	if (joboptions["do_pad1"].getBoolean())
+		command += " --pad 1 ";
 
 	// Running stuff
 	command += " --j " + joboptions["nr_threads"].getString();
