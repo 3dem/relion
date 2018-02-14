@@ -83,8 +83,6 @@ int DefocusFit::_run()
     MetaDataTable mdtAll;
     mdtAll.reserve(mdt0.numberOfObjects());
 
-    const long gc = maxMG >= 0? maxMG+1 : mdts.size();
-
     for (long g = minMG; g < gc; g++)
     {
         std::stringstream stsg;

@@ -84,9 +84,9 @@ int TiltFit::readMoreOptions(IOParser& parser, int argc, char *argv[])
     testtilt_x = textToFloat(parser.getOption("--testtilt_x", "Test value", "0.0"));
     testtilt_y = textToFloat(parser.getOption("--testtilt_y", "Test value", "0.0"));
 
-    testtilt_xx = textToFloat(parser.getOption("--testtilt_xx", "Test value", "0.0"));
+    testtilt_xx = textToFloat(parser.getOption("--testtilt_xx", "Test value", "1.0"));
     testtilt_xy = textToFloat(parser.getOption("--testtilt_xy", "Test value", "0.0"));
-    testtilt_yy = textToFloat(parser.getOption("--testtilt_yy", "Test value", "0.0"));
+    testtilt_yy = textToFloat(parser.getOption("--testtilt_yy", "Test value", "1.0"));
 
     precomputed = precomp != "";
 
@@ -159,8 +159,6 @@ int TiltFit::_run()
 
         std::vector<ParFourierTransformer> fts(nr_omp_threads);
 
-        const long gc = maxMG >= 0? maxMG+1 : mdts.size();
-
         for (long g = minMG; g < gc; g++)
         {
             std::cout << "micrograph " << g << " / " << mdts.size() <<"\n";
@@ -186,7 +184,7 @@ int TiltFit::_run()
             {
                 if (g == minMG)
                 {
-                    std::cout << "applying test tilt: "
+                    std::cout << "applying test tilt to images: "
                               << testtilt_x << ", " << testtilt_y << " / "
                               << testtilt_xx << ", " << testtilt_xy << ", " << testtilt_yy << "\n";
                 }

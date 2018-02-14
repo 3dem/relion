@@ -187,6 +187,15 @@ void CTF::initialise()
 
 }
 
+double CTF::getGamma(double X, double Y)
+{
+    RFLOAT u2 = X * X + Y * Y;
+    RFLOAT u4 = u2 * u2;
+
+    RFLOAT deltaf = getDeltaF(X, Y);
+    return K1 * deltaf * u2 + K2 * u4 - K5 - K3;
+}
+
 RFLOAT CTF::getCtfFreq(RFLOAT X, RFLOAT Y)
 {
     RFLOAT u2 = X * X + Y * Y;

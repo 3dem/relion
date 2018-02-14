@@ -187,6 +187,8 @@ public:
         return scale * retval;
     }
 
+    double getGamma(double X, double Y);
+
     // compute the local frequency of the ctf (i.e. the rate of change of
     // 'double argument' in getCTF()
     RFLOAT getCtfFreq(RFLOAT X, RFLOAT Y);

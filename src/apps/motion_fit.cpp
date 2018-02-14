@@ -156,9 +156,6 @@ int MotionFitProg::_init()
 
 int MotionFitProg::_run()
 {
-    const long gc = maxMG >= 0? maxMG : mdts.size()-1;
-    const long g0 = minMG;
-
     std::vector<ParFourierTransformer> fts(nr_omp_threads);
 
     if (preextracted)

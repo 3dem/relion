@@ -353,7 +353,7 @@ class reconstruct_parameters
         std::cout << "Back-projecting all images ..." << std::endl;
 
         time_config();
-        init_progress_bar(gc);
+        init_progress_bar(gc/nr_omp_threads);
 
         #pragma omp parallel num_threads(nr_omp_threads)
         {
@@ -635,13 +635,13 @@ class reconstruct_parameters
 
                     if (threadnum == 0)
                     {
-                        progress_bar(g);
+                        progress_bar(g/nr_omp_threads);
                     }
                 }
             }
         }
 
-        progress_bar(gc);
+        progress_bar(gc/nr_omp_threads);
 
         std::cerr << "\nMerging volumes..." << std::endl;
 

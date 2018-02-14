@@ -128,8 +128,6 @@ int CsFit::_run()
         totalCostIso[i] = std::vector<double>(samples, 0.0);
     }
 
-    const long gc = maxMG >= 0? maxMG+1 : mdts.size();
-
     for (long g = minMG; g < gc; g++)
     {
         std::stringstream stsg;
