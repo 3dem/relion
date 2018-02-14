@@ -2268,6 +2268,8 @@ bool RelionJob::getCommandsClass2DJob(std::string &outputname, std::vector<std::
 	command += " --pool " + joboptions["nr_pool"].getString();
 	if (joboptions["do_pad1"].getBoolean())
 		command += " --pad 1 ";
+	else
+		command += " --pad 2 ";
 
 	// CTF stuff
 	if (!is_continue)
@@ -2545,6 +2547,8 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
     command += " --pool " + joboptions["nr_pool"].getString();
     if (joboptions["do_pad1"].getBoolean())
     	command += " --pad 1 ";
+	else
+		command += " --pad 2 ";
 
 	// Optimisation
     command += " --particle_diameter " + joboptions["particle_diameter"].getString();
@@ -2853,9 +2857,11 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
             command += " --preread_images " ;
 	else if (joboptions["scratch_dir"].getString() != "")
             command += " --scratch_dir " +  joboptions["scratch_dir"].getString();
-        command += " --pool " + joboptions["nr_pool"].getString();
-        if (joboptions["do_pad1"].getBoolean())
-    	    command += " --pad 1 ";
+	command += " --pool " + joboptions["nr_pool"].getString();
+	if (joboptions["do_pad1"].getBoolean())
+		command += " --pad 1 ";
+	else
+		command += " --pad 2 ";
 
 	// CTF stuff
 	if (!is_continue)
@@ -3235,8 +3241,10 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 	else if (joboptions["scratch_dir"].getString() != "")
                 command += " --scratch_dir " +  joboptions["scratch_dir"].getString();
 	command += " --pool " + joboptions["nr_pool"].getString();
-        if (joboptions["do_pad1"].getBoolean())
-    	    command += " --pad 1 ";
+	if (joboptions["do_pad1"].getBoolean())
+		command += " --pad 1 ";
+	else
+		command += " --pad 2 ";
 
 	// CTF stuff
 	if (!is_continue)
@@ -3517,6 +3525,8 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 	command += " --pool " + joboptions["nr_pool"].getString();
 	if (joboptions["do_pad1"].getBoolean())
 		command += " --pad 1 ";
+	else
+		command += " --pad 2 ";
 
 	// Running stuff
 	command += " --j " + joboptions["nr_threads"].getString();
