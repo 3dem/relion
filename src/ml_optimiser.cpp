@@ -18,7 +18,6 @@
  * author citations must be preserved.
  ***************************************************************************/
 
-//#define DEBUG
 //#define DEBUG_CHECKSIZES
 //#define DEBUG_HELICAL_ORIENTATIONAL_SEARCH
 //#define PRINT_GPU_MEM_INFO
@@ -140,9 +139,12 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	// For multi-body refinement
 	bool fn_body_masks_was_empty = (fn_body_masks == "None");
 	std::string fnt;
-//	fnt = parser.getOption("--multibody_masks", "STAR file with masks and metadata for multi-body refinement", "OLD");
-//	if (fnt != "OLD")
-//		fn_body_masks = fnt;
+	fnt = parser.getOption("--multibody_masks", "STAR file with masks and metadata for multi-body refinement", "OLD");
+	if (fnt != "OLD")
+		fn_body_masks = fnt;
+	// Don't use _ctXX at start of a multibody refinement
+	if (fn_body_masks_was_empty && fn_body_masks != "")
+		fn_out = parser.getOption("--o", "Output rootname", "run");
 
 	// Also allow change of padding...
 	fnt = parser.getOption("--pad", "Oversampling factor for the Fourier transforms of the references", "OLD");
@@ -392,7 +394,11 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	keep_free_scratch_Gb = textToInteger(parser.getOption("--keep_free_scratch", "Space available for copying particle stacks (in Gb)", "10"));
 	do_reuse_scratch = parser.checkOption("--reuse_scratch", "Re-use data on scratchdir, instead of wiping it and re-copying all data.");
 
-	do_cpu = parser.checkOption("--cpu", "Use new implementation for CPU");
+#ifdef ALTCPU
+	do_cpu = parser.checkOption("--cpu", "Use intel vectorisation implementation for CPU");
+#else
+        do_cpu = false;
+#endif
 
 	failsafe_threshold = textToInteger(parser.getOption("--failsafe_threshold", "Maximum number of particles permitted to be drop, due to zero sum of weights, before exiting with an error (GPU only).", "40"));
 
@@ -626,7 +632,11 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	keep_free_scratch_Gb = textToInteger(parser.getOption("--keep_free_scratch", "Space available for copying particle stacks (in Gb)", "10"));
 	do_reuse_scratch = parser.checkOption("--reuse_scratch", "Re-use data on scratchdir, instead of wiping it and re-copying all data.");
 	do_fast_subsets = parser.checkOption("--fast_subsets", "Use faster optimisation by using subsets of the data in the first 15 iterations");
-    do_cpu = parser.checkOption("--cpu", "Use new implementation for CPU");
+#ifdef ALTCPU
+	do_cpu = parser.checkOption("--cpu", "Use intel vectorisation implementation for CPU");
+#else
+        do_cpu = false;
+#endif
 
 	do_gpu = parser.checkOption("--gpu", "Use available gpu resources for some calculations");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","default");
@@ -1904,6 +1914,9 @@ void MlOptimiser::initialiseGeneral(int rank)
 	if(mask1 || mask2)
 		REPORT_ERROR(errstr);
 
+	// Write out unmasked 2D class averages
+	do_write_unmasked_refs = (mymodel.ref_dim == 2);
+
 #ifdef DEBUG
 	std::cerr << "Leaving initialiseGeneral" << std::endl;
 #endif
@@ -2479,6 +2492,10 @@ void MlOptimiser::iterate()
 				}
 			}
 		}
+
+                // Directly use fn_out, without "_it" specifier, so unmasked refs will be overwritten at every iteration
+                if (do_write_unmasked_refs)
+                    mymodel.write(fn_out+"_unmasked", sampling, false, true);
 
 #ifdef TIMING
 		timer.toc(TIMING_ITER_HELICALREFINE);

@@ -53,19 +53,6 @@ void MlOptimiserMpi::read(int argc, char **argv)
     // Define a new MpiNode
     node = new MpiNode(argc, argv);
 
-    if (node->isMaster())
-    {
-      std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
-      std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
-      std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
-      std::cout << "  "<< std::endl;
-      std::cout << " The output from this binary should not be used for research or publication "<< std::endl;
-      std::cout << "  "<< std::endl;
-      std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
-      std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
-      std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
-    }
-
     // First read in non-parallelisation-dependent variables
     MlOptimiser::read(argc, argv, node->rank);
 
@@ -2615,16 +2602,9 @@ void MlOptimiserMpi::reconstructUnregularisedMapAndCalculateSolventCorrectedFSC(
 			}
 
 			// Update header information
-			RFLOAT avg, stddev, minval, maxval;
 			Iunreg().setXmippOrigin();
-			Iunreg().computeStats(avg, stddev, minval, maxval);
-			Iunreg.MDMainHeader.setValue(EMDL_IMAGE_STATS_MIN, minval);
-			Iunreg.MDMainHeader.setValue(EMDL_IMAGE_STATS_MAX, maxval);
-			Iunreg.MDMainHeader.setValue(EMDL_IMAGE_STATS_AVG, avg);
-			Iunreg.MDMainHeader.setValue(EMDL_IMAGE_STATS_STDDEV, stddev);
-			Iunreg.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X, mymodel.pixel_size);
-			Iunreg.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y, mymodel.pixel_size);
-			Iunreg.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z, mymodel.pixel_size);
+			Iunreg.setStatisticsInHeader();
+			Iunreg.setSamplingRateInHeader(mymodel.pixel_size);
 			// And write the resulting model to disc
 			Iunreg.write(fn_root+"_unfil.mrc");
 		}
@@ -2878,15 +2858,8 @@ void MlOptimiserMpi::readTemporaryDataAndWeightArraysAndReconstruct(int iclass, 
 	}
 
 	// Update header information
-	RFLOAT avg, stddev, minval, maxval;
-	Iunreg().computeStats(avg, stddev, minval, maxval);
-	Iunreg.MDMainHeader.setValue(EMDL_IMAGE_STATS_MIN, minval);
-	Iunreg.MDMainHeader.setValue(EMDL_IMAGE_STATS_MAX, maxval);
-	Iunreg.MDMainHeader.setValue(EMDL_IMAGE_STATS_AVG, avg);
-	Iunreg.MDMainHeader.setValue(EMDL_IMAGE_STATS_STDDEV, stddev);
-	Iunreg.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X, mymodel.pixel_size);
-	Iunreg.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y, mymodel.pixel_size);
-	Iunreg.MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z, mymodel.pixel_size);
+	Iunreg.setStatisticsInHeader();
+	Iunreg.setSamplingRateInHeader(mymodel.pixel_size);
 	// And write the resulting model to disc
 	Iunreg.write(fn_root+"_unfil.mrc");
 
@@ -3216,23 +3189,27 @@ void MlOptimiserMpi::iterate()
 		}
 		MPI_Barrier(MPI_COMM_WORLD);
 
+                // Directly use fn_out, without "_it" specifier, so unmasked refs will be overwritten at every iteration
+                if (do_write_unmasked_refs && node->rank == 1)
+                    mymodel.write(fn_out+"_unmasked", sampling, false, true);
+
 		// Mask the reconstructions to get rid of noisy solvent areas
 		// Skip masking upon convergence (for validation purposes)
 #ifdef TIMING
-			timer.toc(TIMING_ITER_HELICALREFINE);
-			timer.tic(TIMING_SOLVFLAT);
+                timer.toc(TIMING_ITER_HELICALREFINE);
+                timer.tic(TIMING_SOLVFLAT);
 #endif
-			if (do_solvent && !has_converged)
-				solventFlatten();
+                if (do_solvent && !has_converged)
+                    solventFlatten();
 #ifdef TIMING
-			timer.toc(TIMING_SOLVFLAT);
-			timer.tic(TIMING_UPDATERES);
+                timer.toc(TIMING_SOLVFLAT);
+                timer.tic(TIMING_UPDATERES);
 #endif
-			// Re-calculate the current resolution, do this before writing to get the correct values in the output files
-			updateCurrentResolution();
+                // Re-calculate the current resolution, do this before writing to get the correct values in the output files
+                updateCurrentResolution();
 #ifdef TIMING
-			timer.toc(TIMING_UPDATERES);
-			timer.tic(TIMING_ITER_WRITE);
+                timer.toc(TIMING_UPDATERES);
+                timer.tic(TIMING_ITER_WRITE);
 #endif
 
 		// If we are joining random halves, then do not write an optimiser file so that it cannot be restarted!
@@ -3291,19 +3268,6 @@ void MlOptimiserMpi::iterate()
 
 	// Hopefully this barrier will prevent some bus errors
 	MPI_Barrier(MPI_COMM_WORLD);
-
-    if (node->isMaster())
-    {
-      std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
-      std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
-      std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
-      std::cout << "  "<< std::endl;
-      std::cout << " The output from this binary should not be used for research or publication "<< std::endl;
-      std::cout << "  "<< std::endl;
-      std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
-      std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
-      std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
-    }
 
 	// delete threads etc.
 	MlOptimiser::iterateWrapUp();
