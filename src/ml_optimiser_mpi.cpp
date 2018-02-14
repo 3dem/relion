@@ -2984,9 +2984,8 @@ void MlOptimiserMpi::iterate()
 		// Update subset_size
 		updateSubsetSize(node->isMaster());
 
-		// Randomly take different subset of the particles each time we do a new "iteration" in SGD, only master has complete mydata
-		if (node->isMaster())
-			mydata.randomiseOriginalParticlesOrder(random_seed+iter, false, (subset_size > 0) );
+		// Randomly take different subset of the particles each time we do a new "iteration" in SGD
+		mydata.randomiseOriginalParticlesOrder(random_seed+iter, do_split_random_halves, (subset_size > 0) );
 
 		// Nobody can start the next iteration until everyone has finished
 		MPI_Barrier(MPI_COMM_WORLD);
