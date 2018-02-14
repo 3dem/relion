@@ -281,7 +281,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 {
 	Image<RFLOAT> Imic;
 	MultidimArray<Complex > Faux, Faux2, Fmic;
-	MultidimArray<RFLOAT> Maux, Mstddev, Mmean, Mstddev2, Mavg, Mccf_best, Mpsi_best, Fctf, Mccf_best_combined;
+	MultidimArray<RFLOAT> Maux, Mstddev, Mmean, Mstddev2, Mavg, Mccf_best, Mpsi_best, Fctf, Mccf_best_combined, Mpsi_best_combined;
 	MultidimArray<int> Mclass_best_combined;
 
 	AccPtr<XFLOAT >  d_Mccf_best(basePckr->workSize*basePckr->workSize, allocator);
@@ -557,11 +557,17 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 
 		if (basePckr->autopick_helical_segments)
 		{
-			CudaGlobalPtr< ACCCOMPLEX > d_Fmsk2(basePckr->Favgmsk.nzyxdim, allocator);
-			CudaGlobalPtr<XFLOAT > d_Mavg(allocator);
-			CudaGlobalPtr<XFLOAT > d_Mstddev2(allocator);
-			d_Mstddev2.device_alloc(basePckr->workSize*basePckr->workSize);
-			d_Mavg.device_alloc(basePckr->workSize*basePckr->workSize);
+			/*
+			AccPtr< ACCCOMPLEX > d_Fmsk2(basePckr->Favgmsk.nzyxdim, allocator);
+			AccPtr<XFLOAT > d_Mavg(allocator);
+			AccPtr<XFLOAT > d_Mstddev2(allocator);
+
+			d_Fmsk2.setSize(micTransformer.fouriers.getSize());
+			d_Mavg.setSize(micTransformer.fouriers.getSize());
+			d_Mstddev2.setSize(micTransformer.fouriers.getSize());
+
+			d_Mavg.deviceAlloc();
+			d_Mstddev2.deviceAlloc();
 
 			//TODO Do this only once further up in scope
 			for(int i = 0; i< d_Fmsk2.size ; i++)
@@ -587,6 +593,8 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 			Mavg.resizeNoCp(1, basePckr->workSize, basePckr->workSize);
 			for(int i = 0; i < d_Mavg.size ; i ++)
 				Mavg.data[i] = d_Mavg[i];
+
+			*/
 
 		}
 
@@ -624,12 +632,14 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 		d_Mstddev.cpToDevice();
 		d_Mstddev.streamSync();
 
+		/*
 		d_Mmean.host_alloc();
 		d_Mmean.cp_to_host();
 		d_Mmean.streamSync();
 		Mmean.resizeNoCp(1, basePckr->workSize, basePckr->workSize);
 		for(int i = 0; i < d_Mmean.size ; i ++)
 			Mmean.data[i] = d_Mmean[i];
+		*/
 
 		CTOC(timer,"calculateStddevAndMeanUnderMask");
 
