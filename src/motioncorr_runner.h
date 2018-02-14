@@ -140,16 +140,16 @@ public:
 	void getOutputFileNames(FileName fn_mic, FileName &fn_avg, FileName &fn_mov);
 
 	// Execute MOTIONCOR2 for a single micrograph
-	bool executeMotioncor2(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts, int rank = 0);
+	bool executeMotioncor2(Micrograph &mic, std::vector<float> &xshifts, std::vector<float> &yshifts, int rank = 0);
 
 	// Get the shifts from MOTIONCOR2
 	void getShiftsMotioncor2(FileName fn_log, std::vector<float> &xshifts, std::vector<float> &yshifts);
 
 	// Execute UNBLUR for a single micrograph
-	bool executeUnblur(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts);
+	bool executeUnblur(Micrograph &mic, std::vector<float> &xshifts, std::vector<float> &yshifts);
 
 	// Execute our own implementation for a single micrograph
-	bool executeOwnMotionCorrection(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts);
+	bool executeOwnMotionCorrection(Micrograph &mic, std::vector<float> &xshifts, std::vector<float> &yshifts);
 
 	// Get the shifts from UNBLUR
 	void getShiftsUnblur(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts);
@@ -161,7 +161,7 @@ public:
 	void plotShifts(FileName fn_eps, std::vector<float> &xshifts, std::vector<float> &yshifts);
 
 	// Save micrograph model
-	void saveModel(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts);
+	void saveModel(Micrograph &mic);
 
 	// Make a PDF file with all the shifts and write output STAR files
 	void generateLogFilePDFAndWriteStarFiles();

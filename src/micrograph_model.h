@@ -30,7 +30,8 @@ public:
 	// Fit model based on observations
 	virtual void fit() = 0;
 
-	virtual void read(FileName fn, std::string block_name) = 0;
+	virtual void read(std::ifstream &fh, std::string block_name) = 0;
+	virtual void write(std::ostream &fh, std::string block_name) = 0;
 
 	// Get motion at frame and (x, y)
 	virtual int getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty) const = 0;
@@ -38,15 +39,16 @@ public:
 
 class ThirdOrderPolynomialModel: public MotionModel {
 public:
+	static const int NUM_COEFFS_PER_DIM;
+
 	Matrix1D <RFLOAT> coeffX, coeffY;
 
 	void fit() {
 		REPORT_ERROR("Not implemented yet.");
 	}
 
-	void read(FileName fn, std::string block_name) {
-		REPORT_ERROR("Not implemented yet.");
-	}
+	void read(std::ifstream &fh, std::string block_name);
+	void write(std::ostream &fh, std::string block_name);
 
 	int getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty) const;
 };
@@ -56,6 +58,7 @@ class Micrograph
 public:
 	static const RFLOAT NOT_OBSERVED;
 	RFLOAT angpix, voltage, dose_per_frame, pre_exposure;
+	MotionModel *model;
 
 	// Empty Constructor is not allowed
 	Micrograph(); // = delete in C++11
@@ -83,7 +86,7 @@ public:
 	{
 		width = 0;
 		height = 0;
-		nFrame = 0;
+		n_frames = 0;
 		binning = 1;
 
 		angpix = -1;
@@ -125,6 +128,18 @@ public:
 		return fnMovie;
 	}
 
+	int getWidth() const {
+		return width;
+	}
+
+	int getHeight() const {
+		return height;
+	}
+
+	int getNframes() const {
+		return n_frames;
+	}
+
 	// Get shift vector at (x, y, frame)
 	// (x, y) and (shiftx, shifty) are UNBINNED pixels in the original movie
 	int getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty) const;
@@ -134,13 +149,12 @@ public:
 	void setGlobalShift(int frame, RFLOAT shiftx, RFLOAT shifty);
 
 private:
-	int width, height, nFrame;
+	int width, height, n_frames;
 	RFLOAT binning;
 	FileName fnGain;
 	FileName fnMovie;
 	
 	std::vector<RFLOAT> globalShiftX, globalShiftY;
-	MotionModel *model;
 };
 
 #endif /* MICROGRAPH_MODEL_H_ */

@@ -296,18 +296,20 @@ void MotioncorrRunner::run()
 			progress_bar(imic);
 
 
+		Micrograph mic(fn_micrographs[imic], fn_gain_reference, bin_factor);
+
 		bool result = false;
 		if (do_own)
-			result = executeOwnMotionCorrection(fn_micrographs[imic], xshifts, yshifts);
+			result = executeOwnMotionCorrection(mic, xshifts, yshifts);
 		else if (do_unblur)
-			result = executeUnblur(fn_micrographs[imic], xshifts, yshifts);
+			result = executeUnblur(mic, xshifts, yshifts);
 		else if (do_motioncor2)
-			result = executeMotioncor2(fn_micrographs[imic], xshifts, yshifts);
+			result = executeMotioncor2(mic, xshifts, yshifts);
 		else
 			REPORT_ERROR("Bug: by now it should be clear whether to use MotionCor2 or Unblur...");
 
 		if (result) {
-			saveModel(fn_micrographs[imic], xshifts, yshifts);
+			saveModel(mic);
 			plotShifts(fn_micrographs[imic], xshifts, yshifts);
 		}
 	}
@@ -326,10 +328,9 @@ void MotioncorrRunner::run()
 #endif
 }
 
-bool MotioncorrRunner::executeMotioncor2(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts, int rank)
+bool MotioncorrRunner::executeMotioncor2(Micrograph &mic, std::vector<float> &xshifts, std::vector<float> &yshifts, int rank)
 {
-
-
+	FileName fn_mic = mic.getMovieFilename();
 	FileName fn_avg, fn_mov;
 	getOutputFileNames(fn_mic, fn_avg, fn_mov);
 
@@ -459,6 +460,12 @@ bool MotioncorrRunner::executeMotioncor2(FileName fn_mic, std::vector<float> &xs
 
 		// Also analyse the shifts
 		getShiftsMotioncor2(fn_out, xshifts, yshifts);
+
+		for (int i = 0, ilim = xshifts.size(); i < ilim; i++) {
+			int frame = i + 1; // Make 1-indexed
+			frame += (first_frame_sum - 1); // Correct for -Throw
+			mic.setGlobalShift(frame, xshifts[i], yshifts[i]);
+		}
 	}
 
 	// Success!
@@ -519,9 +526,10 @@ void MotioncorrRunner::getShiftsMotioncor2(FileName fn_log, std::vector<float> &
     	REPORT_ERROR("ERROR: got an unequal number of x and yshifts from " + fn_log);
 
 }
-bool MotioncorrRunner::executeUnblur(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts)
-{
 
+bool MotioncorrRunner::executeUnblur(Micrograph &mic, std::vector<float> &xshifts, std::vector<float> &yshifts)
+{
+	FileName fn_mic = mic.getMovieFilename();
 	FileName fn_avg, fn_mov;
 	getOutputFileNames(fn_mic, fn_avg, fn_mov);
 	FileName fn_root = fn_avg.withoutExtension();
@@ -604,6 +612,11 @@ bool MotioncorrRunner::executeUnblur(FileName fn_mic, std::vector<float> &xshift
 
 	// Also analyse the shifts
 	getShiftsUnblur(fn_shifts, xshifts, yshifts);
+
+	for (int i = 0, ilim = xshifts.size(); i < ilim; i++) {
+		int frame = i + 1; // make 1-indexed
+		mic.setGlobalShift(frame, xshifts[i], yshifts[i]);
+	}
 
 	// If the requested sum is only a subset, then use summovie to make the average
 	int mylastsum = (last_frame_sum == 0) ? Nframes : last_frame_sum;
@@ -793,29 +806,18 @@ void MotioncorrRunner::plotShifts(FileName fn_mic, std::vector<float> &xshifts, 
 	plot2D->OutputPostScriptPlot(fn_eps);
 }
 
-void MotioncorrRunner::saveModel(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts) {
-	Micrograph m(fn_mic, fn_gain_reference, bin_factor);
+void MotioncorrRunner::saveModel(Micrograph &mic) {
 	if (do_dose_weighting) {
-		m.angpix = angpix;
-		m.voltage = voltage;
-		m.dose_per_frame = dose_per_frame;
-		m.pre_exposure = pre_exposure;
+		mic.angpix = angpix;
+		mic.voltage = voltage;
+		mic.dose_per_frame = dose_per_frame;
+		mic.pre_exposure = pre_exposure;
 	}
 
 	FileName fn_avg, fn_mov;
-        getOutputFileNames(fn_mic, fn_avg, fn_mov);
+	getOutputFileNames(mic.getMovieFilename(), fn_avg, fn_mov);
 
-	for (int i = 0, ilim = xshifts.size(); i < ilim; i++) {
-		int frame = i + 1;
-
-		// UNBLUR processes all frames, but MotionCor2 not.
-		// So we have to adjust...
-		if (do_motioncor2) frame += (first_frame_sum - 1);
-
-		m.setGlobalShift(frame, xshifts[i], yshifts[i]);
-	}
-
-	m.write(fn_avg.withoutExtension() + ".star");
+	mic.write(fn_avg.withoutExtension() + ".star");
 }
 
 void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
@@ -881,13 +883,14 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 // - outlier rejection in fitting (use free set?)
 // - warn or stop when number of patches is too small
 
-bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts) {
+bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<float> &xshifts, std::vector<float> &yshifts) {
 #ifdef DEBUG_OWN
 	std::cout << std::endl;
 	std::cout << "Now working on " << fn_mic << " nthreads = " << n_threads << std::endl;
 #endif
 	omp_set_num_threads(n_threads);
 
+	FileName fn_mic = mic.getMovieFilename();
 	FileName fn_avg, fn_mov;
 	getOutputFileNames(fn_mic, fn_avg, fn_mov);
 	FileName fn_avg_noDW = fn_avg.withoutExtension() + "_noDW.mrc";
@@ -1014,6 +1017,10 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 	RCTIC(TIMING_GLOBAL_ALIGNMENT);
 	alignPatch(Fframes, nx, ny, xshifts, yshifts);
 	RCTOC(TIMING_GLOBAL_ALIGNMENT);
+	for (int i = 0, ilim = xshifts.size(); i < ilim; i++) {
+		int frame = i + 1; // make 1-indexed
+		mic.setGlobalShift(frame, xshifts[i], yshifts[i]);
+        }
 
 #ifdef DEBUG_OWN
 	std::cout << "Global alignment done." << std::endl;
@@ -1151,8 +1158,9 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 	}
 #endif
 
-	ThirdOrderPolynomialModel model;
-	model.coeffX = coeffX; model.coeffY = coeffY;
+	ThirdOrderPolynomialModel *model = new ThirdOrderPolynomialModel();
+	model->coeffX = coeffX; model->coeffY = coeffY;
+	mic.model = model;
 
 	RFLOAT rms_x = 0, rms_y = 0;
         for (int i = 0; i < n_obs; i++) {
@@ -1161,7 +1169,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 		const RFLOAT y = patch_ys[i] / ny - 0.5;
 		const RFLOAT z = patch_frames[i];
 
-		model.getShiftAt(z, x, y, x_fitted, y_fitted);
+		model->getShiftAt(z, x, y, x_fitted, y_fitted);
 		//getFittedXY(x, y, z, coeffX, coeffY, x_fitted, y_fitted);
 		rms_x += (patch_xshifts[i] - x_fitted) * (patch_xshifts[i] - x_fitted);
 		rms_y += (patch_yshifts[i] - y_fitted) * (patch_yshifts[i] - y_fitted);
@@ -1183,7 +1191,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 		std::cout << "Real space interpolation (before dose weighting): ";
 #endif
 		Iref().initZeros();
-		realSpaceInterpolation(Iref, Iframes, coeffX, coeffY, model);
+		realSpaceInterpolation(Iref, Iframes, coeffX, coeffY, *model);
 #ifdef DEBUG_OWN
 		std::cout << " done" << std::endl;
 #endif
@@ -1238,7 +1246,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 	std::cout << "Real space interpolation (after dose weighting): ";
 #endif
 	Iref().initZeros();
-	realSpaceInterpolation(Iref, Iframes, coeffX, coeffY, model);
+	realSpaceInterpolation(Iref, Iframes, coeffX, coeffY, *model);
 #ifdef DEBUG_OWN
 	std::cout << " done" << std::endl;
 #endif

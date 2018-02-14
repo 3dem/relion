@@ -31,6 +31,7 @@
  */
 
 const RFLOAT Micrograph::NOT_OBSERVED = -9999;
+const int ThirdOrderPolynomialModel::NUM_COEFFS_PER_DIM = 18;
 
 int ThirdOrderPolynomialModel::getShiftAt(RFLOAT z, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty) const {
 	const RFLOAT x2 = x * x, y2 = y * y, xy = x * y, z2 = z * z;
@@ -50,18 +51,77 @@ int ThirdOrderPolynomialModel::getShiftAt(RFLOAT z, RFLOAT x, RFLOAT y, RFLOAT &
 	         + (coeffY(15) * z + coeffY(16) * z2 + coeffY(17) * z3) * xy;
 }
 
+void ThirdOrderPolynomialModel::write(std::ostream &fh, std::string block_name) {
+	MetaDataTable MD;
+	MD.setName(block_name);
+
+	int coeff_idx = 0;
+
+	// Write coeffX
+	for (int i = 0; i < NUM_COEFFS_PER_DIM; i++) {
+		MD.addObject();
+                MD.setValue(EMDL_MICROGRAPH_MOTION_COEFFS_IDX, coeff_idx);
+                MD.setValue(EMDL_MICROGRAPH_MOTION_COEFF, coeffX(i));
+		coeff_idx++;
+	}
+
+	// Write coeffY	
+	for (int i = 0; i < NUM_COEFFS_PER_DIM; i++) {
+		MD.addObject();
+                MD.setValue(EMDL_MICROGRAPH_MOTION_COEFFS_IDX, coeff_idx);
+                MD.setValue(EMDL_MICROGRAPH_MOTION_COEFF, coeffY(i));
+		coeff_idx++;
+	}
+
+	MD.write(fh);
+}
+
+void ThirdOrderPolynomialModel::read(std::ifstream &fh, std::string block_name) {
+	MetaDataTable MD;
+	MD.readStar(fh, block_name);
+
+	const int NUM_COEFFS = NUM_COEFFS_PER_DIM * 2;
+	int num_read = 0;
+
+	coeffX.resize(NUM_COEFFS_PER_DIM); coeffX.initZeros();
+	coeffY.resize(NUM_COEFFS_PER_DIM); coeffY.initZeros();
+
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD) {
+		int idx;
+		RFLOAT val;
+
+		if (!MD.getValue(EMDL_MICROGRAPH_MOTION_COEFFS_IDX, idx) ||
+		    !MD.getValue(EMDL_MICROGRAPH_MOTION_COEFF, val)) {
+			REPORT_ERROR("ThirdOrderPolynomialModel coefficients table: missing index or coefficients");
+		}
+
+		if (idx >= 0 && idx < NUM_COEFFS_PER_DIM) {
+			coeffX(idx) = val;
+		} else if (idx >= NUM_COEFFS_PER_DIM && idx < NUM_COEFFS) {
+			coeffY(idx) = val;
+		} else {
+			REPORT_ERROR("ThirdOrderPolynomialModel coefficients table: wrong index");
+		}
+		num_read++;
+	}
+	
+	if (num_read != NUM_COEFFS) {
+		REPORT_ERROR("ThirdOrderPolynomialModel coefficients table: incomplete values");
+	}
+}
+
 void Micrograph::setMovie(FileName fnMovie, FileName fnGain, RFLOAT binning) {
 	Image<RFLOAT> Ihead;
 	Ihead.read(fnMovie, false);
         
 	width = XSIZE(Ihead());
 	height = YSIZE(Ihead());
-	nFrame = NSIZE(Ihead());
+	n_frames = NSIZE(Ihead());
 
 	this->binning = binning;
 
-	globalShiftX.resize(nFrame, NOT_OBSERVED);
-	globalShiftY.resize(nFrame, NOT_OBSERVED);
+	globalShiftX.resize(n_frames, NOT_OBSERVED);
+	globalShiftY.resize(n_frames, NOT_OBSERVED);
 
 	this->fnMovie = fnMovie;
 	this->fnGain = fnGain;
@@ -86,13 +146,13 @@ void Micrograph::read(FileName fn_in)
 
 	if (!MDglobal.getValue(EMDL_IMAGE_SIZEX, width) ||
 	    !MDglobal.getValue(EMDL_IMAGE_SIZEY, height) ||
-	    !MDglobal.getValue(EMDL_IMAGE_SIZEZ, nFrame) ||
+	    !MDglobal.getValue(EMDL_IMAGE_SIZEZ, n_frames) ||
 	    !MDglobal.getValue(EMDL_MICROGRAPH_MOVIE_NAME, fnMovie)) {
 		REPORT_ERROR("MicrographModel::read: insufficient general information");
 	}
 
-	globalShiftX.resize(nFrame, NOT_OBSERVED);
-	globalShiftY.resize(nFrame, NOT_OBSERVED);
+	globalShiftX.resize(n_frames, NOT_OBSERVED);
+	globalShiftY.resize(n_frames, NOT_OBSERVED);
 
 	if (!MDglobal.getValue(EMDL_MICROGRAPH_GAIN_NAME, fnGain)) {
 		fnGain = "";
@@ -133,7 +193,7 @@ void Micrograph::read(FileName fn_in)
 		std::cout << " global shift: frame #" << frame << " x " << shiftX << " Y " << shiftY << std::endl;
 	}
 
-	model = NULL; // new MotionModel();
+	model = NULL; // TODO: MotionModel();
 }
 
 // Write to a STAR file
@@ -151,7 +211,7 @@ void Micrograph::write(FileName filename) {
         MD.addObject();
 	MD.setValue(EMDL_IMAGE_SIZEX, width);
         MD.setValue(EMDL_IMAGE_SIZEY, height);
-        MD.setValue(EMDL_IMAGE_SIZEZ, nFrame);
+        MD.setValue(EMDL_IMAGE_SIZEZ, n_frames);
         MD.setValue(EMDL_MICROGRAPH_MOVIE_NAME, fnMovie);
 	if (fnGain != "") {
 		MD.setValue(EMDL_MICROGRAPH_GAIN_NAME, fnGain);
@@ -173,13 +233,18 @@ void Micrograph::write(FileName filename) {
 
 	MD.clear();
 	MD.setName("global_shift");
-	for (int frame = 0; frame < nFrame; frame++) {
+	for (int frame = 0; frame < n_frames; frame++) {
 		MD.addObject();
 		MD.setValue(EMDL_MICROGRAPH_FRAME_NUMBER, frame + 1); // make 1-indexed
 		MD.setValue(EMDL_MICROGRAPH_SHIFT_X, globalShiftX[frame]);
 		MD.setValue(EMDL_MICROGRAPH_SHIFT_Y, globalShiftY[frame]);
 	}
 	MD.write(fh);
+
+	if (model != NULL) {
+		std::string block_name = "model1";
+		model->write(fh, block_name); // TODO: fix me
+	}
 
 	fh.close();
 }
@@ -198,8 +263,8 @@ int Micrograph::getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFL
 }
 
 void Micrograph::setGlobalShift(int frame, RFLOAT shiftx, RFLOAT shifty) {
-	if (frame <= 0 || frame > nFrame) {
-		std::cout << "Frame: " << frame << " nFrame: " << nFrame << std::endl;
+	if (frame <= 0 || frame > n_frames) {
+		std::cout << "Frame: " << frame << " n_frames: " << n_frames << std::endl;
 		REPORT_ERROR("Micrograph::setGlobalShift() frame out of range");
 	}
 
