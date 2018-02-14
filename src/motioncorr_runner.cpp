@@ -108,6 +108,7 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	pre_exposure = textToFloat(parser.getOption("--preexposure", "Pre-exposure (in electrons/A2) for dose-weighting inside UNBLUR", "0"));
 
 	do_own = parser.checkOption("--use_own","Use our own implementation of motion correction");
+	save_noDW = parser.checkOption("--save_noDW","Save aligned but non dose weighted micrograph. (This is always ON for MOTIONCOR2)");
 	// Initialise verb for non-parallel execution
 	verb = 1;
 
@@ -166,8 +167,7 @@ void MotioncorrRunner::initialise()
 
 	if (do_dose_weighting)
 	{
-		if (!(do_unblur || do_motioncor2 || do_own))
-			REPORT_ERROR("ERROR: Dose-weighting can only be done by UNBLUR or MOTIONCOR2.");
+		if (do_motioncor2) save_noDW = true; // MOTIONCOR2 always writes non-dose weighted micrographs
 		if (angpix < 0)
 			REPORT_ERROR("ERROR: For dose-weighting it is mandatory to provide the pixel size in Angstroms through --angpix.");
 
@@ -847,7 +847,7 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 		if (exists(fn_avg))
 		{
 			MDavg.addObject();
-			if (do_dose_weighting && do_motioncor2)
+			if (do_dose_weighting && save_noDW)
 			{
 				FileName fn_avg_wodose = fn_avg.withoutExtension() + "_noDW.mrc";
 				MDavg.setValue(EMDL_MICROGRAPH_NAME_WODOSE, fn_avg_wodose);
@@ -873,11 +873,17 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 // TODO:
 // - defect
 // - grouping
+// - outlier rejection in fitting (use free set?)
+// - warn or stop when number of patches is too small
 
 bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts) {
 	std::cout << std::endl;
 	std::cout << "Now working on " << fn_mic << " nthreads = " << n_threads << std::endl;
 	omp_set_num_threads(n_threads);
+
+	FileName fn_avg, fn_mov;
+	getOutputFileNames(fn_mic, fn_avg, fn_mov);
+	FileName fn_avg_noDW = fn_avg.withoutExtension() + "_noDW.mrc";
 
 	Image<RFLOAT> Ihead, Igain, Iref;
 	std::vector<MultidimArray<Complex> > Fframes;
@@ -1073,7 +1079,6 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 
 	// Fit polynomial model
 
-	// TODO: outlier rejection
 	RCTIC(TIMING_FIT_POLYNOMIAL);
 	const int n_obs = patch_frames.size();
 	const int n_params = 18;
@@ -1144,6 +1149,26 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 	std::cout << "Polynomial fit RMSD X = " << rms_x << " px, Y = " << rms_y << " px" << std::endl;
 	RCTOC(TIMING_FIT_POLYNOMIAL);
 
+	if (save_noDW) {
+		RCTIC(TIMING_REAL_SPACE_INTERPOLATION);
+		std::cout << "Real space interpolation (before dose weighting): ";
+		Iref().initZeros();
+		realSpaceInterpolation(Iref, Iframes, coeffX, coeffY);
+		std::cout << " done" << std::endl;
+		RCTOC(TIMING_REAL_SPACE_INTERPOLATION);
+	
+		// Apply binning
+		RCTIC(TIMING_BINNING);
+		if (bin_factor != 1) {
+			binNonSquareImage(Iref, bin_factor);
+		}
+		RCTOC(TIMING_BINNING);
+
+		// Final output
+		Iref.write(fn_avg_noDW);
+		std::cout << "Written aligned but non-dose wieghted sum to " << fn_avg_noDW << std::endl;
+	}
+
 	// Dose weighting
 	RCTIC(TIMING_DOSE_WEIGHTING);
 	if (do_dose_weighting) {
@@ -1175,8 +1200,29 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 	RCTOC(TIMING_DOSE_WEIGHTING);
 
 	RCTIC(TIMING_REAL_SPACE_INTERPOLATION);
-	std::cout << "Real space interpolation: ";
+	std::cout << "Real space interpolation (after dose weighting): ";
 	Iref().initZeros();
+	realSpaceInterpolation(Iref, Iframes, coeffX, coeffY);
+	std::cout << " done" << std::endl;
+	RCTOC(TIMING_REAL_SPACE_INTERPOLATION);
+	
+	// Apply binning
+	RCTIC(TIMING_BINNING);
+	if (bin_factor != 1) {
+		binNonSquareImage(Iref, bin_factor);
+	}
+	RCTOC(TIMING_BINNING);
+	
+	// Final output
+	Iref.write(fn_avg);
+	std::cout << "Written aligned and dose-weighted sum to " << fn_avg << std::endl;
+	return true;
+}
+
+void MotioncorrRunner::realSpaceInterpolation(Image <RFLOAT> &Iref, std::vector<Image<RFLOAT> > &Iframes, Matrix1D<RFLOAT> &coeffX, Matrix1D<RFLOAT> &coeffY) {
+	const int n_frames = Iframes.size();
+	const int nx = XSIZE(Iframes[0]()), ny = YSIZE(Iframes[0]());
+
 	for (int iframe = 0; iframe < n_frames; iframe++) {
 		std::cout << "." << std::flush;
 		const RFLOAT z = iframe, z2 = iframe * iframe;
@@ -1250,22 +1296,6 @@ bool MotioncorrRunner::executeOwnMotionCorrection(FileName fn_mic, std::vector<f
 			}
 		}
 	}
-	std::cout << " done" << std::endl;
-	RCTOC(TIMING_REAL_SPACE_INTERPOLATION);
-	
-	// Apply binning
-	RCTIC(TIMING_BINNING);
-	if (bin_factor != 1) {
-		binNonSquareImage(Iref, bin_factor);
-	}
-	RCTOC(TIMING_BINNING);
-	
-	// Final output
-	FileName fn_avg, fn_mov;
-	getOutputFileNames(fn_mic, fn_avg, fn_mov);
-	Iref.write(fn_avg);
-	std::cout << "Written aligned sum to " << fn_avg << std::endl;
-	return true;
 }
 
 bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes, const int pnx, const int pny, std::vector<float> &xshifts, std::vector<float> &yshifts) {

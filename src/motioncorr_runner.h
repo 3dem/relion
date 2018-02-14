@@ -53,6 +53,10 @@ public:
 	// Use our own implementation
 	bool do_own;
 
+	// Save aligned but non-dose weighted micrograph.
+	// With MOTIONCOR2, this flag is always assumed to be true
+	bool save_noDW;
+
 	// Use MOTIONCOR2 instead of UNBLUR?
 	bool do_motioncor2;
 
@@ -173,6 +177,8 @@ private:
 	void binNonSquareImage(Image<RFLOAT> &Iwork, RFLOAT bin_factor);
 
 	void doseWeighting(std::vector<MultidimArray<Complex> > &Fframes, std::vector<RFLOAT> doses);
+
+	void realSpaceInterpolation(Image <RFLOAT> &Iref, std::vector<Image<RFLOAT> > &Iframes, Matrix1D<RFLOAT> &coeffX, Matrix1D<RFLOAT> &coeffY);
 
 	inline void getFittedXY(const RFLOAT x, const RFLOAT y, const RFLOAT z, Matrix1D<RFLOAT> &coeffX, Matrix1D<RFLOAT> &coeffY, RFLOAT &x_fitted, RFLOAT &y_fitted) {
 		const RFLOAT x2 = x * x, y2 = y * y, xy = x * y, z2 = z * z;
