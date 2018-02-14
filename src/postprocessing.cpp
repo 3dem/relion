@@ -25,7 +25,8 @@ void Postprocessing::read(int argc, char **argv)
 
 	parser.setCommandLine(argc, argv);
 	int gen_section = parser.addSection("General options");
-	fn_in = parser.getOption("--i", "Input rootname, e.g. run1");
+	fn_I1 = parser.getOption("--i", "Input name of half1, e.g. run_half1_class001_unfil.mrc");
+	fn_I2 = parser.getOption("--i2", "Input name of half2, (default replaces half1 from --i with half2)", "");
 	fn_out = parser.getOption("--o", "Output rootname", "postprocess");
 	angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms"));
 	write_halfmaps = parser.checkOption("--half_maps", "Write post-processed half maps for validation");
@@ -76,7 +77,7 @@ void Postprocessing::usage()
 
 void Postprocessing::clear()
 {
-	fn_in = "";
+	fn_I1 = fn_I2 = "";
 	fn_out="postprocess";
 	angpix = 1.;
 	do_auto_mask = false;
@@ -99,9 +100,17 @@ void Postprocessing::clear()
 void Postprocessing::initialise()
 {
 	// Read in the input maps
-	fn_I1 = fn_in + "_half1_class001_unfil.mrc";
-	fn_I2 = fn_in + "_half2_class001_unfil.mrc";
+	if (fn_I2 == "")
+	{
+		fn_I2 = fn_I1;
+		if (fn_I1.contains("half1"))
+			fn_I2.replaceAllSubstrings("half1", "half2");
+		else if (fn_I1.contains("half2"))
+			fn_I2.replaceAllSubstrings("half2", "half1");
+		else
+			REPORT_ERROR("ERROR: cannot find half1 or half2 substring in the input filename");
 
+	}
 	if (verb > 0)
 	{
 		std::cout <<"== Reading input half-reconstructions: " <<std::endl;

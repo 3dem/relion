@@ -901,6 +901,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 	Timer ReconTimer;
 	int ReconS_1 = ReconTimer.setNew(" RcS1_Init ");
 	int ReconS_2 = ReconTimer.setNew(" RcS2_Shape&Noise ");
+	int ReconS_2_5 = ReconTimer.setNew(" RcS2.5_Regularize ");
 	int ReconS_3 = ReconTimer.setNew(" RcS3_skipGridding ");
 	int ReconS_4 = ReconTimer.setNew(" RcS4_doGridding_norm ");
 	int ReconS_5 = ReconTimer.setNew(" RcS5_doGridding_init ");
@@ -1033,6 +1034,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 		}
 	}
     RCTOC(ReconTimer,ReconS_2);
+    RCTIC(ReconTimer,ReconS_2_5);
 	// Apply MAP-additional term to the Fnewweight array
 	// This will regularise the actual reconstruction
     if (do_map)
@@ -1114,8 +1116,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 		}
 
 	} //end if do_map
-
-    RCTOC(ReconTimer,ReconS_2);
+    RCTOC(ReconTimer,ReconS_2_5);
 	if (skip_gridding)
 	{
 	    RCTIC(ReconTimer,ReconS_3);

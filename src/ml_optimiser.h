@@ -22,6 +22,13 @@
 #define ML_OPTIMISER_H_
 
 #include <pthread.h>
+
+#ifdef ALTCPU
+	#include <tbb/enumerable_thread_specific.h>
+	#include <tbb/task_scheduler_init.h>
+#endif
+
+
 #include "src/ml_model.h"
 #include "src/parallel.h"
 #include "src/exp_model.h"
@@ -31,6 +38,7 @@
 #include "src/healpix_sampling.h"
 #include "src/helix.h"
 #include "src/local_symmetry.h"
+#include "src/acc/settings.h"
 
 #define ML_SIGNIFICANT_WEIGHT 1.e-8
 #define METADATA_LINE_LENGTH METADATA_LINE_LENGTH_ALL
@@ -95,7 +103,20 @@ public:
 	std::vector<int> cudaDevices;
 	std::vector<int> cudaOptimiserDeviceMap;
 	std::vector<void*> cudaOptimisers;
-	std::vector<void*> cudaDeviceBundles;
+	std::vector<void*> accDataBundles;
+
+#ifdef ALTCPU
+	std::vector<void*> cpuOptimisers;
+
+	// Container for TBB thread-local data
+	typedef tbb::enumerable_thread_specific< void * > CpuOptimiserType;
+
+	CpuOptimiserType   tbbCpuOptimiser;
+	tbb::task_scheduler_init tbbSchedulerInit;
+
+	XFLOAT **mdlClassComplex __attribute__((aligned(64)));
+#endif
+
 
 	// I/O Parser
 	IOParser parser;
@@ -142,17 +163,14 @@ public:
 	// Flag to keep tau-spectrum constant
 	bool fix_tau;
 
-    // some parameters for debugging
+	// some parameters for debugging
 	RFLOAT debug1, debug2, debug3;
 
 	// Starting and finishing particles (for parallelisation)
-    long int my_first_ori_particle_id, my_last_ori_particle_id;
+	long int my_first_ori_particle_id, my_last_ori_particle_id;
 
 	// Total number iterations and current iteration
 	int iter, nr_iter;
-
-	// Total number of subsets and current subset;
-	int subset, subset_start, nr_subsets, write_every_subset;
 
 	// Flag whether to split data from the beginning into two random halves
 	bool do_split_random_halves;
@@ -293,6 +311,29 @@ public:
 	//////////////// Stochastic gradient descent
 	bool do_sgd;
 
+	// 12Feb2018: new parameters to follow cryoSPARC more closely
+	// Number of initial iterations at low resolution, and without annealing of references
+	int sgd_ini_iter;
+
+	// Number of final iterations at high resolution, and without annealing of reference
+	int sgd_fin_iter;
+
+	// Number of iterations between the initial and the final ones
+	// (during which a linear transform from sgd_ini_resol->sgd_fin_resol and sgd_ini_subset_size->sgd_fin_subset_size will be done)
+	int sgd_inbetween_iter;
+
+	// Size of the subsets used in the initial iterations
+	int sgd_ini_subset_size;
+
+	//Size of the subsets used in the final iterations
+	int sgd_fin_subset_size;
+
+	// The resolution in the initial iterations
+	RFLOAT sgd_ini_resol; // in A
+
+	// The resolution in the final iterations
+	RFLOAT sgd_fin_resol; // in A
+
 	// Momentum update parameter
 	RFLOAT mu;
 
@@ -302,8 +343,8 @@ public:
 	// Size of the random subsets
 	long int subset_size;
 
-	// Maximum number of subsets to process using SGD (possibly more than 1 iteration)
-	long int sgd_max_subsets;
+	// Every how many iterations should be written to disk when using subsets
+	int write_every_sgd_iter;
 
 	// Number of particles at which initial sigma2_fudge is reduced by 50%
 	long int sgd_sigma2fudge_halflife;
@@ -311,8 +352,12 @@ public:
 	// Initial sigma2fudge for SGD
 	RFLOAT sgd_sigma2fudge_ini;
 
-	// Strict high-res limit in SGD
-	RFLOAT strict_highres_sgd;
+	// derived from the above, so not given by user:
+	int sgd_inires_pix; // resolution in pixels at beginning of SGD
+	int sgd_finres_pix; // resolution in pixels at end of SGD
+
+	// Use subsets like in cisTEM to speed up 2D/3D classification
+	bool do_fast_subsets;
 
 	// Available memory (in Gigabyte)
 	size_t available_gpu_memory;
@@ -330,6 +375,9 @@ public:
 	// Use gpu resources?
 	bool do_gpu;
 	bool anticipate_oom;
+
+	// Use alternate cpu implementation
+	bool do_cpu;
 
 	// Which GPU devices to use?
 	std::string gpu_ids;
@@ -417,9 +465,9 @@ public:
 	// Flag whether to realign frames of movies
 	bool do_realign_movies;
 
-    // Process movies one micrograph at a time?
-    // This prevents memory problems with very large data sets, but may negatively affect overall parallelization efficiency
-    bool do_movies_in_batches;
+	// Process movies one micrograph at a time?
+	// This prevents memory problems with very large data sets, but may negatively affect overall parallelization efficiency
+	bool do_movies_in_batches;
 
 	// Starfile with the movie-frames
 	FileName fn_data_movie;
@@ -515,7 +563,7 @@ public:
 
 	/////////// Some internal stuff ////////////////////////
 
-    // Array with pointers to the resolution of each point in a Fourier-space FFTW-like array
+	// Array with pointers to the resolution of each point in a Fourier-space FFTW-like array
 	MultidimArray<int> Mresol_fine, Mresol_coarse, Npix_per_shell;
 
 	// Verbosity flag
@@ -568,7 +616,7 @@ public:
 	int failsafe_threshold;
 
 #ifdef TIMING
-    Timer timer;
+	Timer timer;
 	int TIMING_DIFF_PROJ, TIMING_DIFF_SHIFT, TIMING_DIFF_DIFF2;
 	int TIMING_WSUM_PROJ, TIMING_WSUM_BACKPROJ, TIMING_WSUM_DIFF2, TIMING_WSUM_SUMSHIFT;
 	int TIMING_EXP, TIMING_MAX, TIMING_RECONS, TIMING_SOLVFLAT, TIMING_UPDATERES;
@@ -579,8 +627,14 @@ public:
 	int TIMING_ESP_PREC1, TIMING_ESP_PREC2, TIMING_ESP_PRECW, TIMING_WSUM_GETSHIFT, TIMING_DIFF2_GETSHIFT, TIMING_WSUM_SCALE, TIMING_WSUM_LOCALSUMS;
 	int TIMING_ESP_WEIGHT1, TIMING_ESP_WEIGHT2, TIMING_WEIGHT_EXP, TIMING_WEIGHT_SORT, TIMING_ESP_WSUM;
 	int TIMING_EXTRA1, TIMING_EXTRA2, TIMING_EXTRA3;
+	int TIMING_EXP_SETUP, TIMING_ITER_HELICALREFINE;
+	int TIMING_ITER_WRITE, TIMING_ITER_LOCALSYM;
 
 	int RCT_1, RCT_2, RCT_3, RCT_4, RCT_5, RCT_6, RCT_7, RCT_8;
+	int ES_A, ES_B, ES_C, ES_D, ES_E, ES_F;
+	int ESS_1, ESS_2, ESS_3, ESS_4;
+	int EINS_1, EINS_2, EINS_3, EINS_4, EINS_5,EINS_6, EINS_7, EINS_8, EINS_9;
+	int EINS_10, EINS_11;
 #endif
 
 public:
@@ -692,8 +746,16 @@ public:
 		asymmetric_padding(false),
 		maximum_significants(0),
 		threadException(NULL),
+#ifdef ALTCPU
+		tbbSchedulerInit(tbb::task_scheduler_init::deferred ),
+		mdlClassComplex(NULL),
+#endif
 		failsafe_threshold(40)
-	{};
+	{
+#ifdef ALTCPU
+		tbbCpuOptimiser = CpuOptimiserType((void*)NULL);
+#endif
+	};
 
 	/** ========================== I/O operations  =========================== */
 	/// Print help message
@@ -936,6 +998,9 @@ public:
 
 	// Adjust angular sampling based on the expected angular accuracies for auto-refine procedure
 	void updateAngularSampling(bool verb = true);
+
+	// Adjust subset size in fast_subsets or SGD algorithms
+	void updateSubsetSize(bool verb = true);
 
 	// Check convergence for auto-refine procedure
 	// Also print convergence information to screen for auto-refine procedure
