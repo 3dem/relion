@@ -116,12 +116,9 @@ int AberrationPlot::_run()
             {
                 const double xf = x;
                 const double yf = y < sh? y : y - s;
-                const double gamma = ctf0.getGamma(xf/as, yf/as);
-                const double cg = cos(gamma);
-                const double sg = sin(gamma);
-
-                double cx = cg*cg;
-                double cy = sg*cg;
+                const double gamma_i = ctf0.getGamma(xf/as, yf/as);
+                const double cg = cos(gamma_i);
+                const double sg = sin(gamma_i);
 
                 Complex zobs = obsF[p](y,x);
                 Complex zprd = pred[p](y,x);
@@ -129,12 +126,12 @@ int AberrationPlot::_run()
                 double zz = zobs.real*zprd.imag + zobs.imag*zprd.real;
                 double nr = zprd.norm();
 
-                Axx[t](y,x) += nr*cx*cx;
-                Axy[t](y,x) += nr*cx*cy;
-                Ayy[t](y,x) += nr*cy*cy;
+                Axx[t](y,x) += nr*cg*cg;
+                Axy[t](y,x) += nr*cg*sg;
+                Ayy[t](y,x) += nr*sg*sg;
 
-                bx[t](y,x) += zz*cx;
-                by[t](y,x) += zz*cy;
+                bx[t](y,x) += zz*cg;
+                by[t](y,x) += zz*sg;
             }
         }
     }
