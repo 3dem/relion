@@ -1242,7 +1242,7 @@ void ParticlePolisher::reconstructShinyParticlesAndFscWeight(int ipass)
 		Postprocessing prm;
 
 		prm.clear();
-		prm.fn_in = fn_out + "shiny";
+		prm.fn_I1 = fn_out + "shiny_half1_class001_unfil.mrc";
 		prm.fn_out = fn_out + fn_post;
 		prm.angpix = angpix;
 		prm.do_auto_mask = false;

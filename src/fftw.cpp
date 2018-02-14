@@ -51,7 +51,7 @@
 
 static pthread_mutex_t fftw_plan_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-#define TIMING_FFTW
+//#define TIMING_FFTW
 #ifdef TIMING_FFTW
 	#define RCTIC(label) (timer_fftw.tic(label))
 	#define RCTOC(label) (timer_fftw.toc(label))
@@ -453,6 +453,23 @@ void randomizePhasesBeyond(MultidimArray<RFLOAT> &v, int index)
 
 }
 
+/*
+void randomizePhasesBeyond(MultidimArray<Complex> &v, int index)
+{
+    int index2 = index*index;
+    FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(v)
+    {
+       if (kp*kp + ip*ip + jp*jp >= index2)
+       {
+               RFLOAT mag = abs(DIRECT_A3D_ELEM(v, k, i, j));
+               RFLOAT phas = rnd_unif(0., 2.*PI);
+               RFLOAT realval = mag * cos(phas);
+               RFLOAT imagval = mag * sin(phas);
+               DIRECT_A3D_ELEM(v, k, i, j) = Complex(realval, imagval);
+       }
+    }
+}
+*/
 
 // Fourier ring correlation -----------------------------------------------
 // from precalculated Fourier Transforms, and without sampling rate etc.

@@ -924,7 +924,8 @@ bool PipeLine::markAsFinishedJob(int this_job, std::string &error_message)
 	// For relion_refine jobs, add last iteration optimiser.star, data.star, model.star and class???.mrc to the pipeline
 	if (processList[this_job].type == PROC_2DCLASS ||
 		processList[this_job].type == PROC_3DCLASS ||
-		processList[this_job].type == PROC_3DAUTO)
+		processList[this_job].type == PROC_3DAUTO  ||
+		processList[this_job].type == PROC_INIMODEL )
 	{
 		// Get the last iteration optimiser file
 		FileName fn_opt;

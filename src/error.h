@@ -116,6 +116,10 @@ public:
     friend std::ostream& operator<<(std::ostream& o, RelionError& XE);
 };
 
+#define RAMERR "\n\
+There was an issue allocating CPU memory (RAM). \n\
+Likely maximum memory size was exceeded."
+
 #define DEVERR "\n\
 This is a developer error message which you cannot fix \n\
 through changing the run config. Either your data is broken or\n\
@@ -282,4 +286,7 @@ the relion developers at \n\n\
 		  -  through the command-line, add --particle_diameter <d> [A] \n\
 		both methods specify a diameter in Angstroms \n\n")
 
+#define ERRUNSAFEOBJECTREUSE ("An unsafe combination of pointers was found as input to a \n\
+		  function. You probably supplied the same object as both input \n\
+		  and output, which is not always safe, depending on the function design.")
 #endif

@@ -19,7 +19,7 @@
  ***************************************************************************/
 #include "src/motioncorr_runner.h"
 #ifdef CUDA
-#include "src/gpu_utils/cuda_mem_utils.h"
+#include "src/acc/cuda/cuda_mem_utils.h"
 #endif
 #include "src/micrograph_model.h"
 #include "src/fftw.h"
@@ -27,7 +27,7 @@
 #include "src/matrix1d.h"
 #include <omp.h>
 
-#define TIMING
+//#define TIMING
 #ifdef TIMING
 	#define RCTIC(label) (timer.tic(label))
 	#define RCTOC(label) (timer.toc(label))
@@ -60,8 +60,8 @@
 //	int TIMING_ = timer.setNew("");
 
 #else
-	#define RCTIC(timer,label)
-	#define RCTOC(timer,label)
+	#define RCTIC(label)
+	#define RCTOC(label)
 #endif
 
 void MotioncorrRunner::read(int argc, char **argv, int rank)
