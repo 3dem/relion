@@ -81,6 +81,22 @@ Image<Complex> ObservationModel::predictObservation(
     return pred;
 }
 
+std::vector<Image<Complex>> ObservationModel::predictObservations(
+        Projector &proj, MetaDataTable &mdt,
+        bool applyCtf, bool applyTilt, int threads) const
+{
+    const int pc = mdt.numberOfObjects();
+    std::vector<Image<Complex>> out(pc);
+
+    #pragma omp parallel for num_threads(threads)
+    for (int p = 0; p < pc; p++)
+    {
+        out[p] = predictObservation(proj, mdt, p, applyCtf, applyTilt);
+    }
+
+    return out;
+}
+
 void ObservationModel::insertObservation(const Image<Complex>& img, BackProjector &bproj,
         MetaDataTable& mdt, int particle,
         bool applyCtf, bool applyTilt, double shift_x, double shift_y)

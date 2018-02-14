@@ -169,6 +169,7 @@ int TiltFit::_run()
             std::vector<Image<Complex> > pred;
             std::vector<Image<Complex> > obsF;
 
+            // @TODO: use observation model!
             if (nr_omp_threads > 1)
             {
                 pred = StackHelper::projectStackPar(&projectors[0], &mdts[g], nr_omp_threads);

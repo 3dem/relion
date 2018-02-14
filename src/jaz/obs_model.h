@@ -29,6 +29,11 @@ class ObservationModel
                 double deltaTilt = 0.0,
                 double deltaPsi = 0.0) const;
 
+        std::vector<Image<Complex>> predictObservations(
+                Projector &proj, MetaDataTable &mdt,
+                bool applyCtf, bool applyTilt,
+                int threads) const;
+
         void insertObservation(
                 const Image<Complex>& img, BackProjector &bproj,
                 MetaDataTable& mdt, int particle,
