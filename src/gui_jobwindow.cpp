@@ -921,7 +921,7 @@ void JobWindow::initialiseAutopickWindow()
 
 	group4->begin();
 
-	place("do_amyloid");
+	//place("do_amyloid");
 	place("helical_tube_outer_diameter");
 
 	current_y += STEPY/2;
