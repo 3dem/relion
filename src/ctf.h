@@ -59,6 +59,7 @@ protected:
     RFLOAT K3;
     RFLOAT K4;
     RFLOAT K5;
+    RFLOAT Fx, Fy;
 
     // Azimuthal angle in radians
     RFLOAT rad_azimuth;
@@ -122,6 +123,9 @@ public:
     // Phase-shift from a phase-plate (in rad)
     RFLOAT phase_shift;
 
+    // Beam tilt
+    RFLOAT tilt_x, tilt_y;
+
     /** Empty constructor. */
     CTF() { clear(); }
 
@@ -156,8 +160,7 @@ public:
     // @TODO: Fx, Fy -> member variables (units are not meaningful)
     inline RFLOAT getCTF(RFLOAT X, RFLOAT Y,
             bool do_abs = false, bool do_only_flip_phases = false,
-            bool do_intact_until_first_peak = false, bool do_damping = true,
-            RFLOAT Fx = 0.0, RFLOAT Fy = 0.0) const
+            bool do_intact_until_first_peak = false, bool do_damping = true) const
     {
         RFLOAT u2 = X * X + Y * Y;
         RFLOAT u4 = u2 * u2;
@@ -166,7 +169,7 @@ public:
 
         // if (u2>=ua2) return 0;
         RFLOAT deltaf = getDeltaF(X, Y);
-        RFLOAT argument = K1 * deltaf * u2 + K2 * u4 - K5 - K3 + Kt;
+        RFLOAT argument = K1 * deltaf * u2 + K2 * u4 - K5 - K3 - Kt;
         RFLOAT retval;
         if (do_intact_until_first_peak && ABS(argument) < PI/2.)
         {
@@ -247,13 +250,6 @@ public:
     /// The dimensions of the result array should have been set correctly already
     void getFftwImage(MultidimArray < RFLOAT > &result, int orixdim, int oriydim, RFLOAT angpix,
             bool do_abs = false, bool do_only_flip_phases = false, bool do_intact_until_first_peak = false, bool do_damping = true);
-
-    /// Generate (Fourier-space, i.e. FFTW format) image with all CTF values.
-    /// The dimensions of the result array should have been set correctly already
-    void getFftwImageWithTilt(MultidimArray < RFLOAT > &result, int orixdim, int oriydim, RFLOAT angpix,
-            bool do_abs = false, bool do_only_flip_phases = false,
-            bool do_intact_until_first_peak = false, bool do_damping = true,
-            RFLOAT beamtilt_x = 0.0, RFLOAT beamtilt_y = 0.0);
 
     // Get a complex image with the CTFP/Q values, where the angle is in degrees between the Y-axis and the CTFP/Q sector line
     void getCTFPImage(MultidimArray<Complex> &result, int orixdim, int oriydim, RFLOAT angpix,

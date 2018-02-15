@@ -144,6 +144,8 @@ void CTF::clear()
     Cs = Bfac = 0;
     Q0 = 0;
     scale = 1;
+    tilt_x = 0;
+    tilt_y = 0;
 }
 
 /* Initialise the CTF ------------------------------------------------------ */
@@ -178,6 +180,12 @@ void CTF::initialise()
 
     // Phase shift in radian
     K5 = DEG2RAD(phase_shift);
+
+    RFLOAT factor = (PI / 180.0) * 0.360 * Cs * 10000000 * lambda * lambda;
+
+    // Axial coma coefficients (cf. Krivanek 1994)
+    Fx = factor * tilt_x;
+    Fy = factor * tilt_y;
 
     if (Q0 < 0. || Q0 > 1.)
     	REPORT_ERROR("CTF::initialise ERROR: AmplitudeContrast Q0 cannot be smaller than zero or larger than one!");
@@ -218,26 +226,6 @@ void CTF::getFftwImage(MultidimArray<RFLOAT> &result, int orixdim, int oriydim, 
 		RFLOAT x = (RFLOAT)jp / xs;
 		RFLOAT y = (RFLOAT)ip / ys;
 		DIRECT_A2D_ELEM(result, i, j) = getCTF(x, y, do_abs, do_only_flip_phases, do_intact_until_first_peak, do_damping);
-    }
-}
-
-void CTF::getFftwImageWithTilt(MultidimArray<RFLOAT> &result, int orixdim, int oriydim, RFLOAT angpix,
-                    bool do_abs, bool do_only_flip_phases, bool do_intact_until_first_peak, bool do_damping,
-                    double beamtilt_x, double beamtilt_y)
-{
-    RFLOAT xs = (RFLOAT)orixdim * angpix;
-    RFLOAT ys = (RFLOAT)oriydim * angpix;
-
-    RFLOAT factor = (PI / 180.0) * 0.360 * Cs * 10000000 * lambda * lambda;
-
-    FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(result)
-    {
-        RFLOAT x = (RFLOAT)jp / xs;
-        RFLOAT y = (RFLOAT)ip / ys;
-
-        DIRECT_A2D_ELEM(result, i, j) = getCTF(
-            x, y, do_abs, do_only_flip_phases, do_intact_until_first_peak,
-            do_damping, factor * beamtilt_x, factor * beamtilt_y);
     }
 }
 

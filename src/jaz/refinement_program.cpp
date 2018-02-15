@@ -87,6 +87,8 @@ int RefinementProgram::init(int argc, char *argv[])
             beamtilt_xx = textToFloat(parser.getOption("--beamtilt_xx", "Anisotropic beamtilt, XX-coefficient", "1."));
             beamtilt_xy = textToFloat(parser.getOption("--beamtilt_xy", "Anisotropic beamtilt, XY-coefficient", "0."));
             beamtilt_yy = textToFloat(parser.getOption("--beamtilt_yy", "Anisotropic beamtilt, YY-coefficient", "1."));
+
+            ctfTilt = parser.checkOption("--ctf_tilt", "Distort CTF by axial coma");
         }
 
         anisoTilt = beamtilt_xx != 1.0 || beamtilt_xy != 0.0 || beamtilt_yy != 1.0;
@@ -306,6 +308,8 @@ int RefinementProgram::init(int argc, char *argv[])
         {
             obsModel.setAnisoTilt(beamtilt_xx, beamtilt_xy, beamtilt_yy);
         }
+
+        obsModel.ctfTilt = ctfTilt;
     }
 
     int rc0 = _init();

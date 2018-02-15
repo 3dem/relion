@@ -6,14 +6,16 @@
 ObservationModel::ObservationModel()
 :   angpix(-1),
     hasTilt(false),
-    anisoTilt(false)
+    anisoTilt(false),
+    ctfTilt(false)
 {
 }
 
 ObservationModel::ObservationModel(double angpix)
 :   angpix(angpix),
     hasTilt(false),
-    anisoTilt(false)
+    anisoTilt(false),
+    ctfTilt(false)
 {
 }
 
@@ -21,7 +23,8 @@ ObservationModel::ObservationModel(double angpix, double Cs, double voltage, dou
 :   angpix(angpix),
     lambda(12.2643247 / sqrt(voltage * (1.0 + voltage * 0.978466e-6))),
     Cs(Cs), beamtilt_x(beamtilt_x), beamtilt_y(beamtilt_y), hasTilt(true),
-    anisoTilt(false)
+    anisoTilt(false),
+    ctfTilt(false)
 {
 }
 
@@ -60,7 +63,16 @@ Image<Complex> ObservationModel::predictObservation(
     if (applyCtf)
     {
         CTF ctf;
-        ctf.read(mdt, mdt, particle);
+        ctf.read(mdt, mdt, particle);        
+
+        if (ctfTilt && applyTilt && hasTilt)
+        {
+            ctf.tilt_x = beamtilt_x;
+            ctf.tilt_y = beamtilt_y;
+
+            ctf.initialise();
+        }
+
         FilterHelper::modulate(pred, ctf, angpix);
     }
 

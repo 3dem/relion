@@ -114,6 +114,13 @@ int DefocusFit::_run()
             CTF ctf0;
             ctf0.read(mdts[g], mdts[g], 0);
 
+            if (ctfTilt)
+            {
+                ctf0.tilt_x = beamtilt_x;
+                ctf0.tilt_y = beamtilt_y;
+                ctf0.initialise();
+            }
+
             if (diag)
             {
                 Image<RFLOAT> ctfFit(s,s);
@@ -172,6 +179,13 @@ int DefocusFit::_run()
                 CTF ctf0;
                 ctf0.read(mdts[g], mdts[g], p);
 
+                if (ctfTilt)
+                {
+                    ctf0.tilt_x = beamtilt_x;
+                    ctf0.tilt_y = beamtilt_y;
+                    ctf0.initialise();
+                }
+
                 std::vector<d2Vector> cost = DefocusRefinement::diagnoseDefocus(
                     preds[p], obsF[p], freqWeight,
                     ctf0, angpix, defocusRange, 100, nr_omp_threads);
@@ -205,6 +219,13 @@ int DefocusFit::_run()
 
                 CTF ctf0;
                 ctf0.read(mdts[g], mdts[g], p);
+
+                if (ctfTilt)
+                {
+                    ctf0.tilt_x = beamtilt_x;
+                    ctf0.tilt_y = beamtilt_y;
+                    ctf0.initialise();
+                }
 
                 CTF ctf(ctf0);
 

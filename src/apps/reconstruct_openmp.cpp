@@ -460,17 +460,15 @@ class reconstruct_parameters
 
                         if (ctf_tilt)
                         {
-                            ctf.getFftwImageWithTilt(Fctf, mysize, mysize, angpix,
-                                 ctf_phase_flipped, only_flip_phases,
-                                 intact_ctf_first_peak, true,
-                                 beamtilt_x, beamtilt_y);
+                            ctf.tilt_x = beamtilt_x;
+                            ctf.tilt_y = beamtilt_y;
+
+                            ctf.initialise();
                         }
-                        else
-                        {
-                            ctf.getFftwImage(Fctf, mysize, mysize, angpix,
-                                 ctf_phase_flipped, only_flip_phases,
-                                 intact_ctf_first_peak, true);
-                        }
+
+                        ctf.getFftwImage(Fctf, mysize, mysize, angpix,
+                             ctf_phase_flipped, only_flip_phases,
+                             intact_ctf_first_peak, true);
 
                         if (do_beamtilt)
                         {

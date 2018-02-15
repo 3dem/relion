@@ -20,7 +20,7 @@ class ObservationModel
             double angpix, lambda, Cs;
             double beamtilt_x, beamtilt_y;
             double beamtilt_xx, beamtilt_xy, beamtilt_yy;
-            bool hasTilt, anisoTilt;
+            bool hasTilt, anisoTilt, ctfTilt;
 
         Image<Complex> predictObservation(
                 Projector &proj, MetaDataTable &mdt, int particle,
