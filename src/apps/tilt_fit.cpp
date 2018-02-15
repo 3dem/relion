@@ -159,7 +159,7 @@ int TiltFit::_run()
 
         std::vector<ParFourierTransformer> fts(nr_omp_threads);
 
-        for (long g = minMG; g < gc; g++)
+        for (long g = minMG; g <= gc; g++)
         {
             std::cout << "micrograph " << g << " / " << mdts.size() <<"\n";
 

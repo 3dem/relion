@@ -83,7 +83,7 @@ int DefocusFit::_run()
     MetaDataTable mdtAll;
     mdtAll.reserve(mdt0.numberOfObjects());
 
-    for (long g = minMG; g < gc; g++)
+    for (long g = minMG; g <= gc; g++)
     {
         std::stringstream stsg;
         stsg << g;
@@ -95,15 +95,6 @@ int DefocusFit::_run()
         std::vector<Image<Complex> > obsF;
 
         obsF = StackHelper::loadStackFS(&mdts[g], imgPath, nr_omp_threads, &fts);
-
-        /*if (applyTilt)
-        {
-            obsF = StackHelper::applyBeamTiltPar(
-                        obsF, Cs, lambda, angpix,
-                        beamtilt_x, beamtilt_y,
-                        beamtilt_xx, beamtilt_xy, beamtilt_yy,
-                        nr_omp_threads);
-        }*/
 
         std::vector<Image<Complex>> preds(pc);
 

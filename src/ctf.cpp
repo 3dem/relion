@@ -210,15 +210,35 @@ RFLOAT CTF::getCtfFreq(RFLOAT X, RFLOAT Y)
 void CTF::getFftwImage(MultidimArray<RFLOAT> &result, int orixdim, int oriydim, RFLOAT angpix,
 		    		bool do_abs, bool do_only_flip_phases, bool do_intact_until_first_peak, bool do_damping)
 {
-
 	RFLOAT xs = (RFLOAT)orixdim * angpix;
 	RFLOAT ys = (RFLOAT)oriydim * angpix;
+
 	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(result)
 	{
 		RFLOAT x = (RFLOAT)jp / xs;
 		RFLOAT y = (RFLOAT)ip / ys;
 		DIRECT_A2D_ELEM(result, i, j) = getCTF(x, y, do_abs, do_only_flip_phases, do_intact_until_first_peak, do_damping);
-	}
+    }
+}
+
+void CTF::getFftwImageWithTilt(MultidimArray<RFLOAT> &result, int orixdim, int oriydim, RFLOAT angpix,
+                    bool do_abs, bool do_only_flip_phases, bool do_intact_until_first_peak, bool do_damping,
+                    double beamtilt_x, double beamtilt_y)
+{
+    RFLOAT xs = (RFLOAT)orixdim * angpix;
+    RFLOAT ys = (RFLOAT)oriydim * angpix;
+
+    RFLOAT factor = 0.360 * Cs * 10000000 * lambda * lambda;
+
+    FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(result)
+    {
+        RFLOAT x = (RFLOAT)jp / xs;
+        RFLOAT y = (RFLOAT)ip / ys;
+
+        DIRECT_A2D_ELEM(result, i, j) = getCTF(
+            x, y, do_abs, do_only_flip_phases, do_intact_until_first_peak,
+            do_damping, factor * beamtilt_x, factor * beamtilt_y);
+    }
 }
 
 /* Generate a complete CTFP (complex) image (with sector along angle) ------------------------------------------------------ */

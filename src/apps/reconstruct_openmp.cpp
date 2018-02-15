@@ -46,11 +46,10 @@ class reconstruct_parameters
 
     RFLOAT blob_radius, blob_alpha, angular_error, shift_error, angpix, maxres,
         beamtilt_x, beamtilt_y,
-        beamtilt_xx, beamtilt_xy, beamtilt_yy,
         helical_rise, helical_twist;
 
     bool do_ctf, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak,
-        do_fom_weighting, do_3d_rot, do_reconstruct_ctf, do_beamtilt, cl_beamtilt, anisoTilt, do_ewald;
+        do_fom_weighting, do_3d_rot, do_reconstruct_ctf, do_beamtilt, cl_beamtilt, ctf_tilt, do_ewald;
 
     bool skip_gridding, do_reconstruct_ctf2, do_reconstruct_meas, is_positive, read_weights;
 
@@ -89,11 +88,7 @@ class reconstruct_parameters
         beamtilt_y = textToFloat(parser.getOption("--beamtilt_y", "Beamtilt in the Y-direction (in mrad)", "0."));
         cl_beamtilt = (ABS(beamtilt_x) > 0. || ABS(beamtilt_y) > 0.);
 
-        beamtilt_xx = textToFloat(parser.getOption("--beamtilt_xx", "Anisotropic beamtilt, XX-coefficient", "1."));
-        beamtilt_xy = textToFloat(parser.getOption("--beamtilt_xy", "Anisotropic beamtilt, XY-coefficient", "0."));
-        beamtilt_yy = textToFloat(parser.getOption("--beamtilt_yy", "Anisotropic beamtilt, YY-coefficient", "1."));
-
-        anisoTilt = beamtilt_xx != 1.0 || beamtilt_xy != 0.0 || beamtilt_yy != 1.0;
+        ctf_tilt = parser.checkOption("--ctf_tilt", "Consider beam tilt in CTF");
 
         read_weights = parser.checkOption("--read_weights", "Read freq. weight files");
         do_ewald = parser.checkOption("--ewald", "Correct for Ewald-sphere curvature (developmental)");
@@ -328,15 +323,6 @@ class reconstruct_parameters
             do_beamtilt = false;
         }
 
-        if (anisoTilt)
-        {
-            std::cout << " + Assuming anisotropic coma model" << std::endl;
-        }
-        else
-        {
-            std::cout << " + Assuming isotropic coma model" << std::endl;
-        }
-
         std::vector<BackProjector> backprojectors(nr_omp_threads);
 
         for (int i = 0; i < nr_omp_threads; i++)
@@ -367,7 +353,6 @@ class reconstruct_parameters
             MultidimArray<RFLOAT> Fctf;
             Matrix1D<RFLOAT> trans(2);
             FourierTransformer transformer;
-            Image<RFLOAT> img;
 
             #pragma omp for
             for (int g = 0; g < gc; g++)
@@ -472,9 +457,20 @@ class reconstruct_parameters
                     {
                         CTF ctf;
                         ctf.read(mdts[g], mdts[g], p);
-                        ctf.getFftwImage(Fctf, mysize, mysize, angpix,
-                                         ctf_phase_flipped, only_flip_phases,
-                                         intact_ctf_first_peak, true);
+
+                        if (ctf_tilt)
+                        {
+                            ctf.getFftwImageWithTilt(Fctf, mysize, mysize, angpix,
+                                 ctf_phase_flipped, only_flip_phases,
+                                 intact_ctf_first_peak, true,
+                                 beamtilt_x, beamtilt_y);
+                        }
+                        else
+                        {
+                            ctf.getFftwImage(Fctf, mysize, mysize, angpix,
+                                 ctf_phase_flipped, only_flip_phases,
+                                 intact_ctf_first_peak, true);
+                        }
 
                         if (do_beamtilt)
                         {
@@ -491,19 +487,11 @@ class reconstruct_parameters
                                 }
                             }
 
-                            if (anisoTilt)
-                            {
-                                selfApplyBeamTilt(
-                                    F2D, beamtilt_x, beamtilt_y,
-                                    beamtilt_xx, beamtilt_xy, beamtilt_yy,
-                                    ctf.lambda, ctf.Cs, angpix, mysize);
-                            }
-                            else
-                            {
-                                selfApplyBeamTilt(
-                                    F2D, beamtilt_x, beamtilt_y,
-                                    ctf.lambda, ctf.Cs, angpix, mysize);
-                            }
+
+
+                            selfApplyBeamTilt(
+                                F2D, beamtilt_x, beamtilt_y,
+                                ctf.lambda, ctf.Cs, angpix, mysize);
                         }
 
                         // Ewald-sphere curvature correction
