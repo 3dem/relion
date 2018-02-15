@@ -968,9 +968,6 @@ void MlOptimiserMpi::expectation()
 
 	if (do_gpu && ! node->isMaster())
 	{
-		for (int i = 0; i < wsum_model.BPref.size(); i ++)
-			wsum_model.BPref[i].data.coreDeallocate();
-
 		for (int i = 0; i < cudaDevices.size(); i ++)
 		{
 #ifdef TIMING
@@ -1050,9 +1047,6 @@ void MlOptimiserMpi::expectation()
 	MPI_Barrier(MPI_COMM_WORLD);   // Is this really necessary?
 	if (do_cpu  && ! node->isMaster())
 	{
-		for (int i = 0; i < wsum_model.BPref.size(); i ++)
-			wsum_model.BPref[i].data.coreDeallocate();
-
 		unsigned nr_classes = mymodel.PPref.size();
 		// Allocate Array of complex arrays for this class
 		if(posix_memalign((void **)&mdlClassComplex, MEM_ALIGN, nr_classes * sizeof (XFLOAT *)))
@@ -1459,8 +1453,6 @@ void MlOptimiserMpi::expectation()
 
 						b->backprojectors[j].getMdlData(reals, imags, weights);
 
-						wsum_model.BPref[j].data.coreAllocate();
-
 						for (unsigned long n = 0; n < s; n++)
 						{
 							wsum_model.BPref[j].data.data[n].real += (RFLOAT) reals[n];
@@ -1534,8 +1526,6 @@ void MlOptimiserMpi::expectation()
 					XFLOAT *weights = NULL;
 
 					b->backprojectors[j].getMdlDataPtrs(reals, imags, weights);
-
-					wsum_model.BPref[j].data.coreAllocate();
 
 					for (unsigned long n = 0; n < s; n++)
 					{

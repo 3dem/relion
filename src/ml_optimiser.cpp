@@ -2608,9 +2608,6 @@ void MlOptimiser::expectation()
 
 	if (do_gpu)
     {
-		for (int i = 0; i < wsum_model.BPref.size(); i ++)
-			wsum_model.BPref[i].data.coreDeallocate();
-
 		for (int i = 0; i < cudaDevices.size(); i ++)
 		{
 			MlDeviceBundle *b = new MlDeviceBundle(this);
@@ -2672,9 +2669,6 @@ void MlOptimiser::expectation()
 #ifdef ALTCPU
 	if (do_cpu)
 	{
-		for (int i = 0; i < wsum_model.BPref.size(); i ++)
-			wsum_model.BPref[i].data.coreDeallocate();
-
 		unsigned nr_classes = mymodel.PPref.size();
 		// Allocate Array of complex arrays for this class
 		if (posix_memalign((void **)&mdlClassComplex, MEM_ALIGN, nr_classes * sizeof (XFLOAT *)))
@@ -2812,8 +2806,6 @@ void MlOptimiser::expectation()
 
 				b->backprojectors[j].getMdlData(reals, imags, weights);
 
-				wsum_model.BPref[j].data.coreAllocate();
-
 				for (unsigned long n = 0; n < s; n++)
 				{
 					wsum_model.BPref[j].data.data[n].real += (RFLOAT) reals[n];
@@ -2876,8 +2868,6 @@ void MlOptimiser::expectation()
 			XFLOAT *weights = NULL;
 
 			b->backprojectors[j].getMdlDataPtrs(reals, imags, weights);
-
-			wsum_model.BPref[j].data.coreAllocate();
 
 			for (unsigned long n = 0; n < s; n++)
 			{
