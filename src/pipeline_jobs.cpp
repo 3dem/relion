@@ -55,7 +55,8 @@ std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, 
 		if (dim == 3)
 		{
 			FileName fn_tmp;
-			for (int iclass = 0; iclass < K; iclass++)
+			int mynr = (nr_bodies > 1) ? nr_bodies : K;
+			for (int iclass = 0; iclass < mynr; iclass++)
 			{
 				if (nr_bodies > 1)
 					fn_tmp.compose(fn_out+"_body", iclass+1, "mrc", 3);
@@ -70,8 +71,20 @@ std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, 
 		// For auto-refine: also output the half1_class001_unfil.mrc map
 		if (iter < 0)
 		{
-			Node node4(fn_out+"_half1_class001_unfil.mrc", NODE_HALFMAP);
-			result.push_back(node4);
+
+			FileName fn_tmp;
+			int mynr = (nr_bodies > 1) ? nr_bodies : 1;
+			for (int iclass = 0; iclass < mynr; iclass++)
+			{
+				if (nr_bodies > 1)
+					fn_tmp.compose(fn_out+"_half1_body", iclass+1, "mrc", 3);
+				else
+					fn_tmp.compose(fn_out+"_half1_class", iclass+1, "mrc", 3);
+
+				fn_tmp.insertBeforeExtension("_unfil");
+				Node node4(fn_tmp, NODE_3DREF);
+				result.push_back(node4);
+			}
 		}
 	}
 	return result;
@@ -4239,7 +4252,7 @@ void RelionJob::initialisePostprocessJob()
 
 	hidden_name = ".gui_post";
 
-	joboptions["fn_in"] = JobOption("One of the 2 unfiltered half-maps:", NODE_HALFMAP, "", "MRC map files (*half1_class001_unfil.mrc)",  "Provide one of the two unfiltered half-reconstructions that were output upon convergence of a 3D auto-refine run.");
+	joboptions["fn_in"] = JobOption("One of the 2 unfiltered half-maps:", NODE_HALFMAP, "", "MRC map files (*half1_*_unfil.mrc)",  "Provide one of the two unfiltered half-reconstructions that were output upon convergence of a 3D auto-refine run.");
 	joboptions["fn_mask"] = JobOption("Solvent mask:", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide a soft mask where the protein is white (1) and the solvent is black (0). Often, the softer the mask the higher resolution estimates you will get. A soft edge of 5-10 pixels is often a good edge width.");
 	joboptions["angpix"] = JobOption("Calibrated pixel size (A)", 1, 0.3, 5, 0.1, "Provide the final, calibrated pixel size in Angstroms. This value may be different from the pixel-size used thus far, e.g. when you have recalibrated the pixel size using the fit to a PDB model. The X-axis of the output FSC plot will use this calibrated value.");
 
