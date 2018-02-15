@@ -499,18 +499,6 @@ bool decomposePipelineFileName(FileName fn_in, FileName &fn_pre, FileName &fn_jo
 			fn_post = fn_in.substr(slashpos2+1); // this has the rest
 			return true;
 		}
-	    // TODO: temporary check for - in uniq filename for backward compatibility with early alpha version. Remove in near future!!
-		else if (std::isdigit(fn_in[slashpos+1]) && std::isdigit(fn_in[slashpos+2]) && std::isdigit(fn_in[slashpos+3]) &&
-		    std::isdigit(fn_in[slashpos+4]) && std::isdigit(fn_in[slashpos+5]) && std::isdigit(fn_in[slashpos+6]) &&
-		    (fn_in[slashpos+7] == '.' || fn_in[slashpos+7] == '-') &&
-		    std::isdigit(fn_in[slashpos+8]) && std::isdigit(fn_in[slashpos+9]) && std::isdigit(fn_in[slashpos+10]) &&
-		    std::isdigit(fn_in[slashpos+11]) && std::isdigit(fn_in[slashpos+12]) && std::isdigit(fn_in[slashpos+13]) )
-		{
-			fn_pre = fn_in.substr(0, slashpos+1); // this has the first slash
-			fn_jobnr = fn_in.substr(slashpos+1,14); // this has the second slash
-			fn_post = fn_in.substr(slashpos+15); // this has the rest
-			return true;
-		}
 		if (i>20)
 			REPORT_ERROR("decomposePipelineFileName: BUG or found more than 20 directories deep structure for pipeline filename: " + fn_in);
 	}
