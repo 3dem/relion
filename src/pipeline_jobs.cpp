@@ -4281,8 +4281,7 @@ bool RelionJob::getCommandsPostprocessJob(std::string &outputname, std::vector<s
 	Node node3(joboptions["fn_mask"].getString(), joboptions["fn_mask"].node_type);
 	inputNodes.push_back(node3);
 
-	// Get the input rootname from the half-map name
-	// run1_half1_class001_unfil.mrc -> run1
+	// Input half map (one of them)
 	if (joboptions["fn_in"].getString() == "")
 	{
 		error_message = "ERROR: empty field for input half-map...";
@@ -4290,17 +4289,7 @@ bool RelionJob::getCommandsPostprocessJob(std::string &outputname, std::vector<s
 	}
 	Node node(joboptions["fn_in"].getString(), joboptions["fn_in"].node_type);
 	inputNodes.push_back(node);
-	int pos_half = joboptions["fn_in"].getString().rfind("_half");
-	if (pos_half < joboptions["fn_in"].getString().size())
-	{
-		command += " --i " + joboptions["fn_in"].getString().substr(0, pos_half);
-	}
-	else
-	{
-		error_message = "PostJobWindow::getCommands ERROR: cannot find _half substring in input filename!";
-		return false;
-	}
-
+	command += " --i " + joboptions["fn_in"].getString();
 	// The output name contains a directory: use it for output
 	command += " --o " + outputname + "postprocess";
 	command += "  --angpix " + joboptions["angpix"].getString();
