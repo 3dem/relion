@@ -2392,7 +2392,7 @@ void MlOptimiser::iterate()
 		updateSubsetSize();
 
 		// Randomly take different subset of the particles each time we do a new "iteration" in SGD
-		mydata.randomiseOriginalParticlesOrder(random_seed+iter, false, (subset_size > 0) );
+		mydata.randomiseOriginalParticlesOrder(random_seed+iter, do_split_random_halves, subset_size < mydata.numberOfOriginalParticles() );
 
 		if (do_auto_refine)
 		{

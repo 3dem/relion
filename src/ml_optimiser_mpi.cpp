@@ -955,8 +955,8 @@ void MlOptimiserMpi::expectation()
 
 	if (do_gpu && ! node->isMaster())
 	{
-		for (int i = 0; i < wsum_model.BPref.size(); i ++)
-			wsum_model.BPref[i].data.coreDeallocate();
+		//for (int i = 0; i < wsum_model.BPref.size(); i ++)
+		//	wsum_model.BPref[i].data.coreDeallocate();
 
 		for (int i = 0; i < cudaDevices.size(); i ++)
 		{
@@ -1446,7 +1446,7 @@ void MlOptimiserMpi::expectation()
 
 						b->backprojectors[j].getMdlData(reals, imags, weights);
 
-						wsum_model.BPref[j].data.coreAllocate();
+						//wsum_model.BPref[j].data.coreAllocate();
 
 						for (unsigned long n = 0; n < s; n++)
 						{
@@ -2985,7 +2985,7 @@ void MlOptimiserMpi::iterate()
 		updateSubsetSize(node->isMaster());
 
 		// Randomly take different subset of the particles each time we do a new "iteration" in SGD
-		mydata.randomiseOriginalParticlesOrder(random_seed+iter, do_split_random_halves, (subset_size > 0) );
+		mydata.randomiseOriginalParticlesOrder(random_seed+iter, do_split_random_halves,  subset_size < mydata.numberOfOriginalParticles() );
 
 		// Nobody can start the next iteration until everyone has finished
 		MPI_Barrier(MPI_COMM_WORLD);
