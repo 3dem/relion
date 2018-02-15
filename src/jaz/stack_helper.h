@@ -37,7 +37,7 @@ class StackHelper
                 int outBin, int coordsBin, int movieBin,
                 int squareSize, int threads,
                 bool useGain = true, BinningType binningType = BoxBin,
-                bool loadData = true, bool verbose = false);
+                bool loadData = true, RFLOAT hot = -1.0, bool verbose = false);
 
         static Image<Complex> projectView(Projector* projector, const MetaDataTable* mdt, int index);
         //static Image<Complex> projectView2(Projector* projector, const MetaDataTable* mdt, int index);

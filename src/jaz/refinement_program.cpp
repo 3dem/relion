@@ -57,6 +57,8 @@ int RefinementProgram::init(int argc, char *argv[])
             coords_bin = textToInteger(parser.getOption("--cbin", "Binning level of input coordinates", "1"));
             movie_bin = textToInteger(parser.getOption("--mbin", "Binning level of input movies", "1"));
             bin_type_str = parser.getOption("--bintype", "Binning method (box, gauss or fourier)", "fourier");
+
+            hotCutoff = textToFloat(parser.getOption("--hot", "Clip hot pixels to this max. value (-1 = off, TIFF only)", "-1"));
         }
         else
         {

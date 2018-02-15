@@ -286,7 +286,7 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
     int outBin, int coordsBin, int movieBin, int squareSize,
     int threads,
     bool useGain, BinningType binningType,
-    bool loadData, bool verbose)
+    bool loadData, RFLOAT hot, bool verbose)
 {
     std::vector<std::vector<Image<Complex>>> out(mdt->numberOfObjects());
     const long pc = mdt->numberOfObjects();
@@ -335,8 +335,6 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 
         metaMdt.getValue(EMDL_MICROGRAPH_MOVIE_NAME, mgName0, 0);
 
-        std::string mgEnd = mgName0.substr(mgName0.find_last_of(".")+1);
-
         std::string mgNameAct, gainNameAct;
 
         if (moviePath == "")
@@ -354,6 +352,26 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
         }
 
         mgStack.read(mgNameAct, loadData);
+
+        if (loadData && hot > 0)
+        {
+            int count = 0;
+
+            //#pragma omp parallel for num_threads(threads)
+            for (int n = 0; n < mgStack().ndim; n++)
+            for (int z = 0; z < mgStack().zdim; z++)
+            for (int y = 0; y < mgStack().ydim; y++)
+            for (int x = 0; x < mgStack().xdim; x++)
+            {
+                if (DIRECT_NZYX_ELEM(mgStack(), n, z, y, x) > hot)
+                {
+                    DIRECT_NZYX_ELEM(mgStack(), n, z, y, x) = hot;
+                    count ++;
+                }
+            }
+
+            std::cout << count << " hot pixels clipped.\n";
+        }
 
         if (useGain)
         {

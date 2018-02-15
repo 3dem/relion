@@ -35,7 +35,8 @@ class RefinementProgram
 
             RFLOAT angpix, paddingFactor,
                 beamtilt_x, beamtilt_y,
-                beamtilt_xx, beamtilt_xy, beamtilt_yy;
+                beamtilt_xx, beamtilt_xy, beamtilt_yy,
+                hotCutoff;
 
             int nr_omp_threads, bin, coords_bin, movie_bin;
 
