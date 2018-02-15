@@ -44,7 +44,7 @@ public:
 	int verb;
 
 	// Input & Output rootname
-	FileName fn_in, fn_out, fn_I1, fn_I2;
+	FileName fn_out, fn_I1, fn_I2;
 
 	// Images for the two half-reconstructions and the mask
 	Image<RFLOAT> I1, I2, Im;

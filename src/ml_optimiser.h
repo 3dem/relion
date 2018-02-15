@@ -113,11 +113,11 @@ public:
 
 	CpuOptimiserType   tbbCpuOptimiser;
 	tbb::task_scheduler_init tbbSchedulerInit;
-	
+
 	XFLOAT **mdlClassComplex __attribute__((aligned(64)));
 #endif
 
-	
+
 	// I/O Parser
 	IOParser parser;
 
@@ -171,9 +171,6 @@ public:
 
 	// Total number iterations and current iteration
 	int iter, nr_iter;
-
-	// Total number of subsets and current subset;
-	int subset, subset_start, nr_subsets, write_every_subset;
 
 	// Flag whether to split data from the beginning into two random halves
 	bool do_split_random_halves;
@@ -314,6 +311,29 @@ public:
 	//////////////// Stochastic gradient descent
 	bool do_sgd;
 
+	// 12Feb2018: new parameters to follow cryoSPARC more closely
+	// Number of initial iterations at low resolution, and without annealing of references
+	int sgd_ini_iter;
+
+	// Number of final iterations at high resolution, and without annealing of reference
+	int sgd_fin_iter;
+
+	// Number of iterations between the initial and the final ones
+	// (during which a linear transform from sgd_ini_resol->sgd_fin_resol and sgd_ini_subset_size->sgd_fin_subset_size will be done)
+	int sgd_inbetween_iter;
+
+	// Size of the subsets used in the initial iterations
+	int sgd_ini_subset_size;
+
+	//Size of the subsets used in the final iterations
+	int sgd_fin_subset_size;
+
+	// The resolution in the initial iterations
+	RFLOAT sgd_ini_resol; // in A
+
+	// The resolution in the final iterations
+	RFLOAT sgd_fin_resol; // in A
+
 	// Momentum update parameter
 	RFLOAT mu;
 
@@ -323,8 +343,8 @@ public:
 	// Size of the random subsets
 	long int subset_size;
 
-	// Maximum number of subsets to process using SGD (possibly more than 1 iteration)
-	long int sgd_max_subsets;
+	// Every how many iterations should be written to disk when using subsets
+	int write_every_sgd_iter;
 
 	// Number of particles at which initial sigma2_fudge is reduced by 50%
 	long int sgd_sigma2fudge_halflife;
@@ -332,8 +352,12 @@ public:
 	// Initial sigma2fudge for SGD
 	RFLOAT sgd_sigma2fudge_ini;
 
-	// Strict high-res limit in SGD
-	RFLOAT strict_highres_sgd;
+	// derived from the above, so not given by user:
+	int sgd_inires_pix; // resolution in pixels at beginning of SGD
+	int sgd_finres_pix; // resolution in pixels at end of SGD
+
+	// Use subsets like in cisTEM to speed up 2D/3D classification
+	bool do_fast_subsets;
 
 	// Available memory (in Gigabyte)
 	size_t available_gpu_memory;
@@ -351,7 +375,7 @@ public:
 	// Use gpu resources?
 	bool do_gpu;
 	bool anticipate_oom;
-	
+
 	// Use alternate cpu implementation
 	bool do_cpu;
 
@@ -966,6 +990,9 @@ public:
 
 	// Adjust angular sampling based on the expected angular accuracies for auto-refine procedure
 	void updateAngularSampling(bool verb = true);
+
+	// Adjust subset size in fast_subsets or SGD algorithms
+	void updateSubsetSize(bool verb = true);
 
 	// Check convergence for auto-refine procedure
 	// Also print convergence information to screen for auto-refine procedure
