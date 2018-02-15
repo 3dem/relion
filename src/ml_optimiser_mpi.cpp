@@ -1037,8 +1037,8 @@ void MlOptimiserMpi::expectation()
 	MPI_Barrier(MPI_COMM_WORLD);   // Is this really necessary?
 	if (do_cpu  && ! node->isMaster())
 	{
-		for (int i = 0; i < wsum_model.BPref.size(); i ++)
-			wsum_model.BPref[i].data.coreDeallocate();
+		//for (int i = 0; i < wsum_model.BPref.size(); i ++)
+		//	wsum_model.BPref[i].data.coreDeallocate();
 
 		unsigned nr_classes = mymodel.PPref.size();
 		// Allocate Array of complex arrays for this class
@@ -1522,7 +1522,7 @@ void MlOptimiserMpi::expectation()
 
 					b->backprojectors[j].getMdlDataPtrs(reals, imags, weights);
 
-					wsum_model.BPref[j].data.coreAllocate();
+					//wsum_model.BPref[j].data.coreAllocate();
 
 					for (unsigned long n = 0; n < s; n++)
 					{
