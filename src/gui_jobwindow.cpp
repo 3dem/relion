@@ -1730,31 +1730,7 @@ void JobWindow::initialiseMultiBodyWindow()
 	tab2->end();
 
 	tab3->begin();
-	tab3->label("Compute");
-	resetHeight();
-
-	place("do_parallel_discio");
-	place("nr_pool");
-	place("do_pad1");
-	place("do_preread_images");
-	place("scratch_dir");
-	place("do_combine_thru_disc");
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	// Set up queue groups for running tab
-    group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-    group4->end();
-	place("use_gpu", TOGGLE_LEAVE_ACTIVE, group4);
-	group4->begin();
-	place("gpu_ids");
-    group4->end();
-	guientries["use_gpu"].cb_menu_i(); // This is to make the default effective
-
-	tab3->end();
-	tab4->begin();
-	tab4->label("Analyse");
+	tab3->label("Analyse");
 	resetHeight();
 
     group5 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
@@ -1779,6 +1755,31 @@ void JobWindow::initialiseMultiBodyWindow()
 
     group5->end();
 	guientries["do_analyse"].cb_menu_i(); // This is to make the default effective
+
+	tab3->end();
+
+	tab4->begin();
+	tab4->label("Compute");
+	resetHeight();
+
+	place("do_parallel_discio");
+	place("nr_pool");
+	place("do_pad1");
+	place("do_preread_images");
+	place("scratch_dir");
+	place("do_combine_thru_disc");
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	// Set up queue groups for running tab
+    group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group4->end();
+	place("use_gpu", TOGGLE_LEAVE_ACTIVE, group4);
+	group4->begin();
+	place("gpu_ids");
+    group4->end();
+	guientries["use_gpu"].cb_menu_i(); // This is to make the default effective
 
 	tab4->end();
 
