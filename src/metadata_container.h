@@ -32,31 +32,30 @@
 class MetaDataTable;
 
 class MetaDataContainer
-{    
+{
     public:
 
         MetaDataTable* table;
 
-        std::vector<RFLOAT> RFLOATs;
-        std::vector<int> ints;
-        std::vector<long> longs;
+        std::vector<double> doubles;
+        std::vector<long> ints;
         std::vector<bool> bools;
         std::vector<std::string> strings;
 
         MetaDataContainer();
-        MetaDataContainer(MetaDataTable* table, long RFLOATCount, long intCount,
-                          long longCount, long boolCount, long stringCount);
+        MetaDataContainer(MetaDataTable* table, long doubleCount, long intCount,
+                          long boolCount, long stringCount);
         MetaDataContainer(MetaDataTable* table, MetaDataContainer* mdc);
 
-        void getValue(long offset, RFLOAT& dest) const;
+        void getValue(long offset, double& dest) const;
+        void getValue(long offset, float& dest) const;
         void getValue(long offset, int& dest) const;
         void getValue(long offset, long& dest) const;
         void getValue(long offset, bool& dest) const;
         void getValue(long offset, std::string& dest) const;
 
-	// Even when RELION_SINGLE_PRECISION, this must be double
-	// as floating point literals are double
         void setValue(long offset, const double& src);
+        void setValue(long offset, const float& src);
         void setValue(long offset, const int& src);
         void setValue(long offset, const long& src);
         void setValue(long offset, const bool& src);
