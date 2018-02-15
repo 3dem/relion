@@ -228,7 +228,7 @@ void CTF::getFftwImageWithTilt(MultidimArray<RFLOAT> &result, int orixdim, int o
     RFLOAT xs = (RFLOAT)orixdim * angpix;
     RFLOAT ys = (RFLOAT)oriydim * angpix;
 
-    RFLOAT factor = 0.360 * Cs * 10000000 * lambda * lambda;
+    RFLOAT factor = (PI / 180.0) * 0.360 * Cs * 10000000 * lambda * lambda;
 
     FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(result)
     {
