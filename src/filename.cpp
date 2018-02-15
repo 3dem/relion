@@ -534,7 +534,7 @@ bool decomposePipelineSymlinkName(FileName fn_in, FileName &fn_pre, FileName &fn
     	FileName fn_link = std::string(linkname);
     	if (fn_link.substr(0,3) == "../")
     	{
-    		fn_link = fn_link.afterFirstOf("../") + fn_in.substr(slashpos+1);
+    		fn_link = fn_link.substr(3) + fn_in.substr(slashpos+1);
         	return decomposePipelineFileName(fn_link, fn_pre, fn_jobnr, fn_post);
     	}
 		else
