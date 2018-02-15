@@ -39,54 +39,52 @@ std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, 
 	}
 
 	// Data and model.star files
-	int node_type = (do_movies) ? NODE_MOVIE_DATA : NODE_PART_DATA;
-	Node node1(fn_out + "_data.star", node_type);
-	result.push_back(node1);
-
-	if (!do_movies || do_also_rot)
+	if (nr_bodies > 1)
 	{
-		if (iter > 0)
+		FileName fn_tmp;
+		for (int ibody = 0; ibody < nr_bodies; ibody++)
 		{
-			Node node2(fn_out + "_model.star", NODE_MODEL);
-			result.push_back(node2);
+			fn_tmp.compose(fn_out+"_half1_body", ibody+1, "", 3);
+			fn_tmp += "_unfil.mrc";
+			Node node4(fn_tmp, NODE_HALFMAP);
+			result.push_back(node4);
 		}
+	}
+	else // normal refinements/classifications
+	{
+		int node_type = (do_movies) ? NODE_MOVIE_DATA : NODE_PART_DATA;
+		Node node1(fn_out + "_data.star", node_type);
+		result.push_back(node1);
 
-		// For 3D classification or 3D auto-refine, also use individual 3D maps as outputNodes
-		if (dim == 3)
+		if (!do_movies || do_also_rot)
 		{
-			FileName fn_tmp;
-			int mynr = (nr_bodies > 1) ? nr_bodies : K;
-			for (int iclass = 0; iclass < mynr; iclass++)
+			if (iter > 0)
 			{
-				if (nr_bodies > 1)
-					fn_tmp.compose(fn_out+"_body", iclass+1, "mrc", 3);
-				else
-					fn_tmp.compose(fn_out+"_class", iclass+1, "mrc", 3);
-
-				Node node3(fn_tmp, NODE_3DREF);
-				result.push_back(node3);
+				// For classifications: output node model.star to make selections
+				Node node2(fn_out + "_model.star", NODE_MODEL);
+				result.push_back(node2);
 			}
-		}
-
-		// For auto-refine: also output the half1_class001_unfil.mrc map
-		if (iter < 0)
-		{
-
-			FileName fn_tmp;
-			int mynr = (nr_bodies > 1) ? nr_bodies : 1;
-			for (int iclass = 0; iclass < mynr; iclass++)
+			else
 			{
-				if (nr_bodies > 1)
-					fn_tmp.compose(fn_out+"_half1_body", iclass+1, "mrc", 3);
-				else
-					fn_tmp.compose(fn_out+"_half1_class", iclass+1, "mrc", 3);
-
-				fn_tmp.insertBeforeExtension("_unfil");
-				Node node4(fn_tmp, NODE_HALFMAP);
+				// For auto-refine: also output the run_half1_class001_unfil.mrc map
+				Node node4(fn_out+"_half1_class001_unfil.mrc", NODE_HALFMAP);
 				result.push_back(node4);
+			}
+
+			// For 3D classification or 3D auto-refine, also use individual 3D maps as outputNodes
+			if (dim == 3)
+			{
+				FileName fn_tmp;
+				for (int iclass = 0; iclass < K; iclass++)
+				{
+					fn_tmp.compose(fn_out+"_class", iclass+1, "mrc", 3);
+					Node node3(fn_tmp, NODE_3DREF);
+					result.push_back(node3);
+				}
 			}
 		}
 	}
+
 	return result;
 
 }
@@ -3597,7 +3595,7 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 				if (!fns_model[i].contains("_it"))
 					fns_ok.push_back(fns_model[i]);
 			}
-			if (fns_ok.size() < 0)
+			if (fns_ok.size() == 0)
 			{
 				error_message = "ERROR: cannot find appropriate model.star file in the output directory";
 				return false;
