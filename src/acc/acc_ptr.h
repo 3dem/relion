@@ -35,7 +35,11 @@ static void HandleAccPtrDebugFatal( const char *err, const char *file, int line 
 {
     	fprintf(stderr, "DEBUG ERROR: %s in %s:%d\n", err, file, line );
 		fflush(stdout);
+#ifdef DEBUG_CUDA
 		raise(SIGSEGV);
+#else
+		CRITICAL(ERRGPUKERN);
+#endif
 }
 
 #define ACC_PTR_DEBUG_INFO( err ) (HandleAccPtrDebugInformational( err, __FILE__, __LINE__ ))

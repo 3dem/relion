@@ -376,7 +376,6 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		// ------------------------------------------------------------------------------------------
 
 		my_old_offset.selfROUND();
-		size_t img_size = img.data.nzyxdim;
 
 		// ------------------------------------------------------------------------------------------
 
