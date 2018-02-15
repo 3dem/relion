@@ -355,9 +355,7 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 
         if (loadData && hot > 0)
         {
-            int count = 0;
-
-            //#pragma omp parallel for num_threads(threads)
+            #pragma omp parallel for num_threads(threads)
             for (int n = 0; n < mgStack().ndim; n++)
             for (int z = 0; z < mgStack().zdim; z++)
             for (int y = 0; y < mgStack().ydim; y++)
@@ -366,11 +364,8 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
                 if (DIRECT_NZYX_ELEM(mgStack(), n, z, y, x) > hot)
                 {
                     DIRECT_NZYX_ELEM(mgStack(), n, z, y, x) = hot;
-                    count ++;
                 }
             }
-
-            std::cout << count << " hot pixels clipped.\n";
         }
 
         if (useGain)
