@@ -532,18 +532,17 @@ bool decomposePipelineSymlinkName(FileName fn_in, FileName &fn_pre, FileName &fn
     	// This is a symbolic link!
     	linkname[len] = '\0';
     	FileName fn_link = std::string(linkname);
-    	fn_link = fn_link.afterFirstOf("../") + fn_in.substr(slashpos+1);
-    	// So dereference the link, BUT only if the second directory started with "job"!
-    	if (decomposePipelineFileName(fn_link, fn_pre, fn_jobnr, fn_post))
+    	if (fn_link.substr(0,3) == "../")
     	{
-    		return true;
+    		fn_link = fn_link.afterFirstOf("../") + fn_in.substr(slashpos+1);
+        	return decomposePipelineFileName(fn_link, fn_pre, fn_jobnr, fn_post);
     	}
-    	else
-    	{
-    		fn_pre = fn_jobnr = "";
-    		fn_post = fn_in;
-    		return false;
-    	}
+		else
+		{
+			fn_pre = fn_jobnr = "";
+			fn_post = fn_in;
+			return false;
+		}
     }
 
 	// If it is not a symlink, just decompose the filename
