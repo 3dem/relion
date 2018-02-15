@@ -194,6 +194,9 @@ public:
     // Clear stuff
     void clear();
 
+    // How will jobs be displayed in the GUI job running, finished, in, out & scheduled job lists
+    std::string getJobNameForDisplay(Process &job);
+
     // Update the content of the finished, running and scheduled job lists
     void fillRunningJobLists();
 

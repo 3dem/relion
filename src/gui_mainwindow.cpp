@@ -677,6 +677,28 @@ void GuiMainWindow::clear()
 	}
 }
 
+std::string GuiMainWindow::getJobNameForDisplay(Process &job)
+{
+	std::string result;
+	FileName fn_pre, fn_jobnr, fn_post;
+
+	if (!decomposePipelineFileName(job.name, fn_pre, fn_jobnr, fn_post))
+	{
+		result = job.name;
+	}
+	else
+	{
+		std::string numberonly = (fn_jobnr.afterFirstOf("b")).beforeFirstOf("/");
+		if (job.alias != "None")
+			result = numberonly + ": " + job.alias;
+		else
+			result = numberonly + ": " + job.name;
+	}
+
+	return result;
+}
+
+
 // Update the content of the finished, running and scheduled job lists
 void GuiMainWindow::fillRunningJobLists()
 {
@@ -732,10 +754,7 @@ void GuiMainWindow::fillRunningJobLists()
 			if (pipeline.processList[i].status == PROC_FINISHED)
 			{
 				finished_processes.push_back(i);
-				if (pipeline.processList[i].alias != "None")
-					finished_job_browser->add(pipeline.processList[i].alias.c_str());
-				else
-					finished_job_browser->add(pipeline.processList[i].name.c_str());
+				finished_job_browser->add((getJobNameForDisplay(pipeline.processList[i])).c_str());
 			}
 		}
 	}
@@ -746,18 +765,12 @@ void GuiMainWindow::fillRunningJobLists()
 		if (pipeline.processList[i].status == PROC_RUNNING)
 		{
 			running_processes.push_back(i);
-			if (pipeline.processList[i].alias != "None")
-				running_job_browser->add(pipeline.processList[i].alias.c_str());
-			else
-				running_job_browser->add(pipeline.processList[i].name.c_str());
+			running_job_browser->add((getJobNameForDisplay(pipeline.processList[i])).c_str());
 		}
 		else if (pipeline.processList[i].status == PROC_SCHEDULED)
 		{
 			scheduled_processes.push_back(i);
-			if (pipeline.processList[i].alias != "None")
-				scheduled_job_browser->add(pipeline.processList[i].alias.c_str());
-			else
-				scheduled_job_browser->add(pipeline.processList[i].name.c_str());
+			scheduled_job_browser->add((getJobNameForDisplay(pipeline.processList[i])).c_str());
 		}
 	}
 
@@ -815,10 +828,7 @@ void GuiMainWindow::fillToAndFromJobLists()
 				if (!already_there)
 				{
 					input_processes.push_back(myproc);
-					if (pipeline.processList[myproc].alias != "None")
-						input_job_browser->add(pipeline.processList[myproc].alias.c_str());
-					else
-						input_job_browser->add(pipeline.processList[myproc].name.c_str());
+					input_job_browser->add((getJobNameForDisplay(pipeline.processList[myproc])).c_str());
 				}
 			}
 		}
@@ -851,10 +861,7 @@ void GuiMainWindow::fillToAndFromJobLists()
 				if (!already_there)
 				{
 					output_processes.push_back(myproc);
-					if (pipeline.processList[myproc].alias != "None")
-						output_job_browser->add(pipeline.processList[myproc].alias.c_str());
-					else
-						output_job_browser->add(pipeline.processList[myproc].name.c_str());
+					output_job_browser->add((getJobNameForDisplay(pipeline.processList[myproc])).c_str());
 				}
 			}
 		}
