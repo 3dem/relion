@@ -626,6 +626,8 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 			Fl::add_timeout(update_every_sec, Gui_Timer_CB, (void*)this);
     }
 
+    cb_show_initial_screen_i();
+
     // Set and activate current selection from side-browser
 	cb_select_browsegroup_i(true); // make default active; true is used to show_initial_screen
 	is_main_continue = false; // default is a new run
@@ -1944,6 +1946,10 @@ void GuiMainWindow::cb_show_initial_screen(Fl_Widget* o, void* v)
 
 void GuiMainWindow::cb_show_initial_screen_i()
 {
+    run_button->deactivate();
+    print_CL_button->deactivate();
+    schedule_button->deactivate();
+
 	cb_select_browsegroup_i(true);
 }
 
