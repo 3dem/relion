@@ -3607,11 +3607,13 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 			}
 			fn_run = fns_ok[0].beforeFirstOf("_model.star");
 		}
+		else
+			fn_run = outputname + fn_run;
 
 		// General I/O
 		command += " --PCA_orient ";
-		command += " --model " + outputname + fn_run + "_model.star";
-		command += " --data " + outputname + fn_run + "_data.star";
+		command += " --model " + fn_run + "_model.star";
+		command += " --data " + fn_run + "_data.star";
 		command += " --bodies " + joboptions["fn_bodies"].getString();
 		command += " --o " + outputname + "analyse";
 

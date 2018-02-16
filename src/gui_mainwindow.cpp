@@ -293,10 +293,6 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 		image_box = new Fl_Box(WCOL0-8, 45 ,w-WCOL0, h-120); // widget that will contain image
 		xpm_image = new Fl_XPM_Image(fn_bg.c_str());
 		image_box->image(xpm_image); // attach xpm image to box
-		//forgot_button = new Fl_Button(450, 143, 10, 32, "?");
-		//forgot_button->color(GUI_BUTTON_COLOR);
-		//forgot_button->labelsize(12);
-		//forgot_button->callback( cb_forgot, this);
 	 }
 	background_grp->end();
 
@@ -1354,18 +1350,6 @@ void GuiMainWindow::cb_print_cl_i()
 			std::cout << commands[icom] << std::endl;
 	}
 
-}
-
-// Run button call-back functions
-void GuiMainWindow::cb_forgot(Fl_Widget* o, void* v) {
-
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_forgot_i(); // 1st true means only_schedule, do not run, 2nd true means open the note editor window
-}
-
-void GuiMainWindow::cb_forgot_i()
-{
-	fl_message("Really?! Perhaps you should spend fewer nights at the microscope and try to sleep a bit more...");
 }
 
 // Run button call-back functions
