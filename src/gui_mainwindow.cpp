@@ -988,10 +988,7 @@ void GuiMainWindow::loadJobFromPipeline(int this_job)
     cb_toggle_continue_i();
 
     // Set the alias in the window
-    if (pipeline.processList[current_job].alias != "None")
-    	alias_current_job->value(pipeline.processList[current_job].alias.c_str());
-    else
-    	alias_current_job->value(pipeline.processList[current_job].name.c_str());
+    alias_current_job->value((getJobNameForDisplay(pipeline.processList[current_job])).c_str());
 
 	// Update all job lists in the main GUI
 	updateJobLists();
