@@ -2089,7 +2089,7 @@ void MlOptimiserMpi::maximization()
 						// 19may2015 translate the reconstruction back to its C.O.M.
 						selfTranslate(mymodel.Iref[ibody], mymodel.com_bodies[ibody], DONT_WRAP);
 
-#define DEBUG_BODIES_SPI
+//#define DEBUG_BODIES_SPI
 #ifdef DEBUG_BODIES_SPI
 						// Also write out unmasked body reconstruction
 						FileName fn_tmp;
@@ -2310,7 +2310,6 @@ void MlOptimiserMpi::maximization()
 							}
 							else if (node->rank != reconstruct_rank && node->rank == recv_node)
 							{
-								//std::cerr << "ihalfset= "<<ihalfset<< " Receiving iclass="<<iclass<<" from node "<<reconstruct_rank<<" at node "<<node->rank<< std::endl;
 								node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.Iref[ith_recons]), MULTIDIM_SIZE(mymodel.Iref[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_IMAGE, MPI_COMM_WORLD, status);
 								node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[ith_recons]), MULTIDIM_SIZE(mymodel.data_vs_prior_class[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_METADATA, MPI_COMM_WORLD, status);
 								node->relion_MPI_Recv(MULTIDIM_ARRAY(mymodel.fourier_coverage_class[ith_recons]), MULTIDIM_SIZE(mymodel.fourier_coverage_class[ith_recons]), MY_MPI_DOUBLE, reconstruct_rank, MPITAG_METADATA, MPI_COMM_WORLD, status);
@@ -3134,8 +3133,21 @@ void MlOptimiserMpi::iterate()
 		if (do_split_random_halves)
 		{
 			node->relion_MPI_Bcast(&mymodel.ave_Pmax, 1, MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
-			for (int iclass = 0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++)
-				node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[iclass]), MULTIDIM_SIZE(mymodel.data_vs_prior_class[iclass]), MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
+			if (mymodel.nr_bodies > 1)
+			{
+				// Multiple bodies may have been reconstructed on rank other than 1!
+				for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
+				{
+					int reconstruct_rank1 = 2 * (ibody % ( (node->size - 1)/2 ) ) + 1;
+					node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[ibody]), MULTIDIM_SIZE(mymodel.data_vs_prior_class[ibody]), MY_MPI_DOUBLE, reconstruct_rank1, MPI_COMM_WORLD);
+				}
+
+			}
+			else
+			{
+				for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
+					node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.data_vs_prior_class[iclass]), MULTIDIM_SIZE(mymodel.data_vs_prior_class[iclass]), MY_MPI_DOUBLE, 1, MPI_COMM_WORLD);
+			}
 		}
 
 #ifdef TIMING
@@ -3188,27 +3200,27 @@ void MlOptimiserMpi::iterate()
 		}
 		MPI_Barrier(MPI_COMM_WORLD);
 
-                // Directly use fn_out, without "_it" specifier, so unmasked refs will be overwritten at every iteration
-                if (do_write_unmasked_refs && node->rank == 1)
-                    mymodel.write(fn_out+"_unmasked", sampling, false, true);
+		// Directly use fn_out, without "_it" specifier, so unmasked refs will be overwritten at every iteration
+		if (do_write_unmasked_refs && node->rank == 1)
+			mymodel.write(fn_out+"_unmasked", sampling, false, true);
 
 		// Mask the reconstructions to get rid of noisy solvent areas
 		// Skip masking upon convergence (for validation purposes)
 #ifdef TIMING
-                timer.toc(TIMING_ITER_HELICALREFINE);
-                timer.tic(TIMING_SOLVFLAT);
+        timer.toc(TIMING_ITER_HELICALREFINE);
+        timer.tic(TIMING_SOLVFLAT);
 #endif
-                if (do_solvent && !has_converged)
-                    solventFlatten();
+        if (do_solvent && !has_converged)
+        	solventFlatten();
 #ifdef TIMING
-                timer.toc(TIMING_SOLVFLAT);
-                timer.tic(TIMING_UPDATERES);
+        timer.toc(TIMING_SOLVFLAT);
+        timer.tic(TIMING_UPDATERES);
 #endif
-                // Re-calculate the current resolution, do this before writing to get the correct values in the output files
-                updateCurrentResolution();
+        // Re-calculate the current resolution, do this before writing to get the correct values in the output files
+        updateCurrentResolution();
 #ifdef TIMING
-                timer.toc(TIMING_UPDATERES);
-                timer.tic(TIMING_ITER_WRITE);
+        timer.toc(TIMING_UPDATERES);
+        timer.tic(TIMING_ITER_WRITE);
 #endif
 
 		// If we are joining random halves, then do not write an optimiser file so that it cannot be restarted!
