@@ -1947,8 +1947,6 @@ void GuiMainWindow::cb_show_initial_screen(Fl_Widget* o, void* v)
 void GuiMainWindow::cb_show_initial_screen_i()
 {
     run_button->deactivate();
-    print_CL_button->deactivate();
-    schedule_button->deactivate();
 
 	cb_select_browsegroup_i(true);
 }
