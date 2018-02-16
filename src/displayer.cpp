@@ -173,6 +173,7 @@ int basisViewerWindow::fillCanvas(int viewer_type, MetaDataTable &MDin, EMDLabel
     // Pre-set the canvas to the correct size
     FileName fn_img;
     Image<RFLOAT> img;
+    MDin.firstObject();
     MDin.getValue(display_label, fn_img);
 	img.read(fn_img, false);
 	int nimgs = MDin.numberOfObjects();
@@ -810,8 +811,8 @@ void multiViewerCanvas::printMetaData(int main_ipos)
 {
 	std::ostringstream stream;
 
-	if (do_class) {	
-		int myclass, iclass, nselected_classes = 0, nselected_particles = 0; 
+	if (do_class) {
+		int myclass, iclass, nselected_classes = 0, nselected_particles = 0;
 		for (long int ipos = 0; ipos < boxes.size(); ipos++)
 		{
 			if (boxes[ipos]->selected == SELECTED)
@@ -829,7 +830,7 @@ void multiViewerCanvas::printMetaData(int main_ipos)
 		stream << "Selected " << nselected_particles << " particles in " << nselected_classes << " classes.\n";
 	}
 	stream << "Below is the metadata table for the last clicked class/particle.\n";
-	
+
 	boxes[main_ipos]->MDimg.write(stream);
 	FileName str =  stream.str();
 
@@ -1218,9 +1219,9 @@ void multiViewerCanvas::saveTrainingSet()
 	MDout.write(fn_odir + "/selected.star");
 
 	// Give everyone permissions to this directory and its files
-	command = " chmod 777 -R " + fn_odir.beforeLastOf("/");
-	if (system(command.c_str()))
-		REPORT_ERROR("ERROR in executing: " + command);
+	//command = " chmod 777 -R " + fn_odir.beforeLastOf("/");
+	//if (system(command.c_str()))
+	//	REPORT_ERROR("ERROR in executing: " + command);
 
 	std::cout << "Saved selection to Sjors' training directory. Thanks for helping out!" << std::endl;
 

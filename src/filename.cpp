@@ -499,18 +499,6 @@ bool decomposePipelineFileName(FileName fn_in, FileName &fn_pre, FileName &fn_jo
 			fn_post = fn_in.substr(slashpos2+1); // this has the rest
 			return true;
 		}
-	    // TODO: temporary check for - in uniq filename for backward compatibility with early alpha version. Remove in near future!!
-		else if (std::isdigit(fn_in[slashpos+1]) && std::isdigit(fn_in[slashpos+2]) && std::isdigit(fn_in[slashpos+3]) &&
-		    std::isdigit(fn_in[slashpos+4]) && std::isdigit(fn_in[slashpos+5]) && std::isdigit(fn_in[slashpos+6]) &&
-		    (fn_in[slashpos+7] == '.' || fn_in[slashpos+7] == '-') &&
-		    std::isdigit(fn_in[slashpos+8]) && std::isdigit(fn_in[slashpos+9]) && std::isdigit(fn_in[slashpos+10]) &&
-		    std::isdigit(fn_in[slashpos+11]) && std::isdigit(fn_in[slashpos+12]) && std::isdigit(fn_in[slashpos+13]) )
-		{
-			fn_pre = fn_in.substr(0, slashpos+1); // this has the first slash
-			fn_jobnr = fn_in.substr(slashpos+1,14); // this has the second slash
-			fn_post = fn_in.substr(slashpos+15); // this has the rest
-			return true;
-		}
 		if (i>20)
 			REPORT_ERROR("decomposePipelineFileName: BUG or found more than 20 directories deep structure for pipeline filename: " + fn_in);
 	}
@@ -544,18 +532,17 @@ bool decomposePipelineSymlinkName(FileName fn_in, FileName &fn_pre, FileName &fn
     	// This is a symbolic link!
     	linkname[len] = '\0';
     	FileName fn_link = std::string(linkname);
-    	fn_link = fn_link.afterFirstOf("../") + fn_in.substr(slashpos+1);
-    	// So dereference the link, BUT only if the second directory started with "job"!
-    	if (decomposePipelineFileName(fn_link, fn_pre, fn_jobnr, fn_post))
+    	if (fn_link.substr(0,3) == "../")
     	{
-    		return true;
+    		fn_link = fn_link.substr(3) + fn_in.substr(slashpos+1);
+        	return decomposePipelineFileName(fn_link, fn_pre, fn_jobnr, fn_post);
     	}
-    	else
-    	{
-    		fn_pre = fn_jobnr = "";
-    		fn_post = fn_in;
-    		return false;
-    	}
+		else
+		{
+			fn_pre = fn_jobnr = "";
+			fn_post = fn_in;
+			return false;
+		}
     }
 
 	// If it is not a symlink, just decompose the filename

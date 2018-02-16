@@ -187,6 +187,16 @@ void CTF::initialise()
 
 }
 
+RFLOAT CTF::getCtfFreq(RFLOAT X, RFLOAT Y)
+{
+    RFLOAT u2 = X * X + Y * Y;
+    RFLOAT u = sqrt(u2);
+
+    RFLOAT deltaf = getDeltaF(X, Y);
+
+    return 2.0 * K1 * deltaf * u + 4.0 * K2 * u * u * u;
+}
+
 /* Generate a complete CTF Image ------------------------------------------------------ */
 void CTF::getFftwImage(MultidimArray<RFLOAT> &result, int orixdim, int oriydim, RFLOAT angpix,
 		    		bool do_abs, bool do_only_flip_phases, bool do_intact_until_first_peak, bool do_damping)
@@ -292,4 +302,3 @@ void CTF::applyWeightEwaldSphereCurvature(MultidimArray < RFLOAT > &result, int 
 	}
 
 }
-

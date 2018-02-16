@@ -145,13 +145,13 @@ public:
 	FileName pipeline_name; // Name of this pipeline (e.g. default)
 	std::vector<Fl_Check_Button*> check_buttons;
 	Fl_Input *repeat, *wait, *schedule_name;
-	std::vector<long int> my_jobs; // Which jobs to execute
+	std::vector<FileName> my_jobs; // Which jobs to execute
 
 	SchedulerWindow(int w, int h, const char* title): Fl_Window(w, h, title){}
 
 	~SchedulerWindow() {};
 
-	int fill(FileName _pipeline_name, std::vector<FileName> _scheduled_jobs, std::vector<long int> _scheduled_job_ids);
+	int fill(FileName _pipeline_name, std::vector<FileName> _scheduled_jobs);
 
 private:
 
@@ -193,6 +193,9 @@ public:
 
     // Clear stuff
     void clear();
+
+    // How will jobs be displayed in the GUI job running, finished, in, out & scheduled job lists
+    std::string getJobNameForDisplay(Process &job);
 
     // Update the content of the finished, running and scheduled job lists
     void fillRunningJobLists();

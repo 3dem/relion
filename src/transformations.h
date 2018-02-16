@@ -780,12 +780,17 @@ void selfTranslate(MultidimArray<T>& V1,
 template<typename T>
 void translateCenterOfMassToCenter(const MultidimArray<T> &V1,
                                    MultidimArray<T> &V2,
-                                   bool wrap = WRAP)
+                                   bool wrap = WRAP,
+								   bool verb = false)
 {
     V2 = V1;
     V2.setXmippOrigin();
     Matrix1D< RFLOAT > center;
     V2.centerOfMass(center);
+    if (verb)
+    {
+    	std::cout << " Center of mass: x= " << XX(center) << " y= " << YY(center) << " z= " << ZZ(center) << std::endl;
+    }
     center *= -1;
     translate(V1, V2, center, wrap, (RFLOAT)0.);
 }
@@ -797,10 +802,11 @@ void translateCenterOfMassToCenter(const MultidimArray<T> &V1,
  */
 template<typename T>
 void selfTranslateCenterOfMassToCenter(MultidimArray<T> &V1,
-                                       bool wrap = WRAP)
+                                       bool wrap = WRAP,
+									   bool verb = false)
 {
     MultidimArray<T> aux = V1;
-    translateCenterOfMassToCenter(aux, V1, wrap);
+    translateCenterOfMassToCenter(aux, V1, wrap, verb);
 }
 
 /** Scales to a new size.

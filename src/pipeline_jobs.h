@@ -112,27 +112,49 @@ static bool do_allow_change_minimum_dedicated;
 #define NODE_RESMAP			12// Resmap with local resolution (cannot be used as input)
 #define NODE_PDF_LOGFILE    13//PDF logfile
 
-// All the different types of jobs defined inside the pipeline
+// All the directory names of the different types of jobs defined inside the pipeline
+#define PROC_IMPORT_NAME        "Import"       // Import any file as a Node of a given type
+#define PROC_MOTIONCORR_NAME 	"MotionCorr"   // Import any file as a Node of a given type
+#define PROC_CTFFIND_NAME	    "CtfFind"  	   // Estimate CTF parameters from micrographs for either entire micrographs and/or particles
+#define PROC_MANUALPICK_NAME    "ManualPick"   // Manually pick particle coordinates from micrographs
+#define PROC_AUTOPICK_NAME		"AutoPick"     // Automatically pick particle coordinates from micrographs, their CTF and 2D references
+#define PROC_EXTRACT_NAME		"Extract"      // Window particles, normalize, downsize etc from micrographs (also combine CTF into metadata file)
+#define PROC_SORT_NAME          "Sort"         // Sort particles based on their Z-scores
+#define PROC_CLASSSELECT_NAME   "Select" 	   // Read in model.star file, and let user interactively select classes through the display (later: auto-selection as well)
+#define PROC_2DCLASS_NAME 		"Class2D"      // 2D classification (from input particles)
+#define PROC_3DCLASS_NAME		"Class3D"      // 3D classification (from input 2D/3D particles, an input 3D-reference, and possibly a 3D mask)
+#define PROC_3DAUTO_NAME        "Refine3D"     // 3D auto-refine (from input particles, an input 3Dreference, and possibly a 3D mask)
+#define PROC_POLISH_NAME	    "Polish"       // Particle-polishing (from movie-particles)
+#define PROC_MASKCREATE_NAME    "MaskCreate"   // Process to create masks from input maps
+#define PROC_JOINSTAR_NAME      "JoinStar"     // Process to create masks from input maps
+#define PROC_SUBTRACT_NAME      "Subtract"     // Process to subtract projections of parts of the reference from experimental images
+#define PROC_POST_NAME			"PostProcess"  // Post-processing (from unfiltered half-maps and a possibly a 3D mask)
+#define PROC_RESMAP_NAME  	    "LocalRes"     // Local resolution estimation (from unfiltered half-maps and a 3D mask)
+#define PROC_MOVIEREFINE_NAME   "MovieRefine"  // Movie-particle extraction and refinement combined
+#define PROC_INIMODEL_NAME		"InitialModel" // De-novo generation of 3D initial model (using SGD)
+#define PROC_MULTIBODY_NAME		"MultiBody"    // Multi-body refinement
+
 #define PROC_IMPORT         0 // Import any file as a Node of a given type
 #define PROC_MOTIONCORR 	1 // Import any file as a Node of a given type
 #define PROC_CTFFIND	    2 // Estimate CTF parameters from micrographs for either entire micrographs and/or particles
-#define PROC_MANUALPICK		3 // Manually pick particle coordinates from micrographs
+#define PROC_MANUALPICK 	3 // Manually pick particle coordinates from micrographs
 #define PROC_AUTOPICK		4 // Automatically pick particle coordinates from micrographs, their CTF and 2D references
 #define PROC_EXTRACT		5 // Window particles, normalize, downsize etc from micrographs (also combine CTF into metadata file)
 #define PROC_SORT           6 // Sort particles based on their Z-scores
 #define PROC_CLASSSELECT    7 // Read in model.star file, and let user interactively select classes through the display (later: auto-selection as well)
 #define PROC_2DCLASS		8 // 2D classification (from input particles)
 #define PROC_3DCLASS		9 // 3D classification (from input 2D/3D particles, an input 3D-reference, and possibly a 3D mask)
-#define PROC_3DAUTO	        10 // 3D auto-refine (from input particles, an input 3Dreference, and possibly a 3D mask)
-#define PROC_POLISH			11// Particle-polishing (from movie-particles)
+#define PROC_3DAUTO         10// 3D auto-refine (from input particles, an input 3Dreference, and possibly a 3D mask)
+#define PROC_POLISH  		11// Particle-polishing (from movie-particles)
 #define PROC_MASKCREATE     12// Process to create masks from input maps
 #define PROC_JOINSTAR       13// Process to create masks from input maps
 #define PROC_SUBTRACT       14// Process to subtract projections of parts of the reference from experimental images
 #define PROC_POST			15// Post-processing (from unfiltered half-maps and a possibly a 3D mask)
-#define PROC_RESMAP			16// Local resolution estimation (from unfiltered half-maps and a 3D mask)
+#define PROC_RESMAP 		16// Local resolution estimation (from unfiltered half-maps and a 3D mask)
 #define PROC_MOVIEREFINE    17// Movie-particle extraction and refinement combined
 #define PROC_INIMODEL		18// De-novo generation of 3D initial model (using SGD)
-#define NR_BROWSE_TABS      19
+#define PROC_MULTIBODY      19// Multi-body refinement
+#define NR_BROWSE_TABS      20
 
 // Status a Process may have
 #define PROC_RUNNING   0
@@ -221,6 +243,9 @@ public:
     // Get a string value
     std::string getString();
 
+    // Set a string value
+    void setString(std::string set_to);
+
     // Get a string value
     Node getNode();
 
@@ -287,10 +312,10 @@ public:
     }
 
     // Returns true if the option is present in joboptions
-    bool containsOption(std::string option)
-    {
-    	return (joboptions.find(option) != joboptions.end());
-    }
+    bool containsLabel(std::string label, std::string &option);
+
+    // Set this option in the job
+    void setOption(std::string setOptionLine);
 
     // write/read settings to disc
 	bool read(std::string fn, bool &_is_continue, bool do_initialise = false); // return false if unsuccessful
@@ -361,6 +386,10 @@ public:
 
 	void initialiseAutorefineJob();
 	bool getCommandsAutorefineJob(std::string &outputname, std::vector<std::string> &commands,
+			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
+
+	void initialiseMultiBodyJob();
+	bool getCommandsMultiBodyJob(std::string &outputname, std::vector<std::string> &commands,
 			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
 
 	void initialiseMovierefineJob();

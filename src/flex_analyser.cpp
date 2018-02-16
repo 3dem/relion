@@ -117,6 +117,9 @@ void FlexAnalyser::initialise()
 	if (do_PCA_orient)
 	{
 
+		if (model.nr_bodies * 6 > data.numberOfOriginalParticles())
+			REPORT_ERROR("ERROR: there are not enough particles to perform PCA!");
+
 		if (do_generate_maps)
 		{
 			if (explain_variance > 1.)
@@ -310,7 +313,7 @@ void FlexAnalyser::loopThroughParticles(int rank, int size)
 	if (size > 1)
 		divide_equally(total_nr_particles, size, rank, my_first_ori_particle, my_last_ori_particle);
 	long int todo_particles = my_last_ori_particle-my_first_ori_particle+1;
-	long int update_interval = todo_particles / 60;
+	long int update_interval = XMIPP_MAX(1, todo_particles / 60);
 	if (verb > 0)
 	{
 		std::cout << " Processing all particles ... " << std::endl;
@@ -319,7 +322,6 @@ void FlexAnalyser::loopThroughParticles(int rank, int size)
 
 	DFo.clear();
 	DFo.setIsList(false);
-
 
 	std::vector< std::vector<double> > inputdata;
 	long int imgno = 0;
