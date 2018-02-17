@@ -29,7 +29,7 @@ class RefinementProgram
 
             bool singleReference, doesMovies, debug, applyTilt, anisoTilt, useFsc,
                 optStar, noStar, optReference, noReference, noTilt,
-                preextracted, nogain, ctfTilt;
+                preextracted, nogain;
 
             long maxMG, minMG;
 

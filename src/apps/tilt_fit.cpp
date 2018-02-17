@@ -246,7 +246,7 @@ int TiltFit::_run()
         double yy = y <= sh? y : y - s;
         double r = sqrt(xx*xx + yy*yy);
 
-        if (r == 0 || sh/(2.0*angpix*r) > kmin)
+        if (r == 0 || 2.0*sh*angpix/r > kmin)
         {
             wgh(y,x) = 0.0;
         }

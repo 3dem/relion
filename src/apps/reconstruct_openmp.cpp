@@ -49,7 +49,7 @@ class reconstruct_parameters
         helical_rise, helical_twist;
 
     bool do_ctf, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak,
-        do_fom_weighting, do_3d_rot, do_reconstruct_ctf, do_beamtilt, cl_beamtilt, ctf_tilt, do_ewald;
+        do_fom_weighting, do_3d_rot, do_reconstruct_ctf, do_beamtilt, cl_beamtilt, do_ewald;
 
     bool skip_gridding, do_reconstruct_ctf2, do_reconstruct_meas, is_positive, read_weights;
 
@@ -87,8 +87,6 @@ class reconstruct_parameters
         beamtilt_x = textToFloat(parser.getOption("--beamtilt_x", "Beamtilt in the X-direction (in mrad)", "0."));
         beamtilt_y = textToFloat(parser.getOption("--beamtilt_y", "Beamtilt in the Y-direction (in mrad)", "0."));
         cl_beamtilt = (ABS(beamtilt_x) > 0. || ABS(beamtilt_y) > 0.);
-
-        ctf_tilt = parser.checkOption("--ctf_tilt", "Consider beam tilt in CTF");
 
         read_weights = parser.checkOption("--read_weights", "Read freq. weight files");
         do_ewald = parser.checkOption("--ewald", "Correct for Ewald-sphere curvature (developmental)");
@@ -457,14 +455,6 @@ class reconstruct_parameters
                     {
                         CTF ctf;
                         ctf.read(mdts[g], mdts[g], p);
-
-                        if (ctf_tilt)
-                        {
-                            ctf.tilt_x = beamtilt_x;
-                            ctf.tilt_y = beamtilt_y;
-
-                            ctf.initialise();
-                        }
 
                         ctf.getFftwImage(Fctf, mysize, mysize, angpix,
                              ctf_phase_flipped, only_flip_phases,

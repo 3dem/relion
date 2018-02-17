@@ -38,8 +38,8 @@ class DefocusFit : public RefinementProgram
 {
     public:
 
-        RFLOAT defocusRange;
-        bool fitAstigmatism, noGlobAstig, diag;
+        RFLOAT defocusRange, kmin;
+        bool fitAstigmatism, noGlobAstig, diag, fitPhase, globOnly;
 
         int readMoreOptions(IOParser& parser, int argc, char *argv[]);
         int _init();
@@ -61,8 +61,11 @@ int DefocusFit::readMoreOptions(IOParser& parser, int argc, char *argv[])
 {
     fitAstigmatism = parser.checkOption("--astig", "Estimate independent astigmatism for each particle");
     noGlobAstig = parser.checkOption("--no_glob_astig", "Skip per-micrograph astigmatism estimation");
+    fitPhase = !parser.checkOption("--no_phase", "Skip per-micrograph phase shift (amplitude contrast) estimation");
     diag = parser.checkOption("--diag", "Write out defocus errors");
+    globOnly = parser.checkOption("--glob", "Only perform per-micrograph fit");
     defocusRange = textToFloat(parser.getOption("--range", "Defocus scan range (in A)", "2000."));
+    kmin = textToFloat(parser.getOption("--kmin", "Inner freq. threshold [Angst]", "20.0"));
 
     return 0;
 }
@@ -109,26 +112,32 @@ int DefocusFit::_run()
                 projectors[randSubset], mdts[g], p, false, true);
         }
 
+        for (int y = 0; y < s; y++)
+        for (int x = 0; x < sh; x++)
+        {
+            double xx = x;
+            double yy = y <= sh? y : y - s;
+            double r = sqrt(xx*xx + yy*yy);
+
+            if (r == 0 || 2.0*sh*angpix/r > kmin)
+            {
+                freqWeight(y,x) = 0.0;
+            }
+        }
+
         if (!noGlobAstig)
         {
             CTF ctf0;
             ctf0.read(mdts[g], mdts[g], 0);
 
-            if (ctfTilt)
-            {
-                ctf0.tilt_x = beamtilt_x;
-                ctf0.tilt_y = beamtilt_y;
-                ctf0.initialise();
-            }
+            Image<RFLOAT> dataVis;
 
             if (diag)
             {
-                Image<RFLOAT> ctfFit(s,s);
-                ctf0.getCenteredImage(ctfFit.data, angpix, false, false, false, false);
-                VtkHelper::writeVTK(ctfFit, outPath+"_astig0_m"+stsg.str()+".vtk");
-
-                Image<RFLOAT> dotp0(sh,s), dotp0_full(s,s);
+                Image<RFLOAT> dotp0(sh,s), cc(sh,s), wgh0(sh,s), wgh1(sh,s), dotp0_full(s,s);
                 dotp0.data.initZeros();
+                wgh0.data.initZeros();
+                wgh1.data.initZeros();
 
                 for (long p = 0; p < pc; p++)
                 {
@@ -139,21 +148,58 @@ int DefocusFit::_run()
                         const Complex vy = DIRECT_A2D_ELEM(obsF[p].data, y, x);
 
                         dotp0(y,x) += vy.real*vx.real + vy.imag*vx.imag;
+                        wgh0(y,x) += vx.norm();
+                        wgh1(y,x) += vy.norm();
                     }
                 }
 
-                FftwHelper::decenterDouble2D(dotp0.data, dotp0_full.data);
+                for (long y = 0; y < s; y++)
+                for (long x = 0; x < sh; x++)
+                {
+                    double nrm = sqrt(wgh0(y,x) * wgh1(y,x));
+                    cc(y,x) = nrm > 0.0? 10.0 * dotp0(y,x) / nrm : 0.0;
+                }
+
+                FftwHelper::decenterDouble2D(cc.data, dotp0_full.data);
+
                 VtkHelper::writeVTK(dotp0_full, outPath+"_astig_data_m"+stsg.str()+".vtk");
+                dataVis = FilterHelper::polarBlur(dotp0_full, 10.0);
+                VtkHelper::writeVTK(dataVis, outPath+"_astig_data_m"+stsg.str()+"_blurred.vtk");
+
+                Image<RFLOAT> ctfFit(s,s);
+                ctf0.getCenteredImage(ctfFit.data, angpix, false, false, false, false);
+                VtkHelper::writeVTK(ctfFit, outPath+"_astig0_m"+stsg.str()+".vtk");
+
+                ctfFit.data.xinit = 0;
+                ctfFit.data.yinit = 0;
+
+                Image<RFLOAT> vis = FilterHelper::sectorBlend(dataVis, ctfFit, 12);
+                VtkHelper::writeVTK(vis, outPath+"_astig_data_m"+stsg.str()+"_vis0.vtk");
             }
 
-            double u, v, phi;
-            DefocusRefinement::findAstigmatismNM(preds, obsF, freqWeight, ctf0, angpix, &u, &v, &phi);
+            RFLOAT u, v, phi, phase;
+
+            mdts[g].getValue(EMDL_CTF_PHASESHIFT, phase, 0);
+
+            if (fitPhase)
+            {
+                std::cout << "initial phase shift: " << phase << "\n";
+                DefocusRefinement::findAstigmatismAndPhaseNM(
+                        preds, obsF, freqWeight, ctf0, angpix, &u, &v, &phi, &phase);
+                std::cout << "final phase shift: " << phase << "\n";
+            }
+            else
+            {
+                DefocusRefinement::findAstigmatismNM(preds, obsF, freqWeight, ctf0, angpix, &u, &v, &phi);
+            }
 
             for (long p = 0; p < pc; p++)
             {
                 mdts[g].setValue(EMDL_CTF_DEFOCUSU, u, p);
                 mdts[g].setValue(EMDL_CTF_DEFOCUSV, v, p);
                 mdts[g].setValue(EMDL_CTF_DEFOCUS_ANGLE, phi, p);
+
+                if (fitPhase) mdts[g].setValue(EMDL_CTF_PHASESHIFT, phase, p);
             }
 
             if (diag)
@@ -164,8 +210,15 @@ int DefocusFit::_run()
                 Image<RFLOAT> ctfFit(s,s);
                 ctf1.getCenteredImage(ctfFit.data, angpix, false, false, false, false);
                 VtkHelper::writeVTK(ctfFit, outPath+"_astig1_m"+stsg.str()+".vtk");
+                ctfFit.data.xinit = 0;
+                ctfFit.data.yinit = 0;
+
+                Image<RFLOAT> vis = FilterHelper::sectorBlend(dataVis, ctfFit, 12);
+                VtkHelper::writeVTK(vis, outPath+"_astig_data_m"+stsg.str()+"_vis1.vtk");
             }
         }
+
+        if (globOnly) continue;
 
         if (diag)
         {
@@ -178,13 +231,6 @@ int DefocusFit::_run()
 
                 CTF ctf0;
                 ctf0.read(mdts[g], mdts[g], p);
-
-                if (ctfTilt)
-                {
-                    ctf0.tilt_x = beamtilt_x;
-                    ctf0.tilt_y = beamtilt_y;
-                    ctf0.initialise();
-                }
 
                 std::vector<d2Vector> cost = DefocusRefinement::diagnoseDefocus(
                     preds[p], obsF[p], freqWeight,
@@ -219,13 +265,6 @@ int DefocusFit::_run()
 
                 CTF ctf0;
                 ctf0.read(mdts[g], mdts[g], p);
-
-                if (ctfTilt)
-                {
-                    ctf0.tilt_x = beamtilt_x;
-                    ctf0.tilt_y = beamtilt_y;
-                    ctf0.initialise();
-                }
 
                 CTF ctf(ctf0);
 

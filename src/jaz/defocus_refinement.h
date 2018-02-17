@@ -39,6 +39,7 @@ class AstigmatismOptimizationAcc : public Optimization
                 const Image<Complex>& observation,
                 const Image<RFLOAT>& weight,
                 const CTF& ctf0,
+                bool phaseShift,
                 RFLOAT angpix,
                 RFLOAT phiScale = 10);
 
@@ -47,6 +48,7 @@ class AstigmatismOptimizationAcc : public Optimization
                 const std::vector<Image<Complex>>& observation,
                 const Image<RFLOAT>& weight,
                 const CTF& ctf0,
+                bool phaseShift,
                 RFLOAT angpix,
                 RFLOAT phiScale = 10);
 
@@ -55,6 +57,7 @@ class AstigmatismOptimizationAcc : public Optimization
         double getU(const std::vector<double> &x);
         double getV(const std::vector<double> &x);
         double getPhi(const std::vector<double> &x);
+        double getPhase(const std::vector<double> &x);
 
         std::vector<double> getInitialParams();
 
@@ -62,8 +65,8 @@ class AstigmatismOptimizationAcc : public Optimization
 
         Image<Complex> data;
         const CTF& ctf0;
-        RFLOAT angpix;
-        RFLOAT phiScale;
+        bool phaseShift;
+        RFLOAT angpix, phiScale;
 };
 
 class DefocusRefinement
@@ -85,6 +88,13 @@ class DefocusRefinement
             const CTF& ctf0, RFLOAT angpix,
             RFLOAT* destU, RFLOAT* destV, RFLOAT* destPhi);
 
+        static void findAstigmatismAndPhaseNM(
+            const std::vector<Image<Complex>>& prediction,
+            const std::vector<Image<Complex>>& observation,
+            const Image<RFLOAT>& weight,
+            const CTF& ctf0, RFLOAT angpix,
+            RFLOAT* destU, RFLOAT* destV, RFLOAT* destPhi, RFLOAT* destPhase);
+
         static void findAstigmatismNM(
             const std::vector<Image<Complex>>& prediction,
             const std::vector<Image<Complex>>& observation,
@@ -95,7 +105,7 @@ class DefocusRefinement
         static std::vector<gravis::d2Vector> diagnoseDefocus(const Image<Complex>& prediction,
             const Image<Complex>& observation,
             const Image<RFLOAT>& weight,
-            const CTF& ctf0, double angpix,
+            const CTF& ctf0, RFLOAT angpix,
             double range, int steps, int threads);
 };
 

@@ -1839,6 +1839,110 @@ void FilterHelper::polarRemap(d2Vector pos, const Image<RFLOAT>& distTransf, con
     }
 }
 
+Image<RFLOAT> FilterHelper::cartToPolar(const Image<RFLOAT> &img)
+{
+    const int w0 = img.data.xdim;
+    const int h0 = img.data.ydim;
+
+    const double w0h = w0/2.0;
+    const double h0h = h0/2.0;
+
+    const double cx = w0h + 1;
+    const double cy = h0h + 0.5;
+
+    const int w = (int)(2.0*PI*w0h + 1);
+    const int h = w0h;
+
+    Image<RFLOAT> out(w,h);
+
+    for (int y = 0; y < h; y++)
+    for (int x = 0; x < w; x++)
+    {
+        const double phi = 2.0 * PI * x / (double)w;
+        const double r = w0h * y / (double)h;
+
+        double xx = cx + r * cos(phi);
+        double yy = cy + r * sin(phi);
+
+        out(y,x) = Interpolation::cubicXY(img, xx, yy, 0, 0);
+    }
+
+    return out;
+}
+
+Image<RFLOAT> FilterHelper::polarToCart(const Image<RFLOAT> &img)
+{
+    const int wp = img.data.xdim;
+    const int hp = img.data.ydim;
+
+    const double w0h = hp;
+
+    const double cx = w0h + 1;
+    const double cy = w0h + 0.5;
+
+    const int w = 2.0*w0h;
+    const int h = 2.0*w0h;
+
+    Image<RFLOAT> out(w,h);
+
+    for (int y = 0; y < h; y++)
+    for (int x = 0; x < w; x++)
+    {
+        const double xd = x - cx;
+        const double yd = y - cy;
+
+        const double r = sqrt(xd*xd + yd*yd);
+        double phi = (xd == 0 && yd == 0)? 0.0 : atan2(yd,xd);
+        if (phi < 0.0) phi += 2.0*PI;
+
+        out(y,x) = Interpolation::cubicXY(img, wp*phi/(2.0*PI), r, 0, 0);
+    }
+
+    return out;
+}
+
+Image<RFLOAT> FilterHelper::polarBlur(const Image<RFLOAT> &img, double sigma)
+{
+    Image<RFLOAT> img1 = FilterHelper::cartToPolar(img);
+    Image<RFLOAT> img2 = img1;
+    separableGaussianX_wrap(img1, img2, sigma);
+
+    return FilterHelper::polarToCart(img2);
+}
+
+Image<RFLOAT> FilterHelper::sectorBlend(const Image<RFLOAT>& img0, const Image<RFLOAT>& img1, int sectors)
+{
+    const int w = img0.data.xdim;
+    const int h = img0.data.ydim;
+
+    if (img1.data.xdim != w || img1.data.ydim != h)
+    {
+        std::cerr << "FilterHelper::sectorBlend: unequal image size: " << w << "x" << h
+                  << " vs. " << img1.data.xdim << "x" << img1.data.ydim << "\n";
+
+        REPORT_ERROR("FilterHelper::sectorBlend: unequal image size.");
+    }
+
+    Image<RFLOAT> out(w,h);
+
+    const double cx = w/2.0;
+    const double cy = h/2.0;
+
+    for (int y = 0; y < h; y++)
+    for (int x = 0; x < w; x++)
+    {
+        const double xd = x - cx;
+        const double yd = y - cy;
+
+        double phi = (xd == 0 && yd == 0)? 0.0 : atan2(yd,xd) + PI;
+        double a = sectors*phi/(2.0*PI);
+
+        out(y,x) = a - (int)a < 0.5? img0(y,x) : img1(y,x);
+    }
+
+    return out;
+}
+
 void FilterHelper::diffuseAlongIsocontours2D(const Image<RFLOAT>& src, const Image<RFLOAT>& guide,
                                               Image<RFLOAT>& dest, int iters, RFLOAT sigma, RFLOAT lambda, RFLOAT delta)
 {
@@ -2875,11 +2979,51 @@ void FilterHelper::separableGaussianX_wrap(const Image<RFLOAT>& src, const Image
 
         for (long int i = -k; i <= k; i++)
         {
-            const long int xx = x + i;
+            long int xx = (x + i + src.data.xdim) % src.data.xdim;
             if (xx < 0 || xx >= src.data.xdim) continue;
 
             v += kernel[i+k] * DIRECT_A3D_ELEM(mask.data, z, y, xx) * DIRECT_A3D_ELEM(src.data, z, y, xx);
             m += kernel[i+k] * DIRECT_A3D_ELEM(mask.data, z, y, xx);
+        }
+
+        if (m > 0.0)
+        {
+            DIRECT_A3D_ELEM(dest.data, z, y, x) = v/m;
+        }
+    }
+}
+
+void FilterHelper::separableGaussianX_wrap(const Image<RFLOAT>& src, Image<RFLOAT>& dest, RFLOAT sigma, int k)
+{
+    if (k < 0)
+    {
+        k = (int)(2*sigma + 0.5);
+    }
+
+    dest.data.resize(src.data);
+
+    std::vector<RFLOAT> kernel(2*k+1);
+    const RFLOAT s2 = sigma*sigma;
+
+    for (int i = -k; i <= k; i++)
+    {
+        kernel[i+k] = exp(-0.5*i*i/s2);
+    }
+
+    for (size_t z = 0; z < src.data.zdim; z++)
+    for (size_t y = 0; y < src.data.ydim; y++)
+    for (size_t x = 0; x < src.data.xdim; x++)
+    {
+        RFLOAT v = 0;
+        RFLOAT m = 0;
+
+        for (long int i = -k; i <= k; i++)
+        {
+            long int xx = (x + i + src.data.xdim) % src.data.xdim;
+            if (xx < 0 || xx >= src.data.xdim) continue;
+
+            v += kernel[i+k] * DIRECT_A3D_ELEM(src.data, z, y, xx);
+            m += kernel[i+k];
         }
 
         if (m > 0.0)
