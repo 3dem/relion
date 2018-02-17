@@ -39,7 +39,7 @@ class DefocusFit : public RefinementProgram
     public:
 
         RFLOAT defocusRange, kmin;
-        bool fitAstigmatism, noGlobAstig, diag, fitPhase, globOnly;
+        bool fitAstigmatism, noGlobAstig, diag, fitPhase, fitCs, globOnly;
 
         int readMoreOptions(IOParser& parser, int argc, char *argv[]);
         int _init();
@@ -66,6 +66,7 @@ int DefocusFit::readMoreOptions(IOParser& parser, int argc, char *argv[])
     globOnly = parser.checkOption("--glob", "Only perform per-micrograph fit");
     defocusRange = textToFloat(parser.getOption("--range", "Defocus scan range (in A)", "2000."));
     kmin = textToFloat(parser.getOption("--kmin", "Inner freq. threshold [Angst]", "20.0"));
+    fitCs = parser.checkOption("--fit_Cs", "Fit spherical aberration (per micrograph)");
 
     return 0;
 }
@@ -177,15 +178,27 @@ int DefocusFit::_run()
                 VtkHelper::writeVTK(vis, outPath+"_astig_data_m"+stsg.str()+"_vis0.vtk");
             }
 
-            RFLOAT u, v, phi, phase;
+            RFLOAT u, v, phi, phase, newCs;
 
             mdts[g].getValue(EMDL_CTF_PHASESHIFT, phase, 0);
+            mdts[g].getValue(EMDL_CTF_CS, newCs, 0);
 
-            if (fitPhase)
+            if (fitCs)
+            {
+                std::cout << "initial phi and Cs: " << phase << ", " << newCs << "\n";
+
+                DefocusRefinement::findAstigmatismPhaseAndCsNM(
+                        preds, obsF, freqWeight, ctf0, angpix, &u, &v, &phi, &phase, &newCs);
+
+                std::cout << "initial phi and Cs: " << phase << ", " << newCs << "\n";
+            }
+            else if (fitPhase)
             {
                 std::cout << "initial phase shift: " << phase << "\n";
+
                 DefocusRefinement::findAstigmatismAndPhaseNM(
                         preds, obsF, freqWeight, ctf0, angpix, &u, &v, &phi, &phase);
+
                 std::cout << "final phase shift: " << phase << "\n";
             }
             else
@@ -200,6 +213,7 @@ int DefocusFit::_run()
                 mdts[g].setValue(EMDL_CTF_DEFOCUS_ANGLE, phi, p);
 
                 if (fitPhase) mdts[g].setValue(EMDL_CTF_PHASESHIFT, phase, p);
+                if (fitCs) mdts[g].setValue(EMDL_CTF_CS, newCs, p);
             }
 
             if (diag)
