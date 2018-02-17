@@ -6,25 +6,22 @@
 ObservationModel::ObservationModel()
 :   angpix(-1),
     hasTilt(false),
-    anisoTilt(false),
-    ctfTilt(false)
+    anisoTilt(false)
 {
 }
 
 ObservationModel::ObservationModel(double angpix)
 :   angpix(angpix),
     hasTilt(false),
-    anisoTilt(false),
-    ctfTilt(false)
+    anisoTilt(false)
 {
 }
 
 ObservationModel::ObservationModel(double angpix, double Cs, double voltage, double beamtilt_x, double beamtilt_y)
 :   angpix(angpix),
     lambda(12.2643247 / sqrt(voltage * (1.0 + voltage * 0.978466e-6))),
-    Cs(Cs), beamtilt_x(beamtilt_x), beamtilt_y(beamtilt_y), hasTilt(true),
-    anisoTilt(false),
-    ctfTilt(false)
+    Cs(Cs), beamtilt_x(beamtilt_x), beamtilt_y(beamtilt_y),
+    hasTilt(true), anisoTilt(false)
 {
 }
 
@@ -65,28 +62,33 @@ Image<Complex> ObservationModel::predictObservation(
         CTF ctf;
         ctf.read(mdt, mdt, particle);        
 
-        if (ctfTilt && applyTilt && hasTilt)
-        {
-            ctf.tilt_x = beamtilt_x;
-            ctf.tilt_y = beamtilt_y;
-
-            ctf.initialise();
-        }
-
         FilterHelper::modulate(pred, ctf, angpix);
     }
 
-    if (applyTilt && hasTilt)
+    if (applyTilt)
     {
+        double tx, ty;
+
+        if (hasTilt)
+        {
+            tx = beamtilt_x;
+            ty = beamtilt_y;
+        }
+        else
+        {
+            mdt.getValue(EMDL_IMAGE_BEAMTILT_X, tx, particle);
+            mdt.getValue(EMDL_IMAGE_BEAMTILT_Y, ty, particle);
+        }
+
         if (anisoTilt)
         {
-            selfApplyBeamTilt(pred.data, -beamtilt_x, -beamtilt_y,
+            selfApplyBeamTilt(pred.data, -tx, -ty,
                               beamtilt_xx, beamtilt_xy, beamtilt_yy,
                               lambda, Cs, angpix, s);
         }
         else
         {
-            selfApplyBeamTilt(pred.data, -beamtilt_x, -beamtilt_y, lambda, Cs, angpix, s);
+            selfApplyBeamTilt(pred.data, -tx, -ty, lambda, Cs, angpix, s);
         }
     }
 

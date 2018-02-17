@@ -116,6 +116,11 @@ class FilterHelper
         static void polarRemap(gravis::d2Vector pos, const Image<RFLOAT>& distTransf, const Image<RFLOAT>& src, Image<RFLOAT>& dest,
                                const Image<RFLOAT>& mask, Image<RFLOAT>& maskDest, int phiRes, int rRes, double rMax);
 
+        static Image<RFLOAT> cartToPolar(const Image<RFLOAT>& img);
+        static Image<RFLOAT> polarToCart(const Image<RFLOAT>& img);
+        static Image<RFLOAT> polarBlur(const Image<RFLOAT>& img, double sigma);
+        static Image<RFLOAT> sectorBlend(const Image<RFLOAT>& img0, const Image<RFLOAT>& img1, int sectors);
+
 
         static void diffuseAlongIsocontours2D(const Image<RFLOAT>& src, const Image<RFLOAT>& guide,
                                               Image<RFLOAT>& dest, int iters, RFLOAT sigma, RFLOAT lambda, RFLOAT delta);
@@ -150,6 +155,7 @@ class FilterHelper
         static void separableGaussianXYZ(const Image<RFLOAT>& src, Image<RFLOAT>& dest, RFLOAT sigma, int k = -1);
         static void separableGaussianXY(const Image<RFLOAT>& src, Image<RFLOAT>& dest, RFLOAT sigma, int k = -1, bool wrap = false);
         static void separableGaussianX_wrap(const Image<RFLOAT>& src, const Image<RFLOAT>& mask, Image<RFLOAT>& dest, RFLOAT sigma, int k = -1);
+        static void separableGaussianX_wrap(const Image<RFLOAT>& src, Image<RFLOAT>& dest, RFLOAT sigma, int k = -1);
         static void averageX(const Image<RFLOAT>& src, const Image<RFLOAT>& mask, Image<RFLOAT>& dest);
 
         static void centralGradient(const Volume<RFLOAT>& src, Volume<gravis::t3Vector<RFLOAT> >& dest);

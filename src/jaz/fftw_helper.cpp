@@ -49,7 +49,7 @@ void FftwHelper::decenterDouble2D(const MultidimArray<double> &src, MultidimArra
         else
         {
             long int ys = (y + yc) % dest.ydim;
-            DIRECT_A2D_ELEM(dest, y, x) =  DIRECT_A2D_ELEM(src, ys, xs);
+            DIRECT_A2D_ELEM(dest, y, x) =  DIRECT_A2D_ELEM(src, ys, xs+1);
         }
     }
 }

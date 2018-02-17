@@ -128,12 +128,12 @@ int CsFit::_run()
         totalCostIso[i] = std::vector<double>(samples, 0.0);
     }
 
-    for (long g = minMG; g < gc; g++)
+    for (long g = minMG; g <= gc; g++)
     {
         std::stringstream stsg;
         stsg << g;
 
-        std::cout << "micrograph " << g << " / " << mdts.size() <<"\n";
+        std::cout << "micrograph " << g << " / " << gc <<"\n";
 
         const int pc = mdts[g].numberOfObjects();
 

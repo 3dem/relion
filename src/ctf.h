@@ -59,7 +59,6 @@ protected:
     RFLOAT K3;
     RFLOAT K4;
     RFLOAT K5;
-    RFLOAT Fx, Fy;
 
     // Azimuthal angle in radians
     RFLOAT rad_azimuth;
@@ -123,9 +122,6 @@ public:
     // Phase-shift from a phase-plate (in rad)
     RFLOAT phase_shift;
 
-    // Beam tilt
-    RFLOAT tilt_x, tilt_y;
-
     /** Empty constructor. */
     CTF() { clear(); }
 
@@ -165,11 +161,9 @@ public:
         RFLOAT u2 = X * X + Y * Y;
         RFLOAT u4 = u2 * u2;
 
-        RFLOAT Kt = u2 * (X * Fx + Y * Fy);
-
         // if (u2>=ua2) return 0;
         RFLOAT deltaf = getDeltaF(X, Y);
-        RFLOAT argument = K1 * deltaf * u2 + K2 * u4 - K5 - K3 - Kt;
+        RFLOAT argument = K1 * deltaf * u2 + K2 * u4 - K5 - K3;
         RFLOAT retval;
         if (do_intact_until_first_peak && ABS(argument) < PI/2.)
         {

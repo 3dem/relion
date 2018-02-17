@@ -144,8 +144,6 @@ void CTF::clear()
     Cs = Bfac = 0;
     Q0 = 0;
     scale = 1;
-    tilt_x = 0;
-    tilt_y = 0;
 }
 
 /* Initialise the CTF ------------------------------------------------------ */
@@ -180,12 +178,6 @@ void CTF::initialise()
 
     // Phase shift in radian
     K5 = DEG2RAD(phase_shift);
-
-    RFLOAT factor = (PI / 180.0) * 0.360 * Cs * 10000000 * lambda * lambda;
-
-    // Axial coma coefficients (cf. Krivanek 1994)
-    Fx = factor * tilt_x;
-    Fy = factor * tilt_y;
 
     if (Q0 < 0. || Q0 > 1.)
     	REPORT_ERROR("CTF::initialise ERROR: AmplitudeContrast Q0 cannot be smaller than zero or larger than one!");

@@ -70,7 +70,7 @@ void DefocusRefinement::findAstigmatismNM(
         const CTF &ctf0, RFLOAT angpix,
         double *destU, double *destV, double *destPhi)
 {
-    AstigmatismOptimizationAcc opt(prediction, observation, weight, ctf0, angpix);
+    AstigmatismOptimizationAcc opt(prediction, observation, weight, ctf0, false, false, angpix);
 
     std::vector<double> initial = opt.getInitialParams();
 
@@ -81,14 +81,53 @@ void DefocusRefinement::findAstigmatismNM(
     *destPhi = opt.getPhi(params);
 }
 
+void DefocusRefinement::findAstigmatismAndPhaseNM(
+        const std::vector<Image<Complex>>& prediction,
+        const std::vector<Image<Complex>>& observation,
+        const Image<RFLOAT> &weight,
+        const CTF &ctf0, RFLOAT angpix,
+        RFLOAT *destU, RFLOAT *destV, RFLOAT *destPhi, RFLOAT *destPhase)
+{
+    AstigmatismOptimizationAcc opt(prediction, observation, weight, ctf0, true, false, angpix);
+
+    std::vector<double> initial = opt.getInitialParams();
+
+    std::vector<double> params = NelderMead::optimize(initial, opt, 5.0, 0.01, 100000);
+
+    *destU = opt.getU(params);
+    *destV = opt.getV(params);
+    *destPhi = opt.getPhi(params);
+    *destPhase = opt.getPhase(params);
+}
+
+void DefocusRefinement::findAstigmatismPhaseAndCsNM(
+        const std::vector<Image<Complex>>& prediction,
+        const std::vector<Image<Complex>>& observation,
+        const Image<RFLOAT> &weight,
+        const CTF &ctf0, RFLOAT angpix,
+        RFLOAT *destU, RFLOAT *destV, RFLOAT *destPhi, RFLOAT *destPhase, RFLOAT* destCs)
+{
+    AstigmatismOptimizationAcc opt(prediction, observation, weight, ctf0, true, true, angpix);
+
+    std::vector<double> initial = opt.getInitialParams();
+
+    std::vector<double> params = NelderMead::optimize(initial, opt, 5.0, 0.01, 100000);
+
+    *destU = opt.getU(params);
+    *destV = opt.getV(params);
+    *destPhi = opt.getPhi(params);
+    *destPhase = opt.getPhase(params);
+    *destCs = opt.getCs(params);
+}
+
 void DefocusRefinement::findAstigmatismNM(
         const std::vector<Image<Complex>>& prediction,
         const std::vector<Image<Complex>>& observation,
         const Image<RFLOAT> &weight,
         const CTF &ctf0, RFLOAT angpix,
-        double *destU, double *destV, double *destPhi)
+        RFLOAT *destU, RFLOAT *destV, RFLOAT *destPhi)
 {
-    AstigmatismOptimizationAcc opt(prediction, observation, weight, ctf0, angpix);
+    AstigmatismOptimizationAcc opt(prediction, observation, weight, ctf0, false, false, angpix);
 
     std::vector<double> initial = opt.getInitialParams();
 
@@ -103,7 +142,7 @@ std::vector<d2Vector> DefocusRefinement::diagnoseDefocus(
         const Image<Complex> &prediction,
         const Image<Complex> &observation,
         const Image<double> &weight,
-        const CTF &ctf0, double angpix,
+        const CTF &ctf0, RFLOAT angpix,
         double range, int steps, int threads)
 {
     const RFLOAT ratio = ctf0.DeltafV / ctf0.DeltafU;
@@ -151,10 +190,21 @@ double AstigmatismOptimization::f(const std::vector<double>& x) const
     return RefinementHelper::squaredDiff(prediction, observation, ctf, angpix, weight);
 }
 
-AstigmatismOptimizationAcc::AstigmatismOptimizationAcc(
-        const Image<Complex>& prediction, const Image<Complex>& observation,
-        const Image<RFLOAT>& weight, const CTF& ctf0, RFLOAT angpix, RFLOAT phiScale)
-:   ctf0(ctf0), angpix(angpix), phiScale(phiScale)
+AstigmatismOptimizationAcc::AstigmatismOptimizationAcc(const Image<Complex>& prediction,
+        const Image<Complex>& observation,
+        const Image<RFLOAT>& weight,
+        const CTF& ctf0,
+        bool phaseShift,
+        bool spherAberr,
+        RFLOAT angpix,
+        RFLOAT phiScale,
+        RFLOAT csScale)
+:   ctf0(ctf0),
+    phaseShift(phaseShift),
+    spherAberr(spherAberr),
+    angpix(angpix),
+    phiScale(phiScale),
+    csScale(csScale)
 {
     const long w = prediction.data.xdim;
     const long h = prediction.data.ydim;
@@ -181,8 +231,18 @@ AstigmatismOptimizationAcc::AstigmatismOptimizationAcc(
         const std::vector<Image<Complex>>& prediction,
         const std::vector<Image<Complex>>& observation,
         const Image<RFLOAT>& weight,
-        const CTF& ctf0, RFLOAT angpix, RFLOAT phiScale)
-:   ctf0(ctf0), angpix(angpix), phiScale(phiScale)
+        const CTF& ctf0,
+        bool phaseShift,
+        bool spherAberr,
+        RFLOAT angpix,
+        RFLOAT phiScale,
+        RFLOAT csScale)
+:   ctf0(ctf0),
+    phaseShift(phaseShift),
+    spherAberr(spherAberr),
+    angpix(angpix),
+    phiScale(phiScale),
+    csScale(csScale)
 {
     const long w = prediction[0].data.xdim;
     const long h = prediction[0].data.ydim;
@@ -216,6 +276,10 @@ double AstigmatismOptimizationAcc::f(const std::vector<double> &x) const
     ctf.DeltafU = x[0];
     ctf.DeltafV = x[1];
     ctf.azimuthal_angle = x[2]/phiScale;
+
+    if (phaseShift) ctf.phase_shift = x[3]/phiScale;
+    if (spherAberr) ctf.Cs = x[phaseShift?4:3]/csScale;
+
     ctf.initialise();
 
     const long w = data.data.xdim;
@@ -256,13 +320,30 @@ double AstigmatismOptimizationAcc::getPhi(const std::vector<double> &x)
     return x[2] / phiScale;
 }
 
+double AstigmatismOptimizationAcc::getPhase(const std::vector<double> &x)
+{
+    return x[3] / phiScale;
+}
+
+double AstigmatismOptimizationAcc::getCs(const std::vector<double> &x)
+{
+    return x[phaseShift?4:3] / csScale;
+}
+
 std::vector<double> AstigmatismOptimizationAcc::getInitialParams()
 {
-    std::vector<double> initial(3);
+    int num = 3;
+    if (phaseShift) num++;
+    if (spherAberr) num++;
+
+    std::vector<double> initial(num);
 
     initial[0] = ctf0.DeltafU;
     initial[1] = ctf0.DeltafU;
     initial[2] = phiScale * ctf0.azimuthal_angle;
+
+    if (phaseShift) initial[3] = phiScale * ctf0.phase_shift;
+    if (spherAberr) initial[phaseShift?4:3] = csScale * ctf0.Cs;
 
     return initial;
 }
