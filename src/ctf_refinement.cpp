@@ -48,7 +48,6 @@ void CtfRefiner::read(int argc, char **argv)
     beamtilt_xx = textToFloat(parser.getOption("--beamtilt_xx", "Anisotropic beamtilt, XX-coefficient", "1."));
     beamtilt_xy = textToFloat(parser.getOption("--beamtilt_xy", "Anisotropic beamtilt, XY-coefficient", "0."));
     beamtilt_yy = textToFloat(parser.getOption("--beamtilt_yy", "Anisotropic beamtilt, YY-coefficient", "1."));
-    ctfTilt = parser.checkOption("--ctf_tilt", "Distort CTF by axial coma");
 
 	int fit_section = parser.addSection("Defocus fit options");
 	do_defocus_fit = parser.checkOption("--fit_defocus", "Perform refinement of per-particle defocus values?");
@@ -234,9 +233,7 @@ void CtfRefiner::initialise()
 	 if (anisoTilt)
 	 {
 		 obsModel.setAnisoTilt(beamtilt_xx, beamtilt_xy, beamtilt_yy);
-	 }
-
-	 obsModel.ctfTilt = ctfTilt;
+     }
 	}
 
 
@@ -281,13 +278,6 @@ void CtfRefiner::fitDefocusOneMicrograph(long g, const std::vector<Image<Complex
     {
     	CTF ctf0;
         ctf0.read(mdts[g], mdts[g], 0);
-
-        if (ctfTilt)
-        {
-            ctf0.tilt_x = beamtilt_x;
-            ctf0.tilt_y = beamtilt_y;
-            ctf0.initialise();
-        }
 
         if (diag)
         {
@@ -354,13 +344,6 @@ void CtfRefiner::fitDefocusOneMicrograph(long g, const std::vector<Image<Complex
             CTF ctf0;
             ctf0.read(mdts[g], mdts[g], p);
 
-            if (ctfTilt)
-            {
-                ctf0.tilt_x = beamtilt_x;
-                ctf0.tilt_y = beamtilt_y;
-                ctf0.initialise();
-            }
-
             std::vector<d2Vector> cost = DefocusRefinement::diagnoseDefocus(
                 preds[p], obsF[p], freqWeight,
                 ctf0, angpix, defocusRange, 100, nr_omp_threads);
@@ -394,13 +377,6 @@ void CtfRefiner::fitDefocusOneMicrograph(long g, const std::vector<Image<Complex
 
             CTF ctf0;
             ctf0.read(mdts[g], mdts[g], p);
-
-            if (ctfTilt)
-            {
-                ctf0.tilt_x = beamtilt_x;
-                ctf0.tilt_y = beamtilt_y;
-                ctf0.initialise();
-            }
 
             CTF ctf(ctf0);
 
