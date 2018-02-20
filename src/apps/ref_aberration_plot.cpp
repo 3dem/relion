@@ -76,11 +76,8 @@ int AberrationPlot::_run()
     std::vector<ParFourierTransformer> fts(nr_omp_threads);
 
     std::vector<Image<double>>
-            Axx(nr_omp_threads, Image<double>(sh,s)),
-            Axy(nr_omp_threads, Image<double>(sh,s)),
-            Ayy(nr_omp_threads, Image<double>(sh,s)),
-            bx(nr_omp_threads, Image<double>(sh,s)),
-            by(nr_omp_threads, Image<double>(sh,s));
+            A(nr_omp_threads, Image<double>(sh,s)),
+            b(nr_omp_threads, Image<double>(sh,s));
 
     const double as = (double)s * angpix;
 
@@ -108,7 +105,7 @@ int AberrationPlot::_run()
 
             CTF ctf0;
             ctf0.read(mdts[g], mdts[g], p);
-            ctf0.Cs = 0.0;
+            //ctf0.Cs = 0.0;
             ctf0.initialise();
 
             for (int y = 0; y < s;  y++)
@@ -123,15 +120,11 @@ int AberrationPlot::_run()
                 Complex zobs = obsF[p](y,x);
                 Complex zprd = pred[p](y,x);
 
-                double zz = zobs.real*zprd.imag + zobs.imag*zprd.real;
+                double zz = zobs.real*zprd.real + zobs.imag*zprd.imag;
                 double nr = zprd.norm();
 
-                Axx[t](y,x) += nr*cg*cg;
-                Axy[t](y,x) += nr*cg*sg;
-                Ayy[t](y,x) += nr*sg*sg;
-
-                bx[t](y,x) += zz*cg;
-                by[t](y,x) += zz*sg;
+                A[t](y,x) += nr*cg*cg;
+                b[t](y,x) += cg*(sg*nr+zz);
             }
         }
     }
@@ -141,42 +134,23 @@ int AberrationPlot::_run()
         for (int y = 0; y < s;  y++)
         for (int x = 0; x < sh; x++)
         {
-            Axx[0](y,x) += Axx[t](y,x);
-            Axy[0](y,x) += Axy[t](y,x);
-            Ayy[0](y,x) += Ayy[t](y,x);
-
-            bx[0](y,x) += bx[t](y,x);
-            by[0](y,x) += by[t](y,x);
+            A[0](y,x) += A[t](y,x);
+            b[0](y,x) += b[t](y,x);
         }
     }
 
-    Image<RFLOAT> xx(sh,s), xy(sh,s);
+    Image<RFLOAT> dgamma(sh,s);
 
     for (int y = 0; y < s;  y++)
     for (int x = 0; x < sh; x++)
     {
-        d2Matrix A(
-            Axx[0](y,x), Axy[0](y,x),
-            Axy[0](y,x), Ayy[0](y,x));
-
-        d2Vector b(bx[0](y,x), by[0](y,x));
-
-        double det = A(0,0)*A(1,1) - A(1,0)*A(0,1);
-
-        if (det != 0.0)
+        if (A[0](y,x) != 0.0)
         {
-            d2Matrix Ai = A;
-            Ai.invert();
-
-            d2Vector opt = Ai*b;
-
-            xx(y,x) = opt.x;
-            xy(y,x) = opt.y;
+            dgamma(y,x) = b[0](y,x)/A[0](y,x);
         }
     }
 
-    VtkHelper::writeVTK(xx, outPath+"_sin.vtk");
-    VtkHelper::writeVTK(xy, outPath+"_cos.vtk");
+    VtkHelper::writeVTK(dgamma, outPath+"_dgamma.vtk");
 
     return 0;
 }
