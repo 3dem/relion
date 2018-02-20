@@ -211,8 +211,8 @@ int AberrationPlot::_run()
                     Axy[t](y,x) += nr*cg*sg;
                     Ayy[t](y,x) += nr*cg*cg;
 
-                    bx[t](y,x) += zz*sg;
-                    by[t](y,x) += zz*cg;
+                    bx[t](y,x) -= zz*sg;
+                    by[t](y,x) -= zz*cg;
                 }
             }
         }
@@ -261,6 +261,10 @@ int AberrationPlot::_run()
         VtkHelper::writeVTK(xx, outPath+"_cos.vtk");
         VtkHelper::writeVTK(xy, outPath+"_sin.vtk");
         VtkHelper::writeVTK(phase, outPath+"_phase.vtk");
+
+        xx.write(outPath+"_cos.mrc");
+        xy.write(outPath+"_sin.mrc");
+        phase.write(outPath+"_phase.mrc");
     }
 
     return 0;
