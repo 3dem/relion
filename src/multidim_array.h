@@ -1085,9 +1085,14 @@ public:
     {
         if (Ndim*Zdim*Ydim*Xdim == nzyxdimAlloc && data != NULL)
         {
-            if (Ndim != this -> ndim || Zdim != this -> zdim ||
-                Ydim != this -> ydim || Xdim != this -> xdim)
-                REPORT_ERROR("Unmatched resize. Maybe bug in window function?");
+            ndim = Ndim;
+            xdim = Xdim;
+            ydim = Ydim;
+            zdim = Zdim;
+            yxdim = Ydim * Xdim;
+            zyxdim = Zdim * yxdim;
+            nzyxdim = Ndim * zyxdim;
+            nzyxdimAlloc = nzyxdim;
             return;
         }
 
