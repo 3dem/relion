@@ -1535,7 +1535,7 @@ void MotioncorrRunner::doseWeighting(std::vector<MultidimArray<Complex> > &Ffram
 
 			for (int iframe = 0; iframe < n_frames; iframe++) {
 				const RFLOAT weight = std::exp(- doses[iframe] / Ne); // Eq. 5. 0.5 is factored out to Ne.
-				if (isnan(weight)) {
+				if (std::isnan(weight)) {
 					std::cout << "dose = " <<  doses[iframe] << " Ne = " << Ne << " frm = " << iframe << " lx = " << x << " ly = " << ly << " reso = " << 1 / dinv << " weight = " << weight << std::endl;
 				}
 				sum_weight_sq += weight * weight;
@@ -1543,7 +1543,7 @@ void MotioncorrRunner::doseWeighting(std::vector<MultidimArray<Complex> > &Ffram
 			}
 
 			sum_weight_sq = std::sqrt(sum_weight_sq);
-			if (isnan(sum_weight_sq)) {
+			if (std::isnan(sum_weight_sq)) {
 				std::cout << " Ne = " << Ne << " lx = " << x << " ly = " << ly << " reso = " << 1 / dinv << " sum_weight_sq NaN" << std::endl;
 				REPORT_ERROR("Shouldn't happen.");
 			}
