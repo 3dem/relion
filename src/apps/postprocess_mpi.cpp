@@ -23,7 +23,9 @@
 int main(int argc, char *argv[])
 {
 	Postprocessing prm;
-
+	
+    	PRINT_VERISON_INFO();
+    	
 	try
     {
 		int rank, size;

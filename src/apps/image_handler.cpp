@@ -757,10 +757,11 @@ class image_handler_parameters
 int main(int argc, char *argv[])
 {
 	image_handler_parameters prm;
+	
+ 	PRINT_VERISON_INFO();
 
 	try
     {
-
 		prm.read(argc, argv);
 
 		prm.run();
