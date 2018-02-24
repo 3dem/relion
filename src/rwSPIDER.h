@@ -157,10 +157,7 @@ int  readSPIDER(long int img_select)
     MDMainHeader.setValue(EMDL_IMAGE_STATS_MAX,(RFLOAT)header->fmax);
     MDMainHeader.setValue(EMDL_IMAGE_STATS_AVG,(RFLOAT)header->av);
     MDMainHeader.setValue(EMDL_IMAGE_STATS_STDDEV,(RFLOAT)header->sig);
-    MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X,(RFLOAT)header->scale);
-    MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y,(RFLOAT)header->scale);
-    MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z,(RFLOAT)header->scale);
-    MDMainHeader.setValue(EMDL_IMAGE_DATATYPE,(int)datatype);
+    setSamplingRateInHeader((RFLOAT)header->scale);
 
     bool isStack = ( header->istack > 0 );
     long int _xDim,_yDim,_zDim;

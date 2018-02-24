@@ -20,17 +20,16 @@
 #include "src/metadata_container.h"
 
 MetaDataContainer::MetaDataContainer()
-    :   RFLOATs(0), ints(0), longs(0), bools(0), strings(0)
+    :   doubles(0), ints(0), bools(0), strings(0)
 {}
 
 
 MetaDataContainer::MetaDataContainer(
-        MetaDataTable *table, long RFLOATCount, long intCount,
-        long longCount, long boolCount, long stringCount)
+        MetaDataTable *table, long doubleCount, long intCount,
+        long boolCount, long stringCount)
 : table(table),
-  RFLOATs(RFLOATCount, 0),
+  doubles(doubleCount, 0),
   ints(intCount, 0),
-  longs(longCount, 0),
   bools(boolCount, false),
   strings(stringCount, "")
 {}
@@ -38,26 +37,30 @@ MetaDataContainer::MetaDataContainer(
 MetaDataContainer::MetaDataContainer(
         MetaDataTable *table, MetaDataContainer* mdc)
 : table(table),
-  RFLOATs(mdc->RFLOATs),
+  doubles(mdc->doubles),
   ints(mdc->ints),
-  longs(mdc->longs),
   bools(mdc->bools),
   strings(mdc->strings)
 {}
 
-void MetaDataContainer::getValue(long offset, RFLOAT& dest) const
+void MetaDataContainer::getValue(long offset, double& dest) const
 {
-    dest = RFLOATs[offset];
+    dest = doubles[offset];
+}
+
+void MetaDataContainer::getValue(long offset, float& dest) const
+{
+    dest = (float)doubles[offset];
 }
 
 void MetaDataContainer::getValue(long offset, int& dest) const
 {
-    dest = ints[offset];
+    dest = (int)ints[offset];
 }
 
 void MetaDataContainer::getValue(long offset, long& dest) const
 {
-    dest = longs[offset];
+    dest = ints[offset];
 }
 
 void MetaDataContainer::getValue(long offset, bool& dest) const
@@ -73,7 +76,12 @@ void MetaDataContainer::getValue(long offset, std::string& dest) const
 
 void MetaDataContainer::setValue(long offset, const double& src)
 {
-    RFLOATs[offset] = src;
+    doubles[offset] = src;
+}
+
+void MetaDataContainer::setValue(long offset, const float& src)
+{
+    doubles[offset] = src;
 }
 
 void MetaDataContainer::setValue(long offset, const int& src)
@@ -83,7 +91,7 @@ void MetaDataContainer::setValue(long offset, const int& src)
 
 void MetaDataContainer::setValue(long offset, const long& src)
 {
-    longs[offset] = src;
+    ints[offset] = src;
 }
 
 void MetaDataContainer::setValue(long offset, const bool& src)

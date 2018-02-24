@@ -35,17 +35,27 @@ int main(int argc, char *argv[])
 	{
 		// Fill the window, but don't show it!
 		FileName fn_pipe = getParameter(argc, argv, "--pipeline", "default");
-		FileName fn_sched = getParameter(argc, argv, "--schedule");
+		FileName fn_sched = getParameter(argc, argv, "--schedule", "");
 		int nr_repeat = textToInteger(getParameter(argc, argv, "--repeat", "1"));
 		long int minutes_wait =  textToInteger(getParameter(argc, argv, "--min_wait", "10"));
-		FileName fn_jobids  = getParameter(argc, argv, "--jobids", "");
-
+		FileName fn_jobids  = getParameter(argc, argv, "--RunJobs", "");
+		std::string add_type = getParameter(argc, argv, "--addJob", "");
+		FileName fn_options = getParameter(argc, argv, "--addJobOptions", "");
+		int verb = textToInteger(getParameter(argc, argv, "--verb", "1"));
 
 		PipeLine pipeline;
 		pipeline.name = fn_pipe;
 		pipeline.read(DO_LOCK);
 		pipeline.write(DO_LOCK);
-		pipeline.runScheduledJobs(fn_sched, fn_jobids, nr_repeat, minutes_wait);
+		if (add_type != "")
+		{
+			pipeline.addScheduledJob(add_type, fn_options);
+
+		}
+		else if (nr_repeat > 0)
+		{
+			pipeline.runScheduledJobs(fn_sched, fn_jobids, nr_repeat, minutes_wait);
+		}
 
 	}
 

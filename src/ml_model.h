@@ -386,7 +386,7 @@ public:
 	void read(FileName fn_in);
 
 	// Write a model to disc
-	void write(FileName fn_out, HealpixSampling &sampling, bool do_write_bild = true);
+	void write(FileName fn_out, HealpixSampling &sampling, bool do_write_bild = true, bool do_only_write_images = false);
 
 	//Read a tau-spectrum from a STAR file
 	void readTauSpectrum(FileName fn_tau, int verb);

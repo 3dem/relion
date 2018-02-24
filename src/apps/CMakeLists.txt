@@ -111,6 +111,10 @@ if (CUDA_FOUND)
     
 endif(CUDA_FOUND)
 
+if(TIFF_FOUND)
+    include_directories(${TIFF_INCLUDE_DIRS})
+endif()
+
 foreach (_target ${RELION_TARGETS})
 	GET_FILENAME_COMPONENT(_target "relion_${_target}" NAME_WE)  #specify target name WE=WithoutExtension
 	
@@ -120,6 +124,10 @@ foreach (_target ${RELION_TARGETS})
  	add_dependencies(${_target} relion_lib)
 	
 	set_target_properties(${_target} PROPERTIES PREFIX "relion_")
+
+	if(TIFF_FOUND)
+		target_link_libraries(${_target} ${TIFF_LIBRARIES})
+	endif()
 
 	if(NOT MKLFFT)
 	    target_link_libraries(${_target} ${LIB} ${EXTRA_LIBS} ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
@@ -160,5 +168,11 @@ if(GUI)
     )
 endif(GUI)
 
-
+FIND_PACKAGE( OpenMP REQUIRED)
+if(OPENMP_FOUND)
+message("OPENMP FOUND")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+endif()
 

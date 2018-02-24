@@ -513,6 +513,9 @@ public:
 	// Keep helical tilt priors fixed (at 90 degrees) in global angular searches?
 	bool helical_keep_tilt_prior_fixed;
 
+	// Apply directional filter (with this many Angstroms in X) to the references, this can sometimes help in 2D classification of amyloids
+	//RFLOAT directional_lowpass;
+
 	///////// Hidden stuff, does not work with read/write: only via command-line ////////////////
 
 	// Skip gridding in reconstruction
@@ -540,6 +543,9 @@ public:
 	// This will increase SNR but introduce correlations that are not modelled...
 	// Until now the best refinements have used the noisy mask, not the soft mask....
 	bool do_zero_mask;
+
+	// Prepare for automated 2D class average selection: nice to have access to unmasked reference
+	bool do_write_unmasked_refs;
 
 	/////////// Keep track of hidden variable changes ////////////////////////
 
@@ -635,6 +641,7 @@ public:
 
 	MlOptimiser():
 		do_zero_mask(0),
+		do_write_unmasked_refs(0),
 		do_generate_seeds(0),
 		sum_changes_count(0),
 		coarse_size(0),
@@ -735,6 +742,7 @@ public:
 		do_helical_symmetry_local_refinement(0),
 		helical_sigma_distance(0),
 		helical_keep_tilt_prior_fixed(0),
+		//directional_lowpass(0),
 		asymmetric_padding(false),
 		maximum_significants(0),
 		threadException(NULL),

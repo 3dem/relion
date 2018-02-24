@@ -53,6 +53,12 @@
 #include "src/complex.h"
 #include "src/CPlot2D.h"
 
+//#define TIMING_FFTW
+#ifdef TIMING_FFTW
+	#include "src/time.h"
+	extern Timer timer_fftw;
+#endif
+
 #ifdef FAST_CENTERFFT   // defined if ALTCPU=on *AND* Intel Compiler used
 #include "src/acc/cpu/cuda_stubs.h"
 #include "src/acc/settings.h"
@@ -1000,6 +1006,12 @@ void applyBFactorToMap(MultidimArray<Complex > &FT, int ori_size, RFLOAT bfactor
 // Apply a B-factor to a map (given it's real-space array)
 void applyBFactorToMap(MultidimArray<RFLOAT > &img, RFLOAT bfactor, RFLOAT angpix);
 
+// Apply a Laplacian-of-Gaussian filter to a map (given it's Fourier transform)
+void LoGFilterMap(MultidimArray<Complex > &FT, int ori_size, RFLOAT sigma, RFLOAT angpix);
+
+// Apply a Laplacian-of-Gaussian filter to a map (given it's real-space array)
+void LoGFilterMap(MultidimArray<RFLOAT > &img, RFLOAT sigma, RFLOAT angpix);
+
 // Low-pass filter a map (given it's Fourier transform)
 void lowPassFilterMap(MultidimArray<Complex > &FT, int ori_size,
 		RFLOAT low_pass, RFLOAT angpix, int filter_edge_width = 2, bool do_highpass_instead = false);
@@ -1007,6 +1019,12 @@ void lowPassFilterMap(MultidimArray<Complex > &FT, int ori_size,
 // Low-pass and high-pass filter a map (given it's real-space array)
 void lowPassFilterMap(MultidimArray<RFLOAT > &img, RFLOAT low_pass, RFLOAT angpix, int filter_edge_width = 2);
 void highPassFilterMap(MultidimArray<RFLOAT > &img, RFLOAT low_pass, RFLOAT angpix, int filter_edge_width = 2);
+
+// Directional filter a map (given it's Fourier transform)
+void directionalFilterMap(MultidimArray<Complex > &FT, int ori_size,
+		RFLOAT low_pass, RFLOAT angpix, std::string axis = "x", int filter_edge_width = 2);
+void directionalFilterMap(MultidimArray<RFLOAT > &img, RFLOAT low_pass, RFLOAT angpix, std::string axis = "x", int filter_edge_width = 2);
+
 
 /*
  *  Beamtilt x and y are given in mradians

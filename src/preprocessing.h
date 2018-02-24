@@ -97,6 +97,9 @@ public:
 	// Re-center particles according to rlnOriginX/Y in fn_data STAR file?
 	bool do_recenter;
 
+	// Coordinates (in pixel in the reference) to re-center re-extracted particles on
+	RFLOAT recenter_x, recenter_y, recenter_z;
+
 	// MetadataTable with all refined particle coordinates (given through fn_data)
 	//MetaDataTable MDdata;
 

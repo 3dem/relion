@@ -57,6 +57,9 @@ public:
 	// Perform automated masking (based on a density threshold)
 	bool do_auto_mask;
 
+	// Write half maps as well
+	bool write_halfmaps;
+
 	// Density threshold below which to calculate initial mask seed
 	RFLOAT ini_mask_density_threshold;
 
@@ -151,7 +154,8 @@ public:
 	void getAutoMask();
 
 	// Divide by MTF and perform FSC-weighted B-factor sharpening, as in Rosenthal and Henderson, 2003
-	void sharpenMap();
+	// Returns the applied filter resolution
+	RFLOAT sharpenMap();
 
 	// Map nay 3D FFTW pixel onto the surface of a sphere with radius myradius_count
 	bool findSurfacePixel(int idx, int kp, int ip, int jp,
@@ -173,6 +177,9 @@ public:
 
 	// Apply sqrt(2FSC/(FSC=1)) weighting prior to B-factor sharpening
 	void applyFscWeighting(MultidimArray<Complex > &FT, MultidimArray<RFLOAT> my_fsc);
+
+	// Output map and masked map
+	void writeMaps(FileName fn_root);
 
 	// Output map and STAR files with metadata, also write final resolution to screen
 	void writeOutput();
