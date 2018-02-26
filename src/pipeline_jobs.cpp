@@ -683,7 +683,8 @@ void RelionJob::initialise(int _job_type)
 	}
 	else if (type == PROC_MASKCREATE)
 	{
-		has_mpi = has_thread = false;
+		has_mpi = false;
+		has_thread = true;
 		initialiseMaskcreateJob();
 	}
 	else if (type == PROC_JOINSTAR)
@@ -4065,6 +4066,9 @@ bool RelionJob::getCommandsMaskcreateJob(std::string &outputname, std::vector<st
 	{
 		command += " --helix --z_percentage " + floatToString(joboptions["helical_z_percentage"].getNumber() / 100.);
 	}
+
+	// Running stuff
+	command += " --j " + joboptions["nr_threads"].getString();
 
 	// Other arguments
 	command += " " + joboptions["other_args"].getString();
