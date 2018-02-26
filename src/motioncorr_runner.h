@@ -109,9 +109,6 @@ public:
 	// Pixel size for UNBLUR
 	double angpix;
 
-	// Number of threads for unblur
-	int nr_threads;
-
 	// Continue an old run: only estimate CTF if logfile WITH Final Values line does not yet exist, otherwise skip the micrograph
 	bool continue_old;
 
@@ -173,13 +170,13 @@ private:
 	// shiftx, shifty is relative to the (real space) image size
 	void shiftNonSquareImageInFourierTransform(MultidimArray<Complex> &frame, RFLOAT shiftx, RFLOAT shifty);
 
-	bool alignPatch(std::vector<MultidimArray<Complex> > &Fframes, const int pnx, const int pny, std::vector<float> &xshifts, std::vector<float> &yshifts);
+	bool alignPatch(std::vector<MultidimArray<Complex> > &Fframes, const int pnx, const int pny, std::vector<float> &xshifts, std::vector<float> &yshifts, std::ostream &logfile);
 
 	void binNonSquareImage(Image<RFLOAT> &Iwork, RFLOAT bin_factor);
 
 	void doseWeighting(std::vector<MultidimArray<Complex> > &Fframes, std::vector<RFLOAT> doses);
 
-	void realSpaceInterpolation(Image <RFLOAT> &Iref, std::vector<Image<RFLOAT> > &Iframes, Matrix1D<RFLOAT> &coeffX, Matrix1D<RFLOAT> &coeffY, MotionModel &model);
+	void realSpaceInterpolation(Image <RFLOAT> &Iref, std::vector<Image<RFLOAT> > &Iframes, Matrix1D<RFLOAT> &coeffX, Matrix1D<RFLOAT> &coeffY, MotionModel &model, std::ostream &logfile);
 };
 
 
