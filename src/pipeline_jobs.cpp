@@ -4067,6 +4067,9 @@ bool RelionJob::getCommandsMaskcreateJob(std::string &outputname, std::vector<st
 		command += " --helix --z_percentage " + floatToString(joboptions["helical_z_percentage"].getNumber() / 100.);
 	}
 
+	// Running stuff
+	command += " --j " + joboptions["nr_threads"].getString();
+
 	// Other arguments
 	command += " " + joboptions["other_args"].getString();
 
