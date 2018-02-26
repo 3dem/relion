@@ -683,7 +683,8 @@ void RelionJob::initialise(int _job_type)
 	}
 	else if (type == PROC_MASKCREATE)
 	{
-		has_mpi = has_thread = false;
+		has_mpi = false;
+		has_thread = true;
 		initialiseMaskcreateJob();
 	}
 	else if (type == PROC_JOINSTAR)
