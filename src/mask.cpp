@@ -17,6 +17,7 @@
  * source code. Additional authorship citations may be added, but existing
  * author citations must be preserved.
  ***************************************************************************/
+#include <omp.h>
 #include "src/mask.h"
 
 // Mask out corners outside sphere (replace by average value)
@@ -265,7 +266,7 @@ void softMaskOutsideMap(MultidimArray<RFLOAT> &vol, MultidimArray<RFLOAT> &msk, 
 }
 
 void autoMask(MultidimArray<RFLOAT> &img_in, MultidimArray<RFLOAT> &msk_out,
-		RFLOAT ini_mask_density_threshold, RFLOAT extend_ini_mask, RFLOAT width_soft_mask_edge, bool verb)
+		RFLOAT ini_mask_density_threshold, RFLOAT extend_ini_mask, RFLOAT width_soft_mask_edge, bool verb, int n_threads)
 
 {
 	MultidimArray<RFLOAT> msk_cp;
@@ -294,8 +295,8 @@ void autoMask(MultidimArray<RFLOAT> &img_in, MultidimArray<RFLOAT> &msk_out,
 				std::cout << "== Extending initial binary mask ..." << std::endl;
 			else
 				std::cout << "== Shrinking initial binary mask ..." << std::endl;
-			init_progress_bar(MULTIDIM_SIZE(img_in));
-			barstep = MULTIDIM_SIZE(img_in)/120;
+			init_progress_bar(MULTIDIM_SIZE(img_in) / n_threads);
+			barstep = MULTIDIM_SIZE(img_in) / 120 / n_threads;
 			update_bar = 0;
 			totalbar =0;
 		}
@@ -305,6 +306,7 @@ void autoMask(MultidimArray<RFLOAT> &img_in, MultidimArray<RFLOAT> &msk_out,
 		msk_cp = msk_out;
 		if (extend_ini_mask > 0.)
 		{
+			#pragma omp parallel for num_threads(n_threads)
 			FOR_ALL_ELEMENTS_IN_ARRAY3D(msk_cp)
 			{
 				// only extend zero values to 1.
@@ -340,7 +342,7 @@ void autoMask(MultidimArray<RFLOAT> &img_in, MultidimArray<RFLOAT> &msk_out,
 						if (already_done) break;
 					}
 				}
-				if (verb)
+				if (verb && omp_get_thread_num() == 0)
 				{
 					if (update_bar > barstep)
 					{
@@ -354,6 +356,7 @@ void autoMask(MultidimArray<RFLOAT> &img_in, MultidimArray<RFLOAT> &msk_out,
 		}
 		else
 		{
+			#pragma omp parallel for num_threads(n_threads)
 			FOR_ALL_ELEMENTS_IN_ARRAY3D(msk_cp)
 			{
 				// only extend one values to zero.
@@ -389,7 +392,7 @@ void autoMask(MultidimArray<RFLOAT> &img_in, MultidimArray<RFLOAT> &msk_out,
 						if (already_done) break;
 					}
 				}
-				if (verb)
+				if (verb && omp_get_thread_num() == 0)
 				{
 					if (update_bar > barstep)
 					{
@@ -402,7 +405,7 @@ void autoMask(MultidimArray<RFLOAT> &img_in, MultidimArray<RFLOAT> &msk_out,
 			}
 		}
 		if (verb)
-			progress_bar(MULTIDIM_SIZE(msk_out));
+			progress_bar(MULTIDIM_SIZE(msk_out) / n_threads);
 	}
 
 	if (width_soft_mask_edge > 0.)
@@ -410,8 +413,8 @@ void autoMask(MultidimArray<RFLOAT> &img_in, MultidimArray<RFLOAT> &msk_out,
 		if (verb)
 		{
 			std::cout << "== Making a soft edge on the extended mask ..." << std::endl;
-			init_progress_bar(MULTIDIM_SIZE(msk_out));
-			barstep = MULTIDIM_SIZE(msk_out)/120;
+			init_progress_bar(MULTIDIM_SIZE(msk_out) / n_threads);
+			barstep = MULTIDIM_SIZE(msk_out) / 120 / n_threads;
 			update_bar = 0;
 			totalbar =0;
 		}
@@ -421,6 +424,7 @@ void autoMask(MultidimArray<RFLOAT> &img_in, MultidimArray<RFLOAT> &msk_out,
 		msk_cp = msk_out;
 		int extend_size = CEIL(width_soft_mask_edge);
 		RFLOAT width_soft_mask_edge2 = width_soft_mask_edge * width_soft_mask_edge;
+		#pragma omp parallel for
 		FOR_ALL_ELEMENTS_IN_ARRAY3D(msk_cp)
 		{
 			// only extend zero values to values between 0 and 1.
@@ -454,7 +458,7 @@ void autoMask(MultidimArray<RFLOAT> &img_in, MultidimArray<RFLOAT> &msk_out,
 					A3D_ELEM(msk_out, k, i, j) = 0.5 + 0.5 * cos( PI * sqrt(min_r2) / width_soft_mask_edge);
 				}
 			}
-			if (verb)
+			if (verb && omp_get_thread_num() == 0)
 			{
 				if (update_bar > barstep)
 				{
@@ -466,7 +470,7 @@ void autoMask(MultidimArray<RFLOAT> &img_in, MultidimArray<RFLOAT> &msk_out,
 			}
 		}
 		if (verb)
-			progress_bar(MULTIDIM_SIZE(msk_cp));
+			progress_bar(MULTIDIM_SIZE(msk_cp) / n_threads);
 	}
 
 }

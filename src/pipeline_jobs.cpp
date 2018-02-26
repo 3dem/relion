@@ -39,41 +39,52 @@ std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, 
 	}
 
 	// Data and model.star files
-	int node_type = (do_movies) ? NODE_MOVIE_DATA : NODE_PART_DATA;
-	Node node1(fn_out + "_data.star", node_type);
-	result.push_back(node1);
-
-	if (!do_movies || do_also_rot)
+	if (nr_bodies > 1)
 	{
-		if (iter > 0)
+		FileName fn_tmp;
+		for (int ibody = 0; ibody < nr_bodies; ibody++)
 		{
-			Node node2(fn_out + "_model.star", NODE_MODEL);
-			result.push_back(node2);
-		}
-
-		// For 3D classification or 3D auto-refine, also use individual 3D maps as outputNodes
-		if (dim == 3)
-		{
-			FileName fn_tmp;
-			for (int iclass = 0; iclass < K; iclass++)
-			{
-				if (nr_bodies > 1)
-					fn_tmp.compose(fn_out+"_body", iclass+1, "mrc", 3);
-				else
-					fn_tmp.compose(fn_out+"_class", iclass+1, "mrc", 3);
-
-				Node node3(fn_tmp, NODE_3DREF);
-				result.push_back(node3);
-			}
-		}
-
-		// For auto-refine: also output the half1_class001_unfil.mrc map
-		if (iter < 0)
-		{
-			Node node4(fn_out+"_half1_class001_unfil.mrc", NODE_HALFMAP);
+			fn_tmp.compose(fn_out+"_half1_body", ibody+1, "", 3);
+			fn_tmp += "_unfil.mrc";
+			Node node4(fn_tmp, NODE_HALFMAP);
 			result.push_back(node4);
 		}
 	}
+	else // normal refinements/classifications
+	{
+		int node_type = (do_movies) ? NODE_MOVIE_DATA : NODE_PART_DATA;
+		Node node1(fn_out + "_data.star", node_type);
+		result.push_back(node1);
+
+		if (!do_movies || do_also_rot)
+		{
+			if (iter > 0)
+			{
+				// For classifications: output node model.star to make selections
+				Node node2(fn_out + "_model.star", NODE_MODEL);
+				result.push_back(node2);
+			}
+			else
+			{
+				// For auto-refine: also output the run_half1_class001_unfil.mrc map
+				Node node4(fn_out+"_half1_class001_unfil.mrc", NODE_HALFMAP);
+				result.push_back(node4);
+			}
+
+			// For 3D classification or 3D auto-refine, also use individual 3D maps as outputNodes
+			if (dim == 3)
+			{
+				FileName fn_tmp;
+				for (int iclass = 0; iclass < K; iclass++)
+				{
+					fn_tmp.compose(fn_out+"_class", iclass+1, "mrc", 3);
+					Node node3(fn_tmp, NODE_3DREF);
+					result.push_back(node3);
+				}
+			}
+		}
+	}
+
 	return result;
 
 }
@@ -1523,7 +1534,7 @@ void RelionJob::initialiseAutopickJob()
 	joboptions["gpu_ids"] = JobOption("Which GPUs to use:", std::string(""), "This argument is not necessary. If left empty, the job itself will try to allocate available GPU resources. You can override the default allocation by providing a list of which GPUs (0,1,2,3, etc) to use. MPI-processes are separated by ':'. For example: 0:1:0:1:0:1");
 
 	joboptions["do_pick_helical_segments"] = JobOption("Pick 2D helical segments?", false, "Set to Yes if you want to pick 2D helical segments.");
-//	joboptions["do_amyloid"] = JobOption("Pick amyloid segments?", false, "Set to Yes if you want to use the algorithm that was developed specifically for picking amyloids.");
+	joboptions["do_amyloid"] = JobOption("Pick amyloid segments?", false, "Set to Yes if you want to use the algorithm that was developed specifically for picking amyloids.");
 
 	joboptions["helical_tube_outer_diameter"] = JobOption("Tube diameter (A): ", 200, 100, 1000, 10, "Outer diameter (in Angstroms) of helical tubes. \
 This value should be slightly larger than the actual width of the tubes.");
@@ -1624,8 +1635,8 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 		if (joboptions["do_pick_helical_segments"].getBoolean())
 		{
 			command += " --helix";
-//			if (joboptions["do_amyloid"].getBoolean())
-//				command += " --amyloid";
+			if (joboptions["do_amyloid"].getBoolean())
+				command += " --amyloid";
 			command += " --helical_tube_outer_diameter " + joboptions["helical_tube_outer_diameter"].getString();
 			command += " --helical_tube_kappa_max " + joboptions["helical_tube_kappa_max"].getString();
 			command += " --helical_tube_length_min " + joboptions["helical_tube_length_min"].getString();
@@ -3417,6 +3428,7 @@ Where each data line represents a different body, and: \n \
  - rlnBodyRotateRelativeTo defines relative to which other body this body rotates (first body is number 1); \n\
  - rlnBodySigmaAngles and _rlnBodySigmaOffset are the standard deviations (widths) of Gaussian priors on the consensus rotations and translations; \n\
 \n \
+Optionally, there can be a fifth column with _rlnBodyReferenceName. Entries can be 'None' (without the ''s) or the name of a MRC map with an initial reference for that body. In case the entry is None, the reference will be taken from the density in the consensus refinement.\n \n\
 Also note that larger bodies should be above smaller bodies in the STAR file. For more information, see the multi-body paper.");
 
 	joboptions["do_subtracted_bodies"] = JobOption("Reconstruct subtracted bodies?", true, "If set to Yes, then the reconstruction of each of the bodies will use the subtracted images. This may give \
@@ -3434,6 +3446,14 @@ Note that this will only be the value for the first few iteration(s): the sampli
 Translational sampling is also done using the adaptive approach. \
 Therefore, if adaptive=1, the translations will first be evaluated on a 2x coarser grid.\n\n \
 Note that this will only be the value for the first few iteration(s): the sampling rate will be increased automatically after that.");
+
+
+	joboptions["do_analyse"] = JobOption("Run flexibility analysis?", true, "If set to Yes, after the multi-body refinement has completed, a PCA analysis will be run on the orientations all all bodies in the data set. This can be set to No initially, and then the job can be continued afterwards to only perform this analysis.");
+	joboptions["nr_movies"] = JobOption("Number of eigenvector movies:", 3, 0, 16, 1, "Series of ten output maps will be generated along this many eigenvectors. These maps can be opened as a 'Volume Series' in UCSF Chimera, and then displayed as a movie. They represent the principal motions in the particles.");
+	joboptions["do_select"] = JobOption("Select particles based on eigenvalues?", false, "If set to Yes, a particles.star file is written out with all particles that have the below indicated eigenvalue in the selected range.");
+	joboptions["select_eigenval"] = JobOption("Select on eigenvalue:", 1, 1, 20, 1, "This is the number of the eigenvalue to be used in the particle subset selection (start counting at 1).");
+	joboptions["eigenval_min"] = JobOption("Minimum eigenvalue:", -999., -50, 50, 1, "This is the minimum value for the selected eigenvalue; only particles with the selected eigenvalue larger than this value will be included in the output particles.star file");
+	joboptions["eigenval_max"] = JobOption("Maximum eigenvalue:", 999., -50, 50, 1, "This is the maximum value for the selected eigenvalue; only particles with the selected eigenvalue less than this value will be included in the output particles.star file");
 
 	joboptions["do_parallel_discio"] = JobOption("Use parallel disc I/O?", true, "If set to Yes, all MPI slaves will read their own images from disc. \
 Otherwise, only the master will read images and send them through the network to the slaves. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many slaves reading in parallel.");
@@ -3463,94 +3483,180 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 	initialisePipeline(outputname, PROC_MULTIBODY_NAME, job_counter);
 	std::string command;
 
-	if (joboptions["nr_mpi"].getNumber() > 1)
-		command="`which relion_refine_mpi`";
-	else
-		command="`which relion_refine`";
-
-    MetaDataTable MD;
-    MD.read(joboptions["fn_bodies"].getString());
-    int nr_bodies = MD.numberOfObjects();
-
-	FileName fn_run = "run";
-	if (is_continue)
-    {
-		if (joboptions["fn_cont"].getString() == "")
-		{
-			error_message = "ERROR: empty field for continuation STAR file...";
-			return false;
-		}
-		int pos_it = joboptions["fn_cont"].getString().rfind("_it");
-		int pos_op = joboptions["fn_cont"].getString().rfind("_optimiser");
-		if (pos_it < 0 || pos_op < 0)
-			std::cerr << "Warning: invalid optimiser.star filename provided for continuation run: " << joboptions["fn_cont"].getString() << std::endl;
-		int it = (int)textToFloat((joboptions["fn_cont"].getString().substr(pos_it+3, 6)).c_str());
-		FileName fn_run = "run_ct" + floatToString(it);
-		command += " --continue " + joboptions["fn_cont"].getString();
-	    command += " --o " + outputname + fn_run;
-		outputNodes = getOutputNodesRefine(outputname + fn_run, -1, 1, 3, nr_bodies, false, false); // false false means dont do movies
-
-    }
-	else
+	if (is_continue && joboptions["fn_cont"].getString() == "" && !joboptions["do_analyse"].getBoolean())
 	{
-		command += " --continue " + joboptions["fn_in"].getString();
-	    command += " --o " + outputname + "run";
-		outputNodes = getOutputNodesRefine(outputname + "run", -1, 1, 3, nr_bodies, false, false); // false false means dont do movies
-		command += " --solvent_correct_fsc --multibody_masks " + joboptions["fn_bodies"].getString();
-
-		if (joboptions["do_subtracted_bodies"].getBoolean())
-			command += " --reconstruct_subtracted_bodies ";
-
-		// Sampling
-		int iover = 1;
-		command += " --oversampling " + floatToString((float)iover);
-		for (int i = 0; i < 10; i++)
-		{
-			if (strcmp((joboptions["sampling"].getString()).c_str(), job_sampling_options[i]) == 0)
-			{
-				// The sampling given in the GUI will be the oversampled one!
-				command += " --healpix_order " + floatToString((float)i + 1 - iover);
-				// Always perform local searches!
-				command += " --auto_local_healpix_order " + floatToString((float)i + 1 - iover);
-				break;
-			}
-		}
-
-		// Offset range
-		command += " --offset_range " + joboptions["offset_range"].getString();
-		// The sampling given in the GUI will be the oversampled one!
-		command += " --offset_step " + floatToString(joboptions["offset_step"].getNumber() * pow(2., iover));
-
-    }
-
-	// Always do compute stuff
-	if (!joboptions["do_combine_thru_disc"].getBoolean())
-		command += " --dont_combine_weights_via_disc";
-	if (!joboptions["do_parallel_discio"].getBoolean())
-		command += " --no_parallel_disc_io";
-	if (joboptions["do_preread_images"].getBoolean())
-		command += " --preread_images " ;
-	else if (joboptions["scratch_dir"].getString() != "")
-                command += " --scratch_dir " +  joboptions["scratch_dir"].getString();
-	command += " --pool " + joboptions["nr_pool"].getString();
-	if (joboptions["do_pad1"].getBoolean())
-		command += " --pad 1 ";
-	else
-		command += " --pad 2 ";
-
-	// Running stuff
-	command += " --j " + joboptions["nr_threads"].getString();
-
-	// GPU-stuff
-	if (joboptions["use_gpu"].getBoolean())
-	{
-		command += " --gpu \"" + joboptions["gpu_ids"].getString() + "\"";
+		error_message = "ERROR: either specify a optimiser file to continue multibody refinement from; OR run flexibility analysis...";
+		return false;
 	}
 
-	// Other arguments
-	command += " " + joboptions["other_args"].getString();
+	FileName fn_run = "";
+	if (!is_continue || (is_continue && joboptions["fn_cont"].getString() != ""))
+	{
 
-	commands.push_back(command);
+		if (joboptions["nr_mpi"].getNumber() > 1)
+			command="`which relion_refine_mpi`";
+		else
+			command="`which relion_refine`";
+
+		MetaDataTable MD;
+		MD.read(joboptions["fn_bodies"].getString());
+		int nr_bodies = MD.numberOfObjects();
+
+		if (is_continue)
+		{
+			int pos_it = joboptions["fn_cont"].getString().rfind("_it");
+			int pos_op = joboptions["fn_cont"].getString().rfind("_optimiser");
+			if (pos_it < 0 || pos_op < 0)
+				std::cerr << "Warning: invalid optimiser.star filename provided for continuation run: " << joboptions["fn_cont"].getString() << std::endl;
+			int it = (int)textToFloat((joboptions["fn_cont"].getString().substr(pos_it+3, 6)).c_str());
+			fn_run = "run_ct" + floatToString(it);
+			command += " --continue " + joboptions["fn_cont"].getString();
+			command += " --o " + outputname + fn_run;
+			outputNodes = getOutputNodesRefine(outputname + fn_run, -1, 1, 3, nr_bodies, false, false); // false false means dont do movies
+
+		}
+		else
+		{
+			fn_run = "run";
+			command += " --continue " + joboptions["fn_in"].getString();
+			command += " --o " + outputname + fn_run;
+			outputNodes = getOutputNodesRefine(outputname + "run", -1, 1, 3, nr_bodies, false, false); // false false means dont do movies
+			command += " --solvent_correct_fsc --multibody_masks " + joboptions["fn_bodies"].getString();
+
+			if (joboptions["do_subtracted_bodies"].getBoolean())
+				command += " --reconstruct_subtracted_bodies ";
+
+			// Sampling
+			int iover = 1;
+			command += " --oversampling " + floatToString((float)iover);
+			for (int i = 0; i < 10; i++)
+			{
+				if (strcmp((joboptions["sampling"].getString()).c_str(), job_sampling_options[i]) == 0)
+				{
+					// The sampling given in the GUI will be the oversampled one!
+					command += " --healpix_order " + floatToString((float)i + 1 - iover);
+					// Always perform local searches!
+					command += " --auto_local_healpix_order " + floatToString((float)i + 1 - iover);
+					break;
+				}
+			}
+
+			// Offset range
+			command += " --offset_range " + joboptions["offset_range"].getString();
+			// The sampling given in the GUI will be the oversampled one!
+			command += " --offset_step " + floatToString(joboptions["offset_step"].getNumber() * pow(2., iover));
+
+		}
+
+		// Always do compute stuff
+		if (!joboptions["do_combine_thru_disc"].getBoolean())
+			command += " --dont_combine_weights_via_disc";
+		if (!joboptions["do_parallel_discio"].getBoolean())
+			command += " --no_parallel_disc_io";
+		if (joboptions["do_preread_images"].getBoolean())
+			command += " --preread_images " ;
+		else if (joboptions["scratch_dir"].getString() != "")
+					command += " --scratch_dir " +  joboptions["scratch_dir"].getString();
+		command += " --pool " + joboptions["nr_pool"].getString();
+		if (joboptions["do_pad1"].getBoolean())
+			command += " --pad 1 ";
+		else
+			command += " --pad 2 ";
+
+		// Running stuff
+		command += " --j " + joboptions["nr_threads"].getString();
+
+		// GPU-stuff
+		if (joboptions["use_gpu"].getBoolean())
+		{
+			command += " --gpu \"" + joboptions["gpu_ids"].getString() + "\"";
+		}
+
+		// Other arguments
+		command += " " + joboptions["other_args"].getString();
+
+		commands.push_back(command);
+	} // end if (!is_continue || (is_continue && joboptions["fn_cont"].getString() != ""))
+
+	if (joboptions["do_analyse"].getBoolean())
+	{
+		command = "`which relion_flex_analyse`";
+
+		// If we had performed relion_refine command, then fn_run would be set now
+		// Otherwise, we have to search for _model.star files that do NOT have a _it??? specifier
+		if (fn_run == "")
+		{
+			FileName fn_wildcard = outputname + "run*_model.star";
+			std::vector<FileName> fns_model;
+			std::vector<FileName> fns_ok;
+			fn_wildcard.globFiles(fns_model);
+			for (int i = 0; i < fns_model.size(); i++)
+			{
+				if (!fns_model[i].contains("_it"))
+					fns_ok.push_back(fns_model[i]);
+			}
+			if (fns_ok.size() == 0)
+			{
+				error_message = "ERROR: cannot find appropriate model.star file in the output directory";
+				return false;
+			}
+			if (fns_ok.size() > 1)
+			{
+				error_message = "ERROR: there are more than one model.star files (without '_it' specifiers) in the output directory. Move all but one out of the way.";
+				return false;
+			}
+			fn_run = fns_ok[0].beforeFirstOf("_model.star");
+		}
+		else
+			fn_run = outputname + fn_run;
+
+		// General I/O
+		command += " --PCA_orient ";
+		command += " --model " + fn_run + "_model.star";
+		command += " --data " + fn_run + "_data.star";
+		command += " --bodies " + joboptions["fn_bodies"].getString();
+		command += " --o " + outputname + "analyse";
+
+		// Eigenvector movie maps
+		if (joboptions["nr_movies"].getNumber() > 0)
+		{
+			command += " --do_maps ";
+			command += " --k " + joboptions["nr_movies"].getString();
+		}
+
+		// Selection
+		if (joboptions["do_select"].getBoolean())
+		{
+
+			if (joboptions["eigenval_min"].getNumber() >= joboptions["eigenval_max"].getNumber())
+			{
+				error_message = "ERROR: the maximum eigenvalue should be larger than the minimum one!";
+				return false;
+			}
+
+			command += " --select_eigenvalue " + joboptions["select_eigenval"].getString();
+			command += " --select_eigenvalue_min " + joboptions["eigenval_min"].getString();
+			command += " --select_eigenvalue_max " + joboptions["eigenval_max"].getString();
+
+			// Add output node: selected particles star file
+			FileName fnt = outputname + "analyse_eval"+integerToString(joboptions["select_eigenval"].getNumber(),3)+"_select";
+			if (joboptions["eigenval_min"].getNumber() > -99998)
+				fnt += "_min"+integerToString(joboptions["eigenval_min"].getNumber());
+			if (joboptions["eigenval_max"].getNumber() < 99998)
+				fnt += "_max"+integerToString(joboptions["eigenval_max"].getNumber());
+			fnt += ".star";
+			Node node2(fnt, NODE_PART_DATA);
+			outputNodes.push_back(node2);
+
+		}
+
+		// PDF with histograms of the eigenvalues
+		Node node3(outputname + "analyse_logfile.pdf", NODE_PDF_LOGFILE);
+		outputNodes.push_back(node3);
+
+		commands.push_back(command);
+
+	}
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 
@@ -4239,7 +4345,7 @@ void RelionJob::initialisePostprocessJob()
 
 	hidden_name = ".gui_post";
 
-	joboptions["fn_in"] = JobOption("One of the 2 unfiltered half-maps:", NODE_HALFMAP, "", "MRC map files (*half1_class001_unfil.mrc)",  "Provide one of the two unfiltered half-reconstructions that were output upon convergence of a 3D auto-refine run.");
+	joboptions["fn_in"] = JobOption("One of the 2 unfiltered half-maps:", NODE_HALFMAP, "", "MRC map files (*half1_*_unfil.mrc)",  "Provide one of the two unfiltered half-reconstructions that were output upon convergence of a 3D auto-refine run.");
 	joboptions["fn_mask"] = JobOption("Solvent mask:", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide a soft mask where the protein is white (1) and the solvent is black (0). Often, the softer the mask the higher resolution estimates you will get. A soft edge of 5-10 pixels is often a good edge width.");
 	joboptions["angpix"] = JobOption("Calibrated pixel size (A)", 1, 0.3, 5, 0.1, "Provide the final, calibrated pixel size in Angstroms. This value may be different from the pixel-size used thus far, e.g. when you have recalibrated the pixel size using the fit to a PDB model. The X-axis of the output FSC plot will use this calibrated value.");
 
@@ -4281,8 +4387,7 @@ bool RelionJob::getCommandsPostprocessJob(std::string &outputname, std::vector<s
 	Node node3(joboptions["fn_mask"].getString(), joboptions["fn_mask"].node_type);
 	inputNodes.push_back(node3);
 
-	// Get the input rootname from the half-map name
-	// run1_half1_class001_unfil.mrc -> run1
+	// Input half map (one of them)
 	if (joboptions["fn_in"].getString() == "")
 	{
 		error_message = "ERROR: empty field for input half-map...";
@@ -4290,17 +4395,7 @@ bool RelionJob::getCommandsPostprocessJob(std::string &outputname, std::vector<s
 	}
 	Node node(joboptions["fn_in"].getString(), joboptions["fn_in"].node_type);
 	inputNodes.push_back(node);
-	int pos_half = joboptions["fn_in"].getString().rfind("_half");
-	if (pos_half < joboptions["fn_in"].getString().size())
-	{
-		command += " --i " + joboptions["fn_in"].getString().substr(0, pos_half);
-	}
-	else
-	{
-		error_message = "PostJobWindow::getCommands ERROR: cannot find _half substring in input filename!";
-		return false;
-	}
-
+	command += " --i " + joboptions["fn_in"].getString();
 	// The output name contains a directory: use it for output
 	command += " --o " + outputname + "postprocess";
 	command += "  --angpix " + joboptions["angpix"].getString();

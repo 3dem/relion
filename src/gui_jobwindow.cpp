@@ -921,7 +921,7 @@ void JobWindow::initialiseAutopickWindow()
 
 	group4->begin();
 
-	//place("do_amyloid");
+	place("do_amyloid");
 	place("helical_tube_outer_diameter");
 
 	current_y += STEPY/2;
@@ -1703,7 +1703,7 @@ void JobWindow::initialiseAutorefineWindow()
 
 void JobWindow::initialiseMultiBodyWindow()
 {
-	setupTabs(3);
+	setupTabs(4);
 	tab1->begin();
 	tab1->label("I/O");
 	resetHeight();
@@ -1730,7 +1730,36 @@ void JobWindow::initialiseMultiBodyWindow()
 	tab2->end();
 
 	tab3->begin();
-	tab3->label("Compute");
+	tab3->label("Analyse");
+	resetHeight();
+
+    group5 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group5->end();
+
+    place("do_analyse", TOGGLE_LEAVE_ACTIVE, group5);
+	group5->begin();
+
+	place("nr_movies");
+
+    group6 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group6->end();
+
+	place("do_select", TOGGLE_LEAVE_ACTIVE, group6);
+
+	group6->begin();
+	place("select_eigenval");
+	place("eigenval_min");
+	place("eigenval_max");
+    group6->end();
+	guientries["do_select"].cb_menu_i(); // This is to make the default effective
+
+    group5->end();
+	guientries["do_analyse"].cb_menu_i(); // This is to make the default effective
+
+	tab3->end();
+
+	tab4->begin();
+	tab4->label("Compute");
 	resetHeight();
 
 	place("do_parallel_discio");
@@ -1752,7 +1781,8 @@ void JobWindow::initialiseMultiBodyWindow()
     group4->end();
 	guientries["use_gpu"].cb_menu_i(); // This is to make the default effective
 
-	tab3->end();
+	tab4->end();
+
 
 }
 

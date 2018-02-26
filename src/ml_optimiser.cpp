@@ -750,7 +750,7 @@ void MlOptimiser::read(FileName fn_in, int rank)
     std::cerr<<"MlOptimiser::readStar entering ..."<<std::endl;
 #endif
 
-	if (verb > 0)
+	if (rank == 0)
 		std::cout << " Reading in optimiser.star ..." << std::endl;
 
 	// Open input file
@@ -2392,7 +2392,7 @@ void MlOptimiser::iterate()
 		updateSubsetSize();
 
 		// Randomly take different subset of the particles each time we do a new "iteration" in SGD
-		mydata.randomiseOriginalParticlesOrder(random_seed+iter, false, (subset_size > 0) );
+		mydata.randomiseOriginalParticlesOrder(random_seed+iter, do_split_random_halves, subset_size < mydata.numberOfOriginalParticles() );
 
 		if (do_auto_refine)
 		{
@@ -8753,7 +8753,7 @@ void MlOptimiser::updateSubsetSize(bool myverb)
 		{
 			subset_size = min_parts_per_class*mymodel.nr_classes;
 		}
-		if (iter <= 10)
+		else if (iter <= 10)
 		{
 			subset_size = 3*min_parts_per_class*mymodel.nr_classes;
 		}

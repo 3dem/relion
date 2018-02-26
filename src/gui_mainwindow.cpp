@@ -293,10 +293,6 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 		image_box = new Fl_Box(WCOL0-8, 45 ,w-WCOL0, h-120); // widget that will contain image
 		xpm_image = new Fl_XPM_Image(fn_bg.c_str());
 		image_box->image(xpm_image); // attach xpm image to box
-		//forgot_button = new Fl_Button(450, 143, 10, 32, "?");
-		//forgot_button->color(GUI_BUTTON_COLOR);
-		//forgot_button->labelsize(12);
-		//forgot_button->callback( cb_forgot, this);
 	 }
 	background_grp->end();
 
@@ -630,6 +626,8 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 			Fl::add_timeout(update_every_sec, Gui_Timer_CB, (void*)this);
     }
 
+    cb_show_initial_screen_i();
+
     // Set and activate current selection from side-browser
 	cb_select_browsegroup_i(true); // make default active; true is used to show_initial_screen
 	is_main_continue = false; // default is a new run
@@ -676,6 +674,28 @@ void GuiMainWindow::clear()
 		menubar2 = NULL;
 	}
 }
+
+std::string GuiMainWindow::getJobNameForDisplay(Process &job)
+{
+	std::string result;
+	FileName fn_pre, fn_jobnr, fn_post;
+
+	if (!decomposePipelineFileName(job.name, fn_pre, fn_jobnr, fn_post))
+	{
+		result = job.name;
+	}
+	else
+	{
+		std::string numberonly = (fn_jobnr.afterFirstOf("b")).beforeFirstOf("/");
+		if (job.alias != "None")
+			result = numberonly + ": " + job.alias;
+		else
+			result = numberonly + ": " + job.name;
+	}
+
+	return result;
+}
+
 
 // Update the content of the finished, running and scheduled job lists
 void GuiMainWindow::fillRunningJobLists()
@@ -732,10 +752,7 @@ void GuiMainWindow::fillRunningJobLists()
 			if (pipeline.processList[i].status == PROC_FINISHED)
 			{
 				finished_processes.push_back(i);
-				if (pipeline.processList[i].alias != "None")
-					finished_job_browser->add(pipeline.processList[i].alias.c_str());
-				else
-					finished_job_browser->add(pipeline.processList[i].name.c_str());
+				finished_job_browser->add((getJobNameForDisplay(pipeline.processList[i])).c_str());
 			}
 		}
 	}
@@ -746,18 +763,12 @@ void GuiMainWindow::fillRunningJobLists()
 		if (pipeline.processList[i].status == PROC_RUNNING)
 		{
 			running_processes.push_back(i);
-			if (pipeline.processList[i].alias != "None")
-				running_job_browser->add(pipeline.processList[i].alias.c_str());
-			else
-				running_job_browser->add(pipeline.processList[i].name.c_str());
+			running_job_browser->add((getJobNameForDisplay(pipeline.processList[i])).c_str());
 		}
 		else if (pipeline.processList[i].status == PROC_SCHEDULED)
 		{
 			scheduled_processes.push_back(i);
-			if (pipeline.processList[i].alias != "None")
-				scheduled_job_browser->add(pipeline.processList[i].alias.c_str());
-			else
-				scheduled_job_browser->add(pipeline.processList[i].name.c_str());
+			scheduled_job_browser->add((getJobNameForDisplay(pipeline.processList[i])).c_str());
 		}
 	}
 
@@ -815,10 +826,7 @@ void GuiMainWindow::fillToAndFromJobLists()
 				if (!already_there)
 				{
 					input_processes.push_back(myproc);
-					if (pipeline.processList[myproc].alias != "None")
-						input_job_browser->add(pipeline.processList[myproc].alias.c_str());
-					else
-						input_job_browser->add(pipeline.processList[myproc].name.c_str());
+					input_job_browser->add((getJobNameForDisplay(pipeline.processList[myproc])).c_str());
 				}
 			}
 		}
@@ -851,10 +859,7 @@ void GuiMainWindow::fillToAndFromJobLists()
 				if (!already_there)
 				{
 					output_processes.push_back(myproc);
-					if (pipeline.processList[myproc].alias != "None")
-						output_job_browser->add(pipeline.processList[myproc].alias.c_str());
-					else
-						output_job_browser->add(pipeline.processList[myproc].name.c_str());
+					output_job_browser->add((getJobNameForDisplay(pipeline.processList[myproc])).c_str());
 				}
 			}
 		}
@@ -981,10 +986,7 @@ void GuiMainWindow::loadJobFromPipeline(int this_job)
     cb_toggle_continue_i();
 
     // Set the alias in the window
-    if (pipeline.processList[current_job].alias != "None")
-    	alias_current_job->value(pipeline.processList[current_job].alias.c_str());
-    else
-    	alias_current_job->value(pipeline.processList[current_job].name.c_str());
+    alias_current_job->value((getJobNameForDisplay(pipeline.processList[current_job])).c_str());
 
 	// Update all job lists in the main GUI
 	updateJobLists();
@@ -1350,18 +1352,6 @@ void GuiMainWindow::cb_print_cl_i()
 			std::cout << commands[icom] << std::endl;
 	}
 
-}
-
-// Run button call-back functions
-void GuiMainWindow::cb_forgot(Fl_Widget* o, void* v) {
-
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_forgot_i(); // 1st true means only_schedule, do not run, 2nd true means open the note editor window
-}
-
-void GuiMainWindow::cb_forgot_i()
-{
-	fl_message("Really?! Perhaps you should spend fewer nights at the microscope and try to sleep a bit more...");
 }
 
 // Run button call-back functions
@@ -1956,6 +1946,8 @@ void GuiMainWindow::cb_show_initial_screen(Fl_Widget* o, void* v)
 
 void GuiMainWindow::cb_show_initial_screen_i()
 {
+    run_button->deactivate();
+
 	cb_select_browsegroup_i(true);
 }
 

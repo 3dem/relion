@@ -467,6 +467,7 @@ bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, boo
 				processList[current_job].type == PROC_3DCLASS ||
 				processList[current_job].type == PROC_INIMODEL ||
 				processList[current_job].type == PROC_3DAUTO ||
+				processList[current_job].type == PROC_MULTIBODY ||
 				processList[current_job].type == PROC_MANUALPICK ||
 				processList[current_job].type == PROC_CLASSSELECT ||
 				processList[current_job].type == PROC_MOVIEREFINE ||
@@ -475,7 +476,9 @@ bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, boo
 		// For continuation of relion_refine jobs, remove the original output nodes from the list
 		if (processList[current_job].type == PROC_2DCLASS ||
 				processList[current_job].type == PROC_3DCLASS ||
-				processList[current_job].type == PROC_3DAUTO)
+				processList[current_job].type == PROC_3DAUTO ||
+				processList[current_job].type == PROC_MULTIBODY ||
+				processList[current_job].type == PROC_INIMODEL)
 		{
 
 			std::vector<bool> deleteNodes, deleteProcesses;
