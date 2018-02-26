@@ -22,14 +22,6 @@
 #include "src/metadata_table.h"
 #include "src/image.h"
 
-/* Work in progress!
- *
- * Implement position-dependent motion model
- * Use factory pattern?
- *
- * Gain correction (with rotation & flip)
- */
-
 const RFLOAT Micrograph::NOT_OBSERVED = -9999;
 const int ThirdOrderPolynomialModel::NUM_COEFFS_PER_DIM = 18;
 
@@ -172,6 +164,19 @@ void Micrograph::read(FileName fn_in)
 	if (!MDglobal.getValue(EMDL_CTF_VOLTAGE, voltage)) {
 		voltage = -1;
 	}
+	int model_version;
+	if (!MDglobal.getValue(EMDL_MICROGRAPH_MOTION_MODEL_VERSION, model_version)) {
+		if (model_version == MOTION_MODEL_THIRD_ORDER_POLYNOMIAL) {
+			model = new ThirdOrderPolynomialModel();
+		} else if (model_version == MOTION_MODEL_NULL) {
+			model = NULL;
+		} else {
+			std::cerr << "Warning: Ignoring unknown motion model " << model_version << std::endl;
+		}
+		model->read(in, "local_motion_model");
+	} else {
+		model = NULL;
+	}
 
 	// Read global shifts
 	int frame;
@@ -192,8 +197,6 @@ void Micrograph::read(FileName fn_in)
 		globalShiftY[frame - 1] = shiftY;
 		std::cout << " global shift: frame #" << frame << " x " << shiftX << " Y " << shiftY << std::endl;
 	}
-
-	model = NULL; // TODO: MotionModel();
 }
 
 // Write to a STAR file
@@ -229,6 +232,11 @@ void Micrograph::write(FileName filename) {
 	if (voltage != -1) {
 		MD.setValue(EMDL_CTF_VOLTAGE, voltage);
         }
+	if (model != NULL) {
+		MD.setValue(EMDL_MICROGRAPH_MOTION_MODEL_VERSION, model->getModelVersion());
+	} else {
+		MD.setValue(EMDL_MICROGRAPH_MOTION_MODEL_VERSION, MOTION_MODEL_NULL);
+	}
 	MD.write(fh);
 
 	MD.clear();
@@ -242,8 +250,8 @@ void Micrograph::write(FileName filename) {
 	MD.write(fh);
 
 	if (model != NULL) {
-		std::string block_name = "model1";
-		model->write(fh, block_name); // TODO: fix me
+		std::string block_name = "local_motion_model";
+		model->write(fh, block_name);
 	}
 
 	fh.close();

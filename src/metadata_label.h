@@ -160,7 +160,6 @@ enum EMDLabel
     EMDL_MICROGRAPH_DOSE_RATE,
     EMDL_MICROGRAPH_BINNING,
     EMDL_MICROGRAPH_FRAME_NUMBER,
-    EMDL_MICROGRAPH_MOTION_MODEL_IDX,
     EMDL_MICROGRAPH_MOTION_MODEL_VERSION,
     EMDL_MICROGRAPH_START_FRAME,
     EMDL_MICROGRAPH_END_FRAME,
@@ -590,7 +589,6 @@ private:
 	EMDL::addLabel(EMDL_MICROGRAPH_DOSE_RATE, EMDL_DOUBLE, "rlnMicrographDoseRate", "Dose rate in electrons per square Angstrom per frame");
 	EMDL::addLabel(EMDL_MICROGRAPH_BINNING, EMDL_DOUBLE, "rlnMicrographBinning", "Micrograph binning factor");
         EMDL::addLabel(EMDL_MICROGRAPH_FRAME_NUMBER, EMDL_INT, "rlnMicrographFrameNumber", "Micrograph frame number");
-        EMDL::addLabel(EMDL_MICROGRAPH_MOTION_MODEL_IDX, EMDL_INT, "rlnMotionModelIdx", "Micrograph motion model index");
         EMDL::addLabel(EMDL_MICROGRAPH_MOTION_MODEL_VERSION, EMDL_INT, "rlnMotionModelVersion", "Version of micrograph motion model");
         EMDL::addLabel(EMDL_MICROGRAPH_START_FRAME, EMDL_INT, "rlnMicrographStartFrame", "Start frame of a motion model");
         EMDL::addLabel(EMDL_MICROGRAPH_END_FRAME, EMDL_INT, "rlnMicrographEndFrame", "End frame of a motion model");

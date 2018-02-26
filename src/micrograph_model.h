@@ -24,6 +24,11 @@
 #include "src/filename.h"
 #include "src/matrix1d.h"
 
+enum MotionModelVersion {
+	MOTION_MODEL_NULL,
+	MOTION_MODEL_THIRD_ORDER_POLYNOMIAL,
+};
+
 class MotionModel
 {
 public:
@@ -32,6 +37,7 @@ public:
 
 	virtual void read(std::ifstream &fh, std::string block_name) = 0;
 	virtual void write(std::ostream &fh, std::string block_name) = 0;
+	virtual int getModelVersion() const = 0;
 
 	// Get motion at frame and (x, y)
 	virtual int getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty) const = 0;
@@ -49,6 +55,10 @@ public:
 
 	void read(std::ifstream &fh, std::string block_name);
 	void write(std::ostream &fh, std::string block_name);
+
+	int getModelVersion() const {
+		return MOTION_MODEL_THIRD_ORDER_POLYNOMIAL;
+	}
 
 	int getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty) const;
 };
