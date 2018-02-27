@@ -1052,16 +1052,16 @@ void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool als
 					DIRECT_A1D_ELEM(masks_bodies[ibody], i) /= DIRECT_A1D_ELEM(sum_mask, i);
 					
 		for (int ibody = 0; ibody < nr_bodies; ibody++)
+		{
 			for (int obody = 0; obody < nr_bodies; obody++)
-			{
 				DIRECT_A2D_ELEM(pointer_body_overlap, ibody, obody) = obody;
-				if (ibody == obody)
-					pointer_body_overlap_inv[obody] = obody;
-			}
+			pointer_body_overlap_inv[ibody] = ibody;
+		}
 		
 #ifdef DEBUG_OVERLAP
 		for (int ibody = 0; ibody < nr_bodies; ibody++)
 		{
+			Image<RFLOAT> It;
 			It()= masks_bodies[ibody];
 			fnt = "mask_ibody"+integerToString(ibody)+".spi";
 			It.write(fnt);
