@@ -1046,35 +1046,6 @@ void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool als
 		for (int ibody = 1; ibody < nr_bodies; ibody++)
 			sum_mask += masks_bodies[ibody];
 		
-		//Check for discontinuities
-		RFLOAT v,v001,v010,v011,v100,v101,v110,v111;
-		RFLOAT t = 1./4.; //A threshold to identify sharp drop-offs
-		FOR_ALL_ELEMENTS_IN_ARRAY3D(sum_mask)
-		{
-			v = DIRECT_A3D_ELEM(sum_mask, k,i,j);
-			
-			v001 = XSIZE(sum_mask) > j+1 ? DIRECT_A3D_ELEM(sum_mask, k,i,j+1) : v;
-			v010 = YSIZE(sum_mask) > i+1 ? DIRECT_A3D_ELEM(sum_mask, k,i+1,j) : v;
-			v011 = YSIZE(sum_mask) > i+1 && XSIZE(sum_mask) > j+1 ? 
-				DIRECT_A3D_ELEM(sum_mask, k,i+1,j+1) : v;
-			if (ZSIZE(sum_mask) > k+1)
-			{
-				v100 = DIRECT_A3D_ELEM(sum_mask, k+1,i,j);
-				v101 = XSIZE(sum_mask) > j+1 ? DIRECT_A3D_ELEM(sum_mask, k+1,i,j+1) : v;
-				v110 = YSIZE(sum_mask) > i+1 ? DIRECT_A3D_ELEM(sum_mask, k+1,i+1,j) : v;
-				v111 = YSIZE(sum_mask) > i+1 && XSIZE(sum_mask) > j+1 ? 
-					DIRECT_A3D_ELEM(sum_mask, k+1,i+1,j+1) : v;
-			}
-			if (ABS(v-v001) > t || ABS(v-v001) > t || ABS(v-v011) > t || 
-				ABS(v-v100) > t || ABS(v-v101) > t || ABS(v-v110) > t || ABS(v-v111) > t)
-			{
-				std::cout << 
-				"+ WARNING: One of the provided multibody masks appears not to be smooth." << std::endl <<
-				"+ This could have adverse impacts on the results, specially in regions " << std::endl <<
-				"+ overlapping other bodies." << std::endl;
-			}
-		}
-		
 		FOR_ALL_ELEMENTS_IN_ARRAY1D(sum_mask)
 			if (DIRECT_A1D_ELEM(sum_mask, i) > 1.)
 				for (int ibody = 0; ibody < nr_bodies; ibody++)
