@@ -125,7 +125,7 @@ public:
 	}
 
 	template <typename T1>
-	void setHost(MultidimArray<T1> img)
+	void setHost(MultidimArray<T1> &img)
 	{
 		if (img.xdim != x || img.ydim != y || img.zdim != z)
 		{
@@ -152,7 +152,7 @@ public:
 	}
 
 	template <typename T1>
-	void getHost(MultidimArray<T1> img)
+	void getHost(MultidimArray<T1> &img)
 	{
 
 		if(img.nzyxdim!=AccPtr<T>::getSize())
