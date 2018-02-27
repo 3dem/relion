@@ -199,6 +199,10 @@ public:
 	// Allow saving of selection files?
 	bool do_allow_save;
 
+	// remove duplicate-coord particles in fn_data STAR file?
+	bool do_remove_duplicates;
+	RFLOAT duplicate_threshold;	 // Angstrom radius
+
 	// Filenames with the selected class averages and the particles from the selected classes
 	FileName fn_selected_imgs, fn_selected_parts;
 
@@ -389,6 +393,10 @@ public:
 	// Allow saving of the selection?
 	bool do_allow_save;
 
+	// remove duplicate-coord particles in fn_data STAR file?
+	bool do_remove_duplicates;
+	RFLOAT duplicate_threshold;	 // Angstrom radius
+
 	// Number of regroups
 	int nr_regroups;
 
@@ -506,6 +514,10 @@ public:
 
 	// Allow saving of selected particles or images?
 	bool do_allow_save;
+
+	// remove duplicate-coord particles in fn_data STAR file?
+	bool do_remove_duplicates;
+	RFLOAT duplicate_threshold;	 // Angstrom radius
 
 	// Filenames for selected particles and selected images
 	FileName fn_selected_imgs, fn_selected_parts;

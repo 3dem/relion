@@ -62,7 +62,7 @@ void exponentiate_weights_fine(
 void RNDnormalDitributionComplexWithPowerModulation(ACCCOMPLEX* Image, size_t xdim, XFLOAT *spectra)
 {
 	int x,y,size;
-	size = xdim*((xdim-1)*2)
+	size = xdim*((xdim-1)*2);
 	for(int i=0; i<size; i++)
     {
 		y = ( i / xdim ); // fftshift in one of two dims;
@@ -162,7 +162,8 @@ void cosineFilter(	int      block_dim,
 					long int xinit,
 					long int yinit,
 					long int zinit,
-					bool     do_Mnoise,
+					bool     do_noise,
+					XFLOAT *noise,
 					XFLOAT   radius,
 					XFLOAT   radius_p,
 					XFLOAT   cosine_width,
@@ -173,13 +174,14 @@ void cosineFilter(	int      block_dim,
 		for(int tid=0; tid<block_size; tid++) 
 		{
 //		vol.setXmippOrigin(); // sets xinit=xdim , also for y z
-			XFLOAT r, raisedcos;
+			XFLOAT r, raisedcos, defVal;
 			int x,y,z;
 			XFLOAT     img_pixels;
 
 			size_t texel_pass_num = ceilfracf(vol_size,block_size*block_dim);
 			size_t texel = bid*block_size*texel_pass_num + tid;
 
+			defVal = bg_value;
 			for (int pass = 0; pass < texel_pass_num; pass++, texel+=block_size) // loop the available warps enough to complete all translations for this orientation
 			{
 				if(texel<vol_size)
@@ -196,10 +198,13 @@ void cosineFilter(	int      block_dim,
 
 					r = sqrt(XFLOAT(x*x + y*y + z*z));
 
+					if(do_noise)
+                                		defVal = noise[texel];
+
 					if (r < radius)
 						continue;
 					else if (r > radius_p)
-						img_pixels=bg_value;
+						img_pixels=defVal;
 					else
 					{
 		#if defined(ACC_DOUBLE_PRECISION)
@@ -207,7 +212,7 @@ void cosineFilter(	int      block_dim,
 		#else
 						raisedcos = 0.5 + 0.5  * cosf( (radius_p - r) / cosine_width * M_PI);
 		#endif
-						img_pixels= img_pixels*(1-raisedcos) + bg_value*raisedcos;
+						img_pixels= img_pixels*(1-raisedcos) + defVal*raisedcos;
 
 					}
 					vol[texel]=img_pixels;

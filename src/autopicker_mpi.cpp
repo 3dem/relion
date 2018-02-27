@@ -25,6 +25,9 @@ void AutoPickerMpi::read(int argc, char **argv)
     // Define a new MpiNode
     node = new MpiNode(argc, argv);
 
+    if (node->isMaster())
+    	PRINT_VERISON_INFO();
+    	
     // First read in non-parallelisation-dependent variables
     AutoPicker::read(argc, argv);
 

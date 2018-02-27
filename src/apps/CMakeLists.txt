@@ -118,8 +118,8 @@ endif()
 foreach (_target ${RELION_TARGETS})
 	GET_FILENAME_COMPONENT(_target "relion_${_target}" NAME_WE)  #specify target name WE=WithoutExtension
 	
-    add_executable(${_target} ${_target}.cpp)
-    set(LIB relion_lib)
+	add_executable(${_target} ${_target}.cpp )
+	set(LIB relion_lib)
 	
  	add_dependencies(${_target} relion_lib)
 	

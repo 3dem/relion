@@ -20,13 +20,12 @@
 
 #include <src/ml_optimiser_mpi.h>
 
-
 int main(int argc, char **argv)
 {
-
 	MlOptimiserMpi optimiser;
     try
     {
+    	
     	// Read in parameters from the command line
     	optimiser.read(argc, argv);
 
