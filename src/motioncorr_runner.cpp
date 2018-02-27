@@ -160,6 +160,12 @@ void MotioncorrRunner::initialise()
 	}
 	else if (do_own) {
 		std::cerr << "     !!! WARNING !!!" << std::endl << " Our own implementation of motion correction is under development!" << std::endl;
+		if (fn_defect != "") {
+			std::cerr << "The defect file is not yet supported in our own implementation of motion correction." << std::endl;
+		}
+		if (patch_x <= 2 || patch_y <= 2) {
+			std::cerr << "The number of patches is too small (<= 2). Patch based alignment will be skipped." << std::endl;
+		}
 	} else {
 		REPORT_ERROR(" ERROR: You have to specify which programme to use through either --use_motioncor2 or --use_unblur");
 	}
@@ -879,7 +885,6 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 // - defect
 // - grouping
 // - outlier rejection in fitting (use free set?)
-// - warn or stop when number of patches is too small
 
 bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<float> &xshifts, std::vector<float> &yshifts) {
 	omp_set_num_threads(n_threads);
