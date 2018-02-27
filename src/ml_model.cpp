@@ -1046,7 +1046,7 @@ void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool als
 		for (int ibody = 1; ibody < nr_bodies; ibody++)
 			sum_mask += masks_bodies[ibody];
 		
-		FOR_ALL_ELEMENTS_IN_ARRAY1D(sum_mask)
+		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(sum_mask)
 			if (DIRECT_A1D_ELEM(sum_mask, i) > 1.)
 				for (int ibody = 0; ibody < nr_bodies; ibody++)
 					DIRECT_A1D_ELEM(masks_bodies[ibody], i) /= DIRECT_A1D_ELEM(sum_mask, i);
