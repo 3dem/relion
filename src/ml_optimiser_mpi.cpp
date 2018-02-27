@@ -54,6 +54,9 @@ void MlOptimiserMpi::read(int argc, char **argv)
     node = new MpiNode(argc, argv);
 
     if (node->isMaster())
+    	PRINT_VERISON_INFO();
+
+    if (node->isMaster())
     {
       std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
       std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;

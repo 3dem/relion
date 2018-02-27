@@ -22,8 +22,6 @@
 
 int main(int argc, char **argv)
 {
- 	PRINT_VERISON_INFO();
-
 	MlOptimiserMpi optimiser;
     try
     {
