@@ -54,6 +54,9 @@
 #include <sys/mman.h>
 #include <fcntl.h>
 #include <unistd.h>
+#ifdef HAVE_TIFF
+#include <tiffio.h>
+#endif
 #include "src/funcs.h"
 #include "src/memory.h"
 #include "src/filename.h"
@@ -104,8 +107,12 @@ class fImageHandler
 public:
     FILE*     fimg;       // Image File handler
     FILE*     fhed;       // Image File header handler
+#ifdef HAVE_TIFF
+    TIFF*     ftiff;
+#endif
     FileName  ext_name;   // Filename extension
-    bool     exist;       // Shows if the file exists
+    bool      exist;      // Shows if the file exists
+    bool      isTiff;     // Shows if this is a TIFF file
 
     /** Empty constructor
      */
@@ -113,8 +120,12 @@ public:
     {
         fimg=NULL;
         fhed=NULL;
+#ifdef HAVE_TIFF
+        ftiff=NULL;
+#endif
         ext_name="";
         exist=false;
+        isTiff=false;
     }
 
     /** Destructor: closes file (if it still open)
@@ -189,8 +200,19 @@ public:
 			fileName = fileName.addExtension(ext_name);
 		}
 
+		isTiff = ext_name.contains("tif");
+#ifndef HAVE_TIFF
+		if (isTiff) REPORT_ERROR((std::string)"TIFF support was not enabled during compilation");
+#endif
+		if (isTiff && mode != WRITE_READONLY)
+			REPORT_ERROR((std::string)"TIFF is supported only for reading");
+
 		// Open image file
-		if ( ( fimg = fopen(fileName.c_str(), wmChar.c_str()) ) == NULL )
+		if (   (!isTiff && ((fimg  = fopen(fileName.c_str(), wmChar.c_str())) == NULL))
+#ifdef HAVE_TIFF
+		    || ( isTiff && ((ftiff = TIFFOpen(fileName.c_str(), "r")) == NULL))
+#endif
+                   )
 			REPORT_ERROR((std::string)"Image::openFile cannot open: " + name);
 
 		if (headName != "")
@@ -212,7 +234,12 @@ public:
     	if (fimg == NULL && fhed == NULL)
         	return;
 
-    	if (fclose(fimg) != 0 )
+#ifdef HAVE_TIFF
+	if (isTiff && ftiff != NULL)
+		TIFFClose(ftiff);
+#endif
+
+    	if (!isTiff && fclose(fimg) != 0 )
             REPORT_ERROR((std::string)"Can not close image file ");
     	else
     		fimg = NULL;
@@ -341,6 +368,9 @@ public:
 #include "src/rwSPIDER.h"
 #include "src/rwMRC.h"
 #include "src/rwIMAGIC.h"
+#ifdef HAVE_TIFF
+#include "src/rwTIFF.h"
+#endif
 
     /** Is this file an image
      *
@@ -396,6 +426,10 @@ public:
      * select_img= which slice should I replace
      * overwrite = 0, append slice
      * overwrite = 1 overwrite slice
+     *
+     * NOTE:
+     *  select_img has higher priority than the number before "@" in the name.
+     *  select_img counts from 0, while the number before "@" in the name from 1!
      */
     void write(FileName name="",
                long int select_img=-1,
@@ -1269,6 +1303,12 @@ private:
             err = readSPIDER(select_img);
         else if (ext_name.contains("mrcs") || (is_2D && ext_name.contains("mrc")) )//mrc stack MUST go BEFORE plain MRC
             err = readMRC(select_img, true, name);
+	else if (ext_name.contains("tif"))
+#ifdef HAVE_TIFF
+	    err = readTIFF(hFile.ftiff, select_img, readdata, true, name);
+#else
+            REPORT_ERROR("TIFF support was not enabled during compilation");
+#endif
         else if (select_img >= 0 && ext_name.contains("mrc"))
         	REPORT_ERROR("Image::read ERROR: stacks of images in MRC-format should have extension .mrcs; .mrc extensions are reserved for 3D maps.");
         else if (ext_name.contains("mrc")) // mrc 3D map
@@ -1281,9 +1321,6 @@ private:
         // Negative errors are bad.
         return err;
     }
-
-
-
 
     void _write(const FileName &name, fImageHandler &hFile, long int select_img=-1,
                 bool isStack=false, int mode=WRITE_OVERWRITE)

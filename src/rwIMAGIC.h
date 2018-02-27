@@ -176,9 +176,7 @@ int  readIMAGIC(long int img_select)
     MDMainHeader.setValue(EMDL_IMAGE_STATS_MAX,(RFLOAT)header->densmax);
     MDMainHeader.setValue(EMDL_IMAGE_STATS_AVG,(RFLOAT)header->avdens);
     MDMainHeader.setValue(EMDL_IMAGE_STATS_STDDEV,(RFLOAT)header->sigma);
-    MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X,(RFLOAT)1.);
-    MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y,(RFLOAT)1.);
-    MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z,(RFLOAT)1.);
+    setSamplingRateInHeader((RFLOAT)1.);
     MDMainHeader.setValue(EMDL_IMAGE_DATATYPE,(int)datatype);
 
     offset = 0;   // separate header file

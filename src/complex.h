@@ -53,16 +53,16 @@ class Complex
     void operator/=(RFLOAT op);
 
     // Complex conjugated
-    Complex conj();
+    Complex conj() const;
 
     // Abs value: sqrt(real*real+imag*imag)
-    RFLOAT abs();
+    RFLOAT abs() const;
 
     // Norm value: real*real+imag*imag
-    RFLOAT norm();
+    RFLOAT norm() const;
 
     // Phase angle: atan2(imag,real)
-    RFLOAT arg();
+    RFLOAT arg() const;
 
 
 };

@@ -25,8 +25,10 @@
  **************************************************************************/
 int main(int argc, char **argv)
 {
-	MlOptimiser optimiser;
+	 MlOptimiser optimiser;
 
+    PRINT_VERISON_INFO();
+    
     std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
     std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;
     std::cout << "TEST VERSION    TEST VERSION    TEST VERSION     TEST VERSION   TEST VERSION"<< std::endl;

@@ -398,130 +398,116 @@ void JobWindow::initialise(int my_job_type, bool _do_oldstyle)
 {
 
 	do_oldstyle = _do_oldstyle;
-	switch (my_job_type)
-	{
-	case PROC_IMPORT:
+	if (my_job_type == PROC_IMPORT)
 	{
 		myjob.initialise(my_job_type);
 		initialiseImportWindow();
-		break;
 	}
-	case PROC_MOTIONCORR:
+	else if (my_job_type == PROC_MOTIONCORR)
 	{
 		myjob.initialise(my_job_type);
 		initialiseMotioncorrWindow();
-		break;
 	}
-	case PROC_CTFFIND:
+	else if (my_job_type == PROC_CTFFIND)
 	{
 		myjob.initialise(my_job_type);
 		initialiseCtffindWindow();
-		break;
 	}
-	case PROC_MANUALPICK:
+	else if (my_job_type == PROC_MANUALPICK)
 	{
 		myjob.initialise(my_job_type);
 		initialiseManualpickWindow();
-		break;
 	}
-	case PROC_AUTOPICK:
+	else if (my_job_type == PROC_AUTOPICK)
 	{
 		myjob.initialise(my_job_type);
 		initialiseAutopickWindow();
-		break;
 	}
-	case PROC_EXTRACT:
+	else if (my_job_type == PROC_EXTRACT)
 	{
 		myjob.initialise(my_job_type);
 		initialiseExtractWindow();
-		break;
 	}
-	case PROC_SORT:
+	else if (my_job_type == PROC_SORT)
 	{
 		myjob.initialise(my_job_type);
 		initialiseSortWindow();
-		break;
 	}
-	case PROC_CLASSSELECT:
+	else if (my_job_type == PROC_CLASSSELECT)
 	{
 		myjob.initialise(my_job_type);
 		initialiseSelectWindow();
-		break;
 	}
-	case PROC_2DCLASS:
+	else if (my_job_type == PROC_2DCLASS)
 	{
 		myjob.initialise(my_job_type);
 		initialiseClass2DWindow();
-		break;
 	}
-	case PROC_INIMODEL:
+	else if (my_job_type == PROC_INIMODEL)
 	{
 		myjob.initialise(my_job_type);
 		initialiseInimodelWindow();
-		break;
 	}
-	case PROC_3DCLASS:
+	else if (my_job_type == PROC_3DCLASS)
 	{
 		myjob.initialise(my_job_type);
 		initialiseClass3DWindow();
-		break;
 	}
-	case PROC_3DAUTO:
+	else if (my_job_type == PROC_3DAUTO)
 	{
 		myjob.initialise(my_job_type);
 		initialiseAutorefineWindow();
-		break;
 	}
-	case PROC_MOVIEREFINE:
+	else if (my_job_type == PROC_MULTIBODY)
+	{
+		myjob.initialise(my_job_type);
+		initialiseMultiBodyWindow();
+	}
+	else if (my_job_type == PROC_MOVIEREFINE)
 	{
 		myjob.initialise(my_job_type);
 		initialiseMovierefineWindow();
-		break;
 	}
-	case PROC_POLISH:
+	else if (my_job_type == PROC_POLISH)
 	{
 		myjob.initialise(my_job_type);
 		initialisePolishWindow();
-		break;
 	}
-	case PROC_MASKCREATE:
+	else if (my_job_type == PROC_MASKCREATE)
 	{
 		myjob.initialise(my_job_type);
 		initialiseMaskcreateWindow();
-		break;
 	}
-	case PROC_JOINSTAR:
+	else if (my_job_type == PROC_JOINSTAR)
 	{
 		myjob.initialise(my_job_type);
 		initialiseJoinstarWindow();
-		break;
 	}
-	case PROC_SUBTRACT:
+	else if (my_job_type == PROC_SUBTRACT)
 	{
 		myjob.initialise(my_job_type);
 		initialiseSubtractWindow();
-		break;
 	}
-	case PROC_POST:
+	else if (my_job_type == PROC_POST)
 	{
 		myjob.initialise(my_job_type);
 		initialisePostprocessWindow();
-		break;
 	}
-	case PROC_RESMAP:
+	else if (my_job_type == PROC_RESMAP)
 	{
 		myjob.initialise(my_job_type);
 		initialiseLocresWindow();
-		break;
 	}
-	default:
+	else
 	{
 		REPORT_ERROR("ERROR: unrecognised job-type to add to the GUI");
-	}
 	}
 
 	// read settings if hidden file exists
 	myjob.read("", is_continue);
+
+	// update the window
+	updateMyGui();
 
 }
 
@@ -580,7 +566,18 @@ void JobWindow::initialiseMotioncorrWindow()
 
 	group1->begin();
 
+	group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group4->end();
+
+	place("do_3rd_motioncor", TOGGLE_DEACTIVATE, group4);
+
+	group4->begin();
+
 	place("fn_motioncor2_exe", TOGGLE_DEACTIVATE);
+
+	group4->end();
+	guientries["do_3rd_motioncor"].cb_menu_i(); // make default active
+
 	place("fn_gain_ref", TOGGLE_DEACTIVATE);
 	place("fn_defect", TOGGLE_DEACTIVATE);
 
@@ -820,34 +817,37 @@ void JobWindow::initialiseManualpickWindow()
 }
 void JobWindow::initialiseAutopickWindow()
 {
-	setupTabs(4);
+	setupTabs(5);
 
 	tab1->begin();
 	tab1->label("I/O");
 	resetHeight();
 
 	place("fn_input_autopick", TOGGLE_DEACTIVATE);
-	place("fn_refs_autopick", TOGGLE_DEACTIVATE);
-
-	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group1->end();
-	place("do_gauss_ref", TOGGLE_DEACTIVATE, group1);
-
-	group1->begin();
-
-	place("gauss_max", TOGGLE_DEACTIVATE);
-	group1->end();
-
-	guientries["do_gauss_ref"].cb_menu_i();
-
-	// Add a little spacer
-	current_y += STEPY/2;
 	place("angpix", TOGGLE_DEACTIVATE);
-	place("particle_diameter", TOGGLE_DEACTIVATE);
+
+	current_y += STEPY/2;
+
+	place("fn_refs_autopick", TOGGLE_DEACTIVATE);
+	place("do_log", TOGGLE_DEACTIVATE);
 
 	tab1->end();
 	tab2->begin();
-	tab2->label("References");
+	tab2->label("Laplacian");
+	resetHeight();
+
+	place("log_diam", TOGGLE_DEACTIVATE);
+	place("log_diam_range", TOGGLE_DEACTIVATE);
+	place("log_invert", TOGGLE_DEACTIVATE);
+
+	// Add a little spacer
+	current_y += STEPY/2;
+	place("log_maxres", TOGGLE_DEACTIVATE);
+	place("log_adjust_thr");
+
+	tab2->end();
+	tab3->begin();
+	tab3->label("References");
 	resetHeight();
 
 	//set up group
@@ -857,6 +857,7 @@ void JobWindow::initialiseAutopickWindow()
 	place("lowpass", TOGGLE_DEACTIVATE);
 	place("highpass", TOGGLE_DEACTIVATE);
 	place("angpix_ref", TOGGLE_DEACTIVATE);
+	place("particle_diameter", TOGGLE_DEACTIVATE);
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -876,14 +877,15 @@ void JobWindow::initialiseAutopickWindow()
 	group2->end();
 	guientries["do_ctf_autopick"].cb_menu_i();
 
-	tab2->end();
-	tab3->begin();
-	tab3->label("autopicking");
+	tab3->end();
+	tab4->begin();
+	tab4->label("autopicking");
 	resetHeight();
 
 	place("threshold_autopick");
 	place("mindist_autopick");
 	place("maxstddevnoise_autopick");
+	place("minavgnoise_autopick");
 
 	current_y += STEPY/2;
 
@@ -896,6 +898,7 @@ void JobWindow::initialiseAutopickWindow()
 	// Set up queue groups for running tab
 	place("shrink", TOGGLE_DEACTIVATE);
 
+
 	group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
     group3->end();
     place("use_gpu", TOGGLE_LEAVE_ACTIVE, group3);
@@ -906,9 +909,9 @@ void JobWindow::initialiseAutopickWindow()
 
     guientries["use_gpu"].cb_menu_i();
 
-	tab3->end();
-	tab4->begin();
-	tab4->label("Helix");
+	tab4->end();
+	tab5->begin();
+	tab5->label("Helix");
 	resetHeight();
 
 	group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
@@ -918,6 +921,7 @@ void JobWindow::initialiseAutopickWindow()
 
 	group4->begin();
 
+	//place("do_amyloid");
 	place("helical_tube_outer_diameter");
 
 	current_y += STEPY/2;
@@ -934,7 +938,7 @@ void JobWindow::initialiseAutopickWindow()
 
 	guientries["do_pick_helical_segments"].cb_menu_i();
 
-	tab4->end();
+	tab5->end();
 
 }
 void JobWindow::initialiseExtractWindow()
@@ -959,6 +963,7 @@ void JobWindow::initialiseExtractWindow()
 
 	place("fndata_reextract", TOGGLE_DEACTIVATE);
 	place("do_recenter", TOGGLE_DEACTIVATE);
+	place3("recenter_x","recenter_y", "recenter_z", "Recenter on - X, Y, Z (pix):", TOGGLE_DEACTIVATE);
 
 	group1->end();
 	guientries["do_reextract"].cb_menu_i();
@@ -1070,17 +1075,8 @@ void JobWindow::initialiseSortWindow()
 	// Add a little spacer
 	current_y += STEPY/2;
 
-	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group1->end();
-
-	place("is_autopick", TOGGLE_DEACTIVATE, group1);
-
-	group1->begin();
-
+	place("model_refs", TOGGLE_DEACTIVATE);
 	place("autopick_refs", TOGGLE_DEACTIVATE);
-
-	group1->end();
-	guientries["is_autopick"].cb_menu_i();
 
 	tab1->end();
 
@@ -1712,6 +1708,93 @@ void JobWindow::initialiseAutorefineWindow()
 	tab7->end();
 
 }
+
+void JobWindow::initialiseMultiBodyWindow()
+{
+	setupTabs(4);
+	tab1->begin();
+	tab1->label("I/O");
+	resetHeight();
+
+	place("fn_in", TOGGLE_DEACTIVATE);
+	place("fn_cont", TOGGLE_REACTIVATE);
+	place("fn_bodies", TOGGLE_DEACTIVATE);
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	place("do_subtracted_bodies", TOGGLE_DEACTIVATE);
+
+	tab1->end();
+	tab2->begin();
+	tab2->label("Auto-sampling");
+	resetHeight();
+
+	place("sampling", TOGGLE_DEACTIVATE);
+	place("offset_range", TOGGLE_DEACTIVATE);
+	place("offset_step", TOGGLE_DEACTIVATE);
+
+
+	tab2->end();
+
+	tab3->begin();
+	tab3->label("Analyse");
+	resetHeight();
+
+    group5 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group5->end();
+
+    place("do_analyse", TOGGLE_LEAVE_ACTIVE, group5);
+	group5->begin();
+
+	place("nr_movies");
+
+    group6 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group6->end();
+
+	place("do_select", TOGGLE_LEAVE_ACTIVE, group6);
+
+	group6->begin();
+	place("select_eigenval");
+	place("eigenval_min");
+	place("eigenval_max");
+    group6->end();
+	guientries["do_select"].cb_menu_i(); // This is to make the default effective
+
+    group5->end();
+	guientries["do_analyse"].cb_menu_i(); // This is to make the default effective
+
+	tab3->end();
+
+	tab4->begin();
+	tab4->label("Compute");
+	resetHeight();
+
+	place("do_parallel_discio");
+	place("nr_pool");
+	place("do_pad1");
+	place("do_preread_images");
+	place("scratch_dir");
+	place("do_combine_thru_disc");
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	// Set up queue groups for running tab
+    group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group4->end();
+	place("use_gpu", TOGGLE_LEAVE_ACTIVE, group4);
+	group4->begin();
+	place("gpu_ids");
+    group4->end();
+	guientries["use_gpu"].cb_menu_i(); // This is to make the default effective
+
+	tab4->end();
+
+
+}
+
+
 void JobWindow::initialiseMovierefineWindow()
 {
 	setupTabs(4);

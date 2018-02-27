@@ -79,6 +79,7 @@ class PipeLine
 	{
 		name = "default";
 		job_counter = 1;
+		do_read_only = false;
 	}
 
 	~PipeLine()
@@ -148,7 +149,13 @@ class PipeLine
 	// Runs a job and adds it to the pipeline
 	bool runJob(RelionJob &_job, int &current_job, bool only_schedule, bool is_main_continue, bool is_scheduled, std::string &error_message);
 
-	// Runs a series of scheduled jobs, possibly in a loop
+	// Adds a scheduled job to the pipeline from the command line (with a name for job type)
+	void addScheduledJob(std::string job_type, std::string fn_options);
+
+	// Adds a scheduled job to the pipeline from the command line (with integer job type)
+	void addScheduledJob(int job_type, std::string fn_options);
+
+	// Runs a series of scheduled jobs, possibly in a loop, from the command line
 	void runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_repeat, long int minutes_wait);
 
 	// If I'm deleting this_job from the pipeline, which Nodes and which Processes need to be deleted?
