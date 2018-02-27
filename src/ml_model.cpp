@@ -1038,65 +1038,126 @@ void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool als
 	// Find the overlap of the bodies, and extend the Iref, PPref and masks_bodies vectors
 	pointer_body_overlap.resize(nr_bodies, nr_bodies);
 	pointer_body_overlap_inv.resize(nr_bodies);
-	for (int ibody = 0; ibody < nr_bodies; ibody++)
-	{
+	
 //#define DEBUG_OVERLAP
-#ifdef DEBUG_OVERLAP
-		Image<RFLOAT> It;
-		FileName fnt;
-		It()= masks_bodies[ibody];
-		fnt = "mask_ibody"+integerToString(ibody)+".spi";
-		It.write(fnt);
-#endif
-		for (int obody = 0; obody < nr_bodies; obody++)
+	if (norm_body_mask_overlap)
+	{
+		MultidimArray<RFLOAT> sum_mask = masks_bodies[0];
+		for (int ibody = 1; ibody < nr_bodies; ibody++)
+			sum_mask += masks_bodies[ibody];
+		
+		//Check for discontinuities
+		RFLOAT v,v001,v010,v011,v100,v101,v110,v111;
+		RFLOAT t = 1./4.; //A threshold to identify sharp drop-offs
+		FOR_ALL_ELEMENTS_IN_ARRAY3D(sum_mask)
 		{
-			if (ibody == obody)
+			v = DIRECT_A3D_ELEM(sum_mask, k,i,j);
+			
+			v001 = XSIZE(sum_mask) > j+1 ? DIRECT_A3D_ELEM(sum_mask, k,i,j+1) : v;
+			v010 = YSIZE(sum_mask) > i+1 ? DIRECT_A3D_ELEM(sum_mask, k,i+1,j) : v;
+			v011 = YSIZE(sum_mask) > i+1 && XSIZE(sum_mask) > j+1 ? 
+				DIRECT_A3D_ELEM(sum_mask, k,i+1,j+1) : v;
+			if (ZSIZE(sum_mask) > k+1)
+			{
+				v100 = DIRECT_A3D_ELEM(sum_mask, k+1,i,j);
+				v101 = XSIZE(sum_mask) > j+1 ? DIRECT_A3D_ELEM(sum_mask, k+1,i,j+1) : v;
+				v110 = YSIZE(sum_mask) > i+1 ? DIRECT_A3D_ELEM(sum_mask, k+1,i+1,j) : v;
+				v111 = YSIZE(sum_mask) > i+1 && XSIZE(sum_mask) > j+1 ? 
+					DIRECT_A3D_ELEM(sum_mask, k+1,i+1,j+1) : v;
+			}
+			if (ABS(v-v001) > t || ABS(v-v001) > t || ABS(v-v011) > t || 
+				ABS(v-v100) > t || ABS(v-v101) > t || ABS(v-v110) > t || ABS(v-v111) > t)
+			{
+				std::cout << 
+				"+ WARNING: One of the provided multibody masks appears not to be smooth." << std::endl <<
+				"+ This could have adverse impacts on the results, specially in regions " << std::endl <<
+				"+ overlapping other bodies." << std::endl;
+			}
+		}
+		
+		FOR_ALL_ELEMENTS_IN_ARRAY1D(sum_mask)
+			if (DIRECT_A1D_ELEM(sum_mask, i) > 1.)
+				for (int ibody = 0; ibody < nr_bodies; ibody++)
+					DIRECT_A1D_ELEM(masks_bodies[ibody], i) /= DIRECT_A1D_ELEM(sum_mask, i);
+					
+		for (int ibody = 0; ibody < nr_bodies; ibody++)
+			for (int obody = 0; obody < nr_bodies; obody++)
 			{
 				DIRECT_A2D_ELEM(pointer_body_overlap, ibody, obody) = obody;
-				pointer_body_overlap_inv[obody] = obody;
+				if (ibody == obody)
+					pointer_body_overlap_inv[obody] = obody;
 			}
-			else
-			{
-				// Sum all the previously done obody masks to see whether there is also overlap with any of them
-				MultidimArray<RFLOAT> overlap_mask = masks_bodies[ibody];
-				for (int oldobody = 0; oldobody < obody; oldobody++)
-				{
-					if (oldobody != ibody)
-					{
-						int ii = DIRECT_A2D_ELEM(pointer_body_overlap, ibody, oldobody);
-						overlap_mask += masks_bodies[ii];
-					}
-				}
-				// Calculate the overlap between the sum of ibody and all the old obodies until now
-				overlap_mask *= masks_bodies[obody]; // element-wise multiplication
-				// If there is overlap, generate another PPref
-				if (overlap_mask.sum() > 0.)
-				{
-					// Calculate the mask that has the overlap subtracted from the obody mask
-					overlap_mask = masks_bodies[obody] - overlap_mask;
-					// set the right pointer in the 2D matrix
-					DIRECT_A2D_ELEM(pointer_body_overlap, ibody, obody) = PPref.size();
-					//std::cerr << " ibody= " << ibody << " obody= " << obody << " overlap= " << overlap_mask.sum() << " icc= " << PPref.size() << std::endl;
-					// Extend the two vectors here!
-					PPref.push_back(PPref[obody]);
-					masks_bodies.push_back(overlap_mask);
-					// And keep track of which ibody this entry belonged to
-					pointer_body_overlap_inv.push_back(obody);
-
+		
 #ifdef DEBUG_OVERLAP
-					It()= overlap_mask;
-					fnt = "mask_ibody"+integerToString(ibody)+"_obody"+integerToString(obody)+"_overlap.spi";
-					It.write(fnt);
-					std::cerr << " PPref.size()= " << PPref.size() << std::endl;
+		for (int ibody = 0; ibody < nr_bodies; ibody++)
+		{
+			It()= masks_bodies[ibody];
+			fnt = "mask_ibody"+integerToString(ibody)+".spi";
+			It.write(fnt);
+			std::cerr << " PPref.size()= " << PPref.size() << std::endl;
+		}
 #endif
+	}
+	else
+	{
+		for (int ibody = 0; ibody < nr_bodies; ibody++)
+		{
+#ifdef DEBUG_OVERLAP
+			Image<RFLOAT> It;
+			FileName fnt;
+			It()= masks_bodies[ibody];
+			fnt = "mask_ibody"+integerToString(ibody)+".spi";
+			It.write(fnt);
+#endif
+			for (int obody = 0; obody < nr_bodies; obody++)
+			{
+				if (ibody == obody)
+				{
+					DIRECT_A2D_ELEM(pointer_body_overlap, ibody, obody) = obody;
+					pointer_body_overlap_inv[obody] = obody;
 				}
 				else
-					// if there is no overlap: just point to the original obody
-					DIRECT_A2D_ELEM(pointer_body_overlap, ibody, obody) = obody;
+				{
+					// Sum all the previously done obody masks to see whether there is also overlap with any of them
+					MultidimArray<RFLOAT> overlap_mask = masks_bodies[ibody];
+					for (int oldobody = 0; oldobody < obody; oldobody++)
+					{
+						if (oldobody != ibody)
+						{
+							int ii = DIRECT_A2D_ELEM(pointer_body_overlap, ibody, oldobody);
+							overlap_mask += masks_bodies[ii];
+						}
+					}
+					// Calculate the overlap between the sum of ibody and all the old obodies until now
+					overlap_mask *= masks_bodies[obody]; // element-wise multiplication
+					// If there is overlap, generate another PPref
+					if (overlap_mask.sum() > 0.)
+					{
+						// Calculate the mask that has the overlap subtracted from the obody mask
+						overlap_mask = masks_bodies[obody] - overlap_mask;
+						// set the right pointer in the 2D matrix
+						DIRECT_A2D_ELEM(pointer_body_overlap, ibody, obody) = PPref.size();
+						//std::cerr << " ibody= " << ibody << " obody= " << obody << " overlap= " << overlap_mask.sum() << " icc= " << PPref.size() << std::endl;
+						// Extend the two vectors here!
+						PPref.push_back(PPref[obody]);
+						masks_bodies.push_back(overlap_mask);
+						// And keep track of which ibody this entry belonged to
+						pointer_body_overlap_inv.push_back(obody);
+
+#ifdef DEBUG_OVERLAP
+						It()= overlap_mask;
+						fnt = "mask_ibody"+integerToString(ibody)+"_obody"+integerToString(obody)+"_overlap.spi";
+						It.write(fnt);
+						std::cerr << " PPref.size()= " << PPref.size() << std::endl;
+#endif
+					}
+					else
+						// if there is no overlap: just point to the original obody
+						DIRECT_A2D_ELEM(pointer_body_overlap, ibody, obody) = obody;
+				}
 			}
 		}
 	}
-
 }
 
 

@@ -168,8 +168,11 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 		do_initialise_bodies = false;
 
 	if (do_initialise_bodies)
+	{
 		ini_high = textToFloat(parser.getOption("--ini_high", "Resolution (in Angstroms) to which to limit refinement in the first iteration ", "-1"));
-
+		
+		mymodel.norm_body_mask_overlap = parser.checkOption("--multibody_norm_overlap", "Overlapping regions between bodies are normalized. This reduces memory requirements.");
+	}
 	do_reconstruct_subtracted_bodies = parser.checkOption("--reconstruct_subtracted_bodies", "Use this flag to perform reconstructions with the subtracted images in multi-body refinement");
 
 	fnt = parser.getOption("--iter", "Maximum number of iterations to perform", "OLD");
