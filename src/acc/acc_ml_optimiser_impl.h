@@ -331,12 +331,14 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
                         seed = baseMLO->random_seed + part_id;
                 }
 
+                LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
                 // construct the noise-image
                 AccUtilities::makeNoiseImage<MlClass>(	temp_sigmaFudgeFactor,
                 								baseMLO->mymodel.sigma2_noise[group_id],
 												seed,
 												accMLO,
 												RandomImage);
+                LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
         }
         CTOC(cudaMLO->timer,"makeNoiseMask");
 
@@ -527,7 +529,9 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			else
 			{
 				MultidimArray<RFLOAT> Mnoise;
+				RandomImage.hostAlloc();
 				RandomImage.cpToHost();
+				Mnoise.resize(img());
 				RandomImage.getHost(Mnoise);
 				softMaskOutsideMapForHelix(img(), psi_deg, tilt_deg, my_mask_radius,
 						(baseMLO->helical_tube_outer_diameter / (2. * baseMLO->mymodel.pixel_size)),

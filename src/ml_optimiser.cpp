@@ -416,6 +416,8 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	}
 #endif
 	double temp_reqSize = textToDouble(parser.getOption("--free_gpu_memory", "GPU device memory (in Mb) to leave free after allocation.", "0"));
+	if(!do_zero_mask)
+		temp_reqSize += 100;
 	temp_reqSize *= 1000*1000;
 	if(temp_reqSize<0)
 		REPORT_ERROR("Invalid free_gpu_memory value.");
@@ -652,6 +654,8 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	}
 #endif
 	double temp_reqSize = textToDouble(parser.getOption("--free_gpu_memory", "GPU device memory (in Mb) to leave free after allocation.", "0"));
+	if(!do_zero_mask)
+		temp_reqSize += 100;
 	temp_reqSize *= 1000*1000;
 	if(temp_reqSize<0)
 		REPORT_ERROR("Invalid free_gpu_memory value.");
