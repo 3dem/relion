@@ -169,6 +169,8 @@ class mask_create_parameters
 int main(int argc, char *argv[])
 {
 	mask_create_parameters prm;
+	
+   PRINT_VERISON_INFO();
 
 	try
     {

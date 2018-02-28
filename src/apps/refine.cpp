@@ -25,8 +25,10 @@
  **************************************************************************/
 int main(int argc, char **argv)
 {
-	MlOptimiser optimiser;
+	 MlOptimiser optimiser;
 
+    PRINT_VERISON_INFO();
+    
     try
     {
     	// Read in parameters from the command line

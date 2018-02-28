@@ -61,20 +61,12 @@ static void HandleError( cudaError_t err, const char *file, int line )
     	fprintf(stderr, "ERROR: %s in %s at line %d (error-code %d)\n",
 						cudaGetErrorString( err ), file, line, err );
 		fflush(stdout);
+#ifdef DEBUG_CUDA
 		raise(SIGSEGV);
+#else
+		CRITICAL(ERRGPUKERN);
+#endif
     }
-
-//#ifdef DEBUG_CUDA
-//      cudaError_t peek = cudaPeekAtLastError();
-//    if (peek != cudaSuccess)
-//    {
-//        printf( "DEBUG_ERROR: %s in %s at line %d (error-code %d)\n",
-//                      cudaGetErrorString( peek ), file, line, err );
-//        fflush(stdout);
-//              raise(SIGSEGV);
-//    }
-//#endif
-
 }
 
 #ifdef LAUNCH_CHECK
@@ -86,22 +78,10 @@ static void LaunchHandleError( cudaError_t err, const char *file, int line )
         printf( "KERNEL_ERROR: %s in %s at line %d (error-code %d)\n",
                         cudaGetErrorString( err ), file, line, err );
         fflush(stdout);
-              CRITICAL(ERRGPUKERN);
+        CRITICAL(ERRGPUKERN);
     }
 }
 #endif
-
-static void HandleError( curandStatus_t err)
-{
-
-    if (err != cudaSuccess)
-    {
-       fprintf(stderr, "CURAND ERROR");
-               fflush(stdout);
-               raise(SIGSEGV);
-    }
-
-}
 
 
 // GENERAL -----------------------------

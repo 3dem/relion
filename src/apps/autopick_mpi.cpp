@@ -25,7 +25,7 @@
 int main(int argc, char *argv[])
 {
 	AutoPickerMpi prm;
-
+    	
 	try
     {
 		prm.read(argc, argv);
