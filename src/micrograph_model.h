@@ -22,21 +22,53 @@
 
 #include <vector>
 #include "src/filename.h"
+#include "src/matrix1d.h"
+
+enum MotionModelVersion {
+	MOTION_MODEL_NULL,
+	MOTION_MODEL_THIRD_ORDER_POLYNOMIAL,
+};
 
 class MotionModel
 {
 public:
 	// Fit model based on observations
-	virtual void fit();
+	virtual void fit() = 0;
+
+	virtual void read(std::ifstream &fh, std::string block_name) = 0;
+	virtual void write(std::ostream &fh, std::string block_name) = 0;
+	virtual int getModelVersion() const = 0;
 
 	// Get motion at frame and (x, y)
-	virtual int getShiftAt(int frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty);
+	virtual int getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty) const = 0;
+};
+
+class ThirdOrderPolynomialModel: public MotionModel {
+public:
+	static const int NUM_COEFFS_PER_DIM;
+
+	Matrix1D <RFLOAT> coeffX, coeffY;
+
+	void fit() {
+		REPORT_ERROR("Not implemented yet.");
+	}
+
+	void read(std::ifstream &fh, std::string block_name);
+	void write(std::ostream &fh, std::string block_name);
+
+	int getModelVersion() const {
+		return MOTION_MODEL_THIRD_ORDER_POLYNOMIAL;
+	}
+
+	int getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty) const;
 };
 
 class Micrograph
 {
 public:
 	static const RFLOAT NOT_OBSERVED;
+	RFLOAT angpix, voltage, dose_per_frame, pre_exposure;
+	MotionModel *model;
 
 	// Empty Constructor is not allowed
 	Micrograph(); // = delete in C++11
@@ -64,8 +96,13 @@ public:
 	{
 		width = 0;
 		height = 0;
-		nFrame = 0;
+		n_frames = 0;
 		binning = 1;
+
+		angpix = -1;
+		voltage = -1;
+		dose_per_frame = -1;
+		pre_exposure = -1;
 
 		fnMovie = "";
 		fnGain = "";
@@ -87,31 +124,47 @@ public:
 	void setMovie(FileName fnMovie, FileName fnGain="", RFLOAT binning=1.0);
 
 	// Get gain reference file name
-	FileName getGainFilename() {
+	FileName getGainFilename() const {
 		return fnGain;
 	}
 
 	// Get binning factor
-	RFLOAT getBinningFactor() {
+	RFLOAT getBinningFactor() const {
 		return binning;
+	}
+
+	// Get original movie name
+	FileName getMovieFilename() const {
+		return fnMovie;
+	}
+
+	int getWidth() const {
+		return width;
+	}
+
+	int getHeight() const {
+		return height;
+	}
+
+	int getNframes() const {
+		return n_frames;
 	}
 
 	// Get shift vector at (x, y, frame)
 	// (x, y) and (shiftx, shifty) are UNBINNED pixels in the original movie
-	int getShiftAt(int frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty);
+	int getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty) const;
 
 	// Set global shift for frame
 	// (shiftx, shifty) is UNBINNED pixels in the original movie
 	void setGlobalShift(int frame, RFLOAT shiftx, RFLOAT shifty);
 
 private:
-	int width, height, nFrame;
+	int width, height, n_frames;
 	RFLOAT binning;
 	FileName fnGain;
 	FileName fnMovie;
 	
 	std::vector<RFLOAT> globalShiftX, globalShiftY;
-	MotionModel *model;
 };
 
 #endif /* MICROGRAPH_MODEL_H_ */

@@ -683,7 +683,8 @@ void RelionJob::initialise(int _job_type)
 	}
 	else if (type == PROC_MASKCREATE)
 	{
-		has_mpi = has_thread = false;
+		has_mpi = false;
+		has_thread = true;
 		initialiseMaskcreateJob();
 	}
 	else if (type == PROC_JOINSTAR)
@@ -1534,7 +1535,7 @@ void RelionJob::initialiseAutopickJob()
 	joboptions["gpu_ids"] = JobOption("Which GPUs to use:", std::string(""), "This argument is not necessary. If left empty, the job itself will try to allocate available GPU resources. You can override the default allocation by providing a list of which GPUs (0,1,2,3, etc) to use. MPI-processes are separated by ':'. For example: 0:1:0:1:0:1");
 
 	joboptions["do_pick_helical_segments"] = JobOption("Pick 2D helical segments?", false, "Set to Yes if you want to pick 2D helical segments.");
-//	joboptions["do_amyloid"] = JobOption("Pick amyloid segments?", false, "Set to Yes if you want to use the algorithm that was developed specifically for picking amyloids.");
+	joboptions["do_amyloid"] = JobOption("Pick amyloid segments?", false, "Set to Yes if you want to use the algorithm that was developed specifically for picking amyloids.");
 
 	joboptions["helical_tube_outer_diameter"] = JobOption("Tube diameter (A): ", 200, 100, 1000, 10, "Outer diameter (in Angstroms) of helical tubes. \
 This value should be slightly larger than the actual width of the tubes.");
@@ -1635,8 +1636,8 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 		if (joboptions["do_pick_helical_segments"].getBoolean())
 		{
 			command += " --helix";
-//			if (joboptions["do_amyloid"].getBoolean())
-//				command += " --amyloid";
+			if (joboptions["do_amyloid"].getBoolean())
+				command += " --amyloid";
 			command += " --helical_tube_outer_diameter " + joboptions["helical_tube_outer_diameter"].getString();
 			command += " --helical_tube_kappa_max " + joboptions["helical_tube_kappa_max"].getString();
 			command += " --helical_tube_length_min " + joboptions["helical_tube_length_min"].getString();
@@ -4072,6 +4073,9 @@ bool RelionJob::getCommandsMaskcreateJob(std::string &outputname, std::vector<st
 	{
 		command += " --helix --z_percentage " + floatToString(joboptions["helical_z_percentage"].getNumber() / 100.);
 	}
+
+	// Running stuff
+	command += " --j " + joboptions["nr_threads"].getString();
 
 	// Other arguments
 	command += " " + joboptions["other_args"].getString();

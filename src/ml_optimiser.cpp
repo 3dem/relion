@@ -8750,7 +8750,7 @@ void MlOptimiser::updateSubsetSize(bool myverb)
 		{
 			subset_size = min_parts_per_class*mymodel.nr_classes;
 		}
-		if (iter <= 10)
+		else if (iter <= 10)
 		{
 			subset_size = 3*min_parts_per_class*mymodel.nr_classes;
 		}

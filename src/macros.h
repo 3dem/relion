@@ -403,7 +403,7 @@ static void SINCOSF(float x, float *s, float *c) { *s = sinf(x); *c = cosf(x); }
 #define LAST_XMIPP_INDEX(size) FIRST_XMIPP_INDEX(size) + (size) - 1
 
 
-static void PRINT_VERISON_INFO() 
+static void PRINT_VERSION_INFO() 
 {
 	std::cout << "RELION version: " << RELION_VERSION << " "
 #if defined(DEBUG) || defined(DEBUG_CUDA)
