@@ -170,7 +170,7 @@ int main(int argc, char *argv[])
 {
 	mask_create_parameters prm;
 	
-   PRINT_VERISON_INFO();
+   PRINT_VERSION_INFO();
 
 	try
     {

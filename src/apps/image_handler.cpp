@@ -771,7 +771,7 @@ int main(int argc, char *argv[])
 {
 	image_handler_parameters prm;
 	
- 	PRINT_VERISON_INFO();
+ 	PRINT_VERSION_INFO();
 
 	try
     {

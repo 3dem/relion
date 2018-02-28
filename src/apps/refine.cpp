@@ -27,7 +27,7 @@ int main(int argc, char **argv)
 {
 	 MlOptimiser optimiser;
 
-    PRINT_VERISON_INFO();
+    PRINT_VERSION_INFO();
     
     try
     {

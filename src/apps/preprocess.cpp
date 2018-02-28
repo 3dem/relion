@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
 {
 	Preprocessing prm;
 	
-    	PRINT_VERISON_INFO();
+    	PRINT_VERSION_INFO();
     	
 	try
     {
