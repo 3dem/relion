@@ -166,6 +166,9 @@ void MotioncorrRunner::initialise()
 		if (patch_x <= 2 || patch_y <= 2) {
 			std::cerr << "The number of patches is too small (<= 2). Patch based alignment will be skipped." << std::endl;
 		}
+		if (group > 1) {
+			std::cerr << "Frame grouping is not yet supported in our own implementation of motion correction." << std::endl;
+		}
 	} else {
 		REPORT_ERROR(" ERROR: You have to specify which programme to use through either --use_motioncor2 or --use_unblur");
 	}
@@ -931,6 +934,37 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<f
 	xshifts.resize(n_frames);
 	yshifts.resize(n_frames);
 
+	// Setup grouping
+	logfile << "Frame grouping: n_frames = " << n_frames << ", requested group size = " << group << std::endl;
+	const int n_groups = n_frames / group;
+	int n_remaining = n_frames % group;
+	std::vector<int> group_start(n_groups, 0), group_size(n_groups, group);
+	while (n_remaining > 0) {
+		for (int i = n_groups - 1; i >= 1 && n_remaining > 0; i--) {
+			// Do not expand the first group, where the motion is largest.
+			group_size[i]++;
+			n_remaining--;
+		}
+	}
+	for (int i = 1; i < n_groups; i++) {
+		group_start[i] = group_start[i - 1] + group_size[i - 1];
+	}
+	logfile << " | ";
+	for (int i = 0, igroup = 0; i < n_frames; i++) {
+		logfile << frames[i] + 1 << " "; // make 1-indexed
+		if (i == group_start[igroup] + group_size[igroup] - 1) {
+			logfile << "| ";
+			igroup++;
+		}
+	}
+	logfile << std::endl;
+	if (n_frames / group != 0) {
+		logfile << "Some groups contain more than the requested number of frames (" << group << ") because the number of frames (" << n_frames << ") was not divisible." << std::endl;
+		logfile << "If you want to ignore remaining frame(s) instead, use --last_frame_sum to discard last frame(s)." << std::endl;
+	}
+	logfile << std::endl;
+
+	// Read gain reference	
 	RCTIC(TIMING_READ_GAIN);
 	if (fn_gain_reference != "") {
 		Igain.read(fn_gain_reference);
@@ -1030,6 +1064,8 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<f
 	}
 	RCTOC(TIMING_GLOBAL_IFFT);
 
+	// TODO: group frames
+
 	// Patch based alignment
 	logfile << std::endl << "Local alignments:" << std::endl;
 	logfile << "Patches: X = " << patch_x << " Y = " << patch_y << std::endl;
@@ -1096,6 +1132,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<f
 				for (int iframe = 0; iframe < n_frames; iframe++) {
 					patch_xshifts.push_back(local_xshifts[iframe]);
 					patch_yshifts.push_back(local_yshifts[iframe]);
+					// TODO: untangle iframe for grouping
 					patch_frames.push_back(iframe);
 					patch_xs.push_back(x_center);
 					patch_ys.push_back(y_center);
