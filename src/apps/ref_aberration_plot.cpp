@@ -29,6 +29,7 @@
 #include <src/jaz/image_op.h>
 #include <src/jaz/refinement_program.h>
 #include <src/jaz/parallel_ft.h>
+#include <src/jaz/aberration_fit.h>
 
 #include <omp.h>
 
@@ -40,14 +41,23 @@ class AberrationPlot : public RefinementProgram
 
         AberrationPlot();
 
+            RFLOAT kmin;
+
+            bool precomputed;
+            std::string precomp;
+
+            Image<RFLOAT> lastCos, lastSin;
+
         int readMoreOptions(IOParser& parser, int argc, char *argv[]);
         int _init();
         int _run();
 };
 
 AberrationPlot :: AberrationPlot()
-:   RefinementProgram(true)
+:   RefinementProgram(true),
+    precomputed(false)
 {
+    optReference = true;
 }
 
 int main(int argc, char *argv[])
@@ -63,7 +73,24 @@ int main(int argc, char *argv[])
 
 int AberrationPlot::readMoreOptions(IOParser& parser, int argc, char *argv[])
 {
-    return 0;
+    kmin = textToFloat(parser.getOption("--kmin", "Inner freq. threshold [Angst]", "30.0"));
+
+    precomp = parser.getOption("--precomp", "Precomputed *_sin and *_cos files from previous run (optional)", "");
+
+    precomputed = precomp != "";
+
+    noReference = precomputed;
+
+    bool allGood = true;
+
+    if (reconFn0 == "" && !precomputed)
+    {
+        std::cerr << "A reference map (--m) is required if no precomputed pixel-fit is available (--precomp).\n";
+        allGood = false;
+    }
+
+    if (!allGood) return 13;
+    else return 0;
 }
 
 int AberrationPlot::_init()
@@ -158,114 +185,154 @@ int AberrationPlot::_run()
     }
     else
     {
-        std::vector<Image<double>>
-            Axx(nr_omp_threads, Image<double>(sh,s)),
-            Axy(nr_omp_threads, Image<double>(sh,s)),
-            Ayy(nr_omp_threads, Image<double>(sh,s)),
-            bx(nr_omp_threads, Image<double>(sh,s)),
-            by(nr_omp_threads, Image<double>(sh,s));
+        Image<RFLOAT> cosPhi(sh,s), sinPhi(sh,s), phase(sh,s);
 
-        const double as = (double)s * angpix;
-
-        for (long g = minMG; g <= gc; g++)
+        if (precomputed)
         {
-            std::stringstream stsg;
-            stsg << g;
+            std::cout << "using precomputed data...\n";
 
-            std::cout << "micrograph " << g << " / " << mdts.size() <<"\n";
+            cosPhi.read(precomp+"_cos.mrc");
+            sinPhi.read(precomp+"_sin.mrc");
+            phase.read(precomp+"_phase.mrc");
+        }
+        else
+        {
+            std::vector<Image<double>>
+                Axx(nr_omp_threads, Image<double>(sh,s)),
+                Axy(nr_omp_threads, Image<double>(sh,s)),
+                Ayy(nr_omp_threads, Image<double>(sh,s)),
+                bx(nr_omp_threads, Image<double>(sh,s)),
+                by(nr_omp_threads, Image<double>(sh,s));
 
-            const int pc = mdts[g].numberOfObjects();
+            const double as = (double)s * angpix;
 
-            std::vector<Image<Complex> > pred;
-            std::vector<Image<Complex> > obsF;
-
-            pred = obsModel.predictObservations(projectors[0], mdts[g], false, true, nr_omp_threads);
-            obsF = StackHelper::loadStackFS(&mdts[g], imgPath, nr_omp_threads, &fts);
-
-            #pragma omp parallel for num_threads(nr_omp_threads)
-            for (long p = 0; p < pc; p++)
+            for (long g = minMG; g <= gc; g++)
             {
-                int t = omp_get_thread_num();
+                std::stringstream stsg;
+                stsg << g;
 
-                CTF ctf0;
-                ctf0.read(mdts[g], mdts[g], p);
-                //ctf0.Cs = 0.0;
-                ctf0.initialise();
+                std::cout << "micrograph " << g << " / " << mdts.size() <<"\n";
 
+                const int pc = mdts[g].numberOfObjects();
+
+                std::vector<Image<Complex> > pred;
+                std::vector<Image<Complex> > obsF;
+
+                pred = obsModel.predictObservations(projectors[0], mdts[g], false, true, nr_omp_threads);
+                obsF = StackHelper::loadStackFS(&mdts[g], imgPath, nr_omp_threads, &fts);
+
+                #pragma omp parallel for num_threads(nr_omp_threads)
+                for (long p = 0; p < pc; p++)
+                {
+                    int t = omp_get_thread_num();
+
+                    CTF ctf0;
+                    ctf0.read(mdts[g], mdts[g], p);
+                    //ctf0.Cs = 0.0;
+                    ctf0.initialise();
+
+                    for (int y = 0; y < s;  y++)
+                    for (int x = 0; x < sh; x++)
+                    {
+                        const double xf = x;
+                        const double yf = y < sh? y : y - s;
+                        const double gamma_i = ctf0.getGamma(xf/as, yf/as);
+                        const double cg = cos(gamma_i);
+                        const double sg = sin(gamma_i);
+
+                        Complex zobs = obsF[p](y,x);
+                        Complex zprd = pred[p](y,x);
+
+                        double zz = zobs.real*zprd.real + zobs.imag*zprd.imag;
+                        double nr = zprd.norm();
+
+                        Axx[t](y,x) += nr*sg*sg;
+                        Axy[t](y,x) += nr*cg*sg;
+                        Ayy[t](y,x) += nr*cg*cg;
+
+                        bx[t](y,x) -= zz*sg;
+                        by[t](y,x) -= zz*cg;
+                    }
+                }
+            }
+
+            for (int t = 1; t < nr_omp_threads; t++)
+            {
                 for (int y = 0; y < s;  y++)
                 for (int x = 0; x < sh; x++)
                 {
-                    const double xf = x;
-                    const double yf = y < sh? y : y - s;
-                    const double gamma_i = ctf0.getGamma(xf/as, yf/as);
-                    const double cg = cos(gamma_i);
-                    const double sg = sin(gamma_i);
+                    Axx[0](y,x) += Axx[t](y,x);
+                    Axy[0](y,x) += Axy[t](y,x);
+                    Ayy[0](y,x) += Ayy[t](y,x);
 
-                    Complex zobs = obsF[p](y,x);
-                    Complex zprd = pred[p](y,x);
-
-                    double zz = zobs.real*zprd.real + zobs.imag*zprd.imag;
-                    double nr = zprd.norm();
-
-                    Axx[t](y,x) += nr*sg*sg;
-                    Axy[t](y,x) += nr*cg*sg;
-                    Ayy[t](y,x) += nr*cg*cg;
-
-                    bx[t](y,x) -= zz*sg;
-                    by[t](y,x) -= zz*cg;
+                    bx[0](y,x) += bx[t](y,x);
+                    by[0](y,x) += by[t](y,x);
                 }
             }
-        }
 
-        for (int t = 1; t < nr_omp_threads; t++)
-        {
             for (int y = 0; y < s;  y++)
             for (int x = 0; x < sh; x++)
             {
-                Axx[0](y,x) += Axx[t](y,x);
-                Axy[0](y,x) += Axy[t](y,x);
-                Ayy[0](y,x) += Ayy[t](y,x);
+                d2Matrix A(
+                    Axx[0](y,x), Axy[0](y,x),
+                    Axy[0](y,x), Ayy[0](y,x));
 
-                bx[0](y,x) += bx[t](y,x);
-                by[0](y,x) += by[t](y,x);
+                d2Vector b(bx[0](y,x), by[0](y,x));
+
+                double det = A(0,0)*A(1,1) - A(1,0)*A(0,1);
+
+                if (det != 0.0)
+                {
+                    d2Matrix Ai = A;
+                    Ai.invert();
+
+                    d2Vector opt = Ai*b;
+
+                    cosPhi(y,x) = opt.x;
+                    sinPhi(y,x) = opt.y;
+
+                    phase(y,x) = std::abs(opt.x) > 0.0? atan2(opt.y, opt.x) : 0.0;
+                }
             }
+
+            VtkHelper::writeVTK(cosPhi, outPath+"_cos.vtk");
+            VtkHelper::writeVTK(sinPhi, outPath+"_sin.vtk");
+            //VtkHelper::writeVTK(phase, outPath+"_phase.vtk");
+
+            Image<RFLOAT> phaseFull(s,s);
+            FftwHelper::decenterDouble2D(phase.data, phaseFull.data);
+            VtkHelper::writeVTK(phaseFull, outPath+"_phase.vtk");
+
+
+
+            cosPhi.write(outPath+"_cos.mrc");
+            sinPhi.write(outPath+"_sin.mrc");
+            phase.write(outPath+"_phase.mrc");
         }
 
-        Image<RFLOAT> xx(sh,s), xy(sh,s), phase(sh,s);
+        OriginalBasis fit = AberrationFit::fitBasic(phase, freqWeight, angpix);
 
-        for (int y = 0; y < s;  y++)
-        for (int x = 0; x < sh; x++)
+        MetaDataTable mdtAll;
+        mdtAll.reserve(mdt0.numberOfObjects());
+
+        for (long g = minMG; g <= gc; g++)
         {
-            d2Matrix A(
-                Axx[0](y,x), Axy[0](y,x),
-                Axy[0](y,x), Ayy[0](y,x));
+            const int pc = mdts[g].numberOfObjects();
 
-            d2Vector b(bx[0](y,x), by[0](y,x));
-
-            double det = A(0,0)*A(1,1) - A(1,0)*A(0,1);
-
-            if (det != 0.0)
+            for (long p = 0; p < pc; p++)
             {
-                d2Matrix Ai = A;
-                Ai.invert();
-
-                d2Vector opt = Ai*b;
-
-                xx(y,x) = opt.x;
-                xy(y,x) = opt.y;
-
-                phase(y,x) = std::abs(opt.x) > 0.0? atan2(opt.y, opt.x) : 0.0;
+                fit.offsetCtf(mdts[g], p);
             }
+
+            mdtAll.append(mdts[g]);
         }
 
-        VtkHelper::writeVTK(xx, outPath+"_cos.vtk");
-        VtkHelper::writeVTK(xy, outPath+"_sin.vtk");
-        VtkHelper::writeVTK(phase, outPath+"_phase.vtk");
-
-        xx.write(outPath+"_cos.mrc");
-        xy.write(outPath+"_sin.mrc");
-        phase.write(outPath+"_phase.mrc");
+        mdtAll.write(outPath+".star");
     }
+
+    double t1 = omp_get_wtime();
+
+    std::cout << "elapsed: " << (t1 - t0) << "s \n";
 
     return 0;
 }
