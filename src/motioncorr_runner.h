@@ -53,6 +53,7 @@ public:
 
 	// Use our own implementation
 	bool do_own;
+	bool interpolate_shifts;
 
 	// Save aligned but non-dose weighted micrograph.
 	// With MOTIONCOR2, this flag is always assumed to be true

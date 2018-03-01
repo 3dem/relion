@@ -108,6 +108,7 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 
 	do_own = parser.checkOption("--use_own","Use our own implementation of motion correction");
 	save_noDW = parser.checkOption("--save_noDW","Save aligned but non dose weighted micrograph. (This is always ON for MOTIONCOR2)");
+	interpolate_shifts = parser.checkOption("--interpolate_shifts","(EXPERIMENTAL) Interpolate shifts");
 	// Initialise verb for non-parallel execution
 	verb = 1;
 
@@ -937,6 +938,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<f
 	// Setup grouping
 	logfile << "Frame grouping: n_frames = " << n_frames << ", requested group size = " << group << std::endl;
 	const int n_groups = n_frames / group;
+	if (n_groups < 3) REPORT_ERROR("Too few frames (< 3) after grouping.");
 	int n_remaining = n_frames % group;
 	std::vector<int> group_start(n_groups, 0), group_size(n_groups, group);
 	while (n_remaining > 0) {
@@ -1128,15 +1130,64 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<f
 				RCTOC(TIMING_PATCH_ALIGN);
 				if (!converged) continue;
 
-				for (int igroup = 0; igroup < n_groups; igroup++) {
-					patch_xshifts.push_back(local_xshifts[igroup]);
-					patch_yshifts.push_back(local_yshifts[igroup]);
-					// TODO: Consider another approach to interpolate shifts before fitting.
-					//       Current approach might bring the origin to a wrong frame.
-					RFLOAT middle_frame = group_start[igroup] + (group_size[igroup] - 1) / 2.0;
-					patch_frames.push_back(middle_frame);
-					patch_xs.push_back(x_center);
-					patch_ys.push_back(y_center);
+				if (interpolate_shifts) {
+					if (n_groups < 2) REPORT_ERROR("Assert failed for n_groups >= 2");
+
+					const int last_group = n_groups - 1;
+					RFLOAT first_slope_x = (local_xshifts[1] - local_xshifts[0]) / group_size[0];
+					RFLOAT first_slope_y = (local_yshifts[1] - local_yshifts[0]) / group_size[0];
+					RFLOAT last_slope_x = (local_xshifts[last_group] - local_xshifts[last_group - 1]) / group_size[0];
+					RFLOAT last_slope_y = (local_yshifts[last_group] - local_yshifts[last_group - 1]) / group_size[0];
+
+					std::vector<RFLOAT> centers(n_groups), interpolated_xshifts(n_frames), interpolated_yshifts(n_frames);
+					// Calculate anchor points
+					for (int igroup = 0; igroup < n_groups; igroup++) {
+						centers[igroup] = group_start[igroup] + (group_size[igroup] - 1) / 2.0;
+					}
+
+					// Inter-/Extra-polate
+					int cur_group = -1;
+					for (int iframe = 0; iframe < n_frames; iframe++) {
+						if (cur_group < last_group && iframe >= centers[cur_group + 1]) cur_group++;
+
+						if (cur_group == -1) { // extrapolate towards the first frame
+							interpolated_xshifts[iframe] = local_xshifts[0] + (iframe - centers[0]) * first_slope_x;
+							interpolated_yshifts[iframe] = local_yshifts[0] + (iframe - centers[0]) * first_slope_y;
+						} else if (cur_group == last_group) { // extrapolate towards the last frame
+							interpolated_xshifts[iframe] = local_xshifts[last_group] + (iframe - centers[last_group]) * last_slope_x;
+							interpolated_yshifts[iframe] = local_yshifts[last_group] + (iframe - centers[last_group]) * last_slope_y;
+						} else { // interpolate
+							interpolated_xshifts[iframe] = (local_xshifts[cur_group] * (centers[cur_group + 1] - iframe) +
+							                                local_xshifts[cur_group + 1] * (iframe - centers[cur_group])) / 
+							                               (centers[cur_group + 1] - centers[cur_group]);
+							interpolated_yshifts[iframe] = (local_yshifts[cur_group] * (centers[cur_group + 1] - iframe) +
+							                                local_yshifts[cur_group + 1] * (iframe - centers[cur_group])) /
+							                               (centers[cur_group + 1] - centers[cur_group]);
+						}
+					}
+					// Recenter to the first frame
+					for (int iframe = 0; iframe < n_frames; iframe++) {
+						interpolated_xshifts[iframe] -= interpolated_xshifts[0];
+						interpolated_yshifts[iframe] -= interpolated_yshifts[0];
+					}
+					// Store shifts
+					for (int iframe = 0; iframe < n_frames; iframe++) {
+						patch_xshifts.push_back(interpolated_xshifts[iframe]);
+						patch_yshifts.push_back(interpolated_yshifts[iframe]);
+						patch_frames.push_back(iframe);
+						patch_xs.push_back(x_center);
+						patch_ys.push_back(y_center);
+					}
+				} else {
+					for (int igroup = 0; igroup < n_groups; igroup++) {
+						patch_xshifts.push_back(local_xshifts[igroup]);
+						patch_yshifts.push_back(local_yshifts[igroup]);
+						// TODO: This approach might bring the origin to a wrong frame.
+						RFLOAT middle_frame = group_start[igroup] + (group_size[igroup] - 1) / 2.0;
+						patch_frames.push_back(middle_frame);
+						patch_xs.push_back(x_center);
+						patch_ys.push_back(y_center);
+					}
 				}
 			}
 		}
