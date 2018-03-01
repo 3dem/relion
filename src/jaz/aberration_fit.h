@@ -37,6 +37,7 @@ class AberrationFit
     public:
 
         static OriginalBasis fitBasic(Image<RFLOAT> phase, Image<RFLOAT> weight, double angpix);
+        static Image<RFLOAT> draw(AberrationBasis* fit, double angpix, int s);
 };
 
 #endif

@@ -32,11 +32,11 @@ OriginalBasis AberrationFit::fitBasic(
 
         for (int r = 0; r < 5; r++)
         {
-            b(r) += w * vals[r] * v;
+            b(r) += w * w * vals[r] * v;
 
             for (int c = 0; c < 5; c++)
             {
-                A(r,c) += w * vals[r] * vals[c];
+                A(r,c) += w * w * vals[r] * vals[c];
             }
         }
     }
@@ -47,12 +47,20 @@ OriginalBasis AberrationFit::fitBasic(
 
     for (int i = 0; i < 5; i++)
     {
-        std::cout << sol(i) << " ";
         basis.coefficients[i] = sol(i);
     }
-    std::cout << "\n";
+
+    return basis;
+}
+
+Image<RFLOAT> AberrationFit::draw(AberrationBasis *fit, double angpix, int s)
+{
+    const int sh = s/2 + 1;
+    const double as = angpix * s;
 
     Image<RFLOAT> vis(sh,s);
+
+    std::vector<double> vals(fit->coefficients.size(), 0.0);
 
     for (int yi = 0; yi < s; yi++)
     for (int xi = 0; xi < sh; xi++)
@@ -60,21 +68,19 @@ OriginalBasis AberrationFit::fitBasic(
         const double x = xi/as;
         const double y = yi > sh? (yi - s)/as: yi/as;
 
-        basis.getBasisValues(x, y, &vals[0]);
+        fit->getBasisValues(x, y, &vals[0]);
 
         double v = 0.0;
 
         for (int i = 0; i < 5; i++)
         {
-            v += sol(i) * vals[i];
+            v += fit->coefficients[i] * vals[i];
         }
 
         vis(yi,xi) = v;
     }
 
-    VtkHelper::writeVTK(vis, "phaseFit_5.vtk");
-
-    return basis;
+    return vis;
 }
 
 AberrationBasis::AberrationBasis(int dims)

@@ -194,6 +194,9 @@ int AberrationPlot::_run()
             cosPhi.read(precomp+"_cos.mrc");
             sinPhi.read(precomp+"_sin.mrc");
             phase.read(precomp+"_phase.mrc");
+
+            s = cosPhi.data.ydim;
+            sh = cosPhi.data.xdim;
         }
         else
         {
@@ -303,14 +306,31 @@ int AberrationPlot::_run()
             FftwHelper::decenterDouble2D(phase.data, phaseFull.data);
             VtkHelper::writeVTK(phaseFull, outPath+"_phase.vtk");
 
-
-
             cosPhi.write(outPath+"_cos.mrc");
             sinPhi.write(outPath+"_sin.mrc");
             phase.write(outPath+"_phase.mrc");
         }
 
+        for (int y = 0; y < s; y++)
+        for (int x = 0; x < sh; x++)
+        {
+            double xx = x;
+            double yy = y <= sh? y : y - s;
+            double r = sqrt(xx*xx + yy*yy);
+
+            if (r == 0 || 2.0*sh*angpix/r > kmin)
+            {
+                freqWeight(y,x) = 0.0;
+            }
+        }
+
         OriginalBasis fit = AberrationFit::fitBasic(phase, freqWeight, angpix);
+
+        Image<RFLOAT> vis = AberrationFit::draw(&fit, angpix, s);
+        Image<RFLOAT> visFull(s,s);
+        FftwHelper::decenterDouble2D(vis.data, visFull.data);
+        VtkHelper::writeVTK(visFull, outPath+"_fit.vtk");
+
 
         MetaDataTable mdtAll;
         mdtAll.reserve(mdt0.numberOfObjects());
