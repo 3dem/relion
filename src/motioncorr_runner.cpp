@@ -1032,8 +1032,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<f
 			n_bad++;
 		}
 	}
-	logfile << "Detected " << n_bad << " hot pixels to be corrected. (BUT correction not implemented yet)" << std::endl;
-
+	logfile << "Detected " << n_bad << " hot pixels to be corrected. (BUT correction not implemented yet)" << std::endl << std::endl;
 	RCTOC(TIMING_DETECT_HOT);
 	// TODO: fix defects
 
@@ -1046,6 +1045,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<f
 	RCTOC(TIMING_GLOBAL_FFT);
 
 	// Global alignment
+	// TODO: Consider frame grouping in global alignment.
 	logfile << std::endl << "Global alignment:" << std::endl;
 	RCTIC(TIMING_GLOBAL_ALIGNMENT);
 	alignPatch(Fframes, nx, ny, xshifts, yshifts, logfile);
@@ -1064,8 +1064,6 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<f
 	}
 	RCTOC(TIMING_GLOBAL_IFFT);
 
-	// TODO: group frames
-
 	// Patch based alignment
 	logfile << std::endl << "Local alignments:" << std::endl;
 	logfile << "Patches: X = " << patch_x << " Y = " << patch_y << std::endl;
@@ -1077,7 +1075,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<f
 	if (do_local) {
 		const int patch_nx = nx / patch_x, patch_ny = ny / patch_y, n_patches = patch_x * patch_y;
 		std::vector<RFLOAT> patch_xshifts, patch_yshifts, patch_frames, patch_xs, patch_ys;
-		std::vector<MultidimArray<Complex> > Fpatches(n_frames);
+		std::vector<MultidimArray<Complex> > Fpatches(n_groups);
 
 		int ipatch = 1;
 		for (int iy = 0; iy < patch_y; iy++) {
@@ -1102,24 +1100,25 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<f
 				logfile << ", Center = (" << x_center << ", " << y_center << ")" << std::endl;
 				ipatch++;
 
-				std::vector<float> local_xshifts(n_frames), local_yshifts(n_frames);
+				std::vector<float> local_xshifts(n_groups), local_yshifts(n_groups);
 				RCTIC(TIMING_PREP_PATCH);
 				std::vector<MultidimArray<RFLOAT> >Ipatches(n_threads);
 				#pragma omp parallel for
-				for (int iframe = 0; iframe < n_frames; iframe++) {
+				for (int igroup = 0; igroup < n_groups; igroup++) {
 					const int tid = omp_get_thread_num();
 					Ipatches[tid].reshape(y_end - y_start, x_end - x_start); // end is not included
-
 					RCTIC(TIMING_CLIP_PATCH);
-					for (int ipy = y_start; ipy < y_end; ipy++) {
-						for (int ipx = x_start; ipx < x_end; ipx++) {
-							DIRECT_A2D_ELEM(Ipatches[tid], ipy - y_start, ipx - x_start) = DIRECT_A2D_ELEM(Iframes[iframe](), ipy, ipx);
+					for (int iframe = group_start[igroup]; iframe < group_start[igroup] + group_size[igroup]; iframe++) {
+						for (int ipy = y_start; ipy < y_end; ipy++) {
+							for (int ipx = x_start; ipx < x_end; ipx++) {
+								DIRECT_A2D_ELEM(Ipatches[tid], ipy - y_start, ipx - x_start) = DIRECT_A2D_ELEM(Iframes[iframe](), ipy, ipx);
+							}
 						}
 					}
 					RCTOC(TIMING_CLIP_PATCH);
 
 					RCTIC(TIMING_PATCH_FFT);
-					transformers[tid].FourierTransform(Ipatches[tid], Fpatches[iframe]);
+					transformers[tid].FourierTransform(Ipatches[tid], Fpatches[igroup]);
 					RCTOC(TIMING_PATCH_FFT);
 				}
 				RCTOC(TIMING_PREP_PATCH);
@@ -1129,11 +1128,13 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<f
 				RCTOC(TIMING_PATCH_ALIGN);
 				if (!converged) continue;
 
-				for (int iframe = 0; iframe < n_frames; iframe++) {
-					patch_xshifts.push_back(local_xshifts[iframe]);
-					patch_yshifts.push_back(local_yshifts[iframe]);
-					// TODO: untangle iframe for grouping
-					patch_frames.push_back(iframe);
+				for (int igroup = 0; igroup < n_groups; igroup++) {
+					patch_xshifts.push_back(local_xshifts[igroup]);
+					patch_yshifts.push_back(local_yshifts[igroup]);
+					// TODO: Consider another approach to interpolate shifts before fitting.
+					//       Current approach might bring the origin to a wrong frame.
+					RFLOAT middle_frame = group_start[igroup] + (group_size[igroup] - 1) / 2.0;
+					patch_frames.push_back(middle_frame);
 					patch_xs.push_back(x_center);
 					patch_ys.push_back(y_center);
 				}
