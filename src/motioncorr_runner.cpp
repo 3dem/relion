@@ -1133,37 +1133,30 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<f
 				if (interpolate_shifts) {
 					if (n_groups < 2) REPORT_ERROR("Assert failed for n_groups >= 2");
 
-					const int last_group = n_groups - 1;
-					RFLOAT first_slope_x = (local_xshifts[1] - local_xshifts[0]) / group_size[0];
-					RFLOAT first_slope_y = (local_yshifts[1] - local_yshifts[0]) / group_size[0];
-					RFLOAT last_slope_x = (local_xshifts[last_group] - local_xshifts[last_group - 1]) / group_size[0];
-					RFLOAT last_slope_y = (local_yshifts[last_group] - local_yshifts[last_group - 1]) / group_size[0];
-
 					std::vector<RFLOAT> centers(n_groups), interpolated_xshifts(n_frames), interpolated_yshifts(n_frames);
 					// Calculate anchor points
 					for (int igroup = 0; igroup < n_groups; igroup++) {
-						centers[igroup] = group_start[igroup] + (group_size[igroup] - 1) / 2.0;
+						centers[igroup] = group_start[igroup] + group_size[igroup] / 2.0;
+#ifdef DEBUG_OWN
+						std::cout << "igroup = " << igroup << " center " << centers[igroup] << " x " << local_xshifts[igroup] << " y " << local_yshifts[igroup] << std::endl;
+#endif
 					}
 
 					// Inter-/Extra-polate
-					int cur_group = -1;
+					int cur_group = 0;
 					for (int iframe = 0; iframe < n_frames; iframe++) {
-						if (cur_group < last_group && iframe >= centers[cur_group + 1]) cur_group++;
+						if (cur_group < n_groups - 2 && iframe >= centers[cur_group + 1]) cur_group++; // don't go to the last group
 
-						if (cur_group == -1) { // extrapolate towards the first frame
-							interpolated_xshifts[iframe] = local_xshifts[0] + (iframe - centers[0]) * first_slope_x;
-							interpolated_yshifts[iframe] = local_yshifts[0] + (iframe - centers[0]) * first_slope_y;
-						} else if (cur_group == last_group) { // extrapolate towards the last frame
-							interpolated_xshifts[iframe] = local_xshifts[last_group] + (iframe - centers[last_group]) * last_slope_x;
-							interpolated_yshifts[iframe] = local_yshifts[last_group] + (iframe - centers[last_group]) * last_slope_y;
-						} else { // interpolate
-							interpolated_xshifts[iframe] = (local_xshifts[cur_group] * (centers[cur_group + 1] - iframe) +
-							                                local_xshifts[cur_group + 1] * (iframe - centers[cur_group])) / 
-							                               (centers[cur_group + 1] - centers[cur_group]);
-							interpolated_yshifts[iframe] = (local_yshifts[cur_group] * (centers[cur_group + 1] - iframe) +
-							                                local_yshifts[cur_group + 1] * (iframe - centers[cur_group])) /
-							                               (centers[cur_group + 1] - centers[cur_group]);
-						}
+						// This formula can be used for both interpolation and extrapolation
+						interpolated_xshifts[iframe] = (local_xshifts[cur_group] * (centers[cur_group + 1] - iframe) +
+						                                local_xshifts[cur_group + 1] * (iframe - centers[cur_group])) / 
+						                               (centers[cur_group + 1] - centers[cur_group]);
+						interpolated_yshifts[iframe] = (local_yshifts[cur_group] * (centers[cur_group + 1] - iframe) +
+						                                local_yshifts[cur_group + 1] * (iframe - centers[cur_group])) /
+						                               (centers[cur_group + 1] - centers[cur_group]);
+#ifdef DEBUG_OWN
+						std::cout << "iframe = " << iframe << " igroup " << cur_group << " x " << interpolated_xshifts[iframe] << " y " << interpolated_yshifts[iframe] << std::endl;
+#endif
 					}
 					// Recenter to the first frame
 					for (int iframe = 0; iframe < n_frames; iframe++) {
@@ -1183,7 +1176,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<f
 						patch_xshifts.push_back(local_xshifts[igroup]);
 						patch_yshifts.push_back(local_yshifts[igroup]);
 						// TODO: This approach might bring the origin to a wrong frame.
-						RFLOAT middle_frame = group_start[igroup] + (group_size[igroup] - 1) / 2.0;
+						RFLOAT middle_frame = group_start[igroup] + group_size[igroup] / 2.0;
 						patch_frames.push_back(middle_frame);
 						patch_xs.push_back(x_center);
 						patch_ys.push_back(y_center);
@@ -1573,11 +1566,6 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes,
 				DIRECT_MULTIDIM_ELEM(Fref, n) += DIRECT_MULTIDIM_ELEM(Fframes[iframe], n);
 			}
 		}
-#ifdef DEBUG_OWN
-		transformers[tid].inverseFourierTransform(Fref, Icc());
-		Icc.write("ref.spi");
-		std::cout << "Done Fref." << std::endl;
-#endif
 		RCTOC(TIMING_MAKE_REF);
 
 		#pragma omp parallel for
