@@ -20,7 +20,16 @@ public:
 
 	PROJECTOR_PTR_TYPE mdlReal;
 	PROJECTOR_PTR_TYPE mdlImag;
+#ifdef CUDA
 	PROJECTOR_PTR_TYPE mdlComplex;
+#else
+	std::complex<XFLOAT> *mdlComplex;
+//	std::complex<XFLOAT> d000, d001, d010, d011;
+//	std::complex<XFLOAT> d100, d101, d110, d111;
+//	std::complex<XFLOAT> dx00, dx01, dx10, dx11; 
+//	std::complex<XFLOAT> dxy0, dxy1;
+//	std::complex<XFLOAT> result;
+#endif
 
 	AccProjectorKernel(
 			int mdlX, int mdlY, int mdlZ,
@@ -28,7 +37,11 @@ public:
 			int mdlInitY, int mdlInitZ,
 			int padding_factor,
 			int maxR,
+#ifdef CUDA
 			PROJECTOR_PTR_TYPE mdlComplex
+#else
+			std::complex<XFLOAT> *mdlComplex
+#endif
 			):
 			mdlX(mdlX), mdlXY(mdlX*mdlY), mdlZ(mdlZ),
 			imgX(imgX), imgY(imgY), imgZ(imgZ),
@@ -105,6 +118,8 @@ public:
 			real =   no_tex3D(mdlReal, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 			imag = - no_tex3D(mdlImag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 #else
+//			CpuKernels::complex3D(mdlComplex, real, imag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ,
+//					d000, d001, d010, d011, d100, d101, d110, d111, dx00, dx01, dx10, dx11, dxy0, dxy1, result);	
 			CpuKernels::complex3D(mdlComplex, real, imag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);	
 #endif
 			
@@ -183,6 +198,8 @@ public:
 			real = no_tex3D(mdlReal, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 			imag = no_tex3D(mdlImag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 	#else
+//				CpuKernels::complex3D(mdlComplex, real, imag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ,
+//						d000, d001, d010, d011, d100, d101, d110, d111, dx00, dx01, dx10, dx11, dxy0, dxy1, result);
 				CpuKernels::complex3D(mdlComplex, real, imag, xp, yp, zp, mdlX, mdlXY, mdlInitY, mdlInitZ);
 	#endif
 			
@@ -254,6 +271,8 @@ public:
 			real = no_tex2D(mdlReal, xp, yp, mdlX, mdlInitY);
 			imag = no_tex2D(mdlImag, xp, yp, mdlX, mdlInitY);
 	#else
+//			CpuKernels::complex2D(mdlComplex, real, imag, xp, yp, mdlX, mdlInitY,
+//					d000, d010, d100, d110, dx00, dx10, result);	
 			CpuKernels::complex2D(mdlComplex, real, imag, xp, yp, mdlX, mdlInitY);	
 	#endif
 			
