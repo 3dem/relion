@@ -180,6 +180,11 @@ private:
 	void realSpaceInterpolation(Image <RFLOAT> &Iref, std::vector<Image<RFLOAT> > &Iframes, MotionModel *model, std::ostream &logfile);
 
 	void realSpaceInterpolation_ThirdOrderPolynomial(Image <RFLOAT> &Iref, std::vector<Image<RFLOAT> > &Iframes, ThirdOrderPolynomialModel &model, std::ostream &logfile);
+
+	void interpolateShifts(std::vector<int> &group_start, std::vector<int> &group_size,
+	                       std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts,
+	                       int n_frames,
+	                       std::vector<RFLOAT> &interpolated_xshifts, std::vector<RFLOAT> &interpolated_yshifts);
 };
 
 

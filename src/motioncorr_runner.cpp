@@ -887,7 +887,6 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 
 // TODO:
 // - defect
-// - grouping
 // - outlier rejection in fitting (use free set?)
 
 bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<float> &xshifts, std::vector<float> &yshifts) {
@@ -1130,34 +1129,9 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<f
 				RCTOC(TIMING_PATCH_ALIGN);
 				if (!converged) continue;
 
+				std::vector<RFLOAT> interpolated_xshifts(n_frames), interpolated_yshifts(n_frames);
+				interpolateShifts(group_start, group_size, local_xshifts, local_yshifts, n_frames, interpolated_xshifts, interpolated_yshifts);
 				if (interpolate_shifts) {
-					if (n_groups < 2) REPORT_ERROR("Assert failed for n_groups >= 2");
-
-					std::vector<RFLOAT> centers(n_groups), interpolated_xshifts(n_frames), interpolated_yshifts(n_frames);
-					// Calculate anchor points
-					for (int igroup = 0; igroup < n_groups; igroup++) {
-						centers[igroup] = group_start[igroup] + group_size[igroup] / 2.0;
-#ifdef DEBUG_OWN
-						std::cout << "igroup = " << igroup << " center " << centers[igroup] << " x " << local_xshifts[igroup] << " y " << local_yshifts[igroup] << std::endl;
-#endif
-					}
-
-					// Inter-/Extra-polate
-					int cur_group = 0;
-					for (int iframe = 0; iframe < n_frames; iframe++) {
-						if (cur_group < n_groups - 2 && iframe >= centers[cur_group + 1]) cur_group++; // don't go to the last group
-
-						// This formula can be used for both interpolation and extrapolation
-						interpolated_xshifts[iframe] = (local_xshifts[cur_group] * (centers[cur_group + 1] - iframe) +
-						                                local_xshifts[cur_group + 1] * (iframe - centers[cur_group])) / 
-						                               (centers[cur_group + 1] - centers[cur_group]);
-						interpolated_yshifts[iframe] = (local_yshifts[cur_group] * (centers[cur_group + 1] - iframe) +
-						                                local_yshifts[cur_group + 1] * (iframe - centers[cur_group])) /
-						                               (centers[cur_group + 1] - centers[cur_group]);
-#ifdef DEBUG_OWN
-						std::cout << "iframe = " << iframe << " igroup " << cur_group << " x " << interpolated_xshifts[iframe] << " y " << interpolated_yshifts[iframe] << std::endl;
-#endif
-					}
 					// Recenter to the first frame
 					for (int iframe = 0; iframe < n_frames; iframe++) {
 						interpolated_xshifts[iframe] -= interpolated_xshifts[0];
@@ -1171,11 +1145,10 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<f
 						patch_xs.push_back(x_center);
 						patch_ys.push_back(y_center);
 					}
-				} else {
+				} else { // only recenter to the center
 					for (int igroup = 0; igroup < n_groups; igroup++) {
-						patch_xshifts.push_back(local_xshifts[igroup]);
-						patch_yshifts.push_back(local_yshifts[igroup]);
-						// TODO: This approach might bring the origin to a wrong frame.
+						patch_xshifts.push_back(local_xshifts[igroup] - interpolated_xshifts[0]);
+						patch_yshifts.push_back(local_yshifts[igroup] - interpolated_yshifts[0]);
 						RFLOAT middle_frame = group_start[igroup] + group_size[igroup] / 2.0;
 						patch_frames.push_back(middle_frame);
 						patch_xs.push_back(x_center);
@@ -1338,6 +1311,40 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<f
 	logfile << "Written aligned and dose-weighted sum to " << fn_avg << std::endl;
 
 	return true;
+}
+
+void MotioncorrRunner::interpolateShifts(std::vector<int> &group_start, std::vector<int> &group_size,
+                                         std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts,
+                                         int n_frames,
+                                         std::vector<RFLOAT> &interpolated_xshifts, std::vector<RFLOAT> &interpolated_yshifts) {
+	const int n_groups = group_start.size();
+	if (n_groups < 2) REPORT_ERROR("Assert failed for n_groups >= 2");
+	std::vector<RFLOAT> centers(n_groups);
+
+	// Calculate anchor points
+	for (int igroup = 0; igroup < n_groups; igroup++) {
+		centers[igroup] = group_start[igroup] + group_size[igroup] / 2.0;
+#ifdef DEBUG_OWN
+		std::cout << "igroup = " << igroup << " center " << centers[igroup] << " x " << xshifts[igroup] << " y " << yshifts[igroup] << std::endl;
+#endif
+	}
+
+	// Inter-/Extra-polate
+	int cur_group = 0;
+	for (int iframe = 0; iframe < n_frames; iframe++) {
+		if (cur_group < n_groups - 2 && iframe >= centers[cur_group + 1]) cur_group++; // don't go to the last group
+
+		// This formula can be used for both interpolation and extrapolation
+		interpolated_xshifts[iframe] = (xshifts[cur_group] * (centers[cur_group + 1] - iframe) +
+		                                xshifts[cur_group + 1] * (iframe - centers[cur_group])) / 
+		                               (centers[cur_group + 1] - centers[cur_group]);
+		interpolated_yshifts[iframe] = (yshifts[cur_group] * (centers[cur_group + 1] - iframe) +
+		                                yshifts[cur_group + 1] * (iframe - centers[cur_group])) /
+		                               (centers[cur_group + 1] - centers[cur_group]);
+#ifdef DEBUG_OWN
+		std::cout << "iframe = " << iframe << " igroup " << cur_group << " x " << interpolated_xshifts[iframe] << " y " << interpolated_yshifts[iframe] << std::endl;
+#endif
+	}
 }
 
 void MotioncorrRunner::realSpaceInterpolation(Image <RFLOAT> &Iref, std::vector<Image<RFLOAT> > &Iframes, MotionModel *model, std::ostream &logfile) {
