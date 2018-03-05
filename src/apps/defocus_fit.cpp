@@ -190,7 +190,7 @@ int DefocusFit::_run()
                 DefocusRefinement::findAstigmatismPhaseAndCsNM(
                         preds, obsF, freqWeight, ctf0, angpix, &u, &v, &phi, &phase, &newCs);
 
-                std::cout << "initial phi and Cs: " << phase << ", " << newCs << "\n";
+                std::cout << "final phi and Cs: " << phase << ", " << newCs << "\n";
             }
             else if (fitPhase)
             {

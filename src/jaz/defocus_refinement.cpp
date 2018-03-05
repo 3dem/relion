@@ -17,7 +17,7 @@ RFLOAT DefocusRefinement::findDefocus1D(
         RFLOAT range, int steps,
         int recDepth, RFLOAT recScale)
 {
-    const RFLOAT ratio = ctf0.DeltafV / ctf0.DeltafU;
+    const RFLOAT delta = ctf0.DeltafV - ctf0.DeltafU;
     CTF ctf(ctf0);
 
     double minErr = std::numeric_limits<double>::max();
@@ -27,7 +27,7 @@ RFLOAT DefocusRefinement::findDefocus1D(
     for (int s = -steps/2; s <= steps/2; s++)
     {
         const RFLOAT u = ctf0.DeltafU + s * range / (steps/2);
-        const RFLOAT v = ratio * u;
+        const RFLOAT v = u + delta;
 
         ctf.DeltafU = u;
         ctf.DeltafV = v;
@@ -145,7 +145,7 @@ std::vector<d2Vector> DefocusRefinement::diagnoseDefocus(
         const CTF &ctf0, RFLOAT angpix,
         double range, int steps, int threads)
 {
-    const RFLOAT ratio = ctf0.DeltafV / ctf0.DeltafU;
+    const RFLOAT delta = ctf0.DeltafV - ctf0.DeltafU;
 
     std::vector<d2Vector> out(steps);
 
@@ -154,7 +154,7 @@ std::vector<d2Vector> DefocusRefinement::diagnoseDefocus(
     {
         CTF ctf(ctf0);
         const RFLOAT u = ctf0.DeltafU + (s - steps/2) * range / (double)steps;
-        const RFLOAT v = ratio * u;
+        const RFLOAT v = u + delta;
 
         ctf.DeltafU = u;
         ctf.DeltafV = v;

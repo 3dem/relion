@@ -212,14 +212,28 @@ void OriginalBasis::_offsetCtf(
     */
 
     double b0 = K3 - coefficients[0];
-    double t0 = tan(b0);
-    double Q0 = sqrt(t0*t0/(1 + t0*t0));
+
+    if (b0 < 0)
+    {
+        double phase_shift;
+        if (!mdt.getValue(EMDL_CTF_PHASESHIFT, phase_shift, particle)) phase_shift = 0;
+
+        phase_shift = phase_shift - RAD2DEG(coefficients[0]);
+
+        mdt.setValue(EMDL_CTF_PHASESHIFT, phase_shift, particle);
+    }
+    else
+    {
+        double t0 = tan(b0);
+        double Q0 = sqrt(t0*t0/(1 + t0*t0));
+
+        mdt.setValue(EMDL_CTF_Q0, Q0, particle);
+    }
 
     mdt.setValue(EMDL_CTF_DEFOCUSU, DeltafU, particle);
     mdt.setValue(EMDL_CTF_DEFOCUSV, DeltafV, particle);
     mdt.setValue(EMDL_CTF_DEFOCUS_ANGLE, azimuthal_angle, particle);
     mdt.setValue(EMDL_CTF_CS, Cs, particle);
-    mdt.setValue(EMDL_CTF_Q0, Q0, particle);
 
     //std::cout << DeltafU << ", " << DeltafV << " @ " << azimuthal_angle << "°, " << Cs << ", " << Q0 << "\n\n";
 
