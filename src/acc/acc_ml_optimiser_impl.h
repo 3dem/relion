@@ -69,7 +69,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		}
 
 		// Get the optimal origin offsets from the previous iteration
-		Matrix1D<RFLOAT> my_old_offset(3), my_prior(3), my_old_offset_ori;
+		Matrix1D<RFLOAT> my_old_offset(baseMLO->mymodel.data_dim), my_prior(baseMLO->mymodel.data_dim), my_old_offset_ori;
 		int icol_rot, icol_tilt, icol_psi, icol_xoff, icol_yoff, icol_zoff;
 		XX(my_old_offset) = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_XOFF);
 		YY(my_old_offset) = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_YOFF);
