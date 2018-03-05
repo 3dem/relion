@@ -187,7 +187,7 @@ void FlexAnalyser::initialise()
 
 }
 
-void FlexAnalyser::run()
+void FlexAnalyser::run(int rank, int size)
 {
 
 	if (do_subtract)
@@ -196,7 +196,7 @@ void FlexAnalyser::run()
 		setup3DModels();
 
 	// Loop through all particles
-	loopThroughParticles();
+	loopThroughParticles(rank, size);
 
 }
 
@@ -288,7 +288,6 @@ void FlexAnalyser::setupSubtractionMasksAndProjectors()
 
 	// Now set up the Projectors inside the model
 	model.setFourierTransformMaps(false); // false means ignore tau2_class
-
 }
 
 void FlexAnalyser::setup3DModels()
@@ -301,8 +300,7 @@ void FlexAnalyser::setup3DModels()
 		selfTranslate(model.Iref[ibody], -model.com_bodies[ibody], DONT_WRAP);
 		// And do the same for the masks
 		selfTranslate(model.masks_bodies[ibody], -model.com_bodies[ibody], DONT_WRAP);
-}
-
+	}
 }
 
 void FlexAnalyser::loopThroughParticles(int rank, int size)
@@ -350,10 +348,12 @@ void FlexAnalyser::loopThroughParticles(int rank, int size)
 	if (do_subtract || do_3dmodels)
 	{
 		FileName fn_star, fn_addon = (do_subtract) ? "subtracted" : "3dmodels";
-		if (size > 1)
-			fn_star.compose(fn_out + "_rank", rank + 1, "_" + fn_addon + ".star");
-		else
+		if (size > 1) {
+			fn_star.compose(fn_out + "_rank", rank + 1, "");
+			fn_star = fn_star + "_" + fn_addon + ".star";
+		} else {
 			fn_star = fn_out + "_" + fn_addon + ".star";
+		}
 		DFo.write(fn_star);
 	}
 
@@ -605,17 +605,17 @@ void FlexAnalyser::subtractOneParticle(long int ori_particle, long int imgno, in
 		// Write out the rot,tilt,psi as the combination of Aori and Aresi!! So get rid of the rotations around the tilt=90 axes,
 		Abody = Aori * (model.orient_bodies[subtract_body]).transpose() * A_rot90 * Aresi_subtract * model.orient_bodies[subtract_body];
 		Euler_matrix2angles(Abody, rot, tilt, psi);
-		DFo.setValue(EMDL_ORIENT_ROT, rot, part_id);
-		DFo.setValue(EMDL_ORIENT_TILT, tilt, part_id);
-		DFo.setValue(EMDL_ORIENT_PSI, psi, part_id);
+		DFo.setValue(EMDL_ORIENT_ROT, rot);
+		DFo.setValue(EMDL_ORIENT_TILT, tilt);
+		DFo.setValue(EMDL_ORIENT_PSI, psi);
 		my_residual_offset += my_refined_ibody_offset;
 	}
 
 	// Set the difference between the rounded my_old_offset and the actual offsets, plus (for multibody) my_refined_ibody_offset
-	DFo.setValue(EMDL_ORIENT_ORIGIN_X, XX(my_residual_offset), part_id);
-	DFo.setValue(EMDL_ORIENT_ORIGIN_Y, YY(my_residual_offset), part_id);
+	DFo.setValue(EMDL_ORIENT_ORIGIN_X, XX(my_residual_offset));
+	DFo.setValue(EMDL_ORIENT_ORIGIN_Y, YY(my_residual_offset));
 	if (model.data_dim == 3)
-		DFo.setValue(EMDL_ORIENT_ORIGIN_Z, ZZ(my_residual_offset), part_id);
+		DFo.setValue(EMDL_ORIENT_ORIGIN_Z, ZZ(my_residual_offset));
 
 
 	// Rebox the image
@@ -645,10 +645,12 @@ void FlexAnalyser::subtractOneParticle(long int ori_particle, long int imgno, in
     	// Write this particle to the stack on disc
         // First particle: write stack in overwrite mode, from then on just append to it
         FileName fn_stack;
-        if (size > 1)
-        	fn_stack.compose(fn_out + "_rank", rank+1, "_subtracted.mrcs");
-        else
+        if (size > 1) {
+        	fn_stack.compose(fn_out + "_rank", rank + 1, "");
+		fn_stack = fn_stack + "_subtracted.mrcs";
+	} else {
         	fn_stack = fn_out + "_subtracted.mrcs";
+	}
     	fn_img.compose(imgno+1,fn_stack);
         if (imgno == 0)
             img.write(fn_img, -1, false, WRITE_OVERWRITE);
