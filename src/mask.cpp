@@ -424,7 +424,7 @@ void autoMask(MultidimArray<RFLOAT> &img_in, MultidimArray<RFLOAT> &msk_out,
 		msk_cp = msk_out;
 		int extend_size = CEIL(width_soft_mask_edge);
 		RFLOAT width_soft_mask_edge2 = width_soft_mask_edge * width_soft_mask_edge;
-		#pragma omp parallel for
+		#pragma omp parallel for num_threads(n_threads)
 		FOR_ALL_ELEMENTS_IN_ARRAY3D(msk_cp)
 		{
 			// only extend zero values to values between 0 and 1.
