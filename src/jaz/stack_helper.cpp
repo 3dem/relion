@@ -303,6 +303,9 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
     }
 
     Image<float> mgStack;
+    Image<RFLOAT> gainRef;
+
+    std::string mgNameAct;
 
     if (ending == "star")
     {
@@ -335,7 +338,7 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 
         metaMdt.getValue(EMDL_MICROGRAPH_MOVIE_NAME, mgName0, 0);
 
-        std::string mgNameAct, gainNameAct;
+        std::string gainNameAct;
 
         if (moviePath == "")
         {
@@ -351,72 +354,41 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
             std::cout << "loading: " << mgNameAct << "\n";
         }
 
-        mgStack.read(mgNameAct, loadData);
+        mgStack.read(mgNameAct, false);
 
-        if (loadData && hot > 0)
-        {
-            #pragma omp parallel for num_threads(threads)
-            for (int n = 0; n < mgStack().ndim; n++)
-            for (int z = 0; z < mgStack().zdim; z++)
-            for (int y = 0; y < mgStack().ydim; y++)
-            for (int x = 0; x < mgStack().xdim; x++)
-            {
-                if (DIRECT_NZYX_ELEM(mgStack(), n, z, y, x) > hot)
-                {
-                    DIRECT_NZYX_ELEM(mgStack(), n, z, y, x) = hot;
-                }
-            }
-        }
-
-        if (useGain)
+        if (useGain && loadData)
         {
             if (!metaMdt.containsLabel(EMDL_MICROGRAPH_GAIN_NAME))
             {
-                std::cerr << "warning: " << metaNameAct
-                          << " does not contain a rlnMicrographGainName field.\n";
+                REPORT_ERROR("StackHelper::extractMovieStackFS: " + metaNameAct
+                           + " does not contain a rlnMicrographGainName field.");
+            }
+
+            std::string gainName0;
+            metaMdt.getValue(EMDL_MICROGRAPH_GAIN_NAME, gainName0, 0);
+
+            if (moviePath == "")
+            {
+                gainNameAct = gainName0;
             }
             else
             {
-                std::string gainName0;
-                metaMdt.getValue(EMDL_MICROGRAPH_GAIN_NAME, gainName0, 0);
+                gainNameAct = moviePath + "/" + gainName0.substr(gainName0.find_last_of("/")+1);
+            }
 
-                if (moviePath == "")
-                {
-                    gainNameAct = gainName0;
-                }
-                else
-                {
-                    gainNameAct = moviePath + "/" + gainName0.substr(gainName0.find_last_of("/")+1);
-                }
+            gainRef.read(gainNameAct, true);
 
-                Image<RFLOAT> gainRef;
-                gainRef.read(gainNameAct, loadData);
+            if (gainRef.data.xdim != mgStack.data.xdim
+                || gainRef.data.ydim != mgStack.data.ydim)
+            {
+                std::stringstream stsm;
+                stsm << mgStack.data.xdim << "x" << mgStack.data.ydim;
+                std::stringstream stsg;
+                stsg << gainRef.data.xdim << "x" << gainRef.data.ydim;
 
-                if (loadData)
-                {
-                    if (gainRef.data.xdim != mgStack.data.xdim
-                        || gainRef.data.ydim != mgStack.data.ydim)
-                    {
-                        std::stringstream stsm;
-                        stsm << mgStack.data.xdim << "x" << mgStack.data.ydim;
-                        std::stringstream stsg;
-                        stsg << gainRef.data.xdim << "x" << gainRef.data.ydim;
-
-                        REPORT_ERROR("StackHelper::extractMovieStackFS: gain reference ("
-                                     + gainNameAct + ") and movie stack (" + mgNameAct
-                                     + ") are of unequal size ("+stsg.str()+" vs. "+stsm.str()+").");
-                    }
-
-                    #pragma omp parallel for num_threads(threads)
-                    for (int n = 0; n < mgStack().ndim; n++)
-                    for (int z = 0; z < mgStack().zdim; z++)
-                    for (int y = 0; y < mgStack().ydim; y++)
-                    for (int x = 0; x < mgStack().xdim; x++)
-                    {
-                        DIRECT_NZYX_ELEM(mgStack(), n, z, y, x)
-                            *= DIRECT_NZYX_ELEM(gainRef(), 0, 0, y, x);
-                    }
-                }
+                REPORT_ERROR("StackHelper::extractMovieStackFS: gain reference ("
+                             + gainNameAct + ") and movie stack (" + mgNameAct
+                             + ") are of unequal size ("+stsg.str()+" vs. "+stsm.str()+").");
             }
         }
     }
@@ -426,8 +398,6 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
         {
             std::cerr << "Warning: unable to load gain reference - rlnMicrographName (" << name0 << ") is not a .star file.\n";
         }
-
-        std::string mgNameAct;
 
         if (moviePath == "")
         {
@@ -443,7 +413,7 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
             std::cout << "loading: " << mgNameAct << "\n";
         }
 
-        mgStack.read(mgNameAct, loadData);
+        mgStack.read(mgNameAct, false);
     }
 
     if (verbose)
@@ -461,9 +431,6 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
     const int h0 = mgStack.data.ydim;
     const int fc = dataInZ? mgStack.data.zdim : mgStack.data.ndim;
 
-    const int nsc = dataInZ? 0 : 1;
-    const int zsc = dataInZ? 1 : 0;
-
     if (verbose)
     {
         if (dataInZ) std::cout << "data in Z\n";
@@ -471,6 +438,13 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 
         std::cout << "frame count = " << fc << "\n";
     }
+
+    for (long p = 0; p < pc; p++)
+    {
+        out[p] = std::vector<Image<Complex>>(fc);
+    }
+
+    if (!loadData) return out;
 
     const int sqMg = squareSize * outBin / movieBin;
 
@@ -496,27 +470,31 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
         }
     }
 
-    for (long p = 0; p < pc; p++)
+    Image<RFLOAT> muGraph;
+
+    for (long f = 0; f < fc; f++)
     {
-        out[p] = std::vector<Image<Complex>>(fc);
+        muGraph.read(mgNameAct, true, f);
 
-        if (!loadData) continue;
-
-        double xp0, yp0;
-
-        mdt->getValue(EMDL_IMAGE_COORD_X, xp0, p);
-        mdt->getValue(EMDL_IMAGE_COORD_Y, yp0, p);
-
-        const double xpo = (int)(outBin * xp0 / coordsBin) - squareSize/2;
-        const double ypo = (int)(outBin * yp0 / coordsBin) - squareSize/2;
-
-        const int x0 = xpo * outBin / movieBin;
-        const int y0 = ypo * outBin / movieBin;
+        if (verbose) std::cout << (f+1) << "/" << fc << "\n";
 
         #pragma omp parallel for num_threads(threads)
-        for (long f = 0; f < fc; f++)
+        for (long p = 0; p < pc; p++)
         {
             int t = omp_get_thread_num();
+
+            out[p][f] = Image<Complex>(sqMg,sqMg);
+
+            double xp0, yp0;
+
+            mdt->getValue(EMDL_IMAGE_COORD_X, xp0, p);
+            mdt->getValue(EMDL_IMAGE_COORD_Y, yp0, p);
+
+            const double xpo = (int)(outBin * xp0 / coordsBin) - squareSize/2;
+            const double ypo = (int)(outBin * yp0 / coordsBin) - squareSize/2;
+
+            const int x0 = xpo * outBin / movieBin;
+            const int y0 = ypo * outBin / movieBin;
 
             // @TODO: read whole-image shifts from micrograph class
 
@@ -532,31 +510,23 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
                 if (yy < 0) yy = 0;
                 else if (yy >= h0) yy = h0 - 1;
 
-                RFLOAT val = DIRECT_NZYX_ELEM(mgStack.data, nsc*f, zsc*f, yy, xx);
-                DIRECT_NZYX_ELEM(aux0[t].data, 0, 0, y, x) = -val;
+                RFLOAT val = DIRECT_NZYX_ELEM(muGraph.data, 0, 0, yy, xx);
+                RFLOAT gain = 1.0;
+
+                if (useGain) gain = DIRECT_NZYX_ELEM(gainRef.data, 0, 0, yy, xx);
+
+                if (hot > 0.0 && val > hot) val = hot;
+
+                DIRECT_NZYX_ELEM(aux0[t].data, 0, 0, y, x) = -gain*val;
             }
 
             if (outBin == movieBin)
             {
                 fts[t].FourierTransform(aux0[t](), out[p][f]());
             }
-            else if (binningType != FourierCrop)
-            {
-                if (binningType == BoxBin)
-                {
-                    ResamplingHelper::downsampleBox2D(aux0[t], outBin/(double)movieBin, aux1[t]);
-                }
-                else if (binningType == GaussBin)
-                {
-                    ResamplingHelper::downsampleGauss2D(aux0[t], outBin/(double)movieBin, aux1[t]);
-                }
-
-                fts[t].FourierTransform(aux1[t](), out[p][f]());
-            }
             else
             {
                 fts[t].FourierTransform(aux0[t](), aux2[t]());
-
                 out[p][f] = FilterHelper::cropCorner2D(aux2[t], squareSize/2+1, squareSize);
             }
 
