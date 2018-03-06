@@ -4571,7 +4571,7 @@ bool RelionJob::getCommandsLocalresJob(std::string &outputname, std::vector<std:
 		else
 			command="`which relion_postprocess`";
 
-		command += " --locres --i " + joboptions["fn_in"].getString().substr(0, pos_half);
+		command += " --locres --i " + joboptions["fn_in"].getString();
 		command += " --o " + outputname + "relion";
 		command += " --angpix " + joboptions["angpix"].getString();
 		//command += " --locres_sampling " + joboptions["locres_sampling"].getString();
