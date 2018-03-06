@@ -20,7 +20,7 @@
 #include "src/ctffind_runner.h"
 
 #ifdef CUDA
-#include "src/gpu_utils/cuda_mem_utils.h"
+#include "src/acc/cuda/cuda_mem_utils.h"
 #endif
 
 void CtffindRunner::read(int argc, char **argv, int rank)

@@ -19,7 +19,7 @@
  ***************************************************************************/
 #include <src/autopicker.h>
 #ifdef CUDA
-#include <src/gpu_utils/cuda_autopicker.h>
+#include <src/acc/cuda/cuda_autopicker.h>
 #endif
 
 int main(int argc, char *argv[])

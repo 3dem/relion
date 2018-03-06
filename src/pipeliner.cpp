@@ -467,6 +467,7 @@ bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, boo
 				processList[current_job].type == PROC_3DCLASS ||
 				processList[current_job].type == PROC_INIMODEL ||
 				processList[current_job].type == PROC_3DAUTO ||
+				processList[current_job].type == PROC_MULTIBODY ||
 				processList[current_job].type == PROC_MANUALPICK ||
 				processList[current_job].type == PROC_CLASSSELECT ||
 				processList[current_job].type == PROC_MOVIEREFINE ||
@@ -475,7 +476,9 @@ bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, boo
 		// For continuation of relion_refine jobs, remove the original output nodes from the list
 		if (processList[current_job].type == PROC_2DCLASS ||
 				processList[current_job].type == PROC_3DCLASS ||
-				processList[current_job].type == PROC_3DAUTO)
+				processList[current_job].type == PROC_3DAUTO ||
+				processList[current_job].type == PROC_MULTIBODY ||
+				processList[current_job].type == PROC_INIMODEL)
 		{
 
 			std::vector<bool> deleteNodes, deleteProcesses;
@@ -924,7 +927,8 @@ bool PipeLine::markAsFinishedJob(int this_job, std::string &error_message)
 	// For relion_refine jobs, add last iteration optimiser.star, data.star, model.star and class???.mrc to the pipeline
 	if (processList[this_job].type == PROC_2DCLASS ||
 		processList[this_job].type == PROC_3DCLASS ||
-		processList[this_job].type == PROC_3DAUTO)
+		processList[this_job].type == PROC_3DAUTO  ||
+		processList[this_job].type == PROC_INIMODEL )
 	{
 		// Get the last iteration optimiser file
 		FileName fn_opt;

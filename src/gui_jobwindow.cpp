@@ -458,6 +458,11 @@ void JobWindow::initialise(int my_job_type, bool _do_oldstyle)
 		myjob.initialise(my_job_type);
 		initialiseAutorefineWindow();
 	}
+	else if (my_job_type == PROC_MULTIBODY)
+	{
+		myjob.initialise(my_job_type);
+		initialiseMultiBodyWindow();
+	}
 	else if (my_job_type == PROC_MOVIEREFINE)
 	{
 		myjob.initialise(my_job_type);
@@ -500,6 +505,9 @@ void JobWindow::initialise(int my_job_type, bool _do_oldstyle)
 
 	// read settings if hidden file exists
 	myjob.read("", is_continue);
+
+	// update the window
+	updateMyGui();
 
 }
 
@@ -558,7 +566,18 @@ void JobWindow::initialiseMotioncorrWindow()
 
 	group1->begin();
 
+	group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group4->end();
+
+	place("do_3rd_motioncor", TOGGLE_DEACTIVATE, group4);
+
+	group4->begin();
+
 	place("fn_motioncor2_exe", TOGGLE_DEACTIVATE);
+
+	group4->end();
+	guientries["do_3rd_motioncor"].cb_menu_i(); // make default active
+
 	place("fn_gain_ref", TOGGLE_DEACTIVATE);
 	place("fn_defect", TOGGLE_DEACTIVATE);
 
@@ -1056,17 +1075,8 @@ void JobWindow::initialiseSortWindow()
 	// Add a little spacer
 	current_y += STEPY/2;
 
-	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group1->end();
-
-	place("is_autopick", TOGGLE_DEACTIVATE, group1);
-
-	group1->begin();
-
+	place("model_refs", TOGGLE_DEACTIVATE);
 	place("autopick_refs", TOGGLE_DEACTIVATE);
-
-	group1->end();
-	guientries["is_autopick"].cb_menu_i();
 
 	tab1->end();
 
@@ -1173,15 +1183,7 @@ void JobWindow::initialiseClass2DWindow()
 	current_y += STEPY/2;
 
 	place("nr_iter");
-	place("do_subsets", TOGGLE_DEACTIVATE, group2);
-
-	group2->begin();
-
-	place("subset_size", TOGGLE_DEACTIVATE);
-	place("max_subsets", TOGGLE_DEACTIVATE);
-	group2->end();
-
-	guientries["do_subsets"].cb_menu_i(); // to make default effective
+	place("do_fast_subsets", TOGGLE_DEACTIVATE);
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -1245,6 +1247,7 @@ void JobWindow::initialiseClass2DWindow()
 
 	place("do_parallel_discio");
 	place("nr_pool");
+	place("do_pad1");
 	place("do_preread_images");
 	place("scratch_dir");
 	place("do_combine_thru_disc");
@@ -1300,30 +1303,52 @@ void JobWindow::initialiseInimodelWindow()
 	tab2->end();
 
 	tab3->begin();
-	tab3->label("SGD");
+	tab3->label("Optimisation");
 	resetHeight();
 
+	place("nr_classes", TOGGLE_DEACTIVATE);
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
 	place("particle_diameter");
+	place("do_solvent", TOGGLE_DEACTIVATE);
 	place("sym_name", TOGGLE_DEACTIVATE);
 
 	// Add a little spacer
 	current_y += STEPY/2;
 
-	place("nr_iter");
-	place("sgd_subset_size");
-	place("sgd_write_subsets");
-	place("sgd_highres_limit");
-	place("sgd_sigma2fudge_halflife");
-
-	tab3->end();
-	tab4->begin();
-	tab4->label("Sampling");
-
-	resetHeight();
-
 	place("sampling");
 	place("offset_range");
 	place("offset_step");
+
+	tab3->end();
+	tab4->begin();
+	tab4->label("SGD");
+
+	resetHeight();
+
+	place("sgd_ini_iter");
+	place("sgd_inbetween_iter");
+	place("sgd_fin_iter");
+	place("sgd_write_iter");
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	place("sgd_ini_resol");
+	place("sgd_fin_resol");
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	place("sgd_ini_subset_size");
+	place("sgd_fin_subset_size");
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	place("sgd_sigma2fudge_halflife", TOGGLE_DEACTIVATE);
 
 	tab4->end();
 
@@ -1333,6 +1358,7 @@ void JobWindow::initialiseInimodelWindow()
 
 	place("do_parallel_discio");
 	place("nr_pool");
+	place("do_pad1");
 	place("do_preread_images");
 	place("scratch_dir");
 	place("do_combine_thru_disc");
@@ -1416,13 +1442,7 @@ void JobWindow::initialiseClass3DWindow()
 	current_y += STEPY/2;
 
 	place("nr_iter");
-	place("do_subsets", TOGGLE_DEACTIVATE, group2);
-
-	group2->begin();
-	place("subset_size", TOGGLE_DEACTIVATE);
-	place("max_subsets", TOGGLE_DEACTIVATE);
-	group2->end();
-	guientries["do_subsets"].cb_menu_i(); // to make default effective
+	place("do_fast_subsets", TOGGLE_DEACTIVATE);
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -1521,6 +1541,7 @@ void JobWindow::initialiseClass3DWindow()
 
 	place("do_parallel_discio");
 	place("nr_pool");
+	place("do_pad1");
 	place("do_preread_images");
 	place("scratch_dir");
 	place("do_combine_thru_disc");
@@ -1659,6 +1680,7 @@ void JobWindow::initialiseAutorefineWindow()
 
 	place("do_parallel_discio");
 	place("nr_pool");
+	place("do_pad1");
 	place("do_preread_images");
 	place("scratch_dir");
 	place("do_combine_thru_disc");
@@ -1678,6 +1700,93 @@ void JobWindow::initialiseAutorefineWindow()
 	tab7->end();
 
 }
+
+void JobWindow::initialiseMultiBodyWindow()
+{
+	setupTabs(4);
+	tab1->begin();
+	tab1->label("I/O");
+	resetHeight();
+
+	place("fn_in", TOGGLE_DEACTIVATE);
+	place("fn_cont", TOGGLE_REACTIVATE);
+	place("fn_bodies", TOGGLE_DEACTIVATE);
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	place("do_subtracted_bodies", TOGGLE_DEACTIVATE);
+
+	tab1->end();
+	tab2->begin();
+	tab2->label("Auto-sampling");
+	resetHeight();
+
+	place("sampling", TOGGLE_DEACTIVATE);
+	place("offset_range", TOGGLE_DEACTIVATE);
+	place("offset_step", TOGGLE_DEACTIVATE);
+
+
+	tab2->end();
+
+	tab3->begin();
+	tab3->label("Analyse");
+	resetHeight();
+
+    group5 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group5->end();
+
+    place("do_analyse", TOGGLE_LEAVE_ACTIVE, group5);
+	group5->begin();
+
+	place("nr_movies");
+
+    group6 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group6->end();
+
+	place("do_select", TOGGLE_LEAVE_ACTIVE, group6);
+
+	group6->begin();
+	place("select_eigenval");
+	place("eigenval_min");
+	place("eigenval_max");
+    group6->end();
+	guientries["do_select"].cb_menu_i(); // This is to make the default effective
+
+    group5->end();
+	guientries["do_analyse"].cb_menu_i(); // This is to make the default effective
+
+	tab3->end();
+
+	tab4->begin();
+	tab4->label("Compute");
+	resetHeight();
+
+	place("do_parallel_discio");
+	place("nr_pool");
+	place("do_pad1");
+	place("do_preread_images");
+	place("scratch_dir");
+	place("do_combine_thru_disc");
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	// Set up queue groups for running tab
+    group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+    group4->end();
+	place("use_gpu", TOGGLE_LEAVE_ACTIVE, group4);
+	group4->begin();
+	place("gpu_ids");
+    group4->end();
+	guientries["use_gpu"].cb_menu_i(); // This is to make the default effective
+
+	tab4->end();
+
+
+}
+
+
 void JobWindow::initialiseMovierefineWindow()
 {
 	setupTabs(4);

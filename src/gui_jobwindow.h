@@ -117,6 +117,7 @@ private:
     void initialiseInimodelWindow();
     void initialiseClass3DWindow();
     void initialiseAutorefineWindow();
+    void initialiseMultiBodyWindow();
     void initialiseMovierefineWindow();
     void initialisePolishWindow();
     void initialiseMaskcreateWindow();

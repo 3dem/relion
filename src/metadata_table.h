@@ -81,7 +81,7 @@ class MetaDataTable
     // The length of label2offset is always equal to the number of defined labels (~320)
     // e.g.:
     // the value of "defocus-U" for row r is stored in:
-    //   objects[r]->RFLOATs[label2offset[EMDL_CTF_DEFOCUSU]]
+    //   objects[r]->doubles[label2offset[EMDL_CTF_DEFOCUSU]]
     // the value of "image name" is stored in:
     //   objects[r]->strings[label2offset[EMDL_IMAGE_NAME]]
     std::vector<long> label2offset;
@@ -90,7 +90,7 @@ class MetaDataTable
     long current_objectID;
 
     // Number of labels of each type
-    long RFLOATLabels, intLabels, longLabels, boolLabels, stringLabels;
+    long doubleLabels, intLabels, boolLabels, stringLabels;
 
     // Is this a 2D table or a 1D list?
     bool isList;
@@ -299,7 +299,7 @@ private:
 
 void compareMetaDataTable(MetaDataTable &MD1, MetaDataTable &MD2,
 		MetaDataTable &MDboth, MetaDataTable &MDonly1, MetaDataTable &MDonly2,
-		EMDLabel label1, RFLOAT eps = 0., EMDLabel label2 = EMDL_UNDEFINED, EMDLabel label3 = EMDL_UNDEFINED);
+		EMDLabel label1, double eps = 0., EMDLabel label2 = EMDL_UNDEFINED, EMDLabel label3 = EMDL_UNDEFINED);
 
 // Join 2 metadata tables. Only include labels that are present in both of them.
 MetaDataTable combineMetaDataTables(std::vector<MetaDataTable> &MDin);

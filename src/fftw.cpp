@@ -51,6 +51,21 @@
 
 static pthread_mutex_t fftw_plan_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+//#define TIMING_FFTW
+#ifdef TIMING_FFTW
+	#define RCTIC(label) (timer_fftw.tic(label))
+	#define RCTOC(label) (timer_fftw.toc(label))
+
+	Timer timer_fftw;
+	int TIMING_FFTW_PLAN = timer_fftw.setNew("fftw - plan");
+	int TIMING_FFTW_EXECUTE = timer_fftw.setNew("fftw - exec");
+	int TIMING_FFTW_NORMALISE = timer_fftw.setNew("fftw - normalise");
+	int TIMING_FFTW_COPY = timer_fftw.setNew("fftw - copy");
+#else
+	#define RCTIC(label)
+	#define RCTOC(label)
+#endif
+
 //#define DEBUG_PLANS
 
 // Constructors and destructors --------------------------------------------
@@ -197,6 +212,7 @@ void FourierTransformer::setReal(MultidimArray<RFLOAT> &input)
         // Make new plans
         plans_are_set = true;
 
+	RCTIC(TIMING_FFTW_PLAN);
         pthread_mutex_lock(&fftw_plan_mutex);
 #ifdef RELION_SINGLE_PRECISION
         fPlanForward = fftwf_plan_dft_r2c(ndim, N, MULTIDIM_ARRAY(*fReal),
@@ -212,6 +228,7 @@ void FourierTransformer::setReal(MultidimArray<RFLOAT> &input)
                                           FFTW_ESTIMATE);
 #endif
         pthread_mutex_unlock(&fftw_plan_mutex);
+	RCTOC(TIMING_FFTW_PLAN);
 
         if (fPlanForward == NULL || fPlanBackward == NULL)
             REPORT_ERROR("FFTW plans cannot be created");
@@ -269,6 +286,7 @@ void FourierTransformer::setReal(MultidimArray<Complex > &input)
 
         plans_are_set = true;
 
+	RCTIC(TIMING_FFTW_PLAN);
         pthread_mutex_lock(&fftw_plan_mutex);
 #ifdef RELION_SINGLE_PRECISION
         fPlanForward = fftwf_plan_dft(ndim, N, (fftwf_complex*) MULTIDIM_ARRAY(*fComplex),
@@ -282,6 +300,7 @@ void FourierTransformer::setReal(MultidimArray<Complex > &input)
                                       (fftw_complex*) MULTIDIM_ARRAY(*fComplex), FFTW_BACKWARD, FFTW_ESTIMATE);
 #endif
         pthread_mutex_unlock(&fftw_plan_mutex);
+	RCTOC(TIMING_FFTW_PLAN);
 
         if (fPlanForward == NULL || fPlanBackward == NULL)
             REPORT_ERROR("FFTW plans cannot be created");
@@ -293,8 +312,10 @@ void FourierTransformer::setReal(MultidimArray<Complex > &input)
 
 void FourierTransformer::setFourier(const MultidimArray<Complex> &inputFourier)
 {
+    RCTIC(TIMING_FFTW_COPY);
     memcpy(MULTIDIM_ARRAY(fFourier),MULTIDIM_ARRAY(inputFourier),
            MULTIDIM_SIZE(inputFourier)*2*sizeof(RFLOAT));
+    RCTOC(TIMING_FFTW_COPY);
 }
 
 // Transform ---------------------------------------------------------------
@@ -302,6 +323,7 @@ void FourierTransformer::Transform(int sign)
 {
     if (sign == FFTW_FORWARD)
     {
+	RCTIC(TIMING_FFTW_EXECUTE);
 #ifdef RELION_SINGLE_PRECISION
         fftwf_execute_dft_r2c(fPlanForward,MULTIDIM_ARRAY(*fReal),
                 (fftwf_complex*) MULTIDIM_ARRAY(fFourier));
@@ -309,6 +331,8 @@ void FourierTransformer::Transform(int sign)
         fftw_execute_dft_r2c(fPlanForward,MULTIDIM_ARRAY(*fReal),
                 (fftw_complex*) MULTIDIM_ARRAY(fFourier));
 #endif
+	RCTOC(TIMING_FFTW_EXECUTE);
+
         // Normalisation of the transform
         unsigned long int size=0;
         if(fReal!=NULL)
@@ -318,11 +342,14 @@ void FourierTransformer::Transform(int sign)
         else
             REPORT_ERROR("No complex nor real data defined");
 
+	RCTIC(TIMING_FFTW_NORMALISE);
         FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(fFourier)
             DIRECT_MULTIDIM_ELEM(fFourier,n) /= size;
+	RCTOC(TIMING_FFTW_NORMALISE);
     }
     else if (sign == FFTW_BACKWARD)
     {
+	RCTIC(TIMING_FFTW_EXECUTE);
 #ifdef RELION_SINGLE_PRECISION
         fftwf_execute_dft_c2r(fPlanBackward,
                 (fftwf_complex*) MULTIDIM_ARRAY(fFourier), MULTIDIM_ARRAY(*fReal));
@@ -330,6 +357,7 @@ void FourierTransformer::Transform(int sign)
         fftw_execute_dft_c2r(fPlanBackward,
                 (fftw_complex*) MULTIDIM_ARRAY(fFourier), MULTIDIM_ARRAY(*fReal));
 #endif
+	RCTOC(TIMING_FFTW_EXECUTE);
     }
 }
 
@@ -425,6 +453,23 @@ void randomizePhasesBeyond(MultidimArray<RFLOAT> &v, int index)
 
 }
 
+/*
+void randomizePhasesBeyond(MultidimArray<Complex> &v, int index)
+{
+    int index2 = index*index;
+    FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(v)
+    {
+       if (kp*kp + ip*ip + jp*jp >= index2)
+       {
+               RFLOAT mag = abs(DIRECT_A3D_ELEM(v, k, i, j));
+               RFLOAT phas = rnd_unif(0., 2.*PI);
+               RFLOAT realval = mag * cos(phas);
+               RFLOAT imagval = mag * sin(phas);
+               DIRECT_A3D_ELEM(v, k, i, j) = Complex(realval, imagval);
+       }
+    }
+}
+*/
 
 // Fourier ring correlation -----------------------------------------------
 // from precalculated Fourier Transforms, and without sampling rate etc.
@@ -435,13 +480,12 @@ void getFSC(MultidimArray< Complex > &FT1,
 	if (!FT1.sameShape(FT2))
         REPORT_ERROR("fourierShellCorrelation ERROR: MultidimArrays have different shapes!");
 
-    MultidimArray< int > radial_count(XSIZE(FT1));
-    MultidimArray<RFLOAT> num, den1, den2;
+    MultidimArray<RFLOAT> num(XSIZE(FT1)), den1(XSIZE(FT1)), den2(XSIZE(FT1));
     Matrix1D<RFLOAT> f(3);
-    num.initZeros(radial_count);
-    den1.initZeros(radial_count);
-    den2.initZeros(radial_count);
-    fsc.initZeros(radial_count);
+    num.initZeros();
+    den1.initZeros();
+    den2.initZeros();
+    fsc.initZeros(num);
     FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT1)
     {
     	int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
@@ -454,7 +498,6 @@ void getFSC(MultidimArray< Complex > &FT1,
         num(idx)+= (conj(z1) * z2).real;
         den1(idx)+= absz1*absz1;
         den2(idx)+= absz2*absz2;
-        radial_count(idx)++;
     }
 
     FOR_ALL_ELEMENTS_IN_ARRAY1D(fsc)
@@ -1132,7 +1175,7 @@ void LoGFilterMap(MultidimArray<Complex > &FT, int ori_size, RFLOAT sigma, RFLOA
 	// Put a raised cosine from edge_low to edge_high
 	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT)
 	{
-    	int r2 = kp * kp + ip * ip + jp * jp;
+		RFLOAT r2 = (RFLOAT)kp * (RFLOAT)kp + (RFLOAT)ip * (RFLOAT)ip + (RFLOAT)jp * (RFLOAT)jp;
     	DIRECT_A3D_ELEM(FT, k, i, j) *= r2 * exp(-0.5*r2/isigma2) / isigma2;
 	}
 
@@ -1216,7 +1259,7 @@ void lowPassFilterMap(MultidimArray<Complex > &FT, int ori_size,
 	// Put a raised cosine from edge_low to edge_high
 	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT)
 	{
-    	int r2 = kp * kp + ip * ip + jp * jp;
+    	RFLOAT r2 = (RFLOAT)kp * (RFLOAT)kp + (RFLOAT)ip * (RFLOAT)ip + (RFLOAT)jp * (RFLOAT)jp;
     	RFLOAT res = sqrt((RFLOAT)r2)/ori_size; // get resolution in 1/pixel
 
     	if (do_highpass_instead)
@@ -1312,6 +1355,133 @@ void highPassFilterMap(MultidimArray<RFLOAT > &img, RFLOAT low_pass, RFLOAT angp
 	transformer.inverseFourierTransform();
 }
 
+void directionalFilterMap(MultidimArray<Complex > &FT, int ori_size,
+		RFLOAT low_pass, RFLOAT angpix, std::string axis, int filter_edge_width)
+{
+
+
+	// Which resolution shell is the filter?
+	int ires_filter = ROUND((ori_size * angpix)/low_pass);
+	int filter_edge_halfwidth = filter_edge_width / 2;
+
+	// Soft-edge: from 1 shell less to one shell more:
+	RFLOAT edge_low = XMIPP_MAX(0., (ires_filter - filter_edge_halfwidth) / (RFLOAT)ori_size); // in 1/pix
+	RFLOAT edge_high = XMIPP_MIN(XSIZE(FT), (ires_filter + filter_edge_halfwidth) / (RFLOAT)ori_size); // in 1/pix
+	RFLOAT edge_width = edge_high - edge_low;
+
+	if (axis == "x" || axis == "X")
+	{
+		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT)
+		{
+
+			RFLOAT r2 = (RFLOAT)jp * (RFLOAT)jp;
+			RFLOAT res = sqrt((RFLOAT)r2)/ori_size; // get resolution in 1/pixel
+
+			if (res < edge_low)
+				continue;
+			else if (res > edge_high)
+				DIRECT_A3D_ELEM(FT, k, i, j) = 0.;
+			else
+				DIRECT_A3D_ELEM(FT, k, i, j) *= 0.5 + 0.5 * cos( PI * (res-edge_low)/edge_width);
+		}
+	}
+	else if (axis == "y" || axis == "Y")
+	{
+
+		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT)
+		{
+
+			RFLOAT r2 = (RFLOAT)ip * (RFLOAT)ip;
+			RFLOAT res = sqrt((RFLOAT)r2)/ori_size; // get resolution in 1/pixel
+
+			if (res < edge_low)
+				continue;
+			else if (res > edge_high)
+				DIRECT_A3D_ELEM(FT, k, i, j) = 0.;
+			else
+				DIRECT_A3D_ELEM(FT, k, i, j) *= 0.5 + 0.5 * cos( PI * (res-edge_low)/edge_width);
+		}
+	}
+	else if  (axis == "z" || axis == "Z")
+	{
+		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT)
+		{
+
+			RFLOAT r2 = (RFLOAT)kp * (RFLOAT)kp;
+			RFLOAT res = sqrt((RFLOAT)r2)/ori_size; // get resolution in 1/pixel
+
+			if (res < edge_low)
+				continue;
+			else if (res > edge_high)
+				DIRECT_A3D_ELEM(FT, k, i, j) = 0.;
+			else
+				DIRECT_A3D_ELEM(FT, k, i, j) *= 0.5 + 0.5 * cos( PI * (res-edge_low)/edge_width);
+		}
+	}
+
+
+}
+
+void directionalFilterMap(MultidimArray<RFLOAT > &img, RFLOAT low_pass, RFLOAT angpix, std::string axis, int filter_edge_width)
+{
+	FourierTransformer transformer;
+	MultidimArray<Complex > FT;
+
+	// Make this work for maps (or more likely 2D images) that have unequal X and Y dimensions
+	img.setXmippOrigin();
+	int my_xsize = XSIZE(img);
+	int my_ysize = YSIZE(img);
+	int my_size = (my_xsize != my_ysize) ? XMIPP_MAX(my_xsize, my_ysize) : my_xsize;
+	if (my_xsize != my_ysize)
+	{
+		if (img.getDim() == 2)
+		{
+			int my_small_size = XMIPP_MIN(my_xsize, my_ysize);
+			RFLOAT avg,stddev,minn,maxx;
+			img.computeStats(avg,stddev,minn,maxx);
+			img.window(FIRST_XMIPP_INDEX(my_size), FIRST_XMIPP_INDEX(my_size),
+					   LAST_XMIPP_INDEX(my_size),  LAST_XMIPP_INDEX(my_size));
+			if (my_small_size == my_xsize)
+			{
+				FOR_ALL_ELEMENTS_IN_ARRAY2D(img)
+				{
+					if (j <  FIRST_XMIPP_INDEX(my_small_size) || j >  LAST_XMIPP_INDEX(my_small_size))
+						A2D_ELEM(img, i, j) = rnd_gaus(avg, stddev);
+				}
+			}
+			else
+			{
+				FOR_ALL_ELEMENTS_IN_ARRAY2D(img)
+				{
+					if (i <  FIRST_XMIPP_INDEX(my_small_size) || i >  LAST_XMIPP_INDEX(my_small_size))
+						A2D_ELEM(img, i, j) = rnd_gaus(avg, stddev);
+				}
+
+			}
+		}
+		else
+		{
+			REPORT_ERROR("lowPassFilterMap: filtering of non-cube maps is not implemented...");
+		}
+	}
+	transformer.FourierTransform(img, FT, false);
+	directionalFilterMap(FT, XSIZE(img), low_pass, angpix, axis, filter_edge_width);
+	transformer.inverseFourierTransform();
+	img.setXmippOrigin();
+	if (my_xsize != my_ysize)
+	{
+		if (img.getDim() == 2)
+		{
+			img.window(FIRST_XMIPP_INDEX(my_ysize), FIRST_XMIPP_INDEX(my_xsize),
+					   LAST_XMIPP_INDEX(my_ysize),  LAST_XMIPP_INDEX(my_xsize));
+		}
+		else
+		{
+			REPORT_ERROR("lowPassFilterMap: filtering of non-cube maps is not implemented...");
+		}
+	}
+
+}
 
 
 void applyBeamTilt(const MultidimArray<Complex > &Fin, MultidimArray<Complex > &Fout, RFLOAT beamtilt_x, RFLOAT beamtilt_y,

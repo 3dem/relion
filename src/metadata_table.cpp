@@ -50,9 +50,8 @@ MetaDataTable::MetaDataTable()
 :   objects(0),
     label2offset(EMDL_LAST_LABEL, -1),
     current_objectID(0),
-    RFLOATLabels(0),
+    doubleLabels(0),
     intLabels(0),
-    longLabels(0),
     boolLabels(0),
     stringLabels(0),
     isList(false),
@@ -67,9 +66,8 @@ MetaDataTable::MetaDataTable(const MetaDataTable &MD)
 :   objects(MD.objects.size()),
     label2offset(MD.label2offset),
     current_objectID(0),
-    RFLOATLabels(MD.RFLOATLabels),
+    doubleLabels(MD.doubleLabels),
     intLabels(MD.intLabels),
-    longLabels(MD.longLabels),
     boolLabels(MD.boolLabels),
     stringLabels(MD.stringLabels),
     isList(MD.isList),
@@ -94,9 +92,8 @@ MetaDataTable& MetaDataTable::operator = (const MetaDataTable &MD)
         objects.resize(MD.objects.size());
         label2offset = MD.label2offset;
         current_objectID = 0;
-        RFLOATLabels = MD.RFLOATLabels;
+        doubleLabels = MD.doubleLabels;
         intLabels = MD.intLabels;
-        longLabels = MD.longLabels;
         boolLabels = MD.boolLabels;
         stringLabels = MD.stringLabels;
         isList = MD.isList;
@@ -150,9 +147,8 @@ void MetaDataTable::clear()
     label2offset = std::vector<long>(EMDL_LAST_LABEL, -1);
     current_objectID = 0;
 
-    RFLOATLabels = 0;
+    doubleLabels = 0;
     intLabels = 0;
-    longLabels = 0;
     boolLabels = 0;
     stringLabels = 0;
 
@@ -201,7 +197,7 @@ bool MetaDataTable::getValueToString(EMDLabel label, std::string &value, long ob
 
         if (EMDL::isDouble(label))
         {
-            RFLOAT v;
+            double v;
             getValue(label, v, objectID);
             if ((ABS(v) > 0. && ABS(v) < 0.001) || ABS(v) > 100000.)
                  sts << std::setw(12) << std::scientific;
@@ -210,13 +206,6 @@ bool MetaDataTable::getValueToString(EMDLabel label, std::string &value, long ob
               sts << v;
         }
         else if (EMDL::isInt(label))
-        {
-            int v;
-            getValue(label, v, objectID);
-            sts << std::setw(12) << std::fixed;
-            sts << v;
-        }
-        else if (EMDL::isLong(label))
         {
             long v;
             getValue(label, v, objectID);
@@ -254,17 +243,11 @@ bool MetaDataTable::setValueFromString(EMDLabel label, const std::string &value,
 
         if (EMDL::isDouble(label))
         {
-            RFLOAT v;
+            double v;
             i >> v;
             return setValue(label, v, objectID);
         }
         else if (EMDL::isInt(label))
-        {
-            int v;
-            i >> v;
-            return setValue(label, v, objectID);
-        }
-        else if (EMDL::isLong(label))
         {
             long v;
             i >> v;
@@ -281,13 +264,13 @@ bool MetaDataTable::setValueFromString(EMDLabel label, const std::string &value,
 
     // comparators used for sorting
 
-    struct MdRFLOATComparator
+    struct MdDoubleComparator
     {
-        MdRFLOATComparator(long index) : index(index) {}
+        MdDoubleComparator(long index) : index(index) {}
 
         bool operator()(MetaDataContainer *lh, MetaDataContainer *rh) const
         {
-            return lh->RFLOATs[index] < rh->RFLOATs[index];
+            return lh->doubles[index] < rh->doubles[index];
         }
 
         long index;
@@ -300,18 +283,6 @@ bool MetaDataTable::setValueFromString(EMDLabel label, const std::string &value,
         bool operator()(MetaDataContainer *lh, MetaDataContainer *rh) const
         {
             return lh->ints[index] < rh->ints[index];
-        }
-
-        long index;
-    };
-
-    struct MdLongComparator
-    {
-        MdLongComparator(long index) : index(index) {}
-
-        bool operator()(MetaDataContainer *lh, MetaDataContainer *rh) const
-        {
-            return lh->longs[index] < rh->longs[index];
         }
 
         long index;
@@ -373,30 +344,24 @@ void MetaDataTable::sort(EMDLabel name, bool do_reverse, bool only_set_index, bo
 
     if (do_random)
         srand (time(NULL));    		  /* initialize random seed: */
-    else if (!(EMDL::isInt(name) || EMDL::isLong(name) || EMDL::isDouble(name)) )
+    else if (!(EMDL::isInt(name) || EMDL::isDouble(name)) )
         REPORT_ERROR("MetadataTable::sort%% ERROR: can only sorted numbers");
 
-    std::vector<std::pair<RFLOAT,long int> > vp;
+    std::vector<std::pair<double,long int> > vp;
     vp.reserve(objects.size());
     long int i = 0;
     FOR_ALL_OBJECTS_IN_METADATA_TABLE(*this)
     {
-        RFLOAT dval;
+        double dval;
         if (do_random)
         {
-            dval = (RFLOAT)rand();
+            dval = (double)rand();
         }
         else if (EMDL::isInt(name))
         {
-            int val;
+            long val;
             getValue(name, val);
-            dval = (RFLOAT) val;
-        }
-        else if (EMDL::isLong(name))
-        {
-            long int val;
-            getValue(name, val);
-            dval = (RFLOAT) val;
+            dval = (double) val;
         }
         else // EMDL::isDouble(name)
         {
@@ -456,15 +421,11 @@ void MetaDataTable::newSort(const EMDLabel label, bool do_reverse, bool do_sort_
     }
     else if (EMDL::isDouble(label))
     {
-        std::stable_sort(objects.begin(), objects.end(), MdRFLOATComparator(label2offset[label]));
+        std::stable_sort(objects.begin(), objects.end(), MdDoubleComparator(label2offset[label]));
     }
     else if (EMDL::isInt(label))
     {
         std::stable_sort(objects.begin(), objects.end(), MdIntComparator(label2offset[label]));
-    }
-    else if (EMDL::isLong(label))
-    {
-        std::stable_sort(objects.begin(), objects.end(), MdLongComparator(label2offset[label]));
     }
     else
     {
@@ -520,14 +481,14 @@ void MetaDataTable::addLabel(EMDLabel label)
 
         if (EMDL::isDouble(label))
         {
-            id = RFLOATLabels;
+            id = doubleLabels;
 
             for (long i = 0; i < objects.size(); i++)
             {
-                objects[i]->RFLOATs.push_back(0);
+                objects[i]->doubles.push_back(0);
             }
 
-            RFLOATLabels++;
+            doubleLabels++;
         }
         else if (EMDL::isInt(label))
         {
@@ -539,17 +500,6 @@ void MetaDataTable::addLabel(EMDLabel label)
             }
 
             intLabels++;
-        }
-        else if (EMDL::isLong(label))
-        {
-            id = longLabels;
-
-            for (long i = 0; i < objects.size(); i++)
-            {
-                objects[i]->longs.push_back(0);
-            }
-
-            longLabels++;
         }
         else if (EMDL::isBool(label))
         {
@@ -611,7 +561,7 @@ void MetaDataTable::append(const MetaDataTable& mdt)
     for (long i = 0; i < mdt.objects.size(); i++)
     {
         objects.push_back(new MetaDataContainer(
-            this, RFLOATLabels, intLabels, longLabels, boolLabels, stringLabels));
+            this, doubleLabels, intLabels, boolLabels, stringLabels));
 
         setObjectUnsafe(mdt.getObject(i), objects.size() - 1);
     }
@@ -669,15 +619,11 @@ void MetaDataTable::setObjectUnsafe(MetaDataContainer* data, long objectID)
 
         if (EMDL::isDouble(label))
         {
-            obj->RFLOATs[myOff] = data->RFLOATs[srcOff];
+            obj->doubles[myOff] = data->doubles[srcOff];
         }
         else if (EMDL::isInt(label))
         {
             obj->ints[myOff] = data->ints[srcOff];
-        }
-        else if (EMDL::isLong(label))
-        {
-            obj->longs[myOff] = data->longs[srcOff];
         }
         else if (EMDL::isBool(label))
         {
@@ -693,7 +639,7 @@ void MetaDataTable::setObjectUnsafe(MetaDataContainer* data, long objectID)
 void MetaDataTable::addObject()
 {
     objects.push_back(new MetaDataContainer(
-        this, RFLOATLabels, intLabels, longLabels, boolLabels, stringLabels));
+        this, doubleLabels, intLabels, boolLabels, stringLabels));
 
     current_objectID = objects.size()-1;
 }
@@ -701,7 +647,7 @@ void MetaDataTable::addObject()
 void MetaDataTable::addObject(MetaDataContainer* data)
 {
     objects.push_back(new MetaDataContainer(
-        this, RFLOATLabels, intLabels, longLabels, boolLabels, stringLabels));
+        this, doubleLabels, intLabels, boolLabels, stringLabels));
 
     setObject(data, objects.size()-1);
     current_objectID = objects.size()-1;
@@ -710,7 +656,7 @@ void MetaDataTable::addObject(MetaDataContainer* data)
 void MetaDataTable::addValuesOfDefinedLabels(MetaDataContainer* data)
 {
     objects.push_back(new MetaDataContainer(
-        this, RFLOATLabels, intLabels, longLabels, boolLabels, stringLabels));
+        this, doubleLabels, intLabels, boolLabels, stringLabels));
 
     setValuesOfDefinedLabels(data, objects.size()-1);
     current_objectID = objects.size()-1;
@@ -1126,9 +1072,8 @@ void MetaDataTable::addToCPlot2D(CPlot2D *plot2D, EMDLabel xaxis, EMDLabel yaxis
 	dataSet.SetDatasetColor(red, green, blue);
 	dataSet.SetDatasetTitle(EMDL::label2Str(yaxis));
 
-    RFLOAT mydbl;
-    int myint;
-    long int mylong;
+    double mydbl;
+    long int myint;
 	double xval, yval;
 	for (long int idx = 0; idx < objects.size(); idx++)
     {
@@ -1147,11 +1092,6 @@ void MetaDataTable::addToCPlot2D(CPlot2D *plot2D, EMDLabel xaxis, EMDLabel yaxis
     		objects[idx]->getValue(offx, myint);
     		xval = myint;
     	}
-    	else if (EMDL::isLong(xaxis))
-    	{
-    		objects[idx]->getValue(offx, mylong);
-    		xval = mylong;
-    	}
     	else
             REPORT_ERROR("MetaDataTable::addToCPlot2D ERROR: can only plot x-axis double, int or long int");
 
@@ -1168,11 +1108,6 @@ void MetaDataTable::addToCPlot2D(CPlot2D *plot2D, EMDLabel xaxis, EMDLabel yaxis
     	{
     		objects[idx]->getValue(offy, myint);
     		yval = myint;
-    	}
-    	else if (EMDL::isLong(yaxis))
-    	{
-    		objects[idx]->getValue(offy, mylong);
-    		yval = mylong;
     	}
     	else
             REPORT_ERROR("MetaDataTable::addToCPlot2D ERROR: can only plot y-axis double, int or long int");
@@ -1208,7 +1143,7 @@ void MetaDataTable::checkObjectID(long id, std::string caller) const
 
 void compareMetaDataTable(MetaDataTable &MD1, MetaDataTable &MD2,
 		MetaDataTable &MDboth, MetaDataTable &MDonly1, MetaDataTable &MDonly2,
-		EMDLabel label1, RFLOAT eps, EMDLabel label2, EMDLabel label3)
+		EMDLabel label1, double eps, EMDLabel label2, EMDLabel label3)
 {
 	if (!MD1.containsLabel(label1))
 		REPORT_ERROR("compareMetaDataTableEqualLabel::ERROR MD1 does not contain the specified label1.");
@@ -1218,7 +1153,7 @@ void compareMetaDataTable(MetaDataTable &MD1, MetaDataTable &MD2,
 	if (label2 != EMDL_UNDEFINED)
 	{
 		if (!EMDL::isDouble(label1) || !EMDL::isDouble(label2))
-			REPORT_ERROR("compareMetaDataTableEqualLabel::ERROR 2D or 3D distances are only allowed for RFLOATs.");
+			REPORT_ERROR("compareMetaDataTableEqualLabel::ERROR 2D or 3D distances are only allowed for doubles.");
 		if (!MD1.containsLabel(label2))
 			REPORT_ERROR("compareMetaDataTableEqualLabel::ERROR MD1 does not contain the specified label2.");
 		if (!MD2.containsLabel(label2))
@@ -1228,7 +1163,7 @@ void compareMetaDataTable(MetaDataTable &MD1, MetaDataTable &MD2,
 	if (label3 != EMDL_UNDEFINED)
 	{
 		if (!EMDL::isDouble(label3))
-			REPORT_ERROR("compareMetaDataTableEqualLabel::ERROR 3D distances are only allowed for RFLOATs.");
+			REPORT_ERROR("compareMetaDataTableEqualLabel::ERROR 3D distances are only allowed for doubles.");
 		if (!MD1.containsLabel(label3))
 			REPORT_ERROR("compareMetaDataTableEqualLabel::ERROR MD1 does not contain the specified label3.");
 		if (!MD2.containsLabel(label3))
@@ -1240,8 +1175,8 @@ void compareMetaDataTable(MetaDataTable &MD1, MetaDataTable &MD2,
 	MDonly2.clear();
 
 	std::string mystr1, mystr2;
-	int myint1, myint2;
-	RFLOAT myd1, myd2, mydy1 = 0., mydy2 = 0., mydz1 = 0., mydz2 = 0.;
+	long int myint1, myint2;
+	double myd1, myd2, mydy1 = 0., mydy2 = 0., mydz1 = 0., mydz2 = 0.;
 
 
 	// loop over MD1
@@ -1263,7 +1198,7 @@ void compareMetaDataTable(MetaDataTable &MD1, MetaDataTable &MD2,
 				MD1.getValue(label3, mydz1);
 		}
 		else
-			REPORT_ERROR("compareMetaDataTableEqualLabel ERROR: only implemented for strings, integers or RFLOATs");
+			REPORT_ERROR("compareMetaDataTableEqualLabel ERROR: only implemented for strings, integers or doubles");
 
 		// loop over MD2
 		bool have_in_2 = false;
@@ -1302,7 +1237,7 @@ void compareMetaDataTable(MetaDataTable &MD1, MetaDataTable &MD2,
 				if (label3 != EMDL_UNDEFINED)
 					MD2.getValue(label3, mydz2);
 
-				RFLOAT dist = sqrt( (myd1 - myd2) * (myd1 - myd2) +
+				double dist = sqrt( (myd1 - myd2) * (myd1 - myd2) +
 						            (mydy1 - mydy2) * (mydy1 - mydy2) +
 						            (mydz1 - mydz2) * (mydz1 - mydz2) );
 				if ( ABS(dist) <= eps )

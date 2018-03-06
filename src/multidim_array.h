@@ -1085,9 +1085,14 @@ public:
     {
         if (Ndim*Zdim*Ydim*Xdim == nzyxdimAlloc && data != NULL)
         {
-            if (Ndim != this -> ndim || Zdim != this -> zdim ||
-                Ydim != this -> ydim || Xdim != this -> xdim)
-                REPORT_ERROR("Unmatched resize. Maybe bug in window function?");
+            ndim = Ndim;
+            xdim = Xdim;
+            ydim = Ydim;
+            zdim = Zdim;
+            yxdim = Ydim * Xdim;
+            zyxdim = Zdim * yxdim;
+            nzyxdim = Ndim * zyxdim;
+            nzyxdimAlloc = nzyxdim;
             return;
         }
 
@@ -2586,7 +2591,7 @@ public:
         double stddev = 0;
 
         double minval = std::numeric_limits<double>::max();
-        double maxval = std::numeric_limits<double>::min();
+        double maxval = std::numeric_limits<double>::lowest();
 
         T* ptr = NULL;
         long int n;

@@ -151,12 +151,15 @@ enum EMDLabel
     EMDL_MICROGRAPH_GAIN_NAME,
     EMDL_MICROGRAPH_NAME_WODOSE,
     EMDL_MICROGRAPH_MOVIE_NAME,
+    EMDL_MICROGRAPH_METADATA_NAME,
     EMDL_MICROGRAPH_TILT_ANGLE,
     EMDL_MICROGRAPH_TILT_AXIS_DIRECTION,
     EMDL_MICROGRAPH_TILT_AXIS_OUTOFPLANE,
+    EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE,
+    EMDL_MICROGRAPH_PRE_EXPOSURE,
+    EMDL_MICROGRAPH_DOSE_RATE,
     EMDL_MICROGRAPH_BINNING,
     EMDL_MICROGRAPH_FRAME_NUMBER,
-    EMDL_MICROGRAPH_MOTION_MODEL_IDX,
     EMDL_MICROGRAPH_MOTION_MODEL_VERSION,
     EMDL_MICROGRAPH_START_FRAME,
     EMDL_MICROGRAPH_END_FRAME,
@@ -246,10 +249,17 @@ enum EMDLabel
     EMDL_OPTIMISER_DO_REALIGN_MOVIES,
     EMDL_OPTIMISER_DO_MAP,
     EMDL_OPTIMISER_DO_SGD,
+	EMDL_OPTIMISER_FAST_SUBSETS,
+	EMDL_OPTIMISER_SGD_INI_ITER,
+	EMDL_OPTIMISER_SGD_FIN_ITER,
+	EMDL_OPTIMISER_SGD_INBETWEEN_ITER,
+	EMDL_OPTIMISER_SGD_INI_RESOL,
+	EMDL_OPTIMISER_SGD_FIN_RESOL,
+	EMDL_OPTIMISER_SGD_INI_SUBSET_SIZE,
+	EMDL_OPTIMISER_SGD_FIN_SUBSET_SIZE,
     EMDL_OPTIMISER_SGD_MU,
 	EMDL_OPTIMISER_SGD_SIGMA2FUDGE_INI,
 	EMDL_OPTIMISER_SGD_SIGMA2FUDGE_HALFLIFE,
-    EMDL_OPTIMISER_SGD_SUBSET_START,
     EMDL_OPTIMISER_SGD_SUBSET_SIZE,
     EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET,
     EMDL_OPTIMISER_SGD_MAX_SUBSETS,
@@ -409,7 +419,7 @@ enum EMDLabel
 
 enum EMDLabelType
 {
-    EMDL_INT, EMDL_LONG, EMDL_BOOL, EMDL_DOUBLE, EMDL_FLOAT, EMDL_STRING
+    EMDL_INT, EMDL_BOOL, EMDL_DOUBLE, EMDL_FLOAT, EMDL_STRING
 };
 
 class EMDL
@@ -434,7 +444,6 @@ static EMDLabel str2Label(const std::string &labelName);
 static std::string label2Str(const EMDLabel &label);
 
 static bool isInt(const EMDLabel &label);
-static bool isLong(const EMDLabel &label);
 static bool isBool(const EMDLabel &label);
 static bool isString(const EMDLabel &label);
 static bool isDouble(const EMDLabel &label);
@@ -482,7 +491,7 @@ private:
         ///==== Add labels entries from here in the SAME ORDER as declared in ENUM ==========
     	EMDL::addLabel(EMDL_COMMENT, EMDL_STRING, "rlnComment", "A metadata comment (This is treated in a special way)");
 
-        EMDL::addLabel(EMDL_AREA_ID, EMDL_LONG, "rlnAreaId", "ID (i.e. a unique number) of an area (i.e. field-of-view)");
+        EMDL::addLabel(EMDL_AREA_ID, EMDL_INT, "rlnAreaId", "ID (i.e. a unique number) of an area (i.e. field-of-view)");
         EMDL::addLabel(EMDL_AREA_NAME, EMDL_STRING, "rlnAreaName", "Name of an area (i.e. field-of-view)");
 
         EMDL::addLabel(EMDL_BODY_MASK_NAME, EMDL_STRING, "rlnBodyMaskName", "Name of an image that contains a [0,1] body mask for multi-body refinement");
@@ -525,7 +534,7 @@ private:
     	EMDL::addLabel(EMDL_IMAGE_NAME, EMDL_STRING, "rlnImageName", "Name of an image");
     	EMDL::addLabel(EMDL_IMAGE_ORI_NAME, EMDL_STRING, "rlnImageOriginalName", "Original name of an image");
     	EMDL::addLabel(EMDL_IMAGE_RECONSTRUCT_NAME, EMDL_STRING, "rlnReconstructImageName", "Name of an image to be used for reconstruction only");
-    	EMDL::addLabel(EMDL_IMAGE_ID, EMDL_LONG, "rlnImageId", "ID (i.e. a unique number) of an image");
+    	EMDL::addLabel(EMDL_IMAGE_ID, EMDL_INT, "rlnImageId", "ID (i.e. a unique number) of an image");
     	EMDL::addLabel(EMDL_IMAGE_ENABLED, EMDL_BOOL, "rlnEnabled", "Not used in RELION, only included for backward compatibility with XMIPP selfiles");
         EMDL::addLabel(EMDL_IMAGE_DATATYPE, EMDL_INT, "rlnDataType", "Type of data stored in an image (e.g. int, RFLOAT etc)");
         EMDL::addLabel(EMDL_IMAGE_DIMENSIONALITY, EMDL_INT, "rlnImageDimensionality", "Dimensionality of data stored in an image (i.e. 2 or 3)");
@@ -566,24 +575,27 @@ private:
         EMDL::addLabel(EMDL_MATRIX_3_2, EMDL_DOUBLE, "rlnMatrix_3_2", "Matrix element (3,1) of a 3x3 matrix");
         EMDL::addLabel(EMDL_MATRIX_3_3, EMDL_DOUBLE, "rlnMatrix_3_3", "Matrix element (3,1) of a 3x3 matrix");
 
-        EMDL::addLabel(EMDL_MICROGRAPH_ID, EMDL_LONG, "rlnMicrographId", "ID (i.e. a unique number) of a micrograph");
+        EMDL::addLabel(EMDL_MICROGRAPH_ID, EMDL_INT, "rlnMicrographId", "ID (i.e. a unique number) of a micrograph");
         EMDL::addLabel(EMDL_MICROGRAPH_NAME, EMDL_STRING, "rlnMicrographName", "Name of a micrograph");
         EMDL::addLabel(EMDL_MICROGRAPH_GAIN_NAME, EMDL_STRING, "rlnMicrographGainName", "Name of a gain reference");
         EMDL::addLabel(EMDL_MICROGRAPH_NAME_WODOSE, EMDL_STRING, "rlnMicrographNameNoDW", "Name of a micrograph without dose weighting");
         EMDL::addLabel(EMDL_MICROGRAPH_MOVIE_NAME, EMDL_STRING, "rlnMicrographMovieName", "Name of a micrograph movie stack");
+	EMDL::addLabel(EMDL_MICROGRAPH_METADATA_NAME, EMDL_STRING, "rlnMicrographMetadata", "Name of a micrograph metadata file");
         EMDL::addLabel(EMDL_MICROGRAPH_TILT_ANGLE, EMDL_DOUBLE, "rlnMicrographTiltAngle", "Tilt angle (in degrees) used to collect a micrograph");
         EMDL::addLabel(EMDL_MICROGRAPH_TILT_AXIS_DIRECTION, EMDL_DOUBLE, "rlnMicrographTiltAxisDirection", "Direction of the tilt-axis (in degrees) used to collect a micrograph");
         EMDL::addLabel(EMDL_MICROGRAPH_TILT_AXIS_OUTOFPLANE, EMDL_DOUBLE, "rlnMicrographTiltAxisOutOfPlane", "Out-of-plane angle (in degrees) of the tilt-axis used to collect a micrograph (90=in-plane)");
+	EMDL::addLabel(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, EMDL_DOUBLE, "rlnMicrographOriginalPixelSize", "Pixel size of original movie before binning in Angstrom/pixel.");
+	EMDL::addLabel(EMDL_MICROGRAPH_PRE_EXPOSURE, EMDL_DOUBLE, "rlnMicrographPreExposure", "Pre-exposure dose in electrons per square Angstrom");
+	EMDL::addLabel(EMDL_MICROGRAPH_DOSE_RATE, EMDL_DOUBLE, "rlnMicrographDoseRate", "Dose rate in electrons per square Angstrom per frame");
 	EMDL::addLabel(EMDL_MICROGRAPH_BINNING, EMDL_DOUBLE, "rlnMicrographBinning", "Micrograph binning factor");
         EMDL::addLabel(EMDL_MICROGRAPH_FRAME_NUMBER, EMDL_INT, "rlnMicrographFrameNumber", "Micrograph frame number");
-        EMDL::addLabel(EMDL_MICROGRAPH_MOTION_MODEL_IDX, EMDL_INT, "rlnMotionModelIdx", "Micrograph motion model index");
         EMDL::addLabel(EMDL_MICROGRAPH_MOTION_MODEL_VERSION, EMDL_INT, "rlnMotionModelVersion", "Version of micrograph motion model");
         EMDL::addLabel(EMDL_MICROGRAPH_START_FRAME, EMDL_INT, "rlnMicrographStartFrame", "Start frame of a motion model");
         EMDL::addLabel(EMDL_MICROGRAPH_END_FRAME, EMDL_INT, "rlnMicrographEndFrame", "End frame of a motion model");
         EMDL::addLabel(EMDL_MICROGRAPH_SHIFT_X, EMDL_DOUBLE, "rlnMicrographShiftX", "X shift of a (patch of) micrograph");
         EMDL::addLabel(EMDL_MICROGRAPH_SHIFT_Y, EMDL_DOUBLE, "rlnMicrographShiftY", "Y shift of a (patch of) micrograph");
         EMDL::addLabel(EMDL_MICROGRAPH_MOTION_COEFFS_IDX, EMDL_INT, "rlnMotionModelCoeffsIdx", "Index of a coefficient of a motion model");
-        EMDL::addLabel(EMDL_MICROGRAPH_MOTION_COEFFS_IDX, EMDL_INT, "rlnMotionModelCoeff", "A coefficient of a motion model");
+        EMDL::addLabel(EMDL_MICROGRAPH_MOTION_COEFF, EMDL_DOUBLE, "rlnMotionModelCoeff", "A coefficient of a motion model");
 
         EMDL::addLabel(EMDL_MLMODEL_ACCURACY_ROT, EMDL_DOUBLE, "rlnAccuracyRotations", "Estimated accuracy (in degrees) with which rotations can be assigned");
         EMDL::addLabel(EMDL_MLMODEL_ACCURACY_TRANS, EMDL_DOUBLE, "rlnAccuracyTranslations", "Estimated accuracy (in pixels) with which translations can be assigned");
@@ -599,8 +611,8 @@ private:
         EMDL::addLabel(EMDL_MLMODEL_FOURIER_COVERAGE_TOTAL_REF, EMDL_DOUBLE, "rlnOverallFourierCompleteness", "Fraction of all Fourier components up to the current resolution with SNR>1");
         EMDL::addLabel(EMDL_MLMODEL_FSC_HALVES_REF, EMDL_DOUBLE, "rlnGoldStandardFsc", "Fourier shell correlation between two independent reconstructions from random halves of the data");
         EMDL::addLabel(EMDL_MLMODEL_GROUP_NAME, EMDL_STRING, "rlnGroupName", "The name of a group of images (e.g. all images from a micrograph)");
-        EMDL::addLabel(EMDL_MLMODEL_GROUP_NO, EMDL_LONG, "rlnGroupNumber", "The number of a group of images");
-        EMDL::addLabel(EMDL_MLMODEL_GROUP_NR_PARTICLES, EMDL_LONG, "rlnGroupNrParticles", "Number particles in a group of images");
+        EMDL::addLabel(EMDL_MLMODEL_GROUP_NO, EMDL_INT, "rlnGroupNumber", "The number of a group of images");
+        EMDL::addLabel(EMDL_MLMODEL_GROUP_NR_PARTICLES, EMDL_INT, "rlnGroupNrParticles", "Number particles in a group of images");
         EMDL::addLabel(EMDL_MLMODEL_GROUP_SCALE_CORRECTION, EMDL_DOUBLE, "rlnGroupScaleCorrection", "Intensity-scale correction for a group of images");
         EMDL::addLabel(EMDL_MLMODEL_HELICAL_NR_ASU, EMDL_INT, "rlnNrHelicalAsymUnits", "How many new helical asymmetric units are there in each box");
         EMDL::addLabel(EMDL_MLMODEL_HELICAL_TWIST, EMDL_DOUBLE, "rlnHelicalTwist", "The helical twist (rotation per subunit) in degrees");
@@ -662,13 +674,20 @@ private:
         EMDL::addLabel(EMDL_OPTIMISER_DO_REALIGN_MOVIES, EMDL_BOOL, "rlnDoRealignMovies", "Flag to indicate that individual frames of movies are being re-aligned");
         EMDL::addLabel(EMDL_OPTIMISER_DO_MAP, EMDL_BOOL, "rlnDoMapEstimation", "Flag to indicate that MAP estimation should be performed (otherwise ML estimation)");
         EMDL::addLabel(EMDL_OPTIMISER_DO_SGD, EMDL_BOOL, "rlnDoStochasticGradientDescent", "Flag to indicate that SGD-optimisation should be performed (otherwise expectation maximisation)");
+        EMDL::addLabel(EMDL_OPTIMISER_FAST_SUBSETS, EMDL_BOOL, "rlnDoFastSubsetOptimisation", "Use subsets of the data in the earlier iterations to speed up convergence");
+        EMDL::addLabel(EMDL_OPTIMISER_SGD_INI_ITER, EMDL_INT, "rlnSgdInitialIterations", "Number of initial SGD iterations (at rlnSgdInitialResolution and with rlnSgdInitialSubsetSize)");
+        EMDL::addLabel(EMDL_OPTIMISER_SGD_FIN_ITER, EMDL_INT, "rlnSgdFinalIterations", "Number of final SGD iterations (at rlnSgdFinalResolution and with rlnSgdFinalSubsetSize)");
+        EMDL::addLabel(EMDL_OPTIMISER_SGD_INBETWEEN_ITER, EMDL_INT, "rlnSgdInBetweenIterations", "Number of SGD iteration in between the initial ones to the final ones (with linear interpolation of resolution and subset size)");
+        EMDL::addLabel(EMDL_OPTIMISER_SGD_INI_RESOL, EMDL_DOUBLE, "rlnSgdInitialResolution", "Resolution (in A) to use during the initial SGD iterations");
+        EMDL::addLabel(EMDL_OPTIMISER_SGD_FIN_RESOL, EMDL_DOUBLE, "rlnSgdFinalResolution", "Resolution (in A) to use during the final SGD iterations");
+        EMDL::addLabel(EMDL_OPTIMISER_SGD_INI_SUBSET_SIZE, EMDL_INT, "rlnSgdInitialSubsetSize", "Number of particles in a mini-batch (subset) during the initial SGD iterations");
+        EMDL::addLabel(EMDL_OPTIMISER_SGD_FIN_SUBSET_SIZE, EMDL_INT, "rlnSgdFinalSubsetSize", "Number of particles in a mini-batch (subset) during the final SGD iteration");
         EMDL::addLabel(EMDL_OPTIMISER_SGD_MU, EMDL_DOUBLE, "rlnSgdMuFactor", "The mu-parameter that controls the momentum of the SGD gradients");
         EMDL::addLabel(EMDL_OPTIMISER_SGD_SIGMA2FUDGE_INI, EMDL_DOUBLE, "rlnSgdSigma2FudgeInitial", "The variance of the noise will initially be multiplied with this value (larger than 1)");
-        EMDL::addLabel(EMDL_OPTIMISER_SGD_SIGMA2FUDGE_HALFLIFE, EMDL_LONG, "rlnSgdSigma2FudgeHalflife", "After processing this many particles the multiplicative factor for the noise variance will have halved");
-        EMDL::addLabel(EMDL_OPTIMISER_SGD_SUBSET_START, EMDL_INT, "rlnSgdNextSubset", "Number of the next subset to restart this run with");
-        EMDL::addLabel(EMDL_OPTIMISER_SGD_SUBSET_SIZE, EMDL_LONG, "rlnSgdSubsetSize", "The number of particles in the random subsets for SGD");
-        EMDL::addLabel(EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET, EMDL_INT, "rlnSgdWriteEverySubset", "Every this many subsets the model is written to disk");
-        EMDL::addLabel(EMDL_OPTIMISER_SGD_MAX_SUBSETS, EMDL_LONG, "rlnSgdMaxSubsets", "Stop SGD after doing this many subsets (possibly spanning more than 1 iteration)");
+        EMDL::addLabel(EMDL_OPTIMISER_SGD_SIGMA2FUDGE_HALFLIFE, EMDL_INT, "rlnSgdSigma2FudgeHalflife", "After processing this many particles the multiplicative factor for the noise variance will have halved");
+        EMDL::addLabel(EMDL_OPTIMISER_SGD_SUBSET_SIZE, EMDL_INT, "rlnSgdSubsetSize", "The number of particles in the random subsets for SGD");
+        EMDL::addLabel(EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET, EMDL_INT, "rlnSgdWriteEverySubset", "Every this many iterations the model is written to disk in SGD");
+        EMDL::addLabel(EMDL_OPTIMISER_SGD_MAX_SUBSETS, EMDL_INT, "rlnSgdMaxSubsets", "Stop SGD after doing this many subsets (possibly spanning more than 1 iteration)");
         EMDL::addLabel(EMDL_OPTIMISER_SGD_STEPSIZE, EMDL_DOUBLE, "rlnSgdStepsize", "Stepsize in SGD updates)");
         EMDL::addLabel(EMDL_OPTIMISER_DO_AUTO_REFINE, EMDL_BOOL, "rlnDoAutoRefine", "Flag to indicate that 3D auto-refine procedure is being used");
         EMDL::addLabel(EMDL_OPTIMISER_DO_ONLY_FLIP_CTF_PHASES, EMDL_BOOL, "rlnDoOnlyFlipCtfPhases", "Flag to indicate that CTF-correction should only comprise phase-flipping");
@@ -727,7 +746,7 @@ private:
         EMDL::addLabel(EMDL_OPTIMISER_WIDTH_MASK_EDGE, EMDL_INT, "rlnWidthMaskEdge", "Width (in pixels) of the soft edge for spherical/circular masks to be used for solvent flattening");
 
         EMDL::addLabel(EMDL_ORIENT_FLIP, EMDL_BOOL, "rlnIsFlip", "Flag to indicate that an image should be mirrored");
-        EMDL::addLabel(EMDL_ORIENT_ID, EMDL_LONG, "rlnOrientationsID", "ID (i.e. a unique number) for an orientation");
+        EMDL::addLabel(EMDL_ORIENT_ID, EMDL_INT, "rlnOrientationsID", "ID (i.e. a unique number) for an orientation");
         EMDL::addLabel(EMDL_ORIENT_ORIGIN_X, EMDL_DOUBLE, "rlnOriginX", "X-coordinate (in pixels) for the origin of rotation");
         EMDL::addLabel(EMDL_ORIENT_ORIGIN_X_PRIOR, EMDL_DOUBLE, "rlnOriginXPrior", "Center of the prior on the X-coordinate (in pixels) for the origin of rotation");
         EMDL::addLabel(EMDL_ORIENT_ORIGIN_Y, EMDL_DOUBLE, "rlnOriginY", "Y-coordinate (in pixels) for the origin of rotation");
@@ -748,7 +767,7 @@ private:
         EMDL::addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, EMDL_DOUBLE, "rlnHelicalTrackLength", "Distance from the position of this helical segment to the starting point of the tube");
         EMDL::addLabel(EMDL_PARTICLE_CLASS, EMDL_INT, "rlnClassNumber", "Class number for which a particle has its highest probability");
         EMDL::addLabel(EMDL_PARTICLE_DLL, EMDL_DOUBLE, "rlnLogLikeliContribution", "Contribution of a particle to the log-likelihood target function");
-        EMDL::addLabel(EMDL_PARTICLE_ID, EMDL_LONG, "rlnParticleId", "ID (i.e. a unique number) for a particle");
+        EMDL::addLabel(EMDL_PARTICLE_ID, EMDL_INT, "rlnParticleId", "ID (i.e. a unique number) for a particle");
         EMDL::addLabel(EMDL_PARTICLE_FOM, EMDL_DOUBLE, "rlnParticleFigureOfMerit", "Developmental FOM for a particle");
         EMDL::addLabel(EMDL_PARTICLE_KL_DIVERGENCE, EMDL_DOUBLE, "rlnKullbackLeibnerDivergence", "Kullback-Leibner divergence for a particle");
         EMDL::addLabel(EMDL_PARTICLE_RANDOM_SUBSET, EMDL_INT, "rlnRandomSubset", "Random subset to which this particle belongs");
@@ -809,7 +828,7 @@ private:
 
         EMDL::addLabel(EMDL_SELECTED, EMDL_BOOL, "rlnSelected", "Flag whether an entry in a metadatatable is selected in the viewer or not");
         EMDL::addLabel(EMDL_SELECT_PARTICLES_ZSCORE, EMDL_DOUBLE, "rlnParticleSelectZScore", "Sum of Z-scores from particle_select. High Z-scores are likely to be outliers.");
-        EMDL::addLabel(EMDL_SORTED_IDX, EMDL_LONG, "rlnSortedIndex", "Index of a metadata entry after sorting (first sorted index is 0).");
+        EMDL::addLabel(EMDL_SORTED_IDX, EMDL_INT, "rlnSortedIndex", "Index of a metadata entry after sorting (first sorted index is 0).");
         EMDL::addLabel(EMDL_STARFILE_MOVIE_PARTICLES, EMDL_STRING, "rlnStarFileMovieParticles", "Filename of a STAR file with movie-particles in it");
         EMDL::addLabel(EMDL_PERFRAME_CUMULATIVE_WEIGHT, EMDL_DOUBLE, "rlnPerFrameCumulativeWeight", "Sum of the resolution-dependent relative weights from the first frame until the given frame");
 		EMDL::addLabel(EMDL_PERFRAME_RELATIVE_WEIGHT, EMDL_DOUBLE, "rlnPerFrameRelativeWeight", "The resolution-dependent relative weights for a given frame");

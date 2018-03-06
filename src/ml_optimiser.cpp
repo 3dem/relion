@@ -43,7 +43,15 @@
 #include "src/error.h"
 #include "src/ml_optimiser.h"
 #ifdef CUDA
-#include "src/gpu_utils/cuda_ml_optimiser.h"
+#include "src/acc/cuda/cuda_ml_optimiser.h"
+#include <nvToolsExt.h>
+#include <cuda_profiler_api.h>
+#endif
+#ifdef ALTCPU
+	#include <tbb/tbb.h>
+	#include <tbb/parallel_for.h>
+	#include <tbb/task_scheduler_init.h>
+	#include "src/acc/cpu/cpu_ml_optimiser.h"
 #endif
 
 #define NR_CLASS_MUTEXES 5
@@ -102,6 +110,7 @@ void MlOptimiser::read(int argc, char **argv, int rank)
 		// Read in previously calculated parameters
 		if (fn_in != "")
 			read(fn_in, rank);
+
 		// And look for additional command-line options...
 		parseContinue(argc, argv);
 	}
@@ -134,6 +143,9 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	fnt = parser.getOption("--multibody_masks", "STAR file with masks and metadata for multi-body refinement", "OLD");
 	if (fnt != "OLD")
 		fn_body_masks = fnt;
+	// Don't use _ctXX at start of a multibody refinement
+	if (fn_body_masks_was_empty && fn_body_masks != "")
+		fn_out = parser.getOption("--o", "Output rootname", "run");
 
 	// Also allow change of padding...
 	fnt = parser.getOption("--pad", "Oversampling factor for the Fourier transforms of the references", "OLD");
@@ -193,31 +205,45 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 		particle_diameter = textToFloat(fnt);
 
 	// SGD stuff
-	do_sgd = parser.checkOption("--sgd", "Perform stochastic gradient descent instead of default expectation-maximization");
-
-	if (parser.checkOption("--stop_sgd", "Switch from stochastic gradient descent to expectation maximisation for the remainder of iterations."))
-		do_sgd = false;
-
-	fnt = parser.getOption("--max_subsets", "Stop SGD after processing this many subsets (possibly more than 1 iteration)", "OLD");
+	fnt = parser.getOption("--sgd_ini_iter", "Number of initial SGD iterations", "OLD");
 	if (fnt != "OLD")
-		sgd_max_subsets = textToInteger(fnt);
+		sgd_ini_iter = textToInteger(fnt);
 
-	fnt = parser.getOption("--subset_size", "Size of the subsets for SGD", "OLD");
+	fnt = parser.getOption("--sgd_fin_iter", "Number of final SGD iterations", "OLD");
 	if (fnt != "OLD")
-		subset_size = textToInteger(fnt);
+		sgd_fin_iter = textToInteger(fnt);
+
+	fnt = parser.getOption("--sgd_inbetween_iter", "Number of SGD iterations between the initial and final ones", "OLD");
+	if (fnt != "OLD")
+		sgd_inbetween_iter = textToInteger(fnt);
+
+	fnt = parser.getOption("--sgd_ini_resol", "Resolution cutoff during the initial SGD iterations (A)", "OLD");
+	if (fnt != "OLD")
+		sgd_ini_resol = textToFloat(fnt);
+
+	fnt = parser.getOption("--sgd_fin_resol", "Resolution cutoff during the final SGD iterations (A)", "OLD");
+	if (fnt != "OLD")
+		sgd_fin_resol = textToFloat(fnt);
+
+	fnt = parser.getOption("--sgd_ini_subset", "Mini-batch size during the initial SGD iterations", "OLD");
+	if (fnt != "OLD")
+		sgd_ini_subset_size = textToInteger(fnt);
+
+	fnt = parser.getOption("--sgd_fin_subset", "Mini-batch size during the final SGD iterations", "OLD");
+	if (fnt != "OLD")
+		sgd_fin_subset_size = textToInteger(fnt);
 
 	fnt = parser.getOption("--sgd_stepsize", "Step size parameter for SGD updates", "OLD");
 	if (fnt != "OLD")
 		sgd_stepsize = textToInteger(fnt);
 
-	fnt = parser.getOption("--write_subsets", "Write out model every so many subsets", "OLD");
-	if (fnt != "OLD")
-		write_every_subset = textToInteger(fnt);
-
 	fnt = parser.getOption("--mu", "Momentum parameter for SGD updates", "OLD");
 	if (fnt != "OLD")
 		mu = textToFloat(fnt);
 
+	fnt = parser.getOption("--sgd_write_iter", "Write out model every so many iterations in SGD", "OLD");
+	if (fnt != "OLD")
+		write_every_sgd_iter = textToInteger(fnt);
 
 	do_join_random_halves = parser.checkOption("--join_random_halves", "Join previously split random halves again (typically to perform a final reconstruction).");
 
@@ -369,6 +395,11 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	keep_free_scratch_Gb = textToInteger(parser.getOption("--keep_free_scratch", "Space available for copying particle stacks (in Gb)", "10"));
 	do_reuse_scratch = parser.checkOption("--reuse_scratch", "Re-use data on scratchdir, instead of wiping it and re-copying all data.");
 
+#ifdef ALTCPU
+	do_cpu = parser.checkOption("--cpu", "Use intel vectorisation implementation for CPU");
+#else
+        do_cpu = false;
+#endif
 
 	failsafe_threshold = textToInteger(parser.getOption("--failsafe_threshold", "Maximum number of particles permitted to be drop, due to zero sum of weights, before exiting with an error (GPU only).", "40"));
 
@@ -398,10 +429,6 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	fnt = parser.getOption("--strict_highres_exp", "Resolution limit (in Angstrom) to restrict probability calculations in the expectation step", "OLD");
 	if (fnt != "OLD")
 		strict_highres_exp = textToFloat(fnt);
-
-	fnt = parser.getOption("--strict_highres_sgd", "Resolution limit (in Angstrom) to restrict probability calculations in SGD", "OLD");
-	if (fnt != "OLD")
-		strict_highres_sgd = textToFloat(fnt);
 
 	// Debugging/analysis/hidden stuff
 	do_map = !checkParameter(argc, argv, "--no_map");
@@ -580,14 +607,18 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	// SGD stuff
 	int sgd_section = parser.addSection("Stochastic Gradient Descent");
 	do_sgd = parser.checkOption("--sgd", "Perform stochastic gradient descent instead of default expectation-maximization");
+	sgd_ini_iter = textToInteger(parser.getOption("--sgd_ini_iter", "Number of initial SGD iterations", "50"));
+	sgd_fin_iter = textToInteger(parser.getOption("--sgd_fin_iter", "Number of final SGD iterations", "50"));
+	sgd_inbetween_iter = textToInteger(parser.getOption("--sgd_inbetween_iter", "Number of SGD iterations between the initial and final ones", "200"));
+	sgd_ini_resol = textToInteger(parser.getOption("--sgd_ini_resol", "Resolution cutoff during the initial SGD iterations (A)", "35"));
+	sgd_fin_resol = textToInteger(parser.getOption("--sgd_fin_resol", "Resolution cutoff during the final SGD iterations (A)", "15"));
+	sgd_ini_subset_size = textToInteger(parser.getOption("--sgd_ini_subset", "Mini-batch size during the initial SGD iterations", "100"));
+	sgd_fin_subset_size = textToInteger(parser.getOption("--sgd_fin_subset", "Mini-batch size during the final SGD iterations", "500"));
 	mu = textToFloat(parser.getOption("--mu", "Momentum parameter for SGD updates", "0.9"));
-	subset_size = textToInteger(parser.getOption("--subset_size", "Size of the subsets for SGD", "-1"));
 	sgd_stepsize = textToFloat(parser.getOption("--sgd_stepsize", "Step size parameter for SGD updates", "0.5"));
-	sgd_max_subsets = textToInteger(parser.getOption("--max_subsets", "Stop SGD after processing this many subsets (possibly more than 1 iteration)", "-1"));
 	sgd_sigma2fudge_ini = textToFloat(parser.getOption("--sgd_sigma2fudge_initial", "Initial factor by which the noise variance will be multiplied for SGD (not used if halftime is negative)", "8"));
 	sgd_sigma2fudge_halflife = textToInteger(parser.getOption("--sgd_sigma2fudge_halflife", "Initialise SGD with 8x higher noise-variance, and reduce with this half-life in # of particles (default is keep normal variance)", "-1"));
-	write_every_subset = textToInteger(parser.getOption("--write_subsets", "Write out model every so many subsets (default is not writing any)", "-1"));
-	strict_highres_sgd = textToFloat(parser.getOption("--strict_highres_sgd", "Resolution limit (in Angstrom) to restrict probability calculations in SGD", "20"));
+	write_every_sgd_iter = textToInteger(parser.getOption("--sgd_write_iter", "Write out model every so many iterations in SGD (default is writing out all iters)", "1"));
 
 	// Computation stuff
 	// The number of threads is always read from the command line
@@ -601,6 +632,12 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	fn_scratch = parser.getOption("--scratch_dir", "If provided, particle stacks will be copied to this local scratch disk prior to refinement.", "");
 	keep_free_scratch_Gb = textToInteger(parser.getOption("--keep_free_scratch", "Space available for copying particle stacks (in Gb)", "10"));
 	do_reuse_scratch = parser.checkOption("--reuse_scratch", "Re-use data on scratchdir, instead of wiping it and re-copying all data.");
+	do_fast_subsets = parser.checkOption("--fast_subsets", "Use faster optimisation by using subsets of the data in the first 15 iterations");
+#ifdef ALTCPU
+	do_cpu = parser.checkOption("--cpu", "Use intel vectorisation implementation for CPU");
+#else
+        do_cpu = false;
+#endif
 
 	do_gpu = parser.checkOption("--gpu", "Use available gpu resources for some calculations");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread","default");
@@ -643,8 +680,6 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 
 	// When reading from the CL: always start at iteration 1 and subset 1
 	iter = 0;
-	subset = 0;
-	subset_start = 1;
     // When starting from CL: always calculate initial sigma_noise
     do_calculate_initial_sigma_noise = true;
     // Start average norm correction at 1!
@@ -715,7 +750,10 @@ void MlOptimiser::read(FileName fn_in, int rank)
     std::cerr<<"MlOptimiser::readStar entering ..."<<std::endl;
 #endif
 
-    // Open input file
+	if (rank == 0)
+		std::cout << " Reading in optimiser.star ..." << std::endl;
+
+	// Open input file
     std::ifstream in(fn_in.data(), std::ios_base::in);
     if (in.fail())
         REPORT_ERROR( (std::string) "MlOptimiser::readStar: File " + fn_in + " cannot be read." );
@@ -806,10 +844,23 @@ void MlOptimiser::read(FileName fn_in, int rank)
     	helical_keep_tilt_prior_fixed = false;
 	if (!MD.getValue(EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED, ctf_premultiplied))
 		ctf_premultiplied = false;
-	if (!MD.getValue(EMDL_OPTIMISER_HIGHRES_LIMIT_SGD, strict_highres_sgd))
-		strict_highres_sgd = -1.;
+	// New SGD (13Feb2018)
 	if (!MD.getValue(EMDL_OPTIMISER_DO_SGD, do_sgd))
 		do_sgd = false;
+	if (!MD.getValue(EMDL_OPTIMISER_SGD_INI_ITER, sgd_ini_iter))
+		sgd_ini_iter = 50;
+	if (!MD.getValue(EMDL_OPTIMISER_SGD_FIN_ITER, sgd_fin_iter))
+		sgd_fin_iter = 50;
+	if (!MD.getValue(EMDL_OPTIMISER_SGD_INBETWEEN_ITER, sgd_inbetween_iter))
+		sgd_inbetween_iter = 200;
+	if (!MD.getValue(EMDL_OPTIMISER_SGD_INI_RESOL, sgd_ini_resol))
+		sgd_ini_resol = 35.;
+	if (!MD.getValue(EMDL_OPTIMISER_SGD_FIN_RESOL, sgd_fin_resol))
+		sgd_fin_resol = 15.;
+	if (!MD.getValue(EMDL_OPTIMISER_SGD_INI_SUBSET_SIZE, sgd_ini_subset_size))
+		sgd_ini_subset_size = 100;
+	if (!MD.getValue(EMDL_OPTIMISER_SGD_FIN_SUBSET_SIZE, sgd_fin_subset_size))
+		sgd_fin_subset_size = 500;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_MU, mu))
 		mu = 0.9;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_SIGMA2FUDGE_INI, sgd_sigma2fudge_ini))
@@ -818,20 +869,16 @@ void MlOptimiser::read(FileName fn_in, int rank)
 		sgd_sigma2fudge_halflife = -1;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_SUBSET_SIZE, subset_size))
 		subset_size = -1;
-	if (!MD.getValue(EMDL_OPTIMISER_SGD_SUBSET_START, subset_start))
-		subset_start = 1;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_STEPSIZE, sgd_stepsize))
 		sgd_stepsize = 0.5;
-	// The following line is only to avoid strange filenames when writing optimiser.star upon restarting
-	subset = subset_start - 1;
-	if (!MD.getValue(EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET, write_every_subset))
-		write_every_subset = -1;
-	if (!MD.getValue(EMDL_OPTIMISER_SGD_MAX_SUBSETS, sgd_max_subsets))
-		sgd_max_subsets = -1;
+	if (!MD.getValue(EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET, write_every_sgd_iter))
+		write_every_sgd_iter = 1;
 	if (!MD.getValue(EMDL_BODY_STAR_FILE, fn_body_masks))
 		fn_body_masks = "None";
 	if (!MD.getValue(EMDL_OPTIMISER_DO_SOLVENT_FSC, do_phase_random_fsc))
 		do_phase_random_fsc = false;
+	if (!MD.getValue(EMDL_OPTIMISER_FAST_SUBSETS, do_fast_subsets))
+		do_fast_subsets = false;
 
     if (do_split_random_halves &&
     		!MD.getValue(EMDL_OPTIMISER_MODEL_STARFILE2, fn_model2))
@@ -897,6 +944,9 @@ void MlOptimiser::read(FileName fn_in, int rank)
 void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_write_optimiser, bool do_write_model, int random_subset)
 {
 
+	if (subset_size > 0 && (iter % write_every_sgd_iter) != 0)
+		return;
+
 	FileName fn_root, fn_tmp, fn_model, fn_model2, fn_data, fn_sampling, fn_root2;
 	std::ofstream  fh;
 	if (iter > -1)
@@ -905,26 +955,7 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		fn_root = fn_out;
 	// fn_root2 is used to write out the model and optimiser, and adds a subset number in SGD
 	fn_root2 = fn_root;
-	bool do_write_bild = !(do_skip_align || do_skip_rotate);
-	int writeout_subset_start = 1;
-
-	if (iter > 0 && nr_subsets > 1 && subset != nr_subsets)
-	{
-		if ((subset % write_every_subset) == 0)
-		{
-			fn_root2.compose(fn_root+"_sub", subset, "", 4);
-			fn_root += "_sub";
-			do_write_bild = false;
-			writeout_subset_start = subset + 1;
-		}
-		else
-		{
-			do_write_sampling = false;
-			do_write_data = false;
-			do_write_optimiser = false;
-			do_write_model = false;
-		}
-	}
+	bool do_write_bild = !(do_skip_align || do_skip_rotate || do_sgd);
 
 	// First write "main" STAR file with all information from this run
 	// Do this for random_subset==0 and random_subset==1
@@ -989,16 +1020,21 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		MD.setValue(EMDL_OPTIMISER_HIGHRES_LIMIT_EXP, strict_highres_exp);
 		MD.setValue(EMDL_OPTIMISER_INCR_SIZE, incr_size);
 		MD.setValue(EMDL_OPTIMISER_DO_MAP, do_map);
+		MD.setValue(EMDL_OPTIMISER_FAST_SUBSETS, do_fast_subsets);
 		MD.setValue(EMDL_OPTIMISER_DO_SGD, do_sgd);
+		MD.setValue(EMDL_OPTIMISER_SGD_INI_ITER, sgd_ini_iter);
+		MD.setValue(EMDL_OPTIMISER_SGD_FIN_ITER, sgd_fin_iter);
+		MD.setValue(EMDL_OPTIMISER_SGD_INBETWEEN_ITER, sgd_inbetween_iter);
+		MD.setValue(EMDL_OPTIMISER_SGD_INI_RESOL, sgd_ini_resol);
+		MD.setValue(EMDL_OPTIMISER_SGD_FIN_RESOL, sgd_fin_resol);
+		MD.setValue(EMDL_OPTIMISER_SGD_INI_SUBSET_SIZE, sgd_ini_subset_size);
+		MD.setValue(EMDL_OPTIMISER_SGD_FIN_SUBSET_SIZE, sgd_fin_subset_size);
 		MD.setValue(EMDL_OPTIMISER_SGD_MU, mu);
 		MD.setValue(EMDL_OPTIMISER_SGD_SIGMA2FUDGE_INI, sgd_sigma2fudge_ini);
 		MD.setValue(EMDL_OPTIMISER_SGD_SIGMA2FUDGE_HALFLIFE, sgd_sigma2fudge_halflife);
-		MD.setValue(EMDL_OPTIMISER_SGD_SUBSET_START, writeout_subset_start);
 		MD.setValue(EMDL_OPTIMISER_SGD_SUBSET_SIZE, subset_size);
-		MD.setValue(EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET, write_every_subset);
-		MD.setValue(EMDL_OPTIMISER_SGD_MAX_SUBSETS, sgd_max_subsets);
+		MD.setValue(EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET, write_every_sgd_iter);
 		MD.setValue(EMDL_OPTIMISER_SGD_STEPSIZE, sgd_stepsize);
-		MD.setValue(EMDL_OPTIMISER_HIGHRES_LIMIT_SGD, strict_highres_sgd);
 		MD.setValue(EMDL_OPTIMISER_DO_AUTO_REFINE, do_auto_refine);
 		MD.setValue(EMDL_OPTIMISER_AUTO_LOCAL_HP_ORDER, autosampling_hporder_local_searches);
 	    MD.setValue(EMDL_OPTIMISER_NR_ITER_WO_RESOL_GAIN, nr_iter_wo_resol_gain);
@@ -1068,7 +1104,6 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 
 void MlOptimiser::initialise()
 {
-//#define DEBUG
 #ifdef DEBUG
     std::cerr<<"MlOptimiser::initialise Entering"<<std::endl;
 #endif
@@ -1170,6 +1205,25 @@ void MlOptimiser::initialise()
     initialiseGeneral();
 
     initialiseWorkLoad();
+
+#ifdef ALTCPU
+	// Don't start threading until after most I/O is over
+	if (do_cpu)
+	{
+		// Set the size of the TBB thread pool for the entire run
+		tbbSchedulerInit.initialize(nr_threads);
+	}
+#endif
+#ifdef MKLFFT
+	// Enable multi-threaded FFTW
+	int success = fftw_init_threads();
+	if (0 == success)
+		REPORT_ERROR("Multithreaded FFTW failed to initialize");
+
+	// And allow plans before expectation to run using allowed
+	// number of threads
+	fftw_plan_with_nthreads(nr_threads);
+#endif
 
 	if (fn_sigma != "")
 	{
@@ -1321,6 +1375,10 @@ void MlOptimiser::initialiseGeneral(int rank)
 	TIMING_WSUM_SUMSHIFT = timer.setNew(" -  - EOPwsum: shiftimg");
 	TIMING_WSUM_BACKPROJ = timer.setNew(" -  - EOPwsum: backproject");
 
+	TIMING_ITER_HELICALREFINE = timer.setNew("iterate:  helicalRefinement");
+	TIMING_ITER_WRITE         = timer.setNew("iterate:  writeOutput");
+	TIMING_ITER_LOCALSYM      = timer.setNew("iterate:  ApplyLocalSymmetry");
+
 	TIMING_EXTRA1= timer.setNew(" -extra1");
 	TIMING_EXTRA2= timer.setNew(" -extra2");
 	TIMING_EXTRA3= timer.setNew(" -extra3");
@@ -1356,9 +1414,9 @@ void MlOptimiser::initialiseGeneral(int rank)
     if (!exists(fn_dir))
     	REPORT_ERROR("ERROR: output directory does not exist!");
 
-    // Just die if trying to use GPUs and skipping alignments
-    if (do_skip_align && do_gpu)
-    	REPORT_ERROR("ERROR: you cannot use GPUs when skipping alignments");
+    // Just die if trying to use accelerators and skipping alignments
+    if (do_skip_align && (do_gpu || do_cpu))
+    	REPORT_ERROR("ERROR: you cannot use accelerators when skipping alignments");
 
 	if (do_always_cc)
 		do_calculate_initial_sigma_noise = false;
@@ -1754,11 +1812,12 @@ void MlOptimiser::initialiseGeneral(int rank)
     	std::cout << " Using bimodal priors on the psi angle..." << std::endl;
 
 	// Resize the pdf_direction arrays to the correct size and fill with an even distribution
-    if (directions_have_changed)
+	if (directions_have_changed)
 		mymodel.initialisePdfDirection(sampling.NrDirections());
 
 	// Initialise the wsum_model according to the mymodel
 	wsum_model.initialise(mymodel, sampling.symmetryGroup(), asymmetric_padding, skip_gridding);
+
 	// Initialise sums of hidden variable changes
 	// In later iterations, this will be done in updateOverallChangesInHiddenVariables
 	sum_changes_optimal_orientations = 0.;
@@ -1809,21 +1868,25 @@ void MlOptimiser::initialiseGeneral(int rank)
 	if (XSIZE(mymodel.Iref[0]) != data_image_size)
 		REPORT_ERROR("ERROR: reference and data image sizes are not the same!");
 
-	// Make subsets?
-	nr_subsets = 1;
-	if (subset_size > 0)
+	if (do_sgd)
 	{
-    	//do_norm_correction = false;
-	    //do_scale_correction = false;
-	    if (random_seed != 0)
-    		mydata.randomiseOriginalParticlesOrder(random_seed);
-	    nr_subsets = mydata.numberOfOriginalParticles() / subset_size;
-	    if (write_every_subset < 0)
-	    	write_every_subset = nr_subsets;
-    }
+		sgd_inires_pix = mymodel.getPixelFromResolution(1./sgd_ini_resol);
+		sgd_finres_pix = mymodel.getPixelFromResolution(1./sgd_fin_resol);
+		// for continuation jobs (iter>0): could do some more iterations as specified by nr_iter
+		nr_iter = sgd_ini_iter + sgd_fin_iter + sgd_inbetween_iter;
+	}
 	else
 	{
-	    mu = 0.;
+	    subset_size = -1;
+		mu = 0.;
+	}
+
+	if (do_fast_subsets)
+	{
+		if (nr_iter < 20)
+			REPORT_ERROR("ERROR: when using --fast_subsets you have to perform at least 20 iterations!");
+		if (do_auto_refine)
+			REPORT_ERROR("ERROR: you cannot use --fast_subsets together with --auto_refine");
 	}
 
 	// Check first mask [0,1] compliance right away.
@@ -1854,6 +1917,9 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 	if(mask1 || mask2)
 		REPORT_ERROR(errstr);
+
+	// Write out unmasked 2D class averages
+	do_write_unmasked_refs = (mymodel.ref_dim == 2);
 
 #ifdef DEBUG
 	std::cerr << "Leaving initialiseGeneral" << std::endl;
@@ -2035,7 +2101,6 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 
 			// Calculate the power spectrum of this particle
 			CenterFFT(img(), true);
-   			transformer.FourierTransform(img(), Faux);
    			MultidimArray<RFLOAT> ind_spectrum, count;
    			ind_spectrum.initZeros(XSIZE(img()));
 			count.initZeros(XSIZE(img()));
@@ -2054,7 +2119,8 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 			wsum_model.sigma2_noise[group_id] += ind_spectrum;
 			wsum_model.sumw_group[group_id] += 1.;
 
-			if (fn_ref == "None")
+			// When doing SGD, only take the first sgd_ini_subset_size*mymodel.nr_classes images to calculate the initial reconstruction
+			if (fn_ref == "None" && !(do_sgd && ori_part_id < sgd_ini_subset_size*mymodel.nr_classes) )
 			{
 
 				MultidimArray<RFLOAT> Fctf, Fweight;
@@ -2271,6 +2337,9 @@ void MlOptimiser::iterateWrapUp()
     // Delete volatile space on scratch
     mydata.deleteDataOnScratch();
 
+#ifdef MKLFFT
+	fftw_cleanup_threads();
+#endif
 }
 
 void MlOptimiser::iterate()
@@ -2283,11 +2352,13 @@ void MlOptimiser::iterate()
 	// launch threads etc
 	iterateSetup();
 
+
 	// Update the current resolution and image sizes, and precalculate resolution pointers
 	// The rest of the time this will be done after maximization and before writing output files,
 	// so that current resolution is in the output files of the current iteration
 	updateCurrentResolution();
 
+	/*
 	// If we're doing a restart from subsets, then do not increment the iteration number in the restart!
 	if (subset > 0)
 	{
@@ -2295,6 +2366,7 @@ void MlOptimiser::iterate()
 		iter--;
 		std::cerr << " iter= " << iter << std::endl;
 	}
+	*/
 
 	bool has_already_reached_convergence = false;
 	for (iter = iter + 1; iter <= nr_iter; iter++)
@@ -2311,199 +2383,192 @@ void MlOptimiser::iterate()
 		std::cerr << std::endl;
 #endif
 
-		for (subset = subset_start; subset <= nr_subsets; subset++)
+
+#ifdef TIMING
+		timer.tic(TIMING_EXP);
+#endif
+
+		// Update subset_size
+		updateSubsetSize();
+
+		// Randomly take different subset of the particles each time we do a new "iteration" in SGD
+		mydata.randomiseOriginalParticlesOrder(random_seed+iter, do_split_random_halves, subset_size < mydata.numberOfOriginalParticles() );
+
+		if (do_auto_refine)
 		{
+			// Check whether we have converged by now
+			// If we have, set do_join_random_halves and do_use_all_data for the next iteration
+			checkConvergence();
+		}
 
-#ifdef TIMING
-			timer.tic(TIMING_EXP);
-#endif
+		expectation();
 
-			if (do_auto_refine)
-			{
-				// Check whether we have converged by now
-				// If we have, set do_join_random_halves and do_use_all_data for the next iteration
-				checkConvergence();
-			}
 
-			expectation();
-
-			int old_verb = verb;
-			if (nr_subsets > 1) // be quiet
-				verb = 0;
-
-			// Sjors & Shaoda Apr 2015
-			// This function does enforceHermitianSymmetry, applyHelicalSymmetry and applyPointGroupSymmetry sequentially.
-			// First it enforces Hermitian symmetry to the back-projected Fourier 3D matrix.
-			// Then helical symmetry is applied in Fourier space. It does rise and twist for all asymmetrical units in Fourier space.
-			// Finally it applies point group symmetry (such as Cn, ...).
-			// DEBUG
-			if (verb > 0)
-			{
-				if ( (do_helical_refine) && (!ignore_helical_symmetry) )
-				{
-					if (mymodel.helical_nr_asu > 1)
-						std::cout << " Applying helical symmetry from the last iteration for all asymmetrical units in Fourier space..." << std::endl;
-					if ( (iter > 1) && (do_helical_symmetry_local_refinement) )
-					{
-						std::cout << " Refining helical symmetry in real space..." << std::endl;
-						std::cout << " Applying refined helical symmetry in real space..." << std::endl;
-					}
-					else
-						std::cout << " Applying helical symmetry from the last iteration in real space..." << std::endl;
-				}
-			}
-			symmetriseReconstructions();
-
-#ifdef TIMING
-			timer.toc(TIMING_EXP);
-			timer.tic(TIMING_MAX);
-#endif
-
-			if (do_skip_maximization)
-			{
-				// Only write data.star file and break from the iteration loop
-				write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DONT_WRITE_OPTIMISER, DONT_WRITE_MODEL, 0);
-				break;
-			}
-
-			maximization();
-
-#ifdef TIMING
-			timer.toc(TIMING_MAX);
-#endif
-
-			// Apply local symmetry according to a list of masks and their operators
-			applyLocalSymmetryForEachRef();
-
-			// Shaoda Jul26,2015
-			// Helical symmetry refinement and imposition of real space helical symmetry.
-			if (do_helical_refine)
-			{
-				if (!ignore_helical_symmetry)
-					makeGoodHelixForEachRef();
-				if ( (!do_skip_align) && (!do_skip_rotate) )
-				{
-					int nr_same_polarity = 0, nr_opposite_polarity = 0;
-					RFLOAT opposite_percentage = 0.;
-					bool do_auto_refine_local_searches = (do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches);
-					bool do_classification_local_searches = (!do_auto_refine) && (mymodel.orientational_prior_mode == PRIOR_ROTTILT_PSI)
-							&& (mymodel.sigma2_rot > 0.) && (mymodel.sigma2_tilt > 0.) && (mymodel.sigma2_psi > 0.);
-					bool do_local_angular_searches = (do_auto_refine_local_searches) || (do_classification_local_searches);
-
-					if (helical_sigma_distance < 0.)
-						updateAngularPriorsForHelicalReconstruction(mydata.MDimg, helical_keep_tilt_prior_fixed);
-					else
-					{
-						updatePriorsForHelicalReconstruction(
-								mydata.MDimg,
-								nr_opposite_polarity,
-								helical_sigma_distance * ((RFLOAT)(mymodel.ori_size)),
-								(mymodel.data_dim == 3),
-								do_auto_refine,
-								do_local_angular_searches,
-								mymodel.sigma2_rot,
-								mymodel.sigma2_tilt,
-								mymodel.sigma2_psi,
-								mymodel.sigma2_offset,
-								helical_keep_tilt_prior_fixed);
-
-						nr_same_polarity = ((int)(mydata.MDimg.numberOfObjects())) - nr_opposite_polarity;
-						opposite_percentage = (100.) * ((RFLOAT)(nr_opposite_polarity)) / ((RFLOAT)(mydata.MDimg.numberOfObjects()));
-						if ( (verb > 0) && (!do_local_angular_searches) )
-						{
-							//std::cout << " DEBUG: auto_refine, healpix_order, min_for_local = " << do_auto_refine << ", " << sampling.healpix_order << ", " << autosampling_hporder_local_searches << std::endl;
-							//std::cout << " DEBUG: orient_prior_mode = " << PRIOR_ROTTILT_PSI << ", sigma_ang2 = " << mymodel.sigma2_rot << ", " << mymodel.sigma2_tilt << ", " << mymodel.sigma2_psi << ", sigma_offset2 = " << mymodel.sigma2_offset << std::endl;
-							std::cout << " Number of helical segments with psi angles similar/opposite to their priors: " << nr_same_polarity << " / " << nr_opposite_polarity << " (" << opposite_percentage << "%)" << std::endl;
-						}
-					}
-				}
-			}
-
-			// Apply masks to the reference images
-			// At the last iteration, do not mask the map for validation purposes
-			if (do_solvent && !has_converged)
-				solventFlatten();
-
-			// Re-calculate the current resolution, do this before writing to get the correct values in the output files
-			updateCurrentResolution();
-
-			// Write output files
-			write(DO_WRITE_SAMPLING, DO_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, 0);
-
-			if (do_auto_refine && has_converged)
-			{
-				if (verb > 0)
-				{
-					std::cout << " Auto-refine: Refinement has converged, stopping now... " << std::endl;
-					std::cout << " Auto-refine: + Final reconstruction from all particles is saved as: " <<  fn_out << "_class001.mrc" << std::endl;
-					std::cout << " Auto-refine: + Final model parameters are stored in: " << fn_out << "_model.star" << std::endl;
-					std::cout << " Auto-refine: + Final data parameters are stored in: " << fn_out << "_data.star" << std::endl;
-                                        if (mymodel.tau2_fudge_factor > 1.)
-                                        {
-                                            std::cout << " Auto-refine: + SEVERE WARNING: Because you used a tau2_fudge of " << mymodel.tau2_fudge_factor << " your resolution during this refinement will be inflated!" << std::endl;
-                                            std::cout << " Auto-refine: + SEVERE WARNING: You have to run a postprocessing on the unfil.mrc maps to get a gold-standard resolution estimate!"  << std::endl;
-                                        }
-                                        else if (do_phase_random_fsc)
-                                            std::cout << " Auto-refine: + Final resolution (already with masking) is: " << 1./mymodel.current_resolution << std::endl;
-                                        else
-                                        {
-                                            std::cout << " Auto-refine: + Final resolution (without masking) is: " << 1./mymodel.current_resolution << std::endl;
-                                            std::cout << " Auto-refine: + But you may want to run relion_postprocess to mask the unfil.mrc maps and calculate a higher resolution FSC" << std::endl;
-                                        }
-					if (acc_rot > 10.)
-					{
-						std::cout << " Auto-refine: + SEVERE WARNING: The angular accuracy is worse than 10 degrees, so basically you cannot align your particles!" << std::endl;
-						std::cout << " Auto-refine: + SEVERE WARNING: This has been observed to lead to spurious FSC curves, so be VERY wary of inflated resolution estimates..." << std::endl;
-						std::cout << " Auto-refine: + SEVERE WARNING: You most probably do NOT want to publish these results!" << std::endl;
-						std::cout << " Auto-refine: + SEVERE WARNING: Sometimes it is better to tune resolution yourself by adjusting T in a 3D-classification with a single class." << std::endl;
-					}
-				}
-				break;
-			}
-
-			verb = old_verb;
-
-			if (nr_subsets > 1 && sgd_max_subsets > 0 && subset > sgd_max_subsets)
-				break; // break out of loop over the subsets
-
-#ifdef TIMING
-			if (verb > 0)
-				timer.printTimes(false);
-#endif
-		} // end loop subsets
-
-		// In the next iteration, start again from the first subset
-		subset_start = 1;
-
-		// Stop subsets after sgd_max_subsets has been reached
-		if (nr_subsets > 1 && sgd_max_subsets > 0 && subset > sgd_max_subsets)
+		// Sjors & Shaoda Apr 2015
+		// This function does enforceHermitianSymmetry, applyHelicalSymmetry and applyPointGroupSymmetry sequentially.
+		// First it enforces Hermitian symmetry to the back-projected Fourier 3D matrix.
+		// Then helical symmetry is applied in Fourier space. It does rise and twist for all asymmetrical units in Fourier space.
+		// Finally it applies point group symmetry (such as Cn, ...).
+		// DEBUG
+		if (verb > 0)
 		{
-			// Write out without a _sub in the name
-			nr_subsets = 1;
-			write(DO_WRITE_SAMPLING, DO_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, 0);
-			// We must reset mu to zero, otherwise ClassDistributions do not sum to 1.
-			mu = 0;
-
-			if (do_sgd)
+			if ( (do_helical_refine) && (!ignore_helical_symmetry) )
 			{
-				if (verb > 0)
-					std::cout << " SGD has reached the maximum number of subsets, so stopping now..." << std::endl;
-				// For initial model generation, just stop after the sgd_max_subsets has been reached
-				break;
-			}
-			else
-			{
-				if (verb > 0)
-					std::cout << " Run has reached the maximum number of subsets, continuing without subsets now..." << std::endl;
-				// For subsets in 2D classification, now continue rest of iterations without subsets in the next iteration
-				subset_size = -1;
+				if (mymodel.helical_nr_asu > 1)
+					std::cout << " Applying helical symmetry from the last iteration for all asymmetrical units in Fourier space..." << std::endl;
+				if ( (iter > 1) && (do_helical_symmetry_local_refinement) )
+				{
+					std::cout << " Refining helical symmetry in real space..." << std::endl;
+					std::cout << " Applying refined helical symmetry in real space..." << std::endl;
+				}
+				else
+					std::cout << " Applying helical symmetry from the last iteration in real space..." << std::endl;
 			}
 		}
+		symmetriseReconstructions();
+
+#ifdef TIMING
+		timer.toc(TIMING_EXP);
+		timer.tic(TIMING_MAX);
+#endif
+
+		if (do_skip_maximization)
+		{
+			// Only write data.star file and break from the iteration loop
+			write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DONT_WRITE_OPTIMISER, DONT_WRITE_MODEL, 0);
+			break;
+		}
+
+		maximization();
+
+#ifdef TIMING
+		timer.toc(TIMING_MAX);
+		timer.tic(TIMING_ITER_LOCALSYM);
+#endif
+
+		// Apply local symmetry according to a list of masks and their operators
+		applyLocalSymmetryForEachRef();
+
+#ifdef TIMING
+		timer.toc(TIMING_ITER_LOCALSYM);
+		timer.tic(TIMING_ITER_HELICALREFINE);
+#endif
+		// Shaoda Jul26,2015
+		// Helical symmetry refinement and imposition of real space helical symmetry.
+		if (do_helical_refine)
+		{
+			if (!ignore_helical_symmetry)
+				makeGoodHelixForEachRef();
+			if ( (!do_skip_align) && (!do_skip_rotate) )
+			{
+				int nr_same_polarity = 0, nr_opposite_polarity = 0;
+				RFLOAT opposite_percentage = 0.;
+				bool do_auto_refine_local_searches = (do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches);
+				bool do_classification_local_searches = (!do_auto_refine) && (mymodel.orientational_prior_mode == PRIOR_ROTTILT_PSI)
+						&& (mymodel.sigma2_rot > 0.) && (mymodel.sigma2_tilt > 0.) && (mymodel.sigma2_psi > 0.);
+				bool do_local_angular_searches = (do_auto_refine_local_searches) || (do_classification_local_searches);
+
+				if (helical_sigma_distance < 0.)
+					updateAngularPriorsForHelicalReconstruction(mydata.MDimg, helical_keep_tilt_prior_fixed);
+				else
+				{
+					updatePriorsForHelicalReconstruction(
+							mydata.MDimg,
+							nr_opposite_polarity,
+							helical_sigma_distance * ((RFLOAT)(mymodel.ori_size)),
+							(mymodel.data_dim == 3),
+							do_auto_refine,
+							do_local_angular_searches,
+							mymodel.sigma2_rot,
+							mymodel.sigma2_tilt,
+							mymodel.sigma2_psi,
+							mymodel.sigma2_offset,
+							helical_keep_tilt_prior_fixed);
+
+					nr_same_polarity = ((int)(mydata.MDimg.numberOfObjects())) - nr_opposite_polarity;
+					opposite_percentage = (100.) * ((RFLOAT)(nr_opposite_polarity)) / ((RFLOAT)(mydata.MDimg.numberOfObjects()));
+					if ( (verb > 0) && (!do_local_angular_searches) )
+					{
+						//std::cout << " DEBUG: auto_refine, healpix_order, min_for_local = " << do_auto_refine << ", " << sampling.healpix_order << ", " << autosampling_hporder_local_searches << std::endl;
+						//std::cout << " DEBUG: orient_prior_mode = " << PRIOR_ROTTILT_PSI << ", sigma_ang2 = " << mymodel.sigma2_rot << ", " << mymodel.sigma2_tilt << ", " << mymodel.sigma2_psi << ", sigma_offset2 = " << mymodel.sigma2_offset << std::endl;
+						std::cout << " Number of helical segments with psi angles similar/opposite to their priors: " << nr_same_polarity << " / " << nr_opposite_polarity << " (" << opposite_percentage << "%)" << std::endl;
+					}
+				}
+			}
+		}
+
+                // Directly use fn_out, without "_it" specifier, so unmasked refs will be overwritten at every iteration
+                if (do_write_unmasked_refs)
+                    mymodel.write(fn_out+"_unmasked", sampling, false, true);
+
+#ifdef TIMING
+		timer.toc(TIMING_ITER_HELICALREFINE);
+		timer.tic(TIMING_SOLVFLAT);
+#endif
+		// Apply masks to the reference images
+		// At the last iteration, do not mask the map for validation purposes
+		if (do_solvent && !has_converged)
+			solventFlatten();
+
+#ifdef TIMING
+		timer.toc(TIMING_SOLVFLAT);
+		timer.tic(TIMING_UPDATERES);
+#endif
+		// Re-calculate the current resolution, do this before writing to get the correct values in the output files
+		updateCurrentResolution();
+
+#ifdef TIMING
+		timer.toc(TIMING_UPDATERES);
+		timer.tic(TIMING_ITER_WRITE);
+#endif
+		// Write output files
+		write(DO_WRITE_SAMPLING, DO_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, 0);
+
+#ifdef TIMING
+		timer.toc(TIMING_ITER_WRITE);
+#endif
+		if (do_auto_refine && has_converged)
+		{
+			if (verb > 0)
+			{
+				std::cout << " Auto-refine: Refinement has converged, stopping now... " << std::endl;
+				std::cout << " Auto-refine: + Final reconstruction from all particles is saved as: " <<  fn_out << "_class001.mrc" << std::endl;
+				std::cout << " Auto-refine: + Final model parameters are stored in: " << fn_out << "_model.star" << std::endl;
+				std::cout << " Auto-refine: + Final data parameters are stored in: " << fn_out << "_data.star" << std::endl;
+				if (mymodel.tau2_fudge_factor > 1.)
+				{
+					std::cout << " Auto-refine: + SEVERE WARNING: Because you used a tau2_fudge of " << mymodel.tau2_fudge_factor << " your resolution during this refinement will be inflated!" << std::endl;
+					std::cout << " Auto-refine: + SEVERE WARNING: You have to run a postprocessing on the unfil.mrc maps to get a gold-standard resolution estimate!"  << std::endl;
+				}
+				else if (do_phase_random_fsc)
+					std::cout << " Auto-refine: + Final resolution (already with masking) is: " << 1./mymodel.current_resolution << std::endl;
+				else
+				{
+					std::cout << " Auto-refine: + Final resolution (without masking) is: " << 1./mymodel.current_resolution << std::endl;
+					std::cout << " Auto-refine: + But you may want to run relion_postprocess to mask the unfil.mrc maps and calculate a higher resolution FSC" << std::endl;
+				}
+				if (acc_rot > 10.)
+				{
+					std::cout << " Auto-refine: + SEVERE WARNING: The angular accuracy is worse than 10 degrees, so basically you cannot align your particles!" << std::endl;
+					std::cout << " Auto-refine: + SEVERE WARNING: This has been observed to lead to spurious FSC curves, so be VERY wary of inflated resolution estimates..." << std::endl;
+					std::cout << " Auto-refine: + SEVERE WARNING: You most probably do NOT want to publish these results!" << std::endl;
+					std::cout << " Auto-refine: + SEVERE WARNING: Sometimes it is better to tune resolution yourself by adjusting T in a 3D-classification with a single class." << std::endl;
+				}
+			}
+			break;
+		}
+
+#ifdef TIMING
+		if (verb > 0)
+			timer.printTimes(false);
+#endif
+
 
     } // end loop iters
 
 	// delete threads etc
 	iterateWrapUp();
+
 }
 
 void MlOptimiser::expectation()
@@ -2512,6 +2577,11 @@ void MlOptimiser::expectation()
 //#define DEBUG_EXP
 #ifdef DEBUG_EXP
 	std::cerr << "Entering expectation" << std::endl;
+#endif
+
+#ifdef MKLFFT
+	// Allow parallel FFTW execution
+	fftw_plan_with_nthreads(nr_threads);
 #endif
 
 	// Initialise some stuff
@@ -2527,7 +2597,7 @@ void MlOptimiser::expectation()
 
 	// C. Calculate expected minimum angular errors (only for 3D refinements)
 	// And possibly update orientational sampling automatically
-	if (!((iter==1 && do_firstiter_cc) || do_always_cc) && !(do_skip_align || do_only_sample_tilt) && subset == 1)
+	if (!((iter==1 && do_firstiter_cc) || do_always_cc) && !(do_skip_align || do_only_sample_tilt) && !do_sgd)
 	{
 		// Set the exp_metadata (but not the exp_imagedata which is not needed for calculateExpectedAngularErrors)
 		int n_trials_acc = (mymodel.ref_dim==3 && mymodel.data_dim != 3) ? 100 : 10;
@@ -2537,16 +2607,15 @@ void MlOptimiser::expectation()
 	}
 
 	// D. Update the angular sampling (all nodes except master)
-	if ( (do_auto_refine) && iter > 1 )
+	if ( (do_auto_refine || do_sgd) && iter > 1 )
 		updateAngularSampling();
 
 	// E. Check whether everything fits into memory
-	if (subset == 1)
-		expectationSetupCheckMemory(verb);
+	expectationSetupCheckMemory(verb);
 
 	// F. Precalculate AB-matrices for on-the-fly shifts
 	// Use tabulated sine and cosine values instead for 2D helical segments / 3D helical sub-tomogram averaging with on-the-fly shifts
-	if ( (do_shifts_onthefly) && (subset == 1) && (!((do_helical_refine) && (!ignore_helical_symmetry))) )
+	if ( (do_shifts_onthefly) && (!((do_helical_refine) && (!ignore_helical_symmetry))) && !(do_sgd && iter > 1))
 		precalculateABMatrices();
 
 
@@ -2560,21 +2629,24 @@ void MlOptimiser::expectation()
 
 	if (do_gpu)
     {
+		for (int i = 0; i < wsum_model.BPref.size(); i ++)
+			wsum_model.BPref[i].data.coreDeallocate();
+
 		for (int i = 0; i < cudaDevices.size(); i ++)
 		{
 			MlDeviceBundle *b = new MlDeviceBundle(this);
 			b->setDevice(cudaDevices[i]);
 			b->setupFixedSizedObjects();
-			cudaDeviceBundles.push_back((void*)b);
+			accDataBundles.push_back((void*)b);
 		}
 
-		std::vector<unsigned> threadcountOnDevice(cudaDeviceBundles.size(),0);
+		std::vector<unsigned> threadcountOnDevice(accDataBundles.size(),0);
 
 		for (int i = 0; i < cudaOptimiserDeviceMap.size(); i ++)
 		{
 			std::stringstream didSs;
 			didSs << "RRt" << i;
-			MlOptimiserCuda *b = new MlOptimiserCuda(this, (MlDeviceBundle*) cudaDeviceBundles[cudaOptimiserDeviceMap[i]], didSs.str().c_str());
+			MlOptimiserCuda *b = new MlOptimiserCuda(this, (MlDeviceBundle*) accDataBundles[cudaOptimiserDeviceMap[i]], didSs.str().c_str());
 			b->resetData();
 			cudaOptimisers.push_back((void*)b);
 			threadcountOnDevice[cudaOptimiserDeviceMap[i]] ++;
@@ -2583,15 +2655,15 @@ void MlOptimiser::expectation()
 		int devCount;
 		HANDLE_ERROR(cudaGetDeviceCount(&devCount));
 		HANDLE_ERROR(cudaDeviceSynchronize());
-		for (int i = 0; i < cudaDeviceBundles.size(); i ++)
+		for (int i = 0; i < accDataBundles.size(); i ++)
 		{
-			if(((MlDeviceBundle*)cudaDeviceBundles[i])->device_id >= devCount || ((MlDeviceBundle*)cudaDeviceBundles[i])->device_id < 0 )
+			if(((MlDeviceBundle*)accDataBundles[i])->device_id >= devCount || ((MlDeviceBundle*)accDataBundles[i])->device_id < 0 )
 			{
-				//std::cerr << " using device_id=" << ((MlDeviceBundle*)cudaDeviceBundles[i])->device_id << " (device no. " << ((MlDeviceBundle*)cudaDeviceBundles[i])->device_id+1 << ") which is not within the available device range" << devCount << std::endl;
+				//std::cerr << " using device_id=" << ((MlDeviceBundle*)accDataBundles[i])->device_id << " (device no. " << ((MlDeviceBundle*)accDataBundles[i])->device_id+1 << ") which is not within the available device range" << devCount << std::endl;
 				CRITICAL(ERR_GPUID);
 			}
 			else
-				HANDLE_ERROR(cudaSetDevice(((MlDeviceBundle*)cudaDeviceBundles[i])->device_id));
+				HANDLE_ERROR(cudaSetDevice(((MlDeviceBundle*)accDataBundles[i])->device_id));
 
 			size_t free, total, allocationSize;
 			HANDLE_ERROR(cudaMemGetInfo( &free, &total ));
@@ -2614,85 +2686,110 @@ void MlOptimiser::expectation()
 			printf("INFO: Free memory for Custom Allocator of device bundle %d is %d MB\n", i, (int) ( ((float)allocationSize)/1000000.0 ) );
 #endif
 
-			((MlDeviceBundle*)cudaDeviceBundles[i])->setupTunableSizedObjects(allocationSize);
+			((MlDeviceBundle*)accDataBundles[i])->setupTunableSizedObjects(allocationSize);
 		}
 	}
 #endif
+#ifdef ALTCPU
+	if (do_cpu)
+	{
+		for (int i = 0; i < wsum_model.BPref.size(); i ++)
+			wsum_model.BPref[i].data.coreDeallocate();
 
+		unsigned nr_classes = mymodel.PPref.size();
+		// Allocate Array of complex arrays for this class
+		if (posix_memalign((void **)&mdlClassComplex, MEM_ALIGN, nr_classes * sizeof (XFLOAT *)))
+			CRITICAL(RAMERR);
+
+		// Set up XFLOAT complex array shared by all threads for each class
+		for (int iclass = 0; iclass < nr_classes; iclass++)
+		{
+			int mdlX = mymodel.PPref[iclass].data.xdim;
+			int mdlY = mymodel.PPref[iclass].data.ydim;
+			int mdlZ = mymodel.PPref[iclass].data.zdim;
+			int mdlXYZ;
+			if(mdlZ == 0)
+				mdlXYZ = mdlX*mdlY;
+			else
+				mdlXYZ = mdlX*mdlY*mdlZ;
+
+			if(posix_memalign((void **)&mdlClassComplex[iclass], MEM_ALIGN, mdlXYZ * 2 * sizeof(XFLOAT)))
+				CRITICAL(RAMERR);
+
+			XFLOAT *pData = mdlClassComplex[iclass];
+
+			for (unsigned long i = 0; i < mdlXYZ; i ++)
+			{
+				*pData ++ = (XFLOAT) mymodel.PPref[iclass].data.data[i].real;
+				*pData ++ = (XFLOAT) mymodel.PPref[iclass].data.data[i].imag;
+			}
+		}
+
+		MlDataBundle *b = new MlDataBundle();
+		b->setup(this);
+		accDataBundles.push_back((void*)b);
+	}  // do_cpu
+#endif // ALTCPU
 	/************************************************************************/
+
+#ifdef MKLFFT
+	// Single-threaded FFTW execution for code inside parallel processing loop
+	fftw_plan_with_nthreads(1);
+#endif
 
 	// Now perform real expectation over all particles
 	// Use local parameters here, as also done in the same overloaded function in MlOptimiserMpi
 
-	int old_verb = verb;
-	long int prev_barstep = 0;
-	int barstep = XMIPP_MAX(1, mydata.numberOfOriginalParticles() / 60);
-	if (nr_subsets > 1)
-		barstep = XMIPP_MIN(barstep, subset_size);
-
-	long int my_subset_first_ori_particle, my_subset_last_ori_particle, nr_particles_todo;
-	if (nr_subsets > 1)
+	long int my_nr_ori_particles = (subset_size > 0) ? subset_size : mydata.numberOfOriginalParticles();
+	int barstep = XMIPP_MAX(1, my_nr_ori_particles / 60);
+    long int prev_barstep = 0;
+	long int my_first_ori_particle = 0.;
+	long int my_last_ori_particle = my_nr_ori_particles - 1;
+	long int nr_ori_particles_done = 0;
+	if (verb > 0)
 	{
-		divide_equally(mydata.numberOfOriginalParticles(), nr_subsets, subset-1, my_subset_first_ori_particle, my_subset_last_ori_particle);
-		subset_size = nr_particles_todo = my_subset_last_ori_particle - my_subset_first_ori_particle + 1;
-		if (verb > 0)
+		if (do_sgd)
 		{
-			// SGD: progress bar over entire iteration
-			if (subset == subset_start)
-			{
-				if (do_sgd)
-					std::cout << " Stochastic Gradient Descent iteration " << iter << " of " << nr_iter << std::endl;
-				else
-					std::cout << " Incomplete expectation iteration " << iter << " of " << nr_iter << std::endl;
-				long int barsize = (sgd_max_subsets > 0) ? sgd_max_subsets * subset_size : mydata.numberOfOriginalParticles();
-				barsize = XMIPP_MIN(barsize, mydata.numberOfOriginalParticles());
-				init_progress_bar(barsize);
-			}
+			std::cout << " Stochastic Gradient Descent iteration " << iter << " of " << nr_iter;
 		}
-	}
-	else
-	{
-		my_subset_first_ori_particle = 0.;
-		my_subset_last_ori_particle = mydata.numberOfOriginalParticles() - 1;
-		subset_size = nr_particles_todo = mydata.numberOfOriginalParticles();
-		if (verb > 0)
+		else
 		{
 			std::cout << " Expectation iteration " << iter;
 			if (!do_auto_refine)
 				std::cout << " of " << nr_iter;
-			std::cout << std::endl;
-			init_progress_bar(nr_particles_todo);
+			if (my_nr_ori_particles < mydata.numberOfOriginalParticles())
+				std::cout << " (with " << my_nr_ori_particles << " particles)";
 		}
+		std::cout << std::endl;
+		init_progress_bar(my_nr_ori_particles);
 	}
-	long int nr_ori_particles_done = my_subset_first_ori_particle;
 
-	long int nr_subset_particles_done = 0;
-	while (nr_subset_particles_done < subset_size)
+	while (nr_ori_particles_done < my_nr_ori_particles)
 	{
 
 #ifdef TIMING
 		timer.tic(TIMING_EXP_METADATA);
 #endif
 
-		long int my_first_ori_particle = my_subset_first_ori_particle + nr_subset_particles_done;
-		long int my_last_ori_particle = XMIPP_MIN(my_subset_last_ori_particle, my_first_ori_particle + nr_pool - 1);
+		long int my_pool_first_ori_particle = my_first_ori_particle + nr_ori_particles_done;
+		long int my_pool_last_ori_particle = XMIPP_MIN(my_last_ori_particle, my_pool_first_ori_particle + nr_pool - 1);
 
 		// Get the metadata for these particles
-		getMetaAndImageDataSubset(my_first_ori_particle, my_last_ori_particle, !do_parallel_disc_io);
+		getMetaAndImageDataSubset(my_pool_first_ori_particle, my_pool_last_ori_particle, !do_parallel_disc_io);
 
 #ifdef TIMING
 		timer.toc(TIMING_EXP_METADATA);
 #endif
 
 		// perform the actual expectation step on several particles
-		expectationSomeParticles(my_first_ori_particle, my_last_ori_particle);
+		expectationSomeParticles(my_pool_first_ori_particle, my_pool_last_ori_particle);
 
 #ifdef TIMING
 		timer.tic(TIMING_EXP_CHANGES);
 #endif
 
 		// Also monitor the changes in the optimal orientations and classes
-		monitorHiddenVariableChanges(my_first_ori_particle, my_last_ori_particle);
+		monitorHiddenVariableChanges(my_pool_first_ori_particle, my_pool_last_ori_particle);
 
 #ifdef TIMING
 		timer.toc(TIMING_EXP_CHANGES);
@@ -2700,41 +2797,43 @@ void MlOptimiser::expectation()
 #endif
 
 		// Set the metadata for these particles
-		setMetaDataSubset(my_first_ori_particle, my_last_ori_particle);
+		setMetaDataSubset(my_pool_first_ori_particle, my_pool_last_ori_particle);
 
 #ifdef TIMING
 		timer.toc(TIMING_EXP_METADATA);
 #endif
 
-		nr_subset_particles_done += my_last_ori_particle - my_first_ori_particle + 1;
-		nr_ori_particles_done += my_last_ori_particle - my_first_ori_particle + 1;
+		nr_ori_particles_done += my_pool_last_ori_particle - my_pool_first_ori_particle + 1;
 
 		if (verb > 0 && nr_ori_particles_done - prev_barstep > barstep)
 		{
 			prev_barstep = nr_ori_particles_done;
 			progress_bar(nr_ori_particles_done);
 		}
+
 	}
 
-	if (subset_size < 0 && verb > 0)
-		progress_bar(nr_particles_todo);
+	if (verb > 0)
+		progress_bar(my_nr_ori_particles);
 
 #ifdef CUDA
 	if (do_gpu)
 	{
-		for (int i = 0; i < cudaDeviceBundles.size(); i ++)
+		for (int i = 0; i < accDataBundles.size(); i ++)
 		{
-			MlDeviceBundle* b = ((MlDeviceBundle*)cudaDeviceBundles[i]);
+			MlDeviceBundle* b = ((MlDeviceBundle*)accDataBundles[i]);
 			b->syncAllBackprojects();
 
-			for (int j = 0; j < b->cudaProjectors.size(); j++)
+			for (int j = 0; j < b->backprojectors.size(); j++)
 			{
 				unsigned long s = wsum_model.BPref[j].data.nzyxdim;
 				XFLOAT *reals = new XFLOAT[s];
 				XFLOAT *imags = new XFLOAT[s];
 				XFLOAT *weights = new XFLOAT[s];
 
-				b->cudaBackprojectors[j].getMdlData(reals, imags, weights);
+				b->backprojectors[j].getMdlData(reals, imags, weights);
+
+				wsum_model.BPref[j].data.coreAllocate();
 
 				for (unsigned long n = 0; n < s; n++)
 				{
@@ -2747,10 +2846,12 @@ void MlOptimiser::expectation()
 				delete [] imags;
 				delete [] weights;
 
-				b->cudaProjectors[j].clear();
-				b->cudaBackprojectors[j].clear();
-				b->coarseProjectionPlans[j].clear();
+				b->projectors[j].clear();
+				b->backprojectors[j].clear();
 			}
+
+			for (int j = 0; j < b->coarseProjectionPlans.size(); j++)
+				b->coarseProjectionPlans[j].clear();
 		}
 
 		for (int i = 0; i < cudaOptimisers.size(); i ++)
@@ -2759,17 +2860,17 @@ void MlOptimiser::expectation()
 		cudaOptimisers.clear();
 
 
-		for (int i = 0; i < cudaDeviceBundles.size(); i ++)
+		for (int i = 0; i < accDataBundles.size(); i ++)
 		{
 
-			((MlDeviceBundle*)cudaDeviceBundles[i])->allocator->syncReadyEvents();
-			((MlDeviceBundle*)cudaDeviceBundles[i])->allocator->freeReadyAllocs();
+			((MlDeviceBundle*)accDataBundles[i])->allocator->syncReadyEvents();
+			((MlDeviceBundle*)accDataBundles[i])->allocator->freeReadyAllocs();
 
 #ifdef DEBUG_CUDA
-			if (((MlDeviceBundle*) cudaDeviceBundles[i])->allocator->getNumberOfAllocs() != 0)
+			if (((MlDeviceBundle*) accDataBundles[i])->allocator->getNumberOfAllocs() != 0)
 			{
 				printf("DEBUG_ERROR: Non-zero allocation count encountered in custom allocator between iterations.\n");
-				((MlDeviceBundle*) cudaDeviceBundles[i])->allocator->printState();
+				((MlDeviceBundle*) accDataBundles[i])->allocator->printState();
 				fflush(stdout);
 				CRITICAL(ERR_CANZ);
 			}
@@ -2777,19 +2878,66 @@ void MlOptimiser::expectation()
 #endif
 		}
 
-		for (int i = 0; i < cudaDeviceBundles.size(); i ++)
-			delete (MlDeviceBundle*) cudaDeviceBundles[i];
+		for (int i = 0; i < accDataBundles.size(); i ++)
+			delete (MlDeviceBundle*) accDataBundles[i];
 
-		cudaDeviceBundles.clear();
+		accDataBundles.clear();
 	}
 #endif
+#ifdef ALTCPU
+	if (do_cpu)
+	{
+		MlDataBundle* b = (MlDataBundle*) accDataBundles[0];
 
-	// Set back verb
-	verb = old_verb;
+		for (int j = 0; j < b->backprojectors.size(); j++)
+		{
+			unsigned long s = wsum_model.BPref[j].data.nzyxdim;
+			XFLOAT *reals = NULL;
+			XFLOAT *imags = NULL;
+			XFLOAT *weights = NULL;
+
+			b->backprojectors[j].getMdlDataPtrs(reals, imags, weights);
+
+			wsum_model.BPref[j].data.coreAllocate();
+
+			for (unsigned long n = 0; n < s; n++)
+			{
+				wsum_model.BPref[j].data.data[n].real += (RFLOAT) reals[n];
+				wsum_model.BPref[j].data.data[n].imag += (RFLOAT) imags[n];
+				wsum_model.BPref[j].weight.data[n] += (RFLOAT) weights[n];
+			}
+
+			b->projectors[j].clear();
+			b->backprojectors[j].clear();
+		}
+
+		for (int j = 0; j < b->coarseProjectionPlans.size(); j++)
+			b->coarseProjectionPlans[j].clear();
+
+		delete b;
+		accDataBundles.clear();
+
+		// Now clean up
+		unsigned nr_classes = mymodel.nr_classes;
+		for (int iclass = 0; iclass < nr_classes; iclass++)
+		{
+			free(mdlClassComplex[iclass]);
+		}
+		free(mdlClassComplex);
+
+		tbbCpuOptimiser.clear();
+	}
+#endif  // ALTCPU
+#ifdef  MKLFFT
+	// Allow parallel FFTW execution to continue now that we are outside the parallel
+	// portion of expectation
+	fftw_plan_with_nthreads(nr_threads);
+#endif
 
 	// Clean up some memory
 	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 		mymodel.PPref[iclass].data.clear();
+
 #ifdef DEBUG_EXP
 	std::cerr << "Expectation: done " << std::endl;
 #endif
@@ -2817,13 +2965,11 @@ void MlOptimiser::expectationSetup()
 	wsum_model.initZeros();
 
 	// If we're doing SGD with gradual decrease of sigma2_fudge: calculate current fudge-factor here
-	if (nr_subsets > 1 && sgd_sigma2fudge_halflife > 0)
+	if (do_sgd && sgd_sigma2fudge_halflife > 0)
 	{
-		// Subtract 1 from subset, as this is done BEFORE the current subset
-		long int total_nr_subsets = ((iter - 1) * nr_subsets) + (subset - 1);
-		long int NN = (total_nr_subsets * subset_size);
-		RFLOAT f = (RFLOAT)NN / (RFLOAT)(NN + sgd_sigma2fudge_halflife);
-		// new sigma2_fudge = f * 1.0 * (1 - f) * sgd_ini_sigma2fudge
+		RFLOAT NN = (RFLOAT)(iter * subset_size);
+		RFLOAT f = NN / (NN + sgd_sigma2fudge_halflife);
+		// new sigma2_fudge = f * 1.0  +  (1 - f) * sgd_ini_sigma2fudge
 		sigma2_fudge = f + (1. - f) * sgd_sigma2fudge_ini;
 	}
 
@@ -3141,18 +3287,49 @@ void MlOptimiser::expectationSomeParticles(long int my_first_ori_particle, long 
 	} //end loop over ori_part_id
 
 
-//#define DEBUG_EXPSOME
 #ifdef DEBUG_EXPSOME
 	std::cerr << " exp_my_first_ori_particle= " << exp_my_first_ori_particle << " exp_my_last_ori_particle= " << exp_my_last_ori_particle << std::endl;
 	std::cerr << " exp_nr_images= " << exp_nr_images << std::endl;
 #endif
+	if (!do_cpu)
+	{
+		// GPU and traditional CPU case - use RELION's built-in task manager to
+		// process multiple particles at once
+		exp_ipart_ThreadTaskDistributor->resize(my_last_ori_particle - my_first_ori_particle + 1, 1);
+		exp_ipart_ThreadTaskDistributor->reset();
+		global_ThreadManager->run(globalThreadExpectationSomeParticles);
+	}
+#ifdef ALTCPU
+	else
+	{
+		// "New" CPU case - use TBB's tasking system to process multiple
+		// particles in parallel.  Like the GPU implementation, the lower-
+		// level parallelism is implemented by compiler vectorization
+		// (roughly equivalent to GPU "threads").
+		int tCount = 0;
 
-	exp_ipart_ThreadTaskDistributor->resize(my_last_ori_particle - my_first_ori_particle + 1, 1);
-	exp_ipart_ThreadTaskDistributor->reset();
-    global_ThreadManager->run(globalThreadExpectationSomeParticles);
+		// process all passed particles in parallel
+		//for(unsigned long i=my_first_ori_particle; i<=my_last_ori_particle; i++) {
+		tbb::parallel_for(my_first_ori_particle, my_last_ori_particle+1, [&](int i) {
+			CpuOptimiserType::reference ref = tbbCpuOptimiser.local();
+			MlOptimiserCpu *cpuOptimiser = (MlOptimiserCpu *)ref;
+			if(cpuOptimiser == NULL) {
+				cpuOptimiser = new MlOptimiserCpu(this, (MlDataBundle*)accDataBundles[0], "cpu_optimiser");
+				cpuOptimiser->resetData();
+				ref = cpuOptimiser;
 
-    if (threadException != NULL)
-    	throw *threadException;
+				cpuOptimiser->thread_id = tCount;
+				tCount++;  // Race condition!
+			}  // cpuOptimiser == NULL
+
+			cpuOptimiser->expectationOneParticle(i, cpuOptimiser->thread_id);
+		});
+		//}
+	}  // do_cpu
+#endif  // ifdef ALTCPU
+
+	if (threadException != NULL)
+		throw *threadException;
 
 #ifdef TIMING
     timer.toc(TIMING_ESP);
@@ -3318,11 +3495,9 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 			timer.tic(TIMING_ESP_FT);
 		}
 #endif
-		//std::cerr << "before getFour" << std::endl;
 		getFourierTransformsAndCtfs(my_ori_particle, ibody, metadata_offset, exp_Fimgs, exp_Fimgs_nomask, exp_Fctfs,
 				exp_old_offset, exp_prior, exp_power_imgs, exp_highres_Xi2_imgs,
 				exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior);
-		//std::cerr << "after getFour" << std::endl;
 
 #ifdef TIMING
 		if (my_ori_particle == exp_my_first_ori_particle)
@@ -3418,7 +3593,6 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 					exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior,
 					exp_local_Fimgs_shifted, exp_local_Minvsigma2s, exp_local_Fctfs, exp_local_sqrtXi2);
 
-			//std::cerr << "after getDelta2" << std::endl;
 
 #ifdef DEBUG_ESP_MEM
 			if (thread_id==0)
@@ -3438,7 +3612,6 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 					exp_Mweight, exp_Mcoarse_significant, exp_significant_weight,
 					exp_sum_weight, exp_old_offset, exp_prior, exp_min_diff2,
 					exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior);
-			//std::cerr << "after convW" << std::endl;
 
 #ifdef DEBUG_ESP_MEM
 		if (thread_id==0)
@@ -3451,7 +3624,6 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 #endif
 
 		}// end loop over 2 exp_ipass iterations
-		//std::cerr << "after exp_ipass loop" << std::endl;
 
 #ifdef RELION_TESTING
 		std::string mode;
@@ -3530,7 +3702,6 @@ void MlOptimiser::expectationOneParticle(long int my_ori_particle, int thread_id
 				exp_significant_weight, exp_sum_weight, exp_max_weight,
 				exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior,
 				exp_local_Fimgs_shifted, exp_local_Fimgs_shifted_nomask, exp_local_Minvsigma2s, exp_local_Fctfs, exp_local_sqrtXi2);
-		//std::cerr << "after storeWsums" << std::endl;
 
 #ifdef RELION_TESTING
 //		std::string mode;
@@ -3598,7 +3769,16 @@ void MlOptimiser::symmetriseReconstructions()
 			{
 				// Immediately after expectation process. Do rise and twist for all asymmetrical units in Fourier space
 				// Also convert helical rise to pixels for BPref object
-				wsum_model.BPref[ith_recons].symmetrise(mymodel.helical_nr_asu, mymodel.helical_twist[ith_recons], mymodel.helical_rise[ith_recons] / mymodel.pixel_size);
+				wsum_model.BPref[ith_recons].enforceHermitianSymmetry();
+
+				// Then apply helical and point group symmetry (order irrelevant?)
+				if (mymodel.nr_bodies == 1)
+					wsum_model.BPref[ith_recons].applyHelicalSymmetry(
+							mymodel.helical_nr_asu,
+							mymodel.helical_twist[ith_recons],
+							mymodel.helical_rise[ith_recons] / mymodel.pixel_size);
+
+				wsum_model.BPref[ith_recons].applyPointGroupSymmetry();
 			}
 		}
 	}
@@ -3716,14 +3896,13 @@ void MlOptimiser::maximization()
 				MultidimArray<RFLOAT> Iref_old;
 				long int total_nr_subsets;
 				RFLOAT total_mu_fraction, number_of_effective_particles, tau2_fudge;
-				if(do_sgd)
+				if (do_sgd)
 				{
 					Iref_old = mymodel.Iref[iclass];
 					// Still regularise here. tau2 comes from the reconstruction, sum of sigma2 is only over a single subset
 					// Gradually increase tau2_fudge to account for ever increasing number of effective particles in the reconstruction
-					total_nr_subsets = ((iter - 1) * nr_subsets) + subset;
-					total_mu_fraction = pow (mu, (RFLOAT)total_nr_subsets);
-					number_of_effective_particles = (iter == 1) ? subset * subset_size : mydata.numberOfParticles();
+					total_mu_fraction = pow (mu, (RFLOAT)iter);
+					number_of_effective_particles = XMIPP_MIN(iter * subset_size, mydata.numberOfParticles());
 					number_of_effective_particles *= (1. - total_mu_fraction);
 					tau2_fudge = number_of_effective_particles * mymodel.tau2_fudge_factor / subset_size;
 				}
@@ -3811,6 +3990,29 @@ void MlOptimiser::maximizationOtherParameters()
 	// in that case we need to leave all parameters as they were
 	if (sum_weight < XMIPP_EQUAL_ACCURACY)
 		return;
+
+
+	// Annealing of multiple-references in SGD
+	if (do_sgd && mymodel.nr_classes > 1 && iter < sgd_ini_iter + sgd_inbetween_iter)
+	{
+		MultidimArray<RFLOAT> Iavg;
+		Iavg.initZeros(mymodel.Iref[0]);
+		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
+			Iavg += mymodel.Iref[iclass];
+		Iavg /= (RFLOAT)mymodel.nr_classes;
+
+		int diffiter = iter - sgd_ini_iter;
+		RFLOAT frac = RFLOAT(iter - sgd_ini_iter)/RFLOAT(sgd_inbetween_iter);
+		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
+		{
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iavg)
+			{
+				DIRECT_MULTIDIM_ELEM(mymodel.Iref[iclass], n) *= frac;
+				DIRECT_MULTIDIM_ELEM(mymodel.Iref[iclass], n) += (1.-frac)*DIRECT_MULTIDIM_ELEM(Iavg, n);
+			}
+		}
+	}
+
 
 	// Update average norm_correction, don't update norm corrections anymore for multi-body refinements!
 	if (do_norm_correction  && mymodel.nr_bodies == 1)
@@ -3900,7 +4102,7 @@ void MlOptimiser::maximizationOtherParameters()
 	for (int iclass = 0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++)
 	{
 		// Use sampling.NrDirections() to include all directions (also those with zero prior probability for any given image)
-		if (!(do_skip_align || do_skip_rotate))
+		if (!(do_skip_align || do_skip_rotate || do_sgd))
 		{
 			for (int idir = 0; idir < sampling.NrDirections(); idir++)
 			{
@@ -3962,8 +4164,8 @@ void MlOptimiser::maximizationOtherParameters()
 			}
 		}
 	}
-	RCTIC(timer,RCT_7);
-	RCTOC(timer,RCT_8);
+	RCTOC(timer,RCT_7);
+	RCTIC(timer,RCT_8);
 	// After the first iteration the references are always CTF-corrected
     if (do_ctf_correction)
     	refs_are_ctf_corrected = true;
@@ -4040,6 +4242,19 @@ void MlOptimiser::solventFlatten()
 	// If we're doing multibody refinement: don't do solvent flattening anymore. This is already done per body
 	if (mymodel.nr_bodies > 1)
 		return;
+
+
+	// If we're doing SGD: enforce non-negativity during the first sgd_ini_iter iterations
+	if (do_sgd && iter < sgd_ini_iter)
+	{
+		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
+		{
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.Iref[iclass])
+			{
+				DIRECT_MULTIDIM_ELEM(mymodel.Iref[iclass], n) = XMIPP_MAX(0., DIRECT_MULTIDIM_ELEM(mymodel.Iref[iclass], n));
+			}
+		}
+	}
 
 	// First read solvent mask from disc, or pre-calculate it
 	Image<RFLOAT> Isolvent, Isolvent2;
@@ -4128,94 +4343,116 @@ void MlOptimiser::updateCurrentResolution()
 	std::cerr << "Entering MlOptimiser::updateCurrentResolution" << std::endl;
 #endif
 
-	RFLOAT best_current_resolution = 0.;
-	int nr_iter_wo_resol_gain_sum_bodies = 0;
-	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
+	if (do_sgd)
+	{
+		// Do 300 iterations with completely identical K references, 100-particle batch size, enforce non-negativity and 35A resolution limit
+		if (iter < sgd_ini_iter)
+		{
+			mymodel.current_resolution = 1./sgd_ini_resol;
+		}
+		else if (iter < sgd_ini_iter + sgd_inbetween_iter)
+		{
+			int newpixres = sgd_inires_pix + ROUND((RFLOAT(iter - sgd_ini_iter)/RFLOAT(sgd_inbetween_iter))*(sgd_finres_pix - sgd_inires_pix));
+			mymodel.current_resolution = mymodel.getResolution(newpixres);
+		}
+		else
+		{
+			mymodel.current_resolution = 1./sgd_fin_resol;
+		}
+	}
+	else
 	{
 
-		int maxres = 0;
-		if (do_map)
+
+		RFLOAT best_current_resolution = 0.;
+		int nr_iter_wo_resol_gain_sum_bodies = 0;
+		for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
 		{
-			// Set current resolution
-			if (ini_high > 0. && (iter == 0 || (iter == 1 && do_firstiter_cc)))
+
+			int maxres = 0;
+			if (do_map)
 			{
-				maxres = ROUND(mymodel.ori_size * mymodel.pixel_size / ini_high);
+				// Set current resolution
+				if (ini_high > 0. && (iter == 0 || (iter == 1 && do_firstiter_cc)))
+				{
+					maxres = ROUND(mymodel.ori_size * mymodel.pixel_size / ini_high);
+				}
+				else
+				{
+					// Calculate at which resolution shell the data_vs_prior drops below 1
+					int ires;
+					for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
+					{
+						for (ires = 1; ires < mymodel.ori_size/2; ires++)
+						{
+							if (DIRECT_A1D_ELEM(mymodel.data_vs_prior_class[iclass], ires) < 1.)
+								break;
+						}
+						// Subtract one shell to be back on the safe side
+						ires--;
+
+						if (do_split_random_halves && do_auto_refine)
+						{
+							// Let's also try and check from the high-res side. Sometimes phase-randomisation gives artefacts
+							int ires2;
+							for (ires2 = mymodel.ori_size/2-1; ires2 >= ires; ires2--)
+							{
+								if (DIRECT_A1D_ELEM(mymodel.data_vs_prior_class[iclass], ires2) > 1.)
+									break;
+							}
+							if (ires2 > ires + 3)
+							{
+								if (verb > 0)
+								{
+									float higher = mymodel.getResolutionAngstrom(ires2);
+									float lower  = mymodel.getResolutionAngstrom(ires);
+									if (mymodel.nr_bodies > 1)
+										std::cerr << " WARNING: For the " << ibody+1 << "th body:" << std::endl;
+									std::cerr << " WARNING: FSC dipped below 0.5 and rose again. Using higher resolution of "
+											  << higher << " A, instead of " << lower << " A." << std::endl;
+									std::cerr << "          This is not necessarily a bad thing. Often it is caused by too tight masks." << std::endl;
+								}
+								ires = ires2;
+							}
+						}
+
+						if (ires > maxres)
+							maxres = ires;
+					}
+
+					// Never allow smaller maxres than minres_map
+					maxres = XMIPP_MAX(maxres, minres_map);
+				}
 			}
 			else
 			{
-				// Calculate at which resolution shell the data_vs_prior drops below 1
-				int ires;
-				for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
-				{
-					for (ires = 1; ires < mymodel.ori_size/2; ires++)
-					{
-						if (DIRECT_A1D_ELEM(mymodel.data_vs_prior_class[iclass], ires) < 1.)
-							break;
-					}
-					// Subtract one shell to be back on the safe side
-					ires--;
-
-					if (do_split_random_halves && do_auto_refine)
-					{
-						// Let's also try and check from the high-res side. Sometimes phase-randomisation gives artefacts
-						int ires2;
-						for (ires2 = mymodel.ori_size/2-1; ires2 >= ires; ires2--)
-						{
-							if (DIRECT_A1D_ELEM(mymodel.data_vs_prior_class[iclass], ires2) > 1.)
-								break;
-						}
-						if (ires2 > ires + 3)
-						{
-							if (verb > 0)
-							{
-								float higher = mymodel.getResolutionAngstrom(ires2);
-								float lower  = mymodel.getResolutionAngstrom(ires);
-								if (mymodel.nr_bodies > 1)
-									std::cerr << " WARNING: For the " << ibody+1 << "th body:" << std::endl;
-								std::cerr << " WARNING: FSC dipped below 0.5 and rose again. Using higher resolution of "
-										  << higher << " A, instead of " << lower << " A." << std::endl;
-								std::cerr << "          This is not necessarily a bad thing. Often it is caused by too tight masks." << std::endl;
-							}
-							ires = ires2;
-						}
-					}
-
-					if (ires > maxres)
-						maxres = ires;
-				}
-
-				// Never allow smaller maxres than minres_map
-				maxres = XMIPP_MAX(maxres, minres_map);
+				// If we are not doing MAP-estimation, set maxres to Nyquist
+				maxres = mymodel.ori_size/2;
 			}
-		}
-		else
-		{
-			// If we are not doing MAP-estimation, set maxres to Nyquist
-			maxres = mymodel.ori_size/2;
-		}
-		RFLOAT newres = mymodel.getResolution(maxres);
+			RFLOAT newres = mymodel.getResolution(maxres);
 
-		// best resolution over all bodies
-		best_current_resolution = XMIPP_MAX(best_current_resolution, newres);
+			// best resolution over all bodies
+			best_current_resolution = XMIPP_MAX(best_current_resolution, newres);
 
-		// Check whether resolution improved, if not increase nr_iter_wo_resol_gain
-		//if (newres <= best_resol_thus_far)
-		if (newres <= mymodel.current_resolution+0.0001) // Add 0.0001 to avoid problems due to rounding error
-			nr_iter_wo_resol_gain_sum_bodies++;
-		else
-			nr_iter_wo_resol_gain = 0;
+			// Check whether resolution improved, if not increase nr_iter_wo_resol_gain
+			//if (newres <= best_resol_thus_far)
+			if (newres <= mymodel.current_resolution+0.0001) // Add 0.0001 to avoid problems due to rounding error
+				nr_iter_wo_resol_gain_sum_bodies++;
+			else
+				nr_iter_wo_resol_gain = 0;
 
-		// Store best resolution thus far (but no longer do anything with it anymore...)
-		if (newres > best_resol_thus_far)
-			best_resol_thus_far = newres;
+			// Store best resolution thus far (but no longer do anything with it anymore...)
+			if (newres > best_resol_thus_far)
+				best_resol_thus_far = newres;
 
-	} // end for ibody
+		} // end for ibody
 
-	// Set the new resolution to be the highest resolution over all bodies
-	mymodel.current_resolution = best_current_resolution;
+		// Set the new resolution to be the highest resolution over all bodies
+		mymodel.current_resolution = best_current_resolution;
 
-	if (nr_iter_wo_resol_gain_sum_bodies == mymodel.nr_bodies)
-		nr_iter_wo_resol_gain++;
+		if (nr_iter_wo_resol_gain_sum_bodies == mymodel.nr_bodies)
+			nr_iter_wo_resol_gain++;
+	}
 
 #ifdef DEBUG
 	std::cerr << "Leaving MlOptimiser::updateCurrentResolution" << std::endl;
@@ -4242,11 +4479,6 @@ void MlOptimiser::updateImageSizeAndResolutionPointers()
 		maxres += incr_size;
 	}
 
-	// In SGD, optionally restrict maximum resolution to a fixed value
-	if (do_sgd && strict_highres_sgd > 0.)
-	{
-		maxres = XMIPP_MIN(maxres, mymodel.getPixelFromResolution(1./strict_highres_sgd) );
-	}
     // Go back from resolution shells (i.e. radius) to image size, which are BTW always even...
 	mymodel.current_size = maxres * 2;
 
@@ -8241,10 +8473,36 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_ori_particle,
 void MlOptimiser::updateAngularSampling(bool myverb)
 {
 
-	if (!do_split_random_halves)
-		REPORT_ERROR("MlOptimiser::updateAngularSampling: BUG! updating of angular sampling should only happen for gold-standard (auto-) refinements.");
+	// For SGD: onyl update initial angular sampling after the sgd_ini_iter have passed
+	if (do_sgd)
+	{
+		if (iter > sgd_ini_iter)
+		{
+			RFLOAT min_sampling =  360. / CEIL(PI * particle_diameter * mymodel.current_resolution);
+			RFLOAT old_rottilt_step = sampling.getAngularSampling(adaptive_oversampling);
+			if (old_rottilt_step > min_sampling)
+			{
+				has_fine_enough_angular_sampling = false;
 
-	if (do_realign_movies)
+				int new_hp_order = sampling.healpix_order + 1;
+				RFLOAT new_rottilt_step = 360. / (6 * ROUND(std::pow(2., new_hp_order + adaptive_oversampling)));
+
+				// Set the new sampling in the sampling-object
+				sampling.setOrientations(new_hp_order, new_rottilt_step * std::pow(2., adaptive_oversampling));
+
+				// Resize the pdf_direction arrays to the correct size and fill with an even distribution
+				mymodel.initialisePdfDirection(sampling.NrDirections());
+
+				// Also reset the nr_directions in wsum_model
+				wsum_model.nr_directions = mymodel.nr_directions;
+
+				// Also resize and initialise wsum_model.pdf_direction for each class!
+				for (int iclass=0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++)
+					wsum_model.pdf_direction[iclass].initZeros(mymodel.nr_directions);
+			}
+		}
+	}
+	else if (do_realign_movies)
 	{
 
 		// A. Adjust translational sampling to 75% of estimated accuracy
@@ -8305,6 +8563,9 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 	}
 	else
 	{
+
+		if (!do_split_random_halves)
+			REPORT_ERROR("MlOptimiser::updateAngularSampling: BUG! updating of angular sampling should only happen for gold-standard (auto-) refinements.");
 
 		if (do_skip_rotate)
 			REPORT_ERROR("ERROR: --skip_rotate can only be used in movie-frame refinement ...");
@@ -8455,30 +8716,80 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 				}
 			}
 		}
+
+		// Print to screen
+		if (myverb)
+		{
+			std::cout << " Auto-refine: Angular step= " << sampling.getAngularSampling(adaptive_oversampling) << " degrees; local searches= ";
+			if (sampling.orientational_prior_mode == NOPRIOR)
+				std:: cout << "false" << std::endl;
+			else
+				std:: cout << "true" << std::endl;
+			// Jun08,2015 Shaoda & Sjors, Helical refine
+			if ( (do_helical_refine) && (!ignore_helical_symmetry) )
+			{
+				std::cout << " Auto-refine: Helical refinement... Local translational searches along helical axis= ";
+				if ( (mymodel.ref_dim == 3) && (do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches) )
+					std:: cout << "true" << std::endl;
+				else
+					std:: cout << "false" << std::endl;
+			}
+			std::cout << " Auto-refine: Offset search range= " << sampling.offset_range << " pixels; offset step= " << sampling.getTranslationalSampling(adaptive_oversampling) << " pixels";
+			if ( (do_helical_refine) && (!ignore_helical_symmetry) )
+				std::cout << "; offset step along helical axis= " << sampling.getHelicalTranslationalSampling(adaptive_oversampling) << " pixels";
+			std::cout << std::endl;
+		}
 	}
 
-	// Print to screen
-	if (myverb)
+}
+void MlOptimiser::updateSubsetSize(bool myverb)
+{
+	// If we're doing cisTEM-like acceleration of refinement through subsets: set the subset size here
+	long int old_subset_size = subset_size;
+	if (do_fast_subsets)
 	{
-		std::cout << " Auto-refine: Angular step= " << sampling.getAngularSampling(adaptive_oversampling) << " degrees; local searches= ";
-		if (sampling.orientational_prior_mode == NOPRIOR)
-			std:: cout << "false" << std::endl;
-		else
-			std:: cout << "true" << std::endl;
-		// Jun08,2015 Shaoda & Sjors, Helical refine
-		if ( (do_helical_refine) && (!ignore_helical_symmetry) )
+		long int min_parts_per_class = (mymodel.ref_dim == 2) ? 100 : 1500;
+		if (iter <= 5)
 		{
-			std::cout << " Auto-refine: Helical refinement... Local translational searches along helical axis= ";
-			if ( (mymodel.ref_dim == 3) && (do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches) )
-				std:: cout << "true" << std::endl;
-			else
-				std:: cout << "false" << std::endl;
+			subset_size = min_parts_per_class*mymodel.nr_classes;
 		}
-		std::cout << " Auto-refine: Offset search range= " << sampling.offset_range << " pixels; offset step= " << sampling.getTranslationalSampling(adaptive_oversampling) << " pixels";
-		if ( (do_helical_refine) && (!ignore_helical_symmetry) )
-			std::cout << "; offset step along helical axis= " << sampling.getHelicalTranslationalSampling(adaptive_oversampling) << " pixels";
-		std::cout << std::endl;
+		else if (iter <= 10)
+		{
+			subset_size = 3*min_parts_per_class*mymodel.nr_classes;
+		}
+		else if (iter <= 15)
+		{
+			subset_size = XMIPP_MAX(3*min_parts_per_class*mymodel.nr_classes, 0.3 * mydata.numberOfOriginalParticles());
+		}
+		else
+		{
+			subset_size = -1;
+		}
+		if (subset_size > mydata.numberOfOriginalParticles())
+			subset_size = -1;
 	}
+	else if (do_sgd)
+	{
+
+		// Do sgd_ini_iter iterations with completely identical K references, sigd_ini_subset_size, enforce non-negativity and sgd_ini_resol resolution limit
+		if (iter < sgd_ini_iter)
+		{
+			subset_size = sgd_ini_subset_size;
+		}
+		else if (iter < sgd_ini_iter + sgd_inbetween_iter)
+		{
+			subset_size = sgd_ini_subset_size + ROUND((RFLOAT(iter - sgd_ini_iter)/RFLOAT(sgd_inbetween_iter))*(sgd_fin_subset_size-sgd_ini_subset_size));
+		}
+		else
+		{
+			subset_size = sgd_fin_subset_size;
+		}
+
+
+	}
+
+	if (myverb && subset_size != old_subset_size)
+		std::cout << " Setting subset size to " << subset_size << " particles" << std::endl;
 
 }
 

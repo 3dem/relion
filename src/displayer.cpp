@@ -1219,9 +1219,9 @@ void multiViewerCanvas::saveTrainingSet()
 	MDout.write(fn_odir + "/selected.star");
 
 	// Give everyone permissions to this directory and its files
-	command = " chmod 777 -R " + fn_odir.beforeLastOf("/");
-	if (system(command.c_str()))
-		REPORT_ERROR("ERROR in executing: " + command);
+	//command = " chmod 777 -R " + fn_odir.beforeLastOf("/");
+	//if (system(command.c_str()))
+	//	REPORT_ERROR("ERROR in executing: " + command);
 
 	std::cout << "Saved selection to Sjors' training directory. Thanks for helping out!" << std::endl;
 

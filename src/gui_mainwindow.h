@@ -70,14 +70,13 @@ static Fl_XPM_Image *xpm_image;
 static std::vector<long int> running_processes, finished_processes, scheduled_processes, input_processes, output_processes, io_nodes;
 static bool is_main_continue;
 
-#define GUI_NR_BROWSE_TABS  19
-static JobWindow *gui_jobwindows[GUI_NR_BROWSE_TABS];
+static JobWindow *gui_jobwindows[NR_BROWSE_TABS];
 
 // Run button
+// Sjors 16feb2018: somehow suddenly this run_button needs to be a non-static: otherwise it doesn't change to 'continue now' and doesnt grey out...
 static Fl_Button *run_button;
 static Fl_Button *print_CL_button;
 static Fl_Button *schedule_button;
-static Fl_Button *forgot_button;
 static Fl_Input *alias_current_job;
 
 static Fl_Text_Buffer *textbuff_stdout;
@@ -194,6 +193,9 @@ public:
     // Clear stuff
     void clear();
 
+    // How will jobs be displayed in the GUI job running, finished, in, out & scheduled job lists
+    std::string getJobNameForDisplay(Process &job);
+
     // Update the content of the finished, running and scheduled job lists
     void fillRunningJobLists();
 
@@ -290,9 +292,6 @@ private:
 
     static void cb_print_cl(Fl_Widget*, void*);
     inline void cb_print_cl_i();
-
-    static void cb_forgot(Fl_Widget*, void*);
-    inline void cb_forgot_i();
 
     static void cb_save(Fl_Widget*, void*);
     inline void cb_save_i();

@@ -83,9 +83,42 @@ public:
     /** Line number */
     long line;
 
+#ifdef __GNUC__
+    /** 
+        Backtrace 
+
+        To get a line number from something like this:
+        /lmb/home/tnakane/prog/relion-devel-lmb/build-single/lib/librelion_lib.so(_ZN13MetaDataTable4readERK8FileNameRKSsPSt6vectorI8EMDLabelSaIS6_EESsb+0x384) [0x7fb676e8c2a4]
+
+        First get the start address of the function:
+        $ nm lib/librelion_lib.so |grep _ZN13MetaDataTable4readERK8FileNameRKSsPSt6vectorI8EMDLabelSaIS6_EESsb
+        0000000000186f20 T _ZN13MetaDataTable4readERK8FileNameRKSsPSt6vectorI8EMDLabelSaIS6_EESsb
+
+        Add the offset (in hexadecimal):
+        $ echo 'obase=16;ibase=16;186F20+384' | bc
+        1872A4
+
+        Use addr2line:
+        $ addr2line -Cif -e lib/librelion_lib.so 1872A4
+        MetaDataTable::read(FileName const&, std::string const&, std::vector<EMDLabel, std::allocator<EMDLabel> >*, std::string, bool)
+        /usr/include/c++/4.8.2/bits/basic_string.h:539
+        MetaDataTable::read(FileName const&, std::string const&, std::vector<EMDLabel, std::allocator<EMDLabel> >*, std::string, bool)
+        /lmb/home/tnakane/prog/relion-devel-lmb/src/metadata_table.cpp:978
+
+        Happy debugging!
+     **/
+
+    void **backtrace_buffer;
+    size_t size;
+#endif
+
     RelionError(const std::string& what, const std::string &fileArg, const long lineArg);
     friend std::ostream& operator<<(std::ostream& o, RelionError& XE);
 };
+
+#define RAMERR "\n\
+There was an issue allocating CPU memory (RAM). \n\
+Likely maximum memory size was exceeded."
 
 #define DEVERR "\n\
 This is a developer error message which you cannot fix \n\
@@ -253,4 +286,7 @@ the relion developers at \n\n\
 		  -  through the command-line, add --particle_diameter <d> [A] \n\
 		both methods specify a diameter in Angstroms \n\n")
 
+#define ERRUNSAFEOBJECTREUSE ("An unsafe combination of pointers was found as input to a \n\
+		  function. You probably supplied the same object as both input \n\
+		  and output, which is not always safe, depending on the function design.")
 #endif

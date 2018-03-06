@@ -416,11 +416,11 @@ void Experiment::divideOriginalParticlesInRandomHalves(int seed, bool do_helical
 
 }
 
-void Experiment::randomiseOriginalParticlesOrder(int seed, bool do_split_random_halves)
+void Experiment::randomiseOriginalParticlesOrder(int seed, bool do_split_random_halves, bool do_subsets)
 {
 	//This static flag is for only randomize once
 	static bool randomised = false;
-	if (!randomised)
+	if (!randomised || do_subsets)
 	{
 
 		srand(seed);
@@ -1105,7 +1105,6 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name,
 #ifdef DEBUG_READ
 		timer.toc(tfill);
 		timer.tic(tdef);
-		std::cerr << " MDimg.lastObject()= " << MDimg.lastObject() << std::endl;
 		std::cerr << " nr_read= " << nr_read << " particles.size()= " << particles.size() << " ori_particles.size()= " << ori_particles.size()  << " micrographs.size()= " << micrographs.size() << " groups.size()= " << groups.size() << std::endl;
 #endif
 

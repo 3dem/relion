@@ -21,15 +21,16 @@
 #ifndef MOTIONCORR_RUNNER_H_
 #define MOTIONCORR_RUNNER_H_
 
-#include  <glob.h>
-#include  <vector>
-#include  <string>
-#include  <stdlib.h>
-#include  <stdio.h>
+#include <glob.h>
+#include <vector>
+#include <string>
+#include <stdlib.h>
+#include <stdio.h>
+#include <algorithm>
 #include <src/time.h>
 #include "src/metadata_table.h"
 #include "src/image.h"
-#include <algorithm>
+#include "src/micrograph_model.h"
 
 class MotioncorrRunner
 {
@@ -41,6 +42,9 @@ public:
 	// Verbosity
 	int verb;
 
+	// Number of threads per process
+	int n_threads;
+
 	// Output rootname
 	FileName fn_in, fn_out, fn_movie;
 
@@ -49,6 +53,11 @@ public:
 
 	// Use our own implementation
 	bool do_own;
+	bool interpolate_shifts;
+
+	// Save aligned but non-dose weighted micrograph.
+	// With MOTIONCOR2, this flag is always assumed to be true
+	bool save_noDW;
 
 	// Use MOTIONCOR2 instead of UNBLUR?
 	bool do_motioncor2;
@@ -101,9 +110,6 @@ public:
 	// Pixel size for UNBLUR
 	double angpix;
 
-	// Number of threads for unblur
-	int nr_threads;
-
 	// Continue an old run: only estimate CTF if logfile WITH Final Values line does not yet exist, otherwise skip the micrograph
 	bool continue_old;
 
@@ -132,16 +138,16 @@ public:
 	void getOutputFileNames(FileName fn_mic, FileName &fn_avg, FileName &fn_mov);
 
 	// Execute MOTIONCOR2 for a single micrograph
-	bool executeMotioncor2(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts, int rank = 0);
+	bool executeMotioncor2(Micrograph &mic, std::vector<float> &xshifts, std::vector<float> &yshifts, int rank = 0);
 
 	// Get the shifts from MOTIONCOR2
 	void getShiftsMotioncor2(FileName fn_log, std::vector<float> &xshifts, std::vector<float> &yshifts);
 
 	// Execute UNBLUR for a single micrograph
-	bool executeUnblur(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts);
+	bool executeUnblur(Micrograph &mic, std::vector<float> &xshifts, std::vector<float> &yshifts);
 
 	// Execute our own implementation for a single micrograph
-	bool executeOwnMotionCorrection(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts);
+	bool executeOwnMotionCorrection(Micrograph &mic, std::vector<float> &xshifts, std::vector<float> &yshifts);
 
 	// Get the shifts from UNBLUR
 	void getShiftsUnblur(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts);
@@ -153,7 +159,7 @@ public:
 	void plotShifts(FileName fn_eps, std::vector<float> &xshifts, std::vector<float> &yshifts);
 
 	// Save micrograph model
-	void saveModel(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts);
+	void saveModel(Micrograph &mic);
 
 	// Make a PDF file with all the shifts and write output STAR files
 	void generateLogFilePDFAndWriteStarFiles();
@@ -165,29 +171,15 @@ private:
 	// shiftx, shifty is relative to the (real space) image size
 	void shiftNonSquareImageInFourierTransform(MultidimArray<Complex> &frame, RFLOAT shiftx, RFLOAT shifty);
 
-	bool alignPatch(std::vector<MultidimArray<Complex> > &Fframes, const int pnx, const int pny, std::vector<float> &xshifts, std::vector<float> &yshifts);
+	bool alignPatch(std::vector<MultidimArray<Complex> > &Fframes, const int pnx, const int pny, std::vector<float> &xshifts, std::vector<float> &yshifts, std::ostream &logfile);
 
 	void binNonSquareImage(Image<RFLOAT> &Iwork, RFLOAT bin_factor);
 
 	void doseWeighting(std::vector<MultidimArray<Complex> > &Fframes, std::vector<RFLOAT> doses);
 
-	inline void getFittedXY(const RFLOAT x, const RFLOAT y, const RFLOAT z, Matrix1D<RFLOAT> &coeffX, Matrix1D<RFLOAT> &coeffY, RFLOAT &x_fitted, RFLOAT &y_fitted) {
-		const RFLOAT x2 = x * x, y2 = y * y, xy = x * y, z2 = z * z;
-		const RFLOAT z3 = z2 * z;
+	void realSpaceInterpolation(Image <RFLOAT> &Iref, std::vector<Image<RFLOAT> > &Iframes, MotionModel *model, std::ostream &logfile);
 
-		x_fitted = (coeffX(0)  * z + coeffX(1)  * z2 + coeffX(2)  * z3) \
-		         + (coeffX(3)  * z + coeffX(4)  * z2 + coeffX(5)  * z3) * x \
-		         + (coeffX(6)  * z + coeffX(7)  * z2 + coeffX(8)  * z3) * x2 \
-		         + (coeffX(9)  * z + coeffX(10) * z2 + coeffX(11) * z3) * y \
-		         + (coeffX(12) * z + coeffX(13) * z2 + coeffX(14) * z3) * y2 \
-		         + (coeffX(15) * z + coeffX(16) * z2 + coeffX(17) * z3) * xy;
-		y_fitted = (coeffY(0)  * z + coeffY(1)  * z2 + coeffY(2)  * z3)\
-		         + (coeffY(3)  * z + coeffY(4)  * z2 + coeffY(5)  * z3) * x \
-		         + (coeffY(6)  * z + coeffY(7)  * z2 + coeffY(8)  * z3) * x2 \
-		         + (coeffY(9)  * z + coeffY(10) * z2 + coeffY(11) * z3) * y \
-		         + (coeffY(12) * z + coeffY(13) * z2 + coeffY(14) * z3) * y2 \
-		         + (coeffY(15) * z + coeffY(16) * z2 + coeffY(17) * z3) * xy;
-	}
+	void realSpaceInterpolation_ThirdOrderPolynomial(Image <RFLOAT> &Iref, std::vector<Image<RFLOAT> > &Iframes, ThirdOrderPolynomialModel &model, std::ostream &logfile);
 };
 
 
