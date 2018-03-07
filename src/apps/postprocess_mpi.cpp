@@ -35,7 +35,7 @@ int main(int argc, char *argv[])
 	    MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
 	    
 		if (rank == 0)
-			PRINT_VERISON_INFO();
+			PRINT_VERSION_INFO();
 	    
 	    prm.read(argc, argv);
 

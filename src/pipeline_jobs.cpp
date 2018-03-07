@@ -683,7 +683,8 @@ void RelionJob::initialise(int _job_type)
 	}
 	else if (type == PROC_MASKCREATE)
 	{
-		has_mpi = has_thread = false;
+		has_mpi = false;
+		has_thread = true;
 		initialiseMaskcreateJob();
 	}
 	else if (type == PROC_JOINSTAR)
@@ -1534,7 +1535,7 @@ void RelionJob::initialiseAutopickJob()
 	joboptions["gpu_ids"] = JobOption("Which GPUs to use:", std::string(""), "This argument is not necessary. If left empty, the job itself will try to allocate available GPU resources. You can override the default allocation by providing a list of which GPUs (0,1,2,3, etc) to use. MPI-processes are separated by ':'. For example: 0:1:0:1:0:1");
 
 	joboptions["do_pick_helical_segments"] = JobOption("Pick 2D helical segments?", false, "Set to Yes if you want to pick 2D helical segments.");
-//	joboptions["do_amyloid"] = JobOption("Pick amyloid segments?", false, "Set to Yes if you want to use the algorithm that was developed specifically for picking amyloids.");
+	joboptions["do_amyloid"] = JobOption("Pick amyloid segments?", false, "Set to Yes if you want to use the algorithm that was developed specifically for picking amyloids.");
 
 	joboptions["helical_tube_outer_diameter"] = JobOption("Tube diameter (A): ", 200, 100, 1000, 10, "Outer diameter (in Angstroms) of helical tubes. \
 This value should be slightly larger than the actual width of the tubes.");
@@ -1635,8 +1636,8 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 		if (joboptions["do_pick_helical_segments"].getBoolean())
 		{
 			command += " --helix";
-//			if (joboptions["do_amyloid"].getBoolean())
-//				command += " --amyloid";
+			if (joboptions["do_amyloid"].getBoolean())
+				command += " --amyloid";
 			command += " --helical_tube_outer_diameter " + joboptions["helical_tube_outer_diameter"].getString();
 			command += " --helical_tube_kappa_max " + joboptions["helical_tube_kappa_max"].getString();
 			command += " --helical_tube_length_min " + joboptions["helical_tube_length_min"].getString();
@@ -1694,11 +1695,6 @@ void RelionJob::initialiseExtractJob()
 	joboptions["recenter_z"] = JobOption("Re-center on Z-coordinate (in pix): ", std::string("0"), "Re-extract particles centered on this Z-coordinate (in pixels in the reference)");
 	joboptions["do_set_angpix"] = JobOption("Manually set pixel size? ", false, "If set to Yes, the rlnMagnification and rlnDetectorPixelSize will be set in the resulting STAR file. Only use this option if CTF information is NOT coming from the input coordinate STAR file(s). For example, because you decided not to estimate the CTF for your micrographs.");
 	joboptions["angpix"] = JobOption("Pixel size (A)", 1, 0.3, 5, 0.1, "Provide the pixel size in Angstroms in the micrograph (so before any re-scaling).  If you provide input CTF parameters, then leave this value to the default of -1.");
-
-	joboptions["do_remove_duplicates"] = JobOption("Remove duplicates", false, "If set to Yes, then the program will remove all but one of particles which have drifted into the same position during alignment");
-	joboptions["duplicate_threshold"] = JobOption("Threshold [A]: ", 1, 1, 100, 1, "Remove particle coordinates within this distance [A], which might have drifted into the same position during alignment");
-
-
 	joboptions["extract_size"] = JobOption("Particle box size (pix):", 128, 64, 512, 8, "Size of the extracted particles (in pixels). This should be an even number!");
 	joboptions["do_invert"] = JobOption("Invert contrast?", true, "If set to Yes, the contrast in the particles will be inverted.");
 
@@ -4073,6 +4069,9 @@ bool RelionJob::getCommandsMaskcreateJob(std::string &outputname, std::vector<st
 		command += " --helix --z_percentage " + floatToString(joboptions["helical_z_percentage"].getNumber() / 100.);
 	}
 
+	// Running stuff
+	command += " --j " + joboptions["nr_threads"].getString();
+
 	// Other arguments
 	command += " " + joboptions["other_args"].getString();
 
@@ -4572,7 +4571,7 @@ bool RelionJob::getCommandsLocalresJob(std::string &outputname, std::vector<std:
 		else
 			command="`which relion_postprocess`";
 
-		command += " --locres --i " + joboptions["fn_in"].getString().substr(0, pos_half);
+		command += " --locres --i " + joboptions["fn_in"].getString();
 		command += " --o " + outputname + "relion";
 		command += " --angpix " + joboptions["angpix"].getString();
 		//command += " --locres_sampling " + joboptions["locres_sampling"].getString();

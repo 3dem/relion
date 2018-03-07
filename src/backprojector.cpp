@@ -262,7 +262,7 @@ void BackProjector::backproject1Dto2D(const MultidimArray<Complex > &f1d,
     // Go from the 1D slice coordinates to the data-array coordinates
     Ainv *= (RFLOAT)padding_factor;  // take scaling into account directly
 
-	for (int x=first_x; x <= r_max; x++)
+	for (int x=0; x <= r_max; x++)
 	{
 		// Get the relevant value in the input image
 		my_val = DIRECT_A1D_ELEM(f1d, x);

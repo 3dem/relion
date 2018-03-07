@@ -68,18 +68,20 @@ void MotioncorrRunnerMpi::run()
 		if (verb > 0 && imic % barstep == 0)
 			progress_bar(imic);
 
+		Micrograph mic(fn_micrographs[imic], fn_gain_reference, bin_factor);
+
 		bool result;
 		if (do_own)
-			result = executeOwnMotionCorrection(fn_micrographs[imic], xshifts, yshifts);
+			result = executeOwnMotionCorrection(mic, xshifts, yshifts);
 		else if (do_unblur)
-			result = executeUnblur(fn_micrographs[imic], xshifts, yshifts);
+			result = executeUnblur(mic, xshifts, yshifts);
 		else if (do_motioncor2)
-			result = executeMotioncor2(fn_micrographs[imic], xshifts, yshifts, node->rank);
+			result = executeMotioncor2(mic, xshifts, yshifts, node->rank);
 		else
 			REPORT_ERROR("Bug: by now it should be clear whether to use MotionCor2 or Unblur...");
 
 		if (result) {
-			saveModel(fn_micrographs[imic], xshifts, yshifts);
+			saveModel(mic);
 			plotShifts(fn_micrographs[imic], xshifts, yshifts);
 		}
 	}
