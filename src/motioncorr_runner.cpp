@@ -1052,8 +1052,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<f
 	alignPatch(Fframes, nx, ny, xshifts, yshifts, logfile);
 	RCTOC(TIMING_GLOBAL_ALIGNMENT);
 	for (int i = 0, ilim = xshifts.size(); i < ilim; i++) {
-		int frame = i + 1; // make 1-indexed
-		mic.setGlobalShift(frame, xshifts[i], yshifts[i]);
+		mic.setGlobalShift(frames[i] + 1, xshifts[i], yshifts[i]); // 1-indexed
         }
 
 	Iref().reshape(Iframes[0]());
@@ -1310,6 +1309,9 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<f
 	Iref.write(fn_avg);
 	logfile << "Written aligned and dose-weighted sum to " << fn_avg << std::endl;
 
+	// Set the start frame for the local motion model.
+	mic.first_frame = frames[0] + 1; // NOTE that this is 1-indexed.
+
 	return true;
 }
 
@@ -1366,10 +1368,8 @@ void MotioncorrRunner::realSpaceInterpolation(Image <RFLOAT> &Iref, std::vector<
 		}
 
 	} else if (model_version == MOTION_MODEL_THIRD_ORDER_POLYNOMIAL) { // Optimised code
-
 		ThirdOrderPolynomialModel *polynomial_model = (ThirdOrderPolynomialModel*)model;
 		realSpaceInterpolation_ThirdOrderPolynomial(Iref, Iframes, *polynomial_model, logfile);
-
 	} else { // general code
 		const int nx = XSIZE(Iframes[0]()), ny = YSIZE(Iframes[0]());
 		for (int iframe = 0; iframe < n_frames; iframe++) {
