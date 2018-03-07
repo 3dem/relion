@@ -470,6 +470,11 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 
     const int sqMg = 2*(int)(0.5 * squareSize * outPs / moviePs + 0.5);
 
+    if (verbose)
+    {
+        std::cout << "square size in micrograph: " << sqMg << "\n";
+    }
+
     std::vector<ParFourierTransformer> fts(threads);
 
     std::vector<Image<RFLOAT>> aux0(threads);
