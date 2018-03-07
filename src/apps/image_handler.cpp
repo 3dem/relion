@@ -622,7 +622,13 @@ class image_handler_parameters
 				Iin.read(fn_img);
 				RFLOAT avg, stddev, minval, maxval;
 				Iin().computeStats(avg, stddev, minval, maxval);
-				std::cout << fn_img << " : (x,y,z,n)= " << XSIZE(Iin()) << " x "<< YSIZE(Iin()) << " x "<< ZSIZE(Iin()) << " x "<< NSIZE(Iin()) << " ; avg= " << avg << " stddev= " << stddev << " minval= " <<minval << " maxval= " << maxval << std::endl;
+				Matrix1D <RFLOAT> com(3);
+				Iin().setXmippOrigin();
+				Iin().centerOfMass(com);
+				std::cout << fn_img << " : (x,y,z,n)= " << XSIZE(Iin()) << " x "<< YSIZE(Iin()) << " x "<< ZSIZE(Iin()) << " x "<< NSIZE(Iin()) << " ; avg= " << avg << " stddev= " << stddev << " minval= " <<minval << " maxval= " << maxval << " center of mass (relative to XmippOrigin) x " << com(0);
+				if (VEC_XSIZE(com) > 1) std::cout << " y " << YY(com);
+				if (VEC_XSIZE(com) > 2) std::cout << " z " << ZZ(com);
+				std::cout << std::endl;
 			}
 			else if (do_avg_ampl || do_avg_ampl2 || do_avg_ampl2_ali)
 			{
