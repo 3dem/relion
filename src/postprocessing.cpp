@@ -1175,6 +1175,9 @@ void Postprocessing::run()
 
 	// Add the two half-maps together for subsequent sharpening
 	I1() += I2();
+	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(I1()) {
+		DIRECT_MULTIDIM_ELEM(I1(), n) *= 0.5;
+	}
 
 	// Divide by MTF and perform FSC-weighted B-factor sharpening, as in Rosenthal and Henderson, 2003
 	// also low-pass filters...
