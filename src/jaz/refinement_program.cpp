@@ -302,9 +302,9 @@ int RefinementProgram::init(int argc, char *argv[])
 
                     if (i == 0) std::cout << name << " -> ";
 
-                    std::string::size_type pos0 = 0;
+                    std::string::size_type pos0 = name.find(movie_toReplace);
 
-                    while((pos0 = name.find(movie_toReplace)) != std::string::npos)
+                    if (pos0 != std::string::npos)
                     {
                         std::string::size_type pos1 = pos0 + movie_toReplace.length();
 
