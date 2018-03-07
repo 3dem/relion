@@ -45,7 +45,8 @@ class RefinementProgram
             std::string
                 starFn, reconFn0, reconFn1, maskFn,
                 outPath, imgPath, fscFn,
-                meta_path;
+                meta_path, movie_ending,
+                movie_toReplace, movie_replaceBy;
 
             // data:
 

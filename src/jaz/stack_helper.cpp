@@ -282,7 +282,7 @@ std::vector<std::vector<Image<Complex> > > StackHelper::loadMovieStackFS(const M
 
 std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
     const MetaDataTable* mdt,
-    std::string metaPath, std::string moviePath,
+    std::string metaPath, std::string moviePath, std::string movie_ending,
     double outPs, double coordsPs, double moviePs,
     int squareSize, int threads,
     bool loadData, RFLOAT hot, bool verbose)
@@ -293,12 +293,32 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
     std::string name0;
     mdt->getValue(EMDL_MICROGRAPH_NAME, name0, 0);
 
-    std::string ending = name0.substr(name0.find_last_of(".")+1);
+    std::string ending;
 
-    if (verbose)
+    if (movie_ending == "")
     {
-        std::cout << "orig. name: " << name0 << "\n";
-        std::cout << "ending: " << ending << "\n";
+        ending = name0.substr(name0.find_last_of(".")+1);
+
+        if (verbose)
+        {
+            std::cout << "orig. name: " << name0 << "\n";
+            std::cout << "ending: " << ending << "\n";
+        }
+    }
+    else
+    {
+        if (verbose)
+        {
+            std::cout << "orig. name: " << name0 << "\n";
+        }
+
+        ending = movie_ending;
+        name0 = name0.substr(0, name0.find_last_of(".")+1) + movie_ending;
+
+        if (verbose)
+        {
+            std::cout << "act. name:  " << name0 << "\n";
+        }
     }
 
     Image<float> mgStack;
@@ -338,6 +358,11 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
         }
 
         metaMdt.getValue(EMDL_MICROGRAPH_MOVIE_NAME, mgName0, 0);
+
+        if (movie_ending != "")
+        {
+            mgName0.substr(0, mgName0.find_last_of(".")+1) + movie_ending;
+        }
 
         std::string gainNameAct;
 

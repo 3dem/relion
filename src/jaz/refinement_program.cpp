@@ -5,6 +5,8 @@
 #include <src/jaz/stack_helper.h>
 #include <src/jaz/vtk_helper.h>
 
+#include <regex>
+
 RefinementProgram::RefinementProgram(bool singleReference, bool doesMovies)
 :   singleReference(singleReference),
     optStar(false),
@@ -51,6 +53,9 @@ int RefinementProgram::init(int argc, char *argv[])
             imgPath = parser.getOption("--mov", "Path to movies", "");
             preextracted = parser.checkOption("--preex", "Preextracted movie stacks");
             meta_path = parser.getOption("--meta", "Path to per-movie metadata star files", "");
+            movie_ending = parser.getOption("--mov_end", "Ending of movie filenames", "");
+            movie_toReplace = parser.getOption("--mov_toReplace", "Replace this string in micrograph names...", "");
+            movie_replaceBy = parser.getOption("--mov_replaceBy", "..by this one", "");
 
             movie_angpix = textToFloat(parser.getOption("--mps", "Pixel size of input movies (Angst/pix)", "-1"));
             movie_scale = textToFloat(parser.getOption("--msc", "Pixel size of input movies (rel. to reference)", "-1"));
@@ -283,6 +288,37 @@ int RefinementProgram::init(int argc, char *argv[])
             angpix = 10000 * dstep / mag;
 
             std::cout << " + Using pixel size calculated from magnification and detector pixel size in the input STAR file: " << angpix << "\n";
+        }
+
+        if (doesMovies)
+        {
+            if (movie_toReplace != "")
+            {
+                std::string name;
+
+                for (int i = 0; i < mdt0.numberOfObjects(); i++)
+                {
+                    mdt0.getValue(EMDL_MICROGRAPH_NAME, name, i);
+
+                    if (i == 0) std::cout << name << " -> ";
+
+                    std::string::size_type pos0 = 0;
+
+                    while((pos0 = name.find(movie_toReplace)) != std::string::npos)
+                    {
+                        std::string::size_type pos1 = pos0 + movie_toReplace.length();
+
+                        std::string before = name.substr(0, pos0);
+                        std::string after = pos1 < name.length()? name.substr(pos1) : "";
+
+                        name = before + movie_replaceBy + after;
+                    }
+
+                    if (i == 0) std::cout << name << "\n";
+
+                    mdt0.setValue(EMDL_MICROGRAPH_NAME, name, i);
+                }
+            }
         }
 
         mdts = StackHelper::splitByStack(&mdt0);

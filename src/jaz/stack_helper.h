@@ -33,7 +33,7 @@ class StackHelper
 
         static std::vector<std::vector<Image<Complex> > > extractMovieStackFS(
                 const MetaDataTable* mdt,
-                std::string metaPath, std::string moviePath,
+                std::string metaPath, std::string moviePath, std::string movie_ending,
                 double outPs, double coordsPs, double moviePs,
                 int squareSize, int threads,
                 bool loadData = true, RFLOAT hot = -1.0, bool verbose = false);

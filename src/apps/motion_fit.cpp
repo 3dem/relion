@@ -133,7 +133,7 @@ int MotionFitProg::_run()
     else
     {
         std::vector<std::vector<Image<Complex>>> movie = StackHelper::extractMovieStackFS(
-            &mdts[0], meta_path, imgPath, angpix, angpix, movie_angpix, s,
+            &mdts[0], meta_path, imgPath, movie_ending, angpix, angpix, movie_angpix, s,
             nr_omp_threads, false, hotCutoff, debug);
 
         fc = movie[0].size();
@@ -196,7 +196,7 @@ int MotionFitProg::_run()
             else
             {
                 movie = StackHelper::extractMovieStackFS(
-                    &mdts[g], meta_path, imgPath,
+                    &mdts[g], meta_path, imgPath, movie_ending,
                     angpix, angpix, movie_angpix, s,
                     nr_omp_threads, true, hotCutoff, debug);
 
