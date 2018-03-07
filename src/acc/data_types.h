@@ -125,7 +125,7 @@ public:
 	}
 
 	template <typename T1>
-	void setHost(MultidimArray<T1> img)
+	void setHost(MultidimArray<T1> &img)
 	{
 		if (img.xdim != x || img.ydim != y || img.zdim != z)
 		{
@@ -152,10 +152,16 @@ public:
 	}
 
 	template <typename T1>
-	void getHost(MultidimArray<T1> img)
+	void getHost(MultidimArray<T1> &img)
 	{
-		img.resize(AccPtr<T>::getSize());
 
+		if(img.nzyxdim!=AccPtr<T>::getSize())
+		{
+			if(img.nzyxdim==0)
+				img.resize(z,y,x);
+			else
+				CRITICAL("Trying to fill host-array with data from an array with different size!")
+		}
 		T *ptr = AccPtr<T>::getHostPtr();
 
 		if (sizeof(T) == sizeof(T1))

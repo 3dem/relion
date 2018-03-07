@@ -1130,6 +1130,18 @@ void JobWindow::initialiseSelectWindow()
 	group1->end();
 	guientries["do_regroup"].cb_menu_i();
 
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group2->end();
+	place("do_remove_duplicates", TOGGLE_DEACTIVATE, group2);
+    group2->begin();
+	place("duplicate_threshold", TOGGLE_DEACTIVATE);
+	group2->end();
+	guientries["do_remove_duplicates"].cb_menu_i();
+
 	tab2->end();
 
 	// Always deactivate the queue option

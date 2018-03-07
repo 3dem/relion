@@ -69,7 +69,8 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		}
 
 		// Get the optimal origin offsets from the previous iteration
-		Matrix1D<RFLOAT> my_old_offset(3), my_prior(3), my_old_offset_ori;
+		// Sjors 5mar18: it is very important that my_old_offset has baseMLO->mymodel.data_dim and not just (3), as transformCartesianAndHelicalCoords will give different results!!!
+		Matrix1D<RFLOAT> my_old_offset(baseMLO->mymodel.data_dim), my_prior(baseMLO->mymodel.data_dim), my_old_offset_ori;
 		int icol_rot, icol_tilt, icol_psi, icol_xoff, icol_yoff, icol_zoff;
 		XX(my_old_offset) = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_XOFF);
 		YY(my_old_offset) = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_YOFF);
@@ -331,12 +332,14 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
                         seed = baseMLO->random_seed + part_id;
                 }
 
+                LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
                 // construct the noise-image
                 AccUtilities::makeNoiseImage<MlClass>(	temp_sigmaFudgeFactor,
                 								baseMLO->mymodel.sigma2_noise[group_id],
 												seed,
 												accMLO,
 												RandomImage);
+                LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
         }
         CTOC(cudaMLO->timer,"makeNoiseMask");
 
@@ -388,7 +391,6 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		// ------------------------------------------------------------------------------------------
 
 		my_old_offset.selfROUND();
-		size_t img_size = img.data.nzyxdim;
 
 		// ------------------------------------------------------------------------------------------
 
@@ -528,7 +530,9 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			else
 			{
 				MultidimArray<RFLOAT> Mnoise;
+				RandomImage.hostAlloc();
 				RandomImage.cpToHost();
+				Mnoise.resize(img());
 				RandomImage.getHost(Mnoise);
 				softMaskOutsideMapForHelix(img(), psi_deg, tilt_deg, my_mask_radius,
 						(baseMLO->helical_tube_outer_diameter / (2. * baseMLO->mymodel.pixel_size)),

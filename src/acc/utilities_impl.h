@@ -243,11 +243,13 @@ void makeNoiseImage(XFLOAT sigmaFudgeFactor,
 
     NoiseSpectra.cpToDevice();
     NoiseSpectra.streamSync();
+    LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 
     // Initialize randomization by particle ID, like on the CPU-side
     cuda_kernel_initRND<<<RND_BLOCK_NUM,RND_BLOCK_SIZE>>>(
                                      seed,
                                     ~RandomStates);
+    LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 
     // Create noise image with the correct spectral profile
     cuda_kernel_RNDnormalDitributionComplexWithPowerModulation<<<RND_BLOCK_NUM,RND_BLOCK_SIZE>>>(
@@ -255,8 +257,7 @@ void makeNoiseImage(XFLOAT sigmaFudgeFactor,
                                     ~RandomStates,
 									accMLO->transformer1.xFSize,
                                     ~NoiseSpectra);
-
-    //LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
+    LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 
     // Transform to real-space, to get something which look like
     // the particle image without actual signal (a particle)
@@ -269,7 +270,7 @@ void makeNoiseImage(XFLOAT sigmaFudgeFactor,
 #else
 
     // Create noise image with the correct spectral profile
-    CpuKernels::RNDnormalDitributionComplexWithPowerModulation(accMLO->transformer1.fouriers(), accMLO->transformer1.xFSize, NoiseSpectra);
+    CpuKernels::RNDnormalDitributionComplexWithPowerModulation(accMLO->transformer1.fouriers(), accMLO->transformer1.xFSize, ~NoiseSpectra);
 
     // Transform to real-space, to get something which look like
 	// the particle image without actual signal (a particle)
@@ -326,7 +327,7 @@ static void TranslateAndNormCorrect(MultidimArray<RFLOAT > &img_in,
 	if (DATA3D)
 		CpuKernels::cpu_translate3D<XFLOAT>(temp(),img_out(),img_in.zyxdim,img_in.xdim,img_in.ydim,img_in.zdim,xOff,yOff,zOff);
 	else
-		CpuKernels::cpu_translate2D<XFLOAT>(temp(),img_out(),img_in.zyxdim,img_in.xdim,img_in.ydim,xOff,yOff;
+		CpuKernels::cpu_translate2D<XFLOAT>(temp(),img_out(),img_in.zyxdim,img_in.xdim,img_in.ydim,xOff,yOff);
 #endif
 }
 template <class MlClass>

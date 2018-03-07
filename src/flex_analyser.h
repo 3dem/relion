@@ -26,6 +26,7 @@
 #include "src/ctf.h"
 #include "src/time.h"
 #include "src/parallel.h"
+#include "src/mpi.h"
 
 class FlexAnalyser
 {
@@ -116,7 +117,7 @@ public:
 
 	void initialise();
 
-	void run();
+	void run(int rank = 0, int size = 1);
 
 	void setupSubtractionMasksAndProjectors();
 

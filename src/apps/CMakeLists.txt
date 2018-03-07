@@ -118,16 +118,12 @@ endif()
 foreach (_target ${RELION_TARGETS})
 	GET_FILENAME_COMPONENT(_target "relion_${_target}" NAME_WE)  #specify target name WE=WithoutExtension
 	
-    add_executable(${_target} ${_target}.cpp)
-    set(LIB relion_lib)
+	add_executable(${_target} ${_target}.cpp )
+	set(LIB relion_lib)
 	
  	add_dependencies(${_target} relion_lib)
 	
 	set_target_properties(${_target} PROPERTIES PREFIX "relion_")
-
-	if(TIFF_FOUND)
-		target_link_libraries(${_target} ${TIFF_LIBRARIES})
-	endif()
 
 	if(NOT MKLFFT)
 	    target_link_libraries(${_target} ${LIB} ${EXTRA_LIBS} ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
@@ -135,6 +131,10 @@ foreach (_target ${RELION_TARGETS})
 	    target_link_libraries(${_target} ${LIB} ${FFTW_LIBRARIES} ${EXTRA_LIBS} ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
 	endif(NOT MKLFFT)
 	
+	if(TIFF_FOUND)
+		target_link_libraries(${_target} ${TIFF_LIBRARIES})
+	endif()
+
 	if(CUDA_FOUND)
 	    target_link_libraries(${_target} relion_gpu_util)
 	endif(CUDA_FOUND)

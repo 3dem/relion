@@ -168,8 +168,11 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 		do_initialise_bodies = false;
 
 	if (do_initialise_bodies)
+	{
 		ini_high = textToFloat(parser.getOption("--ini_high", "Resolution (in Angstroms) to which to limit refinement in the first iteration ", "-1"));
 
+		mymodel.norm_body_mask_overlap = parser.checkOption("--multibody_norm_overlap", "Overlapping regions between bodies are normalized. This reduces memory requirements.");
+	}
 	do_reconstruct_subtracted_bodies = parser.checkOption("--reconstruct_subtracted_bodies", "Use this flag to perform reconstructions with the subtracted images in multi-body refinement");
 
 	fnt = parser.getOption("--iter", "Maximum number of iterations to perform", "OLD");
@@ -413,6 +416,8 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	}
 #endif
 	double temp_reqSize = textToDouble(parser.getOption("--free_gpu_memory", "GPU device memory (in Mb) to leave free after allocation.", "0"));
+	if(!do_zero_mask)
+		temp_reqSize += 100;
 	temp_reqSize *= 1000*1000;
 	if(temp_reqSize<0)
 		REPORT_ERROR("Invalid free_gpu_memory value.");
@@ -649,6 +654,8 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	}
 #endif
 	double temp_reqSize = textToDouble(parser.getOption("--free_gpu_memory", "GPU device memory (in Mb) to leave free after allocation.", "0"));
+	if(!do_zero_mask)
+		temp_reqSize += 100;
 	temp_reqSize *= 1000*1000;
 	if(temp_reqSize<0)
 		REPORT_ERROR("Invalid free_gpu_memory value.");
@@ -2629,9 +2636,6 @@ void MlOptimiser::expectation()
 
 	if (do_gpu)
     {
-		for (int i = 0; i < wsum_model.BPref.size(); i ++)
-			wsum_model.BPref[i].data.coreDeallocate();
-
 		for (int i = 0; i < cudaDevices.size(); i ++)
 		{
 			MlDeviceBundle *b = new MlDeviceBundle(this);
@@ -2693,9 +2697,6 @@ void MlOptimiser::expectation()
 #ifdef ALTCPU
 	if (do_cpu)
 	{
-		for (int i = 0; i < wsum_model.BPref.size(); i ++)
-			wsum_model.BPref[i].data.coreDeallocate();
-
 		unsigned nr_classes = mymodel.PPref.size();
 		// Allocate Array of complex arrays for this class
 		if (posix_memalign((void **)&mdlClassComplex, MEM_ALIGN, nr_classes * sizeof (XFLOAT *)))
@@ -2833,8 +2834,6 @@ void MlOptimiser::expectation()
 
 				b->backprojectors[j].getMdlData(reals, imags, weights);
 
-				wsum_model.BPref[j].data.coreAllocate();
-
 				for (unsigned long n = 0; n < s; n++)
 				{
 					wsum_model.BPref[j].data.data[n].real += (RFLOAT) reals[n];
@@ -2897,8 +2896,6 @@ void MlOptimiser::expectation()
 			XFLOAT *weights = NULL;
 
 			b->backprojectors[j].getMdlDataPtrs(reals, imags, weights);
-
-			wsum_model.BPref[j].data.coreAllocate();
 
 			for (unsigned long n = 0; n < s; n++)
 			{
@@ -4689,7 +4686,8 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 		}
 
 		// Get the old offsets and the priors on the offsets
-		Matrix1D<RFLOAT> my_old_offset(3), my_prior(3), my_old_offset_ori;
+		// Sjors 5mar18: it is very important that my_old_offset has baseMLO->mymodel.data_dim and not just (3), as transformCartesianAndHelicalCoords will give different results!!!
+		Matrix1D<RFLOAT> my_old_offset(mymodel.data_dim), my_prior(mymodel.data_dim), my_old_offset_ori;
 		int icol_rot, icol_tilt, icol_psi, icol_xoff, icol_yoff, icol_zoff;
 		XX(my_old_offset) = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_XOFF);
 		XX(my_prior)      = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_XOFF_PRIOR);

@@ -217,7 +217,9 @@ public:
 	// Search range of helical rise (in Angstroms)
 	RFLOAT helical_rise_min,  helical_rise_max, helical_rise_inistep;
 
-
+	// Normalize overlapping regions in multibody masks
+	bool norm_body_mask_overlap;
+	
 public:
 
 	// Constructor
@@ -251,7 +253,8 @@ public:
 		helical_twist_inistep(0),
 		helical_rise_min(0),
 		helical_rise_max(0),
-		helical_rise_inistep(0)
+		helical_rise_inistep(0),
+		norm_body_mask_overlap(false)
 	{
 		clear();
 	}

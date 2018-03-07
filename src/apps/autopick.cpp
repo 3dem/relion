@@ -26,6 +26,8 @@ int main(int argc, char *argv[])
 {
 	AutoPicker prm;
 
+    	PRINT_VERSION_INFO();
+
 	try
     {
 		prm.read(argc, argv);
