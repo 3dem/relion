@@ -432,6 +432,7 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 
         if (verbose)
         {
+            std::cout << name0 << " -> " << mgNameAct << "\n";
             std::cout << "loading: " << mgNameAct << "\n";
         }
 

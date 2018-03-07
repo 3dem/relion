@@ -133,7 +133,7 @@ int MotionFitProg::_run()
     else
     {
         std::vector<std::vector<Image<Complex>>> movie = StackHelper::extractMovieStackFS(
-            &mdts[0], meta_path, imgPath, movie_ending, angpix, angpix, movie_angpix, s,
+            &mdts[0], meta_path, imgPath, movie_ending, coords_angpix, angpix, movie_angpix, s,
             nr_omp_threads, false, hotCutoff, debug);
 
         fc = movie[0].size();
@@ -197,7 +197,7 @@ int MotionFitProg::_run()
             {
                 movie = StackHelper::extractMovieStackFS(
                     &mdts[g], meta_path, imgPath, movie_ending,
-                    angpix, angpix, movie_angpix, s,
+                    angpix, coords_angpix, movie_angpix, s,
                     nr_omp_threads, true, hotCutoff, debug);
 
                 #pragma omp parallel for num_threads(nr_omp_threads)
@@ -250,7 +250,14 @@ int MotionFitProg::_run()
 
         std::vector<std::vector<gravis::d2Vector>> tracks(pc);
 
-        std::vector<gravis::d2Vector> globTrack = MotionRefinement::getGlobalTrack(movieCC);
+        //std::vector<gravis::d2Vector> globTrack = MotionRefinement::getGlobalTrack(movieCC);
+        std::vector<Image<RFLOAT>> ccSum = MotionRefinement::addCCs(movieCC);
+        std::vector<gravis::d2Vector> globTrack = MotionRefinement::getGlobalTrack(ccSum);
+
+        if (debug)
+        {
+            VtkHelper::writeCentered(ccSum, outPath + "_CCsum_mg"+stsg.str()+".vtk");
+        }
 
         for (int p = 0; p < pc; p++)
         {

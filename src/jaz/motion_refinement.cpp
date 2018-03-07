@@ -191,7 +191,7 @@ std::vector<std::vector<Image<RFLOAT>>> MotionRefinement::movieCC(
 }
 
 std::vector<d2Vector> MotionRefinement::getGlobalTrack(
-        const std::vector<std::vector<Image<RFLOAT>>>& movieCC)
+    const std::vector<std::vector<Image<RFLOAT>>>& movieCC)
 {
     const int pc = movieCC.size();
     const int fc = movieCC[0].size();
@@ -219,6 +219,58 @@ std::vector<d2Vector> MotionRefinement::getGlobalTrack(
         }
 
         d2Vector pos = Interpolation::quadraticMaxWrapXY(e_sum[f], eps);
+
+        if (pos.x >= sh) pos.x -= s;
+        if (pos.y >= sh) pos.y -= s;
+
+        out[f] = pos;
+    }
+
+    return out;
+}
+
+std::vector<Image<RFLOAT> > MotionRefinement::addCCs(
+    const std::vector<std::vector<Image<RFLOAT>>> &movieCC)
+{
+    const int pc = movieCC.size();
+    const int fc = movieCC[0].size();
+
+    const int s = movieCC[0][0]().xdim;
+
+    std::vector<Image<RFLOAT>> e_sum(fc);
+
+    for (int f = 0; f < fc; f++)
+    {
+        e_sum[f] = Image<RFLOAT>(s, s);
+        e_sum[f].data.initZeros();
+
+        for (int p = 0; p < pc; p++)
+        {
+            for (int y = 0; y < s; y++)
+            for (int x = 0; x < s; x++)
+            {
+                e_sum[f](y,x) += movieCC[p][f](y,x);
+            }
+        }
+    }
+
+    return e_sum;
+}
+
+std::vector<d2Vector> MotionRefinement::getGlobalTrack(
+    const std::vector<Image<RFLOAT>> &movieCcSum)
+{
+    const int fc = movieCcSum.size();
+
+    const int s = movieCcSum[0]().xdim;
+    const int sh = s/2 + 1;
+
+    std::vector<d2Vector> out(fc);
+    const double eps = 1e-30;
+
+    for (int f = 0; f < fc; f++)
+    {
+        d2Vector pos = Interpolation::quadraticMaxWrapXY(movieCcSum[f], eps);
 
         if (pos.x >= sh) pos.x -= s;
         if (pos.y >= sh) pos.y -= s;

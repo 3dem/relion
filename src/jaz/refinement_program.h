@@ -29,14 +29,14 @@ class RefinementProgram
 
             bool singleReference, doesMovies, debug, applyTilt, anisoTilt, useFsc,
                 optStar, noStar, optReference, noReference, noTilt,
-                preextracted;
+                preextracted, coordsAtMgRes;
 
             long maxMG, minMG;
 
             RFLOAT angpix, paddingFactor,
                 beamtilt_x, beamtilt_y,
                 beamtilt_xx, beamtilt_xy, beamtilt_yy,
-                hotCutoff;
+                hotCutoff, coords_angpix;
 
             int nr_omp_threads;
 

@@ -61,6 +61,7 @@ int RefinementProgram::init(int argc, char *argv[])
             movie_scale = textToFloat(parser.getOption("--msc", "Pixel size of input movies (rel. to reference)", "-1"));
 
             hotCutoff = textToFloat(parser.getOption("--hot", "Clip hot pixels to this max. value (-1 = off, TIFF only)", "-1"));
+            coordsAtMgRes = parser.checkOption("--mg_coords", "Particle coordinates are given at micrograph resolution");
         }
         else
         {
@@ -334,6 +335,15 @@ int RefinementProgram::init(int argc, char *argv[])
         if (movie_scale > 0.0)
         {
             movie_angpix = movie_scale * angpix;
+        }
+
+        if (coordsAtMgRes)
+        {
+            coords_angpix = movie_angpix;
+        }
+        else
+        {
+            coords_angpix = angpix;
         }
     }
 
