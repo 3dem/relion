@@ -29,7 +29,7 @@ class RefinementProgram
 
             bool singleReference, doesMovies, debug, applyTilt, anisoTilt, useFsc,
                 optStar, noStar, optReference, noReference, noTilt,
-                preextracted, nogain;
+                preextracted;
 
             long maxMG, minMG;
 
@@ -38,14 +38,14 @@ class RefinementProgram
                 beamtilt_xx, beamtilt_xy, beamtilt_yy,
                 hotCutoff;
 
-            int nr_omp_threads, bin, coords_bin, movie_bin;
+            int nr_omp_threads;
+
+            double movie_scale, movie_angpix;
 
             std::string
                 starFn, reconFn0, reconFn1, maskFn,
                 outPath, imgPath, fscFn,
-                meta_path, bin_type_str;
-
-            StackHelper::BinningType binType;
+                meta_path;
 
             // data:
 

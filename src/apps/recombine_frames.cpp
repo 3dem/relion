@@ -251,8 +251,8 @@ int FrameRecomb::_run()
     else
     {
         std::vector<std::vector<Image<Complex>>> movie = StackHelper::extractMovieStackFS(
-            &mdts[0], meta_path, imgPath, bin, coords_bin, movie_bin, s,
-            nr_omp_threads, !nogain, binType, false, hotCutoff, debug);
+            &mdts[0], meta_path, imgPath, angpix, angpix, movie_angpix, s,
+            nr_omp_threads, false, hotCutoff, debug);
 
         fc = movie[0].size();
     }
@@ -331,9 +331,8 @@ int FrameRecomb::_run()
             {
                 movie = StackHelper::extractMovieStackFS(
                     &mdts[g], meta_path, imgPath,
-                    bin, coords_bin, movie_bin, s,
-                    nr_omp_threads, !nogain, binType,
-                    true, hotCutoff, debug);
+                    angpix, angpix, movie_angpix, s,
+                    nr_omp_threads, true, hotCutoff, debug);
 
                 #pragma omp parallel for num_threads(nr_omp_threads)
                 for (int p = 0; p < pc; p++)

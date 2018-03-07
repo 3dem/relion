@@ -51,12 +51,9 @@ int RefinementProgram::init(int argc, char *argv[])
             imgPath = parser.getOption("--mov", "Path to movies", "");
             preextracted = parser.checkOption("--preex", "Preextracted movie stacks");
             meta_path = parser.getOption("--meta", "Path to per-movie metadata star files", "");
-            nogain = parser.checkOption("--nogain", "Ignore gain reference");
 
-            bin = textToInteger(parser.getOption("--bin", "Binning level for optimization and output (e.g. 2 for 2x2)", "1"));
-            coords_bin = textToInteger(parser.getOption("--cbin", "Binning level of input coordinates", "1"));
-            movie_bin = textToInteger(parser.getOption("--mbin", "Binning level of input movies", "1"));
-            bin_type_str = parser.getOption("--bintype", "Binning method (box, gauss or fourier)", "fourier");
+            movie_angpix = textToFloat(parser.getOption("--mps", "Pixel size of input movies (Angst/pix)", "-1"));
+            movie_scale = textToFloat(parser.getOption("--msc", "Pixel size of input movies (rel. to reference)", "-1"));
 
             hotCutoff = textToFloat(parser.getOption("--hot", "Clip hot pixels to this max. value (-1 = off, TIFF only)", "-1"));
         }
@@ -110,12 +107,15 @@ int RefinementProgram::init(int argc, char *argv[])
 
         if (doesMovies)
         {
-            if (bin_type_str == "box") binType = StackHelper::BoxBin;
-            else if (bin_type_str == "gauss") binType = StackHelper::GaussBin;
-            else if (bin_type_str == "fourier") binType = StackHelper::FourierCrop;
-            else
+            if (movie_scale < 0.0 && movie_angpix < 0.0)
             {
-                REPORT_ERROR("Illegal binning type: " + bin_type_str + " (supported: box, gauss or fourier)");
+                std::cerr << "Movie pixel size has to specified, either as an absolute value (--mps) or relative to the reference (--msc).\n";
+                return 4;
+            }
+            else if (movie_scale > 0.0 && movie_angpix > 0.0)
+            {
+                std::cerr << "Movie pixel size can only be specified as either an absolute value (--mps) or relative to the reference (--msc), but not both.\n";
+                return 4;
             }
         }
     }
@@ -136,7 +136,7 @@ int RefinementProgram::init(int argc, char *argv[])
         }
         catch (RelionError XE)
         {
-            std::cout << "Unable to read map: " << reconFn0 << "\n";
+            std::cerr << "Unable to read map: " << reconFn0 << "\n";
             return 2;
         }
 
@@ -148,7 +148,7 @@ int RefinementProgram::init(int argc, char *argv[])
             }
             catch (RelionError XE)
             {
-                std::cout << "Unable to read map: " << reconFn1 << "\n";
+                std::cerr << "Unable to read map: " << reconFn1 << "\n";
                 return 3;
             }
         }
@@ -291,6 +291,14 @@ int RefinementProgram::init(int argc, char *argv[])
         g0 = minMG;
 
         std::cout << "mg range: " << g0 << ".." << gc << "\n";
+    }
+
+    if (doesMovies)
+    {
+        if (movie_scale > 0.0)
+        {
+            movie_angpix = movie_scale * angpix;
+        }
     }
 
     RFLOAT V = kV * 1e3;

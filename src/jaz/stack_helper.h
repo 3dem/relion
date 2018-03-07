@@ -34,9 +34,8 @@ class StackHelper
         static std::vector<std::vector<Image<Complex> > > extractMovieStackFS(
                 const MetaDataTable* mdt,
                 std::string metaPath, std::string moviePath,
-                int outBin, int coordsBin, int movieBin,
+                double outPs, double coordsPs, double moviePs,
                 int squareSize, int threads,
-                bool useGain = true, BinningType binningType = BoxBin,
                 bool loadData = true, RFLOAT hot = -1.0, bool verbose = false);
 
         static Image<Complex> projectView(Projector* projector, const MetaDataTable* mdt, int index);

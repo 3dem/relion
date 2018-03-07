@@ -281,11 +281,10 @@ std::vector<std::vector<Image<Complex> > > StackHelper::loadMovieStackFS(const M
 }
 
 std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
-    const MetaDataTable *mdt,
+    const MetaDataTable* mdt,
     std::string metaPath, std::string moviePath,
-    int outBin, int coordsBin, int movieBin, int squareSize,
-    int threads,
-    bool useGain, BinningType binningType,
+    double outPs, double coordsPs, double moviePs,
+    int squareSize, int threads,
     bool loadData, RFLOAT hot, bool verbose)
 {
     std::vector<std::vector<Image<Complex>>> out(mdt->numberOfObjects());
@@ -306,6 +305,8 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
     Image<RFLOAT> gainRef;
 
     std::string mgNameAct;
+
+    bool useGain = false;
 
     if (ending == "star")
     {
@@ -356,7 +357,7 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 
         mgStack.read(mgNameAct, false);
 
-        if (useGain && loadData)
+        if (loadData)
         {
             if (!metaMdt.containsLabel(EMDL_MICROGRAPH_GAIN_NAME))
             {
@@ -377,6 +378,7 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
             }
 
             gainRef.read(gainNameAct, true);
+            useGain = true;
 
             if (gainRef.data.xdim != mgStack.data.xdim
                 || gainRef.data.ydim != mgStack.data.ydim)
@@ -394,11 +396,6 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
     }
     else
     {
-        if (useGain)
-        {
-            std::cerr << "Warning: unable to load gain reference - rlnMicrographName (" << name0 << ") is not a .star file.\n";
-        }
-
         if (moviePath == "")
         {
             mgNameAct = name0;
@@ -446,31 +443,24 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 
     if (!loadData) return out;
 
-    const int sqMg = squareSize * outBin / movieBin;
+    const int sqMg = 2*(int)(0.5 * squareSize * outPs / moviePs + 0.5);
 
     std::vector<ParFourierTransformer> fts(threads);
 
-    std::vector<Image<RFLOAT>> aux0(threads), aux1(threads);
-    std::vector<Image<Complex>> aux2(threads);
+    std::vector<Image<RFLOAT>> aux0(threads);
+    std::vector<Image<Complex>> aux1(threads);
 
     for (int t = 0; t < threads; t++)
     {
         aux0[t] = Image<RFLOAT>(sqMg, sqMg);
 
-        if (outBin != movieBin)
+        if (outPs != moviePs)
         {
-            if (binningType == FourierCrop)
-            {
-                aux2[t] = Image<Complex>(sqMg/2+1,sqMg);
-            }
-            else
-            {
-                aux1[t] = Image<RFLOAT>(squareSize, squareSize);
-            }
+            aux1[t] = Image<Complex>(sqMg/2+1,sqMg);
         }
     }
 
-    Image<RFLOAT> muGraph;
+    Image<float> muGraph;
 
     for (long f = 0; f < fc; f++)
     {
@@ -485,16 +475,16 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 
             out[p][f] = Image<Complex>(sqMg,sqMg);
 
-            double xp0, yp0;
+            double xpC, ypC;
 
-            mdt->getValue(EMDL_IMAGE_COORD_X, xp0, p);
-            mdt->getValue(EMDL_IMAGE_COORD_Y, yp0, p);
+            mdt->getValue(EMDL_IMAGE_COORD_X, xpC, p);
+            mdt->getValue(EMDL_IMAGE_COORD_Y, ypC, p);
 
-            const double xpo = (int)(outBin * xp0 / coordsBin) - squareSize/2;
-            const double ypo = (int)(outBin * yp0 / coordsBin) - squareSize/2;
+            const double xpO = (int)(coordsPs * xpC / outPs) - squareSize/2;
+            const double ypO = (int)(coordsPs * ypC / outPs) - squareSize/2;
 
-            const int x0 = xpo * outBin / movieBin;
-            const int y0 = ypo * outBin / movieBin;
+            const int x0 = (int)round(xpO * outPs / moviePs);
+            const int y0 = (int)round(ypO * outPs / moviePs);
 
             // @TODO: read whole-image shifts from micrograph class
 
@@ -517,17 +507,17 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 
                 if (hot > 0.0 && val > hot) val = hot;
 
-                DIRECT_NZYX_ELEM(aux0[t].data, 0, 0, y, x) = -gain*val;
+                DIRECT_NZYX_ELEM(aux0[t].data, 0, 0, y, x) = -gain * val;
             }
 
-            if (outBin == movieBin)
+            if (outPs == moviePs)
             {
                 fts[t].FourierTransform(aux0[t](), out[p][f]());
             }
             else
             {
-                fts[t].FourierTransform(aux0[t](), aux2[t]());
-                out[p][f] = FilterHelper::cropCorner2D(aux2[t], squareSize/2+1, squareSize);
+                fts[t].FourierTransform(aux0[t](), aux1[t]());
+                out[p][f] = FilterHelper::cropCorner2D(aux1[t], squareSize/2+1, squareSize);
             }
 
             out[p][f](0,0) = Complex(0.0,0.0);
