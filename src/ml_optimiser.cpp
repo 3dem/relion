@@ -1920,7 +1920,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		errstr += " \n\t --solvent_mask ";
 	if(mask2)
 		errstr += " \n\t --solvent_mask2 ";
-	errstr += " \n";
+	errstr += ". You can use --threshold_above and --threshold_below in relion_image_handler to do so. \n";
 
 	if(mask1 || mask2)
 		REPORT_ERROR(errstr);
@@ -2060,7 +2060,8 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 
 			// May24,2015 - Shaoda & Sjors, Helical refinement
 			// Check that the average in the noise area is approximately zero and the stddev is one
-			if (!dont_raise_norm_error)
+
+			if (!dont_raise_norm_error && verb > 0)
 			{
 				// NEW METHOD
 				RFLOAT sum, sum2, sphere_radius_pix, cyl_radius_pix;
@@ -2078,12 +2079,13 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 					else
 						std::cerr << " bg_radius= " << sphere_radius_pix << std::flush;
 					std::cerr << std::endl;
-					REPORT_ERROR("ERROR: It appears that these images have not been normalised to an average background value of 0 and a stddev value of 1. \n \
+					std::cerr << "WARNING: It appears that these images have not been normalised to an average background value of 0 and a stddev value of 1. \n \
 							Note that the average and stddev values for the background are calculated: \n \
 							(1) for single particles: outside a circle with the particle diameter \n \
 							(2) for helical segments: outside a cylinder (tube) with the helical tube diameter \n \
 							You can use the relion_preprocess program to normalise your images \n \
-							If you are sure you have normalised the images correctly (also see the RELION Wiki), you can switch off this error message using the --dont_check_norm command line option");
+							If you are sure you have normalised the images correctly (also see the RELION Wiki), you can switch off this warning message using the --dont_check_norm command line option" <<std::endl;
+					dont_raise_norm_error = true;
 				}
 			}
 
