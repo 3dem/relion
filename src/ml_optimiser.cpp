@@ -1920,7 +1920,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		errstr += " \n\t --solvent_mask ";
 	if(mask2)
 		errstr += " \n\t --solvent_mask2 ";
-	errstr += " \n";
+	errstr += ". You can use --threshold_above and --threshold_below in relion_image_handler to do so. \n";
 
 	if(mask1 || mask2)
 		REPORT_ERROR(errstr);
@@ -2060,7 +2060,8 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 
 			// May24,2015 - Shaoda & Sjors, Helical refinement
 			// Check that the average in the noise area is approximately zero and the stddev is one
-			if (!dont_raise_norm_error)
+
+			if (!dont_raise_norm_error && verb > 0)
 			{
 				// NEW METHOD
 				RFLOAT sum, sum2, sphere_radius_pix, cyl_radius_pix;
@@ -2078,12 +2079,13 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 					else
 						std::cerr << " bg_radius= " << sphere_radius_pix << std::flush;
 					std::cerr << std::endl;
-					REPORT_ERROR("ERROR: It appears that these images have not been normalised to an average background value of 0 and a stddev value of 1. \n \
+					std::cerr << "WARNING: It appears that these images have not been normalised to an average background value of 0 and a stddev value of 1. \n \
 							Note that the average and stddev values for the background are calculated: \n \
 							(1) for single particles: outside a circle with the particle diameter \n \
 							(2) for helical segments: outside a cylinder (tube) with the helical tube diameter \n \
 							You can use the relion_preprocess program to normalise your images \n \
-							If you are sure you have normalised the images correctly (also see the RELION Wiki), you can switch off this error message using the --dont_check_norm command line option");
+							If you are sure you have normalised the images correctly (also see the RELION Wiki), you can switch off this warning message using the --dont_check_norm command line option" <<std::endl;
+					dont_raise_norm_error = true;
 				}
 			}
 
@@ -4657,7 +4659,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 		MultidimArray<Complex > Fimg, Faux;
 		MultidimArray<RFLOAT> Fctf;
 		Matrix2D<RFLOAT> Aori;
-		Matrix1D<RFLOAT> my_projected_com(3), my_refined_ibody_offset(3);
+		Matrix1D<RFLOAT> my_projected_com(mymodel.data_dim), my_refined_ibody_offset(mymodel.data_dim);
 
 		// Get the right line in the exp_fn_img strings (also exp_fn_recimg and exp_fn_ctfs)
 		int istop = 0;
@@ -5388,7 +5390,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 
 					// 17May2017: Body is centered at its own COM
 					// move it back to its place in the original particle image
-					Matrix1D<RFLOAT> other_projected_com(3);
+					Matrix1D<RFLOAT> other_projected_com(mymodel.data_dim);
 
 					// Projected COM for this body (using Aori, just like above for ibody and my_projected_com!!!)
 					other_projected_com = Aori * (mymodel.com_bodies[obody]);
@@ -7601,14 +7603,13 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 											DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, icol_tilt) = tilt;
 											RFLOAT old_psi = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, icol_psi);
 											DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, icol_psi) = psi;
-											Matrix1D<RFLOAT> shifts(2);
+											Matrix1D<RFLOAT> shifts(mymodel.data_dim);
 
 											// include old_offsets for normal refinement (i.e. non multi-body)
 											XX(shifts) = XX(exp_old_offset[ipart]) + oversampled_translations_x[iover_trans];
 											YY(shifts) = YY(exp_old_offset[ipart]) + oversampled_translations_y[iover_trans];
 											if (mymodel.data_dim == 3)
 											{
-												shifts.resize(3);
 												ZZ(shifts) = ZZ(exp_old_offset[ipart]) + oversampled_translations_z[iover_trans];
 											}
 #ifdef DEBUG_BODIES2
