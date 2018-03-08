@@ -70,6 +70,9 @@ class RefinementProgram
         virtual int readMoreOptions(IOParser& parser, int argc, char *argv[]) {}
         virtual int _init(){return 0;}
         virtual int _run() = 0;
+
+        double angstToPixFreq(double a);
+        double pixToAngstFreq(double p);
 };
 
 #endif

@@ -381,3 +381,13 @@ int RefinementProgram::run()
 {
     return _run();
 }
+
+double RefinementProgram::angstToPixFreq(double a)
+{
+    return 2.0*sh*angpix/a;
+}
+
+double RefinementProgram::pixToAngstFreq(double p)
+{
+    return 2.0*sh*angpix/p;
+}

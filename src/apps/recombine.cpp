@@ -51,6 +51,7 @@ class FrameRecomb : public RefinementProgram
         FrameRecomb();
 
             int k0, k1;
+            double k0a, k1a;
             std::string trackFn, fccFn;
 
         int readMoreOptions(IOParser& parser, int argc, char *argv[]);
@@ -82,8 +83,8 @@ int FrameRecomb::readMoreOptions(IOParser& parser, int argc, char *argv[])
     fccFn = parser.getOption("--cc", "Input MRC file of per-micrograph Fourier cross-correlations");
 
     // @TODO: change these to Angstrom
-    k0 = textToInteger(parser.getOption("--k0", "Min. frequency used in B-factor fit", "20"));
-    k1 = textToInteger(parser.getOption("--k1", "Max. frequency used in B-factor fit", "100"));
+    k0a = textToInteger(parser.getOption("--k0", "Min. frequency used in B-factor fit (Angst)", "10"));
+    k1a = textToInteger(parser.getOption("--k1", "Max. frequency used in B-factor fit (Angst)", "-1"));
 
     return 0;
 }
@@ -104,6 +105,9 @@ int FrameRecomb::_run()
     sh = fcc.data.xdim;
     s = 2 * (sh-1);
     fc = fcc.data.ydim;
+
+    k0 = (int) angstToPixFreq(k0a);
+    k1 = k1a > 0.0? (int) angstToPixFreq(k1a) : sh;
 
     std::pair<std::vector<d2Vector>,std::vector<double>> bkFacs
             = DamageHelper::fitBkFactors(fcc, k0, k1);
