@@ -138,25 +138,25 @@ public:
 	void getOutputFileNames(FileName fn_mic, FileName &fn_avg, FileName &fn_mov);
 
 	// Execute MOTIONCOR2 for a single micrograph
-	bool executeMotioncor2(Micrograph &mic, std::vector<float> &xshifts, std::vector<float> &yshifts, int rank = 0);
+	bool executeMotioncor2(Micrograph &mic, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts, int rank = 0);
 
 	// Get the shifts from MOTIONCOR2
-	void getShiftsMotioncor2(FileName fn_log, std::vector<float> &xshifts, std::vector<float> &yshifts);
+	void getShiftsMotioncor2(FileName fn_log, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts);
 
 	// Execute UNBLUR for a single micrograph
-	bool executeUnblur(Micrograph &mic, std::vector<float> &xshifts, std::vector<float> &yshifts);
+	bool executeUnblur(Micrograph &mic, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts);
 
 	// Execute our own implementation for a single micrograph
-	bool executeOwnMotionCorrection(Micrograph &mic, std::vector<float> &xshifts, std::vector<float> &yshifts);
+	bool executeOwnMotionCorrection(Micrograph &mic, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts);
 
 	// Get the shifts from UNBLUR
-	void getShiftsUnblur(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts);
+	void getShiftsUnblur(FileName fn_mic, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts);
 
 	// Plot the FRC curve from SUMMOVIE
 	void plotFRC(FileName fn_frc);
 
 	// Plot the shifts
-	void plotShifts(FileName fn_eps, std::vector<float> &xshifts, std::vector<float> &yshifts);
+	void plotShifts(FileName fn_eps, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts);
 
 	// Save micrograph model
 	void saveModel(Micrograph &mic);
@@ -171,7 +171,7 @@ private:
 	// shiftx, shifty is relative to the (real space) image size
 	void shiftNonSquareImageInFourierTransform(MultidimArray<Complex> &frame, RFLOAT shiftx, RFLOAT shifty);
 
-	bool alignPatch(std::vector<MultidimArray<Complex> > &Fframes, const int pnx, const int pny, std::vector<float> &xshifts, std::vector<float> &yshifts, std::ostream &logfile);
+	bool alignPatch(std::vector<MultidimArray<Complex> > &Fframes, const int pnx, const int pny, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts, std::ostream &logfile);
 
 	void binNonSquareImage(Image<RFLOAT> &Iwork, RFLOAT bin_factor);
 

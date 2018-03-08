@@ -298,7 +298,7 @@ void MotioncorrRunner::run()
 
 	for (long int imic = 0; imic < fn_micrographs.size(); imic++)
 	{
-		std::vector<float> xshifts, yshifts;
+		std::vector<RFLOAT> xshifts, yshifts;
 
 		if (verb > 0 && imic % barstep == 0)
 			progress_bar(imic);
@@ -336,7 +336,7 @@ void MotioncorrRunner::run()
 #endif
 }
 
-bool MotioncorrRunner::executeMotioncor2(Micrograph &mic, std::vector<float> &xshifts, std::vector<float> &yshifts, int rank)
+bool MotioncorrRunner::executeMotioncor2(Micrograph &mic, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts, int rank)
 {
 	FileName fn_mic = mic.getMovieFilename();
 	FileName fn_avg, fn_mov;
@@ -480,7 +480,7 @@ bool MotioncorrRunner::executeMotioncor2(Micrograph &mic, std::vector<float> &xs
 	return true;
 }
 
-void MotioncorrRunner::getShiftsMotioncor2(FileName fn_log, std::vector<float> &xshifts, std::vector<float> &yshifts)
+void MotioncorrRunner::getShiftsMotioncor2(FileName fn_log, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts)
 {
 
 	std::ifstream in(fn_log.data(), std::ios_base::in);
@@ -535,7 +535,7 @@ void MotioncorrRunner::getShiftsMotioncor2(FileName fn_log, std::vector<float> &
 
 }
 
-bool MotioncorrRunner::executeUnblur(Micrograph &mic, std::vector<float> &xshifts, std::vector<float> &yshifts)
+bool MotioncorrRunner::executeUnblur(Micrograph &mic, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts)
 {
 	FileName fn_mic = mic.getMovieFilename();
 	FileName fn_avg, fn_mov;
@@ -684,7 +684,7 @@ bool MotioncorrRunner::executeUnblur(Micrograph &mic, std::vector<float> &xshift
 	return true;
 }
 
-void MotioncorrRunner::getShiftsUnblur(FileName fn_shifts, std::vector<float> &xshifts, std::vector<float> &yshifts)
+void MotioncorrRunner::getShiftsUnblur(FileName fn_shifts, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts)
 {
 
 	std::ifstream in(fn_shifts.data(), std::ios_base::in);
@@ -772,7 +772,7 @@ void MotioncorrRunner::plotFRC(FileName fn_frc)
 }
 
 // Plot the shifts
-void MotioncorrRunner::plotShifts(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts)
+void MotioncorrRunner::plotShifts(FileName fn_mic, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts)
 {
 
 	if (xshifts.size() == 0)
@@ -889,7 +889,7 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 // - defect
 // - outlier rejection in fitting (use free set?)
 
-bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<float> &xshifts, std::vector<float> &yshifts) {
+bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts) {
 	omp_set_num_threads(n_threads);
 
 	FileName fn_mic = mic.getMovieFilename();
@@ -965,11 +965,11 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<f
 	}
 	logfile << std::endl;
 
-	// Read gain reference	
+	// Read gain reference
 	RCTIC(TIMING_READ_GAIN);
 	if (fn_gain_reference != "") {
 		Igain.read(fn_gain_reference);
-		if (XSIZE(Igain()) != nx || YSIZE(Igain()) != ny) {	
+		if (XSIZE(Igain()) != nx || YSIZE(Igain()) != ny) {
 			std::cerr << "fn_mic: " << fn_mic << std::endl;
 			REPORT_ERROR("The size of the image and the size of the gain reference do not match.");
 		}
@@ -1100,7 +1100,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<f
 				logfile << ", Center = (" << x_center << ", " << y_center << ")" << std::endl;
 				ipatch++;
 
-				std::vector<float> local_xshifts(n_groups), local_yshifts(n_groups);
+				std::vector<RFLOAT> local_xshifts(n_groups), local_yshifts(n_groups);
 				RCTIC(TIMING_PREP_PATCH);
 				std::vector<MultidimArray<RFLOAT> >Ipatches(n_threads);
 				#pragma omp parallel for
@@ -1338,7 +1338,7 @@ void MotioncorrRunner::interpolateShifts(std::vector<int> &group_start, std::vec
 
 		// This formula can be used for both interpolation and extrapolation
 		interpolated_xshifts[iframe] = (xshifts[cur_group] * (centers[cur_group + 1] - iframe) +
-		                                xshifts[cur_group + 1] * (iframe - centers[cur_group])) / 
+		                                xshifts[cur_group + 1] * (iframe - centers[cur_group])) /
 		                               (centers[cur_group + 1] - centers[cur_group]);
 		interpolated_yshifts[iframe] = (yshifts[cur_group] * (centers[cur_group + 1] - iframe) +
 		                                yshifts[cur_group + 1] * (iframe - centers[cur_group])) /
@@ -1375,7 +1375,7 @@ void MotioncorrRunner::realSpaceInterpolation(Image <RFLOAT> &Iref, std::vector<
 		for (int iframe = 0; iframe < n_frames; iframe++) {
 			logfile << "." << std::flush;
 			const RFLOAT z = iframe;
-			
+
 			#pragma omp parallel for schedule(static)
 			for (int ix = 0; ix < nx; ix++) {
 				const RFLOAT x = (RFLOAT)ix / nx - 0.5;
@@ -1510,7 +1510,7 @@ void MotioncorrRunner::realSpaceInterpolation_ThirdOrderPolynomial(Image <RFLOAT
 	}
 }
 
-bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes, const int pnx, const int pny, std::vector<float> &xshifts, std::vector<float> &yshifts, std::ostream &logfile) {
+bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes, const int pnx, const int pny, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts, std::ostream &logfile) {
 	std::vector<Image<RFLOAT> > Iccs(n_threads);
 	MultidimArray<Complex> Fref;
 	std::vector<MultidimArray<Complex> > Fccs(n_threads);
