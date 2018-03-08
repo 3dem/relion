@@ -119,6 +119,23 @@ int FrameRecomb::_run()
         VtkHelper::writeVTK(bfacFitNoScale, "bfacs/glob_Bk-fit_noScale.vtk");
         VtkHelper::writeVTK(fcc, "bfacs/glob_Bk-data.vtk");
         VtkHelper::write(freqWeights, "bfacs/freqWeights.vtk");
+
+        std::ofstream bfacsDat("bfacs/Bfac.dat");
+        std::ofstream kfacsDat("bfacs/kfac.dat");
+
+        const double cf = -8.0 * angpix*angpix * sh*sh;
+
+        for (int i = 0; i < fc; i++)
+        {
+            double s = bkFacs.first[i].x;
+            double b = cf/(s*s);
+
+            bfacsDat << i << " " << b << "\n";
+            kfacsDat << i << " " << bkFacs.first[i].y << "\n";
+        }
+
+        bfacsDat.close();
+        kfacsDat.close();
     }
 
     std::string name, fullName, movieName;

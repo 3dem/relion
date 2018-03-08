@@ -82,8 +82,8 @@ int MotionFitProg::readMoreOptions(IOParser& parser, int argc, char *argv[])
 
     totalDose = textToFloat(parser.getOption("--dose", "Total electron dose (in e^-/A^2)", "1"));
 
-    sig_vel = textToFloat(parser.getOption("--s_vel", "Velocity sigma, other frames", "2.0"));
-    sig_div = textToFloat(parser.getOption("--s_div", "Divergence sigma, other frames", "0.01"));
+    sig_vel = textToFloat(parser.getOption("--s_vel", "Velocity sigma", "2.0"));
+    sig_div = textToFloat(parser.getOption("--s_div", "Divergence sigma", "0.01"));
     sig_acc = textToFloat(parser.getOption("--s_acc", "Acceleration sigma", "-1.0"));
 
     k_cutoff = textToFloat(parser.getOption("--k_cut", "Freq. cutoff (in pixels)", "-1.0"));
@@ -142,6 +142,7 @@ int MotionFitProg::_run()
     std::vector<Image<RFLOAT> > dmgWeight = DamageHelper::damageWeights(
                 s, angpix, fc, totalDose, dmga, dmgb, dmgc);
 
+    // @TODO: replace k_out by .143 res
     int k_out = k_cutoff + 21;
 
     for (int f = 0; f < fc; f++)
@@ -237,7 +238,7 @@ int MotionFitProg::_run()
             defoci[p] = 0.5*(du + dv)/angpix;
         }
 
-        //@TODO - refactor:
+        //@TODO - refactor (vectors not needed anymore):
 
         std::vector<RFLOAT> sig_vel_vec(1, sig_vel);
         std::vector<RFLOAT> sig_div_vec(1, sig_div);
@@ -250,7 +251,6 @@ int MotionFitProg::_run()
 
         std::vector<std::vector<gravis::d2Vector>> tracks(pc);
 
-        //std::vector<gravis::d2Vector> globTrack = MotionRefinement::getGlobalTrack(movieCC);
         std::vector<Image<RFLOAT>> ccSum = MotionRefinement::addCCs(movieCC);
         std::vector<gravis::d2Vector> globTrack = MotionRefinement::getGlobalTrack(ccSum);
 
@@ -264,6 +264,8 @@ int MotionFitProg::_run()
             tracks[p] = globTrack;
         }
 
+        // @TODO: make regularizer proportional to dose and given in Angstrom
+        // Also, data term proportional to number of pixels?
         std::vector<double> velWgh(fc-1);
         std::vector<double> accWgh(fc-1, sig_acc > 0.0? 0.5/(sig_acc*sig_acc) : 0.0);
 
