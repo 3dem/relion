@@ -108,6 +108,12 @@ public:
 	// Mask with density to keep when doing subtractions
 	FileName fn_keepmask;
 
+	// center of mass of the above
+	Matrix1D<RFLOAT> com_mask;
+
+	// background radius for normalisation
+	float bg_radius;
+
 	// Pre-calculated rotation matrix for (0,90,0) rotation, and its transpose
 	Matrix2D<RFLOAT> A_rot90, A_rot90T;
 
