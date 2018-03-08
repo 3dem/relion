@@ -582,25 +582,22 @@ void FlexAnalyser::subtractOneParticle(long int ori_particle, long int imgno, in
 
 	// re-center to COM of the keepmask
 	my_residual_offset += Abody * (model.com_bodies[subtract_body] - com_mask);
-	shiftImageInFourierTransform(Fimg, Fimg, (RFLOAT)model.ori_size,
-	                             XX(my_residual_offset), YY(my_residual_offset), ZZ(my_residual_offset));
-
-/*	my_old_offset.selfROUND();
-	selfTranslate(img(), my_old_offset, DONT_WRAP);
-	// keep track of the differences between the rounded and the original offsets
-	my_residual_offset -= my_old_offset;
-*/
-
-	// Set the difference between the rounded my_old_offset and the actual offsets, plus (for multibody) my_refined_ibody_offset
-	DFo.setValue(EMDL_ORIENT_ORIGIN_X, 0.0);
-	DFo.setValue(EMDL_ORIENT_ORIGIN_Y, 0.0);
-	if (model.data_dim == 3)
-		DFo.setValue(EMDL_ORIENT_ORIGIN_Z, 0.0);
+	centering_offset = my_residual_offset;
+	centering_offset.selfROUND();
+	my_residual_offset -= centering_offset;
 
 	// And go finally back to real-space
 	windowFourierTransform(Fimg, Faux, model.ori_size);
 	transformer.inverseFourierTransform(Faux, img());
 	CenterFFT(img(), false);
+
+	selfTranslate(img(), centering_offset, DONT_WRAP);
+
+	// Set the difference between the rounded my_old_offset and the actual offsets, plus (for multibody) my_refined_ibody_offset
+	DFo.setValue(EMDL_ORIENT_ORIGIN_X, XX(my_residual_offset));
+	DFo.setValue(EMDL_ORIENT_ORIGIN_Y, YY(my_residual_offset));
+	if (model.data_dim == 3)
+		DFo.setValue(EMDL_ORIENT_ORIGIN_Z, ZZ(my_residual_offset));
 
 	// Rebox the image
 	if (boxsize > 0)
