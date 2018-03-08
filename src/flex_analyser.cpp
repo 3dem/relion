@@ -50,6 +50,7 @@ void FlexAnalyser::read(int argc, char **argv)
 	do_subtract = parser.checkOption("--subtract", "Generate subtracted experimental particles");
 	fn_keepmask = parser.getOption("--keep_inside", "Subtract everything except the density inside this mask", "");
 	boxsize = textToInteger(parser.getOption("--boxsize", "Boxsize (in pixels) of the subtracted particles (default is keep original)", "-1"));
+	bg_radius = textToFloat(parser.getOption("--normalise_bg_radius", "Background radius (in pixels) for normalisation (default is no normalisation)", "-1"));
 	// TODO: implement scale correction!
 	//do_scale = parser.checkOption("--scale", "Apply scale correction in the subtraction");
 	do_norm = parser.checkOption("--norm", "Apply normalisation correction in the subtraction");
@@ -91,9 +92,9 @@ void FlexAnalyser::initialise()
 			std::cout << " Initialising bodies ..." << std::endl;
 		model.initialiseBodies(fn_bodies, fn_out);
 	}
-	else
-		model.nr_bodies = 1;
-
+	else {
+		REPORT_ERROR("ERRPR: please specify the --bodies argument!");
+	}
 
 	if (model.nr_bodies != data.nr_bodies)
 		REPORT_ERROR("ERROR: Unequal number of bodies in bodies.star and data.star files!");
@@ -101,14 +102,11 @@ void FlexAnalyser::initialise()
 	if (do_3dmodels && model.nr_bodies == 1)
 		REPORT_ERROR("ERROR: --3dmodels option is only valid for multibody refinements.");
 
-	if (model.nr_bodies > 1)
-	{
-		// This creates a rotation matrix for (rot,tilt,psi) = (0,90,0)
-		// It will be used to make all Abody orientation matrices relative to (0,90,0) instead of the more logical (0,0,0)
-		// This is useful, as psi-priors are ill-defined around tilt=0, as rot becomes the same as -psi!!
-		rotation3DMatrix(-90., 'Y', A_rot90, false);
-		A_rot90T = A_rot90.transpose();
-	}
+	// This creates a rotation matrix for (rot,tilt,psi) = (0,90,0)
+	// It will be used to make all Abody orientation matrices relative to (0,90,0) instead of the more logical (0,0,0)
+	// This is useful, as psi-priors are ill-defined around tilt=0, as rot becomes the same as -psi!!
+	rotation3DMatrix(-90., 'Y', A_rot90, false);
+	A_rot90T = A_rot90.transpose();
 
 	// ensure even boxsize of subtracted images
 	if (boxsize > 0)
@@ -178,13 +176,8 @@ void FlexAnalyser::initialise()
 			Mbody -= Irefp;
 			norm_pca.push_back(sqrt(Mbody.sum2()));
 			std::cout << " offset: " << sqrt(Mbody.sum2()) << std::endl;
-
 		}
-
-
 	}
-
-
 }
 
 void FlexAnalyser::run(int rank, int size)
@@ -198,6 +191,27 @@ void FlexAnalyser::run(int rank, int size)
 	// Loop through all particles
 	loopThroughParticles(rank, size);
 
+	if (size > 1) {
+		MPI_Barrier(MPI_COMM_WORLD);
+	}
+
+	// Combine all star files
+	if (do_subtract && rank == 0 && size > 1) {
+		std::vector<MetaDataTable> MDs(size);
+		for (int i = 0; i < size; i++) {
+			FileName fn_stack;
+			fn_stack.compose(fn_out + "_rank", i + 1, "");
+			fn_stack = fn_stack + "_subtracted.star";
+
+			MDs[i].read(fn_stack);
+
+			std::remove(fn_stack.c_str());	
+		}
+
+		FileName fn_combined = fn_out + "_subtracted.star";
+		MetaDataTable MD_combined = combineMetaDataTables(MDs);
+		MD_combined.write(fn_combined);
+	}
 }
 
 void FlexAnalyser::setupSubtractionMasksAndProjectors()
@@ -214,76 +228,49 @@ void FlexAnalyser::setupSubtractionMasksAndProjectors()
 	if (minval < 0. || maxval > 1.)
 		REPORT_ERROR("ERROR: the keep_inside mask has values outside the range [0,1]");
 
-	if (model.nr_bodies > 1)
+	Imask().centerOfMass(com_mask);
+	if (verb > 0) {
+		std::cout << " The center of mass of the provided mask is at: " << com_mask(0) << " " << com_mask(1) << " " << com_mask(2) << std::endl;
+		std::cout << " Thus, the following arguments to relion_image_handler will bring the mask into the same box as the subtracted particles." << std::endl;
+		std::cout << "  --shift_x " << -XX(com_mask) << " --shift_y " << -YY(com_mask) << " --shift_z " << -ZZ(com_mask);
+		if (boxsize > 0) std::cout << " --new_box " << boxsize;
+		std::cout << std::endl;
+	}
+
+	// Find out which body has the biggest overlap with the keepmask, use these orientations
+	RFLOAT best_overlap = 0.;
+	subtract_body = -1;
+	for (int ibody = 0; ibody < model.nr_bodies; ibody++)
 	{
-		// Find out which body has the biggest overlap with the keepmask, use these orientations
-		RFLOAT best_overlap = 0.;
-		subtract_body = -1;
-		for (int ibody = 0; ibody < model.nr_bodies; ibody++)
+		if (!Imask().sameShape(model.masks_bodies[ibody]))
 		{
-			if (!Imask().sameShape(model.masks_bodies[ibody]))
-			{
-				Imask().printShape();
-				model.masks_bodies[ibody].printShape();
-				REPORT_ERROR("ERROR: input keep_inside mask is not of same shape as body masks.");
-			}
-
-			RFLOAT overlap = 0.;
-			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Imask())
-				overlap += DIRECT_MULTIDIM_ELEM(model.masks_bodies[ibody], n) * DIRECT_MULTIDIM_ELEM(Imask(), n);
-
-			if (overlap > best_overlap)
-			{
-				best_overlap = overlap;
-				subtract_body = ibody;
-			}
+			Imask().printShape();
+			model.masks_bodies[ibody].printShape();
+			REPORT_ERROR("ERROR: input keep_inside mask is not of same shape as body masks.");
 		}
 
-		if (subtract_body < 0)
-			REPORT_ERROR("ERROR: the input keep_inside mask does not overlap with any of the bodies....");
+		RFLOAT overlap = 0.;
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Imask())
+			overlap += DIRECT_MULTIDIM_ELEM(model.masks_bodies[ibody], n) * DIRECT_MULTIDIM_ELEM(Imask(), n);
 
-		// Apply the inverse of the keepmask to all the mask_bodies
-		for (int obody = 0; obody < model.nr_bodies; obody++)
+		if (overlap > best_overlap)
 		{
-			int ii = DIRECT_A2D_ELEM(model.pointer_body_overlap, subtract_body, obody);
-			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Imask())
-			{
-				DIRECT_MULTIDIM_ELEM(model.masks_bodies[ii], n) *= (1. - DIRECT_MULTIDIM_ELEM(Imask(), n));
-			}
+			best_overlap = overlap;
+			subtract_body = ibody;
 		}
 	}
-	else
+
+	if (subtract_body < 0)
+		REPORT_ERROR("ERROR: the input keep_inside mask does not overlap with any of the bodies....");
+
+	// Apply the inverse of the keepmask to all the mask_bodies
+	for (int obody = 0; obody < model.nr_bodies; obody++)
 	{
-
-		subtract_body = 0;
-		// Apply mask to all classes (could be more than one)
-		for (int iclass = 0; iclass < model.nr_classes; iclass++)
+		int ii = DIRECT_A2D_ELEM(model.pointer_body_overlap, subtract_body, obody);
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Imask())
 		{
-			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Imask())
-			{
-				model.Iref[iclass] *= (1. - DIRECT_MULTIDIM_ELEM(Imask(), n));
-			}
+			DIRECT_MULTIDIM_ELEM(model.masks_bodies[ii], n) *= (1. - DIRECT_MULTIDIM_ELEM(Imask(), n));
 		}
-
-		// misuse the model.com_bodies and model.max_radius_mask_bodies vectors for centering the subtracted images
-		// find center-of-mass for rotations around it
-		int mydim = Imask().getDim();
-		Matrix1D<RFLOAT> com(mydim);
-		Imask().centerOfMass(com);
-		// find maximum radius of mask around it's COM
-		int max_d2 = 0.;
-		FOR_ALL_ELEMENTS_IN_ARRAY3D(Imask())
-		{
-			if (A3D_ELEM(Imask(), k, i, j) > 0.05)
-			{
-				int d2 = (k - ZZ(com)) * (k - ZZ(com)) + (i - YY(com)) * (i - YY(com)) + (j - XX(com)) * (j - XX(com));
-				max_d2 = XMIPP_MAX(max_d2, d2);
-			}
-		}
-		model.max_radius_mask_bodies.push_back(CEIL(sqrt((RFLOAT)max_d2)));
-
-		com.selfROUND();
-		model.com_bodies.push_back(com);
 	}
 
 	// Now set up the Projectors inside the model
@@ -330,6 +317,14 @@ void FlexAnalyser::loopThroughParticles(int rank, int size)
 		if (do_subtract)
 		{
 			subtractOneParticle(ori_particle, imgno, rank, size);
+
+			// Remove origin prior columns if present, as we have re-centered.
+			if (DFo.containsLabel(EMDL_ORIENT_ORIGIN_X_PRIOR)) {
+				DFo.deactivateLabel(EMDL_ORIENT_ORIGIN_X_PRIOR);
+			}
+			if (DFo.containsLabel(EMDL_ORIENT_ORIGIN_Y_PRIOR)) {
+				DFo.deactivateLabel(EMDL_ORIENT_ORIGIN_Y_PRIOR);
+			}
 		}
 		else if (do_3dmodels || do_PCA_orient)
 		{
@@ -427,7 +422,7 @@ void FlexAnalyser::subtractOneParticle(long int ori_particle, long int imgno, in
 	img().setXmippOrigin();
 
 	// Get the consensus class, orientational parameters and norm (if present)
-	Matrix1D<RFLOAT> my_old_offset(3), my_residual_offset(3);
+	Matrix1D<RFLOAT> my_old_offset(3), my_residual_offset(3), centering_offset(3);
 	Matrix2D<RFLOAT> Aori;
 	RFLOAT rot, tilt, psi, xoff, yoff, zoff, norm, scale;
 	int myclass=0;
@@ -443,7 +438,6 @@ void FlexAnalyser::subtractOneParticle(long int ori_particle, long int imgno, in
 	if (!data.MDimg.getValue(EMDL_IMAGE_NORM_CORRECTION, norm, part_id))
 		norm = 1.;
 
-
 	// 17May2017: Shift image to the projected COM for this body!
 	// Aori is the original transformation matrix of the consensus refinement
 	Matrix1D<RFLOAT> my_projected_com(3), my_refined_ibody_offset(3);
@@ -453,17 +447,12 @@ void FlexAnalyser::subtractOneParticle(long int ori_particle, long int imgno, in
 	// Subtract the projected COM offset, to position this body in the center
 	my_old_offset -= my_projected_com;
 	my_residual_offset = my_old_offset;
-	if (model.nr_bodies > 1)
-	{
-		// Also get refined offset for this body
-		data.MDbodies[subtract_body].getValue(EMDL_ORIENT_ORIGIN_X, XX(my_refined_ibody_offset), part_id);
-		data.MDbodies[subtract_body].getValue(EMDL_ORIENT_ORIGIN_Y, YY(my_refined_ibody_offset), part_id);
-		if (model.data_dim == 3)
-			data.MDbodies[subtract_body].getValue(EMDL_ORIENT_ORIGIN_Z, ZZ(my_refined_ibody_offset), part_id);
-	}
-	else
-		// Without bodies, there is no refined offset, so set to zero
-		my_refined_ibody_offset.initZeros();
+		
+	// Also get refined offset for this body
+	data.MDbodies[subtract_body].getValue(EMDL_ORIENT_ORIGIN_X, XX(my_refined_ibody_offset), part_id);
+	data.MDbodies[subtract_body].getValue(EMDL_ORIENT_ORIGIN_Y, YY(my_refined_ibody_offset), part_id);
+	if (model.data_dim == 3)
+		data.MDbodies[subtract_body].getValue(EMDL_ORIENT_ORIGIN_Z, ZZ(my_refined_ibody_offset), part_id);
 
 	// Apply the norm_correction term
 	if (do_norm)
@@ -515,66 +504,53 @@ void FlexAnalyser::subtractOneParticle(long int ori_particle, long int imgno, in
 
 	// For multi-body refinement
 	Matrix2D<RFLOAT> Aresi_subtract;
-	if (model.nr_bodies > 1)
+	for (int obody = 0; obody < model.nr_bodies; obody++)
 	{
-		for (int obody = 0; obody < model.nr_bodies; obody++)
-		{
-			// Unlike getFourierTransformsAndCtfs, no check for ibody==obody: also subtract rest of subtract_body!
+		// Unlike getFourierTransformsAndCtfs, no check for ibody==obody: also subtract rest of subtract_body!
 
-			Matrix1D<RFLOAT> body_offset(3);
-			RFLOAT body_rot, body_tilt, body_psi;
-			data.MDbodies[obody].getValue(EMDL_ORIENT_ROT, body_rot, part_id);
-			data.MDbodies[obody].getValue(EMDL_ORIENT_TILT, body_tilt, part_id);
-			data.MDbodies[obody].getValue(EMDL_ORIENT_PSI,  body_psi, part_id);
-			data.MDbodies[obody].getValue(EMDL_ORIENT_ORIGIN_X, XX(body_offset), part_id);
-			data.MDbodies[obody].getValue(EMDL_ORIENT_ORIGIN_Y, YY(body_offset), part_id);
-			if (model.data_dim == 3)
-				data.MDbodies[obody].getValue(EMDL_ORIENT_ORIGIN_Z, ZZ(body_offset), part_id);
+		Matrix1D<RFLOAT> body_offset(3);
+		RFLOAT body_rot, body_tilt, body_psi;
+		data.MDbodies[obody].getValue(EMDL_ORIENT_ROT, body_rot, part_id);
+		data.MDbodies[obody].getValue(EMDL_ORIENT_TILT, body_tilt, part_id);
+		data.MDbodies[obody].getValue(EMDL_ORIENT_PSI,  body_psi, part_id);
+		data.MDbodies[obody].getValue(EMDL_ORIENT_ORIGIN_X, XX(body_offset), part_id);
+		data.MDbodies[obody].getValue(EMDL_ORIENT_ORIGIN_Y, YY(body_offset), part_id);
+		if (model.data_dim == 3)
+			data.MDbodies[obody].getValue(EMDL_ORIENT_ORIGIN_Z, ZZ(body_offset), part_id);
 
-			Matrix2D<RFLOAT> Aresi,  Abody;
-			// Aresi is the residual orientation for this obody
-			Euler_angles2matrix(body_rot, body_tilt, body_psi, Aresi, false);
-			if (obody == subtract_body)
-				Aresi_subtract = Aresi;
-			// The real orientation to be applied is the obody transformation applied and the original one
-			Abody = Aori * (model.orient_bodies[obody]).transpose() * A_rot90 * Aresi * model.orient_bodies[obody];
+		Matrix2D<RFLOAT> Aresi,  Abody;
+		// Aresi is the residual orientation for this obody
+		Euler_angles2matrix(body_rot, body_tilt, body_psi, Aresi, false);
+		if (obody == subtract_body)
+			Aresi_subtract = Aresi;
+		// The real orientation to be applied is the obody transformation applied and the original one
+		Abody = Aori * (model.orient_bodies[obody]).transpose() * A_rot90 * Aresi * model.orient_bodies[obody];
 
-			// Get the FT of the projection in the right direction
-			MultidimArray<Complex> FTo;
-			FTo.initZeros(Fimg);
-			// The following line gets the correct pointer to account for overlap in the bodies
-			int oobody = DIRECT_A2D_ELEM(model.pointer_body_overlap, subtract_body, obody);
-			model.PPref[oobody].get2DFourierTransform(FTo, Abody, IS_NOT_INV);
+		// Get the FT of the projection in the right direction
+		MultidimArray<Complex> FTo;
+		FTo.initZeros(Fimg);
+		// The following line gets the correct pointer to account for overlap in the bodies
+		int oobody = DIRECT_A2D_ELEM(model.pointer_body_overlap, subtract_body, obody);
+		model.PPref[oobody].get2DFourierTransform(FTo, Abody, IS_NOT_INV);
 
-			// Body is centered at its own COM: move it back to its place in the original particle image
+		// Body is centered at its own COM: move it back to its place in the original particle image
 
-			// Projected COM for this body (using Aori, just like above for ibody and my_projected_com!!!)
-			Matrix1D<RFLOAT> other_projected_com(3);
-			other_projected_com = Aori * (model.com_bodies[obody]);
+		// Projected COM for this body (using Aori, just like above for ibody and my_projected_com!!!)
+		Matrix1D<RFLOAT> other_projected_com(3);
+		other_projected_com = Aori * (model.com_bodies[obody]);
 
-			// Subtract refined obody-displacement
-			other_projected_com -= body_offset;
+		// Subtract refined obody-displacement
+		other_projected_com -= body_offset;
 
-			// Subtract the projected COM already applied to this image for ibody
-			other_projected_com -= my_projected_com;
+		// Subtract the projected COM already applied to this image for ibody
+		other_projected_com -= my_projected_com;
 
-			shiftImageInFourierTransform(FTo, Faux, (RFLOAT)model.ori_size,
-					XX(other_projected_com), YY(other_projected_com), ZZ(other_projected_com));
+		shiftImageInFourierTransform(FTo, Faux, (RFLOAT)model.ori_size,
+				XX(other_projected_com), YY(other_projected_com), ZZ(other_projected_com));
 
-			// Sum the Fourier transforms of all the obodies
-			Fsubtract += Faux;
-		} // end for obody
-	} // end if nr_bodies > 1
-	else
-	{
-		Faux.initZeros(Fimg);
-		// The original PPref is in the original position in the volume,
-		// but Fimg was selfTranslated according to my_old_offset (which has placed it at the COM of the keep_inside mask)
-		model.PPref[myclass].get2DFourierTransform(Faux, Aori, IS_NOT_INV);
-		shiftImageInFourierTransform(Faux, Fsubtract, (RFLOAT)model.ori_size,
-				XX(my_old_offset), YY(my_old_offset), ZZ(my_old_offset));
-
-	}
+		// Sum the Fourier transforms of all the obodies
+		Fsubtract += Faux;
+	} // end for obody
 
 	// Now that we have all the summed projections of the obodies, apply CTF, masks etc
 	// Apply the CTF to this reference projection
@@ -589,27 +565,25 @@ void FlexAnalyser::subtractOneParticle(long int ori_particle, long int imgno, in
 	// Do the actual subtraction
 	Fimg -= Fsubtract;
 
-	// And go finally back to real-space
-	windowFourierTransform(Fimg, Faux, model.ori_size);
-	transformer.inverseFourierTransform(Faux, img());
-	CenterFFT(img(), false);
-
-    // Set the entry in the output STAR file
+	// Set the entry in the output STAR file
 	DFo.addObject();
-    DFo.setObject(data.MDimg.getObject(part_id));
+	DFo.setObject(data.MDimg.getObject(part_id));
 
-    // Set orientations back into the original RELION system of coordinates
-	if (model.nr_bodies > 1)
-	{
-		Matrix2D<RFLOAT> Abody;
-		// Write out the rot,tilt,psi as the combination of Aori and Aresi!! So get rid of the rotations around the tilt=90 axes,
-		Abody = Aori * (model.orient_bodies[subtract_body]).transpose() * A_rot90 * Aresi_subtract * model.orient_bodies[subtract_body];
-		Euler_matrix2angles(Abody, rot, tilt, psi);
-		DFo.setValue(EMDL_ORIENT_ROT, rot);
-		DFo.setValue(EMDL_ORIENT_TILT, tilt);
-		DFo.setValue(EMDL_ORIENT_PSI, psi);
-		my_residual_offset += my_refined_ibody_offset;
-	}
+	// Set orientations back into the original RELION system of coordinates
+	Matrix2D<RFLOAT> Abody;
+
+	// Write out the rot,tilt,psi as the combination of Aori and Aresi!! So get rid of the rotations around the tilt=90 axes,
+	Abody = Aori * (model.orient_bodies[subtract_body]).transpose() * A_rot90 * Aresi_subtract * model.orient_bodies[subtract_body];
+	Euler_matrix2angles(Abody, rot, tilt, psi);
+	DFo.setValue(EMDL_ORIENT_ROT, rot);
+	DFo.setValue(EMDL_ORIENT_TILT, tilt);
+	DFo.setValue(EMDL_ORIENT_PSI, psi);
+	my_residual_offset += my_refined_ibody_offset;
+
+	// re-center to COM of the keepmask
+	centering_offset = Abody * (model.com_bodies[subtract_body] - com_mask);
+	shiftImageInFourierTransform(Fimg, Fimg, (RFLOAT)model.ori_size,
+	                             XX(centering_offset), YY(centering_offset), ZZ(centering_offset));
 
 	// Set the difference between the rounded my_old_offset and the actual offsets, plus (for multibody) my_refined_ibody_offset
 	DFo.setValue(EMDL_ORIENT_ORIGIN_X, XX(my_residual_offset));
@@ -617,6 +591,10 @@ void FlexAnalyser::subtractOneParticle(long int ori_particle, long int imgno, in
 	if (model.data_dim == 3)
 		DFo.setValue(EMDL_ORIENT_ORIGIN_Z, ZZ(my_residual_offset));
 
+	// And go finally back to real-space
+	windowFourierTransform(Fimg, Faux, model.ori_size);
+	transformer.inverseFourierTransform(Faux, img());
+	CenterFFT(img(), false);
 
 	// Rebox the image
 	if (boxsize > 0)
@@ -633,6 +611,10 @@ void FlexAnalyser::subtractOneParticle(long int ori_particle, long int imgno, in
 		}
 	}
 
+	if (bg_radius > 0) {
+		img().setXmippOrigin();
+		normalise(img, bg_radius, -1, -1, false);
+	}
 
 	// Now write it all out
 	if (model.data_dim == 3)
