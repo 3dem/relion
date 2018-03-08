@@ -200,7 +200,7 @@ void FlexAnalyser::run(int rank, int size)
 		std::vector<MetaDataTable> MDs(size);
 		for (int i = 0; i < size; i++) {
 			FileName fn_stack;
-			fn_stack.compose(fn_out + "_rank", i + 1, "");
+			fn_stack.compose(fn_out + "_", i + 1, "");
 			fn_stack = fn_stack + "_subtracted.star";
 
 			MDs[i].read(fn_stack);
@@ -344,7 +344,7 @@ void FlexAnalyser::loopThroughParticles(int rank, int size)
 	{
 		FileName fn_star, fn_addon = (do_subtract) ? "subtracted" : "3dmodels";
 		if (size > 1) {
-			fn_star.compose(fn_out + "_rank", rank + 1, "");
+			fn_star.compose(fn_out + "_", rank + 1, "");
 			fn_star = fn_star + "_" + fn_addon + ".star";
 		} else {
 			fn_star = fn_out + "_" + fn_addon + ".star";
@@ -581,15 +581,21 @@ void FlexAnalyser::subtractOneParticle(long int ori_particle, long int imgno, in
 	my_residual_offset += my_refined_ibody_offset;
 
 	// re-center to COM of the keepmask
-	centering_offset = Abody * (model.com_bodies[subtract_body] - com_mask);
+	my_residual_offset += Abody * (model.com_bodies[subtract_body] - com_mask);
 	shiftImageInFourierTransform(Fimg, Fimg, (RFLOAT)model.ori_size,
-	                             XX(centering_offset), YY(centering_offset), ZZ(centering_offset));
+	                             XX(my_residual_offset), YY(my_residual_offset), ZZ(my_residual_offset));
+
+/*	my_old_offset.selfROUND();
+	selfTranslate(img(), my_old_offset, DONT_WRAP);
+	// keep track of the differences between the rounded and the original offsets
+	my_residual_offset -= my_old_offset;
+*/
 
 	// Set the difference between the rounded my_old_offset and the actual offsets, plus (for multibody) my_refined_ibody_offset
-	DFo.setValue(EMDL_ORIENT_ORIGIN_X, XX(my_residual_offset));
-	DFo.setValue(EMDL_ORIENT_ORIGIN_Y, YY(my_residual_offset));
+	DFo.setValue(EMDL_ORIENT_ORIGIN_X, 0.0);
+	DFo.setValue(EMDL_ORIENT_ORIGIN_Y, 0.0);
 	if (model.data_dim == 3)
-		DFo.setValue(EMDL_ORIENT_ORIGIN_Z, ZZ(my_residual_offset));
+		DFo.setValue(EMDL_ORIENT_ORIGIN_Z, 0.0);
 
 	// And go finally back to real-space
 	windowFourierTransform(Fimg, Faux, model.ori_size);
@@ -628,7 +634,7 @@ void FlexAnalyser::subtractOneParticle(long int ori_particle, long int imgno, in
         // First particle: write stack in overwrite mode, from then on just append to it
         FileName fn_stack;
         if (size > 1) {
-        	fn_stack.compose(fn_out + "_rank", rank + 1, "");
+        	fn_stack.compose(fn_out + "_", rank + 1, "");
 		fn_stack = fn_stack + "_subtracted.mrcs";
 	} else {
         	fn_stack = fn_out + "_subtracted.mrcs";
