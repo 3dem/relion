@@ -53,6 +53,7 @@ public:
 
 	// Use our own implementation
 	bool do_own;
+	bool interpolate_shifts;
 
 	// Save aligned but non-dose weighted micrograph.
 	// With MOTIONCOR2, this flag is always assumed to be true
@@ -176,7 +177,14 @@ private:
 
 	void doseWeighting(std::vector<MultidimArray<Complex> > &Fframes, std::vector<RFLOAT> doses);
 
-	void realSpaceInterpolation(Image <RFLOAT> &Iref, std::vector<Image<RFLOAT> > &Iframes, Matrix1D<RFLOAT> &coeffX, Matrix1D<RFLOAT> &coeffY, MotionModel &model, std::ostream &logfile);
+	void realSpaceInterpolation(Image <RFLOAT> &Iref, std::vector<Image<RFLOAT> > &Iframes, MotionModel *model, std::ostream &logfile);
+
+	void realSpaceInterpolation_ThirdOrderPolynomial(Image <RFLOAT> &Iref, std::vector<Image<RFLOAT> > &Iframes, ThirdOrderPolynomialModel &model, std::ostream &logfile);
+
+	void interpolateShifts(std::vector<int> &group_start, std::vector<int> &group_size,
+	                       std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts,
+	                       int n_frames,
+	                       std::vector<RFLOAT> &interpolated_xshifts, std::vector<RFLOAT> &interpolated_yshifts);
 };
 
 

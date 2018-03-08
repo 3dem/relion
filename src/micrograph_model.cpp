@@ -22,6 +22,8 @@
 #include "src/metadata_table.h"
 #include "src/image.h"
 
+// TODO: Think about first frame for local model
+
 const RFLOAT Micrograph::NOT_OBSERVED = -9999;
 const int ThirdOrderPolynomialModel::NUM_COEFFS_PER_DIM = 18;
 
@@ -164,6 +166,10 @@ void Micrograph::read(FileName fn_in)
 	if (!MDglobal.getValue(EMDL_CTF_VOLTAGE, voltage)) {
 		voltage = -1;
 	}
+	if (!MDglobal.getValue(EMDL_MICROGRAPH_START_FRAME, first_frame)) {
+		first_frame = 1; // 1-indexed
+	}
+
 	int model_version;
 	if (!MDglobal.getValue(EMDL_MICROGRAPH_MOTION_MODEL_VERSION, model_version)) {
 		if (model_version == MOTION_MODEL_THIRD_ORDER_POLYNOMIAL) {
@@ -232,6 +238,8 @@ void Micrograph::write(FileName filename) {
 	if (voltage != -1) {
 		MD.setValue(EMDL_CTF_VOLTAGE, voltage);
         }
+	MD.setValue(EMDL_MICROGRAPH_START_FRAME, first_frame); // 1-indexed
+
 	if (model != NULL) {
 		MD.setValue(EMDL_MICROGRAPH_MOTION_MODEL_VERSION, model->getModelVersion());
 	} else {
@@ -258,8 +266,14 @@ void Micrograph::write(FileName filename) {
 }
 
 int Micrograph::getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty) const {
+	if (globalShiftX[frame - 1] == NOT_OBSERVED || globalShiftX[frame - 1] == NOT_OBSERVED) {
+		shiftx = shifty = NOT_OBSERVED;
+		return -1;
+	}
+
 	if (model != NULL) {
-		model->getShiftAt(frame, x, y, shiftx, shifty);
+		// both frame and first_frame is 1 indexed
+		model->getShiftAt(frame - first_frame, x, y, shiftx, shifty);
 	} else {
 		shiftx = 0;
 		shifty = 0;
@@ -268,6 +282,8 @@ int Micrograph::getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFL
 	// frame is 1-indexed!
 	shiftx += globalShiftX[frame - 1];
 	shifty += globalShiftY[frame - 1];
+
+	return 0;
 }
 
 void Micrograph::setGlobalShift(int frame, RFLOAT shiftx, RFLOAT shifty) {
@@ -276,7 +292,7 @@ void Micrograph::setGlobalShift(int frame, RFLOAT shiftx, RFLOAT shifty) {
 		REPORT_ERROR("Micrograph::setGlobalShift() frame out of range");
 	}
 
-	frame--;
+	frame--; // frame is 1-indexed
 	globalShiftX[frame] = shiftx;
 	globalShiftY[frame] = shifty;
 }
