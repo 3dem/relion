@@ -1240,7 +1240,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<R
 		mic.model = NULL;
 	}
 
-	if (save_noDW) {
+	if (!do_dose_weighting || save_noDW) {
 		Iref().initZeros();
 
 		RCTIC(TIMING_REAL_SPACE_INTERPOLATION);
@@ -1256,14 +1256,14 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<R
 		}
 		RCTOC(TIMING_BINNING);
 
-		// Final output
-		Iref.write(fn_avg_noDW);
-		logfile << "Written aligned but non-dose wieghted sum to " << fn_avg_noDW << std::endl;
+		// Final output.
+		Iref.write(!do_dose_weighting ? fn_avg : fn_avg_noDW);
+		logfile << "Written aligned but non-dose weighted sum to " << fn_avg_noDW << std::endl;
 	}
 
 	// Dose weighting
-	RCTIC(TIMING_DOSE_WEIGHTING);
 	if (do_dose_weighting) {
+		RCTIC(TIMING_DOSE_WEIGHTING);
 		if (std::abs(voltage - 300) > 2 && std::abs(voltage - 200) > 2) {
 			REPORT_ERROR("Sorry, dose weighting is supported only for 300 kV or 200 kV");
 		}
@@ -1288,26 +1288,26 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<R
 			transformers[omp_get_thread_num()].inverseFourierTransform(Fframes[iframe], Iframes[iframe]());
 		}
 		RCTOC(TIMING_DW_IFFT);
+		RCTOC(TIMING_DOSE_WEIGHTING);
+
+		Iref().initZeros();
+		RCTIC(TIMING_REAL_SPACE_INTERPOLATION);
+		logfile << "Summing frames after dose weighting: ";
+		realSpaceInterpolation(Iref, Iframes, mic.model, logfile);
+		logfile << " done" << std::endl;
+		RCTOC(TIMING_REAL_SPACE_INTERPOLATION);
+
+		// Apply binning
+		RCTIC(TIMING_BINNING);
+		if (bin_factor != 1) {
+			binNonSquareImage(Iref, bin_factor);
+		}
+		RCTOC(TIMING_BINNING);
+
+		// Final output
+		Iref.write(fn_avg);
+		logfile << "Written aligned and dose-weighted sum to " << fn_avg << std::endl;
 	}
-	RCTOC(TIMING_DOSE_WEIGHTING);
-
-	Iref().initZeros();
-	RCTIC(TIMING_REAL_SPACE_INTERPOLATION);
-	logfile << "Summing frames after dose weighting: ";
-	realSpaceInterpolation(Iref, Iframes, mic.model, logfile);
-	logfile << " done" << std::endl;
-	RCTOC(TIMING_REAL_SPACE_INTERPOLATION);
-
-	// Apply binning
-	RCTIC(TIMING_BINNING);
-	if (bin_factor != 1) {
-		binNonSquareImage(Iref, bin_factor);
-	}
-	RCTOC(TIMING_BINNING);
-
-	// Final output
-	Iref.write(fn_avg);
-	logfile << "Written aligned and dose-weighted sum to " << fn_avg << std::endl;
 
 	// Set the start frame for the local motion model.
 	mic.first_frame = frames[0] + 1; // NOTE that this is 1-indexed.
