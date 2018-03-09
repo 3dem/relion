@@ -1789,7 +1789,7 @@ void MotioncorrRunner::shiftNonSquareImageInFourierTransform(MultidimArray<Compl
 
 // Iwork is overwritten
 void MotioncorrRunner::binNonSquareImage(Image<RFLOAT> &Iwork, RFLOAT bin_factor) {
-	FourierTransformer transformer;
+	FourierTransformer transformer, transformer2;
 
 	const int nx = XSIZE(Iwork()), ny = YSIZE(Iwork());
 	int new_nx = nx / bin_factor, new_ny = ny / bin_factor;
@@ -1812,5 +1812,8 @@ void MotioncorrRunner::binNonSquareImage(Image<RFLOAT> &Iwork, RFLOAT bin_factor
 	}
 
 	Iwork().reshape(new_ny, new_nx);
-	transformer.inverseFourierTransform(Fbinned, Iwork());
+	// If reshape does NOT change Iwork.data pointer (rare but actually happens),
+	// transformer does not re-create plan although the size is different!
+	// So we have to use different transformer.
+	transformer2.inverseFourierTransform(Fbinned, Iwork());
 }
