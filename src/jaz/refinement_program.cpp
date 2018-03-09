@@ -57,8 +57,8 @@ int RefinementProgram::init(int argc, char *argv[])
             movie_toReplace = parser.getOption("--mov_toReplace", "Replace this string in micrograph names...", "");
             movie_replaceBy = parser.getOption("--mov_replaceBy", "..by this one", "");
 
-            movie_angpix = textToFloat(parser.getOption("--mps", "Pixel size of input movies (Angst/pix)", "-1"));
-            movie_scale = textToFloat(parser.getOption("--msc", "Pixel size of input movies (rel. to reference)", "-1"));
+            movie_angpix = textToFloat(parser.getOption("--mps", "Pixel size of input movies (Angst/pix)"));
+            coords_angpix = textToFloat(parser.getOption("--cps", "Pixel size of particle coordinates in star-file (Angst/pix)"));
 
             hotCutoff = textToFloat(parser.getOption("--hot", "Clip hot pixels to this max. value (-1 = off, TIFF only)", "-1"));
             coordsAtMgRes = parser.checkOption("--mg_coords", "Particle coordinates are given at micrograph resolution");
@@ -110,20 +110,6 @@ int RefinementProgram::init(int argc, char *argv[])
 
         if (parser.checkForErrors()) return 1;
         if (rco != 0) return rco;
-
-        if (doesMovies)
-        {
-            if (movie_scale < 0.0 && movie_angpix < 0.0)
-            {
-                std::cerr << "Movie pixel size has to specified, either as an absolute value (--mps) or relative to the reference (--msc).\n";
-                return 4;
-            }
-            else if (movie_scale > 0.0 && movie_angpix > 0.0)
-            {
-                std::cerr << "Movie pixel size can only be specified as either an absolute value (--mps) or relative to the reference (--msc), but not both.\n";
-                return 4;
-            }
-        }
     }
     catch (RelionError XE)
     {
@@ -328,23 +314,6 @@ int RefinementProgram::init(int argc, char *argv[])
         g0 = minMG;
 
         std::cout << "mg range: " << g0 << ".." << gc << "\n";
-    }
-
-    if (doesMovies)
-    {
-        if (movie_scale > 0.0)
-        {
-            movie_angpix = movie_scale * angpix;
-        }
-
-        if (coordsAtMgRes)
-        {
-            coords_angpix = movie_angpix;
-        }
-        else
-        {
-            coords_angpix = angpix;
-        }
     }
 
     RFLOAT V = kV * 1e3;

@@ -40,7 +40,7 @@ class RefinementProgram
 
             int nr_omp_threads;
 
-            double movie_scale, movie_angpix, coords_angpix;
+            double movie_angpix, coords_angpix;
 
             std::string
                 starFn, reconFn0, reconFn1, maskFn,
