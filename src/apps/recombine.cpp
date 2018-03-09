@@ -82,7 +82,6 @@ int FrameRecomb::readMoreOptions(IOParser& parser, int argc, char *argv[])
     trackFn = parser.getOption("--t", "Input tracks");
     fccFn = parser.getOption("--cc", "Input MRC file of per-micrograph Fourier cross-correlations");
 
-    // @TODO: change these to Angstrom
     k0a = textToInteger(parser.getOption("--k0", "Min. frequency used in B-factor fit (Angst)", "10"));
     k1a = textToInteger(parser.getOption("--k1", "Max. frequency used in B-factor fit (Angst)", "-1"));
 
@@ -108,6 +107,8 @@ int FrameRecomb::_run()
 
     k0 = (int) angstToPixFreq(k0a);
     k1 = k1a > 0.0? (int) angstToPixFreq(k1a) : sh;
+
+    std::cout << "fitting B/k-factors between " << k0 << " and " << k1 << " pixels...\n";
 
     std::pair<std::vector<d2Vector>,std::vector<double>> bkFacs
             = DamageHelper::fitBkFactors(fcc, k0, k1);

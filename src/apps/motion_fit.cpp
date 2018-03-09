@@ -82,8 +82,8 @@ int MotionFitProg::readMoreOptions(IOParser& parser, int argc, char *argv[])
 
     totalDose = textToFloat(parser.getOption("--dose", "Total electron dose (in e^-/A^2)", "1"));
 
-    sig_vel = textToFloat(parser.getOption("--s_vel", "Velocity sigma", "2.0"));
-    sig_div = textToFloat(parser.getOption("--s_div", "Divergence sigma", "0.01"));
+    sig_vel = textToFloat(parser.getOption("--s_vel", "Velocity sigma", "1.07"));
+    sig_div = textToFloat(parser.getOption("--s_div", "Divergence sigma", "0.095"));
     sig_acc = textToFloat(parser.getOption("--s_acc", "Acceleration sigma", "-1.0"));
 
     k_cutoff = textToFloat(parser.getOption("--k_cut", "Freq. cutoff (in pixels)", "-1.0"));
@@ -141,6 +141,8 @@ int MotionFitProg::_run()
 
     std::vector<Image<RFLOAT> > dmgWeight = DamageHelper::damageWeights(
                 s, angpix, fc, totalDose, dmga, dmgb, dmgc);
+
+    const double dosePerFrame = totalDose / fc;
 
     // @TODO: replace k_out by .143 res
     int k_out = k_cutoff + 21;
@@ -238,11 +240,6 @@ int MotionFitProg::_run()
             defoci[p] = 0.5*(du + dv)/angpix;
         }
 
-        //@TODO - refactor (vectors not needed anymore):
-
-        std::vector<RFLOAT> sig_vel_vec(1, sig_vel);
-        std::vector<RFLOAT> sig_div_vec(1, sig_div);
-
         std::cout << "    computing initial correlations...\n";
 
         std::vector<std::vector<Image<RFLOAT>>> movieCC = MotionRefinement::movieCC(
@@ -264,27 +261,12 @@ int MotionFitProg::_run()
             tracks[p] = globTrack;
         }
 
-        // @TODO: make regularizer proportional to dose and given in Angstrom
-        // Also, data term proportional to number of pixels?
-        std::vector<double> velWgh(fc-1);
-        std::vector<double> accWgh(fc-1, sig_acc > 0.0? 0.5/(sig_acc*sig_acc) : 0.0);
+        const double sig_vel_nrm = dosePerFrame * sig_vel / angpix;
+        const double sig_acc_nrm = dosePerFrame * sig_acc / angpix;
+        const double sig_div_nrm = dosePerFrame * sqrt(coords_angpix) * sig_vel / angpix;
 
-        for (int f = 0; f < fc-1; f++)
-        {
-            double sv;
-
-            if (f < sig_vel_vec.size())
-            {
-                sv = sig_vel_vec[f];
-            }
-            else
-            {
-                sv = sig_vel_vec[sig_vel_vec.size()-1];
-            }
-
-            velWgh[f] = 0.5 / (sv*sv);
-        }
-
+        std::vector<double> velWgh(fc-1, 0.5/(sig_vel_nrm*sig_vel_nrm));
+        std::vector<double> accWgh(fc-1, sig_acc > 0.0? 0.5/(sig_acc_nrm*sig_acc_nrm) : 0.0);
         std::vector<std::vector<std::vector<double>>> divWgh(fc-1);
 
         for (int f = 0; f < fc-1; f++)
@@ -298,22 +280,9 @@ int MotionFitProg::_run()
                 for (int q = 0; q < pc; q++)
                 {
                     d2Vector dp = positions[p] - positions[q];
-                    double dd = defoci[p] - defoci[q];
+                    double dist = sqrt(dp.x*dp.x + dp.y*dp.y);
 
-                    double dist = sqrt(dp.x*dp.x + dp.y*dp.y + dd*dd);
-
-                    double sd;
-
-                    if (f < sig_div_vec.size())
-                    {
-                        sd = sig_div_vec[f];
-                    }
-                    else
-                    {
-                        sd = sig_div_vec[sig_div_vec.size()-1];
-                    }
-
-                    divWgh[f][p][q] = 0.5 / (sd * sd * dist);
+                    divWgh[f][p][q] = 0.5 / (sig_div_nrm * sig_div_nrm * dist);
                 }
             }
         }
