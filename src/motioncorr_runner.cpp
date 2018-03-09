@@ -1241,7 +1241,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<R
 	}
 
 	if (!do_dose_weighting || save_noDW) {
-		Iref().initZeros();
+		Iref().initZeros(Iframes[0]());
 
 		RCTIC(TIMING_REAL_SPACE_INTERPOLATION);
 		logfile << "Summing frames before dose weighting: ";
@@ -1290,7 +1290,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<R
 		RCTOC(TIMING_DW_IFFT);
 		RCTOC(TIMING_DOSE_WEIGHTING);
 
-		Iref().initZeros();
+		Iref().initZeros(Iframes[0]());
 		RCTIC(TIMING_REAL_SPACE_INTERPOLATION);
 		logfile << "Summing frames after dose weighting: ";
 		realSpaceInterpolation(Iref, Iframes, mic.model, logfile);
