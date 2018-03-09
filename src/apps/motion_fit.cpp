@@ -82,8 +82,8 @@ int MotionFitProg::readMoreOptions(IOParser& parser, int argc, char *argv[])
 
     totalDose = textToFloat(parser.getOption("--dose", "Total electron dose (in e^-/A^2)", "1"));
 
-    sig_vel = textToFloat(parser.getOption("--s_vel", "Velocity sigma", "1.07"));
-    sig_div = textToFloat(parser.getOption("--s_div", "Divergence sigma", "0.095"));
+    sig_vel = textToFloat(parser.getOption("--s_vel", "Velocity sigma", "1.6"));
+    sig_div = textToFloat(parser.getOption("--s_div", "Divergence sigma", "0.067"));
     sig_acc = textToFloat(parser.getOption("--s_acc", "Acceleration sigma", "-1.0"));
 
     k_cutoff = textToFloat(parser.getOption("--k_cut", "Freq. cutoff (in pixels)", "-1.0"));
@@ -143,6 +143,10 @@ int MotionFitProg::_run()
                 s, angpix, fc, totalDose, dmga, dmgb, dmgc);
 
     const double dosePerFrame = totalDose / fc;
+
+    const double sig_vel_nrm = dosePerFrame * sig_vel / angpix;
+    const double sig_acc_nrm = dosePerFrame * sig_acc / angpix;
+    const double sig_div_nrm = dosePerFrame * sqrt(coords_angpix) * sig_div / angpix;
 
     // @TODO: replace k_out by .143 res
     int k_out = k_cutoff + 21;
@@ -261,9 +265,6 @@ int MotionFitProg::_run()
             tracks[p] = globTrack;
         }
 
-        const double sig_vel_nrm = dosePerFrame * sig_vel / angpix;
-        const double sig_acc_nrm = dosePerFrame * sig_acc / angpix;
-        const double sig_div_nrm = dosePerFrame * sqrt(coords_angpix) * sig_vel / angpix;
 
         std::vector<double> velWgh(fc-1, 0.5/(sig_vel_nrm*sig_vel_nrm));
         std::vector<double> accWgh(fc-1, sig_acc > 0.0? 0.5/(sig_acc_nrm*sig_acc_nrm) : 0.0);
@@ -282,7 +283,8 @@ int MotionFitProg::_run()
                     d2Vector dp = positions[p] - positions[q];
                     double dist = sqrt(dp.x*dp.x + dp.y*dp.y);
 
-                    divWgh[f][p][q] = 0.5 / (sig_div_nrm * sig_div_nrm * dist);
+                    if (q == p) divWgh[f][p][q] = 0.0;
+                    else divWgh[f][p][q] = 0.5 / (sig_div_nrm * sig_div_nrm * dist);
                 }
             }
         }
