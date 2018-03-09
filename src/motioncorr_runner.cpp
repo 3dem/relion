@@ -959,7 +959,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<R
 		}
 	}
 	logfile << std::endl;
-	if (n_frames / group != 0) {
+	if (n_frames % group != 0) {
 		logfile << "Some groups contain more than the requested number of frames (" << group << ") because the number of frames (" << n_frames << ") was not divisible." << std::endl;
 		logfile << "If you want to ignore remaining frame(s) instead, use --last_frame_sum to discard last frame(s)." << std::endl;
 	}
@@ -971,7 +971,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<R
 		Igain.read(fn_gain_reference);
 		if (XSIZE(Igain()) != nx || YSIZE(Igain()) != ny) {
 			std::cerr << "fn_mic: " << fn_mic << std::endl;
-			REPORT_ERROR("The size of the image and the size of the gain reference do not match.");
+			REPORT_ERROR("The size of the image and the size of the gain reference do not match. Make sure the gain reference has been rotated if necessary.");
 		}
 	}
 	RCTOC(TIMING_READ_GAIN);
