@@ -82,7 +82,7 @@ void MotioncorrRunnerMpi::run()
 
 		if (result) {
 			saveModel(mic);
-			plotShifts(fn_micrographs[imic], xshifts, yshifts);
+			plotShifts(fn_micrographs[imic], xshifts, yshifts, mic);
 		}
 	}
 	if (verb > 0)

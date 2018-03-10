@@ -71,6 +71,9 @@ public:
 	int first_frame; // First frame for local motion model. 1-indexed.
 	MotionModel *model;
 
+	// Local trajectories (not written, not read from STAR files)
+	std::vector<RFLOAT> localShiftX, localShiftY, localFitX, localFitY, patchX, patchY, patchZ, patchW, patchH;
+	
 	// Empty Constructor is not allowed
 	Micrograph(); // = delete in C++11
 
@@ -111,6 +114,16 @@ public:
 
 		globalShiftX.resize(0);
 		globalShiftY.resize(0);
+
+		localShiftX.resize(0);
+		localShiftY.resize(0);
+		localFitX.resize(0);
+		localFitY.resize(0);
+		patchX.resize(0);
+		patchY.resize(0);
+		patchZ.resize(0);
+		patchW.resize(0);
+		patchH.resize(0);
 	
 		if (model != NULL) delete model;
 		model = NULL;

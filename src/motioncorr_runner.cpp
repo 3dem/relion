@@ -318,7 +318,7 @@ void MotioncorrRunner::run()
 
 		if (result) {
 			saveModel(mic);
-			plotShifts(fn_micrographs[imic], xshifts, yshifts);
+			plotShifts(fn_micrographs[imic], xshifts, yshifts, mic);
 		}
 	}
 
@@ -467,7 +467,7 @@ bool MotioncorrRunner::executeMotioncor2(Micrograph &mic, std::vector<RFLOAT> &x
 		}
 
 		// Also analyse the shifts
-		getShiftsMotioncor2(fn_out, xshifts, yshifts);
+		getShiftsMotioncor2(fn_out, xshifts, yshifts, mic);
 
 		for (int i = 0, ilim = xshifts.size(); i < ilim; i++) {
 			int frame = i + 1; // Make 1-indexed
@@ -480,7 +480,7 @@ bool MotioncorrRunner::executeMotioncor2(Micrograph &mic, std::vector<RFLOAT> &x
 	return true;
 }
 
-void MotioncorrRunner::getShiftsMotioncor2(FileName fn_log, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts)
+void MotioncorrRunner::getShiftsMotioncor2(FileName fn_log, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts, Micrograph &mic)
 {
 
 	std::ifstream in(fn_log.data(), std::ios_base::in);
@@ -490,49 +490,75 @@ void MotioncorrRunner::getShiftsMotioncor2(FileName fn_log, std::vector<RFLOAT> 
 	xshifts.clear();
 	yshifts.clear();
 
-    std::string line;
+	std::string line;
 
-    // Start reading the ifstream at the top
-    in.seekg(0);
+	// Start reading the ifstream at the top
+	in.seekg(0);
 
-    // Read through the shifts file
-    int i = 0;
-    bool have_found_final = false;
-    while (getline(in, line, '\n'))
-    {
-    	// ignore all commented lines, just read first two lines with data
-    	if (line.find("Full-frame alignment shift") != std::string::npos)
-    	{
-    		have_found_final = true;
-    	}
-    	else if (have_found_final)
-    	{
-    		size_t shiftpos = line.find("shift:");
-    		if (shiftpos != std::string::npos)
-    		{
-    			std::vector<std::string> words;
-    			tokenize(line.substr(shiftpos+7), words);;
-        		if (words.size() < 2)
-        		{
-        			std::cerr << " fn_log= " << fn_log << std::endl;
-        			REPORT_ERROR("ERROR: unexpected number of words on line from MOTIONCORR logfile: " + line);
-        		}
-        		xshifts.push_back(textToFloat(words[0]));
-    			yshifts.push_back(textToFloat(words[1]));
-    		}
-    		else
-    		{
-    			// Stop now
-    			break;
-    		}
-    	}
-    }
-    in.close();
+	// Read through the shifts file
+	int i = 0;
+	bool have_found_final = false;
+	while (getline(in, line, '\n'))
+	{
+	// ignore all commented lines, just read first two lines with data
+		if (line.find("Full-frame alignment shift") != std::string::npos)
+		{
+			have_found_final = true;
+		}
+		else if (have_found_final)
+		{
+			size_t shiftpos = line.find("shift:");
+			if (shiftpos != std::string::npos)
+			{
+				std::vector<std::string> words;
+				tokenize(line.substr(shiftpos+7), words);;
+    				if (words.size() < 2)
+    				{
+    					std::cerr << " fn_log= " << fn_log << std::endl;
+    					REPORT_ERROR("ERROR: unexpected number of words on line from MOTIONCORR logfile: " + line);
+    				}
+ 		   		xshifts.push_back(textToFloat(words[0]));
+				yshifts.push_back(textToFloat(words[1]));
+			}
+			else
+			{
+				// Stop now
+				break;
+			}
+		}
+	}
+	in.close();
 
+	if (xshifts.size() != yshifts.size())
+		REPORT_ERROR("ERROR: got an unequal number of x and yshifts from " + fn_log);
 
-    if (xshifts.size() != yshifts.size())
-    	REPORT_ERROR("ERROR: got an unequal number of x and yshifts from " + fn_log);
+	// Read local shifts
+	FileName fn_patch = fn_log.withoutExtension() + "0-Patch-Patch.log";
+	std::cout << fn_patch << std::endl;
+	if (!exists(fn_patch)) {
+		std::cerr << "warning: failed to load local shifts from MotionCor2 logfile, but this does not affect further processing: " << fn_patch << std::endl;
+		return;
+	}
 
+	in.open(fn_patch.c_str(), std::ios_base::in);
+	in.seekg(0);
+
+	while (getline(in, line, '\n'))
+	{
+		if (line.find("#") != std::string::npos) continue;
+		
+		std::vector<std::string> words;
+		tokenize(line, words);
+    		if (words.size() != 7) continue;
+
+		mic.patchZ.push_back(textToFloat(words[0]));
+		mic.patchX.push_back(textToFloat(words[1]));
+		mic.patchY.push_back(textToFloat(words[2]));
+		mic.localShiftX.push_back(textToFloat(words[3]));
+		mic.localShiftY.push_back(textToFloat(words[4]));
+		mic.localFitX.push_back(textToFloat(words[5]));
+		mic.localFitY.push_back(textToFloat(words[6]));
+	}
 }
 
 bool MotioncorrRunner::executeUnblur(Micrograph &mic, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts)
@@ -623,7 +649,8 @@ bool MotioncorrRunner::executeUnblur(Micrograph &mic, std::vector<RFLOAT> &xshif
 
 	for (int i = 0, ilim = xshifts.size(); i < ilim; i++) {
 		int frame = i + 1; // make 1-indexed
-		mic.setGlobalShift(frame, xshifts[i], yshifts[i]);
+		// shifts from Unblur are in angstrom not pixel
+		mic.setGlobalShift(frame, xshifts[i] / angpix, yshifts[i] / angpix);
 	}
 
 	// If the requested sum is only a subset, then use summovie to make the average
@@ -772,8 +799,13 @@ void MotioncorrRunner::plotFRC(FileName fn_frc)
 }
 
 // Plot the shifts
-void MotioncorrRunner::plotShifts(FileName fn_mic, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts)
+void MotioncorrRunner::plotShifts(FileName fn_mic, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts, Micrograph &mic)
 {
+	const RFLOAT SCALE = 40;
+	RFLOAT shift_scale = SCALE;
+	if (do_unblur) {
+		shift_scale /= angpix; // convert from A to pix
+	}
 
 	if (xshifts.size() == 0)
 		return;
@@ -782,13 +814,14 @@ void MotioncorrRunner::plotShifts(FileName fn_mic, std::vector<RFLOAT> &xshifts,
 	CPlot2D *plot2D=new CPlot2D(fn_eps);
  	plot2D->SetXAxisSize(600);
  	plot2D->SetYAxisSize(600);
+	plot2D->SetDrawLegend(false);
 
  	CDataSet dataSet;
 	dataSet.SetDrawMarker(false);
 	dataSet.SetDatasetColor(0.0,0.0,0.0);
 	for (int j = 0; j < xshifts.size(); j++)
 	{
-		CDataPoint point(xshifts[j], yshifts[j]);
+		CDataPoint point(mic.getWidth() / 2 + shift_scale * xshifts[j], mic.getHeight() / 2 + shift_scale * yshifts[j]);
 		dataSet.AddDataPoint(point);
 	}
 	plot2D->AddDataSet(dataSet);
@@ -796,21 +829,51 @@ void MotioncorrRunner::plotShifts(FileName fn_mic, std::vector<RFLOAT> &xshifts,
 	// Different starting point
 	CDataSet dataSetStart;
 	dataSetStart.SetDrawMarker(true);
+	dataSetStart.SetMarkerSize(5);
 	dataSetStart.SetDatasetColor(1.0,0.0,0.0);
-	CDataPoint point2(xshifts[0], yshifts[0]);
+	CDataPoint point2(mic.getWidth() / 2 + shift_scale * xshifts[0], mic.getHeight() / 2 + shift_scale * yshifts[0]);
 	dataSetStart.AddDataPoint(point2);
 	plot2D->AddDataSet(dataSetStart);
 
-	if (do_unblur)
-	{
-		plot2D->SetXAxisTitle("X-shift (in Angstroms)");
-		plot2D->SetYAxisTitle("Y-shift (in Angstroms)");
+	const int n_local = mic.localShiftX.size();
+	int i = 0;
+	while (i < n_local) {
+		CDataSet patch_start;
+		patch_start.SetDrawMarker(true);
+		patch_start.SetMarkerSize(5);
+		patch_start.SetDatasetColor(1.0,0.0,0.0);
+
+		CDataSet fit, obs;
+		const int start = i;
+		fit.SetDrawMarker(false);
+		fit.SetDatasetColor(0.0,0.0,0.0);
+		obs.SetDrawMarker(false);
+		obs.SetDatasetColor(0.5,0.5,0.5);
+		while (i < n_local) {
+		//	std::cout << mic.patchX[i] << " " << mic.patchY[i] << " " << mic.patchZ[i] << " " << mic.localShiftX[i] << " " << mic.localShiftY[i] << std::endl;
+			if ((mic.patchX[start] != mic.patchX[i]) || (mic.patchY[start] != mic.patchY[i])) {
+		//		std::cout << "End of a trace" << std::endl;
+				break; // start again from this frame
+			}
+			CDataPoint p_obs(mic.patchX[start] + shift_scale * mic.localShiftX[i], mic.patchY[start] + shift_scale * mic.localShiftY[i]);
+			obs.AddDataPoint(p_obs);
+			CDataPoint p_fit(mic.patchX[start] + shift_scale * mic.localFitX[i], mic.patchY[start] + shift_scale * mic.localFitY[i]);
+			fit.AddDataPoint(p_fit);
+			if (i == start) patch_start.AddDataPoint(p_fit);
+			i++;
+		}
+		plot2D->AddDataSet(fit);
+		plot2D->AddDataSet(obs);
+	
+		plot2D->AddDataSet(patch_start);
 	}
-	else
-	{
-		plot2D->SetXAxisTitle("X-shift (in pixels)");
-		plot2D->SetYAxisTitle("Y-shift (in pixels)");
-	}
+
+	char title[256];
+	snprintf(title, 255, "X-shift (in pixels; trajectory scaled by %.0f)", shift_scale);
+	plot2D->SetXAxisTitle(title);
+	title[0] = 'Y';
+	plot2D->SetYAxisTitle(title);
+	
 	plot2D->OutputPostScriptPlot(fn_eps);
 }
 

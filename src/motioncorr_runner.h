@@ -141,7 +141,7 @@ public:
 	bool executeMotioncor2(Micrograph &mic, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts, int rank = 0);
 
 	// Get the shifts from MOTIONCOR2
-	void getShiftsMotioncor2(FileName fn_log, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts);
+	void getShiftsMotioncor2(FileName fn_log, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts, Micrograph &mic);
 
 	// Execute UNBLUR for a single micrograph
 	bool executeUnblur(Micrograph &mic, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts);
@@ -156,7 +156,7 @@ public:
 	void plotFRC(FileName fn_frc);
 
 	// Plot the shifts
-	void plotShifts(FileName fn_eps, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts);
+	void plotShifts(FileName fn_eps, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts, Micrograph &mic);
 
 	// Save micrograph model
 	void saveModel(Micrograph &mic);
