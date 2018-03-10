@@ -1794,20 +1794,21 @@ void MotioncorrRunner::binNonSquareImage(Image<RFLOAT> &Iwork, RFLOAT bin_factor
 	const int nx = XSIZE(Iwork()), ny = YSIZE(Iwork());
 	int new_nx = nx / bin_factor, new_ny = ny / bin_factor;
 	new_nx -= new_nx % 2; new_ny -= new_ny % 2; // force it to be even
-//	std::cout << "Binning from X = " << nx << " Y = " << ny << " to X = " << new_nx << " Y = " << new_ny << std::endl;
-
 	const int half_new_ny = new_ny / 2, new_nfx = new_nx / 2 + 1;
+#ifdef DEBUG_OWN
+	std::cout << "Binning from X = " << nx << " Y = " << ny << " to X = " << new_nx << " Y = " << new_ny << " half_new_ny = " << half_new_ny << " new_nfx = " << new_nfx << std::endl;
+#endif
 	MultidimArray<Complex> Fref, Fbinned(new_ny, new_nfx);
 	transformer.FourierTransform(Iwork(), Fref);
 
-	for (int y = 0; y <= half_new_ny; y++) {
+	for (int y = 0; y < half_new_ny; y++) {
 		for (int x = 0; x < new_nfx; x++) {
 			DIRECT_A2D_ELEM(Fbinned, y, x) =  DIRECT_A2D_ELEM(Fref, y, x);
 		}
 	}
-	for (int y = half_new_ny + 1; y < new_ny; y++) {
+	for (int y = half_new_ny; y < new_ny; y++) {
 		for (int x = 0; x < new_nfx; x++) {
-			DIRECT_A2D_ELEM(Fbinned, y, x) =  DIRECT_A2D_ELEM(Fref, ny - 1 - new_ny + y, x);
+			DIRECT_A2D_ELEM(Fbinned, y, x) =  DIRECT_A2D_ELEM(Fref, ny - new_ny + y, x);
 		}
 	}
 
