@@ -3,6 +3,7 @@
 
 #include <src/image.h>
 #include <src/jaz/optimization.h>
+#include <src/jaz/gravis/t2Vector.h>
 #include <vector>
 
 class LocalMotionFit : public DifferentiableOptimization
@@ -14,6 +15,7 @@ class LocalMotionFit : public DifferentiableOptimization
                 const std::vector<double>& velWgh,
                 const std::vector<double>& accWgh,
                 const std::vector<std::vector<std::vector<double>>>& divWgh,
+                const std::vector<gravis::d2Vector>& offsets,
                 int threads);
 
         double f(const std::vector<double>& x) const;
@@ -26,6 +28,7 @@ class LocalMotionFit : public DifferentiableOptimization
         const std::vector<double>& velWgh;
         const std::vector<double>& accWgh;
         const std::vector<std::vector<std::vector<double>>>& divWgh;
+        const std::vector<gravis::d2Vector>& offsets;
 };
 
 #endif

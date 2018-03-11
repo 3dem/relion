@@ -17,6 +17,7 @@ std::vector<double> GradientDescent::optimize(
     double last_f = opt.f(initial);
 
     double act_step = step;
+    int goodSince = 0, accAfter = 5;
 
     for (int i = 0; i < maxIters; i++)
     {
@@ -24,7 +25,7 @@ std::vector<double> GradientDescent::optimize(
 
         for (int j = 0; j < n; j++)
         {
-            v[j] = inertia * v[j] - (1.0 - inertia) * step * g[j];
+            v[j] = inertia * v[j] - (1.0 - inertia) * act_step * g[j];
             x[j] += v[j];
         }
 
@@ -68,7 +69,13 @@ std::vector<double> GradientDescent::optimize(
 
             if (act_step < step/2.0)
             {
-                act_step *= 2.0;
+                goodSince++;
+
+                if (goodSince >= accAfter)
+                {
+                    goodSince = 0;
+                    act_step *= 2.0;
+                }
             }
             else
             {

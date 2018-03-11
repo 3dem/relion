@@ -2,17 +2,22 @@
 #include <src/jaz/interpolation.h>
 #include <omp.h>
 
+using namespace gravis;
+
 LocalMotionFit::LocalMotionFit(const std::vector<std::vector<Image<RFLOAT>>>& correlation,
         const std::vector<double>& velWgh,
         const std::vector<double>& accWgh,
-        const std::vector<std::vector<std::vector<double>>> &divWgh, int threads)
+        const std::vector<std::vector<std::vector<double>>> &divWgh,
+        const std::vector<d2Vector>& offsets,
+        int threads)
 :   pc(correlation.size()),
     fc(correlation[0].size()),
     threads(threads),
     correlation(correlation),
     velWgh(velWgh),
     accWgh(accWgh),
-    divWgh(divWgh)
+    divWgh(divWgh),
+    offsets(offsets)
 {
 }
 
@@ -30,7 +35,8 @@ double LocalMotionFit::f(const std::vector<double> &x) const
             const double xpf = x[2*(p*fc + f) + 0];
             const double ypf = x[2*(p*fc + f) + 1];
 
-            e -= Interpolation::cubicXY(correlation[p][f], xpf, ypf, 0, 0, true);
+            e -= Interpolation::cubicXY(correlation[p][f],
+                    xpf+offsets[f].x, ypf+offsets[f].y, 0, 0, true);
 
             if (f > 0 && f < fc-1)
             {
@@ -58,6 +64,8 @@ double LocalMotionFit::f(const std::vector<double> &x) const
 
                 for (int q = p+1; q < pc; q++)
                 {
+                    if (divWgh[f-1][p][q] <= 0.0) continue;
+
                     const double xqf = x[2*(q*fc + f) + 0];
                     const double yqf = x[2*(q*fc + f) + 1];
 
@@ -106,7 +114,8 @@ void LocalMotionFit::grad(const std::vector<double> &x, std::vector<double> &gra
             const double xpf = x[2*(p*fc + f) + 0];
             const double ypf = x[2*(p*fc + f) + 1];
 
-            gravis::t2Vector<RFLOAT> g = Interpolation::cubicXYgrad(correlation[p][f], xpf, ypf, 0, 0, true);
+            gravis::t2Vector<RFLOAT> g = Interpolation::cubicXYgrad(
+                    correlation[p][f], xpf+offsets[f].x, ypf+offsets[f].y, 0, 0, true);
 
             tempGrad[th][2*(p*fc + f) + 0] -= g.x;
             tempGrad[th][2*(p*fc + f) + 1] -= g.y;
@@ -147,6 +156,8 @@ void LocalMotionFit::grad(const std::vector<double> &x, std::vector<double> &gra
 
                 for (int q = p+1; q < pc; q++)
                 {
+                    if (divWgh[f-1][p][q] <= 0.0) continue;
+
                     const double xqf = x[2*(q*fc + f) + 0];
                     const double yqf = x[2*(q*fc + f) + 1];
 

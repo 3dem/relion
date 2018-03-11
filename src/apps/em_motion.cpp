@@ -531,7 +531,8 @@ int main(int argc, char *argv[])
                     velWgh[f] *= pc;
                 }
 
-                LocalMotionFit lmf(ccSum, velWgh, accWgh, divWgh, nr_omp_threads);
+                LocalMotionFit lmf(ccSum, velWgh, accWgh, divWgh,
+                    std::vector<d2Vector>(fc, d2Vector(0,0)), nr_omp_threads);
 
                 std::vector<double> initial(2*fc);
 
@@ -626,7 +627,8 @@ int main(int argc, char *argv[])
                     }
                 }
 
-                LocalMotionFit lmf(motEM.initialCC, velWgh, accWgh, divWgh, nr_omp_threads);
+                LocalMotionFit lmf(motEM.initialCC, velWgh, accWgh, divWgh,
+                            std::vector<d2Vector>(fc, d2Vector(0,0)), nr_omp_threads);
 
                 std::vector<double> initial(2*pc*fc);
 

@@ -47,11 +47,11 @@ class MotionFitProg : public RefinementProgram
 
         MotionFitProg();
 
-            int evalFrames;
-            RFLOAT dmga, dmgb, dmgc, totalDose,
+            bool unregGlob;
+            int maxIters;
+            double dmga, dmgb, dmgc, totalDose,
                 sig_vel, sig_div, sig_acc,
-                k_cutoff;
-            bool evaluate;
+                k_cutoff, maxStep, maxDistDiv;
 
         int readMoreOptions(IOParser& parser, int argc, char *argv[]);
         int _init();
@@ -82,14 +82,17 @@ int MotionFitProg::readMoreOptions(IOParser& parser, int argc, char *argv[])
 
     totalDose = textToFloat(parser.getOption("--dose", "Total electron dose (in e^-/A^2)", "1"));
 
-    sig_vel = textToFloat(parser.getOption("--s_vel", "Velocity sigma", "1.6"));
-    sig_div = textToFloat(parser.getOption("--s_div", "Divergence sigma", "0.067"));
-    sig_acc = textToFloat(parser.getOption("--s_acc", "Acceleration sigma", "-1.0"));
+    sig_vel = textToFloat(parser.getOption("--s_vel", "Velocity sigma [Angst/dose]", "1.6"));
+    sig_div = textToFloat(parser.getOption("--s_div", "Divergence sigma [Angst/(sqrt(Angst)*dose)]", "0.067"));
+    sig_acc = textToFloat(parser.getOption("--s_acc", "Acceleration sigma [Angst]", "-1.0"));
+
+    maxDistDiv = textToFloat(parser.getOption("--max_dist_div", "Ignore neighbors if they are further away than this [pixels]", "-1.0"));
 
     k_cutoff = textToFloat(parser.getOption("--k_cut", "Freq. cutoff (in pixels)", "-1.0"));
+    maxIters = textToInteger(parser.getOption("--max_iters", "Maximum number of iterations", "10000"));
+    maxStep = textToFloat(parser.getOption("--max_step", "Maximum step size", "0.05"));
 
-    evalFrames = textToInteger(parser.getOption("--eval", "Measure FSC for this many initial frames", "0"));
-    evaluate = evalFrames > 0;
+    unregGlob = parser.checkOption("--unreg_glob", "Do not regularize global component of motion");
 
     return 0;
 }
@@ -164,7 +167,6 @@ int MotionFitProg::_run()
         }
     }
 
-
     double t0 = omp_get_wtime();
 
     int pctot = 0;
@@ -173,12 +175,9 @@ int MotionFitProg::_run()
     std::vector<Image<RFLOAT> > weights0(nr_omp_threads);
     std::vector<Image<RFLOAT> > weights1(nr_omp_threads);
 
-    if (evaluate)
+    for (int i = 0; i < nr_omp_threads; i++)
     {
-        for (int i = 0; i < nr_omp_threads; i++)
-        {
-            FscHelper::initFscTable(sh, fc, tables[i], weights0[i], weights1[i]);
-        }
+        FscHelper::initFscTable(sh, fc, tables[i], weights0[i], weights1[i]);
     }
 
     for (long g = g0; g <= gc; g++)
@@ -250,21 +249,34 @@ int MotionFitProg::_run()
                 projectors[0], projectors[1], obsModel, mdts[g], movie,
                 sigma2, dmgWeight, fts, nr_omp_threads);
 
-        std::vector<std::vector<gravis::d2Vector>> tracks(pc);
 
         std::vector<Image<RFLOAT>> ccSum = MotionRefinement::addCCs(movieCC);
         std::vector<gravis::d2Vector> globTrack = MotionRefinement::getGlobalTrack(ccSum);
+        std::vector<gravis::d2Vector> globOffsets = MotionRefinement::getGlobalOffsets(movieCC, globTrack);
 
         if (debug)
         {
             VtkHelper::writeCentered(ccSum, outPath + "_CCsum_mg"+stsg.str()+".vtk");
         }
 
+        std::vector<std::vector<gravis::d2Vector>> tracks(pc);
+
         for (int p = 0; p < pc; p++)
         {
-            tracks[p] = globTrack;
-        }
+            tracks[p] = std::vector<d2Vector>(fc);
 
+            for (int f = 0; f < fc; f++)
+            {
+                if (unregGlob)
+                {
+                    tracks[p][f] = globOffsets[p];
+                }
+                else
+                {
+                    tracks[p][f] = globTrack[f] + globOffsets[p];
+                }
+            }
+        }
 
         std::vector<double> velWgh(fc-1, 0.5/(sig_vel_nrm*sig_vel_nrm));
         std::vector<double> accWgh(fc-1, sig_acc > 0.0? 0.5/(sig_acc_nrm*sig_acc_nrm) : 0.0);
@@ -283,13 +295,21 @@ int MotionFitProg::_run()
                     d2Vector dp = positions[p] - positions[q];
                     double dist = sqrt(dp.x*dp.x + dp.y*dp.y);
 
-                    if (q == p) divWgh[f][p][q] = 0.0;
-                    else divWgh[f][p][q] = 0.5 / (sig_div_nrm * sig_div_nrm * dist);
+                    if (q == p || (maxDistDiv >= 0.0 && dist > maxDistDiv))
+                    {
+                        divWgh[f][p][q] = 0.0;
+                    }
+                    else
+                    {
+                        divWgh[f][p][q] = 0.5 / (sig_div_nrm * sig_div_nrm * dist);
+                    }
                 }
             }
         }
 
-        LocalMotionFit lmf(movieCC, velWgh, accWgh, divWgh, nr_omp_threads);
+        std::vector<d2Vector> globComp = unregGlob? globTrack : std::vector<d2Vector>(fc, d2Vector(0,0));
+
+        LocalMotionFit lmf(movieCC, velWgh, accWgh, divWgh, globComp, nr_omp_threads);
 
         std::vector<double> initial(2*pc*fc);
 
@@ -302,7 +322,7 @@ int MotionFitProg::_run()
             }
         }
 
-        std::vector<double> grad0(2*fc*pc);
+        /*std::vector<double> grad0(2*fc*pc);
 
         lmf.grad(initial, grad0);
 
@@ -316,19 +336,27 @@ int MotionFitProg::_run()
 
         gl = sqrt(gl);
 
-        std::cout << "gl = " << gl << "\n";
+        std::cout << "gl = " << gl << "\n";*/
 
         std::cout << "    optimizing...\n";
 
         std::vector<double> optPos = GradientDescent::optimize(
-            initial, lmf, 0.05/gl, 1e-9/gl, 1e-9, 10000, 0.0, false);
+            initial, lmf, maxStep, 1e-9, 1e-9, maxIters, 0.0, debug);
 
         for (int p = 0; p < pc; p++)
         {
             for (int f = 0; f < fc; f++)
             {
-                tracks[p][f].x = optPos[2*(p*fc + f)];
-                tracks[p][f].y = optPos[2*(p*fc + f) + 1];
+                if (unregGlob)
+                {
+                    tracks[p][f].x = optPos[2*(p*fc + f)] + globTrack[f].x;
+                    tracks[p][f].y = optPos[2*(p*fc + f) + 1] + globTrack[f].y;
+                }
+                else
+                {
+                    tracks[p][f].x = optPos[2*(p*fc + f)];
+                    tracks[p][f].y = optPos[2*(p*fc + f) + 1];
+                }
             }
         }
 
@@ -434,33 +462,31 @@ int MotionFitProg::_run()
     table.write(outPath + "_FCC_data.mrc");
     VtkHelper::writeVTK(table, outPath + "_FCC_data.vtk");
 
-    if (evaluate)
+
+    int f_max = fc;
+    double total = 0.0;
+
+    std::ofstream fccOut(outPath + "_FCC_perFrame.dat");
+
+    for (int y = 0; y < f_max; y++)
     {
-        int f_max = fc;
-        double total = 0.0;
+        double avg = 0.0;
 
-        std::ofstream fccOut(outPath + "_FCC_perFrame.dat");
-
-        for (int y = 0; y < f_max; y++)
+        for (int k = k_cutoff+2; k < k_out; k++)
         {
-            double avg = 0.0;
-
-            for (int k = k_cutoff+2; k < k_out; k++)
-            {
-                avg += table(y,k);
-            }
-
-            avg /= k_out - k_cutoff - 1;
-
-            fccOut << y << " " << avg << "\n";
-
-            total += avg;
+            avg += table(y,k);
         }
 
-        total /= f_max;
+        avg /= k_out - k_cutoff - 1;
 
-        std::cout << "total: " << total << "\n";
+        fccOut << y << " " << avg << "\n";
+
+        total += avg;
     }
+
+    total /= f_max;
+
+    std::cout << "total: " << total << "\n";
 
     double t1 = omp_get_wtime();
     double diff = t1 - t0;

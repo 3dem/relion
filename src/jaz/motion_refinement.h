@@ -84,6 +84,10 @@ class MotionRefinement
         static std::vector<gravis::d2Vector> getGlobalTrack(
                 const std::vector<Image<RFLOAT>>& movieCcSum);
 
+        static std::vector<gravis::d2Vector> getGlobalOffsets(
+                const std::vector<std::vector<Image<RFLOAT>>>& movieCC,
+                const std::vector<gravis::d2Vector>& globTrack);
+
         static Image<float> crossCorrelation2D(const Image<Complex>& obs,
                 const Image<Complex>& predConj,
                 const Image<RFLOAT>& wgh, const std::vector<double> &sigma2);
