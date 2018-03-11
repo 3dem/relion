@@ -61,7 +61,9 @@ int RefinementProgram::init(int argc, char *argv[])
             coords_angpix = textToFloat(parser.getOption("--cps", "Pixel size of particle coordinates in star-file (Angst/pix)"));
 
             hotCutoff = textToFloat(parser.getOption("--hot", "Clip hot pixels to this max. value (-1 = off, TIFF only)", "-1"));
-            coordsAtMgRes = parser.checkOption("--mg_coords", "Particle coordinates are given at micrograph resolution");
+
+            firstFrame = textToInteger(parser.getOption("--first_frame", "", "1"))-1;
+            lastFrame = textToInteger(parser.getOption("--last_frame", "", "-1"))-1;
         }
         else
         {
@@ -359,4 +361,72 @@ double RefinementProgram::angstToPixFreq(double a)
 double RefinementProgram::pixToAngstFreq(double p)
 {
     return 2.0*sh*angpix/p;
+}
+
+void RefinementProgram::loadInitialMovieValues()
+{
+    if (preextracted)
+    {
+        std::string name, fullName, movieName;
+        mdts[0].getValue(EMDL_IMAGE_NAME, fullName, 0);
+        mdts[0].getValue(EMDL_MICROGRAPH_NAME, movieName, 0);
+        name = fullName.substr(fullName.find("@")+1);
+
+        std::string finName;
+
+        if (imgPath == "")
+        {
+            finName = name;
+        }
+        else
+        {
+            finName = imgPath + "/" + movieName.substr(movieName.find_last_of("/")+1);
+        }
+
+        Image<RFLOAT> stack0;
+        stack0.read(finName, false);
+
+        const int pc0 = mdts[0].numberOfObjects();
+        const bool zstack = stack0.data.zdim > 1;
+        const int stackSize = zstack? stack0.data.zdim : stack0.data.ndim;
+
+        if (lastFrame < 0) fc = stackSize / pc0 - firstFrame;
+        else fc = lastFrame - firstFrame + 1;
+    }
+    else
+    {
+        std::vector<std::vector<Image<Complex>>> movie = StackHelper::extractMovieStackFS(
+            &mdts[0], meta_path, imgPath, movie_ending, coords_angpix, angpix, movie_angpix, s,
+            nr_omp_threads, false, firstFrame, lastFrame, hotCutoff, debug);
+
+        fc = movie[0].size();
+    }
+}
+
+std::vector<std::vector<Image<Complex>>> RefinementProgram::loadMovie(
+        int g, int pc, std::vector<ParFourierTransformer>& fts)
+{
+    std::vector<std::vector<Image<Complex>>> movie;
+
+    if (preextracted)
+    {
+        movie = StackHelper::loadMovieStackFS(
+            &mdts[g], imgPath, false, nr_omp_threads, &fts,
+            firstFrame, lastFrame);
+    }
+    else
+    {
+        movie = StackHelper::extractMovieStackFS(
+            &mdts[g], meta_path, imgPath, movie_ending,
+            angpix, coords_angpix, movie_angpix, s,
+            nr_omp_threads, true, firstFrame, lastFrame, hotCutoff, debug);
+
+        #pragma omp parallel for num_threads(nr_omp_threads)
+        for (int p = 0; p < pc; p++)
+        {
+            StackHelper::varianceNormalize(movie[p], false);
+        }
+    }
+
+    return movie;
 }

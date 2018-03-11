@@ -216,16 +216,14 @@ Image<RFLOAT> DamageHelper::plotGlobalDamage(double a, double b, double c, int f
 
 std::vector<Image<RFLOAT> > DamageHelper::damageWeights(
         int s, RFLOAT angpix,
-        int fc, RFLOAT totalDose,
+        int f0, int fc, RFLOAT dosePerFrame,
         RFLOAT a, RFLOAT b, RFLOAT c)
 {
     std::vector<Image<RFLOAT> > out(fc);
 
-    RFLOAT dpf = totalDose/fc;
-
     for (long f = 0; f < fc; f++)
     {
-        out[f] = damageWeight(s, angpix, f*dpf, a, b, c);
+        out[f] = damageWeight(s, angpix, (f+f0)*dosePerFrame, a, b, c);
     }
 
     return out;

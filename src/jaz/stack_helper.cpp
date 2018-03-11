@@ -207,10 +207,12 @@ std::vector<std::vector<Image<RFLOAT> > > StackHelper::loadMovieStack(const Meta
     return out;
 }
 
-std::vector<std::vector<Image<Complex> > > StackHelper::loadMovieStackFS(const MetaDataTable* mdt,
-                                                                         std::string moviePath,
-                                                                         bool center, int threads,
-                                                                         std::vector<ParFourierTransformer> *fts)
+std::vector<std::vector<Image<Complex>>> StackHelper::loadMovieStackFS(
+        const MetaDataTable* mdt,
+        std::string moviePath,
+        bool center, int threads,
+        std::vector<ParFourierTransformer> *fts,
+        int firstFrame, int lastFrame)
 {
     std::vector<std::vector<Image<Complex> > > out(mdt->numberOfObjects());
     const long pc = mdt->numberOfObjects();
@@ -239,8 +241,18 @@ std::vector<std::vector<Image<Complex> > > StackHelper::loadMovieStackFS(const M
     std::cout << "size = " << in.data.xdim << "x" << in.data.ydim << "x" << in.data.zdim << "x" << in.data.ndim << "\n";
     std::cout << "pc = " << pc << "\n";
 
+    const int fcMov = in.data.ndim / pc;
 
-    const int fc = in.data.ndim / pc;
+    if (fcMov < lastFrame+1)
+    {
+        std::stringstream sts;
+        sts << "StackHelper::loadMovieStackFS: unable to load " << (lastFrame - firstFrame + 1) << " frames.";
+        sts << "Only " << fcMov << " frames present in " << finName << ".\n";
+        REPORT_ERROR(sts.str());
+    }
+
+    const int lfAct = lastFrame > 0? lastFrame : fcMov - 1;
+    const int fc = lfAct - firstFrame + 1;
 
     const int w = in.data.xdim;
     const int h = in.data.ydim;
@@ -258,7 +270,7 @@ std::vector<std::vector<Image<Complex> > > StackHelper::loadMovieStackFS(const M
 
                 Image<RFLOAT> aux(w,h);
 
-                SliceHelper::extractStackSlice(in, aux, f*pc + p);
+                SliceHelper::extractStackSlice(in, aux, (f+firstFrame)*pc + p);
                 if (center) CenterFFT(aux(), true);
                 (*fts)[threadnum].FourierTransform(aux(), out[p][f]());
             }
@@ -270,7 +282,7 @@ std::vector<std::vector<Image<Complex> > > StackHelper::loadMovieStackFS(const M
 
             for (long f = 0; f < fc; f++)
             {
-                SliceHelper::extractStackSlice(in, aux, f*pc + p);
+                SliceHelper::extractStackSlice(in, aux, (f+firstFrame)*pc + p);
                 if (center) CenterFFT(aux(), true);
                 ft.FourierTransform(aux(), out[p][f]());
             }
@@ -285,7 +297,8 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
     std::string metaPath, std::string moviePath, std::string movie_ending,
     double outPs, double coordsPs, double moviePs,
     int squareSize, int threads,
-    bool loadData, RFLOAT hot, bool verbose)
+    bool loadData, int firstFrame, int lastFrame,
+    RFLOAT hot, bool verbose)
 {
     std::vector<std::vector<Image<Complex>>> out(mdt->numberOfObjects());
     const long pc = mdt->numberOfObjects();
@@ -452,14 +465,16 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 
     const int w0 = mgStack.data.xdim;
     const int h0 = mgStack.data.ydim;
-    const int fc = dataInZ? mgStack.data.zdim : mgStack.data.ndim;
+    const int fcM = dataInZ? mgStack.data.zdim : mgStack.data.ndim;
+    const int fc = lastFrame > 0? lastFrame - firstFrame + 1 : fcM - firstFrame;
 
     if (verbose)
     {
         if (dataInZ) std::cout << "data in Z\n";
         else std::cout << "data in N\n";
 
-        std::cout << "frame count = " << fc << "\n";
+        std::cout << "frame count in movie = " << fcM << "\n";
+        std::cout << "frame count to load  = " << fc << "\n";
     }
 
     for (long p = 0; p < pc; p++)
@@ -495,7 +510,7 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 
     for (long f = 0; f < fc; f++)
     {
-        muGraph.read(mgNameAct, true, f);
+        muGraph.read(mgNameAct, true, f+firstFrame);
 
         if (verbose) std::cout << (f+1) << "/" << fc << "\n";
 

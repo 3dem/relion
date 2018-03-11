@@ -49,7 +49,7 @@ class MotionFitProg : public RefinementProgram
 
             bool unregGlob;
             int maxIters;
-            double dmga, dmgb, dmgc, totalDose,
+            double dmga, dmgb, dmgc, dosePerFrame,
                 sig_vel, sig_div, sig_acc,
                 k_cutoff, maxStep, maxDistDiv;
 
@@ -80,7 +80,7 @@ int MotionFitProg::readMoreOptions(IOParser& parser, int argc, char *argv[])
     dmgb = textToFloat(parser.getOption("--dmg_b", "                        b", "-1.06"));
     dmgc = textToFloat(parser.getOption("--dmg_c", "                        c", "-0.54"));
 
-    totalDose = textToFloat(parser.getOption("--dose", "Total electron dose (in e^-/A^2)", "1"));
+    dosePerFrame = textToFloat(parser.getOption("--fdose", "Electron dose per frame (in e^-/A^2)", "1"));
 
     sig_vel = textToFloat(parser.getOption("--s_vel", "Velocity sigma [Angst/dose]", "1.6"));
     sig_div = textToFloat(parser.getOption("--s_div", "Divergence sigma [Angst/(sqrt(Angst)*dose)]", "0.067"));
@@ -106,46 +106,10 @@ int MotionFitProg::_run()
 {
     std::vector<ParFourierTransformer> fts(nr_omp_threads);
 
-    if (preextracted)
-    {
-        std::string name, fullName, movieName;
-        mdts[0].getValue(EMDL_IMAGE_NAME, fullName, 0);
-        mdts[0].getValue(EMDL_MICROGRAPH_NAME, movieName, 0);
-        name = fullName.substr(fullName.find("@")+1);
-
-        std::string finName;
-
-        if (imgPath == "")
-        {
-            finName = name;
-        }
-        else
-        {
-            finName = imgPath + "/" + movieName.substr(movieName.find_last_of("/")+1);
-        }
-
-        Image<RFLOAT> stack0;
-        stack0.read(finName, false);
-
-        const int pc0 = mdts[0].numberOfObjects();
-        const bool zstack = stack0.data.zdim > 1;
-        const int stackSize = zstack? stack0.data.zdim : stack0.data.ndim;
-
-        fc = stackSize / pc0;
-    }
-    else
-    {
-        std::vector<std::vector<Image<Complex>>> movie = StackHelper::extractMovieStackFS(
-            &mdts[0], meta_path, imgPath, movie_ending, coords_angpix, angpix, movie_angpix, s,
-            nr_omp_threads, false, hotCutoff, debug);
-
-        fc = movie[0].size();
-    }
+    loadInitialMovieValues();
 
     std::vector<Image<RFLOAT> > dmgWeight = DamageHelper::damageWeights(
-                s, angpix, fc, totalDose, dmga, dmgb, dmgc);
-
-    const double dosePerFrame = totalDose / fc;
+        s, angpix, firstFrame, fc, dosePerFrame, dmga, dmgb, dmgc);
 
     const double sig_vel_nrm = dosePerFrame * sig_vel / angpix;
     const double sig_acc_nrm = dosePerFrame * sig_acc / angpix;
@@ -190,28 +154,11 @@ int MotionFitProg::_run()
         const int pc = mdts[g].numberOfObjects();
         pctot += pc;
 
-        std::vector<std::vector<Image<Complex> > > movie;
+        std::vector<std::vector<Image<Complex>>> movie;
 
         try
         {
-            if (preextracted)
-            {
-                movie = StackHelper::loadMovieStackFS(
-                    &mdts[g], imgPath, false, nr_omp_threads, &fts);
-            }
-            else
-            {
-                movie = StackHelper::extractMovieStackFS(
-                    &mdts[g], meta_path, imgPath, movie_ending,
-                    angpix, coords_angpix, movie_angpix, s,
-                    nr_omp_threads, true, hotCutoff, debug);
-
-                #pragma omp parallel for num_threads(nr_omp_threads)
-                for (int p = 0; p < pc; p++)
-                {
-                    StackHelper::varianceNormalize(movie[p], false);
-                }
-            }
+            movie = loadMovie(g, pc, fts);
         }
         catch (RelionError XE)
         {

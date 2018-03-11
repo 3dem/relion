@@ -110,7 +110,7 @@ class DamageHelper
 
         static std::vector<Image<RFLOAT>> damageWeights(
                 int s, RFLOAT angpix,
-                int fc, RFLOAT totalDose,
+                int f0, int fc, RFLOAT dosePerFrame,
                 RFLOAT a, RFLOAT b, RFLOAT c);
 
         static Image<RFLOAT> damageWeight(

@@ -306,7 +306,7 @@ int main(int argc, char *argv[])
     std::cout << "fc = " << fc << "\n";
 
     std::vector<Image<RFLOAT> > dmgWeight = DamageHelper::damageWeights(
-                s, angpix, fc, totalDose, dmga, dmgb, dmgc);
+        s, angpix, 0, fc, totalDose, dmga, dmgb, dmgc);
 
 
     int k_out = k_cutoff + 21;

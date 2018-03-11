@@ -32,6 +32,7 @@ class RefinementProgram
                 preextracted, coordsAtMgRes;
 
             long maxMG, minMG;
+            int firstFrame, lastFrame;
 
             RFLOAT angpix, paddingFactor,
                 beamtilt_x, beamtilt_y,
@@ -73,6 +74,11 @@ class RefinementProgram
 
         double angstToPixFreq(double a);
         double pixToAngstFreq(double p);
+
+        void loadInitialMovieValues();
+
+        std::vector<std::vector<Image<Complex>>> loadMovie(
+                int g, int pc, std::vector<ParFourierTransformer>& fts);
 };
 
 #endif
