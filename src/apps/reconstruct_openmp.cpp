@@ -274,6 +274,12 @@ class reconstruct_parameters
         {
             (DF).firstObject();
             DF.getValue(EMDL_IMAGE_NAME, fn_img);
+
+            if (image_path != "")
+            {
+                fn_img = image_path + "/" + fn_img.substr(fn_img.find_last_of("/")+1);
+            }
+
             img0.read(fn_img);
             mysize=(int)XSIZE(img0());
             // When doing Ewald-curvature correction: allow reconstructing smaller box than the input images (which should have large boxes!!)
