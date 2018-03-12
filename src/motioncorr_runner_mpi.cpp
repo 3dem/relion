@@ -63,8 +63,6 @@ void MotioncorrRunnerMpi::run()
 
 	for (long int imic = my_first_micrograph; imic <= my_last_micrograph; imic++)
 	{
-		std::vector<RFLOAT> xshifts, yshifts;
-
 		if (verb > 0 && imic % barstep == 0)
 			progress_bar(imic);
 
@@ -72,17 +70,17 @@ void MotioncorrRunnerMpi::run()
 
 		bool result;
 		if (do_own)
-			result = executeOwnMotionCorrection(mic, xshifts, yshifts);
+			result = executeOwnMotionCorrection(mic);
 		else if (do_unblur)
-			result = executeUnblur(mic, xshifts, yshifts);
+			result = executeUnblur(mic);
 		else if (do_motioncor2)
-			result = executeMotioncor2(mic, xshifts, yshifts, node->rank);
+			result = executeMotioncor2(mic, node->rank);
 		else
 			REPORT_ERROR("Bug: by now it should be clear whether to use MotionCor2 or Unblur...");
 
 		if (result) {
 			saveModel(mic);
-			plotShifts(fn_micrographs[imic], xshifts, yshifts, mic);
+			plotShifts(fn_micrographs[imic], mic);
 		}
 	}
 	if (verb > 0)

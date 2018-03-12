@@ -267,13 +267,13 @@ void Micrograph::write(FileName filename) {
 	fh.close();
 }
 
-int Micrograph::getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty) const {
+int Micrograph::getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty, bool use_local) const {
 	if (globalShiftX[frame - 1] == NOT_OBSERVED || globalShiftX[frame - 1] == NOT_OBSERVED) {
 		shiftx = shifty = NOT_OBSERVED;
 		return -1;
 	}
 
-	if (model != NULL) {
+	if (model != NULL && use_local) {
 		// both frame and first_frame is 1 indexed
 		model->getShiftAt(frame - first_frame, x, y, shiftx, shifty);
 	} else {
