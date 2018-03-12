@@ -138,25 +138,25 @@ public:
 	void getOutputFileNames(FileName fn_mic, FileName &fn_avg, FileName &fn_mov);
 
 	// Execute MOTIONCOR2 for a single micrograph
-	bool executeMotioncor2(Micrograph &mic, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts, int rank = 0);
+	bool executeMotioncor2(Micrograph &mic, int rank = 0);
 
 	// Get the shifts from MOTIONCOR2
-	void getShiftsMotioncor2(FileName fn_log, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts, Micrograph &mic);
+	void getShiftsMotioncor2(FileName fn_log, Micrograph &mic);
 
 	// Execute UNBLUR for a single micrograph
-	bool executeUnblur(Micrograph &mic, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts);
+	bool executeUnblur(Micrograph &mic);
 
 	// Execute our own implementation for a single micrograph
-	bool executeOwnMotionCorrection(Micrograph &mic, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts);
+	bool executeOwnMotionCorrection(Micrograph &mic);
 
 	// Get the shifts from UNBLUR
-	void getShiftsUnblur(FileName fn_mic, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts);
+	void getShiftsUnblur(FileName fn_mic, Micrograph &mic);
 
 	// Plot the FRC curve from SUMMOVIE
 	void plotFRC(FileName fn_frc);
 
 	// Plot the shifts
-	void plotShifts(FileName fn_eps, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts, Micrograph &mic);
+	void plotShifts(FileName fn_mic, Micrograph &mic);
 
 	// Save micrograph model
 	void saveModel(Micrograph &mic);

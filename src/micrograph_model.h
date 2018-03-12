@@ -167,7 +167,9 @@ public:
 
 	// Get shift vector at (x, y, frame); frame is 1-indexed
 	// (x, y) and (shiftx, shifty) are UNBINNED pixels in the original movie
-	int getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty) const;
+	// Returns non zero if failed (e.g. not observed)
+	
+	int getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty, bool use_local=true) const;
 
 	// Set global shift for frame; frame is 1-indexed
 	// (shiftx, shifty) is UNBINNED pixels in the original movie
