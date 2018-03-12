@@ -959,7 +959,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<R
 		}
 	}
 	logfile << std::endl;
-	if (n_frames / group != 0) {
+	if (n_frames % group != 0) {
 		logfile << "Some groups contain more than the requested number of frames (" << group << ") because the number of frames (" << n_frames << ") was not divisible." << std::endl;
 		logfile << "If you want to ignore remaining frame(s) instead, use --last_frame_sum to discard last frame(s)." << std::endl;
 	}
@@ -971,7 +971,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<R
 		Igain.read(fn_gain_reference);
 		if (XSIZE(Igain()) != nx || YSIZE(Igain()) != ny) {
 			std::cerr << "fn_mic: " << fn_mic << std::endl;
-			REPORT_ERROR("The size of the image and the size of the gain reference do not match.");
+			REPORT_ERROR("The size of the image and the size of the gain reference do not match. Make sure the gain reference has been rotated if necessary.");
 		}
 	}
 	RCTOC(TIMING_READ_GAIN);
@@ -1240,8 +1240,8 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<R
 		mic.model = NULL;
 	}
 
-	if (save_noDW) {
-		Iref().initZeros();
+	if (!do_dose_weighting || save_noDW) {
+		Iref().initZeros(Iframes[0]());
 
 		RCTIC(TIMING_REAL_SPACE_INTERPOLATION);
 		logfile << "Summing frames before dose weighting: ";
@@ -1256,14 +1256,14 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<R
 		}
 		RCTOC(TIMING_BINNING);
 
-		// Final output
-		Iref.write(fn_avg_noDW);
-		logfile << "Written aligned but non-dose wieghted sum to " << fn_avg_noDW << std::endl;
+		// Final output.
+		Iref.write(!do_dose_weighting ? fn_avg : fn_avg_noDW);
+		logfile << "Written aligned but non-dose weighted sum to " << fn_avg_noDW << std::endl;
 	}
 
 	// Dose weighting
-	RCTIC(TIMING_DOSE_WEIGHTING);
 	if (do_dose_weighting) {
+		RCTIC(TIMING_DOSE_WEIGHTING);
 		if (std::abs(voltage - 300) > 2 && std::abs(voltage - 200) > 2) {
 			REPORT_ERROR("Sorry, dose weighting is supported only for 300 kV or 200 kV");
 		}
@@ -1288,26 +1288,26 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<R
 			transformers[omp_get_thread_num()].inverseFourierTransform(Fframes[iframe], Iframes[iframe]());
 		}
 		RCTOC(TIMING_DW_IFFT);
+		RCTOC(TIMING_DOSE_WEIGHTING);
+
+		Iref().initZeros(Iframes[0]());
+		RCTIC(TIMING_REAL_SPACE_INTERPOLATION);
+		logfile << "Summing frames after dose weighting: ";
+		realSpaceInterpolation(Iref, Iframes, mic.model, logfile);
+		logfile << " done" << std::endl;
+		RCTOC(TIMING_REAL_SPACE_INTERPOLATION);
+
+		// Apply binning
+		RCTIC(TIMING_BINNING);
+		if (bin_factor != 1) {
+			binNonSquareImage(Iref, bin_factor);
+		}
+		RCTOC(TIMING_BINNING);
+
+		// Final output
+		Iref.write(fn_avg);
+		logfile << "Written aligned and dose-weighted sum to " << fn_avg << std::endl;
 	}
-	RCTOC(TIMING_DOSE_WEIGHTING);
-
-	Iref().initZeros();
-	RCTIC(TIMING_REAL_SPACE_INTERPOLATION);
-	logfile << "Summing frames after dose weighting: ";
-	realSpaceInterpolation(Iref, Iframes, mic.model, logfile);
-	logfile << " done" << std::endl;
-	RCTOC(TIMING_REAL_SPACE_INTERPOLATION);
-
-	// Apply binning
-	RCTIC(TIMING_BINNING);
-	if (bin_factor != 1) {
-		binNonSquareImage(Iref, bin_factor);
-	}
-	RCTOC(TIMING_BINNING);
-
-	// Final output
-	Iref.write(fn_avg);
-	logfile << "Written aligned and dose-weighted sum to " << fn_avg << std::endl;
 
 	// Set the start frame for the local motion model.
 	mic.first_frame = frames[0] + 1; // NOTE that this is 1-indexed.
@@ -1789,28 +1789,32 @@ void MotioncorrRunner::shiftNonSquareImageInFourierTransform(MultidimArray<Compl
 
 // Iwork is overwritten
 void MotioncorrRunner::binNonSquareImage(Image<RFLOAT> &Iwork, RFLOAT bin_factor) {
-	FourierTransformer transformer;
+	FourierTransformer transformer, transformer2;
 
 	const int nx = XSIZE(Iwork()), ny = YSIZE(Iwork());
 	int new_nx = nx / bin_factor, new_ny = ny / bin_factor;
 	new_nx -= new_nx % 2; new_ny -= new_ny % 2; // force it to be even
-//	std::cout << "Binning from X = " << nx << " Y = " << ny << " to X = " << new_nx << " Y = " << new_ny << std::endl;
-
 	const int half_new_ny = new_ny / 2, new_nfx = new_nx / 2 + 1;
+#ifdef DEBUG_OWN
+	std::cout << "Binning from X = " << nx << " Y = " << ny << " to X = " << new_nx << " Y = " << new_ny << " half_new_ny = " << half_new_ny << " new_nfx = " << new_nfx << std::endl;
+#endif
 	MultidimArray<Complex> Fref, Fbinned(new_ny, new_nfx);
 	transformer.FourierTransform(Iwork(), Fref);
 
-	for (int y = 0; y <= half_new_ny; y++) {
+	for (int y = 0; y < half_new_ny; y++) {
 		for (int x = 0; x < new_nfx; x++) {
 			DIRECT_A2D_ELEM(Fbinned, y, x) =  DIRECT_A2D_ELEM(Fref, y, x);
 		}
 	}
-	for (int y = half_new_ny + 1; y < new_ny; y++) {
+	for (int y = half_new_ny; y < new_ny; y++) {
 		for (int x = 0; x < new_nfx; x++) {
-			DIRECT_A2D_ELEM(Fbinned, y, x) =  DIRECT_A2D_ELEM(Fref, ny - 1 - new_ny + y, x);
+			DIRECT_A2D_ELEM(Fbinned, y, x) =  DIRECT_A2D_ELEM(Fref, ny - new_ny + y, x);
 		}
 	}
 
 	Iwork().reshape(new_ny, new_nx);
-	transformer.inverseFourierTransform(Fbinned, Iwork());
+	// If reshape does NOT change Iwork.data pointer (rare but actually happens),
+	// transformer does not re-create plan although the size is different!
+	// So we have to use different transformer.
+	transformer2.inverseFourierTransform(Fbinned, Iwork());
 }
