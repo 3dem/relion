@@ -84,8 +84,8 @@ public:
     long line;
 
 #ifdef __GNUC__
-    /** 
-        Backtrace 
+    /**
+        Backtrace
 
         To get a line number from something like this:
         /lmb/home/tnakane/prog/relion-devel-lmb/build-single/lib/librelion_lib.so(_ZN13MetaDataTable4readERK8FileNameRKSsPSt6vectorI8EMDLabelSaIS6_EESsb+0x384) [0x7fb676e8c2a4]
@@ -147,7 +147,7 @@ If you \n\n\
 \t-> INSTALLED RELION YOURSELF: if you e.g. specified -DCUDA_ARCH=50\n\
 \t   and are trying ot run on a compute 3.5 GPU (-DCUDA_ARCH=3.5), \n\
 \t   this may happen.\n\n\
-\t-> HAVE MULTIPLE GPUS OF DIFFERNT VERISONS: relion needs GPUS with\n\
+\t-> HAVE MULTIPLE GPUS OF DIFFERNT VERSIONS: relion needs GPUS with\n\
 \t   at least compute 3.5. You may be trying to use a GPU older than\n\
 \t   this. If you have multiple generations, try specifying --gpu <X>\n\
 \t   with X=0. Then try X=1 in a new run, and so on. The numbering of\n\

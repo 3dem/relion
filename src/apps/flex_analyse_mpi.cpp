@@ -17,35 +17,38 @@
  * source code. Additional authorship citations may be added, but existing
  * author citations must be preserved.
  ***************************************************************************/
-#include <src/postprocessing.h>
 
+#include <src/args.h>
+#include "../flex_analyser.h"
 
 int main(int argc, char *argv[])
 {
-	Postprocessing prm;
-	
-    	PRINT_VERSION_INFO();
-    	
-	try
-    {
-		prm.read(argc, argv);
+    FlexAnalyser prm;
 
-		if (prm.do_locres)
-			prm.run_locres();
-		else
-			prm.run();
+    int rank, size;
+
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    // Handle errors
+    MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
+
+    try
+    {
+        prm.read(argc, argv);
+        // Don't put any output to screen for mpi slaves
+        prm.verb = (rank == 0) ? 1 : 0;
+
+       	prm.initialise();
+       	prm.run(rank, size);
+
     }
 
     catch (RelionError XE)
     {
-        //prm.usage();
         std::cerr << XE;
         exit(1);
     }
 
     return 0;
-
 }
-
-
-

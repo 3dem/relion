@@ -5,7 +5,6 @@
 #include <src/jaz/stack_helper.h>
 #include <src/jaz/vtk_helper.h>
 
-#include <regex>
 
 RefinementProgram::RefinementProgram(bool singleReference, bool doesMovies)
 :   singleReference(singleReference),
@@ -14,7 +13,9 @@ RefinementProgram::RefinementProgram(bool singleReference, bool doesMovies)
     optReference(false),
     noReference(false),
     noTilt(false),
-    doesMovies(doesMovies)
+    doesMovies(doesMovies),
+    hasCorrMic(false),
+    last_gainFn("")
 {
 }
 
@@ -49,16 +50,18 @@ int RefinementProgram::init(int argc, char *argv[])
         outPath = parser.getOption("--out", "Output path");
 
         if (doesMovies)
-        {
+        {            
             imgPath = parser.getOption("--mov", "Path to movies", "");
+            corrMicFn = parser.getOption("--corr_mic", "Path to corrected_micrographs.star", "");
             preextracted = parser.checkOption("--preex", "Preextracted movie stacks");
             meta_path = parser.getOption("--meta", "Path to per-movie metadata star files", "");
+            gain_path = parser.getOption("--gain_path", "Path to gain references", "");
             movie_ending = parser.getOption("--mov_end", "Ending of movie filenames", "");
             movie_toReplace = parser.getOption("--mov_toReplace", "Replace this string in micrograph names...", "");
             movie_replaceBy = parser.getOption("--mov_replaceBy", "..by this one", "");
 
-            movie_angpix = textToFloat(parser.getOption("--mps", "Pixel size of input movies (Angst/pix)"));
-            coords_angpix = textToFloat(parser.getOption("--cps", "Pixel size of particle coordinates in star-file (Angst/pix)"));
+            movie_angpix = textToFloat(parser.getOption("--mps", "Pixel size of input movies (Angst/pix)", "-1"));
+            coords_angpix = textToFloat(parser.getOption("--cps", "Pixel size of particle coordinates in star-file (Angst/pix)", "-1"));
 
             hotCutoff = textToFloat(parser.getOption("--hot", "Clip hot pixels to this max. value (-1 = off, TIFF only)", "-1"));
 
@@ -112,6 +115,22 @@ int RefinementProgram::init(int argc, char *argv[])
 
         if (parser.checkForErrors()) return 1;
         if (rco != 0) return rco;
+
+        bool allGood = true;
+
+        if (movie_angpix <= 0 && corrMicFn == "")
+        {
+            std::cerr << "Movie pixel size (--mps) is required unless a corrected_micrographs.star (--corr_mic) is provided.";
+            allGood = false;
+        }
+
+        if (coords_angpix <= 0 && corrMicFn == "")
+        {
+            std::cerr << "Coordinates pixel size (--cps) is required unless a corrected_micrographs.star (--corr_mic) is provided.";
+            allGood = false;
+        }
+
+        if (!allGood) return 12;
     }
     catch (RelionError XE)
     {
@@ -339,6 +358,26 @@ int RefinementProgram::init(int argc, char *argv[])
         freqWeight.data.initConstant(1.0);
     }
 
+    if (doesMovies && corrMicFn != "")
+    {
+        MetaDataTable corrMic;
+        corrMic.read(corrMicFn);
+
+        mic2meta.clear();
+
+        std::string micName, metaName;
+
+        for (int i = 0; i < corrMic.numberOfObjects(); i++)
+        {
+            corrMic.getValueToString(EMDL_MICROGRAPH_NAME, micName, i);
+            corrMic.getValueToString(EMDL_MICROGRAPH_METADATA_NAME, metaName, i);
+
+            mic2meta[micName] = metaName;
+        }
+
+        hasCorrMic = true;
+    }
+
     return rc0;
 }
 
@@ -389,6 +428,7 @@ void RefinementProgram::loadInitialMovieValues()
     }
     else
     {
+        // @TODO: replace by simple movie loading
         std::vector<std::vector<Image<Complex>>> movie = StackHelper::extractMovieStackFS(
             &mdts[0], meta_path, imgPath, movie_ending, coords_angpix, angpix, movie_angpix, s,
             nr_omp_threads, false, firstFrame, lastFrame, hotCutoff, debug);
@@ -411,10 +451,85 @@ std::vector<std::vector<Image<Complex>>> RefinementProgram::loadMovie(
     }
     else
     {
-        movie = StackHelper::extractMovieStackFS(
-            &mdts[g], meta_path, imgPath, movie_ending,
-            angpix, coords_angpix, movie_angpix, s,
-            nr_omp_threads, true, firstFrame, lastFrame, hotCutoff, debug);
+        std::string mgFn;
+        mdts[g].getValueToString(EMDL_MICROGRAPH_NAME, mgFn, 0);
+
+        if (hasCorrMic)
+        {
+            std::string metaFn = mic2meta[mgFn];
+
+            if (meta_path != "")
+            {
+                metaFn = meta_path + "/" + metaFn.substr(metaFn.find_last_of("/")+1);
+            }
+
+            micrograph = Micrograph(metaFn);
+
+            std::string mgFn = micrograph.getMovieFilename();
+            std::string gainFn = micrograph.getGainFilename();
+
+            if (movie_ending != "")
+            {
+                mgFn.substr(0, mgFn.find_last_of(".")+1) + movie_ending;
+            }
+
+            if (imgPath != "")
+            {
+                mgFn = imgPath + "/" + mgFn.substr(mgFn.find_last_of("/")+1);
+            }
+
+            bool mgHasGain = false;
+
+            if (gainFn != "")
+            {
+                if (gain_path != "")
+                {
+                    gainFn = gain_path + "/" + gainFn.substr(gainFn.find_last_of("/")+1);
+                }
+
+                if (gainFn != last_gainFn)
+                {
+                    lastGainRef.read(gainFn);
+                    last_gainFn = gainFn;
+                }
+
+                mgHasGain = true;
+            }
+
+            double movie_angpix_act, coords_angpix_act;
+
+            if (movie_angpix > 0)
+            {
+                movie_angpix_act = movie_angpix;
+            }
+            else
+            {
+                movie_angpix_act = micrograph.angpix;
+                if (debug) std::cout << "movie res.:  " << movie_angpix_act << "A/px";
+            }
+
+            if (coords_angpix > 0)
+            {
+                coords_angpix_act = movie_angpix;
+            }
+            else
+            {
+                coords_angpix_act = micrograph.angpix * micrograph.getBinningFactor();
+                if (debug) std::cout << "coord. res.: " << coords_angpix_act << "A/px";
+            }
+
+            movie = StackHelper::extractMovieStackFS(
+                &mdts[g], mgHasGain? &lastGainRef : 0,
+                mgFn, angpix, coords_angpix_act, movie_angpix_act, s,
+                nr_omp_threads, true, firstFrame, lastFrame, hotCutoff, debug);
+        }
+        else
+        {
+            movie = StackHelper::extractMovieStackFS(
+                &mdts[g], meta_path, imgPath, movie_ending,
+                angpix, coords_angpix, movie_angpix, s,
+                nr_omp_threads, true, firstFrame, lastFrame, hotCutoff, debug);
+        }
 
         #pragma omp parallel for num_threads(nr_omp_threads)
         for (int p = 0; p < pc; p++)

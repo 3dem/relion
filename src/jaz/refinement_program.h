@@ -17,6 +17,8 @@
 #include <src/jaz/obs_model.h>
 #include <src/jaz/stack_helper.h>
 
+#include "src/micrograph_model.h"
+
 #include <omp.h>
 
 class RefinementProgram
@@ -29,7 +31,7 @@ class RefinementProgram
 
             bool singleReference, doesMovies, debug, applyTilt, anisoTilt, useFsc,
                 optStar, noStar, optReference, noReference, noTilt,
-                preextracted, coordsAtMgRes;
+                preextracted, coordsAtMgRes, hasCorrMic;
 
             long maxMG, minMG;
             int firstFrame, lastFrame;
@@ -47,14 +49,19 @@ class RefinementProgram
                 starFn, reconFn0, reconFn1, maskFn,
                 outPath, imgPath, fscFn,
                 meta_path, movie_ending,
-                movie_toReplace, movie_replaceBy;
+                movie_toReplace, movie_replaceBy,
+                corrMicFn, gain_path, last_gainFn;
+
+            std::map<std::string, std::string> mic2meta;
 
             // data:
 
             Image<RFLOAT> maps[2];
             Image<RFLOAT> powSpec[2];
-            Image<RFLOAT> freqWeight;
+            Image<RFLOAT> freqWeight, lastGainRef;
             Projector projectors[2];
+
+            Micrograph micrograph;
 
             MetaDataTable mdt0;
             std::vector<MetaDataTable> mdts;

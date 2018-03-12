@@ -39,7 +39,7 @@ public:
 	virtual void write(std::ostream &fh, std::string block_name) = 0;
 	virtual int getModelVersion() const = 0;
 
-	// Get motion at frame and (x, y)
+	// Get motion at frame and (x, y); frame is 0-indexed (NOT like Micrograph::getShiftAt)
 	virtual int getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty) const = 0;
 };
 
@@ -69,10 +69,15 @@ public:
 
 	static const RFLOAT NOT_OBSERVED;
 	RFLOAT angpix, voltage, dose_per_frame, pre_exposure;
-    MotionModel *model;
 
-	// Empty Constructor is not allowed
-	Micrograph(); // = delete in C++11
+	int first_frame; // First frame for local motion model. 1-indexed.
+	MotionModel *model;
+
+	// Local trajectories (not written, not read from STAR files)
+	std::vector<RFLOAT> localShiftX, localShiftY, localFitX, localFitY, patchX, patchY, patchZ, patchW, patchH;
+	
+    // Empty Constructor is not allowed
+    Micrograph(); // = delete in C++11
 
 	// Create from a movie or a STAR file
 	Micrograph(FileName filename, FileName fnGain="", RFLOAT binning=1.0) {
@@ -98,6 +103,7 @@ public:
 		width = 0;
 		height = 0;
 		n_frames = 0;
+		first_frame = 0;
 		binning = 1;
 
 		angpix = -1;
@@ -110,6 +116,16 @@ public:
 
 		globalShiftX.resize(0);
 		globalShiftY.resize(0);
+
+		localShiftX.resize(0);
+		localShiftY.resize(0);
+		localFitX.resize(0);
+		localFitY.resize(0);
+		patchX.resize(0);
+		patchY.resize(0);
+		patchZ.resize(0);
+		patchW.resize(0);
+		patchH.resize(0);
 	
 		if (model != NULL) delete model;
 		model = NULL;
@@ -151,11 +167,11 @@ public:
 		return n_frames;
 	}
 
-	// Get shift vector at (x, y, frame)
+	// Get shift vector at (x, y, frame); frame is 1-indexed
 	// (x, y) and (shiftx, shifty) are UNBINNED pixels in the original movie
 	int getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty) const;
 
-	// Set global shift for frame
+	// Set global shift for frame; frame is 1-indexed
 	// (shiftx, shifty) is UNBINNED pixels in the original movie
 	void setGlobalShift(int frame, RFLOAT shiftx, RFLOAT shifty);
 

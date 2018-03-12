@@ -63,7 +63,7 @@ void MotioncorrRunnerMpi::run()
 
 	for (long int imic = my_first_micrograph; imic <= my_last_micrograph; imic++)
 	{
-		std::vector<float> xshifts, yshifts;
+		std::vector<RFLOAT> xshifts, yshifts;
 
 		if (verb > 0 && imic % barstep == 0)
 			progress_bar(imic);
@@ -82,7 +82,7 @@ void MotioncorrRunnerMpi::run()
 
 		if (result) {
 			saveModel(mic);
-			plotShifts(fn_micrographs[imic], xshifts, yshifts);
+			plotShifts(fn_micrographs[imic], xshifts, yshifts, mic);
 		}
 	}
 	if (verb > 0)

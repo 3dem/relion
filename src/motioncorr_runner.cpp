@@ -298,7 +298,7 @@ void MotioncorrRunner::run()
 
 	for (long int imic = 0; imic < fn_micrographs.size(); imic++)
 	{
-		std::vector<float> xshifts, yshifts;
+		std::vector<RFLOAT> xshifts, yshifts;
 
 		if (verb > 0 && imic % barstep == 0)
 			progress_bar(imic);
@@ -318,7 +318,7 @@ void MotioncorrRunner::run()
 
 		if (result) {
 			saveModel(mic);
-			plotShifts(fn_micrographs[imic], xshifts, yshifts);
+			plotShifts(fn_micrographs[imic], xshifts, yshifts, mic);
 		}
 	}
 
@@ -336,7 +336,7 @@ void MotioncorrRunner::run()
 #endif
 }
 
-bool MotioncorrRunner::executeMotioncor2(Micrograph &mic, std::vector<float> &xshifts, std::vector<float> &yshifts, int rank)
+bool MotioncorrRunner::executeMotioncor2(Micrograph &mic, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts, int rank)
 {
 	FileName fn_mic = mic.getMovieFilename();
 	FileName fn_avg, fn_mov;
@@ -467,7 +467,7 @@ bool MotioncorrRunner::executeMotioncor2(Micrograph &mic, std::vector<float> &xs
 		}
 
 		// Also analyse the shifts
-		getShiftsMotioncor2(fn_out, xshifts, yshifts);
+		getShiftsMotioncor2(fn_out, xshifts, yshifts, mic);
 
 		for (int i = 0, ilim = xshifts.size(); i < ilim; i++) {
 			int frame = i + 1; // Make 1-indexed
@@ -480,7 +480,7 @@ bool MotioncorrRunner::executeMotioncor2(Micrograph &mic, std::vector<float> &xs
 	return true;
 }
 
-void MotioncorrRunner::getShiftsMotioncor2(FileName fn_log, std::vector<float> &xshifts, std::vector<float> &yshifts)
+void MotioncorrRunner::getShiftsMotioncor2(FileName fn_log, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts, Micrograph &mic)
 {
 
 	std::ifstream in(fn_log.data(), std::ios_base::in);
@@ -490,52 +490,78 @@ void MotioncorrRunner::getShiftsMotioncor2(FileName fn_log, std::vector<float> &
 	xshifts.clear();
 	yshifts.clear();
 
-    std::string line;
+	std::string line;
 
-    // Start reading the ifstream at the top
-    in.seekg(0);
+	// Start reading the ifstream at the top
+	in.seekg(0);
 
-    // Read through the shifts file
-    int i = 0;
-    bool have_found_final = false;
-    while (getline(in, line, '\n'))
-    {
-    	// ignore all commented lines, just read first two lines with data
-    	if (line.find("Full-frame alignment shift") != std::string::npos)
-    	{
-    		have_found_final = true;
-    	}
-    	else if (have_found_final)
-    	{
-    		size_t shiftpos = line.find("shift:");
-    		if (shiftpos != std::string::npos)
-    		{
-    			std::vector<std::string> words;
-    			tokenize(line.substr(shiftpos+7), words);;
-        		if (words.size() < 2)
-        		{
-        			std::cerr << " fn_log= " << fn_log << std::endl;
-        			REPORT_ERROR("ERROR: unexpected number of words on line from MOTIONCORR logfile: " + line);
-        		}
-        		xshifts.push_back(textToFloat(words[0]));
-    			yshifts.push_back(textToFloat(words[1]));
-    		}
-    		else
-    		{
-    			// Stop now
-    			break;
-    		}
-    	}
-    }
-    in.close();
+	// Read through the shifts file
+	int i = 0;
+	bool have_found_final = false;
+	while (getline(in, line, '\n'))
+	{
+	// ignore all commented lines, just read first two lines with data
+		if (line.find("Full-frame alignment shift") != std::string::npos)
+		{
+			have_found_final = true;
+		}
+		else if (have_found_final)
+		{
+			size_t shiftpos = line.find("shift:");
+			if (shiftpos != std::string::npos)
+			{
+				std::vector<std::string> words;
+				tokenize(line.substr(shiftpos+7), words);;
+    				if (words.size() < 2)
+    				{
+    					std::cerr << " fn_log= " << fn_log << std::endl;
+    					REPORT_ERROR("ERROR: unexpected number of words on line from MOTIONCORR logfile: " + line);
+    				}
+ 		   		xshifts.push_back(textToFloat(words[0]));
+				yshifts.push_back(textToFloat(words[1]));
+			}
+			else
+			{
+				// Stop now
+				break;
+			}
+		}
+	}
+	in.close();
 
+	if (xshifts.size() != yshifts.size())
+		REPORT_ERROR("ERROR: got an unequal number of x and yshifts from " + fn_log);
 
-    if (xshifts.size() != yshifts.size())
-    	REPORT_ERROR("ERROR: got an unequal number of x and yshifts from " + fn_log);
+	// Read local shifts
+	FileName fn_patch = fn_log.withoutExtension() + "0-Patch-Patch.log";
+	std::cout << fn_patch << std::endl;
+	if (!exists(fn_patch)) {
+		std::cerr << "warning: failed to load local shifts from MotionCor2 logfile, but this does not affect further processing: " << fn_patch << std::endl;
+		return;
+	}
 
+	in.open(fn_patch.c_str(), std::ios_base::in);
+	in.seekg(0);
+
+	while (getline(in, line, '\n'))
+	{
+		if (line.find("#") != std::string::npos) continue;
+		
+		std::vector<std::string> words;
+		tokenize(line, words);
+    		if (words.size() != 7) continue;
+
+		mic.patchZ.push_back(textToFloat(words[0]));
+		mic.patchX.push_back(textToFloat(words[1]));
+		mic.patchY.push_back(textToFloat(words[2]));
+		mic.localShiftX.push_back(textToFloat(words[3]));
+		mic.localShiftY.push_back(textToFloat(words[4]));
+		mic.localFitX.push_back(textToFloat(words[5]));
+		mic.localFitY.push_back(textToFloat(words[6]));
+	}
 }
 
-bool MotioncorrRunner::executeUnblur(Micrograph &mic, std::vector<float> &xshifts, std::vector<float> &yshifts)
+bool MotioncorrRunner::executeUnblur(Micrograph &mic, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts)
 {
 	FileName fn_mic = mic.getMovieFilename();
 	FileName fn_avg, fn_mov;
@@ -623,7 +649,8 @@ bool MotioncorrRunner::executeUnblur(Micrograph &mic, std::vector<float> &xshift
 
 	for (int i = 0, ilim = xshifts.size(); i < ilim; i++) {
 		int frame = i + 1; // make 1-indexed
-		mic.setGlobalShift(frame, xshifts[i], yshifts[i]);
+		// shifts from Unblur are in angstrom not pixel
+		mic.setGlobalShift(frame, xshifts[i] / angpix, yshifts[i] / angpix);
 	}
 
 	// If the requested sum is only a subset, then use summovie to make the average
@@ -684,7 +711,7 @@ bool MotioncorrRunner::executeUnblur(Micrograph &mic, std::vector<float> &xshift
 	return true;
 }
 
-void MotioncorrRunner::getShiftsUnblur(FileName fn_shifts, std::vector<float> &xshifts, std::vector<float> &yshifts)
+void MotioncorrRunner::getShiftsUnblur(FileName fn_shifts, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts)
 {
 
 	std::ifstream in(fn_shifts.data(), std::ios_base::in);
@@ -772,8 +799,13 @@ void MotioncorrRunner::plotFRC(FileName fn_frc)
 }
 
 // Plot the shifts
-void MotioncorrRunner::plotShifts(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts)
+void MotioncorrRunner::plotShifts(FileName fn_mic, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts, Micrograph &mic)
 {
+	const RFLOAT SCALE = 40;
+	RFLOAT shift_scale = SCALE;
+	if (do_unblur) {
+		shift_scale /= angpix; // convert from A to pix
+	}
 
 	if (xshifts.size() == 0)
 		return;
@@ -782,13 +814,14 @@ void MotioncorrRunner::plotShifts(FileName fn_mic, std::vector<float> &xshifts, 
 	CPlot2D *plot2D=new CPlot2D(fn_eps);
  	plot2D->SetXAxisSize(600);
  	plot2D->SetYAxisSize(600);
+	plot2D->SetDrawLegend(false);
 
  	CDataSet dataSet;
 	dataSet.SetDrawMarker(false);
 	dataSet.SetDatasetColor(0.0,0.0,0.0);
 	for (int j = 0; j < xshifts.size(); j++)
 	{
-		CDataPoint point(xshifts[j], yshifts[j]);
+		CDataPoint point(mic.getWidth() / 2 + shift_scale * xshifts[j], mic.getHeight() / 2 + shift_scale * yshifts[j]);
 		dataSet.AddDataPoint(point);
 	}
 	plot2D->AddDataSet(dataSet);
@@ -796,21 +829,51 @@ void MotioncorrRunner::plotShifts(FileName fn_mic, std::vector<float> &xshifts, 
 	// Different starting point
 	CDataSet dataSetStart;
 	dataSetStart.SetDrawMarker(true);
+	dataSetStart.SetMarkerSize(5);
 	dataSetStart.SetDatasetColor(1.0,0.0,0.0);
-	CDataPoint point2(xshifts[0], yshifts[0]);
+	CDataPoint point2(mic.getWidth() / 2 + shift_scale * xshifts[0], mic.getHeight() / 2 + shift_scale * yshifts[0]);
 	dataSetStart.AddDataPoint(point2);
 	plot2D->AddDataSet(dataSetStart);
 
-	if (do_unblur)
-	{
-		plot2D->SetXAxisTitle("X-shift (in Angstroms)");
-		plot2D->SetYAxisTitle("Y-shift (in Angstroms)");
+	const int n_local = mic.localShiftX.size();
+	int i = 0;
+	while (i < n_local) {
+		CDataSet patch_start;
+		patch_start.SetDrawMarker(true);
+		patch_start.SetMarkerSize(5);
+		patch_start.SetDatasetColor(1.0,0.0,0.0);
+
+		CDataSet fit, obs;
+		const int start = i;
+		fit.SetDrawMarker(false);
+		fit.SetDatasetColor(0.0,0.0,0.0);
+		obs.SetDrawMarker(false);
+		obs.SetDatasetColor(0.5,0.5,0.5);
+		while (i < n_local) {
+		//	std::cout << mic.patchX[i] << " " << mic.patchY[i] << " " << mic.patchZ[i] << " " << mic.localShiftX[i] << " " << mic.localShiftY[i] << std::endl;
+			if ((mic.patchX[start] != mic.patchX[i]) || (mic.patchY[start] != mic.patchY[i])) {
+		//		std::cout << "End of a trace" << std::endl;
+				break; // start again from this frame
+			}
+			CDataPoint p_obs(mic.patchX[start] + shift_scale * mic.localShiftX[i], mic.patchY[start] + shift_scale * mic.localShiftY[i]);
+			obs.AddDataPoint(p_obs);
+			CDataPoint p_fit(mic.patchX[start] + shift_scale * mic.localFitX[i], mic.patchY[start] + shift_scale * mic.localFitY[i]);
+			fit.AddDataPoint(p_fit);
+			if (i == start) patch_start.AddDataPoint(p_fit);
+			i++;
+		}
+		plot2D->AddDataSet(fit);
+		plot2D->AddDataSet(obs);
+	
+		plot2D->AddDataSet(patch_start);
 	}
-	else
-	{
-		plot2D->SetXAxisTitle("X-shift (in pixels)");
-		plot2D->SetYAxisTitle("Y-shift (in pixels)");
-	}
+
+	char title[256];
+	snprintf(title, 255, "X-shift (in pixels; trajectory scaled by %.0f)", shift_scale);
+	plot2D->SetXAxisTitle(title);
+	title[0] = 'Y';
+	plot2D->SetYAxisTitle(title);
+	
 	plot2D->OutputPostScriptPlot(fn_eps);
 }
 
@@ -887,10 +950,9 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 
 // TODO:
 // - defect
-// - grouping
 // - outlier rejection in fitting (use free set?)
 
-bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<float> &xshifts, std::vector<float> &yshifts) {
+bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts) {
 	omp_set_num_threads(n_threads);
 
 	FileName fn_mic = mic.getMovieFilename();
@@ -960,19 +1022,19 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<f
 		}
 	}
 	logfile << std::endl;
-	if (n_frames / group != 0) {
+	if (n_frames % group != 0) {
 		logfile << "Some groups contain more than the requested number of frames (" << group << ") because the number of frames (" << n_frames << ") was not divisible." << std::endl;
 		logfile << "If you want to ignore remaining frame(s) instead, use --last_frame_sum to discard last frame(s)." << std::endl;
 	}
 	logfile << std::endl;
 
-	// Read gain reference	
+	// Read gain reference
 	RCTIC(TIMING_READ_GAIN);
 	if (fn_gain_reference != "") {
 		Igain.read(fn_gain_reference);
-		if (XSIZE(Igain()) != nx || YSIZE(Igain()) != ny) {	
+		if (XSIZE(Igain()) != nx || YSIZE(Igain()) != ny) {
 			std::cerr << "fn_mic: " << fn_mic << std::endl;
-			REPORT_ERROR("The size of the image and the size of the gain reference do not match.");
+			REPORT_ERROR("The size of the image and the size of the gain reference do not match. Make sure the gain reference has been rotated if necessary.");
 		}
 	}
 	RCTOC(TIMING_READ_GAIN);
@@ -1053,8 +1115,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<f
 	alignPatch(Fframes, nx, ny, xshifts, yshifts, logfile);
 	RCTOC(TIMING_GLOBAL_ALIGNMENT);
 	for (int i = 0, ilim = xshifts.size(); i < ilim; i++) {
-		int frame = i + 1; // make 1-indexed
-		mic.setGlobalShift(frame, xshifts[i], yshifts[i]);
+		mic.setGlobalShift(frames[i] + 1, xshifts[i], yshifts[i]); // 1-indexed
         }
 
 	Iref().reshape(Iframes[0]());
@@ -1102,7 +1163,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<f
 				logfile << ", Center = (" << x_center << ", " << y_center << ")" << std::endl;
 				ipatch++;
 
-				std::vector<float> local_xshifts(n_groups), local_yshifts(n_groups);
+				std::vector<RFLOAT> local_xshifts(n_groups), local_yshifts(n_groups);
 				RCTIC(TIMING_PREP_PATCH);
 				std::vector<MultidimArray<RFLOAT> >Ipatches(n_threads);
 				#pragma omp parallel for
@@ -1130,34 +1191,9 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<f
 				RCTOC(TIMING_PATCH_ALIGN);
 				if (!converged) continue;
 
+				std::vector<RFLOAT> interpolated_xshifts(n_frames), interpolated_yshifts(n_frames);
+				interpolateShifts(group_start, group_size, local_xshifts, local_yshifts, n_frames, interpolated_xshifts, interpolated_yshifts);
 				if (interpolate_shifts) {
-					if (n_groups < 2) REPORT_ERROR("Assert failed for n_groups >= 2");
-
-					std::vector<RFLOAT> centers(n_groups), interpolated_xshifts(n_frames), interpolated_yshifts(n_frames);
-					// Calculate anchor points
-					for (int igroup = 0; igroup < n_groups; igroup++) {
-						centers[igroup] = group_start[igroup] + group_size[igroup] / 2.0;
-#ifdef DEBUG_OWN
-						std::cout << "igroup = " << igroup << " center " << centers[igroup] << " x " << local_xshifts[igroup] << " y " << local_yshifts[igroup] << std::endl;
-#endif
-					}
-
-					// Inter-/Extra-polate
-					int cur_group = 0;
-					for (int iframe = 0; iframe < n_frames; iframe++) {
-						if (cur_group < n_groups - 2 && iframe >= centers[cur_group + 1]) cur_group++; // don't go to the last group
-
-						// This formula can be used for both interpolation and extrapolation
-						interpolated_xshifts[iframe] = (local_xshifts[cur_group] * (centers[cur_group + 1] - iframe) +
-						                                local_xshifts[cur_group + 1] * (iframe - centers[cur_group])) / 
-						                               (centers[cur_group + 1] - centers[cur_group]);
-						interpolated_yshifts[iframe] = (local_yshifts[cur_group] * (centers[cur_group + 1] - iframe) +
-						                                local_yshifts[cur_group + 1] * (iframe - centers[cur_group])) /
-						                               (centers[cur_group + 1] - centers[cur_group]);
-#ifdef DEBUG_OWN
-						std::cout << "iframe = " << iframe << " igroup " << cur_group << " x " << interpolated_xshifts[iframe] << " y " << interpolated_yshifts[iframe] << std::endl;
-#endif
-					}
 					// Recenter to the first frame
 					for (int iframe = 0; iframe < n_frames; iframe++) {
 						interpolated_xshifts[iframe] -= interpolated_xshifts[0];
@@ -1171,11 +1207,10 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<f
 						patch_xs.push_back(x_center);
 						patch_ys.push_back(y_center);
 					}
-				} else {
+				} else { // only recenter to the center
 					for (int igroup = 0; igroup < n_groups; igroup++) {
-						patch_xshifts.push_back(local_xshifts[igroup]);
-						patch_yshifts.push_back(local_yshifts[igroup]);
-						// TODO: This approach might bring the origin to a wrong frame.
+						patch_xshifts.push_back(local_xshifts[igroup] - interpolated_xshifts[0]);
+						patch_yshifts.push_back(local_yshifts[igroup] - interpolated_yshifts[0]);
 						RFLOAT middle_frame = group_start[igroup] + group_size[igroup] / 2.0;
 						patch_frames.push_back(middle_frame);
 						patch_xs.push_back(x_center);
@@ -1268,8 +1303,8 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<f
 		mic.model = NULL;
 	}
 
-	if (save_noDW) {
-		Iref().initZeros();
+	if (!do_dose_weighting || save_noDW) {
+		Iref().initZeros(Iframes[0]());
 
 		RCTIC(TIMING_REAL_SPACE_INTERPOLATION);
 		logfile << "Summing frames before dose weighting: ";
@@ -1284,14 +1319,14 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<f
 		}
 		RCTOC(TIMING_BINNING);
 
-		// Final output
-		Iref.write(fn_avg_noDW);
-		logfile << "Written aligned but non-dose wieghted sum to " << fn_avg_noDW << std::endl;
+		// Final output.
+		Iref.write(!do_dose_weighting ? fn_avg : fn_avg_noDW);
+		logfile << "Written aligned but non-dose weighted sum to " << fn_avg_noDW << std::endl;
 	}
 
 	// Dose weighting
-	RCTIC(TIMING_DOSE_WEIGHTING);
 	if (do_dose_weighting) {
+		RCTIC(TIMING_DOSE_WEIGHTING);
 		if (std::abs(voltage - 300) > 2 && std::abs(voltage - 200) > 2) {
 			REPORT_ERROR("Sorry, dose weighting is supported only for 300 kV or 200 kV");
 		}
@@ -1316,28 +1351,65 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<f
 			transformers[omp_get_thread_num()].inverseFourierTransform(Fframes[iframe], Iframes[iframe]());
 		}
 		RCTOC(TIMING_DW_IFFT);
+		RCTOC(TIMING_DOSE_WEIGHTING);
+
+		Iref().initZeros(Iframes[0]());
+		RCTIC(TIMING_REAL_SPACE_INTERPOLATION);
+		logfile << "Summing frames after dose weighting: ";
+		realSpaceInterpolation(Iref, Iframes, mic.model, logfile);
+		logfile << " done" << std::endl;
+		RCTOC(TIMING_REAL_SPACE_INTERPOLATION);
+
+		// Apply binning
+		RCTIC(TIMING_BINNING);
+		if (bin_factor != 1) {
+			binNonSquareImage(Iref, bin_factor);
+		}
+		RCTOC(TIMING_BINNING);
+
+		// Final output
+		Iref.write(fn_avg);
+		logfile << "Written aligned and dose-weighted sum to " << fn_avg << std::endl;
 	}
-	RCTOC(TIMING_DOSE_WEIGHTING);
 
-	Iref().initZeros();
-	RCTIC(TIMING_REAL_SPACE_INTERPOLATION);
-	logfile << "Summing frames after dose weighting: ";
-	realSpaceInterpolation(Iref, Iframes, mic.model, logfile);
-	logfile << " done" << std::endl;
-	RCTOC(TIMING_REAL_SPACE_INTERPOLATION);
-
-	// Apply binning
-	RCTIC(TIMING_BINNING);
-	if (bin_factor != 1) {
-		binNonSquareImage(Iref, bin_factor);
-	}
-	RCTOC(TIMING_BINNING);
-
-	// Final output
-	Iref.write(fn_avg);
-	logfile << "Written aligned and dose-weighted sum to " << fn_avg << std::endl;
+	// Set the start frame for the local motion model.
+	mic.first_frame = frames[0] + 1; // NOTE that this is 1-indexed.
 
 	return true;
+}
+
+void MotioncorrRunner::interpolateShifts(std::vector<int> &group_start, std::vector<int> &group_size,
+                                         std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts,
+                                         int n_frames,
+                                         std::vector<RFLOAT> &interpolated_xshifts, std::vector<RFLOAT> &interpolated_yshifts) {
+	const int n_groups = group_start.size();
+	if (n_groups < 2) REPORT_ERROR("Assert failed for n_groups >= 2");
+	std::vector<RFLOAT> centers(n_groups);
+
+	// Calculate anchor points
+	for (int igroup = 0; igroup < n_groups; igroup++) {
+		centers[igroup] = group_start[igroup] + group_size[igroup] / 2.0;
+#ifdef DEBUG_OWN
+		std::cout << "igroup = " << igroup << " center " << centers[igroup] << " x " << xshifts[igroup] << " y " << yshifts[igroup] << std::endl;
+#endif
+	}
+
+	// Inter-/Extra-polate
+	int cur_group = 0;
+	for (int iframe = 0; iframe < n_frames; iframe++) {
+		if (cur_group < n_groups - 2 && iframe >= centers[cur_group + 1]) cur_group++; // don't go to the last group
+
+		// This formula can be used for both interpolation and extrapolation
+		interpolated_xshifts[iframe] = (xshifts[cur_group] * (centers[cur_group + 1] - iframe) +
+		                                xshifts[cur_group + 1] * (iframe - centers[cur_group])) /
+		                               (centers[cur_group + 1] - centers[cur_group]);
+		interpolated_yshifts[iframe] = (yshifts[cur_group] * (centers[cur_group + 1] - iframe) +
+		                                yshifts[cur_group + 1] * (iframe - centers[cur_group])) /
+		                               (centers[cur_group + 1] - centers[cur_group]);
+#ifdef DEBUG_OWN
+		std::cout << "iframe = " << iframe << " igroup " << cur_group << " x " << interpolated_xshifts[iframe] << " y " << interpolated_yshifts[iframe] << std::endl;
+#endif
+	}
 }
 
 void MotioncorrRunner::realSpaceInterpolation(Image <RFLOAT> &Iref, std::vector<Image<RFLOAT> > &Iframes, MotionModel *model, std::ostream &logfile) {
@@ -1359,16 +1431,14 @@ void MotioncorrRunner::realSpaceInterpolation(Image <RFLOAT> &Iref, std::vector<
 		}
 
 	} else if (model_version == MOTION_MODEL_THIRD_ORDER_POLYNOMIAL) { // Optimised code
-
 		ThirdOrderPolynomialModel *polynomial_model = (ThirdOrderPolynomialModel*)model;
 		realSpaceInterpolation_ThirdOrderPolynomial(Iref, Iframes, *polynomial_model, logfile);
-
 	} else { // general code
 		const int nx = XSIZE(Iframes[0]()), ny = YSIZE(Iframes[0]());
 		for (int iframe = 0; iframe < n_frames; iframe++) {
 			logfile << "." << std::flush;
 			const RFLOAT z = iframe;
-			
+
 			#pragma omp parallel for schedule(static)
 			for (int ix = 0; ix < nx; ix++) {
 				const RFLOAT x = (RFLOAT)ix / nx - 0.5;
@@ -1503,7 +1573,7 @@ void MotioncorrRunner::realSpaceInterpolation_ThirdOrderPolynomial(Image <RFLOAT
 	}
 }
 
-bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes, const int pnx, const int pny, std::vector<float> &xshifts, std::vector<float> &yshifts, std::ostream &logfile) {
+bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes, const int pnx, const int pny, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts, std::ostream &logfile) {
 	std::vector<Image<RFLOAT> > Iccs(n_threads);
 	MultidimArray<Complex> Fref;
 	std::vector<MultidimArray<Complex> > Fccs(n_threads);
@@ -1782,28 +1852,32 @@ void MotioncorrRunner::shiftNonSquareImageInFourierTransform(MultidimArray<Compl
 
 // Iwork is overwritten
 void MotioncorrRunner::binNonSquareImage(Image<RFLOAT> &Iwork, RFLOAT bin_factor) {
-	FourierTransformer transformer;
+	FourierTransformer transformer, transformer2;
 
 	const int nx = XSIZE(Iwork()), ny = YSIZE(Iwork());
 	int new_nx = nx / bin_factor, new_ny = ny / bin_factor;
 	new_nx -= new_nx % 2; new_ny -= new_ny % 2; // force it to be even
-//	std::cout << "Binning from X = " << nx << " Y = " << ny << " to X = " << new_nx << " Y = " << new_ny << std::endl;
-
 	const int half_new_ny = new_ny / 2, new_nfx = new_nx / 2 + 1;
+#ifdef DEBUG_OWN
+	std::cout << "Binning from X = " << nx << " Y = " << ny << " to X = " << new_nx << " Y = " << new_ny << " half_new_ny = " << half_new_ny << " new_nfx = " << new_nfx << std::endl;
+#endif
 	MultidimArray<Complex> Fref, Fbinned(new_ny, new_nfx);
 	transformer.FourierTransform(Iwork(), Fref);
 
-	for (int y = 0; y <= half_new_ny; y++) {
+	for (int y = 0; y < half_new_ny; y++) {
 		for (int x = 0; x < new_nfx; x++) {
 			DIRECT_A2D_ELEM(Fbinned, y, x) =  DIRECT_A2D_ELEM(Fref, y, x);
 		}
 	}
-	for (int y = half_new_ny + 1; y < new_ny; y++) {
+	for (int y = half_new_ny; y < new_ny; y++) {
 		for (int x = 0; x < new_nfx; x++) {
-			DIRECT_A2D_ELEM(Fbinned, y, x) =  DIRECT_A2D_ELEM(Fref, ny - 1 - new_ny + y, x);
+			DIRECT_A2D_ELEM(Fbinned, y, x) =  DIRECT_A2D_ELEM(Fref, ny - new_ny + y, x);
 		}
 	}
 
 	Iwork().reshape(new_ny, new_nx);
-	transformer.inverseFourierTransform(Fbinned, Iwork());
+	// If reshape does NOT change Iwork.data pointer (rare but actually happens),
+	// transformer does not re-create plan although the size is different!
+	// So we have to use different transformer.
+	transformer2.inverseFourierTransform(Fbinned, Iwork());
 }

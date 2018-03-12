@@ -17,7 +17,11 @@ static void CufftHandleError( cufftResult err, const char *file, int line )
     {
         fprintf(stderr, "Cufft error in file '%s' in line %i : %s.\n",
                 __FILE__, __LINE__, "error" );
+#ifdef DEBUG_CUDA
 		raise(SIGSEGV);
+#else
+		CRITICAL(ERRGPUKERN);
+#endif
     }
 }
 

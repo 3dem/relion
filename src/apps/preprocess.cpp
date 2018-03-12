@@ -23,7 +23,9 @@
 int main(int argc, char *argv[])
 {
 	Preprocessing prm;
-
+	
+    	PRINT_VERSION_INFO();
+    	
 	try
     {
 		prm.read(argc, argv);

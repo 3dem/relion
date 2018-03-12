@@ -192,10 +192,16 @@ void generateEulerMatrices(
 	    alpha = DEG2RAD(ProjectionData.rots[i]);
 	    beta  = DEG2RAD(ProjectionData.tilts[i]);
 	    gamma = DEG2RAD(ProjectionData.psis[i]);
-
+	    
+#ifdef RELION_SINGLE_PRECISION
+	    sincosf(alpha, &sa, &ca);
+	    sincosf(beta,  &sb, &cb);
+	    sincosf(gamma, &sg, &cg);
+#else
 	    sincos(alpha, &sa, &ca);
 	    sincos(beta,  &sb, &cb);
 	    sincos(gamma, &sg, &cg);
+#endif
 
 	    cc = cb * ca;
 	    cs = cb * sa;

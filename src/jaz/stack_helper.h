@@ -41,6 +41,14 @@ class StackHelper
                 bool loadData = true, int firstFrame = 0, int lastFrame = -1,
                 RFLOAT hot = -1.0, bool verbose = false);
 
+        static std::vector<std::vector<Image<Complex> > > extractMovieStackFS(
+                const MetaDataTable* mdt,
+                Image<RFLOAT>* gainRef, std::string movieFn,
+                double outPs, double coordsPs, double moviePs,
+                int squareSize, int threads,
+                bool loadData = true, int firstFrame = 0, int lastFrame = -1,
+                RFLOAT hot = -1.0, bool verbose = false);
+
         static Image<Complex> projectView(Projector* projector, const MetaDataTable* mdt, int index);
         //static Image<Complex> projectView2(Projector* projector, const MetaDataTable* mdt, int index);
         static std::vector<Image<Complex> > projectStack(Projector* projector, const MetaDataTable* mdt);

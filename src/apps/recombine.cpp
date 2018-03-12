@@ -136,7 +136,7 @@ int FrameRecomb::_run()
             double b = cf/(s*s);
 
             bfacsDat << i << " " << b << "\n";
-            kfacsDat << i << " " << bkFacs.first[i].y << "\n";
+            kfacsDat << i << " " << log(bkFacs.first[i].y) << "\n";
         }
 
         bfacsDat.close();

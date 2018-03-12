@@ -573,6 +573,154 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
     return out;
 }
 
+
+std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
+    const MetaDataTable* mdt,
+    Image<RFLOAT>* gainRef, std::string movieFn,
+    double outPs, double coordsPs, double moviePs,
+    int squareSize, int threads,
+    bool loadData, int firstFrame, int lastFrame,
+    RFLOAT hot, bool verbose)
+{
+    std::vector<std::vector<Image<Complex>>> out(mdt->numberOfObjects());
+    const long pc = mdt->numberOfObjects();
+
+    Image<float> mgStack;
+    mgStack.read(movieFn, false);
+
+    if (verbose)
+    {
+        std::cout << "size: "
+            << mgStack().xdim << "x"
+            << mgStack().ydim << "x"
+            << mgStack().zdim << "x"
+            << mgStack().ndim << "\n";
+    }
+
+    const bool dataInZ = mgStack.data.zdim > 1;
+
+    const int w0 = mgStack.data.xdim;
+    const int h0 = mgStack.data.ydim;
+    const int fcM = dataInZ? mgStack.data.zdim : mgStack.data.ndim;
+    const int fc = lastFrame > 0? lastFrame - firstFrame + 1 : fcM - firstFrame;
+
+    if (fcM <= lastFrame)
+    {
+        REPORT_ERROR("StackHelper::extractMovieStackFS: insufficient number of frames in "+movieFn);
+    }
+
+    const bool useGain = gainRef != 0;
+    if (useGain && (w0 != gainRef->data.xdim || h0 != gainRef->data.ydim))
+    {
+        REPORT_ERROR("StackHelper::extractMovieStackFS: incompatible gain reference - size is different from "+movieFn);
+    }
+
+    if (verbose)
+    {
+        if (dataInZ) std::cout << "data in Z\n";
+        else std::cout << "data in N\n";
+
+        std::cout << "frame count in movie = " << fcM << "\n";
+        std::cout << "frame count to load  = " << fc << "\n";
+    }
+
+    for (long p = 0; p < pc; p++)
+    {
+        out[p] = std::vector<Image<Complex>>(fc);
+    }
+
+    if (!loadData) return out;
+
+
+    const int sqMg = 2*(int)(0.5 * squareSize * outPs / moviePs + 0.5);
+
+    if (verbose)
+    {
+        std::cout << "square size in micrograph: " << sqMg << "\n";
+    }
+
+    std::vector<ParFourierTransformer> fts(threads);
+
+    std::vector<Image<RFLOAT>> aux0(threads);
+    std::vector<Image<Complex>> aux1(threads);
+
+    for (int t = 0; t < threads; t++)
+    {
+        aux0[t] = Image<RFLOAT>(sqMg, sqMg);
+
+        if (outPs != moviePs)
+        {
+            aux1[t] = Image<Complex>(sqMg/2+1,sqMg);
+        }
+    }
+
+    Image<float> muGraph;
+
+    for (long f = 0; f < fc; f++)
+    {
+        muGraph.read(movieFn, true, f+firstFrame);
+
+        if (verbose) std::cout << (f+1) << "/" << fc << "\n";
+
+        #pragma omp parallel for num_threads(threads)
+        for (long p = 0; p < pc; p++)
+        {
+            int t = omp_get_thread_num();
+
+            out[p][f] = Image<Complex>(sqMg,sqMg);
+
+            double xpC, ypC;
+
+            mdt->getValue(EMDL_IMAGE_COORD_X, xpC, p);
+            mdt->getValue(EMDL_IMAGE_COORD_Y, ypC, p);
+
+            const double xpO = (int)(coordsPs * xpC / outPs) - squareSize/2;
+            const double ypO = (int)(coordsPs * ypC / outPs) - squareSize/2;
+
+            const int x0 = (int)round(xpO * outPs / moviePs);
+            const int y0 = (int)round(ypO * outPs / moviePs);
+
+            // @TODO: read whole-image shifts from micrograph class
+
+            for (long int y = 0; y < sqMg; y++)
+            for (long int x = 0; x < sqMg; x++)
+            {
+                int xx = x0 + x;
+                int yy = y0 + y;
+
+                if (xx < 0) xx = 0;
+                else if (xx >= w0) xx = w0 - 1;
+
+                if (yy < 0) yy = 0;
+                else if (yy >= h0) yy = h0 - 1;
+
+                RFLOAT val = DIRECT_NZYX_ELEM(muGraph.data, 0, 0, yy, xx);
+                RFLOAT gain = 1.0;
+
+                if (useGain) gain = DIRECT_NZYX_ELEM(gainRef->data, 0, 0, yy, xx);
+
+                if (hot > 0.0 && val > hot) val = hot;
+
+                DIRECT_NZYX_ELEM(aux0[t].data, 0, 0, y, x) = -gain * val;
+            }
+
+            if (outPs == moviePs)
+            {
+                fts[t].FourierTransform(aux0[t](), out[p][f]());
+            }
+            else
+            {
+                fts[t].FourierTransform(aux0[t](), aux1[t]());
+                out[p][f] = FilterHelper::cropCorner2D(aux1[t], squareSize/2+1, squareSize);
+            }
+
+            out[p][f](0,0) = Complex(0.0,0.0);
+        }
+    }
+
+    return out;
+}
+
 Image<Complex> StackHelper::projectView(Projector* projector, const MetaDataTable* mdt, int index)
 {
     const int s = projector->ori_size;

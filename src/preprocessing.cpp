@@ -183,7 +183,7 @@ void Preprocessing::initialise()
 				std::cout << " + Using pixel size from input STAR file of " << angpix << " Angstroms" << std::endl;
 
 		}
-		else if (do_recenter || fn_data != "")
+		else if (!do_movie_extract && (do_recenter || fn_data != ""))
 		{
 			REPORT_ERROR("Preprocessing:: ERROR: cannot use --recenter or --reextract_data_star without providing angpix info in the input micrograph STAR file or by using --set_angpix!");
 		}
@@ -1227,7 +1227,6 @@ MetaDataTable Preprocessing::getCoordinateMetaDataTable(FileName fn_mic)
 				MDresult.getValue(EMDL_ORIENT_PSI, psi);
 				MDresult.getValue(EMDL_ORIENT_ORIGIN_X, xoff);
 				MDresult.getValue(EMDL_ORIENT_ORIGIN_Y, yoff);
-				std::cerr << " xoff= " << xoff << " yoff= " << yoff << std::endl;
 				MDresult.setValue(EMDL_ORIENT_ROT_PRIOR, rot);
 				MDresult.setValue(EMDL_ORIENT_TILT_PRIOR, tilt);
 				MDresult.setValue(EMDL_ORIENT_PSI_PRIOR, psi);

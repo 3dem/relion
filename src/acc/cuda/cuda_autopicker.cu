@@ -286,8 +286,8 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 
 	AccPtr<XFLOAT >  d_Mccf_best(basePckr->workSize*basePckr->workSize, allocator);
 	AccPtr<XFLOAT >  d_Mpsi_best(basePckr->workSize*basePckr->workSize, allocator);
-	d_Mccf_best.allAlloc();
-	d_Mpsi_best.allAlloc();
+	d_Mccf_best.deviceAlloc();
+	d_Mpsi_best.deviceAlloc();
 
 	// Always use the same random seed
 	init_random_generator(basePckr->random_seed + imic);
@@ -562,7 +562,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 			AccPtr<XFLOAT > d_Mavg(allocator);
 			AccPtr<XFLOAT > d_Mstddev2(allocator);
 
-			d_Fmsk2.allAlloc();
+			d_Fmsk2.deviceAlloc();
 			d_Mavg.deviceAlloc(basePckr->workSize*basePckr->workSize);
 			d_Mstddev2.deviceAlloc(basePckr->workSize*basePckr->workSize);
 
@@ -595,7 +595,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 
 		//TODO Do this only once further up in scope
 		AccPtr< ACCCOMPLEX > d_Fmsk(basePckr->Finvmsk.nzyxdim, allocator);
-		d_Fmsk.allAlloc();
+		d_Fmsk.deviceAlloc();
 		for(int i = 0; i< d_Fmsk.getSize() ; i++)
 		{
 			d_Fmsk[i].x = basePckr->Finvmsk.data[i].real;
@@ -715,7 +715,7 @@ void AutoPickerCuda::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 	}
 
 	AccPtr< XFLOAT >  d_ctf(Fctf.nzyxdim, allocator);
-	d_ctf.allAlloc();
+	d_ctf.deviceAlloc();
 	if(basePckr->do_ctf)
 	{
 		for(int i = 0; i< d_ctf.getSize() ; i++)
