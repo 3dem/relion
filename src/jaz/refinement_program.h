@@ -79,6 +79,8 @@ class RefinementProgram
 
         std::vector<std::vector<Image<Complex>>> loadMovie(
                 int g, int pc, std::vector<ParFourierTransformer>& fts);
+
+        void setForAll(EMDLabel label, RFLOAT value);
 };
 
 #endif

@@ -62,8 +62,8 @@ int RefinementProgram::init(int argc, char *argv[])
 
             hotCutoff = textToFloat(parser.getOption("--hot", "Clip hot pixels to this max. value (-1 = off, TIFF only)", "-1"));
 
-            firstFrame = textToInteger(parser.getOption("--first_frame", "", "1"))-1;
-            lastFrame = textToInteger(parser.getOption("--last_frame", "", "-1"))-1;
+            firstFrame = textToInteger(parser.getOption("--first_frame", "", "1")) - 1;
+            lastFrame = textToInteger(parser.getOption("--last_frame", "", "-1")) - 1;
         }
         else
         {
@@ -250,10 +250,7 @@ int RefinementProgram::init(int argc, char *argv[])
         }
         else
         {
-            for (int i = 0; i < mdt0.numberOfObjects(); i++)
-            {
-                mdt0.setValue(EMDL_CTF_CS, Cs, i);
-            }
+            setForAll(EMDL_CTF_CS, Cs);
         }
 
         if (kV < 0.0)
@@ -263,10 +260,7 @@ int RefinementProgram::init(int argc, char *argv[])
         }
         else
         {
-            for (int i = 0; i < mdt0.numberOfObjects(); i++)
-            {
-                mdt0.setValue(EMDL_CTF_VOLTAGE, kV, i);
-            }
+            setForAll(EMDL_CTF_VOLTAGE, kV);
         }
 
         if (angpix <= 0.0)
@@ -429,4 +423,12 @@ std::vector<std::vector<Image<Complex>>> RefinementProgram::loadMovie(
     }
 
     return movie;
+}
+
+void RefinementProgram::setForAll(EMDLabel label, double value)
+{
+    for (int i = 0; i < mdt0.numberOfObjects(); i++)
+    {
+        mdt0.setValue(label, value, i);
+    }
 }

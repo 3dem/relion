@@ -166,17 +166,16 @@ int TiltFit::_run()
             CTF ctf0;
             ctf0.read(mdts[g], mdts[g], 0);
 
-            std::vector<Image<Complex> > pred;
-            std::vector<Image<Complex> > obsF;
+            const int pc = mdts[g].numberOfObjects();
 
-            // @TODO: use observation model!
-            if (nr_omp_threads > 1)
+            std::vector<Image<Complex>> pred(pc);
+            std::vector<Image<Complex>> obsF;
+
+            #pragma omp parallel for num_threads(nr_omp_threads)
+            for (long p = 0; p < pc; p++)
             {
-                pred = StackHelper::projectStackPar(&projectors[0], &mdts[g], nr_omp_threads);
-            }
-            else
-            {
-                pred = StackHelper::projectStack(&projectors[0], &mdts[g]);
+                pred[p] = obsModel.predictObservation(
+                    projectors[0], mdts[g], p, false, false);
             }
 
             obsF = StackHelper::loadStackFS(&mdts[g], imgPath, nr_omp_threads, &fts);
@@ -203,7 +202,8 @@ int TiltFit::_run()
                 int threadnum = omp_get_thread_num();
 
                 CTF ctf(ctf0);
-                TiltRefinement::updateTiltShift(pred[p], obsF[p], ctf, angpix, xyAcc[threadnum], wAcc[threadnum]);
+                TiltRefinement::updateTiltShift(
+                    pred[p], obsF[p], ctf, angpix, xyAcc[threadnum], wAcc[threadnum]);
             }
         }
 
@@ -312,6 +312,11 @@ int TiltFit::_run()
     os2 << "beamtilt_x = " << tilt_x << "\n";
     os2 << "beamtilt_y = " << tilt_y << "\n";
     os2.close();
+
+    setForAll(EMDL_IMAGE_BEAMTILT_X, tilt_x);
+    setForAll(EMDL_IMAGE_BEAMTILT_Y, tilt_y);
+
+    mdt0.write(outPath+"_particles.star");
 
     double t1 = omp_get_wtime();
 
