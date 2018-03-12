@@ -82,8 +82,8 @@ int FrameRecomb::readMoreOptions(IOParser& parser, int argc, char *argv[])
     trackFn = parser.getOption("--t", "Input tracks");
     fccFn = parser.getOption("--cc", "Input MRC file of per-micrograph Fourier cross-correlations");
 
-    k0a = textToInteger(parser.getOption("--k0", "Min. frequency used in B-factor fit (Angst)", "10"));
-    k1a = textToInteger(parser.getOption("--k1", "Max. frequency used in B-factor fit (Angst)", "-1"));
+    k0a = textToFloat(parser.getOption("--k0", "Min. frequency used in B-factor fit (Angst)", "20"));
+    k1a = textToFloat(parser.getOption("--k1", "Max. frequency used in B-factor fit (Angst)", "-1"));
 
     return 0;
 }

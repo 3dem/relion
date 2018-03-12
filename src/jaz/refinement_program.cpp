@@ -397,6 +397,7 @@ void RefinementProgram::loadInitialMovieValues()
     }
 }
 
+// @TODO: crash (gracefully) if the number of frames is insufficient
 std::vector<std::vector<Image<Complex>>> RefinementProgram::loadMovie(
         int g, int pc, std::vector<ParFourierTransformer>& fts)
 {

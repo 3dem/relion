@@ -146,7 +146,7 @@ int MotionFitProg::_run()
 
     for (long g = g0; g <= gc; g++)
     {
-        std::cout << "micrograph " << g << " / " << mdts.size() <<"\n";
+        std::cout << "micrograph " << (g+1) << " / " << mdts.size() <<"\n";
 
         std::stringstream stsg;
         stsg << g;
