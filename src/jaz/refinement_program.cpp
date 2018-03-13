@@ -352,7 +352,7 @@ int RefinementProgram::init(int argc, char *argv[])
     {
         RefinementHelper::drawFSC(&fscMdt, freqWeight);
     }
-    else
+    else if (!noReference)
     {
         freqWeight = Image<RFLOAT>(sh,s);
         freqWeight.data.initConstant(1.0);
