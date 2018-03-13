@@ -134,6 +134,7 @@ private:
 	void setMovie(FileName fnMovie, FileName fnGain="", RFLOAT binning=1.0);
 
 	void clear();
+	void clearFields();
 	void copyFieldsFrom(const Micrograph& m);
 
 	void checkReadyFlag(std::string origin) const;

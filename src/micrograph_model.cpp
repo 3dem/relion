@@ -47,7 +47,7 @@ int ThirdOrderPolynomialModel::getShiftAt(RFLOAT z, RFLOAT x, RFLOAT y, RFLOAT &
 
 MotionModel* ThirdOrderPolynomialModel::clone() const
 {
-    return (MotionModel*) new ThirdOrderPolynomialModel(*this);
+	return (MotionModel*) new ThirdOrderPolynomialModel(*this);
 }
 
 void ThirdOrderPolynomialModel::write(std::ostream &fh, std::string block_name) {
@@ -113,7 +113,7 @@ Micrograph::Micrograph()
 :   ready(false),
     model(NULL)
 {
-    clear();
+	clearFields();
 }
 
 Micrograph::Micrograph(const Micrograph& m)
@@ -127,35 +127,37 @@ Micrograph::Micrograph(FileName filename, FileName fnGain, RFLOAT binning)
 :   ready(false),
     model(NULL)
 {
-    clear();
+	clearFields();
 
-    if (filename.getExtension() == "star" && fnGain == "") {
-        read(filename);
-    } else {
-        setMovie(filename, fnGain, binning);
-    }
+	if (filename.getExtension() == "star" && fnGain == "") {
+		read(filename);
+	} else {
+		setMovie(filename, fnGain, binning);
+	}
 
-    ready = true;
+	ready = true;
 }
 
 Micrograph::~Micrograph()
 {
-    if (model != NULL) delete model;
+	if (model != NULL) delete model;
 }
 
 Micrograph& Micrograph::operator = (const Micrograph& m)
 {
-    ready = m.ready;
+	ready = m.ready;
 
-    if (model != NULL) delete model;
-    model = (m.model != NULL)? m.model->clone() : NULL;
+	if (model != NULL) delete model;
+	model = (m.model != NULL)? m.model->clone() : NULL;
 
-    copyFieldsFrom(m);
+	copyFieldsFrom(m);
+
+	return *this;
 }
 
 void Micrograph::write(FileName filename)
 {
-    checkReadyFlag("write");
+	checkReadyFlag("write");
 
 	std::ofstream fh;
 	MetaDataTable MD;
@@ -216,32 +218,32 @@ void Micrograph::write(FileName filename)
 }
 
 FileName Micrograph::getGainFilename() const {
-    return fnGain;
+	return fnGain;
 }
 
 RFLOAT Micrograph::getBinningFactor() const {
-    return binning;
+	return binning;
 }
 
 FileName Micrograph::getMovieFilename() const {
-    return fnMovie;
+	return fnMovie;
 }
 
 int Micrograph::getWidth() const {
-    return width;
+	return width;
 }
 
 int Micrograph::getHeight() const {
-    return height;
+	return height;
 }
 
 int Micrograph::getNframes() const {
-    return n_frames;
+	return n_frames;
 }
 
 int Micrograph::getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty, bool use_local) const
 {
-    checkReadyFlag("getShiftAt");
+	checkReadyFlag("getShiftAt");
 
 	if (globalShiftX[frame - 1] == NOT_OBSERVED || globalShiftX[frame - 1] == NOT_OBSERVED) {
 		shiftx = shifty = NOT_OBSERVED;
@@ -265,7 +267,7 @@ int Micrograph::getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFL
 
 void Micrograph::setGlobalShift(int frame, RFLOAT shiftx, RFLOAT shifty)
 {
-    checkReadyFlag("setGlobalShift");
+	checkReadyFlag("setGlobalShift");
 
 	if (frame <= 0 || frame > n_frames) {
 		std::cout << "Frame: " << frame << " n_frames: " << n_frames << std::endl;
@@ -279,171 +281,175 @@ void Micrograph::setGlobalShift(int frame, RFLOAT shiftx, RFLOAT shifty)
 
 void Micrograph::read(FileName fn_in)
 {
-    // Clear current model
-    clear();
+	if (model != NULL)
+	{
+		delete model;
+		model = NULL;
+	}
 
-    // Open input file
-    std::ifstream in(fn_in.data(), std::ios_base::in);
-    if (in.fail()) {
-        REPORT_ERROR( (std::string) "MicrographModel::read: File " + fn_in + " cannot be read." );
-    }
+	// Clear current model
+	clearFields();
 
-    MetaDataTable MDglobal;
+	// Open input file
+	std::ifstream in(fn_in.data(), std::ios_base::in);
+	if (in.fail()) {
+		REPORT_ERROR( (std::string) "MicrographModel::read: File " + fn_in + " cannot be read." );
+	}
 
-    // Read Image metadata
-    MDglobal.readStar(in, "general");
+	MetaDataTable MDglobal;
 
-    if (!MDglobal.getValue(EMDL_IMAGE_SIZEX, width) ||
-        !MDglobal.getValue(EMDL_IMAGE_SIZEY, height) ||
-        !MDglobal.getValue(EMDL_IMAGE_SIZEZ, n_frames) ||
-        !MDglobal.getValue(EMDL_MICROGRAPH_MOVIE_NAME, fnMovie)) {
-        REPORT_ERROR("MicrographModel::read: insufficient general information");
-    }
+	// Read Image metadata
+	MDglobal.readStar(in, "general");
 
-    globalShiftX.resize(n_frames, NOT_OBSERVED);
-    globalShiftY.resize(n_frames, NOT_OBSERVED);
+	if (!MDglobal.getValue(EMDL_IMAGE_SIZEX, width) ||
+	    !MDglobal.getValue(EMDL_IMAGE_SIZEY, height) ||
+	    !MDglobal.getValue(EMDL_IMAGE_SIZEZ, n_frames) ||
+	    !MDglobal.getValue(EMDL_MICROGRAPH_MOVIE_NAME, fnMovie)) {
+		REPORT_ERROR("MicrographModel::read: insufficient general information");
+	}
 
-    if (!MDglobal.getValue(EMDL_MICROGRAPH_GAIN_NAME, fnGain)) {
-        fnGain = "";
-    }
-    if (!MDglobal.getValue(EMDL_MICROGRAPH_BINNING, binning)) {
-        binning = 1.0;
-    }
-    if (!MDglobal.getValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, angpix)) {
-        angpix = -1;
-    }
-    if (!MDglobal.getValue(EMDL_MICROGRAPH_PRE_EXPOSURE, pre_exposure)) {
-        pre_exposure = -1;
-    }
-    if (!MDglobal.getValue(EMDL_MICROGRAPH_DOSE_RATE, dose_per_frame)) {
-        dose_per_frame = -1;
-    }
-    if (!MDglobal.getValue(EMDL_CTF_VOLTAGE, voltage)) {
-        voltage = -1;
-    }
-    if (!MDglobal.getValue(EMDL_MICROGRAPH_START_FRAME, first_frame)) {
-        first_frame = 1; // 1-indexed
-    }
+	globalShiftX.resize(n_frames, NOT_OBSERVED);
+	globalShiftY.resize(n_frames, NOT_OBSERVED);
 
-    if (model != NULL) delete model;
+	if (!MDglobal.getValue(EMDL_MICROGRAPH_GAIN_NAME, fnGain)) {
+		fnGain = "";
+	}
+	if (!MDglobal.getValue(EMDL_MICROGRAPH_BINNING, binning)) {
+		binning = 1.0;
+	}
+	if (!MDglobal.getValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, angpix)) {
+		angpix = -1;
+	}
+	if (!MDglobal.getValue(EMDL_MICROGRAPH_PRE_EXPOSURE, pre_exposure)) {
+		pre_exposure = -1;
+	}
+	if (!MDglobal.getValue(EMDL_MICROGRAPH_DOSE_RATE, dose_per_frame)) {
+		dose_per_frame = -1;
+	}
+	if (!MDglobal.getValue(EMDL_CTF_VOLTAGE, voltage)) {
+		voltage = -1;
+	}
+	if (!MDglobal.getValue(EMDL_MICROGRAPH_START_FRAME, first_frame)) {
+		first_frame = 1; // 1-indexed
+	}
 
-    int model_version;
-    if (!MDglobal.getValue(EMDL_MICROGRAPH_MOTION_MODEL_VERSION, model_version)) {
-        if (model_version == MOTION_MODEL_THIRD_ORDER_POLYNOMIAL) {
-            model = new ThirdOrderPolynomialModel();
-        } else if (model_version == MOTION_MODEL_NULL) {
-            model = NULL;
-        } else {
-            std::cerr << "Warning: Ignoring unknown motion model " << model_version << std::endl;
-        }
-        model->read(in, "local_motion_model");
-    } else {
-        model = NULL;
-    }
+	int model_version;
+	if (!MDglobal.getValue(EMDL_MICROGRAPH_MOTION_MODEL_VERSION, model_version)) {
+		if (model_version == MOTION_MODEL_THIRD_ORDER_POLYNOMIAL) {
+			model = new ThirdOrderPolynomialModel();
+		} else if (model_version == MOTION_MODEL_NULL) {
+			model = NULL;
+		} else {
+			std::cerr << "Warning: Ignoring unknown motion model " << model_version << std::endl;
+		}
+		model->read(in, "local_motion_model");
+	} else {
+		model = NULL;
+	}
 
-    // Read global shifts
-    int frame;
-    RFLOAT shiftX, shiftY;
+	// Read global shifts
+	int frame;
+	RFLOAT shiftX, shiftY;
 
-    MDglobal.readStar(in, "global_shift");
+	MDglobal.readStar(in, "global_shift");
 
-    FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDglobal)
-    {
-        if (!MDglobal.getValue(EMDL_MICROGRAPH_FRAME_NUMBER, frame) ||
-            !MDglobal.getValue(EMDL_MICROGRAPH_SHIFT_X, shiftX) ||
-            !MDglobal.getValue(EMDL_MICROGRAPH_SHIFT_Y, shiftY)) {
-            REPORT_ERROR("MicrographModel::read: incorrect global_shift table");
-        }
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDglobal)
+	{
+		if (!MDglobal.getValue(EMDL_MICROGRAPH_FRAME_NUMBER, frame) ||
+		    !MDglobal.getValue(EMDL_MICROGRAPH_SHIFT_X, shiftX) ||
+		    !MDglobal.getValue(EMDL_MICROGRAPH_SHIFT_Y, shiftY)) {
+			REPORT_ERROR("MicrographModel::read: incorrect global_shift table");
+		}
 
-        // frame is 1-indexed!
-        globalShiftX[frame - 1] = shiftX;
-        globalShiftY[frame - 1] = shiftY;
-        std::cout << " global shift: frame #" << frame << " x " << shiftX << " Y " << shiftY << std::endl;
-    }
+		// frame is 1-indexed!
+		globalShiftX[frame - 1] = shiftX;
+		globalShiftY[frame - 1] = shiftY;
+		std::cout << " global shift: frame #" << frame << " x " << shiftX << " Y " << shiftY << std::endl;
+	}
 }
 
 void Micrograph::setMovie(FileName fnMovie, FileName fnGain, RFLOAT binning)
 {
-    Image<RFLOAT> Ihead;
-    Ihead.read(fnMovie, false);
+	Image<RFLOAT> Ihead;
+	Ihead.read(fnMovie, false);
 
-    width = XSIZE(Ihead());
-    height = YSIZE(Ihead());
-    n_frames = NSIZE(Ihead());
+	width = XSIZE(Ihead());
+	height = YSIZE(Ihead());
+	n_frames = NSIZE(Ihead());
 
-    this->binning = binning;
+	this->binning = binning;
 
-    globalShiftX.resize(n_frames, NOT_OBSERVED);
-    globalShiftY.resize(n_frames, NOT_OBSERVED);
+	globalShiftX.resize(n_frames, NOT_OBSERVED);
+	globalShiftY.resize(n_frames, NOT_OBSERVED);
 
-    this->fnMovie = fnMovie;
-    this->fnGain = fnGain;
+	this->fnMovie = fnMovie;
+	this->fnGain = fnGain;
 }
 
-void Micrograph::clear()
+void Micrograph::clearFields()
 {
-    width = 0;
-    height = 0;
-    n_frames = 0;
-    first_frame = 0;
-    binning = 1;
+	width = 0;
+	height = 0;
+	n_frames = 0;
+	first_frame = 0;
+	binning = 1;
 
-    angpix = -1;
-    voltage = -1;
-    dose_per_frame = -1;
-    pre_exposure = -1;
+	angpix = -1;
+	voltage = -1;
+	dose_per_frame = -1;
+	pre_exposure = -1;
 
-    fnMovie = "";
-    fnGain = "";
+	fnMovie = "";
+	fnGain = "";
 
-    globalShiftX.resize(0);
-    globalShiftY.resize(0);
+	globalShiftX.resize(0);
+	globalShiftY.resize(0);
 
-    localShiftX.resize(0);
-    localShiftY.resize(0);
-    localFitX.resize(0);
-    localFitY.resize(0);
-    patchX.resize(0);
-    patchY.resize(0);
-    patchZ.resize(0);
-    patchW.resize(0);
-    patchH.resize(0);
+	localShiftX.resize(0);
+	localShiftY.resize(0);
+	localFitX.resize(0);
+	localFitY.resize(0);
+	patchX.resize(0);
+	patchY.resize(0);
+	patchZ.resize(0);
+	patchW.resize(0);
+	patchH.resize(0);
 }
 
 void Micrograph::copyFieldsFrom(const Micrograph& m)
 {
-    width = m.width;
-    height = m.height;
-    n_frames = m.n_frames;
-    first_frame = m.first_frame;
-    binning = m.binning;
+	width = m.width;
+	height = m.height;
+	n_frames = m.n_frames;
+	first_frame = m.first_frame;
+	binning = m.binning;
 
-    angpix = m.angpix;
-    voltage = m.voltage;
-    dose_per_frame = m.dose_per_frame;
-    pre_exposure = m.pre_exposure;
+	angpix = m.angpix;
+	voltage = m.voltage;
+	dose_per_frame = m.dose_per_frame;
+	pre_exposure = m.pre_exposure;
 
-    fnMovie = m.fnMovie;
-    fnGain = m.fnGain;
+	fnMovie = m.fnMovie;
+	fnGain = m.fnGain;
 
-    globalShiftX = m.globalShiftX;
-    globalShiftY = m.globalShiftY;
+	globalShiftX = m.globalShiftX;
+	globalShiftY = m.globalShiftY;
 
-    localShiftX = m.localShiftX;
-    localShiftY = m.localShiftY;
-    localFitX = m.localFitX;
-    localFitY = m.localFitY;
-    patchX = m.patchX;
-    patchY = m.patchY;
-    patchZ = m.patchZ;
-    patchW = m.patchW;
-    patchH = m.patchH;
+	localShiftX = m.localShiftX;
+	localShiftY = m.localShiftY;
+	localFitX = m.localFitX;
+	localFitY = m.localFitY;
+	patchX = m.patchX;
+	patchY = m.patchY;
+	patchZ = m.patchZ;
+	patchW = m.patchW;
+	patchH = m.patchH;
 }
 
 void Micrograph::checkReadyFlag(std::string origin) const
 {
-    if (!ready)
-    {
-        REPORT_ERROR("Micrograph::"+origin+": instance not initialized.");
-    }
+	if (!ready)
+	{
+		REPORT_ERROR("Micrograph::"+origin+": instance not initialized.\n");
+	}
 }
