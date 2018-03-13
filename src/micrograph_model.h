@@ -39,7 +39,7 @@ public:
 	virtual void write(std::ostream &fh, std::string block_name) = 0;
 	virtual int getModelVersion() const = 0;
 
-	// Get motion at frame and (x, y)
+	// Get motion at frame and (x, y); frame is 0-indexed (NOT like Micrograph::getShiftAt)
 	virtual int getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty) const = 0;
 };
 
@@ -68,6 +68,7 @@ class Micrograph
 public:
 	static const RFLOAT NOT_OBSERVED;
 	RFLOAT angpix, voltage, dose_per_frame, pre_exposure;
+	int first_frame; // First frame for local motion model. 1-indexed.
 	MotionModel *model;
 
 	// Empty Constructor is not allowed
@@ -97,6 +98,7 @@ public:
 		width = 0;
 		height = 0;
 		n_frames = 0;
+		first_frame = 0;
 		binning = 1;
 
 		angpix = -1;
@@ -150,11 +152,11 @@ public:
 		return n_frames;
 	}
 
-	// Get shift vector at (x, y, frame)
+	// Get shift vector at (x, y, frame); frame is 1-indexed
 	// (x, y) and (shiftx, shifty) are UNBINNED pixels in the original movie
 	int getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty) const;
 
-	// Set global shift for frame
+	// Set global shift for frame; frame is 1-indexed
 	// (shiftx, shifty) is UNBINNED pixels in the original movie
 	void setGlobalShift(int frame, RFLOAT shiftx, RFLOAT shifty);
 

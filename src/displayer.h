@@ -224,6 +224,9 @@ public:
 	// pointer to the MetaDataTable for the groups when do_class and do_regroup (the data.star file)
 	MetaDataTable *MDgroups;
 
+	// Sjors 12mar18: read/write information-containing backup_selection for Liyi's project
+	MetaDataTable MDbackup;
+
 	// Scale for showing the original image
 	RFLOAT ori_scale;
 
