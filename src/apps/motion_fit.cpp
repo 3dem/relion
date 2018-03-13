@@ -269,22 +269,6 @@ int MotionFitProg::_run()
             }
         }
 
-        /*std::vector<double> grad0(2*fc*pc);
-
-        lmf.grad(initial, grad0);
-
-        double gl = 0.0;
-
-        for (int i = 0; i < grad0.size(); i++)
-        {
-            double gi = grad0[i];
-            gl += gi*gi;
-        }
-
-        gl = sqrt(gl);
-
-        std::cout << "gl = " << gl << "\n";*/
-
         std::cout << "    optimizing...\n";
 
         std::vector<double> optPos = GradientDescent::optimize(

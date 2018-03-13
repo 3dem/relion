@@ -113,7 +113,7 @@ Micrograph::Micrograph()
 :   ready(false),
     model(NULL)
 {
-    clear();
+    clearFields();
 }
 
 Micrograph::Micrograph(const Micrograph& m)
@@ -127,7 +127,7 @@ Micrograph::Micrograph(FileName filename, FileName fnGain, RFLOAT binning)
 :   ready(false),
     model(NULL)
 {
-    clear();
+    clearFields();
 
     if (filename.getExtension() == "star" && fnGain == "") {
         read(filename);
@@ -151,6 +151,8 @@ Micrograph& Micrograph::operator = (const Micrograph& m)
     model = (m.model != NULL)? m.model->clone() : NULL;
 
     copyFieldsFrom(m);
+
+    return *this;
 }
 
 void Micrograph::write(FileName filename)
@@ -280,8 +282,14 @@ void Micrograph::setGlobalShift(int frame, RFLOAT shiftx, RFLOAT shifty)
 
 void Micrograph::read(FileName fn_in)
 {
+    if (model != NULL)
+    {
+        delete model;
+        model = NULL;
+    }
+
     // Clear current model
-    clear();
+    clearFields();
 
     // Open input file
     std::ifstream in(fn_in.data(), std::ios_base::in);
@@ -325,8 +333,6 @@ void Micrograph::read(FileName fn_in)
     if (!MDglobal.getValue(EMDL_MICROGRAPH_START_FRAME, first_frame)) {
         first_frame = 1; // 1-indexed
     }
-
-    if (model != NULL) delete model;
 
     int model_version;
     if (!MDglobal.getValue(EMDL_MICROGRAPH_MOTION_MODEL_VERSION, model_version)) {
@@ -381,7 +387,7 @@ void Micrograph::setMovie(FileName fnMovie, FileName fnGain, RFLOAT binning)
     this->fnGain = fnGain;
 }
 
-void Micrograph::clear()
+void Micrograph::clearFields()
 {
     width = 0;
     height = 0;
@@ -445,6 +451,6 @@ void Micrograph::checkReadyFlag(std::string origin) const
 {
     if (!ready)
     {
-        REPORT_ERROR("Micrograph::"+origin+": instance not initialized.");
+        REPORT_ERROR("Micrograph::"+origin+": instance not initialized.\n");
     }
 }

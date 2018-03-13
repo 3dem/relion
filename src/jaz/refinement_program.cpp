@@ -120,13 +120,13 @@ int RefinementProgram::init(int argc, char *argv[])
 
         if (movie_angpix <= 0 && corrMicFn == "")
         {
-            std::cerr << "Movie pixel size (--mps) is required unless a corrected_micrographs.star (--corr_mic) is provided.";
+            std::cerr << "Movie pixel size (--mps) is required unless a corrected_micrographs.star (--corr_mic) is provided.\n";
             allGood = false;
         }
 
         if (coords_angpix <= 0 && corrMicFn == "")
         {
-            std::cerr << "Coordinates pixel size (--cps) is required unless a corrected_micrographs.star (--corr_mic) is provided.";
+            std::cerr << "Coordinates pixel size (--cps) is required unless a corrected_micrographs.star (--corr_mic) is provided.\n";
             allGood = false;
         }
 
@@ -361,7 +361,7 @@ int RefinementProgram::init(int argc, char *argv[])
     if (doesMovies && corrMicFn != "")
     {
         MetaDataTable corrMic;
-        corrMic.read(corrMicFn);
+        corrMic.read(corrMicFn+"/corrected_micrographs.star");
 
         mic2meta.clear();
 
@@ -428,12 +428,50 @@ void RefinementProgram::loadInitialMovieValues()
     }
     else
     {
-        // @TODO: replace by simple movie loading
-        std::vector<std::vector<Image<Complex>>> movie = StackHelper::extractMovieStackFS(
-            &mdts[0], meta_path, imgPath, movie_ending, coords_angpix, angpix, movie_angpix, s,
-            nr_omp_threads, false, firstFrame, lastFrame, hotCutoff, debug);
+        if (hasCorrMic)
+        {
+            std::string mgFn;
+            mdts[0].getValueToString(EMDL_MICROGRAPH_NAME, mgFn, 0);
 
-        fc = movie[0].size();
+            std::string metaFn = mic2meta[mgFn];
+
+            if (meta_path != "")
+            {
+                metaFn = meta_path + "/" + metaFn.substr(metaFn.find_last_of("/")+1);
+            }
+
+            micrograph = Micrograph(metaFn);
+
+            if (movie_angpix <= 0)
+            {
+                movie_angpix = micrograph.angpix;
+                std::cout << " + Using movie pixel size from " << metaFn << ": " << movie_angpix << " A\n";
+            }
+            else
+            {
+                std::cout << " + Using movie pixel size from command line: " << movie_angpix << " A\n";
+            }
+
+            if (coords_angpix <= 0)
+            {
+                coords_angpix = micrograph.angpix * micrograph.getBinningFactor();
+                std::cout << " + Using coord. pixel size from " << metaFn << ": " << coords_angpix << " A\n";
+            }
+            else
+            {
+                std::cout << " + Using coord. pixel size from command line: " << coords_angpix << " A\n";
+            }
+
+            fc = micrograph.getNframes();
+        }
+        else
+        {
+            std::vector<std::vector<Image<Complex>>> movie = StackHelper::extractMovieStackFS(
+                &mdts[0], meta_path, imgPath, movie_ending, coords_angpix, angpix, movie_angpix, s,
+                nr_omp_threads, false, firstFrame, lastFrame, hotCutoff, debug);
+
+            fc = movie[0].size();
+        }
     }
 }
 
@@ -496,31 +534,9 @@ std::vector<std::vector<Image<Complex>>> RefinementProgram::loadMovie(
                 mgHasGain = true;
             }
 
-            double movie_angpix_act, coords_angpix_act;
-
-            if (movie_angpix > 0)
-            {
-                movie_angpix_act = movie_angpix;
-            }
-            else
-            {
-                movie_angpix_act = micrograph.angpix;
-                if (debug) std::cout << "movie res.:  " << movie_angpix_act << "A/px";
-            }
-
-            if (coords_angpix > 0)
-            {
-                coords_angpix_act = movie_angpix;
-            }
-            else
-            {
-                coords_angpix_act = micrograph.angpix * micrograph.getBinningFactor();
-                if (debug) std::cout << "coord. res.: " << coords_angpix_act << "A/px";
-            }
-
             movie = StackHelper::extractMovieStackFS(
                 &mdts[g], mgHasGain? &lastGainRef : 0,
-                mgFn, angpix, coords_angpix_act, movie_angpix_act, s,
+                mgFn, angpix, coords_angpix, movie_angpix, s,
                 nr_omp_threads, true, firstFrame, lastFrame, hotCutoff, debug);
         }
         else
