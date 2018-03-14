@@ -10,7 +10,7 @@
 #include <src/metadata_table.h>
 #include <src/backprojector.h>
 #include <src/euler.h>
-#include <src/jaz/vtk_helper.h>
+#include <src/jaz/image_log.h>
 #include <src/jaz/slice_helper.h>
 #include <src/jaz/spectral_helper.h>
 #include <src/jaz/filter_helper.h>

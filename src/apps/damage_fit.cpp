@@ -10,7 +10,7 @@
 #include <src/metadata_table.h>
 #include <src/backprojector.h>
 #include <src/euler.h>
-#include <src/jaz/vtk_helper.h>
+#include <src/jaz/image_log.h>
 #include <src/jaz/slice_helper.h>
 #include <src/jaz/spectral_helper.h>
 #include <src/jaz/filter_helper.h>
@@ -222,8 +222,8 @@ int main(int argc, char *argv[])
             table.write(frcPathOut+"_data.mrc");
             weight.write(frcPathOut+"_weight.mrc");
 
-            VtkHelper::writeVTK(table, frcPathOut+"_data.vtk");
-            VtkHelper::writeVTK(weight, frcPathOut+"_weight.vtk");
+            ImageLog::write(table, frcPathOut+"_data");
+            ImageLog::write(weight, frcPathOut+"_weight");
         }
         else
         {
@@ -354,8 +354,8 @@ int main(int argc, char *argv[])
             frcD.write(frcPathOut+"_data.mrc");
             frcW.write(frcPathOut+"_weight.mrc");
 
-            VtkHelper::writeVTK(frcD, frcPathOut+"_data.vtk");
-            VtkHelper::writeVTK(frcW, frcPathOut+"_weight.vtk");
+            ImageLog::write(frcD, frcPathOut+"_data");
+            ImageLog::write(frcW, frcPathOut+"_weight");
         }
     }
 
@@ -390,8 +390,8 @@ int main(int argc, char *argv[])
         }*/
     }
 
-    VtkHelper::writeVTK(frcW, "damage/frcMask_"+tag+".vtk");
-    VtkHelper::writeVTK(frcD, "damage/frcTest_"+tag+".vtk");
+    ImageLog::write(frcW, "damage/frcMask_"+tag);
+    ImageLog::write(frcD, "damage/frcTest_"+tag);
 
 
     std::vector<double> amp;
@@ -410,13 +410,13 @@ int main(int argc, char *argv[])
 
     os.close();
 
-    VtkHelper::writeVTK(frcD, "damage/glob_frcObs_"+tag+".vtk");
+    ImageLog::write(frcD, "damage/glob_frcObs_"+tag);
 
     Image<RFLOAT> snrSynth = DamageHelper::plotGlobalDamage(a, b, c, amp, kc, tc, angpix, dosePerFrame, false);
     Image<RFLOAT> snrSynthN = DamageHelper::plotGlobalDamage(a, b, c, kc, tc, angpix, dosePerFrame, false);
 
-    VtkHelper::writeVTK(snrSynth, "damage/glob_snrSynth_"+tag+".vtk");
-    VtkHelper::writeVTK(snrSynthN, "damage/glob_snrSynthN_"+tag+".vtk");
+    ImageLog::write(snrSynth, "damage/glob_snrSynth_"+tag);
+    ImageLog::write(snrSynthN, "damage/glob_snrSynthN_"+tag);
 
 
 

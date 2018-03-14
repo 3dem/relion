@@ -4,7 +4,7 @@
 #include <src/image.h>
 #include <src/jaz/filter_helper.h>
 #include <src/jaz/resampling_helper.h>
-#include <src/jaz/vtk_helper.h>
+#include <src/jaz/image_log.h>
 #include <src/jaz/image_op.h>
 #include <vector>
 #include <omp.h>

@@ -3,7 +3,7 @@
 #include <src/jaz/image_op.h>
 #include <src/jaz/filter_helper.h>
 #include <src/jaz/noise_helper.h>
-#include <src/jaz/vtk_helper.h>
+#include <src/jaz/image_log.h>
 #include <src/jaz/interpolation.h>
 #include <omp.h>
 

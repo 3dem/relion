@@ -2,7 +2,7 @@
 #include <src/jaz/damage_helper.h>
 #include <src/jaz/gravis/t2Matrix.h>
 #include <src/jaz/nelder_mead.h>
-#include <src/jaz/vtk_helper.h>
+#include <src/jaz/image_log.h>
 
 using namespace gravis;
 

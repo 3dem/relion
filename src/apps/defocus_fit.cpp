@@ -10,7 +10,7 @@
 #include <src/metadata_table.h>
 #include <src/backprojector.h>
 #include <src/euler.h>
-#include <src/jaz/vtk_helper.h>
+#include <src/jaz/image_log.h>
 #include <src/jaz/slice_helper.h>
 #include <src/jaz/spectral_helper.h>
 #include <src/jaz/filter_helper.h>
@@ -163,19 +163,19 @@ int DefocusFit::_run()
 
                 FftwHelper::decenterDouble2D(cc.data, dotp0_full.data);
 
-                VtkHelper::writeVTK(dotp0_full, outPath+"_astig_data_m"+stsg.str()+".vtk");
+                ImageLog::write(dotp0_full, outPath+"_astig_data_m"+stsg.str());
                 dataVis = FilterHelper::polarBlur(dotp0_full, 10.0);
-                VtkHelper::writeVTK(dataVis, outPath+"_astig_data_m"+stsg.str()+"_blurred.vtk");
+                ImageLog::write(dataVis, outPath+"_astig_data_m"+stsg.str()+"_blurred");
 
                 Image<RFLOAT> ctfFit(s,s);
                 ctf0.getCenteredImage(ctfFit.data, angpix, false, false, false, false);
-                VtkHelper::writeVTK(ctfFit, outPath+"_astig0_m"+stsg.str()+".vtk");
+                ImageLog::write(ctfFit, outPath+"_astig0_m"+stsg.str());
 
                 ctfFit.data.xinit = 0;
                 ctfFit.data.yinit = 0;
 
                 Image<RFLOAT> vis = FilterHelper::sectorBlend(dataVis, ctfFit, 12);
-                VtkHelper::writeVTK(vis, outPath+"_astig_data_m"+stsg.str()+"_vis0.vtk");
+                ImageLog::write(vis, outPath+"_astig_data_m"+stsg.str()+"_vis0");
             }
 
             RFLOAT u, v, phi, phase, newCs;
@@ -223,12 +223,12 @@ int DefocusFit::_run()
 
                 Image<RFLOAT> ctfFit(s,s);
                 ctf1.getCenteredImage(ctfFit.data, angpix, false, false, false, false);
-                VtkHelper::writeVTK(ctfFit, outPath+"_astig1_m"+stsg.str()+".vtk");
+                ImageLog::write(ctfFit, outPath+"_astig1_m"+stsg.str());
                 ctfFit.data.xinit = 0;
                 ctfFit.data.yinit = 0;
 
                 Image<RFLOAT> vis = FilterHelper::sectorBlend(dataVis, ctfFit, 12);
-                VtkHelper::writeVTK(vis, outPath+"_astig_data_m"+stsg.str()+"_vis1.vtk");
+                ImageLog::write(vis, outPath+"_astig_data_m"+stsg.str()+"_vis1");
             }
         }
 

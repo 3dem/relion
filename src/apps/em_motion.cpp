@@ -10,7 +10,7 @@
 #include <src/metadata_table.h>
 #include <src/backprojector.h>
 #include <src/euler.h>
-#include <src/jaz/vtk_helper.h>
+#include <src/jaz/image_log.h>
 #include <src/jaz/slice_helper.h>
 #include <src/jaz/spectral_helper.h>
 #include <src/jaz/filter_helper.h>
@@ -443,7 +443,7 @@ int main(int argc, char *argv[])
                 std::stringstream stsp;
                 stsp << p;
 
-                VtkHelper::writeCentered(motEM.posProb[p], "ppDebug/i"+stsg.str()+"_p"+stsp.str()+"_pos_initial.vtk");
+                ImageLog::write(motEM.posProb[p], "ppDebug/i"+stsg.str()+"_p"+stsp.str()+"_pos_initial", CenterXY);
             }
         }
 
@@ -463,8 +463,8 @@ int main(int argc, char *argv[])
                     std::stringstream stsp;
                     stsp << p;
 
-                    VtkHelper::writeCentered(motEM.velProb[p], "ppDebug/i"+stsg.str()+"_p"+stsp.str()+"_vel_"+stsit.str()+".vtk");
-                    VtkHelper::writeCentered(motEM.posProb[p], "ppDebug/i"+stsg.str()+"_p"+stsp.str()+"_pos_"+stsit.str()+".vtk");
+                    ImageLog::write(motEM.velProb[p], "ppDebug/i"+stsg.str()+"_p"+stsp.str()+"_vel_"+stsit.str(), CenterXY);
+                    ImageLog::write(motEM.posProb[p], "ppDebug/i"+stsg.str()+"_p"+stsp.str()+"_pos_"+stsit.str(), CenterXY);
                 }
             }
         }
@@ -814,7 +814,7 @@ int main(int argc, char *argv[])
             FscHelper::mergeFscTables(tablesV, weights0V, weights1V, tableV, weightV);
             FscHelper::mergeFscTables(tablesVW, weights0VW, weights1VW, tableVW, weightVW);
 
-            VtkHelper::writeVTK(tableV, outPath + "_FCC_data_V.vtk");
+            ImageLog::write(tableV, outPath + "_FCC_data_V");
 
             const int ccvBins = 10;
             std::vector<double> ccByV(ccvBins, 0.0);
@@ -876,7 +876,7 @@ int main(int argc, char *argv[])
             table.write(outPath + "_FCC_data.mrc");
             /*weight.write(outPath + "_FCC_weight.mrc");*/
 
-            VtkHelper::writeVTK(table, outPath + "_FCC_data.vtk");
+            ImageLog::write(table, outPath + "_FCC_data");
         }
     }
 

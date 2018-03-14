@@ -4,7 +4,7 @@
 #include <src/jaz/slice_helper.h>
 #include <src/jaz/config.h>
 #include <src/jaz/volume_converter.h>
-#include <src/jaz/vtk_helper.h>
+#include <src/jaz/image_log.h>
 #include <src/jaz/filter_helper.h>
 #include <src/jaz/interpolation.h>
 

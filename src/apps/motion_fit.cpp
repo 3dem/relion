@@ -10,7 +10,7 @@
 #include <src/metadata_table.h>
 #include <src/backprojector.h>
 #include <src/euler.h>
-#include <src/jaz/vtk_helper.h>
+#include <src/jaz/image_log.h>
 #include <src/jaz/slice_helper.h>
 #include <src/jaz/spectral_helper.h>
 #include <src/jaz/filter_helper.h>
@@ -47,7 +47,7 @@ class MotionFitProg : public RefinementProgram
 
         MotionFitProg();
 
-            bool unregGlob;
+            bool unregGlob, noGlobOff;
             int maxIters;
             double dmga, dmgb, dmgc, dosePerFrame,
                 sig_vel, sig_div, sig_acc,
@@ -93,6 +93,7 @@ int MotionFitProg::readMoreOptions(IOParser& parser, int argc, char *argv[])
     maxStep = textToFloat(parser.getOption("--max_step", "Maximum step size", "0.05"));
 
     unregGlob = parser.checkOption("--unreg_glob", "Do not regularize global component of motion");
+    noGlobOff = parser.checkOption("--no_glob_off", "Do not compute initial per-particle offsets");
 
     return 0;
 }
@@ -202,12 +203,21 @@ int MotionFitProg::_run()
 
         std::vector<Image<RFLOAT>> ccSum = MotionRefinement::addCCs(movieCC);
         std::vector<gravis::d2Vector> globTrack = MotionRefinement::getGlobalTrack(ccSum);
-        std::vector<gravis::d2Vector> globOffsets = MotionRefinement::getGlobalOffsets(
-                    movieCC, globTrack, 0.25*s);
+        std::vector<gravis::d2Vector> globOffsets;
+
+        if (noGlobOff)
+        {
+            globOffsets = std::vector<d2Vector>(pc, d2Vector(0,0));
+        }
+        else
+        {
+            globOffsets = MotionRefinement::getGlobalOffsets(
+                    movieCC, globTrack, 0.25*s, nr_omp_threads);
+        }
 
         if (debug)
         {
-            VtkHelper::writeCentered(ccSum, outPath + "_CCsum_mg"+stsg.str()+".vtk");
+            ImageLog::write(ccSum, outPath + "_CCsum_mg"+stsg.str(), CenterXY);
         }
 
         std::vector<std::vector<gravis::d2Vector>> tracks(pc);
@@ -393,9 +403,8 @@ int MotionFitProg::_run()
 
     Image<RFLOAT> table, weight;
 
-    FscHelper::mergeFscTables(tables, weights0, weights1, table, weight);
-    table.write(outPath + "_FCC_data.mrc");
-    VtkHelper::writeVTK(table, outPath + "_FCC_data.vtk");
+    FscHelper::mergeFscTables(tables, weights0, weights1, table, weight);    
+    ImageLog::write(table, outPath+"_FCC_data");
 
 
     int f_max = fc;

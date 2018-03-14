@@ -1,5 +1,5 @@
 #include <src/jaz/filter_helper.h>
-#include <src/jaz/vtk_helper.h>
+#include <src/jaz/image_log.h>
 #include <src/jaz/index_sort.h>
 #include <src/jaz/gravis/t2Vector.h>
 #include <src/jaz/tensor2x2.h>
@@ -869,6 +869,22 @@ void FilterHelper::getReal(const Image<Complex> &img, Image<RFLOAT> &dest)
     for (long int x = 0; x < w; x++)
     {
         DIRECT_NZYX_ELEM(dest.data, 0, z, y, x) = DIRECT_NZYX_ELEM(img.data, 0, z, y, x).real;
+    }
+}
+
+void FilterHelper::getImag(const Image<Complex> &img, Image<RFLOAT> &dest)
+{
+    const long w = img.data.xdim;
+    const long h = img.data.ydim;
+    const long d = img.data.zdim;
+
+    dest = Image<RFLOAT>(w,h,d);
+
+    for (long int z = 0; z < d; z++)
+    for (long int y = 0; y < h; y++)
+    for (long int x = 0; x < w; x++)
+    {
+        DIRECT_NZYX_ELEM(dest.data, 0, z, y, x) = DIRECT_NZYX_ELEM(img.data, 0, z, y, x).imag;
     }
 }
 

@@ -8,7 +8,6 @@
 #include <src/fftw.h>
 #include <src/complex.h>
 #include <src/metadata_table.h>
-#include <src/jaz/vtk_helper.h>
 #include <src/jaz/slice_helper.h>
 #include <src/jaz/filter_helper.h>
 #include <src/jaz/backprojection_helper.h>
@@ -37,7 +36,6 @@ int main(int argc, char *argv[])
         sts >> fn;
 
         img1.write(inPath+"frames/"+inName+"_f"+fn+".mrc");
-        VtkHelper::writeVTK(img1, inPath+"frames/"+inName+"_f"+fn+".vtk");
     }
 
     return 0;

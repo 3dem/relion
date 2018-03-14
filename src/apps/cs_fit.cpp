@@ -10,7 +10,7 @@
 #include <src/metadata_table.h>
 #include <src/backprojector.h>
 #include <src/euler.h>
-#include <src/jaz/vtk_helper.h>
+#include <src/jaz/image_log.h>
 #include <src/jaz/slice_helper.h>
 #include <src/jaz/spectral_helper.h>
 #include <src/jaz/filter_helper.h>
@@ -119,7 +119,7 @@ int CsFit::_run()
         sectorIndex(y,x) = (RFLOAT)sec;
     }
 
-    VtkHelper::writeVTK(sectorIndex, "debug/sectors.vtk");
+    ImageLog::write(sectorIndex, "debug/sectors");
 
     std::vector<std::vector<double>> totalCostIso(nr_omp_threads);
 

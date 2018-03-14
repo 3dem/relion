@@ -1,7 +1,7 @@
 #include <src/jaz/tomo_stack.h>
 #include <src/jaz/projection_helper.h>
 #include <src/jaz/slice_helper.h>
-#include <src/jaz/vtk_helper.h>
+#include <src/jaz/image_log.h>
 #include <src/jaz/ctf_helper.h>
 #include <src/jaz/filter_helper.h>
 #include <src/jaz/gravis/t2Vector.h>

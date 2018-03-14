@@ -16,7 +16,7 @@
 
 #include <src/jaz/obs_model.h>
 #include <src/jaz/stack_helper.h>
-#include <src/jaz/vtk_helper.h>
+#include <src/jaz/image_log.h>
 #include <src/jaz/gravis/t3Matrix.h>
 
 #include <omp.h>

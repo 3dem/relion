@@ -72,6 +72,7 @@ class FilterHelper
         static void getPhase(const Image<Complex>& img, Image<RFLOAT>& dest);
         static void getAbs(const Image<Complex>& img, Image<RFLOAT>& dest);
         static void getReal(const Image<Complex>& img, Image<RFLOAT>& dest);
+        static void getImag(const Image<Complex>& img, Image<RFLOAT>& dest);
 
         static void powerSpectrum2D(Image<RFLOAT>& img, Volume<RFLOAT>& spectrum);
         static void equiphaseAverage2D(const Volume<RFLOAT>& src, Volume<RFLOAT>& dest);

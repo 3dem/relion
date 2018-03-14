@@ -1,5 +1,5 @@
 #include <src/jaz/aberration_fit.h>
-#include <src/jaz/vtk_helper.h>
+#include <src/jaz/image_log.h>
 
 
 OriginalBasis AberrationFit::fitBasic(

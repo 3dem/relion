@@ -27,7 +27,7 @@
 #include <src/time.h>
 #include <omp.h>
 
-#include <src/jaz/vtk_helper.h>
+#include <src/jaz/image_log.h>
 #include <src/jaz/complex_io.h>
 #include <src/jaz/stack_helper.h>
 #include <src/jaz/image_op.h>

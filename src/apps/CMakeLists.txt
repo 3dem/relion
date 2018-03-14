@@ -3,7 +3,7 @@ include_directories("${CMAKE_SOURCE_DIR}")
 message("Running apps/CMakeLists.txt...")
 
 if(NOT MKLFFT)
-    include_directories("${FFTW_INCLUDES}")
+	include_directories("${FFTW_INCLUDES}")
 endif(NOT MKLFFT)
 #include_directories(${CMAKE_BINARY_DIR}/include)
 

@@ -3,7 +3,7 @@
 #include <src/jaz/image_op.h>
 #include <src/jaz/refinement_helper.h>
 #include <src/jaz/stack_helper.h>
-#include <src/jaz/vtk_helper.h>
+#include <src/jaz/image_log.h>
 
 
 RefinementProgram::RefinementProgram(bool singleReference, bool doesMovies)

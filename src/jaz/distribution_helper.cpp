@@ -1,5 +1,5 @@
 #include <src/jaz/distribution_helper.h>
-#include <src/jaz/vtk_helper.h>
+#include <src/jaz/image_log.h>
 #include <src/jaz/nelder_mead.h>
 
 using namespace gravis;

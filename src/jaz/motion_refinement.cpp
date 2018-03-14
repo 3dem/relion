@@ -1,7 +1,7 @@
 #include <src/jaz/motion_refinement.h>
 #include <src/jaz/filter_helper.h>
 #include <src/jaz/image_op.h>
-#include <src/jaz/vtk_helper.h>
+#include <src/jaz/image_log.h>
 #include <src/jaz/interpolation.h>
 #include <src/jaz/nelder_mead.h>
 #include <src/jaz/Fourier_helper.h>
@@ -283,7 +283,7 @@ std::vector<d2Vector> MotionRefinement::getGlobalTrack(
 
 std::vector<d2Vector> MotionRefinement::getGlobalOffsets(
         const std::vector<std::vector<Image<RFLOAT>>>& movieCC,
-        const std::vector<d2Vector>& globTrack, double sigma)
+        const std::vector<d2Vector>& globTrack, double sigma, int threads)
 {
     const int pc = movieCC.size();
     const int fc = movieCC[0].size();
@@ -292,7 +292,7 @@ std::vector<d2Vector> MotionRefinement::getGlobalOffsets(
     const double eps = 1e-30;
 
     std::vector<d2Vector> out(pc);
-    Image<RFLOAT> pSum(s,s), weight(s,s);
+    Image<RFLOAT> weight(s,s);
 
     for (int y = 0; y < s; y++)
     for (int x = 0; x < s; x++)
@@ -303,8 +303,10 @@ std::vector<d2Vector> MotionRefinement::getGlobalOffsets(
         weight(y,x) = exp(-0.5*(xx*xx + yy*yy)/(sigma*sigma));
     }
 
+    #pragma omp parallel for num_threads(threads)
     for (int p = 0; p < pc; p++)
     {
+        Image<RFLOAT> pSum(s,s);
         pSum.data.initZeros();
 
         for (int f = 0; f < fc; f++)
@@ -324,10 +326,12 @@ std::vector<d2Vector> MotionRefinement::getGlobalOffsets(
             pSum(y,x) *= weight(y,x);
         }
 
-        out[p] = Interpolation::quadraticMaxWrapXY(pSum, eps);
+        d2Vector out_p = Interpolation::quadraticMaxWrapXY(pSum, eps);
+        if (out_p.x >= sh) out_p.x -= s;
+        if (out_p.y >= sh) out_p.y -= s;
 
-        if (out[p].x >= sh) out[p].x -= s;
-        if (out[p].y >= sh) out[p].y -= s;
+        #pragma omp_atomic
+            out[p] = out_p;
     }
 
     return out;

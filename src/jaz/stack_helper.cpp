@@ -5,7 +5,7 @@
 #include <src/jaz/Fourier_helper.h>
 #include <src/jaz/nelder_mead.h>
 #include <src/jaz/gravis/t4Matrix.h>
-#include <src/jaz/vtk_helper.h>
+#include <src/jaz/image_log.h>
 #include <src/fftw.h>
 #include <src/micrograph_model.h>
 #include <src/jaz/resampling_helper.h>

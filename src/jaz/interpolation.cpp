@@ -1,5 +1,5 @@
 #include <src/jaz/interpolation.h>
-#include <src/jaz/vtk_helper.h>
+#include <src/jaz/image_log.h>
 
 using namespace gravis;
 
