@@ -237,7 +237,7 @@ int TiltFit::_run()
         wgh = wAccSum;
     }
 
-    Image<RFLOAT> debug(sh,s);
+    //Image<RFLOAT> debug(sh,s);
 
     for (int y = 0; y < s; y++)
     for (int x = 0; x < sh; x++)
@@ -251,22 +251,21 @@ int TiltFit::_run()
             wgh(y,x) = 0.0;
         }
 
-        debug(y,x) = r == 0? 0.0 : sh/(2.0*angpix*r) - kmin;
+        //debug(y,x) = r == 0? 0.0 : sh/(2.0*angpix*r) - kmin;
 
         xyNrm(y,x) = wAccSum(y,x) > 0.0? xyAccSum(y,x)/wAccSum(y,x) : Complex(0.0, 0.0);
     }
 
-    VtkHelper::writeVTK(debug, outPath+"_debug.vtk");
+    //ImageLog::write(debug, outPath+"_debug");
 
     Image<RFLOAT> wghFull;
     FftwHelper::decenterDouble2D(wgh(), wghFull());
-    VtkHelper::writeVTK(wghFull, outPath+"_weight.vtk");
+    ImageLog::write(wghFull, outPath+"_weight_full");
 
 
     FftwHelper::decenterUnflip2D(phase.data, phaseFull.data);
 
-    VtkHelper::writeVTK(phaseFull, outPath+"_delta_phase.vtk");
-    phaseFull.write(outPath+"_delta_phase.mrc");
+    ImageLog::write(phaseFull, outPath+"_delta_phase");
     wgh.write(outPath+"_weight.mrc");
 
     RFLOAT shift_x, shift_y, tilt_x, tilt_y;
@@ -277,8 +276,7 @@ int TiltFit::_run()
 
 
     FftwHelper::decenterUnflip2D(fit.data, fitFull.data);
-    VtkHelper::writeVTK(fitFull, outPath+"_delta_phase_fit.vtk");
-    fitFull.write(outPath+"_delta_phase_fit.mrc");
+    ImageLog::write(fitFull, outPath+"_delta_phase_fit");
 
     std::ofstream os(outPath+"_beam_tilt_0.txt");
     os << "beamtilt_x = " << tilt_x << "\n";
@@ -305,8 +303,7 @@ int TiltFit::_run()
 
 
     FftwHelper::decenterUnflip2D(fit.data, fitFull.data);
-    VtkHelper::writeVTK(fitFull, outPath+"_delta_phase_iter_fit.vtk");
-    fitFull.write(outPath+"_delta_phase_iter_fit.mrc");
+    ImageLog::write(fitFull, outPath+"_delta_phase_iter_fit");
 
     std::ofstream os2(outPath+"_beam_tilt_1.txt");
     os2 << "beamtilt_x = " << tilt_x << "\n";

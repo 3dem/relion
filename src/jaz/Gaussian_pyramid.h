@@ -164,8 +164,8 @@ void GaussianPyramid<T>::test(const Image<T>& img)
         FilterHelper::separableGaussianXY(img, baseline[mp*i + j], sig, 3*sig, true);
     }
 
-    VtkHelper::write(test, "debug/pyr_interpolated.vtk");
-    VtkHelper::write(baseline, "debug/pyr_baseline.vtk");
+    ImageLog::write(test, "debug/pyr_interpolated");
+    ImageLog::write(baseline, "debug/pyr_baseline");
 }
 
 
@@ -256,7 +256,7 @@ void GaussianPyramid<T>::timeTest(const Image<T>& img0)
         ImageOp::linearCombination(sum, bl, 1, 1, sum);
     }
 
-    VtkHelper::writeVTK(sum, "debug/sum_pyr.vtk");
+    ImageLog::write(sum, "debug/sum_pyr");
 
     double t2 = omp_get_wtime();
 
@@ -291,7 +291,7 @@ void GaussianPyramid<T>::timeTest(const Image<T>& img0)
         ImageOp::linearCombination(sum, rs, 1, 1, sum);
     }
 
-    VtkHelper::writeVTK(sum, "debug/sum_fftw.vtk");
+    ImageLog::write(sum, "debug/sum_fftw");
 
     double t3 = omp_get_wtime();
 

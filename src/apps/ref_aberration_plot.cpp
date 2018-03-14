@@ -181,7 +181,7 @@ int AberrationPlot::_run()
             }
         }
 
-        VtkHelper::writeVTK(dgamma, outPath+"_dgamma.vtk");
+        ImageLog::write(dgamma, outPath+"_dgamma");
     }
     else
     {
@@ -298,13 +298,13 @@ int AberrationPlot::_run()
                 }
             }
 
-            VtkHelper::writeVTK(cosPhi, outPath+"_cos.vtk");
-            VtkHelper::writeVTK(sinPhi, outPath+"_sin.vtk");
-            //VtkHelper::writeVTK(phase, outPath+"_phase.vtk");
+            ImageLog::write(cosPhi, outPath+"_cos");
+            ImageLog::write(sinPhi, outPath+"_sin");
+            //ImageLog::write(phase, outPath+"_phase");
 
             Image<RFLOAT> phaseFull(s,s);
             FftwHelper::decenterDouble2D(phase.data, phaseFull.data);
-            VtkHelper::writeVTK(phaseFull, outPath+"_phase.vtk");
+            ImageLog::write(phaseFull, outPath+"_phase");
 
             cosPhi.write(outPath+"_cos.mrc");
             sinPhi.write(outPath+"_sin.mrc");
@@ -329,7 +329,7 @@ int AberrationPlot::_run()
         Image<RFLOAT> vis = AberrationFit::draw(&fit, angpix, s);
         Image<RFLOAT> visFull(s,s);
         FftwHelper::decenterDouble2D(vis.data, visFull.data);
-        VtkHelper::writeVTK(visFull, outPath+"_fit.vtk");
+        ImageLog::write(visFull, outPath+"_fit");
 
 
         MetaDataTable mdtAll;

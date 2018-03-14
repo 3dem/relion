@@ -120,10 +120,10 @@ int FrameRecomb::_run()
         Image<RFLOAT> bfacFit = DamageHelper::renderBkFit(bkFacs, sh, fc);
         Image<RFLOAT> bfacFitNoScale = DamageHelper::renderBkFit(bkFacs, sh, fc, true);
 
-        VtkHelper::writeVTK(bfacFit, "bfacs/glob_Bk-fit.vtk");
-        VtkHelper::writeVTK(bfacFitNoScale, "bfacs/glob_Bk-fit_noScale.vtk");
-        VtkHelper::writeVTK(fcc, "bfacs/glob_Bk-data.vtk");
-        VtkHelper::write(freqWeights, "bfacs/freqWeights.vtk");
+        ImageLog::write(bfacFit, "bfacs/glob_Bk-fit");
+        ImageLog::write(bfacFitNoScale, "bfacs/glob_Bk-fit_noScale");
+        ImageLog::write(fcc, "bfacs/glob_Bk-data");
+        ImageLog::write(freqWeights, "bfacs/freqWeights");
 
         std::ofstream bfacsDat("bfacs/Bfac.dat");
         std::ofstream kfacsDat("bfacs/kfac.dat");

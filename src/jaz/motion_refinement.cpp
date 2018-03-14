@@ -757,8 +757,8 @@ void MotionRefinement::testCC(const Image<Complex> &obs, const Image<Complex> &p
     ft.inverseFourierTransform(obsW(), obsWR());
     ft.inverseFourierTransform(predW(), predWR());
 
-    VtkHelper::writeVTK(obsWR, "debug/obsWR.vtk");
-    VtkHelper::writeVTK(predWR, "debug/predWR.vtk");
+    ImageLog::write(obsWR, "debug/obsWR");
+    ImageLog::write(predWR, "debug/predWR");
 
     double var = 0.0;
 
@@ -793,7 +793,7 @@ void MotionRefinement::testCC(const Image<Complex> &obs, const Image<Complex> &p
         DIRECT_A2D_ELEM(corrR.data, y, x) = cc;
     }
 
-    VtkHelper::writeVTK(corrR, "debug/Wcc_rs.vtk");
+    ImageLog::write(corrR, "debug/Wcc_rs");
 
     Image<RFLOAT> corr(w, h);
 
@@ -829,7 +829,7 @@ void MotionRefinement::testCC(const Image<Complex> &obs, const Image<Complex> &p
         DIRECT_A2D_ELEM(corr.data, y, x) *= w*h;
     }
 
-    VtkHelper::writeVTK(corr, "debug/Wcc_fs.vtk");
+    ImageLog::write(corr, "debug/Wcc_fs");
 }
 
 Image<RFLOAT> MotionRefinement::zeroPad(const Image<RFLOAT>& img, RFLOAT ratio, RFLOAT taper)

@@ -198,9 +198,9 @@ int main(int argc, char *argv[])
         xz(y,x) = opt.z;
     }
 
-    VtkHelper::writeVTK(xx, outPath+"_sin2.vtk");
-    VtkHelper::writeVTK(xy, outPath+"_sincos.vtk");
-    VtkHelper::writeVTK(xz, outPath+"_cos2.vtk");
+    ImageLog::write(xx, outPath+"_sin2");
+    ImageLog::write(xy, outPath+"_sincos");
+    ImageLog::write(xz, outPath+"_cos2");
 
     return 0;
 }

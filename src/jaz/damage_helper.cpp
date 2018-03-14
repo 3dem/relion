@@ -332,7 +332,7 @@ std::vector<double> DamageHelper::fitBFactors(const Image<double> &fcc, int k0, 
         debug(f,k) = scale[k] * exp(-0.5 * k * k / (sig[f] * sig[f]));
     }
 
-    VtkHelper::writeVTK(debug, "bfacs/debug.vtk");
+    ImageLog::write(debug, "bfacs/debug");
 
     return sig;
 }
