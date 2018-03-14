@@ -690,13 +690,11 @@ void multiViewerCanvas::saveBackupSelection()
 		selected[my_sorted_ipos] = boxes[ipos]->selected;
 	}
 
-	MetaDataTable MDout;
 	for (long int ipos = 0; ipos < boxes.size(); ipos++)
 	{
-		MDout.addObject();
         // without the bool() cast, clang will interpret the formal template parameter
         // as a reference to a bit field, which is not the same as a boolean.
-		MDout.setValue(EMDL_SELECTED, bool(selected[ipos]));
+		MDbackup.setValue(EMDL_SELECTED, bool(selected[ipos]), ipos);
 	}
 
 	FileName fn_dir;
@@ -708,7 +706,7 @@ void multiViewerCanvas::saveBackupSelection()
 		fn_dir = ".";
 	fn_dir += "/backup_selection.star";
 
-	MDout.write(fn_dir);
+	MDbackup.write(fn_dir);
 	std::cout <<" Written out " << fn_dir << std::endl;
 }
 
@@ -741,9 +739,9 @@ void multiViewerCanvas::loadBackupSelection(bool do_ask)
 	else
 		fn_sel = fn_dir+"backup_selection.star";
 
-	MetaDataTable MDin;
-	MDin.read(fn_sel);
-	if (MDin.numberOfObjects() != boxes.size())
+	MDbackup.clear();
+	MDbackup.read(fn_sel);
+	if (MDbackup.numberOfObjects() != boxes.size())
 	{
 		std::cerr << "Warning: ignoring .relion_display_backup_selection.star with unexpected number of entries..." << std::endl;
 		return;
@@ -751,10 +749,10 @@ void multiViewerCanvas::loadBackupSelection(bool do_ask)
 
 	std::vector<bool> selected(boxes.size());
 	long int ipos = 0;
-	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDbackup)
 	{
 		bool is_selected;
-		MDin.getValue(EMDL_SELECTED, is_selected);
+		MDbackup.getValue(EMDL_SELECTED, is_selected);
 		selected[ipos] = is_selected;
 		ipos++;
 	}
@@ -2106,6 +2104,7 @@ void Displayer::read(int argc, char **argv)
 	nr_regroups = textToInteger(parser.getOption("--regroup", "Number of groups to regroup saved particles from selected classes in (default is no regrouping)", "-1"));
 	do_allow_save = parser.checkOption("--allow_save", "Allow saving of selected particles or class averages");
 
+	do_remove_duplicates = false;
 	if(do_allow_save)
 			do_remove_duplicates = parser.checkOption("--remove_duplicates", "Remove particles with redundant coordinates (within this distance [A]) in the data_star STAR file.");
 	if(do_remove_duplicates)
