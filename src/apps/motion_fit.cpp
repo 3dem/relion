@@ -108,6 +108,8 @@ int MotionFitProg::_run()
 
     loadInitialMovieValues();
 
+    // @TODO: warn if angpix < coords_anpix or movie_angpix
+
     std::vector<Image<RFLOAT> > dmgWeight = DamageHelper::damageWeights(
         s, angpix, firstFrame, fc, dosePerFrame, dmga, dmgb, dmgc);
 
@@ -196,10 +198,12 @@ int MotionFitProg::_run()
                 projectors[0], projectors[1], obsModel, mdts[g], movie,
                 sigma2, dmgWeight, fts, nr_omp_threads);
 
+        // @TODO: make global offsets optional
 
         std::vector<Image<RFLOAT>> ccSum = MotionRefinement::addCCs(movieCC);
         std::vector<gravis::d2Vector> globTrack = MotionRefinement::getGlobalTrack(ccSum);
-        std::vector<gravis::d2Vector> globOffsets = MotionRefinement::getGlobalOffsets(movieCC, globTrack);
+        std::vector<gravis::d2Vector> globOffsets = MotionRefinement::getGlobalOffsets(
+                    movieCC, globTrack, 0.25*s);
 
         if (debug)
         {

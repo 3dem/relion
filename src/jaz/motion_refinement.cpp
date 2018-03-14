@@ -283,7 +283,7 @@ std::vector<d2Vector> MotionRefinement::getGlobalTrack(
 
 std::vector<d2Vector> MotionRefinement::getGlobalOffsets(
         const std::vector<std::vector<Image<RFLOAT>>>& movieCC,
-        const std::vector<d2Vector>& globTrack)
+        const std::vector<d2Vector>& globTrack, double sigma)
 {
     const int pc = movieCC.size();
     const int fc = movieCC[0].size();
@@ -292,8 +292,16 @@ std::vector<d2Vector> MotionRefinement::getGlobalOffsets(
     const double eps = 1e-30;
 
     std::vector<d2Vector> out(pc);
+    Image<RFLOAT> pSum(s,s), weight(s,s);
 
-    Image<RFLOAT> pSum(s,s);
+    for (int y = 0; y < s; y++)
+    for (int x = 0; x < s; x++)
+    {
+        double xx = x >= sh? x - s: x;
+        double yy = y >= sh? y - s: y;
+
+        weight(y,x) = exp(-0.5*(xx*xx + yy*yy)/(sigma*sigma));
+    }
 
     for (int p = 0; p < pc; p++)
     {
@@ -308,6 +316,12 @@ std::vector<d2Vector> MotionRefinement::getGlobalOffsets(
             {
                 pSum(y,x) += Interpolation::cubicXY(movieCC[p][f], x + g.x, y + g.y, 0, 0, true);
             }
+        }
+
+        for (int y = 0; y < s; y++)
+        for (int x = 0; x < s; x++)
+        {
+            pSum(y,x) *= weight(y,x);
         }
 
         out[p] = Interpolation::quadraticMaxWrapXY(pSum, eps);
