@@ -63,6 +63,11 @@ void Postprocessing::read(int argc, char **argv)
 	randomize_fsc_at = textToFloat(parser.getOption("--randomize_at_fsc", "Randomize phases from the resolution where FSC drops below this value", "0.8"));
 	filter_edge_width = textToInteger(parser.getOption("--filter_edge_width", "Width of the raised cosine on the low-pass filter edge (in resolution shells)", "2"));
 	verb = textToInteger(parser.getOption("--verb", "Verbosity", "1"));
+	// Hidden option
+	int random_seed = textToInteger(getParameter(argc, argv, "--seed", "-1"));
+	if (random_seed >= 0) {
+		init_random_generator(random_seed);
+	}
 
 	// Check for errors in the command-line option
 	if (parser.checkForErrors())

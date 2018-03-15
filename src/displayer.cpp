@@ -2106,6 +2106,7 @@ void Displayer::read(int argc, char **argv)
 	nr_regroups = textToInteger(parser.getOption("--regroup", "Number of groups to regroup saved particles from selected classes in (default is no regrouping)", "-1"));
 	do_allow_save = parser.checkOption("--allow_save", "Allow saving of selected particles or class averages");
 
+	do_remove_duplicates = false;
 	if(do_allow_save)
 			do_remove_duplicates = parser.checkOption("--remove_duplicates", "Remove particles with redundant coordinates (within this distance [A]) in the data_star STAR file.");
 	if(do_remove_duplicates)
