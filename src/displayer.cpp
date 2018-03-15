@@ -692,7 +692,9 @@ void multiViewerCanvas::saveBackupSelection()
 
 	for (long int ipos = 0; ipos < boxes.size(); ipos++)
 	{
-        // without the bool() cast, clang will interpret the formal template parameter
+        if (MDbackup.numberOfObjects() < ipos+1)
+        	MDbackup.addObject();
+		// without the bool() cast, clang will interpret the formal template parameter
         // as a reference to a bit field, which is not the same as a boolean.
 		MDbackup.setValue(EMDL_SELECTED, bool(selected[ipos]), ipos);
 	}
@@ -747,7 +749,7 @@ void multiViewerCanvas::loadBackupSelection(bool do_ask)
 		return;
 	}
 
-	std::vector<bool> selected(boxes.size());
+	std::vector<bool> selected(boxes.size(), false);
 	long int ipos = 0;
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDbackup)
 	{
