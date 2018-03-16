@@ -48,7 +48,7 @@
 #include "src/metadata_table.h"
 
 /* Read -------------------------------------------------------------------- */
-void CTF::read(MetaDataTable &MD1, MetaDataTable &MD2, long int objectID)
+void CTF::read(const MetaDataTable &MD1, const MetaDataTable &MD2, long int objectID)
 {
 
 	if (!MD1.getValue(EMDL_CTF_VOLTAGE, kV, objectID))
@@ -106,7 +106,7 @@ void CTF::setValues(RFLOAT _defU, RFLOAT _defV, RFLOAT _defAng, RFLOAT _voltage,
 	initialise();
 }
 /* Read from 1 MetaDataTable ----------------------------------------------- */
-void CTF::read(MetaDataTable &MD)
+void CTF::read(const MetaDataTable &MD)
 {
 	MetaDataTable MDempty;
 	MDempty.addObject(); // add one empty object

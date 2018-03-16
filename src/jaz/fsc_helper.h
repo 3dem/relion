@@ -101,6 +101,11 @@ class FscHelper
                 const std::vector<Image<RFLOAT>>& weights1,
                 Image<RFLOAT>& table, Image<RFLOAT>& weight);
 
+        static double computeTsc(
+                const std::vector<Image<RFLOAT>>& tables,
+                const std::vector<Image<RFLOAT>>& weights0,
+                const std::vector<Image<RFLOAT>>& weights1,
+                int k0, int k1);
 
         static void computeNoiseSq(
                 std::vector<std::vector<Image<Complex> > > frames,

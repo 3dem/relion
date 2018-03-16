@@ -314,6 +314,39 @@ void FscHelper::mergeFscTables(const std::vector<Image<RFLOAT> > &tables,
     }
 }
 
+double FscHelper::computeTsc(
+        const std::vector<Image<RFLOAT>> &tables,
+        const std::vector<Image<RFLOAT>> &weights0,
+        const std::vector<Image<RFLOAT>> &weights1,
+        int k0, int k1)
+{
+    //const int kc = tables[0].data.xdim;
+    const int fc = tables[0].data.ydim;
+    const int tc = tables.size();
+
+    double tSum = 0.0, w0Sum = 0.0, w1Sum = 0.0;
+
+    for (int t = 0; t < tc; t++)
+    for (int f = 0; f < fc; f++)
+    for (int k = k0; k < k1; k++)
+    {
+        tSum += tables[t](f,k);
+        w0Sum += weights0[t](f,k);
+        w1Sum += weights1[t](f,k);
+    }
+
+    double ww = sqrt(w0Sum*w1Sum);
+
+    if (ww > 0.0)
+    {
+        return tSum / ww;
+    }
+    else
+    {
+        return 0.0;
+    }
+}
+
 void FscHelper::computeNoiseSq(
         std::vector<std::vector<Image<Complex> > > frames,
         std::vector<Image<Complex> > predictions, Image<RFLOAT> &sigma2)

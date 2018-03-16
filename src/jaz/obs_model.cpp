@@ -26,7 +26,7 @@ ObservationModel::ObservationModel(double angpix, double Cs, double voltage, dou
 }
 
 Image<Complex> ObservationModel::predictObservation(
-        Projector& proj, MetaDataTable& mdt, int particle,
+        Projector& proj, const MetaDataTable& mdt, int particle,
         bool applyCtf, bool applyTilt,
         double deltaRot, double deltaTilt, double deltaPsi) const
 {
@@ -96,7 +96,7 @@ Image<Complex> ObservationModel::predictObservation(
 }
 
 std::vector<Image<Complex>> ObservationModel::predictObservations(
-        Projector &proj, MetaDataTable &mdt,
+        Projector &proj, const MetaDataTable &mdt,
         bool applyCtf, bool applyTilt, int threads) const
 {
     const int pc = mdt.numberOfObjects();
@@ -112,7 +112,7 @@ std::vector<Image<Complex>> ObservationModel::predictObservations(
 }
 
 void ObservationModel::insertObservation(const Image<Complex>& img, BackProjector &bproj,
-        MetaDataTable& mdt, int particle,
+        const MetaDataTable& mdt, int particle,
         bool applyCtf, bool applyTilt, double shift_x, double shift_y)
 {
     const int s = img.data.ydim;

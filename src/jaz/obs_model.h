@@ -23,20 +23,20 @@ class ObservationModel
             bool hasTilt, anisoTilt, ctfTilt;
 
         Image<Complex> predictObservation(
-                Projector &proj, MetaDataTable &mdt, int particle,
+                Projector &proj, const MetaDataTable &mdt, int particle,
                 bool applyCtf, bool applyTilt,
                 double deltaRot = 0.0,
                 double deltaTilt = 0.0,
                 double deltaPsi = 0.0) const;
 
         std::vector<Image<Complex>> predictObservations(
-                Projector &proj, MetaDataTable &mdt,
+                Projector &proj, const MetaDataTable &mdt,
                 bool applyCtf, bool applyTilt,
                 int threads) const;
 
         void insertObservation(
                 const Image<Complex>& img, BackProjector &bproj,
-                MetaDataTable& mdt, int particle,
+                const MetaDataTable& mdt, int particle,
                 bool applyCtf, bool applyTilt,
                 double shift_x = 0.0, double shift_y = 0.0);
 

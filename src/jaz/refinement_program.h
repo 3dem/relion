@@ -71,6 +71,8 @@ class RefinementProgram
             int s, sh, fc;
             long g0, gc;
 
+            std::vector<double> freqWeight1D;
+
 
         int init(int argc, char *argv[]);
         int run();

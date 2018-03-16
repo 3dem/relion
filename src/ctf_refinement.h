@@ -100,6 +100,7 @@ public:
     Image<RFLOAT> maps[2];
     Image<RFLOAT> powSpec[2];
     Image<RFLOAT> freqWeight;
+    std::vector<double> freqWeight1D;
     Projector projectors[2];
 
     MetaDataTable mdt0;

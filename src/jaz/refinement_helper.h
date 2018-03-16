@@ -15,7 +15,9 @@ class RefinementHelper
 {
     public:
 
-        static void drawFSC(const MetaDataTable* mdt, Image<RFLOAT>& dest, double thresh = 0.143);
+        static void drawFSC(const MetaDataTable* mdt, std::vector<double>& dest1D,
+                            Image<RFLOAT>& dest, double thresh = 0.143);
+
         static void computeSNR(const MetaDataTable* mdt, Image<RFLOAT>& dest, double eps = 1e-15);
         static void computeSigInvSq(const MetaDataTable* mdt, const std::vector<double>& signalPow,
                                     Image<RFLOAT>& dest, double eps = 1e-15);
