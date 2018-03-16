@@ -135,9 +135,15 @@ int MotionFitProg::readMoreOptions(IOParser& parser, int argc, char *argv[])
     parser.addSection("Parameter estimation");
 
     paramEstim = parser.checkOption("--params", "Estimate parameters instead of motion");
-    param_rV = textToFloat(parser.getOption("--r_vel", "Test s_vel +/- r_vel * s_vel", "0.2"));
+    param_rV = textToFloat(parser.getOption("--r_vel", "Test s_vel +/- r_vel * s_vel", "0.5"));
     param_rD = textToFloat(parser.getOption("--r_div", "Test s_div +/- r_div * s_div", "0.2"));
     param_thresh = textToFloat(parser.getOption("--pthresh", "Abort when relative TSC change is smaller than this", "0.1"));
+
+    if (paramEstim && k_cutoff < 0)
+    {
+        std::cerr << "Parameter estimation requires a freq. cutoff (--k_cut).\n";
+        return 1138;
+    }
 
     return 0;
 }
@@ -229,6 +235,7 @@ int MotionFitProg::_run()
     int pctot = 0;
 
     std::vector<double> sig_v_vals(paramCount), sig_d_vals(paramCount);
+    std::vector<double> sig_v_vals_nrm(paramCount), sig_d_vals_nrm(paramCount);
     std::vector<std::string> paramTags(paramCount);
 
     std::vector<std::vector<double>> paramTsc(paramCount);
@@ -238,8 +245,10 @@ int MotionFitProg::_run()
         const double dv = ((i%3)-1) * param_rV;
         const double dd = ((i/3)-1) * param_rD;
 
-        sig_v_vals[i] = sig_vel_nrm * (1.0 + dv);
-        sig_d_vals[i] = sig_div_nrm * (1.0 + dd);
+        sig_v_vals[i] = sig_vel * (1.0 + dv);
+        sig_d_vals[i] = sig_div * (1.0 + dd);
+        sig_v_vals_nrm[i] = sig_vel_nrm * (1.0 + dv);
+        sig_d_vals_nrm[i] = sig_div_nrm * (1.0 + dd);
 
         std::stringstream sts;
         sts << "v" << sig_v_vals[i] << "-d" << sig_d_vals[i];
@@ -391,7 +400,7 @@ int MotionFitProg::_run()
                     std::cout << "                    sig_div = " << sig_d_vals[i] << " px^(1/2)\n";
                 }
 
-                computeWeights(sig_v_vals[i], sig_acc_nrm, sig_d_vals[i],
+                computeWeights(sig_v_vals_nrm[i], sig_acc_nrm, sig_d_vals_nrm[i],
                                positions, fc, velWgh, accWgh, divWgh);
 
                 std::vector<std::vector<gravis::d2Vector>> tracks = optimize(
@@ -670,6 +679,16 @@ void MotionFitProg::writeParamEstOutput(
         for (int s = 0; s < sc; s++)
         {
             out << cumulPartCount[s] << " " << paramTsc[p][s] << "\n";
+        }
+
+        std::ofstream out2(outPath + "_mg" + mgIndex + "_TSC-rel_" + paramTags[p] + ".dat");
+
+        for (int s = 0; s < sc; s++)
+        {
+            if (paramTsc[4][s] > 0.0)
+            {
+                out2 << cumulPartCount[s] << " " << paramTsc[p][s]/paramTsc[4][s] << "\n";
+            }
         }
     }
 }
