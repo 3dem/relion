@@ -371,7 +371,7 @@ void Micrograph::read(FileName fn_in)
 void Micrograph::setMovie(FileName fnMovie, FileName fnGain, RFLOAT binning)
 {
 	Image<RFLOAT> Ihead;
-	Ihead.read(fnMovie, false);
+	Ihead.read(fnMovie, false, -1, false, true); // select_img -1, mmap false, is_2D true
 
 	width = XSIZE(Ihead());
 	height = YSIZE(Ihead());
