@@ -230,18 +230,15 @@ int basisViewerWindow::fillCanvas(int viewer_type, MetaDataTable &MDin, EMDLabel
 		}
 
 		// Pre-load existing backup_selection.star file
-		FileName fn_sel, fn_dir="";
+		FileName fn_sel, fn_dir=".";
 		if (fn_selected_imgs != "")
 			fn_dir = fn_selected_imgs.beforeLastOf("/");
 		else if (fn_selected_parts != "")
 			fn_dir = fn_selected_parts.beforeLastOf("/");
 
-		if (fn_dir != "")
-		{
-			fn_dir += "/backup_selection.star";
-			if (exists(fn_dir))
-				canvas.loadBackupSelection(false); // false means dont ask for filename
-		}
+		fn_dir += "/backup_selection.star";
+		if (exists(fn_dir))
+			canvas.loadBackupSelection(false); // false means dont ask for filename
 
 		resizable(*this);
 		show();
