@@ -35,8 +35,18 @@ void DisplayBox::draw()
     /* Redraw the whole image */
     fl_draw_image((const uchar *)img_data, xpos, ypos, (short)xsize_data, (short)ysize_data, 1);
     /* Draw a red rectangle around the particle if it is selected */
-    if (selected)
+    if (selected == 1)
         fl_color(FL_RED);
+    else if (selected == 2)
+    	fl_color(FL_GREEN);
+    else if (selected == 3)
+    	fl_color(FL_BLUE);
+    else if (selected == 4)
+    	fl_color(FL_CYAN);
+    else if (selected == 5)
+    	fl_color(FL_MAGENTA);
+    else if (selected == 6)
+    	fl_color(FL_YELLOW);
     else
     	fl_color(FL_BLACK);
 
@@ -138,23 +148,33 @@ void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, i
 
 
 
-bool DisplayBox::toggleSelect()
+int DisplayBox::toggleSelect(int set_selected)
 {
 
-	selected = !selected;
+	if (selected > 0)
+		selected = 0;
+	else if (selected == 0)
+		selected = set_selected;
 	redraw();
 	return selected;
 }
 
-bool DisplayBox::select()
+void DisplayBox::setSelect(int value)
 {
 
-	selected = true;
+	selected = value;
+	redraw();
+}
+
+int DisplayBox::select()
+{
+
+	selected = SELECTED;
 	redraw();
 	return selected;
 }
 
-bool DisplayBox::unSelect()
+int DisplayBox::unSelect()
 {
 
 	selected = NOTSELECTED;
@@ -538,7 +558,7 @@ int multiViewerCanvas::handle(int ev)
 				}
 				else
 				{
-					boxes[ipos]->toggleSelect();
+					boxes[ipos]->toggleSelect(current_selection_type);
 				}
 			}
 			else  if ( Fl::event_button() == FL_RIGHT_MOUSE )
@@ -560,14 +580,16 @@ int multiViewerCanvas::handle(int ev)
 						{ "Show Fourier phase angles (2x)" },
 						{ "Show helical layer line profile" },
 						{ "Show particles from selected classes" },
+						{ "Set selection type" },
 						{ "Save selected classes" },
+						{ "Save STAR with selected images" },
 						{ "Quit" },
 						{ 0 }
 					};
 
 					if (!do_allow_save)
 				    {
-						rclick_menu[12].deactivate();
+						rclick_menu[13].deactivate();
 				    }
 
 				    const Fl_Menu_Item *m = rclick_menu->popup(Fl::event_x(), Fl::event_y(), 0, 0, 0);
@@ -596,12 +618,14 @@ int multiViewerCanvas::handle(int ev)
 					else if ( strcmp(m->label(), "Show helical layer line profile") == 0 )
 						showHelicalLayerLineProfile(ipos);
 					else if ( strcmp(m->label(), "Show particles from selected classes") == 0 )
-						showSelectedParticles(SELECTED);
+						showSelectedParticles(current_selection_type);
+					else if ( strcmp(m->label(), "Set selection type") == 0 )
+						setSelectionType();
 					else if ( strcmp(m->label(), "Save selected classes") == 0 )
 					{
 						saveBackupSelection();
-						saveSelected(SELECTED);
-						saveSelectedParticles(SELECTED);
+						saveSelected(current_selection_type);
+						saveSelectedParticles(current_selection_type);
 					}
 					else if ( strcmp(m->label(), "Quit") == 0 )
 						exit(0);
@@ -622,13 +646,14 @@ int multiViewerCanvas::handle(int ev)
 						{ "Show Fourier phase angles (2x)" },
 						{ "Show helical layer line profile" },
 						{ "Show metadata" },
+						{ "Set selection type" },
 						{ "Save STAR with selected images" },
 						{ "Quit" },
 						{ 0 }
 					};
 					if (!do_allow_save)
 				    {
-						rclick_menu[13].deactivate();
+						rclick_menu[14].deactivate();
 				    }
 
 					const Fl_Menu_Item *m = rclick_menu->popup(Fl::event_x(), Fl::event_y(), 0, 0, 0);
@@ -660,11 +685,14 @@ int multiViewerCanvas::handle(int ev)
 						showHelicalLayerLineProfile(ipos);
 					else if ( strcmp(m->label(), "Show metadata") == 0 )
 						printMetaData(ipos);
+					else if ( strcmp(m->label(), "Set selection type") == 0 )
+						setSelectionType();
 					else if ( strcmp(m->label(), "Save STAR with selected images") == 0 )
 					{
 						saveBackupSelection();
 						saveSelected(SELECTED);
 					}
+
 					else if ( strcmp(m->label(), "Quit") == 0 )
 						exit(0);
 
@@ -679,7 +707,7 @@ int multiViewerCanvas::handle(int ev)
 
 void multiViewerCanvas::saveBackupSelection()
 {
-	std::vector<bool> selected(boxes.size());
+	std::vector<int> selected(boxes.size());
 	for (long int ipos = 0; ipos < boxes.size(); ipos++)
 	{
 		long int my_sorted_ipos;
@@ -696,7 +724,7 @@ void multiViewerCanvas::saveBackupSelection()
         	MDbackup.addObject();
 		// without the bool() cast, clang will interpret the formal template parameter
         // as a reference to a bit field, which is not the same as a boolean.
-		MDbackup.setValue(EMDL_SELECTED, bool(selected[ipos]), ipos);
+		MDbackup.setValue(EMDL_SELECTED, selected[ipos], ipos);
 	}
 
 	FileName fn_dir;
@@ -749,13 +777,11 @@ void multiViewerCanvas::loadBackupSelection(bool do_ask)
 		return;
 	}
 
-	std::vector<bool> selected(boxes.size(), false);
+	std::vector<int> selected(boxes.size(), false);
 	long int ipos = 0;
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDbackup)
 	{
-		bool is_selected;
-		MDbackup.getValue(EMDL_SELECTED, is_selected);
-		selected[ipos] = is_selected;
+		MDbackup.getValue(EMDL_SELECTED, selected[ipos]);
 		ipos++;
 	}
 
@@ -767,10 +793,7 @@ void multiViewerCanvas::loadBackupSelection(bool do_ask)
 		else
 			my_sorted_ipos = ipos;
 
-		if (selected[my_sorted_ipos])
-			boxes[ipos]->select();
-		else
-			boxes[ipos]->unSelect();
+		boxes[ipos]->setSelect(selected[my_sorted_ipos]);
 	}
 
 }
@@ -787,7 +810,7 @@ void multiViewerCanvas::invertSelection()
 {
 	for (long int ipos = 0; ipos < boxes.size(); ipos++)
 	{
-		boxes[ipos]->toggleSelect();
+		boxes[ipos]->toggleSelect(current_selection_type);
 	}
 }
 
@@ -990,7 +1013,7 @@ void multiViewerCanvas::showHelicalLayerLineProfile(int ipos)
 	int res = system(command.c_str());
 }
 
-void multiViewerCanvas::makeStarFileSelectedParticles(bool selected, MetaDataTable &MDpart)
+void multiViewerCanvas::makeStarFileSelectedParticles(int selected, MetaDataTable &MDpart)
 {
 	MDpart.clear();
 	int myclass, iclass;
@@ -1043,7 +1066,7 @@ void multiViewerCanvas::makeStarFileSelectedParticles(bool selected, MetaDataTab
 
 }
 
-void multiViewerCanvas::saveSelectedParticles(bool save_selected)
+void multiViewerCanvas::saveSelectedParticles(int save_selected)
 {
 	if (fn_selected_parts == "")
 	{
@@ -1141,7 +1164,7 @@ void regroupSelectedParticles(MetaDataTable &MDdata, MetaDataTable &MDgroups, in
 
 }
 
-void multiViewerCanvas::showSelectedParticles(bool save_selected)
+void multiViewerCanvas::showSelectedParticles(int save_selected)
 {
 	MetaDataTable MDpart;
 	makeStarFileSelectedParticles(save_selected, MDpart);
@@ -1227,7 +1250,7 @@ void multiViewerCanvas::saveTrainingSet()
 
 }
 
-void multiViewerCanvas::saveSelected(bool save_selected)
+void multiViewerCanvas::saveSelected(int save_selected)
 {
 	if (fn_selected_imgs == "")
 		return;
@@ -1281,6 +1304,38 @@ void multiViewerCanvas::saveSelected(bool save_selected)
 	}
 	else
 		std::cout <<" No images to save...." << std::endl;
+}
+
+void multiViewerCanvas::setSelectionType()
+{
+	popupSelectionTypeWindow win(250, 50, "Set selection type");
+	win.fill();
+}
+
+int popupSelectionTypeWindow::fill()
+{
+	color(GUI_BACKGROUND_COLOR);
+	choice = new Fl_Choice(50, 10, 130, 30, "type: ") ;
+
+	choice->add("Red (1)", 0, 0,0, FL_MENU_VALUE);
+	choice->add("Green (2)", 0, 0,0, FL_MENU_VALUE);
+	choice->add("Blue (3)", 0, 0,0, FL_MENU_VALUE);
+	choice->add("Cyan (4)", 0, 0,0, FL_MENU_VALUE);
+	choice->add("Magenta (5)", 0, 0,0, FL_MENU_VALUE);
+	choice->add("Yellow (6)", 0, 0,0, FL_MENU_VALUE);
+	choice->color(GUI_INPUT_COLOR);
+
+	choice->value(current_selection_type-1);
+
+	choice->callback(cb_set, this);
+
+	Fl_Button * closebutton = new Fl_Button(190, 10, 50, 30, "Close");
+	closebutton->color(GUI_RUNBUTTON_COLOR);
+	closebutton->callback( cb_close, this);
+
+	show();
+
+	return Fl::run();
 }
 
 int singleViewerCanvas::handle(int ev)
@@ -1374,6 +1429,49 @@ void singleViewerCanvas::printHelp()
 	std::cout <<" + Middle-mouse drag: measure distances " << std::endl;
 	std::cout <<" + Right-mouse click: pop-up menu" << std::endl;
 }
+
+/*
+int popupSetContrastWindow::fill()
+{
+	color(GUI_BACKGROUND_COLOR);
+
+	int width = 435;
+	int x=150, y=15, ystep = 27, height = 25,  inputwidth = 50;
+	int x2 = width - inputwidth - 50;
+
+	// Always display these:
+	scale = new Fl_Input(x, y, inputwidth, height, "Scale:");
+	scale->color(GUI_INPUT_COLOR);
+	scale->value("1");
+
+	minval = new Fl_Input(x2, y, inputwidth, height, "Black value:");
+	minval->value("0");
+	minval->color(GUI_INPUT_COLOR);
+	y += ystep;
+
+	sigma_contrast = new Fl_Input(x, y, inputwidth, height, "Sigma contrast:");
+	sigma_contrast->value("0");
+	sigma_contrast->color(GUI_INPUT_COLOR);
+
+	maxval = new Fl_Input(x2, y, inputwidth, height, "White value:");
+	maxval->value("0");
+	maxval->color(GUI_INPUT_COLOR);
+	y += ROUND(ystep);
+
+	Fl_Button * applybutton = new Fl_Button(width-120, y, 70, 30, "Apply!");
+	applybutton->color(GUI_RUNBUTTON_COLOR);
+	applybutton->callback( cb_set, this);
+
+	Fl_Button * closebutton = new Fl_Button(width -200, y, 70, 30, "Close");
+	closebutton->color(GUI_RUNBUTTON_COLOR);
+	closebutton->callback( cb_close, this);
+
+	show();
+
+	return Fl::run();
+}
+*/
+
 
 void pickerViewerCanvas::draw()
 {
@@ -1739,6 +1837,13 @@ void singleViewerCanvas::printMetaData()
 	boxes[0]->MDimg.write(std::cout);
 }
 
+/*
+void singleViewerCanvas::setContrast()
+{
+	popupSetContrastWindow win(400, 100, "Set contrast");
+	win.fill();
+}
+*/
 
 // Fill GUI window
 int displayerGuiWindow::fill(FileName &_fn_in)
