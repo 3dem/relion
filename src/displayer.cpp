@@ -617,10 +617,10 @@ int multiViewerCanvas::handle(int ev)
 						showFourierPhaseAngles(ipos);
 					else if ( strcmp(m->label(), "Show helical layer line profile") == 0 )
 						showHelicalLayerLineProfile(ipos);
-					else if ( strcmp(m->label(), "Show particles from selected classes") == 0 )
-						showSelectedParticles(current_selection_type);
 					else if ( strcmp(m->label(), "Set selection type") == 0 )
 						setSelectionType();
+					else if ( strcmp(m->label(), "Show particles from selected classes") == 0 )
+						showSelectedParticles(current_selection_type);
 					else if ( strcmp(m->label(), "Save selected classes") == 0 )
 					{
 						saveBackupSelection();
@@ -645,8 +645,8 @@ int multiViewerCanvas::handle(int ev)
 						{ "Show Fourier amplitudes (2x)" },
 						{ "Show Fourier phase angles (2x)" },
 						{ "Show helical layer line profile" },
-						{ "Show metadata" },
 						{ "Set selection type" },
+						{ "Show metadata" },
 						{ "Save STAR with selected images" },
 						{ "Quit" },
 						{ 0 }
@@ -683,10 +683,10 @@ int multiViewerCanvas::handle(int ev)
 						showFourierPhaseAngles(ipos);
 					else if ( strcmp(m->label(), "Show helical layer line profile") == 0 )
 						showHelicalLayerLineProfile(ipos);
-					else if ( strcmp(m->label(), "Show metadata") == 0 )
-						printMetaData(ipos);
 					else if ( strcmp(m->label(), "Set selection type") == 0 )
 						setSelectionType();
+					else if ( strcmp(m->label(), "Show metadata") == 0 )
+						printMetaData(ipos);
 					else if ( strcmp(m->label(), "Save STAR with selected images") == 0 )
 					{
 						saveBackupSelection();
