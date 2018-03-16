@@ -556,6 +556,30 @@ std::vector<std::vector<Image<Complex>>> RefinementProgram::loadMovie(
         }
     }
 
+    if (angpix < coords_angpix)
+    {
+        std::cerr << "WARING: pixel size (--angpix) is greater than the AutoPick pixel size (--coords_angpix)\n";
+
+        if (coords_angpix < angpix + 0.01)
+        {
+            std::cerr << "        This is probably a rounding error. It is recommended to set --angpix ("
+                      << angpix << ") to at least " << coords_angpix << "\n";
+
+        }
+    }
+
+    if (angpix < movie_angpix)
+    {
+        std::cerr << "WARING: pixel size (--angpix) is greater than the movie pixel size (--movie_angpix)\n";
+
+        if (movie_angpix < angpix + 0.01)
+        {
+            std::cerr << "        This is probably a rounding error. It is recommended to set --angpix ("
+                      << angpix << ") to at least " << movie_angpix << "\n";
+
+        }
+    }
+
     return movie;
 }
 

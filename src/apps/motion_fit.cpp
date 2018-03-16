@@ -169,30 +169,6 @@ int MotionFitProg::_run()
 
     loadInitialMovieValues();
 
-    if (angpix < coords_angpix)
-    {
-        std::cerr << "WARING: pixel size (--angpix) is greater than the AutoPick pixel size (--coords_angpix)\n";
-
-        if (coords_angpix < angpix + 0.01)
-        {
-            std::cerr << "        This is probably a rounding error. It is recommended to set --angpix ("
-                      << angpix << ") to at least " << coords_angpix << "\n";
-
-        }
-    }
-
-    if (angpix < movie_angpix)
-    {
-        std::cerr << "WARING: pixel size (--angpix) is greater than the movie pixel size (--movie_angpix)\n";
-
-        if (movie_angpix < angpix + 0.01)
-        {
-            std::cerr << "        This is probably a rounding error. It is recommended to set --angpix ("
-                      << angpix << ") to at least " << movie_angpix << "\n";
-
-        }
-    }
-
     std::vector<Image<RFLOAT> > dmgWeight = DamageHelper::damageWeights(
         s, angpix, firstFrame, fc, dosePerFrame, dmga, dmgb, dmgc);
 
@@ -735,10 +711,10 @@ d2Vector MotionFitProg::optimalParams(
         const double d = sig_d_vals[p];
 
         A(p,0) = v*v;
-        A(p,1) = v*d;
-        A(p,2) = v;
+        A(p,1) = 2.0*v*d;
+        A(p,2) = 2.0*v;
         A(p,3) = d*d;
-        A(p,4) = d;
+        A(p,4) = 2.0*d;
         A(p,5) = 1.0;
 
         b(p) = paramTsc[p];
