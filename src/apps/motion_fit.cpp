@@ -58,6 +58,9 @@ class MotionFitProg : public RefinementProgram
         int _init();
         int _run();
 
+        /*void prepMicrograph(
+                int g, std::vector<ParFourierTransformer>& fts, dmgWeight*/
+
         void computeWeights(
                 double sig_vel_nrm, double sig_acc_nrm, double sig_div_nrm,
                 const std::vector<d2Vector>& positions, int fc,
@@ -90,9 +93,16 @@ class MotionFitProg : public RefinementProgram
 
         void writeParamEstOutput(
                 const std::vector<std::vector<double>>& paramTsc,
+                const std::vector<double>& bestV,
+                const std::vector<double>& bestD,
                 const std::vector<int>& cumulPartCount,
                 const std::vector<std::string>& paramTags,
                 std::string outPath, std::string mgIndex);
+
+        d2Vector optimalParams(
+                const std::vector<double>& paramTsc,
+                const std::vector<double>& sig_v_vals,
+                const std::vector<double>& sig_d_vals);
 };
 
 int main(int argc, char *argv[])
@@ -183,14 +193,8 @@ int MotionFitProg::_run()
         }
     }
 
-    // @TODO: warn if angpix < coords_anpix or movie_angpix
-
     std::vector<Image<RFLOAT> > dmgWeight = DamageHelper::damageWeights(
         s, angpix, firstFrame, fc, dosePerFrame, dmga, dmgb, dmgc);
-
-    const double sig_vel_nrm = dosePerFrame * sig_vel / angpix;
-    const double sig_acc_nrm = dosePerFrame * sig_acc / angpix;
-    const double sig_div_nrm = dosePerFrame * sqrt(coords_angpix) * sig_div / angpix;
 
     int k_out = sh;
 
@@ -205,6 +209,7 @@ int MotionFitProg::_run()
 
     std::cout << "max freq. = " << k_out << " px\n";
 
+    // @TODO: use freqWeight!
     for (int f = 0; f < fc; f++)
     {
         dmgWeight[f].data.xinit = 0;
@@ -230,6 +235,11 @@ int MotionFitProg::_run()
         FscHelper::initFscTable(sh, fc, tables[i], weights0[i], weights1[i]);
     }
 
+
+    const double sig_vel_nrm = dosePerFrame * sig_vel / angpix;
+    const double sig_acc_nrm = dosePerFrame * sig_acc / angpix;
+    const double sig_div_nrm = dosePerFrame * sqrt(coords_angpix) * sig_div / angpix;
+
     // initialize parameter-estimation:
     const int paramCount = 9;
     int pctot = 0;
@@ -238,7 +248,9 @@ int MotionFitProg::_run()
     std::vector<double> sig_v_vals_nrm(paramCount), sig_d_vals_nrm(paramCount);
     std::vector<std::string> paramTags(paramCount);
 
-    std::vector<std::vector<double>> paramTsc(paramCount);
+    std::vector<std::vector<double>> allParamTsc(paramCount);
+    std::vector<double> paramTsc(paramCount);
+    std::vector<double> bestV(0), bestD(0);
 
     for (int i = 0; i < paramCount; i++)
     {
@@ -255,7 +267,7 @@ int MotionFitProg::_run()
 
         paramTags[i] = sts.str();
 
-        paramTsc[i] = std::vector<double>(0);
+        allParamTsc[i] = std::vector<double>(0);
     }
 
     std::vector<std::vector<Image<RFLOAT>>>
@@ -409,15 +421,22 @@ int MotionFitProg::_run()
 
                 updateFCC(movie, tracks, mdts[g], paramTables[i], paramWeights0[i], paramWeights1[i]);
 
-                paramTsc[i].push_back(FscHelper::computeTsc(
-                        paramTables[i], paramWeights0[i], paramWeights1[i], k_cutoff+2, k_out));
-            }
+                double tsc = FscHelper::computeTsc(
+                    paramTables[i], paramWeights0[i], paramWeights1[i], k_cutoff+2, k_out);
 
-            std::cout << "paramTsc[0].size() = " << paramTsc[0].size() << "\n";
+                paramTsc[i] = tsc;
+                allParamTsc[i].push_back(tsc);
+            }
 
             cumulPartCount.push_back(pctot);
 
-            writeParamEstOutput(paramTsc, cumulPartCount, paramTags, outPath, stsg.str());
+            d2Vector optPar = optimalParams(paramTsc, sig_v_vals, sig_d_vals);
+
+            bestV.push_back(optPar[0]);
+            bestD.push_back(optPar[1]);
+
+            writeParamEstOutput(allParamTsc, bestV, bestD,
+                    cumulPartCount, paramTags, outPath, stsg.str());
         }
     } // micrographs
 
@@ -664,32 +683,80 @@ void MotionFitProg::writeOutput(
 }
 
 void MotionFitProg::writeParamEstOutput(
-    const std::vector<std::vector<double>>& paramTsc,
+    const std::vector<std::vector<double>>& allParamTsc,
+    const std::vector<double>& bestV,
+    const std::vector<double>& bestD,
     const std::vector<int>& cumulPartCount,
     const std::vector<std::string>& paramTags,
     std::string outPath, std::string mgIndex)
 {
-    const int parCt = paramTsc.size();
-    const int sc = paramTsc[0].size();
+    const int parCt = allParamTsc.size();
+    const int sc = allParamTsc[0].size();
 
     for (int p = 0; p < parCt; p++)
     {
-        std::ofstream out(outPath + "_mg" + mgIndex + "_TSC_" + paramTags[p] + ".dat");
+        std::ofstream outTsc(outPath + "_mg" + mgIndex + "_TSC_" + paramTags[p] + ".dat");
+        std::ofstream outTscRel(outPath + "_mg" + mgIndex + "_TSC-rel_" + paramTags[p] + ".dat");
 
         for (int s = 0; s < sc; s++)
         {
-            out << cumulPartCount[s] << " " << paramTsc[p][s] << "\n";
-        }
+            outTsc << cumulPartCount[s] << " " << allParamTsc[p][s] << "\n";
 
-        std::ofstream out2(outPath + "_mg" + mgIndex + "_TSC-rel_" + paramTags[p] + ".dat");
-
-        for (int s = 0; s < sc; s++)
-        {
-            if (paramTsc[4][s] > 0.0)
+            if (allParamTsc[4][s] > 0.0)
             {
-                out2 << cumulPartCount[s] << " " << paramTsc[p][s]/paramTsc[4][s] << "\n";
+                outTscRel << cumulPartCount[s] << " " << allParamTsc[p][s]/allParamTsc[4][s] << "\n";
             }
         }
     }
+
+    std::ofstream outV(outPath + "_mg" + mgIndex + "_best_sigma_v.dat");
+    std::ofstream outD(outPath + "_mg" + mgIndex + "_best_sigma_d.dat");
+
+    for (int s = 0; s < sc; s++)
+    {
+        outV << cumulPartCount[s] << " " << bestV[s] << "\n";
+        outD << cumulPartCount[s] << " " << bestD[s] << "\n";
+    }
 }
 
+d2Vector MotionFitProg::optimalParams(
+    const std::vector<double>& paramTsc,
+    const std::vector<double>& sig_v_vals,
+    const std::vector<double>& sig_d_vals)
+{
+    const int parCt = paramTsc.size();
+
+    Matrix2D<RFLOAT> A(parCt,6);
+    Matrix1D<RFLOAT> b(parCt);
+
+    for (int p = 0; p < parCt; p++)
+    {
+        const double v = sig_v_vals[p];
+        const double d = sig_d_vals[p];
+
+        A(p,0) = v*v;
+        A(p,1) = v*d;
+        A(p,2) = v;
+        A(p,3) = d*d;
+        A(p,4) = d;
+        A(p,5) = 1.0;
+
+        b(p) = paramTsc[p];
+    }
+
+    const double tol = 1e-20;
+    Matrix1D<RFLOAT> x(6);
+    solve(A, b, x, tol);
+
+    d2Matrix C2(x(0), x(1),
+                x(1), x(3));
+
+    d2Vector l(x(2), x(4));
+
+    d2Matrix C2i = C2;
+    C2i.invert();
+
+    d2Vector min = -(C2i * l);
+
+    return min;
+}

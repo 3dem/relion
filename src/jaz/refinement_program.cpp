@@ -73,9 +73,10 @@ int RefinementProgram::init(int argc, char *argv[])
             imgPath = parser.getOption("--img", "Path to images", "");
         }
 
+        angpix = textToFloat(parser.getOption("--angpix", "Pixel resolution (angst/pix) - read from STAR file by default", "0.0"));
+
         if (!noReference)
         {
-            angpix = textToFloat(parser.getOption("--angpix", "Pixel resolution (angst/pix) - read from STAR file by default", "0.0"));
             Cs = textToFloat(parser.getOption("--Cs", "Spherical aberration - read from STAR file by default", "-1"));
             kV = textToFloat(parser.getOption("--kV", "Electron energy (keV) - read from STAR file by default", "-1"));
 
