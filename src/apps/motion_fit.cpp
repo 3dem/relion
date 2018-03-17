@@ -660,7 +660,7 @@ d2Vector MotionFitProg::estimateParams(
 
         // say something
 
-        if (bestTSC == 4)
+        if (bestIndex == 4)
         {
             return interpolateMax(all_sig_vals, all_TSCs);
         }
@@ -762,7 +762,11 @@ void MotionFitProg::evaluateParams(
 
     for (long g = g0; g <= gc; g++)
     {
-        std::cout << "    micrograph " << (g+1) << " / " << mdts.size() << ": ";
+        const int pc = mdts[g].numberOfObjects();
+        pctot += pc;
+
+        std::cout << "    micrograph " << (g+1) << " / " << mdts.size() << ": "
+            << pc << " particles \t [" << pctot << "]\n";
 
         std::cout.flush();
 
@@ -786,11 +790,6 @@ void MotionFitProg::evaluateParams(
             std::cerr << "warning: unable to load micrograph #" << (g+1) << "\n";
             continue;
         }
-
-        const int pc = movie.size();
-        pctot += pc;
-
-        std::cout << pc << " particles \t [" << pctot << "]\n";
 
         std::vector<double> velWgh, accWgh;
         std::vector<std::vector<std::vector<double>>> divWgh;
