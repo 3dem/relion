@@ -105,6 +105,7 @@ int RefinementProgram::init(int argc, char *argv[])
         maxMG = textToInteger(parser.getOption("--max_MG", "Last micrograph index", "-1"));
 
         debug = parser.checkOption("--debug", "Write debugging data");
+        debugMov = parser.checkOption("--debug_mov", "Write debugging data for movie loading");
 
         int rco = readMoreOptions(parser, argc, argv);
 
@@ -470,7 +471,7 @@ void RefinementProgram::loadInitialMovieValues()
         {
             std::vector<std::vector<Image<Complex>>> movie = StackHelper::extractMovieStackFS(
                 &mdts[0], meta_path, imgPath, movie_ending, coords_angpix, angpix, movie_angpix, s,
-                nr_omp_threads, false, firstFrame, lastFrame, hotCutoff, debug);
+                nr_omp_threads, false, firstFrame, lastFrame, hotCutoff, debugMov);
 
             fc = movie[0].size();
         }
@@ -539,14 +540,14 @@ std::vector<std::vector<Image<Complex>>> RefinementProgram::loadMovie(
             movie = StackHelper::extractMovieStackFS(
                 &mdts[g], mgHasGain? &lastGainRef : 0,
                 mgFn, angpix, coords_angpix, movie_angpix, s,
-                nr_omp_threads, true, firstFrame, lastFrame, hotCutoff, debug);
+                nr_omp_threads, true, firstFrame, lastFrame, hotCutoff, debugMov);
         }
         else
         {
             movie = StackHelper::extractMovieStackFS(
                 &mdts[g], meta_path, imgPath, movie_ending,
                 angpix, coords_angpix, movie_angpix, s,
-                nr_omp_threads, true, firstFrame, lastFrame, hotCutoff, debug);
+                nr_omp_threads, true, firstFrame, lastFrame, hotCutoff, debugMov);
         }
 
         #pragma omp parallel for num_threads(nr_omp_threads)

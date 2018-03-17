@@ -29,7 +29,7 @@ class RefinementProgram
 
             // options:
 
-            bool singleReference, doesMovies, debug, applyTilt, anisoTilt, useFsc,
+            bool singleReference, doesMovies, debug, debugMov, applyTilt, anisoTilt, useFsc,
                 optStar, noStar, optReference, noReference, noTilt,
                 preextracted, coordsAtMgRes, hasCorrMic;
 
