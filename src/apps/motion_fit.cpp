@@ -48,7 +48,7 @@ class MotionFitProg : public RefinementProgram
 
         MotionFitProg();
 
-            bool unregGlob, noGlobOff, paramEstim, debugOpt;
+            bool unregGlob, noGlobOff, paramEstim, debugOpt, diag;
             int maxIters;
             double dmga, dmgb, dmgc, dosePerFrame,
                 sig_vel, sig_div, sig_acc,
@@ -173,7 +173,8 @@ int MotionFitProg::readMoreOptions(IOParser& parser, int argc, char *argv[])
     unregGlob = parser.checkOption("--unreg_glob", "Do not regularize global component of motion");
     noGlobOff = parser.checkOption("--no_glob_off", "Do not compute initial per-particle offsets");
 
-    debugOpt = parser.checkOption("--debug_opt", "Do not compute initial per-particle offsets");
+    debugOpt = parser.checkOption("--debug_opt", "Write optimization debugging info");
+    diag = parser.checkOption("--diag", "Write out diagnostic data");
 
     parser.addSection("Parameter estimation");
 
@@ -307,7 +308,7 @@ void MotionFitProg::prepMicrograph(
                 movieCC, globTrack, 0.25*s, nr_omp_threads);
     }
 
-    if (debug)
+    if (diag)
     {
         std::stringstream stsg;
         stsg << g;
@@ -617,6 +618,8 @@ d2Vector MotionFitProg::estimateParams(
 
                 std::cout << "\n";
             }
+
+            std::cout << "\n";
         }
 
         evaluateParams(fts, dmgWeight, k_out, unknown_sig_vals, unknown_TSCs);
@@ -639,6 +642,8 @@ d2Vector MotionFitProg::estimateParams(
 
                 std::cout << "\n";
             }
+
+            std::cout << "\n";
         }
 
         int bestIndex = 0;
@@ -757,7 +762,9 @@ void MotionFitProg::evaluateParams(
 
     for (long g = g0; g <= gc; g++)
     {
-        std::cout << "    micrograph " << (g+1) << " / " << mdts.size() <<"\n";
+        std::cout << "    micrograph " << (g+1) << " / " << mdts.size() << ": ";
+
+        std::cout.flush();
 
         std::stringstream stsg;
         stsg << g;
@@ -783,29 +790,13 @@ void MotionFitProg::evaluateParams(
         const int pc = movie.size();
         pctot += pc;
 
+        std::cout << pc << " particles \t [" << pctot << "]\n";
+
         std::vector<double> velWgh, accWgh;
         std::vector<std::vector<std::vector<double>>> divWgh;
 
-        if (debug && paramEstim)
-        {
-            std::cout << "        ";
-        }
-
         for (int i = 0; i < paramCount; i++)
         {
-            if (debug)
-            {
-                if (paramEstim)
-                {
-                    std::cout << ".";
-                }
-                else
-                {
-                    std::cout << "        optimizing: sig_vel = " << sig_vals[i][0] << " px\n";
-                    std::cout << "                    sig_div = " << sig_vals[i][1] << " px / px_ap^(1/2)\n";
-                }
-            }
-
             computeWeights(sig_v_vals_nrm[i], sig_acc_nrm, sig_d_vals_nrm[i],
                            positions, fc, velWgh, accWgh, divWgh);
 
@@ -814,11 +805,6 @@ void MotionFitProg::evaluateParams(
                     maxStep, 1e-9, 1e-9, maxIters, 0.0);
 
             updateFCC(movie, tracks, mdts[g], paramTables[i], paramWeights0[i], paramWeights1[i]);
-        }
-
-        if (debug && paramEstim)
-        {
-            std::cout << "\n";
         }
 
     } // micrographs
