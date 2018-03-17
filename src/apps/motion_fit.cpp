@@ -288,7 +288,10 @@ void MotionFitProg::prepMicrograph(
         mdts[g].getValue(EMDL_IMAGE_COORD_Y, positions[p].y, p);
     }
 
-    std::cout << "    computing initial correlations...\n";
+    if (!paramEstim)
+    {
+        std::cout << "    computing initial correlations...\n";
+    }
 
     movieCC = MotionRefinement::movieCC(
             projectors[0], projectors[1], obsModel, mdts[g], movie,
@@ -766,7 +769,7 @@ void MotionFitProg::evaluateParams(
         pctot += pc;
 
         std::cout << "    micrograph " << (g+1) << " / " << mdts.size() << ": "
-            << pc << " particles \t [" << pctot << "]\n";
+            << pc << " particles [" << pctot << " total]\n";
 
         std::cout.flush();
 

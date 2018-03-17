@@ -361,7 +361,17 @@ class reconstruct_parameters
             #pragma omp for
             for (int g = 0; g < gc; g++)
             {
-                std::vector<Image<RFLOAT> > obsR = StackHelper::loadStack(&mdts[g], image_path);
+                std::vector<Image<RFLOAT> > obsR;
+
+                try
+                {
+                    obsR = StackHelper::loadStack(&mdts[g], image_path);
+                }
+                catch (RelionError XE)
+                {
+                    std::cerr << "warning: unable to load micrograph #" << (g+1) << "\n";
+                    continue;
+                }
 
                 const long pc = obsR.size();
 
