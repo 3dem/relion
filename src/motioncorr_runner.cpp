@@ -1221,6 +1221,12 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 		RCTIC(TIMING_FIT_POLYNOMIAL);
 		const int n_obs = patch_frames.size();
 		const int n_params = 18;
+
+		if (n_obs <= n_params) {
+			std::cerr << fn_mic << ": too few valid local trajectories to fit local motion model." << std::endl;
+			mic.model = NULL;
+			goto skip_fitting;
+		}
 		Matrix2D <RFLOAT> matA(n_obs, n_params);
 		Matrix1D <RFLOAT> vecX(n_obs), vecY(n_obs), coeffX(n_params), coeffY(n_params);
 		for (int i = 0; i < n_obs; i++) {
@@ -1307,6 +1313,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 		mic.model = NULL;
 	}
 
+skip_fitting:
 	if (!do_dose_weighting || save_noDW) {
 		Iref().initZeros(Iframes[0]());
 
