@@ -618,6 +618,42 @@ void MotionRefinement::noiseNormalize(
     }
 }
 
+std::vector<std::vector<d2Vector>> MotionRefinement::readTrack(std::string fn, int pc, int fc)
+{
+    std::vector<std::vector<d2Vector>> shift(pc);
+
+    std::ifstream trackIn(fn);
+
+    for (int p = 0; p < pc; p++)
+    {
+        if (!trackIn.good())
+        {
+            std::cerr << "MotionRefinement::readTrack: error reading tracks in " << fn << "\n";
+            REPORT_ERROR("MotionRefinement::readTrack: error reading tracks in " + fn + "\n");
+        }
+
+        shift[p] = std::vector<d2Vector>(fc);
+
+        char dummy[4069];
+        trackIn.getline(dummy, 4069);
+
+        for (int f = 0; f < fc; f++)
+        {
+            char dummy[4069];
+            trackIn.getline(dummy, 4069);
+
+            std::istringstream sts(dummy);
+
+            sts >> shift[p][f].x;
+            sts >> shift[p][f].y;
+        }
+
+        trackIn.getline(dummy, 4069);
+    }
+
+    return shift;
+}
+
 d3Vector MotionRefinement::measureValueScaleReal(
     const Image<Complex>& data,
     const Image<Complex>& ref)

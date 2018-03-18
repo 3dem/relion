@@ -176,6 +176,8 @@ int FrameRecomb::_run()
         const int s = movie[0][0]().ydim;
 
         std::string tfn = trackFn + "_mg" + stsg.str() + "_tracks.dat";
+        std::vector<std::vector<d2Vector>> shift = MotionRefinement::readTrack(tfn, pc, fc);
+        /*
         std::ifstream trackIn(tfn);
 
         std::vector<std::vector<d2Vector>> shift(pc);
@@ -205,7 +207,7 @@ int FrameRecomb::_run()
             }
 
             trackIn.getline(dummy, 4069);
-        }
+        }*/
 
         std::string imgName;
         mdts[g].getValue(EMDL_IMAGE_NAME, imgName, 0);

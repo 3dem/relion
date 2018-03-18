@@ -608,8 +608,7 @@ d2Vector MotionFitProg::estimateParams(
 
     while (!centerBest && iters < maxIters)
     {
-        if (debug)
-        {
+
             std::cout << "evaluating:\n";
 
             for (int i = 0; i < 3; i++)
@@ -623,7 +622,6 @@ d2Vector MotionFitProg::estimateParams(
             }
 
             std::cout << "\n";
-        }
 
         evaluateParams(fts, dmgWeight, k_out, unknown_sig_vals, unknown_TSCs);
 
@@ -632,8 +630,7 @@ d2Vector MotionFitProg::estimateParams(
             all_TSCs[unknown_ind[p]] = unknown_TSCs[p];
         }
 
-        if (debug)
-        {
+
             std::cout << "result:\n";
 
             for (int i = 0; i < 3; i++)
@@ -647,7 +644,6 @@ d2Vector MotionFitProg::estimateParams(
             }
 
             std::cout << "\n";
-        }
 
         int bestIndex = 0;
         double bestTSC = all_TSCs[0];
@@ -660,8 +656,6 @@ d2Vector MotionFitProg::estimateParams(
                 bestIndex = p;
             }
         }
-
-        // say something
 
         if (bestIndex == 4)
         {
@@ -799,6 +793,11 @@ void MotionFitProg::evaluateParams(
 
         for (int i = 0; i < paramCount; i++)
         {
+            if (debug)
+            {
+                std::cout << "        evaluating: " << sig_vals[i] << "\n";
+            }
+
             computeWeights(sig_v_vals_nrm[i], sig_acc_nrm, sig_d_vals_nrm[i],
                            positions, fc, velWgh, accWgh, divWgh);
 

@@ -105,6 +105,10 @@ class MotionRefinement
                 const std::vector<double> &sigma2,
                 Image<Complex>& dest);
 
+        static std::vector<std::vector<gravis::d2Vector>> readTrack(
+                std::string fn,
+                int pc, int fc);
+
         static gravis::d3Vector measureValueScaleReal(
                 const Image<Complex>& obs,
                 const Image<Complex>& ref);

@@ -29,7 +29,7 @@ int RefinementProgram::init(int argc, char *argv[])
 
         parser.addSection("General options");
 
-        starFn = parser.getOption("--i", "Input STAR file", optStar? "" : "NULL");
+        starFn = parser.getOption("--i", "Input STAR file with a list of particles", optStar? "" : "NULL");
 
         if (!noReference)
         {
