@@ -169,6 +169,10 @@ void MotioncorrRunner::initialise()
 		if (group > 1) {
 			std::cerr << "WARNING: Frame grouping is under development in our own implementation of motion correction." << std::endl;
 		}
+		if (do_save_movies) {
+			std::cerr << "WARNING: In our own implementation of motion correction, we do not save aligned movies. --save_movies was ignored." << std::endl;
+			do_save_movies = false;
+		}
 	} else {
 		REPORT_ERROR(" ERROR: You have to specify which programme to use through either --use_motioncor2 or --use_unblur");
 	}
