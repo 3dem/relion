@@ -826,7 +826,7 @@ void MotionFitProg::computeWeights(
 {
     const int pc = positions.size();
 
-    velWgh = std::vector<double>(fc-1, 0.5/(sig_vel_nrm*sig_vel_nrm));
+    velWgh = std::vector<double>(fc-1, sig_vel_nrm > 0.0? 0.5/(sig_vel_nrm*sig_vel_nrm) : 0.0);
     accWgh = std::vector<double>(fc-1, sig_acc > 0.0? 0.5/(sig_acc_nrm*sig_acc_nrm) : 0.0);
     divWgh = std::vector<std::vector<std::vector<double>>>(fc-1);
 
@@ -843,7 +843,7 @@ void MotionFitProg::computeWeights(
                 d2Vector dp = positions[p] - positions[q];
                 double dist = sqrt(dp.x*dp.x + dp.y*dp.y);
 
-                if (q == p || (maxDistDiv >= 0.0 && dist > maxDistDiv))
+                if (sig_div_nrm <= 0.0 || q == p || (maxDistDiv >= 0.0 && dist > maxDistDiv))
                 {
                     divWgh[f][p][q] = 0.0;
                 }
