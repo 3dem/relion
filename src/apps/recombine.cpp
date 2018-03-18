@@ -176,7 +176,18 @@ int FrameRecomb::_run()
         const int s = movie[0][0]().ydim;
 
         std::string tfn = trackFn + "_mg" + stsg.str() + "_tracks.dat";
-        std::vector<std::vector<d2Vector>> shift = MotionRefinement::readTrack(tfn, pc, fc);
+        std::vector<std::vector<d2Vector>> shift;
+
+        try
+        {
+            shift = MotionRefinement::readTrack(tfn, pc, fc);
+        }
+        catch (RelionError XE)
+        {
+            std::cerr << "warning: error reading tracks in " << tfn << "\n";
+            continue;
+        }
+
         /*
         std::ifstream trackIn(tfn);
 

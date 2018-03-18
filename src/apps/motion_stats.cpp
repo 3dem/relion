@@ -20,6 +20,8 @@ int main(int argc, char *argv[])
     angpix = textToFloat(parser.getOption("--angpix", "Pixel resolution (Angst/pix)"));
     fc = textToInteger(parser.getOption("--fc", "Frame count"));
 
+    if (parser.checkForErrors()) return 1;
+
     MetaDataTable mdt0;
     mdt0.read(starFn);
 
@@ -36,11 +38,23 @@ int main(int argc, char *argv[])
         std::stringstream stsg;
         stsg << m;
 
+        if (m%100 == 0) std::cout << "micrograph " << (m+1) << " / " << mgc << "\n";
+
         const int pc = mdts[m].numberOfObjects();
         tpc += pc;
 
         std::string tfn = tracksPath + "_mg" + stsg.str() + "_tracks.dat";
-        std::vector<std::vector<d2Vector>> shift = MotionRefinement::readTrack(tfn, pc, fc);
+        std::vector<std::vector<d2Vector>> shift;
+
+        try
+        {
+            shift = MotionRefinement::readTrack(tfn, pc, fc);
+        }
+        catch (RelionError XE)
+        {
+            std::cerr << "warning: error reading tracks in " << tfn << "\n";
+            continue;
+        }
 
         for (int p = 0; p < pc; p++)
         for (int f = 0; f < fc-1; f++)
