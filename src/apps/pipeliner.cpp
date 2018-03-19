@@ -54,8 +54,8 @@ public:
 
 		// Fill the window, but don't show it!
 		int add_section = parser.addSection("Add scheduled jobs options");
-		add_type = parser.getOption("--addJob", "Add a job of this type to the pipeline");
-		fn_options = parser.getOption("--addJobOptions", "Options for this job");
+		add_type = parser.getOption("--addJob", "Add a job of this type to the pipeline","");
+		fn_options = parser.getOption("--addJobOptions", "Options for this job","");
 		int run_section = parser.addSection("Run scheduled jobs options");
 		fn_jobids  = parser.getOption("--RunJobs", "Run these jobs", "");
 		fn_sched = parser.getOption("--schedule", "Name of the scheduler for running the scheduled jobs", "");
