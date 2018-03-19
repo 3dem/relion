@@ -160,15 +160,14 @@ void MotioncorrRunner::initialise()
 		}
 	}
 	else if (do_own) {
-		std::cerr << "     !!! WARNING !!!" << std::endl << " Our own implementation of motion correction is under development!" << std::endl;
 		if (fn_defect != "") {
-			std::cerr << "The defect file is not yet supported in our own implementation of motion correction." << std::endl;
+			std::cerr << "WARNING: The defect file is not yet supported in our own implementation of motion correction. The defect file is ignored." << std::endl;
 		}
 		if (patch_x <= 2 || patch_y <= 2) {
 			std::cerr << "The number of patches is too small (<= 2). Patch based alignment will be skipped." << std::endl;
 		}
 		if (group > 1) {
-			std::cerr << "Frame grouping is not yet supported in our own implementation of motion correction." << std::endl;
+			std::cerr << "WARNING: Frame grouping is under development in our own implementation of motion correction." << std::endl;
 		}
 	} else {
 		REPORT_ERROR(" ERROR: You have to specify which programme to use through either --use_motioncor2 or --use_unblur");
@@ -245,8 +244,10 @@ void MotioncorrRunner::initialise()
 	{
 		if (do_unblur)
 			std::cout << " Using UNBLUR executable in: " << fn_unblur_exe << std::endl;
-		else
+		else if (do_motioncor2)
 			std::cout << " Using MOTIONCOR2 executable in: " << fn_motioncor2_exe << std::endl;
+		else if (do_own)
+			std::cout << " Using our own implementation based on MOTIONCOR2 algorithm" << std::endl;
 		std::cout << " to correct beam-induced motion for the following micrographs: " << std::endl;
 		if (continue_old)
 			std::cout << " (skipping all micrographs for which a corrected movie already exists) " << std::endl;
@@ -298,8 +299,6 @@ void MotioncorrRunner::run()
 
 	for (long int imic = 0; imic < fn_micrographs.size(); imic++)
 	{
-		std::vector<RFLOAT> xshifts, yshifts;
-
 		if (verb > 0 && imic % barstep == 0)
 			progress_bar(imic);
 
@@ -308,17 +307,17 @@ void MotioncorrRunner::run()
 
 		bool result = false;
 		if (do_own)
-			result = executeOwnMotionCorrection(mic, xshifts, yshifts);
+			result = executeOwnMotionCorrection(mic);
 		else if (do_unblur)
-			result = executeUnblur(mic, xshifts, yshifts);
+			result = executeUnblur(mic);
 		else if (do_motioncor2)
-			result = executeMotioncor2(mic, xshifts, yshifts);
+			result = executeMotioncor2(mic);
 		else
 			REPORT_ERROR("Bug: by now it should be clear whether to use MotionCor2 or Unblur...");
 
 		if (result) {
 			saveModel(mic);
-			plotShifts(fn_micrographs[imic], xshifts, yshifts);
+			plotShifts(fn_micrographs[imic], mic);
 		}
 	}
 
@@ -336,7 +335,7 @@ void MotioncorrRunner::run()
 #endif
 }
 
-bool MotioncorrRunner::executeMotioncor2(Micrograph &mic, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts, int rank)
+bool MotioncorrRunner::executeMotioncor2(Micrograph &mic, int rank)
 {
 	FileName fn_mic = mic.getMovieFilename();
 	FileName fn_avg, fn_mov;
@@ -382,7 +381,7 @@ bool MotioncorrRunner::executeMotioncor2(Micrograph &mic, std::vector<RFLOAT> &x
 	{
 		// Read in header of the movie, to see how many frames it has
 		Image<RFLOAT> Ihead;
-		Ihead.read(fn_mic, false);
+		Ihead.read(fn_mic, false, -1, false, true); // select_img -1, mmap false, is_2D true
 		int n_frames = NSIZE(Ihead());
 
 		int trunc = n_frames - last_frame_sum;
@@ -467,75 +466,89 @@ bool MotioncorrRunner::executeMotioncor2(Micrograph &mic, std::vector<RFLOAT> &x
 		}
 
 		// Also analyse the shifts
-		getShiftsMotioncor2(fn_out, xshifts, yshifts);
-
-		for (int i = 0, ilim = xshifts.size(); i < ilim; i++) {
-			int frame = i + 1; // Make 1-indexed
-			frame += (first_frame_sum - 1); // Correct for -Throw
-			mic.setGlobalShift(frame, xshifts[i], yshifts[i]);
-		}
+		getShiftsMotioncor2(fn_out, mic);
 	}
 
 	// Success!
 	return true;
 }
 
-void MotioncorrRunner::getShiftsMotioncor2(FileName fn_log, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts)
+void MotioncorrRunner::getShiftsMotioncor2(FileName fn_log, Micrograph &mic)
 {
-
 	std::ifstream in(fn_log.data(), std::ios_base::in);
 	if (in.fail())
 		return;
 
-	xshifts.clear();
-	yshifts.clear();
+	std::string line;
 
-    std::string line;
+	// Start reading the ifstream at the top
+	in.seekg(0);
 
-    // Start reading the ifstream at the top
-    in.seekg(0);
+	// Read through the shifts file
+	int frame = first_frame_sum; // 1-indexed
+	bool have_found_final = false;
+	while (getline(in, line, '\n'))
+	{
+	// ignore all commented lines, just read first two lines with data
+		if (line.find("Full-frame alignment shift") != std::string::npos)
+		{
+			have_found_final = true;
+		}
+		else if (have_found_final)
+		{
+			size_t shiftpos = line.find("shift:");
+			if (shiftpos != std::string::npos)
+			{
+				std::vector<std::string> words;
+				tokenize(line.substr(shiftpos+7), words);;
+    				if (words.size() < 2)
+    				{
+    					std::cerr << " fn_log= " << fn_log << std::endl;
+    					REPORT_ERROR("ERROR: unexpected number of words on line from MOTIONCORR logfile: " + line);
+    				}
+ 		   		mic.setGlobalShift(frame, textToFloat(words[0]), textToFloat(words[1]));
+				frame++;
+			}
+			else
+			{
+				// Stop now
+				break;
+			}
+		}
+	}
+	in.close();
 
-    // Read through the shifts file
-    int i = 0;
-    bool have_found_final = false;
-    while (getline(in, line, '\n'))
-    {
-    	// ignore all commented lines, just read first two lines with data
-    	if (line.find("Full-frame alignment shift") != std::string::npos)
-    	{
-    		have_found_final = true;
-    	}
-    	else if (have_found_final)
-    	{
-    		size_t shiftpos = line.find("shift:");
-    		if (shiftpos != std::string::npos)
-    		{
-    			std::vector<std::string> words;
-    			tokenize(line.substr(shiftpos+7), words);;
-        		if (words.size() < 2)
-        		{
-        			std::cerr << " fn_log= " << fn_log << std::endl;
-        			REPORT_ERROR("ERROR: unexpected number of words on line from MOTIONCORR logfile: " + line);
-        		}
-        		xshifts.push_back(textToFloat(words[0]));
-    			yshifts.push_back(textToFloat(words[1]));
-    		}
-    		else
-    		{
-    			// Stop now
-    			break;
-    		}
-    	}
-    }
-    in.close();
+	mic.first_frame = first_frame_sum;
 
+	// Read local shifts
+	FileName fn_patch = fn_log.withoutExtension() + "0-Patch-Patch.log";
+	if (!exists(fn_patch)) {
+		std::cerr << "warning: failed to load local shifts from MotionCor2 logfile, but this does not affect further processing: " << fn_patch << std::endl;
+		return;
+	}
 
-    if (xshifts.size() != yshifts.size())
-    	REPORT_ERROR("ERROR: got an unequal number of x and yshifts from " + fn_log);
+	in.open(fn_patch.c_str(), std::ios_base::in);
+	in.seekg(0);
 
+	while (getline(in, line, '\n'))
+	{
+		if (line.find("#") != std::string::npos) continue;
+		
+		std::vector<std::string> words;
+		tokenize(line, words);
+    		if (words.size() != 7) continue;
+
+		mic.patchZ.push_back(textToFloat(words[0]) + first_frame_sum - 1); // 1-indexed
+		mic.patchX.push_back(textToFloat(words[1]));
+		mic.patchY.push_back(textToFloat(words[2]));
+		mic.localShiftX.push_back(textToFloat(words[3]));
+		mic.localShiftY.push_back(textToFloat(words[4]));
+		mic.localFitX.push_back(textToFloat(words[5]));
+		mic.localFitY.push_back(textToFloat(words[6]));
+	}
 }
 
-bool MotioncorrRunner::executeUnblur(Micrograph &mic, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts)
+bool MotioncorrRunner::executeUnblur(Micrograph &mic)
 {
 	FileName fn_mic = mic.getMovieFilename();
 	FileName fn_avg, fn_mov;
@@ -569,7 +582,7 @@ bool MotioncorrRunner::executeUnblur(Micrograph &mic, std::vector<RFLOAT> &xshif
 	FileName fn_tmp_mov = fn_mov.withoutExtension() + ".mrc";
 
 	Image<RFLOAT> Itest;
-	Itest.read(fn_mic, false);
+	Itest.read(fn_mic, false, -1, false, true); // select_img -1, mmap false, is_2D true
 	int Nframes = NSIZE(Itest());
 
 	std::ofstream  fh;
@@ -619,12 +632,7 @@ bool MotioncorrRunner::executeUnblur(Micrograph &mic, std::vector<RFLOAT> &xshif
     }
 
 	// Also analyse the shifts
-	getShiftsUnblur(fn_shifts, xshifts, yshifts);
-
-	for (int i = 0, ilim = xshifts.size(); i < ilim; i++) {
-		int frame = i + 1; // make 1-indexed
-		mic.setGlobalShift(frame, xshifts[i], yshifts[i]);
-	}
+	getShiftsUnblur(fn_shifts, mic);
 
 	// If the requested sum is only a subset, then use summovie to make the average
 	int mylastsum = (last_frame_sum == 0) ? Nframes : last_frame_sum;
@@ -684,48 +692,53 @@ bool MotioncorrRunner::executeUnblur(Micrograph &mic, std::vector<RFLOAT> &xshif
 	return true;
 }
 
-void MotioncorrRunner::getShiftsUnblur(FileName fn_shifts, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts)
+void MotioncorrRunner::getShiftsUnblur(FileName fn_shifts, Micrograph &mic)
 {
 
 	std::ifstream in(fn_shifts.data(), std::ios_base::in);
 	if (in.fail())
 		return;
 
-	xshifts.clear();
-	yshifts.clear();
-
+	std::vector<RFLOAT> xshifts, yshifts;
 	std::string line, token;
 
-    // Start reading the ifstream at the top
-    in.seekg(0);
+	// Start reading the ifstream at the top
+	in.seekg(0);
 
-    // Read throught the shifts file
-    int i = 0;
-    while (getline(in, line, '\n'))
-    {
-    	// ignore all commented lines, just read first two lines with data
-    	if (line[0] != '#')
-    	{
-    		if (i>1)
-    			REPORT_ERROR("ERROR: reading more than 2 data lines from " + fn_shifts);
+	// Read throught the shifts file
+	int i = 0;
+	while (getline(in, line, '\n'))
+	{
+		// ignore all commented lines, just read first two lines with data
+		if (line[0] != '#')
+		{
+			if (i>1)
+				REPORT_ERROR("ERROR: reading more than 2 data lines from " + fn_shifts);
 
-    		std::vector<std::string> words;
-    	    tokenize(line, words);
-    		for (int j = 0; j < words.size(); j++)
-    		{
-    			float sh = textToFloat(words[j]);
-    			if (i==0)
-    				xshifts.push_back(sh);
-    			else if (i==1)
-    				yshifts.push_back(sh);
-    		}
-    		i++;
-    	}
-    }
-    in.close();
+			std::vector<std::string> words;
+			tokenize(line, words);
+			for (int j = 0; j < words.size(); j++)
+			{
+				float sh = textToFloat(words[j]);
+				if (i==0)
+					xshifts.push_back(sh);
+				else if (i==1)
+					yshifts.push_back(sh);
+			}
+			i++;
+		}
+	}
+	in.close();
 
-    if (xshifts.size() != yshifts.size())
-    	REPORT_ERROR("ERROR: got an unequal number of x and yshifts from " + fn_shifts);
+	if (xshifts.size() != yshifts.size())
+		REPORT_ERROR("ERROR: got an unequal number of x and yshifts from " + fn_shifts);
+
+	for (int i = 0, ilim = xshifts.size(); i < ilim; i++) {
+		int frame = i + first_frame_sum; // make 1-indexed
+		// shifts from Unblur are in angstrom not pixel
+		mic.setGlobalShift(frame, xshifts[i] / angpix, yshifts[i] / angpix);
+	}
+	mic.first_frame = first_frame_sum;
 }
 
 // Plot the UNBLUR FRC curve
@@ -772,45 +785,90 @@ void MotioncorrRunner::plotFRC(FileName fn_frc)
 }
 
 // Plot the shifts
-void MotioncorrRunner::plotShifts(FileName fn_mic, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts)
+void MotioncorrRunner::plotShifts(FileName fn_mic, Micrograph &mic)
 {
+	const RFLOAT SCALE = 40;
+	RFLOAT shift_scale = SCALE;
+	if (do_unblur) {
+		shift_scale = 1.0 / angpix; // convert from A to pix, no scaling
+	}
 
-	if (xshifts.size() == 0)
-		return;
-
+	// Global shift
 	FileName fn_eps = fn_out + fn_mic.withoutExtension() + "_shifts.eps";
 	CPlot2D *plot2D=new CPlot2D(fn_eps);
  	plot2D->SetXAxisSize(600);
  	plot2D->SetYAxisSize(600);
+	plot2D->SetDrawLegend(false);
 
  	CDataSet dataSet;
 	dataSet.SetDrawMarker(false);
 	dataSet.SetDatasetColor(0.0,0.0,0.0);
-	for (int j = 0; j < xshifts.size(); j++)
+	RFLOAT xshift, yshift;
+	// UNBLUR does not provide local trajectories, so start the global trajectory from the origin.
+	const RFLOAT xcenter = (!do_unblur) ? mic.getWidth() / 2.0 : 0;
+	const RFLOAT ycenter = (!do_unblur) ? mic.getHeight() / 2.0 : 0;
+	for (int j = mic.first_frame, jlim = mic.getNframes(); j <= jlim; j++) // 1-indexed
 	{
-		CDataPoint point(xshifts[j], yshifts[j]);
-		dataSet.AddDataPoint(point);
+		mic.getShiftAt(j, 0, 0, xshift, yshift, false); // no local model
+		if (xshift != Micrograph::NOT_OBSERVED) {
+			CDataPoint point(xcenter + shift_scale * xshift, ycenter + shift_scale * yshift);
+			dataSet.AddDataPoint(point);
+		}
 	}
 	plot2D->AddDataSet(dataSet);
 
-	// Different starting point
-	CDataSet dataSetStart;
-	dataSetStart.SetDrawMarker(true);
-	dataSetStart.SetDatasetColor(1.0,0.0,0.0);
-	CDataPoint point2(xshifts[0], yshifts[0]);
-	dataSetStart.AddDataPoint(point2);
-	plot2D->AddDataSet(dataSetStart);
+	// Mark starting point
+	mic.getShiftAt(mic.first_frame, 0, 0, xshift, yshift, false);
+	if (xshift != Micrograph::NOT_OBSERVED) {
+		CDataSet dataSetStart;
+		dataSetStart.SetDrawMarker(true);
+		dataSetStart.SetMarkerSize(5);
+		dataSetStart.SetDatasetColor(1.0,0.0,0.0);
+		CDataPoint point2(xcenter + shift_scale * xshift, ycenter + shift_scale * yshift);
+		dataSetStart.AddDataPoint(point2);
+		plot2D->AddDataSet(dataSetStart);
+	}
 
-	if (do_unblur)
-	{
-		plot2D->SetXAxisTitle("X-shift (in Angstroms)");
-		plot2D->SetYAxisTitle("Y-shift (in Angstroms)");
+	// Local shifts
+	const int n_local = mic.localShiftX.size();
+	int i = 0;
+	while (i < n_local) {
+		CDataSet patch_start;
+		patch_start.SetDrawMarker(true);
+		patch_start.SetMarkerSize(5);
+		patch_start.SetDatasetColor(1.0,0.0,0.0);
+
+		CDataSet fit, obs;
+		const int start = i;
+		fit.SetDrawMarker(false);
+		fit.SetDatasetColor(0.0,0.0,0.0);
+		obs.SetDrawMarker(false);
+		obs.SetDatasetColor(0.5,0.5,0.5);
+		while (i < n_local) {
+		//	std::cout << mic.patchX[i] << " " << mic.patchY[i] << " " << mic.patchZ[i] << " " << mic.localShiftX[i] << " " << mic.localShiftY[i] << std::endl;
+			if ((mic.patchX[start] != mic.patchX[i]) || (mic.patchY[start] != mic.patchY[i])) {
+		//		std::cout << "End of a trace" << std::endl;
+				break; // start again from this frame
+			}
+			CDataPoint p_obs(mic.patchX[start] + shift_scale * mic.localShiftX[i], mic.patchY[start] + shift_scale * mic.localShiftY[i]);
+			obs.AddDataPoint(p_obs);
+			CDataPoint p_fit(mic.patchX[start] + shift_scale * mic.localFitX[i], mic.patchY[start] + shift_scale * mic.localFitY[i]);
+			fit.AddDataPoint(p_fit);
+			if (i == start) patch_start.AddDataPoint(p_fit);
+			i++;
+		}
+		plot2D->AddDataSet(fit);
+		plot2D->AddDataSet(obs);
+	
+		plot2D->AddDataSet(patch_start);
 	}
-	else
-	{
-		plot2D->SetXAxisTitle("X-shift (in pixels)");
-		plot2D->SetYAxisTitle("Y-shift (in pixels)");
-	}
+
+	char title[256];
+	snprintf(title, 255, "X (in pixels; trajectory scaled by %.0f)", shift_scale);
+	plot2D->SetXAxisTitle(title);
+	title[0] = 'Y';
+	plot2D->SetYAxisTitle(title);
+	
 	plot2D->OutputPostScriptPlot(fn_eps);
 }
 
@@ -889,7 +947,7 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 // - defect
 // - outlier rejection in fitting (use free set?)
 
-bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts) {
+bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	omp_set_num_threads(n_threads);
 
 	FileName fn_mic = mic.getMovieFilename();
@@ -912,7 +970,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<R
 	const int hotpixel_sigma = 6;
 
 	// Check image size
-	Ihead.read(fn_mic, false);
+	Ihead.read(fn_mic, false, -1, false, true); // select_img -1, mmap false, is_2D true
 	const int nx = XSIZE(Ihead()), ny = YSIZE(Ihead()), nn = NSIZE(Ihead());
 
 	// Which frame to use?
@@ -931,8 +989,8 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<R
 	const int n_frames = frames.size();
 	Iframes.resize(n_frames);
 	Fframes.resize(n_frames);
-	xshifts.resize(n_frames);
-	yshifts.resize(n_frames);
+	
+	std::vector<RFLOAT> xshifts(n_frames), yshifts(n_frames);
 
 	// Setup grouping
 	logfile << "Frame grouping: n_frames = " << n_frames << ", requested group size = " << group << std::endl;
@@ -980,7 +1038,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<R
 	RCTIC(TIMING_READ_MOVIE);
 	#pragma omp parallel for
 	for (int iframe = 0; iframe < n_frames; iframe++) {
-		Iframes[iframe].read(fn_mic, true, frames[iframe]);
+		Iframes[iframe].read(fn_mic, true, frames[iframe], false, true); // mmap false, is_2D true
 	}
 	RCTOC(TIMING_READ_MOVIE);
 
@@ -1227,6 +1285,15 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic, std::vector<R
 			model->getShiftAt(z, x, y, x_fitted, y_fitted);
 			rms_x += (patch_xshifts[i] - x_fitted) * (patch_xshifts[i] - x_fitted);
 			rms_y += (patch_yshifts[i] - y_fitted) * (patch_yshifts[i] - y_fitted);
+
+			mic.patchX.push_back(patch_xs[i]);
+			mic.patchY.push_back(patch_ys[i]);
+			mic.patchZ.push_back(z + first_frame_sum); // 1-indexed
+			mic.localShiftX.push_back(patch_xshifts[i]);
+			mic.localShiftY.push_back(patch_yshifts[i]);
+			mic.localFitX.push_back(x_fitted);
+			mic.localFitY.push_back(y_fitted);
+			
 #ifdef DEBUG_OWN
 			std::cout << " x = " << x << " y = " << y << " z = " << z;
 			std::cout << ", Xobs = " << patch_xshifts[i] << " Xfit = " << x_fitted;
