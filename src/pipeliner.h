@@ -156,7 +156,7 @@ class PipeLine
 	void addScheduledJob(int job_type, std::string fn_options);
 
 	// Runs a series of scheduled jobs, possibly in a loop, from the command line
-	void runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_repeat, long int minutes_wait);
+	void runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_repeat, long int minutes_wait, long int minutes_wait_before = 0);
 
 	// If I'm deleting this_job from the pipeline, which Nodes and which Processes need to be deleted?
 	void deleteJobGetNodesAndProcesses(int this_job, bool do_recursive, std::vector<bool> &deleteNodes, std::vector<bool> &deleteProcesses);

@@ -637,7 +637,7 @@ void PipeLine::addScheduledJob(int job_type, std::string fn_options)
 
 }
 
-void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_repeat, long int minutes_wait)
+void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_repeat, long int minutes_wait, long int minutes_wait_before)
 {
 
 	std::vector<FileName> my_scheduled_processes;
@@ -670,11 +670,18 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 	fh << " The scheduled jobs are: " << std::endl;
 	for (long int i = 0; i < my_scheduled_processes.size(); i++)
 		fh << " - " << my_scheduled_processes[i] << std::endl;
+	if (minutes_wait_before > 0)
+		fh << " Will wait " << minutes_wait_before << " minutes before running the first job." << std::endl;
 	fh << " Will execute the scheduled jobs " << nr_repeat << " times." << std::endl;
 	if (nr_repeat > 1)
 		fh << " Will wait until at least " << minutes_wait << " minutes have passed between each repeat." << std::endl;
 	fh << " Will be checking for existence of file " << fn_check << "; if it no longer exists, the scheduler will stop." << std::endl;
 	fh << " +++++++++++++++++++++++++++++++++++++++++++++++++++++++" << std::endl;
+
+
+	// Wait this many minutes before starting the repeat cycle...
+	if (minutes_wait_before > 0)
+		sleep(minutes_wait_before * 60);
 
 	int repeat = 0;
 	time_t now = time(0);
