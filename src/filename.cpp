@@ -480,7 +480,6 @@ int mktree(const FileName &fn_dir, mode_t mode)
 
 bool decomposePipelineFileName(FileName fn_in, FileName &fn_pre, FileName &fn_jobnr, FileName &fn_post)
 {
-
 	size_t slashpos = 0;
 	int i = 0;
 	while (slashpos < fn_in.length())
@@ -512,8 +511,7 @@ bool decomposePipelineFileName(FileName fn_in, FileName &fn_pre, FileName &fn_jo
 
 bool decomposePipelineSymlinkName(FileName fn_in, FileName &fn_pre, FileName &fn_jobnr, FileName &fn_post)
 {
-
-	// Symlinks are always in the second directory....
+	// Symlinks are always in the second directory. (e.g. Refine3D/JOB_ALIAS_AS_LINK/...)
 	size_t slashpos = 0;
 	int i = 0;
 	while (slashpos < fn_in.length())
@@ -527,26 +525,26 @@ bool decomposePipelineSymlinkName(FileName fn_in, FileName &fn_pre, FileName &fn
 	// Check whether this is a symbol link
 	char linkname[100];
 	ssize_t len = ::readlink(fn_in.substr(0, slashpos).c_str(), linkname, sizeof(linkname)-1);
-	if (len != -1)
-    {
-    	// This is a symbolic link!
-    	linkname[len] = '\0';
-    	FileName fn_link = std::string(linkname);
-    	if (fn_link.substr(0,3) == "../")
-    	{
-    		fn_link = fn_link.substr(3) + fn_in.substr(slashpos+1);
-        	return decomposePipelineFileName(fn_link, fn_pre, fn_jobnr, fn_post);
-    	}
+	if (i == 2 && len != -1) // we ignore links in the first directory (link/XXX)
+	{
+	    	// This is a symbolic link!
+	    	linkname[len] = '\0';
+	    	FileName fn_link = std::string(linkname);
+    		if (fn_link.substr(0,3) == "../")
+	    	{
+    			fn_link = fn_link.substr(3) + fn_in.substr(slashpos+1);
+        		return decomposePipelineFileName(fn_link, fn_pre, fn_jobnr, fn_post);
+	    	}
 		else
 		{
 			fn_pre = fn_jobnr = "";
 			fn_post = fn_in;
 			return false;
 		}
-    }
+	}
 
 	// If it is not a symlink, just decompose the filename
-    return decomposePipelineFileName(fn_in, fn_pre, fn_jobnr, fn_post);
+	return decomposePipelineFileName(fn_in, fn_pre, fn_jobnr, fn_post);
 
 }
 
