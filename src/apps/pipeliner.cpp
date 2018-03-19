@@ -33,6 +33,7 @@ class pipeliner_parameters
 public:
 	FileName fn_sched, fn_jobids, fn_options;
 	int nr_repeat;
+	bool do_check_complete;
 	long int minutes_wait, minutes_wait_before;
 	std::string add_type;
 
@@ -62,6 +63,8 @@ public:
 		nr_repeat = textToInteger(parser.getOption("--repeat", "Repeat the scheduled jobs this many times", "1"));
 		minutes_wait = textToInteger(parser.getOption("--min_wait", "Wait at least this many minutes between each repeat", "0"));
 		minutes_wait_before = textToInteger(parser.getOption("--min_wait_before", "Wait this many minutes before starting the running the first job", "0"));
+		int check_section = parser.addSection("Check job completion options");
+		do_check_complete = parser.checkOption("--check_job_completion", "Use this flag to check whether running jobs have completed");
 		int expert_section = parser.addSection("Expert options");
 		pipeline.name = parser.getOption("--pipeline", "Name of the pipeline", "default");
 
@@ -84,6 +87,10 @@ public:
 		else if (nr_repeat > 0)
 		{
 			pipeline.runScheduledJobs(fn_sched, fn_jobids, nr_repeat, minutes_wait, minutes_wait_before);
+		}
+		else if (do_check_complete)
+		{
+			pipeline.checkProcessCompletion();
 		}
 
 	}
