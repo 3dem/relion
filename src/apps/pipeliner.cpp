@@ -54,17 +54,17 @@ public:
 		parser.setCommandLine(argc, argv);
 
 		// Fill the window, but don't show it!
+		int check_section = parser.addSection("Check job completion options");
+		do_check_complete = parser.checkOption("--check_job_completion", "Use this flag to only check whether running jobs have completed");
 		int add_section = parser.addSection("Add scheduled jobs options");
 		add_type = parser.getOption("--addJob", "Add a job of this type to the pipeline","");
 		fn_options = parser.getOption("--addJobOptions", "Options for this job","");
 		int run_section = parser.addSection("Run scheduled jobs options");
 		fn_jobids  = parser.getOption("--RunJobs", "Run these jobs", "");
 		fn_sched = parser.getOption("--schedule", "Name of the scheduler for running the scheduled jobs", "");
-		nr_repeat = textToInteger(parser.getOption("--repeat", "Repeat the scheduled jobs this many times", "1"));
+		nr_repeat = textToInteger(parser.getOption("--repeat", "Run the scheduled jobs this many times", "1"));
 		minutes_wait = textToInteger(parser.getOption("--min_wait", "Wait at least this many minutes between each repeat", "0"));
 		minutes_wait_before = textToInteger(parser.getOption("--min_wait_before", "Wait this many minutes before starting the running the first job", "0"));
-		int check_section = parser.addSection("Check job completion options");
-		do_check_complete = parser.checkOption("--check_job_completion", "Use this flag to check whether running jobs have completed");
 		int expert_section = parser.addSection("Expert options");
 		pipeline.name = parser.getOption("--pipeline", "Name of the pipeline", "default");
 
@@ -79,7 +79,11 @@ public:
 
 		pipeline.read(DO_LOCK);
 		pipeline.write(DO_LOCK);
-		if (add_type != "")
+		if (do_check_complete)
+		{
+			pipeline.checkProcessCompletion();
+		}
+		else if (add_type != "")
 		{
 			pipeline.addScheduledJob(add_type, fn_options);
 
@@ -87,10 +91,6 @@ public:
 		else if (nr_repeat > 0)
 		{
 			pipeline.runScheduledJobs(fn_sched, fn_jobids, nr_repeat, minutes_wait, minutes_wait_before);
-		}
-		else if (do_check_complete)
-		{
-			pipeline.checkProcessCompletion();
 		}
 
 	}
