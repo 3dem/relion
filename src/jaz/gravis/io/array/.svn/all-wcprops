@@ -1,0 +1,47 @@
+K 25
+svn:wc:ra_dav:version-url
+V 66
+/repos/gravis/!svn/ver/22702/libs/libGravis/trunk/include/io/array
+END
+ArrayStreamIO.h
+K 25
+svn:wc:ra_dav:version-url
+V 82
+/repos/gravis/!svn/ver/22702/libs/libGravis/trunk/include/io/array/ArrayStreamIO.h
+END
+CMakeLists.txt
+K 25
+svn:wc:ra_dav:version-url
+V 81
+/repos/gravis/!svn/ver/21790/libs/libGravis/trunk/include/io/array/CMakeLists.txt
+END
+networkByteOrder.h
+K 25
+svn:wc:ra_dav:version-url
+V 85
+/repos/gravis/!svn/ver/22187/libs/libGravis/trunk/include/io/array/networkByteOrder.h
+END
+raw.h
+K 25
+svn:wc:ra_dav:version-url
+V 72
+/repos/gravis/!svn/ver/22187/libs/libGravis/trunk/include/io/array/raw.h
+END
+a.h
+K 25
+svn:wc:ra_dav:version-url
+V 70
+/repos/gravis/!svn/ver/22306/libs/libGravis/trunk/include/io/array/a.h
+END
+le.h
+K 25
+svn:wc:ra_dav:version-url
+V 71
+/repos/gravis/!svn/ver/22187/libs/libGravis/trunk/include/io/array/le.h
+END
+matlab.h
+K 25
+svn:wc:ra_dav:version-url
+V 75
+/repos/gravis/!svn/ver/22187/libs/libGravis/trunk/include/io/array/matlab.h
+END

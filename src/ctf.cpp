@@ -48,7 +48,7 @@
 #include "src/metadata_table.h"
 
 /* Read -------------------------------------------------------------------- */
-void CTF::read(MetaDataTable &MD1, MetaDataTable &MD2, long int objectID)
+void CTF::read(const MetaDataTable &MD1, const MetaDataTable &MD2, long int objectID)
 {
 
 	if (!MD1.getValue(EMDL_CTF_VOLTAGE, kV, objectID))
@@ -106,7 +106,7 @@ void CTF::setValues(RFLOAT _defU, RFLOAT _defV, RFLOAT _defAng, RFLOAT _voltage,
 	initialise();
 }
 /* Read from 1 MetaDataTable ----------------------------------------------- */
-void CTF::read(MetaDataTable &MD)
+void CTF::read(const MetaDataTable &MD)
 {
 	MetaDataTable MDempty;
 	MDempty.addObject(); // add one empty object
@@ -187,6 +187,15 @@ void CTF::initialise()
 
 }
 
+double CTF::getGamma(double X, double Y)
+{
+    RFLOAT u2 = X * X + Y * Y;
+    RFLOAT u4 = u2 * u2;
+
+    RFLOAT deltaf = getDeltaF(X, Y);
+    return K1 * deltaf * u2 + K2 * u4 - K5 - K3;
+}
+
 RFLOAT CTF::getCtfFreq(RFLOAT X, RFLOAT Y)
 {
     RFLOAT u2 = X * X + Y * Y;
@@ -201,15 +210,15 @@ RFLOAT CTF::getCtfFreq(RFLOAT X, RFLOAT Y)
 void CTF::getFftwImage(MultidimArray<RFLOAT> &result, int orixdim, int oriydim, RFLOAT angpix,
 		    		bool do_abs, bool do_only_flip_phases, bool do_intact_until_first_peak, bool do_damping)
 {
-
 	RFLOAT xs = (RFLOAT)orixdim * angpix;
 	RFLOAT ys = (RFLOAT)oriydim * angpix;
+
 	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(result)
 	{
 		RFLOAT x = (RFLOAT)jp / xs;
 		RFLOAT y = (RFLOAT)ip / ys;
 		DIRECT_A2D_ELEM(result, i, j) = getCTF(x, y, do_abs, do_only_flip_phases, do_intact_until_first_peak, do_damping);
-	}
+    }
 }
 
 /* Generate a complete CTFP (complex) image (with sector along angle) ------------------------------------------------------ */

@@ -42,7 +42,7 @@ int ThirdOrderPolynomialModel::getShiftAt(RFLOAT z, RFLOAT x, RFLOAT y, RFLOAT &
 	         + (coeffY(6)  * z + coeffY(7)  * z2 + coeffY(8)  * z3) * x2 \
 	       	 + (coeffY(9)  * z + coeffY(10) * z2 + coeffY(11) * z3) * y \
 	         + (coeffY(12) * z + coeffY(13) * z2 + coeffY(14) * z3) * y2 \
-	         + (coeffY(15) * z + coeffY(16) * z2 + coeffY(17) * z3) * xy;
+                 + (coeffY(15) * z + coeffY(16) * z2 + coeffY(17) * z3) * xy;
 }
 
 MotionModel* ThirdOrderPolynomialModel::clone() const
@@ -170,10 +170,11 @@ void Micrograph::write(FileName filename)
         MD.setName("general");
         MD.setIsList(true);
         MD.addObject();
-	MD.setValue(EMDL_IMAGE_SIZEX, width);
-        MD.setValue(EMDL_IMAGE_SIZEY, height);
-        MD.setValue(EMDL_IMAGE_SIZEZ, n_frames);
+        MD.setValue(EMDL_IMAGE_SIZE_X, width);
+        MD.setValue(EMDL_IMAGE_SIZE_Y, height);
+        MD.setValue(EMDL_IMAGE_SIZE_Z, n_frames);
         MD.setValue(EMDL_MICROGRAPH_MOVIE_NAME, fnMovie);
+
 	if (fnGain != "") {
 		MD.setValue(EMDL_MICROGRAPH_GAIN_NAME, fnGain);
 	}
@@ -301,9 +302,9 @@ void Micrograph::read(FileName fn_in)
 	// Read Image metadata
 	MDglobal.readStar(in, "general");
 
-	if (!MDglobal.getValue(EMDL_IMAGE_SIZEX, width) ||
-	    !MDglobal.getValue(EMDL_IMAGE_SIZEY, height) ||
-	    !MDglobal.getValue(EMDL_IMAGE_SIZEZ, n_frames) ||
+	if (!MDglobal.getValue(EMDL_IMAGE_SIZE_X, width) ||
+	    !MDglobal.getValue(EMDL_IMAGE_SIZE_Y, height) ||
+	    !MDglobal.getValue(EMDL_IMAGE_SIZE_Z, n_frames) ||
 	    !MDglobal.getValue(EMDL_MICROGRAPH_MOVIE_NAME, fnMovie)) {
 		REPORT_ERROR("MicrographModel::read: insufficient general information");
 	}

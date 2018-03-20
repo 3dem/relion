@@ -1177,7 +1177,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 		}
 		RCTOC(ReconTimer,ReconS_4);
 		RCTIC(ReconTimer,ReconS_5);
-		// Initialise Fnewweight with 1's and 0's. (also see comments below)
+        // Initialise Fnewweight with 1's and 0's. (also see comments below)
 		FOR_ALL_ELEMENTS_IN_ARRAY3D(weight)
 		{
 			if (k * k + i * i + j * j < max_r2)
@@ -1191,6 +1191,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 		// or Eq. (4) in Matej (2001)
 		for (int iter = 0; iter < max_iter_preweight; iter++)
 		{
+            std::cout << "    iteration " << (iter+1) << "/" << max_iter_preweight << "\n";
 			RCTIC(ReconTimer,ReconS_6);
 			// Set Fnewweight * Fweight in the transformer
 			// In Matej et al (2001), weights w_P^i are convoluted with the kernel,
@@ -1198,6 +1199,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 			// Here the initial weights are also 1 (see initialisation Fnewweight above),
 			// but each "sampling point" counts "Fweight" times!
 			// That is why Fnewweight is multiplied by Fweight prior to the convolution
+
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fconv)
 			{
 				DIRECT_MULTIDIM_ELEM(Fconv, n) = DIRECT_MULTIDIM_ELEM(Fnewweight, n) * DIRECT_MULTIDIM_ELEM(Fweight, n);
@@ -1205,11 +1207,12 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 
 			// convolute through Fourier-transform (as both grids are rectangular)
 			// Note that convoluteRealSpace acts on the complex array inside the transformer
-			convoluteBlobRealSpace(transformer);
+            convoluteBlobRealSpace(transformer, false, nr_threads);
 
 			RFLOAT w, corr_min = LARGE_NUMBER, corr_max = -LARGE_NUMBER, corr_avg=0., corr_nn=0.;
-			FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fconv)
-			{
+
+            FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fconv)
+            {
 				if (kp * kp + ip * ip + jp * jp < max_r2)
 				{
 
@@ -1779,7 +1782,7 @@ void BackProjector::applyPointGroupSymmetry()
 
 }
 
-void BackProjector::convoluteBlobRealSpace(FourierTransformer &transformer, bool do_mask)
+void BackProjector::convoluteBlobRealSpace(FourierTransformer &transformer, bool do_mask, int threads)
 {
 
 	MultidimArray<RFLOAT> Mconv;
@@ -1805,7 +1808,7 @@ void BackProjector::convoluteBlobRealSpace(FourierTransformer &transformer, bool
 	//blob.radius = 1.9 * padding_factor;
 	//blob.alpha = 15;
 
-	// Multiply with FT of the blob kernel
+    // Multiply with FT of the blob kernel
 	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Mconv)
     {
 		int kp = (k < padhdim) ? k : k - pad_size;

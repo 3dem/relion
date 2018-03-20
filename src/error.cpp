@@ -61,6 +61,8 @@ RelionError::RelionError(const std::string &what, const std::string &fileArg, co
     msg = "ERROR: \n" + what;
     file= fileArg;
     line=lineArg;
+
+    std::cerr << msg << "\nin: " << file << ", line " << line << "\n";
 }
 
 // Show message

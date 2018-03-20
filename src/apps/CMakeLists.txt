@@ -1,7 +1,9 @@
 include_directories("${CMAKE_SOURCE_DIR}")
 
+message("Running apps/CMakeLists.txt...")
+
 if(NOT MKLFFT)
-    include_directories("${FFTW_INCLUDES}")
+	include_directories("${FFTW_INCLUDES}")
 endif(NOT MKLFFT)
 #include_directories(${CMAKE_BINARY_DIR}/include)
 
@@ -24,6 +26,11 @@ foreach(GUI_SRC_FILE ${REL_GUI_SRC})
 	list(REMOVE_ITEM REL_SRC "${GUI_SRC_FILE}")
 endforeach()
 
+file(GLOB REL_JAZ_SRC "${CMAKE_SOURCE_DIR}/src/jaz/*.cpp")
+file(GLOB REL_JAZ_SRC_H "${CMAKE_SOURCE_DIR}/src/jaz/*.h")
+file(GLOB REL_D3x3_SRC "${CMAKE_SOURCE_DIR}/src/jaz/d3x3/*.c")
+file(GLOB REL_D3x3_SRC_H "${CMAKE_SOURCE_DIR}/src/jaz/d3x3/*.h")
+
 file(GLOB REL_HP "${CMAKE_SOURCE_DIR}/src/Healpix_2.15a/*.cc")
 file(GLOB RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/*.cpp")
 
@@ -36,22 +43,21 @@ if(NOT GUI)
     endforeach()
 endif(NOT GUI)
 
-
 # relion_lib is STATIC or SHARED type based on BUILD_SHARED_LIBS=ON/OFF
 # relion_lib only contains non-X11 parts
 # relion_gui_lib is where the X11 code is placed
 if(BUILD_SHARED_LIBS)
-    add_library(relion_lib SHARED ${REL_SRC} ${REL_SRC_H} ${REL_HP})
-    install(TARGETS relion_lib LIBRARY DESTINATION lib)
-    if(GUI)
-        add_library(relion_gui_lib SHARED ${REL_GUI_SRC} ${REL_SRC_H} ${REL_HP})
-        install(TARGETS relion_gui_lib LIBRARY DESTINATION lib)
-    endif(GUI)
+	add_library(relion_lib SHARED ${REL_SRC} ${REL_SRC_H} ${REL_HP} ${REL_JAZ_SRC} ${REL_JAZ_H} ${REL_D3x3_SRC} ${REL_D3x3_H})
+	install(TARGETS relion_lib LIBRARY DESTINATION lib)
+	if(GUI)
+		add_library(relion_gui_lib SHARED ${REL_GUI_SRC} ${REL_SRC_H} ${REL_HP})
+		install(TARGETS relion_gui_lib LIBRARY DESTINATION lib)
+	endif(GUI)
 else()
-    add_library(relion_lib STATIC ${REL_SRC} ${REL_SRC_H} ${REL_HP})
-    if(GUI)
-        add_library(relion_gui_lib STATIC ${REL_GUI_SRC} ${REL_SRC_H} ${REL_HP})
-    endif(GUI)
+	add_library(relion_lib STATIC ${REL_SRC} ${REL_SRC_H} ${REL_HP} ${REL_JAZ_SRC} ${REL_JAZ_H} ${REL_D3x3_SRC} ${REL_D3x3_H})
+	if(GUI)
+		add_library(relion_gui_lib STATIC ${REL_GUI_SRC} ${REL_SRC_H} ${REL_HP})
+	endif(GUI)
 endif()
 
 if(NOT MKLFFT)
@@ -71,8 +77,6 @@ if(GUI)
         add_dependencies(relion_gui_lib OWN_FLTK)
     endif()
 endif(GUI)
-
-
 
 if (CUDA_FOUND)
 
@@ -112,7 +116,10 @@ if (CUDA_FOUND)
 endif(CUDA_FOUND)
 
 if(TIFF_FOUND)
+	message("TIFF FOUND")
     include_directories(${TIFF_INCLUDE_DIRS})
+else()
+	message("TIFF NOT FOUND")
 endif()
 
 foreach (_target ${RELION_TARGETS})
@@ -154,6 +161,11 @@ foreach (_target ${RELION_TARGETS})
 		add_dependencies(${_target} relion_gui_lib)
 		target_link_libraries(${_target} relion_gui_lib ${FLTK_LIBRARIES} ${X11})
 	endif()
+
+	if(TIFF_FOUND)
+		message("linking ${_target} to TIFF (${TIFF_LIBRARIES})")
+		target_link_libraries(${_target} ${TIFF_LIBRARIES})
+	endif()
     
 	#message(STATUS "added ${_target}...")
 	
@@ -176,4 +188,5 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
 endif()
 
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
