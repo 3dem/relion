@@ -1,0 +1,17 @@
+K 25
+svn:wc:ra_dav:version-url
+V 66
+/repos/gravis/!svn/ver/22187/libs/libGravis/trunk/include/io/image
+END
+f.h
+K 25
+svn:wc:ra_dav:version-url
+V 70
+/repos/gravis/!svn/ver/22187/libs/libGravis/trunk/include/io/image/f.h
+END
+CMakeLists.txt
+K 25
+svn:wc:ra_dav:version-url
+V 81
+/repos/gravis/!svn/ver/21790/libs/libGravis/trunk/include/io/image/CMakeLists.txt
+END
