@@ -18,22 +18,24 @@
  * author citations must be preserved.
  ***************************************************************************/
 
-#include <src/reconstructor.h>
+#include <src/reconstructor_mpi.h>
+#include <mpi.h>
+
 
 int main(int argc, char *argv[])
 {
-	Reconstructor prm;
+	ReconstructorMpi prm;
 
 	try
     {
 		prm.read(argc, argv);
 		prm.run();
-
     }
     catch (RelionError XE)
     {
-        std::cerr << XE;
-        exit(1);
+        if (prm.verb > 0)
+        	std::cerr << XE;
+        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
     }
     return 0;
 }

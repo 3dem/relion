@@ -134,7 +134,7 @@ void BackProjector::backproject2Dto3D(const MultidimArray<Complex > &f2d,
 			{
 				/*
 				In our implementation, (x, y) are not scaled because:
-	 
+
 	 			x_on_ewald = x * r / sqrt(x * x + y * y + r * r)
 				           = x / sqrt(1 + (x * x + y * y) / (r * r))
 				           ~ x * (1 - (x * x + y * y) / (2 * r * r) + O(1/r^4)) # binomial expansion
@@ -145,7 +145,7 @@ void BackProjector::backproject2Dto3D(const MultidimArray<Complex > &f2d,
 	 			z_on_ewald = r - r * r / sqrt(x * x + y * y + r * r)
 				           ~ r - r * (1 - (x * x + y * y) / (2 * r * r) + O(1/r^4)) # binomial expansion
 				           = (x * x + y * y) / (2 * r) + O(1/r^3)
- 
+
 	                        The error is < 0.0005 reciprocal voxel even for extreme cases like 200kV, 1500 A particle, 1 A / pix.
 				*/
 
@@ -1191,7 +1191,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 		// or Eq. (4) in Matej (2001)
 		for (int iter = 0; iter < max_iter_preweight; iter++)
 		{
-            std::cout << "    iteration " << (iter+1) << "/" << max_iter_preweight << "\n";
+            //std::cout << "    iteration " << (iter+1) << "/" << max_iter_preweight << "\n";
 			RCTIC(ReconTimer,ReconS_6);
 			// Set Fnewweight * Fweight in the transformer
 			// In Matej et al (2001), weights w_P^i are convoluted with the kernel,
