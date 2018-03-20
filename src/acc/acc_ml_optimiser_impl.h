@@ -1879,7 +1879,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
-				XFLOAT weights_max = std::numeric_limits<XFLOAT>::lowest();
+				XFLOAT weights_max = -std::numeric_limits<XFLOAT>::max();
 
 				pdf_offset.streamSync();
 
@@ -2654,7 +2654,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			CTIC(accMLO->timer,"pre_wavg_map");
 
 			for (long unsigned i = 0; i < orientation_num*translation_num; i++)
-				sorted_weights[classPos+i] = std::numeric_limits<XFLOAT>::lowest();
+				sorted_weights[classPos+i] = -std::numeric_limits<XFLOAT>::max();
 
 			for (long unsigned i = 0; i < thisClassFinePassWeights.weights.getSize(); i++)
 				sorted_weights[classPos+(thisClassFinePassWeights.rot_idx[i]) * translation_num + thisClassFinePassWeights.trans_idx[i] ]
@@ -3113,7 +3113,7 @@ baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF2_B);
 				Mweight.setSize(sp.nr_particles * weightsPerPart);
 				Mweight.setHostPtr(op.Mweight.data);
 				Mweight.deviceAlloc();
-				deviceInitValue<XFLOAT>(Mweight, std::numeric_limits<XFLOAT>::lowest());
+				deviceInitValue<XFLOAT>(Mweight, -std::numeric_limits<XFLOAT>::max());
 				Mweight.streamSync();
 
 				CTIC(timer,"getAllSquaredDifferencesCoarse");

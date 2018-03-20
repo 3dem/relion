@@ -102,6 +102,8 @@ int SchedulerWindow::fill(FileName _pipeline_name, std::vector<FileName> _schedu
     current_y = max_y;
     schedule_name = new Fl_Input(xcol, current_y, 100, ystep-8, "Provide a name for this schedule: ");
     current_y += ystep;
+    wait_before = new Fl_Input(xcol, current_y, 100, ystep-8, "Wait this many minutes before starting?");
+    current_y += ystep;
     repeat = new Fl_Input(xcol, current_y, 100, ystep-8, "Run the jobs how many times?");
     current_y += ystep;
     wait = new Fl_Input(xcol, current_y, 100, ystep-8, "Wait at least in between (in minutes)?");
@@ -120,6 +122,10 @@ int SchedulerWindow::fill(FileName _pipeline_name, std::vector<FileName> _schedu
 	wait->color(GUI_INPUT_COLOR);
 	wait->textsize(ENTRY_FONTSIZE);
 	wait->labelsize(ENTRY_FONTSIZE);
+    wait_before->value("0");
+	wait_before->color(GUI_INPUT_COLOR);
+	wait_before->textsize(ENTRY_FONTSIZE);
+	wait_before->labelsize(ENTRY_FONTSIZE);
 
 	// Button to execute
 	Fl_Button *execute_button = new Fl_Button(w()-200, current_y, 80, 30, "Execute");
@@ -175,11 +181,13 @@ void SchedulerWindow::cb_execute_i()
 
 		std::string myrepeat(repeat->value());
 		std::string mywait(wait->value());
+		std::string mywait_before(wait_before->value());
 
 		std::string command = "relion_pipeliner --pipeline " + pipeline_name;
 		command += " --schedule " + fn_sched;
 		command += " --repeat " + myrepeat;
 		command += " --min_wait " + mywait;
+		command += " --min_wait_before " + mywait_before;
 		command += " --RunJobs " + jobids;
 		// Run this in the background, so control returns to the window
 		command += " &";

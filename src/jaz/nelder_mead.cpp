@@ -1,0 +1,182 @@
+#include <src/jaz/nelder_mead.h>
+#include <src/jaz/index_sort.h>
+#include <iostream>
+#include <cmath>
+
+std::vector<double> NelderMead::optimize(
+        const std::vector<double>& initial,
+        const Optimization& opt,
+        double initialStep, double tolerance, long maxIters,
+        double alpha, double gamma, double rho, double sigma,
+        bool verbose)
+{
+    const double n = initial.size();
+    const double m = initial.size() + 1;
+
+    std::vector<std::vector<double> > simplex(m);
+
+    simplex[0] = initial;
+
+    for (int j = 1; j < m; j++)
+    {
+        simplex[j] = initial;
+        simplex[j][j-1] += initialStep;
+    }
+
+    // avoid runtime allocations (std::vectors live on the heap)
+    std::vector<std::vector<double> > nextSimplex(m);
+    std::vector<double> values(m), nextValues(m), centroid(n),
+            reflected(n), expanded(n), contracted(n);
+
+    // compute values
+    for (int j = 0; j < m; j++)
+    {
+        values[j] = opt.f(simplex[j]);
+    }
+
+    if (verbose)
+    {
+        std::cout << "f0 = " << values[0] << "\n";
+    }
+
+    for (long i = 0; i < maxIters; i++)
+    {
+        // sort x and f(x) by ascending f(x)
+        std::vector<int> order = IndexSort<double>::sortIndices(values);
+
+        if (verbose)
+        {
+            std::cout << i << ": " << values[order[0]] << "\n";
+        }
+
+        for (int j = 0; j < m; j++)
+        {
+            nextSimplex[j] = simplex[order[j]];
+            nextValues[j] = values[order[j]];
+        }
+
+        simplex = nextSimplex;
+        values = nextValues;
+
+        // compute centroid
+        for (int k = 0; k < n; k++)
+        {
+            centroid[k] = 0.0;
+        }
+        for (int j = 0; j < n; j++) // leave out the worst x
+        {
+            for (int k = 0; k < n; k++)
+            {
+                centroid[k] += simplex[j][k];
+            }
+        }
+        for (int k = 0; k < n; k++)
+        {
+            centroid[k] /= n;
+        }
+
+        // check for convergence
+        bool allInside = true;
+        for (int j = 0; j < m; j++)
+        {
+            double dx = 0.0;
+
+            for (int k = 0; k < n; k++)
+            {
+                double ddx = simplex[j][k] - centroid[k];
+                dx += ddx * ddx;
+            }
+
+            if (sqrt(dx) > tolerance)
+            {
+                allInside = false;
+                break;
+            }
+        }
+        if (allInside)
+        {
+            return simplex[0];
+        }
+
+        // reflect
+        for (int k = 0; k < n; k++)
+        {
+            reflected[k] = (1.0 + alpha) * centroid[k] - alpha * simplex[n][k];
+        }
+
+        double vRefl = opt.f(reflected);
+
+        if (vRefl < values[n-1] && vRefl > values[0])
+        {
+            simplex[n] = reflected;
+            values[n] = vRefl;
+            continue;
+        }
+
+        // expand
+        if (vRefl < values[0])
+        {
+            for (int k = 0; k < n; k++)
+            {
+                expanded[k] = (1.0 - gamma) * centroid[k] + gamma * reflected[k];
+            }
+
+            double vExp = opt.f(expanded);
+
+            if (vExp < vRefl)
+            {
+                simplex[n] = expanded;
+                values[n] = vExp;
+            }
+            else
+            {
+                simplex[n] = reflected;
+                values[n] = vRefl;
+            }
+
+            continue;
+        }
+
+        // contract
+        for (int k = 0; k < n; k++)
+        {
+            contracted[k] = (1.0 - rho) * centroid[k] + rho * simplex[n][k];
+        }
+
+        double vContr = opt.f(contracted);
+
+        if (vContr < values[n])
+        {
+            simplex[n] = contracted;
+            values[n] = vContr;
+
+            continue;
+        }
+
+        // shrink
+        for (int j = 1; j < m; j++)
+        {
+            for (int k = 0; k < n; k++)
+            {
+                simplex[j][k] = (1.0 - sigma) * simplex[0][k] + sigma * simplex[j][k];
+            }
+
+            values[j] = opt.f(simplex[j]);
+        }
+    }
+
+    std::vector<int> order = IndexSort<double>::sortIndices(values);
+    return simplex[order[0]];
+}
+
+void NelderMead::test()
+{
+    RosenbrockBanana rb;
+    std::vector<double> initial(2);
+    initial[0] = 3.0;
+    initial[0] = 1.0;
+
+    std::vector<double> x0 = optimize(initial, rb, 0.5, 0.001, 1000);
+
+    std::cout << "should be close to 1, 1: " << x0[0] << ", " << x0[1] << "\n";
+}
