@@ -10,8 +10,9 @@ GpMotionFit::GpMotionFit(
     int maxDims,
     const std::vector<d2Vector>& positions,
     const std::vector<d2Vector>& perFrameOffsets,
-    int threads)
+    int threads, bool expKer)
 :
+    expKer(expKer),
     pc(correlation.size()),
     fc(correlation[0].size()),
     threads(threads),
@@ -31,7 +32,7 @@ GpMotionFit::GpMotionFit(
     for (int j = i; j < pc; j++)
     {
         const double dd = (positions[i] - positions[j]).norm2();
-        const double k = sv2 * exp(-0.5*dd/sd2);
+        const double k = sv2 * (expKer? exp(-sqrt(dd/sd2)) : exp(-0.5*dd/sd2));
         A(i,j) = k;
         A(j,i) = k;
     }
@@ -95,6 +96,23 @@ double GpMotionFit::f(const std::vector<double> &x) const
         e_tot += cx*cx + cy*cy;
     }
 
+    if (sig_acc_px > 0.0)
+    {
+        for (int f = 0; f < fc-2; f++)
+        for (int d = 0; d < dc; d++)
+        {
+            const double cx0 = x[2*(pc + dc*f + d)    ];
+            const double cy0 = x[2*(pc + dc*f + d) + 1];
+            const double cx1 = x[2*(pc + dc*(f+1) + d)    ];
+            const double cy1 = x[2*(pc + dc*(f+1) + d) + 1];
+
+            const double dcx = cx1 - cx0;
+            const double dcy = cy1 - cy0;
+
+            e_tot += eigenVals[d]*(dcx*dcx + dcy*dcy) / (sig_acc_px*sig_acc_px);
+        }
+    }
+
     return e_tot;
 }
 
@@ -150,6 +168,30 @@ void GpMotionFit::grad(const std::vector<double> &x,
     {
         gradDest[2*(pc + dc*f + d)  ] += 2.0 * x[2*(pc + dc*f + d)  ];
         gradDest[2*(pc + dc*f + d)+1] += 2.0 * x[2*(pc + dc*f + d)+1];
+    }
+
+    if (sig_acc_px > 0.0)
+    {
+        const double sa2 = sig_acc_px*sig_acc_px;
+
+        for (int f = 0; f < fc-2; f++)
+        for (int d = 0; d < dc; d++)
+        {
+            const double cx0 = x[2*(pc + dc*f + d)    ];
+            const double cy0 = x[2*(pc + dc*f + d) + 1];
+            const double cx1 = x[2*(pc + dc*(f+1) + d)    ];
+            const double cy1 = x[2*(pc + dc*(f+1) + d) + 1];
+
+            const double dcx = cx1 - cx0;
+            const double dcy = cy1 - cy0;
+
+            //e_tot += eigenVals[d]*(dcx*dcx + dcy*dcy) / (sig_acc_px*sig_acc_px);
+
+            gradDest[2*(pc + dc*f + d)  ] -= 2.0 * eigenVals[d] * dcx / sa2;
+            gradDest[2*(pc + dc*f + d)+1] -= 2.0 * eigenVals[d] * dcy / sa2;
+            gradDest[2*(pc + dc*(f+1) + d)  ] += 2.0 * eigenVals[d] * dcx / sa2;
+            gradDest[2*(pc + dc*(f+1) + d)+1] += 2.0 * eigenVals[d] * dcy / sa2;
+        }
     }
 }
 

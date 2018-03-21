@@ -48,7 +48,7 @@ class MotionFitProg : public RefinementProgram
 
         MotionFitProg();
 
-            bool unregGlob, noGlobOff, paramEstim, debugOpt, diag;
+            bool unregGlob, noGlobOff, paramEstim, debugOpt, diag, expKer;
             int maxIters;
             double dmga, dmgb, dmgc, dosePerFrame,
                 sig_vel, sig_div, sig_acc,
@@ -151,7 +151,7 @@ int MotionFitProg::readMoreOptions(IOParser& parser, int argc, char *argv[])
     sig_div = textToFloat(parser.getOption("--s_div", "Divergence sigma [Angst]", "500.0"));
     sig_acc = textToFloat(parser.getOption("--s_acc", "Acceleration sigma [Angst/dose]", "-1.0"));
 
-    maxDistDiv = textToFloat(parser.getOption("--max_dist_div", "Ignore neighbors if they are further away than this [pixels]", "-1.0"));
+    expKer = parser.checkOption("--exp_k", "Use exponential kernel instead of sq. exponential");
 
     k_cutoff = textToFloat(parser.getOption("--k_cut", "Freq. cutoff (in pixels)", "-1.0"));
     maxIters = textToInteger(parser.getOption("--max_iters", "Maximum number of iterations", "10000"));
@@ -694,12 +694,6 @@ std::vector<std::vector<d2Vector>> MotionFitProg::optimize(
         sig_vel_px = eps;
     }
 
-    if (sig_acc_px < eps)
-    {
-        std::cerr << "Warning: sig_acc < " << eps << " px. Setting to " << eps << ".\n";
-        sig_acc_px = eps;
-    }
-
     if (sig_div_px < eps)
     {
         std::cerr << "Warning: sig_div < " << eps << " px. Setting to " << eps << ".\n";
@@ -714,7 +708,7 @@ std::vector<std::vector<d2Vector>> MotionFitProg::optimize(
 
     GpMotionFit gpmf(movieCC, sig_vel_px, sig_div_px, sig_acc_px,
                      pc, positions,
-                     globComp, nr_omp_threads);
+                     globComp, nr_omp_threads, expKer);
 
 
     std::vector<double> initialCoeffs(2*(pc + pc*(fc-1)));

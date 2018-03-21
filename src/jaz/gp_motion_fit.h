@@ -16,7 +16,7 @@ class GpMotionFit : public DifferentiableOptimization
                 int maxDims,
                 const std::vector<gravis::d2Vector>& positions,
                 const std::vector<gravis::d2Vector>& perFrameOffsets,
-                int threads);
+                int threads, bool expKer);
 
         double f(const std::vector<double>& x) const;
         void grad(const std::vector<double>& x, std::vector<double>& gradDest) const;
@@ -29,6 +29,7 @@ class GpMotionFit : public DifferentiableOptimization
 
     private:
 
+        bool expKer;
         int pc, fc, dc, threads;
         double sig_vel_px, sig_div_px, sig_acc_px;
 
