@@ -30,7 +30,7 @@
 #include <src/jaz/refinement_program.h>
 #include <src/jaz/damage_helper.h>
 #include <src/jaz/fsc_helper.h>
-#include <src/jaz/local_motion_fit.h>
+#include <src/jaz/gp_motion_fit.h>
 #include <src/jaz/gradient_descent.h>
 #include <src/jaz/distribution_helper.h>
 #include <src/jaz/parallel_ft.h>
@@ -95,12 +95,12 @@ class MotionFitProg : public RefinementProgram
                 std::vector<double>& accWgh,
                 std::vector<std::vector<std::vector<double>>>& divWgh);
 
-        std::vector<std::vector<d2Vector>> optimize(
-                const std::vector<std::vector<Image<RFLOAT>>>& movieCC,
+        std::vector<std::vector<d2Vector>> optimize(const std::vector<std::vector<Image<RFLOAT>>>& movieCC,
                 const std::vector<std::vector<d2Vector>>& inTracks,
-                const std::vector<double>& velWgh,
-                const std::vector<double>& accWgh,
-                const std::vector<std::vector<std::vector<double>>>& divWgh,
+                double sig_vel_px,
+                double sig_acc_px,
+                double sig_div_px,
+                const std::vector<d2Vector>& positions,
                 const std::vector<d2Vector>& globComp,
                 double step, double minStep, double minDiff,
                 long maxIters, double inertia);
@@ -117,19 +117,6 @@ class MotionFitProg : public RefinementProgram
                 const std::vector<d2Vector>& positions,
                 std::string outPath, std::string mgIndex,
                 double visScale);
-
-        /*void writeParamEstOutput(
-                const std::vector<std::vector<double>>& paramTsc,
-                const std::vector<double>& bestV,
-                const std::vector<double>& bestD,
-                const std::vector<int>& cumulPartCount,
-                const std::vector<std::string>& paramTags,
-                std::string outPath, std::string mgIndex);*/
-
-        /*d2Vector optimalParams(
-                const std::vector<double>& paramTsc,
-                const std::vector<double>& sig_v_vals,
-                const std::vector<double>& sig_d_vals);*/
 
         d2Vector interpolateMax(
                 const std::vector<d2Vector>& all_sig_vals,
@@ -161,8 +148,8 @@ int MotionFitProg::readMoreOptions(IOParser& parser, int argc, char *argv[])
     dosePerFrame = textToFloat(parser.getOption("--fdose", "Electron dose per frame (in e^-/A^2)", "1"));
 
     sig_vel = textToFloat(parser.getOption("--s_vel", "Velocity sigma [Angst/dose]", "1.6"));
-    sig_div = textToFloat(parser.getOption("--s_div", "Divergence sigma [Angst/(sqrt(Angst)*dose)]", "0.067"));
-    sig_acc = textToFloat(parser.getOption("--s_acc", "Acceleration sigma [Angst]", "-1.0"));
+    sig_div = textToFloat(parser.getOption("--s_div", "Divergence sigma [Angst]", "500.0"));
+    sig_acc = textToFloat(parser.getOption("--s_acc", "Acceleration sigma [Angst/dose]", "-1.0"));
 
     maxDistDiv = textToFloat(parser.getOption("--max_dist_div", "Ignore neighbors if they are further away than this [pixels]", "-1.0"));
 
@@ -397,11 +384,17 @@ void MotionFitProg::estimateMotion(
 
         std::cout << "    optimizing...\n";
 
-        computeWeights(sig_vel_nrm, sig_acc_nrm, sig_div_nrm,
+        /*computeWeights(sig_vel_nrm, sig_acc_nrm, sig_div_nrm,
                        positions, fc, velWgh, accWgh, divWgh);
 
         std::vector<std::vector<gravis::d2Vector>> tracks = optimize(
                 movieCC, initialTracks, velWgh, accWgh, divWgh, globComp,
+                maxStep, 1e-9, 1e-9, maxIters, 0.0);*/
+
+        std::vector<std::vector<gravis::d2Vector>> tracks = optimize(
+                movieCC, initialTracks,
+                sig_vel_nrm, sig_acc_nrm, sig_div_nrm,
+                positions, globComp,
                 maxStep, 1e-9, 1e-9, maxIters, 0.0);
 
         updateFCC(movie, tracks, mdts[g], tables, weights0, weights1);
@@ -442,134 +435,6 @@ void MotionFitProg::estimateMotion(
     std::cout << "total: " << total << "\n";
 
 }
-
-/*void MotionFitProg::estimateParams_old(
-        std::vector<ParFourierTransformer>& fts,
-        const std::vector<Image<double>>& dmgWeight,
-        int k_out)
-{
-    const double sig_vel_nrm = dosePerFrame * sig_vel / angpix;
-    const double sig_acc_nrm = dosePerFrame * sig_acc / angpix;
-    const double sig_div_nrm = dosePerFrame * sqrt(coords_angpix) * sig_div / angpix;
-
-    // initialize parameter-estimation:
-    const int paramCount = 9;
-    int pctot = 0;
-
-    std::vector<double> sig_v_vals(paramCount), sig_d_vals(paramCount);
-    std::vector<double> sig_v_vals_nrm(paramCount), sig_d_vals_nrm(paramCount);
-    std::vector<std::string> paramTags(paramCount);
-
-    std::vector<std::vector<double>> allParamTsc(paramCount);
-    std::vector<double> paramTsc(paramCount);
-    std::vector<double> bestV(0), bestD(0);
-
-    for (int i = 0; i < paramCount; i++)
-    {
-        const double dv = ((i%3)-1) * param_rV;
-        const double dd = ((i/3)-1) * param_rD;
-
-        sig_v_vals[i] = sig_vel * (1.0 + dv);
-        sig_d_vals[i] = sig_div * (1.0 + dd);
-        sig_v_vals_nrm[i] = sig_vel_nrm * (1.0 + dv);
-        sig_d_vals_nrm[i] = sig_div_nrm * (1.0 + dd);
-
-        std::stringstream sts;
-        sts << "v" << sig_v_vals[i] << "-d" << sig_d_vals[i];
-
-        paramTags[i] = sts.str();
-
-        allParamTsc[i] = std::vector<double>(0);
-    }
-
-    std::vector<std::vector<Image<RFLOAT>>>
-        paramTables(paramCount), paramWeights0(paramCount), paramWeights1(paramCount);
-
-    std::vector<int> cumulPartCount(0);
-
-    for (int i = 0; i < paramCount; i++)
-    {
-        paramTables[i] = std::vector<Image<RFLOAT>>(nr_omp_threads);
-        paramWeights0[i] = std::vector<Image<RFLOAT>>(nr_omp_threads);
-        paramWeights1[i] = std::vector<Image<RFLOAT>>(nr_omp_threads);
-
-        for (int j = 0; j < nr_omp_threads; j++)
-        {
-            FscHelper::initFscTable(sh, fc, paramTables[i][j],
-                paramWeights0[i][j], paramWeights1[i][j]);
-        }
-    }
-
-    for (long g = g0; g <= gc; g++)
-    {
-        std::cout << "micrograph " << (g+1) << " / " << mdts.size() <<"\n";
-
-        std::stringstream stsg;
-        stsg << g;
-
-        std::vector<std::vector<Image<Complex>>> movie;
-        std::vector<std::vector<Image<RFLOAT>>> movieCC;
-        std::vector<d2Vector> positions;
-        std::vector<std::vector<d2Vector>> initialTracks;
-        std::vector<d2Vector> globComp;
-
-        try
-        {
-            prepMicrograph(
-                g, fts, dmgWeight,
-                movie, movieCC, positions, initialTracks, globComp);
-        }
-        catch (RelionError XE)
-        {
-            std::cerr << "warning: unable to load micrograph #" << (g+1) << "\n";
-            continue;
-        }
-
-        const int pc = movie.size();
-        pctot += pc;
-
-        std::vector<double> velWgh, accWgh;
-        std::vector<std::vector<std::vector<double>>> divWgh;
-
-        std::cout << "    optimizing...\n";
-
-        for (int i = 0; i < paramCount; i++)
-        {
-            if (debug)
-            {
-                std::cout << "        optimizing: sig_vel = " << sig_v_vals[i] << " px\n";
-                std::cout << "                    sig_div = " << sig_d_vals[i] << " px^(1/2)\n";
-            }
-
-            computeWeights(sig_v_vals_nrm[i], sig_acc_nrm, sig_d_vals_nrm[i],
-                           positions, fc, velWgh, accWgh, divWgh);
-
-            std::vector<std::vector<gravis::d2Vector>> tracks = optimize(
-                    movieCC, initialTracks, velWgh, accWgh, divWgh, globComp,
-                    maxStep, 1e-9, 1e-9, maxIters, 0.0);
-
-            updateFCC(movie, tracks, mdts[g], paramTables[i], paramWeights0[i], paramWeights1[i]);
-
-            double tsc = FscHelper::computeTsc(
-                paramTables[i], paramWeights0[i], paramWeights1[i], k_cutoff+2, k_out);
-
-            paramTsc[i] = tsc;
-            allParamTsc[i].push_back(tsc);
-        }
-
-        cumulPartCount.push_back(pctot);
-
-        d2Vector optPar = optimalParams(paramTsc, sig_v_vals, sig_d_vals);
-
-        bestV.push_back(optPar[0]);
-        bestD.push_back(optPar[1]);
-
-        writeParamEstOutput(allParamTsc, bestV, bestD,
-                cumulPartCount, paramTags, outPath, stsg.str());
-
-    } // micrographs
-}
-*/
 
 d2Vector MotionFitProg::estimateParams(
         std::vector<ParFourierTransformer>& fts,
@@ -788,9 +653,6 @@ void MotionFitProg::evaluateParams(
             continue;
         }
 
-        std::vector<double> velWgh, accWgh;
-        std::vector<std::vector<std::vector<double>>> divWgh;
-
         for (int i = 0; i < paramCount; i++)
         {
             if (debug)
@@ -798,12 +660,10 @@ void MotionFitProg::evaluateParams(
                 std::cout << "        evaluating: " << sig_vals[i] << "\n";
             }
 
-            computeWeights(sig_v_vals_nrm[i], sig_acc_nrm, sig_d_vals_nrm[i],
-                           positions, fc, velWgh, accWgh, divWgh);
-
             std::vector<std::vector<gravis::d2Vector>> tracks = optimize(
-                    movieCC, initialTracks, velWgh, accWgh, divWgh, globComp,
-                    maxStep, 1e-9, 1e-9, maxIters, 0.0);
+                    movieCC, initialTracks,
+                    sig_v_vals_nrm[i], sig_acc_nrm, sig_d_vals_nrm[i],
+                    positions, globComp, maxStep, 1e-9, 1e-9, maxIters, 0.0);
 
             updateFCC(movie, tracks, mdts[g], paramTables[i], paramWeights0[i], paramWeights1[i]);
         }
@@ -817,51 +677,11 @@ void MotionFitProg::evaluateParams(
     }
 }
 
-void MotionFitProg::computeWeights(
-        double sig_vel_nrm, double sig_acc_nrm, double sig_div_nrm,
-        const std::vector<d2Vector> &positions, int fc,
-        std::vector<double> &velWgh,
-        std::vector<double> &accWgh,
-        std::vector<std::vector<std::vector<double> > > &divWgh)
-{
-    const int pc = positions.size();
-
-    velWgh = std::vector<double>(fc-1, sig_vel_nrm > 0.0? 0.5/(sig_vel_nrm*sig_vel_nrm) : 0.0);
-    accWgh = std::vector<double>(fc-1, sig_acc > 0.0? 0.5/(sig_acc_nrm*sig_acc_nrm) : 0.0);
-    divWgh = std::vector<std::vector<std::vector<double>>>(fc-1);
-
-    for (int f = 0; f < fc-1; f++)
-    {
-        divWgh[f] = std::vector<std::vector<double>>(pc);
-
-        for (int p = 0; p < pc; p++)
-        {
-            divWgh[f][p] = std::vector<double>(pc);
-
-            for (int q = 0; q < pc; q++)
-            {
-                d2Vector dp = positions[p] - positions[q];
-                double dist = sqrt(dp.x*dp.x + dp.y*dp.y);
-
-                if (sig_div_nrm <= 0.0 || q == p || (maxDistDiv >= 0.0 && dist > maxDistDiv))
-                {
-                    divWgh[f][p][q] = 0.0;
-                }
-                else
-                {
-                    divWgh[f][p][q] = 0.5 / (sig_div_nrm * sig_div_nrm * dist);
-                }
-            }
-        }
-    }
-}
-
 std::vector<std::vector<d2Vector>> MotionFitProg::optimize(
         const std::vector<std::vector<Image<RFLOAT>>>& movieCC,
         const std::vector<std::vector<d2Vector>>& inTracks,
-        const std::vector<double>& velWgh,
-        const std::vector<double>& accWgh,
-        const std::vector<std::vector<std::vector<double>>>& divWgh,
+        double sig_vel_px, double sig_acc_px, double sig_div_px,
+        const std::vector<d2Vector>& positions,
         const std::vector<d2Vector>& globComp,
         double step, double minStep, double minDiff,
         long maxIters, double inertia)
@@ -872,34 +692,20 @@ std::vector<std::vector<d2Vector>> MotionFitProg::optimize(
 
     const int fc = inTracks[0].size();
 
-    LocalMotionFit lmf(movieCC, velWgh, accWgh, divWgh, globComp, nr_omp_threads);
+    GpMotionFit gpmf(movieCC, sig_vel_px, sig_div_px, sig_acc_px,
+                     pc, positions,
+                     globComp, nr_omp_threads);
 
-    std::vector<double> initial(2*pc*fc);
 
-    for (int p = 0; p < pc; p++)
-    {
-        for (int f = 0; f < fc; f++)
-        {
-            initial[2*(p*fc + f)]     = inTracks[p][f].x;
-            initial[2*(p*fc + f) + 1] = inTracks[p][f].y;
-        }
-    }
+    std::vector<double> initialCoeffs(2*(pc + pc*(fc-1)));
+
+    gpmf.posToParams(inTracks, initialCoeffs);
 
     std::vector<double> optPos = GradientDescent::optimize(
-        initial, lmf, step, minStep, minDiff, maxIters, inertia, debugOpt);
+            initialCoeffs, gpmf, step, minStep, minDiff, maxIters, inertia, debugOpt);
 
-    std::vector<std::vector<d2Vector>> out(pc);
-
-    for (int p = 0; p < pc; p++)
-    {
-        out[p] = std::vector<d2Vector>(fc);
-
-        for (int f = 0; f < fc; f++)
-        {
-            out[p][f].x = optPos[2*(p*fc + f)] + globComp[f].x;
-            out[p][f].y = optPos[2*(p*fc + f) + 1] + globComp[f].y;
-        }
-    }
+    std::vector<std::vector<d2Vector>> out(pc, std::vector<d2Vector>(fc));
+    gpmf.paramsToPos(optPos, out);
 
     return out;
 }
@@ -1076,131 +882,3 @@ d2Vector MotionFitProg::interpolateMax(
 
     return min;
 }
-
-/*void MotionFitProg::writeParamEstOutput(
-    const std::vector<std::vector<double>>& allParamTsc,
-    const std::vector<double>& bestV,
-    const std::vector<double>& bestD,
-    const std::vector<int>& cumulPartCount,
-    const std::vector<std::string>& paramTags,
-    std::string outPath, std::string mgIndex)
-{
-    const int parCt = allParamTsc.size();
-    const int sc = allParamTsc[0].size();
-
-    for (int p = 0; p < parCt; p++)
-    {
-        std::ofstream outTsc(outPath + "_mg" + mgIndex + "_TSC_" + paramTags[p] + ".dat");
-        std::ofstream outTscRel(outPath + "_mg" + mgIndex + "_TSC-rel_" + paramTags[p] + ".dat");
-
-        for (int s = 0; s < sc; s++)
-        {
-            outTsc << cumulPartCount[s] << " " << allParamTsc[p][s] << "\n";
-
-            if (allParamTsc[4][s] > 0.0)
-            {
-                outTscRel << cumulPartCount[s] << " " << allParamTsc[p][s]/allParamTsc[4][s] << "\n";
-            }
-        }
-    }
-
-    std::ofstream outV(outPath + "_mg" + mgIndex + "_best_sigma_v.dat");
-    std::ofstream outD(outPath + "_mg" + mgIndex + "_best_sigma_d.dat");
-
-    for (int s = 0; s < sc; s++)
-    {
-        outV << cumulPartCount[s] << " " << bestV[s] << "\n";
-        outD << cumulPartCount[s] << " " << bestD[s] << "\n";
-    }
-}*/
-
-/*d2Vector MotionFitProg::optimalParams(
-    const std::vector<double>& paramTsc,
-    const std::vector<double>& sig_v_vals,
-    const std::vector<double>& sig_d_vals)
-{
-    const int parCt = paramTsc.size();
-
-    Matrix2D<RFLOAT> A(parCt,6);
-    Matrix1D<RFLOAT> b(parCt);
-
-    int bestP = 0;
-    double bestTsc = paramTsc[0];
-
-    for (int p = 0; p < parCt; p++)
-    {
-        if (paramTsc[p] > bestTsc)
-        {
-            bestTsc = paramTsc[p];
-            bestP = p;
-        }
-    }
-
-    if (bestP != 4)
-    {
-
-        return d2Vector(sig_v_vals[bestP], sig_d_vals[bestP]);
-    }
-
-    for (int p = 0; p < parCt; p++)
-    {
-        const double v = sig_v_vals[p];
-        const double d = sig_d_vals[p];
-
-        A(p,0) = v*v;
-        A(p,1) = 2.0*v*d;
-        A(p,2) = 2.0*v;
-        A(p,3) = d*d;
-        A(p,4) = 2.0*d;
-        A(p,5) = 1.0;
-
-        b(p) = paramTsc[p];
-    }
-
-    const double tol = 1e-20;
-    Matrix1D<RFLOAT> x(6);
-    solve(A, b, x, tol);
-
-    d2Matrix C2(x(0), x(1),
-                x(1), x(3));
-
-    d2Vector l(x(2), x(4));
-
-    double Cd[2][2];
-
-    Cd[0][0] = (double)x(0);
-    Cd[0][1] = (double)x(1);
-    Cd[1][0] = (double)x(1);
-    Cd[1][1] = (double)x(3);
-
-    double eigVal0, eigVal1;
-    d2Vector eigVec0;
-
-    dsyev2(x(0), x(1), x(3), &eigVal0, &eigVal1, &eigVec0.x, &eigVec0.y);
-
-    d2Vector eigVec1(eigVec0.y, -eigVec0.x);
-
-    if (eigVal0 < 0.0 && eigVal1 < 0.0)
-    {
-        if (debug)
-        {
-            std::cout << "negative curvature.\n";
-        }
-
-        d2Matrix C2i = C2;
-        C2i.invert();
-
-        d2Vector min = -(C2i * l);
-
-        return min;
-    }
-    else if (eigVal0 > 0.0 && eigVal1 <= 0.0)
-    {
-        if (debug)
-        {
-            std::cout << "mixed curvature.\n";
-        }
-
-        double m0 = l.dot(eigVec0);
-    }
-}*/
