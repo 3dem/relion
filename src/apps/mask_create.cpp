@@ -50,7 +50,7 @@ class mask_create_parameters
 		int create_section = parser.addSection("Mask creation options");
 		fn_thr = parser.getOption("--i", "Input map to use for thresholding to generate initial binary mask","");
 		fn_omask = parser.getOption("--o", "Output mask","mask.mrc");
-	
+
 		fn_and = parser.getOption("--and", "Pixels in the initial mask will be one if the input AND this map are above the --ini_threshold value","");
 		fn_or = parser.getOption("--or", "Pixels in the initial mask will be one if the input OR this map are above the --ini_threshold value","");
 		fn_andnot = parser.getOption("--and_not", "Pixels in the initial mask will be one if the input is above the --ini_threshold AND this map is below it","");
@@ -169,8 +169,6 @@ class mask_create_parameters
 int main(int argc, char *argv[])
 {
 	mask_create_parameters prm;
-	
-   PRINT_VERSION_INFO();
 
 	try
     {
