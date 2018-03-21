@@ -802,7 +802,7 @@ void MotioncorrRunner::plotShifts(FileName fn_mic, Micrograph &mic)
 
  	CDataSet dataSet;
 	dataSet.SetDrawMarker(false);
-	dataSet.SetDatasetColor(0.0,0.0,0.0);
+	dataSet.SetDatasetColor(0.0,0.0,1.0);
 	RFLOAT xshift, yshift;
 	// UNBLUR does not provide local trajectories, so start the global trajectory from the origin.
 	const RFLOAT xcenter = (!do_unblur) ? mic.getWidth() / 2.0 : 0;
