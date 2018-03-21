@@ -31,7 +31,6 @@ void Reconstructor::read(int argc, char **argv)
     angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms)", "1"));
     maxres = textToFloat(parser.getOption("--maxres", "Maximum resolution (in Angstrom) to consider in Fourier space (default Nyquist)", "-1"));
     padding_factor = textToFloat(parser.getOption("--pad", "Padding factor", "2"));
-    nr_omp_threads = textToInteger(parser.getOption("--j", "Number of (open-mp) threads to use. Memory footprint is multiplied by this value.", "1"));
     image_path = parser.getOption("--img", "Optional: image path prefix", "");
     subset = textToInteger(parser.getOption("--subset", "Subset of images to consider (1: only reconstruct half1; 2: only half2; other: reconstruct all)", "-1"));
 
@@ -588,7 +587,7 @@ void Reconstructor::reconstruct()
     	std::cout << " + Starting the reconstruction ..." << std::endl;
     backprojector.symmetrise(nr_helical_asu, helical_twist, helical_rise/angpix);
     backprojector.reconstruct(vol(), iter, do_map, 1., dummy, dummy, dummy, dummy,
-                              fsc, 1., do_use_fsc, true, nr_omp_threads, -1, false);
+                              fsc, 1., do_use_fsc, true, 1, -1, false);
 
 
     if (do_reconstruct_ctf)

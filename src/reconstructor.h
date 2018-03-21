@@ -40,7 +40,7 @@ public:
     MetaDataTable DF;
 
     int r_max, r_min_nn, blob_order, ref_dim, interpolator, iter,
-        nr_omp_threads, debug_ori_size, debug_size,
+        debug_ori_size, debug_size,
         ctf_dim, nr_helical_asu, newbox, width_mask_edge, nr_sectors, subset,
 		data_dim, mysize, verb;
 
