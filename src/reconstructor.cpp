@@ -31,7 +31,6 @@ void Reconstructor::read(int argc, char **argv)
     angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms)", "1"));
     maxres = textToFloat(parser.getOption("--maxres", "Maximum resolution (in Angstrom) to consider in Fourier space (default Nyquist)", "-1"));
     padding_factor = textToFloat(parser.getOption("--pad", "Padding factor", "2"));
-    nr_omp_threads = textToInteger(parser.getOption("--j", "Number of (open-mp) threads to use. Memory footprint is multiplied by this value.", "1"));
     image_path = parser.getOption("--img", "Optional: image path prefix", "");
     subset = textToInteger(parser.getOption("--subset", "Subset of images to consider (1: only reconstruct half1; 2: only half2; other: reconstruct all)", "-1"));
 
@@ -48,7 +47,7 @@ void Reconstructor::read(int argc, char **argv)
     do_ewald = parser.checkOption("--ewald", "Correct for Ewald-sphere curvature (developmental)");
     mask_diameter  = textToFloat(parser.getOption("--mask_diameter", "Diameter (in A) of mask for Ewald-sphere curvature correction", "-1."));
     width_mask_edge = textToInteger(parser.getOption("--width_mask_edge", "Width (in pixels) of the soft edge on the mask", "3"));
-    is_positive = !parser.checkOption("--reverse_curvature", "Try curvature the other way around");
+    is_reverse = parser.checkOption("--reverse_curvature", "Try curvature the other way around");
     newbox = textToInteger(parser.getOption("--newbox", "Box size of reconstruction after Ewald sphere correction", "-1"));
     nr_sectors = textToInteger(parser.getOption("--sectors", "Number of sectors for Ewald sphere correction", "2"));
 
@@ -588,7 +587,7 @@ void Reconstructor::reconstruct()
     	std::cout << " + Starting the reconstruction ..." << std::endl;
     backprojector.symmetrise(nr_helical_asu, helical_twist, helical_rise/angpix);
     backprojector.reconstruct(vol(), iter, do_map, 1., dummy, dummy, dummy, dummy,
-                              fsc, 1., do_use_fsc, true, nr_omp_threads, -1, false);
+                              fsc, 1., do_use_fsc, true, 1, -1, false);
 
 
     if (do_reconstruct_ctf)
@@ -651,7 +650,7 @@ void Reconstructor::applyCTFPandCTFQ(MultidimArray<Complex> &Fin, CTF &ctf, Four
         // Two passes: one for CTFP, one for CTFQ
         for (int ipass = 0; ipass < 2; ipass++)
         {
-            bool is_my_positive = (ipass == 1) ? is_positive : !is_positive;
+            bool is_my_positive = (ipass == 1) ? is_reverse : !is_reverse;
 
             // Get CTFP and multiply the Fapp with it
             ctf.getCTFPImage(CTFP, YSIZE(Fin), YSIZE(Fin), angpix, is_my_positive, angle);

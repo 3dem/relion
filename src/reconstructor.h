@@ -40,7 +40,7 @@ public:
     MetaDataTable DF;
 
     int r_max, r_min_nn, blob_order, ref_dim, interpolator, iter,
-        nr_omp_threads, debug_ori_size, debug_size,
+        debug_ori_size, debug_size,
         ctf_dim, nr_helical_asu, newbox, width_mask_edge, nr_sectors, subset,
 		data_dim, mysize, verb;
 
@@ -51,7 +51,7 @@ public:
     bool do_ctf, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak,
         do_fom_weighting, do_3d_rot, do_reconstruct_ctf, do_beamtilt, cl_beamtilt, do_ewald;
 
-    bool skip_gridding, do_reconstruct_ctf2, do_reconstruct_meas, is_positive, read_weights;
+    bool skip_gridding, do_reconstruct_ctf2, do_reconstruct_meas, is_reverse, read_weights;
 
     float padding_factor, mask_diameter;
 

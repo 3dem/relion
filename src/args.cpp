@@ -144,6 +144,14 @@ void IOParser::setCommandLine(int _argc, char** _argv)
 {
 	argc = _argc;
 	argv = _argv;
+
+	// Print version of software and exit
+	if ( checkParameter(argc, argv, "--version"))
+	{
+		PRINT_VERSION_INFO();
+		exit(0);
+	}
+
 }
 
 void IOParser::addOption(std::string option, std::string usage, std::string defaultvalue, bool hidden)
@@ -380,6 +388,8 @@ void IOParser::writeUsage(std::ostream &out)
 		out << "====== " << section_names[section] << " ===== " << std::endl;
 		writeUsageOneSection(section, out);
 	}
+	out << std::setw(35) << "--version";
+	out << " : Print RELION version and exit" << std::endl;
 
 }
 
