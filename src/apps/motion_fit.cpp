@@ -686,6 +686,26 @@ std::vector<std::vector<d2Vector>> MotionFitProg::optimize(
         double step, double minStep, double minDiff,
         long maxIters, double inertia)
 {
+    const double eps = 1e-20;
+
+    if (sig_vel_px < eps)
+    {
+        std::cerr << "Warning: sig_vel < " << eps << " px. Setting to " << eps << ".\n";
+        sig_vel_px = eps;
+    }
+
+    if (sig_acc_px < eps)
+    {
+        std::cerr << "Warning: sig_acc < " << eps << " px. Setting to " << eps << ".\n";
+        sig_acc_px = eps;
+    }
+
+    if (sig_div_px < eps)
+    {
+        std::cerr << "Warning: sig_div < " << eps << " px. Setting to " << eps << ".\n";
+        sig_div_px = eps;
+    }
+
     const int pc = inTracks.size();
 
     if (pc == 0) return std::vector<std::vector<d2Vector>>(0);

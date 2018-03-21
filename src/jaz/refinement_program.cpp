@@ -120,13 +120,13 @@ int RefinementProgram::init(int argc, char *argv[])
 
         bool allGood = true;
 
-        if (movie_angpix <= 0 && corrMicFn == "")
+        if (doesMovies && movie_angpix <= 0 && corrMicFn == "")
         {
             std::cerr << "Movie pixel size (--mps) is required unless a corrected_micrographs.star (--corr_mic) is provided.\n";
             allGood = false;
         }
 
-        if (coords_angpix <= 0 && corrMicFn == "")
+        if (doesMovies && coords_angpix <= 0 && corrMicFn == "")
         {
             std::cerr << "Coordinates pixel size (--cps) is required unless a corrected_micrographs.star (--corr_mic) is provided.\n";
             allGood = false;
