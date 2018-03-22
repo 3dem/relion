@@ -25,8 +25,8 @@
 #include "src/matrix1d.h"
 
 enum MotionModelVersion {
-	MOTION_MODEL_NULL,
-	MOTION_MODEL_THIRD_ORDER_POLYNOMIAL,
+	MOTION_MODEL_NULL = 0,
+	MOTION_MODEL_THIRD_ORDER_POLYNOMIAL = 1,
 };
 
 class MotionModel

@@ -284,84 +284,88 @@ void Micrograph::setGlobalShift(int frame, RFLOAT shiftx, RFLOAT shifty)
 
 void Micrograph::read(FileName fn_in)
 {
-    if (model != NULL)
-    {
-        delete model;
-        model = NULL;
-    }
+	if (model != NULL)
+	{
+		delete model;
+		model = NULL;
+	}
 
-    // Clear current model
-    clearFields();
+	// Clear current model
+	clearFields();
 
-    // Open input file
-    std::ifstream in(fn_in.data(), std::ios_base::in);
-    if (in.fail()) {
-        REPORT_ERROR( (std::string) "MicrographModel::read: File " + fn_in + " cannot be read." );
-    }
+	// Open input file
+	std::ifstream in(fn_in.data(), std::ios_base::in);
+	if (in.fail()) {
+		REPORT_ERROR( (std::string) "MicrographModel::read: File " + fn_in + " cannot be read." );
+	}
 
-    MetaDataTable MDglobal;
+	MetaDataTable MDglobal;
 
-    // Read Image metadata
-    MDglobal.readStar(in, "general");
+	// Read Image metadata
+	MDglobal.readStar(in, "general");
 
-    if (!MDglobal.getValue(EMDL_IMAGE_SIZE_X, width) ||
-        !MDglobal.getValue(EMDL_IMAGE_SIZE_Y, height) ||
-        !MDglobal.getValue(EMDL_IMAGE_SIZE_Z, n_frames) ||
-        !MDglobal.getValue(EMDL_MICROGRAPH_MOVIE_NAME, fnMovie)) {
-        REPORT_ERROR("MicrographModel::read: insufficient general information");
-    }
+	if (!MDglobal.getValue(EMDL_IMAGE_SIZE_X, width) ||
+	    !MDglobal.getValue(EMDL_IMAGE_SIZE_Y, height) ||
+	    !MDglobal.getValue(EMDL_IMAGE_SIZE_Z, n_frames) ||
+	    !MDglobal.getValue(EMDL_MICROGRAPH_MOVIE_NAME, fnMovie)) {
+		REPORT_ERROR("MicrographModel::read: insufficient general information");
+	}
 
-    globalShiftX.resize(n_frames, NOT_OBSERVED);
-    globalShiftY.resize(n_frames, NOT_OBSERVED);
+	globalShiftX.resize(n_frames, NOT_OBSERVED);
+	globalShiftY.resize(n_frames, NOT_OBSERVED);
 
-    if (!MDglobal.getValue(EMDL_MICROGRAPH_GAIN_NAME, fnGain)) {
-        fnGain = "";
-    }
-    if (!MDglobal.getValue(EMDL_MICROGRAPH_BINNING, binning)) {
-        binning = 1.0;
-    }
-    if (!MDglobal.getValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, angpix)) {
-        angpix = -1;
-    }
-    if (!MDglobal.getValue(EMDL_MICROGRAPH_PRE_EXPOSURE, pre_exposure)) {
-        pre_exposure = -1;
-    }
-    if (!MDglobal.getValue(EMDL_MICROGRAPH_DOSE_RATE, dose_per_frame)) {
-        dose_per_frame = -1;
-    }
-    if (!MDglobal.getValue(EMDL_CTF_VOLTAGE, voltage)) {
-        voltage = -1;
-    }
-    if (!MDglobal.getValue(EMDL_MICROGRAPH_START_FRAME, first_frame)) {
-        first_frame = 1; // 1-indexed
-    }
+	if (!MDglobal.getValue(EMDL_MICROGRAPH_GAIN_NAME, fnGain)) {
+		fnGain = "";
+	}
+	if (!MDglobal.getValue(EMDL_MICROGRAPH_BINNING, binning)) {
+		binning = 1.0;
+	}
+	if (!MDglobal.getValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, angpix)) {
+		angpix = -1;
+	}
+	if (!MDglobal.getValue(EMDL_MICROGRAPH_PRE_EXPOSURE, pre_exposure)) {
+		pre_exposure = -1;
+	}
+	if (!MDglobal.getValue(EMDL_MICROGRAPH_DOSE_RATE, dose_per_frame)) {
+		dose_per_frame = -1;
+	}
+	if (!MDglobal.getValue(EMDL_CTF_VOLTAGE, voltage)) {
+		voltage = -1;
+	}
+	if (!MDglobal.getValue(EMDL_MICROGRAPH_START_FRAME, first_frame)) {
+		first_frame = 1; // 1-indexed
+	}
 
-    int model_version;
-    if (MDglobal.getValue(EMDL_MICROGRAPH_MOTION_MODEL_VERSION, model_version)) {
-        if (model_version == MOTION_MODEL_THIRD_ORDER_POLYNOMIAL) {
-            model = new ThirdOrderPolynomialModel();
-        } else if (model_version == MOTION_MODEL_NULL) {
-            model = NULL;
-        } else {
-            std::cerr << "Warning: Ignoring unknown motion model " << model_version << std::endl;
-        }
-        model->read(in, "local_motion_model");
-    } else {
-        model = NULL;
-    }
+	int model_version;
+	model = NULL;
+	if (!MDglobal.getValue(EMDL_MICROGRAPH_MOTION_MODEL_VERSION, model_version)) {
+		if (model_version == MOTION_MODEL_THIRD_ORDER_POLYNOMIAL) {
+			model = new ThirdOrderPolynomialModel();
+		} else if (model_version == MOTION_MODEL_NULL) {
+			model = NULL;
+		} else {
+			std::cerr << "Warning: Ignoring unknown motion model " << model_version << std::endl;
+		}
+	} else {
+//		std::cerr << "Warning: local motion model is absent in the micrograph star file." << std::endl;
+	}
 
-    // Read global shifts
-    int frame;
-    RFLOAT shiftX, shiftY;
+	if (model != NULL) {
+		model->read(in, "local_motion_model");
+	}
 
-    MDglobal.readStar(in, "global_shift");
+	// Read global shifts
+	int frame;
+	RFLOAT shiftX, shiftY;
 
-    FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDglobal)
-    {
-        if (!MDglobal.getValue(EMDL_MICROGRAPH_FRAME_NUMBER, frame) ||
-            !MDglobal.getValue(EMDL_MICROGRAPH_SHIFT_X, shiftX) ||
-            !MDglobal.getValue(EMDL_MICROGRAPH_SHIFT_Y, shiftY)) {
-            REPORT_ERROR("MicrographModel::read: incorrect global_shift table");
+	MDglobal.readStar(in, "global_shift");
+
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDglobal)
+	{
+		if (!MDglobal.getValue(EMDL_MICROGRAPH_FRAME_NUMBER, frame) ||
+		    !MDglobal.getValue(EMDL_MICROGRAPH_SHIFT_X, shiftX) ||
+		    !MDglobal.getValue(EMDL_MICROGRAPH_SHIFT_Y, shiftY)) {
+			REPORT_ERROR("MicrographModel::read: incorrect global_shift table");
         }
 
         // frame is 1-indexed!
