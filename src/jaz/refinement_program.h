@@ -90,6 +90,8 @@ class RefinementProgram
                 int g, int pc, std::vector<ParFourierTransformer>& fts);
 
         void setForAll(EMDLabel label, RFLOAT value);
+
+        std::string getMicrographTag(int m);
 };
 
 #endif

@@ -71,8 +71,7 @@ class MotionFitProg : public RefinementProgram
 
         void estimateMotion(
                 std::vector<ParFourierTransformer>& fts,
-                const std::vector<Image<RFLOAT>>& dmgWeight,
-                int k_out);
+                const std::vector<Image<RFLOAT>>& dmgWeight);
 
         d2Vector estimateParams(
                 std::vector<ParFourierTransformer>& fts,
@@ -114,8 +113,11 @@ class MotionFitProg : public RefinementProgram
 
         void writeOutput(
                 const std::vector<std::vector<d2Vector>>& tracks,
+                const std::vector<Image<RFLOAT>>& fccData,
+                const std::vector<Image<RFLOAT>>& fccWeight0,
+                const std::vector<Image<RFLOAT>>& fccWeight1,
                 const std::vector<d2Vector>& positions,
-                std::string outPath, std::string mgIndex,
+                std::string outPath, int mg,
                 double visScale);
 
         d2Vector interpolateMax(
@@ -234,7 +236,7 @@ int MotionFitProg::_run()
     }
     else
     {
-        estimateMotion(fts, dmgWeight, k_out);
+        estimateMotion(fts, dmgWeight);
     }
 
 
@@ -330,8 +332,7 @@ void MotionFitProg::prepMicrograph(
 
 void MotionFitProg::estimateMotion(
         std::vector<ParFourierTransformer>& fts,
-        const std::vector<Image<double>>& dmgWeight,
-        int k_out)
+        const std::vector<Image<double>>& dmgWeight)
 {
     std::vector<Image<RFLOAT>>
             tables(nr_omp_threads),
@@ -343,6 +344,7 @@ void MotionFitProg::estimateMotion(
         FscHelper::initFscTable(sh, fc, tables[i], weights0[i], weights1[i]);
     }
 
+    // @TODO: remove sqrt(coords_angpix)!
     const double sig_vel_nrm = dosePerFrame * sig_vel / angpix;
     const double sig_acc_nrm = dosePerFrame * sig_acc / angpix;
     const double sig_div_nrm = dosePerFrame * sqrt(coords_angpix) * sig_div / angpix;
@@ -379,17 +381,7 @@ void MotionFitProg::estimateMotion(
         const int pc = movie.size();
         pctot += pc;
 
-        std::vector<double> velWgh, accWgh;
-        std::vector<std::vector<std::vector<double>>> divWgh;
-
         std::cout << "    optimizing...\n";
-
-        /*computeWeights(sig_vel_nrm, sig_acc_nrm, sig_div_nrm,
-                       positions, fc, velWgh, accWgh, divWgh);
-
-        std::vector<std::vector<gravis::d2Vector>> tracks = optimize(
-                movieCC, initialTracks, velWgh, accWgh, divWgh, globComp,
-                maxStep, 1e-9, 1e-9, maxIters, 0.0);*/
 
         std::vector<std::vector<gravis::d2Vector>> tracks = optimize(
                 movieCC, initialTracks,
@@ -399,11 +391,18 @@ void MotionFitProg::estimateMotion(
 
         updateFCC(movie, tracks, mdts[g], tables, weights0, weights1);
 
-        writeOutput(tracks, positions, outPath, stsg.str(), 30.0);
+        writeOutput(tracks, tables, weights0, weights1, positions, outPath, g, 30.0);
+
+        for (int i = 0; i < nr_omp_threads; i++)
+        {
+            tables[i].data.initZeros();
+            weights0[i].data.initZeros();
+            weights1[i].data.initZeros();
+        }
 
     } // micrographs
 
-    Image<RFLOAT> table, weight;
+    /*Image<RFLOAT> table, weight;
 
     FscHelper::mergeFscTables(tables, weights0, weights1, table, weight);
     ImageLog::write(table, outPath+"_FCC_data");
@@ -432,7 +431,7 @@ void MotionFitProg::estimateMotion(
 
     total /= f_max;
 
-    std::cout << "total: " << total << "\n";
+    std::cout << "total: " << total << "\n";*/
 
 }
 
@@ -767,8 +766,11 @@ void MotionFitProg::updateFCC(
 
 void MotionFitProg::writeOutput(
         const std::vector<std::vector<d2Vector>>& tracks,
+        const std::vector<Image<RFLOAT>>& fccData,
+        const std::vector<Image<RFLOAT>>& fccWeight0,
+        const std::vector<Image<RFLOAT>>& fccWeight1,
         const std::vector<d2Vector>& positions,
-        std::string outPath, std::string mgIndex,
+        std::string outPath, int mg,
         double visScale)
 {
     const int pc = tracks.size();
@@ -776,6 +778,33 @@ void MotionFitProg::writeOutput(
     if (pc == 0) return;
 
     const int fc = tracks[0].size();
+
+    std::string tag = getMicrographTag(mg);
+    MotionRefinement::writeTracks(tracks, outPath + "/" + tag + "_tracks.star");
+
+    Image<RFLOAT> fccDataSum(sh,fc), fccWeight0Sum(sh,fc), fccWeight1Sum(sh,fc);
+    fccDataSum.data.initZeros();
+    fccWeight0Sum.data.initZeros();
+    fccWeight1Sum.data.initZeros();
+
+    for (int i = 0; i < fccData.size(); i++)
+    {
+        for (int y = 0; y < fc; y++)
+        for (int x = 0; x < sh; x++)
+        {
+            fccDataSum(y,x) += fccData[i](y,x);
+            fccWeight0Sum(y,x) += fccWeight0[i](y,x);
+            fccWeight1Sum(y,x) += fccWeight1[i](y,x);
+        }
+    }
+
+    fccDataSum.write(outPath + "/" + tag + "_FCC_cc.mrc");
+    fccWeight0Sum.write(outPath + "/" + tag + "_FCC_w0.mrc");
+    fccWeight1Sum.write(outPath + "/" + tag + "_FCC_w1.mrc");
+
+    if (!diag) return;
+
+    // plot graphs here:
 
     std::vector<std::vector<gravis::d2Vector>>
             centTracks(pc), visTracks(pc), centVisTracks(pc);
@@ -807,9 +836,9 @@ void MotionFitProg::writeOutput(
         }
     }
 
-    std::ofstream rawOut(outPath + "_mg" + mgIndex + "_tracks.dat");
-    std::ofstream visOut(outPath + "_mg" + mgIndex + "_visTracks.dat");
-    std::ofstream visOut15(outPath + "_mg" + mgIndex + "_visTracks_first15.dat");
+    std::ofstream rawOut(outPath + "/" + tag + "_tracks.dat");
+    std::ofstream visOut(outPath + "/" + tag + "_visTracks.dat");
+    std::ofstream visOut15(outPath + "/" + tag + "_visTracks_first15.dat");
 
     for (int p = 0; p < pc; p++)
     {
@@ -830,7 +859,7 @@ void MotionFitProg::writeOutput(
         visOut15 << "\n";
     }
 
-    std::ofstream glbOut(outPath + "_mg" + mgIndex + "_globTrack.dat");
+    std::ofstream glbOut(outPath + "/" + tag + "_globTrack.dat");
 
     for (int f = 0; f < fc; f++)
     {

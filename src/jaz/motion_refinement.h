@@ -109,6 +109,13 @@ class MotionRefinement
                 std::string fn,
                 int pc, int fc);
 
+        static void writeTracks(
+                const std::vector<std::vector<gravis::d2Vector>>& tracks,
+                std::string fn);
+
+        static std::vector<std::vector<gravis::d2Vector>> readTracks(
+                std::string fn);
+
         static gravis::d3Vector measureValueScaleReal(
                 const Image<Complex>& obs,
                 const Image<Complex>& ref);

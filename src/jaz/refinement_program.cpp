@@ -591,3 +591,13 @@ void RefinementProgram::setForAll(EMDLabel label, double value)
         mdt0.setValue(label, value, i);
     }
 }
+
+std::string RefinementProgram::getMicrographTag(int m)
+{
+    std::string tag;
+    mdts[m].getValue(EMDL_IMAGE_NAME, tag, 0);
+    tag = tag.substr(0,tag.find_last_of('.'));
+    tag = tag.substr(tag.find_first_of('@')+1);
+
+    return tag;
+}

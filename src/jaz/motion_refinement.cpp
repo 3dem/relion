@@ -654,6 +654,95 @@ std::vector<std::vector<d2Vector>> MotionRefinement::readTrack(std::string fn, i
     return shift;
 }
 
+void MotionRefinement::writeTracks(
+    const std::vector<std::vector<d2Vector>>& tracks,
+    std::string fn)
+{
+    const int pc = tracks.size();
+    const int fc = tracks[0].size();
+
+    std::string path = fn.substr(0, fn.find_last_of('/'));
+    mktree(path);
+
+    std::ofstream ofs(fn);
+    MetaDataTable mdt;
+
+    mdt.setName("general");
+    mdt.setIsList(true);
+    mdt.addObject();
+    mdt.setValue(EMDL_PARTICLE_NUMBER, pc);
+
+    mdt.write(ofs);
+    mdt.clear();
+
+    for (int p = 0; p < pc; p++)
+    {
+        std::stringstream sts;
+        sts << p;
+        mdt.setName(sts.str());
+
+        for (int f = 0; f < fc; f++)
+        {
+            mdt.addObject();
+            mdt.setValue(EMDL_ORIENT_ORIGIN_X, tracks[p][f].x);
+            mdt.setValue(EMDL_ORIENT_ORIGIN_Y, tracks[p][f].y);
+        }
+
+        mdt.write(ofs);
+        mdt.clear();
+    }
+}
+
+std::vector<std::vector<d2Vector>> MotionRefinement::readTracks(std::string fn)
+{
+    std::ifstream ifs(fn);
+
+    if (ifs.fail())
+    {
+        REPORT_ERROR("MotionRefinement::readTracks: unable to read " + fn + ".");
+    }
+
+    MetaDataTable mdt;
+
+    mdt.readStar(ifs, "general");
+
+    int pc;
+
+    if (!mdt.getValue(EMDL_PARTICLE_NUMBER, pc))
+    {
+        REPORT_ERROR("MotionRefinement::readTracks: missing particle number in "+fn+".");
+    }
+
+    std::vector<std::vector<d2Vector>> out(pc);
+    int fc = 0, lastFc = 0;
+
+    for (int p = 0; p < pc; p++)
+    {
+        std::stringstream sts;
+        sts << p;
+        mdt.readStar(ifs, sts.str());
+
+        fc = mdt.numberOfObjects();
+
+        if (p > 0 && fc != lastFc)
+        {
+            REPORT_ERROR("MotionRefinement::readTracks: broken file: "+fn+".");
+        }
+
+        lastFc = fc;
+
+        out[p] = std::vector<d2Vector>(fc);
+
+        for (int f = 0; f < fc; f++)
+        {
+            mdt.getValue(EMDL_ORIENT_ORIGIN_X, out[p][f].x, f);
+            mdt.getValue(EMDL_ORIENT_ORIGIN_Y, out[p][f].y, f);
+        }
+    }
+
+    return out;
+}
+
 d3Vector MotionRefinement::measureValueScaleReal(
     const Image<Complex>& data,
     const Image<Complex>& ref)

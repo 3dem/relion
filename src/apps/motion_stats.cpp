@@ -45,16 +45,22 @@ int main(int argc, char *argv[])
         const int pc = mdts[m].numberOfObjects();
         tpc += pc;
 
-        std::string tfn = tracksPath + "_mg" + stsg.str() + "_tracks.dat";
+        std::string tag;
+        mdts[m].getValue(EMDL_IMAGE_NAME, tag, 0);
+        tag = tag.substr(0,tag.find_last_of('.'));
+        tag = tag.substr(tag.find_first_of('@')+1);
+
+        std::string tfn = tracksPath + "/" + tag + "_tracks.star";
+
         std::vector<std::vector<d2Vector>> shift;
 
         try
         {
-            shift = MotionRefinement::readTrack(tfn, pc, fc);
+            shift = MotionRefinement::readTracks(tfn);
         }
         catch (RelionError XE)
         {
-            std::cerr << "warning: error reading tracks in " << tfn << "\n";
+            std::cerr << "Warning: error reading tracks in " << tfn << "\n";
             continue;
         }
 
