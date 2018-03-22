@@ -335,6 +335,7 @@ void Micrograph::read(FileName fn_in)
 	}
 
 	int model_version;
+	model = NULL;
 	if (!MDglobal.getValue(EMDL_MICROGRAPH_MOTION_MODEL_VERSION, model_version)) {
 		if (model_version == MOTION_MODEL_THIRD_ORDER_POLYNOMIAL) {
 			model = new ThirdOrderPolynomialModel();
@@ -343,9 +344,12 @@ void Micrograph::read(FileName fn_in)
 		} else {
 			std::cerr << "Warning: Ignoring unknown motion model " << model_version << std::endl;
 		}
-		model->read(in, "local_motion_model");
 	} else {
-		model = NULL;
+//		std::cerr << "Warning: local motion model is absent in the micrograph star file." << std::endl;
+	}
+
+	if (model != NULL) {
+		model->read(in, "local_motion_model");
 	}
 
 	// Read global shifts
