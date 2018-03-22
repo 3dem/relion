@@ -498,6 +498,16 @@ void JobWindow::initialise(int my_job_type, bool _do_oldstyle)
 		myjob.initialise(my_job_type);
 		initialiseLocresWindow();
 	}
+	else if (my_job_type == PROC_MOTIONFIT)
+	{
+		myjob.initialise(my_job_type);
+		initialiseMotionfitWindow();
+	}
+	else if (my_job_type == PROC_CTFREFINE)
+	{
+		myjob.initialise(my_job_type);
+		initialiseCtfrefineWindow();
+	}
 	else
 	{
 		REPORT_ERROR("ERROR: unrecognised job-type to add to the GUI");
@@ -2239,6 +2249,119 @@ void JobWindow::initialiseLocresWindow()
 	guientries["do_relion_locres"].cb_menu_i();
 
 	tab3->end();
+
+}
+
+void JobWindow::initialiseMotionfitWindow()
+{
+	setupTabs(3);
+
+	tab1->begin();
+	tab1->label("I/O");
+	resetHeight();
+
+	// I/O
+	place("fn_mic", TOGGLE_DEACTIVATE);
+	place("fn_data", TOGGLE_DEACTIVATE);
+	place("fn_post", TOGGLE_DEACTIVATE);
+
+	tab1->end();
+
+	tab2->begin();
+	tab2->label("MotionFit");
+	resetHeight();
+
+	// motion_fit
+	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group1->end();
+	place("do_fit", TOGGLE_LEAVE_ACTIVE, group1);
+
+	group1->begin();
+
+	place("sigma_vel", TOGGLE_DEACTIVATE);
+	place("sigma_div", TOGGLE_DEACTIVATE);
+	place("max_iters", TOGGLE_DEACTIVATE);
+	place("dose_rate", TOGGLE_DEACTIVATE);
+	place("do_pad1", TOGGLE_DEACTIVATE);
+	place("other_motionfit_args");
+
+	group1->end();
+	guientries["do_fit"].cb_menu_i();
+
+	tab2->end();
+
+	tab3->begin();
+	tab3->label("Polish");
+	resetHeight();
+
+	//combine_frames
+	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group2->end();
+	place("do_combine", TOGGLE_LEAVE_ACTIVE, group2);
+
+	group2->begin();
+
+	place("minres", TOGGLE_DEACTIVATE);
+	place("maxres", TOGGLE_DEACTIVATE);
+	place("other_motionfit_args");
+
+	group2->end();
+	guientries["do_combine"].cb_menu_i();
+
+	tab3->end();
+
+}
+
+void JobWindow::initialiseCtfrefineWindow()
+{
+	setupTabs(2);
+
+	tab1->begin();
+	tab1->label("I/O");
+	resetHeight();
+
+	// I/O
+	place("fn_data", TOGGLE_DEACTIVATE);
+	place("fn_post", TOGGLE_DEACTIVATE);
+
+	tab1->end();
+
+	tab2->begin();
+	tab2->label("Fit");
+	resetHeight();
+
+	// motion_fit
+	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group1->end();
+	place("do_defocus", TOGGLE_LEAVE_ACTIVE, group1);
+
+	group1->begin();
+
+	place("range", TOGGLE_DEACTIVATE);
+	place("do_no_glob_astig", TOGGLE_DEACTIVATE);
+	place("do_astig", TOGGLE_DEACTIVATE);
+
+	group1->end();
+	guientries["do_defocus"].cb_menu_i();
+
+	current_y += STEPY /2 ;
+
+	// motion_fit
+	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group2->end();
+	place("do_tilt", TOGGLE_LEAVE_ACTIVE, group2);
+
+	group2->begin();
+
+	place("minres", TOGGLE_DEACTIVATE);
+
+	group2->end();
+
+	current_y += STEPY /2 ;
+
+	place("do_pad1", TOGGLE_DEACTIVATE);
+
+	tab2->end();
 
 }
 
