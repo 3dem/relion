@@ -336,7 +336,7 @@ void Micrograph::read(FileName fn_in)
 
 	int model_version;
 	model = NULL;
-	if (!MDglobal.getValue(EMDL_MICROGRAPH_MOTION_MODEL_VERSION, model_version)) {
+	if (MDglobal.getValue(EMDL_MICROGRAPH_MOTION_MODEL_VERSION, model_version)) {
 		if (model_version == MOTION_MODEL_THIRD_ORDER_POLYNOMIAL) {
 			model = new ThirdOrderPolynomialModel();
 		} else if (model_version == MOTION_MODEL_NULL) {
