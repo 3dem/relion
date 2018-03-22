@@ -18,6 +18,7 @@ class StackHelper
 
         typedef enum {BoxBin, GaussBin, FourierCrop} BinningType;
 
+        static std::vector<MetaDataTable> splitByMicrographName(const MetaDataTable* mdt);
         static std::vector<MetaDataTable> splitByStack(const MetaDataTable* mdt);
         static std::vector<Image<RFLOAT> > loadStack(const MetaDataTable* mdt, std::string path = "", int threads = 1);
         static std::vector<Image<Complex> > loadStackFS(const MetaDataTable* mdt, std::string path = "",
