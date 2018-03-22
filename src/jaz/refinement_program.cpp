@@ -52,7 +52,7 @@ int RefinementProgram::init(int argc, char *argv[])
         if (doesMovies)
         {            
             imgPath = parser.getOption("--mov", "Path to movies", "");
-            corrMicFn = parser.getOption("--corr_mic", "Path to corrected_micrographs.star", "");
+            corrMicFn = parser.getOption("--corr_mic", "List of uncorrected micrographs (e.g. corrected_micrographs.star)", "");
             preextracted = parser.checkOption("--preex", "Preextracted movie stacks");
             meta_path = parser.getOption("--meta", "Path to per-movie metadata star files", "");
             gain_path = parser.getOption("--gain_path", "Path to gain references", "");
@@ -364,7 +364,7 @@ int RefinementProgram::init(int argc, char *argv[])
     if (doesMovies && corrMicFn != "")
     {
         MetaDataTable corrMic;
-        corrMic.read(corrMicFn+"/corrected_micrographs.star");
+        corrMic.read(corrMicFn);
 
         mic2meta.clear();
 

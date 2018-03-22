@@ -135,6 +135,8 @@ int FrameRecomb::_run()
 
     std::vector<ParFourierTransformer> fts(nr_omp_threads);
 
+    MetaDataTable mdtAll;
+
     double t0 = omp_get_wtime();
 
     for (long g = g0; g <= gc; g++)
@@ -222,7 +224,18 @@ int FrameRecomb::_run()
             VtkHelper::writeTomoVTK(stack, imgName+".vtk");
         }
 
+        for (int p = 0; p < pc; p++)
+        {
+            std::stringstream sts;
+            sts << (p+1);
+            mdts[g].setValue(EMDL_IMAGE_NAME, sts.str() + "@" + imgName, p);
+        }
+
+        mdtAll.append(mdts[g]);
+
     } // micrographs
+
+    mdtAll.write(outPath + "/particles.star");
 
     double t1 = omp_get_wtime();
     double diff = t1 - t0;
