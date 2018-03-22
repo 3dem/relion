@@ -48,7 +48,8 @@ class MotionFitProg : public RefinementProgram
 
         MotionFitProg();
 
-            bool unregGlob, noGlobOff, paramEstim, debugOpt, diag, expKer;
+            bool unregGlob, noGlobOff, paramEstim,
+                debugOpt, diag, expKer, global_init;
             int maxIters;
             double dmga, dmgb, dmgc, dosePerFrame,
                 sig_vel, sig_div, sig_acc,
@@ -153,6 +154,8 @@ int MotionFitProg::readMoreOptions(IOParser& parser, int argc, char *argv[])
     sig_div = textToFloat(parser.getOption("--s_div", "Divergence sigma [Angst]", "500.0"));
     sig_acc = textToFloat(parser.getOption("--s_acc", "Acceleration sigma [Angst/dose]", "-1.0"));
 
+    global_init = parser.checkOption("--gi", "Initialize with global trajectories instead of loading them from metadata file");
+
     expKer = parser.checkOption("--exp_k", "Use exponential kernel instead of sq. exponential");
 
     k_cutoff = textToFloat(parser.getOption("--k_cut", "Freq. cutoff (in pixels)", "-1.0"));
@@ -174,8 +177,14 @@ int MotionFitProg::readMoreOptions(IOParser& parser, int argc, char *argv[])
 
     if (paramEstim && k_cutoff < 0)
     {
-        std::cerr << "Parameter estimation requires a freq. cutoff (--k_cut).\n";
+        std::cerr << "\nParameter estimation requires a freq. cutoff (--k_cut).\n";
         return 1138;
+    }
+
+    if (!global_init && corrMicFn == "")
+    {
+        std::cerr << "\nWarning: in the absence of a corrected_micrographs.star file (--corr_mic), global paths are used for initialization.\n";
+        global_init = true;
     }
 
     return 0;
@@ -220,7 +229,6 @@ int MotionFitProg::_run()
             dmgWeight[f] = FilterHelper::ButterworthEnvFreq2D(dmgWeight[f], k_cutoff-1, k_cutoff+1);
 
             ImageOp::multiplyBy(dmgWeight[f], freqWeight);
-            // @TODO: test!
         }
     }
 
@@ -286,48 +294,84 @@ void MotionFitProg::prepMicrograph(
             projectors[0], projectors[1], obsModel, mdts[g], movie,
             sigma2, dmgWeight, fts, nr_omp_threads);
 
-    std::vector<Image<RFLOAT>> ccSum = MotionRefinement::addCCs(movieCC);
-    std::vector<gravis::d2Vector> globTrack = MotionRefinement::getGlobalTrack(ccSum);
-    std::vector<gravis::d2Vector> globOffsets;
+    initialTracks = std::vector<std::vector<d2Vector>>(pc);
 
-    if (noGlobOff)
+    if (global_init)
     {
-        globOffsets = std::vector<d2Vector>(pc, d2Vector(0,0));
+        std::vector<Image<RFLOAT>> ccSum = MotionRefinement::addCCs(movieCC);
+        std::vector<gravis::d2Vector> globTrack = MotionRefinement::getGlobalTrack(ccSum);
+        std::vector<gravis::d2Vector> globOffsets;
+
+        if (noGlobOff)
+        {
+            globOffsets = std::vector<d2Vector>(pc, d2Vector(0,0));
+        }
+        else
+        {
+            globOffsets = MotionRefinement::getGlobalOffsets(
+                    movieCC, globTrack, 0.25*s, nr_omp_threads);
+        }
+
+        if (diag)
+        {
+            std::string tag = outPath + "/" + getMicrographTag(g);
+            std::string path = tag.substr(0, tag.find_last_of('/'));
+            mktree(path);
+
+            ImageLog::write(ccSum, tag + "_CCsum", CenterXY);
+        }
+
+        for (int p = 0; p < pc; p++)
+        {
+            initialTracks[p] = std::vector<d2Vector>(fc);
+
+            for (int f = 0; f < fc; f++)
+            {
+                if (unregGlob)
+                {
+                    initialTracks[p][f] = globOffsets[p];
+                }
+                else
+                {
+                    initialTracks[p][f] = globTrack[f] + globOffsets[p];
+                }
+            }
+        }
+
+        globComp = unregGlob? globTrack : std::vector<d2Vector>(fc, d2Vector(0,0));
     }
     else
     {
-        globOffsets = MotionRefinement::getGlobalOffsets(
-                movieCC, globTrack, 0.25*s, nr_omp_threads);
-    }
+        const double outputScale = movie_angpix / angpix;
+        const double inputScale = coords_angpix / movie_angpix;
 
-    if (diag)
-    {
-        std::stringstream stsg;
-        stsg << g;
+        globComp = std::vector<d2Vector>(fc, d2Vector(0,0));
 
-        ImageLog::write(ccSum, outPath + "_CCsum_mg"+stsg.str(), CenterXY);
-    }
-
-    initialTracks = std::vector<std::vector<d2Vector>>(pc);
-
-    for (int p = 0; p < pc; p++)
-    {
-        initialTracks[p] = std::vector<d2Vector>(fc);
-
-        for (int f = 0; f < fc; f++)
+        if (unregGlob)
         {
-            if (unregGlob)
+            for (int f = 0; f < fc; f++)
             {
-                initialTracks[p][f] = globOffsets[p];
+                double sx, sy;
+                micrograph.getShiftAt(f+1, 0, 0, sx, sy, false);
+
+                globComp[f] = outputScale * d2Vector(sx, sy);
             }
-            else
+        }
+
+        for (int p = 0; p < pc; p++)
+        {
+            initialTracks[p] = std::vector<d2Vector>(fc);
+
+            for (int f = 0; f < fc; f++)
             {
-                initialTracks[p][f] = globTrack[f] + globOffsets[p];
+                double sx, sy;
+                micrograph.getShiftAt(
+                    f+1, inputScale * positions[p].x, inputScale * positions[p].y, sx, sy, true);
+
+                initialTracks[p][f] = outputScale * d2Vector(sx,sy) - globComp[f];
             }
         }
     }
-
-    globComp = unregGlob? globTrack : std::vector<d2Vector>(fc, d2Vector(0,0));
 }
 
 void MotionFitProg::estimateMotion(
@@ -344,10 +388,9 @@ void MotionFitProg::estimateMotion(
         FscHelper::initFscTable(sh, fc, tables[i], weights0[i], weights1[i]);
     }
 
-    // @TODO: remove sqrt(coords_angpix)!
     const double sig_vel_nrm = dosePerFrame * sig_vel / angpix;
     const double sig_acc_nrm = dosePerFrame * sig_acc / angpix;
-    const double sig_div_nrm = dosePerFrame * sqrt(coords_angpix) * sig_div / angpix;
+    const double sig_div_nrm = dosePerFrame * sig_div / angpix;
 
     int pctot = 0;
 
@@ -598,7 +641,7 @@ void MotionFitProg::evaluateParams(
     for (int i = 0; i < paramCount; i++)
     {
         sig_v_vals_nrm[i] = dosePerFrame * sig_vals[i][0] / angpix;
-        sig_d_vals_nrm[i] = dosePerFrame * sqrt(coords_angpix) * sig_vals[i][1] / angpix;
+        sig_d_vals_nrm[i] = dosePerFrame * sig_vals[i][1] / angpix;
     }
 
     double sig_acc_nrm = dosePerFrame * sig_acc / angpix;

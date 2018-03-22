@@ -326,10 +326,10 @@ std::vector<Image<RFLOAT>> FrameRecomb::weightsFromFCC()
 
     const double cf = 8.0 * angpix*angpix * sh*sh;
 
+    mktree(outPath + "/bfacs");
+
     if (bfac_debug)
     {
-        mktree(outPath + "/bfacs");
-
         Image<RFLOAT> bfacFit = DamageHelper::renderBkFit(bkFacs, sh, fc);
         Image<RFLOAT> bfacFitNoScale = DamageHelper::renderBkFit(bkFacs, sh, fc, true);
 

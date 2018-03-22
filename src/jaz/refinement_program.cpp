@@ -46,6 +46,11 @@ int RefinementProgram::init(int argc, char *argv[])
             maskFn = parser.getOption("--mask", "Reference mask", "");
             fscFn = parser.getOption("--f", "Input STAR file with the FSC of the reference", "");
         }
+        else
+        {
+            maskFn = "";
+            fscFn = "";
+        }
 
         outPath = parser.getOption("--out", "Output path");
 
@@ -82,10 +87,23 @@ int RefinementProgram::init(int argc, char *argv[])
 
             paddingFactor = textToFloat(parser.getOption("--pad", "Padding factor", "2"));
         }
+        else
+        {
+            Cs = -1;
+            kV = -1;
+            paddingFactor = 2;
+        }
 
         if (noTilt)
         {
+            beamtilt_x = 0.0;
+            beamtilt_y = 0.0;
+
             applyTilt = false;
+
+            beamtilt_xx = 1.0;
+            beamtilt_xy = 0.0;
+            beamtilt_yy = 1.0;
         }
         else
         {

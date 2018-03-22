@@ -230,32 +230,26 @@ void GpMotionFit::posToParams(
     const std::vector<std::vector<d2Vector>>& pos,
     std::vector<double>& x) const
 {
-    if (dc == pc)
+    for (int p = 0; p < pc; p++)
     {
+        x[2*p]   = pos[p][0].x;
+        x[2*p+1] = pos[p][0].y;
+    }
+
+    for (int f = 0; f < fc-1; f++)
+    for (int d = 0; d < dc; d++)
+    {
+        d2Vector c(0.0, 0.0);
+
         for (int p = 0; p < pc; p++)
         {
-            x[2*p]   = pos[p][0].x;
-            x[2*p+1] = pos[p][0].y;
+            d2Vector v = pos[p][f+1] - pos[p][f];
+
+            c.x += v.x * basis(p,d);
+            c.y += v.y * basis(p,d);
         }
 
-        for (int f = 0; f < fc-1; f++)
-        for (int d = 0; d < dc; d++)
-        {
-            d2Vector c(0.0, 0.0);
-
-            for (int p = 0; p < pc; p++)
-            {
-                d2Vector v = pos[p][f+1] - pos[p][f];
-
-                c.x += v.x * basis(p,d);
-                c.y += v.y * basis(p,d);
-            }
-
-            x[2*(pc + dc*f + d)  ] = c.x/eigenVals[d];
-            x[2*(pc + dc*f + d)+1] = c.y/eigenVals[d];
-        }
-    }
-    else
-    {
+        x[2*(pc + dc*f + d)  ] = c.x/eigenVals[d];
+        x[2*(pc + dc*f + d)+1] = c.y/eigenVals[d];
     }
 }

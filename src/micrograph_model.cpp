@@ -253,7 +253,9 @@ int Micrograph::getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFL
 
 	if (model != NULL && use_local) {
 		// both frame and first_frame is 1 indexed
+        std::cout << "using model...\n";
 		model->getShiftAt(frame - first_frame, x, y, shiftx, shifty);
+        std::cout << " -> " << shiftx << ", " <<  shifty << "\n";
 	} else {
 		shiftx = 0;
 		shifty = 0;
