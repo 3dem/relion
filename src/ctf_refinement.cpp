@@ -717,6 +717,7 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
     std::vector<ParFourierTransformer> fts(nr_omp_threads);
 
 	long nr_done = 0;
+	FileName prevdir = "";
 	for (long g = g_start; g <= g_end; g++)
 	{
 
@@ -740,6 +741,15 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 			preds[p] = obsModel.predictObservation(
 				projectors[randSubset], mdts[g], p, false, true);
 		}
+
+		// Make sure output directory exists
+		FileName newdir = getOutputFileNameRoot(g);
+		if (newdir != prevdir)
+		{
+			std::string command = " mkdir -p " + newdir;
+			int res = system(command.c_str());
+		}
+
 
 		if (do_defocus_fit)
 			fitDefocusOneMicrograph(g, obsF, preds, verb - 1);
