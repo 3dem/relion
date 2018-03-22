@@ -126,6 +126,9 @@ public:
 	// Width of raised cosine edge on low-pass filter
 	int filter_edge_width;
 
+	// Shell for randomisaion of phases
+	int randomize_at;
+
 	// Arrays to store FSC, Guinier curves etc
 	MultidimArray<RFLOAT> fsc_unmasked, acorr_unmasked, acorr_masked, dpr_unmasked, dpr_masked;
 	MultidimArray<RFLOAT> fsc_masked, fsc_random_masked, fsc_true;
