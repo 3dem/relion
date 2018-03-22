@@ -45,7 +45,7 @@ void CtfRefinerMpi::run()
 	// Parallel loop over micrographs
 
 
-	long int total_nr_micrographs = gc - g0 + 1;
+	long int total_nr_micrographs = mdts.size();
 
 	// Each node does part of the work
 	long int my_first_micrograph, my_last_micrograph, my_nr_micrographs;
@@ -56,49 +56,32 @@ void CtfRefinerMpi::run()
     //for (int igroup = 0; igroup < nr_micrographs_groups; igroup++)
     //{
 
-    Image<Complex> xyAccSum;
-    Image<RFLOAT> wAccSum;
-	if (do_tilt_fit && !precomputed)
-    {
-    	xyAccSum().initZeros(sh,s);
-    	wAccSum().initZeros(sh,s);
-    }
-	else
-	{
-		xyAccSum = lastXY;
-		wAccSum = lastW;
-	}
+    // If there were multiple groups of micrographs, we could consider introducing a loop over those here...
+    //for (int igroup = 0; igroup < nr_micrographs_groups; igroup++)
+    //{
 
-    if (do_defocus_fit || (do_tilt_fit && !precomputed) )
+	if (do_defocus_fit || (do_tilt_fit && !precomputed) )
     {
     	// The subsets will be used in openMPI parallelisation: instead of over g0->gc, they will be over smaller subsets
-    	processSubsetMicrographs(my_first_micrograph, my_last_micrograph, xyAccSum, wAccSum);
+    	processSubsetMicrographs(my_first_micrograph, my_last_micrograph);
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
 
-	if (do_tilt_fit)
-	{
-		Image<Complex> xyAccSum2;
-		Image<RFLOAT> wAccSum2;
-		xyAccSum2().initZeros(xyAccSum());
-		wAccSum2().initZeros(wAccSum());
-		MPI_Allreduce(MULTIDIM_ARRAY(xyAccSum()), MULTIDIM_ARRAY(xyAccSum2()), 2*MULTIDIM_SIZE(xyAccSum()), MY_MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-		MPI_Allreduce(MULTIDIM_ARRAY(wAccSum()), MULTIDIM_ARRAY(wAccSum2()), MULTIDIM_SIZE(wAccSum()), MY_MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    if (node->isMaster())
+    {
+    	// Read back from disk the metadata tables for the defocus_fit and or the xyACC and wAcc images from the tilt_fit
+        Image<Complex> xyAccSum;
+        Image<RFLOAT> wAccSum;
+        combineAllDefocusFitAndBeamTiltInformation(minMG, maxMG, xyAccSum, wAccSum);
 
-		fitBeamTiltFromSumsAllMicrographs(xyAccSum2, wAccSum2);
-	}
+    	if (do_tilt_fit)
+    		fitBeamTiltFromSumsAllMicrographs(xyAccSum, wAccSum);
 
-	//} // end loop over igroup
+    	//} // end loop over igroup
 
-	// TODO: design mechanism to set the defocus parameters of all individual particles from different MPI ranks...
-	// TODO: will need to pass the values through MPI_Send....
-    MetaDataTable mdtAll;
-    mdtAll.reserve(mdt0.numberOfObjects());
-	for (long g = g0; g <= gc; g++)
-		mdtAll.append(mdts[g]);
-
-	mdtAll.write(outPath + "particles.star");
+    	mdt0.write(outPath + "particles_ctf_refine.star");
+    }
 
 
 }

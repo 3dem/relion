@@ -73,7 +73,7 @@ public:
 	// Perform beamtilt estimation?
 	bool do_tilt_fit;
 
-    // FOR NOW: copied all params from Jasenko's refinement_program class
+	// FOR NOW: copied all params from Jasenko's refinement_program class
 	// TODO: throw away not-needed ones
 	bool singleReference, doesMovies, debug, applyTilt, anisoTilt, useFsc,
         optStar, noStar, optReference, noReference, noTilt,
@@ -110,12 +110,21 @@ public:
 
     // Jasenko, can we have more informative names for these important variables?
     int s, sh, fc;
-    long g0, gc;
 
     // Defocus_fit options
     RFLOAT defocusRange;
-    bool fitAstigmatism, noGlobAstig, diag;
 
+    // Astigmatism options
+	bool fitAstigmatism, noGlobAstig, diag;
+
+	// Fit amplitude contrast/phase shift
+	bool fitPhase;
+
+	// Fit spherical aberration coefficient
+	bool fitCs;
+
+	// only per-micrograph fits
+	bool globOnly;
 
     // Tilt fit options
     RFLOAT kmin,
@@ -139,18 +148,23 @@ public:
 	// Initialise some stuff after reading
 	void initialise();
 
+	// Get output STAR file name for the gth entry in the mdts
+	FileName getOutputFileNameRoot(long int g);
+
 	// Fir defocus for all particles on one micrograph
-	void fitDefocusOneMicrograph(long g, const std::vector<Image<Complex> > &obsF, const std::vector<Image<Complex> > &preds);
+	void fitDefocusOneMicrograph(long g, const std::vector<Image<Complex> > &obsF, const std::vector<Image<Complex> > &preds, int verb = 0);
 
 	// Perform beamtilt calculations for one micrograph
-	void fitBeamtiltOneMicrograph(long g, const std::vector<Image<Complex> > &obsF, const std::vector<Image<Complex> > &pred,
-			 std::vector<Image<Complex> > &xyAcc, std::vector<Image<RFLOAT> > &wAcc);
+	void fitBeamtiltOneMicrograph(long g, const std::vector<Image<Complex> > &obsF, const std::vector<Image<Complex> > &pred);
 
 	// After sums of phase shifts have been accumulated over all micrographs: fit the actual beamtilt
 	void fitBeamTiltFromSumsAllMicrographs(Image<Complex> &xyAccSum, Image<RFLOAT> &wAccSum);
 
 	// Fit CTF parameters for all particles on a subset of the micrographs micrograph
-	void processSubsetMicrographs(long g_start, long g_end, Image<Complex> &xyAccSum, Image<RFLOAT> &wAccSum);
+	void processSubsetMicrographs(long g_start, long g_end);
+
+	// Read all micrograph metadata tables back in, and combine into onelarge one
+	void combineAllDefocusFitAndBeamTiltInformation(long g_start, long g_end, Image<Complex> &xyAccSum, Image<RFLOAT> &wAccSum);
 
 	// General Running
 	void run();
