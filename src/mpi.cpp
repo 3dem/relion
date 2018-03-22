@@ -254,15 +254,40 @@ int MpiNode::relion_MPI_Recv(void *buf, std::ptrdiff_t count, MPI_Datatype datat
 }
 
 
-int MpiNode::relion_MPI_Bcast(void *buffer, int count, MPI_Datatype datatype, int root, MPI_Comm comm)
+int MpiNode::relion_MPI_Bcast(void *buffer, long int count, MPI_Datatype datatype, int root, MPI_Comm comm)
 {
 	int result;
+    int unitsize(0);
+    MPI_Type_size(datatype, &unitsize);
+    const long blocksize(1 * 1024 * 1024 * 1024);
+    const long totalsize(count * unitsize);
 
-	result = MPI_Bcast(buffer, count, datatype, root, comm);
-	if (result != MPI_SUCCESS)
-	{
-		report_MPI_ERROR(result);
-	}
+    if (count < 0) report_MPI_ERROR(MPI_ERR_COUNT);  // overflow
+    if (totalsize <= blocksize) {
+        // maximum amount of data can be sent by MPI_Bcast
+        // 2 * 1024 * 1024 * 1024 - 1 = 2^31 - 1 = 2147483647 bytes
+        result = MPI_Bcast(buffer, (int)count, datatype, root, comm);
+        if (result != MPI_SUCCESS) {
+            report_MPI_ERROR(result);
+        }
+    } else {
+        if (rank == root) {
+            for (int dest = 0; dest < size; dest++) {   
+                if (dest != root) {
+                    result = relion_MPI_Send(buffer, count, datatype, dest, MPITAG_BCAST, comm);
+                    if (result != MPI_SUCCESS) {
+                        report_MPI_ERROR(result);
+                    }
+                }
+            }
+        } else {
+            MPI_Status status;
+            result = relion_MPI_Recv(buffer, count, datatype, root, MPITAG_BCAST, comm, status);
+            if (result != MPI_SUCCESS) {
+                report_MPI_ERROR(result);
+            }
+        }
+    }
 
 	return result;
 
