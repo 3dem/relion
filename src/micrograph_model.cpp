@@ -97,7 +97,7 @@ void ThirdOrderPolynomialModel::read(std::ifstream &fh, std::string block_name) 
 		if (idx >= 0 && idx < NUM_COEFFS_PER_DIM) {
 			coeffX(idx) = val;
 		} else if (idx >= NUM_COEFFS_PER_DIM && idx < NUM_COEFFS) {
-			coeffY(idx) = val;
+			coeffY(idx - NUM_COEFFS_PER_DIM) = val;
 		} else {
 			REPORT_ERROR("ThirdOrderPolynomialModel coefficients table: wrong index");
 		}
