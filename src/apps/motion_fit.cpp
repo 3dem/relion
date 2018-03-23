@@ -401,6 +401,7 @@ void MotionFitProg::estimateMotion(
         std::cout << "micrograph " << (g+1) << " / " << mdts.size() <<"\n";
 
         const int pc = mdts[g].numberOfObjects();
+        if (pc < 2) continue;
 
         std::stringstream stsg;
         stsg << g;
