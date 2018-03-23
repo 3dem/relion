@@ -348,9 +348,6 @@ void MotionFitProg::prepMicrograph(
 
         const double outputScale = movie_angpix / angpix;
 
-        std::cout << "inputScale = " << inputScale << "\n";
-        std::cout << "outputScale = " << outputScale << "\n";
-
         globComp = std::vector<d2Vector>(fc, d2Vector(0,0));
 
         if (unregGlob)
@@ -680,6 +677,9 @@ void MotionFitProg::evaluateParams(
     for (long g = g0; g <= gc; g++)
     {
         const int pc = mdts[g].numberOfObjects();
+
+        if (pc < 2) continue;
+
         pctot += pc;
 
         std::cout << "    micrograph " << (g+1) << " / " << mdts.size() << ": "
