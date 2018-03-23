@@ -400,6 +400,8 @@ void MotionFitProg::estimateMotion(
     {
         std::cout << "micrograph " << (g+1) << " / " << mdts.size() <<"\n";
 
+        const int pc = mdts[g].numberOfObjects();
+
         std::stringstream stsg;
         stsg << g;
 
@@ -421,7 +423,6 @@ void MotionFitProg::estimateMotion(
             continue;
         }
 
-        const int pc = movie.size();
         pctot += pc;
 
         std::cout << "    optimizing...\n";
