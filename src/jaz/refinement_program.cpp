@@ -72,6 +72,8 @@ int RefinementProgram::init(int argc, char *argv[])
 
             firstFrame = textToInteger(parser.getOption("--first_frame", "", "1")) - 1;
             lastFrame = textToInteger(parser.getOption("--last_frame", "", "-1")) - 1;
+
+            saveMem = parser.checkOption("--sbs", "Load movies slice-by-slice to save memory (slower)");
         }
         else
         {
@@ -388,6 +390,7 @@ int RefinementProgram::init(int argc, char *argv[])
 
         std::string micName, metaName;
 
+
         for (int i = 0; i < corrMic.numberOfObjects(); i++)
         {
             corrMic.getValueToString(EMDL_MICROGRAPH_NAME, micName, i);
@@ -496,7 +499,6 @@ void RefinementProgram::loadInitialMovieValues()
     }
 }
 
-// @TODO: crash (gracefully) if the number of frames is insufficient
 std::vector<std::vector<Image<Complex>>> RefinementProgram::loadMovie(
         int g, int pc, std::vector<ParFourierTransformer>& fts)
 {
@@ -558,7 +560,7 @@ std::vector<std::vector<Image<Complex>>> RefinementProgram::loadMovie(
             movie = StackHelper::extractMovieStackFS(
                 &mdts[g], mgHasGain? &lastGainRef : 0,
                 mgFn, angpix, coords_angpix, movie_angpix, s,
-                nr_omp_threads, true, firstFrame, lastFrame, hotCutoff, debugMov);
+                nr_omp_threads, true, firstFrame, lastFrame, hotCutoff, debugMov, saveMem);
         }
         else
         {

@@ -31,7 +31,7 @@ class RefinementProgram
 
             bool singleReference, doesMovies, debug, debugMov, applyTilt, anisoTilt, useFsc,
                 optStar, noStar, optReference, noReference, noTilt,
-                preextracted, coordsAtMgRes, hasCorrMic;
+                preextracted, coordsAtMgRes, hasCorrMic, saveMem;
 
             long maxMG, minMG;
             int firstFrame, lastFrame;

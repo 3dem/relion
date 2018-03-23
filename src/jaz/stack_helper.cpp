@@ -580,7 +580,7 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
     double outPs, double coordsPs, double moviePs,
     int squareSize, int threads,
     bool loadData, int firstFrame, int lastFrame,
-    RFLOAT hot, bool verbose)
+    RFLOAT hot, bool verbose, bool saveMemory)
 {
     std::vector<std::vector<Image<Complex>>> out(mdt->numberOfObjects());
     const long pc = mdt->numberOfObjects();
@@ -622,6 +622,8 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 
         std::cout << "frame count in movie = " << fcM << "\n";
         std::cout << "frame count to load  = " << fc << "\n";
+
+        std::cout << "pc, fc = " << pc << ", " << fc << "\n";
     }
 
     for (long p = 0; p < pc; p++)
@@ -630,7 +632,6 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
     }
 
     if (!loadData) return out;
-
 
     const int sqMg = 2*(int)(0.5 * squareSize * outPs / moviePs + 0.5);
 
@@ -654,18 +655,27 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
         }
     }
 
-    Image<float> muGraph;
 
+    int threads_f = saveMemory? 1 : threads;
+    int threads_p = saveMemory? threads : 1;
+
+    #pragma omp parallel for num_threads(threads_f)
     for (long f = 0; f < fc; f++)
     {
+        int tf = omp_get_thread_num();
+
+        Image<float> muGraph;
         muGraph.read(movieFn, true, f+firstFrame);
 
         if (verbose) std::cout << (f+1) << "/" << fc << "\n";
 
-        #pragma omp parallel for num_threads(threads)
+        #pragma omp parallel for num_threads(threads_p)
         for (long p = 0; p < pc; p++)
         {
-            int t = omp_get_thread_num();
+            int tp = omp_get_thread_num();
+
+            //int t = omp_get_thread_num();
+            int t = saveMemory? tp : tf;
 
             out[p][f] = Image<Complex>(sqMg,sqMg);
 

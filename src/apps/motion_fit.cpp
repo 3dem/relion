@@ -342,8 +342,14 @@ void MotionFitProg::prepMicrograph(
     }
     else
     {
+        const d2Vector inputScale(
+                coords_angpix / (movie_angpix * micrograph.getWidth()),
+                coords_angpix / (movie_angpix * micrograph.getHeight()));
+
         const double outputScale = movie_angpix / angpix;
-        const double inputScale = coords_angpix / movie_angpix;
+
+        std::cout << "inputScale = " << inputScale << "\n";
+        std::cout << "outputScale = " << outputScale << "\n";
 
         globComp = std::vector<d2Vector>(fc, d2Vector(0,0));
 
@@ -354,7 +360,7 @@ void MotionFitProg::prepMicrograph(
                 double sx, sy;
                 micrograph.getShiftAt(f+1, 0, 0, sx, sy, false);
 
-                globComp[f] = outputScale * d2Vector(sx, sy);
+                globComp[f] = -outputScale * d2Vector(sx, sy);
             }
         }
 
@@ -364,11 +370,14 @@ void MotionFitProg::prepMicrograph(
 
             for (int f = 0; f < fc; f++)
             {
-                double sx, sy;
-                micrograph.getShiftAt(
-                    f+1, inputScale * positions[p].x, inputScale * positions[p].y, sx, sy, true);
+                d2Vector in(inputScale.x * positions[p].x - 0.5,
+                            inputScale.y * positions[p].y - 0.5);
 
-                initialTracks[p][f] = outputScale * d2Vector(sx,sy) - globComp[f];
+                double sx, sy;
+
+                micrograph.getShiftAt(f+1, in.x, in.y, sx, sy, true);
+
+                initialTracks[p][f] = -outputScale * d2Vector(sx,sy) - globComp[f];
             }
         }
     }
@@ -390,17 +399,19 @@ void MotionFitProg::estimateMotion(
 
     const double sig_vel_nrm = dosePerFrame * sig_vel / angpix;
     const double sig_acc_nrm = dosePerFrame * sig_acc / angpix;
-    const double sig_div_nrm = dosePerFrame * sig_div / angpix;
+    const double sig_div_nrm = dosePerFrame * sig_div / coords_angpix;
 
     int pctot = 0;
 
     // initialize parameter-estimation:
 
     for (long g = g0; g <= gc; g++)
-    {
-        std::cout << "micrograph " << (g+1) << " / " << mdts.size() <<"\n";
-
+    {        
         const int pc = mdts[g].numberOfObjects();
+
+        std::cout << "micrograph " << (g+1) << " / " << mdts.size()
+                  << ": " << pc << " particles\n";
+
         if (pc < 2) continue;
 
         std::stringstream stsg;
@@ -643,7 +654,7 @@ void MotionFitProg::evaluateParams(
     for (int i = 0; i < paramCount; i++)
     {
         sig_v_vals_nrm[i] = dosePerFrame * sig_vals[i][0] / angpix;
-        sig_d_vals_nrm[i] = dosePerFrame * sig_vals[i][1] / angpix;
+        sig_d_vals_nrm[i] = dosePerFrame * sig_vals[i][1] / coords_angpix;
     }
 
     double sig_acc_nrm = dosePerFrame * sig_acc / angpix;
@@ -849,6 +860,13 @@ void MotionFitProg::writeOutput(
 
     if (!diag) return;
 
+    std::stringstream sts;
+    sts << mg;
+
+    mktree(outPath + "/diag");
+
+    std::string diagPath = outPath + "/diag/mg" + sts.str();
+
     // plot graphs here:
 
     std::vector<std::vector<gravis::d2Vector>>
@@ -881,9 +899,9 @@ void MotionFitProg::writeOutput(
         }
     }
 
-    std::ofstream rawOut(outPath + "/" + tag + "_tracks.dat");
-    std::ofstream visOut(outPath + "/" + tag + "_visTracks.dat");
-    std::ofstream visOut15(outPath + "/" + tag + "_visTracks_first15.dat");
+    std::ofstream rawOut(diagPath + "_tracks.dat");
+    std::ofstream visOut(diagPath + "_visTracks.dat");
+    std::ofstream visOut15(diagPath + "_visTracks_first15.dat");
 
     for (int p = 0; p < pc; p++)
     {
@@ -904,7 +922,7 @@ void MotionFitProg::writeOutput(
         visOut15 << "\n";
     }
 
-    std::ofstream glbOut(outPath + "/" + tag + "_globTrack.dat");
+    std::ofstream glbOut(diagPath + "_globTrack.dat");
 
     for (int f = 0; f < fc; f++)
     {

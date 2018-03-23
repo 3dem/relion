@@ -155,8 +155,8 @@ void GpMotionFit::grad(const std::vector<double> &x,
 
         for (int f = fc-2; f >= 0; f--)
         {
-            g.x += basis(p,d) * ccg_pf[p][f].x;
-            g.y += basis(p,d) * ccg_pf[p][f].y;
+            g.x += basis(p,d) * ccg_pf[p][f+1].x;
+            g.y += basis(p,d) * ccg_pf[p][f+1].y;
 
             gradDest[2*(pc + dc*f + d)  ] -= g.x;
             gradDest[2*(pc + dc*f + d)+1] -= g.y;
