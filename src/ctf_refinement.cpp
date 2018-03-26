@@ -48,7 +48,6 @@ void CtfRefiner::read(int argc, char **argv)
 
 	int tilt_section = parser.addSection("Beam-tilt options");
 	do_tilt_fit = parser.checkOption("--fit_beamtilt", "Perform refinement of beamtilt for micrograph groups?");
-    kmin = textToFloat(parser.getOption("--kmin", "Inner freq. threshold [Angst]", "30.0"));
     precomp = parser.getOption("--precomp", "Precomputed *_xy and *_w files from previous run (optional)", "");
     aniso = parser.checkOption("--anisotropic_tilt", "Use anisotropic coma model");
 
