@@ -35,6 +35,7 @@
 #include <src/jaz/distribution_helper.h>
 #include <src/jaz/parallel_ft.h>
 #include <src/jaz/d3x3/dsyev2.h>
+#include <src/jaz/nelder_mead.h>
 
 #include <src/jaz/motion_em.h>
 
@@ -95,7 +96,8 @@ class MotionFitProg : public RefinementProgram
                 std::vector<double>& accWgh,
                 std::vector<std::vector<std::vector<double>>>& divWgh);
 
-        std::vector<std::vector<d2Vector>> optimize(const std::vector<std::vector<Image<RFLOAT>>>& movieCC,
+        std::vector<std::vector<d2Vector>> optimize(
+                const std::vector<std::vector<Image<RFLOAT>>>& movieCC,
                 const std::vector<std::vector<d2Vector>>& inTracks,
                 double sig_vel_px,
                 double sig_acc_px,

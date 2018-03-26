@@ -281,7 +281,7 @@ std::vector<Image<RFLOAT>> FrameRecomb::weightsFromFCC()
         }
         catch (RelionError e)
         {
-            std::cerr << "    Warning: unable to read FCCs in " << tfn << "_FCC_*.mrc";
+            std::cerr << "    Warning: unable to read FCCs in " << tfn << "_FCC_*.mrc\n";
             continue;
         }
 
