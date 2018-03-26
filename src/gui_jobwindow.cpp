@@ -2330,6 +2330,11 @@ void JobWindow::initialiseCtfrefineWindow()
 	tab2->label("Fit");
 	resetHeight();
 
+	place("minres", TOGGLE_DEACTIVATE);
+	place("do_pad1", TOGGLE_DEACTIVATE);
+
+	current_y += STEPY /2 ;
+
 	// motion_fit
 	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group1->end();
@@ -2346,20 +2351,7 @@ void JobWindow::initialiseCtfrefineWindow()
 
 	current_y += STEPY /2 ;
 
-	// motion_fit
-	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group2->end();
-	place("do_tilt", TOGGLE_LEAVE_ACTIVE, group2);
-
-	group2->begin();
-
-	place("minres", TOGGLE_DEACTIVATE);
-
-	group2->end();
-
-	current_y += STEPY /2 ;
-
-	place("do_pad1", TOGGLE_DEACTIVATE);
+	place("do_tilt", TOGGLE_LEAVE_ACTIVE);
 
 	tab2->end();
 
