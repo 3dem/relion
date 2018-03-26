@@ -494,6 +494,9 @@ d2Vector MotionFitProg::estimateTwoParams(
         double sig_v_step, double sig_d_step,
         int maxIters, int recDepth)
 {
+    int tot_vi = sig_v_0 <= 0.0? 1 : 0;
+    int tot_di = sig_d_0 <= 0.0? 1 : 0;
+
     std::vector<d3Vector> all_sig_vals(9);
 
     for (int p = 0; p < 9; p++)
@@ -501,8 +504,8 @@ d2Vector MotionFitProg::estimateTwoParams(
         int vi = (p%3) - 1;
         int di = (p/3) - 1;
 
-        all_sig_vals[p][0] = sig_v_0 + vi * sig_v_step;
-        all_sig_vals[p][1] = sig_d_0 + di * sig_d_step;
+        all_sig_vals[p][0] = sig_v_0 + (vi+tot_vi) * sig_v_step;
+        all_sig_vals[p][1] = sig_d_0 + (di+tot_di) * sig_d_step;
         all_sig_vals[p][2] = sig_acc;
     }
 
@@ -520,8 +523,6 @@ d2Vector MotionFitProg::estimateTwoParams(
 
     bool centerBest = false;
     int iters = 0;
-
-    int tot_vi = 0, tot_di = 0;
 
     while (!centerBest && iters < maxIters)
     {
@@ -574,27 +575,37 @@ d2Vector MotionFitProg::estimateTwoParams(
             }
         }
 
-        if (bestIndex == 4)
+        int shift_v = bestIndex % 3 - 1;
+        int shift_d = bestIndex / 3 - 1;
+
+        if (shift_v < 0 && all_sig_vals[3][0] <= 0.0)
+        {
+            shift_v = 0;
+        }
+
+        if (shift_d < 0 && all_sig_vals[1][1] <= 0.0)
+        {
+            shift_d = 0;
+        }
+
+        if (shift_v == 0 && shift_d == 0)
         {
             if (recDepth <= 0)
             {
-                return d2Vector(all_sig_vals[4][0], all_sig_vals[4][1]);
+                return d2Vector(all_sig_vals[bestIndex][0], all_sig_vals[bestIndex][1]);
             }
             else
             {
-                std::cout << "current optimum: " << all_sig_vals[4] << "\n";
+                std::cout << "current optimum: " << all_sig_vals[bestIndex] << "\n";
                 std::cout << "repeating at half scan range.\n";
 
                 estimateTwoParams(
                     fts, dmgWeight, k_out,
-                    all_sig_vals[4][0], all_sig_vals[4][1],
+                    all_sig_vals[bestIndex][0], all_sig_vals[bestIndex][1],
                     sig_v_step/2.0, sig_d_step/2.0,
                     maxIters, recDepth-1);
             }
         }
-
-        int shift_v = bestIndex % 3 - 1;
-        int shift_d = bestIndex / 3 - 1;
 
         tot_vi += shift_v;
         tot_di += shift_d;
@@ -658,6 +669,10 @@ d3Vector MotionFitProg::estimateThreeParams(
         double sig_v_step, double sig_d_step, double sig_a_step,
         int maxIters, int recDepth)
 {
+    int tot_vi = sig_v_0 <= 0.0? 1 : 0;
+    int tot_di = sig_d_0 <= 0.0? 1 : 0;
+    int tot_ai = sig_a_0 <= 0.0? 1 : 0;
+
     std::vector<d3Vector> all_sig_vals(27);
 
     for (int p = 0; p < 27; p++)
@@ -666,9 +681,9 @@ d3Vector MotionFitProg::estimateThreeParams(
         int di = ((p/3)%3) - 1;
         int ai = p/9 - 1;
 
-        all_sig_vals[p][0] = sig_v_0 + vi * sig_v_step;
-        all_sig_vals[p][1] = sig_d_0 + di * sig_d_step;
-        all_sig_vals[p][2] = sig_a_0 + ai * sig_a_step;
+        all_sig_vals[p][0] = sig_v_0 + (vi+tot_vi) * sig_v_step;
+        all_sig_vals[p][1] = sig_d_0 + (di+tot_di) * sig_d_step;
+        all_sig_vals[p][2] = sig_a_0 + (ai+tot_ai) * sig_a_step;
     }
 
     std::vector<double> all_TSCs(27);
@@ -685,8 +700,6 @@ d3Vector MotionFitProg::estimateThreeParams(
 
     bool centerBest = false;
     int iters = 0;
-
-    int tot_vi = 0, tot_di = 0, tot_ai = 0;
 
     while (!centerBest && iters < maxIters)
     {
@@ -749,28 +762,43 @@ d3Vector MotionFitProg::estimateThreeParams(
             }
         }
 
-        if (bestIndex == 13)
+        int shift_v = bestIndex % 3 - 1;
+        int shift_d = ((bestIndex / 3)%3) - 1;
+        int shift_a = bestIndex / 3 - 1;
+
+        if (shift_v < 0 && all_sig_vals[12][0] <= 0.0)
+        {
+            shift_v = 0;
+        }
+
+        if (shift_d < 0 && all_sig_vals[10][1] <= 0.0)
+        {
+            shift_d = 0;
+        }
+
+        if (shift_a < 0 && all_sig_vals[4][2] <= 0.0)
+        {
+            shift_a = 0;
+        }
+
+        if (shift_v == 0 && shift_d == 0 && shift_a == 0)
         {
             if (recDepth <= 0)
             {
-                return all_sig_vals[13];
+                return all_sig_vals[bestIndex];
             }
             else
             {
-                std::cout << "current optimum: " << all_sig_vals[13] << "\n";
+                std::cout << "current optimum: " << all_sig_vals[bestIndex] << "\n";
                 std::cout << "repeating at half scan range.\n";
 
                 estimateThreeParams(
                     fts, dmgWeight, k_out,
-                    all_sig_vals[13][0], all_sig_vals[13][1], all_sig_vals[13][2],
+                    all_sig_vals[bestIndex][0], all_sig_vals[bestIndex][1], all_sig_vals[bestIndex][2],
                     sig_v_step/2.0, sig_d_step/2.0, sig_a_step/2.0,
                     maxIters, recDepth-1);
             }
         }
-
-        int shift_v = bestIndex % 3 - 1;
-        int shift_d = ((bestIndex / 3)%3) - 1;
-        int shift_a = bestIndex / 3 - 1;
 
         tot_vi += shift_v;
         tot_di += shift_d;
