@@ -62,7 +62,7 @@ public:
 	int verb;
 
 	// Input & Output rootname
-	FileName fn_opt, fn_fsc, fn_out;
+	FileName fn_opt, fn_fsc;
 
 	// Allow continuation of crashed jobs
 	bool only_do_unfinished;
@@ -105,6 +105,8 @@ public:
 
     MetaDataTable mdt0;
     std::vector<MetaDataTable> mdts;
+    std::vector<FileName> fn_mics_process, fn_mics_ori;
+
     RFLOAT Cs, lambda, kV;
     ObservationModel obsModel;
 
@@ -149,10 +151,13 @@ public:
 	void initialise();
 
 	// Get output STAR file name for the gth entry in the mdts
-	FileName getOutputFileNameRoot(long int g);
+	FileName getOutputFileNameRoot(long int g, bool is_original = false);
 
 	// Fir defocus for all particles on one micrograph
 	void fitDefocusOneMicrograph(long g, const std::vector<Image<Complex> > &obsF, const std::vector<Image<Complex> > &preds, int verb = 0);
+
+	// Write PostScript file with per-particle defocus plotted onto micrograph in blue-red color scale
+	void writePerParticleDefocusEPSfitBeamtiltOneMicrograph(long g);
 
 	// Perform beamtilt calculations for one micrograph
 	void fitBeamtiltOneMicrograph(long g, const std::vector<Image<Complex> > &obsF, const std::vector<Image<Complex> > &pred);

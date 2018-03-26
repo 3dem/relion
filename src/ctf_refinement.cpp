@@ -52,7 +52,6 @@ void CtfRefiner::read(int argc, char **argv)
     precomp = parser.getOption("--precomp", "Precomputed *_xy and *_w files from previous run (optional)", "");
     aniso = parser.checkOption("--anisotropic_tilt", "Use anisotropic coma model");
 
-
 	int comp_section = parser.addSection("Computational options");
     nr_omp_threads = textToInteger(parser.getOption("--j", "Number of (OMP) threads", "1"));
     paddingFactor = textToFloat(parser.getOption("--pad", "Padding factor", "2"));
@@ -78,9 +77,9 @@ void CtfRefiner::read(int argc, char **argv)
 	if (parser.checkForErrors())
 		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 
-	// Make sure fn_out ends with a slash
-	if (fn_out[fn_out.length()-1] != '/')
-		fn_out += "/";
+	// Make sure outPath ends with a slash
+	if (outPath[outPath.length()-1] != '/')
+		outPath += "/";
 
 }
 
@@ -90,12 +89,12 @@ void CtfRefiner::usage()
 }
 
 // Get the coordinate filename from the micrograph filename
-FileName CtfRefiner::getOutputFileNameRoot(long int g)
+FileName CtfRefiner::getOutputFileNameRoot(long int g, bool is_original)
 {
 
-    FileName fn_mic, fn_pre, fn_jobnr, fn_post;
-    mdts[g].getValue(EMDL_MICROGRAPH_NAME, fn_mic, 0);
-	decomposePipelineFileName(fn_mic, fn_pre, fn_jobnr, fn_post);
+    FileName fn_pre, fn_jobnr, fn_post;
+	FileName fn_mic = (is_original) ? fn_mics_ori[g] : fn_mics_process[g];
+    decomposePipelineFileName(fn_mic, fn_pre, fn_jobnr, fn_post);
 	return outPath + fn_post.withoutExtension();
 
 }
@@ -112,16 +111,16 @@ void CtfRefiner::initialise()
 
 	if (Cs < 0.0)
 	{
-	 mdt0.getValue(EMDL_CTF_CS, Cs, 0);
-	 if (verb > 0)
-		 std::cout << "   - Using spherical aberration from the input STAR file: " << Cs << "\n";
+		mdt0.getValue(EMDL_CTF_CS, Cs, 0);
+		if (verb > 0)
+			std::cout << "   - Using spherical aberration from the input STAR file: " << Cs << "\n";
 	}
 	else
 	{
-	 for (int i = 0; i < mdt0.numberOfObjects(); i++)
-	 {
-		 mdt0.setValue(EMDL_CTF_CS, Cs, i);
-	 }
+		for (int i = 0; i < mdt0.numberOfObjects(); i++)
+		{
+			mdt0.setValue(EMDL_CTF_CS, Cs, i);
+		}
 	}
 
 	if (kV < 0.0)
@@ -151,6 +150,14 @@ void CtfRefiner::initialise()
 
 	mdts = StackHelper::splitByMicrographName(&mdt0);
 
+	// Just get vector of all original micrograph names
+	for (long int g = 0; g < mdts.size(); g++)
+	{
+		FileName fn_mic;
+		mdts[g].getValue(EMDL_MICROGRAPH_NAME, fn_mic, 0);
+		fn_mics_ori.push_back(fn_mic);
+	}
+
 	// Only work on a user-specified subset of the micrographs
 	if (maxMG < 0 || maxMG >= mdts.size())
 		maxMG = mdts.size()-1;
@@ -159,7 +166,7 @@ void CtfRefiner::initialise()
 	if (minMG > 0 || maxMG < mdts.size()-1)
 	{
 		if (verb > 0)
-			std::cout << "   - Will only process micrographs in range: [" << minMG << "-" << maxMG << "] \n";
+			std::cout << "   - Will only process micrographs in range: [" << minMG << "-" << maxMG << "]"  << std::endl;
 
 		std::vector<MetaDataTable> todo_mdts;
 		for (long int g = minMG; g <= maxMG; g++ )
@@ -176,15 +183,26 @@ void CtfRefiner::initialise()
 		for (long int g = minMG; g <= maxMG; g++ )
 		{
 			bool is_done = true;
-			if (do_defocus_fit && !exists(getOutputFileNameRoot(g)+"_defocus_fit.star"))
+			if (do_defocus_fit && !exists(getOutputFileNameRoot(g, true)+"_defocus_fit.star"))
 				is_done = false;
-			if (do_tilt_fit && !exists(getOutputFileNameRoot(g)+"_wAcc.mrc"))
+			if (do_tilt_fit && !exists(getOutputFileNameRoot(g, true)+"_wAcc.mrc"))
 				is_done = false;
 			if (!is_done)
 				unfinished_mdts.push_back(mdts[g]);
 		}
 		mdts = unfinished_mdts;
+		if (verb > 0)
+			std::cout << "   - Will only process " << mdts.size() << " unfinished micrographs" << std::endl;
 	}
+
+	// Get vector of all micrograph names that need to be processed
+	for (long int g = 0; g < mdts.size(); g++)
+	{
+		FileName fn_mic;
+		mdts[g].getValue(EMDL_MICROGRAPH_NAME, fn_mic, 0);
+		fn_mics_process.push_back(fn_mic);
+	}
+
 
 	// Make sure output directory ends in a '/'
 	if (outPath[outPath.length()-1] != '/')
@@ -202,54 +220,61 @@ void CtfRefiner::initialise()
 			obsModel.setAnisoTilt(beamtilt_xx, beamtilt_xy, beamtilt_yy);
 	}
 
-	// Read in the references
+	// Only create projectors if there are (still) micrographs to process
+	// Read in the first reference
 	if (verb > 0)
 		std::cout << " + Reading references ...\n";
 	maps[0].read(reconFn0);
-	maps[1].read(reconFn1);
 
 	if (maps[0].data.xdim != maps[0].data.ydim || maps[0].data.ydim != maps[0].data.zdim)
-	REPORT_ERROR(reconFn0 + " is not cubical.\n");
+		REPORT_ERROR(reconFn0 + " is not cubical.\n");
 
-	if (maps[1].data.xdim != maps[1].data.ydim || maps[1].data.ydim != maps[1].data.zdim)
-	REPORT_ERROR(reconFn1 + " is not cubical.\n");
-
-	if (   maps[0].data.xdim != maps[1].data.xdim
-		|| maps[0].data.ydim != maps[1].data.ydim
-		|| maps[0].data.zdim != maps[1].data.zdim)
-		REPORT_ERROR(reconFn0 + " and " + reconFn1 + " are of unequal size.\n");
-
-	if (maskFn != "")
-	{
-		if (verb > 0)
-			std::cout << " + Masking references ...\n";
-
-		Image<RFLOAT> mask, maskedRef;
-
-		mask.read(maskFn);
-
-		ImageOp::multiply(mask, maps[0], maskedRef);
-		maps[0] = maskedRef;
-
-		ImageOp::multiply(mask, maps[1], maskedRef);
-		maps[1] = maskedRef;
-	}
-
-	// dimensions
+	// Get dimensions
 	s = maps[0].data.xdim;
 	sh = s/2 + 1;
 
-
-	if (verb > 0)
-	std::cout << " + Transforming references ...\n";
-
-	projectors[0] = Projector(s, TRILINEAR, paddingFactor, 10, 2);
-	projectors[0].computeFourierTransformMap(maps[0].data, powSpec[0].data, maps[0].data.xdim);
-
-	if (!singleReference)
+	if (mdts.size() > 0)
 	{
-	 projectors[1] = Projector(s, TRILINEAR, paddingFactor, 10, 2);
-	 projectors[1].computeFourierTransformMap(maps[1].data, powSpec[1].data, maps[1].data.xdim);
+
+		// Read in the second reference
+		maps[1].read(reconFn1);
+
+		if (maps[1].data.xdim != maps[1].data.ydim || maps[1].data.ydim != maps[1].data.zdim)
+			REPORT_ERROR(reconFn1 + " is not cubical.\n");
+
+		if (   maps[0].data.xdim != maps[1].data.xdim
+			|| maps[0].data.ydim != maps[1].data.ydim
+			|| maps[0].data.zdim != maps[1].data.zdim)
+			REPORT_ERROR(reconFn0 + " and " + reconFn1 + " are of unequal size.\n");
+
+		if (maskFn != "")
+		{
+			if (verb > 0)
+				std::cout << " + Masking references ...\n";
+
+			Image<RFLOAT> mask, maskedRef;
+
+			mask.read(maskFn);
+
+			ImageOp::multiply(mask, maps[0], maskedRef);
+			maps[0] = maskedRef;
+
+			ImageOp::multiply(mask, maps[1], maskedRef);
+			maps[1] = maskedRef;
+		}
+
+
+		if (verb > 0)
+			std::cout << " + Transforming references ...\n";
+
+		projectors[0] = Projector(s, TRILINEAR, paddingFactor, 10, 2);
+		projectors[0].computeFourierTransformMap(maps[0].data, powSpec[0].data, maps[0].data.xdim);
+
+		if (!singleReference)
+		{
+			projectors[1] = Projector(s, TRILINEAR, paddingFactor, 10, 2);
+			projectors[1].computeFourierTransformMap(maps[1].data, powSpec[1].data, maps[1].data.xdim);
+		}
 	}
 
 	useFsc = (fscFn != "");
@@ -260,9 +285,9 @@ void CtfRefiner::initialise()
 		fscMdt.read(fscFn, "fsc");
 
 		if (!fscMdt.containsLabel(EMDL_SPECTRAL_IDX))
-		 REPORT_ERROR(fscFn + " does not contain a value for " + EMDL::label2Str(EMDL_SPECTRAL_IDX));
+			REPORT_ERROR(fscFn + " does not contain a value for " + EMDL::label2Str(EMDL_SPECTRAL_IDX));
 		if (!fscMdt.containsLabel(EMDL_POSTPROCESS_FSC_TRUE))
-		REPORT_ERROR(fscFn + " does not contain a value for " + EMDL::label2Str(EMDL_POSTPROCESS_FSC_TRUE));
+			REPORT_ERROR(fscFn + " does not contain a value for " + EMDL::label2Str(EMDL_POSTPROCESS_FSC_TRUE));
 
 		RefinementHelper::drawFSC(&fscMdt, freqWeight1D, freqWeight);
 	}
@@ -466,7 +491,9 @@ void CtfRefiner::fitDefocusOneMicrograph(long g, const std::vector<Image<Complex
     }
     else
     {
-        #pragma omp parallel for num_threads(nr_omp_threads)
+
+    	// Parallel loop over all particles on this micrograph
+    	#pragma omp parallel for num_threads(nr_omp_threads)
         for (long p = 0; p < pc; p++)
         {
             std::stringstream stsp;
@@ -510,14 +537,73 @@ void CtfRefiner::fitDefocusOneMicrograph(long g, const std::vector<Image<Complex
                 //ctf.initialise();
             }
         }
+
+        // Output a diagnostic Postscript file
+        writePerParticleDefocusEPSfitBeamtiltOneMicrograph(g);
     }
 
 
     // Now write out STAR file with optimised values for this micrograph
-    mdts[g].write(getOutputFileNameRoot(g)+ "_defocus_fit.star");
+    mdts[g].write(getOutputFileNameRoot(g, false)+ "_defocus_fit.star");
+
+
 
 
 }
+
+void CtfRefiner::writePerParticleDefocusEPSfitBeamtiltOneMicrograph(long g)
+{
+	FileName fn_eps = getOutputFileNameRoot(g, false) + "_defocus_fit.eps";
+	CPlot2D *plot2D=new CPlot2D(fn_eps);
+ 	plot2D->SetXAxisSize(600);
+ 	plot2D->SetYAxisSize(600);
+	plot2D->SetDrawLegend(false);
+
+
+	RFLOAT ave_defocus = 0.;
+	RFLOAT min_defocus = 99.e10;
+	RFLOAT max_defocus = -99.e10;
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(mdts[g])
+	{
+		RFLOAT defU, defV;
+		mdts[g].getValue(EMDL_CTF_DEFOCUSU, defU);
+		mdts[g].getValue(EMDL_CTF_DEFOCUSV, defV);
+		defU = (defU + defV) / 2.;
+		ave_defocus += defU;
+		min_defocus = XMIPP_MIN(min_defocus, defU);
+		max_defocus = XMIPP_MAX(max_defocus, defU);
+	}
+	ave_defocus /= (RFLOAT)(mdts[g].numberOfObjects());
+
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(mdts[g])
+	{
+		RFLOAT defU, defV;
+		RFLOAT xcoor, ycoor;
+		mdts[g].getValue(EMDL_IMAGE_COORD_X, xcoor);
+		mdts[g].getValue(EMDL_IMAGE_COORD_Y, ycoor);
+		mdts[g].getValue(EMDL_CTF_DEFOCUSU, defU);
+		mdts[g].getValue(EMDL_CTF_DEFOCUSV, defV);
+		defU = (defU + defV) / 2.;
+
+		RFLOAT red  = (defU - min_defocus) / (max_defocus - min_defocus);
+		CDataSet dataSet;
+		dataSet.SetDrawMarker(true);
+		dataSet.SetDrawLine(false);
+		dataSet.SetMarkerSize(5);
+		dataSet.SetDatasetColor(red, 0.0, 1. - red);
+		CDataPoint point(xcoor, ycoor);
+		dataSet.AddDataPoint(point);
+		plot2D->AddDataSet(dataSet);
+	}
+
+	char title[256];
+	snprintf(title, 255, "Defocus range from blue to red: %.0f A", max_defocus-min_defocus);
+	plot2D->SetXAxisTitle(title);
+
+	plot2D->OutputPostScriptPlot(fn_eps);
+
+}
+
 
 void CtfRefiner::fitBeamtiltOneMicrograph(long g, const std::vector<Image<Complex> > &obsF, const std::vector<Image<Complex> > &pred)
 {
@@ -550,8 +636,8 @@ void CtfRefiner::fitBeamtiltOneMicrograph(long g, const std::vector<Image<Comple
 
 
 	// Combine the accumulated weights from all threads for this subset, store weighted sums in xyAccSum and wAccSum
-    Image<Complex> xyAccSum;
-    Image<RFLOAT> wAccSum;
+    Image<Complex> xyAccSum(sh,s);
+    Image<RFLOAT> wAccSum(sh,s);
 	for (int i = 0; i < nr_omp_threads; i++)
 	{
 		ImageOp::linearCombination(xyAccSum, xyAcc[i], 1.0, 1.0, xyAccSum);
@@ -560,8 +646,8 @@ void CtfRefiner::fitBeamtiltOneMicrograph(long g, const std::vector<Image<Comple
 
 	// Write out the fitBeamTilt intermediate results per-micrograph, so we can continue without having to redo everything
 
-	ComplexIO::write(xyAccSum(), getOutputFileNameRoot(g)+"_xyAcc", ".mrc");
-	wAccSum.write(getOutputFileNameRoot(g)+"_wAcc.mrc");
+	ComplexIO::write(xyAccSum(), getOutputFileNameRoot(g, false)+"_xyAcc", ".mrc");
+	wAccSum.write(getOutputFileNameRoot(g, false)+"_wAcc.mrc");
 
 }
 
@@ -606,13 +692,13 @@ void CtfRefiner::fitBeamTiltFromSumsAllMicrographs(Image<Complex> &xyAccSum, Ima
     }
 
     if (debug)
-    	VtkHelper::writeVTK(imgdebug, outPath+"_debug.vtk");
+    	VtkHelper::writeVTK(imgdebug, outPath+"fit_beamtilt_debug.vtk");
 
     Image<RFLOAT> wghFull;
     FftwHelper::decenterDouble2D(wgh(), wghFull());
     if (debug)
     {
-    	VtkHelper::writeVTK(wghFull, outPath+"_weight.vtk");
+    	VtkHelper::writeVTK(wghFull, outPath+"fit_beamtilt_weight.vtk");
     }
     else
     {
@@ -623,7 +709,7 @@ void CtfRefiner::fitBeamTiltFromSumsAllMicrographs(Image<Complex> &xyAccSum, Ima
 
     if (debug)
     {
-    	VtkHelper::writeVTK(phaseFull, outPath+"_delta_phase.vtk");
+    	VtkHelper::writeVTK(phaseFull, outPath+"fit_beamtilt_delta_phase.vtk");
     }
     else
     {
@@ -641,16 +727,16 @@ void CtfRefiner::fitBeamTiltFromSumsAllMicrographs(Image<Complex> &xyAccSum, Ima
     FftwHelper::decenterUnflip2D(fit.data, fitFull.data);
     if (debug)
     {
-    	VtkHelper::writeVTK(fitFull, outPath+"_delta_phase_fit.vtk");
+    	VtkHelper::writeVTK(fitFull, outPath+"fit_beamtilt_delta_phase_fit.vtk");
     }
     else
     {
-    	fitFull.write(outPath+"_delta_phase_fit.mrc");
+    	fitFull.write(outPath+"fit_beamtilt_delta_phase_fit.mrc");
     }
 
     // Write beamtilt to a text file???!
     // TODO: write into the particle STAR file!
-    std::ofstream os(outPath+"fitted_beam_tilt_0.txt");
+    std::ofstream os(outPath+"fit_beamtilt_0.txt");
     os << "beamtilt_x = " << tilt_x << "\n";
     os << "beamtilt_y = " << tilt_y << "\n";
     os.close();
@@ -677,16 +763,16 @@ void CtfRefiner::fitBeamTiltFromSumsAllMicrographs(Image<Complex> &xyAccSum, Ima
     FftwHelper::decenterUnflip2D(fit.data, fitFull.data);
     if (debug)
     {
-    	VtkHelper::writeVTK(fitFull, outPath+"_delta_phase_iter_fit.vtk");
+    	VtkHelper::writeVTK(fitFull, outPath+"fit_beamtilt_delta_phase_iter_fit.vtk");
     }
     else
     {
-    	fitFull.write(outPath+"_delta_phase_iter_fit.mrc");
+    	fitFull.write(outPath+"fit_beamtilt_delta_phase_iter_fit.mrc");
     }
 
     // Write beamtilt to a text file???!
     // TODO: write into the particle STAR file!
-    std::ofstream os2(outPath+"fiited_beam_tilt_1.txt");
+    std::ofstream os2(outPath+"fit_beamtilt_1.txt");
     os2 << "beamtilt_x = " << tilt_x << "\n";
     os2 << "beamtilt_y = " << tilt_y << "\n";
     os2.close();
@@ -729,8 +815,6 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 
 		std::vector<Image<Complex>> preds(pc);
 
-		// defocus_fit needs code as below. tilt_fit used StackHelper::projectStackPar, but results are the same
-		// TODO: to be confirmed by Jasenko!
 		#pragma omp parallel for num_threads(nr_omp_threads)
 		for (long p = 0; p < pc; p++)
 		{
@@ -744,6 +828,7 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 
 		// Make sure output directory exists
 		FileName newdir = getOutputFileNameRoot(g);
+		newdir = newdir.beforeLastOf("/");
 		if (newdir != prevdir)
 		{
 			std::string command = " mkdir -p " + newdir;
@@ -765,11 +850,7 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 
 
     if (verb > 0)
-	{
 		progress_bar(my_nr_micrographs);
-	}
-
-
 
 }
 
@@ -780,8 +861,8 @@ void CtfRefiner::combineAllDefocusFitAndBeamTiltInformation(long g_start, long g
 	{
 		if (!precomputed)
 		{
-			xyAccSum().initZeros(sh,s);
-			wAccSum().initZeros(sh,s);
+			xyAccSum().initZeros(s,sh);
+			wAccSum().initZeros(s,sh);
 		}
 		else
 		{
@@ -792,12 +873,15 @@ void CtfRefiner::combineAllDefocusFitAndBeamTiltInformation(long g_start, long g
 
 	int barstep;
 	int my_nr_micrographs = g_end - g_start + 1;
+    std::vector<FileName> fn_eps;
+
     if (verb > 0)
 	{
     	std::cout << " + Combining data for all micrographs " << std::endl;
 		init_progress_bar(my_nr_micrographs);
 		barstep = XMIPP_MAX(1, my_nr_micrographs/ 60);
 	}
+
 
 	if (do_defocus_fit)
 	{
@@ -810,10 +894,13 @@ void CtfRefiner::combineAllDefocusFitAndBeamTiltInformation(long g_start, long g
 	{
 		if (do_defocus_fit)
 		{
+			FileName fn_root = getOutputFileNameRoot(g, true);
 			// Read in STAR file with defocus fit data
 			MetaDataTable mdtt;
-			mdtt.read(getOutputFileNameRoot(g)+"_defocus_fit.star");
+			mdtt.read(fn_root+"_defocus_fit.star");
 			mdt0.append(mdtt);
+			if (exists(fn_root+"_defocus_fit.eps"))
+				fn_eps.push_back(fn_root+"_defocus_fit.eps");
 		}
 
 		if (do_tilt_fit && !precomputed)
@@ -821,8 +908,8 @@ void CtfRefiner::combineAllDefocusFitAndBeamTiltInformation(long g_start, long g
 			Image<Complex> xyAcc;
 			Image<RFLOAT> wAcc;
 
-			wAcc.read(getOutputFileNameRoot(g)+"_wAcc.mrc");
-			ComplexIO::read(xyAcc, getOutputFileNameRoot(g)+"_xyAcc", ".mrc");
+			wAcc.read(getOutputFileNameRoot(g, true)+"_wAcc.mrc");
+			ComplexIO::read(xyAcc, getOutputFileNameRoot(g, true)+"_xyAcc", ".mrc");
 
 			xyAccSum() += xyAcc();
 			wAccSum() += wAcc();
@@ -834,10 +921,13 @@ void CtfRefiner::combineAllDefocusFitAndBeamTiltInformation(long g_start, long g
 	}
 
 	if (verb > 0)
-	{
 		progress_bar(my_nr_micrographs);
-	}
 
+
+	if (fn_eps.size() > 0)
+	{
+		joinMultipleEPSIntoSinglePDF(outPath + "logfile.pdf ", fn_eps);
+	}
 
 }
 
@@ -845,10 +935,6 @@ void CtfRefiner::combineAllDefocusFitAndBeamTiltInformation(long g_start, long g
 void CtfRefiner::run()
 {
 
-
-    // If there were multiple groups of micrographs, we could consider introducing a loop over those here...
-    //for (int igroup = 0; igroup < nr_micrographs_groups; igroup++)
-    //{
 
 	if (do_defocus_fit || (do_tilt_fit && !precomputed) )
     {
@@ -864,9 +950,10 @@ void CtfRefiner::run()
 	if (do_tilt_fit)
 		fitBeamTiltFromSumsAllMicrographs(xyAccSum, wAccSum);
 
-	//} // end loop over igroup
-
 	mdt0.write(outPath + "particles_ctf_refine.star");
+
+	if (verb > 0)
+		std::cout << " + Done! Written out : " << outPath << "particles_ctf_refine.star" << std::endl;
 
 }
 

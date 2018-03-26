@@ -145,7 +145,7 @@ void TiltRefinement::fitTiltShift(const Image<RFLOAT>& phase,
 
     gravis::d4Vector opt = Ainv * b;
 
-    std::cout << opt[0] << ", " << opt[1] << ", " << opt[2] << ", " << opt[3] << "\n";
+    //std::cout << opt[0] << ", " << opt[1] << ", " << opt[2] << ", " << opt[3] << "\n";
 
     *shift_x = opt[0];
     *shift_y = opt[1];
@@ -163,8 +163,8 @@ void TiltRefinement::fitTiltShift(const Image<RFLOAT>& phase,
     std::cout << "cubic:  " << destB << " @ " << destPhiB << "°\n";
     std::cout << "    =  -" << destB << " @ " << (destPhiB + 180.0) << "°\n";*/
 
-    std::cout << "tilt_x = " << *tilt_x << "\n";
-    std::cout << "tilt_y = " << *tilt_y << "\n";
+    //std::cout << "tilt_x = " << *tilt_x << "\n";
+    //std::cout << "tilt_y = " << *tilt_y << "\n";
 
     if (fit != 0)
     {
@@ -200,9 +200,9 @@ void TiltRefinement::optimizeTilt(
     *tilt_x = -opt[2]*scale;
     *tilt_y = -opt[3]*scale;
 
-    std::cout << opt[0] << ", " << opt[1] << ", " << opt[2] << ", " << opt[3] << "\n";
-    std::cout << "tilt_x = " << *tilt_x << "\n";
-    std::cout << "tilt_y = " << *tilt_y << "\n";
+    //std::cout << opt[0] << ", " << opt[1] << ", " << opt[2] << ", " << opt[3] << "\n";
+    //std::cout << "tilt_x = " << *tilt_x << "\n";
+    //std::cout << "tilt_y = " << *tilt_y << "\n";
 
     if (fit != 0)
     {
