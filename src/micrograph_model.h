@@ -49,7 +49,7 @@ class ThirdOrderPolynomialModel: public MotionModel {
 public:
 	static const int NUM_COEFFS_PER_DIM;
 
-	Matrix1D <RFLOAT> coeffX, coeffY;
+    Matrix1D <RFLOAT> coeffX, coeffY;
 
 	void fit() {
 		REPORT_ERROR("Not implemented yet.");
