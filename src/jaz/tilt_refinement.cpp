@@ -200,9 +200,9 @@ void TiltRefinement::optimizeTilt(
     *tilt_x = -opt[2]*scale;
     *tilt_y = -opt[3]*scale;
 
-    std::cout << opt[0] << ", " << opt[1] << ", " << opt[2] << ", " << opt[3] << "\n";
-    std::cout << "tilt_x = " << *tilt_x << "\n";
-    std::cout << "tilt_y = " << *tilt_y << "\n";
+    //std::cout << opt[0] << ", " << opt[1] << ", " << opt[2] << ", " << opt[3] << "\n";
+    //std::cout << "tilt_x = " << *tilt_x << "\n";
+    //std::cout << "tilt_y = " << *tilt_y << "\n";
 
     if (fit != 0)
     {

@@ -4653,7 +4653,7 @@ The mask used for this postprocessing will be applied to the unfiltered half-map
 	joboptions["do_combine"] = JobOption("Generate shiny particles?", true, "If set to Yes, then relion_combine_frames will be run to combine all (aligned) movie frames, using a dose-weighting scheme that is estimated from the data");
 	joboptions["minres"] = JobOption("Minimum resolution for B-factor fit (A): ", 20, 8, 40, 1, "The minimum spatial frequency (in Angstrom) used in the B-factor fit.");
 	joboptions["maxres"] = JobOption("Maximum resolution for B-factor fit (A): ", -1, -1, 15, 1, "The maximum spatial frequency (in Angstrom) used in the B-factor fit. If a negative value is given, the maximum is determined from the input FSC curve.");
-	joboptions["other_combine_args"] = JobOption("Other motion_fit arguments", std::string(""), "Additional arguments that need to be passed to relion_motion_fit.");
+	joboptions["other_combine_args"] = JobOption("Other combine_frames arguments", std::string(""), "Additional arguments that need to be passed to relion_combine_frames.");
 
 
 
@@ -4860,11 +4860,10 @@ bool RelionJob::getCommandsCtfrefineJob(std::string &outputname, std::vector<std
 
 	command += " --i " + joboptions["fn_data"].getString();
 	command += " --f " + joboptions["fn_post"].getString();
-	command += " --corr_mic " + joboptions["fn_mic"].getString();
 	command += " --m1 " + fn_half1;
 	command += " --m2 " + fn_half2;
 	command += " --mask " + fn_mask;
-	command += " --out " + outputname + "particles.star";
+	command += " --o " + outputname;
 
 	if (joboptions["do_defocus"].getBoolean())
 	{
@@ -4875,8 +4874,10 @@ bool RelionJob::getCommandsCtfrefineJob(std::string &outputname, std::vector<std
 		if (joboptions["do_no_glob_astig"].getBoolean())
 			command += " --no_glob_astig";
 
-
+		Node node6(outputname+"logfile.pdf", NODE_PDF_LOGFILE);
+		outputNodes.push_back(node6);
 	}
+
 	if (joboptions["do_tilt"].getBoolean())
 	{
 		command += " --fit_beamtilt";
@@ -4892,13 +4893,15 @@ bool RelionJob::getCommandsCtfrefineJob(std::string &outputname, std::vector<std
 	if (is_continue)
 		command += " --only_do_unfinished ";
 
-	Node node5(outputname+"particles.star", NODE_PART_DATA);
+	Node node5(outputname+"particles_ctf_refine.star", NODE_PART_DATA);
 	outputNodes.push_back(node5);
+
+	// Running stuff
+	command += " --j " + joboptions["nr_threads"].getString();
 
 	// Other arguments for extraction
 	command += " " + joboptions["other_args"].getString();
 	commands.push_back(command);
-
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 

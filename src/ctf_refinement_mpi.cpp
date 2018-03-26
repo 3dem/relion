@@ -52,14 +52,6 @@ void CtfRefinerMpi::run()
 	divide_equally(total_nr_micrographs, node->size, node->rank, my_first_micrograph, my_last_micrograph);
 	my_nr_micrographs = my_last_micrograph - my_first_micrograph + 1;
 
-    // If there were multiple groups of micrographs, we could consider introducing a loop over those here...
-    //for (int igroup = 0; igroup < nr_micrographs_groups; igroup++)
-    //{
-
-    // If there were multiple groups of micrographs, we could consider introducing a loop over those here...
-    //for (int igroup = 0; igroup < nr_micrographs_groups; igroup++)
-    //{
-
 	if (do_defocus_fit || (do_tilt_fit && !precomputed) )
     {
     	// The subsets will be used in openMPI parallelisation: instead of over g0->gc, they will be over smaller subsets
@@ -78,9 +70,10 @@ void CtfRefinerMpi::run()
     	if (do_tilt_fit)
     		fitBeamTiltFromSumsAllMicrographs(xyAccSum, wAccSum);
 
-    	//} // end loop over igroup
-
     	mdt0.write(outPath + "particles_ctf_refine.star");
+
+    	if (verb > 0)
+    		std::cout << " + Done! Written out : " << outPath << "particles_ctf_refine.star" << std::endl;
     }
 
 

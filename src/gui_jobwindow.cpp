@@ -2303,7 +2303,7 @@ void JobWindow::initialiseMotionfitWindow()
 
 	place("minres", TOGGLE_DEACTIVATE);
 	place("maxres", TOGGLE_DEACTIVATE);
-	place("other_motionfit_args");
+	place("other_combine_args");
 
 	group2->end();
 	guientries["do_combine"].cb_menu_i();
