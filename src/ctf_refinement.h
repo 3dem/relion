@@ -62,7 +62,7 @@ public:
 	int verb;
 
 	// Input & Output rootname
-	FileName fn_opt, fn_fsc, fn_out;
+	FileName fn_opt, fn_fsc;
 
 	// Allow continuation of crashed jobs
 	bool only_do_unfinished;

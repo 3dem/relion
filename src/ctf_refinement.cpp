@@ -77,9 +77,9 @@ void CtfRefiner::read(int argc, char **argv)
 	if (parser.checkForErrors())
 		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 
-	// Make sure fn_out ends with a slash
-	if (fn_out[fn_out.length()-1] != '/')
-		fn_out += "/";
+	// Make sure outPath ends with a slash
+	if (outPath[outPath.length()-1] != '/')
+		outPath += "/";
 
 }
 
@@ -166,7 +166,7 @@ void CtfRefiner::initialise()
 	if (minMG > 0 || maxMG < mdts.size()-1)
 	{
 		if (verb > 0)
-			std::cout << "   - Will only process micrographs in range: [" << minMG << "-" << maxMG << "] \n";
+			std::cout << "   - Will only process micrographs in range: [" << minMG << "-" << maxMG << "]"  << std::endl;
 
 		std::vector<MetaDataTable> todo_mdts;
 		for (long int g = minMG; g <= maxMG; g++ )
@@ -191,6 +191,8 @@ void CtfRefiner::initialise()
 				unfinished_mdts.push_back(mdts[g]);
 		}
 		mdts = unfinished_mdts;
+		if (verb > 0)
+			std::cout << "   - Will only process " << mdts.size() << " unfinished micrographs" << std::endl;
 	}
 
 	// Get vector of all micrograph names that need to be processed
@@ -587,12 +589,16 @@ void CtfRefiner::writePerParticleDefocusEPSfitBeamtiltOneMicrograph(long g)
 		CDataSet dataSet;
 		dataSet.SetDrawMarker(true);
 		dataSet.SetDrawLine(false);
-		dataSet.SetMarkerSize(10);
+		dataSet.SetMarkerSize(5);
 		dataSet.SetDatasetColor(red, 0.0, 1. - red);
 		CDataPoint point(xcoor, ycoor);
 		dataSet.AddDataPoint(point);
 		plot2D->AddDataSet(dataSet);
 	}
+
+	char title[256];
+	snprintf(title, 255, "Defocus range from blue to red: %.0f A", max_defocus-min_defocus);
+	plot2D->SetXAxisTitle(title);
 
 	plot2D->OutputPostScriptPlot(fn_eps);
 
@@ -920,7 +926,7 @@ void CtfRefiner::combineAllDefocusFitAndBeamTiltInformation(long g_start, long g
 
 	if (fn_eps.size() > 0)
 	{
-		joinMultipleEPSIntoSinglePDF(fn_out + "logfile.pdf ", fn_eps);
+		joinMultipleEPSIntoSinglePDF(outPath + "logfile.pdf ", fn_eps);
 	}
 
 }
