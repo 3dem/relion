@@ -97,7 +97,7 @@ void ThirdOrderPolynomialModel::read(std::ifstream &fh, std::string block_name) 
 		if (idx >= 0 && idx < NUM_COEFFS_PER_DIM) {
 			coeffX(idx) = val;
 		} else if (idx >= NUM_COEFFS_PER_DIM && idx < NUM_COEFFS) {
-			coeffY(idx) = val;
+			coeffY(idx - NUM_COEFFS_PER_DIM) = val;
 		} else {
 			REPORT_ERROR("ThirdOrderPolynomialModel coefficients table: wrong index");
 		}
@@ -335,7 +335,8 @@ void Micrograph::read(FileName fn_in)
 	}
 
 	int model_version;
-	if (!MDglobal.getValue(EMDL_MICROGRAPH_MOTION_MODEL_VERSION, model_version)) {
+	model = NULL;
+	if (MDglobal.getValue(EMDL_MICROGRAPH_MOTION_MODEL_VERSION, model_version)) {
 		if (model_version == MOTION_MODEL_THIRD_ORDER_POLYNOMIAL) {
 			model = new ThirdOrderPolynomialModel();
 		} else if (model_version == MOTION_MODEL_NULL) {
@@ -343,9 +344,12 @@ void Micrograph::read(FileName fn_in)
 		} else {
 			std::cerr << "Warning: Ignoring unknown motion model " << model_version << std::endl;
 		}
-		model->read(in, "local_motion_model");
 	} else {
-		model = NULL;
+//		std::cerr << "Warning: local motion model is absent in the micrograph star file." << std::endl;
+	}
+
+	if (model != NULL) {
+		model->read(in, "local_motion_model");
 	}
 
 	// Read global shifts
