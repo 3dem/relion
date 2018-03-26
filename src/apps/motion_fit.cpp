@@ -49,13 +49,14 @@ class MotionFitProg : public RefinementProgram
 
         MotionFitProg();
 
-            bool unregGlob, noGlobOff, paramEstim,
+            bool unregGlob, noGlobOff,
+                paramEstim2, paramEstim3,
                 debugOpt, diag, expKer, global_init;
-            int maxIters;
+            int maxIters, paramEstimIters, paramEstimSteps;
             double dmga, dmgb, dmgc, dosePerFrame,
                 sig_vel, sig_div, sig_acc,
                 k_cutoff, maxStep, maxDistDiv,
-                param_rV, param_rD, param_thresh;
+                param_rV, param_rD, param_rA;
 
         int readMoreOptions(IOParser& parser, int argc, char *argv[]);
         int _init();
@@ -75,18 +76,25 @@ class MotionFitProg : public RefinementProgram
                 std::vector<ParFourierTransformer>& fts,
                 const std::vector<Image<RFLOAT>>& dmgWeight);
 
-        d2Vector estimateParams(
+        d2Vector estimateTwoParams(
                 std::vector<ParFourierTransformer>& fts,
                 const std::vector<Image<double>>& dmgWeight,
                 int k_out, double sig_v_0, double sig_d_0,
                 double sig_v_step, double sig_d_step,
-                int maxIters);
+                int maxIters, int recDepth);
+
+        d3Vector estimateThreeParams(
+                std::vector<ParFourierTransformer>& fts,
+                const std::vector<Image<double>>& dmgWeight,
+                int k_out, double sig_v_0, double sig_d_0, double sig_a_0,
+                double sig_v_step, double sig_d_step, double sig_a_step,
+                int maxIters, int recDepth);
 
         void evaluateParams(
                 std::vector<ParFourierTransformer>& fts,
                 const std::vector<Image<double>>& dmgWeight,
                 int k_out,
-                const std::vector<d2Vector>& sig_vals,
+                const std::vector<d3Vector>& sig_vals,
                 std::vector<double>& TSCs);
 
         void computeWeights(
@@ -123,8 +131,12 @@ class MotionFitProg : public RefinementProgram
                 std::string outPath, int mg,
                 double visScale);
 
-        d2Vector interpolateMax(
-                const std::vector<d2Vector>& all_sig_vals,
+        d2Vector interpolateMax2(
+                const std::vector<d3Vector>& all_sig_vals,
+                const std::vector<double>& all_TSCs);
+
+        d3Vector interpolateMax3(
+                const std::vector<d3Vector>& all_sig_vals,
                 const std::vector<double>& all_TSCs);
 };
 
@@ -172,12 +184,15 @@ int MotionFitProg::readMoreOptions(IOParser& parser, int argc, char *argv[])
 
     parser.addSection("Parameter estimation");
 
-    paramEstim = parser.checkOption("--params", "Estimate parameters instead of motion");
+    paramEstim2 = parser.checkOption("--params2", "Estimate 2 parameters instead of motion");
+    paramEstim3 = parser.checkOption("--params3", "Estimate 3 parameters instead of motion");
     param_rV = textToFloat(parser.getOption("--r_vel", "Test s_vel +/- r_vel * s_vel", "0.5"));
-    param_rD = textToFloat(parser.getOption("--r_div", "Test s_div +/- r_div * s_div", "0.2"));
-    param_thresh = textToFloat(parser.getOption("--pthresh", "Abort when relative TSC change is smaller than this", "0.1"));
+    param_rD = textToFloat(parser.getOption("--r_div", "Test s_div +/- r_div * s_div", "0.5"));
+    param_rA = textToFloat(parser.getOption("--r_acc", "Test s_acc +/- r_acc * s_acc", "0.5"));
+    paramEstimIters = textToInteger(parser.getOption("--par_iters", "Parameter estimation is iterated this many times, each time halving the search range", "3"));
+    paramEstimSteps = textToInteger(parser.getOption("--par_steps", "Parameter estimation takes max. this many steps before halving the range", "10"));
 
-    if (paramEstim && k_cutoff < 0)
+    if ((paramEstim2 || paramEstim3) && k_cutoff < 0)
     {
         std::cerr << "\nParameter estimation requires a freq. cutoff (--k_cut).\n";
         return 1138;
@@ -187,6 +202,12 @@ int MotionFitProg::readMoreOptions(IOParser& parser, int argc, char *argv[])
     {
         std::cerr << "\nWarning: in the absence of a corrected_micrographs.star file (--corr_mic), global paths are used for initialization.\n";
         global_init = true;
+    }
+
+    if (paramEstim2 && paramEstim3)
+    {
+        std::cerr << "\nOnly 2 or 3 parameters can be estimated (--params2 or --params3), not both.\n";
+        return 1139;
     }
 
     return 0;
@@ -236,11 +257,19 @@ int MotionFitProg::_run()
 
     double t0 = omp_get_wtime();
 
-    if (paramEstim)
+    if (paramEstim2)
     {
-        d2Vector par = estimateParams(
+        d2Vector par = estimateTwoParams(
             fts, dmgWeight, k_out, sig_vel, sig_div,
-            sig_vel*param_rV, sig_div*param_rD, 10);
+            sig_vel*param_rV, sig_div*param_rD, paramEstimSteps, paramEstimIters);
+
+        std::cout << "opt = " << par << "\n";
+    }
+    else if (paramEstim3)
+    {
+        d3Vector par = estimateThreeParams(
+            fts, dmgWeight, k_out, sig_vel, sig_div, sig_acc,
+            sig_vel*param_rV, sig_div*param_rD, sig_acc*param_rA, paramEstimSteps, paramEstimIters);
 
         std::cout << "opt = " << par << "\n";
     }
@@ -287,7 +316,7 @@ void MotionFitProg::prepMicrograph(
         mdts[g].getValue(EMDL_IMAGE_COORD_Y, positions[p].y, p);
     }
 
-    if (!paramEstim)
+    if (!paramEstim2 && !paramEstim3)
     {
         std::cout << "    computing initial correlations...\n";
     }
@@ -456,48 +485,16 @@ void MotionFitProg::estimateMotion(
         }
 
     } // micrographs
-
-    /*Image<RFLOAT> table, weight;
-
-    FscHelper::mergeFscTables(tables, weights0, weights1, table, weight);
-    ImageLog::write(table, outPath+"_FCC_data");
-
-
-    int f_max = fc;
-    double total = 0.0;
-
-    std::ofstream fccOut(outPath + "_FCC_perFrame.dat");
-
-    for (int y = 0; y < f_max; y++)
-    {
-        double avg = 0.0;
-
-        for (int k = k_cutoff+2; k < k_out; k++)
-        {
-            avg += table(y,k);
-        }
-
-        avg /= k_out - k_cutoff - 1;
-
-        fccOut << y << " " << avg << "\n";
-
-        total += avg;
-    }
-
-    total /= f_max;
-
-    std::cout << "total: " << total << "\n";*/
-
 }
 
-d2Vector MotionFitProg::estimateParams(
+d2Vector MotionFitProg::estimateTwoParams(
         std::vector<ParFourierTransformer>& fts,
         const std::vector<Image<double>>& dmgWeight,
         int k_out, double sig_v_0, double sig_d_0,
         double sig_v_step, double sig_d_step,
-        int maxIters)
+        int maxIters, int recDepth)
 {
-    std::vector<d2Vector> all_sig_vals(9);
+    std::vector<d3Vector> all_sig_vals(9);
 
     for (int p = 0; p < 9; p++)
     {
@@ -506,11 +503,12 @@ d2Vector MotionFitProg::estimateParams(
 
         all_sig_vals[p][0] = sig_v_0 + vi * sig_v_step;
         all_sig_vals[p][1] = sig_d_0 + di * sig_d_step;
+        all_sig_vals[p][2] = sig_acc;
     }
 
     std::vector<double> all_TSCs(9);
 
-    std::vector<d2Vector> unknown_sig_vals = all_sig_vals;
+    std::vector<d3Vector> unknown_sig_vals = all_sig_vals;
     std::vector<double> unknown_TSCs(9);
 
     std::vector<int> unknown_ind(9);
@@ -578,7 +576,21 @@ d2Vector MotionFitProg::estimateParams(
 
         if (bestIndex == 4)
         {
-            return interpolateMax(all_sig_vals, all_TSCs);
+            if (recDepth <= 0)
+            {
+                return d2Vector(all_sig_vals[4][0], all_sig_vals[4][1]);
+            }
+            else
+            {
+                std::cout << "current optimum: " << all_sig_vals[4] << "\n";
+                std::cout << "repeating at half scan range.\n";
+
+                estimateTwoParams(
+                    fts, dmgWeight, k_out,
+                    all_sig_vals[4][0], all_sig_vals[4][1],
+                    sig_v_step/2.0, sig_d_step/2.0,
+                    maxIters, recDepth-1);
+            }
         }
 
         int shift_v = bestIndex % 3 - 1;
@@ -587,7 +599,7 @@ d2Vector MotionFitProg::estimateParams(
         tot_vi += shift_v;
         tot_di += shift_d;
 
-        std::vector<d2Vector> next_sig_vals(9, d2Vector(0,0));
+        std::vector<d3Vector> next_sig_vals(9, d3Vector(0,0,0));
         std::vector<double> next_TSCs(9);
         std::vector<bool> known(9, false);
 
@@ -625,6 +637,188 @@ d2Vector MotionFitProg::estimateParams(
 
                 all_sig_vals[p][0] = sig_v_0 + vi * sig_v_step;
                 all_sig_vals[p][1] = sig_d_0 + di * sig_d_step;
+                all_sig_vals[p][2] = sig_acc;
+
+                unknown_sig_vals.push_back(all_sig_vals[p]);
+                unknown_ind.push_back(p);
+            }
+        }
+
+        unknown_TSCs.resize(unknown_ind.size());
+
+        iters++;
+    }
+}
+
+
+d3Vector MotionFitProg::estimateThreeParams(
+        std::vector<ParFourierTransformer>& fts,
+        const std::vector<Image<double>>& dmgWeight,
+        int k_out, double sig_v_0, double sig_d_0, double sig_a_0,
+        double sig_v_step, double sig_d_step, double sig_a_step,
+        int maxIters, int recDepth)
+{
+    std::vector<d3Vector> all_sig_vals(27);
+
+    for (int p = 0; p < 27; p++)
+    {
+        int vi = (p%3) - 1;
+        int di = ((p/3)%3) - 1;
+        int ai = p/9 - 1;
+
+        all_sig_vals[p][0] = sig_v_0 + vi * sig_v_step;
+        all_sig_vals[p][1] = sig_d_0 + di * sig_d_step;
+        all_sig_vals[p][2] = sig_a_0 + ai * sig_a_step;
+    }
+
+    std::vector<double> all_TSCs(27);
+
+    std::vector<d3Vector> unknown_sig_vals = all_sig_vals;
+    std::vector<double> unknown_TSCs(27);
+
+    std::vector<int> unknown_ind(27);
+
+    for (int p = 0; p < 27; p++)
+    {
+        unknown_ind[p] = p;
+    }
+
+    bool centerBest = false;
+    int iters = 0;
+
+    int tot_vi = 0, tot_di = 0, tot_ai = 0;
+
+    while (!centerBest && iters < maxIters)
+    {
+
+            std::cout << "evaluating:\n";
+
+            for (int k = 0; k < 3; k++)
+            {
+                for (int i = 0; i < 3; i++)
+                {
+                    for (int j = 0; j < 3; j++)
+                    {
+                        std::cout << all_sig_vals[9*k + 3*i + j] << " \t ";
+                    }
+
+                    std::cout << "\n";
+                }
+
+                std::cout << "\n";
+            }
+
+            std::cout << "\n";
+
+        evaluateParams(fts, dmgWeight, k_out, unknown_sig_vals, unknown_TSCs);
+
+        for (int p = 0; p < unknown_ind.size(); p++)
+        {
+            all_TSCs[unknown_ind[p]] = unknown_TSCs[p];
+        }
+
+
+            std::cout << "result:\n";
+
+            for (int k = 0; k < 3; k++)
+            {
+                for (int i = 0; i < 3; i++)
+                {
+                    for (int j = 0; j < 3; j++)
+                    {
+                        std::cout << all_TSCs[9*k + 3*i + j] << " \t ";
+                    }
+
+                    std::cout << "\n";
+                }
+
+                std::cout << "\n";
+            }
+
+            std::cout << "\n";
+
+        int bestIndex = 0;
+        double bestTSC = all_TSCs[0];
+
+        for (int p = 0; p < 27; p++)
+        {
+            if (all_TSCs[p] > bestTSC)
+            {
+                bestTSC = all_TSCs[p];
+                bestIndex = p;
+            }
+        }
+
+        if (bestIndex == 13)
+        {
+            if (recDepth <= 0)
+            {
+                return all_sig_vals[13];
+            }
+            else
+            {
+                std::cout << "current optimum: " << all_sig_vals[13] << "\n";
+                std::cout << "repeating at half scan range.\n";
+
+                estimateThreeParams(
+                    fts, dmgWeight, k_out,
+                    all_sig_vals[13][0], all_sig_vals[13][1], all_sig_vals[13][2],
+                    sig_v_step/2.0, sig_d_step/2.0, sig_a_step/2.0,
+                    maxIters, recDepth-1);
+            }
+        }
+
+        int shift_v = bestIndex % 3 - 1;
+        int shift_d = ((bestIndex / 3)%3) - 1;
+        int shift_a = bestIndex / 3 - 1;
+
+        tot_vi += shift_v;
+        tot_di += shift_d;
+        tot_ai += shift_a;
+
+        std::vector<d3Vector> next_sig_vals(27, d3Vector(0,0,0));
+        std::vector<double> next_TSCs(27);
+        std::vector<bool> known(27, false);
+
+        for (int p = 0; p < 27; p++)
+        {
+            int vi = (p%3) - 1;
+            int di = ((p/3)%3) - 1;
+            int ai = p/9 - 1;
+
+            int vi_next = vi - shift_v;
+            int di_next = di - shift_d;
+            int ai_next = ai - shift_a;
+
+            if (vi_next >= -1 && vi_next <= 1
+                && di_next >= -1 && di_next <= 1
+                && ai_next >= -1 && ai_next <= 1)
+            {
+                int p_next = (vi_next + 1) + 3*(di_next + 1) + 9*(ai_next + 1);
+
+                next_sig_vals[p_next] = all_sig_vals[p];
+                next_TSCs[p_next] = all_TSCs[p];
+                known[p_next] = true;
+            }
+        }
+
+        all_sig_vals = next_sig_vals;
+        all_TSCs = next_TSCs;
+
+        unknown_sig_vals.clear();
+        unknown_ind.clear();
+
+        for (int p = 0; p < 27; p++)
+        {
+            if (!known[p])
+            {
+                int vi = (p%3) - 1 + tot_vi;
+                int di = ((p/3)%3) - 1 + tot_di;
+                int ai = (p/9) - 1 + tot_ai;
+
+                all_sig_vals[p][0] = sig_v_0 + vi * sig_v_step;
+                all_sig_vals[p][1] = sig_d_0 + di * sig_d_step;
+                all_sig_vals[p][2] = sig_a_0 + ai * sig_a_step;
 
                 unknown_sig_vals.push_back(all_sig_vals[p]);
                 unknown_ind.push_back(p);
@@ -641,7 +835,7 @@ void MotionFitProg::evaluateParams(
         std::vector<ParFourierTransformer>& fts,
         const std::vector<Image<double>>& dmgWeight,
         int k_out,
-        const std::vector<d2Vector>& sig_vals,
+        const std::vector<d3Vector>& sig_vals,
         std::vector<double>& TSCs)
 {
     const int paramCount = sig_vals.size();
@@ -649,14 +843,14 @@ void MotionFitProg::evaluateParams(
 
     std::vector<double> sig_v_vals_nrm(paramCount);
     std::vector<double> sig_d_vals_nrm(paramCount);
+    std::vector<double> sig_a_vals_nrm(paramCount);
 
     for (int i = 0; i < paramCount; i++)
     {
         sig_v_vals_nrm[i] = dosePerFrame * sig_vals[i][0] / angpix;
         sig_d_vals_nrm[i] = dosePerFrame * sig_vals[i][1] / coords_angpix;
+        sig_a_vals_nrm[i] = dosePerFrame * sig_vals[i][2] / angpix;
     }
-
-    double sig_acc_nrm = dosePerFrame * sig_acc / angpix;
 
     std::vector<std::vector<Image<RFLOAT>>>
         paramTables(paramCount), paramWeights0(paramCount), paramWeights1(paramCount);
@@ -719,7 +913,7 @@ void MotionFitProg::evaluateParams(
 
             std::vector<std::vector<gravis::d2Vector>> tracks = optimize(
                     movieCC, initialTracks,
-                    sig_v_vals_nrm[i], sig_acc_nrm, sig_d_vals_nrm[i],
+                    sig_v_vals_nrm[i], sig_a_vals_nrm[i], sig_d_vals_nrm[i],
                     positions, globComp, maxStep, 1e-9, 1e-9, maxIters, 0.0);
 
             updateFCC(movie, tracks, mdts[g], paramTables[i], paramWeights0[i], paramWeights1[i]);
@@ -931,9 +1125,9 @@ void MotionFitProg::writeOutput(
         glbOut << globalTrack[f].x << " " << globalTrack[f].y << "\n";
     }
 }
-
-d2Vector MotionFitProg::interpolateMax(
-    const std::vector<d2Vector> &all_sig_vals,
+/*
+d2Vector MotionFitProg::interpolateMax2(
+    const std::vector<d3Vector> &all_sig_vals,
     const std::vector<double> &all_TSCs)
 {
     const int parCt = all_sig_vals.size();
@@ -956,7 +1150,7 @@ d2Vector MotionFitProg::interpolateMax(
     if (bestP != 4)
     {
         std::cerr << "Waring: value not maximal at the center.\n";
-        return all_sig_vals[bestP];
+        return d2Vector(all_sig_vals[bestP][0], all_sig_vals[bestP][1]);
     }
 
     for (int p = 0; p < parCt; p++)
@@ -990,3 +1184,72 @@ d2Vector MotionFitProg::interpolateMax(
 
     return min;
 }
+
+d3Vector MotionFitProg::interpolateMax3(
+    const std::vector<d3Vector> &all_sig_vals,
+    const std::vector<double> &all_TSCs)
+{
+    const int parCt = all_sig_vals.size();
+
+    Matrix2D<RFLOAT> A(parCt,10);
+    Matrix1D<RFLOAT> b(parCt);
+
+    int bestP = 0;
+    double bestTsc = all_TSCs[0];
+
+    for (int p = 0; p < parCt; p++)
+    {
+        if (all_TSCs[p] > bestTsc)
+        {
+            bestTsc = all_TSCs[p];
+            bestP = p;
+        }
+    }
+
+    if (bestP != 13)
+    {
+        std::cerr << "Waring: value not maximal at the center.\n";
+        return all_sig_vals[bestP];
+    }
+
+    for (int p = 0; p < parCt; p++)
+    {
+        const double v = all_sig_vals[p][0];
+        const double d = all_sig_vals[p][1];
+        const double a = all_sig_vals[p][2];
+
+        A(p,0) = v*v;
+        A(p,1) = 2.0*v*d;
+        A(p,2) = 2.0*v*a;
+        A(p,3) = 2.0*v;
+
+        A(p,4) = d*d;
+        A(p,5) = 2.0*d*a;
+        A(p,6) = 2.0*d;
+
+        A(p,7) = a*a;
+        A(p,8) = 2.0*a;
+
+        A(p,9) = 1.0;
+
+        b(p) = all_TSCs[p];
+    }
+
+    const double tol = 1e-20;
+    Matrix1D<RFLOAT> x(10);
+    solve(A, b, x, tol);
+
+    d3Matrix C3(x(0), x(1), x(2),
+                x(1), x(4), x(5),
+                x(2), x(5), x(7));
+
+    d3Vector l(x(3), x(6), x(8));
+
+    d3Matrix C3i = C3;
+    C3i.invert();
+
+    d3Vector min = -(C3i * l);
+
+    return min;
+}
+*/

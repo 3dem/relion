@@ -477,7 +477,7 @@ namespace gravis
   inline
   std::ostream& operator<< (std::ostream& os, const t3Vector<T>& arg)
   {
-    os << std::setprecision(17) << "[" << std::setw(8) << arg.x << ", " << std::setw(8) << arg.y << ", " << std::setw(8) << arg.z << "]";
+	os << "[" << arg.x << ", " << arg.y << ", " << arg.z << "]";
     return os;
   }
 
