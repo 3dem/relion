@@ -110,7 +110,8 @@ static bool do_allow_change_minimum_dedicated;
 #define NODE_HALFMAP		10// Unfiltered half-maps from 3D auto-refine, e.g. run1_half?_class001_unfil.mrc
 #define NODE_FINALMAP		11// Sharpened final map from post-processing (cannot be used as input)
 #define NODE_RESMAP			12// Resmap with local resolution (cannot be used as input)
-#define NODE_PDF_LOGFILE    13//PDF logfile
+#define NODE_PDF_LOGFILE    13// PDF logfile
+#define NODE_POST           14// Postprocess STAR file (with FSC curve, unfil half-maps, masks etc in it: used by Jasenko's programs
 
 // All the directory names of the different types of jobs defined inside the pipeline
 #define PROC_IMPORT_NAME        "Import"       // Import any file as a Node of a given type
@@ -133,6 +134,8 @@ static bool do_allow_change_minimum_dedicated;
 #define PROC_MOVIEREFINE_NAME   "MovieRefine"  // Movie-particle extraction and refinement combined
 #define PROC_INIMODEL_NAME		"InitialModel" // De-novo generation of 3D initial model (using SGD)
 #define PROC_MULTIBODY_NAME		"MultiBody"    // Multi-body refinement
+#define PROC_MOTIONFIT_NAME     "MotionFit"    // Jasenko's motion fitting program (to replace MovieRefine?)
+#define PROC_CTFREFINE_NAME     "CtfRefine"    // Jasenko's program for defocus and beamtilt optimisation
 
 #define PROC_IMPORT         0 // Import any file as a Node of a given type
 #define PROC_MOTIONCORR 	1 // Import any file as a Node of a given type
@@ -154,7 +157,9 @@ static bool do_allow_change_minimum_dedicated;
 #define PROC_MOVIEREFINE    17// Movie-particle extraction and refinement combined
 #define PROC_INIMODEL		18// De-novo generation of 3D initial model (using SGD)
 #define PROC_MULTIBODY      19// Multi-body refinement
-#define NR_BROWSE_TABS      20
+#define PROC_MOTIONFIT      20// Multi-body refinement
+#define PROC_CTFREFINE      21// Multi-body refinement
+#define NR_BROWSE_TABS      22
 
 // Status a Process may have
 #define PROC_RUNNING   0
@@ -189,6 +194,8 @@ class Node
 // Helper function to get the outputnames of refine jobs
 std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, int dim, int nr_bodies=1, bool do_movies=false, bool do_also_rot=false);
 
+// Helper function for Jasenko's programs
+bool getFileNamesFromPostProcess(FileName fn_post, FileName &fn_half1, FileName &fn_half2, FileName &fn_mask);
 
 // One class to store any type of Option for a GUI entry
 class JobOption
@@ -418,6 +425,14 @@ public:
 
 	void initialiseLocalresJob();
 	bool getCommandsLocalresJob(std::string &outputname, std::vector<std::string> &commands,
+			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
+
+	void initialiseMotionfitJob();
+	bool getCommandsMotionfitJob(std::string &outputname, std::vector<std::string> &commands,
+			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
+
+	void initialiseCtfrefineJob();
+	bool getCommandsCtfrefineJob(std::string &outputname, std::vector<std::string> &commands,
 			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
 
 

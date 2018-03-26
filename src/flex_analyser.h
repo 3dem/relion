@@ -61,6 +61,9 @@ public:
 	// Box size of the output 3D models
 	int size_3dmodels;
 
+	// Rescale factor for output 3D models
+	RFLOAT rescale_3dmodels;
+
 	// Perform a PCA on the multibody orientations
 	bool do_PCA_orient;
 

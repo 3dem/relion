@@ -28,42 +28,93 @@
 #endif
 
 
-int main(int argc, char *argv[])
+class pipeliner_parameters
 {
+public:
+	FileName fn_sched, fn_jobids, fn_options;
+	int nr_repeat;
+	bool do_check_complete;
+	long int minutes_wait, minutes_wait_before;
+	std::string add_type;
 
-	try
+	// The actual pipeline
+	PipeLine pipeline;
+
+	// I/O Parser
+	IOParser parser;
+
+	void usage()
 	{
-		// Fill the window, but don't show it!
-		FileName fn_pipe = getParameter(argc, argv, "--pipeline", "default");
-		FileName fn_sched = getParameter(argc, argv, "--schedule", "");
-		int nr_repeat = textToInteger(getParameter(argc, argv, "--repeat", "1"));
-		long int minutes_wait =  textToInteger(getParameter(argc, argv, "--min_wait", "10"));
-		FileName fn_jobids  = getParameter(argc, argv, "--RunJobs", "");
-		std::string add_type = getParameter(argc, argv, "--addJob", "");
-		FileName fn_options = getParameter(argc, argv, "--addJobOptions", "");
-		int verb = textToInteger(getParameter(argc, argv, "--verb", "1"));
+		parser.writeUsage(std::cerr);
+	}
 
-		PipeLine pipeline;
-		pipeline.name = fn_pipe;
+	void read(int argc, char **argv)
+	{
+
+		parser.setCommandLine(argc, argv);
+
+		// Fill the window, but don't show it!
+		int check_section = parser.addSection("Check job completion options");
+		do_check_complete = parser.checkOption("--check_job_completion", "Use this flag to only check whether running jobs have completed");
+		int add_section = parser.addSection("Add scheduled jobs options");
+		add_type = parser.getOption("--addJob", "Add a job of this type to the pipeline","");
+		fn_options = parser.getOption("--addJobOptions", "Options for this job","");
+		int run_section = parser.addSection("Run scheduled jobs options");
+		fn_jobids  = parser.getOption("--RunJobs", "Run these jobs", "");
+		fn_sched = parser.getOption("--schedule", "Name of the scheduler for running the scheduled jobs", "");
+		nr_repeat = textToInteger(parser.getOption("--repeat", "Run the scheduled jobs this many times", "1"));
+		minutes_wait = textToInteger(parser.getOption("--min_wait", "Wait at least this many minutes between each repeat", "0"));
+		minutes_wait_before = textToInteger(parser.getOption("--min_wait_before", "Wait this many minutes before starting the running the first job", "0"));
+		int expert_section = parser.addSection("Expert options");
+		pipeline.name = parser.getOption("--pipeline", "Name of the pipeline", "default");
+
+    	// Check for errors in the command-line option
+    	if (parser.checkForErrors())
+    		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
+
+	}
+
+	void run()
+	{
+
 		pipeline.read(DO_LOCK);
 		pipeline.write(DO_LOCK);
-		if (add_type != "")
+		if (do_check_complete)
+		{
+			pipeline.checkProcessCompletion();
+		}
+		else if (add_type != "")
 		{
 			pipeline.addScheduledJob(add_type, fn_options);
 
 		}
 		else if (nr_repeat > 0)
 		{
-			pipeline.runScheduledJobs(fn_sched, fn_jobids, nr_repeat, minutes_wait);
+			pipeline.runScheduledJobs(fn_sched, fn_jobids, nr_repeat, minutes_wait, minutes_wait_before);
 		}
 
 	}
 
+};
+
+int main(int argc, char *argv[])
+{
+
+	pipeliner_parameters prm;
+
+	try
+    {
+
+		prm.read(argc, argv);
+
+		prm.run();
+
+    }
     catch (RelionError XE)
     {
         std::cerr << XE;
         exit(1);
     }
-
     return 0;
-}
+
+  }

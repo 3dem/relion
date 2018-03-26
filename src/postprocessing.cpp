@@ -63,6 +63,11 @@ void Postprocessing::read(int argc, char **argv)
 	randomize_fsc_at = textToFloat(parser.getOption("--randomize_at_fsc", "Randomize phases from the resolution where FSC drops below this value", "0.8"));
 	filter_edge_width = textToInteger(parser.getOption("--filter_edge_width", "Width of the raised cosine on the low-pass filter edge (in resolution shells)", "2"));
 	verb = textToInteger(parser.getOption("--verb", "Verbosity", "1"));
+	// Hidden option
+	int random_seed = textToInteger(getParameter(argc, argv, "--seed", "-1"));
+	if (random_seed >= 0) {
+		init_random_generator(random_seed);
+	}
 
 	// Check for errors in the command-line option
 	if (parser.checkForErrors())
@@ -667,6 +672,14 @@ void Postprocessing::writeOutput()
 	MDlist.addObject();
 	MDlist.setValue(EMDL_POSTPROCESS_FINAL_RESOLUTION, global_resol);
 	MDlist.setValue(EMDL_POSTPROCESS_BFACTOR, global_bfactor );
+	MDlist.setValue(EMDL_POSTPROCESS_UNFIL_HALFMAP1, fn_I1);
+	MDlist.setValue(EMDL_POSTPROCESS_UNFIL_HALFMAP2, fn_I2);
+	if (do_mask)
+	{
+		RFLOAT randomize_at_Ang = XSIZE(I1())* angpix / randomize_at;
+		MDlist.setValue(EMDL_MASK_NAME, fn_mask);
+		MDlist.setValue(EMDL_POSTPROCESS_RANDOMISE_FROM, randomize_at_Ang);
+	}
 	if (do_auto_bfac)
 	{
 		MDlist.setValue(EMDL_POSTPROCESS_GUINIER_FIT_SLOPE, global_slope);
@@ -1111,7 +1124,7 @@ void Postprocessing::run()
 		I2().setXmippOrigin();
 
 		// Check at which resolution shell the FSC drops below randomize_fsc_at
-		int randomize_at = -1;
+		randomize_at = -1;
 		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(fsc_unmasked)
 		{
 			if (i > 0 && DIRECT_A1D_ELEM(fsc_unmasked, i) < randomize_fsc_at)

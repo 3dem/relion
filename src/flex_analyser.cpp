@@ -205,7 +205,7 @@ void FlexAnalyser::run(int rank, int size)
 
 			MDs[i].read(fn_stack);
 
-			std::remove(fn_stack.c_str());	
+			std::remove(fn_stack.c_str());
 		}
 
 		FileName fn_combined = fn_out + "_subtracted.star";
@@ -279,6 +279,7 @@ void FlexAnalyser::setupSubtractionMasksAndProjectors()
 
 void FlexAnalyser::setup3DModels()
 {
+	rescale_3dmodels = 1.0;
 	for (int ibody = 0; ibody < model.nr_bodies; ibody++)
 	{
 		// Premultiply the map with the mask (otherwise need to do this again for every particle
@@ -287,6 +288,17 @@ void FlexAnalyser::setup3DModels()
 		selfTranslate(model.Iref[ibody], -model.com_bodies[ibody], DONT_WRAP);
 		// And do the same for the masks
 		selfTranslate(model.masks_bodies[ibody], -model.com_bodies[ibody], DONT_WRAP);
+
+		if (size_3dmodels < XSIZE(model.Iref[ibody]))
+		{
+			rescale_3dmodels = (RFLOAT)(size_3dmodels)/(RFLOAT)(XSIZE(model.Iref[ibody]));
+			std::cerr << " rescale_3dmodels= " << rescale_3dmodels << std::endl;
+			selfScaleToSize(model.Iref[ibody], size_3dmodels, size_3dmodels, size_3dmodels);
+			selfScaleToSize(model.masks_bodies[ibody], size_3dmodels, size_3dmodels, size_3dmodels);
+			model.Iref[ibody].setXmippOrigin();
+			model.masks_bodies[ibody].setXmippOrigin();
+		}
+
 	}
 }
 
@@ -447,7 +459,7 @@ void FlexAnalyser::subtractOneParticle(long int ori_particle, long int imgno, in
 	// Subtract the projected COM offset, to position this body in the center
 	my_old_offset -= my_projected_com;
 	my_residual_offset = my_old_offset;
-		
+
 	// Also get refined offset for this body
 	data.MDbodies[subtract_body].getValue(EMDL_ORIENT_ORIGIN_X, XX(my_refined_ibody_offset), part_id);
 	data.MDbodies[subtract_body].getValue(EMDL_ORIENT_ORIGIN_Y, YY(my_refined_ibody_offset), part_id);
@@ -655,16 +667,11 @@ void FlexAnalyser::make3DModelOneParticle(long int ori_particle, long int imgno,
 	long int part_id = data.ori_particles[ori_particle].particles_id[0];
 
 	// Get the consensus class, orientational parameters and norm (if present)
-	Matrix1D<RFLOAT> my_old_offset(3);
 	Matrix2D<RFLOAT> Aori;
 	RFLOAT rot, tilt, psi, xoff, yoff, zoff;
 	data.MDimg.getValue(EMDL_ORIENT_ROT, rot, part_id);
 	data.MDimg.getValue(EMDL_ORIENT_TILT, tilt, part_id);
 	data.MDimg.getValue(EMDL_ORIENT_PSI, psi, part_id);
-	data.MDimg.getValue(EMDL_ORIENT_ORIGIN_X, XX(my_old_offset), part_id);
-	data.MDimg.getValue(EMDL_ORIENT_ORIGIN_Y, YY(my_old_offset), part_id);
-	if (model.data_dim == 3)
-		data.MDimg.getValue(EMDL_ORIENT_ORIGIN_Z, ZZ(my_old_offset), part_id);
 	Euler_angles2matrix(rot, tilt, psi, Aori, false);
 
 
@@ -690,6 +697,9 @@ void FlexAnalyser::make3DModelOneParticle(long int ori_particle, long int imgno,
 		if (model.data_dim == 3)
 			data.MDbodies[ibody].getValue(EMDL_ORIENT_ORIGIN_Z, ZZ(body_offset), part_id);
 
+		// Keep rescaling into account!
+		body_offset *= rescale_3dmodels;
+
 		Matrix2D<RFLOAT> Aresi,  Abody, Anew;
 		// Aresi is the residual orientation for this ibody
 		Euler_angles2matrix(body_rot, body_tilt, body_psi, Aresi);
@@ -703,17 +713,20 @@ void FlexAnalyser::make3DModelOneParticle(long int ori_particle, long int imgno,
 		Anew = Aori * Abody;
 		body_offset_3d = Anew.inv() * (-body_offset);
 
-		datarow.push_back(norm_pca[ibody*4+0] * body_rot);
-		datarow.push_back(norm_pca[ibody*4+1] * body_tilt);
-		datarow.push_back(norm_pca[ibody*4+2] * body_psi);
-		datarow.push_back(norm_pca[ibody*4+3] * XX(body_offset_3d));
-		datarow.push_back(norm_pca[ibody*4+3] * YY(body_offset_3d));
-		datarow.push_back(norm_pca[ibody*4+3] * ZZ(body_offset_3d));
+		if (do_PCA_orient)
+		{
+			datarow.push_back(norm_pca[ibody*4+0] * body_rot);
+			datarow.push_back(norm_pca[ibody*4+1] * body_tilt);
+			datarow.push_back(norm_pca[ibody*4+2] * body_psi);
+			datarow.push_back(norm_pca[ibody*4+3] * XX(body_offset_3d));
+			datarow.push_back(norm_pca[ibody*4+3] * YY(body_offset_3d));
+			datarow.push_back(norm_pca[ibody*4+3] * ZZ(body_offset_3d));
+		}
 
 		if (do_3dmodels)
 		{
 			// Also put back at the centre-of-mass of this body
-			body_offset_3d += model.com_bodies[ibody];
+			body_offset_3d += rescale_3dmodels * model.com_bodies[ibody];
 			Abody.resize(4,4);
 
 			MAT_ELEM(Abody, 0, 3) = XX(body_offset_3d);
@@ -742,7 +755,7 @@ void FlexAnalyser::make3DModelOneParticle(long int ori_particle, long int imgno,
 		}
 		// Write the image to disk
 		FileName fn_img;
-		fn_img.compose(fn_out, imgno+1,"mrc");
+		fn_img.compose(fn_out+"_part", imgno+1,"mrc");
 		img.setSamplingRateInHeader(model.pixel_size);
 		img.write(fn_img);
 

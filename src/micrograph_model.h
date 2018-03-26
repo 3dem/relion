@@ -42,7 +42,7 @@ public:
 	// Get motion at frame and (x, y); frame is 0-indexed (NOT like Micrograph::getShiftAt)
 	virtual int getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty) const = 0;
 
-    virtual MotionModel* clone() const = 0;
+	virtual MotionModel* clone() const = 0;
 };
 
 class ThirdOrderPolynomialModel: public MotionModel {
@@ -64,14 +64,14 @@ public:
 
 	int getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty) const;
 
-    MotionModel* clone() const;
+	MotionModel* clone() const;
 };
 
 class Micrograph
 {
 public:
 
-    bool ready;
+	bool ready;
 	static const RFLOAT NOT_OBSERVED;
 	RFLOAT angpix, voltage, dose_per_frame, pre_exposure;
 
@@ -81,34 +81,34 @@ public:
 	// Local trajectories (not written, not read from STAR files)
 	std::vector<RFLOAT> localShiftX, localShiftY, localFitX, localFitY, patchX, patchY, patchZ, patchW, patchH;
 
-    // Default constructor
-    Micrograph();
+	// Default constructor
+	Micrograph();
 
-    // Copy-constructor
-    Micrograph(const Micrograph& m);
+	// Copy-constructor
+	Micrograph(const Micrograph& m);
 
 	// Create from a movie or a STAR file
-    Micrograph(FileName filename, FileName fnGain="", RFLOAT binning=1.0);
+	Micrograph(FileName filename, FileName fnGain="", RFLOAT binning=1.0);
 
-    ~Micrograph();
+	~Micrograph();
 
-    Micrograph& operator = (const Micrograph& m);
+	Micrograph& operator = (const Micrograph& m);
 
 	// Write micrograph model from a STAR file
 	void write(FileName filename);
 
 	// Get gain reference file name
-    FileName getGainFilename() const;
+	FileName getGainFilename() const;
 
 	// Get binning factor
-    RFLOAT getBinningFactor() const;
+	RFLOAT getBinningFactor() const;
 
 	// Get original movie name
-    FileName getMovieFilename() const;
+	FileName getMovieFilename() const;
 
-    int getWidth() const;
-    int getHeight() const;
-    int getNframes() const;
+	int getWidth() const;
+	int getHeight() const;
+	int getNframes() const;
 
 	// Get shift vector at (x, y, frame); frame is 1-indexed
 	// (x, y) and (shiftx, shifty) are UNBINNED pixels in the original movie
@@ -128,16 +128,17 @@ private:
 	
 	std::vector<RFLOAT> globalShiftX, globalShiftY;
 
-    // Read micrograph model from a STAR file
-    void read(FileName filename);
+	// Read micrograph model from a STAR file
+	void read(FileName filename);
 
-    // Set target movie file
-    void setMovie(FileName fnMovie, FileName fnGain="", RFLOAT binning=1.0);
+	// Set target movie file
+	void setMovie(FileName fnMovie, FileName fnGain="", RFLOAT binning=1.0);
 
-    void clearFields();
-    void copyFieldsFrom(const Micrograph& m);
+	void clear();
+	void clearFields();
+	void copyFieldsFrom(const Micrograph& m);
 
-    void checkReadyFlag(std::string origin) const;
+	void checkReadyFlag(std::string origin) const;
 };
 
 #endif /* MICROGRAPH_MODEL_H_ */

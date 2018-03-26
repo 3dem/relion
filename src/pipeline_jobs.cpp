@@ -89,6 +89,16 @@ std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, 
 
 }
 
+bool getFileNamesFromPostProcess(FileName fn_post, FileName &fn_half1, FileName &fn_half2, FileName &fn_mask)
+{
+	MetaDataTable MD;
+	MD.read(fn_post, "general");
+	return (MD.getValue(EMDL_POSTPROCESS_UNFIL_HALFMAP1, fn_half1) &&
+			MD.getValue(EMDL_POSTPROCESS_UNFIL_HALFMAP2, fn_half2) &&
+			MD.getValue(EMDL_MASK_NAME, fn_mask));
+}
+
+
 // Any constructor
 JobOption::JobOption(std::string _label, std::string _default_value, std::string _helptext)
 {
@@ -315,6 +325,10 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
                 type = PROC_MOVIEREFINE;
         else if (typestring == PROC_INIMODEL_NAME)
                 type = PROC_INIMODEL;
+        else if (typestring == PROC_MOTIONFIT_NAME)
+                type = PROC_MOTIONFIT;
+        else if (typestring == PROC_CTFREFINE_NAME)
+                type = PROC_CTFREFINE;
         else
         	type = (int)textToFloat((line.substr(idx+1,line.length()-idx)).c_str());
         // Just check that went OK
@@ -337,7 +351,9 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 				type != PROC_POST &&
 				type != PROC_RESMAP &&
 				type != PROC_MOVIEREFINE &&
-				type != PROC_INIMODEL)
+				type != PROC_INIMODEL &&
+				type != PROC_MOTIONFIT &&
+				type != PROC_CTFREFINE)
 			REPORT_ERROR("ERROR: cannot find correct job type in " + myfilename + "run.job, with type= " + integerToString(type));
 
 		// Get is_continue from second line
@@ -707,6 +723,16 @@ void RelionJob::initialise(int _job_type)
 		has_mpi = has_thread = true;
 		initialiseLocalresJob();
 	}
+	else if (type == PROC_MOTIONFIT)
+	{
+		has_mpi = has_thread = true;
+		initialiseMotionfitJob();
+	}
+	else if (type == PROC_CTFREFINE)
+	{
+		has_mpi = has_thread = true;
+		initialiseCtfrefineJob();
+	}
 	else
 		REPORT_ERROR("ERROR: unrecognised job-type");
 
@@ -873,6 +899,14 @@ bool RelionJob::getCommands(std::string &outputname, std::vector<std::string> &c
 	else if (type == PROC_RESMAP)
 	{
 		result = getCommandsLocalresJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
+	}
+	else if (type == PROC_MOTIONFIT)
+	{
+		result = getCommandsMotionfitJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
+	}
+	else if (type == PROC_CTFREFINE)
+	{
+		result = getCommandsCtfrefineJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
 	}
 	else
 	{
@@ -1263,6 +1297,7 @@ void RelionJob::initialiseCtffindJob()
 		default_location=mydefault;
 	}
 	joboptions["fn_ctffind_exe"] = JobOption("CTFFIND-4.1 executable:", std::string(default_location), "*.exe", ".", "Location of the CTFFIND (release 4.1 or later) executable. You can control the default of this field by setting environment variable RELION_CTFFIND_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
+	joboptions["slow_search"] = JobOption("Use exhaustive search?", false, "If set to Yes, CTFFIND4 will use slower but more exhaustive search. This option is recommended for CTFFIND version 4.1.8 and earlier, but probably not necessary for 4.1.10 and later. It is also worth trying this option when astigmatism and/or phase shifts are difficult to fit.");
 	joboptions["do_movie_thon_rings"] = JobOption("Estimate Thon rings from movies?", false, "If set to Yes, CTFFIND4 will calculate power spectra of averages of several movie frames and then average those power spectra to calculate Thon rings. This may give better rings than calculation the power spectra of averages of all movie frames, although it does come at increased costs of processing and disk access");
 	joboptions["movie_rootname"] = JobOption("Movie rootname plus extension", std::string("_movie.mrcs"), "Give the movie rootname and extension for all movie files. Movies are assumed to be next to the average micrographs in the same directory.");
 	joboptions["avg_movie_frames"] = JobOption("Nr of movie frames to average:", 4, 1, 20, 1,"Calculate averages over so many movie frames to calculate power spectra. Often values corresponding to an accumulated dose of ~ 4 electrons per squared Angstrom work well.");
@@ -1362,6 +1397,10 @@ bool RelionJob::getCommandsCtffindJob(std::string &outputname, std::vector<std::
 		command += " --ctffind_exe " + joboptions["fn_ctffind_exe"].getString();
 		command += " --ctfWin " + joboptions["ctf_win"].getString();
 		command += " --is_ctffind4 ";
+		if (!joboptions["slow_search"].getBoolean())
+		{
+			command += " --fast_search ";
+		}
 		if (joboptions["do_movie_thon_rings"].getBoolean())
 		{
 			command += " --do_movie_thon_rings --avg_movie_frames " + joboptions["avg_movie_frames"].getString();
@@ -2213,7 +2252,6 @@ A range of 15 degrees is the same as sigma = 5 degrees. Note that the ranges of 
 	joboptions["nr_pool"] = JobOption("Number of pooled particles:", 3, 1, 16, 1, "Particles are processed in individual batches by MPI slaves. During each batch, a stack of particle images is only opened and closed once to improve disk access times. \
 All particle images of a single batch are read into memory together. The size of these batches is at least one particle per thread used. The nr_pooled_particles parameter controls how many particles are read together for each thread. If it is set to 3 and one uses 8 threads, batches of 3x8=24 particles will be read together. \
 This may improve performance on systems where disk access, and particularly metadata handling of disk access, is a problem. It has a modest cost of increased RAM usage.");
-	joboptions["do_pad1"] = JobOption("Skip padding?", true, "If set to Yes, the calculations will not use padding in Fourier space for better interpolation in the references. Otherwise, references are padded 2x before Fourier transforms are calculated. Skipping padding (i.e. use --pad 1) gives nearly as good results as using --pad 2, but some artifacts may appear in the corners from signal that is folded back.");
 	joboptions["do_parallel_discio"] = JobOption("Use parallel disc I/O?", true, "If set to Yes, all MPI slaves will read images from disc. \
 Otherwise, only the master will read images and send them through the network to the slaves. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many slaves reading in parallel.");
 	joboptions["do_preread_images"] = JobOption("Pre-read all particles into RAM?", false, "If set to Yes, all particle images will be read into computer memory, which will greatly speed up calculations on systems with slow disk access. However, one should of course be careful with the amount of RAM available. \
@@ -2288,10 +2326,8 @@ bool RelionJob::getCommandsClass2DJob(std::string &outputname, std::vector<std::
 	else if (joboptions["scratch_dir"].getString() != "")
             command += " --scratch_dir " +  joboptions["scratch_dir"].getString();
 	command += " --pool " + joboptions["nr_pool"].getString();
-	if (joboptions["do_pad1"].getBoolean())
-		command += " --pad 1 ";
-	else
-		command += " --pad 2 ";
+	// Takanori observed bad 2D classifications with pad1, so use pad2 always. Memory isnt a problem here anyway
+	command += " --pad 2 ";
 
 	// CTF stuff
 	if (!is_continue)
@@ -4413,6 +4449,8 @@ bool RelionJob::getCommandsPostprocessJob(std::string &outputname, std::vector<s
 	Node node2b(outputname+"logfile.pdf", NODE_PDF_LOGFILE);
 	outputNodes.push_back(node2b);
 
+	Node node2c(outputname+"postprocess.star", NODE_POST);
+	outputNodes.push_back(node2c);
 
 	// Sharpening
 	if (joboptions["fn_mtf"].getString().length() > 0)
@@ -4591,6 +4629,284 @@ bool RelionJob::getCommandsLocalresJob(std::string &outputname, std::vector<std:
 	command += " " + joboptions["other_args"].getString();
 	commands.push_back(command);
 
+
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
+
+}
+
+void RelionJob::initialiseMotionfitJob()
+{
+
+	hidden_name = ".gui_motionfit";
+
+	// I/O
+	joboptions["fn_mic"] = JobOption("Input micrographs:", NODE_MICS,  "", "STAR files (*.star)", "The input STAR file with the micrograph (and their movie metadata) from a MotionCorr job.");
+	joboptions["fn_data"] = JobOption("Input particles:", NODE_PART_DATA,  "", "STAR files (*.star)", "The input STAR file with the metadata of all particles.");
+	joboptions["fn_post"] = JobOption("Postprocess STAR file:", NODE_POST,  "", "STAR files (postprocess.star)", "The STAR file generated by a PostProcess job. \
+The mask used for this postprocessing will be applied to the unfiltered half-maps and should encompass the entire complex. The resulting FSC curve will be used for weighting the different frequencies.");
+
+	// motion_fit
+	joboptions["do_fit"] = JobOption("Perform motion fit?", true, "If set to Yes, then relion_motion_fit will be run to estimate per-particle motion-tracks using the parameters below.");
+	joboptions["sigma_vel"] = JobOption("Sigma for velocity (unit?): ", 3, 1., 10., 0.1, "Standard deviation for the velocity regularisation. TODO EXPLAIN");
+	joboptions["sigma_div"] = JobOption("Sigma for div (unit?): ", 0.07, 0.01, 0.2, 0.01, "Standard deviation for the XXX regularisation. TODO EXPLAIN");
+	joboptions["max_iters"] = JobOption("Maximum number of iterations: ", 10000, 2000, 50000, 1000, "Maximum number of iterations for the optimisation per micrograph.");
+	joboptions["dose_rate"] = JobOption("Dose rate (electron/A^2/frame): ", 1, 0.2, 5., 0.1, "The dose rate in electrons per squared Angstrom per movie frame.");
+	joboptions["do_pad1"] = JobOption("Skip padding?", false, "If set to Yes, the calculations will not use padding in Fourier space for better interpolation in the references. Otherwise, references are padded 2x before Fourier transforms are calculated. Skipping padding (i.e. use --pad 1) gives nearly as good results as using --pad 2, but some artifacts may appear in the corners from signal that is folded back.");
+	joboptions["other_motionfit_args"] = JobOption("Other motion_fit arguments", std::string(""), "Additional arguments that need to be passed to relion_motion_fit.");
+
+	//combine_frames
+	joboptions["do_combine"] = JobOption("Generate shiny particles?", true, "If set to Yes, then relion_combine_frames will be run to combine all (aligned) movie frames, using a dose-weighting scheme that is estimated from the data");
+	joboptions["minres"] = JobOption("Minimum resolution for B-factor fit (A): ", 20, 8, 40, 1, "The minimum spatial frequency (in Angstrom) used in the B-factor fit.");
+	joboptions["maxres"] = JobOption("Maximum resolution for B-factor fit (A): ", -1, -1, 15, 1, "The maximum spatial frequency (in Angstrom) used in the B-factor fit. If a negative value is given, the maximum is determined from the input FSC curve.");
+	joboptions["other_combine_args"] = JobOption("Other combine_frames arguments", std::string(""), "Additional arguments that need to be passed to relion_combine_frames.");
+
+
+
+}
+
+bool RelionJob::getCommandsMotionfitJob(std::string &outputname, std::vector<std::string> &commands,
+		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
+{
+
+	commands.clear();
+	initialisePipeline(outputname, PROC_MOTIONFIT_NAME, job_counter);
+	std::string command;
+
+	if (joboptions["nr_mpi"].getNumber() > 1)
+		command="`which relion_motion_fit_mpi`";
+	else
+		command="`which relion_motion_fit`";
+
+	if (joboptions["fn_data"].getString() == "")
+	{
+		error_message = "ERROR: empty field for input particle STAR file...";
+		return false;
+	}
+	if (joboptions["fn_mic"].getString() == "")
+	{
+		error_message = "ERROR: empty field for input micrograph STAR file...";
+		return false;
+	}
+	if (joboptions["fn_post"].getString() == "")
+	{
+		error_message = "ERROR: empty field for input PostProcess STAR file...";
+		return false;
+	}
+
+	Node node(joboptions["fn_data"].getString(), joboptions["fn_data"].node_type);
+	inputNodes.push_back(node);
+
+	FileName fn_half1, fn_half2, fn_mask;
+	if (!getFileNamesFromPostProcess(joboptions["fn_post"].getString(), fn_half1, fn_half2, fn_mask))
+	{
+		error_message = "ERROR: could not get filenames for unfiltered half maps or mask from postprocess.star...";
+		return false;
+	}
+
+	Node node2(joboptions["fn_post"].getString(), joboptions["fn_post"].node_type);
+	inputNodes.push_back(node);
+
+	Node node3(fn_half1, NODE_HALFMAP);
+	inputNodes.push_back(node);
+
+	Node node4(fn_mask, NODE_MASK);
+	inputNodes.push_back(node);
+
+	command += " --i " + joboptions["fn_data"].getString();
+	command += " --f " + joboptions["fn_post"].getString();
+	command += " --corr_mic " + joboptions["fn_mic"].getString();
+	command += " --m1 " + fn_half1;
+	command += " --m2 " + fn_half2;
+	command += " --mask " + fn_mask;
+	command += " --out " + outputname + "run";
+	if (joboptions["do_fit"].getBoolean())
+	{
+		// Fit Parameters
+		command += " --s_vel " + joboptions["sigma_vel"].getString();
+		command += " --s_div " + joboptions["sigma_div"].getString();
+		command += " --max_iters " + joboptions["max_iters"].getString();
+		command += " --fdose " + joboptions["dose_rate"].getString();
+	}
+	else
+	{
+		command += " --skip_motion_fit";
+	}
+
+	if (joboptions["do_pad1"].getBoolean())
+		command += " --pad 1 ";
+	else
+		command += " --pad 2 ";
+
+	// If this is a continue job, then only process unfinished micrographs
+	if (is_continue)
+		command += " --only_do_unfinished ";
+
+	// Running stuff
+	command += " --j " + joboptions["nr_threads"].getString();
+
+	// Other arguments for extraction
+	command += " " + joboptions["other_motionfit_args"].getString();
+	commands.push_back(command);
+
+	Node node5(outputname+"motionfit_logfile.pdf", NODE_PDF_LOGFILE);
+	outputNodes.push_back(node5);
+
+
+	if (joboptions["do_combine"].getBoolean())
+	{
+
+		if (joboptions["nr_mpi"].getNumber() > 1)
+			command="`which relion_recombine_mpi`";
+		else
+			command="`which relion_recombine`";
+
+		command += " --i " + joboptions["fn_data"].getString();
+		command += " --t "  + outputname + "run";
+		command += " --corr_mic " + joboptions["fn_mic"].getString();
+
+		// Parameters
+		command += " --k0 " + joboptions["minres"].getString();
+		command += " --k1 " + joboptions["maxres"].getString();
+		command += " --out " + outputname;
+
+		// If this is a continue job, then only process unfinished micrographs
+		if (is_continue)
+			command += " --only_do_unfinished ";
+
+		// Running stuff
+		command += " --j " + joboptions["nr_threads"].getString();
+
+		// Other arguments for extraction
+		command += " " + joboptions["other_combine_args"].getString();
+		commands.push_back(command);
+
+		Node node6(outputname+"recombine_logfile.pdf", NODE_PDF_LOGFILE);
+		outputNodes.push_back(node6);
+
+		Node node7(outputname+"particles.star", NODE_PDF_LOGFILE);
+		outputNodes.push_back(node7);
+
+	}
+
+	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
+
+}
+
+
+void RelionJob::initialiseCtfrefineJob()
+{
+
+	hidden_name = ".gui_ctfrefine";
+
+	// I/O
+	joboptions["fn_data"] = JobOption("Input particles:", NODE_PART_DATA,  "", "STAR files (*.star)", "The input STAR file with the metadata of all particles.");
+	joboptions["fn_post"] = JobOption("Postprocess STAR file:", NODE_POST,  "", "STAR files (postprocess.star)", "The STAR file generated by a PostProcess job. \
+The mask used for this postprocessing will be applied to the unfiltered half-maps and should encompass the entire complex. The resulting FSC curve will be used for weighting the different frequencies.");
+
+	// Defocus fit
+	joboptions["do_defocus"] = JobOption("Perform defocus estimation?", true, "If set to Yes, then relion_ctf_refine will estimate a per-particle defocus.");
+	joboptions["range"] = JobOption("Range for defocus fit (A): ", 2000, 500, 5000, 100, "The range in (Angstrom) for the defocus fit of each particle.");
+	joboptions["do_no_glob_astig"] = JobOption("Skip per-micrograph astigmatism fit?", false, "By default, ctf_refine will try to refine astigamtism on a per-micrograph basis. If this option is set to Yes, this calculation will be skipped. This may be useful if you have few particles per micrograph.");
+	joboptions["do_astig"] = JobOption("Fit per-particle astigmatism?", false, "If set to Yes, astigmatism will be estimated on a per-particle basis. This requires very strong data, i.e. very large particles with excellent signal-to-noise ratios.");
+
+	// Beamtilt fit
+	joboptions["do_tilt"] = JobOption("Perform beamtilt estimation?", true, "If set to Yes, then relion_ctf_refine will also estimate the beamtilt over the entire data set.");
+	joboptions["minres"] = JobOption("Minimum resolution for beamtilt fit (A): ", 30, 8, 40, 1, "The minimum spatial frequency (in Angstrom) used in the beamtilt fit.");
+
+	joboptions["do_pad1"] = JobOption("Skip padding?", false, "If set to Yes, the calculations will not use padding in Fourier space for better interpolation in the references. Otherwise, references are padded 2x before Fourier transforms are calculated. Skipping padding (i.e. use --pad 1) gives nearly as good results as using --pad 2, but some artifacts may appear in the corners from signal that is folded back.");
+
+
+}
+
+bool RelionJob::getCommandsCtfrefineJob(std::string &outputname, std::vector<std::string> &commands,
+		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
+{
+
+	commands.clear();
+	initialisePipeline(outputname, PROC_CTFREFINE_NAME, job_counter);
+	std::string command;
+
+
+	if (joboptions["nr_mpi"].getNumber() > 1)
+		command="`which relion_ctf_refine_mpi`";
+	else
+		command="`which relion_ctf_refine`";
+
+	if (joboptions["fn_data"].getString() == "")
+	{
+		error_message = "ERROR: empty field for input particle STAR file...";
+		return false;
+	}
+	if (joboptions["fn_post"].getString() == "")
+	{
+		error_message = "ERROR: empty field for input PostProcess STAR file...";
+		return false;
+	}
+
+
+	Node node(joboptions["fn_data"].getString(), joboptions["fn_data"].node_type);
+	inputNodes.push_back(node);
+
+	FileName fn_half1, fn_half2, fn_mask;
+	if (!getFileNamesFromPostProcess(joboptions["fn_post"].getString(), fn_half1, fn_half2, fn_mask))
+	{
+		error_message = "ERROR: could not get filenames for unfiltered half maps or mask from postprocess.star...";
+		return false;
+	}
+
+	Node node2(joboptions["fn_post"].getString(), joboptions["fn_post"].node_type);
+	inputNodes.push_back(node);
+
+	Node node3(fn_half1, NODE_HALFMAP);
+	inputNodes.push_back(node);
+
+	Node node4(fn_mask, NODE_MASK);
+	inputNodes.push_back(node);
+
+	command += " --i " + joboptions["fn_data"].getString();
+	command += " --f " + joboptions["fn_post"].getString();
+	command += " --m1 " + fn_half1;
+	command += " --m2 " + fn_half2;
+	command += " --mask " + fn_mask;
+	command += " --o " + outputname;
+
+	if (joboptions["do_defocus"].getBoolean())
+	{
+		command += " --fit_defocus";
+		command += " --range " + joboptions["range"].getString();
+		if (joboptions["do_astig"].getBoolean())
+			command += " --astig";
+		if (joboptions["do_no_glob_astig"].getBoolean())
+			command += " --no_glob_astig";
+
+		Node node6(outputname+"logfile.pdf", NODE_PDF_LOGFILE);
+		outputNodes.push_back(node6);
+	}
+
+	if (joboptions["do_tilt"].getBoolean())
+	{
+		command += " --fit_beamtilt";
+		command += " --kmin " + joboptions["minres"].getString();
+	}
+
+	if (joboptions["do_pad1"].getBoolean())
+		command += " --pad 1 ";
+	else
+		command += " --pad 2 ";
+
+	// If this is a continue job, then only process unfinished micrographs
+	if (is_continue)
+		command += " --only_do_unfinished ";
+
+	Node node5(outputname+"particles_ctf_refine.star", NODE_PART_DATA);
+	outputNodes.push_back(node5);
+
+	// Running stuff
+	command += " --j " + joboptions["nr_threads"].getString();
+
+	// Other arguments for extraction
+	command += " " + joboptions["other_args"].getString();
+	commands.push_back(command);
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 

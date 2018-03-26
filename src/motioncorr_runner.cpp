@@ -381,7 +381,7 @@ bool MotioncorrRunner::executeMotioncor2(Micrograph &mic, int rank)
 	{
 		// Read in header of the movie, to see how many frames it has
 		Image<RFLOAT> Ihead;
-		Ihead.read(fn_mic, false);
+		Ihead.read(fn_mic, false, -1, false, true); // select_img -1, mmap false, is_2D true
 		int n_frames = NSIZE(Ihead());
 
 		int trunc = n_frames - last_frame_sum;
@@ -582,7 +582,7 @@ bool MotioncorrRunner::executeUnblur(Micrograph &mic)
 	FileName fn_tmp_mov = fn_mov.withoutExtension() + ".mrc";
 
 	Image<RFLOAT> Itest;
-	Itest.read(fn_mic, false);
+	Itest.read(fn_mic, false, -1, false, true); // select_img -1, mmap false, is_2D true
 	int Nframes = NSIZE(Itest());
 
 	std::ofstream  fh;
@@ -802,7 +802,7 @@ void MotioncorrRunner::plotShifts(FileName fn_mic, Micrograph &mic)
 
  	CDataSet dataSet;
 	dataSet.SetDrawMarker(false);
-	dataSet.SetDatasetColor(0.0,0.0,0.0);
+	dataSet.SetDatasetColor(0.0,0.0,1.0);
 	RFLOAT xshift, yshift;
 	// UNBLUR does not provide local trajectories, so start the global trajectory from the origin.
 	const RFLOAT xcenter = (!do_unblur) ? mic.getWidth() / 2.0 : 0;
@@ -970,7 +970,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	const int hotpixel_sigma = 6;
 
 	// Check image size
-	Ihead.read(fn_mic, false);
+	Ihead.read(fn_mic, false, -1, false, true); // select_img -1, mmap false, is_2D true
 	const int nx = XSIZE(Ihead()), ny = YSIZE(Ihead()), nn = NSIZE(Ihead());
 
 	// Which frame to use?
@@ -1038,7 +1038,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	RCTIC(TIMING_READ_MOVIE);
 	#pragma omp parallel for
 	for (int iframe = 0; iframe < n_frames; iframe++) {
-		Iframes[iframe].read(fn_mic, true, frames[iframe]);
+		Iframes[iframe].read(fn_mic, true, frames[iframe], false, true); // mmap false, is_2D true
 	}
 	RCTOC(TIMING_READ_MOVIE);
 

@@ -102,6 +102,8 @@ int SchedulerWindow::fill(FileName _pipeline_name, std::vector<FileName> _schedu
     current_y = max_y;
     schedule_name = new Fl_Input(xcol, current_y, 100, ystep-8, "Provide a name for this schedule: ");
     current_y += ystep;
+    wait_before = new Fl_Input(xcol, current_y, 100, ystep-8, "Wait this many minutes before starting?");
+    current_y += ystep;
     repeat = new Fl_Input(xcol, current_y, 100, ystep-8, "Run the jobs how many times?");
     current_y += ystep;
     wait = new Fl_Input(xcol, current_y, 100, ystep-8, "Wait at least in between (in minutes)?");
@@ -120,6 +122,10 @@ int SchedulerWindow::fill(FileName _pipeline_name, std::vector<FileName> _schedu
 	wait->color(GUI_INPUT_COLOR);
 	wait->textsize(ENTRY_FONTSIZE);
 	wait->labelsize(ENTRY_FONTSIZE);
+    wait_before->value("0");
+	wait_before->color(GUI_INPUT_COLOR);
+	wait_before->textsize(ENTRY_FONTSIZE);
+	wait_before->labelsize(ENTRY_FONTSIZE);
 
 	// Button to execute
 	Fl_Button *execute_button = new Fl_Button(w()-200, current_y, 80, 30, "Execute");
@@ -175,11 +181,13 @@ void SchedulerWindow::cb_execute_i()
 
 		std::string myrepeat(repeat->value());
 		std::string mywait(wait->value());
+		std::string mywait_before(wait_before->value());
 
 		std::string command = "relion_pipeliner --pipeline " + pipeline_name;
 		command += " --schedule " + fn_sched;
 		command += " --repeat " + myrepeat;
 		command += " --min_wait " + mywait;
+		command += " --min_wait_before " + mywait_before;
 		command += " --RunJobs " + jobids;
 		// Run this in the background, so control returns to the window
 		command += " &";
@@ -511,6 +519,18 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	gui_jobwindows[19] = new JobWindow();
 	gui_jobwindows[19]->initialise(PROC_RESMAP, maingui_do_old_style);
     browse_grp[19]->end();
+
+    browse_grp[20] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+	browser->add("Motion Fit");
+	gui_jobwindows[20] = new JobWindow();
+	gui_jobwindows[20]->initialise(PROC_MOTIONFIT, maingui_do_old_style);
+    browse_grp[20]->end();
+
+    browse_grp[21] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+	browser->add("CTF refine");
+	gui_jobwindows[21] = new JobWindow();
+	gui_jobwindows[21]->initialise(PROC_CTFREFINE, maingui_do_old_style);
+    browse_grp[21]->end();
 
     browser->callback(cb_select_browsegroup);
     browser->textsize(RLN_FONTSIZE);
@@ -1253,7 +1273,7 @@ void GuiMainWindow::cb_display_io_node_i()
 		std::string myviewer(default_pdf_viewer);
 		command = myviewer + " " + pipeline.nodeList[mynode].name + "&";
 	}
-	else
+	else if (pipeline.nodeList[mynode].type != NODE_POST)
 	{
 		command = "relion_display --gui --i " + pipeline.nodeList[mynode].name + " &";
 	}

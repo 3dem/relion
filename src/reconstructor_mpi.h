@@ -17,32 +17,36 @@
  * source code. Additional authorship citations may be added, but existing
  * author citations must be preserved.
  ***************************************************************************/
-#include <src/preprocessing.h>
+#ifndef SRC_RECONSTRUCTOR_MPI_H_
+#define SRC_RECONSTRUCTOR_MPI_H_
 
+#include "src/mpi.h"
+#include "src/parallel.h"
+#include "src/reconstructor.h"
 
-int main(int argc, char *argv[])
+class ReconstructorMpi : public Reconstructor
 {
-	Preprocessing prm;
+private:
+	MpiNode *node;
 
-	try
+public:
+	/** Destructor, calls MPI_Finalize */
+    ~ReconstructorMpi()
     {
-		prm.read(argc, argv);
-
-		prm.initialise();
-
-		prm.run();
+        delete node;
     }
 
-    catch (RelionError XE)
-    {
-        //prm.usage();
-        std::cerr << XE;
-        exit(1);
-    }
+    /** Read
+     * This could take care of mpi-parallelisation-dependent variables
+     */
+    void read(int argc, char **argv);
 
-    return 0;
+	// Parallelized run function
+    void run();
 
-}
+};
 
 
+
+#endif /* RECONSTRUCTOR_MPI_H_ */
 

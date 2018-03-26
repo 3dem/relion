@@ -15,6 +15,47 @@
 
 using namespace gravis;
 
+std::vector<MetaDataTable> StackHelper::splitByMicrographName(const MetaDataTable* mdt)
+{
+    std::vector<MetaDataTable> out(0);
+
+    if (!mdt->labelExists(EMDL_MICROGRAPH_NAME))
+    {
+        REPORT_ERROR("StackHelper::splitByMicrographName: "+EMDL::label2Str(EMDL_MICROGRAPH_NAME)+" missing in meta_data_table.\n");
+    }
+
+    std::string testString;
+    mdt->getValue(EMDL_MICROGRAPH_NAME, testString, 0);
+
+    MetaDataTable md2(*mdt);
+    md2.newSort(EMDL_MICROGRAPH_NAME);
+
+    const long lc = md2.numberOfObjects();
+    std::string lastName = "", curName;
+    long curInd = -1;
+
+    for (int i = 0; i < lc; i++)
+    {
+        md2.getValue(EMDL_MICROGRAPH_NAME, curName, i);
+
+        if (curName != lastName)
+        {
+            lastName = curName;
+            curInd++;
+            out.push_back(MetaDataTable());
+        }
+
+        out[curInd].addObject(md2.getObject(i));
+    }
+
+    for (int i = 0; i <= curInd; i++)
+    {
+        out[i].newSort(EMDL_IMAGE_NAME, false, false, true);
+    }
+
+    return out;
+}
+
 std::vector<MetaDataTable> StackHelper::splitByStack(const MetaDataTable* mdt)
 {
     std::vector<MetaDataTable> out(0);

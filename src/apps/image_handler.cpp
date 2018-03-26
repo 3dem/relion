@@ -30,7 +30,7 @@ class image_handler_parameters
 	public:
    	FileName fn_in, fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_mult, fn_div, fn_add, fn_subtract, fn_fsc, fn_adjust_power, fn_correct_ampl, fn_fourfilter;
 	int bin_avg, avg_first, avg_last, edge_x0, edge_xF, edge_y0, edge_yF, filter_edge_width, new_box, minr_ampl_corr;
-    bool do_add_edge, do_flipXY, do_flipmXY, do_flipZ, do_flipX, do_flipY, do_shiftCOM, do_stats, do_avg_ampl, do_avg_ampl2, do_avg_ampl2_ali, do_average, do_remove_nan;
+    bool do_add_edge, do_flipXY, do_flipmXY, do_flipZ, do_flipX, do_flipY, do_shiftCOM, do_stats, do_calc_com, do_avg_ampl, do_avg_ampl2, do_avg_ampl2_ali, do_average, do_remove_nan;
 	RFLOAT multiply_constant, divide_constant, add_constant, subtract_constant, threshold_above, threshold_below, angpix, new_angpix, lowpass, highpass, logfilter, bfactor, shift_x, shift_y, shift_z, replace_nan, randomize_at;
 	std::string directional;
    	int verb;
@@ -80,6 +80,7 @@ class image_handler_parameters
 
 	    int four_section = parser.addSection("per-image operations");
 	    do_stats = parser.checkOption("--stats", "Calculate per-image statistics?");
+	    do_calc_com = parser.checkOption("--com", "Calculate center of mass?");
 	    bfactor = textToFloat(parser.getOption("--bfactor", "Apply a B-factor (in A^2)", "0."));
 	    lowpass = textToFloat(parser.getOption("--lowpass", "Low-pass filter frequency (in A)", "-1."));
 	    highpass = textToFloat(parser.getOption("--highpass", "High-pass filter frequency (in A)", "-1."));
@@ -127,7 +128,7 @@ class image_handler_parameters
     	if (parser.checkForErrors())
     		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 
-    	verb = (do_stats || fn_fsc !="") ? 0 : 1;
+    	verb = (do_stats || do_calc_com || fn_fsc !="") ? 0 : 1;
 
 	}
 
@@ -622,10 +623,15 @@ class image_handler_parameters
 				Iin.read(fn_img);
 				RFLOAT avg, stddev, minval, maxval;
 				Iin().computeStats(avg, stddev, minval, maxval);
+				std::cout << fn_img << " : (x,y,z,n)= " << XSIZE(Iin()) << " x "<< YSIZE(Iin()) << " x "<< ZSIZE(Iin()) << " x "<< NSIZE(Iin()) << " ; avg= " << avg << " stddev= " << stddev << " minval= " <<minval << " maxval= " << maxval << std::endl;
+			}
+			else if (do_calc_com)
+			{
 				Matrix1D <RFLOAT> com(3);
+				Iin.read(fn_img);
 				Iin().setXmippOrigin();
 				Iin().centerOfMass(com);
-				std::cout << fn_img << " : (x,y,z,n)= " << XSIZE(Iin()) << " x "<< YSIZE(Iin()) << " x "<< ZSIZE(Iin()) << " x "<< NSIZE(Iin()) << " ; avg= " << avg << " stddev= " << stddev << " minval= " <<minval << " maxval= " << maxval << " center of mass (relative to XmippOrigin) x " << com(0);
+				std::cout << fn_img << " : center of mass (relative to XmippOrigin) x " << com(0);
 				if (VEC_XSIZE(com) > 1) std::cout << " y " << YY(com);
 				if (VEC_XSIZE(com) > 2) std::cout << " z " << ZZ(com);
 				std::cout << std::endl;
@@ -776,8 +782,6 @@ class image_handler_parameters
 int main(int argc, char *argv[])
 {
 	image_handler_parameters prm;
-	
- 	PRINT_VERSION_INFO();
 
 	try
     {
