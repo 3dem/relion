@@ -128,11 +128,13 @@ void GpMotionFit::grad(const std::vector<double> &x,
     {
         for (int f = 0; f < fc; f++)
         {
-            ccg_pf[p][f] = Interpolation::cubicXYgrad(
+            t2Vector<RFLOAT> vr = Interpolation::cubicXYgrad(
                 correlation[p][f],
                 pos[p][f].x + perFrameOffsets[f].x,
                 pos[p][f].y + perFrameOffsets[f].y,
                 0, 0, true);
+
+            ccg_pf[p][f] = d2Vector(vr.x, vr.y);
         }
     }
 

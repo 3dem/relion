@@ -375,7 +375,7 @@ std::vector<Image<RFLOAT>> FrameRecomb::weightsFromFCC()
     return freqWeights;
 }
 
-std::vector<Image<double>> FrameRecomb::weightsFromBfacs()
+std::vector<Image<RFLOAT>> FrameRecomb::weightsFromBfacs()
 {
     MetaDataTable mdt;
     mdt.read(bfacFn);

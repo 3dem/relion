@@ -9,7 +9,7 @@
 using namespace gravis;
 
 void RefinementHelper::drawFSC(const MetaDataTable *mdt, std::vector<double>& dest1D,
-                               Image<double> &dest, double thresh)
+                               Image<RFLOAT> &dest, double thresh)
 {
     const int n = mdt->numberOfObjects();
     const int w = 2*(n-1);
@@ -42,7 +42,7 @@ void RefinementHelper::drawFSC(const MetaDataTable *mdt, std::vector<double>& de
     }
 }
 
-void RefinementHelper::computeSNR(const MetaDataTable *mdt, Image<double> &dest, double eps)
+void RefinementHelper::computeSNR(const MetaDataTable *mdt, Image<RFLOAT> &dest, double eps)
 {
     const int n = mdt->numberOfObjects();
     const int w = 2*(n-1);
@@ -80,7 +80,7 @@ void RefinementHelper::computeSNR(const MetaDataTable *mdt, Image<double> &dest,
 }
 
 void RefinementHelper::computeSigInvSq(const MetaDataTable *mdt, const std::vector<double>& signalPow,
-                                       Image<double> &dest, double eps)
+                                       Image<RFLOAT> &dest, double eps)
 {
     const int n = mdt->numberOfObjects();
     const int w = 2*(n-1);

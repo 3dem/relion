@@ -393,7 +393,7 @@ void CtfRefiner::fitDefocusOneMicrograph(long g, const std::vector<Image<Complex
             ImageLog::write(vis, outPath+"_astig_data_m"+stsg.str()+"_vis0");
         }
 
-        RFLOAT u, v, phi, phase, newCs;
+        double u, v, phi, phase, newCs;
 
         mdts[g].getValue(EMDL_CTF_PHASESHIFT, phase, 0);
         mdts[g].getValue(EMDL_CTF_CS, newCs, 0);
@@ -717,7 +717,7 @@ void CtfRefiner::fitBeamTiltFromSumsAllMicrographs(Image<Complex> &xyAccSum, Ima
 		wgh.write(outPath+"_weight.mrc");
     }
 
-    RFLOAT shift_x, shift_y, tilt_x, tilt_y;
+    double shift_x, shift_y, tilt_x, tilt_y;
 
     TiltRefinement::fitTiltShift(phase, wgh, Cs, lambda, angpix,
                                  &shift_x, &shift_y, &tilt_x, &tilt_y, &fit);

@@ -1,6 +1,6 @@
 #include <src/jaz/fftw_helper.h>
 
-void FftwHelper::decenterUnflip2D(const MultidimArray<double> &src, MultidimArray<double> &dest)
+void FftwHelper::decenterUnflip2D(const MultidimArray<RFLOAT> &src, MultidimArray<RFLOAT> &dest)
 {
     const long int w = src.xdim;
     const long int h = src.ydim;
@@ -27,7 +27,7 @@ void FftwHelper::decenterUnflip2D(const MultidimArray<double> &src, MultidimArra
     }
 }
 
-void FftwHelper::decenterDouble2D(const MultidimArray<double> &src, MultidimArray<double> &dest)
+void FftwHelper::decenterDouble2D(const MultidimArray<RFLOAT> &src, MultidimArray<RFLOAT> &dest)
 {
     const long int w = src.xdim;
     const long int h = src.ydim;

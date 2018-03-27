@@ -78,21 +78,21 @@ class MotionFitProg : public RefinementProgram
 
         d2Vector estimateTwoParams(
                 std::vector<ParFourierTransformer>& fts,
-                const std::vector<Image<double>>& dmgWeight,
+                const std::vector<Image<RFLOAT>>& dmgWeight,
                 int k_out, double sig_v_0, double sig_d_0,
                 double sig_v_step, double sig_d_step,
                 int maxIters, int recDepth);
 
         d3Vector estimateThreeParams(
                 std::vector<ParFourierTransformer>& fts,
-                const std::vector<Image<double>>& dmgWeight,
+                const std::vector<Image<RFLOAT>>& dmgWeight,
                 int k_out, double sig_v_0, double sig_d_0, double sig_a_0,
                 double sig_v_step, double sig_d_step, double sig_a_step,
                 int maxIters, int recDepth);
 
         void evaluateParams(
                 std::vector<ParFourierTransformer>& fts,
-                const std::vector<Image<double>>& dmgWeight,
+                const std::vector<Image<RFLOAT>>& dmgWeight,
                 int k_out,
                 const std::vector<d3Vector>& sig_vals,
                 std::vector<double>& TSCs);
@@ -288,9 +288,9 @@ int MotionFitProg::_run()
 
 void MotionFitProg::prepMicrograph(
         int g, std::vector<ParFourierTransformer>& fts,
-        const std::vector<Image<double>>& dmgWeight,
+        const std::vector<Image<RFLOAT>>& dmgWeight,
         std::vector<std::vector<Image<Complex>>>& movie,
-        std::vector<std::vector<Image<double>>>& movieCC,
+        std::vector<std::vector<Image<RFLOAT>>>& movieCC,
         std::vector<d2Vector>& positions,
         std::vector<std::vector<d2Vector>>& initialTracks,
         std::vector<d2Vector>& globComp)
@@ -385,7 +385,7 @@ void MotionFitProg::prepMicrograph(
         {
             for (int f = 0; f < fc; f++)
             {
-                double sx, sy;
+                RFLOAT sx, sy;
                 micrograph.getShiftAt(f+1, 0, 0, sx, sy, false);
 
                 globComp[f] = -outputScale * d2Vector(sx, sy);
@@ -401,7 +401,7 @@ void MotionFitProg::prepMicrograph(
                 d2Vector in(inputScale.x * positions[p].x - 0.5,
                             inputScale.y * positions[p].y - 0.5);
 
-                double sx, sy;
+                RFLOAT sx, sy;
 
                 micrograph.getShiftAt(f+1, in.x, in.y, sx, sy, true);
 
@@ -413,7 +413,7 @@ void MotionFitProg::prepMicrograph(
 
 void MotionFitProg::estimateMotion(
         std::vector<ParFourierTransformer>& fts,
-        const std::vector<Image<double>>& dmgWeight)
+        const std::vector<Image<RFLOAT>>& dmgWeight)
 {
     std::vector<Image<RFLOAT>>
             tables(nr_omp_threads),
@@ -489,7 +489,7 @@ void MotionFitProg::estimateMotion(
 
 d2Vector MotionFitProg::estimateTwoParams(
         std::vector<ParFourierTransformer>& fts,
-        const std::vector<Image<double>>& dmgWeight,
+        const std::vector<Image<RFLOAT>>& dmgWeight,
         int k_out, double sig_v_0, double sig_d_0,
         double sig_v_step, double sig_d_step,
         int maxIters, int recDepth)
@@ -664,7 +664,7 @@ d2Vector MotionFitProg::estimateTwoParams(
 
 d3Vector MotionFitProg::estimateThreeParams(
         std::vector<ParFourierTransformer>& fts,
-        const std::vector<Image<double>>& dmgWeight,
+        const std::vector<Image<RFLOAT>>& dmgWeight,
         int k_out, double sig_v_0, double sig_d_0, double sig_a_0,
         double sig_v_step, double sig_d_step, double sig_a_step,
         int maxIters, int recDepth)
@@ -861,7 +861,7 @@ d3Vector MotionFitProg::estimateThreeParams(
 
 void MotionFitProg::evaluateParams(
         std::vector<ParFourierTransformer>& fts,
-        const std::vector<Image<double>>& dmgWeight,
+        const std::vector<Image<RFLOAT>>& dmgWeight,
         int k_out,
         const std::vector<d3Vector>& sig_vals,
         std::vector<double>& TSCs)

@@ -604,7 +604,7 @@ std::vector<std::vector<Image<Complex>>> RefinementProgram::loadMovie(
     return movie;
 }
 
-void RefinementProgram::setForAll(EMDLabel label, double value)
+void RefinementProgram::setForAll(EMDLabel label, RFLOAT value)
 {
     for (int i = 0; i < mdt0.numberOfObjects(); i++)
     {
