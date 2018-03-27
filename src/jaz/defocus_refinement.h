@@ -82,7 +82,7 @@ class DefocusRefinement
             const Image<Complex>& observation,
             const Image<RFLOAT>& weight,
             const CTF& ctf0, RFLOAT angpix,
-            RFLOAT* destU, RFLOAT* destV,
+            double* destU, double* destV,
             RFLOAT range = 1000.0, int steps = 11,
             int recDepth = 2, RFLOAT recScale = 10.0);
 
@@ -91,29 +91,29 @@ class DefocusRefinement
             const Image<Complex>& observation,
             const Image<RFLOAT>& weight,
             const CTF& ctf0, RFLOAT angpix,
-            RFLOAT* destU, RFLOAT* destV, RFLOAT* destPhi);
+            double* destU, double* destV, double* destPhi);
 
         static void findAstigmatismAndPhaseNM(
             const std::vector<Image<Complex>>& prediction,
             const std::vector<Image<Complex>>& observation,
             const Image<RFLOAT>& weight,
             const CTF& ctf0, RFLOAT angpix,
-            RFLOAT* destU, RFLOAT* destV, RFLOAT* destPhi, RFLOAT* destPhase);
+            double* destU, double* destV, double* destPhi, double* destPhase);
 
         static void findAstigmatismPhaseAndCsNM(
             const std::vector<Image<Complex>>& prediction,
             const std::vector<Image<Complex>>& observation,
             const Image<RFLOAT>& weight,
             const CTF& ctf0, RFLOAT angpix,
-            RFLOAT* destU, RFLOAT* destV,
-            RFLOAT* destPhi, RFLOAT* destPhase, RFLOAT* destCs);
+            double* destU, double* destV,
+            double* destPhi, double* destPhase, double* destCs);
 
         static void findAstigmatismNM(
             const std::vector<Image<Complex>>& prediction,
             const std::vector<Image<Complex>>& observation,
             const Image<RFLOAT>& weight,
             const CTF& ctf0, RFLOAT angpix,
-            RFLOAT* destU, RFLOAT* destV, RFLOAT* destPhi);
+            double* destU, double* destV, double* destPhi);
 
         static std::vector<gravis::d2Vector> diagnoseDefocus(const Image<Complex>& prediction,
             const Image<Complex>& observation,

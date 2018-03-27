@@ -190,9 +190,9 @@ void FscHelper::updateFscTableVelWgh(
         const std::vector<Image<Complex> > &frames,
         const std::vector<d2Vector> &velocities,
         const Image<Complex> &prediction,
-        Image<double> &table,
-        Image<double> &weight0,
-        Image<double> &weight1)
+        Image<RFLOAT> &table,
+        Image<RFLOAT> &weight0,
+        Image<RFLOAT> &weight1)
 {
     const int w = prediction.data.xdim;
     const int fc = frames.size();
@@ -643,7 +643,7 @@ std::vector<double> FscHelper::powerSpectrum3D(const Image<Complex> &img)
     return sum;
 }
 
-BFactorFit::BFactorFit(const Image<double> &tau2, const Image<double> &weight, int frame, int cutoff,
+BFactorFit::BFactorFit(const Image<RFLOAT> &tau2, const Image<RFLOAT> &weight, int frame, int cutoff,
                        double Bscale, double Cscale)
 :   tau2(tau2),
     weight(weight),

@@ -149,7 +149,7 @@ class MotionRefinement
                 const std::vector<std::vector<Image<float> > >& correlation,
                 const std::vector<gravis::d2Vector>& positions,
                 const std::vector<std::vector<gravis::d2Vector> >& initial,
-                RFLOAT lambda, RFLOAT mu, RFLOAT sigma);
+                double lambda, double mu, double sigma);
 
 
 

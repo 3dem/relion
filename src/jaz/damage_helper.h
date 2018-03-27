@@ -56,7 +56,7 @@ class PerFrameBFactorFit : public Optimization
 
     private:
 
-        const Image<double> &fcc;
+        const Image<RFLOAT> &fcc;
         int kc, fc, k0, k1;
 };
 

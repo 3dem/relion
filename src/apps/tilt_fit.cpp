@@ -268,7 +268,7 @@ int TiltFit::_run()
     ImageLog::write(phaseFull, outPath+"_delta_phase");
     wgh.write(outPath+"_weight.mrc");
 
-    RFLOAT shift_x, shift_y, tilt_x, tilt_y;
+    double shift_x, shift_y, tilt_x, tilt_y;
 
     TiltRefinement::fitTiltShift(phase, wgh, Cs, lambda, angpix,
                                  &shift_x, &shift_y, &tilt_x, &tilt_y, &fit);

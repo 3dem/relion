@@ -36,7 +36,7 @@ Image<RFLOAT> NoiseHelper::predictCCNoise(Projector &prj, double sigma2,
         Matrix1D<RFLOAT> dm(3);
         VECTOR_R3(dm, dx, dy, dz);
 
-        double rot, tilt;
+        RFLOAT rot, tilt;
         Euler_direction2angles(dm, rot, tilt);
 
         Matrix2D<RFLOAT> A3D;
@@ -616,7 +616,7 @@ void NoiseHelper::testVariance(Image<RFLOAT> img)
     std::cout << varSum << " vs. " << sig2*varScale << "\n";
 }
 
-void NoiseHelper::testColorVariance(Image<double> img, std::vector<double> sig2)
+void NoiseHelper::testColorVariance(Image<RFLOAT> img, std::vector<double> sig2)
 {
     const int s = img.data.xdim;
     const int sh = s/2 + 1;
@@ -768,7 +768,7 @@ void NoiseHelper::testParseval()
     const int s = 512;
     const int sh = s/2+1;
 
-    Image<double> real(s,s);
+    Image<RFLOAT> real(s,s);
     Image<Complex> freq(sh,s);
 
     for (int i = 0; i < 10; i++)

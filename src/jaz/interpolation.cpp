@@ -198,7 +198,7 @@ void Interpolation::test2D()
         DIRECT_NZYX_ELEM(img.data, 0, 0, y, x)  = DIRECT_NZYX_ELEM(img0.data, 0, 0, w0*y/w1, w0*x/w1);
         DIRECT_NZYX_ELEM(img1.data, 0, 0, y, x) = cubicXY(img0, w0*x/(double)w1 - 0.5, w0*y/(double)w1 - 0.5, 0);
 
-        d2Vector g = cubicXYgrad(img0, w0*x/(double)w1 - 0.5, w0*y/(double)w1 - 0.5, 0);
+        t2Vector<RFLOAT> g = cubicXYgrad(img0, w0*x/(double)w1 - 0.5, w0*y/(double)w1 - 0.5, 0);
 
         DIRECT_NZYX_ELEM(gradx.data, 0, 0, y, x) = g.x;
         DIRECT_NZYX_ELEM(grady.data, 0, 0, y, x) = g.y;

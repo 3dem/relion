@@ -524,7 +524,7 @@ void SliceHelper::extractStackSlice(const Image<RFLOAT>& src, Image<RFLOAT>& des
     }
 }
 
-void SliceHelper::extractStackSlices(const Image<RFLOAT>& src, Image<RFLOAT>& dest, long int s)
+void SliceHelper::extractStackSlices(const Image<double>& src, Image<RFLOAT>& dest, long int s)
 {
     if (src.data.xdim != dest.data.xdim || src.data.ydim != dest.data.ydim)
     {
@@ -570,7 +570,7 @@ Image<RFLOAT> SliceHelper::getStackSlice(const Image<RFLOAT> &src, long n)
     return out;
 }
 
-void SliceHelper::insertStackSlice(const Image<RFLOAT>& src, Image<RFLOAT>& dest, long int s)
+void SliceHelper::insertStackSlice(const Image<double>& src, Image<double>& dest, long int s)
 {
     if (src.data.xdim != dest.data.xdim || src.data.ydim != dest.data.ydim)
     {
@@ -598,7 +598,7 @@ void SliceHelper::insertStackSlice(const Image<float>& src, Image<float>& dest, 
     }
 }
 
-void SliceHelper::insertZSlice(const Image<RFLOAT>& src, Image<RFLOAT>& dest, long int s)
+void SliceHelper::insertZSlice(const Image<double>& src, Image<double>& dest, long int s)
 {
     if (src.data.xdim != dest.data.xdim || src.data.ydim != dest.data.ydim)
     {
@@ -626,7 +626,7 @@ void SliceHelper::insertZSlice(const Image<float>& src, Image<float>& dest, long
     }
 }
 
-Image<RFLOAT> SliceHelper::consolidate(const std::vector<Image<RFLOAT> >& src, bool toN)
+Image<double> SliceHelper::consolidate(const std::vector<Image<double> >& src, bool toN)
 {
     const int w = src[0].data.xdim;
     const int h = src[0].data.ydim;
@@ -635,7 +635,7 @@ Image<RFLOAT> SliceHelper::consolidate(const std::vector<Image<RFLOAT> >& src, b
     const int zc = toN? 1 : ic;
     const int nc = toN? ic : 1;
 
-    Image<RFLOAT> out(w,h,zc,nc);
+    Image<double> out(w,h,zc,nc);
 
     for (int i = 0; i < ic; i++)
     {

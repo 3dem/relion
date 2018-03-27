@@ -37,59 +37,59 @@ class TiltRefinement
         static void updateTiltShift(
                 const Image<Complex>& prediction,
                 const Image<Complex>& observation,
-                CTF& ctf, RFLOAT angpix,
+                CTF& ctf, double angpix,
                 Image<Complex>& xyDest,
                 Image<RFLOAT>& wDest);
 
         static void updateTiltShiftPar(
                 const Image<Complex>& prediction,
                 const Image<Complex>& observation,
-                CTF& ctf, RFLOAT angpix,
+                CTF& ctf, double angpix,
                 Image<Complex>& xyDest,
                 Image<RFLOAT>& wDest);
 
         static void fitTiltShift(
                 const Image<RFLOAT>& phase,
                 const Image<RFLOAT>& weight,
-                RFLOAT Cs, RFLOAT lambda, RFLOAT angpix,
-                RFLOAT* shift_x, RFLOAT* shift_y,
-                RFLOAT* tilt_x, RFLOAT* tilt_y,
+                double Cs, double lambda, double angpix,
+                double* shift_x, double* shift_y,
+                double* tilt_x, double* tilt_y,
                 Image<RFLOAT>* fit,
                 gravis::d2Matrix magCorr = gravis::d2Matrix());
 
         static void optimizeTilt(
                 const Image<Complex>& xy,
                 const Image<RFLOAT>& weight,
-                RFLOAT Cs, RFLOAT lambda, RFLOAT angpix,
+                double Cs, double lambda, double angpix,
                 bool L1,
-                RFLOAT shift0_x, RFLOAT shift0_y,
-                RFLOAT tilt0_x, RFLOAT tilt0_y,
-                RFLOAT* shift_x, RFLOAT* shift_y,
-                RFLOAT* tilt_x, RFLOAT* tilt_y,
+                double shift0_x, double shift0_y,
+                double tilt0_x, double tilt0_y,
+                double* shift_x, double* shift_y,
+                double* tilt_x, double* tilt_y,
                 Image<RFLOAT>* fit);
 
         static void optimizeAnisoTilt(
                 const Image<Complex>& xy,
                 const Image<RFLOAT>& weight,
-                RFLOAT Cs, RFLOAT lambda, RFLOAT angpix,
+                double Cs, double lambda, double angpix,
                 bool L1,
-                RFLOAT shift0_x, RFLOAT shift0_y,
-                RFLOAT tilt0_x, RFLOAT tilt0_y,
-                RFLOAT* shift_x, RFLOAT* shift_y,
-                RFLOAT* tilt_x, RFLOAT* tilt_y,
-                RFLOAT* tilt_xx, RFLOAT* tilt_xy, RFLOAT* tilt_yy,
+                double shift0_x, double shift0_y,
+                double tilt0_x, double tilt0_y,
+                double* shift_x, double* shift_y,
+                double* tilt_x, double* tilt_y,
+                double* tilt_xx, double* tilt_xy, double* tilt_yy,
                 Image<RFLOAT>* fit);
 
         static void drawPhaseShift(
-                RFLOAT shift_x, RFLOAT shift_y,
-                RFLOAT tilt_x, RFLOAT tilt_y,
+                double shift_x, double shift_y,
+                double tilt_x, double tilt_y,
                 int w, int h, double as,
                 gravis::d2Matrix magCorr,
                 Image<RFLOAT>* tgt);
 
         static void drawPhaseShift(
-                RFLOAT shift_x, RFLOAT shift_y,
-                RFLOAT tilt_x, RFLOAT tilt_y,
+                double shift_x, double shift_y,
+                double tilt_x, double tilt_y,
                 double tilt_xx, double tilt_xy, double tilt_yy,
                 int w, int h, double as,
                 gravis::d2Matrix magCorr,

@@ -45,16 +45,16 @@ class SliceHelper
                                          Image<Complex>& dest, double thickness = 1.0, double imgPad = 0.5);
 
         static void extractStackSlice(const Image<RFLOAT>& src, Image<RFLOAT>& dest, long int s);
-        static void extractStackSlices(const Image<RFLOAT>& src, Image<RFLOAT>& dest, long int s);
+        static void extractStackSlices(const Image<double>& src, Image<RFLOAT>& dest, long int s);
         static void extractStackSlices(const Image<float>& src, Image<RFLOAT>& dest, long int s);
         static Image<RFLOAT> getStackSlice(const Image<RFLOAT>& src, long int n);
 
-        static void insertStackSlice(const Image<RFLOAT>& src, Image<RFLOAT>& dest, long int s);
+        static void insertStackSlice(const Image<double>& src, Image<double>& dest, long int s);
         static void insertStackSlice(const Image<float>& src, Image<float>& dest, long int s);
-        static void insertZSlice(const Image<RFLOAT>& src, Image<RFLOAT>& dest, long int s);
+        static void insertZSlice(const Image<double>& src, Image<double>& dest, long int s);
         static void insertZSlice(const Image<float>& src, Image<float>& dest, long int s);
 
-        static Image<RFLOAT> consolidate(const std::vector<Image<RFLOAT> >& src, bool toN = false);
+        static Image<double> consolidate(const std::vector<Image<double> >& src, bool toN = false);
         static Image<float> consolidate(const std::vector<Image<float> >& src, bool toN = false);
 
         static void stat(const Image<RFLOAT>& img);

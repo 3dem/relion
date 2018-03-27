@@ -371,8 +371,7 @@ void Micrograph::read(FileName fn_in)
 
 		// frame is 1-indexed!
 		globalShiftX[frame - 1] = shiftX;
-		globalShiftY[frame - 1] = shiftY;
-		std::cout << " global shift: frame #" << frame << " x " << shiftX << " Y " << shiftY << std::endl;
+        globalShiftY[frame - 1] = shiftY;
 	}
 }
 

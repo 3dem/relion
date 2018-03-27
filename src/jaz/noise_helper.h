@@ -21,10 +21,10 @@ class NoiseHelper
 
         static std::vector<double> radialWeight(int w, int h, bool half);
         static std::vector<double> fill(Image<RFLOAT>& confusion, double lambda, int iterations);
-        static Image<RFLOAT> normalize(const Image<double> &confusion);
+        static Image<RFLOAT> normalize(const Image<RFLOAT> &confusion);
 
-        static void testVariance(Image<double> img);
-        static void testColorVariance(Image<double> img, std::vector<double> sig2);
+        static void testVariance(Image<RFLOAT> img);
+        static void testColorVariance(Image<RFLOAT> img, std::vector<double> sig2);
         static void testParseval();
 
 

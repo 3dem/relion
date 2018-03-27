@@ -6,7 +6,7 @@
 
 using namespace gravis;
 
-void DamageHelper::fitDamage(const Image<double> &frcData, const Image<double> &frcWeight,
+void DamageHelper::fitDamage(const Image<RFLOAT> &frcData, const Image<RFLOAT> &frcWeight,
                           std::vector<double> &amp, std::vector<double> &dec, int t0, double dosePerFrame, bool root)
 {
     const int kc = frcData.data.xdim;
@@ -130,7 +130,7 @@ void DamageHelper::fitGlobalDamage(const Image<RFLOAT> &frcData,
     amp.resize(kc);
     amp[0] = 0.0;
 
-    Image<double> snrData(kc,tc);
+    Image<RFLOAT> snrData(kc,tc);
 
     const double eps = 1e-3;
 
@@ -264,7 +264,7 @@ RFLOAT DamageHelper::damage(double k, int kc, RFLOAT angpix, RFLOAT dose, RFLOAT
     return exp(-dose/tau);
 }
 
-std::vector<double> DamageHelper::fitBFactors(const Image<double> &fcc, int k0, int k1)
+std::vector<double> DamageHelper::fitBFactors(const Image<RFLOAT> &fcc, int k0, int k1)
 {
     const int kc = fcc.data.xdim;
     const int fc = fcc.data.ydim;
@@ -404,7 +404,7 @@ std::pair<std::vector<d2Vector>,std::vector<double>> DamageHelper::fitBkFactors(
 
 std::vector<d2Vector> DamageHelper::fitBkFactors(
         const Image<RFLOAT> &fcc,
-        const Image<double> &env,
+        const Image<RFLOAT> &env,
         const Image<RFLOAT> &wgh,
         int k0, int k1)
 {
@@ -447,7 +447,7 @@ Image<RFLOAT> DamageHelper::renderBkFit(
     return out;
 }
 
-Image<double> DamageHelper::renderBkFit(std::vector<d2Vector> sig, int kc, int fc)
+Image<RFLOAT> DamageHelper::renderBkFit(std::vector<d2Vector> sig, int kc, int fc)
 {
     Image<RFLOAT> out(kc,fc);
 
@@ -464,7 +464,7 @@ Image<double> DamageHelper::renderBkFit(std::vector<d2Vector> sig, int kc, int f
 }
 
 double DamageHelper::findSigmaRec(
-        const Image<double> &fcc, int f,
+        const Image<RFLOAT> &fcc, int f,
         const std::vector<double> &scale,
         double sig0, double sig1,
         int steps, int depth, double q)
@@ -514,7 +514,7 @@ double DamageHelper::findSigmaRec(
 
 
 d2Vector DamageHelper::findSigmaKRec(
-        const Image<double> &fcc, int f,
+        const Image<RFLOAT> &fcc, int f,
         const std::vector<double> &envelope,
         const std::vector<double> &weight,
         int k0, int k1,
@@ -879,7 +879,7 @@ double GlobalDamageFit::getScale(int k, double tau) const
     return nd > 0.0? nn/nd : 0.0;
 }
 
-PerFrameBFactorFit::PerFrameBFactorFit(const Image<double> &fcc, int k0, int k1)
+PerFrameBFactorFit::PerFrameBFactorFit(const Image<RFLOAT> &fcc, int k0, int k1)
 :   fcc(fcc),
     kc(fcc.data.xdim),
     fc(fcc.data.ydim),
