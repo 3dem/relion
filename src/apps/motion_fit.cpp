@@ -261,15 +261,21 @@ int MotionFitProg::_run()
     {
         d2Vector par = estimateTwoParams(
             fts, dmgWeight, k_out, sig_vel, sig_div,
-            sig_vel*param_rV, sig_div*param_rD, paramEstimSteps, paramEstimIters);
+            std::abs(sig_vel*param_rV),
+            std::abs(sig_div*param_rD),
+            paramEstimSteps, paramEstimIters);
 
         std::cout << "opt = " << par << "\n";
     }
     else if (paramEstim3)
     {
         d3Vector par = estimateThreeParams(
-            fts, dmgWeight, k_out, sig_vel, sig_div, sig_acc,
-            sig_vel*param_rV, sig_div*param_rD, sig_acc*param_rA, paramEstimSteps, paramEstimIters);
+            fts, dmgWeight, k_out,
+            sig_vel, sig_div, sig_acc,
+            std::abs(sig_vel*param_rV),
+            std::abs(sig_div*param_rD),
+            std::abs(sig_acc*param_rA),
+            paramEstimSteps, paramEstimIters);
 
         std::cout << "opt = " << par << "\n";
     }
@@ -494,8 +500,8 @@ d2Vector MotionFitProg::estimateTwoParams(
         double sig_v_step, double sig_d_step,
         int maxIters, int recDepth)
 {
-    int tot_vi = sig_v_0 <= 0.0? 1 : 0;
-    int tot_di = sig_d_0 <= 0.0? 1 : 0;
+    int tot_vi = sig_v_0 <= 0.0? (int)(-sig_v_0/sig_v_step + 1) : 0;
+    int tot_di = sig_d_0 <= 0.0? (int)(-sig_d_0/sig_d_step + 1) : 0;
 
     std::vector<d3Vector> all_sig_vals(9);
 
@@ -669,9 +675,9 @@ d3Vector MotionFitProg::estimateThreeParams(
         double sig_v_step, double sig_d_step, double sig_a_step,
         int maxIters, int recDepth)
 {
-    int tot_vi = sig_v_0 <= 0.0? 1 : 0;
-    int tot_di = sig_d_0 <= 0.0? 1 : 0;
-    int tot_ai = sig_a_0 <= 0.0? 1 : 0;
+    int tot_vi = sig_v_0 <= 0.0? (int)(-sig_v_0/sig_v_step + 1) : 0;
+    int tot_di = sig_d_0 <= 0.0? (int)(-sig_d_0/sig_d_step + 1) : 0;
+    int tot_ai = sig_a_0 <= 0.0? (int)(-sig_a_0/sig_a_step + 1) : 0;
 
     std::vector<d3Vector> all_sig_vals(27);
 

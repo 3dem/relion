@@ -715,23 +715,17 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
         {
             int tp = omp_get_thread_num();
 
-            //int t = omp_get_thread_num();
             int t = saveMemory? tp : tf;
 
             out[p][f] = Image<Complex>(sqMg,sqMg);
 
-            double xpAp, ypAp;
+            double xpC, ypC;
 
-            mdt->getValue(EMDL_IMAGE_COORD_X, xpAp, p);
-            mdt->getValue(EMDL_IMAGE_COORD_Y, ypAp, p);
+            mdt->getValue(EMDL_IMAGE_COORD_X, xpC, p);
+            mdt->getValue(EMDL_IMAGE_COORD_Y, ypC, p);
 
-            double xpRef, ypRef;
-
-            mdt->getValue(EMDL_ORIENT_ORIGIN_X, xpRef, p);
-            mdt->getValue(EMDL_ORIENT_ORIGIN_Y, ypRef, p);
-
-            const double xpO = (int)(coordsPs * xpAp / outPs + xpRef) - squareSize/2;
-            const double ypO = (int)(coordsPs * ypAp / outPs + ypRef) - squareSize/2;
+            const double xpO = (int)(coordsPs * xpC / outPs) - squareSize/2;
+            const double ypO = (int)(coordsPs * ypC / outPs) - squareSize/2;
 
             const int x0 = (int)round(xpO * outPs / moviePs);
             const int y0 = (int)round(ypO * outPs / moviePs);
