@@ -530,6 +530,8 @@ d2Vector MotionFitProg::estimateTwoParams(
     bool centerBest = false;
     int iters = 0;
 
+    d3Vector bestParams = all_sig_vals[13];
+
     while (!centerBest && iters < maxIters)
     {
 
@@ -580,6 +582,8 @@ d2Vector MotionFitProg::estimateTwoParams(
                 bestIndex = p;
             }
         }
+
+        bestParams = all_sig_vals[bestIndex];
 
         int shift_v = bestIndex % 3 - 1;
         int shift_d = bestIndex / 3 - 1;
@@ -665,6 +669,8 @@ d2Vector MotionFitProg::estimateTwoParams(
 
         iters++;
     }
+
+    return d2Vector(bestParams[0], bestParams[1]);
 }
 
 
@@ -706,6 +712,8 @@ d3Vector MotionFitProg::estimateThreeParams(
 
     bool centerBest = false;
     int iters = 0;
+
+    d3Vector bestParams = all_sig_vals[13];
 
     while (!centerBest && iters < maxIters)
     {
@@ -767,6 +775,8 @@ d3Vector MotionFitProg::estimateThreeParams(
                 bestIndex = p;
             }
         }
+
+        bestParams = all_sig_vals[bestIndex];
 
         int shift_v = bestIndex % 3 - 1;
         int shift_d = ((bestIndex / 3)%3) - 1;
@@ -863,6 +873,8 @@ d3Vector MotionFitProg::estimateThreeParams(
 
         iters++;
     }
+
+    return bestParams;
 }
 
 void MotionFitProg::evaluateParams(
