@@ -2324,7 +2324,7 @@ bool RelionJob::getCommandsClass2DJob(std::string &outputname, std::vector<std::
 	if (joboptions["do_preread_images"].getBoolean())
 		command += " --preread_images " ;
 	else if (joboptions["scratch_dir"].getString() != "")
-            command += " --scratch_dir " +  joboptions["scratch_dir"].getString();
+		command += " --scratch_dir " +  joboptions["scratch_dir"].getString();
 	command += " --pool " + joboptions["nr_pool"].getString();
 	// Takanori observed bad 2D classifications with pad1, so use pad2 always. Memory isnt a problem here anyway
 	command += " --pad 2 ";
@@ -2599,20 +2599,20 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 	if (!joboptions["do_parallel_discio"].getBoolean())
 		command += " --no_parallel_disc_io";
 	if (joboptions["do_preread_images"].getBoolean())
-            command += " --preread_images " ;
+		command += " --preread_images " ;
 	else if (joboptions["scratch_dir"].getString() != "")
-            command += " --scratch_dir " +  joboptions["scratch_dir"].getString();
-    command += " --pool " + joboptions["nr_pool"].getString();
-    if (joboptions["do_pad1"].getBoolean())
-    	command += " --pad 1 ";
+	command += " --scratch_dir " +  joboptions["scratch_dir"].getString();
+	command += " --pool " + joboptions["nr_pool"].getString();
+	if (joboptions["do_pad1"].getBoolean())
+		command += " --pad 1 ";
 	else
 		command += " --pad 2 ";
 
 	// Optimisation
-    command += " --particle_diameter " + joboptions["particle_diameter"].getString();
+	command += " --particle_diameter " + joboptions["particle_diameter"].getString();
 
-    // Sampling
-    int iover = 1;
+	// Sampling
+	int iover = 1;
 	command += " --oversampling " + floatToString((float)iover);
 	for (int i = 0; i < 10; i++)
 	{

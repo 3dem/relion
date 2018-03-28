@@ -74,7 +74,7 @@ public:
     void resetHeight();
 
     // Place a single entry
-    void place(std::string key, int deactivate_option = TOGGLE_LEAVE_ACTIVE, Fl_Group * deactivate_this_group = NULL);
+    void place(std::string key, int deactivate_option = TOGGLE_LEAVE_ACTIVE, Fl_Group * deactivate_this_group = NULL, bool actually_activate=false);
     // Place two entries on one line
     void place2(std::string key1, std::string key2, std::string label, int deactivate_option = TOGGLE_LEAVE_ACTIVE);
     // Place three entries on one line
