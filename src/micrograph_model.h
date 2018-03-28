@@ -39,7 +39,10 @@ public:
 	virtual void write(std::ostream &fh, std::string block_name) = 0;
 	virtual int getModelVersion() const = 0;
 
-	// Get motion at frame and (x, y); frame is 0-indexed (NOT like Micrograph::getShiftAt)
+	// Get motion at frame and (x, y);
+	// NB: differences from Micrograph::getShiftAt!
+	// - frame is 0-indexed 
+	// - (x, y) are normalised pixels (i.e. unbinned_pixel_x / width - 0.5)
 	virtual int getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty) const = 0;
 
 	virtual MotionModel* clone() const = 0;
@@ -110,10 +113,13 @@ public:
 	int getHeight() const;
 	int getNframes() const;
 
-	// Get shift vector at (x, y, frame); frame is 1-indexed
-	// (x, y) and (shiftx, shifty) are UNBINNED pixels in the original movie
-	// Returns non zero if failed (e.g. not observed)	
-	int getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty, bool use_local=true) const;
+	// Get shift vector at (x, y, frame)
+	// frame is 1-indexed
+	// (x, y) are normalised coordinate (i.e. pixel_x / width, pixel_y / height) when normalise=false (default)
+	//            unbinned pixels in the original movie when normalise=true
+	// (shiftx, shifty) are always UNBINNED pixels in the original movie.
+	// Returns non zero if failed (e.g. not observed).
+	int getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty, bool use_local=true, bool normalise=false) const;
 
 	// Set global shift for frame; frame is 1-indexed
 	// (shiftx, shifty) is UNBINNED pixels in the original movie
