@@ -235,7 +235,10 @@ void MotionFitter::initialise()
             corrMic.getValueToString(EMDL_MICROGRAPH_NAME, micName, i);
             corrMic.getValueToString(EMDL_MICROGRAPH_METADATA_NAME, metaName, i);
 
-            mic2meta[micName] = metaName;
+            // remove the pipeline job prefix
+            FileName fn_pre, fn_jobnr, fn_post;
+            decomposePipelineFileName(micName, fn_pre, fn_jobnr, fn_post);
+            mic2meta[fn_post] = metaName;
         }
 
         hasCorrMic = true;
@@ -321,35 +324,37 @@ void MotionFitter::initialise()
 		freqWeight.data.initConstant(1.0);
 	}
 
-
-	///// TODO: what are we really getting here????? only fc????
-	// LoadInitialMovieValues
+	// Jasenko's LoadInitialMovieValues
+	// Sjors made changes in behaviour of fc calculation!!
 	if (preextracted)
     {
-        std::string name, fullName, movieName;
-        mdts[0].getValue(EMDL_IMAGE_NAME, fullName, 0);
-        mdts[0].getValue(EMDL_MICROGRAPH_NAME, movieName, 0);
-        name = fullName.substr(fullName.find("@")+1);
 
-        std::string finName;
-
-        if (imgPath == "")
+        if (lastFrame < 0)
         {
-            finName = name;
+            std::string name, fullName, movieName;
+             mdts[0].getValue(EMDL_IMAGE_NAME, fullName, 0);
+             mdts[0].getValue(EMDL_MICROGRAPH_NAME, movieName, 0);
+             name = fullName.substr(fullName.find("@")+1);
+
+             std::string finName;
+
+             if (imgPath == "")
+             {
+                 finName = name;
+             }
+             else
+             {
+                 finName = imgPath + "/" + movieName.substr(movieName.find_last_of("/")+1);
+             }
+
+             Image<RFLOAT> stack0;
+             stack0.read(finName, false);
+
+             const int pc0 = mdts[0].numberOfObjects();
+             const bool zstack = stack0.data.zdim > 1;
+             const int stackSize = zstack? stack0.data.zdim : stack0.data.ndim;
+             fc = stackSize / pc0 - firstFrame;
         }
-        else
-        {
-            finName = imgPath + "/" + movieName.substr(movieName.find_last_of("/")+1);
-        }
-
-        Image<RFLOAT> stack0;
-        stack0.read(finName, false);
-
-        const int pc0 = mdts[0].numberOfObjects();
-        const bool zstack = stack0.data.zdim > 1;
-        const int stackSize = zstack? stack0.data.zdim : stack0.data.ndim;
-
-        if (lastFrame < 0) fc = stackSize / pc0 - firstFrame;
         else fc = lastFrame - firstFrame + 1;
     }
     else
@@ -359,7 +364,10 @@ void MotionFitter::initialise()
             std::string mgFn;
             mdts[0].getValueToString(EMDL_MICROGRAPH_NAME, mgFn, 0);
 
-            std::string metaFn = mic2meta[mgFn];
+            // remove the pipeline job prefix
+            FileName fn_pre, fn_jobnr, fn_post;
+            decomposePipelineFileName(mgFn, fn_pre, fn_jobnr, fn_post);
+            std::string metaFn = mic2meta[fn_post];
 
             if (meta_path != "")
             {
@@ -371,33 +379,42 @@ void MotionFitter::initialise()
             if (movie_angpix <= 0)
             {
                 movie_angpix = micrograph.angpix;
-                std::cout << " + Using movie pixel size from " << metaFn << ": " << movie_angpix << " A\n";
+                if (verb > 0)
+                	std::cout << " + Using movie pixel size from " << metaFn << ": " << movie_angpix << " A\n";
             }
             else
             {
-                std::cout << " + Using movie pixel size from command line: " << movie_angpix << " A\n";
+                if (verb > 0)
+                	std::cout << " + Using movie pixel size from command line: " << movie_angpix << " A\n";
             }
 
             if (coords_angpix <= 0)
             {
                 coords_angpix = micrograph.angpix * micrograph.getBinningFactor();
-                std::cout << " + Using coord. pixel size from " << metaFn << ": " << coords_angpix << " A\n";
+                if (verb > 0)
+                	std::cout << " + Using coord. pixel size from " << metaFn << ": " << coords_angpix << " A\n";
             }
             else
             {
-                std::cout << " + Using coord. pixel size from command line: " << coords_angpix << " A\n";
+                if (verb > 0)
+                	std::cout << " + Using coord. pixel size from command line: " << coords_angpix << " A\n";
             }
 
-            fc = micrograph.getNframes();
+            if (lastFrame < 0) fc = micrograph.getNframes() - firstFrame;
+            else fc = lastFrame - firstFrame + 1;
+
         }
         else
         {
-            std::vector<std::vector<Image<Complex>>> movie = StackHelper::extractMovieStackFS(
-                &mdts[0], meta_path, imgPath, movie_ending, coords_angpix, angpix, movie_angpix, s,
-                nr_omp_threads, false, firstFrame, lastFrame, hotCutoff, debugMov);
+            if (lastFrame < 0)
+            {
+            	std::vector<std::vector<Image<Complex>>> movie = StackHelper::extractMovieStackFS(
+            			&mdts[0], meta_path, imgPath, movie_ending, coords_angpix, angpix, movie_angpix, s,
+						nr_omp_threads, false, firstFrame, lastFrame, hotCutoff, debugMov);
 
-
-            fc = movie[0].size();
+            	fc = movie[0].size() - firstFrame;
+            }
+            else fc = lastFrame - firstFrame + 1;
         }
     }
 
@@ -569,10 +586,12 @@ std::vector<std::vector<Image<Complex>>> MotionFitter::loadMovie(
     {
         std::string mgFn;
         mdts[g].getValueToString(EMDL_MICROGRAPH_NAME, mgFn, 0);
+        FileName fn_pre, fn_jobnr, fn_post;
+        decomposePipelineFileName(mgFn, fn_pre, fn_jobnr, fn_post);
 
         if (hasCorrMic)
         {
-            std::string metaFn = mic2meta[mgFn];
+            std::string metaFn = mic2meta[fn_post];
 
             if (meta_path != "")
             {
