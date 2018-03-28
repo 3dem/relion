@@ -1086,7 +1086,6 @@ void RelionJob::initialiseMotioncorrJob()
 	hidden_name = ".gui_motioncorr";
 
 	joboptions["input_star_mics"] = JobOption("Input movies STAR file:", NODE_MOVIES, "", "STAR files (*.star)", "A STAR file with all micrographs to run MOTIONCORR on");
-	joboptions["do_save_movies"] = JobOption("Save aligned movie stacks?", true,"Save the aligned movie stacks? Say Yes if you want to perform movie-processing in RELION as well. Say No if you only want to correct motions and write out the averages.");
 	joboptions["first_frame_sum"] = JobOption("First frame for corrected sum:", 1, 1, 32, 1, "First frame to use in corrected average (starts counting at 1). ");
 	joboptions["last_frame_sum"] = JobOption("Last frame for corrected sum:", 0, 0, 32, 1, "Last frame to use in corrected average.");
 	joboptions["angpix"] = JobOption("Pixel size (A):", 1, 0.5, 4.0, 0.1, "Provide the pixel size in Angstroms of the input movies. UNBLUR and MOTIONCOR2 use this for their bfactor and their dose-weighting. This is the original pixel size before binning.");
@@ -1173,16 +1172,8 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 	outputName = outputname;
 	Node node2(outputname + "corrected_micrographs.star", NODE_MICS);
 	outputNodes.push_back(node2);
-	if (joboptions["do_save_movies"].getBoolean())
-	{
-		Node node3(outputname + "corrected_micrograph_movies.star", NODE_MOVIES);
-		outputNodes.push_back(node3);
-	}
 	Node node4(outputname + "logfile.pdf", NODE_PDF_LOGFILE);
 	outputNodes.push_back(node4);
-
-	if (joboptions["do_save_movies"].getBoolean())
-		command += " --save_movies ";
 
 	command += " --first_frame_sum " + joboptions["first_frame_sum"].getString();
 	command += " --last_frame_sum " + joboptions["last_frame_sum"].getString();
@@ -4655,7 +4646,6 @@ The mask used for this postprocessing will be applied to the unfiltered half-map
 	joboptions["sigma_div"] = JobOption("Sigma for divergence (A): ", 500, 0, 3000, 100, "Standard deviation for the divergence of tracks across the micrograph. Smaller values allow for TODO EXPLAIN");
 	joboptions["sigma_acc"] = JobOption("Sigma for acceleration (A/dose): ", -1, -10, 0, 0.1, "Standard deviation for the acceleration regularisation. TODO EXPLAIN");
 	joboptions["max_iters"] = JobOption("Maximum number of iterations: ", 10000, 2000, 50000, 1000, "Maximum number of iterations for the optimisation per micrograph.");
-	joboptions["dose_rate"] = JobOption("Dose rate (electron/A^2/frame): ", 1, 0.2, 5., 0.1, "The dose rate in electrons per squared Angstrom per movie frame.");
 	joboptions["do_pad1"] = JobOption("Skip padding?", false, "If set to Yes, the calculations will not use padding in Fourier space for better interpolation in the references. Otherwise, references are padded 2x before Fourier transforms are calculated. Skipping padding (i.e. use --pad 1) gives nearly as good results as using --pad 2, but some artifacts may appear in the corners from signal that is folded back.");
 	joboptions["other_motionfit_args"] = JobOption("Other motion_fit arguments", std::string(""), "Additional arguments that need to be passed to relion_motion_fit.");
 
@@ -4734,7 +4724,6 @@ bool RelionJob::getCommandsMotionfitJob(std::string &outputname, std::vector<std
 		command += " --s_div " + joboptions["sigma_div"].getString();
 		command += " --s_acc " + joboptions["sigma_acc"].getString();
 		command += " --max_iters " + joboptions["max_iters"].getString();
-		command += " --fdose " + joboptions["dose_rate"].getString();
 	}
 	else
 	{

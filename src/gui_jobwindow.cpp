@@ -554,7 +554,6 @@ void JobWindow::initialiseMotioncorrWindow()
 	resetHeight();
 
 	place("input_star_mics", TOGGLE_DEACTIVATE);
-	place("do_save_movies", TOGGLE_DEACTIVATE);
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -574,7 +573,6 @@ void JobWindow::initialiseMotioncorrWindow()
 
 	place("do_motioncor2", TOGGLE_DEACTIVATE, group1);
 
-	current_y += STEPY/2;
 	group1->begin();
 
 	place("fn_gain_ref", TOGGLE_DEACTIVATE);
@@ -590,7 +588,6 @@ void JobWindow::initialiseMotioncorrWindow()
 	group4->begin();
 	place("fn_motioncor2_exe", TOGGLE_DEACTIVATE);
 	place("fn_defect", TOGGLE_DEACTIVATE);
-	current_y += STEPY/2;
 	place("gpu_ids");
 	place("other_motioncor2_args", TOGGLE_DEACTIVATE);
 	group4->end();
@@ -2298,7 +2295,6 @@ void JobWindow::initialiseMotionfitWindow()
 	place("sigma_div", TOGGLE_DEACTIVATE);
 	place("sigma_acc", TOGGLE_DEACTIVATE);
 	place("max_iters", TOGGLE_DEACTIVATE);
-	place("dose_rate", TOGGLE_DEACTIVATE);
 	place("do_pad1", TOGGLE_DEACTIVATE);
 	place("other_motionfit_args");
 
