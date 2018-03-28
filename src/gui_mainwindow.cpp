@@ -520,6 +520,18 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	gui_jobwindows[19]->initialise(PROC_RESMAP, maingui_do_old_style);
     browse_grp[19]->end();
 
+    browse_grp[20] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+	browser->add("Motion Fit");
+	gui_jobwindows[20] = new JobWindow();
+	gui_jobwindows[20]->initialise(PROC_MOTIONFIT, maingui_do_old_style);
+    browse_grp[20]->end();
+
+    browse_grp[21] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+	browser->add("CTF refine");
+	gui_jobwindows[21] = new JobWindow();
+	gui_jobwindows[21]->initialise(PROC_CTFREFINE, maingui_do_old_style);
+    browse_grp[21]->end();
+
     browser->callback(cb_select_browsegroup);
     browser->textsize(RLN_FONTSIZE);
     browser->end();
@@ -1261,7 +1273,7 @@ void GuiMainWindow::cb_display_io_node_i()
 		std::string myviewer(default_pdf_viewer);
 		command = myviewer + " " + pipeline.nodeList[mynode].name + "&";
 	}
-	else
+	else if (pipeline.nodeList[mynode].type != NODE_POST)
 	{
 		command = "relion_display --gui --i " + pipeline.nodeList[mynode].name + " &";
 	}

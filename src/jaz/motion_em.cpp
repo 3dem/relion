@@ -148,7 +148,7 @@ void MotionEM::computeInitial()
                 initialCC[p][f](y,x) = s_full * s_full * ccRs(y,x);
             }
 
-            double offCC = FilterHelper::maxValue(ccRs);
+            RFLOAT offCC = FilterHelper::maxValue(ccRs);
 
             ImageOp::linearCombination(ccRs, offCC, 1.0, -1.0, ccRs);
 
@@ -385,7 +385,7 @@ Image<RFLOAT> MotionEM::blurVelocity(const Image<Complex> &velProbFs, double sig
     return velProbB;
 }
 
-Image<double> MotionEM::adaptSize(const Image<double> &img, int s)
+Image<RFLOAT> MotionEM::adaptSize(const Image<RFLOAT> &img, int s)
 {
     if (img.data.ydim > s)
     {

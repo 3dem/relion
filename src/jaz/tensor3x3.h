@@ -97,12 +97,17 @@ class Tensor3x3
             zz *= arg;
 
             return *this;
-        }
+		}
 
-        Tensor3x3 operator * (T arg) const
-        {
-            return Tensor3x3(xx * arg, xy * arg, xz * arg, yy * arg, yz * arg, zz * arg);
-        }
+		Tensor3x3 operator * (float arg) const
+		{
+			return Tensor3x3(xx * arg, xy * arg, xz * arg, yy * arg, yz * arg, zz * arg);
+		}
+
+		Tensor3x3 operator * (double arg) const
+		{
+			return Tensor3x3(xx * arg, xy * arg, xz * arg, yy * arg, yz * arg, zz * arg);
+		}
 
         Tensor3x3& operator /= (T arg)
         {
@@ -167,7 +172,7 @@ class Tensor3x3
         A[2][2] = (double)zz;
 
         double Q[3][3];
-        std::vector<T> w(3);
+		std::vector<double> w(3);
 
         dsyevh3(A, Q, &w[0]);
 
@@ -175,11 +180,11 @@ class Tensor3x3
 
         for (int i = 0; i < 3; i++)
         {
-            eigenvalues[2-i] = w[inds[i]];
+			eigenvalues[2-i] = (T) w[inds[i]];
 
             for (int j = 0; j < 3; j++)
             {
-                eigenvectors(j,2-i) = Q[j][inds[i]];
+				eigenvectors(j,2-i) = (T) Q[j][inds[i]];
             }
         }
 
@@ -208,21 +213,35 @@ class Tensor3x3
         return Tensor3x3<T>(
             v1.xx - v2.xx, v1.xy - v2.xy, v1.xz - v2.xz,
             v1.yy - v2.yy, v1.yz - v2.yz, v1.zz - v2.zz);
-    }
+	}
 
-    template <class T>
-    inline
-    Tensor3x3<T> operator * (T f, const Tensor3x3<T>& v)
-    {
-        return Tensor3x3<T>(f * v.xx, f * v.xy, f * v.xz, f * v.yy, f * v.yz, f * v.zz);
-    }
+	template <class T>
+	inline
+	Tensor3x3<T> operator * (float f, const Tensor3x3<T>& v)
+	{
+		return Tensor3x3<T>(f * v.xx, f * v.xy, f * v.xz, f * v.yy, f * v.yz, f * v.zz);
+	}
 
-    template <class T>
-    inline
-    Tensor3x3<T> operator * (const Tensor3x3<T>& v, T f)
-    {
-        return Tensor3x3<T>(v.xx * f, v.xy * f, v.xz * f, v.yy * f, v.yz * f, v.zz * f);
-    }
+	template <class T>
+	inline
+	Tensor3x3<T> operator * (const Tensor3x3<T>& v, float f)
+	{
+		return Tensor3x3<T>(v.xx * f, v.xy * f, v.xz * f, v.yy * f, v.yz * f, v.zz * f);
+	}
+
+	template <class T>
+	inline
+	Tensor3x3<T> operator * (double f, const Tensor3x3<T>& v)
+	{
+		return Tensor3x3<T>(f * v.xx, f * v.xy, f * v.xz, f * v.yy, f * v.yz, f * v.zz);
+	}
+
+	template <class T>
+	inline
+	Tensor3x3<T> operator * (const Tensor3x3<T>& v, double f)
+	{
+		return Tensor3x3<T>(v.xx * f, v.xy * f, v.xz * f, v.yy * f, v.yz * f, v.zz * f);
+	}
 
     template <class T>
     inline

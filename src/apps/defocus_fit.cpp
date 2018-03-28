@@ -178,7 +178,7 @@ int DefocusFit::_run()
                 ImageLog::write(vis, outPath+"_astig_data_m"+stsg.str()+"_vis0");
             }
 
-            RFLOAT u, v, phi, phase, newCs;
+            double u, v, phi, phase, newCs;
 
             mdts[g].getValue(EMDL_CTF_PHASESHIFT, phase, 0);
             mdts[g].getValue(EMDL_CTF_CS, newCs, 0);

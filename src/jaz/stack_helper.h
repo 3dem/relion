@@ -18,6 +18,7 @@ class StackHelper
 
         typedef enum {BoxBin, GaussBin, FourierCrop} BinningType;
 
+        static std::vector<MetaDataTable> splitByMicrographName(const MetaDataTable* mdt);
         static std::vector<MetaDataTable> splitByStack(const MetaDataTable* mdt);
         static std::vector<Image<RFLOAT> > loadStack(const MetaDataTable* mdt, std::string path = "", int threads = 1);
         static std::vector<Image<Complex> > loadStackFS(const MetaDataTable* mdt, std::string path = "",
@@ -47,7 +48,7 @@ class StackHelper
                 double outPs, double coordsPs, double moviePs,
                 int squareSize, int threads,
                 bool loadData = true, int firstFrame = 0, int lastFrame = -1,
-                RFLOAT hot = -1.0, bool verbose = false);
+                RFLOAT hot = -1.0, bool verbose = false, bool saveMemory = false);
 
         static Image<Complex> projectView(Projector* projector, const MetaDataTable* mdt, int index);
         //static Image<Complex> projectView2(Projector* projector, const MetaDataTable* mdt, int index);

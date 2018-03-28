@@ -8,7 +8,7 @@ using namespace gravis;
 void TiltRefinement::updateTiltShift(
         const Image<Complex> &prediction,
         const Image<Complex> &observation,
-        CTF &ctf, RFLOAT angpix,
+        CTF &ctf, double angpix,
         Image<Complex>& xyDest,
         Image<RFLOAT>& wDest)
 {
@@ -37,7 +37,7 @@ void TiltRefinement::updateTiltShift(
 void TiltRefinement::updateTiltShiftPar(
         const Image<Complex> &prediction,
         const Image<Complex> &observation,
-        CTF &ctf, RFLOAT angpix,
+        CTF &ctf, double angpix,
         Image<Complex>& xyDest,
         Image<RFLOAT>& wDest)
 {
@@ -65,9 +65,9 @@ void TiltRefinement::updateTiltShiftPar(
 
 void TiltRefinement::fitTiltShift(const Image<RFLOAT>& phase,
                              const Image<RFLOAT>& weight,
-                             RFLOAT Cs, RFLOAT lambda, RFLOAT angpix,
-                             RFLOAT* shift_x, RFLOAT* shift_y,
-                             RFLOAT* tilt_x, RFLOAT* tilt_y,
+                             double Cs, double lambda, double angpix,
+                             double* shift_x, double* shift_y,
+                             double* tilt_x, double* tilt_y,
                              Image<RFLOAT>* fit,
                              d2Matrix magCorr)
 {
@@ -145,7 +145,7 @@ void TiltRefinement::fitTiltShift(const Image<RFLOAT>& phase,
 
     gravis::d4Vector opt = Ainv * b;
 
-    std::cout << opt[0] << ", " << opt[1] << ", " << opt[2] << ", " << opt[3] << "\n";
+    //std::cout << opt[0] << ", " << opt[1] << ", " << opt[2] << ", " << opt[3] << "\n";
 
     *shift_x = opt[0];
     *shift_y = opt[1];
@@ -163,8 +163,8 @@ void TiltRefinement::fitTiltShift(const Image<RFLOAT>& phase,
     std::cout << "cubic:  " << destB << " @ " << destPhiB << "°\n";
     std::cout << "    =  -" << destB << " @ " << (destPhiB + 180.0) << "°\n";*/
 
-    std::cout << "tilt_x = " << *tilt_x << "\n";
-    std::cout << "tilt_y = " << *tilt_y << "\n";
+    //std::cout << "tilt_x = " << *tilt_x << "\n";
+    //std::cout << "tilt_y = " << *tilt_y << "\n";
 
     if (fit != 0)
     {
@@ -176,12 +176,12 @@ void TiltRefinement::fitTiltShift(const Image<RFLOAT>& phase,
 void TiltRefinement::optimizeTilt(
     const Image<Complex> &xy,
     const Image<RFLOAT> &weight,
-    RFLOAT Cs, RFLOAT lambda, RFLOAT angpix,
+    double Cs, double lambda, double angpix,
     bool L1,
-    RFLOAT shift0_x, RFLOAT shift0_y,
-    RFLOAT tilt0_x, RFLOAT tilt0_y,
-    RFLOAT *shift_x, RFLOAT *shift_y,
-    RFLOAT *tilt_x, RFLOAT *tilt_y,
+    double shift0_x, double shift0_y,
+    double tilt0_x, double tilt0_y,
+    double *shift_x, double *shift_y,
+    double *tilt_x, double *tilt_y,
     Image<RFLOAT> *fit)
 {
     TiltOptimization prob(xy, weight, angpix, L1, false);
@@ -200,9 +200,9 @@ void TiltRefinement::optimizeTilt(
     *tilt_x = -opt[2]*scale;
     *tilt_y = -opt[3]*scale;
 
-    std::cout << opt[0] << ", " << opt[1] << ", " << opt[2] << ", " << opt[3] << "\n";
-    std::cout << "tilt_x = " << *tilt_x << "\n";
-    std::cout << "tilt_y = " << *tilt_y << "\n";
+    //std::cout << opt[0] << ", " << opt[1] << ", " << opt[2] << ", " << opt[3] << "\n";
+    //std::cout << "tilt_x = " << *tilt_x << "\n";
+    //std::cout << "tilt_y = " << *tilt_y << "\n";
 
     if (fit != 0)
     {
@@ -218,13 +218,13 @@ void TiltRefinement::optimizeTilt(
 void TiltRefinement::optimizeAnisoTilt(
     const Image<Complex> &xy,
     const Image<RFLOAT> &weight,
-    RFLOAT Cs, RFLOAT lambda, RFLOAT angpix,
+    double Cs, double lambda, double angpix,
     bool L1,
-    RFLOAT shift0_x, RFLOAT shift0_y,
-    RFLOAT tilt0_x, RFLOAT tilt0_y,
-    RFLOAT *shift_x, RFLOAT *shift_y,
-    RFLOAT *tilt_x, RFLOAT *tilt_y,
-    RFLOAT* tilt_xx, RFLOAT* tilt_xy, RFLOAT* tilt_yy,
+    double shift0_x, double shift0_y,
+    double tilt0_x, double tilt0_y,
+    double *shift_x, double *shift_y,
+    double *tilt_x, double *tilt_y,
+    double* tilt_xx, double* tilt_xy, double* tilt_yy,
     Image<RFLOAT> *fit)
 {
     TiltOptimization prob(xy, weight, angpix, L1, true);
@@ -272,7 +272,7 @@ void TiltRefinement::drawPhaseShift(
         double tilt_x, double tilt_y,
         int w, int h, double as,
         gravis::d2Matrix magCorr,
-        Image<double> *tgt)
+        Image<RFLOAT> *tgt)
 {
     for (long yi = 0; yi < h; yi++)
     for (long xi = 0; xi < w; xi++)
@@ -296,7 +296,7 @@ void TiltRefinement::drawPhaseShift(
         double tilt_xx, double tilt_xy, double tilt_yy,
         int w, int h, double as,
         gravis::d2Matrix magCorr,
-        Image<double> *tgt)
+        Image<RFLOAT> *tgt)
 {
     for (long yi = 0; yi < h; yi++)
     for (long xi = 0; xi < w; xi++)
@@ -315,7 +315,7 @@ void TiltRefinement::drawPhaseShift(
 }
 
 TiltOptimization::TiltOptimization(const Image<Complex> &xy,
-    const Image<double> &weight, double angpix,
+    const Image<RFLOAT> &weight, double angpix,
     bool L1,
     bool anisotropic)
     :   xy(xy),

@@ -46,13 +46,18 @@ int RefinementProgram::init(int argc, char *argv[])
             maskFn = parser.getOption("--mask", "Reference mask", "");
             fscFn = parser.getOption("--f", "Input STAR file with the FSC of the reference", "");
         }
+        else
+        {
+            maskFn = "";
+            fscFn = "";
+        }
 
         outPath = parser.getOption("--out", "Output path");
 
         if (doesMovies)
         {            
             imgPath = parser.getOption("--mov", "Path to movies", "");
-            corrMicFn = parser.getOption("--corr_mic", "Path to corrected_micrographs.star", "");
+            corrMicFn = parser.getOption("--corr_mic", "List of uncorrected micrographs (e.g. corrected_micrographs.star)", "");
             preextracted = parser.checkOption("--preex", "Preextracted movie stacks");
             meta_path = parser.getOption("--meta", "Path to per-movie metadata star files", "");
             gain_path = parser.getOption("--gain_path", "Path to gain references", "");
@@ -67,6 +72,8 @@ int RefinementProgram::init(int argc, char *argv[])
 
             firstFrame = textToInteger(parser.getOption("--first_frame", "", "1")) - 1;
             lastFrame = textToInteger(parser.getOption("--last_frame", "", "-1")) - 1;
+
+            saveMem = parser.checkOption("--sbs", "Load movies slice-by-slice to save memory (slower)");
         }
         else
         {
@@ -82,10 +89,23 @@ int RefinementProgram::init(int argc, char *argv[])
 
             paddingFactor = textToFloat(parser.getOption("--pad", "Padding factor", "2"));
         }
+        else
+        {
+            Cs = -1;
+            kV = -1;
+            paddingFactor = 2;
+        }
 
         if (noTilt)
         {
+            beamtilt_x = 0.0;
+            beamtilt_y = 0.0;
+
             applyTilt = false;
+
+            beamtilt_xx = 1.0;
+            beamtilt_xy = 0.0;
+            beamtilt_yy = 1.0;
         }
         else
         {
@@ -120,13 +140,13 @@ int RefinementProgram::init(int argc, char *argv[])
 
         bool allGood = true;
 
-        if (movie_angpix <= 0 && corrMicFn == "")
+        if (doesMovies && movie_angpix <= 0 && corrMicFn == "")
         {
             std::cerr << "Movie pixel size (--mps) is required unless a corrected_micrographs.star (--corr_mic) is provided.\n";
             allGood = false;
         }
 
-        if (coords_angpix <= 0 && corrMicFn == "")
+        if (doesMovies && coords_angpix <= 0 && corrMicFn == "")
         {
             std::cerr << "Coordinates pixel size (--cps) is required unless a corrected_micrographs.star (--corr_mic) is provided.\n";
             allGood = false;
@@ -364,11 +384,12 @@ int RefinementProgram::init(int argc, char *argv[])
     if (doesMovies && corrMicFn != "")
     {
         MetaDataTable corrMic;
-        corrMic.read(corrMicFn+"/corrected_micrographs.star");
+        corrMic.read(corrMicFn);
 
         mic2meta.clear();
 
         std::string micName, metaName;
+
 
         for (int i = 0; i < corrMic.numberOfObjects(); i++)
         {
@@ -478,7 +499,6 @@ void RefinementProgram::loadInitialMovieValues()
     }
 }
 
-// @TODO: crash (gracefully) if the number of frames is insufficient
 std::vector<std::vector<Image<Complex>>> RefinementProgram::loadMovie(
         int g, int pc, std::vector<ParFourierTransformer>& fts)
 {
@@ -540,7 +560,7 @@ std::vector<std::vector<Image<Complex>>> RefinementProgram::loadMovie(
             movie = StackHelper::extractMovieStackFS(
                 &mdts[g], mgHasGain? &lastGainRef : 0,
                 mgFn, angpix, coords_angpix, movie_angpix, s,
-                nr_omp_threads, true, firstFrame, lastFrame, hotCutoff, debugMov);
+                nr_omp_threads, true, firstFrame, lastFrame, hotCutoff, debugMov, saveMem);
         }
         else
         {
@@ -584,10 +604,20 @@ std::vector<std::vector<Image<Complex>>> RefinementProgram::loadMovie(
     return movie;
 }
 
-void RefinementProgram::setForAll(EMDLabel label, double value)
+void RefinementProgram::setForAll(EMDLabel label, RFLOAT value)
 {
     for (int i = 0; i < mdt0.numberOfObjects(); i++)
     {
         mdt0.setValue(label, value, i);
     }
+}
+
+std::string RefinementProgram::getMicrographTag(int m)
+{
+    std::string tag;
+    mdts[m].getValue(EMDL_IMAGE_NAME, tag, 0);
+    tag = tag.substr(0,tag.find_last_of('.'));
+    tag = tag.substr(tag.find_first_of('@')+1);
+
+    return tag;
 }

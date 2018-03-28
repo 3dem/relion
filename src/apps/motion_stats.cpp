@@ -11,13 +11,15 @@ int main(int argc, char *argv[])
     IOParser parser;
     std::string starFn, tracksPath;
     int fc;
-    double angpix;
+    double angpix, fdose;
 
     parser.setCommandLine(argc, argv);
     parser.addSection("General options");
     starFn = parser.getOption("--i", "Input STAR file with a list of particles");
     tracksPath = parser.getOption("--t", "Path to particle trajectories");
+    fdose = textToFloat(parser.getOption("--fdose", "Electron dose per frame (e^-/A^2)"));
     angpix = textToFloat(parser.getOption("--angpix", "Pixel resolution (Angst/pix)"));
+
     fc = textToInteger(parser.getOption("--fc", "Frame count"));
 
     if (parser.checkForErrors()) return 1;
@@ -31,7 +33,7 @@ int main(int argc, char *argv[])
 
     std::vector<double> varPerFrame(fc, 0.0);
     double var = 0.0;
-    int tpc;
+    long tpc = 0;
 
     for (int m = 0; m < mgc; m++)
     {
@@ -43,16 +45,22 @@ int main(int argc, char *argv[])
         const int pc = mdts[m].numberOfObjects();
         tpc += pc;
 
-        std::string tfn = tracksPath + "_mg" + stsg.str() + "_tracks.dat";
+        std::string tag;
+        mdts[m].getValue(EMDL_IMAGE_NAME, tag, 0);
+        tag = tag.substr(0,tag.find_last_of('.'));
+        tag = tag.substr(tag.find_first_of('@')+1);
+
+        std::string tfn = tracksPath + "/" + tag + "_tracks.star";
+
         std::vector<std::vector<d2Vector>> shift;
 
         try
         {
-            shift = MotionRefinement::readTrack(tfn, pc, fc);
+            shift = MotionRefinement::readTracks(tfn);
         }
         catch (RelionError XE)
         {
-            std::cerr << "warning: error reading tracks in " << tfn << "\n";
+            std::cerr << "Warning: error reading tracks in " << tfn << "\n";
             continue;
         }
 
@@ -68,7 +76,7 @@ int main(int argc, char *argv[])
 
     for (int f = 0; f < fc-1; f++)
     {
-        std::cout << f << ": " << sqrt(varPerFrame[f]/tpc) << " A\n";
+        std::cout << fdose*f << " " << sqrt(varPerFrame[f]/tpc) << "\n";
     }
 
     std::cout << "\ntotal: " << sqrt(var/(tpc*fc)) << " A\n";

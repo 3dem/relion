@@ -1,6 +1,6 @@
 #include <src/jaz/convolution_helper.h>
 
-Image<double> ConvolutionHelper::convolve2D(Image<double> &img0, Image<double> &img1)
+Image<RFLOAT> ConvolutionHelper::convolve2D(Image<RFLOAT> &img0, Image<RFLOAT> &img1)
 {
     FourierTransformer ft;
     return convolve2D(img0, img1, ft);

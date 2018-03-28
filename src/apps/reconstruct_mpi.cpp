@@ -17,31 +17,27 @@
  * source code. Additional authorship citations may be added, but existing
  * author citations must be preserved.
  ***************************************************************************/
-#include <src/preprocessing.h>
+
+#include <src/reconstructor_mpi.h>
+#include <mpi.h>
 
 
 int main(int argc, char *argv[])
 {
-	Preprocessing prm;
+	ReconstructorMpi prm;
 
 	try
     {
 		prm.read(argc, argv);
-
-		prm.initialise();
-
 		prm.run();
     }
-
     catch (RelionError XE)
     {
-        //prm.usage();
-        std::cerr << XE;
-        exit(1);
+        if (prm.verb > 0)
+        	std::cerr << XE;
+        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
     }
-
     return 0;
-
 }
 
 

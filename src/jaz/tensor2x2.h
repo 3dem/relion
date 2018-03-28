@@ -167,21 +167,35 @@ class Tensor2x2
     {
         return Tensor2x2<T>(
             v1.xx - v2.xx, v1.xy - v2.xy, v1.yy - v2.yy);
-    }
+	}
 
-    template <class T>
-    inline
-    Tensor2x2<T> operator * (T f, const Tensor2x2<T>& v)
-    {
-        return Tensor2x2<T>(f * v.xx, f * v.xy, f * v.yy);
-    }
+	template <class T>
+	inline
+	Tensor2x2<T> operator * (float f, const Tensor2x2<T>& v)
+	{
+		return Tensor2x2<T>(f * v.xx, f * v.xy, f * v.yy);
+	}
 
-    template <class T>
-    inline
-    Tensor2x2<T> operator * (const Tensor2x2<T>& v, T f)
-    {
-        return Tensor2x2<T>(v.xx * f, v.xy * f, v.yy * f);
-    }
+	template <class T>
+	inline
+	Tensor2x2<T> operator * (const Tensor2x2<T>& v, float f)
+	{
+		return Tensor2x2<T>(v.xx * f, v.xy * f, v.yy * f);
+	}
+
+	template <class T>
+	inline
+	Tensor2x2<T> operator * (double f, const Tensor2x2<T>& v)
+	{
+		return Tensor2x2<T>(f * v.xx, f * v.xy, f * v.yy);
+	}
+
+	template <class T>
+	inline
+	Tensor2x2<T> operator * (const Tensor2x2<T>& v, double f)
+	{
+		return Tensor2x2<T>(v.xx * f, v.xy * f, v.yy * f);
+	}
 
     template <class T>
     inline

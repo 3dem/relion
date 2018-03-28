@@ -31,18 +31,18 @@ int ThirdOrderPolynomialModel::getShiftAt(RFLOAT z, RFLOAT x, RFLOAT y, RFLOAT &
 	const RFLOAT x2 = x * x, y2 = y * y, xy = x * y, z2 = z * z;
 	const RFLOAT z3 = z2 * z;
 
-	shiftx = (coeffX(0)  * z + coeffX(1)  * z2 + coeffX(2)  * z3) \
-	         + (coeffX(3)  * z + coeffX(4)  * z2 + coeffX(5)  * z3) * x \
-	         + (coeffX(6)  * z + coeffX(7)  * z2 + coeffX(8)  * z3) * x2 \
-	         + (coeffX(9)  * z + coeffX(10) * z2 + coeffX(11) * z3) * y \
-	         + (coeffX(12) * z + coeffX(13) * z2 + coeffX(14) * z3) * y2 \
-	         + (coeffX(15) * z + coeffX(16) * z2 + coeffX(17) * z3) * xy;
-	shifty = (coeffY(0)  * z + coeffY(1)  * z2 + coeffY(2)  * z3)\
-	         + (coeffY(3)  * z + coeffY(4)  * z2 + coeffY(5)  * z3) * x \
-	         + (coeffY(6)  * z + coeffY(7)  * z2 + coeffY(8)  * z3) * x2 \
-	       	 + (coeffY(9)  * z + coeffY(10) * z2 + coeffY(11) * z3) * y \
-	         + (coeffY(12) * z + coeffY(13) * z2 + coeffY(14) * z3) * y2 \
-                 + (coeffY(15) * z + coeffY(16) * z2 + coeffY(17) * z3) * xy;
+    shiftx = (coeffX(0)  * z + coeffX(1)  * z2 + coeffX(2)  * z3)
+             + (coeffX(3)  * z + coeffX(4)  * z2 + coeffX(5)  * z3) * x
+             + (coeffX(6)  * z + coeffX(7)  * z2 + coeffX(8)  * z3) * x2
+             + (coeffX(9)  * z + coeffX(10) * z2 + coeffX(11) * z3) * y
+             + (coeffX(12) * z + coeffX(13) * z2 + coeffX(14) * z3) * y2
+             + (coeffX(15) * z + coeffX(16) * z2 + coeffX(17) * z3) * xy;
+    shifty = (coeffY(0)  * z + coeffY(1)  * z2 + coeffY(2)  * z3)
+             + (coeffY(3)  * z + coeffY(4)  * z2 + coeffY(5)  * z3) * x
+             + (coeffY(6)  * z + coeffY(7)  * z2 + coeffY(8)  * z3) * x2
+             + (coeffY(9)  * z + coeffY(10) * z2 + coeffY(11) * z3) * y
+             + (coeffY(12) * z + coeffY(13) * z2 + coeffY(14) * z3) * y2
+            + (coeffY(15) * z + coeffY(16) * z2 + coeffY(17) * z3) * xy;
 }
 
 MotionModel* ThirdOrderPolynomialModel::clone() const
@@ -82,25 +82,28 @@ void ThirdOrderPolynomialModel::read(std::ifstream &fh, std::string block_name) 
 	const int NUM_COEFFS = NUM_COEFFS_PER_DIM * 2;
 	int num_read = 0;
 
-	coeffX.resize(NUM_COEFFS_PER_DIM); coeffX.initZeros();
-	coeffY.resize(NUM_COEFFS_PER_DIM); coeffY.initZeros();
+    coeffX.resize(NUM_COEFFS_PER_DIM); coeffX.initZeros();
+    coeffY.resize(NUM_COEFFS_PER_DIM); coeffY.initZeros();
 
-	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD) {
+    FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
+    {
 		int idx;
 		RFLOAT val;
 
 		if (!MD.getValue(EMDL_MICROGRAPH_MOTION_COEFFS_IDX, idx) ||
-		    !MD.getValue(EMDL_MICROGRAPH_MOTION_COEFF, val)) {
+            !MD.getValue(EMDL_MICROGRAPH_MOTION_COEFF, val))
+        {
 			REPORT_ERROR("ThirdOrderPolynomialModel coefficients table: missing index or coefficients");
-		}
+        }
 
 		if (idx >= 0 && idx < NUM_COEFFS_PER_DIM) {
 			coeffX(idx) = val;
 		} else if (idx >= NUM_COEFFS_PER_DIM && idx < NUM_COEFFS) {
-			coeffY(idx) = val;
+			coeffY(idx - NUM_COEFFS_PER_DIM) = val;
 		} else {
 			REPORT_ERROR("ThirdOrderPolynomialModel coefficients table: wrong index");
 		}
+
 		num_read++;
 	}
 	
@@ -252,8 +255,8 @@ int Micrograph::getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFL
 	}
 
 	if (model != NULL && use_local) {
-		// both frame and first_frame is 1 indexed
-		model->getShiftAt(frame - first_frame, x, y, shiftx, shifty);
+        // both frame and first_frame is 1 indexed
+        model->getShiftAt(frame - first_frame, x, y, shiftx, shifty);
 	} else {
 		shiftx = 0;
 		shifty = 0;
@@ -335,7 +338,8 @@ void Micrograph::read(FileName fn_in)
 	}
 
 	int model_version;
-	if (!MDglobal.getValue(EMDL_MICROGRAPH_MOTION_MODEL_VERSION, model_version)) {
+	model = NULL;
+	if (MDglobal.getValue(EMDL_MICROGRAPH_MOTION_MODEL_VERSION, model_version)) {
 		if (model_version == MOTION_MODEL_THIRD_ORDER_POLYNOMIAL) {
 			model = new ThirdOrderPolynomialModel();
 		} else if (model_version == MOTION_MODEL_NULL) {
@@ -343,9 +347,12 @@ void Micrograph::read(FileName fn_in)
 		} else {
 			std::cerr << "Warning: Ignoring unknown motion model " << model_version << std::endl;
 		}
-		model->read(in, "local_motion_model");
 	} else {
-		model = NULL;
+        std::cerr << "Warning: local motion model is absent in the micrograph star file." << std::endl;
+	}
+
+	if (model != NULL) {
+		model->read(in, "local_motion_model");
 	}
 
 	// Read global shifts
@@ -364,8 +371,7 @@ void Micrograph::read(FileName fn_in)
 
 		// frame is 1-indexed!
 		globalShiftX[frame - 1] = shiftX;
-		globalShiftY[frame - 1] = shiftY;
-		std::cout << " global shift: frame #" << frame << " x " << shiftX << " Y " << shiftY << std::endl;
+        globalShiftY[frame - 1] = shiftY;
 	}
 }
 

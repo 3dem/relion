@@ -25,8 +25,8 @@
 #include "src/matrix1d.h"
 
 enum MotionModelVersion {
-	MOTION_MODEL_NULL,
-	MOTION_MODEL_THIRD_ORDER_POLYNOMIAL,
+	MOTION_MODEL_NULL = 0,
+	MOTION_MODEL_THIRD_ORDER_POLYNOMIAL = 1,
 };
 
 class MotionModel
@@ -49,7 +49,7 @@ class ThirdOrderPolynomialModel: public MotionModel {
 public:
 	static const int NUM_COEFFS_PER_DIM;
 
-	Matrix1D <RFLOAT> coeffX, coeffY;
+    Matrix1D <RFLOAT> coeffX, coeffY;
 
 	void fit() {
 		REPORT_ERROR("Not implemented yet.");

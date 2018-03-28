@@ -125,6 +125,8 @@ private:
     void initialiseSubtractWindow();
     void initialisePostprocessWindow();
     void initialiseLocresWindow();
+    void initialiseMotionfitWindow();
+    void initialiseCtfrefineWindow();
 
 };
 

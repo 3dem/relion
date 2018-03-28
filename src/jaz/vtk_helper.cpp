@@ -350,7 +350,7 @@ void VtkHelper :: writeTomoVTK(Image<RFLOAT>& img, std::string fn, bool binary)
     }
 }
 
-void VtkHelper :: write(std::vector<Image<RFLOAT> >& stack, std::string fn,
+void VtkHelper :: write(std::vector<Image<double> >& stack, std::string fn,
                         double originX, double originY,
                         double spacingX, double spacingY,
                         bool binary)

@@ -13,7 +13,7 @@ RFLOAT DefocusRefinement::findDefocus1D(
         const Image<Complex> &observation,
         const Image<RFLOAT>& weight,
         const CTF &ctf0, RFLOAT angpix,
-        RFLOAT *destU, RFLOAT *destV,
+        double *destU, double *destV,
         RFLOAT range, int steps,
         int recDepth, RFLOAT recScale)
 {
@@ -86,7 +86,7 @@ void DefocusRefinement::findAstigmatismAndPhaseNM(
         const std::vector<Image<Complex>>& observation,
         const Image<RFLOAT> &weight,
         const CTF &ctf0, RFLOAT angpix,
-        RFLOAT *destU, RFLOAT *destV, RFLOAT *destPhi, RFLOAT *destPhase)
+        double *destU, double *destV, double *destPhi, double *destPhase)
 {
     AstigmatismOptimizationAcc opt(prediction, observation, weight, ctf0, true, false, angpix);
 
@@ -105,7 +105,7 @@ void DefocusRefinement::findAstigmatismPhaseAndCsNM(
         const std::vector<Image<Complex>>& observation,
         const Image<RFLOAT> &weight,
         const CTF &ctf0, RFLOAT angpix,
-        RFLOAT *destU, RFLOAT *destV, RFLOAT *destPhi, RFLOAT *destPhase, RFLOAT* destCs)
+        double *destU, double *destV, double *destPhi, double *destPhase, double* destCs)
 {
     AstigmatismOptimizationAcc opt(prediction, observation, weight, ctf0, true, true, angpix);
 
@@ -125,7 +125,7 @@ void DefocusRefinement::findAstigmatismNM(
         const std::vector<Image<Complex>>& observation,
         const Image<RFLOAT> &weight,
         const CTF &ctf0, RFLOAT angpix,
-        RFLOAT *destU, RFLOAT *destV, RFLOAT *destPhi)
+        double *destU, double *destV, double *destPhi)
 {
     AstigmatismOptimizationAcc opt(prediction, observation, weight, ctf0, false, false, angpix);
 
@@ -141,7 +141,7 @@ void DefocusRefinement::findAstigmatismNM(
 std::vector<d2Vector> DefocusRefinement::diagnoseDefocus(
         const Image<Complex> &prediction,
         const Image<Complex> &observation,
-        const Image<double> &weight,
+        const Image<RFLOAT> &weight,
         const CTF &ctf0, RFLOAT angpix,
         double range, int steps, int threads)
 {

@@ -19,6 +19,11 @@ std::vector<double> GradientDescent::optimize(
     double act_step = step;
     int goodSince = 0, accAfter = 5;
 
+    if (verbose)
+    {
+        std::cout << "initial: " << last_f << "\n";
+    }
+
     for (int i = 0; i < maxIters; i++)
     {
         opt.grad(x, g);

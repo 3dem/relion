@@ -216,7 +216,7 @@ void FilterHelper::drawTestPattern(Volume<RFLOAT>& volume, int squareSize)
     }
 }
 
-Image<RFLOAT> FilterHelper::expImg(Image<double> &img, double scale)
+Image<RFLOAT> FilterHelper::expImg(Image<RFLOAT> &img, double scale)
 {
     Image<RFLOAT> out = img;
 
@@ -228,7 +228,7 @@ Image<RFLOAT> FilterHelper::expImg(Image<double> &img, double scale)
     return out;
 }
 
-Image<double> FilterHelper::logImg(Image<double> &img, double thresh, double scale)
+Image<RFLOAT> FilterHelper::logImg(Image<RFLOAT> &img, double thresh, double scale)
 {
     Image<RFLOAT> out = img;
 
@@ -242,7 +242,7 @@ Image<double> FilterHelper::logImg(Image<double> &img, double thresh, double sca
     return out;
 }
 
-Image<double> FilterHelper::padCorner2D(Image<double>& img, double factor)
+Image<RFLOAT> FilterHelper::padCorner2D(Image<RFLOAT>& img, double factor)
 {
     const int w0 = img.data.xdim;
     const int h0 = img.data.ydim;
@@ -387,7 +387,7 @@ Image<Complex> FilterHelper::cropCorner2D(const Image<Complex>& img, int w, int 
     return out;
 }
 
-Image<double> FilterHelper::zeroOutsideCorner2D(Image<double> &img, double radius)
+Image<RFLOAT> FilterHelper::zeroOutsideCorner2D(Image<RFLOAT> &img, double radius)
 {
     const int w = img.data.xdim;
     const int h = img.data.ydim;
@@ -436,7 +436,7 @@ void FilterHelper::GaussianEnvelopeCorner2D(Image<RFLOAT> &img, double sigma)
     }
 }
 
-Image<double> FilterHelper::ButterworthEnvCorner2D(Image<double> &img, double radIn, double radOut)
+Image<RFLOAT> FilterHelper::ButterworthEnvCorner2D(Image<RFLOAT> &img, double radIn, double radOut)
 {
     const int w = img.data.xdim;
     const int h = img.data.ydim;
@@ -472,7 +472,7 @@ Image<double> FilterHelper::ButterworthEnvCorner2D(Image<double> &img, double ra
 
 }
 
-Image<double> FilterHelper::ButterworthEnvFreq2D(Image<double> &img, double radIn, double radOut)
+Image<RFLOAT> FilterHelper::ButterworthEnvFreq2D(Image<RFLOAT> &img, double radIn, double radOut)
 {
     const int w = img.data.xdim;
     const int h = img.data.ydim;
@@ -557,7 +557,7 @@ RFLOAT FilterHelper::averageValue(Image<RFLOAT>& img)
     return sum / (double)(img.data.xdim * img.data.ydim * img.data.zdim * img.data.ndim);
 }
 
-double FilterHelper::maxValue(Image<double> &img)
+RFLOAT FilterHelper::maxValue(Image<RFLOAT> &img)
 {
     RFLOAT vMax = -std::numeric_limits<double>::max();
 
@@ -659,7 +659,7 @@ void FilterHelper::modulate(Image<Complex>& imgFreq, CTF& ctf, RFLOAT angpix)
     }
 }
 
-void FilterHelper::drawCtf(CTF &ctf, double angpix, Image<Complex> &dest)
+void FilterHelper::drawCtf(CTF &ctf, RFLOAT angpix, Image<Complex> &dest)
 {
     RFLOAT as = (RFLOAT)dest.data.ydim * angpix;
 
@@ -2015,7 +2015,7 @@ void FilterHelper::diffuseAlongIsocontours2D(const Image<RFLOAT>& src, const Ima
             g.y = 0.5 * (DIRECT_NZYX_ELEM(guide.data, 0, 0, y+1, x) - DIRECT_NZYX_ELEM(guide.data, 0, 0, y-1, x));
         }
 
-        D0(x,y,0) = Tensor2x2<RFLOAT>::autoDyadicProduct(g);
+        D0(x,y,0) = Tensor2x2<RFLOAT>::autoDyadicProduct(t2Vector<RFLOAT>(g.x, g.y));
     }
 
     separableGaussian(D0, D, sigma);
@@ -2025,20 +2025,21 @@ void FilterHelper::diffuseAlongIsocontours2D(const Image<RFLOAT>& src, const Ima
     for (long int y = 0; y < h; y++)
     for (long int x = 0; x < w; x++)
     {
-        d2Matrix Dxy = D(x,y,0).toMatrix();
+        t2Matrix<RFLOAT> DxyR = D(x,y,0).toMatrix();
+        d2Matrix Dxy(DxyR(0,0), DxyR(0,1), DxyR(1,0), DxyR(1,1));
 
         double qx, qy, l0, l1;
         dsyev2(Dxy(0,0), Dxy(0,1), Dxy(1,1), &l0, &l1, &qx, &qy);
 
 
         double dl = l0 - l1;
-        double ani = 1.0 - exp(-0.5*dl*dl/(lambda*lambda));
+        RFLOAT ani = 1.0 - exp(-0.5*dl*dl/(lambda*lambda));
 
         d2Vector f(-qy, qx);
 
         //dbg0(x,y,0) = f.length();
 
-        J(x,y,0) = ani * Tensor2x2<RFLOAT>::autoDyadicProduct(f);
+        J(x,y,0) = ani * Tensor2x2<RFLOAT>::autoDyadicProduct(t2Vector<RFLOAT>(f.x, f.y));
     }
 
     //VtkHelper::writeVTK(dbg0, "f_len.vtk");
@@ -2081,7 +2082,8 @@ void FilterHelper::diffuseAlongIsocontours2D(const Image<RFLOAT>& src, const Ima
                 g.y = 0.5 * (DIRECT_NZYX_ELEM(guide.data, 0, 0, y+1, x) - DIRECT_NZYX_ELEM(guide.data, 0, 0, y-1, x));
             }
 
-            flux(x,y,0) = J(x,y,0).toMatrix() * g;
+            t2Vector<RFLOAT> fR = J(x,y,0).toMatrix() * t2Vector<RFLOAT>(g.x, g.y);
+            flux(x,y,0) = d2Vector(fR.x, fR.y);
         }
 
         #if JAZ_USE_OPENMP

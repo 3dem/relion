@@ -15,6 +15,47 @@
 
 using namespace gravis;
 
+std::vector<MetaDataTable> StackHelper::splitByMicrographName(const MetaDataTable* mdt)
+{
+    std::vector<MetaDataTable> out(0);
+
+    if (!mdt->labelExists(EMDL_MICROGRAPH_NAME))
+    {
+        REPORT_ERROR("StackHelper::splitByMicrographName: "+EMDL::label2Str(EMDL_MICROGRAPH_NAME)+" missing in meta_data_table.\n");
+    }
+
+    std::string testString;
+    mdt->getValue(EMDL_MICROGRAPH_NAME, testString, 0);
+
+    MetaDataTable md2(*mdt);
+    md2.newSort(EMDL_MICROGRAPH_NAME);
+
+    const long lc = md2.numberOfObjects();
+    std::string lastName = "", curName;
+    long curInd = -1;
+
+    for (int i = 0; i < lc; i++)
+    {
+        md2.getValue(EMDL_MICROGRAPH_NAME, curName, i);
+
+        if (curName != lastName)
+        {
+            lastName = curName;
+            curInd++;
+            out.push_back(MetaDataTable());
+        }
+
+        out[curInd].addObject(md2.getObject(i));
+    }
+
+    for (int i = 0; i <= curInd; i++)
+    {
+        out[i].newSort(EMDL_IMAGE_NAME, false, false, true);
+    }
+
+    return out;
+}
+
 std::vector<MetaDataTable> StackHelper::splitByStack(const MetaDataTable* mdt)
 {
     std::vector<MetaDataTable> out(0);
@@ -580,7 +621,7 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
     double outPs, double coordsPs, double moviePs,
     int squareSize, int threads,
     bool loadData, int firstFrame, int lastFrame,
-    RFLOAT hot, bool verbose)
+    RFLOAT hot, bool verbose, bool saveMemory)
 {
     std::vector<std::vector<Image<Complex>>> out(mdt->numberOfObjects());
     const long pc = mdt->numberOfObjects();
@@ -622,6 +663,8 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 
         std::cout << "frame count in movie = " << fcM << "\n";
         std::cout << "frame count to load  = " << fc << "\n";
+
+        std::cout << "pc, fc = " << pc << ", " << fc << "\n";
     }
 
     for (long p = 0; p < pc; p++)
@@ -630,7 +673,6 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
     }
 
     if (!loadData) return out;
-
 
     const int sqMg = 2*(int)(0.5 * squareSize * outPs / moviePs + 0.5);
 
@@ -654,18 +696,27 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
         }
     }
 
-    Image<float> muGraph;
 
+    int threads_f = saveMemory? 1 : threads;
+    int threads_p = saveMemory? threads : 1;
+
+    #pragma omp parallel for num_threads(threads_f)
     for (long f = 0; f < fc; f++)
     {
+        int tf = omp_get_thread_num();
+
+        Image<float> muGraph;
         muGraph.read(movieFn, true, f+firstFrame);
 
         if (verbose) std::cout << (f+1) << "/" << fc << "\n";
 
-        #pragma omp parallel for num_threads(threads)
+        #pragma omp parallel for num_threads(threads_p)
         for (long p = 0; p < pc; p++)
         {
-            int t = omp_get_thread_num();
+            int tp = omp_get_thread_num();
+
+            //int t = omp_get_thread_num();
+            int t = saveMemory? tp : tf;
 
             out[p][f] = Image<Complex>(sqMg,sqMg);
 
