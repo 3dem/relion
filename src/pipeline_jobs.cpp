@@ -1089,7 +1089,7 @@ void RelionJob::initialiseMotioncorrJob()
 	joboptions["do_save_movies"] = JobOption("Save aligned movie stacks?", true,"Save the aligned movie stacks? Say Yes if you want to perform movie-processing in RELION as well. Say No if you only want to correct motions and write out the averages.");
 	joboptions["first_frame_sum"] = JobOption("First frame for corrected sum:", 1, 1, 32, 1, "First frame to use in corrected average (starts counting at 1). ");
 	joboptions["last_frame_sum"] = JobOption("Last frame for corrected sum:", 0, 0, 32, 1, "Last frame to use in corrected average.");
-	joboptions["angpix"] = JobOption("Pixel size (A):", 1, 0.5, 4.0, 0.1, "Provide the pixel size in Angstroms of the input movies. UNBLUR and MOTIONCOR2 use this for their bfactor and their dose-weighting.");
+	joboptions["angpix"] = JobOption("Pixel size (A):", 1, 0.5, 4.0, 0.1, "Provide the pixel size in Angstroms of the input movies. UNBLUR and MOTIONCOR2 use this for their bfactor and their dose-weighting. This is the original pixel size before binning.");
 
 	// Motioncor2
 
@@ -1101,7 +1101,7 @@ void RelionJob::initialiseMotioncorrJob()
 		default_location=mydefault;
 	}
 
-	joboptions["do_motioncor2"] = JobOption("Use MOTIONCOR2?", true ,"If set to Yes, Shawn Zheng's MOTIONCOR2 will be used instead of UNBLUR.");
+	joboptions["do_motioncor2"] = JobOption("Use MOTIONCOR2 algorithm?", true ,"If set to Yes, Shawn Zheng's MOTIONCOR2 will be used instead of UNBLUR.");
 	joboptions["do_3rd_motioncor"] = JobOption("Wrap to UCSF-implementation?", true ,"If set to No, use RELION's own implementation of MotionCor2 by Takanori Nakane, instead of wrapping to the UCSF implementation.");
 	joboptions["fn_motioncor2_exe"] = JobOption("MOTIONCOR2 executable:", std::string(default_location), "*.*", ".", "Location of the MOTIONCOR2 executable. You can control the default of this field by setting environment variable RELION_MOTIONCOR2_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
 	joboptions["fn_gain_ref"] = JobOption("Gain-reference image:", "", "*.mrc", ".", "Location of the gain-reference file to be applied to the input micrographs. Leave this empty if the movies are already gain-corrected.");
@@ -1296,7 +1296,7 @@ void RelionJob::initialiseCtffindJob()
 	{
 		default_location=mydefault;
 	}
-	joboptions["fn_ctffind_exe"] = JobOption("CTFFIND-4.1 executable:", std::string(default_location), "*.exe", ".", "Location of the CTFFIND (release 4.1 or later) executable. You can control the default of this field by setting environment variable RELION_CTFFIND_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
+	joboptions["fn_ctffind_exe"] = JobOption("CTFFIND-4.1 executable:", std::string(default_location), "*", ".", "Location of the CTFFIND (release 4.1 or later) executable. You can control the default of this field by setting environment variable RELION_CTFFIND_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
 	joboptions["slow_search"] = JobOption("Use exhaustive search?", false, "If set to Yes, CTFFIND4 will use slower but more exhaustive search. This option is recommended for CTFFIND version 4.1.8 and earlier, but probably not necessary for 4.1.10 and later. It is also worth trying this option when astigmatism and/or phase shifts are difficult to fit.");
 	joboptions["do_movie_thon_rings"] = JobOption("Estimate Thon rings from movies?", false, "If set to Yes, CTFFIND4 will calculate power spectra of averages of several movie frames and then average those power spectra to calculate Thon rings. This may give better rings than calculation the power spectra of averages of all movie frames, although it does come at increased costs of processing and disk access");
 	joboptions["movie_rootname"] = JobOption("Movie rootname plus extension", std::string("_movie.mrcs"), "Give the movie rootname and extension for all movie files. Movies are assumed to be next to the average micrographs in the same directory.");

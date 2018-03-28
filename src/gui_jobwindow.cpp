@@ -574,39 +574,28 @@ void JobWindow::initialiseMotioncorrWindow()
 
 	place("do_motioncor2", TOGGLE_DEACTIVATE, group1);
 
+	current_y += STEPY/2;
 	group1->begin();
 
-	group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group4->end();
-
-	place("do_3rd_motioncor", TOGGLE_DEACTIVATE, group4);
-
-	group4->begin();
-
-	place("fn_motioncor2_exe", TOGGLE_DEACTIVATE);
-
-	group4->end();
-	guientries["do_3rd_motioncor"].cb_menu_i(); // make default active
-
 	place("fn_gain_ref", TOGGLE_DEACTIVATE);
-	place("fn_defect", TOGGLE_DEACTIVATE);
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
 	place2("patch_x", "patch_y", "Number of patches X, Y", TOGGLE_DEACTIVATE);
 	place("group_frames", TOGGLE_DEACTIVATE);
 	place("bin_factor", TOGGLE_DEACTIVATE);
 	place("bfactor", TOGGLE_DEACTIVATE);
 
-	// Add a little spacer
+	current_y += STEPY/2;
+	group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group4->end();
+	place("do_3rd_motioncor", TOGGLE_DEACTIVATE, group4);
+	group4->begin();
+	place("fn_motioncor2_exe", TOGGLE_DEACTIVATE);
+	place("fn_defect", TOGGLE_DEACTIVATE);
 	current_y += STEPY/2;
 	place("gpu_ids");
-
-	// Add a little spacer
-	current_y += STEPY/2;
 	place("other_motioncor2_args", TOGGLE_DEACTIVATE);
+	group4->end();
 
+	guientries["do_3rd_motioncor"].cb_menu_i(); // make default active
 	group1->end();
 	guientries["do_motioncor2"].cb_menu_i(); // make default active
 
