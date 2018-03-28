@@ -533,7 +533,7 @@ void MotioncorrRunner::getShiftsMotioncor2(FileName fn_log, Micrograph &mic)
 	while (getline(in, line, '\n'))
 	{
 		if (line.find("#") != std::string::npos) continue;
-		
+
 		std::vector<std::string> words;
 		tokenize(line, words);
     		if (words.size() != 7) continue;
@@ -857,9 +857,9 @@ void MotioncorrRunner::plotShifts(FileName fn_mic, Micrograph &mic)
 			if (i == start) patch_start.AddDataPoint(p_fit);
 			i++;
 		}
-		plot2D->AddDataSet(fit);
 		plot2D->AddDataSet(obs);
-	
+		plot2D->AddDataSet(fit);
+
 		plot2D->AddDataSet(patch_start);
 	}
 
@@ -868,7 +868,7 @@ void MotioncorrRunner::plotShifts(FileName fn_mic, Micrograph &mic)
 	plot2D->SetXAxisTitle(title);
 	title[0] = 'Y';
 	plot2D->SetYAxisTitle(title);
-	
+
 	plot2D->OutputPostScriptPlot(fn_eps);
 }
 
@@ -989,7 +989,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	const int n_frames = frames.size();
 	Iframes.resize(n_frames);
 	Fframes.resize(n_frames);
-	
+
 	std::vector<RFLOAT> xshifts(n_frames), yshifts(n_frames);
 
 	// Setup grouping
@@ -1293,7 +1293,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 			mic.localShiftY.push_back(patch_yshifts[i]);
 			mic.localFitX.push_back(x_fitted);
 			mic.localFitY.push_back(y_fitted);
-			
+
 #ifdef DEBUG_OWN
 			std::cout << " x = " << x << " y = " << y << " z = " << z;
 			std::cout << ", Xobs = " << patch_xshifts[i] << " Xfit = " << x_fitted;

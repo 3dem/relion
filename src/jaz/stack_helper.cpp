@@ -253,7 +253,7 @@ std::vector<std::vector<Image<Complex>>> StackHelper::loadMovieStackFS(
         std::string moviePath,
         bool center, int threads,
         std::vector<ParFourierTransformer> *fts,
-        int firstFrame, int lastFrame)
+        int firstFrame, int lastFrame, bool verbose)
 {
     std::vector<std::vector<Image<Complex> > > out(mdt->numberOfObjects());
     const long pc = mdt->numberOfObjects();
@@ -274,13 +274,17 @@ std::vector<std::vector<Image<Complex>>> StackHelper::loadMovieStackFS(
         finName = moviePath + "/" + movieName.substr(movieName.find_last_of("/")+1);
     }
 
-    std::cout << "loading " << finName << "\n";
+    if (verbose)
+    	std::cout << "loading " << finName << "\n";
 
     Image<RFLOAT> in;
     in.read(finName);
 
-    std::cout << "size = " << in.data.xdim << "x" << in.data.ydim << "x" << in.data.zdim << "x" << in.data.ndim << "\n";
-    std::cout << "pc = " << pc << "\n";
+    if (verbose)
+    {
+    	std::cout << "size = " << in.data.xdim << "x" << in.data.ydim << "x" << in.data.zdim << "x" << in.data.ndim << "\n";
+        std::cout << "pc = " << pc << "\n";
+    }
 
     const int fcMov = in.data.ndim / pc;
 
@@ -563,7 +567,6 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
             out[p][f] = Image<Complex>(sqMg,sqMg);
 
             double xpC, ypC;
-
             mdt->getValue(EMDL_IMAGE_COORD_X, xpC, p);
             mdt->getValue(EMDL_IMAGE_COORD_Y, ypC, p);
 
