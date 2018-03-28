@@ -486,7 +486,8 @@ void RefinementProgram::loadInitialMovieValues()
                 std::cout << " + Using coord. pixel size from command line: " << coords_angpix << " A\n";
             }
 
-            fc = micrograph.getNframes();
+            if (lastFrame < 0) fc = micrograph.getNframes() - firstFrame;
+            else fc = lastFrame - firstFrame + 1;
         }
         else
         {

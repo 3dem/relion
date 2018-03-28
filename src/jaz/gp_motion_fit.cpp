@@ -2,6 +2,8 @@
 #include <src/jaz/svd_helper.h>
 #include <src/jaz/interpolation.h>
 
+#include <omp.h>
+
 using namespace gravis;
 
 GpMotionFit::GpMotionFit(
@@ -124,6 +126,7 @@ void GpMotionFit::grad(const std::vector<double> &x,
 
     std::vector<std::vector<d2Vector>> ccg_pf(pc, std::vector<d2Vector>(fc));
 
+    #pragma omp parallel for num_threads(threads)
     for (int p = 0; p < pc; p++)
     {
         for (int f = 0; f < fc; f++)
@@ -138,21 +141,29 @@ void GpMotionFit::grad(const std::vector<double> &x,
         }
     }
 
+    std::vector<std::vector<double>> gradDestT(threads, std::vector<double>(gradDest.size(), 0.0));
+
     for (int i = 0; i < gradDest.size(); i++)
     {
         gradDest[i] = 0.0;
     }
 
+    #pragma omp parallel for num_threads(threads)
     for (int p = 0; p < pc; p++)
     for (int f = 0; f < fc; f++)
     {
-        gradDest[2*p  ] += ccg_pf[p][f].x;
-        gradDest[2*p+1] += ccg_pf[p][f].y;
+        int t = omp_get_thread_num();
+
+        gradDestT[t][2*p  ] += ccg_pf[p][f].x;
+        gradDestT[t][2*p+1] += ccg_pf[p][f].y;
     }
 
+    #pragma omp parallel for num_threads(threads)
     for (int d = 0; d < dc; d++)
     for (int p = 0; p < pc; p++)
     {
+        int t = omp_get_thread_num();
+
         d2Vector g(0.0, 0.0);
 
         for (int f = fc-2; f >= 0; f--)
@@ -160,25 +171,31 @@ void GpMotionFit::grad(const std::vector<double> &x,
             g.x += basis(p,d) * ccg_pf[p][f+1].x;
             g.y += basis(p,d) * ccg_pf[p][f+1].y;
 
-            gradDest[2*(pc + dc*f + d)  ] -= g.x;
-            gradDest[2*(pc + dc*f + d)+1] -= g.y;
+            gradDestT[t][2*(pc + dc*f + d)  ] -= g.x;
+            gradDestT[t][2*(pc + dc*f + d)+1] -= g.y;
         }
     }
 
+    #pragma omp parallel for num_threads(threads)
     for (int f = 0; f < fc-1; f++)
     for (int d = 0; d < pc; d++)
     {
-        gradDest[2*(pc + dc*f + d)  ] += 2.0 * x[2*(pc + dc*f + d)  ];
-        gradDest[2*(pc + dc*f + d)+1] += 2.0 * x[2*(pc + dc*f + d)+1];
+        int t = omp_get_thread_num();
+
+        gradDestT[t][2*(pc + dc*f + d)  ] += 2.0 * x[2*(pc + dc*f + d)  ];
+        gradDestT[t][2*(pc + dc*f + d)+1] += 2.0 * x[2*(pc + dc*f + d)+1];
     }
 
     if (sig_acc_px > 0.0)
     {
         const double sa2 = sig_acc_px*sig_acc_px;
 
+        #pragma omp parallel for num_threads(threads)
         for (int f = 0; f < fc-2; f++)
         for (int d = 0; d < dc; d++)
         {
+            int t = omp_get_thread_num();
+
             const double cx0 = x[2*(pc + dc*f + d)    ];
             const double cy0 = x[2*(pc + dc*f + d) + 1];
             const double cx1 = x[2*(pc + dc*(f+1) + d)    ];
@@ -189,11 +206,17 @@ void GpMotionFit::grad(const std::vector<double> &x,
 
             //e_tot += eigenVals[d]*(dcx*dcx + dcy*dcy) / (sig_acc_px*sig_acc_px);
 
-            gradDest[2*(pc + dc*f + d)  ] -= 2.0 * eigenVals[d] * dcx / sa2;
-            gradDest[2*(pc + dc*f + d)+1] -= 2.0 * eigenVals[d] * dcy / sa2;
-            gradDest[2*(pc + dc*(f+1) + d)  ] += 2.0 * eigenVals[d] * dcx / sa2;
-            gradDest[2*(pc + dc*(f+1) + d)+1] += 2.0 * eigenVals[d] * dcy / sa2;
+            gradDestT[t][2*(pc + dc*f + d)  ] -= 2.0 * eigenVals[d] * dcx / sa2;
+            gradDestT[t][2*(pc + dc*f + d)+1] -= 2.0 * eigenVals[d] * dcy / sa2;
+            gradDestT[t][2*(pc + dc*(f+1) + d)  ] += 2.0 * eigenVals[d] * dcx / sa2;
+            gradDestT[t][2*(pc + dc*(f+1) + d)+1] += 2.0 * eigenVals[d] * dcy / sa2;
         }
+    }
+
+    for (int t = 0; t < threads; t++)
+    for (int i = 0; i < gradDest.size(); i++)
+    {
+        gradDest[i] += gradDestT[t][i];
     }
 }
 
