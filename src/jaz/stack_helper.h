@@ -32,7 +32,7 @@ class StackHelper
                 const MetaDataTable* mdt, std::string moviePath,
                 bool center = false, int threads = 1,
                 std::vector<ParFourierTransformer>* fts = 0,
-                int firstFrame = 0, int lastFrame = -1);
+                int firstFrame = 0, int lastFrame = -1, bool verbose = false);
 
         static std::vector<std::vector<Image<Complex> > > extractMovieStackFS(
                 const MetaDataTable* mdt,

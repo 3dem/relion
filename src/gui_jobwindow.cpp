@@ -2266,6 +2266,11 @@ void JobWindow::initialiseMotionfitWindow()
 	place("fn_data", TOGGLE_DEACTIVATE);
 	place("fn_post", TOGGLE_DEACTIVATE);
 
+	current_y += STEPY /2 ;
+
+	place("first_frame", TOGGLE_DEACTIVATE);
+	place("last_frame", TOGGLE_DEACTIVATE);
+
 	tab1->end();
 
 	tab2->begin();
@@ -2281,6 +2286,7 @@ void JobWindow::initialiseMotionfitWindow()
 
 	place("sigma_vel", TOGGLE_DEACTIVATE);
 	place("sigma_div", TOGGLE_DEACTIVATE);
+	place("sigma_acc", TOGGLE_DEACTIVATE);
 	place("max_iters", TOGGLE_DEACTIVATE);
 	place("dose_rate", TOGGLE_DEACTIVATE);
 	place("do_pad1", TOGGLE_DEACTIVATE);
