@@ -41,12 +41,13 @@ void MotionFitter::read(int argc, char **argv)
     dmga = textToFloat(parser.getOption("--dmg_a", "Damage model, parameter a", " 3.40"));
     dmgb = textToFloat(parser.getOption("--dmg_b", "                        b", "-1.06"));
     dmgc = textToFloat(parser.getOption("--dmg_c", "                        c", "-0.54"));
-    dosePerFrame = textToFloat(parser.getOption("--fdose", "Electron dose per frame (in e^-/A^2)", "1"));
+    dosePerFrame = textToFloat(parser.getOption("--fdose", "Electron dose per frame (in e^-/A^2)", "-1"));
     sig_vel = textToFloat(parser.getOption("--s_vel", "Velocity sigma [Angst/dose]", "1.6"));
     sig_div = textToFloat(parser.getOption("--s_div", "Divergence sigma [Angst]", "500.0"));
     sig_acc = textToFloat(parser.getOption("--s_acc", "Acceleration sigma [Angst/dose]", "-1.0"));
     global_init = parser.checkOption("--gi", "Initialize with global trajectories instead of loading them from metadata file");
     expKer = parser.checkOption("--exp_k", "Use exponential kernel instead of sq. exponential");
+    // TODO: provide k_cut in Angstroms!
     k_cutoff = textToFloat(parser.getOption("--k_cut", "Freq. cutoff (in pixels)", "-1.0"));
     maxIters = textToInteger(parser.getOption("--max_iters", "Maximum number of iterations", "10000"));
     maxStep = textToFloat(parser.getOption("--max_step", "Maximum step size", "0.05"));
@@ -217,55 +218,59 @@ void MotionFitter::initialise()
 		}
 		mdts = unfinished_mdts;
 		if (verb > 0)
-			std::cout << "   - Will only process " << mdts.size() << " unfinished micrographs" << std::endl;
+		{
+			if (mdts.size() > 0)
+				std::cout << "   - Will only process " << mdts.size() << " unfinished micrographs" << std::endl;
+			else
+				std::cout << "   - Will not process any unfinished micrographs, only create the combined motionfit_logfile.pdf" << std::endl;
+		}
 	}
-
-
-    if (corrMicFn != "")
-    {
-        MetaDataTable corrMic;
-        corrMic.read(corrMicFn);
-
-        mic2meta.clear();
-
-        std::string micName, metaName;
-
-        for (int i = 0; i < corrMic.numberOfObjects(); i++)
-        {
-            corrMic.getValueToString(EMDL_MICROGRAPH_NAME, micName, i);
-            corrMic.getValueToString(EMDL_MICROGRAPH_METADATA_NAME, metaName, i);
-
-            // remove the pipeline job prefix
-            FileName fn_pre, fn_jobnr, fn_post;
-            decomposePipelineFileName(micName, fn_pre, fn_jobnr, fn_post);
-            mic2meta[fn_post] = metaName;
-        }
-
-        hasCorrMic = true;
-    }
-
-	// Make sure output directory ends in a '/'
-	if (outPath[outPath.length()-1] != '/')
-		outPath+="/";
-
-	obsModel = ObservationModel(angpix);
-
-	// Only create projectors if there are (still) micrographs to process
-	// Read in the first reference
-	if (verb > 0)
-		std::cout << " + Reading references ...\n";
-	maps[0].read(reconFn0);
-
-	if (maps[0].data.xdim != maps[0].data.ydim || maps[0].data.ydim != maps[0].data.zdim)
-		REPORT_ERROR(reconFn0 + " is not cubical.\n");
-
-	// Get dimensions
-	s = maps[0].data.xdim;
-	sh = s/2 + 1;
 
 	// Check whether there is something to do at all...
 	if (mdts.size() > 0)
 	{
+
+		if (corrMicFn != "")
+		{
+			MetaDataTable corrMic;
+			corrMic.read(corrMicFn);
+
+			mic2meta.clear();
+
+			std::string micName, metaName;
+
+			for (int i = 0; i < corrMic.numberOfObjects(); i++)
+			{
+				corrMic.getValueToString(EMDL_MICROGRAPH_NAME, micName, i);
+				corrMic.getValueToString(EMDL_MICROGRAPH_METADATA_NAME, metaName, i);
+
+				// remove the pipeline job prefix
+				FileName fn_pre, fn_jobnr, fn_post;
+				decomposePipelineFileName(micName, fn_pre, fn_jobnr, fn_post);
+				mic2meta[fn_post] = metaName;
+			}
+
+			hasCorrMic = true;
+		}
+
+		// Make sure output directory ends in a '/'
+		if (outPath[outPath.length()-1] != '/')
+			outPath+="/";
+
+		obsModel = ObservationModel(angpix);
+
+		// Only create projectors if there are (still) micrographs to process
+		// Read in the first reference
+		if (verb > 0)
+			std::cout << " + Reading references ...\n";
+		maps[0].read(reconFn0);
+
+		if (maps[0].data.xdim != maps[0].data.ydim || maps[0].data.ydim != maps[0].data.zdim)
+			REPORT_ERROR(reconFn0 + " is not cubical.\n");
+
+		// Get dimensions
+		s = maps[0].data.xdim;
+		sh = s/2 + 1;
 
 		// Read in the second reference
 		maps[1].read(reconFn1);
@@ -303,151 +308,159 @@ void MotionFitter::initialise()
 		projectors[0].computeFourierTransformMap(maps[0].data, powSpec[0].data, maps[0].data.xdim);
 		projectors[1] = Projector(s, TRILINEAR, paddingFactor, 10, 2);
 		projectors[1].computeFourierTransformMap(maps[1].data, powSpec[1].data, maps[1].data.xdim);
+
+		if (fscFn != "")
+		{
+			MetaDataTable fscMdt;
+			fscMdt.read(fscFn, "fsc");
+
+			if (!fscMdt.containsLabel(EMDL_SPECTRAL_IDX))
+				REPORT_ERROR(fscFn + " does not contain a value for " + EMDL::label2Str(EMDL_SPECTRAL_IDX));
+			if (!fscMdt.containsLabel(EMDL_POSTPROCESS_FSC_TRUE))
+				REPORT_ERROR(fscFn + " does not contain a value for " + EMDL::label2Str(EMDL_POSTPROCESS_FSC_TRUE));
+
+			RefinementHelper::drawFSC(&fscMdt, freqWeight1D, freqWeight);
+		}
+		else
+		{
+			freqWeight1D = std::vector<double>(sh,1.0);
+			freqWeight = Image<RFLOAT>(sh,s);
+			freqWeight.data.initConstant(1.0);
+		}
+
+		// Jasenko's LoadInitialMovieValues
+		// Sjors made changes in behaviour of fc calculation!!
+		if (preextracted)
+		{
+
+			if (lastFrame < 0)
+			{
+				std::string name, fullName, movieName;
+				 mdts[0].getValue(EMDL_IMAGE_NAME, fullName, 0);
+				 mdts[0].getValue(EMDL_MICROGRAPH_NAME, movieName, 0);
+				 name = fullName.substr(fullName.find("@")+1);
+
+				 std::string finName;
+
+				 if (imgPath == "")
+				 {
+					 finName = name;
+				 }
+				 else
+				 {
+					 finName = imgPath + "/" + movieName.substr(movieName.find_last_of("/")+1);
+				 }
+
+				 Image<RFLOAT> stack0;
+				 stack0.read(finName, false);
+
+				 const int pc0 = mdts[0].numberOfObjects();
+				 const bool zstack = stack0.data.zdim > 1;
+				 const int stackSize = zstack? stack0.data.zdim : stack0.data.ndim;
+				 fc = stackSize / pc0 - firstFrame;
+			}
+			else fc = lastFrame - firstFrame + 1;
+		}
+		else
+		{
+			if (hasCorrMic)
+			{
+				std::string mgFn;
+				mdts[0].getValueToString(EMDL_MICROGRAPH_NAME, mgFn, 0);
+
+				// remove the pipeline job prefix
+				FileName fn_pre, fn_jobnr, fn_post;
+				decomposePipelineFileName(mgFn, fn_pre, fn_jobnr, fn_post);
+				std::string metaFn = mic2meta[fn_post];
+
+				if (meta_path != "")
+				{
+					metaFn = meta_path + "/" + metaFn.substr(metaFn.find_last_of("/")+1);
+				}
+
+				micrograph = Micrograph(metaFn);
+
+				if (movie_angpix <= 0)
+				{
+					movie_angpix = micrograph.angpix;
+					if (verb > 0)
+						std::cout << " + Using movie pixel size from " << metaFn << ": " << movie_angpix << " A\n";
+				}
+				else
+				{
+					if (verb > 0)
+						std::cout << " + Using movie pixel size from command line: " << movie_angpix << " A\n";
+				}
+
+				if (coords_angpix <= 0)
+				{
+					coords_angpix = micrograph.angpix * micrograph.getBinningFactor();
+					if (verb > 0)
+						std::cout << " + Using coord. pixel size from " << metaFn << ": " << coords_angpix << " A\n";
+				}
+				else
+				{
+					if (verb > 0)
+						std::cout << " + Using coord. pixel size from command line: " << coords_angpix << " A\n";
+				}
+
+				if (dosePerFrame <= 0)
+				{
+					dosePerFrame = micrograph.dose_per_frame;
+					if (verb > 0)
+						std::cout << " + Using dose per frame from " << metaFn << ": " << dosePerFrame << " A\n";
+
+				}
+
+				if (lastFrame < 0) fc = micrograph.getNframes() - firstFrame;
+				else fc = lastFrame - firstFrame + 1;
+
+			}
+			else
+			{
+				if (lastFrame < 0)
+				{
+					std::vector<std::vector<Image<Complex>>> movie = StackHelper::extractMovieStackFS(
+							&mdts[0], meta_path, imgPath, movie_ending, coords_angpix, angpix, movie_angpix, s,
+							nr_omp_threads, false, firstFrame, lastFrame, hotCutoff, debugMov);
+
+					fc = movie[0].size() - firstFrame;
+				}
+				else fc = lastFrame - firstFrame + 1;
+			}
+		}
+
+		dmgWeight = DamageHelper::damageWeights(s, angpix, firstFrame, fc, dosePerFrame, dmga, dmgb, dmgc);
+		int k_out = sh;
+
+		for (int i = 1; i < sh; i++)
+		{
+			if (freqWeight1D[i] <= 0.0)
+			{
+				k_out = i;
+				break;
+			}
+		}
+
+		// TODO: output k_out in Angstroms
+		if (verb > 0)
+			std::cout << " + maximum frequency to be consider: = " << (s * angpix)/(RFLOAT)k_out << " Angstrom" << std::endl;
+
+		for (int f = 0; f < fc; f++)
+		{
+			dmgWeight[f].data.xinit = 0;
+			dmgWeight[f].data.yinit = 0;
+
+			if (k_cutoff > 0.0)
+			{
+				std::stringstream stsf;
+				stsf << f;
+				dmgWeight[f] = FilterHelper::ButterworthEnvFreq2D(dmgWeight[f], k_cutoff-1, k_cutoff+1);
+
+				ImageOp::multiplyBy(dmgWeight[f], freqWeight);
+			}
+		}
 	}
-
-	if (fscFn != "")
-	{
-		MetaDataTable fscMdt;
-		fscMdt.read(fscFn, "fsc");
-
-		if (!fscMdt.containsLabel(EMDL_SPECTRAL_IDX))
-			REPORT_ERROR(fscFn + " does not contain a value for " + EMDL::label2Str(EMDL_SPECTRAL_IDX));
-		if (!fscMdt.containsLabel(EMDL_POSTPROCESS_FSC_TRUE))
-			REPORT_ERROR(fscFn + " does not contain a value for " + EMDL::label2Str(EMDL_POSTPROCESS_FSC_TRUE));
-
-		RefinementHelper::drawFSC(&fscMdt, freqWeight1D, freqWeight);
-	}
-	else
-	{
-		freqWeight1D = std::vector<double>(sh,1.0);
-		freqWeight = Image<RFLOAT>(sh,s);
-		freqWeight.data.initConstant(1.0);
-	}
-
-	// Jasenko's LoadInitialMovieValues
-	// Sjors made changes in behaviour of fc calculation!!
-	if (preextracted)
-    {
-
-        if (lastFrame < 0)
-        {
-            std::string name, fullName, movieName;
-             mdts[0].getValue(EMDL_IMAGE_NAME, fullName, 0);
-             mdts[0].getValue(EMDL_MICROGRAPH_NAME, movieName, 0);
-             name = fullName.substr(fullName.find("@")+1);
-
-             std::string finName;
-
-             if (imgPath == "")
-             {
-                 finName = name;
-             }
-             else
-             {
-                 finName = imgPath + "/" + movieName.substr(movieName.find_last_of("/")+1);
-             }
-
-             Image<RFLOAT> stack0;
-             stack0.read(finName, false);
-
-             const int pc0 = mdts[0].numberOfObjects();
-             const bool zstack = stack0.data.zdim > 1;
-             const int stackSize = zstack? stack0.data.zdim : stack0.data.ndim;
-             fc = stackSize / pc0 - firstFrame;
-        }
-        else fc = lastFrame - firstFrame + 1;
-    }
-    else
-    {
-        if (hasCorrMic)
-        {
-            std::string mgFn;
-            mdts[0].getValueToString(EMDL_MICROGRAPH_NAME, mgFn, 0);
-
-            // remove the pipeline job prefix
-            FileName fn_pre, fn_jobnr, fn_post;
-            decomposePipelineFileName(mgFn, fn_pre, fn_jobnr, fn_post);
-            std::string metaFn = mic2meta[fn_post];
-
-            if (meta_path != "")
-            {
-                metaFn = meta_path + "/" + metaFn.substr(metaFn.find_last_of("/")+1);
-            }
-
-            micrograph = Micrograph(metaFn);
-
-            if (movie_angpix <= 0)
-            {
-                movie_angpix = micrograph.angpix;
-                if (verb > 0)
-                	std::cout << " + Using movie pixel size from " << metaFn << ": " << movie_angpix << " A\n";
-            }
-            else
-            {
-                if (verb > 0)
-                	std::cout << " + Using movie pixel size from command line: " << movie_angpix << " A\n";
-            }
-
-            if (coords_angpix <= 0)
-            {
-                coords_angpix = micrograph.angpix * micrograph.getBinningFactor();
-                if (verb > 0)
-                	std::cout << " + Using coord. pixel size from " << metaFn << ": " << coords_angpix << " A\n";
-            }
-            else
-            {
-                if (verb > 0)
-                	std::cout << " + Using coord. pixel size from command line: " << coords_angpix << " A\n";
-            }
-
-            if (lastFrame < 0) fc = micrograph.getNframes() - firstFrame;
-            else fc = lastFrame - firstFrame + 1;
-
-        }
-        else
-        {
-            if (lastFrame < 0)
-            {
-            	std::vector<std::vector<Image<Complex>>> movie = StackHelper::extractMovieStackFS(
-            			&mdts[0], meta_path, imgPath, movie_ending, coords_angpix, angpix, movie_angpix, s,
-						nr_omp_threads, false, firstFrame, lastFrame, hotCutoff, debugMov);
-
-            	fc = movie[0].size() - firstFrame;
-            }
-            else fc = lastFrame - firstFrame + 1;
-        }
-    }
-
-    dmgWeight = DamageHelper::damageWeights(s, angpix, firstFrame, fc, dosePerFrame, dmga, dmgb, dmgc);
-    int k_out = sh;
-
-    for (int i = 1; i < sh; i++)
-    {
-        if (freqWeight1D[i] <= 0.0)
-        {
-            k_out = i;
-            break;
-        }
-    }
-
-    // TODO: output k_out in Angstroms
-    if (verb > 0)
-    	std::cout << " + maximum frequency to be consider: = " << (s * angpix)/(RFLOAT)k_out << " Angstrom" << std::endl;
-
-    for (int f = 0; f < fc; f++)
-    {
-        dmgWeight[f].data.xinit = 0;
-        dmgWeight[f].data.yinit = 0;
-
-        if (k_cutoff > 0.0)
-        {
-            std::stringstream stsf;
-            stsf << f;
-            dmgWeight[f] = FilterHelper::ButterworthEnvFreq2D(dmgWeight[f], k_cutoff-1, k_cutoff+1);
-
-            ImageOp::multiplyBy(dmgWeight[f], freqWeight);
-        }
-    }
 
 }
 
@@ -456,8 +469,10 @@ void MotionFitter::run()
 {
 
 	// The subsets will be used in openMPI parallelisation: instead of over g0->gc, they will be over smaller subsets
-	processSubsetMicrographs(0, mdts.size()-1);
+	if (mdts.size() > 0)
+		processSubsetMicrographs(0, mdts.size()-1);
 
+	combineEPSfiles();
 }
 
 /// Helper functions
@@ -546,6 +561,33 @@ void MotionFitter::processSubsetMicrographs(long g_start, long g_end)
 
     if (verb > 0)
 		progress_bar(my_nr_micrographs);
+
+}
+
+// combine all EPS files into one logfile.pdf
+void MotionFitter::combineEPSfiles()
+{
+    std::vector<FileName> fn_eps;
+    if (verb > 0)
+    	std::cout << " + Combining all EPS files into a PDF ... " << std::endl;
+
+	// Split again, as a subset might have been done before...
+
+    mdts.clear();
+    mdts = StackHelper::splitByMicrographName(&mdt0);
+	for (long g = 0; g < mdts.size(); g++)
+	{
+		FileName fn_root = getOutputFileNameRoot(g);
+		if (exists(fn_root+"_tracks.eps"))
+			fn_eps.push_back(fn_root+"_tracks.eps");
+	}
+
+	if (fn_eps.size() > 0)
+	{
+		joinMultipleEPSIntoSinglePDF(outPath + "motionfit_logfile.pdf ", fn_eps);
+	}
+
+
 
 }
 

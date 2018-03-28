@@ -44,15 +44,19 @@ void MotionFitterMpi::run()
 {
 	// Parallel loop over micrographs
 
+	if (mdts.size() > 0)
+	{
+		long int total_nr_micrographs = mdts.size();
 
-	long int total_nr_micrographs = mdts.size();
+		// Each node does part of the work
+		long int my_first_micrograph, my_last_micrograph, my_nr_micrographs;
+		divide_equally(total_nr_micrographs, node->size, node->rank, my_first_micrograph, my_last_micrograph);
+		my_nr_micrographs = my_last_micrograph - my_first_micrograph + 1;
 
-	// Each node does part of the work
-	long int my_first_micrograph, my_last_micrograph, my_nr_micrographs;
-	divide_equally(total_nr_micrographs, node->size, node->rank, my_first_micrograph, my_last_micrograph);
-	my_nr_micrographs = my_last_micrograph - my_first_micrograph + 1;
+		// The subsets will be used in openMPI parallelisation: instead of over g0->gc, they will be over smaller subsets
+		processSubsetMicrographs(my_first_micrograph, my_last_micrograph);
+	}
 
-	// The subsets will be used in openMPI parallelisation: instead of over g0->gc, they will be over smaller subsets
-	processSubsetMicrographs(my_first_micrograph, my_last_micrograph);
-
+	if (node->isMaster())
+		combineEPSfiles();
 }

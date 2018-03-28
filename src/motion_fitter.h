@@ -128,6 +128,9 @@ public:
 	// Fit CTF parameters for all particles on a subset of the micrographs micrograph
 	void processSubsetMicrographs(long g_start, long g_end);
 
+	// combine all EPS files into one logfile.pdf
+	void combineEPSfiles();
+
 	// Helper functions
 private:
 
