@@ -61,9 +61,6 @@ public:
 	// Verbosity
 	int verb;
 
-	// Input & Output rootname
-	FileName fn_opt, fn_fsc;
-
 	// Allow continuation of crashed jobs
 	bool only_do_unfinished;
 
@@ -75,7 +72,7 @@ public:
 
 	// FOR NOW: copied all params from Jasenko's refinement_program class
 	// TODO: throw away not-needed ones
-	bool singleReference, doesMovies, debug, applyTilt, anisoTilt, useFsc,
+	bool debug, applyTilt, anisoTilt,
         optStar, noStar, optReference, noReference, noTilt,
         preextracted, nogain, ctfTilt;
 
@@ -92,10 +89,6 @@ public:
         starFn, reconFn0, reconFn1, maskFn,
         outPath, imgPath, fscFn,
         meta_path, bin_type_str;
-
-    StackHelper::BinningType binType;
-
-    // data:
 
     Image<RFLOAT> maps[2];
     Image<RFLOAT> powSpec[2];

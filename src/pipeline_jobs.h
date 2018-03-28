@@ -240,33 +240,33 @@ public:
 	JobOption()	{ clear(); }
 
 	// Empty destructor
-    ~JobOption() {	clear(); }
+	~JobOption() {	clear(); }
 
-    void clear();
+	void clear();
 
-    // Set values of label, value, default_value and helptext (common for all types)
-    void initialise(std::string _label, std::string _default_value, std::string _helptext);
+	// Set values of label, value, default_value and helptext (common for all types)
+	void initialise(std::string _label, std::string _default_value, std::string _helptext);
 
-    // Get a string value
-    std::string getString();
+	// Get a string value
+	std::string getString();
 
-    // Set a string value
-    void setString(std::string set_to);
+	// Set a string value
+	void setString(std::string set_to);
 
-    // Get a string value
-    Node getNode();
+	// Get a string value
+	Node getNode();
 
-    // Get a numbered value
-    float getNumber();
+	// Get a numbered value
+	float getNumber();
 
-    // Get a boolean value
-    bool getBoolean();
+	// Get a boolean value
+	bool getBoolean();
 
-    // Read value from an ifstream. Return false if cannot find it
-    bool readValue(std::ifstream& in);
+	// Read value from an ifstream. Return false if cannot find it
+	bool readValue(std::ifstream& in);
 
-    // Write value to an ostream
-    void writeValue(std::ostream& out);
+	// Write value to an ostream
+	void writeValue(std::ostream& out);
 };
 
 
@@ -304,27 +304,27 @@ public:
 	// Constructor
 	RelionJob() { clear(); };
 
-    // Empty Destructor
-    ~RelionJob() { clear(); };
+	// Empty Destructor
+	~RelionJob() { clear(); };
 
-    // Clear everything
-    void clear()
-    {
-    	outputName = alias = "";
-    	type = -1;
-    	inputNodes.clear();
-    	outputNodes.clear();
-    	joboptions.clear();
-    	is_continue = false;
-    }
+	// Clear everything
+	void clear()
+	{
+		outputName = alias = "";
+		type = -1;
+		inputNodes.clear();
+		outputNodes.clear();
+		joboptions.clear();
+		is_continue = false;
+	}
 
-    // Returns true if the option is present in joboptions
-    bool containsLabel(std::string label, std::string &option);
+	// Returns true if the option is present in joboptions
+	bool containsLabel(std::string label, std::string &option);
 
-    // Set this option in the job
-    void setOption(std::string setOptionLine);
+	// Set this option in the job
+	void setOption(std::string setOptionLine);
 
-    // write/read settings to disc
+	// write/read settings to disc
 	bool read(std::string fn, bool &_is_continue, bool do_initialise = false); // return false if unsuccessful
 	void write(std::string fn);
 
@@ -340,11 +340,11 @@ public:
 			bool do_makedir, std::string &warning_message);
 
 	// Initialise the generic RelionJob
-    void initialise(int job_type);
+	void initialise(int job_type);
 
-    // Generic getCommands
-    bool getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
+	// Generic getCommands
+	bool getCommands(std::string &outputname, std::vector<std::string> &commands,
+	 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
 
 	// Now all the specific job types are defined
 	void initialiseImportJob();

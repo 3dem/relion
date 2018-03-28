@@ -49,7 +49,7 @@ public:
 	int start_y, current_y;
 
 	// Tabs
-    Fl_Tabs *tabs;
+	Fl_Tabs *tabs;
 	Fl_Group *tab1, *tab2, *tab3, *tab4, *tab5, *tab6, *tab7, *runtab;
 
 	// Groups
@@ -71,18 +71,18 @@ public:
 	// General initialise
 	void initialise(int my_job_type, bool _do_oldstyle = false);
 
-    void resetHeight();
+	void resetHeight();
 
-    // Place a single entry
-    void place(std::string key, int deactivate_option = TOGGLE_LEAVE_ACTIVE, Fl_Group * deactivate_this_group = NULL);
-    // Place two entries on one line
-    void place2(std::string key1, std::string key2, std::string label, int deactivate_option = TOGGLE_LEAVE_ACTIVE);
-    // Place three entries on one line
-    void place3(std::string key1, std::string key2, std::string key3, std::string label, int deactivate_option = TOGGLE_LEAVE_ACTIVE);
+	// Place a single entry
+	void place(std::string key, int deactivate_option = TOGGLE_LEAVE_ACTIVE, Fl_Group * deactivate_this_group = NULL, bool actually_activate=false);
+	// Place two entries on one line
+	void place2(std::string key1, std::string key2, std::string label, int deactivate_option = TOGGLE_LEAVE_ACTIVE);
+	// Place three entries on one line
+	void place3(std::string key1, std::string key2, std::string key3, std::string label, int deactivate_option = TOGGLE_LEAVE_ACTIVE);
 
-    void setupRunTab();
+	void setupRunTab();
 
-    // De/re-activate options upon toggling the continue button
+	// De/re-activate options upon toggling the continue button
 	void toggle_new_continue(bool is_continue);
 
 	// Write the job submission script
@@ -101,32 +101,32 @@ public:
 
 private:
 
-    static void cb_menu_continue(Fl_Widget*, void*);
-    inline void cb_menu_continue_i();
+	static void cb_menu_continue(Fl_Widget*, void*);
+	inline void cb_menu_continue_i();
 
-    // initialise the window for each of the jobtypes
-    void initialiseImportWindow();
-    void initialiseMotioncorrWindow();
-    void initialiseCtffindWindow();
-    void initialiseManualpickWindow();
-    void initialiseAutopickWindow();
-    void initialiseExtractWindow();
-    void initialiseSortWindow();
-    void initialiseSelectWindow();
-    void initialiseClass2DWindow();
-    void initialiseInimodelWindow();
-    void initialiseClass3DWindow();
-    void initialiseAutorefineWindow();
-    void initialiseMultiBodyWindow();
-    void initialiseMovierefineWindow();
-    void initialisePolishWindow();
-    void initialiseMaskcreateWindow();
-    void initialiseJoinstarWindow();
-    void initialiseSubtractWindow();
-    void initialisePostprocessWindow();
-    void initialiseLocresWindow();
-    void initialiseMotionfitWindow();
-    void initialiseCtfrefineWindow();
+	// initialise the window for each of the jobtypes
+	void initialiseImportWindow();
+	void initialiseMotioncorrWindow();
+	void initialiseCtffindWindow();
+	void initialiseManualpickWindow();
+	void initialiseAutopickWindow();
+	void initialiseExtractWindow();
+	void initialiseSortWindow();
+	void initialiseSelectWindow();
+	void initialiseClass2DWindow();
+	void initialiseInimodelWindow();
+	void initialiseClass3DWindow();
+	void initialiseAutorefineWindow();
+	void initialiseMultiBodyWindow();
+	void initialiseMovierefineWindow();
+	void initialisePolishWindow();
+	void initialiseMaskcreateWindow();
+	void initialiseJoinstarWindow();
+	void initialiseSubtractWindow();
+	void initialisePostprocessWindow();
+	void initialiseLocresWindow();
+	void initialiseMotionfitWindow();
+	void initialiseCtfrefineWindow();
 
 };
 
