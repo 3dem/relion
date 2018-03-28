@@ -25,8 +25,6 @@ void CtfRefiner::read(int argc, char **argv)
 
 	parser.setCommandLine(argc, argv);
 	int gen_section = parser.addSection("General options");
-	// TODO: fn_opt = parser.getOption("--opt", "optimiser STAR file from a previous 3D auto-refinement");
-
     starFn = parser.getOption("--i", "Input STAR file");
 	reconFn0 = parser.getOption("--m1", "Reference map, half 1");
     reconFn1 = parser.getOption("--m2", "Reference map, half 2");
@@ -268,19 +266,14 @@ void CtfRefiner::initialise()
 
 		projectors[0] = Projector(s, TRILINEAR, paddingFactor, 10, 2);
 		projectors[0].computeFourierTransformMap(maps[0].data, powSpec[0].data, maps[0].data.xdim);
+		projectors[1] = Projector(s, TRILINEAR, paddingFactor, 10, 2);
+		projectors[1].computeFourierTransformMap(maps[1].data, powSpec[1].data, maps[1].data.xdim);
 
-		if (!singleReference)
-		{
-			projectors[1] = Projector(s, TRILINEAR, paddingFactor, 10, 2);
-			projectors[1].computeFourierTransformMap(maps[1].data, powSpec[1].data, maps[1].data.xdim);
-		}
 	}
 
-	useFsc = (fscFn != "");
-	MetaDataTable fscMdt;
-
-	if (useFsc)
+	if (fscFn != "")
 	{
+		MetaDataTable fscMdt;
 		fscMdt.read(fscFn, "fsc");
 
 		if (!fscMdt.containsLabel(EMDL_SPECTRAL_IDX))
@@ -662,14 +655,7 @@ void CtfRefiner::fitBeamTiltFromSumsAllMicrographs(Image<Complex> &xyAccSum, Ima
 
     Image<Complex> xyNrm(sh,s);
 
-    if (useFsc)
-    {
-        FilterHelper::multiply(wAccSum, freqWeight, wgh);
-    }
-    else
-    {
-        wgh = wAccSum;
-    }
+    FilterHelper::multiply(wAccSum, freqWeight, wgh);
 
     Image<RFLOAT> imgdebug(sh,s);
 
