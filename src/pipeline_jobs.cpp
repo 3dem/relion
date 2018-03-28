@@ -4725,7 +4725,7 @@ bool RelionJob::getCommandsMotionfitJob(std::string &outputname, std::vector<std
 	command += " --mask " + fn_mask;
 	command += " --first_frame " + joboptions["first_frame"].getString();
 	command += " --last_frame " + joboptions["last_frame"].getString();
-	command += " --o " + outputname + "run";
+	command += " --o " + outputname;
 
 	if (joboptions["do_fit"].getBoolean())
 	{
@@ -4771,7 +4771,7 @@ bool RelionJob::getCommandsMotionfitJob(std::string &outputname, std::vector<std
 			command="`which relion_recombine`";
 
 		command += " --i " + joboptions["fn_data"].getString();
-		command += " --t "  + outputname + "run";
+		command += " --t "  + outputname;
 		command += " --corr_mic " + joboptions["fn_mic"].getString();
 
 		// Parameters
