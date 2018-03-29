@@ -4716,6 +4716,10 @@ bool RelionJob::getCommandsMotionfitJob(std::string &outputname, std::vector<std
 	command += " --first_frame " + joboptions["first_frame"].getString();
 	command += " --last_frame " + joboptions["last_frame"].getString();
 	command += " --o " + outputname;
+	if (joboptions["do_pad1"].getBoolean())
+		command += " --pad 1 ";
+	else
+		command += " --pad 2 ";
 
 	if (joboptions["do_fit"].getBoolean())
 	{
@@ -4730,15 +4734,24 @@ bool RelionJob::getCommandsMotionfitJob(std::string &outputname, std::vector<std
 		command += " --skip_motion_fit";
 	}
 
-
-	if (joboptions["do_pad1"].getBoolean())
-		command += " --pad 1 ";
-	else
-		command += " --pad 2 ";
-
 	// If this is a continue job, then only process unfinished micrographs
 	if (is_continue)
 		command += " --only_do_unfinished ";
+
+	if (joboptions["do_combine"].getBoolean())
+	{
+
+		command += " --combine_frames";
+		command += " --bfac_minfreq " + joboptions["minres"].getString();
+		command += " --bfac_maxfreq " + joboptions["maxres"].getString();
+
+		Node node7(outputname+"shiny.star", NODE_PDF_LOGFILE);
+		outputNodes.push_back(node7);
+
+	}
+
+	Node node6(outputname+"logfile.pdf", NODE_PDF_LOGFILE);
+	outputNodes.push_back(node6);
 
 	// Running stuff
 	command += " --j " + joboptions["nr_threads"].getString();
@@ -4746,48 +4759,6 @@ bool RelionJob::getCommandsMotionfitJob(std::string &outputname, std::vector<std
 	// Other arguments for extraction
 	command += " " + joboptions["other_motionfit_args"].getString();
 	commands.push_back(command);
-
-	Node node5(outputname+"motionfit_logfile.pdf", NODE_PDF_LOGFILE);
-	outputNodes.push_back(node5);
-
-
-	if (joboptions["do_combine"].getBoolean())
-	{
-
-		if (joboptions["nr_mpi"].getNumber() > 1)
-			command="`which relion_recombine_mpi`";
-		else
-			command="`which relion_recombine`";
-
-		command += " --i " + joboptions["fn_data"].getString();
-		command += " --t "  + outputname;
-		command += " --corr_mic " + joboptions["fn_mic"].getString();
-
-		// Parameters
-		command += " --k0 " + joboptions["minres"].getString();
-		command += " --k1 " + joboptions["maxres"].getString();
-		command += " --first_frame " + joboptions["first_frame"].getString();
-		command += " --last_frame " + joboptions["last_frame"].getString();
-		command += " --out " + outputname;
-
-		// If this is a continue job, then only process unfinished micrographs
-		if (is_continue)
-			command += " --only_do_unfinished ";
-
-		// Running stuff
-		command += " --jomp " + joboptions["nr_threads"].getString();
-
-		// Other arguments for extraction
-		command += " " + joboptions["other_combine_args"].getString();
-		commands.push_back(command);
-
-		Node node6(outputname+"recombine_logfile.pdf", NODE_PDF_LOGFILE);
-		outputNodes.push_back(node6);
-
-		Node node7(outputname+"particles.star", NODE_PDF_LOGFILE);
-		outputNodes.push_back(node7);
-
-	}
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 

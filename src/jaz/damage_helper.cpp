@@ -264,7 +264,7 @@ RFLOAT DamageHelper::damage(double k, int kc, RFLOAT angpix, RFLOAT dose, RFLOAT
     return exp(-dose/tau);
 }
 
-std::vector<double> DamageHelper::fitBFactors(const Image<RFLOAT> &fcc, int k0, int k1)
+std::vector<double> DamageHelper::fitBFactors(const Image<RFLOAT> &fcc, int k0, int k1, int verb)
 {
     const int kc = fcc.data.xdim;
     const int fc = fcc.data.ydim;
@@ -288,7 +288,8 @@ std::vector<double> DamageHelper::fitBFactors(const Image<RFLOAT> &fcc, int k0, 
         }
     }
 
-    std::cout << "best f: " << bestF << "\n";
+    if (verb > 0)
+    	std::cout << "best f: " << bestF << "\n";
 
     std::vector<double> scale(kc, 0.0);
 
@@ -338,7 +339,7 @@ std::vector<double> DamageHelper::fitBFactors(const Image<RFLOAT> &fcc, int k0, 
 }
 
 std::pair<std::vector<d2Vector>,std::vector<double>> DamageHelper::fitBkFactors(
-        const Image<RFLOAT> &fcc, int k0, int k1)
+        const Image<RFLOAT> &fcc, int k0, int k1, int verb)
 {
     const int kc = fcc.data.xdim;
     const int fc = fcc.data.ydim;
@@ -362,7 +363,8 @@ std::pair<std::vector<d2Vector>,std::vector<double>> DamageHelper::fitBkFactors(
         }
     }
 
-    std::cout << "best f: " << bestF << "\n";
+    if (verb > 0)
+    	std::cout << "best f: " << bestF << "\n";
 
     std::vector<double> scale(kc, 0.0), wgh(kc, 1.0);
 
