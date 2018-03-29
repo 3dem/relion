@@ -4647,15 +4647,11 @@ The mask used for this postprocessing will be applied to the unfiltered half-map
 	joboptions["sigma_acc"] = JobOption("Sigma for acceleration (A/dose): ", -1, -10, 0, 0.1, "Standard deviation for the acceleration regularisation. TODO EXPLAIN");
 	joboptions["max_iters"] = JobOption("Maximum number of iterations: ", 10000, 2000, 50000, 1000, "Maximum number of iterations for the optimisation per micrograph.");
 	joboptions["do_pad1"] = JobOption("Skip padding?", false, "If set to Yes, the calculations will not use padding in Fourier space for better interpolation in the references. Otherwise, references are padded 2x before Fourier transforms are calculated. Skipping padding (i.e. use --pad 1) gives nearly as good results as using --pad 2, but some artifacts may appear in the corners from signal that is folded back.");
-	joboptions["other_motionfit_args"] = JobOption("Other motion_fit arguments", std::string(""), "Additional arguments that need to be passed to relion_motion_fit.");
 
 	//combine_frames
 	joboptions["do_combine"] = JobOption("Generate shiny particles?", true, "If set to Yes, then relion_combine_frames will be run to combine all (aligned) movie frames, using a dose-weighting scheme that is estimated from the data");
 	joboptions["minres"] = JobOption("Minimum resolution for B-factor fit (A): ", 20, 8, 40, 1, "The minimum spatial frequency (in Angstrom) used in the B-factor fit.");
 	joboptions["maxres"] = JobOption("Maximum resolution for B-factor fit (A): ", -1, -1, 15, 1, "The maximum spatial frequency (in Angstrom) used in the B-factor fit. If a negative value is given, the maximum is determined from the input FSC curve.");
-	joboptions["other_combine_args"] = JobOption("Other combine_frames arguments", std::string(""), "Additional arguments that need to be passed to relion_combine_frames.");
-
-
 
 }
 
@@ -4757,7 +4753,7 @@ bool RelionJob::getCommandsMotionfitJob(std::string &outputname, std::vector<std
 	command += " --j " + joboptions["nr_threads"].getString();
 
 	// Other arguments for extraction
-	command += " " + joboptions["other_motionfit_args"].getString();
+	command += " " + joboptions["other_args"].getString();
 	commands.push_back(command);
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);

@@ -259,7 +259,6 @@ void MotionFitter::initialise()
 			// remove the pipeline job prefix
 			FileName fn_pre, fn_jobnr, fn_post;
 			decomposePipelineFileName(mgFn, fn_pre, fn_jobnr, fn_post);
-			std::cerr << " fn_post= " << fn_post << std::endl;
 			std::string metaFn = mic2meta[fn_post];
 
 			if (meta_path != "")
@@ -563,7 +562,7 @@ void MotionFitter::processSubsetMicrographs(long g_start, long g_end)
 	{
 
         const int pc = mdts[g].numberOfObjects();
-        if (pc < 2) continue;
+        if (pc == 0) continue;
 
 		// Make sure output directory exists
 		FileName newdir = getOutputFileNameRoot(g);
@@ -650,7 +649,7 @@ void MotionFitter::combineFramesSubsetMicrographs(long g_start, long g_end)
 	{
 
         const int pc = mdts[g].numberOfObjects();
-        if (pc < 2) continue;
+        if (pc == 0) continue;
 
         pctot += pc;
 
@@ -675,7 +674,7 @@ void MotionFitter::combineFramesSubsetMicrographs(long g_start, long g_end)
 
             for (int f = 0; f < fc; f++)
             {
-                shiftImageInFourierTransform(movie[p][f](), obs(), s, -shift[p][f].x, -shift[p][f].y);
+            	shiftImageInFourierTransform(movie[p][f](), obs(), s, -shift[p][f].x, -shift[p][f].y);
 
                 for (int y = 0; y < s; y++)
                 for (int x = 0; x < sh; x++)
@@ -760,7 +759,7 @@ void MotionFitter::calculateSingleFrameReconstruction(int iframe)
 	{
 
         const int pc = mdts[g].numberOfObjects();
-        if (pc < 2) continue;
+        if (pc == 0) continue;
 
         pctot += pc;
 

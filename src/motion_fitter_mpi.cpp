@@ -57,7 +57,9 @@ void MotionFitterMpi::run()
 		processSubsetMicrographs(my_first_micrograph, my_last_micrograph);
 	}
 
-	if (doCombineFrames)
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    if (doCombineFrames)
 	{
 		initialiseCombineFrames();
 		if (mdts.size() > 0)
@@ -73,6 +75,8 @@ void MotionFitterMpi::run()
 		}
 	}
 
+
+    MPI_Barrier(MPI_COMM_WORLD);
 
 	if (node->isMaster())
 		combineEPSAndSTARfiles();
