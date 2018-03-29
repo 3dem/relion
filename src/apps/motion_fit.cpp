@@ -1144,15 +1144,15 @@ std::vector<std::vector<d2Vector>> MotionFitProg::optimize(
 {
     const double eps = 1e-20;
 
-    if (debug && sig_vel_px < eps)
+    if (sig_vel_px < eps)
     {
-        std::cerr << "Warning: sig_vel < " << eps << " px. Setting to " << eps << ".\n";
+        if (debug) std::cerr << "Warning: sig_vel < " << eps << " px. Setting to " << eps << ".\n";
         sig_vel_px = eps;
     }
 
-    if (debug && sig_div_px < eps)
+    if (sig_div_px < eps)
     {
-        std::cerr << "Warning: sig_div < " << eps << " px. Setting to " << eps << ".\n";
+        if (debug) std::cerr << "Warning: sig_div < " << eps << " px. Setting to " << eps << ".\n";
         sig_div_px = eps;
     }
 
