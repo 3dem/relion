@@ -36,6 +36,7 @@
 #include <src/jaz/parallel_ft.h>
 #include <src/jaz/d3x3/dsyev2.h>
 #include <src/jaz/nelder_mead.h>
+#include <src/jaz/alignment_set.h>
 
 #include <src/jaz/motion_em.h>
 
@@ -51,16 +52,25 @@ class MotionFitProg : public RefinementProgram
 
             bool unregGlob, noGlobOff,
                 paramEstim2, paramEstim3,
-                debugOpt, diag, expKer, global_init;
-            int maxIters, paramEstimIters, paramEstimSteps;
+                debugOpt, diag, expKer, global_init,
+                useAlignmentSet;
+
+            int maxIters, paramEstimIters, paramEstimSteps, maxEDs, maxRange;
+
             double dmga, dmgb, dmgc, dosePerFrame,
                 sig_vel, sig_div, sig_acc,
                 k_cutoff, maxStep, maxDistDiv,
                 param_rV, param_rD, param_rA;
 
+            AlignmentSet alignmentSet;
+
         int readMoreOptions(IOParser& parser, int argc, char *argv[]);
         int _init();
         int _run();
+
+        void prepAlignment(
+                int k_out,
+                const std::vector<Image<RFLOAT>>& dmgWeight);
 
         void prepMicrograph(
                 int g,
@@ -164,13 +174,14 @@ int MotionFitProg::readMoreOptions(IOParser& parser, int argc, char *argv[])
 
     dosePerFrame = textToFloat(parser.getOption("--fdose", "Electron dose per frame (in e^-/A^2)", "1"));
 
-    sig_vel = textToFloat(parser.getOption("--s_vel", "Velocity sigma [Angst/dose]", "1.6"));
-    sig_div = textToFloat(parser.getOption("--s_div", "Divergence sigma [Angst]", "500.0"));
+    sig_vel = textToFloat(parser.getOption("--s_vel", "Velocity sigma [Angst/dose]", "6"));
+    sig_div = textToFloat(parser.getOption("--s_div", "Divergence sigma [Angst]", "720.0"));
     sig_acc = textToFloat(parser.getOption("--s_acc", "Acceleration sigma [Angst/dose]", "-1.0"));
 
     global_init = parser.checkOption("--gi", "Initialize with global trajectories instead of loading them from metadata file");
 
     expKer = parser.checkOption("--exp_k", "Use exponential kernel instead of sq. exponential");
+    maxEDs = textToInteger(parser.getOption("--max_ed", "Maximum number of eigendeformations", "100"));
 
     k_cutoff = textToFloat(parser.getOption("--k_cut", "Freq. cutoff (in pixels)", "-1.0"));
     maxIters = textToInteger(parser.getOption("--max_iters", "Maximum number of iterations", "10000"));
@@ -191,6 +202,8 @@ int MotionFitProg::readMoreOptions(IOParser& parser, int argc, char *argv[])
     param_rA = textToFloat(parser.getOption("--r_acc", "Test s_acc +/- r_acc * s_acc", "0.5"));
     paramEstimIters = textToInteger(parser.getOption("--par_iters", "Parameter estimation is iterated this many times, each time halving the search range", "3"));
     paramEstimSteps = textToInteger(parser.getOption("--par_steps", "Parameter estimation takes max. this many steps before halving the range", "10"));
+    useAlignmentSet = !parser.checkOption("--exact_params", "Use slower but more precise parameter evaluation");
+    maxRange = textToInteger(parser.getOption("--mot_range", "Limit allowed motion range for parameter estimation [Px]", "50"));
 
     if ((paramEstim2 || paramEstim3) && k_cutoff < 0)
     {
@@ -255,6 +268,11 @@ int MotionFitProg::_run()
         }
     }
 
+    if (useAlignmentSet && (paramEstim2 || paramEstim3))
+    {
+        prepAlignment(k_out, dmgWeight);
+    }
+
     double t0 = omp_get_wtime();
 
     if (paramEstim2)
@@ -290,6 +308,96 @@ int MotionFitProg::_run()
     std::cout << "elapsed (total): " << diff << " sec\n";
 
     return 0;
+}
+
+void MotionFitProg::prepAlignment(int k_out, const std::vector<Image<RFLOAT>>& dmgWeight)
+{
+    std::cout << "preparing alignment data...\n";
+
+    std::vector<ParFourierTransformer> fts(nr_omp_threads);
+
+    std::vector<MetaDataTable> mdtsAct(gc - g0 + 1);
+
+    for (int m = g0; m <= gc; m++)
+    {
+        mdtsAct[m-g0] = mdts[m];
+    }
+
+    alignmentSet = AlignmentSet(mdtsAct, fc, s, k_cutoff+2, k_out);
+
+    int pctot = 0;
+
+    for (long g = g0; g <= gc; g++)
+    {
+        const int pc = mdts[g].numberOfObjects();
+
+        if (pc < 2) continue;
+
+        pctot += pc;
+
+        std::cout << "    micrograph " << (g+1) << " / " << mdts.size() << ": "
+            << pc << " particles [" << pctot << " total]\n";
+
+        std::vector<std::vector<Image<Complex>>> movie;
+        std::vector<std::vector<Image<RFLOAT>>> movieCC;
+
+        try
+        {
+            prepMicrograph(
+                g, fts, dmgWeight,
+                movie, movieCC,
+                alignmentSet.positions[g],
+                alignmentSet.initialTracks[g],
+                alignmentSet.globComp[g]);
+        }
+        catch (RelionError XE)
+        {
+            std::cerr << "warning: unable to load micrograph #" << (g+1) << "\n";
+            continue;
+        }
+
+        Image<float> CCfloat(s,s);
+
+        #pragma omp parallel for num_threads(nr_omp_threads)
+        for (int p = 0; p < pc; p++)
+        {
+            for (int f = 0; f < fc; f++)
+            {
+                if (maxRange > 0)
+                {
+                    movieCC[p][f] = FilterHelper::cropCorner2D(movieCC[p][f], 2*maxRange, 2*maxRange);
+                }
+
+                for (int y = 0; y < movieCC[p][f]().ydim; y++)
+                for (int x = 0; x < movieCC[p][f]().xdim; x++)
+                {
+                    CCfloat(y,x) = movieCC[p][f](y,x);
+                }
+
+                //alignmentSet.CCs[g][p][f] = movieCC[p][f];
+                alignmentSet.CCs[g][p][f] = CCfloat;
+                alignmentSet.obs[g][p][f] = alignmentSet.accelerate(movie[p][f]);
+
+                Image<Complex> pred;
+                int randSubset;
+                mdts[g].getValue(EMDL_PARTICLE_RANDOM_SUBSET, randSubset, p);
+                randSubset -= 1;
+
+                if (randSubset == 0)
+                {
+                    pred = obsModel.predictObservation(projectors[1], mdts[g], p, true, true);
+                }
+                else
+                {
+                    pred = obsModel.predictObservation(projectors[0], mdts[g], p, true, true);
+                }
+
+                alignmentSet.pred[g][p] = alignmentSet.accelerate(pred);
+            }
+        }
+    }
+
+    std::cout << "done\n";
 }
 
 void MotionFitProg::prepMicrograph(
@@ -903,16 +1011,21 @@ void MotionFitProg::evaluateParams(
 
     int pctot = 0;
 
-    for (int i = 0; i < paramCount; i++)
-    {
-        paramTables[i] = std::vector<Image<RFLOAT>>(nr_omp_threads);
-        paramWeights0[i] = std::vector<Image<RFLOAT>>(nr_omp_threads);
-        paramWeights1[i] = std::vector<Image<RFLOAT>>(nr_omp_threads);
+    std::vector<d3Vector> tscsAs(paramCount, d3Vector(0.0, 0.0, 0.0));
 
-        for (int j = 0; j < nr_omp_threads; j++)
+    if (!useAlignmentSet)
+    {
+        for (int i = 0; i < paramCount; i++)
         {
-            FscHelper::initFscTable(sh, fc, paramTables[i][j],
-                paramWeights0[i][j], paramWeights1[i][j]);
+            paramTables[i] = std::vector<Image<RFLOAT>>(nr_omp_threads);
+            paramWeights0[i] = std::vector<Image<RFLOAT>>(nr_omp_threads);
+            paramWeights1[i] = std::vector<Image<RFLOAT>>(nr_omp_threads);
+
+            for (int j = 0; j < nr_omp_threads; j++)
+            {
+                FscHelper::initFscTable(sh, fc, paramTables[i][j],
+                    paramWeights0[i][j], paramWeights1[i][j]);
+            }
         }
     }
 
@@ -927,27 +1040,25 @@ void MotionFitProg::evaluateParams(
         std::cout << "    micrograph " << (g+1) << " / " << mdts.size() << ": "
             << pc << " particles [" << pctot << " total]\n";
 
-        std::cout.flush();
-
-        std::stringstream stsg;
-        stsg << g;
-
         std::vector<std::vector<Image<Complex>>> movie;
         std::vector<std::vector<Image<RFLOAT>>> movieCC;
         std::vector<d2Vector> positions;
         std::vector<std::vector<d2Vector>> initialTracks;
         std::vector<d2Vector> globComp;
 
-        try
+        if (!useAlignmentSet)
         {
-            prepMicrograph(
-                g, fts, dmgWeight,
-                movie, movieCC, positions, initialTracks, globComp);
-        }
-        catch (RelionError XE)
-        {
-            std::cerr << "warning: unable to load micrograph #" << (g+1) << "\n";
-            continue;
+            try
+            {
+                prepMicrograph(
+                    g, fts, dmgWeight,
+                    movie, movieCC, positions, initialTracks, globComp);
+            }
+            catch (RelionError XE)
+            {
+                std::cerr << "warning: unable to load micrograph #" << (g+1) << "\n";
+                continue;
+            }
         }
 
         for (int i = 0; i < paramCount; i++)
@@ -957,20 +1068,68 @@ void MotionFitProg::evaluateParams(
                 std::cout << "        evaluating: " << sig_vals[i] << "\n";
             }
 
-            std::vector<std::vector<gravis::d2Vector>> tracks = optimize(
-                    movieCC, initialTracks,
-                    sig_v_vals_nrm[i], sig_a_vals_nrm[i], sig_d_vals_nrm[i],
-                    positions, globComp, maxStep, 1e-9, 1e-9, maxIters, 0.0);
+            if (useAlignmentSet)
+            {
+                std::vector<std::vector<Image<RFLOAT>>> CCs(pc, std::vector<Image<RFLOAT>>(fc));
 
-            updateFCC(movie, tracks, mdts[g], paramTables[i], paramWeights0[i], paramWeights1[i]);
+                #pragma omp parallel for num_threads(nr_omp_threads)
+                for (int p = 0; p < pc; p++)
+                for (int f = 0; f < fc; f++)
+                {
+                    const int w = alignmentSet.CCs[g][p][f].data.xdim;
+                    const int h = alignmentSet.CCs[g][p][f].data.ydim;
+
+                    CCs[p][f] = Image<RFLOAT>(w,h);
+
+                    for (int y = 0; y < h; y++)
+                    for (int x = 0; x < w; x++)
+                    {
+                        CCs[p][f](y,x) = alignmentSet.CCs[g][p][f](y,x);
+                    }
+                }
+
+                std::vector<std::vector<gravis::d2Vector>> tracks = optimize(
+                        //alignmentSet.CCs[g],
+                        CCs,
+                        alignmentSet.initialTracks[g],
+                        sig_v_vals_nrm[i], sig_a_vals_nrm[i], sig_d_vals_nrm[i],
+                        alignmentSet.positions[g], alignmentSet.globComp[g],
+                        maxStep, 1e-9, 1e-9, maxIters, 0.0);
+
+                tscsAs[i] += alignmentSet.updateTsc(tracks, g);
+            }
+            else
+            {
+                std::vector<std::vector<gravis::d2Vector>> tracks = optimize(
+                        movieCC, initialTracks,
+                        sig_v_vals_nrm[i], sig_a_vals_nrm[i], sig_d_vals_nrm[i],
+                        positions, globComp, maxStep, 1e-9, 1e-9, maxIters, 0.0);
+
+                updateFCC(movie, tracks, mdts[g], paramTables[i], paramWeights0[i], paramWeights1[i]);
+            }
         }
 
     } // micrographs
 
-    for (int i = 0; i < paramCount; i++)
+    if (useAlignmentSet)
     {
-        TSCs[i] = FscHelper::computeTsc(
-            paramTables[i], paramWeights0[i], paramWeights1[i], k_cutoff+2, k_out);
+        for (int i = 0; i < paramCount; i++)
+        {
+            double wg = tscsAs[i][1] * tscsAs[i][2];
+
+            if (wg > 0.0)
+            {
+                TSCs[i] = tscsAs[i][0] / sqrt(wg);
+            }
+        }
+    }
+    else
+    {
+        for (int i = 0; i < paramCount; i++)
+        {
+            TSCs[i] = FscHelper::computeTsc(
+                paramTables[i], paramWeights0[i], paramWeights1[i], k_cutoff+2, k_out);
+        }
     }
 }
 
@@ -1004,7 +1163,7 @@ std::vector<std::vector<d2Vector>> MotionFitProg::optimize(
     const int fc = inTracks[0].size();
 
     GpMotionFit gpmf(movieCC, sig_vel_px, sig_div_px, sig_acc_px,
-                     pc, positions,
+                     maxEDs, positions,
                      globComp, nr_omp_threads, expKer);
 
 
@@ -1171,131 +1330,3 @@ void MotionFitProg::writeOutput(
         glbOut << globalTrack[f].x << " " << globalTrack[f].y << "\n";
     }
 }
-/*
-d2Vector MotionFitProg::interpolateMax2(
-    const std::vector<d3Vector> &all_sig_vals,
-    const std::vector<double> &all_TSCs)
-{
-    const int parCt = all_sig_vals.size();
-
-    Matrix2D<RFLOAT> A(parCt,6);
-    Matrix1D<RFLOAT> b(parCt);
-
-    int bestP = 0;
-    double bestTsc = all_TSCs[0];
-
-    for (int p = 0; p < parCt; p++)
-    {
-        if (all_TSCs[p] > bestTsc)
-        {
-            bestTsc = all_TSCs[p];
-            bestP = p;
-        }
-    }
-
-    if (bestP != 4)
-    {
-        std::cerr << "Waring: value not maximal at the center.\n";
-        return d2Vector(all_sig_vals[bestP][0], all_sig_vals[bestP][1]);
-    }
-
-    for (int p = 0; p < parCt; p++)
-    {
-        const double v = all_sig_vals[p][0];
-        const double d = all_sig_vals[p][1];
-
-        A(p,0) = v*v;
-        A(p,1) = 2.0*v*d;
-        A(p,2) = 2.0*v;
-        A(p,3) = d*d;
-        A(p,4) = 2.0*d;
-        A(p,5) = 1.0;
-
-        b(p) = all_TSCs[p];
-    }
-
-    const double tol = 1e-20;
-    Matrix1D<RFLOAT> x(6);
-    solve(A, b, x, tol);
-
-    d2Matrix C2(x(0), x(1),
-                x(1), x(3));
-
-    d2Vector l(x(2), x(4));
-
-    d2Matrix C2i = C2;
-    C2i.invert();
-
-    d2Vector min = -(C2i * l);
-
-    return min;
-}
-
-d3Vector MotionFitProg::interpolateMax3(
-    const std::vector<d3Vector> &all_sig_vals,
-    const std::vector<double> &all_TSCs)
-{
-    const int parCt = all_sig_vals.size();
-
-    Matrix2D<RFLOAT> A(parCt,10);
-    Matrix1D<RFLOAT> b(parCt);
-
-    int bestP = 0;
-    double bestTsc = all_TSCs[0];
-
-    for (int p = 0; p < parCt; p++)
-    {
-        if (all_TSCs[p] > bestTsc)
-        {
-            bestTsc = all_TSCs[p];
-            bestP = p;
-        }
-    }
-
-    if (bestP != 13)
-    {
-        std::cerr << "Waring: value not maximal at the center.\n";
-        return all_sig_vals[bestP];
-    }
-
-    for (int p = 0; p < parCt; p++)
-    {
-        const double v = all_sig_vals[p][0];
-        const double d = all_sig_vals[p][1];
-        const double a = all_sig_vals[p][2];
-
-        A(p,0) = v*v;
-        A(p,1) = 2.0*v*d;
-        A(p,2) = 2.0*v*a;
-        A(p,3) = 2.0*v;
-
-        A(p,4) = d*d;
-        A(p,5) = 2.0*d*a;
-        A(p,6) = 2.0*d;
-
-        A(p,7) = a*a;
-        A(p,8) = 2.0*a;
-
-        A(p,9) = 1.0;
-
-        b(p) = all_TSCs[p];
-    }
-
-    const double tol = 1e-20;
-    Matrix1D<RFLOAT> x(10);
-    solve(A, b, x, tol);
-
-    d3Matrix C3(x(0), x(1), x(2),
-                x(1), x(4), x(5),
-                x(2), x(5), x(7));
-
-    d3Vector l(x(3), x(6), x(8));
-
-    d3Matrix C3i = C3;
-    C3i.invert();
-
-    d3Vector min = -(C3i * l);
-
-    return min;
-}
-*/

@@ -224,6 +224,7 @@ void GpMotionFit::paramsToPos(
     const std::vector<double>& x,
     std::vector<std::vector<d2Vector>>& pos) const
 {
+    #pragma omp parallel for num_threads(threads)
     for (int p = 0; p < pc; p++)
     {
         d2Vector pp(x[2*p], x[2*p+1]);
