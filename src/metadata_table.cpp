@@ -1050,6 +1050,7 @@ void MetaDataTable::write(const FileName &fn_out) const
     fh.open((fn_out).c_str(), std::ios::out);
     if (!fh)
         REPORT_ERROR( (std::string)"MetaDataTable::write: cannot write to file: " + fn_out);
+    fh << "# RELION; version " << RELION_VERSION << std::endl;
     write(fh);
     fh.close();
 
