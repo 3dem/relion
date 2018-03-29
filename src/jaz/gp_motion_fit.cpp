@@ -86,32 +86,48 @@ double GpMotionFit::f(const std::vector<double> &x) const
         }
 
         #pragma omp atomic
-            e_tot += e;
+        e_tot += e;
     }
 
+    #pragma omp parallel for num_threads(threads)
     for (int f = 0; f < fc-1; f++)
-    for (int d = 0; d < dc; d++)
     {
-        const double cx = x[2*(pc + dc*f + d)    ];
-        const double cy = x[2*(pc + dc*f + d) + 1];
+        double e = 0.0;
 
-        e_tot += cx*cx + cy*cy;
+        for (int d = 0; d < dc; d++)
+        {
+            const double cx = x[2*(pc + dc*f + d)    ];
+            const double cy = x[2*(pc + dc*f + d) + 1];
+
+            e += cx*cx + cy*cy;
+        }
+
+        #pragma omp atomic
+        e_tot += e;
     }
 
     if (sig_acc_px > 0.0)
     {
+        #pragma omp parallel for num_threads(threads)
         for (int f = 0; f < fc-2; f++)
-        for (int d = 0; d < dc; d++)
         {
-            const double cx0 = x[2*(pc + dc*f + d)    ];
-            const double cy0 = x[2*(pc + dc*f + d) + 1];
-            const double cx1 = x[2*(pc + dc*(f+1) + d)    ];
-            const double cy1 = x[2*(pc + dc*(f+1) + d) + 1];
+            double e = 0.0;
 
-            const double dcx = cx1 - cx0;
-            const double dcy = cy1 - cy0;
+            for (int d = 0; d < dc; d++)
+            {
+                const double cx0 = x[2*(pc + dc*f + d)    ];
+                const double cy0 = x[2*(pc + dc*f + d) + 1];
+                const double cx1 = x[2*(pc + dc*(f+1) + d)    ];
+                const double cy1 = x[2*(pc + dc*(f+1) + d) + 1];
 
-            e_tot += eigenVals[d]*(dcx*dcx + dcy*dcy) / (sig_acc_px*sig_acc_px);
+                const double dcx = cx1 - cx0;
+                const double dcy = cy1 - cy0;
+
+                e += eigenVals[d]*(dcx*dcx + dcy*dcy) / (sig_acc_px*sig_acc_px);
+            }
+
+            #pragma omp atomic
+            e_tot += e;
         }
     }
 

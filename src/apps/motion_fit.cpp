@@ -888,7 +888,7 @@ d3Vector MotionFitProg::estimateThreeParams(
 
         int shift_v = bestIndex % 3 - 1;
         int shift_d = ((bestIndex / 3)%3) - 1;
-        int shift_a = bestIndex / 3 - 1;
+        int shift_a = bestIndex / 9 - 1;
 
         if (shift_v < 0 && all_sig_vals[12][0] <= 0.0)
         {
@@ -1144,13 +1144,13 @@ std::vector<std::vector<d2Vector>> MotionFitProg::optimize(
 {
     const double eps = 1e-20;
 
-    if (sig_vel_px < eps)
+    if (debug && sig_vel_px < eps)
     {
         std::cerr << "Warning: sig_vel < " << eps << " px. Setting to " << eps << ".\n";
         sig_vel_px = eps;
     }
 
-    if (sig_div_px < eps)
+    if (debug && sig_div_px < eps)
     {
         std::cerr << "Warning: sig_div < " << eps << " px. Setting to " << eps << ".\n";
         sig_div_px = eps;
