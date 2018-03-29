@@ -44,7 +44,7 @@ GpMotionFit::GpMotionFit(
 
     SvdHelper::decompose(A, U, S, Vt);
 
-    dc = (maxDims > pc)? pc : maxDims;
+    dc = (maxDims < 0 || maxDims > pc)? pc : maxDims;
 
     basis = Matrix2D<RFLOAT>(pc,dc);
 
