@@ -1157,7 +1157,7 @@ std::vector<std::vector<gravis::d2Vector> > MotionRefinement::optimize(
 
     std::vector<double> x0 = pack(initial);
 
-    std::cout << "initial f      = " << mf.f(x0) << "\n";
+    std::cout << "initial f      = " << mf.f(x0, 0) << "\n";
     std::cout << "initial f_data = " << mf.f_data(x0) << "\n";
 
     /*NelderMead nm;
@@ -1293,7 +1293,7 @@ ParticleMotionFit::ParticleMotionFit(const std::vector<Image<float> > &correlati
 {
 }
 
-double ParticleMotionFit::f(const std::vector<double> &x) const
+double ParticleMotionFit::f(const std::vector<double> &x, void* tempStorage) const
 {
     const double cx = correlation[0]().xdim/2;
     const double cy = correlation[0]().ydim/2;
@@ -1349,7 +1349,7 @@ MotionFit::MotionFit(
 {
 }
 
-double MotionFit::f(const std::vector<double> &x) const
+double MotionFit::f(const std::vector<double> &x, void* tempStorage) const
 {
     const int pc = correlation.size();
 
@@ -1451,7 +1451,7 @@ double MotionFit::f_data(const std::vector<double> &x) const
     return e;
 }
 
-void MotionFit::grad(const std::vector<double> &x, std::vector<double> &gradDest) const
+void MotionFit::grad(const std::vector<double> &x, std::vector<double> &gradDest, void* tempStorage) const
 {
     const int pc = correlation.size();
 

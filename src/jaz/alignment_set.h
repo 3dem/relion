@@ -16,7 +16,7 @@ class AlignmentSet
 
             int mc, fc, s, sh, k0, k1, accPix;
 
-            std::vector<std::vector<std::vector< Image<float> >>> CCs;
+            std::vector<std::vector<std::vector< Image<double> >>> CCs;
             std::vector<std::vector<std::vector< std::vector<gravis::d2Vector> >>> obs;
             std::vector<std::vector< std::vector<gravis::d2Vector> >> pred;
 
@@ -30,7 +30,7 @@ class AlignmentSet
 
         gravis::d3Vector updateTsc(
             const std::vector<std::vector<gravis::d2Vector>>& tracks,
-            int mg);
+            int mg, int threads);
 };
 
 

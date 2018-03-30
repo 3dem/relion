@@ -28,10 +28,12 @@ std::vector<double> NelderMead::optimize(
     std::vector<double> values(m), nextValues(m), centroid(n),
             reflected(n), expanded(n), contracted(n);
 
+    void* tempStorage = opt.allocateTempStorage();
+
     // compute values
     for (int j = 0; j < m; j++)
     {
-        values[j] = opt.f(simplex[j]);
+        values[j] = opt.f(simplex[j], tempStorage);
     }
 
     if (verbose)
@@ -104,7 +106,7 @@ std::vector<double> NelderMead::optimize(
             reflected[k] = (1.0 + alpha) * centroid[k] - alpha * simplex[n][k];
         }
 
-        double vRefl = opt.f(reflected);
+        double vRefl = opt.f(reflected, tempStorage);
 
         if (vRefl < values[n-1] && vRefl > values[0])
         {
@@ -121,7 +123,7 @@ std::vector<double> NelderMead::optimize(
                 expanded[k] = (1.0 - gamma) * centroid[k] + gamma * reflected[k];
             }
 
-            double vExp = opt.f(expanded);
+            double vExp = opt.f(expanded, tempStorage);
 
             if (vExp < vRefl)
             {
@@ -143,7 +145,7 @@ std::vector<double> NelderMead::optimize(
             contracted[k] = (1.0 - rho) * centroid[k] + rho * simplex[n][k];
         }
 
-        double vContr = opt.f(contracted);
+        double vContr = opt.f(contracted, tempStorage);
 
         if (vContr < values[n])
         {
@@ -161,9 +163,11 @@ std::vector<double> NelderMead::optimize(
                 simplex[j][k] = (1.0 - sigma) * simplex[0][k] + sigma * simplex[j][k];
             }
 
-            values[j] = opt.f(simplex[j]);
+            values[j] = opt.f(simplex[j], tempStorage);
         }
     }
+
+    opt.deallocateTempStorage(tempStorage);
 
     std::vector<int> order = IndexSort<double>::sortIndices(values);
     return simplex[order[0]];

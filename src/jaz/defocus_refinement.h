@@ -56,7 +56,7 @@ class AstigmatismOptimizationAcc : public Optimization
                 RFLOAT phiScale = 10,
                 RFLOAT csScale = 100);
 
-        double f(const std::vector<double>& x) const;
+        double f(const std::vector<double>& x, void* tempStorage) const;
 
         double getU(const std::vector<double> &x);
         double getV(const std::vector<double> &x);

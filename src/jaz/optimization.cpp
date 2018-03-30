@@ -1,6 +1,6 @@
 #include <src/jaz/optimization.h>
 
-double RosenbrockBanana::f(const std::vector<double> &x) const
+double RosenbrockBanana::f(const std::vector<double> &x, void *tempStorage) const
 {
     const double a = 1.0;
     const double b = 100.0;

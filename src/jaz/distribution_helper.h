@@ -17,7 +17,7 @@ class CorruptedGaussFit : public Optimization
             const std::vector<double>& values;
             const double area;
 
-        double f(const std::vector<double>& x) const;
+        double f(const std::vector<double>& x, void* tempStorage) const;
 };
 
 class CorruptedExponentialFit : public Optimization
@@ -29,7 +29,7 @@ class CorruptedExponentialFit : public Optimization
             const std::vector<double>& velocities;
             const double area;
 
-        double f(const std::vector<double>& x) const;
+        double f(const std::vector<double>& x, void* tempStorage) const;
 };
 
 class BivariateStudentFit : public Optimization
@@ -41,7 +41,7 @@ class BivariateStudentFit : public Optimization
             const std::vector<double>& values;
             double fixedNu;
 
-        double f(const std::vector<double>& x) const;
+        double f(const std::vector<double>& x, void* tempStorage) const;
 };
 
 class GaussStudentFit : public Optimization
@@ -53,7 +53,7 @@ class GaussStudentFit : public Optimization
             const std::vector<double>& values;
             double fixedNu;
 
-        double f(const std::vector<double>& x) const;
+        double f(const std::vector<double>& x, void* tempStorage) const;
 };
 
 class DoubleStudentFit : public Optimization
@@ -74,7 +74,7 @@ class DoubleStudentFit : public Optimization
             double myNu0, myNuS, area;
             bool fixedNu0, fixedNuS, relTheta;
 
-        double f(const std::vector<double>& x) const;
+        double f(const std::vector<double>& x, void* tempStorage) const;
 };
 
 class DoubleGaussFit : public Optimization
@@ -92,7 +92,7 @@ class DoubleGaussFit : public Optimization
             double area;
             bool centered;
 
-        double f(const std::vector<double>& x) const;
+        double f(const std::vector<double>& x, void* tempStorage) const;
 };
 
 class MultiStudentFit : public Optimization
@@ -109,7 +109,7 @@ class MultiStudentFit : public Optimization
             int minPN, maxPN;
             double area;
 
-        double f(const std::vector<double>& x) const;
+        double f(const std::vector<double>& x, void* tempStorage) const;
 };
 
 
@@ -125,7 +125,7 @@ class CollectiveGaussStudentFit : public Optimization
             double fixedNu;
             double mGauss, f0Gauss, betaStudent;
 
-        double f(const std::vector<double>& x) const;
+        double f(const std::vector<double>& x, void* tempStorage) const;
 };
 
 class CorruptedBivariateStudentFit : public Optimization
@@ -138,7 +138,7 @@ class CorruptedBivariateStudentFit : public Optimization
             const double area;
             const double fixedNu;
 
-        double f(const std::vector<double>& x) const;
+        double f(const std::vector<double>& x, void* tempStorage) const;
 };
 
 class DistributionHelper

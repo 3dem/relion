@@ -66,44 +66,42 @@ GpMotionFit::GpMotionFit(
     }
 }
 
+
 double GpMotionFit::f(const std::vector<double> &x) const
 {
     std::vector<std::vector<d2Vector>> pos(pc, std::vector<d2Vector>(fc));
+
     paramsToPos(x, pos);
 
-    double e_tot = 0.0;
+    const int pad = 512;
+    std::vector<double> e_t(pad*threads, 0.0);
 
     #pragma omp parallel for num_threads(threads)
     for (int p = 0; p < pc; p++)
     {
-        double e = 0.0;
+        int t = omp_get_thread_num();
 
         for (int f = 0; f < fc; f++)
         {
-            e -= Interpolation::cubicXY(correlation[p][f],
-                    pos[p][f].x + perFrameOffsets[f].x,
-                    pos[p][f].y + perFrameOffsets[f].y, 0, 0, true);
+            e_t[pad*t] -= Interpolation::cubicXY(
+                correlation[p][f],
+                pos[p][f].x + perFrameOffsets[f].x,
+                pos[p][f].y + perFrameOffsets[f].y, 0, 0, true);
         }
-
-        #pragma omp atomic
-        e_tot += e;
     }
 
     #pragma omp parallel for num_threads(threads)
     for (int f = 0; f < fc-1; f++)
     {
-        double e = 0.0;
+        int t = omp_get_thread_num();
 
         for (int d = 0; d < dc; d++)
         {
             const double cx = x[2*(pc + dc*f + d)    ];
             const double cy = x[2*(pc + dc*f + d) + 1];
 
-            e += cx*cx + cy*cy;
+            e_t[pad*t] += cx*cx + cy*cy;
         }
-
-        #pragma omp atomic
-        e_tot += e;
     }
 
     if (sig_acc_px > 0.0)
@@ -111,7 +109,7 @@ double GpMotionFit::f(const std::vector<double> &x) const
         #pragma omp parallel for num_threads(threads)
         for (int f = 0; f < fc-2; f++)
         {
-            double e = 0.0;
+            int t = omp_get_thread_num();
 
             for (int d = 0; d < dc; d++)
             {
@@ -123,12 +121,88 @@ double GpMotionFit::f(const std::vector<double> &x) const
                 const double dcx = cx1 - cx0;
                 const double dcy = cy1 - cy0;
 
-                e += eigenVals[d]*(dcx*dcx + dcy*dcy) / (sig_acc_px*sig_acc_px);
+                e_t[pad*t] += eigenVals[d]*(dcx*dcx + dcy*dcy) / (sig_acc_px*sig_acc_px);
             }
-
-            #pragma omp atomic
-            e_tot += e;
         }
+    }
+
+    double e_tot = 0.0;
+
+    for (int t = 0; t < threads; t++)
+    {
+        e_tot += e_t[pad*t];
+    }
+
+    return e_tot;
+}
+
+double GpMotionFit::f(const std::vector<double> &x, void* tempStorage) const
+{
+    if (tempStorage == 0) return f(x);
+
+    TempStorage* ts = (TempStorage*) tempStorage;
+
+    paramsToPos(x, ts->pos);
+
+    for (int t = 0; t < threads; t++)
+    {
+        ts->e_t[ts->pad*t] = 0.0;
+    }
+
+    #pragma omp parallel for num_threads(threads)
+    for (int p = 0; p < pc; p++)
+    {
+        int t = omp_get_thread_num();
+
+        for (int f = 0; f < fc; f++)
+        {
+            ts->e_t[ts->pad*t] -= Interpolation::cubicXY(correlation[p][f],
+                    ts->pos[p][f].x + perFrameOffsets[f].x,
+                    ts->pos[p][f].y + perFrameOffsets[f].y, 0, 0, true);
+        }
+    }
+
+    #pragma omp parallel for num_threads(threads)
+    for (int f = 0; f < fc-1; f++)
+    {
+        int t = omp_get_thread_num();
+
+        for (int d = 0; d < dc; d++)
+        {
+            const double cx = x[2*(pc + dc*f + d)    ];
+            const double cy = x[2*(pc + dc*f + d) + 1];
+
+            ts->e_t[ts->pad*t] += cx*cx + cy*cy;
+        }
+    }
+
+    if (sig_acc_px > 0.0)
+    {
+        #pragma omp parallel for num_threads(threads)
+        for (int f = 0; f < fc-2; f++)
+        {
+            int t = omp_get_thread_num();
+
+            for (int d = 0; d < dc; d++)
+            {
+                const double cx0 = x[2*(pc + dc*f + d)    ];
+                const double cy0 = x[2*(pc + dc*f + d) + 1];
+                const double cx1 = x[2*(pc + dc*(f+1) + d)    ];
+                const double cy1 = x[2*(pc + dc*(f+1) + d) + 1];
+
+                const double dcx = cx1 - cx0;
+                const double dcy = cy1 - cy0;
+
+                ts->e_t[ts->pad*t] += eigenVals[d]*(dcx*dcx + dcy*dcy) / (sig_acc_px*sig_acc_px);
+            }
+        }
+    }
+
+    double e_tot = 0.0;
+
+    for (int t = 0; t < threads; t++)
+    {
+        e_tot += ts->e_t[ts->pad*t];
     }
 
     return e_tot;
@@ -140,7 +214,8 @@ void GpMotionFit::grad(const std::vector<double> &x,
     std::vector<std::vector<d2Vector>> pos(pc, std::vector<d2Vector>(fc));
     paramsToPos(x, pos);
 
-    std::vector<std::vector<d2Vector>> ccg_pf(pc, std::vector<d2Vector>(fc));
+    int pad = 512;
+    std::vector<std::vector<d2Vector>> ccg_pf(pc, std::vector<d2Vector>(fc + pad));
 
     #pragma omp parallel for num_threads(threads)
     for (int p = 0; p < pc; p++)
@@ -157,12 +232,7 @@ void GpMotionFit::grad(const std::vector<double> &x,
         }
     }
 
-    std::vector<std::vector<double>> gradDestT(threads, std::vector<double>(gradDest.size(), 0.0));
-
-    for (int i = 0; i < gradDest.size(); i++)
-    {
-        gradDest[i] = 0.0;
-    }
+    std::vector<std::vector<double>> gradDestT(threads, std::vector<double>(gradDest.size()+pad, 0.0));
 
     #pragma omp parallel for num_threads(threads)
     for (int p = 0; p < pc; p++)
@@ -170,8 +240,8 @@ void GpMotionFit::grad(const std::vector<double> &x,
     {
         int t = omp_get_thread_num();
 
-        gradDestT[t][2*p  ] += ccg_pf[p][f].x;
-        gradDestT[t][2*p+1] += ccg_pf[p][f].y;
+        gradDestT[t][2*p  ] -= ccg_pf[p][f].x;
+        gradDestT[t][2*p+1] -= ccg_pf[p][f].y;
     }
 
     #pragma omp parallel for num_threads(threads)
@@ -182,10 +252,12 @@ void GpMotionFit::grad(const std::vector<double> &x,
 
         d2Vector g(0.0, 0.0);
 
+        const double bpd = basis(p,d);
+
         for (int f = fc-2; f >= 0; f--)
         {
-            g.x += basis(p,d) * ccg_pf[p][f+1].x;
-            g.y += basis(p,d) * ccg_pf[p][f+1].y;
+            g.x += bpd * ccg_pf[p][f+1].x;
+            g.y += bpd * ccg_pf[p][f+1].y;
 
             gradDestT[t][2*(pc + dc*f + d)  ] -= g.x;
             gradDestT[t][2*(pc + dc*f + d)+1] -= g.y;
@@ -194,7 +266,7 @@ void GpMotionFit::grad(const std::vector<double> &x,
 
     #pragma omp parallel for num_threads(threads)
     for (int f = 0; f < fc-1; f++)
-    for (int d = 0; d < pc; d++)
+    for (int d = 0; d < dc; d++)
     {
         int t = omp_get_thread_num();
 
@@ -229,11 +301,148 @@ void GpMotionFit::grad(const std::vector<double> &x,
         }
     }
 
+    for (int i = 0; i < gradDest.size(); i++)
+    {
+        gradDest[i] = 0.0;
+    }
+
     for (int t = 0; t < threads; t++)
     for (int i = 0; i < gradDest.size(); i++)
     {
         gradDest[i] += gradDestT[t][i];
     }
+}
+
+void GpMotionFit::grad(const std::vector<double> &x,
+                       std::vector<double> &gradDest,
+                       void* tempStorage) const
+{
+    if (tempStorage == 0) return grad(x, gradDest);
+
+    TempStorage* ts = (TempStorage*) tempStorage;
+
+    paramsToPos(x, ts->pos);
+
+    #pragma omp parallel for num_threads(threads)
+    for (int p = 0; p < pc; p++)
+    {
+        for (int f = 0; f < fc; f++)
+        {
+            t2Vector<RFLOAT> vr = Interpolation::cubicXYgrad(
+                correlation[p][f],
+                ts->pos[p][f].x + perFrameOffsets[f].x,
+                ts->pos[p][f].y + perFrameOffsets[f].y,
+                0, 0, true);
+
+            ts->ccg_pf[p][f] = d2Vector(vr.x, vr.y);
+        }
+    }
+
+    #pragma omp parallel for num_threads(threads)
+    for (int t = 0; t < threads; t++)
+    for (int i = 0; i < gradDest.size(); i++)
+    {
+        ts->gradDestT[t][i] = 0.0;
+    }
+
+    #pragma omp parallel for num_threads(threads)
+    for (int p = 0; p < pc; p++)
+    for (int f = 0; f < fc; f++)
+    {
+        int t = omp_get_thread_num();
+
+        ts->gradDestT[t][2*p  ] -= ts->ccg_pf[p][f].x;
+        ts->gradDestT[t][2*p+1] -= ts->ccg_pf[p][f].y;
+    }
+
+    #pragma omp parallel for num_threads(threads)
+    for (int d = 0; d < dc; d++)
+    for (int p = 0; p < pc; p++)
+    {
+        int t = omp_get_thread_num();
+
+        d2Vector g(0.0, 0.0);
+
+        const double bpd = basis(p,d);
+
+        for (int f = fc-2; f >= 0; f--)
+        {
+            g.x += bpd * ts->ccg_pf[p][f+1].x;
+            g.y += bpd * ts->ccg_pf[p][f+1].y;
+
+            ts->gradDestT[t][2*(pc + dc*f + d)  ] -= g.x;
+            ts->gradDestT[t][2*(pc + dc*f + d)+1] -= g.y;
+        }
+    }
+
+    #pragma omp parallel for num_threads(threads)
+    for (int f = 0; f < fc-1; f++)
+    for (int d = 0; d < dc; d++)
+    {
+        int t = omp_get_thread_num();
+
+        ts->gradDestT[t][2*(pc + dc*f + d)  ] += 2.0 * x[2*(pc + dc*f + d)  ];
+        ts->gradDestT[t][2*(pc + dc*f + d)+1] += 2.0 * x[2*(pc + dc*f + d)+1];
+    }
+
+    if (sig_acc_px > 0.0)
+    {
+        const double sa2 = sig_acc_px*sig_acc_px;
+
+        #pragma omp parallel for num_threads(threads)
+        for (int f = 0; f < fc-2; f++)
+        for (int d = 0; d < dc; d++)
+        {
+            int t = omp_get_thread_num();
+
+            const double cx0 = x[2*(pc + dc*f + d)    ];
+            const double cy0 = x[2*(pc + dc*f + d) + 1];
+            const double cx1 = x[2*(pc + dc*(f+1) + d)    ];
+            const double cy1 = x[2*(pc + dc*(f+1) + d) + 1];
+
+            const double dcx = cx1 - cx0;
+            const double dcy = cy1 - cy0;
+
+            //e_tot += eigenVals[d]*(dcx*dcx + dcy*dcy) / (sig_acc_px*sig_acc_px);
+
+            ts->gradDestT[t][2*(pc + dc*f + d)  ] -= 2.0 * eigenVals[d] * dcx / sa2;
+            ts->gradDestT[t][2*(pc + dc*f + d)+1] -= 2.0 * eigenVals[d] * dcy / sa2;
+            ts->gradDestT[t][2*(pc + dc*(f+1) + d)  ] += 2.0 * eigenVals[d] * dcx / sa2;
+            ts->gradDestT[t][2*(pc + dc*(f+1) + d)+1] += 2.0 * eigenVals[d] * dcy / sa2;
+        }
+    }
+
+    for (int i = 0; i < gradDest.size(); i++)
+    {
+        gradDest[i] = 0.0;
+    }
+
+    for (int t = 0; t < threads; t++)
+    for (int i = 0; i < gradDest.size(); i++)
+    {
+        gradDest[i] += ts->gradDestT[t][i];
+    }
+}
+
+void *GpMotionFit::allocateTempStorage() const
+{
+    TempStorage* ts = new TempStorage;
+
+    const int pad = 512;
+    const int parCt = 2*(pc + dc*(fc-1));
+
+    ts->pad = pad;
+    ts->pos = std::vector<std::vector<d2Vector>>(pc, std::vector<d2Vector>(fc + pad));
+    ts->ccg_pf = std::vector<std::vector<d2Vector>>(pc, std::vector<d2Vector>(fc + pad));
+    ts->gradDestT = std::vector<std::vector<double>>(threads, std::vector<double>(parCt + pad, 0.0));
+    ts->e_t = std::vector<double>(pad*threads, 0.0);
+
+    return ts;
+}
+
+void GpMotionFit::deallocateTempStorage(void* ts) const
+{
+    if (ts) delete (TempStorage*) ts;
 }
 
 void GpMotionFit::paramsToPos(
@@ -272,6 +481,8 @@ void GpMotionFit::posToParams(
     const std::vector<std::vector<d2Vector>>& pos,
     std::vector<double>& x) const
 {
+    x.resize(2*(pc + dc*(fc-1)));
+
     for (int p = 0; p < pc; p++)
     {
         x[2*p]   = pos[p][0].x;

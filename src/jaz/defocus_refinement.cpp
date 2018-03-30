@@ -269,7 +269,7 @@ AstigmatismOptimizationAcc::AstigmatismOptimizationAcc(
     }
 }
 
-double AstigmatismOptimizationAcc::f(const std::vector<double> &x) const
+double AstigmatismOptimizationAcc::f(const std::vector<double> &x, void* tempStorage) const
 {
     CTF ctf(ctf0);
 

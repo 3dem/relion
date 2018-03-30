@@ -544,7 +544,7 @@ int main(int argc, char *argv[])
 
                 std::vector<double> grad0(2*fc*pc);
 
-                lmf.grad(initial, grad0);
+                lmf.grad(initial, grad0, 0);
 
                 double gl = 0.0;
 
@@ -643,7 +643,7 @@ int main(int argc, char *argv[])
 
                 std::vector<double> grad0(2*fc*pc);
 
-                lmf.grad(initial, grad0);
+                lmf.grad(initial, grad0, 0);
 
                 double gl = 0.0;
 

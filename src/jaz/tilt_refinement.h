@@ -20,7 +20,7 @@ class TiltOptimization : public Optimization
                 bool L1 = false,
                 bool anisotropic = false);
 
-        double f(const std::vector<double>& x) const;
+        double f(const std::vector<double>& x, void* tempStorage) const;
 
     private:
 

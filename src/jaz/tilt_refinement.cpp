@@ -326,7 +326,7 @@ TiltOptimization::TiltOptimization(const Image<Complex> &xy,
 {
 }
 
-double TiltOptimization::f(const std::vector<double> &x) const
+double TiltOptimization::f(const std::vector<double> &x, void* tempStorage) const
 {
     double out = 0.0;
 

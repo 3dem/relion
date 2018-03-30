@@ -17,7 +17,7 @@ class BFactorFit : public Optimization
             int frame, int cutoff,
             double Bscale, double Cscale);
 
-        double f(const std::vector<double>& x) const;
+        double f(const std::vector<double>& x, void* tempStorage) const;
 
     private:
 

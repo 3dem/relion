@@ -80,15 +80,18 @@ Image<Complex> ObservationModel::predictObservation(
             mdt.getValue(EMDL_IMAGE_BEAMTILT_Y, ty, particle);
         }
 
-        if (anisoTilt)
+        if (tx != 0.0 && ty != 0.0)
         {
-            selfApplyBeamTilt(pred.data, -tx, -ty,
-                              beamtilt_xx, beamtilt_xy, beamtilt_yy,
-                              lambda, Cs, angpix, s);
-        }
-        else
-        {
-            selfApplyBeamTilt(pred.data, -tx, -ty, lambda, Cs, angpix, s);
+            if (anisoTilt)
+            {
+                selfApplyBeamTilt(pred.data, -tx, -ty,
+                                  beamtilt_xx, beamtilt_xy, beamtilt_yy,
+                                  lambda, Cs, angpix, s);
+            }
+            else
+            {
+                selfApplyBeamTilt(pred.data, -tx, -ty, lambda, Cs, angpix, s);
+            }
         }
     }
 

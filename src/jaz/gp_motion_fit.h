@@ -19,13 +19,30 @@ class GpMotionFit : public DifferentiableOptimization
                 int threads, bool expKer);
 
         double f(const std::vector<double>& x) const;
+        double f(const std::vector<double>& x, void* tempStorage) const;
+
         void grad(const std::vector<double>& x, std::vector<double>& gradDest) const;
+        void grad(const std::vector<double>& x, std::vector<double>& gradDest, void* tempStorage) const;
+
+        void* allocateTempStorage() const;
+        void deallocateTempStorage(void* ts) const;
 
         void paramsToPos(const std::vector<double>& x,
                          std::vector<std::vector<gravis::d2Vector>>& pos) const;
 
         void posToParams(const std::vector<std::vector<gravis::d2Vector>>& pos,
                          std::vector<double>& x) const;
+
+        class TempStorage
+        {
+            public:
+
+                int pad;
+
+                std::vector<std::vector<gravis::d2Vector>> pos, ccg_pf;
+                std::vector<std::vector<double>> gradDestT;
+                std::vector<double> e_t;
+        };
 
     private:
 

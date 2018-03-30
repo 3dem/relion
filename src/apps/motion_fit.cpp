@@ -44,6 +44,17 @@
 
 using namespace gravis;
 
+#define TIMING 1
+
+#ifdef TIMING
+    #define RCTIC(timer,label) (timer.tic(label))
+    #define RCTOC(timer,label) (timer.toc(label))
+#else
+    #define RCTIC(timer,label)
+    #define RCTOC(timer,label)
+#endif
+
+
 class MotionFitProg : public RefinementProgram
 {
     public:
@@ -63,6 +74,11 @@ class MotionFitProg : public RefinementProgram
                 param_rV, param_rD, param_rA;
 
             AlignmentSet alignmentSet;
+
+            #ifdef TIMING
+                Timer motionTimer;
+                int timeInit, timeSetup0, timeSetup1, timeOpt, timeEval;
+            #endif
 
         int readMoreOptions(IOParser& parser, int argc, char *argv[]);
         int _init();
@@ -181,10 +197,10 @@ int MotionFitProg::readMoreOptions(IOParser& parser, int argc, char *argv[])
     global_init = parser.checkOption("--gi", "Initialize with global trajectories instead of loading them from metadata file");
 
     expKer = parser.checkOption("--exp_k", "Use exponential kernel instead of sq. exponential");
-    maxEDs = textToInteger(parser.getOption("--max_ed", "Maximum number of eigendeformations", "100"));
+    maxEDs = textToInteger(parser.getOption("--max_ed", "Maximum number of eigendeformations", "-1"));
 
     k_cutoff = textToFloat(parser.getOption("--k_cut", "Freq. cutoff (in pixels)", "-1.0"));
-    maxIters = textToInteger(parser.getOption("--max_iters", "Maximum number of iterations", "10000"));
+    maxIters = textToInteger(parser.getOption("--max_iters", "Maximum number of iterations", "1000"));
     maxStep = textToFloat(parser.getOption("--max_step", "Maximum step size", "0.05"));
 
     unregGlob = parser.checkOption("--unreg_glob", "Do not regularize global component of motion");
@@ -233,6 +249,14 @@ int MotionFitProg::_init()
 
 int MotionFitProg::_run()
 {
+    #ifdef TIMING
+        timeInit = motionTimer.setNew(" time_Init ");
+        timeSetup0 = motionTimer.setNew(" time_Setup0 ");
+        timeSetup1 = motionTimer.setNew(" time_Setup1 ");
+        timeOpt = motionTimer.setNew(" time_Opt ");
+        timeEval = motionTimer.setNew(" time_Eval ");
+    #endif
+
     std::vector<ParFourierTransformer> fts(nr_omp_threads);
 
     loadInitialMovieValues();
@@ -305,13 +329,21 @@ int MotionFitProg::_run()
 
     double t1 = omp_get_wtime();
     double diff = t1 - t0;
-    std::cout << "elapsed (total): " << diff << " sec\n";
+    std::cout << "elapsed (total): " << diff << " sec\n\n";
+
+    #ifdef TIMING
+        motionTimer.printTimes(true);
+    #endif
+
+    std::cout << "\n";
 
     return 0;
 }
 
 void MotionFitProg::prepAlignment(int k_out, const std::vector<Image<RFLOAT>>& dmgWeight)
 {
+    RCTIC(motionTimer,timeInit);
+
     std::cout << "preparing alignment data...\n";
 
     std::vector<ParFourierTransformer> fts(nr_omp_threads);
@@ -374,8 +406,8 @@ void MotionFitProg::prepAlignment(int k_out, const std::vector<Image<RFLOAT>>& d
                     CCfloat(y,x) = movieCC[p][f](y,x);
                 }
 
-                //alignmentSet.CCs[g][p][f] = movieCC[p][f];
-                alignmentSet.CCs[g][p][f] = CCfloat;
+                alignmentSet.CCs[g][p][f] = movieCC[p][f];
+                //alignmentSet.CCs[g][p][f] = CCfloat;
                 alignmentSet.obs[g][p][f] = alignmentSet.accelerate(movie[p][f]);
 
                 Image<Complex> pred;
@@ -398,6 +430,8 @@ void MotionFitProg::prepAlignment(int k_out, const std::vector<Image<RFLOAT>>& d
     }
 
     std::cout << "done\n";
+
+    RCTOC(motionTimer,timeInit);
 }
 
 void MotionFitProg::prepMicrograph(
@@ -638,7 +672,7 @@ d2Vector MotionFitProg::estimateTwoParams(
     bool centerBest = false;
     int iters = 0;
 
-    d3Vector bestParams = all_sig_vals[13];
+    d3Vector bestParams = all_sig_vals[4];
 
     while (!centerBest && iters < maxIters)
     {
@@ -991,7 +1025,9 @@ void MotionFitProg::evaluateParams(
         int k_out,
         const std::vector<d3Vector>& sig_vals,
         std::vector<double>& TSCs)
-{
+{    
+    RCTIC(motionTimer,timeSetup0);
+
     const int paramCount = sig_vals.size();
     TSCs.resize(paramCount);
 
@@ -1028,6 +1064,8 @@ void MotionFitProg::evaluateParams(
             }
         }
     }
+
+    RCTOC(motionTimer,timeSetup0);
 
     for (long g = g0; g <= gc; g++)
     {
@@ -1070,7 +1108,9 @@ void MotionFitProg::evaluateParams(
 
             if (useAlignmentSet)
             {
-                std::vector<std::vector<Image<RFLOAT>>> CCs(pc, std::vector<Image<RFLOAT>>(fc));
+                RCTIC(motionTimer,timeSetup1);
+
+                /*std::vector<std::vector<Image<RFLOAT>>> CCs(pc, std::vector<Image<RFLOAT>>(fc));
 
                 #pragma omp parallel for num_threads(nr_omp_threads)
                 for (int p = 0; p < pc; p++)
@@ -1086,24 +1126,33 @@ void MotionFitProg::evaluateParams(
                     {
                         CCs[p][f](y,x) = alignmentSet.CCs[g][p][f](y,x);
                     }
-                }
+                }*/
+
+                RCTOC(motionTimer,timeSetup1);
 
                 std::vector<std::vector<gravis::d2Vector>> tracks = optimize(
-                        //alignmentSet.CCs[g],
-                        CCs,
+                        alignmentSet.CCs[g],
+                        //CCs,
                         alignmentSet.initialTracks[g],
                         sig_v_vals_nrm[i], sig_a_vals_nrm[i], sig_d_vals_nrm[i],
                         alignmentSet.positions[g], alignmentSet.globComp[g],
                         maxStep, 1e-9, 1e-9, maxIters, 0.0);
 
-                tscsAs[i] += alignmentSet.updateTsc(tracks, g);
+                RCTIC(motionTimer,timeEval);
+
+                tscsAs[i] += alignmentSet.updateTsc(tracks, g, nr_omp_threads);
             }
             else
             {
+                RCTIC(motionTimer,timeSetup1);
+                RCTOC(motionTimer,timeSetup1);
+
                 std::vector<std::vector<gravis::d2Vector>> tracks = optimize(
                         movieCC, initialTracks,
                         sig_v_vals_nrm[i], sig_a_vals_nrm[i], sig_d_vals_nrm[i],
                         positions, globComp, maxStep, 1e-9, 1e-9, maxIters, 0.0);
+
+                RCTIC(motionTimer,timeEval);
 
                 updateFCC(movie, tracks, mdts[g], paramTables[i], paramWeights0[i], paramWeights1[i]);
             }
@@ -1131,6 +1180,9 @@ void MotionFitProg::evaluateParams(
                 paramTables[i], paramWeights0[i], paramWeights1[i], k_cutoff+2, k_out);
         }
     }
+
+
+    RCTOC(motionTimer,timeEval);
 }
 
 std::vector<std::vector<d2Vector>> MotionFitProg::optimize(
@@ -1162,6 +1214,9 @@ std::vector<std::vector<d2Vector>> MotionFitProg::optimize(
 
     const int fc = inTracks[0].size();
 
+
+    RCTIC(motionTimer,timeOpt);
+
     GpMotionFit gpmf(movieCC, sig_vel_px, sig_div_px, sig_acc_px,
                      maxEDs, positions,
                      globComp, nr_omp_threads, expKer);
@@ -1171,11 +1226,14 @@ std::vector<std::vector<d2Vector>> MotionFitProg::optimize(
 
     gpmf.posToParams(inTracks, initialCoeffs);
 
-    std::vector<double> optPos = GradientDescent::optimize(
+    std::vector<double> optCoeffs = GradientDescent::optimize(
             initialCoeffs, gpmf, step, minStep, minDiff, maxIters, inertia, debugOpt);
 
+
     std::vector<std::vector<d2Vector>> out(pc, std::vector<d2Vector>(fc));
-    gpmf.paramsToPos(optPos, out);
+    gpmf.paramsToPos(optCoeffs, out);
+
+    RCTOC(motionTimer,timeOpt);
 
     return out;
 }
