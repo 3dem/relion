@@ -753,7 +753,6 @@ d2Vector MotionFitProg::estimateTwoParams(
         {
             std::cout << "optimum: " << all_sig_vals[bestIndex] << " ";
             std::cout << "(" << all_TSCs[bestIndex] << ")\n";
-            std::cout << "grid_0: [" << shift_v << ", " << shift_d << "]\n";
         }
 
         if (shift_v < 0 && all_sig_vals[3][0] <= 0.0)
@@ -766,11 +765,6 @@ d2Vector MotionFitProg::estimateTwoParams(
             shift_d = 0;
         }
 
-        if (verbose)
-        {
-            std::cout << "grid_1: [" << shift_v << ", " << shift_d << "]\n";
-        }
-
         if (shift_v == 0 && shift_d == 0)
         {
             if (recDepth <= 0)
@@ -781,7 +775,7 @@ d2Vector MotionFitProg::estimateTwoParams(
             {
                 std::cout << "\nrepeating at half scan range.\n\n";
 
-                estimateTwoParams(
+                return estimateTwoParams(
                     fts, dmgWeight, k_out,
                     all_sig_vals[bestIndex][0], all_sig_vals[bestIndex][1],
                     sig_v_step/2.0, sig_d_step/2.0,
@@ -893,7 +887,7 @@ d3Vector MotionFitProg::estimateThreeParams(
     {
         if (verbose)
         {
-            std::cout << "evaluating:\n";
+            std::cout << "\nevaluating:\n";
 
             for (int k = 0; k < 3; k++)
             {
@@ -922,7 +916,7 @@ d3Vector MotionFitProg::estimateThreeParams(
 
         if (verbose)
         {
-            std::cout << "result:\n";
+            std::cout << "\nresult:\n";
 
             for (int k = 0; k < 3; k++)
             {
@@ -960,6 +954,12 @@ d3Vector MotionFitProg::estimateThreeParams(
         int shift_d = ((bestIndex / 3)%3) - 1;
         int shift_a = bestIndex / 9 - 1;
 
+        if (verbose)
+        {
+            std::cout << "optimum: " << all_sig_vals[bestIndex] << " ";
+            std::cout << "(" << all_TSCs[bestIndex] << ")\n";
+        }
+
         if (shift_v < 0 && all_sig_vals[12][0] <= 0.0)
         {
             shift_v = 0;
@@ -983,10 +983,9 @@ d3Vector MotionFitProg::estimateThreeParams(
             }
             else
             {
-                std::cout << "current optimum: " << all_sig_vals[bestIndex] << "\n";
-                std::cout << "repeating at half scan range.\n";
+                std::cout << "\nrepeating at half scan range.\n\n";
 
-                estimateThreeParams(
+                return estimateThreeParams(
                     fts, dmgWeight, k_out,
                     all_sig_vals[bestIndex][0], all_sig_vals[bestIndex][1], all_sig_vals[bestIndex][2],
                     sig_v_step/2.0, sig_d_step/2.0, sig_a_step/2.0,

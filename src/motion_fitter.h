@@ -36,7 +36,19 @@
 #include <omp.h>
 
 //using namespace gravis;
-// Never use 'using' in headers! --JZ
+
+/*
+   Do not use 'using' in headers!
+
+   Headers are contagious (they include each other).
+   This can lead to unexpected symbols from another namespace
+   overwriting the expected symbols.
+   Names in namespaces are chosen without regard for collisions.
+
+   harmless example: abs (returns ints) vs. std::abs (returns doubles)
+
+    --JZ
+*/
 
 
 class MotionFitter
