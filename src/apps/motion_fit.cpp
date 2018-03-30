@@ -79,7 +79,7 @@ class MotionFitProg : public RefinementProgram
 
             #ifdef TIMING
                 Timer motionTimer;
-                int timeInit, timeSetup0, timeSetup1, timeOpt, timeEval;
+                int timeInit, timeSetup, timeOpt, timeEval;
             #endif
 
         int readMoreOptions(IOParser& parser, int argc, char *argv[]);
@@ -88,6 +88,7 @@ class MotionFitProg : public RefinementProgram
 
         void prepAlignment(
                 int k_out,
+                const std::vector<Image<RFLOAT>>& dmgWeight0,
                 const std::vector<Image<RFLOAT>>& dmgWeight);
 
         void prepMicrograph(
@@ -250,8 +251,7 @@ int MotionFitProg::_run()
 {
     #ifdef TIMING
         timeInit = motionTimer.setNew(" time_Init ");
-        timeSetup0 = motionTimer.setNew(" time_Setup0 ");
-        timeSetup1 = motionTimer.setNew(" time_Setup1 ");
+        timeSetup = motionTimer.setNew(" time_Setup0 ");
         timeOpt = motionTimer.setNew(" time_Opt ");
         timeEval = motionTimer.setNew(" time_Eval ");
     #endif
@@ -260,7 +260,7 @@ int MotionFitProg::_run()
 
     loadInitialMovieValues();
 
-    std::vector<Image<RFLOAT>> dmgWeight = DamageHelper::damageWeights(
+    std::vector<Image<RFLOAT>> dmgWeight0 = DamageHelper::damageWeights(
         s, angpix, firstFrame, fc, dosePerFrame, dmga, dmgb, dmgc);
 
     int k_out = sh;
@@ -275,6 +275,8 @@ int MotionFitProg::_run()
     }
 
     std::cout << "max freq. = " << k_out << " px\n";
+
+    std::vector<Image<RFLOAT>> dmgWeight = dmgWeight0;
 
     for (int f = 0; f < fc; f++)
     {
@@ -293,7 +295,7 @@ int MotionFitProg::_run()
 
     if (useAlignmentSet && (paramEstim2 || paramEstim3))
     {
-        prepAlignment(k_out, dmgWeight);
+        prepAlignment(k_out, dmgWeight0, dmgWeight);
     }
 
     double t0 = omp_get_wtime();
@@ -339,7 +341,10 @@ int MotionFitProg::_run()
     return 0;
 }
 
-void MotionFitProg::prepAlignment(int k_out, const std::vector<Image<RFLOAT>>& dmgWeight)
+void MotionFitProg::prepAlignment(
+        int k_out,
+        const std::vector<Image<RFLOAT>>& dmgWeight0,
+        const std::vector<Image<RFLOAT>>& dmgWeight)
 {
     RCTIC(motionTimer,timeInit);
 
@@ -355,6 +360,11 @@ void MotionFitProg::prepAlignment(int k_out, const std::vector<Image<RFLOAT>>& d
     }
 
     alignmentSet = AlignmentSet(mdtsAct, fc, s, k_cutoff+2, k_out);
+
+    for (int f = 0; f < fc; f++)
+    {
+        alignmentSet.damage[f] = alignmentSet.accelerate(dmgWeight0[f]);
+    }
 
     int pctot = 0;
 
@@ -1052,7 +1062,7 @@ void MotionFitProg::evaluateParams(
         const std::vector<d3Vector>& sig_vals,
         std::vector<double>& TSCs)
 {    
-    RCTIC(motionTimer,timeSetup0);
+    RCTIC(motionTimer, timeSetup);
 
     const int paramCount = sig_vals.size();
     TSCs.resize(paramCount);
@@ -1091,7 +1101,7 @@ void MotionFitProg::evaluateParams(
         }
     }
 
-    RCTOC(motionTimer,timeSetup0);
+    RCTOC(motionTimer, timeSetup);
 
     for (long g = g0; g <= gc; g++)
     {
@@ -1134,31 +1144,8 @@ void MotionFitProg::evaluateParams(
 
             if (useAlignmentSet)
             {
-                RCTIC(motionTimer,timeSetup1);
-
-                /*std::vector<std::vector<Image<RFLOAT>>> CCs(pc, std::vector<Image<RFLOAT>>(fc));
-
-                #pragma omp parallel for num_threads(nr_omp_threads)
-                for (int p = 0; p < pc; p++)
-                for (int f = 0; f < fc; f++)
-                {
-                    const int w = alignmentSet.CCs[g][p][f].data.xdim;
-                    const int h = alignmentSet.CCs[g][p][f].data.ydim;
-
-                    CCs[p][f] = Image<RFLOAT>(w,h);
-
-                    for (int y = 0; y < h; y++)
-                    for (int x = 0; x < w; x++)
-                    {
-                        CCs[p][f](y,x) = alignmentSet.CCs[g][p][f](y,x);
-                    }
-                }*/
-
-                RCTOC(motionTimer,timeSetup1);
-
                 std::vector<std::vector<gravis::d2Vector>> tracks = optimize(
                         alignmentSet.CCs[g],
-                        //CCs,
                         alignmentSet.initialTracks[g],
                         sig_v_vals_nrm[i], sig_a_vals_nrm[i], sig_d_vals_nrm[i],
                         alignmentSet.positions[g], alignmentSet.globComp[g],
@@ -1170,9 +1157,6 @@ void MotionFitProg::evaluateParams(
             }
             else
             {
-                RCTIC(motionTimer,timeSetup1);
-                RCTOC(motionTimer,timeSetup1);
-
                 std::vector<std::vector<gravis::d2Vector>> tracks = optimize(
                         movieCC, initialTracks,
                         sig_v_vals_nrm[i], sig_a_vals_nrm[i], sig_d_vals_nrm[i],

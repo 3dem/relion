@@ -23,6 +23,7 @@ AlignmentSet::AlignmentSet(
     CCs.resize(mc);
     obs.resize(mc);
     pred.resize(mc);
+    damage.resize(fc);
 
     positions.resize(mc);
     initialTracks.resize(mc);
@@ -74,6 +75,19 @@ std::vector<d2Vector> AlignmentSet::accelerate(const Image<Complex> &img)
     return out;
 }
 
+std::vector<double> AlignmentSet::accelerate(const Image<RFLOAT> &img)
+{
+    std::vector<double> out(accPix);
+
+    for (int i = 0; i < accPix; i++)
+    {
+        t2Vector<int> c = accCoords[i];
+        out[i] = img(c.y, c.x);
+    }
+
+    return out;
+}
+
 d3Vector AlignmentSet::updateTsc(
     const std::vector<std::vector<d2Vector>>& tracks,
     int mg, int threads)
@@ -116,12 +130,13 @@ d3Vector AlignmentSet::updateTsc(
             const Complex z_obs = Complex(ac - bd, ab_cd - ac - bd);
 
             const d2Vector z_pred_f2 = pred[mg][p][i];
-
             const Complex z_pred = Complex(z_pred_f2.x, z_pred_f2.y);
 
-            outT[pad*t][0] += z_pred.real * z_obs.real + z_pred.imag * z_obs.imag;
-            outT[pad*t][1] += z_obs.norm();
-            outT[pad*t][2] += z_pred.norm();
+            const double dmg = damage[f][i];
+
+            outT[pad*t][0] += dmg * (z_pred.real * z_obs.real + z_pred.imag * z_obs.imag);
+            outT[pad*t][1] += dmg * z_obs.norm();
+            outT[pad*t][2] += dmg * z_pred.norm();
         }
     }
 
