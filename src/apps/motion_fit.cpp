@@ -752,7 +752,7 @@ d2Vector MotionFitProg::estimateTwoParams(
         if (verbose)
         {
             std::cout << "optimum: " << all_sig_vals[bestIndex] << " ";
-            std::cout << "(" << all_sig_vals[bestIndex] << ")\n";
+            std::cout << "(" << all_TSCs[bestIndex] << ")\n";
             std::cout << "grid_0: [" << shift_v << ", " << shift_d << "]\n";
         }
 
