@@ -121,10 +121,10 @@ class DamageHelper
                 double k, int kc, RFLOAT angpix, RFLOAT dose,
                 RFLOAT a, RFLOAT b, RFLOAT c);
 
-        static std::vector<double> fitBFactors(const Image<RFLOAT>& fcc, int k0, int k1);
+        static std::vector<double> fitBFactors(const Image<RFLOAT>& fcc, int k0, int k1, int verb = 0);
 
         static std::pair<std::vector<gravis::d2Vector>,std::vector<double>>
-            fitBkFactors(const Image<RFLOAT>& fcc, int k0, int k1);
+            fitBkFactors(const Image<RFLOAT>& fcc, int k0, int k1, int verb = 0);
 
         static std::vector<gravis::d2Vector>
             fitBkFactors(const Image<RFLOAT>& fcc,

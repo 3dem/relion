@@ -95,6 +95,12 @@ public:
     std::vector<Image<RFLOAT>> dmgWeight;
     Micrograph micrograph;
 
+    // For recombining frames
+    bool doCombineFrames, hasBfacs, bfac_debug;
+    int k0, k1;
+    double k0a, k1a;
+    std::string trackFn, bfacFn;
+
     // data:
     Image<RFLOAT> maps[2];
     Image<RFLOAT> powSpec[2];
@@ -119,17 +125,27 @@ public:
 	// Print usage instructions
 	void usage();
 
-	// Initialise some stuff after reading
+	// Initialise some general stuff after reading
 	void initialise();
+
+	// Re-initialise vector mdts to allow only_do_unfinished for combine_frames
+	void initialiseCombineFrames();
 
 	// General Running
 	void run();
 
-	// Fit CTF parameters for all particles on a subset of the micrographs micrograph
+	// Fit CTF parameters for all particles on a subset of the micrographs
 	void processSubsetMicrographs(long g_start, long g_end);
 
+	// Combine frames on a subset of the micrographa
+	void combineFramesSubsetMicrographs(long g_start, long g_end);
+
 	// combine all EPS files into one logfile.pdf
-	void combineEPSfiles();
+	void combineEPSAndSTARfiles();
+
+	// For original particle-polishing-like Bfactors
+	void calculateSingleFrameReconstruction(int iframe);
+
 
 	// Helper functions
 private:
@@ -140,7 +156,7 @@ private:
     std::string getMicrographTag(long g);
 
     std::vector<std::vector<Image<Complex>>> loadMovie(
-	        long g, int pc, std::vector<ParFourierTransformer>& fts);
+	        long g, int pc, std::vector<ParFourierTransformer>& fts, int only_this_frame = -1);
 
 	void prepMicrograph(
 	        long g, std::vector<ParFourierTransformer>& fts,
@@ -177,6 +193,10 @@ private:
             std::string outPath, long g,
             double visScale);
 
+    // recombine_frames
+    std::vector<Image<RFLOAT>> weightsFromFCC();
+
+    std::vector<Image<RFLOAT>> weightsFromBfacs();
 
 
 
