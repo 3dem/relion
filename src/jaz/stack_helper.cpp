@@ -3,7 +3,7 @@
 #include <src/projector.h>
 #include <src/jaz/filter_helper.h>
 #include <src/jaz/Fourier_helper.h>
-#include <src/jaz/nelder_mead.h>
+#include <src/jaz/optimization/nelder_mead.h>
 #include <src/jaz/gravis/t4Matrix.h>
 #include <src/jaz/image_log.h>
 #include <src/fftw.h>

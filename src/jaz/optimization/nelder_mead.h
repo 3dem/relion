@@ -2,7 +2,7 @@
 #define NELDER_MEAD_H
 
 #include <vector>
-#include <src/jaz/optimization.h>
+#include "optimization.h"
 
 class NelderMead
 {

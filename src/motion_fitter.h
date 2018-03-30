@@ -39,7 +39,7 @@
 #include <src/jaz/damage_helper.h>
 #include <src/jaz/fsc_helper.h>
 #include <src/jaz/gp_motion_fit.h>
-#include <src/jaz/gradient_descent.h>
+#include <src/jaz/optimization/gradient_descent.h>
 #include <src/jaz/motion_refinement.h>
 #include <src/jaz/image_op.h>
 #include <src/jaz/parallel_ft.h>

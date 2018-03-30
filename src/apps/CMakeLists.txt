@@ -28,8 +28,12 @@ endforeach()
 
 file(GLOB REL_JAZ_SRC "${CMAKE_SOURCE_DIR}/src/jaz/*.cpp")
 file(GLOB REL_JAZ_SRC_H "${CMAKE_SOURCE_DIR}/src/jaz/*.h")
+file(GLOB REL_JAZ_OPT_SRC "${CMAKE_SOURCE_DIR}/src/jaz/optimization/*.cpp")
+file(GLOB REL_JAZ_OPT_SRC_H "${CMAKE_SOURCE_DIR}/src/jaz/optimization/*.h")
 file(GLOB REL_D3x3_SRC "${CMAKE_SOURCE_DIR}/src/jaz/d3x3/*.c")
 file(GLOB REL_D3x3_SRC_H "${CMAKE_SOURCE_DIR}/src/jaz/d3x3/*.h")
+file(GLOB REL_LBFGS_SRC "${CMAKE_SOURCE_DIR}/src/jaz/lbfgs/*.c")
+file(GLOB REL_LBFGS_SRC_H "${CMAKE_SOURCE_DIR}/src/jaz/lbfgs/*.h")
 
 file(GLOB REL_HP "${CMAKE_SOURCE_DIR}/src/Healpix_2.15a/*.cc")
 file(GLOB RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/*.cpp")
@@ -47,14 +51,26 @@ endif(NOT GUI)
 # relion_lib only contains non-X11 parts
 # relion_gui_lib is where the X11 code is placed
 if(BUILD_SHARED_LIBS)
-	add_library(relion_lib SHARED ${REL_SRC} ${REL_SRC_H} ${REL_HP} ${REL_JAZ_SRC} ${REL_JAZ_H} ${REL_D3x3_SRC} ${REL_D3x3_H})
+	add_library(relion_lib SHARED
+		${REL_SRC} ${REL_SRC_H} ${REL_HP}
+		${REL_JAZ_SRC} ${REL_JAZ_H}
+		${REL_JAZ_OPT_SRC} ${REL_JAZ_OPT_H}
+		${REL_D3x3_SRC} ${REL_D3x3_H}
+		${REL_LBFGS_SRC} ${REL_LBFGS_H})
+
 	install(TARGETS relion_lib LIBRARY DESTINATION lib)
 	if(GUI)
 		add_library(relion_gui_lib SHARED ${REL_GUI_SRC} ${REL_SRC_H} ${REL_HP})
 		install(TARGETS relion_gui_lib LIBRARY DESTINATION lib)
 	endif(GUI)
 else()
-	add_library(relion_lib STATIC ${REL_SRC} ${REL_SRC_H} ${REL_HP} ${REL_JAZ_SRC} ${REL_JAZ_H} ${REL_D3x3_SRC} ${REL_D3x3_H})
+	add_library(relion_lib STATIC
+		${REL_SRC} ${REL_SRC_H} ${REL_HP}
+		${REL_JAZ_SRC} ${REL_JAZ_H}
+		${REL_JAZ_OPT_SRC} ${REL_JAZ_OPT_H}
+		${REL_D3x3_SRC} ${REL_D3x3_H}
+		${REL_LBFGS_SRC} ${REL_LBFGS_H})
+
 	if(GUI)
 		add_library(relion_gui_lib STATIC ${REL_GUI_SRC} ${REL_SRC_H} ${REL_HP})
 	endif(GUI)

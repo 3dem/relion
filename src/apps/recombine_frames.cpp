@@ -36,7 +36,7 @@
 #include <src/jaz/convolution_helper.h>
 #include <src/jaz/motion_em.h>
 #include <src/jaz/local_motion_fit.h>
-#include <src/jaz/gradient_descent.h>
+#include <src/jaz/optimization/gradient_descent.h>
 #include <src/jaz/refinement_program.h>
 #include <src/jaz/parallel_ft.h>
 

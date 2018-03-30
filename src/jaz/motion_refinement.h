@@ -6,7 +6,7 @@
 #include <src/metadata_table.h>
 #include <src/projector.h>
 #include <src/complex.h>
-#include <src/jaz/optimization.h>
+#include <src/jaz/optimization/optimization.h>
 #include <src/jaz/volume.h>
 #include <src/jaz/gravis/t2Matrix.h>
 #include <src/jaz/gravis/t3Vector.h>

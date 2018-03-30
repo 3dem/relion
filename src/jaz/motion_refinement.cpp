@@ -3,9 +3,9 @@
 #include <src/jaz/image_op.h>
 #include <src/jaz/image_log.h>
 #include <src/jaz/interpolation.h>
-#include <src/jaz/nelder_mead.h>
+#include <src/jaz/optimization/nelder_mead.h>
 #include <src/jaz/Fourier_helper.h>
-#include <src/jaz/gradient_descent.h>
+#include <src/jaz/optimization/gradient_descent.h>
 #include <omp.h>
 
 using namespace gravis;

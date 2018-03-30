@@ -20,11 +20,12 @@ class DifferentiableOptimization : public Optimization
     virtual void grad(const std::vector<double>& x, std::vector<double>& gradDest, void* tempStorage) const = 0;
 };
 
-class RosenbrockBanana : public Optimization
+class RosenbrockBanana : public DifferentiableOptimization
 {
     public:
 
     double f(const std::vector<double>& x, void* tempStorage) const;
+    void grad(const std::vector<double>& x, std::vector<double>& gradDest, void* tempStorage) const;
 };
 
 #endif

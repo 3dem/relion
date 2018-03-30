@@ -2,7 +2,7 @@
 #define LOCAL_MOTION_FIT
 
 #include <src/image.h>
-#include <src/jaz/optimization.h>
+#include <src/jaz/optimization/optimization.h>
 #include <src/jaz/gravis/t2Vector.h>
 #include <vector>
 

@@ -1,4 +1,4 @@
-#include <src/jaz/nelder_mead.h>
+#include "nelder_mead.h"
 #include <src/jaz/index_sort.h>
 #include <iostream>
 #include <cmath>

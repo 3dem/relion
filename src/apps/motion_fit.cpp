@@ -31,11 +31,12 @@
 #include <src/jaz/damage_helper.h>
 #include <src/jaz/fsc_helper.h>
 #include <src/jaz/gp_motion_fit.h>
-#include <src/jaz/gradient_descent.h>
+#include <src/jaz/optimization/gradient_descent.h>
+#include <src/jaz/optimization/nelder_mead.h>
+#include <src/jaz/optimization/lbfgs.h>
 #include <src/jaz/distribution_helper.h>
 #include <src/jaz/parallel_ft.h>
 #include <src/jaz/d3x3/dsyev2.h>
-#include <src/jaz/nelder_mead.h>
 #include <src/jaz/alignment_set.h>
 
 #include <src/jaz/motion_em.h>
@@ -156,14 +157,6 @@ class MotionFitProg : public RefinementProgram
                 const std::vector<d2Vector>& positions,
                 std::string outPath, int mg,
                 double visScale);
-
-        d2Vector interpolateMax2(
-                const std::vector<d3Vector>& all_sig_vals,
-                const std::vector<double>& all_TSCs);
-
-        d3Vector interpolateMax3(
-                const std::vector<d3Vector>& all_sig_vals,
-                const std::vector<double>& all_TSCs);
 };
 
 int main(int argc, char *argv[])
@@ -642,6 +635,10 @@ d2Vector MotionFitProg::estimateTwoParams(
         double sig_v_step, double sig_d_step,
         int maxIters, int recDepth)
 {
+    std::cout << "estimating sig_v and sig_d\n";
+    std::cout << "sig_v = " << sig_v_0 << " +/- " << sig_v_step << "\n";
+    std::cout << "sig_d = " << sig_d_0 << " +/- " << sig_d_step << "\n";
+
     int tot_vi = sig_v_0 <= 0.0? (int)(-sig_v_0/sig_v_step + 1) : 0;
     int tot_di = sig_d_0 <= 0.0? (int)(-sig_d_0/sig_d_step + 1) : 0;
 
@@ -674,10 +671,13 @@ d2Vector MotionFitProg::estimateTwoParams(
 
     d3Vector bestParams = all_sig_vals[4];
 
+    const bool verbose = true;
+
     while (!centerBest && iters < maxIters)
     {
-
-            std::cout << "evaluating:\n";
+        if (verbose)
+        {
+            std::cout << "\nevaluating:\n";
 
             for (int i = 0; i < 3; i++)
             {
@@ -690,6 +690,7 @@ d2Vector MotionFitProg::estimateTwoParams(
             }
 
             std::cout << "\n";
+        }
 
         evaluateParams(fts, dmgWeight, k_out, unknown_sig_vals, unknown_TSCs);
 
@@ -698,8 +699,9 @@ d2Vector MotionFitProg::estimateTwoParams(
             all_TSCs[unknown_ind[p]] = unknown_TSCs[p];
         }
 
-
-            std::cout << "result:\n";
+        if (verbose)
+        {
+            std::cout << "\nresult:\n";
 
             for (int i = 0; i < 3; i++)
             {
@@ -712,6 +714,7 @@ d2Vector MotionFitProg::estimateTwoParams(
             }
 
             std::cout << "\n";
+        }
 
         int bestIndex = 0;
         double bestTSC = all_TSCs[0];
@@ -730,6 +733,13 @@ d2Vector MotionFitProg::estimateTwoParams(
         int shift_v = bestIndex % 3 - 1;
         int shift_d = bestIndex / 3 - 1;
 
+        if (verbose)
+        {
+            std::cout << "optimum: " << all_sig_vals[bestIndex] << " ";
+            std::cout << "(" << all_sig_vals[bestIndex] << ")\n";
+            std::cout << "grid_0: [" << shift_v << ", " << shift_d << "]\n";
+        }
+
         if (shift_v < 0 && all_sig_vals[3][0] <= 0.0)
         {
             shift_v = 0;
@@ -740,6 +750,11 @@ d2Vector MotionFitProg::estimateTwoParams(
             shift_d = 0;
         }
 
+        if (verbose)
+        {
+            std::cout << "grid_1: [" << shift_v << ", " << shift_d << "]\n";
+        }
+
         if (shift_v == 0 && shift_d == 0)
         {
             if (recDepth <= 0)
@@ -748,8 +763,7 @@ d2Vector MotionFitProg::estimateTwoParams(
             }
             else
             {
-                std::cout << "current optimum: " << all_sig_vals[bestIndex] << "\n";
-                std::cout << "repeating at half scan range.\n";
+                std::cout << "\nrepeating at half scan range.\n\n";
 
                 estimateTwoParams(
                     fts, dmgWeight, k_out,
@@ -857,9 +871,12 @@ d3Vector MotionFitProg::estimateThreeParams(
 
     d3Vector bestParams = all_sig_vals[13];
 
+    const bool verbose = true;
+
     while (!centerBest && iters < maxIters)
     {
-
+        if (verbose)
+        {
             std::cout << "evaluating:\n";
 
             for (int k = 0; k < 3; k++)
@@ -878,6 +895,7 @@ d3Vector MotionFitProg::estimateThreeParams(
             }
 
             std::cout << "\n";
+        }
 
         evaluateParams(fts, dmgWeight, k_out, unknown_sig_vals, unknown_TSCs);
 
@@ -886,7 +904,8 @@ d3Vector MotionFitProg::estimateThreeParams(
             all_TSCs[unknown_ind[p]] = unknown_TSCs[p];
         }
 
-
+        if (verbose)
+        {
             std::cout << "result:\n";
 
             for (int k = 0; k < 3; k++)
@@ -905,6 +924,7 @@ d3Vector MotionFitProg::estimateThreeParams(
             }
 
             std::cout << "\n";
+        }
 
         int bestIndex = 0;
         double bestTSC = all_TSCs[0];
@@ -1226,9 +1246,20 @@ std::vector<std::vector<d2Vector>> MotionFitProg::optimize(
 
     gpmf.posToParams(inTracks, initialCoeffs);
 
-    std::vector<double> optCoeffs = GradientDescent::optimize(
-            initialCoeffs, gpmf, step, minStep, minDiff, maxIters, inertia, debugOpt);
+    std::vector<double> optCoeffs;
 
+    const bool useLbfgs = true;
+
+    if (useLbfgs)
+    {
+        optCoeffs = LBFGS::optimize(
+            initialCoeffs, gpmf, debugOpt);
+    }
+    else
+    {
+        optCoeffs = GradientDescent::optimize(
+            initialCoeffs, gpmf, step, minStep, minDiff, maxIters, inertia, debugOpt);
+    }
 
     std::vector<std::vector<d2Vector>> out(pc, std::vector<d2Vector>(fc));
     gpmf.paramsToPos(optCoeffs, out);

@@ -5,7 +5,7 @@
 #include <src/image.h>
 #include <vector>
 #include <src/jaz/gravis/t2Vector.h>
-#include <src/jaz/optimization.h>
+#include <src/jaz/optimization/optimization.h>
 
 class BFactorFit : public Optimization
 {

@@ -6,7 +6,7 @@
 #include <src/jaz/gravis/t2Vector.h>
 #include <src/jaz/gravis/t3Vector.h>
 #include <src/jaz/gravis/t4Vector.h>
-#include <src/jaz/optimization.h>
+#include <src/jaz/optimization/optimization.h>
 
 class CorruptedGaussFit : public Optimization
 {

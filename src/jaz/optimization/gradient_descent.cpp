@@ -1,4 +1,4 @@
-#include <src/jaz/gradient_descent.h>
+#include "gradient_descent.h"
 #include <iostream>
 
 std::vector<double> GradientDescent::optimize(
