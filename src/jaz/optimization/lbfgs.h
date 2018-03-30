@@ -12,7 +12,9 @@ class LBFGS
         static std::vector<double> optimize(
             const std::vector<double>& initial,
             const DifferentiableOptimization& opt,
-            bool verbose = false);
+            bool verbose = false,
+            int max_iters = 0,
+            double epsilon = 1e-5);
 
         static void test();
 

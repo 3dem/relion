@@ -6,7 +6,7 @@ static pthread_mutex_t lib_lbfgs_mutex = PTHREAD_MUTEX_INITIALIZER;
 std::vector<double> LBFGS::optimize(
     const std::vector<double> &initial,
     const DifferentiableOptimization &opt,
-    bool verbose)
+    bool verbose, int max_iters, double epsilon)
 {
     const int N = initial.size();
 
@@ -27,14 +27,24 @@ std::vector<double> LBFGS::optimize(
 
     int ret;
 
+    lbfgs_parameter_t param;
+
+    lbfgs_parameter_init(&param);
+
+    param.max_iterations = max_iters;
+    param.epsilon = epsilon;
+
     pthread_mutex_lock(&lib_lbfgs_mutex);
     {
-        ret = lbfgs(N, m_x, &fx, evaluate, progress, &adapter, NULL);
+        ret = lbfgs(N, m_x, &fx, evaluate, progress, &adapter, &param);
     }
     pthread_mutex_unlock(&lib_lbfgs_mutex);
 
-    printf("L-BFGS optimization terminated with status code = %d\n", ret);
-    printf("  fx = %f\n", fx);
+    if (verbose)
+    {
+        std::cout << "L-BFGS optimization terminated with status code = " << ret << "\n";
+        std::cout << "  fx = " << fx << "\n";
+    }
 
     std::vector<double> out(N);
 

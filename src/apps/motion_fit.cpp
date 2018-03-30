@@ -65,14 +65,15 @@ class MotionFitProg : public RefinementProgram
             bool unregGlob, noGlobOff,
                 paramEstim2, paramEstim3,
                 debugOpt, diag, expKer, global_init,
-                useAlignmentSet;
+                useAlignmentSet, useLbfgs;
 
             int maxIters, paramEstimIters, paramEstimSteps, maxEDs, maxRange;
 
             double dmga, dmgb, dmgc, dosePerFrame,
                 sig_vel, sig_div, sig_acc,
                 k_cutoff, maxStep, maxDistDiv,
-                param_rV, param_rD, param_rA;
+                param_rV, param_rD, param_rA,
+                optEps;
 
             AlignmentSet alignmentSet;
 
@@ -194,7 +195,6 @@ int MotionFitProg::readMoreOptions(IOParser& parser, int argc, char *argv[])
 
     k_cutoff = textToFloat(parser.getOption("--k_cut", "Freq. cutoff (in pixels)", "-1.0"));
     maxIters = textToInteger(parser.getOption("--max_iters", "Maximum number of iterations", "1000"));
-    maxStep = textToFloat(parser.getOption("--max_step", "Maximum step size", "0.05"));
 
     unregGlob = parser.checkOption("--unreg_glob", "Do not regularize global component of motion");
     noGlobOff = parser.checkOption("--no_glob_off", "Do not compute initial per-particle offsets");
@@ -213,6 +213,12 @@ int MotionFitProg::readMoreOptions(IOParser& parser, int argc, char *argv[])
     paramEstimSteps = textToInteger(parser.getOption("--par_steps", "Parameter estimation takes max. this many steps before halving the range", "10"));
     useAlignmentSet = !parser.checkOption("--exact_params", "Use slower but more precise parameter evaluation");
     maxRange = textToInteger(parser.getOption("--mot_range", "Limit allowed motion range for parameter estimation [Px]", "50"));
+
+    parser.addSection("Development options");
+
+    optEps = textToFloat(parser.getOption("--eps", "Abort optimization once ||grad|| < eps * max(1, ||x||)", "1e-4"));
+    useLbfgs = !parser.checkOption("--grad_desc", "Use gradient descent instead of LBFGS for optimization (don't!)");
+    maxStep = textToFloat(parser.getOption("--max_step", "Maximum step size for gradient descent", "0.05"));
 
     if ((paramEstim2 || paramEstim3) && k_cutoff < 0)
     {
@@ -1248,12 +1254,10 @@ std::vector<std::vector<d2Vector>> MotionFitProg::optimize(
 
     std::vector<double> optCoeffs;
 
-    const bool useLbfgs = true;
-
     if (useLbfgs)
     {
         optCoeffs = LBFGS::optimize(
-            initialCoeffs, gpmf, debugOpt);
+            initialCoeffs, gpmf, debugOpt, maxIters, optEps);
     }
     else
     {
