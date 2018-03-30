@@ -20,6 +20,25 @@
 
 #include "src/motion_fitter.h"
 
+#include <src/jaz/optimization/lbfgs.h>
+#include <src/jaz/image_log.h>
+#include <src/jaz/slice_helper.h>
+#include <src/jaz/spectral_helper.h>
+#include <src/jaz/filter_helper.h>
+#include <src/jaz/backprojection_helper.h>
+#include <src/jaz/complex_io.h>
+#include <src/jaz/fftw_helper.h>
+#include <src/jaz/refinement_helper.h>
+#include <src/jaz/stack_helper.h>
+#include <src/jaz/damage_helper.h>
+#include <src/jaz/fsc_helper.h>
+#include <src/jaz/gp_motion_fit.h>
+#include <src/jaz/motion_refinement.h>
+#include <src/jaz/image_op.h>
+#include <src/jaz/parallel_ft.h>
+
+using namespace gravis;
+
 void MotionFitter::read(int argc, char **argv)
 {
 
@@ -48,9 +67,8 @@ void MotionFitter::read(int argc, char **argv)
     global_init = parser.checkOption("--gi", "Initialize with global trajectories instead of loading them from metadata file");
     expKer = parser.checkOption("--exp_k", "Use exponential kernel instead of sq. exponential");
     // TODO: provide k_cut in Angstroms!
+    maxEDs = textToInteger(parser.getOption("--max_ed", "Maximum number of eigendeformations", "-1"));
     k_cutoff = textToFloat(parser.getOption("--k_cut", "Freq. cutoff (in pixels) for parameter estimation", "-1.0"));
-    maxIters = textToInteger(parser.getOption("--max_iters", "Maximum number of iterations", "10000"));
-    maxStep = textToFloat(parser.getOption("--max_step", "Maximum step size", "0.05"));
     unregGlob = parser.checkOption("--unreg_glob", "Do not regularize global component of motion");
     noGlobOff = parser.checkOption("--no_glob_off", "Do not compute initial per-particle offsets");
     debugOpt = parser.checkOption("--debug_opt", "Write optimization debugging info");
@@ -79,7 +97,6 @@ void MotionFitter::read(int argc, char **argv)
     paddingFactor = textToFloat(parser.getOption("--pad", "Padding factor", "2"));
     minMG = textToInteger(parser.getOption("--min_MG", "First micrograph index", "0"));
     maxMG = textToInteger(parser.getOption("--max_MG", "Last micrograph index (default is to process all)", "-1"));
-    imgPath = parser.getOption("--img", "Path to images - read from STAR file by default", "");
     debug = parser.checkOption("--debug", "Write debugging data");
     debugMov = parser.checkOption("--debug_mov", "Write debugging data for movie loading");
 	verb = textToInteger(parser.getOption("--verb", "Verbosity", "1"));
@@ -87,6 +104,8 @@ void MotionFitter::read(int argc, char **argv)
 
 	int expert_section = parser.addSection("Expert options");
 	angpix = textToFloat(parser.getOption("--angpix", "Pixel resolution (angst/pix) - read from STAR file by default", "-1"));
+    maxIters = textToInteger(parser.getOption("--max_iters", "Maximum number of iterations", "10000"));
+    optEps = textToFloat(parser.getOption("--eps", "Terminate optimization after gradient length falls below this value", "1e-4"));
 	imgPath = parser.getOption("--mov", "Path to movies", "");
     corrMicFn = parser.getOption("--corr_mic", "List of uncorrected micrographs (e.g. corrected_micrographs.star)", "");
     preextracted = parser.checkOption("--preex", "Preextracted movie stacks");
@@ -105,8 +124,7 @@ void MotionFitter::read(int argc, char **argv)
 
 	// Make sure outPath ends with a slash
 	if (outPath[outPath.length()-1] != '/')
-		outPath += "/";
-
+        outPath += "/";
 }
 
 void MotionFitter::usage()
@@ -142,15 +160,7 @@ void MotionFitter::initialise()
 
     if (verb > 0)
 		std::cout << " + Reading " << starFn << "...\n";
-	mdt0.read(starFn);
-
-	// Get micrograph_xsize and micrograph_ysize for EPS plots
-    FileName fn_mic;
-    mdt0.getValue(EMDL_MICROGRAPH_NAME, fn_mic, 0);
-    Image<RFLOAT> dum;
-    dum.read(fn_mic, false);
-    micrograph_xsize = XSIZE(dum());
-    micrograph_ysize = YSIZE(dum());
+    mdt0.read(starFn);
 
     if (movie_toReplace != "")
     {
@@ -214,6 +224,26 @@ void MotionFitter::initialise()
 
 		hasCorrMic = true;
 	}
+    else
+    {
+        hasCorrMic = false;
+    }
+
+    {
+        // Get micrograph_xsize and micrograph_ysize for EPS plots
+        FileName fn_mic;
+        mdt0.getValue(EMDL_MICROGRAPH_NAME, fn_mic, 0);
+
+        if (imgPath != "")
+        {
+            fn_mic = imgPath + fn_mic.substr(fn_mic.find_last_of('/')+1);
+        }
+
+        Image<RFLOAT> dum;
+        dum.read(fn_mic, false);
+        micrograph_xsize = XSIZE(dum());
+        micrograph_ysize = YSIZE(dum());
+    }
 
 	mdts = StackHelper::splitByMicrographName(&mdt0);
 
@@ -452,7 +482,7 @@ void MotionFitter::initialise()
 
 			// TODO: output k_out in Angstroms
 			if (verb > 0)
-				std::cout << " + maximum frequency to be consider: = " << (s * angpix)/(RFLOAT)k_out << " Angstrom" << std::endl;
+                std::cout << " + maximum frequency to consider: = " << (s * angpix)/(RFLOAT)k_out << " Angstrom" << std::endl;
 
 			for (int f = 0; f < fc; f++)
 			{
@@ -588,8 +618,7 @@ void MotionFitter::processSubsetMicrographs(long g_start, long g_end)
         std::vector<std::vector<gravis::d2Vector>> tracks = optimize(
                 movieCC, initialTracks,
                 sig_vel_nrm, sig_acc_nrm, sig_div_nrm,
-                positions, globComp,
-                maxStep, 1e-9, 1e-9, maxIters, 0.0);
+                positions, globComp, optEps, maxIters);
 
         updateFCC(movie, tracks, mdts[g], tables, weights0, weights1);
 
@@ -1150,8 +1179,7 @@ std::vector<std::vector<d2Vector>> MotionFitter::optimize(
         double sig_vel_px, double sig_acc_px, double sig_div_px,
         const std::vector<d2Vector>& positions,
         const std::vector<d2Vector>& globComp,
-        double step, double minStep, double minDiff,
-        long maxIters, double inertia)
+        double epsilon, long maxIters)
 {
     const double eps = 1e-20;
 
@@ -1174,19 +1202,19 @@ std::vector<std::vector<d2Vector>> MotionFitter::optimize(
     const int fc = inTracks[0].size();
 
     GpMotionFit gpmf(movieCC, sig_vel_px, sig_div_px, sig_acc_px,
-                     pc, positions,
+                     maxEDs, positions,
                      globComp, nr_omp_threads, expKer);
 
 
-    std::vector<double> initialCoeffs(2*(pc + pc*(fc-1)));
+    std::vector<double> initialCoeffs;
 
     gpmf.posToParams(inTracks, initialCoeffs);
 
-    std::vector<double> optPos = GradientDescent::optimize(
-            initialCoeffs, gpmf, step, minStep, minDiff, maxIters, inertia, debugOpt);
+    std::vector<double> optCoeffs = LBFGS::optimize(
+        initialCoeffs, gpmf, debugOpt, maxIters, epsilon);
 
     std::vector<std::vector<d2Vector>> out(pc, std::vector<d2Vector>(fc));
-    gpmf.paramsToPos(optPos, out);
+    gpmf.paramsToPos(optCoeffs, out);
 
     return out;
 }
@@ -1366,7 +1394,9 @@ void MotionFitter::writeOutput(
 
 
 	// Compatibility with Jasenko's diagnostic .dat files
-	// TODO: remove this
+    // NOTTODO: remove this
+    // Don't! It's the only way to plot tracks on top of each other.
+
 	if (!diag) return;
 
     std::ofstream rawOut(fn_root + "_tracks.dat");

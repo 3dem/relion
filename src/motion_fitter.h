@@ -27,26 +27,16 @@
 #include "src/fftw.h"
 #include "src/backprojector.h"
 #include "src/micrograph_model.h"
-#include <src/jaz/image_log.h>
-#include <src/jaz/slice_helper.h>
-#include <src/jaz/spectral_helper.h>
-#include <src/jaz/filter_helper.h>
-#include <src/jaz/backprojection_helper.h>
-#include <src/jaz/complex_io.h>
-#include <src/jaz/fftw_helper.h>
-#include <src/jaz/refinement_helper.h>
-#include <src/jaz/stack_helper.h>
-#include <src/jaz/damage_helper.h>
-#include <src/jaz/fsc_helper.h>
-#include <src/jaz/gp_motion_fit.h>
-#include <src/jaz/optimization/gradient_descent.h>
-#include <src/jaz/motion_refinement.h>
-#include <src/jaz/image_op.h>
-#include <src/jaz/parallel_ft.h>
+#include "src/jaz/obs_model.h"
+#include "src/jaz/gravis/t2Vector.h"
+#include "src/jaz/parallel_ft.h"
+// Includes not required in the header moved to the .cpp file.
+// This prevents recompilation cascades.
 
 #include <omp.h>
 
-using namespace gravis;
+//using namespace gravis;
+// Never use 'using' in headers! --JZ
 
 
 class MotionFitter
@@ -71,11 +61,12 @@ public:
         debugOpt, diag, expKer, global_init,
     	preextracted, coordsAtMgRes, hasCorrMic, saveMem;
 
-    int maxIters, paramEstimIters, paramEstimSteps;
+    int maxEDs, maxIters, paramEstimIters, paramEstimSteps;
+
     double dmga, dmgb, dmgc, dosePerFrame,
         sig_vel, sig_div, sig_acc,
-        k_cutoff, maxStep, maxDistDiv,
         param_rV, param_rD, param_rA,
+        k_cutoff, optEps,
 		movie_angpix, coords_angpix;
 
     long maxMG, minMG;
@@ -113,7 +104,10 @@ public:
 
     ObservationModel obsModel;
 
-    // Jasenko, can we have more informative names for these important variables?
+    // Q: Jasenko, can we have more informative names for these important variables?
+    // A: They are so important and common that they should be short!
+    // (s: full image size, sh: half-size + 1, fc: frame count
+    //  - these are consistent throughout the codebase.)
     int s, sh, fc;
     int micrograph_xsize, micrograph_ysize;
 
@@ -163,33 +157,33 @@ private:
 	        const std::vector<Image<RFLOAT>>& dmgWeight,
 	        std::vector<std::vector<Image<Complex>>>& movie,
 	        std::vector<std::vector<Image<RFLOAT>>>& movieCC,
-	        std::vector<d2Vector>& positions,
-	        std::vector<std::vector<d2Vector>>& initialTracks,
-	        std::vector<d2Vector>& globComp);
+            std::vector<gravis::d2Vector>& positions,
+            std::vector<std::vector<gravis::d2Vector>>& initialTracks,
+            std::vector<gravis::d2Vector>& globComp);
 
-    std::vector<std::vector<d2Vector>> optimize(
+    std::vector<std::vector<gravis::d2Vector>> optimize(
             const std::vector<std::vector<Image<RFLOAT>>>& movieCC,
-            const std::vector<std::vector<d2Vector>>& inTracks,
+            const std::vector<std::vector<gravis::d2Vector>>& inTracks,
             double sig_vel_px, double sig_acc_px, double sig_div_px,
-            const std::vector<d2Vector>& positions,
-            const std::vector<d2Vector>& globComp,
-            double step, double minStep, double minDiff,
-            long maxIters, double inertia);
+            const std::vector<gravis::d2Vector>& positions,
+            const std::vector<gravis::d2Vector>& globComp,
+            double epsilon,
+            long maxIters);
 
     void updateFCC(
             const std::vector<std::vector<Image<Complex>>>& movie,
-            const std::vector<std::vector<d2Vector>>& tracks,
+            const std::vector<std::vector<gravis::d2Vector>>& tracks,
             const MetaDataTable& mdt,
             std::vector<Image<RFLOAT>>& tables,
             std::vector<Image<RFLOAT>>& weights0,
             std::vector<Image<RFLOAT>>& weights1);
 
     void writeOutput(
-            const std::vector<std::vector<d2Vector>>& tracks,
+            const std::vector<std::vector<gravis::d2Vector>>& tracks,
             const std::vector<Image<RFLOAT>>& fccData,
             const std::vector<Image<RFLOAT>>& fccWeight0,
             const std::vector<Image<RFLOAT>>& fccWeight1,
-            const std::vector<d2Vector>& positions,
+            const std::vector<gravis::d2Vector>& positions,
             std::string outPath, long g,
             double visScale);
 
