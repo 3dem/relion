@@ -28,7 +28,7 @@ int main(int argc, char *argv[])
     {
 		prm.read(argc, argv);
 
-		prm.initialise();
+        prm.init();
 
 		prm.run();
     }

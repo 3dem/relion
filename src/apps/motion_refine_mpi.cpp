@@ -29,7 +29,7 @@ int main(int argc, char *argv[])
     {
 		prm.read(argc, argv);
 
-		prm.initialise();
+        prm.init();
 
 		MPI_Barrier(MPI_COMM_WORLD);
 

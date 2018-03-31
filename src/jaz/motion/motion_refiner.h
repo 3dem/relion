@@ -32,6 +32,7 @@
 #include <src/jaz/parallel_ft.h>
 
 #include "motion_param_estimator.h"
+#include "motion_estimator.h"
 
 #include <omp.h>
 
@@ -43,9 +44,6 @@ class MotionRefiner
         MotionRefiner();
 
 
-        // I/O Parser
-        IOParser parser;
-
         // Verbosity
         int verb;
 
@@ -55,16 +53,9 @@ class MotionRefiner
         // Write out debugging information
         bool debug, debugMov;
 
-        bool unregGlob, noGlobOff,
-            debugOpt, diag, expKer, global_init,
-            preextracted, hasCorrMic, saveMem;
+        bool preextracted, hasCorrMic, saveMem;
 
-        int maxEDs, maxIters;
-
-        double dmga, dmgb, dmgc, dosePerFrame,
-            sig_vel, sig_div, sig_acc,
-            k_cutoff, k_cutoff_Angst, optEps,
-            movie_angpix, coords_angpix;
+        double movie_angpix, coords_angpix;
 
         long maxMG, minMG;
 
@@ -80,7 +71,6 @@ class MotionRefiner
             corrMicFn, gain_path, last_gainFn;
 
         std::map<std::string, std::string> mic2meta;
-        std::vector<Image<RFLOAT>> dmgWeight, dmgWeightEval;
         Micrograph micrograph;
 
         // For recombining frames
@@ -102,12 +92,14 @@ class MotionRefiner
         ObservationModel obsModel;
 
         MotionParamEstimator motionParamEstimator;
+        MotionEstimator motionEstimator;
 
         // Q: Jasenko, can we have more informative names for these important variables?
         // A: They are so important and common that their names should be short!
         // (s: full image size, sh: half-size + 1, fc: frame count
         //  - these are consistent throughout the codebase.)
         int s, sh, fc;
+
         int micrograph_xsize, micrograph_ysize;
 
 
@@ -115,11 +107,8 @@ class MotionRefiner
         // Read command line arguments
         void read(int argc, char **argv);
 
-        // Print usage instructions
-        void usage();
-
         // Initialise some general stuff after reading
-        void initialise();
+        void init();
 
         // Re-initialise vector mdts to allow only_do_unfinished for combine_frames
         void initialiseCombineFrames();
@@ -127,8 +116,10 @@ class MotionRefiner
         // General Running
         void run();
 
-        // Fit CTF parameters for all particles on a subset of the micrographs
-        void processSubsetMicrographs(long g_start, long g_end);
+
+        double angToPix(double a);
+        double pixToAng(double p);
+
 
         // Combine frames on a subset of the micrographa
         void combineFramesSubsetMicrographs(long g_start, long g_end);
@@ -136,33 +127,10 @@ class MotionRefiner
         // combine all EPS files into one logfile.pdf
         void combineEPSAndSTARfiles();
 
+
         // For original particle-polishing-like Bfactors
         void calculateSingleFrameReconstruction(int iframe);
 
-        // load micrograph g and compute all data required for the optimization;
-        // also used by MotionParamEstimator
-        void prepMicrograph(
-            // in:
-            long g, std::vector<ParFourierTransformer>& fts,
-            const std::vector<Image<RFLOAT>>& dmgWeight,
-            // out:
-            std::vector<std::vector<Image<Complex>>>& movie,
-            std::vector<std::vector<Image<RFLOAT>>>& movieCC,
-            std::vector<gravis::d2Vector>& positions,
-            std::vector<std::vector<gravis::d2Vector>>& initialTracks,
-            std::vector<gravis::d2Vector>& globComp);
-
-        // Actual optimization method; also used by MotionParamEstimator
-        std::vector<std::vector<gravis::d2Vector>> optimize(
-            const std::vector<std::vector<Image<RFLOAT>>>& movieCC,
-            const std::vector<std::vector<gravis::d2Vector>>& inTracks,
-            double sig_vel_px, double sig_acc_px, double sig_div_px,
-            const std::vector<gravis::d2Vector>& positions,
-            const std::vector<gravis::d2Vector>& globComp);
-
-
-//    private:
-// C++ doesn't know 'package protected'
 
         // Get output STAR file name for the gth entry in the mdts
         FileName getOutputFileNameRoot(long int g);
@@ -172,22 +140,8 @@ class MotionRefiner
         std::vector<std::vector<Image<Complex>>> loadMovie(
                 long g, int pc, std::vector<ParFourierTransformer>& fts, int only_this_frame = -1);
 
-        void updateFCC(
-                const std::vector<std::vector<Image<Complex>>>& movie,
-                const std::vector<std::vector<gravis::d2Vector>>& tracks,
-                const MetaDataTable& mdt,
-                std::vector<Image<RFLOAT>>& tables,
-                std::vector<Image<RFLOAT>>& weights0,
-                std::vector<Image<RFLOAT>>& weights1);
 
-        void writeOutput(
-                const std::vector<std::vector<gravis::d2Vector>>& tracks,
-                const std::vector<Image<RFLOAT>>& fccData,
-                const std::vector<Image<RFLOAT>>& fccWeight0,
-                const std::vector<Image<RFLOAT>>& fccWeight1,
-                const std::vector<gravis::d2Vector>& positions,
-                std::string outPath, long g,
-                double visScale);
+
 
         // recombine_frames
         std::vector<Image<RFLOAT>> weightsFromFCC();

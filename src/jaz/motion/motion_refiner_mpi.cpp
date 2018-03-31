@@ -65,8 +65,9 @@ void MotionRefinerMpi::run()
 		divide_equally(total_nr_micrographs, node->size, node->rank, my_first_micrograph, my_last_micrograph);
 		my_nr_micrographs = my_last_micrograph - my_first_micrograph + 1;
 
-		// The subsets will be used in openMPI parallelisation: instead of over g0->gc, they will be over smaller subsets
-		processSubsetMicrographs(my_first_micrograph, my_last_micrograph);
+        // The subsets will be used in openMPI parallelisation:
+        // instead of over g0->gc, they will be over smaller subsets
+        motionEstimator.process(my_first_micrograph, my_last_micrograph);
 	}
 
 	MPI_Barrier(MPI_COMM_WORLD);

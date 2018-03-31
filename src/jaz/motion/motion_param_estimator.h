@@ -21,7 +21,7 @@ class MotionParamEstimator
 
         int read(IOParser& parser, int argc, char *argv[]);
 
-        void prepare();
+        void init();
         void run();
 
         gravis::d2Vector estimateTwoParamsRec();

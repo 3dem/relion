@@ -1,13 +1,15 @@
 #include "motion_param_estimator.h"
 #include "motion_refiner.h"
 
+using namespace gravis;
+
 MotionParamEstimator::MotionParamEstimator(MotionRefiner& motionRefiner)
 :   motionRefiner(motionRefiner)
 {
 
 }
 
-int MotionParamEstimator::read(IOParser &parser, int argc, char *argv[])
+int MotionParamEstimator::read(IOParser& parser, int argc, char *argv[])
 {
     parser.addSection("Parameter estimation");
 
@@ -19,22 +21,19 @@ int MotionParamEstimator::read(IOParser &parser, int argc, char *argv[])
     recursions = textToInteger(parser.getOption("--par_recs", "Parameter estimation is iterated recursively this many times, each time halving the search range", "3"));
     steps = textToInteger(parser.getOption("--par_steps", "Parameter estimation takes max. this many steps before halving the range", "10"));
     maxRange = textToInteger(parser.getOption("--mot_range", "Limit allowed motion range [Px]", "50"));
-
 }
 
-void MotionParamEstimator::prepare()
+void MotionParamEstimator::init()
 {
-    if ((estim2 || estim3) && motionRefiner.k_cutoff < 0)
+    if ((estim2 || estim3) && motionRefiner.motionEstimator.k_cutoff < 0)
     {
-        REPORT_ERROR("ERROR: Parameter estimation requires a freq. cutoff (--k_cut).");
+        REPORT_ERROR("ERROR: Parameter estimation requires a freq. cutoff (--k_cut / --k_cut_A).");
     }
 
     if (estim2 && estim3)
     {
         REPORT_ERROR("ERROR: Only 2 or 3 parameters can be estimated (--params2 or --params3), not both.");
     }
-
-
 }
 
 void MotionParamEstimator::run()
