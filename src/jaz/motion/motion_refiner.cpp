@@ -214,6 +214,10 @@ void MotionRefiner::init()
             chosenMdts.push_back(allMdts[g]);
         }
 	}
+    else
+    {
+        chosenMdts = allMdts;
+    }
 
     // Check which motion-fit and recombination output files already exist.
 	if (only_do_unfinished)
