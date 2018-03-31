@@ -118,6 +118,7 @@ void MotionEstimator::process(long g_start, long g_end)
     }
 
     std::vector<ParFourierTransformer> fts(motionRefiner.nr_omp_threads);
+
     std::vector<Image<RFLOAT>>
             tables(motionRefiner.nr_omp_threads),
             weights0(motionRefiner.nr_omp_threads),

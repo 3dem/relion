@@ -65,9 +65,9 @@ class MotionRefiner
 
         std::string
             starFn, reconFn0, reconFn1, maskFn,
-            outPath, imgPath, fscFn,
+            outPath, fscFn,
             meta_path,
-            movie_ending, movie_toReplace, movie_replaceBy,
+            movie_path, movie_ending, movie_toReplace, movie_replaceBy,
             corrMicFn, gain_path, last_gainFn;
 
         std::map<std::string, std::string> mic2meta;
@@ -137,9 +137,15 @@ class MotionRefiner
 
         std::string getMicrographTag(long g);
 
+        // load a movie and extract all particles
+        // returns a per-particle vector of per-frame images of size sh x s
         std::vector<std::vector<Image<Complex>>> loadMovie(
-                long g, int pc, std::vector<ParFourierTransformer>& fts, int only_this_frame = -1);
+                long g, int pc, std::vector<ParFourierTransformer>& fts);
 
+        // load the header of the first movie only to learn the frame number and micrograph size
+        // (also the dose and movie pixel size if a corrected_micrographs.star is available)
+        // - this should be given by the global part of run_data.star, once it exists
+        std::vector<std::vector<Image<Complex>>> loadInitialMovie();
 
 
 
@@ -147,6 +153,13 @@ class MotionRefiner
         std::vector<Image<RFLOAT>> weightsFromFCC();
 
         std::vector<Image<RFLOAT>> weightsFromBfacs();
+
+
+    protected:
+
+        // apply changes to micrograph-filenames implied by
+        // movie_path, movie_ending, movie_toReplace, movie_replaceBy
+        void adaptMovieNames();
 };
 
 

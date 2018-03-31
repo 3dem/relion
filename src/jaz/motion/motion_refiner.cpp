@@ -88,7 +88,7 @@ void MotionRefiner::read(int argc, char **argv)
 	int expert_section = parser.addSection("Expert options");
 
 	angpix = textToFloat(parser.getOption("--angpix", "Pixel resolution (angst/pix) - read from STAR file by default", "-1"));
-    imgPath = parser.getOption("--mov", "Path to movies", "");
+    movie_path = parser.getOption("--mov", "Path to movies", "");
     corrMicFn = parser.getOption("--corr_mic", "List of uncorrected micrographs (e.g. corrected_micrographs.star)", "");
     preextracted = parser.checkOption("--preex", "Preextracted movie stacks");
     meta_path = parser.getOption("--meta", "Path to per-movie metadata star files", "");
@@ -125,7 +125,7 @@ void MotionRefiner::init()
 
 	if (outPath[outPath.length()-1] != '/')
     {
-		outPath+="/";
+        outPath += "/";
     }
 
     if (verb > 0)
@@ -135,39 +135,7 @@ void MotionRefiner::init()
 
     mdt0.read(starFn);
 
-    if (movie_toReplace != "")
-    {
-        std::string name;
-
-        for (int i = 0; i < mdt0.numberOfObjects(); i++)
-        {
-            mdt0.getValue(EMDL_MICROGRAPH_NAME, name, i);
-
-            if (i == 0 && verb > 0)
-            {
-            	std::cout << "   - Replacing: " << name << " -> ";
-            }
-
-            std::string::size_type pos0 = name.find(movie_toReplace);
-
-            if (pos0 != std::string::npos)
-            {
-                std::string::size_type pos1 = pos0 + movie_toReplace.length();
-
-                std::string before = name.substr(0, pos0);
-                std::string after = pos1 < name.length()? name.substr(pos1) : "";
-
-                name = before + movie_replaceBy + after;
-            }
-
-            if (i == 0 && verb > 0)
-            {
-            	std::cout << name << "\n";
-            }
-
-            mdt0.setValue(EMDL_MICROGRAPH_NAME, name, i);
-        }
-    }
+    adaptMovieNames();
 
 	if (angpix <= 0.0)
 	{
@@ -178,10 +146,12 @@ void MotionRefiner::init()
 
 		if (verb > 0)
         {
-			std::cout << "   - Using pixel size calculated from magnification and detector pixel size in the input STAR file: " << angpix << "\n";
+            std::cout << "   - Using pixel size calculated from magnification and "
+                      << "detector pixel size in the input STAR file: " << angpix << "\n";
         }
 	}
 
+    // initialise corrected/uncorrected micrograph dictionary
 	if (corrMicFn != "")
 	{
 		MetaDataTable corrMic;
@@ -210,159 +180,29 @@ void MotionRefiner::init()
         hasCorrMic = false;
     }
 
+    mdts = StackHelper::splitByMicrographName(&mdt0);
+
+    if (minMG >= mdts.size())
     {
-        // Get micrograph_xsize and micrograph_ysize for EPS plots
-        FileName fn_mic;
-        mdt0.getValue(EMDL_MICROGRAPH_NAME, fn_mic, 0);
+        std::stringstream sts0, sts1;
+        sts0 << minMG;
+        sts0 << mdts.size();
 
-        if (imgPath != "")
-        {
-            fn_mic = imgPath + fn_mic.substr(fn_mic.find_last_of('/')+1);
-        }
-
-        Image<RFLOAT> dum;
-        dum.read(fn_mic, false);
-        micrograph_xsize = XSIZE(dum());
-        micrograph_ysize = YSIZE(dum());
+        REPORT_ERROR("ERROR: Cannot start with micrograph "+sts0.str()
+            +" (--min_MG); only "+sts1.str()+" micrographs defined in "+starFn+".");
     }
 
-	mdts = StackHelper::splitByMicrographName(&mdt0);
+    if (minMG < 0)
+    {
+        minMG = 0;
+    }
 
-	if (preextracted)
-	{
-		if (lastFrame < 0)
-		{
-             std::string name, fullName, movieName;
-			 mdts[0].getValue(EMDL_IMAGE_NAME, fullName, 0);
-			 mdts[0].getValue(EMDL_MICROGRAPH_NAME, movieName, 0);
-			 name = fullName.substr(fullName.find("@")+1);
-
-			 std::string finName;
-
-			 if (imgPath == "")
-			 {
-				 finName = name;
-			 }
-			 else
-			 {
-				 finName = imgPath + "/" + movieName.substr(movieName.find_last_of("/")+1);
-			 }
-
-			 Image<RFLOAT> stack0;
-			 stack0.read(finName, false);
-
-			 const int pc0 = mdts[0].numberOfObjects();
-			 const bool zstack = stack0.data.zdim > 1;
-			 const int stackSize = zstack? stack0.data.zdim : stack0.data.ndim;
-			 fc = stackSize / pc0 - firstFrame;
-		}
-        else
-        {
-            fc = lastFrame - firstFrame + 1;
-        }
-	}
-	else
-	{
-		if (hasCorrMic)
-		{
-			std::string mgFn;
-			mdts[0].getValueToString(EMDL_MICROGRAPH_NAME, mgFn, 0);
-
-			// remove the pipeline job prefix
-			FileName fn_pre, fn_jobnr, fn_post;
-			decomposePipelineFileName(mgFn, fn_pre, fn_jobnr, fn_post);
-
-            //@TODO: make safe:
-			std::string metaFn = mic2meta[fn_post];
-
-			if (meta_path != "")
-			{
-				metaFn = meta_path + "/" + metaFn.substr(metaFn.find_last_of("/")+1);
-			}
-
-			micrograph = Micrograph(metaFn);
-
-			if (movie_angpix <= 0)
-			{
-				movie_angpix = micrograph.angpix;
-
-				if (verb > 0)
-                {
-					std::cout << " + Using movie pixel size from " << metaFn << ": " << movie_angpix << " A\n";
-                }
-			}
-			else
-			{
-				if (verb > 0)
-                {
-					std::cout << " + Using movie pixel size from command line: " << movie_angpix << " A\n";
-                }
-			}
-
-			if (coords_angpix <= 0)
-			{
-				coords_angpix = micrograph.angpix * micrograph.getBinningFactor();
-
-				if (verb > 0)
-                {
-					std::cout << " + Using coord. pixel size from " << metaFn << ": " << coords_angpix << " A\n";
-                }
-			}
-			else
-			{
-				if (verb > 0)
-                {
-					std::cout << " + Using coord. pixel size from command line: " << coords_angpix << " A\n";
-                }
-			}
-
-            // this is safe to do - motionEstimator.read() has been called already
-            if (motionEstimator.dosePerFrame < 0)
-			{
-                motionEstimator.dosePerFrame = micrograph.dose_per_frame;
-
-                if (verb > 0)
-                {
-                    std::cout << " + Using dose per frame from " << metaFn << ": "
-                              << motionEstimator.dosePerFrame << " A\n";
-                }
-			}
-
-            if (lastFrame < 0)
-            {
-                fc = micrograph.getNframes() - firstFrame;
-            }
-            else
-            {
-                fc = lastFrame - firstFrame + 1;
-            }
-		}
-		else
-		{
-			if (lastFrame < 0)
-			{
-				std::vector<std::vector<Image<Complex>>> movie = StackHelper::extractMovieStackFS(
-						&mdts[0], meta_path, imgPath, movie_ending, coords_angpix, angpix, movie_angpix, s,
-						nr_omp_threads, false, firstFrame, lastFrame, hotCutoff, debugMov);
-
-				fc = movie[0].size() - firstFrame;
-			}
-            else
-            {
-                fc = lastFrame - firstFrame + 1;
-            }
-		}
-	}
+    loadInitialMovie();
 
 	// Only work on a user-specified subset of the micrographs
 	if (maxMG < 0 || maxMG >= mdts.size())
     {
 		maxMG = mdts.size()-1;
-    }
-
-	if (minMG < 0 || minMG >= mdts.size())
-    {
-		minMG = 0;
     }
 
 	if (minMG > 0 || maxMG < mdts.size()-1)
@@ -428,13 +268,14 @@ void MotionRefiner::init()
 	{
 		obsModel = ObservationModel(angpix);
 
-		// Only create projectors if there are (still) micrographs to process
-		// Read in the first reference
 		if (verb > 0)
         {
 			std::cout << " + Reading references ...\n";
         }
 
+        // Read in the first reference
+        // (even if there is no motion to estimate - only to learn the image size)
+        // TODO: replace once there is global information available
 		maps[0].read(reconFn0);
 
 		if (maps[0].data.xdim != maps[0].data.ydim || maps[0].data.ydim != maps[0].data.zdim)
@@ -447,6 +288,7 @@ void MotionRefiner::init()
         sh = s/2 + 1;
 
         // Only read and initialise the rest for unfinished motion_fit
+        // Only create projectors if there are (still) micrographs to process
 		if (mdts.size() > 0)
 		{
 			// Read in the second reference
@@ -493,9 +335,16 @@ void MotionRefiner::init()
 				fscMdt.read(fscFn, "fsc");
 
 				if (!fscMdt.containsLabel(EMDL_SPECTRAL_IDX))
-					REPORT_ERROR(fscFn + " does not contain a value for " + EMDL::label2Str(EMDL_SPECTRAL_IDX));
+                {
+                    REPORT_ERROR(fscFn + " does not contain a value for "
+                                 + EMDL::label2Str(EMDL_SPECTRAL_IDX));
+                }
+
 				if (!fscMdt.containsLabel(EMDL_POSTPROCESS_FSC_TRUE))
-					REPORT_ERROR(fscFn + " does not contain a value for " + EMDL::label2Str(EMDL_POSTPROCESS_FSC_TRUE));
+                {
+                    REPORT_ERROR(fscFn + " does not contain a value for "
+                                 + EMDL::label2Str(EMDL_POSTPROCESS_FSC_TRUE));
+                }
 
 				RefinementHelper::drawFSC(&fscMdt, freqWeight1D, freqWeight);
 			}
@@ -938,18 +787,15 @@ std::string MotionRefiner::getMicrographTag(long g)
 }
 
 std::vector<std::vector<Image<Complex>>> MotionRefiner::loadMovie(
-        long g, int pc, std::vector<ParFourierTransformer>& fts, int only_this_frame)
+        long g, int pc, std::vector<ParFourierTransformer>& fts)
 {
     std::vector<std::vector<Image<Complex>>> movie;
-
-    int myFirstFrame = (only_this_frame < 0) ? firstFrame : only_this_frame;
-    int myLastFrame = (only_this_frame < 0) ? lastFrame : only_this_frame;
 
     if (preextracted)
     {
         movie = StackHelper::loadMovieStackFS(
-            &mdts[g], imgPath, false, nr_omp_threads, &fts,
-            myFirstFrame, myLastFrame);
+            &mdts[g], "", false, nr_omp_threads, &fts,
+            firstFrame, lastFrame);
     }
     else
     {
@@ -978,9 +824,9 @@ std::vector<std::vector<Image<Complex>>> MotionRefiner::loadMovie(
                 mgFn.substr(0, mgFn.find_last_of(".")+1) + movie_ending;
             }
 
-            if (imgPath != "")
+            if (movie_path != "")
             {
-                mgFn = imgPath + "/" + mgFn.substr(mgFn.find_last_of("/")+1);
+                mgFn = movie_path + "/" + mgFn.substr(mgFn.find_last_of("/")+1);
             }
 
             bool mgHasGain = false;
@@ -1004,14 +850,22 @@ std::vector<std::vector<Image<Complex>>> MotionRefiner::loadMovie(
             movie = StackHelper::extractMovieStackFS(
                 &mdts[g], mgHasGain? &lastGainRef : 0,
                 mgFn, angpix, coords_angpix, movie_angpix, s,
-                nr_omp_threads, true, myFirstFrame, myLastFrame, hotCutoff, debugMov, saveMem);
+                nr_omp_threads, true, firstFrame, lastFrame,
+                hotCutoff, debugMov, saveMem);
         }
         else
         {
-            movie = StackHelper::extractMovieStackFS(
-                &mdts[g], meta_path, imgPath, movie_ending,
+            // gain no longer supported without a corrected_micrographs.star:
+            /*movie = StackHelper::extractMovieStackFS(
+                &mdts[g], meta_path, movie_path, movie_ending,
                 angpix, coords_angpix, movie_angpix, s,
-                nr_omp_threads, true, myFirstFrame, myLastFrame, hotCutoff, debugMov);
+                nr_omp_threads, true, firstFrame, lastFrame, hotCutoff, debugMov);*/
+
+            movie = StackHelper::extractMovieStackFS(
+                &mdts[g], 0,
+                mgFn, angpix, coords_angpix, movie_angpix, s,
+                nr_omp_threads, true, firstFrame, lastFrame,
+                hotCutoff, debugMov, saveMem);
         }
 
         #pragma omp parallel for num_threads(nr_omp_threads)
@@ -1046,6 +900,137 @@ std::vector<std::vector<Image<Complex>>> MotionRefiner::loadMovie(
     }
 
     return movie;
+}
+
+std::vector<std::vector<Image<Complex> > > MotionRefiner::loadInitialMovie()
+{
+    if (preextracted)
+    {
+        if (lastFrame < 0)
+        {
+             std::string name;
+             mdts[0].getValue(EMDL_MICROGRAPH_NAME, name, 0);
+
+             Image<RFLOAT> stack0;
+             stack0.read(name, false);
+
+             const int pc0 = mdts[0].numberOfObjects();
+             const bool zstack = stack0.data.zdim > 1;
+             const int stackSize = zstack? stack0.data.zdim : stack0.data.ndim;
+             fc = stackSize / pc0 - firstFrame;
+        }
+        else
+        {
+            fc = lastFrame - firstFrame + 1;
+        }
+
+        FileName fn_mic;
+        mdt0.getValue(EMDL_MICROGRAPH_NAME, fn_mic, 0);
+
+        Image<RFLOAT> dum;
+        dum.read(fn_mic, false);
+        micrograph_xsize = XSIZE(dum());
+        micrograph_ysize = YSIZE(dum());
+    }
+    else
+    {
+        if (hasCorrMic)
+        {
+            std::string mgFn;
+            mdts[0].getValueToString(EMDL_MICROGRAPH_NAME, mgFn, 0);
+
+            // remove the pipeline job prefix
+            FileName fn_pre, fn_jobnr, fn_post;
+            decomposePipelineFileName(mgFn, fn_pre, fn_jobnr, fn_post);
+
+            //@TODO: make safe:
+            std::string metaFn = mic2meta[fn_post];
+
+            if (meta_path != "")
+            {
+                metaFn = meta_path + "/" + metaFn.substr(metaFn.find_last_of("/")+1);
+            }
+
+            micrograph = Micrograph(metaFn);
+
+            if (movie_angpix <= 0)
+            {
+                movie_angpix = micrograph.angpix;
+
+                if (verb > 0)
+                {
+                    std::cout << " + Using movie pixel size from " << metaFn << ": " << movie_angpix << " A\n";
+                }
+            }
+            else
+            {
+                if (verb > 0)
+                {
+                    std::cout << " + Using movie pixel size from command line: " << movie_angpix << " A\n";
+                }
+            }
+
+            if (coords_angpix <= 0)
+            {
+                coords_angpix = micrograph.angpix * micrograph.getBinningFactor();
+
+                if (verb > 0)
+                {
+                    std::cout << " + Using coord. pixel size from " << metaFn << ": " << coords_angpix << " A\n";
+                }
+            }
+            else
+            {
+                if (verb > 0)
+                {
+                    std::cout << " + Using coord. pixel size from command line: " << coords_angpix << " A\n";
+                }
+            }
+
+            // this is safe to do - motionEstimator.read() has been called already
+            if (motionEstimator.dosePerFrame < 0)
+            {
+                motionEstimator.dosePerFrame = micrograph.dose_per_frame;
+
+                if (verb > 0)
+                {
+                    std::cout << " + Using dose per frame from " << metaFn << ": "
+                              << motionEstimator.dosePerFrame << " A\n";
+                }
+            }
+
+            micrograph_xsize = micrograph.getWidth();
+            micrograph_ysize = micrograph.getHeight();
+
+            if (lastFrame < 0)
+            {
+                fc = micrograph.getNframes() - firstFrame;
+            }
+            else
+            {
+                fc = lastFrame - firstFrame + 1;
+            }
+        }
+        else
+        {
+            if (lastFrame < 0)
+            {
+                FileName mgFn;
+                mdt0.getValue(EMDL_MICROGRAPH_NAME, mgFn, 0);
+
+                Image<RFLOAT> dum;
+                dum.read(mgFn, false);
+                micrograph_xsize = XSIZE(dum());
+                micrograph_ysize = YSIZE(dum());
+
+                fc = (dum().zdim > 1? dum().zdim : dum().ndim) - firstFrame;
+            }
+            else
+            {
+                fc = lastFrame - firstFrame + 1;
+            }
+        }
+    }
 }
 
 std::vector<Image<RFLOAT>> MotionRefiner::weightsFromFCC()
@@ -1253,6 +1238,63 @@ std::vector<Image<RFLOAT>> MotionRefiner::weightsFromBfacs()
     }
 
     return freqWeights;
+}
+
+void MotionRefiner::adaptMovieNames()
+{
+    if (movie_toReplace != "")
+    {
+        std::string name;
+
+        for (int i = 0; i < mdt0.numberOfObjects(); i++)
+        {
+            mdt0.getValue(EMDL_MICROGRAPH_NAME, name, i);
+
+            if (i == 0 && verb > 0)
+            {
+                std::cout << "   - Replacing: " << name << "\n";
+            }
+
+            std::string::size_type pos0 = name.find(movie_toReplace);
+
+            if (pos0 != std::string::npos)
+            {
+                std::string::size_type pos1 = pos0 + movie_toReplace.length();
+
+                std::string before = name.substr(0, pos0);
+                std::string after = pos1 < name.length()? name.substr(pos1) : "";
+
+                name = before + movie_replaceBy + after;
+            }
+
+            if (i == 0 && verb > 0)
+            {
+                std::cout << " -> " << name << "\n";
+            }
+
+            if (movie_path != "")
+            {
+                name = movie_path + name.substr(name.find_last_of('/')+1);
+
+                if (i == 0 && verb > 0)
+                {
+                    std::cout << " -> " << name << "\n";
+                }
+            }
+
+            if (movie_ending != "")
+            {
+                name = name + name.substr(0, name.find_last_of('.'));
+
+                if (i == 0 && verb > 0)
+                {
+                    std::cout << " -> " << name << "\n";
+                }
+            }
+
+            mdt0.setValue(EMDL_MICROGRAPH_NAME, name, i);
+        }
+    }
 }
 
 
