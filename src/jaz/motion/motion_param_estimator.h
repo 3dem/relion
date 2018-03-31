@@ -14,7 +14,7 @@ class MotionParamEstimator
             MotionRefiner& motionRefiner;
             AlignmentSet alignmentSet;
 
-            bool estim2, estim3;
+            bool ready, estim2, estim3;
             int maxRange, recursions, steps;
             double rV, rD, rA;
 

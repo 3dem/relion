@@ -14,7 +14,7 @@
 using namespace gravis;
 
 MotionEstimator::MotionEstimator(MotionRefiner& motionRefiner)
-:   motionRefiner(motionRefiner)
+:   motionRefiner(motionRefiner), ready(false)
 {
 }
 
@@ -103,10 +103,17 @@ void MotionEstimator::init()
                         dmgWeight[f], k_cutoff-1, k_cutoff+1);
         }
     }
+
+    ready = true;
 }
 
-void MotionEstimator::process(long g_start, long g_end)
+void MotionEstimator::process(const std::vector<MetaDataTable>& mdts, long g_start, long g_end)
 {
+    if (!ready)
+    {
+        REPORT_ERROR("ERROR: MotionEstimator::process: MotionEstimator not initialized.");
+    }
+
     int barstep;
     int my_nr_micrographs = g_end - g_start + 1;
 
@@ -140,17 +147,17 @@ void MotionEstimator::process(long g_start, long g_end)
 
     for (long g = g_start; g <= g_end; g++)
     {
-        const int pc = motionRefiner.mdts[g].numberOfObjects();
+        const int pc = mdts[g].numberOfObjects();
         if (pc == 0) continue;
 
         // Make sure output directory exists
-        FileName newdir = motionRefiner.getOutputFileNameRoot(g);
+        FileName newdir = motionRefiner.getOutputFileNameRoot(mdts[g]);
         newdir = newdir.beforeLastOf("/");
 
         if (newdir != prevdir)
         {
             std::string command = " mkdir -p " + newdir;
-            int res = system(command.c_str());
+            int ret = system(command.c_str());
         }
 
         std::vector<std::vector<Image<Complex>>> movie;
@@ -159,7 +166,7 @@ void MotionEstimator::process(long g_start, long g_end)
         std::vector<std::vector<d2Vector>> initialTracks;
         std::vector<d2Vector> globComp;
 
-        prepMicrograph(g, fts, dmgWeight,
+        prepMicrograph(mdts[g], fts, dmgWeight,
                 movie, movieCC, positions, initialTracks, globComp);
 
         pctot += pc;
@@ -169,9 +176,11 @@ void MotionEstimator::process(long g_start, long g_end)
                 sig_vel_nrm, sig_acc_nrm, sig_div_nrm,
                 positions, globComp);
 
-        updateFCC(movie, tracks, motionRefiner.mdts[g], tables, weights0, weights1);
+        updateFCC(movie, tracks, mdts[g], tables, weights0, weights1);
 
-        writeOutput(tracks, tables, weights0, weights1, positions, motionRefiner.outPath, g, 30.0);
+        std::string fn_root = motionRefiner.getOutputFileNameRoot(mdts[g]);
+
+        writeOutput(tracks, tables, weights0, weights1, positions, fn_root, 30.0);
 
         for (int i = 0; i < motionRefiner.nr_omp_threads; i++)
         {
@@ -196,7 +205,7 @@ void MotionEstimator::process(long g_start, long g_end)
 
 
 void MotionEstimator::prepMicrograph(
-        long g, std::vector<ParFourierTransformer>& fts,
+        const MetaDataTable &mdt, std::vector<ParFourierTransformer>& fts,
         const std::vector<Image<RFLOAT>>& dmgWeight,
         std::vector<std::vector<Image<Complex>>>& movie,
         std::vector<std::vector<Image<RFLOAT>>>& movieCC,
@@ -204,9 +213,9 @@ void MotionEstimator::prepMicrograph(
         std::vector<std::vector<d2Vector>>& initialTracks,
         std::vector<d2Vector>& globComp)
 {
-    const int pc = motionRefiner.mdts[g].numberOfObjects();
+    const int pc = mdt.numberOfObjects();
 
-    movie = motionRefiner.loadMovie(g, pc, fts); // throws exceptions
+    movie = motionRefiner.loadMovie(mdt, fts); // throws exceptions
     std::vector<double> sigma2 = StackHelper::powerSpectrum(movie);
 
     #pragma omp parallel for num_threads(motionRefiner.nr_omp_threads)
@@ -220,13 +229,13 @@ void MotionEstimator::prepMicrograph(
 
     for (int p = 0; p < pc; p++)
     {
-        motionRefiner.mdts[g].getValue(EMDL_IMAGE_COORD_X, positions[p].x, p);
-        motionRefiner.mdts[g].getValue(EMDL_IMAGE_COORD_Y, positions[p].y, p);
+        mdt.getValue(EMDL_IMAGE_COORD_X, positions[p].x, p);
+        mdt.getValue(EMDL_IMAGE_COORD_Y, positions[p].y, p);
     }
 
     movieCC = MotionHelper::movieCC(
             motionRefiner.projectors[0], motionRefiner.projectors[1],
-            motionRefiner.obsModel, motionRefiner.mdts[g], movie,
+            motionRefiner.obsModel, mdt, movie,
             sigma2, dmgWeight, fts, motionRefiner.nr_omp_threads);
 
     initialTracks = std::vector<std::vector<d2Vector>>(pc);
@@ -249,7 +258,7 @@ void MotionEstimator::prepMicrograph(
 
         if (diag)
         {
-            ImageLog::write(ccSum, motionRefiner.getOutputFileNameRoot(g) + "_CCsum", CenterXY);
+            ImageLog::write(ccSum, motionRefiner.getOutputFileNameRoot(mdt) + "_CCsum", CenterXY);
         }
 
         for (int p = 0; p < pc; p++)
@@ -404,8 +413,7 @@ void MotionEstimator::writeOutput(
         const std::vector<Image<RFLOAT>>& fccWeight0,
         const std::vector<Image<RFLOAT>>& fccWeight1,
         const std::vector<d2Vector>& positions,
-        std::string outPath, long g,
-        double visScale)
+        std::string fn_root, double visScale)
 {
     const int pc = tracks.size();
 
@@ -413,7 +421,6 @@ void MotionEstimator::writeOutput(
 
     const int fc = tracks[0].size();
 
-    FileName fn_root = motionRefiner.getOutputFileNameRoot(g);
     MotionHelper::writeTracks(tracks, fn_root + "_tracks.star");
 
     Image<RFLOAT> fccDataSum(sh,fc), fccWeight0Sum(sh,fc), fccWeight1Sum(sh,fc);
@@ -563,3 +570,10 @@ void MotionEstimator::writeOutput(
     }
 }
 
+bool MotionEstimator::isFinished(std::string filenameRoot)
+{
+    return exists(filenameRoot+"_tracks.star")
+            && exists(filenameRoot+"_FCC_cc.mrc")
+            && exists(filenameRoot+"_FCC_w0.mrc")
+            && exists(filenameRoot+"_FCC_w1.mrc");
+}

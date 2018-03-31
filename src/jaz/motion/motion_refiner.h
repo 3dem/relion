@@ -44,61 +44,39 @@ class MotionRefiner
 
         MotionRefiner();
 
+            // Verbosity
+            int verb;
 
-        // Verbosity
-        int verb;
+            // Write out debugging information
+            bool debug;
+            double movie_angpix, coords_angpix, angpix;
+            int nr_omp_threads, firstFrame, lastFrame;
+            std::string outPath, corrMicFn;
 
-        // Allow continuation of crashed jobs
-        bool only_do_unfinished;
+            Micrograph micrograph;
 
-        // Write out debugging information
-        bool debug, debugMov;
+            Image<RFLOAT> freqWeight;
+            Projector projectors[2];
 
-        bool preextracted, hasCorrMic, saveMem;
+            MetaDataTable mdt0;
+            std::vector<MetaDataTable>
+                allMdts, // all micrographs
+                chosenMdts, // micrographs between minMG and maxMG
+                motionMdts, recombMdts; // unfinished micrographs
 
-        double movie_angpix, coords_angpix;
+            ObservationModel obsModel;
 
-        long maxMG, minMG;
+            MotionParamEstimator motionParamEstimator;
+            MotionEstimator motionEstimator;
+            FrameRecombiner frameRecombiner;
 
-        RFLOAT angpix, paddingFactor, hotCutoff;
+            // Q: Jasenko, can we have more informative names for these important variables?
+            // A: They are so important and common that their names should be short!
+            // (s: full image size, sh: half-size + 1, fc: frame count
+            //  - these are consistent throughout the codebase.)
+            int s, sh, fc;
 
-        int nr_omp_threads, firstFrame, lastFrame;
-
-        std::string
-            starFn, reconFn0, reconFn1, maskFn,
-            outPath, fscFn,
-            meta_path,
-            movie_path, movie_ending, movie_toReplace, movie_replaceBy,
-            corrMicFn, gain_path, last_gainFn;
-
-        std::map<std::string, std::string> mic2meta;
-        Micrograph micrograph;
-
-
-        // data:
-        Image<RFLOAT> maps[2];
-        Image<RFLOAT> powSpec[2];
-        Image<RFLOAT> freqWeight, lastGainRef;
-        std::vector<double> freqWeight1D;
-        Projector projectors[2];
-
-        MetaDataTable mdt0;
-        std::vector<MetaDataTable> mdts;
-
-        ObservationModel obsModel;
-
-        MotionParamEstimator motionParamEstimator;
-        MotionEstimator motionEstimator;
-        FrameRecombiner frameRecombiner;
-
-        // Q: Jasenko, can we have more informative names for these important variables?
-        // A: They are so important and common that their names should be short!
-        // (s: full image size, sh: half-size + 1, fc: frame count
-        //  - these are consistent throughout the codebase.)
-        int s, sh, fc;
-
-        int micrograph_xsize, micrograph_ysize;
-
+            int micrograph_xsize, micrograph_ysize;
 
 
         // Read command line arguments
@@ -113,28 +91,53 @@ class MotionRefiner
         double angToPix(double a);
         double pixToAng(double p);
 
-        // combine all EPS files into one logfile.pdf
-        void combineEPSAndSTARfiles();
+        // For original particle-polishing-like Bfactors (not used)
+        void calculateSingleFrameReconstruction(int iframe);
 
-        // For original particle-polishing-like Bfactors
-        // void calculateSingleFrameReconstruction(int iframe);
-
-        // Get output STAR file name for the gth entry in the mdts
-        FileName getOutputFileNameRoot(long int g);
+        // Get output STAR file name for this micrograph
+        FileName getOutputFileNameRoot(const MetaDataTable& mdt);
 
         // load a movie and extract all particles
         // returns a per-particle vector of per-frame images of size sh x s
         std::vector<std::vector<Image<Complex>>> loadMovie(
-                long g, int pc, std::vector<ParFourierTransformer>& fts);
+                const MetaDataTable& mdt, std::vector<ParFourierTransformer>& fts);
+
+    protected:
+
+            std::string
+                starFn, reconFn0, reconFn1, maskFn,
+                fscFn, meta_path,
+                movie_path, movie_ending, movie_toReplace, movie_replaceBy,
+                gain_path, last_gainFn;
+
+            // Allow continuation of crashed jobs
+            bool only_do_unfinished, debugMov,
+                 preextracted, hasCorrMic, saveMem;
+
+            bool estimateParams,
+                 estimateMotion,
+                 recombineFrames,
+                 generateStar;
+
+            long maxMG, minMG;
+
+            double paddingFactor, hotCutoff;
+
+            std::map<std::string, std::string> mic2meta;
+
+            Image<RFLOAT> maps[2], powSpec[2], lastGainRef;
+            std::vector<double> freqWeight1D;
+
 
         // load the header of the first movie only to learn the frame number and micrograph size
         // (also the dose and movie pixel size if a corrected_micrographs.star is available)
         std::vector<std::vector<Image<Complex>>> loadInitialMovie();
 
-    protected:
+        // combine all EPS files into one logfile.pdf
+        void combineEPSAndSTARfiles();
 
         // apply changes to micrograph-filenames implied by
-        // movie_path, movie_ending, movie_toReplace, movie_replaceBy
+        // movie_path, movie_ending and movie_toReplace/replaceBy
         void adaptMovieNames();
 };
 

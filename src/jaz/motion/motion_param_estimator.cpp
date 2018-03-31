@@ -4,7 +4,7 @@
 using namespace gravis;
 
 MotionParamEstimator::MotionParamEstimator(MotionRefiner& motionRefiner)
-:   motionRefiner(motionRefiner)
+:   motionRefiner(motionRefiner), ready(false)
 {
 
 }
@@ -25,6 +25,11 @@ int MotionParamEstimator::read(IOParser& parser, int argc, char *argv[])
 
 void MotionParamEstimator::init()
 {
+    if (!motionRefiner.motionEstimator.ready)
+    {
+        REPORT_ERROR("ERROR: MotionParamEstimator initialized before MotionEstimator.");
+    }
+
     if ((estim2 || estim3) && motionRefiner.motionEstimator.k_cutoff < 0)
     {
         REPORT_ERROR("ERROR: Parameter estimation requires a freq. cutoff (--k_cut / --k_cut_A).");
@@ -34,9 +39,15 @@ void MotionParamEstimator::init()
     {
         REPORT_ERROR("ERROR: Only 2 or 3 parameters can be estimated (--params2 or --params3), not both.");
     }
+
+    ready = true;
 }
 
 void MotionParamEstimator::run()
 {
+    if (!ready)
+    {
+        REPORT_ERROR("ERROR: MotionParamEstimator::run: MotionParamEstimator not initialized.");
+    }
 
 }

@@ -25,7 +25,9 @@ class FrameRecombiner
 
         void read(IOParser& parser, int argc, char *argv[]);
         void init();
-        void process(long g_start, long g_end);
+        void process(const std::vector<MetaDataTable>& mdts, long g_start, long g_end);
+
+        static bool isFinished(std::string filenameRoot);
 
 
     protected:

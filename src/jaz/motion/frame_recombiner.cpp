@@ -30,56 +30,9 @@ void FrameRecombiner::init()
     s = motionRefiner.s;
     sh = motionRefiner.sh;
     fc = motionRefiner.fc;
-
-    // Split again, as a subset might have been done before for only_do_unfinished...
-    motionRefiner.mdts.clear();
-    motionRefiner.mdts = StackHelper::splitByMicrographName(&motionRefiner.mdt0);
-
-    // check whether combine_frames output stacks exist - if they do, skip this micrograph
-    // @TODO: turn off if not all motion had been estimated!
-    if (motionRefiner.only_do_unfinished)
-    {
-        std::vector<MetaDataTable> unfinished_mdts;
-
-        for (long int g = motionRefiner.minMG; g <= motionRefiner.maxMG; g++ )
-        {
-            bool is_done = true;
-
-            if (!exists(motionRefiner.getOutputFileNameRoot(g)+"_shiny.mrcs"))
-            {
-                is_done = false;
-            }
-
-            if (!exists(motionRefiner.getOutputFileNameRoot(g)+"_shiny.star"))
-            {
-                is_done = false;
-            }
-
-            if (!is_done)
-            {
-                unfinished_mdts.push_back(motionRefiner.mdts[g]);
-            }
-        }
-
-        motionRefiner.mdts = unfinished_mdts;
-
-        if (motionRefiner.verb > 0)
-        {
-            if (motionRefiner.mdts.size() > 0)
-            {
-                std::cout << "   - Will only combine frames for " << motionRefiner.mdts.size()
-                          << " unfinished micrographs" << std::endl;
-            }
-            else
-            {
-                std::cout << "   - Will not combine frames for any unfinished micrographs, "
-                          << "just generate a STAR file" << std::endl;
-            }
-        }
-    }
 }
 
-void FrameRecombiner::process(long g_start, long g_end)
+void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_start, long g_end)
 {
     std::vector<Image<RFLOAT>> freqWeights;
 
@@ -108,21 +61,19 @@ void FrameRecombiner::process(long g_start, long g_end)
     std::vector<ParFourierTransformer> fts(motionRefiner.nr_omp_threads);
 
     int pctot = 0;
-
     long nr_done = 0;
-    FileName prevdir = "";
 
     for (long g = g_start; g <= g_end; g++)
     {
-        const int pc = motionRefiner.mdts[g].numberOfObjects();
+        const int pc = mdts[g].numberOfObjects();
         if (pc == 0) continue;
 
         pctot += pc;
 
         std::vector<std::vector<Image<Complex>>> movie;
-        movie = motionRefiner.loadMovie(g, pc, fts);
+        movie = motionRefiner.loadMovie(mdts[g], fts);
 
-        FileName fn_root = motionRefiner.getOutputFileNameRoot(g);
+        FileName fn_root = motionRefiner.getOutputFileNameRoot(mdts[g]);
         std::vector<std::vector<d2Vector>> shift;
         shift = MotionHelper::readTracks(fn_root+"_tracks.star");
 
@@ -167,14 +118,16 @@ void FrameRecombiner::process(long g_start, long g_end)
             VtkHelper::writeTomoVTK(stack, fn_root+"_shiny.vtk");
         }
 
+        MetaDataTable mdtOut = mdts[g];
+
         for (int p = 0; p < pc; p++)
         {
             std::stringstream sts;
             sts << (p+1);
-            motionRefiner.mdts[g].setValue(EMDL_IMAGE_NAME, sts.str() + "@" + fn_root+"_shiny.mrcs", p);
+            mdtOut.setValue(EMDL_IMAGE_NAME, sts.str() + "@" + fn_root+"_shiny.mrcs", p);
         }
 
-        motionRefiner.mdts[g].write(fn_root+"_shiny.star");
+        mdtOut.write(fn_root+"_shiny.star");
 
         nr_done++;
 
@@ -202,9 +155,18 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromFCC()
 
     bool first = true;
 
-    for (long g = 0; g < motionRefiner.mdts.size(); g++)
+    // Compute B/k-factors from all available FCCs (allMdts),
+    // even if only a subset of micrographs (chosenMdts) is being recombined.
+    for (long g = 0; g < motionRefiner.allMdts.size(); g++)
     {
-        FileName fn_root = motionRefiner.getOutputFileNameRoot(g);
+        FileName fn_root = motionRefiner.getOutputFileNameRoot(motionRefiner.allMdts[g]);
+
+        if (!( exists(fn_root + "_FCC_cc.mrc")
+            && exists(fn_root + "_FCC_w0.mrc")
+            && exists(fn_root + "_FCC_w1.mrc")))
+        {
+            continue;
+        }
 
         fccDataMg.read(fn_root + "_FCC_cc.mrc");
         fccWgh0Mg.read(fn_root + "_FCC_w0.mrc");
@@ -397,4 +359,10 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromBfacs()
     }
 
     return freqWeights;
+}
+
+bool FrameRecombiner::isFinished(std::string filenameRoot)
+{
+    return exists(filenameRoot+"_shiny.mrcs")
+            && exists(filenameRoot+"_shiny.star");
 }

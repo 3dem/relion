@@ -15,7 +15,7 @@ std::vector<std::vector<Image<RFLOAT>>> MotionHelper::movieCC(
         Projector& projector0,
         Projector& projector1,
         const ObservationModel &obsModel,
-        MetaDataTable &viewParams,
+        const MetaDataTable &viewParams,
         const std::vector<std::vector<Image<Complex> > > &movie,
         const std::vector<double> &sigma2,
         const std::vector<Image<RFLOAT> > &damageWeights,

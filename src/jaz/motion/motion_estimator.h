@@ -17,8 +17,9 @@ class MotionEstimator
 
             MotionRefiner& motionRefiner;
 
-            int s, sh, fc;
+            bool ready;
 
+            int s, sh, fc;
             int maxEDs, maxIters;
 
             bool unregGlob, noGlobOff,
@@ -33,13 +34,13 @@ class MotionEstimator
 
         void read(IOParser& parser, int argc, char *argv[]);
         void init();
-        void process(long g_start, long g_end);
+        void process(const std::vector<MetaDataTable> &mdts, long g_start, long g_end);
 
         // load micrograph g and compute all data required for the optimization;
         // also used by MotionParamEstimator
         void prepMicrograph(
             // in:
-            long g, std::vector<ParFourierTransformer>& fts,
+            const MetaDataTable& mdt, std::vector<ParFourierTransformer>& fts,
             const std::vector<Image<RFLOAT>>& dmgWeight,
             // out:
             std::vector<std::vector<Image<Complex>>>& movie,
@@ -70,8 +71,9 @@ class MotionEstimator
             const std::vector<Image<RFLOAT>>& fccWeight0,
             const std::vector<Image<RFLOAT>>& fccWeight1,
             const std::vector<gravis::d2Vector>& positions,
-            std::string outPath, long g,
-            double visScale);
+            std::string fn_root, double visScale);
+
+        static bool isFinished(std::string filenameRoot);
 
 };
 
