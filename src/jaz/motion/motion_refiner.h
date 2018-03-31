@@ -22,34 +22,18 @@
 #define MOTION_REFINER_H_
 
 
-#include "src/ctf.h"
-#include "src/image.h"
-#include "src/fftw.h"
-#include "src/backprojector.h"
-#include "src/micrograph_model.h"
-#include "src/jaz/obs_model.h"
-#include "src/jaz/gravis/t2Vector.h"
-#include "src/jaz/parallel_ft.h"
+#include <src/ctf.h>
+#include <src/image.h>
+#include <src/fftw.h>
+#include <src/backprojector.h>
+#include <src/micrograph_model.h>
+#include <src/jaz/obs_model.h>
+#include <src/jaz/gravis/t2Vector.h>
+#include <src/jaz/parallel_ft.h>
+
 #include "motion_param_estimator.h"
-// Includes not required in the header moved to the .cpp file.
-// This prevents recompilation cascades.
 
 #include <omp.h>
-
-//using namespace gravis;
-
-/*
-   Do not use 'using' in headers!
-
-   Headers are contagious (they include each other).
-   This can lead to unexpected symbols from another namespace
-   overwriting the expected symbols.
-   Names in namespaces are chosen without regard for collisions.
-
-   harmless example: abs (returns ints) vs. std::abs (returns doubles)
-
-    --JZ
-*/
 
 
 class MotionRefiner
@@ -127,7 +111,6 @@ class MotionRefiner
         int micrograph_xsize, micrograph_ysize;
 
 
-    public:
 
         // Read command line arguments
         void read(int argc, char **argv);
@@ -178,7 +161,8 @@ class MotionRefiner
             const std::vector<gravis::d2Vector>& globComp);
 
 
-    private:
+//    private:
+// C++ doesn't know 'package protected'
 
         // Get output STAR file name for the gth entry in the mdts
         FileName getOutputFileNameRoot(long int g);

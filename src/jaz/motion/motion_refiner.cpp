@@ -36,7 +36,7 @@
 #include <src/jaz/parallel_ft.h>
 
 #include "gp_motion_fit.h"
-#include "motion_refinement.h"
+#include "motion_helper.h"
 
 using namespace gravis;
 
@@ -793,7 +793,7 @@ void MotionRefiner::combineFramesSubsetMicrographs(long g_start, long g_end)
 
 		FileName fn_root = getOutputFileNameRoot(g);
         std::vector<std::vector<d2Vector>> shift;
-        shift = MotionRefinement::readTracks(fn_root+"_tracks.star");
+        shift = MotionHelper::readTracks(fn_root+"_tracks.star");
 
         Image<RFLOAT> stack(s,s,1,pc);
 
@@ -906,7 +906,7 @@ void MotionRefiner::calculateSingleFrameReconstruction(int iframe)
 
 		FileName fn_root = getOutputFileNameRoot(g);
         std::vector<std::vector<d2Vector>> shift;
-        shift = MotionRefinement::readTracks(fn_root+"_tracks.star");
+        shift = MotionHelper::readTracks(fn_root+"_tracks.star");
 
 
         // Loop over all particles in this micrograph
@@ -1197,7 +1197,7 @@ void MotionRefiner::prepMicrograph(
     for (int p = 0; p < pc; p++)
     for (int f = 0; f < fc; f++)
     {
-        MotionRefinement::noiseNormalize(movie[p][f], sigma2, movie[p][f]);
+        MotionHelper::noiseNormalize(movie[p][f], sigma2, movie[p][f]);
     }
 
     positions = std::vector<gravis::d2Vector>(pc);
@@ -1208,7 +1208,7 @@ void MotionRefiner::prepMicrograph(
         mdts[g].getValue(EMDL_IMAGE_COORD_Y, positions[p].y, p);
     }
 
-    movieCC = MotionRefinement::movieCC(
+    movieCC = MotionHelper::movieCC(
             projectors[0], projectors[1], obsModel, mdts[g], movie,
             sigma2, dmgWeight, fts, nr_omp_threads);
 
@@ -1216,8 +1216,8 @@ void MotionRefiner::prepMicrograph(
 
     if (global_init)
     {
-        std::vector<Image<RFLOAT>> ccSum = MotionRefinement::addCCs(movieCC);
-        std::vector<gravis::d2Vector> globTrack = MotionRefinement::getGlobalTrack(ccSum);
+        std::vector<Image<RFLOAT>> ccSum = MotionHelper::addCCs(movieCC);
+        std::vector<gravis::d2Vector> globTrack = MotionHelper::getGlobalTrack(ccSum);
         std::vector<gravis::d2Vector> globOffsets;
 
         if (noGlobOff)
@@ -1226,7 +1226,7 @@ void MotionRefiner::prepMicrograph(
         }
         else
         {
-            globOffsets = MotionRefinement::getGlobalOffsets(
+            globOffsets = MotionHelper::getGlobalOffsets(
                     movieCC, globTrack, 0.25*s, nr_omp_threads);
         }
 
@@ -1393,7 +1393,7 @@ void MotionRefiner::writeOutput(
     const int fc = tracks[0].size();
 
     FileName fn_root = getOutputFileNameRoot(g);
-    MotionRefinement::writeTracks(tracks, fn_root + "_tracks.star");
+    MotionHelper::writeTracks(tracks, fn_root + "_tracks.star");
 
     Image<RFLOAT> fccDataSum(sh,fc), fccWeight0Sum(sh,fc), fccWeight1Sum(sh,fc);
     fccDataSum.data.initZeros();
@@ -1478,7 +1478,7 @@ void MotionRefiner::writeOutput(
 		CDataSet fit;
 		fit.SetDrawMarker(false);
 		fit.SetDatasetColor(0.0,0.0,0.0);
-		fit.SetLineWidth(1);
+        fit.SetLineWidth(0.5);
 
 		for (int f = 0; f < fc; f++)
 	    {
@@ -1491,7 +1491,7 @@ void MotionRefiner::writeOutput(
 		CDataSet patch_start;
 		patch_start.SetDrawMarker(true);
 		patch_start.SetMarkerSize(2);
-		patch_start.SetDatasetColor(1.0,0.0,0.0);
+        patch_start.SetDatasetColor(1.0,0.3,0.0);
 		CDataPoint point3(visTracks[p][0].x, visTracks[p][0].y);
 		patch_start.AddDataPoint(point3);
 		plot2D->AddDataSet(patch_start);
@@ -1611,8 +1611,10 @@ std::vector<Image<RFLOAT>> MotionRefiner::weightsFromFCC()
     k1 = k1a > 0.0? (int) (s*angpix / k1a) : sh;
 
     if (verb > 0)
+    {
     	std::cout << " + Fitting B/k-factors between " << k0 << " and " << k1 << " pixels, or "
     	<< k0a << " and " << k1a << " Angstrom ...\n";
+    }
 
     std::pair<std::vector<d2Vector>,std::vector<double>> bkFacs
             = DamageHelper::fitBkFactors(fcc, k0, k1);

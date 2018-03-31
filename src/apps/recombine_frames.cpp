@@ -25,7 +25,7 @@
 #include <src/jaz/refinement_helper.h>
 #include <src/jaz/stack_helper.h>
 #include <src/jaz/tilt_refinement.h>
-#include <src/jaz/motion/motion_refinement.h>
+#include <src/jaz/motion/motion_helper.h>
 #include <src/jaz/image_op.h>
 #include <src/jaz/Fourier_helper.h>
 #include <src/jaz/fsc_helper.h>
@@ -34,7 +34,6 @@
 #include <src/jaz/distribution_helper.h>
 #include <src/jaz/noise_helper.h>
 #include <src/jaz/convolution_helper.h>
-#include <src/jaz/motion_em.h>
 #include <src/jaz/local_motion_fit.h>
 #include <src/jaz/optimization/gradient_descent.h>
 #include <src/jaz/refinement_program.h>
@@ -170,7 +169,7 @@ int FrameRecomb::_run()
 
         try
         {
-            shift = MotionRefinement::readTracks(tfn);
+            shift = MotionHelper::readTracks(tfn);
         }
         catch (RelionError XE)
         {

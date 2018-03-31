@@ -25,21 +25,20 @@
 #include <src/jaz/refinement_helper.h>
 #include <src/jaz/stack_helper.h>
 #include <src/jaz/tilt_refinement.h>
-#include <src/jaz/motion/motion_refinement.h>
 #include <src/jaz/image_op.h>
 #include <src/jaz/refinement_program.h>
 #include <src/jaz/damage_helper.h>
 #include <src/jaz/fsc_helper.h>
-#include <src/jaz/motion/gp_motion_fit.h>
 #include <src/jaz/optimization/gradient_descent.h>
 #include <src/jaz/optimization/nelder_mead.h>
 #include <src/jaz/optimization/lbfgs.h>
 #include <src/jaz/distribution_helper.h>
 #include <src/jaz/parallel_ft.h>
 #include <src/jaz/d3x3/dsyev2.h>
-#include <src/jaz/alignment_set.h>
 
-#include <src/jaz/motion_em.h>
+#include <src/jaz/motion/alignment_set.h>
+#include <src/jaz/motion/gp_motion_fit.h>
+#include <src/jaz/motion/motion_helper.h>
 
 #include <omp.h>
 
@@ -462,7 +461,7 @@ void MotionFitProg::prepMicrograph(
     for (int p = 0; p < pc; p++)
     for (int f = 0; f < fc; f++)
     {
-        MotionRefinement::noiseNormalize(movie[p][f], sigma2, movie[p][f]);
+        MotionHelper::noiseNormalize(movie[p][f], sigma2, movie[p][f]);
     }
 
     positions = std::vector<gravis::d2Vector>(pc);
@@ -478,7 +477,7 @@ void MotionFitProg::prepMicrograph(
         std::cout << "    computing initial correlations...\n";
     }
 
-    movieCC = MotionRefinement::movieCC(
+    movieCC = MotionHelper::movieCC(
             projectors[0], projectors[1], obsModel, mdts[g], movie,
             sigma2, dmgWeight, fts, nr_omp_threads);
 
@@ -486,8 +485,8 @@ void MotionFitProg::prepMicrograph(
 
     if (global_init)
     {
-        std::vector<Image<RFLOAT>> ccSum = MotionRefinement::addCCs(movieCC);
-        std::vector<gravis::d2Vector> globTrack = MotionRefinement::getGlobalTrack(ccSum);
+        std::vector<Image<RFLOAT>> ccSum = MotionHelper::addCCs(movieCC);
+        std::vector<gravis::d2Vector> globTrack = MotionHelper::getGlobalTrack(ccSum);
         std::vector<gravis::d2Vector> globOffsets;
 
         if (noGlobOff)
@@ -496,7 +495,7 @@ void MotionFitProg::prepMicrograph(
         }
         else
         {
-            globOffsets = MotionRefinement::getGlobalOffsets(
+            globOffsets = MotionHelper::getGlobalOffsets(
                     movieCC, globTrack, 0.25*s, nr_omp_threads);
         }
 
@@ -1313,7 +1312,7 @@ void MotionFitProg::writeOutput(
     const int fc = tracks[0].size();
 
     std::string tag = getMicrographTag(mg);
-    MotionRefinement::writeTracks(tracks, outPath + "/" + tag + "_tracks.star");
+    MotionHelper::writeTracks(tracks, outPath + "/" + tag + "_tracks.star");
 
     Image<RFLOAT> fccDataSum(sh,fc), fccWeight0Sum(sh,fc), fccWeight1Sum(sh,fc);
     fccDataSum.data.initZeros();

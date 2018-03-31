@@ -1,7 +1,7 @@
 #ifndef MOTION_PARAM_ESTIMATOR_H
 #define MOTION_PARAM_ESTIMATOR_H
 
-#include <src/jaz/alignment_set.h>
+#include "alignment_set.h"
 
 class MotionRefiner;
 
