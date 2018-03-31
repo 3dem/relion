@@ -107,7 +107,7 @@ class MotionRefiner
         // Initialise some general stuff after reading
         void init();
 
-        // General Running
+        // General Running (Admiral Swimming!)
         void run();
 
         double angToPix(double a);
@@ -117,12 +117,10 @@ class MotionRefiner
         void combineEPSAndSTARfiles();
 
         // For original particle-polishing-like Bfactors
-        void calculateSingleFrameReconstruction(int iframe);
+        // void calculateSingleFrameReconstruction(int iframe);
 
         // Get output STAR file name for the gth entry in the mdts
         FileName getOutputFileNameRoot(long int g);
-
-        std::string getMicrographTag(long g);
 
         // load a movie and extract all particles
         // returns a per-particle vector of per-frame images of size sh x s
@@ -131,7 +129,6 @@ class MotionRefiner
 
         // load the header of the first movie only to learn the frame number and micrograph size
         // (also the dose and movie pixel size if a corrected_micrographs.star is available)
-        // - this should be given by the global part of run_data.star, once it exists
         std::vector<std::vector<Image<Complex>>> loadInitialMovie();
 
     protected:

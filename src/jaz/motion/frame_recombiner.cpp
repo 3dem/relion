@@ -27,11 +27,15 @@ void FrameRecombiner::read(IOParser& parser, int argc, char* argv[])
 
 void FrameRecombiner::init()
 {
+    s = motionRefiner.s;
+    sh = motionRefiner.sh;
+    fc = motionRefiner.fc;
+
     // Split again, as a subset might have been done before for only_do_unfinished...
     motionRefiner.mdts.clear();
     motionRefiner.mdts = StackHelper::splitByMicrographName(&motionRefiner.mdt0);
 
-    // check whether combine_frames output stack exist and if they do, then skip this micrograph
+    // check whether combine_frames output stacks exist - if they do, skip this micrograph
     // @TODO: turn off if not all motion had been estimated!
     if (motionRefiner.only_do_unfinished)
     {
@@ -80,7 +84,7 @@ void FrameRecombiner::process(long g_start, long g_end)
     std::vector<Image<RFLOAT>> freqWeights;
 
     // Either calculate weights from FCC or from user-provided B-factors
-    hasBfacs = bfacFn != "";
+    const bool hasBfacs = bfacFn != "";
 
     if (!hasBfacs)
     {

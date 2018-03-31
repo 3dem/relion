@@ -18,7 +18,7 @@ class FrameRecombiner
 
             int s, sh, fc;
 
-            bool doCombineFrames, hasBfacs, bfac_diag;
+            bool doCombineFrames, bfac_diag;
             int k0, k1;
             double k0a, k1a;
             std::string trackFn, bfacFn;

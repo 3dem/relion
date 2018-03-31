@@ -183,7 +183,6 @@ foreach (_target ${RELION_TARGETS})
 	endif()
 
 	if(TIFF_FOUND)
-		message("linking ${_target} to TIFF (${TIFF_LIBRARIES})")
 		target_link_libraries(${_target} ${TIFF_LIBRARIES})
 	endif()
     
