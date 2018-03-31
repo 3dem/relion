@@ -610,16 +610,6 @@ FileName MotionRefiner::getOutputFileNameRoot(long int g)
 	return outPath + fn_post.withoutExtension();
 }
 
-std::string MotionRefiner::getMicrographTag(long g)
-{
-    std::string tag;
-    mdts[g].getValue(EMDL_IMAGE_NAME, tag, 0);
-    tag = tag.substr(0,tag.find_last_of('.'));
-    tag = tag.substr(tag.find_first_of('@')+1);
-
-    return tag;
-}
-
 std::vector<std::vector<Image<Complex>>> MotionRefiner::loadMovie(
         long g, int pc, std::vector<ParFourierTransformer>& fts)
 {
