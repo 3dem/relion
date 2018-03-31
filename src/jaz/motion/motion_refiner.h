@@ -30,7 +30,7 @@
 #include "src/jaz/obs_model.h"
 #include "src/jaz/gravis/t2Vector.h"
 #include "src/jaz/parallel_ft.h"
-#include "src/jaz/motion_param_estimator.h"
+#include "motion_param_estimator.h"
 // Includes not required in the header moved to the .cpp file.
 // This prevents recompilation cascades.
 

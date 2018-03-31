@@ -18,7 +18,7 @@
  * author citations must be preserved.
  ***************************************************************************/
 
-#include "src/motion_refiner_mpi.h"
+#include "motion_refiner_mpi.h"
 
 void MotionRefinerMpi::read(int argc, char **argv)
 {

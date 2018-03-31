@@ -21,9 +21,10 @@
 #ifndef MOTION_REFINER_MPI_H_
 #define MOTION_REFINER_MPI_H_
 
-#include "src/mpi.h"
-#include "src/parallel.h"
-#include "src/motion_refiner.h"
+#include <src/mpi.h>
+#include <src/parallel.h>
+
+#include "motion_refiner.h"
 
 class MotionRefinerMpi : public MotionRefiner
 {

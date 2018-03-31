@@ -18,7 +18,7 @@
  * author citations must be preserved.
  ***************************************************************************/
 
-#include "src/motion_refiner.h"
+#include "motion_refiner.h"
 
 #include <src/jaz/optimization/lbfgs.h>
 #include <src/jaz/image_log.h>
@@ -32,10 +32,11 @@
 #include <src/jaz/stack_helper.h>
 #include <src/jaz/damage_helper.h>
 #include <src/jaz/fsc_helper.h>
-#include <src/jaz/gp_motion_fit.h>
-#include <src/jaz/motion_refinement.h>
 #include <src/jaz/image_op.h>
 #include <src/jaz/parallel_ft.h>
+
+#include "gp_motion_fit.h"
+#include "motion_refinement.h"
 
 using namespace gravis;
 

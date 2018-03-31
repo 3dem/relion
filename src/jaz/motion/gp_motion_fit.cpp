@@ -1,4 +1,5 @@
-#include <src/jaz/gp_motion_fit.h>
+#include "gp_motion_fit.h"
+
 #include <src/jaz/svd_helper.h>
 #include <src/jaz/interpolation.h>
 

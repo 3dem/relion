@@ -2,7 +2,7 @@
 #include <src/args.h>
 #include <src/metadata_table.h>
 #include <src/jaz/stack_helper.h>
-#include <src/jaz/motion_refinement.h>
+#include <src/jaz/motion/motion_refinement.h>
 
 using namespace gravis;
 

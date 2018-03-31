@@ -1,5 +1,5 @@
 #include "motion_param_estimator.h"
-#include <src/motion_refiner.h>
+#include "motion_refiner.h"
 
 MotionParamEstimator::MotionParamEstimator(MotionRefiner& motionRefiner)
 :   motionRefiner(motionRefiner)
