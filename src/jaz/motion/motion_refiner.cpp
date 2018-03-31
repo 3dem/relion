@@ -42,7 +42,8 @@ using namespace gravis;
 
 MotionRefiner::MotionRefiner()
 :   motionParamEstimator(*this),
-    motionEstimator(*this)
+    motionEstimator(*this),
+    frameRecombiner(*this)
 {
 }
 
@@ -51,7 +52,7 @@ void MotionRefiner::read(int argc, char **argv)
     IOParser parser;
     parser.setCommandLine(argc, argv);
 
-	int gen_section = parser.addSection("General options");
+    parser.addSection("General options");
 	// TODO: fn_opt = parser.getOption("--opt", "optimiser STAR file from a previous 3D auto-refinement");
 
     starFn = parser.getOption("--i", "Input STAR file");
@@ -67,16 +68,9 @@ void MotionRefiner::read(int argc, char **argv)
 
     motionEstimator.read(parser, argc, argv);
     motionParamEstimator.read(parser, argc, argv);
+    frameRecombiner.read(parser, argc, argv);
 
-	int combine_section = parser.addSection("Combine frames options");
-
-	doCombineFrames = parser.checkOption("--combine_frames", "Combine movie frames into polished particles.");
-	k0a = textToFloat(parser.getOption("--bfac_minfreq", "Min. frequency used in B-factor fit [Angst]", "20"));
-    k1a = textToFloat(parser.getOption("--bfac_maxfreq", "Max. frequency used in B-factor fit [Angst]", "-1"));
-    bfacFn = parser.getOption("--bfactors", "A .star file with external B/k-factors", "");
-    bfac_debug = parser.checkOption("--debug_bfactor", "Write out B/k-factor diagnostic data");
-
-	int comp_section = parser.addSection("Computational options");
+    parser.addSection("Computational options");
 
     nr_omp_threads = textToInteger(parser.getOption("--j", "Number of (OMP) threads", "1"));
     paddingFactor = textToFloat(parser.getOption("--pad", "Padding factor", "2"));
@@ -85,7 +79,7 @@ void MotionRefiner::read(int argc, char **argv)
 
     saveMem = parser.checkOption("--sbs", "Load movies slice-by-slice to save memory (slower)");
 
-	int expert_section = parser.addSection("Expert options");
+    parser.addSection("Expert options");
 
 	angpix = textToFloat(parser.getOption("--angpix", "Pixel resolution (angst/pix) - read from STAR file by default", "-1"));
     movie_path = parser.getOption("--mov", "Path to movies", "");
@@ -264,7 +258,7 @@ void MotionRefiner::init()
 	}
 
     // Check whether there is anything to do at all
-	if (mdts.size() > 0 || doCombineFrames)
+    if (mdts.size() > 0 || frameRecombiner.doCombineFrames)
 	{
 		obsModel = ObservationModel(angpix);
 
@@ -378,55 +372,6 @@ void MotionRefiner::init()
     motionParamEstimator.init();
 }
 
-void MotionRefiner::initialiseCombineFrames()
-{
-	// Split again, as a subset might have been done before for only_do_unfinished...
-    mdts.clear();
-    mdts = StackHelper::splitByMicrographName(&mdt0);
-
-    // check whether combine_frames output stack exist and if they do, then skip this micrograph
-	if (only_do_unfinished)
-	{
-		std::vector<MetaDataTable> unfinished_mdts;
-
-		for (long int g = minMG; g <= maxMG; g++ )
-		{
-			bool is_done = true;
-
-			if (!exists(getOutputFileNameRoot(g)+"_shiny.mrcs"))
-            {
-				is_done = false;
-            }
-
-			if (!exists(getOutputFileNameRoot(g)+"_shiny.star"))
-            {
-				is_done = false;
-            }
-
-			if (!is_done)
-            {
-				unfinished_mdts.push_back(mdts[g]);
-            }
-		}
-
-		mdts = unfinished_mdts;
-
-		if (verb > 0)
-		{
-			if (mdts.size() > 0)
-            {
-                std::cout << "   - Will only combine frames for " << mdts.size()
-                          << " unfinished micrographs" << std::endl;
-            }
-			else
-            {
-                std::cout << "   - Will not combine frames for any unfinished micrographs, "
-                          << "just generate a STAR file" << std::endl;
-            }
-		}
-	}
-}
-
 void MotionRefiner::run()
 {
     if (motionParamEstimator.estim2 || motionParamEstimator.estim3)
@@ -443,13 +388,13 @@ void MotionRefiner::run()
         motionEstimator.process(0, mdts.size()-1);
     }
 
-	if (doCombineFrames)
-	{
-		initialiseCombineFrames();
+    if (frameRecombiner.doCombineFrames)
+    {
+        frameRecombiner.init();
 
 		if (mdts.size() > 0)
         {
-			combineFramesSubsetMicrographs(0, mdts.size()-1);
+            frameRecombiner.process(0, mdts.size()-1);
         }
 	}
 
@@ -464,117 +409,6 @@ double MotionRefiner::angToPix(double a)
 double MotionRefiner::pixToAng(double p)
 {
     return s * angpix / p;
-}
-
-void MotionRefiner::combineFramesSubsetMicrographs(long g_start, long g_end)
-{
-    std::vector<Image<RFLOAT>> freqWeights;
-
-    // Either calculate weights from FCC or from user-provided B-factors
-    hasBfacs = bfacFn != "";
-
-    if (!hasBfacs)
-    {
-        freqWeights = weightsFromFCC();
-    }
-    else
-    {
-        freqWeights = weightsFromBfacs();
-    }
-
-    int barstep;
-	int my_nr_micrographs = g_end - g_start + 1;
-
-    if (verb > 0)
-	{
-		std::cout << " + Combining frames for all micrographs ... " << std::endl;
-		init_progress_bar(my_nr_micrographs);
-		barstep = XMIPP_MAX(1, my_nr_micrographs/ 60);
-	}
-
-    std::vector<ParFourierTransformer> fts(nr_omp_threads);
-
-    int pctot = 0;
-
-	long nr_done = 0;
-	FileName prevdir = "";
-
-	for (long g = g_start; g <= g_end; g++)
-	{
-        const int pc = mdts[g].numberOfObjects();
-        if (pc == 0) continue;
-
-        pctot += pc;
-
-        std::vector<std::vector<Image<Complex>>> movie;
-        movie = loadMovie(g, pc, fts);
-
-		FileName fn_root = getOutputFileNameRoot(g);
-        std::vector<std::vector<d2Vector>> shift;
-        shift = MotionHelper::readTracks(fn_root+"_tracks.star");
-
-        Image<RFLOAT> stack(s,s,1,pc);
-
-        #pragma omp parallel for num_threads(nr_omp_threads)
-        for (int p = 0; p < pc; p++)
-        {
-            int threadnum = omp_get_thread_num();
-
-            Image<Complex> sum(sh,s);
-            sum.data.initZeros();
-
-            Image<Complex> obs(sh,s);
-
-            for (int f = 0; f < fc; f++)
-            {
-            	shiftImageInFourierTransform(movie[p][f](), obs(), s, -shift[p][f].x, -shift[p][f].y);
-
-                for (int y = 0; y < s; y++)
-                for (int x = 0; x < sh; x++)
-                {
-                    sum(y,x) += freqWeights[f](y,x) * obs(y,x);
-                }
-            }
-
-            Image<RFLOAT> real(s,s);
-
-            fts[threadnum].inverseFourierTransform(sum(), real());
-
-            for (int y = 0; y < s; y++)
-            for (int x = 0; x < s; x++)
-            {
-                DIRECT_NZYX_ELEM(stack(), p, 0, y, x) = real(y,x);
-            }
-        }
-
-        stack.write(fn_root+"_shiny.mrcs");
-
-        if (debug)
-        {
-            VtkHelper::writeTomoVTK(stack, fn_root+"_shiny.vtk");
-        }
-
-        for (int p = 0; p < pc; p++)
-        {
-            std::stringstream sts;
-            sts << (p+1);
-            mdts[g].setValue(EMDL_IMAGE_NAME, sts.str() + "@" + fn_root+"_shiny.mrcs", p);
-        }
-
-        mdts[g].write(fn_root+"_shiny.star");
-
-		nr_done++;
-
-		if (verb > 0 && nr_done % barstep == 0)
-        {
-			progress_bar(nr_done);
-        }
-	}
-
-    if (verb > 0)
-    {
-		progress_bar(my_nr_micrographs);
-    }
 }
 
 
@@ -710,7 +544,7 @@ void MotionRefiner::combineEPSAndSTARfiles()
 
     MetaDataTable mdtAll;
 
-    if (doCombineFrames)
+    if (frameRecombiner.doCombineFrames)
     {
     	if (exists(outPath+"bfactors.eps"))
         {
@@ -736,7 +570,7 @@ void MotionRefiner::combineEPSAndSTARfiles()
 			fn_eps.push_back(fn_root+"_tracks.eps");
         }
 
-		if (doCombineFrames)
+        if (frameRecombiner.doCombineFrames)
 		{
 			MetaDataTable mdt;
 			mdt.read(fn_root+"_shiny.star");
@@ -749,7 +583,7 @@ void MotionRefiner::combineEPSAndSTARfiles()
 		joinMultipleEPSIntoSinglePDF(outPath + "logfile.pdf ", fn_eps);
 	}
 
-	if (doCombineFrames)
+    if (frameRecombiner.doCombineFrames)
     {
 		mdtAll.write(outPath+"shiny.star");
     }
@@ -759,7 +593,7 @@ void MotionRefiner::combineEPSAndSTARfiles()
 		std::cout << " + Done! " << std::endl;
 		std::cout << " + Written logfile in " << outPath << "logfile.pdf" << std::endl;
 
-		if (doCombineFrames)
+        if (frameRecombiner.doCombineFrames)
         {
 			std::cout << " + Written new particle STAR file in " << outPath << "shiny.star" << std::endl;
         }
@@ -1031,213 +865,6 @@ std::vector<std::vector<Image<Complex> > > MotionRefiner::loadInitialMovie()
             }
         }
     }
-}
-
-std::vector<Image<RFLOAT>> MotionRefiner::weightsFromFCC()
-{
-    if (debug && verb > 0)
-    {
-        std::cout << " + Summing up FCCs...\n";
-    }
-
-    Image<RFLOAT> fccData, fccWgh0, fccWgh1;
-    Image<RFLOAT> fccDataMg, fccWgh0Mg, fccWgh1Mg;
-
-    bool first = true;
-
-    for (long g = 0; g < mdts.size(); g++)
-    {
-        FileName fn_root = getOutputFileNameRoot(g);
-
-		fccDataMg.read(fn_root + "_FCC_cc.mrc");
-		fccWgh0Mg.read(fn_root + "_FCC_w0.mrc");
-		fccWgh1Mg.read(fn_root + "_FCC_w1.mrc");
-
-		if (first)
-		{
-			sh = fccDataMg.data.xdim;
-			s = 2 * (sh-1);
-			fc = fccDataMg.data.ydim;
-
-			fccData = Image<RFLOAT>(sh,fc);
-			fccWgh0 = Image<RFLOAT>(sh,fc);
-			fccWgh1 = Image<RFLOAT>(sh,fc);
-
-			fccData.data.initZeros();
-			fccWgh0.data.initZeros();
-			fccWgh1.data.initZeros();
-
-			first = false;
-		}
-
-        for (int y = 0; y < fc; y++)
-        for (int x = 0; x < sh; x++)
-        {
-            fccData(y,x) += fccDataMg(y,x);
-            fccWgh0(y,x) += fccWgh0Mg(y,x);
-            fccWgh1(y,x) += fccWgh1Mg(y,x);
-        }
-    }
-
-    Image<RFLOAT> fcc(sh,fc);
-
-    for (int y = 0; y < fc; y++)
-    for (int x = 0; x < sh; x++)
-    {
-        const double wgh = sqrt(fccWgh0Mg(y,x) * fccWgh1Mg(y,x));
-
-        if (wgh > 0.0)
-        {
-            fcc(y,x) = fccData(y,x) / wgh;
-        }
-        else
-        {
-            fcc(y,x) = 0.0;
-        }
-    }
-
-    if (debug) std::cout << "done\n";
-
-    k0 = (int) (s*angpix / k0a);
-    k1 = k1a > 0.0? (int) (s*angpix / k1a) : sh;
-
-    if (verb > 0)
-    {
-    	std::cout << " + Fitting B/k-factors between " << k0 << " and " << k1 << " pixels, or "
-    	<< k0a << " and " << k1a << " Angstrom ...\n";
-    }
-
-    std::pair<std::vector<d2Vector>,std::vector<double>> bkFacs
-            = DamageHelper::fitBkFactors(fcc, k0, k1);
-
-    std::vector<Image<RFLOAT>> freqWeights;
-    freqWeights = DamageHelper::computeWeights(bkFacs.first, sh);
-
-    const double cf = 8.0 * angpix*angpix * sh*sh;
-
-    if (bfac_debug)
-    {
-        mktree(outPath + "/bfacs");
-
-        Image<RFLOAT> bfacFit = DamageHelper::renderBkFit(bkFacs, sh, fc);
-        Image<RFLOAT> bfacFitNoScale = DamageHelper::renderBkFit(bkFacs, sh, fc, true);
-
-        ImageLog::write(bfacFit, outPath + "/bfacs/glob_Bk-fit");
-        ImageLog::write(bfacFitNoScale, outPath + "/bfacs/glob_Bk-fit_noScale");
-        ImageLog::write(fcc, outPath + "/bfacs/glob_Bk-data");
-        ImageLog::write(freqWeights, outPath + "/bfacs/freqWeights");
-
-        std::ofstream bfacsDat(outPath + "/bfacs/Bfac.dat");
-        std::ofstream kfacsDat(outPath + "/bfacs/kfac.dat");
-
-        for (int i = 0; i < fc; i++)
-        {
-            double s = bkFacs.first[i].x;
-            double b = -cf/(s*s);
-
-            bfacsDat << i << " " << b << "\n";
-            kfacsDat << i << " " << log(bkFacs.first[i].y) << "\n";
-        }
-
-        bfacsDat.close();
-        kfacsDat.close();
-    }
-
-    MetaDataTable mdt;
-    mdt.setName("perframe_bfactors");
-
-    for (int f = 0; f < fc; f++ )
-    {
-        double s = bkFacs.first[f].x;
-        double b = -cf/(s*s);
-        double k = log(bkFacs.first[f].y);
-
-        mdt.addObject();
-        mdt.setValue(EMDL_IMAGE_FRAME_NR, f);
-        mdt.setValue(EMDL_POSTPROCESS_BFACTOR, b);
-        mdt.setValue(EMDL_POSTPROCESS_GUINIER_FIT_INTERCEPT, k);
-    }
-
-    mdt.write(outPath + "/bfactors.star");
-
-    // Also write out EPS plots of the B-factors and scale factors
-    CPlot2D *plot2D=new CPlot2D("Polishing B-factors");
-	plot2D->SetXAxisSize(600);
-	plot2D->SetYAxisSize(400);
-	plot2D->SetDrawLegend(false);
-	plot2D->SetXAxisTitle("movie frame");
-	plot2D->SetYAxisTitle("B-factor");
-	mdt.addToCPlot2D(plot2D, EMDL_IMAGE_FRAME_NR, EMDL_POSTPROCESS_BFACTOR);
-	plot2D->OutputPostScriptPlot(outPath + "bfactors.eps");
-
-	CPlot2D *plot2Db=new CPlot2D("Polishing scale-factors");
-	plot2Db->SetXAxisSize(600);
-	plot2Db->SetYAxisSize(400);
-	plot2Db->SetDrawLegend(false);
-	plot2Db->SetXAxisTitle("movie frame");
-	plot2Db->SetYAxisTitle("Scale-factor");
-	mdt.addToCPlot2D(plot2Db, EMDL_IMAGE_FRAME_NR, EMDL_POSTPROCESS_GUINIER_FIT_INTERCEPT);
-	plot2Db->OutputPostScriptPlot(outPath + "scalefactors.eps");
-
-    return freqWeights;
-}
-
-std::vector<Image<RFLOAT>> MotionRefiner::weightsFromBfacs()
-{
-    MetaDataTable mdt;
-    mdt.read(bfacFn);
-
-    fc = mdt.numberOfObjects();
-
-    std::vector<d2Vector> bkFacs(fc);
-
-    const double cf = 8.0 * angpix*angpix * sh*sh;
-
-    for (int f = 0; f < fc; f++)
-    {
-        int ff;
-        mdt.getValue(EMDL_IMAGE_FRAME_NR, ff);
-
-        double b, k;
-        mdt.getValue(EMDL_POSTPROCESS_BFACTOR, b, f);
-        mdt.getValue(EMDL_POSTPROCESS_GUINIER_FIT_INTERCEPT, k, f);
-
-        bkFacs[f] = d2Vector(sqrt(-cf/b), exp(k));
-    }
-
-    std::vector<Image<RFLOAT>> freqWeights;
-    freqWeights = DamageHelper::computeWeights(bkFacs, sh);
-
-    if (bfac_debug)
-    {
-        mktree(outPath + "bfacs");
-
-        std::pair<std::vector<d2Vector>,std::vector<double>> bkFacs2;
-        bkFacs2.first = bkFacs;
-        bkFacs2.second = std::vector<double>(fc, 1.0);
-
-        Image<RFLOAT> bfacFitNoScale = DamageHelper::renderBkFit(bkFacs2, sh, fc, true);
-
-        ImageLog::write(bfacFitNoScale, outPath + "/bfacs/glob_Bk-fit_noScale");
-        ImageLog::write(freqWeights, outPath + "/bfacs/freqWeights");
-
-        std::ofstream bfacsDat(outPath + "/bfacs/Bfac.dat");
-        std::ofstream kfacsDat(outPath + "/bfacs/kfac.dat");
-
-        for (int i = 0; i < fc; i++)
-        {
-            double s = bkFacs[i].x;
-            double b = -cf/(s*s);
-
-            bfacsDat << i << " " << b << "\n";
-            kfacsDat << i << " " << log(bkFacs[i].y) << "\n";
-        }
-
-        bfacsDat.close();
-        kfacsDat.close();
-    }
-
-    return freqWeights;
 }
 
 void MotionRefiner::adaptMovieNames()

@@ -33,6 +33,7 @@
 
 #include "motion_param_estimator.h"
 #include "motion_estimator.h"
+#include "frame_recombiner.h"
 
 #include <omp.h>
 
@@ -73,11 +74,6 @@ class MotionRefiner
         std::map<std::string, std::string> mic2meta;
         Micrograph micrograph;
 
-        // For recombining frames
-        bool doCombineFrames, hasBfacs, bfac_debug;
-        int k0, k1;
-        double k0a, k1a;
-        std::string trackFn, bfacFn;
 
         // data:
         Image<RFLOAT> maps[2];
@@ -93,6 +89,7 @@ class MotionRefiner
 
         MotionParamEstimator motionParamEstimator;
         MotionEstimator motionEstimator;
+        FrameRecombiner frameRecombiner;
 
         // Q: Jasenko, can we have more informative names for these important variables?
         // A: They are so important and common that their names should be short!
@@ -110,27 +107,17 @@ class MotionRefiner
         // Initialise some general stuff after reading
         void init();
 
-        // Re-initialise vector mdts to allow only_do_unfinished for combine_frames
-        void initialiseCombineFrames();
-
         // General Running
         void run();
-
 
         double angToPix(double a);
         double pixToAng(double p);
 
-
-        // Combine frames on a subset of the micrographa
-        void combineFramesSubsetMicrographs(long g_start, long g_end);
-
         // combine all EPS files into one logfile.pdf
         void combineEPSAndSTARfiles();
 
-
         // For original particle-polishing-like Bfactors
         void calculateSingleFrameReconstruction(int iframe);
-
 
         // Get output STAR file name for the gth entry in the mdts
         FileName getOutputFileNameRoot(long int g);
@@ -146,14 +133,6 @@ class MotionRefiner
         // (also the dose and movie pixel size if a corrected_micrographs.star is available)
         // - this should be given by the global part of run_data.star, once it exists
         std::vector<std::vector<Image<Complex>>> loadInitialMovie();
-
-
-
-        // recombine_frames
-        std::vector<Image<RFLOAT>> weightsFromFCC();
-
-        std::vector<Image<RFLOAT>> weightsFromBfacs();
-
 
     protected:
 

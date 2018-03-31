@@ -72,9 +72,10 @@ void MotionRefinerMpi::run()
 
 	MPI_Barrier(MPI_COMM_WORLD);
 
-	if (doCombineFrames)
+    if (frameRecombiner.doCombineFrames)
 	{
-		initialiseCombineFrames();
+        frameRecombiner.init();
+
 		if (mdts.size() > 0)
 		{
 			long int total_nr_micrographs = mdts.size();
@@ -84,7 +85,7 @@ void MotionRefinerMpi::run()
 			divide_equally(total_nr_micrographs, node->size, node->rank, my_first_micrograph, my_last_micrograph);
 			my_nr_micrographs = my_last_micrograph - my_first_micrograph + 1;
 
-			combineFramesSubsetMicrographs(my_first_micrograph, my_last_micrograph);
+            frameRecombiner.process(my_first_micrograph, my_last_micrograph);
 		}
 	}
 
