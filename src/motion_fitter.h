@@ -30,6 +30,7 @@
 #include "src/jaz/obs_model.h"
 #include "src/jaz/gravis/t2Vector.h"
 #include "src/jaz/parallel_ft.h"
+#include "src/jaz/motion_param_estimator.h"
 // Includes not required in the header moved to the .cpp file.
 // This prevents recompilation cascades.
 
@@ -53,159 +54,161 @@
 
 class MotionFitter
 {
-public:
+    public:
 
-	// I/O Parser
-	IOParser parser;
-
-	// Verbosity
-	int verb;
-
-	// Allow continuation of crashed jobs
-	bool only_do_unfinished;
-
-	// Write out debugging information
-	bool debug, debugMov;
-
-	// FOR NOW: copied all params from Jasenko's refinement_program class
-    bool unregGlob, noGlobOff,
-        paramEstim2, paramEstim3,
-        debugOpt, diag, expKer, global_init,
-    	preextracted, coordsAtMgRes, hasCorrMic, saveMem;
-
-    int maxEDs, maxIters, paramEstimIters, paramEstimSteps;
-
-    double dmga, dmgb, dmgc, dosePerFrame,
-        sig_vel, sig_div, sig_acc,
-        param_rV, param_rD, param_rA,
-        k_cutoff, optEps,
-		movie_angpix, coords_angpix;
-
-    long maxMG, minMG;
-
-    RFLOAT angpix, paddingFactor, hotCutoff;
-
-    int nr_omp_threads, bin, firstFrame, lastFrame, coords_bin, movie_bin;
-
-    std::string
-        starFn, reconFn0, reconFn1, maskFn,
-        outPath, imgPath, fscFn,
-        meta_path, bin_type_str,
-		movie_ending, movie_toReplace, movie_replaceBy,
-		corrMicFn, gain_path, last_gainFn;
-
-    std::map<std::string, std::string> mic2meta;
-    std::vector<Image<RFLOAT>> dmgWeight;
-    Micrograph micrograph;
-
-    // For recombining frames
-    bool doCombineFrames, hasBfacs, bfac_debug;
-    int k0, k1;
-    double k0a, k1a;
-    std::string trackFn, bfacFn;
-
-    // data:
-    Image<RFLOAT> maps[2];
-    Image<RFLOAT> powSpec[2];
-    Image<RFLOAT> freqWeight, lastGainRef;
-    std::vector<double> freqWeight1D;
-    Projector projectors[2];
-
-    MetaDataTable mdt0;
-    std::vector<MetaDataTable> mdts;
-
-    ObservationModel obsModel;
-
-    // Q: Jasenko, can we have more informative names for these important variables?
-    // A: They are so important and common that they should be short!
-    // (s: full image size, sh: half-size + 1, fc: frame count
-    //  - these are consistent throughout the codebase.)
-    int s, sh, fc;
-    int micrograph_xsize, micrograph_ysize;
+        MotionFitter();
 
 
-public:
-	// Read command line arguments
-	void read(int argc, char **argv);
+        // I/O Parser
+        IOParser parser;
 
-	// Print usage instructions
-	void usage();
+        // Verbosity
+        int verb;
 
-	// Initialise some general stuff after reading
-	void initialise();
+        // Allow continuation of crashed jobs
+        bool only_do_unfinished;
 
-	// Re-initialise vector mdts to allow only_do_unfinished for combine_frames
-	void initialiseCombineFrames();
+        // Write out debugging information
+        bool debug, debugMov;
 
-	// General Running
-	void run();
+        bool unregGlob, noGlobOff,
+            debugOpt, diag, expKer, global_init,
+            preextracted, hasCorrMic, saveMem;
 
-	// Fit CTF parameters for all particles on a subset of the micrographs
-	void processSubsetMicrographs(long g_start, long g_end);
+        int maxEDs, maxIters;
 
-	// Combine frames on a subset of the micrographa
-	void combineFramesSubsetMicrographs(long g_start, long g_end);
+        double dmga, dmgb, dmgc, dosePerFrame,
+            sig_vel, sig_div, sig_acc,
+            k_cutoff, k_cutoff_Angst, optEps,
+            movie_angpix, coords_angpix;
 
-	// combine all EPS files into one logfile.pdf
-	void combineEPSAndSTARfiles();
+        long maxMG, minMG;
 
-	// For original particle-polishing-like Bfactors
-	void calculateSingleFrameReconstruction(int iframe);
+        RFLOAT angpix, paddingFactor, hotCutoff;
+
+        int nr_omp_threads, firstFrame, lastFrame;
+
+        std::string
+            starFn, reconFn0, reconFn1, maskFn,
+            outPath, imgPath, fscFn,
+            meta_path,
+            movie_ending, movie_toReplace, movie_replaceBy,
+            corrMicFn, gain_path, last_gainFn;
+
+        std::map<std::string, std::string> mic2meta;
+        std::vector<Image<RFLOAT>> dmgWeight, dmgWeightEval;
+        Micrograph micrograph;
+
+        // For recombining frames
+        bool doCombineFrames, hasBfacs, bfac_debug;
+        int k0, k1;
+        double k0a, k1a;
+        std::string trackFn, bfacFn;
+
+        // data:
+        Image<RFLOAT> maps[2];
+        Image<RFLOAT> powSpec[2];
+        Image<RFLOAT> freqWeight, lastGainRef;
+        std::vector<double> freqWeight1D;
+        Projector projectors[2];
+
+        MetaDataTable mdt0;
+        std::vector<MetaDataTable> mdts;
+
+        ObservationModel obsModel;
+
+        MotionParamEstimator motionParamEstimator;
+
+        // Q: Jasenko, can we have more informative names for these important variables?
+        // A: They are so important and common that their names should be short!
+        // (s: full image size, sh: half-size + 1, fc: frame count
+        //  - these are consistent throughout the codebase.)
+        int s, sh, fc;
+        int micrograph_xsize, micrograph_ysize;
 
 
-	// Helper functions
-private:
+    public:
 
-	// Get output STAR file name for the gth entry in the mdts
-	FileName getOutputFileNameRoot(long int g);
+        // Read command line arguments
+        void read(int argc, char **argv);
 
-    std::string getMicrographTag(long g);
+        // Print usage instructions
+        void usage();
 
-    std::vector<std::vector<Image<Complex>>> loadMovie(
-	        long g, int pc, std::vector<ParFourierTransformer>& fts, int only_this_frame = -1);
+        // Initialise some general stuff after reading
+        void initialise();
 
-	void prepMicrograph(
-	        long g, std::vector<ParFourierTransformer>& fts,
-	        const std::vector<Image<RFLOAT>>& dmgWeight,
-	        std::vector<std::vector<Image<Complex>>>& movie,
-	        std::vector<std::vector<Image<RFLOAT>>>& movieCC,
+        // Re-initialise vector mdts to allow only_do_unfinished for combine_frames
+        void initialiseCombineFrames();
+
+        // General Running
+        void run();
+
+        // Fit CTF parameters for all particles on a subset of the micrographs
+        void processSubsetMicrographs(long g_start, long g_end);
+
+        // Combine frames on a subset of the micrographa
+        void combineFramesSubsetMicrographs(long g_start, long g_end);
+
+        // combine all EPS files into one logfile.pdf
+        void combineEPSAndSTARfiles();
+
+        // For original particle-polishing-like Bfactors
+        void calculateSingleFrameReconstruction(int iframe);
+
+        // load micrograph g and compute all data required for the optimization;
+        // also used by MotionParamEstimator
+        void prepMicrograph(
+            // in:
+            long g, std::vector<ParFourierTransformer>& fts,
+            const std::vector<Image<RFLOAT>>& dmgWeight,
+            // out:
+            std::vector<std::vector<Image<Complex>>>& movie,
+            std::vector<std::vector<Image<RFLOAT>>>& movieCC,
             std::vector<gravis::d2Vector>& positions,
             std::vector<std::vector<gravis::d2Vector>>& initialTracks,
             std::vector<gravis::d2Vector>& globComp);
 
-    std::vector<std::vector<gravis::d2Vector>> optimize(
+        // Actual optimization method; also used by MotionParamEstimator
+        std::vector<std::vector<gravis::d2Vector>> optimize(
             const std::vector<std::vector<Image<RFLOAT>>>& movieCC,
             const std::vector<std::vector<gravis::d2Vector>>& inTracks,
             double sig_vel_px, double sig_acc_px, double sig_div_px,
             const std::vector<gravis::d2Vector>& positions,
-            const std::vector<gravis::d2Vector>& globComp,
-            double epsilon,
-            long maxIters);
-
-    void updateFCC(
-            const std::vector<std::vector<Image<Complex>>>& movie,
-            const std::vector<std::vector<gravis::d2Vector>>& tracks,
-            const MetaDataTable& mdt,
-            std::vector<Image<RFLOAT>>& tables,
-            std::vector<Image<RFLOAT>>& weights0,
-            std::vector<Image<RFLOAT>>& weights1);
-
-    void writeOutput(
-            const std::vector<std::vector<gravis::d2Vector>>& tracks,
-            const std::vector<Image<RFLOAT>>& fccData,
-            const std::vector<Image<RFLOAT>>& fccWeight0,
-            const std::vector<Image<RFLOAT>>& fccWeight1,
-            const std::vector<gravis::d2Vector>& positions,
-            std::string outPath, long g,
-            double visScale);
-
-    // recombine_frames
-    std::vector<Image<RFLOAT>> weightsFromFCC();
-
-    std::vector<Image<RFLOAT>> weightsFromBfacs();
+            const std::vector<gravis::d2Vector>& globComp);
 
 
+    private:
 
+        // Get output STAR file name for the gth entry in the mdts
+        FileName getOutputFileNameRoot(long int g);
+
+        std::string getMicrographTag(long g);
+
+        std::vector<std::vector<Image<Complex>>> loadMovie(
+                long g, int pc, std::vector<ParFourierTransformer>& fts, int only_this_frame = -1);
+
+        void updateFCC(
+                const std::vector<std::vector<Image<Complex>>>& movie,
+                const std::vector<std::vector<gravis::d2Vector>>& tracks,
+                const MetaDataTable& mdt,
+                std::vector<Image<RFLOAT>>& tables,
+                std::vector<Image<RFLOAT>>& weights0,
+                std::vector<Image<RFLOAT>>& weights1);
+
+        void writeOutput(
+                const std::vector<std::vector<gravis::d2Vector>>& tracks,
+                const std::vector<Image<RFLOAT>>& fccData,
+                const std::vector<Image<RFLOAT>>& fccWeight0,
+                const std::vector<Image<RFLOAT>>& fccWeight1,
+                const std::vector<gravis::d2Vector>& positions,
+                std::string outPath, long g,
+                double visScale);
+
+        // recombine_frames
+        std::vector<Image<RFLOAT>> weightsFromFCC();
+
+        std::vector<Image<RFLOAT>> weightsFromBfacs();
 };
 
 
