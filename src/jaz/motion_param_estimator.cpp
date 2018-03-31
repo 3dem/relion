@@ -1,8 +1,8 @@
 #include "motion_param_estimator.h"
-#include <src/motion_fitter.h>
+#include <src/motion_refiner.h>
 
-MotionParamEstimator::MotionParamEstimator(MotionFitter& motionFitter)
-:   motionFitter(motionFitter)
+MotionParamEstimator::MotionParamEstimator(MotionRefiner& motionRefiner)
+:   motionRefiner(motionRefiner)
 {
 
 }
@@ -24,7 +24,7 @@ int MotionParamEstimator::read(IOParser &parser, int argc, char *argv[])
 
 void MotionParamEstimator::prepare()
 {
-    if ((estim2 || estim3) && motionFitter.k_cutoff < 0)
+    if ((estim2 || estim3) && motionRefiner.k_cutoff < 0)
     {
         REPORT_ERROR("ERROR: Parameter estimation requires a freq. cutoff (--k_cut).");
     }

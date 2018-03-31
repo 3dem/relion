@@ -3,15 +3,15 @@
 
 #include <src/jaz/alignment_set.h>
 
-class MotionFitter;
+class MotionRefiner;
 
 class MotionParamEstimator
 {
     public:
 
-        MotionParamEstimator(MotionFitter& motionFitter);
+        MotionParamEstimator(MotionRefiner& motionRefiner);
 
-            MotionFitter& motionFitter;
+            MotionRefiner& motionRefiner;
             AlignmentSet alignmentSet;
 
             bool estim2, estim3;

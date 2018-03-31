@@ -18,11 +18,11 @@
  * author citations must be preserved.
  ***************************************************************************/
 
-#include <src/motion_fitter.h>
+#include <src/motion_refiner.h>
 
 int main(int argc, char *argv[])
 {
-	MotionFitter prm;
+    MotionRefiner prm;
 
 	try
     {
