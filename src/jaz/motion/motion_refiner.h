@@ -56,6 +56,8 @@ class MotionRefiner
             Micrograph micrograph;
 
             Image<RFLOAT> freqWeight;
+            std::vector<double> freqWeight1D;
+
             Projector projectors[2];
 
             MetaDataTable mdt0;
@@ -126,7 +128,6 @@ class MotionRefiner
             std::map<std::string, std::string> mic2meta;
 
             Image<RFLOAT> maps[2], powSpec[2], lastGainRef;
-            std::vector<double> freqWeight1D;
 
 
         // load the header of the first movie only to learn the frame number and micrograph size

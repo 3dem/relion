@@ -282,14 +282,16 @@ int MotionFitProg::_run()
         dmgWeight[f].data.xinit = 0;
         dmgWeight[f].data.yinit = 0;
 
-        if (k_cutoff > 0.0)
+        if (k_cutoff > 0.0 && k_cutoff < k_out)
         {
-            std::stringstream stsf;
-            stsf << f;
             dmgWeight[f] = FilterHelper::ButterworthEnvFreq2D(dmgWeight[f], k_cutoff-1, k_cutoff+1);
-
-            ImageOp::multiplyBy(dmgWeight[f], freqWeight);
         }
+        else
+        {
+            dmgWeight[f] = FilterHelper::ButterworthEnvFreq2D(dmgWeight[f], k_out-1, k_out+1);
+        }
+
+        //ImageOp::multiplyBy(dmgWeight[f], freqWeight);
     }
 
     if (useAlignmentSet && (paramEstim2 || paramEstim3))

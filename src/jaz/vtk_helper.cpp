@@ -33,8 +33,6 @@ void VtkHelper :: writeVTK(Image<double>& img, std::string fn,
 
     std::string sizetype = "double";
 
-    std::cout << "writing: " << fn << "\n";
-
     os << "# vtk DataFile Version 2.0\n";
     os << "Volume example\n";
 
@@ -77,8 +75,6 @@ void VtkHelper :: writeVTK(Image<float>& img, std::string fn,
     std::ofstream os(fn.c_str(), std::ios::binary);
 
     std::string sizetype = "float";
-
-    std::cout << "writing: " << fn << "\n";
 
     os << "# vtk DataFile Version 2.0\n";
     os << "Volume example\n";
@@ -123,8 +119,6 @@ void VtkHelper::writeVTK(Image<Complex> &img, std::string fn, double originX, do
 
     //std::cout << "size: " << size << "\n";
     //std::cout << "sizetype: " << sizetype << "\n";
-
-    std::cout << "writing: " << fn << "\n";
 
     os << "# vtk DataFile Version 2.0\n";
     os << "Volume example\n";
@@ -174,8 +168,6 @@ void VtkHelper :: writeVTK(MultidimArray<RFLOAT>& img, std::string fn,
     //std::cout << "size: " << size << "\n";
     //std::cout << "sizetype: " << sizetype << "\n";
 
-    std::cout << "writing: " << fn << "\n";
-
     os << "# vtk DataFile Version 2.0\n";
     os << "Volume example\n";
 
@@ -219,8 +211,6 @@ void VtkHelper :: writeVTK_Complex(MultidimArray<Complex>& img, std::string fn, 
 
     //std::cout << "size: " << size << "\n";
     //std::cout << "sizetype: " << sizetype << "\n";
-
-    std::cout << "writing: " << fn << "\n";
 
     os << "# vtk DataFile Version 2.0\n";
     os << "Volume example\n";
@@ -266,8 +256,6 @@ void VtkHelper :: writeVTK_d3(MultidimArray<gravis::t3Vector<RFLOAT> >& img, std
 
     //std::cout << "size: " << size << "\n";
     //std::cout << "sizetype: " << sizetype << "\n";
-
-    std::cout << "writing: " << fn << "\n";
 
     os << "# vtk DataFile Version 2.0\n";
     os << "Volume example\n";
@@ -315,8 +303,6 @@ void VtkHelper :: writeTomoVTK(Image<RFLOAT>& img, std::string fn, bool binary)
     //std::cout << "size: " << size << "\n";
     //std::cout << "sizetype: " << sizetype << "\n";
 
-    std::cout << "writing: " << fn << "\n";
-
     os << "# vtk DataFile Version 2.0\n";
     os << "Volume example\n";
 
@@ -360,8 +346,6 @@ void VtkHelper :: write(std::vector<Image<double> >& stack, std::string fn,
 
     std::string sizetype = "float";
     if (sizeof(RFLOAT) > 4) sizetype = "double";
-
-    std::cout << "writing: " << fn << "\n";
 
     os << "# vtk DataFile Version 2.0\n";
     os << "Volume example\n";
@@ -409,8 +393,6 @@ void VtkHelper :: writeCentered(std::vector<Image<RFLOAT> >& stack, std::string 
 
     std::string sizetype = "float";
     if (sizeof(RFLOAT) > 4) sizetype = "double";
-
-    std::cout << "writing: " << fn << "\n";
 
     os << "# vtk DataFile Version 2.0\n";
     os << "Volume example\n";
@@ -464,8 +446,6 @@ void VtkHelper :: write(std::vector<Image<float> >& stack, std::string fn,
 
     std::string sizetype = "float";
 
-    std::cout << "writing: " << fn << "\n";
-
     os << "# vtk DataFile Version 2.0\n";
     os << "Volume example\n";
 
@@ -513,8 +493,6 @@ void VtkHelper :: writeVTK(Volume<RFLOAT>& vol, std::string fn,
     std::string sizetype = "float";
     if (sizeof(RFLOAT) > 4) sizetype = "double";
 
-    std::cout << "writing: " << fn << "\n";
-
     os << "# vtk DataFile Version 2.0\n";
     os << "Volume example\n";
 
@@ -558,8 +536,6 @@ void VtkHelper :: writeVTK(Volume<t3Vector<RFLOAT> >& vol, std::string fn,
 
     std::string sizetype = "float";
     if (sizeof(RFLOAT) > 4) sizetype = "double";
-
-    std::cout << "writing: " << fn << "\n";
 
     os << "# vtk DataFile Version 2.0\n";
     os << "Volume example\n";
@@ -718,8 +694,6 @@ void VtkHelper :: writeVTK(Volume<Tensor3x3<RFLOAT> >& vol, std::string fn,
 
     std::string sizetype = "float";
     if (sizeof(RFLOAT) > 4) sizetype = "double";
-
-    std::cout << "writing: " << fn << "\n";
 
     os << "# vtk DataFile Version 2.0\n";
     os << "Volume example\n";

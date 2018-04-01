@@ -209,7 +209,7 @@ void MotionRefiner::init()
 
         chosenMdts.clear();
 
-		for (long int g = minMG; g <= maxMG; g++ )
+        for (long int g = minMG; g <= maxMG; g++)
 		{
             chosenMdts.push_back(allMdts[g]);
         }
@@ -267,6 +267,11 @@ void MotionRefiner::init()
             }
 		}
 	}
+    else
+    {
+        motionMdts = chosenMdts;
+        recombMdts = chosenMdts;
+    }
 
     estimateParams = motionParamEstimator.estim2 ||  motionParamEstimator.estim3;
     estimateMotion = motionMdts.size() > 0;
@@ -364,23 +369,6 @@ void MotionRefiner::init()
 				freqWeight1D = std::vector<double>(sh,1.0);
 				freqWeight = Image<RFLOAT>(sh,s);
 				freqWeight.data.initConstant(1.0);
-            }
-
-			int k_out = sh;
-
-			for (int i = 1; i < sh; i++)
-			{
-				if (freqWeight1D[i] <= 0.0)
-				{
-					k_out = i;
-					break;
-				}
-			}
-
-			if (verb > 0)
-            {
-                std::cout << " + maximum frequency to consider: "
-                    << (s * angpix)/(RFLOAT)k_out << " A (" << k_out << " px)\n";
             }
 		}
     } // if (doAnything)

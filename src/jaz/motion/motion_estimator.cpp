@@ -79,6 +79,24 @@ void MotionEstimator::init()
         k_cutoff_Angst = motionRefiner.pixToAng(k_cutoff);
     }
 
+
+    int k_out = sh;
+
+    for (int i = 1; i < sh; i++)
+    {
+        if (motionRefiner.freqWeight1D[i] <= 0.0)
+        {
+            k_out = i;
+            break;
+        }
+    }
+
+    if (motionRefiner.verb > 0)
+    {
+        std::cout << " + maximum frequency to consider: "
+            << (s * motionRefiner.angpix)/(RFLOAT)k_out << " A (" << k_out << " px)\n";
+    }
+
     dmgWeight = DamageHelper::damageWeights(s, motionRefiner.angpix,
             motionRefiner.firstFrame, fc, dosePerFrame, dmga, dmgb, dmgc);
 
@@ -89,18 +107,19 @@ void MotionEstimator::init()
         dmgWeight[f].data.xinit = 0;
         dmgWeight[f].data.yinit = 0;
 
-        ImageOp::multiplyBy(dmgWeight[f], motionRefiner.freqWeight);
+        //ImageOp::multiplyBy(dmgWeight[f], motionRefiner.freqWeight);
 
-        // evaluation is performed beyond k_cutoff only
+        // parameter evaluation is performed beyond k_cutoff only
         // do not crop dmgWeightEval
         dmgWeightEval[f] = dmgWeight[f];
 
-        if (k_cutoff > 0.0)
+        if (k_cutoff > 0.0 && k_cutoff < k_out)
         {
-            std::stringstream stsf;
-            stsf << f;
-            dmgWeight[f] = FilterHelper::ButterworthEnvFreq2D(
-                        dmgWeight[f], k_cutoff-1, k_cutoff+1);
+            dmgWeight[f] = FilterHelper::ButterworthEnvFreq2D(dmgWeight[f], k_cutoff-1, k_cutoff+1);
+        }
+        else
+        {
+            dmgWeight[f] = FilterHelper::ButterworthEnvFreq2D(dmgWeight[f], k_out-1, k_out+1);
         }
     }
 
