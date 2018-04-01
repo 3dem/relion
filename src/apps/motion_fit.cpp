@@ -397,7 +397,7 @@ void MotionFitProg::prepAlignment(
         try
         {
             prepMicrograph(
-                g, fts, dmgWeight,
+                gg, fts, dmgWeight,
                 movie, movieCC,
                 alignmentSet.positions[g],
                 alignmentSet.initialTracks[g],
@@ -432,7 +432,7 @@ void MotionFitProg::prepAlignment(
 
                 Image<Complex> pred;
                 int randSubset;
-                mdts[g].getValue(EMDL_PARTICLE_RANDOM_SUBSET, randSubset, p);
+                mdts[gg].getValue(EMDL_PARTICLE_RANDOM_SUBSET, randSubset, p);
                 randSubset -= 1;
 
                 if (randSubset == 0)
@@ -1115,15 +1115,16 @@ void MotionFitProg::evaluateParams(
 
     RCTOC(motionTimer, timeSetup);
 
-    for (long g = g0; g <= gc; g++)
+    for (long gg = g0; gg <= gc; gg++)
     {
-        const int pc = mdts[g].numberOfObjects();
+        const int pc = mdts[gg].numberOfObjects();
+        const int g = gg - g0;
 
         if (pc < 2) continue;
 
         pctot += pc;
 
-        std::cout << "    micrograph " << (g+1) << " / " << mdts.size() << ": "
+        std::cout << "    micrograph " << (gg+1) << " / " << mdts.size() << ": "
             << pc << " particles [" << pctot << " total]\n";
 
         std::vector<std::vector<Image<Complex>>> movie;
@@ -1137,12 +1138,12 @@ void MotionFitProg::evaluateParams(
             try
             {
                 prepMicrograph(
-                    g, fts, dmgWeight,
+                    gg, fts, dmgWeight,
                     movie, movieCC, positions, initialTracks, globComp);
             }
             catch (RelionError XE)
             {
-                std::cerr << "warning: unable to load micrograph #" << (g+1) << "\n";
+                std::cerr << "warning: unable to load micrograph #" << (gg+1) << "\n";
                 continue;
             }
         }
@@ -1176,7 +1177,7 @@ void MotionFitProg::evaluateParams(
 
                 RCTIC(motionTimer,timeEval);
 
-                updateFCC(movie, tracks, mdts[g], paramTables[i], paramWeights0[i], paramWeights1[i]);
+                updateFCC(movie, tracks, mdts[gg], paramTables[i], paramWeights0[i], paramWeights1[i]);
             }
         }
 

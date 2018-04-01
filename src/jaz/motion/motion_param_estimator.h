@@ -19,6 +19,9 @@ class MotionParamEstimator
             int maxRange, recursions, steps;
             double rV, rD, rA;
 
+            int fc, s, k_out;
+            double k_cutoff;
+
 
         int read(IOParser& parser, int argc, char *argv[]);
 

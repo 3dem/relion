@@ -40,6 +40,8 @@ void MotionParamEstimator::init()
         REPORT_ERROR("ERROR: Only 2 or 3 parameters can be estimated (--params2 or --params3), not both.");
     }
 
+
+
     ready = true;
 }
 
@@ -63,23 +65,14 @@ d4Vector MotionParamEstimator::estimateTwoParamsRec()
 
 }
 
-/*void MotionParamEstimator::prepAlignment(
+void MotionParamEstimator::prepAlignment(
         int k_out,
         const std::vector<Image<RFLOAT>>& dmgWeight0,
         const std::vector<Image<RFLOAT>>& dmgWeight)
 {
-    RCTIC(motionTimer,timeInit);
-
-    std::cout << "preparing alignment data...\n";
+    /*std::cout << "preparing alignment data...\n";
 
     std::vector<ParFourierTransformer> fts(nr_omp_threads);
-
-    std::vector<MetaDataTable> mdtsAct(gc - g0 + 1);
-
-    for (int m = g0; m <= gc; m++)
-    {
-        mdtsAct[m-g0] = mdts[m];
-    }
 
     alignmentSet = AlignmentSet(mdtsAct, fc, s, k_cutoff+2, k_out);
 
@@ -109,7 +102,7 @@ d4Vector MotionParamEstimator::estimateTwoParamsRec()
         try
         {
             prepMicrograph(
-                g, fts, dmgWeight,
+                gg, fts, dmgWeight,
                 movie, movieCC,
                 alignmentSet.positions[g],
                 alignmentSet.initialTracks[g],
@@ -144,7 +137,7 @@ d4Vector MotionParamEstimator::estimateTwoParamsRec()
 
                 Image<Complex> pred;
                 int randSubset;
-                mdts[g].getValue(EMDL_PARTICLE_RANDOM_SUBSET, randSubset, p);
+                mdts[gg].getValue(EMDL_PARTICLE_RANDOM_SUBSET, randSubset, p);
                 randSubset -= 1;
 
                 if (randSubset == 0)
@@ -161,8 +154,6 @@ d4Vector MotionParamEstimator::estimateTwoParamsRec()
         }
     }
 
-    std::cout << "done\n";
-
-    RCTOC(motionTimer,timeInit);
-}*/
+    std::cout << "done\n";*/
+}
 
