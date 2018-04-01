@@ -211,6 +211,7 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
 
 # Set this flag to activate bounds checking in stl-vectors (incl. strings)
-# (useful to do periodically, as it catches difficult-to-see bugs):
+# It is useful to do this periodically, as it catches 
+# difficult-to-see rare-to-manifest bugs
 
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_GLIBCXX_DEBUG")
+# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_GLIBCXX_DEBUG")

@@ -22,7 +22,7 @@ class MotionEstimator
             int s, sh, fc;
             int maxEDs, maxIters;
 
-            bool unregGlob, noGlobOff,
+            bool unregGlob, noGlobOff, cutoffOut,
                 diag, expKer, global_init, debugOpt;
 
             double dmga, dmgb, dmgc, dosePerFrame,

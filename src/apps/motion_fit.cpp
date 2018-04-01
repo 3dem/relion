@@ -378,15 +378,17 @@ void MotionFitProg::prepAlignment(
 
     int pctot = 0;
 
-    for (long g = g0; g <= gc; g++)
+    for (long gg = g0; gg <= gc; gg++)
     {
-        const int pc = mdts[g].numberOfObjects();
+        const int pc = mdts[gg].numberOfObjects();
+
+        const int g = gg - g0;
 
         if (pc < 2) continue;
 
         pctot += pc;
 
-        std::cout << "    micrograph " << (g+1) << " / " << mdts.size() << ": "
+        std::cout << "    micrograph " << (gg+1) << " / " << mdts.size() << ": "
             << pc << " particles [" << pctot << " total]\n";
 
         std::vector<std::vector<Image<Complex>>> movie;
@@ -403,7 +405,7 @@ void MotionFitProg::prepAlignment(
         }
         catch (RelionError XE)
         {
-            std::cerr << "warning: unable to load micrograph #" << (g+1) << "\n";
+            std::cerr << "warning: unable to load micrograph #" << (gg+1) << "\n";
             continue;
         }
 
@@ -435,11 +437,11 @@ void MotionFitProg::prepAlignment(
 
                 if (randSubset == 0)
                 {
-                    pred = obsModel.predictObservation(projectors[1], mdts[g], p, true, true);
+                    pred = obsModel.predictObservation(projectors[1], mdts[gg], p, true, true);
                 }
                 else
                 {
-                    pred = obsModel.predictObservation(projectors[0], mdts[g], p, true, true);
+                    pred = obsModel.predictObservation(projectors[0], mdts[gg], p, true, true);
                 }
 
                 alignmentSet.pred[g][p] = alignmentSet.accelerate(pred);

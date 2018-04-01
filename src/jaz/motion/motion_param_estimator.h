@@ -26,6 +26,10 @@ class MotionParamEstimator
         void run();
 
         gravis::d4Vector estimateTwoParamsRec();
+
+        void prepAlignment(int k_out,
+                const std::vector<Image<RFLOAT>>& dmgWeight0,
+                const std::vector<Image<RFLOAT>>& dmgWeight);
 };
 
 #endif

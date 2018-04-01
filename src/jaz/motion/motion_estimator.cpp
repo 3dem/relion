@@ -46,6 +46,8 @@ void MotionEstimator::read(IOParser& parser, int argc, char *argv[])
     global_init = parser.checkOption("--gi", "Initialize with global trajectories instead of loading them from metadata file");
     expKer = parser.checkOption("--exp_k", "Use exponential kernel instead of sq. exponential");
     maxEDs = textToInteger(parser.getOption("--max_ed", "Maximum number of eigendeformations", "-1"));
+
+    cutoffOut = parser.checkOption("--out_cut", "Do not consider frequencies beyond the 0.143-FSC threshold for alignment");
 }
 
 void MotionEstimator::init()
@@ -107,17 +109,15 @@ void MotionEstimator::init()
         dmgWeight[f].data.xinit = 0;
         dmgWeight[f].data.yinit = 0;
 
-        //ImageOp::multiplyBy(dmgWeight[f], motionRefiner.freqWeight);
-
         // parameter evaluation is performed beyond k_cutoff only
         // do not crop dmgWeightEval
         dmgWeightEval[f] = dmgWeight[f];
 
-        if (k_cutoff > 0.0 && k_cutoff < k_out)
+        if (k_cutoff > 0.0)
         {
             dmgWeight[f] = FilterHelper::ButterworthEnvFreq2D(dmgWeight[f], k_cutoff-1, k_cutoff+1);
         }
-        else
+        else if (cutoffOut)
         {
             dmgWeight[f] = FilterHelper::ButterworthEnvFreq2D(dmgWeight[f], k_out-1, k_out+1);
         }
