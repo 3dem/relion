@@ -282,6 +282,15 @@ int MotionFitProg::_run()
         dmgWeight[f].data.xinit = 0;
         dmgWeight[f].data.yinit = 0;
 
+        /*for (int y = 0; y < s; y++)
+        for (int x = 0; x < sh; x++)
+        {
+            const double xx = x;
+            const double yy = y < sh? y : y - s;
+
+            dmgWeight[f](y,x) *= 2.0 * sqrt(xx*xx + yy*yy) / sh;
+        }*/
+
         if (k_cutoff > 0.0 && k_cutoff < k_out)
         {
             dmgWeight[f] = FilterHelper::ButterworthEnvFreq2D(dmgWeight[f], k_cutoff-1, k_cutoff+1);
@@ -417,7 +426,6 @@ void MotionFitProg::prepAlignment(
                 }
 
                 alignmentSet.CCs[g][p][f] = movieCC[p][f];
-                //alignmentSet.CCs[g][p][f] = CCfloat;
                 alignmentSet.obs[g][p][f] = alignmentSet.accelerate(movie[p][f]);
 
                 Image<Complex> pred;
@@ -458,6 +466,8 @@ void MotionFitProg::prepMicrograph(
     movie = loadMovie(g, pc, fts); // throws exceptions
 
     std::vector<double> sigma2 = StackHelper::powerSpectrum(movie);
+
+    //std::vector<double> sigma2 = std::vector<double>(sh, 1.0);
 
     #pragma omp parallel for num_threads(nr_omp_threads)
     for (int p = 0; p < pc; p++)

@@ -2,6 +2,7 @@
 #define MOTION_PARAM_ESTIMATOR_H
 
 #include "alignment_set.h"
+#include <src/jaz/gravis/t4Vector.h>
 
 class MotionRefiner;
 
@@ -24,7 +25,7 @@ class MotionParamEstimator
         void init();
         void run();
 
-        gravis::d2Vector estimateTwoParamsRec();
+        gravis::d4Vector estimateTwoParamsRec();
 };
 
 #endif

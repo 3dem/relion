@@ -50,4 +50,13 @@ void MotionParamEstimator::run()
         REPORT_ERROR("ERROR: MotionParamEstimator::run: MotionParamEstimator not initialized.");
     }
 
+    if (estim2)
+    {
+        estimateTwoParamsRec();
+    }
+}
+
+d4Vector MotionParamEstimator::estimateTwoParamsRec()
+{
+
 }

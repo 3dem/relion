@@ -67,7 +67,7 @@ Image<Complex> ObservationModel::predictObservation(
 
     if (applyTilt)
     {
-        double tx, ty;
+        double tx = 0.0, ty = 0.0;
 
         if (hasTilt)
         {
