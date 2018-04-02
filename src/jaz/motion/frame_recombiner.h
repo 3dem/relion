@@ -22,9 +22,10 @@ class FrameRecombiner
             int k0, k1;
             double k0a, k1a;
             std::string trackFn, bfacFn;
+            std::vector<Image<RFLOAT>> freqWeights;
 
         void read(IOParser& parser, int argc, char *argv[]);
-        void init();
+        void init(const std::vector<MetaDataTable>& allMdts);
         void process(const std::vector<MetaDataTable>& mdts, long g_start, long g_end);
 
         static bool isFinished(std::string filenameRoot);
@@ -32,7 +33,7 @@ class FrameRecombiner
 
     protected:
 
-        std::vector<Image<RFLOAT>> weightsFromFCC();
+        std::vector<Image<RFLOAT>> weightsFromFCC(const std::vector<MetaDataTable>& allMdts);
         std::vector<Image<RFLOAT>> weightsFromBfacs();
 };
 

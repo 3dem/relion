@@ -25,29 +25,27 @@ void FrameRecombiner::read(IOParser& parser, int argc, char* argv[])
     bfac_diag = parser.checkOption("--diag_bfactor", "Write out B/k-factor diagnostic data");
 }
 
-void FrameRecombiner::init()
+void FrameRecombiner::init(const std::vector<MetaDataTable>& allMdts)
 {
     s = motionRefiner.s;
     sh = motionRefiner.sh;
     fc = motionRefiner.fc;
-}
-
-void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_start, long g_end)
-{
-    std::vector<Image<RFLOAT>> freqWeights;
 
     // Either calculate weights from FCC or from user-provided B-factors
     const bool hasBfacs = bfacFn != "";
 
     if (!hasBfacs)
     {
-        freqWeights = weightsFromFCC();
+        freqWeights = weightsFromFCC(allMdts);
     }
     else
     {
         freqWeights = weightsFromBfacs();
     }
+}
 
+void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_start, long g_end)
+{
     int barstep;
     int my_nr_micrographs = g_end - g_start + 1;
 
@@ -143,7 +141,8 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
     }
 }
 
-std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromFCC()
+std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromFCC(
+        const std::vector<MetaDataTable>& allMdts)
 {
     if (motionRefiner.debug && motionRefiner.verb > 0)
     {
@@ -157,9 +156,9 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromFCC()
 
     // Compute B/k-factors from all available FCCs (allMdts),
     // even if only a subset of micrographs (chosenMdts) is being recombined.
-    for (long g = 0; g < motionRefiner.allMdts.size(); g++)
+    for (long g = 0; g < allMdts.size(); g++)
     {
-        FileName fn_root = motionRefiner.getOutputFileNameRoot(motionRefiner.allMdts[g]);
+        FileName fn_root = motionRefiner.getOutputFileNameRoot(allMdts[g]);
 
         if (!( exists(fn_root + "_FCC_cc.mrc")
             && exists(fn_root + "_FCC_w0.mrc")

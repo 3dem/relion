@@ -234,7 +234,17 @@ void MotionEstimator::prepMicrograph(
 {
     const int pc = mdt.numberOfObjects();
 
-    movie = motionRefiner.loadMovie(mdt, fts); // throws exceptions
+    positions = std::vector<gravis::d2Vector>(pc);
+
+    for (int p = 0; p < pc; p++)
+    {
+        mdt.getValue(EMDL_IMAGE_COORD_X, positions[p].x, p);
+        mdt.getValue(EMDL_IMAGE_COORD_Y, positions[p].y, p);
+    }
+
+    movie = motionRefiner.loadMovie(
+        mdt, fts, positions, initialTracks, unregGlob, globComp); // throws exceptions
+
     std::vector<double> sigma2 = StackHelper::powerSpectrum(movie);
 
     #pragma omp parallel for num_threads(motionRefiner.nr_omp_threads)
@@ -244,22 +254,12 @@ void MotionEstimator::prepMicrograph(
         MotionHelper::noiseNormalize(movie[p][f], sigma2, movie[p][f]);
     }
 
-    positions = std::vector<gravis::d2Vector>(pc);
-
-    for (int p = 0; p < pc; p++)
-    {
-        mdt.getValue(EMDL_IMAGE_COORD_X, positions[p].x, p);
-        mdt.getValue(EMDL_IMAGE_COORD_Y, positions[p].y, p);
-    }
-
     movieCC = MotionHelper::movieCC(
             motionRefiner.projectors[0], motionRefiner.projectors[1],
-            motionRefiner.obsModel, mdt, movie,
+            motionRefiner.obsModel, mdt, movie, //why mdt? - for the random subset
             sigma2, dmgWeight, fts, motionRefiner.nr_omp_threads);
 
-    initialTracks = std::vector<std::vector<d2Vector>>(pc);
-
-    if (global_init)
+    if (global_init || initialTracks.size() == 0)
     {
         std::vector<Image<RFLOAT>> ccSum = MotionHelper::addCCs(movieCC);
         std::vector<gravis::d2Vector> globTrack = MotionHelper::getGlobalTrack(ccSum);
@@ -280,6 +280,8 @@ void MotionEstimator::prepMicrograph(
             ImageLog::write(ccSum, motionRefiner.getOutputFileNameRoot(mdt) + "_CCsum", CenterXY);
         }
 
+        initialTracks.resize(pc);
+
         for (int p = 0; p < pc; p++)
         {
             initialTracks[p] = std::vector<d2Vector>(fc);
@@ -298,46 +300,6 @@ void MotionEstimator::prepMicrograph(
         }
 
         globComp = unregGlob? globTrack : std::vector<d2Vector>(fc, d2Vector(0,0));
-    }
-    else
-    {
-        const d2Vector inputScale(
-                motionRefiner.coords_angpix
-                    / (motionRefiner.movie_angpix * motionRefiner.micrograph.getWidth()),
-                motionRefiner.coords_angpix
-                    / (motionRefiner.movie_angpix * motionRefiner.micrograph.getHeight()));
-
-        const double outputScale = motionRefiner.movie_angpix / motionRefiner.angpix;
-
-        globComp = std::vector<d2Vector>(fc, d2Vector(0,0));
-
-        if (unregGlob)
-        {
-            for (int f = 0; f < fc; f++)
-            {
-                RFLOAT sx, sy;
-                motionRefiner.micrograph.getShiftAt(f+1, 0, 0, sx, sy, false);
-
-                globComp[f] = -outputScale * d2Vector(sx, sy);
-            }
-        }
-
-        for (int p = 0; p < pc; p++)
-        {
-            initialTracks[p] = std::vector<d2Vector>(fc);
-
-            for (int f = 0; f < fc; f++)
-            {
-                d2Vector in(inputScale.x * positions[p].x - 0.5,
-                            inputScale.y * positions[p].y - 0.5);
-
-                RFLOAT sx, sy;
-
-                motionRefiner.micrograph.getShiftAt(f+1, in.x, in.y, sx, sy, true);
-
-                initialTracks[p][f] = -outputScale * d2Vector(sx,sy) - globComp[f];
-            }
-        }
     }
 }
 

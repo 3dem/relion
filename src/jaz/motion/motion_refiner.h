@@ -30,6 +30,7 @@
 #include <src/jaz/obs_model.h>
 #include <src/jaz/gravis/t2Vector.h>
 #include <src/jaz/parallel_ft.h>
+#include <src/jaz/micrograph_handler.h>
 
 #include "motion_param_estimator.h"
 #include "motion_estimator.h"
@@ -49,24 +50,19 @@ class MotionRefiner
 
             // Write out debugging information
             bool debug;
+
             double movie_angpix, coords_angpix, angpix;
             int nr_omp_threads, firstFrame, lastFrame;
-            std::string outPath, corrMicFn;
+            std::string outPath, corrMicFn; // move to micrographHandler?
 
-            Micrograph micrograph;
+            //Micrograph micrograph;
 
+            // reference:
             Image<RFLOAT> freqWeight;
             std::vector<double> freqWeight1D;
-
             Projector projectors[2];
-
-            MetaDataTable mdt0;
-            std::vector<MetaDataTable>
-                allMdts, // all micrographs
-                chosenMdts, // micrographs between minMG and maxMG
-                motionMdts, recombMdts; // unfinished micrographs
-
             ObservationModel obsModel;
+
 
             MotionParamEstimator motionParamEstimator;
             MotionEstimator motionEstimator;
@@ -104,17 +100,21 @@ class MotionRefiner
         std::vector<std::vector<Image<Complex>>> loadMovie(
                 const MetaDataTable& mdt, std::vector<ParFourierTransformer>& fts);
 
+        // does the same and then also loads the particle tracks for particles at positions pos
+        std::vector<std::vector<Image<Complex>>> loadMovie(
+                const MetaDataTable& mdt, std::vector<ParFourierTransformer>& fts,
+                const std::vector<gravis::d2Vector>& pos,
+                std::vector<std::vector<gravis::d2Vector>>& tracks,
+                bool unregGlob, std::vector<gravis::d2Vector>& globComp);
+
     protected:
 
             std::string
                 starFn, reconFn0, reconFn1, maskFn,
-                fscFn, meta_path,
-                movie_path, movie_ending, movie_toReplace, movie_replaceBy,
-                gain_path, last_gainFn;
+                fscFn, movie_toReplace, movie_replaceBy;
 
             // Allow continuation of crashed jobs
-            bool only_do_unfinished, debugMov,
-                 preextracted, hasCorrMic, saveMem;
+            bool only_do_unfinished;
 
             bool estimateParams,
                  estimateMotion,
@@ -123,16 +123,25 @@ class MotionRefiner
 
             long maxMG, minMG;
 
-            double paddingFactor, hotCutoff;
+            double paddingFactor;
+
+            MetaDataTable mdt0;
+            std::vector<MetaDataTable>
+                allMdts, // all micrographs (used for B-factor computation)
+                chosenMdts, // micrographs between minMG and maxMG
+                paramMdts, // micrographs on which the parameters are to be estimated
+                motionMdts, recombMdts; // unfinished micrographs
 
             std::map<std::string, std::string> mic2meta;
 
             Image<RFLOAT> maps[2], powSpec[2], lastGainRef;
 
+            MicrographHandler micrographHandler;
+
 
         // load the header of the first movie only to learn the frame number and micrograph size
         // (also the dose and movie pixel size if a corrected_micrographs.star is available)
-        std::vector<std::vector<Image<Complex>>> loadInitialMovie();
+        void loadInitialMovie();
 
         // combine all EPS files into one logfile.pdf
         void combineEPSAndSTARfiles();

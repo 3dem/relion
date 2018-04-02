@@ -77,24 +77,24 @@ void MotionRefiner::read(int argc, char **argv)
     minMG = textToInteger(parser.getOption("--min_MG", "First micrograph index", "0"));
     maxMG = textToInteger(parser.getOption("--max_MG", "Last micrograph index (default is to process all)", "-1"));
 
-    saveMem = parser.checkOption("--sbs", "Load movies slice-by-slice to save memory (slower)");
+    micrographHandler.saveMem = parser.checkOption("--sbs", "Load movies slice-by-slice to save memory (slower)");
 
     parser.addSection("Expert options");
 
 	angpix = textToFloat(parser.getOption("--angpix", "Pixel resolution (angst/pix) - read from STAR file by default", "-1"));
-    movie_path = parser.getOption("--mov", "Path to movies", "");
+    micrographHandler.movie_path = parser.getOption("--mov", "Path to movies", "");
     corrMicFn = parser.getOption("--corr_mic", "List of uncorrected micrographs (e.g. corrected_micrographs.star)", "");
-    preextracted = parser.checkOption("--preex", "Preextracted movie stacks");
-    meta_path = parser.getOption("--meta", "Path to per-movie metadata star files", "");
-    gain_path = parser.getOption("--gain_path", "Path to gain references", "");
-    movie_ending = parser.getOption("--mov_end", "Ending of movie filenames", "");
+    micrographHandler.preextracted = parser.checkOption("--preex", "Preextracted movie stacks");
+    micrographHandler.meta_path = parser.getOption("--meta", "Path to per-movie metadata star files", "");
+    micrographHandler.gain_path = parser.getOption("--gain_path", "Path to gain references", "");
+    micrographHandler.movie_ending = parser.getOption("--mov_end", "Ending of movie filenames", "");
     movie_toReplace = parser.getOption("--mov_toReplace", "Replace this string in micrograph names...", "");
     movie_replaceBy = parser.getOption("--mov_replaceBy", "..by this one", "");
     movie_angpix = textToFloat(parser.getOption("--mps", "Pixel size of input movies (Angst/pix)", "-1"));
     coords_angpix = textToFloat(parser.getOption("--cps", "Pixel size of particle coordinates in star-file (Angst/pix)", "-1"));
-    hotCutoff = textToFloat(parser.getOption("--hot", "Clip hot pixels to this max. value (-1 = off, TIFF only)", "-1"));
+    micrographHandler.hotCutoff = textToFloat(parser.getOption("--hot", "Clip hot pixels to this max. value (-1 = off, TIFF only)", "-1"));
     debug = parser.checkOption("--debug", "Write debugging data");
-    debugMov = parser.checkOption("--debug_mov", "Write debugging data for movie loading");
+    micrographHandler.debug = parser.checkOption("--debug_mov", "Write debugging data for movie loading");
 
 	// Check for errors in the command-line option
 	if (parser.checkForErrors())
@@ -148,30 +148,11 @@ void MotionRefiner::init()
     // initialise corrected/uncorrected micrograph dictionary
 	if (corrMicFn != "")
 	{
-		MetaDataTable corrMic;
-		corrMic.read(corrMicFn);
-
-		mic2meta.clear();
-
-		std::string micName, metaName;
-
-		for (int i = 0; i < corrMic.numberOfObjects(); i++)
-		{
-			corrMic.getValueToString(EMDL_MICROGRAPH_NAME, micName, i);
-			corrMic.getValueToString(EMDL_MICROGRAPH_METADATA_NAME, metaName, i);
-
-			// remove the pipeline job prefix
-			FileName fn_pre, fn_jobnr, fn_post;
-			decomposePipelineFileName(micName, fn_pre, fn_jobnr, fn_post);
-
-			mic2meta[fn_post] = metaName;
-		}
-
-		hasCorrMic = true;
+        micrographHandler.init(corrMicFn);
 	}
     else
     {
-        hasCorrMic = false;
+        micrographHandler.init();
     }
 
     allMdts = StackHelper::splitByMicrographName(&mdt0);
@@ -252,7 +233,7 @@ void MotionRefiner::init()
             }
             else
             {
-                std::cout << "   - Will not estimate motion for any unfinished micrographs\n";
+                std::cout << "   - Motion has already been estimated for all micrographs\n";
             }
 
             if (recombMdts.size() > 0) // implies frameRecombiner.doCombineFrames
@@ -262,8 +243,8 @@ void MotionRefiner::init()
             }
             else if (frameRecombiner.doCombineFrames)
             {
-                std::cout << "   - Will not combine frames for any unfinished micrographs, "
-                          << "just generate a STAR file\n";
+                std::cout << "   - Frames have already been recombined for all micrographs; "
+                          << "a new STAR file will be generated\n";
             }
 		}
 	}
@@ -284,17 +265,12 @@ void MotionRefiner::init()
 
     if (doAnything)
 	{
-		obsModel = ObservationModel(angpix);
-
-		if (verb > 0)
-        {
-			std::cout << " + Reading references ...\n";
-        }
+        obsModel = ObservationModel(angpix);
 
         // Read in the first reference
         // (even if there is no motion to estimate - only to learn the image size)
-        // TODO: replace once there is global information available
-		maps[0].read(reconFn0);
+        // TODO: replace once data is tree-structured
+        maps[0].read(reconFn0, needsReference);
 
 		if (maps[0].data.xdim != maps[0].data.ydim || maps[0].data.ydim != maps[0].data.zdim)
         {
@@ -306,7 +282,12 @@ void MotionRefiner::init()
         sh = s/2 + 1;
 
         if (needsReference)
-		{
+        {
+            if (verb > 0)
+            {
+                std::cout << " + Reading references ...\n";
+            }
+
 			// Read in the second reference
 			maps[1].read(reconFn1);
 
@@ -380,12 +361,7 @@ void MotionRefiner::init()
 
     if (estimateParams)
     {
-        motionParamEstimator.init();
-    }
-
-    if (recombineFrames)
-    {
-        frameRecombiner.init();
+        motionParamEstimator.init(allMdts);
     }
 }
 
@@ -408,6 +384,7 @@ void MotionRefiner::run()
 
     if (recombineFrames)
     {
+        frameRecombiner.init(allMdts);
         frameRecombiner.process(recombMdts, 0, recombMdts.size()-1);
 	}
 
@@ -607,12 +584,13 @@ void MotionRefiner::combineEPSAndSTARfiles()
 
         if (frameRecombiner.doCombineFrames)
         {
-			std::cout << " + Written new particle STAR file in " << outPath << "shiny.star" << std::endl;
+            std::cout << " + Written new particle STAR file in "
+                      << outPath << "shiny.star" << std::endl;
         }
 	}
 }
 
-// Get the coordinate filename from the micrograph filename
+// Get the output filename from the micrograph filename
 FileName MotionRefiner::getOutputFileNameRoot(const MetaDataTable& mdt)
 {
     FileName fn_mic, fn_pre, fn_jobnr, fn_post;
@@ -624,251 +602,27 @@ FileName MotionRefiner::getOutputFileNameRoot(const MetaDataTable& mdt)
 std::vector<std::vector<Image<Complex>>> MotionRefiner::loadMovie(
     const MetaDataTable& mdt, std::vector<ParFourierTransformer>& fts)
 {
-    std::vector<std::vector<Image<Complex>>> movie;
-
-    if (preextracted)
-    {
-        movie = StackHelper::loadMovieStackFS(
-            &mdt, "", false, nr_omp_threads, &fts,
-            firstFrame, lastFrame);
-    }
-    else
-    {
-        std::string mgFn;
-        mdt.getValueToString(EMDL_MICROGRAPH_NAME, mgFn, 0);
-        FileName fn_pre, fn_jobnr, fn_post;
-        decomposePipelineFileName(mgFn, fn_pre, fn_jobnr, fn_post);
-
-        if (hasCorrMic)
-        {
-            //@TODO: make safe:
-            std::string metaFn = mic2meta[fn_post];
-
-            if (meta_path != "")
-            {
-                metaFn = meta_path + "/" + metaFn.substr(metaFn.find_last_of("/")+1);
-            }
-
-            micrograph = Micrograph(metaFn);
-
-            std::string mgFn = micrograph.getMovieFilename();
-            std::string gainFn = micrograph.getGainFilename();
-
-            if (movie_ending != "")
-            {
-                mgFn.substr(0, mgFn.find_last_of(".")+1) + movie_ending;
-            }
-
-            if (movie_path != "")
-            {
-                mgFn = movie_path + "/" + mgFn.substr(mgFn.find_last_of("/")+1);
-            }
-
-            bool mgHasGain = false;
-
-            if (gainFn != "")
-            {
-                if (gain_path != "")
-                {
-                    gainFn = gain_path + "/" + gainFn.substr(gainFn.find_last_of("/")+1);
-                }
-
-                if (gainFn != last_gainFn)
-                {
-                    lastGainRef.read(gainFn);
-                    last_gainFn = gainFn;
-                }
-
-                mgHasGain = true;
-            }
-
-            movie = StackHelper::extractMovieStackFS(
-                &mdt, mgHasGain? &lastGainRef : 0,
-                mgFn, angpix, coords_angpix, movie_angpix, s,
-                nr_omp_threads, true, firstFrame, lastFrame,
-                hotCutoff, debugMov, saveMem);
-        }
-        else
-        {
-            // gain no longer supported without a corrected_micrographs.star:
-            /*movie = StackHelper::extractMovieStackFS(
-                &mdts[g], meta_path, movie_path, movie_ending,
-                angpix, coords_angpix, movie_angpix, s,
-                nr_omp_threads, true, firstFrame, lastFrame, hotCutoff, debugMov);*/
-
-            movie = StackHelper::extractMovieStackFS(
-                &mdt, 0,
-                mgFn, angpix, coords_angpix, movie_angpix, s,
-                nr_omp_threads, true, firstFrame, lastFrame,
-                hotCutoff, debugMov, saveMem);
-        }
-
-        const int pc = movie.size();
-
-        #pragma omp parallel for num_threads(nr_omp_threads)
-        for (int p = 0; p < pc; p++)
-        {
-            StackHelper::varianceNormalize(movie[p], false);
-        }
-    }
-
-    // Really warn each time?
-    if (angpix < coords_angpix)
-    {
-        std::cerr << "WARING: pixel size (--angpix) is greater than the AutoPick pixel size (--coords_angpix)\n";
-
-        if (coords_angpix < angpix + 0.01)
-        {
-            std::cerr << "        This is probably a rounding error. It is recommended to set --angpix ("
-                      << angpix << ") to at least " << coords_angpix << "\n";
-
-        }
-    }
-
-    if (angpix < movie_angpix)
-    {
-        std::cerr << "WARING: pixel size (--angpix) is greater than the movie pixel size (--movie_angpix)\n";
-
-        if (movie_angpix < angpix + 0.01)
-        {
-            std::cerr << "        This is probably a rounding error. It is recommended to set --angpix ("
-                      << angpix << ") to at least " << movie_angpix << "\n";
-
-        }
-    }
-
-    return movie;
+    return micrographHandler.loadMovie(
+        mdt, s, angpix, movie_angpix, coords_angpix, fts);
 }
 
-std::vector<std::vector<Image<Complex>>> MotionRefiner::loadInitialMovie()
+std::vector<std::vector<Image<Complex> > > MotionRefiner::loadMovie(
+        const MetaDataTable& mdt, std::vector<ParFourierTransformer>& fts,
+        const std::vector<d2Vector>& pos,
+        std::vector<std::vector<gravis::d2Vector>>& tracks,
+        bool unregGlob, std::vector<gravis::d2Vector>& globComp)
 {
-    if (preextracted)
-    {
-        if (lastFrame < 0)
-        {
-             std::string name;
-             allMdts[0].getValue(EMDL_MICROGRAPH_NAME, name, 0);
+    return micrographHandler.loadMovie(
+        mdt, s, angpix, movie_angpix, coords_angpix, fts,
+        pos, tracks, unregGlob, globComp);
+}
 
-             Image<RFLOAT> stack0;
-             stack0.read(name, false);
-
-             const int pc0 = allMdts[0].numberOfObjects();
-             const bool zstack = stack0.data.zdim > 1;
-             const int stackSize = zstack? stack0.data.zdim : stack0.data.ndim;
-             fc = stackSize / pc0 - firstFrame;
-        }
-        else
-        {
-            fc = lastFrame - firstFrame + 1;
-        }
-
-        FileName fn_mic;
-        mdt0.getValue(EMDL_MICROGRAPH_NAME, fn_mic, 0);
-
-        Image<RFLOAT> dum;
-        dum.read(fn_mic, false);
-        micrograph_xsize = XSIZE(dum());
-        micrograph_ysize = YSIZE(dum());
-    }
-    else
-    {
-        if (hasCorrMic)
-        {
-            std::string mgFn;
-            allMdts[0].getValueToString(EMDL_MICROGRAPH_NAME, mgFn, 0);
-
-            // remove the pipeline job prefix
-            FileName fn_pre, fn_jobnr, fn_post;
-            decomposePipelineFileName(mgFn, fn_pre, fn_jobnr, fn_post);
-
-            //@TODO: make safe:
-            std::string metaFn = mic2meta[fn_post];
-
-            if (meta_path != "")
-            {
-                metaFn = meta_path + "/" + metaFn.substr(metaFn.find_last_of("/")+1);
-            }
-
-            micrograph = Micrograph(metaFn);
-
-            if (movie_angpix <= 0)
-            {
-                movie_angpix = micrograph.angpix;
-
-                if (verb > 0)
-                {
-                    std::cout << " + Using movie pixel size from " << metaFn << ": " << movie_angpix << " A\n";
-                }
-            }
-            else
-            {
-                if (verb > 0)
-                {
-                    std::cout << " + Using movie pixel size from command line: " << movie_angpix << " A\n";
-                }
-            }
-
-            if (coords_angpix <= 0)
-            {
-                coords_angpix = micrograph.angpix * micrograph.getBinningFactor();
-
-                if (verb > 0)
-                {
-                    std::cout << " + Using coord. pixel size from " << metaFn << ": " << coords_angpix << " A\n";
-                }
-            }
-            else
-            {
-                if (verb > 0)
-                {
-                    std::cout << " + Using coord. pixel size from command line: " << coords_angpix << " A\n";
-                }
-            }
-
-            // this is safe to do - motionEstimator.read() has been called already
-            if (motionEstimator.dosePerFrame < 0)
-            {
-                motionEstimator.dosePerFrame = micrograph.dose_per_frame;
-
-                if (verb > 0)
-                {
-                    std::cout << " + Using dose per frame from " << metaFn << ": "
-                              << motionEstimator.dosePerFrame << " A\n";
-                }
-            }
-
-            micrograph_xsize = micrograph.getWidth();
-            micrograph_ysize = micrograph.getHeight();
-
-            if (lastFrame < 0)
-            {
-                fc = micrograph.getNframes() - firstFrame;
-            }
-            else
-            {
-                fc = lastFrame - firstFrame + 1;
-            }
-        }
-        else
-        {
-            if (lastFrame < 0)
-            {
-                FileName mgFn;
-                mdt0.getValue(EMDL_MICROGRAPH_NAME, mgFn, 0);
-
-                Image<RFLOAT> dum;
-                dum.read(mgFn, false);
-                micrograph_xsize = XSIZE(dum());
-                micrograph_ysize = YSIZE(dum());
-
-                fc = (dum().zdim > 1? dum().zdim : dum().ndim) - firstFrame;
-            }
-            else
-            {
-                fc = lastFrame - firstFrame + 1;
-            }
-        }
-    }
+void MotionRefiner::loadInitialMovie()
+{
+    micrographHandler.loadInitial(
+        mdt0, angpix, verb, fc,
+        micrograph_xsize, micrograph_ysize,
+        movie_angpix, coords_angpix, motionEstimator.dosePerFrame);
 }
 
 void MotionRefiner::adaptMovieNames()
@@ -903,9 +657,9 @@ void MotionRefiner::adaptMovieNames()
                 std::cout << "                -> " << name << "\n";
             }
 
-            if (movie_path != "")
+            if (micrographHandler.movie_path != "")
             {
-                name = movie_path + name.substr(name.find_last_of('/')+1);
+                name = micrographHandler.movie_path + name.substr(name.find_last_of('/')+1);
 
                 if (i == 0 && verb > 0)
                 {
@@ -913,9 +667,9 @@ void MotionRefiner::adaptMovieNames()
                 }
             }
 
-            if (movie_ending != "")
+            if (micrographHandler.movie_ending != "")
             {
-                name = name + name.substr(0, name.find_last_of('.'));
+                name = name.substr(0, name.find_last_of('.')) + micrographHandler.movie_ending;
 
                 if (i == 0 && verb > 0)
                 {

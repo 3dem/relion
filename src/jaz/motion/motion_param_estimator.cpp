@@ -1,6 +1,8 @@
 #include "motion_param_estimator.h"
 #include "motion_refiner.h"
 
+#include <src/jaz/index_sort.h>
+
 using namespace gravis;
 
 MotionParamEstimator::MotionParamEstimator(MotionRefiner& motionRefiner)
@@ -15,6 +17,7 @@ int MotionParamEstimator::read(IOParser& parser, int argc, char *argv[])
 
     estim2 = parser.checkOption("--params2", "Estimate 2 parameters instead of motion");
     estim3 = parser.checkOption("--params3", "Estimate 3 parameters instead of motion");
+    minParticles = textToInteger(parser.getOption("--min_p", "Minimum number of particles on which to estimate the parameters", "1000"));
     rV = textToFloat(parser.getOption("--r_vel", "Test s_vel +/- r_vel * s_vel", "0.5"));
     rD = textToFloat(parser.getOption("--r_div", "Test s_div +/- r_div * s_div", "0.5"));
     rA = textToFloat(parser.getOption("--r_acc", "Test s_acc +/- r_acc * s_acc", "0.5"));
@@ -23,7 +26,7 @@ int MotionParamEstimator::read(IOParser& parser, int argc, char *argv[])
     maxRange = textToInteger(parser.getOption("--mot_range", "Limit allowed motion range [Px]", "50"));
 }
 
-void MotionParamEstimator::init()
+void MotionParamEstimator::init(const std::vector<MetaDataTable>& allMdts)
 {
     if (!motionRefiner.motionEstimator.ready)
     {
@@ -40,7 +43,49 @@ void MotionParamEstimator::init()
         REPORT_ERROR("ERROR: Only 2 or 3 parameters can be estimated (--params2 or --params3), not both.");
     }
 
+    const long mc = allMdts.size();
 
+    std::vector<double> randNums(mc);
+
+    for (int m = 0; m < mc; m++)
+    {
+        randNums[m] = rand() / (double)RAND_MAX;
+    }
+
+    std::vector<int> order = IndexSort<RFLOAT>::sortIndices(randNums);
+
+    int pc = 0;
+    mdts.clear();
+
+    for (int i = 0; i < order.size(); i++)
+    {
+        const int m = order[i];
+
+        const int pcm = allMdts[m].numberOfObjects();
+
+        // motion estimation does not work on one single particle
+        if (pcm < 2) continue;
+
+        mdts.push_back(allMdts[m]);
+        pc += pcm;
+
+        if (pc > minParticles)
+        {
+            if (motionRefiner.verb > 0)
+            {
+                std::cout << " + " << pc << " particles found in "
+                          << mdts.size() << " micrographs\n";
+            }
+
+            break;
+        }
+    }
+
+    if (motionRefiner.verb > 0 && pc < minParticles)
+    {
+        std::cout << " - Warning: this dataset does not contain " << minParticles
+                  << " particles in micrographs with at least 2 particles\n";
+    }
 
     ready = true;
 }

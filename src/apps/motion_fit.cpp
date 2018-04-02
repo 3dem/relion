@@ -295,10 +295,10 @@ int MotionFitProg::_run()
         {
             dmgWeight[f] = FilterHelper::ButterworthEnvFreq2D(dmgWeight[f], k_cutoff-1, k_cutoff+1);
         }
-        else
+        /*else
         {
             dmgWeight[f] = FilterHelper::ButterworthEnvFreq2D(dmgWeight[f], k_out-1, k_out+1);
-        }
+        }*/
 
         //ImageOp::multiplyBy(dmgWeight[f], freqWeight);
     }

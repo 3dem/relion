@@ -34,12 +34,12 @@ void MotionRefinerMpi::read(int argc, char **argv)
 	// Possibly also read parallelisation-dependent variables here
 	if (node->size < 2)
 	{
-		REPORT_ERROR("ParticlePolisherMpi::read ERROR: this program needs to be run with at least two MPI processes!");
+        REPORT_ERROR("ERROR: this program needs to be run with at least two MPI processes!");
 	}
 
 	if (node->isMaster() && (motionParamEstimator.estim2 || motionParamEstimator.estim3))
 	{
-		REPORT_ERROR("Parameter estimation is currently not supported in MPI mode.");
+        REPORT_ERROR("Parameter estimation is not supported in MPI mode.");
 		return;
 	}
 
@@ -51,7 +51,7 @@ void MotionRefinerMpi::run()
 {
     if (estimateParams)
 	{
-        REPORT_ERROR("Parameter estimation is currently not supported in MPI mode.");
+        REPORT_ERROR("Parameter estimation is not supported in MPI mode.");
 		return;
 	}
 
@@ -83,6 +83,7 @@ void MotionRefinerMpi::run()
                        my_first_micrograph, my_last_micrograph);
         my_nr_micrographs = my_last_micrograph - my_first_micrograph + 1;
 
+        frameRecombiner.init(allMdts);
         frameRecombiner.process(recombMdts, my_first_micrograph, my_last_micrograph);
 	}
 

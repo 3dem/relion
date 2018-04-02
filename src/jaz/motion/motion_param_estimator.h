@@ -2,6 +2,8 @@
 #define MOTION_PARAM_ESTIMATOR_H
 
 #include "alignment_set.h"
+
+#include <src/image.h>
 #include <src/jaz/gravis/t4Vector.h>
 
 class MotionRefiner;
@@ -16,16 +18,18 @@ class MotionParamEstimator
             AlignmentSet alignmentSet;
 
             bool ready, estim2, estim3;
-            int maxRange, recursions, steps;
+            int minParticles, maxRange, recursions, steps;
             double rV, rD, rA;
 
             int fc, s, k_out;
             double k_cutoff;
 
+            std::vector<MetaDataTable> mdts;
+
 
         int read(IOParser& parser, int argc, char *argv[]);
 
-        void init();
+        void init(const std::vector<MetaDataTable>& allMdts);
         void run();
 
         gravis::d4Vector estimateTwoParamsRec();
