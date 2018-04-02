@@ -30,7 +30,9 @@
 #include <src/jaz/obs_model.h>
 #include <src/jaz/gravis/t2Vector.h>
 #include <src/jaz/parallel_ft.h>
+
 #include <src/jaz/micrograph_handler.h>
+#include <src/jaz/reference_map.h>
 
 #include "motion_param_estimator.h"
 #include "motion_estimator.h"
@@ -53,21 +55,16 @@ class MotionRefiner
 
             double movie_angpix, coords_angpix, angpix;
             int nr_omp_threads, firstFrame, lastFrame;
-            std::string outPath, corrMicFn; // move to micrographHandler?
+            std::string outPath; // move to micrographHandler? - Yes!
 
-            //Micrograph micrograph;
-
-            // reference:
-            Image<RFLOAT> freqWeight;
-            std::vector<double> freqWeight1D;
-            Projector projectors[2];
 
             ObservationModel obsModel;
 
-
+            ReferenceMap reference;
             MotionParamEstimator motionParamEstimator;
             MotionEstimator motionEstimator;
             FrameRecombiner frameRecombiner;
+
 
             // Q: Jasenko, can we have more informative names for these important variables?
             // A: They are so important and common that their names should be short!
@@ -108,11 +105,12 @@ class MotionRefiner
                 std::vector<std::vector<gravis::d2Vector>>& tracks,
                 bool unregGlob, std::vector<gravis::d2Vector>& globComp);
 
+        bool hasCorrMic();
+
     protected:
 
             std::string
-                starFn, reconFn0, reconFn1, maskFn,
-                fscFn, movie_toReplace, movie_replaceBy;
+                starFn, movie_toReplace, movie_replaceBy;
 
             // Allow continuation of crashed jobs
             bool only_do_unfinished;
@@ -124,7 +122,6 @@ class MotionRefiner
 
             long maxMG, minMG;
 
-            double paddingFactor;
 
             MetaDataTable mdt0;
             std::vector<MetaDataTable>
@@ -133,7 +130,6 @@ class MotionRefiner
                 paramMdts, // micrographs on which the parameters are to be estimated
                 motionMdts, recombMdts; // unfinished micrographs
 
-            Image<RFLOAT> maps[2], powSpec[2];
 
             MicrographHandler micrographHandler;
 

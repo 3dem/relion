@@ -201,7 +201,7 @@ void VtkHelper :: writeVTK(MultidimArray<RFLOAT>& img, std::string fn,
     }
 }
 
-void VtkHelper :: writeVTK_Complex(MultidimArray<Complex>& img, std::string fn, bool binary)
+void VtkHelper :: writeVTK_Complex(const MultidimArray<Complex>& img, std::string fn, bool binary)
 {
     const size_t size = (img.xdim * img.ydim * img.zdim);
     std::ofstream os(fn.c_str(), std::ios::binary);

@@ -21,35 +21,40 @@ MicrographHandler::MicrographHandler()
     corrMicFn("")
 {}
 
-void MicrographHandler::init(std::string corrMicFn)
+void MicrographHandler::init(int nr_omp_threads, int firstFrame, int lastFrame)
 {
-    MetaDataTable corrMic;
-    corrMic.read(corrMicFn);
+    this->nr_omp_threads = nr_omp_threads;
+    this->firstFrame = firstFrame;
+    this->lastFrame = lastFrame;
 
-    mic2meta.clear();
-
-    std::string micName, metaName;
-
-    for (int i = 0; i < corrMic.numberOfObjects(); i++)
+    if (corrMicFn != "")
     {
-        corrMic.getValueToString(EMDL_MICROGRAPH_NAME, micName, i);
-        corrMic.getValueToString(EMDL_MICROGRAPH_METADATA_NAME, metaName, i);
+        MetaDataTable corrMic;
+        corrMic.read(corrMicFn);
 
-        // remove the pipeline job prefix
-        FileName fn_pre, fn_jobnr, fn_post;
-        decomposePipelineFileName(micName, fn_pre, fn_jobnr, fn_post);
+        mic2meta.clear();
 
-        mic2meta[fn_post] = metaName;
+        std::string micName, metaName;
+
+        for (int i = 0; i < corrMic.numberOfObjects(); i++)
+        {
+            corrMic.getValueToString(EMDL_MICROGRAPH_NAME, micName, i);
+            corrMic.getValueToString(EMDL_MICROGRAPH_METADATA_NAME, metaName, i);
+
+            // remove the pipeline job prefix
+            FileName fn_pre, fn_jobnr, fn_post;
+            decomposePipelineFileName(micName, fn_pre, fn_jobnr, fn_post);
+
+            mic2meta[fn_post] = metaName;
+        }
+
+        hasCorrMic = true;
+    }
+    else
+    {
+        hasCorrMic = false;
     }
 
-    this->corrMicFn = corrMicFn;
-    hasCorrMic = true;
-    ready = true;
-}
-
-void MicrographHandler::init()
-{
-    hasCorrMic = false;
     ready = true;
 }
 

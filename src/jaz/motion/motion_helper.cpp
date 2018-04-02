@@ -12,14 +12,70 @@
 using namespace gravis;
 
 std::vector<std::vector<Image<RFLOAT>>> MotionHelper::movieCC(
-        Projector& projector0,
-        Projector& projector1,
-        const ObservationModel &obsModel,
-        const MetaDataTable &viewParams,
-        const std::vector<std::vector<Image<Complex> > > &movie,
-        const std::vector<double> &sigma2,
-        const std::vector<Image<RFLOAT> > &damageWeights,
-        std::vector<ParFourierTransformer>& fts, int threads)
+    const std::vector<std::vector<Image<Complex>>>& movie,
+    const std::vector<Image<Complex>>& preds,
+    const std::vector<Image<RFLOAT> > &damageWeights,
+    std::vector<ParFourierTransformer>& fts, int threads)
+{
+    const int pc = movie.size();
+    const int fc = movie[0].size();
+
+    const int s = movie[0][0]().ydim;
+    const int sh = s/2 + 1;
+
+    std::vector<std::vector<Image<RFLOAT>>> out(pc);
+
+    std::vector<Image<Complex>> ccsFs(threads);
+    std::vector<Image<RFLOAT>> ccsRs(threads);
+
+    for (int t = 0; t < threads; t++)
+    {
+        ccsFs[t] = Image<Complex>(sh,s);
+        ccsFs[t].data.xinit = 0;
+        ccsFs[t].data.yinit = 0;
+
+        ccsRs[t] = Image<RFLOAT>(s,s);
+        ccsRs[t].data.xinit = 0;
+        ccsRs[t].data.yinit = 0;
+    }
+
+    for (int p = 0; p < pc; p++)
+    {
+        out[p] = std::vector<Image<RFLOAT>>(fc, Image<RFLOAT>(s,s));
+
+        #pragma omp parallel for num_threads(threads)
+        for (int f = 0; f < fc; f++)
+        {
+            int t = omp_get_thread_num();
+
+            for (int y = 0; y < s; y++)
+            for (int x = 0; x < sh; x++)
+            {
+                ccsFs[t](y,x) = movie[p][f](y,x) * damageWeights[f](y,x) * preds[p](y,x).conj();
+            }
+
+            fts[t].inverseFourierTransform(ccsFs[t](), ccsRs[t]());
+
+            for (int y = 0; y < s; y++)
+            for (int x = 0; x < s; x++)
+            {
+                out[p][f](y,x) = s * s * ccsRs[t](y,x);
+            }
+        }
+    }
+
+    return out;
+}
+
+std::vector<std::vector<Image<RFLOAT>>> MotionHelper::movieCC(
+    Projector& projector0,
+    Projector& projector1,
+    const ObservationModel &obsModel,
+    const MetaDataTable &viewParams,
+    const std::vector<std::vector<Image<Complex> > > &movie,
+    const std::vector<double> &sigma2,
+    const std::vector<Image<RFLOAT> > &damageWeights,
+    std::vector<ParFourierTransformer>& fts, int threads)
 {
     const int pc = movie.size();
     const int fc = movie[0].size();

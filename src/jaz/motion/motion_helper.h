@@ -20,6 +20,13 @@ class MotionHelper
     public:
 
         static std::vector<std::vector<Image<RFLOAT>>> movieCC(
+                const std::vector<std::vector<Image<Complex>>>& movie,
+                const std::vector<Image<Complex>>& preds,
+                const std::vector<Image<RFLOAT>>& damageWeights,
+                std::vector<ParFourierTransformer>& fts, int threads);
+
+        // deprecated: use the one above!
+        static std::vector<std::vector<Image<RFLOAT>>> movieCC(
                 Projector& projector0,
                 Projector& projector1,
                 const ObservationModel& obsModel,

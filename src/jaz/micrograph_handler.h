@@ -21,12 +21,12 @@ class MicrographHandler
 
             bool preextracted, debug, saveMem, ready;
 
+            std::string corrMicFn;
             std::string movie_path, meta_path, movie_ending;
             std::string gain_path, last_gainFn;
 
 
-        void init(std::string corrMicFn);
-        void init();
+        void init(int nr_omp_threads, int firstFrame, int lastFrame);
 
         void loadInitial(
             // in:
@@ -61,7 +61,6 @@ class MicrographHandler
             Image<RFLOAT> lastGainRef;
 
             bool hasCorrMic;
-            std::string corrMicFn;
             std::map<std::string, std::string> mic2meta;
 
         std::string getMetaName(std::string micName);

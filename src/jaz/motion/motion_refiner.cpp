@@ -55,12 +55,11 @@ void MotionRefiner::read(int argc, char **argv)
     parser.addSection("General options");
 	// TODO: fn_opt = parser.getOption("--opt", "optimiser STAR file from a previous 3D auto-refinement");
 
-    starFn = parser.getOption("--i", "Input STAR file");
-	reconFn0 = parser.getOption("--m1", "Reference map, half 1");
-    reconFn1 = parser.getOption("--m2", "Reference map, half 2");
-    maskFn = parser.getOption("--mask", "Reference mask", "");
-    fscFn = parser.getOption("--f", "Input STAR file with the FSC of the reference");
+    starFn = parser.getOption("--i", "Input STAR file");	
     outPath = parser.getOption("--o", "Output directory, e.g. MotionFit/job041/");
+
+    reference.read(parser, argc, argv);
+
     firstFrame = textToInteger(parser.getOption("--first_frame", "", "1")) - 1;
     lastFrame = textToInteger(parser.getOption("--last_frame", "", "-1")) - 1;
 	only_do_unfinished = parser.checkOption("--only_do_unfinished", "Skip those steps for which output files already exist.");
@@ -73,7 +72,6 @@ void MotionRefiner::read(int argc, char **argv)
     parser.addSection("Computational options");
 
     nr_omp_threads = textToInteger(parser.getOption("--j", "Number of (OMP) threads", "1"));
-    paddingFactor = textToFloat(parser.getOption("--pad", "Padding factor", "2"));
     minMG = textToInteger(parser.getOption("--min_MG", "First micrograph index", "0"));
     maxMG = textToInteger(parser.getOption("--max_MG", "Last micrograph index (default is to process all)", "-1"));
 
@@ -83,7 +81,7 @@ void MotionRefiner::read(int argc, char **argv)
 
 	angpix = textToFloat(parser.getOption("--angpix", "Pixel resolution (angst/pix) - read from STAR file by default", "-1"));
     micrographHandler.movie_path = parser.getOption("--mov", "Path to movies", "");
-    corrMicFn = parser.getOption("--corr_mic", "List of uncorrected micrographs (e.g. corrected_micrographs.star)", "");
+    micrographHandler.corrMicFn = parser.getOption("--corr_mic", "List of uncorrected micrographs (e.g. corrected_micrographs.star)", "");
     micrographHandler.preextracted = parser.checkOption("--preex", "Preextracted movie stacks");
     micrographHandler.meta_path = parser.getOption("--meta", "Path to per-movie metadata star files", "");
     micrographHandler.gain_path = parser.getOption("--gain_path", "Path to gain references", "");
@@ -107,12 +105,12 @@ void MotionRefiner::read(int argc, char **argv)
 
 void MotionRefiner::init()
 {
-    if (movie_angpix <= 0 && corrMicFn == "")
+    if (movie_angpix <= 0 && micrographHandler.corrMicFn == "")
     {
         REPORT_ERROR("ERROR: Movie pixel size (--mps) is required unless a corrected_micrographs.star (--corr_mic) is provided.");
     }
 
-    if (coords_angpix <= 0 && corrMicFn == "")
+    if (coords_angpix <= 0 && micrographHandler.corrMicFn == "")
     {
         REPORT_ERROR("ERROR: Coordinates pixel size (--cps) is required unless a corrected_micrographs.star (--corr_mic) is provided.");
     }
@@ -146,14 +144,7 @@ void MotionRefiner::init()
 	}
 
     // initialise corrected/uncorrected micrograph dictionary
-	if (corrMicFn != "")
-	{
-        micrographHandler.init(corrMicFn);
-	}
-    else
-    {
-        micrographHandler.init();
-    }
+    micrographHandler.init(nr_omp_threads, firstFrame, lastFrame);
 
     allMdts = StackHelper::splitByMicrographName(&mdt0);
 
@@ -269,16 +260,12 @@ void MotionRefiner::init()
 
         // Read in the first reference
         // (even if there is no motion to estimate - only to learn the image size)
-        // TODO: replace once data is tree-structured
-        maps[0].read(reconFn0, needsReference);
-
-		if (maps[0].data.xdim != maps[0].data.ydim || maps[0].data.ydim != maps[0].data.zdim)
-        {
-			REPORT_ERROR(reconFn0 + " is not cubical.\n");
-        }
+        // TODO: replace once the data is tree-structured
+        Image<RFLOAT> map0;
+        map0.read(reference.reconFn0, false);
 
 		// Get dimensions
-		s = maps[0].data.xdim;
+        s = map0.data.xdim;
         sh = s/2 + 1;
 
         if (needsReference)
@@ -288,70 +275,9 @@ void MotionRefiner::init()
                 std::cout << " + Reading references ...\n";
             }
 
-			// Read in the second reference
-			maps[1].read(reconFn1);
+            reference.load(verb);
+        }
 
-			if (maps[1].data.xdim != maps[1].data.ydim || maps[1].data.ydim != maps[1].data.zdim)
-            {
-				REPORT_ERROR(reconFn1 + " is not cubical.\n");
-            }
-
-			if (   maps[0].data.xdim != maps[1].data.xdim
-				|| maps[0].data.ydim != maps[1].data.ydim
-				|| maps[0].data.zdim != maps[1].data.zdim)
-            {
-				REPORT_ERROR(reconFn0 + " and " + reconFn1 + " are of unequal size.\n");
-            }
-
-			if (maskFn != "")
-			{
-                if (verb > 0) std::cout << " + Masking references ...\n";
-
-				Image<RFLOAT> mask, maskedRef;
-
-				mask.read(maskFn);
-
-				ImageOp::multiply(mask, maps[0], maskedRef);
-				maps[0] = maskedRef;
-
-				ImageOp::multiply(mask, maps[1], maskedRef);
-				maps[1] = maskedRef;
-			}
-
-
-            if (verb > 0) std::cout << " + Transforming references ...\n";
-
-			projectors[0] = Projector(s, TRILINEAR, paddingFactor, 10, 2);
-			projectors[0].computeFourierTransformMap(maps[0].data, powSpec[0].data, maps[0].data.xdim);
-			projectors[1] = Projector(s, TRILINEAR, paddingFactor, 10, 2);
-			projectors[1].computeFourierTransformMap(maps[1].data, powSpec[1].data, maps[1].data.xdim);
-
-			if (fscFn != "")
-			{
-				MetaDataTable fscMdt;
-				fscMdt.read(fscFn, "fsc");
-
-				if (!fscMdt.containsLabel(EMDL_SPECTRAL_IDX))
-                {
-                    REPORT_ERROR(fscFn + " does not contain a value for "
-                                 + EMDL::label2Str(EMDL_SPECTRAL_IDX));
-                }
-
-				if (!fscMdt.containsLabel(EMDL_POSTPROCESS_FSC_TRUE))
-                {
-                    REPORT_ERROR(fscFn + " does not contain a value for "
-                                 + EMDL::label2Str(EMDL_POSTPROCESS_FSC_TRUE));
-                }
-
-				RefinementHelper::drawFSC(&fscMdt, freqWeight1D, freqWeight);
-			}
-			else
-			{
-				freqWeight1D = std::vector<double>(sh,1.0);
-				freqWeight = Image<RFLOAT>(sh,s);
-				freqWeight.data.initConstant(1.0);
-            }
-		}
     } // if (doAnything)
 
     if (estimateMotion || estimateParams)
@@ -614,7 +540,12 @@ std::vector<std::vector<Image<Complex> > > MotionRefiner::loadMovie(
 {
     return micrographHandler.loadMovie(
         mdt, s, angpix, movie_angpix, coords_angpix, fts,
-        pos, tracks, unregGlob, globComp);
+                pos, tracks, unregGlob, globComp);
+}
+
+bool MotionRefiner::hasCorrMic()
+{
+    return micrographHandler.corrMicFn != "";
 }
 
 void MotionRefiner::loadInitialMovie()

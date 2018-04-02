@@ -52,7 +52,7 @@ void MotionEstimator::read(IOParser& parser, int argc, char *argv[])
 
 void MotionEstimator::init()
 {
-    if (!global_init && motionRefiner.corrMicFn == "")
+    if (!global_init && !motionRefiner.hasCorrMic())
     {
         if (motionRefiner.verb > 0)
         {
@@ -86,14 +86,14 @@ void MotionEstimator::init()
 
     for (int i = 1; i < sh; i++)
     {
-        if (motionRefiner.freqWeight1D[i] <= 0.0)
+        if (motionRefiner.reference.freqWeight1D[i] <= 0.0)
         {
             k_out = i;
             break;
         }
     }
 
-    if (motionRefiner.verb > 0)
+    if (motionRefiner.verb > 0 && cutoffOut)
     {
         std::cout << " + maximum frequency to consider: "
             << (s * motionRefiner.angpix)/(RFLOAT)k_out << " A (" << k_out << " px)\n";
@@ -245,19 +245,23 @@ void MotionEstimator::prepMicrograph(
     movie = motionRefiner.loadMovie(
         mdt, fts, positions, initialTracks, unregGlob, globComp); // throws exceptions
 
+    std::vector<Image<Complex>> preds = motionRefiner.reference.predictAll(
+        mdt, motionRefiner.obsModel, ReferenceMap::Own, motionRefiner.nr_omp_threads);
+
     std::vector<double> sigma2 = StackHelper::powerSpectrum(movie);
 
     #pragma omp parallel for num_threads(motionRefiner.nr_omp_threads)
     for (int p = 0; p < pc; p++)
-    for (int f = 0; f < fc; f++)
     {
-        MotionHelper::noiseNormalize(movie[p][f], sigma2, movie[p][f]);
+        MotionHelper::noiseNormalize(preds[p], sigma2, preds[p]);
+
+        for (int f = 0; f < fc; f++)
+        {
+            MotionHelper::noiseNormalize(movie[p][f], sigma2, movie[p][f]);
+        }
     }
 
-    movieCC = MotionHelper::movieCC(
-            motionRefiner.projectors[0], motionRefiner.projectors[1],
-            motionRefiner.obsModel, mdt, movie, //why mdt? - for the random subset
-            sigma2, dmgWeight, fts, motionRefiner.nr_omp_threads);
+    movieCC = MotionHelper::movieCC(movie, preds, dmgWeight, fts, motionRefiner.nr_omp_threads);
 
     if (global_init || initialTracks.size() == 0)
     {
@@ -360,7 +364,6 @@ void MotionEstimator::updateFCC(
     {
         int threadnum = omp_get_thread_num();
 
-        Image<Complex> pred;
         std::vector<Image<Complex>> obs = movie[p];
 
         for (int f = 0; f < fc; f++)
@@ -368,20 +371,10 @@ void MotionEstimator::updateFCC(
             shiftImageInFourierTransform(obs[f](), obs[f](), s, -tracks[p][f].x, -tracks[p][f].y);
         }
 
-        int randSubset;
-        mdt.getValue(EMDL_PARTICLE_RANDOM_SUBSET, randSubset, p);
-        randSubset -= 1;
+        Image<Complex> pred = motionRefiner.reference.predict(
+            mdt, p, motionRefiner.obsModel, ReferenceMap::Opposite);
 
-        if (randSubset == 0)
-        {
-            pred = motionRefiner.obsModel.predictObservation(
-                        motionRefiner.projectors[1], mdt, p, true, true);
-        }
-        else
-        {
-            pred = motionRefiner.obsModel.predictObservation(
-                        motionRefiner.projectors[0], mdt, p, true, true);
-        }
+        // @TODO: noise-normalize pred?
 
         FscHelper::updateFscTable(obs, pred, tables[threadnum],
                                   weights0[threadnum], weights1[threadnum]);
