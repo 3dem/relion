@@ -61,6 +61,7 @@ class MotionRefiner
             Image<RFLOAT> freqWeight;
             std::vector<double> freqWeight1D;
             Projector projectors[2];
+
             ObservationModel obsModel;
 
 
@@ -132,9 +133,7 @@ class MotionRefiner
                 paramMdts, // micrographs on which the parameters are to be estimated
                 motionMdts, recombMdts; // unfinished micrographs
 
-            std::map<std::string, std::string> mic2meta;
-
-            Image<RFLOAT> maps[2], powSpec[2], lastGainRef;
+            Image<RFLOAT> maps[2], powSpec[2];
 
             MicrographHandler micrographHandler;
 

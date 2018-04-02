@@ -57,11 +57,15 @@ class MicrographHandler
 
     protected:
 
-        Micrograph micrograph;
-        Image<RFLOAT> lastGainRef;
+            Micrograph micrograph;
+            Image<RFLOAT> lastGainRef;
 
-        bool hasCorrMic;
-        std::map<std::string, std::string> mic2meta;
+            bool hasCorrMic;
+            std::string corrMicFn;
+            std::map<std::string, std::string> mic2meta;
+
+        std::string getMetaName(std::string micName);
+
 };
 
 #endif

@@ -17,7 +17,8 @@ MicrographHandler::MicrographHandler()
     meta_path(""),
     movie_ending(""),
     gain_path(""),
-    last_gainFn("")
+    last_gainFn(""),
+    corrMicFn("")
 {}
 
 void MicrographHandler::init(std::string corrMicFn)
@@ -41,6 +42,7 @@ void MicrographHandler::init(std::string corrMicFn)
         mic2meta[fn_post] = metaName;
     }
 
+    this->corrMicFn = corrMicFn;
     hasCorrMic = true;
     ready = true;
 }
@@ -101,14 +103,7 @@ void MicrographHandler::loadInitial(
             FileName fn_pre, fn_jobnr, fn_post;
             decomposePipelineFileName(mgFn, fn_pre, fn_jobnr, fn_post);
 
-            //@TODO: make safe:
-            std::string metaFn = mic2meta[fn_post];
-
-            if (meta_path != "")
-            {
-                metaFn = meta_path + "/" + metaFn.substr(metaFn.find_last_of("/")+1);
-            }
-
+            std::string metaFn = getMetaName(fn_post);
             micrograph = Micrograph(metaFn);
 
             if (movie_angpix <= 0)
@@ -248,14 +243,7 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 
         if (hasCorrMic)
         {
-            //@TODO: make safe:
-            std::string metaFn = mic2meta[fn_post];
-
-            if (meta_path != "")
-            {
-                metaFn = meta_path + "/" + metaFn.substr(metaFn.find_last_of("/")+1);
-            }
-
+            std::string metaFn = getMetaName(fn_post);
             micrograph = Micrograph(metaFn);
 
             std::string mgFn = micrograph.getMovieFilename();
@@ -382,4 +370,19 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
     }
 
     return out;
+}
+
+std::string MicrographHandler::getMetaName(std::string micName)
+{
+    std::map<std::string, std::string>::iterator it = mic2meta.find(micName);
+
+    if (it == mic2meta.end())
+    {
+        REPORT_ERROR("ERROR: MicrographHandler::getMetaName: no metadata star-file for "
+                     +micName+" found in "+corrMicFn+".");
+    }
+    else
+    {
+        return it->second;
+    }
 }
