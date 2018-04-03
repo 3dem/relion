@@ -216,8 +216,16 @@ void MotionRefiner::init()
         {
             if (motionMdts.size() > 0)
             {
-                std::cout << "   - Will only estimate motion for " << motionMdts.size()
+                if (motionMdts.size() < chosenMdts.size())
+                {
+                    std::cout << "   - Will only estimate motion for " << motionMdts.size()
                           << " unfinished micrographs\n";
+                }
+                else
+                {
+                    std::cout << "   - Will estimate motion for all " << motionMdts.size()
+                          << " micrographs - none are finished\n";
+                }
             }
             else
             {
@@ -228,8 +236,16 @@ void MotionRefiner::init()
             {
                 if (recombMdts.size() > 0)
                 {
-                    std::cout << "   - Will only recombine frames for " << recombMdts.size()
+                    if (recombMdts.size() < chosenMdts.size())
+                    {
+                        std::cout << "   - Will only recombine frames for " << recombMdts.size()
                               << " unfinished micrographs\n";
+                    }
+                    else
+                    {
+                        std::cout << "   - Will recombine frames for all " << recombMdts.size()
+                              << " micrographs - none are finished\n";
+                    }
                 }
                 else
                 {
@@ -281,7 +297,7 @@ void MotionRefiner::init()
 
     if (estimateMotion || estimateParams)
     {
-        motionEstimator.init(verb, s, fc, nr_omp_threads, outPath,
+        motionEstimator.init(verb, s, fc, nr_omp_threads, debug, outPath,
                              &reference, &obsModel, &micrographHandler);
     }
 

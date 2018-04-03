@@ -54,7 +54,8 @@ void MotionEstimator::read(IOParser& parser, int argc, char *argv[])
 }
 
 void MotionEstimator::init(
-    int verb, int s, int fc, int nr_omp_threads, std::string outPath,
+    int verb, int s, int fc, int nr_omp_threads,
+    bool debug, std::string outPath,
     ReferenceMap* reference,
     ObservationModel* obsModel,
     MicrographHandler* micrographHandler)
@@ -69,6 +70,7 @@ void MotionEstimator::init(
     this->sh = s/2 + 1;
     this->fc = fc;
     this->nr_omp_threads = nr_omp_threads;
+    this->debug = debug;
     this->outPath = outPath;
     this->reference = reference;
     this->obsModel = obsModel;
@@ -135,7 +137,7 @@ void MotionEstimator::process(const std::vector<MetaDataTable>& mdts, long g_sta
     if (verb > 0)
     {
         std::cout << " + Performing loop over all micrographs ... " << std::endl;
-        init_progress_bar(my_nr_micrographs);
+        if (!debug) init_progress_bar(my_nr_micrographs);
         barstep = XMIPP_MAX(1, my_nr_micrographs/ 60);
     }
 
@@ -165,6 +167,11 @@ void MotionEstimator::process(const std::vector<MetaDataTable>& mdts, long g_sta
         const int pc = mdts[g].numberOfObjects();
         if (pc == 0) continue;
 
+        if (debug)
+        {
+            std::cout << g << "/" << g_end << " (" << pc << " particles)\n";
+        }
+
         // Make sure output directory exists
         FileName newdir = MotionRefiner::getOutputFileNameRoot(outPath, mdts[g]);
         newdir = newdir.beforeLastOf("/");
@@ -186,10 +193,19 @@ void MotionEstimator::process(const std::vector<MetaDataTable>& mdts, long g_sta
 
         pctot += pc;
 
-        std::vector<std::vector<gravis::d2Vector>> tracks = optimize(
+        std::vector<std::vector<gravis::d2Vector>> tracks;
+
+        if (pc > 1)
+        {
+            tracks = optimize(
                 movieCC, initialTracks,
                 sig_vel_nrm, sig_acc_nrm, sig_div_nrm,
                 positions, globComp);
+        }
+        else
+        {
+            tracks = initialTracks;
+        }
 
         updateFCC(movie, tracks, mdts[g], tables, weights0, weights1);
 
@@ -206,13 +222,13 @@ void MotionEstimator::process(const std::vector<MetaDataTable>& mdts, long g_sta
 
         nr_done++;
 
-        if (verb > 0 && nr_done % barstep == 0)
+        if (!debug && verb > 0 && nr_done % barstep == 0)
         {
             progress_bar(nr_done);
         }
     }
 
-    if (verb > 0)
+    if (!debug && verb > 0)
     {
         progress_bar(my_nr_micrographs);
     }

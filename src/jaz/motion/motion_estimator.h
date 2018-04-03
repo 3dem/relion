@@ -20,7 +20,8 @@ class MotionEstimator
 
         void read(IOParser& parser, int argc, char *argv[]);
 
-        void init(int verb, int s, int fc, int nr_omp_threads, std::string outPath,
+        void init(int verb, int s, int fc, int nr_omp_threads,
+                  bool debug, std::string outPath,
                   ReferenceMap* reference,
                   ObservationModel* obsModel,
                   MicrographHandler* micrographHandler);
@@ -77,6 +78,7 @@ class MotionEstimator
             // set at init
             int s, sh, fc, verb, nr_omp_threads;
             double angpix;
+            bool debug;
 
             std::vector<Image<RFLOAT>> dmgWeight;
 
