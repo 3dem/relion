@@ -6,37 +6,57 @@
 #include <src/image.h>
 #include <src/jaz/gravis/t4Vector.h>
 
-class MotionRefiner;
+class MotionEstimator;
+class ReferenceMap;
+class ObservationModel;
 
 class MotionParamEstimator
 {
     public:
 
-        MotionParamEstimator(MotionRefiner& motionRefiner);
-
-            MotionRefiner& motionRefiner;
-            AlignmentSet alignmentSet;
-
-            bool ready, estim2, estim3;
-            int minParticles, maxRange, recursions, steps;
-            double rV, rD, rA;
-
-            int fc, s, k_out;
-            double k_cutoff;
-
-            std::vector<MetaDataTable> mdts;
+        MotionParamEstimator();
 
 
         int read(IOParser& parser, int argc, char *argv[]);
 
-        void init(const std::vector<MetaDataTable>& allMdts);
+        void init(int verb, int nr_omp_threads, bool debug,
+                  int s, int fc,
+                  const std::vector<MetaDataTable>& allMdts,
+                  MotionEstimator* motionEstimator,
+                  ReferenceMap* reference,
+                  ObservationModel* obsModel);
+
         void run();
+
+        bool anythingToDo();
+
+
+    protected:
+
+            bool paramsRead, ready;
+
+            AlignmentSet alignmentSet;
+
+            // read from cmd. line:
+            bool estim2, estim3;
+            int minParticles, maxRange, recursions, steps;
+            double rV, rD, rA;
+            double k_cutoff, k_cutoff_Angst;
+
+            // set at init:
+            std::vector<MetaDataTable> mdts;
+
+            MotionEstimator* motionEstimator;
+            ObservationModel* obsModel;
+            ReferenceMap* reference;
+
+            int fc, s, k_out, verb, nr_omp_threads;
+            bool debug;
+
 
         gravis::d4Vector estimateTwoParamsRec();
 
-        void prepAlignment(int k_out,
-                const std::vector<Image<RFLOAT>>& dmgWeight0,
-                const std::vector<Image<RFLOAT>>& dmgWeight);
+        void prepAlignment();
 };
 
 #endif

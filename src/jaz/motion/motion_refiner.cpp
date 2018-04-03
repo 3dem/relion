@@ -41,9 +41,9 @@
 using namespace gravis;
 
 MotionRefiner::MotionRefiner()
-:   motionParamEstimator(*this),
-    motionEstimator(*this),
-    frameRecombiner(*this)
+:   motionParamEstimator(),
+    motionEstimator(),
+    frameRecombiner()
 {
 }
 
@@ -60,8 +60,8 @@ void MotionRefiner::read(int argc, char **argv)
 
     reference.read(parser, argc, argv);
 
-    firstFrame = textToInteger(parser.getOption("--first_frame", "", "1")) - 1;
-    lastFrame = textToInteger(parser.getOption("--last_frame", "", "-1")) - 1;
+    micrographHandler.firstFrame = textToInteger(parser.getOption("--first_frame", "", "1")) - 1;
+    micrographHandler.lastFrame = textToInteger(parser.getOption("--last_frame", "", "-1")) - 1;
 	only_do_unfinished = parser.checkOption("--only_do_unfinished", "Skip those steps for which output files already exist.");
     verb = textToInteger(parser.getOption("--verb", "Verbosity", "1"));
 
@@ -80,19 +80,21 @@ void MotionRefiner::read(int argc, char **argv)
     parser.addSection("Expert options");
 
 	angpix = textToFloat(parser.getOption("--angpix", "Pixel resolution (angst/pix) - read from STAR file by default", "-1"));
+    debug = parser.checkOption("--debug", "Write debugging data");
+
     micrographHandler.movie_path = parser.getOption("--mov", "Path to movies", "");
     micrographHandler.corrMicFn = parser.getOption("--corr_mic", "List of uncorrected micrographs (e.g. corrected_micrographs.star)", "");
     micrographHandler.preextracted = parser.checkOption("--preex", "Preextracted movie stacks");
     micrographHandler.meta_path = parser.getOption("--meta", "Path to per-movie metadata star files", "");
     micrographHandler.gain_path = parser.getOption("--gain_path", "Path to gain references", "");
     micrographHandler.movie_ending = parser.getOption("--mov_end", "Ending of movie filenames", "");
+    micrographHandler.movie_angpix = textToFloat(parser.getOption("--mps", "Pixel size of input movies (Angst/pix)", "-1"));
+    micrographHandler.coords_angpix = textToFloat(parser.getOption("--cps", "Pixel size of particle coordinates in star-file (Angst/pix)", "-1"));
+    micrographHandler.hotCutoff = textToFloat(parser.getOption("--hot", "Clip hot pixels to this max. value (-1 = off, TIFF only)", "-1"));
+    micrographHandler.debug = parser.checkOption("--debug_mov", "Write debugging data for movie loading");
+
     movie_toReplace = parser.getOption("--mov_toReplace", "Replace this string in micrograph names...", "");
     movie_replaceBy = parser.getOption("--mov_replaceBy", "..by this one", "");
-    movie_angpix = textToFloat(parser.getOption("--mps", "Pixel size of input movies (Angst/pix)", "-1"));
-    coords_angpix = textToFloat(parser.getOption("--cps", "Pixel size of particle coordinates in star-file (Angst/pix)", "-1"));
-    micrographHandler.hotCutoff = textToFloat(parser.getOption("--hot", "Clip hot pixels to this max. value (-1 = off, TIFF only)", "-1"));
-    debug = parser.checkOption("--debug", "Write debugging data");
-    micrographHandler.debug = parser.checkOption("--debug_mov", "Write debugging data for movie loading");
 
 	// Check for errors in the command-line option
 	if (parser.checkForErrors())
@@ -105,12 +107,12 @@ void MotionRefiner::read(int argc, char **argv)
 
 void MotionRefiner::init()
 {
-    if (movie_angpix <= 0 && micrographHandler.corrMicFn == "")
+    if (micrographHandler.movie_angpix <= 0 && micrographHandler.corrMicFn == "")
     {
         REPORT_ERROR("ERROR: Movie pixel size (--mps) is required unless a corrected_micrographs.star (--corr_mic) is provided.");
     }
 
-    if (coords_angpix <= 0 && micrographHandler.corrMicFn == "")
+    if (micrographHandler.coords_angpix <= 0 && micrographHandler.corrMicFn == "")
     {
         REPORT_ERROR("ERROR: Coordinates pixel size (--cps) is required unless a corrected_micrographs.star (--corr_mic) is provided.");
     }
@@ -143,8 +145,21 @@ void MotionRefiner::init()
         }
 	}
 
-    // initialise corrected/uncorrected micrograph dictionary
-    micrographHandler.init(nr_omp_threads, firstFrame, lastFrame);
+    {
+        double fractDose;
+        std::string metaFn = "";
+
+        // initialise corrected/uncorrected micrograph dictionary, then load the header
+        // of the first movie (or read corrected_micrographs.star) to obtain:
+        //  frame count, micrograph size and the fractional dose
+        micrographHandler.init(
+            mdt0, angpix, verb, nr_omp_threads, // in
+            fc, fractDose, metaFn); // out
+
+        // metaFn is only needed for console output
+        // verb is needed since motionEstimator has not been initialised yet
+        motionEstimator.proposeDosePerFrame(fractDose, metaFn, verb);
+    }
 
     allMdts = StackHelper::splitByMicrographName(&mdt0);
 
@@ -162,8 +177,6 @@ void MotionRefiner::init()
     {
         minMG = 0;
     }
-
-    loadInitialMovie();
 
 	// Only work on a user-specified subset of the micrographs
     if (maxMG < 0 || maxMG >= allMdts.size())
@@ -191,29 +204,13 @@ void MotionRefiner::init()
         chosenMdts = allMdts;
     }
 
-    // Check which motion-fit and recombination output files already exist.
 	if (only_do_unfinished)
     {
         motionMdts.clear();
         recombMdts.clear();
 
-        for (long int g = 0; g < chosenMdts.size(); g++ )
-		{
-            std::string fnRoot = getOutputFileNameRoot(chosenMdts[g]);
-
-            bool motionDone = MotionEstimator::isFinished(fnRoot);
-            bool recombDone = FrameRecombiner::isFinished(fnRoot);
-
-            if (!motionDone)
-            {
-                motionMdts.push_back(chosenMdts[g]);
-            }
-
-            if (frameRecombiner.doCombineFrames && (!motionDone || !recombDone))
-            {
-                recombMdts.push_back(chosenMdts[g]);
-            }
-        }
+        motionMdts = MotionEstimator::findUnfinishedJobs(chosenMdts, outPath);
+        recombMdts = FrameRecombiner::findUnfinishedJobs(chosenMdts, outPath);
 
 		if (verb > 0)
         {
@@ -227,15 +224,18 @@ void MotionRefiner::init()
                 std::cout << "   - Motion has already been estimated for all micrographs\n";
             }
 
-            if (recombMdts.size() > 0) // implies frameRecombiner.doCombineFrames
+            if (frameRecombiner.doingRecombination())
             {
-                std::cout << "   - Will only recombine frames for " << recombMdts.size()
-                          << " unfinished micrographs\n";
-            }
-            else if (frameRecombiner.doCombineFrames)
-            {
-                std::cout << "   - Frames have already been recombined for all micrographs; "
-                          << "a new STAR file will be generated\n";
+                if (recombMdts.size() > 0)
+                {
+                    std::cout << "   - Will only recombine frames for " << recombMdts.size()
+                              << " unfinished micrographs\n";
+                }
+                else
+                {
+                    std::cout << "   - Frames have already been recombined for all micrographs; "
+                              << "a new STAR file will be generated\n";
+                }
             }
 		}
 	}
@@ -245,11 +245,10 @@ void MotionRefiner::init()
         recombMdts = chosenMdts;
     }
 
-    estimateParams = motionParamEstimator.estim2 ||  motionParamEstimator.estim3;
+    estimateParams = motionParamEstimator.anythingToDo();
     estimateMotion = motionMdts.size() > 0;
-    recombineFrames = frameRecombiner.doCombineFrames && (recombMdts.size() > 0);
-    generateStar = frameRecombiner.doCombineFrames;
-
+    recombineFrames = frameRecombiner.doingRecombination() && (recombMdts.size() > 0);
+    generateStar = frameRecombiner.doingRecombination();
 
     bool doAnything = estimateParams || estimateMotion || recombineFrames;
     bool needsReference = estimateParams || estimateMotion;
@@ -258,9 +257,9 @@ void MotionRefiner::init()
 	{
         obsModel = ObservationModel(angpix);
 
-        // Read in the first reference
+        // Read the first reference
         // (even if there is no motion to estimate - only to learn the image size)
-        // TODO: replace once the data is tree-structured
+        // @TODO: replace this once the data is tree-structured
         Image<RFLOAT> map0;
         map0.read(reference.reconFn0, false);
 
@@ -278,16 +277,19 @@ void MotionRefiner::init()
             reference.load(verb);
         }
 
-    } // if (doAnything)
+    }
 
     if (estimateMotion || estimateParams)
     {
-        motionEstimator.init();
+        motionEstimator.init(verb, s, fc, nr_omp_threads, outPath,
+                             &reference, &obsModel, &micrographHandler);
     }
 
     if (estimateParams)
     {
-        motionParamEstimator.init(allMdts);
+        motionParamEstimator.init(
+            verb, nr_omp_threads, debug,
+            s, fc, allMdts, &motionEstimator, &reference, &obsModel);
     }
 }
 
@@ -310,7 +312,10 @@ void MotionRefiner::run()
 
     if (recombineFrames)
     {
-        frameRecombiner.init(allMdts);
+        frameRecombiner.init(
+            allMdts, verb, s, fc, nr_omp_threads, outPath, debug,
+            &obsModel, &micrographHandler);
+
         frameRecombiner.process(recombMdts, 0, recombMdts.size()-1);
 	}
 
@@ -320,16 +325,10 @@ void MotionRefiner::run()
     }
 }
 
-double MotionRefiner::angToPix(double a)
+int MotionRefiner::getVerbosityLevel()
 {
-    return s * angpix / a;
+    return verb;
 }
-
-double MotionRefiner::pixToAng(double p)
-{
-    return s * angpix / p;
-}
-
 
 /*
 void MotionRefiner::calculateSingleFrameReconstruction(int iframe)
@@ -463,7 +462,7 @@ void MotionRefiner::combineEPSAndSTARfiles()
 
     MetaDataTable mdtAll;
 
-    if (frameRecombiner.doCombineFrames)
+    if (frameRecombiner.doingRecombination())
     {
     	if (exists(outPath+"bfactors.eps"))
         {
@@ -478,14 +477,14 @@ void MotionRefiner::combineEPSAndSTARfiles()
 
     for (long g = 0; g < allMdts.size(); g++)
 	{
-        FileName fn_root = getOutputFileNameRoot(allMdts[g]);
+        FileName fn_root = getOutputFileNameRoot(outPath, allMdts[g]);
 
 		if (exists(fn_root+"_tracks.eps"))
         {
 			fn_eps.push_back(fn_root+"_tracks.eps");
         }
 
-        if (frameRecombiner.doCombineFrames && exists(fn_root+"_shiny.star"))
+        if (frameRecombiner.doingRecombination() && exists(fn_root+"_shiny.star"))
 		{
 			MetaDataTable mdt;
             mdt.read(fn_root+"_shiny.star");
@@ -498,7 +497,7 @@ void MotionRefiner::combineEPSAndSTARfiles()
 		joinMultipleEPSIntoSinglePDF(outPath + "logfile.pdf ", fn_eps);
 	}
 
-    if (frameRecombiner.doCombineFrames)
+    if (frameRecombiner.doingRecombination())
     {
 		mdtAll.write(outPath+"shiny.star");
     }
@@ -508,7 +507,7 @@ void MotionRefiner::combineEPSAndSTARfiles()
 		std::cout << " + Done! " << std::endl;
 		std::cout << " + Written logfile in " << outPath << "logfile.pdf" << std::endl;
 
-        if (frameRecombiner.doCombineFrames)
+        if (frameRecombiner.doingRecombination())
         {
             std::cout << " + Written new particle STAR file in "
                       << outPath << "shiny.star" << std::endl;
@@ -517,43 +516,12 @@ void MotionRefiner::combineEPSAndSTARfiles()
 }
 
 // Get the output filename from the micrograph filename
-FileName MotionRefiner::getOutputFileNameRoot(const MetaDataTable& mdt)
+FileName MotionRefiner::getOutputFileNameRoot(std::string outPath, const MetaDataTable& mdt)
 {
     FileName fn_mic, fn_pre, fn_jobnr, fn_post;
     mdt.getValue(EMDL_MICROGRAPH_NAME, fn_mic, 0);
     decomposePipelineFileName(fn_mic, fn_pre, fn_jobnr, fn_post);
 	return outPath + fn_post.withoutExtension();
-}
-
-std::vector<std::vector<Image<Complex>>> MotionRefiner::loadMovie(
-    const MetaDataTable& mdt, std::vector<ParFourierTransformer>& fts)
-{
-    return micrographHandler.loadMovie(
-        mdt, s, angpix, movie_angpix, coords_angpix, fts);
-}
-
-std::vector<std::vector<Image<Complex> > > MotionRefiner::loadMovie(
-        const MetaDataTable& mdt, std::vector<ParFourierTransformer>& fts,
-        const std::vector<d2Vector>& pos,
-        std::vector<std::vector<gravis::d2Vector>>& tracks,
-        bool unregGlob, std::vector<gravis::d2Vector>& globComp)
-{
-    return micrographHandler.loadMovie(
-        mdt, s, angpix, movie_angpix, coords_angpix, fts,
-                pos, tracks, unregGlob, globComp);
-}
-
-bool MotionRefiner::hasCorrMic()
-{
-    return micrographHandler.corrMicFn != "";
-}
-
-void MotionRefiner::loadInitialMovie()
-{
-    micrographHandler.loadInitial(
-        mdt0, angpix, verb, fc,
-        micrograph_xsize, micrograph_ysize,
-        movie_angpix, coords_angpix, motionEstimator.dosePerFrame);
 }
 
 void MotionRefiner::adaptMovieNames()

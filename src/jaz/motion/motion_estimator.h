@@ -5,38 +5,30 @@
 #include <src/jaz/gravis/t2Vector.h>
 #include <vector>
 
-class MotionRefiner;
 class IOParser;
 class ParFourierTransformer;
+class ReferenceMap;
+class ObservationModel;
+class MicrographHandler;
 
 class MotionEstimator
 {
     public:
 
-        MotionEstimator(MotionRefiner& motionRefiner);
-
-            MotionRefiner& motionRefiner;
-
-            bool ready;
-
-            int s, sh, fc;
-            int maxEDs, maxIters;
-
-            bool unregGlob, noGlobOff, cutoffOut,
-                diag, expKer, global_init, debugOpt;
-
-            double dmga, dmgb, dmgc, dosePerFrame,
-                sig_vel, sig_div, sig_acc,
-                k_cutoff, k_cutoff_Angst, optEps;
-
-            std::vector<Image<RFLOAT>> dmgWeight, dmgWeightEval;
+        MotionEstimator();
 
 
         void read(IOParser& parser, int argc, char *argv[]);
-        void init();
+
+        void init(int verb, int s, int fc, int nr_omp_threads, std::string outPath,
+                  ReferenceMap* reference,
+                  ObservationModel* obsModel,
+                  MicrographHandler* micrographHandler);
+
         void process(const std::vector<MetaDataTable> &mdts, long g_start, long g_end);
 
-        // load micrograph g and compute all data required for the optimization;
+
+        // load micrograph from mdt and compute all data required for the optimization;
         // also used by MotionParamEstimator
         void prepMicrograph(
             // in:
@@ -57,6 +49,44 @@ class MotionEstimator
             const std::vector<gravis::d2Vector>& positions,
             const std::vector<gravis::d2Vector>& globComp);
 
+        const std::vector<Image<RFLOAT>>& getDamageWeights();
+
+        bool isReady();
+
+        double getDosePerFrame();
+        void proposeDosePerFrame(double dpf, std::string metaFn, int verb);
+
+
+        static std::vector<MetaDataTable> findUnfinishedJobs(
+                const std::vector<MetaDataTable>& mdts, std::string path);
+
+
+    protected:
+
+            bool paramsRead, ready;
+
+            // read from cmd line
+            int maxEDs, maxIters;
+
+            bool unregGlob, noGlobOff, cutoffOut,
+                diag, expKer, global_init, debugOpt;
+
+            double dmga, dmgb, dmgc, dosePerFrame,
+                sig_vel, sig_div, sig_acc, optEps;
+
+            // set at init
+            int s, sh, fc, verb, nr_omp_threads;
+            double angpix;
+
+            std::vector<Image<RFLOAT>> dmgWeight;
+
+            std::string outPath;
+
+            ReferenceMap* reference;
+            ObservationModel* obsModel;
+            MicrographHandler* micrographHandler;
+
+
         void updateFCC(
             const std::vector<std::vector<Image<Complex>>>& movie,
             const std::vector<std::vector<gravis::d2Vector>>& tracks,
@@ -73,7 +103,8 @@ class MotionEstimator
             const std::vector<gravis::d2Vector>& positions,
             std::string fn_root, double visScale);
 
-        static bool isFinished(std::string filenameRoot);
+
+        static bool isJobFinished(std::string filenameRoot);
 
 };
 

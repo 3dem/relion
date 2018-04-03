@@ -37,7 +37,7 @@ void MotionRefinerMpi::read(int argc, char **argv)
         REPORT_ERROR("ERROR: this program needs to be run with at least two MPI processes!");
 	}
 
-	if (node->isMaster() && (motionParamEstimator.estim2 || motionParamEstimator.estim3))
+    if (node->isMaster() && (motionParamEstimator.anythingToDo()))
 	{
         REPORT_ERROR("Parameter estimation is not supported in MPI mode.");
 		return;
@@ -83,7 +83,10 @@ void MotionRefinerMpi::run()
                        my_first_micrograph, my_last_micrograph);
         my_nr_micrographs = my_last_micrograph - my_first_micrograph + 1;
 
-        frameRecombiner.init(allMdts);
+        frameRecombiner.init(
+            allMdts, verb, s, fc, nr_omp_threads, outPath, debug,
+            &obsModel, &micrographHandler);
+
         frameRecombiner.process(recombMdts, my_first_micrograph, my_last_micrograph);
 	}
 

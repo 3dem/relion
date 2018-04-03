@@ -1,8 +1,11 @@
 #include "motion_estimator.h"
-#include "motion_refiner.h"
 #include "motion_helper.h"
 #include "gp_motion_fit.h"
+#include "motion_refiner.h"
 
+#include <src/jaz/micrograph_handler.h>
+#include <src/jaz/obs_model.h>
+#include <src/jaz/reference_map.h>
 #include <src/jaz/damage_helper.h>
 #include <src/jaz/filter_helper.h>
 #include <src/jaz/fsc_helper.h>
@@ -13,8 +16,8 @@
 
 using namespace gravis;
 
-MotionEstimator::MotionEstimator(MotionRefiner& motionRefiner)
-:   motionRefiner(motionRefiner), ready(false)
+MotionEstimator::MotionEstimator()
+:   paramsRead(false), ready(false)
 {
 }
 
@@ -26,8 +29,6 @@ void MotionEstimator::read(IOParser& parser, int argc, char *argv[])
     sig_vel = textToFloat(parser.getOption("--s_vel", "Velocity sigma [Angst/dose]", "0.5"));
     sig_div = textToFloat(parser.getOption("--s_div", "Divergence sigma [Angst]", "1000.0"));
     sig_acc = textToFloat(parser.getOption("--s_acc", "Acceleration sigma [Angst/dose]", "-1.0"));
-    k_cutoff = textToFloat(parser.getOption("--k_cut", "Freq. cutoff for parameter estimation [Pixels]", "-1.0"));
-    k_cutoff_Angst = textToFloat(parser.getOption("--k_cut_A", "Freq. cutoff for parameter estimation [Angstrom]", "-1.0"));
     diag = parser.checkOption("--diag", "Write out diagnostic data");
 
     parser.addSection("Motion fit options (advanced)");
@@ -48,13 +49,36 @@ void MotionEstimator::read(IOParser& parser, int argc, char *argv[])
     maxEDs = textToInteger(parser.getOption("--max_ed", "Maximum number of eigendeformations", "-1"));
 
     cutoffOut = parser.checkOption("--out_cut", "Do not consider frequencies beyond the 0.143-FSC threshold for alignment");
+
+    paramsRead = true;
 }
 
-void MotionEstimator::init()
+void MotionEstimator::init(
+    int verb, int s, int fc, int nr_omp_threads, std::string outPath,
+    ReferenceMap* reference,
+    ObservationModel* obsModel,
+    MicrographHandler* micrographHandler)
 {
-    if (!global_init && !motionRefiner.hasCorrMic())
+    if (!paramsRead)
     {
-        if (motionRefiner.verb > 0)
+        REPORT_ERROR("ERROR: MotionEstimator::init: MotionEstimator has not read its cmd-line parameters.");
+    }
+
+    this->verb = verb;
+    this->s = s;
+    this->sh = s/2 + 1;
+    this->fc = fc;
+    this->nr_omp_threads = nr_omp_threads;
+    this->outPath = outPath;
+    this->reference = reference;
+    this->obsModel = obsModel;
+    this->micrographHandler = micrographHandler;
+    angpix = obsModel->angpix;
+
+
+    if (!global_init && micrographHandler->corrMicFn == "")
+    {
+        if (verb > 0)
         {
             std::cerr << "\nWarning: in the absence of a corrected_micrographs.star file (--corr_mic), global paths are used for initialization.\n\n";
         }
@@ -62,62 +86,34 @@ void MotionEstimator::init()
         global_init = true;
     }
 
-    if (k_cutoff_Angst > 0.0 && k_cutoff > 0.0)
-    {
-        REPORT_ERROR("ERROR: Cutoff frequency can only be provided in pixels (--k_cut) or Angstrom (--k_cut_A), not both.");
-    }
-
-    s = motionRefiner.s;
-    sh = motionRefiner.sh;
-    fc = motionRefiner.fc;
-
-    if (k_cutoff_Angst > 0.0 && k_cutoff < 0.0)
-    {
-        k_cutoff = motionRefiner.angToPix(k_cutoff_Angst);
-    }
-
-    else if (k_cutoff > 0.0 && k_cutoff_Angst < 0.0)
-    {
-        k_cutoff_Angst = motionRefiner.pixToAng(k_cutoff);
-    }
-
-
     int k_out = sh;
 
     for (int i = 1; i < sh; i++)
     {
-        if (motionRefiner.reference.freqWeight1D[i] <= 0.0)
+        if (reference->freqWeight1D[i] <= 0.0)
         {
             k_out = i;
             break;
         }
     }
 
-    if (motionRefiner.verb > 0 && cutoffOut)
+    if (verb > 0 && cutoffOut)
     {
         std::cout << " + maximum frequency to consider: "
-            << (s * motionRefiner.angpix)/(RFLOAT)k_out << " A (" << k_out << " px)\n";
+            << (s * angpix)/(RFLOAT)k_out << " A (" << k_out << " px)\n";
     }
 
-    dmgWeight = DamageHelper::damageWeights(s, motionRefiner.angpix,
-            motionRefiner.firstFrame, fc, dosePerFrame, dmga, dmgb, dmgc);
-
-    dmgWeightEval.resize(fc);
+    dmgWeight = DamageHelper::damageWeights(
+            s, angpix,
+            micrographHandler->firstFrame, fc, dosePerFrame,
+            dmga, dmgb, dmgc);
 
     for (int f = 0; f < fc; f++)
     {
         dmgWeight[f].data.xinit = 0;
         dmgWeight[f].data.yinit = 0;
 
-        // parameter evaluation is performed beyond k_cutoff only
-        // do not crop dmgWeightEval
-        dmgWeightEval[f] = dmgWeight[f];
-
-        if (k_cutoff > 0.0)
-        {
-            dmgWeight[f] = FilterHelper::ButterworthEnvFreq2D(dmgWeight[f], k_cutoff-1, k_cutoff+1);
-        }
-        else if (cutoffOut)
+        if (cutoffOut)
         {
             dmgWeight[f] = FilterHelper::ButterworthEnvFreq2D(dmgWeight[f], k_out-1, k_out+1);
         }
@@ -136,28 +132,28 @@ void MotionEstimator::process(const std::vector<MetaDataTable>& mdts, long g_sta
     int barstep;
     int my_nr_micrographs = g_end - g_start + 1;
 
-    if (motionRefiner.verb > 0)
+    if (verb > 0)
     {
         std::cout << " + Performing loop over all micrographs ... " << std::endl;
         init_progress_bar(my_nr_micrographs);
         barstep = XMIPP_MAX(1, my_nr_micrographs/ 60);
     }
 
-    std::vector<ParFourierTransformer> fts(motionRefiner.nr_omp_threads);
+    std::vector<ParFourierTransformer> fts(nr_omp_threads);
 
     std::vector<Image<RFLOAT>>
-            tables(motionRefiner.nr_omp_threads),
-            weights0(motionRefiner.nr_omp_threads),
-            weights1(motionRefiner.nr_omp_threads);
+            tables(nr_omp_threads),
+            weights0(nr_omp_threads),
+            weights1(nr_omp_threads);
 
-    for (int i = 0; i < motionRefiner.nr_omp_threads; i++)
+    for (int i = 0; i < nr_omp_threads; i++)
     {
         FscHelper::initFscTable(sh, fc, tables[i], weights0[i], weights1[i]);
     }
 
-    const double sig_vel_nrm = dosePerFrame * sig_vel / motionRefiner.angpix;
-    const double sig_acc_nrm = dosePerFrame * sig_acc / motionRefiner.angpix;
-    const double sig_div_nrm = dosePerFrame * sig_div / motionRefiner.coords_angpix;
+    const double sig_vel_nrm = dosePerFrame * sig_vel / angpix;
+    const double sig_acc_nrm = dosePerFrame * sig_acc / angpix;
+    const double sig_div_nrm = dosePerFrame * sig_div / micrographHandler->coords_angpix;
 
     int pctot = 0;
 
@@ -170,7 +166,7 @@ void MotionEstimator::process(const std::vector<MetaDataTable>& mdts, long g_sta
         if (pc == 0) continue;
 
         // Make sure output directory exists
-        FileName newdir = motionRefiner.getOutputFileNameRoot(mdts[g]);
+        FileName newdir = MotionRefiner::getOutputFileNameRoot(outPath, mdts[g]);
         newdir = newdir.beforeLastOf("/");
 
         if (newdir != prevdir)
@@ -197,11 +193,11 @@ void MotionEstimator::process(const std::vector<MetaDataTable>& mdts, long g_sta
 
         updateFCC(movie, tracks, mdts[g], tables, weights0, weights1);
 
-        std::string fn_root = motionRefiner.getOutputFileNameRoot(mdts[g]);
+        std::string fn_root = MotionRefiner::getOutputFileNameRoot(outPath, mdts[g]);
 
         writeOutput(tracks, tables, weights0, weights1, positions, fn_root, 30.0);
 
-        for (int i = 0; i < motionRefiner.nr_omp_threads; i++)
+        for (int i = 0; i < nr_omp_threads; i++)
         {
             tables[i].data.initZeros();
             weights0[i].data.initZeros();
@@ -210,13 +206,13 @@ void MotionEstimator::process(const std::vector<MetaDataTable>& mdts, long g_sta
 
         nr_done++;
 
-        if (motionRefiner.verb > 0 && nr_done % barstep == 0)
+        if (verb > 0 && nr_done % barstep == 0)
         {
             progress_bar(nr_done);
         }
     }
 
-    if (motionRefiner.verb > 0)
+    if (verb > 0)
     {
         progress_bar(my_nr_micrographs);
     }
@@ -242,15 +238,15 @@ void MotionEstimator::prepMicrograph(
         mdt.getValue(EMDL_IMAGE_COORD_Y, positions[p].y, p);
     }
 
-    movie = motionRefiner.loadMovie(
-        mdt, fts, positions, initialTracks, unregGlob, globComp); // throws exceptions
+    movie = micrographHandler->loadMovie(
+        mdt, s, angpix, fts, positions, initialTracks, unregGlob, globComp); // throws exceptions
 
-    std::vector<Image<Complex>> preds = motionRefiner.reference.predictAll(
-        mdt, motionRefiner.obsModel, ReferenceMap::Own, motionRefiner.nr_omp_threads);
+    std::vector<Image<Complex>> preds = reference->predictAll(
+        mdt, *obsModel, ReferenceMap::Own, nr_omp_threads);
 
     std::vector<double> sigma2 = StackHelper::powerSpectrum(movie);
 
-    #pragma omp parallel for num_threads(motionRefiner.nr_omp_threads)
+    #pragma omp parallel for num_threads(nr_omp_threads)
     for (int p = 0; p < pc; p++)
     {
         MotionHelper::noiseNormalize(preds[p], sigma2, preds[p]);
@@ -261,7 +257,7 @@ void MotionEstimator::prepMicrograph(
         }
     }
 
-    movieCC = MotionHelper::movieCC(movie, preds, dmgWeight, fts, motionRefiner.nr_omp_threads);
+    movieCC = MotionHelper::movieCC(movie, preds, dmgWeight, fts, nr_omp_threads);
 
     if (global_init || initialTracks.size() == 0)
     {
@@ -276,12 +272,13 @@ void MotionEstimator::prepMicrograph(
         else
         {
             globOffsets = MotionHelper::getGlobalOffsets(
-                    movieCC, globTrack, 0.25*s, motionRefiner.nr_omp_threads);
+                    movieCC, globTrack, 0.25*s, nr_omp_threads);
         }
 
         if (diag)
         {
-            ImageLog::write(ccSum, motionRefiner.getOutputFileNameRoot(mdt) + "_CCsum", CenterXY);
+            ImageLog::write(ccSum,
+                MotionRefiner::getOutputFileNameRoot(outPath, mdt) + "_CCsum", CenterXY);
         }
 
         initialTracks.resize(pc);
@@ -334,7 +331,7 @@ std::vector<std::vector<d2Vector>> MotionEstimator::optimize(
 
     GpMotionFit gpmf(movieCC, sig_vel_px, sig_div_px, sig_acc_px,
                      maxEDs, positions,
-                     globComp, motionRefiner.nr_omp_threads, expKer);
+                     globComp, nr_omp_threads, expKer);
 
     std::vector<double> initialCoeffs;
 
@@ -359,7 +356,7 @@ void MotionEstimator::updateFCC(
 {
     const int pc = mdt.numberOfObjects();
 
-    #pragma omp parallel for num_threads(motionRefiner.nr_omp_threads)
+    #pragma omp parallel for num_threads(nr_omp_threads)
     for (int p = 0; p < pc; p++)
     {
         int threadnum = omp_get_thread_num();
@@ -371,8 +368,8 @@ void MotionEstimator::updateFCC(
             shiftImageInFourierTransform(obs[f](), obs[f](), s, -tracks[p][f].x, -tracks[p][f].y);
         }
 
-        Image<Complex> pred = motionRefiner.reference.predict(
-            mdt, p, motionRefiner.obsModel, ReferenceMap::Opposite);
+        Image<Complex> pred = reference->predict(
+            mdt, p, *obsModel, ReferenceMap::Opposite);
 
         // @TODO: noise-normalize pred?
 
@@ -437,6 +434,7 @@ void MotionEstimator::writeOutput(
         }
 
         globalTrack[f] /= pc;
+
         for (int p = 0; p < pc; p++)
         {
             visTracks[p][f] = positions[p] + visScale * tracks[p][f];
@@ -455,14 +453,23 @@ void MotionEstimator::writeOutput(
     dataSet.SetDrawMarker(false);
     dataSet.SetDatasetColor(0.0,0.0,1.0);
     dataSet.SetLineWidth(1.);
-    RFLOAT xshift, yshift;
-    const RFLOAT xcenter =  motionRefiner.micrograph_xsize / 2.0;
-    const RFLOAT ycenter =  motionRefiner.micrograph_ysize / 2.0;
+
+    const RFLOAT xcenterMg =  micrographHandler->micrograph_size.x / 2.0;
+    const RFLOAT ycenterMg =  micrographHandler->micrograph_size.y / 2.0;
+
+    const RFLOAT xcenterCoord = micrographHandler->movie_angpix * xcenterMg
+            / micrographHandler->coords_angpix;
+
+    const RFLOAT ycenterCoord = micrographHandler->movie_angpix * ycenterMg
+            / micrographHandler->coords_angpix;
+
     for (int f = 0; f < fc; f++)
     {
-        CDataPoint point(xcenter + visScale * globalTrack[f].x, ycenter + visScale * globalTrack[f].y);
+        CDataPoint point(xcenterCoord + visScale * globalTrack[f].x,
+                         ycenterCoord + visScale * globalTrack[f].y);
         dataSet.AddDataPoint(point);
     }
+
     plot2D->AddDataSet(dataSet);
 
     // Mark starting point global track
@@ -470,7 +477,9 @@ void MotionEstimator::writeOutput(
     dataSetStart.SetDrawMarker(true);
     dataSetStart.SetMarkerSize(2);
     dataSetStart.SetDatasetColor(1.0,0.0,0.0);
-    CDataPoint point2(xcenter + visScale * globalTrack[0].x, ycenter + visScale * globalTrack[0].y);
+    CDataPoint point2(
+            xcenterCoord + visScale * globalTrack[0].x,
+            ycenterCoord + visScale * globalTrack[0].y);
     dataSetStart.AddDataPoint(point2);
     plot2D->AddDataSet(dataSetStart);
 
@@ -544,7 +553,71 @@ void MotionEstimator::writeOutput(
     }
 }
 
-bool MotionEstimator::isFinished(std::string filenameRoot)
+const std::vector<Image<double>>& MotionEstimator::getDamageWeights()
+{
+    return dmgWeight;
+}
+
+bool MotionEstimator::isReady()
+{
+    return ready;
+}
+
+double MotionEstimator::getDosePerFrame()
+{
+    return dosePerFrame;
+}
+
+void MotionEstimator::proposeDosePerFrame(double dpf, std::string metaFn, int verb)
+{
+    if (dosePerFrame < 0)
+    {
+        if (metaFn == "")
+        {
+            REPORT_ERROR("ERROR: No electron dose available. Please provide one through the command line (--fdose).");
+        }
+        else
+        {
+            dosePerFrame = dpf;
+
+            if (verb > 0)
+            {
+                std::cout << " + Using dose per frame from " << metaFn << ": "
+                          << dosePerFrame << " e/A^2\n";
+            }
+        }
+    }
+    else
+    {
+        if (verb > 0)
+        {
+            std::cout << " + Using dose per frame from cmd. line: "
+                      << dosePerFrame << " e/A^2\n";
+        }
+    }
+}
+
+std::vector<MetaDataTable> MotionEstimator::findUnfinishedJobs(
+        const std::vector<MetaDataTable> &mdts, std::string path)
+{
+    std::vector<MetaDataTable> out(0);
+
+    const int gc = mdts.size();
+
+    for (int g = 0; g < gc; g++)
+    {
+        std::string fn_root = MotionRefiner::getOutputFileNameRoot(path, mdts[g]);
+
+        if (!isJobFinished(fn_root))
+        {
+            out.push_back(mdts[g]);
+        }
+    }
+
+    return out;
+}
+
+bool MotionEstimator::isJobFinished(std::string filenameRoot)
 {
     return exists(filenameRoot+"_tracks.star")
             && exists(filenameRoot+"_FCC_cc.mrc")

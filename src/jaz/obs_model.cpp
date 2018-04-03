@@ -187,3 +187,14 @@ void ObservationModel::setAnisoTilt(double xx, double xy, double yy)
     beamtilt_yy = yy;
     anisoTilt = true;
 }
+
+
+double ObservationModel::angToPix(double a, int s)
+{
+    return s * angpix / a;
+}
+
+double ObservationModel::pixToAng(double p, int s)
+{
+    return s * angpix / p;
+}

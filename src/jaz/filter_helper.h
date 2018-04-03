@@ -48,7 +48,7 @@ class FilterHelper
         static Image<RFLOAT> zeroOutsideCorner2D(Image<RFLOAT>& img, double radius);
         static void GaussianEnvelopeCorner2D(Image<RFLOAT>& img, double sigma);
         static Image<RFLOAT> ButterworthEnvCorner2D(Image<RFLOAT>& img, double radIn, double radOut);
-        static Image<RFLOAT> ButterworthEnvFreq2D(Image<RFLOAT>& img, double radIn, double radOut);
+        static Image<RFLOAT> ButterworthEnvFreq2D(const Image<RFLOAT>& img, double radIn, double radOut);
 
 
         static void lowPassFilter(Image<RFLOAT>& img, double maxFreq0, double maxFreq1, Image<RFLOAT>& dest);

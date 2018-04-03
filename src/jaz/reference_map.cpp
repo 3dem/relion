@@ -100,6 +100,17 @@ void ReferenceMap::load(int verb)
         freqWeight = Image<RFLOAT>(sh,s);
         freqWeight.data.initConstant(1.0);
     }
+
+    k_out = sh;
+
+    for (int i = 1; i < sh; i++)
+    {
+        if (freqWeight1D[i] <= 0.0)
+        {
+            k_out = i;
+            break;
+        }
+    }
 }
 
 std::vector<Image<Complex>> ReferenceMap::predictAll(

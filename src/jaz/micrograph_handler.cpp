@@ -21,7 +21,15 @@ MicrographHandler::MicrographHandler()
     corrMicFn("")
 {}
 
-void MicrographHandler::init(int nr_omp_threads, int firstFrame, int lastFrame)
+void MicrographHandler::init(
+    // in:
+    const MetaDataTable& mdt,
+    double angpix, bool verb,
+    int nr_omp_threads,
+    // out:
+    int& fc,
+    double& dosePerFrame,
+    std::string& metaFn)
 {
     this->nr_omp_threads = nr_omp_threads;
     this->firstFrame = firstFrame;
@@ -55,20 +63,17 @@ void MicrographHandler::init(int nr_omp_threads, int firstFrame, int lastFrame)
         hasCorrMic = false;
     }
 
+    loadInitial(
+        mdt, angpix, verb,
+        fc, dosePerFrame, metaFn);
+
     ready = true;
 }
 
 void MicrographHandler::loadInitial(
-        const MetaDataTable& mdt, double angpix, bool verb,
-        int& fc, int& micrograph_xsize, int& micrograph_ysize,
-        double& movie_angpix, double& coords_angpix,
-        double& dosePerFrame)
+    const MetaDataTable& mdt, double angpix, bool verb,
+    int& fc, double& dosePerFrame, std::string& metaFn)
 {
-    if (!ready)
-    {
-        REPORT_ERROR("ERROR: MicrographHandler::loadInitial - MicrographHandler not initialized.");
-    }
-
     if (preextracted)
     {
         if (lastFrame < 0)
@@ -94,8 +99,8 @@ void MicrographHandler::loadInitial(
 
         Image<RFLOAT> dum;
         dum.read(fn_mic, false);
-        micrograph_xsize = XSIZE(dum());
-        micrograph_ysize = YSIZE(dum());
+        micrograph_size.x = XSIZE(dum());
+        micrograph_size.y = YSIZE(dum());
     }
     else
     {
@@ -108,7 +113,8 @@ void MicrographHandler::loadInitial(
             FileName fn_pre, fn_jobnr, fn_post;
             decomposePipelineFileName(mgFn, fn_pre, fn_jobnr, fn_post);
 
-            std::string metaFn = getMetaName(fn_post);
+            metaFn = getMetaName(fn_post);
+
             micrograph = Micrograph(metaFn);
 
             if (movie_angpix <= 0)
@@ -149,20 +155,10 @@ void MicrographHandler::loadInitial(
                 }
             }
 
-            // this is safe to do - motionEstimator.read() has been called already
-            if (dosePerFrame < 0)
-            {
-                dosePerFrame = micrograph.dose_per_frame;
+            dosePerFrame = micrograph.dose_per_frame;
 
-                if (verb > 0)
-                {
-                    std::cout << " + Using dose per frame from " << metaFn << ": "
-                              << dosePerFrame << " A\n";
-                }
-            }
-
-            micrograph_xsize = micrograph.getWidth();
-            micrograph_ysize = micrograph.getHeight();
+            micrograph_size.x = micrograph.getWidth();
+            micrograph_size.y = micrograph.getHeight();
 
             if (lastFrame < 0)
             {
@@ -182,8 +178,8 @@ void MicrographHandler::loadInitial(
 
                 Image<RFLOAT> dum;
                 dum.read(mgFn, false);
-                micrograph_xsize = XSIZE(dum());
-                micrograph_ysize = YSIZE(dum());
+                micrograph_size.x = XSIZE(dum());
+                micrograph_size.y = YSIZE(dum());
 
                 fc = (dum().zdim > 1? dum().zdim : dum().ndim) - firstFrame;
             }
@@ -221,8 +217,7 @@ void MicrographHandler::loadInitial(
 
 std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
     const MetaDataTable &mdt, int s,
-    double angpix, double movie_angpix, double coords_angpix,
-    std::vector<ParFourierTransformer>& fts)
+    double angpix, std::vector<ParFourierTransformer>& fts)
 {
     if (!ready)
     {
@@ -316,15 +311,13 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 }
 
 std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
-        const MetaDataTable &mdt, int s,
-        double angpix, double movie_angpix, double coords_angpix,
+        const MetaDataTable &mdt, int s, double angpix,
         std::vector<ParFourierTransformer>& fts,
         const std::vector<d2Vector>& pos,
         std::vector<std::vector<d2Vector>>& tracks,
         bool unregGlob, std::vector<d2Vector>& globComp)
 {
-    std::vector<std::vector<Image<Complex>>> out = loadMovie(
-        mdt, s, angpix, movie_angpix, coords_angpix, fts);
+    std::vector<std::vector<Image<Complex>>> out = loadMovie(mdt, s, angpix, fts);
 
     if (!hasCorrMic || micrograph.model == 0)
     {

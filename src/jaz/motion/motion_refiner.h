@@ -47,33 +47,6 @@ class MotionRefiner
 
         MotionRefiner();
 
-            // Verbosity
-            int verb;
-
-            // Write out debugging information
-            bool debug;
-
-            double movie_angpix, coords_angpix, angpix;
-            int nr_omp_threads, firstFrame, lastFrame;
-            std::string outPath; // move to micrographHandler? - Yes!
-
-
-            ObservationModel obsModel;
-
-            ReferenceMap reference;
-            MotionParamEstimator motionParamEstimator;
-            MotionEstimator motionEstimator;
-            FrameRecombiner frameRecombiner;
-
-
-            // Q: Jasenko, can we have more informative names for these important variables?
-            // A: They are so important and common that their names should be short!
-            // (s: full image size, sh: half-size + 1, fc: frame count
-            //  - these are consistent throughout the codebase.)
-            int s, sh, fc;
-
-            int micrograph_xsize, micrograph_ysize;
-
 
         // Read command line arguments
         void read(int argc, char **argv);
@@ -84,33 +57,45 @@ class MotionRefiner
         // General Running (Admiral Swimming!)
         void run();
 
-        double angToPix(double a);
-        double pixToAng(double p);
+        int getVerbosityLevel();
+
 
         // For original particle-polishing-like Bfactors (not used)
-        void calculateSingleFrameReconstruction(int iframe);
+        //void calculateSingleFrameReconstruction(int iframe);
 
         // Get output STAR file name for this micrograph
-        FileName getOutputFileNameRoot(const MetaDataTable& mdt);
+        static FileName getOutputFileNameRoot(std::string outPath, const MetaDataTable& mdt);
 
-        // load a movie and extract all particles
-        // returns a per-particle vector of per-frame images of size sh x s
-        std::vector<std::vector<Image<Complex>>> loadMovie(
-                const MetaDataTable& mdt, std::vector<ParFourierTransformer>& fts);
-
-        // does the same and then also loads the particle tracks for particles at positions pos
-        std::vector<std::vector<Image<Complex>>> loadMovie(
-                const MetaDataTable& mdt, std::vector<ParFourierTransformer>& fts,
-                const std::vector<gravis::d2Vector>& pos,
-                std::vector<std::vector<gravis::d2Vector>>& tracks,
-                bool unregGlob, std::vector<gravis::d2Vector>& globComp);
-
-        bool hasCorrMic();
 
     protected:
 
-            std::string
-                starFn, movie_toReplace, movie_replaceBy;
+            // components that do the actual work
+            MotionParamEstimator motionParamEstimator;
+            MotionEstimator motionEstimator;
+            FrameRecombiner frameRecombiner;
+
+            // required components
+            ObservationModel obsModel;
+            ReferenceMap reference;
+            MicrographHandler micrographHandler;
+
+            // Q: Jasenko, can we have more informative names for these important variables?
+            // A: They are so important and common that their names should be short!
+            // (s: full image size, sh: half-size + 1, fc: frame count
+            //  - these are consistent throughout the codebase.)
+            int s, sh, fc;
+
+            // Verbosity
+            int verb;
+
+            // Write out debugging information
+            bool debug;
+
+            double angpix;
+            int nr_omp_threads;
+            std::string outPath;
+
+            std::string starFn, movie_toReplace, movie_replaceBy;
 
             // Allow continuation of crashed jobs
             bool only_do_unfinished;
@@ -122,21 +107,13 @@ class MotionRefiner
 
             long maxMG, minMG;
 
-
             MetaDataTable mdt0;
+
             std::vector<MetaDataTable>
                 allMdts, // all micrographs (used for B-factor computation)
                 chosenMdts, // micrographs between minMG and maxMG
-                paramMdts, // micrographs on which the parameters are to be estimated
                 motionMdts, recombMdts; // unfinished micrographs
 
-
-            MicrographHandler micrographHandler;
-
-
-        // load the header of the first movie only to learn the frame number and micrograph size
-        // (also the dose and movie pixel size if a corrected_micrographs.star is available)
-        void loadInitialMovie();
 
         // combine all EPS files into one logfile.pdf
         void combineEPSAndSTARfiles();

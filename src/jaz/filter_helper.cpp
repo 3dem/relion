@@ -472,7 +472,7 @@ Image<RFLOAT> FilterHelper::ButterworthEnvCorner2D(Image<RFLOAT> &img, double ra
 
 }
 
-Image<RFLOAT> FilterHelper::ButterworthEnvFreq2D(Image<RFLOAT> &img, double radIn, double radOut)
+Image<RFLOAT> FilterHelper::ButterworthEnvFreq2D(const Image<RFLOAT>& img, double radIn, double radOut)
 {
     const int w = img.data.xdim;
     const int h = img.data.ydim;

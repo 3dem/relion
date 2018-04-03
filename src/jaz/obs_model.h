@@ -42,6 +42,9 @@ class ObservationModel
 
         void setAnisoTilt(double xx, double xy, double yy);
 
+        double angToPix(double a, int s);
+        double pixToAng(double p, int s);
+
 };
 
 #endif
