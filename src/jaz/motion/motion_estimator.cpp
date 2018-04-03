@@ -82,7 +82,7 @@ void MotionEstimator::init(
     {
         if (verb > 0)
         {
-            std::cerr << "\nWarning: in the absence of a corrected_micrographs.star file (--corr_mic), global paths are used for initialization.\n\n";
+            std::cerr << " - Warning: in the absence of a corrected_micrographs.star file (--corr_mic), global paths are used for initialization.\n";
         }
 
         global_init = true;
@@ -153,9 +153,9 @@ void MotionEstimator::process(const std::vector<MetaDataTable>& mdts, long g_sta
         FscHelper::initFscTable(sh, fc, tables[i], weights0[i], weights1[i]);
     }
 
-    const double sig_vel_nrm = dosePerFrame * sig_vel / angpix;
-    const double sig_acc_nrm = dosePerFrame * sig_acc / angpix;
-    const double sig_div_nrm = dosePerFrame * sig_div / micrographHandler->coords_angpix;
+    const double sig_vel_px = normalizeSigVel(sig_vel);
+    const double sig_acc_px = normalizeSigAcc(sig_acc);
+    const double sig_div_px = normalizeSigDiv(sig_div);
 
     int pctot = 0;
 
@@ -199,7 +199,7 @@ void MotionEstimator::process(const std::vector<MetaDataTable>& mdts, long g_sta
         {
             tracks = optimize(
                 movieCC, initialTracks,
-                sig_vel_nrm, sig_acc_nrm, sig_div_nrm,
+                sig_vel_px, sig_acc_px, sig_div_px,
                 positions, globComp);
         }
         else
@@ -346,8 +346,7 @@ std::vector<std::vector<d2Vector>> MotionEstimator::optimize(
     const int fc = inTracks[0].size();
 
     GpMotionFit gpmf(movieCC, sig_vel_px, sig_div_px, sig_acc_px,
-                     maxEDs, positions,
-                     globComp, nr_omp_threads, expKer);
+                     maxEDs, positions, globComp, nr_omp_threads, expKer);
 
     std::vector<double> initialCoeffs;
 
@@ -631,6 +630,21 @@ std::vector<MetaDataTable> MotionEstimator::findUnfinishedJobs(
     }
 
     return out;
+}
+
+double MotionEstimator::normalizeSigVel(double sig_vel)
+{
+    return dosePerFrame * sig_vel / angpix;
+}
+
+double MotionEstimator::normalizeSigDiv(double sig_div)
+{
+    return dosePerFrame * sig_div / micrographHandler->coords_angpix;
+}
+
+double MotionEstimator::normalizeSigAcc(double sig_acc)
+{
+    return dosePerFrame * sig_acc / angpix;
 }
 
 bool MotionEstimator::isJobFinished(std::string filenameRoot)

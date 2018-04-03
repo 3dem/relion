@@ -4,11 +4,25 @@
 #include "alignment_set.h"
 
 #include <src/image.h>
+#include <src/time.h>
+
 #include <src/jaz/gravis/t4Vector.h>
+
+
+#define TIMING 1
+
+#ifdef TIMING
+    #define RCTIC(timer,label) (timer.tic(label))
+    #define RCTOC(timer,label) (timer.toc(label))
+#else
+    #define RCTIC(timer,label)
+    #define RCTOC(timer,label)
+#endif
 
 class MotionEstimator;
 class ReferenceMap;
 class ObservationModel;
+class ParFourierTransformer;
 
 class MotionParamEstimator
 {
@@ -40,6 +54,7 @@ class MotionParamEstimator
             // read from cmd. line:
             bool estim2, estim3;
             int minParticles, maxRange, recursions, steps;
+            double sV, sD, sA;
             double rV, rD, rA;
             double k_cutoff, k_cutoff_Angst;
 
@@ -53,8 +68,24 @@ class MotionParamEstimator
             int fc, s, k_out, verb, nr_omp_threads;
             bool debug;
 
+            #ifdef TIMING
+                Timer paramTimer;
+                int timeSetup, timeOpt, timeEval;
+            #endif
 
-        gravis::d4Vector estimateTwoParamsRec();
+
+        gravis::d4Vector estimateTwoParamsRec(
+                double sig_v_0, double sig_d_0, double sig_acc,
+                double sig_v_step, double sig_d_step,
+                int maxIters, int recDepth);
+
+        gravis::d4Vector estimateThreeParamsRec(
+                double sig_v_0, double sig_d_0, double sig_a_0,
+                double sig_v_step, double sig_d_step, double sig_a_step,
+                int maxIters, int recDepth);
+
+        void evaluateParams(const std::vector<gravis::d3Vector>& sig_vals,
+                            std::vector<double>& TSCs);
 
         void prepAlignment();
 };

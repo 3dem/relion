@@ -305,7 +305,7 @@ void MotionRefiner::init()
     {
         motionParamEstimator.init(
             verb, nr_omp_threads, debug,
-            s, fc, allMdts, &motionEstimator, &reference, &obsModel);
+            s, fc, chosenMdts, &motionEstimator, &reference, &obsModel);
     }
 }
 

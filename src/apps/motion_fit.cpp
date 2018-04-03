@@ -1157,6 +1157,9 @@ void MotionFitProg::evaluateParams(
 
             if (useAlignmentSet)
             {
+
+                RCTIC(motionTimer,timeOpt);
+
                 std::vector<std::vector<gravis::d2Vector>> tracks = optimize(
                         alignmentSet.CCs[g],
                         alignmentSet.initialTracks[g],
@@ -1164,24 +1167,36 @@ void MotionFitProg::evaluateParams(
                         alignmentSet.positions[g], alignmentSet.globComp[g],
                         maxStep, 1e-9, 1e-9, maxIters, 0.0);
 
+                RCTOC(motionTimer,timeOpt);
+
                 RCTIC(motionTimer,timeEval);
 
                 tscsAs[i] += alignmentSet.updateTsc(tracks, g, nr_omp_threads);
+
+                RCTOC(motionTimer,timeEval);
             }
             else
             {
+                RCTIC(motionTimer,timeOpt);
+
                 std::vector<std::vector<gravis::d2Vector>> tracks = optimize(
                         movieCC, initialTracks,
                         sig_v_vals_nrm[i], sig_a_vals_nrm[i], sig_d_vals_nrm[i],
                         positions, globComp, maxStep, 1e-9, 1e-9, maxIters, 0.0);
 
+                RCTOC(motionTimer,timeOpt);
+
                 RCTIC(motionTimer,timeEval);
 
                 updateFCC(movie, tracks, mdts[gg], paramTables[i], paramWeights0[i], paramWeights1[i]);
+
+                RCTOC(motionTimer,timeEval);
             }
         }
 
     } // micrographs
+
+    RCTIC(motionTimer,timeEval);
 
     if (useAlignmentSet)
     {
@@ -1238,12 +1253,9 @@ std::vector<std::vector<d2Vector>> MotionFitProg::optimize(
     const int fc = inTracks[0].size();
 
 
-    RCTIC(motionTimer,timeOpt);
-
     GpMotionFit gpmf(movieCC, sig_vel_px, sig_div_px, sig_acc_px,
                      maxEDs, positions,
                      globComp, nr_omp_threads, expKer);
-
 
     std::vector<double> initialCoeffs(2*(pc + pc*(fc-1)));
 
@@ -1264,8 +1276,6 @@ std::vector<std::vector<d2Vector>> MotionFitProg::optimize(
 
     std::vector<std::vector<d2Vector>> out(pc, std::vector<d2Vector>(fc));
     gpmf.paramsToPos(optCoeffs, out);
-
-    RCTOC(motionTimer,timeOpt);
 
     return out;
 }

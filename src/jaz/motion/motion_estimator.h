@@ -61,6 +61,12 @@ class MotionEstimator
         static std::vector<MetaDataTable> findUnfinishedJobs(
                 const std::vector<MetaDataTable>& mdts, std::string path);
 
+        // translates the given parameters (in A or A/dose) into pixels
+        // done in one place to ensure consistency
+        double normalizeSigVel(double sig_vel);
+        double normalizeSigDiv(double sig_div);
+        double normalizeSigAcc(double sig_acc);
+
 
     protected:
 

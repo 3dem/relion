@@ -4,7 +4,9 @@
 #include <src/jaz/index_sort.h>
 #include <src/jaz/filter_helper.h>
 
+
 using namespace gravis;
+
 
 MotionParamEstimator::MotionParamEstimator()
 :   paramsRead(false), ready(false)
@@ -21,6 +23,9 @@ int MotionParamEstimator::read(IOParser& parser, int argc, char *argv[])
     k_cutoff_Angst = textToFloat(parser.getOption("--k_cut_A", "Freq. cutoff for parameter estimation [Angstrom]", "-1.0"));
 
     minParticles = textToInteger(parser.getOption("--min_p", "Minimum number of particles on which to estimate the parameters", "1000"));
+    sV = textToFloat(parser.getOption("--s_vel_0", "Initial s_vel", "0.6"));
+    sD = textToFloat(parser.getOption("--s_div_0", "Initial s_div", "3000"));
+    sA = textToFloat(parser.getOption("--s_acc_0", "Initial s_acc", "-1"));
     rV = textToFloat(parser.getOption("--r_vel", "Test s_vel +/- r_vel * s_vel", "0.5"));
     rD = textToFloat(parser.getOption("--r_div", "Test s_div +/- r_div * s_div", "0.5"));
     rA = textToFloat(parser.getOption("--r_acc", "Test s_acc +/- r_acc * s_acc", "0.5"));
@@ -83,6 +88,12 @@ void MotionParamEstimator::init(
         REPORT_ERROR("ERROR: Only 2 or 3 parameters can be estimated (--params2 or --params3), not both.");
     }
 
+    if (verb > 0)
+    {
+        std::cout << " + maximum frequency to consider for alignment: "
+            << k_cutoff_Angst << " A (" << k_cutoff << " px)\n";
+    }
+
     const long mc = allMdts.size();
 
     std::vector<double> randNums(mc);
@@ -134,6 +145,12 @@ void MotionParamEstimator::init(
 
 void MotionParamEstimator::run()
 {
+    #ifdef TIMING
+        timeSetup = paramTimer.setNew(" time_Setup ");
+        timeOpt = paramTimer.setNew(" time_Opt ");
+        timeEval = paramTimer.setNew(" time_Eval ");
+    #endif
+
     if (!ready)
     {
         REPORT_ERROR("ERROR: MotionParamEstimator::run: MotionParamEstimator not initialized.");
@@ -141,12 +158,25 @@ void MotionParamEstimator::run()
 
     if (!estim2 && !estim3) return;
 
+    RCTIC(paramTimer, timeSetup);
+
     prepAlignment();
+
+    RCTOC(paramTimer, timeSetup);
 
     if (estim2)
     {
-        estimateTwoParamsRec();
+        estimateTwoParamsRec(sV, sD, sA, rV*sV, rD*sD, steps, recursions);
     }
+
+    if (estim3)
+    {
+        estimateThreeParamsRec(sV, sD, sA, rV*sV, rD*sD, rA*sA, steps, recursions);
+    }
+
+    #ifdef TIMING
+        paramTimer.printTimes(true);
+    #endif
 }
 
 bool MotionParamEstimator::anythingToDo()
@@ -154,9 +184,518 @@ bool MotionParamEstimator::anythingToDo()
     return estim2 || estim3;
 }
 
-d4Vector MotionParamEstimator::estimateTwoParamsRec()
+d4Vector MotionParamEstimator::estimateTwoParamsRec(
+        double sig_v_0, double sig_d_0, double sig_acc,
+        double sig_v_step, double sig_d_step,
+        int maxIters, int recDepth)
 {
+    std::cout << "estimating sig_v and sig_d\n";
+    std::cout << "sig_v = " << sig_v_0 << " +/- " << sig_v_step << "\n";
+    std::cout << "sig_d = " << sig_d_0 << " +/- " << sig_d_step << "\n";
 
+    int tot_vi = sig_v_0 <= 0.0? (int)(-sig_v_0/sig_v_step + 1) : 0;
+    int tot_di = sig_d_0 <= 0.0? (int)(-sig_d_0/sig_d_step + 1) : 0;
+
+    std::vector<d3Vector> all_sig_vals(9);
+
+    for (int p = 0; p < 9; p++)
+    {
+        int vi = (p%3) - 1;
+        int di = (p/3) - 1;
+
+        all_sig_vals[p][0] = sig_v_0 + (vi+tot_vi) * sig_v_step;
+        all_sig_vals[p][1] = sig_d_0 + (di+tot_di) * sig_d_step;
+        all_sig_vals[p][2] = sig_acc;
+    }
+
+    std::vector<double> all_TSCs(9);
+
+    std::vector<d3Vector> unknown_sig_vals = all_sig_vals;
+    std::vector<double> unknown_TSCs(9);
+
+    std::vector<int> unknown_ind(9);
+
+    for (int p = 0; p < 9; p++)
+    {
+        unknown_ind[p] = p;
+    }
+
+    bool centerBest = false;
+    int iters = 0;
+
+    d3Vector bestParams = all_sig_vals[4];
+    double bestTSC = 0.0;
+
+    const bool verbose = true;
+
+    while (!centerBest && iters < maxIters)
+    {
+        if (verbose)
+        {
+            std::cout << "\nevaluating:\n";
+
+            for (int i = 0; i < 3; i++)
+            {
+                for (int j = 0; j < 3; j++)
+                {
+                    std::cout << all_sig_vals[3*i + j] << " \t ";
+                }
+
+                std::cout << "\n";
+            }
+
+            std::cout << "\n";
+        }
+
+        evaluateParams(unknown_sig_vals, unknown_TSCs);
+
+        for (int p = 0; p < unknown_ind.size(); p++)
+        {
+            all_TSCs[unknown_ind[p]] = unknown_TSCs[p];
+        }
+
+        if (verbose)
+        {
+            std::cout << "\nresult:\n";
+
+            for (int i = 0; i < 3; i++)
+            {
+                for (int j = 0; j < 3; j++)
+                {
+                    std::cout << all_TSCs[3*i + j] << " \t ";
+                }
+
+                std::cout << "\n";
+            }
+
+            std::cout << "\n";
+        }
+
+        int bestIndex = 0;
+        bestTSC = all_TSCs[0];
+
+        for (int p = 0; p < 9; p++)
+        {
+            if (all_TSCs[p] > bestTSC)
+            {
+                bestTSC = all_TSCs[p];
+                bestIndex = p;
+            }
+        }
+
+        bestParams = all_sig_vals[bestIndex];
+
+        int shift_v = bestIndex % 3 - 1;
+        int shift_d = bestIndex / 3 - 1;
+
+        if (verbose)
+        {
+            std::cout << "optimum: " << all_sig_vals[bestIndex] << " ";
+            std::cout << "(" << all_TSCs[bestIndex] << ")\n";
+        }
+
+        if (shift_v < 0 && all_sig_vals[3][0] <= 0.0)
+        {
+            shift_v = 0;
+        }
+
+        if (shift_d < 0 && all_sig_vals[1][1] <= 0.0)
+        {
+            shift_d = 0;
+        }
+
+        if (shift_v == 0 && shift_d == 0)
+        {
+            if (recDepth <= 0)
+            {
+                return d4Vector(bestParams[0],
+                                bestParams[1],
+                                bestParams[2],
+                                bestTSC);
+            }
+            else
+            {
+                std::cout << "\nrepeating at half scan range.\n\n";
+
+                return estimateTwoParamsRec(
+                    all_sig_vals[bestIndex][0], all_sig_vals[bestIndex][1], sig_acc,
+                    sig_v_step/2.0, sig_d_step/2.0,
+                    maxIters, recDepth-1);
+            }
+        }
+
+        tot_vi += shift_v;
+        tot_di += shift_d;
+
+        std::vector<d3Vector> next_sig_vals(9, d3Vector(0,0,0));
+        std::vector<double> next_TSCs(9);
+        std::vector<bool> known(9, false);
+
+        for (int p = 0; p < 9; p++)
+        {
+            int vi = (p%3) - 1;
+            int di = (p/3) - 1;
+
+            int vi_next = vi - shift_v;
+            int di_next = di - shift_d;
+
+            if (vi_next >= -1 && vi_next <= 1
+                && di_next >= -1 && di_next <= 1)
+            {
+                int p_next = (vi_next + 1) + 3*(di_next + 1);
+
+                next_sig_vals[p_next] = all_sig_vals[p];
+                next_TSCs[p_next] = all_TSCs[p];
+                known[p_next] = true;
+            }
+        }
+
+        all_sig_vals = next_sig_vals;
+        all_TSCs = next_TSCs;
+
+        unknown_sig_vals.clear();
+        unknown_ind.clear();
+
+        for (int p = 0; p < 9; p++)
+        {
+            if (!known[p])
+            {
+                int vi = (p%3) - 1 + tot_vi;
+                int di = (p/3) - 1 + tot_di;
+
+                all_sig_vals[p][0] = sig_v_0 + vi * sig_v_step;
+                all_sig_vals[p][1] = sig_d_0 + di * sig_d_step;
+                all_sig_vals[p][2] = sig_acc;
+
+                unknown_sig_vals.push_back(all_sig_vals[p]);
+                unknown_ind.push_back(p);
+            }
+        }
+
+        unknown_TSCs.resize(unknown_ind.size());
+
+        iters++;
+    }
+
+    std::cout << "\nsearch aborted after " << maxIters << " steps\n";
+
+    return d4Vector(bestParams[0], bestParams[1], sig_acc, bestTSC);
+}
+
+d4Vector MotionParamEstimator::estimateThreeParamsRec(
+    double sig_v_0, double sig_d_0, double sig_a_0,
+    double sig_v_step, double sig_d_step, double sig_a_step,
+    int maxIters, int recDepth)
+{
+    int tot_vi = sig_v_0 <= 0.0? (int)(-sig_v_0/sig_v_step + 1) : 0;
+    int tot_di = sig_d_0 <= 0.0? (int)(-sig_d_0/sig_d_step + 1) : 0;
+    int tot_ai = sig_a_0 <= 0.0? (int)(-sig_a_0/sig_a_step + 1) : 0;
+
+    std::vector<d3Vector> all_sig_vals(27);
+
+    for (int p = 0; p < 27; p++)
+    {
+        int vi = (p%3) - 1;
+        int di = ((p/3)%3) - 1;
+        int ai = p/9 - 1;
+
+        all_sig_vals[p][0] = sig_v_0 + (vi+tot_vi) * sig_v_step;
+        all_sig_vals[p][1] = sig_d_0 + (di+tot_di) * sig_d_step;
+        all_sig_vals[p][2] = sig_a_0 + (ai+tot_ai) * sig_a_step;
+    }
+
+    std::vector<double> all_TSCs(27);
+
+    std::vector<d3Vector> unknown_sig_vals = all_sig_vals;
+    std::vector<double> unknown_TSCs(27);
+
+    std::vector<int> unknown_ind(27);
+
+    for (int p = 0; p < 27; p++)
+    {
+        unknown_ind[p] = p;
+    }
+
+    bool centerBest = false;
+    int iters = 0;
+
+    d3Vector bestParams = all_sig_vals[13];
+    double bestTSC = 0.0;
+
+    const bool verbose = true;
+
+    while (!centerBest && iters < maxIters)
+    {
+        if (verbose)
+        {
+            std::cout << "\nevaluating:\n";
+
+            for (int k = 0; k < 3; k++)
+            {
+                for (int i = 0; i < 3; i++)
+                {
+                    for (int j = 0; j < 3; j++)
+                    {
+                        std::cout << all_sig_vals[9*k + 3*i + j] << " \t ";
+                    }
+
+                    std::cout << "\n";
+                }
+
+                std::cout << "\n";
+            }
+
+            std::cout << "\n";
+        }
+
+        evaluateParams(unknown_sig_vals, unknown_TSCs);
+
+        for (int p = 0; p < unknown_ind.size(); p++)
+        {
+            all_TSCs[unknown_ind[p]] = unknown_TSCs[p];
+        }
+
+        if (verbose)
+        {
+            std::cout << "\nresult:\n";
+
+            for (int k = 0; k < 3; k++)
+            {
+                for (int i = 0; i < 3; i++)
+                {
+                    for (int j = 0; j < 3; j++)
+                    {
+                        std::cout << all_TSCs[9*k + 3*i + j] << " \t ";
+                    }
+
+                    std::cout << "\n";
+                }
+
+                std::cout << "\n";
+            }
+
+            std::cout << "\n";
+        }
+
+        int bestIndex = 0;
+        bestTSC = all_TSCs[0];
+
+        for (int p = 0; p < 27; p++)
+        {
+            if (all_TSCs[p] > bestTSC)
+            {
+                bestTSC = all_TSCs[p];
+                bestIndex = p;
+            }
+        }
+
+        bestParams = all_sig_vals[bestIndex];
+
+        int shift_v = bestIndex % 3 - 1;
+        int shift_d = ((bestIndex / 3)%3) - 1;
+        int shift_a = bestIndex / 9 - 1;
+
+        if (verbose)
+        {
+            std::cout << "optimum: " << all_sig_vals[bestIndex] << " ";
+            std::cout << "(" << all_TSCs[bestIndex] << ")\n";
+        }
+
+        if (shift_v < 0 && all_sig_vals[12][0] <= 0.0)
+        {
+            shift_v = 0;
+        }
+
+        if (shift_d < 0 && all_sig_vals[10][1] <= 0.0)
+        {
+            shift_d = 0;
+        }
+
+        if (shift_a < 0 && all_sig_vals[4][2] <= 0.0)
+        {
+            shift_a = 0;
+        }
+
+        if (shift_v == 0 && shift_d == 0 && shift_a == 0)
+        {
+            if (recDepth <= 0)
+            {
+                return d4Vector(bestParams[0],
+                                bestParams[1],
+                                bestParams[2],
+                                bestTSC);
+            }
+            else
+            {
+                std::cout << "\nrepeating at half scan range.\n\n";
+
+                return estimateThreeParamsRec(
+                    all_sig_vals[bestIndex][0], all_sig_vals[bestIndex][1], all_sig_vals[bestIndex][2],
+                    sig_v_step/2.0, sig_d_step/2.0, sig_a_step/2.0,
+                    maxIters, recDepth-1);
+            }
+        }
+
+        tot_vi += shift_v;
+        tot_di += shift_d;
+        tot_ai += shift_a;
+
+        std::vector<d3Vector> next_sig_vals(27, d3Vector(0,0,0));
+        std::vector<double> next_TSCs(27);
+        std::vector<bool> known(27, false);
+
+        for (int p = 0; p < 27; p++)
+        {
+            int vi = (p%3) - 1;
+            int di = ((p/3)%3) - 1;
+            int ai = p/9 - 1;
+
+            int vi_next = vi - shift_v;
+            int di_next = di - shift_d;
+            int ai_next = ai - shift_a;
+
+            if (vi_next >= -1 && vi_next <= 1
+                && di_next >= -1 && di_next <= 1
+                && ai_next >= -1 && ai_next <= 1)
+            {
+                int p_next = (vi_next + 1) + 3*(di_next + 1) + 9*(ai_next + 1);
+
+                next_sig_vals[p_next] = all_sig_vals[p];
+                next_TSCs[p_next] = all_TSCs[p];
+                known[p_next] = true;
+            }
+        }
+
+        all_sig_vals = next_sig_vals;
+        all_TSCs = next_TSCs;
+
+        unknown_sig_vals.clear();
+        unknown_ind.clear();
+
+        for (int p = 0; p < 27; p++)
+        {
+            if (!known[p])
+            {
+                int vi = (p%3) - 1 + tot_vi;
+                int di = ((p/3)%3) - 1 + tot_di;
+                int ai = (p/9) - 1 + tot_ai;
+
+                all_sig_vals[p][0] = sig_v_0 + vi * sig_v_step;
+                all_sig_vals[p][1] = sig_d_0 + di * sig_d_step;
+                all_sig_vals[p][2] = sig_a_0 + ai * sig_a_step;
+
+                unknown_sig_vals.push_back(all_sig_vals[p]);
+                unknown_ind.push_back(p);
+            }
+        }
+
+        unknown_TSCs.resize(unknown_ind.size());
+
+        iters++;
+    }
+
+    std::cout << "\nsearch aborted after " << maxIters << " steps\n";
+
+    return d4Vector(bestParams[0],
+                    bestParams[1],
+                    bestParams[2],
+                    bestTSC);
+}
+
+void MotionParamEstimator::evaluateParams(
+    const std::vector<d3Vector>& sig_vals,
+    std::vector<double>& TSCs)
+{
+    const int paramCount = sig_vals.size();
+    TSCs.resize(paramCount);
+
+    std::vector<double> sig_v_vals_px(paramCount);
+    std::vector<double> sig_d_vals_px(paramCount);
+    std::vector<double> sig_a_vals_px(paramCount);
+
+    for (int i = 0; i < paramCount; i++)
+    {
+        sig_v_vals_px[i] = motionEstimator->normalizeSigVel(sig_vals[i][0]);
+        sig_d_vals_px[i] = motionEstimator->normalizeSigDiv(sig_vals[i][1]);
+        sig_a_vals_px[i] = motionEstimator->normalizeSigAcc(sig_vals[i][2]);
+    }
+
+    int pctot = 0;
+    std::vector<d3Vector> tscsAs(paramCount, d3Vector(0.0, 0.0, 0.0));
+
+    const int gc = mdts.size();
+
+    if (verb)
+    {
+        std::cout << "    ";
+        std::cout.flush();
+    }
+
+    for (long g = 0; g < gc; g++)
+    {
+        const int pc = mdts[g].numberOfObjects();
+
+        if (pc < 2) continue; // not really needed, mdts are pre-screened
+
+        pctot += pc;
+
+        if (debug)
+        {
+            std::cout << "    micrograph " << (g+1) << " / " << mdts.size() << ": "
+                << pc << " particles [" << pctot << " total]\n";
+        }
+        else if (verb)
+        {
+            std::cout << ".";
+            std::cout.flush();
+        }
+
+        for (int i = 0; i < paramCount; i++)
+        {
+            if (debug)
+            {
+                std::cout << "        evaluating: " << sig_vals[i] << "\n";
+            }
+
+            RCTIC(paramTimer,timeOpt);
+
+            std::vector<std::vector<gravis::d2Vector>> tracks =
+                motionEstimator->optimize(
+                    alignmentSet.CCs[g],
+                    alignmentSet.initialTracks[g],
+                    sig_v_vals_px[i], sig_a_vals_px[i], sig_d_vals_px[i],
+                    alignmentSet.positions[g], alignmentSet.globComp[g]);
+
+            RCTOC(paramTimer,timeOpt);
+
+            RCTIC(paramTimer,timeEval);
+
+            tscsAs[i] += alignmentSet.updateTsc(tracks, g, nr_omp_threads);
+
+            RCTOC(paramTimer,timeEval);
+        }
+
+    } // micrographs
+
+    if (debug)
+    {
+        std::cout << "\n";
+    }
+
+    RCTIC(paramTimer,timeEval);
+
+    // compute final TSC
+    for (int i = 0; i < paramCount; i++)
+    {
+        double wg = tscsAs[i][1] * tscsAs[i][2];
+
+        if (wg > 0.0)
+        {
+            TSCs[i] = tscsAs[i][0] / sqrt(wg);
+        }
+    }
+
+    RCTOC(paramTimer,timeEval);
 }
 
 void MotionParamEstimator::prepAlignment()
@@ -168,7 +707,7 @@ void MotionParamEstimator::prepAlignment()
 
     for (int f = 0; f < fc; f++)
     {
-        alignDmgWgh[f] = FilterHelper::ButterworthEnvFreq2D(dmgWgh[f], k_out-1, k_out+1);
+        alignDmgWgh[f] = FilterHelper::ButterworthEnvFreq2D(dmgWgh[f], k_cutoff-1, k_cutoff+1);
     }
 
     std::vector<ParFourierTransformer> fts(nr_omp_threads);
