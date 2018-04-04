@@ -327,6 +327,8 @@ std::vector<std::vector<d2Vector>> MotionEstimator::optimize(
     const std::vector<gravis::d2Vector>& positions,
     const std::vector<gravis::d2Vector>& globComp)
 {
+    if (maxIters == 0) return inTracks;
+
     const double eps = 1e-20;
 
     if (sig_vel_px < eps)
@@ -532,8 +534,10 @@ void MotionEstimator::writeOutput(
     plot2D->OutputPostScriptPlot(fn_eps);
 
     // Compatibility with Jasenko's diagnostic .dat files
-    // NOTTODO: remove this
+    // TONOTDO: remove this
     // Don't! It's the only way to plot tracks on top of each other.
+    // We'll probably need this in the future.
+    // (e.g. each time there is something wrong with the polynomial tracks)
 
     if (!diag) return;
 
