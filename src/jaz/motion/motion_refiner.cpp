@@ -204,6 +204,9 @@ void MotionRefiner::init()
         chosenMdts = allMdts;
     }
 
+    // make sure we don't try to load too many frames
+    micrographHandler.findLowestFrameCount(chosenMdts, verb);
+
 	if (only_do_unfinished)
     {
         motionMdts.clear();

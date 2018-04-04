@@ -41,6 +41,8 @@ class MicrographHandler
                 double& dosePerFrame,
                 std::string& metaFn);
 
+        void findLowestFrameCount(const std::vector<MetaDataTable>& mdts, int verb);
+
         // load a movie and extract all particles
         // returns a per-particle vector of per-frame images of size (s/2+1) x s
         std::vector<std::vector<Image<Complex>>> loadMovie(const MetaDataTable& mdt, int s,

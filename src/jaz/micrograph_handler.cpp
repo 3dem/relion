@@ -70,6 +70,85 @@ void MicrographHandler::init(
     ready = true;
 }
 
+void MicrographHandler::findLowestFrameCount(
+        const std::vector<MetaDataTable> &mdts, int verb)
+{
+    if (!ready)
+    {
+        REPORT_ERROR("ERROR: MicrographHandler::loadMovie - MicrographHandler not initialized.");
+    }
+
+    int fcmin = std::numeric_limits<int>::max();
+    const int mc = mdts.size();
+
+    for (int m = 0; m < mc; m++)
+    {
+        int fcm;
+
+        if (preextracted)
+        {
+             std::string name;
+             mdts[m].getValue(EMDL_MICROGRAPH_NAME, name, 0);
+
+             Image<RFLOAT> stack0;
+             stack0.read(name, false);
+
+             const int pc0 = mdts[m].numberOfObjects();
+             const bool zstack = stack0.data.zdim > 1;
+             const int stackSize = zstack? stack0.data.zdim : stack0.data.ndim;
+
+             fcm = stackSize / pc0;
+        }
+        else if (hasCorrMic)
+        {
+            std::string mgFn;
+            mdts[m].getValueToString(EMDL_MICROGRAPH_NAME, mgFn, 0);
+
+            // remove the pipeline job prefix
+            FileName fn_pre, fn_jobnr, fn_post;
+            decomposePipelineFileName(mgFn, fn_pre, fn_jobnr, fn_post);
+
+            std::string metaFn = getMetaName(fn_post);
+            micrograph = Micrograph(metaFn);
+
+            fcm = micrograph.getNframes();
+        }
+        else
+        {
+            FileName mgFn;
+            mdts[m].getValue(EMDL_MICROGRAPH_NAME, mgFn, 0);
+
+            Image<RFLOAT> dum;
+            dum.read(mgFn, false);
+            micrograph_size.x = XSIZE(dum());
+            micrograph_size.y = YSIZE(dum());
+
+            fcm = dum().zdim > 1? dum().zdim : dum().ndim;
+        }
+
+        if (fcm < fcmin)
+        {
+            fcmin = fcm;
+        }
+    }
+
+    if (lastFrame >= fcmin)
+    {
+        std::cout << " - Warning: some movies contain only " << fcmin
+                  << " frames. Unable to load frames " << (fcmin+1)
+                  << ".." << (lastFrame+1) << " ( = --last_frame).\n";
+    }
+    else if (verb > 0)
+    {
+        std::cout << " + Max. frame number available in all movies: " << fcmin << "\n";
+    }
+
+    if (lastFrame > fcmin-1)
+    {
+        lastFrame = fcmin-1;
+    }
+}
+
 void MicrographHandler::loadInitial(
     const MetaDataTable& mdt, double angpix, bool verb,
     int& fc, double& dosePerFrame, std::string& metaFn)
