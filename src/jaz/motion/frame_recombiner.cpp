@@ -238,7 +238,7 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromFCC(
     }
     else
     {
-        k1a = (int) obsModel->pixToAng(k1, s);
+        k1a = (int) obsModel->pixToAng(sh, s);
         k1 = sh;
     }
 

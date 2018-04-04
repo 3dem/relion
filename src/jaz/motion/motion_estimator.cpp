@@ -176,6 +176,14 @@ void MotionEstimator::process(const std::vector<MetaDataTable>& mdts, long g_sta
         FileName newdir = MotionRefiner::getOutputFileNameRoot(outPath, mdts[g]);
         newdir = newdir.beforeLastOf("/");
 
+        if (debug)
+        {
+            std::string mgName;
+            mdts[g].getValue(EMDL_MICROGRAPH_NAME, mgName, 0);
+
+            std::cout << "    movie = " << mgName << "\n";
+        }
+
         if (newdir != prevdir)
         {
             std::string command = " mkdir -p " + newdir;
