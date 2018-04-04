@@ -115,6 +115,12 @@ void MicrographHandler::loadInitial(
 
             metaFn = getMetaName(fn_post);
 
+            if (debug)
+            {
+                std::cout << "first movie: " << fn_post << "\n";
+                std::cout << "maps to: " << metaFn << "\n";
+            }
+
             micrograph = Micrograph(metaFn);
 
             if (movie_angpix <= 0)
@@ -160,6 +166,13 @@ void MicrographHandler::loadInitial(
             micrograph_size.x = micrograph.getWidth();
             micrograph_size.y = micrograph.getHeight();
 
+            if (lastFrame >= micrograph.getNframes())
+            {
+                REPORT_ERROR_STR("ERROR: There are only " << micrograph.getNframes()
+                    << " frames in " << metaFn << " - " << lastFrame
+                    << " have been requested using the --lastFrame option.");
+            }
+
             if (lastFrame < 0)
             {
                 fc = micrograph.getNframes() - firstFrame;
@@ -171,21 +184,32 @@ void MicrographHandler::loadInitial(
         }
         else
         {
+            FileName mgFn;
+            mdt.getValue(EMDL_MICROGRAPH_NAME, mgFn, 0);
+
+            Image<RFLOAT> dum;
+            dum.read(mgFn, false);
+            micrograph_size.x = XSIZE(dum());
+            micrograph_size.y = YSIZE(dum());
+
+            const int fc0 = dum().zdim > 1? dum().zdim : dum().ndim;
+
             if (lastFrame < 0)
             {
-                FileName mgFn;
-                mdt.getValue(EMDL_MICROGRAPH_NAME, mgFn, 0);
-
-                Image<RFLOAT> dum;
-                dum.read(mgFn, false);
-                micrograph_size.x = XSIZE(dum());
-                micrograph_size.y = YSIZE(dum());
-
-                fc = (dum().zdim > 1? dum().zdim : dum().ndim) - firstFrame;
+                fc = fc0 - firstFrame;
             }
             else
             {
-                fc = lastFrame - firstFrame + 1;
+                if (lastFrame >= fc0)
+                {
+                    REPORT_ERROR_STR("ERROR: There are only " << micrograph.getNframes()
+                        << " frames in " << metaFn << " - " << (lastFrame+1)
+                        << " have been requested using the --lastFrame option.");
+                }
+                else
+                {
+                    fc = lastFrame - firstFrame + 1;
+                }
             }
         }
     }
@@ -248,6 +272,15 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 
             std::string mgFn = micrograph.getMovieFilename();
             std::string gainFn = micrograph.getGainFilename();
+
+            if (debug)
+            {
+                std::cout << "loading: " << fn_post << "\n";
+                std::cout << "-> meta: " << metaFn << "\n";
+                std::cout << "-> data: " << mgFn << "\n";
+                std::cout << "   gain: " << gainFn << "\n";
+            }
+
 
             if (movie_ending != "")
             {
@@ -325,7 +358,18 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
     }
     else
     {
-        const int fc = micrograph.getNframes();
+        const int fc0 = micrograph.getNframes();
+        int fc;
+
+        if (lastFrame >= 0)
+        {
+            fc = lastFrame - firstFrame + 1;
+        }
+        else
+        {
+            fc = fc0 - firstFrame;
+        }
+
         const int pc = pos.size();
 
         const d2Vector inputScale(
@@ -341,7 +385,7 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
             for (int f = 0; f < fc; f++)
             {
                 RFLOAT sx, sy;
-                micrograph.getShiftAt(f+1, 0, 0, sx, sy, false);
+                micrograph.getShiftAt(firstFrame + f + 1, 0, 0, sx, sy, false);
 
                 globComp[f] = -outputScale * d2Vector(sx, sy);
             }
@@ -360,7 +404,7 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 
                 RFLOAT sx, sy;
 
-                micrograph.getShiftAt(f+1, in.x, in.y, sx, sy, true);
+                micrograph.getShiftAt(firstFrame + f + 1, in.x, in.y, sx, sy, true);
 
                 tracks[p][f] = -outputScale * d2Vector(sx,sy) - globComp[f];
             }
