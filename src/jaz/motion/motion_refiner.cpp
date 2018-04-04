@@ -79,6 +79,7 @@ void MotionRefiner::read(int argc, char **argv)
 
     parser.addSection("Expert options");
 
+    findShortestMovie = parser.checkOption("--find_shortest", "Load only as many frames as are present in all movies.");
 	angpix = textToFloat(parser.getOption("--angpix", "Pixel resolution (angst/pix) - read from STAR file by default", "-1"));
     debug = parser.checkOption("--debug", "Write debugging data");
 
@@ -143,22 +144,6 @@ void MotionRefiner::init()
             std::cout << "   - Using pixel size calculated from magnification and "
                       << "detector pixel size in the input STAR file: " << angpix << "\n";
         }
-	}
-
-    {
-        double fractDose;
-        std::string metaFn = "";
-
-        // initialise corrected/uncorrected micrograph dictionary, then load the header
-        // of the first movie (or read corrected_micrographs.star) to obtain:
-        //  frame count, micrograph size and the fractional dose
-        micrographHandler.init(
-            mdt0, angpix, verb, nr_omp_threads, // in
-            fc, fractDose, metaFn); // out
-
-        // metaFn is only needed for console output
-        // verb is needed since motionEstimator has not been initialised yet
-        motionEstimator.proposeDosePerFrame(fractDose, metaFn, verb);
     }
 
     allMdts = StackHelper::splitByMicrographName(&mdt0);
@@ -204,8 +189,60 @@ void MotionRefiner::init()
         chosenMdts = allMdts;
     }
 
-    // make sure we don't try to load too many frames
-    micrographHandler.findLowestFrameCount(chosenMdts, verb);
+    /* There are two options on how to handle movies of varying size:
+
+       1)  Find the lowest frame-count in the selected dataset,
+           and only extract that number of frames from all movies.
+           (findShortestMovie == true)
+
+       2)  Remove all movies of insufficient size from the dataset.
+           If no --last_frame value is supplied, the length of the first
+           movie is used as the reference length
+           (findShortestMovie == false)
+    */
+
+    {
+        std::string metaFn = ""; // the first meta-star filename
+        double fractDose = 0.0; // the dose in the first meta-star (@TODO: support variable dose)
+        int fc0; // the frame count in the first movie
+
+        // initialise corrected/uncorrected micrograph dictionary, then load the header
+        // of the first movie (or read corrected_micrographs.star) to obtain:
+        //  frame count, micrograph size and the fractional dose
+        micrographHandler.init(
+            chosenMdts[0], angpix, verb, nr_omp_threads, // in
+            fc0, fractDose, metaFn); // out
+
+        if (!findShortestMovie)
+        {
+            if (micrographHandler.lastFrame < 0)
+            {
+                fc = fc0 - micrographHandler.firstFrame;
+                micrographHandler.lastFrame = fc0 - 1;
+            }
+            else
+            {
+                fc = micrographHandler.lastFrame - micrographHandler.firstFrame + 1;
+            }
+        }
+
+        // metaFn is only needed for console output
+        // verb is needed since motionEstimator has not been initialised yet
+        motionEstimator.proposeDosePerFrame(fractDose, metaFn, verb);
+    }
+
+    if (findShortestMovie)
+    {
+        // make sure we don't try to load too many frames
+        micrographHandler.findLowestFrameCount(chosenMdts, verb);
+        fc = micrographHandler.lastFrame - micrographHandler.firstFrame + 1;
+    }
+    else
+    {
+        // remove movies of insufficient size
+        chosenMdts = micrographHandler.findLongEnoughMovies(
+            chosenMdts, micrographHandler.lastFrame+1, verb);
+    }
 
 	if (only_do_unfinished)
     {

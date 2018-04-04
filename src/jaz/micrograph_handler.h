@@ -41,7 +41,13 @@ class MicrographHandler
                 double& dosePerFrame,
                 std::string& metaFn);
 
+        // find the greatest number of frames available in all micrographs
         void findLowestFrameCount(const std::vector<MetaDataTable>& mdts, int verb);
+
+        // find all movies of sufficient length
+        std::vector<MetaDataTable> findLongEnoughMovies(
+                const std::vector<MetaDataTable>& mdts,
+                int fc, int verb);
 
         // load a movie and extract all particles
         // returns a per-particle vector of per-frame images of size (s/2+1) x s
@@ -70,6 +76,9 @@ class MicrographHandler
                 int& fc, double& dosePerFrame, std::string& metaFn);
 
         std::string getMetaName(std::string micName);
+
+        int determineFrameCount(const MetaDataTable& mdt);
+        std::string getMovieFilename(const MetaDataTable& mdt);
 
 };
 

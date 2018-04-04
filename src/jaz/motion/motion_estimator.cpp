@@ -196,8 +196,34 @@ void MotionEstimator::process(const std::vector<MetaDataTable>& mdts, long g_sta
         std::vector<std::vector<d2Vector>> initialTracks;
         std::vector<d2Vector> globComp;
 
-        prepMicrograph(mdts[g], fts, dmgWeight,
+        /* The following try/catch block is important! - Do not remove!
+           Even though we have either:
+           - removed all movies with an insufficient number of frames or
+           - determined the max. number available in all movies,
+           this does not guarantee that the movies are actually:
+           - available (we have only read the meta-stars) and
+           - uncorrupted (the files could be damaged)
+
+           Due to MPI, finding the bad micrograph after a job has crashed
+           can be very time-consuming, since there is no obvious last
+           file on which the estimation has succeeded.
+
+           -- JZ, April 4th 2018 AD
+        */
+
+        try
+        {
+            prepMicrograph(mdts[g], fts, dmgWeight,
                 movie, movieCC, positions, initialTracks, globComp);
+        }
+        catch (RelionError e)
+        {
+            std::string mgName;
+            mdts[g].getValue(EMDL_MICROGRAPH_NAME, mgName, 0);
+
+            std::cerr << " - Warning: unable to load " << mgName << ". "
+                      << " File is missing or corrupted.\n";
+        }
 
         pctot += pc;
 

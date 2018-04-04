@@ -83,48 +83,7 @@ void MicrographHandler::findLowestFrameCount(
 
     for (int m = 0; m < mc; m++)
     {
-        int fcm;
-
-        if (preextracted)
-        {
-             std::string name;
-             mdts[m].getValue(EMDL_MICROGRAPH_NAME, name, 0);
-
-             Image<RFLOAT> stack0;
-             stack0.read(name, false);
-
-             const int pc0 = mdts[m].numberOfObjects();
-             const bool zstack = stack0.data.zdim > 1;
-             const int stackSize = zstack? stack0.data.zdim : stack0.data.ndim;
-
-             fcm = stackSize / pc0;
-        }
-        else if (hasCorrMic)
-        {
-            std::string mgFn;
-            mdts[m].getValueToString(EMDL_MICROGRAPH_NAME, mgFn, 0);
-
-            // remove the pipeline job prefix
-            FileName fn_pre, fn_jobnr, fn_post;
-            decomposePipelineFileName(mgFn, fn_pre, fn_jobnr, fn_post);
-
-            std::string metaFn = getMetaName(fn_post);
-            micrograph = Micrograph(metaFn);
-
-            fcm = micrograph.getNframes();
-        }
-        else
-        {
-            FileName mgFn;
-            mdts[m].getValue(EMDL_MICROGRAPH_NAME, mgFn, 0);
-
-            Image<RFLOAT> dum;
-            dum.read(mgFn, false);
-            micrograph_size.x = XSIZE(dum());
-            micrograph_size.y = YSIZE(dum());
-
-            fcm = dum().zdim > 1? dum().zdim : dum().ndim;
-        }
+        int fcm = determineFrameCount(mdts[m]);
 
         if (fcm < fcmin)
         {
@@ -143,10 +102,65 @@ void MicrographHandler::findLowestFrameCount(
         std::cout << " + Max. frame number available in all movies: " << fcmin << "\n";
     }
 
-    if (lastFrame > fcmin-1)
+    if (lastFrame < 0 || lastFrame > fcmin-1)
     {
-        lastFrame = fcmin-1;
+        lastFrame = fcmin - 1;
     }
+}
+
+std::vector<MetaDataTable> MicrographHandler::findLongEnoughMovies(
+    const std::vector<MetaDataTable> &mdts, int fc, int verb)
+{
+    if (!ready)
+    {
+        REPORT_ERROR("ERROR: MicrographHandler::loadMovie - MicrographHandler not initialized.");
+    }
+
+    std::vector<MetaDataTable> good(0);
+    std::vector<std::string> bad(0);
+
+    const int mc = mdts.size();
+
+    for (int m = 0; m < mc; m++)
+    {
+        int fcm = determineFrameCount(mdts[m]);
+
+        if (fcm < fc)
+        {
+            bad.push_back(getMovieFilename(mdts[m]));
+        }
+        else
+        {
+            good.push_back(mdts[m]);
+        }
+    }
+
+    if (good.size() == 0)
+    {
+        REPORT_ERROR_STR("ERROR: Not a single movie contains the requested number of frames ("
+                         << fc << ")");
+    }
+
+    if (verb && bad.size() > 0)
+    {
+        if (bad.size() == 1)
+        {
+            std::cerr << " - The following micrograph does not contain "
+                      << fc << " frames:\n";
+        }
+        else
+        {
+            std::cerr << " - The following micrographs do not contain "
+                      << fc << " frames:\n";
+        }
+
+        for (int i = 0; i < bad.size(); i++)
+        {
+            std::cout << "       " << bad[i] << "\n";
+        }
+    }
+
+    return good;
 }
 
 void MicrographHandler::loadInitial(
@@ -505,5 +519,78 @@ std::string MicrographHandler::getMetaName(std::string micName)
     else
     {
         return it->second;
+    }
+}
+
+int MicrographHandler::determineFrameCount(const MetaDataTable &mdt)
+{
+    int fc = 0;
+
+    if (preextracted)
+    {
+         std::string name;
+         mdt.getValue(EMDL_MICROGRAPH_NAME, name, 0);
+
+         Image<RFLOAT> stack0;
+         stack0.read(name, false);
+
+         const int pc0 = mdt.numberOfObjects();
+         const bool zstack = stack0.data.zdim > 1;
+         const int stackSize = zstack? stack0.data.zdim : stack0.data.ndim;
+
+         fc = stackSize / pc0;
+    }
+    else if (hasCorrMic)
+    {
+        std::string mgFn;
+        mdt.getValueToString(EMDL_MICROGRAPH_NAME, mgFn, 0);
+
+        // remove the pipeline job prefix
+        FileName fn_pre, fn_jobnr, fn_post;
+        decomposePipelineFileName(mgFn, fn_pre, fn_jobnr, fn_post);
+
+        std::string metaFn = getMetaName(fn_post);
+        micrograph = Micrograph(metaFn);
+
+        fc = micrograph.getNframes();
+    }
+    else
+    {
+        FileName mgFn;
+        mdt.getValue(EMDL_MICROGRAPH_NAME, mgFn, 0);
+
+        Image<RFLOAT> dum;
+        dum.read(mgFn, false);
+        micrograph_size.x = XSIZE(dum());
+        micrograph_size.y = YSIZE(dum());
+
+        fc = dum().zdim > 1? dum().zdim : dum().ndim;
+    }
+
+    return fc;
+}
+
+std::string MicrographHandler::getMovieFilename(const MetaDataTable& mdt)
+{
+    if (preextracted || !hasCorrMic)
+    {
+         std::string name;
+         mdt.getValue(EMDL_MICROGRAPH_NAME, name, 0);
+
+         return name;
+    }
+    else
+    {
+        std::string mgFn;
+        mdt.getValueToString(EMDL_MICROGRAPH_NAME, mgFn, 0);
+
+        // remove the pipeline job prefix
+        FileName fn_pre, fn_jobnr, fn_post;
+        decomposePipelineFileName(mgFn, fn_pre, fn_jobnr, fn_post);
+
+        std::string metaFn = getMetaName(fn_post);
+        micrograph = Micrograph(metaFn);
+
+        return micrograph.getMovieFilename();
     }
 }

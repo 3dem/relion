@@ -88,8 +88,7 @@ class MotionRefiner
             // Verbosity
             int verb;
 
-            // Write out debugging information
-            bool debug;
+            bool debug, findShortestMovie;
 
             double angpix;
             int nr_omp_threads;
