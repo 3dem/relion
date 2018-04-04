@@ -1,6 +1,8 @@
 #include "motion_param_estimator.h"
 #include "motion_refiner.h"
+#include "two_hyperparameter_fit.h"
 
+#include <src/jaz/optimization/nelder_mead.h>
 #include <src/jaz/index_sort.h>
 #include <src/jaz/filter_helper.h>
 
@@ -166,7 +168,8 @@ void MotionParamEstimator::run()
 
     if (estim2)
     {
-        estimateTwoParamsRec(sV, sD, sA, rV*sV, rD*sD, steps, recursions);
+        //estimateTwoParamsRec(sV, sD, sA, rV*sV, rD*sD, steps, recursions);
+        estimateTwoParamsNM(sV, sD, sA, 1000);
     }
 
     if (estim3)
@@ -602,6 +605,25 @@ d4Vector MotionParamEstimator::estimateThreeParamsRec(
                     bestTSC);
 }
 
+d4Vector MotionParamEstimator::estimateTwoParamsNM(
+    double sig_v_0, double sig_d_0, double sig_acc, int maxIters)
+{
+    TwoHyperParameterProblem thpp(*this, sig_acc);
+
+    std::vector<double> initial = TwoHyperParameterProblem::motionToProblem(
+            d2Vector(sig_v_0, sig_d_0));
+
+    double minTsc;
+
+    std::vector<double> final = NelderMead::optimize(
+            initial, thpp, 200, 10, maxIters,
+            1.0, 2.0, 0.5, 0.5, false, &minTsc);
+
+    d2Vector vd = TwoHyperParameterProblem::problemToMotion(final);
+
+    return d4Vector(vd[0], vd[1], sig_acc, -minTsc);
+}
+
 void MotionParamEstimator::evaluateParams(
     const std::vector<d3Vector>& sig_vals,
     std::vector<double>& TSCs)
@@ -625,11 +647,11 @@ void MotionParamEstimator::evaluateParams(
 
     const int gc = mdts.size();
 
-    if (verb)
+    /*if (verb)
     {
         std::cout << "    ";
         std::cout.flush();
-    }
+    }*/
 
     for (long g = 0; g < gc; g++)
     {
@@ -644,11 +666,11 @@ void MotionParamEstimator::evaluateParams(
             std::cout << "    micrograph " << (g+1) << " / " << mdts.size() << ": "
                 << pc << " particles [" << pctot << " total]\n";
         }
-        else if (verb)
+        /*else if (verb)
         {
             std::cout << ".";
             std::cout.flush();
-        }
+        }*/
 
         for (int i = 0; i < paramCount; i++)
         {
@@ -677,7 +699,7 @@ void MotionParamEstimator::evaluateParams(
 
     } // micrographs
 
-    if (debug)
+    if (debug /*|| verb*/)
     {
         std::cout << "\n";
     }

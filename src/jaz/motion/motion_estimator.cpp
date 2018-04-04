@@ -325,7 +325,7 @@ std::vector<std::vector<d2Vector>> MotionEstimator::optimize(
     const std::vector<std::vector<gravis::d2Vector>>& inTracks,
     double sig_vel_px, double sig_acc_px, double sig_div_px,
     const std::vector<gravis::d2Vector>& positions,
-    const std::vector<gravis::d2Vector>& globComp)
+    const std::vector<gravis::d2Vector>& globComp) const
 {
     if (maxIters == 0) return inTracks;
 

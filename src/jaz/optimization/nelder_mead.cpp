@@ -8,7 +8,7 @@ std::vector<double> NelderMead::optimize(
         const Optimization& opt,
         double initialStep, double tolerance, long maxIters,
         double alpha, double gamma, double rho, double sigma,
-        bool verbose)
+        bool verbose, double* minCost)
 {
     const double n = initial.size();
     const double m = initial.size() + 1;
@@ -45,6 +45,8 @@ std::vector<double> NelderMead::optimize(
     {
         // sort x and f(x) by ascending f(x)
         std::vector<int> order = IndexSort<double>::sortIndices(values);
+
+        opt.report(i, values[order[0]], simplex[order[0]]);
 
         if (verbose)
         {
@@ -170,6 +172,12 @@ std::vector<double> NelderMead::optimize(
     opt.deallocateTempStorage(tempStorage);
 
     std::vector<int> order = IndexSort<double>::sortIndices(values);
+
+    if (minCost)
+    {
+        *minCost = values[order[0]];
+    }
+
     return simplex[order[0]];
 }
 

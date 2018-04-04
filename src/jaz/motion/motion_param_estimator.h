@@ -44,6 +44,10 @@ class MotionParamEstimator
 
         bool anythingToDo();
 
+        // to be used by instances of OptimizationProblem
+        void evaluateParams(const std::vector<gravis::d3Vector>& sig_vals,
+                            std::vector<double>& TSCs);
+
 
     protected:
 
@@ -84,8 +88,11 @@ class MotionParamEstimator
                 double sig_v_step, double sig_d_step, double sig_a_step,
                 int maxIters, int recDepth);
 
-        void evaluateParams(const std::vector<gravis::d3Vector>& sig_vals,
-                            std::vector<double>& TSCs);
+
+        gravis::d4Vector estimateTwoParamsNM(
+                double sig_v_0, double sig_d_0, double sig_acc,
+                int maxIters);
+
 
         void prepAlignment();
 };

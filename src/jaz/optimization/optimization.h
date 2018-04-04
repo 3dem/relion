@@ -11,6 +11,7 @@ class Optimization
     virtual double f(const std::vector<double>& x, void* tempStorage) const = 0;
     virtual void* allocateTempStorage() const {return 0;}
     virtual void deallocateTempStorage(void* ts) const {}
+    virtual void report(int iteration, double cost, const std::vector<double>& x) const {}
 };
 
 class DifferentiableOptimization : public Optimization

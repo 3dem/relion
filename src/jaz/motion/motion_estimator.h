@@ -48,7 +48,7 @@ class MotionEstimator
             const std::vector<std::vector<gravis::d2Vector>>& inTracks,
             double sig_vel_px, double sig_acc_px, double sig_div_px,
             const std::vector<gravis::d2Vector>& positions,
-            const std::vector<gravis::d2Vector>& globComp);
+            const std::vector<gravis::d2Vector>& globComp) const;
 
         const std::vector<Image<RFLOAT>>& getDamageWeights();
 
