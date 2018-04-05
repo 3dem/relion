@@ -9,7 +9,7 @@
 #include <src/jaz/gravis/t4Vector.h>
 
 
-#define TIMING 1
+//#define TIMING 1
 
 #ifdef TIMING
     #define RCTIC(timer,label) (timer.tic(label))
@@ -48,6 +48,8 @@ class MotionParamEstimator
         void evaluateParams(const std::vector<gravis::d3Vector>& sig_vals,
                             std::vector<double>& TSCs);
 
+        static const double velScale, divScale, accScale;
+
 
     protected:
 
@@ -57,9 +59,9 @@ class MotionParamEstimator
 
             // read from cmd. line:
             bool estim2, estim3;
-            int minParticles, maxRange, recursions, steps;
+            int minParticles, maxRange, maxIters;
             double sV, sD, sA;
-            double rV, rD, rA;
+            double iniStep, conv;
             double k_cutoff, k_cutoff_Angst;
 
             // set at init:
@@ -91,7 +93,11 @@ class MotionParamEstimator
 
         gravis::d4Vector estimateTwoParamsNM(
                 double sig_v_0, double sig_d_0, double sig_acc,
-                int maxIters);
+                double inStep, double conv, int maxIters);
+
+        gravis::d4Vector estimateThreeParamsNM(
+                double sig_v_0, double sig_d_0, double sig_a_0,
+                double inStep, double conv, int maxIters);
 
 
         void prepAlignment();

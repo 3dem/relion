@@ -24,8 +24,6 @@ class TwoHyperParameterProblem : public Optimization
 
         MotionParamEstimator& motionParamEstimator;
         double s_acc;
-
-        static double velScale, divScale, accScale;
 };
 
 #endif

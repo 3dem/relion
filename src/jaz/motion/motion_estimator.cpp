@@ -45,7 +45,7 @@ void MotionEstimator::read(IOParser& parser, int argc, char *argv[])
     debugOpt = parser.checkOption("--debug_opt", "Write optimization debugging info");
 
     global_init = parser.checkOption("--gi", "Initialize with global trajectories instead of loading them from metadata file");
-    expKer = parser.checkOption("--exp_k", "Use exponential kernel instead of sq. exponential");
+    expKer = !parser.checkOption("--sq_exp_ker", "Use a square-exponential kernel instead of an exponential one");
     maxEDs = textToInteger(parser.getOption("--max_ed", "Maximum number of eigendeformations", "-1"));
 
     cutoffOut = parser.checkOption("--out_cut", "Do not consider frequencies beyond the 0.143-FSC threshold for alignment");
@@ -677,7 +677,7 @@ double MotionEstimator::normalizeSigVel(double sig_vel)
 
 double MotionEstimator::normalizeSigDiv(double sig_div)
 {
-    return dosePerFrame * sig_div / micrographHandler->coords_angpix;
+    return sig_div / micrographHandler->coords_angpix;
 }
 
 double MotionEstimator::normalizeSigAcc(double sig_acc)

@@ -1,6 +1,7 @@
 #include "motion_param_estimator.h"
 #include "motion_refiner.h"
 #include "two_hyperparameter_fit.h"
+#include "three_hyperparameter_fit.h"
 
 #include <src/jaz/optimization/nelder_mead.h>
 #include <src/jaz/index_sort.h>
@@ -9,6 +10,9 @@
 
 using namespace gravis;
 
+const double MotionParamEstimator::velScale = 1000.0;
+const double MotionParamEstimator::divScale = 1.0;
+const double MotionParamEstimator::accScale = 1000.0;
 
 MotionParamEstimator::MotionParamEstimator()
 :   paramsRead(false), ready(false)
@@ -28,11 +32,9 @@ int MotionParamEstimator::read(IOParser& parser, int argc, char *argv[])
     sV = textToFloat(parser.getOption("--s_vel_0", "Initial s_vel", "0.6"));
     sD = textToFloat(parser.getOption("--s_div_0", "Initial s_div", "3000"));
     sA = textToFloat(parser.getOption("--s_acc_0", "Initial s_acc", "-1"));
-    rV = textToFloat(parser.getOption("--r_vel", "Test s_vel +/- r_vel * s_vel", "0.5"));
-    rD = textToFloat(parser.getOption("--r_div", "Test s_div +/- r_div * s_div", "0.5"));
-    rA = textToFloat(parser.getOption("--r_acc", "Test s_acc +/- r_acc * s_acc", "0.5"));
-    recursions = textToInteger(parser.getOption("--par_recs", "Parameter estimation is iterated recursively this many times, each time halving the search range", "3"));
-    steps = textToInteger(parser.getOption("--par_steps", "Parameter estimation takes max. this many steps before halving the range", "10"));
+    iniStep = textToFloat(parser.getOption("--in_step", "Initial step size in s_div", "500"));
+    conv = textToFloat(parser.getOption("--conv", "Abort when simplex diameter falls below this", "10"));
+    maxIters = textToInteger(parser.getOption("--par_iters", "Max. number of iterations", "300"));
     maxRange = textToInteger(parser.getOption("--mot_range", "Limit allowed motion range [Px]", "50"));
 
     paramsRead = true;
@@ -94,6 +96,11 @@ void MotionParamEstimator::init(
     {
         std::cout << " + maximum frequency to consider for alignment: "
             << k_cutoff_Angst << " A (" << k_cutoff << " px)\n";
+
+        std::cout << " + frequency range to consider for evaluation:  "
+            << k_cutoff_Angst << " - " << obsModel->pixToAng(reference->k_out,s) << " A ("
+            << k_cutoff << " - " << reference->k_out << " px)\n";
+
     }
 
     const long mc = allMdts.size();
@@ -110,6 +117,11 @@ void MotionParamEstimator::init(
     int pc = 0;
     mdts.clear();
 
+    if (verb > 0)
+    {
+        std::cout << " + micrographs randomly selected for parameter optimization:\n";
+    }
+
     for (int i = 0; i < order.size(); i++)
     {
         const int m = order[i];
@@ -122,11 +134,19 @@ void MotionParamEstimator::init(
         mdts.push_back(allMdts[m]);
         pc += pcm;
 
-        if (pc > minParticles)
+        if (verb > 0)
+        {
+            std::string mn;
+            allMdts[m].getValue(EMDL_MICROGRAPH_NAME, mn, 0);
+
+            std::cout << "        " << mn << "\n";
+        }
+
+        if (pc >= minParticles)
         {
             if (verb > 0)
             {
-                std::cout << " + " << pc << " particles found in "
+                std::cout << "\n + " << pc << " particles found in "
                           << mdts.size() << " micrographs\n";
             }
 
@@ -136,7 +156,7 @@ void MotionParamEstimator::init(
 
     if (verb > 0 && pc < minParticles)
     {
-        std::cout << " - Warning: this dataset does not contain " << minParticles
+        std::cout << "\n   - Warning: this dataset does not contain " << minParticles
                   << " particles (--min_p) in micrographs with at least 2 particles\n";
     }
 
@@ -166,16 +186,45 @@ void MotionParamEstimator::run()
 
     RCTOC(paramTimer, timeSetup);
 
+    d4Vector opt;
+
+    std::cout.setf(std::ios::fixed, std::ios::floatfield);
+    std::cout.precision(6);
+
     if (estim2)
     {
         //estimateTwoParamsRec(sV, sD, sA, rV*sV, rD*sD, steps, recursions);
-        estimateTwoParamsNM(sV, sD, sA, 1000);
+        opt = estimateTwoParamsNM(sV, sD, sA, iniStep, conv, maxIters);
     }
 
     if (estim3)
     {
-        estimateThreeParamsRec(sV, sD, sA, rV*sV, rD*sD, rA*sA, steps, recursions);
+        //estimateThreeParamsRec(sV, sD, sA, rV*sV, rD*sD, rA*sA, steps, recursions);
+        opt = estimateThreeParamsNM(sV, sD, sA, iniStep, conv, maxIters);
     }
+
+    std::cout.setf(std::ios::floatfield);
+
+    d3Vector nrm(
+        opt[0] * velScale,
+        opt[1] * divScale,
+        opt[2] * accScale);
+
+    // round result to conv / 2 (the min. radius of the optimization simplex)
+    d3Vector rnd(
+        conv * 0.5 * ((int)(2.0*nrm[0]/conv + 0.5)) / velScale,
+        conv * 0.5 * ((int)(2.0*nrm[1]/conv + 0.5)) / divScale,
+        conv * 0.5 * ((int)(2.0*nrm[2]/conv + 0.5)) / accScale);
+
+    if (estim2)
+    {
+        rnd[2] = sA;
+    }
+
+    std::cout << "\ngood parameters:"
+              << " --s_vel " << rnd[0]
+              << " --s_div " << rnd[1]
+              << " --s_acc " << rnd[2] << "\n\n";
 
     #ifdef TIMING
         paramTimer.printTimes(true);
@@ -606,8 +655,10 @@ d4Vector MotionParamEstimator::estimateThreeParamsRec(
 }
 
 d4Vector MotionParamEstimator::estimateTwoParamsNM(
-    double sig_v_0, double sig_d_0, double sig_acc, int maxIters)
+        double sig_v_0, double sig_d_0, double sig_acc, double inStep, double conv, int maxIters)
 {
+    std::cout << "\nit: \t s_vel: \t s_div: \t s_acc: \t fsc:\n\n";
+
     TwoHyperParameterProblem thpp(*this, sig_acc);
 
     std::vector<double> initial = TwoHyperParameterProblem::motionToProblem(
@@ -616,12 +667,33 @@ d4Vector MotionParamEstimator::estimateTwoParamsNM(
     double minTsc;
 
     std::vector<double> final = NelderMead::optimize(
-            initial, thpp, 200, 10, maxIters,
+            initial, thpp, inStep, conv, maxIters,
             1.0, 2.0, 0.5, 0.5, false, &minTsc);
 
     d2Vector vd = TwoHyperParameterProblem::problemToMotion(final);
 
     return d4Vector(vd[0], vd[1], sig_acc, -minTsc);
+}
+
+d4Vector MotionParamEstimator::estimateThreeParamsNM(
+        double sig_v_0, double sig_d_0, double sig_a_0, double inStep, double conv, int maxIters)
+{
+    std::cout << "\nit: \t s_vel: \t s_div: \t s_acc: \t fsc:\n\n";
+
+    ThreeHyperParameterProblem thpp(*this);
+
+    std::vector<double> initial = ThreeHyperParameterProblem::motionToProblem(
+            d3Vector(sig_v_0, sig_d_0, sig_a_0));
+
+    double minTsc;
+
+    std::vector<double> final = NelderMead::optimize(
+            initial, thpp, inStep, conv, maxIters,
+            1.0, 2.0, 0.5, 0.5, false, &minTsc);
+
+    d3Vector vd = ThreeHyperParameterProblem::problemToMotion(final);
+
+    return d4Vector(vd[0], vd[1], vd[2], -minTsc);
 }
 
 void MotionParamEstimator::evaluateParams(
@@ -647,12 +719,6 @@ void MotionParamEstimator::evaluateParams(
 
     const int gc = mdts.size();
 
-    /*if (verb)
-    {
-        std::cout << "    ";
-        std::cout.flush();
-    }*/
-
     for (long g = 0; g < gc; g++)
     {
         const int pc = mdts[g].numberOfObjects();
@@ -666,11 +732,6 @@ void MotionParamEstimator::evaluateParams(
             std::cout << "    micrograph " << (g+1) << " / " << mdts.size() << ": "
                 << pc << " particles [" << pctot << " total]\n";
         }
-        /*else if (verb)
-        {
-            std::cout << ".";
-            std::cout.flush();
-        }*/
 
         for (int i = 0; i < paramCount; i++)
         {
@@ -699,7 +760,7 @@ void MotionParamEstimator::evaluateParams(
 
     } // micrographs
 
-    if (debug /*|| verb*/)
+    if (debug)
     {
         std::cout << "\n";
     }
@@ -722,7 +783,8 @@ void MotionParamEstimator::evaluateParams(
 
 void MotionParamEstimator::prepAlignment()
 {
-    std::cout << "preparing alignment data...\n";
+    std::cout << " + preparing alignment data... \n";
+    std::cout.flush();
 
     const std::vector<Image<RFLOAT>>& dmgWgh = motionEstimator->getDamageWeights();
     std::vector<Image<RFLOAT>> alignDmgWgh(fc);
@@ -753,7 +815,7 @@ void MotionParamEstimator::prepAlignment()
 
         pctot += pc;
 
-        std::cout << "    micrograph " << (g+1) << " / " << gc << ": "
+        std::cout << "        micrograph " << (g+1) << " / " << gc << ": "
             << pc << " particles [" << pctot << " total]\n";
 
         std::vector<std::vector<Image<Complex>>> movie;
@@ -793,8 +855,17 @@ void MotionParamEstimator::prepAlignment()
                 alignmentSet.pred[g][p] = alignmentSet.accelerate(pred);
             }
         }
+
+        alignmentSet.initialTracks[g] = motionEstimator->optimize(
+                alignmentSet.CCs[g],
+                alignmentSet.initialTracks[g],
+                motionEstimator->normalizeSigVel(sV),
+                motionEstimator->normalizeSigAcc(sA),
+                motionEstimator->normalizeSigDiv(sD),
+                alignmentSet.positions[g],
+                alignmentSet.globComp[g]);
     }
 
-    std::cout << "done\n";
+    std::cout << "   done\n";
 }
 

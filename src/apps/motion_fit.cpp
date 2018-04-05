@@ -190,7 +190,7 @@ int MotionFitProg::readMoreOptions(IOParser& parser, int argc, char *argv[])
 
     global_init = parser.checkOption("--gi", "Initialize with global trajectories instead of loading them from metadata file");
 
-    expKer = parser.checkOption("--exp_k", "Use exponential kernel instead of sq. exponential");
+    expKer = !parser.checkOption("--sq_exp_ker", "Use a square-exponential kernel instead of an exponential one");
     maxEDs = textToInteger(parser.getOption("--max_ed", "Maximum number of eigendeformations", "-1"));
 
     k_cutoff = textToFloat(parser.getOption("--k_cut", "Freq. cutoff (in pixels)", "-1.0"));
@@ -282,25 +282,10 @@ int MotionFitProg::_run()
         dmgWeight[f].data.xinit = 0;
         dmgWeight[f].data.yinit = 0;
 
-        /*for (int y = 0; y < s; y++)
-        for (int x = 0; x < sh; x++)
-        {
-            const double xx = x;
-            const double yy = y < sh? y : y - s;
-
-            dmgWeight[f](y,x) *= 2.0 * sqrt(xx*xx + yy*yy) / sh;
-        }*/
-
         if (k_cutoff > 0.0 && k_cutoff < k_out)
         {
             dmgWeight[f] = FilterHelper::ButterworthEnvFreq2D(dmgWeight[f], k_cutoff-1, k_cutoff+1);
         }
-        /*else
-        {
-            dmgWeight[f] = FilterHelper::ButterworthEnvFreq2D(dmgWeight[f], k_out-1, k_out+1);
-        }*/
-
-        //ImageOp::multiplyBy(dmgWeight[f], freqWeight);
     }
 
     if (useAlignmentSet && (paramEstim2 || paramEstim3))
