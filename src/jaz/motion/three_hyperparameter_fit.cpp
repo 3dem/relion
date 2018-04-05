@@ -4,7 +4,7 @@
 using namespace gravis;
 
 
-double ThreeHyperParameterProblem::accThresh = 100.0;
+double ThreeHyperParameterProblem::accThresh = 500.0;
 double ThreeHyperParameterProblem::accEps = 1e-5;
 
 
