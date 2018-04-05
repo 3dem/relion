@@ -63,6 +63,7 @@ class MotionParamEstimator
             double sV, sD, sA;
             double iniStep, conv;
             double k_cutoff, k_cutoff_Angst;
+            double k_eval, k_eval_Angst;
 
             // set at init:
             std::vector<MetaDataTable> mdts;

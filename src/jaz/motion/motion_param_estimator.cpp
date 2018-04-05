@@ -27,6 +27,8 @@ int MotionParamEstimator::read(IOParser& parser, int argc, char *argv[])
     estim3 = parser.checkOption("--params3", "Estimate 3 parameters instead of motion");
     k_cutoff = textToFloat(parser.getOption("--k_cut", "Freq. cutoff for parameter estimation [Pixels]", "-1.0"));
     k_cutoff_Angst = textToFloat(parser.getOption("--k_cut_A", "Freq. cutoff for parameter estimation [Angstrom]", "-1.0"));
+    k_eval = textToFloat(parser.getOption("--k_eval", "Threshold freq. for parameter evaluation [Pixels]", "-1.0"));
+    k_eval_Angst = textToFloat(parser.getOption("--k_eval_A", "Threshold freq. for parameter evaluation [Angstrom]", "-1.0"));
 
     minParticles = textToInteger(parser.getOption("--min_p", "Minimum number of particles on which to estimate the parameters", "1000"));
     sV = textToFloat(parser.getOption("--s_vel_0", "Initial s_vel", "0.6"));
@@ -69,15 +71,20 @@ void MotionParamEstimator::init(
 
     if (k_cutoff_Angst > 0.0 && k_cutoff > 0.0)
     {
-        REPORT_ERROR("ERROR: Cutoff frequency can only be provided in pixels (--k_cut) or Angstrom (--k_cut_A), not both.");
+        REPORT_ERROR("ERROR: Cutoff frequency can only be provided in pixels (--k_cut) or Angstrom (--k_eval_A), not both.");
     }
 
-    if (k_cutoff_Angst > 0.0 && k_cutoff < 0.0)
+    if (k_eval_Angst > 0.0 && k_eval > 0.0)
+    {
+        REPORT_ERROR("ERROR: Evaluation frequency can only be provided in pixels (--k_eval) or Angstrom (--k_cut_A), not both.");
+    }
+
+    if (k_cutoff_Angst > 0.0 && k_cutoff < 0)
     {
         k_cutoff = obsModel->angToPix(k_cutoff_Angst, s);
     }
 
-    else if (k_cutoff > 0.0 && k_cutoff_Angst < 0.0)
+    else if (k_cutoff > 0 && k_cutoff_Angst < 0.0)
     {
         k_cutoff_Angst = obsModel->angToPix(k_cutoff, s);
     }
@@ -92,14 +99,28 @@ void MotionParamEstimator::init(
         REPORT_ERROR("ERROR: Only 2 or 3 parameters can be estimated (--params2 or --params3), not both.");
     }
 
+    if (k_eval < 0 && k_eval_Angst > 0.0)
+    {
+        k_eval = obsModel->angToPix(k_eval_Angst, s);
+    }
+    else if (k_eval > 0 && k_eval_Angst < 0.0)
+    {
+        k_eval_Angst = obsModel->angToPix(k_eval, s);
+    }
+    else
+    {
+        k_eval = k_cutoff;
+        k_eval_Angst = k_cutoff_Angst;
+    }
+
     if (verb > 0)
     {
         std::cout << " + maximum frequency to consider for alignment: "
             << k_cutoff_Angst << " A (" << k_cutoff << " px)\n";
 
         std::cout << " + frequency range to consider for evaluation:  "
-            << k_cutoff_Angst << " - " << obsModel->pixToAng(reference->k_out,s) << " A ("
-            << k_cutoff << " - " << reference->k_out << " px)\n";
+            << k_eval_Angst << " - " << obsModel->pixToAng(reference->k_out,s) << " A ("
+            << k_eval << " - " << reference->k_out << " px)\n";
 
     }
 
@@ -139,7 +160,7 @@ void MotionParamEstimator::init(
             std::string mn;
             allMdts[m].getValue(EMDL_MICROGRAPH_NAME, mn, 0);
 
-            std::cout << "        " << mn << "\n";
+            std::cout << "        " << m << ": " << mn << "\n";
         }
 
         if (pc >= minParticles)
@@ -801,7 +822,7 @@ void MotionParamEstimator::prepAlignment()
 
     std::vector<ParFourierTransformer> fts(nr_omp_threads);
 
-    alignmentSet = AlignmentSet(mdts, fc, s, k_cutoff+2, k_out);
+    alignmentSet = AlignmentSet(mdts, fc, s, k_eval+2, k_out);
 
     for (int f = 0; f < fc; f++)
     {
