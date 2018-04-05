@@ -221,6 +221,11 @@ void MotionParamEstimator::run()
         rnd[2] = sA;
     }
 
+    if (opt[2] <= 0.0)
+    {
+        rnd[2] = -1;
+    }
+
     std::cout << "\ngood parameters:"
               << " --s_vel " << rnd[0]
               << " --s_div " << rnd[1]
