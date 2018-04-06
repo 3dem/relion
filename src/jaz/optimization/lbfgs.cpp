@@ -23,7 +23,9 @@ std::vector<double> LBFGS::optimize(
         m_x[i] = initial[i];
     }
 
-    LibLbfgsAdapter adapter(opt, N, verbose);
+    void* tempStorage = opt.allocateTempStorage();
+
+    LibLbfgsAdapter adapter(opt, tempStorage, N, verbose);
 
     int ret;
 
@@ -54,6 +56,8 @@ std::vector<double> LBFGS::optimize(
     }
 
     lbfgs_free(m_x);
+
+    opt.deallocateTempStorage(tempStorage);
 
     return out;
 }
@@ -90,14 +94,15 @@ int LBFGS::progress(
 }
 
 LBFGS::LibLbfgsAdapter::LibLbfgsAdapter(
-        const DifferentiableOptimization &opt, int n, bool verbose)
+        const DifferentiableOptimization &opt,
+        void *tempStorage, int n, bool verbose)
 :   opt(opt),
     n(n),
     verbose(verbose),
     x_vec(n),
-    grad_vec(n)
-{
-    tempStorage = opt.allocateTempStorage();
+    grad_vec(n),
+    tempStorage(tempStorage)
+{    
 }
 
 lbfgsfloatval_t LBFGS::LibLbfgsAdapter::evaluate(

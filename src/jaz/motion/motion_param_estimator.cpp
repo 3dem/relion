@@ -810,7 +810,6 @@ void MotionParamEstimator::evaluateParams(
 void MotionParamEstimator::prepAlignment()
 {
     std::cout << " + preparing alignment data... \n";
-    std::cout.flush();
 
     const std::vector<Image<RFLOAT>>& dmgWgh = motionEstimator->getDamageWeights();
     std::vector<Image<RFLOAT>> alignDmgWgh(fc);

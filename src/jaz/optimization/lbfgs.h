@@ -45,7 +45,7 @@ class LBFGS
 
                 LibLbfgsAdapter(
                     const DifferentiableOptimization& opt,
-                    int n, bool verbose);
+                    void* tempStorage, int n, bool verbose);
 
                 const DifferentiableOptimization& opt;
                 int n;
