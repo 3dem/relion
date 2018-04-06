@@ -88,22 +88,13 @@ void MotionEstimator::init(
         global_init = true;
     }
 
-    int k_out = sh;
-
-    for (int i = 1; i < sh; i++)
-    {
-        if (reference->freqWeight1D[i] <= 0.0)
-        {
-            k_out = i;
-            break;
-        }
-    }
-
     if (verb > 0 && cutoffOut)
     {
         std::cout << " + maximum frequency to consider: "
-            << (s * angpix)/(RFLOAT)k_out << " A (" << k_out << " px)\n";
+            << (s * angpix)/(RFLOAT)reference->k_out << " A (" << reference->k_out << " px)\n";
     }
+
+    if (debug) std::cout << "computing damage weights...\n";
 
     dmgWeight = DamageHelper::damageWeights(
             s, angpix,
@@ -117,7 +108,7 @@ void MotionEstimator::init(
 
         if (cutoffOut)
         {
-            dmgWeight[f] = FilterHelper::ButterworthEnvFreq2D(dmgWeight[f], k_out-1, k_out+1);
+            dmgWeight[f] = FilterHelper::ButterworthEnvFreq2D(dmgWeight[f], reference->k_out-1, reference->k_out+1);
         }
     }
 

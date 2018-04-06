@@ -27,7 +27,7 @@ class ReferenceMap
             int k_out;
 
         void read(IOParser& parser, int argc, char *argv[]);
-        void load(int verb);
+        void load(int verb, bool debug);
 
         std::vector<Image<Complex>> predictAll(
                 const MetaDataTable& mdt,

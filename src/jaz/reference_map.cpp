@@ -24,8 +24,10 @@ void ReferenceMap::read(IOParser& parser, int argc, char* argv[])
     paddingFactor = textToFloat(parser.getOption("--pad", "Padding factor", "2"));
 }
 
-void ReferenceMap::load(int verb)
+void ReferenceMap::load(int verb, bool debug)
 {
+    if (debug) std::cout << "reading: " << reconFn0 << "\n";
+
     maps[0].read(reconFn0);
 
     if (maps[0].data.xdim != maps[0].data.ydim
@@ -33,6 +35,8 @@ void ReferenceMap::load(int verb)
     {
         REPORT_ERROR(reconFn0 + " is not cubical.\n");
     }
+
+    if (debug) std::cout << "reading: " << reconFn1 << "\n";
 
     maps[1].read(reconFn1);
 
@@ -74,6 +78,8 @@ void ReferenceMap::load(int verb)
 
     projectors[1] = Projector(s, TRILINEAR, paddingFactor, 10, 2);
     projectors[1].computeFourierTransformMap(maps[1].data, powSpec[1].data, maps[1].data.xdim);
+
+    if (debug) std::cout << "loading FSC\n";
 
     if (fscFn != "")
     {

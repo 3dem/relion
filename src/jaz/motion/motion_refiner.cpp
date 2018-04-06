@@ -123,10 +123,7 @@ void MotionRefiner::init()
         outPath += "/";
     }
 
-    if (verb > 0)
-    {
-		std::cout << " + Reading " << starFn << "...\n";
-    }
+    if (verb > 0) std::cout << " + Reading " << starFn << "...\n";
 
     mdt0.read(starFn);
 
@@ -325,24 +322,25 @@ void MotionRefiner::init()
 
         if (needsReference)
         {
-            if (verb > 0)
-            {
-                std::cout << " + Reading references ...\n";
-            }
+            if (verb > 0) std::cout << " + Reading references ...\n";
 
-            reference.load(verb);
+            reference.load(verb, debug);
         }
 
     }
 
     if (estimateMotion || estimateParams)
     {
+        if (verb > 0) std::cout << " + initializing motion estimator ...\n";
+
         motionEstimator.init(verb, s, fc, nr_omp_threads, debug, outPath,
                              &reference, &obsModel, &micrographHandler);
     }
 
     if (estimateParams)
     {
+        if (verb > 0) std::cout << " + initializing motion parameter estimator ...\n";
+
         motionParamEstimator.init(
             verb, nr_omp_threads, debug,
             s, fc, chosenMdts, &motionEstimator, &reference, &obsModel);
