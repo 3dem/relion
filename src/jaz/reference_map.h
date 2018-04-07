@@ -23,7 +23,6 @@ class ReferenceMap
             Image<RFLOAT> freqWeight;
             std::vector<double> freqWeight1D;
             Projector projectors[2];
-            Image<RFLOAT> maps[2], powSpec[2];
             int k_out;
 
         void read(IOParser& parser, int argc, char *argv[]);

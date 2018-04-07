@@ -26,6 +26,8 @@ void ReferenceMap::read(IOParser& parser, int argc, char* argv[])
 
 void ReferenceMap::load(int verb, bool debug)
 {
+    Image<RFLOAT> maps[2], powSpec[2];
+
     if (debug) std::cout << "reading: " << reconFn0 << "\n";
 
     maps[0].read(reconFn0);

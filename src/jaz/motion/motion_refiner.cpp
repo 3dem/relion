@@ -186,7 +186,7 @@ void MotionRefiner::init()
         chosenMdts = allMdts;
     }
 
-    /* There are two options on how to handle movies of varying size:
+    /* There are two options on how to handle movies of varying length:
 
        1)  Find the lowest frame-count in the selected dataset,
            and only extract that number of frames from all movies.

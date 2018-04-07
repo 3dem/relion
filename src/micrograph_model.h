@@ -32,6 +32,9 @@ enum MotionModelVersion {
 class MotionModel
 {
 public:
+
+    virtual ~MotionModel(){}
+
 	// Fit model based on observations
 	virtual void fit() = 0;
 
