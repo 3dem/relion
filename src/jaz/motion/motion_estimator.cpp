@@ -183,9 +183,9 @@ void MotionEstimator::process(const std::vector<MetaDataTable>& mdts, long g_sta
 
         std::vector<std::vector<Image<Complex>>> movie;
         std::vector<std::vector<Image<RFLOAT>>> movieCC;
-        std::vector<d2Vector> positions;
-        std::vector<std::vector<d2Vector>> initialTracks;
-        std::vector<d2Vector> globComp;
+        std::vector<d2Vector> positions(pc);
+        std::vector<std::vector<d2Vector>> initialTracks(pc, std::vector<d2Vector>(fc));
+        std::vector<d2Vector> globComp(fc);
 
         /* The following try/catch block is important! - Do not remove!
            Even though we have either:
@@ -271,7 +271,8 @@ void MotionEstimator::prepMicrograph(
 {
     const int pc = mdt.numberOfObjects();
 
-    positions = std::vector<gravis::d2Vector>(pc);
+    std::vector<std::vector<d2Vector>> myInitialTracks;
+    std::vector<d2Vector> myGlobComp;
 
     for (int p = 0; p < pc; p++)
     {
@@ -280,7 +281,7 @@ void MotionEstimator::prepMicrograph(
     }
 
     movie = micrographHandler->loadMovie(
-        mdt, s, angpix, fts, positions, initialTracks, unregGlob, globComp); // throws exceptions
+        mdt, s, angpix, fts, positions, myInitialTracks, unregGlob, myGlobComp); // throws exceptions
 
     std::vector<Image<Complex>> preds = reference->predictAll(
         mdt, *obsModel, ReferenceMap::Own, nr_omp_threads);
@@ -300,7 +301,7 @@ void MotionEstimator::prepMicrograph(
 
     movieCC = MotionHelper::movieCC(movie, preds, dmgWeight, fts, nr_omp_threads);
 
-    if (global_init || initialTracks.size() == 0)
+    if (global_init || myInitialTracks.size() == 0)
     {
         std::vector<Image<RFLOAT>> ccSum = MotionHelper::addCCs(movieCC);
         std::vector<gravis::d2Vector> globTrack = MotionHelper::getGlobalTrack(ccSum);
@@ -322,26 +323,39 @@ void MotionEstimator::prepMicrograph(
                 MotionRefiner::getOutputFileNameRoot(outPath, mdt) + "_CCsum", CenterXY);
         }
 
-        initialTracks.resize(pc);
+        myInitialTracks.resize(pc);
 
         for (int p = 0; p < pc; p++)
         {
-            initialTracks[p] = std::vector<d2Vector>(fc);
+            myInitialTracks[p] = std::vector<d2Vector>(fc);
 
             for (int f = 0; f < fc; f++)
             {
                 if (unregGlob)
                 {
-                    initialTracks[p][f] = globOffsets[p];
+                    myInitialTracks[p][f] = globOffsets[p];
                 }
                 else
                 {
-                    initialTracks[p][f] = globTrack[f] + globOffsets[p];
+                    myInitialTracks[p][f] = globTrack[f] + globOffsets[p];
                 }
             }
         }
 
-        globComp = unregGlob? globTrack : std::vector<d2Vector>(fc, d2Vector(0,0));
+        myGlobComp = unregGlob? globTrack : std::vector<d2Vector>(fc, d2Vector(0,0));
+    }
+
+    for (int p = 0; p < pc; p++)
+    {
+        for (int f = 0; f < fc; f++)
+        {
+            initialTracks[p][f] = myInitialTracks[p][f];
+        }
+    }
+
+    for (int f = 0; f < fc; f++)
+    {
+        globComp[f] = myGlobComp[f];
     }
 }
 

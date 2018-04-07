@@ -354,11 +354,11 @@ void MotionFitProg::prepAlignment(
         mdtsAct[m-g0] = mdts[m];
     }
 
-    alignmentSet = AlignmentSet(mdtsAct, fc, s, k_cutoff+2, k_out);
+    alignmentSet = AlignmentSet(mdtsAct, fc, s, k_cutoff+2, k_out, maxRange);
 
     for (int f = 0; f < fc; f++)
     {
-        alignmentSet.damage[f] = alignmentSet.accelerate(dmgWeight0[f]);
+        alignmentSet.accelerate(dmgWeight0[f], alignmentSet.damage[f]);
     }
 
     int pctot = 0;
@@ -412,8 +412,9 @@ void MotionFitProg::prepAlignment(
                     CCfloat(y,x) = movieCC[p][f](y,x);
                 }
 
-                alignmentSet.CCs[g][p][f] = movieCC[p][f];
-                alignmentSet.obs[g][p][f] = alignmentSet.accelerate(movie[p][f]);
+                //alignmentSet.CCs[g][p][f] = movieCC[p][f];
+                alignmentSet.copyCC(g, p ,f, movieCC[p][f]);
+                alignmentSet.accelerate(movie[p][f], alignmentSet.obs[g][p][f]);
 
                 Image<Complex> pred;
                 int randSubset;
@@ -429,7 +430,7 @@ void MotionFitProg::prepAlignment(
                     pred = obsModel.predictObservation(projectors[0], mdts[gg], p, true, true);
                 }
 
-                alignmentSet.pred[g][p] = alignmentSet.accelerate(pred);
+                alignmentSet.accelerate(pred, alignmentSet.pred[g][p]);
             }
         }
     }

@@ -824,11 +824,11 @@ void MotionParamEstimator::prepAlignment()
 
     std::vector<ParFourierTransformer> fts(nr_omp_threads);
 
-    alignmentSet = AlignmentSet(mdts, fc, s, k_eval+2, k_out);
+    alignmentSet = AlignmentSet(mdts, fc, s, k_eval+2, k_out, maxRange);
 
     for (int f = 0; f < fc; f++)
     {
-        alignmentSet.damage[f] = alignmentSet.accelerate(dmgWgh[f]);
+        alignmentSet.accelerate(dmgWgh[f], alignmentSet.damage[f]);
     }
 
     const int gc = mdts.size();
@@ -874,17 +874,19 @@ void MotionParamEstimator::prepAlignment()
                     movieCC[p][f] = FilterHelper::cropCorner2D(movieCC[p][f], 2*maxRange, 2*maxRange);
                 }
 
-                alignmentSet.CCs[g][p][f] = movieCC[p][f];
-                alignmentSet.obs[g][p][f] = alignmentSet.accelerate(movie[p][f]);
+                //alignmentSet.CCs[g][p][f] = movieCC[p][f];
+                alignmentSet.copyCC(g, p, f, movieCC[p][f]);
 
                 Image<Complex> pred = reference->predict(
                     mdts[g], p, *obsModel, ReferenceMap::Opposite);
 
-                alignmentSet.pred[g][p] = alignmentSet.accelerate(pred);
+                alignmentSet.accelerate(movie[p][f], alignmentSet.obs[g][p][f]);
+                alignmentSet.accelerate(pred, alignmentSet.pred[g][p]);
             }
         }
 
-        alignmentSet.initialTracks[g] = motionEstimator->optimize(
+        std::vector<std::vector<d2Vector>> tracks =
+            motionEstimator->optimize(
                 alignmentSet.CCs[g],
                 alignmentSet.initialTracks[g],
                 motionEstimator->normalizeSigVel(sV),
@@ -892,6 +894,14 @@ void MotionParamEstimator::prepAlignment()
                 motionEstimator->normalizeSigDiv(sD),
                 alignmentSet.positions[g],
                 alignmentSet.globComp[g]);
+
+        for (int p = 0; p < pc; p++)
+        {
+            for (int f = 0; f < fc; f++)
+            {
+                alignmentSet.initialTracks[g][p][f] = tracks[p][f];
+            }
+        }
     }
 
     std::cout << "   done\n";

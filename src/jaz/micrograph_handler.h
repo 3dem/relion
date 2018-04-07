@@ -23,7 +23,7 @@ class MicrographHandler
 
             std::string corrMicFn;
             std::string movie_path, meta_path, movie_ending;
-            std::string gain_path, last_gainFn;
+            std::string gain_path, last_gainFn; // make protected
 
             gravis::t2Vector<int> micrograph_size;
 

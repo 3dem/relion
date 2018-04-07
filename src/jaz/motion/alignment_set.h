@@ -12,9 +12,10 @@ class AlignmentSet
     public:
 
         AlignmentSet();
-        AlignmentSet(const std::vector<MetaDataTable>& mdts, int fc, int s, int k0, int k1);
+        AlignmentSet(const std::vector<MetaDataTable>& mdts,
+                     int fc, int s, int k0, int k1, int maxRng);
 
-            int mc, fc, s, sh, k0, k1, accPix;
+            int mc, fc, s, sh, k0, k1, accPix, maxRng;
 
             // micrograph < particle < frame <pixels> > >
             std::vector<std::vector<std::vector< Image<double> >>> CCs;            
@@ -31,8 +32,10 @@ class AlignmentSet
 
             std::vector<gravis::t2Vector<int>> accCoords;
 
-        std::vector<gravis::d2Vector> accelerate(const Image<Complex>& img);
-        std::vector<double> accelerate(const Image<RFLOAT>& img);
+
+        void copyCC(int m, int p, int f, const Image<double>& src);
+        void accelerate(const Image<Complex>& img, std::vector<gravis::d2Vector>& dest);
+        void accelerate(const Image<RFLOAT>& img, std::vector<double>& dest);
 
         gravis::d3Vector updateTsc(
             const std::vector<std::vector<gravis::d2Vector>>& tracks,

@@ -30,7 +30,8 @@ class MotionEstimator
 
 
         // load micrograph from mdt and compute all data required for the optimization;
-        // also used by MotionParamEstimator
+        // positions, initialTracks and globComp need to have the right sizes already (pc, pc*fc, fc)
+        // (also used by MotionParamEstimator)
         void prepMicrograph(
             // in:
             const MetaDataTable& mdt, std::vector<ParFourierTransformer>& fts,

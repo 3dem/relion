@@ -6,37 +6,20 @@
 using namespace gravis;
 
 AlignmentSet::AlignmentSet()
-:   mc(0), fc(0), s(0), sh(0), k0(0), k1(0)
+:   mc(0), fc(0), s(0), sh(0), k0(0), k1(0), maxRng(0)
 {
 }
 
-AlignmentSet::AlignmentSet(
-        const std::vector<MetaDataTable> &mdts,
-        int fc, int s, int k0, int k1)
+AlignmentSet::AlignmentSet(const std::vector<MetaDataTable> &mdts,
+        int fc, int s, int k0, int k1, int maxRng)
 :   mc(mdts.size()),
     fc(fc),
     s(s),
     sh(s/2+1),
     k0(k0),
-    k1(k1)
+    k1(k1),
+    maxRng(maxRng>0? maxRng : s/2)
 {
-    CCs.resize(mc);
-    obs.resize(mc);
-    pred.resize(mc);
-    damage.resize(fc);
-
-    positions.resize(mc);
-    initialTracks.resize(mc);
-    globComp.resize(mc);
-
-    for (int m = 0; m < mc; m++)
-    {
-        const int pc = mdts[m].numberOfObjects();
-        CCs[m] = std::vector<std::vector<Image<double>>>(pc, std::vector<Image<double>>(fc));
-        obs[m] = std::vector<std::vector<std::vector<d2Vector>>>(pc, std::vector<std::vector<d2Vector>>(fc));
-        pred[m].resize(pc);
-    }
-
     accCoords.reserve(sh*s);
 
     int num = 0;
@@ -57,35 +40,88 @@ AlignmentSet::AlignmentSet(
     }
 
     accPix = num;
+
+    CCs.resize(mc);
+    obs.resize(mc);
+    pred.resize(mc);
+
+    positions.resize(mc);
+    initialTracks.resize(mc);
+    globComp.resize(mc);
+
+    for (int m = 0; m < mc; m++)
+    {
+        const int pc = mdts[m].numberOfObjects();
+
+        positions[m].resize(pc);
+        globComp[m].resize(fc);
+
+        initialTracks[m].resize(pc);
+        CCs[m].resize(pc);
+        obs[m].resize(pc);
+        pred[m].resize(pc);
+
+        for (int p = 0; p < pc; p++)
+        {
+            initialTracks[m][p].resize(fc);
+            pred[m][p].resize(accPix);
+
+            CCs[m][p].resize(fc);
+            obs[m][p].resize(fc);
+
+            for (int f = 0; f < fc; f++)
+            {
+                CCs[m][p][f] = Image<double>(2*maxRng, 2*maxRng);
+                obs[m][p][f].resize(accPix);
+            }
+        }
+    }
+
+    damage.resize(fc);
+
+    for (int f = 0; f < fc; f++)
+    {
+        damage[f].resize(accPix);
+    }
 }
 
-std::vector<d2Vector> AlignmentSet::accelerate(const Image<Complex> &img)
+void AlignmentSet::copyCC(int m, int p, int f, const Image<double> &src)
 {
-    std::vector<d2Vector> out(accPix);
+    if (m < 0 || m >= mc ||
+        p < 0 || p >= CCs[m].size() ||
+        f < 0 || f >= fc)
+    {
+        REPORT_ERROR_STR("AlignmentSet::copyCC: bad CC-index: "
+            << m << ", " << p << ", " << f << " for "
+            << mc << ", " << ((m >= 0 && m < mc)? CCs[m].size() : 0) << ", " << fc << ".");
+    }
 
+    for (int y = 0; y < 2*maxRng; y++)
+    for (int x = 0; x < 2*maxRng; x++)
+    {
+        CCs[m][p][f](y,x) = src(y,x);
+    }
+}
+
+void AlignmentSet::accelerate(const Image<Complex> &img, std::vector<d2Vector>& dest)
+{
     for (int i = 0; i < accPix; i++)
     {
         t2Vector<int> c = accCoords[i];
 
         Complex z = img(c.y, c.x);
 
-        out[i] = d2Vector(z.real, z.imag);
+        dest[i] = d2Vector(z.real, z.imag);
     }
-
-    return out;
 }
 
-std::vector<double> AlignmentSet::accelerate(const Image<RFLOAT> &img)
+void AlignmentSet::accelerate(const Image<RFLOAT> &img, std::vector<double>& dest)
 {
-    std::vector<double> out(accPix);
-
     for (int i = 0; i < accPix; i++)
     {
         t2Vector<int> c = accCoords[i];
-        out[i] = img(c.y, c.x);
+        dest[i] = img(c.y, c.x);
     }
-
-    return out;
 }
 
 d3Vector AlignmentSet::updateTsc(
