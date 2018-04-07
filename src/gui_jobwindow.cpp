@@ -1564,7 +1564,6 @@ void JobWindow::initialiseClass3DWindow()
 	group7->begin();
 	place("scratch_dir");
 	group7->end();
-	place("scratch_dir");
 	place("do_combine_thru_disc");
 	// Add a little spacer
 	current_y += STEPY/2;
