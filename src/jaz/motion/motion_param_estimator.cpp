@@ -38,6 +38,7 @@ int MotionParamEstimator::read(IOParser& parser, int argc, char *argv[])
     conv = textToFloat(parser.getOption("--conv", "Abort when simplex diameter falls below this", "10"));
     maxIters = textToInteger(parser.getOption("--par_iters", "Max. number of iterations", "300"));
     maxRange = textToInteger(parser.getOption("--mot_range", "Limit allowed motion range [Px]", "50"));
+    seed = textToInteger(parser.getOption("--seed", "Random seed for micrograph selection", "23"));
 
     paramsRead = true;
 }
@@ -125,6 +126,8 @@ void MotionParamEstimator::init(
     }
 
     const long mc = allMdts.size();
+
+    srand(seed);
 
     std::vector<double> randNums(mc);
 

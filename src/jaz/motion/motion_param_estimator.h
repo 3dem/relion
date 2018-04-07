@@ -59,7 +59,7 @@ class MotionParamEstimator
 
             // read from cmd. line:
             bool estim2, estim3;
-            int minParticles, maxRange, maxIters;
+            int minParticles, maxRange, maxIters, seed;
             double sV, sD, sA;
             double iniStep, conv;
             double k_cutoff, k_cutoff_Angst;
