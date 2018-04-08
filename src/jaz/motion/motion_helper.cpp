@@ -7,6 +7,8 @@
 #include <src/jaz/optimization/nelder_mead.h>
 #include <src/jaz/Fourier_helper.h>
 #include <src/jaz/optimization/gradient_descent.h>
+#include <src/jaz/t_complex.h>
+#include <src/jaz/new_ft.h>
 #include <omp.h>
 
 using namespace gravis;
@@ -25,7 +27,7 @@ std::vector<std::vector<Image<RFLOAT>>> MotionHelper::movieCC(
 
     std::vector<std::vector<Image<RFLOAT>>> out(pc);
 
-    std::vector<Image<Complex>> ccsFs(threads);
+    std::vector<Image<dComplex>> ccsFs(threads);
     std::vector<Image<RFLOAT>> ccsRs(threads);
 
     for (int t = 0; t < threads; t++)
@@ -39,6 +41,8 @@ std::vector<std::vector<Image<RFLOAT>>> MotionHelper::movieCC(
         ccsRs[t].data.yinit = 0;
     }
 
+    NewFFT::DoublePlan plan(s,s,1);
+
     for (int p = 0; p < pc; p++)
     {
         out[p] = std::vector<Image<RFLOAT>>(fc, Image<RFLOAT>(s,s));
@@ -51,10 +55,13 @@ std::vector<std::vector<Image<RFLOAT>>> MotionHelper::movieCC(
             for (int y = 0; y < s; y++)
             for (int x = 0; x < sh; x++)
             {
-                ccsFs[t](y,x) = movie[p][f](y,x) * damageWeights[f](y,x) * preds[p](y,x).conj();
+                Complex z = movie[p][f](y,x) * damageWeights[f](y,x) * preds[p](y,x).conj();
+                ccsFs[t](y,x) = dComplex(z.real, z.imag);
+                //ccsFs[t](y,x) = movie[p][f](y,x) * damageWeights[f](y,x) * preds[p](y,x).conj();
             }
 
-            fts[t].inverseFourierTransform(ccsFs[t](), ccsRs[t]());
+            //fts[t].inverseFourierTransform(ccsFs[t](), ccsRs[t]());
+            NewFFT::inverseFourierTransform(ccsFs[t](), ccsRs[t](), plan);
 
             for (int y = 0; y < s; y++)
             for (int x = 0; x < s; x++)

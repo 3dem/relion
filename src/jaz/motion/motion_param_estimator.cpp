@@ -822,14 +822,14 @@ void MotionParamEstimator::prepAlignment()
         alignDmgWgh[f] = FilterHelper::ButterworthEnvFreq2D(dmgWgh[f], k_cutoff-1, k_cutoff+1);
     }
 
-    std::vector<ParFourierTransformer> fts(nr_omp_threads);
-
     alignmentSet = AlignmentSet(mdts, fc, s, k_eval+2, k_out, maxRange);
 
     for (int f = 0; f < fc; f++)
     {
         alignmentSet.accelerate(dmgWgh[f], alignmentSet.damage[f]);
     }
+
+    std::vector<ParFourierTransformer> fts(nr_omp_threads);
 
     const int gc = mdts.size();
 
@@ -903,6 +903,10 @@ void MotionParamEstimator::prepAlignment()
             }
         }
     }
+
+    // release all unneeded heap space back to the OS
+    // (this can free tens of Gb)
+    malloc_trim(0);
 
     std::cout << "   done\n";
 }

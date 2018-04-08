@@ -300,7 +300,7 @@ void ParFourierTransformer::inverseFourierTransform()
     Transform(FFTW_BACKWARD);
 }
 
-// Inforce Hermitian symmetry ---------------------------------------------
+// Enforce Hermitian symmetry ---------------------------------------------
 void ParFourierTransformer::enforceHermitianSymmetry()
 {
     int ndim=3;
