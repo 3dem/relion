@@ -402,6 +402,40 @@ std::vector<std::vector<d2Vector>> MotionEstimator::optimize(
     return out;
 }
 
+std::vector<std::vector<d2Vector>> MotionEstimator::optimize(
+    const std::vector<std::vector<Image<float>>>& movieCC,
+    const std::vector<std::vector<gravis::d2Vector>>& inTracks,
+    double sig_vel_px, double sig_acc_px, double sig_div_px,
+    const std::vector<gravis::d2Vector>& positions,
+    const std::vector<gravis::d2Vector>& globComp) const
+{
+    const int pc = movieCC.size();
+    const int fc = movieCC[0].size();
+    const int w = movieCC[0][0].data.xdim;
+    const int h = movieCC[0][0].data.ydim;
+
+    std::vector<std::vector<Image<double>>> CCd(pc);
+
+    #pragma omp parallel for num_threads(nr_omp_threads)
+    for (int p = 0; p < pc; p++)
+    {
+        CCd[p].resize(fc);
+
+        for (int f = 0; f < fc; f++)
+        {
+            CCd[p][f] = Image<double>(w,h);
+
+            for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                CCd[p][f](y,x) = movieCC[p][f](y,x);
+            }
+        }
+    }
+
+    return optimize(CCd, inTracks, sig_vel_px, sig_acc_px, sig_div_px, positions, globComp);
+}
+
 void MotionEstimator::updateFCC(
         const std::vector<std::vector<Image<Complex>>>& movie,
         const std::vector<std::vector<d2Vector>>& tracks,

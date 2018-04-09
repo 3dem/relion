@@ -11,7 +11,7 @@ class GpMotionFit : public DifferentiableOptimization
     public:
 
         GpMotionFit(
-                const std::vector<std::vector<Image<RFLOAT>>>& correlation,
+                const std::vector<std::vector<Image<double>>>& correlation,
                 double sig_vel_px, double sig_div_px, double sig_acc_px,
                 int maxDims,
                 const std::vector<gravis::d2Vector>& positions,
@@ -53,7 +53,7 @@ class GpMotionFit : public DifferentiableOptimization
         Matrix2D<RFLOAT> basis;
         std::vector<double> eigenVals;
 
-        const std::vector<std::vector<Image<RFLOAT>>>& correlation;
+        const std::vector<std::vector<Image<double>>>& correlation;
         const std::vector<gravis::d2Vector>& positions;
         const std::vector<gravis::d2Vector>& perFrameOffsets;
 };

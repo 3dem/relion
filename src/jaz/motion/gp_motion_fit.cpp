@@ -8,7 +8,7 @@
 using namespace gravis;
 
 GpMotionFit::GpMotionFit(
-    const std::vector<std::vector<Image<RFLOAT>>>& correlation,
+    const std::vector<std::vector<Image<double>>>& correlation,
     double sig_vel_px, double sig_div_px, double sig_acc_px,
     int maxDims,
     const std::vector<d2Vector>& positions,
@@ -223,7 +223,7 @@ void GpMotionFit::grad(const std::vector<double> &x,
     {
         for (int f = 0; f < fc; f++)
         {
-            t2Vector<RFLOAT> vr = Interpolation::cubicXYgrad(
+            d2Vector vr = Interpolation::cubicXYgrad(
                 correlation[p][f],
                 pos[p][f].x + perFrameOffsets[f].x,
                 pos[p][f].y + perFrameOffsets[f].y,
@@ -329,7 +329,7 @@ void GpMotionFit::grad(const std::vector<double> &x,
     {
         for (int f = 0; f < fc; f++)
         {
-            t2Vector<RFLOAT> vr = Interpolation::cubicXYgrad(
+            d2Vector vr = Interpolation::cubicXYgrad(
                 correlation[p][f],
                 ts->pos[p][f].x + perFrameOffsets[f].x,
                 ts->pos[p][f].y + perFrameOffsets[f].y,

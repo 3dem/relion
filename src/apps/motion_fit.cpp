@@ -74,7 +74,7 @@ class MotionFitProg : public RefinementProgram
                 param_rV, param_rD, param_rA,
                 optEps;
 
-            AlignmentSet alignmentSet;
+            AlignmentSet<double> alignmentSet;
 
             #ifdef TIMING
                 Timer motionTimer;
@@ -354,7 +354,7 @@ void MotionFitProg::prepAlignment(
         mdtsAct[m-g0] = mdts[m];
     }
 
-    alignmentSet = AlignmentSet(mdtsAct, fc, s, k_cutoff+2, k_out, maxRange);
+    alignmentSet = AlignmentSet<double>(mdtsAct, fc, s, k_cutoff+2, k_out, maxRange);
 
     for (int f = 0; f < fc; f++)
     {

@@ -51,6 +51,14 @@ class MotionEstimator
             const std::vector<gravis::d2Vector>& positions,
             const std::vector<gravis::d2Vector>& globComp) const;
 
+        // syntactic sugar for float-valued CCs
+        std::vector<std::vector<gravis::d2Vector>> optimize(
+            const std::vector<std::vector<Image<float>>>& movieCC,
+            const std::vector<std::vector<gravis::d2Vector>>& inTracks,
+            double sig_vel_px, double sig_acc_px, double sig_div_px,
+            const std::vector<gravis::d2Vector>& positions,
+            const std::vector<gravis::d2Vector>& globComp) const;
+
         const std::vector<Image<RFLOAT>>& getDamageWeights();
 
         bool isReady();

@@ -822,7 +822,7 @@ void MotionParamEstimator::prepAlignment()
         alignDmgWgh[f] = FilterHelper::ButterworthEnvFreq2D(dmgWgh[f], k_cutoff-1, k_cutoff+1);
     }
 
-    alignmentSet = AlignmentSet(mdts, fc, s, k_eval+2, k_out, maxRange);
+    alignmentSet = AlignmentSet<float>(mdts, fc, s, k_eval+2, k_out, maxRange);
 
     for (int f = 0; f < fc; f++)
     {

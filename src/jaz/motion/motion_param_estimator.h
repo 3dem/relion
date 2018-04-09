@@ -55,7 +55,7 @@ class MotionParamEstimator
 
             bool paramsRead, ready;
 
-            AlignmentSet alignmentSet;
+            AlignmentSet<float> alignmentSet;
 
             // read from cmd. line:
             bool estim2, estim3;
