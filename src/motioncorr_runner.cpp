@@ -1650,13 +1650,13 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes,
 		Fccs[i].reshape(Fref);
 	}
 
-//#ifdef DEBUG
+#ifdef DEBUG
 	std::cout << "Patch Size X = " << pnx << " Y  = " << pny << std::endl;
 	std::cout << "Fframes X = " << nfx << " Y = " << nfy << std::endl;
 	std::cout << "Fccf X = " << ccf_nfx << " Y = " << ccf_nfy << std::endl;
 	std::cout << "CCF crop request = " << ccf_requested_scale << ", actual X = " << 1 / ccf_scale_x << " Y = " << 1 / ccf_scale_y << std::endl;
 	std::cout << "Trajectory size: " << xshifts.size() << std::endl;
-//#endif
+#endif
 
 	// Initialize B factor weight
 	weight.reshape(Fref);
@@ -1664,10 +1664,10 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes,
 	#pragma omp parallel for num_threads(n_threads) 
 	for (int y = 0; y < ccf_nfy; y++) {
 		const int ly = (y > ccf_nfy_half) ? (y - ccf_nfy) : y;
-		RFLOAT ly2 = ly * (RFLOAT)ly / (nfy * (RFLOAT)nfy); // TODO: Is this right?
+		RFLOAT ly2 = ly * (RFLOAT)ly / (nfy * (RFLOAT)nfy);
 
 		for (int x = 0; x < ccf_nfx; x++) {
-			RFLOAT dist2 = ly2 + x * (RFLOAT)x / (nfx * (RFLOAT)nfx); // TODO: Is this right?
+			RFLOAT dist2 = ly2 + x * (RFLOAT)x / (nfx * (RFLOAT)nfx);
 			DIRECT_A2D_ELEM(weight, y, x) = exp(- 2 * dist2 * bfactor); // 2 for Fref and Fframe
 		}
 	}
