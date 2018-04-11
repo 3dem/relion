@@ -41,7 +41,7 @@ void MotionEstimator::read(IOParser& parser, int argc, char *argv[])
     optEps = textToFloat(parser.getOption("--eps", "Terminate optimization after gradient length falls below this value", "1e-4"));
 
     unregGlob = parser.checkOption("--unreg_glob", "Do not regularize global component of motion");
-    noGlobOff = parser.checkOption("--no_glob_off", "Do not compute initial per-particle offsets");
+    noGlobOff = !parser.checkOption("--glob_off", "Compute initial per-particle offsets");
     debugOpt = parser.checkOption("--debug_opt", "Write optimization debugging info");
 
     global_init = parser.checkOption("--gi", "Initialize with global trajectories instead of loading them from metadata file");
@@ -122,14 +122,13 @@ void MotionEstimator::process(const std::vector<MetaDataTable>& mdts, long g_sta
         REPORT_ERROR("ERROR: MotionEstimator::process: MotionEstimator not initialized.");
     }
 
-    int barstep;
+    int barstep = 1;
     int my_nr_micrographs = g_end - g_start + 1;
 
     if (verb > 0)
     {
         std::cout << " + Performing loop over all micrographs ... " << std::endl;
         if (!debug) init_progress_bar(my_nr_micrographs);
-        barstep = XMIPP_MAX(1, my_nr_micrographs/ 60);
     }
 
     std::vector<ParFourierTransformer> fts(nr_omp_threads);

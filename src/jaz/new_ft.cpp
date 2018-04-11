@@ -192,8 +192,17 @@ void NewFFT::inverseFourierTransform(
     Normalization normalization,
     bool preserveInput)
 {
-    DoublePlan p(dest, src);
-    inverseFourierTransform(src, dest, p, normalization, preserveInput);
+    if (preserveInput)
+    {
+        MultidimArray<dComplex> src2 = src;
+        DoublePlan p(dest, src2);
+        inverseFourierTransform(src2, dest, p, normalization, false);
+    }
+    else
+    {
+        DoublePlan p(dest, src);
+        inverseFourierTransform(src, dest, p, normalization, preserveInput);
+    }
 }
 
 void NewFFT::FourierTransform(
@@ -211,8 +220,17 @@ void NewFFT::inverseFourierTransform(
     Normalization normalization,
     bool preserveInput)
 {
-    FloatPlan p(dest, src);
-    inverseFourierTransform(src, dest, p, normalization, preserveInput);
+    if (preserveInput)
+    {
+        MultidimArray<fComplex> src2 = src;
+        FloatPlan p(dest, src2);
+        inverseFourierTransform(src2, dest, p, normalization, false);
+    }
+    else
+    {
+        FloatPlan p(dest, src);
+        inverseFourierTransform(src, dest, p, normalization, preserveInput);
+    }
 }
 
 

@@ -81,17 +81,6 @@ class MotionParamEstimator
             #endif
 
 
-        gravis::d4Vector estimateTwoParamsRec(
-                double sig_v_0, double sig_d_0, double sig_acc,
-                double sig_v_step, double sig_d_step,
-                int maxIters, int recDepth);
-
-        gravis::d4Vector estimateThreeParamsRec(
-                double sig_v_0, double sig_d_0, double sig_a_0,
-                double sig_v_step, double sig_d_step, double sig_a_step,
-                int maxIters, int recDepth);
-
-
         gravis::d4Vector estimateTwoParamsNM(
                 double sig_v_0, double sig_d_0, double sig_acc,
                 double inStep, double conv, int maxIters);
