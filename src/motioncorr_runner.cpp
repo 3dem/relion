@@ -110,6 +110,7 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	save_noDW = parser.checkOption("--save_noDW", "Save aligned but non dose weighted micrograph. (This is always ON for MOTIONCOR2)");
 	interpolate_shifts = parser.checkOption("--interpolate_shifts", "(EXPERIMENTAL) Interpolate shifts");
 	ccf_downsample = textToFloat(parser.getOption("--ccf_downsample", "(EXPERT) Downsampling rate of CC map. 0 = automatic based on B factor", "0"));
+	early_binning = parser.checkOption("--early_binning", "Do binning before alignment.");
 	if (ccf_downsample > 1) REPORT_ERROR("--ccf_downsample cannot exceed 1.");
 	// Initialise verb for non-parallel execution
 	verb = 1;
@@ -951,7 +952,6 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 
 // TODO:
 // - defect
-// - outlier rejection in fitting (use free set?)
 
 bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	FileName fn_mic = mic.getMovieFilename();
@@ -1059,6 +1059,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	}
 	RCTOC(TIMING_APPLY_GAIN);
 
+	/*
 	MultidimArray<RFLOAT> Iframe(ny, nx);
 	Iframe.initZeros();
 
@@ -1073,7 +1074,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	RCTOC(TIMING_INITIAL_SUM);
 
 	// Hot pixel
-	/*
+	
 	RCTIC(TIMING_DETECT_HOT);
 	RFLOAT mean = 0, std = 0;
 	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iframe) {
@@ -1107,6 +1108,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	#pragma omp parallel for num_threads(n_threads)
 	for (int iframe = 0; iframe < n_frames; iframe++) {
 		transformers[omp_get_thread_num()].FourierTransform(Iframes[iframe](), Fframes[iframe]);
+		Iframes[iframe].clear(); // save some memory (global alignment use the most memory)
 	}
 	RCTOC(TIMING_GLOBAL_FFT);
 
@@ -1120,12 +1122,14 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 		mic.setGlobalShift(frames[i] + 1, xshifts[i], yshifts[i]); // 1-indexed
         }
 
-	Iref().reshape(Iframes[0]());
+	Iref().reshape(ny, nx);
 	Iref().initZeros();
 	RCTIC(TIMING_GLOBAL_IFFT);
 	#pragma omp parallel for num_threads(n_threads)
 	for (int iframe = 0; iframe < n_frames; iframe++) {
+		Iframes[iframe]().reshape(ny, nx);
 		transformers[omp_get_thread_num()].inverseFourierTransform(Fframes[iframe], Iframes[iframe]());
+		// Unfortunately, we cannot deallocate Fframes here because of dose-weighting
 	}
 	RCTOC(TIMING_GLOBAL_IFFT);
 
@@ -1927,23 +1931,13 @@ void MotioncorrRunner::binNonSquareImage(Image<RFLOAT> &Iwork, RFLOAT bin_factor
 	const int nx = XSIZE(Iwork()), ny = YSIZE(Iwork());
 	int new_nx = nx / bin_factor, new_ny = ny / bin_factor;
 	new_nx -= new_nx % 2; new_ny -= new_ny % 2; // force it to be even
-	const int half_new_ny = new_ny / 2, new_nfx = new_nx / 2 + 1;
 #ifdef DEBUG_OWN
-	std::cout << "Binning from X = " << nx << " Y = " << ny << " to X = " << new_nx << " Y = " << new_ny << " half_new_ny = " << half_new_ny << " new_nfx = " << new_nfx << std::endl;
+	std::cout << "Binning from X = " << nx << " Y = " << ny << " to X = " << new_nx << " Y = " << new_ny << std::endl;
 #endif
-	MultidimArray<Complex> Fref, Fbinned(new_ny, new_nfx);
+	MultidimArray<Complex> Fref, Fbinned(new_ny, new_nx / 2 + 1);
 	transformer.FourierTransform(Iwork(), Fref);
 
-	for (int y = 0; y < half_new_ny; y++) {
-		for (int x = 0; x < new_nfx; x++) {
-			DIRECT_A2D_ELEM(Fbinned, y, x) =  DIRECT_A2D_ELEM(Fref, y, x);
-		}
-	}
-	for (int y = half_new_ny; y < new_ny; y++) {
-		for (int x = 0; x < new_nfx; x++) {
-			DIRECT_A2D_ELEM(Fbinned, y, x) =  DIRECT_A2D_ELEM(Fref, ny - new_ny + y, x);
-		}
-	}
+	cropInFourierSpace(Fref, Fbinned);
 
 	Iwork().reshape(new_ny, new_nx);
 	// If reshape does NOT change Iwork.data pointer (rare but actually happens),
@@ -1952,13 +1946,12 @@ void MotioncorrRunner::binNonSquareImage(Image<RFLOAT> &Iwork, RFLOAT bin_factor
 	transformer2.inverseFourierTransform(Fbinned, Iwork());
 }
 
-// TODO: Not used yet
 void MotioncorrRunner::cropInFourierSpace(MultidimArray<Complex> &Fref, MultidimArray<Complex> &Fbinned) {
 	const int nfx = XSIZE(Fref), nfy = YSIZE(Fref);
 	const int new_nfx = XSIZE(Fbinned), new_nfy = YSIZE(Fbinned);
 	const int half_new_nfy = new_nfy / 2;
 
-	if (new_nfx > nfx || new_nfy > nfy) REPORT_ERROR("Invalid size to cropInFourierSpace");
+	if (new_nfx > nfx || new_nfy > nfy) REPORT_ERROR("Invalid size given to cropInFourierSpace");
 
 	for (int y = 0; y < half_new_nfy; y++) {
 		for (int x = 0; x < new_nfx; x++) {

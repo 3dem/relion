@@ -68,6 +68,9 @@ public:
 	// Binning factor for binning inside MOTIONCORR/MOTIONCOR2
 	double bin_factor;
 
+	// Do binning before processing
+	bool early_binning;
+
 	// B-factor for MOTIONCOR2
 	double bfactor;
 
