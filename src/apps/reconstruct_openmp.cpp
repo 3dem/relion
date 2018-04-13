@@ -258,9 +258,7 @@ class reconstruct_parameters
         int data_dim = (do_3d_rot) ? 3 : 2;
 
         MultidimArray<RFLOAT> dummy;
-        Matrix1D<RFLOAT> trans(2);
         Image<RFLOAT> vol, img0, sub;
-        Projector proj;
         int mysize;
 
         // Get dimension of the images
@@ -383,13 +381,6 @@ class reconstruct_parameters
 
                     if (subset >= 0 && randSubset != subset) continue;
 
-                    /*if (!do_reconstruct_ctf)
-                    {
-                        mdts[g].getValue(EMDL_IMAGE_NAME, fn_img, p);
-                        img.read(fn_img);
-                        img().setXmippOrigin();
-                    }*/
-
                     // Rotations
                     if (ref_dim == 2)
                     {
@@ -490,8 +481,6 @@ class reconstruct_parameters
                                     mdts[g].getValue(EMDL_IMAGE_BEAMTILT_Y, beamtilt_y, p);
                                 }
                             }
-
-
 
                             selfApplyBeamTilt(
                                 F2D, beamtilt_x, beamtilt_y,

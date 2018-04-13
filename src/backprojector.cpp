@@ -900,11 +900,11 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
                                 int max_iter_preweight,
                                 bool do_map,
                                 RFLOAT tau2_fudge,
-                                MultidimArray<RFLOAT> &tau2,
-                                MultidimArray<RFLOAT> &sigma2,
-                                MultidimArray<RFLOAT> &data_vs_prior,
-                                MultidimArray<RFLOAT> &fourier_coverage,
-                                MultidimArray<RFLOAT> fsc, // only input
+                                MultidimArray<RFLOAT> &tau2_out,
+                                MultidimArray<RFLOAT> &sigma2_out,
+                                MultidimArray<RFLOAT> &data_vs_prior_out,
+                                MultidimArray<RFLOAT> &fourier_coverage_out,
+                                const MultidimArray<RFLOAT> &fsc, // only input
                                 RFLOAT normalise,
                                 bool update_tau2_with_fsc,
                                 bool is_whole_instead_of_half,
@@ -941,6 +941,10 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 	int ReconS_23 = ReconTimer.setNew(" RcS23_tauShrinkToFit ");
 	int ReconS_24 = ReconTimer.setNew(" RcS24_extra ");
 #endif
+
+    // never rely on references (handed to you from the outside) for computation:
+    // they could be the same (i.e. reconstruct(..., dummy, dummy, dummy, dummy, ...); )
+    MultidimArray<RFLOAT> tau2, sigma2, data_vs_prior, fourier_coverage;
 
 
     RCTIC(ReconTimer,ReconS_1);
@@ -1001,26 +1005,26 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 			DIRECT_A1D_ELEM(sigma2, ires) += invw;
 			DIRECT_A1D_ELEM(counter, ires) += 1.;
 		}
-	}
+    }
 
 	// Average (inverse of) sigma2 in reconstruction
 	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(sigma2)
 	{
-		if (DIRECT_A1D_ELEM(sigma2, i) > 1e-10)
-			DIRECT_A1D_ELEM(sigma2, i) = DIRECT_A1D_ELEM(counter, i) / DIRECT_A1D_ELEM(sigma2, i);
-		else if (DIRECT_A1D_ELEM(sigma2, i) == 0)
-			DIRECT_A1D_ELEM(sigma2, i) = 0.;
+        if (DIRECT_A1D_ELEM(sigma2, i) > 1e-10)
+            DIRECT_A1D_ELEM(sigma2, i) = DIRECT_A1D_ELEM(counter, i) / DIRECT_A1D_ELEM(sigma2, i);
+        else if (DIRECT_A1D_ELEM(sigma2, i) == 0)
+            DIRECT_A1D_ELEM(sigma2, i) = 0.;
 		else
 		{
 			std::cerr << " DIRECT_A1D_ELEM(sigma2, i)= " << DIRECT_A1D_ELEM(sigma2, i) << std::endl;
 			REPORT_ERROR("BackProjector::reconstruct: ERROR: unexpectedly small, yet non-zero sigma2 value, this should not happen...a");
-		}
-	}
+        }
+    }
 
 	if (update_tau2_with_fsc)
-	{
-		tau2.reshape(ori_size/2 + 1);
-		data_vs_prior.initZeros(ori_size/2 + 1);
+    {
+        tau2.reshape(ori_size/2 + 1);
+        data_vs_prior.initZeros(ori_size/2 + 1);
 		// Then calculate new tau2 values, based on the FSC
 		if (!fsc.sameShape(sigma2) || !fsc.sameShape(tau2))
 		{
@@ -1030,7 +1034,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 			REPORT_ERROR("ERROR BackProjector::reconstruct: sigma2, tau2 and fsc have different sizes");
 		}
 		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(sigma2)
-		{
+        {
 			// FSC cannot be negative or zero for conversion into tau2
 			RFLOAT myfsc = XMIPP_MAX(0.001, DIRECT_A1D_ELEM(fsc, i));
 			if (is_whole_instead_of_half)
@@ -1042,7 +1046,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 			myfsc = XMIPP_MIN(0.999, myfsc);
 			RFLOAT myssnr = myfsc / (1. - myfsc);
 			// Sjors 29nov2017 try tau2_fudge for pulling harder on Refine3D runs...
-			myssnr *= tau2_fudge;
+            myssnr *= tau2_fudge;
 			RFLOAT fsc_based_tau = myssnr * DIRECT_A1D_ELEM(sigma2, i);
 			DIRECT_A1D_ELEM(tau2, i) = fsc_based_tau;
 			// data_vs_prior is merely for reporting: it is not used for anything in the reconstruction
@@ -1432,6 +1436,10 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
     std::cerr<<"done with reconstruct"<<std::endl;
 #endif
 
+    tau2_out = tau2;
+    sigma2_out = sigma2;
+    data_vs_prior_out = data_vs_prior;
+    fourier_coverage_out = fourier_coverage;
 }
 
 void BackProjector::symmetrise(int nr_helical_asu, RFLOAT helical_twist, RFLOAT helical_rise)
