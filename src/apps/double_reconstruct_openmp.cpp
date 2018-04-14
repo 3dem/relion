@@ -120,7 +120,7 @@ class reconstruct_parameters
         ctf_dim  = textToInteger(parser.getOption("--reconstruct_ctf", "Perform a 3D reconstruction from 2D CTF-images, with the given size in pixels", "-1"));
         do_reconstruct_ctf2 = parser.checkOption("--ctf2", "Reconstruct CTF^2 and then take the sqrt of that");
         do_reconstruct_meas = parser.checkOption("--measured", "Fill Hermitian half of the CTF reconstruction with how often each voxel was measured.");
-        skip_gridding = parser.checkOption("--skip_gridding", "Skip gridding part of the reconstruction");
+        skip_gridding = !parser.checkOption("--grid", "Perform gridding part of the reconstruction");
         do_reconstruct_ctf = (ctf_dim > 0);
         if (do_reconstruct_ctf)
             do_ctf = false;
@@ -680,16 +680,19 @@ class reconstruct_parameters
                 fscOld << i << " " << fsc(i) << "\n";
             }
         }
+
         backprojector[0]->getDownsampledAverage(avg0, false);
         backprojector[1]->getDownsampledAverage(avg1, false);
 
         backprojector[0]->calculateDownSampledFourierShellCorrelation(avg0, avg1, fsc);
 
-        std::ofstream fscNew("fsc_weighted.dat");
-
-        for (int i = 0; i < fsc.xdim; i++)
         {
-            fscNew << i << " " << fsc(i) << "\n";
+            std::ofstream fscNew("fsc_weighted.dat");
+
+            for (int i = 0; i < fsc.xdim; i++)
+            {
+                fscNew << i << " " << fsc(i) << "\n";
+            }
         }
 
         for (int j = 0; j < 2; j++)

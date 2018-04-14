@@ -792,7 +792,7 @@ void BackProjector::setLowResDataAndWeight(MultidimArray<Complex > &lowres_data,
 	}
 }
 
-void BackProjector::getDownsampledAverage(MultidimArray<Complex>& avg, bool divide)
+void BackProjector::getDownsampledAverage(MultidimArray<Complex> avg, bool divide) const
 {
     MultidimArray<RFLOAT> down_weight;
 
@@ -851,9 +851,9 @@ void BackProjector::getDownsampledAverage(MultidimArray<Complex>& avg, bool divi
 }
 
 
-void BackProjector::calculateDownSampledFourierShellCorrelation(MultidimArray<Complex > &avg1,
-                                                                MultidimArray<Complex > &avg2,
-                                                                MultidimArray<RFLOAT> &fsc)
+void BackProjector::calculateDownSampledFourierShellCorrelation(const MultidimArray<Complex>& avg1,
+                                                                const MultidimArray<Complex>& avg2,
+                                                                MultidimArray<RFLOAT>& fsc) const
 {
 
     if (!avg1.sameShape(avg2))
