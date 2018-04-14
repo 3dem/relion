@@ -792,7 +792,7 @@ void BackProjector::setLowResDataAndWeight(MultidimArray<Complex > &lowres_data,
 	}
 }
 
-void BackProjector::getDownsampledAverage(MultidimArray<Complex> avg, bool divide) const
+void BackProjector::getDownsampledAverage(MultidimArray<Complex>& avg, bool divide) const
 {
     MultidimArray<RFLOAT> down_weight;
 
@@ -837,16 +837,20 @@ void BackProjector::getDownsampledAverage(MultidimArray<Complex> avg, bool divid
         }
 #endif
         A3D_ELEM(avg, kp, ip, jp) += A3D_ELEM(data, k , i, j);
-        A3D_ELEM(down_weight, kp, ip, jp) += divide? A3D_ELEM(weight, k , i, j) : 1.0;
+        A3D_ELEM(down_weight, kp, ip, jp) += (divide? A3D_ELEM(weight, k , i, j) : 1.0);
     }
 
     // Calculate the straightforward average in the downsampled arrays
     FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(avg)
     {
         if (DIRECT_MULTIDIM_ELEM(down_weight, n) > 0.)
+        {
             DIRECT_MULTIDIM_ELEM(avg, n) /= DIRECT_MULTIDIM_ELEM(down_weight, n);
+        }
         else
+        {
             DIRECT_MULTIDIM_ELEM(avg, n) = 0.;
+        }
     }
 }
 
@@ -868,29 +872,34 @@ void BackProjector::calculateDownSampledFourierShellCorrelation(const MultidimAr
     FOR_ALL_ELEMENTS_IN_ARRAY3D(avg1)
     {
         RFLOAT R = sqrt(k*k + i*i + j*j);
-        if (R > r_max)
-            continue;
-        int idx=ROUND(R);
-        Complex z1=A3D_ELEM(avg1, k, i, j);
-        Complex z2=A3D_ELEM(avg2, k, i, j);
-        RFLOAT absz1=abs(z1);
-        RFLOAT absz2=abs(z2);
-        num(idx)+=(conj(z1) * z2).real;
-        den1(idx)+= absz1*absz1;
-        den2(idx)+= absz2*absz2;
+
+        if (R > r_max) continue;
+
+        int idx = ROUND(R);
+
+        Complex z1 = A3D_ELEM(avg1, k, i, j);
+        Complex z2 = A3D_ELEM(avg2, k, i, j);
+
+        RFLOAT nrmz1 = z1.norm();
+        RFLOAT nrmz2 = z2.norm();
+
+        num(idx) += z1.real * z2.real + z1.imag * z2.imag;
+        den1(idx) += nrmz1;
+        den2(idx) += nrmz2;
     }
 
     FOR_ALL_ELEMENTS_IN_ARRAY1D(fsc)
     {
         if (den1(i)*den2(i) > 0.)
+        {
             fsc(i) = num(i)/sqrt(den1(i)*den2(i));
+        }
     }
 
     // Always set zero-resolution shell to FSC=1
     // Raimond Ravelli reported a problem with FSC=1 at res=0 on 13feb2013...
     // (because of a suboptimal normalisation scheme, but anyway)
     fsc(0) = 1.;
-
 }
 
 void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,

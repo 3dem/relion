@@ -36,13 +36,13 @@ class reconstruct_parameters
 {
     public:
 
-    FileName fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_fsc, fn_debug, image_path;
+    FileName fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_debug, image_path;
 
     MetaDataTable DF;
 
     int r_max, r_min_nn, blob_order, ref_dim, interpolator, iter,
         nr_omp_threads, debug_ori_size, debug_size,
-        ctf_dim, nr_helical_asu, newbox, width_mask_edge, nr_sectors, subset;
+        ctf_dim, nr_helical_asu, newbox, width_mask_edge, nr_sectors;
 
     RFLOAT blob_radius, blob_alpha, angular_error, shift_error, angpix, maxres,
         beamtilt_x, beamtilt_y,
@@ -77,7 +77,6 @@ class reconstruct_parameters
         padding_factor = textToFloat(parser.getOption("--pad", "Padding factor", "2"));
         nr_omp_threads = textToInteger(parser.getOption("--jomp", "Number of open-mp threads to use. Memory footprint is multiplied by this value.", "16"));
         image_path = parser.getOption("--img", "Image path", "");
-        subset = textToInteger(parser.getOption("--subset", "Subset of images to consider (0: even; 1: odd; other: all)", "-1"));
 
         int ctf_section = parser.addSection("CTF options");
         do_ctf = parser.checkOption("--ctf", "Apply CTF correction");
@@ -115,7 +114,6 @@ class reconstruct_parameters
         angular_error = textToFloat(parser.getOption("--angular_error", "Apply random deviations with this standard deviation (in degrees) to each of the 3 Euler angles", "0."));
         shift_error = textToFloat(parser.getOption("--shift_error", "Apply random deviations with this standard deviation (in pixels) to each of the 2 translations", "0."));
         do_fom_weighting = parser.checkOption("--fom_weighting", "Weight particles according to their figure-of-merit (_rlnParticleFigureOfMerit)");
-        fn_fsc = parser.getOption("--fsc", "FSC-curve for regularized reconstruction", "");
         do_3d_rot = parser.checkOption("--3d_rot", "Perform 3D rotations instead of backprojections from 2D images");
         ctf_dim  = textToInteger(parser.getOption("--reconstruct_ctf", "Perform a 3D reconstruction from 2D CTF-images, with the given size in pixels", "-1"));
         do_reconstruct_ctf2 = parser.checkOption("--ctf2", "Reconstruct CTF^2 and then take the sqrt of that");
@@ -631,12 +629,13 @@ class reconstruct_parameters
 
         progress_bar(gc/nr_omp_threads);
 
-        std::cerr << "\nMerging volumes..." << std::endl;
 
         std::vector<BackProjector*> backprojector(2);
 
         for (int j = 0; j < 2; j++)
         {
+            std::cerr << " + Merging volumes for half-set " << (j+1) << "...\n";
+
             backprojector[j] = &backprojectors[j][0];
 
             for (int bpi = 1; bpi < nr_omp_threads; bpi++)
@@ -658,6 +657,8 @@ class reconstruct_parameters
                 backprojectors[j][bpi].weight.clear();
             }
 
+            std::cerr << " + Symmetrising half-set " << (j+1) << "...\n";
+
             backprojector[j]->symmetrise(nr_helical_asu, helical_twist, helical_rise/angpix);
         }
 
@@ -670,7 +671,6 @@ class reconstruct_parameters
         {
             backprojector[0]->getDownsampledAverage(avg0);
             backprojector[1]->getDownsampledAverage(avg1);
-
             backprojector[0]->calculateDownSampledFourierShellCorrelation(avg0, avg1, fsc);
 
             std::ofstream fscOld("fsc_divided.dat");
@@ -683,11 +683,10 @@ class reconstruct_parameters
 
         backprojector[0]->getDownsampledAverage(avg0, false);
         backprojector[1]->getDownsampledAverage(avg1, false);
-
         backprojector[0]->calculateDownSampledFourierShellCorrelation(avg0, avg1, fsc);
 
         {
-            std::ofstream fscNew("fsc_weighted.dat");
+            std::ofstream fscNew("fsc_undivided.dat");
 
             for (int i = 0; i < fsc.xdim; i++)
             {
@@ -697,7 +696,7 @@ class reconstruct_parameters
 
         for (int j = 0; j < 2; j++)
         {
-            std::cerr << "Starting the reconstruction ..." << std::endl;
+            std::cerr << " + Starting the reconstruction ..." << std::endl;
             backprojector[j]->reconstruct(vol(), iter, do_map, 1., dummy, dummy, dummy, dummy,
                                       fsc, 1., do_use_fsc, true, nr_omp_threads, -1, false);
 
@@ -742,12 +741,12 @@ class reconstruct_parameters
             }
 
             std::stringstream sts;
-            sts << j;
+            sts << (j+1);
 
             std::string fnFull = fn_out + "_half" + sts.str() + "_class001_unfil.mrc";
 
             vol.write(fnFull);
-            std::cerr<<" Done writing map in " << fnFull << std::endl;
+            std::cout << " Done writing map in " << fnFull << "\n";
         }
     }
 };

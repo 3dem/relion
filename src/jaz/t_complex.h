@@ -174,6 +174,13 @@ tComplex<T> operator / (const tComplex<T>& z, const T& x)
     return tComplex<T>(z.real / x, z.imag / x);
 }
 
+template <class T> inline
+std::ostream& operator << (std::ostream& os, const tComplex<T>& z)
+{
+  os << "[" << z.real << ", " << z.imag << "]";
+  return os;
+}
+
 typedef tComplex<float> fComplex;
 typedef tComplex<double> dComplex;
 

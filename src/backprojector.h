@@ -266,7 +266,7 @@ public:
 	 *  padding_factor*padding_factor*padding_factor voxels
 	 *  This will then be used for FSC calculation between two random halves
      */
-    void getDownsampledAverage(MultidimArray<Complex> avg, bool divide = true) const;
+    void getDownsampledAverage(MultidimArray<Complex>& avg, bool divide = true) const;
 
     /*
      * From two of the straightforward downsampled averages, calculate an FSC curve
