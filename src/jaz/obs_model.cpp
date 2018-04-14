@@ -3,6 +3,8 @@
 #include "src/jaz/filter_helper.h"
 #include "src/jaz/Fourier_helper.h"
 
+#include <src/backprojector.h>
+
 ObservationModel::ObservationModel()
 :   angpix(-1),
     hasTilt(false),

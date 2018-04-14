@@ -25,7 +25,6 @@
 #include <src/ctf.h>
 #include <src/image.h>
 #include <src/fftw.h>
-#include <src/backprojector.h>
 #include <src/micrograph_model.h>
 #include <src/jaz/obs_model.h>
 #include <src/jaz/gravis/t2Vector.h>

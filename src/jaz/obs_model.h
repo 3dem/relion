@@ -6,8 +6,8 @@
 #include <src/complex.h>
 #include <src/metadata_table.h>
 #include <src/projector.h>
-#include <src/backprojector.h>
 
+class BackProjector;
 
 class ObservationModel
 {
