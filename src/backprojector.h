@@ -265,15 +265,15 @@ public:
 	 *  Get complex array at the original size as the straightforward average
 	 *  padding_factor*padding_factor*padding_factor voxels
 	 *  This will then be used for FSC calculation between two random halves
-	 */
-	void getDownsampledAverage(MultidimArray<Complex > &avg);
+     */
+    void getDownsampledAverage(MultidimArray<Complex> &avg, bool divide = true);
 
-	/*
-	 * From two of the straightforward downsampled averages, calculate an FSC curve
-	 */
-	void calculateDownSampledFourierShellCorrelation(MultidimArray<Complex > &avg1,
-			                                         MultidimArray<Complex > &avg2,
-			                                         MultidimArray<RFLOAT> &fsc);
+    /*
+     * From two of the straightforward downsampled averages, calculate an FSC curve
+     */
+    void calculateDownSampledFourierShellCorrelation(MultidimArray<Complex > &avg1,
+                                                     MultidimArray<Complex > &avg2,
+                                                     MultidimArray<RFLOAT> &fsc);
 
 	/* Get the 3D reconstruction
          * If do_map is true, 1 will be added to all weights
