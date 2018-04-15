@@ -135,8 +135,7 @@ class reconstruct_parameters
             REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 
         // Read MetaData file, which should have the image names and their angles!
-        if (fn_debug == "")
-            DF.read(fn_sel);
+        DF.read(fn_sel);
 
         randomize_random_generator();
 
