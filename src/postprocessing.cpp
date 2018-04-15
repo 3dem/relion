@@ -1177,7 +1177,7 @@ void Postprocessing::run()
 	}
 
 	// Only have one digit after final resolution
-	global_resol = (ROUND(global_resol*10.))/10.;
+    // global_resol = (ROUND(global_resol*10.))/10.;
 
 	// Check whether the phase-randomised FSC is less than 5% at the resolution estimate, otherwise warn the user
 	if (DIRECT_A1D_ELEM(fsc_random_masked, global_resol_i) > 0.1)
