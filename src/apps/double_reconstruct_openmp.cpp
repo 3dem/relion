@@ -668,12 +668,13 @@ class reconstruct_parameters
         MultidimArray<Complex> avg0, avg1;
         MultidimArray<RFLOAT> fsc;
 
+        if (fn_debug != "")
         {
             backprojector[0]->getDownsampledAverage(avg0);
             backprojector[1]->getDownsampledAverage(avg1);
             backprojector[0]->calculateDownSampledFourierShellCorrelation(avg0, avg1, fsc);
 
-            std::ofstream fscOld("fsc_divided.dat");
+            std::ofstream fscOld(fn_debug+"_FSC_divided.dat");
 
             for (int i = 0; i < fsc.xdim; i++)
             {
@@ -685,8 +686,9 @@ class reconstruct_parameters
         backprojector[1]->getDownsampledAverage(avg1, false);
         backprojector[0]->calculateDownSampledFourierShellCorrelation(avg0, avg1, fsc);
 
+        if (fn_debug != "")
         {
-            std::ofstream fscNew("fsc_undivided.dat");
+            std::ofstream fscNew(fn_debug+"_FSC_undivided.dat");
 
             for (int i = 0; i < fsc.xdim; i++)
             {
