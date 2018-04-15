@@ -51,7 +51,7 @@ class reconstruct_parameters
     bool do_ctf, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak,
         do_fom_weighting, do_3d_rot, do_reconstruct_ctf, do_beamtilt, cl_beamtilt, do_ewald;
 
-    bool skip_gridding, do_reconstruct_ctf2, do_reconstruct_meas, is_positive, read_weights;
+    bool skip_gridding, do_reconstruct_ctf2, do_reconstruct_meas, is_positive, read_weights, div_avg;
 
     float padding_factor, mask_diameter;
 
@@ -119,6 +119,7 @@ class reconstruct_parameters
         do_reconstruct_ctf2 = parser.checkOption("--ctf2", "Reconstruct CTF^2 and then take the sqrt of that");
         do_reconstruct_meas = parser.checkOption("--measured", "Fill Hermitian half of the CTF reconstruction with how often each voxel was measured.");
         skip_gridding = !parser.checkOption("--grid", "Perform gridding part of the reconstruction");
+        div_avg = parser.checkOption("--div_avg", "Divide the per-voxel average by its weight prior to computing the preliminary FSC");
         do_reconstruct_ctf = (ctf_dim > 0);
         if (do_reconstruct_ctf)
             do_ctf = false;
@@ -667,27 +668,13 @@ class reconstruct_parameters
         MultidimArray<Complex> avg0, avg1;
         MultidimArray<RFLOAT> fsc;
 
-        if (fn_debug != "")
-        {
-            backprojector[0]->getDownsampledAverage(avg0);
-            backprojector[1]->getDownsampledAverage(avg1);
-            backprojector[0]->calculateDownSampledFourierShellCorrelation(avg0, avg1, fsc);
-
-            std::ofstream fscOld(fn_debug+"_FSC_divided.dat");
-
-            for (int i = 0; i < fsc.xdim; i++)
-            {
-                fscOld << i << " " << fsc(i) << "\n";
-            }
-        }
-
-        backprojector[0]->getDownsampledAverage(avg0, false);
-        backprojector[1]->getDownsampledAverage(avg1, false);
+        backprojector[0]->getDownsampledAverage(avg0, div_avg);
+        backprojector[1]->getDownsampledAverage(avg1, div_avg);
         backprojector[0]->calculateDownSampledFourierShellCorrelation(avg0, avg1, fsc);
 
         if (fn_debug != "")
         {
-            std::ofstream fscNew(fn_debug+"_FSC_undivided.dat");
+            std::ofstream fscNew(fn_debug+"_prelim_FSC.dat");
 
             for (int i = 0; i < fsc.xdim; i++)
             {
