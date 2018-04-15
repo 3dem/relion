@@ -343,7 +343,7 @@ class reconstruct_parameters
         std::cout << "Back-projecting all images ..." << std::endl;
 
         time_config();
-        init_progress_bar(gc/nr_omp_threads);
+        init_progress_bar(gc);
 
         #pragma omp parallel num_threads(nr_omp_threads)
         {
@@ -620,13 +620,13 @@ class reconstruct_parameters
 
                     if (threadnum == 0)
                     {
-                        progress_bar(g/nr_omp_threads);
+                        progress_bar(g);
                     }
                 }
             }
         }
 
-        progress_bar(gc/nr_omp_threads);
+        progress_bar(gc);
 
 
         std::vector<BackProjector*> backprojector(2);
