@@ -597,7 +597,7 @@ class reconstruct_parameters
                             for (long int x = 0; x < Fctf.xdim; x++)
                             {
                                 DIRECT_NZYX_ELEM(Fctf, n, z, y, x)
-                                        *= DIRECT_NZYX_ELEM(wgh(), n, z, y, x);
+									*= DIRECT_NZYX_ELEM(wgh(), n, z, y, x);
                             }
                         }
 
@@ -605,8 +605,10 @@ class reconstruct_parameters
 
                         if (do_ewald)
                         {
-                            backprojector.set2DFourierTransform(F2DP, A3D, IS_NOT_INV, &Fctf, r_ewald_sphere, true);
-                            backprojector.set2DFourierTransform(F2DQ, A3D, IS_NOT_INV, &Fctf, r_ewald_sphere, false);
+                            backprojector.set2DFourierTransform(
+								F2DP, A3D, IS_NOT_INV, &Fctf, r_ewald_sphere, true);
+                            backprojector.set2DFourierTransform(
+								F2DQ, A3D, IS_NOT_INV, &Fctf, r_ewald_sphere, false);
                         }
                         else
                         {

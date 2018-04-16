@@ -195,7 +195,7 @@ int main(int argc, char *argv[])
                     CTF ctf0;
                     ctf0.read(mdts[g], mdts[g], p);
 
-                    FilterHelper::modulate(pred[p], ctf0, angpix);
+                    FilterHelper::modulate(pred[p](), ctf0, angpix);
 
                     if (applyTilt)
                     {

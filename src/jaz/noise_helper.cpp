@@ -54,7 +54,7 @@ Image<RFLOAT> NoiseHelper::predictCCNoise(Projector &prj, double sigma2,
         ctf0.DeltafV = defocus;
         ctf0.initialise();
 
-        FilterHelper::modulate(spec, ctf0, angpix);
+        FilterHelper::modulate(spec(), ctf0, angpix);
 
         for (long int yy = 0; yy < s; yy++)
         for (long int xx = 0; xx < sh; xx++)

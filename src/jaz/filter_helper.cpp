@@ -645,17 +645,17 @@ void FilterHelper::modulate(Image<Complex>& imgFreq, CTF& ctf, RFLOAT angpix, Im
     ft2.inverseFourierTransform(imgFreq(), dest());
 }
 
-void FilterHelper::modulate(Image<Complex>& imgFreq, CTF& ctf, RFLOAT angpix)
+void FilterHelper::modulate(MultidimArray<Complex>& imgFreq, CTF& ctf, RFLOAT angpix)
 {
-    RFLOAT as = (RFLOAT)imgFreq.data.ydim * angpix;
+    RFLOAT as = (RFLOAT)imgFreq.ydim * angpix;
 
-    FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(imgFreq())
+    FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(imgFreq)
     {
         const int x = j;
-        const int y = i < imgFreq().ydim/2? i : i - imgFreq().ydim;
+        const int y = i < imgFreq.ydim/2? i : i - imgFreq.ydim;
 
         RFLOAT c = ctf.getCTF(x/as, y/as);
-        DIRECT_A2D_ELEM(imgFreq(), i, j) *= c;
+        DIRECT_A2D_ELEM(imgFreq, i, j) *= c;
     }
 }
 

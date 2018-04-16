@@ -353,9 +353,6 @@ int RefinementProgram::init(int argc, char *argv[])
         std::cout << "mg range: " << g0 << ".." << gc << "\n";
     }
 
-    RFLOAT V = kV * 1e3;
-    lambda = 12.2643247 / sqrt(V * (1.0 + V * 0.978466e-6));
-
     obsModel = ObservationModel(angpix);
 
     if (applyTilt)
