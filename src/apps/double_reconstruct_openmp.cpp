@@ -414,21 +414,6 @@ class reconstruct_parameters
 				subProjector.computeFourierTransformMap(sub(), dummy, 2 * r_max);
 			}
 			
-			std::vector<std::vector<BackProjector>> backprojectors(2);
-			
-			for (int j = 0; j < 2; j++)
-			{
-				backprojectors[j] = std::vector<BackProjector>(nr_omp_threads);
-				
-				for (int i = 0; i < nr_omp_threads; i++)
-				{
-					backprojectors[j][i] = BackProjector(
-								mysize, ref_dim, fn_sym, interpolator,
-								padding_factor, r_min_nn, blob_order,
-								blob_radius, blob_alpha, data_dim, skip_gridding);
-				}
-			}
-			
 			std::vector<MetaDataTable> mdts = StackHelper::splitByStack(&mdt0);
 			const long gc = mdts.size();
 			
@@ -436,6 +421,21 @@ class reconstruct_parameters
 			
 			for (int iter = 0; iter < L1_iters; iter++)
 			{
+				std::vector<std::vector<BackProjector>> backprojectors(2);
+				
+				for (int j = 0; j < 2; j++)
+				{
+					backprojectors[j] = std::vector<BackProjector>(nr_omp_threads);
+					
+					for (int i = 0; i < nr_omp_threads; i++)
+					{
+						backprojectors[j][i] = BackProjector(
+									mysize, ref_dim, fn_sym, interpolator,
+									padding_factor, r_min_nn, blob_order,
+									blob_radius, blob_alpha, data_dim, skip_gridding);
+					}
+				}
+				
 				std::cout << "Back-projecting all images ..." << std::endl;
 				
 				time_config();
