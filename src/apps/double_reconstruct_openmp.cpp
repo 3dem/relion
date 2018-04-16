@@ -719,7 +719,7 @@ class reconstruct_parameters
 									obsModel.predictObservation(
 										prevProjectors[randSubset], mdts[g], p, prevSlice,
 										do_ctf, do_beamtilt);
-									
+																		
 									if (L1_freq)
 									{
 										for (long int y = 0; y < F2D.ydim; y++)
