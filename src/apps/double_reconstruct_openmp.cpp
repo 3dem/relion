@@ -727,8 +727,14 @@ class reconstruct_parameters
 										{
 											RFLOAT w1 = DIRECT_NZYX_ELEM(Fctf, 0, 0, y, x);
 											
-											Complex z0 = w1 * DIRECT_NZYX_ELEM(prevSlice, 0, 0, y, x);
-											Complex z1 = DIRECT_NZYX_ELEM(F2D, 0, 0, y, x);
+											if (w1 == 0.0) 
+											{
+												DIRECT_NZYX_ELEM(L1_weights, 0, 0, y, x) = 0.0;
+												continue;
+											}
+											
+											Complex z0 = DIRECT_NZYX_ELEM(prevSlice, 0, 0, y, x);
+											Complex z1 = DIRECT_NZYX_ELEM(F2D, 0, 0, y, x) / w1;
 											
 											double dl = (z1 - z0).abs();
 											
@@ -855,17 +861,24 @@ class reconstruct_parameters
 						XX(shift)=-(RFLOAT)(int)(ctf_dim / 2);
 						YY(shift)=-(RFLOAT)(int)(ctf_dim / 2);
 						ZZ(shift)=-(RFLOAT)(int)(ctf_dim / 2);
-						shiftImageInFourierTransform(F2D, F2D, (RFLOAT)ctf_dim, XX(shift), YY(shift), ZZ(shift));
+						
+						shiftImageInFourierTransform(F2D, F2D, (RFLOAT)ctf_dim, 
+													 XX(shift), YY(shift), ZZ(shift));
 						vol().setXmippOrigin();
 						vol().initZeros();
+						
 						FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(F2D)
 						{
 							// Take care of kp==dim/2, as XmippOrigin lies just right off center of image...
 							if ( kp > FINISHINGZ(vol()) || ip > FINISHINGY(vol()) || jp > FINISHINGX(vol()))
+							{
 								continue;
+							}
+							
 							A3D_ELEM(vol(), kp, ip, jp)    = FFTW_ELEM(F2D, kp, ip, jp).real;
 							A3D_ELEM(vol(), -kp, -ip, -jp) = FFTW_ELEM(F2D, kp, ip, jp).real;
 						}
+						
 						vol() *= (RFLOAT)ctf_dim;
 						
 						// Take sqrt(CTF^2)
@@ -874,9 +887,13 @@ class reconstruct_parameters
 							FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(vol())
 							{
 								if (DIRECT_MULTIDIM_ELEM(vol(), n) > 0.)
+								{
 									DIRECT_MULTIDIM_ELEM(vol(), n) = sqrt(DIRECT_MULTIDIM_ELEM(vol(), n));
+								}
 								else
+								{
 									DIRECT_MULTIDIM_ELEM(vol(), n) = 0.;
+								}
 							}
 						}
 					}
