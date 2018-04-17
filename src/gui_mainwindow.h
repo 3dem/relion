@@ -143,7 +143,7 @@ public:
 
 	FileName pipeline_name; // Name of this pipeline (e.g. default)
 	std::vector<Fl_Check_Button*> check_buttons;
-	Fl_Input *repeat, *wait, *schedule_name;
+	Fl_Input *repeat, *wait_before, *wait, *schedule_name;
 	std::vector<FileName> my_jobs; // Which jobs to execute
 
 	SchedulerWindow(int w, int h, const char* title): Fl_Window(w, h, title){}

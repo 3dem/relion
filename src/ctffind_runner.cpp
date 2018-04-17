@@ -114,17 +114,22 @@ void CtffindRunner::initialise()
 	}
 
 	if (do_use_gctf && ctf_win>0)
-		REPORT_ERROR("CtffindRunner::initialise ERROR: Running Gctf together with --ctfWin is not implemented, please use CTFFIND instead.");
+		REPORT_ERROR("ERROR: Running Gctf together with --ctfWin is not implemented, please use CTFFIND instead.");
 
 	// Make sure fn_out ends with a slash
 	if (fn_out[fn_out.length()-1] != '/')
 		fn_out += "/";
+
 
 	// Set up which micrographs to estimate CTFs from
 	if (fn_in.isStarFile())
 	{
 		MetaDataTable MDin;
 		MDin.read(fn_in);
+
+		if (do_use_without_doseweighting && !MDin.containsLabel(EMDL_MICROGRAPH_NAME_WODOSE))
+			REPORT_ERROR("ERROR: You are using --use_noDW, but there is no rlnMicrographNameNoDW label in the input micrograph STAR file.");
+
 		fn_micrographs_all.clear();
 		fn_micrographs_widose_all.clear();
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
@@ -587,7 +592,7 @@ void CtffindRunner::executeCtffind4(long int imic)
 	fh << "no" << std::endl;
 	// Slower, more exhaustive search?
 	// The default was "no" in CTFFIND 4.1.5, but turned out to be less accurate.
-	// The default was changed to "yes" in CTFFIND 4.1.8. 
+	// The default was changed to "yes" in CTFFIND 4.1.8.
 	// Ref: http://grigoriefflab.janelia.org/ctffind4
 	// So, we say "yes" regardless of the version unless "--fast_search" is specified.
 	if (!do_fast_search)

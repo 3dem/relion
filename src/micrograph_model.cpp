@@ -22,6 +22,8 @@
 #include "src/metadata_table.h"
 #include "src/image.h"
 
+// TODO: Think about first frame for local model
+
 const RFLOAT Micrograph::NOT_OBSERVED = -9999;
 const int ThirdOrderPolynomialModel::NUM_COEFFS_PER_DIM = 18;
 
@@ -41,6 +43,11 @@ int ThirdOrderPolynomialModel::getShiftAt(RFLOAT z, RFLOAT x, RFLOAT y, RFLOAT &
 	       	 + (coeffY(9)  * z + coeffY(10) * z2 + coeffY(11) * z3) * y \
 	         + (coeffY(12) * z + coeffY(13) * z2 + coeffY(14) * z3) * y2 \
 	         + (coeffY(15) * z + coeffY(16) * z2 + coeffY(17) * z3) * xy;
+}
+
+MotionModel* ThirdOrderPolynomialModel::clone() const
+{
+	return (MotionModel*) new ThirdOrderPolynomialModel(*this);
 }
 
 void ThirdOrderPolynomialModel::write(std::ostream &fh, std::string block_name) {
@@ -102,28 +109,186 @@ void ThirdOrderPolynomialModel::read(std::ifstream &fh, std::string block_name) 
 	}
 }
 
-void Micrograph::setMovie(FileName fnMovie, FileName fnGain, RFLOAT binning) {
-	Image<RFLOAT> Ihead;
-	Ihead.read(fnMovie, false);
-        
-	width = XSIZE(Ihead());
-	height = YSIZE(Ihead());
-	n_frames = NSIZE(Ihead());
-
-	this->binning = binning;
-
-	globalShiftX.resize(n_frames, NOT_OBSERVED);
-	globalShiftY.resize(n_frames, NOT_OBSERVED);
-
-	this->fnMovie = fnMovie;
-	this->fnGain = fnGain;
+Micrograph::Micrograph()
+:   ready(false),
+    model(NULL)
+{
+	clearFields();
 }
 
-// Read from a STAR file
+Micrograph::Micrograph(const Micrograph& m)
+:   ready(m.ready),
+    model((m.model != NULL)? m.model->clone() : NULL)
+{
+    copyFieldsFrom(m);
+}
+
+Micrograph::Micrograph(FileName filename, FileName fnGain, RFLOAT binning)
+:   ready(false),
+    model(NULL)
+{
+	clearFields();
+
+	if (filename.getExtension() == "star" && fnGain == "") {
+		read(filename);
+	} else {
+		setMovie(filename, fnGain, binning);
+	}
+
+	ready = true;
+}
+
+Micrograph::~Micrograph()
+{
+	if (model != NULL) delete model;
+}
+
+Micrograph& Micrograph::operator = (const Micrograph& m)
+{
+	ready = m.ready;
+
+	if (model != NULL) delete model;
+	model = (m.model != NULL)? m.model->clone() : NULL;
+
+	copyFieldsFrom(m);
+
+	return *this;
+}
+
+void Micrograph::write(FileName filename)
+{
+	checkReadyFlag("write");
+
+	std::ofstream fh;
+	MetaDataTable MD;
+
+	fh.open(filename.c_str());
+	if (!fh) {
+		REPORT_ERROR((std::string)"Micrograph::write: Cannot write file: " + filename);
+	}
+
+        MD.setName("general");
+        MD.setIsList(true);
+        MD.addObject();
+	MD.setValue(EMDL_IMAGE_SIZEX, width);
+        MD.setValue(EMDL_IMAGE_SIZEY, height);
+        MD.setValue(EMDL_IMAGE_SIZEZ, n_frames);
+        MD.setValue(EMDL_MICROGRAPH_MOVIE_NAME, fnMovie);
+	if (fnGain != "") {
+		MD.setValue(EMDL_MICROGRAPH_GAIN_NAME, fnGain);
+	}
+	MD.setValue(EMDL_MICROGRAPH_BINNING, binning);
+	if (angpix != -1) {
+		MD.setValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, angpix);
+        }
+	if (dose_per_frame != -1) {
+		MD.setValue(EMDL_MICROGRAPH_DOSE_RATE, dose_per_frame);
+        }
+	if (pre_exposure != -1) {
+		MD.setValue(EMDL_MICROGRAPH_PRE_EXPOSURE, pre_exposure);
+        }
+	if (voltage != -1) {
+		MD.setValue(EMDL_CTF_VOLTAGE, voltage);
+        }
+	MD.setValue(EMDL_MICROGRAPH_START_FRAME, first_frame); // 1-indexed
+
+	if (model != NULL) {
+		MD.setValue(EMDL_MICROGRAPH_MOTION_MODEL_VERSION, model->getModelVersion());
+	} else {
+		MD.setValue(EMDL_MICROGRAPH_MOTION_MODEL_VERSION, MOTION_MODEL_NULL);
+	}
+	MD.write(fh);
+
+	MD.clear();
+	MD.setName("global_shift");
+	for (int frame = 0; frame < n_frames; frame++) {
+		MD.addObject();
+		MD.setValue(EMDL_MICROGRAPH_FRAME_NUMBER, frame + 1); // make 1-indexed
+		MD.setValue(EMDL_MICROGRAPH_SHIFT_X, globalShiftX[frame]);
+		MD.setValue(EMDL_MICROGRAPH_SHIFT_Y, globalShiftY[frame]);
+	}
+	MD.write(fh);
+
+	if (model != NULL) {
+		std::string block_name = "local_motion_model";
+		model->write(fh, block_name);
+	}
+
+	fh.close();
+}
+
+FileName Micrograph::getGainFilename() const {
+	return fnGain;
+}
+
+RFLOAT Micrograph::getBinningFactor() const {
+	return binning;
+}
+
+FileName Micrograph::getMovieFilename() const {
+	return fnMovie;
+}
+
+int Micrograph::getWidth() const {
+	return width;
+}
+
+int Micrograph::getHeight() const {
+	return height;
+}
+
+int Micrograph::getNframes() const {
+	return n_frames;
+}
+
+int Micrograph::getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty, bool use_local) const
+{
+	checkReadyFlag("getShiftAt");
+
+	if (globalShiftX[frame - 1] == NOT_OBSERVED || globalShiftX[frame - 1] == NOT_OBSERVED) {
+		shiftx = shifty = NOT_OBSERVED;
+		return -1;
+	}
+
+	if (model != NULL && use_local) {
+		// both frame and first_frame is 1 indexed
+		model->getShiftAt(frame - first_frame, x, y, shiftx, shifty);
+	} else {
+		shiftx = 0;
+		shifty = 0;
+	}
+
+	// frame is 1-indexed!
+	shiftx += globalShiftX[frame - 1];
+	shifty += globalShiftY[frame - 1];
+
+	return 0;
+}
+
+void Micrograph::setGlobalShift(int frame, RFLOAT shiftx, RFLOAT shifty)
+{
+	checkReadyFlag("setGlobalShift");
+
+	if (frame <= 0 || frame > n_frames) {
+		std::cout << "Frame: " << frame << " n_frames: " << n_frames << std::endl;
+		REPORT_ERROR("Micrograph::setGlobalShift() frame out of range");
+	}
+
+	frame--; // frame is 1-indexed
+	globalShiftX[frame] = shiftx;
+	globalShiftY[frame] = shifty;
+}
+
 void Micrograph::read(FileName fn_in)
 {
+	if (model != NULL)
+	{
+		delete model;
+		model = NULL;
+	}
+
 	// Clear current model
-	clear();
+	clearFields();
 
 	// Open input file
 	std::ifstream in(fn_in.data(), std::ios_base::in);
@@ -164,6 +329,10 @@ void Micrograph::read(FileName fn_in)
 	if (!MDglobal.getValue(EMDL_CTF_VOLTAGE, voltage)) {
 		voltage = -1;
 	}
+	if (!MDglobal.getValue(EMDL_MICROGRAPH_START_FRAME, first_frame)) {
+		first_frame = 1; // 1-indexed
+	}
+
 	int model_version;
 	if (!MDglobal.getValue(EMDL_MICROGRAPH_MOTION_MODEL_VERSION, model_version)) {
 		if (model_version == MOTION_MODEL_THIRD_ORDER_POLYNOMIAL) {
@@ -188,7 +357,7 @@ void Micrograph::read(FileName fn_in)
 	{
 		if (!MDglobal.getValue(EMDL_MICROGRAPH_FRAME_NUMBER, frame) ||
 		    !MDglobal.getValue(EMDL_MICROGRAPH_SHIFT_X, shiftX) ||
-		    !MDglobal.getValue(EMDL_MICROGRAPH_SHIFT_Y, shiftY)) { 
+		    !MDglobal.getValue(EMDL_MICROGRAPH_SHIFT_Y, shiftY)) {
 			REPORT_ERROR("MicrographModel::read: incorrect global_shift table");
 		}
 
@@ -199,84 +368,88 @@ void Micrograph::read(FileName fn_in)
 	}
 }
 
-// Write to a STAR file
-void Micrograph::write(FileName filename) {
-	std::ofstream fh;
-	MetaDataTable MD;
+void Micrograph::setMovie(FileName fnMovie, FileName fnGain, RFLOAT binning)
+{
+	Image<RFLOAT> Ihead;
+	Ihead.read(fnMovie, false, -1, false, true); // select_img -1, mmap false, is_2D true
 
-	fh.open(filename.c_str());
-	if (!fh) {
-		REPORT_ERROR((std::string)"Micrograph::write: Cannot write file: " + filename);
-	}
+	width = XSIZE(Ihead());
+	height = YSIZE(Ihead());
+	n_frames = NSIZE(Ihead());
 
-        MD.setName("general");
-        MD.setIsList(true);
-        MD.addObject();
-	MD.setValue(EMDL_IMAGE_SIZEX, width);
-        MD.setValue(EMDL_IMAGE_SIZEY, height);
-        MD.setValue(EMDL_IMAGE_SIZEZ, n_frames);
-        MD.setValue(EMDL_MICROGRAPH_MOVIE_NAME, fnMovie);
-	if (fnGain != "") {
-		MD.setValue(EMDL_MICROGRAPH_GAIN_NAME, fnGain);
-	}
-	MD.setValue(EMDL_MICROGRAPH_BINNING, binning);
-	if (angpix != -1) {
-		MD.setValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, angpix);
-        }
-	if (dose_per_frame != -1) {
-		MD.setValue(EMDL_MICROGRAPH_DOSE_RATE, dose_per_frame);
-        }
-	if (pre_exposure != -1) {
-		MD.setValue(EMDL_MICROGRAPH_PRE_EXPOSURE, pre_exposure);
-        }
-	if (voltage != -1) {
-		MD.setValue(EMDL_CTF_VOLTAGE, voltage);
-        }
-	if (model != NULL) {
-		MD.setValue(EMDL_MICROGRAPH_MOTION_MODEL_VERSION, model->getModelVersion());
-	} else {
-		MD.setValue(EMDL_MICROGRAPH_MOTION_MODEL_VERSION, MOTION_MODEL_NULL);
-	}
-	MD.write(fh);
+	this->binning = binning;
 
-	MD.clear();
-	MD.setName("global_shift");
-	for (int frame = 0; frame < n_frames; frame++) {
-		MD.addObject();
-		MD.setValue(EMDL_MICROGRAPH_FRAME_NUMBER, frame + 1); // make 1-indexed
-		MD.setValue(EMDL_MICROGRAPH_SHIFT_X, globalShiftX[frame]);
-		MD.setValue(EMDL_MICROGRAPH_SHIFT_Y, globalShiftY[frame]);
-	}
-	MD.write(fh);
+	globalShiftX.resize(n_frames, NOT_OBSERVED);
+	globalShiftY.resize(n_frames, NOT_OBSERVED);
 
-	if (model != NULL) {
-		std::string block_name = "local_motion_model";
-		model->write(fh, block_name);
-	}
-
-	fh.close();
+	this->fnMovie = fnMovie;
+	this->fnGain = fnGain;
 }
 
-int Micrograph::getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty) const {
-	if (model != NULL) {
-		model->getShiftAt(frame, x, y, shiftx, shifty);
-	} else {
-		shiftx = 0;
-		shifty = 0;
-	}
+void Micrograph::clearFields()
+{
+	width = 0;
+	height = 0;
+	n_frames = 0;
+	first_frame = 0;
+	binning = 1;
 
-	// frame is 1-indexed!
-	shiftx += globalShiftX[frame - 1];
-	shifty += globalShiftY[frame - 1];
+	angpix = -1;
+	voltage = -1;
+	dose_per_frame = -1;
+	pre_exposure = -1;
+
+	fnMovie = "";
+	fnGain = "";
+
+	globalShiftX.resize(0);
+	globalShiftY.resize(0);
+
+	localShiftX.resize(0);
+	localShiftY.resize(0);
+	localFitX.resize(0);
+	localFitY.resize(0);
+	patchX.resize(0);
+	patchY.resize(0);
+	patchZ.resize(0);
+	patchW.resize(0);
+	patchH.resize(0);
 }
 
-void Micrograph::setGlobalShift(int frame, RFLOAT shiftx, RFLOAT shifty) {
-	if (frame <= 0 || frame > n_frames) {
-		std::cout << "Frame: " << frame << " n_frames: " << n_frames << std::endl;
-		REPORT_ERROR("Micrograph::setGlobalShift() frame out of range");
-	}
+void Micrograph::copyFieldsFrom(const Micrograph& m)
+{
+	width = m.width;
+	height = m.height;
+	n_frames = m.n_frames;
+	first_frame = m.first_frame;
+	binning = m.binning;
 
-	frame--;
-	globalShiftX[frame] = shiftx;
-	globalShiftY[frame] = shifty;
+	angpix = m.angpix;
+	voltage = m.voltage;
+	dose_per_frame = m.dose_per_frame;
+	pre_exposure = m.pre_exposure;
+
+	fnMovie = m.fnMovie;
+	fnGain = m.fnGain;
+
+	globalShiftX = m.globalShiftX;
+	globalShiftY = m.globalShiftY;
+
+	localShiftX = m.localShiftX;
+	localShiftY = m.localShiftY;
+	localFitX = m.localFitX;
+	localFitY = m.localFitY;
+	patchX = m.patchX;
+	patchY = m.patchY;
+	patchZ = m.patchZ;
+	patchW = m.patchW;
+	patchH = m.patchH;
+}
+
+void Micrograph::checkReadyFlag(std::string origin) const
+{
+	if (!ready)
+	{
+		REPORT_ERROR("Micrograph::"+origin+": instance not initialized.\n");
+	}
 }

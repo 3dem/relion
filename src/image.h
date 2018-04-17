@@ -231,12 +231,14 @@ public:
         exist=false;
 
         // Check whether the file was closed already
-    	if (fimg == NULL && fhed == NULL)
+    	if (fimg == NULL && fhed == NULL && ftiff == NULL)
         	return;
 
 #ifdef HAVE_TIFF
-	if (isTiff && ftiff != NULL)
+	if (isTiff && ftiff != NULL) {
 		TIFFClose(ftiff);
+		ftiff = NULL;
+	}
 #endif
 
     	if (!isTiff && fclose(fimg) != 0 )

@@ -183,7 +183,7 @@ void Preprocessing::initialise()
 				std::cout << " + Using pixel size from input STAR file of " << angpix << " Angstroms" << std::endl;
 
 		}
-		else if (do_recenter || fn_data != "")
+		else if (!do_movie_extract && (do_recenter || fn_data != ""))
 		{
 			REPORT_ERROR("Preprocessing:: ERROR: cannot use --recenter or --reextract_data_star without providing angpix info in the input micrograph STAR file or by using --set_angpix!");
 		}

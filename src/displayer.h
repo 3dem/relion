@@ -48,8 +48,8 @@
 // devel-version
 //#define GUI_RUNBUTTON_COLOR (fl_rgb_color(170, 0, 0))
 
-#define SELECTED true
-#define NOTSELECTED false
+#define SELECTED 1
+#define NOTSELECTED 0
 #define MULTIVIEW_WINDOW_WIDTH  720
 #define MULTIVIEW_WINDOW_HEIGHT 486
 
@@ -68,6 +68,14 @@ static int predrag_yc;
 static bool has_shift;
 static int preshift_ipos;
 
+static int current_selection_type;
+/*
+static RFLOAT current_minval;
+static RFLOAT current_maxval;
+static RFLOAT current_scale;
+static RFLOAT current_sigma_contrast;
+*/
+
 class DisplayBox : public Fl_Box
 {
 protected:
@@ -83,7 +91,7 @@ public:
 	int yoff;
 
 	// The box's selection status
-	bool selected;
+	int selected;
 
 	// The box's original position in the input MetaDataTable
 	int ipos;
@@ -114,11 +122,13 @@ public:
 	};
 
 	// Change selected status, redraw and return new status
-	bool toggleSelect();
+	int toggleSelect(int set_selected);
+	// Set a specific value in selected for this box
+	void setSelect(int value);
 	// Select, redraw and return new selected status
-	bool select();
+	int select();
 	// unSelect, redraw and return new selected status
-	bool unSelect();
+	int unSelect();
 
 };
 
@@ -224,6 +234,9 @@ public:
 	// pointer to the MetaDataTable for the groups when do_class and do_regroup (the data.star file)
 	MetaDataTable *MDgroups;
 
+	// Sjors 12mar18: read/write information-containing backup_selection for Liyi's project
+	MetaDataTable MDbackup;
+
 	// Scale for showing the original image
 	RFLOAT ori_scale;
 
@@ -237,7 +250,10 @@ public:
 	long int multi_max_nr_images;
 
 	// Constructor with w x h size of the window and a title
-	multiViewerCanvas(int X,int Y, int W, int H, const char* title=0): basisViewerCanvas(X,Y,W, H, title) { }
+	multiViewerCanvas(int X,int Y, int W, int H, const char* title=0): basisViewerCanvas(X,Y,W, H, title)
+	{
+		current_selection_type= 1;
+	}
 
 private:
 
@@ -252,12 +268,13 @@ private:
 	void showFourierAmplitudes(int ipos);
 	void showFourierPhaseAngles(int ipos);
 	void showHelicalLayerLineProfile(int ipos);
-	void makeStarFileSelectedParticles(bool save_selected, MetaDataTable &MDpart);
-	void saveSelectedParticles(bool save_selected);
-	void showSelectedParticles(bool save_selected);
+	void makeStarFileSelectedParticles(int save_selected, MetaDataTable &MDpart);
+	void saveSelectedParticles(int save_selected);
+	void showSelectedParticles(int save_selected);
 	void saveTrainingSet();
-	void saveSelected(bool save_selected);
+	void saveSelected(int save_selected);
 	void saveBackupSelection();
+	void setSelectionType();
 	// Allow re-loading of existing backup selection
 public:
 	void loadBackupSelection(bool do_ask = true);
@@ -266,6 +283,36 @@ public:
 
 // Generally accessible function
 void regroupSelectedParticles(MetaDataTable &MDdata, MetaDataTable &MDgroups, int nr_regroups);
+
+class popupSelectionTypeWindow : Fl_Window
+{
+	Fl_Choice * choice;
+public:
+	int result;
+
+	// Constructor with w x h size of the window and a title
+	popupSelectionTypeWindow(int W, int H, const char* title=0): Fl_Window(W, H, title){}
+
+	int fill();
+
+	static void cb_set(Fl_Widget* o, void* v)
+	{
+		popupSelectionTypeWindow* T=(popupSelectionTypeWindow*)v;
+	    T->cb_set_i();
+	}
+	inline void cb_set_i()
+	{
+		// Careful with setting the right value! Look at handle function of multiviewerCanvas
+		current_selection_type =  choice->value() + 1;
+	}
+
+	static void cb_close(Fl_Widget* o, void* v)
+	{
+		popupSelectionTypeWindow* T=(popupSelectionTypeWindow*)v;
+	    T->hide();
+	}
+
+};
 
 class singleViewerCanvas : public basisViewerCanvas
 {
@@ -281,12 +328,50 @@ private:
 
 	// Functionalities for  popup menu
 	void printMetaData();
+	// void setContrast();
 
 	// explain functionality of clicks
 	void printHelp();
 
 
 };
+
+/*
+class popupSetContrastWindow : Fl_Window
+{
+	Fl_Input *minval, *maxval, *scale, *sigma_contrast;
+
+public:
+	int result;
+
+	// Constructor with w x h size of the window and a title
+	popupSetContrastWindow(int W, int H, const char* title=0): Fl_Window(W, H, title){}
+
+	int fill();
+
+	static void cb_set(Fl_Widget* o, void* v)
+	{
+		popupSelectionTypeWindow* T=(popupSelectionTypeWindow*)v;
+	    T->cb_set_i();
+	}
+	inline void cb_set_i()
+	{
+		// Careful with setting the right value! Look at handle function of multiviewerCanvas
+		current_minval =  textToFloat(minval->value());
+		current_maxval =  textToFloat(minval->value());
+		current_scale =  textToFloat(minval->value());
+		current_sigma_contrast =  textToFloat(sigma_contrast->value());
+	}
+
+	static void cb_close(Fl_Widget* o, void* v)
+	{
+		popupSetContrastWindow* T=(popupSetContrastWindow*)v;
+	    T->hide();
+	}
+
+};
+*/
+
 
 class pickerViewerCanvas : public basisViewerCanvas
 {
@@ -342,37 +427,6 @@ private:
 	void viewExtractedParticles();
 };
 
-class popupInputWindow : Fl_Window
-{
-	Fl_Input * input;
-	RFLOAT result;
-public:
-
-	// Constructor with w x h size of the window and a title
-	popupInputWindow(int W, int H, const char* title=0): Fl_Window(W, H, title){}
-
-	int fill(std::string label, RFLOAT &_result)
-	{
-		input = new Fl_Input(x() + 200, 0, 100, 30, "black value: ") ;
-		Fl_Button * done = new Fl_Button(x()+350, 0, 30, 30, "go!");
-		//*result = atof(input->value());
-		done->callback( cb_done, this);
-		result = _result;
-		show();
-	}
-
-	static void cb_done(Fl_Widget* o, void* v)
-	{
-		popupInputWindow* T=(popupInputWindow*)v;
-	    T->cb_done_i();
-	}
-	inline void cb_done_i()
-	{
-		std::cerr << " input->value()= " << input->value() << std::endl;
-		result =  atof(input->value());
-	}
-
-};
 // This class only puts scrollbars around the resizable canvas
 class displayerGuiWindow : public Fl_Window
 {

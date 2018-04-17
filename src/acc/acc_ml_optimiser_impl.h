@@ -32,7 +32,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		MultidimArray<Complex > Faux(accMLO->transformer.fFourier,true);
 		MultidimArray<RFLOAT> Fctf;
 		Matrix2D<RFLOAT> Aori;
-		Matrix1D<RFLOAT> my_projected_com(3), my_refined_ibody_offset(3);
+		Matrix1D<RFLOAT> my_projected_com(baseMLO->mymodel.data_dim), my_refined_ibody_offset(baseMLO->mymodel.data_dim);
 
 		// What is my particle_id?
 		long int part_id = baseMLO->mydata.ori_particles[my_ori_particle].particles_id[ipart];
@@ -782,7 +782,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 					// 17May2017: Body is centered at its own COM
 					// move it back to its place in the original particle image
-					Matrix1D<RFLOAT> other_projected_com(3);
+					Matrix1D<RFLOAT> other_projected_com(baseMLO->mymodel.data_dim);
 
 					// Projected COM for this body (using Aori, just like above for ibody and my_projected_com!!!)
 					other_projected_com = Aori * (baseMLO->mymodel.com_bodies[obody]);
@@ -2369,13 +2369,12 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		RFLOAT old_psi = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, icol_psi);
 		DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, icol_psi) = psi;
 
-		Matrix1D<RFLOAT> shifts(2);
+		Matrix1D<RFLOAT> shifts(baseMLO->mymodel.data_dim);
 
 		XX(shifts) = XX(op.old_offset[ipart]) + oversampled_translations_x[op.max_index[ipart].iovertrans];
 		YY(shifts) = YY(op.old_offset[ipart]) + oversampled_translations_y[op.max_index[ipart].iovertrans];
 		if (accMLO->dataIs3D)
 		{
-			shifts.resize(3);
 			ZZ(shifts) = oversampled_translations_z[op.max_index[ipart].iovertrans];
 		}
 
