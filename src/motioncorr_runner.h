@@ -177,7 +177,7 @@ private:
 	// shiftx, shifty is relative to the (real space) image size
 	void shiftNonSquareImageInFourierTransform(MultidimArray<Complex> &frame, RFLOAT shiftx, RFLOAT shifty);
 
-	bool alignPatch(std::vector<MultidimArray<Complex> > &Fframes, const int pnx, const int pny, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts, std::ostream &logfile);
+	bool alignPatch(std::vector<MultidimArray<Complex> > &Fframes, const int pnx, const int pny, const RFLOAT scaled_B, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts, std::ostream &logfile);
 
 	void binNonSquareImage(Image<RFLOAT> &Iwork, RFLOAT bin_factor);
 
@@ -185,7 +185,7 @@ private:
 
 	int findGoodSize(int request);
 
-	void doseWeighting(std::vector<MultidimArray<Complex> > &Fframes, std::vector<RFLOAT> doses);
+	void doseWeighting(std::vector<MultidimArray<Complex> > &Fframes, std::vector<RFLOAT> doses, RFLOAT apix);
 
 	void realSpaceInterpolation(Image <RFLOAT> &Iref, std::vector<Image<RFLOAT> > &Iframes, MotionModel *model, std::ostream &logfile);
 

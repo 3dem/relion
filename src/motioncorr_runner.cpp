@@ -971,12 +971,14 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	std::vector<FourierTransformer> transformers(n_threads);
 	FourierTransformer transformer;
 
+	RFLOAT prescaling = 1;
+
 	const int hotpixel_sigma = 6;
 	const int fit_rmsd_threshold = 10; // px
 
 	// Check image size
 	Ihead.read(fn_mic, false, -1, false, true); // select_img -1, mmap false, is_2D true
-	const int nx = XSIZE(Ihead()), ny = YSIZE(Ihead()), nn = NSIZE(Ihead());
+	int nx = XSIZE(Ihead()), ny = YSIZE(Ihead()), nn = NSIZE(Ihead());
 
 	// Which frame to use?
 	logfile << "Movie size: X = " << nx << " Y = " << ny << " N = " << nn << std::endl;
@@ -1026,6 +1028,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 		logfile << "Some groups contain more than the requested number of frames (" << group << ") because the number of frames (" << n_frames << ") was not divisible." << std::endl;
 		logfile << "If you want to ignore remaining frame(s) instead, use --last_frame_sum to discard last frame(s)." << std::endl;
 	}
+	logfile << "interpolate_shifts = " << interpolate_shifts << std::endl;
 	logfile << std::endl;
 
 	// Read gain reference
@@ -1103,11 +1106,28 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	// TODO: fix defects
 	*/
 
+	if (early_binning) {
+		nx /= bin_factor; ny /= bin_factor;
+		if (nx % 2 != 0 || ny % 2 != 0) {
+			// Do not adjust the size because it might lead to non-square pixels
+			REPORT_ERROR("The dimensions of the image after binning must be even");
+		}
+		prescaling = bin_factor;
+		logfile << "Image size after binning: X = " << nx << " Y = " << ny << std::endl;
+	}
+
 	// FFT
 	RCTIC(TIMING_GLOBAL_FFT);
 	#pragma omp parallel for num_threads(n_threads)
 	for (int iframe = 0; iframe < n_frames; iframe++) {
-		transformers[omp_get_thread_num()].FourierTransform(Iframes[iframe](), Fframes[iframe]);
+		if (!early_binning) {
+			transformers[omp_get_thread_num()].FourierTransform(Iframes[iframe](), Fframes[iframe]);
+		} else {
+			MultidimArray<Complex> Fframe;
+			transformers[omp_get_thread_num()].FourierTransform(Iframes[iframe](), Fframe);
+			Fframes[iframe].reshape(ny, nx / 2 + 1);
+			cropInFourierSpace(Fframe, Fframes[iframe]);
+		}
 		Iframes[iframe].clear(); // save some memory (global alignment use the most memory)
 	}
 	RCTOC(TIMING_GLOBAL_FFT);
@@ -1116,10 +1136,11 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	// TODO: Consider frame grouping in global alignment.
 	logfile << std::endl << "Global alignment:" << std::endl;
 	RCTIC(TIMING_GLOBAL_ALIGNMENT);
-	alignPatch(Fframes, nx, ny, xshifts, yshifts, logfile);
+	alignPatch(Fframes, nx, ny, bfactor / (prescaling * prescaling), xshifts, yshifts, logfile);
 	RCTOC(TIMING_GLOBAL_ALIGNMENT);
 	for (int i = 0, ilim = xshifts.size(); i < ilim; i++) {
-		mic.setGlobalShift(frames[i] + 1, xshifts[i], yshifts[i]); // 1-indexed
+		// Should be in the original pixel size
+		mic.setGlobalShift(frames[i] + 1, xshifts[i] * prescaling, yshifts[i] * prescaling); // 1-indexed
         }
 
 	Iref().reshape(ny, nx);
@@ -1193,7 +1214,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 				RCTOC(TIMING_PREP_PATCH);
 
 				RCTIC(TIMING_PATCH_ALIGN);
-				bool converged = alignPatch(Fpatches, x_end - x_start, y_end - y_start, local_xshifts, local_yshifts, logfile);
+				bool converged = alignPatch(Fpatches, x_end - x_start, y_end - y_start, bfactor / (prescaling * prescaling), local_xshifts, local_yshifts, logfile);
 				RCTOC(TIMING_PATCH_ALIGN);
 				if (!converged) continue;
 
@@ -1304,21 +1325,22 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 			rms_x += (patch_xshifts[i] - x_fitted) * (patch_xshifts[i] - x_fitted);
 			rms_y += (patch_yshifts[i] - y_fitted) * (patch_yshifts[i] - y_fitted);
 
-			mic.patchX.push_back(patch_xs[i]);
-			mic.patchY.push_back(patch_ys[i]);
+			// These shifts and RMSDs are for reporting, so should be in the original pixel size
+			mic.patchX.push_back(patch_xs[i] * prescaling);
+			mic.patchY.push_back(patch_ys[i] * prescaling);
 			mic.patchZ.push_back(z + first_frame_sum); // 1-indexed
-			mic.localShiftX.push_back(patch_xshifts[i]);
-			mic.localShiftY.push_back(patch_yshifts[i]);
-			mic.localFitX.push_back(x_fitted);
-			mic.localFitY.push_back(y_fitted);
+			mic.localShiftX.push_back(patch_xshifts[i] * prescaling);
+			mic.localShiftY.push_back(patch_yshifts[i] * prescaling);
+			mic.localFitX.push_back(x_fitted * prescaling);
+			mic.localFitY.push_back(y_fitted * prescaling);
 
 #ifdef DEBUG_OWN
 			std::cout << " x = " << x << " y = " << y << " z = " << z;
-			std::cout << ", Xobs = " << patch_xshifts[i] << " Xfit = " << x_fitted;
-			std::cout << ", Yobs = " << patch_yshifts[i] << " Yfit = " << y_fitted << std::endl;
+			std::cout << ", Xobs = " << patch_xshifts[i] * prescaling << " Xfit = " << x_fitted * prescaling;
+			std::cout << ", Yobs = " << patch_yshifts[i] * prescaling << " Yfit = " << y_fitted * prescaling<< std::endl;
 #endif
 		}
-		rms_x = std::sqrt(rms_x / n_obs); rms_y = std::sqrt(rms_y / n_obs);
+		rms_x = std::sqrt(rms_x / n_obs) * prescaling; rms_y = std::sqrt(rms_y / n_obs) * prescaling;
 		logfile << std::endl << "Polynomial fit RMSD: X = " << rms_x << " px Y = " << rms_y << " px" << std::endl;
 		if (rms_x >= fit_rmsd_threshold || rms_y >= fit_rmsd_threshold) {
 			logfile << "The polynomial motion model did not explain the observation very well." << std::endl;
@@ -1349,7 +1371,7 @@ skip_fitting:
 
 		// Apply binning
 		RCTIC(TIMING_BINNING);
-		if (bin_factor != 1) {
+		if (!early_binning && bin_factor != 1) {
 			binNonSquareImage(Iref, bin_factor);
 		}
 		RCTOC(TIMING_BINNING);
@@ -1376,7 +1398,7 @@ skip_fitting:
 		}
 
 		RCTIC(TIMING_DW_WEIGHT);
-		doseWeighting(Fframes, doses);
+		doseWeighting(Fframes, doses, angpix * prescaling);
 		RCTOC(TIMING_DW_WEIGHT);
 
 		// Update real space images
@@ -1397,7 +1419,7 @@ skip_fitting:
 
 		// Apply binning
 		RCTIC(TIMING_BINNING);
-		if (bin_factor != 1) {
+		if (!early_binning & bin_factor != 1) {
 			binNonSquareImage(Iref, bin_factor);
 		}
 		RCTOC(TIMING_BINNING);
@@ -1608,7 +1630,7 @@ void MotioncorrRunner::realSpaceInterpolation_ThirdOrderPolynomial(Image <RFLOAT
 	}
 }
 
-bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes, const int pnx, const int pny, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts, std::ostream &logfile) {
+bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes, const int pnx, const int pny, const RFLOAT scaled_B, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts, std::ostream &logfile) {
 	std::vector<Image<RFLOAT> > Iccs(n_threads);
 	MultidimArray<Complex> Fref;
 	std::vector<MultidimArray<Complex> > Fccs(n_threads);
@@ -1619,7 +1641,7 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes,
 
 	// Parameters TODO: make an option
 	const int max_iter = 5;
-	const int search_range = 50; // px TODO: bound check
+	int search_range = 50; // px 
 	const RFLOAT tolerance = 0.5; // px
 	const RFLOAT EPS = 1e-15;
 
@@ -1635,11 +1657,13 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes,
 	// Calculate the size of down-sampled CCF
 	float ccf_requested_scale = ccf_downsample;
 	if (ccf_downsample <= 0) {
-		ccf_requested_scale = sqrt(-log(1E-8) / 2 / bfactor); // exp(-2 B max_dist^2) = 1E-8 
+		ccf_requested_scale = sqrt(-log(1E-8) / (2 * scaled_B)); // exp(-2 B max_dist^2) = 1E-8 
 	}
 	int ccf_nx = findGoodSize(int(pnx * ccf_requested_scale)), ccf_ny = findGoodSize(int(pny * ccf_requested_scale));
 	if (ccf_nx % 2 == 1) ccf_nx++;
 	if (ccf_ny % 2 == 1) ccf_ny++;
+	if (search_range * 2 + 1 < ccf_nx) search_range = ccf_nx / 2 - 1;
+	if (search_range * 2 + 1 < ccf_ny) search_range = ccf_ny / 2 - 1;
 	const int ccf_nfx = ccf_nx / 2 + 1, ccf_nfy = ccf_ny;
 	const int ccf_nfy_half = ccf_ny / 2;
 	const RFLOAT ccf_scale_x = (RFLOAT)pnx / ccf_nx;
@@ -1672,7 +1696,7 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes,
 
 		for (int x = 0; x < ccf_nfx; x++) {
 			RFLOAT dist2 = ly2 + x * (RFLOAT)x / (nfx * (RFLOAT)nfx);
-			DIRECT_A2D_ELEM(weight, y, x) = exp(- 2 * dist2 * bfactor); // 2 for Fref and Fframe
+			DIRECT_A2D_ELEM(weight, y, x) = exp(- 2 * dist2 * scaled_B); // 2 for Fref and Fframe
 		}
 	}
 	RCTOC(TIMING_PREP_WEIGHT);
@@ -1713,10 +1737,10 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes,
 			RCTIC(TIMING_CCF_FIND_MAX);
 			RFLOAT maxval = -1E30;
 			int posx = 0, posy = 0;
-			for (int y = -search_range; y < search_range; y++) {
+			for (int y = -search_range; y <= search_range; y++) {
 				const int iy = (y < 0) ? ccf_ny + y : y;
 
-				for (int x = -search_range; x < search_range; x++) {
+				for (int x = -search_range; x <= search_range; x++) {
 					const int ix = (x < 0) ? ccf_nx + x : x;
 					RFLOAT val = DIRECT_A2D_ELEM(Iccs[tid](), iy, ix);
 //					std::cout << "(x, y) = " << x << ", " << y << ", (ix, iy) = " << ix << " , " << iy << " val = " << val << std::endl;
@@ -1824,7 +1848,7 @@ int MotioncorrRunner::findGoodSize(int request) {
 // dose is equivalent dose at 300 kV at the END of the frame.
 // This implements the model by Timothy Grant & Nikolaus Grigorieff on eLife, 2015
 // doi: 10.7554/eLife.06980
-void MotioncorrRunner::doseWeighting(std::vector<MultidimArray<Complex> > &Fframes, std::vector<RFLOAT> doses) {
+void MotioncorrRunner::doseWeighting(std::vector<MultidimArray<Complex> > &Fframes, std::vector<RFLOAT> doses, RFLOAT apix) {
 	const int nfx = XSIZE(Fframes[0]), nfy = YSIZE(Fframes[0]);
 	const int nfy_half = nfy / 2;
 	const RFLOAT nfy2 = (RFLOAT)nfy * nfy;
@@ -1840,7 +1864,7 @@ void MotioncorrRunner::doseWeighting(std::vector<MultidimArray<Complex> > &Ffram
 		const RFLOAT ly2 = (RFLOAT)ly * ly / nfy2;
 		for (int x = 0; x < nfx; x++) {
 			const RFLOAT dinv2 = ly2 + (RFLOAT)x * x / nfx2;
-			const RFLOAT dinv = std::sqrt(dinv2) / angpix; // d = N * angpix / dist, thus dinv = dist / N / angpix
+			const RFLOAT dinv = std::sqrt(dinv2) / apix; // d = N * apix / dist, thus dinv = dist / N / angpix
 			const RFLOAT Ne = (A * std::pow(dinv, B) + C) * 2; // Eq. 3. 2 comes from Eq. 5
 			RFLOAT sum_weight_sq = 0;
 
@@ -1930,7 +1954,10 @@ void MotioncorrRunner::binNonSquareImage(Image<RFLOAT> &Iwork, RFLOAT bin_factor
 
 	const int nx = XSIZE(Iwork()), ny = YSIZE(Iwork());
 	int new_nx = nx / bin_factor, new_ny = ny / bin_factor;
-	new_nx -= new_nx % 2; new_ny -= new_ny % 2; // force it to be even
+	if (new_nx % 2 != 0 || new_ny % 2 != 0) {
+		// Do not adjust the size because it might lead to non-square pixels
+		REPORT_ERROR("The dimensions of the image after binning must be even");
+	}
 #ifdef DEBUG_OWN
 	std::cout << "Binning from X = " << nx << " Y = " << ny << " to X = " << new_nx << " Y = " << new_ny << std::endl;
 #endif
