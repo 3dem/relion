@@ -48,7 +48,7 @@ class FilterHelper
         static Image<RFLOAT> zeroOutsideCorner2D(Image<RFLOAT>& img, double radius);
         static void GaussianEnvelopeCorner2D(Image<RFLOAT>& img, double sigma);
         static Image<RFLOAT> ButterworthEnvCorner2D(Image<RFLOAT>& img, double radIn, double radOut);
-        static Image<RFLOAT> ButterworthEnvFreq2D(Image<RFLOAT>& img, double radIn, double radOut);
+        static Image<RFLOAT> ButterworthEnvFreq2D(const Image<RFLOAT>& img, double radIn, double radOut);
 
 
         static void lowPassFilter(Image<RFLOAT>& img, double maxFreq0, double maxFreq1, Image<RFLOAT>& dest);
@@ -62,7 +62,7 @@ class FilterHelper
                                   RFLOAT lambda, RFLOAT Cs, RFLOAT angpix, int s, Image<RFLOAT>& dest);
         static void modulate(Image<RFLOAT>& img, CTF& ctf, RFLOAT angpix, Image<RFLOAT>& dest);
         static void modulate(Image<Complex>& imgFreq, CTF& ctf, RFLOAT angpix, Image<RFLOAT>& dest);
-        static void modulate(Image<Complex>& imgFreq, CTF& ctf, RFLOAT angpix);
+        static void modulate(MultidimArray<Complex>& imgFreq, CTF& ctf, RFLOAT angpix);
         static void drawCtf(CTF& ctf, RFLOAT angpix, Image<Complex>& dest);
         static void wienerFilter(Image<RFLOAT>& img, CTF& ctf, RFLOAT angpix, RFLOAT eps, RFLOAT Bfac, Image<RFLOAT>& dest);
         static void richardsonLucy(Image<RFLOAT>& img, CTF& ctf, RFLOAT angpix, RFLOAT eps, int iterations, Image<RFLOAT>& dest);

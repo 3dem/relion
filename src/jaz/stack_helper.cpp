@@ -3,7 +3,7 @@
 #include <src/projector.h>
 #include <src/jaz/filter_helper.h>
 #include <src/jaz/Fourier_helper.h>
-#include <src/jaz/nelder_mead.h>
+#include <src/jaz/optimization/nelder_mead.h>
 #include <src/jaz/gravis/t4Matrix.h>
 #include <src/jaz/image_log.h>
 #include <src/fftw.h>
@@ -718,7 +718,6 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
         {
             int tp = omp_get_thread_num();
 
-            //int t = omp_get_thread_num();
             int t = saveMemory? tp : tf;
 
             out[p][f] = Image<Complex>(sqMg,sqMg);

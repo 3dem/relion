@@ -1,7 +1,7 @@
 #include <src/jaz/tilt_refinement.h>
 #include <src/jaz/gravis/t2Matrix.h>
 #include <src/jaz/gravis/t4Matrix.h>
-#include <src/jaz/nelder_mead.h>
+#include <src/jaz/optimization/nelder_mead.h>
 
 using namespace gravis;
 
@@ -326,7 +326,7 @@ TiltOptimization::TiltOptimization(const Image<Complex> &xy,
 {
 }
 
-double TiltOptimization::f(const std::vector<double> &x) const
+double TiltOptimization::f(const std::vector<double> &x, void* tempStorage) const
 {
     double out = 0.0;
 

@@ -6,7 +6,7 @@
 #include <src/metadata_table.h>
 #include <src/projector.h>
 #include <src/complex.h>
-#include <src/jaz/optimization.h>
+#include <src/jaz/optimization/optimization.h>
 #include <src/jaz/volume.h>
 #include <src/jaz/gravis/t2Matrix.h>
 #include <src/jaz/gravis/t3Vector.h>
@@ -22,7 +22,8 @@ class ParticleMotionFit : public Optimization
                 const std::vector<Image<float> >& correlation,
                 RFLOAT lambda_vel, RFLOAT lambda_acc);
 
-        double f(const std::vector<double>& x) const;
+        double f(const std::vector<double>& x, void* tempStorage) const;
+
 
     private:
 
@@ -39,10 +40,11 @@ class MotionFit : public DifferentiableOptimization
                 const std::vector<std::vector<RFLOAT> >& distWeights,
                 RFLOAT lambda, RFLOAT mu);
 
-        double f(const std::vector<double>& x) const;
+        double f(const std::vector<double>& x, void* tempStorage) const;
         double f_data(const std::vector<double>& x) const;
 
-        void grad(const std::vector<double>& x, std::vector<double>& gradDest) const;
+        void grad(const std::vector<double>& x, std::vector<double>& gradDest, void* tempStorage) const;
+
 
     private:
 

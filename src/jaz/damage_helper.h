@@ -5,7 +5,7 @@
 #include <src/image.h>
 #include <vector>
 #include <src/jaz/gravis/t2Vector.h>
-#include <src/jaz/optimization.h>
+#include <src/jaz/optimization/optimization.h>
 
 class DamageFit : public Optimization
 {
@@ -16,7 +16,7 @@ class DamageFit : public Optimization
                   int k, int t0,
                   double ampScale, double decScale);
 
-        double f(const std::vector<double>& x) const;
+        double f(const std::vector<double>& x, void* tempStorage) const;
 
     private:
 
@@ -34,7 +34,7 @@ class GlobalDamageFit : public Optimization
                   const Image<RFLOAT>& snrWeight,
                   int k0, int k1, int t0, bool L1);
 
-        double f(const std::vector<double>& x) const;
+        double f(const std::vector<double>& x, void* tempStorage) const;
 
         double getScale(int k, double tau) const;
 

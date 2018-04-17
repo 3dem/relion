@@ -2,7 +2,7 @@
 #define LOCAL_MOTION_FIT
 
 #include <src/image.h>
-#include <src/jaz/optimization.h>
+#include <src/jaz/optimization/optimization.h>
 #include <src/jaz/gravis/t2Vector.h>
 #include <vector>
 
@@ -18,8 +18,8 @@ class LocalMotionFit : public DifferentiableOptimization
                 const std::vector<gravis::d2Vector>& offsets,
                 int threads);
 
-        double f(const std::vector<double>& x) const;
-        void grad(const std::vector<double>& x, std::vector<double>& gradDest) const;
+        double f(const std::vector<double>& x, void* tempStorage) const;
+        void grad(const std::vector<double>& x, std::vector<double>& gradDest, void* tempStorage) const;
 
     private:
 

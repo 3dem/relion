@@ -265,15 +265,15 @@ public:
 	 *  Get complex array at the original size as the straightforward average
 	 *  padding_factor*padding_factor*padding_factor voxels
 	 *  This will then be used for FSC calculation between two random halves
-	 */
-	void getDownsampledAverage(MultidimArray<Complex > &avg);
+     */
+    void getDownsampledAverage(MultidimArray<Complex>& avg, bool divide = true) const;
 
-	/*
-	 * From two of the straightforward downsampled averages, calculate an FSC curve
-	 */
-	void calculateDownSampledFourierShellCorrelation(MultidimArray<Complex > &avg1,
-			                                         MultidimArray<Complex > &avg2,
-			                                         MultidimArray<RFLOAT> &fsc);
+    /*
+     * From two of the straightforward downsampled averages, calculate an FSC curve
+     */
+    void calculateDownSampledFourierShellCorrelation(const MultidimArray<Complex>& avg1,
+                                                     const MultidimArray<Complex>& avg2,
+                                                     MultidimArray<RFLOAT>& fsc) const;
 
 	/* Get the 3D reconstruction
          * If do_map is true, 1 will be added to all weights
@@ -283,11 +283,11 @@ public:
                      int max_iter_preweight,
                      bool do_map,
                      RFLOAT tau2_fudge,
-                     MultidimArray<RFLOAT> &tau2,
-                     MultidimArray<RFLOAT> &sigma2,
-                     MultidimArray<RFLOAT> &evidence_vs_prior,
-                     MultidimArray<RFLOAT> &fourier_coverage,
-                     MultidimArray<RFLOAT> fsc,
+                     MultidimArray<RFLOAT> &tau2_out,
+                     MultidimArray<RFLOAT> &sigma2_out,
+                     MultidimArray<RFLOAT> &evidence_vs_prior_out,
+                     MultidimArray<RFLOAT> &fourier_coverage_out,
+                     const MultidimArray<RFLOAT>& fsc,
                      RFLOAT normalise = 1.,
                      bool update_tau2_with_fsc = false,
                      bool is_whole_instead_of_half = false,

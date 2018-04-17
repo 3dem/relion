@@ -4,7 +4,7 @@
 #include <src/ctf.h>
 #include <src/image.h>
 #include <src/metadata_table.h>
-#include <src/jaz/optimization.h>
+#include <src/jaz/optimization/optimization.h>
 #include <src/jaz/volume.h>
 #include <src/jaz/gravis/t2Matrix.h>
 #include <vector>
@@ -56,7 +56,7 @@ class AstigmatismOptimizationAcc : public Optimization
                 RFLOAT phiScale = 10,
                 RFLOAT csScale = 100);
 
-        double f(const std::vector<double>& x) const;
+        double f(const std::vector<double>& x, void* tempStorage) const;
 
         double getU(const std::vector<double> &x);
         double getV(const std::vector<double> &x);

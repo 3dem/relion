@@ -1,6 +1,6 @@
 #include <src/jaz/distribution_helper.h>
 #include <src/jaz/image_log.h>
-#include <src/jaz/nelder_mead.h>
+#include <src/jaz/optimization/nelder_mead.h>
 
 using namespace gravis;
 
@@ -733,7 +733,7 @@ CorruptedExponentialFit::CorruptedExponentialFit(const std::vector<double> &velo
         area(area)
 {}
 
-double CorruptedExponentialFit::f(const std::vector<double> &x) const
+double CorruptedExponentialFit::f(const std::vector<double> &x, void* tempStorage) const
 {
     const int pc = velocities.size();
     double e = 0.0;
@@ -759,7 +759,7 @@ BivariateStudentFit::BivariateStudentFit(const std::vector<double> &values, doub
 {
 }
 
-double BivariateStudentFit::f(const std::vector<double> &x) const
+double BivariateStudentFit::f(const std::vector<double> &x, void* tempStorage) const
 {
     const int pc = values.size();
     double e = 0.0;
@@ -788,7 +788,7 @@ CorruptedBivariateStudentFit::CorruptedBivariateStudentFit(const std::vector<dou
 {
 }
 
-double CorruptedBivariateStudentFit::f(const std::vector<double> &x) const
+double CorruptedBivariateStudentFit::f(const std::vector<double> &x, void* tempStorage) const
 {
     const int pc = values.size();
     double e = 0.0;
@@ -819,7 +819,7 @@ GaussStudentFit::GaussStudentFit(const std::vector<double> &values, double fixed
 {
 }
 
-double GaussStudentFit::f(const std::vector<double> &x) const
+double GaussStudentFit::f(const std::vector<double> &x, void* tempStorage) const
 {
     const int pc = values.size();
     double e = 0.0;
@@ -864,7 +864,7 @@ DoubleStudentFit::DoubleStudentFit(const std::vector<double> &values,
 {
 }
 
-double DoubleStudentFit::f(const std::vector<double> &x) const
+double DoubleStudentFit::f(const std::vector<double> &x, void* tempStorage) const
 {
     const int pc = values.size();
     double e = 0.0;
@@ -943,7 +943,7 @@ MultiStudentFit::MultiStudentFit(const std::vector<double> &values,
 {
 }
 
-double MultiStudentFit::f(const std::vector<double> &x) const
+double MultiStudentFit::f(const std::vector<double> &x, void* tempStorage) const
 {
     const int pc = values.size();
     double e = 0.0;
@@ -1013,7 +1013,7 @@ DoubleGaussFit::DoubleGaussFit(const std::vector<double> &values,
 {
 }
 
-double DoubleGaussFit::f(const std::vector<double> &x) const
+double DoubleGaussFit::f(const std::vector<double> &x, void* tempStorage) const
 {
     const int pc = values.size();
     double e = 0.0;
@@ -1068,7 +1068,7 @@ CorruptedGaussFit::CorruptedGaussFit(const std::vector<double> &values, double a
 {
 }
 
-double CorruptedGaussFit::f(const std::vector<double> &x) const
+double CorruptedGaussFit::f(const std::vector<double> &x, void* tempStorage) const
 {
     const int pc = values.size();
     double e = 0.0;

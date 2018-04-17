@@ -4,7 +4,7 @@
 #include <src/ctf.h>
 #include <src/image.h>
 #include <src/metadata_table.h>
-#include <src/jaz/optimization.h>
+#include <src/jaz/optimization/optimization.h>
 #include <src/jaz/volume.h>
 #include <src/jaz/gravis/t2Matrix.h>
 #include <src/jaz/parallel_ft.h>
@@ -15,8 +15,6 @@ class Projector;
 class StackHelper
 {
     public:
-
-        typedef enum {BoxBin, GaussBin, FourierCrop} BinningType;
 
         static std::vector<MetaDataTable> splitByMicrographName(const MetaDataTable* mdt);
         static std::vector<MetaDataTable> splitByStack(const MetaDataTable* mdt);

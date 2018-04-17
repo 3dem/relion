@@ -4,7 +4,7 @@
 #include <src/ctf.h>
 #include <src/image.h>
 #include <src/metadata_table.h>
-#include <src/jaz/optimization.h>
+#include <src/jaz/optimization/optimization.h>
 #include <src/jaz/volume.h>
 #include <src/jaz/gravis/t2Matrix.h>
 #include <vector>
@@ -20,7 +20,7 @@ class TiltOptimization : public Optimization
                 bool L1 = false,
                 bool anisotropic = false);
 
-        double f(const std::vector<double>& x) const;
+        double f(const std::vector<double>& x, void* tempStorage) const;
 
     private:
 

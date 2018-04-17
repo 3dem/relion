@@ -3,6 +3,8 @@
 #include "src/jaz/filter_helper.h"
 #include "src/jaz/Fourier_helper.h"
 
+#include <src/backprojector.h>
+
 ObservationModel::ObservationModel()
 :   angpix(-1),
     hasTilt(false),
@@ -25,8 +27,9 @@ ObservationModel::ObservationModel(double angpix, double Cs, double voltage, dou
 {
 }
 
-Image<Complex> ObservationModel::predictObservation(
+void ObservationModel::predictObservation(
         Projector& proj, const MetaDataTable& mdt, int particle,
+		MultidimArray<Complex>& dest,
         bool applyCtf, bool applyTilt,
         double deltaRot, double deltaTilt, double deltaPsi) const
 {
@@ -51,23 +54,27 @@ Image<Complex> ObservationModel::predictObservation(
 
     Euler_angles2matrix(rot, tilt, psi, A3D);
 
-    Image<Complex> pred(sh, s);
-    pred.data.initZeros();
+	if (dest.xdim != sh || dest.ydim != s)
+	{
+		dest.resize(s,sh);
+	}
+	
+	dest.initZeros();
 
-    proj.get2DFourierTransform(pred.data, A3D, false);
-    shiftImageInFourierTransform(pred(), pred(), s, s/2 - xoff, s/2 - yoff);
+    proj.get2DFourierTransform(dest, A3D, false);
+    shiftImageInFourierTransform(dest, dest, s, s/2 - xoff, s/2 - yoff);
 
     if (applyCtf)
     {
         CTF ctf;
         ctf.read(mdt, mdt, particle);        
 
-        FilterHelper::modulate(pred, ctf, angpix);
+        FilterHelper::modulate(dest, ctf, angpix);
     }
 
     if (applyTilt)
     {
-        double tx, ty;
+        double tx = 0.0, ty = 0.0;
 
         if (hasTilt)
         {
@@ -80,18 +87,32 @@ Image<Complex> ObservationModel::predictObservation(
             mdt.getValue(EMDL_IMAGE_BEAMTILT_Y, ty, particle);
         }
 
-        if (anisoTilt)
+        if (tx != 0.0 && ty != 0.0)
         {
-            selfApplyBeamTilt(pred.data, -tx, -ty,
-                              beamtilt_xx, beamtilt_xy, beamtilt_yy,
-                              lambda, Cs, angpix, s);
-        }
-        else
-        {
-            selfApplyBeamTilt(pred.data, -tx, -ty, lambda, Cs, angpix, s);
+            if (anisoTilt)
+            {
+                selfApplyBeamTilt(dest, -tx, -ty,
+                                  beamtilt_xx, beamtilt_xy, beamtilt_yy,
+                                  lambda, Cs, angpix, s);
+            }
+            else
+            {
+                selfApplyBeamTilt(dest, -tx, -ty, lambda, Cs, angpix, s);
+            }
         }
     }
+}
 
+
+Image<Complex> ObservationModel::predictObservation(
+        Projector& proj, const MetaDataTable& mdt, int particle,
+        bool applyCtf, bool applyTilt,
+        double deltaRot, double deltaTilt, double deltaPsi) const
+{
+    Image<Complex> pred;
+	
+	predictObservation(proj, mdt, particle, pred.data, applyCtf, applyTilt,
+					   deltaRot, deltaTilt, deltaPsi);
     return pred;
 }
 
@@ -183,4 +204,15 @@ void ObservationModel::setAnisoTilt(double xx, double xy, double yy)
     beamtilt_xy = xy;
     beamtilt_yy = yy;
     anisoTilt = true;
+}
+
+
+double ObservationModel::angToPix(double a, int s)
+{
+    return s * angpix / a;
+}
+
+double ObservationModel::pixToAng(double p, int s)
+{
+    return s * angpix / p;
 }

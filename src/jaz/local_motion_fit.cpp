@@ -21,7 +21,7 @@ LocalMotionFit::LocalMotionFit(const std::vector<std::vector<Image<RFLOAT>>>& co
 {
 }
 
-double LocalMotionFit::f(const std::vector<double> &x) const
+double LocalMotionFit::f(const std::vector<double> &x, void* tempStorage) const
 {
     double e_tot = 0.0;
 
@@ -88,7 +88,7 @@ double LocalMotionFit::f(const std::vector<double> &x) const
 }
 
 
-void LocalMotionFit::grad(const std::vector<double> &x, std::vector<double> &gradDest) const
+void LocalMotionFit::grad(const std::vector<double> &x, std::vector<double> &gradDest, void* tempStorage) const
 {
     for (int p = 0; p < pc; p++)
     for (int f = 0; f < fc; f++)

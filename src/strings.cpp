@@ -116,7 +116,7 @@ std::string simplify( const std::string& str )
 
     // Remove space left at the end of the string
     // if needed
-    if( temp[ temp.size( ) - 1 ] == ' ' )
+    if( temp.size( ) > 0 && temp[ temp.size( ) - 1 ] == ' ' )
     {
         temp.resize( temp.size() - 1 );
     }

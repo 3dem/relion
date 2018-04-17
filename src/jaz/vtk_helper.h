@@ -33,7 +33,7 @@ class VtkHelper
                              double spacingX = 1.0, double spacingY = 1.0, double spacingZ = 1.0,
                              bool binary = false);
 
-        static void writeVTK_Complex(MultidimArray<Complex>& img, std::string fn, bool binary = false);
+        static void writeVTK_Complex(const MultidimArray<Complex>& img, std::string fn, bool binary = false);
         static void writeVTK_d3(MultidimArray<gravis::t3Vector<RFLOAT> >& img, std::string fn, bool binary = false);
         static void writeTomoVTK(Image<RFLOAT>& img, std::string fn, bool binary = false);
 

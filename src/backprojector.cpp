@@ -790,77 +790,78 @@ void BackProjector::setLowResDataAndWeight(MultidimArray<Complex > &lowres_data,
 			A3D_ELEM(weight, k, i, j) = A3D_ELEM(lowres_weight, k , i, j);
 		}
 	}
-
 }
 
-
-void BackProjector::getDownsampledAverage(MultidimArray<Complex > &avg)
+void BackProjector::getDownsampledAverage(MultidimArray<Complex>& avg, bool divide) const
 {
-	MultidimArray<RFLOAT> down_weight;
+    MultidimArray<RFLOAT> down_weight;
 
-	// Pre-set down_data and down_weight sizes
-	int down_size = 2 * (r_max + 1) + 1;
-	int r2_max = r_max * r_max;
-	// Short side of data array
-	switch (ref_dim)
-	{
-	case 2:
-	   avg.initZeros(down_size, down_size / 2 + 1);
-	   break;
-	case 3:
-	   avg.initZeros(down_size, down_size, down_size / 2 + 1);
-	   break;
-	default:
-	   REPORT_ERROR("BackProjector::getDownsampledAverage%%ERROR: Dimension of the data array should be 2 or 3");
-	}
-	// Set origin in the y.z-center, but on the left side for x.
-	avg.setXmippOrigin();
-	avg.xinit=0;
-	// Resize down_weight the same as down_data
-	down_weight.initZeros(avg);
+    // Pre-set down_data and down_weight sizes
+    int down_size = 2 * (r_max + 1) + 1;
 
-	// Now calculate the down-sized sum
-	int kp, ip, jp;
-	FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
-	{
-		kp = ROUND((RFLOAT)k/padding_factor);
-		ip = ROUND((RFLOAT)i/padding_factor);
-		jp = ROUND((RFLOAT)j/padding_factor);
+    // Short side of data array
+    switch (ref_dim)
+    {
+    case 2:
+       avg.initZeros(down_size, down_size / 2 + 1);
+       break;
+    case 3:
+       avg.initZeros(down_size, down_size, down_size / 2 + 1);
+       break;
+    default:
+       REPORT_ERROR("BackProjector::getDownsampledAverage%%ERROR: Dimension of the data array should be 2 or 3");
+    }
+    // Set origin in the y.z-center, but on the left side for x.
+    avg.setXmippOrigin();
+    avg.xinit=0;
+    // Resize down_weight the same as down_data
+    down_weight.initZeros(avg);
+
+    // Now calculate the down-sized sum
+    int kp, ip, jp;
+    FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
+    {
+        kp = ROUND((RFLOAT)k/padding_factor);
+        ip = ROUND((RFLOAT)i/padding_factor);
+        jp = ROUND((RFLOAT)j/padding_factor);
 
 // TMP
 //#define CHECK_SIZE
 #ifdef CHECK_SIZE
-		if (kp > FINISHINGZ(avg) || ip > FINISHINGY(avg) || jp > FINISHINGX(avg) ||
-				kp < STARTINGZ(avg) || ip < STARTINGY(avg) || jp < STARTINGX(avg))
-		{
-			std::cerr << " kp= " << kp << " ip= " << ip << " jp= " << jp << std::endl;
-			avg.printShape();
-			REPORT_ERROR("BackProjector::getDownsampledAverage: indices out of range");
-		}
+        if (kp > FINISHINGZ(avg) || ip > FINISHINGY(avg) || jp > FINISHINGX(avg) ||
+                kp < STARTINGZ(avg) || ip < STARTINGY(avg) || jp < STARTINGX(avg))
+        {
+            std::cerr << " kp= " << kp << " ip= " << ip << " jp= " << jp << std::endl;
+            avg.printShape();
+            REPORT_ERROR("BackProjector::getDownsampledAverage: indices out of range");
+        }
 #endif
-		A3D_ELEM(avg, kp, ip, jp) += A3D_ELEM(data, k , i, j);
-		A3D_ELEM(down_weight, kp, ip, jp) += A3D_ELEM(weight, k , i, j);
-	}
+        A3D_ELEM(avg, kp, ip, jp) += A3D_ELEM(data, k , i, j);
+        A3D_ELEM(down_weight, kp, ip, jp) += (divide? A3D_ELEM(weight, k , i, j) : 1.0);
+    }
 
-	// Calculate the straightforward average in the downsampled arrays
-	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(avg)
-	{
-		if (DIRECT_MULTIDIM_ELEM(down_weight, n) > 0.)
-			DIRECT_MULTIDIM_ELEM(avg, n) /= DIRECT_MULTIDIM_ELEM(down_weight, n);
-		else
-			DIRECT_MULTIDIM_ELEM(avg, n) = 0.;
-	}
-
-
+    // Calculate the straightforward average in the downsampled arrays
+    FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(avg)
+    {
+        if (DIRECT_MULTIDIM_ELEM(down_weight, n) > 0.)
+        {
+            DIRECT_MULTIDIM_ELEM(avg, n) /= DIRECT_MULTIDIM_ELEM(down_weight, n);
+        }
+        else
+        {
+            DIRECT_MULTIDIM_ELEM(avg, n) = 0.;
+        }
+    }
 }
 
-void BackProjector::calculateDownSampledFourierShellCorrelation(MultidimArray<Complex > &avg1,
-																MultidimArray<Complex > &avg2,
-																MultidimArray<RFLOAT> &fsc)
+
+void BackProjector::calculateDownSampledFourierShellCorrelation(const MultidimArray<Complex>& avg1,
+                                                                const MultidimArray<Complex>& avg2,
+                                                                MultidimArray<RFLOAT>& fsc) const
 {
 
     if (!avg1.sameShape(avg2))
-    	REPORT_ERROR("ERROR BackProjector::calculateDownSampledFourierShellCorrelation: two arrays have different sizes");
+        REPORT_ERROR("ERROR BackProjector::calculateDownSampledFourierShellCorrelation: two arrays have different sizes");
 
     MultidimArray<RFLOAT> num, den1, den2;
     num.initZeros(ori_size/2 + 1);
@@ -870,41 +871,46 @@ void BackProjector::calculateDownSampledFourierShellCorrelation(MultidimArray<Co
 
     FOR_ALL_ELEMENTS_IN_ARRAY3D(avg1)
     {
-    	RFLOAT R = sqrt(k*k + i*i + j*j);
-        if (R > r_max)
-            continue;
-        int idx=ROUND(R);
-        Complex z1=A3D_ELEM(avg1, k, i, j);
-        Complex z2=A3D_ELEM(avg2, k, i, j);
-        RFLOAT absz1=abs(z1);
-        RFLOAT absz2=abs(z2);
-        num(idx)+=(conj(z1) * z2).real;
-        den1(idx)+= absz1*absz1;
-        den2(idx)+= absz2*absz2;
+        RFLOAT R = sqrt(k*k + i*i + j*j);
+
+        if (R > r_max) continue;
+
+        int idx = ROUND(R);
+
+        Complex z1 = A3D_ELEM(avg1, k, i, j);
+        Complex z2 = A3D_ELEM(avg2, k, i, j);
+
+        RFLOAT nrmz1 = z1.norm();
+        RFLOAT nrmz2 = z2.norm();
+
+        num(idx) += z1.real * z2.real + z1.imag * z2.imag;
+        den1(idx) += nrmz1;
+        den2(idx) += nrmz2;
     }
 
     FOR_ALL_ELEMENTS_IN_ARRAY1D(fsc)
     {
-    	if (den1(i)*den2(i) > 0.)
-    		fsc(i) = num(i)/sqrt(den1(i)*den2(i));
+        if (den1(i)*den2(i) > 0.)
+        {
+            fsc(i) = num(i)/sqrt(den1(i)*den2(i));
+        }
     }
 
     // Always set zero-resolution shell to FSC=1
     // Raimond Ravelli reported a problem with FSC=1 at res=0 on 13feb2013...
     // (because of a suboptimal normalisation scheme, but anyway)
     fsc(0) = 1.;
-
 }
 
 void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
                                 int max_iter_preweight,
                                 bool do_map,
                                 RFLOAT tau2_fudge,
-                                MultidimArray<RFLOAT> &tau2,
-                                MultidimArray<RFLOAT> &sigma2,
-                                MultidimArray<RFLOAT> &data_vs_prior,
-                                MultidimArray<RFLOAT> &fourier_coverage,
-                                MultidimArray<RFLOAT> fsc, // only input
+                                MultidimArray<RFLOAT> &tau2_out,
+                                MultidimArray<RFLOAT> &sigma2_out,
+                                MultidimArray<RFLOAT> &data_vs_prior_out,
+                                MultidimArray<RFLOAT> &fourier_coverage_out,
+                                const MultidimArray<RFLOAT> &fsc, // only input
                                 RFLOAT normalise,
                                 bool update_tau2_with_fsc,
                                 bool is_whole_instead_of_half,
@@ -941,6 +947,10 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 	int ReconS_23 = ReconTimer.setNew(" RcS23_tauShrinkToFit ");
 	int ReconS_24 = ReconTimer.setNew(" RcS24_extra ");
 #endif
+
+    // never rely on references (handed to you from the outside) for computation:
+    // they could be the same (i.e. reconstruct(..., dummy, dummy, dummy, dummy, ...); )
+    MultidimArray<RFLOAT> tau2, sigma2, data_vs_prior, fourier_coverage;
 
 
     RCTIC(ReconTimer,ReconS_1);
@@ -1001,26 +1011,26 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 			DIRECT_A1D_ELEM(sigma2, ires) += invw;
 			DIRECT_A1D_ELEM(counter, ires) += 1.;
 		}
-	}
+    }
 
 	// Average (inverse of) sigma2 in reconstruction
 	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(sigma2)
 	{
-		if (DIRECT_A1D_ELEM(sigma2, i) > 1e-10)
-			DIRECT_A1D_ELEM(sigma2, i) = DIRECT_A1D_ELEM(counter, i) / DIRECT_A1D_ELEM(sigma2, i);
-		else if (DIRECT_A1D_ELEM(sigma2, i) == 0)
-			DIRECT_A1D_ELEM(sigma2, i) = 0.;
+        if (DIRECT_A1D_ELEM(sigma2, i) > 1e-10)
+            DIRECT_A1D_ELEM(sigma2, i) = DIRECT_A1D_ELEM(counter, i) / DIRECT_A1D_ELEM(sigma2, i);
+        else if (DIRECT_A1D_ELEM(sigma2, i) == 0)
+            DIRECT_A1D_ELEM(sigma2, i) = 0.;
 		else
 		{
 			std::cerr << " DIRECT_A1D_ELEM(sigma2, i)= " << DIRECT_A1D_ELEM(sigma2, i) << std::endl;
 			REPORT_ERROR("BackProjector::reconstruct: ERROR: unexpectedly small, yet non-zero sigma2 value, this should not happen...a");
-		}
-	}
+        }
+    }
 
 	if (update_tau2_with_fsc)
-	{
-		tau2.reshape(ori_size/2 + 1);
-		data_vs_prior.initZeros(ori_size/2 + 1);
+    {
+        tau2.reshape(ori_size/2 + 1);
+        data_vs_prior.initZeros(ori_size/2 + 1);
 		// Then calculate new tau2 values, based on the FSC
 		if (!fsc.sameShape(sigma2) || !fsc.sameShape(tau2))
 		{
@@ -1030,7 +1040,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 			REPORT_ERROR("ERROR BackProjector::reconstruct: sigma2, tau2 and fsc have different sizes");
 		}
 		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(sigma2)
-		{
+        {
 			// FSC cannot be negative or zero for conversion into tau2
 			RFLOAT myfsc = XMIPP_MAX(0.001, DIRECT_A1D_ELEM(fsc, i));
 			if (is_whole_instead_of_half)
@@ -1042,7 +1052,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 			myfsc = XMIPP_MIN(0.999, myfsc);
 			RFLOAT myssnr = myfsc / (1. - myfsc);
 			// Sjors 29nov2017 try tau2_fudge for pulling harder on Refine3D runs...
-			myssnr *= tau2_fudge;
+            myssnr *= tau2_fudge;
 			RFLOAT fsc_based_tau = myssnr * DIRECT_A1D_ELEM(sigma2, i);
 			DIRECT_A1D_ELEM(tau2, i) = fsc_based_tau;
 			// data_vs_prior is merely for reporting: it is not used for anything in the reconstruction
@@ -1432,6 +1442,10 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
     std::cerr<<"done with reconstruct"<<std::endl;
 #endif
 
+    tau2_out = tau2;
+    sigma2_out = sigma2;
+    data_vs_prior_out = data_vs_prior;
+    fourier_coverage_out = fourier_coverage;
 }
 
 void BackProjector::symmetrise(int nr_helical_asu, RFLOAT helical_twist, RFLOAT helical_rise)

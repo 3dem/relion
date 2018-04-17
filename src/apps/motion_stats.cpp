@@ -2,7 +2,7 @@
 #include <src/args.h>
 #include <src/metadata_table.h>
 #include <src/jaz/stack_helper.h>
-#include <src/jaz/motion_refinement.h>
+#include <src/jaz/motion/motion_helper.h>
 
 using namespace gravis;
 
@@ -56,7 +56,7 @@ int main(int argc, char *argv[])
 
         try
         {
-            shift = MotionRefinement::readTracks(tfn);
+            shift = MotionHelper::readTracks(tfn);
         }
         catch (RelionError XE)
         {

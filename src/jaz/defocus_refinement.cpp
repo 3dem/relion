@@ -3,7 +3,7 @@
 #include <src/projector.h>
 #include <src/jaz/filter_helper.h>
 #include <src/jaz/refinement_helper.h>
-#include <src/jaz/nelder_mead.h>
+#include <src/jaz/optimization/nelder_mead.h>
 #include <src/jaz/gravis/t4Matrix.h>
 
 using namespace gravis;
@@ -269,7 +269,7 @@ AstigmatismOptimizationAcc::AstigmatismOptimizationAcc(
     }
 }
 
-double AstigmatismOptimizationAcc::f(const std::vector<double> &x) const
+double AstigmatismOptimizationAcc::f(const std::vector<double> &x, void* tempStorage) const
 {
     CTF ctf(ctf0);
 
