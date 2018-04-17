@@ -156,7 +156,7 @@ std::vector<MetaDataTable> MicrographHandler::findLongEnoughMovies(
 
         for (int i = 0; i < bad.size(); i++)
         {
-            std::cout << "       " << bad[i] << "\n";
+            std::cerr << "       " << bad[i] << "\n";
         }
     }
 

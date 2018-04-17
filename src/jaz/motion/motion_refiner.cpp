@@ -129,14 +129,14 @@ void MotionRefiner::init()
 
     adaptMovieNames();
 
-	if (angpix <= 0.0)
-	{
-		RFLOAT mag, dstep;
-		mdt0.getValue(EMDL_CTF_MAGNIFICATION, mag, 0);
-		mdt0.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep, 0);
-		angpix = 10000 * dstep / mag;
+    if (angpix <= 0.0)
+    {
+        RFLOAT mag, dstep;
+        mdt0.getValue(EMDL_CTF_MAGNIFICATION, mag, 0);
+        mdt0.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep, 0);
+        angpix = 10000 * dstep / mag;
 
-		if (verb > 0)
+        if (verb > 0)
         {
             std::cout << "   - Using pixel size calculated from magnification and "
                       << "detector pixel size in the input STAR file: " << angpix << "\n";
@@ -167,8 +167,8 @@ void MotionRefiner::init()
     }
 
     if (minMG > 0 || maxMG < allMdts.size()-1)
-	{
-		if (verb > 0)
+    {
+        if (verb > 0)
         {
             std::cout << "   - Will only process micrographs in range: ["
                       << minMG << "-" << maxMG << "]"  << std::endl;
@@ -177,10 +177,10 @@ void MotionRefiner::init()
         chosenMdts.clear();
 
         for (long int g = minMG; g <= maxMG; g++)
-		{
+        {
             chosenMdts.push_back(allMdts[g]);
         }
-	}
+    }
     else
     {
         chosenMdts = allMdts;
@@ -241,7 +241,7 @@ void MotionRefiner::init()
             chosenMdts, micrographHandler.lastFrame+1, verb);
     }
 
-	if (only_do_unfinished)
+    if (only_do_unfinished)
     {
         motionMdts.clear();
         recombMdts.clear();
@@ -249,7 +249,7 @@ void MotionRefiner::init()
         motionMdts = MotionEstimator::findUnfinishedJobs(chosenMdts, outPath);
         recombMdts = FrameRecombiner::findUnfinishedJobs(chosenMdts, outPath);
 
-		if (verb > 0)
+        if (verb > 0)
         {
             if (motionMdts.size() > 0)
             {
@@ -307,7 +307,7 @@ void MotionRefiner::init()
     bool needsReference = estimateParams || estimateMotion;
 
     if (doAnything)
-	{
+    {
         obsModel = ObservationModel(angpix);
 
         // Read the first reference
@@ -316,7 +316,7 @@ void MotionRefiner::init()
         Image<RFLOAT> map0;
         map0.read(reference.reconFn0, false);
 
-		// Get dimensions
+        // Get dimensions
         s = map0.data.xdim;
         sh = s/2 + 1;
 
@@ -371,7 +371,7 @@ void MotionRefiner::run()
             &obsModel, &micrographHandler);
 
         frameRecombiner.process(recombMdts, 0, recombMdts.size()-1);
-	}
+    }
 
     if (generateStar)
     {
@@ -383,126 +383,6 @@ int MotionRefiner::getVerbosityLevel()
 {
     return verb;
 }
-
-/*
-void MotionRefiner::calculateSingleFrameReconstruction(int iframe)
-{
-
-	FileName fn_vol1, fn_vol2;
-	fn_vol1.compose(outPath + "frame", iframe, "", 3);
-	fn_vol1 += "_half1_unfil.mrc";
-	fn_vol2.compose(outPath + "frame", iframe, "", 3);
-	fn_vol2 += "_half2_unfil.mrc";
-	if (only_do_unfinished && exists(fn_vol1) && exists(fn_vol2))
-	{
-		if (verb > 0)
-			std::cout << std::endl << " + " << fn_vol1 << " and" << fn_vol2 << " already exist: skipping per-frame reconstruction." << std::endl;
-		return;
-	}
-
-	// Set current_size
-	int current_size;
-	if (perframe_highres > 0.)
-		current_size = 2 * ROUND(ori_size * angpix / perframe_highres);
-	else
-		current_size = ori_size;
-
-	BackProjector BP1(ori_size, 3, fn_sym, TRILINEAR, 1); // use only pad1 to save memory...
-	BP1.initZeros(current_size);
-	BackProjector BP2(ori_size, 3, fn_sym, TRILINEAR, 1);
-	BP2.initZeros(current_size);
-
-    std::vector<ParFourierTransformer> fts(nr_omp_threads);
-
-    // Loop over all individual micrographs
-	long nr_done = 0;
-	long int pctot;
-	for (long g = 0; g <= mdts.size(); g++)
-	{
-
-        const int pc = mdts[g].numberOfObjects();
-        if (pc == 0) continue;
-
-        pctot += pc;
-
-        std::vector<std::vector<Image<Complex>>> movie;
-        movie = loadMovie(g, pc, fts, iframe);
-
-		FileName fn_root = getOutputFileNameRoot(g);
-        std::vector<std::vector<d2Vector>> shift;
-        shift = MotionHelper::readTracks(fn_root+"_tracks.star");
-
-
-        // Loop over all particles in this micrograph
-        for (int p = 0; p < pc; p++)
-        {
-    		CTF ctf;
-    		std::string dum;
-    		Matrix2D<RFLOAT> A3D;
-    		MultidimArray<Complex > Faux, F2D, F2Dp, Fsub;
-    		MultidimArray<RFLOAT> Fweight, Fctf;
-
-    		RFLOAT xtrans, ytrans;
-    		RFLOAT rot, tilt, psi;
-    		int i_half;
-
-    		windowFourierTransform(movie[p][0](), F2D, current_size);
-
-
-			mdts[g].getValue(EMDL_PARTICLE_RANDOM_SUBSET, i_half, p);
-			mdts[g].getValue(EMDL_ORIENT_ROT_PRIOR, rot, p);
-			mdts[g].getValue(EMDL_ORIENT_TILT_PRIOR, tilt, p);
-			mdts[g].getValue(EMDL_ORIENT_PSI_PRIOR, psi, p);
-			Euler_angles2matrix(rot, tilt, psi, A3D);
-
-			// Translations
-			xtrans=ytrans=0.;
-			mdts[g].getValue(EMDL_ORIENT_ORIGIN_X, xtrans, p);
-			mdts[g].getValue(EMDL_ORIENT_ORIGIN_Y, ytrans, p);
-
-			// And fitted tracks
-			xtrans -= shift[p][iframe].x;
-			ytrans -= shift[p][iframe].y;
-
-			shiftImageInFourierTransform(F2D, F2D, s, xtrans, ytrans);
-
-
-			// CTF
-			Fctf.resize(F2D);
-			Fctf.initConstant(1.);
-			if (do_ctf)
-			{
-				ctf.read(mdts[g], mdts[g], p);
-				ctf.getFftwImage(Fctf, s, s, angpix, false, false, false, true);
-				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F2D)
-				{
-					DIRECT_MULTIDIM_ELEM(F2D, n)  *= DIRECT_MULTIDIM_ELEM(Fctf, n);
-					DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
-				}
-			}
-
-			if (i_half == 1)
-				BP1.set2DFourierTransform(F2D, A3D, IS_NOT_INV, &Fctf);
-			else if (i_half == 2)
-				BP2.set2DFourierTransform(F2D, A3D, IS_NOT_INV, &Fctf);
-			else
-				REPORT_ERROR("ERROR: invalid rlnRandomSubset value");
-        }
-   	}
-
-	BP1.symmetrise(helical_nr_asu, helical_twist, helical_rise / angpix);
-	BP2.symmetrise(helical_nr_asu, helical_twist, helical_rise / angpix);
-
-	// Now do the reconstructions
-	MultidimArray<RFLOAT> dummy;
-	Image<RFLOAT> vol;
-	BP1.reconstruct(vol(), 10, false, 1., dummy, dummy, dummy, dummy, dummy);
-	vol.write(fn_vol1);
-	BP2.reconstruct(vol(), 10, false, 1., dummy, dummy, dummy, dummy, dummy);
-	vol.write(fn_vol2);
-
-}
-*/
 
 // combine all EPS files into one logfile.pdf
 void MotionRefiner::combineEPSAndSTARfiles()
@@ -530,43 +410,43 @@ void MotionRefiner::combineEPSAndSTARfiles()
     }
 
     for (long g = 0; g < allMdts.size(); g++)
-	{
+    {
         FileName fn_root = getOutputFileNameRoot(outPath, allMdts[g]);
 
-		if (exists(fn_root+"_tracks.eps"))
+        if (exists(fn_root+"_tracks.eps"))
         {
-			fn_eps.push_back(fn_root+"_tracks.eps");
+              fn_eps.push_back(fn_root+"_tracks.eps");
         }
 
         if (frameRecombiner.doingRecombination() && exists(fn_root+"_shiny.star"))
-		{
-			MetaDataTable mdt;
+        {
+            MetaDataTable mdt;
             mdt.read(fn_root+"_shiny.star");
             mdtAll.append(mdt);
-		}
-	}
+        }
+    }
 
-	if (fn_eps.size() > 0)
-	{
-		joinMultipleEPSIntoSinglePDF(outPath + "logfile.pdf ", fn_eps);
-	}
+    if (fn_eps.size() > 0)
+    {
+         joinMultipleEPSIntoSinglePDF(outPath + "logfile.pdf ", fn_eps);
+    }
 
     if (frameRecombiner.doingRecombination())
     {
-		mdtAll.write(outPath+"shiny.star");
+        mdtAll.write(outPath+"shiny.star");
     }
 
-	if (verb > 0)
-	{
-		std::cout << " + Done! " << std::endl;
-		std::cout << " + Written logfile in " << outPath << "logfile.pdf" << std::endl;
+    if (verb > 0)
+    {
+        std::cout << " + Done! " << std::endl;
+        std::cout << " + Written logfile in " << outPath << "logfile.pdf" << std::endl;
 
         if (frameRecombiner.doingRecombination())
         {
             std::cout << " + Written new particle STAR file in "
                       << outPath << "shiny.star" << std::endl;
         }
-	}
+    }
 }
 
 // Get the output filename from the micrograph filename
