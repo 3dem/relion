@@ -76,7 +76,7 @@ else(NOT DEFINED CUDA_ARCH)
     message(STATUS "Using provided CUDA_ARCH=${CUDA_ARCH}")
     set(CUDARCH "-arch=sm_${CUDA_ARCH}")
 endif(NOT DEFINED CUDA_ARCH)
-
+    
 # -------------------------------------------------------------------FURTHER OPTIONS--
 option(CUDA "Enable CUDA GPU acceleration" ON)
 option(ALTCPU "Enable Accelerated CPU version" OFF)
@@ -257,30 +257,11 @@ endif(GUI)
 if(NOT MKLFFT)
 	option(FORCE_OWN_FFTW "FORCE_OWN_FFTW" OFF)
 	
-	if(DoublePrec_CPU OR DoublePrec_ACC)
-		set(FFTW_DOUBLE_REQUIRED TRUE)
-		message(STATUS "Double-precision FFT is required.")
-	else()
-		set(FFTW_DOUBLE_REQUIRED FALSE)
-		message(STATUS "Double-precision FFT is NOT required.")
-	endif()
-	
-	if(NOT DoublePrec_CPU OR NOT DoublePrec_ACC)
-		set(FFTW_SINGLE_REQUIRED TRUE)
-		message(STATUS "Single-precision FFT is required.")
-	else()
-		set(FFTW_SINGLE_REQUIRED FALSE)
-		message(STATUS "Single-precision FFT is NOT required.")
-	endif()
-	
+	set(FFTW_DOUBLE_REQUIRED TRUE)
+	set(FFTW_SINGLE_REQUIRED TRUE)
+		
 	if(NOT FORCE_OWN_FFTW)
-		if(FFTW_SINGLE_REQUIRED AND FFTW_DOUBLE_REQUIRED)
-			FIND_PACKAGE(FFTW COMPONENTS SINGLE DOUBLE)
-		elseif(FFTW_DOUBLE_REQUIRED)
-			FIND_PACKAGE(FFTW COMPONENTS DOUBLE)
-		elseif(FFTW_SINGLE_REQUIRED)
-			FIND_PACKAGE(FFTW COMPONENTS SINGLE)
-		endif()
+		FIND_PACKAGE(FFTW COMPONENTS SINGLE DOUBLE)
 	endif(NOT FORCE_OWN_FFTW)
 
 	if(NOT FFTW_FOUND)

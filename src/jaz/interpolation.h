@@ -202,7 +202,7 @@ class Interpolation
         }
 
         template<typename T>
-        static gravis::t2Vector<RFLOAT> cubicXYgrad(const Image<T>& img, double x, double y, int z = 0, int n = 0, bool wrap = false)
+        static gravis::t2Vector<T> cubicXYgrad(const Image<T>& img, double x, double y, int z = 0, int n = 0, bool wrap = false)
         {
             if (wrap)
             {
@@ -284,7 +284,7 @@ class Interpolation
             const gravis::d4Vector xxd(3.0*xf*xf, 2.0*xf, 1.0, 0.0);
             const gravis::d4Vector yyd(3.0*yf*yf, 2.0*yf, 1.0, 0.0);
 
-            return gravis::t2Vector<RFLOAT>(xxd.dot(AVA * yy), xx.dot(AVA * yyd));
+            return gravis::t2Vector<T>(xxd.dot(AVA * yy), xx.dot(AVA * yyd));
         }
 
         static void test2D();

@@ -36,7 +36,9 @@ class AlignmentSet
             std::vector<gravis::t2Vector<int>> accCoords;
 
 
-        void copyCC(int m, int p, int f, const Image<double>& src);
+		template<class T2>
+        void copyCC(int m, int p, int f, const Image<T2>& src);
+		
         void accelerate(const Image<Complex>& img, std::vector<gravis::t2Vector<T>>& dest);
         void accelerate(const Image<RFLOAT>& img, std::vector<double>& dest);
 
@@ -129,7 +131,8 @@ AlignmentSet<T>::AlignmentSet(
 }
 
 template<class T>
-void AlignmentSet<T>::copyCC(int m, int p, int f, const Image<double> &src)
+template<class T2>
+void AlignmentSet<T>::copyCC(int m, int p, int f, const Image<T2> &src)
 {
     if (m < 0 || m >= mc ||
         p < 0 || p >= CCs[m].size() ||

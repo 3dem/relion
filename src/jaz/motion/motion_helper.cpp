@@ -28,15 +28,15 @@ std::vector<std::vector<Image<RFLOAT>>> MotionHelper::movieCC(
     std::vector<std::vector<Image<RFLOAT>>> out(pc);
 
     std::vector<Image<dComplex>> ccsFs(threads);
-    std::vector<Image<RFLOAT>> ccsRs(threads);
+    std::vector<Image<double>> ccsRs(threads);
 
     for (int t = 0; t < threads; t++)
     {
-        ccsFs[t] = Image<Complex>(sh,s);
+        ccsFs[t] = Image<dComplex>(sh,s);
         ccsFs[t].data.xinit = 0;
         ccsFs[t].data.yinit = 0;
 
-        ccsRs[t] = Image<RFLOAT>(s,s);
+        ccsRs[t] = Image<double>(s,s);
         ccsRs[t].data.xinit = 0;
         ccsRs[t].data.yinit = 0;
     }
@@ -57,10 +57,8 @@ std::vector<std::vector<Image<RFLOAT>>> MotionHelper::movieCC(
             {
                 Complex z = movie[p][f](y,x) * damageWeights[f](y,x) * preds[p](y,x).conj();
                 ccsFs[t](y,x) = dComplex(z.real, z.imag);
-                //ccsFs[t](y,x) = movie[p][f](y,x) * damageWeights[f](y,x) * preds[p](y,x).conj();
             }
 
-            //fts[t].inverseFourierTransform(ccsFs[t](), ccsRs[t]());
             NewFFT::inverseFourierTransform(ccsFs[t](), ccsRs[t](), plan);
 
             for (int y = 0; y < s; y++)
