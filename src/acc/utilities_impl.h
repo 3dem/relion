@@ -57,7 +57,7 @@ void dump_array(char *name, size_t *ptr, size_t size)
 	FILE *fp = fopen(name, "w");
 	fprintf(fp, "Array size:  %ld\n", size);
 	for (size_t i=0; i < size; i++) {
-		fprintf(fp, "%d, ", ptr[i]);
+		fprintf(fp, "%zu, ", ptr[i]);
 		count++;
 		if (count > 10) {
 			fprintf(fp, "\n");
