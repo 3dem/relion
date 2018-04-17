@@ -479,15 +479,15 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
     browse_grp[12]->end();
 
     browse_grp[13] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-	browser->add("Movie refinement");
+	browser->add("Motion refinement");
 	gui_jobwindows[13] = new JobWindow();
-	gui_jobwindows[13]->initialise(PROC_MOVIEREFINE, maingui_do_old_style);
+	gui_jobwindows[13]->initialise(PROC_MOTIONREFINE, maingui_do_old_style);
     browse_grp[13]->end();
 
     browse_grp[14] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-	browser->add("Particle polishing");
+	browser->add("CTF refinement");
 	gui_jobwindows[14] = new JobWindow();
-	gui_jobwindows[14]->initialise(PROC_POLISH, maingui_do_old_style);
+	gui_jobwindows[14]->initialise(PROC_CTFREFINE, maingui_do_old_style);
     browse_grp[14]->end();
 
     browse_grp[15] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
@@ -519,18 +519,6 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	gui_jobwindows[19] = new JobWindow();
 	gui_jobwindows[19]->initialise(PROC_RESMAP, maingui_do_old_style);
     browse_grp[19]->end();
-
-    browse_grp[20] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-	browser->add("Motion Fit");
-	gui_jobwindows[20] = new JobWindow();
-	gui_jobwindows[20]->initialise(PROC_MOTIONFIT, maingui_do_old_style);
-    browse_grp[20]->end();
-
-    browse_grp[21] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-	browser->add("CTF refine");
-	gui_jobwindows[21] = new JobWindow();
-	gui_jobwindows[21]->initialise(PROC_CTFREFINE, maingui_do_old_style);
-    browse_grp[21]->end();
 
     browser->callback(cb_select_browsegroup);
     browser->textsize(RLN_FONTSIZE);

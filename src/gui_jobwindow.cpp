@@ -498,10 +498,10 @@ void JobWindow::initialise(int my_job_type, bool _do_oldstyle)
 		myjob.initialise(my_job_type);
 		initialiseLocresWindow();
 	}
-	else if (my_job_type == PROC_MOTIONFIT)
+	else if (my_job_type == PROC_MOTIONREFINE)
 	{
 		myjob.initialise(my_job_type);
-		initialiseMotionfitWindow();
+		initialiseMotionrefineWindow();
 	}
 	else if (my_job_type == PROC_CTFREFINE)
 	{
@@ -547,7 +547,7 @@ void JobWindow::initialiseImportWindow()
 void JobWindow::initialiseMotioncorrWindow()
 {
 
-	setupTabs(4);
+	setupTabs(3);
 
 	tab1->begin();
 	tab1->label("I/O");
@@ -565,26 +565,19 @@ void JobWindow::initialiseMotioncorrWindow()
 	tab1->end();
 
 	tab2->begin();
-	tab2->label("Motioncor2");
+	tab2->label("Motion");
 	resetHeight();
 
-	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group1->end();
-
-	place("do_motioncor2", TOGGLE_DEACTIVATE, group1);
-
-	group1->begin();
-
-	place("fn_gain_ref", TOGGLE_DEACTIVATE);
+	place("bfactor", TOGGLE_DEACTIVATE);
 	place2("patch_x", "patch_y", "Number of patches X, Y", TOGGLE_DEACTIVATE);
 	place("group_frames", TOGGLE_DEACTIVATE);
 	place("bin_factor", TOGGLE_DEACTIVATE);
-	place("bfactor", TOGGLE_DEACTIVATE);
+	place("fn_gain_ref", TOGGLE_DEACTIVATE);
 
 	current_y += STEPY/2;
 	group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group4->end();
-	place("do_3rd_motioncor", TOGGLE_DEACTIVATE, group4);
+	place("do_own_motioncor", TOGGLE_DEACTIVATE, group4, true);
 	group4->begin();
 	place("fn_motioncor2_exe", TOGGLE_DEACTIVATE);
 	place("fn_defect", TOGGLE_DEACTIVATE);
@@ -592,31 +585,12 @@ void JobWindow::initialiseMotioncorrWindow()
 	place("other_motioncor2_args", TOGGLE_DEACTIVATE);
 	group4->end();
 
-	guientries["do_3rd_motioncor"].cb_menu_i(); // make default active
-	group1->end();
-	guientries["do_motioncor2"].cb_menu_i(); // make default active
+	guientries["do_own_motioncor"].cb_menu_i(); // make default active
 
 	tab2->end();
+
 	tab3->begin();
-	tab3->label("Unblur");
-	resetHeight();
-
-	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group2->end();
-
-	place("do_unblur", TOGGLE_DEACTIVATE, group2);
-
-	group2->begin();
-
-	place("fn_unblur_exe", TOGGLE_DEACTIVATE);
-	place("fn_summovie_exe", TOGGLE_DEACTIVATE);
-
-	group2->end();
-	guientries["do_unblur"].cb_menu_i(); // make default active
-
-	tab3->end();
-	tab4->begin();
-	tab4->label("Dose-weight");
+	tab3->label("Dose-weight");
 	resetHeight();
 
 	group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
@@ -632,7 +606,7 @@ void JobWindow::initialiseMotioncorrWindow()
 
 	group3->end();
 	guientries["do_dose_weighting"].cb_menu_i(); // make default active
-	tab4->end();
+	tab3->end();
 
 }
 
@@ -2259,7 +2233,7 @@ void JobWindow::initialiseLocresWindow()
 
 }
 
-void JobWindow::initialiseMotionfitWindow()
+void JobWindow::initialiseMotionrefineWindow()
 {
 	setupTabs(3);
 
@@ -2280,7 +2254,7 @@ void JobWindow::initialiseMotionfitWindow()
 	tab1->end();
 
 	tab2->begin();
-	tab2->label("MotionFit");
+	tab2->label("Motion");
 	resetHeight();
 
 	// motion_fit
@@ -2290,14 +2264,28 @@ void JobWindow::initialiseMotionfitWindow()
 
 	group1->begin();
 
+	current_y += STEPY /2 ;
+
 	place("sigma_vel", TOGGLE_DEACTIVATE);
 	place("sigma_div", TOGGLE_DEACTIVATE);
 	place("sigma_acc", TOGGLE_DEACTIVATE);
-	place("max_iters", TOGGLE_DEACTIVATE);
-	place("do_pad1", TOGGLE_DEACTIVATE);
 
-	group1->end();
-	guientries["do_fit"].cb_menu_i();
+	//place("max_iters", TOGGLE_DEACTIVATE);
+
+	current_y += STEPY /2 ;
+
+	//combine_frames
+	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group2->end();
+	place("do_param_optim", TOGGLE_LEAVE_ACTIVE, group2);
+
+	group2->begin();
+
+	place("optim_freq_cutoff");
+	place("optim_min_part");
+
+	group2->end();
+	guientries["do_param_optim"].cb_menu_i();
 
 	tab2->end();
 
@@ -2306,16 +2294,16 @@ void JobWindow::initialiseMotionfitWindow()
 	resetHeight();
 
 	//combine_frames
-	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group2->end();
-	place("do_combine", TOGGLE_LEAVE_ACTIVE, group2);
+	group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group3->end();
+	place("do_combine", TOGGLE_LEAVE_ACTIVE, group3);
 
-	group2->begin();
+	group3->begin();
 
 	place("minres", TOGGLE_DEACTIVATE);
 	place("maxres", TOGGLE_DEACTIVATE);
 
-	group2->end();
+	group3->end();
 	guientries["do_combine"].cb_menu_i();
 
 	tab3->end();
