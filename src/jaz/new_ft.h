@@ -164,13 +164,20 @@ class NewFFT
 
                 bool isCompatible(const MultidimArray<double>& real) const
                 {
-                    return real.xdim == w && real.ydim == h && real.zdim == d;
+                    return real.xdim == w && real.ydim == h && real.zdim == d
+							&& (reusable || realPtr == MULTIDIM_ARRAY(real));
                 }
 
                 bool isCompatible(const MultidimArray<dComplex>& complex) const
                 {
-                    return complex.xdim == w/2+1 && complex.ydim == h && complex.zdim == d;
+                    return complex.xdim == w/2+1 && complex.ydim == h && complex.zdim == d							
+							&& (reusable || complexPtr == (double*)MULTIDIM_ARRAY(complex));
                 }
+				
+				bool isReusable() const
+				{
+					return reusable;
+				}
 
             private:
 
@@ -195,7 +202,9 @@ class NewFFT
                         fftw_plan forward, backward;
                 };
 
+				bool reusable;
                 int w, h, d;
+				double *realPtr, *complexPtr;
                 std::shared_ptr<Plan> plan;
         };
 
@@ -222,13 +231,20 @@ class NewFFT
 
                 bool isCompatible(const MultidimArray<float>& real) const
                 {
-                    return real.xdim == w && real.ydim == h && real.zdim == d;
+                    return (real.xdim == w && real.ydim == h && real.zdim == d)
+							&& (reusable || realPtr == MULTIDIM_ARRAY(real));
                 }
 
                 bool isCompatible(const MultidimArray<fComplex>& complex) const
                 {
-                    return complex.xdim == w/2+1 && complex.ydim == h && complex.zdim == d;
+                    return (complex.xdim == w/2+1 && complex.ydim == h && complex.zdim == d)
+							&& (reusable || complexPtr == (float*)MULTIDIM_ARRAY(complex));
                 }
+				
+				bool isReusable() const
+				{
+					return reusable;
+				}
 
 
 
@@ -254,8 +270,10 @@ class NewFFT
 
                         fftwf_plan forward, backward;
                 };
-
+				
+				bool reusable;
                 int w, h, d;
+				float *realPtr, *complexPtr;
                 std::shared_ptr<Plan> plan;
         };
 
