@@ -127,8 +127,8 @@ class NewFFT
 		
 		template<class T>
 		static bool areSizesCompatible(
-				MultidimArray<T>& real,
-				MultidimArray<tComplex<T>>& complex)
+				const MultidimArray<T>& real,
+				const MultidimArray<tComplex<T>>& complex)
 		{
 			return real.xdim == 2 * (complex.xdim - 1)
 			    && real.ydim == complex.ydim
