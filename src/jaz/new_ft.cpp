@@ -32,27 +32,7 @@ void NewFFT::FourierTransform(
 		}
 	}
 	
-	fftw_execute_dft_r2c(plan.getForward(),
-						 MULTIDIM_ARRAY(src), (fftw_complex*) MULTIDIM_ARRAY(dest));
-	
-	if (normalization == FwdOnly)
-	{
-		const double scale = MULTIDIM_SIZE(src);
-		
-		for (long int i = 0; i < NZYXSIZE(dest); i++)
-		{
-			dest.data[i] /= scale;
-		}
-	}
-	else if (normalization == Both)
-	{
-		const double scale = sqrt(MULTIDIM_SIZE(src));
-		
-		for (long int i = 0; i < NZYXSIZE(dest); i++)
-		{
-			dest.data[i] /= scale;
-		}
-	}
+	_FourierTransform(src, dest, plan, normalization);
 }
 
 void NewFFT::inverseFourierTransform(
@@ -84,29 +64,16 @@ void NewFFT::inverseFourierTransform(
 		}
 	}
 	
-	fftw_complex* in;
 	MultidimArray<dComplex> src2;
 	
 	if (preserveInput)
 	{
 		src2 = src;
-		in = (fftw_complex*) MULTIDIM_ARRAY(src2);
+		_inverseFourierTransform(src2, dest, plan, normalization);
 	}
 	else
 	{
-		in = (fftw_complex*) MULTIDIM_ARRAY(src);
-	}
-	
-	fftw_execute_dft_c2r(plan.getBackward(), in, MULTIDIM_ARRAY(dest));
-	
-	if (normalization == Both)
-	{
-		const double scale = sqrt(MULTIDIM_SIZE(dest));
-		
-		for (long int i = 0; i < NZYXSIZE(dest); i++)
-		{
-			dest.data[i] /= scale;
-		}
+		_inverseFourierTransform(src, dest, plan, normalization);
 	}
 }
 
@@ -133,27 +100,7 @@ void NewFFT::FourierTransform(
 		}
 	}
 	
-	fftwf_execute_dft_r2c(plan.getForward(),
-						  MULTIDIM_ARRAY(src), (fftwf_complex*) MULTIDIM_ARRAY(dest));
-	
-	if (normalization == FwdOnly)
-	{
-		const float scale = MULTIDIM_SIZE(src);
-		
-		for (long int i = 0; i < NZYXSIZE(dest); i++)
-		{
-			dest.data[i] /= scale;
-		}
-	}
-	else if (normalization == Both)
-	{
-		const float scale = sqrt(MULTIDIM_SIZE(src));
-		
-		for (long int i = 0; i < NZYXSIZE(dest); i++)
-		{
-			dest.data[i] /= scale;
-		}
-	}
+	_FourierTransform(src, dest, plan, normalization);
 }
 
 void NewFFT::inverseFourierTransform(
@@ -185,29 +132,16 @@ void NewFFT::inverseFourierTransform(
 		}
 	}
 	
-	fftwf_complex* in;
 	MultidimArray<fComplex> src2;
 	
 	if (preserveInput)
 	{
 		src2 = src;
-		in = (fftwf_complex*) MULTIDIM_ARRAY(src2);
+		_inverseFourierTransform(src2, dest, plan, normalization);
 	}
 	else
 	{
-		in = (fftwf_complex*) MULTIDIM_ARRAY(src);
-	}
-	
-	fftwf_execute_dft_c2r(plan.getBackward(), in, MULTIDIM_ARRAY(dest));
-	
-	if (normalization == Both)
-	{
-		const float scale = sqrt(MULTIDIM_SIZE(dest));
-		
-		for (long int i = 0; i < NZYXSIZE(dest); i++)
-		{
-			dest.data[i] /= scale;
-		}
+		_inverseFourierTransform(src, dest, plan, normalization);
 	}
 }
 
@@ -224,7 +158,7 @@ void NewFFT::FourierTransform(
 	}
 			
 	DoublePlan p(src, dest);
-	FourierTransform(src, dest, p, normalization);
+	_FourierTransform(src, dest, p, normalization);
 }
 
 void NewFFT::inverseFourierTransform(
@@ -242,12 +176,12 @@ void NewFFT::inverseFourierTransform(
 	{
 		MultidimArray<dComplex> src2 = src;
 		DoublePlan p(dest, src2);
-		inverseFourierTransform(src2, dest, p, normalization, false);
+		_inverseFourierTransform(src2, dest, p, normalization);
 	}
 	else
 	{
 		DoublePlan p(dest, src);
-		inverseFourierTransform(src, dest, p, normalization, false);
+		_inverseFourierTransform(src, dest, p, normalization);
 	}
 }
 
@@ -262,7 +196,7 @@ void NewFFT::FourierTransform(
 	}
 			
 	FloatPlan p(src, dest);
-	FourierTransform(src, dest, p, normalization);
+	_FourierTransform(src, dest, p, normalization);
 }
 
 void NewFFT::inverseFourierTransform(
@@ -280,16 +214,115 @@ void NewFFT::inverseFourierTransform(
 	{
 		MultidimArray<fComplex> src2 = src;
 		FloatPlan p(dest, src2);
-		inverseFourierTransform(src2, dest, p, normalization, false);
+		_inverseFourierTransform(src2, dest, p, normalization);
 	}
 	else
 	{
 		FloatPlan p(dest, src);
-		inverseFourierTransform(src, dest, p, normalization, false);
+		_inverseFourierTransform(src, dest, p, normalization);
 	}
 }
 
 
+void NewFFT::_FourierTransform(
+		MultidimArray<double>& src,
+		MultidimArray<dComplex>& dest,
+		const NewFFT::DoublePlan& plan,
+		Normalization normalization)
+{
+	fftw_execute_dft_r2c(plan.getForward(),
+						 MULTIDIM_ARRAY(src), (fftw_complex*) MULTIDIM_ARRAY(dest));
+	
+	if (normalization == FwdOnly)
+	{
+		const double scale = MULTIDIM_SIZE(src);
+		
+		for (long int i = 0; i < NZYXSIZE(dest); i++)
+		{
+			dest.data[i] /= scale;
+		}
+	}
+	else if (normalization == Both)
+	{
+		const double scale = sqrt(MULTIDIM_SIZE(src));
+		
+		for (long int i = 0; i < NZYXSIZE(dest); i++)
+		{
+			dest.data[i] /= scale;
+		}
+	}
+}
+
+void NewFFT::_inverseFourierTransform(
+		MultidimArray<dComplex>& src,
+		MultidimArray<double>& dest,
+		const NewFFT::DoublePlan& plan,
+		Normalization normalization)
+{
+	fftw_complex* in = (fftw_complex*) MULTIDIM_ARRAY(src);
+	
+	fftw_execute_dft_c2r(plan.getBackward(), in, MULTIDIM_ARRAY(dest));
+	
+	if (normalization == Both)
+	{
+		const double scale = sqrt(MULTIDIM_SIZE(dest));
+		
+		for (long int i = 0; i < NZYXSIZE(dest); i++)
+		{
+			dest.data[i] /= scale;
+		}
+	}
+}
+
+void NewFFT::_FourierTransform(
+		MultidimArray<float>& src,
+		MultidimArray<fComplex>& dest,
+		const NewFFT::FloatPlan& plan,
+		Normalization normalization)
+{
+	fftwf_execute_dft_r2c(plan.getForward(),
+						  MULTIDIM_ARRAY(src), (fftwf_complex*) MULTIDIM_ARRAY(dest));
+	
+	if (normalization == FwdOnly)
+	{
+		const float scale = MULTIDIM_SIZE(src);
+		
+		for (long int i = 0; i < NZYXSIZE(dest); i++)
+		{
+			dest.data[i] /= scale;
+		}
+	}
+	else if (normalization == Both)
+	{
+		const float scale = sqrt(MULTIDIM_SIZE(src));
+		
+		for (long int i = 0; i < NZYXSIZE(dest); i++)
+		{
+			dest.data[i] /= scale;
+		}
+	}
+}
+
+void NewFFT::_inverseFourierTransform(
+		MultidimArray<fComplex>& src,
+		MultidimArray<float>& dest,
+		const NewFFT::FloatPlan& plan,
+		Normalization normalization)
+{	
+	fftwf_complex* in = (fftwf_complex*) MULTIDIM_ARRAY(src);
+	
+	fftwf_execute_dft_c2r(plan.getBackward(), in, MULTIDIM_ARRAY(dest));
+	
+	if (normalization == Both)
+	{
+		const float scale = sqrt(MULTIDIM_SIZE(dest));
+		
+		for (long int i = 0; i < NZYXSIZE(dest); i++)
+		{
+			dest.data[i] /= scale;
+		}
+	}
+}
 
 
 NewFFT::DoublePlan::DoublePlan(int w, int h, int d, unsigned int flags)

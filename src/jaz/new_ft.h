@@ -123,6 +123,7 @@ class NewFFT
                 MultidimArray<float>& dest,
                 Normalization normalization = FwdOnly,
                 bool preserveInput = true);
+	
 		
 		template<class T>
 		static bool areSizesCompatible(
@@ -150,6 +151,41 @@ class NewFFT
 		{
 			complex.resizeNoCp(real.ndim, real.zdim, real.ydim, real.xdim/2 + 1);
 		}
+	
+		
+	private:
+		
+		/* Private static methods that perform the actual transforms.
+		   The arrays are guaranteed to have the correct sizes 
+		   and a compatible plan when these are called. 
+		   Also, the complex array is always destroyed in the 
+		   inverse transform - a copy has been made before.*/
+		
+		static void _FourierTransform(
+                MultidimArray<double>& src,
+                MultidimArray<dComplex>& dest,
+                const DoublePlan& plan,
+                Normalization normalization);
+
+        static void _inverseFourierTransform(
+                MultidimArray<dComplex>& src,
+                MultidimArray<double>& dest,
+                const DoublePlan& plan,
+                Normalization normalization);
+
+        static void _FourierTransform(
+                MultidimArray<float>& src,
+                MultidimArray<fComplex>& dest,
+                const FloatPlan& plan,
+                Normalization normalization);
+
+        static void _inverseFourierTransform(
+                MultidimArray<fComplex>& src,
+                MultidimArray<float>& dest,
+                const FloatPlan& plan,
+                Normalization normalization);
+		
+	public:
 
 
         /* These plan classes can be copied freely.
