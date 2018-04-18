@@ -218,6 +218,11 @@ void NewFFT::FourierTransform(
 		MultidimArray<dComplex>& dest,
 		Normalization normalization)
 {
+	if (!areSizesCompatible(src, dest))
+	{
+		resizeComplexToMatch(src, dest);
+	}
+			
 	DoublePlan p(src, dest);
 	FourierTransform(src, dest, p, normalization);
 }
@@ -228,6 +233,11 @@ void NewFFT::inverseFourierTransform(
 		Normalization normalization,
 		bool preserveInput)
 {
+	if (!areSizesCompatible(dest, src))
+	{
+		resizeRealToMatch(dest, src);
+	}
+			
 	if (preserveInput)
 	{
 		MultidimArray<dComplex> src2 = src;
@@ -246,6 +256,11 @@ void NewFFT::FourierTransform(
 		MultidimArray<fComplex>& dest,
 		Normalization normalization)
 {
+	if (!areSizesCompatible(src, dest))
+	{
+		resizeComplexToMatch(src, dest);
+	}
+			
 	FloatPlan p(src, dest);
 	FourierTransform(src, dest, p, normalization);
 }
@@ -256,6 +271,11 @@ void NewFFT::inverseFourierTransform(
 		Normalization normalization,
 		bool preserveInput)
 {
+	if (!areSizesCompatible(dest, src))
+	{
+		resizeRealToMatch(dest, src);
+	}
+			
 	if (preserveInput)
 	{
 		MultidimArray<fComplex> src2 = src;

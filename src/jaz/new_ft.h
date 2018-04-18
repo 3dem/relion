@@ -123,6 +123,33 @@ class NewFFT
                 MultidimArray<float>& dest,
                 Normalization normalization = FwdOnly,
                 bool preserveInput = true);
+		
+		template<class T>
+		static bool areSizesCompatible(
+				MultidimArray<T>& real,
+				MultidimArray<tComplex<T>>& complex)
+		{
+			return real.xdim == 2 * (complex.xdim - 1)
+			    && real.ydim == complex.ydim
+			    && real.zdim == complex.zdim
+			    && real.ndim == complex.ndim;
+		}
+		
+		template<class T>
+		static bool resizeRealToMatch(
+				MultidimArray<T>& real,
+				const MultidimArray<tComplex<T>>& complex)
+		{
+			real.resizeNoCp(complex.ndim, complex.zdim, complex.ydim, 2 * (complex.xdim - 1));
+		}
+		
+		template<class T>
+		static bool resizeComplexToMatch(
+				const MultidimArray<T>& real,
+				MultidimArray<tComplex<T>>& complex)
+		{
+			complex.resizeNoCp(real.ndim, real.zdim, real.ydim, real.xdim/2 + 1);
+		}
 
 
         /* These plan classes can be copied freely.
