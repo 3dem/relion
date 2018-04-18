@@ -4606,12 +4606,11 @@ The mask used for this postprocessing will be applied to the unfiltered half-map
 	joboptions["sigma_vel"] = JobOption("Sigma for velocity (A/dose): ", 1.6, 1., 10., 0.1, "Standard deviation for the velocity regularisation. Smaller values allow for only shorter tracks.");
 	joboptions["sigma_div"] = JobOption("Sigma for divergence (A): ", 500, 0, 3000, 100, "Standard deviation for the divergence of tracks across the micrograph. Smaller values allow for TODO EXPLAIN");
 	joboptions["sigma_acc"] = JobOption("Sigma for acceleration (A/dose): ", 3, -1, 0, 0.1, "Standard deviation for the acceleration regularisation. TODO EXPLAIN");
-	//joboptions["max_iters"] = JobOption("Maximum number of iterations: ", 10000, 2000, 50000, 1000, "Maximum number of iterations for the optimisation per micrograph.");
 
 	// Parameter optimisation
 	joboptions["do_param_optim"] = JobOption("Estimate optimal sigma values?", false, "If set to Yes, then relion_motion_refine will estimate optimal parameter values for the three sigma values above on a subset of the data (determined by the minimum number of particles to be used below).");
-	joboptions["optim_freq_cutoff"] = JobOption("Freq. for evaluation cutoff (A): ", 8, 4, 20, 0.5, "Frequency (in A) below which all Fourier components will be used for parameter estimation and above which will be used for evaluation of the fits");
-	joboptions["optim_min_part"] = JobOption("Use this many particles: ", 2000, 500, 10000, 500, "Use at least this many particles for the meta-parameter optimisation. The more particles the more expensive in time and computer memory the calculation becomes, but the better the results may get.");
+	joboptions["optim_cutoff"] = JobOption("Four. ring for evaluation cutoff (A): ", 100, 10, 500, 10, "Fouring ring below which all Fourier components will be used for parameter estimation and above which will be used for evaluation of the fits. A good value could be the number of the ring to which the resolution of the reference extends MINUS 50.");
+	joboptions["optim_min_part"] = JobOption("Use this many particles: ", 5000, 500, 20000, 500, "Use at least this many particles for the meta-parameter optimisation. The more particles the more expensive in time and computer memory the calculation becomes, but the better the results may get.");
 
 	//combine_frames
 	joboptions["do_combine"] = JobOption("Generate shiny particles?", true, "If set to Yes, then relion_combine_frames will be run to combine all (aligned) movie frames, using a dose-weighting scheme that is estimated from the data");
@@ -4706,8 +4705,8 @@ bool RelionJob::getCommandsMotionrefineJob(std::string &outputname, std::vector<
 			}
 
 			command += " --min_p " + joboptions["optim_min_part"].getString();
-			command += " --k_cut_A " + joboptions["optim_freq_cutoff"].getString();
-			command += " --k_eval_A " + joboptions["optim_freq_cutoff"].getString();
+			command += " --k_cut " + joboptions["optim_cutoff"].getString();
+			command += " --k_eval " + joboptions["optim_cutoff"].getString();
 			command += " --s_vel_0 " + joboptions["sigma_vel"].getString();
 			command += " --s_div_0 " + joboptions["sigma_div"].getString();
 		}
@@ -4718,7 +4717,6 @@ bool RelionJob::getCommandsMotionrefineJob(std::string &outputname, std::vector<
 			command += " --s_vel " + joboptions["sigma_vel"].getString();
 			command += " --s_div " + joboptions["sigma_div"].getString();
 			command += " --s_acc " + joboptions["sigma_acc"].getString();
-			//command += " --max_iters " + joboptions["max_iters"].getString();
 		}
 	}
 	else

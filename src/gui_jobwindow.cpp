@@ -2270,8 +2270,6 @@ void JobWindow::initialiseMotionrefineWindow()
 	place("sigma_div", TOGGLE_DEACTIVATE);
 	place("sigma_acc", TOGGLE_DEACTIVATE);
 
-	//place("max_iters", TOGGLE_DEACTIVATE);
-
 	current_y += STEPY /2 ;
 
 	//combine_frames
@@ -2281,7 +2279,7 @@ void JobWindow::initialiseMotionrefineWindow()
 
 	group2->begin();
 
-	place("optim_freq_cutoff");
+	place("optim_cutoff");
 	place("optim_min_part");
 
 	group2->end();
