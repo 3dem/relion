@@ -19,11 +19,10 @@ class MicrographHandler
             int nr_omp_threads, firstFrame, lastFrame;
             double movie_angpix, coords_angpix, hotCutoff;
 
-            bool preextracted, debug, saveMem, ready;
+            bool debug, saveMem, ready;
 
             std::string corrMicFn;
-            std::string movie_path, meta_path, movie_ending;
-            std::string gain_path, last_gainFn; // make protected
+            std::string last_gainFn; // make protected
 
             gravis::t2Vector<int> micrograph_size;
 
