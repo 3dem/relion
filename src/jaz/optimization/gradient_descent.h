@@ -2,7 +2,7 @@
 #define GRADIENT_DESCENT_H
 
 #include <vector>
-#include <src/jaz/optimization.h>
+#include "optimization.h"
 
 class GradientDescent
 {

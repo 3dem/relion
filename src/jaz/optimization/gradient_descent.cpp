@@ -1,4 +1,4 @@
-#include <src/jaz/gradient_descent.h>
+#include "gradient_descent.h"
 #include <iostream>
 
 std::vector<double> GradientDescent::optimize(
@@ -14,7 +14,9 @@ std::vector<double> GradientDescent::optimize(
 
     std::vector<double> g(n, 0.0), v(n, 0.0);
 
-    double last_f = opt.f(initial);
+    void* tempStorage = opt.allocateTempStorage();
+
+    double last_f = opt.f(initial, tempStorage);
 
     double act_step = step;
     int goodSince = 0, accAfter = 5;
@@ -26,7 +28,7 @@ std::vector<double> GradientDescent::optimize(
 
     for (int i = 0; i < maxIters; i++)
     {
-        opt.grad(x, g);
+        opt.grad(x, g, tempStorage);
 
         for (int j = 0; j < n; j++)
         {
@@ -34,7 +36,7 @@ std::vector<double> GradientDescent::optimize(
             x[j] += v[j];
         }
 
-        double f = opt.f(x);
+        double f = opt.f(x, tempStorage);
 
         if (verbose)
         {
@@ -91,6 +93,8 @@ std::vector<double> GradientDescent::optimize(
         }
 
     }
+
+    opt.deallocateTempStorage(tempStorage);
 
     return x;
 }

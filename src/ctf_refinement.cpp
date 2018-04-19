@@ -19,6 +19,7 @@
  ***************************************************************************/
 
 #include "src/ctf_refinement.h"
+#include <src/time.h>
 
 void CtfRefiner::read(int argc, char **argv)
 {

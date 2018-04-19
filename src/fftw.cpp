@@ -169,19 +169,21 @@ const MultidimArray<Complex > &FourierTransformer::getComplex() const
 
 void FourierTransformer::setReal(MultidimArray<RFLOAT> &input)
 {
-    bool recomputePlan=false;
-    if (fReal==NULL)
-        recomputePlan=true;
-    else if (dataPtr!=MULTIDIM_ARRAY(input))
-        recomputePlan=true;
-    else
-        recomputePlan=!(fReal->sameShape(input));
-
-    fFourier.reshape(ZSIZE(input),YSIZE(input),XSIZE(input)/2+1);
-    fReal=&input;
+	bool recomputePlan = false;
+	
+	if (   fReal == NULL
+		|| dataPtr != MULTIDIM_ARRAY(input)
+		|| !fReal->sameShape(input)
+		|| complexDataPtr != MULTIDIM_ARRAY(fFourier))
+	{
+		recomputePlan = true;
+	}
 
     if (recomputePlan)
     {
+		fFourier.reshape(ZSIZE(input),YSIZE(input),XSIZE(input)/2+1);
+		fReal=&input;
+		
         int ndim=3;
         if (ZSIZE(input)==1)
         {
@@ -239,7 +241,9 @@ void FourierTransformer::setReal(MultidimArray<RFLOAT> &input)
 
         delete [] N;
         dataPtr=MULTIDIM_ARRAY(*fReal);
-    }
+		complexDataPtr = MULTIDIM_ARRAY(fFourier);
+		
+	}
 }
 
 void FourierTransformer::setReal(MultidimArray<Complex > &input)

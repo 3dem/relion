@@ -25,7 +25,6 @@
 #include "src/ctf.h"
 #include "src/image.h"
 #include "src/fftw.h"
-#include <src/backprojector.h>
 #include <src/jaz/image_log.h>
 #include <src/jaz/slice_helper.h>
 #include <src/jaz/spectral_helper.h>
@@ -41,7 +40,6 @@
 #include <src/jaz/refinement_helper.h>
 #include <src/jaz/stack_helper.h>
 #include <src/jaz/tilt_refinement.h>
-#include <src/jaz/motion_refinement.h>
 #include <src/jaz/image_op.h>
 #include <src/jaz/refinement_program.h>
 #include <src/jaz/parallel_ft.h>

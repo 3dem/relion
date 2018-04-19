@@ -12,7 +12,6 @@
 #include <src/fftw.h>
 #include <src/complex.h>
 #include <src/metadata_table.h>
-#include <src/backprojector.h>
 
 #include <src/jaz/obs_model.h>
 #include <src/jaz/stack_helper.h>

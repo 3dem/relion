@@ -18,17 +18,17 @@
  * author citations must be preserved.
  ***************************************************************************/
 
-#include <src/motion_fitter.h>
+#include <src/jaz/motion/motion_refiner.h>
 
 int main(int argc, char *argv[])
 {
-	MotionFitter prm;
+    MotionRefiner prm;
 
 	try
     {
 		prm.read(argc, argv);
 
-		prm.initialise();
+        prm.init();
 
 		prm.run();
     }

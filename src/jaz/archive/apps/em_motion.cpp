@@ -25,7 +25,7 @@
 #include <src/jaz/refinement_helper.h>
 #include <src/jaz/stack_helper.h>
 #include <src/jaz/tilt_refinement.h>
-#include <src/jaz/motion_refinement.h>
+#include <src/jaz/motion/motion_refinement.h>
 #include <src/jaz/image_op.h>
 #include <src/jaz/Fourier_helper.h>
 #include <src/jaz/fsc_helper.h>
@@ -36,7 +36,7 @@
 #include <src/jaz/convolution_helper.h>
 #include <src/jaz/motion_em.h>
 #include <src/jaz/local_motion_fit.h>
-#include <src/jaz/gradient_descent.h>
+#include <src/jaz/optimization/gradient_descent.h>
 #include <src/jaz/parallel_ft.h>
 
 #include <omp.h>
@@ -544,7 +544,7 @@ int main(int argc, char *argv[])
 
                 std::vector<double> grad0(2*fc*pc);
 
-                lmf.grad(initial, grad0);
+                lmf.grad(initial, grad0, 0);
 
                 double gl = 0.0;
 
@@ -643,7 +643,7 @@ int main(int argc, char *argv[])
 
                 std::vector<double> grad0(2*fc*pc);
 
-                lmf.grad(initial, grad0);
+                lmf.grad(initial, grad0, 0);
 
                 double gl = 0.0;
 

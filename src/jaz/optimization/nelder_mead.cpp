@@ -1,4 +1,4 @@
-#include <src/jaz/nelder_mead.h>
+#include "nelder_mead.h"
 #include <src/jaz/index_sort.h>
 #include <iostream>
 #include <cmath>
@@ -8,7 +8,7 @@ std::vector<double> NelderMead::optimize(
         const Optimization& opt,
         double initialStep, double tolerance, long maxIters,
         double alpha, double gamma, double rho, double sigma,
-        bool verbose)
+        bool verbose, double* minCost)
 {
     const double n = initial.size();
     const double m = initial.size() + 1;
@@ -28,10 +28,12 @@ std::vector<double> NelderMead::optimize(
     std::vector<double> values(m), nextValues(m), centroid(n),
             reflected(n), expanded(n), contracted(n);
 
+    void* tempStorage = opt.allocateTempStorage();
+
     // compute values
     for (int j = 0; j < m; j++)
     {
-        values[j] = opt.f(simplex[j]);
+        values[j] = opt.f(simplex[j], tempStorage);
     }
 
     if (verbose)
@@ -43,6 +45,8 @@ std::vector<double> NelderMead::optimize(
     {
         // sort x and f(x) by ascending f(x)
         std::vector<int> order = IndexSort<double>::sortIndices(values);
+
+        opt.report(i, values[order[0]], simplex[order[0]]);
 
         if (verbose)
         {
@@ -104,7 +108,7 @@ std::vector<double> NelderMead::optimize(
             reflected[k] = (1.0 + alpha) * centroid[k] - alpha * simplex[n][k];
         }
 
-        double vRefl = opt.f(reflected);
+        double vRefl = opt.f(reflected, tempStorage);
 
         if (vRefl < values[n-1] && vRefl > values[0])
         {
@@ -121,7 +125,7 @@ std::vector<double> NelderMead::optimize(
                 expanded[k] = (1.0 - gamma) * centroid[k] + gamma * reflected[k];
             }
 
-            double vExp = opt.f(expanded);
+            double vExp = opt.f(expanded, tempStorage);
 
             if (vExp < vRefl)
             {
@@ -143,7 +147,7 @@ std::vector<double> NelderMead::optimize(
             contracted[k] = (1.0 - rho) * centroid[k] + rho * simplex[n][k];
         }
 
-        double vContr = opt.f(contracted);
+        double vContr = opt.f(contracted, tempStorage);
 
         if (vContr < values[n])
         {
@@ -161,11 +165,19 @@ std::vector<double> NelderMead::optimize(
                 simplex[j][k] = (1.0 - sigma) * simplex[0][k] + sigma * simplex[j][k];
             }
 
-            values[j] = opt.f(simplex[j]);
+            values[j] = opt.f(simplex[j], tempStorage);
         }
     }
 
+    opt.deallocateTempStorage(tempStorage);
+
     std::vector<int> order = IndexSort<double>::sortIndices(values);
+
+    if (minCost)
+    {
+        *minCost = values[order[0]];
+    }
+
     return simplex[order[0]];
 }
 

@@ -1,6 +1,6 @@
 #include <src/jaz/fsc_helper.h>
 #include <src/jaz/gravis/t2Matrix.h>
-#include <src/jaz/nelder_mead.h>
+#include <src/jaz/optimization/nelder_mead.h>
 
 using namespace gravis;
 
@@ -654,7 +654,7 @@ BFactorFit::BFactorFit(const Image<RFLOAT> &tau2, const Image<RFLOAT> &weight, i
 {
 }
 
-double BFactorFit::f(const std::vector<double>& x) const
+double BFactorFit::f(const std::vector<double>& x, void* tempStorage) const
 {
     double Bf = x[0]*Bscale;
     double Cf = x[1]*Cscale;

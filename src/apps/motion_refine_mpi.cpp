@@ -18,18 +18,18 @@
  * author citations must be preserved.
  ***************************************************************************/
 
-#include <src/motion_fitter_mpi.h>
+#include <src/jaz/motion/motion_refiner_mpi.h>
 
 
 int main(int argc, char *argv[])
 {
-	MotionFitterMpi prm;
+    MotionRefinerMpi prm;
 
 	try
     {
 		prm.read(argc, argv);
 
-		prm.initialise();
+        prm.init();
 
 		MPI_Barrier(MPI_COMM_WORLD);
 
@@ -38,9 +38,11 @@ int main(int argc, char *argv[])
 
     catch (RelionError XE)
     {
-    	if (prm.verb > 0)
-    		//prm.usage();
-        std::cerr << XE;
+        if (prm.getVerbosityLevel() > 0)
+        {
+            std::cerr << XE;
+        }
+
         MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
     }
 

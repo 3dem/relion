@@ -90,7 +90,7 @@ public:
         created. */
     void FourierTransform();
 
-    /** Inforce Hermitian symmetry.
+    /** Enforce Hermitian symmetry.
         If the Fourier transform risks of losing Hermitian symmetry,
         use this function to renforce it. */
     void enforceHermitianSymmetry();

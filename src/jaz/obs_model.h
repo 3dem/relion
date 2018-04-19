@@ -6,8 +6,8 @@
 #include <src/complex.h>
 #include <src/metadata_table.h>
 #include <src/projector.h>
-#include <src/backprojector.h>
 
+class BackProjector;
 
 class ObservationModel
 {
@@ -21,13 +21,21 @@ class ObservationModel
             double beamtilt_x, beamtilt_y;
             double beamtilt_xx, beamtilt_xy, beamtilt_yy;
             bool hasTilt, anisoTilt, ctfTilt;
-
-        Image<Complex> predictObservation(
-                Projector &proj, const MetaDataTable &mdt, int particle,
-                bool applyCtf, bool applyTilt,
-                double deltaRot = 0.0,
-                double deltaTilt = 0.0,
-                double deltaPsi = 0.0) const;
+			
+		void predictObservation(
+				Projector &proj, const MetaDataTable &mdt, int particle,
+				MultidimArray<Complex>& dest,
+				bool applyCtf, bool applyTilt,
+				double deltaRot = 0.0,
+				double deltaTilt = 0.0,
+				double deltaPsi = 0.0) const;
+		
+		Image<Complex> predictObservation(
+				Projector &proj, const MetaDataTable &mdt, int particle,
+				bool applyCtf, bool applyTilt,
+				double deltaRot = 0.0,
+				double deltaTilt = 0.0,
+				double deltaPsi = 0.0) const;
 
         std::vector<Image<Complex>> predictObservations(
                 Projector &proj, const MetaDataTable &mdt,
@@ -41,6 +49,9 @@ class ObservationModel
                 double shift_x = 0.0, double shift_y = 0.0);
 
         void setAnisoTilt(double xx, double xy, double yy);
+
+        double angToPix(double a, int s);
+        double pixToAng(double p, int s);
 
 };
 
