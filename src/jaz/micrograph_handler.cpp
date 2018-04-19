@@ -277,11 +277,23 @@ void MicrographHandler::loadInitial(
         }
         else
         {
-            FileName mgFn;
-            mdt.getValue(EMDL_MICROGRAPH_NAME, mgFn, 0);
-
+			std::string mgFn0;
+			mdt.getValueToString(EMDL_MICROGRAPH_NAME, mgFn0, 0);
+			FileName fn_pre, fn_jobnr, fn_post;
+			decomposePipelineFileName(mgFn0, fn_pre, fn_jobnr, fn_post);
+						
+			if (movie_ending != "")
+            {
+                fn_post.substr(0, fn_post.find_last_of(".")+1) + movie_ending;
+            }
+			
+			if (movie_path != "")
+            {
+                fn_post = movie_path + "/" + fn_post.substr(fn_post.find_last_of("/")+1);
+            }
+			
             Image<RFLOAT> dum;
-            dum.read(mgFn, false);
+            dum.read(fn_post, false);
             micrograph_size.x = XSIZE(dum());
             micrograph_size.y = YSIZE(dum());
 
