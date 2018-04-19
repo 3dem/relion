@@ -362,7 +362,7 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 	
 	const int pc = movie.size();
 	
-#pragma omp parallel for num_threads(nr_omp_threads)
+	#pragma omp parallel for num_threads(nr_omp_threads)
 	for (int p = 0; p < pc; p++)
 	{
 		StackHelper::varianceNormalize(movie[p], false);

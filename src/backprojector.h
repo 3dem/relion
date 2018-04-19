@@ -283,7 +283,7 @@ public:
                      int max_iter_preweight,
                      bool do_map,
                      RFLOAT tau2_fudge,
-                     MultidimArray<RFLOAT> &tau2_out,
+                     MultidimArray<RFLOAT> &tau2_io,
                      MultidimArray<RFLOAT> &sigma2_out,
                      MultidimArray<RFLOAT> &evidence_vs_prior_out,
                      MultidimArray<RFLOAT> &fourier_coverage_out,

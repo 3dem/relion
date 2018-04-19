@@ -906,7 +906,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
                                 int max_iter_preweight,
                                 bool do_map,
                                 RFLOAT tau2_fudge,
-                                MultidimArray<RFLOAT> &tau2, // can be input/output
+                                MultidimArray<RFLOAT> &tau2_io, // can be input/output
                                 MultidimArray<RFLOAT> &sigma2_out,
                                 MultidimArray<RFLOAT> &data_vs_prior_out,
                                 MultidimArray<RFLOAT> &fourier_coverage_out,
@@ -951,6 +951,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
     // never rely on references (handed to you from the outside) for computation:
     // they could be the same (i.e. reconstruct(..., dummy, dummy, dummy, dummy, ...); )
     MultidimArray<RFLOAT> sigma2, data_vs_prior, fourier_coverage;
+	MultidimArray<RFLOAT> tau2 = tau2_io;
 
 
     RCTIC(ReconTimer,ReconS_1);
@@ -1442,6 +1443,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
     std::cerr<<"done with reconstruct"<<std::endl;
 #endif
 
+	tau2_io = tau2;
     sigma2_out = sigma2;
     data_vs_prior_out = data_vs_prior;
     fourier_coverage_out = fourier_coverage;
