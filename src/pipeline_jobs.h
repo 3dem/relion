@@ -134,7 +134,7 @@ static bool do_allow_change_minimum_dedicated;
 #define PROC_MOVIEREFINE_NAME   "MovieRefine"  // Movie-particle extraction and refinement combined
 #define PROC_INIMODEL_NAME		"InitialModel" // De-novo generation of 3D initial model (using SGD)
 #define PROC_MULTIBODY_NAME		"MultiBody"    // Multi-body refinement
-#define PROC_MOTIONFIT_NAME     "MotionFit"    // Jasenko's motion fitting program (to replace MovieRefine?)
+#define PROC_MOTIONREFINE_NAME  "MotionRefine" // Jasenko's motion fitting program (to replace MovieRefine?)
 #define PROC_CTFREFINE_NAME     "CtfRefine"    // Jasenko's program for defocus and beamtilt optimisation
 
 #define PROC_IMPORT         0 // Import any file as a Node of a given type
@@ -157,9 +157,9 @@ static bool do_allow_change_minimum_dedicated;
 #define PROC_MOVIEREFINE    17// Movie-particle extraction and refinement combined
 #define PROC_INIMODEL		18// De-novo generation of 3D initial model (using SGD)
 #define PROC_MULTIBODY      19// Multi-body refinement
-#define PROC_MOTIONFIT      20// Multi-body refinement
-#define PROC_CTFREFINE      21// Multi-body refinement
-#define NR_BROWSE_TABS      22
+#define PROC_MOTIONREFINE   20// Jasenko's motion_refine
+#define PROC_CTFREFINE      21// Jasenko's ctf_refine
+#define NR_BROWSE_TABS      20
 
 // Status a Process may have
 #define PROC_RUNNING   0
@@ -427,8 +427,8 @@ public:
 	bool getCommandsLocalresJob(std::string &outputname, std::vector<std::string> &commands,
 			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
 
-	void initialiseMotionfitJob();
-	bool getCommandsMotionfitJob(std::string &outputname, std::vector<std::string> &commands,
+	void initialiseMotionrefineJob();
+	bool getCommandsMotionrefineJob(std::string &outputname, std::vector<std::string> &commands,
 			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
 
 	void initialiseCtfrefineJob();
