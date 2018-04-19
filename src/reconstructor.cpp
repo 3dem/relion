@@ -39,7 +39,8 @@ void Reconstructor::read(int argc, char **argv)
     intact_ctf_first_peak = parser.checkOption("--ctf_intact_first_peak", "Leave CTFs intact until first peak");
     ctf_phase_flipped = parser.checkOption("--ctf_phase_flipped", "Images have been phase flipped");
     only_flip_phases = parser.checkOption("--only_flip_phases", "Do not correct CTF-amplitudes, only flip phases");
-    beamtilt_x = textToFloat(parser.getOption("--beamtilt_x", "Beamtilt in the X-direction (in mrad)", "0."));
+    ctf_premultiplied = parser.checkOption("--ctf_multiplied", "Have the data been premultiplied with their CTF?");
+	beamtilt_x = textToFloat(parser.getOption("--beamtilt_x", "Beamtilt in the X-direction (in mrad)", "0."));
     beamtilt_y = textToFloat(parser.getOption("--beamtilt_y", "Beamtilt in the Y-direction (in mrad)", "0."));
     cl_beamtilt = (ABS(beamtilt_x) > 0. || ABS(beamtilt_y) > 0.);
 
@@ -365,18 +366,21 @@ void Reconstructor::backprojectOneParticle(long int p)
     CenterFFT(img(), true);
     transformer.FourierTransform(img(), F2D);
 
-    if (ABS(XX(trans)) > 0. || ABS(YY(trans)) > 0.)
+    if (do_3d_rot)
     {
-        if (do_3d_rot)
-        {
+    	if (ABS(XX(trans)) > 0. || ABS(YY(trans)) > 0. || ABS(ZZ(trans)) > 0. )
+    	{
             shiftImageInFourierTransform(F2D, F2D,
                 XSIZE(img()), XX(trans), YY(trans), ZZ(trans));
-        }
-        else
-        {
+    	}
+    }
+    else
+    {
+    	if (ABS(XX(trans)) > 0. || ABS(YY(trans)) > 0.)
+    	{
             shiftImageInFourierTransform(F2D, F2D,
-                XSIZE(img()), XX(trans), YY(trans));
-        }
+                 XSIZE(img()), XX(trans), YY(trans));
+    	}
     }
 
     Fctf.resize(F2D);
@@ -490,9 +494,15 @@ void Reconstructor::backprojectOneParticle(long int p)
         // "Normal" reconstruction, multiply X by CTF, and W by CTF^2
         else if (do_ctf)
         {
-            FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F2D)
+            if (!ctf_premultiplied)
             {
-                DIRECT_MULTIDIM_ELEM(F2D, n)  *= DIRECT_MULTIDIM_ELEM(Fctf, n);
+               	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F2D)
+                {
+               		DIRECT_MULTIDIM_ELEM(F2D, n)  *= DIRECT_MULTIDIM_ELEM(Fctf, n);
+                }
+            }
+        	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fctf)
+            {
                 DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
             }
         }
