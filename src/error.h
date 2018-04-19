@@ -62,6 +62,18 @@
  */
 #define REPORT_ERROR(ErrormMsg) throw RelionError(ErrormMsg, __FILE__, __LINE__)
 
+/** Show message and throw exception
+ * @ingroup ErrorHandling
+ *
+ * same as REPORT_ERROR, but with the ability to stream in other data types (e.g. numbers)
+
+ * @code
+ * if (...)
+ *     REPORT_ERROR_STR("Requested " << num1 << " objects, only " << num2 << " available!");
+ * @endcode
+ */
+#define REPORT_ERROR_STR(m) std::stringstream sts; sts << m; throw RelionError(sts.str(), __FILE__, __LINE__)
+
 /** Exception class
  * @ingroup ErrorHandling
  *

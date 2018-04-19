@@ -402,7 +402,9 @@ public:
     int read(const FileName &name, bool readdata=true, long int select_img=-1, bool mapData = false, bool is_2D = false)
     {
 
-        int err = 0;
+        if (name == "")
+        	REPORT_ERROR("ERROR: trying to read image with empty file name!");
+    	int err = 0;
         fImageHandler hFile;
         hFile.openFile(name);
         err = _read(name, hFile, readdata, select_img, mapData, is_2D);

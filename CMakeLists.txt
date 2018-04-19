@@ -1,5 +1,4 @@
 cmake_minimum_required(VERSION 2.8 FATAL_ERROR)
-add_compile_options(-std=c++11)
 
 #
 #if(POLICY CMP0048)
@@ -137,7 +136,7 @@ endif(CUDA_FOUND)
 option(CachedAlloc "CachedAlloc" ON)
 if(NOT CachedAlloc)
     add_definitions(-DCUDA_NO_CUSTOM_ALLOCATION)
-    message(STATUS "Cashed allocation is disabled.")
+	message(STATUS "Cached allocation is disabled.")
 endif(NOT CachedAlloc)
 option(CustomAllocMemGuards "CustomAllocMemGuards" OFF)
 if(CustomAllocMemGuards)
@@ -306,7 +305,7 @@ endif()
 
 find_package(TIFF)
 if(TIFF_FOUND)
-    add_definitions(-DHAVE_TIFF)
+	add_definitions(-DHAVE_TIFF)
 endif()
 
 # ----------------------------------------------------------------------COPY SCRIPTS--
@@ -345,6 +344,8 @@ endif()
 
 # -----------------------------------------------------------------RELION COMPONENTS--
 option(BUILD_SHARED_LIBS "BUILD_SHARED_LIBS" ON)
+set(BUILD_SHARED_LIBS OFF)
+message("BUILD_SHARED_LIBS = ${BUILD_SHARED_LIBS}")
 if(BUILD_SHARED_LIBS)
     message(STATUS "Building shared libs (smaller build size and binaries)")
 else()

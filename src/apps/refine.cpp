@@ -27,8 +27,6 @@ int main(int argc, char **argv)
 {
 	 MlOptimiser optimiser;
 
-    PRINT_VERSION_INFO();
-    
     try
     {
     	// Read in parameters from the command line

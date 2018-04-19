@@ -137,7 +137,7 @@ void mapWeights(
 {
 
 	for (long unsigned i = 0; i < orientation_num*translation_num; i++)
-		mapped_weights[i] = std::numeric_limits<XFLOAT>::lowest();
+		mapped_weights[i] = -std::numeric_limits<XFLOAT>::max();
 
 	for (long unsigned i = idxArr_start; i < idxArr_end; i++)
 		mapped_weights[ (rot_idx[i]-orientation_start) * translation_num + trans_idx[i] ]= weights[i];

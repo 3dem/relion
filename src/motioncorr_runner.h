@@ -71,6 +71,9 @@ public:
 	// B-factor for MOTIONCOR2
 	double bfactor;
 
+	// Downsampling rate of CCF
+	double ccf_downsample;
+
 	// Also save the aligned movies?
 	bool do_save_movies;
 
@@ -174,6 +177,10 @@ private:
 	bool alignPatch(std::vector<MultidimArray<Complex> > &Fframes, const int pnx, const int pny, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts, std::ostream &logfile);
 
 	void binNonSquareImage(Image<RFLOAT> &Iwork, RFLOAT bin_factor);
+
+	void cropInFourierSpace(MultidimArray<Complex> &Fref, MultidimArray<Complex> &Fbinned);
+
+	int findGoodSize(int request);
 
 	void doseWeighting(std::vector<MultidimArray<Complex> > &Fframes, std::vector<RFLOAT> doses);
 

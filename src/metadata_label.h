@@ -125,9 +125,9 @@ enum EMDLabel
     EMDL_IMAGE_SAMPLINGRATE_Y,
     EMDL_IMAGE_SAMPLINGRATE_Z,
     EMDL_IMAGE_SIZE,
-    EMDL_IMAGE_SIZEX,
-    EMDL_IMAGE_SIZEY,
-    EMDL_IMAGE_SIZEZ,
+    EMDL_IMAGE_SIZE_X,
+    EMDL_IMAGE_SIZE_Y,
+    EMDL_IMAGE_SIZE_Z,
     EMDL_IMAGE_STATS_MIN,
     EMDL_IMAGE_STATS_MAX,
     EMDL_IMAGE_STATS_AVG,
@@ -351,6 +351,7 @@ enum EMDLabel
     EMDL_PARTICLE_NR_FRAMES_AVG,
     EMDL_PARTICLE_MOVIE_RUNNING_AVG,
     EMDL_PARTICLE_PMAX,
+    EMDL_PARTICLE_NUMBER,
 
     EMDL_PIPELINE_JOB_COUNTER,
     EMDL_PIPELINE_NODE_NAME,
@@ -384,6 +385,9 @@ enum EMDLabel
     EMDL_POSTPROCESS_GUINIER_VALUE_INTERCEPT,
     EMDL_POSTPROCESS_GUINIER_RESOL_SQUARED,
     EMDL_POSTPROCESS_MTF_VALUE, ///< Detector MTF value
+	EMDL_POSTPROCESS_RANDOMISE_FROM,
+	EMDL_POSTPROCESS_UNFIL_HALFMAP1,
+	EMDL_POSTPROCESS_UNFIL_HALFMAP2,
 
     EMDL_SAMPLING_IS_3D,
     EMDL_SAMPLING_IS_3D_TRANS,
@@ -552,9 +556,9 @@ private:
         EMDL::addLabel(EMDL_IMAGE_SAMPLINGRATE_Y, EMDL_DOUBLE, "rlnSamplingRateY", "Sampling rate in Y-direction of an image (in Angstrom/pixel)");
         EMDL::addLabel(EMDL_IMAGE_SAMPLINGRATE_Z, EMDL_DOUBLE, "rlnSamplingRateZ", "Sampling rate in Z-direction of an image (in Angstrom/pixel)");
         EMDL::addLabel(EMDL_IMAGE_SIZE, EMDL_INT, "rlnImageSize", "Size of an image (in pixels)");
-        EMDL::addLabel(EMDL_IMAGE_SIZEX, EMDL_INT, "rlnImageSizeX", "Size of an image in the X-direction (in pixels)");
-        EMDL::addLabel(EMDL_IMAGE_SIZEY, EMDL_INT, "rlnImageSizeY", "Size of an image in the Y-direction (in pixels)");
-        EMDL::addLabel(EMDL_IMAGE_SIZEZ, EMDL_INT, "rlnImageSizeZ", "Size of an image in the Z-direction (in pixels)");
+        EMDL::addLabel(EMDL_IMAGE_SIZE_X, EMDL_INT, "rlnImageSizeX", "Size of an image in the X-direction (in pixels)");
+        EMDL::addLabel(EMDL_IMAGE_SIZE_Y, EMDL_INT, "rlnImageSizeY", "Size of an image in the Y-direction (in pixels)");
+        EMDL::addLabel(EMDL_IMAGE_SIZE_Z, EMDL_INT, "rlnImageSizeZ", "Size of an image in the Z-direction (in pixels)");
         EMDL::addLabel(EMDL_IMAGE_STATS_MIN, EMDL_DOUBLE, "rlnMinimumValue", "Minimum value for the pixels in an image");
         EMDL::addLabel(EMDL_IMAGE_STATS_MAX, EMDL_DOUBLE, "rlnMaximumValue", "Maximum value for the pixels in an image");
         EMDL::addLabel(EMDL_IMAGE_STATS_AVG, EMDL_DOUBLE, "rlnAverageValue", "Average value for the pixels in an image");
@@ -577,7 +581,7 @@ private:
 
         EMDL::addLabel(EMDL_MICROGRAPH_ID, EMDL_INT, "rlnMicrographId", "ID (i.e. a unique number) of a micrograph");
         EMDL::addLabel(EMDL_MICROGRAPH_NAME, EMDL_STRING, "rlnMicrographName", "Name of a micrograph");
-	EMDL::addLabel(EMDL_MICROGRAPH_GAIN_NAME, EMDL_STRING, "rlnMicrographGainName", "Name of a gain reference");
+        EMDL::addLabel(EMDL_MICROGRAPH_GAIN_NAME, EMDL_STRING, "rlnMicrographGainName", "Name of a gain reference");
         EMDL::addLabel(EMDL_MICROGRAPH_NAME_WODOSE, EMDL_STRING, "rlnMicrographNameNoDW", "Name of a micrograph without dose weighting");
         EMDL::addLabel(EMDL_MICROGRAPH_MOVIE_NAME, EMDL_STRING, "rlnMicrographMovieName", "Name of a micrograph movie stack");
 	EMDL::addLabel(EMDL_MICROGRAPH_METADATA_NAME, EMDL_STRING, "rlnMicrographMetadata", "Name of a micrograph metadata file");
@@ -763,7 +767,7 @@ private:
 
         EMDL::addLabel(EMDL_PARTICLE_AUTOPICK_FOM, EMDL_DOUBLE, "rlnAutopickFigureOfMerit", "Autopicking FOM for a particle");
         EMDL::addLabel(EMDL_PARTICLE_HELICAL_TUBE_ID, EMDL_INT, "rlnHelicalTubeID", "Helical tube ID for a helical segment");
-        EMDL::addLabel(EMDL_PARTICLE_HELICAL_TUBE_PITCH, EMDL_DOUBLE, "rlnHelicalTubePitch", "Corss-over distance for a helical segment (A)");
+        EMDL::addLabel(EMDL_PARTICLE_HELICAL_TUBE_PITCH, EMDL_DOUBLE, "rlnHelicalTubePitch", "Cross-over distance for a helical segment (A)");
         EMDL::addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, EMDL_DOUBLE, "rlnHelicalTrackLength", "Distance from the position of this helical segment to the starting point of the tube");
         EMDL::addLabel(EMDL_PARTICLE_CLASS, EMDL_INT, "rlnClassNumber", "Class number for which a particle has its highest probability");
         EMDL::addLabel(EMDL_PARTICLE_DLL, EMDL_DOUBLE, "rlnLogLikeliContribution", "Contribution of a particle to the log-likelihood target function");
@@ -778,7 +782,7 @@ private:
         EMDL::addLabel(EMDL_PARTICLE_NR_FRAMES_AVG, EMDL_INT, "rlnAverageNrOfFrames", "Number of movie frames that one averages over upon extraction of movie-particles");
         EMDL::addLabel(EMDL_PARTICLE_MOVIE_RUNNING_AVG, EMDL_INT, "rlnMovieFramesRunningAverage", "Number of movie frames inside the running average that will be used for movie-refinement");
         EMDL::addLabel(EMDL_PARTICLE_PMAX, EMDL_DOUBLE, "rlnMaxValueProbDistribution", "Maximum value of the (normalised) probability function for a particle"); /**< particle, Maximum value of probability distribution */
-
+        EMDL::addLabel(EMDL_PARTICLE_NUMBER, EMDL_INT, "rlnParticleNumber", "Number of particles");
 
         EMDL::addLabel(EMDL_PIPELINE_JOB_COUNTER, EMDL_INT, "rlnPipeLineJobCounter", "Number of the last job in the pipeline");
         EMDL::addLabel(EMDL_PIPELINE_NODE_NAME, EMDL_STRING , "rlnPipeLineNodeName", "Name of a Node in the pipeline");
@@ -812,6 +816,9 @@ private:
         EMDL::addLabel(EMDL_POSTPROCESS_GUINIER_VALUE_INTERCEPT, EMDL_DOUBLE, "rlnLogAmplitudesIntercept", "Y-value for Guinier plot: the fitted plateau of the logarithm of the radially averaged amplitudes");
         EMDL::addLabel(EMDL_POSTPROCESS_GUINIER_RESOL_SQUARED, EMDL_DOUBLE, "rlnResolutionSquared", "X-value for Guinier plot: squared resolution in 1/Angstrom^2");
 		EMDL::addLabel(EMDL_POSTPROCESS_MTF_VALUE, EMDL_DOUBLE, "rlnMtfValue", "Value of the detectors modulation transfer function (between 0 and 1)");
+		EMDL::addLabel(EMDL_POSTPROCESS_RANDOMISE_FROM, EMDL_DOUBLE, "rlnRandomiseFrom", "Resolution (in A) from which the phases are randomised in the postprocessing step");
+		EMDL::addLabel(EMDL_POSTPROCESS_UNFIL_HALFMAP1, EMDL_STRING, "rlnUnfilteredMapHalf1", "Name of the unfiltered map from halfset 1");
+		EMDL::addLabel(EMDL_POSTPROCESS_UNFIL_HALFMAP2, EMDL_STRING, "rlnUnfilteredMapHalf2", "Name of the unfiltered map from halfset 2");
 
         EMDL::addLabel(EMDL_SAMPLING_IS_3D, EMDL_BOOL, "rlnIs3DSampling", "Flag to indicate this concerns a 3D sampling ");
         EMDL::addLabel(EMDL_SAMPLING_IS_3D_TRANS, EMDL_BOOL, "rlnIs3DTranslationalSampling", "Flag to indicate this concerns a x,y,z-translational sampling ");
