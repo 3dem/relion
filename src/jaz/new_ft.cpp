@@ -335,9 +335,10 @@ NewFFT::DoublePlan::DoublePlan(int w, int h, int d, unsigned int flags)
 	MultidimArray<double> realDummy(d,h,w);
 	MultidimArray<dComplex> complexDummy(d,h,w/2+1);
 	
-	std::vector<int> N(1,w);
-	if (h > 1) N.push_back(h);
+	std::vector<int> N(0);
 	if (d > 1) N.push_back(d);
+	if (h > 1) N.push_back(h);
+	           N.push_back(w);
 	
 	const int ndim = N.size();
 	
@@ -375,9 +376,10 @@ NewFFT::DoublePlan::DoublePlan(
 	realPtr(MULTIDIM_ARRAY(real)), 
 	complexPtr((double*)MULTIDIM_ARRAY(complex))
 {
-	std::vector<int> N(1,w);
-	if (h > 1) N.push_back(h);
+	std::vector<int> N(0);
 	if (d > 1) N.push_back(d);
+	if (h > 1) N.push_back(h);
+	           N.push_back(w);
 	
 	const int ndim = N.size();
 	
@@ -414,9 +416,10 @@ NewFFT::FloatPlan::FloatPlan(int w, int h, int d, unsigned int flags)
 	MultidimArray<float> realDummy(d,h,w);
 	MultidimArray<fComplex> complexDummy(d,h,w/2+1);
 	
-	std::vector<int> N(1,w);
-	if (h > 1) N.push_back(h);
+	std::vector<int> N(0);
 	if (d > 1) N.push_back(d);
+	if (h > 1) N.push_back(h);
+	           N.push_back(w);
 	
 	const int ndim = N.size();
 	
@@ -454,9 +457,10 @@ NewFFT::FloatPlan::FloatPlan(
 	realPtr(MULTIDIM_ARRAY(real)), 
 	complexPtr((float*)MULTIDIM_ARRAY(complex))
 {
-	std::vector<int> N(1,w);
-	if (h > 1) N.push_back(h);
+	std::vector<int> N(0);
 	if (d > 1) N.push_back(d);
+	if (h > 1) N.push_back(h);
+	           N.push_back(w);
 	
 	const int ndim = N.size();
 	
