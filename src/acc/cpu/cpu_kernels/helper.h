@@ -167,7 +167,8 @@ void exponentiate_weights_fine(
 		unsigned long *d_job_num,
 		long int job_num);
 
-void RNDnormalDitributionComplexWithPowerModulation(ACCCOMPLEX* Image, size_t xdim, XFLOAT *spectra);
+void RNDnormalDitributionComplexWithPowerModulation2D(ACCCOMPLEX* Image, size_t xdim, XFLOAT *spectra);
+void RNDnormalDitributionComplexWithPowerModulation3D(ACCCOMPLEX* Image, size_t xdim, size_t ydim, XFLOAT *spectra);
 
 void softMaskBackgroundValue(	int      block_dim,
                                 int      block_size,

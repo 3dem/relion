@@ -183,9 +183,15 @@ __global__ void cuda_kernel_exponentiate_weights_fine(
 __global__ void cuda_kernel_initRND(unsigned long seed,
                                     curandState *States);
 
-__global__ void cuda_kernel_RNDnormalDitributionComplexWithPowerModulation( ACCCOMPLEX *Image,
+__global__ void cuda_kernel_RNDnormalDitributionComplexWithPowerModulation2D( ACCCOMPLEX *Image,
                                                                             curandState *States,
                                                                             long int xdim,
+                                                                            XFLOAT * spectra);
+
+__global__ void cuda_kernel_RNDnormalDitributionComplexWithPowerModulation3D( ACCCOMPLEX *Image,
+                                                                            curandState *States,
+                                                                            long int xdim,
+                                                                            long int ydim,
                                                                             XFLOAT * spectra);
 
 __global__ void cuda_kernel_softMaskOutsideMap(	XFLOAT *vol,

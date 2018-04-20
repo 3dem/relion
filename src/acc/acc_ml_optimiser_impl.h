@@ -338,7 +338,8 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
                 								baseMLO->mymodel.sigma2_noise[group_id],
 												seed,
 												accMLO,
-												RandomImage);
+												RandomImage,
+												RandomImage.is3D());
                 LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
         }
         CTOC(cudaMLO->timer,"makeNoiseMask");

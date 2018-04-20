@@ -220,7 +220,8 @@ void makeNoiseImage(XFLOAT sigmaFudgeFactor,
 		MultidimArray<RFLOAT > &sigmaNoiseSpectra,
 		long int seed,
 		MlClass *accMLO,
-		AccPtr<XFLOAT> &RandomImage)
+		AccPtr<XFLOAT> &RandomImage,
+		bool is3D)
 {
     // Different MPI-distributed subsets may otherwise have different instances of the random noise below,
     // because work is on an on-demand basis and therefore variable with the timing of distinct nodes...
@@ -252,11 +253,23 @@ void makeNoiseImage(XFLOAT sigmaFudgeFactor,
     LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 
     // Create noise image with the correct spectral profile
-    cuda_kernel_RNDnormalDitributionComplexWithPowerModulation<<<RND_BLOCK_NUM,RND_BLOCK_SIZE>>>(
+    if(is3D)
+    {
+    	cuda_kernel_RNDnormalDitributionComplexWithPowerModulation3D<<<RND_BLOCK_NUM,RND_BLOCK_SIZE>>>(
                                     ~accMLO->transformer1.fouriers,
                                     ~RandomStates,
 									accMLO->transformer1.xFSize,
+									accMLO->transformer1.yFSize,
                                     ~NoiseSpectra);
+    }
+    else
+    {
+    	cuda_kernel_RNDnormalDitributionComplexWithPowerModulation2D<<<RND_BLOCK_NUM,RND_BLOCK_SIZE>>>(
+    	                                    ~accMLO->transformer1.fouriers,
+    	                                    ~RandomStates,
+    										accMLO->transformer1.xFSize,
+    	                                    ~NoiseSpectra);
+    }
     LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 
     // Transform to real-space, to get something which look like
@@ -270,7 +283,10 @@ void makeNoiseImage(XFLOAT sigmaFudgeFactor,
 #else
 
     // Create noise image with the correct spectral profile
-    CpuKernels::RNDnormalDitributionComplexWithPowerModulation(accMLO->transformer1.fouriers(), accMLO->transformer1.xFSize, ~NoiseSpectra);
+    if(is3D)
+    	CpuKernels::RNDnormalDitributionComplexWithPowerModulation3D(accMLO->transformer1.fouriers(), accMLO->transformer1.xFSize, accMLO->transformer1.yFSize, ~NoiseSpectra);
+    else
+    	CpuKernels::RNDnormalDitributionComplexWithPowerModulation2D(accMLO->transformer1.fouriers(), accMLO->transformer1.xFSize, ~NoiseSpectra);
 
     // Transform to real-space, to get something which look like
 	// the particle image without actual signal (a particle)

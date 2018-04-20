@@ -59,18 +59,49 @@ void exponentiate_weights_fine(
 		}
 	}
 }
-void RNDnormalDitributionComplexWithPowerModulation(ACCCOMPLEX* Image, size_t xdim, XFLOAT *spectra)
+void RNDnormalDitributionComplexWithPowerModulation2D(ACCCOMPLEX* Image, size_t xdim, XFLOAT *spectra)
 {
 	int x,y,size;
-	size = xdim*((xdim-1)*2);
+	size = xdim*((xdim-1)*2);					//assuming square input images (particles)
 	for(int i=0; i<size; i++)
     {
-		y = ( i / xdim ); // fftshift in one of two dims;
-		if(y>=xdim)
-			y -= (xdim-1)*2;
+		y = ( i / xdim );
 		x = i % xdim;
+		// fftshift in one of two dims;
+		if(y>=xdim)
+			y -= (xdim-1)*2;					//assuming square input images (particles)
 
 		int ires = (int)(sqrtf(x*x + y*y));
+
+		if(ires<xdim)
+		{
+			Image[i].x = rnd_gaus(0., spectra[ires]);
+			Image[i].y = rnd_gaus(0., spectra[ires]);
+		}
+		else
+		{
+			Image[i].x = 0;
+			Image[i].y = 0;
+		}
+    }
+}
+
+void RNDnormalDitributionComplexWithPowerModulation3D(ACCCOMPLEX* Image, size_t xdim, size_t ydim, XFLOAT *spectra)
+{
+	int x,y,z,xydim(xdim*ydim),size;
+	size = xdim*((xdim-1)*2);				//assuming square input images (particles)
+	for(int i=0; i<size; i++)
+    {
+	   	z = i / xydim;
+        y = ( i - (z*xydim) / xdim );
+        x = i % xdim;
+        // fftshift in two of three dims;
+        if(z>=xdim)
+     	   z -= (xdim-1)*2;					//assuming square input images (particles)
+        if(y>=xdim)
+           y -= (xdim-1)*2;					//assuming square input images (particles)
+
+		int ires = (int)(sqrtf(x*x + y*y + z*z));
 
 		if(ires<xdim)
 		{
