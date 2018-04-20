@@ -25,13 +25,16 @@
 #include "src/matrix1d.h"
 
 enum MotionModelVersion {
-	MOTION_MODEL_NULL,
-	MOTION_MODEL_THIRD_ORDER_POLYNOMIAL,
+	MOTION_MODEL_NULL = 0,
+	MOTION_MODEL_THIRD_ORDER_POLYNOMIAL = 1,
 };
 
 class MotionModel
 {
 public:
+
+    virtual ~MotionModel(){}
+
 	// Fit model based on observations
 	virtual void fit() = 0;
 
@@ -39,7 +42,10 @@ public:
 	virtual void write(std::ostream &fh, std::string block_name) = 0;
 	virtual int getModelVersion() const = 0;
 
-	// Get motion at frame and (x, y); frame is 0-indexed (NOT like Micrograph::getShiftAt)
+	// Get motion at frame and (x, y);
+	// NB: differences from Micrograph::getShiftAt!
+	// - frame is 0-indexed 
+	// - (x, y) are normalised pixels (i.e. unbinned_pixel_x / width - 0.5)
 	virtual int getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty) const = 0;
 
 	virtual MotionModel* clone() const = 0;
@@ -49,7 +55,7 @@ class ThirdOrderPolynomialModel: public MotionModel {
 public:
 	static const int NUM_COEFFS_PER_DIM;
 
-	Matrix1D <RFLOAT> coeffX, coeffY;
+    Matrix1D <RFLOAT> coeffX, coeffY;
 
 	void fit() {
 		REPORT_ERROR("Not implemented yet.");
@@ -74,6 +80,7 @@ public:
 	bool ready;
 	static const RFLOAT NOT_OBSERVED;
 	RFLOAT angpix, voltage, dose_per_frame, pre_exposure;
+
 	int first_frame; // First frame for local motion model. 1-indexed.
 	MotionModel *model;
 
@@ -109,10 +116,13 @@ public:
 	int getHeight() const;
 	int getNframes() const;
 
-	// Get shift vector at (x, y, frame); frame is 1-indexed
-	// (x, y) and (shiftx, shifty) are UNBINNED pixels in the original movie
-	// Returns non zero if failed (e.g. not observed)	
-	int getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty, bool use_local=true) const;
+	// Get shift vector at (x, y, frame)
+	// frame is 1-indexed
+	// (x, y) are normalised coordinate (i.e. pixel_x / width, pixel_y / height) when normalise=false (default)
+	//            unbinned pixels in the original movie when normalise=true
+	// (shiftx, shifty) are always UNBINNED pixels in the original movie.
+	// Returns non zero if failed (e.g. not observed).
+	int getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty, bool use_local=true, bool normalise=false) const;
 
 	// Set global shift for frame; frame is 1-indexed
 	// (shiftx, shifty) is UNBINNED pixels in the original movie

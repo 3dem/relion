@@ -807,7 +807,7 @@ RFLOAT Pythag(RFLOAT a, RFLOAT b)
         return((absb == 0.0) ? (0.0) : (absb * sqrt(1.0 + absa * absa / (absb * absb))));
 }
 
-#define SVDMAXITER 1000
+#define SVDMAXITER 1000000
 void svdcmp(RFLOAT *U, int Lines, int Columns, RFLOAT *W, RFLOAT *V)
 {
     RFLOAT *rv1 = (RFLOAT *)NULL;

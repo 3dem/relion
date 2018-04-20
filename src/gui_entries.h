@@ -194,7 +194,7 @@ public:
 	// JobOption
 	JobOption joboption;
 
-    // Button to show additional help text
+	// Button to show additional help text
 	Fl_Button* help;
 
 	////////////// FileName entry
@@ -210,6 +210,7 @@ public:
     Fl_Menu_* menu;
     // Deactivate this group
     Fl_Group * my_deactivate_group;
+	bool actually_activate;
 
     ////////////// Slider entry
 
@@ -234,6 +235,7 @@ public:
 		choice = NULL;
 		menu = NULL;
 		my_deactivate_group = NULL;
+		actually_activate = false;
 		slider = NULL;
 		do_oldstyle = false;
     };
@@ -247,12 +249,12 @@ public:
 
 	/** Here really start the entry
 	 */
-	void initialise(int x, int y, Fl_Group * deactivate_this_group, int height, int wcol2, int wcol3);
+	void initialise(int x, int y, Fl_Group * deactivate_this_group, bool actually_activate, int height, int wcol2, int wcol3);
 
 	/** Place an entry on a window
 	 */
-	void place(JobOption &joboption, int &y, int _deactivate_option = TOGGLE_LEAVE_ACTIVE, Fl_Group * deactivate_this_group = NULL, bool _do_oldstyle = false,
-			int x = XCOL2, int h = STEPY, int wcol2 = WCOL2, int wcol3 = WCOL3 );
+	void place(JobOption &joboption, int &y, int _deactivate_option = TOGGLE_LEAVE_ACTIVE, Fl_Group * deactivate_this_group = NULL, bool actually_activate = false,
+	           bool _do_oldstyle = false, int x = XCOL2, int h = STEPY, int wcol2 = WCOL2, int wcol3 = WCOL3 );
 
     // Set _value in the Fl_Input on the GUI, and also in the joboptions. Also update menu/slider if necessary
     void setValue(std::string _value);

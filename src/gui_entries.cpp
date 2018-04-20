@@ -94,7 +94,7 @@ void GuiEntry::clear()
 	*/
 
 }
-void GuiEntry::initialise(int x, int y, Fl_Group * deactivate_this_group, int height, int wcol2, int wcol3)
+void GuiEntry::initialise(int x, int y, Fl_Group * deactivate_this_group, bool _actually_activate, int height, int wcol2, int wcol3)
 {
 
     // The input field
@@ -159,8 +159,10 @@ void GuiEntry::initialise(int x, int y, Fl_Group * deactivate_this_group, int he
 		}
 		else // boolean
 		{
-			if (deactivate_this_group != NULL)
+			if (deactivate_this_group != NULL) {
 				my_deactivate_group = deactivate_this_group;
+				actually_activate = _actually_activate;
+			}
 
 			choice->menu(bool_options);
 			if (joboption.default_value=="Yes")
@@ -199,7 +201,7 @@ void GuiEntry::initialise(int x, int y, Fl_Group * deactivate_this_group, int he
 
 
 }
-void GuiEntry::place(JobOption &_joboption, int &y, int _deactivate_option, Fl_Group * deactivate_this_group, bool _do_oldstyle, int x, int h, int wcol2, int wcol3 )
+void GuiEntry::place(JobOption &_joboption, int &y, int _deactivate_option, Fl_Group * deactivate_this_group, bool actually_activate, bool _do_oldstyle, int x, int h, int wcol2, int wcol3 )
 {
 
 	// Clear if existing
@@ -213,7 +215,7 @@ void GuiEntry::place(JobOption &_joboption, int &y, int _deactivate_option, Fl_G
 	do_oldstyle = _do_oldstyle;
 
 	// Add the entry to the window
-	initialise(x, y, deactivate_this_group, h, wcol2, wcol3);
+	initialise(x, y, deactivate_this_group, actually_activate, h, wcol2, wcol3);
 
 	// Update the Y-coordinate
     y += h + 2;
@@ -401,7 +403,8 @@ void GuiEntry::cb_menu_i()
 	// In case this was a boolean that deactivates a group, do so:
 	if (my_deactivate_group != NULL)
 	{
-		if (strcmp(inp->value(), "No") == 0)
+		if ( actually_activate && (strcmp(inp->value(), "Yes") == 0) ||
+		    !actually_activate && (strcmp(inp->value(), "No") == 0))
 			my_deactivate_group->deactivate();
 		else
 			my_deactivate_group->activate();

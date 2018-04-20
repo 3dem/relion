@@ -106,9 +106,11 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	dose_per_frame = textToFloat(parser.getOption("--dose_per_frame", "Electron dose (in electrons/A2/frame) for dose-weighting inside MOTIONCOR2/UNBLUR", "0"));
 	pre_exposure = textToFloat(parser.getOption("--preexposure", "Pre-exposure (in electrons/A2) for dose-weighting inside UNBLUR", "0"));
 
-	do_own = parser.checkOption("--use_own","Use our own implementation of motion correction");
-	save_noDW = parser.checkOption("--save_noDW","Save aligned but non dose weighted micrograph. (This is always ON for MOTIONCOR2)");
-	interpolate_shifts = parser.checkOption("--interpolate_shifts","(EXPERIMENTAL) Interpolate shifts");
+	do_own = parser.checkOption("--use_own", "Use our own implementation of motion correction");
+	save_noDW = parser.checkOption("--save_noDW", "Save aligned but non dose weighted micrograph. (This is always ON for MOTIONCOR2)");
+	interpolate_shifts = parser.checkOption("--interpolate_shifts", "(EXPERIMENTAL) Interpolate shifts");
+	ccf_downsample = textToFloat(parser.getOption("--ccf_downsample", "(EXPERT) Downsampling rate of CC map. 0 = automatic based on B factor", "0"));
+	if (ccf_downsample > 1) REPORT_ERROR("--ccf_downsample cannot exceed 1.");
 	// Initialise verb for non-parallel execution
 	verb = 1;
 
@@ -168,6 +170,10 @@ void MotioncorrRunner::initialise()
 		}
 		if (group > 1) {
 			std::cerr << "WARNING: Frame grouping is under development in our own implementation of motion correction." << std::endl;
+		}
+		if (do_save_movies) {
+			std::cerr << "WARNING: In our own implementation of motion correction, we do not save aligned movies. --save_movies was ignored." << std::endl;
+			do_save_movies = false;
 		}
 	} else {
 		REPORT_ERROR(" ERROR: You have to specify which programme to use through either --use_motioncor2 or --use_unblur");
@@ -533,7 +539,7 @@ void MotioncorrRunner::getShiftsMotioncor2(FileName fn_log, Micrograph &mic)
 	while (getline(in, line, '\n'))
 	{
 		if (line.find("#") != std::string::npos) continue;
-		
+
 		std::vector<std::string> words;
 		tokenize(line, words);
     		if (words.size() != 7) continue;
@@ -802,7 +808,7 @@ void MotioncorrRunner::plotShifts(FileName fn_mic, Micrograph &mic)
 
  	CDataSet dataSet;
 	dataSet.SetDrawMarker(false);
-	dataSet.SetDatasetColor(0.0,0.0,0.0);
+	dataSet.SetDatasetColor(0.0,0.0,1.0);
 	RFLOAT xshift, yshift;
 	// UNBLUR does not provide local trajectories, so start the global trajectory from the origin.
 	const RFLOAT xcenter = (!do_unblur) ? mic.getWidth() / 2.0 : 0;
@@ -857,9 +863,9 @@ void MotioncorrRunner::plotShifts(FileName fn_mic, Micrograph &mic)
 			if (i == start) patch_start.AddDataPoint(p_fit);
 			i++;
 		}
-		plot2D->AddDataSet(fit);
 		plot2D->AddDataSet(obs);
-	
+		plot2D->AddDataSet(fit);
+
 		plot2D->AddDataSet(patch_start);
 	}
 
@@ -868,7 +874,7 @@ void MotioncorrRunner::plotShifts(FileName fn_mic, Micrograph &mic)
 	plot2D->SetXAxisTitle(title);
 	title[0] = 'Y';
 	plot2D->SetYAxisTitle(title);
-	
+
 	plot2D->OutputPostScriptPlot(fn_eps);
 }
 
@@ -923,7 +929,7 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 			if (do_dose_weighting && save_noDW)
 			{
 				FileName fn_avg_wodose = fn_avg.withoutExtension() + "_noDW.mrc";
-				MDavg.setValue(EMDL_MICROGRAPH_NAME_WODOSE, fn_avg_wodose);
+                MDavg.setValue(EMDL_MICROGRAPH_NAME_WODOSE, fn_avg_wodose);
 			}
 			MDavg.setValue(EMDL_MICROGRAPH_NAME, fn_avg);
 			MDavg.setValue(EMDL_MICROGRAPH_METADATA_NAME, fn_avg.withoutExtension() + ".star");
@@ -948,8 +954,6 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 // - outlier rejection in fitting (use free set?)
 
 bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
-	omp_set_num_threads(n_threads);
-
 	FileName fn_mic = mic.getMovieFilename();
 	FileName fn_avg, fn_mov;
 	getOutputFileNames(fn_mic, fn_avg, fn_mov);
@@ -968,6 +972,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	FourierTransformer transformer;
 
 	const int hotpixel_sigma = 6;
+	const int fit_rmsd_threshold = 10; // px
 
 	// Check image size
 	Ihead.read(fn_mic, false, -1, false, true); // select_img -1, mmap false, is_2D true
@@ -989,7 +994,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	const int n_frames = frames.size();
 	Iframes.resize(n_frames);
 	Fframes.resize(n_frames);
-	
+
 	std::vector<RFLOAT> xshifts(n_frames), yshifts(n_frames);
 
 	// Setup grouping
@@ -1036,7 +1041,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 
 	// Read images
 	RCTIC(TIMING_READ_MOVIE);
-	#pragma omp parallel for
+	#pragma omp parallel for num_threads(n_threads)
 	for (int iframe = 0; iframe < n_frames; iframe++) {
 		Iframes[iframe].read(fn_mic, true, frames[iframe], false, true); // mmap false, is_2D true
 	}
@@ -1046,7 +1051,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	RCTIC(TIMING_APPLY_GAIN);
 	if (fn_gain_reference != "") {
 		for (int iframe = 0; iframe < n_frames; iframe++) {
-			#pragma omp parallel for
+			#pragma omp parallel for num_threads(n_threads)
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Igain()) {
 				DIRECT_MULTIDIM_ELEM(Iframes[iframe](), n) *= DIRECT_MULTIDIM_ELEM(Igain(), n);
 			}
@@ -1060,7 +1065,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	// Simple unaligned sum
 	RCTIC(TIMING_INITIAL_SUM);
 	for (int iframe = 0; iframe < n_frames; iframe++) {
-		#pragma omp parallel for
+		#pragma omp parallel for num_threads(n_threads)
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iframe) {
 			DIRECT_MULTIDIM_ELEM(Iframe, n) += DIRECT_MULTIDIM_ELEM(Iframes[iframe](), n);
 		}
@@ -1068,6 +1073,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	RCTOC(TIMING_INITIAL_SUM);
 
 	// Hot pixel
+	/*
 	RCTIC(TIMING_DETECT_HOT);
 	RFLOAT mean = 0, std = 0;
 	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iframe) {
@@ -1094,10 +1100,11 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	logfile << "Detected " << n_bad << " hot pixels to be corrected. (BUT correction not implemented yet)" << std::endl << std::endl;
 	RCTOC(TIMING_DETECT_HOT);
 	// TODO: fix defects
+	*/
 
 	// FFT
 	RCTIC(TIMING_GLOBAL_FFT);
-	#pragma omp parallel for
+	#pragma omp parallel for num_threads(n_threads)
 	for (int iframe = 0; iframe < n_frames; iframe++) {
 		transformers[omp_get_thread_num()].FourierTransform(Iframes[iframe](), Fframes[iframe]);
 	}
@@ -1116,7 +1123,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	Iref().reshape(Iframes[0]());
 	Iref().initZeros();
 	RCTIC(TIMING_GLOBAL_IFFT);
-	#pragma omp parallel for
+	#pragma omp parallel for num_threads(n_threads)
 	for (int iframe = 0; iframe < n_frames; iframe++) {
 		transformers[omp_get_thread_num()].inverseFourierTransform(Fframes[iframe], Iframes[iframe]());
 	}
@@ -1161,7 +1168,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 				std::vector<RFLOAT> local_xshifts(n_groups), local_yshifts(n_groups);
 				RCTIC(TIMING_PREP_PATCH);
 				std::vector<MultidimArray<RFLOAT> >Ipatches(n_threads);
-				#pragma omp parallel for
+				#pragma omp parallel for num_threads(n_threads)
 				for (int igroup = 0; igroup < n_groups; igroup++) {
 					const int tid = omp_get_thread_num();
 					Ipatches[tid].reshape(y_end - y_start, x_end - x_start); // end is not included
@@ -1221,6 +1228,13 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 		RCTIC(TIMING_FIT_POLYNOMIAL);
 		const int n_obs = patch_frames.size();
 		const int n_params = 18;
+
+		if (n_obs <= n_params) {
+			std::cerr << fn_mic << ": too few valid local trajectories to fit local motion model." << std::endl;
+			mic.model = NULL;
+			goto skip_fitting; // TODO: Refactor!
+		}
+
 		Matrix2D <RFLOAT> matA(n_obs, n_params);
 		Matrix1D <RFLOAT> vecX(n_obs), vecY(n_obs), coeffX(n_params), coeffY(n_params);
 		for (int i = 0; i < n_obs; i++) {
@@ -1293,7 +1307,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 			mic.localShiftY.push_back(patch_yshifts[i]);
 			mic.localFitX.push_back(x_fitted);
 			mic.localFitY.push_back(y_fitted);
-			
+
 #ifdef DEBUG_OWN
 			std::cout << " x = " << x << " y = " << y << " z = " << z;
 			std::cout << ", Xobs = " << patch_xshifts[i] << " Xfit = " << x_fitted;
@@ -1302,11 +1316,24 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 		}
 		rms_x = std::sqrt(rms_x / n_obs); rms_y = std::sqrt(rms_y / n_obs);
 		logfile << std::endl << "Polynomial fit RMSD: X = " << rms_x << " px Y = " << rms_y << " px" << std::endl;
+		if (rms_x >= fit_rmsd_threshold || rms_y >= fit_rmsd_threshold) {
+			logfile << "The polynomial motion model did not explain the observation very well." << std::endl;
+			logfile << "Local correction is disabled for this micrograph." << std::endl;
+			delete mic.model;
+			mic.model = NULL;
+
+			// remove fitted trajectories
+			for (int i = 0, ilim = mic.localFitX.size(); i < ilim; i++) {
+				mic.localFitX[i] = 0;
+				mic.localFitY[i] = 0;
+			}
+		}
 		RCTOC(TIMING_FIT_POLYNOMIAL);
 	} else { // !do_local
 		mic.model = NULL;
 	}
 
+skip_fitting:
 	if (!do_dose_weighting || save_noDW) {
 		Iref().initZeros(Iframes[0]());
 
@@ -1350,7 +1377,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 
 		// Update real space images
 		RCTIC(TIMING_DW_IFFT);
-		#pragma omp parallel for
+		#pragma omp parallel for num_threads(n_threads)
 		for (int iframe = 0; iframe < n_frames; iframe++) {
 			transformers[omp_get_thread_num()].inverseFourierTransform(Fframes[iframe], Iframes[iframe]());
 		}
@@ -1428,7 +1455,7 @@ void MotioncorrRunner::realSpaceInterpolation(Image <RFLOAT> &Iref, std::vector<
 		for (int iframe = 0; iframe < n_frames; iframe++) {
 			logfile << "." << std::flush;
 
-			#pragma omp parallel for
+			#pragma omp parallel for num_threads(n_threads)
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iref()) {
 				DIRECT_MULTIDIM_ELEM(Iref(), n) += DIRECT_MULTIDIM_ELEM(Iframes[iframe](), n);
 			}
@@ -1443,7 +1470,7 @@ void MotioncorrRunner::realSpaceInterpolation(Image <RFLOAT> &Iref, std::vector<
 			logfile << "." << std::flush;
 			const RFLOAT z = iframe;
 
-			#pragma omp parallel for schedule(static)
+			#pragma omp parallel for num_threads(n_threads)
 			for (int ix = 0; ix < nx; ix++) {
 				const RFLOAT x = (RFLOAT)ix / nx - 0.5;
 				for (int iy = 0; iy < ny; iy++) {
@@ -1518,7 +1545,7 @@ void MotioncorrRunner::realSpaceInterpolation_ThirdOrderPolynomial(Image <RFLOAT
 		const RFLOAT y_C4 = coeffY(12) * z + coeffY(13) * z2 + coeffY(14) * z3;
 		const RFLOAT y_C5 = coeffY(15) * z + coeffY(16) * z2 + coeffY(17) * z3;
 
-		#pragma omp parallel for schedule(static)
+		#pragma omp parallel for num_threads(n_threads)
 		for (int ix = 0; ix < nx; ix++) {
 			const RFLOAT x = (RFLOAT)ix / nx - 0.5;
 			for (int iy = 0; iy < ny; iy++) {
@@ -1600,30 +1627,46 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes,
 	if (pny % 2 == 1 || pnx % 2 == 1) {
 		REPORT_ERROR("Patch size must be even");
 	}
+
+	// Calculate the size of down-sampled CCF
+	float ccf_requested_scale = ccf_downsample;
+	if (ccf_downsample <= 0) {
+		ccf_requested_scale = sqrt(-log(1E-8) / 2 / bfactor); // exp(-2 B max_dist^2) = 1E-8 
+	}
+	int ccf_nx = findGoodSize(int(pnx * ccf_requested_scale)), ccf_ny = findGoodSize(int(pny * ccf_requested_scale));
+	if (ccf_nx % 2 == 1) ccf_nx++;
+	if (ccf_ny % 2 == 1) ccf_ny++;
+	const int ccf_nfx = ccf_nx / 2 + 1, ccf_nfy = ccf_ny;
+	const int ccf_nfy_half = ccf_ny / 2;
+	const RFLOAT ccf_scale_x = (RFLOAT)pnx / ccf_nx;
+	const RFLOAT ccf_scale_y = (RFLOAT)pny / ccf_ny;
+
 	const int nfx = XSIZE(Fframes[0]), nfy = YSIZE(Fframes[0]);
 	const int nfy_half = nfy / 2;
-	Fref.reshape(nfy, nfx);
+
+	Fref.reshape(ccf_nfy, ccf_nfx);
 	for (int i = 0; i < n_threads; i++) {
-		Iccs[i]().reshape(pny, pnx);
+		Iccs[i]().reshape(ccf_ny, ccf_nx);
 		Fccs[i].reshape(Fref);
 	}
 
 #ifdef DEBUG
 	std::cout << "Patch Size X = " << pnx << " Y  = " << pny << std::endl;
 	std::cout << "Fframes X = " << nfx << " Y = " << nfy << std::endl;
+	std::cout << "Fccf X = " << ccf_nfx << " Y = " << ccf_nfy << std::endl;
+	std::cout << "CCF crop request = " << ccf_requested_scale << ", actual X = " << 1 / ccf_scale_x << " Y = " << 1 / ccf_scale_y << std::endl;
 	std::cout << "Trajectory size: " << xshifts.size() << std::endl;
 #endif
 
 	// Initialize B factor weight
 	weight.reshape(Fref);
 	RCTIC(TIMING_PREP_WEIGHT);
-	#pragma omp parallel for schedule(static)
-	for (int y = 0; y < nfy; y++) {
-		int ly = y;
-		if (y > nfy_half) ly = y - nfy;
+	#pragma omp parallel for num_threads(n_threads) 
+	for (int y = 0; y < ccf_nfy; y++) {
+		const int ly = (y > ccf_nfy_half) ? (y - ccf_nfy) : y;
 		RFLOAT ly2 = ly * (RFLOAT)ly / (nfy * (RFLOAT)nfy);
 
-		for (int x = 0; x < nfx; x++) {
+		for (int x = 0; x < ccf_nfx; x++) {
 			RFLOAT dist2 = ly2 + x * (RFLOAT)x / (nfx * (RFLOAT)nfx);
 			DIRECT_A2D_ELEM(weight, y, x) = exp(- 2 * dist2 * bfactor); // 2 for Fref and Fframe
 		}
@@ -1634,22 +1677,28 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes,
 		RCTIC(TIMING_MAKE_REF);
 		Fref.initZeros();
 
-		#pragma omp parallel for
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fref) {
-			for (int iframe = 0; iframe < n_frames; iframe++) {
-				DIRECT_MULTIDIM_ELEM(Fref, n) += DIRECT_MULTIDIM_ELEM(Fframes[iframe], n);
+		#pragma omp parallel for num_threads(n_threads)
+		for (int y = 0; y < ccf_nfy; y++) {
+			const int ly = (y > ccf_nfy_half) ? (y - ccf_nfy + nfy) : y;
+			for (int x = 0; x < ccf_nfx; x++) {
+				for (int iframe = 0; iframe < n_frames; iframe++) {
+					DIRECT_A2D_ELEM(Fref, y, x) += DIRECT_A2D_ELEM(Fframes[iframe], ly, x);
+				}
 			}
 		}
 		RCTOC(TIMING_MAKE_REF);
 
-		#pragma omp parallel for
+		#pragma omp parallel for num_threads(n_threads)
 		for (int iframe = 0; iframe < n_frames; iframe++) {
 			const int tid = omp_get_thread_num();
 
 			RCTIC(TIMING_CCF_CALC);
-			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fref) {
-				DIRECT_MULTIDIM_ELEM(Fccs[tid], n) = (DIRECT_MULTIDIM_ELEM(Fref, n) - DIRECT_MULTIDIM_ELEM(Fframes[iframe], n)) *
-				                                     DIRECT_MULTIDIM_ELEM(Fframes[iframe], n).conj() * DIRECT_MULTIDIM_ELEM(weight, n);
+			for (int y = 0; y < ccf_nfy; y++) {
+				const int ly = (y > ccf_nfy_half) ? (y - ccf_nfy + nfy) : y;
+				for (int x = 0; x < ccf_nfx; x++) {
+					DIRECT_A2D_ELEM(Fccs[tid], y, x) = (DIRECT_A2D_ELEM(Fref, y, x) - DIRECT_A2D_ELEM(Fframes[iframe], ly, x)) *
+					                                    DIRECT_A2D_ELEM(Fframes[iframe], ly, x).conj() * DIRECT_A2D_ELEM(weight, y, x);
+				}
 			}
 			RCTOC(TIMING_CCF_CALC);
 
@@ -1661,12 +1710,10 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes,
 			RFLOAT maxval = -1E30;
 			int posx = 0, posy = 0;
 			for (int y = -search_range; y < search_range; y++) {
-				int iy = y;
-				if (y < 0) iy = pny + y;
+				const int iy = (y < 0) ? ccf_ny + y : y;
 
 				for (int x = -search_range; x < search_range; x++) {
-					int ix = x;
-					if (x < 0) ix = pnx + x;
+					const int ix = (x < 0) ? ccf_nx + x : x;
 					RFLOAT val = DIRECT_A2D_ELEM(Iccs[tid](), iy, ix);
 //					std::cout << "(x, y) = " << x << ", " << y << ", (ix, iy) = " << ix << " , " << iy << " val = " << val << std::endl;
 					if (val > maxval) {
@@ -1677,12 +1724,12 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes,
 			}
 
 			int ipx_n = posx - 1, ipx = posx, ipx_p = posx + 1, ipy_n = posy - 1, ipy = posy, ipy_p = posy + 1;
-			if (ipx_n < 0) ipx_n = pnx + ipx_n;
-			if (ipx < 0) ipx = pnx + ipx;
-			if (ipx_p < 0) ipx_p = pnx + ipx_p;
-			if (ipy_n < 0) ipy_n = pny + ipy_n;
-			if (ipy < 0) ipy = pny + ipy;
-			if (ipy_p < 0) ipy_p = pny + ipy_p;
+			if (ipx_n < 0) ipx_n = ccf_nx + ipx_n;
+			if (ipx < 0) ipx = ccf_nx + ipx;
+			if (ipx_p < 0) ipx_p = ccf_nx + ipx_p;
+			if (ipy_n < 0) ipy_n = ccf_ny + ipy_n;
+			if (ipy < 0) ipy = ccf_ny + ipy;
+			if (ipy_p < 0) ipy_p = ccf_ny + ipy_p;
 
 			// Quadratic interpolation by Jasenko
 			RFLOAT vp, vn;
@@ -1701,6 +1748,8 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes,
 			} else {
 				cur_yshifts[iframe] = posy;
 			}
+			cur_xshifts[iframe] *= ccf_scale_x;
+			cur_yshifts[iframe] *= ccf_scale_y;
 #ifdef DEBUG_OWN
 			std::cout << "tid " << tid << " Frame " << 1 + iframe << ": raw shift x = " << posx << " y = " << posy << " cc = " << maxval << " interpolated x = " << cur_xshifts[iframe] << " y = " << cur_yshifts[iframe] << std::endl;
 #endif
@@ -1726,7 +1775,7 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes,
 		// Apply shifts
 		// Since the image is not necessarily square, we cannot use the method in fftw.cpp
 		RCTIC(TIMING_FOURIER_SHIFT);
-		#pragma omp parallel for
+		#pragma omp parallel for num_threads(n_threads)
 		for (int iframe = 1; iframe < n_frames; iframe++) {
 			shiftNonSquareImageInFourierTransform(Fframes[iframe], -cur_xshifts[iframe] / pnx, -cur_yshifts[iframe] / pny);
 		}
@@ -1751,6 +1800,23 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<Complex> > &Fframes,
 	return converged;
 }
 
+int MotioncorrRunner::findGoodSize(int request) {
+	// numbers that do not contain large prime numbers
+	const int good_numbers[] = {192, 216, 256, 288, 324, 
+	                            384, 432, 486, 512, 576, 648,
+	                            768, 800, 864, 972, 1024,
+	                            1296, 1536, 1728, 1944,
+	                            2048, 2304, 2592, 3072, 3200,
+	                            3456, 3888, 4096, 4608, 5000, 5184,
+	                            6144, 6250, 6400, 6912, 7776, 8192,
+	                            9216, 10240, 12288, 12500, -1};
+
+	for (int i = 0; good_numbers[i] != -1; i++) {
+		if (good_numbers[i] < request) continue;
+		else return good_numbers[i];
+	}
+	return request; // return as it is
+}
 // dose is equivalent dose at 300 kV at the END of the frame.
 // This implements the model by Timothy Grant & Nikolaus Grigorieff on eLife, 2015
 // doi: 10.7554/eLife.06980
@@ -1762,7 +1828,7 @@ void MotioncorrRunner::doseWeighting(std::vector<MultidimArray<Complex> > &Ffram
 	const int n_frames= Fframes.size();
 	const RFLOAT A = 0.245, B = -1.665, C = 2.81;
 
-	#pragma omp parallel for schedule(static)
+	#pragma omp parallel for num_threads(n_threads)
 	for (int y = 0; y < nfy; y++) {
 		int ly = y;
 		if (y > nfy_half) ly = y - nfy;
@@ -1884,4 +1950,24 @@ void MotioncorrRunner::binNonSquareImage(Image<RFLOAT> &Iwork, RFLOAT bin_factor
 	// transformer does not re-create plan although the size is different!
 	// So we have to use different transformer.
 	transformer2.inverseFourierTransform(Fbinned, Iwork());
+}
+
+// TODO: Not used yet
+void MotioncorrRunner::cropInFourierSpace(MultidimArray<Complex> &Fref, MultidimArray<Complex> &Fbinned) {
+	const int nfx = XSIZE(Fref), nfy = YSIZE(Fref);
+	const int new_nfx = XSIZE(Fbinned), new_nfy = YSIZE(Fbinned);
+	const int half_new_nfy = new_nfy / 2;
+
+	if (new_nfx > nfx || new_nfy > nfy) REPORT_ERROR("Invalid size to cropInFourierSpace");
+
+	for (int y = 0; y < half_new_nfy; y++) {
+		for (int x = 0; x < new_nfx; x++) {
+			DIRECT_A2D_ELEM(Fbinned, y, x) =  DIRECT_A2D_ELEM(Fref, y, x);
+		}
+	}
+	for (int y = half_new_nfy; y < new_nfy; y++) {
+		for (int x = 0; x < new_nfx; x++) {
+			DIRECT_A2D_ELEM(Fbinned, y, x) =  DIRECT_A2D_ELEM(Fref, nfy - new_nfy + y, x);
+		}
+	}
 }

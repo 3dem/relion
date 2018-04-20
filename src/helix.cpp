@@ -4477,11 +4477,6 @@ void updatePriorsForHelicalReconstruction(
 		updateAngularPriorsForHelicalReconstruction(MD, keep_tilt_prior_fixed);
 		return;
 	}
-	else if (keep_tilt_prior_fixed)
-	{
-		REPORT_ERROR("helix.cpp::updatePriorsForHelicalReconstruction(): cannot keep tilt priors fixed while doing local averaging of helical segments along the same filaments!");
-		return;
-	}
 
 	// Check labels
 	if ( (!(sigma_cutoff > 0.)) )
@@ -4580,7 +4575,8 @@ void updatePriorsForHelicalReconstruction(
 		// Write to _data.star file
 		for (int id = sid; id <= eid; id++)
 		{
-			MD.setValue(EMDL_ORIENT_TILT_PRIOR, list[id].tilt_prior_deg, list[id].MDobjectID);
+			if (!keep_tilt_prior_fixed)
+				MD.setValue(EMDL_ORIENT_TILT_PRIOR, list[id].tilt_prior_deg, list[id].MDobjectID);
 			MD.setValue(EMDL_ORIENT_PSI_PRIOR, list[id].psi_prior_deg, list[id].MDobjectID);
 			MD.setValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, list[id].psi_flip_ratio, list[id].MDobjectID);
 

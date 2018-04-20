@@ -631,7 +631,7 @@ class image_handler_parameters
 				Iin.read(fn_img);
 				Iin().setXmippOrigin();
 				Iin().centerOfMass(com);
-				std::cout << fn_img << " : center of mass (relative to XmippOrigin) x " << com(0);	
+				std::cout << fn_img << " : center of mass (relative to XmippOrigin) x " << com(0);
 				if (VEC_XSIZE(com) > 1) std::cout << " y " << YY(com);
 				if (VEC_XSIZE(com) > 2) std::cout << " z " << ZZ(com);
 				std::cout << std::endl;
@@ -782,8 +782,6 @@ class image_handler_parameters
 int main(int argc, char *argv[])
 {
 	image_handler_parameters prm;
-	
- 	PRINT_VERSION_INFO();
 
 	try
     {
