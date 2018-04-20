@@ -709,7 +709,7 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
         int tf = omp_get_thread_num();
 
         Image<float> muGraph;
-        muGraph.read(movieFn, true, f+firstFrame);
+        muGraph.read(movieFn, true, f+firstFrame, false, true);
 
         if (verbose) std::cout << (f+1) << "/" << fc << "\n";
 
