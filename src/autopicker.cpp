@@ -3426,7 +3426,7 @@ void AutoPicker::removeTooCloselyNeighbouringPeaks(std::vector<Peak> &peaks, int
 				int dx = peaks[ipeakp].x - my_x;
 				int dy = peaks[ipeakp].y - my_y;
 				int d2 = dx*dx + dy*dy;
-				if ( d2 < my_mind2*scale*scale )
+				if ( d2 < my_mind2 )
 					my_mind2 = d2;
 			}
 		}
