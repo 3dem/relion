@@ -31,6 +31,7 @@
 #include "src/metadata_table.h"
 #include "src/image.h"
 #include "src/micrograph_model.h"
+#include "src/jaz/new_ft.h"
 
 class MotioncorrRunner
 {
@@ -175,21 +176,21 @@ public:
 
 private:
 	// shiftx, shifty is relative to the (real space) image size
-	void shiftNonSquareImageInFourierTransform(MultidimArray<Complex> &frame, RFLOAT shiftx, RFLOAT shifty);
+	void shiftNonSquareImageInFourierTransform(MultidimArray<fComplex> &frame, RFLOAT shiftx, RFLOAT shifty);
 
-	bool alignPatch(std::vector<MultidimArray<Complex> > &Fframes, const int pnx, const int pny, const RFLOAT scaled_B, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts, std::ostream &logfile);
+	bool alignPatch(std::vector<MultidimArray<fComplex> > &Fframes, const int pnx, const int pny, const RFLOAT scaled_B, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts, std::ostream &logfile);
 
-	void binNonSquareImage(Image<RFLOAT> &Iwork, RFLOAT bin_factor);
+	void binNonSquareImage(Image<float> &Iwork, RFLOAT bin_factor);
 
-	void cropInFourierSpace(MultidimArray<Complex> &Fref, MultidimArray<Complex> &Fbinned);
+	void cropInFourierSpace(MultidimArray<fComplex> &Fref, MultidimArray<fComplex> &Fbinned);
 
 	int findGoodSize(int request);
 
-	void doseWeighting(std::vector<MultidimArray<Complex> > &Fframes, std::vector<RFLOAT> doses, RFLOAT apix);
+	void doseWeighting(std::vector<MultidimArray<fComplex> > &Fframes, std::vector<RFLOAT> doses, RFLOAT apix);
 
-	void realSpaceInterpolation(Image <RFLOAT> &Iref, std::vector<Image<RFLOAT> > &Iframes, MotionModel *model, std::ostream &logfile);
+	void realSpaceInterpolation(Image <float> &Isum, std::vector<Image<float> > &Iframes, MotionModel *model, std::ostream &logfile);
 
-	void realSpaceInterpolation_ThirdOrderPolynomial(Image <RFLOAT> &Iref, std::vector<Image<RFLOAT> > &Iframes, ThirdOrderPolynomialModel &model, std::ostream &logfile);
+	void realSpaceInterpolation_ThirdOrderPolynomial(Image <float> &Isum, std::vector<Image<float> > &Iframes, ThirdOrderPolynomialModel &model, std::ostream &logfile);
 
 	void interpolateShifts(std::vector<int> &group_start, std::vector<int> &group_size,
 	                       std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts,
