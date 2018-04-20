@@ -46,17 +46,17 @@ class stack_create_parameters
 		parser.setCommandLine(argc, argv);
 
 		int general_section = parser.addSection("General options");
-	    fn_star = parser.getOption("--i", "Input STAR file with the images (as rlnImageName) to be saved in a stack");
-	    fn_root = parser.getOption("--o", "Output rootname","output");
-	    do_spider  = parser.checkOption("--spider_format", "Write out in SPIDER stack format (by default MRC stack format)");
-	    do_split_per_micrograph = parser.checkOption("--split_per_micrograph", "Write out separate stacks for each micrograph (needs rlnMicrographName in STAR file)");
-	    do_apply_trans = parser.checkOption("--apply_transformation", "Apply the inplane-transformations (needs _rlnOriginX/Y and _rlnAnglePsi in STAR file)");
+		fn_star = parser.getOption("--i", "Input STAR file with the images (as rlnImageName) to be saved in a stack");
+		fn_root = parser.getOption("--o", "Output rootname","output");
+		do_spider  = parser.checkOption("--spider_format", "Write out in SPIDER stack format (by default MRC stack format)");
+		do_split_per_micrograph = parser.checkOption("--split_per_micrograph", "Write out separate stacks for each micrograph (needs rlnMicrographName in STAR file)");
+		do_apply_trans = parser.checkOption("--apply_transformation", "Apply the inplane-transformations (needs _rlnOriginX/Y and _rlnAnglePsi in STAR file)");
 
-	    fn_ext = (do_spider) ? ".spi" : ".mrcs";
+		fn_ext = (do_spider) ? ".spi" : ".mrcs";
 
-      	// Check for errors in the command-line option
-    	if (parser.checkForErrors())
-    		REPORT_ERROR("Errors encountered on the command line, exiting...");
+		// Check for errors in the command-line option
+		if (parser.checkForErrors())
+    			REPORT_ERROR("Errors encountered on the command line, exiting...");
 	}
 
 
@@ -162,9 +162,9 @@ class stack_create_parameters
 						// Apply the actual transformation
 						Matrix2D<RFLOAT> A;
 						rotation2DMatrix(psi, A);
-					    MAT_ELEM(A,0, 2) = xoff;
-					    MAT_ELEM(A,1, 2) = yoff;
-					    selfApplyGeometry(in(), A, IS_NOT_INV, DONT_WRAP);
+						MAT_ELEM(A,0, 2) = xoff;
+						MAT_ELEM(A,1, 2) = yoff;
+						selfApplyGeometry(in(), A, IS_NOT_INV, DONT_WRAP);
 					}
 
 					out().setImage(n, in());
@@ -184,6 +184,15 @@ class stack_create_parameters
 			}
 			else
 				fn_out = fn_root + fn_ext;
+
+			// Make all output directories if necessary
+			if (fn_out.contains("/"))
+			{
+				FileName path = fn_out.beforeLastOf("/");
+				std::string command = " mkdir -p " + path;
+				system(command.c_str());
+			}
+
 			out.write(fn_out);
 			std::cout << "Written out: " << fn_out << std::endl;
 		}
