@@ -49,6 +49,14 @@ if(NOT GUI)
     endforeach()
 endif(NOT GUI)
 
+#--Remove apps for testing--
+set(TEST_TARGETS ft_test)
+if(NOT RELION_TEST)
+    foreach(TARGET ${TEST_TARGETS})
+        list(REMOVE_ITEM RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/${TARGET}.cpp")
+    endforeach()
+endif(NOT RELION_TEST)
+
 # relion_lib is STATIC or SHARED type based on BUILD_SHARED_LIBS=ON/OFF
 # relion_lib only contains non-X11 parts
 # relion_gui_lib is where the X11 code is placed
