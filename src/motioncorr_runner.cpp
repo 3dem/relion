@@ -967,8 +967,6 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	std::vector<MultidimArray<fComplex> > Fframes;
 	std::vector<Image<float> > Iframes;
 	std::vector<int> frames;
-	std::vector<FourierTransformer> transformers(n_threads);
-	FourierTransformer transformer;
 
 	RFLOAT prescaling = 1;
 
@@ -1120,11 +1118,9 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	#pragma omp parallel for num_threads(n_threads)
 	for (int iframe = 0; iframe < n_frames; iframe++) {
 		if (!early_binning) {
-			// transformers[omp_get_thread_num()].FourierTransform(Iframes[iframe](), Fframes[iframe]);
 			NewFFT::FourierTransform(Iframes[iframe](), Fframes[iframe]);
 		} else {
 			MultidimArray<fComplex> Fframe;
-			//transformers[omp_get_thread_num()].FourierTransform(Iframes[iframe](), Fframe);
 			Fframes[iframe].reshape(ny, nx / 2 + 1);
 			cropInFourierSpace(Fframe, Fframes[iframe]);
 		}
@@ -1150,7 +1146,6 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	for (int iframe = 0; iframe < n_frames; iframe++) {
 		Iframes[iframe]().reshape(ny, nx);
 		NewFFT::inverseFourierTransform(Fframes[iframe], Iframes[iframe]());
-		//transformers[omp_get_thread_num()].inverseFourierTransform(Fframes[iframe], Iframes[iframe]());
 		// Unfortunately, we cannot deallocate Fframes here because of dose-weighting
 	}
 	RCTOC(TIMING_GLOBAL_IFFT);
@@ -1210,7 +1205,6 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 
 					RCTIC(TIMING_PATCH_FFT);
 					NewFFT::FourierTransform(Ipatches[tid], Fpatches[igroup]);
-					//transformers[tid].FourierTransform(Ipatches[tid], Fpatches[igroup]);
 					RCTOC(TIMING_PATCH_FFT);
 				}
 				RCTOC(TIMING_PREP_PATCH);
@@ -1408,7 +1402,6 @@ skip_fitting:
 		#pragma omp parallel for num_threads(n_threads)
 		for (int iframe = 0; iframe < n_frames; iframe++) {
 			NewFFT::inverseFourierTransform(Fframes[iframe], Iframes[iframe]());
-			//transformers[omp_get_thread_num()].inverseFourierTransform(Fframes[iframe], Iframes[iframe]());
 		}
 		RCTOC(TIMING_DW_IFFT);
 		RCTOC(TIMING_DOSE_WEIGHTING);
@@ -1639,7 +1632,6 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<fComplex> > &Fframes
 	std::vector<MultidimArray<fComplex> > Fccs(n_threads);
 	MultidimArray<float> weight;
 	std::vector<RFLOAT> cur_xshifts, cur_yshifts;
-	std::vector<FourierTransformer> transformers(n_threads);
 	bool converged = false;
 
 	// Parameters TODO: make an option
@@ -1739,7 +1731,6 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<fComplex> > &Fframes
 
 			RCTIC(TIMING_CCF_IFFT);
 			NewFFT::inverseFourierTransform(Fccs[tid], Iccs[tid]());
-			//transformers[tid].inverseFourierTransform(Fccs[tid], Iccs[tid]());
 			RCTOC(TIMING_CCF_IFFT);
 
 			RCTIC(TIMING_CCF_FIND_MAX);
@@ -1959,8 +1950,6 @@ void MotioncorrRunner::shiftNonSquareImageInFourierTransform(MultidimArray<fComp
 
 // Iwork is overwritten
 void MotioncorrRunner::binNonSquareImage(Image<float> &Iwork, RFLOAT bin_factor) {
-	FourierTransformer transformer, transformer2;
-
 	const int nx = XSIZE(Iwork()), ny = YSIZE(Iwork());
 	int new_nx = nx / bin_factor, new_ny = ny / bin_factor;
 	if (new_nx % 2 != 0 || new_ny % 2 != 0) {
@@ -1971,16 +1960,11 @@ void MotioncorrRunner::binNonSquareImage(Image<float> &Iwork, RFLOAT bin_factor)
 	std::cout << "Binning from X = " << nx << " Y = " << ny << " to X = " << new_nx << " Y = " << new_ny << std::endl;
 #endif
 	MultidimArray<fComplex> Fref(ny, nx / 2 + 1), Fbinned(new_ny, new_nx / 2 + 1);
-	//transformer.FourierTransform(Iwork(), Fref);
 	NewFFT::FourierTransform(Iwork(), Fref);
 
 	cropInFourierSpace(Fref, Fbinned);
 
 	Iwork().reshape(new_ny, new_nx);
-	// If reshape does NOT change Iwork.data pointer (rare but actually happens),
-	// transformer does not re-create plan although the size is different!
-	// So we have to use different transformer.
-	//transformer2.inverseFourierTransform(Fbinned, Iwork());
 	NewFFT::inverseFourierTransform(Fbinned, Iwork());
 }
 
