@@ -78,10 +78,7 @@ class MotionRefiner
             ReferenceMap reference;
             MicrographHandler micrographHandler;
 
-            // Q: Jasenko, can we have more informative names for these important variables?
-            // A: They are so important and common that their names should be short!
-            // (s: full image size, sh: half-size + 1, fc: frame count
-            //  - these are consistent throughout the codebase.)
+            // s: full image size, sh: half-size + 1, fc: frame count
             int s, sh, fc;
 
             // Verbosity
