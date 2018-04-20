@@ -389,17 +389,32 @@ int basisViewerCanvas::fill(MetaDataTable &MDin, EMDLabel display_label, bool _d
 
 				if (_do_apply_orient)
 				{
-					RFLOAT psi;
-					Matrix1D<RFLOAT> offset(2);
+					RFLOAT psi,rot,tilt;
+					Matrix1D<RFLOAT> offset(3);
+					Matrix2D<RFLOAT> A;
 					MDin.getValue(EMDL_ORIENT_PSI, psi, my_ipos);
 					MDin.getValue(EMDL_ORIENT_ORIGIN_X, XX(offset), my_ipos);
 					MDin.getValue(EMDL_ORIENT_ORIGIN_Y, YY(offset), my_ipos);
 
-					Matrix2D<RFLOAT> A;
-					rotation2DMatrix(psi, A);
-                                        MAT_ELEM(A, 0, 2) = COSD(psi) * XX(offset) - SIND(psi) * YY(offset);
-                                        MAT_ELEM(A, 1, 2) = COSD(psi) * YY(offset) + SIND(psi) * XX(offset);
-                                        selfApplyGeometry(img(), A, IS_NOT_INV, DONT_WRAP);
+					if(img().getDim()==2)
+					{
+						rotation2DMatrix(psi, A);
+						MAT_ELEM(A, 0, 2) = COSD(psi) * XX(offset) - SIND(psi) * YY(offset);
+						MAT_ELEM(A, 1, 2) = COSD(psi) * YY(offset) + SIND(psi) * XX(offset);
+						selfApplyGeometry(img(), A, IS_NOT_INV, DONT_WRAP);
+					}
+					else
+					{
+						MDin.getValue(EMDL_ORIENT_PSI, psi, my_ipos);
+						MDin.getValue(EMDL_ORIENT_ROT, rot, my_ipos);
+						MDin.getValue(EMDL_ORIENT_TILT, tilt, my_ipos);
+						MDin.getValue(EMDL_ORIENT_ORIGIN_Z, ZZ(offset), my_ipos);
+						Euler_rotation3DMatrix(rot,tilt,psi, A);
+						MAT_ELEM(A, 0, 3) = MAT_ELEM(A, 0, 0) * XX(offset) + MAT_ELEM(A, 0, 1) * YY(offset) + MAT_ELEM(A, 0, 2) * ZZ(offset);
+						MAT_ELEM(A, 1, 3) = MAT_ELEM(A, 1, 0) * XX(offset) + MAT_ELEM(A, 1, 1) * YY(offset) + MAT_ELEM(A, 1, 2) * ZZ(offset);
+						MAT_ELEM(A, 2, 3) = MAT_ELEM(A, 2, 0) * XX(offset) + MAT_ELEM(A, 2, 1) * YY(offset) + MAT_ELEM(A, 2, 2) * ZZ(offset);
+						selfApplyGeometry(img(), A, IS_NOT_INV, DONT_WRAP);
+					}
 				}
 				if (_do_recenter)
 				{

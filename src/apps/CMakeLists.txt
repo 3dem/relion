@@ -130,10 +130,6 @@ foreach (_target ${RELION_TARGETS})
 	else()	
 	    target_link_libraries(${_target} ${LIB} ${FFTW_LIBRARIES} ${EXTRA_LIBS} ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
 	endif(NOT MKLFFT)
-	
-	if(TIFF_FOUND)
-		target_link_libraries(${_target} ${TIFF_LIBRARIES})
-	endif()
 
 	if(CUDA_FOUND)
 	    target_link_libraries(${_target} relion_gpu_util)
@@ -155,6 +151,10 @@ foreach (_target ${RELION_TARGETS})
 		target_link_libraries(${_target} relion_gui_lib ${FLTK_LIBRARIES} ${X11})
 	endif()
     
+    if(TIFF_FOUND)
+		target_link_libraries(${_target} ${TIFF_LIBRARIES})
+	endif()
+	
 	#message(STATUS "added ${_target}...")
 	
 	install (TARGETS ${_target} RUNTIME DESTINATION bin)
