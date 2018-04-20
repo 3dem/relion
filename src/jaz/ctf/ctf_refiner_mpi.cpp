@@ -53,7 +53,7 @@ void CtfRefinerMpi::run()
 	divide_equally(total_nr_micrographs, node->size, node->rank, my_first_micrograph, my_last_micrograph);
 	my_nr_micrographs = my_last_micrograph - my_first_micrograph + 1;
 
-	if (do_defocus_fit || (do_tilt_fit && !precomputed) )
+	if (do_defocus_fit || do_tilt_fit)
     {
     	// The subsets will be used in openMPI parallelisation: instead of over g0->gc, 
 		// they will be over smaller subsets
@@ -64,15 +64,12 @@ void CtfRefinerMpi::run()
 
     if (node->isMaster())
     {
-    	// Read back from disk the metadata tables for the defocus_fit and/or 
-		// the xyACC and wAcc images from the tilt_fit
-        Image<Complex> xyAccSum;
-        Image<RFLOAT> wAccSum;
-        combineAllDefocusFitAndBeamTiltInformation(minMG, maxMG, xyAccSum, wAccSum);
+    	// Read back from disk the metadata tables for the defocus_fit
+        combineAllDefocusFitAndBeamTiltInformation(minMG, maxMG);
 
     	if (do_tilt_fit)
 		{
-    		fitBeamTiltFromSumsAllMicrographs(xyAccSum, wAccSum);
+			tiltEstimator.parametricFit(mdts, kmin, Cs, lambda, aniso);
 		}
 
     	mdt0.write(outPath + "particles_ctf_refine.star");

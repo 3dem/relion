@@ -1,14 +1,15 @@
-#include <src/jaz/tilt_refinement.h>
+#include "tilt_helper.h"
+
 #include <src/jaz/gravis/t2Matrix.h>
 #include <src/jaz/gravis/t4Matrix.h>
 #include <src/jaz/optimization/nelder_mead.h>
 
 using namespace gravis;
 
-void TiltRefinement::updateTiltShift(
+void TiltHelper::updateTiltShift(
         const Image<Complex> &prediction,
         const Image<Complex> &observation,
-        CTF &ctf, double angpix,
+        const CTF& ctf, double angpix,
         Image<Complex>& xyDest,
         Image<RFLOAT>& wDest)
 {
@@ -34,10 +35,10 @@ void TiltRefinement::updateTiltShift(
     }
 }
 
-void TiltRefinement::updateTiltShiftPar(
+void TiltHelper::updateTiltShiftPar(
         const Image<Complex> &prediction,
         const Image<Complex> &observation,
-        CTF &ctf, double angpix,
+        const CTF& ctf, double angpix,
         Image<Complex>& xyDest,
         Image<RFLOAT>& wDest)
 {
@@ -63,13 +64,14 @@ void TiltRefinement::updateTiltShiftPar(
     }
 }
 
-void TiltRefinement::fitTiltShift(const Image<RFLOAT>& phase,
-                             const Image<RFLOAT>& weight,
-                             double Cs, double lambda, double angpix,
-                             double* shift_x, double* shift_y,
-                             double* tilt_x, double* tilt_y,
-                             Image<RFLOAT>* fit,
-                             d2Matrix magCorr)
+void TiltHelper::fitTiltShift(
+		const Image<RFLOAT>& phase,
+		const Image<RFLOAT>& weight,
+		double Cs, double lambda, double angpix,
+		double* shift_x, double* shift_y,
+		double* tilt_x, double* tilt_y,
+		Image<RFLOAT>* fit,
+		d2Matrix magCorr)
 {
     const long w = phase.data.xdim;
     const long h = phase.data.ydim;
@@ -173,7 +175,7 @@ void TiltRefinement::fitTiltShift(const Image<RFLOAT>& phase,
     }
 }
 
-void TiltRefinement::optimizeTilt(
+void TiltHelper::optimizeTilt(
     const Image<Complex> &xy,
     const Image<RFLOAT> &weight,
     double Cs, double lambda, double angpix,
@@ -215,7 +217,7 @@ void TiltRefinement::optimizeTilt(
     }
 }
 
-void TiltRefinement::optimizeAnisoTilt(
+void TiltHelper::optimizeAnisoTilt(
     const Image<Complex> &xy,
     const Image<RFLOAT> &weight,
     double Cs, double lambda, double angpix,
@@ -267,7 +269,7 @@ void TiltRefinement::optimizeAnisoTilt(
     }
 }
 
-void TiltRefinement::drawPhaseShift(
+void TiltHelper::drawPhaseShift(
         double shift_x, double shift_y,
         double tilt_x, double tilt_y,
         int w, int h, double as,
@@ -290,7 +292,7 @@ void TiltRefinement::drawPhaseShift(
     }
 }
 
-void TiltRefinement::drawPhaseShift(
+void TiltHelper::drawPhaseShift(
         double shift_x, double shift_y,
         double tilt_x, double tilt_y,
         double tilt_xx, double tilt_xy, double tilt_yy,

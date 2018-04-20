@@ -24,7 +24,6 @@
 #include <src/jaz/magnification_refinement.h>
 #include <src/jaz/refinement_helper.h>
 #include <src/jaz/stack_helper.h>
-#include <src/jaz/tilt_refinement.h>
 #include <src/jaz/motion/motion_helper.h>
 #include <src/jaz/image_op.h>
 #include <src/jaz/Fourier_helper.h>

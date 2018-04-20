@@ -25,6 +25,7 @@
 #include <src/jaz/reference_map.h>
 #include <src/image.h>
 
+#include "tilt_estimator.h"
 
 class CtfRefiner
 {	
@@ -41,6 +42,9 @@ class CtfRefiner
 		
 		int getVerbosityLevel();
 		
+		static FileName getOutputFilenameRoot(
+				const MetaDataTable& mdt, std::string outPath);
+		
 		
 	protected:
 	
@@ -48,6 +52,8 @@ class CtfRefiner
 		
 		ObservationModel obsModel;
 		ReferenceMap reference;
+		
+		TiltEstimator tiltEstimator;
 	
 		// Verbosity
 		int verb;
@@ -103,8 +109,7 @@ class CtfRefiner
 			testtilt_x, testtilt_y,
 			testtilt_xx, testtilt_xy, testtilt_yy;
 	
-		bool precomputed, aniso;
-		std::string precomp;
+		bool aniso;
 	
 		Image<Complex> lastXY;
 		Image<RFLOAT> lastW;
@@ -118,21 +123,14 @@ class CtfRefiner
 									 const std::vector<Image<Complex> > &preds, int verb = 0);
 	
 		// Write PostScript file with per-particle defocus plotted onto micrograph in blue-red color scale
-		void writePerParticleDefocusEPSfitBeamtiltOneMicrograph(long g);
-	
-		// Perform beamtilt calculations for one micrograph
-		void fitBeamtiltOneMicrograph(long g, const std::vector<Image<Complex> > &obsF, 
-									  const std::vector<Image<Complex> > &pred);
-	
-		// After sums of phase shifts have been accumulated over all micrographs: fit the actual beamtilt
-		void fitBeamTiltFromSumsAllMicrographs(Image<Complex> &xyAccSum, Image<RFLOAT> &wAccSum);
+		void writePerParticleDefocusEPS(long g);
 	
 		// Fit CTF parameters for all particles on a subset of the micrographs micrograph
 		void processSubsetMicrographs(long g_start, long g_end);
 	
 		// Read all micrograph metadata tables back in, and combine into onelarge one
 		void combineAllDefocusFitAndBeamTiltInformation(
-				long g_start, long g_end, Image<Complex> &xyAccSum, Image<RFLOAT> &wAccSum);
+				long g_start, long g_end);
 };
 
 
