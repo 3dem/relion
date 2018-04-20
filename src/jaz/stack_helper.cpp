@@ -118,12 +118,6 @@ std::vector<Image<RFLOAT> > StackHelper::loadStack(const MetaDataTable* mdt, std
         name = path + "/" + name.substr(name.find_last_of("/")+1);
     }
 
-    Image<RFLOAT> in;
-    in.read(name);
-
-    const int w = in.data.xdim;
-    const int h = in.data.ydim;
-
     #pragma omp parallel for num_threads(threads)
     for (long i = 0; i < ic; i++)
     {
@@ -135,8 +129,7 @@ std::vector<Image<RFLOAT> > StackHelper::loadStack(const MetaDataTable* mdt, std
         int j;
         str >> j;
 
-        out[i] = Image<RFLOAT>(w,h);
-        SliceHelper::extractStackSlice(in, out[i], j-1);
+        out[i].read(name, true, j-1, false, true);
     }
 
     return out;
@@ -157,12 +150,6 @@ std::vector<Image<Complex> > StackHelper::loadStackFS(const MetaDataTable *mdt, 
         name = path + "/" + name.substr(name.find_last_of("/")+1);
     }
 
-    Image<RFLOAT> in;
-    in.read(name);
-
-    const int w = in.data.xdim;
-    const int h = in.data.ydim;
-
     #pragma omp parallel for num_threads(threads)
     for (long i = 0; i < ic; i++)
     {
@@ -175,10 +162,11 @@ std::vector<Image<Complex> > StackHelper::loadStackFS(const MetaDataTable *mdt, 
         std::istringstream str(indStr);
         int j;
         str >> j;
-
-        Image<RFLOAT> aux(w,h);
-        SliceHelper::extractStackSlice(in, aux, j-1);
-        (*fts)[threadnum].FourierTransform(aux(), out[i]());
+		
+		Image<RFLOAT> in;
+		in.read(name, true, j-1, false, true);
+		
+        (*fts)[threadnum].FourierTransform(in(), out[i]());
     }
 
     return out;
@@ -337,6 +325,7 @@ std::vector<std::vector<Image<Complex>>> StackHelper::loadMovieStackFS(
     return out;
 }
 
+// deprecated:
 std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
     const MetaDataTable* mdt,
     std::string metaPath, std::string moviePath, std::string movie_ending,
