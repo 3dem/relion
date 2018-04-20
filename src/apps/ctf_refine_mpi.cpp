@@ -18,7 +18,7 @@
  * author citations must be preserved.
  ***************************************************************************/
 
-#include <src/ctf_refinement_mpi.h>
+#include <src/jaz/ctf/ctf_refiner_mpi.h>
 
 
 int main(int argc, char *argv[])
@@ -29,7 +29,7 @@ int main(int argc, char *argv[])
     {
 		prm.read(argc, argv);
 
-		prm.initialise();
+		prm.init();
 
 		MPI_Barrier(MPI_COMM_WORLD);
 
@@ -38,9 +38,12 @@ int main(int argc, char *argv[])
 
     catch (RelionError XE)
     {
-    	if (prm.verb > 0)
+    	if (prm.getVerbosityLevel() > 0)
+		{
     		//prm.usage();
-        std::cerr << XE;
+			std::cerr << XE;
+		}
+		
         MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
     }
 

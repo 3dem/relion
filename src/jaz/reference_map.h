@@ -14,19 +14,21 @@ class ReferenceMap
         typedef enum {Own, Opposite} HalfSet;
 
         ReferenceMap();
-
-            // input parameters:
+	
+			// input parameters:
             std::string reconFn0, reconFn1, maskFn, fscFn;
-            double paddingFactor;
+            double paddingFactor, kmin;
 
             // data:
             Image<RFLOAT> freqWeight;
             std::vector<double> freqWeight1D;
             Projector projectors[2];
-            int k_out;
+            int k_out, s, sh;
 
         void read(IOParser& parser, int argc, char *argv[]);
         void load(int verb, bool debug);
+		
+		void zeroCenter(double kmin);
 
         std::vector<Image<Complex>> predictAll(
                 const MetaDataTable& mdt,
