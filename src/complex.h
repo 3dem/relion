@@ -19,67 +19,10 @@
  ***************************************************************************/
 #ifndef COMPLEX_H_
 #define COMPLEX_H_
-#include <iostream>
-#include <cmath>
-#include "src/macros.h"
 
-class Complex
-{
+#include <src/macros.h>
+#include <src/jaz/t_complex.h>
 
-	public:
-
-	RFLOAT real;
-	RFLOAT imag;
-
-    // Constructor
-	Complex(RFLOAT _r = 0.0, RFLOAT _i = 0.0);
-
-    Complex operator+(Complex &op);
-    void operator+=(Complex &op);
-
-    Complex operator-(Complex &op);
-    void operator-=(Complex &op);
-
-    Complex operator*(Complex &op);
-
-    void operator*=(RFLOAT op);
-
-    Complex operator*(RFLOAT op);
-
-    Complex operator/(Complex &op);
-
-    Complex operator/(RFLOAT op);
-
-    void operator/=(RFLOAT op);
-
-    // Complex conjugated
-    Complex conj() const;
-
-    // Abs value: sqrt(real*real+imag*imag)
-    RFLOAT abs() const;
-
-    // Norm value: real*real+imag*imag
-    RFLOAT norm() const;
-
-    // Phase angle: atan2(imag,real)
-    RFLOAT arg() const;
-
-
-};
-
-Complex conj(const Complex& op);
-RFLOAT abs(const Complex& op);
-RFLOAT norm(const Complex& op);
-RFLOAT arg(const Complex& op);
-
-Complex operator+(const Complex& lhs, const Complex& rhs);
-Complex operator-(const Complex& lhs, const Complex& rhs);
-Complex operator*(const Complex& lhs, const Complex& rhs);
-Complex operator*(const Complex& lhs, const RFLOAT& val);
-Complex operator*(const RFLOAT& val, const Complex& rhs);
-Complex operator/(const Complex& lhs, const RFLOAT& val);
-
-void operator+=(Complex& lhs, const Complex& rhs);
-void operator-=(Complex& lhs, const Complex& rhs);
+typedef tComplex<RFLOAT> Complex;
 
 #endif
