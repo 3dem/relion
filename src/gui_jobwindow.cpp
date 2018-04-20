@@ -600,6 +600,7 @@ void JobWindow::initialiseMotioncorrWindow()
 
 	group3->begin();
 
+	place("save_noDW", TOGGLE_DEACTIVATE);
 	place("voltage", TOGGLE_DEACTIVATE);
 	place("dose_per_frame", TOGGLE_DEACTIVATE);
 	place("pre_exposure", TOGGLE_DEACTIVATE);

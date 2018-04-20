@@ -106,7 +106,7 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	pre_exposure = textToFloat(parser.getOption("--preexposure", "Pre-exposure (in electrons/A2) for dose-weighting inside UNBLUR", "0"));
 
 	do_own = parser.checkOption("--use_own", "Use our own implementation of motion correction");
-	save_noDW = parser.checkOption("--save_noDW", "Save aligned but non dose weighted micrograph. (This is always ON for MOTIONCOR2)");
+	save_noDW = parser.checkOption("--save_noDW", "Save aligned but non dose weighted micrograph.");
 	interpolate_shifts = parser.checkOption("--interpolate_shifts", "(EXPERIMENTAL) Interpolate shifts");
 	ccf_downsample = textToFloat(parser.getOption("--ccf_downsample", "(EXPERT) Downsampling rate of CC map. default = 0 = automatic based on B factor", "0"));
 	early_binning = parser.checkOption("--early_binning", "(EXPERT) Do binning before alignment to reduce memory usage. This might dampen signal near Nyquist.");
@@ -181,7 +181,6 @@ void MotioncorrRunner::initialise()
 
 	if (do_dose_weighting)
 	{
-		if (do_motioncor2) save_noDW = true; // MOTIONCOR2 always writes non-dose weighted micrographs
 		if (angpix < 0)
 			REPORT_ERROR("ERROR: For dose-weighting it is mandatory to provide the pixel size in Angstroms through --angpix.");
 
@@ -444,13 +443,24 @@ bool MotioncorrRunner::executeMotioncor2(Micrograph &mic, int rank)
 	{
 		if (do_dose_weighting)
 		{
-			// Move .mrc to _noDW.mrc filename
 			FileName fn_tmp = fn_avg.withoutExtension() + "_noDW.mrc";
-			if (std::rename(fn_avg.c_str(), fn_tmp.c_str()))
+			if (save_noDW) // Move .mrc to _noDW.mrc filename 
 			{
-				std::cerr << "ERROR in renaming: " << fn_avg << " to " << fn_tmp <<std::endl;
-				return false;
+				if (std::rename(fn_avg.c_str(), fn_tmp.c_str()))
+				{
+					std::cerr << "ERROR in renaming: " << fn_avg << " to " << fn_tmp << std::endl;
+					return false;
+				}
 			}
+			else // or just delete it
+			{
+				if (std::remove(fn_avg.c_str()))
+				{
+					std::cerr << "ERROR in removing non-dose weighted image: " << fn_avg << std::endl;
+					return false;
+				}
+			}
+
 			// Move _DW.mrc to .mrc filename
 			fn_tmp = fn_avg.withoutExtension() + "_DW.mrc";
 			if (std::rename(fn_tmp.c_str(), fn_avg.c_str()))
