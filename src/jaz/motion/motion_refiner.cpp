@@ -55,13 +55,13 @@ void MotionRefiner::read(int argc, char **argv)
     parser.addSection("General options");
 	// TODO: fn_opt = parser.getOption("--opt", "optimiser STAR file from a previous 3D auto-refinement");
 
-    starFn = parser.getOption("--i", "Input STAR file");	
+    starFn = parser.getOption("--i", "Input STAR file");
     outPath = parser.getOption("--o", "Output directory, e.g. MotionFit/job041/");
 
     reference.read(parser, argc, argv);
 
-    micrographHandler.firstFrame = textToInteger(parser.getOption("--first_frame", "", "1")) - 1;
-    micrographHandler.lastFrame = textToInteger(parser.getOption("--last_frame", "", "-1")) - 1;
+    micrographHandler.firstFrame = textToInteger(parser.getOption("--first_frame", "First move frame to process", "1")) - 1;
+    micrographHandler.lastFrame = textToInteger(parser.getOption("--last_frame", "Last movie frame to process (default is all)", "-1")) - 1;
 	only_do_unfinished = parser.checkOption("--only_do_unfinished", "Skip those steps for which output files already exist.");
     verb = textToInteger(parser.getOption("--verb", "Verbosity", "1"));
 

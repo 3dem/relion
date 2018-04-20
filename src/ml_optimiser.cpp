@@ -1645,9 +1645,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 					<< std::endl;
 		}
 
-		if ( (helical_keep_tilt_prior_fixed) && (!(helical_sigma_distance < 0.)) )
-			REPORT_ERROR("ERROR: cannot keep tilt priors fixed while doing local averaging of helical segments along the same filaments!");
-
 		// Set particle diameter to 90% the box size if user does not give this parameter
 		if (particle_diameter < 0.)
 		{
@@ -3037,11 +3034,14 @@ void MlOptimiser::expectationSetupCheckMemory(int myverb)
 		{
 			std::cout << " Oversampling= " << oversampling << " NrHiddenVariableSamplingPoints= " << mymodel.nr_classes * sampling.NrSamplingPoints(oversampling, &pointer_dir_nonzeroprior, &pointer_psi_nonzeroprior) << std::endl;
 			int nr_orient = (do_only_sample_tilt) ? sampling.NrDirections(oversampling, &pointer_dir_nonzeroprior) : sampling.NrDirections(oversampling, &pointer_dir_nonzeroprior) * sampling.NrPsiSamplings(oversampling, &pointer_psi_nonzeroprior);
+			if (do_skip_rotate || do_skip_align)
+				nr_orient = 1;
 			std::cout << " OrientationalSampling= " << sampling.getAngularSampling(oversampling) << " NrOrientations= "<< nr_orient <<std::endl;
 			if ( (do_helical_refine) && (!ignore_helical_symmetry) )
 				std::cout << " TranslationalSamplingAlongHelicalAxis= " << sampling.getHelicalTranslationalSampling(oversampling) << std::flush;
+			int nr_trans = (do_skip_align) ? 1 : sampling.NrTranslationalSamplings(oversampling);
 			std::cout << " TranslationalSampling= " << sampling.getTranslationalSampling(oversampling)
-					<< " NrTranslations= "<< sampling.NrTranslationalSamplings(oversampling) << std::endl;
+					<< " NrTranslations= " << nr_trans << std::endl;
 			std::cout << "=============================" << std::endl;
 		}
 	}
