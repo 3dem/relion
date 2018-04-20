@@ -45,7 +45,7 @@ class MotionEstimator
 
         // perform the actual optimization (also used by MotionParamEstimator)
         std::vector<std::vector<gravis::d2Vector>> optimize(
-            const std::vector<std::vector<Image<RFLOAT>>>& movieCC,
+            const std::vector<std::vector<Image<double>>>& movieCC,
             const std::vector<std::vector<gravis::d2Vector>>& inTracks,
             double sig_vel_px, double sig_acc_px, double sig_div_px,
             const std::vector<gravis::d2Vector>& positions,

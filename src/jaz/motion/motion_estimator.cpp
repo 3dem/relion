@@ -359,7 +359,7 @@ void MotionEstimator::prepMicrograph(
 }
 
 std::vector<std::vector<d2Vector>> MotionEstimator::optimize(
-    const std::vector<std::vector<Image<RFLOAT>>>& movieCC,
+    const std::vector<std::vector<Image<double>>>& movieCC,
     const std::vector<std::vector<gravis::d2Vector>>& inTracks,
     double sig_vel_px, double sig_acc_px, double sig_div_px,
     const std::vector<gravis::d2Vector>& positions,
@@ -644,7 +644,7 @@ void MotionEstimator::writeOutput(
     }
 }
 
-const std::vector<Image<double>>& MotionEstimator::getDamageWeights()
+const std::vector<Image<RFLOAT>>& MotionEstimator::getDamageWeights()
 {
     return dmgWeight;
 }

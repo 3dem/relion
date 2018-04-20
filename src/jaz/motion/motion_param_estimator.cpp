@@ -136,7 +136,7 @@ void MotionParamEstimator::init(
         randNums[m] = rand() / (double)RAND_MAX;
     }
 
-    std::vector<int> order = IndexSort<RFLOAT>::sortIndices(randNums);
+    std::vector<int> order = IndexSort<double>::sortIndices(randNums);
 
     int pc = 0;
     mdts.clear();

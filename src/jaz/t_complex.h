@@ -126,52 +126,52 @@ T arg(const tComplex<T>& op)
     return op.arg();
 }
 
-template <class T> inline
-tComplex<T> operator + (const tComplex<T>& z, const tComplex<T>& w)
+template <class T1, class T2> inline
+tComplex<T1> operator + (const tComplex<T1>& z, const tComplex<T2>& w)
 {
-    return tComplex<T>(z.real + w.real, z.imag + w.imag);
+    return tComplex<T1>(z.real + w.real, z.imag + w.imag);
 }
 
-template <class T> inline
-tComplex<T> operator - (const tComplex<T>& z, const tComplex<T>& w)
+template <class T1, class T2> inline
+tComplex<T1> operator - (const tComplex<T1>& z, const tComplex<T2>& w)
 {
-    return tComplex<T>(z.real - w.real, z.imag - w.imag);
+    return tComplex<T1>(z.real - w.real, z.imag - w.imag);
 }
 
-template <class T> inline
-tComplex<T> operator * (const tComplex<T>& z, const tComplex<T>& w)
+template <class T1, class T2> inline
+tComplex<T1> operator * (const tComplex<T1>& z, const tComplex<T2>& w)
 {
-    return tComplex<T>(
+    return tComplex<T1>(
         z.real * w.real - z.imag * w.imag,
         z.real * w.imag + z.imag * w.real);
 }
 
-template <class T> inline
-tComplex<T> operator * (const tComplex<T>& z, const T& x)
+template <class T1, class T2> inline
+tComplex<T1> operator * (const tComplex<T1>& z, const T2& x)
 {
-    return tComplex<T>(x * z.real, x * z.imag);
+    return tComplex<T1>(x * z.real, x * z.imag);
 }
 
-template <class T> inline
-tComplex<T> operator * (const T& x, const tComplex<T>& z)
+template <class T1, class T2> inline
+tComplex<T1> operator * (const T2& x, const tComplex<T1>& z)
 {
-    return tComplex<T>(x * z.real, x * z.imag);
+    return tComplex<T1>(x * z.real, x * z.imag);
 }
 
-template <class T> inline
-tComplex<T> operator / (const tComplex<T>& z, const tComplex<T>& w)
+template <class T1, class T2> inline
+tComplex<T1> operator / (const tComplex<T1>& z, const tComplex<T2>& w)
 {
-    const T d = w.real * w.real + w.imag * w.imag;
+    const T1 d = w.real * w.real + w.imag * w.imag;
 
-    return tComplex<T>(
+    return tComplex<T1>(
         (z.real * w.real + z.imag * w.imag) / d,
         (z.imag * w.real - z.real * w.imag) / d);
 }
 
-template <class T> inline
-tComplex<T> operator / (const tComplex<T>& z, const T& x)
+template <class T1, class T2> inline
+tComplex<T1> operator / (const tComplex<T1>& z, const T2& x)
 {
-    return tComplex<T>(z.real / x, z.imag / x);
+    return tComplex<T1>(z.real / x, z.imag / x);
 }
 
 template <class T> inline

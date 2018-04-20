@@ -123,6 +123,69 @@ class NewFFT
                 MultidimArray<float>& dest,
                 Normalization normalization = FwdOnly,
                 bool preserveInput = true);
+	
+		
+		template<class T>
+		static bool areSizesCompatible(
+				const MultidimArray<T>& real,
+				const MultidimArray<tComplex<T>>& complex)
+		{
+			return real.xdim == 2 * (complex.xdim - 1)
+			    && real.ydim == complex.ydim
+			    && real.zdim == complex.zdim
+			    && real.ndim == complex.ndim;
+		}
+		
+		template<class T>
+		static bool resizeRealToMatch(
+				MultidimArray<T>& real,
+				const MultidimArray<tComplex<T>>& complex)
+		{
+			real.resizeNoCp(complex.ndim, complex.zdim, complex.ydim, 2 * (complex.xdim - 1));
+		}
+		
+		template<class T>
+		static bool resizeComplexToMatch(
+				const MultidimArray<T>& real,
+				MultidimArray<tComplex<T>>& complex)
+		{
+			complex.resizeNoCp(real.ndim, real.zdim, real.ydim, real.xdim/2 + 1);
+		}
+	
+		
+	private:
+		
+		/* Private static methods that perform the actual transforms.
+		   The arrays are guaranteed to have the correct sizes 
+		   and a compatible plan when these are called. 
+		   Also, the complex array is always destroyed in the 
+		   inverse transform - a copy has been made before.*/
+		
+		static void _FourierTransform(
+                MultidimArray<double>& src,
+                MultidimArray<dComplex>& dest,
+                const DoublePlan& plan,
+                Normalization normalization);
+
+        static void _inverseFourierTransform(
+                MultidimArray<dComplex>& src,
+                MultidimArray<double>& dest,
+                const DoublePlan& plan,
+                Normalization normalization);
+
+        static void _FourierTransform(
+                MultidimArray<float>& src,
+                MultidimArray<fComplex>& dest,
+                const FloatPlan& plan,
+                Normalization normalization);
+
+        static void _inverseFourierTransform(
+                MultidimArray<fComplex>& src,
+                MultidimArray<float>& dest,
+                const FloatPlan& plan,
+                Normalization normalization);
+		
+	public:
 
 
         /* These plan classes can be copied freely.
@@ -164,13 +227,20 @@ class NewFFT
 
                 bool isCompatible(const MultidimArray<double>& real) const
                 {
-                    return real.xdim == w && real.ydim == h && real.zdim == d;
+                    return real.xdim == w && real.ydim == h && real.zdim == d
+							&& (reusable || realPtr == MULTIDIM_ARRAY(real));
                 }
 
                 bool isCompatible(const MultidimArray<dComplex>& complex) const
                 {
-                    return complex.xdim == w/2+1 && complex.ydim == h && complex.zdim == d;
+                    return complex.xdim == w/2+1 && complex.ydim == h && complex.zdim == d							
+							&& (reusable || complexPtr == (double*)MULTIDIM_ARRAY(complex));
                 }
+				
+				bool isReusable() const
+				{
+					return reusable;
+				}
 
             private:
 
@@ -195,7 +265,9 @@ class NewFFT
                         fftw_plan forward, backward;
                 };
 
+				bool reusable;
                 int w, h, d;
+				double *realPtr, *complexPtr;
                 std::shared_ptr<Plan> plan;
         };
 
@@ -222,13 +294,20 @@ class NewFFT
 
                 bool isCompatible(const MultidimArray<float>& real) const
                 {
-                    return real.xdim == w && real.ydim == h && real.zdim == d;
+                    return (real.xdim == w && real.ydim == h && real.zdim == d)
+							&& (reusable || realPtr == MULTIDIM_ARRAY(real));
                 }
 
                 bool isCompatible(const MultidimArray<fComplex>& complex) const
                 {
-                    return complex.xdim == w/2+1 && complex.ydim == h && complex.zdim == d;
+                    return (complex.xdim == w/2+1 && complex.ydim == h && complex.zdim == d)
+							&& (reusable || complexPtr == (float*)MULTIDIM_ARRAY(complex));
                 }
+				
+				bool isReusable() const
+				{
+					return reusable;
+				}
 
 
 
@@ -254,8 +333,10 @@ class NewFFT
 
                         fftwf_plan forward, backward;
                 };
-
+				
+				bool reusable;
                 int w, h, d;
+				float *realPtr, *complexPtr;
                 std::shared_ptr<Plan> plan;
         };
 
