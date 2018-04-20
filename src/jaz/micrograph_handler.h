@@ -39,6 +39,10 @@ class MicrographHandler
                 int& fc,
                 double& dosePerFrame,
                 std::string& metaFn);
+		
+		// remove movies from the list for which either the meta-star or the movie itself is missing
+		std::vector<MetaDataTable> 
+			cullMissingMovies(const std::vector<MetaDataTable>& mdts, int verb);
 
         // find the greatest number of frames available in all micrographs
         void findLowestFrameCount(const std::vector<MetaDataTable>& mdts, int verb);
@@ -77,6 +81,7 @@ class MicrographHandler
         std::string getMetaName(std::string micName);
 
         int determineFrameCount(const MetaDataTable& mdt);
+		bool isMoviePresent(const MetaDataTable& mdt);
         std::string getMovieFilename(const MetaDataTable& mdt);
 
 };

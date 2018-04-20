@@ -205,6 +205,8 @@ void MotionRefiner::init()
 					chosenMdts[0], angpix, verb, nr_omp_threads, // in
 				fc0, fractDose, metaFn); // out
 		
+		chosenMdts = micrographHandler.cullMissingMovies(chosenMdts, verb);
+		
 		if (!findShortestMovie)
 		{
 			if (micrographHandler.lastFrame < 0)
