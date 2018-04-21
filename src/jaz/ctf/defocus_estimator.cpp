@@ -207,11 +207,6 @@ void DefocusEstimator::processMicrograph(
 		
 		for (long p = 0; p < pc; p++)
 		{
-			if (verb > 0)
-			{
-				std::cout << "    " << p << " / " << pc << "\n";
-			}
-			
 			CTF ctf0;
 			ctf0.read(mdt, mdt, p);
 			
