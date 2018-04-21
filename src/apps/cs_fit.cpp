@@ -20,13 +20,14 @@
 #include <src/jaz/fftw_helper.h>
 #include <src/jaz/resampling_helper.h>
 #include <src/jaz/ctf_helper.h>
-#include <src/jaz/defocus_refinement.h>
 #include <src/jaz/magnification_refinement.h>
 #include <src/jaz/refinement_helper.h>
 #include <src/jaz/stack_helper.h>
 #include <src/jaz/image_op.h>
 #include <src/jaz/refinement_program.h>
 #include <src/jaz/parallel_ft.h>
+
+#include <src/jaz/ctf/defocus_helper.h>
 
 #include <omp.h>
 
@@ -177,7 +178,7 @@ int CsFit::_run()
 
                     double u, v;
 
-                    double err = DefocusRefinement::findDefocus1D(
+                    double err = DefocusHelper::findDefocus1D(
                         pred, obsF[p], freqWeight, ctf0, angpix, &u, &v, defocusRange, 11, 1);
 
                     totalCostIso[threadnum][i] += err;

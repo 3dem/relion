@@ -26,6 +26,7 @@
 #include <src/image.h>
 
 #include "tilt_estimator.h"
+#include "defocus_estimator.h"
 
 class CtfRefiner
 {	
@@ -34,11 +35,11 @@ class CtfRefiner
 		CtfRefiner();
 		
 		
-		void read(int argc, char **argv);
-		
+		void read(int argc, char **argv);		
 		void init();		
+		void run();		
+		void finalise();
 		
-		void run();
 		
 		int getVerbosityLevel();
 		
@@ -54,6 +55,7 @@ class CtfRefiner
 		ReferenceMap reference;
 		
 		TiltEstimator tiltEstimator;
+		DefocusEstimator defocusEstimator;
 	
 		// Verbosity
 		int verb;
@@ -68,6 +70,7 @@ class CtfRefiner
 		bool do_tilt_fit;
 	
 		bool debug,     // write out debugging info
+		     diag,      // write out diagnostic info
 		     clTilt,    // tilt from cmd. line
 		     anisoTilt; // use experimental anisotropic tilt model
 	
@@ -82,55 +85,13 @@ class CtfRefiner
 		std::string starFn, outPath;
 	
 		MetaDataTable mdt0;
-		std::vector<MetaDataTable> mdts;
-		std::vector<FileName> fn_mics_process, fn_mics_ori;
-	
+		std::vector<MetaDataTable> allMdts, unfinishedMdts;	
 		
 		// s: full image size, sh: half-size + 1, fc: frame count
 		int s, sh, fc;
-	
-		// Defocus_fit options
-		RFLOAT defocusRange;
-	
-		// Astigmatism options
-		bool fitAstigmatism, noGlobAstig, diag;
-	
-		// Fit amplitude contrast/phase shift
-		bool fitPhase;
-	
-		// Fit spherical aberration coefficient
-		bool fitCs;
-	
-		// only per-micrograph fits
-		bool globOnly;
-	
-		// Tilt fit options
-		RFLOAT kmin,
-			testtilt_x, testtilt_y,
-			testtilt_xx, testtilt_xy, testtilt_yy;
-	
-		bool aniso;
-	
-		Image<Complex> lastXY;
-		Image<RFLOAT> lastW;
-	
-	
-		// Get output STAR file name for the gth entry in the mdts
-		FileName getOutputFileNameRoot(long int g, bool is_original = false);
-	
-		// Fir defocus for all particles on one micrograph
-		void fitDefocusOneMicrograph(long g, const std::vector<Image<Complex> > &obsF, 
-									 const std::vector<Image<Complex> > &preds, int verb = 0);
-	
-		// Write PostScript file with per-particle defocus plotted onto micrograph in blue-red color scale
-		void writePerParticleDefocusEPS(long g);
-	
+			
 		// Fit CTF parameters for all particles on a subset of the micrographs micrograph
 		void processSubsetMicrographs(long g_start, long g_end);
-	
-		// Read all micrograph metadata tables back in, and combine into onelarge one
-		void combineAllDefocusFitAndBeamTiltInformation(
-				long g_start, long g_end);
 };
 
 

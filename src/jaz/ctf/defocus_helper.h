@@ -74,7 +74,7 @@ class AstigmatismOptimizationAcc : public Optimization
         RFLOAT angpix, phiScale, csScale;
 };
 
-class DefocusRefinement
+class DefocusHelper
 {
     public:
 

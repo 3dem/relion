@@ -12,15 +12,11 @@
 #include <src/euler.h>
 #include <src/jaz/image_log.h>
 #include <src/jaz/slice_helper.h>
-#include <src/jaz/spectral_helper.h>
 #include <src/jaz/filter_helper.h>
-#include <src/jaz/backprojection_helper.h>
 #include <src/jaz/volume_converter.h>
 #include <src/jaz/complex_io.h>
 #include <src/jaz/fftw_helper.h>
 #include <src/jaz/resampling_helper.h>
-#include <src/jaz/ctf_helper.h>
-#include <src/jaz/defocus_refinement.h>
 #include <src/jaz/magnification_refinement.h>
 #include <src/jaz/refinement_helper.h>
 #include <src/jaz/stack_helper.h>

@@ -16,8 +16,16 @@
 #include <omp.h>
 
 TiltEstimator::TiltEstimator()
-:	ready(false)
+	:	ready(false)
 {}
+
+void TiltEstimator::read(IOParser &parser, int argc, char *argv[])
+{
+	kmin = textToFloat(parser.getOption("--kmin_tilt", 
+						"Inner freq. threshold for beamtilt estimation [Angst]", "20.0"));
+	
+	aniso = parser.checkOption("--anisotropic_tilt", "Use anisotropic coma model");
+}
 
 void TiltEstimator::init(
 		int verb, int s, int nr_omp_threads, 
@@ -28,11 +36,15 @@ void TiltEstimator::init(
 	this->s = s;
 	sh = s/2 + 1;
 	this->nr_omp_threads = nr_omp_threads;
+	
 	this->debug = debug;
 	this->diag = diag;
 	this->outPath = outPath;
+	
 	this->reference = reference;
 	this->obsModel = obsModel;
+	
+	angpix = obsModel->angpix;
 	
 	ready = true;
 }
@@ -48,14 +60,8 @@ void TiltEstimator::processMicrograph(
 	
 	const int pc = mdt.numberOfObjects();
 	
-	std::vector<Image<Complex>> pred(pc);
-	
-	#pragma omp parallel for num_threads(nr_omp_threads)
-	for (long p = 0; p < pc; p++)
-	{
-		pred[p] = reference->predict(
-			mdt, p, *obsModel, ReferenceMap::Opposite, false, false);
-	}
+	std::vector<Image<Complex>> pred = reference->predictAll(
+		mdt, *obsModel, ReferenceMap::Opposite, nr_omp_threads, false, false);
 	
 	std::vector<Image<Complex>> xyAcc(nr_omp_threads);
 	std::vector<Image<RFLOAT>> wAcc(nr_omp_threads);
@@ -103,9 +109,15 @@ void TiltEstimator::processMicrograph(
 }
 
 void TiltEstimator::parametricFit(
-		std::vector<MetaDataTable>& mdts, 
-		double kmin, double Cs, double lambda, bool aniso)
+		const std::vector<MetaDataTable>& mdts, 
+		double Cs, double lambda, 
+		MetaDataTable& mdtOut)
 {
+	if (!ready)
+	{
+		REPORT_ERROR("ERROR: TiltEstimator::parametricFit: TiltEstimator not initialized.");
+	}
+	
 	if (verb > 0)
 	{
 		std::cout << " + Fitting beam tilt ..." << std::endl;
@@ -133,26 +145,20 @@ void TiltEstimator::parametricFit(
 		wAccSum() += wAcc();		
 	}
 		
-	Image<RFLOAT> wgh, phase, fit, phaseFull, fitFull;
+	Image<RFLOAT> phase, fit, phaseFull, fitFull;
 	
 	FilterHelper::getPhase(xyAccSum, phase);
 	
 	Image<Complex> xyNrm(sh,s);
 	
-	FilterHelper::multiply(wAccSum, reference->freqWeight, wgh);
+	double kmin_px = obsModel->angToPix(kmin, s);
+	Image<RFLOAT> wgh = reference->getHollowWeight(kmin_px);
+	
+	FilterHelper::multiply(wAccSum, wgh, wgh);
 	
 	for (int y = 0; y < s; y++)
 	for (int x = 0; x < sh; x++)
 	{
-		double xx = x;
-		double yy = y <= sh? y : y - s;
-		double r = sqrt(xx*xx + yy*yy);
-		
-		if (r < kmin)
-		{
-			wgh(y,x) = 0.0;
-		}
-				
 		xyNrm(y,x) = wAccSum(y,x) > 0.0? xyAccSum(y,x)/wAccSum(y,x) : Complex(0.0, 0.0);
 	}
 	
@@ -183,7 +189,7 @@ void TiltEstimator::parametricFit(
 	double shift_x, shift_y, tilt_x, tilt_y;
 	
 	TiltHelper::fitTiltShift(
-		phase, wgh, Cs, lambda, obsModel->angpix,
+		phase, wgh, Cs, lambda, angpix,
 		&shift_x, &shift_y, &tilt_x, &tilt_y, &fit);
 		
 	FftwHelper::decenterUnflip2D(fit.data, fitFull.data);
@@ -207,7 +213,7 @@ void TiltEstimator::parametricFit(
 	if (aniso)
 	{
 		TiltHelper::optimizeAnisoTilt(
-			xyNrm, wgh, Cs, lambda, obsModel->angpix, false,
+			xyNrm, wgh, Cs, lambda, angpix, false,
 			shift_x, shift_y, tilt_x, tilt_y,
 			&shift_x, &shift_y, &tilt_x, &tilt_y,
 			&tilt_xx, &tilt_xy, &tilt_yy, &fit);
@@ -215,7 +221,7 @@ void TiltEstimator::parametricFit(
 	else
 	{
 		TiltHelper::optimizeTilt(
-			xyNrm, wgh, Cs, lambda, obsModel->angpix, false,
+			xyNrm, wgh, Cs, lambda, angpix, false,
 			shift_x, shift_y, tilt_x, tilt_y,
 			&shift_x, &shift_y, &tilt_x, &tilt_y, &fit);
 	}
@@ -236,15 +242,26 @@ void TiltEstimator::parametricFit(
 	os2 << "beamtilt_y = " << tilt_y << "\n";
 	os2.close();
 		
-	// Now set the beamtilt in the output mdt0
-	for (int g = 0; g < gc; g++)
+	// Now write the beamtilt into mdtOut	
+	const long tpc = mdtOut.numberOfObjects();
+	
+	for (long p = 0; p < tpc; p++)
 	{
-		const int pc = mdts[g].numberOfObjects();
-		
-		for (int p = 0; p < pc; p++)
-		{
-			mdts[g].setValue(EMDL_IMAGE_BEAMTILT_X, tilt_x, p);
-			mdts[g].setValue(EMDL_IMAGE_BEAMTILT_Y, tilt_y, p);
-		}
+		mdtOut.setValue(EMDL_IMAGE_BEAMTILT_X, tilt_x, p);
+		mdtOut.setValue(EMDL_IMAGE_BEAMTILT_Y, tilt_y, p);
 	}
+}
+
+bool TiltEstimator::isFinished(const MetaDataTable &mdt)
+{
+	if (!ready)
+	{
+		REPORT_ERROR("ERROR: TiltEstimator::isFinished: DefocusEstimator not initialized.");
+	}
+	
+	std::string outRoot = CtfRefiner::getOutputFilenameRoot(mdt, outPath);
+	
+	return exists(outRoot+"_xyAcc_real.mrc")
+	    && exists(outRoot+"_xyAcc_imag.mrc")
+	    && exists(outRoot+"_wAcc.mrc");
 }

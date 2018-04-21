@@ -13,25 +13,39 @@ class TiltEstimator
 		
 		TiltEstimator();
 		
+		
+		void read(IOParser& parser, int argc, char *argv[]);
+		
 		void init(
 				int verb, int s, int nr_omp_threads,
 				bool debug, bool diag, std::string outPath,
 				ReferenceMap* reference, ObservationModel* obsModel);
-
+		
+		// Compute per-pixel information for one micrograph
 		void processMicrograph(
 				long g, MetaDataTable& mdt, 
 				const std::vector<Image<Complex>>& obs);
 		
+		// Sum up per-pixel information from all micrographs, 
+		// then fit beam-tilt model to the per-pixel fit
 		void parametricFit(
-				std::vector<MetaDataTable>& mdts, 
-				double kmin, double Cs, double lambda,
-				bool aniso);
+				const std::vector<MetaDataTable>& mdts, 
+				double Cs, double lambda, 
+				MetaDataTable& mdtOut);
+		
+		// Has this mdt been processed already?
+		bool isFinished(const MetaDataTable& mdt);
 		
 	private:
+				
+		// cmd. line options (see read())
+		bool aniso, kmin;
 		
+		// parameters obtained through init()
 		int verb, s, sh, nr_omp_threads;
 		bool debug, diag, ready;
 		std::string outPath;
+		double angpix;
 		
 		ReferenceMap* reference;
 		ObservationModel* obsModel;

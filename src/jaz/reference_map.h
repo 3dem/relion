@@ -28,7 +28,7 @@ class ReferenceMap
         void read(IOParser& parser, int argc, char *argv[]);
         void load(int verb, bool debug);
 		
-		void zeroCenter(double kmin);
+		Image<RFLOAT> getHollowWeight(double kmin_px);
 
         std::vector<Image<Complex>> predictAll(
                 const MetaDataTable& mdt,

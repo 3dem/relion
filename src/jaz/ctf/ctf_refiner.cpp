@@ -27,7 +27,6 @@
 #include <src/jaz/fftw_helper.h>
 #include <src/jaz/resampling_helper.h>
 #include <src/jaz/ctf_helper.h>
-#include <src/jaz/defocus_refinement.h>
 #include <src/jaz/refinement_helper.h>
 #include <src/jaz/stack_helper.h>
 #include <src/jaz/image_op.h>
@@ -58,28 +57,23 @@ void CtfRefiner::read(int argc, char **argv)
 	reference.read(parser, argc, argv);
 	
 	outPath = parser.getOption("--o", "Output directory, e.g. CtfRefine/job041/");
-	kmin = textToFloat(parser.getOption("--kmin", "Inner freq. threshold [Angst]", "20.0"));
 	only_do_unfinished = parser.checkOption("--only_do_unfinished", "Skip those steps for which output files already exist.");
+	
+	diag = parser.checkOption("--diag", "Write out diagnostic data (slower)");
 	
 	int fit_section = parser.addSection("Defocus fit options");
 	do_defocus_fit = parser.checkOption("--fit_defocus", "Perform refinement of per-particle defocus values?");
-	fitAstigmatism = parser.checkOption("--astig", "Estimate independent astigmatism for each particle");
-	noGlobAstig = parser.checkOption("--no_glob_astig", "Skip per-micrograph astigmatism estimation");
-	diag = parser.checkOption("--diag", "Write out defocus errors");
-	defocusRange = textToFloat(parser.getOption("--range", "Defocus scan range (in A)", "2000."));
-	fitCs = parser.checkOption("--fit_Cs", "Fit spherical aberration (per micrograph)");
-	fitPhase = parser.checkOption("--fit_phase", "Fit phase shift (amplitude contrast) per-micrograph");
-	globOnly = parser.checkOption("--glob", "Only perform per-micrograph fit");
+	defocusEstimator.read(parser, argc, argv);
 	
 	int tilt_section = parser.addSection("Beam-tilt options");
 	do_tilt_fit = parser.checkOption("--fit_beamtilt", "Perform refinement of beamtilt for micrograph groups?");
-	aniso = parser.checkOption("--anisotropic_tilt", "Use anisotropic coma model");
+	tiltEstimator.read(parser, argc, argv);
 	
 	int comp_section = parser.addSection("Computational options");
 	nr_omp_threads = textToInteger(parser.getOption("--j", "Number of (OMP) threads", "1"));
 	minMG = textToInteger(parser.getOption("--min_MG", "First micrograph index", "0"));
 	maxMG = textToInteger(parser.getOption("--max_MG", "Last micrograph index (default is to process all)", "-1"));
-
+	
 	debug = parser.checkOption("--debug", "Write debugging data");
 	verb = textToInteger(parser.getOption("--verb", "Verbosity", "1"));
 	
@@ -106,15 +100,6 @@ void CtfRefiner::read(int argc, char **argv)
 	{
 		outPath += "/";
 	}
-}
-
-// Get the coordinate filename from the micrograph filename
-FileName CtfRefiner::getOutputFileNameRoot(long int g, bool is_original)
-{
-	FileName fn_pre, fn_jobnr, fn_post;
-	FileName fn_mic = (is_original) ? fn_mics_ori[g] : fn_mics_process[g];
-	decomposePipelineFileName(fn_mic, fn_pre, fn_jobnr, fn_post);
-	return outPath + fn_post.withoutExtension();
 }
 
 void CtfRefiner::init()
@@ -174,28 +159,20 @@ void CtfRefiner::init()
 		}
 	}
 	
-	mdts = StackHelper::splitByMicrographName(&mdt0);
-	
-	// Just get vector of all original micrograph names
-	for (long int g = 0; g < mdts.size(); g++)
-	{
-		FileName fn_mic;
-		mdts[g].getValue(EMDL_MICROGRAPH_NAME, fn_mic, 0);
-		fn_mics_ori.push_back(fn_mic);
-	}
+	allMdts = StackHelper::splitByMicrographName(&mdt0);
 	
 	// Only work on a user-specified subset of the micrographs
-	if (maxMG < 0 || maxMG >= mdts.size())
+	if (maxMG < 0 || maxMG >= allMdts.size())
 	{
-		maxMG = mdts.size()-1;
+		maxMG = allMdts.size()-1;
 	}
 	
-	if (minMG < 0 || minMG >= mdts.size())
+	if (minMG < 0 || minMG >= allMdts.size())
 	{
 		minMG = 0;
 	}
 	
-	if (minMG > 0 || maxMG < mdts.size()-1)
+	if (minMG > 0 || maxMG < allMdts.size()-1)
 	{
 		if (verb > 0)
 		{
@@ -207,52 +184,10 @@ void CtfRefiner::init()
 		
 		for (long int g = minMG; g <= maxMG; g++ )
 		{
-			todo_mdts.push_back(mdts[g]);
+			todo_mdts.push_back(allMdts[g]);
 		}
 		
-		mdts = todo_mdts;
-	}
-	
-	// check whether output files exist and if they do, then skip this micrograph
-	if (only_do_unfinished)
-	{
-		std::vector<MetaDataTable> unfinished_mdts;
-		
-		for (long int g = minMG; g <= maxMG; g++ )
-		{
-			bool is_done = true;
-			
-			if (do_defocus_fit && !exists(getOutputFileNameRoot(g, true)+"_defocus_fit.star"))
-			{
-				is_done = false;
-			}
-			
-			if (do_tilt_fit && !exists(getOutputFileNameRoot(g, true)+"_wAcc.mrc"))
-			{
-				is_done = false;
-			}
-			
-			if (!is_done)
-			{
-				unfinished_mdts.push_back(mdts[g]);
-			}
-		}
-		
-		mdts = unfinished_mdts;
-		
-		if (verb > 0)
-		{
-			std::cout << "   - Will only process " << mdts.size() 
-					  << " unfinished micrographs" << std::endl;
-		}
-	}
-	
-	// Get vector of all micrograph names that need to be processed
-	for (long int g = 0; g < mdts.size(); g++)
-	{
-		FileName fn_mic;
-		mdts[g].getValue(EMDL_MICROGRAPH_NAME, fn_mic, 0);
-		fn_mics_process.push_back(fn_mic);
+		allMdts = todo_mdts;
 	}
 	
 	// Make sure output directory ends in a '/'
@@ -275,8 +210,6 @@ void CtfRefiner::init()
 		}
 	}
 	
-	// Only create projectors if there are (still) micrographs to process
-	// Read in the first reference
 	if (verb > 0)
 	{
 		std::cout << " + Reading references ...\n";
@@ -288,278 +221,30 @@ void CtfRefiner::init()
 	s = reference.s;
 	sh = s/2 + 1;
 	
-	reference.zeroCenter(2.0*sh*angpix/kmin);
+	tiltEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
+	defocusEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
 		
-	tiltEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);	
-}
-
-void CtfRefiner::fitDefocusOneMicrograph(long g, const std::vector<Image<Complex> > &obsF, 
-										 const std::vector<Image<Complex> > &preds, int verb)
-{
-	long pc = obsF.size();
-	
-	std::stringstream stsg;
-	stsg << g;
-	
-	if (!noGlobAstig)
+	// check whether output files exist and if they do, then skip this micrograph
+	if (only_do_unfinished)
 	{
-		CTF ctf0;
-		ctf0.read(mdts[g], mdts[g], 0);
-		
-		Image<RFLOAT> dataVis;
-		
-		if (diag)
+		for (long int g = minMG; g <= maxMG; g++ )
 		{
-			Image<RFLOAT> dotp0(sh,s), cc(sh,s), wgh0(sh,s), wgh1(sh,s), dotp0_full(s,s);
-			dotp0.data.initZeros();
-			wgh0.data.initZeros();
-			wgh1.data.initZeros();
+			bool is_done = 
+				   tiltEstimator.isFinished(allMdts[g])
+				&& defocusEstimator.isFinished(allMdts[g]);
 			
-			for (long p = 0; p < pc; p++)
+			if (!is_done)
 			{
-				for (long y = 0; y < s; y++)
-				for (long x = 0; x < sh; x++)
-				{
-					Complex vx = DIRECT_A2D_ELEM(preds[p].data, y, x);
-					const Complex vy = DIRECT_A2D_ELEM(obsF[p].data, y, x);
-					
-					dotp0(y,x) += vy.real*vx.real + vy.imag*vx.imag;
-					wgh0(y,x) += vx.norm();
-					wgh1(y,x) += vy.norm();
-				}
-			}
-			
-			for (long y = 0; y < s; y++)
-			for (long x = 0; x < sh; x++)
-			{
-				double nrm = sqrt(wgh0(y,x) * wgh1(y,x));
-				cc(y,x) = nrm > 0.0? 10.0 * dotp0(y,x) / nrm : 0.0;
-			}
-			
-			FftwHelper::decenterDouble2D(cc.data, dotp0_full.data);
-			
-			ImageLog::write(dotp0_full, outPath+"_astig_data_m"+stsg.str());
-			dataVis = FilterHelper::polarBlur(dotp0_full, 10.0);
-			ImageLog::write(dataVis, outPath+"_astig_data_m"+stsg.str()+"_blurred");
-			
-			Image<RFLOAT> ctfFit(s,s);
-			ctf0.getCenteredImage(ctfFit.data, angpix, false, false, false, false);
-			ImageLog::write(ctfFit, outPath+"_astig0_m"+stsg.str());
-			
-			ctfFit.data.xinit = 0;
-			ctfFit.data.yinit = 0;
-			
-			Image<RFLOAT> vis = FilterHelper::sectorBlend(dataVis, ctfFit, 12);
-			ImageLog::write(vis, outPath+"_astig_data_m"+stsg.str()+"_vis0");
-		}
-		
-		double u, v, phi, phase, newCs;
-		
-		mdts[g].getValue(EMDL_CTF_PHASESHIFT, phase, 0);
-		mdts[g].getValue(EMDL_CTF_CS, newCs, 0);
-		
-		if (fitCs)
-		{
-			if (verb > 0)
-			{
-				std::cout << "initial phi and Cs: " << phase << ", " << newCs << "\n";
-			}
-			
-			DefocusRefinement::findAstigmatismPhaseAndCsNM(
-				preds, obsF, reference.freqWeight, ctf0, angpix, &u, &v, &phi, &phase, &newCs);
-			
-			if (verb > 0)
-			{
-				std::cout << "final phi and Cs: " << phase << ", " << newCs << "\n";
+				unfinishedMdts.push_back(allMdts[g]);
 			}
 		}
-		else if (fitPhase)
+		if (verb > 0)
 		{
-			if (verb > 0)
-			{
-				std::cout << "initial phase shift: " << phase << "\n";
-			}
-			
-			DefocusRefinement::findAstigmatismAndPhaseNM(
-				preds, obsF, reference.freqWeight, ctf0, angpix, &u, &v, &phi, &phase);
-			
-			if (verb > 0)
-			{
-				std::cout << "final phase shift: " << phase << "\n";
-			}
+			std::cout << "   - Will only process " << unfinishedMdts.size() 
+					  << " unfinished (out of " << allMdts.size() 
+					  << ") micrographs" << std::endl;
 		}
-		else
-		{
-			DefocusRefinement::findAstigmatismNM(preds, obsF, reference.freqWeight, ctf0, angpix, &u, &v, &phi);
-		}
-		
-		for (long p = 0; p < pc; p++)
-		{
-			mdts[g].setValue(EMDL_CTF_DEFOCUSU, u, p);
-			mdts[g].setValue(EMDL_CTF_DEFOCUSV, v, p);
-			mdts[g].setValue(EMDL_CTF_DEFOCUS_ANGLE, phi, p);
-			
-			if (fitPhase) mdts[g].setValue(EMDL_CTF_PHASESHIFT, phase, p);
-			if (fitCs) mdts[g].setValue(EMDL_CTF_CS, newCs, p);
-		}
-		
-		if (diag)
-		{
-			CTF ctf1;
-			ctf1.read(mdts[g], mdts[g], 0);
-			
-			Image<RFLOAT> ctfFit(s,s);
-			ctf1.getCenteredImage(ctfFit.data, angpix, false, false, false, false);
-			ImageLog::write(ctfFit, outPath+"_astig1_m"+stsg.str());
-			ctfFit.data.xinit = 0;
-			ctfFit.data.yinit = 0;
-			
-			Image<RFLOAT> vis = FilterHelper::sectorBlend(dataVis, ctfFit, 12);
-			ImageLog::write(vis, outPath+"_astig_data_m"+stsg.str()+"_vis1");
-		}
-	}
-	
-	if (globOnly) return;
-		
-	if (diag)
-	{
-		std::ofstream ofst(outPath+"_diag_m"+stsg.str()+".dat");
-		std::ofstream ofsto(outPath+"_diag_m"+stsg.str()+"_opt.dat");
-		
-		for (long p = 0; p < pc; p++)
-		{
-			if (verb > 0)
-			{
-				std::cout << "    " << p << " / " << pc << "\n";
-			}
-			
-			CTF ctf0;
-			ctf0.read(mdts[g], mdts[g], p);
-			
-			std::vector<d2Vector> cost = DefocusRefinement::diagnoseDefocus(
-				preds[p], obsF[p], reference.freqWeight,
-				ctf0, angpix, defocusRange, 100, nr_omp_threads);
-			
-			double cMin = cost[0][1];
-			double dOpt = cost[0][0];
-			
-			for (int i = 0; i < cost.size(); i++)
-			{
-				ofst << cost[i][0] << " " << cost[i][1] << "\n";
-				
-				if (cost[i][1] < cMin)
-				{
-					cMin = cost[i][1];
-					dOpt = cost[i][0];
-				}
-			}
-			
-			ofsto << dOpt << " " << cMin << "\n";
-			
-			ofst << "\n";
-		}
-	}
-	else
-	{		
-		// Parallel loop over all particles on this micrograph
-		#pragma omp parallel for num_threads(nr_omp_threads)
-		for (long p = 0; p < pc; p++)
-		{
-			std::stringstream stsp;
-			stsp << p;
-			
-			CTF ctf0;
-			ctf0.read(mdts[g], mdts[g], p);
-			
-			if (fitAstigmatism)
-			{
-				double u, v, phi;
-				DefocusRefinement::findAstigmatismNM(
-					preds[p], obsF[p], reference.freqWeight, ctf0,
-					angpix, &u, &v, &phi);
-				
-				mdts[g].setValue(EMDL_CTF_DEFOCUSU, u, p);
-				mdts[g].setValue(EMDL_CTF_DEFOCUSV, v, p);
-				mdts[g].setValue(EMDL_CTF_DEFOCUS_ANGLE, phi, p);
-			}
-			else
-			{
-				double u, v;
-				DefocusRefinement::findDefocus1D(
-					preds[p], obsF[p], reference.freqWeight, ctf0,
-					angpix, &u, &v, defocusRange);
-				
-				mdts[g].setValue(EMDL_CTF_DEFOCUSU, u, p);
-				mdts[g].setValue(EMDL_CTF_DEFOCUSV, v, p);
-			}
-		}
-		
-		// Output a diagnostic Postscript file
-		writePerParticleDefocusEPS(g);
-	}
-	
-	// Now write out STAR file with optimised values for this micrograph
-	mdts[g].write(getOutputFileNameRoot(g, false)+ "_defocus_fit.star");
-}
-
-void CtfRefiner::writePerParticleDefocusEPS(long g)
-{
-	FileName fn_eps = getOutputFileNameRoot(g, false) + "_defocus_fit.eps";
-	CPlot2D *plot2D=new CPlot2D(fn_eps);
-	plot2D->SetXAxisSize(600);
-	plot2D->SetYAxisSize(600);
-	plot2D->SetDrawLegend(false);	
-	
-	RFLOAT ave_defocus = 0.;
-	RFLOAT min_defocus = 99.e10;
-	RFLOAT max_defocus = -99.e10;
-	
-	FOR_ALL_OBJECTS_IN_METADATA_TABLE(mdts[g])
-	{
-		RFLOAT defU, defV;
-		mdts[g].getValue(EMDL_CTF_DEFOCUSU, defU);
-		mdts[g].getValue(EMDL_CTF_DEFOCUSV, defV);
-		defU = (defU + defV) / 2.;
-		ave_defocus += defU;
-		min_defocus = XMIPP_MIN(min_defocus, defU);
-		max_defocus = XMIPP_MAX(max_defocus, defU);
-	}
-	
-	ave_defocus /= (RFLOAT)(mdts[g].numberOfObjects());
-	
-	FOR_ALL_OBJECTS_IN_METADATA_TABLE(mdts[g])
-	{
-		RFLOAT defU, defV;
-		RFLOAT xcoor, ycoor;
-		
-		mdts[g].getValue(EMDL_IMAGE_COORD_X, xcoor);
-		mdts[g].getValue(EMDL_IMAGE_COORD_Y, ycoor);
-		mdts[g].getValue(EMDL_CTF_DEFOCUSU, defU);
-		mdts[g].getValue(EMDL_CTF_DEFOCUSV, defV);
-		
-		defU = (defU + defV) / 2.;
-		
-		RFLOAT red  = (defU - min_defocus) / (max_defocus - min_defocus);
-		
-		CDataSet dataSet;
-		
-		dataSet.SetDrawMarker(true);
-		dataSet.SetDrawLine(false);
-		dataSet.SetMarkerSize(5);
-		dataSet.SetDatasetColor(red, 0.0, 1. - red);
-		
-		CDataPoint point(xcoor, ycoor);
-		
-		dataSet.AddDataPoint(point);
-		
-		plot2D->AddDataSet(dataSet);
-	}
-	
-	char title[256];
-	snprintf(title, 255, "Defocus range from blue to red: %.0f A", max_defocus - min_defocus);
-	plot2D->SetXAxisTitle(title);
-	
-	plot2D->OutputPostScriptPlot(fn_eps);	
+	}	
 }
 
 void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
@@ -581,23 +266,13 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 	
 	for (long g = g_start; g <= g_end; g++)
 	{
-		std::vector<Image<Complex> > obsF;
+		std::vector<Image<Complex> > obs;
 		
-		// both defocus_tit and tilt_fit need the same obsF
-		obsF = StackHelper::loadStackFS(&mdts[g], "", nr_omp_threads, &fts);
-		const long pc = obsF.size();
-		
-		std::vector<Image<Complex>> predsDefocus(pc);
-		
-		#pragma omp parallel for num_threads(nr_omp_threads)
-		for (long p = 0; p < pc; p++)
-		{
-			predsDefocus[p] = reference.predict(
-				mdts[g], p, obsModel, ReferenceMap::Own, false, true);
-		}
+		// both defocus_tit and tilt_fit need the same observations
+		obs = StackHelper::loadStackFS(&unfinishedMdts[g], "", nr_omp_threads, &fts);
 		
 		// Make sure output directory exists
-		FileName newdir = getOutputFileNameRoot(g);
+		FileName newdir = getOutputFilenameRoot(unfinishedMdts[g], outPath);
 		newdir = newdir.beforeLastOf("/");
 		
 		if (newdir != prevdir)
@@ -608,12 +283,12 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 		
 		if (do_defocus_fit)
 		{
-			fitDefocusOneMicrograph(g, obsF, predsDefocus, verb - 1);
+			defocusEstimator.processMicrograph(g, unfinishedMdts[g], obs);
 		}
 		
 		if (do_tilt_fit)
 		{
-			tiltEstimator.processMicrograph(g, mdts[g], obsF);
+			tiltEstimator.processMicrograph(g, unfinishedMdts[g], obs);
 		}
 		
 		nr_done++;
@@ -629,78 +304,39 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 		progress_bar(my_nr_micrographs);
 	}
 }
-
-void CtfRefiner::combineAllDefocusFitAndBeamTiltInformation(long g_start, long g_end)
-{
-	int barstep;
-	int my_nr_micrographs = g_end - g_start + 1;
-	std::vector<FileName> fn_eps;
-	
-	if (verb > 0)
-	{
-		std::cout << " + Combining data for all micrographs " << std::endl;
-		init_progress_bar(my_nr_micrographs);
-		barstep = XMIPP_MAX(1, my_nr_micrographs/ 60);
-	}
-	
-	
-	if (do_defocus_fit)
-	{
-		// Re-fill mdt0 from all the defocus_fit STAR files
-		mdt0.clear();
-	}
-	
-	long nr_done = 0;
-	for (long g = g_start; g <= g_end; g++)
-	{
-		if (do_defocus_fit)
-		{
-			FileName fn_root = getOutputFileNameRoot(g, true);
-			// Read in STAR file with defocus fit data
-			MetaDataTable mdtt;
-			mdtt.read(fn_root+"_defocus_fit.star");
-			mdt0.append(mdtt);
-			if (exists(fn_root+"_defocus_fit.eps"))
-				fn_eps.push_back(fn_root+"_defocus_fit.eps");
-		}
-		
-		nr_done++;
-		
-		if (verb > 0 && nr_done % barstep == 0)
-		{
-			progress_bar(nr_done);
-		}
-	}
-	
-	if (verb > 0)
-	{
-		progress_bar(my_nr_micrographs);
-	}
-	
-	if (fn_eps.size() > 0)
-	{
-		joinMultipleEPSIntoSinglePDF(outPath + "logfile.pdf ", fn_eps);
-	}
-}
-
 
 void CtfRefiner::run()
 {
 	if (do_defocus_fit || do_tilt_fit)
 	{
-		// The subsets will be used in openMPI parallelisation: instead of over g0->gc, they will be over smaller subsets
-		processSubsetMicrographs(0, mdts.size()-1);
+		// The subsets will be used in openMPI parallelisation: 
+		// instead of over g0->gc, they will be over smaller subsets
+		processSubsetMicrographs(0, unfinishedMdts.size()-1);
 	}
 	
-	// Read back from disk the metadata tables for the defocus_fit
-	combineAllDefocusFitAndBeamTiltInformation(minMG, maxMG);
+	finalise();
+}
+
+void CtfRefiner::finalise()
+{	
+	MetaDataTable mdtOut = mdt0;
 	
+	// Read back from disk the metadata-tables and eps-plots for the defocus fit
+	// Note: only micrographs for which the defoci were estimated (either now or before)
+	// will end up in mdtOut - micrographs excluded through min_MG and max_MG will not.
+	if (do_defocus_fit)
+	{
+		defocusEstimator.merge(allMdts, mdtOut);
+	}
+	
+	// Sum up the per-pixel beamtilt fits of all micrographs and fit a parametric model to them.
+	// Then, write the beamtilt parameters into mdtOut
 	if (do_tilt_fit)
 	{
-		tiltEstimator.parametricFit(mdts, kmin, Cs, lambda, aniso);
+		tiltEstimator.parametricFit(allMdts, Cs, lambda, mdtOut);
 	}
 	
-	mdt0.write(outPath + "particles_ctf_refine.star");
+	mdtOut.write(outPath + "particles_ctf_refine.star");
 	
 	if (verb > 0)
 	{
@@ -719,7 +355,6 @@ FileName CtfRefiner::getOutputFilenameRoot(const MetaDataTable &mdt, std::string
 	mdt.getValue(EMDL_MICROGRAPH_NAME, fn_mic, 0);	
 	FileName fn_pre, fn_jobnr, fn_post;
 	decomposePipelineFileName(fn_mic, fn_pre, fn_jobnr, fn_post);
+	
 	return outPath + fn_post.withoutExtension();
 }
-
-

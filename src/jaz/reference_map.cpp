@@ -121,8 +121,10 @@ void ReferenceMap::load(int verb, bool debug)
 	}
 }
 
-void ReferenceMap::zeroCenter(double kmin)
+Image<RFLOAT> ReferenceMap::getHollowWeight(double kmin_px)
 {
+	Image<RFLOAT> out = freqWeight;
+	
 	for (int y = 0; y < s; y++)
 	for (int x = 0; x < sh; x++)
 	{
@@ -130,11 +132,13 @@ void ReferenceMap::zeroCenter(double kmin)
 		double yy = y <= sh? y : y - s;
 		double r = sqrt(xx*xx + yy*yy);
 		
-		if (r < kmin)
+		if (r < kmin_px)
 		{
-			freqWeight(y,x) = 0.0;
+			out(y,x) = 0.0;
 		}
 	}
+	
+	return out;
 }
 
 std::vector<Image<Complex>> ReferenceMap::predictAll(
@@ -148,7 +152,7 @@ std::vector<Image<Complex>> ReferenceMap::predictAll(
 	
 	const int pc = mdt.numberOfObjects();
 	
-#pragma omp parallel for num_threads(threads)
+	#pragma omp parallel for num_threads(threads)
 	for (int p = 0; p < pc; p++)
 	{
 		out[p] = predict(mdt, p, obs, hs, applyCtf, applyTilt);
