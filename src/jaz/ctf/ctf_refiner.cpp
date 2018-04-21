@@ -244,7 +244,11 @@ void CtfRefiner::init()
 					  << " unfinished (out of " << allMdts.size() 
 					  << ") micrographs" << std::endl;
 		}
-	}	
+	}
+	else
+	{
+		unfinishedMdts = allMdts;
+	}
 }
 
 void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
@@ -327,6 +331,10 @@ void CtfRefiner::finalise()
 	if (do_defocus_fit)
 	{
 		defocusEstimator.merge(allMdts, mdtOut);
+	}
+	else
+	{
+		mdtOut = mdt0;
 	}
 	
 	// Sum up the per-pixel beamtilt fits of all micrographs and fit a parametric model to them.
