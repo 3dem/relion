@@ -39,7 +39,8 @@ class TiltEstimator
 	private:
 				
 		// cmd. line options (see read())
-		bool aniso, kmin;
+		bool aniso;
+		double kmin;
 		
 		// parameters obtained through init()
 		int verb, s, sh, nr_omp_threads;

@@ -202,8 +202,8 @@ void DefocusEstimator::processMicrograph(
 		
 	if (diag)
 	{
-		std::ofstream ofst(outPath+"_diag_m"+stsg.str()+"_defocus_cost.dat");
-		std::ofstream ofsto(outPath+"_diag_m"+stsg.str()+"_defocus_opt.dat");
+		std::ofstream ofst(outPath+"diag_m"+stsg.str()+"_defocus_cost.dat");
+		std::ofstream ofsto(outPath+"diag_m"+stsg.str()+"_defocus_opt.dat");
 		
 		for (long p = 0; p < pc; p++)
 		{

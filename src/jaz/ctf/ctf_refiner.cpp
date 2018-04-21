@@ -89,6 +89,9 @@ void CtfRefiner::read(int argc, char **argv)
 	beamtilt_xy = textToFloat(parser.getOption("--beamtilt_xy", "Anisotropic beamtilt, XY-coefficient", "0."));
 	beamtilt_yy = textToFloat(parser.getOption("--beamtilt_yy", "Anisotropic beamtilt, YY-coefficient", "1."));
 	
+	JazConfig::writeMrc = !debug;
+	JazConfig::writeVtk = debug;
+			
 	// Check for errors in the command-line option
 	if (parser.checkForErrors())
 	{

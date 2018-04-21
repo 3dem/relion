@@ -80,9 +80,7 @@ void ReferenceMap::load(int verb, bool debug)
 	
 	projectors[1] = Projector(s, TRILINEAR, paddingFactor, 10, 2);
 	projectors[1].computeFourierTransformMap(maps[1].data, powSpec[1].data, maps[1].data.xdim);
-	
-	if (debug) std::cout << "loading FSC\n";
-	
+		
 	if (fscFn != "")
 	{
 		MetaDataTable fscMdt;

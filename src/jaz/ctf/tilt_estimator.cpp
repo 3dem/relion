@@ -9,6 +9,7 @@
 #include <src/jaz/filter_helper.h>
 #include <src/jaz/fftw_helper.h>
 #include <src/jaz/vtk_helper.h>
+#include <src/jaz/image_log.h>
 
 #include <src/args.h>
 #include <src/ctf.h>
@@ -23,7 +24,7 @@ void TiltEstimator::read(IOParser &parser, int argc, char *argv[])
 {
 	kmin = textToFloat(parser.getOption("--kmin_tilt", 
 						"Inner freq. threshold for beamtilt estimation [Angst]", "20.0"));
-	
+		
 	aniso = parser.checkOption("--anisotropic_tilt", "Use anisotropic coma model");
 }
 
@@ -142,19 +143,20 @@ void TiltEstimator::parametricFit(
 		ComplexIO::read(xyAcc, outRoot+"_xyAcc", ".mrc");
 		
 		xyAccSum() += xyAcc();
-		wAccSum() += wAcc();		
+		wAccSum() += wAcc();
 	}
 		
-	Image<RFLOAT> phase, fit, phaseFull, fitFull;
+	Image<RFLOAT> wgh, phase, fit, phaseFull, fitFull;
 	
 	FilterHelper::getPhase(xyAccSum, phase);
 	
 	Image<Complex> xyNrm(sh,s);
-	
+
 	double kmin_px = obsModel->angToPix(kmin, s);
-	Image<RFLOAT> wgh = reference->getHollowWeight(kmin_px);
-	
-	FilterHelper::multiply(wAccSum, wgh, wgh);
+			 
+	Image<RFLOAT> wgh0 = reference->getHollowWeight(kmin_px);
+
+	FilterHelper::multiply(wAccSum, wgh0, wgh);
 	
 	for (int y = 0; y < s; y++)
 	for (int x = 0; x < sh; x++)
@@ -167,24 +169,12 @@ void TiltEstimator::parametricFit(
 	
 	if (debug)
 	{
-		VtkHelper::writeVTK(wghFull, outPath+"fit_beamtilt_weight.vtk");
-	}
-	else
-	{
-		wghFull.write(outPath+"_weight.mrc");
+		ImageLog::write(wghFull, outPath + "beamtilt_weight-full");
 	}
 	
 	FftwHelper::decenterUnflip2D(phase.data, phaseFull.data);
-	
-	if (debug)
-	{
-		VtkHelper::writeVTK(phaseFull, outPath+"fit_beamtilt_delta_phase.vtk");
-	}
-	else
-	{
-		phaseFull.write(outPath+"_delta_phase.mrc");
-		wgh.write(outPath+"_weight.mrc");
-	}
+		
+	ImageLog::write(phaseFull, outPath + "beamtilt_delta-phase_per-pixel");
 	
 	double shift_x, shift_y, tilt_x, tilt_y;
 	
@@ -194,14 +184,7 @@ void TiltEstimator::parametricFit(
 		
 	FftwHelper::decenterUnflip2D(fit.data, fitFull.data);
 	
-	if (debug)
-	{
-		VtkHelper::writeVTK(fitFull, outPath+"beamtilt_delta_phase_fit.vtk");
-	}
-	else
-	{
-		fitFull.write(outPath+"beamtilt_delta_phase_fit.mrc");
-	}
+	ImageLog::write(fitFull, outPath + "beamtilt_delta-phase_lin-fit");
 	
 	std::ofstream os(outPath+"beamtilt_0.txt");
 	os << "beamtilt_x = " << tilt_x << "\n";
@@ -228,14 +211,7 @@ void TiltEstimator::parametricFit(
 	
 	FftwHelper::decenterUnflip2D(fit.data, fitFull.data);
 	
-	if (debug)
-	{
-		VtkHelper::writeVTK(fitFull, outPath+"beamtilt_delta_phase_iter_fit.vtk");
-	}
-	else
-	{
-		fitFull.write(outPath+"beamtilt_delta_phase_iter_fit.mrc");
-	}
+	ImageLog::write(fitFull, outPath+"beamtilt_delta-phase_iter-fit");
 	
 	std::ofstream os2(outPath+"fit_beamtilt_1.txt");
 	os2 << "beamtilt_x = " << tilt_x << "\n";

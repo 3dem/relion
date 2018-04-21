@@ -43,7 +43,7 @@ class DefocusEstimator
 	private:
 		
 		// cmd. line options (see read()):
-		RFLOAT defocusRange, kmin;	
+		double defocusRange, kmin;	
 		bool fitAstigmatism, noGlobAstig, fitPhase, fitCs, globOnly;
 		
 		// set at init:
