@@ -420,9 +420,7 @@ void CtfRefiner::fitDefocusOneMicrograph(long g, const std::vector<Image<Complex
 	}
 	
 	if (globOnly) return;
-	
-	std::cout << "fitDefocusOneMicrograph: diag = " << diag << "\n";
-	
+		
 	if (diag)
 	{
 		std::ofstream ofst(outPath+"_diag_m"+stsg.str()+".dat");

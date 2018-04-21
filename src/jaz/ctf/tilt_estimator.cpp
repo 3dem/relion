@@ -69,12 +69,12 @@ void TiltEstimator::processMicrograph(
 		wAcc[i].data.initZeros();
 	}
 	
-	CTF ctf;
-	ctf.read(mdt, mdt, 0);
-	
 	#pragma omp parallel for num_threads(nr_omp_threads)
 	for (long p = 0; p < pc; p++)
 	{
+		CTF ctf;
+		ctf.read(mdt, mdt, p);
+		
 		int threadnum = omp_get_thread_num();
 		
 		TiltHelper::updateTiltShift(
@@ -94,8 +94,7 @@ void TiltEstimator::processMicrograph(
 		ImageOp::linearCombination(wAccSum, wAcc[i], 1.0, 1.0, wAccSum);
 	}
 	
-	// Write out the fitBeamTilt intermediate results per-micrograph, 
-	// so we can continue without having to redo everything
+	// Write out the intermediate results per-micrograph:
 	
 	std::string outRoot = CtfRefiner::getOutputFilenameRoot(mdt, outPath);
 	
