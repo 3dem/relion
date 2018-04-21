@@ -74,7 +74,7 @@ void DefocusEstimator::processMicrograph(
 	long pc = obs.size();
 	
 	std::vector<Image<Complex>> pred = reference->predictAll(
-		mdt, *obsModel, ReferenceMap::Opposite, nr_omp_threads, false, false);
+		mdt, *obsModel, ReferenceMap::Own, nr_omp_threads, false, true);
 	
 	std::stringstream stsg;
 	stsg << g;
@@ -366,14 +366,14 @@ void DefocusEstimator::writeEPS(const MetaDataTable& mdt)
 		
 		defU = (defU + defV) / 2.;
 		
-		RFLOAT red  = (defU - min_defocus) / (max_defocus - min_defocus);
+		RFLOAT val  = (defU - min_defocus) / (max_defocus - min_defocus);
 		
 		CDataSet dataSet;
 		
 		dataSet.SetDrawMarker(true);
 		dataSet.SetDrawLine(false);
-		dataSet.SetMarkerSize(5);
-		dataSet.SetDatasetColor(red, 0.0, 1. - red);
+		dataSet.SetMarkerSize(10);
+		dataSet.SetDatasetColor(val, 0.8 * val, 1.0 - val);
 		
 		CDataPoint point(xcoor, ycoor);
 		
@@ -383,7 +383,7 @@ void DefocusEstimator::writeEPS(const MetaDataTable& mdt)
 	}
 	
 	char title[256];
-	snprintf(title, 255, "Defocus range from blue to red: %.0f A", max_defocus - min_defocus);
+	snprintf(title, 255, "Defocus range from blue to orange: %.0f A", max_defocus - min_defocus);
 	plot2D->SetXAxisTitle(title);
 	
 	plot2D->OutputPostScriptPlot(fn_eps);	
