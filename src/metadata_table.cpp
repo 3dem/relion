@@ -1291,13 +1291,13 @@ MetaDataTable combineMetaDataTables(std::vector<MetaDataTable> &MDin)
 	MetaDataTable MDc;
 
 	if (MDin.size() == 0)
-    {
+	{
 		REPORT_ERROR("combineMetaDataTables ERROR: No input STAR files selected!");
-    }
+	}
 	else if (MDin.size() == 1 )
-    {
+	{
 		MDc = MDin[0];
-    }
+	}
 	else
 	{
 		bool some_labels_missing = false;
@@ -1311,7 +1311,7 @@ MetaDataTable combineMetaDataTables(std::vector<MetaDataTable> &MDin)
 			// Check their presence in each of the input files
 			bool is_present = true;
 
-            for (size_t j = 1; j < MDin.size(); j++)
+			for (size_t j = 1; j < MDin.size(); j++)
 			{
 				is_present = vectorContainsLabel(MDin[j].getActiveLabels(), labels1[i]);
 
@@ -1338,28 +1338,28 @@ MetaDataTable combineMetaDataTables(std::vector<MetaDataTable> &MDin)
 		}
 		else
 		{
-            // Select only the labels in common, do this per line!
+			// Select only the labels in common, do this per line!
 
-            for (size_t i = 0; i < labelsc.size(); i++)
-            {
-                MDc.addLabel(labelsc[i]);
-            }
-
-            long totalLines = 0;
-
-            for (size_t i = 0; i < MDin.size(); i++)
+			for (size_t i = 0; i < labelsc.size(); i++)
 			{
-                totalLines += MDin[i].numberOfObjects();
-            }
+				MDc.addLabel(labelsc[i]);
+			}
 
-            MDc.reserve(totalLines);
+			long totalLines = 0;
 
-            for (size_t i = 0; i < MDin.size(); i++)
-            {
-                for (size_t j = 0; j < MDin[i].numberOfObjects(); j++)
-                {
-                    MDc.addValuesOfDefinedLabels(MDin[j].getObject(j));
-                }
+			for (size_t i = 0; i < MDin.size(); i++)
+			{
+				totalLines += MDin[i].numberOfObjects();
+			}
+
+			MDc.reserve(totalLines);
+
+			for (size_t i = 0; i < MDin.size(); i++)
+			{
+				for (size_t j = 0; j < MDin[i].numberOfObjects(); j++)
+				{
+					MDc.addValuesOfDefinedLabels(MDin[i].getObject(j));
+				}
 			}
 		}
 	}
