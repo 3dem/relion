@@ -80,9 +80,11 @@ void MotionRefinerMpi::run()
         divide_equally(total_nr_micrographs, node->size, node->rank,
                        my_first_micrograph, my_last_micrograph);
         my_nr_micrographs = my_last_micrograph - my_first_micrograph + 1;
-
+		
+		double k_out_A = obsModel.pixToAng(reference.k_out, s);
+		
         frameRecombiner.init(
-            allMdts, verb, s, fc, nr_omp_threads, outPath, debug,
+            allMdts, verb, s, fc, k_out_A, nr_omp_threads, outPath, debug,
             &obsModel, &micrographHandler);
 
         frameRecombiner.process(recombMdts, my_first_micrograph, my_last_micrograph);

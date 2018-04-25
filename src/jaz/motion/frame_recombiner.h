@@ -19,7 +19,8 @@ class FrameRecombiner
         void read(IOParser& parser, int argc, char *argv[]);
 
         void init(const std::vector<MetaDataTable>& allMdts,
-                  int verb, int s, int fc, int nr_omp_threads,
+                  int verb, int s, int fc, 
+				  double maxFreq, int nr_omp_threads,
                   std::string outPath, bool debug,
                   ObservationModel* obsModel,
                   MicrographHandler* micrographHandler);
@@ -28,6 +29,9 @@ class FrameRecombiner
 
 
         bool doingRecombination();
+		
+		// has a max. freq. parameter been supplied?
+		bool outerFreqKnown();
 
 
         static std::vector<MetaDataTable> findUnfinishedJobs(
@@ -47,7 +51,7 @@ class FrameRecombiner
             int verb, nr_omp_threads;
             std::string outPath;
             bool debug;
-            double angpix;
+            double angpix, maxFreq;
 
             ObservationModel* obsModel;
             MicrographHandler* micrographHandler;

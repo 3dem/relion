@@ -24,7 +24,8 @@ class TiltEstimator
 		// Compute per-pixel information for one micrograph
 		void processMicrograph(
 				long g, MetaDataTable& mdt, 
-				const std::vector<Image<Complex>>& obs);
+				const std::vector<Image<Complex>>& obs,
+				const std::vector<Image<Complex>>& pred);
 		
 		// Sum up per-pixel information from all micrographs, 
 		// then fit beam-tilt model to the per-pixel fit

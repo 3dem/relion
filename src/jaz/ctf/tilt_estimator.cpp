@@ -52,7 +52,8 @@ void TiltEstimator::init(
 
 void TiltEstimator::processMicrograph(
 		long g, MetaDataTable& mdt, 
-		const std::vector<Image<Complex>>& obs)
+		const std::vector<Image<Complex>>& obs,
+		const std::vector<Image<Complex>>& pred)
 {
 	if (!ready)
 	{
@@ -60,10 +61,7 @@ void TiltEstimator::processMicrograph(
 	}
 	
 	const int pc = mdt.numberOfObjects();
-	
-	std::vector<Image<Complex>> pred = reference->predictAll(
-		mdt, *obsModel, ReferenceMap::Opposite, nr_omp_threads, false, false);
-	
+		
 	std::vector<Image<Complex>> xyAcc(nr_omp_threads);
 	std::vector<Image<RFLOAT>> wAcc(nr_omp_threads);
 	

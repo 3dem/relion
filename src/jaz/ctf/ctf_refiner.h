@@ -68,6 +68,9 @@ class CtfRefiner
 	
 		// Perform beamtilt estimation?
 		bool do_tilt_fit;
+		
+		// Estimate anisotropic magnification?
+		bool do_anisotropy;
 	
 		bool debug,     // write out debugging info
 		     diag,      // write out diagnostic info

@@ -64,7 +64,8 @@ void DefocusEstimator::init(
 
 void DefocusEstimator::processMicrograph(
 		long g, MetaDataTable& mdt,
-		const std::vector<Image<Complex> > &obs)
+		const std::vector<Image<Complex>>& obs,
+		const std::vector<Image<Complex>>& pred)
 {
 	if (!ready)
 	{
@@ -72,9 +73,6 @@ void DefocusEstimator::processMicrograph(
 	}
 	
 	long pc = obs.size();
-	
-	std::vector<Image<Complex>> pred = reference->predictAll(
-		mdt, *obsModel, ReferenceMap::Own, nr_omp_threads, false, true);
 	
 	std::stringstream stsg;
 	stsg << g;

@@ -69,6 +69,9 @@ void CtfRefiner::read(int argc, char **argv)
 	do_tilt_fit = parser.checkOption("--fit_beamtilt", "Perform refinement of beamtilt for micrograph groups?");
 	tiltEstimator.read(parser, argc, argv);
 	
+	int aniso_section = parser.addSection("Anisotropic magnification options");
+	do_anisotropy = parser.checkOption("--fit_aniso", "Estimate anisotropic magnification?");
+	
 	int comp_section = parser.addSection("Computational options");
 	nr_omp_threads = textToInteger(parser.getOption("--j", "Number of (OMP) threads", "1"));
 	minMG = textToInteger(parser.getOption("--min_MG", "First micrograph index", "0"));
@@ -288,14 +291,30 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 			int res = system(command.c_str());
 		}
 		
+		std::vector<Image<Complex>> predSame, predOpp;
+				
+		// use prediction from same half-set for defocus estimation (overfitting danger):
 		if (do_defocus_fit)
 		{
-			defocusEstimator.processMicrograph(g, unfinishedMdts[g], obs);
+			predSame = reference.predictAll(
+				unfinishedMdts[g], obsModel, ReferenceMap::Own, nr_omp_threads, false, true);
+		}
+		
+		// use prediction from opposite half-set otherwise:
+		if (do_tilt_fit || do_anisotropy)
+		{
+			predOpp = reference.predictAll(
+				unfinishedMdts[g], obsModel, ReferenceMap::Opposite, nr_omp_threads, false, false);
+		}
+		
+		if (do_defocus_fit)
+		{
+			defocusEstimator.processMicrograph(g, unfinishedMdts[g], obs, predSame);
 		}
 		
 		if (do_tilt_fit)
 		{
-			tiltEstimator.processMicrograph(g, unfinishedMdts[g], obs);
+			tiltEstimator.processMicrograph(g, unfinishedMdts[g], obs, predOpp);
 		}
 		
 		nr_done++;

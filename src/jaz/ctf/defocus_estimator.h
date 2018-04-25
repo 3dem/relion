@@ -27,7 +27,8 @@ class DefocusEstimator
 		// Fit defocus for all particles on one micrograph
 		void processMicrograph(
 				long g, MetaDataTable& mdt, 
-				const std::vector<Image<Complex>>& obsF);
+				const std::vector<Image<Complex>>& obs,
+				const std::vector<Image<Complex>>& pred);
 		
 		// Combine all .stars and .eps files
 		void merge(const std::vector<MetaDataTable>& mdts, MetaDataTable& mdtOut);

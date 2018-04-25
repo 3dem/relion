@@ -300,8 +300,9 @@ void MotionRefiner::init()
 	recombineFrames = frameRecombiner.doingRecombination() && (recombMdts.size() > 0);
 	generateStar = frameRecombiner.doingRecombination();
 	
+	
 	bool doAnything = estimateParams || estimateMotion || recombineFrames;
-	bool needsReference = estimateParams || estimateMotion;
+	bool needsReference = estimateParams || estimateMotion || !frameRecombiner.outerFreqKnown();
 	
 	if (doAnything)
 	{
@@ -363,8 +364,10 @@ void MotionRefiner::run()
 	
 	if (recombineFrames)
 	{
+		double k_out_A = obsModel.pixToAng(reference.k_out, s);
+		
 		frameRecombiner.init(
-					allMdts, verb, s, fc, nr_omp_threads, outPath, debug,
+					allMdts, verb, s, fc, k_out_A, nr_omp_threads, outPath, debug,
 					&obsModel, &micrographHandler);
 		
 		frameRecombiner.process(recombMdts, 0, recombMdts.size()-1);

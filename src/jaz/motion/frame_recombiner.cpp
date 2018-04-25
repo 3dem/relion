@@ -28,7 +28,7 @@ void FrameRecombiner::read(IOParser& parser, int argc, char* argv[])
 
 void FrameRecombiner::init(
     const std::vector<MetaDataTable>& allMdts,
-    int verb, int s, int fc,
+    int verb, int s, int fc, double maxFreq,
     int nr_omp_threads, std::string outPath, bool debug,
     ObservationModel* obsModel,
     MicrographHandler* micrographHandler)
@@ -43,6 +43,7 @@ void FrameRecombiner::init(
     this->obsModel = obsModel;
     this->micrographHandler = micrographHandler;
     this->angpix = obsModel->angpix;
+	this->maxFreq = maxFreq;
 
 
     // Either calculate weights from FCC or from user-provided B-factors
@@ -232,15 +233,12 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromFCC(
 
     k0 = (int) obsModel->angToPix(k0a, s);
 
-    if (k1a > 0.0)
+    if (!outerFreqKnown())
     {
-        k1 = (int) obsModel->angToPix(k1a, s);
+        k1a = maxFreq;
     }
-    else
-    {
-        k1a = (int) obsModel->pixToAng(sh, s);
-        k1 = sh;
-    }
+	
+	k1 = (int) obsModel->angToPix(k1a, s);
 
     if (verb > 0)
     {
@@ -385,7 +383,12 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromBfacs()
 
 bool FrameRecombiner::doingRecombination()
 {
-    return doCombineFrames;
+	return doCombineFrames;
+}
+
+bool FrameRecombiner::outerFreqKnown()
+{
+	return k1a > 0.0;
 }
 
 std::vector<MetaDataTable> FrameRecombiner::findUnfinishedJobs(
