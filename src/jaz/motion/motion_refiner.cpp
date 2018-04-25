@@ -328,7 +328,7 @@ void MotionRefiner::init()
 	
 	if (estimateMotion || estimateParams)
 	{
-		if (verb > 0) std::cout << " + initializing motion estimator ...\n";
+		if (verb > 0) std::cout << " + Initializing motion estimator ...\n";
 		
 		motionEstimator.init(verb, s, fc, nr_omp_threads, debug, outPath,
 							 &reference, &obsModel, &micrographHandler);
@@ -336,7 +336,7 @@ void MotionRefiner::init()
 	
 	if (estimateParams)
 	{
-		if (verb > 0) std::cout << " + initializing motion parameter estimator ...\n";
+		if (verb > 0) std::cout << " + Initializing motion parameter estimator ...\n";
 		
 		motionParamEstimator.init(
 					verb, nr_omp_threads, debug,
@@ -425,7 +425,7 @@ void MotionRefiner::combineEPSAndSTARfiles()
 	
 	if (fn_eps.size() > 0)
 	{
-		joinMultipleEPSIntoSinglePDF(outPath + "logfile.pdf ", fn_eps);
+		joinMultipleEPSIntoSinglePDF(outPath + "logfile.pdf", fn_eps);
 	}
 	
 	if (frameRecombiner.doingRecombination())

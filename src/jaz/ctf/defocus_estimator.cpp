@@ -318,7 +318,7 @@ void DefocusEstimator::merge(const std::vector<MetaDataTable>& mdts, MetaDataTab
 	
 	if (fn_eps.size() > 0)
 	{
-		joinMultipleEPSIntoSinglePDF(outPath + "logfile.pdf ", fn_eps);
+		joinMultipleEPSIntoSinglePDF(outPath + "logfile.pdf", fn_eps);
 	}
 }
 
@@ -333,10 +333,10 @@ void DefocusEstimator::writeEPS(const MetaDataTable& mdt)
 	
 	FileName fn_eps = outRoot + "_defocus_fit.eps";
 	
-	CPlot2D *plot2D=new CPlot2D(fn_eps);
-	plot2D->SetXAxisSize(600);
-	plot2D->SetYAxisSize(600);
-	plot2D->SetDrawLegend(false);	
+	CPlot2D plot2D(fn_eps);
+	plot2D.SetXAxisSize(600);
+	plot2D.SetYAxisSize(600);
+	plot2D.SetDrawLegend(false);	
 	
 	RFLOAT min_defocus = 99.e10;
 	RFLOAT max_defocus = -99.e10;
@@ -379,14 +379,14 @@ void DefocusEstimator::writeEPS(const MetaDataTable& mdt)
 		
 		dataSet.AddDataPoint(point);
 		
-		plot2D->AddDataSet(dataSet);
+		plot2D.AddDataSet(dataSet);
 	}
 	
 	char title[256];
 	snprintf(title, 255, "Defocus range from blue to orange: %.0f A", max_defocus - min_defocus);
-	plot2D->SetXAxisTitle(title);
+	plot2D.SetXAxisTitle(title);
 	
-	plot2D->OutputPostScriptPlot(fn_eps);	
+	plot2D.OutputPostScriptPlot(fn_eps);	
 }
 
 bool DefocusEstimator::isFinished(const MetaDataTable &mdt)
