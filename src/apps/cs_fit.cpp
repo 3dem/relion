@@ -20,7 +20,6 @@
 #include <src/jaz/fftw_helper.h>
 #include <src/jaz/resampling_helper.h>
 #include <src/jaz/ctf_helper.h>
-#include <src/jaz/magnification_refinement.h>
 #include <src/jaz/refinement_helper.h>
 #include <src/jaz/stack_helper.h>
 #include <src/jaz/image_op.h>

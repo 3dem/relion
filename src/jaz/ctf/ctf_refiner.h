@@ -27,6 +27,7 @@
 
 #include "tilt_estimator.h"
 #include "defocus_estimator.h"
+#include "magnification_estimator.h"
 
 class CtfRefiner
 {	
@@ -56,6 +57,7 @@ class CtfRefiner
 		
 		TiltEstimator tiltEstimator;
 		DefocusEstimator defocusEstimator;
+		MagnificationEstimator magnificationEstimator;
 	
 		// Verbosity
 		int verb;
@@ -70,7 +72,7 @@ class CtfRefiner
 		bool do_tilt_fit;
 		
 		// Estimate anisotropic magnification?
-		bool do_anisotropy;
+		bool do_mag_fit;
 	
 		bool debug,     // write out debugging info
 		     diag,      // write out diagnostic info

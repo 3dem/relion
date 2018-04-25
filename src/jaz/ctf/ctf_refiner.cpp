@@ -70,7 +70,8 @@ void CtfRefiner::read(int argc, char **argv)
 	tiltEstimator.read(parser, argc, argv);
 	
 	int aniso_section = parser.addSection("Anisotropic magnification options");
-	do_anisotropy = parser.checkOption("--fit_aniso", "Estimate anisotropic magnification?");
+	do_mag_fit = parser.checkOption("--fit_aniso", "Estimate anisotropic magnification?");
+	magnificationEstimator.read(parser, argc, argv);
 	
 	int comp_section = parser.addSection("Computational options");
 	nr_omp_threads = textToInteger(parser.getOption("--j", "Number of (OMP) threads", "1"));
@@ -229,6 +230,7 @@ void CtfRefiner::init()
 	
 	tiltEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
 	defocusEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
+	magnificationEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
 		
 	// check whether output files exist and if they do, then skip this micrograph
 	if (only_do_unfinished)
@@ -236,8 +238,9 @@ void CtfRefiner::init()
 		for (long int g = minMG; g <= maxMG; g++ )
 		{
 			bool is_done = 
-				   tiltEstimator.isFinished(allMdts[g])
-				&& defocusEstimator.isFinished(allMdts[g]);
+				   (!do_tilt_fit || tiltEstimator.isFinished(allMdts[g]))
+				&& (!do_defocus_fit || defocusEstimator.isFinished(allMdts[g]))
+				&& (!do_mag_fit || magnificationEstimator.isFinished(allMdts[g]));
 			
 			if (!is_done)
 			{
@@ -301,7 +304,7 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 		}
 		
 		// use prediction from opposite half-set otherwise:
-		if (do_tilt_fit || do_anisotropy)
+		if (do_tilt_fit || do_mag_fit)
 		{
 			predOpp = reference.predictAll(
 				unfinishedMdts[g], obsModel, ReferenceMap::Opposite, nr_omp_threads, false, false);
@@ -315,6 +318,11 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 		if (do_tilt_fit)
 		{
 			tiltEstimator.processMicrograph(g, unfinishedMdts[g], obs, predOpp);
+		}
+		
+		if (do_mag_fit)
+		{
+			magnificationEstimator.processMicrograph(g, unfinishedMdts[g], obs, predOpp);
 		}
 		
 		nr_done++;
@@ -333,7 +341,7 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 
 void CtfRefiner::run()
 {
-	if (do_defocus_fit || do_tilt_fit)
+	if (do_defocus_fit || do_tilt_fit || do_mag_fit)
 	{
 		// The subsets will be used in openMPI parallelisation: 
 		// instead of over g0->gc, they will be over smaller subsets
@@ -364,6 +372,12 @@ void CtfRefiner::finalise()
 	if (do_tilt_fit)
 	{
 		tiltEstimator.parametricFit(allMdts, Cs, lambda, mdtOut);
+	}
+	
+	// Do the equivalent for mag. fit
+	if (do_mag_fit)
+	{
+		magnificationEstimator.parametricFit(allMdts, mdtOut);
 	}
 	
 	mdtOut.write(outPath + "particles_ctf_refine.star");
