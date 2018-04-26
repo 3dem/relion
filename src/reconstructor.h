@@ -49,7 +49,7 @@ public:
         helical_rise, helical_twist;
 
     bool do_ctf, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, ctf_premultiplied,
-        do_fom_weighting, do_3d_rot, do_reconstruct_ctf, do_beamtilt, cl_beamtilt, do_ewald;
+        do_fom_weighting, do_3d_rot, do_reconstruct_ctf, do_beamtilt, cl_beamtilt, do_ewald, do_debug;
 
     bool skip_gridding, do_reconstruct_ctf2, do_reconstruct_meas, is_reverse, read_weights;
 
