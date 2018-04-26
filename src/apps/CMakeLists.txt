@@ -50,7 +50,7 @@ if(NOT GUI)
 endif(NOT GUI)
 
 #--Remove apps for testing--
-set(TEST_TARGETS ft_test)
+set(TEST_TARGETS ft_test double_reconstruct_openmp)
 if(NOT RELION_TEST)
     foreach(TARGET ${TEST_TARGETS})
         list(REMOVE_ITEM RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/${TARGET}.cpp")
