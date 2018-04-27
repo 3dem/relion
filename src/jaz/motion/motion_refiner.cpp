@@ -120,7 +120,13 @@ void MotionRefiner::init()
 	
 	if (verb > 0) std::cout << " + Reading " << starFn << "...\n";
 	
-	mdt0.read(starFn);
+	mdt0.read(starFn);	
+	
+	if (!ObservationModel::containsAllNeededColumns(mdt0))
+	{
+		REPORT_ERROR_STR(starFn << " does not contain all of the required columns ("
+			<< "rlnOriginX, rlnOriginY, rlnAngleRot, rlnAngleTilt, rlnAnglePsi and rlnRandomSubset)");
+	}
 	
 	adaptMovieNames();
 	

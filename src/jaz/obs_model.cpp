@@ -211,5 +211,15 @@ double ObservationModel::angToPix(double a, int s)
 
 double ObservationModel::pixToAng(double p, int s)
 {
-    return s * angpix / p;
+	return s * angpix / p;
+}
+
+bool ObservationModel::containsAllNeededColumns(const MetaDataTable& mdt)
+{
+	return (mdt.containsLabel(EMDL_ORIENT_ORIGIN_X)
+         && mdt.containsLabel(EMDL_ORIENT_ORIGIN_Y)
+         && mdt.containsLabel(EMDL_ORIENT_ROT)
+         && mdt.containsLabel(EMDL_ORIENT_TILT)
+         && mdt.containsLabel(EMDL_ORIENT_PSI)
+         && mdt.containsLabel(EMDL_PARTICLE_RANDOM_SUBSET));
 }

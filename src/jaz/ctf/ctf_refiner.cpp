@@ -118,6 +118,12 @@ void CtfRefiner::init()
 	
 	mdt0.read(starFn);
 	
+	if (!ObservationModel::containsAllNeededColumns(mdt0))
+	{
+		REPORT_ERROR_STR(starFn << " does not contain all of the required columns ("
+			<< "rlnOriginX, rlnOriginY, rlnAngleRot, rlnAngleTilt, rlnAnglePsi and rlnRandomSubset)");
+	}
+	
 	if (Cs < 0.0)
 	{
 		mdt0.getValue(EMDL_CTF_CS, Cs, 0);

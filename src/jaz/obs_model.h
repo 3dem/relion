@@ -45,6 +45,9 @@ class ObservationModel
 
         double angToPix(double a, int s);
         double pixToAng(double p, int s);
+		
+		
+		static bool containsAllNeededColumns(const MetaDataTable& mdt);
 
 };
 
