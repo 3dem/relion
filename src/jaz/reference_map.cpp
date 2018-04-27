@@ -143,7 +143,7 @@ std::vector<Image<Complex>> ReferenceMap::predictAll(
 		const MetaDataTable& mdt,
 		const ObservationModel& obs,
 		HalfSet hs, int threads,
-		bool applyCtf, bool applyTilt)
+		bool applyCtf, bool applyTilt, bool applyShift)
 {
 	// declare on first line to prevent copying
 	std::vector<Image<Complex>> out(mdt.numberOfObjects());
@@ -153,7 +153,7 @@ std::vector<Image<Complex>> ReferenceMap::predictAll(
 	#pragma omp parallel for num_threads(threads)
 	for (int p = 0; p < pc; p++)
 	{
-		out[p] = predict(mdt, p, obs, hs, applyCtf, applyTilt);
+		out[p] = predict(mdt, p, obs, hs, applyCtf, applyTilt, applyShift);
 	}
 	
 	return out;
@@ -163,7 +163,7 @@ Image<Complex> ReferenceMap::predict(
 		const MetaDataTable& mdt, int p,
 		const ObservationModel& obs,
 		HalfSet hs,
-		bool applyCtf, bool applyTilt)
+		bool applyCtf, bool applyTilt, bool applyShift)
 {
 	Image<Complex> pred;
 	
@@ -173,7 +173,7 @@ Image<Complex> ReferenceMap::predict(
 	
 	int pi = (hs == Own)? randSubset : 1 - randSubset;
 	
-	pred = obs.predictObservation(projectors[pi], mdt, p, applyCtf, applyTilt);
+	pred = obs.predictObservation(projectors[pi], mdt, p, applyCtf, applyTilt, applyShift);
 	
 	return pred;
 }

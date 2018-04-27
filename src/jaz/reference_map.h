@@ -31,18 +31,20 @@ class ReferenceMap
 		Image<RFLOAT> getHollowWeight(double kmin_px);
 
         std::vector<Image<Complex>> predictAll(
-                const MetaDataTable& mdt,
+				const MetaDataTable& mdt,
                 const ObservationModel& obs,
                 HalfSet hs, int threads,
                 bool applyCtf = true,
-                bool applyTilt = true);
+                bool applyTilt = true, 
+				bool applyShift = true);
 
         Image<Complex> predict(
                 const MetaDataTable& mdt, int p,
                 const ObservationModel& obs,
                 HalfSet hs,
                 bool applyCtf = true,
-                bool applyTilt = true);
+                bool applyTilt = true, 
+				bool applyShift = true);
 
 };
 

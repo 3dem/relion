@@ -282,7 +282,7 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 		std::vector<Image<Complex> > obs;
 		
 		// both defocus_tit and tilt_fit need the same observations
-		obs = StackHelper::loadStackFS(&unfinishedMdts[g], "", nr_omp_threads, &fts);
+		obs = StackHelper::loadStackFS(&unfinishedMdts[g], "", nr_omp_threads, &fts, true);
 		
 		// Make sure output directory exists
 		FileName newdir = getOutputFilenameRoot(unfinishedMdts[g], outPath);
@@ -300,14 +300,16 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 		if (do_defocus_fit)
 		{
 			predSame = reference.predictAll(
-				unfinishedMdts[g], obsModel, ReferenceMap::Own, nr_omp_threads, false, true);
+				unfinishedMdts[g], obsModel, ReferenceMap::Own, nr_omp_threads, 
+				false, true, false);
 		}
 		
 		// use prediction from opposite half-set otherwise:
 		if (do_tilt_fit || do_mag_fit)
 		{
 			predOpp = reference.predictAll(
-				unfinishedMdts[g], obsModel, ReferenceMap::Opposite, nr_omp_threads, false, false);
+				unfinishedMdts[g], obsModel, ReferenceMap::Opposite, nr_omp_threads, 
+				false, false, false);
 		}
 		
 		if (do_defocus_fit)
