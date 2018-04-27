@@ -237,11 +237,15 @@ void MotioncorrRunner::initialise()
 	FileName prevdir="";
 	for (size_t i = 0; i < fn_micrographs.size(); i++)
 	{
-		FileName newdir = fn_micrographs[i].beforeLastOf("/");
+		FileName newdir = fn_out + fn_micrographs[i];
+		if (!newdir.contains("/")) continue;
+		newdir = newdir.beforeLastOf("/");
+
 		if (newdir != prevdir)
 		{
-			std::string command = " mkdir -p " + fn_out + newdir;
+			std::string command = " mkdir -p " + newdir;
 			int res = system(command.c_str());
+			prevdir = newdir;
 		}
 	}
 
@@ -1518,10 +1522,11 @@ void MotioncorrRunner::realSpaceInterpolation(Image <float> &Isum, std::vector<I
 					const int x1 = x0 + 1;
 					const int y1 = y0 + 1;
 
-					if (x0 < 0) {x0 = 0; valid = false;}
-					if (y0 < 0) {y0 = 0; valid = false;}
-					if (x1 >= nx) {x0 = nx - 1; valid = false;}
-					if (y1 >= ny) {y0 = ny - 1; valid = false;}
+					// some conditions might seem redundant but necessary when overflow happened
+					if (x0 < 0 || x1 < 0) {x0 = 0; valid = false;}
+					if (y0 < 0 || y1 < 0) {y0 = 0; valid = false;}
+					if (x1 >= nx || x0 >= nx - 1) {x0 = nx - 1; valid = false;}
+					if (y1 >= ny || y1 >= ny - 1) {y0 = ny - 1; valid = false;}
 					if (!valid) {
 						DIRECT_A2D_ELEM(Isum(), iy, ix) += DIRECT_A2D_ELEM(Iframes[iframe](), y0, x0);
 						if (std::isnan(DIRECT_A2D_ELEM(Isum(), iy, ix))) {
@@ -1601,15 +1606,18 @@ void MotioncorrRunner::realSpaceInterpolation_ThirdOrderPolynomial(Image <float>
 				const int x1 = x0 + 1;
 				const int y1 = y0 + 1;
 
-				if (x0 < 0) {x0 = 0; valid = false;}
-				if (y0 < 0) {y0 = 0; valid = false;}
-				if (x1 >= nx) {x0 = nx - 1; valid = false;}
-				if (y1 >= ny) {y0 = ny - 1; valid = false;}
+				// some conditions might seem redundant but necessary when overflow happened
+				if (x0 < 0 || x1 < 0) {x0 = 0; valid = false;}
+				if (y0 < 0 || y1 < 0) {y0 = 0; valid = false;}
+				if (x1 >= nx || x0 >= nx - 1) {x0 = nx - 1; valid = false;}
+				if (y1 >= ny || y0 >= ny - 1) {y0 = ny - 1; valid = false;}
 				if (!valid) {
 					DIRECT_A2D_ELEM(Isum(), iy, ix) += DIRECT_A2D_ELEM(Iframes[iframe](), y0, x0);
+#ifdef DEBUG_OWN
 					if (std::isnan(DIRECT_A2D_ELEM(Isum(), iy, ix))) {
 						std::cerr << "ix = " << ix << " xfit = " << x_fitted << " iy = " << iy << " ifit = " << y_fitted << std::endl;
 					}
+#endif
 					continue;
 				}
 
