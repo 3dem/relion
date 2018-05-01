@@ -40,6 +40,7 @@ void MotionEstimator::read(IOParser& parser, int argc, char *argv[])
     maxIters = textToInteger(parser.getOption("--max_iters", "Maximum number of iterations", "10000"));
     optEps = textToFloat(parser.getOption("--eps", "Terminate optimization after gradient length falls below this value", "1e-4"));
 
+	no_whitening = parser.checkOption("--no_whiten", "Do not whiten the noise spectrum");
     unregGlob = parser.checkOption("--unreg_glob", "Do not regularize global component of motion");
     noGlobOff = !parser.checkOption("--glob_off", "Compute initial per-particle offsets");
     debugOpt = parser.checkOption("--debug_opt", "Write optimization debugging info");
@@ -285,18 +286,21 @@ void MotionEstimator::prepMicrograph(
     std::vector<Image<Complex>> preds = reference->predictAll(
         mdt, *obsModel, ReferenceMap::Own, nr_omp_threads);
 
-    std::vector<double> sigma2 = StackHelper::powerSpectrum(movie);
-
-    #pragma omp parallel for num_threads(nr_omp_threads)
-    for (int p = 0; p < pc; p++)
-    {
-        MotionHelper::noiseNormalize(preds[p], sigma2, preds[p]);
-
-        for (int f = 0; f < fc; f++)
-        {
-            MotionHelper::noiseNormalize(movie[p][f], sigma2, movie[p][f]);
-        }
-    }
+	if (!no_whitening)
+	{
+		std::vector<double> sigma2 = StackHelper::powerSpectrum(movie);
+	
+		#pragma omp parallel for num_threads(nr_omp_threads)
+		for (int p = 0; p < pc; p++)
+		{
+			MotionHelper::noiseNormalize(preds[p], sigma2, preds[p]);
+	
+			for (int f = 0; f < fc; f++)
+			{
+				MotionHelper::noiseNormalize(movie[p][f], sigma2, movie[p][f]);
+			}
+		}
+	}
 
     movieCC = MotionHelper::movieCC(movie, preds, dmgWeight, fts, nr_omp_threads);
 

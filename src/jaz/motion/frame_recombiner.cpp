@@ -22,6 +22,7 @@ void FrameRecombiner::read(IOParser& parser, int argc, char* argv[])
     doCombineFrames = parser.checkOption("--combine_frames", "Combine movie frames into polished particles.");
     k0a = textToFloat(parser.getOption("--bfac_minfreq", "Min. frequency used in B-factor fit [Angst]", "20"));
     k1a = textToFloat(parser.getOption("--bfac_maxfreq", "Max. frequency used in B-factor fit [Angst]", "-1"));
+	b_scale = textToFloat(parser.getOption("--bfac_scale", "Scale of B/k-factors", "1"));
     bfacFn = parser.getOption("--bfactors", "A .star file with external B/k-factors", "");
     bfac_diag = parser.checkOption("--diag_bfactor", "Write out B/k-factor diagnostic data");
 }
@@ -248,6 +249,12 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromFCC(
 
     std::pair<std::vector<d2Vector>,std::vector<double>> bkFacs
             = DamageHelper::fitBkFactors(fcc, k0, k1);
+	
+	for (int f = 0; f < fc; f++)
+	{
+		bkFacs.first[f].x = bkFacs.first[f].x / sqrt(b_scale);
+		bkFacs.first[f].y = pow(bkFacs.first[f].y, b_scale);
+	}
 
     std::vector<Image<RFLOAT>> freqWeights;
     freqWeights = DamageHelper::computeWeights(bkFacs.first, sh);
@@ -300,7 +307,7 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromFCC(
     mdt.write(outPath + "/bfactors.star");
 
     // Also write out EPS plots of the B-factors and scale factors
-    CPlot2D *plot2D=new CPlot2D("Polishing B-factors");
+    CPlot2D *plot2D = new CPlot2D("Polishing B-factors");
     plot2D->SetXAxisSize(600);
     plot2D->SetYAxisSize(400);
     plot2D->SetDrawLegend(false);
@@ -317,6 +324,8 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromFCC(
     plot2Db->SetYAxisTitle("Scale-factor");
     mdt.addToCPlot2D(plot2Db, EMDL_IMAGE_FRAME_NR, EMDL_POSTPROCESS_GUINIER_FIT_INTERCEPT);
     plot2Db->OutputPostScriptPlot(outPath + "scalefactors.eps");
+	
+	delete plot2D;
 
     return freqWeights;
 }

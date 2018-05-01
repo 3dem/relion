@@ -43,7 +43,7 @@ class FrameRecombiner
             // read from cmd. line:
             bool doCombineFrames, bfac_diag;
             int k0, k1;
-            double k0a, k1a;
+            double k0a, k1a, b_scale;
             std::string bfacFn;
 
             // set at init:

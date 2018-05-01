@@ -93,7 +93,7 @@ class MotionEstimator
             // set at init
             int s, sh, fc, verb, nr_omp_threads;
             double angpix;
-            bool debug;
+            bool debug, no_whitening;
 
             std::vector<Image<RFLOAT>> dmgWeight;
 
