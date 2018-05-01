@@ -985,6 +985,30 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 					MD.setValue(EMDL_CTF_FOM, fom);
 				}
 			}
+
+			// If the image was re-scaled, then also rescale the rlnOriginX/Y/Z
+			if (do_rescale)
+			{
+				RFLOAT xoff, yoff, zoff=0.;
+				RFLOAT rescale_factor = (RFLOAT)scale/(RFLOAT)extract_size;
+
+				MD.getValue(EMDL_ORIENT_ORIGIN_X, xoff);
+				MD.getValue(EMDL_ORIENT_ORIGIN_Y, yoff);
+				xoff *= rescale_factor;
+				yoff *= rescale_factor;
+				MD.setValue(EMDL_ORIENT_ORIGIN_X, xoff);
+				MD.setValue(EMDL_ORIENT_ORIGIN_Y, yoff);
+
+				if (MD.containsLabel(EMDL_ORIENT_ORIGIN_Z))
+				{
+					MD.getValue(EMDL_ORIENT_ORIGIN_Z, zoff);
+					zoff *= rescale_factor;
+					MD.setValue(EMDL_ORIENT_ORIGIN_Z, zoff);
+				}
+
+			}
+
+
 			TIMING_TOC(TIMING_REST);
 
 		}
