@@ -42,7 +42,9 @@ void MotionEstimator::read(IOParser& parser, int argc, char *argv[])
 
 	no_whitening = parser.checkOption("--no_whiten", "Do not whiten the noise spectrum");
     unregGlob = parser.checkOption("--unreg_glob", "Do not regularize global component of motion");
-    noGlobOff = !parser.checkOption("--glob_off", "Compute initial per-particle offsets");
+    globOff = parser.checkOption("--glob_off", "Compute initial per-particle offsets");
+	globOffMax = textToInteger(parser.getOption("--glob_off_max", "Maximum per-particle offset range [Pixels]", "10"));
+			
     debugOpt = parser.checkOption("--debug_opt", "Write optimization debugging info");
 
     global_init = parser.checkOption("--gi", "Initialize with global trajectories instead of loading them from metadata file");
@@ -303,21 +305,23 @@ void MotionEstimator::prepMicrograph(
 	}
 
     movieCC = MotionHelper::movieCC(movie, preds, dmgWeight, fts, nr_omp_threads);
+	
 
     if (global_init || myInitialTracks.size() == 0)
     {
-        std::vector<Image<RFLOAT>> ccSum = MotionHelper::addCCs(movieCC);
+		std::vector<Image<RFLOAT>> ccSum = MotionHelper::addCCs(movieCC);
         std::vector<gravis::d2Vector> globTrack = MotionHelper::getGlobalTrack(ccSum);
         std::vector<gravis::d2Vector> globOffsets;
 
-        if (noGlobOff)
+        if (!globOff)
         {
             globOffsets = std::vector<d2Vector>(pc, d2Vector(0,0));
         }
         else
         {
+			std::vector<std::vector<gravis::d2Vector>> initialTracks(pc, globTrack);
             globOffsets = MotionHelper::getGlobalOffsets(
-                    movieCC, globTrack, 0.25*s, nr_omp_threads);
+                    movieCC, initialTracks, 0.25*s, globOffMax, globOffMax, nr_omp_threads);
         }
 
         if (diag)
@@ -347,6 +351,21 @@ void MotionEstimator::prepMicrograph(
 
         myGlobComp = unregGlob? globTrack : std::vector<d2Vector>(fc, d2Vector(0,0));
     }
+	else if (globOff)
+	{
+        std::vector<gravis::d2Vector> globOffsets;
+		
+		globOffsets = MotionHelper::getGlobalOffsets(
+				movieCC, myInitialTracks, 0.25*s, globOffMax, globOffMax, nr_omp_threads);
+		
+		for (int p = 0; p < pc; p++)
+		{
+			for (int f = 0; f < fc; f++)
+			{
+				myInitialTracks[p][f] += globOffsets[p];
+			}
+		}
+	}
 
     for (int p = 0; p < pc; p++)
     {

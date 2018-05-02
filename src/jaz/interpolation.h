@@ -68,10 +68,15 @@ class Interpolation
         }
 
         template<typename T>
-        static gravis::d2Vector quadraticMaxWrapXY(const Image<T>& img, double eps = 1e-25)
+        static gravis::d2Vector quadraticMaxWrapXY(
+				const Image<T>& img, double eps = 1e-25,
+				int wMax = -1, int hMax = -1)
         {
             const int w = img.data.xdim;
             const int h = img.data.ydim;
+			
+			if (wMax < 0) wMax = w;
+			if (hMax < 0) hMax = h;
 
             int xmax = -1, ymax = -1;
             double vmax = 0.0;
@@ -79,6 +84,12 @@ class Interpolation
             for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++)
             {
+				if ((x > wMax && w - x > wMax)
+				  || y > hMax && h - x > hMax)
+				{
+					continue;
+				}
+					
                 T v = DIRECT_A2D_ELEM(img.data, y, x);
 
                 if (xmax < 0 || v > vmax)

@@ -247,7 +247,8 @@ std::vector<d2Vector> MotionHelper::getGlobalTrack(
 
 std::vector<d2Vector> MotionHelper::getGlobalOffsets(
         const std::vector<std::vector<Image<RFLOAT>>>& movieCC,
-        const std::vector<d2Vector>& globTrack, double sigma, int threads)
+        const std::vector<std::vector<gravis::d2Vector>>& initialTracks, 
+		double sigma, int wMax, int hMax, int threads)
 {
     const int pc = movieCC.size();
     const int fc = movieCC[0].size();
@@ -275,7 +276,7 @@ std::vector<d2Vector> MotionHelper::getGlobalOffsets(
 
         for (int f = 0; f < fc; f++)
         {
-            const d2Vector g = globTrack[f];
+            const d2Vector g = initialTracks[p][f];
 
             for (int y = 0; y < s; y++)
             for (int x = 0; x < s; x++)
@@ -290,7 +291,7 @@ std::vector<d2Vector> MotionHelper::getGlobalOffsets(
             pSum(y,x) *= weight(y,x);
         }
 
-        d2Vector out_p = Interpolation::quadraticMaxWrapXY(pSum, eps);
+        d2Vector out_p = Interpolation::quadraticMaxWrapXY(pSum, eps, wMax, hMax);
         if (out_p.x >= sh) out_p.x -= s;
         if (out_p.y >= sh) out_p.y -= s;
 

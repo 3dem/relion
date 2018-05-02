@@ -82,9 +82,9 @@ class MotionEstimator
             bool paramsRead, ready;
 
             // read from cmd line
-            int maxEDs, maxIters;
+            int maxEDs, maxIters, globOffMax;
 
-            bool unregGlob, noGlobOff, cutoffOut,
+            bool unregGlob, globOff, cutoffOut,
                 diag, expKer, global_init, debugOpt;
 
             double dmga, dmgb, dmgc, dosePerFrame,
