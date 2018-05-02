@@ -661,7 +661,7 @@ void Postprocessing::writeOutput()
 		REPORT_ERROR( (std::string)"MlOptimiser::write: Cannot write file: " + fn_tmp);
 
 	// Write the command line as a comment in the header
-	fh << "# RELION postprocess" << std::endl;
+	fh << "# RELION postprocess; version " << RELION_VERSION << std::endl;
 	fh << "# ";
 	parser.writeCommandLine(fh);
 
@@ -672,6 +672,14 @@ void Postprocessing::writeOutput()
 	MDlist.addObject();
 	MDlist.setValue(EMDL_POSTPROCESS_FINAL_RESOLUTION, global_resol);
 	MDlist.setValue(EMDL_POSTPROCESS_BFACTOR, global_bfactor );
+	MDlist.setValue(EMDL_POSTPROCESS_UNFIL_HALFMAP1, fn_I1);
+	MDlist.setValue(EMDL_POSTPROCESS_UNFIL_HALFMAP2, fn_I2);
+	if (do_mask)
+	{
+		RFLOAT randomize_at_Ang = XSIZE(I1())* angpix / randomize_at;
+		MDlist.setValue(EMDL_MASK_NAME, fn_mask);
+		MDlist.setValue(EMDL_POSTPROCESS_RANDOMISE_FROM, randomize_at_Ang);
+	}
 	if (do_auto_bfac)
 	{
 		MDlist.setValue(EMDL_POSTPROCESS_GUINIER_FIT_SLOPE, global_slope);
@@ -1116,7 +1124,7 @@ void Postprocessing::run()
 		I2().setXmippOrigin();
 
 		// Check at which resolution shell the FSC drops below randomize_fsc_at
-		int randomize_at = -1;
+		randomize_at = -1;
 		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(fsc_unmasked)
 		{
 			if (i > 0 && DIRECT_A1D_ELEM(fsc_unmasked, i) < randomize_fsc_at)
@@ -1169,7 +1177,7 @@ void Postprocessing::run()
 	}
 
 	// Only have one digit after final resolution
-	global_resol = (ROUND(global_resol*10.))/10.;
+    // global_resol = (ROUND(global_resol*10.))/10.;
 
 	// Check whether the phase-randomised FSC is less than 5% at the resolution estimate, otherwise warn the user
 	if (DIRECT_A1D_ELEM(fsc_random_masked, global_resol_i) > 0.1)

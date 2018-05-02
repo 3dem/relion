@@ -223,7 +223,7 @@ public:
         matrix is already resized to the right size before entering
         in this function. */
     template <typename T, typename T1>
-        void inverseFourierTransform(T& V, T1& v)
+        void inverseFourierTransform(const T& V, T1& v)
         {
             setReal(v);
             setFourier(V);
@@ -375,7 +375,7 @@ public:
         It is assumed that the container for the real image as well as
         the one for the Fourier array are already resized.
         No plan is updated. */
-    void setFourier(MultidimArray<Complex > &imgFourier);
+    void setFourier(const MultidimArray<Complex> &imgFourier);
 };
 
 // Randomize phases beyond the given F-space shell (index) of R-space input image
@@ -1032,7 +1032,13 @@ void directionalFilterMap(MultidimArray<RFLOAT > &img, RFLOAT low_pass, RFLOAT a
  *  Phase shifts caused by the beamtilt will be calculated and applied to Fimg
  */
 void selfApplyBeamTilt(MultidimArray<Complex > &Fimg, RFLOAT beamtilt_x, RFLOAT beamtilt_y,
-		RFLOAT wavelength, RFLOAT Cs, RFLOAT angpix, int ori_size);
+        RFLOAT wavelength, RFLOAT Cs, RFLOAT angpix, int ori_size);
+
+/* same as above, but for the anisotropic coma model*/
+void selfApplyBeamTilt(MultidimArray<Complex > &Fimg,
+        RFLOAT beamtilt_x, RFLOAT beamtilt_y,
+        RFLOAT beamtilt_xx, RFLOAT beamtilt_xy, RFLOAT beamtilt_yy,
+        RFLOAT wavelength, RFLOAT Cs, RFLOAT angpix, int ori_size);
 
 void applyBeamTilt(const MultidimArray<Complex > &Fin, MultidimArray<Complex > &Fout, RFLOAT beamtilt_x, RFLOAT beamtilt_y,
 		RFLOAT wavelength, RFLOAT Cs, RFLOAT angpix, int ori_size);

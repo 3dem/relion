@@ -2591,7 +2591,7 @@ public:
         double stddev = 0;
 
         double minval = std::numeric_limits<double>::max();
-        double maxval = std::numeric_limits<double>::lowest();
+        double maxval = -std::numeric_limits<double>::max();
 
         T* ptr = NULL;
         long int n;

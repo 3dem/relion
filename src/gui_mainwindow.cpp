@@ -122,6 +122,10 @@ int SchedulerWindow::fill(FileName _pipeline_name, std::vector<FileName> _schedu
 	wait->color(GUI_INPUT_COLOR);
 	wait->textsize(ENTRY_FONTSIZE);
 	wait->labelsize(ENTRY_FONTSIZE);
+    wait_before->value("0");
+	wait_before->color(GUI_INPUT_COLOR);
+	wait_before->textsize(ENTRY_FONTSIZE);
+	wait_before->labelsize(ENTRY_FONTSIZE);
 
 	// Button to execute
 	Fl_Button *execute_button = new Fl_Button(w()-200, current_y, 80, 30, "Execute");
@@ -475,15 +479,15 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
     browse_grp[12]->end();
 
     browse_grp[13] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-	browser->add("Movie refinement");
+	browser->add("Motion refinement");
 	gui_jobwindows[13] = new JobWindow();
-	gui_jobwindows[13]->initialise(PROC_MOVIEREFINE, maingui_do_old_style);
+	gui_jobwindows[13]->initialise(PROC_MOTIONREFINE, maingui_do_old_style);
     browse_grp[13]->end();
 
     browse_grp[14] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-	browser->add("Particle polishing");
+	browser->add("CTF refinement");
 	gui_jobwindows[14] = new JobWindow();
-	gui_jobwindows[14]->initialise(PROC_POLISH, maingui_do_old_style);
+	gui_jobwindows[14]->initialise(PROC_CTFREFINE, maingui_do_old_style);
     browse_grp[14]->end();
 
     browse_grp[15] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
@@ -1257,7 +1261,7 @@ void GuiMainWindow::cb_display_io_node_i()
 		std::string myviewer(default_pdf_viewer);
 		command = myviewer + " " + pipeline.nodeList[mynode].name + "&";
 	}
-	else
+	else if (pipeline.nodeList[mynode].type != NODE_POST)
 	{
 		command = "relion_display --gui --i " + pipeline.nodeList[mynode].name + " &";
 	}
