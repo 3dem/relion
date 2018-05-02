@@ -43,6 +43,7 @@ void MotionEstimator::read(IOParser& parser, int argc, char *argv[])
 	no_whitening = parser.checkOption("--no_whiten", "Do not whiten the noise spectrum");
     unregGlob = parser.checkOption("--unreg_glob", "Do not regularize global component of motion");
     globOff = parser.checkOption("--glob_off", "Compute initial per-particle offsets");
+	params_scaled_by_dose = parser.checkOption("--params_by_dose", "Scale motion parameters by dose");
 	globOffMax = textToInteger(parser.getOption("--glob_off_max", "Maximum per-particle offset range [Pixels]", "10"));
 			
     debugOpt = parser.checkOption("--debug_opt", "Write optimization debugging info");
@@ -733,7 +734,7 @@ std::vector<MetaDataTable> MotionEstimator::findUnfinishedJobs(
 
 double MotionEstimator::normalizeSigVel(double sig_vel)
 {
-    return dosePerFrame * sig_vel / angpix;
+    return params_scaled_by_dose? dosePerFrame * sig_vel / angpix : sig_vel / angpix;
 }
 
 double MotionEstimator::normalizeSigDiv(double sig_div)
@@ -743,7 +744,7 @@ double MotionEstimator::normalizeSigDiv(double sig_div)
 
 double MotionEstimator::normalizeSigAcc(double sig_acc)
 {
-    return dosePerFrame * sig_acc / angpix;
+    return params_scaled_by_dose? dosePerFrame * sig_acc / angpix : sig_acc / angpix;
 }
 
 bool MotionEstimator::isJobFinished(std::string filenameRoot)

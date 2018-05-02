@@ -85,7 +85,8 @@ class MotionEstimator
             int maxEDs, maxIters, globOffMax;
 
             bool unregGlob, globOff, cutoffOut,
-                diag, expKer, global_init, debugOpt;
+                diag, expKer, global_init, debugOpt,
+				params_scaled_by_dose;
 
             double dmga, dmgb, dmgc, dosePerFrame,
                 sig_vel, sig_div, sig_acc, optEps;
