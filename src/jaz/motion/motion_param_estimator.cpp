@@ -12,7 +12,7 @@ using namespace gravis;
 
 const double MotionParamEstimator::velScale = 1000.0;
 const double MotionParamEstimator::divScale = 1.0;
-const double MotionParamEstimator::accScale = 1000.0;
+const double MotionParamEstimator::accScale = 10000.0;
 
 MotionParamEstimator::MotionParamEstimator()
 :   paramsRead(false), ready(false)
