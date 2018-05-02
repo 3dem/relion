@@ -43,7 +43,7 @@ void MotionEstimator::read(IOParser& parser, int argc, char *argv[])
 	no_whitening = parser.checkOption("--no_whiten", "Do not whiten the noise spectrum");
     unregGlob = parser.checkOption("--unreg_glob", "Do not regularize global component of motion");
     globOff = parser.checkOption("--glob_off", "Compute initial per-particle offsets");
-	params_scaled_by_dose = parser.checkOption("--params_by_dose", "Scale motion parameters by dose");
+	params_scaled_by_dose = !parser.checkOption("--absolute_params", "Do not scale input motion parameters by dose");
 	globOffMax = textToInteger(parser.getOption("--glob_off_max", "Maximum per-particle offset range [Pixels]", "10"));
 			
     debugOpt = parser.checkOption("--debug_opt", "Write optimization debugging info");
