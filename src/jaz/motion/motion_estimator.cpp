@@ -329,6 +329,45 @@ void MotionEstimator::prepMicrograph(
         {
             ImageLog::write(ccSum,
                 MotionRefiner::getOutputFileNameRoot(outPath, mdt) + "_CCsum", CenterXY);
+			
+			if (debug)
+			{
+				std::vector<Image<RFLOAT>> ccMax(fc);
+				
+				for (int f = 0; f < fc; f++)
+				{
+					ccMax[f] = Image<RFLOAT>(s,s);
+					
+					d2Vector mf = globTrack[f];
+					i2Vector mi(FLOOR(mf.x), FLOOR(mf.y));
+					
+					t2Vector<int> m00(mi.x,   mi.y);
+					t2Vector<int> m10(mi.x+1, mi.y);
+					t2Vector<int> m01(mi.x,   mi.y+1);
+					t2Vector<int> m11(mi.x+1, mi.y+1);
+					
+					for (int d = 0; d < 2; d++)
+					{
+						m00[d] = (m00[d] + s) % s;
+						m10[d] = (m10[d] + s) % s;
+						m01[d] = (m01[d] + s) % s;
+						m11[d] = (m11[d] + s) % s;
+					}
+					
+					double fx = mf.x - mi.x;
+					double fy = mf.y - mi.y;
+					
+					ccMax[f](m00.y, m00.x) = (1-fx)*(1-fy);
+					ccMax[f](m10.y, m10.x) = fx*(1-fy);
+					ccMax[f](m01.y, m01.x) = (1-fx)*fy;
+					ccMax[f](m11.y, m11.x) = fx*fy;
+					
+					std::cout << f << ": " << mf << " -> " << m00 << ", " << fx << ", " << fy << "\n";
+				}
+				
+				ImageLog::write(ccMax,
+					MotionRefiner::getOutputFileNameRoot(outPath, mdt) + "_CCmax", CenterXY);	
+			}			
         }
 
         myInitialTracks.resize(pc);
@@ -407,7 +446,7 @@ std::vector<std::vector<d2Vector>> MotionEstimator::optimize(
 
     if (pc == 0) return std::vector<std::vector<d2Vector>>(0);
 
-    const int fc = inTracks[0].size();
+    const int fc = inTracks[0].size();		
 
     GpMotionFit gpmf(movieCC, sig_vel_px, sig_div_px, sig_acc_px,
                      maxEDs, positions, globComp, nr_omp_threads, expKer);
