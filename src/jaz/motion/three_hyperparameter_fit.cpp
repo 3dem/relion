@@ -42,7 +42,8 @@ d3Vector ThreeHyperParameterProblem::problemToMotion(const std::vector<double>& 
     return d3Vector(
         x[0] / MotionParamEstimator::velScale,
         x[1] / MotionParamEstimator::divScale,
-        (w > 1.0/accThresh ? (w < 1.0/accEps? 1.0/w : 1.0/accEps) : -1.0));
+        //(w > 1.0/accThresh ? (w < 1.0/accEps? 1.0/w : 1.0/accEps) : -1.0));
+		w);
 }
 
 std::vector<double> ThreeHyperParameterProblem::motionToProblem(d3Vector vd)
@@ -53,5 +54,6 @@ std::vector<double> ThreeHyperParameterProblem::motionToProblem(d3Vector vd)
     return std::vector<double>{
         vd[0] * MotionParamEstimator::velScale,
         vd[1] * MotionParamEstimator::divScale,
-        w * MotionParamEstimator::accScale};
+        //w * MotionParamEstimator::accScale};
+		s * MotionParamEstimator::accScale};
 }

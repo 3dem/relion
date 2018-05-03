@@ -666,6 +666,8 @@ void MotionEstimator::writeOutput(
     {
         glbOut << globalTrack[f].x << " " << globalTrack[f].y << "\n";
     }
+	
+	delete plot2D;
 }
 
 const std::vector<Image<RFLOAT>>& MotionEstimator::getDamageWeights()
