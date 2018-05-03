@@ -137,6 +137,8 @@ void MotioncorrRunner::initialise()
 			penv = getenv ("RELION_UNBLUR_EXECUTABLE");
 			if (penv!=NULL)
 				fn_unblur_exe = (std::string)penv;
+			else
+				REPORT_ERROR("ERROR: You have to specify the path to UNBLUR as --unblur_exe or the RELION_UNBLUR_EXECUTABLE variable");
 		}
 		// Get the SUMMOVIE executable
 		if (fn_summovie_exe == "")
@@ -145,6 +147,8 @@ void MotioncorrRunner::initialise()
 			penv = getenv ("RELION_SUMMOVIE_EXECUTABLE");
 			if (penv!=NULL)
 				fn_summovie_exe = (std::string)penv;
+			else
+				REPORT_ERROR("ERROR: You have to specify the path to SUMMOVIE as --summovie_exe or the RELION_SUMMOVIE_EXECUTABLE variable");
 		}
 
 		if (angpix < 0)
@@ -157,8 +161,17 @@ void MotioncorrRunner::initialise()
 		{
 			char * penv;
 			penv = getenv ("RELION_MOTIONCOR2_EXECUTABLE");
-			if (penv!=NULL)
+			if (penv!= NULL)
 				fn_motioncor2_exe = (std::string)penv;
+			else
+				REPORT_ERROR("ERROR: You have to specify the path to MotionCor2 as --motioncor2_exe or the RELION_MOTIONCOR2_EXECUTABLE variable");
+		}
+
+		if (fn_other_motioncor2_args.contains("RotGain") || fn_other_motioncor2_args.contains("FlipGain"))
+		{
+			std::cerr << "You are applying rotation and/or flipping to the gain reference in MotionCor2." << std::endl;
+			std::cerr << "This leads to incorrect results in MotionRefine." << std::endl;
+			REPORT_ERROR("Please apply rotation and flipping to the gain reference beforehand.");
 		}
 	}
 	else if (do_own) {
