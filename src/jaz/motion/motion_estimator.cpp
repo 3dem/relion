@@ -421,7 +421,13 @@ std::vector<std::vector<d2Vector>> MotionEstimator::optimize(
 
     std::vector<std::vector<d2Vector>> out(pc, std::vector<d2Vector>(fc));
     gpmf.paramsToPos(optCoeffs, out);
-
+		
+	for (int p = 0; p < pc; p++)
+	for (int f = 0; f < fc; f++)
+	{
+		out[p][f] += globComp[f];
+	}
+	
     return out;
 }
 
