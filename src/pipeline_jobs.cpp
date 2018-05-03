@@ -1105,6 +1105,8 @@ void RelionJob::initialiseMotioncorrJob()
 	joboptions["group_frames"] = JobOption("Group frames:", 1, 1, 5, 1, "Average together this many frames before calculating the beam-induced shifts.");
 	joboptions["bin_factor"] = JobOption("Binning factor:", 1, 1, 2, 1, "Bin the micrographs this much by a windowing operation in the Fourier Tranform. Binning at this level is hard to un-do later on, but may be useful to down-scale super-resolution images. Float-values may be used. Do make sure though that the resulting micrograph size is even.");
 	joboptions["fn_gain_ref"] = JobOption("Gain-reference image:", "", "*.mrc", ".", "Location of the gain-reference file to be applied to the input micrographs. Leave this empty if the movies are already gain-corrected.");
+	joboptions["gain_rot"] = JobOption("Gain rotation:", std::string("0"), "Rotate the gain reference by this number times 90 degrees clockwise in relion_display. This is the same as -RotGain in MotionCor2. Note that MotionCor2 uses a different convention for rotation so it says 'counter-clockwise'. Valid values are 0, 1, 2 and 3.");
+	joboptions["gain_flip"] = JobOption("Gain flip:", std::string("0"), "Flip the gain reference after rotation. This is the same as -FlipGain in MotionCor2. 0 means do nothing, 1 means flip Y (upside down) and 2 means flip X (left to right).");
 
 	// UCSF-wrapper
 	joboptions["do_own_motioncor"] = JobOption("Use RELION's own implementation?", true ,"If set to Yes, use RELION's own implementation of a MotionCor2-like algorithm by Takanori Nakane. Otherwise, wrap to the UCSF implementation. Note that Takanori's program only runs on CPUs but uses multiple threads, while the UCSF-implementation needs a GPU but uses only one CPU thread. Takanori's implementation is most efficient when the number of frames is divisible by the number of threads (e.g. 12 or 18 threads per MPI process for 36 frames). On some machines, setting the OMP_PROC_BIND environmental variable to TRUE accelerates the program.\n\
@@ -1177,7 +1179,11 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 	if (joboptions["group_frames"].getNumber() > 1.)
 		command += " --group_frames " + joboptions["group_frames"].getString();
 	if ((joboptions["fn_gain_ref"].getString()).length() > 0)
+	{
 		command += " --gainref " + joboptions["fn_gain_ref"].getString();
+		command += " --gain_rot " + joboptions["gain_rot"].getString();
+		command += " --gain_flip " + joboptions["gain_flip"].getString();
+	}
 	if ((joboptions["fn_defect"].getString()).length() > 0)
 		command += " --defect_file " + joboptions["fn_defect"].getString();
 

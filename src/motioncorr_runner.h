@@ -95,6 +95,7 @@ public:
 
 	// Gain reference file
 	FileName fn_gain_reference;
+	int gain_rotation, gain_flip;
 
 	// Defect file
 	FileName fn_defect;
@@ -137,6 +138,8 @@ public:
 
 	// Initialise some stuff after reading
 	void initialise();
+
+	void prepareGainReference(bool write_gain);
 
 	// Execute all MOTIONCORR jobs
 	void run();

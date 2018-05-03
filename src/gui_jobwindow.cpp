@@ -573,6 +573,8 @@ void JobWindow::initialiseMotioncorrWindow()
 	place("group_frames", TOGGLE_DEACTIVATE);
 	place("bin_factor", TOGGLE_DEACTIVATE);
 	place("fn_gain_ref", TOGGLE_DEACTIVATE);
+	place("gain_rot", TOGGLE_DEACTIVATE);
+	place("gain_flip", TOGGLE_DEACTIVATE);
 
 	current_y += STEPY/2;
 	group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");

@@ -36,6 +36,8 @@ void MotioncorrRunnerMpi::read(int argc, char **argv)
 
 void MotioncorrRunnerMpi::run()
 {
+	prepareGainReference(node->isMaster());
+	MPI_Barrier(MPI_COMM_WORLD); // wait for the master to write the gain reference
 
 	// Each node does part of the work
 	long int my_first_micrograph, my_last_micrograph, my_nr_micrographs;
