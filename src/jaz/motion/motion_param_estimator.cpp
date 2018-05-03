@@ -10,9 +10,9 @@
 
 using namespace gravis;
 
-const double MotionParamEstimator::velScale = 1000.0;
+const double MotionParamEstimator::velScale = 10000.0;
 const double MotionParamEstimator::divScale = 1.0;
-const double MotionParamEstimator::accScale = 100.0;
+const double MotionParamEstimator::accScale = 1000.0;
 
 MotionParamEstimator::MotionParamEstimator()
 :   paramsRead(false), ready(false)
@@ -34,8 +34,8 @@ int MotionParamEstimator::read(IOParser& parser, int argc, char *argv[])
     sV = textToFloat(parser.getOption("--s_vel_0", "Initial s_vel", "0.6"));
     sD = textToFloat(parser.getOption("--s_div_0", "Initial s_div", "3000"));
     sA = textToFloat(parser.getOption("--s_acc_0", "Initial s_acc", "5"));
-    iniStep = textToFloat(parser.getOption("--in_step", "Initial step size in s_div", "100"));
-    conv = textToFloat(parser.getOption("--conv", "Abort when simplex diameter falls below this", "10"));
+    iniStep = textToFloat(parser.getOption("--in_step", "Initial step size in s_div", "1000"));
+    conv = textToFloat(parser.getOption("--conv", "Abort when simplex diameter falls below this", "100"));
     maxIters = textToInteger(parser.getOption("--par_iters", "Max. number of iterations", "50"));
     maxRange = textToInteger(parser.getOption("--mot_range", "Limit allowed motion range [Px]", "50"));
     seed = textToInteger(parser.getOption("--seed", "Random seed for micrograph selection", "23"));
