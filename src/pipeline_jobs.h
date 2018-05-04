@@ -47,6 +47,8 @@
 
 #define RADIO_SAMPLING 0
 #define RADIO_NODETYPE 1
+#define RADIO_GAIN_ROTATION 2
+#define RADIO_GAIN_FLIP 3
 
 // Our own defaults at LMB are the hard-coded ones
 #define DEFAULTQSUBLOCATION "/public/EM/RELION/relion/bin/relion_qsub.csh"
@@ -61,28 +63,41 @@
 #define DEFAULTALLOWCHANGEMINDEDICATED true
 
 static const char* job_sampling_options[] = {
-		      "30 degrees",
-		      "15 degrees",
-		      "7.5 degrees",
-		      "3.7 degrees",
-		      "1.8 degrees",
-		      "0.9 degrees",
-		      "0.5 degrees",
-		      "0.2 degrees",
-		      "0.1 degrees",
+	"30 degrees",
+	"15 degrees",
+	"7.5 degrees",
+	"3.7 degrees",
+	"1.8 degrees",
+	"0.9 degrees",
+	"0.5 degrees",
+	"0.2 degrees",
+	"0.1 degrees",
 };
 
 static const char* job_nodetype_options[] = {
-		      "2D micrograph movies (*.mrcs)",
-	          "2D micrographs/tomograms (*.mrc)",
-	          "2D/3D particle coordinates (*.box, *_pick.star)",
-	          "Particles STAR file (.star)",
-	          "Movie-particles STAR file (.star)",
-	          "2D references (.star or .mrcs)",
-	          "Micrographs STAR file (.star)",
-		      "3D reference (.mrc)",
-		      "3D mask (.mrc)",
-		      "Unfiltered half-map (unfil.mrc)",
+	"2D micrograph movies (*.mrcs)",
+	"2D micrographs/tomograms (*.mrc)",
+	"2D/3D particle coordinates (*.box, *_pick.star)",
+	"Particles STAR file (.star)",
+	"Movie-particles STAR file (.star)",
+	"2D references (.star or .mrcs)",
+	"Micrographs STAR file (.star)",
+	"3D reference (.mrc)",
+	"3D mask (.mrc)",
+	"Unfiltered half-map (unfil.mrc)",
+};
+
+static const char* job_gain_rotation_options[] = {
+	"No rotation (0)",
+	"90 degrees (1)",
+	"180 degrees (2)",
+	"270 degrees (3)",
+};
+
+static const char* job_gain_flip_options[] = {
+	"No flipping (0)",
+	"Flip upside down (1)",
+	"Flip left to right (2)"
 };
 
 // To have a line on the GUI to change the minimum number of dedicated in a job

@@ -133,11 +133,17 @@ JobOption::JobOption(std::string _label, int _radio_menu, int ioption,  std::str
 		defaultval = std::string(job_sampling_options[ioption]);
 	else if (radio_menu == RADIO_NODETYPE)
 		defaultval = std::string(job_nodetype_options[ioption]);
-	else
+	else if (radio_menu == RADIO_GAIN_ROTATION)
+		defaultval = std::string(job_gain_rotation_options[ioption]);
+	else if (radio_menu == RADIO_GAIN_FLIP)
+		defaultval = std::string(job_gain_flip_options[ioption]);
+	else {
+		std::cout << "Debug: radio_menu == " << radio_menu << std::endl;
 		REPORT_ERROR("BUG: unrecognised radio_menu type");
+	}
+
 	initialise(_label, defaultval, _helptext);
 	joboption_type = JOBOPTION_RADIO;
-
 }
 
 // Boolean constructor
@@ -1105,8 +1111,8 @@ void RelionJob::initialiseMotioncorrJob()
 	joboptions["group_frames"] = JobOption("Group frames:", 1, 1, 5, 1, "Average together this many frames before calculating the beam-induced shifts.");
 	joboptions["bin_factor"] = JobOption("Binning factor:", 1, 1, 2, 1, "Bin the micrographs this much by a windowing operation in the Fourier Tranform. Binning at this level is hard to un-do later on, but may be useful to down-scale super-resolution images. Float-values may be used. Do make sure though that the resulting micrograph size is even.");
 	joboptions["fn_gain_ref"] = JobOption("Gain-reference image:", "", "*.mrc", ".", "Location of the gain-reference file to be applied to the input micrographs. Leave this empty if the movies are already gain-corrected.");
-	joboptions["gain_rot"] = JobOption("Gain rotation:", std::string("0"), "Rotate the gain reference by this number times 90 degrees clockwise in relion_display. This is the same as -RotGain in MotionCor2. Note that MotionCor2 uses a different convention for rotation so it says 'counter-clockwise'. Valid values are 0, 1, 2 and 3.");
-	joboptions["gain_flip"] = JobOption("Gain flip:", std::string("0"), "Flip the gain reference after rotation. This is the same as -FlipGain in MotionCor2. 0 means do nothing, 1 means flip Y (upside down) and 2 means flip X (left to right).");
+	joboptions["gain_rot"] = JobOption("Gain rotation:", RADIO_GAIN_ROTATION, 0, "Rotate the gain reference by this number times 90 degrees clockwise in relion_display. This is the same as -RotGain in MotionCor2. Note that MotionCor2 uses a different convention for rotation so it says 'counter-clockwise'. Valid values are 0, 1, 2 and 3.");
+	joboptions["gain_flip"] = JobOption("Gain flip:", RADIO_GAIN_FLIP, 0, "Flip the gain reference after rotation. This is the same as -FlipGain in MotionCor2. 0 means do nothing, 1 means flip Y (upside down) and 2 means flip X (left to right).");
 
 	// UCSF-wrapper
 	joboptions["do_own_motioncor"] = JobOption("Use RELION's own implementation?", true ,"If set to Yes, use RELION's own implementation of a MotionCor2-like algorithm by Takanori Nakane. Otherwise, wrap to the UCSF implementation. Note that Takanori's program only runs on CPUs but uses multiple threads, while the UCSF-implementation needs a GPU but uses only one CPU thread. Takanori's implementation is most efficient when the number of frames is divisible by the number of threads (e.g. 12 or 18 threads per MPI process for 36 frames). On some machines, setting the OMP_PROC_BIND environmental variable to TRUE accelerates the program.\n\
@@ -1180,9 +1186,34 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 		command += " --group_frames " + joboptions["group_frames"].getString();
 	if ((joboptions["fn_gain_ref"].getString()).length() > 0)
 	{
+		std::cout << joboptions["gain_rot"].getString() << std::endl;
+		std::cout << joboptions["gain_flip"].getString() << std::endl;
+
+		int gain_rot = -1, gain_flip = -1;
+		for (int i = 0; i <= 3; i++)
+		{
+			if (strcmp((joboptions["gain_rot"].getString()).c_str(), job_gain_rotation_options[i]) == 0)
+			{
+				gain_rot = i;
+				break;
+			}
+		}
+
+		for (int i = 0; i <= 2; i++)
+		{
+			if (strcmp((joboptions["gain_flip"].getString()).c_str(), job_gain_flip_options[i]) == 0)
+			{
+				gain_flip = i;
+				break;
+			}
+		}
+
+		if (gain_rot == -1 || gain_flip == -1)
+			REPORT_ERROR("Illegal gain_rot and/or gain_flip.");
+
 		command += " --gainref " + joboptions["fn_gain_ref"].getString();
-		command += " --gain_rot " + joboptions["gain_rot"].getString();
-		command += " --gain_flip " + joboptions["gain_flip"].getString();
+		command += " --gain_rot " + integerToString(gain_rot);
+		command += " --gain_flip " + integerToString(gain_flip);
 	}
 	if ((joboptions["fn_defect"].getString()).length() > 0)
 		command += " --defect_file " + joboptions["fn_defect"].getString();
