@@ -180,7 +180,11 @@ Complex Interpolation::linearFFTW2D(const Image<Complex>& img, double x, double 
 void Interpolation::test2D()
 {
     int w0 = 5, w1 = 1000;
-    Image<RFLOAT> img0(w0,w0), img(w1,w1), img1(w1,w1);
+    Image<RFLOAT> 
+		img0(w0,w0), img(w1,w1), img1(w1,w1), 
+		img2a(w1,w1), img2b(w1,w1), 
+		img3a(w1,w1), img3b(w1,w1), img3c(w1,w1);
+	
     Image<RFLOAT> gradx(w1,w1), grady(w1,w1);
     Image<RFLOAT> gradnx(w1,w1), gradny(w1,w1);
 
@@ -196,8 +200,25 @@ void Interpolation::test2D()
     for (int x = 0; x < w1; x++)
     {
         DIRECT_NZYX_ELEM(img.data, 0, 0, y, x)  = DIRECT_NZYX_ELEM(img0.data, 0, 0, w0*y/w1, w0*x/w1);
-        DIRECT_NZYX_ELEM(img1.data, 0, 0, y, x) = cubicXY(img0, w0*x/(double)w1 - 0.5, w0*y/(double)w1 - 0.5, 0);
-
+		
+		DIRECT_NZYX_ELEM(img1.data, 0, 0, y, x) = cubicXY(
+					img0, w0*x/(double)w1 - 0.5, w0*y/(double)w1 - 0.5, 0);
+		
+		DIRECT_NZYX_ELEM(img2a.data, 0, 0, y, x) = cubicXY(
+					img0, w0*x/(double)w1 - 0.5, w0*y/(double)w1 - 0.5, 0, 0, true);
+		
+		DIRECT_NZYX_ELEM(img2b.data, 0, 0, y, x) = cubicXY(
+					img0, w0*x/(double)w1 - 0.5 - w0/2, w0*y/(double)w1 - 0.5 - w0/2, 0, 0, true);
+		
+		DIRECT_NZYX_ELEM(img3a.data, 0, 0, y, x) = cubicXY(
+					img0, 1e-2*(x-w1/2), 1e-2*(y-w1/2), 0, 0, true);
+		
+		DIRECT_NZYX_ELEM(img3b.data, 0, 0, y, x) = cubicXY(
+					img0, 1e-7*(x-w1/2), 1e-7*(y-w1/2), 0, 0, true);
+		
+		DIRECT_NZYX_ELEM(img3c.data, 0, 0, y, x) = cubicXY(
+					img0, 1e-16*(x-w1/2), 1e-16*(y-w1/2), 0, 0, true);
+        
         t2Vector<RFLOAT> g = cubicXYgrad(img0, w0*x/(double)w1 - 0.5, w0*y/(double)w1 - 0.5, 0);
 
         DIRECT_NZYX_ELEM(gradx.data, 0, 0, y, x) = g.x;
@@ -213,7 +234,14 @@ void Interpolation::test2D()
     }
 
     VtkHelper::writeVTK(img,  "debug/interpolationX_0.vtk", 0, 0, 0, 1, 1, 1);
-    VtkHelper::writeVTK(img1, "debug/interpolationX_1b.vtk", 0, 0, 0, 1, 1, 1);
+	VtkHelper::writeVTK(img1, "debug/interpolationX_1.vtk", 0, 0, 0, 1, 1, 1);
+	VtkHelper::writeVTK(img2a, "debug/interpolationX_1w.vtk", 0, 0, 0, 1, 1, 1);
+	VtkHelper::writeVTK(img2b, "debug/interpolationX_2w.vtk", 0, 0, 0, 1, 1, 1);
+	
+	VtkHelper::writeVTK(img3a, "debug/interpolationX_3w_0.vtk", 0, 0, 0, 1, 1, 1);
+	VtkHelper::writeVTK(img3b, "debug/interpolationX_3w_4.vtk", 0, 0, 0, 1, 1, 1);
+	VtkHelper::writeVTK(img3c, "debug/interpolationX_3w_16.vtk", 0, 0, 0, 1, 1, 1);
+	
     VtkHelper::writeVTK(gradx, "debug/interpolationX_gx.vtk", 0, 0, 0, 1, 1, 1);
     VtkHelper::writeVTK(grady, "debug/interpolationX_gy.vtk", 0, 0, 0, 1, 1, 1);
     VtkHelper::writeVTK(gradnx, "debug/interpolationX_gnx.vtk", 0, 0, 0, 1, 1, 1);
