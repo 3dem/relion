@@ -21,24 +21,23 @@
 
 void MotioncorrRunnerMpi::read(int argc, char **argv)
 {
-    // Define a new MpiNode
-    node = new MpiNode(argc, argv);
+	// Define a new MpiNode
+	node = new MpiNode(argc, argv);
 
-    // First read in non-parallelisation-dependent variables
-    MotioncorrRunner::read(argc, argv);
+	// First read in non-parallelisation-dependent variables
+	MotioncorrRunner::read(argc, argv);
 
-    // Don't put any output to screen for mpi slaves
-    verb = (node->isMaster()) ? 1 : 0;
+	// Don't put any output to screen for mpi slaves
+	verb = (node->isMaster()) ? 1 : 0;
 
-    // Possibly also read parallelisation-dependent variables here
-
-    // Print out MPI info
+	// Print out MPI info
 	printMpiNodesMachineNames(*node);
-
-
 }
+
 void MotioncorrRunnerMpi::run()
 {
+	prepareGainReference(node->isMaster());
+	MPI_Barrier(MPI_COMM_WORLD); // wait for the master to write the gain reference
 
 	// Each node does part of the work
 	long int my_first_micrograph, my_last_micrograph, my_nr_micrographs;

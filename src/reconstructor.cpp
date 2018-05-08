@@ -80,6 +80,7 @@ void Reconstructor::read(int argc, char **argv)
     debug_ori_size =  textToInteger(parser.getOption("--debug_ori_size", "Rootname for debug reconstruction files", "1"));
     debug_size =  textToInteger(parser.getOption("--debug_size", "Rootname for debug reconstruction files", "1"));
     read_weights = parser.checkOption("--read_weights", "Developmental: read freq. weight files");
+    do_debug = parser.checkOption("--write_debug_output", "Write out arrays with data and weight terms prior to reconstruct");
     verb = textToInteger(parser.getOption("--verb", "Verbosity", "1"));
 
     // Hidden
@@ -596,6 +597,27 @@ void Reconstructor::reconstruct()
     if (verb > 0)
     	std::cout << " + Starting the reconstruction ..." << std::endl;
     backprojector.symmetrise(nr_helical_asu, helical_twist, helical_rise/angpix);
+
+
+    if (do_debug)
+    {
+		Image<RFLOAT> It;
+    	FileName fn_tmp = fn_out.withoutExtension();
+		It().resize(backprojector.data);
+    	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(It())
+		{
+			DIRECT_MULTIDIM_ELEM(It(), n) = (DIRECT_MULTIDIM_ELEM(backprojector.data, n)).real;
+		}
+		It.write(fn_tmp+"_data_real.mrc");
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(It())
+		{
+			DIRECT_MULTIDIM_ELEM(It(), n) = (DIRECT_MULTIDIM_ELEM(backprojector.data, n)).imag;
+		}
+		It.write(fn_tmp+"_data_imag.mrc");
+		It()=backprojector.weight;
+		It.write(fn_tmp+"_weight.mrc");
+    }
+
     backprojector.reconstruct(vol(), iter, do_map, 1., dummy, dummy, dummy, dummy,
                               fsc, 1., do_use_fsc, true, 1, -1, false);
 

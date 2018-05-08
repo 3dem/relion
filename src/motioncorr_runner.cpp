@@ -24,6 +24,7 @@
 #include "src/micrograph_model.h"
 #include "src/matrix2d.h"
 #include "src/matrix1d.h"
+#include "src/jaz/image_op.h"
 #include <omp.h>
 
 //#define TIMING
@@ -85,12 +86,13 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	bin_factor =  textToFloat(parser.getOption("--bin_factor", "Binning factor (can be non-integer)", "1"));
 	bfactor =  textToFloat(parser.getOption("--bfactor", "B-factor (in pix^2) that will be used inside MOTIONCOR2", "150"));
 	fn_gain_reference = parser.getOption("--gainref","Location of MRC file with the gain reference to be applied","");
+	gain_rotation = textToInteger(parser.getOption("--gain_rot", "Rotate the gain reference this number times 90 degrees clock-wise (in relion_display). This is same as MotionCor2's RotGain. 0, 1, 2 or 3", "0"));
+	gain_flip = textToInteger(parser.getOption("--gain_flip", "Flip the gain reference. This is same as MotionCor2's FlipGain. 0, 1 (flip Y == upside down) or 2 (flip X == left to right)", "0"));
 	patch_x = textToInteger(parser.getOption("--patch_x", "Patching in X-direction for MOTIONCOR2", "1"));
 	patch_y = textToInteger(parser.getOption("--patch_y", "Patching in Y-direction for MOTIONCOR2", "1"));
 	group = textToInteger(parser.getOption("--group_frames", "Average together this many frames before calculating the beam-induced shifts", "1"));
 	fn_defect = parser.getOption("--defect_file","Location of a MOTIONCOR2-style detector defect file","");
 	fn_archive = parser.getOption("--archive","Location of the directory for archiving movies in 4-byte MRC format","");
-
 	fn_other_motioncor2_args = parser.getOption("--other_motioncor2_args", "Additional arguments to MOTIONCOR2", "");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread, e.g 0:1:2:3", "");
 
@@ -137,6 +139,8 @@ void MotioncorrRunner::initialise()
 			penv = getenv ("RELION_UNBLUR_EXECUTABLE");
 			if (penv!=NULL)
 				fn_unblur_exe = (std::string)penv;
+			else
+				REPORT_ERROR("ERROR: You have to specify the path to UNBLUR as --unblur_exe or the RELION_UNBLUR_EXECUTABLE variable");
 		}
 		// Get the SUMMOVIE executable
 		if (fn_summovie_exe == "")
@@ -145,6 +149,8 @@ void MotioncorrRunner::initialise()
 			penv = getenv ("RELION_SUMMOVIE_EXECUTABLE");
 			if (penv!=NULL)
 				fn_summovie_exe = (std::string)penv;
+			else
+				REPORT_ERROR("ERROR: You have to specify the path to SUMMOVIE as --summovie_exe or the RELION_SUMMOVIE_EXECUTABLE variable");
 		}
 
 		if (angpix < 0)
@@ -157,8 +163,15 @@ void MotioncorrRunner::initialise()
 		{
 			char * penv;
 			penv = getenv ("RELION_MOTIONCOR2_EXECUTABLE");
-			if (penv!=NULL)
+			if (penv!= NULL)
 				fn_motioncor2_exe = (std::string)penv;
+			else
+				REPORT_ERROR("ERROR: You have to specify the path to MotionCor2 as --motioncor2_exe or the RELION_MOTIONCOR2_EXECUTABLE variable");
+		}
+
+		if (fn_other_motioncor2_args.contains("RotGain") || fn_other_motioncor2_args.contains("FlipGain"))
+		{
+			REPORT_ERROR("You supplied -RotGain and/or -FlipGain to MotionCor2. Please use --gain_rot and--gain_flip instead.");
 		}
 	}
 	else if (do_own) {
@@ -237,11 +250,15 @@ void MotioncorrRunner::initialise()
 	FileName prevdir="";
 	for (size_t i = 0; i < fn_micrographs.size(); i++)
 	{
-		FileName newdir = fn_micrographs[i].beforeLastOf("/");
+		FileName newdir = fn_out + fn_micrographs[i];
+		if (!newdir.contains("/")) continue;
+		newdir = newdir.beforeLastOf("/");
+
 		if (newdir != prevdir)
 		{
-			std::string command = " mkdir -p " + fn_out + newdir;
+			std::string command = " mkdir -p " + newdir;
 			int res = system(command.c_str());
+			prevdir = newdir;
 		}
 	}
 
@@ -260,6 +277,48 @@ void MotioncorrRunner::initialise()
 			std::cout << "  * " << fn_micrographs[i] << std::endl;
 	}
 
+}
+
+void MotioncorrRunner::prepareGainReference(bool write_gain)
+{
+	if (fn_gain_reference == "") return;
+	if (gain_rotation == 0 && gain_flip == 0) return;
+
+	// Need gain rotation and/or flipping
+	
+	FileName fn_new_gain = fn_out + "gain.mrc";
+	if (write_gain)
+	{
+		Image<RFLOAT> Iin, Iout;
+		Iin.read(fn_gain_reference);
+
+		if (gain_rotation == 0)
+			Iout() = Iin();
+		else if (gain_rotation == 1)
+			ImageOp::rotate90(Iin(), Iout());
+		else if (gain_rotation == 2)
+			ImageOp::rotate180(Iin(), Iout());
+		else if (gain_rotation == 3)
+			ImageOp::rotate270(Iin(), Iout());
+		else
+			REPORT_ERROR("--gain_rotation must be 0, 1, 2 or 3.");
+
+		Iin() = Iout();
+		if (gain_flip == 0)
+			Iout() = Iin();
+		else if (gain_flip == 1)
+			ImageOp::flipY(Iin(), Iout());
+		else if (gain_flip == 2)
+			ImageOp::flipX(Iin(), Iout());
+		else
+			REPORT_ERROR("--gain_flip must be 0, 1 or 2");
+
+		// Since this is called after initialise(), we can assume that fn_out directory is already present
+		Iout.write(fn_new_gain);
+		std::cout << "Applied rotation and/or flipping to the gain reference and saved to " << fn_new_gain << std::endl;
+	}
+
+	fn_gain_reference =fn_new_gain;
 }
 
 void MotioncorrRunner::getOutputFileNames(FileName fn_mic, FileName &fn_avg, FileName &fn_mov)
@@ -285,6 +344,7 @@ void MotioncorrRunner::getOutputFileNames(FileName fn_mic, FileName &fn_avg, Fil
 
 void MotioncorrRunner::run()
 {
+	prepareGainReference(true);
 
 	int barstep;
 	if (verb > 0)
@@ -1518,10 +1578,11 @@ void MotioncorrRunner::realSpaceInterpolation(Image <float> &Isum, std::vector<I
 					const int x1 = x0 + 1;
 					const int y1 = y0 + 1;
 
-					if (x0 < 0) {x0 = 0; valid = false;}
-					if (y0 < 0) {y0 = 0; valid = false;}
-					if (x1 >= nx) {x0 = nx - 1; valid = false;}
-					if (y1 >= ny) {y0 = ny - 1; valid = false;}
+					// some conditions might seem redundant but necessary when overflow happened
+					if (x0 < 0 || x1 < 0) {x0 = 0; valid = false;}
+					if (y0 < 0 || y1 < 0) {y0 = 0; valid = false;}
+					if (x1 >= nx || x0 >= nx - 1) {x0 = nx - 1; valid = false;}
+					if (y1 >= ny || y1 >= ny - 1) {y0 = ny - 1; valid = false;}
 					if (!valid) {
 						DIRECT_A2D_ELEM(Isum(), iy, ix) += DIRECT_A2D_ELEM(Iframes[iframe](), y0, x0);
 						if (std::isnan(DIRECT_A2D_ELEM(Isum(), iy, ix))) {
@@ -1601,15 +1662,18 @@ void MotioncorrRunner::realSpaceInterpolation_ThirdOrderPolynomial(Image <float>
 				const int x1 = x0 + 1;
 				const int y1 = y0 + 1;
 
-				if (x0 < 0) {x0 = 0; valid = false;}
-				if (y0 < 0) {y0 = 0; valid = false;}
-				if (x1 >= nx) {x0 = nx - 1; valid = false;}
-				if (y1 >= ny) {y0 = ny - 1; valid = false;}
+				// some conditions might seem redundant but necessary when overflow happened
+				if (x0 < 0 || x1 < 0) {x0 = 0; valid = false;}
+				if (y0 < 0 || y1 < 0) {y0 = 0; valid = false;}
+				if (x1 >= nx || x0 >= nx - 1) {x0 = nx - 1; valid = false;}
+				if (y1 >= ny || y0 >= ny - 1) {y0 = ny - 1; valid = false;}
 				if (!valid) {
 					DIRECT_A2D_ELEM(Isum(), iy, ix) += DIRECT_A2D_ELEM(Iframes[iframe](), y0, x0);
+#ifdef DEBUG_OWN
 					if (std::isnan(DIRECT_A2D_ELEM(Isum(), iy, ix))) {
 						std::cerr << "ix = " << ix << " xfit = " << x_fitted << " iy = " << iy << " ifit = " << y_fitted << std::endl;
 					}
+#endif
 					continue;
 				}
 
