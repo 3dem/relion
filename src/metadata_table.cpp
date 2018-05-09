@@ -1387,3 +1387,39 @@ bool compareLabels(const MetaDataTable &MD1, const MetaDataTable &MD2)
 	}
 	return true;
 }
+
+MetaDataTable subsetMetaDataTable(MetaDataTable &MDin, EMDLabel label, RFLOAT min_value, RFLOAT max_value)
+{
+	if (!(EMDL::isInt(label) || EMDL::isDouble(label)) )
+		REPORT_ERROR("subsetMetadataTable ERROR: can only make a subset selection based on numbers");
+
+	if (!MDin.containsLabel(label))
+		REPORT_ERROR("subsetMetadataTable ERROR: input MetaDataTable does not contain label: " +  EMDL::label2Str(label));
+
+	MetaDataTable MDout;
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
+	{
+		bool do_include = false;
+		if (EMDL::isInt(label))
+		{
+			long val;
+			MDin.getValue(label, val);
+			do_include = ((RFLOAT)val < max_value && (RFLOAT)val > min_value);
+		}
+		else
+		{
+			RFLOAT val;
+			MDin.getValue(label, val);
+			do_include = ((RFLOAT)val < max_value && (RFLOAT)val > min_value);
+		}
+
+		if (do_include)
+		{
+			MDout.addObject(MDin.getObject(current_object));
+		}
+
+	}
+
+	return MDout;
+
+}

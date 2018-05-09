@@ -1078,7 +1078,7 @@ void JobWindow::initialiseSortWindow()
 }
 void JobWindow::initialiseSelectWindow()
 {
-	setupTabs(2);
+	setupTabs(3);
 
 	tab1->begin();
 	tab1->label("I/O");
@@ -1117,6 +1117,23 @@ void JobWindow::initialiseSelectWindow()
 	guientries["do_remove_duplicates"].cb_menu_i();
 
 	tab2->end();
+
+	tab3->begin();
+	tab3->label("Values");
+	resetHeight();
+
+	group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group3->end();
+
+	place("do_select_values", TOGGLE_DEACTIVATE, group3);
+	group3->begin();
+	place("select_label", TOGGLE_DEACTIVATE);
+	place("select_minval", TOGGLE_DEACTIVATE);
+	place("select_maxval", TOGGLE_DEACTIVATE);
+	group3->end();
+	guientries["do_select_values"].cb_menu_i();
+
+	tab3->end();
 
 	// Always deactivate the queue option
 	guientries["do_queue"].deactivate_option = TOGGLE_ALWAYS_DEACTIVATE;
