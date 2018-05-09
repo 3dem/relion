@@ -2049,13 +2049,13 @@ void MlOptimiserMpi::maximization()
 								mymodel.tau2_fudge_factor, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
 								mymodel.data_vs_prior_class[ith_recons], mymodel.fourier_coverage_class[ith_recons],
 								mymodel.fsc_halves_class[ibody], wsum_model.pdf_class[iclass],
-								do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map, &timer);
+								do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map, &timer, do_fsc0999);
 #else
 						(wsum_model.BPref[ith_recons]).reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
 								mymodel.tau2_fudge_factor, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
 								mymodel.data_vs_prior_class[ith_recons], mymodel.fourier_coverage_class[ith_recons],
 								mymodel.fsc_halves_class[ibody], wsum_model.pdf_class[iclass],
-								do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map);
+								do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map, false, do_fsc0999);
 #endif
 						if(do_sgd)
 						{
@@ -2160,7 +2160,7 @@ void MlOptimiserMpi::maximization()
 									mymodel.tau2_fudge_factor, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
 									mymodel.data_vs_prior_class[ith_recons], mymodel.fourier_coverage_class[ith_recons],
 									mymodel.fsc_halves_class[ibody], wsum_model.pdf_class[iclass],
-									do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map);
+									do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map, false, do_fsc0999);
 
 							if (do_sgd)
 							{
@@ -2589,7 +2589,7 @@ void MlOptimiserMpi::reconstructUnregularisedMapAndCalculateSolventCorrectedFSC(
 
 			BackProjector BPextra(wsum_model.BPref[ibody]);
 
-			BPextra.reconstruct(Iunreg(), gridding_nr_iter, false, 1., dummy, dummy, dummy, dummy, dummy, 1., false, true, nr_threads, -1);
+			BPextra.reconstruct(Iunreg(), gridding_nr_iter, false, 1., dummy, dummy, dummy, dummy, dummy, 1., false, true, nr_threads, -1, false, do_fsc0999);
 
 			if (mymodel.nr_bodies > 1)
 			{
@@ -2845,7 +2845,7 @@ void MlOptimiserMpi::readTemporaryDataAndWeightArraysAndReconstruct(int iclass, 
 	}
 
 	// Now perform the unregularized reconstruction
-	wsum_model.BPref[iclass].reconstruct(Iunreg(), gridding_nr_iter, false, 1., dummy, dummy, dummy, dummy, dummy, 1., false, true, nr_threads, -1);
+	wsum_model.BPref[iclass].reconstruct(Iunreg(), gridding_nr_iter, false, 1., dummy, dummy, dummy, dummy, dummy, 1., false, true, nr_threads, -1, false, do_fsc0999);
 
 	if (mymodel.nr_bodies > 1)
 	{

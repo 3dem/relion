@@ -916,7 +916,8 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
                                 bool is_whole_instead_of_half,
                                 int nr_threads,
                                 int minres_map,
-                                bool printTimes)
+                                bool printTimes,
+								bool do_fsc0999)
 {
 
 #ifdef TIMING
@@ -1142,6 +1143,27 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 		}
 
 	} //end if do_map
+    else if (do_fsc0999)
+    {
+
+     	// Sjors 9may2018: avoid numerical instabilities with unregularised reconstructions....
+        FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fconv)
+        {
+            int r2 = kp * kp + ip * ip + jp * jp;
+            if (r2 < max_r2)
+            {
+                int ires = ROUND( sqrt((RFLOAT)r2) / padding_factor );
+                if (ires >= minres_map)
+                {
+                    // add 1/1000th of the radially averaged sigma2 to the Fweight, to avoid having zeros there...
+                	DIRECT_A3D_ELEM(Fweight, k, i, j) += 1./(999. * DIRECT_A1D_ELEM(sigma2, ires));
+                }
+            }
+        }
+
+    }
+
+
     RCTOC(ReconTimer,ReconS_2_5);
 	if (skip_gridding)
 	{
