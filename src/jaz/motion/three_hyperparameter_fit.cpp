@@ -29,10 +29,18 @@ double ThreeHyperParameterProblem::f(const std::vector<double>& x, void *tempSto
 void ThreeHyperParameterProblem::report(int iteration, double cost, const std::vector<double>& x) const
 {
     d3Vector vda = problemToMotion(x);
-
+	
+	std::cout.precision(5);
+	
     std::cout << iteration << ": \t "
-              << vda[0] << ", \t " << vda[1] << ", \t " << vda[2]
-              << " \t " << -cost << "\n";
+              << vda[0] << "  \t " << vda[1] << "  \t " << vda[2]
+              << "  \t ";
+	
+	std::cout.precision(12);
+	
+	std::cout << -cost << "\n";
+	
+	std::cout.precision(5);
 }
 
 d3Vector ThreeHyperParameterProblem::problemToMotion(const std::vector<double>& x)

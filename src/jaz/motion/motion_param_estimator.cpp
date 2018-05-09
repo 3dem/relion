@@ -25,10 +25,14 @@ int MotionParamEstimator::read(IOParser& parser, int argc, char *argv[])
 
     estim2 = parser.checkOption("--params2", "Estimate 2 parameters instead of motion");
     estim3 = parser.checkOption("--params3", "Estimate 3 parameters instead of motion");
-    k_cutoff = textToFloat(parser.getOption("--k_cut", "Freq. cutoff for parameter estimation [Pixels]", "-1.0"));
+	
+	align_frac = textToFloat(parser.getOption("--align_frac", "Fraction of pixels to be used for alignment", "0.5"));
+	eval_frac = textToFloat(parser.getOption("--eval_frac", "Fraction of pixels to be used for evaluation", "0.5"));
+	
+	/*k_cutoff = textToFloat(parser.getOption("--k_cut", "Freq. cutoff for parameter estimation [Pixels]", "-1.0"));
     k_cutoff_Angst = textToFloat(parser.getOption("--k_cut_A", "Freq. cutoff for parameter estimation [Angstrom]", "-1.0"));
     k_eval = textToFloat(parser.getOption("--k_eval", "Threshold freq. for parameter evaluation [Pixels]", "-1.0"));
-    k_eval_Angst = textToFloat(parser.getOption("--k_eval_A", "Threshold freq. for parameter evaluation [Angstrom]", "-1.0"));
+    k_eval_Angst = textToFloat(parser.getOption("--k_eval_A", "Threshold freq. for parameter evaluation [Angstrom]", "-1.0"));*/
 
     minParticles = textToInteger(parser.getOption("--min_p", "Minimum number of particles on which to estimate the parameters", "1000"));
     sV = textToFloat(parser.getOption("--s_vel_0", "Initial s_vel", "0.6"));
@@ -70,59 +74,33 @@ void MotionParamEstimator::init(
         REPORT_ERROR("ERROR: MotionParamEstimator initialized before MotionEstimator.");
     }
 
-    if (k_cutoff_Angst > 0.0 && k_cutoff > 0.0)
+    if (eval_frac + align_frac > 1.000001)
     {
-        REPORT_ERROR("ERROR: Cutoff frequency can only be provided in pixels (--k_cut) or Angstrom (--k_eval_A), not both.");
-    }
-
-    if (k_eval_Angst > 0.0 && k_eval > 0.0)
-    {
-        REPORT_ERROR("ERROR: Evaluation frequency can only be provided in pixels (--k_eval) or Angstrom (--k_cut_A), not both.");
-    }
-
-    if (k_cutoff_Angst > 0.0 && k_cutoff < 0)
-    {
-        k_cutoff = obsModel->angToPix(k_cutoff_Angst, s);
-    }
-
-    else if (k_cutoff > 0 && k_cutoff_Angst < 0.0)
-    {
-        k_cutoff_Angst = obsModel->angToPix(k_cutoff, s);
-    }
-
-    if ((estim2 || estim3) && k_cutoff < 0)
-    {
-        REPORT_ERROR("ERROR: Parameter estimation requires a freq. cutoff (--k_cut or --k_cut_A).");
+        REPORT_ERROR_STR("ERROR: Alignment and evaluation sets are intersecting. "
+			<< "Please make sure that --align_frac and --eval_frac do not add up to more than 1.");
     }
 
     if (estim2 && estim3)
     {
         REPORT_ERROR("ERROR: Only 2 or 3 parameters can be estimated (--params2 or --params3), not both.");
     }
-
-    if (k_eval < 0 && k_eval_Angst > 0.0)
-    {
-        k_eval = obsModel->angToPix(k_eval_Angst, s);
-    }
-    else if (k_eval > 0 && k_eval_Angst < 0.0)
-    {
-        k_eval_Angst = obsModel->angToPix(k_eval, s);
-    }
-    else
-    {
-        k_eval = k_cutoff;
-        k_eval_Angst = k_cutoff_Angst;
-    }
-
+	
+	k_out = reference->k_out;
+	
+	k_cutoff = (int)(k_out * sqrt(align_frac) + 0.5);
+	k_eval = (int)(k_out * sqrt(1.0 - eval_frac) + 0.5);
+			
     if (verb > 0)
     {
+		double k_cutoff_Angst = obsModel->angToPix(k_cutoff, s);
+		double k_eval_Angst = obsModel->angToPix(k_eval, s); 
+		
         std::cout << " + maximum frequency to consider for alignment: "
             << k_cutoff_Angst << " A (" << k_cutoff << " px)\n";
 
         std::cout << " + frequency range to consider for evaluation:  "
             << k_eval_Angst << " - " << obsModel->pixToAng(reference->k_out,s) << " A ("
             << k_eval << " - " << reference->k_out << " px)\n";
-
     }
 
     const long mc = allMdts.size();
@@ -184,8 +162,6 @@ void MotionParamEstimator::init(
                   << " particles (--min_p) in micrographs with at least 2 particles\n";
     }
 
-    k_out = reference->k_out;
-
     ready = true;
 }
 
@@ -213,17 +189,15 @@ void MotionParamEstimator::run()
     d4Vector opt;
 
     std::cout.setf(std::ios::fixed, std::ios::floatfield);
-    std::cout.precision(6);
+    std::cout.precision(5);
 
     if (estim2)
     {
-        //estimateTwoParamsRec(sV, sD, sA, rV*sV, rD*sD, steps, recursions);
         opt = estimateTwoParamsNM(sV, sD, sA, iniStep, conv, maxIters);
     }
 
     if (estim3)
     {
-        //estimateThreeParamsRec(sV, sD, sA, rV*sV, rD*sD, rA*sA, steps, recursions);
         opt = estimateThreeParamsNM(sV, sD, sA, iniStep, conv, maxIters);
     }
 
@@ -456,7 +430,6 @@ void MotionParamEstimator::prepAlignment()
                     movieCC[p][f] = FilterHelper::cropCorner2D(movieCC[p][f], 2*maxRange, 2*maxRange);
                 }
 
-                //alignmentSet.CCs[g][p][f] = movieCC[p][f];
                 alignmentSet.copyCC(g, p, f, movieCC[p][f]);
 
                 Image<Complex> pred = reference->predict(

@@ -26,11 +26,19 @@ double TwoHyperParameterProblem::f(const std::vector<double>& x, void *tempStora
 
 void TwoHyperParameterProblem::report(int iteration, double cost, const std::vector<double>& x) const
 {
-    d2Vector vd = problemToMotion(x);
-
+    d2Vector vd = problemToMotion(x);	
+	
+	std::cout.precision(5);
+	
     std::cout << iteration << ": \t "
-              << vd[0] << ", \t " << vd[1] << ", \t " << s_acc
-              << " \t " << -cost << "\n";
+              << vd[0] << "  \t " << vd[1] << "  \t " << s_acc
+              << "  \t ";
+	
+	std::cout.precision(12);
+	
+	std::cout << -cost << "\n";
+	
+	std::cout.precision(5);
 }
 
 d2Vector TwoHyperParameterProblem::problemToMotion(const std::vector<double>& x)
