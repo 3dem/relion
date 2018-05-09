@@ -133,32 +133,45 @@ extern std::string current_browse_directory;
 #define TOGGLE_LEAVE_ACTIVE 3
 
 static Fl_Menu_Item fl_sampling_options[] = {
-		      {job_sampling_options[0]},
-		      {job_sampling_options[1]},
-		      {job_sampling_options[2]},
-		      {job_sampling_options[3]},
-		      {job_sampling_options[4]},
-		      {job_sampling_options[5]},
-		      {job_sampling_options[6]},
-		      {job_sampling_options[7]},
-		      {job_sampling_options[8]},
-		      {0} // this should be the last entry
+	{job_sampling_options[0]},
+	{job_sampling_options[1]},
+	{job_sampling_options[2]},
+	{job_sampling_options[3]},
+	{job_sampling_options[4]},
+	{job_sampling_options[5]},
+	{job_sampling_options[6]},
+	{job_sampling_options[7]},
+	{job_sampling_options[8]},
+	{0} // this should be the last entry
 };
 
 static Fl_Menu_Item fl_node_type_options[] = {
-			  {job_nodetype_options[0]},
-			  {job_nodetype_options[1]},
-			  {job_nodetype_options[2]},
-			  {job_nodetype_options[3]},
-			  {job_nodetype_options[4]},
-			  {job_nodetype_options[5]},
-			  {job_nodetype_options[6]},
-			  {job_nodetype_options[7]},
-			  {job_nodetype_options[8]},
-			  {job_nodetype_options[9]},
-		      {0} // this should be the last entry
+	{job_nodetype_options[0]},
+	{job_nodetype_options[1]},
+	{job_nodetype_options[2]},
+	{job_nodetype_options[3]},
+	{job_nodetype_options[4]},
+	{job_nodetype_options[5]},
+	{job_nodetype_options[6]},
+	{job_nodetype_options[7]},
+	{job_nodetype_options[8]},
+	{job_nodetype_options[9]},
+	{0} // this should be the last entry
 };
 
+static Fl_Menu_Item fl_gain_rotation_options[] = {
+	{job_gain_rotation_options[0]},
+	{job_gain_rotation_options[1]},
+	{job_gain_rotation_options[2]},
+	{job_gain_rotation_options[3]},
+	{0} // this should be the last entry
+};
+static Fl_Menu_Item fl_gain_flip_options[] = {
+	{job_gain_flip_options[0]},
+	{job_gain_flip_options[1]},
+	{job_gain_flip_options[2]},
+	{0} // this should be the last entry
+};
 static Fl_Menu_Item bool_options[] = {
 			      {"Yes"},
 			      {"No"},

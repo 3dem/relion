@@ -30,7 +30,7 @@ class image_handler_parameters
 	public:
    	FileName fn_in, fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_mult, fn_div, fn_add, fn_subtract, fn_fsc, fn_adjust_power, fn_correct_ampl, fn_fourfilter;
 	int bin_avg, avg_first, avg_last, edge_x0, edge_xF, edge_y0, edge_yF, filter_edge_width, new_box, minr_ampl_corr;
-    bool do_add_edge, do_flipXY, do_flipmXY, do_flipZ, do_flipX, do_flipY, do_shiftCOM, do_stats, do_calc_com, do_avg_ampl, do_avg_ampl2, do_avg_ampl2_ali, do_average, do_remove_nan;
+	bool do_add_edge, do_flipXY, do_flipmXY, do_flipZ, do_flipX, do_flipY, do_shiftCOM, do_stats, do_calc_com, do_avg_ampl, do_avg_ampl2, do_avg_ampl2_ali, do_average, do_remove_nan;
 	RFLOAT multiply_constant, divide_constant, add_constant, subtract_constant, threshold_above, threshold_below, angpix, new_angpix, lowpass, highpass, logfilter, bfactor, shift_x, shift_y, shift_z, replace_nan, randomize_at;
 	std::string directional;
    	int verb;
@@ -58,77 +58,77 @@ class image_handler_parameters
 		parser.setCommandLine(argc, argv);
 
 		int general_section = parser.addSection("General options");
-	    fn_in = parser.getOption("--i", "Input STAR file, image (.mrc) or movie/stack (.mrcs)");
-	    fn_out = parser.getOption("--o", "Output name (overwrite input if empty; for STAR-input: insert this string before each image's extension)", "");
+		fn_in = parser.getOption("--i", "Input STAR file, image (.mrc) or movie/stack (.mrcs)");
+		fn_out = parser.getOption("--o", "Output name (overwrite input if empty; for STAR-input: insert this string before each image's extension)", "");
 
-	    int cst_section = parser.addSection("image-by-constant operations");
-	    multiply_constant = textToFloat(parser.getOption("--multiply_constant", "Multiply the image(s) pixel values by this constant", "1"));
-	    divide_constant = textToFloat(parser.getOption("--divide_constant", "Divide the image(s) pixel values by this constant", "1"));
-	    add_constant = textToFloat(parser.getOption("--add_constant", "Add this constant to the image(s) pixel values", "0."));
-	    subtract_constant = textToFloat(parser.getOption("--subtract_constant", "Subtract this constant from the image(s) pixel values", "0."));
-	    threshold_above = textToFloat(parser.getOption("--threshold_above", "Set all values higher than this value to this value", "999."));
-	    threshold_below = textToFloat(parser.getOption("--threshold_below", "Set all values lower than this value to this value", "-999."));
+		int cst_section = parser.addSection("image-by-constant operations");
+		multiply_constant = textToFloat(parser.getOption("--multiply_constant", "Multiply the image(s) pixel values by this constant", "1"));
+		divide_constant = textToFloat(parser.getOption("--divide_constant", "Divide the image(s) pixel values by this constant", "1"));
+		add_constant = textToFloat(parser.getOption("--add_constant", "Add this constant to the image(s) pixel values", "0."));
+		subtract_constant = textToFloat(parser.getOption("--subtract_constant", "Subtract this constant from the image(s) pixel values", "0."));
+		threshold_above = textToFloat(parser.getOption("--threshold_above", "Set all values higher than this value to this value", "999."));
+		threshold_below = textToFloat(parser.getOption("--threshold_below", "Set all values lower than this value to this value", "-999."));
 
-	    int img_section = parser.addSection("image-by-image operations");
-	    fn_mult = parser.getOption("--multiply", "Multiply input image(s) by the pixel values in this image", "");
-	    fn_div = parser.getOption("--divide", "Divide input image(s) by the pixel values in this image", "");
-	    fn_add = parser.getOption("--add", "Add the pixel values in this image to the input image(s) ", "");
-	    fn_subtract = parser.getOption("--subtract", "Subtract the pixel values in this image to the input image(s) ", "");
-	    fn_fsc = parser.getOption("--fsc", "Calculate FSC curve of the input image with this image ", "");
-	    fn_adjust_power = parser.getOption("--adjust_power", "Adjust the power spectrum of the input image to be the same as this image ", "");
-	    fn_fourfilter = parser.getOption("--fourier_filter", "Multiply the Fourier transform of the input image(s) with this one image ", "");
+		int img_section = parser.addSection("image-by-image operations");
+		fn_mult = parser.getOption("--multiply", "Multiply input image(s) by the pixel values in this image", "");
+		fn_div = parser.getOption("--divide", "Divide input image(s) by the pixel values in this image", "");
+		fn_add = parser.getOption("--add", "Add the pixel values in this image to the input image(s) ", "");
+		fn_subtract = parser.getOption("--subtract", "Subtract the pixel values in this image to the input image(s) ", "");
+		fn_fsc = parser.getOption("--fsc", "Calculate FSC curve of the input image with this image ", "");
+		fn_adjust_power = parser.getOption("--adjust_power", "Adjust the power spectrum of the input image to be the same as this image ", "");
+		fn_fourfilter = parser.getOption("--fourier_filter", "Multiply the Fourier transform of the input image(s) with this one image ", "");
 
-	    int four_section = parser.addSection("per-image operations");
-	    do_stats = parser.checkOption("--stats", "Calculate per-image statistics?");
-	    do_calc_com = parser.checkOption("--com", "Calculate center of mass?");
-	    bfactor = textToFloat(parser.getOption("--bfactor", "Apply a B-factor (in A^2)", "0."));
-	    lowpass = textToFloat(parser.getOption("--lowpass", "Low-pass filter frequency (in A)", "-1."));
-	    highpass = textToFloat(parser.getOption("--highpass", "High-pass filter frequency (in A)", "-1."));
-	    directional = parser.getOption("--directional", "Directionality of low-pass filter frequency ('X', 'Y' or 'Z', default non-directional)", "");
-	    logfilter = textToFloat(parser.getOption("--LoG", "Sigma for Laplacian of Gaussian filter (in A)", "-1."));
-	    angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in A)", "1."));
-	    new_angpix = textToFloat(parser.getOption("--rescale_angpix", "Scale input image(s) to this new pixel size (in A)", "-1."));
-	    new_box = textToInteger(parser.getOption("--new_box", "Resize the image(s) to this new box size (in pixel) ", "-1"));
-	    filter_edge_width = textToInteger(parser.getOption("--filter_edge_width", "Width of the raised cosine on the low/high-pass filter edge (in resolution shells)", "2"));
-	    do_flipX = parser.checkOption("--flipX", "Flip (mirror) a 2D image or 3D map in the X-direction?");
-	    do_flipY = parser.checkOption("--flipY", "Flip (mirror) a 2D image or 3D map in the Y-direction?");
-	    do_flipZ = parser.checkOption("--flipZ", "Flip (mirror) a 3D map in the Z-direction?");
-	    do_shiftCOM = parser.checkOption("--shift_com", "Shift image(s) to their center-of-mass (only on positive pixel values)");
-	    shift_x = textToFloat(parser.getOption("--shift_x", "Shift images this many pixels in the X-direction", "0."));
-	    shift_y = textToFloat(parser.getOption("--shift_y", "Shift images this many pixels in the Y-direction", "0."));
-	    shift_z = textToFloat(parser.getOption("--shift_z", "Shift images this many pixels in the Z-direction", "0."));
-	    do_avg_ampl = parser.checkOption("--avg_ampl", "Calculate average amplitude spectrum for all images?");
-	    do_avg_ampl2 = parser.checkOption("--avg_ampl2", "Calculate average amplitude spectrum for all images?");
-	    do_avg_ampl2_ali = parser.checkOption("--avg_ampl2_ali", "Calculate average amplitude spectrum for all aligned images?");
-	    do_average = parser.checkOption("--average", "Calculate average of all images (without alignment)");
-	    fn_correct_ampl = parser.getOption("--correct_avg_ampl", "Correct all images with this average amplitude spectrum", "");
-	    minr_ampl_corr = textToInteger(parser.getOption("--minr_ampl_corr", "Minimum radius (in Fourier pixels) to apply average amplitudes", "0"));
-	    do_remove_nan = parser.checkOption("--remove_nan", "Replace non-numerical values (NaN, inf, etc) in the image(s)");
-	    replace_nan = textToFloat(parser.getOption("--replace_nan", "Replace non-numerical values (NaN, inf, etc) with this value", "0"));
-	    randomize_at = textToFloat(parser.getOption("--phase_randomise", "Randomise phases beyond this resolution (in Angstroms)", "-1"));
+		int four_section = parser.addSection("per-image operations");
+		do_stats = parser.checkOption("--stats", "Calculate per-image statistics?");
+		do_calc_com = parser.checkOption("--com", "Calculate center of mass?");
+		bfactor = textToFloat(parser.getOption("--bfactor", "Apply a B-factor (in A^2)", "0."));
+		lowpass = textToFloat(parser.getOption("--lowpass", "Low-pass filter frequency (in A)", "-1."));
+		highpass = textToFloat(parser.getOption("--highpass", "High-pass filter frequency (in A)", "-1."));
+		directional = parser.getOption("--directional", "Directionality of low-pass filter frequency ('X', 'Y' or 'Z', default non-directional)", "");
+		logfilter = textToFloat(parser.getOption("--LoG", "Sigma for Laplacian of Gaussian filter (in A)", "-1."));
+		angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in A)", "1."));
+		new_angpix = textToFloat(parser.getOption("--rescale_angpix", "Scale input image(s) to this new pixel size (in A)", "-1."));
+		new_box = textToInteger(parser.getOption("--new_box", "Resize the image(s) to this new box size (in pixel) ", "-1"));
+		filter_edge_width = textToInteger(parser.getOption("--filter_edge_width", "Width of the raised cosine on the low/high-pass filter edge (in resolution shells)", "2"));
+		do_flipX = parser.checkOption("--flipX", "Flip (mirror) a 2D image or 3D map in the X-direction?");
+		do_flipY = parser.checkOption("--flipY", "Flip (mirror) a 2D image or 3D map in the Y-direction?");
+		do_flipZ = parser.checkOption("--flipZ", "Flip (mirror) a 3D map in the Z-direction?");
+		do_shiftCOM = parser.checkOption("--shift_com", "Shift image(s) to their center-of-mass (only on positive pixel values)");
+		shift_x = textToFloat(parser.getOption("--shift_x", "Shift images this many pixels in the X-direction", "0."));
+		shift_y = textToFloat(parser.getOption("--shift_y", "Shift images this many pixels in the Y-direction", "0."));
+		shift_z = textToFloat(parser.getOption("--shift_z", "Shift images this many pixels in the Z-direction", "0."));
+		do_avg_ampl = parser.checkOption("--avg_ampl", "Calculate average amplitude spectrum for all images?");
+		do_avg_ampl2 = parser.checkOption("--avg_ampl2", "Calculate average amplitude spectrum for all images?");
+		do_avg_ampl2_ali = parser.checkOption("--avg_ampl2_ali", "Calculate average amplitude spectrum for all aligned images?");
+		do_average = parser.checkOption("--average", "Calculate average of all images (without alignment)");
+		fn_correct_ampl = parser.getOption("--correct_avg_ampl", "Correct all images with this average amplitude spectrum", "");
+		minr_ampl_corr = textToInteger(parser.getOption("--minr_ampl_corr", "Minimum radius (in Fourier pixels) to apply average amplitudes", "0"));
+		do_remove_nan = parser.checkOption("--remove_nan", "Replace non-numerical values (NaN, inf, etc) in the image(s)");
+		replace_nan = textToFloat(parser.getOption("--replace_nan", "Replace non-numerical values (NaN, inf, etc) with this value", "0"));
+		randomize_at = textToFloat(parser.getOption("--phase_randomise", "Randomise phases beyond this resolution (in Angstroms)", "-1"));
 
-	    int three_d_section = parser.addSection("3D operations");
-	    fn_sym = parser.getOption("--sym", "Symmetrise 3D map with this point group (e.g. D6)", "");
+		int three_d_section = parser.addSection("3D operations");
+		fn_sym = parser.getOption("--sym", "Symmetrise 3D map with this point group (e.g. D6)", "");
 
-	    int preprocess_section = parser.addSection("2D-micrograph (or movie) operations");
-	    do_flipXY = parser.checkOption("--flipXY", "Flip the image(s) in the XY direction?");
-	    do_flipmXY = parser.checkOption("--flipmXY", "Flip the image(s) image(s)in the -XY direction?");
-	    do_add_edge = parser.checkOption("--add_edge", "Add a barcode-like edge to the micrograph/movie frames?");
-	    edge_x0 = textToInteger(parser.getOption("--edge_x0", "Pixel column to be used for the left edge", "0"));
-	    edge_y0 = textToInteger(parser.getOption("--edge_y0", "Pixel row to be used for the top edge", "0"));
-	    edge_xF = textToInteger(parser.getOption("--edge_xF", "Pixel column to be used for the right edge", "4095"));
-	    edge_yF = textToInteger(parser.getOption("--edge_yF", "Pixel row to be used for the bottom edge", "4095"));
+		int preprocess_section = parser.addSection("2D-micrograph (or movie) operations");
+		do_flipXY = parser.checkOption("--flipXY", "Flip the image(s) in the XY direction?");
+		do_flipmXY = parser.checkOption("--flipmXY", "Flip the image(s) in the -XY direction?");
+		do_add_edge = parser.checkOption("--add_edge", "Add a barcode-like edge to the micrograph/movie frames?");
+		edge_x0 = textToInteger(parser.getOption("--edge_x0", "Pixel column to be used for the left edge", "0"));
+		edge_y0 = textToInteger(parser.getOption("--edge_y0", "Pixel row to be used for the top edge", "0"));
+		edge_xF = textToInteger(parser.getOption("--edge_xF", "Pixel column to be used for the right edge", "4095"));
+		edge_yF = textToInteger(parser.getOption("--edge_yF", "Pixel row to be used for the bottom edge", "4095"));
 
-	    int avg_section = parser.addSection("Movie-frame averaging options");
-       	bin_avg = textToInteger(parser.getOption("--avg_bin", "Width (in frames) for binning average, i.e. of every so-many frames", "-1"));
-    	avg_first = textToInteger(parser.getOption("--avg_first", "First frame to include in averaging", "-1"));
-    	avg_last = textToInteger(parser.getOption("--avg_last", "Last frame to include in averaging", "-1"));
+		int avg_section = parser.addSection("Movie-frame averaging options");
+       		bin_avg = textToInteger(parser.getOption("--avg_bin", "Width (in frames) for binning average, i.e. of every so-many frames", "-1"));
+	    	avg_first = textToInteger(parser.getOption("--avg_first", "First frame to include in averaging", "-1"));
+    		avg_last = textToInteger(parser.getOption("--avg_last", "Last frame to include in averaging", "-1"));
 
-    	// Check for errors in the command-line option
-    	if (parser.checkForErrors())
-    		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
+	    	// Check for errors in the command-line option
+    		if (parser.checkForErrors())
+    			REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 
-    	verb = (do_stats || do_calc_com || fn_fsc !="") ? 0 : 1;
+	    	verb = (do_stats || do_calc_com || fn_fsc !="") ? 0 : 1;
 
 	}
 
@@ -575,33 +575,33 @@ class image_handler_parameters
 					Iop.read(fn_correct_ampl);
 
 					// Calculate by the radial average in the Fourier domain
-				    MultidimArray<RFLOAT> spectrum, count;
-				    spectrum.initZeros(YSIZE(Iop()));
-				    count.initZeros(YSIZE(Iop()));
-				    FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Iop())
-				    {
-				    	long int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
-				        spectrum(idx) += dAkij(Iop(), k, i, j);
-				        count(idx) += 1.;
-				    }
-				    FOR_ALL_ELEMENTS_IN_ARRAY1D(spectrum)
-				    {
-				    	if (A1D_ELEM(count, i) > 0.)
-				    		A1D_ELEM(spectrum, i) /= A1D_ELEM(count, i);
-				    }
-
-				    FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Iop())
+					MultidimArray<RFLOAT> spectrum, count;
+					spectrum.initZeros(YSIZE(Iop()));
+					count.initZeros(YSIZE(Iop()));
+					FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Iop())
 					{
-				    	long int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
-				    	if (idx > minr_ampl_corr)
-				    		dAkij(Iop(), k, i, j) /= spectrum(idx);
-				    	else
-				    		dAkij(Iop(), k, i, j) = 1.;
+						long int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
+						spectrum(idx) += dAkij(Iop(), k, i, j);
+						count(idx) += 1.;
+					}
+					FOR_ALL_ELEMENTS_IN_ARRAY1D(spectrum)
+					{
+						if (A1D_ELEM(count, i) > 0.)
+							A1D_ELEM(spectrum, i) /= A1D_ELEM(count, i);
+					}
+
+					FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Iop())
+					{
+				    		long int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
+					    	if (idx > minr_ampl_corr)
+					    		dAkij(Iop(), k, i, j) /= spectrum(idx);
+					    	else
+					    		dAkij(Iop(), k, i, j) = 1.;
 					}
 					avg_ampl = Iop();
 					Iop.write("test.mrc");
-
 				}
+
 				if (fn_mult != "" || fn_div != "" || fn_add != "" || fn_subtract != "" || fn_fsc != "" || fn_adjust_power != "" ||fn_fourfilter != "")
 					if (XSIZE(Iop()) != xdim || YSIZE(Iop()) != ydim || ZSIZE(Iop()) != zdim)
 						REPORT_ERROR("Error: operate-image is not of the correct size");
@@ -651,9 +651,9 @@ class image_handler_parameters
 					// Apply the actual transformation
 					Matrix2D<RFLOAT> A;
 					rotation2DMatrix(psi, A);
-				    MAT_ELEM(A,0, 2) = xoff;
-				    MAT_ELEM(A,1, 2) = yoff;
-				    selfApplyGeometry(Iin(), A, IS_NOT_INV, DONT_WRAP);
+					MAT_ELEM(A,0, 2) = xoff;
+					MAT_ELEM(A,1, 2) = yoff;
+					selfApplyGeometry(Iin(), A, IS_NOT_INV, DONT_WRAP);
 				}
 
 				MultidimArray<Complex> FT;
@@ -784,19 +784,19 @@ int main(int argc, char *argv[])
 	image_handler_parameters prm;
 
 	try
-    {
+	{
 		prm.read(argc, argv);
 
 		prm.run();
 
-    }
-    catch (RelionError XE)
-    {
-        //prm.usage();
-        std::cerr << XE;
-        exit(1);
-    }
-    return 0;
+	}
+	catch (RelionError XE)
+	{
+        	//prm.usage();
+	        std::cerr << XE;
+        	exit(1);
+	}
+	return 0;
 }
 
 

@@ -116,7 +116,6 @@ int readTIFF(TIFF* ftiff, long int img_select, bool readdata=false, bool isStack
         MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z,(RFLOAT)header->c/header->mz);
     */
 
-
     if (readdata) {
         if (img_select == -1) img_select = 0; // img_select starts from 0
 
@@ -156,7 +155,7 @@ int readTIFF(TIFF* ftiff, long int img_select, bool readdata=false, bool isStack
            In an MRC file, the origin is bottom-left, +X to the right, +Y to the top.
            (c.f. Fig. 2 of Heymann et al, JSB 2005 https://doi.org/10.1016/j.jsb.2005.06.001
                  IMOD's interpretation http://bio3d.colorado.edu/imod/doc/mrc_format.txt)
-           3dmod (from IMOD) and e2display.py (from EMAN2) displays like this.
+           3dmod (from IMOD) and e2display.py (from EMAN2) display like this.
 
            relion_display has the origin at top-left, +X to the right, +Y to the bottom.
            GIMP and ImageJ display in this way as well.
