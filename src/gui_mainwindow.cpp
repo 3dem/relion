@@ -479,7 +479,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
     browse_grp[12]->end();
 
     browse_grp[13] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-	browser->add("Motion refinement");
+	browser->add("Bayesian polishing");
 	gui_jobwindows[13] = new JobWindow();
 	gui_jobwindows[13]->initialise(PROC_MOTIONREFINE, maingui_do_old_style);
     browse_grp[13]->end();

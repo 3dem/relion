@@ -4597,7 +4597,7 @@ bool RelionJob::getCommandsLocalresJob(std::string &outputname, std::vector<std:
 void RelionJob::initialiseMotionrefineJob()
 {
 
-	hidden_name = ".gui_motionrefine";
+	hidden_name = ".gui_bayespolish";
 
 	// I/O
 	joboptions["fn_mic"] = JobOption("Input micrographs:", NODE_MICS,  "", "STAR files (*.star)", "The input STAR file with the micrograph (and their movie metadata) from a MotionCorr job.");

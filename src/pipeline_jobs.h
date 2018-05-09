@@ -134,7 +134,7 @@ static bool do_allow_change_minimum_dedicated;
 #define PROC_MOVIEREFINE_NAME   "MovieRefine"  // Movie-particle extraction and refinement combined
 #define PROC_INIMODEL_NAME		"InitialModel" // De-novo generation of 3D initial model (using SGD)
 #define PROC_MULTIBODY_NAME		"MultiBody"    // Multi-body refinement
-#define PROC_MOTIONREFINE_NAME  "MotionRefine" // Jasenko's motion fitting program (to replace MovieRefine?)
+#define PROC_MOTIONREFINE_NAME  "BayesPolish"  // Jasenko's motion fitting program for Bayesian polishing (to replace MovieRefine?)
 #define PROC_CTFREFINE_NAME     "CtfRefine"    // Jasenko's program for defocus and beamtilt optimisation
 
 #define PROC_IMPORT         0 // Import any file as a Node of a given type
