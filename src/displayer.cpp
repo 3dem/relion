@@ -27,40 +27,40 @@ void DisplayBox::draw()
 	if (!img_data) return;
 
 	short xpos = x() + xoff;
-    short ypos = y() + yoff;
+	short ypos = y() + yoff;
 
-    /* Ensure that the full window is redrawn */
-    //fl_push_clip(x(),y(),w(),h());
+	/* Ensure that the full window is redrawn */
+	//fl_push_clip(x(),y(),w(),h());
 
-    /* Redraw the whole image */
-    fl_draw_image((const uchar *)img_data, xpos, ypos, (short)xsize_data, (short)ysize_data, 1);
-    /* Draw a red rectangle around the particle if it is selected */
-    if (selected == 1)
-        fl_color(FL_RED);
-    else if (selected == 2)
-    	fl_color(FL_GREEN);
-    else if (selected == 3)
-    	fl_color(FL_BLUE);
-    else if (selected == 4)
-    	fl_color(FL_CYAN);
-    else if (selected == 5)
-    	fl_color(FL_MAGENTA);
-    else if (selected == 6)
-    	fl_color(FL_YELLOW);
-    else
-    	fl_color(FL_BLACK);
+	/* Redraw the whole image */
+	fl_draw_image((const uchar *)img_data, xpos, ypos, (short)xsize_data, (short)ysize_data, 1);
+	/* Draw a red rectangle around the particle if it is selected */
+	if (selected == 1)
+		fl_color(FL_RED);
+	else if (selected == 2)
+		fl_color(FL_GREEN);
+	else if (selected == 3)
+		fl_color(FL_BLUE);
+	else if (selected == 4)
+		fl_color(FL_CYAN);
+	else if (selected == 5)
+		fl_color(FL_MAGENTA);
+	else if (selected == 6)
+		fl_color(FL_YELLOW);
+	else
+		fl_color(FL_BLACK);
 
-    fl_line_style(FL_SOLID, 2);
-    int x1 = xpos;
-    int y1 = ypos;
-    int x2 = xpos + xsize_data;
-    int y2 = ypos + ysize_data;
-    fl_line(x1, y1, x1, y2);
-    fl_line(x1, y2, x2, y2);
-    fl_line(x2, y2, x2, y1);
-    fl_line(x2, y1, x1, y1);
+	fl_line_style(FL_SOLID, 2);
+	int x1 = xpos;
+	int y1 = ypos;
+	int x2 = xpos + xsize_data;
+	int y2 = ypos + ysize_data;
+	fl_line(x1, y1, x1, y2);
+	fl_line(x1, y2, x2, y2);
+	fl_line(x2, y2, x2, y1);
+	fl_line(x2, y1, x1, y1);
 
-    //fl_pop_clip();
+	//fl_pop_clip();
 }
 
 void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, int _ipos,
@@ -94,17 +94,17 @@ void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, i
 	RFLOAT range = maxval - minval;
 	RFLOAT step = range / 255; // 8-bit scaling range from 0 to 255
 	RFLOAT* old_ptr=NULL;
-    long int n;
+	long int n;
 
-    // For micrographs use relion-scaling to avoid bias in down-sampled positions
-    // For multi-image viewers, do not use this scaling as it is slower...
-    if (do_relion_scale && ABS(scale - 1.0) > 0.01)
-    	selfScaleToSize(img, xsize_data, ysize_data);
+	// For micrographs use relion-scaling to avoid bias in down-sampled positions
+	// For multi-image viewers, do not use this scaling as it is slower...
+	if (do_relion_scale && ABS(scale - 1.0) > 0.01)
+		selfScaleToSize(img, xsize_data, ysize_data);
 
-    // Use the same nearest-neighbor algorithm as in the copy function of Fl_Image...
-    if (ABS(scale - 1.0) > 0.01 && !do_relion_scale)
-    {
-    	int xmod   = XSIZE(img) % xsize_data;
+	// Use the same nearest-neighbor algorithm as in the copy function of Fl_Image...
+	if (ABS(scale - 1.0) > 0.01 && !do_relion_scale)
+	{
+    		int xmod   = XSIZE(img) % xsize_data;
 		int xstep  = XSIZE(img) / xsize_data;
 		int ymod   = YSIZE(img) % ysize_data;
 		int ystep  = YSIZE(img) / ysize_data;
@@ -135,15 +135,14 @@ void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, i
 			}
 		}
 
-    }
-    else
-    {
-    	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(img, n, old_ptr)
+	}
+	else
+	{
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(img, n, old_ptr)
 		{
-    		img_data[n] = (char)FLOOR((*old_ptr - minval) / step);
+    			img_data[n] = (char)FLOOR((*old_ptr - minval) / step);
 		}
-    }
-
+	}
 }
 
 
@@ -187,14 +186,14 @@ int basisViewerWindow::fillCanvas(int viewer_type, MetaDataTable &MDin, EMDLabel
 		MetaDataTable *_MDdata, int _nr_regroup, bool _do_recenter,  bool _is_data, MetaDataTable *_MDgroups,
 		bool do_allow_save, FileName fn_selected_imgs, FileName fn_selected_parts, int max_nr_parts_per_class)
 {
-    // Scroll bars
-    Fl_Scroll scroll(0, 0, w(), h());
+	// Scroll bars
+	Fl_Scroll scroll(0, 0, w(), h());
 
-    // Pre-set the canvas to the correct size
-    FileName fn_img;
-    Image<RFLOAT> img;
-    MDin.firstObject();
-    MDin.getValue(display_label, fn_img);
+	// Pre-set the canvas to the correct size
+	FileName fn_img;
+	Image<RFLOAT> img;
+	MDin.firstObject();
+	MDin.getValue(display_label, fn_img);
 	img.read(fn_img, false);
 	int nimgs = MDin.numberOfObjects();
 	if (viewer_type == MULTIVIEWER)
@@ -264,8 +263,8 @@ int basisViewerWindow::fillPickerViewerCanvas(MultidimArray<RFLOAT> image, RFLOA
 		RFLOAT _scale, int _particle_radius, bool _do_startend, FileName _fn_coords,
 		FileName _fn_color, FileName _fn_mic, FileName _color_label, RFLOAT _color_blue_value, RFLOAT _color_red_value)
 {
-    // Scroll bars
-    Fl_Scroll scroll(0, 0, w(), h());
+	// Scroll bars
+	Fl_Scroll scroll(0, 0, w(), h());
 	int xsize_canvas = CEIL(XSIZE(image)*_scale);
 	int ysize_canvas = CEIL(YSIZE(image)*_scale);
 	pickerViewerCanvas canvas(0, 0, xsize_canvas, ysize_canvas);
@@ -294,10 +293,10 @@ int basisViewerWindow::fillPickerViewerCanvas(MultidimArray<RFLOAT> image, RFLOA
 
 int basisViewerWindow::fillSingleViewerCanvas(MultidimArray<RFLOAT> image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale)
 {
-    // Scroll bars
-    Fl_Scroll scroll(0, 0, w(), h());
+	// Scroll bars
+	Fl_Scroll scroll(0, 0, w(), h());
 
-    // Pre-set the canvas to the correct size
+	// Pre-set the canvas to the correct size
 	int xsize_canvas = CEIL(XSIZE(image)*_scale);
 	int ysize_canvas = CEIL(YSIZE(image)*_scale);
 	singleViewerCanvas canvas(0, 0, xsize_canvas, ysize_canvas);
@@ -893,19 +892,19 @@ void multiViewerCanvas::showAverage(bool selected, bool show_stddev)
 	{
 		DIRECT_MULTIDIM_ELEM(sum2, n) -=  DIRECT_MULTIDIM_ELEM(sum, n) * DIRECT_MULTIDIM_ELEM(sum, n);
 	}
-    sum2 *= nn / (nn - 1);
+	sum2 *= nn / (nn - 1);
 
-    // Show the average
-    if (show_stddev)
-    {
-        basisViewerWindow stddev(xsize, ysize, "Stddev");
-        stddev.fillSingleViewerCanvas(sum2, 0., 0., 0., 1.); // scale=1 now means: keep same scale as the one in the boxes!!!
-    }
-    else
-    {
-    	basisViewerWindow avg(xsize, ysize, "Average");
-    	avg.fillSingleViewerCanvas(sum, 0., 0., 0., 1.); // scale=1 now means: keep same scale as the one in the boxes!!!
-    }
+	// Show the average
+	if (show_stddev)
+	{
+		basisViewerWindow stddev(xsize, ysize, "Stddev");
+		stddev.fillSingleViewerCanvas(sum2, 0., 0., 0., 1.); // scale=1 now means: keep same scale as the one in the boxes!!!
+	}
+	else
+	{
+	basisViewerWindow avg(xsize, ysize, "Average");
+	avg.fillSingleViewerCanvas(sum, 0., 0., 0., 1.); // scale=1 now means: keep same scale as the one in the boxes!!!
+	}
 
 }
 
@@ -929,15 +928,15 @@ void multiViewerCanvas::showOriginalImage(int ipos)
 	boxes[ipos]->MDimg.getValue(display_label, fn_img);
 	Image<RFLOAT> img;
 	img.read(fn_img);
-    basisViewerWindow win(CEIL(ori_scale*XSIZE(img())), CEIL(ori_scale*YSIZE(img())), fn_img.c_str());
-    if (sigma_contrast > 0.)
-    {
-    	win.fillSingleViewerCanvas(img(), 0., 0., sigma_contrast, ori_scale);
-    }
-    else
-    {
-    	win.fillSingleViewerCanvas(img(), boxes[ipos]->minval, boxes[ipos]->maxval, 0., ori_scale);
-    }
+	basisViewerWindow win(CEIL(ori_scale*XSIZE(img())), CEIL(ori_scale*YSIZE(img())), fn_img.c_str());
+	if (sigma_contrast > 0.)
+	{
+		win.fillSingleViewerCanvas(img(), 0., 0., sigma_contrast, ori_scale);
+	}
+	else
+	{
+		win.fillSingleViewerCanvas(img(), boxes[ipos]->minval, boxes[ipos]->maxval, 0., ori_scale);
+	}
     */
 }
 
@@ -956,9 +955,9 @@ void multiViewerCanvas::showFourierAmplitudes(int ipos)
 	}
 
 	std::string cl = "relion_display  --i " + fn_img + " --scale " + floatToString(ori_scale);
-    if (sigma_contrast > 0.)
-    	cl += " --sigma_contrast " + floatToString(sigma_contrast);
-    cl += " --show_fourier_amplitudes";
+	if (sigma_contrast > 0.)
+    		cl += " --sigma_contrast " + floatToString(sigma_contrast);
+	cl += " --show_fourier_amplitudes";
 	// send job in the background
 	cl += " &";
 
@@ -1231,6 +1230,8 @@ void multiViewerCanvas::saveTrainingSet()
 	copy(fn_img, fn_odir+"/"+fn_img.afterLastOf("/"));
 	fn_iroot = fn_iroot.beforeLastOf("/");
 	fn_img = fn_iroot + "/note.txt";
+	copy(fn_img, fn_odir+"/"+fn_img.afterLastOf("/"));
+	fn_img = fn_iroot + "/run_unmasked_classes.mrcs";
 	copy(fn_img, fn_odir+"/"+fn_img.afterLastOf("/"));
 	fn_img = fn_iroot + "/default_pipeline.star";
 	copy(fn_img, fn_odir+"/"+fn_img.afterLastOf("/"));
@@ -1546,8 +1547,10 @@ void pickerViewerCanvas::draw()
 
 int pickerViewerCanvas::handle(int ev)
 {
-
-	if (ev==FL_PUSH || (ev==FL_DRAG && Fl::event_button() == FL_MIDDLE_MOUSE) )
+	const int button = Fl::event_button() ;
+	const bool with_shift = (Fl::event_shift() != 0);
+	const bool with_control = (Fl::event_ctrl() != 0);
+	if (ev==FL_PUSH || (ev==FL_DRAG && (button == FL_MIDDLE_MOUSE || (button == FL_LEFT_MOUSE && with_shift))))
 	{
 		RFLOAT scale = boxes[0]->scale;
 		int xc = (int)Fl::event_x() - scroll->x() + scroll->hscrollbar.value();
@@ -1555,7 +1558,7 @@ int pickerViewerCanvas::handle(int ev)
 		RFLOAT xcoor = (RFLOAT)ROUND(xc/scale);
 		RFLOAT ycoor = (RFLOAT)ROUND(yc/scale);
 		RFLOAT rad2 = particle_radius*particle_radius/(scale*scale);
-		if (Fl::event_button() == FL_LEFT_MOUSE)
+		if (button == FL_LEFT_MOUSE && !with_shift && !with_control)
 		{
 			// Left mouse for picking
 			// Check the pick is not inside an existing circle
@@ -1601,7 +1604,7 @@ int pickerViewerCanvas::handle(int ev)
 			redraw();
 			return 1;
 		}
-		else if (Fl::event_button() == FL_MIDDLE_MOUSE)
+		else if ((button == FL_MIDDLE_MOUSE) || (button == FL_LEFT_MOUSE && with_shift))
 		{
 			boxes[0]->redraw();
 			// Middle mouse for deleting
@@ -1622,7 +1625,7 @@ int pickerViewerCanvas::handle(int ev)
 			redraw();
 			return 1;
 		}
-		else if (Fl::event_button() == FL_RIGHT_MOUSE)
+		else if ((button == FL_RIGHT_MOUSE) || (button == FL_LEFT_MOUSE && with_control))
 		{
 			redraw();
 			Fl_Menu_Item rclick_menu[] = {
@@ -2041,40 +2044,39 @@ void displayerGuiWindow::readLastSettings()
 }
 void displayerGuiWindow::writeLastSettings()
 {
-    std::ofstream  fh;
-    FileName fn = ".relion_display_gui_settings";
-    fh.open(fn.c_str(), std::ios::out);
-    if (!fh)
-    {
-    	//std::cerr << "Cannot write last settings to file: "<<fn<<std::endl;
-    	return;
-    }
+	std::ofstream  fh;
+	FileName fn = ".relion_display_gui_settings";
+	fh.open(fn.c_str(), std::ios::out);
+	if (!fh)
+	{
+		//std::cerr << "Cannot write last settings to file: "<<fn<<std::endl;
+		return;
+	}
 
-    fh << scale_input->label() << " = " << scale_input->value() << std::endl;
-    fh << black_input->label() << " = " << black_input->value() << std::endl;
-    fh << white_input->label() << " = " << white_input->value() << std::endl;
-    fh << sigma_contrast_input->label() << " = " << sigma_contrast_input->value() << std::endl;
-    if (is_multi)
-    {
-    	fh << col_input->label() << " = " << col_input->value() << std::endl;
-    	fh << ori_scale_input->label() << " = " << ori_scale_input->value() << std::endl;
-    	fh << max_nr_images_input->label() << " = " << max_nr_images_input->value() << std::endl;
-    }
-    else
-    {
-    	fh << lowpass_input->label() << " = " << lowpass_input->value() << std::endl;
-    	fh << highpass_input->label() << " = " << highpass_input->value() << std::endl;
-    	fh << angpix_input->label() << " = " << angpix_input->value() << std::endl;
-    }
+	fh << scale_input->label() << " = " << scale_input->value() << std::endl;
+	fh << black_input->label() << " = " << black_input->value() << std::endl;
+	fh << white_input->label() << " = " << white_input->value() << std::endl;
+	fh << sigma_contrast_input->label() << " = " << sigma_contrast_input->value() << std::endl;
+	if (is_multi)
+	{
+		fh << col_input->label() << " = " << col_input->value() << std::endl;
+		fh << ori_scale_input->label() << " = " << ori_scale_input->value() << std::endl;
+		fh << max_nr_images_input->label() << " = " << max_nr_images_input->value() << std::endl;
+	}
+	else
+	{
+		fh << lowpass_input->label() << " = " << lowpass_input->value() << std::endl;
+		fh << highpass_input->label() << " = " << highpass_input->value() << std::endl;
+		fh << angpix_input->label() << " = " << angpix_input->value() << std::endl;
+	}
 
-    fh.close();
-
+	fh.close();
 }
+
 // Display button call-back functions
 void displayerGuiWindow::cb_display(Fl_Widget* o, void* v) {
-
 	displayerGuiWindow* T=(displayerGuiWindow*)v;
-    T->cb_display_i();
+	T->cb_display_i();
 }
 
 void displayerGuiWindow::cb_display_i()
@@ -2251,97 +2253,97 @@ void Displayer::initialise()
 
 	if (!do_gui && fn_in=="")
 		REPORT_ERROR("Displayer::initialise ERROR: either provide --i or --gui");
-    Fl::visual(FL_RGB);
-    // initialise some static variables
-    has_dragged = false;
-    has_shift = false;
+	Fl::visual(FL_RGB);
+	// initialise some static variables
+	has_dragged = false;
+	has_shift = false;
 
-    if (do_class)
-    {
-    	display_label = EMDL_MLMODEL_REF_IMAGE;
-    	table_name = "model_classes";
-    	FileName fn_data;
-    	if (fn_in.contains("_half1_model.star"))
-    		fn_data = fn_in.without("_half1_model.star") + "_data.star";
-    	else if (fn_in.contains("_half2_model.star"))
-    		fn_data = fn_in.without("_half2_model.star") + "_data.star";
-    	else
-    		fn_data = fn_in.without("_model.star") + "_data.star";
-    	MDdata.read(fn_data);
+	if (do_class)
+	{
+		display_label = EMDL_MLMODEL_REF_IMAGE;
+		table_name = "model_classes";
+		FileName fn_data;
+		if (fn_in.contains("_half1_model.star"))
+			fn_data = fn_in.without("_half1_model.star") + "_data.star";
+		else if (fn_in.contains("_half2_model.star"))
+			fn_data = fn_in.without("_half2_model.star") + "_data.star";
+		else
+			fn_data = fn_in.without("_model.star") + "_data.star";
+		MDdata.read(fn_data);
 
-    	// If regrouping, also read the model_groups table into memory
-    	if (nr_regroups > 0)
-    		MDgroups.read(fn_in, "model_groups");
-    }
+		// If regrouping, also read the model_groups table into memory
+		if (nr_regroups > 0)
+			MDgroups.read(fn_in, "model_groups");
+	}
 
-    // Also allow regrouping on data.star
-    if (fn_in.contains("_data.star") && nr_regroups > 0)
-    {
-    	FileName fn_model;
-    	fn_model = fn_in.without("_data.star") + "_model.star";
-    	bool has_model = false;
-    	if (exists(fn_model))
-    	{
-    		MDgroups.read(fn_model, "model_groups");
-    		has_model = true;
-    	}
-    	else
-    	{
-    		fn_model = fn_in.without("_data.star") + "_half1_model.star";
-    		if (exists(fn_model))
-    		{
-    			MDgroups.read(fn_model, "model_groups");
-    			has_model = true;
-    		}
-    	}
-    	if (!has_model)
-    		std::cout <<" Warning: cannot find model.star file for " << fn_in << " needed for regrouping..." << std::endl;
-
-    }
-
-    // Check if input STAR file contains pixel-size information
-
-    if ((lowpass > 0 || highpass > 0) && angpix < 0)
-    {
-
-		if (fn_in.isStarFile())
+	// Also allow regrouping on data.star
+	if (fn_in.contains("_data.star") && nr_regroups > 0)
+	{
+		FileName fn_model;
+		fn_model = fn_in.without("_data.star") + "_model.star";
+		bool has_model = false;
+		if (exists(fn_model))
 		{
-			MetaDataTable MD;
-			MD.read(fn_in);
-			RFLOAT mag, dstep;
-			if (MD.containsLabel(EMDL_CTF_MAGNIFICATION) && MD.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
-			{
-				MD.goToObject(0);
-				MD.getValue(EMDL_CTF_MAGNIFICATION, mag);
-				MD.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
-				angpix = 10000. * dstep / mag;
-				if (verb > 0)
-					std::cout << " Using pixel size from input STAR file of " << angpix << " Angstroms" << std::endl;
-			}
-			else if (verb > 0 && (lowpass > 0 || highpass > 0))
-			{
-				REPORT_ERROR("Displayer::initialise ERROR: you provided a low- or highpass filter in Angstroms, but the input STAR file does not contain the pixel size. Please provide --angpix.");
-			}
+			MDgroups.read(fn_model, "model_groups");
+			has_model = true;
 		}
 		else
 		{
-			REPORT_ERROR("Displayer::initialise ERROR: you provided a low- or highpass filter in Angstroms, so please also provide --angpix.");
+			fn_model = fn_in.without("_data.star") + "_half1_model.star";
+			if (exists(fn_model))
+			{
+				MDgroups.read(fn_model, "model_groups");
+				has_model = true;
+			}
 		}
-    }
+		if (!has_model)
+			std::cout <<" Warning: cannot find model.star file for " << fn_in << " needed for regrouping..." << std::endl;
 
-    if (show_fourier_amplitudes && show_fourier_phase_angles)
-    	REPORT_ERROR("Displayer::initialise ERROR: cannot display Fourier amplitudes and phase angles at the same time!");
-    if (show_fourier_amplitudes || show_fourier_phase_angles)
-    {
-    	if (do_pick || do_pick_startend)
-    		REPORT_ERROR("Displayer::initialise ERROR: cannot pick particles from Fourier maps!");
-    	if (fn_in.isStarFile())
-    		REPORT_ERROR("Displayer::initialise ERROR: use single 2D image files as input!");
-    	Image<RFLOAT> img;
-    	img.read(fn_in, false); // dont read data yet: only header to get size
-    	if ( (ZSIZE(img()) > 1) || (NSIZE(img()) > 1) )
-    		REPORT_ERROR("Displayer::initialise ERROR: cannot display Fourier maps for 3D images or stacks!");
-    }
+	}
+
+	// Check if input STAR file contains pixel-size information
+
+	if ((lowpass > 0 || highpass > 0) && angpix < 0)
+	{
+
+	    	if (fn_in.isStarFile())
+    		{
+	    		MetaDataTable MD;
+    			MD.read(fn_in);
+    			RFLOAT mag, dstep;
+    			if (MD.containsLabel(EMDL_CTF_MAGNIFICATION) && MD.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
+	    		{
+    				MD.goToObject(0);
+    				MD.getValue(EMDL_CTF_MAGNIFICATION, mag);
+    				MD.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
+	    			angpix = 10000. * dstep / mag;
+    				if (verb > 0)
+    					std::cout << " Using pixel size from input STAR file of " << angpix << " Angstroms" << std::endl;
+	    		}
+    			else if (verb > 0 && (lowpass > 0 || highpass > 0))
+    			{
+    				REPORT_ERROR("Displayer::initialise ERROR: you provided a low- or highpass filter in Angstroms, but the input STAR file does not contain the pixel size. Please provide --angpix.");
+	    		}
+    		}
+	    	else
+    		{
+    			REPORT_ERROR("Displayer::initialise ERROR: you provided a low- or highpass filter in Angstroms, so please also provide --angpix.");
+	    	}
+	}
+
+	if (show_fourier_amplitudes && show_fourier_phase_angles)
+		REPORT_ERROR("Displayer::initialise ERROR: cannot display Fourier amplitudes and phase angles at the same time!");
+	if (show_fourier_amplitudes || show_fourier_phase_angles)
+	{
+		if (do_pick || do_pick_startend)
+			REPORT_ERROR("Displayer::initialise ERROR: cannot pick particles from Fourier maps!");
+		if (fn_in.isStarFile())
+			REPORT_ERROR("Displayer::initialise ERROR: use single 2D image files as input!");
+		Image<RFLOAT> img;
+		img.read(fn_in, false); // dont read data yet: only header to get size
+		if ( (ZSIZE(img()) > 1) || (NSIZE(img()) > 1) )
+			REPORT_ERROR("Displayer::initialise ERROR: cannot display Fourier maps for 3D images or stacks!");
+	}
 
 }
 
@@ -2355,9 +2357,9 @@ int Displayer::runGui()
 		// Perhaps here is better..., then there will be no fn_in yet....
 		// Update entire window each time the entry of the browser changes...
 		Fl_File_Chooser chooser(".",                        // directory
-								"All recognised formats (*.{star,mrc,mrcs})\tSTAR Files (*.star)\tMRC stack (*.mrcs)\tMRC image (*.mrc)\tAll Files (*)*", // filter
-								Fl_File_Chooser::SINGLE,     // chooser type
-								"Choose file to display");        // title
+		                        "All recognised formats (*.{star,mrc,mrcs})\tSTAR Files (*.star)\tMRC stack (*.mrcs)\tMRC image (*.mrc)\tAll Files (*)*", // filter
+		                        Fl_File_Chooser::SINGLE,     // chooser type
+		                        "Choose file to display");        // title
 		chooser.show();
 		// Block until user picks something.
 		while(chooser.shown())
@@ -2441,147 +2443,141 @@ int Displayer::runGui()
 
 int Displayer::run()
 {
-    if (do_gui)
-    {
-    }
-    else if (do_pick || do_pick_startend)
-    {
+	if (do_gui)
+	{
+	}
+	else if (do_pick || do_pick_startend)
+	{
+		Image<RFLOAT> img;
+		img.read(fn_in); // dont read data yet: only header to get size
 
-        Image<RFLOAT> img;
-        img.read(fn_in); // dont read data yet: only header to get size
+		if (lowpass > 0.)
+			lowPassFilterMap(img(), lowpass, angpix);
+		if (highpass > 0.)
+			highPassFilterMap(img(), highpass, angpix, 25); // use a rather soft high-pass edge of 25 pixels wide
+		basisViewerWindow win(CEIL(scale*XSIZE(img())), CEIL(scale*YSIZE(img())), fn_in.c_str());
+		if (fn_coords=="")
+			fn_coords = fn_in.withoutExtension()+"_coords.star";
+		win.fillPickerViewerCanvas(img(), minval, maxval, sigma_contrast, scale, ROUND(scale*particle_radius), do_pick_startend, fn_coords,
+    		fn_color, fn_in, color_label, color_blue_value, color_red_value);
+	}
+	else if (fn_in.isStarFile())
+	{
+		MDin.read(fn_in, table_name);
+		// Check that label to display is present in the table
+		if (!MDin.containsLabel(display_label))
+			REPORT_ERROR("Cannot find metadata label in input STAR file");
 
-        if (lowpass > 0.)
-        	lowPassFilterMap(img(), lowpass, angpix);
-        if (highpass > 0.)
-        	highPassFilterMap(img(), highpass, angpix, 25); // use a rather soft high-pass edge of 25 pixels wide
-        basisViewerWindow win(CEIL(scale*XSIZE(img())), CEIL(scale*YSIZE(img())), fn_in.c_str());
-        if (fn_coords=="")
-            fn_coords = fn_in.withoutExtension()+"_coords.star";
-        win.fillPickerViewerCanvas(img(), minval, maxval, sigma_contrast, scale, ROUND(scale*particle_radius), do_pick_startend, fn_coords,
-        		fn_color, fn_in, color_label, color_blue_value, color_red_value);
-    }
-
-    else if (fn_in.isStarFile())
-    {
-        MDin.read(fn_in, table_name);
-        // Check that label to display is present in the table
-        if (!MDin.containsLabel(display_label))
-        	REPORT_ERROR("Cannot find metadata label in input STAR file");
-
-        // Store class number in metadata table
-        if (do_class)
-        {
+		// Store class number in metadata table
+		if (do_class)
+		{
 			int iclass = 0;
 			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
 			{
-        		iclass++; // start counting at 1
-        		MDin.setValue(EMDL_PARTICLE_CLASS, iclass);
-        	}
-        }
+				iclass++; // start counting at 1
+				MDin.setValue(EMDL_PARTICLE_CLASS, iclass);
+			}
+		}
 
-        if (sort_label != EMDL_UNDEFINED || random_sort)
-        {
-        	MDin.sort(sort_label, reverse_sort, true, random_sort); // true means only store sorted_idx!
-        	// When sorting: never read in the whole stacks!
-        	do_read_whole_stacks = false;
-        }
+		if (sort_label != EMDL_UNDEFINED || random_sort)
+		{
+			MDin.sort(sort_label, reverse_sort, true, random_sort); // true means only store sorted_idx!
+			// When sorting: never read in the whole stacks!
+			do_read_whole_stacks = false;
+		}
 
-        basisViewerWindow win(MULTIVIEW_WINDOW_WIDTH, MULTIVIEW_WINDOW_HEIGHT, fn_in.c_str());
-        if((lowpass>0 || highpass>0) && angpix>0)
-        	win.fillCanvas(MULTIVIEWER, MDin, display_label, do_read_whole_stacks, do_apply_orient, minval, maxval, sigma_contrast, scale, ori_scale, ncol,
-        		max_nr_images,  lowpass/angpix, highpass/angpix, do_class, &MDdata, nr_regroups, do_recenter, fn_in.contains("_data.star"), &MDgroups,
-				do_allow_save, fn_selected_imgs, fn_selected_parts, max_nr_parts_per_class);
-        else
-        	win.fillCanvas(MULTIVIEWER, MDin, display_label, do_read_whole_stacks, do_apply_orient, minval, maxval, sigma_contrast, scale, ori_scale, ncol,
-        		max_nr_images, -1, -1, do_class, &MDdata, nr_regroups, do_recenter, fn_in.contains("_data.star"), &MDgroups,
-				do_allow_save, fn_selected_imgs, fn_selected_parts, max_nr_parts_per_class);
-    }
-    else
-    {
-        // Attempt to read a single-file image
-        Image<RFLOAT> img;
-        img.read(fn_in, false); // dont read data yet: only header to get size
+		basisViewerWindow win(MULTIVIEW_WINDOW_WIDTH, MULTIVIEW_WINDOW_HEIGHT, fn_in.c_str());
+		if ((lowpass>0 || highpass>0) && angpix>0)
+			win.fillCanvas(MULTIVIEWER, MDin, display_label, do_read_whole_stacks, do_apply_orient, minval, maxval, sigma_contrast, scale, ori_scale, ncol,
+			               max_nr_images,  lowpass/angpix, highpass/angpix, do_class, &MDdata, nr_regroups, do_recenter, fn_in.contains("_data.star"), &MDgroups,
+		                       do_allow_save, fn_selected_imgs, fn_selected_parts, max_nr_parts_per_class);
+		else
+			win.fillCanvas(MULTIVIEWER, MDin, display_label, do_read_whole_stacks, do_apply_orient, minval, maxval, sigma_contrast, scale, ori_scale, ncol,
+			               max_nr_images, -1, -1, do_class, &MDdata, nr_regroups, do_recenter, fn_in.contains("_data.star"), &MDgroups,
+			               do_allow_save, fn_selected_imgs, fn_selected_parts, max_nr_parts_per_class);
+	}
+	else
+	{
+		// Attempt to read a single-file image
+		Image<RFLOAT> img;
+		img.read(fn_in, false); // dont read data yet: only header to get size
 
-        MDin.clear();
-        // display stacks
-        if (NSIZE(img()) > 1)
-        {
-        	for (int n = 0; n < NSIZE(img()); n++)
-        	{
-        		FileName fn_tmp;
-        		fn_tmp.compose(n+1,fn_in);
-        		MDin.addObject();
-        		MDin.setValue(EMDL_IMAGE_NAME, fn_tmp);
-        	}
-            basisViewerWindow win(MULTIVIEW_WINDOW_WIDTH, MULTIVIEW_WINDOW_HEIGHT, fn_in.c_str());
-            if((lowpass>0 || highpass>0) && angpix>0)
-            	win.fillCanvas(MULTIVIEWER, MDin, EMDL_IMAGE_NAME, true, false, minval, maxval, sigma_contrast, scale, ori_scale, ncol, max_nr_images, lowpass/angpix, highpass/angpix);
-            else
-            	win.fillCanvas(MULTIVIEWER, MDin, EMDL_IMAGE_NAME, true, false, minval, maxval, sigma_contrast, scale, ori_scale, ncol, max_nr_images);
-        }
-        else if (ZSIZE(img()) > 1)
-        {
+		MDin.clear();
+		// display stacks
+		if (NSIZE(img()) > 1)
+		{
+			for (int n = 0; n < NSIZE(img()); n++)
+			{
+				FileName fn_tmp;
+				fn_tmp.compose(n+1,fn_in);
+				MDin.addObject();
+				MDin.setValue(EMDL_IMAGE_NAME, fn_tmp);
+			}
+			basisViewerWindow win(MULTIVIEW_WINDOW_WIDTH, MULTIVIEW_WINDOW_HEIGHT, fn_in.c_str());
+			if ((lowpass>0 || highpass>0) && angpix>0)
+				win.fillCanvas(MULTIVIEWER, MDin, EMDL_IMAGE_NAME, true, false, minval, maxval, sigma_contrast, scale, ori_scale, ncol, max_nr_images, lowpass/angpix, highpass/angpix);
+			else
+				win.fillCanvas(MULTIVIEWER, MDin, EMDL_IMAGE_NAME, true, false, minval, maxval, sigma_contrast, scale, ori_scale, ncol, max_nr_images);
+		}
+		else if (ZSIZE(img()) > 1)
+		{
 
-        	// Read volume slices from .mrc as if it were a .mrcs stack and then use normal slice viewer
-        	// This will not work for Spider volumes...
-        	if (fn_in.getFileFormat() != "mrc")
-        		REPORT_ERROR("Displayer::run() ERROR: only MRC maps are allowed...");
+			// Read volume slices from .mrc as if it were a .mrcs stack and then use normal slice viewer
+			// This will not work for Spider volumes...
+			if (fn_in.getFileFormat() != "mrc")
+				REPORT_ERROR("Displayer::run() ERROR: only MRC maps are allowed...");
 
-        	// Use a single minval and maxval for all slice
-        	if (minval == maxval)
-        	{
-        		Image<RFLOAT> It;
-        		It.read(fn_in);
-        		It().computeDoubleMinMax(minval, maxval);
-        	}
+			// Use a single minval and maxval for all slice
+			if (minval == maxval)
+			{
+				Image<RFLOAT> It;
+				It.read(fn_in);
+				It().computeDoubleMinMax(minval, maxval);
+			}
 
-        	// Trick MD with :mrcs extension....
-        	for (int n = 0; n < ZSIZE(img()); n++)
-        	{
-        		FileName fn_tmp;
-        		fn_tmp.compose(n+1,fn_in);
-        		fn_tmp += ":mrcs";
-        		MDin.addObject();
-        		MDin.setValue(EMDL_IMAGE_NAME, fn_tmp);
-        	}
+			// Trick MD with :mrcs extension....
+			for (int n = 0; n < ZSIZE(img()); n++)
+			{
+				FileName fn_tmp;
+				fn_tmp.compose(n+1,fn_in);
+				fn_tmp += ":mrcs";
+				MDin.addObject();
+				MDin.setValue(EMDL_IMAGE_NAME, fn_tmp);
+			}
 
-            basisViewerWindow win(MULTIVIEW_WINDOW_WIDTH, MULTIVIEW_WINDOW_HEIGHT, fn_in.c_str());
-            win.fillCanvas(MULTIVIEWER, MDin, EMDL_IMAGE_NAME, true, false, minval, maxval, sigma_contrast, scale, ori_scale, ncol, max_nr_images);
-        }
-        else
-        {
-        	img.read(fn_in); // now read image data as well (not only header)
+			basisViewerWindow win(MULTIVIEW_WINDOW_WIDTH, MULTIVIEW_WINDOW_HEIGHT, fn_in.c_str());
+			win.fillCanvas(MULTIVIEWER, MDin, EMDL_IMAGE_NAME, true, false, minval, maxval, sigma_contrast, scale, ori_scale, ncol, max_nr_images);
+		}
+		else
+		{
+			img.read(fn_in); // now read image data as well (not only header)
 
-            if (lowpass > 0.)
-            	lowPassFilterMap(img(), lowpass, angpix);
-            if (highpass > 0.)
-            	highPassFilterMap(img(), highpass, angpix);
+			if (lowpass > 0.)
+				lowPassFilterMap(img(), lowpass, angpix);
+			if (highpass > 0.)
+				highPassFilterMap(img(), highpass, angpix);
 
-            MDin.addObject();
-            MDin.setValue(EMDL_IMAGE_NAME, fn_in);
-            RFLOAT new_scale = scale;
-            if (show_fourier_amplitudes || show_fourier_phase_angles)
-            	new_scale *= 2.;
-            basisViewerWindow win(CEIL(new_scale*XSIZE(img())), CEIL(new_scale*YSIZE(img())), fn_in.c_str());
-            if (show_fourier_amplitudes)
-            {
-            	amplitudeOrPhaseMap(img(), img(), AMPLITUDE_MAP);
-            	win.fillSingleViewerCanvas(img(), minval, maxval, sigma_contrast, scale);
-            }
-            else if (show_fourier_phase_angles)
-            {
-            	amplitudeOrPhaseMap(img(), img(), PHASE_MAP);
-            	win.fillSingleViewerCanvas(img(), -180., 180., 0., scale);
-            }
-            else
-            {
-                win.fillSingleViewerCanvas(img(), minval, maxval, sigma_contrast, scale);
-            }
-        }
-
-    }
-
-
-
+			MDin.addObject();
+			MDin.setValue(EMDL_IMAGE_NAME, fn_in);
+			RFLOAT new_scale = scale;
+			if (show_fourier_amplitudes || show_fourier_phase_angles)
+				new_scale *= 2.;
+			basisViewerWindow win(CEIL(new_scale*XSIZE(img())), CEIL(new_scale*YSIZE(img())), fn_in.c_str());
+			if (show_fourier_amplitudes)
+			{
+				amplitudeOrPhaseMap(img(), img(), AMPLITUDE_MAP);
+				win.fillSingleViewerCanvas(img(), minval, maxval, sigma_contrast, scale);
+			}
+			else if (show_fourier_phase_angles)
+			{
+				amplitudeOrPhaseMap(img(), img(), PHASE_MAP);
+				win.fillSingleViewerCanvas(img(), -180., 180., 0., scale);
+			}
+			else
+			{
+				win.fillSingleViewerCanvas(img(), minval, maxval, sigma_contrast, scale);
+			}
+		}
+	}
 }
 

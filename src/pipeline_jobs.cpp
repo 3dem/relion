@@ -133,11 +133,17 @@ JobOption::JobOption(std::string _label, int _radio_menu, int ioption,  std::str
 		defaultval = std::string(job_sampling_options[ioption]);
 	else if (radio_menu == RADIO_NODETYPE)
 		defaultval = std::string(job_nodetype_options[ioption]);
-	else
+	else if (radio_menu == RADIO_GAIN_ROTATION)
+		defaultval = std::string(job_gain_rotation_options[ioption]);
+	else if (radio_menu == RADIO_GAIN_FLIP)
+		defaultval = std::string(job_gain_flip_options[ioption]);
+	else {
+		std::cout << "Debug: radio_menu == " << radio_menu << std::endl;
 		REPORT_ERROR("BUG: unrecognised radio_menu type");
+	}
+
 	initialise(_label, defaultval, _helptext);
 	joboption_type = JOBOPTION_RADIO;
-
 }
 
 // Boolean constructor
@@ -210,11 +216,11 @@ bool JobOption::getBoolean()
 
 bool JobOption::readValue(std::ifstream& in)
 {
-    if (label != "")
-    {
+	if (label != "")
+	{
 		// Start reading the ifstream at the top
 		in.clear(); // reset eof if happened...
-    	in.seekg(0, std::ios::beg);
+		in.seekg(0, std::ios::beg);
 		std::string line;
 		while (getline(in, line, '\n'))
 		{
@@ -226,8 +232,8 @@ bool JobOption::readValue(std::ifstream& in)
 				return true;
 			}
 		}
-    }
-    return false;
+	}
+	return false;
 }
 
 void JobOption::writeValue(std::ostream& out)
@@ -273,87 +279,87 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 
 	std::ifstream fh;
 	fh.open((myfilename+"run.job").c_str(), std::ios_base::in);
-    if (fh.fail())
-    	return false;
-    else
-    {
-		std::string line;
+	if (fh.fail())
+		return false;
+	else
+	{
+	    	std::string line;
 
-		// Get job type from first line
-		getline(fh, line, '\n');
-		size_t idx = line.find("==");
-		idx++;
-        // TMP to maintain backwards compatibility with a temporary development version towards 3.0....
+    		// Get job type from first line
+	    	getline(fh, line, '\n');
+    		size_t idx = line.find("==");
+	    	idx++;
+		// TMP to maintain backwards compatibility with a temporary development version towards 3.0....
 		std::string typestring = simplify((line.substr(idx+1,line.length()-idx)).c_str());
 		if (typestring == PROC_IMPORT_NAME)
-                type = PROC_IMPORT;
-        else if (typestring == PROC_MOTIONCORR_NAME)
-                type = PROC_MOTIONCORR;
-        else if (typestring == PROC_CTFFIND_NAME)
-                type = PROC_CTFFIND;
-        else if (typestring == PROC_MANUALPICK_NAME)
-                type = PROC_MANUALPICK;
-        else if (typestring == PROC_AUTOPICK_NAME)
-                type = PROC_AUTOPICK;
-        else if (typestring == PROC_EXTRACT_NAME)
-                type = PROC_EXTRACT;
-        else if (typestring == PROC_SORT_NAME)
-                type = PROC_SORT;
-        else if (typestring == PROC_CLASSSELECT_NAME)
-                type = PROC_CLASSSELECT;
-        else if (typestring == PROC_2DCLASS_NAME)
-                type = PROC_2DCLASS;
-        else if (typestring == PROC_3DCLASS_NAME)
-                type = PROC_3DCLASS;
-        else if (typestring == PROC_3DAUTO_NAME)
-                type = PROC_3DAUTO;
-        else if (typestring == PROC_MULTIBODY_NAME)
-                type = PROC_MULTIBODY;
-        else if (typestring == PROC_POLISH_NAME)
-                type = PROC_POLISH;
-        else if (typestring == PROC_MASKCREATE_NAME)
-                type = PROC_MASKCREATE;
-        else if (typestring == PROC_JOINSTAR_NAME)
-                type = PROC_JOINSTAR;
-        else if (typestring == PROC_SUBTRACT_NAME)
-                type = PROC_SUBTRACT;
-        else if (typestring == PROC_POST_NAME)
-                type = PROC_POST;
-        else if (typestring == PROC_RESMAP_NAME)
-                type = PROC_RESMAP;
-        else if (typestring == PROC_MOVIEREFINE_NAME)
-                type = PROC_MOVIEREFINE;
-        else if (typestring == PROC_INIMODEL_NAME)
-                type = PROC_INIMODEL;
-        else if (typestring == PROC_MOTIONREFINE_NAME)
-                type = PROC_MOTIONREFINE;
-        else if (typestring == PROC_CTFREFINE_NAME)
-                type = PROC_CTFREFINE;
-        else
-        	type = (int)textToFloat((line.substr(idx+1,line.length()-idx)).c_str());
-        // Just check that went OK
-        if (type != PROC_IMPORT &&
-				type != PROC_MOTIONCORR &&
-				type != PROC_CTFFIND &&
-				type != PROC_MANUALPICK &&
-				type != PROC_AUTOPICK &&
-				type != PROC_EXTRACT &&
-				type != PROC_SORT &&
-				type != PROC_CLASSSELECT &&
-				type != PROC_2DCLASS &&
-				type != PROC_3DCLASS &&
-				type != PROC_3DAUTO &&
-				type != PROC_MULTIBODY &&
-				type != PROC_POLISH &&
-				type != PROC_MASKCREATE &&
-				type != PROC_JOINSTAR &&
-				type != PROC_SUBTRACT &&
-				type != PROC_POST &&
-				type != PROC_RESMAP &&
-				type != PROC_MOVIEREFINE &&
-				type != PROC_INIMODEL &&
-				type != PROC_MOTIONREFINE &&
-				type != PROC_CTFREFINE)
+			type = PROC_IMPORT;
+		else if (typestring == PROC_MOTIONCORR_NAME)
+			type = PROC_MOTIONCORR;
+		else if (typestring == PROC_CTFFIND_NAME)
+			type = PROC_CTFFIND;
+		else if (typestring == PROC_MANUALPICK_NAME)
+			type = PROC_MANUALPICK;
+		else if (typestring == PROC_AUTOPICK_NAME)
+			type = PROC_AUTOPICK;
+		else if (typestring == PROC_EXTRACT_NAME)
+			type = PROC_EXTRACT;
+		else if (typestring == PROC_SORT_NAME)
+			type = PROC_SORT;
+		else if (typestring == PROC_CLASSSELECT_NAME)
+			type = PROC_CLASSSELECT;
+		else if (typestring == PROC_2DCLASS_NAME)
+			type = PROC_2DCLASS;
+		else if (typestring == PROC_3DCLASS_NAME)
+			type = PROC_3DCLASS;
+		else if (typestring == PROC_3DAUTO_NAME)
+			type = PROC_3DAUTO;
+		else if (typestring == PROC_MULTIBODY_NAME)
+			type = PROC_MULTIBODY;
+		else if (typestring == PROC_POLISH_NAME)
+			type = PROC_POLISH;
+		else if (typestring == PROC_MASKCREATE_NAME)
+			type = PROC_MASKCREATE;
+		else if (typestring == PROC_JOINSTAR_NAME)
+		type = PROC_JOINSTAR;
+		else if (typestring == PROC_SUBTRACT_NAME)
+			type = PROC_SUBTRACT;
+		else if (typestring == PROC_POST_NAME)
+			type = PROC_POST;
+		else if (typestring == PROC_RESMAP_NAME)
+			type = PROC_RESMAP;
+		else if (typestring == PROC_MOVIEREFINE_NAME)
+			type = PROC_MOVIEREFINE;
+		else if (typestring == PROC_INIMODEL_NAME)
+			type = PROC_INIMODEL;
+		else if (typestring == PROC_MOTIONREFINE_NAME)
+			type = PROC_MOTIONREFINE;
+		else if (typestring == PROC_CTFREFINE_NAME)
+			type = PROC_CTFREFINE;
+		else
+			type = (int)textToFloat((line.substr(idx+1,line.length()-idx)).c_str());
+		// Just check that went OK
+		if (type != PROC_IMPORT &&
+		    type != PROC_MOTIONCORR &&
+		    type != PROC_CTFFIND &&
+		    type != PROC_MANUALPICK &&
+		    type != PROC_AUTOPICK &&
+		    type != PROC_EXTRACT &&
+		    type != PROC_SORT &&
+		    type != PROC_CLASSSELECT &&
+		    type != PROC_2DCLASS &&
+		    type != PROC_3DCLASS &&
+		    type != PROC_3DAUTO &&
+		    type != PROC_MULTIBODY &&
+		    type != PROC_POLISH &&
+		    type != PROC_MASKCREATE &&
+		    type != PROC_JOINSTAR &&
+		    type != PROC_SUBTRACT &&
+		    type != PROC_POST &&
+		    type != PROC_RESMAP &&
+		    type != PROC_MOVIEREFINE &&
+		    type != PROC_INIMODEL &&
+		    type != PROC_MOTIONREFINE &&
+		    type != PROC_CTFREFINE)
 			REPORT_ERROR("ERROR: cannot find correct job type in " + myfilename + "run.job, with type= " + integerToString(type));
 
 		// Get is_continue from second line
@@ -376,7 +382,7 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 		}
 
 		return read_all;
-    }
+	}
 
 	fh.close();
 
@@ -389,26 +395,24 @@ void RelionJob::write(std::string fn)
 
 	std::ofstream fh;
 	fh.open((myfilename+"run.job").c_str(), std::ios::out);
-    if (!fh)
-    	REPORT_ERROR("ERROR: Cannot write to file: " + myfilename + "run.job");
+	if (!fh)
+		REPORT_ERROR("ERROR: Cannot write to file: " + myfilename + "run.job");
 
-    // Write the job type
-    fh << "job_type == " << type << std::endl;
+	// Write the job type
+	fh << "job_type == " << type << std::endl;
 
-    // is_continue flag
-    if (is_continue)
-    	fh << "is_continue == true" << std::endl;
-    else
-    	fh << "is_continue == false" << std::endl;
+	// is_continue flag
+	if (is_continue)
+		fh << "is_continue == true" << std::endl;
+	else
+		fh << "is_continue == false" << std::endl;
 
-    for (std::map<std::string,JobOption>::iterator it=joboptions.begin(); it!=joboptions.end(); ++it)
+	for (std::map<std::string,JobOption>::iterator it=joboptions.begin(); it!=joboptions.end(); ++it)
 	{
 		(it->second).writeValue(fh);
 	}
 
 	fh.close();
-
-
 }
 
 bool RelionJob::saveJobSubmissionScript(std::string newfilename, std::string outputname, std::vector<std::string> commands, std::string &error_message)
@@ -422,33 +426,33 @@ bool RelionJob::saveJobSubmissionScript(std::string newfilename, std::string out
 	std::ifstream fh;
 	fh.open(fn_qsub.c_str(), std::ios_base::in);
 	fo.open(newfilename.c_str(), std::ios::out);
-    if (fh.fail())
-    {
-    	error_message = "Error reading template submission script in: " + fn_qsub;
-    	return false;
-    }
-    else if (fo.fail())
-    {
-    	error_message = "Error writing to job submission script in: " + newfilename;
-    	return false;
-    }
-    else
-    {
-    	int nmpi = (joboptions.find("nr_mpi") != joboptions.end()) ? joboptions["nr_mpi"].getNumber() : 1;
-    	int nthr = (joboptions.find("nr_threads") != joboptions.end()) ? joboptions["nr_threads"].getNumber() : 1;
-    	int ncores = nmpi * nthr;
-    	int ndedi = joboptions["min_dedicated"].getNumber();
-    	float fnodes = (float)ncores / (float)ndedi;
-    	int nnodes = CEIL(fnodes);
-    	if (fmod(fnodes, 1) > 0)
-    	{
-    		std:: cout << std::endl;
-    		std::cout << " Warning! You're using " << nmpi << " MPI processes with " << nthr << " threads each (i.e. " << ncores << " cores), while asking for " << nnodes << " nodes with " << ndedi << " cores." << std::endl;
-    		std::cout << " It is more efficient to make the number of cores (i.e. mpi*threads) a multiple of the minimum number of dedicated cores per node " << std::endl;
-    	}
+	if (fh.fail())
+	{
+		error_message = "Error reading template submission script in: " + fn_qsub;
+		return false;
+	}
+	else if (fo.fail())
+	{
+		error_message = "Error writing to job submission script in: " + newfilename;
+		return false;
+	}
+	else
+	{
+		int nmpi = (joboptions.find("nr_mpi") != joboptions.end()) ? joboptions["nr_mpi"].getNumber() : 1;
+		int nthr = (joboptions.find("nr_threads") != joboptions.end()) ? joboptions["nr_threads"].getNumber() : 1;
+		int ncores = nmpi * nthr;
+		int ndedi = joboptions["min_dedicated"].getNumber();
+		float fnodes = (float)ncores / (float)ndedi;
+		int nnodes = CEIL(fnodes);
+		if (fmod(fnodes, 1) > 0)
+		{
+			std:: cout << std::endl;
+			std::cout << " Warning! You're using " << nmpi << " MPI processes with " << nthr << " threads each (i.e. " << ncores << " cores), while asking for " << nnodes << " nodes with " << ndedi << " cores." << std::endl;
+			std::cout << " It is more efficient to make the number of cores (i.e. mpi*threads) a multiple of the minimum number of dedicated cores per node " << std::endl;
+		}
 
 		fh.clear(); // reset eof if happened...
-    	fh.seekg(0, std::ios::beg);
+		fh.seekg(0, std::ios::beg);
 		std::string line;
 		std::map<std::string, std::string> replacing;
 		replacing["XXXmpinodesXXX"] = floatToString(nmpi);
@@ -516,9 +520,9 @@ bool RelionJob::saveJobSubmissionScript(std::string newfilename, std::string out
 
 		fo << std::endl;
 
-    	fo.close();
+		fo.close();
 		fh.close();
-    }
+	}
 
 	return true;
 
@@ -743,13 +747,13 @@ void RelionJob::initialise(int _job_type)
 		joboptions["nr_threads"] = JobOption("Number of threads:", 1, 1, 16, 1, "Number of shared-memory (POSIX) threads to use in parallel. \
 		When set to 1, no multi-threading will be used. Multi-threading is often useful in 3D refinements to have more memory. 2D class averaging often proceeds more efficiently without threads.");
 
-    joboptions["do_queue"] = JobOption("Submit to queue?", false, "If set to Yes, the job will be submit to a queue, otherwise \
+	joboptions["do_queue"] = JobOption("Submit to queue?", false, "If set to Yes, the job will be submit to a queue, otherwise \
 the job will be executed locally. Note that only MPI jobs may be sent to a queue.");
 
-    // Need the std::string(), as otherwise it will be overloaded and passed as a boolean....
-    joboptions["queuename"] = JobOption("Queue name: ", std::string("openmpi"), "Name of the queue to which to submit the job.");
+	// Need the std::string(), as otherwise it will be overloaded and passed as a boolean....
+	joboptions["queuename"] = JobOption("Queue name: ", std::string("openmpi"), "Name of the queue to which to submit the job.");
 
-    joboptions["qsub"] = JobOption("Queue submit command:", std::string("qsub"), "Name of the command used to submit scripts to the queue, e.g. qsub or bsub.\n\n\
+	joboptions["qsub"] = JobOption("Queue submit command:", std::string("qsub"), "Name of the command used to submit scripts to the queue, e.g. qsub or bsub.\n\n\
 Note that the person who installed RELION should have made a custom script for your cluster/queue setup. Check this is the case \
 (or create your own script following the RELION WIKI) if you have trouble submitting jobs.");
 
@@ -778,12 +782,12 @@ Any occurrences of XXXextra2XXX will be changed by this value.");
 
 	// Check for environment variable RELION_QSUB_TEMPLATE
 	char * default_location = getenv ("RELION_QSUB_TEMPLATE");
+	char mydefault[]=DEFAULTQSUBLOCATION;
 	if (default_location==NULL)
 	{
-		char mydefault[]=DEFAULTQSUBLOCATION;
 		default_location=mydefault;
 	}
-    joboptions["qsubscript"] = JobOption("Standard submission script:", std::string(default_location), "Script Files (*.{csh,sh,bash,script})", ".",
+	joboptions["qsubscript"] = JobOption("Standard submission script:", std::string(default_location), "Script Files (*.{csh,sh,bash,script})", ".",
 "The template for your standard queue job submission script. \
 Its default location may be changed by setting the environment variable RELION_QSUB_TEMPLATE. \
 In the template script a number of variables will be replaced: \n \
@@ -1107,20 +1111,25 @@ void RelionJob::initialiseMotioncorrJob()
 	joboptions["group_frames"] = JobOption("Group frames:", 1, 1, 5, 1, "Average together this many frames before calculating the beam-induced shifts.");
 	joboptions["bin_factor"] = JobOption("Binning factor:", 1, 1, 2, 1, "Bin the micrographs this much by a windowing operation in the Fourier Tranform. Binning at this level is hard to un-do later on, but may be useful to down-scale super-resolution images. Float-values may be used. Do make sure though that the resulting micrograph size is even.");
 	joboptions["fn_gain_ref"] = JobOption("Gain-reference image:", "", "*.mrc", ".", "Location of the gain-reference file to be applied to the input micrographs. Leave this empty if the movies are already gain-corrected.");
+	joboptions["gain_rot"] = JobOption("Gain rotation:", RADIO_GAIN_ROTATION, 0, "Rotate the gain reference by this number times 90 degrees clockwise in relion_display. This is the same as -RotGain in MotionCor2. Note that MotionCor2 uses a different convention for rotation so it says 'counter-clockwise'. Valid values are 0, 1, 2 and 3.");
+	joboptions["gain_flip"] = JobOption("Gain flip:", RADIO_GAIN_FLIP, 0, "Flip the gain reference after rotation. This is the same as -FlipGain in MotionCor2. 0 means do nothing, 1 means flip Y (upside down) and 2 means flip X (left to right).");
 
 	// UCSF-wrapper
-	joboptions["do_own_motioncor"] = JobOption("Use RELION's own implementation?", true ,"If set to Yes, use RELION's own implementation of a MotionCor2-like algorithm by Takanori Nakane. Otherwise, wrap to the UCSF implementation. Note that Takanori's program only runs on CPUs, while the UCSF-implementation also needs a GPU. \
-When running on 4kx4k movies and using at least 12 threads, the speeds should be similar. Note that Takanori's program uses the same model as the UCSF program and gives results that are almost identical.");
+	joboptions["do_own_motioncor"] = JobOption("Use RELION's own implementation?", true ,"If set to Yes, use RELION's own implementation of a MotionCor2-like algorithm by Takanori Nakane. Otherwise, wrap to the UCSF implementation. Note that Takanori's program only runs on CPUs but uses multiple threads, while the UCSF-implementation needs a GPU but uses only one CPU thread. Takanori's implementation is most efficient when the number of frames is divisible by the number of threads (e.g. 12 or 18 threads per MPI process for 36 frames). On some machines, setting the OMP_PROC_BIND environmental variable to TRUE accelerates the program.\n\
+When running on 4k x 4k movies and using 6 to 12 threads, the speeds should be similar. Note that Takanori's program uses the same model as the UCSF program and gives results that are almost identical.\n\
+Whichever program you use, 'Motion Refinement' is highly recommended to get the most of your dataset.");
 	joboptions["fn_motioncor2_exe"] = JobOption("MOTIONCOR2 executable:", std::string(default_location), "*.*", ".", "Location of the MOTIONCOR2 executable. You can control the default of this field by setting environment variable RELION_MOTIONCOR2_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
 	joboptions["fn_defect"] = JobOption("Defect file:", "", "*", ".", "Location of the MOTIONCOR2-style ASCII file that describes the defect pixels on the detector (using the -DefectFile option). Leave empty if you don't have any defects, or don't want to correct for defects on your detector.");
-	joboptions["gpu_ids"] = JobOption("Which GPUs to use: ", std::string("0"), "Provide a list of which GPUs (0,1,2,3, etc) to use. MPI-processes are separated by ':'. For example, to place two ranks on device 0 and one rank on device 1, provide '0:0:1'");
+	joboptions["gpu_ids"] = JobOption("Which GPUs to use: ", std::string("0"), "Provide a list of which GPUs (0,1,2,3, etc) to use. MPI-processes are separated by ':'. For example, to place one rank on device 0 and one rank on device 1, provide '0:1'.\n\
+Note that multiple MotionCor2 processes should not share a GPU; otherwise, it can lead to crash or broken outputs (e.g. black images) .");
 	joboptions["other_motioncor2_args"] = JobOption("Other MOTIONCOR2 arguments", std::string(""), "Additional arguments that need to be passed to MOTIONCOR2.");
 
 	// Dose-weight
-	joboptions["do_dose_weighting"] = JobOption("Do dose-weighting?", false ,"If set to Yes, the averaged micrographs will be dose-weighted using either UNBLUR or MOTIONCOR2. Note this does not work in MOTIONCORR.");
+	joboptions["do_dose_weighting"] = JobOption("Do dose-weighting?", false ,"If set to Yes, the averaged micrographs will be dose-weighted.");
+	joboptions["save_noDW"] = JobOption("Save non-dose weighted as well?", false, "Aligned but non-dose weighted images are sometimes useful in CTF estimation, although there is no difference in most cases. Whichever the choice, CTF refinement job is always done on dose-weighted particles.");
 	joboptions["voltage"] = JobOption("Voltage (kV):", 300, 80, 300, 20, "Acceleration voltage in kV.");
 	joboptions["dose_per_frame"] = JobOption("Dose per frame (e/A2):", 1, 0, 5, 0.2, "Dose per movie frame (in electrons per squared Angstrom).");
-	joboptions["pre_exposure"] = JobOption("Pre-exposure (e/A2):", 0, 0, 5, 0.5, "Pre-exposure dose (in electrons per squared Angstrom). This is only used by UNBLUR, not by MOTIONCOR2.");
+	joboptions["pre_exposure"] = JobOption("Pre-exposure (e/A2):", 0, 0, 5, 0.5, "Pre-exposure dose (in electrons per squared Angstrom).");
 
 }
 
@@ -1158,15 +1167,14 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 	command += " --first_frame_sum " + joboptions["first_frame_sum"].getString();
 	command += " --last_frame_sum " + joboptions["last_frame_sum"].getString();
 
-	// Motioncor2-specific stuff
 	if (joboptions["do_own_motioncor"].getBoolean())
 	{
-		command += " --use_motioncor2";
 		command += " --use_own ";
+		command += " --j " + joboptions["nr_threads"].getString();
 	}
 	else
 	{
-		command += " --j " + joboptions["nr_threads"].getString();
+		command += " --use_motioncor2 ";
 		command += " --motioncor2_exe " + joboptions["fn_motioncor2_exe"].getString();
 	}
 	command += " --bin_factor " + joboptions["bin_factor"].getString();
@@ -1177,7 +1185,36 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 	if (joboptions["group_frames"].getNumber() > 1.)
 		command += " --group_frames " + joboptions["group_frames"].getString();
 	if ((joboptions["fn_gain_ref"].getString()).length() > 0)
+	{
+		std::cout << joboptions["gain_rot"].getString() << std::endl;
+		std::cout << joboptions["gain_flip"].getString() << std::endl;
+
+		int gain_rot = -1, gain_flip = -1;
+		for (int i = 0; i <= 3; i++)
+		{
+			if (strcmp((joboptions["gain_rot"].getString()).c_str(), job_gain_rotation_options[i]) == 0)
+			{
+				gain_rot = i;
+				break;
+			}
+		}
+
+		for (int i = 0; i <= 2; i++)
+		{
+			if (strcmp((joboptions["gain_flip"].getString()).c_str(), job_gain_flip_options[i]) == 0)
+			{
+				gain_flip = i;
+				break;
+			}
+		}
+
+		if (gain_rot == -1 || gain_flip == -1)
+			REPORT_ERROR("Illegal gain_rot and/or gain_flip.");
+
 		command += " --gainref " + joboptions["fn_gain_ref"].getString();
+		command += " --gain_rot " + integerToString(gain_rot);
+		command += " --gain_flip " + integerToString(gain_flip);
+	}
 	if ((joboptions["fn_defect"].getString()).length() > 0)
 		command += " --defect_file " + joboptions["fn_defect"].getString();
 
@@ -1189,10 +1226,14 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 
 	if (joboptions["do_dose_weighting"].getBoolean())
 	{
-		command += " --dose_weighting";
+		command += " --dose_weighting ";
 		command += " --voltage " + joboptions["voltage"].getString();
 		command += " --dose_per_frame " + joboptions["dose_per_frame"].getString();
 		command += " --preexposure " + joboptions["pre_exposure"].getString();
+		if (joboptions["save_noDW"].getBoolean())
+		{
+			command += " --save_noDW ";
+		}
 	}
 
 	if (is_continue)
@@ -1950,6 +1991,11 @@ void RelionJob::initialiseSelectJob()
 	joboptions["do_regroup"] = JobOption("Regroup the particles?", false, "If set to Yes, then the program will regroup the selected particles in 'more-or-less' the number of groups indicated below. For re-grouping from individual particle _data.star files, a _model.star file with the same prefix should exist, i.e. the particle star file should be generated by relion_refine");
 	joboptions["nr_groups"] = JobOption("Approximate nr of groups: ", 1, 50, 20, 1, "It is normal that the actual number of groups may deviate a little from this number. ");
 
+	joboptions["do_select_values"] = JobOption("Select based on metadata values?", false, "If set to Yes, the job will be non-interactive and the selected star file will be based only on the value of the corresponding metadata label. Note that this option is only valid for micrographs or particles STAR files.");
+	joboptions["select_label"] = JobOption("Metadata label for subset selection:", (std::string)"rlnCtfFigureOfMerit", "This column from the input STAR file will be used for the subset selection.");
+	joboptions["select_minval"] = JobOption("Minimum metadata value:",  (std::string)"-9999.", "Only lines in the input STAR file with the corresponding metadata value larger than this value will be included in the subset.");
+	joboptions["select_maxval"] = JobOption("Maximum metadata value:",  (std::string)"9999.", "Only lines in the input STAR file with the corresponding metadata value smaller than this value will be included in the subset.");
+
 	joboptions["do_remove_duplicates"] = JobOption("Remove duplicates", false, "If set to Yes, then the program will remove all but one of particles which have drifted into the same position during alignment");
 	joboptions["duplicate_threshold"] = JobOption("Threshold [A]: ", 1, 1, 100, 1, "Remove particle coordinates within this distance [A], which might have drifted into the same position during alignment");
 
@@ -1962,140 +2008,190 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 	commands.clear();
 	initialisePipeline(outputname, PROC_CLASSSELECT_NAME, job_counter);
 	std::string command;
-	command="`which relion_display`";
 
-	// I/O
-	if (joboptions["fn_model"].getString() != "")
-	{
-		command += " --gui --i " + joboptions["fn_model"].getString();
-		Node node(joboptions["fn_model"].getString(), joboptions["fn_model"].node_type);
-		inputNodes.push_back(node);
-
-		FileName fn_parts = outputname+"particles.star";
-		command += " --allow_save --fn_parts " + fn_parts;
-		Node node2(fn_parts, NODE_PART_DATA);
-		outputNodes.push_back(node2);
-
-		// Only save the 2D class averages for 2D jobs
-		FileName fnt = joboptions["fn_model"].getString();
-		if (fnt.contains("Class2D/"))
-		{
-			FileName fn_imgs = outputname+"class_averages.star";
-			command += " --fn_imgs " + fn_imgs;
-			Node node3(fn_imgs, NODE_2DREFS);
-			outputNodes.push_back(node3);
-
-			if (joboptions["do_recenter"].getBoolean())
-			{
-				command += " --recenter ";
-			}
-		}
-	}
-	else if (joboptions["fn_mic"].getString() != "")
-	{
-		command += " --gui --i " + joboptions["fn_mic"].getString();
-		Node node(joboptions["fn_mic"].getString(), joboptions["fn_mic"].node_type);
-		inputNodes.push_back(node);
-
-		FileName fn_mics = outputname+"micrographs.star";
-		command += " --allow_save --fn_imgs " + fn_mics;
-		Node node2(fn_mics, NODE_MICS);
-		outputNodes.push_back(node2);
-	}
-	else if (joboptions["fn_data"].getString() != "")
-	{
-		command += " --gui --i " + joboptions["fn_data"].getString();
-		Node node(joboptions["fn_data"].getString(), joboptions["fn_data"].node_type);
-		inputNodes.push_back(node);
-
-		FileName fn_parts = outputname+"particles.star";
-		command += " --allow_save --fn_imgs " + fn_parts;
-		Node node2(fn_parts, NODE_PART_DATA);
-		outputNodes.push_back(node2);
-	}
-	else if  (joboptions["fn_coords"].getString() != "")
-	{
-
-    	RelionJob manualpickjob;
-
-    	FileName fn_job = ".gui_manualpick";
-		bool iscont=false;
-		if (exists(fn_job+"run.job"))
-		{
-			manualpickjob.read(fn_job.c_str(), iscont, true); // true means do initialise
-		}
-		else
-		{
-			error_message = "You need to save 'Manual picking' job settings (using the Jobs menu) before you can display coordinate files.";
-			return false;
-		}
-
-		// Get the name of the micrograph STAR file from reading the suffix file
-	    FileName fn_suffix = joboptions["fn_coords"].getString();
-		FileName fn_star;
-	    if (is_continue)
-	    {
-	    	fn_star = outputname + "micrographs_selected.star";
-	    }
-	    else
-	    {
-	    	std::ifstream in(fn_suffix.data(), std::ios_base::in);
-	    	in >> fn_star ;
-	    	in.close();
-	    }
-	    FileName fn_dirs = fn_suffix.beforeLastOf("/")+"/";
-		fn_suffix = fn_suffix.afterLastOf("/").without("coords_suffix_");
-		fn_suffix = fn_suffix.withoutExtension();
-
-		// Launch the manualpicker...
-		command="`which relion_manualpick` --i " + fn_star;
-		Node node4(joboptions["fn_coords"].getString(), joboptions["fn_coords"].node_type);
-		inputNodes.push_back(node4);
-
-		command += " --odir " + fn_dirs;
-		command += " --pickname " + fn_suffix;
-
-		// The output selection
-		FileName fn_outstar = outputname + "micrographs_selected.star";
-		Node node3(fn_outstar, NODE_MICS);
-		outputNodes.push_back(node3);
-		command += " --allow_save  --selection " + fn_outstar;
-
-		// All the stuff from the saved manualpickjob
-		command += " --scale " + manualpickjob.joboptions["micscale"].getString();
-		command += " --sigma_contrast " + manualpickjob.joboptions["sigma_contrast"].getString();
-		command += " --black " + manualpickjob.joboptions["black_val"].getString();
-		command += " --white " + manualpickjob.joboptions["white_val"].getString();
-
-		if (manualpickjob.joboptions["lowpass"].getNumber() > 0.)
-			command += " --lowpass " + manualpickjob.joboptions["lowpass"].getString();
-		if (manualpickjob.joboptions["highpass"].getNumber() > 0.)
-			command += " --highpass " + manualpickjob.joboptions["highpass"].getString();
-		if (manualpickjob.joboptions["angpix"].getNumber() > 0.)
-			command += " --angpix " + manualpickjob.joboptions["angpix"].getString();
-
-		command += " --ctf_scale " + manualpickjob.joboptions["ctfscale"].getString();
-
-		command += " --particle_diameter " + manualpickjob.joboptions["diameter"].getString();
-
-
-		if (manualpickjob.joboptions["do_color"].getBoolean())
-		{
-			command += " --color_label " + manualpickjob.joboptions["color_label"].getString();
-			command += " --blue " + manualpickjob.joboptions["blue_value"].getString();
-			command += " --red " + manualpickjob.joboptions["red_value"].getString();
-			if (manualpickjob.joboptions["fn_color"].getString().length() > 0)
-				command += " --color_star " + manualpickjob.joboptions["fn_color"].getString();
-		}
-
-		// Other arguments for extraction
-		command += " " + manualpickjob.joboptions["other_args"].getString() + " &";
-	}
-	else
+	if (joboptions["fn_model"].getString() == "" && joboptions["fn_coords"].getString() == "" &&
+			joboptions["fn_mic"].getString() == "" && joboptions["fn_data"].getString() == "")
 	{
 		// Nothing was selected...
 		error_message = "Please select an input file.";
 		return false;
+	}
+
+	// Value-based selection
+	if (joboptions["do_select_values"].getBoolean())
+	{
+		command="`which relion_star_subset`";
+
+		if (joboptions["fn_model"].getString() != "" || joboptions["fn_coords"].getString() != "")
+		{
+			error_message = "ERROR: Value-selection is only possible for micrograph or particle STAR files... ";
+			return false;
+		}
+		else if (joboptions["fn_mic"].getString() != "")
+		{
+			Node node(joboptions["fn_mic"].getString(), joboptions["fn_mic"].node_type);
+			inputNodes.push_back(node);
+
+			FileName fn_out = outputname+"micrographs.star";
+			Node node2(fn_out, NODE_MICS);
+			outputNodes.push_back(node2);
+
+			command += " --i " + joboptions["fn_mic"].getString();
+			command += " --o " + fn_out;
+
+		}
+		else if (joboptions["fn_data"].getString() != "")
+		{
+			Node node(joboptions["fn_data"].getString(), joboptions["fn_data"].node_type);
+			inputNodes.push_back(node);
+
+			FileName fn_out = outputname+"particles.star";
+			Node node2(fn_out, NODE_PART_DATA);
+			outputNodes.push_back(node2);
+
+			command += " --i " + joboptions["fn_data"].getString();
+			command += " --o " + fn_out;
+
+		}
+
+		command += " --label " + joboptions["select_label"].getString();
+		command += " --minval " + joboptions["select_minval"].getString();
+		command += " --maxval " + joboptions["select_maxval"].getString();
+
+	}
+	else
+	{
+		// Interactive selection
+
+		command="`which relion_display`";
+
+		// I/O
+		if (joboptions["fn_model"].getString() != "")
+		{
+
+			command += " --gui --i " + joboptions["fn_model"].getString();
+			Node node(joboptions["fn_model"].getString(), joboptions["fn_model"].node_type);
+			inputNodes.push_back(node);
+
+			FileName fn_parts = outputname+"particles.star";
+			command += " --allow_save --fn_parts " + fn_parts;
+			Node node2(fn_parts, NODE_PART_DATA);
+			outputNodes.push_back(node2);
+
+			// Only save the 2D class averages for 2D jobs
+			FileName fnt = joboptions["fn_model"].getString();
+			if (fnt.contains("Class2D/"))
+			{
+				FileName fn_imgs = outputname+"class_averages.star";
+				command += " --fn_imgs " + fn_imgs;
+				Node node3(fn_imgs, NODE_2DREFS);
+				outputNodes.push_back(node3);
+
+				if (joboptions["do_recenter"].getBoolean())
+				{
+					command += " --recenter ";
+				}
+			}
+		}
+		else if (joboptions["fn_mic"].getString() != "")
+		{
+			command += " --gui --i " + joboptions["fn_mic"].getString();
+			Node node(joboptions["fn_mic"].getString(), joboptions["fn_mic"].node_type);
+			inputNodes.push_back(node);
+
+			FileName fn_mics = outputname+"micrographs.star";
+			command += " --allow_save --fn_imgs " + fn_mics;
+			Node node2(fn_mics, NODE_MICS);
+			outputNodes.push_back(node2);
+		}
+		else if (joboptions["fn_data"].getString() != "")
+		{
+			command += " --gui --i " + joboptions["fn_data"].getString();
+			Node node(joboptions["fn_data"].getString(), joboptions["fn_data"].node_type);
+			inputNodes.push_back(node);
+
+			FileName fn_parts = outputname+"particles.star";
+			command += " --allow_save --fn_imgs " + fn_parts;
+			Node node2(fn_parts, NODE_PART_DATA);
+			outputNodes.push_back(node2);
+		}
+		else if  (joboptions["fn_coords"].getString() != "")
+		{
+			RelionJob manualpickjob;
+
+			FileName fn_job = ".gui_manualpick";
+			bool iscont=false;
+			if (exists(fn_job+"run.job"))
+			{
+				manualpickjob.read(fn_job.c_str(), iscont, true); // true means do initialise
+			}
+			else
+			{
+				error_message = "You need to save 'Manual picking' job settings (using the Jobs menu) before you can display coordinate files.";
+				return false;
+			}
+
+			// Get the name of the micrograph STAR file from reading the suffix file
+			FileName fn_suffix = joboptions["fn_coords"].getString();
+			FileName fn_star;
+			if (is_continue)
+			{
+				fn_star = outputname + "micrographs_selected.star";
+			}
+			else
+			{
+				std::ifstream in(fn_suffix.data(), std::ios_base::in);
+				in >> fn_star ;
+				in.close();
+			}
+			FileName fn_dirs = fn_suffix.beforeLastOf("/")+"/";
+			fn_suffix = fn_suffix.afterLastOf("/").without("coords_suffix_");
+			fn_suffix = fn_suffix.withoutExtension();
+
+			// Launch the manualpicker...
+			command="`which relion_manualpick` --i " + fn_star;
+			Node node4(joboptions["fn_coords"].getString(), joboptions["fn_coords"].node_type);
+			inputNodes.push_back(node4);
+
+			command += " --odir " + fn_dirs;
+			command += " --pickname " + fn_suffix;
+
+			// The output selection
+			FileName fn_outstar = outputname + "micrographs_selected.star";
+			Node node3(fn_outstar, NODE_MICS);
+			outputNodes.push_back(node3);
+			command += " --allow_save  --selection " + fn_outstar;
+
+			// All the stuff from the saved manualpickjob
+			command += " --scale " + manualpickjob.joboptions["micscale"].getString();
+			command += " --sigma_contrast " + manualpickjob.joboptions["sigma_contrast"].getString();
+			command += " --black " + manualpickjob.joboptions["black_val"].getString();
+			command += " --white " + manualpickjob.joboptions["white_val"].getString();
+
+			if (manualpickjob.joboptions["lowpass"].getNumber() > 0.)
+				command += " --lowpass " + manualpickjob.joboptions["lowpass"].getString();
+			if (manualpickjob.joboptions["highpass"].getNumber() > 0.)
+				command += " --highpass " + manualpickjob.joboptions["highpass"].getString();
+			if (manualpickjob.joboptions["angpix"].getNumber() > 0.)
+				command += " --angpix " + manualpickjob.joboptions["angpix"].getString();
+
+			command += " --ctf_scale " + manualpickjob.joboptions["ctfscale"].getString();
+
+			command += " --particle_diameter " + manualpickjob.joboptions["diameter"].getString();
+
+
+			if (manualpickjob.joboptions["do_color"].getBoolean())
+			{
+				command += " --color_label " + manualpickjob.joboptions["color_label"].getString();
+				command += " --blue " + manualpickjob.joboptions["blue_value"].getString();
+				command += " --red " + manualpickjob.joboptions["red_value"].getString();
+				if (manualpickjob.joboptions["fn_color"].getString().length() > 0)
+					command += " --color_star " + manualpickjob.joboptions["fn_color"].getString();
+			}
+
+			// Other arguments for extraction
+			command += " " + manualpickjob.joboptions["other_args"].getString() + " &";
+		}
 	}
 
 	// Re-grouping
@@ -2233,9 +2329,9 @@ bool RelionJob::getCommandsClass2DJob(std::string &outputname, std::vector<std::
 	else
 		command="`which relion_refine`";
 
-    FileName fn_run = "run";
+	FileName fn_run = "run";
 	if (is_continue)
-    {
+	{
 		if (joboptions["fn_cont"].getString() == "")
 		{
 			error_message = "ERROR: empty field for continuation STAR file...";
@@ -2251,9 +2347,9 @@ bool RelionJob::getCommandsClass2DJob(std::string &outputname, std::vector<std::
 		int it = (int)textToFloat((joboptions["fn_cont"].getString().substr(pos_it+3, 6)).c_str());
 		fn_run += "_ct" + floatToString(it);
 		command += " --continue " + joboptions["fn_cont"].getString();
-    }
+	}
 
-    command += " --o " + outputname + fn_run;
+	command += " --o " + outputname + fn_run;
 	outputNodes = getOutputNodesRefine(outputname + fn_run, (int)joboptions["nr_iter"].getNumber(), (int)joboptions["nr_classes"].getNumber(), 2, 1);
 
 	if (!is_continue)
@@ -2478,9 +2574,9 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 	else
 		command="`which relion_refine`";
 
-    FileName fn_run = "run";
+	FileName fn_run = "run";
 	if (is_continue)
-    {
+	{
 		if (joboptions["fn_cont"].getString() == "")
 		{
 			error_message = "ERROR: empty field for continuation STAR file...";
@@ -2493,17 +2589,17 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 		int it = (int)textToFloat((joboptions["fn_cont"].getString().substr(pos_it+3, 6)).c_str());
 		fn_run += "_ct" + floatToString(it);
 		command += " --continue " + joboptions["fn_cont"].getString();
-    }
+	}
 
-    command += " --o " + outputname + fn_run;
+	command += " --o " + outputname + fn_run;
 
 
 
-    int total_nr_iter = joboptions["sgd_ini_iter"].getNumber();
-    total_nr_iter += joboptions["sgd_inbetween_iter"].getNumber();
-    total_nr_iter += joboptions["sgd_fin_iter"].getNumber();
+	int total_nr_iter = joboptions["sgd_ini_iter"].getNumber();
+	total_nr_iter += joboptions["sgd_inbetween_iter"].getNumber();
+	total_nr_iter += joboptions["sgd_fin_iter"].getNumber();
 
-    outputNodes = getOutputNodesRefine(outputname + fn_run, total_nr_iter, 1, 3, 1);
+	outputNodes = getOutputNodesRefine(outputname + fn_run, total_nr_iter, 1, 3, 1);
 
 	command += " --sgd_ini_iter " + joboptions["sgd_ini_iter"].getString();
 	command += " --sgd_inbetween_iter " + joboptions["sgd_inbetween_iter"].getString();
@@ -2808,9 +2904,9 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 	else
 		command="`which relion_refine`";
 
-    FileName fn_run = "run";
+	FileName fn_run = "run";
 	if (is_continue)
-    {
+	{
 		if (joboptions["fn_cont"].getString() == "")
 		{
 			error_message = "ERROR: empty field for continuation STAR file...";
@@ -2823,9 +2919,9 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 		int it = (int)textToFloat((joboptions["fn_cont"].getString().substr(pos_it+3, 6)).c_str());
 		fn_run += "_ct" + floatToString(it);;
 		command += " --continue " + joboptions["fn_cont"].getString();
-    }
+	}
 
-    command += " --o " + outputname + fn_run;
+	command += " --o " + outputname + fn_run;
 	outputNodes = getOutputNodesRefine(outputname + fn_run, (int)joboptions["nr_iter"].getNumber(), (int)joboptions["nr_classes"].getNumber(), 3, 1);
 
 	if (!is_continue)
@@ -3194,9 +3290,9 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 	else
 		command="`which relion_refine`";
 
-    FileName fn_run = "run";
+	FileName fn_run = "run";
 	if (is_continue)
-    {
+	{
 		if (joboptions["fn_cont"].getString() == "")
 		{
 			error_message = "ERROR: empty field for continuation STAR file...";
@@ -3209,9 +3305,9 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 		int it = (int)textToFloat((joboptions["fn_cont"].getString().substr(pos_it+3, 6)).c_str());
 		fn_run += "_ct" + floatToString(it);
 		command += " --continue " + joboptions["fn_cont"].getString();
-    }
+	}
 
-    command += " --o " + outputname + fn_run;
+	command += " --o " + outputname + fn_run;
 	// TODO: add bodies!! (probably in next version)
 	outputNodes = getOutputNodesRefine(outputname + fn_run, -1, 1, 3, 1, false, false); // false false means dont do movies
 
@@ -4594,7 +4690,7 @@ bool RelionJob::getCommandsLocalresJob(std::string &outputname, std::vector<std:
 void RelionJob::initialiseMotionrefineJob()
 {
 
-	hidden_name = ".gui_motionrefine";
+	hidden_name = ".gui_bayespolish";
 
 	// I/O
 	joboptions["fn_mic"] = JobOption("Input micrographs:", NODE_MICS,  "", "STAR files (*.star)", "The input STAR file with the micrograph (and their movie metadata) from a MotionCorr job.");

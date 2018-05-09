@@ -24,12 +24,12 @@
 float fltkTextToFloat(const char* str)
 {
 	float result = -999.;
-    if (str == NULL)
-    	fl_message("ERROR: NULL entry for TextToFloat conversion. Check your inputs!");
-    else if (!sscanf(str, "%f", &result))
-    	fl_message("ERROR: Invalid (non-numerical?) entry for TextToFloat conversion. Check your inputs!");
+	if (str == NULL)
+		fl_message("ERROR: NULL entry for TextToFloat conversion. Check your inputs!");
+	else if (!sscanf(str, "%f", &result))
+		fl_message("ERROR: Invalid (non-numerical?) entry for TextToFloat conversion. Check your inputs!");
 
-    return result;
+	return result;
 }
 
 // This allows CURRENT_ODIR browse buttons
@@ -37,16 +37,16 @@ std::string current_browse_directory;
 
 ShowHelpText::ShowHelpText(const char *help)
 {
-    int w=640;
-    int h=480;
+	int w=640;
+	int h=480;
 	Fl_Window *win = new Fl_Window(w, h);
-    Fl_Text_Buffer *buff = new Fl_Text_Buffer();
-    Fl_Text_Display *disp = new Fl_Text_Display(20, 20, w-40, h-40, "relion additional text.");
-    disp->buffer(buff);
-    disp->wrap_mode(1,79);
-    win->resizable(*disp);
-    win->show();
-    buff->text(help);
+	Fl_Text_Buffer *buff = new Fl_Text_Buffer();
+	Fl_Text_Display *disp = new Fl_Text_Display(20, 20, w-40, h-40, "relion additional text.");
+	disp->buffer(buff);
+	disp->wrap_mode(1,79);
+	win->resizable(*disp);
+	win->show();
+	buff->text(help);
 }
 
 ShowHelpText::~ShowHelpText(){};
@@ -97,7 +97,7 @@ void GuiEntry::clear()
 void GuiEntry::initialise(int x, int y, Fl_Group * deactivate_this_group, bool _actually_activate, int height, int wcol2, int wcol3)
 {
 
-    // The input field
+	// The input field
 	int mywidth = (joboption.joboption_type == JOBOPTION_SLIDER) ? 50 : wcol2;
 	inp = new Fl_Input(x, y, mywidth, height, joboption.label_gui.c_str());
 	inp->color(GUI_INPUT_COLOR);
@@ -106,35 +106,33 @@ void GuiEntry::initialise(int x, int y, Fl_Group * deactivate_this_group, bool _
 	inp->value(joboption.default_value.c_str());
 
 	// Display help button if needed
-    if (joboption.helptext != "")
-    {
-		// The Help button
-		help = new Fl_Button( XCOL3, y, wcol3, height, "?");
-		help->callback( cb_help, this );
-		help->color(GUI_BUTTON_COLOR);
-		help->labelsize(ENTRY_FONTSIZE);
-    }
+	if (joboption.helptext != "")
+	{
+	    	// The Help button
+    		help = new Fl_Button( XCOL3, y, wcol3, height, "?");
+	    	help->callback( cb_help, this );
+	    	help->color(GUI_BUTTON_COLOR);
+	    	help->labelsize(ENTRY_FONTSIZE);
+	}
 
-    if (joboption.joboption_type == JOBOPTION_FILENAME)
-    {
-        // The Browse button
-        browse = new Fl_Button( XCOL4, y, WCOL4, height, "Browse");
-        browse->callback( cb_browse, this );
-        browse->color(GUI_BUTTON_COLOR);
-        browse->labelsize(ENTRY_FONTSIZE);
-
-    }
-    else if (joboption.joboption_type == JOBOPTION_INPUTNODE)
-    {
-
-        // The Browse button
-        browse = new Fl_Button( XCOL4, y, WCOL4, height, "Browse");
-        browse->callback( cb_browse_node, this );
-        browse->color(GUI_BUTTON_COLOR);
-        browse->labelsize(ENTRY_FONTSIZE);
-    }
-    else if (joboption.joboption_type == JOBOPTION_RADIO || joboption.joboption_type == JOBOPTION_BOOLEAN)
-    {
+	if (joboption.joboption_type == JOBOPTION_FILENAME)
+	{
+		// The Browse button
+		browse = new Fl_Button( XCOL4, y, WCOL4, height, "Browse");
+		browse->callback( cb_browse, this );
+		browse->color(GUI_BUTTON_COLOR);
+		browse->labelsize(ENTRY_FONTSIZE);
+	}
+	else if (joboption.joboption_type == JOBOPTION_INPUTNODE)
+	{
+		 // The Browse button
+		browse = new Fl_Button( XCOL4, y, WCOL4, height, "Browse");
+		browse->callback( cb_browse_node, this );
+		browse->color(GUI_BUTTON_COLOR);
+	browse->labelsize(ENTRY_FONTSIZE);
+	}
+	else if (joboption.joboption_type == JOBOPTION_RADIO || joboption.joboption_type == JOBOPTION_BOOLEAN)
+	{
 
 		choice = new Fl_Choice(XCOL2, y, WCOL2, height);
 		if (joboption.joboption_type == JOBOPTION_RADIO)
@@ -152,6 +150,20 @@ void GuiEntry::initialise(int x, int y, Fl_Group * deactivate_this_group, bool _
 				for (int i = 0; i < 10; i++)
 					if (std::string(job_nodetype_options[i]) == joboption.default_value)
 						choice->picked(&fl_node_type_options[i]);
+			}
+			else if (joboption.radio_menu == RADIO_GAIN_ROTATION)
+			{
+				choice->menu(fl_gain_rotation_options);
+				for (int i = 0; i <= 3; i++)
+					if (std::string(job_gain_rotation_options[i]) == joboption.default_value)
+						choice->picked(&fl_gain_rotation_options[i]);
+			}
+			else if (joboption.radio_menu == RADIO_GAIN_FLIP)
+			{
+				choice->menu(fl_gain_flip_options);
+				for (int i = 0; i <= 2; i++)
+					if (std::string(job_gain_flip_options[i]) == joboption.default_value)
+						choice->picked(&fl_gain_flip_options[i]);
 			}
 			else
 				REPORT_ERROR("BUG: unrecognised radio menu type.");
@@ -177,29 +189,26 @@ void GuiEntry::initialise(int x, int y, Fl_Group * deactivate_this_group, bool _
 		//menu->color(GUI_BACKGROUND_COLOR);
 		menu->color(GUI_INPUT_COLOR);
 		menu->textsize(ENTRY_FONTSIZE);
-    }
-    else if (joboption.joboption_type == JOBOPTION_SLIDER)
-    {
-    	int floatwidth = 50;
-    	// Slider is shorter than wcol2, so that underlying input field becomes visible
-    	slider = new Fl_Slider(XCOL2 + floatwidth, y, wcol2 - floatwidth, height);
-    	slider->type(1);
-    	slider->callback(cb_slider, this);
-    	slider->minimum(joboption.min_value);
-    	slider->maximum(joboption.max_value);
-    	slider->step(joboption.step_value);
-    	slider->type(FL_HOR_NICE_SLIDER);
-    	slider->color(GUI_BACKGROUND_COLOR);
-    	inp->callback(cb_input, this);
-    	inp->when(FL_WHEN_ENTER_KEY|FL_WHEN_NOT_CHANGED);
+	}
+	else if (joboption.joboption_type == JOBOPTION_SLIDER)
+	{
+		int floatwidth = 50;
+		// Slider is shorter than wcol2, so that underlying input field becomes visible
+		slider = new Fl_Slider(XCOL2 + floatwidth, y, wcol2 - floatwidth, height);
+		slider->type(1);
+		slider->callback(cb_slider, this);
+		slider->minimum(joboption.min_value);
+		slider->maximum(joboption.max_value);
+		slider->step(joboption.step_value);
+		slider->type(FL_HOR_NICE_SLIDER);
+		slider->color(GUI_BACKGROUND_COLOR);
+		inp->callback(cb_input, this);
+		inp->when(FL_WHEN_ENTER_KEY|FL_WHEN_NOT_CHANGED);
 
-    	// Set the default in the input and the slider:
-    	inp->value(joboption.default_value.c_str());
-    	slider->value(textToDouble(joboption.default_value));
-
-    }
-
-
+		// Set the default in the input and the slider:
+		inp->value(joboption.default_value.c_str());
+		slider->value(textToDouble(joboption.default_value));
+	}
 }
 void GuiEntry::place(JobOption &_joboption, int &y, int _deactivate_option, Fl_Group * deactivate_this_group, bool actually_activate, bool _do_oldstyle, int x, int h, int wcol2, int wcol3 )
 {
@@ -218,8 +227,7 @@ void GuiEntry::place(JobOption &_joboption, int &y, int _deactivate_option, Fl_G
 	initialise(x, y, deactivate_this_group, actually_activate, h, wcol2, wcol3);
 
 	// Update the Y-coordinate
-    y += h + 2;
-
+	y += h + 2;
 }
 
 // Set the value back from the Fl_Input into the JobOption.value
@@ -278,120 +286,116 @@ void GuiEntry::deactivate(bool do_deactivate)
 void GuiEntry::cb_help(Fl_Widget* o, void* v)
 {
 
-    GuiEntry* T=(GuiEntry*)v;
-    T->cb_help_i();
+	GuiEntry* T=(GuiEntry*)v;
+	T->cb_help_i();
 }
 
 void GuiEntry::cb_help_i()
 {
 
-    ShowHelpText *help = new ShowHelpText(joboption.helptext.c_str());
+	ShowHelpText *help = new ShowHelpText(joboption.helptext.c_str());
 
 }
 
 void GuiEntry::cb_browse(Fl_Widget* o, void* v)
 {
 
-    GuiEntry* T=(GuiEntry*)v;
-    T->cb_browse_i();
+	GuiEntry* T=(GuiEntry*)v;
+	T->cb_browse_i();
 }
 
 
 void GuiEntry::cb_browse_i()
 {
 
-    Fl::scheme("gtk+");
-    Fl_File_Chooser * G_chooser = new Fl_File_Chooser("", joboption.pattern.c_str(), Fl_File_Chooser::SINGLE, "");
+	Fl::scheme("gtk+");
+	Fl_File_Chooser * G_chooser = new Fl_File_Chooser("", joboption.pattern.c_str(), Fl_File_Chooser::SINGLE, "");
 
-    if (joboption.directory=="CURRENT_ODIR")
-    	G_chooser->directory(current_browse_directory.c_str());
-    else
-    	G_chooser->directory(joboption.directory.c_str());
-    G_chooser->color(GUI_BACKGROUND_COLOR);
-    G_chooser->show();
+	if (joboption.directory=="CURRENT_ODIR")
+		G_chooser->directory(current_browse_directory.c_str());
+	else
+		G_chooser->directory(joboption.directory.c_str());
+	G_chooser->color(GUI_BACKGROUND_COLOR);
+	G_chooser->show();
 
-    // Block until user picks something.
-    //     (The other way to do this is to use a callback())
-    //
-    while(G_chooser->shown()) {
-        Fl::wait();
-    }
+	// Block until user picks something.
+	//     (The other way to do this is to use a callback())
+	//
+	while(G_chooser->shown()) {
+		Fl::wait();
+	}
 
-    // Print the results
-    if ( G_chooser->value() == NULL ) {
-        //fprintf(stderr, "(User hit 'Cancel')\n");
-        return;
-    }
+	// Print the results
+	if ( G_chooser->value() == NULL ) {
+		//fprintf(stderr, "(User hit 'Cancel')\n");
+		return;
+	}
 
-    char relname[FL_PATH_MAX];
-    fl_filename_relative(relname,sizeof(relname),G_chooser->value());
+	char relname[FL_PATH_MAX];
+	fl_filename_relative(relname,sizeof(relname),G_chooser->value());
 
-    FileName fn_pre, fn_jobnr, fn_post, fn_out;
-    decomposePipelineSymlinkName(relname, fn_pre, fn_jobnr, fn_post);
-    fn_out = fn_pre + fn_jobnr + fn_post;
+	FileName fn_pre, fn_jobnr, fn_post, fn_out;
+	decomposePipelineSymlinkName(relname, fn_pre, fn_jobnr, fn_post);
+	fn_out = fn_pre + fn_jobnr + fn_post;
 
-    inp->value(fn_out.c_str());
+	inp->value(fn_out.c_str());
 }
 
 
 void GuiEntry::cb_browse_node(Fl_Widget* o, void* v) {
-
-    GuiEntry* T=(GuiEntry*)v;
-    T->cb_browse_node_i();
+	GuiEntry* T=(GuiEntry*)v;
+	T->cb_browse_node_i();
 }
 
 
 void GuiEntry::cb_browse_node_i() {
+	Fl::scheme("gtk+");
+	Fl_File_Chooser * G_chooser = new Fl_File_Chooser("", joboption.pattern.c_str(), Fl_File_Chooser::SINGLE, "");
 
-    Fl::scheme("gtk+");
-    Fl_File_Chooser * G_chooser = new Fl_File_Chooser("", joboption.pattern.c_str(), Fl_File_Chooser::SINGLE, "");
+	std::string fn_dir = (do_oldstyle) ? "." : ".Nodes/" + integerToString(joboption.node_type);
+	G_chooser->directory(fn_dir.c_str());
+	G_chooser->color(GUI_BACKGROUND_COLOR);
+	G_chooser->show();
 
-    std::string fn_dir = (do_oldstyle) ? "." : ".Nodes/" + integerToString(joboption.node_type);
-    G_chooser->directory(fn_dir.c_str());
-    G_chooser->color(GUI_BACKGROUND_COLOR);
-    G_chooser->show();
+	// Block until user picks something.
+	//     (The other way to do this is to use a callback())
+	//
+	while(G_chooser->shown()) {
+		Fl::wait();
+	}
 
-    // Block until user picks something.
-    //     (The other way to do this is to use a callback())
-    //
-    while(G_chooser->shown()) {
-        Fl::wait();
-    }
+	// Print the results
+	if ( G_chooser->value() == NULL ) {
+		//fprintf(stderr, "(User hit 'Cancel')\n");
+		return;
+	}
 
-    // Print the results
-    if ( G_chooser->value() == NULL ) {
-        //fprintf(stderr, "(User hit 'Cancel')\n");
-        return;
-    }
+	char relname[FL_PATH_MAX];
+	fl_filename_relative(relname,sizeof(relname),G_chooser->value());
 
-    char relname[FL_PATH_MAX];
-    fl_filename_relative(relname,sizeof(relname),G_chooser->value());
+	// Get rid of the .Nodes/type/ directory-name again
+	if (do_oldstyle)
+	{
+		inp->value(relname);
+	}
+	else
+	{
+    		std::string replace = std::string(relname);
+	    	std::string replace2 = (std::string::npos == replace.find(fn_dir.c_str())) ? replace : replace.substr(fn_dir.length()+1, replace.length());
+    		char relname2[FL_PATH_MAX];
+	    	strcpy(relname2, replace2.c_str());
 
-    // Get rid of the .Nodes/type/ directory-name again
-    if (do_oldstyle)
-    {
-    	inp->value(relname);
-    }
-    else
-    {
-		std::string replace = std::string(relname);
-		std::string replace2 = (std::string::npos == replace.find(fn_dir.c_str())) ? replace : replace.substr(fn_dir.length()+1, replace.length());
-		char relname2[FL_PATH_MAX];
-		strcpy(relname2, replace2.c_str());
+	    	FileName fn_pre, fn_jobnr, fn_post, fn_out;
+        	decomposePipelineSymlinkName(replace2, fn_pre, fn_jobnr, fn_post);
+        	fn_out = fn_pre + fn_jobnr + fn_post;
 
-		FileName fn_pre, fn_jobnr, fn_post, fn_out;
-	    decomposePipelineSymlinkName(replace2, fn_pre, fn_jobnr, fn_post);
-	    fn_out = fn_pre + fn_jobnr + fn_post;
-
-	    inp->value(fn_out.c_str());
-    }
-
+	        inp->value(fn_out.c_str());
+	}
 }
 
 void GuiEntry::cb_menu(Fl_Widget* o, void* v) {
-
-    GuiEntry* T=(GuiEntry*)v;
-    T->cb_menu_i();
+	GuiEntry* T=(GuiEntry*)v;
+	T->cb_menu_i();
 }
 
 
@@ -414,42 +418,39 @@ void GuiEntry::cb_menu_i()
 
 void GuiEntry::cb_slider(Fl_Widget* o, void* v) {
 
-    GuiEntry* T=(GuiEntry*)v;
-    T->cb_slider_i();
+	GuiEntry* T=(GuiEntry*)v;
+	T->cb_slider_i();
 }
 
 
 void GuiEntry::cb_slider_i() {
-
-    static int recurse = 0;
-    if ( recurse ) {
-        return;
-    } else {
-        recurse = 1;
-        std::string str = floatToString(slider->value());
-        inp->value(str.c_str());
-        slider->redraw();
-        recurse = 0;
-    }
+	static int recurse = 0;
+	if ( recurse ) {
+		return;
+	} else {
+		recurse = 1;
+		std::string str = floatToString(slider->value());
+		inp->value(str.c_str());
+		slider->redraw();
+		recurse = 0;
+	}
 }
 
 void GuiEntry::cb_input(Fl_Widget* o, void* v) {
-
-    GuiEntry* T=(GuiEntry*)v;
-    T->cb_input_i();
+	GuiEntry* T=(GuiEntry*)v;
+	T->cb_input_i();
 }
 
 
 void GuiEntry::cb_input_i() {
-
-    static int recurse = 0;
-    if ( recurse ) {
-        return;
-    } else {
-        recurse = 1;
-        slider->value(fltkTextToFloat(inp->value()));         // pass input's value to slider
-        recurse = 0;
-    }
+	static int recurse = 0;
+	if ( recurse ) {
+		return;
+	} else {
+		recurse = 1;
+		slider->value(fltkTextToFloat(inp->value()));         // pass input's value to slider
+		recurse = 0;
+	}
 }
 
 

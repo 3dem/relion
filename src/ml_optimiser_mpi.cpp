@@ -62,6 +62,7 @@ void MlOptimiserMpi::read(int argc, char **argv)
     int mpi_section = parser.addSection("MPI options");
     only_do_unfinished_movies = parser.checkOption("--only_do_unfinished_movies", "When processing movies on a per-micrograph basis, ignore those movies for which the output STAR file already exists.");
     halt_all_slaves_except_this = textToInteger(parser.getOption("--halt_all_slaves_except", "For debugging: keep all slaves except this one waiting", "-1"));
+    do_keep_debug_reconstruct_files  = parser.checkOption("--keep_debug_reconstruct_files", "For debugging: keep temporary data and weight files for debug-reconstructions.");
 
     // Don't put any output to screen for mpi slaves
     ori_verb = verb;
@@ -2048,13 +2049,13 @@ void MlOptimiserMpi::maximization()
 								mymodel.tau2_fudge_factor, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
 								mymodel.data_vs_prior_class[ith_recons], mymodel.fourier_coverage_class[ith_recons],
 								mymodel.fsc_halves_class[ibody], wsum_model.pdf_class[iclass],
-								do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map, &timer);
+								do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map, &timer, do_fsc0999);
 #else
 						(wsum_model.BPref[ith_recons]).reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
 								mymodel.tau2_fudge_factor, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
 								mymodel.data_vs_prior_class[ith_recons], mymodel.fourier_coverage_class[ith_recons],
 								mymodel.fsc_halves_class[ibody], wsum_model.pdf_class[iclass],
-								do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map);
+								do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map, false, do_fsc0999);
 #endif
 						if(do_sgd)
 						{
@@ -2159,7 +2160,7 @@ void MlOptimiserMpi::maximization()
 									mymodel.tau2_fudge_factor, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
 									mymodel.data_vs_prior_class[ith_recons], mymodel.fourier_coverage_class[ith_recons],
 									mymodel.fsc_halves_class[ibody], wsum_model.pdf_class[iclass],
-									do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map);
+									do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map, false, do_fsc0999);
 
 							if (do_sgd)
 							{
@@ -2588,7 +2589,7 @@ void MlOptimiserMpi::reconstructUnregularisedMapAndCalculateSolventCorrectedFSC(
 
 			BackProjector BPextra(wsum_model.BPref[ibody]);
 
-			BPextra.reconstruct(Iunreg(), gridding_nr_iter, false, 1., dummy, dummy, dummy, dummy, dummy, 1., false, true, nr_threads, -1);
+			BPextra.reconstruct(Iunreg(), gridding_nr_iter, false, 1., dummy, dummy, dummy, dummy, dummy, 1., false, true, nr_threads, -1, false, do_fsc0999);
 
 			if (mymodel.nr_bodies > 1)
 			{
@@ -2844,7 +2845,7 @@ void MlOptimiserMpi::readTemporaryDataAndWeightArraysAndReconstruct(int iclass, 
 	}
 
 	// Now perform the unregularized reconstruction
-	wsum_model.BPref[iclass].reconstruct(Iunreg(), gridding_nr_iter, false, 1., dummy, dummy, dummy, dummy, dummy, 1., false, true, nr_threads, -1);
+	wsum_model.BPref[iclass].reconstruct(Iunreg(), gridding_nr_iter, false, 1., dummy, dummy, dummy, dummy, dummy, 1., false, true, nr_threads, -1, false, do_fsc0999);
 
 	if (mymodel.nr_bodies > 1)
 	{
@@ -2861,9 +2862,12 @@ void MlOptimiserMpi::readTemporaryDataAndWeightArraysAndReconstruct(int iclass, 
 
 	// remove temporary arrays from the disc
 #ifndef DEBUG_RECONSTRUCTION
-	remove((fn_root+"_data_real.mrc").c_str());
-	remove((fn_root+"_data_imag.mrc").c_str());
-	remove((fn_root+"_weight.mrc").c_str());
+	if (!do_keep_debug_reconstruct_files)
+	{
+		remove((fn_root+"_data_real.mrc").c_str());
+		remove((fn_root+"_data_imag.mrc").c_str());
+		remove((fn_root+"_weight.mrc").c_str());
+	}
 #endif
 
 }
@@ -3053,7 +3057,7 @@ void MlOptimiserMpi::iterate()
 
 		// Write out data and weight arrays to disc in order to also do an unregularized reconstruction
 #ifndef DEBUG_RECONSTRUCTION
-		if (do_auto_refine && has_converged)
+		if ((do_auto_refine && has_converged) || do_keep_debug_reconstruct_files)
 #endif
 			writeTemporaryDataAndWeightArrays();
 

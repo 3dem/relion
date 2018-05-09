@@ -573,6 +573,8 @@ void JobWindow::initialiseMotioncorrWindow()
 	place("group_frames", TOGGLE_DEACTIVATE);
 	place("bin_factor", TOGGLE_DEACTIVATE);
 	place("fn_gain_ref", TOGGLE_DEACTIVATE);
+	place("gain_rot", TOGGLE_DEACTIVATE);
+	place("gain_flip", TOGGLE_DEACTIVATE);
 
 	current_y += STEPY/2;
 	group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
@@ -600,6 +602,7 @@ void JobWindow::initialiseMotioncorrWindow()
 
 	group3->begin();
 
+	place("save_noDW", TOGGLE_DEACTIVATE);
 	place("voltage", TOGGLE_DEACTIVATE);
 	place("dose_per_frame", TOGGLE_DEACTIVATE);
 	place("pre_exposure", TOGGLE_DEACTIVATE);
@@ -1075,7 +1078,7 @@ void JobWindow::initialiseSortWindow()
 }
 void JobWindow::initialiseSelectWindow()
 {
-	setupTabs(2);
+	setupTabs(3);
 
 	tab1->begin();
 	tab1->label("I/O");
@@ -1114,6 +1117,23 @@ void JobWindow::initialiseSelectWindow()
 	guientries["do_remove_duplicates"].cb_menu_i();
 
 	tab2->end();
+
+	tab3->begin();
+	tab3->label("Values");
+	resetHeight();
+
+	group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group3->end();
+
+	place("do_select_values", TOGGLE_DEACTIVATE, group3);
+	group3->begin();
+	place("select_label", TOGGLE_DEACTIVATE);
+	place("select_minval", TOGGLE_DEACTIVATE);
+	place("select_maxval", TOGGLE_DEACTIVATE);
+	group3->end();
+	guientries["do_select_values"].cb_menu_i();
+
+	tab3->end();
 
 	// Always deactivate the queue option
 	guientries["do_queue"].deactivate_option = TOGGLE_ALWAYS_DEACTIVATE;

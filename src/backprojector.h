@@ -293,7 +293,8 @@ public:
                      bool is_whole_instead_of_half = false,
                      int nr_threads = 1,
                      int minres_map = -1,
-                     bool printTimes= false);
+                     bool printTimes= false,
+					 bool do_fsc0999 = false);
 
 
 	/*  Enforce Hermitian symmetry, apply helical symmetry as well as point-group symmetry

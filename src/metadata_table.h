@@ -307,7 +307,8 @@ MetaDataTable combineMetaDataTables(std::vector<MetaDataTable> &MDin);
 // Feb14,2017 - Shaoda, Check whether the two MetaDataTables contain the same set of activeLabels
 bool compareLabels(const MetaDataTable &MD1, const MetaDataTable &MD2);
 
-
+// find a subset of the input metadata table that has corresponding entries between the specified min and max values
+MetaDataTable subsetMetaDataTable(MetaDataTable &MD1, EMDLabel label, RFLOAT min_value, RFLOAT max_value);
 
 template<class T>
 bool MetaDataTable::getValue(EMDLabel label, T& value, long objectID) const
