@@ -51,6 +51,8 @@ if(NOT GUI)
     endforeach()
 endif(NOT GUI)
 
+SET(RELION_TEST TRUE)
+
 #--Remove apps for testing--
 set(TEST_TARGETS ft_test double_reconstruct_openmp)
 if(NOT RELION_TEST)
