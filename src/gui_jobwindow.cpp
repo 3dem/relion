@@ -2295,7 +2295,7 @@ void JobWindow::initialiseMotionrefineWindow()
 
 	group2->begin();
 
-	place("optim_cutoff");
+	place("eval_frac");
 	place("optim_min_part");
 
 	group2->end();
