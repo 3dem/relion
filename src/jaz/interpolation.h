@@ -6,6 +6,8 @@
 #include <src/jaz/gravis/t2Vector.h>
 #include <src/jaz/gravis/t4Matrix.h>
 
+#define INTERPOL_WRAP(i,n) ((i) >= 0 ? (i) % (n) : -(i) % (n) ? (n) - (-(i) % (n)) : 0)
+
 class Interpolation
 {
     public:
@@ -68,10 +70,15 @@ class Interpolation
         }
 
         template<typename T>
-        static gravis::d2Vector quadraticMaxWrapXY(const Image<T>& img, double eps = 1e-25)
+        static gravis::d2Vector quadraticMaxWrapXY(
+				const Image<T>& img, double eps = 1e-25,
+				int wMax = -1, int hMax = -1)
         {
             const int w = img.data.xdim;
             const int h = img.data.ydim;
+			
+			if (wMax < 0) wMax = w;
+			if (hMax < 0) hMax = h;
 
             int xmax = -1, ymax = -1;
             double vmax = 0.0;
@@ -79,6 +86,12 @@ class Interpolation
             for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++)
             {
+				if ((x > wMax && w - x > wMax)
+				  || y > hMax && h - x > hMax)
+				{
+					continue;
+				}
+					
                 T v = DIRECT_A2D_ELEM(img.data, y, x);
 
                 if (xmax < 0 || v > vmax)
@@ -119,33 +132,28 @@ class Interpolation
         template<typename T>
         static T cubicXY(const Image<T>& img, double x, double y, int z = 0, int n = 0, bool wrap = false)
         {
-            if (wrap)
-            {
-                x = x - img.data.xdim * std::floor(x/img.data.xdim);
-                y = y - img.data.ydim * std::floor(y/img.data.ydim);
-            }
-
-            int xi    = (int)x;
-            int yi    = (int)y;
-            int xi_n1 = (int)x-1;
-            int yi_n1 = (int)y-1;
-            int xi_p1 = (int)x+1;
-            int yi_p1 = (int)y+1;
-            int xi_p2 = (int)x+2;
-            int yi_p2 = (int)y+2;
+            int xi    = (int)std::floor(x);
+            int yi    = (int)std::floor(y);
+            int xi_n1 = xi-1;
+            int yi_n1 = yi-1;
+            int xi_p1 = xi+1;
+            int yi_p1 = yi+1;
+            int xi_p2 = xi+2;
+            int yi_p2 = yi+2;
 
             const double xf = x - xi;
             const double yf = y - yi;
 
             if (wrap)
             {
-                xi_n1 = (xi_n1 + img.data.xdim) % img.data.xdim;
-                yi_n1 = (yi_n1 + img.data.ydim) % img.data.ydim;
-
-                xi_p1 = xi_p1 % img.data.xdim;
-                yi_p1 = yi_p1 % img.data.ydim;
-                xi_p2 = xi_p2 % img.data.xdim;
-                yi_p2 = yi_p2 % img.data.ydim;
+				xi_n1 = INTERPOL_WRAP(xi_n1, img.data.xdim);
+                yi_n1 = INTERPOL_WRAP(yi_n1, img.data.ydim);
+				xi    = INTERPOL_WRAP(xi,    img.data.xdim);
+                yi    = INTERPOL_WRAP(yi,    img.data.ydim);
+                xi_p1 = INTERPOL_WRAP(xi_p1, img.data.xdim);
+                yi_p1 = INTERPOL_WRAP(yi_p1, img.data.ydim);
+                xi_p2 = INTERPOL_WRAP(xi_p2, img.data.xdim);
+                yi_p2 = INTERPOL_WRAP(yi_p2, img.data.ydim);
             }
             else
             {
@@ -204,33 +212,28 @@ class Interpolation
         template<typename T>
         static gravis::t2Vector<T> cubicXYgrad(const Image<T>& img, double x, double y, int z = 0, int n = 0, bool wrap = false)
         {
-            if (wrap)
-            {
-                x = x - img.data.xdim * std::floor(x/img.data.xdim);
-                y = y - img.data.ydim * std::floor(y/img.data.ydim);
-            }
-
-            int xi    = (int)x;
-            int yi    = (int)y;
-            int xi_n1 = (int)x-1;
-            int yi_n1 = (int)y-1;
-            int xi_p1 = (int)x+1;
-            int yi_p1 = (int)y+1;
-            int xi_p2 = (int)x+2;
-            int yi_p2 = (int)y+2;
+			int xi    = (int)std::floor(x);
+            int yi    = (int)std::floor(y);
+            int xi_n1 = xi-1;
+            int yi_n1 = yi-1;
+            int xi_p1 = xi+1;
+            int yi_p1 = yi+1;
+            int xi_p2 = xi+2;
+            int yi_p2 = yi+2;
 
             const double xf = x - xi;
             const double yf = y - yi;
 
             if (wrap)
             {
-                xi_n1 = (xi_n1 + img.data.xdim) % img.data.xdim;
-                yi_n1 = (yi_n1 + img.data.ydim) % img.data.ydim;
-
-                xi_p1 = xi_p1 % img.data.xdim;
-                yi_p1 = yi_p1 % img.data.ydim;
-                xi_p2 = xi_p2 % img.data.xdim;
-                yi_p2 = yi_p2 % img.data.ydim;
+				xi_n1 = INTERPOL_WRAP(xi_n1, img.data.xdim);
+                yi_n1 = INTERPOL_WRAP(yi_n1, img.data.ydim);
+				xi    = INTERPOL_WRAP(xi,    img.data.xdim);
+                yi    = INTERPOL_WRAP(yi,    img.data.ydim);
+                xi_p1 = INTERPOL_WRAP(xi_p1, img.data.xdim);
+                yi_p1 = INTERPOL_WRAP(yi_p1, img.data.ydim);
+                xi_p2 = INTERPOL_WRAP(xi_p2, img.data.xdim);
+                yi_p2 = INTERPOL_WRAP(yi_p2, img.data.ydim);
             }
             else
             {

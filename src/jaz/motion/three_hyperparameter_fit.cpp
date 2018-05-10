@@ -29,10 +29,18 @@ double ThreeHyperParameterProblem::f(const std::vector<double>& x, void *tempSto
 void ThreeHyperParameterProblem::report(int iteration, double cost, const std::vector<double>& x) const
 {
     d3Vector vda = problemToMotion(x);
-
+	
+	std::cout.precision(5);
+	
     std::cout << iteration << ": \t "
-              << vda[0] << ", \t " << vda[1] << ", \t " << vda[2]
-              << " \t " << -cost << "\n";
+              << vda[0] << "  \t " << vda[1] << "  \t " << vda[2]
+              << "  \t ";
+	
+	std::cout.precision(12);
+	
+	std::cout << -cost << "\n";
+	
+	std::cout.precision(5);
 }
 
 d3Vector ThreeHyperParameterProblem::problemToMotion(const std::vector<double>& x)
@@ -42,7 +50,8 @@ d3Vector ThreeHyperParameterProblem::problemToMotion(const std::vector<double>& 
     return d3Vector(
         x[0] / MotionParamEstimator::velScale,
         x[1] / MotionParamEstimator::divScale,
-        (w > 1.0/accThresh ? (w < 1.0/accEps? 1.0/w : 1.0/accEps) : -1.0));
+        //(w > 1.0/accThresh ? (w < 1.0/accEps? 1.0/w : 1.0/accEps) : -1.0));
+		(x[2] > accEps)? x[2] / MotionParamEstimator::accScale : accEps / MotionParamEstimator::accScale);
 }
 
 std::vector<double> ThreeHyperParameterProblem::motionToProblem(d3Vector vd)
@@ -53,5 +62,6 @@ std::vector<double> ThreeHyperParameterProblem::motionToProblem(d3Vector vd)
     return std::vector<double>{
         vd[0] * MotionParamEstimator::velScale,
         vd[1] * MotionParamEstimator::divScale,
-        w * MotionParamEstimator::accScale};
+        //w * MotionParamEstimator::accScale};
+		vd[2] * MotionParamEstimator::accScale};
 }

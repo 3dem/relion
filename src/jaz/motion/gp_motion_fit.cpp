@@ -29,13 +29,14 @@ GpMotionFit::GpMotionFit(
     Matrix2D<RFLOAT> A(pc,pc);
 
     const double sv2 = sig_vel_px * sig_vel_px;
-    const double sd2 = sig_div_px * sig_div_px;
+	const double sd2 = sig_div_px * sig_div_px;
+	const double sd1 = sig_div_px;
 
     for (int i = 0; i < pc; i++)
     for (int j = i; j < pc; j++)
     {
         const double dd = (positions[i] - positions[j]).norm2();
-        const double k = sv2 * (expKer? exp(-sqrt(dd/sd2)) : exp(-0.5*dd/sd2));
+        const double k = sv2 * (expKer? exp(-sqrt(dd/sd2)) : exp(-0.5*dd/sd1));
         A(i,j) = k;
         A(j,i) = k;
     }
@@ -157,9 +158,11 @@ double GpMotionFit::f(const std::vector<double> &x, void* tempStorage) const
 
         for (int f = 0; f < fc; f++)
         {
-            ts->e_t[ts->pad*t] -= Interpolation::cubicXY(correlation[p][f],
+			const double epf = Interpolation::cubicXY(correlation[p][f],
                     ts->pos[p][f].x + perFrameOffsets[f].x,
                     ts->pos[p][f].y + perFrameOffsets[f].y, 0, 0, true);
+			
+			ts->e_t[ts->pad*t] -= epf;
         }
     }
 

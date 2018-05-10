@@ -18,7 +18,7 @@
  * author citations must be preserved.
  ***************************************************************************/
 
-#include "src/ctf_refinement_mpi.h"
+#include "ctf_refiner_mpi.h"
 
 void CtfRefinerMpi::read(int argc, char **argv)
 {
@@ -33,28 +33,27 @@ void CtfRefinerMpi::read(int argc, char **argv)
 
     // Possibly also read parallelisation-dependent variables here
 	if (node->size < 2)
-		REPORT_ERROR("ParticlePolisherMpi::read ERROR: this program needs to be run with at least two MPI processes!");
+	{
+		REPORT_ERROR_STR("ParticlePolisherMpi::read ERROR: this program needs to be run "
+						 << "with at least two MPI processes!");
+	}
 
     // Print out MPI info
 	printMpiNodesMachineNames(*node);
-
 }
 
 void CtfRefinerMpi::run()
 {
 	// Parallel loop over micrographs
 
-
-	long int total_nr_micrographs = mdts.size();
+	long int total_nr_micrographs = unfinishedMdts.size();
 
 	// Each node does part of the work
-	long int my_first_micrograph, my_last_micrograph, my_nr_micrographs;
+	long int my_first_micrograph, my_last_micrograph;
 	divide_equally(total_nr_micrographs, node->size, node->rank, my_first_micrograph, my_last_micrograph);
-	my_nr_micrographs = my_last_micrograph - my_first_micrograph + 1;
-
-	if (do_defocus_fit || (do_tilt_fit && !precomputed) )
+	
+	if (do_defocus_fit || do_tilt_fit || do_mag_fit)
     {
-    	// The subsets will be used in openMPI parallelisation: instead of over g0->gc, they will be over smaller subsets
     	processSubsetMicrographs(my_first_micrograph, my_last_micrograph);
     }
 
@@ -62,19 +61,6 @@ void CtfRefinerMpi::run()
 
     if (node->isMaster())
     {
-    	// Read back from disk the metadata tables for the defocus_fit and or the xyACC and wAcc images from the tilt_fit
-        Image<Complex> xyAccSum;
-        Image<RFLOAT> wAccSum;
-        combineAllDefocusFitAndBeamTiltInformation(minMG, maxMG, xyAccSum, wAccSum);
-
-    	if (do_tilt_fit)
-    		fitBeamTiltFromSumsAllMicrographs(xyAccSum, wAccSum);
-
-    	mdt0.write(outPath + "particles_ctf_refine.star");
-
-    	if (verb > 0)
-    		std::cout << " + Done! Written out : " << outPath << "particles_ctf_refine.star" << std::endl;
+		finalise();
     }
-
-
 }

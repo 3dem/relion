@@ -30,21 +30,21 @@ class TiltOptimization : public Optimization
         const bool L1, anisotropic;
 };
 
-class TiltRefinement
+class TiltHelper
 {
     public:
 
         static void updateTiltShift(
                 const Image<Complex>& prediction,
                 const Image<Complex>& observation,
-                CTF& ctf, double angpix,
+                const CTF& ctf, double angpix,
                 Image<Complex>& xyDest,
                 Image<RFLOAT>& wDest);
 
         static void updateTiltShiftPar(
                 const Image<Complex>& prediction,
                 const Image<Complex>& observation,
-                CTF& ctf, double angpix,
+                const CTF& ctf, double angpix,
                 Image<Complex>& xyDest,
                 Image<RFLOAT>& wDest);
 

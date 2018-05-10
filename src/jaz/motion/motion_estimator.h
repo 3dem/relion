@@ -82,10 +82,11 @@ class MotionEstimator
             bool paramsRead, ready;
 
             // read from cmd line
-            int maxEDs, maxIters;
+            int maxEDs, maxIters, globOffMax;
 
-            bool unregGlob, noGlobOff, cutoffOut,
-                diag, expKer, global_init, debugOpt;
+            bool unregGlob, globOff, cutoffOut,
+                diag, expKer, global_init, debugOpt,
+				params_scaled_by_dose;
 
             double dmga, dmgb, dmgc, dosePerFrame,
                 sig_vel, sig_div, sig_acc, optEps;
@@ -93,7 +94,7 @@ class MotionEstimator
             // set at init
             int s, sh, fc, verb, nr_omp_threads;
             double angpix;
-            bool debug;
+            bool debug, no_whitening;
 
             std::vector<Image<RFLOAT>> dmgWeight;
 

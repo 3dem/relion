@@ -18,12 +18,12 @@
  * author citations must be preserved.
  ***************************************************************************/
 
-#ifndef CTF_REFINEMENT_MPI_H_
-#define CTF_REFINEMENT_MPI_H_
+#ifndef CTF_REFINER_MPI_H_
+#define CTF_REFINER_MPI_H_
 
-#include "src/mpi.h"
-#include "src/parallel.h"
-#include "src/ctf_refinement.h"
+#include <src/mpi.h>
+#include <src/parallel.h>
+#include "ctf_refiner.h"
 
 class CtfRefinerMpi : public CtfRefiner
 {
