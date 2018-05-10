@@ -2343,23 +2343,30 @@ void JobWindow::initialiseCtfrefineWindow()
 	resetHeight();
 
 	place("minres", TOGGLE_DEACTIVATE);
-	place("do_pad1", TOGGLE_DEACTIVATE);
 
 	current_y += STEPY /2 ;
 
 	// motion_fit
 	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group1->end();
-	place("do_defocus", TOGGLE_LEAVE_ACTIVE, group1);
+	place("do_ctf", TOGGLE_LEAVE_ACTIVE, group1);
 
 	group1->begin();
 
+	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group2->end();
+	place("do_defocus", TOGGLE_LEAVE_ACTIVE, group2);
+	group2->begin();
 	place("range", TOGGLE_DEACTIVATE);
-	place("do_no_glob_astig", TOGGLE_DEACTIVATE);
+	group2->end();
+	guientries["do_defocus"].cb_menu_i();
+
+	place("do_glob_astig", TOGGLE_DEACTIVATE);
 	place("do_astig", TOGGLE_DEACTIVATE);
+	place("do_phase", TOGGLE_DEACTIVATE);
 
 	group1->end();
-	guientries["do_defocus"].cb_menu_i();
+	guientries["do_ctf"].cb_menu_i();
 
 	current_y += STEPY /2 ;
 

@@ -4869,15 +4869,15 @@ The mask used for this postprocessing will be applied to the unfiltered half-map
 	joboptions["minres"] = JobOption("Minimum resolution for fits (A): ", 30, 8, 40, 1, "The minimum spatial frequency (in Angstrom) used in the beamtilt fit.");
 
 	// Defocus fit
-	joboptions["do_defocus"] = JobOption("Perform defocus estimation?", true, "If set to Yes, then relion_ctf_refine will estimate a per-particle defocus.");
+	joboptions["do_ctf"] = JobOption("Perform CTF parameter fitting?", true, "If set to Yes, then relion_ctf_refine will be used to estimate the selected parameters below.");
+	joboptions["do_defocus"] = JobOption("Fit per-particle defocus?", true, "If set to Yes, then relion_ctf_refine will estimate a per-particle defocus.");
 	joboptions["range"] = JobOption("Range for defocus fit (A): ", 2000, 500, 5000, 100, "The range in (Angstrom) for the defocus fit of each particle.");
-	joboptions["do_no_glob_astig"] = JobOption("Skip per-micrograph astigmatism fit?", false, "By default, ctf_refine will try to refine astigamtism on a per-micrograph basis. If this option is set to Yes, this calculation will be skipped. This may be useful if you have few particles per micrograph.");
+	joboptions["do_glob_astig"] = JobOption("Fit per-micrograph astigmatism?", false, "If set to Yes, ctf_refine will try to refine astigamtism on a per-micrograph basis. This will require many particles and good signal-to-noise ratios per micrograph.");
 	joboptions["do_astig"] = JobOption("Fit per-particle astigmatism?", false, "If set to Yes, astigmatism will be estimated on a per-particle basis. This requires very strong data, i.e. very large particles with excellent signal-to-noise ratios.");
+	joboptions["do_phase"] = JobOption("Fit per-micrograph phase-shift?", false, "If set to Yes, ctf_refine will try to refine a phase-shift (amplitude contrast) on a per-micrograph basis. This may be useful for Volta-phase plate data, but will require many particles and good signal-to-noise ratios per micrograph.");
 
 	// Beamtilt fit
 	joboptions["do_tilt"] = JobOption("Perform beamtilt estimation?", false, "If set to Yes, then relion_ctf_refine will also estimate the beamtilt over the entire data set. This option is only recommended for high-resolution data sets, i.e. significantly beyond 3 Angstrom resolution.");
-
-	joboptions["do_pad1"] = JobOption("Skip padding?", false, "If set to Yes, the calculations will not use padding in Fourier space for better interpolation in the references. Otherwise, references are padded 2x before Fourier transforms are calculated. Skipping padding (i.e. use --pad 1) gives nearly as good results as using --pad 2, but some artifacts may appear in the corners from signal that is folded back.");
 
 
 }
@@ -4907,6 +4907,18 @@ bool RelionJob::getCommandsCtfrefineJob(std::string &outputname, std::vector<std
 		return false;
 	}
 
+	if (joboptions["do_astig"].getBoolean() && joboptions["do_glob_astig"].getBoolean())
+	{
+		error_message = "ERROR: you cannot perform both per-micrograph and per-particle astigmatism estimation. Choose one option.";
+		return false;
+	}
+
+	if (joboptions["do_ctf"].getBoolean() && !(joboptions["do_defocus"].getBoolean()
+			|| joboptions["do_astig"].getBoolean() || joboptions["do_glob_astig"].getBoolean() || joboptions["do_phase"].getBoolean() ))
+	{
+		error_message = "ERROR: you did not select any CTF parameter to fit. Either switch off CTF parameter fitting, or select one to fit.";
+		return false;
+	}
 
 	Node node(joboptions["fn_data"].getString(), joboptions["fn_data"].node_type);
 	inputNodes.push_back(node);
@@ -4935,15 +4947,25 @@ bool RelionJob::getCommandsCtfrefineJob(std::string &outputname, std::vector<std
 	command += " --o " + outputname;
 	command += " --kmin " + joboptions["minres"].getString();
 
-	if (joboptions["do_defocus"].getBoolean())
+	if (joboptions["do_ctf"].getBoolean())
 	{
-		command += " --fit_defocus";
-		command += " --range " + joboptions["range"].getString();
+		if (joboptions["do_defocus"].getBoolean())
+		{
+			command += " --fit_defocus";
+			command += " --range " + joboptions["range"].getString();
+		}
 		if (joboptions["do_astig"].getBoolean())
+		{
 			command += " --astig";
-		if (joboptions["do_no_glob_astig"].getBoolean())
-			command += " --no_glob_astig";
-
+		}
+		if (joboptions["do_glob_astig"].getBoolean())
+		{
+			command += " --glob_astig";
+		}
+		if (joboptions["do_phase"].getBoolean())
+		{
+			command += " --fit_phase";
+		}
 		Node node6(outputname+"logfile.pdf", NODE_PDF_LOGFILE);
 		outputNodes.push_back(node6);
 	}
@@ -4952,11 +4974,6 @@ bool RelionJob::getCommandsCtfrefineJob(std::string &outputname, std::vector<std
 	{
 		command += " --fit_beamtilt";
 	}
-
-	if (joboptions["do_pad1"].getBoolean())
-		command += " --pad 1 ";
-	else
-		command += " --pad 2 ";
 
 	// If this is a continue job, then only process unfinished micrographs
 	if (is_continue)
