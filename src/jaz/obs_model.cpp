@@ -30,8 +30,7 @@ ObservationModel::ObservationModel(double angpix, double Cs, double voltage, dou
 void ObservationModel::predictObservation(
         Projector& proj, const MetaDataTable& mdt, int particle,
 		MultidimArray<Complex>& dest,
-        bool applyCtf, bool applyTilt,
-        double deltaRot, double deltaTilt, double deltaPsi) const
+        bool applyCtf, bool applyTilt, bool applyShift) const
 {
     const int s = proj.ori_size;
     const int sh = s/2 + 1;
@@ -48,10 +47,6 @@ void ObservationModel::predictObservation(
     mdt.getValue(EMDL_ORIENT_TILT, tilt, particle);
     mdt.getValue(EMDL_ORIENT_PSI, psi, particle);
 
-    rot += deltaRot;
-    tilt += deltaTilt;
-    psi += deltaPsi;
-
     Euler_angles2matrix(rot, tilt, psi, A3D);
 
 	if (dest.xdim != sh || dest.ydim != s)
@@ -62,7 +57,11 @@ void ObservationModel::predictObservation(
 	dest.initZeros();
 
     proj.get2DFourierTransform(dest, A3D, false);
-    shiftImageInFourierTransform(dest, dest, s, s/2 - xoff, s/2 - yoff);
+	
+	if (applyShift)
+	{
+		shiftImageInFourierTransform(dest, dest, s, s/2 - xoff, s/2 - yoff);
+	}
 
     if (applyCtf)
     {
@@ -106,19 +105,17 @@ void ObservationModel::predictObservation(
 
 Image<Complex> ObservationModel::predictObservation(
         Projector& proj, const MetaDataTable& mdt, int particle,
-        bool applyCtf, bool applyTilt,
-        double deltaRot, double deltaTilt, double deltaPsi) const
+        bool applyCtf, bool applyTilt, bool applyShift) const
 {
     Image<Complex> pred;
 	
-	predictObservation(proj, mdt, particle, pred.data, applyCtf, applyTilt,
-					   deltaRot, deltaTilt, deltaPsi);
+	predictObservation(proj, mdt, particle, pred.data, applyCtf, applyTilt, applyShift);
     return pred;
 }
 
 std::vector<Image<Complex>> ObservationModel::predictObservations(
-        Projector &proj, const MetaDataTable &mdt,
-        bool applyCtf, bool applyTilt, int threads) const
+        Projector &proj, const MetaDataTable &mdt, int threads,
+        bool applyCtf, bool applyTilt, bool applyShift) const
 {
     const int pc = mdt.numberOfObjects();
     std::vector<Image<Complex>> out(pc);
@@ -126,7 +123,7 @@ std::vector<Image<Complex>> ObservationModel::predictObservations(
     #pragma omp parallel for num_threads(threads)
     for (int p = 0; p < pc; p++)
     {
-        out[p] = predictObservation(proj, mdt, p, applyCtf, applyTilt);
+        out[p] = predictObservation(proj, mdt, p, applyCtf, applyTilt, applyShift);
     }
 
     return out;
@@ -214,5 +211,15 @@ double ObservationModel::angToPix(double a, int s)
 
 double ObservationModel::pixToAng(double p, int s)
 {
-    return s * angpix / p;
+	return s * angpix / p;
+}
+
+bool ObservationModel::containsAllNeededColumns(const MetaDataTable& mdt)
+{
+	return (mdt.containsLabel(EMDL_ORIENT_ORIGIN_X)
+         && mdt.containsLabel(EMDL_ORIENT_ORIGIN_Y)
+         && mdt.containsLabel(EMDL_ORIENT_ROT)
+         && mdt.containsLabel(EMDL_ORIENT_TILT)
+         && mdt.containsLabel(EMDL_ORIENT_PSI)
+         && mdt.containsLabel(EMDL_PARTICLE_RANDOM_SUBSET));
 }

@@ -456,6 +456,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	asymmetric_padding = parser.checkOption("--asymmetric_padding", "", "false", true);
 	maximum_significants = textToInteger(parser.getOption("--maxsig", "", "0", true));
 	skip_gridding = parser.checkOption("--skip_gridding", "", "false", true);
+	do_fsc0999 = checkParameter(argc, argv, "--fsc0999");
 
 	do_print_metadata_labels = false;
 	do_print_symmetry_ops = false;
@@ -742,6 +743,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	asymmetric_padding = parser.checkOption("--asymmetric_padding", "", "false", true);
 	maximum_significants = textToInteger(parser.getOption("--maxsig", "", "0", true));
 	skip_gridding = parser.checkOption("--skip_gridding", "", "false", true);
+	do_fsc0999 = checkParameter(argc, argv, "--fsc0999");
 
 #ifdef DEBUG_READ
     std::cerr<<"MlOptimiser::parseInitial Done"<<std::endl;
@@ -1924,6 +1926,11 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 	// Write out unmasked 2D class averages
 	do_write_unmasked_refs = (mymodel.ref_dim == 2);
+
+	if (do_fsc0999 && verb > 0)
+	{
+		std::cerr << " Warning: performing unfil.mrc reconstructions with experimental do_fsc0999 option!" << std::endl;
+	}
 
 #ifdef DEBUG
 	std::cerr << "Leaving initialiseGeneral" << std::endl;
@@ -3913,7 +3920,7 @@ void MlOptimiser::maximization()
 				(wsum_model.BPref[iclass]).reconstruct(mymodel.Iref[iclass], gridding_nr_iter, do_map,
 								tau2_fudge, mymodel.tau2_class[iclass], mymodel.sigma2_class[iclass],
 								mymodel.data_vs_prior_class[iclass], mymodel.fourier_coverage_class[iclass],
-								mymodel.fsc_halves_class[0], wsum_model.pdf_class[iclass], false, false, nr_threads, minres_map, (iclass==0));
+								mymodel.fsc_halves_class[0], wsum_model.pdf_class[iclass], false, false, nr_threads, minres_map, (iclass==0), do_fsc0999);
 
 				if(do_sgd)
 				{

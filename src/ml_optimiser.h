@@ -521,6 +521,9 @@ public:
 	// Skip gridding in reconstruction
 	bool skip_gridding;
 
+	// Use do_fsc0999 in reconstructions for unfil.mrc maps
+	bool do_fsc0999;
+
 	// Number of iterations for gridding preweighting reconstruction
 	int gridding_nr_iter;
 

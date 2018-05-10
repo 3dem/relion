@@ -47,6 +47,10 @@ public:
     // Only process unfinished micrographs in movie-refinement on a per-micrograph basis
     bool only_do_unfinished_movies;
 
+
+    // For debugging: keep temporary/debug weight and data mrc files
+    bool do_keep_debug_reconstruct_files;
+
     // For debugging: halt all slaves except this one
     int halt_all_slaves_except_this;
 

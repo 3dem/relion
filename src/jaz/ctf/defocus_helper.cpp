@@ -1,14 +1,16 @@
-#include <src/jaz/defocus_refinement.h>
+#include "defocus_helper.h"
+
 #include <src/jaz/slice_helper.h>
-#include <src/projector.h>
 #include <src/jaz/filter_helper.h>
 #include <src/jaz/refinement_helper.h>
 #include <src/jaz/optimization/nelder_mead.h>
 #include <src/jaz/gravis/t4Matrix.h>
 
+#include <src/projector.h>
+
 using namespace gravis;
 
-RFLOAT DefocusRefinement::findDefocus1D(
+RFLOAT DefocusHelper::findDefocus1D(
         const Image<Complex> &prediction,
         const Image<Complex> &observation,
         const Image<RFLOAT>& weight,
@@ -63,7 +65,7 @@ RFLOAT DefocusRefinement::findDefocus1D(
     return minErr;
 }
 
-void DefocusRefinement::findAstigmatismNM(
+void DefocusHelper::findAstigmatismNM(
         const Image<Complex> &prediction,
         const Image<Complex> &observation,
         const Image<RFLOAT> &weight,
@@ -81,7 +83,7 @@ void DefocusRefinement::findAstigmatismNM(
     *destPhi = opt.getPhi(params);
 }
 
-void DefocusRefinement::findAstigmatismAndPhaseNM(
+void DefocusHelper::findAstigmatismAndPhaseNM(
         const std::vector<Image<Complex>>& prediction,
         const std::vector<Image<Complex>>& observation,
         const Image<RFLOAT> &weight,
@@ -100,7 +102,7 @@ void DefocusRefinement::findAstigmatismAndPhaseNM(
     *destPhase = opt.getPhase(params);
 }
 
-void DefocusRefinement::findAstigmatismPhaseAndCsNM(
+void DefocusHelper::findAstigmatismPhaseAndCsNM(
         const std::vector<Image<Complex>>& prediction,
         const std::vector<Image<Complex>>& observation,
         const Image<RFLOAT> &weight,
@@ -120,7 +122,7 @@ void DefocusRefinement::findAstigmatismPhaseAndCsNM(
     *destCs = opt.getCs(params);
 }
 
-void DefocusRefinement::findAstigmatismNM(
+void DefocusHelper::findAstigmatismNM(
         const std::vector<Image<Complex>>& prediction,
         const std::vector<Image<Complex>>& observation,
         const Image<RFLOAT> &weight,
@@ -138,7 +140,7 @@ void DefocusRefinement::findAstigmatismNM(
     *destPhi = opt.getPhi(params);
 }
 
-std::vector<d2Vector> DefocusRefinement::diagnoseDefocus(
+std::vector<d2Vector> DefocusHelper::diagnoseDefocus(
         const Image<Complex> &prediction,
         const Image<Complex> &observation,
         const Image<RFLOAT> &weight,

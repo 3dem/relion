@@ -45,6 +45,16 @@ class Volume
         void resize(size_t dimx, size_t dimy, size_t dimz);
         void resize(const Volume& example);
         void fill(T t);
+        
+        Volume& operator += (const Volume& v)
+        {
+            for (int i = 0; i < voxels.size(); i++)
+            {
+                voxels[i] += v.voxels[i];
+            }
+
+            return *this;
+        }
 };
 
 template <class T>

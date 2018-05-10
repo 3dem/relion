@@ -25,22 +25,15 @@ class ObservationModel
 		void predictObservation(
 				Projector &proj, const MetaDataTable &mdt, int particle,
 				MultidimArray<Complex>& dest,
-				bool applyCtf, bool applyTilt,
-				double deltaRot = 0.0,
-				double deltaTilt = 0.0,
-				double deltaPsi = 0.0) const;
+				bool applyCtf = true, bool applyTilt = true, bool applyShift = true) const;
 		
 		Image<Complex> predictObservation(
 				Projector &proj, const MetaDataTable &mdt, int particle,
-				bool applyCtf, bool applyTilt,
-				double deltaRot = 0.0,
-				double deltaTilt = 0.0,
-				double deltaPsi = 0.0) const;
+				bool applyCtf = true, bool applyTilt = true, bool applyShift = true) const;
 
         std::vector<Image<Complex>> predictObservations(
-                Projector &proj, const MetaDataTable &mdt,
-                bool applyCtf, bool applyTilt,
-                int threads) const;
+                Projector &proj, const MetaDataTable &mdt, int threads,
+                bool applyCtf = true, bool applyTilt = true, bool applyShift = true) const;
 
         void insertObservation(
                 const Image<Complex>& img, BackProjector &bproj,
@@ -52,6 +45,9 @@ class ObservationModel
 
         double angToPix(double a, int s);
         double pixToAng(double p, int s);
+		
+		
+		static bool containsAllNeededColumns(const MetaDataTable& mdt);
 
 };
 

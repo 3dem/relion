@@ -283,7 +283,7 @@ public:
                      int max_iter_preweight,
                      bool do_map,
                      RFLOAT tau2_fudge,
-                     MultidimArray<RFLOAT> &tau2_out,
+                     MultidimArray<RFLOAT> &tau2_io,
                      MultidimArray<RFLOAT> &sigma2_out,
                      MultidimArray<RFLOAT> &evidence_vs_prior_out,
                      MultidimArray<RFLOAT> &fourier_coverage_out,
@@ -293,7 +293,8 @@ public:
                      bool is_whole_instead_of_half = false,
                      int nr_threads = 1,
                      int minres_map = -1,
-                     bool printTimes= false);
+                     bool printTimes= false,
+					 bool do_fsc0999 = false);
 
 
 	/*  Enforce Hermitian symmetry, apply helical symmetry as well as point-group symmetry

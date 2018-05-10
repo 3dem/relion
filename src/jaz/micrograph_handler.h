@@ -19,11 +19,10 @@ class MicrographHandler
             int nr_omp_threads, firstFrame, lastFrame;
             double movie_angpix, coords_angpix, hotCutoff;
 
-            bool preextracted, debug, saveMem, ready;
+            bool debug, saveMem, ready;
 
             std::string corrMicFn;
-            std::string movie_path, meta_path, movie_ending;
-            std::string gain_path, last_gainFn; // make protected
+            std::string last_gainFn; // make protected
 
             gravis::t2Vector<int> micrograph_size;
 
@@ -40,6 +39,10 @@ class MicrographHandler
                 int& fc,
                 double& dosePerFrame,
                 std::string& metaFn);
+		
+		// remove movies from the list for which either the meta-star or the movie itself is missing
+		std::vector<MetaDataTable> 
+			cullMissingMovies(const std::vector<MetaDataTable>& mdts, int verb);
 
         // find the greatest number of frames available in all micrographs
         void findLowestFrameCount(const std::vector<MetaDataTable>& mdts, int verb);
@@ -78,6 +81,7 @@ class MicrographHandler
         std::string getMetaName(std::string micName);
 
         int determineFrameCount(const MetaDataTable& mdt);
+		bool isMoviePresent(const MetaDataTable& mdt);
         std::string getMovieFilename(const MetaDataTable& mdt);
 
 };

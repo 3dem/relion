@@ -47,8 +47,8 @@ class MotionHelper
 
         static std::vector<gravis::d2Vector> getGlobalOffsets(
                 const std::vector<std::vector<Image<RFLOAT>>>& movieCC,
-                const std::vector<gravis::d2Vector>& globTrack,
-                double sigma, int threads);
+                const std::vector<std::vector<gravis::d2Vector>>& initialTracks,
+                double sigma, int wMax, int hMax, int threads);
 
         static void noiseNormalize(
                 const Image<Complex>& img,

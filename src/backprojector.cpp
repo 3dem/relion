@@ -906,7 +906,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
                                 int max_iter_preweight,
                                 bool do_map,
                                 RFLOAT tau2_fudge,
-                                MultidimArray<RFLOAT> &tau2, // can be input/output
+                                MultidimArray<RFLOAT> &tau2_io, // can be input/output
                                 MultidimArray<RFLOAT> &sigma2_out,
                                 MultidimArray<RFLOAT> &data_vs_prior_out,
                                 MultidimArray<RFLOAT> &fourier_coverage_out,
@@ -916,7 +916,8 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
                                 bool is_whole_instead_of_half,
                                 int nr_threads,
                                 int minres_map,
-                                bool printTimes)
+                                bool printTimes,
+								bool do_fsc0999)
 {
 
 #ifdef TIMING
@@ -951,6 +952,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
     // never rely on references (handed to you from the outside) for computation:
     // they could be the same (i.e. reconstruct(..., dummy, dummy, dummy, dummy, ...); )
     MultidimArray<RFLOAT> sigma2, data_vs_prior, fourier_coverage;
+	MultidimArray<RFLOAT> tau2 = tau2_io;
 
 
     RCTIC(ReconTimer,ReconS_1);
@@ -1142,6 +1144,27 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 		}
 
 	} //end if do_map
+    else if (do_fsc0999)
+    {
+
+     	// Sjors 9may2018: avoid numerical instabilities with unregularised reconstructions....
+        FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fconv)
+        {
+            int r2 = kp * kp + ip * ip + jp * jp;
+            if (r2 < max_r2)
+            {
+                int ires = ROUND( sqrt((RFLOAT)r2) / padding_factor );
+                if (ires >= minres_map)
+                {
+                    // add 1/1000th of the radially averaged sigma2 to the Fweight, to avoid having zeros there...
+                	DIRECT_A3D_ELEM(Fweight, k, i, j) += 1./(999. * DIRECT_A1D_ELEM(sigma2, ires));
+                }
+            }
+        }
+
+    }
+
+
     RCTOC(ReconTimer,ReconS_2_5);
 	if (skip_gridding)
 	{
@@ -1442,6 +1465,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
     std::cerr<<"done with reconstruct"<<std::endl;
 #endif
 
+	tau2_io = tau2;
     sigma2_out = sigma2;
     data_vs_prior_out = data_vs_prior;
     fourier_coverage_out = fourier_coverage;

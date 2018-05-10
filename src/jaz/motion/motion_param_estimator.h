@@ -62,8 +62,8 @@ class MotionParamEstimator
             int minParticles, maxRange, maxIters, seed;
             double sV, sD, sA;
             double iniStep, conv;
-            double k_cutoff, k_cutoff_Angst;
-            double k_eval, k_eval_Angst;
+			double align_frac, eval_frac;
+            double k_cutoff, k_eval;
 
             // set at init:
             std::vector<MetaDataTable> mdts;

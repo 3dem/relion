@@ -243,6 +243,7 @@ void Reconstructor::readDebugArrays()
 	{
 		A3D_ELEM(backprojector.weight, k, i, j) = A3D_ELEM(It(), k, i, j);
 	}
+	mysize = debug_ori_size;
 
 }
 

@@ -18,7 +18,7 @@
  * author citations must be preserved.
  ***************************************************************************/
 
-#include <src/ctf_refinement.h>
+#include <src/jaz/ctf/ctf_refiner.h>
 
 int main(int argc, char *argv[])
 {
@@ -28,7 +28,7 @@ int main(int argc, char *argv[])
     {
 		prm.read(argc, argv);
 
-		prm.initialise();
+		prm.init();
 
 		prm.run();
     }

@@ -314,6 +314,7 @@ namespace gravis
 
   typedef t2Vector<float > f2Vector;
   typedef t2Vector<double> d2Vector;
+  typedef t2Vector<int> i2Vector;
 
 } /* Close Namespace "gravis" */
 
