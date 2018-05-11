@@ -1186,8 +1186,6 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 		command += " --group_frames " + joboptions["group_frames"].getString();
 	if ((joboptions["fn_gain_ref"].getString()).length() > 0)
 	{
-		std::cout << joboptions["gain_rot"].getString() << std::endl;
-		std::cout << joboptions["gain_flip"].getString() << std::endl;
 
 		int gain_rot = -1, gain_flip = -1;
 		for (int i = 0; i <= 3; i++)
