@@ -657,7 +657,7 @@ bool Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 		int npos = MDin.numberOfObjects();
 		if (npos < 10)
 		{
-			std::cout << "warning: There are only " << npos << " particles in micrograph " << fn_mic <<". Consider joining multiple micrographs into one group. "<< std::endl;
+			std::cerr << "Warning: There are only " << npos << " particles in micrograph " << fn_mic <<". Consider joining multiple micrographs into one group. "<< std::endl;
 		}
 
 		// Get movie or normal micrograph name and check it exists

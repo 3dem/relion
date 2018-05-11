@@ -1186,8 +1186,6 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 		command += " --group_frames " + joboptions["group_frames"].getString();
 	if ((joboptions["fn_gain_ref"].getString()).length() > 0)
 	{
-		std::cout << joboptions["gain_rot"].getString() << std::endl;
-		std::cout << joboptions["gain_flip"].getString() << std::endl;
 
 		int gain_rot = -1, gain_flip = -1;
 		for (int i = 0; i <= 3; i++)
@@ -4954,10 +4952,10 @@ bool RelionJob::getCommandsCtfrefineJob(std::string &outputname, std::vector<std
 	command += " --m2 " + fn_half2;
 	command += " --mask " + fn_mask;
 	command += " --o " + outputname;
-	command += " --kmin " + joboptions["minres"].getString();
 
 	if (joboptions["do_ctf"].getBoolean())
 	{
+		command += " --kmin_defocus " + joboptions["minres"].getString();
 		if (joboptions["do_defocus"].getBoolean())
 		{
 			command += " --fit_defocus";
@@ -4982,6 +4980,7 @@ bool RelionJob::getCommandsCtfrefineJob(std::string &outputname, std::vector<std
 	if (joboptions["do_tilt"].getBoolean())
 	{
 		command += " --fit_beamtilt";
+		command += " --kmin_tilt " + joboptions["minres"].getString();
 	}
 
 	// If this is a continue job, then only process unfinished micrographs

@@ -30,7 +30,7 @@ class image_handler_parameters
 	public:
    	FileName fn_in, fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_mult, fn_div, fn_add, fn_subtract, fn_fsc, fn_adjust_power, fn_correct_ampl, fn_fourfilter;
 	int bin_avg, avg_first, avg_last, edge_x0, edge_xF, edge_y0, edge_yF, filter_edge_width, new_box, minr_ampl_corr;
-	bool do_add_edge, do_flipXY, do_flipmXY, do_flipZ, do_flipX, do_flipY, do_shiftCOM, do_stats, do_calc_com, do_avg_ampl, do_avg_ampl2, do_avg_ampl2_ali, do_average, do_remove_nan;
+	bool do_add_edge, do_flipXY, do_flipmXY, do_flipZ, do_flipX, do_flipY, do_shiftCOM, do_stats, do_calc_com, do_avg_ampl, do_avg_ampl2, do_avg_ampl2_ali, do_average, do_remove_nan, do_average_all_frames;
 	RFLOAT multiply_constant, divide_constant, add_constant, subtract_constant, threshold_above, threshold_below, angpix, new_angpix, lowpass, highpass, logfilter, bfactor, shift_x, shift_y, shift_z, replace_nan, randomize_at;
 	std::string directional;
    	int verb;
@@ -120,15 +120,16 @@ class image_handler_parameters
 		edge_yF = textToInteger(parser.getOption("--edge_yF", "Pixel row to be used for the bottom edge", "4095"));
 
 		int avg_section = parser.addSection("Movie-frame averaging options");
-       		bin_avg = textToInteger(parser.getOption("--avg_bin", "Width (in frames) for binning average, i.e. of every so-many frames", "-1"));
-	    	avg_first = textToInteger(parser.getOption("--avg_first", "First frame to include in averaging", "-1"));
-    		avg_last = textToInteger(parser.getOption("--avg_last", "Last frame to include in averaging", "-1"));
+		bin_avg = textToInteger(parser.getOption("--avg_bin", "Width (in frames) for binning average, i.e. of every so-many frames", "-1"));
+		avg_first = textToInteger(parser.getOption("--avg_first", "First frame to include in averaging", "-1"));
+		avg_last = textToInteger(parser.getOption("--avg_last", "Last frame to include in averaging", "-1"));
+		do_average_all_frames = parser.checkOption("--average_all_movie_frames", "Average all movie frames of all movies in the input STAR file.");
 
-	    	// Check for errors in the command-line option
-    		if (parser.checkForErrors())
-    			REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
+		// Check for errors in the command-line option
+		if (parser.checkForErrors())
+			REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 
-	    	verb = (do_stats || do_calc_com || fn_fsc !="") ? 0 : 1;
+	    verb = (do_stats || do_calc_com || fn_fsc !="") ? 0 : 1;
 
 	}
 
@@ -535,7 +536,14 @@ class image_handler_parameters
    		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
 		{
 			FileName fn_img;
-			MD.getValue(EMDL_IMAGE_NAME, fn_img);
+			if (do_average_all_frames)
+			{
+				MD.getValue(EMDL_MICROGRAPH_MOVIE_NAME, fn_img);
+			}
+			else
+			{
+				MD.getValue(EMDL_IMAGE_NAME, fn_img);
+			}
 
 			// For fourfilter...
 			RFLOAT psi;
@@ -610,7 +618,7 @@ class image_handler_parameters
 				{
 					avg_ampl.initZeros(zdim, ydim, xdim/2+1);
 				}
-				else if (do_average)
+				else if (do_average || do_average_all_frames)
 				{
 					avg_ampl.initZeros(zdim, ydim, xdim);
 				}
@@ -682,6 +690,17 @@ class image_handler_parameters
 					DIRECT_MULTIDIM_ELEM(avg_ampl, n) +=  DIRECT_MULTIDIM_ELEM(Iin(), n);
 				}
 			}
+			else if (do_average_all_frames)
+			{
+				Iin.read(fn_img);
+				for (int n = 0; n < ndim; n++)
+				{
+					FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(avg_ampl)
+					{
+						DIRECT_A3D_ELEM(avg_ampl, k, i, j) +=  DIRECT_NZYX_ELEM(Iin(), n, k, i, j);
+					}
+				}
+			}
 			else if (bin_avg > 0 || (avg_first >= 0 && avg_last >= 0))
 			{
 				// movie-frame averaging operations
@@ -750,13 +769,13 @@ class image_handler_parameters
 				MD.setValue(EMDL_IMAGE_NAME, my_fn_out);
 			}
 
-			i_img++;
+			i_img+=ndim;
 			if (verb > 0)
-				progress_bar(i_img);
+				progress_bar(i_img/ndim);
 		}
 
 
-		if (do_avg_ampl || do_avg_ampl2 || do_avg_ampl2_ali || do_average)
+		if (do_avg_ampl || do_avg_ampl2 || do_avg_ampl2_ali || do_average || do_average_all_frames)
 		{
 			avg_ampl /= (RFLOAT)i_img;
 			Iout() = avg_ampl;
