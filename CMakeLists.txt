@@ -160,13 +160,18 @@ endif()
 # ---------------------------------------------------------------------------TBB --
 
 if (ALTCPU)
-	find_package(TBB REQUIRED)
-	include_directories("${TBB_INCLUDE_DIRS}")
+	find_package(TBB)
 	
-	message(STATUS "TBB_FOUND :        ${TBB_FOUND}")
-	message(STATUS "TBB_INCLUDE_DIRS : ${TBB_INCLUDE_DIRS}")
-	message(STATUS "TBB_VERSION :      ${TBB_VERSION}")
-	message(STATUS "TBB_LIBRARIES :    ${TBB_LIBRARIES}")
+	if(TBB_FOUND)
+		include_directories("${TBB_INCLUDE_DIRS}")
+		message(STATUS "TBB_FOUND :        ${TBB_FOUND}")
+		message(STATUS "TBB_INCLUDE_DIRS : ${TBB_INCLUDE_DIRS}")
+		message(STATUS "TBB_VERSION :      ${TBB_VERSION}")
+		message(STATUS "TBB_LIBRARIES :    ${TBB_LIBRARIES}")
+	else(TBB_FOUND)
+		include(${CMAKE_SOURCE_DIR}/cmake/BuildTBB.cmake)
+		set(INSTALL_OWN_TBB 1)
+	endif(TBB_FOUND)
 endif()
 
 # ----------------------------------------------------------Intel Compiler support --
@@ -239,9 +244,9 @@ if(GUI)
         endif(NOT FORCE_OWN_FLTK)
         
 	if(NOT FLTK_FOUND)
-            include(${CMAKE_SOURCE_DIR}/cmake/BuildFLTK.cmake)
-            set(INSTALL_OWN_FLTK 1)
-        endif(NOT FLTK_FOUND)
+		include(${CMAKE_SOURCE_DIR}/cmake/BuildFLTK.cmake)
+		set(INSTALL_OWN_FLTK 1)
+	endif(NOT FLTK_FOUND)
 
     else(X11_FOUND)
         message( STATUS "\n-- ------------------ YOU HAVE NO X11-LIBS ------------------")
