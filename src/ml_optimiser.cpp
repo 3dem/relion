@@ -2698,7 +2698,7 @@ void MlOptimiser::expectation()
 	{
 		unsigned nr_classes = mymodel.PPref.size();
 		// Allocate Array of complex arrays for this class
-		if (posix_memalign((void **)&mdlClassComplex, MEM_ALIGN, nr_classes * sizeof (XFLOAT *)))
+		if (posix_memalign((void **)&mdlClassComplex, MEM_ALIGN, nr_classes * sizeof (std::complex<XFLOAT> *)))
 			CRITICAL(RAMERR);
 
 		// Set up XFLOAT complex array shared by all threads for each class
@@ -2713,15 +2713,25 @@ void MlOptimiser::expectation()
 			else
 				mdlXYZ = mdlX*mdlY*mdlZ;
 
-			if(posix_memalign((void **)&mdlClassComplex[iclass], MEM_ALIGN, mdlXYZ * 2 * sizeof(XFLOAT)))
+			try
+			{
+				mdlClassComplex[iclass] = new std::complex<XFLOAT>[mdlXYZ];
+			}
+			catch (std::bad_alloc& ba)
+			{
 				CRITICAL(RAMERR);
+			}			
 
-			XFLOAT *pData = mdlClassComplex[iclass];
+			std::complex<XFLOAT> *pData = mdlClassComplex[iclass];
 
+			// Copy results into complex number array
 			for (unsigned long i = 0; i < mdlXYZ; i ++)
 			{
-				*pData ++ = (XFLOAT) mymodel.PPref[iclass].data.data[i].real;
-				*pData ++ = (XFLOAT) mymodel.PPref[iclass].data.data[i].imag;
+				std::complex<XFLOAT> arrayval(
+					(XFLOAT) mymodel.PPref[iclass].data.data[i].real,
+					(XFLOAT) mymodel.PPref[iclass].data.data[i].imag
+				);
+				pData[i] = arrayval;
 			}
 		}
 
@@ -2917,7 +2927,7 @@ void MlOptimiser::expectation()
 		unsigned nr_classes = mymodel.nr_classes;
 		for (int iclass = 0; iclass < nr_classes; iclass++)
 		{
-			free(mdlClassComplex[iclass]);
+			delete [] mdlClassComplex[iclass];
 		}
 		free(mdlClassComplex);
 

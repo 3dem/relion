@@ -161,17 +161,19 @@ void AccProjector::initMdl(XFLOAT *real, XFLOAT *imag)
 	DEBUG_HANDLE_ERROR(cudaMemcpy( mdlReal, real, mdlXYZ * sizeof(XFLOAT), cudaMemcpyHostToDevice));
 	DEBUG_HANDLE_ERROR(cudaMemcpy( mdlImag, imag, mdlXYZ * sizeof(XFLOAT), cudaMemcpyHostToDevice));
 #else
-	XFLOAT *pData = mdlComplex;
+	std::complex<XFLOAT> *pData = mdlComplex;
     for(int i=0; i<mdlXYZ; i++) {
-	    *pData ++ = *real ++;
-		*pData ++ = *imag ++;			        
+		std::complex<XFLOAT> arrayval(*real ++, *imag ++);
+		pData[i] = arrayval;
+//      *pData ++ = *real ++;
+//		*pData ++ = *imag ++;			        
     }
 #endif
 #endif
 
 }
 
-void AccProjector::initMdl(XFLOAT *data)
+void AccProjector::initMdl(std::complex<XFLOAT> *data)
 {
 #ifndef CUDA
 	mdlComplex = data;  // No copy needed - everyone shares the complex reference arrays
@@ -245,7 +247,7 @@ void AccProjector::clear()
 #else // ifdef CUDA
 	if ((mdlComplex != NULL) && (externalFree == 0))
 	{
-		free(mdlComplex);
+		delete [] mdlComplex;
 		mdlComplex = NULL;
 	}
 #endif  // ifdef CUDA

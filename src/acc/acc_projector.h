@@ -7,6 +7,9 @@
 #include "src/acc/acc_ptr.h"
 //#include <cuda_runtime.h>
 //#include "src/acc/cuda/cuda_kernels/cuda_device_utils.cuh"
+#ifndef CUDA
+#include <complex>
+#endif
 
 class AccProjector
 {
@@ -29,7 +32,7 @@ class AccProjector
 #ifdef CUDA
 	XFLOAT *mdlReal, *mdlImag;
 #else
-	XFLOAT *mdlComplex;
+	std::complex<XFLOAT> *mdlComplex;
 	int externalFree;
 #endif
 #endif  // PROJECTOR_NO_TEXTURES
@@ -69,7 +72,7 @@ public:
 
 	void initMdl(XFLOAT *real, XFLOAT *imag);
 	void initMdl(Complex *data);
-	void initMdl(XFLOAT *data);
+	void initMdl(std::complex<XFLOAT> *data);
 
 	void clear();
 
