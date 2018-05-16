@@ -85,6 +85,11 @@ option(DoublePrec_ACC "Accelerated Code use double-precision" OFF)
 option(MKLFFT "Use MKL rather than FFTW for FFT" OFF)
 option(CudaTexture "CudaTexture" ON)
 
+if(ALTCPU)
+   message(STATUS "Turning CUDA off since ALTCPU is enabled")
+   set(CUDA FALSE)
+endif()
+
 if(CUDA OR ALTCPU)
     add_definitions(-DACC_CUDA=2 -DACC_CPU=1)
 endif()

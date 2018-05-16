@@ -72,7 +72,9 @@ public:
 
 	void initMdl(XFLOAT *real, XFLOAT *imag);
 	void initMdl(Complex *data);
+#ifndef CUDA
 	void initMdl(std::complex<XFLOAT> *data);
+#endif
 
 	void clear();
 
