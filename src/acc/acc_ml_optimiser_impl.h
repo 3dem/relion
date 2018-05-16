@@ -587,13 +587,13 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 			//avoid kernel-calls warning about null-pointer for RandomImage
 			if (baseMLO->do_zero_mask)
-						RandomImage.setDevicePtr(d_img);
+				RandomImage.setAccPtr(d_img);
 
 			// Apply a cosine-softened mask, using either the background value or the noise-image outside of the radius
 			AccUtilities::cosineFilter(
 					d_img,
 					baseMLO->do_zero_mask,
-					~RandomImage,
+					RandomImage,
 					radius,
 					radius_p,
 					cosine_width,
