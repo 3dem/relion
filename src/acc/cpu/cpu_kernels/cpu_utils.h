@@ -196,7 +196,9 @@ XFLOAT no_tex3D(
 
 // 3D linear interpolation for complex data that interleaves real and
 // imaginary data, rather than storing them in a separate array
+#ifdef __INTEL_COMPILER
 __attribute__((vector(uniform(mdlX,mdlXY,mdlInitY,mdlInitZ))))
+#endif
 static inline
 void complex3D(
 #ifdef DEBUG_CUDA
