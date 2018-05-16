@@ -164,9 +164,7 @@ void AccProjector::initMdl(XFLOAT *real, XFLOAT *imag)
 	std::complex<XFLOAT> *pData = mdlComplex;
     for(int i=0; i<mdlXYZ; i++) {
 		std::complex<XFLOAT> arrayval(*real ++, *imag ++);
-		pData[i] = arrayval;
-//      *pData ++ = *real ++;
-//		*pData ++ = *imag ++;			        
+		pData[i] = arrayval;		        
     }
 #endif
 #endif

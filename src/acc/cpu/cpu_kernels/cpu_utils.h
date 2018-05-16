@@ -91,18 +91,7 @@ XFLOAT no_tex2D(XFLOAT* mdl, XFLOAT xp, XFLOAT yp, int mdlX, int mdlInitY)
 // imaginary data, rather than storing them in a separate array
 static inline
 void complex2D(std::complex<XFLOAT> *mdlComplex, XFLOAT &real, XFLOAT &imag,
-               XFLOAT xp, XFLOAT yp, int mdlX, int mdlInitY
-#if 0
-,
-		std::complex<XFLOAT> &d00, 
-		std::complex<XFLOAT> &d01, 
-		std::complex<XFLOAT> &d10, 
-		std::complex<XFLOAT> &d11,
-		std::complex<XFLOAT> &dx0, 
-		std::complex<XFLOAT> &dx1,
-		std::complex<XFLOAT> &result
-#endif
-)
+               XFLOAT xp, XFLOAT yp, int mdlX, int mdlInitY)
 {
 	int x0 = floorf(xp);
 	XFLOAT fx = xp - x0;
@@ -111,13 +100,12 @@ void complex2D(std::complex<XFLOAT> *mdlComplex, XFLOAT &real, XFLOAT &imag,
 	XFLOAT fy = yp - y0;
 	y0 -= mdlInitY;
 
-    int offset1 = (y0 * mdlX + x0) * 2;
-    int offset2 = offset1 + 2;
-    int offset3 = offset1 + mdlX * 2;
-    int offset4 = offset3 + 2;  
+    int offset1 = (y0 * mdlX + x0);
+    int offset2 = offset1 + 1;
+    int offset3 = offset1 + mdlX;
+    int offset4 = offset3 + 1;  
     
 	//-----------------------------
-//	std::complex<XFLOAT> d00, d01, d10, d11;
 	XFLOAT d00[2], d01[2], d10[2], d11[2];
 
 	d00[0] = mdlComplex[offset1].real();  d00[1] = mdlComplex[offset1].imag();
@@ -126,7 +114,6 @@ void complex2D(std::complex<XFLOAT> *mdlComplex, XFLOAT &real, XFLOAT &imag,
 	d11[0] = mdlComplex[offset4].real();  d11[1] = mdlComplex[offset4].imag();
 	
 	//-----------------------------
-//	std::complex<XFLOAT> dx0, dx1;
 	XFLOAT dx0[2], dx1[2];
 	
 	dx0[0] = d00[0] + (d01[0] - d00[0]) * fx;
@@ -135,13 +122,7 @@ void complex2D(std::complex<XFLOAT> *mdlComplex, XFLOAT &real, XFLOAT &imag,
 	dx0[1] = d00[1] + (d01[1] - d00[1]) * fx;
 	dx1[1] = d10[1] + (d11[1] - d10[1]) * fx;
 	
-	//-----------------------------
-//	std::complex<XFLOAT> result;
-	
-//	result = dx0 + (dx1 - dx0) * fy;
-	
-//	real = result.real(); //dx0[0] + (dx1[0] - dx0[0])*fy;
-//	imag = result.imag(); //dx0[1] + (dx1[1] - dx0[1])*fy;	
+	//-----------------------------	
 	real = dx0[0] + (dx1[0] - dx0[0])*fy;
 	imag = dx0[1] + (dx1[1] - dx0[1])*fy;
 }
@@ -208,24 +189,6 @@ void complex3D(
 #endif
 				XFLOAT &real, XFLOAT &imag,
 				XFLOAT xp, XFLOAT yp, XFLOAT zp, int mdlX, int mdlXY, int mdlInitY, int mdlInitZ
-#if 0
-,
-		std::complex<XFLOAT> &d000, 
-		std::complex<XFLOAT> &d001, 
-		std::complex<XFLOAT> &d010, 
-		std::complex<XFLOAT> &d011,
-		std::complex<XFLOAT> &d100, 
-		std::complex<XFLOAT> &d101, 
-		std::complex<XFLOAT> &d110, 
-		std::complex<XFLOAT> &d111,
-		std::complex<XFLOAT> &dx00, 
-		std::complex<XFLOAT> &dx01, 
-		std::complex<XFLOAT> &dx10, 
-		std::complex<XFLOAT> &dx11,
-		std::complex<XFLOAT> &dxy0, 
-		std::complex<XFLOAT> &dxy1,
-		std::complex<XFLOAT> &result
-#endif
 		)
 {
 #ifdef DEBUG_CUDA
@@ -243,49 +206,32 @@ void complex3D(
 	XFLOAT fz = zp - z0;
 	z0 -= mdlInitZ;
 
-    int offset1 = (z0*mdlXY+y0*mdlX+x0) * 2;
-    int offset2 = offset1 + 2;
-    int offset3 = offset1 + mdlX * 2;
-    int offset4 = offset3 + 2;
-    int offset5 = offset1 + mdlXY * 2;
-    int offset6 = offset2 + mdlXY * 2;
-    int offset7 = offset3 + mdlXY * 2;
-    int offset8 = offset4 + mdlXY * 2;    
+    int offset1 = (z0*mdlXY+y0*mdlX+x0);
+    int offset2 = offset1 + 1;
+    int offset3 = offset1 + mdlX;
+    int offset4 = offset3 + 1;
+    int offset5 = offset1 + mdlXY;
+    int offset6 = offset2 + mdlXY;
+    int offset7 = offset3 + mdlXY;
+    int offset8 = offset4 + mdlXY;    
         
-//    std::complex<XFLOAT> d000, d001, d010, d011; //XFLOAT d000[2], d001[2], d010[2], d011[2];
-//    std::complex<XFLOAT> d100, d101, d110, d111;//XFLOAT d100[2], d101[2], d110[2], d111[2];   
 	XFLOAT d000[2], d001[2], d010[2], d011[2];
 	XFLOAT d100[2], d101[2], d110[2], d111[2]; 
-//    std::complex<XFLOAT> d100, d101, d110, d111;//XFLOAT d100[2], d101[2], d110[2], d111[2];  
-  
-	
- //   d000 = mdlComplex[offset1]; //
+
 	d000[0] = mdlComplex[offset1].real(); d000[1] = mdlComplex[offset1].imag();
- //   d001 = mdlComplex[offset2]; // 
 	d001[0] = mdlComplex[offset2].real(); d001[1] = mdlComplex[offset2].imag();    
- //   d010 = mdlComplex[offset3]; // 
 	d010[0] = mdlComplex[offset3].real(); d010[1] = mdlComplex[offset3].imag();
- //   d011 = mdlComplex[offset4]; // 
 	d011[0] = mdlComplex[offset4].real(); d011[1] = mdlComplex[offset4].imag();
- //   d100 = mdlComplex[offset5]; // 
 	d100[0] = mdlComplex[offset5].real(); d100[1] = mdlComplex[offset5].imag();
-  //  d101 = mdlComplex[offset6]; // 
 	d101[0] = mdlComplex[offset6].real(); d101[1] = mdlComplex[offset6].imag();
- //   d110 = mdlComplex[offset7]; // 
 	d110[0] = mdlComplex[offset7].real(); d110[1] = mdlComplex[offset7].imag();
- //   d111 = mdlComplex[offset8]; // 
 	d111[0] = mdlComplex[offset8].real(); d111[1] = mdlComplex[offset8].imag();                    
                                 
 	//-----------------------------
-//	 std::complex<XFLOAT> dx00, dx01, dx10, dx11; //
 	XFLOAT dx00[2], dx01[2], dx10[2], dx11[2];
-//    dx00 = d000 + (d001 - d000)*fx; //
 	dx00[0] = d000[0] + (d001[0] - d000[0])*fx;
-//    dx01 = d100 + (d101 - d100)*fx; //
 	dx01[0] = d100[0] + (d101[0] - d100[0])*fx;
-//    dx10 = d010 + (d011 - d010)*fx; //
 	dx10[0] = d010[0] + (d011[0] - d010[0])*fx;
-//    dx11 = d110 + (d111 - d110)*fx; //
 	dx11[0] = d110[0] + (d111[0] - d110[0])*fx;
 
     dx00[1] = d000[1] + (d001[1] - d000[1])*fx;
@@ -294,22 +240,15 @@ void complex3D(
     dx11[1] = d110[1] + (d111[1] - d110[1])*fx;
 	
 	//-----------------------------
-//   std::complex<XFLOAT> dxy0, dxy1; //
 	XFLOAT dxy0[2], dxy1[2];	
-//	dxy0 = dx00 + (dx10 - dx00)*fy;  //
 	dxy0[0] = dx00[0] + (dx10[0] - dx00[0])*fy;
-//	dxy1 = dx01 + (dx11 - dx01)*fy;  //
 	dxy1[0] = dx01[0] + (dx11[0] - dx01[0])*fy;
 	
     dxy0[1] = dx00[1] + (dx10[1] - dx00[1])*fy;
     dxy1[1] = dx01[1] + (dx11[1] - dx01[1])*fy;
 
 	//-----------------------------
-//	std::complex<XFLOAT> result;
 	
-//	result = dxy0 + (dxy1 - dxy0)*fz;
-//	real = result.real(); //dxy0[0] + (dxy1[0] - dxy0[0])*fz;
-//	imag = result.imag(); //dxy0[1] + (dxy1[1] - dxy0[1])*fz;	
 	real = dxy0[0] + (dxy1[0] - dxy0[0])*fz;
 	imag = dxy0[1] + (dxy1[1] - dxy0[1])*fz;	
 }
