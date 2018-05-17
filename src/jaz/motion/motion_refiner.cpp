@@ -346,7 +346,7 @@ void MotionRefiner::init()
 		if (verb > 0) std::cout << " + Initializing motion parameter estimator ...\n";
 		
 		motionParamEstimator.init(
-					verb, nr_omp_threads, debug,
+					verb, nr_omp_threads, debug, outPath,
 					s, fc, chosenMdts, &motionEstimator, &reference, &obsModel);
 	}
 }

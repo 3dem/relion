@@ -49,7 +49,7 @@ int MotionParamEstimator::read(IOParser& parser, int argc, char *argv[])
 
 void MotionParamEstimator::init(
     int verb, int nr_omp_threads, bool debug,
-    int s, int fc,
+    std::string outPath, int s, int fc,
     const std::vector<MetaDataTable>& allMdts,
     MotionEstimator* motionEstimator,
     ReferenceMap* reference,
@@ -63,6 +63,7 @@ void MotionParamEstimator::init(
     this->verb = verb;
     this->nr_omp_threads = nr_omp_threads;
     this->debug = debug;
+	this->outPath = outPath;
     this->s = s;
     this->fc = fc;
     this->motionEstimator = motionEstimator;
@@ -228,6 +229,18 @@ void MotionParamEstimator::run()
               << " --s_vel " << rnd[0]
               << " --s_div " << rnd[1]
               << " --s_acc " << rnd[2] << "\n\n";
+	
+	FileName newdir = FileName(outPath).beforeLastOf("/");
+	std::string command = " mkdir -p " + newdir;
+	int ret = system(command.c_str());
+	
+	std::ofstream ofs(outPath+"opt_params.txt");
+	ofs << rnd[0] << " ";
+	ofs << rnd[1] << " ";
+	ofs << rnd[2] << "\n";
+	ofs.close();
+	
+	std::cout << "written to " << (outPath+"opt_params.txt") << "\n";
 
     #ifdef TIMING
         paramTimer.printTimes(true);

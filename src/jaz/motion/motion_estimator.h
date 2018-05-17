@@ -90,6 +90,8 @@ class MotionEstimator
 
             double dmga, dmgb, dmgc, dosePerFrame,
                 sig_vel, sig_div, sig_acc, optEps;
+			
+			std::string paramsFn;
 
             // set at init
             int s, sh, fc, verb, nr_omp_threads;
