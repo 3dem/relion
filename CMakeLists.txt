@@ -164,20 +164,28 @@ endif()
 
 # ---------------------------------------------------------------------------TBB --
 
+option(FORCE_OWN_TBB "FORCE_OWN_TBB" OFF)
+
 if (ALTCPU)
-	find_package(TBB)
 	
-	if(TBB_FOUND)
-		include_directories("${TBB_INCLUDE_DIRS}")
-		message(STATUS "TBB_FOUND :        ${TBB_FOUND}")
-		message(STATUS "TBB_INCLUDE_DIRS : ${TBB_INCLUDE_DIRS}")
-		message(STATUS "TBB_VERSION :      ${TBB_VERSION}")
-		message(STATUS "TBB_LIBRARIES :    ${TBB_LIBRARIES}")
-	else(TBB_FOUND)
+	if (FORCE_OWN_TBB)
+		message(STATUS "Will ignore any potentially installed system TBB lib, as per your request.")
 		include(${CMAKE_SOURCE_DIR}/cmake/BuildTBB.cmake)
 		set(INSTALL_OWN_TBB 1)
-	endif(TBB_FOUND)
-endif()
+	else(FORCE_OWN_TBB)
+		find_package(TBB)
+		if(TBB_FOUND)
+			include_directories("${TBB_INCLUDE_DIRS}")
+			message(STATUS "TBB_FOUND :        ${TBB_FOUND}")
+			message(STATUS "TBB_INCLUDE_DIRS : ${TBB_INCLUDE_DIRS}")
+			message(STATUS "TBB_VERSION :      ${TBB_VERSION}")
+			message(STATUS "TBB_LIBRARIES :    ${TBB_LIBRARIES}")
+		else(TBB_FOUND)
+			include(${CMAKE_SOURCE_DIR}/cmake/BuildTBB.cmake)
+			set(INSTALL_OWN_TBB 1)
+		endif(TBB_FOUND)
+	endif(FORCE_OWN_TBB)
+endif(ALTCPU)
 
 # ----------------------------------------------------------Intel Compiler support --
 # ----------------------------------  and build flags including MKL and TBB ---------
