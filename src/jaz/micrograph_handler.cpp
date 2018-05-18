@@ -318,9 +318,9 @@ void MicrographHandler::loadInitial(
 		}
 	}
 	
-	if (angpix < coords_angpix)
+	if (angpix < coords_angpix - 1e-9)
 	{
-		std::cerr << "WARING: pixel size (--angpix) is greater than the AutoPick pixel size (--coords_angpix)\n";
+		std::cerr << "WARNING: pixel size (--angpix) is greater than the AutoPick pixel size (--coords_angpix)\n";
 		
 		if (coords_angpix < angpix + 0.01)
 		{
@@ -330,9 +330,9 @@ void MicrographHandler::loadInitial(
 		}
 	}
 	
-	if (angpix < movie_angpix)
+	if (angpix < movie_angpix - 1e-9)
 	{
-		std::cerr << "WARING: pixel size (--angpix) is greater than the movie pixel size (--movie_angpix)\n";
+		std::cerr << "WARNING: pixel size (--angpix) is greater than the movie pixel size (--movie_angpix)\n";
 		
 		if (movie_angpix < angpix + 0.01)
 		{

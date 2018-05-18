@@ -12,7 +12,8 @@ class GpMotionFit : public DifferentiableOptimization
 
         GpMotionFit(
                 const std::vector<std::vector<Image<double>>>& correlation,
-                double sig_vel_px, double sig_div_px, double sig_acc_px,
+                double cc_pad,
+				double sig_vel_px, double sig_div_px, double sig_acc_px,
                 int maxDims,
                 const std::vector<gravis::d2Vector>& positions,
                 const std::vector<gravis::d2Vector>& perFrameOffsets,
@@ -48,7 +49,7 @@ class GpMotionFit : public DifferentiableOptimization
 
         bool expKer;
         int pc, fc, dc, threads;
-        double sig_vel_px, sig_div_px, sig_acc_px;
+        double cc_pad, sig_vel_px, sig_div_px, sig_acc_px;
 
         Matrix2D<RFLOAT> basis;
         std::vector<double> eigenVals;

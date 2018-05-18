@@ -23,10 +23,10 @@ class MotionHelper
                 const std::vector<std::vector<Image<Complex>>>& movie,
                 const std::vector<Image<Complex>>& preds,
                 const std::vector<Image<RFLOAT>>& damageWeights,
-                std::vector<ParFourierTransformer>& fts, int threads);
+                double pad, int threads);
 
         // deprecated: use the one above!
-        static std::vector<std::vector<Image<RFLOAT>>> movieCC(
+        /*static std::vector<std::vector<Image<RFLOAT>>> movieCC(
                 Projector& projector0,
                 Projector& projector1,
                 const ObservationModel& obsModel,
@@ -34,21 +34,21 @@ class MotionHelper
                 const std::vector<std::vector<Image<Complex>>>& movie,
                 const std::vector<double>& sigma2,
                 const std::vector<Image<RFLOAT>>& damageWeights,
-                std::vector<ParFourierTransformer>& fts, int threads);
+                std::vector<ParFourierTransformer>& fts, int threads);*/
 
-        static std::vector<gravis::d2Vector> getGlobalTrack(
-                const std::vector<std::vector<Image<RFLOAT>>>& movieCC);
+        /*static std::vector<gravis::d2Vector> getGlobalTrack(
+                const std::vector<std::vector<Image<RFLOAT>>>& movieCC, double cc_pad);*/
 
         static std::vector<Image<RFLOAT>> addCCs(
                 const std::vector<std::vector<Image<RFLOAT>>>& movieCC);
 
         static std::vector<gravis::d2Vector> getGlobalTrack(
-                const std::vector<Image<RFLOAT>>& movieCcSum);
+                const std::vector<Image<RFLOAT>>& movieCcSum, double cc_pad);
 
         static std::vector<gravis::d2Vector> getGlobalOffsets(
                 const std::vector<std::vector<Image<RFLOAT>>>& movieCC,
-                const std::vector<std::vector<gravis::d2Vector>>& initialTracks,
-                double sigma, int wMax, int hMax, int threads);
+                const std::vector<std::vector<gravis::d2Vector>>& initialTracks, 
+				double cc_pad, double sigma, int wMax, int hMax, int threads);
 
         static void noiseNormalize(
                 const Image<Complex>& img,

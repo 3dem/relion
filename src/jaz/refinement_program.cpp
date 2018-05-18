@@ -577,7 +577,7 @@ std::vector<std::vector<Image<Complex>>> RefinementProgram::loadMovie(
 
     if (angpix < coords_angpix)
     {
-        std::cerr << "WARING: pixel size (--angpix) is greater than the AutoPick pixel size (--coords_angpix)\n";
+        std::cerr << "WARNING: pixel size (--angpix) is greater than the AutoPick pixel size (--coords_angpix)\n";
 
         if (coords_angpix < angpix + 0.01)
         {
@@ -589,7 +589,7 @@ std::vector<std::vector<Image<Complex>>> RefinementProgram::loadMovie(
 
     if (angpix < movie_angpix)
     {
-        std::cerr << "WARING: pixel size (--angpix) is greater than the movie pixel size (--movie_angpix)\n";
+        std::cerr << "WARNING: pixel size (--angpix) is greater than the movie pixel size (--movie_angpix)\n";
 
         if (movie_angpix < angpix + 0.01)
         {
