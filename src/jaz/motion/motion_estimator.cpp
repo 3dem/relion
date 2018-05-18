@@ -27,8 +27,11 @@ void MotionEstimator::read(IOParser& parser, int argc, char *argv[])
 	
 	dosePerFrame = textToFloat(parser.getOption("--fdose", "Electron dose per frame (in e^-/A^2)", "-1"));
 	sig_vel = textToFloat(parser.getOption("--s_vel", "Velocity sigma [Angst/dose]", "0.5"));
-	sig_div = textToFloat(parser.getOption("--s_div", "Divergence sigma [Angst]", "1000.0"));
-	sig_acc = textToFloat(parser.getOption("--s_acc", "Acceleration sigma [Angst/dose]", "-1.0"));
+	sig_div = textToFloat(parser.getOption("--s_div", "Divergence sigma [Angst]", "5000.0"));
+	sig_acc = textToFloat(parser.getOption("--s_acc", "Acceleration sigma [Angst/dose]", "2.0"));
+	
+	paramsFn = parser.getOption("--params_file", "File containing s_vel, s_div and s_acc (overrides command line parameters)", "");
+			
 	diag = parser.checkOption("--diag", "Write out diagnostic data");
 	
 	parser.addSection("Motion fit options (advanced)");
@@ -96,6 +99,31 @@ void MotionEstimator::init(
 	{
 		std::cout << " + maximum frequency to consider: "
 				  << (s * angpix)/(RFLOAT)reference->k_out << " A (" << reference->k_out << " px)\n";
+	}
+	
+	if (paramsFn != "")
+	{
+		if (verb > 0)
+		{
+			std::cout << " + using parameters from: " << paramsFn << "\n";
+		}
+		
+		std::ifstream ifs(paramsFn);
+		
+		if (ifs.fail())
+		{
+			REPORT_ERROR("Unable to read " + paramsFn);
+		}
+		
+		ifs >> sig_vel;
+		ifs >> sig_div;
+		ifs >> sig_acc;
+		
+		if (verb > 0)
+		{
+			std::cout << "   s_vel: " << sig_vel << ", s_div: " << sig_div 
+					  << ", s_acc: " << sig_acc << "\n";
+		}		
 	}
 	
 	if (debug) std::cout << "computing damage weights...\n";

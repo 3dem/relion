@@ -34,7 +34,7 @@ class MotionParamEstimator
         int read(IOParser& parser, int argc, char *argv[]);
 
         void init(int verb, int nr_omp_threads, bool debug,
-                  int s, int fc,
+                  std::string outPath, int s, int fc,
                   const std::vector<MetaDataTable>& allMdts,
                   MotionEstimator* motionEstimator,
                   ReferenceMap* reference,
@@ -74,6 +74,7 @@ class MotionParamEstimator
 
             int fc, s, k_out, verb, nr_omp_threads;
             bool debug;
+			std::string outPath;
 
             #ifdef TIMING
                 Timer paramTimer;
