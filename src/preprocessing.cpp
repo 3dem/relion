@@ -964,33 +964,34 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 			if (star_has_ctf)
 			{
 
+				RFLOAT mag, dstep, maxres, fom;
+				if (MDmics.containsLabel(EMDL_CTF_MAGNIFICATION))
+				{
+					MDmics.getValue(EMDL_CTF_MAGNIFICATION, mag, imic);
+					MD.setValue(EMDL_CTF_MAGNIFICATION, mag);
+				}
+				if (MDmics.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
+				{
+					MDmics.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep, imic);
+					if (do_rescale)
+						dstep *= (RFLOAT)extract_size/(RFLOAT)scale;
+					MD.setValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
+				}
+				if (MDmics.containsLabel(EMDL_CTF_MAXRES))
+				{
+					MDmics.getValue(EMDL_CTF_MAXRES, maxres, imic);
+					MD.setValue(EMDL_CTF_MAXRES, maxres);
+				}
+				if (MDmics.containsLabel(EMDL_CTF_FOM))
+				{
+					MDmics.getValue(EMDL_CTF_FOM, fom, imic);
+					MD.setValue(EMDL_CTF_FOM, fom);
+				}
+
 				// Only set CTF parameters from the micrographs STAR file if the input STAR file did not contain it!
 				if (!MDin_has_ctf)
 				{
 					ctf.write(MD);
-					RFLOAT mag, dstep, maxres, fom;
-					if (MDmics.containsLabel(EMDL_CTF_MAGNIFICATION))
-					{
-						MDmics.getValue(EMDL_CTF_MAGNIFICATION, mag, imic);
-						MD.setValue(EMDL_CTF_MAGNIFICATION, mag);
-					}
-					if (MDmics.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
-					{
-						MDmics.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep, imic);
-						if (do_rescale)
-							dstep *= (RFLOAT)extract_size/(RFLOAT)scale;
-						MD.setValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
-					}
-					if (MDmics.containsLabel(EMDL_CTF_MAXRES))
-					{
-						MDmics.getValue(EMDL_CTF_MAXRES, maxres, imic);
-						MD.setValue(EMDL_CTF_MAXRES, maxres);
-					}
-					if (MDmics.containsLabel(EMDL_CTF_FOM))
-					{
-						MDmics.getValue(EMDL_CTF_FOM, fom, imic);
-						MD.setValue(EMDL_CTF_FOM, fom);
-					}
 				}
 
 				// Only set beamtilt from the micrographs STAR file if the input STAR file did not contain it!
