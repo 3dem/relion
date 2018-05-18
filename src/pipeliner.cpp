@@ -754,7 +754,8 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 					{
 						int mytype = processList[current_job].type;
 						// The following jobtypes have functionality to only do the unfinished part of the job
-						if (mytype == PROC_MOTIONCORR || mytype == PROC_CTFFIND || mytype == PROC_AUTOPICK || mytype == PROC_EXTRACT || mytype == PROC_MOVIEREFINE)
+						if (mytype == PROC_MOTIONCORR || mytype == PROC_CTFFIND || mytype == PROC_AUTOPICK || mytype == PROC_EXTRACT
+								|| mytype == PROC_CLASSSELECT || mytype == PROC_MOVIEREFINE)
 						{
 							myjob.is_continue = true;
 							// Write the job again, now with the updated is_continue status

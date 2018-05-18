@@ -2116,7 +2116,7 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 
 			for (int isplit = 0; isplit < nr_split; isplit++)
 			{
-				FileName fn_split = fn_out.insertBeforeExtension("_split"+integerToString(isplit+1));
+				FileName fn_split = fn_out.insertBeforeExtension("_split"+integerToString(isplit+1,3));
 				Node node2(fn_split, NODE_PART_DATA);
 				outputNodes.push_back(node2);
 			}

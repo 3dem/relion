@@ -273,7 +273,7 @@ class star_handler_parameters
 
 		for (int isplit = 0; isplit < nr_split; isplit ++)
 		{
-			FileName fnt = fn_out.insertBeforeExtension("_split"+integerToString(isplit+1));
+			FileName fnt = fn_out.insertBeforeExtension("_split"+integerToString(isplit+1,3));
 			MDouts[isplit].write(fnt);
 			std::cout << " Written: " <<fnt << " with " << MDouts[isplit].numberOfObjects() << " objects." << std::endl;
 		}
