@@ -2100,17 +2100,9 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 
 				// Calculate nr_split from number of entries in input STAR file
 				MetaDataTable MDtmp;
-				long int n_obj;
-				if (joboptions["fn_mic"].getString() != "")
-					n_obj = MDtmp.read(joboptions["fn_mic"].getString(), "", NULL, "", true); // true means do_only_count
-				else
-					n_obj = MDtmp.read(joboptions["fn_data"].getString(), "", NULL, "", true); // true means do_only_count
+				FileName fnt = (joboptions["fn_mic"].getString() != "") ? joboptions["fn_mic"].getString() : joboptions["fn_data"].getString();
+				long int n_obj = (exists(fnt)) ? MDtmp.read(fnt, "", NULL, "", true) : 0; // true means do_only_count
 				long int size_split = joboptions["split_size"].getNumber();
-				if (size_split > n_obj)
-				{
-					error_message = "ERROR: size_split is set to a larger value than the number of input images.";
-					return false;
-				}
 				nr_split = n_obj / size_split;
 			}
 
