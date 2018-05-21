@@ -81,9 +81,9 @@ class star_handler_parameters
 
 	    int center_section = parser.addSection("Center options");
 	    do_center = parser.checkOption("--center", "Perform centering of particles according to a position in the reference.");
-	    center_X = textToFloat(parser.getOption("--center_X", "X-coordinate in the reference to center particles on", "0."));
-	    center_Y = textToFloat(parser.getOption("--center_Y", "Y-coordinate in the reference to center particles on", "0."));
-	    center_Z = textToFloat(parser.getOption("--center_Z", "Z-coordinate in the reference to center particles on", "0."));
+	    center_X = textToFloat(parser.getOption("--center_X", "X-coordinate in the reference to center particles on (in pix)", "0."));
+	    center_Y = textToFloat(parser.getOption("--center_Y", "Y-coordinate in the reference to center particles on (in pix)", "0."));
+	    center_Z = textToFloat(parser.getOption("--center_Z", "Z-coordinate in the reference to center particles on (in pix)", "0."));
 
 	    // Check for errors in the command-line option
     	if (parser.checkForErrors())
