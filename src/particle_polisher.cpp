@@ -492,6 +492,8 @@ void ParticlePolisher::fitMovementsOneMicrograph(long int imic)
 	plot2D->SetXAxisTitle("X-coordinate");
 	plot2D->SetYAxisTitle("Y-coordinate");
 	plot2D->OutputPostScriptPlot(fn_eps);
+
+	delete plot2D;
 }
 
 void ParticlePolisher::calculateAllSingleFrameReconstructionsAndBfactors()
@@ -619,6 +621,7 @@ void ParticlePolisher::writeStarFileBfactors(FileName fn_star)
 	plot2D->SetYAxisTitle("B-factor");
 	MDout.addToCPlot2D(plot2D, EMDL_IMAGE_FRAME_NR, EMDL_POSTPROCESS_BFACTOR);
 	plot2D->OutputPostScriptPlot(fn_out + "bfactors.eps");
+	delete plot2D;
 
 	CPlot2D *plot2Db=new CPlot2D("Polishing scale-factors");
 	plot2Db->SetXAxisSize(600);
@@ -628,7 +631,7 @@ void ParticlePolisher::writeStarFileBfactors(FileName fn_star)
 	plot2Db->SetYAxisTitle("Scale-factor");
 	MDout.addToCPlot2D(plot2Db, EMDL_IMAGE_FRAME_NR, EMDL_POSTPROCESS_GUINIER_FIT_INTERCEPT);
 	plot2Db->OutputPostScriptPlot(fn_out + "scalefactors.eps");
-
+	delete plot2Db;
 
 }
 
@@ -944,6 +947,7 @@ void ParticlePolisher::calculateBfactorSingleFrameReconstruction(int iframe, RFL
 		MDout.addToCPlot2D(plot2D, EMDL_POSTPROCESS_GUINIER_RESOL_SQUARED, EMDL_POSTPROCESS_GUINIER_VALUE_IN);
 		plot2D->AddDataSet(dataSet);
 		plot2D->OutputPostScriptPlot(fn_out + "frame_"+integerToString(iframe+1, 3, '0')+"_guinier.eps");
+		delete plot2D;
 	}
 
 }

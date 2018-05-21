@@ -1119,7 +1119,7 @@ void JobWindow::initialiseSelectWindow()
 	tab2->end();
 
 	tab3->begin();
-	tab3->label("Values");
+	tab3->label("Subsets");
 	resetHeight();
 
 	group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
@@ -1132,6 +1132,20 @@ void JobWindow::initialiseSelectWindow()
 	place("select_maxval", TOGGLE_DEACTIVATE);
 	group3->end();
 	guientries["do_select_values"].cb_menu_i();
+
+	group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group4->end();
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	place("do_split", TOGGLE_DEACTIVATE, group4);
+	group4->begin();
+	place("do_random", TOGGLE_DEACTIVATE);
+	place("split_size", TOGGLE_DEACTIVATE);
+	place("nr_split", TOGGLE_DEACTIVATE);
+	group4->end();
+	guientries["do_split"].cb_menu_i();
 
 	tab3->end();
 
@@ -2270,25 +2284,10 @@ void JobWindow::initialiseMotionrefineWindow()
 	tab1->end();
 
 	tab2->begin();
-	tab2->label("Motion");
+	tab2->label("Train");
 	resetHeight();
 
-	// motion_fit
-	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group1->end();
-	place("do_fit", TOGGLE_LEAVE_ACTIVE, group1);
-
-	group1->begin();
-
-	current_y += STEPY /2 ;
-
-	place("sigma_vel", TOGGLE_DEACTIVATE);
-	place("sigma_div", TOGGLE_DEACTIVATE);
-	place("sigma_acc", TOGGLE_DEACTIVATE);
-
-	current_y += STEPY /2 ;
-
-	//combine_frames
+	// Train for optimal parameters
 	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group2->end();
 	place("do_param_optim", TOGGLE_LEAVE_ACTIVE, group2);
@@ -2307,18 +2306,32 @@ void JobWindow::initialiseMotionrefineWindow()
 	tab3->label("Polish");
 	resetHeight();
 
-	//combine_frames
-	group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group3->end();
-	place("do_combine", TOGGLE_LEAVE_ACTIVE, group3);
+	// Polishing
+	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group1->end();
+	place("do_polish", TOGGLE_DEACTIVATE, group1);
 
-	group3->begin();
+	current_y += STEPY /2 ;
+
+	group1->begin();
+
+	place("opt_params", TOGGLE_DEACTIVATE);
+
+	group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group4->end();
+	place("do_own_params", TOGGLE_DEACTIVATE, group4);
+
+	group4->begin();
+	place("sigma_vel", TOGGLE_DEACTIVATE);
+	place("sigma_div", TOGGLE_DEACTIVATE);
+	place("sigma_acc", TOGGLE_DEACTIVATE);
+	group4->end();
+	guientries["do_own_params"].cb_menu_i();
+
+	current_y += STEPY /2 ;
 
 	place("minres", TOGGLE_DEACTIVATE);
 	place("maxres", TOGGLE_DEACTIVATE);
-
-	group3->end();
-	guientries["do_combine"].cb_menu_i();
 
 	tab3->end();
 

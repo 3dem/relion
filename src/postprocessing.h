@@ -72,6 +72,9 @@ public:
 	// From the resolution where the FSC drops below this value, randomize the phases in the two maps
 	RFLOAT randomize_fsc_at;
 
+	// Or user-specified resolution (in A) for randomisation of phases
+	RFLOAT randomize_at_A;
+
 	// Filename for a user-provided mask
 	FileName fn_mask;
 
@@ -126,7 +129,7 @@ public:
 	// Width of raised cosine edge on low-pass filter
 	int filter_edge_width;
 
-	// Shell for randomisaion of phases
+	// Shell for randomisation of phases
 	int randomize_at;
 
 	// Arrays to store FSC, Guinier curves etc

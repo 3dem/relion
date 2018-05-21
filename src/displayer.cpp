@@ -1070,7 +1070,7 @@ void multiViewerCanvas::saveSelectedParticles(int save_selected)
 		return;
 	}
 
-//#define RELION_DEVEL_ASKTRAINING
+#define RELION_DEVEL_ASKTRAINING
 #ifdef RELION_DEVEL_ASKTRAINING
 	bool do_training = false;
 	std::string ask = "Is this a selection of good classes, so it can be used for Sjors' training set for automated class selection?\n \
@@ -1231,8 +1231,11 @@ void multiViewerCanvas::saveTrainingSet()
 	fn_iroot = fn_iroot.beforeLastOf("/");
 	fn_img = fn_iroot + "/note.txt";
 	copy(fn_img, fn_odir+"/"+fn_img.afterLastOf("/"));
-	fn_img = fn_iroot + "/run_unmasked_classes.mrcs";
-	copy(fn_img, fn_odir+"/"+fn_img.afterLastOf("/"));
+        fn_img = fn_iroot + "/run_unmasked_classes.mrcs";
+        if (exists(fn_img))
+        {
+            copy(fn_img, fn_odir+"/"+fn_img.afterLastOf("/"));
+        }
 	fn_img = fn_iroot + "/default_pipeline.star";
 	copy(fn_img, fn_odir+"/"+fn_img.afterLastOf("/"));
 

@@ -285,7 +285,7 @@ void MotioncorrRunner::prepareGainReference(bool write_gain)
 	if (gain_rotation == 0 && gain_flip == 0) return;
 
 	// Need gain rotation and/or flipping
-	
+
 	FileName fn_new_gain = fn_out + "gain.mrc";
 	if (write_gain)
 	{
@@ -504,7 +504,7 @@ bool MotioncorrRunner::executeMotioncor2(Micrograph &mic, int rank)
 		if (do_dose_weighting)
 		{
 			FileName fn_tmp = fn_avg.withoutExtension() + "_noDW.mrc";
-			if (save_noDW) // Move .mrc to _noDW.mrc filename 
+			if (save_noDW) // Move .mrc to _noDW.mrc filename
 			{
 				if (std::rename(fn_avg.c_str(), fn_tmp.c_str()))
 				{
@@ -858,6 +858,8 @@ void MotioncorrRunner::plotFRC(FileName fn_frc)
 	plot2D->SetYAxisTitle("FRC");
 	plot2D->OutputPostScriptPlot(fn_eps);
 
+	delete plot2D;
+
 }
 
 // Plot the shifts
@@ -946,6 +948,8 @@ void MotioncorrRunner::plotShifts(FileName fn_mic, Micrograph &mic)
 	plot2D->SetYAxisTitle(title);
 
 	plot2D->OutputPostScriptPlot(fn_eps);
+
+	delete plot2D;
 }
 
 void MotioncorrRunner::saveModel(Micrograph &mic) {
@@ -1145,7 +1149,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	RCTOC(TIMING_INITIAL_SUM);
 
 	// Hot pixel
-	
+
 	RCTIC(TIMING_DETECT_HOT);
 	RFLOAT mean = 0, std = 0;
 	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iframe) {
@@ -1711,7 +1715,7 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<fComplex> > &Fframes
 
 	// Parameters TODO: make an option
 	const int max_iter = 5;
-	int search_range = 50; // px 
+	int search_range = 50; // px
 	const RFLOAT tolerance = 0.5; // px
 	const RFLOAT EPS = 1e-15;
 
@@ -1727,7 +1731,7 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<fComplex> > &Fframes
 	// Calculate the size of down-sampled CCF
 	float ccf_requested_scale = ccf_downsample;
 	if (ccf_downsample <= 0) {
-		ccf_requested_scale = sqrt(-log(1E-8) / (2 * scaled_B)); // exp(-2 B max_dist^2) = 1E-8 
+		ccf_requested_scale = sqrt(-log(1E-8) / (2 * scaled_B)); // exp(-2 B max_dist^2) = 1E-8
 	}
 	int ccf_nx = findGoodSize(int(pnx * ccf_requested_scale)), ccf_ny = findGoodSize(int(pny * ccf_requested_scale));
 	if (ccf_nx > pnx) ccf_nx = pnx;
@@ -1763,7 +1767,7 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<fComplex> > &Fframes
 	// Initialize B factor weight
 	weight.reshape(Fref);
 	RCTIC(TIMING_PREP_WEIGHT);
-	#pragma omp parallel for num_threads(n_threads) 
+	#pragma omp parallel for num_threads(n_threads)
 	for (int y = 0; y < ccf_nfy; y++) {
 		const int ly = (y > ccf_nfy_half) ? (y - ccf_nfy) : y;
 		RFLOAT ly2 = ly * (RFLOAT)ly / (nfy * (RFLOAT)nfy);
@@ -1904,7 +1908,7 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<fComplex> > &Fframes
 
 int MotioncorrRunner::findGoodSize(int request) {
 	// numbers that do not contain large prime numbers
-	const int good_numbers[] = {192, 216, 256, 288, 324, 
+	const int good_numbers[] = {192, 216, 256, 288, 324,
 	                            384, 432, 486, 512, 576, 648,
 	                            768, 800, 864, 972, 1024,
 	                            1296, 1536, 1728, 1944,

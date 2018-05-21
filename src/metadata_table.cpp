@@ -1130,6 +1130,11 @@ void MetaDataTable::printLabels(std::ostream &ost)
     }
 }
 
+void MetaDataTable::randomiseOrder()
+{
+	std::random_shuffle(objects.begin(), objects.end());
+}
+
 void MetaDataTable::checkObjectID(long id, std::string caller) const
 {
     if (id >= objects.size() || id < 0)
