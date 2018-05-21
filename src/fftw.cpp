@@ -170,7 +170,7 @@ const MultidimArray<Complex > &FourierTransformer::getComplex() const
 void FourierTransformer::setReal(MultidimArray<RFLOAT> &input)
 {
 	bool recomputePlan = false;
-	
+
 	if (   fReal == NULL
 		|| dataPtr != MULTIDIM_ARRAY(input)
 		|| !fReal->sameShape(input)
@@ -183,7 +183,7 @@ void FourierTransformer::setReal(MultidimArray<RFLOAT> &input)
     {
 		fFourier.reshape(ZSIZE(input),YSIZE(input),XSIZE(input)/2+1);
 		fReal=&input;
-		
+
         int ndim=3;
         if (ZSIZE(input)==1)
         {
@@ -242,7 +242,7 @@ void FourierTransformer::setReal(MultidimArray<RFLOAT> &input)
         delete [] N;
         dataPtr=MULTIDIM_ARRAY(*fReal);
 		complexDataPtr = MULTIDIM_ARRAY(fFourier);
-		
+
 	}
 }
 
@@ -1708,4 +1708,5 @@ void helicalLayerLineProfile(const MultidimArray<RFLOAT > &v, std::string title,
 	plot2D->AddDataSet(dataSetAmpl);
 	plot2D->AddDataSet(dataSetAmpr);
 	plot2D->OutputPostScriptPlot(fn_eps);
+	delete plot2D;
 }

@@ -2083,40 +2083,34 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 			{
 				command += " --random_order ";
 			}
+			if (joboptions["nr_split"].getNumber() <= 0 && joboptions["split_size"].getNumber() <= 0)
+			{
+				error_message = "ERROR: When splitting the input STAR file into subsets, set nr_split and/or split_size to a positive value";
+				return false;
+			}
 			if (joboptions["nr_split"].getNumber() > 0)
 			{
 				nr_split = joboptions["nr_split"].getNumber();
 				command += " --nr_split " + joboptions["nr_split"].getString();
 			}
-			else
+			if (joboptions["split_size"].getNumber() > 0)
 			{
-				if (joboptions["split_size"].getNumber() <= 0)
-				{
-					error_message = "When splitting the input STAR file into subsets, give a positive number for subset size or the number of subsets.";
-					return false;
-				}
-
 				command += " --size_split " + joboptions["split_size"].getString();
 
-				// Calculate nr_split from number of entries in input STAR file
-				MetaDataTable MDtmp;
-				long int n_obj;
-				if (joboptions["fn_mic"].getString() != "")
-					n_obj = MDtmp.read(joboptions["fn_mic"].getString(), "", NULL, "", true); // true means do_only_count
-				else
-					n_obj = MDtmp.read(joboptions["fn_data"].getString(), "", NULL, "", true); // true means do_only_count
-				long int size_split = joboptions["split_size"].getNumber();
-				if (size_split > n_obj)
+				if (joboptions["nr_split"].getNumber() <= 0)
 				{
-					error_message = "ERROR: size_split is set to a larger value than the number of input images.";
-					return false;
+					// Calculate nr_split from number of entries in input STAR file
+					MetaDataTable MDtmp;
+					FileName fnt = (joboptions["fn_mic"].getString() != "") ? joboptions["fn_mic"].getString() : joboptions["fn_data"].getString();
+					long int n_obj = (exists(fnt)) ? MDtmp.read(fnt, "", NULL, "", true) : 0; // true means do_only_count
+					long int size_split = joboptions["split_size"].getNumber();
+					nr_split = n_obj / size_split;
 				}
-				nr_split = n_obj / size_split;
 			}
 
 			for (int isplit = 0; isplit < nr_split; isplit++)
 			{
-				FileName fn_split = fn_out.insertBeforeExtension("_split"+integerToString(isplit+1));
+				FileName fn_split = fn_out.insertBeforeExtension("_split"+integerToString(isplit+1,3));
 				Node node2(fn_split, NODE_PART_DATA);
 				outputNodes.push_back(node2);
 			}

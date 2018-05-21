@@ -61,11 +61,13 @@ void Postprocessing::read(int argc, char **argv)
 	int expert_section = parser.addSection("Expert options");
 	do_ampl_corr = parser.checkOption("--ampl_corr", "Perform amplitude correlation and DPR, also re-normalize amplitudes for non-uniform angular distributions");
 	randomize_fsc_at = textToFloat(parser.getOption("--randomize_at_fsc", "Randomize phases from the resolution where FSC drops below this value", "0.8"));
+	randomize_at_A  = textToFloat(parser.getOption("--randomize_at_A", "Randomize phases from this resolution (in A) onwards (if positive)", "-1"));
 	filter_edge_width = textToInteger(parser.getOption("--filter_edge_width", "Width of the raised cosine on the low-pass filter edge (in resolution shells)", "2"));
 	verb = textToInteger(parser.getOption("--verb", "Verbosity", "1"));
-	// Hidden option
-	int random_seed = textToInteger(getParameter(argc, argv, "--seed", "-1"));
-	if (random_seed >= 0) {
+	int random_seed = textToInteger(parser.getOption("--random_seed", "Seed for random number generator (negative value for truly random)", "0"));
+
+	if (random_seed >= 0)
+	{
 		init_random_generator(random_seed);
 	}
 
@@ -97,6 +99,7 @@ void Postprocessing::clear()
 	do_fsc_weighting = true;
 	low_pass_freq = 0.;
 	randomize_fsc_at = 0.8;
+	randomize_at_A = -1.;
 	filter_edge_width = 2.;
 	verb = 1;
 	do_ampl_corr = false;
@@ -735,6 +738,7 @@ void Postprocessing::writeOutput()
 	MDfsc.addToCPlot2D(plot2D, EMDL_RESOLUTION, EMDL_POSTPROCESS_FSC_MASKED, 0., 0., 1.);
 	MDfsc.addToCPlot2D(plot2D, EMDL_RESOLUTION, EMDL_POSTPROCESS_FSC_RANDOM_MASKED, 1., 0., 0.);
 	plot2D->OutputPostScriptPlot(fn_out + "_fsc.eps");
+	delete plot2D;
 
 	// Also write XML file with FSC_true curve for EMDB submission
 	writeFscXml(MDfsc);
@@ -791,6 +795,7 @@ void Postprocessing::writeOutput()
 		MDextra2.addToCPlot2D(plot2Db, EMDL_POSTPROCESS_GUINIER_RESOL_SQUARED, EMDL_POSTPROCESS_GUINIER_VALUE_SHARPENED, 1., 0., 0.);
 	}
 	plot2Db->OutputPostScriptPlot(fn_out + "_guinier.eps");
+	delete plot2Db;
 
 	FileName fn_log = fn_out.beforeLastOf("/") + "/logfile.pdf";
 	if (!exists(fn_log))
@@ -1125,12 +1130,21 @@ void Postprocessing::run()
 
 		// Check at which resolution shell the FSC drops below randomize_fsc_at
 		randomize_at = -1;
-		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(fsc_unmasked)
+
+		if (randomize_at_A > 0.)
 		{
-			if (i > 0 && DIRECT_A1D_ELEM(fsc_unmasked, i) < randomize_fsc_at)
+			randomize_at = (int)(angpix * XSIZE(I1()) / randomize_at_A );
+		}
+		else
+		{
+			// Check when FSC drops below randomize_fsc_at
+			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(fsc_unmasked)
 			{
-				randomize_at = i;
-				break;
+				if (i > 0 && DIRECT_A1D_ELEM(fsc_unmasked, i) < randomize_fsc_at)
+				{
+					randomize_at = i;
+					break;
+				}
 			}
 		}
 		if (verb > 0)

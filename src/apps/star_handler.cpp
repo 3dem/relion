@@ -27,6 +27,7 @@ class star_handler_parameters
 	public:
    	FileName fn_in, fn_out, fn_compare, fn_label1, fn_label2, fn_label3, select_label;
    	FileName fn_check, fn_operate, fn_operate2, fn_operate3, fn_set;
+   	std::string remove_col_label, add_col_label, add_col_value;
 	RFLOAT eps, select_minval, select_maxval, multiply_by, add_to, center_X, center_Y, center_Z;
 	bool do_combine, do_split, do_center, do_random_order;
 	long int nr_split, size_split;
@@ -68,8 +69,8 @@ class star_handler_parameters
 	    int split_section = parser.addSection("Split options");
 	    do_split = parser.checkOption("--split", "Split the input STAR file into one or more smaller output STAR files");
 	    do_random_order = parser.checkOption("--random_order", "Perform splits on randomised order of the input STAR file");
-	    nr_split = textToInteger(parser.getOption("--nr_split", "Split into this many equal-sized STAR files", "0"));
-	    size_split = textToInteger(parser.getOption("--size_split", "Split into subsets of this many lines", "0"));
+	    nr_split = textToInteger(parser.getOption("--nr_split", "Split into this many equal-sized STAR files", "-1"));
+	    size_split = textToInteger(parser.getOption("--size_split", "AND/OR split into subsets of this many lines", "-1"));
 
 	    int operate_section = parser.addSection("Operate options");
 	    fn_operate = parser.getOption("--operate", "Operate on this metadata label", "");
@@ -81,9 +82,14 @@ class star_handler_parameters
 
 	    int center_section = parser.addSection("Center options");
 	    do_center = parser.checkOption("--center", "Perform centering of particles according to a position in the reference.");
-	    center_X = textToFloat(parser.getOption("--center_X", "X-coordinate in the reference to center particles on", "0."));
-	    center_Y = textToFloat(parser.getOption("--center_Y", "Y-coordinate in the reference to center particles on", "0."));
-	    center_Z = textToFloat(parser.getOption("--center_Z", "Z-coordinate in the reference to center particles on", "0."));
+	    center_X = textToFloat(parser.getOption("--center_X", "X-coordinate in the reference to center particles on (in pix)", "0."));
+	    center_Y = textToFloat(parser.getOption("--center_Y", "Y-coordinate in the reference to center particles on (in pix)", "0."));
+	    center_Z = textToFloat(parser.getOption("--center_Z", "Z-coordinate in the reference to center particles on (in pix)", "0."));
+
+	    int column_section = parser.addSection("Column options");
+	    remove_col_label = parser.getOption("--remove_column", "Remove the column with this metadata label from the input STAR file.","");
+	    add_col_label = parser.getOption("--add_column", "Add a column with this metadata label from the input STAR file.","");
+	    add_col_value = parser.getOption("--add_column_value", "Set this value in all rows for the added column","");
 
 	    // Check for errors in the command-line option
     	if (parser.checkForErrors())
@@ -100,8 +106,10 @@ class star_handler_parameters
 		if (do_split) c++;
 		if (fn_operate != "") c++;
 		if (do_center) c++;
+		if (remove_col_label!= "") c++;
+		if (add_col_label!= "") c++;
 		if (c != 1)
-			REPORT_ERROR("ERROR: specify (only and at least) one of the following options: --compare, --select, --combine, --split, --operate or --center");
+			REPORT_ERROR("ERROR: specify (only and at least) one of the following options: --compare, --select, --combine, --split, --operate, --center, --remove_label or --add_label");
 
 
 		if (fn_compare != "") compare();
@@ -110,6 +118,9 @@ class star_handler_parameters
 		if (do_split) split();
 		if (fn_operate != "") operate();
 		if (do_center) center();
+		if (remove_col_label!= "") remove_column();
+		if (add_col_label!= "") add_column();
+
 
 		std::cout << " Done!" << std::endl;
 
@@ -240,15 +251,20 @@ class star_handler_parameters
 
 		long int n_obj = MD.numberOfObjects();
 
-		if (size_split > 0)
+		if (nr_split < 0 && size_split < 0)
+		{
+			REPORT_ERROR("ERROR: nr_split and size_split are both zero. Set at least one of them to be positive.");
+		}
+		else if (nr_split < 0 && size_split > 0)
 		{
 			if (size_split > n_obj)
 			{
-				REPORT_ERROR("ERROR: size_split is set to a larger value than the number of input images.");
+				std::cout << " Nothing to do, as size_split is set to a larger value than the number of input images..." << std::endl;
+				return;
 			}
 			nr_split = n_obj / size_split;
 		}
-		else
+		else if (nr_split > 0 && size_split < 0)
 		{
 			size_split = CEIL(1. * n_obj / nr_split);
 		}
@@ -273,7 +289,7 @@ class star_handler_parameters
 
 		for (int isplit = 0; isplit < nr_split; isplit ++)
 		{
-			FileName fnt = fn_out.insertBeforeExtension("_split"+integerToString(isplit+1));
+			FileName fnt = fn_out.insertBeforeExtension("_split"+integerToString(isplit+1,3));
 			MDouts[isplit].write(fnt);
 			std::cout << " Written: " <<fnt << " with " << MDouts[isplit].numberOfObjects() << " objects." << std::endl;
 		}
@@ -437,6 +453,53 @@ class star_handler_parameters
 		MD.write(fn_out);
 		std::cout << " Written: " << fn_out << std::endl;
 
+
+	}
+
+	void remove_column()
+	{
+		MetaDataTable MD;
+		MD.read(fn_in);
+		MD.deactivateLabel(EMDL::str2Label(remove_col_label));
+		MD.write(fn_out);
+		std::cout << " Written: " << fn_out << std::endl;
+	}
+
+	void add_column()
+	{
+
+		if (add_col_value == "")
+			REPORT_ERROR("ERROR: you need to specify --add_column_value when adding a column.");
+
+		MetaDataTable MD;
+		EMDLabel label = EMDL::str2Label(add_col_label);
+		MD.read(fn_in);
+		MD.addLabel(label);
+
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
+		{
+			if (EMDL::isDouble(label))
+			{
+				RFLOAT aux = textToFloat(add_col_value);
+				MD.setValue(label, aux);
+			}
+			else if (EMDL::isInt(label))
+			{
+				long aux = textToInteger(add_col_value);
+				MD.setValue(label, aux);
+			}
+			else if (EMDL::isBool(label))
+			{
+				bool aux = (bool)textToInteger(add_col_value);
+				MD.setValue(label, aux);
+			}
+			else if (EMDL::isString(label))
+			{
+				MD.setValue(label, add_col_value);
+			}
+		}
+		MD.write(fn_out);
+		std::cout << " Written: " << fn_out << std::endl;
 
 	}
 
