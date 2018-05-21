@@ -27,6 +27,7 @@ class star_handler_parameters
 	public:
    	FileName fn_in, fn_out, fn_compare, fn_label1, fn_label2, fn_label3, select_label;
    	FileName fn_check, fn_operate, fn_operate2, fn_operate3, fn_set;
+   	std::string remove_col_label, add_col_label, add_col_value;
 	RFLOAT eps, select_minval, select_maxval, multiply_by, add_to, center_X, center_Y, center_Z;
 	bool do_combine, do_split, do_center, do_random_order;
 	long int nr_split, size_split;
@@ -85,6 +86,11 @@ class star_handler_parameters
 	    center_Y = textToFloat(parser.getOption("--center_Y", "Y-coordinate in the reference to center particles on (in pix)", "0."));
 	    center_Z = textToFloat(parser.getOption("--center_Z", "Z-coordinate in the reference to center particles on (in pix)", "0."));
 
+	    int column_section = parser.addSection("Column options");
+	    remove_col_label = parser.getOption("--remove_column", "Remove the column with this metadata label from the input STAR file.","");
+	    add_col_label = parser.getOption("--add_column", "Add a column with this metadata label from the input STAR file.","");
+	    add_col_value = parser.getOption("--add_column_value", "Set this value in all rows for the added column","");
+
 	    // Check for errors in the command-line option
     	if (parser.checkForErrors())
     		REPORT_ERROR("Errors encountered on the command line, exiting...");
@@ -100,8 +106,10 @@ class star_handler_parameters
 		if (do_split) c++;
 		if (fn_operate != "") c++;
 		if (do_center) c++;
+		if (remove_col_label!= "") c++;
+		if (add_col_label!= "") c++;
 		if (c != 1)
-			REPORT_ERROR("ERROR: specify (only and at least) one of the following options: --compare, --select, --combine, --split, --operate or --center");
+			REPORT_ERROR("ERROR: specify (only and at least) one of the following options: --compare, --select, --combine, --split, --operate, --center, --remove_label or --add_label");
 
 
 		if (fn_compare != "") compare();
@@ -110,6 +118,9 @@ class star_handler_parameters
 		if (do_split) split();
 		if (fn_operate != "") operate();
 		if (do_center) center();
+		if (remove_col_label!= "") remove_column();
+		if (add_col_label!= "") add_column();
+
 
 		std::cout << " Done!" << std::endl;
 
@@ -442,6 +453,53 @@ class star_handler_parameters
 		MD.write(fn_out);
 		std::cout << " Written: " << fn_out << std::endl;
 
+
+	}
+
+	void remove_column()
+	{
+		MetaDataTable MD;
+		MD.read(fn_in);
+		MD.deactivateLabel(EMDL::str2Label(remove_col_label));
+		MD.write(fn_out);
+		std::cout << " Written: " << fn_out << std::endl;
+	}
+
+	void add_column()
+	{
+
+		if (add_col_value == "")
+			REPORT_ERROR("ERROR: you need to specify --add_column_value when adding a column.");
+
+		MetaDataTable MD;
+		EMDLabel label = EMDL::str2Label(add_col_label);
+		MD.read(fn_in);
+		MD.addLabel(label);
+
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
+		{
+			if (EMDL::isDouble(label))
+			{
+				RFLOAT aux = textToFloat(add_col_value);
+				MD.setValue(label, aux);
+			}
+			else if (EMDL::isInt(label))
+			{
+				long aux = textToInteger(add_col_value);
+				MD.setValue(label, aux);
+			}
+			else if (EMDL::isBool(label))
+			{
+				bool aux = (bool)textToInteger(add_col_value);
+				MD.setValue(label, aux);
+			}
+			else if (EMDL::isString(label))
+			{
+				MD.setValue(label, add_col_value);
+			}
+		}
+		MD.write(fn_out);
+		std::cout << " Written: " << fn_out << std::endl;
 
 	}
 
