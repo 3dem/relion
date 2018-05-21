@@ -949,8 +949,9 @@ void MotioncorrRunner::plotShifts(FileName fn_mic, Micrograph &mic)
 }
 
 void MotioncorrRunner::saveModel(Micrograph &mic) {
+	if (angpix > 0) mic.angpix = angpix;
+	
 	if (do_dose_weighting) {
-		mic.angpix = angpix;
 		mic.voltage = voltage;
 		mic.dose_per_frame = dose_per_frame;
 		mic.pre_exposure = pre_exposure;
