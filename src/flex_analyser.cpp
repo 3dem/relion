@@ -796,7 +796,7 @@ void FlexAnalyser::makePCAhistograms(std::vector< std::vector<double> > &project
 	plot2D->SetXAxisTitle("Eigenvalue");
 	plot2D->SetYAxisTitle("Variance explained [%]");
 	plot2D->OutputPostScriptPlot(fn_eps);
-
+	delete plot2D;
 
 	// Determine how much variance the requested number of components explains
 	if (nr_components < 0)
@@ -865,6 +865,7 @@ void FlexAnalyser::makePCAhistograms(std::vector< std::vector<double> > &project
 		plot2D->SetXAxisTitle("Eigenvalue");
 		plot2D->SetYAxisTitle("Nr particles");
 		plot2D->OutputPostScriptPlot(fn_eps);
+		delete plot2D;
 	}
 
 	joinMultipleEPSIntoSinglePDF(fn_out + "_logfile.pdf ", all_fn_eps);
