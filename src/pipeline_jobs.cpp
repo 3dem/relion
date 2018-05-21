@@ -2083,27 +2083,29 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 			{
 				command += " --random_order ";
 			}
+			if (joboptions["nr_split"].getNumber() <= 0 && joboptions["split_size"].getNumber() <= 0)
+			{
+				error_message = "ERROR: When splitting the input STAR file into subsets, set nr_split and/or split_size to a positive value";
+				return false;
+			}
 			if (joboptions["nr_split"].getNumber() > 0)
 			{
 				nr_split = joboptions["nr_split"].getNumber();
 				command += " --nr_split " + joboptions["nr_split"].getString();
 			}
-			else
+			if (joboptions["split_size"].getNumber() > 0)
 			{
-				if (joboptions["split_size"].getNumber() <= 0)
-				{
-					error_message = "When splitting the input STAR file into subsets, give a positive number for subset size or the number of subsets.";
-					return false;
-				}
-
 				command += " --size_split " + joboptions["split_size"].getString();
 
-				// Calculate nr_split from number of entries in input STAR file
-				MetaDataTable MDtmp;
-				FileName fnt = (joboptions["fn_mic"].getString() != "") ? joboptions["fn_mic"].getString() : joboptions["fn_data"].getString();
-				long int n_obj = (exists(fnt)) ? MDtmp.read(fnt, "", NULL, "", true) : 0; // true means do_only_count
-				long int size_split = joboptions["split_size"].getNumber();
-				nr_split = n_obj / size_split;
+				if (joboptions["nr_split"].getNumber() <= 0)
+				{
+					// Calculate nr_split from number of entries in input STAR file
+					MetaDataTable MDtmp;
+					FileName fnt = (joboptions["fn_mic"].getString() != "") ? joboptions["fn_mic"].getString() : joboptions["fn_data"].getString();
+					long int n_obj = (exists(fnt)) ? MDtmp.read(fnt, "", NULL, "", true) : 0; // true means do_only_count
+					long int size_split = joboptions["split_size"].getNumber();
+					nr_split = n_obj / size_split;
+				}
 			}
 
 			for (int isplit = 0; isplit < nr_split; isplit++)
