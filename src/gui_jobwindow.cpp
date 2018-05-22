@@ -547,7 +547,7 @@ void JobWindow::initialiseImportWindow()
 void JobWindow::initialiseMotioncorrWindow()
 {
 
-	setupTabs(3);
+	setupTabs(2);
 
 	tab1->begin();
 	tab1->label("I/O");
@@ -561,6 +561,21 @@ void JobWindow::initialiseMotioncorrWindow()
 	place("first_frame_sum", TOGGLE_DEACTIVATE);
 	place("last_frame_sum", TOGGLE_DEACTIVATE);
 	place("angpix", TOGGLE_DEACTIVATE);
+	place("voltage", TOGGLE_DEACTIVATE);
+	place("dose_per_frame", TOGGLE_DEACTIVATE);
+	place("pre_exposure", TOGGLE_DEACTIVATE);
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group1->end();
+	place("do_dose_weighting", TOGGLE_DEACTIVATE, group1);
+	group1->begin();
+	place("save_noDW", TOGGLE_DEACTIVATE);
+	group1->end();
+
+	guientries["do_dose_weighting"].cb_menu_i(); // make default active
 
 	tab1->end();
 
@@ -590,26 +605,6 @@ void JobWindow::initialiseMotioncorrWindow()
 	guientries["do_own_motioncor"].cb_menu_i(); // make default active
 
 	tab2->end();
-
-	tab3->begin();
-	tab3->label("Dose-weight");
-	resetHeight();
-
-	group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group3->end();
-
-	place("do_dose_weighting", TOGGLE_DEACTIVATE, group3);
-
-	group3->begin();
-
-	place("save_noDW", TOGGLE_DEACTIVATE);
-	place("voltage", TOGGLE_DEACTIVATE);
-	place("dose_per_frame", TOGGLE_DEACTIVATE);
-	place("pre_exposure", TOGGLE_DEACTIVATE);
-
-	group3->end();
-	guientries["do_dose_weighting"].cb_menu_i(); // make default active
-	tab3->end();
 
 }
 
