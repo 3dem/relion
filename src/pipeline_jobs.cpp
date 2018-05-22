@@ -4291,7 +4291,7 @@ bool RelionJob::getCommandsJoinstarJob(std::string &outputname, std::vector<std:
 			error_message = "ERROR: empty field for first or second input STAR file...";
 			return false;
 		}
-		command += " --i \" " + joboptions["fn_part1"].getString();
+		command += " --combine --i \" " + joboptions["fn_part1"].getString();
 		Node node(joboptions["fn_part1"].getString(), joboptions["fn_part1"].node_type);
 		inputNodes.push_back(node);
 		command += " " + joboptions["fn_part2"].getString();
@@ -4325,7 +4325,7 @@ bool RelionJob::getCommandsJoinstarJob(std::string &outputname, std::vector<std:
 			error_message = "ERROR: empty field for first or second input STAR file...";
 			return false;
 		}
-		command += " --i \" " + joboptions["fn_mic1"].getString();
+		command += " --combine --i \" " + joboptions["fn_mic1"].getString();
 		Node node(joboptions["fn_mic1"].getString(), joboptions["fn_mic1"].node_type);
 		inputNodes.push_back(node);
 		command += " " + joboptions["fn_mic2"].getString();
@@ -4359,7 +4359,7 @@ bool RelionJob::getCommandsJoinstarJob(std::string &outputname, std::vector<std:
 			error_message = "ERROR: empty field for first or second input STAR file...";
 			return false;
 		}
-		command += " --i \" " + joboptions["fn_mov1"].getString();
+		command += " --combine --i \" " + joboptions["fn_mov1"].getString();
 		Node node(joboptions["fn_mov1"].getString(), joboptions["fn_mov1"].node_type);
 		inputNodes.push_back(node);
 		command += " " + joboptions["fn_mov2"].getString();
