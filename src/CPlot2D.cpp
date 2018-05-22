@@ -29,20 +29,46 @@
 void joinMultipleEPSIntoSinglePDF(FileName fn_pdf, std::vector<FileName> fn_eps)
 {
 
+    std::string command = "gs -sDEVICE=pdfwrite -dNOPAUSE -dBATCH -dSAFER -dDEVICEWIDTHPOINTS=800 -dDEVICEHEIGHTPOINTS=800 -sOutputFile=";
+    command += fn_pdf + " ";
+    bool have_at_least_one = false;
+    for (int i = 0; i < fn_eps.size(); i++)
+    {
+        // fn_eps[i] could be a Linux wildcard...
+    	std::vector<FileName> all_eps_files;
+        fn_eps[i].globFiles(all_eps_files);
+        for (long int j= 0; j < all_eps_files.size(); j++)
+        {
+        	if (exists(all_eps_files[j]))
+        	{
+        		command += all_eps_files[j] + " ";
+        		have_at_least_one = true;
+        	}
+        }
+    }
 
-	std::string command = "gs -sDEVICE=pdfwrite -dNOPAUSE -dBATCH -dSAFER -dDEVICEWIDTHPOINTS=800 -dDEVICEHEIGHTPOINTS=800 -sOutputFile=";
-	command += fn_pdf + " ";
-	for (int i = 0; i < fn_eps.size(); i++)
-		command += fn_eps[i] + " ";
+    bool have_error_in_gs = false;
+    if (have_at_least_one)
+    {
+		command += " > /dev/null &";
 
-	command += " > /dev/null &";
-	if (system(command.c_str()))
-	{
-		std::cerr << " ERROR in executing: " << command << std::endl;
-		std::cerr << " + Will make an empty PDF-file in " << fn_pdf << std::endl;
-		std::cerr << " + Solve your issue with the ps-command to get better PDF logfiles." << std::endl;
-		touch(fn_pdf);
-	}
+		if (system(command.c_str()))
+		{
+			std::cerr << " ERROR in executing: " << command << std::endl;
+			have_error_in_gs = true;
+		}
+    }
+    else
+    {
+    	std::cerr << " Did not find any of the expected EPS files to generate a PDF file" << std::endl;
+    }
+
+    if (!have_at_least_one || have_error_in_gs)
+    {
+    	std::cerr << " + Will make an empty PDF-file in " << fn_pdf << std::endl;
+    	touch(fn_pdf);
+    }
+
 }
 
 CPlot2D::CPlot2D(std::string title)
