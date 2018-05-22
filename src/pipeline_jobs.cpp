@@ -1092,7 +1092,7 @@ void RelionJob::initialiseMotioncorrJob()
 	joboptions["input_star_mics"] = JobOption("Input movies STAR file:", NODE_MOVIES, "", "STAR files (*.star)", "A STAR file with all micrographs to run MOTIONCORR on");
 	joboptions["first_frame_sum"] = JobOption("First frame for corrected sum:", 1, 1, 32, 1, "First frame to use in corrected average (starts counting at 1). ");
 	joboptions["last_frame_sum"] = JobOption("Last frame for corrected sum:", 0, 0, 32, 1, "Last frame to use in corrected average.");
-	joboptions["angpix"] = JobOption("Pixel size (A):", 1, 0.5, 4.0, 0.1, "Provide the pixel size in Angstroms of the input movies. UNBLUR and MOTIONCOR2 use this for their bfactor and their dose-weighting. This is the original pixel size before binning.");
+	joboptions["angpix"] = JobOption("Pixel size (A):", 1, 0.5, 4.0, 0.1, "Provide the pixel size in Angstroms of the input movies. This is the original pixel size before binning.");
 
 	// Motioncor2
 
@@ -1176,7 +1176,17 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 	{
 		command += " --use_motioncor2 ";
 		command += " --motioncor2_exe " + joboptions["fn_motioncor2_exe"].getString();
+
+		if ((joboptions["fn_defect"].getString()).length() > 0)
+			command += " --defect_file " + joboptions["fn_defect"].getString();
+
+		if ((joboptions["other_motioncor2_args"].getString()).length() > 0)
+			command += " --other_motioncor2_args \" " + joboptions["other_motioncor2_args"].getString() + " \"";
+
+		// Which GPUs to use?
+		command += " --gpu \"" + joboptions["gpu_ids"].getString() + "\"";
 	}
+
 	command += " --bin_factor " + joboptions["bin_factor"].getString();
 	command += " --bfactor " + joboptions["bfactor"].getString();
 	command += " --angpix " +  joboptions["angpix"].getString();
@@ -1216,14 +1226,6 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 		command += " --gain_rot " + integerToString(gain_rot);
 		command += " --gain_flip " + integerToString(gain_flip);
 	}
-	if ((joboptions["fn_defect"].getString()).length() > 0)
-		command += " --defect_file " + joboptions["fn_defect"].getString();
-
-	if ((joboptions["other_motioncor2_args"].getString()).length() > 0)
-		command += " --other_motioncor2_args \" " + joboptions["other_motioncor2_args"].getString() + " \"";
-
-	// Which GPUs to use?
-	command += " --gpu \"" + joboptions["gpu_ids"].getString() + "\"";
 
 	if (joboptions["do_dose_weighting"].getBoolean())
 	{
@@ -1237,14 +1239,12 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 	if (is_continue)
 		command += " --only_do_unfinished ";
 
-
 	// Other arguments
 	command += " " + joboptions["other_args"].getString();
 
 	commands.push_back(command);
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
-
 
 }
 
@@ -1258,7 +1258,7 @@ void RelionJob::initialiseCtffindJob()
 	joboptions["input_star_mics"] = JobOption("Input micrographs STAR file:", NODE_MICS, "", "STAR files (*.star)", "A STAR file with all micrographs to run CTFFIND or Gctf on");
 	joboptions["use_noDW"] = JobOption("Use micrograph without dose-weighting?", false, "If set to Yes, the CTF estimation will be done using the micrograph without dose-weighting as in rlnMicrographNameNoDW (_noDW.mrc from MotionCor2). If set to No, the normal rlnMicrographName will be used. Note this option will not work for motion-correction with UNBLUR.");
 
-	joboptions["cs"] = JobOption("Spherical aberration (mm):", 2, 0, 8, 0.1, "Spherical aberration of the microscope used to collect these images (in mm)");
+	joboptions["cs"] = JobOption("Spherical aberration (mm):", 2.7, 0, 8, 0.1, "Spherical aberration of the microscope used to collect these images (in mm). Typical values are 2.7 (FEI Titan & Talos), 2.0 (FEI Polara), 1.4 (JEOL CRYO-ARM) and 0.01 (microscopes with a Cs corrector).");
 	joboptions["kv"] = JobOption("Voltage (kV):", 300, 50, 500, 10, "Voltage the microscope was operated on (in kV)");
 	joboptions["q0"] = JobOption("Amplitude contrast:", 0.1, 0, 0.3, 0.01, "Fraction of amplitude contrast. Often values around 10% work better than theoretically more accurate lower values...");
 	joboptions["angpix"] = JobOption("Magnified pixel size (Angstrom):", 1.4, 0.5, 3, 0.1, "Pixel size in Angstroms. ");
