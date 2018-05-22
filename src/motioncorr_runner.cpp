@@ -1036,6 +1036,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	std::vector<Image<float> > Iframes;
 	std::vector<int> frames;
 
+	RFLOAT output_angpix = angpix * bin_factor;
 	RFLOAT prescaling = 1;
 
 	const int hotpixel_sigma = 6;
@@ -1401,7 +1402,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 #ifdef DEBUG_OWN
 			std::cout << " x = " << x << " y = " << y << " z = " << z;
 			std::cout << ", Xobs = " << patch_xshifts[i] * prescaling << " Xfit = " << x_fitted * prescaling;
-			std::cout << ", Yobs = " << patch_yshifts[i] * prescaling << " Yfit = " << y_fitted * prescaling<< std::endl;
+			std::cout << ", Yobs = " << patch_yshifts[i] * prescaling << " Yfit = " << y_fitted * prescaling << std::endl;
 #endif
 		}
 		rms_x = std::sqrt(rms_x / n_obs) * prescaling; rms_y = std::sqrt(rms_y / n_obs) * prescaling;
@@ -1440,7 +1441,8 @@ skip_fitting:
 		}
 		RCTOC(TIMING_BINNING);
 
-		// Final output.
+		// Final output
+                Iref.setSamplingRateInHeader(output_angpix, output_angpix);
 		Iref.write(!do_dose_weighting ? fn_avg : fn_avg_noDW);
 		logfile << "Written aligned but non-dose weighted sum to " << fn_avg_noDW << std::endl;
 	}
@@ -1489,6 +1491,7 @@ skip_fitting:
 		RCTOC(TIMING_BINNING);
 
 		// Final output
+                Iref.setSamplingRateInHeader(output_angpix, output_angpix);
 		Iref.write(fn_avg);
 		logfile << "Written aligned and dose-weighted sum to " << fn_avg << std::endl;
 	}
