@@ -70,6 +70,8 @@ void FlexAnalyser::read(int argc, char **argv)
 
 void FlexAnalyser::initialise()
 {
+	rescale_3dmodels = 1.0;
+
 	if (verb > 0)
 		std::cout << " Reading in data.star file ..." << std::endl;
 
@@ -284,7 +286,6 @@ void FlexAnalyser::setupSubtractionMasksAndProjectors()
 
 void FlexAnalyser::setup3DModels()
 {
-	rescale_3dmodels = 1.0;
 	for (int ibody = 0; ibody < model.nr_bodies; ibody++)
 	{
 		// Premultiply the map with the mask (otherwise need to do this again for every particle
