@@ -39,6 +39,8 @@ void TwoHyperParameterProblem::report(int iteration, double cost, const std::vec
 	std::cout << -cost << "\n";
 	
 	std::cout.precision(5);
+	
+	std::cout.flush();
 }
 
 d2Vector TwoHyperParameterProblem::problemToMotion(const std::vector<double>& x)

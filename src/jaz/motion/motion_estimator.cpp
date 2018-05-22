@@ -36,12 +36,14 @@ void MotionEstimator::read(IOParser& parser, int argc, char *argv[])
 	
 	parser.addSection("Motion fit options (advanced)");
 	
+	cc_pad = textToFloat(parser.getOption("--cc_pad", "Cross-correlation Fourier-padding", "1.0"));
+	
 	dmga = textToFloat(parser.getOption("--dmg_a", "Damage model, parameter a", " 3.40"));
 	dmgb = textToFloat(parser.getOption("--dmg_b", "                        b", "-1.06"));
 	dmgc = textToFloat(parser.getOption("--dmg_c", "                        c", "-0.54"));
 	
 	maxIters = textToInteger(parser.getOption("--max_iters", "Maximum number of iterations", "10000"));
-	optEps = textToFloat(parser.getOption("--eps", "Terminate optimization after gradient length falls below this value", "1e-4"));
+	optEps = textToFloat(parser.getOption("--eps", "Terminate optimization after gradient length falls below this value", "1e-5"));
 	
 	no_whitening = parser.checkOption("--no_whiten", "Do not whiten the noise spectrum");
 	unregGlob = parser.checkOption("--unreg_glob", "Do not regularize global component of motion");
@@ -244,6 +246,8 @@ void MotionEstimator::process(const std::vector<MetaDataTable>& mdts, long g_sta
 			
 			std::cerr << " - Warning: unable to load " << mgName << ". "
 					  << " File is missing or corrupted.\n";
+			
+			continue;
 		}
 		
 		pctot += pc;
@@ -332,12 +336,12 @@ void MotionEstimator::prepMicrograph(
 		}
 	}
 	
-	movieCC = MotionHelper::movieCC(movie, preds, dmgWeight, fts, nr_omp_threads);	
+	movieCC = MotionHelper::movieCC(movie, preds, dmgWeight, cc_pad, nr_omp_threads);
 	
 	if (global_init || myInitialTracks.size() == 0)
 	{
 		std::vector<Image<RFLOAT>> ccSum = MotionHelper::addCCs(movieCC);
-		std::vector<gravis::d2Vector> globTrack = MotionHelper::getGlobalTrack(ccSum);
+		std::vector<gravis::d2Vector> globTrack = MotionHelper::getGlobalTrack(ccSum, cc_pad);
 		std::vector<gravis::d2Vector> globOffsets;
 		
 		if (!globOff)
@@ -348,7 +352,7 @@ void MotionEstimator::prepMicrograph(
 		{
 			std::vector<std::vector<gravis::d2Vector>> initialTracks(pc, globTrack);
 			globOffsets = MotionHelper::getGlobalOffsets(
-					movieCC, initialTracks, 0.25*s, globOffMax, globOffMax, nr_omp_threads);
+					movieCC, initialTracks, cc_pad, 0.25*s, globOffMax, globOffMax, nr_omp_threads);
 		}
 		
 		if (diag)
@@ -383,7 +387,7 @@ void MotionEstimator::prepMicrograph(
 		std::vector<gravis::d2Vector> globOffsets;
 		
 		globOffsets = MotionHelper::getGlobalOffsets(
-					movieCC, myInitialTracks, 0.25*s, globOffMax, globOffMax, nr_omp_threads);
+					movieCC, myInitialTracks, cc_pad, 0.25*s, globOffMax, globOffMax, nr_omp_threads);
 		
 		for (int p = 0; p < pc; p++)
 		{
@@ -435,7 +439,7 @@ std::vector<std::vector<d2Vector>> MotionEstimator::optimize(
 	
 	const int fc = inTracks[0].size();		
 	
-	GpMotionFit gpmf(movieCC, sig_vel_px, sig_div_px, sig_acc_px,
+	GpMotionFit gpmf(movieCC, cc_pad, sig_vel_px, sig_div_px, sig_acc_px,
 					 maxEDs, positions, globComp, nr_omp_threads, expKer);
 	
 	std::vector<double> initialCoeffs;
@@ -515,9 +519,7 @@ void MotionEstimator::updateFCC(
 		
 		Image<Complex> pred = reference->predict(
 				mdt, p, *obsModel, ReferenceMap::Opposite);
-		
-		// @TODO: noise-normalize pred?
-		
+				
 		FscHelper::updateFscTable(obs, pred, tables[threadnum],
 								  weights0[threadnum], weights1[threadnum]);
 	}
@@ -744,6 +746,11 @@ void MotionEstimator::proposeDosePerFrame(double dpf, std::string metaFn, int ve
 					  << dosePerFrame << " e/A^2\n";
 		}
 	}
+}
+
+double MotionEstimator::getCCPad()
+{
+	return cc_pad;
 }
 
 std::vector<MetaDataTable> MotionEstimator::findUnfinishedJobs(

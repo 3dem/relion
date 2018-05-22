@@ -9,6 +9,7 @@ using namespace gravis;
 
 GpMotionFit::GpMotionFit(
     const std::vector<std::vector<Image<double>>>& correlation,
+	double cc_pad,
     double sig_vel_px, double sig_div_px, double sig_acc_px,
     int maxDims,
     const std::vector<d2Vector>& positions,
@@ -19,6 +20,7 @@ GpMotionFit::GpMotionFit(
     pc(correlation.size()),
     fc(correlation[0].size()),
     threads(threads),
+	cc_pad(cc_pad),
     sig_vel_px(sig_vel_px),
     sig_div_px(sig_div_px),
     sig_acc_px(sig_acc_px),
@@ -87,8 +89,9 @@ double GpMotionFit::f(const std::vector<double> &x) const
         {
             e_t[pad*t] -= Interpolation::cubicXY(
                 correlation[p][f],
-                pos[p][f].x + perFrameOffsets[f].x,
-                pos[p][f].y + perFrameOffsets[f].y, 0, 0, true);
+                cc_pad * (pos[p][f].x + perFrameOffsets[f].x),
+                cc_pad * (pos[p][f].y + perFrameOffsets[f].y), 
+				0, 0, true);
         }
     }
 
@@ -159,8 +162,9 @@ double GpMotionFit::f(const std::vector<double> &x, void* tempStorage) const
         for (int f = 0; f < fc; f++)
         {
 			const double epf = Interpolation::cubicXY(correlation[p][f],
-                    ts->pos[p][f].x + perFrameOffsets[f].x,
-                    ts->pos[p][f].y + perFrameOffsets[f].y, 0, 0, true);
+                    cc_pad * (ts->pos[p][f].x + perFrameOffsets[f].x),
+                    cc_pad * (ts->pos[p][f].y + perFrameOffsets[f].y), 
+					0, 0, true);
 			
 			ts->e_t[ts->pad*t] -= epf;
         }
@@ -228,8 +232,8 @@ void GpMotionFit::grad(const std::vector<double> &x,
         {
             d2Vector vr = Interpolation::cubicXYgrad(
                 correlation[p][f],
-                pos[p][f].x + perFrameOffsets[f].x,
-                pos[p][f].y + perFrameOffsets[f].y,
+                cc_pad * (pos[p][f].x + perFrameOffsets[f].x),
+                cc_pad * (pos[p][f].y + perFrameOffsets[f].y),
                 0, 0, true);
 
             ccg_pf[p][f] = d2Vector(vr.x, vr.y);
@@ -334,8 +338,8 @@ void GpMotionFit::grad(const std::vector<double> &x,
         {
             d2Vector vr = Interpolation::cubicXYgrad(
                 correlation[p][f],
-                ts->pos[p][f].x + perFrameOffsets[f].x,
-                ts->pos[p][f].y + perFrameOffsets[f].y,
+                cc_pad * (ts->pos[p][f].x + perFrameOffsets[f].x),
+                cc_pad * (ts->pos[p][f].y + perFrameOffsets[f].y),
                 0, 0, true);
 
             ts->ccg_pf[p][f] = d2Vector(vr.x, vr.y);
