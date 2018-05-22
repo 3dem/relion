@@ -129,7 +129,11 @@ void FlexAnalyser::initialise()
 		// Calculate effect of 1 degree rotations and 1 pixel translations on the bodies, in order to normalise vectors for PCA
 		norm_pca.clear();
 
-		std::cout << " Normalise PCA columns: " << std::endl;
+		FileName fn_weights = fn_out + "_pca_weights.dat";
+		std::ofstream f_weights(fn_weights);
+		std::cout << " Normalisation weights for PCA columns are written to " << fn_weights << std::endl;
+		f_weights << "body rot tilt psi offset" << std::endl;
+		f_weights << std::scientific;
 		for (int ibody = 0; ibody < model.nr_bodies; ibody++)
 		{
 			MultidimArray<RFLOAT> Mbody, Irefp;
@@ -137,7 +141,7 @@ void FlexAnalyser::initialise()
 			// Place each body with its center-of-mass in the center of the box
 			selfTranslate(Irefp, -model.com_bodies[ibody], DONT_WRAP);
 
-			std::cout << " body: " << ibody;
+			f_weights << ibody + 1;
 			Matrix2D<RFLOAT> Aresi,  Abody;
 			// rot
 			Euler_angles2matrix(1., 90., 0., Aresi);
@@ -147,7 +151,7 @@ void FlexAnalyser::initialise()
 			applyGeometry(Irefp, Mbody, Abody, IS_NOT_INV, DONT_WRAP);
 			Mbody -= Irefp;
 			norm_pca.push_back(sqrt(Mbody.sum2()));
-			std::cout << " rot: " << sqrt(Mbody.sum2());
+			f_weights << " " << sqrt(Mbody.sum2());
 			// tilt
 			Euler_angles2matrix(0., 91., 0., Aresi);
 			Abody = (model.orient_bodies[ibody]).transpose() * A_rot90 * Aresi * model.orient_bodies[ibody];
@@ -156,7 +160,7 @@ void FlexAnalyser::initialise()
 			applyGeometry(Irefp, Mbody, Abody, IS_NOT_INV, DONT_WRAP);
 			Mbody -= Irefp;
 			norm_pca.push_back(sqrt(Mbody.sum2()));
-			std::cout << " tilt: " << sqrt(Mbody.sum2());
+			f_weights << " " << sqrt(Mbody.sum2());
 			// psi
 			Euler_angles2matrix(0., 90., 1., Aresi);
 			Abody = (model.orient_bodies[ibody]).transpose() * A_rot90 * Aresi * model.orient_bodies[ibody];
@@ -165,7 +169,7 @@ void FlexAnalyser::initialise()
 			applyGeometry(Irefp, Mbody, Abody, IS_NOT_INV, DONT_WRAP);
 			Mbody -= Irefp;
 			norm_pca.push_back(sqrt(Mbody.sum2()));
-			std::cout << " psi: " << sqrt(Mbody.sum2());
+			f_weights << " " << sqrt(Mbody.sum2());
 			// translation x & y (considered the same)
 			Euler_angles2matrix(0., 90., 0., Aresi);
 			Abody = (model.orient_bodies[ibody]).transpose() * A_rot90 * Aresi * model.orient_bodies[ibody];
@@ -175,8 +179,9 @@ void FlexAnalyser::initialise()
 			applyGeometry(Irefp, Mbody, Abody, IS_NOT_INV, DONT_WRAP);
 			Mbody -= Irefp;
 			norm_pca.push_back(sqrt(Mbody.sum2()));
-			std::cout << " offset: " << sqrt(Mbody.sum2()) << std::endl;
+			f_weights << " " << sqrt(Mbody.sum2()) << std::endl;
 		}
+		f_weights.close();
 	}
 }
 
@@ -371,32 +376,53 @@ void FlexAnalyser::loopThroughParticles(int rank, int size)
 		// Do the PCA and make histograms
 		principalComponentsAnalysis(inputdata, eigenvectors, eigenvalues, means, projected_data);
 
-		// TMP
-		std::cout << " Eigenvectors (only rotations): " << std::endl;
-		for (int j =0; j < eigenvectors[0].size(); j++)
+		FileName fn_evec = fn_out + "_eigenvectors.dat";
+		std::ofstream f_evec(fn_evec);
+		std::cout << " Eigenvectors (rotations only):" << std::endl;
+		for (int j = 0; j < eigenvectors[0].size(); j++)
 		{
-			std::string stro="";
-			if (j%6==0)
-				stro="rot";
-			else if (j%6==1)
-				stro="tilt";
-			else if (j%6==2)
-				stro="psi";
+			std::string stro = "";
+			if (j % 6 == 0)
+				stro = "rot";
+			else if (j % 6 == 1)
+				stro = "tilt";
+			else if (j % 6 == 2)
+				stro = "psi";
+			else if (j % 6 == 3)
+				stro = "x";
+			else if (j % 6 ==  4)
+				stro = "y";
+			else if (j % 6 == 5)
+				stro = "z";
 			if (stro != "")
 			{
-				stro+= "-body-"+integerToString(1+(j/6));
-				std::cout << std::setw(12) << std::right << std::fixed;
-				std::cout << stro;
+				stro +=  "-body-" + integerToString(1 + (j / 6));
+				f_evec << stro << " ";
+				if (j % 6 < 3) {
+					std::cout << std::setw(12) << std::right << std::fixed;
+					std::cout << stro;
+				}
 			}
 		}
 		std::cout << std::endl;
-		for (int k= 0; k < eigenvectors.size(); k++)
+		f_evec << std::endl;
+		std::cout << " Full eigenvectors including translations are written to " << fn_evec << std::endl;
+
+		f_evec << std::scientific;
+		for (int k = 0; k < eigenvectors.size(); k++)
 		{
-			if (k%6<3)
+			for (int j =0; j < eigenvectors[0].size(); j++)
+			{
+				if (j > 0) f_evec << " ";
+				f_evec << eigenvectors[k][j];
+			}
+			f_evec << std::endl;
+
+			if (k % 6 < 3)
 			{
 				for (int j =0; j < eigenvectors[0].size(); j++)
 				{
-					if (j%6<3)
+					if (j % 6 < 3)
 					{
 						std::cout << std::setw(12) << std::fixed;
 						std::cout << eigenvectors[k][j];
@@ -405,6 +431,8 @@ void FlexAnalyser::loopThroughParticles(int rank, int size)
 				std::cout << std::endl;
 			}
 		}
+		
+		f_evec.close();
 
 		makePCAhistograms(projected_data, eigenvalues, means);
 
