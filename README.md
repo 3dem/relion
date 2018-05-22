@@ -109,10 +109,12 @@ CC=mpiicc CXX=mpiicpc cmake -DCUDA=OFF -DALTCPU=ON -DCudaTexture=OFF -DMKLFFT=ON
 ```
 CC=mpiicc CXX=mpiicpc cmake -DCUDA=OFF -DALTCPU=ON -DCudaTexture=OFF -DMKLFFT=ON -D CMAKE_C_FLAGS="-O3 -ip -g -debug inline-debug-info -xCORE-AVX2 -restrict " -D CMAKE_CXX_FLAGS="-O3 -ip -g -debug inline-debug-info -xCORE-AVX2 -restrict " -DGUI=OFF -D CMAKE_BUILD_TYPE=Release ..
 ```
+Note that this binary will only run on AXV2 platforms
     * Best performance on AVX512 platforms has been measured using the following CMAKE command:
 ```
 CC=mpiicc CXX=mpiicpc cmake -DCUDA=OFF -DALTCPU=ON -DCudaTexture=OFF -DMKLFFT=ON -D CMAKE_C_FLAGS="-O3 -ip -g -debug inline-debug-info -xCORE-AVX512 -qopt-zmm-usage=high -restrict " -D CMAKE_CXX_FLAGS="-O3 -ip -g -debug inline-debug-info -xCORE-AVX512 -qopt-zmm-usage=high -restrict " -DGUI=OFF -D CMAKE_BUILD_TYPE=Release ..
 ```
+Note that the resulting binary will only work on AVX512 platforms
   * If you want to run a version of RELION built with the Intel(R) C++ Compiler
   on another machine or cluster, you can download the runtime libraries for free
   for use on those machines from the following sources:
@@ -130,6 +132,33 @@ CC=mpiicc CXX=mpiicpc cmake -DCUDA=OFF -DALTCPU=ON -DCudaTexture=OFF -DMKLFFT=ON
       that goes to your holding directory
     * Once done, `source <holding_dir>/compilers_and_libraries_2018.2.199/linux/bin/compilervars.sh intel64`
     should set up the runtime environment on your machine without a local Intel software installation.
+  * To run the Plasmodium ribosome data set workload found at the [RELION benchmark page](https://www2.mrc-lmb.cam.ac.uk/relion/index.php?title=Benchmarks_%26_computer_hardware)
+  on a machine with two sockets populated by AVX512 CPUs containing 20 cores each supporting
+  Intel(R) Hyper-Threading Technology (so two threads per core for a total of 80 threads):
+    * 1 machine - completes in about 4.7 hours:
+```
+export OMP_SCHEDULE="dynamic"
+export KMP_BLOCKTIME=0
+relion_refine --o Results/skx --i Particles/shiny_2sets.star --ref emd_2660.map:mrc --firstiter_cc --ini_high 60 --ctf --ctf_corrected_ref --tau2_fudge 4 --particle_diameter 360 --K 6 --flatten_solvent --zero_mask --oversampling 1 --healpix_order 2 --offset_range 5 --offset_step 2 --sym C1 --norm --scale --random_seed 0 --dont_combine_weights_via_disc --preread_images --iter 25 --pool 160 --j 80 --cpu
+```
+    * 2 machines - completes in about 2.6 hours:
+    ```
+export OMP_SCHEDULE="dynamic"
+export KMP_BLOCKTIME=0
+mpirun -perhost 4 np 8 relion_refine_mpi --i Particles/shiny_2sets.star --ref emd_2660.map:mrc --firstiter_cc --ini_high 60 --dont_combine_weights_via_disc --ctf --ctf_corrected_ref --tau2_fudge 4 --particle_diameter 360 --K 6 --flatten_solvent --zero_mask --oversampling 1 --healpix_order 2 --offset_range 5 --offset_step 2 --sym C1 --norm --scale --random_seed 0 o Results/cpu --pool 40 --j 20 --iter 25 --cpu
+    ```
+    * 4 machines - completes in about 1.4 hours:
+```
+export OMP_SCHEDULE="dynamic"
+export KMP_BLOCKTIME=0
+mpirun -perhost 4 np 16 relion_refine_mpi --i Particles/shiny_2sets.star --ref emd_2660.map:mrc --firstiter_cc --ini_high 60 --dont_combine_weights_via_disc --ctf --ctf_corrected_ref --tau2_fudge 4 --particle_diameter 360 --K 6 --flatten_solvent --zero_mask --oversampling 1 --healpix_order 2 --offset_range 5 --offset_step 2 --sym C1 --norm --scale --random_seed 0 o Results/cpu --pool 40 --j 20 --iter 25 cpu
+```
+    * 8 machines - completes in about 1 hour:
+```
+export OMP_SCHEDULE="dynamic"
+export KMP_BLOCKTIME=0
+mpirun -perhost 4 np 32 relion_refine_mpi --i Particles/shiny_2sets.star --ref emd_2660.map:mrc --firstiter_cc --ini_high 60 --dont_combine_weights_via_disc --ctf --ctf_corrected_ref --tau2_fudge 4 --particle_diameter 360 --K 6 --flatten_solvent --zero_mask --oversampling 1 --healpix_order 2 --offset_range 5 --offset_step 2 --sym C1 --norm --scale --random_seed 0 o Results/cpu --pool 40 --j 20 --iter 25 --cpu
+```
 
 
 ## Updating
