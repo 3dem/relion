@@ -974,7 +974,6 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 			if (fn_prev != fn_ori_micrographs[i].beforeLastOf("/"))
 			{
 				fn_prev = fn_ori_micrographs[i].beforeLastOf("/");
-				std::cout << (fn_out + fn_prev+"/*.eps") << std::endl;
 				fn_eps.push_back(fn_out + fn_prev+"/*.eps");
 			}
 		}
