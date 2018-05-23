@@ -11,7 +11,8 @@ ReferenceMap::ReferenceMap()
 	reconFn1(""),
 	maskFn(""),
 	fscFn(""),
-	paddingFactor(2.0)
+	paddingFactor(2.0),	
+	hasMask(false)
 {
 }
 
@@ -62,7 +63,7 @@ void ReferenceMap::load(int verb, bool debug)
 	{
 		if (verb > 0) std::cout << " + Masking references ...\n";
 		
-		Image<RFLOAT> mask, maskedRef;
+		Image<RFLOAT> maskedRef;
 		
 		mask.read(maskFn);
 		
@@ -71,6 +72,8 @@ void ReferenceMap::load(int verb, bool debug)
 		
 		ImageOp::multiply(mask, maps[1], maskedRef);
 		maps[1] = maskedRef;
+		
+		hasMask = true;
 	}
 	
 	if (verb > 0) std::cout << " + Transforming references ...\n";

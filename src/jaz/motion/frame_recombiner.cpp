@@ -162,7 +162,7 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromFCC(
 {
     if (debug && verb > 0)
     {
-        std::cout << " + Summing up FCCs...\n";
+        std::cout << " + Summing up FCCs..." << std::endl;
     }
 
     Image<RFLOAT> fccData, fccWgh0, fccWgh1;
@@ -244,7 +244,7 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromFCC(
     if (verb > 0)
     {
         std::cout << " + Fitting B/k-factors between " << k0 << " and " << k1 << " pixels, or "
-                  << k0a << " and " << k1a << " Angstrom ...\n";
+                  << k0a << " and " << k1a << " Angstrom ..." << std::endl;
     }
 
     std::pair<std::vector<d2Vector>,std::vector<double>> bkFacs
@@ -281,8 +281,8 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromFCC(
             double s = bkFacs.first[i].x;
             double b = -cf/(s*s);
 
-            bfacsDat << i << " " << b << "\n";
-            kfacsDat << i << " " << log(bkFacs.first[i].y) << "\n";
+            bfacsDat << i << " " << b << std::endl;
+            kfacsDat << i << " " << log(bkFacs.first[i].y) << std::endl;
         }
 
         bfacsDat.close();
@@ -379,8 +379,8 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromBfacs()
             double s = bkFacs[i].x;
             double b = -cf/(s*s);
 
-            bfacsDat << i << " " << b << "\n";
-            kfacsDat << i << " " << log(bkFacs[i].y) << "\n";
+            bfacsDat << i << " " << b << std::endl;
+            kfacsDat << i << " " << log(bkFacs[i].y) << std::endl;
         }
 
         bfacsDat.close();
