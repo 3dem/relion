@@ -131,7 +131,7 @@ void AutoPicker::read(int argc, char **argv)
 	LoG_diameter = textToFloat(parser.getOption("--LoG_diam", "Diameter (in Angstroms) for blob-detection by Laplacian-of-Gaussian filter", "-1"));
 	LoG_diameter_fracrange = textToFloat(parser.getOption("--LoG_diam_range", "Min and max diameter change by this fraction of the diameter above", "0.2"));
 	LoG_invert = parser.checkOption("--Log_invert", "Use this option if the particles are white instead of black");
-	LoG_adjust_threshold = textToFloat(parser.getOption("--LoG_adjust_threshold", "Use this option to adjust the picking threshold: positive for more particles, negative for fewer", "0."));
+	LoG_adjust_threshold = textToFloat(parser.getOption("--LoG_adjust_threshold", "Use this option to adjust the picking threshold: positive for less particles, negative for more", "0."));
 
 	int helix_section = parser.addSection("Helix options");
 	autopick_helical_segments = parser.checkOption("--helix", "Are the references 2D helical segments? If so, in-plane rotation angles (psi) are estimated for the references.");
@@ -2499,7 +2499,7 @@ void AutoPicker::autoPickLoGOneMicrograph(FileName &fn_mic, long int imic)
 	sum2_fom_low = sum2_fom_low/count_low - sum_fom_low*sum_fom_low;
 	sum2_fom_high = sum2_fom_high/count_high - sum_fom_high*sum_fom_high;
 	sum2_fom_ok = sum2_fom_ok/count_ok - sum_fom_ok*sum_fom_ok;
-	float my_threshold =  sum_fom_low - LoG_adjust_threshold * sqrt(sum2_fom_low);
+	float my_threshold =  sum_fom_low + LoG_adjust_threshold * sqrt(sum2_fom_low);
 
 	if (verb > 1)
 	{
