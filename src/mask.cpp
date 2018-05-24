@@ -474,6 +474,7 @@ void autoMask(MultidimArray<RFLOAT> &img_in, MultidimArray<RFLOAT> &msk_out,
 	}
 
 }
+
 void raisedCosineMask(MultidimArray<RFLOAT> &mask, RFLOAT radius, RFLOAT radius_p, int x, int y, int z)
 {
 	mask.setXmippOrigin();
@@ -488,5 +489,28 @@ void raisedCosineMask(MultidimArray<RFLOAT> &mask, RFLOAT radius, RFLOAT radius_
 		else
 			A3D_ELEM(mask, k, i, j) = 0.5 - 0.5 * cos(PI * (radius_p - d) / (radius_p - radius));
 	}
-
 }
+
+void raisedCrownMask(MultidimArray<RFLOAT> &mask, RFLOAT inner_radius, RFLOAT outer_radius, RFLOAT width, RFLOAT x, RFLOAT y, RFLOAT z)
+{
+	RFLOAT inner_border = inner_radius - width;
+	RFLOAT outer_border = outer_radius + width;
+
+	mask.setXmippOrigin();
+	FOR_ALL_ELEMENTS_IN_ARRAY3D(mask)
+	{
+		RFLOAT d = sqrt((RFLOAT)((z-k)*(z-k) + (y-i)*(y-i) + (x-j)*(x-j)));
+		if (d < inner_border)
+			A3D_ELEM(mask, k, i, j) = 0.;
+		else if (d < inner_radius)
+			A3D_ELEM(mask, k, i, j) = 0.5  - 0.5 * cos(PI * (d - inner_border) / width);
+		else if (d < outer_radius) 
+			A3D_ELEM(mask, k, i, j) = 1.; 
+		else if (d < outer_border)
+			A3D_ELEM(mask, k, i, j) = 0.5 - 0.5 * cos(PI * (outer_border - d) / width);
+		else
+			A3D_ELEM(mask, k, i, j) = 0.;
+	}
+}
+
+

@@ -1092,7 +1092,7 @@ void RelionJob::initialiseMotioncorrJob()
 	joboptions["input_star_mics"] = JobOption("Input movies STAR file:", NODE_MOVIES, "", "STAR files (*.star)", "A STAR file with all micrographs to run MOTIONCORR on");
 	joboptions["first_frame_sum"] = JobOption("First frame for corrected sum:", 1, 1, 32, 1, "First frame to use in corrected average (starts counting at 1). ");
 	joboptions["last_frame_sum"] = JobOption("Last frame for corrected sum:", 0, 0, 32, 1, "Last frame to use in corrected average.");
-	joboptions["angpix"] = JobOption("Pixel size (A):", 1, 0.5, 4.0, 0.1, "Provide the pixel size in Angstroms of the input movies. UNBLUR and MOTIONCOR2 use this for their bfactor and their dose-weighting. This is the original pixel size before binning.");
+	joboptions["angpix"] = JobOption("Pixel size (A):", 1, 0.5, 4.0, 0.1, "Provide the pixel size in Angstroms of the input movies. This is the original pixel size before binning.");
 
 	// Motioncor2
 
@@ -1176,18 +1176,29 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 	{
 		command += " --use_motioncor2 ";
 		command += " --motioncor2_exe " + joboptions["fn_motioncor2_exe"].getString();
+
+		if ((joboptions["fn_defect"].getString()).length() > 0)
+			command += " --defect_file " + joboptions["fn_defect"].getString();
+
+		if ((joboptions["other_motioncor2_args"].getString()).length() > 0)
+			command += " --other_motioncor2_args \" " + joboptions["other_motioncor2_args"].getString() + " \"";
+
+		// Which GPUs to use?
+		command += " --gpu \"" + joboptions["gpu_ids"].getString() + "\"";
 	}
+
 	command += " --bin_factor " + joboptions["bin_factor"].getString();
 	command += " --bfactor " + joboptions["bfactor"].getString();
 	command += " --angpix " +  joboptions["angpix"].getString();
+	command += " --voltage " + joboptions["voltage"].getString();
+	command += " --dose_per_frame " + joboptions["dose_per_frame"].getString();
+	command += " --preexposure " + joboptions["pre_exposure"].getString();
 	command += " --patch_x " + joboptions["patch_x"].getString();
 	command += " --patch_y " + joboptions["patch_y"].getString();
 	if (joboptions["group_frames"].getNumber() > 1.)
 		command += " --group_frames " + joboptions["group_frames"].getString();
 	if ((joboptions["fn_gain_ref"].getString()).length() > 0)
 	{
-		std::cout << joboptions["gain_rot"].getString() << std::endl;
-		std::cout << joboptions["gain_flip"].getString() << std::endl;
 
 		int gain_rot = -1, gain_flip = -1;
 		for (int i = 0; i <= 3; i++)
@@ -1215,21 +1226,10 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 		command += " --gain_rot " + integerToString(gain_rot);
 		command += " --gain_flip " + integerToString(gain_flip);
 	}
-	if ((joboptions["fn_defect"].getString()).length() > 0)
-		command += " --defect_file " + joboptions["fn_defect"].getString();
-
-	if ((joboptions["other_motioncor2_args"].getString()).length() > 0)
-		command += " --other_motioncor2_args \" " + joboptions["other_motioncor2_args"].getString() + " \"";
-
-	// Which GPUs to use?
-	command += " --gpu \"" + joboptions["gpu_ids"].getString() + "\"";
 
 	if (joboptions["do_dose_weighting"].getBoolean())
 	{
 		command += " --dose_weighting ";
-		command += " --voltage " + joboptions["voltage"].getString();
-		command += " --dose_per_frame " + joboptions["dose_per_frame"].getString();
-		command += " --preexposure " + joboptions["pre_exposure"].getString();
 		if (joboptions["save_noDW"].getBoolean())
 		{
 			command += " --save_noDW ";
@@ -1239,14 +1239,12 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 	if (is_continue)
 		command += " --only_do_unfinished ";
 
-
 	// Other arguments
 	command += " " + joboptions["other_args"].getString();
 
 	commands.push_back(command);
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
-
 
 }
 
@@ -1260,7 +1258,7 @@ void RelionJob::initialiseCtffindJob()
 	joboptions["input_star_mics"] = JobOption("Input micrographs STAR file:", NODE_MICS, "", "STAR files (*.star)", "A STAR file with all micrographs to run CTFFIND or Gctf on");
 	joboptions["use_noDW"] = JobOption("Use micrograph without dose-weighting?", false, "If set to Yes, the CTF estimation will be done using the micrograph without dose-weighting as in rlnMicrographNameNoDW (_noDW.mrc from MotionCor2). If set to No, the normal rlnMicrographName will be used. Note this option will not work for motion-correction with UNBLUR.");
 
-	joboptions["cs"] = JobOption("Spherical aberration (mm):", 2, 0, 8, 0.1, "Spherical aberration of the microscope used to collect these images (in mm)");
+	joboptions["cs"] = JobOption("Spherical aberration (mm):", 2.7, 0, 8, 0.1, "Spherical aberration of the microscope used to collect these images (in mm). Typical values are 2.7 (FEI Titan & Talos), 2.0 (FEI Polara), 1.4 (JEOL CRYO-ARM) and 0.01 (microscopes with a Cs corrector).");
 	joboptions["kv"] = JobOption("Voltage (kV):", 300, 50, 500, 10, "Voltage the microscope was operated on (in kV)");
 	joboptions["q0"] = JobOption("Amplitude contrast:", 0.1, 0, 0.3, 0.01, "Fraction of amplitude contrast. Often values around 10% work better than theoretically more accurate lower values...");
 	joboptions["angpix"] = JobOption("Magnified pixel size (Angstrom):", 1.4, 0.5, 3, 0.1, "Pixel size in Angstroms. ");
@@ -1996,6 +1994,11 @@ void RelionJob::initialiseSelectJob()
 	joboptions["select_minval"] = JobOption("Minimum metadata value:",  (std::string)"-9999.", "Only lines in the input STAR file with the corresponding metadata value larger than this value will be included in the subset.");
 	joboptions["select_maxval"] = JobOption("Maximum metadata value:",  (std::string)"9999.", "Only lines in the input STAR file with the corresponding metadata value smaller than this value will be included in the subset.");
 
+	joboptions["do_split"] = JobOption("Split into subsets?", false, "If set to Yes, the job will be non-interactive and the star file will be split into subsets as defined below.");
+	joboptions["do_random"] = JobOption("Randomise order before making subsets?:", false, "If set to Yes, the input STAR file order will be randomised. If set to No, the original order in the input STAR file will be maintained.");
+	joboptions["split_size"] = JobOption("Subset size: ", 100, 100, 10000, 100, "The number of lines in each of the output subsets. This line will be ignored when the number of subsets is specified on the next line.");
+	joboptions["nr_split"] = JobOption("OR: number of subsets: ", -1, 1, 50, 1, "Give a positive integer to specify into how many equal-sized subsets the data will be divided");
+
 	joboptions["do_remove_duplicates"] = JobOption("Remove duplicates", false, "If set to Yes, then the program will remove all but one of particles which have drifted into the same position during alignment");
 	joboptions["duplicate_threshold"] = JobOption("Threshold [A]: ", 1, 1, 100, 1, "Remove particle coordinates within this distance [A], which might have drifted into the same position during alignment");
 
@@ -2018,45 +2021,100 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 	}
 
 	// Value-based selection
-	if (joboptions["do_select_values"].getBoolean())
+	if (joboptions["do_select_values"].getBoolean() || joboptions["do_split"].getBoolean())
 	{
-		command="`which relion_star_subset`";
+		command="`which relion_star_handler`";
 
 		if (joboptions["fn_model"].getString() != "" || joboptions["fn_coords"].getString() != "")
 		{
-			error_message = "ERROR: Value-selection is only possible for micrograph or particle STAR files... ";
+			error_message = "ERROR: Value-selection or subset splitting is only possible for micrograph or particle STAR files... ";
 			return false;
 		}
-		else if (joboptions["fn_mic"].getString() != "")
+
+		FileName fn_out;
+		if (joboptions["fn_mic"].getString() != "")
 		{
+
 			Node node(joboptions["fn_mic"].getString(), joboptions["fn_mic"].node_type);
 			inputNodes.push_back(node);
-
-			FileName fn_out = outputname+"micrographs.star";
-			Node node2(fn_out, NODE_MICS);
-			outputNodes.push_back(node2);
-
 			command += " --i " + joboptions["fn_mic"].getString();
-			command += " --o " + fn_out;
+			fn_out = outputname+"micrographs.star";
 
 		}
 		else if (joboptions["fn_data"].getString() != "")
 		{
+
 			Node node(joboptions["fn_data"].getString(), joboptions["fn_data"].node_type);
 			inputNodes.push_back(node);
-
-			FileName fn_out = outputname+"particles.star";
-			Node node2(fn_out, NODE_PART_DATA);
-			outputNodes.push_back(node2);
-
 			command += " --i " + joboptions["fn_data"].getString();
-			command += " --o " + fn_out;
+			fn_out = outputname+"particles.star";
+		}
+		command += " --o " + fn_out;
+
+		if (joboptions["do_select_values"].getBoolean())
+		{
+
+			if (joboptions["fn_mic"].getString() != "")
+			{
+
+				Node node2(fn_out, NODE_MICS);
+				outputNodes.push_back(node2);
+
+			}
+			else if (joboptions["fn_data"].getString() != "")
+			{
+
+				Node node2(fn_out, NODE_PART_DATA);
+				outputNodes.push_back(node2);
+
+			}
+
+			command += " --select " + joboptions["select_label"].getString();
+			command += " --minval " + joboptions["select_minval"].getString();
+			command += " --maxval " + joboptions["select_maxval"].getString();
 
 		}
+		else if (joboptions["do_split"].getBoolean())
+		{
 
-		command += " --label " + joboptions["select_label"].getString();
-		command += " --minval " + joboptions["select_minval"].getString();
-		command += " --maxval " + joboptions["select_maxval"].getString();
+			int nr_split;
+			command += " --split ";
+			if (joboptions["do_random"].getBoolean())
+			{
+				command += " --random_order ";
+			}
+			if (joboptions["nr_split"].getNumber() <= 0 && joboptions["split_size"].getNumber() <= 0)
+			{
+				error_message = "ERROR: When splitting the input STAR file into subsets, set nr_split and/or split_size to a positive value";
+				return false;
+			}
+			if (joboptions["nr_split"].getNumber() > 0)
+			{
+				nr_split = joboptions["nr_split"].getNumber();
+				command += " --nr_split " + joboptions["nr_split"].getString();
+			}
+			if (joboptions["split_size"].getNumber() > 0)
+			{
+				command += " --size_split " + joboptions["split_size"].getString();
+
+				if (joboptions["nr_split"].getNumber() <= 0)
+				{
+					// Calculate nr_split from number of entries in input STAR file
+					MetaDataTable MDtmp;
+					FileName fnt = (joboptions["fn_mic"].getString() != "") ? joboptions["fn_mic"].getString() : joboptions["fn_data"].getString();
+					long int n_obj = (exists(fnt)) ? MDtmp.read(fnt, "", NULL, "", true) : 0; // true means do_only_count
+					long int size_split = joboptions["split_size"].getNumber();
+					nr_split = n_obj / size_split;
+				}
+			}
+
+			for (int isplit = 0; isplit < nr_split; isplit++)
+			{
+				FileName fn_split = fn_out.insertBeforeExtension("_split"+integerToString(isplit+1,3));
+				Node node2(fn_split, NODE_PART_DATA);
+				outputNodes.push_back(node2);
+			}
+		}
 
 	}
 	else
@@ -2545,7 +2603,7 @@ Otherwise, only the master will read images and send them through the network to
 	joboptions["nr_pool"] = JobOption("Number of pooled particles:", 3, 1, 16, 1, "Particles are processed in individual batches by MPI slaves. During each batch, a stack of particle images is only opened and closed once to improve disk access times. \
 All particle images of a single batch are read into memory together. The size of these batches is at least one particle per thread used. The nr_pooled_particles parameter controls how many particles are read together for each thread. If it is set to 3 and one uses 8 threads, batches of 3x8=24 particles will be read together. \
 This may improve performance on systems where disk access, and particularly metadata handling of disk access, is a problem. It has a modest cost of increased RAM usage.");
-	joboptions["do_pad1"] = JobOption("Skip padding?", true, "If set to Yes, the calculations will not use padding in Fourier space for better interpolation in the references. Otherwise, references are padded 2x before Fourier transforms are calculated. Skipping padding (i.e. use --pad 1) gives nearly as good results as using --pad 2, but some artifacts may appear in the corners from signal that is folded back.");
+	joboptions["do_pad1"] = JobOption("Skip padding?", false, "If set to Yes, the calculations will not use padding in Fourier space for better interpolation in the references. Otherwise, references are padded 2x before Fourier transforms are calculated. Skipping padding (i.e. use --pad 1) gives nearly as good results as using --pad 2, but some artifacts may appear in the corners from signal that is folded back.");
 	joboptions["do_preread_images"] = JobOption("Pre-read all particles into RAM?", false, "If set to Yes, all particle images will be read into computer memory, which will greatly speed up calculations on systems with slow disk access. However, one should of course be careful with the amount of RAM available. \
 Because particles are read in float-precision, it will take ( N * box_size * box_size * 4 / (1024 * 1024 * 1024) ) Giga-bytes to read N particles into RAM. For 100 thousand 200x200 images, that becomes 15Gb, or 60 Gb for the same number of 400x400 particles. \
 Remember that running a single MPI slave on each node that runs as many threads as available cores will have access to all available RAM. \n \n If parallel disc I/O is set to No, then only the master reads all particles into RAM and sends those particles through the network to the MPI slaves during the refinement iterations.");
@@ -2876,7 +2934,7 @@ Otherwise, only the master will read images and send them through the network to
 	joboptions["nr_pool"] = JobOption("Number of pooled particles:", 3, 1, 16, 1, "Particles are processed in individual batches by MPI slaves. During each batch, a stack of particle images is only opened and closed once to improve disk access times. \
 All particle images of a single batch are read into memory together. The size of these batches is at least one particle per thread used. The nr_pooled_particles parameter controls how many particles are read together for each thread. If it is set to 3 and one uses 8 threads, batches of 3x8=24 particles will be read together. \
 This may improve performance on systems where disk access, and particularly metadata handling of disk access, is a problem. It has a modest cost of increased RAM usage.");
-	joboptions["do_pad1"] = JobOption("Skip padding?", true, "If set to Yes, the calculations will not use padding in Fourier space for better interpolation in the references. Otherwise, references are padded 2x before Fourier transforms are calculated. Skipping padding (i.e. use --pad 1) gives nearly as good results as using --pad 2, but some artifacts may appear in the corners from signal that is folded back.");
+	joboptions["do_pad1"] = JobOption("Skip padding?", false, "If set to Yes, the calculations will not use padding in Fourier space for better interpolation in the references. Otherwise, references are padded 2x before Fourier transforms are calculated. Skipping padding (i.e. use --pad 1) gives nearly as good results as using --pad 2, but some artifacts may appear in the corners from signal that is folded back.");
 	joboptions["do_preread_images"] = JobOption("Pre-read all particles into RAM?", false, "If set to Yes, all particle images will be read into computer memory, which will greatly speed up calculations on systems with slow disk access. However, one should of course be careful with the amount of RAM available. \
 Because particles are read in float-precision, it will take ( N * box_size * box_size * 4 / (1024 * 1024 * 1024) ) Giga-bytes to read N particles into RAM. For 100 thousand 200x200 images, that becomes 15Gb, or 60 Gb for the same number of 400x400 particles. \
 Remember that running a single MPI slave on each node that runs as many threads as available cores will have access to all available RAM. \n \n If parallel disc I/O is set to No, then only the master reads all particles into RAM and sends those particles through the network to the MPI slaves during the refinement iterations.");
@@ -3262,7 +3320,7 @@ Otherwise, only the master will read images and send them through the network to
 	joboptions["nr_pool"] = JobOption("Number of pooled particles:", 3, 1, 16, 1, "Particles are processed in individual batches by MPI slaves. During each batch, a stack of particle images is only opened and closed once to improve disk access times. \
 All particle images of a single batch are read into memory together. The size of these batches is at least one particle per thread used. The nr_pooled_particles parameter controls how many particles are read together for each thread. If it is set to 3 and one uses 8 threads, batches of 3x8=24 particles will be read together. \
 This may improve performance on systems where disk access, and particularly metadata handling of disk access, is a problem. It has a modest cost of increased RAM usage.");
-	joboptions["do_pad1"] = JobOption("Skip padding?", true, "If set to Yes, the calculations will not use padding in Fourier space for better interpolation in the references. Otherwise, references are padded 2x before Fourier transforms are calculated. Skipping padding (i.e. use --pad 1) gives nearly as good results as using --pad 2, but some artifacts may appear in the corners from signal that is folded back.");
+	joboptions["do_pad1"] = JobOption("Skip padding?", false, "If set to Yes, the calculations will not use padding in Fourier space for better interpolation in the references. Otherwise, references are padded 2x before Fourier transforms are calculated. Skipping padding (i.e. use --pad 1) gives nearly as good results as using --pad 2, but some artifacts may appear in the corners from signal that is folded back.");
 	joboptions["do_preread_images"] = JobOption("Pre-read all particles into RAM?", false, "If set to Yes, all particle images will be read into computer memory, which will greatly speed up calculations on systems with slow disk access. However, one should of course be careful with the amount of RAM available. \
 Because particles are read in float-precision, it will take ( N * box_size * box_size * 8 / (1024 * 1024 * 1024) ) Giga-bytes to read N particles into RAM. For 100 thousand 200x200 images, that becomes 15Gb, or 60 Gb for the same number of 400x400 particles. \
 Remember that running a single MPI slave on each node that runs as many threads as available cores will have access to all available RAM. \n \n If parallel disc I/O is set to No, then only the master reads all particles into RAM and sends those particles through the network to the MPI slaves during the refinement iterations.");
@@ -3552,7 +3610,7 @@ Otherwise, only the master will read images and send them through the network to
 	joboptions["nr_pool"] = JobOption("Number of pooled particles:", 3, 1, 16, 1, "Particles are processed in individual batches by MPI slaves. During each batch, a stack of particle images is only opened and closed once to improve disk access times. \
 All particle images of a single batch are read into memory together. The size of these batches is at least one particle per thread used. The nr_pooled_particles parameter controls how many particles are read together for each thread. If it is set to 3 and one uses 8 threads, batches of 3x8=24 particles will be read together. \
 This may improve performance on systems where disk access, and particularly metadata handling of disk access, is a problem. It has a modest cost of increased RAM usage.");
-	joboptions["do_pad1"] = JobOption("Skip padding?", true, "If set to Yes, the calculations will not use padding in Fourier space for better interpolation in the references. Otherwise, references are padded 2x before Fourier transforms are calculated. Skipping padding (i.e. use --pad 1) gives nearly as good results as using --pad 2, but some artifacts may appear in the corners from signal that is folded back.");
+	joboptions["do_pad1"] = JobOption("Skip padding?", false, "If set to Yes, the calculations will not use padding in Fourier space for better interpolation in the references. Otherwise, references are padded 2x before Fourier transforms are calculated. Skipping padding (i.e. use --pad 1) gives nearly as good results as using --pad 2, but some artifacts may appear in the corners from signal that is folded back.");
 	joboptions["do_preread_images"] = JobOption("Pre-read all particles into RAM?", false, "If set to Yes, all particle images will be read into computer memory, which will greatly speed up calculations on systems with slow disk access. However, one should of course be careful with the amount of RAM available. \
 Because particles are read in float-precision, it will take ( N * box_size * box_size * 8 / (1024 * 1024 * 1024) ) Giga-bytes to read N particles into RAM. For 100 thousand 200x200 images, that becomes 15Gb, or 60 Gb for the same number of 400x400 particles. \
 Remember that running a single MPI slave on each node that runs as many threads as available cores will have access to all available RAM. \n \n If parallel disc I/O is set to No, then only the master reads all particles into RAM and sends those particles through the network to the MPI slaves during the refinement iterations.");
@@ -4203,7 +4261,7 @@ bool RelionJob::getCommandsJoinstarJob(std::string &outputname, std::vector<std:
 	commands.clear();
 	initialisePipeline(outputname, PROC_JOINSTAR_NAME, job_counter);
 	std::string command;
-	command="`which relion_star_combine`";
+	command="`which relion_star_handler`";
 
 	int ii = 0;
 	if (joboptions["do_part"].getBoolean())
@@ -4233,7 +4291,7 @@ bool RelionJob::getCommandsJoinstarJob(std::string &outputname, std::vector<std:
 			error_message = "ERROR: empty field for first or second input STAR file...";
 			return false;
 		}
-		command += " --i \" " + joboptions["fn_part1"].getString();
+		command += " --combine --i \" " + joboptions["fn_part1"].getString();
 		Node node(joboptions["fn_part1"].getString(), joboptions["fn_part1"].node_type);
 		inputNodes.push_back(node);
 		command += " " + joboptions["fn_part2"].getString();
@@ -4267,7 +4325,7 @@ bool RelionJob::getCommandsJoinstarJob(std::string &outputname, std::vector<std:
 			error_message = "ERROR: empty field for first or second input STAR file...";
 			return false;
 		}
-		command += " --i \" " + joboptions["fn_mic1"].getString();
+		command += " --combine --i \" " + joboptions["fn_mic1"].getString();
 		Node node(joboptions["fn_mic1"].getString(), joboptions["fn_mic1"].node_type);
 		inputNodes.push_back(node);
 		command += " " + joboptions["fn_mic2"].getString();
@@ -4301,7 +4359,7 @@ bool RelionJob::getCommandsJoinstarJob(std::string &outputname, std::vector<std:
 			error_message = "ERROR: empty field for first or second input STAR file...";
 			return false;
 		}
-		command += " --i \" " + joboptions["fn_mov1"].getString();
+		command += " --combine --i \" " + joboptions["fn_mov1"].getString();
 		Node node(joboptions["fn_mov1"].getString(), joboptions["fn_mov1"].node_type);
 		inputNodes.push_back(node);
 		command += " " + joboptions["fn_mov2"].getString();
@@ -4693,8 +4751,8 @@ void RelionJob::initialiseMotionrefineJob()
 	hidden_name = ".gui_bayespolish";
 
 	// I/O
-	joboptions["fn_mic"] = JobOption("Input micrographs:", NODE_MICS,  "", "STAR files (*.star)", "The input STAR file with the micrograph (and their movie metadata) from a MotionCorr job.");
-	joboptions["fn_data"] = JobOption("Input particles:", NODE_PART_DATA,  "", "STAR files (*.star)", "The input STAR file with the metadata of all particles.");
+	joboptions["fn_mic"] = JobOption("Micrographs (from MotionCorr):", NODE_MICS,  "", "STAR files (*.star)", "The input STAR file with the micrograph (and their movie metadata) from a MotionCorr job.");
+	joboptions["fn_data"] = JobOption("Particles (from Refine3D):", NODE_PART_DATA,  "", "STAR files (*.star)", "The input STAR file with the metadata of all particles.");
 	joboptions["fn_post"] = JobOption("Postprocess STAR file:", NODE_POST,  "", "STAR files (postprocess.star)", "The STAR file generated by a PostProcess job. \
 The mask used for this postprocessing will be applied to the unfiltered half-maps and should encompass the entire complex. The resulting FSC curve will be used for weighting the different frequencies.");
 
@@ -4702,19 +4760,20 @@ The mask used for this postprocessing will be applied to the unfiltered half-map
 	joboptions["first_frame"] = JobOption("First movie frame: ", 1., 1., 10., 1, "First movie frame to take into account in motion fit and combination step");
 	joboptions["last_frame"] = JobOption("Last movie frame: ", -1., 5., 50., 1, "Last movie frame to take into account in motion fit and combination step. Negative values mean: take all frames into acount.");
 
-	// motion_fit
-	joboptions["do_fit"] = JobOption("Perform motion refinement?", true, "If set to Yes, then relion_motion_refine will be run to estimate per-particle motion-tracks using the parameters below.");
-	joboptions["sigma_vel"] = JobOption("Sigma for velocity (A/dose): ", 1.6, 1., 10., 0.1, "Standard deviation for the velocity regularisation. Smaller values allow for only shorter tracks.");
-	joboptions["sigma_div"] = JobOption("Sigma for divergence (A): ", 500, 0, 3000, 100, "Standard deviation for the divergence of tracks across the micrograph. Smaller values allow for TODO EXPLAIN");
-	joboptions["sigma_acc"] = JobOption("Sigma for acceleration (A/dose): ", 3, -1, 0, 0.1, "Standard deviation for the acceleration regularisation. TODO EXPLAIN");
-
 	// Parameter optimisation
-	joboptions["do_param_optim"] = JobOption("Estimate optimal sigma values?", false, "If set to Yes, then relion_motion_refine will estimate optimal parameter values for the three sigma values above on a subset of the data (determined by the minimum number of particles to be used below).");
-	joboptions["optim_cutoff"] = JobOption("Four. ring for evaluation cutoff (A): ", 100, 10, 500, 10, "Fouring ring below which all Fourier components will be used for parameter estimation and above which will be used for evaluation of the fits. A good value could be the number of the ring to which the resolution of the reference extends MINUS 50.");
-	joboptions["optim_min_part"] = JobOption("Use this many particles: ", 5000, 500, 20000, 500, "Use at least this many particles for the meta-parameter optimisation. The more particles the more expensive in time and computer memory the calculation becomes, but the better the results may get.");
+	joboptions["do_param_optim"] = JobOption("Train optimal parameters?", false, "If set to Yes, then relion_motion_refine will estimate optimal parameter values for the three sigma values above on a subset of the data (determined by the minimum number of particles to be used below).");
+	joboptions["eval_frac"] = JobOption("Fraction of Fourier pixels for testing: ", 0.5, 0, 1., 0.01, "This fraction of Fourier pixels (at higher resolution) will be used for evaluation of the parameters (test set), whereas the rest (at lower resolution) will be used for parameter estimation itself (work set).");
+	joboptions["optim_min_part"] = JobOption("Use this many particles: ", 10000, 5000, 50000, 1000, "Use at least this many particles for the meta-parameter optimisation. The more particles the more expensive in time and computer memory the calculation becomes, but the better the results may get.");
+
+	// motion_fit
+	joboptions["do_polish"] = JobOption("Perform particle polishing?", true, "If set to Yes, then relion_motion_refine will be run to estimate per-particle motion-tracks using the parameters below, and polished particles will be generated.");
+	joboptions["opt_params"] = JobOption("Optimised parameter file:", NODE_POLISH_PARAMS,  "", "TXT files (opt_params.txt)", "The output TXT file from a previous Bayesian polishing job in which the optimal parameters were determined.");
+	joboptions["do_own_params"] = JobOption("OR use your own parameters?", false, "If set to Yes, then the field for the optimised parameter file will be ignored and the parameters specified below will be used instead.");
+	joboptions["sigma_vel"] = JobOption("Sigma for velocity (A/dose): ", 0.2, 1., 10., 0.1, "Standard deviation for the velocity regularisation. Smaller values allow for only shorter tracks.");
+	joboptions["sigma_div"] = JobOption("Sigma for divergence (A): ", 5000, 0, 10000, 10000, "Standard deviation for the divergence of tracks across the micrograph. Smaller values allow for TODO EXPLAIN");
+	joboptions["sigma_acc"] = JobOption("Sigma for acceleration (A/dose): ", 2, -1, 7, 0.1, "Standard deviation for the acceleration regularisation. TODO EXPLAIN");
 
 	//combine_frames
-	joboptions["do_combine"] = JobOption("Generate shiny particles?", true, "If set to Yes, then relion_combine_frames will be run to combine all (aligned) movie frames, using a dose-weighting scheme that is estimated from the data");
 	joboptions["minres"] = JobOption("Minimum resolution for B-factor fit (A): ", 20, 8, 40, 1, "The minimum spatial frequency (in Angstrom) used in the B-factor fit.");
 	joboptions["maxres"] = JobOption("Maximum resolution for B-factor fit (A): ", -1, -1, 15, 1, "The maximum spatial frequency (in Angstrom) used in the B-factor fit. If a negative value is given, the maximum is determined from the input FSC curve.");
 
@@ -4749,15 +4808,15 @@ bool RelionJob::getCommandsMotionrefineJob(std::string &outputname, std::vector<
 		return false;
 	}
 
-	if (!joboptions["do_fit"].getBoolean() && !joboptions["do_combine"].getBoolean())
+	if (!joboptions["do_param_optim"].getBoolean() && !joboptions["do_polish"].getBoolean())
 	{
-		error_message = "ERROR: nothing to do...";
+		error_message = "ERROR: nothing to do, choose either parameter training or polishing.";
 		return false;
 	}
 
-	if (joboptions["do_fit"].getBoolean() && joboptions["do_param_optim"].getBoolean() && joboptions["do_combine"].getBoolean())
+	if (joboptions["eval_frac"].getNumber() <= 0.1 || joboptions["eval_frac"].getNumber() > 0.9)
 	{
-		error_message = "ERROR: you cannot estimate optimal sigmas AND generate shiny particles. Deactivate the latter, get sigma values, and re-run without estimating sigma values to generate shiny particles..";
+		error_message = "ERROR: the fraction of Fourier pixels used for evaluation should be between 0.1 and 0.9.";
 		return false;
 	}
 
@@ -4790,59 +4849,56 @@ bool RelionJob::getCommandsMotionrefineJob(std::string &outputname, std::vector<
 	command += " --last_frame " + joboptions["last_frame"].getString();
 	command += " --o " + outputname;
 
-	if (joboptions["do_fit"].getBoolean())
+	if (joboptions["do_param_optim"].getBoolean())
 	{
-		if (joboptions["do_param_optim"].getBoolean())
-		{
-			// Estimate meta-parameters
-			if (joboptions["sigma_acc"].getNumber() < 0)
-			{
-				command += " --params2 ";
-			}
-			else
-			{
-				command += " --params3 ";
-				command += " --s_acc_0 " + joboptions["sigma_acc"].getString();
-			}
 
-			command += " --min_p " + joboptions["optim_min_part"].getString();
-			command += " --k_cut " + joboptions["optim_cutoff"].getString();
-			command += " --k_eval " + joboptions["optim_cutoff"].getString();
-			command += " --s_vel_0 " + joboptions["sigma_vel"].getString();
-			command += " --s_div_0 " + joboptions["sigma_div"].getString();
+		// Estimate meta-parameters
+		RFLOAT align_frac = 1.0 - joboptions["eval_frac"].getNumber();
+		command += " --min_p " + joboptions["optim_min_part"].getString();
+		command += " --eval_frac " + joboptions["eval_frac"].getString();
+		command += " --align_frac " + floatToString(align_frac);
+
+		if (joboptions["sigma_acc"].getNumber() < 0)
+		{
+			command += " --params2 ";
 		}
 		else
 		{
+			command += " --params3 ";
+		}
 
-			// Fit Parameters
+		Node node5(outputname+"opt_params.txt", NODE_POLISH_PARAMS);
+		outputNodes.push_back(node5);
+	}
+	else if (joboptions["do_polish"].getBoolean())
+	{
+		if (joboptions["do_own_params"].getBoolean())
+		{
+			// User-specified Parameters
 			command += " --s_vel " + joboptions["sigma_vel"].getString();
 			command += " --s_div " + joboptions["sigma_div"].getString();
 			command += " --s_acc " + joboptions["sigma_acc"].getString();
 		}
-	}
-	else
-	{
-		command += " --skip_motion_fit";
-	}
-
-	// If this is a continue job, then only process unfinished micrographs
-	if (is_continue)
-		command += " --only_do_unfinished ";
-
-	if (joboptions["do_combine"].getBoolean())
-	{
+		else
+		{
+			command += " --params_file " + joboptions["opt_params"].getString();
+		}
 
 		command += " --combine_frames";
 		command += " --bfac_minfreq " + joboptions["minres"].getString();
 		command += " --bfac_maxfreq " + joboptions["maxres"].getString();
+
+		Node node6(outputname+"logfile.pdf", NODE_PDF_LOGFILE);
+		outputNodes.push_back(node6);
 
 		Node node7(outputname+"shiny.star", NODE_PART_DATA);
 		outputNodes.push_back(node7);
 
 	}
 
-	Node node6(outputname+"logfile.pdf", NODE_PDF_LOGFILE);
-	outputNodes.push_back(node6);
+	// If this is a continue job, then only process unfinished micrographs
+	if (is_continue)
+		command += " --only_do_unfinished ";
 
 	// Running stuff
 	command += " --j " + joboptions["nr_threads"].getString();
@@ -4862,22 +4918,23 @@ void RelionJob::initialiseCtfrefineJob()
 	hidden_name = ".gui_ctfrefine";
 
 	// I/O
-	joboptions["fn_data"] = JobOption("Input particles:", NODE_PART_DATA,  "", "STAR files (*.star)", "The input STAR file with the metadata of all particles.");
+	joboptions["fn_data"] = JobOption("Particles (from Refine3D):", NODE_PART_DATA,  "", "STAR files (*.star)", "The input STAR file with the metadata of all particles.");
 	joboptions["fn_post"] = JobOption("Postprocess STAR file:", NODE_POST,  "", "STAR files (postprocess.star)", "The STAR file generated by a PostProcess job. \
-The mask used for this postprocessing will be applied to the unfiltered half-maps and should encompass the entire complex. The resulting FSC curve will be used for weighting the different frequencies.");
+The mask used for this postprocessing will be applied to the unfiltered half-maps and should encompass the entire complex. The resulting FSC curve will be used for weighting the different frequencies. \n \n Note that for helices it is common practice to use a mask only encompassing the central 30% or so of the box. \
+This gives higher resolution estimates, as it disregards ill-defined regions near the box edges. However, for ctf_refine it is better to use a mask encompassing (almost) the entire box, as otherwise there may not be enough signal.");
 
 	joboptions["minres"] = JobOption("Minimum resolution for fits (A): ", 30, 8, 40, 1, "The minimum spatial frequency (in Angstrom) used in the beamtilt fit.");
 
 	// Defocus fit
-	joboptions["do_defocus"] = JobOption("Perform defocus estimation?", true, "If set to Yes, then relion_ctf_refine will estimate a per-particle defocus.");
+	joboptions["do_ctf"] = JobOption("Perform CTF parameter fitting?", true, "If set to Yes, then relion_ctf_refine will be used to estimate the selected parameters below.");
+	joboptions["do_defocus"] = JobOption("Fit per-particle defocus?", true, "If set to Yes, then relion_ctf_refine will estimate a per-particle defocus.");
 	joboptions["range"] = JobOption("Range for defocus fit (A): ", 2000, 500, 5000, 100, "The range in (Angstrom) for the defocus fit of each particle.");
-	joboptions["do_no_glob_astig"] = JobOption("Skip per-micrograph astigmatism fit?", false, "By default, ctf_refine will try to refine astigamtism on a per-micrograph basis. If this option is set to Yes, this calculation will be skipped. This may be useful if you have few particles per micrograph.");
+	joboptions["do_glob_astig"] = JobOption("Fit per-micrograph astigmatism?", false, "If set to Yes, ctf_refine will try to refine astigamtism on a per-micrograph basis. This will require many particles and good signal-to-noise ratios per micrograph.");
 	joboptions["do_astig"] = JobOption("Fit per-particle astigmatism?", false, "If set to Yes, astigmatism will be estimated on a per-particle basis. This requires very strong data, i.e. very large particles with excellent signal-to-noise ratios.");
+	joboptions["do_phase"] = JobOption("Fit per-micrograph phase-shift?", false, "If set to Yes, ctf_refine will try to refine a phase-shift (amplitude contrast) on a per-micrograph basis. This may be useful for Volta-phase plate data, but will require many particles and good signal-to-noise ratios per micrograph.");
 
 	// Beamtilt fit
 	joboptions["do_tilt"] = JobOption("Perform beamtilt estimation?", false, "If set to Yes, then relion_ctf_refine will also estimate the beamtilt over the entire data set. This option is only recommended for high-resolution data sets, i.e. significantly beyond 3 Angstrom resolution.");
-
-	joboptions["do_pad1"] = JobOption("Skip padding?", false, "If set to Yes, the calculations will not use padding in Fourier space for better interpolation in the references. Otherwise, references are padded 2x before Fourier transforms are calculated. Skipping padding (i.e. use --pad 1) gives nearly as good results as using --pad 2, but some artifacts may appear in the corners from signal that is folded back.");
 
 
 }
@@ -4907,6 +4964,18 @@ bool RelionJob::getCommandsCtfrefineJob(std::string &outputname, std::vector<std
 		return false;
 	}
 
+	if (joboptions["do_astig"].getBoolean() && joboptions["do_glob_astig"].getBoolean())
+	{
+		error_message = "ERROR: you cannot perform both per-micrograph and per-particle astigmatism estimation. Choose one option.";
+		return false;
+	}
+
+	if (joboptions["do_ctf"].getBoolean() && !(joboptions["do_defocus"].getBoolean()
+			|| joboptions["do_astig"].getBoolean() || joboptions["do_glob_astig"].getBoolean() || joboptions["do_phase"].getBoolean() ))
+	{
+		error_message = "ERROR: you did not select any CTF parameter to fit. Either switch off CTF parameter fitting, or select one to fit.";
+		return false;
+	}
 
 	Node node(joboptions["fn_data"].getString(), joboptions["fn_data"].node_type);
 	inputNodes.push_back(node);
@@ -4933,17 +5002,27 @@ bool RelionJob::getCommandsCtfrefineJob(std::string &outputname, std::vector<std
 	command += " --m2 " + fn_half2;
 	command += " --mask " + fn_mask;
 	command += " --o " + outputname;
-	command += " --kmin " + joboptions["minres"].getString();
 
-	if (joboptions["do_defocus"].getBoolean())
+	if (joboptions["do_ctf"].getBoolean())
 	{
-		command += " --fit_defocus";
-		command += " --range " + joboptions["range"].getString();
+		command += " --kmin_defocus " + joboptions["minres"].getString();
+		if (joboptions["do_defocus"].getBoolean())
+		{
+			command += " --fit_defocus";
+			command += " --range " + joboptions["range"].getString();
+		}
 		if (joboptions["do_astig"].getBoolean())
+		{
 			command += " --astig";
-		if (joboptions["do_no_glob_astig"].getBoolean())
-			command += " --no_glob_astig";
-
+		}
+		if (joboptions["do_glob_astig"].getBoolean())
+		{
+			command += " --glob_astig";
+		}
+		if (joboptions["do_phase"].getBoolean())
+		{
+			command += " --fit_phase";
+		}
 		Node node6(outputname+"logfile.pdf", NODE_PDF_LOGFILE);
 		outputNodes.push_back(node6);
 	}
@@ -4951,12 +5030,8 @@ bool RelionJob::getCommandsCtfrefineJob(std::string &outputname, std::vector<std
 	if (joboptions["do_tilt"].getBoolean())
 	{
 		command += " --fit_beamtilt";
+		command += " --kmin_tilt " + joboptions["minres"].getString();
 	}
-
-	if (joboptions["do_pad1"].getBoolean())
-		command += " --pad 1 ";
-	else
-		command += " --pad 2 ";
 
 	// If this is a continue job, then only process unfinished micrographs
 	if (is_continue)

@@ -642,7 +642,6 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 
 	std::vector<FileName> my_scheduled_processes;
 	std::vector<std::string> jobids;
-	std::cerr << " fn_jobids= " << fn_jobids << std::endl;
 	int njobs = splitString(fn_jobids, " ", jobids);
 	if (njobs == 0)
 	{
@@ -654,30 +653,36 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 			my_scheduled_processes.push_back(jobids[i]);
 	}
 
-	FileName fn_log = "pipeline_" + name + "_" + fn_sched + ".log";
+	FileName fn_log = "pipeline_" + fn_sched + ".log";
 	std::ofstream  fh;
 	fh.open((fn_log).c_str(), std::ios::app);
 
 	std::cout << " PIPELINER: writing out information in logfile " << fn_log << std::endl;
 
 	// Touch the fn_check file
-	FileName fn_check = "RUNNING_PIPELINER_" + name + "_" + fn_sched;
-	touch(fn_check);
-	bool fn_check_exists = true;
+	FileName fn_check = "RUNNING_PIPELINER_" + fn_sched;
+	bool fn_check_exists = false;
+	if (nr_repeat > 1)
+	{
+		touch(fn_check);
+		fn_check_exists = true;
+	}
 
 	fh << " +++++++++++++++++++++++++++++++++++++++++++++++++++++++" << std::endl;
 	fh << " Starting a new scheduler execution called " << fn_sched << std::endl;
 	fh << " The scheduled jobs are: " << std::endl;
 	for (long int i = 0; i < my_scheduled_processes.size(); i++)
 		fh << " - " << my_scheduled_processes[i] << std::endl;
-	if (minutes_wait_before > 0)
-		fh << " Will wait " << minutes_wait_before << " minutes before running the first job." << std::endl;
-	fh << " Will execute the scheduled jobs " << nr_repeat << " times." << std::endl;
 	if (nr_repeat > 1)
-		fh << " Will wait until at least " << minutes_wait << " minutes have passed between each repeat." << std::endl;
-	fh << " Will be checking for existence of file " << fn_check << "; if it no longer exists, the scheduler will stop." << std::endl;
+	{
+		if (minutes_wait_before > 0)
+			fh << " Will wait " << minutes_wait_before << " minutes before running the first job." << std::endl;
+		fh << " Will execute the scheduled jobs " << nr_repeat << " times." << std::endl;
+		if (nr_repeat > 1)
+			fh << " Will wait until at least " << minutes_wait << " minutes have passed between each repeat." << std::endl;
+		fh << " Will be checking for existence of file " << fn_check << "; if it no longer exists, the scheduler will stop." << std::endl;
+	}
 	fh << " +++++++++++++++++++++++++++++++++++++++++++++++++++++++" << std::endl;
-
 
 	// Wait this many minutes before starting the repeat cycle...
 	if (minutes_wait_before > 0)
@@ -687,7 +692,10 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 	time_t now = time(0);
 	for (repeat = 0 ; repeat < nr_repeat; repeat++)
 	{
-		fh << " + " << ctime(&now) << " -- Starting the " << repeat+1 << "th repeat" << std::endl;
+		if (nr_repeat > 1)
+		{
+			fh << " + " << ctime(&now) << " -- Starting the " << repeat+1 << "th repeat" << std::endl;
+		}
 
 		// Get starting time of the repeat cycle
 		timeval time_start, time_end;
@@ -728,7 +736,7 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 			// Now wait until that job is done!
 			while (true)
 			{
-				if (!exists(fn_check))
+				if (nr_repeat > 1 && !exists(fn_check))
 				{
 					fn_check_exists = false;
 					break;
@@ -746,7 +754,8 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 					{
 						int mytype = processList[current_job].type;
 						// The following jobtypes have functionality to only do the unfinished part of the job
-						if (mytype == PROC_MOTIONCORR || mytype == PROC_CTFFIND || mytype == PROC_AUTOPICK || mytype == PROC_EXTRACT || mytype == PROC_MOVIEREFINE)
+						if (mytype == PROC_MOTIONCORR || mytype == PROC_CTFFIND || mytype == PROC_AUTOPICK || mytype == PROC_EXTRACT
+								|| mytype == PROC_CLASSSELECT || mytype == PROC_MOVIEREFINE)
 						{
 							myjob.is_continue = true;
 							// Write the job again, now with the updated is_continue status
@@ -765,13 +774,13 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 				}
 			}
 
-			if (!fn_check_exists)
+			if (nr_repeat > 1 && !fn_check_exists)
 				break;
 
 		} //end loop my_scheduled_processes
 
 
-		if (!fn_check_exists)
+		if (nr_repeat > 1 && !fn_check_exists)
 			break;
 
 		// Wait at least until 'minutes_wait' minutes have passed from the beginning of the repeat cycle
@@ -788,9 +797,14 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 
 	if (repeat == nr_repeat)
 	{
-		fh << " + performed all requested repeats in scheduler " << fn_sched << ". Stopping now ..." << std::endl;
-		std::cout << " PIPELINER: performed all requested repeats, stopping now ..." << std::endl;
-		std::cout << " PIPELINER: you may want to re-read the pipeline (from the File menu) to update the job lists." << std::endl;
+		if (nr_repeat > 1)
+		{
+			fh << " + performed all requested repeats in scheduler " << fn_sched << ". Stopping pipeliner now ..." << std::endl;
+		}
+		else
+		{
+			fh << " + All jobs have finished, so stopping pipeliner now ..." << std::endl;
+		}
 
 		// Read in existing pipeline, in case some other window had changed it
 		read(DO_LOCK);
@@ -808,15 +822,10 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 		// Remove the temporary file
 		std::remove(fn_check.c_str());
 	}
-	else if (!fn_check_exists)
+	else if (!fn_check_exists && nr_repeat > 1)
 	{
 		fh << " + File " << fn_check << " was removed. Stopping now .." << std::endl;
 		std::cout << " PIPELINER: the " << fn_check << " file was removed. Stopping now ..." << std::endl;
-		std::cout << " PIPELINER: you may want to re-read the pipeline (from the File menu) to update the job lists." << std::endl;
-	}
-	else
-	{
-		REPORT_ERROR("PIPELINER BUG: This shouldn't happen, either fn_check should not exist or we should reach end of repeat cycles...");
 	}
 
 	fh << " +++++++++++++++++++++++++++++++++++++++++++++++++++++++" << std::endl;

@@ -373,7 +373,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 		if (maingui_do_read_only)
 			schedule_button->deactivate();
 
-		run_button = new Fl_Button(GUIWIDTH - 110 , h-90, 100, 32, "Run now");
+		run_button = new Fl_Button(GUIWIDTH - 110 , h-90, 100, 32, "Run!");
 		run_button->color(GUI_RUNBUTTON_COLOR);
 		run_button->labelfont(FL_ITALIC);
 		run_button->labelsize(14);
@@ -1314,7 +1314,7 @@ void GuiMainWindow::cb_toggle_continue_i()
 
 	if (is_main_continue)
 	{
-		run_button->label("Continue now");
+		run_button->label("Continue!");
 		run_button->color(GUI_BUTTON_COLOR);
 		run_button->labelfont(FL_ITALIC);
 		run_button->labelsize(13);
@@ -1322,7 +1322,7 @@ void GuiMainWindow::cb_toggle_continue_i()
 	}
 	else
 	{
-		run_button->label("Run now!");
+		run_button->label("Run!");
 		run_button->color(GUI_RUNBUTTON_COLOR);
 		run_button->labelfont(FL_ITALIC);
 		run_button->labelsize(16);
