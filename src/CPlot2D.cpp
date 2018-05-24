@@ -778,7 +778,7 @@ void CPlot2D::DrawYAxisLabelsPostScript()
     for (int i=0;i<m_iYAxisNumberOfLabels;++i) {
 
         labelXCoordinate=m_dLeftFrameSize;
-        labelYCoordinate=m_dBottomFrameSize+m_dFlipYOffset+(i*m_dYAxisNumbersSpacing)*m_dYScale; // was just Bottom
+        labelYCoordinate=m_dBottomFrameSize+m_dFlipYOffset+(i*m_dYAxisNumbersSpacing)*m_dYScale;
 
         // adjustment for the label
         labelXCoordinate-=m_dYAxisLabelFontSize*0.5;
