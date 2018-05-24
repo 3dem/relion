@@ -873,6 +873,7 @@ void MotioncorrRunner::plotShifts(FileName fn_mic, Micrograph &mic)
  	plot2D->SetXAxisSize(600);
  	plot2D->SetYAxisSize(600);
 	plot2D->SetDrawLegend(false);
+	plot2D->SetFlipY(true);
 
  	CDataSet dataSet;
 	dataSet.SetDrawMarker(false);

@@ -108,6 +108,9 @@ CPlot2D::CPlot2D(std::string title)
     m_bDrawYAxisGridLines=true;
     m_bDrawGridLinesDashed=true;
 
+    m_bFlipY = false;
+    m_dFlipYOffset = 0;
+
     // Sjors Scheres 22mar2016: changed all fonts to Times
     m_strXAxisLabelFont="Times";
     m_dXAxisLabelFontSize=12.0;
@@ -287,6 +290,12 @@ void CPlot2D::PrecomputeDimensions()
     m_dMaxYExtent=m_dMaxYEndPoint-m_dMinYStartPoint;
     m_dXScale=m_dXAxisSize/m_dMaxXExtent;
     m_dYScale=m_dYAxisSize/m_dMaxYExtent;
+
+    if (m_bFlipY) {
+        m_dMinYStartPoint = m_dMaxYEndPoint;
+        m_dYScale *= -1;
+        m_dFlipYOffset = m_dYAxisSize;
+    }
 
     // establish a pleasing spacing between dots
     // for a dashed line made up of dots... :)
@@ -560,7 +569,7 @@ void CPlot2D::DrawYAxisTickMarksPostScript()
 {
     for (int i=0;i<m_iYAxisNumberOfLabels;++i) {
         outputFile << m_dLeftFrameSize << " "
-                   << m_dBottomFrameSize+(i*m_dYAxisNumbersSpacing)*m_dYScale << " moveto" << std::endl;
+                   << m_dBottomFrameSize+m_dFlipYOffset+(i*m_dYAxisNumbersSpacing)*m_dYScale << " moveto" << std::endl;
         outputFile << m_dTickMarkLength << " " << 0 << " rlineto" << std::endl;
         outputFile << m_dFrameLineWidth << " setlinewidth" << std::endl;
         outputFile << m_dFrameColor[0] << " " << m_dFrameColor[1] << " " << m_dFrameColor[2] << " setrgbcolor" << std::endl;
@@ -613,7 +622,7 @@ void CPlot2D::DrawYAxisGridLinesPostScript()
 {
     if (!m_bDrawGridLinesDashed) {
         for (int i=0;i<m_iYAxisNumberOfLabels;++i) {
-            outputFile << m_dLeftFrameSize << " " << m_dBottomFrameSize+(i*m_dYAxisNumbersSpacing)*m_dYScale << " moveto" << std::endl;
+            outputFile << m_dLeftFrameSize << " " << m_dBottomFrameSize+m_dFlipYOffset+(i*m_dYAxisNumbersSpacing)*m_dYScale << " moveto" << std::endl;
             outputFile << m_dXAxisSize << " " << 0 << " rlineto" << std::endl;
             outputFile << m_dGridLineWidth << " setlinewidth" << std::endl;
             outputFile << m_dGridColor[0] << " " << m_dGridColor[1] << " " << m_dGridColor[2] << " setrgbcolor" << std::endl;
@@ -632,11 +641,11 @@ void CPlot2D::DrawYAxisGridLinesPostScript()
 
         for (int i=0;i<m_iYAxisNumberOfLabels;++i) {
 
-            outputFile << m_dLeftFrameSize << " " << m_dBottomFrameSize+(i*m_dYAxisNumbersSpacing)*m_dYScale << " moveto" << std::endl;
+            outputFile << m_dLeftFrameSize << " " << m_dBottomFrameSize+m_dFlipYOffset+(i*m_dYAxisNumbersSpacing)*m_dYScale << " moveto" << std::endl;
 
             for (int k=0;k<numDashes+1;k+=2) {
 
-                outputFile << m_dLeftFrameSize+k*delX  << " " << m_dBottomFrameSize+(i*m_dYAxisNumbersSpacing)*m_dYScale << " moveto" << std::endl;
+                outputFile << m_dLeftFrameSize+k*delX  << " " << m_dBottomFrameSize+m_dFlipYOffset+(i*m_dYAxisNumbersSpacing)*m_dYScale << " moveto" << std::endl;
                 outputFile << delX << " " << 0 << " rlineto" << std::endl;
 
                 outputFile << m_dGridLineWidth << " setlinewidth" << std::endl;
@@ -769,7 +778,7 @@ void CPlot2D::DrawYAxisLabelsPostScript()
     for (int i=0;i<m_iYAxisNumberOfLabels;++i) {
 
         labelXCoordinate=m_dLeftFrameSize;
-        labelYCoordinate=m_dBottomFrameSize+(i*m_dYAxisNumbersSpacing)*m_dYScale;
+        labelYCoordinate=m_dBottomFrameSize+m_dFlipYOffset+(i*m_dYAxisNumbersSpacing)*m_dYScale; // was just Bottom
 
         // adjustment for the label
         labelXCoordinate-=m_dYAxisLabelFontSize*0.5;

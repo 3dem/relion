@@ -594,6 +594,7 @@ void MotionEstimator::writeOutput(
 	plot2D->SetXAxisSize(600);
 	plot2D->SetYAxisSize(600);
 	plot2D->SetDrawLegend(false);
+	plot2D->SetFlipY(true);
 	
 	// Global track in the middle
 	CDataSet dataSet;
