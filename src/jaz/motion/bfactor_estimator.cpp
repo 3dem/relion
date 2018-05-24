@@ -150,12 +150,13 @@ void BFactorEstimator::process(const std::vector<MetaDataTable>& mdts)
 				mdts[g].getValue(EMDL_ORIENT_ORIGIN_X, XX(trans), p);
 				mdts[g].getValue(EMDL_ORIENT_ORIGIN_Y, YY(trans), p);
 				
-				Image<Complex> obs(sh,s);
 				
 				#pragma omp parallel for num_threads(nr_omp_threads)
 				for (int f = 0; f < fcb; f++)
 				{
 					const int ff = f0 + f;
+					
+					Image<Complex> obs(sh,s);
 					
 					shiftImageInFourierTransform(
 						movie[p][ff](), obs(), s, 
@@ -164,7 +165,7 @@ void BFactorEstimator::process(const std::vector<MetaDataTable>& mdts)
 									
 					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(obs())
 					{
-						DIRECT_MULTIDIM_ELEM(obs(), n)  *= DIRECT_MULTIDIM_ELEM(ctfImg(), n);
+						DIRECT_MULTIDIM_ELEM(obs(), n) *= DIRECT_MULTIDIM_ELEM(ctfImg(), n);
 					}
 	
 					backprojectors[2*f + subset].set2DFourierTransform(
@@ -269,7 +270,7 @@ void BFactorEstimator::process(const std::vector<MetaDataTable>& mdts)
 		}
 		else 
 		{
-			getFSC(avgs[0](), avgs[1](), fsc);
+			getFSC(vols[0](), vols[1](), fsc);
 		}
 		
 		double bfactor, offset, corr_coeff;
