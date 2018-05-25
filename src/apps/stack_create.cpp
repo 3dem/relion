@@ -33,7 +33,7 @@ class stack_create_parameters
 	MetaDataTable MD;
 	// I/O Parser
 	IOParser parser;
-	bool do_spider, do_split_per_micrograph, do_apply_trans;
+	bool do_spider, do_split_per_micrograph, do_apply_trans, do_apply_trans_only;
 
 	void usage()
 	{
@@ -51,6 +51,7 @@ class stack_create_parameters
 		do_spider  = parser.checkOption("--spider_format", "Write out in SPIDER stack format (by default MRC stack format)");
 		do_split_per_micrograph = parser.checkOption("--split_per_micrograph", "Write out separate stacks for each micrograph (needs rlnMicrographName in STAR file)");
 		do_apply_trans = parser.checkOption("--apply_transformation", "Apply the inplane-transformations (needs _rlnOriginX/Y and _rlnAnglePsi in STAR file)");
+		do_apply_trans_only = parser.checkOption("--apply_rounded_offsets_only", "Apply the rounded translations only (so-recentering without interpolation; needs _rlnOriginX/Y in STAR file)");
 
 		fn_ext = (do_spider) ? ".spi" : ".mrcs";
 
@@ -151,7 +152,7 @@ class stack_create_parameters
 					MD.getValue(EMDL_IMAGE_NAME, fn_img);
 					in.read(fn_img);
 
-					if (do_apply_trans)
+					if (do_apply_trans || do_apply_trans_only)
 					{
 						RFLOAT xoff = 0.;
 						RFLOAT yoff = 0.;
@@ -159,6 +160,13 @@ class stack_create_parameters
 						MD.getValue(EMDL_ORIENT_ORIGIN_X, xoff);
 						MD.getValue(EMDL_ORIENT_ORIGIN_Y, yoff);
 						MD.getValue(EMDL_ORIENT_PSI, psi);
+
+						if (do_apply_trans_only)
+						{
+							xoff = ROUND(xoff);
+							yoff = ROUND(yoff);
+							psi = 0.;
+						}
 						// Apply the actual transformation
 						Matrix2D<RFLOAT> A;
 						rotation2DMatrix(psi, A);
