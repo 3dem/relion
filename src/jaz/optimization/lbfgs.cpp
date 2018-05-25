@@ -34,7 +34,7 @@ std::vector<double> LBFGS::optimize(
     lbfgs_parameter_init(&param);
 
     param.max_iterations = max_iters;
-    param.epsilon = epsilon;
+	param.epsilon = epsilon;
 
     pthread_mutex_lock(&lib_lbfgs_mutex);
     {
@@ -45,7 +45,7 @@ std::vector<double> LBFGS::optimize(
     if (verbose)
     {
         std::cout << "L-BFGS optimization terminated with status code = " << ret << "\n";
-        std::cout << "  fx = " << fx << "\n";
+		std::cout << "  fx = " << fx << "\n";
     }
 
     std::vector<double> out(N);

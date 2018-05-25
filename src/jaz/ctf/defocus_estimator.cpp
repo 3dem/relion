@@ -334,7 +334,8 @@ void DefocusEstimator::writeEPS(const MetaDataTable& mdt)
 	CPlot2D plot2D(fn_eps);
 	plot2D.SetXAxisSize(600);
 	plot2D.SetYAxisSize(600);
-	plot2D.SetDrawLegend(false);	
+	plot2D.SetDrawLegend(false);
+	plot2D.SetFlipY(true);
 	
 	RFLOAT min_defocus = 99.e10;
 	RFLOAT max_defocus = -99.e10;

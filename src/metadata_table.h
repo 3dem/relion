@@ -274,6 +274,9 @@ public:
 
     void printLabels(std::ostream& ost);
 
+    // Randomise the order inside the STAR file
+    void randomiseOrder();
+
     // legacy error codes:
     // @TODO: remove after changing:
     //   - particle_reposition.cpp, line ~127

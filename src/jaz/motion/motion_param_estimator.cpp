@@ -6,6 +6,7 @@
 #include <src/jaz/optimization/nelder_mead.h>
 #include <src/jaz/index_sort.h>
 #include <src/jaz/filter_helper.h>
+#include <src/jaz/vtk_helper.h>
 
 
 using namespace gravis;
@@ -26,8 +27,8 @@ int MotionParamEstimator::read(IOParser& parser, int argc, char *argv[])
     estim2 = parser.checkOption("--params2", "Estimate 2 parameters instead of motion");
     estim3 = parser.checkOption("--params3", "Estimate 3 parameters instead of motion");
 	
-	align_frac = textToFloat(parser.getOption("--align_frac", "Fraction of pixels to be used for alignment", "0.5"));
-	eval_frac = textToFloat(parser.getOption("--eval_frac", "Fraction of pixels to be used for evaluation", "0.5"));
+	align_frac = textToDouble(parser.getOption("--align_frac", "Fraction of pixels to be used for alignment", "0.5"));
+	eval_frac = textToDouble(parser.getOption("--eval_frac", "Fraction of pixels to be used for evaluation", "0.5"));
 	
 	/*k_cutoff = textToFloat(parser.getOption("--k_cut", "Freq. cutoff for parameter estimation [Pixels]", "-1.0"));
     k_cutoff_Angst = textToFloat(parser.getOption("--k_cut_A", "Freq. cutoff for parameter estimation [Angstrom]", "-1.0"));
@@ -35,12 +36,12 @@ int MotionParamEstimator::read(IOParser& parser, int argc, char *argv[])
     k_eval_Angst = textToFloat(parser.getOption("--k_eval_A", "Threshold freq. for parameter evaluation [Angstrom]", "-1.0"));*/
 
     minParticles = textToInteger(parser.getOption("--min_p", "Minimum number of particles on which to estimate the parameters", "1000"));
-    sV = textToFloat(parser.getOption("--s_vel_0", "Initial s_vel", "0.6"));
-    sD = textToFloat(parser.getOption("--s_div_0", "Initial s_div", "5000"));
-    sA = textToFloat(parser.getOption("--s_acc_0", "Initial s_acc", "5"));
-    iniStep = textToFloat(parser.getOption("--in_step", "Initial step size in s_div", "3000"));
-    conv = textToFloat(parser.getOption("--conv", "Abort when simplex diameter falls below this", "100"));
-    maxIters = textToInteger(parser.getOption("--par_iters", "Max. number of iterations", "50"));
+    sV = textToDouble(parser.getOption("--s_vel_0", "Initial s_vel", "0.6"));
+    sD = textToDouble(parser.getOption("--s_div_0", "Initial s_div", "5000"));
+    sA = textToDouble(parser.getOption("--s_acc_0", "Initial s_acc", "5"));
+    iniStep = textToDouble(parser.getOption("--in_step", "Initial step size in s_div", "3000"));
+    conv = textToDouble(parser.getOption("--conv", "Abort when simplex diameter falls below this", "30"));
+    maxIters = textToInteger(parser.getOption("--par_iters", "Max. number of iterations", "100"));
     maxRange = textToInteger(parser.getOption("--mot_range", "Limit allowed motion range [Px]", "50"));
     seed = textToInteger(parser.getOption("--seed", "Random seed for micrograph selection", "23"));
 
@@ -49,7 +50,7 @@ int MotionParamEstimator::read(IOParser& parser, int argc, char *argv[])
 
 void MotionParamEstimator::init(
     int verb, int nr_omp_threads, bool debug,
-    int s, int fc,
+    std::string outPath, int s, int fc,
     const std::vector<MetaDataTable>& allMdts,
     MotionEstimator* motionEstimator,
     ReferenceMap* reference,
@@ -63,6 +64,7 @@ void MotionParamEstimator::init(
     this->verb = verb;
     this->nr_omp_threads = nr_omp_threads;
     this->debug = debug;
+	this->outPath = outPath;
     this->s = s;
     this->fc = fc;
     this->motionEstimator = motionEstimator;
@@ -228,6 +230,18 @@ void MotionParamEstimator::run()
               << " --s_vel " << rnd[0]
               << " --s_div " << rnd[1]
               << " --s_acc " << rnd[2] << "\n\n";
+	
+	FileName newdir = FileName(outPath).beforeLastOf("/");
+	std::string command = " mkdir -p " + newdir;
+	int ret = system(command.c_str());
+	
+	std::ofstream ofs(outPath+"opt_params.txt");
+	ofs << rnd[0] << " ";
+	ofs << rnd[1] << " ";
+	ofs << rnd[2] << "\n";
+	ofs.close();
+	
+	std::cout << "written to " << (outPath+"opt_params.txt") << "\n";
 
     #ifdef TIMING
         paramTimer.printTimes(true);
@@ -333,6 +347,25 @@ void MotionParamEstimator::evaluateParams(
                     alignmentSet.initialTracks[g],
                     sig_v_vals_px[i], sig_a_vals_px[i], sig_d_vals_px[i],
                     alignmentSet.positions[g], alignmentSet.globComp[g]);
+			
+			/*{
+				std::stringstream sts;
+				sts << sig_vals[i][0] << "_" << sig_vals[i][1] << "_" << sig_vals[i][2] << ".dat";
+				
+				std::ofstream debugStr(sts.str());
+				
+				for (int p = 0; p < pc; p++)
+				{			
+					for (int f = 0; f < fc; f++)
+					{
+						debugStr << tracks[p][f] << "\n";
+					}
+					
+					debugStr << "\n";
+				}
+				
+				debugStr.close();
+			}*/
 
             RCTOC(paramTimer,timeOpt);
 
@@ -378,7 +411,7 @@ void MotionParamEstimator::prepAlignment()
         alignDmgWgh[f] = FilterHelper::ButterworthEnvFreq2D(dmgWgh[f], k_cutoff-1, k_cutoff+1);
     }
 
-    alignmentSet = AlignmentSet<float>(mdts, fc, s, k_eval+2, k_out, maxRange);
+    alignmentSet = AlignmentSet<float>(mdts, fc, s, k_eval+2, k_out);
 
     for (int f = 0; f < fc; f++)
     {
@@ -419,15 +452,17 @@ void MotionParamEstimator::prepAlignment()
             std::cerr << "warning: unable to load micrograph #" << (g+1) << "\n";
             continue;
         }
-
+		
+		const int maxRangeP = 2 * motionEstimator->getCCPad() * maxRange;
+		
         #pragma omp parallel for num_threads(nr_omp_threads)
         for (int p = 0; p < pc; p++)
         {
-            for (int f = 0; f < fc; f++)
+			for (int f = 0; f < fc; f++)
             {
-                if (maxRange > 0)
+				if (maxRange > 0)
                 {
-                    movieCC[p][f] = FilterHelper::cropCorner2D(movieCC[p][f], 2*maxRange, 2*maxRange);
+                    movieCC[p][f] = FilterHelper::cropCorner2D(movieCC[p][f], maxRangeP, maxRangeP);
                 }
 
                 alignmentSet.copyCC(g, p, f, movieCC[p][f]);
@@ -440,7 +475,7 @@ void MotionParamEstimator::prepAlignment()
             }
         }
 
-        std::vector<std::vector<d2Vector>> tracks =
+        /*std::vector<std::vector<d2Vector>> tracks =
             motionEstimator->optimize(
                 alignmentSet.CCs[g],
                 alignmentSet.initialTracks[g],
@@ -456,7 +491,7 @@ void MotionParamEstimator::prepAlignment()
             {
                 alignmentSet.initialTracks[g][p][f] = tracks[p][f];
             }
-        }
+        }*/
     }
 
     // release all unneeded heap space back to the OS

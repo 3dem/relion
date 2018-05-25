@@ -127,6 +127,7 @@ static bool do_allow_change_minimum_dedicated;
 #define NODE_RESMAP			12// Resmap with local resolution (cannot be used as input)
 #define NODE_PDF_LOGFILE    13// PDF logfile
 #define NODE_POST           14// Postprocess STAR file (with FSC curve, unfil half-maps, masks etc in it: used by Jasenko's programs
+#define NODE_POLISH_PARAMS  15// Txt file with optimal parameters for Bayesian polishing
 
 // All the directory names of the different types of jobs defined inside the pipeline
 #define PROC_IMPORT_NAME        "Import"       // Import any file as a Node of a given type
@@ -149,7 +150,7 @@ static bool do_allow_change_minimum_dedicated;
 #define PROC_MOVIEREFINE_NAME   "MovieRefine"  // Movie-particle extraction and refinement combined
 #define PROC_INIMODEL_NAME		"InitialModel" // De-novo generation of 3D initial model (using SGD)
 #define PROC_MULTIBODY_NAME		"MultiBody"    // Multi-body refinement
-#define PROC_MOTIONREFINE_NAME  "BayesPolish"  // Jasenko's motion fitting program for Bayesian polishing (to replace MovieRefine?)
+#define PROC_MOTIONREFINE_NAME  "Polish"       // Jasenko's motion fitting program for Bayesian polishing (to replace MovieRefine?)
 #define PROC_CTFREFINE_NAME     "CtfRefine"    // Jasenko's program for defocus and beamtilt optimisation
 
 #define PROC_IMPORT         0 // Import any file as a Node of a given type

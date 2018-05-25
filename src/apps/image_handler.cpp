@@ -85,7 +85,7 @@ class image_handler_parameters
 		lowpass = textToFloat(parser.getOption("--lowpass", "Low-pass filter frequency (in A)", "-1."));
 		highpass = textToFloat(parser.getOption("--highpass", "High-pass filter frequency (in A)", "-1."));
 		directional = parser.getOption("--directional", "Directionality of low-pass filter frequency ('X', 'Y' or 'Z', default non-directional)", "");
-		logfilter = textToFloat(parser.getOption("--LoG", "Sigma for Laplacian of Gaussian filter (in A)", "-1."));
+		logfilter = textToFloat(parser.getOption("--LoG", "Diameter for optimal response of Laplacian of Gaussian filter (in A)", "-1."));
 		angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in A)", "1."));
 		new_angpix = textToFloat(parser.getOption("--rescale_angpix", "Scale input image(s) to this new pixel size (in A)", "-1."));
 		new_box = textToInteger(parser.getOption("--new_box", "Resize the image(s) to this new box size (in pixel) ", "-1"));

@@ -70,6 +70,8 @@ void FlexAnalyser::read(int argc, char **argv)
 
 void FlexAnalyser::initialise()
 {
+	rescale_3dmodels = 1.0;
+
 	if (verb > 0)
 		std::cout << " Reading in data.star file ..." << std::endl;
 
@@ -129,7 +131,11 @@ void FlexAnalyser::initialise()
 		// Calculate effect of 1 degree rotations and 1 pixel translations on the bodies, in order to normalise vectors for PCA
 		norm_pca.clear();
 
-		std::cout << " Normalise PCA columns: " << std::endl;
+		FileName fn_weights = fn_out + "_pca_weights.dat";
+		std::ofstream f_weights(fn_weights);
+		std::cout << " Normalisation weights for PCA columns are written to " << fn_weights << std::endl;
+		f_weights << "body rot tilt psi offset" << std::endl;
+		f_weights << std::scientific;
 		for (int ibody = 0; ibody < model.nr_bodies; ibody++)
 		{
 			MultidimArray<RFLOAT> Mbody, Irefp;
@@ -137,7 +143,7 @@ void FlexAnalyser::initialise()
 			// Place each body with its center-of-mass in the center of the box
 			selfTranslate(Irefp, -model.com_bodies[ibody], DONT_WRAP);
 
-			std::cout << " body: " << ibody;
+			f_weights << ibody + 1;
 			Matrix2D<RFLOAT> Aresi,  Abody;
 			// rot
 			Euler_angles2matrix(1., 90., 0., Aresi);
@@ -147,7 +153,7 @@ void FlexAnalyser::initialise()
 			applyGeometry(Irefp, Mbody, Abody, IS_NOT_INV, DONT_WRAP);
 			Mbody -= Irefp;
 			norm_pca.push_back(sqrt(Mbody.sum2()));
-			std::cout << " rot: " << sqrt(Mbody.sum2());
+			f_weights << " " << sqrt(Mbody.sum2());
 			// tilt
 			Euler_angles2matrix(0., 91., 0., Aresi);
 			Abody = (model.orient_bodies[ibody]).transpose() * A_rot90 * Aresi * model.orient_bodies[ibody];
@@ -156,7 +162,7 @@ void FlexAnalyser::initialise()
 			applyGeometry(Irefp, Mbody, Abody, IS_NOT_INV, DONT_WRAP);
 			Mbody -= Irefp;
 			norm_pca.push_back(sqrt(Mbody.sum2()));
-			std::cout << " tilt: " << sqrt(Mbody.sum2());
+			f_weights << " " << sqrt(Mbody.sum2());
 			// psi
 			Euler_angles2matrix(0., 90., 1., Aresi);
 			Abody = (model.orient_bodies[ibody]).transpose() * A_rot90 * Aresi * model.orient_bodies[ibody];
@@ -165,7 +171,7 @@ void FlexAnalyser::initialise()
 			applyGeometry(Irefp, Mbody, Abody, IS_NOT_INV, DONT_WRAP);
 			Mbody -= Irefp;
 			norm_pca.push_back(sqrt(Mbody.sum2()));
-			std::cout << " psi: " << sqrt(Mbody.sum2());
+			f_weights << " " << sqrt(Mbody.sum2());
 			// translation x & y (considered the same)
 			Euler_angles2matrix(0., 90., 0., Aresi);
 			Abody = (model.orient_bodies[ibody]).transpose() * A_rot90 * Aresi * model.orient_bodies[ibody];
@@ -175,8 +181,9 @@ void FlexAnalyser::initialise()
 			applyGeometry(Irefp, Mbody, Abody, IS_NOT_INV, DONT_WRAP);
 			Mbody -= Irefp;
 			norm_pca.push_back(sqrt(Mbody.sum2()));
-			std::cout << " offset: " << sqrt(Mbody.sum2()) << std::endl;
+			f_weights << " " << sqrt(Mbody.sum2()) << std::endl;
 		}
+		f_weights.close();
 	}
 }
 
@@ -279,7 +286,6 @@ void FlexAnalyser::setupSubtractionMasksAndProjectors()
 
 void FlexAnalyser::setup3DModels()
 {
-	rescale_3dmodels = 1.0;
 	for (int ibody = 0; ibody < model.nr_bodies; ibody++)
 	{
 		// Premultiply the map with the mask (otherwise need to do this again for every particle
@@ -345,10 +351,10 @@ void FlexAnalyser::loopThroughParticles(int rank, int size)
 				inputdata.push_back(datarow);
 		}
 
-        if (imgno%update_interval==0 && verb > 0)
-        	progress_bar(imgno);
-        imgno++;
-    }
+		if (imgno%update_interval==0 && verb > 0)
+			progress_bar(imgno);
+		imgno++;
+	}
 	if (verb > 0)
 		progress_bar(todo_particles);
 
@@ -371,32 +377,53 @@ void FlexAnalyser::loopThroughParticles(int rank, int size)
 		// Do the PCA and make histograms
 		principalComponentsAnalysis(inputdata, eigenvectors, eigenvalues, means, projected_data);
 
-		// TMP
-		std::cout << " Eigenvectors (only rotations): " << std::endl;
-		for (int j =0; j < eigenvectors[0].size(); j++)
+		FileName fn_evec = fn_out + "_eigenvectors.dat";
+		std::ofstream f_evec(fn_evec);
+		std::cout << " Eigenvectors (rotations only):" << std::endl;
+		for (int j = 0; j < eigenvectors[0].size(); j++)
 		{
-			std::string stro="";
-			if (j%6==0)
-				stro="rot";
-			else if (j%6==1)
-				stro="tilt";
-			else if (j%6==2)
-				stro="psi";
+			std::string stro = "";
+			if (j % 6 == 0)
+				stro = "rot";
+			else if (j % 6 == 1)
+				stro = "tilt";
+			else if (j % 6 == 2)
+				stro = "psi";
+			else if (j % 6 == 3)
+				stro = "x";
+			else if (j % 6 ==  4)
+				stro = "y";
+			else if (j % 6 == 5)
+				stro = "z";
 			if (stro != "")
 			{
-				stro+= "-body-"+integerToString(1+(j/6));
-				std::cout << std::setw(12) << std::right << std::fixed;
-				std::cout << stro;
+				stro +=  "-body-" + integerToString(1 + (j / 6));
+				f_evec << stro << " ";
+				if (j % 6 < 3) {
+					std::cout << std::setw(12) << std::right << std::fixed;
+					std::cout << stro;
+				}
 			}
 		}
 		std::cout << std::endl;
-		for (int k= 0; k < eigenvectors.size(); k++)
+		f_evec << std::endl;
+		std::cout << " Full eigenvectors including translations are written to " << fn_evec << std::endl;
+
+		f_evec << std::scientific;
+		for (int k = 0; k < eigenvectors.size(); k++)
 		{
-			if (k%6<3)
+			for (int j =0; j < eigenvectors[0].size(); j++)
+			{
+				if (j > 0) f_evec << " ";
+				f_evec << eigenvectors[k][j];
+			}
+			f_evec << std::endl;
+
+			if (k % 6 < 3)
 			{
 				for (int j =0; j < eigenvectors[0].size(); j++)
 				{
-					if (j%6<3)
+					if (j % 6 < 3)
 					{
 						std::cout << std::setw(12) << std::fixed;
 						std::cout << eigenvectors[k][j];
@@ -405,6 +432,8 @@ void FlexAnalyser::loopThroughParticles(int rank, int size)
 				std::cout << std::endl;
 			}
 		}
+		
+		f_evec.close();
 
 		makePCAhistograms(projected_data, eigenvalues, means);
 
@@ -633,29 +662,28 @@ void FlexAnalyser::subtractOneParticle(long int ori_particle, long int imgno, in
 
 	// Now write it all out
 	if (model.data_dim == 3)
-    {
-        fn_img.compose(fn_out, imgno+1,"mrc");
-        img.write(fn_img);
-    }
-    else
-    {
-    	// Write this particle to the stack on disc
-        // First particle: write stack in overwrite mode, from then on just append to it
-        FileName fn_stack;
-        if (size > 1) {
-        	fn_stack.compose(fn_out + "_", rank + 1, "");
-		fn_stack = fn_stack + "_subtracted.mrcs";
-	} else {
-        	fn_stack = fn_out + "_subtracted.mrcs";
+	{
+		fn_img.compose(fn_out, imgno+1,"mrc");
+		img.write(fn_img);
 	}
-    	fn_img.compose(imgno+1,fn_stack);
-        if (imgno == 0)
-            img.write(fn_img, -1, false, WRITE_OVERWRITE);
-        else
-            img.write(fn_img, -1, false, WRITE_APPEND);
-    }
-    DFo.setValue(EMDL_IMAGE_NAME,fn_img);
-
+	else
+	{
+		// Write this particle to the stack on disc
+		// First particle: write stack in overwrite mode, from then on just append to it
+		FileName fn_stack;
+		if (size > 1) {
+			fn_stack.compose(fn_out + "_", rank + 1, "");
+			fn_stack = fn_stack + "_subtracted.mrcs";
+		} else {
+			fn_stack = fn_out + "_subtracted.mrcs";
+		}
+		fn_img.compose(imgno+1,fn_stack);
+		if (imgno == 0)
+			img.write(fn_img, -1, false, WRITE_OVERWRITE);
+		else
+			img.write(fn_img, -1, false, WRITE_APPEND);
+	}
+	DFo.setValue(EMDL_IMAGE_NAME,fn_img);
 }
 
 void FlexAnalyser::make3DModelOneParticle(long int ori_particle, long int imgno, std::vector<double> &datarow, int rank, int size)
@@ -797,21 +825,21 @@ void FlexAnalyser::makePCAhistograms(std::vector< std::vector<double> > &project
 	plot2D->SetXAxisTitle("Eigenvalue");
 	plot2D->SetYAxisTitle("Variance explained [%]");
 	plot2D->OutputPostScriptPlot(fn_eps);
-
+	delete plot2D;
 
 	// Determine how much variance the requested number of components explains
 	if (nr_components < 0)
 	{
-        double cum = 0.;
+		double cum = 0.;
 		for (int i = 0; i < eigenvalues.size(); i++)
-        {
-            cum += eigenvalues[i]/sum;
-            if (cum >= explain_variance)
-            {
-                nr_components = i + 1;
-                break;
-            }
-        }
+		{
+			cum += eigenvalues[i]/sum;
+			if (cum >= explain_variance)
+			{
+				nr_components = i + 1;
+				break;
+			}
+		}
 	}
 
 	explain_variance = 0.;
@@ -828,7 +856,7 @@ void FlexAnalyser::makePCAhistograms(std::vector< std::vector<double> > &project
 		for (long int ipart = 0; ipart < projected_input.size(); ipart++)
 			project.push_back(projected_input[ipart][k]);
 
-		// Sort the vector to calculate average of 10 equi-populated bins
+		// Sort the vector to calculate average of nr_maps_per_component equi-populated bins
 		std::sort (project.begin(), project.end());
 
 		// TODO: write histogram to file!!!
@@ -866,6 +894,7 @@ void FlexAnalyser::makePCAhistograms(std::vector< std::vector<double> > &project
 		plot2D->SetXAxisTitle("Eigenvalue");
 		plot2D->SetYAxisTitle("Nr particles");
 		plot2D->OutputPostScriptPlot(fn_eps);
+		delete plot2D;
 	}
 
 	joinMultipleEPSIntoSinglePDF(fn_out + "_logfile.pdf ", all_fn_eps);
@@ -885,7 +914,7 @@ void FlexAnalyser::make3DModelsAlongPrincipalComponents(std::vector< std::vector
 		for (long int ipart = 0; ipart < projected_input.size(); ipart++)
 			project.push_back(projected_input[ipart][k]);
 
-		// Sort the vector to calculate average of 10 equi-populated bins
+		// Sort the vector to calculate average of "nr_maps_per_component" equi-populated bins
 		std::sort (project.begin(), project.end());
 
 		long int binwidth = ROUND((double)project.size() / (double)nr_maps_per_component);
@@ -1012,14 +1041,14 @@ void principalComponentsAnalysis(const std::vector< std::vector<double> > &input
 
 	std::vector<std::vector<double> > a;
 	long int datasize = input.size();
-    if (datasize == 0)
-    	REPORT_ERROR("ERROR: empty input vector for PCA!");
+	if (datasize == 0)
+		REPORT_ERROR("ERROR: empty input vector for PCA!");
 
-    // The dimension (n)
-    long int n = input[0].size();
-    a.resize(n);
+	// The dimension (n)
+	long int n = input[0].size();
+	a.resize(n);
 
-    //Get the mean and variance of the given cluster of vectors
+	//Get the mean and variance of the given cluster of vectors
 	for (int k = 0; k < n; k++)
 	{
 		a[k].resize(n);
@@ -1054,108 +1083,108 @@ void principalComponentsAnalysis(const std::vector< std::vector<double> > &input
 	}
 
 	eigenval.resize(n);
-    eigenvec.resize(n);
+	eigenvec.resize(n);
 
-    std::vector<double> b;
-    b.resize(n);
-    std::vector<double> z;
-    z.resize(n);
-    std::vector<double> &d = eigenval;
-    std::vector< std::vector<double> > &v = eigenvec;
+	std::vector<double> b;
+	b.resize(n);
+	std::vector<double> z;
+	z.resize(n);
+	std::vector<double> &d = eigenval;
+	std::vector< std::vector<double> > &v = eigenvec;
 
-    for (int i = 0; i < n; i++)
-    {
-        v[i].resize(n);
-        v[i][i] = 1.0;
-        b[i] = d[i] = a[i][i];
-    }
+	for (int i = 0; i < n; i++)
+	{
+		v[i].resize(n);
+		v[i][i] = 1.0;
+		b[i] = d[i] = a[i][i];
+	}
 
-    int nrot = 0;
+	int nrot = 0;
 
-    // Jacobi method (it=iteration number)
-    for (int it = 1; it <= 50; it++)
-    {
+	// Jacobi method (it=iteration number)
+	for (int it = 1; it <= 50; it++)
+	{
 
-        double threshold;
-        double sm = 0.0;
-        for (int ip = 0; ip < n - 1; ip++)
-        {
-            for (int iq = ip + 1; iq < n; iq++)
-                sm += fabs(a[iq][ip]);
-        }
-        if (sm == 0.0)
-        {//Done. Sort vectors
-            for (int i = 0; i < n - 1; i++)
-            {
-                int k = i;
-                double p = d[i];
+		double threshold;
+		double sm = 0.0;
+		for (int ip = 0; ip < n - 1; ip++)
+		{
+			for (int iq = ip + 1; iq < n; iq++)
+				sm += fabs(a[iq][ip]);
+		}
+		if (sm == 0.0)
+		{//Done. Sort vectors
+			for (int i = 0; i < n - 1; i++)
+			{
+				int k = i;
+				double p = d[i];
 
-                for (int j = i + 1; j < n; j++)
-                    if (d[j] >= p)
-                        p = d[k = j];
+				for (int j = i + 1; j < n; j++)
+					if (d[j] >= p)
+						p = d[k = j];
 
-                if (k != i)
-                {//Swap i<->k
-                    d[k] = d[i];
-                    d[i] = p;
-                    std::vector<double> t = v[i];
-                    v[i] = v[k];
-                    v[k] = t;
-                }
-            }
+				if (k != i)
+				{//Swap i<->k
+					d[k] = d[i];
+					d[i] = p;
+					std::vector<double> t = v[i];
+					v[i] = v[k];
+					v[k] = t;
+				}
+			}
 
-            // Done with PCA now!
-            // Just project all data onto the PCA now and exit
-        	projected_input = input;
-        	for (int i = 0; i < n; i++)
-            {
-                for (long int z = 0; z < datasize; z++)
-                {
-                    double cum = 0;
-                    for (int j = 0; j < n; j++)
-                        cum += v[i][j] * (input[z][j] - means[j]);
-                    projected_input[z][i] = cum;
-                }  // z
-            } // i
+			// Done with PCA now!
+			// Just project all data onto the PCA now and exit
+			projected_input = input;
+			for (int i = 0; i < n; i++)
+			{
+				for (long int z = 0; z < datasize; z++)
+				{
+					double cum = 0;
+					for (int j = 0; j < n; j++)
+						cum += v[i][j] * (input[z][j] - means[j]);
+					projected_input[z][i] = cum;
+				}  // z
+			} // i
 
-            return;
-        }
+			return;
+		}
 
-        if (it < 4)
-            threshold = 0.2 * sm / (n * n);
-        else
-            threshold = 0;
-        for (int ip = 0; ip < n - 1; ip++)
-        {
-            for (int iq = ip + 1; iq < n; iq++)
-            {
-                double g = 100.0 * fabs(a[iq][ip]);
-                if (it > 4
-                    && fabs(d[ip]) + g == fabs(d[ip])
-                    && fabs(d[iq]) + g == fabs(d[iq]))
-                    a[iq][ip] = 0.0;
-                else if (fabs(a[iq][ip]) > threshold)
-                {
-                    double tau, t, s, c;
-                    double h = d[iq] - d[ip];
-                    if (fabs(h) + g == fabs(h))
-                        t = a[iq][ip] / h;
-                    else
-                    {
-                        double theta = 0.5 * h / a[iq][ip];
-                        t = 1.0 / (fabs(theta) + sqrt(1.0 + theta * theta));
-                        if (theta < 0.0)
-                            t = -t;
-                    }
-                    c = 1.0 / sqrt(1 + t * t);
-                    s = t * c;
-                    tau = s / (1.0 + c);
-                    h = t * a[iq][ip];
-                    z[ip] -= h;
-                    z[iq] += h;
-                    d[ip] -= h;
-                    d[iq] += h;
-                    a[iq][ip] = 0.0;
+		if (it < 4)
+			threshold = 0.2 * sm / (n * n);
+		else
+			threshold = 0;
+		for (int ip = 0; ip < n - 1; ip++)
+		{
+			for (int iq = ip + 1; iq < n; iq++)
+			{
+				double g = 100.0 * fabs(a[iq][ip]);
+				if (it > 4
+				    && fabs(d[ip]) + g == fabs(d[ip])
+				    && fabs(d[iq]) + g == fabs(d[iq]))
+					a[iq][ip] = 0.0;
+				else if (fabs(a[iq][ip]) > threshold)
+				{
+					double tau, t, s, c;
+					double h = d[iq] - d[ip];
+					if (fabs(h) + g == fabs(h))
+						t = a[iq][ip] / h;
+					else
+					{
+						double theta = 0.5 * h / a[iq][ip];
+						t = 1.0 / (fabs(theta) + sqrt(1.0 + theta * theta));
+						if (theta < 0.0)
+							t = -t;
+					}
+					c = 1.0 / sqrt(1 + t * t);
+					s = t * c;
+					tau = s / (1.0 + c);
+					h = t * a[iq][ip];
+					z[ip] -= h;
+					z[iq] += h;
+					d[ip] -= h;
+					d[iq] += h;
+					a[iq][ip] = 0.0;
 
 #define rotate(a,i,j,k,l) \
     g = a[i][j]; \
@@ -1163,40 +1192,38 @@ void principalComponentsAnalysis(const std::vector< std::vector<double> > &input
     a[i][j] = g - s *(h + g*tau); \
     a[k][l] = h + s*(g - h*tau);
 
-                    for (int j = 0; j < ip; j++)
-                    {
-                    	rotate(a, ip, j, iq, j)
-                    }
+					for (int j = 0; j < ip; j++)
+					{
+						rotate(a, ip, j, iq, j)
+					}
 					for (int j = ip + 1; j < iq; j++)
 					{
 						rotate(a, j, ip, iq, j)
 					}
-                    for (int j = iq + 1; j < n; j++)
-                    {
+					for (int j = iq + 1; j < n; j++)
+					{
 						rotate(a, j, ip, j, iq)
-                    }
-                    for (int j = 0; j < n; j++)
-                    {
-                        rotate(v, ip, j, iq, j)
-                    }
+					}
+					for (int j = 0; j < n; j++)
+					{
+						rotate(v, ip, j, iq, j)
+					}
 
-                    nrot += 1;
-                }//if
-            }//for iq
-        }//for ip
+					nrot += 1;
+				}//if
+			}//for iq
+		}//for ip
 
-        for (int ip = 0; ip < n; ip++)
-        {
-            b[ip] += z[ip];
-            d[ip] = b[ip];
-            z[ip] = 0.0;
-        }
+		for (int ip = 0; ip < n; ip++)
+		{
+			b[ip] += z[ip];
+			d[ip] = b[ip];
+			z[ip] = 0.0;
+		}
 
-    }//for it
+	}//for it
 
-
-    REPORT_ERROR("ERROR: too many Jacobi iterations in PCA calculation...");
-
+	REPORT_ERROR("ERROR: too many Jacobi iterations in PCA calculation...");
 }
 
 

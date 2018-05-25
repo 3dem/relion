@@ -754,7 +754,8 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 					{
 						int mytype = processList[current_job].type;
 						// The following jobtypes have functionality to only do the unfinished part of the job
-						if (mytype == PROC_MOTIONCORR || mytype == PROC_CTFFIND || mytype == PROC_AUTOPICK || mytype == PROC_EXTRACT || mytype == PROC_MOVIEREFINE)
+						if (mytype == PROC_MOTIONCORR || mytype == PROC_CTFFIND || mytype == PROC_AUTOPICK || mytype == PROC_EXTRACT
+								|| mytype == PROC_CLASSSELECT || mytype == PROC_MOVIEREFINE)
 						{
 							myjob.is_continue = true;
 							// Write the job again, now with the updated is_continue status
@@ -1675,7 +1676,7 @@ void PipeLine::read(bool do_lock)
 				std::cout << "WARNING: trying to read pipeline.star, but " << fn_lock << " exists!" << std::endl;
 				std::cout << " This is a protection against simultaneous writing to the pipeline by multiple instances of the GUI." << std::endl;
 				std::cout << " You can override this by manually deleting the " << fn_lock << " file." << std::endl;
-				std::cout << " This instance of the GUI will try for 1 minute to see whether the lock disappears." << std::endl;
+				std::cout << " Will try for 1 minute to see whether the lock disappears. If not, an error will be raised." << std::endl;
 			}
 			sleep(3);
 			iwait++;

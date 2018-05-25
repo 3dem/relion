@@ -192,10 +192,15 @@ void HelixAligner::initialise()
 	}
 
 	if (angpix < 0.)
+	{
 		REPORT_ERROR("ERROR: provide pixel size through --angpix or through the magnification and detectorpixel size in the input STAR file.");
+	}
 
-	if (maxres < 0.)
+	if (maxres < 0. || maxres > 2. * angpix)
+	{
 		maxres = 2. * angpix;
+		std::cout << " Setting maximum resolution to " << maxres << std::endl;
+	}
 
 	down_size = ori_size * angpix * 2. / maxres;
 
@@ -222,10 +227,10 @@ void HelixAligner::initialise()
 				down_angpix = myangpix;
 				best_size = mysize;
 			}
-			std::cerr << " *   mydiv= " << mydiv << " myangpix= " << myangpix << " myfit= " << myfit << std::endl;
+			std::cout << " *   mydiv= " << mydiv << " myangpix= " << myangpix << " myfit= " << myfit << std::endl;
 		}
 	}
-	std::cerr <<     " *** best_angpix= " << down_angpix << " rectangles xsize= " << (2. * crossover_distance)/down_angpix << std::endl;
+	std::cout <<     " *** best_angpix= " << down_angpix << " rectangles xsize= " << (2. * crossover_distance)/down_angpix << std::endl;
 
 	down_size = best_size;
 	yrect  = ROUND(ori_size * angpix/down_angpix);
@@ -233,8 +238,8 @@ void HelixAligner::initialise()
 	yrect -= yrect%2;
 	xrect  = ROUND((2. * crossover_distance)/down_angpix);
 	model.initialise(nr_classes, yrect, xrect);
-	std::cerr << " maxres= " << maxres << " angpix= " << angpix << " down_size= " << down_size << std::endl;
-	std::cerr << " xrect= " << xrect << " yrect= " << yrect << " down_angpix= " << down_angpix << std::endl;
+	std::cout << " maxres= " << maxres << " angpix= " << angpix << " down_size= " << down_size << std::endl;
+	std::cout << " xrect= " << xrect << " yrect= " << yrect << " down_angpix= " << down_angpix << std::endl;
 
 	// Now read in all images
 	if (fn_mics == "")

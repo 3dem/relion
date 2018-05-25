@@ -66,6 +66,7 @@ class MotionEstimator
         double getDosePerFrame();
         void proposeDosePerFrame(double dpf, std::string metaFn, int verb);
 
+		double getCCPad();
 
         static std::vector<MetaDataTable> findUnfinishedJobs(
                 const std::vector<MetaDataTable>& mdts, std::string path);
@@ -89,7 +90,10 @@ class MotionEstimator
 				params_scaled_by_dose;
 
             double dmga, dmgb, dmgc, dosePerFrame,
-                sig_vel, sig_div, sig_acc, optEps;
+                sig_vel, sig_div, sig_acc, optEps,
+				cc_pad;
+			
+			std::string paramsFn;
 
             // set at init
             int s, sh, fc, verb, nr_omp_threads;

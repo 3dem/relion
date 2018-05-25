@@ -170,7 +170,7 @@ const MultidimArray<Complex > &FourierTransformer::getComplex() const
 void FourierTransformer::setReal(MultidimArray<RFLOAT> &input)
 {
 	bool recomputePlan = false;
-	
+
 	if (   fReal == NULL
 		|| dataPtr != MULTIDIM_ARRAY(input)
 		|| !fReal->sameShape(input)
@@ -183,7 +183,7 @@ void FourierTransformer::setReal(MultidimArray<RFLOAT> &input)
     {
 		fFourier.reshape(ZSIZE(input),YSIZE(input),XSIZE(input)/2+1);
 		fReal=&input;
-		
+
         int ndim=3;
         if (ZSIZE(input)==1)
         {
@@ -242,7 +242,7 @@ void FourierTransformer::setReal(MultidimArray<RFLOAT> &input)
         delete [] N;
         dataPtr=MULTIDIM_ARRAY(*fReal);
 		complexDataPtr = MULTIDIM_ARRAY(fFourier);
-		
+
 	}
 }
 
@@ -1173,10 +1173,14 @@ void LoGFilterMap(MultidimArray<Complex > &FT, int ori_size, RFLOAT sigma, RFLOA
 {
 
 	// Calculation sigma in reciprocal pixels (input is in Angstroms) and pre-calculate its square
+	// Factor of 1/2 because input is diameter, and filter uses radius
 	RFLOAT isigma2 = (0.5*ori_size * angpix)/sigma;
 	isigma2 *= isigma2;
 
-	// Put a raised cosine from edge_low to edge_high
+	// Gunn Pattern Recognition 32 (1999) 1463-1472
+	// The Laplacian filter is: 1/(PI*sigma2)*(r^2/2*sigma2 - 1) * exp(-r^2/(2*sigma2))
+	// and its Fourier Transform is: r^2 * exp(-0.5*r2/isigma2);
+	// Then to normalise for different scales: divide by isigma2;
 	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT)
 	{
 		RFLOAT r2 = (RFLOAT)kp * (RFLOAT)kp + (RFLOAT)ip * (RFLOAT)ip + (RFLOAT)jp * (RFLOAT)jp;
@@ -1708,4 +1712,5 @@ void helicalLayerLineProfile(const MultidimArray<RFLOAT > &v, std::string title,
 	plot2D->AddDataSet(dataSetAmpl);
 	plot2D->AddDataSet(dataSetAmpr);
 	plot2D->OutputPostScriptPlot(fn_eps);
+	delete plot2D;
 }

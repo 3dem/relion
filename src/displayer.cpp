@@ -1231,8 +1231,11 @@ void multiViewerCanvas::saveTrainingSet()
 	fn_iroot = fn_iroot.beforeLastOf("/");
 	fn_img = fn_iroot + "/note.txt";
 	copy(fn_img, fn_odir+"/"+fn_img.afterLastOf("/"));
-	fn_img = fn_iroot + "/run_unmasked_classes.mrcs";
-	copy(fn_img, fn_odir+"/"+fn_img.afterLastOf("/"));
+        fn_img = fn_iroot + "/run_unmasked_classes.mrcs";
+        if (exists(fn_img))
+        {
+            copy(fn_img, fn_odir+"/"+fn_img.afterLastOf("/"));
+        }
 	fn_img = fn_iroot + "/default_pipeline.star";
 	copy(fn_img, fn_odir+"/"+fn_img.afterLastOf("/"));
 

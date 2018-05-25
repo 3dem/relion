@@ -734,6 +734,9 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 
 	Image<RFLOAT> Ipart, Imic, Itmp;
 
+	bool MDin_has_beamtilt = (MD.containsLabel(EMDL_IMAGE_BEAMTILT_X) || MD.containsLabel(EMDL_IMAGE_BEAMTILT_Y));
+	bool MDin_has_ctf = MD.containsLabel(EMDL_CTF_DEFOCUSU);
+
 	TIMING_TIC(TIMING_READ_IMG);
 
 	FileName fn_frame;
@@ -960,7 +963,7 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 			// Also fill in the CTF parameters
 			if (star_has_ctf)
 			{
-				ctf.write(MD);
+
 				RFLOAT mag, dstep, maxres, fom;
 				if (MDmics.containsLabel(EMDL_CTF_MAGNIFICATION))
 				{
@@ -984,6 +987,29 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 					MDmics.getValue(EMDL_CTF_FOM, fom, imic);
 					MD.setValue(EMDL_CTF_FOM, fom);
 				}
+
+				// Only set CTF parameters from the micrographs STAR file if the input STAR file did not contain it!
+				if (!MDin_has_ctf)
+				{
+					ctf.write(MD);
+				}
+
+				// Only set beamtilt from the micrographs STAR file if the input STAR file did not contain it!
+				if (!MDin_has_beamtilt)
+				{
+					RFLOAT tilt_x, tilt_y;
+					if (MDmics.containsLabel(EMDL_IMAGE_BEAMTILT_X))
+					{
+						MDmics.getValue(EMDL_IMAGE_BEAMTILT_X, tilt_x, imic);
+						MD.setValue(EMDL_IMAGE_BEAMTILT_X, tilt_x);
+					}
+					if (MDmics.containsLabel(EMDL_IMAGE_BEAMTILT_Y))
+					{
+						MDmics.getValue(EMDL_IMAGE_BEAMTILT_Y, tilt_y, imic);
+						MD.setValue(EMDL_IMAGE_BEAMTILT_Y, tilt_y);
+					}
+				}
+
 			}
 
 			// If the image was re-scaled, then also rescale the rlnOriginX/Y/Z

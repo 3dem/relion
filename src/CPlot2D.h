@@ -857,6 +857,11 @@ void joinMultipleEPSIntoSinglePDF(FileName fn_pdf, std::vector<FileName> fn_eps)
       */
      bool GetDrawLegend();
 
+     /*! 
+      Get and Set a flag that flips the orientation of the Y axis.
+     */
+     bool GetFlipY();
+     bool SetFlipY(bool flag);
 
      // outputs
      /*!
@@ -970,6 +975,8 @@ void joinMultipleEPSIntoSinglePDF(FileName fn_pdf, std::vector<FileName> fn_eps)
      double m_dYAxisSize; /*!< The size of the plot in the y direction. Not including the frames around it. */
      double m_dDiagonalSize; /*!< The size of the plot along its diagonal direction. */
 
+     double m_dFlipYOffset; /*!< Used to shift the Y origin when flipping the Y axis. */
+
      double m_dBottomFrameSize; /*!< The size of the bottom frame. */
      double m_dRightFrameSize; /*!< The size of the right frame. */
      double m_dTopFrameSize; /*!< The size of the top frame. */
@@ -1032,6 +1039,7 @@ void joinMultipleEPSIntoSinglePDF(FileName fn_pdf, std::vector<FileName> fn_eps)
      bool m_bDrawYAxisGridLines; /*!< Flag for enabling/disabling the drawing of y axis grid lines. */
      bool m_bDrawGridLinesDashed; /*!< Flag for enabling/disabling the drawing dashed grid lines. */
      bool m_bDrawLegend; /*!< Flag for enabling/disabling the drawing of the legend. */
+     bool m_bFlipY; /*!< Flag for flipping the Y axis. */
 
      // output
      std::ofstream outputFile; /*!< The output stream. */
@@ -1422,5 +1430,15 @@ void joinMultipleEPSIntoSinglePDF(FileName fn_pdf, std::vector<FileName> fn_eps)
  {
      return (m_bDrawLegend);
  }
+
+inline bool CPlot2D::SetFlipY(bool flag)
+{
+     m_bFlipY=flag;
+}
+
+inline bool CPlot2D::GetFlipY()
+{
+     return (m_bFlipY);
+}
 
  #endif /* defined(__CPlot2D__) */
