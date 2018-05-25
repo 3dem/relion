@@ -805,8 +805,8 @@ void JobWindow::initialiseAutopickWindow()
 	tab2->label("Laplacian");
 	resetHeight();
 
-	place("log_diam", TOGGLE_DEACTIVATE);
-	place("log_diam_range", TOGGLE_DEACTIVATE);
+	place("log_diam_min", TOGGLE_DEACTIVATE);
+	place("log_diam_max", TOGGLE_DEACTIVATE);
 	place("log_invert", TOGGLE_DEACTIVATE);
 
 	// Add a little spacer
