@@ -322,6 +322,12 @@ def load_star(filename):
         
     return datasets
 
+# Don't get stuck in infinite while True loops....
+def CheckForExit():
+    if not os.path.isfile(RUNNING_FILE):
+        print " RELION_IT:", RUNNING_FILE, "file no longer exists, exiting now ..."
+        exit(0)
+
 def addJob(jobtype, name_in_script, done_file, options):
 
     jobname = ""
@@ -354,21 +360,41 @@ def addJob(jobtype, name_in_script, done_file, options):
         f.write(name_in_script + ' = ' + jobname + '\n')
         f.close()
 
-    # return the name of the job in the RELION pipeline, e.g. 'Import/job001'
+    # return the name of the job in the RELION pipeline, e.g. 'Import/job001/'
     return jobname, already_had_it
 
-def RunJobs(jobs, repeat, wait, schedulename, run_in_background):
+def RunJobs(jobs, repeat, wait, schedulename):
 
     runjobsstring = ''
     for job in jobs[:]:
         runjobsstring += job + ' '
 
-    command = 'relion_pipeliner --schedule ' + schedulename + ' --repeat ' + str(repeat) + ' --min_wait ' + str(wait) + ' --RunJobs "' + runjobsstring + '"' 
-    if (run_in_background):
-        command += ' &'
+    command = 'relion_pipeliner --schedule ' + schedulename + ' --repeat ' + str(repeat) + ' --min_wait ' + str(wait) + ' --RunJobs "' + runjobsstring + '" &' 
 
     os.system(command)
 
+def WaitForJob(wait_for_this_job, seconds_wait):
+    print " RELION_IT: waiting for job to finish in", wait_for_this_job
+    time.sleep(seconds_wait)
+    while True:
+        pipeline = load_star(PIPELINE_STAR)
+        myjobnr = -1
+        for jobnr in range(0,len(pipeline['pipeline_processes']['rlnPipeLineProcessName'])):
+            jobname = pipeline['pipeline_processes']['rlnPipeLineProcessName'][jobnr]
+            if jobname == wait_for_this_job:
+                myjobnr = jobnr
+        if myjobnr < 0:
+            print " ERROR: cannot find ", wait_for_this_job, " in ", PIPELINE_STAR
+            exit(1)
+
+        status = int(pipeline['pipeline_processes']['rlnPipeLineProcessStatus'][myjobnr])
+        if status == 2:
+            print " RELION_IT: job in", wait_for_this_job, "has finished now"
+            return
+        else:
+            CheckForExit()
+            time.sleep(seconds_wait)
+        
 
 def run_pipeline(opts):
     """
@@ -578,8 +604,9 @@ White value: == 0
     with open('.gui_projectdir', 'w'):
         pass
 
-    # True means run in background
-    RunJobs(runjobs, opts.preprocess_repeat_times, opts.preprocess_repeat_wait, 'PREPROCESS', True)
+    # Now execute the entire preprocessing pipeliner
+    RunJobs(runjobs, opts.preprocess_repeat_times, opts.preprocess_repeat_wait, 'PREPROCESS')
+    print " RELION_IT: submitted PREPROCESS pipeliner with", opts.preprocess_repeat_times, "repeats of the preprocessing jobs"
 
     # Possibility to stop here...
     if not opts.stop_after_extraction:
@@ -642,13 +669,14 @@ White value: == 0
 
                 if ((not already_had_it) or rerun_batch1):
                     have_new_batch = True
-                    # False means: run job in foreground: so wait with submitting next one until this one is ready...
-                    RunJobs([class2d_job], 1, 1, 'CLASS2D', False)
+                    RunJobs([class2d_job], 1, 1, 'CLASS2D')
+                    print " RELION_IT: submitted 2D classification with", batch_size ,"particles in", class2d_job
+
+                    # Wait here until this Class2D job is finished. Check every thirty seconds
+                    WaitForJob(class2d_job, 30)
 
             if not have_new_batch:
-                if not os.path.isfile(RUNNING_FILE):
-                    print RUNNING_FILE, " no longer exists, exiting ..."
-                    exit(0)
+                CheckForExit()
                 # The following prevents checking the particles.star file too often
                 time.sleep(60*opts.class2d_repeat_time)
 
