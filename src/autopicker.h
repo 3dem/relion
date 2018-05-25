@@ -139,10 +139,7 @@ public:
 	bool do_LoG;
 
 	// Minimum diameter for features to be detected by the LoG filter
-	RFLOAT LoG_diameter, LoG_min_diameter, LoG_max_diameter;
-
-	// Maximum diameter for features to be detected by the LoG filter
-	RFLOAT LoG_diameter_fracrange;
+	RFLOAT LoG_min_diameter, LoG_max_diameter;
 
 	// How many times the LoG_max_diameter is searched?
 	RFLOAT LoG_max_search;

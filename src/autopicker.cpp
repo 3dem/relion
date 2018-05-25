@@ -128,8 +128,8 @@ void AutoPicker::read(int argc, char **argv)
 
 	int log_section = parser.addSection("Laplacian-of-Gaussian options");
 	do_LoG = parser.checkOption("--LoG", "Use Laplacian-of-Gaussian filter-based picking, instead of template matching");
-	LoG_diameter = textToFloat(parser.getOption("--LoG_diam", "Diameter (in Angstroms) for blob-detection by Laplacian-of-Gaussian filter", "-1"));
-	LoG_diameter_fracrange = textToFloat(parser.getOption("--LoG_diam_range", "Min and max diameter change by this fraction of the diameter above", "0.2"));
+	LoG_min_diameter = textToFloat(parser.getOption("--LoG_diam_min", "Smallest particle diameter (in Angstroms) for blob-detection by Laplacian-of-Gaussian filter", "-1"));
+	LoG_max_diameter = textToFloat(parser.getOption("--LoG_diam_max", "Largest particle diameter (in Angstroms) for blob-detection by Laplacian-of-Gaussian filter", "-1"));
 	LoG_invert = parser.checkOption("--Log_invert", "Use this option if the particles are white instead of black");
 	LoG_adjust_threshold = textToFloat(parser.getOption("--LoG_adjust_threshold", "Use this option to adjust the picking threshold: positive for less particles, negative for more", "0."));
 
@@ -297,24 +297,22 @@ void AutoPicker::initialise()
 	Mrefs.clear();
 	if (do_LoG)
 	{
-		if (LoG_diameter < 0)
-			REPORT_ERROR("ERROR: Provide --Log_diam when using the LoG-filter for autopicking");
-		if (LoG_diameter_fracrange < 0 || LoG_diameter_fracrange > 1)
-			REPORT_ERROR("ERROR: --LoG_diam_range should be between 0 and 1");
+		if (LoG_min_diameter < 0)
+			REPORT_ERROR("ERROR: Provide --LoG_diam_min when using the LoG-filter for autopicking");
+		if (LoG_max_diameter < 0)
+			REPORT_ERROR("ERROR: Provide --LoG_diam_max when using the LoG-filter for autopicking");
 
 		// Always use skip_side, as algorithms tends to pick on the sides of micrographs
-		autopick_skip_side = XMIPP_MAX(autopick_skip_side, 0.5*LoG_diameter/angpix);
+		autopick_skip_side = XMIPP_MAX(autopick_skip_side, 0.5*LoG_min_diameter/angpix);
 
 		// Fill vector with diameters to be searched
-		LoG_min_diameter = ROUND(LoG_diameter - LoG_diameter_fracrange * LoG_diameter);
-		LoG_max_diameter = ROUND(LoG_diameter + LoG_diameter_fracrange * LoG_diameter);
 		diams_LoG.clear();
-		for (int i = LoG_max_search; i > 2; i--)
+		for (int i = LoG_max_search; i > 1; i--)
 			diams_LoG.push_back(ROUND(LoG_min_diameter/(RFLOAT)(i)));
 		diams_LoG.push_back(LoG_min_diameter);
-		diams_LoG.push_back(LoG_diameter);
+		diams_LoG.push_back((LoG_max_diameter+LoG_min_diameter)/2.);
 		diams_LoG.push_back(LoG_max_diameter);
-		for (int i = 3; i <= LoG_max_search; i++)
+		for (int i = 2; i <= LoG_max_search; i++)
 			diams_LoG.push_back(ROUND(LoG_max_diameter*(RFLOAT)(i)));
 
 		std::cout << " + Will use following diameters for Laplacian-of-Gaussian filter: " << std::endl;
@@ -2499,7 +2497,9 @@ void AutoPicker::autoPickLoGOneMicrograph(FileName &fn_mic, long int imic)
 	sum2_fom_low = sum2_fom_low/count_low - sum_fom_low*sum_fom_low;
 	sum2_fom_high = sum2_fom_high/count_high - sum_fom_high*sum_fom_high;
 	sum2_fom_ok = sum2_fom_ok/count_ok - sum_fom_ok*sum_fom_ok;
-	float my_threshold =  sum_fom_low + LoG_adjust_threshold * sqrt(sum2_fom_low);
+	//float my_threshold =  sum_fom_low + LoG_adjust_threshold * sqrt(sum2_fom_low);
+	//Sjors 25May2018: better have threshold only depend on fom_ok, as in some cases fom_low/high are on very different scale...
+	float my_threshold =  sum_fom_ok + LoG_adjust_threshold * sqrt(sum2_fom_ok);
 
 	if (verb > 1)
 	{
