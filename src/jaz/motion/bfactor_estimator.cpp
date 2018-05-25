@@ -191,7 +191,7 @@ void BFactorEstimator::process(const std::vector<MetaDataTable>& mdts)
 			std::cout << " +       Performing reconstruction ... " << std::endl;
 		}
 		
-		#pragma omp parallel for num_threads(nr_omp_threads)
+		//#pragma omp parallel for num_threads(nr_omp_threads)
 		for (int f = 0; f < fcb; f++)
 		{
 			const int ff = f0 + f;
