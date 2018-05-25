@@ -256,6 +256,10 @@ class star_handler_parameters
 		}
 
 		long int n_obj = MD.numberOfObjects();
+		if (n_obj == 0)
+		{
+			REPORT_ERROR("ERROR: empty STAR file...");
+		}
 
 		if (nr_split < 0 && size_split < 0)
 		{
@@ -263,12 +267,7 @@ class star_handler_parameters
 		}
 		else if (nr_split < 0 && size_split > 0)
 		{
-			if (size_split > n_obj)
-			{
-				std::cout << " Nothing to do, as size_split is set to a larger value than the number of input images..." << std::endl;
-				return;
-			}
-			nr_split = n_obj / size_split;
+			nr_split = CEIL(1. * n_obj / size_split);
 		}
 		else if (nr_split > 0 && size_split < 0)
 		{
