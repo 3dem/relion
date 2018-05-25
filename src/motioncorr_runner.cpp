@@ -75,7 +75,7 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	fn_movie = parser.getOption("--movie", "Rootname to identify movies", "movie");
 	continue_old = parser.checkOption("--only_do_unfinished", "Only run motion correction for those micrographs for which there is not yet an output micrograph.");
 	do_save_movies  = parser.checkOption("--save_movies", "Also save the motion-corrected movies.");
-	angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms","-1"));
+	angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms", "-1"));
 	first_frame_sum =  textToInteger(parser.getOption("--first_frame_sum", "First movie frame used in output sum (start at 1)", "1"));
 	if (first_frame_sum < 1) first_frame_sum = 1;
 	last_frame_sum =  textToInteger(parser.getOption("--last_frame_sum", "Last movie frame used in output sum (0: use all)", "0"));
@@ -103,8 +103,8 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 
 	int doseweight_section = parser.addSection("Dose-weighting options");
 	do_dose_weighting = parser.checkOption("--dose_weighting", "Use MOTIONCOR2s or UNBLURs dose-weighting scheme");
-	voltage = textToFloat(parser.getOption("--voltage","Voltage (in kV) for dose-weighting inside MOTIONCOR2/UNBLUR","300"));
-	dose_per_frame = textToFloat(parser.getOption("--dose_per_frame", "Electron dose (in electrons/A2/frame) for dose-weighting inside MOTIONCOR2/UNBLUR", "0"));
+	voltage = textToFloat(parser.getOption("--voltage","Voltage (in kV) for dose-weighting inside MOTIONCOR2/UNBLUR", "300"));
+	dose_per_frame = textToFloat(parser.getOption("--dose_per_frame", "Electron dose (in electrons/A2/frame) for dose-weighting inside MOTIONCOR2/UNBLUR", "1"));
 	pre_exposure = textToFloat(parser.getOption("--preexposure", "Pre-exposure (in electrons/A2) for dose-weighting inside UNBLUR", "0"));
 
 	do_own = parser.checkOption("--use_own", "Use our own implementation of motion correction");
@@ -192,12 +192,8 @@ void MotioncorrRunner::initialise()
 		REPORT_ERROR(" ERROR: You have to specify which programme to use through either --use_motioncor2 or --use_unblur");
 	}
 
-	if (do_dose_weighting)
-	{
-		if (angpix < 0)
-			REPORT_ERROR("ERROR: For dose-weighting it is mandatory to provide the pixel size in Angstroms through --angpix.");
-
-	}
+	if (angpix < 0)
+		REPORT_ERROR("ERROR: It is mandatory to provide the pixel size in Angstroms through --angpix.");
 
 #ifdef CUDA
 	if (do_motioncor2)
@@ -877,6 +873,7 @@ void MotioncorrRunner::plotShifts(FileName fn_mic, Micrograph &mic)
  	plot2D->SetXAxisSize(600);
  	plot2D->SetYAxisSize(600);
 	plot2D->SetDrawLegend(false);
+	plot2D->SetFlipY(true);
 
  	CDataSet dataSet;
 	dataSet.SetDrawMarker(false);
@@ -953,13 +950,10 @@ void MotioncorrRunner::plotShifts(FileName fn_mic, Micrograph &mic)
 }
 
 void MotioncorrRunner::saveModel(Micrograph &mic) {
-	if (angpix > 0) mic.angpix = angpix;
-	
-	if (do_dose_weighting) {
-		mic.voltage = voltage;
-		mic.dose_per_frame = dose_per_frame;
-		mic.pre_exposure = pre_exposure;
-	}
+	mic.angpix = angpix;
+	mic.voltage = voltage;
+	mic.dose_per_frame = dose_per_frame;
+	mic.pre_exposure = pre_exposure;
 
 	FileName fn_avg, fn_mov;
 	getOutputFileNames(mic.getMovieFilename(), fn_avg, fn_mov);
@@ -1043,6 +1037,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	std::vector<Image<float> > Iframes;
 	std::vector<int> frames;
 
+	RFLOAT output_angpix = angpix * bin_factor;
 	RFLOAT prescaling = 1;
 
 	const int hotpixel_sigma = 6;
@@ -1408,7 +1403,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 #ifdef DEBUG_OWN
 			std::cout << " x = " << x << " y = " << y << " z = " << z;
 			std::cout << ", Xobs = " << patch_xshifts[i] * prescaling << " Xfit = " << x_fitted * prescaling;
-			std::cout << ", Yobs = " << patch_yshifts[i] * prescaling << " Yfit = " << y_fitted * prescaling<< std::endl;
+			std::cout << ", Yobs = " << patch_yshifts[i] * prescaling << " Yfit = " << y_fitted * prescaling << std::endl;
 #endif
 		}
 		rms_x = std::sqrt(rms_x / n_obs) * prescaling; rms_y = std::sqrt(rms_y / n_obs) * prescaling;
@@ -1447,7 +1442,8 @@ skip_fitting:
 		}
 		RCTOC(TIMING_BINNING);
 
-		// Final output.
+		// Final output
+                Iref.setSamplingRateInHeader(output_angpix, output_angpix);
 		Iref.write(!do_dose_weighting ? fn_avg : fn_avg_noDW);
 		logfile << "Written aligned but non-dose weighted sum to " << fn_avg_noDW << std::endl;
 	}
@@ -1496,6 +1492,7 @@ skip_fitting:
 		RCTOC(TIMING_BINNING);
 
 		// Final output
+                Iref.setSamplingRateInHeader(output_angpix, output_angpix);
 		Iref.write(fn_avg);
 		logfile << "Written aligned and dose-weighted sum to " << fn_avg << std::endl;
 	}

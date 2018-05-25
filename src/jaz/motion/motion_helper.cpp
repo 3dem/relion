@@ -17,7 +17,7 @@ std::vector<std::vector<Image<RFLOAT>>> MotionHelper::movieCC(
     const std::vector<std::vector<Image<Complex>>>& movie,
     const std::vector<Image<Complex>>& preds,
     const std::vector<Image<RFLOAT> > &damageWeights,
-    std::vector<ParFourierTransformer>& fts, int threads)
+    double pad, int threads)
 {
     const int pc = movie.size();
     const int fc = movie[0].size();
@@ -29,23 +29,26 @@ std::vector<std::vector<Image<RFLOAT>>> MotionHelper::movieCC(
 
     std::vector<Image<dComplex>> ccsFs(threads);
     std::vector<Image<double>> ccsRs(threads);
+	
+	const int s2 = (int)(pad * s);
+	const int sh2 = s2/2 + 1;
 
     for (int t = 0; t < threads; t++)
     {
-        ccsFs[t] = Image<dComplex>(sh,s);
+        ccsFs[t] = Image<dComplex>(sh2,s2);
         ccsFs[t].data.xinit = 0;
         ccsFs[t].data.yinit = 0;
 
-        ccsRs[t] = Image<double>(s,s);
+        ccsRs[t] = Image<double>(s2,s2);
         ccsRs[t].data.xinit = 0;
         ccsRs[t].data.yinit = 0;
     }
 
-    NewFFT::DoublePlan plan(s,s,1);
+    NewFFT::DoublePlan plan(s2,s2,1);
 
     for (int p = 0; p < pc; p++)
     {
-        out[p] = std::vector<Image<RFLOAT>>(fc, Image<RFLOAT>(s,s));
+        out[p] = std::vector<Image<RFLOAT>>(fc, Image<RFLOAT>(s2,s2));
 
         #pragma omp parallel for num_threads(threads)
         for (int f = 0; f < fc; f++)
@@ -56,13 +59,16 @@ std::vector<std::vector<Image<RFLOAT>>> MotionHelper::movieCC(
             for (int x = 0; x < sh; x++)
             {
                 Complex z = movie[p][f](y,x) * damageWeights[f](y,x) * preds[p](y,x).conj();
-                ccsFs[t](y,x) = dComplex(z.real, z.imag);
+				
+				const int yy = y < sh? y : s2 - (s - y);
+				
+                ccsFs[t](yy,x) = dComplex(z.real, z.imag);
             }
 
             NewFFT::inverseFourierTransform(ccsFs[t](), ccsRs[t](), plan);
 
-            for (int y = 0; y < s; y++)
-            for (int x = 0; x < s; x++)
+            for (int y = 0; y < s2; y++)
+            for (int x = 0; x < s2; x++)
             {
                 out[p][f](y,x) = s * s * ccsRs[t](y,x);
             }
@@ -72,7 +78,7 @@ std::vector<std::vector<Image<RFLOAT>>> MotionHelper::movieCC(
     return out;
 }
 
-std::vector<std::vector<Image<RFLOAT>>> MotionHelper::movieCC(
+/*std::vector<std::vector<Image<RFLOAT>>> MotionHelper::movieCC(
     Projector& projector0,
     Projector& projector1,
     const ObservationModel &obsModel,
@@ -152,9 +158,9 @@ std::vector<std::vector<Image<RFLOAT>>> MotionHelper::movieCC(
     }
 
     return out;
-}
+}*/
 
-std::vector<d2Vector> MotionHelper::getGlobalTrack(
+/*std::vector<d2Vector> MotionHelper::getGlobalTrack(
     const std::vector<std::vector<Image<RFLOAT>>>& movieCC)
 {
     const int pc = movieCC.size();
@@ -191,7 +197,7 @@ std::vector<d2Vector> MotionHelper::getGlobalTrack(
     }
 
     return out;
-}
+}*/
 
 std::vector<Image<RFLOAT> > MotionHelper::addCCs(
     const std::vector<std::vector<Image<RFLOAT>>> &movieCC)
@@ -222,7 +228,7 @@ std::vector<Image<RFLOAT> > MotionHelper::addCCs(
 }
 
 std::vector<d2Vector> MotionHelper::getGlobalTrack(
-    const std::vector<Image<RFLOAT>> &movieCcSum)
+    const std::vector<Image<RFLOAT>> &movieCcSum, double cc_pad)
 {
     const int fc = movieCcSum.size();
 
@@ -239,7 +245,7 @@ std::vector<d2Vector> MotionHelper::getGlobalTrack(
         if (pos.x >= sh) pos.x -= s;
         if (pos.y >= sh) pos.y -= s;
 
-        out[f] = pos;
+        out[f] = pos/cc_pad;
     }
 
     return out;
@@ -248,7 +254,7 @@ std::vector<d2Vector> MotionHelper::getGlobalTrack(
 std::vector<d2Vector> MotionHelper::getGlobalOffsets(
         const std::vector<std::vector<Image<RFLOAT>>>& movieCC,
         const std::vector<std::vector<gravis::d2Vector>>& initialTracks, 
-		double sigma, int wMax, int hMax, int threads)
+		double cc_pad, double sigma, int wMax, int hMax, int threads)
 {
     const int pc = movieCC.size();
     const int fc = movieCC[0].size();
@@ -296,7 +302,7 @@ std::vector<d2Vector> MotionHelper::getGlobalOffsets(
         if (out_p.y >= sh) out_p.y -= s;
 
         #pragma omp_atomic
-            out[p] = out_p;
+            out[p] = out_p/cc_pad;
     }
 
     return out;

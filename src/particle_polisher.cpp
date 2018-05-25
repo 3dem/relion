@@ -321,6 +321,7 @@ void ParticlePolisher::fitMovementsOneMicrograph(long int imic)
 	plot2D->SetXAxisSize(600);
 	plot2D->SetYAxisSize(600);
 	plot2D->SetDrawLegend(false);
+	plot2D->SetFlipY(true);
 
 	std::vector<RFLOAT> x_pick, y_pick, x_off_prior, y_off_prior, x_start, x_end, dummy; // X and Y-coordinates for the average particles in the micrograph
 	std::vector< std::vector<RFLOAT> > x_off, y_off; // X and Y shifts w.r.t. the average for each movie frame

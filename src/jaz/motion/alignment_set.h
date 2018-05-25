@@ -16,9 +16,9 @@ class AlignmentSet
 
         AlignmentSet();
         AlignmentSet(const std::vector<MetaDataTable>& mdts,
-                     int fc, int s, int k0, int k1, int maxRng);
+                     int fc, int s, int k0, int k1);
 
-            int mc, fc, s, sh, k0, k1, accPix, maxRng;
+            int mc, fc, s, sh, k0, k1, accPix;
 
             // micrograph < particle < frame <pixels> > >
             std::vector<std::vector<std::vector< Image<T> >>> CCs;
@@ -49,21 +49,20 @@ class AlignmentSet
 
 template<class T>
 AlignmentSet<T>::AlignmentSet()
-:   mc(0), fc(0), s(0), sh(0), k0(0), k1(0), maxRng(0)
+:   mc(0), fc(0), s(0), sh(0), k0(0), k1(0)
 {
 }
 
 template<class T>
 AlignmentSet<T>::AlignmentSet(
         const std::vector<MetaDataTable> &mdts,
-        int fc, int s, int k0, int k1, int maxRng)
+        int fc, int s, int k0, int k1)
 :   mc(mdts.size()),
     fc(fc),
     s(s),
     sh(s/2+1),
     k0(k0),
-    k1(k1),
-    maxRng(maxRng>0? maxRng : s/2)
+    k1(k1)
 {
     accCoords.reserve(sh*s);
 
@@ -116,7 +115,6 @@ AlignmentSet<T>::AlignmentSet(
 
             for (int f = 0; f < fc; f++)
             {
-                CCs[m][p][f] = Image<T>(2*maxRng, 2*maxRng);
                 obs[m][p][f].resize(accPix);
             }
         }
@@ -143,8 +141,10 @@ void AlignmentSet<T>::copyCC(int m, int p, int f, const Image<T2> &src)
             << mc << ", " << ((m >= 0 && m < mc)? CCs[m].size() : 0) << ", " << fc << ".");
     }
 
-    for (int y = 0; y < 2*maxRng; y++)
-    for (int x = 0; x < 2*maxRng; x++)
+	CCs[m][p][f] = Image<T>(src.data.xdim, src.data.ydim);
+	
+    for (int y = 0; y < src.data.ydim; y++)
+    for (int x = 0; x < src.data.xdim; x++)
     {
         CCs[m][p][f](y,x) = (T)src(y,x);
     }
