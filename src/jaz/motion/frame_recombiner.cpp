@@ -341,19 +341,26 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromBfacs()
     fc = mdt.numberOfObjects();
 
     std::vector<d2Vector> bkFacs(fc);
+	
+	double bfacOff = 0.0;
+	
+	for (int f = 0; f < fc; f++)
+    {
+        double b;
+        mdt.getValue(EMDL_POSTPROCESS_BFACTOR, b, f);
 
+        if (b > bfacOff) bfacOff = b;
+    }
+	
     const double cf = 8.0 * angpix * angpix * sh * sh;
 
     for (int f = 0; f < fc; f++)
     {
-        int ff;
-        mdt.getValue(EMDL_IMAGE_FRAME_NR, ff);
-
         double b, k;
         mdt.getValue(EMDL_POSTPROCESS_BFACTOR, b, f);
         mdt.getValue(EMDL_POSTPROCESS_GUINIER_FIT_INTERCEPT, k, f);
 
-        bkFacs[f] = d2Vector(sqrt(-cf/b), exp(k));
+		bkFacs[f] = d2Vector(sqrt(-cf/(b-bfacOff-1)), exp(k));
     }
 
     freqWeights = DamageHelper::computeWeights(bkFacs, sh);
