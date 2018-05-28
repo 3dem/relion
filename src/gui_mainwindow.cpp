@@ -310,7 +310,8 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 		pipeline.name = fn_pipe;
 		if (exists(fn_pipe + "_pipeline.star"))
 		{
-			pipeline.read(DO_LOCK);
+			std::string lock_message = "mainGUI constructor";
+			pipeline.read(DO_LOCK, lock_message);
 			// With the locking system, each read needs to be followed soon with a write
 			pipeline.write(DO_LOCK);
 		}
@@ -1927,7 +1928,8 @@ void GuiMainWindow::cb_reread_pipeline(Fl_Widget*, void* v)
 
 void GuiMainWindow::cb_reread_pipeline_i()
 {
-	pipeline.read(DO_LOCK);
+	std::string lock_message = " mainGUI reread_pipeline_i";
+	pipeline.read(DO_LOCK, lock_message);
 	// With the locking system, each read needs to be followed soon with a write
 	pipeline.write(DO_LOCK);
 }
