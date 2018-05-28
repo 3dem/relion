@@ -11,6 +11,8 @@
 #include "src/multidim_array.h"
 #include "src/metadata_table.h"
 #include "src/projector.h"
+#include "src/healpix_sampling.h"
+#include "src/projector.h"
 #include "src/ctf.h"
 #include "src/fftw.h"
 #include "src/time.h"
@@ -104,6 +106,12 @@ public:
 	// Pixel size for the references (for low-pass filter and particle diameter)
 	RFLOAT angpix_ref;
 
+	// Angular sampling rate for projection of 3D reference (hp=0: 60 deg, hp=1: 30 deg; hp=2: 15deg)
+	int healpix_order;
+
+	// Symmetry point group for 3D reference
+	std::string symmetry;
+
 	// Metadata of the micrographs
 	MetaDataTable MDmic;
 
@@ -125,6 +133,9 @@ public:
 
 	// Dimension of the filtered image
 	int current_size;
+
+	// Padding to use for Projectors
+	int padding;
 
 	// Maxmimum value in the Gaussian blob reference
 	RFLOAT gauss_max_value;

@@ -125,6 +125,9 @@ void AutoPicker::read(int argc, char **argv)
 	do_ctf = parser.checkOption("--ctf", "Perform CTF correction on the references?");
 	intact_ctf_first_peak = parser.checkOption("--ctf_intact_first_peak", "Ignore CTFs until their first peak?");
 	gauss_max_value = textToFloat(parser.getOption("--gauss_max", "Value of the peak in the Gaussian blob reference","0.1"));
+	healpix_order = textToInteger(parser.getOption("--healpix_order", "Healpix order for projecting a 3D reference (hp0=60deg; hp1=30deg; hp2=15deg)", "1"));
+	symmetry = parser.getOption("--sym", "Symmetry point group for a 3D reference","C1");
+
 
 	int log_section = parser.addSection("Laplacian-of-Gaussian options");
 	do_LoG = parser.checkOption("--LoG", "Use Laplacian-of-Gaussian filter-based picking, instead of template matching");
@@ -150,6 +153,7 @@ void AutoPicker::read(int argc, char **argv)
 
 	int expert_section = parser.addSection("Expert options");
 	verb = textToInteger(parser.getOption("--verb", "Verbosity", "1"));
+	padding = textToInteger(parser.getOption("--pad", "Padding factor for Fourier transforms", "2"));
 	random_seed = textToInteger(parser.getOption("--random_seed", "Number for the random seed generator", "1"));
 	workFrac = textToFloat(parser.getOption("--shrink", "Reduce micrograph to this fraction size, during correlation calc (saves memory and time)", "1.0"));
 	LoG_max_search = textToFloat(parser.getOption("--Log_max_search", "Maximum diameter in LoG-picking multi-scale approach is this many times the min/max diameter", "5."));
@@ -385,13 +389,74 @@ void AutoPicker::initialise()
 	}
 	else
 	{
+
+
+
 		Image<RFLOAT> Istk, Iref;
 		Istk.read(fn_ref);
-		for (int n = 0; n < NSIZE(Istk()); n++)
+
+		if (ZSIZE(Istk()) > 1)
 		{
-			Istk().getImage(n, Iref());
-			Iref().setXmippOrigin();
-			Mrefs.push_back(Iref());
+			// Re-scale references if necessary
+			if (angpix_ref < 0)
+				angpix_ref = angpix;
+
+			HealpixSampling sampling;
+			sampling.healpix_order = healpix_order;
+			sampling.fn_sym = symmetry;
+			sampling.perturbation_factor = 0.;
+			sampling.offset_step = 1;
+			sampling.limit_tilt = -91.;
+			sampling.is_3D = true;
+			sampling.initialise(NOPRIOR);
+
+			std::cout << " Projecting a 3D reference with " << symmetry << " symmetry, using angular sampling rate of "
+					<< sampling.getAngularSampling() << " degrees, i.e. in " << sampling.NrDirections() << " directions ... "
+					<< std::endl;
+
+			int my_ori_size = XSIZE(Istk());
+			Projector projector(my_ori_size, TRILINEAR, padding);
+			MultidimArray<RFLOAT> dummy;
+   			int lowpass_size = 2 * CEIL(my_ori_size * angpix_ref / lowpass);
+			projector.computeFourierTransformMap(Istk(), dummy, lowpass_size);
+			MultidimArray<RFLOAT> Mref(my_ori_size, my_ori_size);
+			MultidimArray<Complex> Fref;
+			FourierTransformer transformer;
+			transformer.setReal(Mref);
+			transformer.getFourierAlias(Fref);
+
+			for (long int idir = 0; idir < sampling.NrDirections(); idir++)
+			{
+				RFLOAT rot = sampling.rot_angles[idir];
+				RFLOAT tilt = sampling.tilt_angles[idir];
+				Matrix2D<RFLOAT> A;
+
+				Euler_angles2matrix(rot, tilt, 0., A, false);
+				Fref.initZeros();
+				projector.get2DFourierTransform(Fref, A, IS_NOT_INV);
+	        	transformer.inverseFourierTransform();
+	        	// Shift the image back to the center...
+	        	CenterFFT(Mref, false);
+	        	Mrefs.push_back(Mref);
+#define DEBUG_PROJECT3DREF
+#ifdef DEBUG_PROJECT3DREF
+	        	Image<RFLOAT> Itmp;
+	        	Itmp()=Mref;
+	        	FileName fnt;
+	        	fnt.compose("3dref_proj",idir,"mrc");
+	        	Itmp.write(fnt);
+#endif
+			}
+		}
+		else
+		{
+			// Stack of 2D references
+			for (int n = 0; n < NSIZE(Istk()); n++)
+			{
+				Istk().getImage(n, Iref());
+				Iref().setXmippOrigin();
+				Mrefs.push_back(Iref());
+			}
 		}
 	}
 #ifdef TIMING
@@ -701,7 +766,7 @@ void AutoPicker::initialise()
 		if (verb > 0)
 			init_progress_bar(Mrefs.size());
 
-		Projector PP(micrograph_size);
+		Projector PP(micrograph_size, TRILINEAR, padding);
 		MultidimArray<RFLOAT> dummy;
 
 		for (int iref = 0; iref < Mrefs.size(); iref++)

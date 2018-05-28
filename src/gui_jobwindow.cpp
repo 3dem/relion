@@ -798,6 +798,17 @@ void JobWindow::initialiseAutopickWindow()
 	current_y += STEPY/2;
 
 	place("fn_refs_autopick", TOGGLE_DEACTIVATE);
+
+	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group1->end();
+	place("do_ref3d", TOGGLE_DEACTIVATE, group1);
+	group1->begin();
+	place("fn_ref3d_autopick", TOGGLE_DEACTIVATE);
+	place("ref3d_symmetry", TOGGLE_DEACTIVATE);
+	place("ref3d_sampling", TOGGLE_DEACTIVATE);
+	group1->end();
+	guientries["do_ref3d"].cb_menu_i();
+
 	place("do_log", TOGGLE_DEACTIVATE);
 
 	tab1->end();
