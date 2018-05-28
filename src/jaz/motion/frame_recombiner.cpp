@@ -20,9 +20,9 @@ void FrameRecombiner::read(IOParser& parser, int argc, char* argv[])
     parser.addSection("Combine frames options");
 
     doCombineFrames = parser.checkOption("--combine_frames", "Combine movie frames into polished particles.");
+	box_arg = textToInteger(parser.getOption("--comb_box", "New box size", "-1"));
     k0a = textToFloat(parser.getOption("--bfac_minfreq", "Min. frequency used in B-factor fit [Angst]", "20"));
     k1a = textToFloat(parser.getOption("--bfac_maxfreq", "Max. frequency used in B-factor fit [Angst]", "-1"));
-	b_scale = textToFloat(parser.getOption("--bfac_scale", "Scale of B/k-factors", "1"));
     bfacFn = parser.getOption("--bfactors", "A .star file with external B/k-factors", "");
     bfac_diag = parser.checkOption("--diag_bfactor", "Write out B/k-factor diagnostic data");
 }
@@ -35,8 +35,30 @@ void FrameRecombiner::init(
     MicrographHandler* micrographHandler)
 {
     this->verb = verb;
-    this->s = s;
-    this->sh = s/2 + 1;
+	this->s = s;
+	this->sh = s/2 + 1;
+	
+	if (box_arg > 0)
+	{
+		double ratio = obsModel->angpix / micrographHandler->movie_angpix;
+		
+		if (std::abs(ratio - (double)((int)ratio)) > 1e-6)
+		{
+			REPORT_ERROR_STR("Box size cannot be changed without re-estimating motion "
+				<< "- reference pixel size (" << obsModel->angpix << " A) "
+				<< "is not an integral multiple of movie pixel size (" 
+				<< micrographHandler->movie_angpix << " A)!");
+		}
+		
+		s_box = box_arg;
+	}
+	else
+	{
+		s_box = s;
+	}
+	
+	sh_box = s_box/2 + 1;
+	
     this->fc = fc;
     this->nr_omp_threads = nr_omp_threads;
     this->outPath = outPath;
@@ -76,7 +98,7 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 
     int pctot = 0;
     long nr_done = 0;
-
+	
     for (long g = g_start; g <= g_end; g++)
     {
         const int pc = mdts[g].numberOfObjects();
@@ -85,41 +107,41 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
         pctot += pc;
 
         std::vector<std::vector<Image<Complex>>> movie;
-        movie = micrographHandler->loadMovie(mdts[g], s, angpix, fts);
+        movie = micrographHandler->loadMovie(mdts[g], s_box, angpix, fts);
 
         FileName fn_root = MotionRefiner::getOutputFileNameRoot(outPath, mdts[g]);
         std::vector<std::vector<d2Vector>> shift;
         shift = MotionHelper::readTracks(fn_root+"_tracks.star");
 
-        Image<RFLOAT> stack(s,s,1,pc);
+        Image<RFLOAT> stack(s_box,s_box,1,pc);
 
         #pragma omp parallel for num_threads(nr_omp_threads)
         for (int p = 0; p < pc; p++)
         {
             int threadnum = omp_get_thread_num();
 
-            Image<Complex> sum(sh,s);
+            Image<Complex> sum(sh_box,s_box);
             sum.data.initZeros();
 
-            Image<Complex> obs(sh,s);
+            Image<Complex> obs(sh_box,s_box);
 
             for (int f = 0; f < fc; f++)
             {
-                shiftImageInFourierTransform(movie[p][f](), obs(), s, -shift[p][f].x, -shift[p][f].y);
+                shiftImageInFourierTransform(movie[p][f](), obs(), s_box, -shift[p][f].x, -shift[p][f].y);
 
-                for (int y = 0; y < s; y++)
-                for (int x = 0; x < sh; x++)
+                for (int y = 0; y < s_box; y++)
+                for (int x = 0; x < sh_box; x++)
                 {
                     sum(y,x) += freqWeights[f](y,x) * obs(y,x);
                 }
             }
 
-            Image<RFLOAT> real(s,s);
+            Image<RFLOAT> real(s_box, s_box);
 
             fts[threadnum].inverseFourierTransform(sum(), real());
 
-            for (int y = 0; y < s; y++)
-            for (int x = 0; x < s; x++)
+            for (int y = 0; y < s_box; y++)
+            for (int x = 0; x < s_box; x++)
             {
                 DIRECT_NZYX_ELEM(stack(), p, 0, y, x) = real(y,x);
             }
@@ -191,6 +213,7 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromFCC(
         {
             sh = fccDataMg.data.xdim;
             s = 2 * (sh-1);
+			
             fc = fccDataMg.data.ydim;
 
             fccData = Image<RFLOAT>(sh,fc);
@@ -250,14 +273,25 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromFCC(
     std::pair<std::vector<d2Vector>,std::vector<double>> bkFacs
             = DamageHelper::fitBkFactors(fcc, k0, k1);
 	
-	for (int f = 0; f < fc; f++)
+	// sigmas (bkFacs[f].x) are given in pixels;
+	// rescale if a different box size is to be extracted
+	std::vector<d2Vector> bkFacsRescaled(fc);
+	
+	if (s_box == s)
 	{
-		bkFacs.first[f].x = bkFacs.first[f].x / sqrt(b_scale);
-		bkFacs.first[f].y = pow(bkFacs.first[f].y, b_scale);
+		bkFacsRescaled = bkFacs.first;
 	}
-
+	else
+	{
+		for (int f = 0; f < fc; f++)
+		{
+			bkFacsRescaled[f].x = s_box * bkFacs.first[f].x / (double) s; 
+			bkFacsRescaled[f].y = bkFacs.first[f].y;
+		}
+	}
+	
     std::vector<Image<RFLOAT>> freqWeights;
-    freqWeights = DamageHelper::computeWeights(bkFacs.first, sh);
+    freqWeights = DamageHelper::computeWeights(bkFacsRescaled, sh_box);
 
     const double cf = 8.0 * angpix * angpix * sh * sh;
 
@@ -315,6 +349,8 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromFCC(
     plot2D->SetYAxisTitle("B-factor");
     mdt.addToCPlot2D(plot2D, EMDL_IMAGE_FRAME_NR, EMDL_POSTPROCESS_BFACTOR);
     plot2D->OutputPostScriptPlot(outPath + "bfactors.eps");
+	
+	delete plot2D;
 
     CPlot2D *plot2Db=new CPlot2D("Polishing scale-factors");
     plot2Db->SetXAxisSize(600);
@@ -325,7 +361,7 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromFCC(
     mdt.addToCPlot2D(plot2Db, EMDL_IMAGE_FRAME_NR, EMDL_POSTPROCESS_GUINIER_FIT_INTERCEPT);
     plot2Db->OutputPostScriptPlot(outPath + "scalefactors.eps");
 	
-	delete plot2D;
+	delete plot2Db;
 
     return freqWeights;
 }
@@ -352,7 +388,7 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromBfacs()
         if (b > bfacOff) bfacOff = b;
     }
 	
-    const double cf = 8.0 * angpix * angpix * sh * sh;
+    const double cf = 8.0 * angpix * angpix * sh_box * sh_box;
 
     for (int f = 0; f < fc; f++)
     {
@@ -363,7 +399,7 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromBfacs()
 		bkFacs[f] = d2Vector(sqrt(-cf/(b-bfacOff-1)), exp(k));
     }
 
-    freqWeights = DamageHelper::computeWeights(bkFacs, sh);
+    freqWeights = DamageHelper::computeWeights(bkFacs, sh_box);
 
     if (bfac_diag)
     {
@@ -373,7 +409,7 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromBfacs()
         bkFacs2.first = bkFacs;
         bkFacs2.second = std::vector<double>(fc, 1.0);
 
-        Image<RFLOAT> bfacFitNoScale = DamageHelper::renderBkFit(bkFacs2, sh, fc, true);
+        Image<RFLOAT> bfacFitNoScale = DamageHelper::renderBkFit(bkFacs2, sh_box, fc, true);
 
         ImageLog::write(bfacFitNoScale, outPath + "/bfacs/glob_Bk-fit_noScale");
         ImageLog::write(freqWeights, outPath + "/bfacs/freqWeights");
