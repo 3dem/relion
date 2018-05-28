@@ -663,7 +663,10 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 	std::ofstream  fh;
 	fh.open((fn_log).c_str(), std::ios::app);
 
-	std::cout << " PIPELINER: writing out information in logfile " << fn_log << std::endl;
+	if (nr_repeat > 1)
+	{
+		std::cout << " PIPELINER: writing out information in logfile " << fn_log << std::endl;
+	}
 
 	// Touch the fn_check file
 	FileName fn_check = "RUNNING_PIPELINER_" + fn_sched;
