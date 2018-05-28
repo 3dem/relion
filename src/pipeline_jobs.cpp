@@ -1642,7 +1642,7 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 			}
 
 			command += " --ref " + joboptions["fn_ref3d_autopick"].getString();
-			Node node2(joboptions["fn_ref3d_autopick"].getString(), joboptions["fn_ref3d_autopick"].node_type);
+			Node node2(joboptions["fn_ref3d_autopick"].getString(), NODE_3DREF);
 			inputNodes.push_back(node2);
 			command += " --sym " + joboptions["ref3d_symmetry"].getString();
 
@@ -1668,7 +1668,7 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 			}
 
 			command += " --ref " + joboptions["fn_refs_autopick"].getString();
-			Node node2(joboptions["fn_refs_autopick"].getString(), joboptions["fn_refs_autopick"].node_type);
+			Node node2(joboptions["fn_refs_autopick"].getString(), NODE_2DREFS);
 			inputNodes.push_back(node2);
 
 		}
