@@ -354,7 +354,11 @@ bool PipeLine::checkProcessCompletion()
 	if (finished_processes.size() > 0 || exists(PIPELINE_HAS_CHANGED))
 	{
 		// Read in the latest version of the pipeline, just in case anyone else made a change meanwhile...
-		read(DO_LOCK);
+		std::string lock_message = "checkProcessCompletion: the following jobs have finished: ";
+		for (long int i = 0; i < finished_processes.size(); i++)
+			lock_message += " " + processList[finished_processes[i]].name;
+
+		read(DO_LOCK, lock_message);
 
 		// Set the new status of all the finished processes
 		for (int i=0; i < finished_processes.size(); i++)
@@ -450,7 +454,8 @@ bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, boo
 	}
 
 	// Read in the latest version of the pipeline, just in case anyone else made a change meanwhile...
-	read(DO_LOCK);
+	std::string lock_message = "runJob: " + _job.outputName;
+	read(DO_LOCK, lock_message);
 
 	// Save temporary hidden file with this jobs settings as default for a new job
 	_job.write("");
@@ -497,7 +502,8 @@ bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, boo
 			std::remove("tmpdeleted_pipeline.star");
 
 			// Read the updated pipeline back in again
-			read(DO_LOCK);
+			lock_message += " part 2";
+			read(DO_LOCK, lock_message);
 
 		}
 	} // end if !only_schedule && is_main_continue
@@ -746,8 +752,12 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 				checkProcessCompletion();
 				if (processList[current_job].status == PROC_FINISHED)
 				{
+					// Prepare a string for a more informative .lock file
+					std::string lock_message = " Scheduler " + fn_sched + " noticed that " + processList[current_job].name +
+							" finished and is trying to update the pipeline";
+
 					// Read in existing pipeline, in case some other window had changed something else
-					read(DO_LOCK);
+					read(DO_LOCK, lock_message);
 
 					// Will we do another repeat?
 					if (repeat + 1 != nr_repeat)
@@ -807,7 +817,8 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 		}
 
 		// Read in existing pipeline, in case some other window had changed it
-		read(DO_LOCK);
+		std::string lock_message = " Scheduler " + fn_sched + " has finished and is trying to update the pipeline";
+		read(DO_LOCK, lock_message);
 
 		// After breaking out of repeat, set status of the jobs to finished
 		for (long int i = 0; i < my_scheduled_processes.size(); i++)
@@ -889,7 +900,8 @@ void PipeLine::deleteNodesAndProcesses(std::vector<bool> &deleteNodes, std::vect
 {
 
 	// Read in existing pipeline, in case some other window had changed it
-	read(DO_LOCK);
+	std::string lock_message = "deleteNodesAndProcesses";
+	read(DO_LOCK, lock_message);
 
 	// Write new pipeline without the deleted processes and nodes to disc and read in again
 	FileName fn_del;
@@ -927,7 +939,8 @@ void PipeLine::deleteNodesAndProcesses(std::vector<bool> &deleteNodes, std::vect
 	}
 
 	// Read new pipeline back in again
-	read(DO_LOCK);
+	lock_message += " part 2";
+	read(DO_LOCK, lock_message);
 	write(DO_LOCK);
 
 }
@@ -936,7 +949,8 @@ bool PipeLine::markAsFinishedJob(int this_job, std::string &error_message)
 {
 
 	// Read in existing pipeline, in case some other window had changed it
-	read(DO_LOCK);
+	std::string lock_message = "markAsFinishedJob";
+	read(DO_LOCK, lock_message);
 
 	processList[this_job].status = PROC_FINISHED;
 
@@ -1013,7 +1027,8 @@ bool PipeLine::markAsFinishedJob(int this_job, std::string &error_message)
 
 	// Read the updated pipeline back in and write it out again
 	// With the locking mechanism, each pipeline.read(bool, DO_LOCK) needs to be followed soon by a pipeline.write(DO_LOCK)!
-	read(DO_LOCK);
+	lock_message += " part 2";
+	read(DO_LOCK, lock_message);
 	write(DO_LOCK);
 
 	return true;
@@ -1075,7 +1090,8 @@ bool PipeLine::setAliasJob(int this_job, std::string alias, std::string &error_m
 
 
 	// Read in existing pipeline, in case some other window had changed it
-	read(DO_LOCK);
+	std::string lock_message = "setAliasJob";
+	read(DO_LOCK, lock_message);
 
 	// Remove the original .Nodes entry
 	deleteTemporaryNodeFiles(processList[this_job]);
@@ -1146,7 +1162,8 @@ bool PipeLine::makeFlowChart(long int current_job, bool do_display_pdf, std::str
 	}
 
 	// Read in existing pipeline, in case some other window had changed it
-	read(DO_LOCK);
+	std::string lock_message = "makeFlowChart";
+	read(DO_LOCK, lock_message);
 
 	// Add the PDF file as a logfile to the outputnodes of this job, so it can be visualised from the Display button
 	Node node(fn_dir+"flowchart.pdf", NODE_PDF_LOGFILE);
@@ -1161,7 +1178,8 @@ void PipeLine::undeleteJob(FileName fn_undel)
 {
 
 	// Read in existing pipeline, in case some other window had changed it
-	read(DO_LOCK);
+	std::string lock_message = "undeleteJob";
+	read(DO_LOCK, lock_message);
 
     importPipeline(fn_undel.beforeLastOf("_pipeline.star"));
 
@@ -1546,7 +1564,8 @@ void PipeLine::importJobs(FileName fn_export)
 	MDexported.read(fn_export);
 
 	// Read in existing pipeline, in case some other window had changed it
-	read(DO_LOCK);
+	std::string lock_message = "importJobs";
+	read(DO_LOCK, lock_message);
 
 	std::vector<std::string> find_pattern, replace_pattern;
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDexported)
@@ -1660,7 +1679,7 @@ bool PipeLine::importPipeline(std::string _name)
 }
 
 // Read pipeline from STAR file
-void PipeLine::read(bool do_lock)
+void PipeLine::read(bool do_lock, std::string lock_message)
 {
 
 	FileName fn_lock = ".lock_" + name + "_pipeline.star";
@@ -1671,20 +1690,27 @@ void PipeLine::read(bool do_lock)
 		{
 			// If the lock exists: wait 3 seconds and try again
 			// First time round, print a warning message
-			if (iwait == 0)
-			{
-				std::cout << "WARNING: trying to read pipeline.star, but " << fn_lock << " exists!" << std::endl;
-				std::cout << " This is a protection against simultaneous writing to the pipeline by multiple instances of the GUI." << std::endl;
-				std::cout << " You can override this by manually deleting the " << fn_lock << " file." << std::endl;
-				std::cout << " Will try for 1 minute to see whether the lock disappears. If not, an error will be raised." << std::endl;
-			}
+			//if (iwait == 0)
+			//{
+			//	std::cout << " WARNING: trying to read pipeline.star, but " << fn_lock << " exists!" << std::endl;
+			//	std::cout << " This is a protection against simultaneous writing to the pipeline by multiple instances of the GUI." << std::endl;
+			//	std::cout << " You can override this by manually deleting the " << fn_lock << " file." << std::endl;
+			//	std::cout << " Will try for 1 minute to see whether the lock disappears. If not, an error will be raised." << std::endl;
+			//}
 			sleep(3);
 			iwait++;
-			if (iwait > 20)
-				REPORT_ERROR("ERROR: PipeLine::read has waited for 1 minute for lock file to disappear. You may want to manually remove the file: " + fn_lock);
+			if (iwait > 40)
+				REPORT_ERROR("ERROR: PipeLine::read has waited for 2 minutes for lock file to disappear. You may want to manually remove the file: " + fn_lock);
 		}
 		// Generate the lock file
-		touch(fn_lock);
+		std::ofstream  fh;
+	    fh.open(fn_lock.c_str(), std::ios::out);
+	    if (!fh)
+	        REPORT_ERROR( (std::string)"ERROR: Cannot open file: " + fn_lock);
+	    fh << lock_message << std::endl;
+	    fh.close();
+
+	    touch(fn_lock);
 	}
 
 
