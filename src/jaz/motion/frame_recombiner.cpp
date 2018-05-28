@@ -105,13 +105,15 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
         if (pc == 0) continue;
 
         pctot += pc;
+		
+		FileName fn_root = MotionRefiner::getOutputFileNameRoot(outPath, mdts[g]);
+        std::vector<std::vector<d2Vector>> shift0;
+        shift0 = MotionHelper::readTracks(fn_root+"_tracks.star");
 
+		std::vector<std::vector<d2Vector>> shift = shift0;
+		
         std::vector<std::vector<Image<Complex>>> movie;
-        movie = micrographHandler->loadMovie(mdts[g], s_box, angpix, fts);
-
-        FileName fn_root = MotionRefiner::getOutputFileNameRoot(outPath, mdts[g]);
-        std::vector<std::vector<d2Vector>> shift;
-        shift = MotionHelper::readTracks(fn_root+"_tracks.star");
+        movie = micrographHandler->loadMovie(mdts[g], s_box, angpix, fts, &shift0, &shift);
 
         Image<RFLOAT> stack(s_box,s_box,1,pc);
 
