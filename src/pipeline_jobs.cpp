@@ -1996,7 +1996,11 @@ void RelionJob::initialiseSelectJob()
 	joboptions["select_minval"] = JobOption("Minimum metadata value:",  (std::string)"-9999.", "Only lines in the input STAR file with the corresponding metadata value larger than this value will be included in the subset.");
 	joboptions["select_maxval"] = JobOption("Maximum metadata value:",  (std::string)"9999.", "Only lines in the input STAR file with the corresponding metadata value smaller than this value will be included in the subset.");
 
-	joboptions["do_split"] = JobOption("Split into subsets?", false, "If set to Yes, the job will be non-interactive and the star file will be split into subsets as defined below.");
+	joboptions["do_discard"] = JobOption("OR: select on image statistics?", false, "If set to Yes, the job will be non-interactive and all images in the input star file that have average and/or stddev pixel values that are more than the specified sigma-values away from the ensemble mean will be discarded.");
+	joboptions["discard_label"] = JobOption("Metadata label for images:", (std::string)"rlnImageName", "Specify which column from the input STAR contains the names of the images to be used to calculate the average and stddev values.");
+	joboptions["discard_sigma"] = JobOption("Sigma-value for discarding images:", 4, 1, 10, 0.1, "Images with average and/or stddev values that are more than this many times the ensemble stddev away from the ensemble mean will be discarded.");
+
+	joboptions["do_split"] = JobOption("OR: split into subsets?", false, "If set to Yes, the job will be non-interactive and the star file will be split into subsets as defined below.");
 	joboptions["do_random"] = JobOption("Randomise order before making subsets?:", false, "If set to Yes, the input STAR file order will be randomised. If set to No, the original order in the input STAR file will be maintained.");
 	joboptions["split_size"] = JobOption("Subset size: ", 100, 100, 10000, 100, "The number of lines in each of the output subsets. This line will be ignored when the number of subsets is specified on the next line.");
 	joboptions["nr_split"] = JobOption("OR: number of subsets: ", -1, 1, 50, 1, "Give a positive integer to specify into how many equal-sized subsets the data will be divided");
@@ -2023,7 +2027,7 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 	}
 
 	// Value-based selection
-	if (joboptions["do_select_values"].getBoolean() || joboptions["do_split"].getBoolean())
+	if (joboptions["do_select_values"].getBoolean() || joboptions["do_discard"].getBoolean() || joboptions["do_split"].getBoolean())
 	{
 		command="`which relion_star_handler`";
 
@@ -2053,7 +2057,7 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 		}
 		command += " --o " + fn_out;
 
-		if (joboptions["do_select_values"].getBoolean())
+		if (joboptions["do_select_values"].getBoolean() || joboptions["do_discard"].getBoolean())
 		{
 
 			if (joboptions["fn_mic"].getString() != "")
@@ -2071,9 +2075,18 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 
 			}
 
-			command += " --select " + joboptions["select_label"].getString();
-			command += " --minval " + joboptions["select_minval"].getString();
-			command += " --maxval " + joboptions["select_maxval"].getString();
+			if (joboptions["do_select_values"].getBoolean())
+			{
+				command += " --select " + joboptions["select_label"].getString();
+				command += " --minval " + joboptions["select_minval"].getString();
+				command += " --maxval " + joboptions["select_maxval"].getString();
+			}
+			else if (joboptions["do_discard"].getBoolean())
+			{
+				command += " --discard_on_stats ";
+				command += " --discard_label " + joboptions["discard_label"].getString();
+				command += " --discard_sigma " + joboptions["discard_sigma"].getString();
+			}
 
 		}
 		else if (joboptions["do_split"].getBoolean())
@@ -2113,8 +2126,21 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 			for (int isplit = 0; isplit < nr_split; isplit++)
 			{
 				FileName fn_split = fn_out.insertBeforeExtension("_split"+integerToString(isplit+1,3));
-				Node node2(fn_split, NODE_PART_DATA);
-				outputNodes.push_back(node2);
+
+				if (joboptions["fn_mic"].getString() != "")
+				{
+
+					Node node2(fn_split, NODE_MICS);
+					outputNodes.push_back(node2);
+
+				}
+				else if (joboptions["fn_data"].getString() != "")
+				{
+
+					Node node2(fn_split, NODE_PART_DATA);
+					outputNodes.push_back(node2);
+
+				}
 			}
 		}
 
@@ -2546,8 +2572,8 @@ with X being the iteration from which one continues the previous run.");
 together with the mini-batch or subset size. In case of a multi-class refinement, the different references are also increasingly left to become dissimilar. 200 seems to work well in many cases. Increase if multiple references have trouble separating, or the correct solution is not found.");
 	joboptions["sgd_fin_iter"] = JobOption("Number of final iterations:", 50, 10, 300, 10, "Number of final SGD iterations, at which the final resolution cutoff and the final subset size will be used, and multiple references are left dissimilar. 50 seems to work well in many cases. Perhaps increase when multiple reference have trouble separating.");
 
-	joboptions["sgd_ini_resol"] = JobOption("Initial resolution (A): ", 35, 10, 60, 5, "This is the resolution cutoff (in A) that will be applied during the initial SGD iterations. 35A seems to work well in many cases.");
-	joboptions["sgd_fin_resol"] = JobOption("Final resolution (A): ", 15, 5, 30, 5, "This is the resolution cutoff (in A) that will be applied during the final SGD iterations. 15A seems to work well in many cases.");
+	joboptions["sgd_ini_resol"] = JobOption("Initial resolution (A):", 35, 10, 60, 5, "This is the resolution cutoff (in A) that will be applied during the initial SGD iterations. 35A seems to work well in many cases.");
+	joboptions["sgd_fin_resol"] = JobOption("Final resolution (A):", 15, 5, 30, 5, "This is the resolution cutoff (in A) that will be applied during the final SGD iterations. 15A seems to work well in many cases.");
 
 	joboptions["sgd_ini_subset_size"] = JobOption("Initial mini-batch size:", 100, 30, 300, 10, "The number of particles that will be processed during the initial iterations. 100 seems to work well in many cases. Lower values may result in wider searches of the energy landscape, but possibly at reduced resolutions.");
 	joboptions["sgd_fin_subset_size"] = JobOption("Final mini-batch size:", 500, 100, 2000, 100, "The number of particles that will be processed during the final iterations. 300-500 seems to work well in many cases. Higher values may result in increased resolutions, but at increased computational costs and possibly reduced searches of the energy landscape, but possibly at reduced resolutions.");
