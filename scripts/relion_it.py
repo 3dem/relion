@@ -1128,6 +1128,7 @@ def run_pipeline(opts):
                                 g.close()
 
                                 # Move out of this ipass of the passes loop....
+                                ibatch = nr_batches+1
                                 continue_this_pass = False
                                 print ' RELION_IT: moving on to the second pass using',opts.autopick_3dreference,'for template-based autopicking'
 
@@ -1145,8 +1146,8 @@ def main():
     Options files given as command line arguments will be opened in order and
     used to update the default options.
     """
-
-    print ' RELION_IT: script for automated, on-the-fly single-particle analysis in RELION (at least version 3.0-alpha-5)'
+    print ' RELION_IT: -------------------------------------------------------------------------------------------------------------------'
+    print ' RELION_IT: script for automated, on-the-fly single-particle analysis in RELION (>= 3.0-alpha-5)'
     print ' RELION_IT: authors: Sjors H.W. Scheres, Takanori Nakane & Colin Palmer'
     print ' RELION_IT: '
     print ' RELION_IT: usage: ./relion_it.py [extra_options.py [extra_options2.py ....] ]'
@@ -1157,6 +1158,7 @@ def main():
     print ' RELION_IT:   upon a restart, jobs present in this file will be continued (for preprocessing), or ignored when already finished'
     print ' RELION_IT: if you would like to re-do a specific job from scratch (e.g. because you changed its parameters)' 
     print ' RELION_IT:   remove that job, and those that depend on it, from the',SETUP_CHECK_FILE
+    print ' RELION_IT: -------------------------------------------------------------------------------------------------------------------'
     print ' RELION_IT: '
     
     # Make sure no other version of this script are running...
@@ -1173,7 +1175,6 @@ def main():
     opts = RelionItOptions()
     for user_opt_file in sys.argv[1:]:
         print ' RELION_IT: reading options from {}'.format(user_opt_file)
-        print ' RELION_IT: '
         user_opts = runpy.run_path(user_opt_file)
         opts.update_from(user_opts)
     run_pipeline(opts)
