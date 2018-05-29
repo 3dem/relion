@@ -861,7 +861,7 @@ void joinMultipleEPSIntoSinglePDF(FileName fn_pdf, std::vector<FileName> fn_eps)
       Get and Set a flag that flips the orientation of the Y axis.
      */
      bool GetFlipY();
-     bool SetFlipY(bool flag);
+     void SetFlipY(bool flag);
 
      // outputs
      /*!
@@ -1431,14 +1431,14 @@ void joinMultipleEPSIntoSinglePDF(FileName fn_pdf, std::vector<FileName> fn_eps)
      return (m_bDrawLegend);
  }
 
-inline bool CPlot2D::SetFlipY(bool flag)
-{
+ inline void CPlot2D::SetFlipY(bool flag)
+ {
      m_bFlipY=flag;
-}
+ }
 
-inline bool CPlot2D::GetFlipY()
-{
+ inline bool CPlot2D::GetFlipY()
+ {
      return (m_bFlipY);
-}
+ }
 
  #endif /* defined(__CPlot2D__) */
