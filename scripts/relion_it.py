@@ -27,6 +27,8 @@ PIPELINE_STAR = 'default_pipeline.star'
 RUNNING_FILE = 'RUNNING_RELION_IT'
 SECONDPASS_REF3D_FILE = 'RELION_IT_2NDPASS_3DREF'
 SETUP_CHECK_FILE = 'RELION_IT_SUBMITTED_JOBS'
+PREPROCESS_SCHEDULE_PASS1 = 'PREPROCESS'
+PREPROCESS_SCHEDULE_PASS2 = 'PREPROCESS_PASS2'
 
 class RelionItOptions(object):
     """
@@ -111,13 +113,11 @@ class RelionItOptions(object):
 
     
     ### Now perform 2D and/or 3D classification with the extracted particles?
-    do_class2d = False
+    do_class2d = True
     # And/or perform 3D classification?
     do_class3d = True
     # Repeat 2D and/or 3D-classification for batches of this many particles
     batch_size = 10000
-    # Wait with the first 2D and/or 3D-classification batch until at least this many particles are extracted
-    minimum_batch_size = 1000
     # Number of 2D classes to use
     class2d_nr_classes  = 50
     # Diameter of the mask used for 2D/3D classification (in Angstrom)
@@ -140,11 +140,17 @@ class RelionItOptions(object):
     class3d_ini_lowpass = 40 
 
 
-    ### Use the largest 3D class as a 3D reference for a second pass of autopicking? (only when do_class3d is True)
+    ### Use the largest 3D class from the first batch as a 3D reference for a second pass of autopicking? (only when do_class3d is True)
     do_second_pass = True
     # Only move on to template-based autopicking if the 3D references achieves this resolution (in A)
-    minimum_resolution_3dref_2ndpass = 15
-
+    minimum_resolution_3dref_2ndpass = 20
+    # In the second pass, perform 2D classification?
+    do_class2d_pass2 = True
+    # In the second pass, perform 3D classification?
+    do_class3d_pass2 = False
+    # Batch size in the second pass
+    batch_size_pass2 = 100000
+    
 
     ###################################################################################
     ############ Often the parameters below can be kept the same for a given set-up
@@ -255,7 +261,7 @@ class RelionItOptions(object):
 
 
     ## Discard particles based on average/stddev values? (this may be important for SGD initial model generation)
-    do_discard_on_image_statistics = True
+    do_discard_on_image_statistics = False
     # Discard images that have average/stddev values that are more than this many sigma away from the ensemble average
     discard_sigma = 4
     # Submit discard job to the cluster?
@@ -281,11 +287,15 @@ class RelionItOptions(object):
     refine_skip_padding = False
     # Submit jobs to the cluster?
     refine_submit_to_queue = False
-             
+    # Use fast subsets in 2D/3D classification when batch_size is bigger than this
+    refine_batchsize_for_fast_subsets = 100000
+
 
     ### 2D classification parameters
+    # Wait with the first 2D classification batch until at least this many particles are extracted
+    minimum_batch_size = 1000
     # Number of iterations to perform in 2D classification
-    class_nr_iter = 20
+    class2d_nr_iter = 20
     # Rotational search step (in degrees)
     class2d_angle_step = 6
     # Offset search range (in pixels)
@@ -785,28 +795,29 @@ def run_pipeline(opts):
             extract_job, already_had_it  = addJob('Extract', extract_job_name, SETUP_CHECK_FILE, extract_options)
             runjobs.append(extract_job)
 
-            if opts.do_class2d or opts.do_class3d:
+            if (ipass == 0 and (opts.do_class2d or opts.do_class3d)) or (ipass == 1 and (opts.do_class2d_pass2 or opts.do_class3d_pass2)):
                 #### Set up the Select job to split the particle STAR file into batches
-                select_options = ['OR select from particles.star: == {}particles.star'.format(extract_job),
-                                  'OR: split into subsets? == Yes',
-                                  'Subset size:  == {}'.format(opts.batch_size),
-                                  'OR: number of subsets:  == -1']
+                split_options = ['OR select from particles.star: == {}particles.star'.format(extract_job),
+                                 'OR: split into subsets? == Yes',
+                                 'OR: number of subsets:  == -1']
 
                 if ipass == 0:
-                    select_job_name = 'select_job'
+                    split_job_name = 'split_job'
+                    split_options.append('Subset size:  == {}'.format(opts.batch_size))
                 else:
-                    select_job_name = 'select2_job'
+                    split_job_name = 'split2_job'
+                    split_options.append('Subset size:  == {}'.format(opts.batch_size_pass2))
 
-                select_job, already_had_it = addJob('Select', select_job_name, SETUP_CHECK_FILE, select_options)
+                split_job, already_had_it = addJob('Select', split_job_name, SETUP_CHECK_FILE, split_options)
 
                 # Now start running stuff
-                runjobs.append(select_job)
+                runjobs.append(split_job)
 
         # Now execute the entire preprocessing pipeliner
         if ipass == 0:
-            preprocess_schedule_name = 'PREPROCESS'
+            preprocess_schedule_name = PREPROCESS_SCHEDULE_PASS1
         else:
-            preprocess_schedule_name = 'PREPROCESS_PASS2'
+            preprocess_schedule_name = PREPROCESS_SCHEDULE_PASS2
         RunJobs(runjobs, opts.preprocess_repeat_times, opts.preprocess_repeat_wait, preprocess_schedule_name)
         print ' RELION_IT: submitted',preprocess_schedule_name,'pipeliner with', opts.preprocess_repeat_times,'repeats of the preprocessing jobs'
         print ' RELION_IT: this pipeliner will run in the background of your shell. You can stop it by deleting the file RUNNING_PIPELINER_'+preprocess_schedule_name
@@ -815,7 +826,7 @@ def run_pipeline(opts):
         ########## From now on, process extracted particles in batches for 2D or 3D classification, only perform SGD inimodel for first batch and if no 3D reference is available
 
         # There is again an option to stop here...
-        if opts.do_class2d or opts.do_class3d:
+        if (ipass == 0 and (opts.do_class2d or opts.do_class3d)) or (ipass == 1 and (opts.do_class2d_pass2 or opts.do_class3d_pass2)):
 
             ### If necessary, rescale the 3D reference in the second pass!
             if ipass == 1 and (opts.extract_downscale or opts.extract2_downscale):
@@ -841,10 +852,10 @@ def run_pipeline(opts):
             while continue_this_pass:
 
                 have_new_batch = False
-                nr_batches = len(glob.glob(select_job + "particles_split*.star"))
+                nr_batches = len(glob.glob(split_job + "particles_split*.star"))
                 for ibatch  in range(0, nr_batches):
                     iibatch = ibatch + 1
-                    batch_name = select_job + 'particles_split%03d.star' % iibatch
+                    batch_name = split_job + 'particles_split%03d.star' % iibatch
 
                     batch = load_star(batch_name)
                     batch_size = len(batch['']['rlnMicrographName'])
@@ -853,7 +864,7 @@ def run_pipeline(opts):
                         previous_batch1_size = batch_size
                         rerun_batch1 = True
 
-                    # The first batch is special: process with smaller size (but at least minimum_batch_size) and keep overwriting in the same output directory
+                    # The first batch is special: perform 2D classification with smaller batch size (but at least minimum_batch_size) and keep overwriting in the same output directory
                     if ( rerun_batch1 or batch_size == opts.batch_size):
 
 
@@ -889,7 +900,7 @@ def run_pipeline(opts):
 
 
                         # 2D classification
-                        if opts.do_class2d:
+                        if (ipass == 0 and opts.do_class2d) or (ipass == 1 and opts.do_class2d_pass2):
 
                             class2d_options = ['Input images STAR file: == {}'.format(particles_star_file),
                                                'Number of classes: == {}'.format(opts.class2d_nr_classes),
@@ -904,6 +915,11 @@ def run_pipeline(opts):
                                                'Number of threads: == {}'.format(opts.refine_threads),
                                                'Copy particles to scratch directory: == {}'.format(opts.refine_scratch_disk),
                                                'Additional arguments: == {}'.format(opts.class2d_other_args)]
+
+                            if batch_size > opts.refine_batchsize_for_fast_subsets:
+                                class2d_options.append('Use fast subsets (for large data sets)? == Yes')
+                            else:
+                                class2d_options.append('Use fast subsets (for large data sets)? == No')
 
                             if opts.refine_do_gpu:
                                 class2d_options.append('Use GPU acceleration? == Yes')
@@ -923,7 +939,11 @@ def run_pipeline(opts):
                             if opts.refine_submit_to_queue:
                                 class2d_options.extend(queue_options)
 
-                            jobname = 'class2d_job_batch_{:03d}'.format(iibatch)
+                            if ipass == 0:
+                                jobname = 'class2d_job_batch_{:03d}'.format(iibatch)
+                            else:
+                                jobname = 'class2d_pass2_job_batch_{:03d}'.format(iibatch)
+
                             class2d_job, already_had_it = addJob('Class2D', jobname, SETUP_CHECK_FILE, class2d_options)              
 
 
@@ -935,81 +955,83 @@ def run_pipeline(opts):
                                 # Wait here until this Class2D job is finished. Check every thirty seconds
                                 WaitForJob(class2d_job, 30)
 
-                        # 3D classification
-                        if opts.do_class3d:
+                    # Perform 3D classification
+                    if (ipass == 0 and opts.do_class3d) or (ipass == 1 and opts.do_class3d_pass2):
 
-                            # Do SGD initial model generation only when no reference is provided AND only for the first batch, for subsequent batches use that model
-                            if (not opts.have_3d_reference) and iibatch == 1:
+                        # Do SGD initial model generation only in the first pass, when no reference is provided AND only for the first (complete) batch, for subsequent batches use that model
+                        if (not opts.have_3d_reference) and ipass == 0 and iibatch == 1 and batch_size == opts.batch_size:
 
-                                inimodel_options = ['Input images STAR file: == {}'.format(particles_star_file),
-                                                    'Symmetry: == {}'.format(opts.symmetry),
-                                                    'Mask diameter (A): == {}'.format(opts.mask_diameter),
-                                                    'Number of classes: == {}'.format(opts.inimodel_nr_classes),
-                                                    'Initial angular sampling: == {}'.format(opts.inimodel_angle_step), 
-                                                    'Offset search range (pix): == {}'.format(opts.inimodel_offset_range),
-                                                    'Offset search step (pix): == {}'.format(opts.inimodel_offset_step),
-                                                    'Number of initial iterations: == {}'.format(opts.inimodel_nr_iter_initial), 
-                                                    'Number of in-between iterations: == {}'.format(opts.inimodel_nr_iter_inbetween), 
-                                                    'Number of final iterations: == {}'.format(opts.inimodel_nr_iter_final),
-                                                    'Write-out frequency (iter): == {}'.format(opts.inimodel_freq_writeout), 
-                                                    'Initial resolution (A): == {}'.format(opts.inimodel_resol_ini), 
-                                                    'Final resolution (A): == {}'.format(opts.inimodel_resol_final), 
-                                                    'Initial mini-batch size: == {}'.format(opts.inimodel_batchsize_ini), 
-                                                    'Final mini-batch size: == {}'.format(opts.inimodel_batchsize_final), 
-                                                    'SGD increased noise variance half-life: == {}'.format(opts.inimodel_sigmafudge_halflife), 
-                                                    'Number of pooled particles: == 1',
-                                                    'Which GPUs to use: == {}'.format(opts.refine_gpu),
-                                                    'Number of MPI procs: == {}'.format(opts.refine_mpi),
-                                                    'Number of threads: == {}'.format(opts.refine_threads),
-                                                    'Copy particles to scratch directory: == {}'.format(opts.refine_scratch_disk),
-                                                    'Additional arguments: == {}'.format(opts.inimodel_other_args)]
+                            inimodel_options = ['Input images STAR file: == {}'.format(particles_star_file),
+                                                'Symmetry: == {}'.format(opts.symmetry),
+                                                'Mask diameter (A): == {}'.format(opts.mask_diameter),
+                                                'Number of classes: == {}'.format(opts.inimodel_nr_classes),
+                                                'Initial angular sampling: == {}'.format(opts.inimodel_angle_step), 
+                                                'Offset search range (pix): == {}'.format(opts.inimodel_offset_range),
+                                                'Offset search step (pix): == {}'.format(opts.inimodel_offset_step),
+                                                'Number of initial iterations: == {}'.format(opts.inimodel_nr_iter_initial), 
+                                                'Number of in-between iterations: == {}'.format(opts.inimodel_nr_iter_inbetween), 
+                                                'Number of final iterations: == {}'.format(opts.inimodel_nr_iter_final),
+                                                'Write-out frequency (iter): == {}'.format(opts.inimodel_freq_writeout), 
+                                                'Initial resolution (A): == {}'.format(opts.inimodel_resol_ini), 
+                                                'Final resolution (A): == {}'.format(opts.inimodel_resol_final), 
+                                                'Initial mini-batch size: == {}'.format(opts.inimodel_batchsize_ini), 
+                                                'Final mini-batch size: == {}'.format(opts.inimodel_batchsize_final), 
+                                                'SGD increased noise variance half-life: == {}'.format(opts.inimodel_sigmafudge_halflife), 
+                                                'Number of pooled particles: == 1',
+                                                'Which GPUs to use: == {}'.format(opts.refine_gpu),
+                                                'Number of MPI procs: == {}'.format(opts.refine_mpi),
+                                                'Number of threads: == {}'.format(opts.refine_threads),
+                                                'Copy particles to scratch directory: == {}'.format(opts.refine_scratch_disk),
+                                                'Additional arguments: == {}'.format(opts.inimodel_other_args)]
 
-                                if opts.inimodel_solvent_flatten:
-                                    inimodel_options.append('Flatten and enforce non-negative solvent? == Yes')
-                                else:    
-                                    inimodel_options.append('Flatten and enforce non-negative solvent? == No')
+                            if opts.inimodel_solvent_flatten:
+                                inimodel_options.append('Flatten and enforce non-negative solvent? == Yes')
+                            else:    
+                                inimodel_options.append('Flatten and enforce non-negative solvent? == No')
 
-                                if opts.refine_skip_padding:
-                                    inimodel_options.append('Skip padding? == Yes')
-                                else:    
-                                    inimodel_options.append('Skip padding? == No')
+                            if opts.refine_skip_padding:
+                                inimodel_options.append('Skip padding? == Yes')
+                            else:    
+                                inimodel_options.append('Skip padding? == No')
 
-                                if opts.refine_do_gpu:
-                                    inimodel_options.append('Use GPU acceleration? == Yes')
-                                else:
-                                    inimodel_options.append('Use GPU acceleration? == No')
+                            if opts.refine_do_gpu:
+                                inimodel_options.append('Use GPU acceleration? == Yes')
+                            else:
+                                inimodel_options.append('Use GPU acceleration? == No')
 
-                                if opts.inimodel_ctf_ign1stpeak:
-                                    inimodel_options.append('Ignore CTFs until first peak? == Yes')
-                                else:
-                                    inimodel_options.append('Ignore CTFs until first peak? == No')
+                            if opts.inimodel_ctf_ign1stpeak:
+                                inimodel_options.append('Ignore CTFs until first peak? == Yes')
+                            else:
+                                inimodel_options.append('Ignore CTFs until first peak? == No')
 
-                                if opts.refine_preread_images:
-                                    inimodel_options.append('Pre-read all particles into RAM? == Yes')
-                                else:
-                                    inimodel_options.append('Pre-read all particles into RAM? == No')
+                            if opts.refine_preread_images:
+                                inimodel_options.append('Pre-read all particles into RAM? == Yes')
+                            else:
+                                inimodel_options.append('Pre-read all particles into RAM? == No')
 
-                                if opts.refine_submit_to_queue:
-                                    inimodel_options.extend(queue_options)
+                            if opts.refine_submit_to_queue:
+                                inimodel_options.extend(queue_options)
 
-                                inimodel_job, already_had_it = addJob('InitialModel', 'inimodel', SETUP_CHECK_FILE, inimodel_options)              
+                            inimodel_job, already_had_it = addJob('InitialModel', 'inimodel', SETUP_CHECK_FILE, inimodel_options)              
 
-                                if ((not already_had_it) or rerun_batch1):
-                                    have_new_batch = True
-                                    RunJobs([inimodel_job], 1, 1, 'INIMODEL')
-                                    print " RELION_IT: submitted initial model generation with", batch_size ,"particles in", inimodel_job
+                            if ((not already_had_it) or rerun_batch1):
+                                have_new_batch = True
+                                RunJobs([inimodel_job], 1, 1, 'INIMODEL')
+                                print " RELION_IT: submitted initial model generation with", batch_size ,"particles in", inimodel_job
 
-                                    # Wait here until this inimodel job is finished. Check every thirty seconds
-                                    WaitForJob(inimodel_job, 30)
+                                # Wait here until this inimodel job is finished. Check every thirty seconds
+                                WaitForJob(inimodel_job, 30)
 
-                                # Use the model of the largest class for the 3D classification below
-                                total_iter = opts.inimodel_nr_iter_initial + opts.inimodel_nr_iter_inbetween + opts.inimodel_nr_iter_final
-                                best_inimodel_class, best_inimodel_resol, best_inimodel_angpix = findLargestClass(inimodel_job + 'run_it{:03d}_model.star'.format(total_iter))
-                                opts.class3d_reference = best_inimodel_class
-                                opts.class3d_ref_is_correct_greyscale = True
-                                opts.class3d_ref_is_ctf_corrected = True
+                            # Use the model of the largest class for the 3D classification below
+                            total_iter = opts.inimodel_nr_iter_initial + opts.inimodel_nr_iter_inbetween + opts.inimodel_nr_iter_final
+                            best_inimodel_class, best_inimodel_resol, best_inimodel_angpix = findLargestClass(inimodel_job + 'run_it{:03d}_model.star'.format(total_iter))
+                            opts.class3d_reference = best_inimodel_class
+                            opts.class3d_ref_is_correct_greyscale = True
+                            opts.class3d_ref_is_ctf_corrected = True
+                            opts.have_3d_reference = True
 
 
+                        if opts.have_3d_reference:
                             # Now perform the actual 3D classification
                             class3d_options = ['Input images STAR file: == {}'.format(particles_star_file),
                                                'Reference map: == {}'.format(opts.class3d_reference),
@@ -1030,6 +1052,11 @@ def run_pipeline(opts):
                                                'Copy particles to scratch directory: == {}'.format(opts.refine_scratch_disk),
                                                'Additional arguments: == {}'.format(opts.class3d_other_args)]
 
+                            if batch_size > opts.refine_batchsize_for_fast_subsets:
+                                class3d_options.append('Use fast subsets (for large data sets)? == Yes')
+                            else:
+                                class3d_options.append('Use fast subsets (for large data sets)? == No')
+                            
                             if opts.class3d_ref_is_correct_greyscale:
                                 class3d_options.append('Ref. map is on absolute greyscale? == Yes')
                             else:
@@ -1080,8 +1107,8 @@ def run_pipeline(opts):
 
                             best_class3d_class, best_class3d_resol, best_class3d_angpix = findLargestClass(class3d_job + 'run_it{:03d}_model.star'.format(opts.class3d_nr_iter))
 
-                            if (ipass == 0 and opts.do_second_pass and batch_size == opts.batch_size and iibatch == 1 and best_class3d_resol < opts.minimum_resolution_3dref_2ndpass):
-                                # At the end of the first batch: move on to the second pass
+                            # Once the first batch in the first pass is completed: move on to the second pass
+                            if (ipass == 0 and opts.do_second_pass and iibatch == 1 and best_class3d_resol < opts.minimum_resolution_3dref_2ndpass):
                                 opts.autopick_3dreference = best_class3d_class
                                 opts.autopick_ref_angpix = best_class3d_angpix
                                 opts.autopick_2dreferences = ''
@@ -1099,7 +1126,7 @@ def run_pipeline(opts):
                                 g = open(SECONDPASS_REF3D_FILE,'w')
                                 g.write(str(best_class3d_class)+'\n'+str(best_class3d_angpix)+'\n')
                                 g.close()
-                                        
+
                                 # Move out of this ipass of the passes loop....
                                 continue_this_pass = False
                                 print ' RELION_IT: moving on to the second pass using',opts.autopick_3dreference,'for template-based autopicking'
@@ -1119,14 +1146,34 @@ def main():
     used to update the default options.
     """
 
+    print ' RELION_IT: script for automated, on-the-fly single-particle analysis in RELION (at least version 3.0-alpha-5)'
+    print ' RELION_IT: authors: Sjors H.W. Scheres, Takanori Nakane & Colin Palmer'
+    print ' RELION_IT: '
+    print ' RELION_IT: usage: ./relion_it.py [extra_options.py [extra_options2.py ....] ]'
+    print ' RELION_IT: '
+    print ' RELION_IT: this script will check whether processes are still running using files with names starting with RUNNING' 
+    print ' RELION_IT:   you can restart this script after stopping previous processes by deleting all RUNNING files'
+    print ' RELION_IT: this script keeps track of already submitted jobs in a filed called',SETUP_CHECK_FILE
+    print ' RELION_IT:   upon a restart, jobs present in this file will be continued (for preprocessing), or ignored when already finished'
+    print ' RELION_IT: if you would like to re-do a specific job from scratch (e.g. because you changed its parameters)' 
+    print ' RELION_IT:   remove that job, and those that depend on it, from the',SETUP_CHECK_FILE
+    print ' RELION_IT: '
+    
     # Make sure no other version of this script are running...
     if os.path.isfile(RUNNING_FILE):
-        print " RELION_IT:", RUNNING_FILE, "is already present: delete this file and make sure no other copy of this script is running. Exiting now ..."
+        print " RELION_IT: ERROR:", RUNNING_FILE, "is already present: delete this file and make sure no other copy of this script is running. Exiting now ..."
         exit(0)
+
+    # Also make sure the preprocessing pipeliners are stopped before re-starting this script
+    for checkfile in ('RUNNING_PIPELINER_'+PREPROCESS_SCHEDULE_PASS1, 'RUNNING_PIPELINER_'+PREPROCESS_SCHEDULE_PASS2):
+        if os.path.isfile(checkfile):
+            print " RELION_IT: ERROR:", checkfile, "is already present: delete this file and make sure no relion_pipeliner job is still running. Exiting now ..."
+            exit(0)
 
     opts = RelionItOptions()
     for user_opt_file in sys.argv[1:]:
         print ' RELION_IT: reading options from {}'.format(user_opt_file)
+        print ' RELION_IT: '
         user_opts = runpy.run_path(user_opt_file)
         opts.update_from(user_opts)
     run_pipeline(opts)
