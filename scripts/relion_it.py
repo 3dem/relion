@@ -101,7 +101,7 @@ class RelionItOptions(object):
 
     ### Extract parameters
     # Box size of particles in the averaged micrographs (in pixels)
-    extract_boxsize = 260
+    extract_boxsize = 256
     # Down-scale the particles upon extraction?
     extract_downscale = False
     # Box size of the down-scaled particles (in pixels)
@@ -109,7 +109,7 @@ class RelionItOptions(object):
     # In second pass, down-scale the particles upon extraction?
     extract2_downscale = False
     # In second pass, box size of the down-scaled particles (in pixels)
-    extract2_small_boxsize = 64
+    extract2_small_boxsize = 128
 
     
     ### Now perform 2D and/or 3D classification with the extracted particles?
@@ -169,9 +169,9 @@ class RelionItOptions(object):
 
     ### MotionCorrection parameters
     # Use RELION's own implementation of motion-correction (CPU-only) instead of the UCSF implementation?
-    motioncor_do_own = True
+    motioncor_do_own = False
     # Exectutable of UCSF MotionCor2
-    motioncor_exe = '/public/EM/MOTIONCOR2/MotionCor2-1.0.0'
+    motioncor_exe = '/public/EM/MOTIONCOR2/MotionCor2'
     # On which GPU(s) to execute UCSF MotionCor2
     motioncor_gpu = '0'
     # How many MPI processes to use for running motion correction?
@@ -272,7 +272,7 @@ class RelionItOptions(object):
     # Read all particles in one batch into memory?
     refine_preread_images = False
     # Or copy particles to scratch disk?
-    refine_scratch_disk = ''
+    refine_scratch_disk = '/ssd'
     # Number of pooled particles?
     refine_nr_pool = 10
     # Use GPU-acceleration?
@@ -634,7 +634,8 @@ def run_pipeline(opts):
             import_options.append('Node type: == 2D micrographs/tomograms (*.mrc)')
 
         import_job, already_had_it  = addJob('Import','import_job', SETUP_CHECK_FILE, import_options)
-
+        runjobs = [import_job]
+        
         if opts.images_are_movies:
             #### Set up the MotionCor job
             motioncorr_options = ['Input movies STAR file: == {}movies.star'.format(import_job),
@@ -664,11 +665,14 @@ def run_pipeline(opts):
                 motioncorr_options.extend(queue_options)
 
             motioncorr_job, already_had_it  = addJob('MotionCorr', 'motioncorr_job', SETUP_CHECK_FILE, motioncorr_options)
-
+            runjobs.append(motioncorr_job)
 
         #### Set up the CtfFind job
-        star_name = 'corrected_micrographs.star' if opts.images_are_movies else 'micrographs.star'
-        ctffind_options = ['Input micrographs STAR file: == {}{}'.format(motioncorr_job, star_name),
+        if opts.images_are_movies:
+            star_name = motioncorr_job + 'corrected_micrographs.star'  
+        else:
+            star_name = import_job + 'micrographs.star'
+        ctffind_options = ['Input micrographs STAR file: == {}'.format(star_name),
                            'Voltage (kV): == {}'.format(opts.voltage),
                            'Spherical aberration (mm): == {}'.format(opts.Cs),
                            'Amplitude contrast: == {}'.format(opts.ampl_contrast),
@@ -699,8 +703,7 @@ def run_pipeline(opts):
             ctffind_options.append('Estimate phase shifts? == No')
 
         ctffind_job, already_had_it  = addJob('CtfFind', 'ctffind_job', SETUP_CHECK_FILE, ctffind_options)
-
-        runjobs = [import_job, motioncorr_job, ctffind_job]
+        runjobs.append(ctffind_job)
 
         # There is an option to stop on-the-fly processing after CTF estimation
         if opts.stop_after_ctf_estimation:
