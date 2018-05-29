@@ -624,6 +624,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	sgd_stepsize = textToFloat(parser.getOption("--sgd_stepsize", "Step size parameter for SGD updates", "0.5"));
 	sgd_sigma2fudge_ini = textToFloat(parser.getOption("--sgd_sigma2fudge_initial", "Initial factor by which the noise variance will be multiplied for SGD (not used if halftime is negative)", "8"));
 	sgd_sigma2fudge_halflife = textToInteger(parser.getOption("--sgd_sigma2fudge_halflife", "Initialise SGD with 8x higher noise-variance, and reduce with this half-life in # of particles (default is keep normal variance)", "-1"));
+	do_sgd_skip_anneal = parser.checkOption("--sgd_skip_anneal", "By default, multiple references are annealed during the in_between iterations. Use this option to switch annealing off");
 	write_every_sgd_iter = textToInteger(parser.getOption("--sgd_write_iter", "Write out model every so many iterations in SGD (default is writing out all iters)", "1"));
 
 	// Computation stuff
@@ -876,6 +877,8 @@ void MlOptimiser::read(FileName fn_in, int rank)
 		sgd_sigma2fudge_ini = 8.;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_SIGMA2FUDGE_HALFLIFE, sgd_sigma2fudge_halflife))
 		sgd_sigma2fudge_halflife = -1;
+	if (!MD.getValue(EMDL_OPTIMISER_SGD_SKIP_ANNNEAL, do_sgd_skip_anneal))
+		do_sgd_skip_anneal = false;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_SUBSET_SIZE, subset_size))
 		subset_size = -1;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_STEPSIZE, sgd_stepsize))
@@ -1041,6 +1044,7 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		MD.setValue(EMDL_OPTIMISER_SGD_MU, mu);
 		MD.setValue(EMDL_OPTIMISER_SGD_SIGMA2FUDGE_INI, sgd_sigma2fudge_ini);
 		MD.setValue(EMDL_OPTIMISER_SGD_SIGMA2FUDGE_HALFLIFE, sgd_sigma2fudge_halflife);
+		MD.setValue(EMDL_OPTIMISER_SGD_SKIP_ANNNEAL, do_sgd_skip_anneal);
 		MD.setValue(EMDL_OPTIMISER_SGD_SUBSET_SIZE, subset_size);
 		MD.setValue(EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET, write_every_sgd_iter);
 		MD.setValue(EMDL_OPTIMISER_SGD_STEPSIZE, sgd_stepsize);
@@ -1437,6 +1441,12 @@ void MlOptimiser::initialiseGeneral(int rank)
 		exit(0);
 	}
 
+    if (do_shifts_onthefly && (do_gpu || do_cpu))
+    {
+    	std::cerr << "WARNING: --onthefly_shifts cannot be combined with --cpu or --gpu, setting do_shifts_onthefly to false" << std::endl;
+    	do_shifts_onthefly = false;
+    }
+
 	// Print symmetry operators to cout
 	if (do_print_symmetry_ops)
 	{
@@ -1640,7 +1650,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		if (mymodel.nr_bodies != 1)
 			REPORT_ERROR("ERROR: cannot do multi-body refinement for helices!");
 
-		if ( (!do_gpu) && (do_shifts_onthefly) && (!ignore_helical_symmetry) && (verb > 0) )
+		if ( (do_shifts_onthefly) && (!ignore_helical_symmetry) && (verb > 0) )
 		{
 			std::cerr << " WARNING: On-the-fly shifts slow down helical reconstructions with CPUs considerably. "
 					<< "Enable this option only if limited RAM causes trouble (e.g. too large segment boxes used or in 3D sub-tomogram averaging). "
@@ -1834,9 +1844,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 	if (mymodel.data_dim == 3)
 	{
 
-		if (do_gpu)
-			std::cerr << "NOTE: Input 3D data on GPU is development feature: please report unexpected behaviour" << std::endl;
-
 		// TODO: later do norm correction?!
 		// Don't do norm correction for volume averaging at this stage....
 		do_norm_correction = false;
@@ -1849,8 +1856,9 @@ void MlOptimiser::initialiseGeneral(int rank)
 		// getMetaAndImageData is not made for passing multiple volumes!
 		do_parallel_disc_io = true;
 	}
+
 	// Tabulated sine and cosine values (for 2D helical segments / 3D helical sub-tomogram averaging with on-the-fly shifts)
-	if ( (!do_gpu) && (do_helical_refine) && (!ignore_helical_symmetry) && (do_shifts_onthefly) )
+	if ( (do_shifts_onthefly) && (do_helical_refine) && (!ignore_helical_symmetry) )
 	{
 		tab_sin.initialise(100000);
 		tab_cos.initialise(100000);
@@ -3999,7 +4007,7 @@ void MlOptimiser::maximizationOtherParameters()
 
 
 	// Annealing of multiple-references in SGD
-	if (do_sgd && mymodel.nr_classes > 1 && iter < sgd_ini_iter + sgd_inbetween_iter)
+	if (do_sgd && !do_sgd_skip_anneal && mymodel.nr_classes > 1 && iter < sgd_ini_iter + sgd_inbetween_iter)
 	{
 		MultidimArray<RFLOAT> Iavg;
 		Iavg.initZeros(mymodel.Iref[0]);
@@ -4018,7 +4026,6 @@ void MlOptimiser::maximizationOtherParameters()
 			}
 		}
 	}
-
 
 	// Update average norm_correction, don't update norm corrections anymore for multi-body refinements!
 	if (do_norm_correction  && mymodel.nr_bodies == 1)
@@ -4351,7 +4358,7 @@ void MlOptimiser::updateCurrentResolution()
 
 	if (do_sgd)
 	{
-		// Do 300 iterations with completely identical K references, 100-particle batch size, enforce non-negativity and 35A resolution limit
+		// Do initial iterations with completely identical K references, 100-particle batch size, enforce non-negativity and 35A resolution limit
 		if (iter < sgd_ini_iter)
 		{
 			mymodel.current_resolution = 1./sgd_ini_resol;
@@ -5624,8 +5631,8 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 			}
 		}
 
-		//Shifts are done on the fly on the gpu
-		if (do_shifts_onthefly && !do_gpu)
+		//Shifts are done on the fly on the gpu, if do_gpu || do_cpu, do_shifts_onthefly is always false!
+		if (do_shifts_onthefly)
 		{
 			// Store a single, down-sized version of exp_Fimgs[ipart] in exp_local_Fimgs_shifted
 #ifdef DEBUG_CHECKSIZES
@@ -5643,7 +5650,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 			std::cerr << " MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(): do_shifts_onthefly && !do_gpu" << std::endl;
 #endif
 		}
-		else if(!do_gpu)
+		else if(!(do_gpu || do_cpu))
 		{
 #ifdef DEBUG_HELICAL_ORIENTATIONAL_SEARCH
 			Image<RFLOAT> img_save_ori, img_save_mask, img_save_nomask;
