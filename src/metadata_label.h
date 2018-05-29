@@ -260,6 +260,7 @@ enum EMDLabel
     EMDL_OPTIMISER_SGD_MU,
 	EMDL_OPTIMISER_SGD_SIGMA2FUDGE_INI,
 	EMDL_OPTIMISER_SGD_SIGMA2FUDGE_HALFLIFE,
+	EMDL_OPTIMISER_SGD_SKIP_ANNNEAL,
     EMDL_OPTIMISER_SGD_SUBSET_SIZE,
     EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET,
     EMDL_OPTIMISER_SGD_MAX_SUBSETS,
@@ -689,6 +690,7 @@ private:
         EMDL::addLabel(EMDL_OPTIMISER_SGD_MU, EMDL_DOUBLE, "rlnSgdMuFactor", "The mu-parameter that controls the momentum of the SGD gradients");
         EMDL::addLabel(EMDL_OPTIMISER_SGD_SIGMA2FUDGE_INI, EMDL_DOUBLE, "rlnSgdSigma2FudgeInitial", "The variance of the noise will initially be multiplied with this value (larger than 1)");
         EMDL::addLabel(EMDL_OPTIMISER_SGD_SIGMA2FUDGE_HALFLIFE, EMDL_INT, "rlnSgdSigma2FudgeHalflife", "After processing this many particles the multiplicative factor for the noise variance will have halved");
+        EMDL::addLabel(EMDL_OPTIMISER_SGD_SKIP_ANNNEAL, EMDL_BOOL, "rlnSgdSkipAnneal", "Option to switch off annealing of multiple references in SGD");
         EMDL::addLabel(EMDL_OPTIMISER_SGD_SUBSET_SIZE, EMDL_INT, "rlnSgdSubsetSize", "The number of particles in the random subsets for SGD");
         EMDL::addLabel(EMDL_OPTIMISER_SGD_WRITE_EVERY_SUBSET, EMDL_INT, "rlnSgdWriteEverySubset", "Every this many iterations the model is written to disk in SGD");
         EMDL::addLabel(EMDL_OPTIMISER_SGD_MAX_SUBSETS, EMDL_INT, "rlnSgdMaxSubsets", "Stop SGD after doing this many subsets (possibly spanning more than 1 iteration)");
