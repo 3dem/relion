@@ -329,7 +329,10 @@ void CtffindRunner::joinCtffindResults()
 			MDctf.setValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, DStep);
 			MDctf.setValue(EMDL_CTF_FOM, CC);
 			if (fabs(maxres + 999.) > 0.)
-				MDctf.setValue(EMDL_CTF_MAXRES, maxres);
+			{
+				// Put an upper limit on maxres, as gCtf may put 999. now max is 25.
+				MDctf.setValue(EMDL_CTF_MAXRES, XMIPP_MIN(25., maxres));
+			}
 			if (fabs(phaseshift + 999.) > 0.)
 				MDctf.setValue(EMDL_CTF_PHASESHIFT, phaseshift);
 			if (fabs(valscore + 999.) > 0.)
