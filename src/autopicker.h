@@ -190,7 +190,7 @@ public:
 	bool todo_anything;
 
 	// All micrographs to autopick from
-	std::vector<FileName> fn_micrographs;
+	std::vector<FileName> fn_micrographs, fn_ori_micrographs;
 
 	// Original size of the micrographs
 	int micrograph_size, micrograph_xsize, micrograph_ysize, micrograph_minxy_size;
@@ -290,6 +290,9 @@ public:
 
 	// General function to decide what to do
 	void run();
+
+	// Make a PDF file with plots of numbers of particles per micrograph, average FOMs etc
+	void generatePDFLogfile();
 
 	std::vector<AmyloidCoord> findNextCandidateCoordinates(AmyloidCoord &mycoord, std::vector<AmyloidCoord> &circle,
 			RFLOAT threshold_value, RFLOAT max_psidiff, int skip_side, float scale,

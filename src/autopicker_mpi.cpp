@@ -27,7 +27,7 @@ void AutoPickerMpi::read(int argc, char **argv)
 
     if (node->isMaster())
     	PRINT_VERSION_INFO();
-    	
+
     // First read in non-parallelisation-dependent variables
     AutoPicker::read(argc, argv);
 
@@ -116,5 +116,9 @@ void AutoPickerMpi::run()
 	if (verb > 0)
 		progress_bar(my_nr_micrographs);
 
+
+	// Make a PDF logfile with stats about the picking
+	if (node->isMaster())
+		generatePDFLogfile();
 
 }

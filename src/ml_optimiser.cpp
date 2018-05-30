@@ -487,8 +487,8 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 
 	// General optimiser I/O stuff
     int general_section = parser.addSection("General options");
-    fn_data = parser.getOption("--i", "Input images (in a star-file or a stack)");
-    fn_out = parser.getOption("--o", "Output rootname");
+    fn_data = parser.getOption("--i", "Input images (in a star-file or a stack)", "");
+    fn_out = parser.getOption("--o", "Output rootname", "");
     nr_iter = textToInteger(parser.getOption("--iter", "Maximum number of iterations to perform", "50"));
     mymodel.pixel_size = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms)", "-1"));
 	mymodel.tau2_fudge_factor = textToFloat(parser.getOption("--tau2_fudge", "Regularisation parameter (values higher than 1 give more weight to the data)", "1"));
@@ -1419,6 +1419,29 @@ void MlOptimiser::initialiseGeneral(int rank)
             std::cout << " Running CPU instructions in double precision. " << std::endl;
 #endif
 
+    // print symmetry operators or metadata labels before doing anything else...
+    if (do_print_symmetry_ops)
+    {
+		if (verb > 0)
+		{
+			SymList SL;
+			SL.writeDefinition(std::cout, sampling.symmetryGroup());
+		}
+		exit(0);
+    }
+
+    if (do_print_metadata_labels)
+	{
+		if (verb > 0)
+			EMDL::printDefinitions(std::cout);
+		exit(0);
+	}
+
+    if (fn_data == "" || fn_out == "")
+    {
+    	REPORT_ERROR("ERROR: provide both --i and --o arguments");
+    }
+
     // For safeguarding the gold-standard separation
     my_halfset = -1;
 
@@ -1434,29 +1457,12 @@ void MlOptimiser::initialiseGeneral(int rank)
 	if (do_always_cc)
 		do_calculate_initial_sigma_noise = false;
 
-    if (do_print_metadata_labels)
-	{
-		if (verb > 0)
-			EMDL::printDefinitions(std::cout);
-		exit(0);
-	}
 
     if (do_shifts_onthefly && (do_gpu || do_cpu))
     {
     	std::cerr << "WARNING: --onthefly_shifts cannot be combined with --cpu or --gpu, setting do_shifts_onthefly to false" << std::endl;
     	do_shifts_onthefly = false;
     }
-
-	// Print symmetry operators to cout
-	if (do_print_symmetry_ops)
-	{
-		if (verb > 0)
-		{
-			SymList SL;
-			SL.writeDefinition(std::cout, sampling.symmetryGroup());
-		}
-		exit(0);
-	}
 
 	// If we are not continuing an old run, now read in the data and the reference images
 	if (iter == 0)

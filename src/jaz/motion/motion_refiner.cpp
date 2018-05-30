@@ -92,6 +92,8 @@ void MotionRefiner::read(int argc, char **argv)
 	movie_toReplace = parser.getOption("--mov_toReplace", "Replace this string in micrograph names...", "");
 	movie_replaceBy = parser.getOption("--mov_replaceBy", "..by this one", "");
 	
+	bfactorEstimator.read(parser, argc, argv);
+			
 	// Check for errors in the command-line option
 	if (parser.checkForErrors())
 	{
@@ -118,7 +120,7 @@ void MotionRefiner::init()
 		outPath += "/";
 	}
 	
-	if (verb > 0) std::cout << " + Reading " << starFn << "...\n";
+	if (verb > 0) std::cout << " + Reading " << starFn << "..." << std::endl;
 	
 	mdt0.read(starFn);	
 	
@@ -140,7 +142,7 @@ void MotionRefiner::init()
 		if (verb > 0)
 		{
 			std::cout << "   - Using pixel size calculated from magnification and "
-					  << "detector pixel size in the input STAR file: " << angpix << "\n";
+					  << "detector pixel size in the input STAR file: " << angpix << std::endl;
 		}
 	}
 	
@@ -259,17 +261,17 @@ void MotionRefiner::init()
 				if (motionMdts.size() < chosenMdts.size())
 				{
 					std::cout << "   - Will only estimate motion for " << motionMdts.size()
-							  << " unfinished micrographs\n";
+							  << " unfinished micrographs" << std::endl;
 				}
 				else
 				{
 					std::cout << "   - Will estimate motion for all " << motionMdts.size()
-							  << " micrographs - none are finished\n";
+							  << " micrographs - none are finished" << std::endl;
 				}
 			}
 			else
 			{
-				std::cout << "   - Motion has already been estimated for all micrographs\n";
+				std::cout << "   - Motion has already been estimated for all micrographs" << std::endl;
 			}
 			
 			if (frameRecombiner.doingRecombination())
@@ -279,18 +281,18 @@ void MotionRefiner::init()
 					if (recombMdts.size() < chosenMdts.size())
 					{
 						std::cout << "   - Will only recombine frames for " << recombMdts.size()
-								  << " unfinished micrographs\n";
+								  << " unfinished micrographs" << std::endl;
 					}
 					else
 					{
 						std::cout << "   - Will recombine frames for all " << recombMdts.size()
-								  << " micrographs - none are finished\n";
+								  << " micrographs - none are finished" << std::endl;
 					}
 				}
 				else
 				{
 					std::cout << "   - Frames have already been recombined for all micrographs; "
-							  << "a new STAR file will be generated\n";
+							  << "a new STAR file will be generated" << std::endl;
 				}
 			}
 		}
@@ -304,11 +306,13 @@ void MotionRefiner::init()
 	estimateParams = motionParamEstimator.anythingToDo();
 	estimateMotion = motionMdts.size() > 0;
 	recombineFrames = frameRecombiner.doingRecombination() && (recombMdts.size() > 0);
+	estimateOldBfacs = bfactorEstimator.doingAnything();
 	generateStar = frameRecombiner.doingRecombination();
 	
 	
-	bool doAnything = estimateParams || estimateMotion || recombineFrames;
-	bool needsReference = estimateParams || estimateMotion || !frameRecombiner.outerFreqKnown();
+	bool doAnything = estimateParams || estimateMotion || recombineFrames || estimateOldBfacs;
+	bool needsReference = estimateParams || estimateMotion 
+			|| !frameRecombiner.outerFreqKnown() || estimateOldBfacs;
 	
 	if (doAnything)
 	{
@@ -326,7 +330,7 @@ void MotionRefiner::init()
 		
 		if (needsReference)
 		{
-			if (verb > 0) std::cout << " + Reading references ...\n";
+			if (verb > 0) std::cout << " + Reading references ..." << std::endl;
 			
 			reference.load(verb, debug);
 		}
@@ -335,7 +339,7 @@ void MotionRefiner::init()
 	
 	if (estimateMotion || estimateParams)
 	{
-		if (verb > 0) std::cout << " + Initializing motion estimator ...\n";
+		if (verb > 0) std::cout << " + Initializing motion estimator ..." << std::endl;
 		
 		motionEstimator.init(verb, s, fc, nr_omp_threads, debug, outPath,
 							 &reference, &obsModel, &micrographHandler);
@@ -343,7 +347,7 @@ void MotionRefiner::init()
 	
 	if (estimateParams)
 	{
-		if (verb > 0) std::cout << " + Initializing motion parameter estimator ...\n";
+		if (verb > 0) std::cout << " + Initializing motion parameter estimator ..." << std::endl;
 		
 		motionParamEstimator.init(
 					verb, nr_omp_threads, debug, outPath,
@@ -366,6 +370,14 @@ void MotionRefiner::run()
 	if (estimateMotion)
 	{
 		motionEstimator.process(motionMdts, 0, motionMdts.size()-1);
+	}
+	
+	if (estimateOldBfacs)
+	{
+		bfactorEstimator.init(verb, s, fc, nr_omp_threads, outPath, debug,
+							  &obsModel, &micrographHandler, &reference);
+		
+		bfactorEstimator.process(chosenMdts);
 	}
 	
 	if (recombineFrames)
@@ -476,7 +488,7 @@ void MotionRefiner::adaptMovieNames()
 			
 			if (i == 0 && verb > 0)
 			{
-				std::cout << "   - Replacing: " << name << "\n";
+				std::cout << "   - Replacing: " << name << std::endl;
 			}
 			
 			std::string::size_type pos0 = name.find(movie_toReplace);
@@ -493,7 +505,7 @@ void MotionRefiner::adaptMovieNames()
 			
 			if (i == 0 && verb > 0)
 			{
-				std::cout << "                -> " << name << "\n";
+				std::cout << "                -> " << name << std::endl;
 			}
 			
 			mdt0.setValue(EMDL_MICROGRAPH_NAME, name, i);

@@ -91,7 +91,8 @@ void MotionEstimator::init(
 	{
 		if (verb > 0)
 		{
-			std::cerr << " - Warning: in the absence of a corrected_micrographs.star file (--corr_mic), global paths are used for initialization.\n";
+			std::cerr << " - Warning: in the absence of a corrected_micrographs.star file"
+			          << " (--corr_mic), global paths are used for initialization." << std::endl;
 		}
 		
 		global_init = true;
@@ -100,14 +101,15 @@ void MotionEstimator::init(
 	if (verb > 0 && cutoffOut)
 	{
 		std::cout << " + maximum frequency to consider: "
-				  << (s * angpix)/(RFLOAT)reference->k_out << " A (" << reference->k_out << " px)\n";
+		          << (s * angpix)/(RFLOAT)reference->k_out << " A (" << reference->k_out << " px)" 
+		          << std::endl;
 	}
 	
 	if (paramsFn != "")
 	{
 		if (verb > 0)
 		{
-			std::cout << " + using parameters from: " << paramsFn << "\n";
+			std::cout << " + using parameters from: " << paramsFn << std::endl;
 		}
 		
 		std::ifstream ifs(paramsFn);
@@ -124,11 +126,11 @@ void MotionEstimator::init(
 		if (verb > 0)
 		{
 			std::cout << "   s_vel: " << sig_vel << ", s_div: " << sig_div 
-					  << ", s_acc: " << sig_acc << "\n";
+					  << ", s_acc: " << sig_acc << std::endl;
 		}		
 	}
 	
-	if (debug) std::cout << "computing damage weights...\n";
+	if (debug) std::cout << "computing damage weights..." << std::endl;
 	
 	dmgWeight = DamageHelper::damageWeights(
 		s, angpix, micrographHandler->firstFrame, fc, dosePerFrame, dmga, dmgb, dmgc);
@@ -192,7 +194,7 @@ void MotionEstimator::process(const std::vector<MetaDataTable>& mdts, long g_sta
 		
 		if (debug)
 		{
-			std::cout << g << "/" << g_end << " (" << pc << " particles)\n";
+			std::cout << g << "/" << g_end << " (" << pc << " particles)" << std::endl;
 		}
 		
 		// Make sure output directory exists
@@ -204,7 +206,7 @@ void MotionEstimator::process(const std::vector<MetaDataTable>& mdts, long g_sta
 			std::string mgName;
 			mdts[g].getValue(EMDL_MICROGRAPH_NAME, mgName, 0);
 			
-			std::cout << "    movie = " << mgName << "\n";
+			std::cout << "    movie = " << mgName << std::endl;
 		}
 		
 		if (newdir != prevdir)
@@ -245,7 +247,7 @@ void MotionEstimator::process(const std::vector<MetaDataTable>& mdts, long g_sta
 			mdts[g].getValue(EMDL_MICROGRAPH_NAME, mgName, 0);
 			
 			std::cerr << " - Warning: unable to load " << mgName << ". "
-					  << " File is missing or corrupted.\n";
+					  << " File is missing or corrupted." << std::endl;
 			
 			continue;
 		}
@@ -678,28 +680,28 @@ void MotionEstimator::writeOutput(
 	
 	for (int p = 0; p < pc; p++)
 	{
-		rawOut << "#particle " << p << "\n";
-		visOut << "#particle " << p << "\n";
-		visOut15 << "#particle " << p << "\n";
+		rawOut << "#particle " << p << std::endl;
+		visOut << "#particle " << p << std::endl;
+		visOut15 << "#particle " << p << std::endl;
 		
 		for (int f = 0; f < fc; f++)
 		{
-			rawOut << tracks[p][f].x << " " << tracks[p][f].y << "\n";
-			visOut << visTracks[p][f].x << " " << visTracks[p][f].y << "\n";
+			rawOut << tracks[p][f].x << " " << tracks[p][f].y << std::endl;
+			visOut << visTracks[p][f].x << " " << visTracks[p][f].y << std::endl;
 			
-			if (f < 15) visOut15 << visTracks[p][f].x << " " << visTracks[p][f].y << "\n";
+			if (f < 15) visOut15 << visTracks[p][f].x << " " << visTracks[p][f].y << std::endl;
 		}
 		
-		rawOut << "\n";
-		visOut << "\n";
-		visOut15 << "\n";
+		rawOut << std::endl;
+		visOut << std::endl;
+		visOut15 << std::endl;
 	}
 	
 	std::ofstream glbOut(fn_root + "_globTrack.dat");
 	
 	for (int f = 0; f < fc; f++)
 	{
-		glbOut << globalTrack[f].x << " " << globalTrack[f].y << "\n";
+		glbOut << globalTrack[f].x << " " << globalTrack[f].y << std::endl;
 	}
 	
 	delete plot2D;
@@ -726,7 +728,8 @@ void MotionEstimator::proposeDosePerFrame(double dpf, std::string metaFn, int ve
 	{
 		if (metaFn == "")
 		{
-			REPORT_ERROR("ERROR: No electron dose available. Please provide one through the command line (--fdose).");
+			REPORT_ERROR_STR("ERROR: No electron dose available. Please provide one "
+							 << "through the command line (--fdose).");
 		}
 		else
 		{
@@ -735,7 +738,7 @@ void MotionEstimator::proposeDosePerFrame(double dpf, std::string metaFn, int ve
 			if (verb > 0)
 			{
 				std::cout << " + Using dose per frame from " << metaFn << ": "
-						  << dosePerFrame << " e/A^2\n";
+						  << dosePerFrame << " e/A^2" << std::endl;
 			}
 		}
 	}
@@ -744,7 +747,7 @@ void MotionEstimator::proposeDosePerFrame(double dpf, std::string metaFn, int ve
 		if (verb > 0)
 		{
 			std::cout << " + Using dose per frame from cmd. line: "
-					  << dosePerFrame << " e/A^2\n";
+					  << dosePerFrame << " e/A^2" << std::endl;
 		}
 	}
 }

@@ -345,7 +345,9 @@ void MicrographHandler::loadInitial(
 
 std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 		const MetaDataTable &mdt, int s,
-		double angpix, std::vector<ParFourierTransformer>& fts)
+		double angpix, std::vector<ParFourierTransformer>& fts,
+		const std::vector<std::vector<gravis::d2Vector>>* offsets_in,
+		std::vector<std::vector<gravis::d2Vector>>* offsets_out)
 {
 	if (!ready)
 	{
@@ -394,7 +396,7 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 					&mdt, mgHasGain? &lastGainRef : 0,
 					mgFn, angpix, coords_angpix, movie_angpix, s,
 					nr_omp_threads, true, firstFrame, lastFrame,
-					hotCutoff, debug, saveMem);
+					hotCutoff, debug, saveMem, offsets_in, offsets_out);
 	}
 	else
 	{
@@ -402,7 +404,7 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 					&mdt, 0,
 					fn_post, angpix, coords_angpix, movie_angpix, s,
 					nr_omp_threads, true, firstFrame, lastFrame,
-					hotCutoff, debug, saveMem);
+					hotCutoff, debug, saveMem, offsets_in, offsets_out);
 	}
 	
 	const int pc = movie.size();
@@ -421,9 +423,12 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 		std::vector<ParFourierTransformer>& fts,
 		const std::vector<d2Vector>& pos,
 		std::vector<std::vector<d2Vector>>& tracks,
-		bool unregGlob, std::vector<d2Vector>& globComp)
+		bool unregGlob, std::vector<d2Vector>& globComp,
+		const std::vector<std::vector<gravis::d2Vector>>* offsets_in,
+		std::vector<std::vector<gravis::d2Vector>>* offsets_out)
 {
-	std::vector<std::vector<Image<Complex>>> out = loadMovie(mdt, s, angpix, fts);
+	std::vector<std::vector<Image<Complex>>> out = loadMovie(
+				mdt, s, angpix, fts, offsets_in, offsets_out);
 	
 	if (!hasCorrMic || micrograph.model == 0)
 	{

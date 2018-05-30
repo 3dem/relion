@@ -490,6 +490,11 @@ void joinMultipleEPSIntoSinglePDF(FileName fn_pdf, std::vector<FileName> fn_eps)
      /*!
       Sets the total size of the plot in the x dimension.
       */
+     void SetTitle(std::string);
+
+    /*!
+      Sets the total size of the plot in the x dimension.
+      */
      void SetXTotalSize(double value);
 
      /*!
@@ -881,6 +886,13 @@ void joinMultipleEPSIntoSinglePDF(FileName fn_pdf, std::vector<FileName> fn_eps)
       */
      void AddDataSet(int numPoints, double *xValues, double *yValues);
 
+     /*!
+      Adds a new dataset to the plot as two vectors comprised of the x and y values
+      */
+     void AddDataSet(std::vector<RFLOAT> xValues, std::vector<RFLOAT> yValues);
+     void AddDataSet(std::vector<RFLOAT> yValues);
+
+
  protected:
 
      /*!
@@ -1047,6 +1059,11 @@ void joinMultipleEPSIntoSinglePDF(FileName fn_pdf, std::vector<FileName> fn_eps)
      // data storage
      std::vector<CDataSet> m_dataSets; /*!< Storage for the datasets, implemented as a vector. */
  };
+
+ inline void CPlot2D::SetTitle(std::string title)
+ {
+	 m_strPlotTitle=title;
+ }
 
  inline void CPlot2D::SetXTotalSize(double value)
  {
