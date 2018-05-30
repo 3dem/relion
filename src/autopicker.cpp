@@ -926,24 +926,26 @@ void AutoPicker::generatePDFLogfile()
 	CPlot2D *plot2Db=new CPlot2D("Nr of picked particles for all micrographs");
 	MDresult.addToCPlot2D(plot2Db, EMDL_UNDEFINED, EMDL_MLMODEL_GROUP_NR_PARTICLES, 1.);
 	plot2Db->SetDrawLegend(false);
-	fn_eps = fn_out + "nr_picked_particles_per_micrograph.eps";
+	fn_eps = fn_odir + "all_nr_parts.eps";
 	plot2Db->OutputPostScriptPlot(fn_eps);
 	all_fn_eps.push_back(fn_eps);
-	CPlot2D *plot2D=new CPlot2D("Histogram of nr of picked particles per micrograph");
+	CPlot2D *plot2D=new CPlot2D("");
 	MDresult.columnHistogram(EMDL_MLMODEL_GROUP_NR_PARTICLES,histX,histY,0, plot2D);
-	fn_eps = fn_out + "histogram_nr_picked_particles_per_micrograph.eps";
+	fn_eps = fn_odir + "histogram_nrparts.eps";
+	plot2D->SetTitle("Histogram of nr of picked particles per micrograph");
 	plot2D->OutputPostScriptPlot(fn_eps);
 	all_fn_eps.push_back(fn_eps);
 
 	CPlot2D *plot2Dc=new CPlot2D("Average autopick FOM for all micrographs");
 	MDresult.addToCPlot2D(plot2Dc, EMDL_UNDEFINED, EMDL_PARTICLE_AUTOPICK_FOM, 1.);
 	plot2Dc->SetDrawLegend(false);
-	fn_eps = fn_out + "average_autopick_FOM_per_micrograph.eps";
+	fn_eps = fn_odir + "all_FOMs.eps";
 	plot2Dc->OutputPostScriptPlot(fn_eps);
 	all_fn_eps.push_back(fn_eps);
-	CPlot2D *plot2Dd=new CPlot2D("Histogram of average autopick FOM per micrograph");
+	CPlot2D *plot2Dd=new CPlot2D("");
 	MDresult.columnHistogram(EMDL_PARTICLE_AUTOPICK_FOM,histX,histY,0, plot2Dd);
-	fn_eps = fn_out + "histogram_nr_picked_particles_per_micrograph.eps";
+	fn_eps = fn_odir + "histogram_FOMs.eps";
+	plot2Dd->SetTitle("Histogram of average autopick FOM per micrograph");
 	plot2Dd->OutputPostScriptPlot(fn_eps);
 	all_fn_eps.push_back(fn_eps);
 
