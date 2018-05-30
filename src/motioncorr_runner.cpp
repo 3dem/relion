@@ -178,7 +178,11 @@ void MotioncorrRunner::initialise()
 		if (fn_defect != "") {
 			std::cerr << "WARNING: The defect file is not yet supported in our own implementation of motion correction. The defect file is ignored." << std::endl;
 		}
-		if (patch_x <= 2 || patch_y <= 2) {
+		if (patch_x <= 0 || patch_y <= 0) {
+			REPORT_ERROR("The number of patches must be a positive integer.");
+		}
+		if (patch_x == 2 || patch_y == 2) {
+			// If patch_x == patch_y == 1, the user actually wants global alignment alone, so do not warn.
 			std::cerr << "The number of patches is too small (<= 2). Patch based alignment will be skipped." << std::endl;
 		}
 		if (group > 1) {
@@ -1225,7 +1229,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	logfile << "Patches: X = " << patch_x << " Y = " << patch_y << std::endl;
 	bool do_local = (patch_x > 2) && (patch_y > 2);
 	if (!do_local) {
-		logfile << "Too few patches to do local alignments." << std::endl;
+		logfile << "Too few patches to do local alignments. Local alignment is skipped." << std::endl;
 	}
 
 	if (do_local) {
