@@ -467,9 +467,53 @@ void CPlot2D::DrawDataPostScript()
 void CPlot2D::AddDataSet(int numPoints, double *xValues, double *yValues)
 {
     CDataSet dataSet;
-
     for (int i=0;i<numPoints;++i) {
         CDataPoint point=CDataPoint(xValues[i],yValues[i]);
+        dataSet.AddDataPoint(point);
+    }
+    m_dataSets.push_back(dataSet);
+}
+
+void CPlot2D::AddDataSet(std::vector<RFLOAT> xValues, std::vector<RFLOAT> yValues)
+{
+    CDataSet dataSet;
+    if (m_dataSets.size() == 0)
+    	dataSet.SetDatasetColor(1., 0., 0.);
+    else if (m_dataSets.size() == 1)
+    	dataSet.SetDatasetColor(0., 1., 0.);
+    else
+    	dataSet.SetDatasetColor(0., 0., 1.);
+
+    dataSet.SetDrawMarker(false);
+
+    if (xValues.size() != yValues.size())
+    {
+    	REPORT_ERROR("ERROR: xValues and yValues vectors do not have identical sizes.");
+    }
+
+    for (long int i = 0; i < yValues.size(); i++)
+    {
+    	CDataPoint point=CDataPoint(xValues[i],yValues[i]);
+        dataSet.AddDataPoint(point);
+    }
+    m_dataSets.push_back(dataSet);
+}
+
+void CPlot2D::AddDataSet(std::vector<RFLOAT> yValues)
+{
+    CDataSet dataSet;
+    if (m_dataSets.size() == 0)
+    	dataSet.SetDatasetColor(1., 0., 0.);
+    else if (m_dataSets.size() == 1)
+    	dataSet.SetDatasetColor(0., 1., 0.);
+    else
+    	dataSet.SetDatasetColor(0., 0., 1.);
+
+   dataSet.SetDrawMarker(false);
+
+    for (long int i = 0; i < yValues.size(); i++)
+    {
+    	CDataPoint point=CDataPoint(i+1,yValues[i]);
         dataSet.AddDataPoint(point);
     }
     m_dataSets.push_back(dataSet);

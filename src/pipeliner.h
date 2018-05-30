@@ -199,7 +199,7 @@ class PipeLine
 	void write(bool do_lock = false, FileName fn_del="", std::vector<bool> deleteNode = std::vector<bool>(), std::vector<bool> deleteProcess = std::vector<bool>());
 
 	// Read in the pipeline from a STAR file
-	void read(bool do_lock = false);
+	void read(bool do_lock = false, std::string lock_message = "Undefined lock message");
 
 };
 

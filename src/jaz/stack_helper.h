@@ -55,7 +55,9 @@ class StackHelper
 				double outPs, double coordsPs, double moviePs,
 				int squareSize, int threads,
 				bool loadData = true, int firstFrame = 0, int lastFrame = -1,
-				RFLOAT hot = -1.0, bool verbose = false, bool saveMemory = false);
+				RFLOAT hot = -1.0, bool verbose = false, bool saveMemory = false,
+				const std::vector<std::vector<gravis::d2Vector>>* offsets_in = 0,
+				std::vector<std::vector<gravis::d2Vector>>* offsets_out = 0);
 		
 		static Image<Complex> projectView(Projector* projector, const MetaDataTable* mdt, int index);
 		

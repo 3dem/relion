@@ -24,7 +24,7 @@ double ThreeHyperParameterProblem::f(const std::vector<double>& x, void *tempSto
     motionParamEstimator.evaluateParams(vdav, tsc);
 	
 	/*std::cout.precision(16);
-	std::cout << "  " << vda << " => " << tsc[0] << "\n";
+	std::cout << "  " << vda << " => " << tsc[0] << std::endl;
 	std::cout.precision(5);*/
 
     return -tsc[0];
@@ -42,11 +42,9 @@ void ThreeHyperParameterProblem::report(int iteration, double cost, const std::v
 	
 	std::cout.precision(12);
 	
-	std::cout << -cost << "\n";
+	std::cout << -cost << std::endl;
 	
-	std::cout.precision(5);
-	
-	std::cout.flush();
+	std::cout.precision(5);	
 }
 
 d3Vector ThreeHyperParameterProblem::problemToMotion(const std::vector<double>& x)

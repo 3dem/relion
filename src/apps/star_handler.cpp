@@ -21,17 +21,19 @@
 #include <src/image.h>
 #include <src/metadata_table.h>
 #include <src/filename.h>
+#include <src/time.h>
 #include <cmath>
 
 class star_handler_parameters
 {
 	public:
-	FileName fn_in, fn_out, fn_compare, fn_label1, fn_label2, fn_label3, select_label;
+	FileName fn_in, fn_out, fn_compare, fn_label1, fn_label2, fn_label3, select_label, discard_label;
 	FileName fn_check, fn_operate, fn_operate2, fn_operate3, fn_set;
-	std::string remove_col_label, add_col_label, add_col_value, add_col_from, stat_col_label;
+	std::string remove_col_label, add_col_label, add_col_value, add_col_from, hist_col_label;
 	RFLOAT eps, select_minval, select_maxval, multiply_by, add_to, center_X, center_Y, center_Z, hist_min, hist_max;
-	bool do_combine, do_split, do_center, do_random_order, show_frac, show_cumulative;
+	bool do_combine, do_split, do_center, do_random_order, show_frac, show_cumulative, do_discard;
 	long int nr_split, size_split, nr_bin;
+	RFLOAT discard_sigma;
 	// I/O Parser
 	IOParser parser;
 
@@ -48,7 +50,7 @@ class star_handler_parameters
 
 		int general_section = parser.addSection("General options");
 		fn_in = parser.getOption("--i", "Input STAR file");
-		fn_out = parser.getOption("--o", "Output STAR file", "");
+		fn_out = parser.getOption("--o", "Output STAR file", "out.star");
 
 		int compare_section = parser.addSection("Compare options");
 		fn_compare = parser.getOption("--compare", "STAR file name to compare the input STAR file with", "");
@@ -61,6 +63,11 @@ class star_handler_parameters
 		select_label = parser.getOption("--select", "Metadata label to base output selection on (e.g. rlnCtfFigureOfMerit)", "");
 		select_minval = textToFloat(parser.getOption("--minval", "Minimum acceptable value for this label", "-99999999."));
 		select_maxval = textToFloat(parser.getOption("--maxval", "Maximum acceptable value for this label", "99999999."));
+
+		int discard_section = parser.addSection("Discard based on image statistics options");
+		do_discard = parser.checkOption("--discard_on_stats", "Discard images if their average/stddev deviates too many sigma from the ensemble average");
+		discard_label = parser.getOption("--discard_label", "MetaDataLabel that points to the images to be used for discarding based on statistics", "rlnImageName");
+		discard_sigma = textToFloat(parser.getOption("--discard_sigma", "Discard images with average or stddev values that lie this many sigma away from the ensemble average", "4."));
 
 		int combine_section = parser.addSection("Combine options");
 		do_combine = parser.checkOption("--combine", "Combine input STAR files (multiple individual filenames, all within double-quotes after --i)");
@@ -91,9 +98,9 @@ class star_handler_parameters
 		add_col_label = parser.getOption("--add_column", "Add a column with this metadata label from the input STAR file.", "");
 		add_col_value = parser.getOption("--add_column_value", "Set this value in all rows for the added column", "");
 		add_col_from = parser.getOption("--copy_column_from", "Copy values in this column to the added column", "");
-		stat_col_label = parser.getOption("--stat_column", "Show statistics of the column", "");
-		show_frac = parser.checkOption("--in_percent", "Show a histogram in percent (need --stat_column)");
-		show_cumulative = parser.checkOption("--show_cumulative", "Show a histogram of cumulative distribution (need --stat_column)");
+		hist_col_label = parser.getOption("--hist_column", "Calculate histogram of values in the column with this metadata label", "");
+		show_frac = parser.checkOption("--in_percent", "Show a histogram in percent (need --hist_column)");
+		show_cumulative = parser.checkOption("--show_cumulative", "Show a histogram of cumulative distribution (need --hist_column)");
 		nr_bin = textToInteger(parser.getOption("--hist_bins", "Number of bins for the histogram. By default, determined automatically by Freedman–Diaconis rule.", "-1"));
 		hist_min = textToFloat(parser.getOption("--hist_min", "Minimum value for the histogram (needs --hist_bins)", "-inf"));
 		hist_max = textToFloat(parser.getOption("--hist_max", "Maximum value for the histogram (needs --hist_bins)", "inf"));
@@ -108,28 +115,32 @@ class star_handler_parameters
 		int c = 0;
 		if (fn_compare != "") c++;
 		if (select_label != "") c++;
+		if (do_discard) c++;
 		if (do_combine) c++;
 		if (do_split) c++;
 		if (fn_operate != "") c++;
 		if (do_center) c++;
 		if (remove_col_label != "") c++;
 		if (add_col_label != "") c++;
-		if (stat_col_label != "") c++;
+		if (hist_col_label != "") c++;
 		if (c != 1)
-			REPORT_ERROR("ERROR: specify (only and at least) one of the following options: --compare, --select, --combine, --split, --operate, --center, --remove_column, --add_column or --stat_column");
+		{
+			REPORT_ERROR("ERROR: specify (only and at least) one of the following options: --compare, --select, --combine, --split, --operate, --center, --remove_column, --add_column or --hist_column");
+		}
 
-		if (fn_out == "" && stat_col_label == "")
+		if (fn_out == "" && hist_col_label == "")
 			REPORT_ERROR("ERROR: specify the output file name (--o)");
 
 		if (fn_compare != "") compare();
 		if (select_label != "") select();
+		if (do_discard) discard_on_image_stats();
 		if (do_combine) combine();
 		if (do_split) split();
 		if (fn_operate != "") operate();
 		if (do_center) center();
 		if (remove_col_label!= "") remove_column();
 		if (add_col_label!= "") add_column();
-		if (stat_col_label != "") stat_column();
+		if (hist_col_label != "") hist_column();
 
 		std::cout << " Done!" << std::endl;
 	}
@@ -176,6 +187,79 @@ class star_handler_parameters
 		}
 
 		MDout = subsetMetaDataTable(MDin, EMDL::str2Label(select_label), select_minval, select_maxval);
+
+		MDout.write(fn_out);
+		std::cout << " Written: " << fn_out << std::endl;
+
+	}
+
+
+	void discard_on_image_stats()
+	{
+
+		MetaDataTable MDin, MDout;
+		MDin.read(fn_in);
+
+		std::cout << " Calculating average and stddev for all images ... " << std::endl;
+		time_config();
+		init_progress_bar(MDin.numberOfObjects());
+
+
+   		RFLOAT sum_avg = 0.;
+		RFLOAT sum2_avg = 0.;
+		RFLOAT sum_stddev = 0.;
+		RFLOAT sum2_stddev = 0.;
+		RFLOAT sum_n = 0.;
+		std::vector<RFLOAT> avgs, stddevs;
+		long int ii = 0;
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
+		{
+			Image<RFLOAT> img;
+			FileName fn_img;
+			RFLOAT avg, stddev, minval, maxval;
+			MDin.getValue(EMDL::str2Label(discard_label), fn_img);
+			img.read(fn_img);
+			img().computeStats(avg, stddev, minval, maxval);
+			sum_avg += avg;
+			sum2_avg += avg * avg;
+			sum_stddev += stddev;
+			sum2_stddev += stddev * stddev;
+			sum_n += 1.;
+			avgs.push_back(avg);
+			stddevs.push_back(stddev);
+
+			ii++;
+			if (ii%100 == 0) progress_bar(ii);
+		}
+
+		progress_bar(MDin.numberOfObjects());
+
+		sum_avg /= sum_n;
+		sum_stddev /= sum_n;
+		sum2_avg = sqrt(sum2_avg/sum_n - sum_avg*sum_avg);
+		sum2_stddev = sqrt(sum2_stddev/sum_n - sum_stddev*sum_stddev);
+
+		std::cout << " [ Average , stddev ] of the average Image value = [ " << sum_avg<< " , " << sum2_avg << " ] " << std::endl;
+		std::cout << " [ Average , stddev ] of the stddev  Image value = [ " << sum_stddev<< " , " << sum2_stddev << " ] "  << std::endl;
+
+		long int i = 0, nr_discard = 0;
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
+		{
+			if (avgs[i] > sum_avg - discard_sigma * sum2_avg &&
+				avgs[i] < sum_avg + discard_sigma * sum2_avg &&
+				stddevs[i] > sum_stddev - discard_sigma * sum2_stddev &&
+				stddevs[i] < sum_stddev + discard_sigma * sum2_stddev)
+			{
+				MDout.addObject(MDin.getObject(current_object));
+			}
+			else
+			{
+				nr_discard++;
+			}
+			i++;
+		}
+
+		std::cout << " Discarded " << nr_discard << " Images because of too large or too small average/stddev values " << std::endl;
 
 		MDout.write(fn_out);
 		std::cout << " Written: " << fn_out << std::endl;
@@ -529,110 +613,25 @@ class star_handler_parameters
 		std::cout << " Written: " << fn_out << std::endl;
 	}
 
-	void stat_column()
+	void hist_column()
 	{
 		MetaDataTable MD;
-		EMDLabel label = EMDL::str2Label(stat_col_label);
+		EMDLabel label = EMDL::str2Label(hist_col_label);
 
 		std::vector<RFLOAT> values;
 
 		MD.read(fn_in);
 		if (!MD.containsLabel(label))
-			REPORT_ERROR("ERROR: The column specified in --stat_column is not present in the input STAR file.");
+			REPORT_ERROR("ERROR: The column specified in --hist_column is not present in the input STAR file.");
 
-		double sum = 0, sumsq = 0;
-		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
-		{
-			RFLOAT val;
-			if (EMDL::isDouble(label))
-			{
-				MD.getValue(label, val);
-			}
-			else if (EMDL::isInt(label))
-			{
-				long aux;
-				MD.getValue(label, aux);
-				val = aux;
-			}
-			else if (EMDL::isBool(label))
-			{
-				bool aux;
-				MD.getValue(label, aux);
-				val = aux ? 1 : 0;
-			}
-			else
-				REPORT_ERROR("Cannot use --stat_column for this type of column");
+		std::vector<RFLOAT> histX,histY;
+		CPlot2D *plot2D=new CPlot2D("");
+		MD.columnHistogram(label, histY, histX, 1, plot2D, nr_bin, hist_min, hist_max, show_frac, show_cumulative);
+		FileName fn_eps = fn_out.withoutExtension()+".eps";
+		plot2D->OutputPostScriptPlot(fn_eps);
+		std::cout << " Done! written out " << fn_eps << std::endl;
+		delete plot2D;
 
-			values.push_back(val);
-			sum += val;
-			sumsq += val * val;
-		}
-
-		long long n_row = values.size();
-		std::sort(values.begin(), values.end());
-		sum /= n_row; sumsq /= n_row;
-
-		std::cout << "Number of items: " << n_row << std::endl;
-		std::cout << "Min: " << values[0] << " Q1: " << values[n_row / 4];
-		std::cout << " Median: " << values[n_row / 2] << " Q3: " << values[n_row * 3 / 4] << " Max: " << values[n_row - 1] << std::endl;
-		std::cout << "Mean: " << sum << " Std: " << std::sqrt(sumsq - sum * sum) << std::endl;
-
-		RFLOAT iqr = values[n_row * 3 / 4] - values[n_row / 2];
-		RFLOAT bin_width = 1, bin_size = 1;
-
-		// change bin parameters only when there are many values
-		if (iqr != 0)
-		{
-			if (nr_bin <= 0)
-			{
-				hist_min = values[0];
-				hist_max = values[n_row - 1];
-				bin_width = 2 * iqr / std::pow(n_row, 1.0 / 3); // Freedman-Diaconis rule
-				bin_size = int(std::ceil((hist_max - hist_min) / bin_width));
-			}
-			else
-			{		
-				if (!std::isfinite(hist_min)) hist_min = values[0];
-				if (!std::isfinite(hist_max)) hist_max = values[n_row - 1];
-				bin_size = nr_bin;
-			}
-			bin_width = (hist_max - hist_min) / bin_size;
-		}
-
-		bin_size += 2; // for -inf and +inf
-		std::cout << "Bin size: " << bin_size << " width: " << bin_width << std::endl;
-
-		std::vector<long> hist(bin_size);
-		for (int i = 0; i < n_row; i++)
-		{
-			int ibin = (int)((values[i] - hist_min) / bin_width) + 1;
-			if (ibin < 0) ibin = 0;
-			if (ibin >= bin_size) ibin = bin_size - 1;
-			// std::cout << "val = " << values[i] << " ibin = " << ibin << std::endl;
-			hist[ibin]++;
-		}
-
-		long cum = 0;
-		for (int i = 0; i < bin_size; i++)
-		{
-			if (i == 0)
-				std::cout << "[-INF, " << hist_min << "): ";
-			else if (i == bin_size - 1)
-				std::cout << "[" << hist_max << ", +INF]: ";
-			else
-				std::cout << "[" << (hist_min + bin_width * (i - 1)) << ", " << (hist_min + bin_width * i) << "): ";
-
-			cum += hist[i];
-			
-			if (!show_frac && !show_cumulative)
-				std::cout << hist[i];
-			if (show_frac)
-				std::cout << (100 * hist[i] / (float)n_row) << "% ";
-			if (show_cumulative)
-				std::cout << "cumlative " << (100 * cum / (float)n_row) << "%";
-
-			std::cout << std::endl;
-		}
 	}
 };
 

@@ -125,6 +125,9 @@ void AutoPicker::read(int argc, char **argv)
 	do_ctf = parser.checkOption("--ctf", "Perform CTF correction on the references?");
 	intact_ctf_first_peak = parser.checkOption("--ctf_intact_first_peak", "Ignore CTFs until their first peak?");
 	gauss_max_value = textToFloat(parser.getOption("--gauss_max", "Value of the peak in the Gaussian blob reference","0.1"));
+	healpix_order = textToInteger(parser.getOption("--healpix_order", "Healpix order for projecting a 3D reference (hp0=60deg; hp1=30deg; hp2=15deg)", "1"));
+	symmetry = parser.getOption("--sym", "Symmetry point group for a 3D reference","C1");
+
 
 	int log_section = parser.addSection("Laplacian-of-Gaussian options");
 	do_LoG = parser.checkOption("--LoG", "Use Laplacian-of-Gaussian filter-based picking, instead of template matching");
@@ -150,6 +153,7 @@ void AutoPicker::read(int argc, char **argv)
 
 	int expert_section = parser.addSection("Expert options");
 	verb = textToInteger(parser.getOption("--verb", "Verbosity", "1"));
+	padding = textToInteger(parser.getOption("--pad", "Padding factor for Fourier transforms", "2"));
 	random_seed = textToInteger(parser.getOption("--random_seed", "Number for the random seed generator", "1"));
 	workFrac = textToFloat(parser.getOption("--shrink", "Reduce micrograph to this fraction size, during correlation calc (saves memory and time)", "1.0"));
 	LoG_max_search = textToFloat(parser.getOption("--Log_max_search", "Maximum diameter in LoG-picking multi-scale approach is this many times the min/max diameter", "5."));
@@ -243,6 +247,7 @@ void AutoPicker::initialise()
 			REPORT_ERROR("Cannot find any micrograph called: "+fns_autopick);
 	}
 
+	fn_ori_micrographs = fn_micrographs;
 	// If we're continuing an old run, see which micrographs have not been finished yet...
 	if (do_only_unfinished)
 	{
@@ -385,13 +390,74 @@ void AutoPicker::initialise()
 	}
 	else
 	{
+
+
+
 		Image<RFLOAT> Istk, Iref;
 		Istk.read(fn_ref);
-		for (int n = 0; n < NSIZE(Istk()); n++)
+
+		if (ZSIZE(Istk()) > 1)
 		{
-			Istk().getImage(n, Iref());
-			Iref().setXmippOrigin();
-			Mrefs.push_back(Iref());
+			// Re-scale references if necessary
+			if (angpix_ref < 0)
+				angpix_ref = angpix;
+
+			HealpixSampling sampling;
+			sampling.healpix_order = healpix_order;
+			sampling.fn_sym = symmetry;
+			sampling.perturbation_factor = 0.;
+			sampling.offset_step = 1;
+			sampling.limit_tilt = -91.;
+			sampling.is_3D = true;
+			sampling.initialise(NOPRIOR);
+
+			std::cout << " Projecting a 3D reference with " << symmetry << " symmetry, using angular sampling rate of "
+					<< sampling.getAngularSampling() << " degrees, i.e. in " << sampling.NrDirections() << " directions ... "
+					<< std::endl;
+
+			int my_ori_size = XSIZE(Istk());
+			Projector projector(my_ori_size, TRILINEAR, padding);
+			MultidimArray<RFLOAT> dummy;
+   			int lowpass_size = 2 * CEIL(my_ori_size * angpix_ref / lowpass);
+			projector.computeFourierTransformMap(Istk(), dummy, lowpass_size);
+			MultidimArray<RFLOAT> Mref(my_ori_size, my_ori_size);
+			MultidimArray<Complex> Fref;
+			FourierTransformer transformer;
+			transformer.setReal(Mref);
+			transformer.getFourierAlias(Fref);
+
+			for (long int idir = 0; idir < sampling.NrDirections(); idir++)
+			{
+				RFLOAT rot = sampling.rot_angles[idir];
+				RFLOAT tilt = sampling.tilt_angles[idir];
+				Matrix2D<RFLOAT> A;
+
+				Euler_angles2matrix(rot, tilt, 0., A, false);
+				Fref.initZeros();
+				projector.get2DFourierTransform(Fref, A, IS_NOT_INV);
+	        	transformer.inverseFourierTransform();
+	        	// Shift the image back to the center...
+	        	CenterFFT(Mref, false);
+	        	Mrefs.push_back(Mref);
+#define DEBUG_PROJECT3DREF
+#ifdef DEBUG_PROJECT3DREF
+	        	Image<RFLOAT> Itmp;
+	        	Itmp()=Mref;
+	        	FileName fnt;
+	        	fnt.compose("3dref_proj",idir,"mrc");
+	        	Itmp.write(fnt);
+#endif
+			}
+		}
+		else
+		{
+			// Stack of 2D references
+			for (int n = 0; n < NSIZE(Istk()); n++)
+			{
+				Istk().getImage(n, Iref());
+				Iref().setXmippOrigin();
+				Mrefs.push_back(Iref());
+			}
 		}
 	}
 #ifdef TIMING
@@ -701,7 +767,7 @@ void AutoPicker::initialise()
 		if (verb > 0)
 			init_progress_bar(Mrefs.size());
 
-		Projector PP(micrograph_size);
+		Projector PP(micrograph_size, TRILINEAR, padding);
 		MultidimArray<RFLOAT> dummy;
 
 		for (int iref = 0; iref < Mrefs.size(); iref++)
@@ -810,8 +876,84 @@ void AutoPicker::run()
 	if (verb > 0)
 		progress_bar(fn_micrographs.size());
 
+	// Make a logfile with plots of the number of particles per micrograph, and their average autopick FOM
+	generatePDFLogfile();
+
+
 }
 
+
+void AutoPicker::generatePDFLogfile()
+{
+	if (verb > 0)
+		std::cout << " Generate PDF logfile ... " << std::endl;
+
+	MetaDataTable MDresult;
+	RFLOAT total_nr_picked = 0;
+	for (long int imic = 0; imic < fn_ori_micrographs.size(); imic++)
+	{
+		MetaDataTable MD;
+		MD.read(getOutputRootName(fn_ori_micrographs[imic]) + "_" + fn_out + ".star");
+		long nr_pick = (RFLOAT) MD.numberOfObjects();
+		total_nr_picked += nr_pick;
+		if (MD.containsLabel(EMDL_PARTICLE_AUTOPICK_FOM))
+		{
+			RFLOAT fom, avg_fom = 0.;
+			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
+			{
+				MD.getValue(EMDL_PARTICLE_AUTOPICK_FOM, fom);
+				avg_fom += fom;
+			}
+			avg_fom /= nr_pick;
+			// mis-use MetadataTable to conveniently make histograms and value-plots
+			MDresult.addObject();
+			MDresult.setValue(EMDL_PARTICLE_AUTOPICK_FOM, avg_fom);
+			MDresult.setValue(EMDL_MLMODEL_GROUP_NR_PARTICLES, nr_pick);
+		}
+	}
+
+	if (verb > 0)
+	{
+		std::cout << " Total number of particles from " << fn_ori_micrographs.size() << " micrographs is " << total_nr_picked << std::endl;
+		std::cout << " i.e. on average there were " << ROUND(total_nr_picked/fn_ori_micrographs.size()) << " particles per micrograph" << std::endl;
+	}
+
+	// Values for all micrographs
+	FileName fn_eps;
+	std::vector<FileName> all_fn_eps;
+	std::vector<RFLOAT> histX, histY;
+
+	CPlot2D *plot2Db=new CPlot2D("Nr of picked particles for all micrographs");
+	MDresult.addToCPlot2D(plot2Db, EMDL_UNDEFINED, EMDL_MLMODEL_GROUP_NR_PARTICLES, 1.);
+	plot2Db->SetDrawLegend(false);
+	fn_eps = fn_odir + "all_nr_parts.eps";
+	plot2Db->OutputPostScriptPlot(fn_eps);
+	all_fn_eps.push_back(fn_eps);
+	CPlot2D *plot2D=new CPlot2D("");
+	MDresult.columnHistogram(EMDL_MLMODEL_GROUP_NR_PARTICLES,histX,histY,0, plot2D);
+	fn_eps = fn_odir + "histogram_nrparts.eps";
+	plot2D->SetTitle("Histogram of nr of picked particles per micrograph");
+	plot2D->OutputPostScriptPlot(fn_eps);
+	all_fn_eps.push_back(fn_eps);
+
+	CPlot2D *plot2Dc=new CPlot2D("Average autopick FOM for all micrographs");
+	MDresult.addToCPlot2D(plot2Dc, EMDL_UNDEFINED, EMDL_PARTICLE_AUTOPICK_FOM, 1.);
+	plot2Dc->SetDrawLegend(false);
+	fn_eps = fn_odir + "all_FOMs.eps";
+	plot2Dc->OutputPostScriptPlot(fn_eps);
+	all_fn_eps.push_back(fn_eps);
+	CPlot2D *plot2Dd=new CPlot2D("");
+	MDresult.columnHistogram(EMDL_PARTICLE_AUTOPICK_FOM,histX,histY,0, plot2Dd);
+	fn_eps = fn_odir + "histogram_FOMs.eps";
+	plot2Dd->SetTitle("Histogram of average autopick FOM per micrograph");
+	plot2Dd->OutputPostScriptPlot(fn_eps);
+	all_fn_eps.push_back(fn_eps);
+
+	delete plot2D, plot2Db, plot2Dc, plot2Dd;
+
+	joinMultipleEPSIntoSinglePDF(fn_odir + "logfile.pdf ", all_fn_eps);
+
+}
 
 std::vector<AmyloidCoord> AutoPicker::findNextCandidateCoordinates(AmyloidCoord &mycoord, std::vector<AmyloidCoord> &circle,
 		RFLOAT threshold_value, RFLOAT max_psidiff, int skip_side, float scale,

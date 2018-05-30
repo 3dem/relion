@@ -798,6 +798,17 @@ void JobWindow::initialiseAutopickWindow()
 	current_y += STEPY/2;
 
 	place("fn_refs_autopick", TOGGLE_DEACTIVATE);
+
+	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group1->end();
+	place("do_ref3d", TOGGLE_DEACTIVATE, group1);
+	group1->begin();
+	place("fn_ref3d_autopick", TOGGLE_DEACTIVATE);
+	place("ref3d_symmetry", TOGGLE_DEACTIVATE);
+	place("ref3d_sampling", TOGGLE_DEACTIVATE);
+	group1->end();
+	guientries["do_ref3d"].cb_menu_i();
+
 	place("do_log", TOGGLE_DEACTIVATE);
 
 	tab1->end();
@@ -1134,12 +1145,25 @@ void JobWindow::initialiseSelectWindow()
 	// Add a little spacer
 	current_y += STEPY/2;
 
-	place("do_split", TOGGLE_DEACTIVATE, group4);
+	place("do_discard", TOGGLE_DEACTIVATE, group4);
 	group4->begin();
+	place("discard_label", TOGGLE_DEACTIVATE);
+	place("discard_sigma", TOGGLE_DEACTIVATE);
+	group4->end();
+	guientries["do_discard"].cb_menu_i();
+
+	group5 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group5->end();
+
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	place("do_split", TOGGLE_DEACTIVATE, group5);
+	group5->begin();
 	place("do_random", TOGGLE_DEACTIVATE);
 	place("split_size", TOGGLE_DEACTIVATE);
 	place("nr_split", TOGGLE_DEACTIVATE);
-	group4->end();
+	group5->end();
 	guientries["do_split"].cb_menu_i();
 
 	tab3->end();
