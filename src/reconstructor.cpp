@@ -642,6 +642,7 @@ void Reconstructor::reconstruct()
 		}
 	}
 
+	vol.setSamplingRateInHeader(angpix);
 	vol.write(fn_out);
 	if (verb > 0)
 		std::cout << " + Done! Written output map in: "<<fn_out<<std::endl;
