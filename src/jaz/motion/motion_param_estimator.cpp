@@ -98,11 +98,11 @@ void MotionParamEstimator::init(
 		double k_eval_Angst = obsModel->angToPix(k_eval, s); 
 		
         std::cout << " + maximum frequency to consider for alignment: "
-            << k_cutoff_Angst << " A (" << k_cutoff << " px)\n";
+            << k_cutoff_Angst << " A (" << k_cutoff << " px)" << std::endl;
 
         std::cout << " + frequency range to consider for evaluation:  "
             << k_eval_Angst << " - " << obsModel->pixToAng(reference->k_out,s) << " A ("
-            << k_eval << " - " << reference->k_out << " px)\n";
+            << k_eval << " - " << reference->k_out << " px)" << std::endl;
     }
 
     const long mc = allMdts.size();
@@ -123,7 +123,7 @@ void MotionParamEstimator::init(
 
     if (verb > 0)
     {
-        std::cout << " + micrographs randomly selected for parameter optimization:\n";
+        std::cout << " + micrographs randomly selected for parameter optimization:" << std::endl;
     }
 
     for (int i = 0; i < order.size(); i++)
@@ -143,7 +143,7 @@ void MotionParamEstimator::init(
             std::string mn;
             allMdts[m].getValue(EMDL_MICROGRAPH_NAME, mn, 0);
 
-            std::cout << "        " << m << ": " << mn << "\n";
+            std::cout << "        " << m << ": " << mn << std::endl;
         }
 
         if (pc >= minParticles)
@@ -238,10 +238,10 @@ void MotionParamEstimator::run()
 	std::ofstream ofs(outPath+"opt_params.txt");
 	ofs << rnd[0] << " ";
 	ofs << rnd[1] << " ";
-	ofs << rnd[2] << "\n";
+	ofs << rnd[2] << std::endl;
 	ofs.close();
 	
-	std::cout << "written to " << (outPath+"opt_params.txt") << "\n";
+	std::cout << "written to " << (outPath+"opt_params.txt") << std::endl;
 
     #ifdef TIMING
         paramTimer.printTimes(true);
@@ -329,14 +329,14 @@ void MotionParamEstimator::evaluateParams(
         if (debug)
         {
             std::cout << "    micrograph " << (g+1) << " / " << mdts.size() << ": "
-                << pc << " particles [" << pctot << " total]\n";
+                << pc << " particles [" << pctot << " total]" << std::endl;
         }
 
         for (int i = 0; i < paramCount; i++)
         {
             if (debug)
             {
-                std::cout << "        evaluating: " << sig_vals[i] << "\n";
+                std::cout << "        evaluating: " << sig_vals[i] << std::endl;
             }
 
             RCTIC(paramTimer,timeOpt);
@@ -358,10 +358,10 @@ void MotionParamEstimator::evaluateParams(
 				{			
 					for (int f = 0; f < fc; f++)
 					{
-						debugStr << tracks[p][f] << "\n";
+						debugStr << tracks[p][f] << std::endl;
 					}
 					
-					debugStr << "\n";
+					debugStr << std::endl;
 				}
 				
 				debugStr.close();
@@ -380,7 +380,7 @@ void MotionParamEstimator::evaluateParams(
 
     if (debug)
     {
-        std::cout << "\n";
+        std::cout << std::endl;
     }
 
     RCTIC(paramTimer,timeEval);
@@ -401,7 +401,7 @@ void MotionParamEstimator::evaluateParams(
 
 void MotionParamEstimator::prepAlignment()
 {
-    std::cout << " + preparing alignment data... \n";
+    std::cout << " + preparing alignment data... " << std::endl;
 
     const std::vector<Image<RFLOAT>>& dmgWgh = motionEstimator->getDamageWeights();
     std::vector<Image<RFLOAT>> alignDmgWgh(fc);
@@ -433,7 +433,7 @@ void MotionParamEstimator::prepAlignment()
         pctot += pc;
 
         std::cout << "        micrograph " << (g+1) << " / " << gc << ": "
-            << pc << " particles [" << pctot << " total]\n";
+            << pc << " particles [" << pctot << " total]" << std::endl;
 
         std::vector<std::vector<Image<Complex>>> movie;
         std::vector<std::vector<Image<RFLOAT>>> movieCC;
@@ -449,7 +449,7 @@ void MotionParamEstimator::prepAlignment()
         }
         catch (RelionError XE)
         {
-            std::cerr << "warning: unable to load micrograph #" << (g+1) << "\n";
+            std::cerr << "warning: unable to load micrograph #" << (g+1) << std::endl;
             continue;
         }
 		

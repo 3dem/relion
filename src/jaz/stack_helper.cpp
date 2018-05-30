@@ -627,7 +627,9 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 		double outPs, double coordsPs, double moviePs,
 		int squareSize, int threads,
 		bool loadData, int firstFrame, int lastFrame,
-		RFLOAT hot, bool verbose, bool saveMemory)
+		RFLOAT hot, bool verbose, bool saveMemory,
+		const std::vector<std::vector<gravis::d2Vector>>* offsets_in,
+		std::vector<std::vector<gravis::d2Vector>>* offsets_out)
 {
 	std::vector<std::vector<Image<Complex>>> out(mdt->numberOfObjects());
 	const long pc = mdt->numberOfObjects();
@@ -733,10 +735,25 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 			const double xpO = (int)(coordsPs * xpC / outPs) - squareSize/2;
 			const double ypO = (int)(coordsPs * ypC / outPs) - squareSize/2;
 			
-			const int x0 = (int)round(xpO * outPs / moviePs);
-			const int y0 = (int)round(ypO * outPs / moviePs);
+			int x0 = (int)round(xpO * outPs / moviePs);
+			int y0 = (int)round(ypO * outPs / moviePs);
 			
-			// @TODO: read whole-image shifts from micrograph class
+			if (offsets_in != 0 && offsets_out != 0)
+			{
+				double dxM = (*offsets_in)[p][f].x * outPs / moviePs;
+				double dyM = (*offsets_in)[p][f].y * outPs / moviePs;
+				
+				int dxI = (int)round(dxM);
+				int dyI = (int)round(dyM);
+				
+				x0 += dxI;
+				y0 += dyI;
+				
+				double dxR = (dxM - dxI) * moviePs / outPs;
+				double dyR = (dyM - dyI) * moviePs / outPs;
+				
+				(*offsets_out)[p][f] = d2Vector(dxR, dyR);
+			}
 			
 			for (long int y = 0; y < sqMg; y++)
 			for (long int x = 0; x < sqMg; x++)

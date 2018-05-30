@@ -17,13 +17,14 @@ class ReferenceMap
 	
 			// input parameters:
             std::string reconFn0, reconFn1, maskFn, fscFn;
-            double paddingFactor, kmin;
+            double paddingFactor;
 
             // data:
-            Image<RFLOAT> freqWeight;
+            Image<RFLOAT> freqWeight, mask;
             std::vector<double> freqWeight1D;
             Projector projectors[2];
             int k_out, s, sh;
+			bool hasMask;
 
         void read(IOParser& parser, int argc, char *argv[]);
         void load(int verb, bool debug);
