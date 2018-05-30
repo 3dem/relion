@@ -27,17 +27,17 @@ int main(int argc, char *argv[])
 	ReconstructorMpi prm;
 
 	try
-    {
+	{
 		prm.read(argc, argv);
 		prm.run();
-    }
-    catch (RelionError XE)
-    {
-        if (prm.verb > 0)
-        	std::cerr << XE;
-        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
-    }
-    return 0;
+	}
+	catch (RelionError XE)
+	{
+		if (prm.verb > 0)
+			std::cerr << XE;
+		MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+	}
+	return 0;
 }
 
 

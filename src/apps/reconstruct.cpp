@@ -25,17 +25,17 @@ int main(int argc, char *argv[])
 	Reconstructor prm;
 
 	try
-    {
+	{
 		prm.read(argc, argv);
 		prm.run();
 
-    }
-    catch (RelionError XE)
-    {
-        std::cerr << XE;
-        exit(1);
-    }
-    return 0;
+	}
+	catch (RelionError XE)
+	{
+		std::cerr << XE;
+		exit(1);
+	}
+	return 0;
 }
 
 
