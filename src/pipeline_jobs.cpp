@@ -1326,6 +1326,10 @@ bool RelionJob::getCommandsCtffindJob(std::string &outputname, std::vector<std::
 	outputNodes.push_back(node);
 	outputName = outputname;
 
+	// PDF with histograms of the eigenvalues
+	Node node3(outputname + "logfile.pdf", NODE_PDF_LOGFILE);
+	outputNodes.push_back(node3);
+
 	if (joboptions["input_star_mics"].getString() == "")
 	{
 		error_message = "ERROR: empty field for input STAR file...";
@@ -1615,6 +1619,10 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 	// Output
 	Node node3(outputname + "coords_suffix_autopick.star", NODE_MIC_COORDS);
 	outputNodes.push_back(node3);
+
+	// PDF with histograms of the eigenvalues
+	Node node3b(outputname + "logfile.pdf", NODE_PDF_LOGFILE);
+	outputNodes.push_back(node3b);
 
 	command += " --odir " + outputname;
 	command += " --pickname autopick";

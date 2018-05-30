@@ -339,6 +339,39 @@ void CtffindRunner::joinCtffindResults()
 	MDctf.write(fn_out+"micrographs_ctf.star");
 	std::cout << " Done! Written out: " << fn_out <<  "micrographs_ctf.star" << std::endl;
 
+
+	std::vector<EMDLabel> plot_labels;
+	plot_labels.push_back(EMDL_CTF_DEFOCUSU);
+	plot_labels.push_back(EMDL_CTF_MAXRES);
+	plot_labels.push_back(EMDL_CTF_PHASESHIFT);
+	plot_labels.push_back(EMDL_CTF_FOM);
+	plot_labels.push_back(EMDL_CTF_VALIDATIONSCORE);
+	FileName fn_eps, fn_eps_root = fn_out+"micrographs_ctf";
+	std::vector<FileName> all_fn_eps;
+	for (int i = 0; i < plot_labels.size(); i++)
+	{
+		EMDLabel label = plot_labels[i];
+		if (MDctf.containsLabel(label))
+		{
+			// Values for all micrographs
+			CPlot2D *plot2Db=new CPlot2D("For all micrographs");
+			MDctf.addToCPlot2D(plot2Db, EMDL_UNDEFINED, label, 1.);
+			plot2Db->SetDrawLegend(false);
+			fn_eps = fn_eps_root + "_all_" + EMDL::label2Str(label) + ".eps";
+			plot2Db->OutputPostScriptPlot(fn_eps);
+			all_fn_eps.push_back(fn_eps);
+			// Histogram
+			std::vector<RFLOAT> histX, histY;
+			CPlot2D *plot2D=new CPlot2D("");
+			MDctf.columnHistogram(label,histX,histY,0, plot2D);
+			fn_eps = fn_eps_root + "_hist_" + EMDL::label2Str(label) + ".eps";
+			plot2D->OutputPostScriptPlot(fn_eps);
+			all_fn_eps.push_back(fn_eps);
+			delete plot2D, plot2Db;
+		}
+	}
+	joinMultipleEPSIntoSinglePDF(fn_out + "logfile.pdf ", all_fn_eps);
+
 	if (do_use_gctf)
 	{
 		FileName fn_gctf_junk = "micrographs_all_gctf";

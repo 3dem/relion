@@ -1056,6 +1056,145 @@ void MetaDataTable::write(const FileName &fn_out) const
 
 }
 
+void MetaDataTable::columnHistogram(EMDLabel label, std::vector<RFLOAT> &histX, std::vector<RFLOAT> &histY,
+		int verb, CPlot2D * plot2D,
+		long int nr_bin, RFLOAT hist_min, RFLOAT hist_max,
+		bool do_fractional_instead, bool do_cumulative_instead)
+{
+	if (!containsLabel(label))
+		REPORT_ERROR("ERROR: The column specified is not present in the MetaDataTable.");
+
+	std::vector<RFLOAT> values;
+	double sum = 0, sumsq = 0;
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(*this)
+	{
+		RFLOAT val;
+		if (EMDL::isDouble(label))
+		{
+			getValue(label, val);
+		}
+		else if (EMDL::isInt(label))
+		{
+			long aux;
+			getValue(label, aux);
+			val = aux;
+		}
+		else if (EMDL::isBool(label))
+		{
+			bool aux;
+			getValue(label, aux);
+			val = aux ? 1 : 0;
+		}
+		else
+			REPORT_ERROR("Cannot use --stat_column for this type of column");
+
+		values.push_back(val);
+		sum += val;
+		sumsq += val * val;
+	}
+
+	long long n_row = values.size();
+	std::sort(values.begin(), values.end());
+	sum /= n_row; sumsq /= n_row;
+
+	if (verb > 0)
+	{
+		std::cout << "Number of items: " << n_row << std::endl;
+		std::cout << "Min: " << values[0] << " Q1: " << values[n_row / 4];
+		std::cout << " Median: " << values[n_row / 2] << " Q3: " << values[n_row * 3 / 4] << " Max: " << values[n_row - 1] << std::endl;
+		std::cout << "Mean: " << sum << " Std: " << std::sqrt(sumsq - sum * sum) << std::endl;
+	}
+
+	RFLOAT iqr = values[n_row * 3 / 4] - values[n_row / 2];
+	RFLOAT bin_width = 1, bin_size = 1;
+
+	// change bin parameters only when there are many values
+	if (iqr != 0)
+	{
+		if (nr_bin <= 0)
+		{
+			hist_min = values[0];
+			hist_max = values[n_row - 1];
+			bin_width = 2 * iqr / std::pow(n_row, 1.0 / 3); // Freedman-Diaconis rule
+			bin_size = int(std::ceil((hist_max - hist_min) / bin_width));
+		}
+		else
+		{
+			if (!std::isfinite(hist_min)) hist_min = values[0];
+			if (!std::isfinite(hist_max)) hist_max = values[n_row - 1];
+			bin_size = nr_bin;
+		}
+		bin_width = (hist_max - hist_min) / bin_size;
+	}
+
+	bin_size += 2; // for -inf and +inf
+	if (verb > 0) std::cout << "Bin size: " << bin_size << " width: " << bin_width << std::endl;
+
+	std::vector<long> hist(bin_size);
+	histY.resize(4*bin_size, 0.);
+	histX.resize(4*bin_size, 0.);
+	for (int i = 0; i < n_row; i++)
+	{
+		int ibin = (int)((values[i] - hist_min) / bin_width) + 1;
+		if (ibin < 0) ibin = 0;
+		if (ibin >= bin_size) ibin = bin_size - 1;
+		hist[ibin]++;
+	}
+
+	long cum = 0;
+	for (int i = 0; i < bin_size; i++)
+	{
+		if (i == 0)
+		{
+			if (verb > 0) std::cout << "[-INF, " << hist_min << "): ";
+			histX[4*i]   = hist_min - bin_width;
+			histX[4*i+1] = hist_min - bin_width;
+			histX[4*i+2] = hist_min;
+			histX[4*i+3] = hist_min;
+		}
+		else if (i == bin_size - 1)
+		{
+			if (verb > 0) std::cout << "[" << hist_max << ", +INF]: ";
+			histX[4*i]   = hist_max;
+			histX[4*i+1] = hist_max;
+			histX[4*i+2] = hist_max + bin_width;
+			histX[4*i+3] = hist_max + bin_width;
+		}
+		else
+		{
+			if (verb > 0) std::cout << "[" << (hist_min + bin_width * (i - 1)) << ", " << (hist_min + bin_width * i) << "): ";
+			histX[4*i]   = hist_min + bin_width * (i - 1);
+			histX[4*i+1] = hist_min + bin_width * (i - 1);
+			histX[4*i+2] = hist_min + bin_width * i;
+			histX[4*i+3] = hist_min + bin_width * i;
+		}
+
+		cum += hist[i];
+		if (do_fractional_instead) hist[i] = (100. * hist[i] / (float)n_row);
+		else if (do_cumulative_instead) hist[i] = (100 * cum / (float)n_row);
+
+		if (verb > 0) std::cout  << hist[i] << std::endl;
+
+		histY[4*i+1] = histY[4*i+2] = hist[i];
+		histY[4*i] = histY[4*i+3] = 0.;
+
+	}
+	histX[histX.size()-1] = histX[histX.size()-2];
+
+	if (plot2D != NULL)
+	{
+		std::string title = " Histogram of " + EMDL::label2Str(label);
+		plot2D->SetTitle(title);
+		plot2D->SetDrawLegend(false);
+		plot2D->AddDataSet(histX,histY);
+		plot2D->SetXAxisTitle(EMDL::label2Str(label));
+		plot2D->SetYAxisTitle("# entries");
+	}
+
+}
+
+
+
 void MetaDataTable::addToCPlot2D(CPlot2D *plot2D, EMDLabel xaxis, EMDLabel yaxis,
 		double red, double green, double blue, double linewidth, std::string marker)
 {
@@ -1082,8 +1221,11 @@ void MetaDataTable::addToCPlot2D(CPlot2D *plot2D, EMDLabel xaxis, EMDLabel yaxis
 		if (offx < 0)
             REPORT_ERROR("MetaDataTable::addToCPlot2D ERROR: cannot find x-axis label");
 
-
-		if (EMDL::isDouble(xaxis))
+		if (xaxis == EMDL_UNDEFINED)
+		{
+			xval = idx+1;
+		}
+		else if (EMDL::isDouble(xaxis))
     	{
     		objects[idx]->getValue(offx, mydbl);
     		xval = mydbl;
@@ -1119,6 +1261,9 @@ void MetaDataTable::addToCPlot2D(CPlot2D *plot2D, EMDLabel xaxis, EMDLabel yaxis
 	}
 
     plot2D->AddDataSet(dataSet);
+    if (xaxis != EMDL_UNDEFINED)
+    	plot2D->SetXAxisTitle(EMDL::label2Str(xaxis));
+    plot2D->SetYAxisTitle(EMDL::label2Str(yaxis));
 
 }
 
