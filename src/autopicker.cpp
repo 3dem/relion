@@ -893,22 +893,26 @@ void AutoPicker::generatePDFLogfile()
 	for (long int imic = 0; imic < fn_ori_micrographs.size(); imic++)
 	{
 		MetaDataTable MD;
-		MD.read(getOutputRootName(fn_ori_micrographs[imic]) + "_" + fn_out + ".star");
-		long nr_pick = (RFLOAT) MD.numberOfObjects();
-		total_nr_picked += nr_pick;
-		if (MD.containsLabel(EMDL_PARTICLE_AUTOPICK_FOM))
+		FileName fn_pick = getOutputRootName(fn_ori_micrographs[imic]) + "_" + fn_out + ".star";
+		if (exists(fn_pick))
 		{
-			RFLOAT fom, avg_fom = 0.;
-			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
+			MD.read(fn_pick);
+			long nr_pick = (RFLOAT) MD.numberOfObjects();
+			total_nr_picked += nr_pick;
+			if (MD.containsLabel(EMDL_PARTICLE_AUTOPICK_FOM))
 			{
-				MD.getValue(EMDL_PARTICLE_AUTOPICK_FOM, fom);
-				avg_fom += fom;
+				RFLOAT fom, avg_fom = 0.;
+				FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
+				{
+					MD.getValue(EMDL_PARTICLE_AUTOPICK_FOM, fom);
+					avg_fom += fom;
+				}
+				avg_fom /= nr_pick;
+				// mis-use MetadataTable to conveniently make histograms and value-plots
+				MDresult.addObject();
+				MDresult.setValue(EMDL_PARTICLE_AUTOPICK_FOM, avg_fom);
+				MDresult.setValue(EMDL_MLMODEL_GROUP_NR_PARTICLES, nr_pick);
 			}
-			avg_fom /= nr_pick;
-			// mis-use MetadataTable to conveniently make histograms and value-plots
-			MDresult.addObject();
-			MDresult.setValue(EMDL_PARTICLE_AUTOPICK_FOM, avg_fom);
-			MDresult.setValue(EMDL_MLMODEL_GROUP_NR_PARTICLES, nr_pick);
 		}
 	}
 

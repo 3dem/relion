@@ -58,8 +58,6 @@ class RelionItOptions(object):
 
     
     ### MotionCorrection parameters
-    # The number of threads (only for RELION's own implementation) is optimal when nr_movie_frames/nr_threads = integer
-    motioncor_threads = 12
     # Dose in electrons per squared Angstrom per frame
     motioncor_doseperframe = 1.277
     # Gain-reference image in MRC format (only necessary if input movies are not yet gain-corrected, e.g. compressed TIFFs from K2)
@@ -170,6 +168,8 @@ class RelionItOptions(object):
     ### MotionCorrection parameters
     # Use RELION's own implementation of motion-correction (CPU-only) instead of the UCSF implementation?
     motioncor_do_own = False
+    # The number of threads (only for RELION's own implementation) is optimal when nr_movie_frames/nr_threads = integer
+    motioncor_threads = 12
     # Exectutable of UCSF MotionCor2
     motioncor_exe = '/public/EM/MOTIONCOR2/MotionCor2'
     # On which GPU(s) to execute UCSF MotionCor2
@@ -555,14 +555,14 @@ def findLargestClass(model_star_file):
     best_size = 0 
     best_class = 0
     for iclass in range(0, len(model_star['model_classes']['rlnReferenceImage'])):
-        mysize = model_star['model_classes']['rlnClassDistribution'][iclass]
+        mysize = float(model_star['model_classes']['rlnClassDistribution'][iclass])
         if mysize > best_size:
             best_size = mysize
             best_class = model_star['model_classes']['rlnReferenceImage'][iclass]
-            best_resol = model_star['model_classes']['rlnEstimatedResolution'][iclass]
+            best_resol = float(model_star['model_classes']['rlnEstimatedResolution'][iclass])
 
     print " RELION_IT: found largest class:",best_class,"with class size of",best_size,"and resolution of",best_resol
-    return best_class, float(best_resol),  float(model_star['model_general']['rlnPixelSize'])
+    return best_class, best_resol, model_star['model_general']['rlnPixelSize']
 
 def run_pipeline(opts):
     """
@@ -847,7 +847,13 @@ def run_pipeline(opts):
 
 
             print ' RELION_IT: now entering an infinite loop for batch-processing of particles. You can stop this loop by deleting the file',RUNNING_FILE
-            previous_batch1_size = 0
+            
+            # It could be that this is a restart, so check previous_batch1_size in the output directory
+            if os.path.isfile(split_job + 'particles_split001.star'):
+                batch1 = load_star(split_job + 'particles_split001.star')
+                previous_batch1_size = len(batch1['']['rlnMicrographName'])
+            else:
+                previous_batch1_size = 0
             continue_this_pass = True
             while continue_this_pass:
 
