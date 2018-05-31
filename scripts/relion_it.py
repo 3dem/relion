@@ -58,8 +58,6 @@ class RelionItOptions(object):
 
     
     ### MotionCorrection parameters
-    # The number of threads (only for RELION's own implementation) is optimal when nr_movie_frames/nr_threads = integer
-    motioncor_threads = 12
     # Dose in electrons per squared Angstrom per frame
     motioncor_doseperframe = 1.277
     # Gain-reference image in MRC format (only necessary if input movies are not yet gain-corrected, e.g. compressed TIFFs from K2)
@@ -170,6 +168,8 @@ class RelionItOptions(object):
     ### MotionCorrection parameters
     # Use RELION's own implementation of motion-correction (CPU-only) instead of the UCSF implementation?
     motioncor_do_own = False
+    # The number of threads (only for RELION's own implementation) is optimal when nr_movie_frames/nr_threads = integer
+    motioncor_threads = 12
     # Exectutable of UCSF MotionCor2
     motioncor_exe = '/public/EM/MOTIONCOR2/MotionCor2'
     # On which GPU(s) to execute UCSF MotionCor2
