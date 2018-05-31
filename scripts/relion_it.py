@@ -854,6 +854,7 @@ def run_pipeline(opts):
                 previous_batch1_size = len(batch1['']['rlnMicrographName'])
             else:
                 previous_batch1_size = 0
+
             continue_this_pass = True
             while continue_this_pass:
 
@@ -1020,7 +1021,7 @@ def run_pipeline(opts):
 
                             inimodel_job, already_had_it = addJob('InitialModel', 'inimodel', SETUP_CHECK_FILE, inimodel_options)              
 
-                            if ((not already_had_it) or rerun_batch1):
+                            if (not already_had_it):
                                 have_new_batch = True
                                 RunJobs([inimodel_job], 1, 1, 'INIMODEL')
                                 print " RELION_IT: submitted initial model generation with", batch_size ,"particles in", inimodel_job
@@ -1137,12 +1138,14 @@ def run_pipeline(opts):
                                 ibatch = nr_batches+1
                                 continue_this_pass = False
                                 print ' RELION_IT: moving on to the second pass using',opts.autopick_3dreference,'for template-based autopicking'
+                                # break out of the for-loop over the batches
+                                break
 
 
                 if not have_new_batch:
                     CheckForExit()
                     # The following prevents checking the particles.star file too often
-                    time.sleep(60*opts.class2d_repeat_time)
+                    time.sleep(60*opts.batch_repeat_time)
 
 
 def main():
