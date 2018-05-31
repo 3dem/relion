@@ -439,7 +439,7 @@ void AutoPicker::initialise()
 	        	// Shift the image back to the center...
 	        	CenterFFT(Mref, false);
 	        	Mrefs.push_back(Mref);
-#define DEBUG_PROJECT3DREF
+//#define DEBUG_PROJECT3DREF
 #ifdef DEBUG_PROJECT3DREF
 	        	Image<RFLOAT> Itmp;
 	        	Itmp()=Mref;
