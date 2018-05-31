@@ -1,6 +1,6 @@
 /***************************************************************************
  *
- * Author: "Sjors H.W. Scheres"
+ * Author: "Sjors H.W. Scheres" and "Takanori Nakane"
  * MRC Laboratory of Molecular Biology
  *
  * This program is free software; you can redistribute it and/or modify
@@ -28,11 +28,17 @@
 
 class align_symmetry
 {
+private:
+	Matrix2D<RFLOAT> A3D;
+	MultidimArray<Complex> F2D;
+	MultidimArray<RFLOAT> rotated, symmetrised, dummy;
+	FourierTransformer transformer;
+
 public:
 
 	FileName fn_in, fn_out, fn_sym;
-	RFLOAT angpix, maxres;
-	int nr_uniform, padding_factor, interpolator, r_min_nn, boxsize;
+	RFLOAT angpix, maxres, search_step;
+	int nr_uniform, padding_factor, interpolator, r_min_nn, boxsize, search_range;
 	bool keep_centre;
 	// I/O Parser
 	IOParser parser;
@@ -50,14 +56,17 @@ public:
 		fn_in = parser.getOption("--i", "Input map to be projected");
 		fn_out = parser.getOption("--o", "Rootname for output projections", "aligned.mrc");
 		fn_sym = parser.getOption("--sym", "Target point group symmetry");
-		boxsize = textToInteger(parser.getOption("--box_size", "Working box size (in pixels)", "64"));
+		boxsize = textToInteger(parser.getOption("--box_size", "Working box size in pixels. Very small box (such that Nyquist is aroud 20 A) is usually sufficient.", "64"));
 		if (boxsize % 2 != 0)
 			REPORT_ERROR("The working box size (--box_size) must be an even number.");
 		keep_centre = parser.checkOption("--keep_centre", "Do not re-centre the input");
 		angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms)", "-1"));
 		nr_uniform = textToInteger(parser.getOption("--nr_uniform", "Randomly search this many orientations", "400"));
 		maxres = textToFloat(parser.getOption("--maxres", "Maximum resolution (in Angstrom) to consider in Fourier space (default Nyquist)", "-1"));
+		search_range = textToInteger(parser.getOption("--local_search_range", "Local search range (1 + 2 * this number)", "2"));
+		search_step = textToFloat(parser.getOption("--local_search_step", "Local search step (in degrees)", "2"));
 		padding_factor = textToInteger(parser.getOption("--pad", "Padding factor", "2"));
+		
 		if (parser.checkOption("--NN", "Use nearest-neighbour instead of linear interpolation"))
 			interpolator = NEAREST_NEIGHBOUR;
 		else
@@ -71,14 +80,57 @@ public:
 			REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 	}
 
+	int search(MetaDataTable &MDang, Projector &projector)
+	{
+		init_progress_bar(MDang.numberOfObjects());
+		long int best_at = 0;
+		double best_diff2 = 1E99;
+		RFLOAT rot, tilt, psi;
+
+		// TODO: parallelise?
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDang)
+		{
+			MDang.getValue(EMDL_ORIENT_ROT, rot);
+			MDang.getValue(EMDL_ORIENT_TILT, tilt);
+			MDang.getValue(EMDL_ORIENT_PSI, psi);
+
+			Euler_rotation3DMatrix(rot, tilt, psi, A3D);
+			F2D.initZeros();
+			projector.get2DFourierTransform(F2D, A3D, IS_NOT_INV);
+
+			transformer.inverseFourierTransform();
+			CenterFFT(rotated, false);
+			symmetrised = rotated;
+			symmetriseMap(symmetrised, fn_sym);
+
+			// non-weighted real-space squared difference
+			double diff2 = 0;
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(rotated)	
+			{                                
+				diff2 += (DIRECT_MULTIDIM_ELEM(rotated, n) - DIRECT_MULTIDIM_ELEM(symmetrised, n)) * 
+				         (DIRECT_MULTIDIM_ELEM(rotated, n) - DIRECT_MULTIDIM_ELEM(symmetrised, n));
+			}
+			if (best_diff2 > diff2)
+			{
+				best_diff2 = diff2;
+				best_at = current_object;
+			}
+
+			if (current_object % 30 == 0) progress_bar(current_object);
+#ifdef DEBUG
+			std::cout << rot << " " << tilt << " " << psi << " " << diff2 << std::endl; 
+#endif
+		} // end search
+
+		progress_bar(MDang.numberOfObjects());
+
+		return best_at;
+	}
+
 	void project()
 	{
 		MetaDataTable MDang;
-		Matrix2D<RFLOAT> A3D;
-		MultidimArray<Complex> F3D, F2D;
-		MultidimArray<RFLOAT> rotated, symmetrised, dummy;
 		Image<RFLOAT> vol_in, vol_work;
-		FourierTransformer transformer;
 		int orig_size;
 		RFLOAT work_angpix, r_max, rot, tilt, psi;
 
@@ -148,54 +200,40 @@ public:
 		Projector projector(boxsize, interpolator, padding_factor, r_min_nn, data_dim);
 		projector.computeFourierTransformMap(vol_work(), dummy, 2* r_max);
 
-		std::cout << " Searching ..." << std::endl;
-		init_progress_bar(MDang.numberOfObjects());
-		long int best_at = 0;
-		double best_diff2 = 1E99;
-
-		// TODO: parallelise?
-		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDang)
-		{
-			MDang.getValue(EMDL_ORIENT_ROT, rot);
-			MDang.getValue(EMDL_ORIENT_TILT, tilt);
-			MDang.getValue(EMDL_ORIENT_PSI, psi);
-
-			Euler_rotation3DMatrix(rot, tilt, psi, A3D);
-			F2D.initZeros();
-			projector.get2DFourierTransform(F2D, A3D, IS_NOT_INV);
-
-			transformer.inverseFourierTransform();
-			CenterFFT(rotated, false);
-			symmetrised = rotated;
-			symmetriseMap(symmetrised, fn_sym);
-
-			// non-weighted real-space squared difference
-			double diff2 = 0;
-			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(rotated)	
-			{                                
-				diff2 += (DIRECT_MULTIDIM_ELEM(rotated, n) - DIRECT_MULTIDIM_ELEM(symmetrised, n)) * 
-				         (DIRECT_MULTIDIM_ELEM(rotated, n) - DIRECT_MULTIDIM_ELEM(symmetrised, n));
-			}
-			if (best_diff2 > diff2)
-			{
-				best_diff2 = diff2;
-				best_at = current_object;
-			}
-
-			if (current_object % 30 == 0) progress_bar(current_object);
-#ifdef DEBUG
-			std::cout << rot << " " << tilt << " " << psi << " " << diff2 << std::endl; 
-#endif
-		} // end search
-
-		progress_bar(MDang.numberOfObjects());
-		std::cout << std::endl;
+		// Global search
+		std::cout << " Searching globally ..." << std::endl;
+		int best_at;
+		best_at = search(MDang, projector);
 
 		MDang.getValue(EMDL_ORIENT_ROT, rot, best_at);
 		MDang.getValue(EMDL_ORIENT_TILT, tilt, best_at);
 		MDang.getValue(EMDL_ORIENT_PSI, psi, best_at);
-		std::cout << " The best solution is ROT = " << rot << " TILT = " << tilt << " PSI = " << psi << std::endl;
-	
+		std::cout << " The best solution is ROT = " << rot << " TILT = " << tilt << " PSI = " << psi << std::endl << std::endl;
+
+		// Local refinement
+		std::cout << " Refining locally ..." << std::endl;	
+		MDang.clear();
+
+		for (int i = -search_range; i <= search_range; i++)
+		{
+			for (int j = -search_range; j <= search_range; j++)
+			{
+				for (int k = -search_range; k <= search_range; k++)
+				{
+					MDang.addObject();
+					MDang.setValue(EMDL_ORIENT_ROT, rot + i * search_step);
+					MDang.setValue(EMDL_ORIENT_TILT, tilt + j * search_step);
+					MDang.setValue(EMDL_ORIENT_PSI, psi + k * search_range);
+				}
+			}
+		}
+		best_at = search(MDang, projector);
+		
+		MDang.getValue(EMDL_ORIENT_ROT, rot, best_at);
+		MDang.getValue(EMDL_ORIENT_TILT, tilt, best_at);
+		MDang.getValue(EMDL_ORIENT_PSI, psi, best_at);
+		std::cout << " The refined solution is ROT = " << rot << " TILT = " << tilt << " PSI = " << psi << std::endl << std::endl;
+
 		std::cout << " Now rotating the original (full size) volume ..." << std::endl << std::endl;
 		Projector full_projector(orig_size, interpolator, padding_factor, r_min_nn, data_dim);
 		Image<RFLOAT> vol_out;
