@@ -15,9 +15,10 @@ class AccProjector
 {
 	friend class AccProjectorKernel;
 
-	int mdlX, mdlY, mdlZ, mdlXYZ, mdlMaxR,
+	int mdlX, mdlY, mdlZ, mdlMaxR,
 	    mdlInitY, mdlInitZ,
 	    padding_factor;
+		size_t mdlXYZ;
 
 	size_t allocaton_size;
 

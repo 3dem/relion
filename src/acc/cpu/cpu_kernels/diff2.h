@@ -42,8 +42,8 @@ void diff2_coarse_2D(
 		AccProjectorKernel &projector,
 		XFLOAT *g_corr,
 		XFLOAT *g_diff2s,
-		int     trans_num,
-		int     image_size
+		unsigned long     trans_num,
+		unsigned long     image_size
 		)
 {                   
 	//Prefetch euler matrices
@@ -51,7 +51,7 @@ void diff2_coarse_2D(
  
 	for (int block = 0; block < grid_size; block++) {
 		for (int i = 0; i < eulers_per_block * 9; i++)
-			s_eulers[i] = g_eulers[block * eulers_per_block * 9 + i];		
+			s_eulers[i] = g_eulers[(size_t)block * (size_t)eulers_per_block * (size_t)9 + i];		
 
 		int xSize = projector.imgX;
 		int ySize = projector.imgY;
@@ -72,7 +72,7 @@ void diff2_coarse_2D(
 		XFLOAT diff2s[trans_num][eulers_per_block];
 		memset(&diff2s[0][0], 0, sizeof(XFLOAT) * trans_num * eulers_per_block);
 
-		int pixel = 0;
+		unsigned long pixel = 0;
 		for(int iy = 0; iy < ySize; iy++) {
 			int xstart = 0, xend = xSize;
 			int y = iy;
@@ -151,12 +151,12 @@ void diff2_coarse_2D(
 				}			               
 			}  // for each translation
 
-			pixel += xSize;
+			pixel += (unsigned long)xSize;
 		}  // for y direction
 
-		XFLOAT *pData = g_diff2s + block * eulers_per_block * trans_num;
+		XFLOAT *pData = g_diff2s + (size_t)block * (size_t)eulers_per_block * (size_t)trans_num;
 		for(int i=0; i<eulers_per_block; i++) {
-			for(int j=0; j<trans_num; j++) {
+			for(unsigned long j=0; j<trans_num; j++) {
 				 *pData += diff2s[j][i];
 				 pData ++;
 			}
@@ -176,8 +176,8 @@ void diff2_coarse_3D(
 		AccProjectorKernel &projector,
 		XFLOAT *g_corr,
 		XFLOAT *g_diff2s,
-		int     trans_num,
-		int     image_size
+		unsigned long     trans_num,
+		unsigned long     image_size
 		)
 {           
 	//Prefetch euler matrices
@@ -185,7 +185,7 @@ void diff2_coarse_3D(
 	
 	for (int block = 0; block < grid_size; block++) {
 		for (int i = 0; i < eulers_per_block * 9; i++)
-			s_eulers[i] = g_eulers[block * eulers_per_block * 9 + i];		
+			s_eulers[i] = g_eulers[(size_t)block * (size_t)eulers_per_block * (size_t)9 + i];		
 
 		// pre-compute sin and cos for x and y component
 		int xSize = projector.imgX;
@@ -211,7 +211,7 @@ void diff2_coarse_3D(
 		XFLOAT diff2s[trans_num][eulers_per_block];
 		memset(&diff2s[0][0], 0, sizeof(XFLOAT) * trans_num * eulers_per_block);
 
-		int pixel = 0;
+		unsigned long pixel = 0;
 		for(int iz = 0; iz < zSize; iz ++) {
 			int xstart_z = 0, xend_z = xSize;
 			int z = iz;
@@ -307,13 +307,13 @@ void diff2_coarse_3D(
 					}			               
 				}  // for each translation
 
-				pixel += xSize;
+				pixel += (unsigned long)xSize;
 			}  // for y direction
 		}	
 
-		XFLOAT *pData = g_diff2s + block * eulers_per_block * trans_num;
+		XFLOAT *pData = g_diff2s + (size_t)block * (size_t)ulers_per_block * (size_t)trans_num;
 		for(int i=0; i<eulers_per_block; i++) {
-			for(int j=0; j<trans_num; j++) {
+			for(unsigned long j=0; j<trans_num; j++) {
 				 *pData += diff2s[j][i];
 				 pData ++;
 			}
@@ -337,8 +337,8 @@ void diff2_coarse(
 		AccProjectorKernel &projector,
 		XFLOAT *g_corr,
 		XFLOAT *g_diff2s,
-		int translation_num,
-		int image_size
+		unsigned long translation_num,
+		unsigned long image_size
 		)
 { 
 #ifdef DEBUG_CUDA
@@ -350,7 +350,7 @@ void diff2_coarse(
 
 	for (int block = 0; block < grid_size; block++) {
 		for (int i = 0; i < eulers_per_block * 9; i++)
-			s_eulers[i] = g_eulers[block * eulers_per_block * 9 + i];
+			s_eulers[i] = g_eulers[(size_t)block * (size_t)eulers_per_block * (size_t)9 + i];
 
 		//Setup variables
 		XFLOAT s_ref_real[eulers_per_block][block_sz];
@@ -368,12 +368,12 @@ void diff2_coarse(
 		//Step through data
 		unsigned pass_num(ceilfracf(image_size,block_sz));
 		for (unsigned pass = 0; pass < pass_num; pass++) { // finish an entire ref image each block
-			int start = pass * block_sz;
+			unsigned long start = pass * block_sz;
 
 			// Rotate the reference image per block_sz, saved in cache
 			#pragma simd
 			for (int tid=0; tid<block_sz; tid++){
-				int pixel = start + tid;
+				unsigned long pixel = (unsigned long)start + (unsigned long)tid;
 				if(pixel >= image_size)
 					continue;
 
@@ -436,14 +436,14 @@ void diff2_coarse(
 				s_corr[tid] = g_corr[pixel] * (XFLOAT)0.5;
 			}
 
-			for(int i=0; i<translation_num; i++) {
+			for(unsigned long i=0; i<translation_num; i++) {
 				XFLOAT tx = trans_x[i];
 				XFLOAT ty = trans_y[i];
 				XFLOAT tz = trans_z[i];                 
 
 				#pragma simd
 				for (int tid=0; tid<block_sz; tid++) {
-					int pixel = start + tid;
+					unsigned long pixel = (unsigned long)start + (unsigned long)tid;
 					if(pixel >= image_size)
 						continue;                
 
@@ -463,9 +463,9 @@ void diff2_coarse(
 			}  // for each translation
 		}  // for each pass
 
-		XFLOAT *pData = g_diff2s + block * eulers_per_block * translation_num;
+		XFLOAT *pData = g_diff2s + (size_t)block * (size_t)eulers_per_block * (size_t)translation_num;
 		for(int i=0; i<eulers_per_block; i++) {
-			for(int j=0; j<translation_num; j++) {
+			for(unsigned long j=0; j<translation_num; j++) {
 				 *pData += diff2s[j][i];
 				 pData ++;
 			}
@@ -489,7 +489,7 @@ void diff2_fine_2D(
 		AccProjectorKernel &projector,
 		XFLOAT *g_corr_img,
 		XFLOAT *g_diff2s,
-		unsigned image_size,
+		unsigned long image_size,
 		XFLOAT sum_init,
 		unsigned long *d_rot_idx,
 		unsigned long *d_trans_idx,
@@ -502,10 +502,10 @@ void diff2_fine_2D(
 	g_imgs_real.initCheckedArray(_g_imgs_real);
 #endif
 	for (unsigned long bid = 0; bid < grid_size; bid++) {
-		unsigned trans_num        = (unsigned)d_job_num[bid];     
+		unsigned long trans_num        = (unsigned long)d_job_num[bid];     
 		unsigned long int iy_part = d_trans_idx[d_job_idx[bid]];  
 
-		int offset = d_rot_idx[d_job_idx[bid]] * 9;
+		size_t offset = d_rot_idx[d_job_idx[bid]] * 9;
 		XFLOAT e1 = g_eulers[offset  ], e2 = g_eulers[offset+1];
 		XFLOAT e3 = g_eulers[offset+3], e4 = g_eulers[offset+4];
 		XFLOAT e5 = g_eulers[offset+6], e6 = g_eulers[offset+7];        
@@ -516,7 +516,7 @@ void diff2_fine_2D(
 		XFLOAT sin_y[trans_num][ySize], cos_y[trans_num][ySize];
 
 		XFLOAT trans_x[trans_num], trans_y[trans_num];
-		for(int i=0; i<trans_num; i++) {
+		for(unsigned long i=0; i<trans_num; i++) {
 			int itrans = d_trans_idx[d_job_idx[bid]] + i;
 			trans_x[i] = g_trans_x[itrans];
 			trans_y[i] = g_trans_y[itrans];	       
@@ -528,7 +528,7 @@ void diff2_fine_2D(
 		XFLOAT s[trans_num];    
 		memset(s, 0, sizeof(XFLOAT) * trans_num);
 
-		int pixel = 0;
+		unsigned long pixel = 0;
 		for(int iy = 0; iy < ySize; iy++) {
 			int xstart = 0, xend = xSize;
 			int y = iy;
@@ -569,7 +569,7 @@ void diff2_fine_2D(
 			}
 
 
-			for (int itrans=0; itrans<trans_num; itrans++) {
+			for (unsigned long itrans=0; itrans<trans_num; itrans++) {
 				XFLOAT trans_cos_y, trans_sin_y;
 				if ( y < 0) {
 					trans_cos_y =  cos_y[itrans][-y];
@@ -600,10 +600,10 @@ void diff2_fine_2D(
 				s[itrans] += sum;
 			}
 
-			pixel += xSize;
+			pixel += (unsigned long)xSize;
 		}  // for pass
 
-		for (int itrans=0; itrans<trans_num; itrans++)
+		for (unsigned long itrans=0; itrans<trans_num; itrans++)
 		{
 			unsigned long int iy = d_job_idx[bid]+itrans;
 			g_diff2s[iy] = s[itrans] + sum_init;
@@ -627,7 +627,7 @@ void diff2_fine_3D(
 		AccProjectorKernel &projector,
 		XFLOAT *g_corr_img,
 		XFLOAT *g_diff2s,
-		unsigned image_size,
+		unsigned long image_size,
 		XFLOAT sum_init,
 		unsigned long *d_rot_idx,
 		unsigned long *d_trans_idx,
@@ -640,10 +640,10 @@ void diff2_fine_3D(
 	g_imgs_real.initCheckedArray(_g_imgs_real);
 #endif
 	for (unsigned long bid = 0; bid < grid_size; bid++) {
-		unsigned trans_num        = (unsigned)d_job_num[bid];     
+		unsigned long trans_num        = (unsigned long)d_job_num[bid];     
 		unsigned long int iy_part = d_trans_idx[d_job_idx[bid]];  
 
-		int offset = d_rot_idx[d_job_idx[bid]] * 9;
+		size_t offset = d_rot_idx[d_job_idx[bid]] * 9;
 		XFLOAT e1 = g_eulers[offset  ], e2 = g_eulers[offset+1];
 		XFLOAT e3 = g_eulers[offset+2], e4 = g_eulers[offset+3];
 		XFLOAT e5 = g_eulers[offset+4], e6 = g_eulers[offset+5];
@@ -659,7 +659,7 @@ void diff2_fine_3D(
 		XFLOAT sin_z[trans_num][zSize], cos_z[trans_num][zSize];	
 
 		XFLOAT trans_x[trans_num], trans_y[trans_num], trans_z[trans_num];
-		for(int i=0; i<trans_num; i++) {
+		for(unsigned long i=0; i<trans_num; i++) {
 			int itrans = d_trans_idx[d_job_idx[bid]] + i;
 			trans_x[i] = g_trans_x[itrans];
 			trans_y[i] = g_trans_y[itrans];	    
@@ -675,7 +675,7 @@ void diff2_fine_3D(
 		memset(s, 0, sizeof(XFLOAT) * trans_num);
 
 		// index of comparison
-		int pixel = 0;
+		unsigned long pixel = 0;
 		for(int iz = 0; iz < zSize; iz ++) {
 			int xstart_z = 0, xend_z = xSize;
 			int z = iz;
@@ -723,7 +723,7 @@ void diff2_fine_3D(
 				}
 
 
-				for (int itrans=0; itrans<trans_num; itrans++) {
+				for (unsigned long itrans=0; itrans<trans_num; itrans++) {
 					XFLOAT trans_cos_z, trans_sin_z;
 					if ( z < 0) {
 						trans_cos_z =  cos_z[itrans][-z];
@@ -767,11 +767,11 @@ void diff2_fine_3D(
 					s[itrans] += sum;
 				}
 
-				pixel += xSize;
+				pixel += (unsigned long)xSize;
 			} // for y direction
 		}  // for z direction
 
-		for (int itrans=0; itrans<trans_num; itrans++)
+		for (unsigned long itrans=0; itrans<trans_num; itrans++)
 		{
 			unsigned long int iy = d_job_idx[bid]+itrans;
 			g_diff2s[iy] = s[itrans] + sum_init;
@@ -798,8 +798,8 @@ template<bool REF3D>
 		AccProjectorKernel &projector,
 		XFLOAT *g_corr_img,
 		XFLOAT  *g_diff2,
-		unsigned trans_num,
-		int      image_size,
+		unsigned long trans_num,
+		unsigned long image_size,
 		XFLOAT   exp_local_sqrtXi2
 		)
 {  
@@ -832,7 +832,7 @@ template<bool REF3D>
 		XFLOAT s_norm[trans_num][xSize];
 		memset(s_norm, 0, sizeof(XFLOAT) *   xSize * trans_num);
 
-		int pixel = 0;
+		unsigned long pixel = 0;
 		for(int iy = 0; iy < ySize; iy++) {
 			int xstart = 0, xend = xSize;
 			int y = iy;
@@ -867,7 +867,7 @@ template<bool REF3D>
 				corr_imag[x] = g_corr_img[pixel + x];            
 			}
 
-			for(int itrans=0; itrans<trans_num; itrans++) {
+			for(unsigned long itrans=0; itrans<trans_num; itrans++) {
 				XFLOAT trans_cos_y, trans_sin_y;
 				if ( y < 0) {
 					trans_cos_y =  cos_y[itrans][-y];
@@ -894,10 +894,10 @@ template<bool REF3D>
 				}
 			}
 
-			pixel += xSize;
+			pixel += (unsigned long)xSize;
 		}
 
-		for(int itrans=0; itrans<trans_num; itrans++) {
+		for(unsigned long itrans=0; itrans<trans_num; itrans++) {
 			XFLOAT sum_weight = (XFLOAT)0.0;
 			XFLOAT sum_norm   = (XFLOAT)0.0;		
 
@@ -907,9 +907,11 @@ template<bool REF3D>
 			}
 
 	#ifdef RELION_SINGLE_PRECISION                  
-			g_diff2[iorient*trans_num + itrans] = - ( sum_weight / sqrtf(sum_norm));
+			g_diff2[(unsigned long)iorient*(unsigned long)trans_num + itrans] = 
+					- ( sum_weight / sqrtf(sum_norm));
 	#else                   
-			g_diff2[iorient*trans_num + itrans] = - ( sum_weight / sqrt(sum_norm));
+			g_diff2[(unsigned long)iorient*(unsigned long)trans_num + itrans] = 
+					- ( sum_weight / sqrt(sum_norm));
 	#endif
 		}
 	} // for iorient
@@ -932,8 +934,8 @@ void diff2_CC_coarse_3D(
 		AccProjectorKernel &projector,
 		XFLOAT *g_corr_img,
 		XFLOAT  *g_diff2,
-		unsigned trans_num,
-		int      image_size,
+		unsigned long trans_num,
+		unsigned long image_size,
 		XFLOAT   exp_local_sqrtXi2
 		)
 { 
@@ -972,7 +974,7 @@ void diff2_CC_coarse_3D(
 		XFLOAT s_norm[trans_num][xSize];
 		memset(s_norm,   0, sizeof(XFLOAT) *   xSize * trans_num);
 
-		int pixel = 0;
+		unsigned long pixel = 0;
 		for(int iz = 0; iz < zSize; iz ++) {
 			int xstart_z = 0, xend_z = xSize;
 			int z = iz;
@@ -1051,10 +1053,12 @@ void diff2_CC_coarse_3D(
 						s_norm  [itrans][x] += (ref_real[x] * ref_real[x] + ref_imag[x] * ref_imag[x]) * corr_imag[x];
 					}
 				}
+				
+				pixel += (unsigned long)xSize;
 			}
 		}
 
-		for(int itrans=0; itrans<trans_num; itrans++) {
+		for(unsigned long itrans=0; itrans<trans_num; itrans++) {
 			XFLOAT sum_weight = (XFLOAT)0.0;
 			XFLOAT sum_norm   = (XFLOAT)0.0;		
 
@@ -1064,9 +1068,11 @@ void diff2_CC_coarse_3D(
 			}
 
 	#ifdef RELION_SINGLE_PRECISION                  
-			g_diff2[iorient*trans_num + itrans] = - ( sum_weight / sqrtf(sum_norm));
+			g_diff2[(unsigned long)iorient*(unsigned long)trans_num + itrans] = 
+					- ( sum_weight / sqrtf(sum_norm));
 	#else                   
-			g_diff2[iorient*trans_num + itrans] = - ( sum_weight / sqrt(sum_norm));
+			g_diff2[(unsigned long)iorient*(unsigned long)trans_num + itrans] = 
+					- ( sum_weight / sqrt(sum_norm));
 	#endif
 		}
 	} // for iorient
@@ -1088,7 +1094,7 @@ void diff2_CC_fine_2D(
 		AccProjectorKernel &projector,
 		XFLOAT *g_corr_img,
 		XFLOAT *g_diff2s,
-		unsigned image_size,
+		unsigned long image_size,
 		XFLOAT sum_init,
 		XFLOAT exp_local_sqrtXi2,
 		unsigned long *d_rot_idx,
@@ -1103,7 +1109,7 @@ void diff2_CC_fine_2D(
 #endif
 	for (int bid = 0; bid < grid_size; bid++) {
 
-		unsigned trans_num   = d_job_num[bid]; //how many transes we have for this rot
+		unsigned long trans_num   = d_job_num[bid]; //how many transes we have for this rot
 
 		// pre-compute sin and cos for x and y direction
 		int xSize = projector.imgX;
@@ -1112,8 +1118,8 @@ void diff2_CC_fine_2D(
 		XFLOAT sin_y[trans_num][ySize], cos_y[trans_num][ySize];
 
 		XFLOAT trans_x[trans_num], trans_y[trans_num];
-		for(int i=0; i<trans_num; i++) {
-			int itrans = d_trans_idx[d_job_idx[bid]] + i;
+		for(unsigned long i=0; i<trans_num; i++) {
+			unsigned long itrans = d_trans_idx[d_job_idx[bid]] + i;
 			trans_x[i] = g_trans_x[itrans];
 			trans_y[i] = g_trans_y[itrans];	    
 		}	
@@ -1135,7 +1141,7 @@ void diff2_CC_fine_2D(
 		memset(&s[0][0],    0, sizeof(XFLOAT) * xSize * trans_num);
 		memset(&s_cc[0][0], 0, sizeof(XFLOAT) * xSize * trans_num);
 
-		int pixel = 0;
+		unsigned long pixel = 0;
 		for(int iy = 0; iy < ySize; iy++) {
 			int xstart = 0, xend = xSize;
 			int y = iy;
@@ -1170,7 +1176,7 @@ void diff2_CC_fine_2D(
 				corr_imag[x] = g_corr_img [pixel + x];
 			}
 
-			for (int itrans=0; itrans<trans_num; itrans++) // finish all translations in each partial pass
+			for (unsigned long itrans=0; itrans<trans_num; itrans++) // finish all translations in each partial pass
 			{			
 				XFLOAT trans_cos_y, trans_sin_y;
 				if ( y < 0) {
@@ -1197,10 +1203,10 @@ void diff2_CC_fine_2D(
 				}
 			}
 
-			pixel += xSize;
+			pixel += (unsigned long)xSize;
 		} // loop y direction
 
-		for(int itrans=0; itrans<trans_num; itrans++) {
+		for(unsigned long itrans=0; itrans<trans_num; itrans++) {
 			XFLOAT sum1 = (XFLOAT)0.0;
 			XFLOAT sum2 = (XFLOAT)0.0;
 			for(int x=0; x<xSize; x++){
@@ -1234,7 +1240,7 @@ void diff2_CC_fine_3D(
 		AccProjectorKernel &projector,
 		XFLOAT *g_corr_img,
 		XFLOAT *g_diff2s,
-		unsigned image_size,
+		unsigned long image_size,
 		XFLOAT sum_init,
 		XFLOAT exp_local_sqrtXi2,
 		unsigned long *d_rot_idx,
@@ -1250,7 +1256,7 @@ void diff2_CC_fine_3D(
 
 	for (int bid = 0; bid < grid_size; bid++) {
 
-		unsigned trans_num   = d_job_num[bid]; //how many transes we have for this rot
+		unsigned long trans_num   = d_job_num[bid]; //how many transes we have for this rot
 
 		// pre-compute sin and cos for x and y direction
 		int xSize = projector.imgX;
@@ -1261,8 +1267,8 @@ void diff2_CC_fine_3D(
 		XFLOAT sin_z[trans_num][zSize], cos_z[trans_num][zSize];	
 
 		XFLOAT trans_x[trans_num], trans_y[trans_num], trans_z[trans_num];
-		for(int i=0; i<trans_num; i++) {
-			int itrans = d_trans_idx[d_job_idx[bid]] + i;
+		for(unsigned long i=0; i<trans_num; i++) {
+			unsigned long itrans = d_trans_idx[d_job_idx[bid]] + i;
 			trans_x[i] = g_trans_x[itrans];
 			trans_y[i] = g_trans_y[itrans];	    
 			trans_z[i] = g_trans_z[itrans];	    	    
@@ -1291,7 +1297,7 @@ void diff2_CC_fine_3D(
 		e7 = g_eulers[iorient*9+7];
 		e8 = g_eulers[iorient*9+8];
 
-		int pixel = 0;
+		unsigned long pixel = 0;
 		for(int iz = 0; iz < zSize; iz ++) {
 			int xstart_z = 0, xend_z = xSize;
 			int z = iz;
@@ -1330,7 +1336,7 @@ void diff2_CC_fine_3D(
 					corr_imag[x] = g_corr_img [pixel + x];	            
 				}
 
-				for (int itrans=0; itrans<trans_num; itrans++) // finish all translations in each partial pass
+				for (unsigned long itrans=0; itrans<trans_num; itrans++) // finish all translations in each partial pass
 				{			
 					XFLOAT trans_cos_z, trans_sin_z;
 					if ( z < 0) {
@@ -1371,10 +1377,10 @@ void diff2_CC_fine_3D(
 				}
 			}
 
-			pixel += xSize;
+			pixel += (unsigned long)xSize;
 		} // loop y direction
 
-		for(int itrans=0; itrans<trans_num; itrans++) {
+		for(unsigned long itrans=0; itrans<trans_num; itrans++) {
 			XFLOAT sum1 = (XFLOAT)0.0;
 			XFLOAT sum2 = (XFLOAT)0.0;
 			for(int x=0; x<xSize; x++){

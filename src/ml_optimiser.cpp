@@ -2707,11 +2707,11 @@ void MlOptimiser::expectation()
 			int mdlX = mymodel.PPref[iclass].data.xdim;
 			int mdlY = mymodel.PPref[iclass].data.ydim;
 			int mdlZ = mymodel.PPref[iclass].data.zdim;
-			int mdlXYZ;
+			size_t mdlXYZ;
 			if(mdlZ == 0)
-				mdlXYZ = mdlX*mdlY;
+				mdlXYZ = (size_t)mdlX*(size_t)mdlY;
 			else
-				mdlXYZ = mdlX*mdlY*mdlZ;
+				mdlXYZ = (size_t)mdlX*(size_t)mdlY*(size_t)mdlZ;
 
 			try
 			{
@@ -2725,7 +2725,7 @@ void MlOptimiser::expectation()
 			std::complex<XFLOAT> *pData = mdlClassComplex[iclass];
 
 			// Copy results into complex number array
-			for (unsigned long i = 0; i < mdlXYZ; i ++)
+			for (size_t i = 0; i < mdlXYZ; i ++)
 			{
 				std::complex<XFLOAT> arrayval(
 					(XFLOAT) mymodel.PPref[iclass].data.data[i].real,

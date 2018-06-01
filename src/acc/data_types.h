@@ -147,7 +147,7 @@ public:
 		if (sizeof(T) == sizeof(T1))
 			memcpy(ptr, img.data, sizeof(T)*img.nzyxdim);
 		else
-			for (int i = 0; i < img.nzyxdim; i++)
+			for (unsigned long i = 0; i < img.nzyxdim; i++)
 				ptr[i] = (T) img.data[i];
 	}
 
@@ -167,7 +167,7 @@ public:
 		if (sizeof(T) == sizeof(T1))
 			memcpy(img.data, ptr, sizeof(T)*img.nzyxdim);
 		else
-			for (int i = 0; i < img.nzyxdim; i++)
+			for (unsigned long i = 0; i < img.nzyxdim; i++)
 				img.data[i] = (T1) ptr[i];
 	}
 };

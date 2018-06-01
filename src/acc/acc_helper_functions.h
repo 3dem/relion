@@ -27,7 +27,7 @@ long int makeJobsForDiff2Fine(
  * orientations into 'jobs' which are fed into the collect-kenrel, which reduces all translations
  * with computed differences into a reduced object to be back-projected.
  */
-int  makeJobsForCollect(IndexedDataArray &FPW, 
+long int  makeJobsForCollect(IndexedDataArray &FPW, 
         IndexedDataArrayMask &dataMask, 
         unsigned long NewJobNum); // FPW=FinePassWeights
 
@@ -37,16 +37,20 @@ int  makeJobsForCollect(IndexedDataArray &FPW,
 void mapWeights(
 		unsigned long orientation_start,
 		XFLOAT *mapped_weights,
-		unsigned orientation_num,
+		unsigned long orientation_num,
 		unsigned long idxArr_start,
 		unsigned long idxArr_end,
-		unsigned translation_num,
+		unsigned long translation_num,
 		XFLOAT *weights,
 		long unsigned *rot_idx,
 		long unsigned *trans_idx,
 		unsigned long current_oversampling);
 
-void buildCorrImage(MlOptimiser *baseMLO, OptimisationParamters &op, AccPtr<XFLOAT> &corr_img, long int ipart, long int group_id);
+void buildCorrImage(MlOptimiser *baseMLO, 
+		OptimisationParamters &op, 
+		AccPtr<XFLOAT> &corr_img, 
+		long int ipart, 
+		long int group_id);
 
 void generateEulerMatrices(
 		ProjectionParams &ProjectionData,
@@ -78,7 +82,7 @@ void runWavgKernel(
 		OptimisationParamters &op,
 		long unsigned orientation_num,
 		long unsigned translation_num,
-		unsigned image_size,
+		unsigned long image_size,
 		long int ipart,
 		int group_id,
 		int exp_iclass,
@@ -211,8 +215,8 @@ void runDiff2KernelCoarse(
 		XFLOAT *diff2s,
 		XFLOAT local_sqrtXi2,
 		long unsigned orientation_num,
-		int translation_num,
-		int image_size,
+		unsigned long translation_num,
+		unsigned long image_size,
 		cudaStream_t stream,
 		bool do_CC,
 		bool data_is_3D);
@@ -237,7 +241,7 @@ void runDiff2KernelFine(
 		long unsigned orientation_num,
 		long unsigned translation_num,
 		long unsigned significant_num,
-		unsigned image_size,
+		unsigned long image_size,
 		int ipart,
 		int exp_iclass,
 		cudaStream_t stream,
@@ -256,7 +260,7 @@ void runCollect2jobs(	int grid_dim,
 						unsigned long nr_trans,
 						unsigned long oversampled_trans,
 						unsigned long oversampled_rot,
-						int oversamples,
+						unsigned long oversamples,
 						bool skip_rots,
 						XFLOAT * p_weights,
 						XFLOAT * p_thr_wsum_prior_offsetx_class,
@@ -289,7 +293,7 @@ void runCenterFFT(MultidimArray< T >& v, bool forward, CudaCustomAllocator *allo
 	AccPtr<XFLOAT >  img_in (v.nzyxdim, allocator);   // with original data pointer
 //	AccPtr<XFLOAT >  img_aux(v.nzyxdim, allocator);   // temporary holder
 
-	for (unsigned i = 0; i < v.nzyxdim; i ++)
+	for (unsigned long i = 0; i < v.nzyxdim; i ++)
 		img_in[i] = (XFLOAT) v.data[i];
 
 	img_in.putOnDevice();
@@ -357,7 +361,7 @@ void runCenterFFT(MultidimArray< T >& v, bool forward, CudaCustomAllocator *allo
 
 		img_in.cpToHost();
 
-		for (unsigned i = 0; i < v.nzyxdim; i ++)
+		for (unsigned long i = 0; i < v.nzyxdim; i ++)
 			v.data[i] = (T) img_in[i];
 
 	}
@@ -525,11 +529,12 @@ void runCenterFFT( AccPtr< T > &img_in,
 			zshift = -zshift;
 		}
 
-		int grid_size = ceilf((float)((xSize*ySize*zSize)/(float)(2*CFTT_BLOCK_SIZE)));
+		int grid_size = ceilf((float)(((size_t)xSize*(size_t)ySize*(size_t)zSize)/
+			(float)(2*CFTT_BLOCK_SIZE)));
 		AccUtilities::centerFFT_3D(grid_size, batchSize, CFTT_BLOCK_SIZE,
 			img_in.getStream(),
 			~img_in,
-			(size_t)xSize*ySize*zSize,
+			(size_t)xSize*(size_t)ySize*(size_t)zSize,
 			xSize,
 			ySize,
 			zSize,
@@ -589,7 +594,8 @@ void lowPassFilterMapGPU(
 	XFLOAT edge_high = XMIPP_MIN(Xdim, (ires_filter + filter_edge_halfwidth) / (RFLOAT)ori_size); // in 1/pix
 	XFLOAT edge_width = edge_high - edge_low;
 
-	int blocks = ceilf( (float)(Xdim*Ydim*Zdim)/ (float)(CFTT_BLOCK_SIZE) );
+	int blocks = ceilf( (float)((size_t)Xdim*(size_t)Ydim*(size_t)Zdim) / 
+		(float)(CFTT_BLOCK_SIZE) );
 	if (do_highpass)
 	{
 		AccUtilities::frequencyPass<true>(blocks,CFTT_BLOCK_SIZE, img_in.getStream(),
@@ -602,7 +608,7 @@ void lowPassFilterMapGPU(
 				edge_width,
 				edge_high,
 				(XFLOAT)angpix,
-				Xdim*Ydim*Zdim);
+				(size_t)Xdim*(size_t)Ydim*(size_t)Zdim);
 	}
 	else
 	{
@@ -616,7 +622,7 @@ void lowPassFilterMapGPU(
 						edge_width,
 						edge_high,
 						(XFLOAT)angpix,
-						Xdim*Ydim*Zdim);
+						(size_t)Xdim*(size_t)Ydim*(size_t)Zdim);
 	}
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 }

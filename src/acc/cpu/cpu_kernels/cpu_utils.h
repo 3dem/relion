@@ -44,7 +44,7 @@ class checkedArray
 
 /*
  * For the following functions always use fast, low-precision intrinsics
- */
+ 
 
 template< typename T1, typename T2 >
 static inline
@@ -61,6 +61,54 @@ int ceilfracf(T1 a, T2 b)
 //	return __float2int_ru(__fdividef( (float)a, (float)b ) );
 	return (int)(a/b + 1);
 }
+ */
+static inline
+int floorfracf(int a, int b)
+{
+        return (int)(a/b);
+}
+
+static inline
+size_t floorfracf(size_t a, int b)
+{
+        return (size_t)(a/b);
+}
+
+static inline
+int floorfracf(int a, size_t b)
+{
+        return (int)(a/b);
+}
+
+static inline
+size_t floorfracf(size_t a, size_t b)
+{
+        return (size_t)(a/b);
+}
+
+static inline
+int ceilfracf(int a, int b)
+{
+        return (int)(a/b + 1);
+}
+
+static inline
+size_t ceilfracf(size_t a, int b)
+{
+        return (size_t)(a/b + (size_t)1);
+}
+
+static inline
+int ceilfracf(int a, size_t b)
+{
+        return (int)(a/b + 1);
+}
+
+static inline
+size_t ceilfracf(size_t a, size_t b)
+{
+        return (size_t)(a/b + (size_t)1);
+}
 
 static inline
 XFLOAT no_tex2D(XFLOAT* mdl, XFLOAT xp, XFLOAT yp, int mdlX, int mdlInitY)
@@ -75,10 +123,10 @@ XFLOAT no_tex2D(XFLOAT* mdl, XFLOAT xp, XFLOAT yp, int mdlX, int mdlInitY)
 	int y1 = y0 + 1;
 
 	//-----------------------------
-	XFLOAT d00 = mdl[y0*mdlX+x0];
-	XFLOAT d01 = mdl[y0*mdlX+x1];
-	XFLOAT d10 = mdl[y1*mdlX+x0];
-	XFLOAT d11 = mdl[y1*mdlX+x1];
+	XFLOAT d00 = mdl[(size_t)y0*(size_t)mdlX+x0];
+	XFLOAT d01 = mdl[(size_t)y0*(size_t)mdlX+x1];
+	XFLOAT d10 = mdl[(size_t)y1*(size_t)mdlX+x0];
+	XFLOAT d11 = mdl[(size_t)y1*(size_t)mdlX+x1];
 	//-----------------------------
 	XFLOAT dx0 = d00 + (d01 - d00)*fx;
 	XFLOAT dx1 = d10 + (d11 - d10)*fx;
@@ -100,10 +148,10 @@ void complex2D(std::complex<XFLOAT> *mdlComplex, XFLOAT &real, XFLOAT &imag,
 	XFLOAT fy = yp - y0;
 	y0 -= mdlInitY;
 
-    int offset1 = (y0 * mdlX + x0);
-    int offset2 = offset1 + 1;
-    int offset3 = offset1 + mdlX;
-    int offset4 = offset3 + 1;  
+    size_t offset1 = ((size_t)y0 * (size_t)mdlX + (size_t)x0);
+    size_t offset2 = offset1 + (size_t)1;
+    size_t offset3 = offset1 + (size_t)mdlX;
+    size_t offset4 = offset3 + (size_t)1;  
     
 	//-----------------------------
 	XFLOAT d00[2], d01[2], d10[2], d11[2];
@@ -155,14 +203,14 @@ XFLOAT no_tex3D(
 	z0 -= mdlInitZ;
 	int z1 = z0 + 1;
 
-	XFLOAT d000 = mdl[z0*mdlXY+y0*mdlX+x0];
-	XFLOAT d001 = mdl[z0*mdlXY+y0*mdlX+x1];
-	XFLOAT d010 = mdl[z0*mdlXY+y1*mdlX+x0];
-	XFLOAT d011 = mdl[z0*mdlXY+y1*mdlX+x1];
-	XFLOAT d100 = mdl[z1*mdlXY+y0*mdlX+x0];
-	XFLOAT d101 = mdl[z1*mdlXY+y0*mdlX+x1];
-	XFLOAT d110 = mdl[z1*mdlXY+y1*mdlX+x0];
-	XFLOAT d111 = mdl[z1*mdlXY+y1*mdlX+x1];
+	XFLOAT d000 = mdl[(size_t)z0*(size_t)mdlXY+(size_t)y0*(size_t)mdlX+x0];
+	XFLOAT d001 = mdl[(size_t)z0*(size_t)mdlXY+(size_t)y0*(size_t)mdlX+x1];
+	XFLOAT d010 = mdl[(size_t)z0*(size_t)mdlXY+(size_t)y1*(size_t)mdlX+x0];
+	XFLOAT d011 = mdl[(size_t)z0*(size_t)mdlXY+(size_t)y1*(size_t)mdlX+x1];
+	XFLOAT d100 = mdl[(size_t)z1*(size_t)mdlXY+(size_t)y0*(size_t)mdlX+x0];
+	XFLOAT d101 = mdl[(size_t)z1*(size_t)mdlXY+(size_t)y0*(size_t)mdlX+x1];
+	XFLOAT d110 = mdl[(size_t)z1*(size_t)mdlXY+(size_t)y1*(size_t)mdlX+x0];
+	XFLOAT d111 = mdl[(size_t)z1*(size_t)mdlXY+(size_t)y1*(size_t)mdlX+x1];
 	//-----------------------------
 	XFLOAT dx00 = d000 + (d001 - d000)*fx;
 	XFLOAT dx01 = d100 + (d101 - d100)*fx;
@@ -182,19 +230,11 @@ __attribute__((vector(uniform(mdlX,mdlXY,mdlInitY,mdlInitZ))))
 #endif
 static inline
 void complex3D(
-#ifdef DEBUG_CUDA
-				std::complex<XFLOAT> * _mdlComplex, 
-#else
 				std::complex<XFLOAT> * mdlComplex, 
-#endif
 				XFLOAT &real, XFLOAT &imag,
 				XFLOAT xp, XFLOAT yp, XFLOAT zp, int mdlX, int mdlXY, int mdlInitY, int mdlInitZ
 		)
 {
-#ifdef DEBUG_CUDA
-	checkedArray<std::complex<XFLOAT> > mdlComplex;
-	mdlComplex.initCheckedArray(_mdlComplex);
-#endif
 	int x0 = floorf(xp);
 	XFLOAT fx = xp - x0;
 
@@ -206,14 +246,14 @@ void complex3D(
 	XFLOAT fz = zp - z0;
 	z0 -= mdlInitZ;
 
-    int offset1 = (z0*mdlXY+y0*mdlX+x0);
-    int offset2 = offset1 + 1;
-    int offset3 = offset1 + mdlX;
-    int offset4 = offset3 + 1;
-    int offset5 = offset1 + mdlXY;
-    int offset6 = offset2 + mdlXY;
-    int offset7 = offset3 + mdlXY;
-    int offset8 = offset4 + mdlXY;    
+    size_t offset1 = (size_t)((size_t)z0*(size_t)mdlXY+(size_t)y0*(size_t)mdlX+(size_t)x0);
+    size_t offset2 = offset1 + (size_t)1;
+    size_t offset3 = offset1 + (size_t)mdlX;
+    size_t offset4 = offset3 + (size_t)1;
+    size_t offset5 = offset1 + (size_t)mdlXY;
+    size_t offset6 = offset2 + (size_t)mdlXY;
+    size_t offset7 = offset3 + (size_t)mdlXY;
+    size_t offset8 = offset4 + (size_t)mdlXY;    
         
 	XFLOAT d000[2], d001[2], d010[2], d011[2];
 	XFLOAT d100[2], d101[2], d110[2], d111[2]; 

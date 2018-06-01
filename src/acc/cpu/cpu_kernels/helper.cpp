@@ -31,8 +31,8 @@ void exponentiate_weights_fine(
 		bool *g_pdf_offset_zeros,
 		XFLOAT *g_weights,
 		XFLOAT min_diff2,
-		int oversamples_orient,
-		int oversamples_trans,
+		unsigned long  oversamples_orient,
+		unsigned long  oversamples_trans,
 		unsigned long *d_rot_id,
 		unsigned long *d_trans_idx,
 		unsigned long *d_job_idx,
@@ -48,7 +48,7 @@ void exponentiate_weights_fine(
 		long int in = d_job_num  [jobid]; // ...AND the number of translations to go through
 
 		int c_itrans;
-		for (int itrans=0; itrans < in; itrans++, iy++)
+		for (long int itrans=0; itrans < in; itrans++, iy++)
 		{
 			c_itrans = ( iy - (iy % oversamples_trans))/ oversamples_trans;
 
@@ -62,9 +62,9 @@ void exponentiate_weights_fine(
 }
 void RNDnormalDitributionComplexWithPowerModulation(ACCCOMPLEX* Image, size_t xdim, XFLOAT *spectra)
 {
-	int x,y,size;
+	size_t x,y,size;
 	size = xdim*((xdim-1)*2);
-	for(int i=0; i<size; i++)
+	for(size_t i=0; i<size; i++)
     {
 		y = ( i / xdim ); // fftshift in one of two dims;
 		if(y>=xdim)
@@ -110,10 +110,10 @@ void softMaskBackgroundValue(	int      block_dim,
 			int x,y,z;
 			XFLOAT     img_pixels;
 
-			size_t texel_pass_num = ceilfracf(vol_size,block_size*block_dim);
-			size_t texel = bid*block_size*texel_pass_num + tid;
+			size_t texel_pass_num = ceilfracf((size_t)vol_size,(size_t)block_size*(size_t)block_dim);
+			size_t texel = (size_t)bid*(size_t)block_size*(size_t)texel_pass_num + tid;
 
-			for (int pass = 0; pass < texel_pass_num; pass++, texel+=block_size) // loop through all translations for this orientation
+			for (size_t pass = 0; pass < texel_pass_num; pass++, texel+=block_size) // loop through all translations for this orientation
 			{
 				if(texel<vol_size)
 				{
@@ -179,11 +179,11 @@ void cosineFilter(	int      block_dim,
 			int x,y,z;
 			XFLOAT     img_pixels;
 
-			size_t texel_pass_num = ceilfracf(vol_size,block_size*block_dim);
-			size_t texel = bid*block_size*texel_pass_num + tid;
+			size_t texel_pass_num = ceilfracf((size_t)vol_size,(size_t)block_size*(size_t)block_dim);
+			size_t texel = (size_t)bid*(size_t)block_size*(size_t)texel_pass_num + tid;
 
 			defVal = bg_value;
-			for (int pass = 0; pass < texel_pass_num; pass++, texel+=block_size) // loop the available warps enough to complete all translations for this orientation
+			for (size_t pass = 0; pass < texel_pass_num; pass++, texel+=block_size) // loop the available warps enough to complete all translations for this orientation
 			{
 				if(texel<vol_size)
 				{
@@ -464,7 +464,7 @@ void probRatio( int       blockIdx_x,
 				XFLOAT   *d_Maux,
 				XFLOAT   *d_Mmean,
 				XFLOAT   *d_Mstddev,
-				int       image_size,
+				size_t       image_size,
 				XFLOAT    normfft,
 				XFLOAT    sum_ref_under_circ_mask,
 				XFLOAT    sum_ref2_under_circ_mask,
@@ -489,7 +489,7 @@ void probRatio( int       blockIdx_x,
 	 *
 	 *|
 
-	int pixel = threadIdx_x + blockIdx_x*(int)PROBRATIO_BLOCK_SIZE;
+	size_t pixel = (size_t)threadIdx_x + (size_t)blockIdx_x*(size_t)PROBRATIO_BLOCK_SIZE;
 	if(pixel<image_size)
 	{
 		XFLOAT Kccf = d_Mccf[pixel];
@@ -533,8 +533,8 @@ void rotateOnly(int              blockIdx_x,
 		       )
 {
 	int proj = blockIdx_y;
-	int image_size=projector.imgX*projector.imgY;
-	int pixel = threadIdx_x + blockIdx_x*BLOCK_SIZE;
+	size_t image_size=(size_t)projector.imgX*(size_t)projector.imgY;
+	size_t pixel = (size_t)threadIdx_x + (size_t)blockIdx_x*(size_t)BLOCK_SIZE;
 	if(pixel<image_size)
 	{
 		int y = floorfracf(pixel,projector.imgX);
@@ -582,8 +582,8 @@ void rotateAndCtf(  int              blockIdx_x,
 				)
 {
 	int proj = blockIdx_y;
-	int image_size=projector.imgX*projector.imgY;
-	int pixel = threadIdx_x + blockIdx_x*BLOCK_SIZE;
+	size_t image_size=(size_t)projector.imgX*(size_t)projector.imgY;
+	size_t pixel = (size_t)threadIdx_x + (size_t)blockIdx_x*(size_t)BLOCK_SIZE;
 	if(pixel<image_size)
 	{
 		int y = floorfracf(pixel,projector.imgX);
@@ -625,9 +625,9 @@ void convol_A(  int           blockIdx_x,
 				int           threadIdx_x,
 				ACCCOMPLEX  *d_A,
 				ACCCOMPLEX  *d_B,
-				int           image_size)
+				size_t           image_size)
 {
-	int pixel = threadIdx_x + blockIdx_x*BLOCK_SIZE;
+	size_t pixel = (size_t)threadIdx_x + (size_t)blockIdx_x*(size_t)BLOCK_SIZE;
 	if(pixel<image_size)
 	{
 		XFLOAT tr =   d_A[pixel].x;
@@ -642,9 +642,9 @@ void convol_A(  int          blockIdx_x,
 				ACCCOMPLEX *d_A,
 				ACCCOMPLEX *d_B,
 				ACCCOMPLEX *d_C,
-				int          image_size)
+				size_t          image_size)
 {
-	int pixel = threadIdx_x + blockIdx_x*BLOCK_SIZE;
+	size_t pixel = (size_t)threadIdx_x + (size_t)blockIdx_x*(size_t)BLOCK_SIZE;
 	if(pixel<image_size)
 	{
 		XFLOAT tr =   d_A[pixel].x;
@@ -659,9 +659,9 @@ void batch_convol_A(int           blockIdx_x,
 					int           threadIdx_x,
 					ACCCOMPLEX  *d_A,
 					ACCCOMPLEX  *d_B,
-					int           image_size)
+					size_t           image_size)
 {
-	int pixel = threadIdx_x + blockIdx_x*BLOCK_SIZE;
+	size_t pixel = (size_t)threadIdx_x + (size_t)blockIdx_x*(size_t)BLOCK_SIZE;
 	int A_off = blockIdx_y * image_size;
 	if(pixel<image_size)
 	{
@@ -678,9 +678,9 @@ void batch_convol_A(int           blockIdx_x,
 					ACCCOMPLEX  *d_A,
 					ACCCOMPLEX  *d_B,
 					ACCCOMPLEX  *d_C,
-					int           image_size)
+					size_t           image_size)
 {
-	int pixel = threadIdx_x + blockIdx_x*BLOCK_SIZE;
+	size_t pixel = (size_t)threadIdx_x + (size_t)blockIdx_x*(size_t)BLOCK_SIZE;
 	int A_off = blockIdx_y*image_size;
 	if(pixel<image_size)
 	{
@@ -695,9 +695,9 @@ void convol_B(  int          blockIdx_x,
 				int          threadIdx_x,
 				ACCCOMPLEX *d_A,
 				ACCCOMPLEX *d_B,
-				int          image_size)
+				size_t          image_size)
 {
-	int pixel =  threadIdx_x + blockIdx_x*BLOCK_SIZE;
+	size_t pixel =  (size_t)threadIdx_x + (size_t)blockIdx_x*(size_t)BLOCK_SIZE;
 	if(pixel<image_size)
 	{
 		XFLOAT tr = d_A[pixel].x;
@@ -712,9 +712,9 @@ void convol_B(  int           blockIdx_x,
 				ACCCOMPLEX  *d_A,
 				ACCCOMPLEX  *d_B,
 				ACCCOMPLEX  *d_C,
-				int           image_size)
+				size_t           image_size)
 {
-	int pixel = threadIdx_x + blockIdx_x*BLOCK_SIZE;
+	size_t pixel = (size_t)threadIdx_x + (size_t)blockIdx_x*(size_t)BLOCK_SIZE;
 	if(pixel<image_size)
 	{
 		XFLOAT tr = d_A[pixel].x;
@@ -729,9 +729,9 @@ void batch_convol_B(int          blockIdx_x,
 					int          threadIdx_x,
 					ACCCOMPLEX *d_A,
 					ACCCOMPLEX *d_B,
-					int          image_size)
+					size_t          image_size)
 {
-	long int pixel = threadIdx_x + blockIdx_x*BLOCK_SIZE;
+	long int pixel = (size_t)threadIdx_x + (size_t)blockIdx_x*(size_t)BLOCK_SIZE;
 	int A_off = blockIdx_y*image_size;
 	if(pixel<image_size)
 	{
@@ -746,26 +746,26 @@ template <typename T>
 void cpu_kernel_multi( T *A,
 			T *OUT,
 			T  S,
-			int     image_size)
+			size_t     image_size)
 {
 #ifdef DEBUG_CUDA
 	if (image_size < 0)
 		ACC_PTR_DEBUG_INFO("cpu_kernel_multi:  image_size < 0");
 #endif
-	for (int i = 0; i < image_size; i ++)
+	for (size_t i = 0; i < image_size; i ++)
 		OUT[i] = A[i]*S;
 }
 
 template <typename T>
 void cpu_kernel_multi( T *A,
 			T  S,
-			int     image_size)
+			size_t     image_size)
 {
 #ifdef DEBUG_CUDA
 	if (image_size < 0)
 		ACC_PTR_DEBUG_INFO("cpu_kernel_multi2:  image_size < 0");
 #endif
-	for (int i = 0; i < image_size; i ++)
+	for (size_t i = 0; i < image_size; i ++)
 		A[i] *= S;
 }
 
@@ -774,13 +774,13 @@ void cpu_kernel_multi( T *A,
 			T *B,
 			T *OUT,
 			T  S,
-			int     image_size)
+			size_t     image_size)
 {
 #ifdef DEBUG_CUDA
 	if (image_size < 0)
 		ACC_PTR_DEBUG_INFO("cpu_kernel_multi3:  image_size < 0");
 #endif
-	for (int i = 0; i < image_size; i ++)
+	for (size_t i = 0; i < image_size; i ++)
 		OUT[i] = A[i]*B[i]*S;
 }
 /*
@@ -791,9 +791,9 @@ void batch_multi(   int     blockIdx_x,
 					XFLOAT *B,
 					XFLOAT *OUT,
 					XFLOAT  S,
-					int     image_size)
+					size_t     image_size)
 {
-	int pixel = threadIdx_x + blockIdx_x*BLOCK_SIZE;
+	sise_t pixel = (size_t)threadIdx_x + (size_t)blockIdx_x*(size_t)BLOCK_SIZE;
 	if(pixel<image_size)
 		OUT[pixel + blockIdx_y*image_size] = A[pixel + blockIdx_y*image_size]*B[pixel + blockIdx_y*image_size]*S;
 }
@@ -804,9 +804,9 @@ void finalizeMstddev(   int     blockIdx_x,
 						XFLOAT *Mstddev,
 						XFLOAT *aux,
 						XFLOAT  S,
-						int     image_size)
+						size_t     image_size)
 {
-	int pixel = threadIdx_x + blockIdx_x*BLOCK_SIZE;
+	int size_t = (size_t)threadIdx_x + (size_t)blockIdx_x*(size_t)BLOCK_SIZE;
 	if(pixel<image_size)
 	{
 		XFLOAT temp = Mstddev[pixel] + S * aux[pixel];
@@ -820,9 +820,9 @@ void finalizeMstddev(   int     blockIdx_x,
 void square(int     blockIdx_x,
 			int     threadIdx_x,
 			XFLOAT *A,
-			int     image_size)
+			size_t     image_size)
 {
-	int pixel = threadIdx_x + blockIdx_x*BLOCK_SIZE;
+	size_t pixel = (size_t)threadIdx_x + (size_t)blockIdx_x*(size_t)BLOCK_SIZE;
 	if(pixel<image_size)
 		A[pixel] = A[pixel]*A[pixel];
 }
@@ -831,7 +831,7 @@ template<bool invert>
 void cpu_kernel_make_eulers_2D(int grid_size, int block_size,
 		XFLOAT *alphas,
 		XFLOAT *eulers,
-		unsigned orientation_num)
+		unsigned long orientation_num)
 {
 #ifdef DEBUG_CUDA
 	if ((size_t)grid_size*(size_t)block_size > (size_t)std::numeric_limits<int>::max())
@@ -839,7 +839,7 @@ void cpu_kernel_make_eulers_2D(int grid_size, int block_size,
 #endif
 	for(int blockIdx_x=0; blockIdx_x<(int)(grid_size); blockIdx_x++) {
 		for(int threadIdx_x=0; threadIdx_x<block_size; threadIdx_x++)  {							
-			unsigned oid = blockIdx_x * block_size + threadIdx_x; //Orientation id
+			unsigned long oid = (unsigned long)blockIdx_x * (unsigned long)block_size + threadIdx_x; //Orientation id
 
 			if (oid >= orientation_num)
 				return;
@@ -887,7 +887,7 @@ void cpu_kernel_make_eulers_3D(int grid_size, int block_size,
 		XFLOAT *betas,
 		XFLOAT *gammas,
 		XFLOAT *eulers,
-		unsigned orientation_num,
+		unsigned long orientation_num,
 		XFLOAT *L,
 		XFLOAT *R)
 {
@@ -900,7 +900,7 @@ void cpu_kernel_make_eulers_3D(int grid_size, int block_size,
 			XFLOAT a(0.f),b(0.f),g(0.f), A[9],B[9];
 			XFLOAT ca, sa, cb, sb, cg, sg, cc, cs, sc, ss;
 
-			unsigned oid = blockIdx_x * block_size + threadIdx_x; //Orientation id
+			unsigned long oid = (unsigned long)blockIdx_x * (unsigned long)block_size + threadIdx_x; //Orientation id
 
 			if (oid >= orientation_num)
 				return;
@@ -1005,28 +1005,28 @@ template void CpuKernels::cpu_translate3D<XFLOAT>(XFLOAT *,
     XFLOAT *, size_t, int, int, int, int, int, int);
 
 template void CpuKernels::cpu_kernel_multi<XFLOAT>( XFLOAT *,
-	XFLOAT, int);
+	XFLOAT, size_t);
 
 template void CpuKernels::cpu_kernel_make_eulers_3D<true, true, true>(int, int,
-		XFLOAT *, XFLOAT *, XFLOAT *, XFLOAT *, unsigned, XFLOAT *, XFLOAT *);
+		XFLOAT *, XFLOAT *, XFLOAT *, XFLOAT *, unsigned long, XFLOAT *, XFLOAT *);
 template void CpuKernels::cpu_kernel_make_eulers_3D<true, true, false>(int, int,
-		XFLOAT *, XFLOAT *, XFLOAT *, XFLOAT *, unsigned, XFLOAT *, XFLOAT *);
+		XFLOAT *, XFLOAT *, XFLOAT *, XFLOAT *, unsigned long, XFLOAT *, XFLOAT *);
 template void CpuKernels::cpu_kernel_make_eulers_3D<true, false,true>(int, int,
-		XFLOAT *, XFLOAT *, XFLOAT *, XFLOAT *, unsigned, XFLOAT *, XFLOAT *);
+		XFLOAT *, XFLOAT *, XFLOAT *, XFLOAT *, unsigned long, XFLOAT *, XFLOAT *);
 template void CpuKernels::cpu_kernel_make_eulers_3D<true, false,false>(int, int,
-		XFLOAT *, XFLOAT *, XFLOAT *, XFLOAT *, unsigned, XFLOAT *, XFLOAT *);
+		XFLOAT *, XFLOAT *, XFLOAT *, XFLOAT *, unsigned long, XFLOAT *, XFLOAT *);
 template void CpuKernels::cpu_kernel_make_eulers_3D<false,true, true>(int, int,
-		XFLOAT *, XFLOAT *, XFLOAT *, XFLOAT *, unsigned, XFLOAT *, XFLOAT *);
+		XFLOAT *, XFLOAT *, XFLOAT *, XFLOAT *, unsigned long, XFLOAT *, XFLOAT *);
 template void CpuKernels::cpu_kernel_make_eulers_3D<false,true, false>(int, int,
-		XFLOAT *, XFLOAT *, XFLOAT *, XFLOAT *, unsigned, XFLOAT *, XFLOAT *);
+		XFLOAT *, XFLOAT *, XFLOAT *, XFLOAT *, unsigned long, XFLOAT *, XFLOAT *);
 template void CpuKernels::cpu_kernel_make_eulers_3D<false,false,true>(int, int,
-		XFLOAT *, XFLOAT *, XFLOAT *, XFLOAT *, unsigned, XFLOAT *, XFLOAT *);
+		XFLOAT *, XFLOAT *, XFLOAT *, XFLOAT *, unsigned long, XFLOAT *, XFLOAT *);
 template void CpuKernels::cpu_kernel_make_eulers_3D<false,false,false>(int, int,
-		XFLOAT *, XFLOAT *, XFLOAT *, XFLOAT *, unsigned, XFLOAT *, XFLOAT *);
+		XFLOAT *, XFLOAT *, XFLOAT *, XFLOAT *, unsigned long, XFLOAT *, XFLOAT *);
 
 template void CpuKernels::cpu_kernel_make_eulers_2D<true>(int, int, 
-		XFLOAT *, XFLOAT *, unsigned);
+		XFLOAT *, XFLOAT *, unsigned long);
 template void CpuKernels::cpu_kernel_make_eulers_2D<false>(int, int, 
-		XFLOAT *, XFLOAT *, unsigned);
+		XFLOAT *, XFLOAT *, unsigned long);
 // ----------------------------------------------------------------------
 

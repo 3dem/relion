@@ -24,9 +24,9 @@ bool AccProjector::setMdlDim(
 	mdlY = ydim;
 	mdlZ = zdim;
 	if(zdim == 0)
-		mdlXYZ = xdim*ydim;
+		mdlXYZ = (size_t)xdim*(size_t)ydim;
 	else
-		mdlXYZ = xdim*ydim*zdim;
+		mdlXYZ = (size_t)xdim*(size_t)ydim*(size_t)zdim;
 	mdlInitY = inity;
 	mdlInitZ = initz;
 	mdlMaxR = maxr;
@@ -162,7 +162,7 @@ void AccProjector::initMdl(XFLOAT *real, XFLOAT *imag)
 	DEBUG_HANDLE_ERROR(cudaMemcpy( mdlImag, imag, mdlXYZ * sizeof(XFLOAT), cudaMemcpyHostToDevice));
 #else
 	std::complex<XFLOAT> *pData = mdlComplex;
-    for(int i=0; i<mdlXYZ; i++) {
+    for(size_t i=0; i<mdlXYZ; i++) {
 		std::complex<XFLOAT> arrayval(*real ++, *imag ++);
 		pData[i] = arrayval;		        
     }
@@ -187,7 +187,7 @@ void AccProjector::initMdl(Complex *data)
 	if (posix_memalign((void **)&tmpImag, MEM_ALIGN, mdlXYZ * sizeof(XFLOAT))) CRITICAL(RAMERR);
 
 
-	for (unsigned long i = 0; i < mdlXYZ; i ++)
+	for (size_t i = 0; i < mdlXYZ; i ++)
 	{
 		tmpReal[i] = (XFLOAT) data[i].real;
 		tmpImag[i] = (XFLOAT) data[i].imag;

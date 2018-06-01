@@ -61,11 +61,12 @@ public:
 				maxR(maxR), maxR2(maxR*maxR),
 				mdlReal(mdlReal), mdlImag(mdlImag)
 			{
-#ifndef CUDA			
-				for(int i=0; i<mdlX * mdlY * mdlZ; i++) {
-			        *mdlComplex ++ = *mdlReal ++;
-			        *mdlComplex ++ = *mdlImag ++;
-			    }
+#ifndef CUDA		
+				std::complex<XFLOAT> *pData = mdlComplex;
+				for(size_t i=0; i<(size_t)mdlX * (size_t)mdlY * (size_t)mdlZ; i++) {
+					std::complex<XFLOAT> arrayval(*mdlReal ++, *mdlImag ++);
+					pData[i] = arrayval;		        
+				}
 #endif
 			};
 
