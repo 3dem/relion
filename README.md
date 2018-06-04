@@ -144,46 +144,66 @@ Note that the resulting binary will only work on AVX512 platforms.
      CC=mpiicc CXX=mpiicpc cmake -DCUDA=OFF -DALTCPU=ON -DCudaTexture=OFF -DMKLFFT=ON -D CMAKE_C_FLAGS="-O3 -ip -g -debug inline-debug-info -xMIC-AVX512 -restrict " -D CMAKE_CXX_FLAGS="-O3 -ip -g -debug inline-debug-info -xMIC-AVX512 -restrict " -DGUI=OFF -D CMAKE_BUILD_TYPE=Release ..
      ```
      Note that this binary will only run on Intel(R) Xeon Phi(TM) Processor family platforms.
-  * If you want to run a version of RELION built with the Intel(R) C++ Compiler
-  on another machine or cluster, you can download the runtime libraries for free
-  for use on those machines from the following sources:
-    *  [Intel (R) C++ Compiler libraries](https://software.intel.com/en-us/articles/redistributable-libraries-for-intel-c-and-fortran-2018-compilers-for-linux) including Threading Building Blocks
-      * Decompress the .tgz file
-      * Create a directory to hold all the Intel components somewhere that all
-      machines using the binary can access
-      * Install by running `install.sh` and selecting the above holding directory
-    *  [Intel(R) Math Kernel Libraries and Intel(R) MPI](https://software.intel.com/en-us/mkl)
-      *  Register
-      *  Now download at least "Intel(R) Math Kernel Library (Intel MKL)" and "Intel
-      MPI Library (Linux Package)" (make sure the product "Intel(R) Performance
-      Libraries for Linux*" is selected at the top)
-      *  Install each by running `install.sh` and select a user-level installation
-      that goes to your holding directory
-    * Once done, `source <holding_dir>/compilers_and_libraries_2018.2.199/linux/bin/compilervars.sh intel64`
-    should set up the runtime environment on your machine without a local Intel software installation.
-  * To run the Plasmodium ribosome data set workload found at the [RELION benchmark page](https://www2.mrc-lmb.cam.ac.uk/relion/index.php?title=Benchmarks_%26_computer_hardware)
-  on a machine with two sockets populated by AVX512 CPUs containing 20 cores each supporting
-  Intel(R) Hyper-Threading Technology (so two threads per core for a total of 80 threads -
-  Intel(R) Xeon(R) Gold 6148 processors):
-    * 1 machine - completes in about 4.7 hours:
+* If you want to run a version of RELION built with the Intel(R) C++ Compiler
+on another machine or cluster, you can download the runtime libraries for free
+for use on those machines from the following sources:
+  *  [Intel (R) C++ Compiler libraries](https://software.intel.com/en-us/articles/redistributable-libraries-for-intel-c-and-fortran-2018-compilers-for-linux) including Threading Building Blocks
+    * Decompress the .tgz file
+    * Create a directory to hold all the Intel components somewhere that all
+    machines using the binary can access
+    * Install by running `install.sh` and selecting the above holding directory
+  *  [Intel(R) Math Kernel Libraries and Intel(R) MPI](https://software.intel.com/en-us/mkl)
+    *  Register
+    *  Now download at least "Intel(R) Math Kernel Library (Intel MKL)" and "Intel
+    MPI Library (Linux Package)" (make sure the product "Intel(R) Performance
+    Libraries for Linux*" is selected at the top)
+    *  Install each by running `install.sh` and select a user-level installation
+    that goes to your holding directory
+  * Once done, `source <holding_dir>/compilers_and_libraries_2018.2.199/linux/bin/compilervars.sh intel64`
+  should set up the runtime environment on your machine without a local Intel software installation.
+* Best performance seems to be seen when the pool size (`--pool`) is about twice
+the number of threads (`--j`), to about half the number of threads.  Lowering the
+pool size may also decrease the memory used by a process or rank.  When running
+multi-node, 4 MPI ranks per node seems to also work well (so `--j` should be set
+to the total number of threads in the machine divided by 4, and `--pool` adjusted
+accordingly), although how many ranks you use per machine may also depend on the data set.
+* Systems with 256GB or 512GB are recommended for the CPU-accelerated kernels, with
+the most memory utilization being seen at the last iteration of autorefinement.
+For example, during a multi-rank MPI run, a single process/rank working on an
+800x800 image stack was seen to have a peak memory use of about 170GB during this
+final iteration.  By contrast, the previous iterations of the same data set have a
+peak memory utilization of about 90 GB per rank (the same was seen during 3D
+classification).   This data set would be run one rank per node on a 256GB system
+due to the memory requirements of this final iteration.
+By contrast, a data set with 300x300 images (Plasmodium ribosome) can run with
+4 ranks per 256GB system without swapping.
+* To run the Plasmodium ribosome data set workload found at the [RELION benchmark page](https://www2.mrc-lmb.cam.ac.uk/relion/index.php?title=Benchmarks_%26_computer_hardware)
+on a machine with two sockets populated by AVX512 CPUs containing 20 cores each supporting
+Intel(R) Hyper-Threading Technology (so two threads per core for a total of 80 threads -
+Intel(R) Xeon(R) Gold 6148 processors):
+  * 1 machine - completes in about 4.7 hours when built with Intel(R) Parallel
+Studio XE 2018 Cluster Edition and the options listed above:
 ```
 export OMP_SCHEDULE="dynamic"
 export KMP_BLOCKTIME=0
 relion_refine --o Results/skx --i Particles/shiny_2sets.star --ref emd_2660.map:mrc --firstiter_cc --ini_high 60 --ctf --ctf_corrected_ref --tau2_fudge 4 --particle_diameter 360 --K 6 --flatten_solvent --zero_mask --oversampling 1 --healpix_order 2 --offset_range 5 --offset_step 2 --sym C1 --norm --scale --random_seed 0 --dont_combine_weights_via_disc --preread_images --iter 25 --pool 160 --j 80 --cpu
 ```
-    * 2 machines - completes in about 2.6 hours:
-    ```
+  * 2 machines - completes in about 2.6 hours when built with Intel(R) Parallel
+Studio XE 2018 Cluster Edition and the options listed above:
+  ```
 export OMP_SCHEDULE="dynamic"
 export KMP_BLOCKTIME=0
 mpirun -perhost 4 -np 8 relion_refine_mpi --i Particles/shiny_2sets.star --ref emd_2660.map:mrc --firstiter_cc --ini_high 60 --dont_combine_weights_via_disc --ctf --ctf_corrected_ref --tau2_fudge 4 --particle_diameter 360 --K 6 --flatten_solvent --zero_mask --oversampling 1 --healpix_order 2 --offset_range 5 --offset_step 2 --sym C1 --norm --scale --random_seed 0 --o Results/cpu --pool 40 --j 20 --iter 25 --cpu
-    ```
-    * 4 machines - completes in about 1.4 hours:
+  ```
+  * 4 machines - completes in about 1.4 hours when built with Intel(R) Parallel
+Studio XE 2018 Cluster Edition and the options listed above:
 ```
 export OMP_SCHEDULE="dynamic"
 export KMP_BLOCKTIME=0
 mpirun -perhost 4 -np 16 relion_refine_mpi --i Particles/shiny_2sets.star --ref emd_2660.map:mrc --firstiter_cc --ini_high 60 --dont_combine_weights_via_disc --ctf --ctf_corrected_ref --tau2_fudge 4 --particle_diameter 360 --K 6 --flatten_solvent --zero_mask --oversampling 1 --healpix_order 2 --offset_range 5 --offset_step 2 --sym C1 --norm --scale --random_seed 0 --o Results/cpu --pool 40 --j 20 --iter 25 --cpu
 ```
-    * 8 machines - completes in about 1 hour:
+  * 8 machines - completes in about 1 hour when built with Intel(R) Parallel
+Studio XE 2018 Cluster Edition and the options listed above:
 ```
 export OMP_SCHEDULE="dynamic"
 export KMP_BLOCKTIME=0
