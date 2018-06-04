@@ -293,6 +293,13 @@ void CtffindRunner::run()
 void CtffindRunner::joinCtffindResults()
 {
 
+	long int barstep = XMIPP_MAX(1, fn_micrographs_all.size() / 60);
+	if (verb > 0)
+	{
+		std::cout << " Generating logfile.pdf ... " << std::endl;
+		init_progress_bar(fn_micrographs_all.size());
+	}
+
 	MetaDataTable MDctf;
 	for (long int imic = 0; imic < fn_micrographs_all.size(); imic++)
     {
@@ -321,6 +328,7 @@ void CtffindRunner::joinCtffindResults()
 			MDctf.setValue(EMDL_CTF_IMAGE, fn_ctf);
 			MDctf.setValue(EMDL_CTF_DEFOCUSU, defU);
 			MDctf.setValue(EMDL_CTF_DEFOCUSV, defV);
+			MDctf.setValue(EMDL_CTF_ASTIGMATISM, fabs(defU-defV));
 			MDctf.setValue(EMDL_CTF_DEFOCUS_ANGLE, defAng);
 			MDctf.setValue(EMDL_CTF_VOLTAGE, HT);
 			MDctf.setValue(EMDL_CTF_CS, CS);
@@ -338,13 +346,18 @@ void CtffindRunner::joinCtffindResults()
 			if (fabs(valscore + 999.) > 0.)
 				MDctf.setValue(EMDL_CTF_VALIDATIONSCORE, valscore);
 		}
+
+		if (verb > 0 && imic % 60 == 0) progress_bar(imic);
+
     }
+
 	MDctf.write(fn_out+"micrographs_ctf.star");
-	std::cout << " Done! Written out: " << fn_out <<  "micrographs_ctf.star" << std::endl;
 
 
 	std::vector<EMDLabel> plot_labels;
 	plot_labels.push_back(EMDL_CTF_DEFOCUSU);
+	plot_labels.push_back(EMDL_CTF_DEFOCUS_ANGLE);
+	plot_labels.push_back(EMDL_CTF_ASTIGMATISM);
 	plot_labels.push_back(EMDL_CTF_MAXRES);
 	plot_labels.push_back(EMDL_CTF_PHASESHIFT);
 	plot_labels.push_back(EMDL_CTF_FOM);
@@ -357,7 +370,7 @@ void CtffindRunner::joinCtffindResults()
 		if (MDctf.containsLabel(label))
 		{
 			// Values for all micrographs
-			CPlot2D *plot2Db=new CPlot2D("For all micrographs");
+			CPlot2D *plot2Db=new CPlot2D(EMDL::label2Str(label) + " for all micrographs");
 			MDctf.addToCPlot2D(plot2Db, EMDL_UNDEFINED, label, 1.);
 			plot2Db->SetDrawLegend(false);
 			fn_eps = fn_eps_root + "_all_" + EMDL::label2Str(label) + ".eps";
@@ -374,6 +387,12 @@ void CtffindRunner::joinCtffindResults()
 		}
 	}
 	joinMultipleEPSIntoSinglePDF(fn_out + "logfile.pdf ", all_fn_eps);
+
+	if (verb > 0 )
+	{
+		progress_bar(fn_micrographs_all.size());
+		std::cout << " Done! Written out: " << fn_out <<  "micrographs_ctf.star and " << fn_out << "logfile.pdf" << std::endl;
+	}
 
 	if (do_use_gctf)
 	{

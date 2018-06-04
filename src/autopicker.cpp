@@ -885,8 +885,13 @@ void AutoPicker::run()
 
 void AutoPicker::generatePDFLogfile()
 {
+
+	long int barstep = XMIPP_MAX(1, fn_ori_micrographs.size() / 60);
 	if (verb > 0)
-		std::cout << " Generate PDF logfile ... " << std::endl;
+	{
+		std::cout << " Generating logfile.pdf ... " << std::endl;
+		init_progress_bar(fn_ori_micrographs.size());
+	}
 
 	MetaDataTable MDresult;
 	RFLOAT total_nr_picked = 0;
@@ -914,10 +919,15 @@ void AutoPicker::generatePDFLogfile()
 				MDresult.setValue(EMDL_MLMODEL_GROUP_NR_PARTICLES, nr_pick);
 			}
 		}
+
+		if (verb > 0 && imic % 60 == 0) progress_bar(imic);
+
 	}
 
-	if (verb > 0)
+
+	if (verb > 0 )
 	{
+		progress_bar(fn_ori_micrographs.size());
 		std::cout << " Total number of particles from " << fn_ori_micrographs.size() << " micrographs is " << total_nr_picked << std::endl;
 		std::cout << " i.e. on average there were " << ROUND(total_nr_picked/fn_ori_micrographs.size()) << " particles per micrograph" << std::endl;
 	}
@@ -956,6 +966,11 @@ void AutoPicker::generatePDFLogfile()
 	delete plot2D, plot2Db, plot2Dc, plot2Dd;
 
 	joinMultipleEPSIntoSinglePDF(fn_odir + "logfile.pdf ", all_fn_eps);
+
+	if (verb > 0)
+	{
+		std::cout << " Done! Written: " << fn_odir << "logfile.pdf " << std::endl;
+	}
 
 }
 
