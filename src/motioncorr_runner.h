@@ -78,6 +78,9 @@ public:
 	// Downsampling rate of CCF
 	double ccf_downsample;
 
+	// Dose at which to distinguish between early/late global motion in output statistics
+	double dose_motionstats_cutoff;
+
 	// Also save the aligned movies?
 	bool do_save_movies;
 
