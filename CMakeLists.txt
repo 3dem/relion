@@ -85,9 +85,16 @@ option(DoublePrec_ACC "Accelerated Code use double-precision" OFF)
 option(MKLFFT "Use MKL rather than FFTW for FFT" OFF)
 option(CudaTexture "CudaTexture" ON)
 
+if(ALTCPU AND CUDA)
+   message(FATAL_ERROR "You cannot build with both CUDA and ALTCPU enabled.  Please choose one and rerun CMAKE")
+endif()
+
 if(ALTCPU)
-   message(STATUS "Turning CUDA off since ALTCPU is enabled")
-   set(CUDA FALSE)
+    message(STATUS "ALTCPU enabled - Building CPU-accelerated version of RELION")
+endif()
+
+if(CUDA)
+    message(STATUS "CUDA enabled - Building CUDA-accelerated version of RELION")
 endif()
 
 if(CUDA OR ALTCPU)

@@ -54,7 +54,18 @@ These steps will download the source-code, create a build-directory,
 then configure and build relion, and lastly install it to be generally
 available on the system.
 
-## Options for Accelerated versions
+## Options for Accelerated versions of relion\_refine\*
+
+Depending on your build options, you can build two different RELION binaries.
+One will contain the original CPU version of RELION plus the CUDA-accelerated
+version, invoked with the "`--gpu`" flag.   The other will contain the original
+CPU version of RELION plus the CPU-accelerated version, invoked with the "`--cpu`"
+flag.  Unfortunately, all three versions cannot be built into the same binaries
+at this time.  So, if you wish to have all three available at
+your site, you will need to copy the binaries at `<RELION_root>/build/bin` and the
+shared library `librelion_lib.so` at `<RELION_root>/build/lib` into a holding directory,
+clean out the build area, set up and build with a different set of build options, and then
+copy the new binaries and `librelion_lib.so` into a different holding directory.
 
 ### CUDA-accelerated kernels
 To build with support for CUDA-accelerated kernels in addition to the original CPU version,
@@ -90,8 +101,20 @@ it will run the original CPU version.
 [Open MPI](https://www.open-mpi.org/) or
 [Intel MPI](https://software.intel.com/en-us/intel-mpi-library).  You may also
 minimize difficulties by specifying `FORCE_OWN_TBB=ON`
+* The `FORCE_OWN_TBB=ON` option ensures you are building with the latest version of
+Threading Building Blocks (TBB), an open-source library originally development by
+Intel Corporation to implement a task-based parallelism.  It has been found that
+the version of TBB installed on some systems is missing functionality found in
+later versions.   Using this flag should remove any build or link issues related
+to TBB.
+* The `MKLFFT=ON` option builds relion\_refine\* with the Intel(R) Math Kernel Library
+(Intel(R) MKL), which has an FFT implementation that was found to scale better with
+increased threads than the one found in FFTW.
 * Best performance of the CPU-accelerated kernels enabled with "`--cpu`" will be
-obtained using [Intel Parallel Studio XE 2018 Cluster Edition](https://software.intel.com/en-us/parallel-studio-xe).  
+obtained using [Intel(R) Parallel Studio XE 2018 Cluster Edition](https://software.intel.com/en-us/parallel-studio-xe).  With the Plasmodium ribosome benchmark noted on the [RELION website](https://www2.mrc-lmb.cam.ac.uk/relion/index.php?title=Benchmarks_%26_computer_hardware),
+GCC 7.3 hardware-optimized builds appear to run about 3x slower than those built
+with Intel(R) Parallel Studio XE 2018 Cluster Edition (for reasons still under
+investigation).
   * Before running cmake, set up the compile and build environment by sourcing the appropriate files:
 ```
 source /opt/intel/compilers_and_libraries_2018.2.199/linux/bin/compilervars.sh intel64
@@ -109,12 +132,18 @@ CC=mpiicc CXX=mpiicpc cmake -DCUDA=OFF -DALTCPU=ON -DCudaTexture=OFF -DMKLFFT=ON
 ```
 CC=mpiicc CXX=mpiicpc cmake -DCUDA=OFF -DALTCPU=ON -DCudaTexture=OFF -DMKLFFT=ON -D CMAKE_C_FLAGS="-O3 -ip -g -debug inline-debug-info -xCORE-AVX2 -restrict " -D CMAKE_CXX_FLAGS="-O3 -ip -g -debug inline-debug-info -xCORE-AVX2 -restrict " -DGUI=OFF -D CMAKE_BUILD_TYPE=Release ..
 ```
-Note that this binary will only run on AXV2 platforms
+Note that this binary will only run on AXV2 platforms.
     * Best performance on AVX512 platforms has been measured using the following CMAKE command:
 ```
 CC=mpiicc CXX=mpiicpc cmake -DCUDA=OFF -DALTCPU=ON -DCudaTexture=OFF -DMKLFFT=ON -D CMAKE_C_FLAGS="-O3 -ip -g -debug inline-debug-info -xCORE-AVX512 -qopt-zmm-usage=high -restrict " -D CMAKE_CXX_FLAGS="-O3 -ip -g -debug inline-debug-info -xCORE-AVX512 -qopt-zmm-usage=high -restrict " -DGUI=OFF -D CMAKE_BUILD_TYPE=Release ..
 ```
-Note that the resulting binary will only work on AVX512 platforms
+Note that the resulting binary will only work on AVX512 platforms.
+    * Best performance on Intel(R) Xeon Phi(TM) Processors (x700 Family) has been measured
+     using the following CMAKE command:
+     ```
+     CC=mpiicc CXX=mpiicpc cmake -DCUDA=OFF -DALTCPU=ON -DCudaTexture=OFF -DMKLFFT=ON -D CMAKE_C_FLAGS="-O3 -ip -g -debug inline-debug-info -xMIC-AVX512 -restrict " -D CMAKE_CXX_FLAGS="-O3 -ip -g -debug inline-debug-info -xMIC-AVX512 -restrict " -DGUI=OFF -D CMAKE_BUILD_TYPE=Release ..
+     ```
+     Note that this binary will only run on Intel(R) Xeon Phi(TM) Processor family platforms.
   * If you want to run a version of RELION built with the Intel(R) C++ Compiler
   on another machine or cluster, you can download the runtime libraries for free
   for use on those machines from the following sources:
@@ -134,7 +163,8 @@ Note that the resulting binary will only work on AVX512 platforms
     should set up the runtime environment on your machine without a local Intel software installation.
   * To run the Plasmodium ribosome data set workload found at the [RELION benchmark page](https://www2.mrc-lmb.cam.ac.uk/relion/index.php?title=Benchmarks_%26_computer_hardware)
   on a machine with two sockets populated by AVX512 CPUs containing 20 cores each supporting
-  Intel(R) Hyper-Threading Technology (so two threads per core for a total of 80 threads):
+  Intel(R) Hyper-Threading Technology (so two threads per core for a total of 80 threads -
+  Intel(R) Xeon(R) Gold 6148 processors):
     * 1 machine - completes in about 4.7 hours:
 ```
 export OMP_SCHEDULE="dynamic"
@@ -145,19 +175,19 @@ relion_refine --o Results/skx --i Particles/shiny_2sets.star --ref emd_2660.map:
     ```
 export OMP_SCHEDULE="dynamic"
 export KMP_BLOCKTIME=0
-mpirun -perhost 4 np 8 relion_refine_mpi --i Particles/shiny_2sets.star --ref emd_2660.map:mrc --firstiter_cc --ini_high 60 --dont_combine_weights_via_disc --ctf --ctf_corrected_ref --tau2_fudge 4 --particle_diameter 360 --K 6 --flatten_solvent --zero_mask --oversampling 1 --healpix_order 2 --offset_range 5 --offset_step 2 --sym C1 --norm --scale --random_seed 0 o Results/cpu --pool 40 --j 20 --iter 25 --cpu
+mpirun -perhost 4 -np 8 relion_refine_mpi --i Particles/shiny_2sets.star --ref emd_2660.map:mrc --firstiter_cc --ini_high 60 --dont_combine_weights_via_disc --ctf --ctf_corrected_ref --tau2_fudge 4 --particle_diameter 360 --K 6 --flatten_solvent --zero_mask --oversampling 1 --healpix_order 2 --offset_range 5 --offset_step 2 --sym C1 --norm --scale --random_seed 0 --o Results/cpu --pool 40 --j 20 --iter 25 --cpu
     ```
     * 4 machines - completes in about 1.4 hours:
 ```
 export OMP_SCHEDULE="dynamic"
 export KMP_BLOCKTIME=0
-mpirun -perhost 4 np 16 relion_refine_mpi --i Particles/shiny_2sets.star --ref emd_2660.map:mrc --firstiter_cc --ini_high 60 --dont_combine_weights_via_disc --ctf --ctf_corrected_ref --tau2_fudge 4 --particle_diameter 360 --K 6 --flatten_solvent --zero_mask --oversampling 1 --healpix_order 2 --offset_range 5 --offset_step 2 --sym C1 --norm --scale --random_seed 0 o Results/cpu --pool 40 --j 20 --iter 25 cpu
+mpirun -perhost 4 -np 16 relion_refine_mpi --i Particles/shiny_2sets.star --ref emd_2660.map:mrc --firstiter_cc --ini_high 60 --dont_combine_weights_via_disc --ctf --ctf_corrected_ref --tau2_fudge 4 --particle_diameter 360 --K 6 --flatten_solvent --zero_mask --oversampling 1 --healpix_order 2 --offset_range 5 --offset_step 2 --sym C1 --norm --scale --random_seed 0 --o Results/cpu --pool 40 --j 20 --iter 25 --cpu
 ```
     * 8 machines - completes in about 1 hour:
 ```
 export OMP_SCHEDULE="dynamic"
 export KMP_BLOCKTIME=0
-mpirun -perhost 4 np 32 relion_refine_mpi --i Particles/shiny_2sets.star --ref emd_2660.map:mrc --firstiter_cc --ini_high 60 --dont_combine_weights_via_disc --ctf --ctf_corrected_ref --tau2_fudge 4 --particle_diameter 360 --K 6 --flatten_solvent --zero_mask --oversampling 1 --healpix_order 2 --offset_range 5 --offset_step 2 --sym C1 --norm --scale --random_seed 0 o Results/cpu --pool 40 --j 20 --iter 25 --cpu
+mpirun -perhost 4 -np 32 relion_refine_mpi --i Particles/shiny_2sets.star --ref emd_2660.map:mrc --firstiter_cc --ini_high 60 --dont_combine_weights_via_disc --ctf --ctf_corrected_ref --tau2_fudge 4 --particle_diameter 360 --K 6 --flatten_solvent --zero_mask --oversampling 1 --healpix_order 2 --offset_range 5 --offset_step 2 --sym C1 --norm --scale --random_seed 0 --o Results/cpu --pool 40 --j 20 --iter 25 --cpu
 ```
 
 
