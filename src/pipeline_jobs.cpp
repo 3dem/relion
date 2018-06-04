@@ -2635,8 +2635,7 @@ In some difficult cases, switching this option on helps. In such cases, values a
 
 	joboptions["nr_classes"] = JobOption("Number of classes:", 1, 1, 50, 1, "The number of classes (K) for a multi-reference ab initio SGD refinement. \
 These classes will be made in an unsupervised manner, starting from a single reference in the initial iterations of the SGD, and the references will become increasingly dissimilar during the inbetween iterations.");
-	joboptions["sym_name"] = JobOption("Symmetry:", std::string("C1"), "Initial SGD runs are often performed in C1. If a particle is confirmed to have symmetry, the SGD can also be repeated with the corresponding \
-point group symmetry. That has the advantage that the symetry axes in the reference will be aligned correctly.");
+	joboptions["sym_name"] = JobOption("Symmetry:", std::string("C1"), "SGD sometimes works better in C1. If you make an initial model in C1 but want to run Class3D/Refine3D with a higher point group symmetry, the reference model must be rotated to conform the symmetry convention. You can do this by the relion_align_symmetry command.");
 	joboptions["particle_diameter"] = JobOption("Mask diameter (A):", 200, 0, 1000, 10, "The experimental images will be masked with a soft \
 circular mask with this diameter. Make sure this radius is not set too small because that may mask away part of the signal! \
 If set to a value larger than the image size no masking will be performed.\n\n\
