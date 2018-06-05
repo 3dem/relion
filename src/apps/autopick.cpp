@@ -47,6 +47,9 @@ int main(int argc, char *argv[])
 		{
 			prm.run();
 		}
+
+		prm.generatePDFLogfile();
+
 #ifdef TIMING
 		std::cout << "timings:" << std::endl;
 		prm.timer.printTimes(false);

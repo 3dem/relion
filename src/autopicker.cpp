@@ -876,9 +876,6 @@ void AutoPicker::run()
 	if (verb > 0)
 		progress_bar(fn_micrographs.size());
 
-	// Make a logfile with plots of the number of particles per micrograph, and their average autopick FOM
-	generatePDFLogfile();
-
 
 }
 
@@ -943,12 +940,17 @@ void AutoPicker::generatePDFLogfile()
 	fn_eps = fn_odir + "all_nr_parts.eps";
 	plot2Db->OutputPostScriptPlot(fn_eps);
 	all_fn_eps.push_back(fn_eps);
-	CPlot2D *plot2D=new CPlot2D("");
-	MDresult.columnHistogram(EMDL_MLMODEL_GROUP_NR_PARTICLES,histX,histY,0, plot2D);
-	fn_eps = fn_odir + "histogram_nrparts.eps";
-	plot2D->SetTitle("Histogram of nr of picked particles per micrograph");
-	plot2D->OutputPostScriptPlot(fn_eps);
-	all_fn_eps.push_back(fn_eps);
+	delete plot2Db;
+	if (MDresult.numberOfObjects() > 3)
+	{
+		CPlot2D *plot2D=new CPlot2D("");
+		MDresult.columnHistogram(EMDL_MLMODEL_GROUP_NR_PARTICLES,histX,histY,0, plot2D);
+		fn_eps = fn_odir + "histogram_nrparts.eps";
+		plot2D->SetTitle("Histogram of nr of picked particles per micrograph");
+		plot2D->OutputPostScriptPlot(fn_eps);
+		all_fn_eps.push_back(fn_eps);
+		delete plot2D;
+	}
 
 	CPlot2D *plot2Dc=new CPlot2D("Average autopick FOM for all micrographs");
 	MDresult.addToCPlot2D(plot2Dc, EMDL_UNDEFINED, EMDL_PARTICLE_AUTOPICK_FOM, 1.);
@@ -956,14 +958,17 @@ void AutoPicker::generatePDFLogfile()
 	fn_eps = fn_odir + "all_FOMs.eps";
 	plot2Dc->OutputPostScriptPlot(fn_eps);
 	all_fn_eps.push_back(fn_eps);
-	CPlot2D *plot2Dd=new CPlot2D("");
-	MDresult.columnHistogram(EMDL_PARTICLE_AUTOPICK_FOM,histX,histY,0, plot2Dd);
-	fn_eps = fn_odir + "histogram_FOMs.eps";
-	plot2Dd->SetTitle("Histogram of average autopick FOM per micrograph");
-	plot2Dd->OutputPostScriptPlot(fn_eps);
-	all_fn_eps.push_back(fn_eps);
-
-	delete plot2D, plot2Db, plot2Dc, plot2Dd;
+	delete plot2Dc;
+	if (MDresult.numberOfObjects() > 3)
+	{
+		CPlot2D *plot2Dd=new CPlot2D("");
+		MDresult.columnHistogram(EMDL_PARTICLE_AUTOPICK_FOM,histX,histY,0, plot2Dd);
+		fn_eps = fn_odir + "histogram_FOMs.eps";
+		plot2Dd->SetTitle("Histogram of average autopick FOM per micrograph");
+		plot2Dd->OutputPostScriptPlot(fn_eps);
+		all_fn_eps.push_back(fn_eps);
+		delete plot2Dd;
+	}
 
 	joinMultipleEPSIntoSinglePDF(fn_odir + "logfile.pdf ", all_fn_eps);
 

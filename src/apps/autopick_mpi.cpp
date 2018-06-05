@@ -47,6 +47,9 @@ int main(int argc, char *argv[])
 		{
 			prm.run();
 		}
+
+		if (prm.getRank() == 0)
+			prm.generatePDFLogfile();
     }
 
     catch (RelionError XE)
