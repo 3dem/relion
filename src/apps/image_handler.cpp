@@ -59,7 +59,7 @@ class image_handler_parameters
 
 		int general_section = parser.addSection("General options");
 		fn_in = parser.getOption("--i", "Input STAR file, image (.mrc) or movie/stack (.mrcs)");
-		fn_out = parser.getOption("--o", "Output name (for STAR-input: insert this string before each image's extension)");
+		fn_out = parser.getOption("--o", "Output name (for STAR-input: insert this string before each image's extension)", "");
 
 		int cst_section = parser.addSection("image-by-constant operations");
 		multiply_constant = textToFloat(parser.getOption("--multiply_constant", "Multiply the image(s) pixel values by this constant", "1"));
@@ -132,6 +132,8 @@ class image_handler_parameters
 
 	    verb = (do_stats || do_calc_com || fn_fsc !="") ? 0 : 1;
 
+		if (fn_out == "" && verb == 1)
+			REPORT_ERROR("Please specify the output file name with --o.");
 	}
 
 
