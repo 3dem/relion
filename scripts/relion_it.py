@@ -203,6 +203,10 @@ class RelionItOptions(object):
     ctffind_defocus_max = 50000
     ctffind_defocus_min = 5000
     ctffind_defocus_step = 500
+    # For Gctf: ignore parameters on the 'Searches' tab?
+    ctffind_do_ignore_search_params = True
+    # For Gctf: perform equi-phase averaging?
+    ctffind_do_EPA = True
     # Also estimate phase shifts (for VPP data)
     ctffind_do_phaseshift = False
     # Executable to Kai Zhang's Gctf
@@ -674,7 +678,6 @@ def run_pipeline(opts):
                            'Amplitude contrast: == {}'.format(opts.ampl_contrast),
                            'Amount of astigmatism (A): == {}'.format(opts.ctffind_astigmatism),
                            'FFT box size (pix): == {}'.format(opts.ctffind_boxsize),
-                           'Perform equi-phase averaging? == Yes', 
                            'Maximum defocus value (A): == {}'.format(opts.ctffind_defocus_max),
                            'Minimum defocus value (A): == {}'.format(opts.ctffind_defocus_min),
                            'Defocus step size (A): == {}'.format(opts.ctffind_defocus_step),
@@ -692,11 +695,20 @@ def run_pipeline(opts):
         else:
             ctffind_options.append('Use CTFFIND-4.1? == No')
             ctffind_options.append('Use Gctf instead? == Yes')
+            if (opts.ctffind_do_ignore_search_params):
+                ctffind_options.append('Ignore \'Searches\' parameters? == Yes')
+            else:
+                ctffind_options.append('Ignore \'Searches\' parameters? == No')
+            if (opts.ctffind_do_EPA):
+                 ctffind_options.append('Perform equi-phase averaging? == Yes')
+            else:
+                 ctffind_options.append('Perform equi-phase averaging? == No')
 
         if opts.ctffind_do_phaseshift:
             ctffind_options.append('Estimate phase shifts? == Yes')
         else:
             ctffind_options.append('Estimate phase shifts? == No')
+
 
         ctffind_job, already_had_it  = addJob('CtfFind', 'ctffind_job', SETUP_CHECK_FILE, ctffind_options)
 
