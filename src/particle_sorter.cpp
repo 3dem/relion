@@ -149,6 +149,7 @@ void ParticleSorter::initialise()
 			sumr += (last_corner - first_corner);
 		}
 		sumr /= 2. * Mrefs.size(); // factor 2 to go from diameter to radius; Mref.size() for averaging
+		if (sumr > 0.5*XSIZE(Mrefs[0])) sumr = 0.5*XSIZE(Mrefs[0]);
 		particle_radius2 = sumr*sumr;
 		std::cout << " Automatically set the background radius to " << sumr << " pixels in the references" << std::endl;
 		std::cout << " You can override this by providing --particle_diameter (in Angstroms)" << std::endl;
