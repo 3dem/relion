@@ -28,9 +28,9 @@
 class image_handler_parameters
 {
 	public:
-   	FileName fn_in, fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_mult, fn_div, fn_add, fn_subtract, fn_fsc, fn_adjust_power, fn_correct_ampl, fn_fourfilter;
+   	FileName fn_in, fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_mult, fn_div, fn_add, fn_subtract, fn_fsc, fn_adjust_power, fn_correct_ampl, fn_fourfilter, fn_cosDPhi;
 	int bin_avg, avg_first, avg_last, edge_x0, edge_xF, edge_y0, edge_yF, filter_edge_width, new_box, minr_ampl_corr;
-	bool do_add_edge, do_invert_hand, do_flipXY, do_flipmXY, do_flipZ, do_flipX, do_flipY, do_shiftCOM, do_stats, do_calc_com, do_avg_ampl, do_avg_ampl2, do_avg_ampl2_ali, do_average, do_remove_nan, do_average_all_frames;
+	bool do_add_edge, do_invert_hand, do_flipXY, do_flipmXY, do_flipZ, do_flipX, do_flipY, do_shiftCOM, do_stats, do_calc_com, do_avg_ampl, do_avg_ampl2, do_avg_ampl2_ali, do_average, do_remove_nan, do_average_all_frames, do_power;
 	RFLOAT multiply_constant, divide_constant, add_constant, subtract_constant, threshold_above, threshold_below, angpix, new_angpix, lowpass, highpass, logfilter, bfactor, shift_x, shift_y, shift_z, replace_nan, randomize_at;
 	std::string directional;
    	int verb;
@@ -74,7 +74,8 @@ class image_handler_parameters
 		fn_div = parser.getOption("--divide", "Divide input image(s) by the pixel values in this image", "");
 		fn_add = parser.getOption("--add", "Add the pixel values in this image to the input image(s) ", "");
 		fn_subtract = parser.getOption("--subtract", "Subtract the pixel values in this image to the input image(s) ", "");
-		fn_fsc = parser.getOption("--fsc", "Calculate FSC curve of the input image with this image ", "");
+		fn_fsc = parser.getOption("--fsc", "Calculate FSC curve of the input image with this image", "");
+		do_power = parser.checkOption("--power", "Calculate power spectrum (|F|^2) of the input image");
 		fn_adjust_power = parser.getOption("--adjust_power", "Adjust the power spectrum of the input image to be the same as this image ", "");
 		fn_fourfilter = parser.getOption("--fourier_filter", "Multiply the Fourier transform of the input image(s) with this one image ", "");
 
@@ -126,11 +127,13 @@ class image_handler_parameters
 		avg_last = textToInteger(parser.getOption("--avg_last", "Last frame to include in averaging", "-1"));
 		do_average_all_frames = parser.checkOption("--average_all_movie_frames", "Average all movie frames of all movies in the input STAR file.");
 
+		// Hidden
+		fn_cosDPhi = getParameter(argc, argv, "--cos_dphi", "");
 		// Check for errors in the command-line option
 		if (parser.checkForErrors())
 			REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 
-	    verb = (do_stats || do_calc_com || fn_fsc !="") ? 0 : 1;
+		verb = (do_stats || do_calc_com || fn_fsc !="" || fn_cosDPhi != "" | do_power) ? 0 : 1;
 
 		if (fn_out == "" && verb == 1)
 			REPORT_ERROR("Please specify the output file name with --o.");
@@ -273,7 +276,6 @@ class image_handler_parameters
 		}
 		else if (fn_fsc != "")
 		{
-			/// TODO
 			MultidimArray<RFLOAT> fsc;
 			MetaDataTable MDfsc;
 			getFSC(Iout(), Iop(), fsc);
@@ -285,15 +287,57 @@ class image_handler_parameters
 				MDfsc.setValue(EMDL_SPECTRAL_IDX, (int)i);
 				MDfsc.setValue(EMDL_RESOLUTION, 1./res);
 				MDfsc.setValue(EMDL_RESOLUTION_ANGSTROM, res);
-				MDfsc.setValue(EMDL_POSTPROCESS_FSC_GENERAL, DIRECT_A1D_ELEM(fsc, i) );
+				MDfsc.setValue(EMDL_POSTPROCESS_FSC_GENERAL, DIRECT_A1D_ELEM(fsc, i));
 			}
 			MDfsc.write(std::cout);
+		}
+		else if (do_power)
+		{
+			MultidimArray<RFLOAT> spectrum;
+			getSpectrum(Iout(), spectrum, POWER_SPECTRUM);
+			MetaDataTable MDpower;
+			MDpower.setName("power");
+			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(spectrum)
+			{
+				if (i > XSIZE(Iout()) / 2 + 1) break; // getSpectrum returns beyond Nyquist!!
+
+				MDpower.addObject();
+				RFLOAT res = (i > 0) ? (XSIZE(Iout()) * angpix / (RFLOAT)i) : 999.;
+				MDpower.setValue(EMDL_SPECTRAL_IDX, (int)i);
+				MDpower.setValue(EMDL_RESOLUTION, 1./res);
+				MDpower.setValue(EMDL_RESOLUTION_ANGSTROM, res);
+				MDpower.setValue(EMDL_MLMODEL_POWER_REF, DIRECT_A1D_ELEM(spectrum, i));
+			}
+			MDpower.write(std::cout);
 		}
 		else if (fn_adjust_power != "")
 		{
 			MultidimArray<RFLOAT> spectrum;
 			getSpectrum(Iop(), spectrum, AMPLITUDE_SPECTRUM);
 			adaptSpectrum(Iin(), Iout(), spectrum, AMPLITUDE_SPECTRUM);
+		}
+		else if (fn_cosDPhi != "")
+		{
+			MultidimArray<RFLOAT> cosDPhi;
+			MetaDataTable MDcos;
+
+			MultidimArray< Complex > FT1, FT2;
+			FourierTransformer transformer;
+			transformer.FourierTransform(Iout(), FT1);
+			transformer.FourierTransform(Iop(), FT2);
+
+			getCosDeltaPhase(FT1, FT2, cosDPhi);
+			MDcos.setName("cos");
+			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(cosDPhi)
+			{
+				MDcos.addObject();
+				RFLOAT res = (i > 0) ? (XSIZE(Iout()) * angpix / (RFLOAT)i) : 999.;
+				MDcos.setValue(EMDL_SPECTRAL_IDX, (int)i);
+				MDcos.setValue(EMDL_RESOLUTION, 1./res);
+				MDcos.setValue(EMDL_RESOLUTION_ANGSTROM, res);
+				MDcos.setValue(EMDL_POSTPROCESS_FSC_GENERAL, DIRECT_A1D_ELEM(cosDPhi, i));
+			}
+			MDcos.write(std::cout);
 		}
 		else if (fn_correct_ampl != "")
 		{
@@ -581,6 +625,8 @@ class image_handler_parameters
 					Iop.read(fn_subtract);
 				else if (fn_fsc != "")
 					Iop.read(fn_fsc);
+				else if (fn_cosDPhi != "")
+					Iop.read(fn_cosDPhi);
 				else if (fn_adjust_power != "")
 					Iop.read(fn_adjust_power);
 				else if (fn_fourfilter != "")

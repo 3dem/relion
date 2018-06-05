@@ -598,6 +598,32 @@ void getAmplitudeCorrelationAndDifferentialPhaseResidual(MultidimArray< Complex 
 
 }
 
+void getCosDeltaPhase(MultidimArray< Complex > &FT1,
+                      MultidimArray< Complex > &FT2,
+                      MultidimArray< RFLOAT > &cosPhi)
+{
+	MultidimArray< int > radial_count(XSIZE(FT1));
+	cosPhi.initZeros(XSIZE(FT1));
+
+	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT1)
+	{
+		int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
+		if (idx >= XSIZE(FT1))
+			continue;
+
+		RFLOAT phas1 = RAD2DEG(atan2((DIRECT_A3D_ELEM(FT1, k, i, j)).imag, (DIRECT_A3D_ELEM(FT1, k, i, j)).real));
+		RFLOAT phas2 = RAD2DEG(atan2((DIRECT_A3D_ELEM(FT2, k, i, j)).imag, (DIRECT_A3D_ELEM(FT2, k, i, j)).real));
+		cosPhi(idx) += cos(phas1 - phas2);
+		radial_count(idx) ++;
+	}
+
+	FOR_ALL_ELEMENTS_IN_ARRAY1D(cosPhi)
+	{
+		if (radial_count(i) > 0)
+			cosPhi(i) /= radial_count(i);
+	}
+}
+
 void getAmplitudeCorrelationAndDifferentialPhaseResidual(MultidimArray< RFLOAT > &m1,
 		    MultidimArray< RFLOAT > &m2,
 		    MultidimArray< RFLOAT > &acorr,
@@ -937,6 +963,7 @@ void getSpectrum(MultidimArray<RFLOAT> &Min,
 
     MultidimArray<Complex > Faux;
     int xsize = XSIZE(Min);
+    // Takanori: The above line should be XSIZE(Min) / 2 + 1 but for compatibility reasons, I keep this as it is.
     Matrix1D<RFLOAT> f(3);
     MultidimArray<RFLOAT> count(xsize);
     FourierTransformer transformer;
