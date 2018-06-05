@@ -30,7 +30,7 @@ class image_handler_parameters
 	public:
    	FileName fn_in, fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_mult, fn_div, fn_add, fn_subtract, fn_fsc, fn_adjust_power, fn_correct_ampl, fn_fourfilter;
 	int bin_avg, avg_first, avg_last, edge_x0, edge_xF, edge_y0, edge_yF, filter_edge_width, new_box, minr_ampl_corr;
-	bool do_add_edge, do_flipXY, do_flipmXY, do_flipZ, do_flipX, do_flipY, do_shiftCOM, do_stats, do_calc_com, do_avg_ampl, do_avg_ampl2, do_avg_ampl2_ali, do_average, do_remove_nan, do_average_all_frames;
+	bool do_add_edge, do_invert_hand, do_flipXY, do_flipmXY, do_flipZ, do_flipX, do_flipY, do_shiftCOM, do_stats, do_calc_com, do_avg_ampl, do_avg_ampl2, do_avg_ampl2_ali, do_average, do_remove_nan, do_average_all_frames;
 	RFLOAT multiply_constant, divide_constant, add_constant, subtract_constant, threshold_above, threshold_below, angpix, new_angpix, lowpass, highpass, logfilter, bfactor, shift_x, shift_y, shift_z, replace_nan, randomize_at;
 	std::string directional;
    	int verb;
@@ -59,7 +59,7 @@ class image_handler_parameters
 
 		int general_section = parser.addSection("General options");
 		fn_in = parser.getOption("--i", "Input STAR file, image (.mrc) or movie/stack (.mrcs)");
-		fn_out = parser.getOption("--o", "Output name (overwrite input if empty; for STAR-input: insert this string before each image's extension)", "");
+		fn_out = parser.getOption("--o", "Output name (for STAR-input: insert this string before each image's extension)");
 
 		int cst_section = parser.addSection("image-by-constant operations");
 		multiply_constant = textToFloat(parser.getOption("--multiply_constant", "Multiply the image(s) pixel values by this constant", "1"));
@@ -93,6 +93,7 @@ class image_handler_parameters
 		do_flipX = parser.checkOption("--flipX", "Flip (mirror) a 2D image or 3D map in the X-direction?");
 		do_flipY = parser.checkOption("--flipY", "Flip (mirror) a 2D image or 3D map in the Y-direction?");
 		do_flipZ = parser.checkOption("--flipZ", "Flip (mirror) a 3D map in the Z-direction?");
+		do_invert_hand = parser.checkOption("--invert_hand", "Invert hand by flipping X? Similar to flipX, but preserves the symmetry origin. Edge pixels are wrapped around.");
 		do_shiftCOM = parser.checkOption("--shift_com", "Shift image(s) to their center-of-mass (only on positive pixel values)");
 		shift_x = textToFloat(parser.getOption("--shift_x", "Shift images this many pixels in the X-direction", "0."));
 		shift_y = textToFloat(parser.getOption("--shift_y", "Shift images this many pixels in the Y-direction", "0."));
@@ -352,6 +353,8 @@ class image_handler_parameters
 
 		if (do_flipX)
 		{
+			// For input:  0, 1, 2, 3, 4, 5 (XSIZE = 6)
+			// This gives: 5, 4, 3, 2, 1, 0
 			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Iin())
 			{
 				DIRECT_A3D_ELEM(Iout(), k, i, j) = A3D_ELEM(Iin(), k, i, XSIZE(Iin()) - 1 - j);
@@ -374,6 +377,16 @@ class image_handler_parameters
 				DIRECT_A3D_ELEM(Iout(), k, i, j) = A3D_ELEM(Iin(), ZSIZE(Iin()) - 1 - k, i, j);
 			}
 		}
+		else if (do_invert_hand)
+		{
+			// For input:  0, 1, 2, 3, 4, 5 (XSIZE = 6)
+			// This gives: 0, 5, 4, 3, 2, 1
+			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Iin())
+			{
+				long int dest_x = (j == 0) ? 0 : (XSIZE(Iin()) - j);
+				DIRECT_A3D_ELEM(Iout(), k, i, j) = A3D_ELEM(Iin(), k, i, dest_x);
+			}
+		}	
 
 		// Shifting
 		if (do_shiftCOM)
@@ -470,19 +483,11 @@ class image_handler_parameters
 		if (n >= 0) // This is a stack...
 		{
 
-			// If an output name was not specified: just replace the input image (in an existing stack)
-			if (fn_out == "")
-			{
-				Iout.write(fn_tmp, n, true, WRITE_REPLACE); // replace an image in an existing stack
-			}
+			// The following assumes the images in the stack come ordered...
+			if (n == 0)
+				Iout.write(fn_tmp, n, true, WRITE_OVERWRITE); // make a new stack
 			else
-			{
-				// The following assumes the images in the stack come ordered...
-				if (n == 0)
-					Iout.write(fn_tmp, n, true, WRITE_OVERWRITE); // make a new stack
-				else
-					Iout.write(fn_tmp, n, true, WRITE_APPEND);
-			}
+				Iout.write(fn_tmp, n, true, WRITE_APPEND);
 		}
 		else
 			Iout.write(my_fn_out);
@@ -746,9 +751,8 @@ class image_handler_parameters
 			{
 				Iin.read(fn_img);
 				FileName my_fn_out;
-				if (fn_out == "")
-					my_fn_out = fn_img;
-				else if(fn_out.getExtension() == "mrcs" && !fn_out.contains("@"))
+
+				if(fn_out.getExtension() == "mrcs" && !fn_out.contains("@"))
 				{
 					// current_object starts counting from 0, thus needs to be incremented.
 					my_fn_out.compose(current_object + 1, fn_out);
