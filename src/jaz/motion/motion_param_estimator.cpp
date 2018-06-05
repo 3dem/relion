@@ -37,8 +37,8 @@ int MotionParamEstimator::read(IOParser& parser, int argc, char *argv[])
 
     minParticles = textToInteger(parser.getOption("--min_p", "Minimum number of particles on which to estimate the parameters", "1000"));
     sV = textToDouble(parser.getOption("--s_vel_0", "Initial s_vel", "0.6"));
-    sD = textToDouble(parser.getOption("--s_div_0", "Initial s_div", "5000"));
-    sA = textToDouble(parser.getOption("--s_acc_0", "Initial s_acc", "5"));
+    sD = textToDouble(parser.getOption("--s_div_0", "Initial s_div", "10000"));
+    sA = textToDouble(parser.getOption("--s_acc_0", "Initial s_acc", "3"));
     iniStep = textToDouble(parser.getOption("--in_step", "Initial step size in s_div", "3000"));
     conv = textToDouble(parser.getOption("--conv", "Abort when simplex diameter falls below this", "30"));
     maxIters = textToInteger(parser.getOption("--par_iters", "Max. number of iterations", "100"));
