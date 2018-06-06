@@ -111,10 +111,13 @@ to TBB.
 (Intel(R) MKL), which has an FFT implementation that was found to scale better with
 increased threads than the one found in FFTW.
 * Best performance of the CPU-accelerated kernels enabled with "`--cpu`" will be
-obtained using [Intel(R) Parallel Studio XE 2018 Cluster Edition](https://software.intel.com/en-us/parallel-studio-xe).  With the Plasmodium ribosome benchmark noted on the [RELION website](https://www2.mrc-lmb.cam.ac.uk/relion/index.php?title=Benchmarks_%26_computer_hardware),
+obtained using [Intel(R) Parallel Studio XE 2018 Cluster Edition](https://software.intel.com/en-us/parallel-studio-xe).  
+With the Plasmodium ribosome benchmark noted on the [RELION website](https://www2.mrc-lmb.cam.ac.uk/relion/index.php?title=Benchmarks_%26_computer_hardware),
 GCC 7.3 hardware-optimized builds appear to run about 3x slower than those built
 with Intel(R) Parallel Studio XE 2018 Cluster Edition (for reasons still under
 investigation).
+  * __The minimum recommended version of the Intel(R) Compiler is
+  Intel(R) Parallel Studio XE 2018 Cluster Edition Update 2__.
   * Before running cmake, set up the compile and build environment by sourcing the appropriate files:
 ```
 source /opt/intel/compilers_and_libraries_2018.2.199/linux/bin/compilervars.sh intel64
