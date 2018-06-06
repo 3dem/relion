@@ -85,6 +85,9 @@ option(DoublePrec_ACC "Accelerated Code use double-precision" OFF)
 option(MKLFFT "Use MKL rather than FFTW for FFT" OFF)
 option(CudaTexture "CudaTexture" ON)
 
+# to test the single-precision build:
+# set(DoublePrec_CPU OFF)
+ 
 if(CUDA OR ALTCPU)
     add_definitions(-DACC_CUDA=2 -DACC_CPU=1)
 endif()

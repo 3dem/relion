@@ -48,8 +48,8 @@ void MotionEstimator::read(IOParser& parser, int argc, char *argv[])
 	no_whitening = parser.checkOption("--no_whiten", "Do not whiten the noise spectrum");
 	unregGlob = parser.checkOption("--unreg_glob", "Do not regularize global component of motion");
 	globOff = parser.checkOption("--glob_off", "Compute initial per-particle offsets");
-	params_scaled_by_dose = !parser.checkOption("--absolute_params", "Do not scale input motion parameters by dose");
 	globOffMax = textToInteger(parser.getOption("--glob_off_max", "Maximum per-particle offset range [Pixels]", "10"));
+	params_scaled_by_dose = !parser.checkOption("--absolute_params", "Do not scale input motion parameters by dose");
 	
 	debugOpt = parser.checkOption("--debug_opt", "Write optimization debugging info");
 	
@@ -629,9 +629,22 @@ void MotionEstimator::writeOutput(
 	dataSetStart.SetDatasetColor(1.0,0.0,0.0);
 	CDataPoint point2(
 				xcenterCoord + visScale * globalTrack[0].x,
-			ycenterCoord + visScale * globalTrack[0].y);
+				ycenterCoord + visScale * globalTrack[0].y);
 	dataSetStart.AddDataPoint(point2);
 	plot2D->AddDataSet(dataSetStart);
+	
+	// Now loop over all particles for local tracks
+	for (int p = 0; p < pc; p++)
+	{
+		// Mark start of each track
+		CDataSet patch_start;
+		patch_start.SetDrawMarker(true);
+		patch_start.SetMarkerSize(8);
+		patch_start.SetDatasetColor(0.2,0.5,1.0);
+		CDataPoint point3(visTracks[p][0].x, visTracks[p][0].y);
+		patch_start.AddDataPoint(point3);
+		plot2D->AddDataSet(patch_start);
+	}
 	
 	// Now loop over all particles for local tracks
 	for (int p = 0; p < pc; p++)
@@ -647,15 +660,6 @@ void MotionEstimator::writeOutput(
 			fit.AddDataPoint(point);
 		}
 		plot2D->AddDataSet(fit);
-		
-		// Mark start of each track
-		CDataSet patch_start;
-		patch_start.SetDrawMarker(true);
-		patch_start.SetMarkerSize(2);
-		patch_start.SetDatasetColor(1.0,0.3,0.0);
-		CDataPoint point3(visTracks[p][0].x, visTracks[p][0].y);
-		patch_start.AddDataPoint(point3);
-		plot2D->AddDataSet(patch_start);
 	}
 	
 	char title[256];
@@ -665,6 +669,8 @@ void MotionEstimator::writeOutput(
 	plot2D->SetYAxisTitle(title);
 	
 	plot2D->OutputPostScriptPlot(fn_eps);
+	
+	delete plot2D;
 	
 	// Compatibility with Jasenko's diagnostic .dat files
 	// TONOTDO: remove this
@@ -702,9 +708,7 @@ void MotionEstimator::writeOutput(
 	for (int f = 0; f < fc; f++)
 	{
 		glbOut << globalTrack[f].x << " " << globalTrack[f].y << std::endl;
-	}
-	
-	delete plot2D;
+	}	
 }
 
 const std::vector<Image<RFLOAT>>& MotionEstimator::getDamageWeights()

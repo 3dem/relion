@@ -256,7 +256,7 @@ int Micrograph::getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFL
 	}
 
 	if (globalShiftX[frame - 1] == NOT_OBSERVED || globalShiftX[frame - 1] == NOT_OBSERVED) {
-		shiftx = shifty = NOT_OBSERVED;
+		shiftx = shifty = 0;
 		return -1;
 	}
 
