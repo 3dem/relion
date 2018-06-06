@@ -2002,6 +2002,9 @@ bool RelionJob::getCommandsSortJob(std::string &outputname, std::vector<std::str
 	Node node3(outputname + "particles_sort.star", NODE_PART_DATA);
 	outputNodes.push_back(node3);
 
+	Node node4(outputname + "logfile.pdf", NODE_PDF_LOGFILE);
+	outputNodes.push_back(node4);
+
 	if (joboptions["do_ctf"].getBoolean())
 	{
 		command += " --ctf ";
