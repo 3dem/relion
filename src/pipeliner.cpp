@@ -1278,7 +1278,7 @@ bool PipeLine::cleanupJob(int this_job, bool do_harsh, std::string &error_messag
 		{
 			if (do_harsh)
 			{
-				//remove entire directory
+				//remove entire movies directory
 				fns_del.push_back(processList[this_job].name + fns_subdir[idir]);
 			}
 			else
@@ -1693,17 +1693,17 @@ void PipeLine::read(bool do_lock, std::string lock_message)
 		{
 			// If the lock exists: wait 3 seconds and try again
 			// First time round, print a warning message
-			//if (iwait == 0)
-			//{
-			//	std::cout << " WARNING: trying to read pipeline.star, but " << fn_lock << " exists!" << std::endl;
-			//	std::cout << " This is a protection against simultaneous writing to the pipeline by multiple instances of the GUI." << std::endl;
-			//	std::cout << " You can override this by manually deleting the " << fn_lock << " file." << std::endl;
-			//	std::cout << " Will try for 1 minute to see whether the lock disappears. If not, an error will be raised." << std::endl;
-			//}
+			if (iwait == 0)
+			{
+				std::cout << " WARNING: trying to read pipeline.star, but " << fn_lock << " exists (which protects against simultaneous writing by multiple instances of the GUI)" << std::endl;
+			}
 			sleep(3);
 			iwait++;
 			if (iwait > 40)
+			{
+
 				REPORT_ERROR("ERROR: PipeLine::read has waited for 2 minutes for lock file to disappear. You may want to manually remove the file: " + fn_lock);
+			}
 		}
 		// Generate the lock file
 		std::ofstream  fh;
