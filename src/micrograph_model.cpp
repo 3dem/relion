@@ -256,7 +256,21 @@ int Micrograph::getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFL
 	}
 
 	if (globalShiftX[frame - 1] == NOT_OBSERVED || globalShiftX[frame - 1] == NOT_OBSERVED) {
-		shiftx = shifty = NOT_OBSERVED;
+		// Find the shift of the closest observed frame.
+		// If the given 'frame' is unobserved due to initial frame truncation (--first_frame),
+		// the output becomes zero. This is OK because the shift of the first observed frame
+		// is zero by definition. So we don't have to search after the 'frame'.
+		shiftx = shifty = 0;
+
+		for (int i = frame - 1; i >= 0; i--)
+		{
+			if (globalShiftX[i] != NOT_OBSERVED && globalShiftY[i] != NOT_OBSERVED)
+			{
+				shiftx = globalShiftX[i];
+				shifty = globalShiftY[i];
+				break;
+			}
+		}
 		return -1;
 	}
 

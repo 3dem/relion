@@ -889,8 +889,7 @@ void MotioncorrRunner::plotShifts(FileName fn_mic, Micrograph &mic)
 	const RFLOAT ycenter = (!do_unblur) ? mic.getHeight() / 2.0 : 0;
 	for (int j = mic.first_frame, jlim = mic.getNframes(); j <= jlim; j++) // 1-indexed
 	{
-		mic.getShiftAt(j, 0, 0, xshift, yshift, false); // no local model
-		if (xshift != Micrograph::NOT_OBSERVED) {
+		if (mic.getShiftAt(j, 0, 0, xshift, yshift, false)) { // no local model
 			CDataPoint point(xcenter + shift_scale * xshift, ycenter + shift_scale * yshift);
 			dataSet.AddDataPoint(point);
 		}
@@ -898,8 +897,7 @@ void MotioncorrRunner::plotShifts(FileName fn_mic, Micrograph &mic)
 	plot2D->AddDataSet(dataSet);
 
 	// Mark starting point
-	mic.getShiftAt(mic.first_frame, 0, 0, xshift, yshift, false);
-	if (xshift != Micrograph::NOT_OBSERVED) {
+	if (mic.getShiftAt(mic.first_frame, 0, 0, xshift, yshift, false)) {
 		CDataSet dataSetStart;
 		dataSetStart.SetDrawMarker(true);
 		dataSetStart.SetMarkerSize(5);
