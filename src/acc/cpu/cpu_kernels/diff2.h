@@ -134,7 +134,7 @@ void diff2_coarse_2D(
 				XFLOAT *trans_cos_x = &cos_x[itrans][0];
 				XFLOAT *trans_sin_x = &sin_x[itrans][0];     
 
-				#pragma simd
+				#pragma omp simd
 				for(int x = xstart; x < xend; x++) {
 					XFLOAT ss = trans_sin_x[x] * trans_cos_y + trans_cos_x[x] * trans_sin_y;
 					XFLOAT cc = trans_cos_x[x] * trans_cos_y - trans_sin_x[x] * trans_sin_y;
@@ -371,7 +371,7 @@ void diff2_coarse(
 			unsigned long start = pass * block_sz;
 
 			// Rotate the reference image per block_sz, saved in cache
-			#pragma simd
+			#pragma omp simd
 			for (int tid=0; tid<block_sz; tid++){
 				unsigned long pixel = (unsigned long)start + (unsigned long)tid;
 				if(pixel >= image_size)
@@ -441,7 +441,7 @@ void diff2_coarse(
 				XFLOAT ty = trans_y[i];
 				XFLOAT tz = trans_z[i];                 
 
-				#pragma simd
+				#pragma omp simd
 				for (int tid=0; tid<block_sz; tid++) {
 					unsigned long pixel = (unsigned long)start + (unsigned long)tid;
 					if(pixel >= image_size)
@@ -545,7 +545,7 @@ void diff2_fine_2D(
 			XFLOAT ref_real[xSize],  ref_imag[xSize];
 			XFLOAT imgs_real[xSize], imgs_imag[xSize];
 
-			#pragma simd
+			#pragma omp simd
 			for(int x = xstart; x < xend; x++) {
 				if(REF3D)
 					projector.project3Dmodel(x, y, e1, e2, e3, e4, e5, e6, 
@@ -555,7 +555,7 @@ void diff2_fine_2D(
 										 ref_real[x], ref_imag[x]);			                      
 			}
 
-			#pragma simd
+			#pragma omp simd
 			for(int x = xstart; x < xend; x++) {
 	#ifdef ACC_DOUBLE_PRECISION        
 				XFLOAT half_corr = sqrt (g_corr_img[pixel + x] * (XFLOAT)0.5);
@@ -584,7 +584,7 @@ void diff2_fine_2D(
 				XFLOAT *trans_sin_x = &sin_x[itrans][0];     
 
 				XFLOAT sum = (XFLOAT) 0.0;                   
-				#pragma simd  reduction(+:sum) 
+				#pragma omp simd  reduction(+:sum) 
 				for(int x = xstart; x < xend; x++) {
 					XFLOAT ss = trans_sin_x[x] * trans_cos_y + trans_cos_x[x] * trans_sin_y;
 					XFLOAT cc = trans_cos_x[x] * trans_cos_y - trans_sin_x[x] * trans_sin_y;
@@ -703,13 +703,13 @@ void diff2_fine_3D(
 				XFLOAT ref_real[xSize],  ref_imag[xSize];
 				XFLOAT imgs_real[xSize], imgs_imag[xSize];
 
-				#pragma simd
+				#pragma omp simd
 				for(int x = xstart_y; x < xend_y; x++) {
 					projector.project3Dmodel(x, y, z, e1, e2, e3, e4, e5, e6, e7, e8, e9, 
 											 ref_real[x], ref_imag[x]);
 				}
 
-				#pragma simd
+				#pragma omp simd
 				for(int x = xstart_y; x < xend_y; x++) {
 	#ifdef ACC_DOUBLE_PRECISION        
 					XFLOAT half_corr = sqrt (g_corr_img[pixel + x] * (XFLOAT)0.5);
@@ -748,7 +748,7 @@ void diff2_fine_3D(
 					XFLOAT *trans_sin_x = &sin_x[itrans][0];     
 
 					XFLOAT sum = (XFLOAT) 0.0;                   
-					#pragma simd  reduction(+:sum) 
+					#pragma omp simd  reduction(+:sum) 
 					for(int x = xstart_y; x < xend_y; x++) {
 						XFLOAT s1  = trans_sin_x[x] * trans_cos_y + trans_cos_x[x] * trans_sin_y;
 						XFLOAT c1  = trans_cos_x[x] * trans_cos_y - trans_sin_x[x] * trans_sin_y;
@@ -849,7 +849,7 @@ template<bool REF3D>
 			XFLOAT ref_real[xSize], ref_imag[xSize];
 			XFLOAT img_real[xSize], img_imag[xSize], corr_imag[xSize];
 
-			#pragma simd
+			#pragma omp simd
 			for(int x = xstart; x < xend; x++) {
 				if(REF3D)
 					projector.project3Dmodel(
@@ -1002,7 +1002,7 @@ void diff2_CC_coarse_3D(
 				XFLOAT ref_real[xSize], ref_imag[xSize];
 				XFLOAT img_real[xSize], img_imag[xSize], corr_imag[xSize];
 
-				#pragma simd
+				#pragma omp simd
 				for(int x = xstart_y; x < xend_y; x++) {
 					projector.project3Dmodel(
 						x, y, z,
@@ -1158,7 +1158,7 @@ void diff2_CC_fine_2D(
 			XFLOAT ref_real[xSize], ref_imag[xSize];
 			XFLOAT img_real[xSize], img_imag[xSize], corr_imag[xSize];
 
-			#pragma simd
+			#pragma omp simd
 			for(int x = xstart; x < xend; x++) {
 				if(REF3D)
 					projector.project3Dmodel(
@@ -1325,7 +1325,7 @@ void diff2_CC_fine_3D(
 				XFLOAT ref_real[xSize], ref_imag[xSize];
 				XFLOAT img_real[xSize], img_imag[xSize], corr_imag[xSize];
 
-				#pragma simd
+				#pragma omp simd
 				for(int x = xstart_y; x < xend_y; x++) {
 					projector.project3Dmodel(
 						x, y, z, e0, e1, e2, e3, e4, e5, e6, e7, e8,

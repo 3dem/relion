@@ -86,7 +86,7 @@ void wavg_ref3D(
 			XFLOAT ref_real[xSize], ref_imag[xSize];
 			XFLOAT img_real[xSize], img_imag[xSize];
 
-			#pragma simd
+			#pragma omp simd
 			for(int x = xstart; x < xend; x++) {
 				if(REF3D)
 					projector.project3Dmodel(x, y, e0, e1, e3, e4, e6, e7, 
@@ -235,7 +235,7 @@ void wavg_3D(
 				XFLOAT ref_real[xSize],  ref_imag[xSize];
 				XFLOAT img_real[xSize], img_imag[xSize];
 
-				#pragma simd
+				#pragma omp simd
 				for(int x = xstart_y; x < xend_y; x++) {
 					projector.project3Dmodel(x, y, z, e0, e1, e2, e3, e4, e5, e6, e7, e8,
 											 ref_real[x], ref_imag[x]);                    
