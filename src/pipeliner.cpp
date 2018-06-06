@@ -1278,7 +1278,7 @@ bool PipeLine::cleanupJob(int this_job, bool do_harsh, std::string &error_messag
 		{
 			if (do_harsh)
 			{
-				//remove entire directory
+				//remove entire movies directory
 				fns_del.push_back(processList[this_job].name + fns_subdir[idir]);
 			}
 			else
@@ -1693,17 +1693,17 @@ void PipeLine::read(bool do_lock, std::string lock_message)
 		{
 			// If the lock exists: wait 3 seconds and try again
 			// First time round, print a warning message
-			//if (iwait == 0)
-			//{
-			//	std::cout << " WARNING: trying to read pipeline.star, but " << fn_lock << " exists!" << std::endl;
-			//	std::cout << " This is a protection against simultaneous writing to the pipeline by multiple instances of the GUI." << std::endl;
-			//	std::cout << " You can override this by manually deleting the " << fn_lock << " file." << std::endl;
-			//	std::cout << " Will try for 1 minute to see whether the lock disappears. If not, an error will be raised." << std::endl;
-			//}
+			if (iwait == 0)
+			{
+				std::cout << " WARNING: trying to read pipeline.star, but " << fn_lock << " exists (which protects against simultaneous writing by multiple instances of the GUI)" << std::endl;
+			}
 			sleep(3);
 			iwait++;
 			if (iwait > 40)
+			{
+
 				REPORT_ERROR("ERROR: PipeLine::read has waited for 2 minutes for lock file to disappear. You may want to manually remove the file: " + fn_lock);
+			}
 		}
 		// Generate the lock file
 		std::ofstream  fh;
@@ -2432,13 +2432,23 @@ void PipeLineFlowChart::makeAllUpwardsFlowCharts(FileName &fn_out, PipeLine &pip
 {
 	std::ofstream fh;
 	openFlowChartFile(fn_out, fh);
+
+	// At the beginning of the flowchart file, first make an overview flowchart with short names
+	do_short_names = true;
+	do_branches = false;
+	FileName myorititle = (pipeline.processList[from_process].alias != "None") ?
+			pipeline.processList[from_process].alias : pipeline.processList[from_process].name;
+	myorititle=myorititle.beforeLastOf("/");
+	fh << "\\section*{Overview flowchart for " << myorititle << "}" << std::endl;
+	std::vector<long int> dummy;
+	makeOneUpwardsFlowChart(fh, pipeline, from_process, dummy, true);
+
+	// Then, make fully branched flowcharts below
+	do_short_names = false;
+	do_branches = true;
 	std::vector<long int> all_branches;
-
-
-
-	std::string myorititle;
-	all_branches.push_back(from_process);
 	int i = 0;
+	all_branches.push_back(from_process);
 	while (i < all_branches.size())
 	{
 		FileName mytitle = (pipeline.processList[all_branches[i]].alias != "None") ? pipeline.processList[all_branches[i]].alias : pipeline.processList[all_branches[i]].name;
@@ -2446,17 +2456,14 @@ void PipeLineFlowChart::makeAllUpwardsFlowCharts(FileName &fn_out, PipeLine &pip
 		adaptNamesForTikZ(mytitle);
 		if (i == 0)
 		{
-			std::cout << " Making first flowchart ... " <<std::endl;
+			std::cout << " Making main branched flowchart ... " <<std::endl;
 			fh << "\\section*{Branched flowchart for " << mytitle << "}" << std::endl;
-			myorititle = mytitle;
 		}
 		else
 		{
 			std::cout << " Making flowchart for branch: " << integerToString(i) << " ... " << std::endl;
 			std::string hypertarget = "sec:" + mytitle;
 			fh << "\\subsection*{Flowchart for branch " << integerToString(i)<< ": "<< mytitle << "\\hypertarget{"<<hypertarget<<"}{}}" << std::endl;
-			//fh << "\\hypertarget{" << hypertarget<<"}{.}"<<std::endl;
-			//fh << "\\newline" << std::endl;
 		}
 
 		makeOneUpwardsFlowChart(fh, pipeline, all_branches[i], all_branches, (i==0) );
@@ -2464,11 +2471,6 @@ void PipeLineFlowChart::makeAllUpwardsFlowCharts(FileName &fn_out, PipeLine &pip
 		i++;
 	}
 
-	// At the end of the flowchart file, also make one with short names
-	do_short_names = true;
-	do_branches = false;
-	fh << "\\section{Overview flowchart for " << myorititle << "}" << std::endl;
-	makeOneUpwardsFlowChart(fh, pipeline,all_branches[0], all_branches, true);
 
 	closeFlowChartFile(fh);
 
@@ -2478,8 +2480,8 @@ void PipeLineFlowChart::openTikZPicture(std::ofstream &fh, bool is_main_flow)
 {
 	if (is_main_flow)
 	{
-		fh << "% For large flowcharts: try removing percent sign on next line, and on line below." << std::endl;
-		fh << "%\\resizebox{!}{0.95\\textheight}{" << std::endl;
+		fh << "% For large flowcharts: try reducing the fraction on the next line." << std::endl;
+		fh << "\\resizebox{!}{0.75\\textheight}{" << std::endl;
 	}
 	fh << "\\begin{tikzpicture}[scale=1, auto]" << std::endl;
     // Override the long-name styles with the shorter ones
@@ -2496,8 +2498,8 @@ void PipeLineFlowChart::closeTikZPicture(std::ofstream &fh, bool is_main_flow)
 	fh << "\\end{tikzpicture}" << std::endl;
 	if (is_main_flow)
 	{
-		fh << "% For large flowcharts: also remove percent sign on next line." << std::endl;
-		fh << "%}" << std::endl; // closes resizebox
+		fh << "% For large flowcharts: close resizebox here..." << std::endl;
+		fh << "}" << std::endl; // closes resizebox
 	}
 }
 
@@ -2510,10 +2512,9 @@ void PipeLineFlowChart::openFlowChartFile(FileName &fn_out, std::ofstream &fh)
 
     // Set up the LaTex header
     fh << "\\documentclass{article}" << std::endl;
-    fh << "\\usepackage{tikz,hyperref, sectsty,xcolor}" << std::endl;
+    fh << "\\usepackage{tikz,hyperref}" << std::endl;
     fh << "\\usetikzlibrary{shapes,arrows}" << std::endl;
     fh << "\\begin{document}" << std::endl;
-    fh << "\\subsectionfont{\\color{blue!50}}" << std::endl;
     // These are the styles for the long names!
     fh << "\\tikzstyle{block} = [rectangle, draw, fill=white,text width=3.5cm, node distance = 1.8cm, text centered, rounded corners]" << std::endl;
     fh << "\\tikzstyle{block2} = [rectangle, draw, fill=blue!20,text width=3.5cm, node distance = 5cm, text centered, rounded corners]" << std::endl;

@@ -117,8 +117,4 @@ void AutoPickerMpi::run()
 		progress_bar(my_nr_micrographs);
 
 
-	// Make a PDF logfile with stats about the picking
-	if (node->isMaster())
-		generatePDFLogfile();
-
 }

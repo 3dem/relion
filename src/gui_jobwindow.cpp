@@ -675,19 +675,6 @@ void JobWindow::initialiseCtffindWindow()
 	place("fn_ctffind_exe", TOGGLE_DEACTIVATE);
 	place("slow_search", TOGGLE_DEACTIVATE);
 
-	group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group3->end();
-
-	place("do_movie_thon_rings", TOGGLE_DEACTIVATE, group3);
-
-	group3->begin();
-
-	place("movie_rootname", TOGGLE_DEACTIVATE);
-	place("avg_movie_frames", TOGGLE_DEACTIVATE);
-
-	group3->end();
-	guientries["do_movie_thon_rings"].cb_menu_i(); // make default active
-
 	// Add a little spacer
 	current_y += STEPY/2;
 

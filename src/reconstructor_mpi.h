@@ -31,18 +31,18 @@ private:
 
 public:
 	/** Destructor, calls MPI_Finalize */
-    ~ReconstructorMpi()
-    {
-        delete node;
-    }
+	~ReconstructorMpi()
+	{
+		delete node;
+	}
 
-    /** Read
-     * This could take care of mpi-parallelisation-dependent variables
-     */
-    void read(int argc, char **argv);
+	/** Read
+	 * This could take care of mpi-parallelisation-dependent variables
+	 */
+	void read(int argc, char **argv);
 
 	// Parallelized run function
-    void run();
+	void run();
 
 };
 

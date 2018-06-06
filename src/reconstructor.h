@@ -35,43 +35,43 @@ public:
 	// I/O Parser
 	IOParser parser;
 
-    FileName fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_fsc, fn_debug, image_path;
+	FileName fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_fsc, fn_debug, image_path;
 
-    MetaDataTable DF;
+	MetaDataTable DF;
 
-    int r_max, r_min_nn, blob_order, ref_dim, interpolator, iter,
-        debug_ori_size, debug_size,
-        ctf_dim, nr_helical_asu, newbox, width_mask_edge, nr_sectors, subset,
-		data_dim, mysize, verb;
+	int r_max, r_min_nn, blob_order, ref_dim, interpolator, iter,
+	    debug_ori_size, debug_size,
+	    ctf_dim, nr_helical_asu, newbox, width_mask_edge, nr_sectors, subset,
+	    data_dim, mysize, verb;
 
-    RFLOAT blob_radius, blob_alpha, angular_error, shift_error, angpix, maxres,
-        beamtilt_x, beamtilt_y,
-        helical_rise, helical_twist;
+	RFLOAT blob_radius, blob_alpha, angular_error, shift_error, angpix, maxres,
+	       beamtilt_x, beamtilt_y,
+	       helical_rise, helical_twist;
 
-    bool do_ctf, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, ctf_premultiplied,
-        do_fom_weighting, do_3d_rot, do_reconstruct_ctf, do_beamtilt, cl_beamtilt, do_ewald, do_debug;
+	bool do_ctf, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, ctf_premultiplied,
+	     do_fom_weighting, do_3d_rot, do_reconstruct_ctf, do_beamtilt, cl_beamtilt, do_ewald, do_debug;
 
-    bool skip_gridding, do_reconstruct_ctf2, do_reconstruct_meas, is_reverse, read_weights;
+	bool skip_gridding, do_reconstruct_ctf2, do_reconstruct_meas, is_reverse, read_weights;
 
-    float padding_factor, mask_diameter;
+	float padding_factor, mask_diameter;
 
-    // All backprojectors needed for parallel reconstruction
-    BackProjector backprojector;
+	// All backprojectors needed for parallel reconstruction
+	BackProjector backprojector;
 
-    // A single projector is needed for parallel reconstruction
-    Projector projector;
+	// A single projector is needed for parallel reconstruction
+	Projector projector;
 
 public:
 
-    /** Empty constructor
-     *
-     * A default Projector is created.
-     *
-     * @code
-     * Projector PPref;
-     * @endcode
-     */
-    Reconstructor() { }
+	/** Empty constructor
+	 *
+	 * A default Projector is created.
+	 *
+	 * @code
+	 * Projector PPref;
+	 * @endcode
+	 */
+	Reconstructor() { }
 
 	// Read command line arguments
 	void read(int argc, char **argv);
@@ -98,7 +98,7 @@ public:
 	void reconstruct();
 
 	void applyCTFPandCTFQ(MultidimArray<Complex> &Fin, CTF &ctf, FourierTransformer &transformer,
-	        MultidimArray<Complex> &outP, MultidimArray<Complex> &outQ);
+	                      MultidimArray<Complex> &outP, MultidimArray<Complex> &outQ);
 
 };
 

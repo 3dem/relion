@@ -373,11 +373,18 @@ bool BFactorEstimator::calculateBfactorSingleFrameReconstruction(
 		
 		return false;
 	}
-
+	
+	RFLOAT bfactor_rfloat, offset_rfloat, corr_coeff_rfloat;
+	
 	// Now do the fit
-	fitStraightLine(guinier, bfactor, offset, corr_coeff);
+	fitStraightLine(guinier, bfactor_rfloat, offset_rfloat, corr_coeff_rfloat);
 	// this is the B-factor relative to the average from all single-frame reconstructions!
 	// in this case: positive values mean BETTER than average, and thus HIGHER WEIGHTS!
+	
+	bfactor = bfactor_rfloat;
+	offset = offset_rfloat;
+	corr_coeff = corr_coeff_rfloat;
+	
 	bfactor *= 4.;
 
 	CDataSet dataSet;

@@ -112,6 +112,7 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	interpolate_shifts = parser.checkOption("--interpolate_shifts", "(EXPERIMENTAL) Interpolate shifts");
 	ccf_downsample = textToFloat(parser.getOption("--ccf_downsample", "(EXPERT) Downsampling rate of CC map. default = 0 = automatic based on B factor", "0"));
 	early_binning = parser.checkOption("--early_binning", "(EXPERT) Do binning before alignment to reduce memory usage. This might dampen signal near Nyquist.");
+	dose_motionstats_cutoff = textToFloat(parser.getOption("--dose_motionstats_cutoff", "Electron dose (in electrons/A2) at which to distinguish early/late global accumulated motion in output statistics", "4."));
 	if (ccf_downsample > 1) REPORT_ERROR("--ccf_downsample cannot exceed 1.");
 	// Initialise verb for non-parallel execution
 	verb = 1;
@@ -888,8 +889,7 @@ void MotioncorrRunner::plotShifts(FileName fn_mic, Micrograph &mic)
 	const RFLOAT ycenter = (!do_unblur) ? mic.getHeight() / 2.0 : 0;
 	for (int j = mic.first_frame, jlim = mic.getNframes(); j <= jlim; j++) // 1-indexed
 	{
-		mic.getShiftAt(j, 0, 0, xshift, yshift, false); // no local model
-		if (xshift != Micrograph::NOT_OBSERVED) {
+		if (mic.getShiftAt(j, 0, 0, xshift, yshift, false)) { // no local model
 			CDataPoint point(xcenter + shift_scale * xshift, ycenter + shift_scale * yshift);
 			dataSet.AddDataPoint(point);
 		}
@@ -897,8 +897,7 @@ void MotioncorrRunner::plotShifts(FileName fn_mic, Micrograph &mic)
 	plot2D->AddDataSet(dataSet);
 
 	// Mark starting point
-	mic.getShiftAt(mic.first_frame, 0, 0, xshift, yshift, false);
-	if (xshift != Micrograph::NOT_OBSERVED) {
+	if (mic.getShiftAt(mic.first_frame, 0, 0, xshift, yshift, false)) {
 		CDataSet dataSetStart;
 		dataSetStart.SetDrawMarker(true);
 		dataSetStart.SetMarkerSize(5);
@@ -968,23 +967,11 @@ void MotioncorrRunner::saveModel(Micrograph &mic) {
 void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 {
 
-	if (fn_ori_micrographs.size() > 0)
+	long int barstep = XMIPP_MAX(1, fn_ori_micrographs.size() / 60);
+	if (verb > 0)
 	{
-
-		std::vector<FileName> fn_eps;
-
-		FileName fn_prev="";
-		for (long int i = 0; i < fn_ori_micrographs.size(); i++)
-		{
-			if (fn_prev != fn_ori_micrographs[i].beforeLastOf("/"))
-			{
-				fn_prev = fn_ori_micrographs[i].beforeLastOf("/");
-				fn_eps.push_back(fn_out + fn_prev+"/*.eps");
-			}
-		}
-
-		joinMultipleEPSIntoSinglePDF(fn_out + "logfile.pdf ", fn_eps);
-
+		std::cout << " Generating logfile.pdf ... " << std::endl;
+		init_progress_bar(fn_ori_micrographs.size());
 	}
 
 	// Also write out the output star files
@@ -1012,13 +999,114 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 				MDmov.setValue(EMDL_MICROGRAPH_MOVIE_NAME, fn_mov);
 				MDmov.setValue(EMDL_MICROGRAPH_NAME, fn_avg);
 			}
+
+			FileName fn_star = fn_avg.withoutExtension() + ".star";
+			if (exists(fn_star))
+			{
+				Micrograph mic(fn_star);
+				RFLOAT cutoff_frame = (dose_motionstats_cutoff - mic.pre_exposure) / mic.dose_per_frame;
+				RFLOAT sum_total = 0.;
+				RFLOAT sum_early = 0.;
+				RFLOAT sum_late = 0.;
+
+				RFLOAT x = 0., y = 0., xold = 0., yold = 0.;
+				for (RFLOAT frame = 1.; frame <= mic.getNframes(); frame+=1.)
+				{
+					if (mic.getShiftAt(frame, 0., 0., x, y, false, false))
+						continue;
+					if (frame >= 2.)
+					{
+						RFLOAT d = sqrt( (x-xold)*(x-xold) + (y-yold)*(y-yold) );
+						sum_total += d;
+						if (frame <= cutoff_frame)
+						{
+							sum_early += d;
+						}
+						else
+						{
+							sum_late += d;
+						}
+					}
+					xold = x;
+					yold = y;
+				}
+				MDavg.setValue(EMDL_MICROGRAPH_ACCUM_MOTION_TOTAL, sum_total);
+				MDavg.setValue(EMDL_MICROGRAPH_ACCUM_MOTION_EARLY, sum_early);
+				MDavg.setValue(EMDL_MICROGRAPH_ACCUM_MOTION_LATE, sum_late);
+			}
+
 		}
+
+		if (verb > 0 && imic % 60 == 0) progress_bar(imic);
+
 	}
 
 	// Write out STAR files at the end
 	MDavg.write(fn_out + "corrected_micrographs.star");
 	if (do_save_movies)
 		MDmov.write(fn_out + "corrected_micrograph_movies.star");
+
+	// Now generate EPS plot with histograms and combine all EPS into a logfile.pdf
+	std::vector<EMDLabel> plot_labels;
+	plot_labels.push_back(EMDL_MICROGRAPH_ACCUM_MOTION_TOTAL);
+	plot_labels.push_back(EMDL_MICROGRAPH_ACCUM_MOTION_EARLY);
+	plot_labels.push_back(EMDL_MICROGRAPH_ACCUM_MOTION_LATE);
+	FileName fn_eps, fn_eps_root = fn_out + "corrected_micrographs";
+	std::vector<FileName> all_fn_eps;
+	for (int i = 0; i < plot_labels.size(); i++)
+	{
+		EMDLabel label = plot_labels[i];
+		if (MDavg.containsLabel(label))
+		{
+			// Values for all micrographs
+			CPlot2D *plot2Db=new CPlot2D(EMDL::label2Str(label) + " for all micrographs");
+			MDavg.addToCPlot2D(plot2Db, EMDL_UNDEFINED, label, 1.);
+			plot2Db->SetDrawLegend(false);
+			fn_eps = fn_eps_root + "_all_" + EMDL::label2Str(label) + ".eps";
+			plot2Db->OutputPostScriptPlot(fn_eps);
+			all_fn_eps.push_back(fn_eps);
+			delete plot2Db;
+			if (MDavg.numberOfObjects() > 3)
+			{
+				// Histogram
+				std::vector<RFLOAT> histX, histY;
+				CPlot2D *plot2D=new CPlot2D("");
+				MDavg.columnHistogram(label,histX,histY,0, plot2D);
+				fn_eps = fn_eps_root + "_hist_" + EMDL::label2Str(label) + ".eps";
+				plot2D->OutputPostScriptPlot(fn_eps);
+				all_fn_eps.push_back(fn_eps);
+				delete plot2D;
+			}
+		}
+	}
+
+
+	// Combine all EPS into a single logfile.pdf
+	if (fn_ori_micrographs.size() > 0)
+	{
+
+		FileName fn_prev="";
+		for (long int i = 0; i < fn_ori_micrographs.size(); i++)
+		{
+			if (fn_prev != fn_ori_micrographs[i].beforeLastOf("/"))
+			{
+				fn_prev = fn_ori_micrographs[i].beforeLastOf("/");
+				all_fn_eps.push_back(fn_out + fn_prev+"/*.eps");
+			}
+		}
+
+		joinMultipleEPSIntoSinglePDF(fn_out + "logfile.pdf ", all_fn_eps);
+
+	}
+
+
+	if (verb > 0 )
+	{
+		progress_bar(fn_ori_micrographs.size());
+
+		std::cout << " Done! Written: " << fn_out << "logfile.pdf" << " and " << fn_out << "corrected_micrographs.star" << std::endl;
+	}
+
 
 }
 

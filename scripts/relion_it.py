@@ -58,8 +58,6 @@ class RelionItOptions(object):
 
     
     ### MotionCorrection parameters
-    # The number of threads (only for RELION's own implementation) is optimal when nr_movie_frames/nr_threads = integer
-    motioncor_threads = 12
     # Dose in electrons per squared Angstrom per frame
     motioncor_doseperframe = 1.277
     # Gain-reference image in MRC format (only necessary if input movies are not yet gain-corrected, e.g. compressed TIFFs from K2)
@@ -170,6 +168,8 @@ class RelionItOptions(object):
     ### MotionCorrection parameters
     # Use RELION's own implementation of motion-correction (CPU-only) instead of the UCSF implementation?
     motioncor_do_own = False
+    # The number of threads (only for RELION's own implementation) is optimal when nr_movie_frames/nr_threads = integer
+    motioncor_threads = 12
     # Exectutable of UCSF MotionCor2
     motioncor_exe = '/public/EM/MOTIONCOR2/MotionCor2'
     # On which GPU(s) to execute UCSF MotionCor2
@@ -203,6 +203,10 @@ class RelionItOptions(object):
     ctffind_defocus_max = 50000
     ctffind_defocus_min = 5000
     ctffind_defocus_step = 500
+    # For Gctf: ignore parameters on the 'Searches' tab?
+    ctffind_do_ignore_search_params = True
+    # For Gctf: perform equi-phase averaging?
+    ctffind_do_EPA = True
     # Also estimate phase shifts (for VPP data)
     ctffind_do_phaseshift = False
     # Executable to Kai Zhang's Gctf
@@ -555,14 +559,14 @@ def findLargestClass(model_star_file):
     best_size = 0 
     best_class = 0
     for iclass in range(0, len(model_star['model_classes']['rlnReferenceImage'])):
-        mysize = model_star['model_classes']['rlnClassDistribution'][iclass]
+        mysize = float(model_star['model_classes']['rlnClassDistribution'][iclass])
         if mysize > best_size:
             best_size = mysize
             best_class = model_star['model_classes']['rlnReferenceImage'][iclass]
-            best_resol = model_star['model_classes']['rlnEstimatedResolution'][iclass]
+            best_resol = float(model_star['model_classes']['rlnEstimatedResolution'][iclass])
 
     print " RELION_IT: found largest class:",best_class,"with class size of",best_size,"and resolution of",best_resol
-    return best_class, float(best_resol),  float(model_star['model_general']['rlnPixelSize'])
+    return best_class, best_resol, model_star['model_general']['rlnPixelSize']
 
 def run_pipeline(opts):
     """
@@ -674,7 +678,6 @@ def run_pipeline(opts):
                            'Amplitude contrast: == {}'.format(opts.ampl_contrast),
                            'Amount of astigmatism (A): == {}'.format(opts.ctffind_astigmatism),
                            'FFT box size (pix): == {}'.format(opts.ctffind_boxsize),
-                           'Perform equi-phase averaging? == Yes', 
                            'Maximum defocus value (A): == {}'.format(opts.ctffind_defocus_max),
                            'Minimum defocus value (A): == {}'.format(opts.ctffind_defocus_min),
                            'Defocus step size (A): == {}'.format(opts.ctffind_defocus_step),
@@ -692,11 +695,20 @@ def run_pipeline(opts):
         else:
             ctffind_options.append('Use CTFFIND-4.1? == No')
             ctffind_options.append('Use Gctf instead? == Yes')
+            if (opts.ctffind_do_ignore_search_params):
+                ctffind_options.append('Ignore \'Searches\' parameters? == Yes')
+            else:
+                ctffind_options.append('Ignore \'Searches\' parameters? == No')
+            if (opts.ctffind_do_EPA):
+                 ctffind_options.append('Perform equi-phase averaging? == Yes')
+            else:
+                 ctffind_options.append('Perform equi-phase averaging? == No')
 
         if opts.ctffind_do_phaseshift:
             ctffind_options.append('Estimate phase shifts? == Yes')
         else:
             ctffind_options.append('Estimate phase shifts? == No')
+
 
         ctffind_job, already_had_it  = addJob('CtfFind', 'ctffind_job', SETUP_CHECK_FILE, ctffind_options)
 
@@ -847,7 +859,14 @@ def run_pipeline(opts):
 
 
             print ' RELION_IT: now entering an infinite loop for batch-processing of particles. You can stop this loop by deleting the file',RUNNING_FILE
-            previous_batch1_size = 0
+            
+            # It could be that this is a restart, so check previous_batch1_size in the output directory
+            if os.path.isfile(split_job + 'particles_split001.star'):
+                batch1 = load_star(split_job + 'particles_split001.star')
+                previous_batch1_size = len(batch1['']['rlnMicrographName'])
+            else:
+                previous_batch1_size = 0
+
             continue_this_pass = True
             while continue_this_pass:
 
@@ -1014,7 +1033,7 @@ def run_pipeline(opts):
 
                             inimodel_job, already_had_it = addJob('InitialModel', 'inimodel', SETUP_CHECK_FILE, inimodel_options)              
 
-                            if ((not already_had_it) or rerun_batch1):
+                            if (not already_had_it):
                                 have_new_batch = True
                                 RunJobs([inimodel_job], 1, 1, 'INIMODEL')
                                 print " RELION_IT: submitted initial model generation with", batch_size ,"particles in", inimodel_job
@@ -1131,12 +1150,14 @@ def run_pipeline(opts):
                                 ibatch = nr_batches+1
                                 continue_this_pass = False
                                 print ' RELION_IT: moving on to the second pass using',opts.autopick_3dreference,'for template-based autopicking'
+                                # break out of the for-loop over the batches
+                                break
 
 
                 if not have_new_batch:
                     CheckForExit()
                     # The following prevents checking the particles.star file too often
-                    time.sleep(60*opts.class2d_repeat_time)
+                    time.sleep(60*opts.batch_repeat_time)
 
 
 def main():

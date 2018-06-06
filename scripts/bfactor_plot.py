@@ -40,11 +40,13 @@ class RelionItOptions(object):
     #############################################################################
 
     # Refine3D job with all particles
-    input_refine3d_job = 'Refine3D/job024/'
+    input_refine3d_job = 'Refine3D/job040/' # 24
     # PostProcess job for resolution assessment
-    input_postprocess_job = 'PostProcess/job026/'
+    input_postprocess_job = 'PostProcess/job083/' # 26
     # Minimum number of particles
     minimum_nr_particles = 100
+    # Maximum number of particles
+    maximum_nr_particles = 9999999
 
     #### relion_refine paremeters 
     # Initial low-pass filter for the refinements
@@ -303,7 +305,7 @@ def run_pipeline(opts):
     resolutions = []
 
     current_nr_particles = opts.minimum_nr_particles
-    while current_nr_particles < all_nr_particles:
+    while current_nr_particles <= opts.maximum_nr_particles and current_nr_particles < all_nr_particles:
 
         schedule_name = 'batch_' + str(current_nr_particles)
 
@@ -357,32 +359,46 @@ def run_pipeline(opts):
             RunJobs([refine_job], 1, 0, schedule_name)
             WaitForJob(refine_job, 30)
 
+	halfmap_filename = None
+	try:
+		job_star = load_star(refine_job + "job_pipeline.star")
+		for output_file in job_star["pipeline_output_edges"]['rlnPipeLineEdgeToNode']:
+			if output_file.endswith("half1_class001_unfil.mrc"):
+				halfmap_filename = output_file
+				break
+		assert halfmap_filename != None
+	except:
+		print " RELION_IT: Refinement job " + refine_job + " does not contain expected output maps."
+		print " RELION_IT: This job should have finished, but you may continue it from the GUI. "
+		print " RELION_IT: For now, making the plot without this job."
 
-        # C. Run PostProcess
-        postprocess_run_file = opts.input_postprocess_job+'run.job'
-        post_options = ['One of the 2 unfiltered half-maps: == {}run_half1_class001_unfil.mrc'.format(refine_job)]
-        appendJobOptionsFromRunJobFile(postprocess_run_file, post_options)
-        post_job_name = 'post_job_' + str(current_nr_particles)
-        post_job, already_had_it = addJob('PostProcess', post_job_name, SETUP_CHECK_FILE, post_options)
-        if not already_had_it:
-            RunJobs([post_job], 1, 0, schedule_name)
-            WaitForJob(post_job, 30)
+	if halfmap_filename is not None:
+	        # C. Run PostProcess
+	        postprocess_run_file = opts.input_postprocess_job+'run.job'
+	        post_options = ['One of the 2 unfiltered half-maps: == {}'.format(halfmap_filename)]
+	        appendJobOptionsFromRunJobFile(postprocess_run_file, post_options)
+	        post_job_name = 'post_job_' + str(current_nr_particles)
+	        post_job, already_had_it = addJob('PostProcess', post_job_name, SETUP_CHECK_FILE, post_options)
+	        if not already_had_it:
+	            RunJobs([post_job], 1, 0, schedule_name)
+	            WaitForJob(post_job, 30)
         
-        # Get resolution from
-        post_star = post_job + 'postprocess.star'
-        try:
-            resolution = float(load_star(post_star)['general']['rlnFinalResolution'])
-            nr_particles.append(current_nr_particles)
-            resolutions.append(resolution)
-        except:
-            print 'WARNING: Failed to get post-processed resolution for {} particles'.format(current_nr_particles)
+	        # Get resolution from
+	        post_star = post_job + 'postprocess.star'
+        	try:
+	            resolution = float(load_star(post_star)['general']['rlnFinalResolution'])
+	            nr_particles.append(current_nr_particles)
+	            resolutions.append(resolution)
+	        except:
+	            print ' RELION_IT: WARNING: Failed to get post-processed resolution for {} particles'.format(current_nr_particles)
 
         # Update the current number of particles
         current_nr_particles = 2 * current_nr_particles
 
     # Also include the result from the original PostProcessing job
-    nr_particles.append(all_nr_particles)
-    resolutions.append(all_particles_resolution)
+    if all_nr_particles <= opts.maximum_nr_particles:
+        nr_particles.append(all_nr_particles)
+        resolutions.append(all_particles_resolution)
 
     # Now already make preliminary plots here, e.g
     print
@@ -407,7 +423,7 @@ def run_pipeline(opts):
         plt.plot(xs, ys, '.')
         plt.plot(xs, fitted)
         plt.xlabel("ln(#particles)")
-        plt.ylabel("1/Resolution$^2$ in 1/A$^2$")
+        plt.ylabel("1/Resolution$^2$ in 1/$\AA^2$")
         plt.title("Rosenthal & Henderson plot: B = 2.0 / slope = {:.1f}".format(b_factor));
         plt.savefig("rosenthal-henderson-plot.pdf", bbox_inches='tight')
         print "Plot written to rosenthal-henderson-plot.pdf."
@@ -417,8 +433,8 @@ def run_pipeline(opts):
     if os.path.isfile(RUNNING_FILE):
         os.remove(RUNNING_FILE)
 
-    print 'RELION_IT: Finished all refinements, the plot was written to rosenthal-henderson-plot.pdf.'
-    print 'RELION_IT: exiting now... '
+    print ' RELION_IT: Finished all refinements, the plot was written to rosenthal-henderson-plot.pdf.'
+    print ' RELION_IT: exiting now... '
 
 
 def main():

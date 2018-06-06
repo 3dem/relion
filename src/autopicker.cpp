@@ -439,7 +439,7 @@ void AutoPicker::initialise()
 	        	// Shift the image back to the center...
 	        	CenterFFT(Mref, false);
 	        	Mrefs.push_back(Mref);
-#define DEBUG_PROJECT3DREF
+//#define DEBUG_PROJECT3DREF
 #ifdef DEBUG_PROJECT3DREF
 	        	Image<RFLOAT> Itmp;
 	        	Itmp()=Mref;
@@ -876,44 +876,55 @@ void AutoPicker::run()
 	if (verb > 0)
 		progress_bar(fn_micrographs.size());
 
-	// Make a logfile with plots of the number of particles per micrograph, and their average autopick FOM
-	generatePDFLogfile();
-
 
 }
 
 
 void AutoPicker::generatePDFLogfile()
 {
+
+	long int barstep = XMIPP_MAX(1, fn_ori_micrographs.size() / 60);
 	if (verb > 0)
-		std::cout << " Generate PDF logfile ... " << std::endl;
+	{
+		std::cout << " Generating logfile.pdf ... " << std::endl;
+		init_progress_bar(fn_ori_micrographs.size());
+	}
 
 	MetaDataTable MDresult;
 	RFLOAT total_nr_picked = 0;
 	for (long int imic = 0; imic < fn_ori_micrographs.size(); imic++)
 	{
 		MetaDataTable MD;
-		MD.read(getOutputRootName(fn_ori_micrographs[imic]) + "_" + fn_out + ".star");
-		long nr_pick = (RFLOAT) MD.numberOfObjects();
-		total_nr_picked += nr_pick;
-		if (MD.containsLabel(EMDL_PARTICLE_AUTOPICK_FOM))
+		FileName fn_pick = getOutputRootName(fn_ori_micrographs[imic]) + "_" + fn_out + ".star";
+		if (exists(fn_pick))
 		{
-			RFLOAT fom, avg_fom = 0.;
-			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
+			MD.read(fn_pick);
+			long nr_pick = (RFLOAT) MD.numberOfObjects();
+			total_nr_picked += nr_pick;
+			if (MD.containsLabel(EMDL_PARTICLE_AUTOPICK_FOM))
 			{
-				MD.getValue(EMDL_PARTICLE_AUTOPICK_FOM, fom);
-				avg_fom += fom;
+				RFLOAT fom, avg_fom = 0.;
+				FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
+				{
+					MD.getValue(EMDL_PARTICLE_AUTOPICK_FOM, fom);
+					avg_fom += fom;
+				}
+				avg_fom /= nr_pick;
+				// mis-use MetadataTable to conveniently make histograms and value-plots
+				MDresult.addObject();
+				MDresult.setValue(EMDL_PARTICLE_AUTOPICK_FOM, avg_fom);
+				MDresult.setValue(EMDL_MLMODEL_GROUP_NR_PARTICLES, nr_pick);
 			}
-			avg_fom /= nr_pick;
-			// mis-use MetadataTable to conveniently make histograms and value-plots
-			MDresult.addObject();
-			MDresult.setValue(EMDL_PARTICLE_AUTOPICK_FOM, avg_fom);
-			MDresult.setValue(EMDL_MLMODEL_GROUP_NR_PARTICLES, nr_pick);
 		}
+
+		if (verb > 0 && imic % 60 == 0) progress_bar(imic);
+
 	}
 
-	if (verb > 0)
+
+	if (verb > 0 )
 	{
+		progress_bar(fn_ori_micrographs.size());
 		std::cout << " Total number of particles from " << fn_ori_micrographs.size() << " micrographs is " << total_nr_picked << std::endl;
 		std::cout << " i.e. on average there were " << ROUND(total_nr_picked/fn_ori_micrographs.size()) << " particles per micrograph" << std::endl;
 	}
@@ -929,12 +940,17 @@ void AutoPicker::generatePDFLogfile()
 	fn_eps = fn_odir + "all_nr_parts.eps";
 	plot2Db->OutputPostScriptPlot(fn_eps);
 	all_fn_eps.push_back(fn_eps);
-	CPlot2D *plot2D=new CPlot2D("");
-	MDresult.columnHistogram(EMDL_MLMODEL_GROUP_NR_PARTICLES,histX,histY,0, plot2D);
-	fn_eps = fn_odir + "histogram_nrparts.eps";
-	plot2D->SetTitle("Histogram of nr of picked particles per micrograph");
-	plot2D->OutputPostScriptPlot(fn_eps);
-	all_fn_eps.push_back(fn_eps);
+	delete plot2Db;
+	if (MDresult.numberOfObjects() > 3)
+	{
+		CPlot2D *plot2D=new CPlot2D("");
+		MDresult.columnHistogram(EMDL_MLMODEL_GROUP_NR_PARTICLES,histX,histY,0, plot2D);
+		fn_eps = fn_odir + "histogram_nrparts.eps";
+		plot2D->SetTitle("Histogram of nr of picked particles per micrograph");
+		plot2D->OutputPostScriptPlot(fn_eps);
+		all_fn_eps.push_back(fn_eps);
+		delete plot2D;
+	}
 
 	CPlot2D *plot2Dc=new CPlot2D("Average autopick FOM for all micrographs");
 	MDresult.addToCPlot2D(plot2Dc, EMDL_UNDEFINED, EMDL_PARTICLE_AUTOPICK_FOM, 1.);
@@ -942,16 +958,24 @@ void AutoPicker::generatePDFLogfile()
 	fn_eps = fn_odir + "all_FOMs.eps";
 	plot2Dc->OutputPostScriptPlot(fn_eps);
 	all_fn_eps.push_back(fn_eps);
-	CPlot2D *plot2Dd=new CPlot2D("");
-	MDresult.columnHistogram(EMDL_PARTICLE_AUTOPICK_FOM,histX,histY,0, plot2Dd);
-	fn_eps = fn_odir + "histogram_FOMs.eps";
-	plot2Dd->SetTitle("Histogram of average autopick FOM per micrograph");
-	plot2Dd->OutputPostScriptPlot(fn_eps);
-	all_fn_eps.push_back(fn_eps);
-
-	delete plot2D, plot2Db, plot2Dc, plot2Dd;
+	delete plot2Dc;
+	if (MDresult.numberOfObjects() > 3)
+	{
+		CPlot2D *plot2Dd=new CPlot2D("");
+		MDresult.columnHistogram(EMDL_PARTICLE_AUTOPICK_FOM,histX,histY,0, plot2Dd);
+		fn_eps = fn_odir + "histogram_FOMs.eps";
+		plot2Dd->SetTitle("Histogram of average autopick FOM per micrograph");
+		plot2Dd->OutputPostScriptPlot(fn_eps);
+		all_fn_eps.push_back(fn_eps);
+		delete plot2Dd;
+	}
 
 	joinMultipleEPSIntoSinglePDF(fn_odir + "logfile.pdf ", all_fn_eps);
+
+	if (verb > 0)
+	{
+		std::cout << " Done! Written: " << fn_odir << "logfile.pdf " << std::endl;
+	}
 
 }
 
