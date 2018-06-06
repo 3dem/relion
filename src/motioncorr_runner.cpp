@@ -1013,7 +1013,7 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 				for (RFLOAT frame = 1.; frame <= mic.getNframes(); frame+=1.)
 				{
 					if (mic.getShiftAt(frame, 0., 0., x, y, false, false))
-						REPORT_ERROR("ERROR: cannot get shift for frame " + floatToString(frame) + " in micrograph" + fn_avg);
+						continue;
 					if (frame >= 2.)
 					{
 						RFLOAT d = sqrt( (x-xold)*(x-xold) + (y-yold)*(y-yold) );
