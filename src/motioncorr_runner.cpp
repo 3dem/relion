@@ -889,7 +889,7 @@ void MotioncorrRunner::plotShifts(FileName fn_mic, Micrograph &mic)
 	const RFLOAT ycenter = (!do_unblur) ? mic.getHeight() / 2.0 : 0;
 	for (int j = mic.first_frame, jlim = mic.getNframes(); j <= jlim; j++) // 1-indexed
 	{
-		if (mic.getShiftAt(j, 0, 0, xshift, yshift, false)) { // no local model
+		if (mic.getShiftAt(j, 0, 0, xshift, yshift, false) == 0) {
 			CDataPoint point(xcenter + shift_scale * xshift, ycenter + shift_scale * yshift);
 			dataSet.AddDataPoint(point);
 		}
@@ -897,7 +897,7 @@ void MotioncorrRunner::plotShifts(FileName fn_mic, Micrograph &mic)
 	plot2D->AddDataSet(dataSet);
 
 	// Mark starting point
-	if (mic.getShiftAt(mic.first_frame, 0, 0, xshift, yshift, false)) {
+	if (mic.getShiftAt(mic.first_frame, 0, 0, xshift, yshift, false) == 0) {
 		CDataSet dataSetStart;
 		dataSetStart.SetDrawMarker(true);
 		dataSetStart.SetMarkerSize(5);
@@ -922,10 +922,11 @@ void MotioncorrRunner::plotShifts(FileName fn_mic, Micrograph &mic)
 		fit.SetDatasetColor(0.0,0.0,0.0);
 		obs.SetDrawMarker(false);
 		obs.SetDatasetColor(0.5,0.5,0.5);
+//		std::cout << "New trace" << std::endl;
 		while (i < n_local) {
-		//	std::cout << mic.patchX[i] << " " << mic.patchY[i] << " " << mic.patchZ[i] << " " << mic.localShiftX[i] << " " << mic.localShiftY[i] << std::endl;
+//			std::cout << mic.patchX[i] << " " << mic.patchY[i] << " " << mic.patchZ[i] << " " << mic.localShiftX[i] << " " << mic.localShiftY[i] << std::endl;
 			if ((mic.patchX[start] != mic.patchX[i]) || (mic.patchY[start] != mic.patchY[i])) {
-		//		std::cout << "End of a trace" << std::endl;
+//				std::cout << "End of a trace" << std::endl;
 				break; // start again from this frame
 			}
 			CDataPoint p_obs(mic.patchX[start] + shift_scale * mic.localShiftX[i], mic.patchY[start] + shift_scale * mic.localShiftY[i]);
@@ -1012,7 +1013,7 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 				RFLOAT x = 0., y = 0., xold = 0., yold = 0.;
 				for (RFLOAT frame = 1.; frame <= mic.getNframes(); frame+=1.)
 				{
-					if (mic.getShiftAt(frame, 0., 0., x, y, false, false))
+					if (mic.getShiftAt(frame, 0., 0., x, y, false, false) != 0)
 						continue;
 					if (frame >= 2.)
 					{
