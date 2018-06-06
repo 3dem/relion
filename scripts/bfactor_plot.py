@@ -407,7 +407,7 @@ def run_pipeline(opts):
         plt.plot(xs, ys, '.')
         plt.plot(xs, fitted)
         plt.xlabel("ln(#particles)")
-        plt.ylabel("1/Resolution$^2$ in 1/A$^2$")
+        plt.ylabel("1/Resolution$^2$ in 1/$\AA^2$")
         plt.title("Rosenthal & Henderson plot: B = 2.0 / slope = {:.1f}".format(b_factor));
         plt.savefig("rosenthal-henderson-plot.pdf", bbox_inches='tight')
         print "Plot written to rosenthal-henderson-plot.pdf."
