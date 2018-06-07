@@ -1008,7 +1008,7 @@ bool PipeLine::markAsFinishedJob(int this_job, std::string &error_message)
 		{
 			error_message = "You are trying to mark a relion_refine job as finished that hasn't even started. \n This will be ignored. Perhaps you wanted to delete it instead?";
 			processList[this_job].status = PROC_RUNNING;
-	                write(DO_LOCK);
+			write(DO_LOCK);
 			return false;
 		}
 	}
@@ -1859,8 +1859,22 @@ void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode
 	FileName fn_lock = ".lock_" + name + "_pipeline.star";
 	if (do_lock)
 	{
-		if (!exists(fn_lock))
-			REPORT_ERROR("ERROR: PipeLine::write was expecting a file called "+fn_lock+ " but it isn't there.");
+		int iwait =0;
+		while( !exists(fn_lock) )
+		{
+			// If the lock exists: wait 3 seconds and try again
+			// First time round, print a warning message
+			if (iwait == 0)
+			{
+				std::cerr << " WARNING: was expecting a file called "+fn_lock+ " but it isn't there. Will wait for 1 minute to see whether it appears" << std::endl;
+			}
+			sleep(3);
+			iwait++;
+			if (iwait > 20)
+			{
+				REPORT_ERROR("ERROR: PipeLine::read has waited for 1 minute for lock file to appear, but it doesn't. This should not happen. Is something wrong with the disk access?");
+			}
+		}
 	}
 
 	std::ofstream  fh, fh_del;
