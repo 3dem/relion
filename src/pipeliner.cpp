@@ -1341,7 +1341,9 @@ bool PipeLine::cleanupJob(int this_job, bool do_harsh, std::string &error_messag
 	} // end if extract
 	else if (processList[this_job].type == PROC_2DCLASS ||
 			 processList[this_job].type == PROC_3DCLASS ||
-			 processList[this_job].type == PROC_3DAUTO)
+			 processList[this_job].type == PROC_3DAUTO ||
+			 processList[this_job].type == PROC_INIMODEL ||
+			 processList[this_job].type == PROC_MULTIBODY)
 	{
 
 		// First find the _data.star from each iteration
@@ -1369,55 +1371,54 @@ bool PipeLine::cleanupJob(int this_job, bool do_harsh, std::string &error_messag
 				fn_pattern.globFiles(fns_del, false);
 			}
 
+			// Also clean up maps for PCA movies when doing harsh cleaning
+			if (do_harsh && processList[this_job].type == PROC_MULTIBODY)
+			{
+				fn_pattern = processList[this_job].name + "analyse_component???_bin???.mrc";
+				fn_pattern.globFiles(fns_del, false);
+			}
+
 		} //end loop over ifile (i.e. the _data.star files from all iterations)
 
 	} // end if refine job
-	else if (processList[this_job].type == PROC_MOVIEREFINE)
+	else if (processList[this_job].type == PROC_CTFREFINE)
 	{
 
-		fn_pattern = processList[this_job].name + "batch*mics_nr[0-9][0-9][0-9].star";
-		fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
-		fn_pattern = processList[this_job].name + "run_it[0-9][0-9][0-9]*";
-		fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
 		for (int idir = 0; idir < fns_subdir.size(); idir++)
 		{
+			// remove the temporary output files
+			fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_wAcc.mrc";
+			fn_pattern.globFiles(fns_del, false);
+			fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_xyAcc_real.mrc";
+			fn_pattern.globFiles(fns_del, false);
+			fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_xyAcc_imag.mrc";
+			fn_pattern.globFiles(fns_del, false);
+		}
+
+	} // end if ctf_refine
+	else if (processList[this_job].type == PROC_MOTIONREFINE)
+	{
+
+		for (int idir = 0; idir < fns_subdir.size(); idir++)
+		{
+			// remove the temporary output files
+			fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_FCC_cc.mrc";
+			fn_pattern.globFiles(fns_del, false);
+			fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_FCC_w0.mrc";
+			fn_pattern.globFiles(fns_del, false);
+			fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_FCC_w1.mrc";
+			fn_pattern.globFiles(fns_del, false);
+
 			if (do_harsh)
 			{
-				//remove entire Micrographs directory (STAR files and particle stacks!)
-				fns_del.push_back(processList[this_job].name + fns_subdir[idir]);
-			}
-			else
-			{
-				// only remove the STAR files with the metadata (this will only give moderate file savings)
-				fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_extract.star";
+				fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_shiny.mrcs";
+				fn_pattern.globFiles(fns_del, false);
+				fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_shiny.star";
 				fn_pattern.globFiles(fns_del, false);
 			}
 		}
 
-	} // end if movierefine
-	else if (processList[this_job].type == PROC_POLISH)
-	{
-
-		fn_pattern = processList[this_job].name + "*.mrc";
-		fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
-		fn_pattern = processList[this_job].name + "shiny*xml";
-		fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
-		for (int idir = 0; idir < fns_subdir.size(); idir++)
-		{
-			if (do_harsh)
-			{
-				//remove entire Micrographs directory (STAR files and particle stacks!)
-				fns_del.push_back(processList[this_job].name + fns_subdir[idir]);
-			}
-			else
-			{
-				// only remove the STAR files with the metadata (this will only give moderate file savings)
-				fn_pattern = processList[this_job].name + fns_subdir[idir] + "*.star";
-				fn_pattern.globFiles(fns_del, false);
-			}
-		}
-
-	} // end if polish
+	} // end if motion_refine
 	else if (processList[this_job].type == PROC_SUBTRACT)
 	{
 
