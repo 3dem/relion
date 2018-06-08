@@ -960,7 +960,7 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 		outputstar = outputname+"movies.star";
 		command = "relion_star_loopheader rlnMicrographMovieName > " + outputstar;;
 		commands.push_back(command);
-		command = "ls " + fn_in + " >> " + outputstar;
+		command = "ls -rt " + fn_in + " >> " + outputstar;
 		commands.push_back(command);
 		Node node(outputstar, NODE_MOVIES);
 		outputNodes.push_back(node);
@@ -970,7 +970,7 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 		outputstar = outputname+"micrographs.star";
 		command = "relion_star_loopheader rlnMicrographName > " + outputstar;;
 		commands.push_back(command);
-		command = "ls " + fn_in + " >> " + outputstar;
+		command = "ls -rt " + fn_in + " >> " + outputstar;
 		commands.push_back(command);
 		Node node(outputstar, NODE_MICS);
 		outputNodes.push_back(node);
@@ -982,7 +982,7 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 		// Copy all coordinate files into the same subdirectory in the Import directory
 		// But remove directory structure from pipeline if that exists
 		// Dereference symbolic links if needed
-        FileName fn_dir = fn_in;
+		FileName fn_dir = fn_in;
 		if (fn_dir.contains("/"))
 			fn_dir = fn_dir.beforeLastOf("/");
 		else
