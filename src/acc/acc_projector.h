@@ -7,14 +7,18 @@
 #include "src/acc/acc_ptr.h"
 //#include <cuda_runtime.h>
 //#include "src/acc/cuda/cuda_kernels/cuda_device_utils.cuh"
+#ifndef CUDA
+#include <complex>
+#endif
 
 class AccProjector
 {
 	friend class AccProjectorKernel;
 
-	int mdlX, mdlY, mdlZ, mdlXYZ, mdlMaxR,
+	int mdlX, mdlY, mdlZ, mdlMaxR,
 	    mdlInitY, mdlInitZ,
 	    padding_factor;
+		size_t mdlXYZ;
 
 	size_t allocaton_size;
 
@@ -29,7 +33,7 @@ class AccProjector
 #ifdef CUDA
 	XFLOAT *mdlReal, *mdlImag;
 #else
-	XFLOAT *mdlComplex;
+	std::complex<XFLOAT> *mdlComplex;
 	int externalFree;
 #endif
 #endif  // PROJECTOR_NO_TEXTURES
@@ -69,7 +73,9 @@ public:
 
 	void initMdl(XFLOAT *real, XFLOAT *imag);
 	void initMdl(Complex *data);
-	void initMdl(XFLOAT *data);
+#ifndef CUDA
+	void initMdl(std::complex<XFLOAT> *data);
+#endif
 
 	void clear();
 

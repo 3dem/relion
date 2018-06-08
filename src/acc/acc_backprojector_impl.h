@@ -24,7 +24,7 @@ size_t AccBackprojector::setMdlDim(
 		mdlY = ydim;
 		mdlZ = zdim;
 		if (mdlZ < 1) mdlZ = 1;
-		mdlXYZ = xdim*ydim*zdim;
+		mdlXYZ = (size_t)xdim*(size_t)ydim*(size_t)zdim;
 		mdlInitY = inity;
 		mdlInitZ = initz;
 		maxR = max_r;

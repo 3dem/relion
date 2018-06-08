@@ -25,9 +25,9 @@ namespace CpuKernels
 #define WINDOW_FT_BLOCK_SIZE 128
 template<bool check_max_r2>
 void window_fourier_transform(
-		int grid_dim, 
-		int Npsi, 
-		int block_size,
+		size_t grid_dim, 
+		size_t Npsi, 
+		size_t block_size,
 		ACCCOMPLEX *g_in,
 		ACCCOMPLEX *g_out,
 		size_t iX, size_t iY, size_t iZ, size_t iYX, //Input dimensions
@@ -36,9 +36,9 @@ void window_fourier_transform(
 		size_t max_r2 = 0
 		)
 {
-	for(int blk=0; blk<grid_dim; blk++) {
-		for(int psi=0; psi<Npsi; psi++) {
-			for(int tid=0; tid< block_size; tid++) {
+	for(size_t blk=0; blk<grid_dim; blk++) {
+		for(size_t psi=0; psi<Npsi; psi++) {
+			for(size_t tid=0; tid< block_size; tid++) {
 				size_t n = tid + block_size * blk;
 				size_t oOFF = oX*oY*oZ*psi;
 				size_t iOFF = iX*iY*iZ*psi;
@@ -81,7 +81,7 @@ template <typename T>
 static T getMin(T *data, size_t size)
 {
 	T min = data[0];
-	for(int i=1; i<size; i++)
+	for(size_t i=1; i<size; i++)
 		min = data[i] < min ? data[i] : min;
 	 
 	return min;
@@ -92,7 +92,7 @@ template <typename T>
 static T getMax(T *data, size_t size)
 {
 	T max = data[0];
-	for(int i=1; i<size; i++)
+	for(size_t i=1; i<size; i++)
 		max = data[i] > max ? data[i] : max;
 
 	return max;
@@ -102,20 +102,20 @@ template <typename T>
 static T getSum(T *data, size_t size)
 {
 	T sum = data[0];
-	for(int i=1; i<size; i++)
+	for(size_t i=1; i<size; i++)
 		sum += data[i];
 	 
 	return sum;
 }
 
 template <typename T>
-static std::pair<int, T> getArgMin(T *data, size_t size)
+static std::pair<size_t, T> getArgMin(T *data, size_t size)
 {
-	std::pair<int, T> pair;
+	std::pair<size_t, T> pair;
 	pair.first = 0;
 	pair.second = data[0];
 	
-	for(int i=1; i<size; i++)
+	for(size_t i=1; i<size; i++)
 		if( data[i] < pair.second) {
 			pair.first = i;
 			pair.second = data[i];
@@ -125,13 +125,13 @@ static std::pair<int, T> getArgMin(T *data, size_t size)
 }
 
 template <typename T>
-static std::pair<int, T> getArgMax(T *data, size_t size)
+static std::pair<size_t, T> getArgMax(T *data, size_t size)
 {
-	std::pair<int, T> pair;
+	std::pair<size_t, T> pair;
 	pair.first = 0;
 	pair.second = data[0];
 	
-	for(int i=1; i<size; i++)
+	for(size_t i=1; i<size; i++)
 		if( data[i] > pair.second) {
 			pair.first = i;
 			pair.second = data[i];

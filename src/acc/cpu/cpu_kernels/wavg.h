@@ -23,7 +23,7 @@ template<bool REFCTF, bool REF3D>
 void wavg_ref3D(
 		XFLOAT * RESTRICT   g_eulers,
 		AccProjectorKernel &projector,
-		unsigned            image_size,
+		unsigned long       image_size,
 		unsigned long       orientation_num,
 #ifdef DEBUG_CUDA
 		XFLOAT * RESTRICT   _g_img_real,
@@ -50,7 +50,7 @@ void wavg_ref3D(
 #endif
 	XFLOAT ref_real, ref_imag, img_real, img_imag, trans_real, trans_imag;
 
-	for(int bid=0; bid<orientation_num; bid++) {
+	for(unsigned long bid=0; bid<orientation_num; bid++) {
 
 		// Copy the rotation matrix to local variables
 		int offset = bid * 9;
@@ -69,7 +69,7 @@ void wavg_ref3D(
 								  &sin_y[0][0], &cos_y[0][0]);
 
 		XFLOAT weight_norm_inverse = (XFLOAT) 1.0 / weight_norm;
-		int pixel = 0;
+		unsigned long pixel = 0;
 		for(int iy = 0; iy < ySize; iy++) {
 			int xstart = 0, xend = xSize;
 			int y = iy;
@@ -86,7 +86,7 @@ void wavg_ref3D(
 			XFLOAT ref_real[xSize], ref_imag[xSize];
 			XFLOAT img_real[xSize], img_imag[xSize];
 
-			#pragma simd
+			#pragma omp simd
 			for(int x = xstart; x < xend; x++) {
 				if(REF3D)
 					projector.project3Dmodel(x, y, e0, e1, e3, e4, e6, e7, 
@@ -147,7 +147,7 @@ void wavg_ref3D(
 				} 
 			}  // for itrans
 
-			pixel += xSize;
+			pixel += (unsigned long)xSize;
 		} // y direction
 	} // bid
 }
@@ -156,7 +156,7 @@ template<bool REFCTF>
 void wavg_3D(
 		XFLOAT * RESTRICT   g_eulers,
 		AccProjectorKernel &projector,
-		unsigned            image_size,
+		unsigned long       image_size,
 		unsigned long       orientation_num,
 #ifdef DEBUG_CUDA
 		XFLOAT * RESTRICT   _g_img_real,
@@ -183,7 +183,7 @@ void wavg_3D(
 #endif
 	XFLOAT ref_real, ref_imag, img_real, img_imag, trans_real, trans_imag;
 
-	for(int bid=0; bid<orientation_num; bid++) {
+	for(unsigned long bid=0; bid<orientation_num; bid++) {
 		// Copy the rotation matrix to local variables
 		int offset = bid * 9;
 		XFLOAT e0 = g_eulers[offset  ], e1 = g_eulers[offset+1];
@@ -207,7 +207,7 @@ void wavg_3D(
 								  &sin_z[0][0], &cos_z[0][0]);
 
 		XFLOAT weight_norm_inverse = (XFLOAT) 1.0 / weight_norm;
-		int pixel = 0;
+		unsigned long pixel = 0;
 		for(int iz = 0; iz < zSize; iz ++) {
 			int xstart_z = 0, xend_z = xSize;
 			int z = iz;
@@ -235,7 +235,7 @@ void wavg_3D(
 				XFLOAT ref_real[xSize],  ref_imag[xSize];
 				XFLOAT img_real[xSize], img_imag[xSize];
 
-				#pragma simd
+				#pragma omp simd
 				for(int x = xstart_y; x < xend_y; x++) {
 					projector.project3Dmodel(x, y, z, e0, e1, e2, e3, e4, e5, e6, e7, e8,
 											 ref_real[x], ref_imag[x]);                    
@@ -310,7 +310,7 @@ void wavg_3D(
 					} 
 				}  // for itrans
 
-				pixel += xSize;
+				pixel += (unsigned long)xSize;
 			} // y direction
 		} // z direction
 	} // bid

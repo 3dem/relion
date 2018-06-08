@@ -16,17 +16,18 @@ class AccBackprojector
 {
 
 public:
-	int mdlX, mdlY, mdlZ, mdlXYZ,
+	int mdlX, mdlY, mdlZ, 
 	    mdlInitY, mdlInitZ,
 	    maxR, maxR2,
 	    padding_factor;
+		size_t mdlXYZ;
 
 #ifndef CUDA
 	tbb::spin_mutex *mutexes;
 #endif
 
 	size_t allocaton_size;
-	int voxelCount;
+	size_t voxelCount;
 
 	XFLOAT *d_mdlReal, *d_mdlImag, *d_mdlWeight;
 

@@ -322,11 +322,11 @@ public:
 
 	void clear()
 	{
+		reals.freeIfSet();
+		fouriers.freeIfSet();
+	
 		if (planSet)
 		{
-			reals.freeIfSet();
-			fouriers.freeIfSet();
-
 			tbb::spin_mutex::scoped_lock lock(mkl_mutex);        
 #ifdef ACC_DOUBLE_PRECISION
 			fftw_destroy_plan(fPlanForward);

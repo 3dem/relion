@@ -83,7 +83,7 @@ void backproject2D(
 		{
 			for (unsigned pass = 0; pass < pixel_pass_num; pass++)
 			{
-				unsigned pixel = (pass * block_size) + tid;
+				unsigned long pixel = (pass * block_size) + tid;
 
 				if (pixel >= img_xy)
 					continue;
@@ -163,8 +163,7 @@ void backproject2D(
 					XFLOAT dd10 =  fy * mfx;
 					XFLOAT dd11 =  fy *  fx;
 
-					// No locking necessary since multiple threads are not
-					// updating the same particle
+					// Locking necessary since all threads share the same back projector
 					{
 						tbb::spin_mutex::scoped_lock lock(mutexes[y0]);
 						g_model_real  [y0 * mdl_x + x0]+=dd00 * real;
@@ -218,14 +217,14 @@ void backproject3D(
 		unsigned img_x,
 		unsigned img_y,
 		unsigned img_z,
-		unsigned img_xyz,
+		size_t   img_xyz,
 		unsigned mdl_x,
 		unsigned mdl_y,
 		int mdl_inity,
 		int mdl_initz,
 		tbb::spin_mutex *mutexes)
 {
-	for (unsigned img=0; img<imageCount; img++) {
+	for (unsigned long img=0; img<imageCount; img++) {
 		XFLOAT s_eulers[9];
 
 		 for (int i = 0; i < 9; i++)
@@ -247,16 +246,16 @@ void backproject3D(
 		for (unsigned pass = 0; pass < pixel_pass_num; pass++)
 		{
 			memset(Fweight,0,sizeof(XFLOAT)*block_size);
-			#pragma simd
+			#pragma omp simd
 			for(int tid=0; tid<block_size; tid++)
 			{
 				int ok_for_next(1);  // This flag avoids continues, helping the vectorizer
 				
-				unsigned pixel(0);
+				size_t pixel(0);
 				if(DATA3D)
-					pixel = (pass * block_size) + tid;
+					pixel = ((size_t)pass * (size_t)block_size) + (size_t)tid;
 				else
-					pixel = (pass * block_size) + tid;
+					pixel = ((size_t)pass * (size_t)block_size) + (size_t)tid;
 
 				if (pixel >= img_xyz)
 					continue; // just doesn't make sense to proceed in this case
@@ -266,10 +265,10 @@ void backproject3D(
 
 				if(DATA3D)
 				{
-					z =  CpuKernels::floorfracf(pixel, img_x*img_y);
+					z =  CpuKernels::floorfracf(pixel, (size_t)img_x*(size_t)img_y);
 					xy = pixel % (img_x*img_y);
 					x =             xy  % img_x;
-					y = CpuKernels::floorfracf( xy,   img_x);
+					y = CpuKernels::floorfracf( xy,   (size_t)img_x);
 					if (z > max_r)
 					{
 						if (z >= img_z - max_r)
@@ -284,7 +283,7 @@ void backproject3D(
 				else
 				{
 					x =             pixel % img_x;
-					y = CpuKernels::floorfracf( pixel , img_x);
+					y = CpuKernels::floorfracf( pixel , (size_t)img_x);
 				}
 				if (y > max_r)
 				{
@@ -390,20 +389,22 @@ void backproject3D(
 					XFLOAT mfy = (XFLOAT)1.0 - fy;
 					XFLOAT mfz = (XFLOAT)1.0 - fz;
 
-					// No locking since each thread working on a different particle
+					// Locking necessary since all threads share the same back projector
 					XFLOAT dd000 = mfz * mfy * mfx;
 					XFLOAT dd001 = mfz * mfy *  fx;
+					
+					size_t z0MdlxMdly = (size_t)z0 * (size_t)mdl_x * (size_t)mdl_y;
 
 					{
 						tbb::spin_mutex::scoped_lock lock(mutexes[z0 * mdl_y + y0]);
 
-						g_model_real  [z0 * mdl_x * mdl_y + y0 * mdl_x + x0]+=dd000 * real[tid];
-						g_model_imag  [z0 * mdl_x * mdl_y + y0 * mdl_x + x0]+=dd000 * imag[tid];
-						g_model_weight[z0 * mdl_x * mdl_y + y0 * mdl_x + x0]+=dd000 * Fweight[tid];
+						g_model_real  [z0MdlxMdly + y0 * mdl_x + x0]+=dd000 * real[tid];
+						g_model_imag  [z0MdlxMdly + y0 * mdl_x + x0]+=dd000 * imag[tid];
+						g_model_weight[z0MdlxMdly + y0 * mdl_x + x0]+=dd000 * Fweight[tid];
 
-						g_model_real  [z0 * mdl_x * mdl_y + y0 * mdl_x + x1]+=dd001 * real[tid];
-						g_model_imag  [z0 * mdl_x * mdl_y + y0 * mdl_x + x1]+=dd001 * imag[tid];
-						g_model_weight[z0 * mdl_x * mdl_y + y0 * mdl_x + x1]+=dd001 * Fweight[tid];
+						g_model_real  [z0MdlxMdly + y0 * mdl_x + x1]+=dd001 * real[tid];
+						g_model_imag  [z0MdlxMdly + y0 * mdl_x + x1]+=dd001 * imag[tid];
+						g_model_weight[z0MdlxMdly + y0 * mdl_x + x1]+=dd001 * Fweight[tid];
 					}
 
 					XFLOAT dd010 = mfz *  fy * mfx;
@@ -412,28 +413,30 @@ void backproject3D(
 					{
 						tbb::spin_mutex::scoped_lock lock(mutexes[z0 * mdl_y + y1]);
 
-						g_model_real  [z0 * mdl_x * mdl_y + y1 * mdl_x + x0]+=dd010 * real[tid];
-						g_model_imag  [z0 * mdl_x * mdl_y + y1 * mdl_x + x0]+=dd010 * imag[tid];
-						g_model_weight[z0 * mdl_x * mdl_y + y1 * mdl_x + x0]+=dd010 * Fweight[tid];
+						g_model_real  [z0MdlxMdly + y1 * mdl_x + x0]+=dd010 * real[tid];
+						g_model_imag  [z0MdlxMdly + y1 * mdl_x + x0]+=dd010 * imag[tid];
+						g_model_weight[z0MdlxMdly + y1 * mdl_x + x0]+=dd010 * Fweight[tid];
 
-						g_model_real  [z0 * mdl_x * mdl_y + y1 * mdl_x + x1]+=dd011 * real[tid];
-						g_model_imag  [z0 * mdl_x * mdl_y + y1 * mdl_x + x1]+=dd011 * imag[tid];
-						g_model_weight[z0 * mdl_x * mdl_y + y1 * mdl_x + x1]+=dd011 * Fweight[tid];
+						g_model_real  [z0MdlxMdly + y1 * mdl_x + x1]+=dd011 * real[tid];
+						g_model_imag  [z0MdlxMdly + y1 * mdl_x + x1]+=dd011 * imag[tid];
+						g_model_weight[z0MdlxMdly + y1 * mdl_x + x1]+=dd011 * Fweight[tid];
 					}
 
 					XFLOAT dd100 =  fz * mfy * mfx;
 					XFLOAT dd101 =  fz * mfy *  fx;
 
+					size_t z1MdlxMdly = (size_t)z1 * (size_t)mdl_x * (size_t)mdl_y;
+					
 					{
 						tbb::spin_mutex::scoped_lock lock(mutexes[z1 * mdl_y + y0]);
 
-						g_model_real  [z1 * mdl_x * mdl_y + y0 * mdl_x + x0]+=dd100 * real[tid];
-						g_model_imag  [z1 * mdl_x * mdl_y + y0 * mdl_x + x0]+=dd100 * imag[tid];
-						g_model_weight[z1 * mdl_x * mdl_y + y0 * mdl_x + x0]+=dd100 * Fweight[tid];
+						g_model_real  [z1MdlxMdly + y0 * mdl_x + x0]+=dd100 * real[tid];
+						g_model_imag  [z1MdlxMdly + y0 * mdl_x + x0]+=dd100 * imag[tid];
+						g_model_weight[z1MdlxMdly + y0 * mdl_x + x0]+=dd100 * Fweight[tid];
 
-						g_model_real  [z1 * mdl_x * mdl_y + y0 * mdl_x + x1]+=dd101 * real[tid];
-						g_model_imag  [z1 * mdl_x * mdl_y + y0 * mdl_x + x1]+=dd101 * imag[tid];
-						g_model_weight[z1 * mdl_x * mdl_y + y0 * mdl_x + x1]+=dd101 * Fweight[tid];
+						g_model_real  [z1MdlxMdly + y0 * mdl_x + x1]+=dd101 * real[tid];
+						g_model_imag  [z1MdlxMdly + y0 * mdl_x + x1]+=dd101 * imag[tid];
+						g_model_weight[z1MdlxMdly + y0 * mdl_x + x1]+=dd101 * Fweight[tid];
 					}
 
 					XFLOAT dd110 =  fz *  fy * mfx;
@@ -442,13 +445,13 @@ void backproject3D(
 					{
 						tbb::spin_mutex::scoped_lock lock(mutexes[z1 * mdl_y + y1]);
 
-						g_model_real  [z1 * mdl_x * mdl_y + y1 * mdl_x + x0]+=dd110 * real[tid];
-						g_model_imag  [z1 * mdl_x * mdl_y + y1 * mdl_x + x0]+=dd110 * imag[tid];
-						g_model_weight[z1 * mdl_x * mdl_y + y1 * mdl_x + x0]+=dd110 * Fweight[tid];
+						g_model_real  [z1MdlxMdly + y1 * mdl_x + x0]+=dd110 * real[tid];
+						g_model_imag  [z1MdlxMdly + y1 * mdl_x + x0]+=dd110 * imag[tid];
+						g_model_weight[z1MdlxMdly + y1 * mdl_x + x0]+=dd110 * Fweight[tid];
 
-						g_model_real  [z1 * mdl_x * mdl_y + y1 * mdl_x + x1]+=dd111 * real[tid];
-						g_model_imag  [z1 * mdl_x * mdl_y + y1 * mdl_x + x1]+=dd111 * imag[tid];
-						g_model_weight[z1 * mdl_x * mdl_y + y1 * mdl_x + x1]+=dd111 * Fweight[tid];
+						g_model_real  [z1MdlxMdly + y1 * mdl_x + x1]+=dd111 * real[tid];
+						g_model_imag  [z1MdlxMdly + y1 * mdl_x + x1]+=dd111 * imag[tid];
+						g_model_weight[z1MdlxMdly + y1 * mdl_x + x1]+=dd111 * Fweight[tid];
 					}
 				}  // Fweight[tid] > (RFLOAT) 0.0
 			}  // for tid
@@ -485,7 +488,7 @@ void backprojectRef3D(
 		unsigned img_x,
 		unsigned img_y,
 		unsigned img_z,
-		unsigned img_xyz,
+		size_t   img_xyz,
 		unsigned mdl_x,
 		unsigned mdl_y,
 		int      mdl_inity,
@@ -514,7 +517,7 @@ void backprojectRef3D(
 		unsigned img_x,
 		unsigned img_y,
 		unsigned img_z,
-		unsigned img_xyz,
+		size_t   img_xyz,
 		unsigned mdl_x,
 		unsigned mdl_y,
 		int      mdl_inity,
@@ -539,15 +542,15 @@ void backprojectRef3D(
 		XFLOAT xp[img_x], yp[img_x], zp[img_x];
 		XFLOAT real[img_x], imag[img_x], Fweight[img_x];
 
-		int mdl_x_mdl_y = mdl_x * mdl_y;
-		int pixel = 0;
+		size_t mdl_x_mdl_y = (size_t)mdl_x * (size_t)mdl_y;
+		size_t pixel = 0;
 		for(int iy = 0; iy < img_y; iy++) {
 			int y = iy;
 			if (iy > max_r) {
 				if (iy >= img_y - max_r)
 					y = iy - img_y;
 				else {
-					pixel += img_x;
+					pixel += (size_t)img_x;
 					continue;
 				}
 			}
@@ -578,7 +581,7 @@ void backprojectRef3D(
 				XFLOAT *trans_cos_x = &cos_x[itrans][0];
 				XFLOAT *trans_sin_x = &sin_x[itrans][0];     
 
-				#pragma simd
+				#pragma omp simd
 				for(int x=0; x<xmax; x++) {
 					XFLOAT minvsigma2 = g_Minvsigma2s[pixel + x];
 					XFLOAT ctf        = g_ctfs       [pixel + x];
@@ -604,7 +607,7 @@ void backprojectRef3D(
 				}
 			}
 
-			#pragma simd
+			#pragma omp simd
 			for(int x=0; x<img_x; x++) {		
 				// Get logical coordinates in the 3D map
 				xp[x] = (s_eulers[0] * x + s_eulers[1] * y ) * padding_factor;
@@ -641,9 +644,9 @@ void backprojectRef3D(
 				XFLOAT mfz = (XFLOAT)1.0 - fz;
 
 				XFLOAT mfz_mfy = mfz * mfy;
-				int z0_mdl_x_mdl_y = z0 * mdl_x_mdl_y;
-				int y0_mdl_x = y0 * mdl_x;
-				int idx_tmp;
+				size_t z0_mdl_x_mdl_y = (size_t)z0 * mdl_x_mdl_y;
+				size_t y0_mdl_x = (size_t)y0 * (size_t)mdl_x;
+				size_t idx_tmp;
 
 				XFLOAT dd000 = mfz_mfy * mfx; // mfz *  mfy *  mfx
 				XFLOAT dd001 = mfz_mfy - dd000; // mfz *  mfy *  fx
@@ -651,7 +654,7 @@ void backprojectRef3D(
 				{
 					tbb::spin_mutex::scoped_lock lock(mutexes[z0 * mdl_y + y0]);
 
-					idx_tmp = z0_mdl_x_mdl_y + y0_mdl_x + x0; // z0 * mdl_x * mdl_y + y0 * mdl_x + x0;
+					idx_tmp = z0_mdl_x_mdl_y + y0_mdl_x + (size_t)x0; // z0 * mdl_x * mdl_y + y0 * mdl_x + x0;
 					g_model_real  [idx_tmp]+=dd000 * real[x];
 					g_model_imag  [idx_tmp]+=dd000 * imag[x];
 					g_model_weight[idx_tmp]+=dd000 * Fweight[x];
@@ -668,7 +671,7 @@ void backprojectRef3D(
 				{
 					tbb::spin_mutex::scoped_lock lock(mutexes[z0 * mdl_y + y0 + 1]);
 
-					idx_tmp = z0_mdl_x_mdl_y + y0_mdl_x + mdl_x + x0; // z0 * mdl_x * mdl_y + y1 * mdl_x + x0;
+					idx_tmp = z0_mdl_x_mdl_y + y0_mdl_x + (size_t)mdl_x + (size_t)x0; // z0 * mdl_x * mdl_y + y1 * mdl_x + x0;
 					g_model_real  [idx_tmp]+=dd010 * real[x];
 					g_model_imag  [idx_tmp]+=dd010 * imag[x];
 					g_model_weight[idx_tmp]+=dd010 * Fweight[x];
@@ -686,7 +689,7 @@ void backprojectRef3D(
 				{
 					tbb::spin_mutex::scoped_lock lock(mutexes[z1 * mdl_y + y0]);
 
-					idx_tmp = z0_mdl_x_mdl_y + mdl_x_mdl_y + y0_mdl_x + x0; // z1 * mdl_x * mdl_y + y0 * mdl_x + x0;
+					idx_tmp = z0_mdl_x_mdl_y + mdl_x_mdl_y + y0_mdl_x + (size_t)x0; // z1 * mdl_x * mdl_y + y0 * mdl_x + x0;
 					g_model_real  [idx_tmp]+=dd100 * real[x];
 					g_model_imag  [idx_tmp]+=dd100 * imag[x];
 					g_model_weight[idx_tmp]+=dd100 * Fweight[x];
@@ -703,7 +706,7 @@ void backprojectRef3D(
 
 				{
 					tbb::spin_mutex::scoped_lock lock(mutexes[z1 * mdl_y + y0 + 1]);
-					idx_tmp = z0_mdl_x_mdl_y + mdl_x_mdl_y + y0_mdl_x + mdl_x + x0; // z1 * mdl_x * mdl_y + y1 * mdl_x + x0;
+					idx_tmp = z0_mdl_x_mdl_y + mdl_x_mdl_y + y0_mdl_x + (size_t)mdl_x + (size_t)x0; // z1 * mdl_x * mdl_y + y1 * mdl_x + x0;
 					g_model_real  [idx_tmp]+=dd110 * real[x];
 					g_model_imag  [idx_tmp]+=dd110 * imag[x];
 					g_model_weight[idx_tmp]+=dd110 * Fweight[x];
@@ -715,7 +718,7 @@ void backprojectRef3D(
 				}
 			}  // for x direction
 
-			pixel += img_x;
+			pixel += (size_t)img_x;
 		} // for y direction
 	} // for img
 }
@@ -747,7 +750,7 @@ void backprojectSGD(
 		unsigned img_x,
 		unsigned img_y,
 		unsigned img_z,
-		unsigned img_xyz,
+		size_t   img_xyz,
 		unsigned mdl_x,
 		unsigned mdl_y,
 		int mdl_inity,
@@ -778,15 +781,15 @@ void backprojectSGD(
 
 		for (unsigned pass = 0; pass < pixel_pass_num; pass++)   {
 			memset(Fweight,0,sizeof(XFLOAT)*block_size);
-//			#pragma simd
+//			#pragma omp simd
 			for(int tid=0; tid<block_size; tid++) {
 				int ok_for_next(1);  // This flag avoids continues, helping the vectorizer
 				
-				unsigned pixel(0);
+				size_t pixel(0);
 				if(DATA3D)
-					pixel = (pass * block_size) + tid;
+					pixel = ((size_t)pass * (size_t)block_size) + (size_t)tid;
 				else
-					pixel = (pass * block_size) + tid;
+					pixel = ((size_t)pass * (size_t)block_size) + (size_t)tid;
 
 				if (pixel >= img_xyz)
 					continue;  // just doesn't make sense to proceed in this case
@@ -796,10 +799,10 @@ void backprojectSGD(
 
 				if(DATA3D)
 				{
-					z =  CpuKernels::floorfracf(pixel, img_x*img_y);
+					z =  CpuKernels::floorfracf(pixel, (size_t)((size_t)img_x*(size_t)img_y));
 					xy = pixel % (img_x*img_y);
 					x =             xy  % img_x;
-					y = CpuKernels::floorfracf( xy,   img_x);
+					y = CpuKernels::floorfracf( xy,   (size_t)img_x);
 					if (z > max_r)
 					{
 						if (z >= img_z - max_r)
@@ -814,7 +817,7 @@ void backprojectSGD(
 				else
 				{
 					x =             pixel % img_x;
-					y = CpuKernels::floorfracf( pixel , img_x);
+					y = CpuKernels::floorfracf( pixel , (size_t)img_x);
 				}
 				if (y > max_r)
 				{
@@ -938,17 +941,19 @@ void backprojectSGD(
 
 					XFLOAT dd000 = mfz * mfy * mfx;
 					XFLOAT dd001 = mfz * mfy *  fx;
+					
+					size_t z0MdlxMdly = (size_t)z0 * (size_t)mdl_x * (size_t)mdl_y;
 
 					{
 						tbb::spin_mutex::scoped_lock lock(mutexes[z0 * mdl_y + y0]);
 
-						g_model_real  [z0 * mdl_x * mdl_y + y0 * mdl_x + x0] += dd000 * real[tid];
-						g_model_imag  [z0 * mdl_x * mdl_y + y0 * mdl_x + x0] += dd000 * imag[tid];
-						g_model_weight[z0 * mdl_x * mdl_y + y0 * mdl_x + x0] += dd000 * Fweight[tid];
+						g_model_real  [z0MdlxMdly + y0 * mdl_x + x0] += dd000 * real[tid];
+						g_model_imag  [z0MdlxMdly + y0 * mdl_x + x0] += dd000 * imag[tid];
+						g_model_weight[z0MdlxMdly + y0 * mdl_x + x0] += dd000 * Fweight[tid];
 
-						g_model_real  [z0 * mdl_x * mdl_y + y0 * mdl_x + x1] += dd001 * real[tid];
-						g_model_imag  [z0 * mdl_x * mdl_y + y0 * mdl_x + x1] += dd001 * imag[tid];
-						g_model_weight[z0 * mdl_x * mdl_y + y0 * mdl_x + x1] += dd001 * Fweight[tid];
+						g_model_real  [z0MdlxMdly + y0 * mdl_x + x1] += dd001 * real[tid];
+						g_model_imag  [z0MdlxMdly + y0 * mdl_x + x1] += dd001 * imag[tid];
+						g_model_weight[z0MdlxMdly + y0 * mdl_x + x1] += dd001 * Fweight[tid];
 					}
 
 					XFLOAT dd010 = mfz *  fy * mfx;
@@ -957,28 +962,30 @@ void backprojectSGD(
 					{
 						tbb::spin_mutex::scoped_lock lock(mutexes[z0 * mdl_y + y1]);
 
-						g_model_real  [z0 * mdl_x * mdl_y + y1 * mdl_x + x0] += dd010 * real[tid];
-						g_model_imag  [z0 * mdl_x * mdl_y + y1 * mdl_x + x0] += dd010 * imag[tid];
-						g_model_weight[z0 * mdl_x * mdl_y + y1 * mdl_x + x0] += dd010 * Fweight[tid];
+						g_model_real  [z0MdlxMdly + y1 * mdl_x + x0] += dd010 * real[tid];
+						g_model_imag  [z0MdlxMdly + y1 * mdl_x + x0] += dd010 * imag[tid];
+						g_model_weight[z0MdlxMdly + y1 * mdl_x + x0] += dd010 * Fweight[tid];
 
-						g_model_real  [z0 * mdl_x * mdl_y + y1 * mdl_x + x1] += dd011 * real[tid];
-						g_model_imag  [z0 * mdl_x * mdl_y + y1 * mdl_x + x1] += dd011 * imag[tid];
-						g_model_weight[z0 * mdl_x * mdl_y + y1 * mdl_x + x1] += dd011 * Fweight[tid];
+						g_model_real  [z0MdlxMdly + y1 * mdl_x + x1] += dd011 * real[tid];
+						g_model_imag  [z0MdlxMdly + y1 * mdl_x + x1] += dd011 * imag[tid];
+						g_model_weight[z0MdlxMdly + y1 * mdl_x + x1] += dd011 * Fweight[tid];
 					}
 
 					XFLOAT dd100 =  fz * mfy * mfx;
 					XFLOAT dd101 =  fz * mfy *  fx;
+					
+					size_t z1MdlxMdly = (size_t)z1 * (size_t)mdl_x * (size_t)mdl_y;
 
 					{
 						tbb::spin_mutex::scoped_lock lock(mutexes[z1 * mdl_y + y0]);
 
-						g_model_real  [z1 * mdl_x * mdl_y + y0 * mdl_x + x0] += dd100 * real[tid];
-						g_model_imag  [z1 * mdl_x * mdl_y + y0 * mdl_x + x0] += dd100 * imag[tid];
-						g_model_weight[z1 * mdl_x * mdl_y + y0 * mdl_x + x0] += dd100 * Fweight[tid];
+						g_model_real  [z1MdlxMdly + y0 * mdl_x + x0] += dd100 * real[tid];
+						g_model_imag  [z1MdlxMdly + y0 * mdl_x + x0] += dd100 * imag[tid];
+						g_model_weight[z1MdlxMdly + y0 * mdl_x + x0] += dd100 * Fweight[tid];
 
-						g_model_real  [z1 * mdl_x * mdl_y + y0 * mdl_x + x1] += dd101 * real[tid];
-						g_model_imag  [z1 * mdl_x * mdl_y + y0 * mdl_x + x1] += dd101 * imag[tid];
-						g_model_weight[z1 * mdl_x * mdl_y + y0 * mdl_x + x1] += dd101 * Fweight[tid];
+						g_model_real  [z1MdlxMdly + y0 * mdl_x + x1] += dd101 * real[tid];
+						g_model_imag  [z1MdlxMdly + y0 * mdl_x + x1] += dd101 * imag[tid];
+						g_model_weight[z1MdlxMdly + y0 * mdl_x + x1] += dd101 * Fweight[tid];
 
 					}
 
@@ -988,13 +995,13 @@ void backprojectSGD(
 					{
 						tbb::spin_mutex::scoped_lock lock(mutexes[z1 * mdl_y + y1]);
 
-						g_model_real  [z1 * mdl_x * mdl_y + y1 * mdl_x + x0] += dd110 * real[tid];
-						g_model_imag  [z1 * mdl_x * mdl_y + y1 * mdl_x + x0] += dd110 * imag[tid];
-						g_model_weight[z1 * mdl_x * mdl_y + y1 * mdl_x + x0] += dd110 * Fweight[tid];
+						g_model_real  [z1MdlxMdly + y1 * mdl_x + x0] += dd110 * real[tid];
+						g_model_imag  [z1MdlxMdly + y1 * mdl_x + x0] += dd110 * imag[tid];
+						g_model_weight[z1MdlxMdly + y1 * mdl_x + x0] += dd110 * Fweight[tid];
 
-						g_model_real  [z1 * mdl_x * mdl_y + y1 * mdl_x + x1] += dd111 * real[tid];
-						g_model_imag  [z1 * mdl_x * mdl_y + y1 * mdl_x + x1] += dd111 * imag[tid];
-						g_model_weight[z1 * mdl_x * mdl_y + y1 * mdl_x + x1] += dd111 * Fweight[tid];
+						g_model_real  [z1MdlxMdly + y1 * mdl_x + x1] += dd111 * real[tid];
+						g_model_imag  [z1MdlxMdly + y1 * mdl_x + x1] += dd111 * imag[tid];
+						g_model_weight[z1MdlxMdly + y1 * mdl_x + x1] += dd111 * Fweight[tid];
 					}
 
 				} // Fweight[tid] > (RFLOAT) 0.0
