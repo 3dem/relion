@@ -186,9 +186,6 @@ void MotioncorrRunner::initialise()
 			// If patch_x == patch_y == 1, the user actually wants global alignment alone, so do not warn.
 			std::cerr << "The number of patches is too small (<= 2). Patch based alignment will be skipped." << std::endl;
 		}
-		if (group > 1) {
-			std::cerr << "WARNING: Frame grouping is under development in our own implementation of motion correction." << std::endl;
-		}
 		if (do_save_movies) {
 			std::cerr << "WARNING: In our own implementation of motion correction, we do not save aligned movies. --save_movies was ignored." << std::endl;
 			do_save_movies = false;
