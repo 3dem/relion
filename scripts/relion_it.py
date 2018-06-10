@@ -561,7 +561,8 @@ def findBestClass(model_star_file, use_resol=True):
     for iclass in range(0, len(model_star['model_classes']['rlnReferenceImage'])):
         mysize = float(model_star['model_classes']['rlnClassDistribution'][iclass])
         myresol = float(model_star['model_classes']['rlnEstimatedResolution'][iclass])
-        if (not use_resol and mysize > best_size) or (use_resol and myresol < best_resol):
+        if (not use_resol and (mysize > best_size or (mysize == best_size and myresol < best_resol))) \
+        or (use_resol and (myresol < best_resol or (myresol == best_resol and mysize > best_size))):
             best_size = mysize
             best_class = model_star['model_classes']['rlnReferenceImage'][iclass]
             best_resol = myresol
