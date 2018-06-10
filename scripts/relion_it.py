@@ -606,6 +606,12 @@ def run_pipeline(opts):
                      'Standard submission script: == {}'.format(opts.queue_submission_template),
                      'Minimum dedicated cores per node: == {}'.format(opts.queue_minimum_dedicated)]
 
+    # If we're only doing motioncorr and ctf estimation, then forget about the second pass and the batch processing
+    if opts.stop_after_ctf_estimation:
+        opts.do_class2d = False
+        opts.do_class3d = False
+        opts.do_second_pass = False
+
     if opts.do_second_pass:
         nr_passes = 2
     else:
@@ -716,10 +722,7 @@ def run_pipeline(opts):
         runjobs = [import_job, motioncorr_job, ctffind_job]
 
         # There is an option to stop on-the-fly processing after CTF estimation
-        if opts.stop_after_ctf_estimation:
-            opts.do_class2d = False
-            opts.do_class3d = False
-        else:
+        if not opts.stop_after_ctf_estimation:
             autopick_options = ['Input micrographs for autopick: == {}micrographs_ctf.star'.format(ctffind_job),
                                 'Min. diameter for LoG filter (A) == {}'.format(opts.autopick_LoG_diam_min),
                                 'Max. diameter for LoG filter (A) == {}'.format(opts.autopick_LoG_diam_max),
