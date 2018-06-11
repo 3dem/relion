@@ -235,7 +235,8 @@ void MotioncorrRunner::initialise()
 		{
 			FileName fn_avg, fn_mov;
 			getOutputFileNames(fn_ori_micrographs[imic], fn_avg, fn_mov);
-			if (!exists(fn_avg) || (do_save_movies && !exists(fn_mov)) )
+			if (!exists(fn_avg) || !exists(fn_avg.withoutExtension() + ".star") ||
+                            (do_save_movies && !exists(fn_mov)))
 				fn_micrographs.push_back(fn_ori_micrographs[imic]);
 		}
 	}
@@ -1093,7 +1094,7 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 			}
 		}
 
-		joinMultipleEPSIntoSinglePDF(fn_out + "logfile.pdf ", all_fn_eps);
+		joinMultipleEPSIntoSinglePDF(fn_out + "logfile.pdf", all_fn_eps);
 
 	}
 

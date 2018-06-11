@@ -1370,7 +1370,7 @@ void ParticlePolisher::generateLogFilePDF()
 			}
 		}
 
-		joinMultipleEPSIntoSinglePDF(fn_out + "logfile.pdf ", fn_eps);
+		joinMultipleEPSIntoSinglePDF(fn_out + "logfile.pdf", fn_eps);
 
 	}
 }
