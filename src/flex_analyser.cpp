@@ -897,7 +897,7 @@ void FlexAnalyser::makePCAhistograms(std::vector< std::vector<double> > &project
 		delete plot2D;
 	}
 
-	joinMultipleEPSIntoSinglePDF(fn_out + "_logfile.pdf ", all_fn_eps);
+	joinMultipleEPSIntoSinglePDF(fn_out + "_logfile.pdf", all_fn_eps);
 
 }
 

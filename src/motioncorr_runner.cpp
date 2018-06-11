@@ -1094,7 +1094,7 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 			}
 		}
 
-		joinMultipleEPSIntoSinglePDF(fn_out + "logfile.pdf ", all_fn_eps);
+		joinMultipleEPSIntoSinglePDF(fn_out + "logfile.pdf", all_fn_eps);
 
 	}
 
