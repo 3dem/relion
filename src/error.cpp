@@ -62,14 +62,12 @@ RelionError::RelionError(const std::string &what, const std::string &fileArg, co
     file= fileArg;
     line=lineArg;
 
-    std::cerr << msg << "\nin: " << file << ", line " << line << "\n";
+    std::cerr << "in: " << file << ", line " << line << "\n";
 }
 
 // Show message
 std::ostream& operator << (std::ostream& o, RelionError& XE)
 {
-    o << XE.msg << std::endl
-      << "File: " << XE.file << " line: " << XE.line << std::endl;
 
 #ifdef __GNUC__
     o << "=== Backtrace  ===" << std::endl;
@@ -81,6 +79,8 @@ std::ostream& operator << (std::ostream& o, RelionError& XE)
     delete[] XE.backtrace_buffer;
     free(bt_symbols);
 #endif
+
+    o << XE.msg << std::endl;
 
     return o;
 }
