@@ -60,7 +60,7 @@ void exponentiate_weights_fine(
 		}
 	}
 }
-void RNDnormalDitributionComplexWithPowerModulation(ACCCOMPLEX* Image, size_t xdim, XFLOAT *spectra)
+void RNDnormalDitributionComplexWithPowerModulation2D(ACCCOMPLEX* Image, size_t xdim, XFLOAT *spectra)
 {
 	size_t x,y,size;
 	size = xdim*((xdim-1)*2);
