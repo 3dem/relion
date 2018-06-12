@@ -52,6 +52,17 @@
 #include "src/error.h"
 #include "src/macros.h"
 
+#define MPITAG_JOB_REQUEST 0
+#define MPITAG_JOB_REPLY 1
+#define MPITAG_METADATA 2
+#define MPITAG_RANDOMSEED 3
+#define MPITAG_IMAGE 4
+#define MPITAG_PACK 5
+#define MPITAG_RFLOAT 6
+#define MPITAG_INT 7
+#define MPITAG_IDENTIFIER 8
+#define MPITAG_BCAST 9
+
  /** Class to wrapp some MPI common calls in an work node.
  *
  */
@@ -87,7 +98,7 @@ public:
 
     int relion_MPI_Recv(void *buf, std::ptrdiff_t count, MPI_Datatype datatype, int source, int tag, MPI_Comm comm, MPI_Status &status);
 
-    int relion_MPI_Bcast(void *buffer, int count, MPI_Datatype datatype, int root, MPI_Comm comm);
+    int relion_MPI_Bcast(void *buffer, long int count, MPI_Datatype datatype, int root, MPI_Comm comm);
 
     /* Better error handling of MPI error messages */
     void report_MPI_ERROR(int error_code);
