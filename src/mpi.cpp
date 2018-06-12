@@ -266,7 +266,7 @@ int MpiNode::relion_MPI_Bcast(void *buffer, long int count, MPI_Datatype datatyp
     if (totalsize <= blocksize) {
         // maximum amount of data can be sent by MPI_Bcast
         // 2 * 1024 * 1024 * 1024 - 1 = 2^31 - 1 = 2147483647 bytes
-        result = MPI_Bcast(buffer, (int)count, datatype, root, comm);
+        result = MPI_Bcast(buffer, static_cast<int>(count), datatype, root, comm);
         if (result != MPI_SUCCESS) {
             report_MPI_ERROR(result);
         }
