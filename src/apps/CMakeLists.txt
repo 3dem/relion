@@ -51,10 +51,9 @@ if(NOT GUI)
     endforeach()
 endif(NOT GUI)
 
-SET(RELION_TEST TRUE)
-
 #--Remove apps for testing--
-set(TEST_TARGETS ft_test double_reconstruct_openmp)
+SET(RELION_TEST FALSE)
+set(TEST_TARGETS ft_test double_reconstruct_openmp cs_fit helix_inimodel2d ctf_nyquist_test free_aberration_plot split_stack)
 if(NOT RELION_TEST)
     foreach(TARGET ${TEST_TARGETS})
         list(REMOVE_ITEM RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/${TARGET}.cpp")

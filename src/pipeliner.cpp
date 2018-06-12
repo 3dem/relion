@@ -1008,7 +1008,7 @@ bool PipeLine::markAsFinishedJob(int this_job, std::string &error_message)
 		{
 			error_message = "You are trying to mark a relion_refine job as finished that hasn't even started. \n This will be ignored. Perhaps you wanted to delete it instead?";
 			processList[this_job].status = PROC_RUNNING;
-	                write(DO_LOCK);
+			write(DO_LOCK);
 			return false;
 		}
 	}
@@ -1341,7 +1341,9 @@ bool PipeLine::cleanupJob(int this_job, bool do_harsh, std::string &error_messag
 	} // end if extract
 	else if (processList[this_job].type == PROC_2DCLASS ||
 			 processList[this_job].type == PROC_3DCLASS ||
-			 processList[this_job].type == PROC_3DAUTO)
+			 processList[this_job].type == PROC_3DAUTO ||
+			 processList[this_job].type == PROC_INIMODEL ||
+			 processList[this_job].type == PROC_MULTIBODY)
 	{
 
 		// First find the _data.star from each iteration
@@ -1369,55 +1371,54 @@ bool PipeLine::cleanupJob(int this_job, bool do_harsh, std::string &error_messag
 				fn_pattern.globFiles(fns_del, false);
 			}
 
+			// Also clean up maps for PCA movies when doing harsh cleaning
+			if (do_harsh && processList[this_job].type == PROC_MULTIBODY)
+			{
+				fn_pattern = processList[this_job].name + "analyse_component???_bin???.mrc";
+				fn_pattern.globFiles(fns_del, false);
+			}
+
 		} //end loop over ifile (i.e. the _data.star files from all iterations)
 
 	} // end if refine job
-	else if (processList[this_job].type == PROC_MOVIEREFINE)
+	else if (processList[this_job].type == PROC_CTFREFINE)
 	{
 
-		fn_pattern = processList[this_job].name + "batch*mics_nr[0-9][0-9][0-9].star";
-		fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
-		fn_pattern = processList[this_job].name + "run_it[0-9][0-9][0-9]*";
-		fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
 		for (int idir = 0; idir < fns_subdir.size(); idir++)
 		{
+			// remove the temporary output files
+			fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_wAcc.mrc";
+			fn_pattern.globFiles(fns_del, false);
+			fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_xyAcc_real.mrc";
+			fn_pattern.globFiles(fns_del, false);
+			fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_xyAcc_imag.mrc";
+			fn_pattern.globFiles(fns_del, false);
+		}
+
+	} // end if ctf_refine
+	else if (processList[this_job].type == PROC_MOTIONREFINE)
+	{
+
+		for (int idir = 0; idir < fns_subdir.size(); idir++)
+		{
+			// remove the temporary output files
+			fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_FCC_cc.mrc";
+			fn_pattern.globFiles(fns_del, false);
+			fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_FCC_w0.mrc";
+			fn_pattern.globFiles(fns_del, false);
+			fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_FCC_w1.mrc";
+			fn_pattern.globFiles(fns_del, false);
+
 			if (do_harsh)
 			{
-				//remove entire Micrographs directory (STAR files and particle stacks!)
-				fns_del.push_back(processList[this_job].name + fns_subdir[idir]);
-			}
-			else
-			{
-				// only remove the STAR files with the metadata (this will only give moderate file savings)
-				fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_extract.star";
+				fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_shiny.mrcs";
+				fn_pattern.globFiles(fns_del, false);
+				fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_shiny.star";
 				fn_pattern.globFiles(fns_del, false);
 			}
 		}
 
-	} // end if movierefine
-	else if (processList[this_job].type == PROC_POLISH)
-	{
-
-		fn_pattern = processList[this_job].name + "*.mrc";
-		fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
-		fn_pattern = processList[this_job].name + "shiny*xml";
-		fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
-		for (int idir = 0; idir < fns_subdir.size(); idir++)
-		{
-			if (do_harsh)
-			{
-				//remove entire Micrographs directory (STAR files and particle stacks!)
-				fns_del.push_back(processList[this_job].name + fns_subdir[idir]);
-			}
-			else
-			{
-				// only remove the STAR files with the metadata (this will only give moderate file savings)
-				fn_pattern = processList[this_job].name + fns_subdir[idir] + "*.star";
-				fn_pattern.globFiles(fns_del, false);
-			}
-		}
-
-	} // end if polish
+	} // end if motion_refine
 	else if (processList[this_job].type == PROC_SUBTRACT)
 	{
 
@@ -1859,8 +1860,22 @@ void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode
 	FileName fn_lock = ".lock_" + name + "_pipeline.star";
 	if (do_lock)
 	{
-		if (!exists(fn_lock))
-			REPORT_ERROR("ERROR: PipeLine::write was expecting a file called "+fn_lock+ " but it isn't there.");
+		int iwait =0;
+		while( !exists(fn_lock) )
+		{
+			// If the lock exists: wait 3 seconds and try again
+			// First time round, print a warning message
+			if (iwait == 0)
+			{
+				std::cerr << " WARNING: was expecting a file called "+fn_lock+ " but it isn't there. Will wait for 1 minute to see whether it appears" << std::endl;
+			}
+			sleep(3);
+			iwait++;
+			if (iwait > 20)
+			{
+				REPORT_ERROR("ERROR: PipeLine::read has waited for 1 minute for lock file to appear, but it doesn't. This should not happen. Is something wrong with the disk access?");
+			}
+		}
 	}
 
 	std::ofstream  fh, fh_del;

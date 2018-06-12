@@ -136,6 +136,23 @@ class stack_create_parameters
 			std::cout << "This will require " << Gb << "Gb of memory...."<< std::endl;
 			Image<RFLOAT> out(xdim, ydim, zdim, ndim);
 
+			FileName fn_out;
+			if (do_split_per_micrograph)
+			{
+				// Remove any extensions from micrograph names....
+				fn_out = fn_root + "_" + fn_mic.withoutExtension() + fn_ext;
+			}
+			else
+				fn_out = fn_root + fn_ext;
+
+			// Make all output directories if necessary
+			if (fn_out.contains("/"))
+			{
+				FileName path = fn_out.beforeLastOf("/");
+				std::string command = " mkdir -p " + path;
+				system(command.c_str());
+			}
+
 			int n = 0;
 			init_progress_bar(ndim);
 			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
@@ -154,25 +171,39 @@ class stack_create_parameters
 
 					if (do_apply_trans || do_apply_trans_only)
 					{
-						RFLOAT xoff = 0.;
-						RFLOAT yoff = 0.;
-						RFLOAT psi = 0.;
-						MD.getValue(EMDL_ORIENT_ORIGIN_X, xoff);
-						MD.getValue(EMDL_ORIENT_ORIGIN_Y, yoff);
-						MD.getValue(EMDL_ORIENT_PSI, psi);
+						RFLOAT xoff, ori_xoff;
+						RFLOAT yoff, ori_yoff;
+						RFLOAT psi, ori_psi;
+						MD.getValue(EMDL_ORIENT_ORIGIN_X, ori_xoff);
+						MD.getValue(EMDL_ORIENT_ORIGIN_Y, ori_yoff);
+						MD.getValue(EMDL_ORIENT_PSI, ori_psi);
 
 						if (do_apply_trans_only)
 						{
-							xoff = ROUND(xoff);
-							yoff = ROUND(yoff);
+							xoff = ROUND(ori_xoff);
+							yoff = ROUND(ori_yoff);
 							psi = 0.;
 						}
+						else
+						{
+							xoff = ori_xoff;
+							yoff = ori_yoff;
+							psi = ori_psi;
+						}
+
 						// Apply the actual transformation
 						Matrix2D<RFLOAT> A;
 						rotation2DMatrix(psi, A);
 						MAT_ELEM(A,0, 2) = xoff;
 						MAT_ELEM(A,1, 2) = yoff;
 						selfApplyGeometry(in(), A, IS_NOT_INV, DONT_WRAP);
+
+						MD.setValue(EMDL_ORIENT_ORIGIN_X, ori_xoff - xoff);
+						MD.setValue(EMDL_ORIENT_ORIGIN_Y, ori_yoff - yoff);
+						MD.setValue(EMDL_ORIENT_PSI, ori_psi - psi);
+						FileName fn_img;
+						fn_img.compose(n+1, fn_out);
+						MD.setValue(EMDL_IMAGE_NAME, fn_img);
 					}
 
 					out().setImage(n, in());
@@ -183,28 +214,15 @@ class stack_create_parameters
 			}
 			progress_bar(ndim);
 
-
-			FileName fn_out;
-			if (do_split_per_micrograph)
-			{
-				// Remove any extensions from micrograph names....
-				fn_out = fn_root + "_" + fn_mic.withoutExtension() + fn_ext;
-			}
-			else
-				fn_out = fn_root + fn_ext;
-
-			// Make all output directories if necessary
-			if (fn_out.contains("/"))
-			{
-				FileName path = fn_out.beforeLastOf("/");
-				std::string command = " mkdir -p " + path;
-				system(command.c_str());
-			}
-
 			out.write(fn_out);
 			std::cout << "Written out: " << fn_out << std::endl;
+
 		}
+
+		MD.write(fn_root+".star");
+		std::cout << "Written out: " << fn_root << ".star" << std::endl;
 		std::cout << "Done!" <<std::endl;
+
 	}
 
 };

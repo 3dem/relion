@@ -960,7 +960,7 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 		outputstar = outputname+"movies.star";
 		command = "relion_star_loopheader rlnMicrographMovieName > " + outputstar;;
 		commands.push_back(command);
-		command = "ls " + fn_in + " >> " + outputstar;
+		command = "ls -rt " + fn_in + " >> " + outputstar;
 		commands.push_back(command);
 		Node node(outputstar, NODE_MOVIES);
 		outputNodes.push_back(node);
@@ -970,7 +970,7 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 		outputstar = outputname+"micrographs.star";
 		command = "relion_star_loopheader rlnMicrographName > " + outputstar;;
 		commands.push_back(command);
-		command = "ls " + fn_in + " >> " + outputstar;
+		command = "ls -rt " + fn_in + " >> " + outputstar;
 		commands.push_back(command);
 		Node node(outputstar, NODE_MICS);
 		outputNodes.push_back(node);
@@ -982,7 +982,7 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 		// Copy all coordinate files into the same subdirectory in the Import directory
 		// But remove directory structure from pipeline if that exists
 		// Dereference symbolic links if needed
-        FileName fn_dir = fn_in;
+		FileName fn_dir = fn_in;
 		if (fn_dir.contains("/"))
 			fn_dir = fn_dir.beforeLastOf("/");
 		else
@@ -2002,6 +2002,9 @@ bool RelionJob::getCommandsSortJob(std::string &outputname, std::vector<std::str
 	Node node3(outputname + "particles_sort.star", NODE_PART_DATA);
 	outputNodes.push_back(node3);
 
+	Node node4(outputname + "logfile.pdf", NODE_PDF_LOGFILE);
+	outputNodes.push_back(node4);
+
 	if (joboptions["do_ctf"].getBoolean())
 	{
 		command += " --ctf ";
@@ -2046,8 +2049,8 @@ void RelionJob::initialiseSelectJob()
 	joboptions["split_size"] = JobOption("Subset size: ", 100, 100, 10000, 100, "The number of lines in each of the output subsets. This line will be ignored when the number of subsets is specified on the next line.");
 	joboptions["nr_split"] = JobOption("OR: number of subsets: ", -1, 1, 50, 1, "Give a positive integer to specify into how many equal-sized subsets the data will be divided");
 
-	joboptions["do_remove_duplicates"] = JobOption("Remove duplicates", false, "If set to Yes, then the program will remove all but one of particles which have drifted into the same position during alignment");
-	joboptions["duplicate_threshold"] = JobOption("Threshold [A]: ", 1, 1, 100, 1, "Remove particle coordinates within this distance [A], which might have drifted into the same position during alignment");
+	//joboptions["do_remove_duplicates"] = JobOption("Remove duplicates", false, "If set to Yes, then the program will remove all but one of particles which have drifted into the same position during alignment");
+	//joboptions["duplicate_threshold"] = JobOption("Threshold [A]: ", 1, 1, 100, 1, "Remove particle coordinates within this distance [A], which might have drifted into the same position during alignment");
 
 }
 

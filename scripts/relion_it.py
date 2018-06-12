@@ -162,7 +162,7 @@ class RelionItOptions(object):
     ### Stop after CTF estimation? I.e., skip autopicking, extraction, 2D/3D classification, etc?
     stop_after_ctf_estimation = False
     # Check every this many minutes if enough particles have been extracted for a new batch of 2D-classification
-    class2d_repeat_time = 1
+    batch_repeat_time = 1
 
 
     ### MotionCorrection parameters
@@ -552,20 +552,22 @@ White value: == 0
     return
 
 
-def findLargestClass(model_star_file):
+def findBestClass(model_star_file, use_resol=True):
 
     model_star = load_star(model_star_file)
-    best_resol = 0
+    best_resol = 999
     best_size = 0 
     best_class = 0
     for iclass in range(0, len(model_star['model_classes']['rlnReferenceImage'])):
         mysize = float(model_star['model_classes']['rlnClassDistribution'][iclass])
-        if mysize > best_size:
+        myresol = float(model_star['model_classes']['rlnEstimatedResolution'][iclass])
+        if (not use_resol and (mysize > best_size or (mysize == best_size and myresol < best_resol))) \
+        or (use_resol and (myresol < best_resol or (myresol == best_resol and mysize > best_size))):
             best_size = mysize
             best_class = model_star['model_classes']['rlnReferenceImage'][iclass]
-            best_resol = float(model_star['model_classes']['rlnEstimatedResolution'][iclass])
+            best_resol = myresol
 
-    print " RELION_IT: found largest class:",best_class,"with class size of",best_size,"and resolution of",best_resol
+    print " RELION_IT: found best class:",best_class,"with class size of",best_size,"and resolution of",best_resol
     return best_class, best_resol, model_star['model_general']['rlnPixelSize']
 
 def run_pipeline(opts):
@@ -604,6 +606,12 @@ def run_pipeline(opts):
                      'Queue submit command: == {}'.format(opts.queue_submit_command),
                      'Standard submission script: == {}'.format(opts.queue_submission_template),
                      'Minimum dedicated cores per node: == {}'.format(opts.queue_minimum_dedicated)]
+
+    # If we're only doing motioncorr and ctf estimation, then forget about the second pass and the batch processing
+    if opts.stop_after_ctf_estimation:
+        opts.do_class2d = False
+        opts.do_class3d = False
+        opts.do_second_pass = False
 
     if opts.do_second_pass:
         nr_passes = 2
@@ -715,10 +723,7 @@ def run_pipeline(opts):
         runjobs = [import_job, motioncorr_job, ctffind_job]
 
         # There is an option to stop on-the-fly processing after CTF estimation
-        if opts.stop_after_ctf_estimation:
-            opts.do_class2d = False
-            opts.do_class3d = False
-        else:
+        if not opts.stop_after_ctf_estimation:
             autopick_options = ['Input micrographs for autopick: == {}micrographs_ctf.star'.format(ctffind_job),
                                 'Min. diameter for LoG filter (A) == {}'.format(opts.autopick_LoG_diam_min),
                                 'Max. diameter for LoG filter (A) == {}'.format(opts.autopick_LoG_diam_max),
@@ -883,12 +888,13 @@ def run_pipeline(opts):
                         previous_batch1_size = batch_size
                         rerun_batch1 = True
 
+                    particles_star_file = batch_name
+
                     # The first batch is special: perform 2D classification with smaller batch size (but at least minimum_batch_size) and keep overwriting in the same output directory
                     if ( rerun_batch1 or batch_size == opts.batch_size):
 
 
                         # Discard particles with odd average/stddev values
-                        particles_star_file = batch_name
                         if opts.do_discard_on_image_statistics:
 
                             #### Run a Select job to get rid of particles with outlier average/stddev values...
@@ -1043,7 +1049,7 @@ def run_pipeline(opts):
 
                             # Use the model of the largest class for the 3D classification below
                             total_iter = opts.inimodel_nr_iter_initial + opts.inimodel_nr_iter_inbetween + opts.inimodel_nr_iter_final
-                            best_inimodel_class, best_inimodel_resol, best_inimodel_angpix = findLargestClass(inimodel_job + 'run_it{:03d}_model.star'.format(total_iter))
+                            best_inimodel_class, best_inimodel_resol, best_inimodel_angpix = findBestClass(inimodel_job + 'run_it{:03d}_model.star'.format(total_iter), use_resol=True)
                             opts.class3d_reference = best_inimodel_class
                             opts.class3d_ref_is_correct_greyscale = True
                             opts.class3d_ref_is_ctf_corrected = True
@@ -1124,7 +1130,7 @@ def run_pipeline(opts):
                                 # Wait here until this Class2D job is finished. Check every thirty seconds
                                 WaitForJob(class3d_job, 30)
 
-                            best_class3d_class, best_class3d_resol, best_class3d_angpix = findLargestClass(class3d_job + 'run_it{:03d}_model.star'.format(opts.class3d_nr_iter))
+                            best_class3d_class, best_class3d_resol, best_class3d_angpix = findBestClass(class3d_job + 'run_it{:03d}_model.star'.format(opts.class3d_nr_iter), use_resol=True)
 
                             # Once the first batch in the first pass is completed: move on to the second pass
                             if (ipass == 0 and opts.do_second_pass and iibatch == 1 and best_class3d_resol < opts.minimum_resolution_3dref_2ndpass):

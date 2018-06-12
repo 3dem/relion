@@ -29,8 +29,10 @@
 void joinMultipleEPSIntoSinglePDF(FileName fn_pdf, std::vector<FileName> fn_eps)
 {
 
+    FileName fn_list = fn_pdf + ".lst";
     std::string command = "gs -sDEVICE=pdfwrite -dNOPAUSE -dBATCH -dSAFER -dDEVICEWIDTHPOINTS=800 -dDEVICEHEIGHTPOINTS=800 -sOutputFile=";
-    command += fn_pdf + " ";
+    command += fn_pdf + " @" + fn_list;
+    std::ofstream filelist(fn_pdf + ".lst");
     bool have_at_least_one = false;
     for (int i = 0; i < fn_eps.size(); i++)
     {
@@ -41,12 +43,13 @@ void joinMultipleEPSIntoSinglePDF(FileName fn_pdf, std::vector<FileName> fn_eps)
         {
         	if (exists(all_eps_files[j]))
         	{
-        		command += all_eps_files[j] + " ";
+			filelist << all_eps_files[j] << std::endl;
         		have_at_least_one = true;
         	}
         }
     }
-
+    filelist.close();
+    
     bool have_error_in_gs = false;
     if (have_at_least_one)
     {
@@ -63,6 +66,8 @@ void joinMultipleEPSIntoSinglePDF(FileName fn_pdf, std::vector<FileName> fn_eps)
     	std::cerr << " Did not find any of the expected EPS files to generate a PDF file" << std::endl;
     }
 
+    // std::remove(fn_list.c_str()); // don't know why but Ghostscript fails with this line.
+    // system() should wait the termination of the program, so this is very strange...
     if (!have_at_least_one || have_error_in_gs)
     {
     	std::cerr << " + Will make an empty PDF-file in " << fn_pdf << std::endl;

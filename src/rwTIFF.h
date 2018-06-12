@@ -33,9 +33,8 @@
 */
 int readTIFF(TIFF* ftiff, long int img_select, bool readdata=false, bool isStack=false, const FileName &name="")
 {
-#undef DEBUG
-//#define DEBUG
-#ifdef DEBUG
+//#define DEBUG_TIFF
+#ifdef DEBUG_TIFF
     printf("DEBUG readTIFF: Reading TIFF file. img_select %d\n", img_select);
 #endif
 
@@ -60,7 +59,7 @@ int readTIFF(TIFF* ftiff, long int img_select, bool readdata=false, bool isStack
     //  and back to the start
     TIFFSetDirectory(ftiff, 0);
 
-#ifdef DEBUG
+#ifdef DEBUG_TIFF
     printf("TIFF width %d, length %d, nDim %d, sample format %d, bits per sample %d\n", 
            width, length, _nDim, sampleFormat, bitsPerSample);
 #endif
@@ -138,12 +137,18 @@ int readTIFF(TIFF* ftiff, long int img_select, bool readdata=false, bool isStack
             tsize_t stripSize = TIFFStripSize(ftiff);
             tstrip_t numberOfStrips = TIFFNumberOfStrips(ftiff);
             tdata_t buf = _TIFFmalloc(stripSize);
-
+#ifdef DEBUG_TIFF
             size_t readsize_n = stripSize * 8 / bitsPerSample;
+            std::cout << "TIFF stripSize=" << stripSize << " numberOfStrips=" << numberOfStrips << " readsize_n=" << readsize_n << std::endl;
+#endif
             for (tstrip_t strip = 0; strip < numberOfStrips; strip++) {
-                TIFFReadEncodedStrip(ftiff, strip, buf, stripSize);
-                castPage2T((char*)buf, MULTIDIM_ARRAY(data) + haveread_n, datatype, readsize_n);
-                haveread_n += readsize_n;
+                tsize_t actually_read = TIFFReadEncodedStrip(ftiff, strip, buf, stripSize);
+                tsize_t actually_read_n = actually_read * 8 / bitsPerSample;
+#ifdef DEBUG_TIFF
+                std::cout << "Reading strip: " << strip << "actually read byte:" << actually_read << std::endl;
+#endif
+                castPage2T((char*)buf, MULTIDIM_ARRAY(data) + haveread_n, datatype, actually_read_n);
+                haveread_n += actually_read_n;
 	    }
 
             _TIFFfree(buf);

@@ -390,7 +390,7 @@ void CtffindRunner::joinCtffindResults()
 			}
 		}
 	}
-	joinMultipleEPSIntoSinglePDF(fn_out + "logfile.pdf ", all_fn_eps);
+	joinMultipleEPSIntoSinglePDF(fn_out + "logfile.pdf", all_fn_eps);
 
 	if (verb > 0 )
 	{
