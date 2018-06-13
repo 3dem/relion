@@ -3243,6 +3243,11 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 	// GPU-stuff
 	if (joboptions["use_gpu"].getBoolean())
 	{
+		if (!joboptions["dont_skip_align"].getBoolean())
+		{
+			error_message = "ERROR: you cannot use GPUs when skipping image alignments.";
+			return false;
+		}
 		command += " --gpu \"" + joboptions["gpu_ids"].getString() + "\"";
 	}
 
