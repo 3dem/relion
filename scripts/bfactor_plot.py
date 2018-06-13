@@ -40,9 +40,9 @@ class RelionItOptions(object):
     #############################################################################
 
     # Refine3D job with all particles
-    input_refine3d_job = 'Refine3D/job040/' # 24
+    input_refine3d_job = 'Refine3D/job040/'
     # PostProcess job for resolution assessment
-    input_postprocess_job = 'PostProcess/job083/' # 26
+    input_postprocess_job = 'PostProcess/job083/'
     # Minimum number of particles
     minimum_nr_particles = 100
     # Maximum number of particles
@@ -52,9 +52,9 @@ class RelionItOptions(object):
     # Initial low-pass filter for the refinements
     refine_ini_lowpass = 40
     # Read all particles in one batch into memory?
-    refine_preread_images = True
+    refine_preread_images = False
     # Or copy particles to scratch disk?
-    refine_scratch_disk = '/ssd'
+    refine_scratch_disk = ''
     # Number of pooled particles?
     refine_nr_pool = 10
     # Use GPU-acceleration?
@@ -62,9 +62,9 @@ class RelionItOptions(object):
     # Which GPU to use (different from GPU used for pre-processing?)
     refine_gpu = ''
     # How many MPI processes to use
-    refine_mpi = 3
+    refine_mpi = 5
     # How many threads to use
-    refine_threads = 12
+    refine_threads = 6
     # Skip padding?
     refine_skip_padding = False
     # Submit jobs to the cluster?
@@ -75,11 +75,11 @@ class RelionItOptions(object):
     # Name of the queue to which to submit the job
     queue_name = 'openmpi'
     # Name of the command used to submit scripts to the queue
-    queue_submit_command = 'qsub'
+    queue_submit_command = 'qsub -l gpu=4'
     # The template for your standard queue job submission script
     queue_submission_template = '/public/EM/RELION/relion/bin/qsub.csh'
     # Minimum number of dedicated cores that need to be requested on each node
-    queue_minimum_dedicated = 1
+    queue_minimum_dedicated = 32
     
     #######################################################################
     ############ typically no need to change anything below this line
