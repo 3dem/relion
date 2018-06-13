@@ -742,40 +742,60 @@ void RelionJob::initialise(int _job_type)
 	else
 		REPORT_ERROR("ERROR: unrecognised job-type");
 
+	// Check for environment variable RELION_MPI_MAX
+	const char *mpi_max_input = getenv("RELION_MPI_MAX");
+	int mpi_max = (mpi_max_input == NULL) ? DEFAULTMPIMAX : textToInteger(mpi_max_input);
 	if (has_mpi)
-		joboptions["nr_mpi"] = JobOption("Number of MPI procs:", 1, 1, 64, 1, "Number of MPI nodes to use in parallel. When set to 1, MPI will not be used.");
+		joboptions["nr_mpi"] = JobOption("Number of MPI procs:", 1, 1, mpi_max, 1, "Number of MPI nodes to use in parallel. When set to 1, MPI will not be used. The maximum can be set through the environment variable RELION_MPI_MAX.");
 
+	const char *thread_max_input = getenv("RELION_THREAD_MAX");
+	int thread_max = (thread_max_input == NULL) ? DEFAULTTHREADMAX : textToInteger(thread_max_input);
 	if (has_thread)
-		joboptions["nr_threads"] = JobOption("Number of threads:", 1, 1, 16, 1, "Number of shared-memory (POSIX) threads to use in parallel. \
-		When set to 1, no multi-threading will be used. Multi-threading is often useful in 3D refinements to have more memory. 2D class averaging often proceeds more efficiently without threads.");
+		joboptions["nr_threads"] = JobOption("Number of threads:", 1, 1, thread_max, 1, "Number of shared-memory (POSIX) threads to use in parallel. \
+		When set to 1, no multi-threading will be used. The maximum can be set through the environment variable RELION_THREAD_MAX.");
 
-	joboptions["do_queue"] = JobOption("Submit to queue?", false, "If set to Yes, the job will be submit to a queue, otherwise \
-the job will be executed locally. Note that only MPI jobs may be sent to a queue.");
+	const char * use_queue_input = getenv("RELION_QUEUE_USE");
+	bool use_queue = (use_queue_input == NULL) ? DEFAULTQUEUEUSE : textToBool(use_queue_input);
+	joboptions["do_queue"] = JobOption("Submit to queue?", use_queue, "If set to Yes, the job will be submit to a queue, otherwise \
+the job will be executed locally. Note that only MPI jobs may be sent to a queue. The default can be set through the environment variable RELION_QUEUE_USE.");
+
+	// Check for environment variable RELION_QUEUE_NAME
+	const char * default_queue = getenv ("RELION_QUEUE_NAME");
+	if (default_queue==NULL)
+	{
+		default_queue = DEFAULTQUEUENAME;
+	}
 
 	// Need the std::string(), as otherwise it will be overloaded and passed as a boolean....
-	joboptions["queuename"] = JobOption("Queue name: ", std::string("openmpi"), "Name of the queue to which to submit the job.");
+	joboptions["queuename"] = JobOption("Queue name: ", std::string(default_queue), "Name of the queue to which to submit the job. The default name can be set through the environment variable RELION_QUEUE_NAME.");
 
-	joboptions["qsub"] = JobOption("Queue submit command:", std::string("qsub"), "Name of the command used to submit scripts to the queue, e.g. qsub or bsub.\n\n\
+	// Check for environment variable RELION_QSUB_COMMAND
+	const char * default_command = getenv ("RELION_QSUB_COMMAND");
+	if (default_command==NULL)
+	{
+		default_command = DEFAULTQSUBCOMMAND;
+	}
+
+	joboptions["qsub"] = JobOption("Queue submit command:", std::string(default_command), "Name of the command used to submit scripts to the queue, e.g. qsub or bsub.\n\n\
 Note that the person who installed RELION should have made a custom script for your cluster/queue setup. Check this is the case \
-(or create your own script following the RELION WIKI) if you have trouble submitting jobs.");
+(or create your own script following the RELION Wiki) if you have trouble submitting jobs. The default command can be set through the environment variable RELION_QSUB_COMMAND.");
 
 	// Two additional options that may be set through environment variables RELION_QSUB_EXTRA1 and RELION_QSUB_EXTRA2 (for more flexibility)
-	char * extra1_text = getenv ("RELION_QSUB_EXTRA1");
+	char *extra1_text = getenv("RELION_QSUB_EXTRA1");
+	char *extra1_default = getenv("RELION_QSUB_EXTRA1_DEFAULT");
+	char emptychar[] = "";
 	if (extra1_text != NULL)
 	{
-		char * extra1_default = getenv ("RELION_QSUB_EXTRA1_DEFAULT");
-		char emptychar[] = "";
 		if (extra1_default == NULL)
 			extra1_default=emptychar;
 		joboptions["qsub_extra1"] = JobOption(std::string(extra1_text), std::string(extra1_default), "Extra option to pass to the qsub template script. \
 Any occurrences of XXXextra1XXX will be changed by this value.");
 	}
 
-	char * extra2_text = getenv ("RELION_QSUB_EXTRA2");
+	char *extra2_text = getenv("RELION_QSUB_EXTRA2");
+	char *extra2_default = getenv("RELION_QSUB_EXTRA2_DEFAULT");
 	if (extra2_text != NULL)
 	{
-		char * extra2_default = getenv ("RELION_QSUB_EXTRA2_DEFAULT");
-		char emptychar[] = "";
 		if (extra2_default == NULL)
 			extra2_default=emptychar;
 		joboptions["qsub_extra2"] = JobOption(std::string(extra2_text), std::string(extra2_default), "Extra option to pass to the qsub template script. \
@@ -810,7 +830,7 @@ But note that (unlike all other entries in the GUI) the extra values are not rem
 	// Check for environment variable RELION_QSUB_TEMPLATE
 	char * my_minimum_dedicated = getenv ("RELION_MINIMUM_DEDICATED");
 	int minimum_nr_dedicated = (my_minimum_dedicated == NULL) ? DEFAULTMININIMUMDEDICATED : textToInteger(my_minimum_dedicated);
-	joboptions["min_dedicated"] = JobOption("Minimum dedicated cores per node:", minimum_nr_dedicated, 1, 64, 1, "Minimum number of dedicated cores that need to be requested on each node. This is useful to force the queue to fill up entire nodes of a given size.");
+	joboptions["min_dedicated"] = JobOption("Minimum dedicated cores per node:", minimum_nr_dedicated, 1, 64, 1, "Minimum number of dedicated cores that need to be requested on each node. This is useful to force the queue to fill up entire nodes of a given size. The default can be set through the environment variable RELION_MINIMUM_DEDICATED.");
 
 	// Need the std::string(), as otherwise it will be overloaded and passed as a boolean....
 	joboptions["other_args"] = JobOption("Additional arguments:", std::string(""), "In this box command-line arguments may be provided that are not generated by the GUI. \
