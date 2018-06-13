@@ -265,6 +265,12 @@ def line_fit(xs, ys):
 
     return slope, intercept
 
+def get_postprocess_result(post_star):
+    result = load_star(post_star)['general']
+    resolution = float(result['rlnFinalResolution'])
+    pp_bfactor = float(result['rlnBfactorUsedForSharpening'])
+    return resolution, pp_bfactor
+
 def run_pipeline(opts):
     """
     Configure and run the RELION 3 pipeline with the given options.
@@ -299,10 +305,11 @@ def run_pipeline(opts):
 
     all_particles = load_star(all_particles_star_file)
     all_nr_particles = len(all_particles['']['rlnImageName'])
-    all_particles_resolution = float(load_star(opts.input_postprocess_job + 'postprocess.star')['general']['rlnFinalResolution'])
+    all_particles_resolution, all_particles_bfactor = get_postprocess_result(opts.input_postprocess_job + 'postprocess.star') 
 
     nr_particles = []
     resolutions = []
+    pp_bfactors = []
 
     current_nr_particles = opts.minimum_nr_particles
     while current_nr_particles <= opts.maximum_nr_particles and current_nr_particles < all_nr_particles:
@@ -386,9 +393,10 @@ def run_pipeline(opts):
 	        # Get resolution from
 	        post_star = post_job + 'postprocess.star'
         	try:
-	            resolution = float(load_star(post_star)['general']['rlnFinalResolution'])
+	            resolution, pp_bfactor = get_postprocess_result(post_star)
 	            nr_particles.append(current_nr_particles)
 	            resolutions.append(resolution)
+                    pp_bfactors.append(pp_bfactor)
 	        except:
 	            print ' RELION_IT: WARNING: Failed to get post-processed resolution for {} particles'.format(current_nr_particles)
 
@@ -399,16 +407,17 @@ def run_pipeline(opts):
     if all_nr_particles <= opts.maximum_nr_particles:
         nr_particles.append(all_nr_particles)
         resolutions.append(all_particles_resolution)
+        pp_bfactors.append(all_particles_bfactor)
 
     # Now already make preliminary plots here, e.g
     print
-    print 'NrParticles Ln(NrParticles) Resolution(A) 1/Resolution^2'
+    print 'NrParticles Ln(NrParticles) Resolution(A) 1/Resolution^2 PostProcessBfactor'
     xs = []
     ys = []
-    for n_particles, resolution in zip(nr_particles, resolutions):
+    for n_particles, resolution, pp_bfactor in zip(nr_particles, resolutions, pp_bfactors):
         log_n_particles = log(n_particles)
         inv_d2 = 1.0 / (resolution * resolution)
-        print '{0:11d} {1:15.3f} {2:13.2f} {3:14.4f}'.format(n_particles,log_n_particles, resolution, inv_d2)
+        print '{0:11d} {1:15.3f} {2:13.2f} {3:14.4f} {4:18.2f}'.format(n_particles,log_n_particles, resolution, inv_d2, -pp_bfactor)
         xs.append(log_n_particles)
         ys.append(inv_d2)
     slope, intercept = line_fit(xs, ys)
