@@ -150,10 +150,10 @@ class PipeLine
 	bool runJob(RelionJob &_job, int &current_job, bool only_schedule, bool is_main_continue, bool is_scheduled, std::string &error_message);
 
 	// Adds a scheduled job to the pipeline from the command line (with a name for job type)
-	void addScheduledJob(std::string job_type, std::string fn_options);
+	int addScheduledJob(std::string job_type, std::string fn_options);
 
 	// Adds a scheduled job to the pipeline from the command line (with integer job type)
-	void addScheduledJob(int job_type, std::string fn_options);
+	int addScheduledJob(int job_type, std::string fn_options);
 
 	// Runs a series of scheduled jobs, possibly in a loop, from the command line
 	void runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_repeat, long int minutes_wait, long int minutes_wait_before = 0);
