@@ -103,6 +103,9 @@ public:
 	// Defect file
 	FileName fn_defect;
 
+	// Skip hot pixel detection in own motioncorr
+	bool skip_defect;
+
 	// Archive directory
 	FileName fn_archive;
 
