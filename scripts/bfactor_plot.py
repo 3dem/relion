@@ -21,7 +21,7 @@ import runpy
 import sys
 import time
 import glob
-from math import log
+from math import log, sqrt
 
 # Constants
 PIPELINE_STAR = 'default_pipeline.star'
@@ -424,25 +424,52 @@ def run_pipeline(opts):
     b_factor = 2.0 / slope
     print
     print " RELION_IT: ESTIMATED B-FACTOR from {0:d} points is {1:.2f}".format(len(xs), b_factor)
-    try: # Try plotting
+    print " RELION_IT: The fitted line is: Resolution = 1 / Sqrt(2 / {0:.3f} * Log_e(#Particles) + {1:.3f})".format(b_factor, intercept)
+    nr_50percent_more = int(all_nr_particles * 1.5)
+    reso_50percent_more = 1 / sqrt(slope * log(nr_50percent_more) + intercept)
+    nr_100percent_more = all_nr_particles * 2
+    reso_100percent_more = 1 / sqrt(slope * log(nr_100percent_more) + intercept)
+    print " RELION_IT: IF this trend holds, you will get {0:.2f} A from {1:d} particles and {2:.2f} A from {3:d} particles.".format(reso_50percent_more, nr_50percent_more, reso_100percent_more, nr_100percent_more)
+    if True:#try: # Try plotting
         import matplotlib.pyplot as plt
+	import numpy as np
         fitted = []
         for x in xs:
             fitted.append(x * slope + intercept)
-        plt.plot(xs, ys, '.')
-        plt.plot(xs, fitted)
-        plt.xlabel("ln(#particles)")
-        plt.ylabel("1/Resolution$^2$ in 1/$\AA^2$")
-        plt.title("Rosenthal & Henderson plot: B = 2.0 / slope = {:.1f}".format(b_factor));
+
+        fig = plt.figure()
+        ax1 = fig.add_subplot(111)
+        ax1.plot(xs, ys, '.')
+        ax1.plot(xs, fitted)
+        ax1.set_xlabel("ln(#particles)")
+        ax1.set_ylabel("1/Resolution$^2$ in 1/$\AA^2$")
+        ax1.set_title("Rosenthal & Henderson plot: B = 2.0 / slope = {:.1f}".format(b_factor));
+
+        ax2 = ax1.twiny()
+        ax2.set_xlabel("#particles")
+        ax2.xaxis.set_ticks_position("bottom")
+        ax2.xaxis.set_label_position("bottom")
+        ax2.set_xlim(ax1.get_xlim())
+        ax2.set_xticklabels(np.exp(ax1.get_xticks()).astype(np.int))
+        ax2.spines["bottom"].set_position(("axes", -0.15))
+
+        ax3 = ax1.twinx()
+        ax3.set_ylabel("Resolution in $\AA$")
+        ax3.set_ylim(ax1.get_ylim())
+        ax3.yaxis.set_ticks_position("right")
+        ax3.yaxis.set_label_position("right")
+	yticks = ax1.get_yticks()
+	yticks[yticks <= 0] = 1.0 / (999 * 999) # to avoid zero division and negative sqrt
+        ax3.set_yticklabels(np.sqrt(1 / yticks).round(1))
+
         plt.savefig("rosenthal-henderson-plot.pdf", bbox_inches='tight')
-        print "Plot written to rosenthal-henderson-plot.pdf."
-    except:
-        print 'WARNING: Failed to plot. Probably matplotlib is missing.'
+        print " RELION_IT: Plot written to rosenthal-henderson-plot.pdf."
+    else:#except:
+        print 'WARNING: Failed to plot. Probably matplotlib and/or numpy is missing.'
 
     if os.path.isfile(RUNNING_FILE):
         os.remove(RUNNING_FILE)
 
-    print ' RELION_IT: Finished all refinements, the plot was written to rosenthal-henderson-plot.pdf.'
     print ' RELION_IT: exiting now... '
 
 
