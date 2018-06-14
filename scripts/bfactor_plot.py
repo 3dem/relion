@@ -25,8 +25,8 @@ from math import log, sqrt
 
 # Constants
 PIPELINE_STAR = 'default_pipeline.star'
-RUNNING_FILE = 'RUNNING_BFACTOR_PLOT'
-SETUP_CHECK_FILE = 'BFACTOR_PLOT_SUBMITTED_JOBS'
+RUNNING_FILE = 'RUNNING' # prefix is appended in main()
+SETUP_CHECK_FILE = 'SUBMITTED_JOBS' # prefix is appended in main()
 
 class RelionItOptions(object):
     """
@@ -38,6 +38,9 @@ class RelionItOptions(object):
     #############################################################################
     # Change the parameters below to reflect your experiment                    #
     #############################################################################
+
+    # job prefix
+    prefix = 'BFACTOR_PLOT_'
 
     # Refine3D job with all particles
     input_refine3d_job = 'Refine3D/job040/'
@@ -69,7 +72,6 @@ class RelionItOptions(object):
     refine_skip_padding = False
     # Submit jobs to the cluster?
     refine_submit_to_queue = False
-
 
     ### Cluster submission settings
     # Name of the queue to which to submit the job
@@ -169,7 +171,7 @@ def appendJobOptionsFromRunJobFile(filename, job_options):
     return
 
 
-def addJob(jobtype, name_in_script, done_file, options):
+def addJob(jobtype, name_in_script, done_file, options, alias=""):
 
     jobname = ""
     # See if we've done this job before, i.e. whether it is in the done_file
@@ -190,6 +192,8 @@ def addJob(jobtype, name_in_script, done_file, options):
             optionstring += opt + ';'
 
         command = 'relion_pipeliner --addJob ' + jobtype + ' --addJobOptions "' + optionstring + '"'
+	if alias != "":
+		command += ' --setJobAlias "' + alias + '"'
 
         os.system(command)
 
@@ -324,7 +328,7 @@ def run_pipeline(opts):
                          'OR: number of subsets:  == 1']
 
         split_job_name = 'split_job_' + str(current_nr_particles)
-        split_job, already_had_it = addJob('Select', split_job_name, SETUP_CHECK_FILE, split_options)
+        split_job, already_had_it = addJob('Select', split_job_name, SETUP_CHECK_FILE, split_options, opts.prefix + split_job_name)
         if not already_had_it:
             RunJobs([split_job], 1, 0, schedule_name)
             WaitForJob(split_job, 30)
@@ -361,7 +365,7 @@ def run_pipeline(opts):
 
         appendJobOptionsFromRunJobFile(refine3d_run_file, refine_options)
         refine_job_name = 'refine_job_' + str(current_nr_particles)
-        refine_job, already_had_it = addJob('Refine3D', refine_job_name, SETUP_CHECK_FILE, refine_options)
+        refine_job, already_had_it = addJob('Refine3D', refine_job_name, SETUP_CHECK_FILE, refine_options, opts.prefix + refine_job_name)
         if not already_had_it:
             RunJobs([refine_job], 1, 0, schedule_name)
             WaitForJob(refine_job, 30)
@@ -385,7 +389,7 @@ def run_pipeline(opts):
 	        post_options = ['One of the 2 unfiltered half-maps: == {}'.format(halfmap_filename)]
 	        appendJobOptionsFromRunJobFile(postprocess_run_file, post_options)
 	        post_job_name = 'post_job_' + str(current_nr_particles)
-	        post_job, already_had_it = addJob('PostProcess', post_job_name, SETUP_CHECK_FILE, post_options)
+	        post_job, already_had_it = addJob('PostProcess', post_job_name, SETUP_CHECK_FILE, post_options, opts.prefix + post_job_name)
 	        if not already_had_it:
 	            RunJobs([post_job], 1, 0, schedule_name)
 	            WaitForJob(post_job, 30)
@@ -425,11 +429,11 @@ def run_pipeline(opts):
     print
     print " RELION_IT: ESTIMATED B-FACTOR from {0:d} points is {1:.2f}".format(len(xs), b_factor)
     print " RELION_IT: The fitted line is: Resolution = 1 / Sqrt(2 / {0:.3f} * Log_e(#Particles) + {1:.3f})".format(b_factor, intercept)
-    nr_50percent_more = int(all_nr_particles * 1.5)
-    reso_50percent_more = 1 / sqrt(slope * log(nr_50percent_more) + intercept)
-    nr_100percent_more = all_nr_particles * 2
-    reso_100percent_more = 1 / sqrt(slope * log(nr_100percent_more) + intercept)
-    print " RELION_IT: IF this trend holds, you will get {0:.2f} A from {1:d} particles and {2:.2f} A from {3:d} particles.".format(reso_50percent_more, nr_50percent_more, reso_100percent_more, nr_100percent_more)
+    print " RELION_IT: IF this trend holds, you will get:"
+    for x in (1.5, 2, 4, 8):
+        current_nr_particles = int(all_nr_particles * x)
+        resolution = 1 / sqrt(slope * log(current_nr_particles) + intercept)
+        print " RELION_IT:   {0:.2f} A from {1:d} particles ({2:d} % of the current number of particles)".format(resolution, current_nr_particles, int(x * 100))
     if True:#try: # Try plotting
         import matplotlib.pyplot as plt
 	import numpy as np
@@ -462,7 +466,7 @@ def run_pipeline(opts):
 	yticks[yticks <= 0] = 1.0 / (999 * 999) # to avoid zero division and negative sqrt
         ax3.set_yticklabels(np.sqrt(1 / yticks).round(1))
 
-        plt.savefig("rosenthal-henderson-plot.pdf", bbox_inches='tight')
+        plt.savefig(opts.prefix + "rosenthal-henderson-plot.pdf", bbox_inches='tight')
         print " RELION_IT: Plot written to rosenthal-henderson-plot.pdf."
     else:#except:
         print 'WARNING: Failed to plot. Probably matplotlib and/or numpy is missing.'
@@ -472,7 +476,6 @@ def run_pipeline(opts):
 
     print ' RELION_IT: exiting now... '
 
-
 def main():
     """
     Run the RELION 3 pipeline.
@@ -480,6 +483,24 @@ def main():
     Options files given as command line arguments will be opened in order and
     used to update the default options.
     """
+
+    global RUNNING_FILE
+    global SETUP_CHECK_FILE
+
+    opts = RelionItOptions()
+    for user_opt_file in sys.argv[1:]:
+        print ' RELION_IT: reading options from {}'.format(user_opt_file)
+        user_opts = runpy.run_path(user_opt_file)
+        opts.update_from(user_opts)
+
+    SETUP_CHECK_FILE = opts.prefix + SETUP_CHECK_FILE
+    RUNNING_FILE = opts.prefix + RUNNING_FILE
+
+    # Make sure no other version of this script are running...
+    if os.path.isfile(RUNNING_FILE):
+        print " RELION_IT: ERROR:", RUNNING_FILE, "is already present: delete this file and make sure no other copy of this script is running. Exiting now ..."
+        exit(0)
+
     print ' RELION_IT: -------------------------------------------------------------------------------------------------------------------'
     print ' RELION_IT: script for automated bfactor-plot generation in RELION (>= 3.0-alpha-5)'
     print ' RELION_IT: authors: Sjors H.W. Scheres & Takanori Nakane'
@@ -493,18 +514,7 @@ def main():
     print ' RELION_IT: -------------------------------------------------------------------------------------------------------------------'
     print ' RELION_IT: '
     
-    # Make sure no other version of this script are running...
-    if os.path.isfile(RUNNING_FILE):
-        print " RELION_IT: ERROR:", RUNNING_FILE, "is already present: delete this file and make sure no other copy of this script is running. Exiting now ..."
-        exit(0)
-
-    opts = RelionItOptions()
-    for user_opt_file in sys.argv[1:]:
-        print ' RELION_IT: reading options from {}'.format(user_opt_file)
-        user_opts = runpy.run_path(user_opt_file)
-        opts.update_from(user_opts)
     run_pipeline(opts)
-
 
 if __name__ == "__main__":
     main()
