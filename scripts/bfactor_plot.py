@@ -171,7 +171,7 @@ def appendJobOptionsFromRunJobFile(filename, job_options):
     return
 
 
-def addJob(jobtype, name_in_script, done_file, options, alias=""):
+def addJob(jobtype, name_in_script, done_file, options, alias=None):
 
     jobname = ""
     # See if we've done this job before, i.e. whether it is in the done_file
@@ -192,7 +192,7 @@ def addJob(jobtype, name_in_script, done_file, options, alias=""):
             optionstring += opt + ';'
 
         command = 'relion_pipeliner --addJob ' + jobtype + ' --addJobOptions "' + optionstring + '"'
-	if alias != "":
+	if alias is not None:
 		command += ' --setJobAlias "' + alias + '"'
 
         os.system(command)
@@ -328,7 +328,8 @@ def run_pipeline(opts):
                          'OR: number of subsets:  == 1']
 
         split_job_name = 'split_job_' + str(current_nr_particles)
-        split_job, already_had_it = addJob('Select', split_job_name, SETUP_CHECK_FILE, split_options, opts.prefix + split_job_name)
+	split_alias = opts.prefix + 'split_' + str(current_nr_particles)
+        split_job, already_had_it = addJob('Select', split_job_name, SETUP_CHECK_FILE, split_options, split_alias)
         if not already_had_it:
             RunJobs([split_job], 1, 0, schedule_name)
             WaitForJob(split_job, 30)
@@ -365,7 +366,8 @@ def run_pipeline(opts):
 
         appendJobOptionsFromRunJobFile(refine3d_run_file, refine_options)
         refine_job_name = 'refine_job_' + str(current_nr_particles)
-        refine_job, already_had_it = addJob('Refine3D', refine_job_name, SETUP_CHECK_FILE, refine_options, opts.prefix + refine_job_name)
+        refine_alias = opts.prefix + str(current_nr_particles)
+        refine_job, already_had_it = addJob('Refine3D', refine_job_name, SETUP_CHECK_FILE, refine_options, refine_alias)
         if not already_had_it:
             RunJobs([refine_job], 1, 0, schedule_name)
             WaitForJob(refine_job, 30)
@@ -389,7 +391,8 @@ def run_pipeline(opts):
 	        post_options = ['One of the 2 unfiltered half-maps: == {}'.format(halfmap_filename)]
 	        appendJobOptionsFromRunJobFile(postprocess_run_file, post_options)
 	        post_job_name = 'post_job_' + str(current_nr_particles)
-	        post_job, already_had_it = addJob('PostProcess', post_job_name, SETUP_CHECK_FILE, post_options, opts.prefix + post_job_name)
+                post_alias = opts.prefix + str(current_nr_particles)
+	        post_job, already_had_it = addJob('PostProcess', post_job_name, SETUP_CHECK_FILE, post_options, post_alias)
 	        if not already_had_it:
 	            RunJobs([post_job], 1, 0, schedule_name)
 	            WaitForJob(post_job, 30)
@@ -435,6 +438,8 @@ def run_pipeline(opts):
         resolution = 1 / sqrt(slope * log(current_nr_particles) + intercept)
         print " RELION_IT:   {0:.2f} A from {1:d} particles ({2:d} % of the current number of particles)".format(resolution, current_nr_particles, int(x * 100))
     if True:#try: # Try plotting
+        import matplotlib as mpl
+        mpl.use('pdf')
         import matplotlib.pyplot as plt
 	import numpy as np
         fitted = []
@@ -466,8 +471,9 @@ def run_pipeline(opts):
 	yticks[yticks <= 0] = 1.0 / (999 * 999) # to avoid zero division and negative sqrt
         ax3.set_yticklabels(np.sqrt(1 / yticks).round(1))
 
-        plt.savefig(opts.prefix + "rosenthal-henderson-plot.pdf", bbox_inches='tight')
-        print " RELION_IT: Plot written to rosenthal-henderson-plot.pdf."
+        output_name = opts.prefix + "rosenthal-henderson-plot.pdf"
+        plt.savefig(output_name, bbox_inches='tight')
+        print " RELION_IT: Plot written to " + output_name
     else:#except:
         print 'WARNING: Failed to plot. Probably matplotlib and/or numpy is missing.'
 
