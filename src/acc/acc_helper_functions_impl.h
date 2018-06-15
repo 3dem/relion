@@ -18,7 +18,7 @@ long int makeJobsForDiff2Fine(
 		IndexedDataArrayMask &dataMask,
 		int chunk)
 {
-	long int w_base = dataMask.firstPos, w(0), k(0);
+	long unsigned w_base = dataMask.firstPos, w(0), k(0);
 	// be on the safe side with the jobArrays: make them as large as they could possibly be
 	// (this will be reduced at exit of this function)
 	dataMask.setNumberOfJobs(orientation_num*translation_num);
@@ -30,7 +30,7 @@ long int makeJobsForDiff2Fine(
 	for (long unsigned i = 0; i < orientation_num; i++)
 	{
 		dataMask.jobExtent[k]=0;
-		int tk=0;
+		long int tk=0;
 		long int iover_rot = FineProjectionData.iover_rots[i];
 		for (long unsigned j = 0; j < translation_num; j++)
 		{
@@ -83,7 +83,7 @@ long int makeJobsForDiff2Fine(
 	return(w);
 }
 
-int  makeJobsForCollect(IndexedDataArray &FPW, 
+long int  makeJobsForCollect(IndexedDataArray &FPW, 
     IndexedDataArrayMask &dataMask, unsigned long NewJobNum) // FPW=FinePassWeights
 {
 	// reset the old (diff2Fine) job-definitions
@@ -126,10 +126,10 @@ int  makeJobsForCollect(IndexedDataArray &FPW,
 void mapWeights(
 		unsigned long orientation_start,
 		XFLOAT *mapped_weights,
-		unsigned orientation_num,
+		unsigned long orientation_num,
 		unsigned long idxArr_start,
 		unsigned long idxArr_end,
-		unsigned translation_num,
+		unsigned long translation_num,
 		XFLOAT *weights,
 		long unsigned *rot_idx,
 		long unsigned *trans_idx,
@@ -143,28 +143,32 @@ void mapWeights(
 		mapped_weights[ (rot_idx[i]-orientation_start) * translation_num + trans_idx[i] ]= weights[i];
 }
 
-void buildCorrImage(MlOptimiser *baseMLO, OptimisationParamters &op, AccPtr<XFLOAT> &corr_img, long int ipart, long int group_id)
+void buildCorrImage(MlOptimiser *baseMLO, 
+		OptimisationParamters &op, 
+		AccPtr<XFLOAT> &corr_img, 
+		long int ipart, 
+		long int group_id)
 {
 	// CC or not
 	if((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
-		for(int i = 0; i < corr_img.getSize(); i++)
+		for(size_t i = 0; i < corr_img.getSize(); i++)
 			corr_img[i] = 1. / (op.local_sqrtXi2[ipart]*op.local_sqrtXi2[ipart]);
 	else
-		for(int i = 0; i < corr_img.getSize(); i++)
+		for(size_t i = 0; i < corr_img.getSize(); i++)
 			corr_img[i] = *(op.local_Minvsigma2s[ipart].data + i );
 
 	// ctf-correction or not ( NOTE this is not were the difference metric is ctf-corrected, but
 	// rather where we apply the additional correction to make the GPU-specific arithmetic equal
 	// to the CPU method)
 	if (baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected)
-		for(int i = 0; i < corr_img.getSize(); i++)
+		for(size_t i = 0; i < corr_img.getSize(); i++)
 			corr_img[i] *= DIRECT_MULTIDIM_ELEM(op.local_Fctfs[ipart], i)*DIRECT_MULTIDIM_ELEM(op.local_Fctfs[ipart], i);
 	// scale-correction or not ( NOTE this is not were the difference metric is scale-corrected, but
 	// rather where we apply the additional correction to make the GPU-specific arithmetic equal
 	// to the CPU method)
 	XFLOAT myscale = baseMLO->mymodel.scale_correction[group_id];
 	if (baseMLO->do_scale_correction)
-		for(int i = 0; i < corr_img.getSize(); i++)
+		for(size_t i = 0; i < corr_img.getSize(); i++)
 			corr_img[i] *= myscale * myscale;
 }
 
@@ -301,7 +305,7 @@ void runWavgKernel(
 		OptimisationParamters &op,
 		long unsigned orientation_num,
 		long unsigned translation_num,
-		unsigned image_size,
+		unsigned long image_size,
 		long int ipart,
 		int group_id,
 		int exp_iclass,
@@ -525,7 +529,7 @@ void runBackProjectKernel(
 					translation_num, significant_weight, weight_norm, d_eulers,
 					BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
 					BP.maxR, BP.maxR2, BP.padding_factor,
-					imgX, imgY, imgZ, imgX*imgY*imgZ,
+					imgX, imgY, imgZ, (size_t)imgX*(size_t)imgY*(size_t)imgZ,
 					BP.mdlX, BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ, BP.mutexes);
 #endif
 			else
@@ -547,7 +551,7 @@ void runBackProjectKernel(
 					translation_num, significant_weight, weight_norm, d_eulers,
 					BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
 					BP.maxR, BP.maxR2, (XFLOAT)BP.padding_factor,
-					(unsigned)imgX, (unsigned)imgY, (unsigned)imgZ, (unsigned)imgX*imgY*imgZ,
+					(unsigned)imgX, (unsigned)imgY, (unsigned)imgZ, (size_t)imgX*(size_t)imgY*(size_t)imgZ,
 					(unsigned)BP.mdlX, (unsigned)BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ, BP.mutexes);
 #endif
 		}
@@ -572,7 +576,7 @@ void runBackProjectKernel(
 					translation_num, significant_weight, weight_norm, d_eulers,
 					BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
 					BP.maxR, BP.maxR2, (XFLOAT)BP.padding_factor,
-					(unsigned)imgX, (unsigned)imgY, (unsigned)imgZ, (unsigned)imgX*imgY*imgZ,
+					(unsigned)imgX, (unsigned)imgY, (unsigned)imgZ, (size_t)imgX*(size_t)imgY*(size_t)imgZ,
 					(unsigned)BP.mdlX, (unsigned)BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ, BP.mutexes);
 #endif
 			else
@@ -595,7 +599,7 @@ void runBackProjectKernel(
 					translation_num, significant_weight, weight_norm, d_eulers,
 					BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
 					BP.maxR, BP.maxR2, (XFLOAT)BP.padding_factor,
-					(unsigned)imgX, (unsigned)imgY, (unsigned)imgZ, (unsigned)imgX*imgY*imgZ,
+					(unsigned)imgX, (unsigned)imgY, (unsigned)imgZ, (size_t)imgX*(size_t)imgY*(size_t)imgZ,
 					(unsigned)BP.mdlX, (unsigned)BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ, BP.mutexes);
 #else
 				CpuKernels::backproject3D<false>(imageCount,BP_REF3D_BLOCK_SIZE,
@@ -605,7 +609,7 @@ void runBackProjectKernel(
 					translation_num, significant_weight, weight_norm, d_eulers,
 					BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
 					BP.maxR, BP.maxR2, (XFLOAT)BP.padding_factor,
-					(unsigned)imgX, (unsigned)imgY, (unsigned)imgZ, (unsigned)imgX*imgY*imgZ,
+					(unsigned)imgX, (unsigned)imgY, (unsigned)imgZ, (size_t)imgX*(size_t)imgY*(size_t)imgZ,
 					(unsigned)BP.mdlX, (unsigned)BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ, BP.mutexes);
 #endif
 #endif
@@ -656,13 +660,13 @@ void runDiff2KernelCoarse(
 		XFLOAT *diff2s,
 		XFLOAT local_sqrtXi2,
 		long unsigned orientation_num,
-		int translation_num,
-		int image_size,
+		long unsigned translation_num,
+		long unsigned image_size,
 		cudaStream_t stream,
 		bool do_CC,
 		bool data_is_3D)
 {
-	const int blocks3D = (data_is_3D? D2C_BLOCK_SIZE_DATA3D : D2C_BLOCK_SIZE_REF3D);
+	const long unsigned blocks3D = (data_is_3D? D2C_BLOCK_SIZE_DATA3D : D2C_BLOCK_SIZE_REF3D);
 
 	if(!do_CC)
 	{
@@ -1151,7 +1155,7 @@ void runDiff2KernelFine(
 		long unsigned orientation_num,
 		long unsigned translation_num,
 		long unsigned significant_num,
-		unsigned image_size,
+		unsigned long image_size,
 		int ipart,
 		int exp_iclass,
 		cudaStream_t stream,
@@ -1328,7 +1332,7 @@ void runCollect2jobs(	int grid_dim,
 						unsigned long nr_trans,
 						unsigned long nr_oversampled_trans,
 						unsigned long nr_oversampled_rot,
-						int oversamples,
+						unsigned long oversamples,
 						bool skip_rots,
 						XFLOAT * p_weights,
 						XFLOAT * p_thr_wsum_prior_offsetx_class,
@@ -1541,7 +1545,7 @@ void windowFourierTransform2(
 				max_r2);
 		LAUNCH_HANDLE_ERROR(cudaGetLastError());
 #else
-		int grid_dim = (int)( ceil((float)(iX*iY*iZ) / (float) WINDOW_FT_BLOCK_SIZE));
+		size_t grid_dim = (size_t)( ceil((float)(iX*iY*iZ) / (float) WINDOW_FT_BLOCK_SIZE));
 		CpuKernels::window_fourier_transform<true>(
 				grid_dim,
 				Npsi,

@@ -20,7 +20,11 @@ public:
 
 	PROJECTOR_PTR_TYPE mdlReal;
 	PROJECTOR_PTR_TYPE mdlImag;
+#ifdef CUDA
 	PROJECTOR_PTR_TYPE mdlComplex;
+#else
+	std::complex<XFLOAT> *mdlComplex;
+#endif
 
 	AccProjectorKernel(
 			int mdlX, int mdlY, int mdlZ,
@@ -28,7 +32,11 @@ public:
 			int mdlInitY, int mdlInitZ,
 			int padding_factor,
 			int maxR,
+#ifdef CUDA
 			PROJECTOR_PTR_TYPE mdlComplex
+#else
+			std::complex<XFLOAT> *mdlComplex
+#endif
 			):
 			mdlX(mdlX), mdlXY(mdlX*mdlY), mdlZ(mdlZ),
 			imgX(imgX), imgY(imgY), imgZ(imgZ),
@@ -53,11 +61,12 @@ public:
 				maxR(maxR), maxR2(maxR*maxR),
 				mdlReal(mdlReal), mdlImag(mdlImag)
 			{
-#ifndef CUDA			
-				for(int i=0; i<mdlX * mdlY * mdlZ; i++) {
-			        *mdlComplex ++ = *mdlReal ++;
-			        *mdlComplex ++ = *mdlImag ++;
-			    }
+#ifndef CUDA		
+				std::complex<XFLOAT> *pData = mdlComplex;
+				for(size_t i=0; i<(size_t)mdlX * (size_t)mdlY * (size_t)mdlZ; i++) {
+					std::complex<XFLOAT> arrayval(*mdlReal ++, *mdlImag ++);
+					pData[i] = arrayval;		        
+				}
 #endif
 			};
 

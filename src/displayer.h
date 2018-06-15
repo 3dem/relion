@@ -225,6 +225,9 @@ public:
 	// Number of groups for regrouping the selected particles (for model.star)
 	int nr_regroups;
 
+	// Apply the positioning parameters in the particle metadata?
+	bool do_apply_orient;
+
 	// Save selected images recentered to their center-of-mass?
 	bool do_recenter;
 
