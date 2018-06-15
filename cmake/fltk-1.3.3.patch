@@ -24,3 +24,26 @@ diff -r -u fltk-1.3.3-orig/src/fl_line_style.cxx fltk-1.3.3/src/fl_line_style.cx
                                      kCGLineJoinRound, kCGLineJoinBevel };
    if (width<1) width = 1;
    fl_quartz_line_width_ = (float)width; 
+
+diff -r -u fltk-1.3.3-orig/src/Fl_JPEG_Image.cxx fltk-1.3.3/src/Fl_JPEG_Image.cxx
+--- fltk-1.3.3-orig/src/Fl_JPEG_Image.cxx 2018-06-15 14:29:25.591146641 +0100
++++ fltk-1.3.3/src/Fl_JPEG_Image.cxx   2018-06-15 14:29:51.914582122 +0100
+@@ -155,7 +155,7 @@
+   
+   jpeg_create_decompress(&dinfo);
+   jpeg_stdio_src(&dinfo, fp);
+-  jpeg_read_header(&dinfo, 1);
++  jpeg_read_header(&dinfo, TRUE);
+   
+   dinfo.quantize_colors      = (boolean)FALSE;
+   dinfo.out_color_space      = JCS_RGB;
+@@ -337,7 +337,7 @@
+   
+   jpeg_create_decompress(&dinfo);
+   jpeg_mem_src(&dinfo, data);
+-  jpeg_read_header(&dinfo, 1);
++  jpeg_read_header(&dinfo, TRUE);
+   
+   dinfo.quantize_colors      = (boolean)FALSE;
+   dinfo.out_color_space      = JCS_RGB;
+
