@@ -21,18 +21,19 @@ void weights_exponent_coarse(
 		bool *g_pdf_offset_zeros,
 		T *g_weights,
 		T g_min_diff2,
-		int nr_coarse_orient,
-		int nr_coarse_trans,
+		unsigned long  nr_coarse_orient,
+		unsigned long  nr_coarse_trans,
 		size_t max_idx)
 {
 	for (size_t idx = 0; idx < max_idx; idx++)
 	{
-		int itrans = idx % nr_coarse_trans;
-		int iorient = (idx - itrans) / nr_coarse_trans;
+		unsigned long  itrans = idx % nr_coarse_trans;
+		unsigned long  iorient = (idx - itrans) / nr_coarse_trans;
 
 		T diff2 = g_weights[idx];
 		if( diff2 < g_min_diff2 || g_pdf_orientation_zeros[iorient] || g_pdf_offset_zeros[itrans])
-			g_weights[idx] = std::numeric_limits<T>::lowest(); //large negative number
+	// TODO - replace with lowest() when C++11 is supported
+			g_weights[idx] = -std::numeric_limits<T>::max(); //large negative number
 		else
 			g_weights[idx] = g_pdf_orientation[iorient] + g_pdf_offset[itrans] + g_min_diff2 - diff2;
 	}
@@ -72,10 +73,10 @@ void collect2jobs(  int     grid_size,
 					XFLOAT *g_i_weights,
 					XFLOAT op_significant_weight,    // TODO Put in const
 					XFLOAT op_sum_weight,            // TODO Put in const
-					int   coarse_trans,
-					int   oversamples_trans,
-					int   oversamples_orient,
-					int   oversamples,
+					unsigned long   coarse_trans,
+					unsigned long   oversamples_trans,
+					unsigned long   oversamples_orient,
+					unsigned long   oversamples,
 					bool  do_ignore_pdf_direction,
 					XFLOAT *g_o_weights,
 					XFLOAT *g_thr_wsum_prior_offsetx_class,
@@ -97,8 +98,8 @@ void collect2jobs(  int     grid_size,
 		XFLOAT s_thr_wsum_prior_offsety_class[block_size];
 		XFLOAT s_thr_wsum_prior_offsetz_class[block_size];
 
-		long int pos = d_job_idx[bid];
-		int job_size = d_job_num[bid];
+		unsigned long pos = d_job_idx[bid];
+		unsigned long job_size = d_job_num[bid];
 
 		int pass_num = ceilfracf(job_size,block_size);
 
@@ -159,15 +160,16 @@ void exponentiate_weights_fine(
 		bool *g_pdf_offset_zeros,
 		XFLOAT *g_weights,
 		XFLOAT min_diff2,
-		int oversamples_orient,
-		int oversamples_trans,
+		unsigned long oversamples_orient,
+		unsigned long oversamples_trans,
 		unsigned long *d_rot_id,
 		unsigned long *d_trans_idx,
 		unsigned long *d_job_idx,
 		unsigned long *d_job_num,
 		long int job_num);
 
-void RNDnormalDitributionComplexWithPowerModulation(ACCCOMPLEX* Image, size_t xdim, XFLOAT *spectra);
+void RNDnormalDitributionComplexWithPowerModulation2D(ACCCOMPLEX* Image, size_t xdim, XFLOAT *spectra);
+void RNDnormalDitributionComplexWithPowerModulation3D(ACCCOMPLEX* Image, size_t xdim, size_t ydim, XFLOAT *spectra);
 
 void softMaskBackgroundValue(	int      block_dim,
                                 int      block_size,
@@ -256,7 +258,7 @@ void centerFFT_3D(  int		batch_size,
 				XFLOAT *d_Maux,
 				XFLOAT *d_Mmean,
 				XFLOAT *d_Mstddev,
-				int     image_size,
+				size_t image_size,
 				XFLOAT  normfft,
 				XFLOAT  sum_ref_under_circ_mask,
 				XFLOAT sum_ref2_under_circ_mask,
@@ -288,7 +290,7 @@ void convol_A(  int          blockIdx_x,
 				int          threadIdx_x,
 				ACCCOMPLEX *d_A,
 				ACCCOMPLEX *d_B,
-				int          image_size);
+				size_t       image_size);
 
 |*
  * Multiplies complex array A (in-place) by B, pixel-by-pixel, after conjugating A, writes to C
@@ -298,7 +300,7 @@ void convol_A(  int          blockIdx_x,
 				ACCCOMPLEX *d_A,
 				ACCCOMPLEX *d_B,
 				ACCCOMPLEX *d_C,
-				int          image_size);
+				size_t       image_size);
 
 |*
  * Multiplies many complex arrays A (in-place) by a single B, pixel-by-pixel, after conjugating A
@@ -307,7 +309,7 @@ void batch_convol_A(int           blockIdx_x,
 					int           threadIdx_x,
 					ACCCOMPLEX  *d_A,
 					ACCCOMPLEX  *d_B,
-					int           image_size);
+					size_t        image_size);
 
 |*
 * Multiplies many complex arrays A (not in-place) by a single B, pixel-by-pixel, after conjugating A
@@ -317,7 +319,7 @@ void batch_convol_A(int          blockIdx_x,
 					ACCCOMPLEX *d_A,
 					ACCCOMPLEX *d_B,
 					ACCCOMPLEX *d_C,
-					int          image_size);
+					size_t       image_size);
 
 |*
  * Multiplies complex array A (in-place) by B, pixel-by-pixel, after conjugating B
@@ -326,7 +328,7 @@ void convol_B(  int          blockIdx_x,
 				int          threadIdx_x,
 				ACCCOMPLEX *d_A,
 				ACCCOMPLEX *d_B,
-				int          image_size);
+				size_t       image_size);
 
 |*
  * Multiplies complex array A (in-place) by B, pixel-by-pixel, after conjugating B, writes to C
@@ -336,7 +338,7 @@ void convol_B(  int       blockIdx_x,
 				ACCCOMPLEX *d_A,
 				ACCCOMPLEX *d_B,
 				ACCCOMPLEX *d_C,
-				int      image_size);
+				size_t    image_size);
 |*
  * Multiplies many complex arrays A (in-place) by a single one B, pixel-by-pixel, after conjugating B
  *|
@@ -344,7 +346,7 @@ void batch_convol_B(int           blockIdx_x,
 					int           threadIdx_x,
 					ACCCOMPLEX  *d_A,
 					ACCCOMPLEX  *d_B,
-					int           image_size);
+					size_t        image_size);
 |*
  * Multiplies scalar array A by a scalar S
  *
@@ -354,7 +356,7 @@ template <typename T>
 void cpu_kernel_multi( T   *A,
 			T   *OUT,
 			T    S,
-			int       image_size);
+			size_t   image_size);
 */
 /*
  * In place multiplies scalar array A by a scalar S
@@ -364,7 +366,7 @@ void cpu_kernel_multi( T   *A,
 template <typename T>
 void cpu_kernel_multi( T   *A,
 			T    S,
-			int       image_size);
+			size_t     image_size);
 /*
  * Multiplies scalar array A by scalar array B and a scalar S, pixel-by-pixel
  *
@@ -375,14 +377,14 @@ void cpu_kernel_multi( T *A,
 			T *B,
 			T *OUT,
 			T  S,
-			int     image_size);
+			size_t   image_size);
 /*
 void finalizeMstddev(   int       blockIdx_x, 
 						int       threadIdx_x,
 						XFLOAT   *Mstddev,
 						XFLOAT   *aux,
 						XFLOAT    S,
-						int       image_size);
+						size_t       image_size);
 
 |*
  * In place squares array in place
@@ -392,7 +394,7 @@ void finalizeMstddev(   int       blockIdx_x,
 void square(int       blockIdx_x, 
 			int       threadIdx_x,
 			XFLOAT   *A,
-			int       image_size);
+			size_t       image_size);
 */
 /*
  * Casts on device so we can copy_to_host directly into a multidimarray.
@@ -402,9 +404,9 @@ void cast(  int blockIdx_x,
 			int threadIdx_x,
 			T1 *IN,
 			T2 *OUT,
-			int size)
+			size_t size)
 {
-	int pixel = threadIdx_x + blockIdx_x*BLOCK_SIZE;
+	size_t pixel = (size_t)threadIdx_x + (size_t)blockIdx_x*(size_t)BLOCK_SIZE;
 	if(pixel<size)
 		OUT[pixel] = IN[pixel];
 }
@@ -420,7 +422,7 @@ void kernel_frequencyPass( int grid_size, int block_size,
 					XFLOAT       edge_width,
 					XFLOAT       edge_high,
 					XFLOAT       angpix,
-					int          image_size)
+					size_t       image_size)
 {
 #ifdef DEBUG_CUDA
 	if((size_t)grid_size*(size_t)block_size > (size_t)std::numeric_limits<int>::max())
@@ -431,7 +433,7 @@ void kernel_frequencyPass( int grid_size, int block_size,
 	// TODO - why not a single loop over image_size pixels?
 	for(int blk=0; blk<grid_size; blk++) {
 		for(int tid=0; tid<block_size; tid++) {
-			int texel = tid + blk*block_size;
+			size_t texel = (size_t)tid + (size_t)blk*(size_t)block_size;
 
 			int z = texel / (Xdim*Ydim);
 			int xy = (texel - z*Xdim*Ydim);
@@ -486,8 +488,8 @@ template<bool DATA3D>
 void powerClass(int          gridSize,
 				ACCCOMPLEX   *g_image,
 				XFLOAT       *g_spectrum,
-				int          image_size,
-				int          spectrum_size,
+				size_t       image_size,
+				size_t       spectrum_size,
 				int          xdim,
 				int          ydim,
 				int          zdim,
@@ -513,7 +515,7 @@ void powerClass(int          gridSize,
 			s_highres_Xi2[tid] = (XFLOAT)0.;
 
 		for(int tid=0; tid<POWERCLASS_BLOCK_SIZE; tid++){
-			int voxel=tid + bid*POWERCLASS_BLOCK_SIZE;
+			size_t voxel=(size_t)tid + (size_t)bid*(size_t)POWERCLASS_BLOCK_SIZE;
 			if(voxel<image_size)
 			{
 				if(DATA3D)
@@ -540,11 +542,11 @@ void powerClass(int          gridSize,
 				}
 
 		#if defined(ACC_DOUBLE_PRECISION)
-				int ires = (int)(sqrt((XFLOAT)d) + 0.5);
+				size_t ires = (size_t)(sqrt((XFLOAT)d) + 0.5);
 		#else
-				int ires = (int)(sqrtf((XFLOAT)d) + 0.5f);
+				size_t ires = (size_t)(sqrtf((XFLOAT)d) + 0.5f);
 		#endif
-				if((ires>0.f) && (ires<spectrum_size) && coords_in_range)
+				if((ires<spectrum_size) && coords_in_range)
 				{
 					normFaux = g_image[voxel].x*g_image[voxel].x + g_image[voxel].y*g_image[voxel].y;
 					g_spectrum[ires] += normFaux;
@@ -611,7 +613,7 @@ inline void translatePixel(
 // translation index. Since sin(a+B) = sin(A) * cos(B) + cos(A) * sin(B), and 
 // cos(A+B) = cos(A) * cos(B) - sin(A) * sin(B), we can use lookup table to 
 // compute sin(x*tx + y*ty) and cos(x*tx + y*ty). 
-inline void  computeSincosLookupTable2D(int      trans_num,
+inline void  computeSincosLookupTable2D(unsigned long  trans_num,
                                         XFLOAT  *trans_x,
 										XFLOAT  *trans_y,										
 										int      xSize,
@@ -621,12 +623,12 @@ inline void  computeSincosLookupTable2D(int      trans_num,
 	                                    XFLOAT  *sin_y,
 	                                    XFLOAT  *cos_y)
 {
-	for(int i=0; i<trans_num; i++) {
+	for(unsigned long i=0; i<trans_num; i++) {
 		XFLOAT tx = trans_x[i];
 		XFLOAT ty = trans_y[i];
 
 		for(int x=0; x<xSize; x++) {
-		   int index = i * xSize + x;
+		   unsigned long index = i * xSize + x;
 #ifdef ACC_DOUBLE_PRECISION
 			sincos ( x * tx, &sin_x[index], &cos_x[index] );
 #else
@@ -635,7 +637,7 @@ inline void  computeSincosLookupTable2D(int      trans_num,
 		}
 		
 		for(int y=0; y<ySize; y++) {
-            int index = i * ySize + y;
+            unsigned long index = i * ySize + y;
 #ifdef ACC_DOUBLE_PRECISION
 			sincos ( y * ty, &sin_y[index], &cos_y[index] );
 #else
@@ -645,7 +647,7 @@ inline void  computeSincosLookupTable2D(int      trans_num,
 	}
 }	                                    
 				
-inline void  computeSincosLookupTable3D(int      trans_num,
+inline void  computeSincosLookupTable3D(unsigned long  trans_num,
                                         XFLOAT  *trans_x,
 										XFLOAT  *trans_y,
 										XFLOAT  *trans_z,										
@@ -659,13 +661,13 @@ inline void  computeSincosLookupTable3D(int      trans_num,
 	                                    XFLOAT  *sin_z,
 	                                    XFLOAT  *cos_z)
 {	                                    
-	for(int i=0; i<trans_num; i++) {
+	for(unsigned long i=0; i<trans_num; i++) {
 		XFLOAT tx = trans_x[i];
 		XFLOAT ty = trans_y[i];
 		XFLOAT tz = trans_z[i];
 
 		for(int x=0; x<xSize; x++) {
-		   int index = i * xSize + x;
+		   unsigned long index = i * xSize + x;
 #ifdef ACC_DOUBLE_PRECISION
 			sincos ( x * tx, &sin_x[index], &cos_x[index] );
 #else
@@ -674,7 +676,7 @@ inline void  computeSincosLookupTable3D(int      trans_num,
 		}
 		
 		for(int y=0; y<ySize; y++) {
-            int index = i * ySize + y;
+            unsigned long index = i * ySize + y;
 #ifdef ACC_DOUBLE_PRECISION
 			sincos ( y * ty, &sin_y[index], &cos_y[index] );
 #else
@@ -683,7 +685,7 @@ inline void  computeSincosLookupTable3D(int      trans_num,
 		}           
 		
 		for(int z=0; z<zSize; z++) {
-			int index = i * zSize + z;
+			unsigned long index = i * zSize + z;
 #ifdef ACC_DOUBLE_PRECISION
 			sincos ( z * tz, &sin_z[index], &cos_z[index] );
 #else
@@ -697,7 +699,7 @@ template<bool invert>
 void cpu_kernel_make_eulers_2D(int grid_size, int block_size,
 		XFLOAT *alphas,
 		XFLOAT *eulers,
-		unsigned orientation_num);
+		unsigned long orientation_num);
 
 template<bool invert,bool doL, bool doR>
 void cpu_kernel_make_eulers_3D(int grid_size, int block_size,
@@ -705,7 +707,7 @@ void cpu_kernel_make_eulers_3D(int grid_size, int block_size,
 		XFLOAT *betas,
 		XFLOAT *gammas,
 		XFLOAT *eulers,
-		unsigned orientation_num,
+		unsigned long orientation_num,
 		XFLOAT *L,
 		XFLOAT *R);
 

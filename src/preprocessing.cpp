@@ -54,6 +54,7 @@ void Preprocessing::read(int argc, char **argv, int rank)
 	fn_part_star = parser.getOption("--part_star", "Output STAR file with all particles metadata", "");
 	fn_list_star = parser.getOption("--list_star", "Output STAR file with a list to the output STAR files of individual micrographs", "");
 	fn_data = parser.getOption("--reextract_data_star", "A _data.star file from a refinement to re-extract, e.g. with different binning or re-centered (instead of --coord_suffix)", "");
+	do_reset_offsets = parser.checkOption("--reset_offsets", "reset the origin offsets from the input _data.star file to zero?");
 	do_recenter = parser.checkOption("--recenter", "Re-center particle according to rlnOriginX/Y in --reextract_data_star STAR file");
 	recenter_x = textToFloat(parser.getOption("--recenter_x", "X-coordinate (in pixel inside the reference) to recenter re-extracted data on", "0."));
 	recenter_y = textToFloat(parser.getOption("--recenter_y", "Y-coordinate (in pixel inside the reference) to recenter re-extracted data on", "0."));
@@ -1285,8 +1286,23 @@ MetaDataTable Preprocessing::getCoordinateMetaDataTable(FileName fn_mic)
 			}
 			else
 			{
-				// re-scale or re-center
-				if (ABS(rescale_fndata - 1.) > 1e-6 || do_recenter)
+				// reset input offsets
+				if (do_reset_offsets)
+				{
+					RFLOAT zero = 0.;
+					if (do_contains_xy)
+					{
+
+						MDresult.setValue(EMDL_ORIENT_ORIGIN_X, zero);
+						MDresult.setValue(EMDL_ORIENT_ORIGIN_Y, zero);
+					}
+					if (do_contains_z)
+					{
+						MDresult.setValue(EMDL_ORIENT_ORIGIN_Z, zero);
+					}
+				}
+				// re-scale or re-center (irrelevant if do_reset_offsets)
+				else if (ABS(rescale_fndata - 1.) > 1e-6 || do_recenter)
 				{
 					Matrix1D<RFLOAT>  my_projected_center(3);
 					my_projected_center.initZeros();

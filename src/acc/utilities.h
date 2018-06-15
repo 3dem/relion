@@ -143,7 +143,7 @@ static T getSumOnDevice(AccPtr<T> &ptr)
 #endif
 	size_t size = ptr.getSize();
 	T sum = 0;
-	for (int i=0; i<size; i++)
+	for (size_t i=0; i<size; i++)
 		sum += ptr[i];
 	return sum;
 #endif
@@ -182,7 +182,7 @@ static T getMaxOnDevice(AccPtr<T> &ptr)
 }
 
 template <typename T>
-static std::pair<int, T> getArgMinOnDevice(AccPtr<T> &ptr)
+static std::pair<size_t, T> getArgMinOnDevice(AccPtr<T> &ptr)
 {
 #ifdef CUDA
 	return CudaKernels::getArgMinOnDevice<T>(ptr);
@@ -198,7 +198,7 @@ static std::pair<int, T> getArgMinOnDevice(AccPtr<T> &ptr)
 }
 
 template <typename T>
-static std::pair<int, T> getArgMaxOnDevice(AccPtr<T> &ptr)
+static std::pair<size_t, T> getArgMaxOnDevice(AccPtr<T> &ptr)
 {
 #ifdef CUDA
 	return CudaKernels::getArgMaxOnDevice<T>(ptr);
@@ -224,7 +224,7 @@ static int filterGreaterZeroOnDevice(AccPtr<T> &in, AccPtr<T> &out)
 	size_t filt_size = 0;
 	size_t outindex = 0;
 	// Find how many entries the output array will have
-	for(int i=0; i<arr_size; i++)
+	for(size_t i=0; i<arr_size; i++)
 	{
 		if(in[i] > (T)0.0)
 			filt_size++;
@@ -235,7 +235,7 @@ static int filterGreaterZeroOnDevice(AccPtr<T> &in, AccPtr<T> &out)
 #endif
 	out.resizeHost(filt_size);
 	// Now populate output array
-	for(int i=0; i<arr_size; i++)
+	for(size_t i=0; i<arr_size; i++)
 		if(in[i] > (T)0.0) {
 			out[outindex] = in[i];
 			outindex++;
@@ -255,7 +255,7 @@ static void sortOnDevice(AccPtr<T> &in, AccPtr<T> &out)
 	size_t arr_size = in.getSize();
 	std::vector<T> sortVector(in(), in() + in.getSize());
 	sort(sortVector.begin(), sortVector.end());
-	for (int i=0; i < arr_size; i++)
+	for (size_t i=0; i < arr_size; i++)
 		out[i] = sortVector[i];
 #endif
 }
@@ -268,7 +268,7 @@ static void scanOnDevice(AccPtr<T> &in, AccPtr<T> &out)
 #else
 	T sum = 0.0;
 	size_t arr_size = in.getSize();
-	for(int i=0; i<arr_size; i++) 
+	for(size_t i=0; i<arr_size; i++) 
 	{
 		sum += in[i];
 		out[i] = sum;
@@ -318,8 +318,8 @@ void powerClass(int		in_gridSize,
 				int			in_blocksize,
 				ACCCOMPLEX  *g_image,
 				XFLOAT      *g_spectrum,
-				int          image_size,
-				int          spectrum_size,
+				size_t       image_size,
+				size_t       spectrum_size,
 				int          xdim,
 				int          ydim,
 				int          zdim,
@@ -357,7 +357,7 @@ void acc_make_eulers_2D(int grid_size, int block_size,
 		cudaStream_t stream,
 		XFLOAT *alphas,
 		XFLOAT *eulers,
-		unsigned orientation_num)
+		unsigned long orientation_num)
 {
 #ifdef CUDA
 	cuda_kernel_make_eulers_2D<invert><<<grid_size,block_size,0,stream>>>(
@@ -377,7 +377,7 @@ void acc_make_eulers_3D(int grid_size, int block_size,
 		XFLOAT *betas,
 		XFLOAT *gammas,
 		XFLOAT *eulers,
-		unsigned orientation_num,
+		unsigned long orientation_num,
 		XFLOAT *L,
 		XFLOAT *R)
 {
@@ -416,7 +416,7 @@ void InitComplexValue(AccPtr<T> &data, XFLOAT value)
 			value,
 			data.getSize(), INIT_VALUE_BLOCK_SIZE);
 #else
-	int Size = data.getSize();
+	size_t Size = data.getSize();
 	for(size_t i=0; i<Size; i++)
 	{
 		data[i].x = value;
@@ -437,7 +437,7 @@ void InitValue(AccPtr<T> &data, T value)
 			INIT_VALUE_BLOCK_SIZE);
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 #else
-	int Size = data.getSize();
+	size_t Size = data.getSize();
 	for (size_t i=0; i < Size; i++)
 		data[i] = value;
 #endif
@@ -462,7 +462,7 @@ void InitValue(AccPtr<T> &data, T value, size_t Size)
 void centerFFT_2D(int grid_size, int batch_size, int block_size,
 				cudaStream_t stream,
 				XFLOAT *img_in,
-				int image_size,
+				size_t image_size,
 				int xdim,
 				int ydim,
 				int xshift,
@@ -471,7 +471,7 @@ void centerFFT_2D(int grid_size, int batch_size, int block_size,
 
 void centerFFT_2D(int grid_size, int batch_size, int block_size,
 				XFLOAT *img_in,
-				int image_size,
+				size_t image_size,
 				int xdim,
 				int ydim,
 				int xshift,
@@ -501,7 +501,7 @@ void frequencyPass(int grid_size, int block_size,
 				XFLOAT edge_width,
 				XFLOAT edge_high,
 				XFLOAT angpix,
-				int image_size)
+				size_t image_size)
 {
 #ifdef CUDA
 	dim3 blocks(grid_size);
@@ -535,7 +535,7 @@ template<bool REFCTF, bool REF3D, bool DATA3D, int block_sz>
 void kernel_wavg(
 		XFLOAT *g_eulers,
 		AccProjectorKernel &projector,
-		unsigned image_size,
+		unsigned long image_size,
 		unsigned long orientation_num,
 		XFLOAT *g_img_real,
 		XFLOAT *g_img_imag,
@@ -637,8 +637,8 @@ void diff2_coarse(
 		AccProjectorKernel projector,
 		XFLOAT *g_corr,
 		XFLOAT *g_diff2s,
-		int translation_num,
-		int image_size,
+		unsigned long translation_num,
+		unsigned long image_size,
 		cudaStream_t stream
 		)
 {
@@ -717,8 +717,8 @@ void diff2_CC_coarse(
 		AccProjectorKernel projector,
 		XFLOAT *g_corr_img,
 		XFLOAT *g_diff2s,
-		unsigned translation_num,
-		int image_size,
+		unsigned long translation_num,
+		unsigned long image_size,
 		XFLOAT exp_local_sqrtXi2,
 		cudaStream_t stream
 		)
@@ -872,7 +872,7 @@ void diff2_CC_fine(
 		AccProjectorKernel &projector,
 		XFLOAT *g_corr_img,
 		XFLOAT *g_diff2s,
-		unsigned image_size,
+		unsigned long image_size,
 		XFLOAT sum_init,
 		XFLOAT exp_local_sqrtXi2,
 		unsigned long orientation_num,
@@ -953,15 +953,15 @@ void diff2_CC_fine(
 
 template<typename T>
 void kernel_weights_exponent_coarse(
-		int num_classes,
+		unsigned long num_classes,
 		AccPtr<T> &g_pdf_orientation,
 		AccPtr<bool> &g_pdf_orientation_zeros,
 		AccPtr<T> &g_pdf_offset,
 		AccPtr<bool> &g_pdf_offset_zeros,
 		AccPtr<T> &g_Mweight,
 		T g_min_diff2,
-		int nr_coarse_orient,
-		int nr_coarse_trans)
+		unsigned long nr_coarse_orient,
+		unsigned long  nr_coarse_trans)
 {
 	long int block_num = ceilf( ((double)nr_coarse_orient*nr_coarse_trans*num_classes) / (double)SUMW_BLOCK_SIZE );
 
@@ -1012,8 +1012,8 @@ void kernel_exponentiate_weights_fine(	int grid_size,
 										XFLOAT *g_pdf_orientation,
 										XFLOAT *g_pdf_offset,
 										XFLOAT *g_weights,
-										int oversamples_orient,
-										int oversamples_trans,
+										unsigned long  oversamples_orient,
+										unsigned long  oversamples_trans,
 										unsigned long *d_rot_id,
 										unsigned long *d_trans_idx,
 										unsigned long *d_job_idx,

@@ -20,6 +20,17 @@
 #include <omp.h>
 #include "src/mask.h"
 
+// Workaround for compiler versions before 2018 update 2
+#ifdef __INTEL_COMPILER
+# if (__INTEL_COMPILER<1800)
+#  pragma optimize ("", off)
+# endif
+# if (__INTEL_COMPILER==1800)
+#  if (__INTEL_COMPILER_UPDATE<2)
+#   pragma optimize ("", off)
+#  endif
+# endif
+#endif
 // Mask out corners outside sphere (replace by average value)
 // Apply a soft mask (raised cosine with cosine_width pixels width)
 void softMaskOutsideMap(MultidimArray<RFLOAT> &vol, RFLOAT radius, RFLOAT cosine_width, MultidimArray<RFLOAT> *Mnoise)
@@ -232,6 +243,18 @@ void softMaskOutsideMapForHelix(
 	}
 	return;
 }
+
+// Workaround for compiler versions before 2018 update 2
+#ifdef __INTEL_COMPILER
+# if (__INTEL_COMPILER<1800)
+#  pragma optimize ("", on)
+# endif
+# if (__INTEL_COMPILER==1800)
+#  if (__INTEL_COMPILER_UPDATE<2)
+#   pragma optimize ("", on)
+#  endif
+# endif
+#endif
 
 void softMaskOutsideMap(MultidimArray<RFLOAT> &vol, MultidimArray<RFLOAT> &msk, bool invert_mask)
 {

@@ -1782,7 +1782,8 @@ void RelionJob::initialiseExtractJob()
 	joboptions["coords_suffix"] = JobOption("Input coordinates: ", NODE_MIC_COORDS, "", "Input coords_suffix file ({coords_suffix}*)", "Filename of the coords_suffix file with the directory structure and the suffix of all coordinate files.");
 	joboptions["do_reextract"] = JobOption("OR re-extract refined particles? ", false, "If set to Yes, the input Coordinates above will be ignored. Instead, one uses a _data.star file from a previous 2D or 3D refinement to re-extract the particles in that refinement, possibly re-centered with their refined origin offsets. This is particularly useful when going from binned to unbinned particles.");
 	joboptions["fndata_reextract"] = JobOption("Refined particles STAR file: ", NODE_PART_DATA, "", "Input STAR file (*.{star})", "Filename of the STAR file with the refined particle coordinates, e.g. from a previous 2D or 3D classification or auto-refine run.");
-	joboptions["do_recenter"] = JobOption("Re-center refined coordinates? ", true, "If set to Yes, the input coordinates will be re-centered according to the refined origin offsets in the provided _data.star file .");
+	joboptions["do_reset_offsets"] = JobOption("Reset the refined offsets to zero? ", false, "If set to Yes, the input origin offsets will be reset to zero. This may be useful after 2D classification of helical segments, where one does not want neighbouring segments to be translated on top of each other for a subsequent 3D refinement or classification.");
+	joboptions["do_recenter"] = JobOption("OR: re-center refined coordinates? ", false, "If set to Yes, the input coordinates will be re-centered according to the refined origin offsets in the provided _data.star file .");
 	joboptions["recenter_x"] = JobOption("Re-center on X-coordinate (in pix): ", std::string("0"), "Re-extract particles centered on this X-coordinate (in pixels in the reference)");
 	joboptions["recenter_y"] = JobOption("Re-center on Y-coordinate (in pix): ", std::string("0"), "Re-extract particles centered on this Y-coordinate (in pixels in the reference)");
 	joboptions["recenter_z"] = JobOption("Re-center on Z-coordinate (in pix): ", std::string("0"), "Re-extract particles centered on this Z-coordinate (in pixels in the reference)");
@@ -1844,10 +1845,21 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 			error_message = "ERROR: empty field for refined particles STAR file...";
 			return false;
 		}
+
+		if (joboptions["do_reset_offsets"].getBoolean() && joboptions["do_recenter"].getBoolean())
+		{
+			error_message = "ERROR: you cannot both reset refined offsets and recenter on refined coordinates, choose one...";
+			return false;
+		}
+
 		command += " --reextract_data_star " + joboptions["fndata_reextract"].getString();
 		Node node2(joboptions["fndata_reextract"].getString(), joboptions["fndata_reextract"].node_type);
 		inputNodes.push_back(node2);
-		if (joboptions["do_recenter"].getBoolean())
+		if (joboptions["do_reset_offsets"].getBoolean())
+		{
+			command += " --reset_offsets";
+		}
+		else if (joboptions["do_recenter"].getBoolean())
 		{
 			command += " --recenter";
 			command += " --recenter_x " + joboptions["recenter_x"].getString();

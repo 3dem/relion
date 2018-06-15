@@ -94,6 +94,9 @@ public:
 	// How many micrographs are joined together in batches of movie-particles?
 	int join_nr_mics;
 
+	// Reset origin offsets in the input fn_data STAR file to zero
+	bool do_reset_offsets;
+
 	// Re-center particles according to rlnOriginX/Y in fn_data STAR file?
 	bool do_recenter;
 

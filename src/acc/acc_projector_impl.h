@@ -24,9 +24,9 @@ bool AccProjector::setMdlDim(
 	mdlY = ydim;
 	mdlZ = zdim;
 	if(zdim == 0)
-		mdlXYZ = xdim*ydim;
+		mdlXYZ = (size_t)xdim*(size_t)ydim;
 	else
-		mdlXYZ = xdim*ydim*zdim;
+		mdlXYZ = (size_t)xdim*(size_t)ydim*(size_t)zdim;
 	mdlInitY = inity;
 	mdlInitZ = initz;
 	mdlMaxR = maxr;
@@ -161,23 +161,23 @@ void AccProjector::initMdl(XFLOAT *real, XFLOAT *imag)
 	DEBUG_HANDLE_ERROR(cudaMemcpy( mdlReal, real, mdlXYZ * sizeof(XFLOAT), cudaMemcpyHostToDevice));
 	DEBUG_HANDLE_ERROR(cudaMemcpy( mdlImag, imag, mdlXYZ * sizeof(XFLOAT), cudaMemcpyHostToDevice));
 #else
-	XFLOAT *pData = mdlComplex;
-    for(int i=0; i<mdlXYZ; i++) {
-	    *pData ++ = *real ++;
-		*pData ++ = *imag ++;			        
+	std::complex<XFLOAT> *pData = mdlComplex;
+    for(size_t i=0; i<mdlXYZ; i++) {
+		std::complex<XFLOAT> arrayval(*real ++, *imag ++);
+		pData[i] = arrayval;		        
     }
 #endif
 #endif
 
 }
 
-void AccProjector::initMdl(XFLOAT *data)
-{
 #ifndef CUDA
+void AccProjector::initMdl(std::complex<XFLOAT> *data)
+{
 	mdlComplex = data;  // No copy needed - everyone shares the complex reference arrays
 	externalFree = 1;   // This is shared memory freed outside the projector
-#endif
 }
+#endif
 
 void AccProjector::initMdl(Complex *data)
 {
@@ -187,7 +187,7 @@ void AccProjector::initMdl(Complex *data)
 	if (posix_memalign((void **)&tmpImag, MEM_ALIGN, mdlXYZ * sizeof(XFLOAT))) CRITICAL(RAMERR);
 
 
-	for (unsigned long i = 0; i < mdlXYZ; i ++)
+	for (size_t i = 0; i < mdlXYZ; i ++)
 	{
 		tmpReal[i] = (XFLOAT) data[i].real;
 		tmpImag[i] = (XFLOAT) data[i].imag;
@@ -245,7 +245,7 @@ void AccProjector::clear()
 #else // ifdef CUDA
 	if ((mdlComplex != NULL) && (externalFree == 0))
 	{
-		free(mdlComplex);
+		delete [] mdlComplex;
 		mdlComplex = NULL;
 	}
 #endif  // ifdef CUDA

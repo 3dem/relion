@@ -920,6 +920,7 @@ void JobWindow::initialiseExtractWindow()
 
 	current_y += STEPY/2;
 	place("coords_suffix", TOGGLE_DEACTIVATE);
+	current_y += STEPY/2;
 
 	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group1->end();
@@ -929,8 +930,15 @@ void JobWindow::initialiseExtractWindow()
 	group1->begin();
 
 	place("fndata_reextract", TOGGLE_DEACTIVATE);
-	place("do_recenter", TOGGLE_DEACTIVATE);
+	place("do_reset_offsets", TOGGLE_DEACTIVATE);
+	group7 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group7->end();
+	place("do_recenter", TOGGLE_DEACTIVATE, group7);
+
+	group7->begin();
 	place3("recenter_x","recenter_y", "recenter_z", "Recenter on - X, Y, Z (pix):", TOGGLE_DEACTIVATE);
+	group7->end();
+	guientries["do_recenter"].cb_menu_i();
 
 	group1->end();
 	guientries["do_reextract"].cb_menu_i();
