@@ -231,7 +231,10 @@ public:
         exist=false;
 
         // Check whether the file was closed already
-    	if (fimg == NULL && fhed == NULL && ftiff == NULL)
+    	if (fimg == NULL && fhed == NULL)
+#ifdef HAVE_TIFF
+    		if (ftiff == NULL)
+#endif
         	return;
 
 #ifdef HAVE_TIFF

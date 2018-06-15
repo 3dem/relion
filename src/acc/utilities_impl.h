@@ -57,7 +57,7 @@ void dump_array(char *name, size_t *ptr, size_t size)
 	FILE *fp = fopen(name, "w");
 	fprintf(fp, "Array size:  %ld\n", size);
 	for (size_t i=0; i < size; i++) {
-		fprintf(fp, "%d, ", ptr[i]);
+		fprintf(fp, "%zu, ", ptr[i]);
 		count++;
 		if (count > 10) {
 			fprintf(fp, "\n");
@@ -220,7 +220,8 @@ void makeNoiseImage(XFLOAT sigmaFudgeFactor,
 		MultidimArray<RFLOAT > &sigmaNoiseSpectra,
 		long int seed,
 		MlClass *accMLO,
-		AccPtr<XFLOAT> &RandomImage)
+		AccPtr<XFLOAT> &RandomImage,
+		bool is3D)
 {
     // Different MPI-distributed subsets may otherwise have different instances of the random noise below,
     // because work is on an on-demand basis and therefore variable with the timing of distinct nodes...
@@ -252,11 +253,23 @@ void makeNoiseImage(XFLOAT sigmaFudgeFactor,
     LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 
     // Create noise image with the correct spectral profile
-    cuda_kernel_RNDnormalDitributionComplexWithPowerModulation<<<RND_BLOCK_NUM,RND_BLOCK_SIZE>>>(
+    if(is3D)
+    {
+    	cuda_kernel_RNDnormalDitributionComplexWithPowerModulation3D<<<RND_BLOCK_NUM,RND_BLOCK_SIZE>>>(
                                     ~accMLO->transformer1.fouriers,
                                     ~RandomStates,
 									accMLO->transformer1.xFSize,
+									accMLO->transformer1.yFSize,
                                     ~NoiseSpectra);
+    }
+    else
+    {
+    	cuda_kernel_RNDnormalDitributionComplexWithPowerModulation2D<<<RND_BLOCK_NUM,RND_BLOCK_SIZE>>>(
+    	                                    ~accMLO->transformer1.fouriers,
+    	                                    ~RandomStates,
+    										accMLO->transformer1.xFSize,
+    	                                    ~NoiseSpectra);
+    }
     LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 
     // Transform to real-space, to get something which look like
@@ -270,7 +283,10 @@ void makeNoiseImage(XFLOAT sigmaFudgeFactor,
 #else
 
     // Create noise image with the correct spectral profile
-    CpuKernels::RNDnormalDitributionComplexWithPowerModulation(accMLO->transformer1.fouriers(), accMLO->transformer1.xFSize, ~NoiseSpectra);
+    if(is3D)
+    	CpuKernels::RNDnormalDitributionComplexWithPowerModulation3D(accMLO->transformer1.fouriers(), accMLO->transformer1.xFSize, accMLO->transformer1.yFSize, ~NoiseSpectra);
+    else
+    	CpuKernels::RNDnormalDitributionComplexWithPowerModulation2D(accMLO->transformer1.fouriers(), accMLO->transformer1.xFSize, ~NoiseSpectra);
 
     // Transform to real-space, to get something which look like
 	// the particle image without actual signal (a particle)
@@ -278,7 +294,7 @@ void makeNoiseImage(XFLOAT sigmaFudgeFactor,
 
 	// Copy the randomized image to A separate device-array, so that the
 	// transformer can be used to set up the actual particle image
-	for(int i=0; i<RandomImage.getSize(); i++)
+	for(size_t i=0; i<RandomImage.getSize(); i++)
 		RandomImage[i]=accMLO->transformer1.reals[i];
 
 #endif
@@ -296,7 +312,7 @@ static void TranslateAndNormCorrect(MultidimArray<RFLOAT > &img_in,
 	AccPtr<XFLOAT> temp = img_out.make<XFLOAT>(img_in.nzyxdim);
 	temp.allAlloc();
 
-	for (int i = 0; i < img_in.nzyxdim; i++)
+	for (unsigned long i = 0; i < img_in.nzyxdim; i++)
 		temp[i] = (XFLOAT) img_in.data[i];
 
 	temp.cpToDevice();
@@ -350,7 +366,7 @@ void normalizeAndTransformImage(	AccPtr<XFLOAT> &img_in,
 			accMLO->transformer1.forward();
 			accMLO->transformer1.fouriers.streamSync();
 
-			int FMultiBsize = ( (int) ceilf(( float)accMLO->transformer1.fouriers.getSize()*2/(float)BLOCK_SIZE));
+			size_t FMultiBsize = ( (int) ceilf(( float)accMLO->transformer1.fouriers.getSize()*2/(float)BLOCK_SIZE));
 			AccUtilities::multiply<XFLOAT>(FMultiBsize, BLOCK_SIZE, accMLO->transformer1.fouriers.getStream(),
 							(XFLOAT*)~accMLO->transformer1.fouriers,
 							(XFLOAT)1/((XFLOAT)(accMLO->transformer1.reals.getSize())),
@@ -371,7 +387,7 @@ void normalizeAndTransformImage(	AccPtr<XFLOAT> &img_in,
 			d_Fimg.cpToHost();
 			d_Fimg.streamSync();
 			img_out.initZeros(zSize, ySize, xSize);
-			for (int i = 0; i < img_out.nzyxdim; i ++)
+			for (unsigned long i = 0; i < img_out.nzyxdim; i ++)
 			{
 				img_out.data[i].real = (RFLOAT) d_Fimg[i].x;
 				img_out.data[i].imag = (RFLOAT) d_Fimg[i].y;
@@ -426,7 +442,7 @@ static void softMaskBackgroundValue(
 static void cosineFilter(
 		AccDataTypes::Image<XFLOAT> &vol,
 		bool do_Mnoise,
-		XFLOAT *Noise,
+		AccDataTypes::Image<XFLOAT> Noise,
 		XFLOAT radius,
 		XFLOAT radius_p,
 		XFLOAT cosine_width,
@@ -444,7 +460,7 @@ static void cosineFilter(
 			vol.gety()/2,
 			vol.getz()/2,
 			!do_Mnoise,
-			Noise,
+			~Noise,
 			radius,
 			radius_p,
 			cosine_width,
@@ -462,7 +478,7 @@ static void cosineFilter(
 			vol.gety()/2,
 			vol.getz()/2,
 			!do_Mnoise,
-			Noise,
+			~Noise,
 			radius,
 			radius_p,
 			cosine_width,
@@ -473,7 +489,7 @@ static void cosineFilter(
 void centerFFT_2D(int grid_size, int batch_size, int block_size,
 				cudaStream_t stream,
 				XFLOAT *img_in,
-				int image_size,
+				size_t image_size,
 				int xdim,
 				int ydim,
 				int xshift,
@@ -501,7 +517,7 @@ void centerFFT_2D(int grid_size, int batch_size, int block_size,
 
 void centerFFT_2D(int grid_size, int batch_size, int block_size,
 				XFLOAT *img_in,
-				int image_size,
+				size_t image_size,
 				int xdim,
 				int ydim,
 				int xshift,
@@ -568,8 +584,8 @@ void kernel_exponentiate_weights_fine(	XFLOAT *g_pdf_orientation,
 										bool *g_pdf_offset_zeros,
 										XFLOAT *g_weights,
 										XFLOAT min_diff2,
-										int oversamples_orient,
-										int oversamples_trans,
+										unsigned long  oversamples_orient,
+										unsigned long  oversamples_trans,
 										unsigned long *d_rot_id,
 										unsigned long *d_trans_idx,
 										unsigned long *d_job_idx,

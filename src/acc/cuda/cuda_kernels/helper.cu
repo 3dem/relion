@@ -87,7 +87,7 @@ __global__ void cuda_kernel_initRND(unsigned long seed, curandState *States)
        curand_init(seed, pixel, 0, &States[id]);
 }
 
-__global__ void cuda_kernel_RNDnormalDitributionComplexWithPowerModulation( ACCCOMPLEX *Image,
+__global__ void cuda_kernel_RNDnormalDitributionComplexWithPowerModulation2D( ACCCOMPLEX *Image,
 																		    curandState *States,
 																		    long int xdim,
 																			XFLOAT * spectra)
@@ -101,18 +101,61 @@ __global__ void cuda_kernel_RNDnormalDitributionComplexWithPowerModulation( ACCC
        //curand_init(1234, pixel, 0, &States[id]);
 
        int x,y;
-       int size = xdim*((xdim-1)*2);
+       int size = xdim*((xdim-1)*2);   					//assuming square input images (particles)
        int passes = size/(RND_BLOCK_NUM*RND_BLOCK_SIZE) + 1;
        for(int i=0; i<passes; i++)
        {
                if(pixel<size)
                {
-                       y = ( pixel / xdim ); // fftshift in one of two dims;
-                       if(y>=xdim)
-                               y -= (xdim-1)*2;
+                       y = ( pixel / xdim );
                        x = pixel % xdim;
 
+                       // fftshift in one of two dims;
+                       if(y>=xdim)
+                               y -= (xdim-1)*2;   		//assuming square input images (particles)
+
                        int ires = rintf(sqrtf(x*x + y*y));
+                       XFLOAT scale = 0.f;
+                       if(ires<xdim)
+                               scale =  spectra[ires];
+
+                       Image[pixel] = (curand_normal2(&States[id]))*scale;
+               }
+               pixel += RND_BLOCK_NUM*RND_BLOCK_SIZE;
+       }
+}
+__global__ void cuda_kernel_RNDnormalDitributionComplexWithPowerModulation3D( ACCCOMPLEX *Image,
+																		    curandState *States,
+																		    long int xdim,
+                                                                            long int ydim,
+																			XFLOAT * spectra)
+{
+       int tid = threadIdx.x;
+       int bid = blockIdx.x;
+
+       int id    = bid*RND_BLOCK_SIZE + tid;
+       int pixel = bid*RND_BLOCK_SIZE + tid;
+
+       //curand_init(1234, pixel, 0, &States[id]);
+
+       int x,y,z,xydim(xdim*ydim);
+       int size = xdim*((xdim-1)*2)*((xdim-1)*2);   		//assuming square input images (particles)
+       int passes = size/(RND_BLOCK_NUM*RND_BLOCK_SIZE) + 1;
+       for(int i=0; i<passes; i++)
+       {
+               if(pixel<size)
+               {
+            	   	   z = pixel / xydim;
+                       y = ( pixel - (z*xydim) / xdim );
+                       x = pixel % xdim;
+                       // fftshift in two of three dims;
+                       if(z>=xdim)
+                    	   z -= (xdim-1)*2;					//assuming square input images (particles)
+                       if(y>=xdim)
+                           y -= (xdim-1)*2;					//assuming square input images (particles)
+
+
+                       int ires = rintf(sqrtf(x*x + y*y + z*z));
                        XFLOAT scale = 0.f;
                        if(ires<xdim)
                                scale =  spectra[ires];
