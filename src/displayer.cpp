@@ -578,7 +578,6 @@ int multiViewerCanvas::handle(int ev)
 						{ "Show particles from selected classes" },
 						{ "Set selection type" },
 						{ "Save selected classes" },
-						{ "Save STAR with selected images" },
 						{ "Quit" },
 						{ 0 }
 					};
