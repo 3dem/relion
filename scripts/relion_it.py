@@ -463,7 +463,7 @@ def getSecondPassReference():
         angpix = '0'
     return filename.replace('\n',''), angpix.replace('\n','')
 
-def addJob(jobtype, name_in_script, done_file, options):
+def addJob(jobtype, name_in_script, done_file, options, alias=None):
 
     jobname = ""
     # See if we've done this job before, i.e. whether it is in the done_file
@@ -484,7 +484,8 @@ def addJob(jobtype, name_in_script, done_file, options):
             optionstring += opt + ';'
 
         command = 'relion_pipeliner --addJob ' + jobtype + ' --addJobOptions "' + optionstring + '"'
-
+        if alias is not None:
+                command += ' --setJobAlias "' + alias + '"'
         os.system(command)
 
         pipeline = load_star(PIPELINE_STAR)
@@ -780,10 +781,12 @@ def run_pipeline(opts):
             
             if ipass == 0:
                 autopick_job_name = 'autopick_job'
+                autopick_alias = 'reference free'
             else:
                 autopick_job_name = 'autopick2_job'
+                autopick_alias = 'reference based'
 
-            autopick_job, already_had_it  = addJob('AutoPick', autopick_job_name, SETUP_CHECK_FILE, autopick_options)
+            autopick_job, already_had_it  = addJob('AutoPick', autopick_job_name, SETUP_CHECK_FILE, autopick_options, alias=autopick_alias)
             runjobs.append(autopick_job)
 
             #### Set up the Extract job
@@ -806,10 +809,12 @@ def run_pipeline(opts):
 
             if ipass == 0:
                 extract_job_name = 'extract_job'
+                extract_alias = 'reference free'
             else:
                 extract_job_name = 'extract2_job'
+                extract_alias = 'reference based'
 
-            extract_job, already_had_it  = addJob('Extract', extract_job_name, SETUP_CHECK_FILE, extract_options)
+            extract_job, already_had_it  = addJob('Extract', extract_job_name, SETUP_CHECK_FILE, extract_options, alias=extract_alias)
             runjobs.append(extract_job)
 
             if (ipass == 0 and (opts.do_class2d or opts.do_class3d)) or (ipass == 1 and (opts.do_class2d_pass2 or opts.do_class3d_pass2)):
@@ -821,11 +826,13 @@ def run_pipeline(opts):
                 if ipass == 0:
                     split_job_name = 'split_job'
                     split_options.append('Subset size:  == {}'.format(opts.batch_size))
+                    split_alias = 'into {}'.format(opts.batch_size) 
                 else:
                     split_job_name = 'split2_job'
                     split_options.append('Subset size:  == {}'.format(opts.batch_size_pass2))
+                    split_alias = 'into {}'.format(opts.batch_size_pass2)
 
-                split_job, already_had_it = addJob('Select', split_job_name, SETUP_CHECK_FILE, split_options)
+                split_job, already_had_it = addJob('Select', split_job_name, SETUP_CHECK_FILE, split_options, alias=split_alias)
 
                 # Now start running stuff
                 runjobs.append(split_job)
@@ -966,12 +973,13 @@ def run_pipeline(opts):
 
                             if ipass == 0:
                                 jobname = 'class2d_job_batch_{:03d}'.format(iibatch)
+                                alias = 'pass1_batch_{:03d}'.format(iibatch)
                             else:
                                 jobname = 'class2d_pass2_job_batch_{:03d}'.format(iibatch)
+                                alias = 'pass2_batch_{:03d}'.format(iibatch)
 
-                            class2d_job, already_had_it = addJob('Class2D', jobname, SETUP_CHECK_FILE, class2d_options)              
-
-
+                            class2d_job, already_had_it = addJob('Class2D', jobname, SETUP_CHECK_FILE, class2d_options, alias=alias)
+ 
                             if ((not already_had_it) or rerun_batch1):
                                 have_new_batch = True
                                 RunJobs([class2d_job], 1, 1, 'CLASS2D')
@@ -1117,10 +1125,12 @@ def run_pipeline(opts):
 
                             if ipass == 0:
                                 jobname = 'class3d_job_batch_{:03d}'.format(iibatch)
+                                alias = 'pass1_batch_{:03d}'.format(iibatch)
                             else:
                                 jobname = 'class3d2_job_batch_{:03d}'.format(iibatch)
+                                alias = 'pass2_batch_{:03d}'.format(iibatch)
 
-                            class3d_job, already_had_it = addJob('Class3D', jobname, SETUP_CHECK_FILE, class3d_options)              
+                            class3d_job, already_had_it = addJob('Class3D', jobname, SETUP_CHECK_FILE, class3d_options, alias=alias) 
 
                             if ((not already_had_it) or rerun_batch1):
                                 have_new_batch = True
