@@ -1395,6 +1395,8 @@ void GuiMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 	if (!pipeline.runJob(gui_jobwindows[iwin]->myjob, current_job, only_schedule, is_main_continue, false, error_message))
 	{
 		fl_message("%s",error_message.c_str());
+		// Allow the user to fix the error and submit this job again
+		run_button->activate();
 		return;
 	}
 

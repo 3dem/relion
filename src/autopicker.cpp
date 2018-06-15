@@ -970,7 +970,7 @@ void AutoPicker::generatePDFLogfile()
 		delete plot2Dd;
 	}
 
-	joinMultipleEPSIntoSinglePDF(fn_odir + "logfile.pdf ", all_fn_eps);
+	joinMultipleEPSIntoSinglePDF(fn_odir + "logfile.pdf", all_fn_eps);
 
 	if (verb > 0)
 	{

@@ -25,6 +25,7 @@
 #include "src/matrix2d.h"
 #include "src/matrix1d.h"
 #include "src/jaz/image_op.h"
+#include "src/funcs.h"
 #include <omp.h>
 
 //#define TIMING
@@ -91,7 +92,7 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	patch_x = textToInteger(parser.getOption("--patch_x", "Patching in X-direction for MOTIONCOR2", "1"));
 	patch_y = textToInteger(parser.getOption("--patch_y", "Patching in Y-direction for MOTIONCOR2", "1"));
 	group = textToInteger(parser.getOption("--group_frames", "Average together this many frames before calculating the beam-induced shifts", "1"));
-	fn_defect = parser.getOption("--defect_file","Location of a MOTIONCOR2-style detector defect file","");
+	fn_defect = parser.getOption("--defect_file","Location of a MOTIONCOR2-style detector defect file", "");
 	fn_archive = parser.getOption("--archive","Location of the directory for archiving movies in 4-byte MRC format","");
 	fn_other_motioncor2_args = parser.getOption("--other_motioncor2_args", "Additional arguments to MOTIONCOR2", "");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread, e.g 0:1:2:3", "");
@@ -107,13 +108,16 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	dose_per_frame = textToFloat(parser.getOption("--dose_per_frame", "Electron dose (in electrons/A2/frame) for dose-weighting inside MOTIONCOR2/UNBLUR", "1"));
 	pre_exposure = textToFloat(parser.getOption("--preexposure", "Pre-exposure (in electrons/A2) for dose-weighting inside UNBLUR", "0"));
 
+	parser.addSection("Own motion correction options");
 	do_own = parser.checkOption("--use_own", "Use our own implementation of motion correction");
+	skip_defect = parser.checkOption("--skip_defect", "Skip hot pixel detection");
 	save_noDW = parser.checkOption("--save_noDW", "Save aligned but non dose weighted micrograph.");
 	interpolate_shifts = parser.checkOption("--interpolate_shifts", "(EXPERIMENTAL) Interpolate shifts");
 	ccf_downsample = textToFloat(parser.getOption("--ccf_downsample", "(EXPERT) Downsampling rate of CC map. default = 0 = automatic based on B factor", "0"));
 	early_binning = parser.checkOption("--early_binning", "(EXPERT) Do binning before alignment to reduce memory usage. This might dampen signal near Nyquist.");
 	dose_motionstats_cutoff = textToFloat(parser.getOption("--dose_motionstats_cutoff", "Electron dose (in electrons/A2) at which to distinguish early/late global accumulated motion in output statistics", "4."));
 	if (ccf_downsample > 1) REPORT_ERROR("--ccf_downsample cannot exceed 1.");
+	if (skip_defect && !do_own) REPORT_ERROR("--skip_decet is valid only for --use_own");
 	// Initialise verb for non-parallel execution
 	verb = 1;
 
@@ -159,6 +163,10 @@ void MotioncorrRunner::initialise()
 	}
 	else if (do_motioncor2)
 	{
+		if (fn_defect != "") {
+			std::cerr << "WARNING: Although the defect file will be used by MotionCor2, Bayesian Polishing will work on uncorrected raw movies and ignore the defect file." << std::endl;
+		}	
+
 		// Get the MOTIONCOR2 executable
 		if (fn_motioncor2_exe == "")
 		{
@@ -177,7 +185,7 @@ void MotioncorrRunner::initialise()
 	}
 	else if (do_own) {
 		if (fn_defect != "") {
-			std::cerr << "WARNING: The defect file is not yet supported in our own implementation of motion correction. The defect file is ignored." << std::endl;
+			std::cerr << "WARNING: Our own implementation of motion correction detects hot pixels by itself. The defect file is not used." << std::endl;
 		}
 		if (patch_x <= 0 || patch_y <= 0) {
 			REPORT_ERROR("The number of patches must be a positive integer.");
@@ -956,6 +964,7 @@ void MotioncorrRunner::saveModel(Micrograph &mic) {
 	mic.voltage = voltage;
 	mic.dose_per_frame = dose_per_frame;
 	mic.pre_exposure = pre_exposure;
+	mic.fnDefect = fn_defect;
 
 	FileName fn_avg, fn_mov;
 	getOutputFileNames(mic.getMovieFilename(), fn_avg, fn_mov);
@@ -1105,12 +1114,7 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 
 		std::cout << " Done! Written: " << fn_out << "logfile.pdf" << " and " << fn_out << "corrected_micrographs.star" << std::endl;
 	}
-
-
 }
-
-// TODO:
-// - defect
 
 bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	FileName fn_mic = mic.getMovieFilename();
@@ -1220,49 +1224,86 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	}
 	RCTOC(TIMING_APPLY_GAIN);
 
-	/*
-	MultidimArray<float> Iframe(ny, nx);
-	Iframe.initZeros();
-
-	// Simple unaligned sum
+	MultidimArray<float> Isum(ny, nx);
+	Isum.initZeros();
+	// First sum unaligned frames
 	RCTIC(TIMING_INITIAL_SUM);
 	for (int iframe = 0; iframe < n_frames; iframe++) {
 		#pragma omp parallel for num_threads(n_threads)
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iframe) {
-			DIRECT_MULTIDIM_ELEM(Iframe, n) += DIRECT_MULTIDIM_ELEM(Iframes[iframe](), n);
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Isum) {
+			DIRECT_MULTIDIM_ELEM(Isum, n) += DIRECT_MULTIDIM_ELEM(Iframes[iframe](), n);
 		}
 	}
 	RCTOC(TIMING_INITIAL_SUM);
 
 	// Hot pixel
-
-	RCTIC(TIMING_DETECT_HOT);
-	RFLOAT mean = 0, std = 0;
-	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iframe) {
-		mean += DIRECT_MULTIDIM_ELEM(Iframe, n);
-	}
-	mean /=  YXSIZE(Iframe);
-	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iframe) {
-		RFLOAT d = (DIRECT_MULTIDIM_ELEM(Iframe, n) - mean);
-		std += d * d;
-	}
-	std = std::sqrt(std / YXSIZE(Iframe));
-	const RFLOAT threshold = mean + hotpixel_sigma * std;
-	logfile << "Mean = " << mean << " Std = " << std << ", Hotpixel threshold = " << threshold << std::endl;
-
-	MultidimArray<bool> bBad(ny, nx);
-	bBad.initZeros();
-	int n_bad = 0;
-	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iframe) {
-		if (DIRECT_MULTIDIM_ELEM(Iframe, n) > threshold) {
-			DIRECT_MULTIDIM_ELEM(bBad, n) = true;
-			n_bad++;
+	if (!skip_defect)
+	{
+		RCTIC(TIMING_DETECT_HOT);
+		RFLOAT mean = 0, std = 0;
+		#pragma omp parallel for reduction(+:mean) num_threads(n_threads)
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Isum) {
+			mean += DIRECT_MULTIDIM_ELEM(Isum, n);
 		}
-	}
-	logfile << "Detected " << n_bad << " hot pixels to be corrected. (BUT correction not implemented yet)" << std::endl << std::endl;
-	RCTOC(TIMING_DETECT_HOT);
-	// TODO: fix defects
-	*/
+		mean /=  YXSIZE(Isum);
+		#pragma omp parallel for reduction(+:std) num_threads(n_threads)
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Isum) {
+			RFLOAT d = (DIRECT_MULTIDIM_ELEM(Isum, n) - mean);
+			std += d * d;
+		}
+		std = std::sqrt(std / YXSIZE(Isum));
+		const RFLOAT threshold = mean + hotpixel_sigma * std;
+		logfile << "In unaligned sum, Mean = " << mean << " Std = " << std << " Hotpixel threshold = " << threshold << std::endl;
+
+		MultidimArray<bool> bBad(ny, nx);
+		bBad.initZeros();
+		int n_bad = 0;
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Isum) {
+			if (DIRECT_MULTIDIM_ELEM(Isum, n) > threshold) {
+				DIRECT_MULTIDIM_ELEM(bBad, n) = true;
+				n_bad++;
+			}
+		}
+		logfile << "Detected " << n_bad << " hot pixels to be corrected." << std::endl;
+		Isum.clear();
+		RCTOC(TIMING_DETECT_HOT);
+
+		const RFLOAT frame_mean = mean / n_frames;
+		const RFLOAT frame_std = std / n_frames;
+
+		// 25 neighbours; should be enough even for super-resolution images.
+		const int NUM_MIN_OK = 6;
+		const int D_MAX = 2;
+		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(bBad)
+		{
+			if (!DIRECT_A2D_ELEM(bBad, i, j)) continue;
+//			std::cout << "Hot pixel at (" << i << ", " << j << ")" << std::endl;
+			#pragma omp parallel for num_threads(n_threads)
+			for (int iframe = 0; iframe < n_frames; iframe++)
+			{
+				int n_ok = 0;
+				RFLOAT val = 0;
+				for (int dy= -D_MAX; dy <= D_MAX; dy++)
+				{
+					int y = i + dy;
+					if (y < 0 || y >= ny) continue;
+					for (int dx = -D_MAX; dx <= D_MAX; dx++)
+					{
+						int x = j + dx;
+						if (x < 0 || x >= nx) continue;
+						if (DIRECT_A2D_ELEM(bBad, y, x)) continue;
+
+						n_ok++;
+						val += DIRECT_A2D_ELEM(Iframes[iframe](), y, x);
+					}
+				}
+//				std::cout << "n_ok = " << n_ok << " val = " << val << std::endl;
+				if (n_ok > NUM_MIN_OK) DIRECT_A2D_ELEM(Iframes[iframe](), i, j) = val / n_ok;
+				else DIRECT_A2D_ELEM(Iframes[iframe](), i, j) = rnd_gaus(frame_mean, frame_std);
+			}
+		}
+		logfile << "Fixed hot pixels." << std::endl;
+	} // !skip_defect
 
 	if (early_binning) {
 		nx /= bin_factor; ny /= bin_factor;

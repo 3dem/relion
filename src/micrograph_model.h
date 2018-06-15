@@ -33,7 +33,7 @@ class MotionModel
 {
 public:
 
-    virtual ~MotionModel(){}
+	virtual ~MotionModel(){}
 
 	// Fit model based on observations
 	virtual void fit() = 0;
@@ -55,7 +55,7 @@ class ThirdOrderPolynomialModel: public MotionModel {
 public:
 	static const int NUM_COEFFS_PER_DIM;
 
-    Matrix1D <RFLOAT> coeffX, coeffY;
+	Matrix1D <RFLOAT> coeffX, coeffY;
 
 	void fit() {
 		REPORT_ERROR("Not implemented yet.");
@@ -80,6 +80,7 @@ public:
 	bool ready;
 	static const RFLOAT NOT_OBSERVED;
 	RFLOAT angpix, voltage, dose_per_frame, pre_exposure;
+	FileName fnDefect;
 
 	int first_frame; // First frame for local motion model. 1-indexed.
 	MotionModel *model;

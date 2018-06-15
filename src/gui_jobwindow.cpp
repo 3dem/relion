@@ -590,6 +590,7 @@ void JobWindow::initialiseMotioncorrWindow()
 	place("fn_gain_ref", TOGGLE_DEACTIVATE);
 	place("gain_rot", TOGGLE_DEACTIVATE);
 	place("gain_flip", TOGGLE_DEACTIVATE);
+	place("fn_defect", TOGGLE_DEACTIVATE);
 
 	current_y += STEPY/2;
 	group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
@@ -597,7 +598,6 @@ void JobWindow::initialiseMotioncorrWindow()
 	place("do_own_motioncor", TOGGLE_DEACTIVATE, group4, true);
 	group4->begin();
 	place("fn_motioncor2_exe", TOGGLE_DEACTIVATE);
-	place("fn_defect", TOGGLE_DEACTIVATE);
 	place("gpu_ids");
 	place("other_motioncor2_args", TOGGLE_DEACTIVATE);
 	group4->end();
