@@ -625,6 +625,12 @@ def run_pipeline(opts):
         secondpass_ref3d, secondpass_ref3d_angpix = getSecondPassReference()
         if not secondpass_ref3d == '':
             print ' RELION_IT: found', secondpass_ref3d,'with angpix=',secondpass_ref3d_angpix,'as a 3D reference for second pass in file',SECONDPASS_REF3D_FILE
+            print ' RELION_IT: if the automatic selection of the reference turned out to be unsatisfactory,'
+            print ' RELION_IT: you can re-run the second pass with another reference by'
+            print ' RELION_IT:  stopping the pipeline by deleteing RUNNING_*'
+            print ' RELION_IT:  updating the reference filename in',SECONDPASS_REF3D_FILE
+            print ' RELION_IT:  deleting relevant jobs (autopick2_job and followings) in',SETUP_CHECK_FILE
+            print ' RELION_IT:  and restarting the pipeline.'
             first_pass = 1
             opts.autopick_3dreference = secondpass_ref3d
             opts.autopick_ref_angpix = secondpass_ref3d_angpix
