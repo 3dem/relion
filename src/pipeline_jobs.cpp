@@ -2759,8 +2759,9 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 	int total_nr_iter = joboptions["sgd_ini_iter"].getNumber();
 	total_nr_iter += joboptions["sgd_inbetween_iter"].getNumber();
 	total_nr_iter += joboptions["sgd_fin_iter"].getNumber();
+	int nr_classes = joboptions["nr_classes"].getNumber();
 
-	outputNodes = getOutputNodesRefine(outputname + fn_run, total_nr_iter, 1, 3, 1);
+	outputNodes = getOutputNodesRefine(outputname + fn_run, total_nr_iter, nr_classes, 3, 1);
 
 	command += " --sgd_ini_iter " + joboptions["sgd_ini_iter"].getString();
 	command += " --sgd_inbetween_iter " + joboptions["sgd_inbetween_iter"].getString();
