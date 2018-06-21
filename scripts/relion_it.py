@@ -188,6 +188,8 @@ class RelionItOptions(object):
     # orientation of the gain-reference w.r.t your movies (if input movies are not yet gain-corrected, e.g. TIFFs)
     motioncor_gainflip = 'No flipping (0)'
     motioncor_gainrot = 'No rotation (0)'
+    # Other arguments for MotionCor2
+    motioncor_other_args = ''
     # Submit motion correction job to the cluster?
     motioncor_submit_to_queue = False
     
@@ -671,6 +673,7 @@ def run_pipeline(opts):
                                   'Bfactor: ==  {}'.format(opts.motioncor_bfactor),
                                   'Binning factor: == {}'.format(opts.motioncor_binning),
                                   'Which GPUs to use: == {}'.format(opts.motioncor_gpu),
+                                  'Other MOTIONCOR2 arguments == {}'.format(opts.motioncor_other_args),
                                   'Number of threads: == {}'.format(opts.motioncor_threads),
                                   'Number of MPI procs: == {}'.format(opts.motioncor_mpi)]
 
@@ -724,6 +727,8 @@ def run_pipeline(opts):
         else:
             ctffind_options.append('Estimate phase shifts? == No')
 
+        if opts.ctffind_submit_to_queue:
+            ctffind_options.extend(queue_options)
 
         ctffind_job, already_had_it  = addJob('CtfFind', 'ctffind_job', SETUP_CHECK_FILE, ctffind_options)
 
@@ -931,7 +936,7 @@ def run_pipeline(opts):
                                 RunJobs([discard_job], 1, 1, 'DISCARD')
                                 print " RELION_IT: submitted job to discard based on image statistics for", batch_size ,"particles in", batch_name
 
-                                # Wait here until this Class2D job is finished. Check every thirty seconds
+                                # Wait here until this Discard job is finished. Check every thirty seconds
                                 WaitForJob(discard_job, 30)
 
                             particles_star_file = discard_job + 'particles.star'
@@ -1156,6 +1161,7 @@ def run_pipeline(opts):
                                 opts.autopick_do_LoG = False
                                 opts.class3d_reference = best_class3d_class
                                 opts.have_3d_reference = True
+                                opts.autopick_3dref_symmetry = opts.symmetry
 
                                 # Stop the PREPROCESS pipeliner of the first pass by removing its RUNNING file
                                 filename_to_remove = 'RUNNING_PIPELINER_'+preprocess_schedule_name
