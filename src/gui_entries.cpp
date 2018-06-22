@@ -233,6 +233,10 @@ void GuiEntry::place(JobOption &_joboption, int &y, int _deactivate_option, Fl_G
 // Set the value back from the Fl_Input into the JobOption.value
 void GuiEntry::setValue(std::string _value)
 {
+	// Dirty hack to keep backward compatibility...
+	if (_value == "2D micrograph movies (*.mrcs)")
+		_value = "2D micrograph movies (*.mrcs, *.tiff)";
+
 	joboption.value = _value;
 	inp->value(_value.c_str());
 	// Also update menu or slider if necessary
