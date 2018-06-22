@@ -35,6 +35,7 @@ int StdOutDisplay::handle(int ev)
 		// double-click
 		if (Fl::event_clicks())
 		{
+			if (current_job < 0) return 0;
 			current_browse_directory = pipeline.processList[current_job].name;
 			FileName fn = current_browse_directory + fn_file;
 			std::string command;
