@@ -50,6 +50,8 @@ void Reconstructor::read(int argc, char **argv)
 	is_reverse = parser.checkOption("--reverse_curvature", "Try curvature the other way around");
 	newbox = textToInteger(parser.getOption("--newbox", "Box size of reconstruction after Ewald sphere correction", "-1"));
 	nr_sectors = textToInteger(parser.getOption("--sectors", "Number of sectors for Ewald sphere correction", "2"));
+	skip_mask = parser.checkOption("--skip_mask", "Do not apply real space mask during Ewald sphere correction");
+	skip_weighting = parser.checkOption("--skip_weighting", "Do not apply weighting during Ewald sphere correction");
 
 	int helical_section = parser.addSection("Helical options");
 	nr_helical_asu = textToInteger(parser.getOption("--nr_helical_asu", "Number of helical asymmetrical units", "1"));
@@ -421,10 +423,13 @@ void Reconstructor::backprojectOneParticle(long int p)
 			// Ewald-sphere curvature correction
 			if (do_ewald)
 			{
-				applyCTFPandCTFQ(F2D, ctf, transformer, F2DP, F2DQ);
+				applyCTFPandCTFQ(F2D, ctf, transformer, F2DP, F2DQ, skip_mask);
 
-				// Also calculate W, store again in Fctf
-				ctf.applyWeightEwaldSphereCurvature(Fctf, mysize, mysize, angpix, mask_diameter);
+				if (!skip_weighting)
+				{
+					// Also calculate W, store again in Fctf
+					ctf.applyWeightEwaldSphereCurvature(Fctf, mysize, mysize, angpix, mask_diameter);
+				}
 
 				// Also calculate the radius of the Ewald sphere (in pixels)
 				r_ewald_sphere = mysize * angpix / ctf.lambda;
@@ -651,7 +656,7 @@ void Reconstructor::reconstruct()
 }
 
 void Reconstructor::applyCTFPandCTFQ(MultidimArray<Complex> &Fin, CTF &ctf, FourierTransformer &transformer,
-		MultidimArray<Complex> &outP, MultidimArray<Complex> &outQ)
+		MultidimArray<Complex> &outP, MultidimArray<Complex> &outQ, bool skip_mask)
 {
 	//FourierTransformer transformer;
 	outP.resize(Fin);
@@ -671,24 +676,29 @@ void Reconstructor::applyCTFPandCTFQ(MultidimArray<Complex> &Fin, CTF &ctf, Four
 
 			Fapp = Fin * CTFP; // element-wise complex multiplication!
 
-			// inverse transform and mask out the particle....
-			transformer.inverseFourierTransform(Fapp, Iapp);
-			CenterFFT(Iapp, false);
-
-			softMaskOutsideMap(Iapp, ROUND(mask_diameter/(angpix*2.)), (RFLOAT)width_mask_edge);
-
-			// Re-box to a smaller size if necessary....
-			if (newbox > 0 && newbox < YSIZE(Fin))
+			if (!skip_mask)
 			{
-				Iapp.setXmippOrigin();
-				Iapp.window(FIRST_XMIPP_INDEX(newbox), FIRST_XMIPP_INDEX(newbox),
-							   LAST_XMIPP_INDEX(newbox),  LAST_XMIPP_INDEX(newbox));
+				// inverse transform and mask out the particle....
+				transformer.inverseFourierTransform(Fapp, Iapp);
+				CenterFFT(Iapp, false);
 
+				softMaskOutsideMap(Iapp, ROUND(mask_diameter/(angpix*2.)), (RFLOAT)width_mask_edge);
+
+				// Re-box to a smaller size if necessary....
+				if (newbox > 0 && newbox < YSIZE(Fin))
+				{
+					Iapp.setXmippOrigin();
+					Iapp.window(FIRST_XMIPP_INDEX(newbox), FIRST_XMIPP_INDEX(newbox),
+					            LAST_XMIPP_INDEX(newbox),  LAST_XMIPP_INDEX(newbox));
+
+				}
+				Image<RFLOAT> I; I() = Iapp;
+				I.write("test.mrc");
+				int x; std::cin >> x;
+				// Back into Fourier-space
+				CenterFFT(Iapp, true);
+				transformer.FourierTransform(Iapp, Fapp, false); // false means: leave Fapp in the transformer
 			}
-
-			// Back into Fourier-space
-			CenterFFT(Iapp, true);
-			transformer.FourierTransform(Iapp, Fapp, false); // false means: leave Fapp in the transformer
 
 			// First time round: resize the output arrays
 			if (ipass == 0 && fabs(angle) < XMIPP_EQUAL_ACCURACY)
