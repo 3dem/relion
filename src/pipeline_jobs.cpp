@@ -975,7 +975,7 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 
 	std::string fn_in = joboptions["fn_in"].getString();
 	std::string node_type = joboptions["node_type"].getString();
-	if (node_type == "2D micrograph movies (*.mrcs)")
+	if (node_type == "2D micrograph movies (*.mrcs)" || node_type == "2D micrograph movies (*.mrcs, *.tiff)")
 	{
 		outputstar = outputname+"movies.star";
 		command = "relion_star_loopheader rlnMicrographMovieName > " + outputstar;;
