@@ -5037,7 +5037,7 @@ This gives higher resolution estimates, as it disregards ill-defined regions nea
 	// Defocus fit
 	joboptions["do_ctf"] = JobOption("Perform CTF parameter fitting?", true, "If set to Yes, then relion_ctf_refine will be used to estimate the selected parameters below.");
 	joboptions["do_defocus"] = JobOption("Fit per-particle defocus?", true, "If set to Yes, then relion_ctf_refine will estimate a per-particle defocus.");
-	joboptions["range"] = JobOption("Range for defocus fit (A): ", 2000, 500, 5000, 100, "The range in (Angstrom) for the defocus fit of each particle.");
+	joboptions["range"] = JobOption("Range for defocus fit (A): ", 2000, 500, 5000, 100, "The initial defocus value given in the input STAR file +/- this value (in Angstrom) will be the search range for each particle.");
 	joboptions["do_glob_astig"] = JobOption("Fit per-micrograph astigmatism?", false, "If set to Yes, ctf_refine will try to refine astigamtism on a per-micrograph basis. This will require many particles and good signal-to-noise ratios per micrograph.");
 	joboptions["do_astig"] = JobOption("Fit per-particle astigmatism?", false, "If set to Yes, astigmatism will be estimated on a per-particle basis. This requires very strong data, i.e. very large particles with excellent signal-to-noise ratios.");
 	joboptions["do_phase"] = JobOption("Fit per-micrograph phase-shift?", false, "If set to Yes, ctf_refine will try to refine a phase-shift (amplitude contrast) on a per-micrograph basis. This may be useful for Volta-phase plate data, but will require many particles and good signal-to-noise ratios per micrograph.");
