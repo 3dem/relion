@@ -51,7 +51,7 @@ class RelionItOptions(object):
     Cs = 1.4
 
 
-    ### Import images (Linux wild card; movies as *.mrcs or *.tif; single-frame micrographs as *.mrc)
+    ### Import images (Linux wild card; movies as *.mrc, *.mrcs, *.tiff or *.tif; single-frame micrographs as *.mrc)
     import_images = 'Movies/*tiff'
     # Are these multi-frame movies? Set to False for single-frame micrographs (and motion-correction will be skipped)
     images_are_movies = True
