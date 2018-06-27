@@ -726,12 +726,12 @@ void Postprocessing::writeOutput()
 	CPlot2D *plot2D = new CPlot2D(title);
 	plot2D->SetXAxisSize(600);
 	plot2D->SetYAxisSize(400);
-	plot2D->SetXAxisTitle("resolution (1/A)");
-	plot2D->SetYAxisTitle("Fourier Shell Correlation");
 	MDfsc.addToCPlot2D(plot2D, EMDL_RESOLUTION, EMDL_POSTPROCESS_FSC_TRUE, 0., 0., 0., 2.);
 	MDfsc.addToCPlot2D(plot2D, EMDL_RESOLUTION, EMDL_POSTPROCESS_FSC_UNMASKED, 0., 1., 0.);
 	MDfsc.addToCPlot2D(plot2D, EMDL_RESOLUTION, EMDL_POSTPROCESS_FSC_MASKED, 0., 0., 1.);
 	MDfsc.addToCPlot2D(plot2D, EMDL_RESOLUTION, EMDL_POSTPROCESS_FSC_RANDOM_MASKED, 1., 0., 0.);
+	plot2D->SetXAxisTitle("resolution (1/A)");
+	plot2D->SetYAxisTitle("Fourier Shell Correlation");
 	plot2D->OutputPostScriptPlot(fn_out + "_fsc.eps");
 	delete plot2D;
 
@@ -776,8 +776,6 @@ void Postprocessing::writeOutput()
 	CPlot2D *plot2Db = new CPlot2D("Guinier plots");
 	plot2Db->SetXAxisSize(600);
 	plot2Db->SetYAxisSize(400);
-	plot2Db->SetXAxisTitle("resolution^2 (1/A^2)");
-	plot2Db->SetYAxisTitle("ln(amplitudes)");
 	MDguinier.addToCPlot2D(plot2Db, EMDL_POSTPROCESS_GUINIER_RESOL_SQUARED, EMDL_POSTPROCESS_GUINIER_VALUE_IN, 0., 0., 0.);
 	if (fn_mtf != "")
 		MDguinier.addToCPlot2D(plot2Db, EMDL_POSTPROCESS_GUINIER_RESOL_SQUARED, EMDL_POSTPROCESS_GUINIER_VALUE_INVMTF, 0., 1., 0.);
@@ -789,6 +787,8 @@ void Postprocessing::writeOutput()
 	{
 		MDextra2.addToCPlot2D(plot2Db, EMDL_POSTPROCESS_GUINIER_RESOL_SQUARED, EMDL_POSTPROCESS_GUINIER_VALUE_SHARPENED, 1., 0., 0.);
 	}
+	plot2Db->SetXAxisTitle("resolution^2 (1/A^2)");
+	plot2Db->SetYAxisTitle("ln(amplitudes)");
 	plot2Db->OutputPostScriptPlot(fn_out + "_guinier.eps");
 	delete plot2Db;
 
