@@ -38,7 +38,7 @@ std::vector<double> NelderMead::optimize(
 
     if (verbose)
     {
-        std::cout << "f0 = " << values[0] << "\n";
+        std::cout << "f0 = " << values[0] << std::endl;
     }
 
     for (long i = 0; i < maxIters; i++)
@@ -50,7 +50,7 @@ std::vector<double> NelderMead::optimize(
 
         if (verbose)
         {
-            std::cout << i << ": " << values[order[0]] << "\n";
+            std::cout << i << ": " << values[order[0]] << std::endl;
         }
 
         for (int j = 0; j < m; j++)
