@@ -209,6 +209,20 @@ long long textToLongLong(const char* str,
                          int _errno = 2102,
                          std::string errmsg = "Error in AtoL");
 
+/** String (STL) to long long conversion.
+ *
+ * @code
+ * int param_no = textToLongLong(str, 1602, "Error reading number parameters")
+ * @endcode
+ */
+inline int textToLongLong(const std::string& str,
+                         int _errno = 2102,
+                         std::string errmsg = "Error in textToInteger")
+{
+    return textToLongLong(str.c_str(), _errno, errmsg);
+}
+
+
 /** Float to string conversion.
  *
  * If precision==0 the precision is automatically computed in such a way that

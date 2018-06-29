@@ -24,6 +24,8 @@
 #include <sstream>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <dirent.h>
 #include "src/metadata_table.h"
 #include "src/pipeline_jobs.h"

@@ -80,7 +80,7 @@ class star_handler_parameters
 		do_split = parser.checkOption("--split", "Split the input STAR file into one or more smaller output STAR files");
 		do_random_order = parser.checkOption("--random_order", "Perform splits on randomised order of the input STAR file");
 		nr_split = textToInteger(parser.getOption("--nr_split", "Split into this many equal-sized STAR files", "-1"));
-		size_split = textToInteger(parser.getOption("--size_split", "AND/OR split into subsets of this many lines", "-1"));
+		size_split = textToLongLong(parser.getOption("--size_split", "AND/OR split into subsets of this many lines", "-1"));
 
 		int operate_section = parser.addSection("Operate options");
 		fn_operate = parser.getOption("--operate", "Operate on this metadata label", "");
