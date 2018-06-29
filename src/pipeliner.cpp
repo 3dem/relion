@@ -1685,11 +1685,19 @@ bool PipeLine::importPipeline(std::string _name)
 void PipeLine::read(bool do_lock, std::string lock_message)
 {
 
-	FileName fn_lock = ".lock_" + name + "_pipeline.star";
+#ifdef DEBUG_LOCK
+	std::cerr << "entering read lock_message=" << lock_message << std::endl;
+#endif
+	FileName dir_lock=".relion_lock", fn_lock=".relion_lock/lock_" + name + "_pipeline.star";;
 	if (do_lock && !do_read_only)
 	{
 		int iwait =0;
-		while( exists(fn_lock) )
+		int status = mkdir(dir_lock.c_str(), S_IRWXU);
+
+#ifdef DEBUG_LOCK
+		std::cerr <<  " A status= " << status << std::endl;
+#endif
+		while (!status == 0)
 		{
 			// If the lock exists: wait 3 seconds and try again
 			// First time round, print a warning message
@@ -1698,12 +1706,16 @@ void PipeLine::read(bool do_lock, std::string lock_message)
 				std::cout << " WARNING: trying to read pipeline.star, but " << fn_lock << " exists (which protects against simultaneous writing by multiple instances of the GUI)" << std::endl;
 			}
 			sleep(3);
+			status =  mkdir(dir_lock.c_str(), S_IRWXU);
+			std::cerr <<  " B status= " << status << std::endl;
+
 			iwait++;
 			if (iwait > 40)
 			{
 
 				REPORT_ERROR("ERROR: PipeLine::read has waited for 2 minutes for lock file to disappear. You may want to manually remove the file: " + fn_lock);
 			}
+
 		}
 		// Generate the lock file
 		std::ofstream  fh;
@@ -1713,7 +1725,6 @@ void PipeLine::read(bool do_lock, std::string lock_message)
 	    fh << lock_message << std::endl;
 	    fh.close();
 
-	    touch(fn_lock);
 	}
 
 
@@ -1856,9 +1867,17 @@ void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode
 	if (do_read_only)
 		return;
 
-	FileName fn_lock = ".lock_" + name + "_pipeline.star";
+	FileName dir_lock=".relion_lock", fn_lock=".relion_lock/lock_" + name + "_pipeline.star";;
 	if (do_lock)
 	{
+
+#ifdef DEBUG_LOCK
+		if (exists(fn_lock))
+		{
+			std::cerr << "writing pipeline: " << fn_lock << " exists as expected" << std::endl;
+		}
+#endif
+
 		int iwait =0;
 		while( !exists(fn_lock) )
 		{
@@ -1870,9 +1889,9 @@ void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode
 			}
 			sleep(3);
 			iwait++;
-			if (iwait > 20)
+			if (iwait > 40)
 			{
-				REPORT_ERROR("ERROR: PipeLine::read has waited for 1 minute for lock file to appear, but it doesn't. This should not happen. Is something wrong with the disk access?");
+				REPORT_ERROR("ERROR: PipeLine::read has waited for 2 minutes for lock file to appear, but it doesn't. This should not happen. Is something wrong with the disk access?");
 			}
 		}
 	}
@@ -2034,9 +2053,17 @@ void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode
 
 	if (do_lock)
 	{
+
+#ifdef DEBUG_LOCK
+		std::cerr << " write pipeline: now deleting " << fn_lock << std::endl;
+#endif
+
 		if (!exists(fn_lock))
 			REPORT_ERROR("ERROR: PipeLine::write was expecting a file called "+fn_lock+ " but it is no longer there.");
-		std::remove(fn_lock.c_str());
+		if (std::remove(fn_lock.c_str()))
+			REPORT_ERROR("ERROR: PipeLine::write reported error in removing file "+fn_lock);
+		if (rmdir(dir_lock.c_str()))
+			REPORT_ERROR("ERROR: PipeLine::write reported error in removing directory "+dir_lock);
 	}
 
 	// Touch a file to indicate to the GUI that the pipeline has just changed
