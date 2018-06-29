@@ -209,10 +209,6 @@ public:
 	// Allow saving of selection files?
 	bool do_allow_save;
 
-	// remove duplicate-coord particles in fn_data STAR file?
-	bool do_remove_duplicates;
-	RFLOAT duplicate_threshold;	 // Angstrom radius
-
 	// Filenames with the selected class averages and the particles from the selected classes
 	FileName fn_selected_imgs, fn_selected_parts;
 
