@@ -573,6 +573,19 @@ def findBestClass(model_star_file, use_resol=True):
     print " RELION_IT: found best class:",best_class,"with class size of",best_size,"and resolution of",best_resol
     return best_class, best_resol, model_star['model_general']['rlnPixelSize']
 
+def findOutputModelStar(job_dir):
+    found = None
+    try:
+        job_star = load_star(job_dir + "job_pipeline.star")
+        for output_file in job_star["pipeline_output_edges"]['rlnPipeLineEdgeToNode']:
+            if output_file.endswith("_model.star"):
+                found = output_file
+                break
+    except:
+        pass
+
+    return found
+
 def run_pipeline(opts):
     """
     Configure and run the RELION 3 pipeline with the given options.
@@ -1066,9 +1079,15 @@ def run_pipeline(opts):
                                 # Wait here until this inimodel job is finished. Check every thirty seconds
                                 WaitForJob(inimodel_job, 30)
 
+                            sgd_model_star = findOutputModelStar(inimodel_job)
+                            if sgd_model_star is None:
+                                print " RELION_IT: Initial model generation " + inimodel_job + " does not contain expected output maps."
+                                print " RELION_IT: This job should have finished, but you may continue it from the GUI. "
+                                raise " ERROR!! quitting the pipeline." # TODO: MAKE MORE ROBUST
+
                             # Use the model of the largest class for the 3D classification below
                             total_iter = opts.inimodel_nr_iter_initial + opts.inimodel_nr_iter_inbetween + opts.inimodel_nr_iter_final
-                            best_inimodel_class, best_inimodel_resol, best_inimodel_angpix = findBestClass(inimodel_job + 'run_it{:03d}_model.star'.format(total_iter), use_resol=True)
+                            best_inimodel_class, best_inimodel_resol, best_inimodel_angpix = findBestClass(sgd_model_star, use_resol=True)
                             opts.class3d_reference = best_inimodel_class
                             opts.class3d_ref_is_correct_greyscale = True
                             opts.class3d_ref_is_ctf_corrected = True
@@ -1151,7 +1170,13 @@ def run_pipeline(opts):
                                 # Wait here until this Class2D job is finished. Check every thirty seconds
                                 WaitForJob(class3d_job, 30)
 
-                            best_class3d_class, best_class3d_resol, best_class3d_angpix = findBestClass(class3d_job + 'run_it{:03d}_model.star'.format(opts.class3d_nr_iter), use_resol=True)
+                            class3d_model_star = findOutputModelStar(class3d_job)
+                            if class3d_model_star is None:
+                                print " RELION_IT: 3D Classification " + class3d_job + " does not contain expected output maps."
+                                print " RELION_IT: This job should have finished, but you may continue it from the GUI."
+                                raise Exception("ERROR!! quitting the pipeline.") # TODO: MAKE MORE ROBUST
+
+                            best_class3d_class, best_class3d_resol, best_class3d_angpix = findBestClass(class3d_model_star, use_resol=True)
 
                             # Once the first batch in the first pass is completed: move on to the second pass
                             if (ipass == 0 and opts.do_second_pass and iibatch == 1 and best_class3d_resol < opts.minimum_resolution_3dref_2ndpass):
