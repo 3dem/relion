@@ -926,7 +926,9 @@ void AutoPicker::generatePDFLogfile()
 	{
 		progress_bar(fn_ori_micrographs.size());
 		std::cout << " Total number of particles from " << fn_ori_micrographs.size() << " micrographs is " << total_nr_picked << std::endl;
-		std::cout << " i.e. on average there were " << ROUND(total_nr_picked/fn_ori_micrographs.size()) << " particles per micrograph" << std::endl;
+		long avg = 0;
+		if (fn_ori_micrographs.size() > 0) avg = ROUND(total_nr_picked/fn_ori_micrographs.size());
+		std::cout << " i.e. on average there were " << avg << " particles per micrograph" << std::endl;
 	}
 
 	// Values for all micrographs

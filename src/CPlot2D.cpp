@@ -316,6 +316,7 @@ void CPlot2D::DrawDataPostScript()
 
     // for all data sets
     for (int i=0;i<m_dataSets.size();++i) {
+        if (m_dataSets[i].GetNumberOfDataPointsInSet() == 0) continue;
 
         CDataPoint point;
 
