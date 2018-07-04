@@ -1124,23 +1124,17 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 
 
 	// Combine all EPS into a single logfile.pdf
-	if (fn_ori_micrographs.size() > 0)
+	FileName fn_prev="";
+	for (long int i = 0; i < fn_ori_micrographs.size(); i++)
 	{
-
-		FileName fn_prev="";
-		for (long int i = 0; i < fn_ori_micrographs.size(); i++)
+		if (fn_prev != fn_ori_micrographs[i].beforeLastOf("/"))
 		{
-			if (fn_prev != fn_ori_micrographs[i].beforeLastOf("/"))
-			{
-				fn_prev = fn_ori_micrographs[i].beforeLastOf("/");
-				all_fn_eps.push_back(fn_out + fn_prev+"/*.eps");
-			}
+			fn_prev = fn_ori_micrographs[i].beforeLastOf("/");
+			all_fn_eps.push_back(fn_out + fn_prev+"/*.eps");
 		}
-
-		joinMultipleEPSIntoSinglePDF(fn_out + "logfile.pdf", all_fn_eps);
-
 	}
 
+	joinMultipleEPSIntoSinglePDF(fn_out + "logfile.pdf", all_fn_eps);
 
 	if (verb > 0 )
 	{
