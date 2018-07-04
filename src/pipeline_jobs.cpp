@@ -2081,8 +2081,9 @@ void RelionJob::initialiseSelectJob()
 	joboptions["split_size"] = JobOption("Subset size: ", 100, 100, 10000, 100, "The number of lines in each of the output subsets. This line will be ignored when the number of subsets is specified on the next line.");
 	joboptions["nr_split"] = JobOption("OR: number of subsets: ", -1, 1, 50, 1, "Give a positive integer to specify into how many equal-sized subsets the data will be divided");
 
-	//joboptions["do_remove_duplicates"] = JobOption("Remove duplicates", false, "If set to Yes, then the program will remove all but one of particles which have drifted into the same position during alignment");
-	//joboptions["duplicate_threshold"] = JobOption("Threshold [A]: ", 1, 1, 100, 1, "Remove particle coordinates within this distance [A], which might have drifted into the same position during alignment");
+	joboptions["do_remove_duplicates"] = JobOption("OR: remove duplicates?", false, "If set to Yes, duplicated particles that are within a given distance are removed leaving only one. Duplicated particles are sometimes generated when particles drift into the same position during alignment. They inflate and invalidate gold-standard FSC calculation.");
+	joboptions["duplicate_threshold"] = JobOption("Minimum inter-particle distance (A)", 30, 0, 1000, 1, "Particles within this distance are removed leaving only one.");
+	joboptions["image_angpix"] = JobOption("Pixel size before extraction (A)", -1, -1, 10, 0.01, "The pixel size of particles (relevant to rlnOriginX/Y) is read from the STAR file. When the pixel size of the original micrograph used for extraction (relevant to rlnCoordinateX/Y) is different, specify it here");
 
 }
 
@@ -2102,14 +2103,55 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 		return false;
 	}
 
-	// Value-based selection
-	if (joboptions["do_select_values"].getBoolean() || joboptions["do_discard"].getBoolean() || joboptions["do_split"].getBoolean())
+	int c = 0;
+	if (joboptions["do_select_values"].getBoolean()) c++;
+	if (joboptions["do_discard"].getBoolean()) c++;
+	if (joboptions["do_split"].getBoolean()) c++;
+	if (joboptions["do_remove_duplicates"].getBoolean()) c++;
+	if (c > 1)
 	{
+		error_message = "You cannot do many tasks simultaneously...";
+		return false;
+	}
+
+	if (joboptions["do_remove_duplicates"].getBoolean())
+	{
+		// Remove duplicates
+		command="`which relion_star_handler`";
+
+		if (joboptions["fn_mic"].getString() != "" || joboptions["fn_model"].getString() != "" || joboptions["fn_coords"].getString() != "")
+		{
+			error_message = "ERROR: Duplicate removal is only possible for particle STAR files...";
+			return false;
+		}
+
+		if (joboptions["fn_data"].getString() == "")
+		{
+			error_message = "ERROR: Duplicate removal needs a particle STAR file...";
+			return false;
+		}
+
+		Node node(joboptions["fn_data"].getString(), joboptions["fn_data"].node_type);
+		inputNodes.push_back(node);
+		command += " --i " + joboptions["fn_data"].getString();
+
+		FileName fn_out = outputname+"particles.star";
+		Node node2(fn_out, NODE_PART_DATA);
+		outputNodes.push_back(node2);
+		command += " --o " + fn_out;
+
+		command += " --remove_duplicates " + joboptions["duplicate_threshold"].getString();
+		if (joboptions["image_angpix"].getNumber() > 0)
+			command += " --image_angpix " + joboptions["image_angpix"].getString();
+	}
+	else if (joboptions["do_select_values"].getBoolean() || joboptions["do_discard"].getBoolean() || joboptions["do_split"].getBoolean())
+	{
+		// Value-based selection
 		command="`which relion_star_handler`";
 
 		if (joboptions["fn_model"].getString() != "" || joboptions["fn_coords"].getString() != "")
 		{
-			error_message = "ERROR: Value-selection or subset splitting is only possible for micrograph or particle STAR files... ";
+			error_message = "ERROR: Value-selection or subset splitting is only possible for micrograph or particle STAR files...";
 			return false;
 		}
 
