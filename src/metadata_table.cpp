@@ -1260,6 +1260,7 @@ void MetaDataTable::addToCPlot2D(CPlot2D *plot2D, EMDLabel xaxis, EMDLabel yaxis
 	}
 
 	plot2D->AddDataSet(dataSet);
+
 	if (xaxis != EMDL_UNDEFINED)
 		plot2D->SetXAxisTitle(EMDL::label2Str(xaxis));
 	plot2D->SetYAxisTitle(EMDL::label2Str(yaxis));
@@ -1599,7 +1600,7 @@ MetaDataTable subsetMetaDataTable(MetaDataTable &MDin, EMDLabel label, std::stri
 	return MDout;
 }
 
-MetaDataTable removeDuplicatedParticles(MetaDataTable &MDin, EMDLabel mic_label, RFLOAT threshold, bool verb)
+MetaDataTable removeDuplicatedParticles(MetaDataTable &MDin, EMDLabel mic_label, RFLOAT threshold, RFLOAT origin_scale, FileName fn_removed, bool verb)
 {
 	// Sanity check
 	if (!MDin.containsLabel(EMDL_ORIENT_ORIGIN_X) || !MDin.containsLabel(EMDL_ORIENT_ORIGIN_Y) ||
@@ -1622,14 +1623,13 @@ MetaDataTable removeDuplicatedParticles(MetaDataTable &MDin, EMDLabel mic_label,
 		std::string mic_name;
 		MDin.getValue(mic_label, mic_name);
 
-		// NOTE: This is not accurate when particles are down-sampled after AutoPick...
 		RFLOAT val1, val2;
 		MDin.getValue(EMDL_ORIENT_ORIGIN_X, val1);
 		MDin.getValue(EMDL_IMAGE_COORD_X, val2);
-		xs[current_object] = val1 + val2;
+		xs[current_object] = val1 * origin_scale + val2;
 		MDin.getValue(EMDL_ORIENT_ORIGIN_Y, val1);
 		MDin.getValue(EMDL_IMAGE_COORD_Y, val2);	
-		ys[current_object] = val1 + val2;
+		ys[current_object] = val1 * origin_scale + val2;
 
 		grouped[mic_name].push_back(current_object);
 	}
@@ -1659,7 +1659,7 @@ MetaDataTable removeDuplicatedParticles(MetaDataTable &MDin, EMDLabel mic_label,
 	}
 
 	
-	MetaDataTable MDout;
+	MetaDataTable MDout, MDremoved;
 	long n_removed = 0;
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
 	{
@@ -1667,11 +1667,15 @@ MetaDataTable removeDuplicatedParticles(MetaDataTable &MDin, EMDLabel mic_label,
 		{
 			MDout.addObject(MDin.getObject(current_object));
 		}
-		else
+		else	
 		{
+			MDremoved.addObject(MDin.getObject(current_object));
 			n_removed++;
 		}
 	}
+
+	if (fn_removed != "")
+		MDremoved.write(fn_removed);
 
 	std::cout << "Removed " << n_removed << " duplicated objects from " << MDin.numberOfObjects() << " objects." << std::endl;
 

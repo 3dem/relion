@@ -33,7 +33,7 @@ class star_handler_parameters
 	RFLOAT eps, select_minval, select_maxval, multiply_by, add_to, center_X, center_Y, center_Z, hist_min, hist_max;
 	bool do_combine, do_split, do_center, do_random_order, show_frac, show_cumulative, do_discard;
 	long int nr_split, size_split, nr_bin;
-	RFLOAT discard_sigma, duplicate_threshold;
+	RFLOAT discard_sigma, duplicate_threshold, extract_angpix;
 	// I/O Parser
 	IOParser parser;
 
@@ -109,7 +109,8 @@ class star_handler_parameters
 		hist_max = textToFloat(parser.getOption("--hist_max", "Maximum value for the histogram (needs --hist_bins)", "inf"));
 
 		int duplicate_section = parser.addSection("Duplicate removal");
-		duplicate_threshold = textToFloat(parser.getOption("--remove_duplicates","Remove duplicated particles within this distance [px]. Negative values disable this.", "-1"));
+		duplicate_threshold = textToFloat(parser.getOption("--remove_duplicates","Remove duplicated particles within this distance [Angstrom]. Negative values disable this.", "-1"));
+		extract_angpix = textToFloat(parser.getOption("--image_angpix", "For down-sampled particles, specify the pixel size [A/pix] of the original images used in the Extract job", "-1"));
 
 		// Check for errors in the command-line option
 		if (parser.checkForErrors())
@@ -682,7 +683,36 @@ class star_handler_parameters
 		if (MD.containsLabel(EMDL_MICROGRAPH_NAME)) mic_label = EMDL_MICROGRAPH_NAME;
 		else REPORT_ERROR("The input STAR file does not contain rlnMicrographName column.");
 
-		MetaDataTable MDout = removeDuplicatedParticles(MD, mic_label, duplicate_threshold, true);
+		RFLOAT particle_angpix = 1.0;
+		if (MD.containsLabel(EMDL_CTF_MAGNIFICATION) && MD.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
+		{
+			RFLOAT mag, dstep;
+			MD.getValue(EMDL_CTF_MAGNIFICATION, mag);
+			MD.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
+			particle_angpix = 10000. * dstep / mag;
+			std::cout << " + Using pixel size calculated from magnification and detector pixel size in the input STAR file: " << particle_angpix << std::endl;
+		}
+		else {
+			std::cerr << "WARNING: The given STAR file does not contain the pixel size. Assuming 1 A/pix." << std::endl;
+		}
+
+		if (extract_angpix > 0)
+		{
+			std::cout << " + Using the provided pixel size for original micrographs before extraction: " << extract_angpix << std::endl;
+		}
+		else
+		{
+			extract_angpix = particle_angpix;
+			std::cout << " + Assuming the pixel size of original micrographs before extraction is also " << extract_angpix << std::endl;
+		}
+
+		RFLOAT scale = extract_angpix / particle_angpix;
+		RFLOAT duplicate_threshold_in_px = duplicate_threshold / extract_angpix;
+
+		std::cout << " + The minimum inter-particle distance " << duplicate_threshold << " A corresponds to " << duplicate_threshold_in_px << " px in the micrograph coordinate (rlnCoordinateX/Y)." << std::endl;
+		std::cout << " + The particle shifts (rlnOriginX/Y) are multiplied by " << scale << " to bring it to the same scale as rlnCoordinateX/Y." << std::endl;
+		FileName fn_removed = fn_out.withoutExtension() + "_removed.star";
+		MetaDataTable MDout = removeDuplicatedParticles(MD, mic_label, duplicate_threshold_in_px, scale, fn_removed, true);
 	
 		MDout.write(fn_out);
 		std::cout << " Written: " << fn_out << std::endl;

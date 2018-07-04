@@ -322,7 +322,8 @@ MetaDataTable subsetMetaDataTable(MetaDataTable &MDin, EMDLabel label, RFLOAT mi
 MetaDataTable subsetMetaDataTable(MetaDataTable &MDin, EMDLabel label, std::string search_str, bool exclude=false);
 
 // remove duplicated particles that are in the same micrograph (mic_label) and within a given threshold [px]
-MetaDataTable removeDuplicatedParticles(MetaDataTable &MDin, EMDLabel mic_label, RFLOAT threshold, bool verb=true);
+// OriginX/Y are multiplied by origin_scale before added to CoordinateX/Y to compensate for down-sampling
+MetaDataTable removeDuplicatedParticles(MetaDataTable &MDin, EMDLabel mic_label, RFLOAT threshold, RFLOAT origin_scale=1.0, FileName fn_removed="", bool verb=true);
 
 template<class T>
 bool MetaDataTable::getValue(EMDLabel label, T& value, long objectID) const
