@@ -426,6 +426,8 @@ void AutoPicker::initialise()
 			transformer.setReal(Mref);
 			transformer.getFourierAlias(Fref);
 
+			Image<RFLOAT> Iprojs;
+			FileName fn_img, fn_proj = fn_odir + "reference_projections.mrcs";
 			for (long int idir = 0; idir < sampling.NrDirections(); idir++)
 			{
 				RFLOAT rot = sampling.rot_angles[idir];
@@ -439,14 +441,15 @@ void AutoPicker::initialise()
 	        	// Shift the image back to the center...
 	        	CenterFFT(Mref, false);
 	        	Mrefs.push_back(Mref);
-//#define DEBUG_PROJECT3DREF
-#ifdef DEBUG_PROJECT3DREF
-	        	Image<RFLOAT> Itmp;
-	        	Itmp()=Mref;
-	        	FileName fnt;
-	        	fnt.compose("3dref_proj",idir,"mrc");
-	        	Itmp.write(fnt);
-#endif
+
+	        	// Also write out a stack with the 2D reference projections
+	        	Iprojs()=Mref;
+	        	fn_img.compose(idir+1,fn_proj);
+				if (idir == 0)
+					Iprojs.write(fn_img, -1, false, WRITE_OVERWRITE);
+				else
+					Iprojs.write(fn_img, -1, false, WRITE_APPEND);
+
 			}
 		}
 		else
