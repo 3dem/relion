@@ -1079,7 +1079,7 @@ void JobWindow::initialiseSortWindow()
 }
 void JobWindow::initialiseSelectWindow()
 {
-	setupTabs(3);
+	setupTabs(4);
 
 	tab1->begin();
 	tab1->label("I/O");
@@ -1104,21 +1104,6 @@ void JobWindow::initialiseSelectWindow()
 	place("nr_groups", TOGGLE_DEACTIVATE);
 	group1->end();
 	guientries["do_regroup"].cb_menu_i();
-
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	/*
-	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group2->end();
-	place("do_remove_duplicates", TOGGLE_DEACTIVATE, group2);
-	group2->begin();
-	place("duplicate_threshold", TOGGLE_DEACTIVATE);
-	group2->end();
-	guientries["do_remove_duplicates"].cb_menu_i();
-	*/
-
 	tab2->end();
 
 	tab3->begin();
@@ -1164,6 +1149,20 @@ void JobWindow::initialiseSelectWindow()
 	guientries["do_split"].cb_menu_i();
 
 	tab3->end();
+
+	tab4->begin();
+	tab4->label("Duplicates");
+	resetHeight();
+
+	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group2->end();
+	place("do_remove_duplicates", TOGGLE_DEACTIVATE, group2);
+	group2->begin();
+	place("duplicate_threshold", TOGGLE_DEACTIVATE);
+	place("image_angpix", TOGGLE_DEACTIVATE);
+	group2->end();
+	guientries["do_remove_duplicates"].cb_menu_i();
+	tab4->end();
 
 	// Always deactivate the queue option
 	guientries["do_queue"].deactivate_option = TOGGLE_ALWAYS_DEACTIVATE;

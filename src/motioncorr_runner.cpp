@@ -75,6 +75,7 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	n_threads = textToInteger(parser.getOption("--j", "Number of threads per movie (= process)", "1"));
 	fn_movie = parser.getOption("--movie", "Rootname to identify movies", "movie");
 	continue_old = parser.checkOption("--only_do_unfinished", "Only run motion correction for those micrographs for which there is not yet an output micrograph.");
+	do_at_most = textToInteger(parser.getOption("--do_at_most", "Only process at most this number of (unprocessed) micrographs.", "-1"));
 	do_save_movies  = parser.checkOption("--save_movies", "Also save the motion-corrected movies.");
 	angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms", "-1"));
 	first_frame_sum =  textToInteger(parser.getOption("--first_frame_sum", "First movie frame used in output sum (start at 1)", "1"));
@@ -234,19 +235,52 @@ void MotioncorrRunner::initialise()
 		fn_in.globFiles(fn_micrographs);
 	}
 
-	// If we're continuing an old run, see which micrographs have not been finished yet...
-	fn_ori_micrographs = fn_micrographs;
-	if (continue_old)
+	// First backup the given list of all micrographs
+	std::vector<FileName> fn_mic_given_all = fn_micrographs;
+	// This list contains those for the output STAR & PDF files
+	fn_ori_micrographs.clear();
+	// These are micrographs to be processed
+	fn_micrographs.clear();
+
+	bool warned = false;
+
+	for (long int imic = 0; imic < fn_mic_given_all.size(); imic++)
 	{
-		fn_micrographs.clear();
-		for (long int imic = 0; imic < fn_ori_micrographs.size(); imic++)
+		bool ignore_this = false;
+		bool process_this = true;
+		std::cout << fn_mic_given_all[imic] << std::endl;
+
+		if (continue_old)
 		{
 			FileName fn_avg, fn_mov;
-			getOutputFileNames(fn_ori_micrographs[imic], fn_avg, fn_mov);
-			if (!exists(fn_avg) || !exists(fn_avg.withoutExtension() + ".star") ||
-                            (do_save_movies && !exists(fn_mov)))
-				fn_micrographs.push_back(fn_ori_micrographs[imic]);
+			getOutputFileNames(fn_mic_given_all[imic], fn_avg, fn_mov);
+			if (exists(fn_avg) && exists(fn_avg.withoutExtension() + ".star") &&
+			    (!do_save_movies || exists(fn_mov)))
+			{
+				process_this = false; // already done
+			}
 		}
+
+		if (do_at_most >= 0 && fn_micrographs.size() >= do_at_most)
+		{
+			if (process_this) {
+				ignore_this = true;
+				process_this = false;
+				if (!warned)
+				{
+					warned = true;
+					std::cout << "NOTE: processing of some micrographs will be skipped as requested by --do_at_most" << std::endl;
+				}
+			}
+			// If this micrograph has already been processed, the result should be included in the output.
+			// So ignore_this remains false.
+		}
+
+		if (process_this)
+			fn_micrographs.push_back(fn_mic_given_all[imic]);
+
+		if (!ignore_this)
+			fn_ori_micrographs.push_back(fn_mic_given_all[imic]);
 	}
 
 	// Make sure fn_out ends with a slash
@@ -997,7 +1031,7 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 			if (do_dose_weighting && save_noDW)
 			{
 				FileName fn_avg_wodose = fn_avg.withoutExtension() + "_noDW.mrc";
-                MDavg.setValue(EMDL_MICROGRAPH_NAME_WODOSE, fn_avg_wodose);
+				MDavg.setValue(EMDL_MICROGRAPH_NAME_WODOSE, fn_avg_wodose);
 			}
 			MDavg.setValue(EMDL_MICROGRAPH_NAME, fn_avg);
 			MDavg.setValue(EMDL_MICROGRAPH_METADATA_NAME, fn_avg.withoutExtension() + ".star");
@@ -1090,23 +1124,17 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 
 
 	// Combine all EPS into a single logfile.pdf
-	if (fn_ori_micrographs.size() > 0)
+	FileName fn_prev="";
+	for (long int i = 0; i < fn_ori_micrographs.size(); i++)
 	{
-
-		FileName fn_prev="";
-		for (long int i = 0; i < fn_ori_micrographs.size(); i++)
+		if (fn_prev != fn_ori_micrographs[i].beforeLastOf("/"))
 		{
-			if (fn_prev != fn_ori_micrographs[i].beforeLastOf("/"))
-			{
-				fn_prev = fn_ori_micrographs[i].beforeLastOf("/");
-				all_fn_eps.push_back(fn_out + fn_prev+"/*.eps");
-			}
+			fn_prev = fn_ori_micrographs[i].beforeLastOf("/");
+			all_fn_eps.push_back(fn_out + fn_prev+"/*.eps");
 		}
-
-		joinMultipleEPSIntoSinglePDF(fn_out + "logfile.pdf", all_fn_eps);
-
 	}
 
+	joinMultipleEPSIntoSinglePDF(fn_out + "logfile.pdf", all_fn_eps);
 
 	if (verb > 0 )
 	{
