@@ -386,6 +386,29 @@ void AutoPicker::initialise()
 			Iref.read(fn_img);
 			Iref().setXmippOrigin();
 			Mrefs.push_back(Iref());
+
+			if (Mrefs.size() == 1 && verb > 0)
+			{
+
+				// Check pixel size in the header is consistent with angpix_ref. Otherwise, raise a warning
+				RFLOAT angpix_header = Iref.samplingRateX();
+				if (angpix_ref < 0)
+				{
+					if (fabs(angpix_header - angpix) > 1e-3)
+					{
+						std::cerr << " WARNING!!! Pixel size in reference image header= " << angpix_header << " but you have not provided --angpix_ref" << std::endl;
+					}
+				}
+				else
+				{
+					if (fabs(angpix_header - angpix_ref) > 1e-3)
+					{
+						std::cerr << " WARNING!!! Pixel size in reference image header= " << angpix_header << " but you have provided --angpix_ref " << angpix_ref << std::endl;
+					}
+				}
+
+			}
+
 		}
 	}
 	else
@@ -395,6 +418,26 @@ void AutoPicker::initialise()
 
 		Image<RFLOAT> Istk, Iref;
 		Istk.read(fn_ref);
+
+		// Check pixel size in the header is consistent with angpix_ref. Otherwise, raise a warning
+		RFLOAT angpix_header = Istk.samplingRateX();
+		if (verb > 0)
+		{
+			if (angpix_ref < 0)
+			{
+				if (fabs(angpix_header - angpix) > 1e-3)
+				{
+					std::cerr << " WARNING!!! Pixel size in reference image header= " << angpix_header << " but you have not provided --angpix_ref" << std::endl;
+				}
+			}
+			else
+			{
+				if (fabs(angpix_header - angpix_ref) > 1e-3)
+				{
+					std::cerr << " WARNING!!! Pixel size in reference image header= " << angpix_header << " but you have provided --angpix_ref " << angpix_ref << std::endl;
+				}
+			}
+		}
 
 		if (ZSIZE(Istk()) > 1)
 		{
