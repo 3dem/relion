@@ -519,6 +519,7 @@ void AutoPicker::initialise()
 			}
 		}
 
+		// Now bring Mrefs from angpix_ref to angpix!
 		if (fabs(angpix_ref - angpix) > 1e-3)
 		{
 			int halfoldsize = XSIZE(Mrefs[0]) / 2;
@@ -542,9 +543,9 @@ void AutoPicker::initialise()
 		// Get particle boxsize from the input reference images
 		particle_size = XSIZE(Mrefs[0]);
 
-		if (particle_diameter > particle_size * angpix_ref)
+		if (particle_diameter > particle_size * angpix)
 		{
-			std::cerr << " particle_diameter (A): " << particle_diameter << " box_size (pix): " << particle_size << " pixel size (A): " << angpix_ref << std::endl;
+			std::cerr << " particle_diameter (A): " << particle_diameter << " box_size (pix): " << particle_size << " pixel size (A): " << angpix << std::endl;
 			REPORT_ERROR("ERROR: the particle diameter is larger than the size of the box.");
 		}
 
@@ -555,7 +556,9 @@ void AutoPicker::initialise()
 			std::cout << " + Helical tube diameter should be smaller than the particle (background) diameter" << std::endl;
 		}
 		if ( (autopick_helical_segments) && (helical_tube_diameter > particle_diameter) )
+		{
 			REPORT_ERROR("Error: Helical tube diameter should be smaller than the particle (background) diameter!");
+		}
 
 
 		if (autopick_helical_segments && do_amyloid)
