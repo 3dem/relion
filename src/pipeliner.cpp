@@ -1703,17 +1703,19 @@ void PipeLine::read(bool do_lock, std::string lock_message)
 			// First time round, print a warning message
 			if (iwait == 0)
 			{
-				std::cout << " WARNING: trying to read pipeline.star, but " << fn_lock << " exists (which protects against simultaneous writing by multiple instances of the GUI)" << std::endl;
+				std::cout << " WARNING: trying to read pipeline.star, but directory " << dir_lock << " exists (which protects against simultaneous writing by multiple instances of the GUI)" << std::endl;
 			}
 			sleep(3);
 			status =  mkdir(dir_lock.c_str(), S_IRWXU);
+#ifdef DEBUG_LOCK
 			std::cerr <<  " B status= " << status << std::endl;
+#endif
 
 			iwait++;
 			if (iwait > 40)
 			{
 
-				REPORT_ERROR("ERROR: PipeLine::read has waited for 2 minutes for lock file to disappear. You may want to manually remove the file: " + fn_lock);
+				REPORT_ERROR("ERROR: PipeLine::read has waited for 2 minutes for lock directory to disappear. You may want to manually remove the file: " + fn_lock);
 			}
 
 		}
