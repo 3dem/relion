@@ -939,10 +939,10 @@ def run_pipeline(opts):
                             else:
                                 discard_job_name = 'discard2_job'
               
-                            discard_job, already_had_it = addJob('Select', discard_job_name, SETUP_CHECK_FILE, discard_options)
-
                             if opts.discard_submit_to_queue:
                                 discard_options.extend(queue_options)
+
+                            discard_job, already_had_it = addJob('Select', discard_job_name, SETUP_CHECK_FILE, discard_options)
 
                             if ((not already_had_it) or rerun_batch1):
                                 have_new_batch = True
