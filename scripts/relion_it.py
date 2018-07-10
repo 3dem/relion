@@ -84,8 +84,8 @@ class RelionItOptions(object):
     # OR: provide a 3D references for reference-based picking (when autopick_do_LoG = False)
     autopick_3dreference = ''
 
-    # Threshold for reference-based autopicking (threshold 0 will pick too many particles. Just hope classification will sort it all out...) 
-    autopick_refs_threshold = 0.0
+    # Threshold for reference-based autopicking (threshold 0 will pick too many particles. Default of 0.4 is hopefully better. Ultimately, just hope classification will sort it all out...) 
+    autopick_refs_threshold = 0.4
     # Minimum inter-particle distance for reference-based picking (~70% of particle diameter often works well)
     autopick_refs_min_distance = 120
     #
