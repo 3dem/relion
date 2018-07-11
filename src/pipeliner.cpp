@@ -1347,9 +1347,16 @@ bool PipeLine::cleanupJob(int this_job, bool do_harsh, std::string &error_messag
 
 		// First find the _data.star from each iteration
 		std::vector<FileName> fns_iter;
-		fn_pattern = processList[this_job].name + "*_it[0-9][0-9][0-9]_data.star";
+		fn_pattern = processList[this_job].name + "run_it[0-9][0-9][0-9]_data.star";
 		fn_pattern.globFiles(fns_iter);
-		for (int ifile = 0; ifile < fns_iter.size(); ifile++)
+		fn_pattern = processList[this_job].name + "run_ct[0-9]_it[0-9][0-9][0-9]_data.star";
+		fn_pattern.globFiles(fns_iter, false);
+		fn_pattern = processList[this_job].name + "run_ct[0-9][0-9]_it[0-9][0-9][0-9]_data.star";
+		fn_pattern.globFiles(fns_iter, false);
+		fn_pattern = processList[this_job].name + "run_ct[0-9][0-9][0-9]_it[0-9][0-9][0-9]_data.star";
+		fn_pattern.globFiles(fns_iter, false);
+		// Keep everything for the last iteration, such thatone could for example still do a multibody refinement after gentle cleaning
+		for (int ifile = 0; ifile < (signed int)(fns_iter.size())-1; ifile++)
 		{
 			FileName fn_file = (fns_iter[ifile]).without("_data.star");
 			// Find the iterations to keep: i.e. those that are part of the pipeline
