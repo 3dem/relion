@@ -196,7 +196,7 @@ void HelixAligner::initialise()
 		REPORT_ERROR("ERROR: provide pixel size through --angpix or through the magnification and detectorpixel size in the input STAR file.");
 	}
 
-	if (maxres < 0. || maxres > 2. * angpix)
+	if (maxres < 0. || maxres < 2. * angpix)
 	{
 		maxres = 2. * angpix;
 		std::cout << " Setting maximum resolution to " << maxres << std::endl;

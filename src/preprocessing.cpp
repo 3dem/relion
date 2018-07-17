@@ -382,8 +382,8 @@ void Preprocessing::joinAllStarFiles()
 
 		RFLOAT new_angpix = angpix;
 		if (do_rescale)
-			new_angpix *= extract_size / scale;
-		std::cout << " The new pixel size of the extracted particles are " << new_angpix << " Angstrom/pixel." << std::endl;	
+			new_angpix *= (RFLOAT)extract_size / (RFLOAT)scale;
+		std::cout << " The new pixel size of the extracted particles are " << new_angpix << " Angstrom/pixel." << std::endl;
 	}
 
 	if (do_movie_extract && fn_list_star != "")

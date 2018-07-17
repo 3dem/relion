@@ -18,7 +18,6 @@
  * author citations must be preserved.
  ***************************************************************************/
 #include "src/gui_jobwindow.h"
-
 JobWindow::JobWindow(int _x, int _y, int _w, int _h, const char* title ) : Fl_Box(x,y,w,h,title)
 {
 	tabs = NULL;
@@ -245,12 +244,18 @@ void JobWindow::setupRunTab()
 
 	place("qsub");
 
-	// Two extra fields if needed
-	if (myjob.joboptions.find("qsub_extra1") != myjob.joboptions.end())
-		place("qsub_extra1");
-
-	if (myjob.joboptions.find("qsub_extra2") != myjob.joboptions.end())
-		place("qsub_extra2");
+	char * extra_count_text = getenv ("RELION_QSUB_EXTRA_COUNT");
+	const char extra_count_val = (extra_count_text ? atoi(extra_count_text) : 0);
+	for (int i=1; i<=extra_count_val; i++)
+	{
+		std::stringstream out;
+		out<<i;
+		const std::string i_str=out.str();
+		if (myjob.joboptions.find(std::string("qsub_extra")+i_str) != myjob.joboptions.end())
+		{
+			place(std::string("qsub_extra")+i_str);
+		}
+	}
 
 	place("qsubscript");
 
