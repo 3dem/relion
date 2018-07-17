@@ -64,7 +64,9 @@
 #define DEFAULTWARNINGLOCALMPI 32
 #define DEFAULTALLOWCHANGEMINDEDICATED true
 #define DEFAULTQUEUEUSE false
+#define DEFAULTNRMPI 1
 #define DEFAULTMPIMAX 64
+#define DEFAULTNRTHREADS 1
 #define DEFAULTTHREADMAX 16
 
 static const char* job_sampling_options[] = {

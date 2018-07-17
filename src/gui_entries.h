@@ -74,13 +74,18 @@ extern std::string current_browse_directory;
 //#define XCOL3 460
 //#define XCOL4 475
 //#define XCOL5 535
+//Additional space in tab if more than 4 XXXextraiXXX template variables are used defined by
+//environment variable RELION_QSUB_EXTRA_COUNT
+#define GUIEXTRA \
+	( (getenv ("RELION_QSUB_EXTRA_COUNT"))? \
+	((atoi(getenv ("RELION_QSUB_EXTRA_COUNT"))-4)*STEPY) : 0 )
 #define MENUHEIGHT 30
 #define TABHEIGHT 25
 #define GUIWIDTH 800
-#define GUIHEIGHT_OLD 420
-#define GUIHEIGHT_EXT_START 370
+#define GUIHEIGHT_OLD 420+GUIEXTRA
+#define GUIHEIGHT_EXT_START 370+GUIEXTRA
 #define GUIHEIGHT_EXT_START2 (GUIHEIGHT_EXT_START+MENUHEIGHT+10)
-#define GUIHEIGHT_EXT 800
+#define GUIHEIGHT_EXT 800+GUIEXTRA
 #define XCOL0 200
 #define WCOL0 200
 #define XCOL1 ( (XCOL0) + 10  )

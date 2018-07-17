@@ -471,6 +471,19 @@ bool RelionJob::saveJobSubmissionScript(std::string newfilename, std::string out
 		if (joboptions.find("qsub_extra2") != joboptions.end())
 			replacing["XXXextra2XXX"] = joboptions["qsub_extra2"].getString();
 
+		char * extra_count_text = getenv ("RELION_QSUB_EXTRA_COUNT");
+		const char extra_count_val = (extra_count_text ? atoi(extra_count_text) : 2);
+		for (int i=1; i<=extra_count_val; i++)
+		{
+			std::stringstream out;
+			out<<i;
+			const std::string i_str=out.str();
+			if (joboptions.find(std::string("qsub_extra")+i_str) != joboptions.end())
+			{
+				replacing[std::string("XXXextra")+i_str+"XXX"] = joboptions[std::string("qsub_extra")+i_str].getString();
+			}
+		}
+
 		while (getline(fh, line, '\n'))
 		{
 
@@ -742,17 +755,26 @@ void RelionJob::initialise(int _job_type)
 	else
 		REPORT_ERROR("ERROR: unrecognised job-type");
 
-	// Check for environment variable RELION_MPI_MAX
+	// Check for environment variable RELION_MPI_MAX and RELION_QSUB_NRMPI
 	const char *mpi_max_input = getenv("RELION_MPI_MAX");
 	int mpi_max = (mpi_max_input == NULL) ? DEFAULTMPIMAX : textToInteger(mpi_max_input);
+	char * qsub_nrmpi_text = getenv ("RELION_QSUB_NRMPI");
+	const char qsub_nrmpi_val = (qsub_nrmpi_text ? atoi(qsub_nrmpi_text) : DEFAULTNRMPI);
 	if (has_mpi)
-		joboptions["nr_mpi"] = JobOption("Number of MPI procs:", 1, 1, mpi_max, 1, "Number of MPI nodes to use in parallel. When set to 1, MPI will not be used. The maximum can be set through the environment variable RELION_MPI_MAX.");
+	{
+		joboptions["nr_mpi"] = JobOption("Number of MPI procs:", qsub_nrmpi_val , 1, mpi_max, 1, "Number of MPI nodes to use in parallel. When set to 1, MPI will not be used. The maximum can be set through the environment variable RELION_MPI_MAX.");
+	}
 
 	const char *thread_max_input = getenv("RELION_THREAD_MAX");
 	int thread_max = (thread_max_input == NULL) ? DEFAULTTHREADMAX : textToInteger(thread_max_input);
+	char * qsub_nrthr_text = getenv ("RELION_QSUB_NRTHREADS");
+	const char qsub_nrthreads_val = (qsub_nrthr_text ? atoi(qsub_nrthr_text) : DEFAULTNRTHREADS);
 	if (has_thread)
-		joboptions["nr_threads"] = JobOption("Number of threads:", 1, 1, thread_max, 1, "Number of shared-memory (POSIX) threads to use in parallel. \
-		When set to 1, no multi-threading will be used. The maximum can be set through the environment variable RELION_THREAD_MAX.");
+	{
+		joboptions["nr_threads"] = JobOption("Number of threads:", qsub_nrthreads_val, 1, thread_max, 1, "Number of shared-memory (POSIX) threads to use in parallel. \
+When set to 1, no multi-threading will be used. The maximum can be set through the environment variable RELION_THREAD_MAX.");
+	}
+
 
 	const char * use_queue_input = getenv("RELION_QUEUE_USE");
 	bool use_queue = (use_queue_input == NULL) ? DEFAULTQUEUEUSE : textToBool(use_queue_input);
@@ -760,7 +782,7 @@ void RelionJob::initialise(int _job_type)
 the job will be executed locally. Note that only MPI jobs may be sent to a queue. The default can be set through the environment variable RELION_QUEUE_USE.");
 
 	// Check for environment variable RELION_QUEUE_NAME
-	const char * default_queue = getenv ("RELION_QUEUE_NAME");
+	const char * default_queue = getenv("RELION_QUEUE_NAME");
 	if (default_queue==NULL)
 	{
 		default_queue = DEFAULTQUEUENAME;
@@ -780,30 +802,36 @@ the job will be executed locally. Note that only MPI jobs may be sent to a queue
 Note that the person who installed RELION should have made a custom script for your cluster/queue setup. Check this is the case \
 (or create your own script following the RELION Wiki) if you have trouble submitting jobs. The default command can be set through the environment variable RELION_QSUB_COMMAND.");
 
-	// Two additional options that may be set through environment variables RELION_QSUB_EXTRA1 and RELION_QSUB_EXTRA2 (for more flexibility)
-	char *extra1_text = getenv("RELION_QSUB_EXTRA1");
-	char *extra1_default = getenv("RELION_QSUB_EXTRA1_DEFAULT");
-	char emptychar[] = "";
-	if (extra1_text != NULL)
-	{
-		if (extra1_default == NULL)
-			extra1_default=emptychar;
-		joboptions["qsub_extra1"] = JobOption(std::string(extra1_text), std::string(extra1_default), "Extra option to pass to the qsub template script. \
-Any occurrences of XXXextra1XXX will be changed by this value.");
-	}
 
-	char *extra2_text = getenv("RELION_QSUB_EXTRA2");
-	char *extra2_default = getenv("RELION_QSUB_EXTRA2_DEFAULT");
-	if (extra2_text != NULL)
+	// additional options that may be set through environment variables RELION_QSUB_EXTRAi and RELION_QSUB_EXTRAi (for more flexibility)
+	// i is either defined by RELION_QSUB_EXTRA_COUNT environment variable or is 0
+	char * extra_count_text = getenv ("RELION_QSUB_EXTRA_COUNT");
+	const char extra_count_val = (extra_count_text ? atoi(extra_count_text) : 0);
+	for (int i=1; i<=extra_count_val; i++)
 	{
-		if (extra2_default == NULL)
-			extra2_default=emptychar;
-		joboptions["qsub_extra2"] = JobOption(std::string(extra2_text), std::string(extra2_default), "Extra option to pass to the qsub template script. \
-Any occurrences of XXXextra2XXX will be changed by this value.");
+		std::stringstream out;
+		out<<i;
+		const std::string i_str=out.str();
+		char * extra_text = getenv ((std::string("RELION_QSUB_EXTRA")+i_str).c_str());
+		if (extra_text != NULL)
+		{
+			std::stringstream out;
+			out<<i;
+			const std::string i_str=out.str();
+			const std::string query=std::string("RELION_QSUB_EXTRA")+i_str+"_DEFAULT";
+			char * extra_default = getenv (query.c_str());
+			char emptychar[] = "";
+			if (extra_default == NULL)
+			{
+				extra_default=emptychar;
+			}
+			std::string txt=std::string("Extra option to pass to the qsub template script. Any occurrences of XXXextra")+i_str+"XXX will be changed by this value.";
+			joboptions[std::string("qsub_extra")+i_str] = JobOption(std::string(extra_text), std::string(extra_default), txt.c_str());
+        }
 	}
 
 	// Check for environment variable RELION_QSUB_TEMPLATE
-	char * default_location = getenv ("RELION_QSUB_TEMPLATE");
+	char * default_location = getenv("RELION_QSUB_TEMPLATE");
 	char mydefault[]=DEFAULTQSUBLOCATION;
 	if (default_location==NULL)
 	{
