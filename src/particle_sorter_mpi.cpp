@@ -86,6 +86,8 @@ void ParticleSorterMpi::run()
 		normaliseFeatures();
 
 		writeFeatures();
+
+		generateLogFilePDF();
 	}
 
 }

@@ -95,6 +95,9 @@ public:
 	// Continue an old run: only estimate CTF if logfile WITH Final Values line does not yet exist, otherwise skip the micrograph
 	bool continue_old;
 
+	// Process at most this number of unprocessed micrographs
+	long do_at_most;
+
 	////// CTFFIND parameters
 	// Size of the box to calculate FFTw
 	RFLOAT box_size;

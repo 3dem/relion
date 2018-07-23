@@ -58,9 +58,16 @@
 #define DEFAULTSUMMOVIELOCATION "/public/EM/SUMMOVIE/summovie.exe"
 #define DEFAULTGCTFLOCATION "/public/EM/Gctf/bin/Gctf"
 #define DEFAULTRESMAPLOCATION "/public/EM/ResMap/ResMap-1.1.4-linux64"
+#define DEFAULTQSUBCOMMAND "qsub"
+#define DEFAULTQUEUENAME "openmpi"
 #define DEFAULTMININIMUMDEDICATED 1
 #define DEFAULTWARNINGLOCALMPI 32
 #define DEFAULTALLOWCHANGEMINDEDICATED true
+#define DEFAULTQUEUEUSE false
+#define DEFAULTNRMPI 1
+#define DEFAULTMPIMAX 64
+#define DEFAULTNRTHREADS 1
+#define DEFAULTTHREADMAX 16
 
 static const char* job_sampling_options[] = {
 	"30 degrees",
@@ -75,7 +82,7 @@ static const char* job_sampling_options[] = {
 };
 
 static const char* job_nodetype_options[] = {
-	"2D micrograph movies (*.mrcs)",
+	"2D micrograph movies (*.mrcs, *.tiff)",
 	"2D micrographs/tomograms (*.mrc)",
 	"2D/3D particle coordinates (*.box, *_pick.star)",
 	"Particles STAR file (.star)",

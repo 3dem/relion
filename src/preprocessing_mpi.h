@@ -31,22 +31,22 @@ private:
 
 public:
 	/** Destructor, calls MPI_Finalize */
-    ~PreprocessingMpi()
-    {
-        delete node;
-    }
+	~PreprocessingMpi()
+	{
+		delete node;
+	}
 
-    // Limit the number of effective MPI nodes to this value, rather than what is given through mpirun
-    int max_mpi_nodes;
+	// Limit the number of effective MPI nodes to this value, rather than what is given through mpirun
+	int max_mpi_nodes;
 
-    /** Read
-     * This could take care of mpi-parallelisation-dependent variables
-     */
-    void read(int argc, char **argv);
+	/** Read
+	 * This could take care of mpi-parallelisation-dependent variables
+	 */
+	void read(int argc, char **argv);
 
-    // Parallelized run functions
-    void runExtractParticles();
-    void run();
+	// Parallelized run functions
+	void runExtractParticles();
+	void run();
 
 };
 

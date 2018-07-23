@@ -35,6 +35,7 @@ int StdOutDisplay::handle(int ev)
 		// double-click
 		if (Fl::event_clicks())
 		{
+			if (current_job < 0) return 0;
 			current_browse_directory = pipeline.processList[current_job].name;
 			FileName fn = current_browse_directory + fn_file;
 			std::string command;
@@ -310,7 +311,8 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 		pipeline.name = fn_pipe;
 		if (exists(fn_pipe + "_pipeline.star"))
 		{
-			pipeline.read(DO_LOCK);
+			std::string lock_message = "mainGUI constructor";
+			pipeline.read(DO_LOCK, lock_message);
 			// With the locking system, each read needs to be followed soon with a write
 			pipeline.write(DO_LOCK);
 		}
@@ -479,15 +481,15 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
     browse_grp[12]->end();
 
     browse_grp[13] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-	browser->add("Bayesian polishing");
+	browser->add("CTF refinement");
 	gui_jobwindows[13] = new JobWindow();
-	gui_jobwindows[13]->initialise(PROC_MOTIONREFINE, maingui_do_old_style);
+	gui_jobwindows[13]->initialise(PROC_CTFREFINE, maingui_do_old_style);
     browse_grp[13]->end();
 
     browse_grp[14] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-	browser->add("CTF refinement");
+	browser->add("Bayesian polishing");
 	gui_jobwindows[14] = new JobWindow();
-	gui_jobwindows[14]->initialise(PROC_CTFREFINE, maingui_do_old_style);
+	gui_jobwindows[14]->initialise(PROC_MOTIONREFINE, maingui_do_old_style);
     browse_grp[14]->end();
 
     browse_grp[15] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
@@ -1394,6 +1396,8 @@ void GuiMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 	if (!pipeline.runJob(gui_jobwindows[iwin]->myjob, current_job, only_schedule, is_main_continue, false, error_message))
 	{
 		fl_message("%s",error_message.c_str());
+		// Allow the user to fix the error and submit this job again
+		run_button->activate();
 		return;
 	}
 
@@ -1927,7 +1931,8 @@ void GuiMainWindow::cb_reread_pipeline(Fl_Widget*, void* v)
 
 void GuiMainWindow::cb_reread_pipeline_i()
 {
-	pipeline.read(DO_LOCK);
+	std::string lock_message = " mainGUI reread_pipeline_i";
+	pipeline.read(DO_LOCK, lock_message);
 	// With the locking system, each read needs to be followed soon with a write
 	pipeline.write(DO_LOCK);
 }

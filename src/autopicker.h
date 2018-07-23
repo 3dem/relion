@@ -11,6 +11,8 @@
 #include "src/multidim_array.h"
 #include "src/metadata_table.h"
 #include "src/projector.h"
+#include "src/healpix_sampling.h"
+#include "src/projector.h"
 #include "src/ctf.h"
 #include "src/fftw.h"
 #include "src/time.h"
@@ -104,6 +106,12 @@ public:
 	// Pixel size for the references (for low-pass filter and particle diameter)
 	RFLOAT angpix_ref;
 
+	// Angular sampling rate for projection of 3D reference (hp=0: 60 deg, hp=1: 30 deg; hp=2: 15deg)
+	int healpix_order;
+
+	// Symmetry point group for 3D reference
+	std::string symmetry;
+
 	// Metadata of the micrographs
 	MetaDataTable MDmic;
 
@@ -126,6 +134,9 @@ public:
 	// Dimension of the filtered image
 	int current_size;
 
+	// Padding to use for Projectors
+	int padding;
+
 	// Maxmimum value in the Gaussian blob reference
 	RFLOAT gauss_max_value;
 
@@ -139,10 +150,7 @@ public:
 	bool do_LoG;
 
 	// Minimum diameter for features to be detected by the LoG filter
-	RFLOAT LoG_diameter, LoG_min_diameter, LoG_max_diameter;
-
-	// Maximum diameter for features to be detected by the LoG filter
-	RFLOAT LoG_diameter_fracrange;
+	RFLOAT LoG_min_diameter, LoG_max_diameter;
 
 	// How many times the LoG_max_diameter is searched?
 	RFLOAT LoG_max_search;
@@ -182,7 +190,7 @@ public:
 	bool todo_anything;
 
 	// All micrographs to autopick from
-	std::vector<FileName> fn_micrographs;
+	std::vector<FileName> fn_micrographs, fn_ori_micrographs;
 
 	// Original size of the micrographs
 	int micrograph_size, micrograph_xsize, micrograph_ysize, micrograph_minxy_size;
@@ -282,6 +290,9 @@ public:
 
 	// General function to decide what to do
 	void run();
+
+	// Make a PDF file with plots of numbers of particles per micrograph, average FOMs etc
+	void generatePDFLogfile();
 
 	std::vector<AmyloidCoord> findNextCandidateCoordinates(AmyloidCoord &mycoord, std::vector<AmyloidCoord> &circle,
 			RFLOAT threshold_value, RFLOAT max_psidiff, int skip_side, float scale,

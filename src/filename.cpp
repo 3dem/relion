@@ -416,7 +416,7 @@ int FileName::globFiles(std::vector<FileName> &files, bool do_clear) const
 
 	glob_t glob_result;
 	glob((*this).c_str(), GLOB_TILDE, NULL, &glob_result);
-	for(unsigned  int  i = 0; i < glob_result.gl_pathc; ++i)
+	for(unsigned long int i = 0; i < glob_result.gl_pathc; ++i)
 	{
 		files.push_back(std::string(glob_result.gl_pathv[i]));
 	}

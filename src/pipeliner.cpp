@@ -131,7 +131,7 @@ void PipeLine::addNewOutputEdge(long int myProcess, Node &_Node)
 
 long int PipeLine::addNewProcess(Process &_Process, bool do_overwrite)
 {
-	// Check whether Process  with the same name already exists in the processList
+	// Check whether Process with the same name already exists in the processList
 	bool is_found = false;
 	long int i;
 	for (i=0; i < processList.size(); i++)
@@ -354,7 +354,11 @@ bool PipeLine::checkProcessCompletion()
 	if (finished_processes.size() > 0 || exists(PIPELINE_HAS_CHANGED))
 	{
 		// Read in the latest version of the pipeline, just in case anyone else made a change meanwhile...
-		read(DO_LOCK);
+		std::string lock_message = "checkProcessCompletion: the following jobs have finished: ";
+		for (long int i = 0; i < finished_processes.size(); i++)
+			lock_message += " " + processList[finished_processes[i]].name;
+
+		read(DO_LOCK, lock_message);
 
 		// Set the new status of all the finished processes
 		for (int i=0; i < finished_processes.size(); i++)
@@ -434,7 +438,6 @@ long int PipeLine::addJob(RelionJob &thisjob, int as_status, bool do_overwrite)
 
 	return myProcess;
 
-
 }
 
 bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, bool is_main_continue, bool is_scheduled, std::string &error_message)
@@ -450,7 +453,8 @@ bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, boo
 	}
 
 	// Read in the latest version of the pipeline, just in case anyone else made a change meanwhile...
-	read(DO_LOCK);
+	std::string lock_message = "runJob: " + _job.outputName;
+	read(DO_LOCK, lock_message);
 
 	// Save temporary hidden file with this jobs settings as default for a new job
 	_job.write("");
@@ -464,21 +468,21 @@ bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, boo
 	if (!only_schedule && is_main_continue)
 	{
 		do_move_output_nodes_to_old = !(processList[current_job].type == PROC_2DCLASS ||
-				processList[current_job].type == PROC_3DCLASS ||
-				processList[current_job].type == PROC_INIMODEL ||
-				processList[current_job].type == PROC_3DAUTO ||
-				processList[current_job].type == PROC_MULTIBODY ||
-				processList[current_job].type == PROC_MANUALPICK ||
-				processList[current_job].type == PROC_CLASSSELECT ||
-				processList[current_job].type == PROC_MOVIEREFINE ||
-				processList[current_job].type == PROC_POLISH);
+		                                processList[current_job].type == PROC_3DCLASS ||
+		                                processList[current_job].type == PROC_INIMODEL ||
+		                                processList[current_job].type == PROC_3DAUTO ||
+		                                processList[current_job].type == PROC_MULTIBODY ||
+		                                processList[current_job].type == PROC_MANUALPICK ||
+		                                processList[current_job].type == PROC_CLASSSELECT ||
+		                                processList[current_job].type == PROC_MOVIEREFINE ||
+		                                processList[current_job].type == PROC_POLISH);
 
 		// For continuation of relion_refine jobs, remove the original output nodes from the list
 		if (processList[current_job].type == PROC_2DCLASS ||
-				processList[current_job].type == PROC_3DCLASS ||
-				processList[current_job].type == PROC_3DAUTO ||
-				processList[current_job].type == PROC_MULTIBODY ||
-				processList[current_job].type == PROC_INIMODEL)
+		    processList[current_job].type == PROC_3DCLASS ||
+		    processList[current_job].type == PROC_3DAUTO ||
+		    processList[current_job].type == PROC_MULTIBODY ||
+		    processList[current_job].type == PROC_INIMODEL)
 		{
 
 			std::vector<bool> deleteNodes, deleteProcesses;
@@ -497,7 +501,8 @@ bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, boo
 			std::remove("tmpdeleted_pipeline.star");
 
 			// Read the updated pipeline back in again
-			read(DO_LOCK);
+			lock_message += " part 2";
+			read(DO_LOCK, lock_message);
 
 		}
 	} // end if !only_schedule && is_main_continue
@@ -533,7 +538,6 @@ bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, boo
 	// Add the job to the pipeline, and set current_job to the new one
 	current_job = addJob(_job, mynewstatus, allow_overwrite);
 
-
 	// Write out the new pipeline
 	write(DO_LOCK);
 
@@ -567,57 +571,57 @@ bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, boo
 }
 
 // Adds a scheduled job to the pipeline from the command line
-void PipeLine::addScheduledJob(std::string typestring, std::string fn_options)
+int PipeLine::addScheduledJob(std::string typestring, std::string fn_options)
 {
 
 	int type;
 	if (typestring == PROC_IMPORT_NAME)
-            type = PROC_IMPORT;
-    else if (typestring == PROC_MOTIONCORR_NAME)
-            type = PROC_MOTIONCORR;
-    else if (typestring == PROC_CTFFIND_NAME)
-            type = PROC_CTFFIND;
-    else if (typestring == PROC_MANUALPICK_NAME)
-            type = PROC_MANUALPICK;
-    else if (typestring == PROC_AUTOPICK_NAME)
-            type = PROC_AUTOPICK;
-    else if (typestring == PROC_EXTRACT_NAME)
-            type = PROC_EXTRACT;
-    else if (typestring == PROC_SORT_NAME)
-            type = PROC_SORT;
-    else if (typestring == PROC_CLASSSELECT_NAME)
-            type = PROC_CLASSSELECT;
-    else if (typestring == PROC_2DCLASS_NAME)
-            type = PROC_2DCLASS;
-    else if (typestring == PROC_3DCLASS_NAME)
-            type = PROC_3DCLASS;
-    else if (typestring == PROC_3DAUTO_NAME)
-            type = PROC_3DAUTO;
-    else if (typestring == PROC_POLISH_NAME)
-            type = PROC_POLISH;
-    else if (typestring == PROC_MASKCREATE_NAME)
-            typestring = PROC_MASKCREATE;
-    else if (typestring == PROC_JOINSTAR_NAME)
-            type = PROC_JOINSTAR;
-    else if (typestring == PROC_SUBTRACT_NAME)
-            type = PROC_SUBTRACT;
-    else if (typestring == PROC_POST_NAME)
-            type = PROC_POST;
-    else if (typestring == PROC_RESMAP_NAME)
-            type = PROC_RESMAP;
-    else if (typestring == PROC_MOVIEREFINE_NAME)
-            type = PROC_MOVIEREFINE;
-    else if (typestring == PROC_INIMODEL_NAME)
-            type = PROC_INIMODEL;
-    else
-    	REPORT_ERROR("ERROR: unrecognised string for job type: " + typestring);
+		type = PROC_IMPORT;
+	else if (typestring == PROC_MOTIONCORR_NAME)
+		type = PROC_MOTIONCORR;
+	else if (typestring == PROC_CTFFIND_NAME)
+		type = PROC_CTFFIND;
+	else if (typestring == PROC_MANUALPICK_NAME)
+		type = PROC_MANUALPICK;
+	else if (typestring == PROC_AUTOPICK_NAME)
+		type = PROC_AUTOPICK;
+	else if (typestring == PROC_EXTRACT_NAME)
+		type = PROC_EXTRACT;
+	else if (typestring == PROC_SORT_NAME)
+		type = PROC_SORT;
+	else if (typestring == PROC_CLASSSELECT_NAME)
+		type = PROC_CLASSSELECT;
+	else if (typestring == PROC_2DCLASS_NAME)
+		type = PROC_2DCLASS;
+	else if (typestring == PROC_3DCLASS_NAME)
+		type = PROC_3DCLASS;
+	else if (typestring == PROC_3DAUTO_NAME)
+		type = PROC_3DAUTO;
+	else if (typestring == PROC_POLISH_NAME)
+		type = PROC_POLISH;
+	else if (typestring == PROC_MASKCREATE_NAME)
+		typestring = PROC_MASKCREATE;
+	else if (typestring == PROC_JOINSTAR_NAME)
+		type = PROC_JOINSTAR;
+	else if (typestring == PROC_SUBTRACT_NAME)
+		type = PROC_SUBTRACT;
+	else if (typestring == PROC_POST_NAME)
+		type = PROC_POST;
+	else if (typestring == PROC_RESMAP_NAME)
+		type = PROC_RESMAP;
+	else if (typestring == PROC_MOVIEREFINE_NAME)
+		type = PROC_MOVIEREFINE;
+	else if (typestring == PROC_INIMODEL_NAME)
+		type = PROC_INIMODEL;
+	else
+		REPORT_ERROR("ERROR: unrecognised string for job type: " + typestring);
 
-	addScheduledJob(type, fn_options);
+	return addScheduledJob(type, fn_options);
 
 }
 
 // Adds a scheduled job to the pipeline from the command line
-void PipeLine::addScheduledJob(int job_type, std::string fn_options)
+int PipeLine::addScheduledJob(int job_type, std::string fn_options)
 {
 	RelionJob job;
 	job.initialise(job_type);
@@ -635,6 +639,7 @@ void PipeLine::addScheduledJob(int job_type, std::string fn_options)
 	if (!runJob(job, current_job, true, job.is_continue, false, error_message)) // true is only_schedule, false means !is_scheduled
 		REPORT_ERROR(error_message.c_str());
 
+	return current_job;
 }
 
 void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_repeat, long int minutes_wait, long int minutes_wait_before)
@@ -657,7 +662,10 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 	std::ofstream  fh;
 	fh.open((fn_log).c_str(), std::ios::app);
 
-	std::cout << " PIPELINER: writing out information in logfile " << fn_log << std::endl;
+	if (nr_repeat > 1)
+	{
+		std::cout << " PIPELINER: writing out information in logfile " << fn_log << std::endl;
+	}
 
 	// Touch the fn_check file
 	FileName fn_check = "RUNNING_PIPELINER_" + fn_sched;
@@ -746,8 +754,12 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 				checkProcessCompletion();
 				if (processList[current_job].status == PROC_FINISHED)
 				{
+					// Prepare a string for a more informative .lock file
+					std::string lock_message = " Scheduler " + fn_sched + " noticed that " + processList[current_job].name +
+							" finished and is trying to update the pipeline";
+
 					// Read in existing pipeline, in case some other window had changed something else
-					read(DO_LOCK);
+					read(DO_LOCK, lock_message);
 
 					// Will we do another repeat?
 					if (repeat + 1 != nr_repeat)
@@ -807,7 +819,8 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 		}
 
 		// Read in existing pipeline, in case some other window had changed it
-		read(DO_LOCK);
+		std::string lock_message = " Scheduler " + fn_sched + " has finished and is trying to update the pipeline";
+		read(DO_LOCK, lock_message);
 
 		// After breaking out of repeat, set status of the jobs to finished
 		for (long int i = 0; i < my_scheduled_processes.size(); i++)
@@ -889,7 +902,8 @@ void PipeLine::deleteNodesAndProcesses(std::vector<bool> &deleteNodes, std::vect
 {
 
 	// Read in existing pipeline, in case some other window had changed it
-	read(DO_LOCK);
+	std::string lock_message = "deleteNodesAndProcesses";
+	read(DO_LOCK, lock_message);
 
 	// Write new pipeline without the deleted processes and nodes to disc and read in again
 	FileName fn_del;
@@ -927,7 +941,8 @@ void PipeLine::deleteNodesAndProcesses(std::vector<bool> &deleteNodes, std::vect
 	}
 
 	// Read new pipeline back in again
-	read(DO_LOCK);
+	lock_message += " part 2";
+	read(DO_LOCK, lock_message);
 	write(DO_LOCK);
 
 }
@@ -936,7 +951,8 @@ bool PipeLine::markAsFinishedJob(int this_job, std::string &error_message)
 {
 
 	// Read in existing pipeline, in case some other window had changed it
-	read(DO_LOCK);
+	std::string lock_message = "markAsFinishedJob";
+	read(DO_LOCK, lock_message);
 
 	processList[this_job].status = PROC_FINISHED;
 
@@ -991,7 +1007,7 @@ bool PipeLine::markAsFinishedJob(int this_job, std::string &error_message)
 		{
 			error_message = "You are trying to mark a relion_refine job as finished that hasn't even started. \n This will be ignored. Perhaps you wanted to delete it instead?";
 			processList[this_job].status = PROC_RUNNING;
-	                write(DO_LOCK);
+			write(DO_LOCK);
 			return false;
 		}
 	}
@@ -1013,7 +1029,8 @@ bool PipeLine::markAsFinishedJob(int this_job, std::string &error_message)
 
 	// Read the updated pipeline back in and write it out again
 	// With the locking mechanism, each pipeline.read(bool, DO_LOCK) needs to be followed soon by a pipeline.write(DO_LOCK)!
-	read(DO_LOCK);
+	lock_message += " part 2";
+	read(DO_LOCK, lock_message);
 	write(DO_LOCK);
 
 	return true;
@@ -1041,6 +1058,13 @@ bool PipeLine::setAliasJob(int this_job, std::string alias, std::string &error_m
 	{
 		 error_message = "Alias cannot start with 'job', please provide another one";
 		 return false;
+	}
+	else if (alias.find("*") != std::string::npos || alias.find("?") != std::string::npos || alias.find("(") != std::string::npos || alias.find(")") != std::string::npos ||
+	         alias.find("/") != std::string::npos || alias.find("\"") != std::string::npos || alias.find("\\") != std::string::npos || alias.find("|") != std::string::npos ||
+		 alias.find("#") != std::string::npos || alias.find("<") != std::string::npos || alias.find(">") != std::string::npos)
+	{
+		error_message = "Alias cannot contain following symbols: *, ?, (, ), /, \", \\, |, #, <, >";
+		return false;
 	}
 	else
 	{
@@ -1075,7 +1099,8 @@ bool PipeLine::setAliasJob(int this_job, std::string alias, std::string &error_m
 
 
 	// Read in existing pipeline, in case some other window had changed it
-	read(DO_LOCK);
+	std::string lock_message = "setAliasJob";
+	read(DO_LOCK, lock_message);
 
 	// Remove the original .Nodes entry
 	deleteTemporaryNodeFiles(processList[this_job]);
@@ -1146,7 +1171,8 @@ bool PipeLine::makeFlowChart(long int current_job, bool do_display_pdf, std::str
 	}
 
 	// Read in existing pipeline, in case some other window had changed it
-	read(DO_LOCK);
+	std::string lock_message = "makeFlowChart";
+	read(DO_LOCK, lock_message);
 
 	// Add the PDF file as a logfile to the outputnodes of this job, so it can be visualised from the Display button
 	Node node(fn_dir+"flowchart.pdf", NODE_PDF_LOGFILE);
@@ -1161,9 +1187,10 @@ void PipeLine::undeleteJob(FileName fn_undel)
 {
 
 	// Read in existing pipeline, in case some other window had changed it
-	read(DO_LOCK);
+	std::string lock_message = "undeleteJob";
+	read(DO_LOCK, lock_message);
 
-    importPipeline(fn_undel.beforeLastOf("_pipeline.star"));
+	importPipeline(fn_undel.beforeLastOf("_pipeline.star"));
 
 	// Copy all processes in the STAR file back into the ProjectDirectory
 	MetaDataTable MDproc;
@@ -1257,7 +1284,7 @@ bool PipeLine::cleanupJob(int this_job, bool do_harsh, std::string &error_messag
 		{
 			if (do_harsh)
 			{
-				//remove entire directory
+				//remove entire movies directory
 				fns_del.push_back(processList[this_job].name + fns_subdir[idir]);
 			}
 			else
@@ -1320,14 +1347,23 @@ bool PipeLine::cleanupJob(int this_job, bool do_harsh, std::string &error_messag
 	} // end if extract
 	else if (processList[this_job].type == PROC_2DCLASS ||
 			 processList[this_job].type == PROC_3DCLASS ||
-			 processList[this_job].type == PROC_3DAUTO)
+			 processList[this_job].type == PROC_3DAUTO ||
+			 processList[this_job].type == PROC_INIMODEL ||
+			 processList[this_job].type == PROC_MULTIBODY)
 	{
 
 		// First find the _data.star from each iteration
 		std::vector<FileName> fns_iter;
-		fn_pattern = processList[this_job].name + "*_it[0-9][0-9][0-9]_data.star";
+		fn_pattern = processList[this_job].name + "run_it[0-9][0-9][0-9]_data.star";
 		fn_pattern.globFiles(fns_iter);
-		for (int ifile = 0; ifile < fns_iter.size(); ifile++)
+		fn_pattern = processList[this_job].name + "run_ct[0-9]_it[0-9][0-9][0-9]_data.star";
+		fn_pattern.globFiles(fns_iter, false);
+		fn_pattern = processList[this_job].name + "run_ct[0-9][0-9]_it[0-9][0-9][0-9]_data.star";
+		fn_pattern.globFiles(fns_iter, false);
+		fn_pattern = processList[this_job].name + "run_ct[0-9][0-9][0-9]_it[0-9][0-9][0-9]_data.star";
+		fn_pattern.globFiles(fns_iter, false);
+		// Keep everything for the last iteration, such thatone could for example still do a multibody refinement after gentle cleaning
+		for (int ifile = 0; ifile < (signed int)(fns_iter.size())-1; ifile++)
 		{
 			FileName fn_file = (fns_iter[ifile]).without("_data.star");
 			// Find the iterations to keep: i.e. those that are part of the pipeline
@@ -1348,55 +1384,54 @@ bool PipeLine::cleanupJob(int this_job, bool do_harsh, std::string &error_messag
 				fn_pattern.globFiles(fns_del, false);
 			}
 
+			// Also clean up maps for PCA movies when doing harsh cleaning
+			if (do_harsh && processList[this_job].type == PROC_MULTIBODY)
+			{
+				fn_pattern = processList[this_job].name + "analyse_component???_bin???.mrc";
+				fn_pattern.globFiles(fns_del, false);
+			}
+
 		} //end loop over ifile (i.e. the _data.star files from all iterations)
 
 	} // end if refine job
-	else if (processList[this_job].type == PROC_MOVIEREFINE)
+	else if (processList[this_job].type == PROC_CTFREFINE)
 	{
 
-		fn_pattern = processList[this_job].name + "batch*mics_nr[0-9][0-9][0-9].star";
-		fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
-		fn_pattern = processList[this_job].name + "run_it[0-9][0-9][0-9]*";
-		fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
 		for (int idir = 0; idir < fns_subdir.size(); idir++)
 		{
+			// remove the temporary output files
+			fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_wAcc.mrc";
+			fn_pattern.globFiles(fns_del, false);
+			fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_xyAcc_real.mrc";
+			fn_pattern.globFiles(fns_del, false);
+			fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_xyAcc_imag.mrc";
+			fn_pattern.globFiles(fns_del, false);
+		}
+
+	} // end if ctf_refine
+	else if (processList[this_job].type == PROC_MOTIONREFINE)
+	{
+
+		for (int idir = 0; idir < fns_subdir.size(); idir++)
+		{
+			// remove the temporary output files
+			fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_FCC_cc.mrc";
+			fn_pattern.globFiles(fns_del, false);
+			fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_FCC_w0.mrc";
+			fn_pattern.globFiles(fns_del, false);
+			fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_FCC_w1.mrc";
+			fn_pattern.globFiles(fns_del, false);
+
 			if (do_harsh)
 			{
-				//remove entire Micrographs directory (STAR files and particle stacks!)
-				fns_del.push_back(processList[this_job].name + fns_subdir[idir]);
-			}
-			else
-			{
-				// only remove the STAR files with the metadata (this will only give moderate file savings)
-				fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_extract.star";
+				fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_shiny.mrcs";
+				fn_pattern.globFiles(fns_del, false);
+				fn_pattern = processList[this_job].name + fns_subdir[idir] + "*_shiny.star";
 				fn_pattern.globFiles(fns_del, false);
 			}
 		}
 
-	} // end if movierefine
-	else if (processList[this_job].type == PROC_POLISH)
-	{
-
-		fn_pattern = processList[this_job].name + "*.mrc";
-		fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
-		fn_pattern = processList[this_job].name + "shiny*xml";
-		fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
-		for (int idir = 0; idir < fns_subdir.size(); idir++)
-		{
-			if (do_harsh)
-			{
-				//remove entire Micrographs directory (STAR files and particle stacks!)
-				fns_del.push_back(processList[this_job].name + fns_subdir[idir]);
-			}
-			else
-			{
-				// only remove the STAR files with the metadata (this will only give moderate file savings)
-				fn_pattern = processList[this_job].name + fns_subdir[idir] + "*.star";
-				fn_pattern.globFiles(fns_del, false);
-			}
-		}
-
-	} // end if polish
+	} // end if motion_refine
 	else if (processList[this_job].type == PROC_SUBTRACT)
 	{
 
@@ -1546,7 +1581,8 @@ void PipeLine::importJobs(FileName fn_export)
 	MDexported.read(fn_export);
 
 	// Read in existing pipeline, in case some other window had changed it
-	read(DO_LOCK);
+	std::string lock_message = "importJobs";
+	read(DO_LOCK, lock_message);
 
 	std::vector<std::string> find_pattern, replace_pattern;
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDexported)
@@ -1660,31 +1696,51 @@ bool PipeLine::importPipeline(std::string _name)
 }
 
 // Read pipeline from STAR file
-void PipeLine::read(bool do_lock)
+void PipeLine::read(bool do_lock, std::string lock_message)
 {
 
-	FileName fn_lock = ".lock_" + name + "_pipeline.star";
+#ifdef DEBUG_LOCK
+	std::cerr << "entering read lock_message=" << lock_message << std::endl;
+#endif
+	FileName dir_lock=".relion_lock", fn_lock=".relion_lock/lock_" + name + "_pipeline.star";;
 	if (do_lock && !do_read_only)
 	{
 		int iwait =0;
-		while( exists(fn_lock) )
+		int status = mkdir(dir_lock.c_str(), S_IRWXU);
+
+#ifdef DEBUG_LOCK
+		std::cerr <<  " A status= " << status << std::endl;
+#endif
+		while (!status == 0)
 		{
 			// If the lock exists: wait 3 seconds and try again
 			// First time round, print a warning message
 			if (iwait == 0)
 			{
-				std::cout << "WARNING: trying to read pipeline.star, but " << fn_lock << " exists!" << std::endl;
-				std::cout << " This is a protection against simultaneous writing to the pipeline by multiple instances of the GUI." << std::endl;
-				std::cout << " You can override this by manually deleting the " << fn_lock << " file." << std::endl;
-				std::cout << " This instance of the GUI will try for 1 minute to see whether the lock disappears." << std::endl;
+				std::cout << " WARNING: trying to read pipeline.star, but directory " << dir_lock << " exists (which protects against simultaneous writing by multiple instances of the GUI)" << std::endl;
 			}
 			sleep(3);
+			status =  mkdir(dir_lock.c_str(), S_IRWXU);
+#ifdef DEBUG_LOCK
+			std::cerr <<  " B status= " << status << std::endl;
+#endif
+
 			iwait++;
-			if (iwait > 20)
-				REPORT_ERROR("ERROR: PipeLine::read has waited for 1 minute for lock file to disappear. You may want to manually remove the file: " + fn_lock);
+			if (iwait > 40)
+			{
+
+				REPORT_ERROR("ERROR: PipeLine::read has waited for 2 minutes for lock directory to disappear. You may want to manually remove the file: " + fn_lock);
+			}
+
 		}
 		// Generate the lock file
-		touch(fn_lock);
+		std::ofstream  fh;
+	    fh.open(fn_lock.c_str(), std::ios::out);
+	    if (!fh)
+	        REPORT_ERROR( (std::string)"ERROR: Cannot open file: " + fn_lock);
+	    fh << lock_message << std::endl;
+	    fh.close();
+
 	}
 
 
@@ -1697,16 +1753,16 @@ void PipeLine::read(bool do_lock)
 	if (in.fail())
 		REPORT_ERROR( (std::string) "PipeLine::read: File " + fn + " cannot be read." );
 
-    MetaDataTable MDgen, MDnode, MDproc, MDedge1, MDedge2;
+	MetaDataTable MDgen, MDnode, MDproc, MDedge1, MDedge2;
 
-    // This if allows for older version of the pipeline without the jobcounter
-    // TODO: remove after alpha-testing
-    if (MDgen.readStar(in, "pipeline_general"))
-    {
-        MDgen.getValue(EMDL_PIPELINE_JOB_COUNTER, job_counter);
-    }
+	// This if allows for older version of the pipeline without the jobcounter
+	// TODO: remove after alpha-testing
+	if (MDgen.readStar(in, "pipeline_general"))
+	{
+		MDgen.getValue(EMDL_PIPELINE_JOB_COUNTER, job_counter);
+	}
 
-    MDnode.readStar(in, "pipeline_nodes");
+	MDnode.readStar(in, "pipeline_nodes");
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDnode)
 	{
 		std::string name;
@@ -1719,7 +1775,7 @@ void PipeLine::read(bool do_lock)
 		nodeList.push_back(newNode);
 	}
 
-    MDproc.readStar(in, "pipeline_processes");
+	MDproc.readStar(in, "pipeline_processes");
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDproc)
 	{
 		std::string name, alias;
@@ -1753,9 +1809,9 @@ void PipeLine::read(bool do_lock)
 		}
 	}
 
-    // Read in all input (Node->Process) edges
-    MDedge1.readStar(in, "pipeline_input_edges");
-    FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDedge1)
+	// Read in all input (Node->Process) edges
+	MDedge1.readStar(in, "pipeline_input_edges");
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDedge1)
 	{
 		std::string fromnodename, procname;
 		if (!MDedge1.getValue(EMDL_PIPELINE_EDGE_PROCESS, procname) ||
@@ -1785,8 +1841,8 @@ void PipeLine::read(bool do_lock)
 		}
 	}
 
-    // Read in all output (Process->Node) edges
-    MDedge2.readStar(in, "pipeline_output_edges");
+	// Read in all output (Process->Node) edges
+	MDedge2.readStar(in, "pipeline_output_edges");
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDedge2)
 	{
 		std::string tonodename, procname;
@@ -1827,11 +1883,33 @@ void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode
 	if (do_read_only)
 		return;
 
-	FileName fn_lock = ".lock_" + name + "_pipeline.star";
+	FileName dir_lock=".relion_lock", fn_lock=".relion_lock/lock_" + name + "_pipeline.star";;
 	if (do_lock)
 	{
-		if (!exists(fn_lock))
-			REPORT_ERROR("ERROR: PipeLine::write was expecting a file called "+fn_lock+ " but it isn't there.");
+
+#ifdef DEBUG_LOCK
+		if (exists(fn_lock))
+		{
+			std::cerr << "writing pipeline: " << fn_lock << " exists as expected" << std::endl;
+		}
+#endif
+
+		int iwait =0;
+		while( !exists(fn_lock) )
+		{
+			// If the lock exists: wait 3 seconds and try again
+			// First time round, print a warning message
+			if (iwait == 0)
+			{
+				std::cerr << " WARNING: was expecting a file called "+fn_lock+ " but it isn't there. Will wait for 1 minute to see whether it appears" << std::endl;
+			}
+			sleep(3);
+			iwait++;
+			if (iwait > 40)
+			{
+				REPORT_ERROR("ERROR: PipeLine::read has waited for 2 minutes for lock file to appear, but it doesn't. This should not happen. Is something wrong with the disk access?");
+			}
+		}
 	}
 
 	std::ofstream  fh, fh_del;
@@ -1991,9 +2069,17 @@ void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode
 
 	if (do_lock)
 	{
+
+#ifdef DEBUG_LOCK
+		std::cerr << " write pipeline: now deleting " << fn_lock << std::endl;
+#endif
+
 		if (!exists(fn_lock))
 			REPORT_ERROR("ERROR: PipeLine::write was expecting a file called "+fn_lock+ " but it is no longer there.");
-		std::remove(fn_lock.c_str());
+		if (std::remove(fn_lock.c_str()))
+			REPORT_ERROR("ERROR: PipeLine::write reported error in removing file "+fn_lock);
+		if (rmdir(dir_lock.c_str()))
+			REPORT_ERROR("ERROR: PipeLine::write reported error in removing directory "+dir_lock);
 	}
 
 	// Touch a file to indicate to the GUI that the pipeline has just changed
@@ -2022,80 +2108,80 @@ std::string PipeLineFlowChart::getDownwardsArrowLabel(PipeLine &pipeline, long i
 		REPORT_ERROR("PipeLineFlowChart::getDownwardsArrowLabel ERROR: cannot find node connecting " + pipeline.processList[upper_process].name + " -> " + pipeline.processList[lower_process].name);
 
 	std::string mylabel = "";
-    MetaDataTable MD;
-    long int nr_obj;
+	MetaDataTable MD;
+	long int nr_obj;
 
-    switch (pipeline.nodeList[mynode].type)
-    {
-    case NODE_MOVIES:
-    {
-    	nr_obj = MD.read(pipeline.nodeList[mynode].name, "", NULL, "", true); // true means: only count nr entries;
-    	mylabel = integerToString(nr_obj) + " movies";
-    	break;
-    }
-    case NODE_MICS:
-    {
-    	nr_obj = MD.read(pipeline.nodeList[mynode].name, "", NULL, "", true); // true means: only count nr entries;
-    	mylabel = integerToString(nr_obj) + " micrographs";
-        break;
-    }
-    case NODE_PART_DATA:
-    {
-    	nr_obj = MD.read(pipeline.nodeList[mynode].name, "", NULL, "", true); // true means: only count nr entries;
-    	mylabel = integerToString(nr_obj) + " particles";
-        break;
-    }
-    case NODE_MOVIE_DATA:
-    {
-    	mylabel = "particle movie-frames";
-        break;
-    }
-    case NODE_2DREFS:
-    {
-        mylabel = "2Drefs";
-    	break;
-    }
-    case NODE_3DREF:
-    {
-        mylabel = "3D ref";
-    	break;
-    }
-    case NODE_MASK:
-    {
-        mylabel = "mask";
-    	break;
-    }
-    case NODE_MODEL:
-    {
-    	nr_obj = MD.read(pipeline.nodeList[mynode].name, "model_classes", NULL, "", true); // true means: only count nr entries;
-    	mylabel = integerToString(nr_obj) + " classes";
-        break;
-    }
-   case NODE_OPTIMISER:
-    {
-        mylabel = "continue";
-    	break;
-    }
-    case NODE_HALFMAP:
-    {
-        mylabel = "half-map";
-    	break;
-    }
-    case NODE_FINALMAP:
-    {
-        mylabel = "final map";
-    	break;
-    }
-    case NODE_RESMAP:
-    {
-        mylabel = "local-res map";
-    	break;
-    }
-	default:
+	switch (pipeline.nodeList[mynode].type)
 	{
-		mylabel = "";
-		break;
-	}
+		case NODE_MOVIES:
+		{
+			nr_obj = MD.read(pipeline.nodeList[mynode].name, "", NULL, "", true); // true means: only count nr entries;
+			mylabel = integerToString(nr_obj) + " movies";
+			break;
+		}
+		case NODE_MICS:
+		{
+			nr_obj = MD.read(pipeline.nodeList[mynode].name, "", NULL, "", true); // true means: only count nr entries;
+			mylabel = integerToString(nr_obj) + " micrographs";
+			break;
+		}
+		case NODE_PART_DATA:
+		{
+			nr_obj = MD.read(pipeline.nodeList[mynode].name, "", NULL, "", true); // true means: only count nr entries;
+			mylabel = integerToString(nr_obj) + " particles";
+			break;
+		}
+		case NODE_MOVIE_DATA:
+		{
+			mylabel = "particle movie-frames";
+			break;
+		}
+		case NODE_2DREFS:
+		{
+			mylabel = "2Drefs";
+			break;
+		}
+		case NODE_3DREF:
+		{
+			mylabel = "3D ref";
+			break;
+		}
+		case NODE_MASK:
+		{
+			mylabel = "mask";
+			break;
+		}
+		case NODE_MODEL:
+		{
+			nr_obj = MD.read(pipeline.nodeList[mynode].name, "model_classes", NULL, "", true); // true means: only count nr entries;
+			mylabel = integerToString(nr_obj) + " classes";
+			break;
+		}
+		case NODE_OPTIMISER:
+		{
+			mylabel = "continue";
+			break;
+		}
+		case NODE_HALFMAP:
+		{
+			mylabel = "half-map";
+			break;
+		}
+		case NODE_FINALMAP:
+		{
+			mylabel = "final map";
+			break;
+		}
+		case NODE_RESMAP:
+		{
+			mylabel = "local-res map";
+			break;
+		}
+		default:
+		{
+			mylabel = "";
+			break;
+		}
 	}
 
 	return mylabel;
@@ -2114,7 +2200,7 @@ long int PipeLineFlowChart::addProcessToUpwardsFlowChart(std::ofstream &fh, Pipe
 
 
 	branched_procs.clear();
-    FileName procname;
+	FileName procname;
 	if (pipeline.processList[new_process].alias != "None")
 		procname = pipeline.processList[new_process].alias;
 	else
@@ -2403,13 +2489,23 @@ void PipeLineFlowChart::makeAllUpwardsFlowCharts(FileName &fn_out, PipeLine &pip
 {
 	std::ofstream fh;
 	openFlowChartFile(fn_out, fh);
+
+	// At the beginning of the flowchart file, first make an overview flowchart with short names
+	do_short_names = true;
+	do_branches = false;
+	FileName myorititle = (pipeline.processList[from_process].alias != "None") ?
+			pipeline.processList[from_process].alias : pipeline.processList[from_process].name;
+	myorititle=myorititle.beforeLastOf("/");
+	fh << "\\section*{Overview flowchart for " << myorititle << "}" << std::endl;
+	std::vector<long int> dummy;
+	makeOneUpwardsFlowChart(fh, pipeline, from_process, dummy, true);
+
+	// Then, make fully branched flowcharts below
+	do_short_names = false;
+	do_branches = true;
 	std::vector<long int> all_branches;
-
-
-
-	std::string myorititle;
-	all_branches.push_back(from_process);
 	int i = 0;
+	all_branches.push_back(from_process);
 	while (i < all_branches.size())
 	{
 		FileName mytitle = (pipeline.processList[all_branches[i]].alias != "None") ? pipeline.processList[all_branches[i]].alias : pipeline.processList[all_branches[i]].name;
@@ -2417,17 +2513,14 @@ void PipeLineFlowChart::makeAllUpwardsFlowCharts(FileName &fn_out, PipeLine &pip
 		adaptNamesForTikZ(mytitle);
 		if (i == 0)
 		{
-			std::cout << " Making first flowchart ... " <<std::endl;
+			std::cout << " Making main branched flowchart ... " <<std::endl;
 			fh << "\\section*{Branched flowchart for " << mytitle << "}" << std::endl;
-			myorititle = mytitle;
 		}
 		else
 		{
 			std::cout << " Making flowchart for branch: " << integerToString(i) << " ... " << std::endl;
 			std::string hypertarget = "sec:" + mytitle;
 			fh << "\\subsection*{Flowchart for branch " << integerToString(i)<< ": "<< mytitle << "\\hypertarget{"<<hypertarget<<"}{}}" << std::endl;
-			//fh << "\\hypertarget{" << hypertarget<<"}{.}"<<std::endl;
-			//fh << "\\newline" << std::endl;
 		}
 
 		makeOneUpwardsFlowChart(fh, pipeline, all_branches[i], all_branches, (i==0) );
@@ -2435,11 +2528,6 @@ void PipeLineFlowChart::makeAllUpwardsFlowCharts(FileName &fn_out, PipeLine &pip
 		i++;
 	}
 
-	// At the end of the flowchart file, also make one with short names
-	do_short_names = true;
-	do_branches = false;
-	fh << "\\section{Overview flowchart for " << myorititle << "}" << std::endl;
-	makeOneUpwardsFlowChart(fh, pipeline,all_branches[0], all_branches, true);
 
 	closeFlowChartFile(fh);
 
@@ -2449,17 +2537,17 @@ void PipeLineFlowChart::openTikZPicture(std::ofstream &fh, bool is_main_flow)
 {
 	if (is_main_flow)
 	{
-		fh << "% For large flowcharts: try removing percent sign on next line, and on line below." << std::endl;
-		fh << "%\\resizebox{!}{0.95\\textheight}{" << std::endl;
+		fh << "% For large flowcharts: try reducing the fraction on the next line." << std::endl;
+		fh << "\\resizebox{!}{0.75\\textheight}{" << std::endl;
 	}
 	fh << "\\begin{tikzpicture}[scale=1, auto]" << std::endl;
-    // Override the long-name styles with the shorter ones
-    if (do_short_names)
-    {
-    	fh << "\\tikzstyle{block} = [rectangle, draw, fill=white,text width=2.5cm, node distance = 1.6cm, text centered, rounded corners, minimum height=0.8cm]" << std::endl;
-        fh << "\\tikzstyle{block2} = [rectangle, draw, fill=white,text width=2.5cm, node distance = 4cm, text centered, rounded corners, minimum height=0.8cm]" << std::endl;
-        fh << "\\tikzstyle{block2b} = [rectangle, draw, fill=white,text width=2.5cm, node distance = 1.6cm, text centered, rounded corners, minimum height=0.8cm]" << std::endl;
-    }
+	// Override the long-name styles with the shorter ones
+	if (do_short_names)
+	{
+		fh << "\\tikzstyle{block} = [rectangle, draw, fill=white,text width=2.5cm, node distance = 1.6cm, text centered, rounded corners, minimum height=0.8cm]" << std::endl;
+		fh << "\\tikzstyle{block2} = [rectangle, draw, fill=white,text width=2.5cm, node distance = 4cm, text centered, rounded corners, minimum height=0.8cm]" << std::endl;
+		fh << "\\tikzstyle{block2b} = [rectangle, draw, fill=white,text width=2.5cm, node distance = 1.6cm, text centered, rounded corners, minimum height=0.8cm]" << std::endl;
+	}
 }
 
 void PipeLineFlowChart::closeTikZPicture(std::ofstream &fh, bool is_main_flow)
@@ -2467,31 +2555,30 @@ void PipeLineFlowChart::closeTikZPicture(std::ofstream &fh, bool is_main_flow)
 	fh << "\\end{tikzpicture}" << std::endl;
 	if (is_main_flow)
 	{
-		fh << "% For large flowcharts: also remove percent sign on next line." << std::endl;
-		fh << "%}" << std::endl; // closes resizebox
+		fh << "% For large flowcharts: close resizebox here..." << std::endl;
+		fh << "}" << std::endl; // closes resizebox
 	}
 }
 
 void PipeLineFlowChart::openFlowChartFile(FileName &fn_out, std::ofstream &fh)
 {
 
-    fh.open((fn_out).c_str(), std::ios::out);
-    if (!fh)
-        REPORT_ERROR( (std::string)"PipeLineFlowChart ERROR: Cannot write to file: " + fn_out);
+	fh.open((fn_out).c_str(), std::ios::out);
+	if (!fh)
+		REPORT_ERROR( (std::string)"PipeLineFlowChart ERROR: Cannot write to file: " + fn_out);
 
-    // Set up the LaTex header
-    fh << "\\documentclass{article}" << std::endl;
-    fh << "\\usepackage{tikz,hyperref, sectsty,xcolor}" << std::endl;
-    fh << "\\usetikzlibrary{shapes,arrows}" << std::endl;
-    fh << "\\begin{document}" << std::endl;
-    fh << "\\subsectionfont{\\color{blue!50}}" << std::endl;
-    // These are the styles for the long names!
-    fh << "\\tikzstyle{block} = [rectangle, draw, fill=white,text width=3.5cm, node distance = 1.8cm, text centered, rounded corners]" << std::endl;
-    fh << "\\tikzstyle{block2} = [rectangle, draw, fill=blue!20,text width=3.5cm, node distance = 5cm, text centered, rounded corners]" << std::endl;
-    fh << "\\tikzstyle{block2b} = [rectangle, draw, fill=blue!20,text width=3.5cm, node distance = 1.8cm, text centered, rounded corners]" << std::endl;
+	// Set up the LaTex header
+	fh << "\\documentclass{article}" << std::endl;
+	fh << "\\usepackage{tikz,hyperref}" << std::endl;
+	fh << "\\usetikzlibrary{shapes,arrows}" << std::endl;
+	fh << "\\begin{document}" << std::endl;
+	// These are the styles for the long names!
+	fh << "\\tikzstyle{block} = [rectangle, draw, fill=white,text width=3.5cm, node distance = 1.8cm, text centered, rounded corners]" << std::endl;
+	fh << "\\tikzstyle{block2} = [rectangle, draw, fill=blue!20,text width=3.5cm, node distance = 5cm, text centered, rounded corners]" << std::endl;
+	fh << "\\tikzstyle{block2b} = [rectangle, draw, fill=blue!20,text width=3.5cm, node distance = 1.8cm, text centered, rounded corners]" << std::endl;
 
 
-    fh << "\\tikzstyle{line} = [draw, very thick, color=black!50, -latex']" << std::endl << std::endl;
+	fh << "\\tikzstyle{line} = [draw, very thick, color=black!50, -latex']" << std::endl << std::endl;
 }
 
 void PipeLineFlowChart::closeFlowChartFile(std::ofstream &fh)

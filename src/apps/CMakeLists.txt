@@ -15,7 +15,7 @@ file(GLOB REL_GUI_SRC "${CMAKE_SOURCE_DIR}/src/manualpicker.cpp" "${CMAKE_SOURCE
 
 if (ALTCPU)
     file(GLOB REL_SRC "${CMAKE_SOURCE_DIR}/src/*.cpp" "${CMAKE_SOURCE_DIR}/src/*.c" "${CMAKE_SOURCE_DIR}/src/acc/cpu/*.cpp" "${CMAKE_SOURCE_DIR}/src/acc/cpu/cpu_kernels/*.cpp" )
-    file(GLOB REL_SRC_H "${CMAKE_SOURCE_DIR}/src/*.h" "${CMAKE_SOURCE_DIR}/src/acc/*.h" "${CMAKE_SOURCE_DIR}/src/acc/cpu/*.h" "${CMAKE_SOURCE_DIR}/src/acc/cpu/cpu_kernels/*.h" ) 
+    file(GLOB REL_SRC_H "${CMAKE_SOURCE_DIR}/src/*.h" "${CMAKE_SOURCE_DIR}/src/acc/*.h" "${CMAKE_SOURCE_DIR}/src/acc/cpu/*.h" "${CMAKE_SOURCE_DIR}/src/acc/cpu/cpu_kernels/*.h" )
 else()
     file(GLOB REL_SRC "${CMAKE_SOURCE_DIR}/src/*.cpp" "${CMAKE_SOURCE_DIR}/src/*.c" "${CMAKE_SOURCE_DIR}/src/acc/*.cpp" )
     file(GLOB REL_SRC_H "${CMAKE_SOURCE_DIR}/src/*.h" "${CMAKE_SOURCE_DIR}/src/acc/*.h" ) 
@@ -51,10 +51,9 @@ if(NOT GUI)
     endforeach()
 endif(NOT GUI)
 
-SET(RELION_TEST TRUE)
-
 #--Remove apps for testing--
-set(TEST_TARGETS ft_test double_reconstruct_openmp)
+SET(RELION_TEST FALSE)
+set(TEST_TARGETS ft_test double_reconstruct_openmp cs_fit helix_inimodel2d ctf_nyquist_test free_aberration_plot split_stack)
 if(NOT RELION_TEST)
     foreach(TARGET ${TEST_TARGETS})
         list(REMOVE_ITEM RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/${TARGET}.cpp")
@@ -156,6 +155,10 @@ else()
 	message("TIFF NOT FOUND")
 endif()
 
+if(BUILD_OWN_TBB)
+    add_dependencies(relion_lib OWN_TBB)
+endif()
+
 foreach (_target ${RELION_TARGETS})
 	GET_FILENAME_COMPONENT(_target "relion_${_target}" NAME_WE)  #specify target name WE=WithoutExtension
 	
@@ -171,10 +174,6 @@ foreach (_target ${RELION_TARGETS})
 	else()	
 	    target_link_libraries(${_target} ${LIB} ${FFTW_LIBRARIES} ${EXTRA_LIBS} ${MPI_LIBRARIES} ${CMAKE_DL_LIBS})
 	endif(NOT MKLFFT)
-	
-	if(TIFF_FOUND)
-		target_link_libraries(${_target} ${TIFF_LIBRARIES})
-	endif()
 
 	if(CUDA_FOUND)
 	    target_link_libraries(${_target} relion_gpu_util)
@@ -200,6 +199,10 @@ foreach (_target ${RELION_TARGETS})
 		target_link_libraries(${_target} ${TIFF_LIBRARIES})
 	endif()
     
+    if(TIFF_FOUND)
+		target_link_libraries(${_target} ${TIFF_LIBRARIES})
+	endif()
+	
 	#message(STATUS "added ${_target}...")
 	
 	install (TARGETS ${_target} RUNTIME DESTINATION bin)

@@ -45,7 +45,7 @@
 #ifndef MACROS_H
 #define MACROS_H
 
-#define RELION_VERSION "3.0-alpha-4"
+#define RELION_VERSION "3.0-beta-1"
 
 #include <math.h>
 #include <signal.h>
@@ -403,15 +403,15 @@ static void SINCOSF(float x, float *s, float *c) { *s = sinf(x); *c = cosf(x); }
 #define LAST_XMIPP_INDEX(size) FIRST_XMIPP_INDEX(size) + (size) - 1
 
 
-static void PRINT_VERSION_INFO() 
+static void PRINT_VERSION_INFO()
 {
 	std::cout << "RELION version: " << RELION_VERSION << " "
 #if defined(DEBUG) || defined(DEBUG_CUDA)
 	<< "(debug-build) "
 #endif
-	
+
 	<< std::endl << "Precision: "
-	
+
 #ifdef RELION_SINGLE_PRECISION
 	<< "BASE=single"
 #else
@@ -419,11 +419,11 @@ static void PRINT_VERSION_INFO()
 #endif
 
 #if defined(CUDA) || defined(ALTCPU)
-	
+
 	#ifdef CUDA
 	<< ", CUDA-ACC="
 	#endif
-	
+
 	#ifdef ALTCPU
 	<< ", VECTOR-ACC="
 	#endif
@@ -433,7 +433,7 @@ static void PRINT_VERSION_INFO()
 	#else
 	<< "single "
 	#endif
-	
+
 #endif
 
 	<< std::endl << std::endl;

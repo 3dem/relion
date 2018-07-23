@@ -23,7 +23,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 	CUSTOM_ALLOCATOR_REGION_NAME("GFTCTF");
 
-	for (int ipart = 0; ipart < baseMLO->mydata.ori_particles[my_ori_particle].particles_id.size(); ipart++)
+	for (unsigned long ipart = 0; ipart < baseMLO->mydata.ori_particles[my_ori_particle].particles_id.size(); ipart++)
 	{
 		CTIC(accMLO->timer,"init");
 		FileName fn_img;
@@ -338,7 +338,8 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
                 								baseMLO->mymodel.sigma2_noise[group_id],
 												seed,
 												accMLO,
-												RandomImage);
+												RandomImage,
+												RandomImage.is3D());
                 LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
         }
         CTOC(cudaMLO->timer,"makeNoiseMask");
@@ -587,13 +588,13 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 
 			//avoid kernel-calls warning about null-pointer for RandomImage
 			if (baseMLO->do_zero_mask)
-						RandomImage.setDevicePtr(d_img);
+				RandomImage.setAccPtr(d_img);
 
 			// Apply a cosine-softened mask, using either the background value or the noise-image outside of the radius
 			AccUtilities::cosineFilter(
 					d_img,
 					baseMLO->do_zero_mask,
-					~RandomImage,
+					RandomImage,
 					radius,
 					radius_p,
 					cosine_width,
@@ -889,7 +890,7 @@ void getAllSquaredDifferencesCoarse(
 			sp.itrans_min, sp.itrans_max, op.Fimgs, dummy, op.Fctfs, dummy, dummy,
 			op.local_Fctfs, op.local_sqrtXi2, op.local_Minvsigma2s);
 
-	unsigned image_size = op.local_Minvsigma2s[0].nzyxdim;
+	unsigned long image_size = op.local_Minvsigma2s[0].nzyxdim;
 
 	CTOC(accMLO->timer,"diff_pre_gpu");
 
@@ -903,7 +904,7 @@ void getAllSquaredDifferencesCoarse(
 		projectorPlans.resize(baseMLO->mymodel.nr_classes, (CudaCustomAllocator *)accMLO->getAllocator());
 
 
-		for (int iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
+		for (unsigned long iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
 		{
 			if (baseMLO->mymodel.pdf_class[iclass] > 0.)
 			{
@@ -1026,7 +1027,7 @@ void getAllSquaredDifferencesCoarse(
 		MultidimArray<Complex > Fimg;
 		windowFourierTransform(op.Fimgs[ipart], Fimg, sp.current_image_size); //TODO PO isen't this already done in getFourierTransformsAndCtfs?
 
-		for (unsigned i = 0; i < image_size; i ++)
+		for (unsigned long i = 0; i < image_size; i ++)
 		{
 			XFLOAT pixel_correction = 1.0/scale_correction;
 			if (baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected)
@@ -1067,7 +1068,7 @@ void getAllSquaredDifferencesCoarse(
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
-		for (int iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
+		for (unsigned long iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
 		{
 			int iproj;
 			if (baseMLO->mymodel.nr_bodies > 1) iproj = ibody;
@@ -1117,9 +1118,7 @@ void getAllSquaredDifferencesCoarse(
 			}
 		}
 
-
-
-		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+		for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread)); // does not appear to be NEEDED FOR NON-BLOCKING CLASS STREAMS in tests, but should be to sync against classStreams
 
@@ -1167,7 +1166,7 @@ void getAllSquaredDifferencesFine(
 	MultidimArray<Complex > Fref;
 	Fref.resize(op.local_Minvsigma2s[0]);
 
-	unsigned image_size = op.local_Minvsigma2s[0].nzyxdim;
+	unsigned long image_size = op.local_Minvsigma2s[0].nzyxdim;
 
 	CTOC(accMLO->timer,"diff_pre_gpu");
 
@@ -1240,7 +1239,7 @@ void getAllSquaredDifferencesFine(
 		MultidimArray<Complex > Fimg, Fimg_nomask;
 		windowFourierTransform(op.Fimgs[ipart], Fimg, sp.current_image_size); //TODO PO isen't this already done in getFourierTransformsAndCtfs?
 
-		for (unsigned i = 0; i < image_size; i ++)
+		for (unsigned long i = 0; i < image_size; i ++)
 		{
 			XFLOAT pixel_correction = 1.0/scale_correction;
 			if (baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected)
@@ -1286,7 +1285,7 @@ void getAllSquaredDifferencesFine(
 
 		unsigned long newDataSize(0);
 
-		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+		for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		{
 			FPCMasks[ipart][exp_iclass].weightNum=0;
 
@@ -1390,11 +1389,11 @@ void getAllSquaredDifferencesFine(
 		FinePassWeights[ipart].rot_idx.cpToDevice();
 		FinePassWeights[ipart].trans_idx.cpToDevice();
 
-		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+		for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
-		for (int iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
+		for (unsigned long iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
 		{
 			int iproj;
 			if (baseMLO->mymodel.nr_bodies > 1) iproj = ibody;
@@ -1423,7 +1422,7 @@ void getAllSquaredDifferencesFine(
 				IndexedDataArray thisClassFinePassWeights(FinePassWeights[ipart],FPCMasks[ipart][iclass]);
 
 				CTIC(accMLO->timer,"Diff2CALL");
-
+				
 				runDiff2KernelFine(
 						projKernel,
 						~corr_img,
@@ -1459,7 +1458,7 @@ void getAllSquaredDifferencesFine(
 			} // end if class significant
 		} // end loop iclass
 
-		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+		for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
@@ -1521,9 +1520,9 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 	// pdf_orientation is ipart-independent, so we keep it above ipart scope
 	CTIC(accMLO->timer,"get_orient_priors");
-	for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
-		for (long int idir = sp.idir_min, iorientclass = (exp_iclass-sp.iclass_min) * sp.nr_dir * sp.nr_psi; idir <=sp.idir_max; idir++)
-			for (long int ipsi = sp.ipsi_min; ipsi <= sp.ipsi_max; ipsi++, iorientclass++)
+	for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+		for (unsigned long idir = sp.idir_min, iorientclass = (exp_iclass-sp.iclass_min) * sp.nr_dir * sp.nr_psi; idir <=sp.idir_max; idir++)
+			for (unsigned long ipsi = sp.ipsi_min; ipsi <= sp.ipsi_max; ipsi++, iorientclass++)
 			{
 				RFLOAT pdf(0);
 
@@ -1566,7 +1565,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 	op.significant_weight.resize(sp.nr_particles, 0.);
 
 	// loop over all particles inside this ori_particle
-	for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
+	for (unsigned long ipart = 0; ipart < sp.nr_particles; ipart++)
 	{
 		long int part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
 
@@ -1595,7 +1594,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 			}
 			PassWeights[ipart].weights.doFreeHost=false;
 
-			std::pair<int, XFLOAT> min_pair=AccUtilities::getArgMinOnDevice<XFLOAT>(PassWeights[ipart].weights);
+			std::pair<size_t, XFLOAT> min_pair=AccUtilities::getArgMinOnDevice<XFLOAT>(PassWeights[ipart].weights);
 			PassWeights[ipart].weights.cpToHost();
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
@@ -1623,7 +1622,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 						DIRECT_A2D_ELEM(op.Mcoarse_significant, ipart, ihidden) = false;
 			else
 			{
-				std::pair<int, XFLOAT> max_pair = AccUtilities::getArgMaxOnDevice<XFLOAT>(PassWeights[ipart].weights);
+				std::pair<size_t, XFLOAT> max_pair = AccUtilities::getArgMaxOnDevice<XFLOAT>(PassWeights[ipart].weights);
 				op.max_index[ipart].fineIdx = PassWeights[ipart].ihidden_overs[max_pair.first];
 				op.max_weight[ipart] = max_pair.second;
 			}
@@ -1634,13 +1633,13 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 
 			long int sumRedSize=0;
-			for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+			for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 				sumRedSize+= (exp_ipass==0) ? ceilf((float)(sp.nr_dir*sp.nr_psi)/(float)SUMW_BLOCK_SIZE) : ceil((float)FPCMasks[ipart][exp_iclass].jobNum / (float)SUMW_BLOCK_SIZE);
 
 			// loop through making translational priors for all classes this ipart - then copy all at once - then loop through kernel calls ( TODO: group kernel calls into one big kernel)
 			CTIC(accMLO->timer,"get_offset_priors");
 
-			for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+			for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			{
 				RFLOAT myprior_x, myprior_y, myprior_z;
 				if (baseMLO->mymodel.nr_bodies > 1)
@@ -1660,7 +1659,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 						myprior_z = ZZ(op.prior[ipart]);
 				}
 
-				for (long int itrans = sp.itrans_min; itrans <= sp.itrans_max; itrans++)
+				for (unsigned long itrans = sp.itrans_min; itrans <= sp.itrans_max; itrans++)
 				{
 
 					// If it is doing helical refinement AND Cartesian vector myprior has a length > 0, transform the vector to its helical coordinates
@@ -1755,7 +1754,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				CTIC(accMLO->timer,"sort");
 				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
-				long ipart_length = (sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi * sp.nr_trans;
+				unsigned long ipart_length = (sp.iclass_max-sp.iclass_min+1) * sp.nr_dir * sp.nr_psi * sp.nr_trans;
 				size_t offset = ipart * op.Mweight.xdim + sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.iclass_min;
 
 				if (ipart_length > 1)
@@ -1777,7 +1776,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 						ACC_PTR_DEBUG_FATAL("Unsorted array size zero.\n");  // Hopefully Impossible
 #endif
 					size_t filteredSize = AccUtilities::filterGreaterZeroOnDevice<XFLOAT>(unsorted_ipart, filtered);
-
+					
 					if (filteredSize == 0)
 					{
 						std::cerr << std::endl;
@@ -1843,7 +1842,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					XFLOAT significant_weight = sorted.getAccValueAt(thresholdIdx);
 
 					CTIC(accMLO->timer,"getArgMaxOnDevice");
-					std::pair<int, XFLOAT> max_pair = AccUtilities::getArgMaxOnDevice<XFLOAT>(unsorted_ipart);
+					std::pair<size_t, XFLOAT> max_pair = AccUtilities::getArgMaxOnDevice<XFLOAT>(unsorted_ipart);
 					CTOC(accMLO->timer,"getArgMaxOnDevice");
 					op.max_index[ipart].coarseIdx = max_pair.first;
 					op.max_weight[ipart] = max_pair.second;
@@ -1883,7 +1882,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 				pdf_offset.streamSync();
 
-				for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++) // TODO could use classStreams
+				for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++) // TODO could use classStreams
 				{
 					if ((baseMLO->mymodel.pdf_class[exp_iclass] > 0.) && (FPCMasks[ipart][exp_iclass].weightNum > 0) )
 					{
@@ -1928,7 +1927,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					}
 				}
 
-				for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++) // TODO could use classStreams
+				for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++) // TODO could use classStreams
 				{
 					if ((baseMLO->mymodel.pdf_class[exp_iclass] > 0.) && (FPCMasks[ipart][exp_iclass].weightNum > 0) )
 					{
@@ -1946,7 +1945,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 
 				op.min_diff2[ipart] += 50 - weights_max;
 
-				for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+				for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 					DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 				DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
@@ -1993,7 +1992,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 					my_significant_weight = sorted.getAccValueAt(thresholdIdx);
 
 					CTIC(accMLO->timer,"getArgMaxOnDevice");
-					std::pair<int, XFLOAT> max_pair = AccUtilities::getArgMaxOnDevice<XFLOAT>(PassWeights[ipart].weights);
+					std::pair<size_t, XFLOAT> max_pair = AccUtilities::getArgMaxOnDevice<XFLOAT>(PassWeights[ipart].weights);
 					CTOC(accMLO->timer,"getArgMaxOnDevice");
 					op.max_index[ipart].fineIdx = PassWeights[ipart].ihidden_overs[max_pair.first];
 					op.max_weight[ipart] = max_pair.second;
@@ -2007,7 +2006,8 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 		}
 
 		op.significant_weight[ipart] = (RFLOAT) my_significant_weight;
-	} // end loop ipart
+		} // end loop ipart
+
 
 #ifdef TIMING
 	if (op.my_ori_particle == baseMLO->exp_my_first_ori_particle)
@@ -2096,7 +2096,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	}
 	// wsum_sigma2_offset is just a RFLOAT
 	thr_wsum_sigma2_offset = 0.;
-	unsigned image_size = op.Fimgs[0].nzyxdim;
+	unsigned long image_size = op.Fimgs[0].nzyxdim;
 
 	CTOC(accMLO->timer,"store_init");
 
@@ -2105,12 +2105,12 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	=======================================================================================*/
 
 	CTIC(accMLO->timer,"collect_data_2");
-	int nr_transes = sp.nr_trans*sp.nr_oversampled_trans;
-	int nr_fake_classes = (sp.iclass_max-sp.iclass_min+1);
-	int oversamples = sp.nr_oversampled_trans * sp.nr_oversampled_rot;
+	unsigned long nr_transes = sp.nr_trans*sp.nr_oversampled_trans;
+	unsigned long nr_fake_classes = (sp.iclass_max-sp.iclass_min+1);
+	unsigned long oversamples = sp.nr_oversampled_trans * sp.nr_oversampled_rot;
 	std::vector<long int> block_nums(sp.nr_particles*nr_fake_classes);
 
-	for (long int ipart = 0; ipart < sp.nr_particles; ipart++)
+	for (unsigned long ipart = 0; ipart < sp.nr_particles; ipart++)
 	{
 		// Allocate space for all classes, so that we can pre-calculate data for all classes, copy in one operation, call kenrels on all classes, and copy back in one operation
 		AccPtr<XFLOAT>          oo_otrans_x = ptrFactory.make<XFLOAT>((size_t)nr_fake_classes*nr_transes); // old_offset_oversampled_trans_x
@@ -2124,12 +2124,12 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		myp_oo_otrans_x2y2z2.allAlloc();
 
 		int sumBlockNum =0;
-		long int part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
+		unsigned long part_id = baseMLO->mydata.ori_particles[op.my_ori_particle].particles_id[ipart];
 		int group_id = baseMLO->mydata.getGroupId(part_id);
 		CTIC(accMLO->timer,"collect_data_2_pre_kernel");
-		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+		for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		{
-			int fake_class = exp_iclass-sp.iclass_min; // if we only have the third class to do, the third class will be the "first" we do, i.e. the "fake" first.
+			unsigned long fake_class = exp_iclass-sp.iclass_min; // if we only have the third class to do, the third class will be the "first" we do, i.e. the "fake" first.
 			if ((baseMLO->mymodel.pdf_class[exp_iclass] == 0.) || (ProjectionData[ipart].class_entries[exp_iclass] == 0) )
 				continue;
 
@@ -2236,16 +2236,16 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		int partial_pos=0;
 
 
-		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+		for (long int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		{
-			int fake_class = exp_iclass-sp.iclass_min; // if we only have the third class to do, the third class will be the "first" we do, i.e. the "fake" first.
+			long int fake_class = exp_iclass-sp.iclass_min; // if we only have the third class to do, the third class will be the "first" we do, i.e. the "fake" first.
 			if ((baseMLO->mymodel.pdf_class[exp_iclass] == 0.) || (ProjectionData[ipart].class_entries[exp_iclass] == 0) )
 				continue;
 
 			// Use the constructed mask to construct a partial class-specific input
 			IndexedDataArray thisClassFinePassWeights(FinePassWeights[ipart],FPCMasks[ipart][exp_iclass]);
 
-			int cpos=fake_class*nr_transes;
+			long int cpos=fake_class*nr_transes;
 			int block_num = block_nums[nr_fake_classes*ipart + fake_class];
 
 			runCollect2jobs(block_num,
@@ -2287,9 +2287,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 		int iorient = 0;
 		partial_pos=0;
-		for (int iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
+		for (long int iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
 		{
-			int fake_class = iclass-sp.iclass_min; // if we only have the third class to do, the third class will be the "first" we do, i.e. the "fake" first.
+			long int fake_class = iclass-sp.iclass_min; // if we only have the third class to do, the third class will be the "first" we do, i.e. the "fake" first.
 			if ((baseMLO->mymodel.pdf_class[iclass] == 0.) || (ProjectionData[ipart].class_entries[iclass] == 0) )
 				continue;
 			int block_num = block_nums[nr_fake_classes*ipart + fake_class];
@@ -2485,7 +2485,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		windowFourierTransform(op.Fimgs[ipart], Fimg, sp.current_image_size); //TODO PO isen't this already done in getFourierTransformsAndCtfs?
 		windowFourierTransform(op.Fimgs_nomask[ipart], Fimg_nonmask, sp.current_image_size);
 
-		for (unsigned i = 0; i < image_size; i ++)
+		for (unsigned long i = 0; i < image_size; i ++)
 		{
 			Fimgs_real[i] = Fimg.data[i].real;
 			Fimgs_imag[i] = Fimg.data[i].imag;
@@ -2532,11 +2532,11 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 		if (baseMLO->do_ctf_correction)
 		{
-			for (unsigned i = 0; i < image_size; i++)
+			for (unsigned long i = 0; i < image_size; i++)
 				ctfs[i] = (XFLOAT) op.local_Fctfs[ipart].data[i] * part_scale;
 		}
 		else //TODO should be handled by memset
-			for (unsigned i = 0; i < image_size; i++)
+			for (unsigned long i = 0; i < image_size; i++)
 				ctfs[i] = part_scale;
 
 		ctfs.cpToDevice();
@@ -2549,10 +2549,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		Minvsigma2s.allAlloc();
 
 		if (baseMLO->do_map)
-			for (unsigned i = 0; i < image_size; i++)
+			for (unsigned long i = 0; i < image_size; i++)
 				Minvsigma2s[i] = op.local_Minvsigma2s[ipart].data[i];
 		else
-			for (unsigned i = 0; i < image_size; i++)
+			for (unsigned long i = 0; i < image_size; i++)
 				Minvsigma2s[i] = 1;
 
 		Minvsigma2s.cpToDevice();
@@ -2584,13 +2584,13 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		sorted_weights.allAlloc();
 		std::vector<AccPtr<XFLOAT> > eulers(baseMLO->mymodel.nr_classes, ptrFactory.make<XFLOAT>());
 
-		int classPos = 0;
+		unsigned long classPos = 0;
 
-		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+		for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
-		for (int iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
+		for (unsigned long iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
 		{
 			if((baseMLO->mymodel.pdf_class[iclass] == 0.) || (ProjectionData[ipart].class_entries[iclass] == 0))
 				continue;
@@ -2666,13 +2666,13 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		sorted_weights.cpToDevice();
 
 		// These syncs are necessary (for multiple ranks on the same GPU), and (assumed) low-cost.
-		for (int iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
+		for (unsigned long iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[iclass]));
 
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
 		classPos = 0;
-		for (int iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
+		for (unsigned long iclass = sp.iclass_min; iclass <= sp.iclass_max; iclass++)
 		{
 			int iproj;
 			if (baseMLO->mymodel.nr_bodies > 1) iproj = ibody;
@@ -2769,7 +2769,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 		// NOTE: We've never seen that this sync is necessary, but it is needed in principle, and
 		// its absence in other parts of the code has caused issues. It is also very low-cost.
-		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+		for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 			DEBUG_HANDLE_ERROR(cudaStreamSynchronize(accMLO->classStreams[exp_iclass]));
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(cudaStreamPerThread));
 
@@ -2780,7 +2780,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 		AAXA_pos=0;
 
-		for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
+		for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		{
 			if((baseMLO->mymodel.pdf_class[exp_iclass] == 0.) || (ProjectionData[ipart].class_entries[exp_iclass] == 0))
 				continue;
@@ -2796,7 +2796,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			}
 			AAXA_pos += image_size;
 		} // end loop iclass
-		for (long int j = 0; j < image_size; j++)
+		for (unsigned long j = 0; j < image_size; j++)
 		{
 			int ires = DIRECT_MULTIDIM_ELEM(baseMLO->Mresol_fine, j);
 			if (ires > -1)
@@ -2822,7 +2822,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		int group_id = baseMLO->mydata.getGroupId(part_id);
 
 		// If the current images were smaller than the original size, fill the rest of wsum_model.sigma2_noise with the power_class spectrum of the images
-		for (int ires = baseMLO->mymodel.current_size/2 + 1; ires < baseMLO->mymodel.ori_size/2 + 1; ires++)
+		for (unsigned long ires = baseMLO->mymodel.current_size/2 + 1; ires < baseMLO->mymodel.ori_size/2 + 1; ires++)
 		{
 			DIRECT_A1D_ELEM(thr_wsum_sigma2_noise[group_id], ires) += DIRECT_A1D_ELEM(op.power_imgs[ipart], ires);
 			// Also extend the weighted sum of the norm_correction
@@ -3134,7 +3134,7 @@ baseMLO->timer.tic(baseMLO->TIMING_ESP_DIFF2_D);
 //					// -- go through all classes and generate projectionsetups for all classes - to be used in getASDF and storeWS below --
 //					// the reason to do this globally is subtle - we want the orientation_num of all classes to estimate a largest possible
 //					// weight-array, which would be insanely much larger than necessary if we had to assume the worst.
-				for (long int iframe = 0; iframe < sp.nr_particles; iframe++)
+				for (unsigned long iframe = 0; iframe < sp.nr_particles; iframe++)
 				{
 					FineProjectionData[iframe].orientationNumAllClasses = 0;
 					for (int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
@@ -3191,7 +3191,7 @@ baseMLO->timer.tic(baseMLO->TIMING_ESP_DIFF2_E);
 		// For the reconstruction step use mymodel.current_size!
 		sp.current_image_size = baseMLO->mymodel.current_size;
 
-	for (long int iframe = 0; iframe < sp.nr_particles; iframe++)
+	for (unsigned long iframe = 0; iframe < sp.nr_particles; iframe++)
 	{
 		bundleSWS[iframe].setSize(2*(FineProjectionData[iframe].orientationNumAllClasses)*sizeof(unsigned long));
 		bundleSWS[iframe].allAlloc();

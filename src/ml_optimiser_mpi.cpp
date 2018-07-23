@@ -821,7 +821,7 @@ void MlOptimiserMpi::expectation()
 			fn_tmp.compose("PPref_", i,"dat");
 			std::ofstream f;
 			f.open(fn_tmp.c_str());
-			for (unsigned j = 0; j < mymodel.PPref[i].data.nzyxdim; j++)
+			for (unsigned long j = 0; j < mymodel.PPref[i].data.nzyxdim; j++)
 					f << mymodel.PPref[i].data.data[j].real << std::endl;
 			f.close();
 		}
@@ -1040,7 +1040,7 @@ void MlOptimiserMpi::expectation()
 	{
 		unsigned nr_classes = mymodel.PPref.size();
 		// Allocate Array of complex arrays for this class
-		if(posix_memalign((void **)&mdlClassComplex, MEM_ALIGN, nr_classes * sizeof (XFLOAT *)))
+		if (posix_memalign((void **)&mdlClassComplex, MEM_ALIGN, nr_classes * sizeof (std::complex<XFLOAT> *)))
 			CRITICAL(RAMERR);
 
 		// Set up XFLOAT complex array shared by all threads for each class
@@ -1049,21 +1049,31 @@ void MlOptimiserMpi::expectation()
 			int mdlX = mymodel.PPref[iclass].data.xdim;
 			int mdlY = mymodel.PPref[iclass].data.ydim;
 			int mdlZ = mymodel.PPref[iclass].data.zdim;
-			int mdlXYZ;
+			size_t mdlXYZ;
 			if(mdlZ == 0)
-				mdlXYZ = mdlX*mdlY;
+				mdlXYZ = (size_t)mdlX*(size_t)mdlY;
 			else
-				mdlXYZ = mdlX*mdlY*mdlZ;
+				mdlXYZ = (size_t)mdlX*(size_t)mdlY*(size_t)mdlZ;
 
-			if(posix_memalign((void **)&mdlClassComplex[iclass], MEM_ALIGN, mdlXYZ * 2 * sizeof(XFLOAT)))
-				CRITICAL(RAMERR);
-
-			XFLOAT *pData = mdlClassComplex[iclass];
-
-			for (unsigned long i = 0; i < mdlXYZ; i ++)
+			try
 			{
-				*pData ++ = (XFLOAT) mymodel.PPref[iclass].data.data[i].real;
-				*pData ++ = (XFLOAT) mymodel.PPref[iclass].data.data[i].imag;
+				mdlClassComplex[iclass] = new std::complex<XFLOAT>[mdlXYZ];
+			}
+			catch (std::bad_alloc& ba)
+			{
+				CRITICAL(RAMERR);
+			}			
+
+			std::complex<XFLOAT> *pData = mdlClassComplex[iclass];
+
+			// Copy results into complex number array
+			for (size_t i = 0; i < mdlXYZ; i ++)
+			{
+				std::complex<XFLOAT> arrayval(
+					(XFLOAT) mymodel.PPref[iclass].data.data[i].real,
+					(XFLOAT) mymodel.PPref[iclass].data.data[i].imag
+				);
+				pData[i] = arrayval;
 			}
 		}
 
@@ -1539,7 +1549,7 @@ void MlOptimiserMpi::expectation()
 				unsigned nr_classes = mymodel.nr_classes;
 				for (int iclass = 0; iclass < nr_classes; iclass++)
 				{
-					free(mdlClassComplex[iclass]);
+					delete [] mdlClassComplex[iclass];
 				}
 				free(mdlClassComplex);
 

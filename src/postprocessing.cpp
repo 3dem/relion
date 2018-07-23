@@ -265,14 +265,13 @@ void Postprocessing::divideByMtf(MultidimArray<Complex > &FT)
 			i++;
 		}
 
-	    RFLOAT xsize = (RFLOAT)XSIZE(I1());
-	    FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT)
-	    {
-	    	int r2 = kp * kp + ip * ip + jp * jp;
-	    	RFLOAT res = sqrt((RFLOAT)r2)/xsize; // get resolution in 1/pixel
+		RFLOAT xsize = (RFLOAT)XSIZE(I1());
+		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT)
+		{
+			int r2 = kp * kp + ip * ip + jp * jp;
+			RFLOAT res = sqrt((RFLOAT)r2)/xsize; // get resolution in 1/pixel
 			if (res < 0.5 )
 			{
-
 				// Find the suitable MTF value
 				int i_0 = 0;
 				for (int ii = 0; ii < XSIZE(mtf_resol); ii++)
@@ -297,11 +296,8 @@ void Postprocessing::divideByMtf(MultidimArray<Complex > &FT)
 				// Divide Fourier component by the MTF
 				DIRECT_A3D_ELEM(FT, k, i, j) /= mtf;
 			}
-	    }
-
+		}
 	}
-
-
 }
 
 bool Postprocessing::findSurfacePixel(int idx, int kp, int ip, int jp,
@@ -354,84 +350,83 @@ void Postprocessing::correctRadialAmplitudeDistribution(MultidimArray<RFLOAT > &
 	transformer.FourierTransform(I, FT, false);
 
 	// First calculate radial average, to normalize the power spectrum
-    int myradius = XSIZE(FT);
+	int myradius = XSIZE(FT);
 	MultidimArray< int > radial_count(myradius);
-    MultidimArray<RFLOAT> num, ravg;
-    num.initZeros(myradius);
-    ravg.initZeros(myradius);
-    FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT)
-    {
-    	int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
-        if (idx >= myradius)
-        	continue;
-        ravg(idx)+= norm(DIRECT_A3D_ELEM(FT, k, i, j));
-        radial_count(idx)++;
-    }
-    FOR_ALL_ELEMENTS_IN_ARRAY1D(ravg)
-    {
-        if (radial_count(i) > 0)
-        {
-			ravg(i) /= radial_count(i);
+	MultidimArray<RFLOAT> num, ravg;
+	num.initZeros(myradius);
+	ravg.initZeros(myradius);
+	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT)
+	{
+		int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
+		if (idx >= myradius)
+	    		continue;
+		ravg(idx)+= norm(DIRECT_A3D_ELEM(FT, k, i, j));
+		radial_count(idx)++;
+	}
+	FOR_ALL_ELEMENTS_IN_ARRAY1D(ravg)
+	{
+		if (radial_count(i) > 0)
+		{
+    			ravg(i) /= radial_count(i);
+	    	}
+	}
+
+	// Apply correction only beyond low-res fitting of B-factors
+	int minr = FLOOR(XSIZE(FT) * angpix / fit_minres);
+	int myradius_count = minr;
+	MultidimArray<RFLOAT> sum3d;
+	MultidimArray<int> count3d;
+	sum3d.resize(2*myradius_count+4, 2*myradius_count+4, 2*myradius_count+4);
+	sum3d.setXmippOrigin();
+	count3d.resize(sum3d);
+	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT)
+	{
+		int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
+		// only correct from fit_minres to Nyquist
+		if (idx < minr || idx >= myradius)
+	     		continue;
+
+		int best_kpp, best_ipp, best_jpp;
+		if (!findSurfacePixel(idx, kp, ip, jp, best_kpp, best_ipp, best_jpp, myradius_count, 2))
+		{
+			std::cerr << "Postprocessing::correctRadialAmplitudeDistribution ERROR! kp= " << kp << " ip= " << ip << " jp= " << jp << std::endl;
 		}
-    }
 
-    // Apply correction only beyond low-res fitting of B-factors
-    int minr = FLOOR(XSIZE(FT) * angpix / fit_minres);
-    int myradius_count = minr;
-    MultidimArray<RFLOAT> sum3d;
-    MultidimArray<int> count3d;
-    sum3d.resize(2*myradius_count+4, 2*myradius_count+4, 2*myradius_count+4);
-    sum3d.setXmippOrigin();
-    count3d.resize(sum3d);
-    FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT)
-    {
-    	int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
-    	// only correct from fit_minres to Nyquist
-    	if (idx < minr || idx >= myradius)
-         	continue;
+		// Apply correction on the spectrum-corrected values!
+		RFLOAT aux = norm(DIRECT_A3D_ELEM(FT, k, i, j)) / ravg(idx);
+		A3D_ELEM(sum3d, best_kpp, best_ipp, best_jpp) += aux;
+		A3D_ELEM(count3d, best_kpp, best_ipp, best_jpp) += 1;
+	}
 
-    	int best_kpp, best_ipp, best_jpp;
-    	if (!findSurfacePixel(idx, kp, ip, jp, best_kpp, best_ipp, best_jpp, myradius_count, 2))
-    	{
-    		std::cerr << "Postprocessing::correctRadialAmplitudeDistribution ERROR! kp= " << kp << " ip= " << ip << " jp= " << jp << std::endl;
-    	}
+	// Average
+	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(sum3d)
+	{
+		if (DIRECT_MULTIDIM_ELEM(count3d, n) > 0)
+		{
+			DIRECT_MULTIDIM_ELEM(sum3d, n) /= DIRECT_MULTIDIM_ELEM(count3d, n);
+		}
+	}
 
-    	// Apply correction on the spectrum-corrected values!
-    	RFLOAT aux = norm(DIRECT_A3D_ELEM(FT, k, i, j)) / ravg(idx);
-    	A3D_ELEM(sum3d, best_kpp, best_ipp, best_jpp) += aux;
-    	A3D_ELEM(count3d, best_kpp, best_ipp, best_jpp) += 1;
-    }
+	// Now divide all elements by the normalized correction term
+	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT)
+	{
+		int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
+		// only correct from fit_minres to Nyquist
+		if (idx < minr || idx >= myradius)
+		     	continue;
 
-    // Average
-    FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(sum3d)
-    {
-    	if (DIRECT_MULTIDIM_ELEM(count3d, n) > 0)
-    	{
-    		DIRECT_MULTIDIM_ELEM(sum3d, n) /= DIRECT_MULTIDIM_ELEM(count3d, n);
-    	}
-    }
+		int best_kpp, best_ipp, best_jpp;
+		if (!findSurfacePixel(idx, kp, ip, jp, best_kpp, best_ipp, best_jpp, myradius_count, 2))
+		{
+			std::cerr << "Postprocessing::correctRadialAmplitudeDistribution ERROR!  kp= " << kp << " ip= " << ip << " jp= " << jp << std::endl;
+		}
 
-    // Now divide all elements by the normalized correction term
-    FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT)
-    {
-    	int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
-    	// only correct from fit_minres to Nyquist
-    	if (idx < minr || idx >= myradius)
-         	continue;
-
-    	int best_kpp, best_ipp, best_jpp;
-    	if (!findSurfacePixel(idx, kp, ip, jp, best_kpp, best_ipp, best_jpp, myradius_count, 2))
-    	{
-    		std::cerr << "Postprocessing::correctRadialAmplitudeDistribution ERROR!  kp= " << kp << " ip= " << ip << " jp= " << jp << std::endl;
-    	}
-
-    	// Apply correction on the spectrum-corrected values!
-    	RFLOAT aux = sqrt(A3D_ELEM(sum3d, best_kpp, best_ipp, best_jpp));
-    	DIRECT_A3D_ELEM(FT, k, i, j) /= aux;
-    }
+		// Apply correction on the spectrum-corrected values!
+		RFLOAT aux = sqrt(A3D_ELEM(sum3d, best_kpp, best_ipp, best_jpp));
+		DIRECT_A3D_ELEM(FT, k, i, j) /= aux;
+	}
 
 	transformer.inverseFourierTransform(FT, I);
-
 }
 
 
@@ -731,12 +726,12 @@ void Postprocessing::writeOutput()
 	CPlot2D *plot2D = new CPlot2D(title);
 	plot2D->SetXAxisSize(600);
 	plot2D->SetYAxisSize(400);
-	plot2D->SetXAxisTitle("resolution (1/A)");
-	plot2D->SetYAxisTitle("Fourier Shell Correlation");
 	MDfsc.addToCPlot2D(plot2D, EMDL_RESOLUTION, EMDL_POSTPROCESS_FSC_TRUE, 0., 0., 0., 2.);
 	MDfsc.addToCPlot2D(plot2D, EMDL_RESOLUTION, EMDL_POSTPROCESS_FSC_UNMASKED, 0., 1., 0.);
 	MDfsc.addToCPlot2D(plot2D, EMDL_RESOLUTION, EMDL_POSTPROCESS_FSC_MASKED, 0., 0., 1.);
 	MDfsc.addToCPlot2D(plot2D, EMDL_RESOLUTION, EMDL_POSTPROCESS_FSC_RANDOM_MASKED, 1., 0., 0.);
+	plot2D->SetXAxisTitle("resolution (1/A)");
+	plot2D->SetYAxisTitle("Fourier Shell Correlation");
 	plot2D->OutputPostScriptPlot(fn_out + "_fsc.eps");
 	delete plot2D;
 
@@ -781,8 +776,6 @@ void Postprocessing::writeOutput()
 	CPlot2D *plot2Db = new CPlot2D("Guinier plots");
 	plot2Db->SetXAxisSize(600);
 	plot2Db->SetYAxisSize(400);
-	plot2Db->SetXAxisTitle("resolution^2 (1/A^2)");
-	plot2Db->SetYAxisTitle("ln(amplitudes)");
 	MDguinier.addToCPlot2D(plot2Db, EMDL_POSTPROCESS_GUINIER_RESOL_SQUARED, EMDL_POSTPROCESS_GUINIER_VALUE_IN, 0., 0., 0.);
 	if (fn_mtf != "")
 		MDguinier.addToCPlot2D(plot2Db, EMDL_POSTPROCESS_GUINIER_RESOL_SQUARED, EMDL_POSTPROCESS_GUINIER_VALUE_INVMTF, 0., 1., 0.);
@@ -794,6 +787,8 @@ void Postprocessing::writeOutput()
 	{
 		MDextra2.addToCPlot2D(plot2Db, EMDL_POSTPROCESS_GUINIER_RESOL_SQUARED, EMDL_POSTPROCESS_GUINIER_VALUE_SHARPENED, 1., 0., 0.);
 	}
+	plot2Db->SetXAxisTitle("resolution^2 (1/A^2)");
+	plot2Db->SetYAxisTitle("ln(amplitudes)");
 	plot2Db->OutputPostScriptPlot(fn_out + "_guinier.eps");
 	delete plot2Db;
 
@@ -841,28 +836,26 @@ void Postprocessing::writeMaps(FileName fn_root) {
 
 void Postprocessing::writeFscXml(MetaDataTable &MDfsc)
 {
-
-    FileName fn_fsc = fn_out + "_fsc.xml";
+	FileName fn_fsc = fn_out + "_fsc.xml";
 	std::ofstream  fh;
-    fh.open((fn_fsc).c_str(), std::ios::out);
-    if (!fh)
-        REPORT_ERROR( (std::string)"MetaDataTable::write Cannot write to file: " + fn_fsc);
+	fh.open((fn_fsc).c_str(), std::ios::out);
+	if (!fh)
+		REPORT_ERROR( (std::string)"MetaDataTable::write Cannot write to file: " + fn_fsc);
 
-    fh << "<fsc title=\"RELION masked-corrected FSC\" xaxis=\"Resolution (A-1)\" yaxis=\"Correlation Coefficient\">"<<std::endl;
+	fh << "<fsc title=\"RELION masked-corrected FSC\" xaxis=\"Resolution (A-1)\" yaxis=\"Correlation Coefficient\">"<<std::endl;
 
-    FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDfsc)
-    {
-    	RFLOAT xx, yy;
-    	MDfsc.getValue(EMDL_RESOLUTION, xx);
-    	MDfsc.getValue(EMDL_POSTPROCESS_FSC_TRUE, yy);
-    	fh << "  <coordinate>" << std::endl;
-    	fh << "    <x>" << xx << "</x>" << std::endl;
-    	fh << "    <y>" << yy << "</y>" << std::endl;
-    	fh << "  </coordinate>" << std::endl;
-    }
-    fh << "</fsc>" << std::endl;
-    fh.close();
-
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDfsc)
+	{
+		RFLOAT xx, yy;
+		MDfsc.getValue(EMDL_RESOLUTION, xx);
+		MDfsc.getValue(EMDL_POSTPROCESS_FSC_TRUE, yy);
+		fh << "  <coordinate>" << std::endl;
+		fh << "    <x>" << xx << "</x>" << std::endl;
+		fh << "    <y>" << yy << "</y>" << std::endl;
+		fh << "  </coordinate>" << std::endl;
+	}
+	fh << "</fsc>" << std::endl;
+	fh.close();
 }
 
 void Postprocessing::run_locres(int rank, int size)
@@ -1190,14 +1183,29 @@ void Postprocessing::run()
 		global_resol_i = i;
 	}
 
-	// Only have one digit after final resolution
-    // global_resol = (ROUND(global_resol*10.))/10.;
-
-	// Check whether the phase-randomised FSC is less than 5% at the resolution estimate, otherwise warn the user
-	if (DIRECT_A1D_ELEM(fsc_random_masked, global_resol_i) > 0.1)
+	// Perform some checks on phase-randomisation..
+	if (do_mask)
 	{
-		std::cerr << " WARNING: The phase-randomised FSC is larger than 0.10 at the estimated resolution!" << std::endl;
-		std::cerr << " WARNING: This may result in an incorrect resolution estimation. Provide a softer mask with less features to get lower phase-randomised FSCs." << std::endl;
+		int unmasked_resol_i = 0;
+		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(fsc_unmasked)
+		{
+			if ( DIRECT_A1D_ELEM(fsc_unmasked, i) < 0.143)
+				break;
+			unmasked_resol_i = i;
+		}
+		// Check whether global_resol is worse than the unmasked one
+		if (unmasked_resol_i > global_resol_i)
+		{
+			std::cerr << " WARNING: the unmasked FSC extends beyond the solvent-corrected FSC. Skip masking for now, but you may want to adjust you mask!" << std::endl;
+			fsc_true = fsc_unmasked;
+			global_resol = XSIZE(I1())*angpix/(RFLOAT)unmasked_resol_i;
+		}
+		// Check whether the phase-randomised FSC is less than 5% at the resolution estimate, otherwise warn the user
+		else if (DIRECT_A1D_ELEM(fsc_random_masked, global_resol_i) > 0.1)
+		{
+			std::cerr << " WARNING: The phase-randomised FSC is larger than 0.10 at the estimated resolution!" << std::endl;
+			std::cerr << " WARNING: This may result in an incorrect resolution estimation. Provide a softer mask with less features to get lower phase-randomised FSCs." << std::endl;
+		}
 	}
 
 	// Add the two half-maps together for subsequent sharpening

@@ -181,6 +181,9 @@ void Micrograph::write(FileName filename)
 	if (fnGain != "") {
 		MD.setValue(EMDL_MICROGRAPH_GAIN_NAME, fnGain);
 	}
+	if (fnDefect != "") {
+		MD.setValue(EMDL_MICROGRAPH_DEFECT_FILE, fnDefect);
+	}
 	MD.setValue(EMDL_MICROGRAPH_BINNING, binning);
 	if (angpix != -1) {
 		MD.setValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, angpix);
@@ -256,7 +259,21 @@ int Micrograph::getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFL
 	}
 
 	if (globalShiftX[frame - 1] == NOT_OBSERVED || globalShiftX[frame - 1] == NOT_OBSERVED) {
+		// Find the shift of the closest observed frame.
+		// If the given 'frame' is unobserved due to initial frame truncation (--first_frame),
+		// the output becomes zero. This is OK because the shift of the first observed frame
+		// is zero by definition. So we don't have to search after the 'frame'.
 		shiftx = shifty = 0;
+
+		for (int i = frame - 1; i >= 0; i--)
+		{
+			if (globalShiftX[i] != NOT_OBSERVED && globalShiftY[i] != NOT_OBSERVED)
+			{
+				shiftx = globalShiftX[i];
+				shifty = globalShiftY[i];
+				break;
+			}
+		}
 		return -1;
 	}
 
@@ -323,6 +340,9 @@ void Micrograph::read(FileName fn_in)
 
 	if (!MDglobal.getValue(EMDL_MICROGRAPH_GAIN_NAME, fnGain)) {
 		fnGain = "";
+	}
+	if (!MDglobal.getValue(EMDL_MICROGRAPH_DEFECT_FILE, fnDefect)) {
+		fnDefect = "";
 	}
 	if (!MDglobal.getValue(EMDL_MICROGRAPH_BINNING, binning)) {
 		binning = 1.0;
@@ -414,6 +434,7 @@ void Micrograph::clearFields()
 
 	fnMovie = "";
 	fnGain = "";
+	fnDefect = "";
 
 	globalShiftX.resize(0);
 	globalShiftY.resize(0);
@@ -444,6 +465,7 @@ void Micrograph::copyFieldsFrom(const Micrograph& m)
 
 	fnMovie = m.fnMovie;
 	fnGain = m.fnGain;
+	fnDefect = m.fnDefect;
 
 	globalShiftX = m.globalShiftX;
 	globalShiftY = m.globalShiftY;

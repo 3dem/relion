@@ -33,7 +33,7 @@ class stack_create_parameters
 	MetaDataTable MD;
 	// I/O Parser
 	IOParser parser;
-	bool do_spider, do_split_per_micrograph, do_apply_trans;
+	bool do_spider, do_split_per_micrograph, do_apply_trans, do_apply_trans_only;
 
 	void usage()
 	{
@@ -51,6 +51,7 @@ class stack_create_parameters
 		do_spider  = parser.checkOption("--spider_format", "Write out in SPIDER stack format (by default MRC stack format)");
 		do_split_per_micrograph = parser.checkOption("--split_per_micrograph", "Write out separate stacks for each micrograph (needs rlnMicrographName in STAR file)");
 		do_apply_trans = parser.checkOption("--apply_transformation", "Apply the inplane-transformations (needs _rlnOriginX/Y and _rlnAnglePsi in STAR file)");
+		do_apply_trans_only = parser.checkOption("--apply_rounded_offsets_only", "Apply the rounded translations only (so-recentering without interpolation; needs _rlnOriginX/Y in STAR file)");
 
 		fn_ext = (do_spider) ? ".spi" : ".mrcs";
 
@@ -135,47 +136,6 @@ class stack_create_parameters
 			std::cout << "This will require " << Gb << "Gb of memory...."<< std::endl;
 			Image<RFLOAT> out(xdim, ydim, zdim, ndim);
 
-			int n = 0;
-			init_progress_bar(ndim);
-			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
-			{
-				FileName fn_mymic;
-				if (do_split_per_micrograph)
-					MD.getValue(EMDL_MICROGRAPH_NAME, fn_mymic);
-				else
-					fn_mymic="";
-
-				if (fn_mymic == fn_mic)
-				{
-
-					MD.getValue(EMDL_IMAGE_NAME, fn_img);
-					in.read(fn_img);
-
-					if (do_apply_trans)
-					{
-						RFLOAT xoff = 0.;
-						RFLOAT yoff = 0.;
-						RFLOAT psi = 0.;
-						MD.getValue(EMDL_ORIENT_ORIGIN_X, xoff);
-						MD.getValue(EMDL_ORIENT_ORIGIN_Y, yoff);
-						MD.getValue(EMDL_ORIENT_PSI, psi);
-						// Apply the actual transformation
-						Matrix2D<RFLOAT> A;
-						rotation2DMatrix(psi, A);
-						MAT_ELEM(A,0, 2) = xoff;
-						MAT_ELEM(A,1, 2) = yoff;
-						selfApplyGeometry(in(), A, IS_NOT_INV, DONT_WRAP);
-					}
-
-					out().setImage(n, in());
-					n++;
-					if (n%100==0) progress_bar(n);
-
-				}
-			}
-			progress_bar(ndim);
-
-
 			FileName fn_out;
 			if (do_split_per_micrograph)
 			{
@@ -193,10 +153,76 @@ class stack_create_parameters
 				system(command.c_str());
 			}
 
+			int n = 0;
+			init_progress_bar(ndim);
+			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
+			{
+				FileName fn_mymic;
+				if (do_split_per_micrograph)
+					MD.getValue(EMDL_MICROGRAPH_NAME, fn_mymic);
+				else
+					fn_mymic="";
+
+				if (fn_mymic == fn_mic)
+				{
+
+					MD.getValue(EMDL_IMAGE_NAME, fn_img);
+					in.read(fn_img);
+
+					if (do_apply_trans || do_apply_trans_only)
+					{
+						RFLOAT xoff, ori_xoff;
+						RFLOAT yoff, ori_yoff;
+						RFLOAT psi, ori_psi;
+						MD.getValue(EMDL_ORIENT_ORIGIN_X, ori_xoff);
+						MD.getValue(EMDL_ORIENT_ORIGIN_Y, ori_yoff);
+						MD.getValue(EMDL_ORIENT_PSI, ori_psi);
+
+						if (do_apply_trans_only)
+						{
+							xoff = ROUND(ori_xoff);
+							yoff = ROUND(ori_yoff);
+							psi = 0.;
+						}
+						else
+						{
+							xoff = ori_xoff;
+							yoff = ori_yoff;
+							psi = ori_psi;
+						}
+
+						// Apply the actual transformation
+						Matrix2D<RFLOAT> A;
+						rotation2DMatrix(psi, A);
+						MAT_ELEM(A,0, 2) = xoff;
+						MAT_ELEM(A,1, 2) = yoff;
+						selfApplyGeometry(in(), A, IS_NOT_INV, DONT_WRAP);
+
+						MD.setValue(EMDL_ORIENT_ORIGIN_X, ori_xoff - xoff);
+						MD.setValue(EMDL_ORIENT_ORIGIN_Y, ori_yoff - yoff);
+						MD.setValue(EMDL_ORIENT_PSI, ori_psi - psi);
+						FileName fn_img;
+						fn_img.compose(n+1, fn_out);
+						MD.setValue(EMDL_IMAGE_NAME, fn_img);
+					}
+
+					out().setImage(n, in());
+					n++;
+					if (n%100==0) progress_bar(n);
+
+				}
+			}
+			progress_bar(ndim);
+
 			out.write(fn_out);
 			std::cout << "Written out: " << fn_out << std::endl;
+
 		}
+
+		MD.write(fn_root+".star");
+		std::cout << "Written out: " << fn_root << ".star" << std::endl;
 		std::cout << "Done!" <<std::endl;
+
 	}
 
 };

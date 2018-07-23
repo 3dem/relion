@@ -28,7 +28,7 @@ void ParticleSorter::read(int argc, char **argv)
 	int gen_section = parser.addSection("General options");
 	fn_in = parser.getOption("--i", "Input STAR file ");
 	fn_ref = parser.getOption("--ref", "STAR file with the reference names, or an MRC stack with all references");
-	fn_out = parser.getOption("--o", "Output rootname (if empty the input file will be overwritten)", "");
+	fn_out = parser.getOption("--o", "Output rootname (if empty the input file will be overwritten)", "sorted.star");
 	angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms", "1"));
 	angpix_ref = textToFloat(parser.getOption("--angpix_ref", "Pixel size of the references in Angstroms (default is same as micrographs)", "-1"));
 	particle_diameter = textToFloat(parser.getOption("--particle_diameter", "Diameter of the circ. mask for the experimental images (in Angstroms, default=automatic)", "-1"));
@@ -149,9 +149,13 @@ void ParticleSorter::initialise()
 			sumr += (last_corner - first_corner);
 		}
 		sumr /= 2. * Mrefs.size(); // factor 2 to go from diameter to radius; Mref.size() for averaging
+		if (sumr > 0.5*XSIZE(Mrefs[0])) sumr = 0.5*XSIZE(Mrefs[0]);
 		particle_radius2 = sumr*sumr;
-		std::cout << " Automatically set the background radius to " << sumr << " pixels in the references" << std::endl;
-		std::cout << " You can override this by providing --particle_diameter (in Angstroms)" << std::endl;
+		if (verb > 0)
+		{
+			std::cout << " Automatically set the background radius to " << sumr << " pixels in the references" << std::endl;
+			std::cout << " You can override this by providing --particle_diameter (in Angstroms)" << std::endl;
+		}
 	}
 	else
 	{
@@ -262,7 +266,41 @@ void ParticleSorter::run()
 
 	writeFeatures();
 
+	generateLogFilePDF();
 
+
+}
+
+void ParticleSorter::generateLogFilePDF()
+{
+	std::vector<FileName> all_fn_eps;
+	if (MDin.numberOfObjects() > 3)
+	{
+		// Histogram
+		std::vector<RFLOAT> histX, histY;
+		CPlot2D *plot2D=new CPlot2D("");
+		MDin.columnHistogram(EMDL_SELECT_PARTICLES_ZSCORE,histX,histY,0, plot2D);
+		FileName fn_eps = fn_out + "_hist_" + EMDL::label2Str(EMDL_SELECT_PARTICLES_ZSCORE) + ".eps";
+		plot2D->OutputPostScriptPlot(fn_eps);
+		all_fn_eps.push_back(fn_eps);
+		delete plot2D;
+	}
+	// Values for all micrographs
+	CPlot2D *plot2Db=new CPlot2D(EMDL::label2Str(EMDL_SELECT_PARTICLES_ZSCORE) + " for all micrographs");
+	MDin.addToCPlot2D(plot2Db, EMDL_UNDEFINED, EMDL_SELECT_PARTICLES_ZSCORE, 1.);
+	plot2Db->SetDrawLegend(false);
+	FileName fn_eps = fn_out + "_all_" + EMDL::label2Str(EMDL_SELECT_PARTICLES_ZSCORE) + ".eps";
+	plot2Db->OutputPostScriptPlot(fn_eps);
+	all_fn_eps.push_back(fn_eps);
+	delete plot2Db;
+
+	FileName fn_pdf = (fn_out.contains("/")) ? fn_out.beforeLastOf("/") + "/logfile.pdf" : "sort_logfile.pdf";
+
+	joinMultipleEPSIntoSinglePDF(fn_pdf, all_fn_eps);
+	if (verb > 0 )
+	{
+		std::cout << " Done! Written out: " << fn_pdf << std::endl;
+	}
 }
 
 void ParticleSorter::calculateFeaturesOneParticle(long int ipart)

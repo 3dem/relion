@@ -26,6 +26,7 @@
 #ifdef ALTCPU
 	#include <tbb/enumerable_thread_specific.h>
 	#include <tbb/task_scheduler_init.h>
+	#include <complex>
 #endif
 
 
@@ -114,7 +115,7 @@ public:
 	CpuOptimiserType   tbbCpuOptimiser;
 	tbb::task_scheduler_init tbbSchedulerInit;
 
-	XFLOAT **mdlClassComplex __attribute__((aligned(64)));
+	std::complex<XFLOAT> **mdlClassComplex __attribute__((aligned(64)));
 #endif
 
 
@@ -333,6 +334,10 @@ public:
 
 	// The resolution in the final iterations
 	RFLOAT sgd_fin_resol; // in A
+
+	// Skip annealing of multiple reference in SGD
+	// (by default refs are kept the same during sgd_nr_iter_initial and then slowly annealed during sgd_nr_iter_inbetween)
+	bool do_sgd_skip_anneal;
 
 	// Momentum update parameter
 	RFLOAT mu;

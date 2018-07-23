@@ -25,6 +25,7 @@
 #include "src/matrix2d.h"
 #include "src/matrix1d.h"
 #include "src/jaz/image_op.h"
+#include "src/funcs.h"
 #include <omp.h>
 
 //#define TIMING
@@ -74,6 +75,7 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	n_threads = textToInteger(parser.getOption("--j", "Number of threads per movie (= process)", "1"));
 	fn_movie = parser.getOption("--movie", "Rootname to identify movies", "movie");
 	continue_old = parser.checkOption("--only_do_unfinished", "Only run motion correction for those micrographs for which there is not yet an output micrograph.");
+	do_at_most = textToInteger(parser.getOption("--do_at_most", "Only process at most this number of (unprocessed) micrographs.", "-1"));
 	do_save_movies  = parser.checkOption("--save_movies", "Also save the motion-corrected movies.");
 	angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms", "-1"));
 	first_frame_sum =  textToInteger(parser.getOption("--first_frame_sum", "First movie frame used in output sum (start at 1)", "1"));
@@ -91,7 +93,7 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	patch_x = textToInteger(parser.getOption("--patch_x", "Patching in X-direction for MOTIONCOR2", "1"));
 	patch_y = textToInteger(parser.getOption("--patch_y", "Patching in Y-direction for MOTIONCOR2", "1"));
 	group = textToInteger(parser.getOption("--group_frames", "Average together this many frames before calculating the beam-induced shifts", "1"));
-	fn_defect = parser.getOption("--defect_file","Location of a MOTIONCOR2-style detector defect file","");
+	fn_defect = parser.getOption("--defect_file","Location of a MOTIONCOR2-style detector defect file", "");
 	fn_archive = parser.getOption("--archive","Location of the directory for archiving movies in 4-byte MRC format","");
 	fn_other_motioncor2_args = parser.getOption("--other_motioncor2_args", "Additional arguments to MOTIONCOR2", "");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread, e.g 0:1:2:3", "");
@@ -107,12 +109,16 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	dose_per_frame = textToFloat(parser.getOption("--dose_per_frame", "Electron dose (in electrons/A2/frame) for dose-weighting inside MOTIONCOR2/UNBLUR", "1"));
 	pre_exposure = textToFloat(parser.getOption("--preexposure", "Pre-exposure (in electrons/A2) for dose-weighting inside UNBLUR", "0"));
 
+	parser.addSection("Own motion correction options");
 	do_own = parser.checkOption("--use_own", "Use our own implementation of motion correction");
+	skip_defect = parser.checkOption("--skip_defect", "Skip hot pixel detection");
 	save_noDW = parser.checkOption("--save_noDW", "Save aligned but non dose weighted micrograph.");
 	interpolate_shifts = parser.checkOption("--interpolate_shifts", "(EXPERIMENTAL) Interpolate shifts");
 	ccf_downsample = textToFloat(parser.getOption("--ccf_downsample", "(EXPERT) Downsampling rate of CC map. default = 0 = automatic based on B factor", "0"));
 	early_binning = parser.checkOption("--early_binning", "(EXPERT) Do binning before alignment to reduce memory usage. This might dampen signal near Nyquist.");
+	dose_motionstats_cutoff = textToFloat(parser.getOption("--dose_motionstats_cutoff", "Electron dose (in electrons/A2) at which to distinguish early/late global accumulated motion in output statistics", "4."));
 	if (ccf_downsample > 1) REPORT_ERROR("--ccf_downsample cannot exceed 1.");
+	if (skip_defect && !do_own) REPORT_ERROR("--skip_decet is valid only for --use_own");
 	// Initialise verb for non-parallel execution
 	verb = 1;
 
@@ -158,6 +164,10 @@ void MotioncorrRunner::initialise()
 	}
 	else if (do_motioncor2)
 	{
+		if (fn_defect != "") {
+			std::cerr << "WARNING: Although the defect file will be used by MotionCor2, Bayesian Polishing will work on uncorrected raw movies and ignore the defect file." << std::endl;
+		}	
+
 		// Get the MOTIONCOR2 executable
 		if (fn_motioncor2_exe == "")
 		{
@@ -176,13 +186,14 @@ void MotioncorrRunner::initialise()
 	}
 	else if (do_own) {
 		if (fn_defect != "") {
-			std::cerr << "WARNING: The defect file is not yet supported in our own implementation of motion correction. The defect file is ignored." << std::endl;
+			std::cerr << "WARNING: Our own implementation of motion correction detects hot pixels by itself. The defect file is not used." << std::endl;
 		}
-		if (patch_x <= 2 || patch_y <= 2) {
+		if (patch_x <= 0 || patch_y <= 0) {
+			REPORT_ERROR("The number of patches must be a positive integer.");
+		}
+		if (patch_x == 2 || patch_y == 2) {
+			// If patch_x == patch_y == 1, the user actually wants global alignment alone, so do not warn.
 			std::cerr << "The number of patches is too small (<= 2). Patch based alignment will be skipped." << std::endl;
-		}
-		if (group > 1) {
-			std::cerr << "WARNING: Frame grouping is under development in our own implementation of motion correction." << std::endl;
 		}
 		if (do_save_movies) {
 			std::cerr << "WARNING: In our own implementation of motion correction, we do not save aligned movies. --save_movies was ignored." << std::endl;
@@ -224,18 +235,52 @@ void MotioncorrRunner::initialise()
 		fn_in.globFiles(fn_micrographs);
 	}
 
-	// If we're continuing an old run, see which micrographs have not been finished yet...
-	fn_ori_micrographs = fn_micrographs;
-	if (continue_old)
+	// First backup the given list of all micrographs
+	std::vector<FileName> fn_mic_given_all = fn_micrographs;
+	// This list contains those for the output STAR & PDF files
+	fn_ori_micrographs.clear();
+	// These are micrographs to be processed
+	fn_micrographs.clear();
+
+	bool warned = false;
+
+	for (long int imic = 0; imic < fn_mic_given_all.size(); imic++)
 	{
-		fn_micrographs.clear();
-		for (long int imic = 0; imic < fn_ori_micrographs.size(); imic++)
+		bool ignore_this = false;
+		bool process_this = true;
+		std::cout << fn_mic_given_all[imic] << std::endl;
+
+		if (continue_old)
 		{
 			FileName fn_avg, fn_mov;
-			getOutputFileNames(fn_ori_micrographs[imic], fn_avg, fn_mov);
-			if (!exists(fn_avg) || (do_save_movies && !exists(fn_mov)) )
-				fn_micrographs.push_back(fn_ori_micrographs[imic]);
+			getOutputFileNames(fn_mic_given_all[imic], fn_avg, fn_mov);
+			if (exists(fn_avg) && exists(fn_avg.withoutExtension() + ".star") &&
+			    (!do_save_movies || exists(fn_mov)))
+			{
+				process_this = false; // already done
+			}
 		}
+
+		if (do_at_most >= 0 && fn_micrographs.size() >= do_at_most)
+		{
+			if (process_this) {
+				ignore_this = true;
+				process_this = false;
+				if (!warned)
+				{
+					warned = true;
+					std::cout << "NOTE: processing of some micrographs will be skipped as requested by --do_at_most" << std::endl;
+				}
+			}
+			// If this micrograph has already been processed, the result should be included in the output.
+			// So ignore_this remains false.
+		}
+
+		if (process_this)
+			fn_micrographs.push_back(fn_mic_given_all[imic]);
+
+		if (!ignore_this)
+			fn_ori_micrographs.push_back(fn_mic_given_all[imic]);
 	}
 
 	// Make sure fn_out ends with a slash
@@ -884,8 +929,7 @@ void MotioncorrRunner::plotShifts(FileName fn_mic, Micrograph &mic)
 	const RFLOAT ycenter = (!do_unblur) ? mic.getHeight() / 2.0 : 0;
 	for (int j = mic.first_frame, jlim = mic.getNframes(); j <= jlim; j++) // 1-indexed
 	{
-		mic.getShiftAt(j, 0, 0, xshift, yshift, false); // no local model
-		if (xshift != Micrograph::NOT_OBSERVED) {
+		if (mic.getShiftAt(j, 0, 0, xshift, yshift, false) == 0) {
 			CDataPoint point(xcenter + shift_scale * xshift, ycenter + shift_scale * yshift);
 			dataSet.AddDataPoint(point);
 		}
@@ -893,8 +937,7 @@ void MotioncorrRunner::plotShifts(FileName fn_mic, Micrograph &mic)
 	plot2D->AddDataSet(dataSet);
 
 	// Mark starting point
-	mic.getShiftAt(mic.first_frame, 0, 0, xshift, yshift, false);
-	if (xshift != Micrograph::NOT_OBSERVED) {
+	if (mic.getShiftAt(mic.first_frame, 0, 0, xshift, yshift, false) == 0) {
 		CDataSet dataSetStart;
 		dataSetStart.SetDrawMarker(true);
 		dataSetStart.SetMarkerSize(5);
@@ -919,10 +962,11 @@ void MotioncorrRunner::plotShifts(FileName fn_mic, Micrograph &mic)
 		fit.SetDatasetColor(0.0,0.0,0.0);
 		obs.SetDrawMarker(false);
 		obs.SetDatasetColor(0.5,0.5,0.5);
+//		std::cout << "New trace" << std::endl;
 		while (i < n_local) {
-		//	std::cout << mic.patchX[i] << " " << mic.patchY[i] << " " << mic.patchZ[i] << " " << mic.localShiftX[i] << " " << mic.localShiftY[i] << std::endl;
+//			std::cout << mic.patchX[i] << " " << mic.patchY[i] << " " << mic.patchZ[i] << " " << mic.localShiftX[i] << " " << mic.localShiftY[i] << std::endl;
 			if ((mic.patchX[start] != mic.patchX[i]) || (mic.patchY[start] != mic.patchY[i])) {
-		//		std::cout << "End of a trace" << std::endl;
+//				std::cout << "End of a trace" << std::endl;
 				break; // start again from this frame
 			}
 			CDataPoint p_obs(mic.patchX[start] + shift_scale * mic.localShiftX[i], mic.patchY[start] + shift_scale * mic.localShiftY[i]);
@@ -954,6 +998,7 @@ void MotioncorrRunner::saveModel(Micrograph &mic) {
 	mic.voltage = voltage;
 	mic.dose_per_frame = dose_per_frame;
 	mic.pre_exposure = pre_exposure;
+	mic.fnDefect = fn_defect;
 
 	FileName fn_avg, fn_mov;
 	getOutputFileNames(mic.getMovieFilename(), fn_avg, fn_mov);
@@ -964,23 +1009,11 @@ void MotioncorrRunner::saveModel(Micrograph &mic) {
 void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 {
 
-	if (fn_ori_micrographs.size() > 0)
+	long int barstep = XMIPP_MAX(1, fn_ori_micrographs.size() / 60);
+	if (verb > 0)
 	{
-
-		std::vector<FileName> fn_eps;
-
-		FileName fn_prev="";
-		for (long int i = 0; i < fn_ori_micrographs.size(); i++)
-		{
-			if (fn_prev != fn_ori_micrographs[i].beforeLastOf("/"))
-			{
-				fn_prev = fn_ori_micrographs[i].beforeLastOf("/");
-				fn_eps.push_back(fn_out + fn_prev+"/*.eps");
-			}
-		}
-
-		joinMultipleEPSIntoSinglePDF(fn_out + "logfile.pdf ", fn_eps);
-
+		std::cout << " Generating logfile.pdf ... " << std::endl;
+		init_progress_bar(fn_ori_micrographs.size());
 	}
 
 	// Also write out the output star files
@@ -998,7 +1031,7 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 			if (do_dose_weighting && save_noDW)
 			{
 				FileName fn_avg_wodose = fn_avg.withoutExtension() + "_noDW.mrc";
-                MDavg.setValue(EMDL_MICROGRAPH_NAME_WODOSE, fn_avg_wodose);
+				MDavg.setValue(EMDL_MICROGRAPH_NAME_WODOSE, fn_avg_wodose);
 			}
 			MDavg.setValue(EMDL_MICROGRAPH_NAME, fn_avg);
 			MDavg.setValue(EMDL_MICROGRAPH_METADATA_NAME, fn_avg.withoutExtension() + ".star");
@@ -1008,7 +1041,46 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 				MDmov.setValue(EMDL_MICROGRAPH_MOVIE_NAME, fn_mov);
 				MDmov.setValue(EMDL_MICROGRAPH_NAME, fn_avg);
 			}
+
+			FileName fn_star = fn_avg.withoutExtension() + ".star";
+			if (exists(fn_star))
+			{
+				Micrograph mic(fn_star);
+				RFLOAT cutoff_frame = (dose_motionstats_cutoff - mic.pre_exposure) / mic.dose_per_frame;
+				RFLOAT sum_total = 0.;
+				RFLOAT sum_early = 0.;
+				RFLOAT sum_late = 0.;
+
+				RFLOAT x = 0., y = 0., xold = 0., yold = 0.;
+				for (RFLOAT frame = 1.; frame <= mic.getNframes(); frame+=1.)
+				{
+					if (mic.getShiftAt(frame, 0., 0., x, y, false, false) != 0)
+						continue;
+					if (frame >= 2.)
+					{
+						RFLOAT d = sqrt( (x-xold)*(x-xold) + (y-yold)*(y-yold) );
+						sum_total += d;
+						if (frame <= cutoff_frame)
+						{
+							sum_early += d;
+						}
+						else
+						{
+							sum_late += d;
+						}
+					}
+					xold = x;
+					yold = y;
+				}
+				MDavg.setValue(EMDL_MICROGRAPH_ACCUM_MOTION_TOTAL, sum_total);
+				MDavg.setValue(EMDL_MICROGRAPH_ACCUM_MOTION_EARLY, sum_early);
+				MDavg.setValue(EMDL_MICROGRAPH_ACCUM_MOTION_LATE, sum_late);
+			}
+
 		}
+
+		if (verb > 0 && imic % 60 == 0) progress_bar(imic);
+
 	}
 
 	// Write out STAR files at the end
@@ -1016,10 +1088,61 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 	if (do_save_movies)
 		MDmov.write(fn_out + "corrected_micrograph_movies.star");
 
-}
+	// Now generate EPS plot with histograms and combine all EPS into a logfile.pdf
+	std::vector<EMDLabel> plot_labels;
+	plot_labels.push_back(EMDL_MICROGRAPH_ACCUM_MOTION_TOTAL);
+	plot_labels.push_back(EMDL_MICROGRAPH_ACCUM_MOTION_EARLY);
+	plot_labels.push_back(EMDL_MICROGRAPH_ACCUM_MOTION_LATE);
+	FileName fn_eps, fn_eps_root = fn_out + "corrected_micrographs";
+	std::vector<FileName> all_fn_eps;
+	for (int i = 0; i < plot_labels.size(); i++)
+	{
+		EMDLabel label = plot_labels[i];
+		if (MDavg.containsLabel(label))
+		{
+			// Values for all micrographs
+			CPlot2D *plot2Db=new CPlot2D(EMDL::label2Str(label) + " for all micrographs");
+			MDavg.addToCPlot2D(plot2Db, EMDL_UNDEFINED, label, 1.);
+			plot2Db->SetDrawLegend(false);
+			fn_eps = fn_eps_root + "_all_" + EMDL::label2Str(label) + ".eps";
+			plot2Db->OutputPostScriptPlot(fn_eps);
+			all_fn_eps.push_back(fn_eps);
+			delete plot2Db;
+			if (MDavg.numberOfObjects() > 3)
+			{
+				// Histogram
+				std::vector<RFLOAT> histX, histY;
+				CPlot2D *plot2D=new CPlot2D("");
+				MDavg.columnHistogram(label,histX,histY,0, plot2D);
+				fn_eps = fn_eps_root + "_hist_" + EMDL::label2Str(label) + ".eps";
+				plot2D->OutputPostScriptPlot(fn_eps);
+				all_fn_eps.push_back(fn_eps);
+				delete plot2D;
+			}
+		}
+	}
 
-// TODO:
-// - defect
+
+	// Combine all EPS into a single logfile.pdf
+	FileName fn_prev="";
+	for (long int i = 0; i < fn_ori_micrographs.size(); i++)
+	{
+		if (fn_prev != fn_ori_micrographs[i].beforeLastOf("/"))
+		{
+			fn_prev = fn_ori_micrographs[i].beforeLastOf("/");
+			all_fn_eps.push_back(fn_out + fn_prev+"/*.eps");
+		}
+	}
+
+	joinMultipleEPSIntoSinglePDF(fn_out + "logfile.pdf", all_fn_eps);
+
+	if (verb > 0 )
+	{
+		progress_bar(fn_ori_micrographs.size());
+
+		std::cout << " Done! Written: " << fn_out << "logfile.pdf" << " and " << fn_out << "corrected_micrographs.star" << std::endl;
+	}
+}
 
 bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	FileName fn_mic = mic.getMovieFilename();
@@ -1129,49 +1252,86 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	}
 	RCTOC(TIMING_APPLY_GAIN);
 
-	/*
-	MultidimArray<float> Iframe(ny, nx);
-	Iframe.initZeros();
-
-	// Simple unaligned sum
+	MultidimArray<float> Isum(ny, nx);
+	Isum.initZeros();
+	// First sum unaligned frames
 	RCTIC(TIMING_INITIAL_SUM);
 	for (int iframe = 0; iframe < n_frames; iframe++) {
 		#pragma omp parallel for num_threads(n_threads)
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iframe) {
-			DIRECT_MULTIDIM_ELEM(Iframe, n) += DIRECT_MULTIDIM_ELEM(Iframes[iframe](), n);
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Isum) {
+			DIRECT_MULTIDIM_ELEM(Isum, n) += DIRECT_MULTIDIM_ELEM(Iframes[iframe](), n);
 		}
 	}
 	RCTOC(TIMING_INITIAL_SUM);
 
 	// Hot pixel
-
-	RCTIC(TIMING_DETECT_HOT);
-	RFLOAT mean = 0, std = 0;
-	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iframe) {
-		mean += DIRECT_MULTIDIM_ELEM(Iframe, n);
-	}
-	mean /=  YXSIZE(Iframe);
-	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iframe) {
-		RFLOAT d = (DIRECT_MULTIDIM_ELEM(Iframe, n) - mean);
-		std += d * d;
-	}
-	std = std::sqrt(std / YXSIZE(Iframe));
-	const RFLOAT threshold = mean + hotpixel_sigma * std;
-	logfile << "Mean = " << mean << " Std = " << std << ", Hotpixel threshold = " << threshold << std::endl;
-
-	MultidimArray<bool> bBad(ny, nx);
-	bBad.initZeros();
-	int n_bad = 0;
-	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iframe) {
-		if (DIRECT_MULTIDIM_ELEM(Iframe, n) > threshold) {
-			DIRECT_MULTIDIM_ELEM(bBad, n) = true;
-			n_bad++;
+	if (!skip_defect)
+	{
+		RCTIC(TIMING_DETECT_HOT);
+		RFLOAT mean = 0, std = 0;
+		#pragma omp parallel for reduction(+:mean) num_threads(n_threads)
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Isum) {
+			mean += DIRECT_MULTIDIM_ELEM(Isum, n);
 		}
-	}
-	logfile << "Detected " << n_bad << " hot pixels to be corrected. (BUT correction not implemented yet)" << std::endl << std::endl;
-	RCTOC(TIMING_DETECT_HOT);
-	// TODO: fix defects
-	*/
+		mean /=  YXSIZE(Isum);
+		#pragma omp parallel for reduction(+:std) num_threads(n_threads)
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Isum) {
+			RFLOAT d = (DIRECT_MULTIDIM_ELEM(Isum, n) - mean);
+			std += d * d;
+		}
+		std = std::sqrt(std / YXSIZE(Isum));
+		const RFLOAT threshold = mean + hotpixel_sigma * std;
+		logfile << "In unaligned sum, Mean = " << mean << " Std = " << std << " Hotpixel threshold = " << threshold << std::endl;
+
+		MultidimArray<bool> bBad(ny, nx);
+		bBad.initZeros();
+		int n_bad = 0;
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Isum) {
+			if (DIRECT_MULTIDIM_ELEM(Isum, n) > threshold) {
+				DIRECT_MULTIDIM_ELEM(bBad, n) = true;
+				n_bad++;
+			}
+		}
+		logfile << "Detected " << n_bad << " hot pixels to be corrected." << std::endl;
+		Isum.clear();
+		RCTOC(TIMING_DETECT_HOT);
+
+		const RFLOAT frame_mean = mean / n_frames;
+		const RFLOAT frame_std = std / n_frames;
+
+		// 25 neighbours; should be enough even for super-resolution images.
+		const int NUM_MIN_OK = 6;
+		const int D_MAX = 2;
+		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(bBad)
+		{
+			if (!DIRECT_A2D_ELEM(bBad, i, j)) continue;
+//			std::cout << "Hot pixel at (" << i << ", " << j << ")" << std::endl;
+			#pragma omp parallel for num_threads(n_threads)
+			for (int iframe = 0; iframe < n_frames; iframe++)
+			{
+				int n_ok = 0;
+				RFLOAT val = 0;
+				for (int dy= -D_MAX; dy <= D_MAX; dy++)
+				{
+					int y = i + dy;
+					if (y < 0 || y >= ny) continue;
+					for (int dx = -D_MAX; dx <= D_MAX; dx++)
+					{
+						int x = j + dx;
+						if (x < 0 || x >= nx) continue;
+						if (DIRECT_A2D_ELEM(bBad, y, x)) continue;
+
+						n_ok++;
+						val += DIRECT_A2D_ELEM(Iframes[iframe](), y, x);
+					}
+				}
+//				std::cout << "n_ok = " << n_ok << " val = " << val << std::endl;
+				if (n_ok > NUM_MIN_OK) DIRECT_A2D_ELEM(Iframes[iframe](), i, j) = val / n_ok;
+				else DIRECT_A2D_ELEM(Iframes[iframe](), i, j) = rnd_gaus(frame_mean, frame_std);
+			}
+		}
+		logfile << "Fixed hot pixels." << std::endl;
+	} // !skip_defect
 
 	if (early_binning) {
 		nx /= bin_factor; ny /= bin_factor;
@@ -1225,7 +1385,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	logfile << "Patches: X = " << patch_x << " Y = " << patch_y << std::endl;
 	bool do_local = (patch_x > 2) && (patch_y > 2);
 	if (!do_local) {
-		logfile << "Too few patches to do local alignments." << std::endl;
+		logfile << "Too few patches to do local alignments. Local alignment is skipped." << std::endl;
 	}
 
 	if (do_local) {

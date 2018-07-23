@@ -21,23 +21,22 @@
 
 void ReconstructorMpi::read(int argc, char **argv)
 {
-    // Define a new MpiNode
-    node = new MpiNode(argc, argv);
+	// Define a new MpiNode
+	node = new MpiNode(argc, argv);
 
-    // First read in non-parallelisation-dependent variables
-    Reconstructor::read(argc, argv);
+	// First read in non-parallelisation-dependent variables
+	Reconstructor::read(argc, argv);
 
-    // Don't put any output to screen for mpi slaves
-    verb = (node->isMaster()) ? verb : 0;
+	// Don't put any output to screen for mpi slaves
+	verb = (node->isMaster()) ? verb : 0;
 
-    // Possibly also read parallelisation-dependent variables here
+	// Possibly also read parallelisation-dependent variables here
 
 	if (node->size < 2)
 		REPORT_ERROR("ParticlePolisherMpi::read ERROR: this program needs to be run with at least two MPI processes!");
 
-    // Print out MPI info
+	// Print out MPI info
 	printMpiNodesMachineNames(*node);
-
 
 }
 

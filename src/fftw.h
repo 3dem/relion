@@ -923,6 +923,10 @@ void getAmplitudeCorrelationAndDifferentialPhaseResidual(MultidimArray< RFLOAT >
 		    MultidimArray< RFLOAT > &acorr,
 		    MultidimArray< RFLOAT > &dpr);
 
+void getCosDeltaPhase(MultidimArray< Complex > &FT1,
+                      MultidimArray< Complex > &FT2,
+                      MultidimArray< RFLOAT > &cosPhi);
+
 // Get precalculated AB-matrices for on-the-fly shift calculations (without tabulated sine and cosine)
 void getAbMatricesForShiftImageInFourierTransform(MultidimArray<Complex > &in,
 									MultidimArray<Complex > &out,

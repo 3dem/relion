@@ -209,10 +209,6 @@ public:
 	// Allow saving of selection files?
 	bool do_allow_save;
 
-	// remove duplicate-coord particles in fn_data STAR file?
-	bool do_remove_duplicates;
-	RFLOAT duplicate_threshold;	 // Angstrom radius
-
 	// Filenames with the selected class averages and the particles from the selected classes
 	FileName fn_selected_imgs, fn_selected_parts;
 
@@ -224,6 +220,9 @@ public:
 
 	// Number of groups for regrouping the selected particles (for model.star)
 	int nr_regroups;
+
+	// Apply the positioning parameters in the particle metadata?
+	bool do_apply_orient;
 
 	// Save selected images recentered to their center-of-mass?
 	bool do_recenter;

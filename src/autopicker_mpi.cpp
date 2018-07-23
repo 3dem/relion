@@ -27,7 +27,7 @@ void AutoPickerMpi::read(int argc, char **argv)
 
     if (node->isMaster())
     	PRINT_VERSION_INFO();
-    	
+
     // First read in non-parallelisation-dependent variables
     AutoPicker::read(argc, argv);
 

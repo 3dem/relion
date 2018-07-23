@@ -21,24 +21,22 @@
 
 void PreprocessingMpi::read(int argc, char **argv)
 {
-    // Define a new MpiNode
-    node = new MpiNode(argc, argv);
+	// Define a new MpiNode
+	node = new MpiNode(argc, argv);
 
-    // First read in non-parallelisation-dependent variables
-    Preprocessing::read(argc, argv, node->rank);
+	// First read in non-parallelisation-dependent variables
+	Preprocessing::read(argc, argv, node->rank);
 
-    int mpi_section = parser.addSection("MPI options");
-     max_mpi_nodes =textToInteger(parser.getOption("--max_mpi_nodes", "Limit the number of effective MPI nodes to protect from too heavy disk I/O (thus ignoring larger values from mpirun)", "8"));
+	int mpi_section = parser.addSection("MPI options");
+	max_mpi_nodes =textToInteger(parser.getOption("--max_mpi_nodes", "Limit the number of effective MPI nodes to protect from too heavy disk I/O (thus ignoring larger values from mpirun)", "8"));
 
+	// Don't put any output to screen for mpi slaves
+	verb = (node->isMaster()) ? 1 : 0;
 
-    // Don't put any output to screen for mpi slaves
-    verb = (node->isMaster()) ? 1 : 0;
+	// Possibly also read parallelisation-dependent variables here
 
-    // Possibly also read parallelisation-dependent variables here
-
-    // Print out MPI info
+	// Print out MPI info
 	printMpiNodesMachineNames(*node);
-
 
 }
 
