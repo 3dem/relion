@@ -107,6 +107,11 @@ void Reconstructor::initialise()
 	if (fn_debug == "")
 		DF.read(fn_sel);
 
+	if (verb > 0 && (subset == 1 || subset == 2) && !DF.containsLabel(EMDL_PARTICLE_RANDOM_SUBSET))
+	{
+		REPORT_ERROR("The rlnRandomSubset column is missing in the input STAR file.");
+	}
+
 	randomize_random_generator();
 
 	if (cl_beamtilt || do_ewald)
@@ -283,7 +288,7 @@ void Reconstructor::backprojectOneParticle(long int p)
 	Matrix1D<RFLOAT> trans(2);
 	FourierTransformer transformer;
 
-	int randSubset;
+	int randSubset = 0;
 	DF.getValue(EMDL_PARTICLE_RANDOM_SUBSET, randSubset, p);
 
 	if (subset >= 1 && subset <= 2 && randSubset != subset)
@@ -382,7 +387,7 @@ void Reconstructor::backprojectOneParticle(long int p)
 			Image<RFLOAT> Ictf;
 			FileName fn_ctf;
 			if (!DF.getValue(EMDL_CTF_IMAGE, fn_ctf, p))
-				REPORT_ERROR("MlOptimiser::getMetaAndImageDataSubset ERROR: cannot find rlnCtfImage for 3D CTF correction!");
+				REPORT_ERROR("ERROR: cannot find rlnCtfImage for 3D CTF correction!");
 			Ictf.read(fn_ctf);
 			Ictf().setXmippOrigin();
 			FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fctf)
