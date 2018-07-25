@@ -55,7 +55,7 @@ public:
 	bool do_phase_flip;
 	bool do_premultiply_ctf;
 	bool do_ctf_intact_first_peak;
-	RFLOAT angpix;
+	RFLOAT angpix, output_angpix;
 
 	////////////////// Extract particles from the micrographs
 	// Perform particle extraction?
