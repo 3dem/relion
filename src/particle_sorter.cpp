@@ -28,7 +28,7 @@ void ParticleSorter::read(int argc, char **argv)
 	int gen_section = parser.addSection("General options");
 	fn_in = parser.getOption("--i", "Input STAR file ");
 	fn_ref = parser.getOption("--ref", "STAR file with the reference names, or an MRC stack with all references");
-	fn_out = parser.getOption("--o", "Output rootname (if empty the input file will be overwritten)", "");
+	fn_out = parser.getOption("--o", "Output rootname (if empty the input file will be overwritten)", "sorted.star");
 	angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms", "1"));
 	angpix_ref = textToFloat(parser.getOption("--angpix_ref", "Pixel size of the references in Angstroms (default is same as micrographs)", "-1"));
 	particle_diameter = textToFloat(parser.getOption("--particle_diameter", "Diameter of the circ. mask for the experimental images (in Angstroms, default=automatic)", "-1"));

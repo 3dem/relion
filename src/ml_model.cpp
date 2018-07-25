@@ -360,6 +360,7 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
     			DIRECT_NZYX_ELEM(img(), iclass, 0, i, j) = DIRECT_A2D_ELEM(Iref[iclass], i, j);
 			}
     	}
+	img.setSamplingRateInHeader(pixel_size);
     	if (nr_bodies > 1)
     		img.write(fn_out + "_bodies.mrcs");
     	else

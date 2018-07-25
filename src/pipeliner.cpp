@@ -1059,6 +1059,14 @@ bool PipeLine::setAliasJob(int this_job, std::string alias, std::string &error_m
 		 error_message = "Alias cannot start with 'job', please provide another one";
 		 return false;
 	}
+	else if (alias.find("*") != std::string::npos || alias.find("?") != std::string::npos || alias.find("(") != std::string::npos || alias.find(")") != std::string::npos ||
+	         alias.find("/") != std::string::npos || alias.find("\"") != std::string::npos || alias.find("\\") != std::string::npos || alias.find("|") != std::string::npos ||
+		 alias.find("#") != std::string::npos || alias.find("<") != std::string::npos || alias.find(">") != std::string::npos || alias.find("&") != std::string::npos || 
+		 alias.find("%") != std::string::npos)
+	{
+		error_message = "Alias cannot contain following symbols: *, ?, (, ), /, \", \\, |, #, <, >, &, %";
+		return false;
+	}
 	else
 	{
 

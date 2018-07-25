@@ -171,6 +171,30 @@ void CtfRefiner::init()
 			          << "pixel size in the input STAR file: " << angpix << std::endl;
 		}
 	}
+	else
+	{
+		for (int i = 0; i < mdt0.numberOfObjects(); i++)
+		{
+			mdt0.setValue(EMDL_CTF_MAGNIFICATION, 10000.0);
+			mdt0.setValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, angpix);
+		}
+	}
+
+	if (ABS(beamtilt_x) > 0)
+	{
+		for (int i = 0; i < mdt0.numberOfObjects(); i++)
+		{
+			mdt0.setValue(EMDL_IMAGE_BEAMTILT_X, beamtilt_x);
+		}
+	}
+
+	if (ABS(beamtilt_y) > 0)
+	{
+		for (int i = 0; i < mdt0.numberOfObjects(); i++)
+		{
+			mdt0.setValue(EMDL_IMAGE_BEAMTILT_Y, beamtilt_y);
+		}
+	}
 
 	allMdts = StackHelper::splitByMicrographName(&mdt0);
 
