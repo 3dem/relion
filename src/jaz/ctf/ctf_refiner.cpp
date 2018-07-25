@@ -289,11 +289,11 @@ void CtfRefiner::init()
 	s = reference.s;
 	sh = s/2 + 1;
 
-	tiltEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
+	tiltEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, mdt0, &reference, &obsModel);
 	defocusEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
 	magnificationEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
 
-	// check whether output files exist and if they do, then skip this micrograph
+	// check whether output files exist and skip the micrographs for which they do
 	if (only_do_unfinished)
 	{
 		for (long int g = minMG; g <= maxMG; g++ )
