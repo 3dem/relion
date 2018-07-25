@@ -730,8 +730,8 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 				long int mynode = processList[current_job].inputNodeList[inode];
 				while (!exists(nodeList[mynode].name))
 				{
-					fh << " + -- Warning " << nodeList[mynode].name << " does not exist. Waiting 10 seconds ... " << std::endl;
-					sleep(10);
+					fh << " + -- Warning " << nodeList[mynode].name << " does not exist. Waiting 60 seconds ... " << std::endl;
+					sleep(60);
 				}
 			}
 			now = time(0);
@@ -750,7 +750,7 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 					break;
 				}
 
-				sleep(10);
+				sleep(60);
 				checkProcessCompletion();
 				if (processList[current_job].status == PROC_FINISHED)
 				{
