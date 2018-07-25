@@ -206,10 +206,28 @@ void CtfRefiner::init()
 
 	if (clTilt)
 	{
+		if (verb > 0)
+		{
+			std::cout << "   - Using beam tilt from command line: " 
+					  << beamtilt_x << ", " << beamtilt_y << std::endl;
+		}
+		
 		for (int i = 0; i < mdt0.numberOfObjects(); i++)
 		{
 			mdt0.setValue(EMDL_IMAGE_BEAMTILT_X, beamtilt_x);
 			mdt0.setValue(EMDL_IMAGE_BEAMTILT_Y, beamtilt_y);
+		}
+	}
+	else if (verb > 0)
+	{
+		if (   mdt0.containsLabel(EMDL_IMAGE_BEAMTILT_X)
+			|| mdt0.containsLabel(EMDL_IMAGE_BEAMTILT_Y))
+		{
+			std::cout << "   - Using beam tilt from star file." << std::endl;
+		}
+		else
+		{
+			std::cout << "   - Beam tilt not present in star file: assuming zero beam tilt." << std::endl;
 		}
 	}
 
