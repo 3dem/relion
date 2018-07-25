@@ -186,40 +186,63 @@ std::string MetaDataTable::getName() const
 
 bool MetaDataTable::getValueToString(EMDLabel label, std::string &value, long objectID) const
 {
+
+	// SHWS 18jul2018: this function previously had a stringstream, but it greatly slowed down writing of large STAR files in
+	// some strange circumstances (with large data.star and model.star files in refinement)
+	// Therefore replaced the strstream with faster snprintf
+	char buffer[14];
+
 	if (EMDL::isString(label))
 	{
 		getValue(label, value, objectID);
 	}
 	else
 	{
-		std::stringstream sts(value);
 
 		if (EMDL::isDouble(label))
 		{
 			double v;
 			getValue(label, v, objectID);
+
 			if ((ABS(v) > 0. && ABS(v) < 0.001) || ABS(v) > 100000.)
-				 sts << std::setw(12) << std::scientific;
+			{
+				if (v < 0.)
+				{
+					snprintf(buffer,13, "%12.5e", v);
+				}
+				else
+				{
+					snprintf(buffer,13, "%12.6e", v);
+				}
+			}
 			else
-				 sts << std::setw(12) << std::fixed;
-			sts << v;
+			{
+				if (v < 0.)
+				{
+					snprintf(buffer,13, "%12.5f", v);
+				}
+				else
+				{
+					snprintf(buffer,13, "%12.6f", v);
+				}
+			}
+
 		}
 		else if (EMDL::isInt(label))
 		{
 			long v;
 			getValue(label, v, objectID);
-			sts << std::setw(12) << std::fixed;
-			sts << v;
+			snprintf(buffer,13, "%12ld", v);
 		}
 		else if (EMDL::isBool(label))
 		{
 			bool v;
 			getValue(label, v, objectID);
-			sts << std::setw(12) << std::fixed;
-			sts << v;
+			snprintf(buffer,13, "%12d", (int)v);
 		}
 
-		value = sts.str();
+		std::string tt(buffer);
+		value = tt;
 	}
 
 }
@@ -861,7 +884,6 @@ bool MetaDataTable::readStarList(std::ifstream& in, std::vector<EMDLabel> *desir
 
 long int MetaDataTable::readStar(std::ifstream& in, const std::string &name, std::vector<EMDLabel> *desiredLabels, std::string grep_pattern, bool do_only_count)
 {
-	std::stringstream ss;
 	std::string line, token, value;
 	clear();
 	bool also_has_loop;
@@ -1041,6 +1063,7 @@ void MetaDataTable::write(std::ostream& out) const
 		// End a data block with a white line
 		out << " \n";
 	}
+
 }
 
 void MetaDataTable::write(const FileName &fn_out) const
@@ -1590,7 +1613,7 @@ MetaDataTable subsetMetaDataTable(MetaDataTable &MDin, EMDLabel label, std::stri
 		MDin.getValue(label, val);
 
 		bool found = (val.find(search_str) != std::string::npos);
-		
+
 		if ((!exclude && found) || (exclude && !found))
 		{
 			MDout.addObject(MDin.getObject(current_object));
@@ -1606,7 +1629,7 @@ MetaDataTable removeDuplicatedParticles(MetaDataTable &MDin, EMDLabel mic_label,
 	if (!MDin.containsLabel(EMDL_ORIENT_ORIGIN_X) || !MDin.containsLabel(EMDL_ORIENT_ORIGIN_Y) ||
 	    !MDin.containsLabel(EMDL_IMAGE_COORD_X) || !MDin.containsLabel(EMDL_IMAGE_COORD_Y))
 		REPORT_ERROR("You need rlnCoordinateX, rlnCoordinateY, rlnOriginX and rlnOriginY to remove duplicated particles");
- 
+
 	if (!MDin.containsLabel(mic_label))
 		REPORT_ERROR("STAR file does not contain " + EMDL::label2Str(mic_label));
 
@@ -1628,7 +1651,7 @@ MetaDataTable removeDuplicatedParticles(MetaDataTable &MDin, EMDLabel mic_label,
 		MDin.getValue(EMDL_IMAGE_COORD_X, val2);
 		xs[current_object] = val1 * origin_scale + val2;
 		MDin.getValue(EMDL_ORIENT_ORIGIN_Y, val1);
-		MDin.getValue(EMDL_IMAGE_COORD_Y, val2);	
+		MDin.getValue(EMDL_IMAGE_COORD_Y, val2);
 		ys[current_object] = val1 * origin_scale + val2;
 
 		grouped[mic_name].push_back(current_object);
@@ -1658,7 +1681,7 @@ MetaDataTable removeDuplicatedParticles(MetaDataTable &MDin, EMDLabel mic_label,
 		}
 	}
 
-	
+
 	MetaDataTable MDout, MDremoved;
 	long n_removed = 0;
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
@@ -1667,7 +1690,7 @@ MetaDataTable removeDuplicatedParticles(MetaDataTable &MDin, EMDLabel mic_label,
 		{
 			MDout.addObject(MDin.getObject(current_object));
 		}
-		else	
+		else
 		{
 			MDremoved.addObject(MDin.getObject(current_object));
 			n_removed++;
