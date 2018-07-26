@@ -18,7 +18,6 @@
  * author citations must be preserved.
  ***************************************************************************/
 #include "src/gui_jobwindow.h"
-
 JobWindow::JobWindow(int _x, int _y, int _w, int _h, const char* title ) : Fl_Box(x,y,w,h,title)
 {
 	tabs = NULL;
@@ -245,12 +244,18 @@ void JobWindow::setupRunTab()
 
 	place("qsub");
 
-	// Two extra fields if needed
-	if (myjob.joboptions.find("qsub_extra1") != myjob.joboptions.end())
-		place("qsub_extra1");
-
-	if (myjob.joboptions.find("qsub_extra2") != myjob.joboptions.end())
-		place("qsub_extra2");
+	char * extra_count_text = getenv ("RELION_QSUB_EXTRA_COUNT");
+	const char extra_count_val = (extra_count_text ? atoi(extra_count_text) : 0);
+	for (int i=1; i<=extra_count_val; i++)
+	{
+		std::stringstream out;
+		out<<i;
+		const std::string i_str=out.str();
+		if (myjob.joboptions.find(std::string("qsub_extra")+i_str) != myjob.joboptions.end())
+		{
+			place(std::string("qsub_extra")+i_str);
+		}
+	}
 
 	place("qsubscript");
 
@@ -590,6 +595,7 @@ void JobWindow::initialiseMotioncorrWindow()
 	place("fn_gain_ref", TOGGLE_DEACTIVATE);
 	place("gain_rot", TOGGLE_DEACTIVATE);
 	place("gain_flip", TOGGLE_DEACTIVATE);
+	place("fn_defect", TOGGLE_DEACTIVATE);
 
 	current_y += STEPY/2;
 	group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
@@ -597,7 +603,6 @@ void JobWindow::initialiseMotioncorrWindow()
 	place("do_own_motioncor", TOGGLE_DEACTIVATE, group4, true);
 	group4->begin();
 	place("fn_motioncor2_exe", TOGGLE_DEACTIVATE);
-	place("fn_defect", TOGGLE_DEACTIVATE);
 	place("gpu_ids");
 	place("other_motioncor2_args", TOGGLE_DEACTIVATE);
 	group4->end();
@@ -920,6 +925,7 @@ void JobWindow::initialiseExtractWindow()
 
 	current_y += STEPY/2;
 	place("coords_suffix", TOGGLE_DEACTIVATE);
+	current_y += STEPY/2;
 
 	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group1->end();
@@ -929,8 +935,15 @@ void JobWindow::initialiseExtractWindow()
 	group1->begin();
 
 	place("fndata_reextract", TOGGLE_DEACTIVATE);
-	place("do_recenter", TOGGLE_DEACTIVATE);
+	place("do_reset_offsets", TOGGLE_DEACTIVATE);
+	group7 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group7->end();
+	place("do_recenter", TOGGLE_DEACTIVATE, group7);
+
+	group7->begin();
 	place3("recenter_x","recenter_y", "recenter_z", "Recenter on - X, Y, Z (pix):", TOGGLE_DEACTIVATE);
+	group7->end();
+	guientries["do_recenter"].cb_menu_i();
 
 	group1->end();
 	guientries["do_reextract"].cb_menu_i();
@@ -1071,7 +1084,7 @@ void JobWindow::initialiseSortWindow()
 }
 void JobWindow::initialiseSelectWindow()
 {
-	setupTabs(3);
+	setupTabs(4);
 
 	tab1->begin();
 	tab1->label("I/O");
@@ -1096,21 +1109,6 @@ void JobWindow::initialiseSelectWindow()
 	place("nr_groups", TOGGLE_DEACTIVATE);
 	group1->end();
 	guientries["do_regroup"].cb_menu_i();
-
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	/*
-	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group2->end();
-	place("do_remove_duplicates", TOGGLE_DEACTIVATE, group2);
-	group2->begin();
-	place("duplicate_threshold", TOGGLE_DEACTIVATE);
-	group2->end();
-	guientries["do_remove_duplicates"].cb_menu_i();
-	*/
-
 	tab2->end();
 
 	tab3->begin();
@@ -1156,6 +1154,20 @@ void JobWindow::initialiseSelectWindow()
 	guientries["do_split"].cb_menu_i();
 
 	tab3->end();
+
+	tab4->begin();
+	tab4->label("Duplicates");
+	resetHeight();
+
+	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group2->end();
+	place("do_remove_duplicates", TOGGLE_DEACTIVATE, group2);
+	group2->begin();
+	place("duplicate_threshold", TOGGLE_DEACTIVATE);
+	place("image_angpix", TOGGLE_DEACTIVATE);
+	group2->end();
+	guientries["do_remove_duplicates"].cb_menu_i();
+	tab4->end();
 
 	// Always deactivate the queue option
 	guientries["do_queue"].deactivate_option = TOGGLE_ALWAYS_DEACTIVATE;

@@ -153,6 +153,7 @@ enum EMDLabel
     EMDL_MICROGRAPH_ID,
     EMDL_MICROGRAPH_NAME,
     EMDL_MICROGRAPH_GAIN_NAME,
+    EMDL_MICROGRAPH_DEFECT_FILE,
     EMDL_MICROGRAPH_NAME_WODOSE,
     EMDL_MICROGRAPH_MOVIE_NAME,
     EMDL_MICROGRAPH_METADATA_NAME,
@@ -592,6 +593,7 @@ private:
         EMDL::addLabel(EMDL_MICROGRAPH_ID, EMDL_INT, "rlnMicrographId", "ID (i.e. a unique number) of a micrograph");
         EMDL::addLabel(EMDL_MICROGRAPH_NAME, EMDL_STRING, "rlnMicrographName", "Name of a micrograph");
         EMDL::addLabel(EMDL_MICROGRAPH_GAIN_NAME, EMDL_STRING, "rlnMicrographGainName", "Name of a gain reference");
+	EMDL::addLabel(EMDL_MICROGRAPH_DEFECT_FILE, EMDL_STRING, "rlnMicrographDefectFile", "Name of a defect list file");
         EMDL::addLabel(EMDL_MICROGRAPH_NAME_WODOSE, EMDL_STRING, "rlnMicrographNameNoDW", "Name of a micrograph without dose weighting");
         EMDL::addLabel(EMDL_MICROGRAPH_MOVIE_NAME, EMDL_STRING, "rlnMicrographMovieName", "Name of a micrograph movie stack");
         EMDL::addLabel(EMDL_MICROGRAPH_METADATA_NAME, EMDL_STRING, "rlnMicrographMetadata", "Name of a micrograph metadata file");

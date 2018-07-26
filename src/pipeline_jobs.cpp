@@ -471,6 +471,19 @@ bool RelionJob::saveJobSubmissionScript(std::string newfilename, std::string out
 		if (joboptions.find("qsub_extra2") != joboptions.end())
 			replacing["XXXextra2XXX"] = joboptions["qsub_extra2"].getString();
 
+		char * extra_count_text = getenv ("RELION_QSUB_EXTRA_COUNT");
+		const char extra_count_val = (extra_count_text ? atoi(extra_count_text) : 2);
+		for (int i=1; i<=extra_count_val; i++)
+		{
+			std::stringstream out;
+			out<<i;
+			const std::string i_str=out.str();
+			if (joboptions.find(std::string("qsub_extra")+i_str) != joboptions.end())
+			{
+				replacing[std::string("XXXextra")+i_str+"XXX"] = joboptions[std::string("qsub_extra")+i_str].getString();
+			}
+		}
+
 		while (getline(fh, line, '\n'))
 		{
 
@@ -742,48 +755,83 @@ void RelionJob::initialise(int _job_type)
 	else
 		REPORT_ERROR("ERROR: unrecognised job-type");
 
+	// Check for environment variable RELION_MPI_MAX and RELION_QSUB_NRMPI
+	const char *mpi_max_input = getenv("RELION_MPI_MAX");
+	int mpi_max = (mpi_max_input == NULL) ? DEFAULTMPIMAX : textToInteger(mpi_max_input);
+	char * qsub_nrmpi_text = getenv ("RELION_QSUB_NRMPI");
+	const char qsub_nrmpi_val = (qsub_nrmpi_text ? atoi(qsub_nrmpi_text) : DEFAULTNRMPI);
 	if (has_mpi)
-		joboptions["nr_mpi"] = JobOption("Number of MPI procs:", 1, 1, 64, 1, "Number of MPI nodes to use in parallel. When set to 1, MPI will not be used.");
-
-	if (has_thread)
-		joboptions["nr_threads"] = JobOption("Number of threads:", 1, 1, 16, 1, "Number of shared-memory (POSIX) threads to use in parallel. \
-		When set to 1, no multi-threading will be used. Multi-threading is often useful in 3D refinements to have more memory. 2D class averaging often proceeds more efficiently without threads.");
-
-	joboptions["do_queue"] = JobOption("Submit to queue?", false, "If set to Yes, the job will be submit to a queue, otherwise \
-the job will be executed locally. Note that only MPI jobs may be sent to a queue.");
-
-	// Need the std::string(), as otherwise it will be overloaded and passed as a boolean....
-	joboptions["queuename"] = JobOption("Queue name: ", std::string("openmpi"), "Name of the queue to which to submit the job.");
-
-	joboptions["qsub"] = JobOption("Queue submit command:", std::string("qsub"), "Name of the command used to submit scripts to the queue, e.g. qsub or bsub.\n\n\
-Note that the person who installed RELION should have made a custom script for your cluster/queue setup. Check this is the case \
-(or create your own script following the RELION WIKI) if you have trouble submitting jobs.");
-
-	// Two additional options that may be set through environment variables RELION_QSUB_EXTRA1 and RELION_QSUB_EXTRA2 (for more flexibility)
-	char * extra1_text = getenv ("RELION_QSUB_EXTRA1");
-	if (extra1_text != NULL)
 	{
-		char * extra1_default = getenv ("RELION_QSUB_EXTRA1_DEFAULT");
-		char emptychar[] = "";
-		if (extra1_default == NULL)
-			extra1_default=emptychar;
-		joboptions["qsub_extra1"] = JobOption(std::string(extra1_text), std::string(extra1_default), "Extra option to pass to the qsub template script. \
-Any occurrences of XXXextra1XXX will be changed by this value.");
+		joboptions["nr_mpi"] = JobOption("Number of MPI procs:", qsub_nrmpi_val , 1, mpi_max, 1, "Number of MPI nodes to use in parallel. When set to 1, MPI will not be used. The maximum can be set through the environment variable RELION_MPI_MAX.");
 	}
 
-	char * extra2_text = getenv ("RELION_QSUB_EXTRA2");
-	if (extra2_text != NULL)
+	const char *thread_max_input = getenv("RELION_THREAD_MAX");
+	int thread_max = (thread_max_input == NULL) ? DEFAULTTHREADMAX : textToInteger(thread_max_input);
+	char * qsub_nrthr_text = getenv ("RELION_QSUB_NRTHREADS");
+	const char qsub_nrthreads_val = (qsub_nrthr_text ? atoi(qsub_nrthr_text) : DEFAULTNRTHREADS);
+	if (has_thread)
 	{
-		char * extra2_default = getenv ("RELION_QSUB_EXTRA2_DEFAULT");
-		char emptychar[] = "";
-		if (extra2_default == NULL)
-			extra2_default=emptychar;
-		joboptions["qsub_extra2"] = JobOption(std::string(extra2_text), std::string(extra2_default), "Extra option to pass to the qsub template script. \
-Any occurrences of XXXextra2XXX will be changed by this value.");
+		joboptions["nr_threads"] = JobOption("Number of threads:", qsub_nrthreads_val, 1, thread_max, 1, "Number of shared-memory (POSIX) threads to use in parallel. \
+When set to 1, no multi-threading will be used. The maximum can be set through the environment variable RELION_THREAD_MAX.");
+	}
+
+
+	const char * use_queue_input = getenv("RELION_QUEUE_USE");
+	bool use_queue = (use_queue_input == NULL) ? DEFAULTQUEUEUSE : textToBool(use_queue_input);
+	joboptions["do_queue"] = JobOption("Submit to queue?", use_queue, "If set to Yes, the job will be submit to a queue, otherwise \
+the job will be executed locally. Note that only MPI jobs may be sent to a queue. The default can be set through the environment variable RELION_QUEUE_USE.");
+
+	// Check for environment variable RELION_QUEUE_NAME
+	const char * default_queue = getenv("RELION_QUEUE_NAME");
+	if (default_queue==NULL)
+	{
+		default_queue = DEFAULTQUEUENAME;
+	}
+
+	// Need the std::string(), as otherwise it will be overloaded and passed as a boolean....
+	joboptions["queuename"] = JobOption("Queue name: ", std::string(default_queue), "Name of the queue to which to submit the job. The default name can be set through the environment variable RELION_QUEUE_NAME.");
+
+	// Check for environment variable RELION_QSUB_COMMAND
+	const char * default_command = getenv ("RELION_QSUB_COMMAND");
+	if (default_command==NULL)
+	{
+		default_command = DEFAULTQSUBCOMMAND;
+	}
+
+	joboptions["qsub"] = JobOption("Queue submit command:", std::string(default_command), "Name of the command used to submit scripts to the queue, e.g. qsub or bsub.\n\n\
+Note that the person who installed RELION should have made a custom script for your cluster/queue setup. Check this is the case \
+(or create your own script following the RELION Wiki) if you have trouble submitting jobs. The default command can be set through the environment variable RELION_QSUB_COMMAND.");
+
+
+	// additional options that may be set through environment variables RELION_QSUB_EXTRAi and RELION_QSUB_EXTRAi (for more flexibility)
+	// i is either defined by RELION_QSUB_EXTRA_COUNT environment variable or is 0
+	char * extra_count_text = getenv ("RELION_QSUB_EXTRA_COUNT");
+	const char extra_count_val = (extra_count_text ? atoi(extra_count_text) : 0);
+	for (int i=1; i<=extra_count_val; i++)
+	{
+		std::stringstream out;
+		out<<i;
+		const std::string i_str=out.str();
+		char * extra_text = getenv ((std::string("RELION_QSUB_EXTRA")+i_str).c_str());
+		if (extra_text != NULL)
+		{
+			std::stringstream out;
+			out<<i;
+			const std::string i_str=out.str();
+			const std::string query=std::string("RELION_QSUB_EXTRA")+i_str+"_DEFAULT";
+			char * extra_default = getenv (query.c_str());
+			char emptychar[] = "";
+			if (extra_default == NULL)
+			{
+				extra_default=emptychar;
+			}
+			std::string txt=std::string("Extra option to pass to the qsub template script. Any occurrences of XXXextra")+i_str+"XXX will be changed by this value.";
+			joboptions[std::string("qsub_extra")+i_str] = JobOption(std::string(extra_text), std::string(extra_default), txt.c_str());
+        }
 	}
 
 	// Check for environment variable RELION_QSUB_TEMPLATE
-	char * default_location = getenv ("RELION_QSUB_TEMPLATE");
+	char * default_location = getenv("RELION_QSUB_TEMPLATE");
 	char mydefault[]=DEFAULTQSUBLOCATION;
 	if (default_location==NULL)
 	{
@@ -810,12 +858,12 @@ But note that (unlike all other entries in the GUI) the extra values are not rem
 	// Check for environment variable RELION_QSUB_TEMPLATE
 	char * my_minimum_dedicated = getenv ("RELION_MINIMUM_DEDICATED");
 	int minimum_nr_dedicated = (my_minimum_dedicated == NULL) ? DEFAULTMININIMUMDEDICATED : textToInteger(my_minimum_dedicated);
-	joboptions["min_dedicated"] = JobOption("Minimum dedicated cores per node:", minimum_nr_dedicated, 1, 64, 1, "Minimum number of dedicated cores that need to be requested on each node. This is useful to force the queue to fill up entire nodes of a given size.");
+	joboptions["min_dedicated"] = JobOption("Minimum dedicated cores per node:", minimum_nr_dedicated, 1, 64, 1, "Minimum number of dedicated cores that need to be requested on each node. This is useful to force the queue to fill up entire nodes of a given size. The default can be set through the environment variable RELION_MINIMUM_DEDICATED.");
 
 	// Need the std::string(), as otherwise it will be overloaded and passed as a boolean....
 	joboptions["other_args"] = JobOption("Additional arguments:", std::string(""), "In this box command-line arguments may be provided that are not generated by the GUI. \
 This may be useful for testing developmental options and/or expert use of the program. \
-The command 'relion_refine' will print a list of possible options.");
+To print a list of possible options, run the corresponding program from the command line without any arguments.");
 
 }
 
@@ -955,7 +1003,7 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 
 	std::string fn_in = joboptions["fn_in"].getString();
 	std::string node_type = joboptions["node_type"].getString();
-	if (node_type == "2D micrograph movies (*.mrcs)")
+	if (node_type == "2D micrograph movies (*.mrcs)" || node_type == "2D micrograph movies (*.mrcs, *.tiff)")
 	{
 		outputstar = outputname+"movies.star";
 		command = "relion_star_loopheader rlnMicrographMovieName > " + outputstar;;
@@ -1093,7 +1141,7 @@ void RelionJob::initialiseMotioncorrJob()
 
 	joboptions["input_star_mics"] = JobOption("Input movies STAR file:", NODE_MOVIES, "", "STAR files (*.star)", "A STAR file with all micrographs to run MOTIONCORR on");
 	joboptions["first_frame_sum"] = JobOption("First frame for corrected sum:", 1, 1, 32, 1, "First frame to use in corrected average (starts counting at 1). ");
-	joboptions["last_frame_sum"] = JobOption("Last frame for corrected sum:", 0, 0, 32, 1, "Last frame to use in corrected average.");
+	joboptions["last_frame_sum"] = JobOption("Last frame for corrected sum:", 0, 0, 32, 1, "Last frame to use in corrected average. 0 means 'use all frames'.");
 	joboptions["angpix"] = JobOption("Pixel size (A):", 1, 0.5, 4.0, 0.1, "Provide the pixel size in Angstroms of the input movies. This is the original pixel size before binning.");
 
 	// Motioncor2
@@ -1258,9 +1306,9 @@ void RelionJob::initialiseCtffindJob()
 	char *default_location;
 
 	joboptions["input_star_mics"] = JobOption("Input micrographs STAR file:", NODE_MICS, "", "STAR files (*.star)", "A STAR file with all micrographs to run CTFFIND or Gctf on");
-	joboptions["use_noDW"] = JobOption("Use micrograph without dose-weighting?", false, "If set to Yes, the CTF estimation will be done using the micrograph without dose-weighting as in rlnMicrographNameNoDW (_noDW.mrc from MotionCor2). If set to No, the normal rlnMicrographName will be used. Note this option will not work for motion-correction with UNBLUR.");
+	joboptions["use_noDW"] = JobOption("Use micrograph without dose-weighting?", false, "If set to Yes, the CTF estimation will be done using the micrograph without dose-weighting as in rlnMicrographNameNoDW (_noDW.mrc from MotionCor2). If set to No, the normal rlnMicrographName will be used.");
 
-	joboptions["cs"] = JobOption("Spherical aberration (mm):", 2.7, 0, 8, 0.1, "Spherical aberration of the microscope used to collect these images (in mm). Typical values are 2.7 (FEI Titan & Talos), 2.0 (FEI Polara), 1.4 (JEOL CRYO-ARM) and 0.01 (microscopes with a Cs corrector).");
+	joboptions["cs"] = JobOption("Spherical aberration (mm):", 2.7, 0, 8, 0.1, "Spherical aberration of the microscope used to collect these images (in mm). Typical values are 2.7 (FEI Titan & Talos, most JEOL CRYO-ARM), 2.0 (FEI Polara), 1.4 (some JEOL CRYO-ARM) and 0.01 (microscopes with a Cs corrector).");
 	joboptions["kv"] = JobOption("Voltage (kV):", 300, 50, 500, 10, "Voltage the microscope was operated on (in kV)");
 	joboptions["q0"] = JobOption("Amplitude contrast:", 0.1, 0, 0.3, 0.01, "Fraction of amplitude contrast. Often values around 10% work better than theoretically more accurate lower values...");
 	joboptions["angpix"] = JobOption("Magnified pixel size (Angstrom):", 1.4, 0.5, 3, 0.1, "Pixel size in Angstroms. ");
@@ -1762,7 +1810,8 @@ void RelionJob::initialiseExtractJob()
 	joboptions["coords_suffix"] = JobOption("Input coordinates: ", NODE_MIC_COORDS, "", "Input coords_suffix file ({coords_suffix}*)", "Filename of the coords_suffix file with the directory structure and the suffix of all coordinate files.");
 	joboptions["do_reextract"] = JobOption("OR re-extract refined particles? ", false, "If set to Yes, the input Coordinates above will be ignored. Instead, one uses a _data.star file from a previous 2D or 3D refinement to re-extract the particles in that refinement, possibly re-centered with their refined origin offsets. This is particularly useful when going from binned to unbinned particles.");
 	joboptions["fndata_reextract"] = JobOption("Refined particles STAR file: ", NODE_PART_DATA, "", "Input STAR file (*.{star})", "Filename of the STAR file with the refined particle coordinates, e.g. from a previous 2D or 3D classification or auto-refine run.");
-	joboptions["do_recenter"] = JobOption("Re-center refined coordinates? ", true, "If set to Yes, the input coordinates will be re-centered according to the refined origin offsets in the provided _data.star file .");
+	joboptions["do_reset_offsets"] = JobOption("Reset the refined offsets to zero? ", false, "If set to Yes, the input origin offsets will be reset to zero. This may be useful after 2D classification of helical segments, where one does not want neighbouring segments to be translated on top of each other for a subsequent 3D refinement or classification.");
+	joboptions["do_recenter"] = JobOption("OR: re-center refined coordinates? ", false, "If set to Yes, the input coordinates will be re-centered according to the refined origin offsets in the provided _data.star file .");
 	joboptions["recenter_x"] = JobOption("Re-center on X-coordinate (in pix): ", std::string("0"), "Re-extract particles centered on this X-coordinate (in pixels in the reference)");
 	joboptions["recenter_y"] = JobOption("Re-center on Y-coordinate (in pix): ", std::string("0"), "Re-extract particles centered on this Y-coordinate (in pixels in the reference)");
 	joboptions["recenter_z"] = JobOption("Re-center on Z-coordinate (in pix): ", std::string("0"), "Re-extract particles centered on this Z-coordinate (in pixels in the reference)");
@@ -1824,10 +1873,21 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 			error_message = "ERROR: empty field for refined particles STAR file...";
 			return false;
 		}
+
+		if (joboptions["do_reset_offsets"].getBoolean() && joboptions["do_recenter"].getBoolean())
+		{
+			error_message = "ERROR: you cannot both reset refined offsets and recenter on refined coordinates, choose one...";
+			return false;
+		}
+
 		command += " --reextract_data_star " + joboptions["fndata_reextract"].getString();
 		Node node2(joboptions["fndata_reextract"].getString(), joboptions["fndata_reextract"].node_type);
 		inputNodes.push_back(node2);
-		if (joboptions["do_recenter"].getBoolean())
+		if (joboptions["do_reset_offsets"].getBoolean())
+		{
+			command += " --reset_offsets";
+		}
+		else if (joboptions["do_recenter"].getBoolean())
 		{
 			command += " --recenter";
 			command += " --recenter_x " + joboptions["recenter_x"].getString();
@@ -2049,8 +2109,9 @@ void RelionJob::initialiseSelectJob()
 	joboptions["split_size"] = JobOption("Subset size: ", 100, 100, 10000, 100, "The number of lines in each of the output subsets. This line will be ignored when the number of subsets is specified on the next line.");
 	joboptions["nr_split"] = JobOption("OR: number of subsets: ", -1, 1, 50, 1, "Give a positive integer to specify into how many equal-sized subsets the data will be divided");
 
-	//joboptions["do_remove_duplicates"] = JobOption("Remove duplicates", false, "If set to Yes, then the program will remove all but one of particles which have drifted into the same position during alignment");
-	//joboptions["duplicate_threshold"] = JobOption("Threshold [A]: ", 1, 1, 100, 1, "Remove particle coordinates within this distance [A], which might have drifted into the same position during alignment");
+	joboptions["do_remove_duplicates"] = JobOption("OR: remove duplicates?", false, "If set to Yes, duplicated particles that are within a given distance are removed leaving only one. Duplicated particles are sometimes generated when particles drift into the same position during alignment. They inflate and invalidate gold-standard FSC calculation.");
+	joboptions["duplicate_threshold"] = JobOption("Minimum inter-particle distance (A)", 30, 0, 1000, 1, "Particles within this distance are removed leaving only one.");
+	joboptions["image_angpix"] = JobOption("Pixel size before extraction (A)", -1, -1, 10, 0.01, "The pixel size of particles (relevant to rlnOriginX/Y) is read from the STAR file. When the pixel size of the original micrograph used for extraction (relevant to rlnCoordinateX/Y) is different, specify it here");
 
 }
 
@@ -2070,14 +2131,55 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 		return false;
 	}
 
-	// Value-based selection
-	if (joboptions["do_select_values"].getBoolean() || joboptions["do_discard"].getBoolean() || joboptions["do_split"].getBoolean())
+	int c = 0;
+	if (joboptions["do_select_values"].getBoolean()) c++;
+	if (joboptions["do_discard"].getBoolean()) c++;
+	if (joboptions["do_split"].getBoolean()) c++;
+	if (joboptions["do_remove_duplicates"].getBoolean()) c++;
+	if (c > 1)
 	{
+		error_message = "You cannot do many tasks simultaneously...";
+		return false;
+	}
+
+	if (joboptions["do_remove_duplicates"].getBoolean())
+	{
+		// Remove duplicates
+		command="`which relion_star_handler`";
+
+		if (joboptions["fn_mic"].getString() != "" || joboptions["fn_model"].getString() != "" || joboptions["fn_coords"].getString() != "")
+		{
+			error_message = "ERROR: Duplicate removal is only possible for particle STAR files...";
+			return false;
+		}
+
+		if (joboptions["fn_data"].getString() == "")
+		{
+			error_message = "ERROR: Duplicate removal needs a particle STAR file...";
+			return false;
+		}
+
+		Node node(joboptions["fn_data"].getString(), joboptions["fn_data"].node_type);
+		inputNodes.push_back(node);
+		command += " --i " + joboptions["fn_data"].getString();
+
+		FileName fn_out = outputname+"particles.star";
+		Node node2(fn_out, NODE_PART_DATA);
+		outputNodes.push_back(node2);
+		command += " --o " + fn_out;
+
+		command += " --remove_duplicates " + joboptions["duplicate_threshold"].getString();
+		if (joboptions["image_angpix"].getNumber() > 0)
+			command += " --image_angpix " + joboptions["image_angpix"].getString();
+	}
+	else if (joboptions["do_select_values"].getBoolean() || joboptions["do_discard"].getBoolean() || joboptions["do_split"].getBoolean())
+	{
+		// Value-based selection
 		command="`which relion_star_handler`";
 
 		if (joboptions["fn_model"].getString() != "" || joboptions["fn_coords"].getString() != "")
 		{
-			error_message = "ERROR: Value-selection or subset splitting is only possible for micrograph or particle STAR files... ";
+			error_message = "ERROR: Value-selection or subset splitting is only possible for micrograph or particle STAR files...";
 			return false;
 		}
 
@@ -2727,8 +2829,9 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 	int total_nr_iter = joboptions["sgd_ini_iter"].getNumber();
 	total_nr_iter += joboptions["sgd_inbetween_iter"].getNumber();
 	total_nr_iter += joboptions["sgd_fin_iter"].getNumber();
+	int nr_classes = joboptions["nr_classes"].getNumber();
 
-	outputNodes = getOutputNodesRefine(outputname + fn_run, total_nr_iter, 1, 3, 1);
+	outputNodes = getOutputNodesRefine(outputname + fn_run, total_nr_iter, nr_classes, 3, 1);
 
 	command += " --sgd_ini_iter " + joboptions["sgd_ini_iter"].getString();
 	command += " --sgd_inbetween_iter " + joboptions["sgd_inbetween_iter"].getString();
@@ -3223,6 +3326,11 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 	// GPU-stuff
 	if (joboptions["use_gpu"].getBoolean())
 	{
+		if (!joboptions["dont_skip_align"].getBoolean())
+		{
+			error_message = "ERROR: you cannot use GPUs when skipping image alignments.";
+			return false;
+		}
 		command += " --gpu \"" + joboptions["gpu_ids"].getString() + "\"";
 	}
 
@@ -4999,7 +5107,7 @@ This gives higher resolution estimates, as it disregards ill-defined regions nea
 	// Defocus fit
 	joboptions["do_ctf"] = JobOption("Perform CTF parameter fitting?", true, "If set to Yes, then relion_ctf_refine will be used to estimate the selected parameters below.");
 	joboptions["do_defocus"] = JobOption("Fit per-particle defocus?", true, "If set to Yes, then relion_ctf_refine will estimate a per-particle defocus.");
-	joboptions["range"] = JobOption("Range for defocus fit (A): ", 2000, 500, 5000, 100, "The range in (Angstrom) for the defocus fit of each particle.");
+	joboptions["range"] = JobOption("Range for defocus fit (A): ", 2000, 500, 5000, 100, "The initial defocus value given in the input STAR file +/- this value (in Angstrom) will be the search range for each particle.");
 	joboptions["do_glob_astig"] = JobOption("Fit per-micrograph astigmatism?", false, "If set to Yes, ctf_refine will try to refine astigamtism on a per-micrograph basis. This will require many particles and good signal-to-noise ratios per micrograph.");
 	joboptions["do_astig"] = JobOption("Fit per-particle astigmatism?", false, "If set to Yes, astigmatism will be estimated on a per-particle basis. This requires very strong data, i.e. very large particles with excellent signal-to-noise ratios.");
 	joboptions["do_phase"] = JobOption("Fit per-micrograph phase-shift?", false, "If set to Yes, ctf_refine will try to refine a phase-shift (amplitude contrast) on a per-micrograph basis. This may be useful for Volta-phase plate data, but will require many particles and good signal-to-noise ratios per micrograph.");

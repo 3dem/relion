@@ -27,13 +27,13 @@
 class star_handler_parameters
 {
 	public:
-	FileName fn_in, fn_out, fn_compare, fn_label1, fn_label2, fn_label3, select_label, discard_label;
+	FileName fn_in, fn_out, fn_compare, fn_label1, fn_label2, fn_label3, select_label, select_str_label, discard_label;
 	FileName fn_check, fn_operate, fn_operate2, fn_operate3, fn_set;
-	std::string remove_col_label, add_col_label, add_col_value, add_col_from, hist_col_label;
+	std::string remove_col_label, add_col_label, add_col_value, add_col_from, hist_col_label, select_include_str, select_exclude_str;
 	RFLOAT eps, select_minval, select_maxval, multiply_by, add_to, center_X, center_Y, center_Z, hist_min, hist_max;
 	bool do_combine, do_split, do_center, do_random_order, show_frac, show_cumulative, do_discard;
 	long int nr_split, size_split, nr_bin;
-	RFLOAT discard_sigma;
+	RFLOAT discard_sigma, duplicate_threshold, extract_angpix;
 	// I/O Parser
 	IOParser parser;
 
@@ -60,9 +60,12 @@ class star_handler_parameters
 		eps = textToFloat(parser.getOption("--max_dist", "Maximum distance to consider a match (for int and RFLOAT only)", "0."));
 
 		int subset_section = parser.addSection("Select options");
-		select_label = parser.getOption("--select", "Metadata label to base output selection on (e.g. rlnCtfFigureOfMerit)", "");
+		select_label = parser.getOption("--select", "Metadata label (number) to base output selection on (e.g. rlnCtfFigureOfMerit)", "");
 		select_minval = textToFloat(parser.getOption("--minval", "Minimum acceptable value for this label", "-99999999."));
 		select_maxval = textToFloat(parser.getOption("--maxval", "Maximum acceptable value for this label", "99999999."));
+		select_str_label = parser.getOption("--select_by_str", "Metadata label (string) to base output selection on (e.g. rlnMicrographname)", "");
+		select_include_str = parser.getOption("--select_include", "select rows that contains this string in --select_by_str ", "");
+		select_exclude_str = parser.getOption("--select_exclude", "exclude rows that contains this string in --select_by_str ", "");
 
 		int discard_section = parser.addSection("Discard based on image statistics options");
 		do_discard = parser.checkOption("--discard_on_stats", "Discard images if their average/stddev deviates too many sigma from the ensemble average");
@@ -77,7 +80,7 @@ class star_handler_parameters
 		do_split = parser.checkOption("--split", "Split the input STAR file into one or more smaller output STAR files");
 		do_random_order = parser.checkOption("--random_order", "Perform splits on randomised order of the input STAR file");
 		nr_split = textToInteger(parser.getOption("--nr_split", "Split into this many equal-sized STAR files", "-1"));
-		size_split = textToInteger(parser.getOption("--size_split", "AND/OR split into subsets of this many lines", "-1"));
+		size_split = textToLongLong(parser.getOption("--size_split", "AND/OR split into subsets of this many lines", "-1"));
 
 		int operate_section = parser.addSection("Operate options");
 		fn_operate = parser.getOption("--operate", "Operate on this metadata label", "");
@@ -104,17 +107,22 @@ class star_handler_parameters
 		nr_bin = textToInteger(parser.getOption("--hist_bins", "Number of bins for the histogram. By default, determined automatically by Freedman–Diaconis rule.", "-1"));
 		hist_min = textToFloat(parser.getOption("--hist_min", "Minimum value for the histogram (needs --hist_bins)", "-inf"));
 		hist_max = textToFloat(parser.getOption("--hist_max", "Maximum value for the histogram (needs --hist_bins)", "inf"));
+
+		int duplicate_section = parser.addSection("Duplicate removal");
+		duplicate_threshold = textToFloat(parser.getOption("--remove_duplicates","Remove duplicated particles within this distance [Angstrom]. Negative values disable this.", "-1"));
+		extract_angpix = textToFloat(parser.getOption("--image_angpix", "For down-sampled particles, specify the pixel size [A/pix] of the original images used in the Extract job", "-1"));
+
 		// Check for errors in the command-line option
 		if (parser.checkForErrors())
 			REPORT_ERROR("Errors encountered on the command line, exiting...");
 	}
-
 
 	void run()
 	{
 		int c = 0;
 		if (fn_compare != "") c++;
 		if (select_label != "") c++;
+		if (select_str_label != "") c++;
 		if (do_discard) c++;
 		if (do_combine) c++;
 		if (do_split) c++;
@@ -123,9 +131,10 @@ class star_handler_parameters
 		if (remove_col_label != "") c++;
 		if (add_col_label != "") c++;
 		if (hist_col_label != "") c++;
+		if (duplicate_threshold > 0) c++;
 		if (c != 1)
 		{
-			REPORT_ERROR("ERROR: specify (only and at least) one of the following options: --compare, --select, --combine, --split, --operate, --center, --remove_column, --add_column or --hist_column");
+			REPORT_ERROR("ERROR: specify (only and at least) one of the following options: --compare, --select, --select_by_str, --combine, --split, --operate, --center, --remove_column, --add_column, --hist_column or --remove_duplicates.");
 		}
 
 		if (fn_out == "" && hist_col_label == "")
@@ -133,6 +142,7 @@ class star_handler_parameters
 
 		if (fn_compare != "") compare();
 		if (select_label != "") select();
+		if (select_str_label != "") select_by_str();
 		if (do_discard) discard_on_image_stats();
 		if (do_combine) combine();
 		if (do_split) split();
@@ -141,6 +151,7 @@ class star_handler_parameters
 		if (remove_col_label!= "") remove_column();
 		if (add_col_label!= "") add_column();
 		if (hist_col_label != "") hist_column();
+		if (duplicate_threshold > 0) remove_duplicate();
 
 		std::cout << " Done!" << std::endl;
 	}
@@ -193,6 +204,35 @@ class star_handler_parameters
 
 	}
 
+	void select_by_str()
+	{
+
+		int c = 0;
+		if (select_include_str != "") c++;
+		if (select_exclude_str != "") c++;
+		if (c != 1)
+			REPORT_ERROR("You must specify only and at least one of --select_include and --select_exclude");
+
+		MetaDataTable MDin, MDout;
+
+		if (fn_in.contains("_model.star"))
+		{
+			MDin.read(fn_in, "model_classes");
+		}
+		else
+		{
+			MDin.read(fn_in);
+		}
+
+		if (select_include_str != "")
+			MDout = subsetMetaDataTable(MDin, EMDL::str2Label(select_str_label), select_include_str, false);
+		else
+			MDout = subsetMetaDataTable(MDin, EMDL::str2Label(select_str_label), select_exclude_str, true);
+
+		MDout.write(fn_out);
+		std::cout << " Written: " << fn_out << std::endl;
+
+	}
 
 	void discard_on_image_stats()
 	{
@@ -632,6 +672,50 @@ class star_handler_parameters
 		std::cout << " Done! written out " << fn_eps << std::endl;
 		delete plot2D;
 
+	}
+
+	void remove_duplicate()
+	{
+		MetaDataTable MD;
+		MD.read(fn_in);
+
+		EMDLabel mic_label;
+		if (MD.containsLabel(EMDL_MICROGRAPH_NAME)) mic_label = EMDL_MICROGRAPH_NAME;
+		else REPORT_ERROR("The input STAR file does not contain rlnMicrographName column.");
+
+		RFLOAT particle_angpix = 1.0;
+		if (MD.containsLabel(EMDL_CTF_MAGNIFICATION) && MD.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
+		{
+			RFLOAT mag, dstep;
+			MD.getValue(EMDL_CTF_MAGNIFICATION, mag);
+			MD.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
+			particle_angpix = 10000. * dstep / mag;
+			std::cout << " + Using pixel size calculated from magnification and detector pixel size in the input STAR file: " << particle_angpix << std::endl;
+		}
+		else {
+			std::cerr << "WARNING: The given STAR file does not contain the pixel size. Assuming 1 A/pix." << std::endl;
+		}
+
+		if (extract_angpix > 0)
+		{
+			std::cout << " + Using the provided pixel size for original micrographs before extraction: " << extract_angpix << std::endl;
+		}
+		else
+		{
+			extract_angpix = particle_angpix;
+			std::cout << " + Assuming the pixel size of original micrographs before extraction is also " << extract_angpix << std::endl;
+		}
+
+		RFLOAT scale = extract_angpix / particle_angpix;
+		RFLOAT duplicate_threshold_in_px = duplicate_threshold / extract_angpix;
+
+		std::cout << " + The minimum inter-particle distance " << duplicate_threshold << " A corresponds to " << duplicate_threshold_in_px << " px in the micrograph coordinate (rlnCoordinateX/Y)." << std::endl;
+		std::cout << " + The particle shifts (rlnOriginX/Y) are multiplied by " << scale << " to bring it to the same scale as rlnCoordinateX/Y." << std::endl;
+		FileName fn_removed = fn_out.withoutExtension() + "_removed.star";
+		MetaDataTable MDout = removeDuplicatedParticles(MD, mic_label, duplicate_threshold_in_px, scale, fn_removed, true);
+	
+		MDout.write(fn_out);
+		std::cout << " Written: " << fn_out << std::endl;
 	}
 };
 

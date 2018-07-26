@@ -181,6 +181,9 @@ void Micrograph::write(FileName filename)
 	if (fnGain != "") {
 		MD.setValue(EMDL_MICROGRAPH_GAIN_NAME, fnGain);
 	}
+	if (fnDefect != "") {
+		MD.setValue(EMDL_MICROGRAPH_DEFECT_FILE, fnDefect);
+	}
 	MD.setValue(EMDL_MICROGRAPH_BINNING, binning);
 	if (angpix != -1) {
 		MD.setValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, angpix);
@@ -338,6 +341,9 @@ void Micrograph::read(FileName fn_in)
 	if (!MDglobal.getValue(EMDL_MICROGRAPH_GAIN_NAME, fnGain)) {
 		fnGain = "";
 	}
+	if (!MDglobal.getValue(EMDL_MICROGRAPH_DEFECT_FILE, fnDefect)) {
+		fnDefect = "";
+	}
 	if (!MDglobal.getValue(EMDL_MICROGRAPH_BINNING, binning)) {
 		binning = 1.0;
 	}
@@ -428,6 +434,7 @@ void Micrograph::clearFields()
 
 	fnMovie = "";
 	fnGain = "";
+	fnDefect = "";
 
 	globalShiftX.resize(0);
 	globalShiftY.resize(0);
@@ -458,6 +465,7 @@ void Micrograph::copyFieldsFrom(const Micrograph& m)
 
 	fnMovie = m.fnMovie;
 	fnGain = m.fnGain;
+	fnDefect = m.fnDefect;
 
 	globalShiftX = m.globalShiftX;
 	globalShiftY = m.globalShiftY;

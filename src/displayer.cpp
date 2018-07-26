@@ -594,7 +594,6 @@ int multiViewerCanvas::handle(int ev)
 						{ "Show particles from selected classes" },
 						{ "Set selection type" },
 						{ "Save selected classes" },
-						{ "Save STAR with selected images" },
 						{ "Quit" },
 						{ 0 }
 					};
@@ -2228,12 +2227,6 @@ void Displayer::read(int argc, char **argv)
 	do_class = parser.checkOption("--class", "Use this to analyse classes in input model.star file");
 	nr_regroups = textToInteger(parser.getOption("--regroup", "Number of groups to regroup saved particles from selected classes in (default is no regrouping)", "-1"));
 	do_allow_save = parser.checkOption("--allow_save", "Allow saving of selected particles or class averages");
-
-	do_remove_duplicates = false;
-	if(do_allow_save)
-			do_remove_duplicates = parser.checkOption("--remove_duplicates", "Remove particles with redundant coordinates (within this distance [A]) in the data_star STAR file.");
-	if(do_remove_duplicates)
-			duplicate_threshold = textToFloat(parser.getOption("--remove_duplicates",""));
 
 	fn_selected_imgs = parser.getOption("--fn_imgs", "Name of the STAR file in which to save selected images.", "");
 	fn_selected_parts = parser.getOption("--fn_parts", "Name of the STAR file in which to save particles from selected classes.", "");

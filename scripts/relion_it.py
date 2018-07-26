@@ -51,7 +51,7 @@ class RelionItOptions(object):
     Cs = 1.4
 
 
-    ### Import images (Linux wild card; movies as *.mrcs or *.tif; single-frame micrographs as *.mrc)
+    ### Import images (Linux wild card; movies as *.mrc, *.mrcs, *.tiff or *.tif; single-frame micrographs as *.mrc)
     import_images = 'Movies/*tiff'
     # Are these multi-frame movies? Set to False for single-frame micrographs (and motion-correction will be skipped)
     images_are_movies = True
@@ -84,8 +84,8 @@ class RelionItOptions(object):
     # OR: provide a 3D references for reference-based picking (when autopick_do_LoG = False)
     autopick_3dreference = ''
 
-    # Threshold for reference-based autopicking (threshold 0 will pick too many particles. Just hope classification will sort it all out...) 
-    autopick_refs_threshold = 0.0
+    # Threshold for reference-based autopicking (threshold 0 will pick too many particles. Default of 0.4 is hopefully better. Ultimately, just hope classification will sort it all out...) 
+    autopick_refs_threshold = 0.4
     # Minimum inter-particle distance for reference-based picking (~70% of particle diameter often works well)
     autopick_refs_min_distance = 120
     #
@@ -188,6 +188,8 @@ class RelionItOptions(object):
     # orientation of the gain-reference w.r.t your movies (if input movies are not yet gain-corrected, e.g. TIFFs)
     motioncor_gainflip = 'No flipping (0)'
     motioncor_gainrot = 'No rotation (0)'
+    # Other arguments for MotionCor2
+    motioncor_other_args = ''
     # Submit motion correction job to the cluster?
     motioncor_submit_to_queue = False
     
@@ -463,7 +465,7 @@ def getSecondPassReference():
         angpix = '0'
     return filename.replace('\n',''), angpix.replace('\n','')
 
-def addJob(jobtype, name_in_script, done_file, options):
+def addJob(jobtype, name_in_script, done_file, options, alias=None):
 
     jobname = ""
     # See if we've done this job before, i.e. whether it is in the done_file
@@ -484,7 +486,8 @@ def addJob(jobtype, name_in_script, done_file, options):
             optionstring += opt + ';'
 
         command = 'relion_pipeliner --addJob ' + jobtype + ' --addJobOptions "' + optionstring + '"'
-
+        if alias is not None:
+                command += ' --setJobAlias "' + alias + '"'
         os.system(command)
 
         pipeline = load_star(PIPELINE_STAR)
@@ -570,6 +573,19 @@ def findBestClass(model_star_file, use_resol=True):
     print " RELION_IT: found best class:",best_class,"with class size of",best_size,"and resolution of",best_resol
     return best_class, best_resol, model_star['model_general']['rlnPixelSize']
 
+def findOutputModelStar(job_dir):
+    found = None
+    try:
+        job_star = load_star(job_dir + "job_pipeline.star")
+        for output_file in job_star["pipeline_output_edges"]['rlnPipeLineEdgeToNode']:
+            if output_file.endswith("_model.star"):
+                found = output_file
+                break
+    except:
+        pass
+
+    return found
+
 def run_pipeline(opts):
     """
     Configure and run the RELION 3 pipeline with the given options.
@@ -624,6 +640,12 @@ def run_pipeline(opts):
         secondpass_ref3d, secondpass_ref3d_angpix = getSecondPassReference()
         if not secondpass_ref3d == '':
             print ' RELION_IT: found', secondpass_ref3d,'with angpix=',secondpass_ref3d_angpix,'as a 3D reference for second pass in file',SECONDPASS_REF3D_FILE
+            print ' RELION_IT: if the automatic selection of the reference turned out to be unsatisfactory,'
+            print ' RELION_IT: you can re-run the second pass with another reference by'
+            print ' RELION_IT:  stopping the pipeline by deleteing RUNNING_*'
+            print ' RELION_IT:  updating the reference filename in',SECONDPASS_REF3D_FILE
+            print ' RELION_IT:  deleting relevant jobs (autopick2_job and followings) in',SETUP_CHECK_FILE
+            print ' RELION_IT:  and restarting the pipeline.'
             first_pass = 1
             opts.autopick_3dreference = secondpass_ref3d
             opts.autopick_ref_angpix = secondpass_ref3d_angpix
@@ -664,6 +686,7 @@ def run_pipeline(opts):
                                   'Bfactor: ==  {}'.format(opts.motioncor_bfactor),
                                   'Binning factor: == {}'.format(opts.motioncor_binning),
                                   'Which GPUs to use: == {}'.format(opts.motioncor_gpu),
+                                  'Other MOTIONCOR2 arguments == {}'.format(opts.motioncor_other_args),
                                   'Number of threads: == {}'.format(opts.motioncor_threads),
                                   'Number of MPI procs: == {}'.format(opts.motioncor_mpi)]
 
@@ -717,6 +740,8 @@ def run_pipeline(opts):
         else:
             ctffind_options.append('Estimate phase shifts? == No')
 
+        if opts.ctffind_submit_to_queue:
+            ctffind_options.extend(queue_options)
 
         ctffind_job, already_had_it  = addJob('CtfFind', 'ctffind_job', SETUP_CHECK_FILE, ctffind_options)
 
@@ -780,10 +805,12 @@ def run_pipeline(opts):
             
             if ipass == 0:
                 autopick_job_name = 'autopick_job'
+                autopick_alias = 'reference free'
             else:
                 autopick_job_name = 'autopick2_job'
+                autopick_alias = 'reference based'
 
-            autopick_job, already_had_it  = addJob('AutoPick', autopick_job_name, SETUP_CHECK_FILE, autopick_options)
+            autopick_job, already_had_it  = addJob('AutoPick', autopick_job_name, SETUP_CHECK_FILE, autopick_options, alias=autopick_alias)
             runjobs.append(autopick_job)
 
             #### Set up the Extract job
@@ -806,10 +833,12 @@ def run_pipeline(opts):
 
             if ipass == 0:
                 extract_job_name = 'extract_job'
+                extract_alias = 'reference free'
             else:
                 extract_job_name = 'extract2_job'
+                extract_alias = 'reference based'
 
-            extract_job, already_had_it  = addJob('Extract', extract_job_name, SETUP_CHECK_FILE, extract_options)
+            extract_job, already_had_it  = addJob('Extract', extract_job_name, SETUP_CHECK_FILE, extract_options, alias=extract_alias)
             runjobs.append(extract_job)
 
             if (ipass == 0 and (opts.do_class2d or opts.do_class3d)) or (ipass == 1 and (opts.do_class2d_pass2 or opts.do_class3d_pass2)):
@@ -821,11 +850,13 @@ def run_pipeline(opts):
                 if ipass == 0:
                     split_job_name = 'split_job'
                     split_options.append('Subset size:  == {}'.format(opts.batch_size))
+                    split_alias = 'into {}'.format(opts.batch_size) 
                 else:
                     split_job_name = 'split2_job'
                     split_options.append('Subset size:  == {}'.format(opts.batch_size_pass2))
+                    split_alias = 'into {}'.format(opts.batch_size_pass2)
 
-                split_job, already_had_it = addJob('Select', split_job_name, SETUP_CHECK_FILE, split_options)
+                split_job, already_had_it = addJob('Select', split_job_name, SETUP_CHECK_FILE, split_options, alias=split_alias)
 
                 # Now start running stuff
                 runjobs.append(split_job)
@@ -908,17 +939,17 @@ def run_pipeline(opts):
                             else:
                                 discard_job_name = 'discard2_job'
               
-                            discard_job, already_had_it = addJob('Select', discard_job_name, SETUP_CHECK_FILE, discard_options)
-
                             if opts.discard_submit_to_queue:
                                 discard_options.extend(queue_options)
+
+                            discard_job, already_had_it = addJob('Select', discard_job_name, SETUP_CHECK_FILE, discard_options)
 
                             if ((not already_had_it) or rerun_batch1):
                                 have_new_batch = True
                                 RunJobs([discard_job], 1, 1, 'DISCARD')
                                 print " RELION_IT: submitted job to discard based on image statistics for", batch_size ,"particles in", batch_name
 
-                                # Wait here until this Class2D job is finished. Check every thirty seconds
+                                # Wait here until this Discard job is finished. Check every thirty seconds
                                 WaitForJob(discard_job, 30)
 
                             particles_star_file = discard_job + 'particles.star'
@@ -966,12 +997,13 @@ def run_pipeline(opts):
 
                             if ipass == 0:
                                 jobname = 'class2d_job_batch_{:03d}'.format(iibatch)
+                                alias = 'pass1_batch_{:03d}'.format(iibatch)
                             else:
                                 jobname = 'class2d_pass2_job_batch_{:03d}'.format(iibatch)
+                                alias = 'pass2_batch_{:03d}'.format(iibatch)
 
-                            class2d_job, already_had_it = addJob('Class2D', jobname, SETUP_CHECK_FILE, class2d_options)              
-
-
+                            class2d_job, already_had_it = addJob('Class2D', jobname, SETUP_CHECK_FILE, class2d_options, alias=alias)
+ 
                             if ((not already_had_it) or rerun_batch1):
                                 have_new_batch = True
                                 RunJobs([class2d_job], 1, 1, 'CLASS2D')
@@ -1047,9 +1079,15 @@ def run_pipeline(opts):
                                 # Wait here until this inimodel job is finished. Check every thirty seconds
                                 WaitForJob(inimodel_job, 30)
 
+                            sgd_model_star = findOutputModelStar(inimodel_job)
+                            if sgd_model_star is None:
+                                print " RELION_IT: Initial model generation " + inimodel_job + " does not contain expected output maps."
+                                print " RELION_IT: This job should have finished, but you may continue it from the GUI. "
+                                raise " ERROR!! quitting the pipeline." # TODO: MAKE MORE ROBUST
+
                             # Use the model of the largest class for the 3D classification below
                             total_iter = opts.inimodel_nr_iter_initial + opts.inimodel_nr_iter_inbetween + opts.inimodel_nr_iter_final
-                            best_inimodel_class, best_inimodel_resol, best_inimodel_angpix = findBestClass(inimodel_job + 'run_it{:03d}_model.star'.format(total_iter), use_resol=True)
+                            best_inimodel_class, best_inimodel_resol, best_inimodel_angpix = findBestClass(sgd_model_star, use_resol=True)
                             opts.class3d_reference = best_inimodel_class
                             opts.class3d_ref_is_correct_greyscale = True
                             opts.class3d_ref_is_ctf_corrected = True
@@ -1117,10 +1155,12 @@ def run_pipeline(opts):
 
                             if ipass == 0:
                                 jobname = 'class3d_job_batch_{:03d}'.format(iibatch)
+                                alias = 'pass1_batch_{:03d}'.format(iibatch)
                             else:
                                 jobname = 'class3d2_job_batch_{:03d}'.format(iibatch)
+                                alias = 'pass2_batch_{:03d}'.format(iibatch)
 
-                            class3d_job, already_had_it = addJob('Class3D', jobname, SETUP_CHECK_FILE, class3d_options)              
+                            class3d_job, already_had_it = addJob('Class3D', jobname, SETUP_CHECK_FILE, class3d_options, alias=alias) 
 
                             if ((not already_had_it) or rerun_batch1):
                                 have_new_batch = True
@@ -1130,7 +1170,13 @@ def run_pipeline(opts):
                                 # Wait here until this Class2D job is finished. Check every thirty seconds
                                 WaitForJob(class3d_job, 30)
 
-                            best_class3d_class, best_class3d_resol, best_class3d_angpix = findBestClass(class3d_job + 'run_it{:03d}_model.star'.format(opts.class3d_nr_iter), use_resol=True)
+                            class3d_model_star = findOutputModelStar(class3d_job)
+                            if class3d_model_star is None:
+                                print " RELION_IT: 3D Classification " + class3d_job + " does not contain expected output maps."
+                                print " RELION_IT: This job should have finished, but you may continue it from the GUI."
+                                raise Exception("ERROR!! quitting the pipeline.") # TODO: MAKE MORE ROBUST
+
+                            best_class3d_class, best_class3d_resol, best_class3d_angpix = findBestClass(class3d_model_star, use_resol=True)
 
                             # Once the first batch in the first pass is completed: move on to the second pass
                             if (ipass == 0 and opts.do_second_pass and iibatch == 1 and best_class3d_resol < opts.minimum_resolution_3dref_2ndpass):
@@ -1140,6 +1186,7 @@ def run_pipeline(opts):
                                 opts.autopick_do_LoG = False
                                 opts.class3d_reference = best_class3d_class
                                 opts.have_3d_reference = True
+                                opts.autopick_3dref_symmetry = opts.symmetry
 
                                 # Stop the PREPROCESS pipeliner of the first pass by removing its RUNNING file
                                 filename_to_remove = 'RUNNING_PIPELINER_'+preprocess_schedule_name

@@ -55,7 +55,7 @@ public:
 	bool do_phase_flip;
 	bool do_premultiply_ctf;
 	bool do_ctf_intact_first_peak;
-	RFLOAT angpix;
+	RFLOAT angpix, output_angpix;
 
 	////////////////// Extract particles from the micrographs
 	// Perform particle extraction?
@@ -93,6 +93,9 @@ public:
 
 	// How many micrographs are joined together in batches of movie-particles?
 	int join_nr_mics;
+
+	// Reset origin offsets in the input fn_data STAR file to zero
+	bool do_reset_offsets;
 
 	// Re-center particles according to rlnOriginX/Y in fn_data STAR file?
 	bool do_recenter;

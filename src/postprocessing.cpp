@@ -726,12 +726,12 @@ void Postprocessing::writeOutput()
 	CPlot2D *plot2D = new CPlot2D(title);
 	plot2D->SetXAxisSize(600);
 	plot2D->SetYAxisSize(400);
-	plot2D->SetXAxisTitle("resolution (1/A)");
-	plot2D->SetYAxisTitle("Fourier Shell Correlation");
 	MDfsc.addToCPlot2D(plot2D, EMDL_RESOLUTION, EMDL_POSTPROCESS_FSC_TRUE, 0., 0., 0., 2.);
 	MDfsc.addToCPlot2D(plot2D, EMDL_RESOLUTION, EMDL_POSTPROCESS_FSC_UNMASKED, 0., 1., 0.);
 	MDfsc.addToCPlot2D(plot2D, EMDL_RESOLUTION, EMDL_POSTPROCESS_FSC_MASKED, 0., 0., 1.);
 	MDfsc.addToCPlot2D(plot2D, EMDL_RESOLUTION, EMDL_POSTPROCESS_FSC_RANDOM_MASKED, 1., 0., 0.);
+	plot2D->SetXAxisTitle("resolution (1/A)");
+	plot2D->SetYAxisTitle("Fourier Shell Correlation");
 	plot2D->OutputPostScriptPlot(fn_out + "_fsc.eps");
 	delete plot2D;
 
@@ -776,8 +776,6 @@ void Postprocessing::writeOutput()
 	CPlot2D *plot2Db = new CPlot2D("Guinier plots");
 	plot2Db->SetXAxisSize(600);
 	plot2Db->SetYAxisSize(400);
-	plot2Db->SetXAxisTitle("resolution^2 (1/A^2)");
-	plot2Db->SetYAxisTitle("ln(amplitudes)");
 	MDguinier.addToCPlot2D(plot2Db, EMDL_POSTPROCESS_GUINIER_RESOL_SQUARED, EMDL_POSTPROCESS_GUINIER_VALUE_IN, 0., 0., 0.);
 	if (fn_mtf != "")
 		MDguinier.addToCPlot2D(plot2Db, EMDL_POSTPROCESS_GUINIER_RESOL_SQUARED, EMDL_POSTPROCESS_GUINIER_VALUE_INVMTF, 0., 1., 0.);
@@ -789,6 +787,8 @@ void Postprocessing::writeOutput()
 	{
 		MDextra2.addToCPlot2D(plot2Db, EMDL_POSTPROCESS_GUINIER_RESOL_SQUARED, EMDL_POSTPROCESS_GUINIER_VALUE_SHARPENED, 1., 0., 0.);
 	}
+	plot2Db->SetXAxisTitle("resolution^2 (1/A^2)");
+	plot2Db->SetYAxisTitle("ln(amplitudes)");
 	plot2Db->OutputPostScriptPlot(fn_out + "_guinier.eps");
 	delete plot2Db;
 
@@ -1183,14 +1183,29 @@ void Postprocessing::run()
 		global_resol_i = i;
 	}
 
-	// Only have one digit after final resolution
-    // global_resol = (ROUND(global_resol*10.))/10.;
-
-	// Check whether the phase-randomised FSC is less than 5% at the resolution estimate, otherwise warn the user
-	if (DIRECT_A1D_ELEM(fsc_random_masked, global_resol_i) > 0.1)
+	// Perform some checks on phase-randomisation..
+	if (do_mask)
 	{
-		std::cerr << " WARNING: The phase-randomised FSC is larger than 0.10 at the estimated resolution!" << std::endl;
-		std::cerr << " WARNING: This may result in an incorrect resolution estimation. Provide a softer mask with less features to get lower phase-randomised FSCs." << std::endl;
+		int unmasked_resol_i = 0;
+		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(fsc_unmasked)
+		{
+			if ( DIRECT_A1D_ELEM(fsc_unmasked, i) < 0.143)
+				break;
+			unmasked_resol_i = i;
+		}
+		// Check whether global_resol is worse than the unmasked one
+		if (unmasked_resol_i > global_resol_i)
+		{
+			std::cerr << " WARNING: the unmasked FSC extends beyond the solvent-corrected FSC. Skip masking for now, but you may want to adjust you mask!" << std::endl;
+			fsc_true = fsc_unmasked;
+			global_resol = XSIZE(I1())*angpix/(RFLOAT)unmasked_resol_i;
+		}
+		// Check whether the phase-randomised FSC is less than 5% at the resolution estimate, otherwise warn the user
+		else if (DIRECT_A1D_ELEM(fsc_random_masked, global_resol_i) > 0.1)
+		{
+			std::cerr << " WARNING: The phase-randomised FSC is larger than 0.10 at the estimated resolution!" << std::endl;
+			std::cerr << " WARNING: This may result in an incorrect resolution estimation. Provide a softer mask with less features to get lower phase-randomised FSCs." << std::endl;
+		}
 	}
 
 	// Add the two half-maps together for subsequent sharpening

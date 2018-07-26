@@ -54,6 +54,7 @@ void Preprocessing::read(int argc, char **argv, int rank)
 	fn_part_star = parser.getOption("--part_star", "Output STAR file with all particles metadata", "");
 	fn_list_star = parser.getOption("--list_star", "Output STAR file with a list to the output STAR files of individual micrographs", "");
 	fn_data = parser.getOption("--reextract_data_star", "A _data.star file from a refinement to re-extract, e.g. with different binning or re-centered (instead of --coord_suffix)", "");
+	do_reset_offsets = parser.checkOption("--reset_offsets", "reset the origin offsets from the input _data.star file to zero?");
 	do_recenter = parser.checkOption("--recenter", "Re-center particle according to rlnOriginX/Y in --reextract_data_star STAR file");
 	recenter_x = textToFloat(parser.getOption("--recenter_x", "X-coordinate (in pixel inside the reference) to recenter re-extracted data on", "0."));
 	recenter_y = textToFloat(parser.getOption("--recenter_y", "Y-coordinate (in pixel inside the reference) to recenter re-extracted data on", "0."));
@@ -102,7 +103,6 @@ void Preprocessing::read(int argc, char **argv, int rank)
 	helical_cut_into_segments = parser.checkOption("--helical_cut_into_segments", "Cut helical tubes into segments");
 	// Initialise verb for non-parallel execution
 	verb = 1;
-
 
 }
 
@@ -251,6 +251,10 @@ void Preprocessing::initialise()
 		}
 
 	}
+
+	output_angpix = angpix;
+	if (do_rescale)
+		output_angpix *= (RFLOAT)extract_size / (RFLOAT)scale;
 }
 
 void Preprocessing::run()
@@ -379,13 +383,14 @@ void Preprocessing::joinAllStarFiles()
 	{
 		MDout.write(fn_part_star);
 		std::cout << " Written out STAR file with " << MDout.numberOfObjects() << " particles in " << fn_part_star<< std::endl;
+		std::cout << " The new pixel size of the extracted particles are " << output_angpix << " Angstrom/pixel." << std::endl;
 	}
 
-    if (do_movie_extract && fn_list_star != "")
-    {
-    	MDmicnames.write(fn_list_star);
-    	std::cout << " Written out list of " << MDmicnames.numberOfObjects() << " movie-particle STAR files of individual micrographs in " << fn_list_star<< std::endl;
-    }
+	if (do_movie_extract && fn_list_star != "")
+	{
+		MDmicnames.write(fn_list_star);
+		std::cout << " Written out list of " << MDmicnames.numberOfObjects() << " movie-particle STAR files of individual micrographs in " << fn_list_star<< std::endl;
+	}
 
 }
 
@@ -447,14 +452,14 @@ void Preprocessing::runExtractParticles()
 
 void Preprocessing::readCoordinates(FileName fn_coord, MetaDataTable &MD)
 {
-    MD.clear();
+	MD.clear();
 
-    bool is_star = (fn_coord.getExtension() == "star");
-    bool is_box = (fn_coord.getExtension() == "box");
+	bool is_star = (fn_coord.getExtension() == "star");
+	bool is_box = (fn_coord.getExtension() == "box");
 
-    if (is_star)
+	if (is_star)
 	{
-    	MD.read(fn_coord);
+		MD.read(fn_coord);
 	}
 	else
 	{
@@ -534,7 +539,7 @@ void Preprocessing::readCoordinates(FileName fn_coord, MetaDataTable &MD)
 
 void Preprocessing::readHelicalCoordinates(FileName fn_mic, FileName fn_coord, MetaDataTable &MD)
 {
-    MD.clear();
+	MD.clear();
 
 	// Get movie or normal micrograph name and check it exists
 	if (!exists(fn_mic))
@@ -556,18 +561,18 @@ void Preprocessing::readHelicalCoordinates(FileName fn_mic, FileName fn_coord, M
 	if (zdim > 1)
 		is_3D = true;
 
-    bool is_star = (fn_coord.getExtension() == "star");
-    bool is_box = (fn_coord.getExtension() == "box");
-    bool is_coords = (fn_coord.getExtension() == "coords");
-    if ( (!is_star) && (!is_box) && (!is_coords) )
+	bool is_star = (fn_coord.getExtension() == "star");
+	bool is_box = (fn_coord.getExtension() == "box");
+	bool is_coords = (fn_coord.getExtension() == "coords");
+	if ( (!is_star) && (!is_box) && (!is_coords) )
 		REPORT_ERROR("Preprocessing::readCoordinates ERROR: Extraction of helical segments - Unknown file extension (RELION *.star, EMAN2 *.box and XIMDISP *.coords are supported).");
-    if ( (is_3D) && (!is_star) )
-   		REPORT_ERROR("Preprocessing::readCoordinates ERROR: Extraction of 3D helical subtomograms - Only STAR coordinate files are supported!");
+	if ( (is_3D) && (!is_star) )
+		REPORT_ERROR("Preprocessing::readCoordinates ERROR: Extraction of 3D helical subtomograms - Only STAR coordinate files are supported!");
 
 	int total_segments, total_tubes;
-    if (is_star)
-    {
-    	//std::cerr << " DEBUG: Extracting helical segments / subtomograms from RELION STAR coordinate files..." << std::endl;
+	if (is_star)
+	{
+		//std::cerr << " DEBUG: Extracting helical segments / subtomograms from RELION STAR coordinate files..." << std::endl;
 		if (do_extract_helical_tubes)
 		{
 			if (is_3D)
@@ -576,21 +581,21 @@ void Preprocessing::readHelicalCoordinates(FileName fn_mic, FileName fn_coord, M
 		}
 		else
 			convertHelicalSegmentCoordsToMetaDataTable(fn_coord, MD, total_segments, is_3D, xdim, ydim, zdim, extract_size, helical_bimodal_angular_priors);
-    }
-    else if (is_box)
-    {
-    	if (do_extract_helical_tubes)
+	}
+	else if (is_box)
+	{
+		if (do_extract_helical_tubes)
 			convertEmanHelicalTubeCoordsToMetaDataTable(fn_coord, MD, total_segments, total_tubes, helical_nr_asu, helical_rise, angpix, xdim, ydim, extract_size, helical_bimodal_angular_priors, helical_cut_into_segments);
 		else
 			convertEmanHelicalSegmentCoordsToMetaDataTable(fn_coord, MD, total_segments, total_tubes, xdim, ydim, extract_size, helical_bimodal_angular_priors);
-    }
-    else if (is_coords)
-    {
+	}
+	else if (is_coords)
+	{
 		if (do_extract_helical_tubes)
 			convertXimdispHelicalTubeCoordsToMetaDataTable(fn_coord, MD, total_segments, total_tubes, helical_nr_asu, helical_rise, angpix, xdim, ydim, extract_size, helical_bimodal_angular_priors, helical_cut_into_segments);
 		else
 			convertXimdispHelicalSegmentCoordsToMetaDataTable(fn_coord, MD, total_segments, total_tubes, xdim, ydim, extract_size, helical_bimodal_angular_priors);
-    }
+	}
 	else
 		REPORT_ERROR("Preprocessing::readCoordinates ERROR: Extraction of helical segments - Unknown file extension (RELION *.star, EMAN2 *.box and XIMDISP *.coords are supported).");
 }
@@ -606,12 +611,12 @@ bool Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 	FileName fn_oristack = fn_post.withoutExtension() + "_extract.mrcs";
 
 	// Name of this micrographs STAR file
-    FileName fn_star = fn_output_img_root + "_extract.star";
+	FileName fn_star = fn_output_img_root + "_extract.star";
 
-    if (exists(fn_star) && only_extract_unfinished)
-    {
-    	return(true);
-    }
+	if (exists(fn_star) && only_extract_unfinished)
+	{
+		return(true);
+	}
 
 	TIMING_TIC(TIMING_READ_COORD);
 	// Read in the coordinates file
@@ -1178,6 +1183,7 @@ void Preprocessing::performPerImageOperations(
 		Ipart.MDMainHeader.setValue(EMDL_IMAGE_STATS_MAX, maxval);
 		Ipart.MDMainHeader.setValue(EMDL_IMAGE_STATS_AVG, avg);
 		Ipart.MDMainHeader.setValue(EMDL_IMAGE_STATS_STDDEV, stddev);
+		Ipart.setSamplingRateInHeader(output_angpix);
 
 		TIMING_TIC(TIMING_PER_IMG_OP_WRITE);
 		// Write one mrc file for every subtomogram
@@ -1204,6 +1210,7 @@ void Preprocessing::performPerImageOperations(
 			Ipart.MDMainHeader.setValue(EMDL_IMAGE_STATS_MAX, all_maxval);
 			Ipart.MDMainHeader.setValue(EMDL_IMAGE_STATS_AVG, all_avg);
 			Ipart.MDMainHeader.setValue(EMDL_IMAGE_STATS_STDDEV, all_stddev);
+			Ipart.setSamplingRateInHeader(output_angpix);
 		}
 
 		TIMING_TIC(TIMING_PER_IMG_OP_WRITE);
@@ -1285,8 +1292,23 @@ MetaDataTable Preprocessing::getCoordinateMetaDataTable(FileName fn_mic)
 			}
 			else
 			{
-				// re-scale or re-center
-				if (ABS(rescale_fndata - 1.) > 1e-6 || do_recenter)
+				// reset input offsets
+				if (do_reset_offsets)
+				{
+					RFLOAT zero = 0.;
+					if (do_contains_xy)
+					{
+
+						MDresult.setValue(EMDL_ORIENT_ORIGIN_X, zero);
+						MDresult.setValue(EMDL_ORIENT_ORIGIN_Y, zero);
+					}
+					if (do_contains_z)
+					{
+						MDresult.setValue(EMDL_ORIENT_ORIGIN_Z, zero);
+					}
+				}
+				// re-scale or re-center (irrelevant if do_reset_offsets)
+				else if (ABS(rescale_fndata - 1.) > 1e-6 || do_recenter)
 				{
 					Matrix1D<RFLOAT>  my_projected_center(3);
 					my_projected_center.initZeros();

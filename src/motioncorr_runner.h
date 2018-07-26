@@ -103,6 +103,9 @@ public:
 	// Defect file
 	FileName fn_defect;
 
+	// Skip hot pixel detection in own motioncorr
+	bool skip_defect;
+
 	// Archive directory
 	FileName fn_archive;
 
@@ -123,6 +126,9 @@ public:
 
 	// Continue an old run: only estimate CTF if logfile WITH Final Values line does not yet exist, otherwise skip the micrograph
 	bool continue_old;
+
+	// Process at most this number of (unprocessed) micrographs
+	long do_at_most;
 
 	// Output STAR file
 	MetaDataTable MDavg, MDmov;

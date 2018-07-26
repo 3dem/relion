@@ -386,6 +386,29 @@ void AutoPicker::initialise()
 			Iref.read(fn_img);
 			Iref().setXmippOrigin();
 			Mrefs.push_back(Iref());
+
+			if (Mrefs.size() == 1 && verb > 0)
+			{
+
+				// Check pixel size in the header is consistent with angpix_ref. Otherwise, raise a warning
+				RFLOAT angpix_header = Iref.samplingRateX();
+				if (angpix_ref < 0)
+				{
+					if (fabs(angpix_header - angpix) > 1e-3)
+					{
+						std::cerr << " WARNING!!! Pixel size in reference image header= " << angpix_header << " but you have not provided --angpix_ref" << std::endl;
+					}
+				}
+				else
+				{
+					if (fabs(angpix_header - angpix_ref) > 1e-3)
+					{
+						std::cerr << " WARNING!!! Pixel size in reference image header= " << angpix_header << " but you have provided --angpix_ref " << angpix_ref << std::endl;
+					}
+				}
+
+			}
+
 		}
 	}
 	else
@@ -395,6 +418,26 @@ void AutoPicker::initialise()
 
 		Image<RFLOAT> Istk, Iref;
 		Istk.read(fn_ref);
+
+		// Check pixel size in the header is consistent with angpix_ref. Otherwise, raise a warning
+		RFLOAT angpix_header = Istk.samplingRateX();
+		if (verb > 0)
+		{
+			if (angpix_ref < 0)
+			{
+				if (fabs(angpix_header - angpix) > 1e-3)
+				{
+					std::cerr << " WARNING!!! Pixel size in reference image header= " << angpix_header << " but you have not provided --angpix_ref" << std::endl;
+				}
+			}
+			else
+			{
+				if (fabs(angpix_header - angpix_ref) > 1e-3)
+				{
+					std::cerr << " WARNING!!! Pixel size in reference image header= " << angpix_header << " but you have provided --angpix_ref " << angpix_ref << std::endl;
+				}
+			}
+		}
 
 		if (ZSIZE(Istk()) > 1)
 		{
@@ -426,6 +469,8 @@ void AutoPicker::initialise()
 			transformer.setReal(Mref);
 			transformer.getFourierAlias(Fref);
 
+			Image<RFLOAT> Iprojs;
+			FileName fn_img, fn_proj = fn_odir + "reference_projections.mrcs";
 			for (long int idir = 0; idir < sampling.NrDirections(); idir++)
 			{
 				RFLOAT rot = sampling.rot_angles[idir];
@@ -439,14 +484,15 @@ void AutoPicker::initialise()
 	        	// Shift the image back to the center...
 	        	CenterFFT(Mref, false);
 	        	Mrefs.push_back(Mref);
-//#define DEBUG_PROJECT3DREF
-#ifdef DEBUG_PROJECT3DREF
-	        	Image<RFLOAT> Itmp;
-	        	Itmp()=Mref;
-	        	FileName fnt;
-	        	fnt.compose("3dref_proj",idir,"mrc");
-	        	Itmp.write(fnt);
-#endif
+
+	        	// Also write out a stack with the 2D reference projections
+	        	Iprojs()=Mref;
+	        	fn_img.compose(idir+1,fn_proj);
+				if (idir == 0)
+					Iprojs.write(fn_img, -1, false, WRITE_OVERWRITE);
+				else
+					Iprojs.write(fn_img, -1, false, WRITE_APPEND);
+
 			}
 		}
 		else
@@ -516,6 +562,7 @@ void AutoPicker::initialise()
 			}
 		}
 
+		// Now bring Mrefs from angpix_ref to angpix!
 		if (fabs(angpix_ref - angpix) > 1e-3)
 		{
 			int halfoldsize = XSIZE(Mrefs[0]) / 2;
@@ -539,9 +586,9 @@ void AutoPicker::initialise()
 		// Get particle boxsize from the input reference images
 		particle_size = XSIZE(Mrefs[0]);
 
-		if (particle_diameter > particle_size * angpix_ref)
+		if (particle_diameter > particle_size * angpix)
 		{
-			std::cerr << " particle_diameter (A): " << particle_diameter << " box_size (pix): " << particle_size << " pixel size (A): " << angpix_ref << std::endl;
+			std::cerr << " particle_diameter (A): " << particle_diameter << " box_size (pix): " << particle_size << " pixel size (A): " << angpix << std::endl;
 			REPORT_ERROR("ERROR: the particle diameter is larger than the size of the box.");
 		}
 
@@ -552,7 +599,9 @@ void AutoPicker::initialise()
 			std::cout << " + Helical tube diameter should be smaller than the particle (background) diameter" << std::endl;
 		}
 		if ( (autopick_helical_segments) && (helical_tube_diameter > particle_diameter) )
+		{
 			REPORT_ERROR("Error: Helical tube diameter should be smaller than the particle (background) diameter!");
+		}
 
 
 		if (autopick_helical_segments && do_amyloid)
@@ -926,7 +975,9 @@ void AutoPicker::generatePDFLogfile()
 	{
 		progress_bar(fn_ori_micrographs.size());
 		std::cout << " Total number of particles from " << fn_ori_micrographs.size() << " micrographs is " << total_nr_picked << std::endl;
-		std::cout << " i.e. on average there were " << ROUND(total_nr_picked/fn_ori_micrographs.size()) << " particles per micrograph" << std::endl;
+		long avg = 0;
+		if (fn_ori_micrographs.size() > 0) avg = ROUND(total_nr_picked/fn_ori_micrographs.size());
+		std::cout << " i.e. on average there were " << avg << " particles per micrograph" << std::endl;
 	}
 
 	// Values for all micrographs
@@ -970,7 +1021,7 @@ void AutoPicker::generatePDFLogfile()
 		delete plot2Dd;
 	}
 
-	joinMultipleEPSIntoSinglePDF(fn_odir + "logfile.pdf ", all_fn_eps);
+	joinMultipleEPSIntoSinglePDF(fn_odir + "logfile.pdf", all_fn_eps);
 
 	if (verb > 0)
 	{
