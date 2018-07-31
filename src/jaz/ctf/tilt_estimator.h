@@ -19,6 +19,7 @@ class TiltEstimator
 		void init(
 				int verb, int s, int nr_omp_threads,
 				bool debug, bool diag, std::string outPath,
+				MetaDataTable& mdt0,
 				ReferenceMap* reference, ObservationModel* obsModel);
 		
 		// Compute per-pixel information for one micrograph
@@ -48,6 +49,9 @@ class TiltEstimator
 		bool debug, diag, ready;
 		std::string outPath;
 		double angpix;
+		
+		std::vector<int> tiltClasses;
+		std::map<int,int> classNameToIndex;
 		
 		ReferenceMap* reference;
 		ObservationModel* obsModel;

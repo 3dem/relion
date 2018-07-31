@@ -65,10 +65,10 @@ class CtfRefiner
 		// Allow continuation of crashed jobs
 		bool only_do_unfinished;
 	
-		// Perform per-particle defocus estimation?
+		// Estimate per-particle defocus?
 		bool do_defocus_fit;
 	
-		// Perform beamtilt estimation?
+		// Estimate beamtilt?
 		bool do_tilt_fit;
 		
 		// Estimate anisotropic magnification?

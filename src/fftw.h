@@ -994,8 +994,8 @@ void adaptSpectrum(MultidimArray<RFLOAT> &Min,
                    int spectrum_type=AMPLITUDE_SPECTRUM,
                    bool leave_origin_intact=false);
 
-/** Kullback-Leibner divergence */
-RFLOAT getKullbackLeibnerDivergence(MultidimArray<Complex > &Fimg,
+/** Kullback-Leibler divergence */
+RFLOAT getKullbackLeiblerDivergence(MultidimArray<Complex > &Fimg,
 		MultidimArray<Complex > &Fref, MultidimArray<RFLOAT> &sigma2,
 		MultidimArray<RFLOAT> &p_i, MultidimArray<RFLOAT> &q_i,
 		int highshell = -1, int lowshell = -1);
