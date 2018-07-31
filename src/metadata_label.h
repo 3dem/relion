@@ -350,6 +350,7 @@ enum EMDLabel
     EMDL_PARTICLE_FOM,
     EMDL_PARTICLE_KL_DIVERGENCE,
     EMDL_PARTICLE_RANDOM_SUBSET,
+	EMDL_PARTICLE_BEAM_TILT_CLASS,
     EMDL_PARTICLE_NAME,
     EMDL_PARTICLE_ORI_NAME,
     EMDL_PARTICLE_NR_SIGNIFICANT_SAMPLES,
@@ -469,8 +470,9 @@ private:
     static std::map<std::string, std::string> definitions;
     static StaticInitialization initialization; //Just for initialization
 
-    static void addLabel(EMDLabel label, EMDLabelType type, std::string name, std::string definition = "undocumented");
-
+	static void addLabel(EMDLabel label, EMDLabelType type, std::string name, std::string definition = "undocumented");
+	static void addAltLabel(EMDLabel label, std::string name);
+    
     friend class StaticInitialization;
 }
 ;//close class MLD definition
@@ -786,9 +788,11 @@ private:
         EMDL::addLabel(EMDL_PARTICLE_DLL, EMDL_DOUBLE, "rlnLogLikeliContribution", "Contribution of a particle to the log-likelihood target function");
         EMDL::addLabel(EMDL_PARTICLE_ID, EMDL_INT, "rlnParticleId", "ID (i.e. a unique number) for a particle");
         EMDL::addLabel(EMDL_PARTICLE_FOM, EMDL_DOUBLE, "rlnParticleFigureOfMerit", "Developmental FOM for a particle");
-        EMDL::addLabel(EMDL_PARTICLE_KL_DIVERGENCE, EMDL_DOUBLE, "rlnKullbackLeibnerDivergence", "Kullback-Leibner divergence for a particle");
-        EMDL::addLabel(EMDL_PARTICLE_RANDOM_SUBSET, EMDL_INT, "rlnRandomSubset", "Random subset to which this particle belongs");
-        EMDL::addLabel(EMDL_PARTICLE_NAME, EMDL_STRING, "rlnParticleName", "Name for a particles");
+		EMDL::addLabel(EMDL_PARTICLE_KL_DIVERGENCE, EMDL_DOUBLE, "rlnKullbackLeiblerDivergence", "Kullback-Leibler divergence for a particle");
+		EMDL::addAltLabel(EMDL_PARTICLE_KL_DIVERGENCE,           "rlnKullbackLeibnerDivergence"); // wrong spelling for backwards compatibility
+		EMDL::addLabel(EMDL_PARTICLE_RANDOM_SUBSET, EMDL_INT, "rlnRandomSubset", "Random subset to which this particle belongs");
+		EMDL::addLabel(EMDL_PARTICLE_BEAM_TILT_CLASS, EMDL_INT, "rlnBeamTiltClass", "Beam-tilt class of a particle");		
+        EMDL::addLabel(EMDL_PARTICLE_NAME, EMDL_STRING, "rlnParticleName", "Name for a particle");
         EMDL::addLabel(EMDL_PARTICLE_ORI_NAME, EMDL_STRING, "rlnOriginalParticleName", "Original name for a particles");
         EMDL::addLabel(EMDL_PARTICLE_NR_SIGNIFICANT_SAMPLES, EMDL_INT, "rlnNrOfSignificantSamples", "Number of orientational/class assignments (for a particle) with sign.probabilities in the 1st pass of adaptive oversampling"); /**< particle, Number of orientations contributing to weights*/
         EMDL::addLabel(EMDL_PARTICLE_NR_FRAMES, EMDL_INT, "rlnNrOfFrames", "Number of movie frames that were collected for this particle");

@@ -316,7 +316,11 @@ void MotionRefiner::init()
 	
 	if (doAnything)
 	{
-		obsModel = ObservationModel(angpix);
+		double kV, Cs;		
+		mdt0.getValue(EMDL_CTF_VOLTAGE, kV, 0);
+		mdt0.getValue(EMDL_CTF_CS, Cs, 0);
+		
+		obsModel = ObservationModel(angpix, Cs, kV * 1e3);
 		
 		// Read the first reference
 		// (even if there is no motion to estimate - only to learn the image size)

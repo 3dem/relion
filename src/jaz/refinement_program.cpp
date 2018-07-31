@@ -353,17 +353,12 @@ int RefinementProgram::init(int argc, char *argv[])
         std::cout << "mg range: " << g0 << ".." << gc << "\n";
     }
 
-    obsModel = ObservationModel(angpix);
+    obsModel = ObservationModel(angpix, Cs, kV * 1e3);
 
-    if (applyTilt)
-    {
-        obsModel = ObservationModel(angpix, Cs, kV * 1e3, beamtilt_x, beamtilt_y);
-
-        if (anisoTilt)
-        {
-            obsModel.setAnisoTilt(beamtilt_xx, beamtilt_xy, beamtilt_yy);
-        }
-    }
+    if (applyTilt && anisoTilt)
+	{
+		obsModel.setAnisoTilt(beamtilt_xx, beamtilt_xy, beamtilt_yy);
+	}
 
     int rc0 = _init();
 
