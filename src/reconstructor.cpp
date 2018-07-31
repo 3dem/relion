@@ -697,9 +697,6 @@ void Reconstructor::applyCTFPandCTFQ(MultidimArray<Complex> &Fin, CTF &ctf, Four
 					            LAST_XMIPP_INDEX(newbox),  LAST_XMIPP_INDEX(newbox));
 
 				}
-				Image<RFLOAT> I; I() = Iapp;
-				I.write("test.mrc");
-				int x; std::cin >> x;
 				// Back into Fourier-space
 				CenterFFT(Iapp, true);
 				transformer.FourierTransform(Iapp, Fapp, false); // false means: leave Fapp in the transformer
