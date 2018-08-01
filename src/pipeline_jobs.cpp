@@ -4344,7 +4344,7 @@ void RelionJob::initialiseMaskcreateJob()
 	joboptions["fn_in"] = JobOption("Input 3D map:", NODE_3DREF, "", "MRC map files (*.mrc)", "Provide an input MRC map from which to start binarizing the map.");
 
 	joboptions["lowpass_filter"] = JobOption("Lowpass filter map (A)", 15, 10, 100, 5, "Lowpass filter that will be applied to the input map, prior to binarization. To calculate solvent masks, a lowpass filter of 15-20A may work well.");
-	joboptions["angpix"] = JobOption("Pixel size (A)", 1, 0.3, 5, 0.1, "Provide the pixel size in Angstroms of the input map (to calculate the low-pass filter)");
+	joboptions["angpix"] = JobOption("Pixel size (A)", -1, 0.3, 5, 0.1, "Provide the pixel size of the input map in Angstroms to calculate the low-pass filter. This value is also used in the output image header.");
 
 	joboptions["inimask_threshold"] = JobOption("Initial binarisation threshold:", 0.02, 0., 0.5, 0.01, "This threshold is used to make an initial binary mask from the average of the two unfiltered half-reconstructions. \
 If you don't know what value to use, display one of the unfiltered half-maps in a 3D surface rendering viewer and find the lowest threshold that gives no noise peaks outside the reconstruction.");
@@ -4384,6 +4384,9 @@ bool RelionJob::getCommandsMaskcreateJob(std::string &outputname, std::vector<st
 	if (joboptions["lowpass_filter"].getNumber() > 0)
 	{
 		command += " --lowpass " + joboptions["lowpass_filter"].getString();
+	}
+	if (joboptions["angpix"].getNumber() > 0)
+	{
 		command += " --angpix " + joboptions["angpix"].getString();
 	}
 	command += " --ini_threshold " + joboptions["inimask_threshold"].getString();
