@@ -1057,14 +1057,14 @@ void adaptSpectrum(MultidimArray<RFLOAT> &Min,
     multiplyBySpectrum(Mout,spectrum,leave_origin_intact);
 }
 
-/** Kullback-Leibner divergence */
-RFLOAT getKullbackLeibnerDivergence(MultidimArray<Complex > &Fimg,
+/** Kullback-Leibler divergence */
+RFLOAT getKullbackLeiblerDivergence(MultidimArray<Complex > &Fimg,
 		MultidimArray<Complex > &Fref, MultidimArray<RFLOAT> &sigma2,
 		MultidimArray<RFLOAT> &p_i, MultidimArray<RFLOAT> &q_i, int highshell, int lowshell )
 {
 	// First check dimensions are OK
 	if (!Fimg.sameShape(Fref))
-		REPORT_ERROR("getKullbackLeibnerDivergence ERROR: Fimg and Fref are not of the same shape.");
+		REPORT_ERROR("getKullbackLeiblerDivergence ERROR: Fimg and Fref are not of the same shape.");
 
 	if (highshell < 0)
 		highshell = XSIZE(Fimg) - 1;
@@ -1072,10 +1072,10 @@ RFLOAT getKullbackLeibnerDivergence(MultidimArray<Complex > &Fimg,
 		lowshell = 0;
 
 	if (highshell > XSIZE(sigma2))
-		REPORT_ERROR("getKullbackLeibnerDivergence ERROR: highshell is larger than size of sigma2 array.");
+		REPORT_ERROR("getKullbackLeiblerDivergence ERROR: highshell is larger than size of sigma2 array.");
 
 	if (highshell < lowshell)
-		REPORT_ERROR("getKullbackLeibnerDivergence ERROR: highshell is smaller than lowshell.");
+		REPORT_ERROR("getKullbackLeiblerDivergence ERROR: highshell is smaller than lowshell.");
 
 	// Initialize the histogram
 	MultidimArray<int> histogram;
@@ -1132,7 +1132,7 @@ RFLOAT getKullbackLeibnerDivergence(MultidimArray<Complex > &Fimg,
 		gaussnorm += gaussian1D(x - sigma_max, 1. , 0.);
 	}
 
-	// Now calculate the actual Kullback-Leibner divergence
+	// Now calculate the actual Kullback-Leibler divergence
 	RFLOAT kl_divergence = 0.;
 	p_i.resize(histogram_size);
 	q_i.resize(histogram_size);

@@ -243,7 +243,7 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromFCC(
     for (int y = 0; y < fc; y++)
     for (int x = 0; x < sh; x++)
     {
-        const double wgh = sqrt(fccWgh0Mg(y,x) * fccWgh1Mg(y,x));
+        const double wgh = sqrt(fccWgh0(y,x) * fccWgh1(y,x));
 
         if (wgh > 0.0)
         {

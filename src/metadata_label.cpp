@@ -54,7 +54,12 @@ void EMDL::addLabel(EMDLabel label, EMDLabelType type, std::string name, std::st
     data[label] = EMDLabelData(type, name);
     names[name] = label;
     definitions[name] = definition;
-}//close function addLable
+}
+
+void EMDL::addAltLabel(EMDLabel label, std::string name)
+{
+    names[name] = label;
+}
 
 void EMDL::printDefinitions(std::ostream& out)
 {

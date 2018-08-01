@@ -14,13 +14,11 @@ class ObservationModel
     public:
 
         ObservationModel();
-        ObservationModel(double angpix);
-        ObservationModel(double angpix, double Cs, double voltage, double beamtilt_x, double beamtilt_y);
+        ObservationModel(double angpix, double Cs, double voltage);
 
             double angpix, lambda, Cs;
-            double beamtilt_x, beamtilt_y;
             double beamtilt_xx, beamtilt_xy, beamtilt_yy;
-            bool hasTilt, anisoTilt, ctfTilt;
+            bool anisoTilt;
 			
 		void predictObservation(
 				Projector &proj, const MetaDataTable &mdt, int particle,

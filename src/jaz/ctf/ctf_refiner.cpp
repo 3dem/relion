@@ -57,20 +57,27 @@ void CtfRefiner::read(int argc, char **argv)
 	reference.read(parser, argc, argv);
 
 	outPath = parser.getOption("--o", "Output directory, e.g. CtfRefine/job041/");
-	only_do_unfinished = parser.checkOption("--only_do_unfinished", "Skip those steps for which output files already exist.");
+	only_do_unfinished = parser.checkOption("--only_do_unfinished", 
+		"Skip those steps for which output files already exist.");
 
 	diag = parser.checkOption("--diag", "Write out diagnostic data (slower)");
 
 	int fit_section = parser.addSection("Defocus fit options");
-	do_defocus_fit = parser.checkOption("--fit_defocus", "Perform refinement of per-particle defocus values?");
+	do_defocus_fit = parser.checkOption("--fit_defocus", 
+		"Perform refinement of per-particle defocus values?");
+	
 	defocusEstimator.read(parser, argc, argv);
 
 	int tilt_section = parser.addSection("Beam-tilt options");
-	do_tilt_fit = parser.checkOption("--fit_beamtilt", "Perform refinement of beamtilt for micrograph groups?");
+	do_tilt_fit = parser.checkOption("--fit_beamtilt", 
+		"Perform refinement of beamtilt");
+	
 	tiltEstimator.read(parser, argc, argv);
 
 	int aniso_section = parser.addSection("Anisotropic magnification options");
-	do_mag_fit = parser.checkOption("--fit_aniso", "Estimate anisotropic magnification?");
+	do_mag_fit = parser.checkOption("--fit_aniso", 
+		"Estimate anisotropic magnification");
+	
 	magnificationEstimator.read(parser, argc, argv);
 
 	int comp_section = parser.addSection("Computational options");
@@ -81,14 +88,31 @@ void CtfRefiner::read(int argc, char **argv)
 	debug = parser.checkOption("--debug", "Write debugging data");
 	verb = textToInteger(parser.getOption("--verb", "Verbosity", "1"));
 
-
 	int expert_section = parser.addSection("Expert options");
 	angpix = textToFloat(parser.getOption("--angpix", "Pixel resolution (angst/pix) - read from STAR file by default", "-1"));
 	Cs = textToFloat(parser.getOption("--Cs", "Spherical aberration - read from STAR file by default", "-1"));
 	kV = textToFloat(parser.getOption("--kV", "Electron energy (keV) - read from STAR file by default", "-1"));
-	beamtilt_x = textToFloat(parser.getOption("--beamtilt_x", "Beamtilt in X-direction (in mrad)", "0."));
-	beamtilt_y = textToFloat(parser.getOption("--beamtilt_y", "Beamtilt in Y-direction (in mrad)", "0."));
-	clTilt = ABS(beamtilt_x) > 0. || ABS(beamtilt_y) > 0.;
+	
+	beamtilt_x = 0.0;
+	beamtilt_y = 0.0;
+	
+	clTilt = false;
+	
+	std::string beamtilt_x_str = parser.getOption("--beamtilt_x", "Beamtilt in X-direction (in mrad)", "none");
+	std::string beamtilt_y_str = parser.getOption("--beamtilt_y", "Beamtilt in Y-direction (in mrad)", "none");
+	
+	if (beamtilt_x_str != "none")
+	{
+		beamtilt_x = textToFloat(beamtilt_x_str);
+		clTilt = true;
+	}
+	
+	if (beamtilt_y_str != "none")
+	{
+		beamtilt_y = textToFloat(beamtilt_y_str);
+		clTilt = true;
+	}
+	
 	beamtilt_xx = textToFloat(parser.getOption("--beamtilt_xx", "Anisotropic beamtilt, XX-coefficient", "1."));
 	beamtilt_xy = textToFloat(parser.getOption("--beamtilt_xy", "Anisotropic beamtilt, XY-coefficient", "0."));
 	beamtilt_yy = textToFloat(parser.getOption("--beamtilt_yy", "Anisotropic beamtilt, YY-coefficient", "1."));
@@ -180,19 +204,30 @@ void CtfRefiner::init()
 		}
 	}
 
-	if (ABS(beamtilt_x) > 0)
+	if (clTilt)
 	{
+		if (verb > 0)
+		{
+			std::cout << "   - Using beam tilt from command line: " 
+					  << beamtilt_x << ", " << beamtilt_y << std::endl;
+		}
+		
 		for (int i = 0; i < mdt0.numberOfObjects(); i++)
 		{
 			mdt0.setValue(EMDL_IMAGE_BEAMTILT_X, beamtilt_x);
+			mdt0.setValue(EMDL_IMAGE_BEAMTILT_Y, beamtilt_y);
 		}
 	}
-
-	if (ABS(beamtilt_y) > 0)
+	else if (verb > 0)
 	{
-		for (int i = 0; i < mdt0.numberOfObjects(); i++)
+		if (   mdt0.containsLabel(EMDL_IMAGE_BEAMTILT_X)
+			|| mdt0.containsLabel(EMDL_IMAGE_BEAMTILT_Y))
 		{
-			mdt0.setValue(EMDL_IMAGE_BEAMTILT_Y, beamtilt_y);
+			std::cout << "   - Using beam tilt from star file." << std::endl;
+		}
+		else
+		{
+			std::cout << "   - Beam tilt not present in star file: assuming zero beam tilt." << std::endl;
 		}
 	}
 
@@ -235,16 +270,12 @@ void CtfRefiner::init()
 
 	RFLOAT V = kV * 1e3;
 	lambda = 12.2643247 / sqrt(V * (1.0 + V * 0.978466e-6));
-	obsModel = ObservationModel(angpix);
+		
+	obsModel = ObservationModel(angpix, Cs, kV * 1e3);
 
-	if (clTilt)
+    if (anisoTilt)
 	{
-		obsModel = ObservationModel(angpix, Cs, kV * 1e3, beamtilt_x, beamtilt_y);
-
-		if (anisoTilt)
-		{
-			obsModel.setAnisoTilt(beamtilt_xx, beamtilt_xy, beamtilt_yy);
-		}
+		obsModel.setAnisoTilt(beamtilt_xx, beamtilt_xy, beamtilt_yy);
 	}
 
 	if (verb > 0)
@@ -258,11 +289,11 @@ void CtfRefiner::init()
 	s = reference.s;
 	sh = s/2 + 1;
 
-	tiltEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
+	tiltEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, mdt0, &reference, &obsModel);
 	defocusEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
 	magnificationEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
 
-	// check whether output files exist and if they do, then skip this micrograph
+	// check whether output files exist and skip the micrographs for which they do
 	if (only_do_unfinished)
 	{
 		for (long int g = minMG; g <= maxMG; g++ )

@@ -7,23 +7,15 @@
 
 ObservationModel::ObservationModel()
 :   angpix(-1),
-    hasTilt(false),
     anisoTilt(false)
 {
 }
 
-ObservationModel::ObservationModel(double angpix)
-:   angpix(angpix),
-    hasTilt(false),
-    anisoTilt(false)
-{
-}
-
-ObservationModel::ObservationModel(double angpix, double Cs, double voltage, double beamtilt_x, double beamtilt_y)
+ObservationModel::ObservationModel(double angpix, double Cs, double voltage)
 :   angpix(angpix),
     lambda(12.2643247 / sqrt(voltage * (1.0 + voltage * 0.978466e-6))),
-    Cs(Cs), beamtilt_x(beamtilt_x), beamtilt_y(beamtilt_y),
-    hasTilt(true), anisoTilt(false)
+    Cs(Cs),
+    anisoTilt(false)
 {
 }
 
@@ -75,24 +67,15 @@ void ObservationModel::predictObservation(
     {
         double tx = 0.0, ty = 0.0;
 
-        if (hasTilt)
-        {
-            tx = beamtilt_x;
-            ty = beamtilt_y;
-        }
-        else
-        {
-            mdt.getValue(EMDL_IMAGE_BEAMTILT_X, tx, particle);
-            mdt.getValue(EMDL_IMAGE_BEAMTILT_Y, ty, particle);
-        }
+        mdt.getValue(EMDL_IMAGE_BEAMTILT_X, tx, particle);
+        mdt.getValue(EMDL_IMAGE_BEAMTILT_Y, ty, particle);
 
         if (tx != 0.0 && ty != 0.0)
         {
             if (anisoTilt)
             {
-                selfApplyBeamTilt(dest, -tx, -ty,
-                                  beamtilt_xx, beamtilt_xy, beamtilt_yy,
-                                  lambda, Cs, angpix, s);
+                selfApplyBeamTilt(
+					dest, -tx, -ty, beamtilt_xx, beamtilt_xy, beamtilt_yy, lambda, Cs, angpix, s);
             }
             else
             {
@@ -176,8 +159,8 @@ void ObservationModel::insertObservation(const Image<Complex>& img, BackProjecto
 
     if (applyTilt)
     {
-        double my_tilt_x = hasTilt? beamtilt_x : 0.0;
-        double my_tilt_y = hasTilt? beamtilt_y : 0.0;
+        double my_tilt_x = 0.0;
+        double my_tilt_y = 0.0;
 
         if (mdt.containsLabel(EMDL_IMAGE_BEAMTILT_X))
         {
@@ -202,7 +185,6 @@ void ObservationModel::setAnisoTilt(double xx, double xy, double yy)
     beamtilt_yy = yy;
     anisoTilt = true;
 }
-
 
 double ObservationModel::angToPix(double a, int s)
 {
