@@ -466,11 +466,6 @@ bool RelionJob::saveJobSubmissionScript(std::string newfilename, std::string out
 		replacing["XXXerrfileXXX"] = outputname + "run.err";
 		replacing["XXXoutfileXXX"] = outputname + "run.out";
 		replacing["XXXqueueXXX"] = joboptions["queuename"].getString();
-		if (joboptions.find("qsub_extra1") != joboptions.end())
-			replacing["XXXextra1XXX"] = joboptions["qsub_extra1"].getString();
-		if (joboptions.find("qsub_extra2") != joboptions.end())
-			replacing["XXXextra2XXX"] = joboptions["qsub_extra2"].getString();
-
 		char * extra_count_text = getenv ("RELION_QSUB_EXTRA_COUNT");
 		const char extra_count_val = (extra_count_text ? atoi(extra_count_text) : 2);
 		for (int i=1; i<=extra_count_val; i++)
@@ -804,9 +799,8 @@ Note that the person who installed RELION should have made a custom script for y
 
 
 	// additional options that may be set through environment variables RELION_QSUB_EXTRAi and RELION_QSUB_EXTRAi (for more flexibility)
-	// i is either defined by RELION_QSUB_EXTRA_COUNT environment variable or is 0
 	char * extra_count_text = getenv ("RELION_QSUB_EXTRA_COUNT");
-	const char extra_count_val = (extra_count_text ? atoi(extra_count_text) : 0);
+	const char extra_count_val = (extra_count_text ? atoi(extra_count_text) : 2);
 	for (int i=1; i<=extra_count_val; i++)
 	{
 		std::stringstream out;
@@ -827,7 +821,7 @@ Note that the person who installed RELION should have made a custom script for y
 			}
 			std::string txt=std::string("Extra option to pass to the qsub template script. Any occurrences of XXXextra")+i_str+"XXX will be changed by this value.";
 			joboptions[std::string("qsub_extra")+i_str] = JobOption(std::string(extra_text), std::string(extra_default), txt.c_str());
-        }
+                }
 	}
 
 	// Check for environment variable RELION_QSUB_TEMPLATE
@@ -848,11 +842,12 @@ XXXthreadsXXX = The number of threads; \n \
 XXXcoresXXX = XXXmpinodesXXX * XXXthreadsXXX; \n \
 XXXdedicatedXXX = The minimum number of dedicated cores on each node; \n \
 XXXnodesXXX = The number of requested nodes = CEIL(XXXcoresXXX / XXXdedicatedXXX); \n \
-If these options are not enough for your standard jobs, you may define two extra variables: XXXextra1XXX and XXXextra2XXX \
-Their help text is set by the environment variables RELION_QSUB_EXTRA1 and RELION_QSUB_EXTRA2 \
-For example, setenv RELION_QSUB_EXTRA1 \"Max number of hours in queue\" will result in an additional (text) ein the GUI \
+If these options are not enough for your standard jobs, you may define a user-specified number of extra variables: XXXextra1XXX, XXXextra2XXX, etc. \
+The number of extra variables is controlled through the environment variable RELION_QSUB_EXTRA_COUNT. \
+Their help text is set by the environment variables RELION_QSUB_EXTRA1, RELION_QSUB_EXTRA2, etc \
+For example, setenv RELION_QSUB_EXTRA_COUNT 1, together with setenv RELION_QSUB_EXTRA1 \"Max number of hours in queue\" will result in an additional (text) ein the GUI \
 Any variables XXXextra1XXX in the template script will be replaced by the corresponding value.\
-Likewise, default values for the extra entries can be set through environment variables RELION_QSUB_EXTRA1_DEFAULT and  RELION_QSUB_EXTRA2_DEFAULT. \
+Likewise, default values for the extra entries can be set through environment variables RELION_QSUB_EXTRA1_DEFAULT, RELION_QSUB_EXTRA2_DEFAULT, etc. \
 But note that (unlike all other entries in the GUI) the extra values are not remembered from one run to the other.");
 
 	// Check for environment variable RELION_QSUB_TEMPLATE
