@@ -642,7 +642,7 @@ int PipeLine::addScheduledJob(int job_type, std::string fn_options)
 	return current_job;
 }
 
-void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_repeat, long int minutes_wait, long int minutes_wait_before)
+void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_repeat, long int minutes_wait, long int minutes_wait_before, long int seconds_wait_after)
 {
 
 	std::vector<FileName> my_scheduled_processes;
@@ -750,7 +750,7 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 					break;
 				}
 
-				sleep(60);
+				sleep(seconds_wait_after);
 				checkProcessCompletion();
 				if (processList[current_job].status == PROC_FINISHED)
 				{
