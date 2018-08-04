@@ -52,7 +52,7 @@ if(NOT GUI)
 endif(NOT GUI)
 
 #--Remove apps for testing--
-SET(RELION_TEST FALSE)
+SET(RELION_TEST TRUE)
 set(TEST_TARGETS ft_test double_reconstruct_openmp cs_fit helix_inimodel2d ctf_nyquist_test free_aberration_plot split_stack)
 if(NOT RELION_TEST)
     foreach(TARGET ${TEST_TARGETS})

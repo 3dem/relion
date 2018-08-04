@@ -373,29 +373,22 @@ class reconstruct_parameters
 				
 			ObservationModel obsModel;
 			
-			if (do_beamtilt)
+			if (!mdt0.containsLabel(EMDL_CTF_CS))
 			{
-				if (!mdt0.containsLabel(EMDL_CTF_CS))
-				{
-					REPORT_ERROR(fn_sel+" does not contain a column for rlnSphericalAberration.");
-				}
-				
-				if (!mdt0.containsLabel(EMDL_CTF_VOLTAGE))
-				{
-					REPORT_ERROR(fn_sel+" does not contain a column for rlnVoltage.");
-				}
-				
-				RFLOAT Cs, kV;
-				
-				mdt0.getValue(EMDL_CTF_CS, Cs, 0);
-				mdt0.getValue(EMDL_CTF_VOLTAGE, kV, 0);
-				
-				obsModel = ObservationModel(angpix, Cs, kV * 1e3, beamtilt_x, beamtilt_y);
+				REPORT_ERROR(fn_sel+" does not contain a column for rlnSphericalAberration.");
 			}
-			else
+			
+			if (!mdt0.containsLabel(EMDL_CTF_VOLTAGE))
 			{
-				obsModel = ObservationModel(angpix);
+				REPORT_ERROR(fn_sel+" does not contain a column for rlnVoltage.");
 			}
+			
+			RFLOAT Cs, kV;
+			
+			mdt0.getValue(EMDL_CTF_CS, Cs, 0);
+			mdt0.getValue(EMDL_CTF_VOLTAGE, kV, 0);
+			
+			obsModel = ObservationModel(angpix, Cs, kV * 1e3);
 			
 			Projector subProjector(mysize, interpolator, padding_factor, r_min_nn);
 			
