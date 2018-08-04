@@ -84,7 +84,7 @@ class RelionItOptions(object):
     # OR: provide a 3D references for reference-based picking (when autopick_do_LoG = False)
     autopick_3dreference = ''
 
-    # Threshold for reference-based autopicking (threshold 0 will pick too many particles. Default of 0.4 is hopefully better. Ultimately, just hope classification will sort it all out...) 
+    # Threshold for reference-based autopicking (threshold 0 will pick too many particles. Default of 0.4 is hopefully better. Ultimately, just hope classification will sort it all out...)
     autopick_refs_threshold = 0.4
     # Minimum inter-particle distance for reference-based picking (~70% of particle diameter often works well)
     autopick_refs_min_distance = 120
@@ -443,7 +443,8 @@ def load_star(filename):
         elif in_loop > 0:
             in_loop = 2
             elems = line.split()
-            assert len(elems) == len(current_colnames)
+            assert len(elems) == len(current_colnames), ("Error in STAR file {}, number of elements in {} does not match number of column names {}"
+                                                         .format(filename, elems, current_colnames))
             for idx, e in enumerate(elems):
                 current_data[current_colnames[idx]].append(e)        
         
@@ -805,10 +806,10 @@ def run_pipeline(opts):
             
             if ipass == 0:
                 autopick_job_name = 'autopick_job'
-                autopick_alias = 'reference free'
+                autopick_alias = 'pass 1'
             else:
                 autopick_job_name = 'autopick2_job'
-                autopick_alias = 'reference based'
+                autopick_alias = 'pass 2'
 
             autopick_job, already_had_it  = addJob('AutoPick', autopick_job_name, SETUP_CHECK_FILE, autopick_options, alias=autopick_alias)
             runjobs.append(autopick_job)
@@ -833,10 +834,10 @@ def run_pipeline(opts):
 
             if ipass == 0:
                 extract_job_name = 'extract_job'
-                extract_alias = 'reference free'
+                extract_alias = 'pass 1'
             else:
                 extract_job_name = 'extract2_job'
-                extract_alias = 'reference based'
+                extract_alias = 'pass 2'
 
             extract_job, already_had_it  = addJob('Extract', extract_job_name, SETUP_CHECK_FILE, extract_options, alias=extract_alias)
             runjobs.append(extract_job)
@@ -938,7 +939,7 @@ def run_pipeline(opts):
                                 discard_job_name = 'discard_job'
                             else:
                                 discard_job_name = 'discard2_job'
-              
+
                             if opts.discard_submit_to_queue:
                                 discard_options.extend(queue_options)
 

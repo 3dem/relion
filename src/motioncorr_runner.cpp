@@ -73,6 +73,7 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	fn_in = parser.getOption("--i", "STAR file with all input micrographs, or a Linux wildcard with all micrographs to operate on");
 	fn_out = parser.getOption("--o", "Name for the output directory", "MotionCorr");
 	n_threads = textToInteger(parser.getOption("--j", "Number of threads per movie (= process)", "1"));
+	max_io_threads = textToInteger(parser.getOption("--max_io_threads", "Limit the number of IO threads.", "-1"));
 	fn_movie = parser.getOption("--movie", "Rootname to identify movies", "movie");
 	continue_old = parser.checkOption("--only_do_unfinished", "Only run motion correction for those micrographs for which there is not yet an output micrograph.");
 	do_at_most = textToInteger(parser.getOption("--do_at_most", "Only process at most this number of (unprocessed) micrographs.", "-1"));
@@ -1153,7 +1154,13 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	std::ofstream logfile;
 	logfile.open(fn_log);
 
+	int n_io_threads = n_threads;
 	logfile << "Working on " << fn_mic << " with " << n_threads << " thread(s)." << std::endl << std::endl;
+	if (max_io_threads > 0 && n_io_threads > max_io_threads)
+	{
+		n_io_threads = max_io_threads;
+		logfile << "Limitted the number of IO threads per movie to " << n_io_threads << " thread(s)." << std::endl;
+	}
 
 	Image<float> Ihead, Igain, Iref;
 	std::vector<MultidimArray<fComplex> > Fframes;
@@ -1234,7 +1241,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 
 	// Read images
 	RCTIC(TIMING_READ_MOVIE);
-	#pragma omp parallel for num_threads(n_threads)
+	#pragma omp parallel for num_threads(n_io_threads)
 	for (int iframe = 0; iframe < n_frames; iframe++) {
 		Iframes[iframe].read(fn_mic, true, frames[iframe], false, true); // mmap false, is_2D true
 	}

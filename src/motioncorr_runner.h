@@ -45,6 +45,7 @@ public:
 
 	// Number of threads per process
 	int n_threads;
+	int max_io_threads;
 
 	// Output rootname
 	FileName fn_in, fn_out, fn_movie;

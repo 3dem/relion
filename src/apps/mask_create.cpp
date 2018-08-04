@@ -133,14 +133,15 @@ class mask_create_parameters
 		std:: cout << " Creating a mask ..." << std::endl;
 		Iin.read(fn_thr);
 
+		if (angpix < 0)
+		{
+			angpix = Iin.samplingRateX();
+			std::cerr << "WARNING: The pixel size (--angpix) was not specified." << std::endl;
+			std::cerr << "         The value in the input image header (= " << angpix << ") is used instead." << std::endl;
+		}
+
 		if (lowpass > 0)
 		{
-			if (angpix < 0)
-			{
-				angpix = Iin.samplingRateX();
-				std::cerr << "WARNING: The pixel size for low-pass filtering (--angpix) was not specified." << std::endl;
-				std::cerr << "         The value in the input image header (= " << angpix << ") is used instead." << std::endl;
-			}
 			lowPassFilterMap(Iin(), lowpass, angpix);
 		}
 

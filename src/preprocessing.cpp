@@ -251,6 +251,10 @@ void Preprocessing::initialise()
 		}
 
 	}
+
+	output_angpix = angpix;
+	if (do_rescale)
+		output_angpix *= (RFLOAT)extract_size / (RFLOAT)scale;
 }
 
 void Preprocessing::run()
@@ -379,11 +383,7 @@ void Preprocessing::joinAllStarFiles()
 	{
 		MDout.write(fn_part_star);
 		std::cout << " Written out STAR file with " << MDout.numberOfObjects() << " particles in " << fn_part_star<< std::endl;
-
-		RFLOAT new_angpix = angpix;
-		if (do_rescale)
-			new_angpix *= (RFLOAT)extract_size / (RFLOAT)scale;
-		std::cout << " The new pixel size of the extracted particles are " << new_angpix << " Angstrom/pixel." << std::endl;
+		std::cout << " The new pixel size of the extracted particles are " << output_angpix << " Angstrom/pixel." << std::endl;
 	}
 
 	if (do_movie_extract && fn_list_star != "")
@@ -1183,6 +1183,7 @@ void Preprocessing::performPerImageOperations(
 		Ipart.MDMainHeader.setValue(EMDL_IMAGE_STATS_MAX, maxval);
 		Ipart.MDMainHeader.setValue(EMDL_IMAGE_STATS_AVG, avg);
 		Ipart.MDMainHeader.setValue(EMDL_IMAGE_STATS_STDDEV, stddev);
+		Ipart.setSamplingRateInHeader(output_angpix);
 
 		TIMING_TIC(TIMING_PER_IMG_OP_WRITE);
 		// Write one mrc file for every subtomogram
@@ -1209,6 +1210,7 @@ void Preprocessing::performPerImageOperations(
 			Ipart.MDMainHeader.setValue(EMDL_IMAGE_STATS_MAX, all_maxval);
 			Ipart.MDMainHeader.setValue(EMDL_IMAGE_STATS_AVG, all_avg);
 			Ipart.MDMainHeader.setValue(EMDL_IMAGE_STATS_STDDEV, all_stddev);
+			Ipart.setSamplingRateInHeader(output_angpix);
 		}
 
 		TIMING_TIC(TIMING_PER_IMG_OP_WRITE);

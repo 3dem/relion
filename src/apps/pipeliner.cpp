@@ -34,7 +34,7 @@ public:
 	FileName fn_sched, fn_jobids, fn_options, fn_alias;
 	int nr_repeat;
 	bool do_check_complete;
-	long int minutes_wait, minutes_wait_before;
+	long int minutes_wait, minutes_wait_before, seconds_wait_after;
 	std::string add_type;
 
 	// The actual pipeline
@@ -66,6 +66,7 @@ public:
 		nr_repeat = textToInteger(parser.getOption("--repeat", "Run the scheduled jobs this many times", "1"));
 		minutes_wait = textToInteger(parser.getOption("--min_wait", "Wait at least this many minutes between each repeat", "0"));
 		minutes_wait_before = textToInteger(parser.getOption("--min_wait_before", "Wait this many minutes before starting the running the first job", "0"));
+		seconds_wait_after = textToInteger(parser.getOption("--sec_wait_after", "Wait this many seconds after a process finishes (workaround for slow IO)", "10"));
 		int expert_section = parser.addSection("Expert options");
 		pipeline.name = parser.getOption("--pipeline", "Name of the pipeline", "default");
 
@@ -99,7 +100,7 @@ public:
 		}
 		else if (nr_repeat > 0)
 		{
-			pipeline.runScheduledJobs(fn_sched, fn_jobids, nr_repeat, minutes_wait, minutes_wait_before);
+			pipeline.runScheduledJobs(fn_sched, fn_jobids, nr_repeat, minutes_wait, minutes_wait_before, seconds_wait_after);
 		}
 
 	}

@@ -454,9 +454,12 @@ void AutoPicker::initialise()
 			sampling.is_3D = true;
 			sampling.initialise(NOPRIOR);
 
-			std::cout << " Projecting a 3D reference with " << symmetry << " symmetry, using angular sampling rate of "
-					<< sampling.getAngularSampling() << " degrees, i.e. in " << sampling.NrDirections() << " directions ... "
-					<< std::endl;
+			if (verb > 0)
+			{
+				std::cout << " Projecting a 3D reference with " << symmetry << " symmetry, using angular sampling rate of "
+						<< sampling.getAngularSampling() << " degrees, i.e. in " << sampling.NrDirections() << " directions ... "
+						<< std::endl;
+			}
 
 			int my_ori_size = XSIZE(Istk());
 			Projector projector(my_ori_size, TRILINEAR, padding);
@@ -485,13 +488,16 @@ void AutoPicker::initialise()
 	        	CenterFFT(Mref, false);
 	        	Mrefs.push_back(Mref);
 
-	        	// Also write out a stack with the 2D reference projections
-	        	Iprojs()=Mref;
-	        	fn_img.compose(idir+1,fn_proj);
-				if (idir == 0)
-					Iprojs.write(fn_img, -1, false, WRITE_OVERWRITE);
-				else
-					Iprojs.write(fn_img, -1, false, WRITE_APPEND);
+	        	if (verb > 0)
+	        	{
+					// Also write out a stack with the 2D reference projections
+					Iprojs()=Mref;
+					fn_img.compose(idir+1,fn_proj);
+					if (idir == 0)
+						Iprojs.write(fn_img, -1, false, WRITE_OVERWRITE);
+					else
+						Iprojs.write(fn_img, -1, false, WRITE_APPEND);
+	        	}
 
 			}
 		}
@@ -2754,6 +2760,8 @@ void AutoPicker::autoPickLoGOneMicrograph(FileName &fn_mic, long int imic)
 		MDout.setValue(EMDL_IMAGE_COORD_X, (RFLOAT)(xx) / scale);
 		MDout.setValue(EMDL_IMAGE_COORD_Y, (RFLOAT)(yy) / scale);
 		MDout.setValue(EMDL_PARTICLE_AUTOPICK_FOM, A2D_ELEM(Mbest_fom, imax, jmax));
+		MDout.setValue(EMDL_PARTICLE_CLASS, 0); // Dummy values to avoid problems in JoinStar
+		MDout.setValue(EMDL_ORIENT_PSI, 0.0);
 
 		// Now set all pixels of Mbest_fom within a distance of 0.5* the corresponding Mbest_size to zero
 		// Exclude a bit more radius, such that no very close neighbours are allowed: 20% more

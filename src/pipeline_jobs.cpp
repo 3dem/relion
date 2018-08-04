@@ -466,11 +466,6 @@ bool RelionJob::saveJobSubmissionScript(std::string newfilename, std::string out
 		replacing["XXXerrfileXXX"] = outputname + "run.err";
 		replacing["XXXoutfileXXX"] = outputname + "run.out";
 		replacing["XXXqueueXXX"] = joboptions["queuename"].getString();
-		if (joboptions.find("qsub_extra1") != joboptions.end())
-			replacing["XXXextra1XXX"] = joboptions["qsub_extra1"].getString();
-		if (joboptions.find("qsub_extra2") != joboptions.end())
-			replacing["XXXextra2XXX"] = joboptions["qsub_extra2"].getString();
-
 		char * extra_count_text = getenv ("RELION_QSUB_EXTRA_COUNT");
 		const char extra_count_val = (extra_count_text ? atoi(extra_count_text) : 2);
 		for (int i=1; i<=extra_count_val; i++)
@@ -804,9 +799,8 @@ Note that the person who installed RELION should have made a custom script for y
 
 
 	// additional options that may be set through environment variables RELION_QSUB_EXTRAi and RELION_QSUB_EXTRAi (for more flexibility)
-	// i is either defined by RELION_QSUB_EXTRA_COUNT environment variable or is 0
 	char * extra_count_text = getenv ("RELION_QSUB_EXTRA_COUNT");
-	const char extra_count_val = (extra_count_text ? atoi(extra_count_text) : 0);
+	const char extra_count_val = (extra_count_text ? atoi(extra_count_text) : 2);
 	for (int i=1; i<=extra_count_val; i++)
 	{
 		std::stringstream out;
@@ -827,7 +821,7 @@ Note that the person who installed RELION should have made a custom script for y
 			}
 			std::string txt=std::string("Extra option to pass to the qsub template script. Any occurrences of XXXextra")+i_str+"XXX will be changed by this value.";
 			joboptions[std::string("qsub_extra")+i_str] = JobOption(std::string(extra_text), std::string(extra_default), txt.c_str());
-        }
+                }
 	}
 
 	// Check for environment variable RELION_QSUB_TEMPLATE
@@ -848,11 +842,12 @@ XXXthreadsXXX = The number of threads; \n \
 XXXcoresXXX = XXXmpinodesXXX * XXXthreadsXXX; \n \
 XXXdedicatedXXX = The minimum number of dedicated cores on each node; \n \
 XXXnodesXXX = The number of requested nodes = CEIL(XXXcoresXXX / XXXdedicatedXXX); \n \
-If these options are not enough for your standard jobs, you may define two extra variables: XXXextra1XXX and XXXextra2XXX \
-Their help text is set by the environment variables RELION_QSUB_EXTRA1 and RELION_QSUB_EXTRA2 \
-For example, setenv RELION_QSUB_EXTRA1 \"Max number of hours in queue\" will result in an additional (text) ein the GUI \
+If these options are not enough for your standard jobs, you may define a user-specified number of extra variables: XXXextra1XXX, XXXextra2XXX, etc. \
+The number of extra variables is controlled through the environment variable RELION_QSUB_EXTRA_COUNT. \
+Their help text is set by the environment variables RELION_QSUB_EXTRA1, RELION_QSUB_EXTRA2, etc \
+For example, setenv RELION_QSUB_EXTRA_COUNT 1, together with setenv RELION_QSUB_EXTRA1 \"Max number of hours in queue\" will result in an additional (text) ein the GUI \
 Any variables XXXextra1XXX in the template script will be replaced by the corresponding value.\
-Likewise, default values for the extra entries can be set through environment variables RELION_QSUB_EXTRA1_DEFAULT and  RELION_QSUB_EXTRA2_DEFAULT. \
+Likewise, default values for the extra entries can be set through environment variables RELION_QSUB_EXTRA1_DEFAULT, RELION_QSUB_EXTRA2_DEFAULT, etc. \
 But note that (unlike all other entries in the GUI) the extra values are not remembered from one run to the other.");
 
 	// Check for environment variable RELION_QSUB_TEMPLATE
@@ -1308,7 +1303,7 @@ void RelionJob::initialiseCtffindJob()
 	joboptions["input_star_mics"] = JobOption("Input micrographs STAR file:", NODE_MICS, "", "STAR files (*.star)", "A STAR file with all micrographs to run CTFFIND or Gctf on");
 	joboptions["use_noDW"] = JobOption("Use micrograph without dose-weighting?", false, "If set to Yes, the CTF estimation will be done using the micrograph without dose-weighting as in rlnMicrographNameNoDW (_noDW.mrc from MotionCor2). If set to No, the normal rlnMicrographName will be used.");
 
-	joboptions["cs"] = JobOption("Spherical aberration (mm):", 2.7, 0, 8, 0.1, "Spherical aberration of the microscope used to collect these images (in mm). Typical values are 2.7 (FEI Titan & Talos), 2.0 (FEI Polara), 1.4 (JEOL CRYO-ARM) and 0.01 (microscopes with a Cs corrector).");
+	joboptions["cs"] = JobOption("Spherical aberration (mm):", 2.7, 0, 8, 0.1, "Spherical aberration of the microscope used to collect these images (in mm). Typical values are 2.7 (FEI Titan & Talos, most JEOL CRYO-ARM), 2.0 (FEI Polara), 1.4 (some JEOL CRYO-ARM) and 0.01 (microscopes with a Cs corrector).");
 	joboptions["kv"] = JobOption("Voltage (kV):", 300, 50, 500, 10, "Voltage the microscope was operated on (in kV)");
 	joboptions["q0"] = JobOption("Amplitude contrast:", 0.1, 0, 0.3, 0.01, "Fraction of amplitude contrast. Often values around 10% work better than theoretically more accurate lower values...");
 	joboptions["angpix"] = JobOption("Magnified pixel size (Angstrom):", 1.4, 0.5, 3, 0.1, "Pixel size in Angstroms. ");
@@ -4344,7 +4339,7 @@ void RelionJob::initialiseMaskcreateJob()
 	joboptions["fn_in"] = JobOption("Input 3D map:", NODE_3DREF, "", "MRC map files (*.mrc)", "Provide an input MRC map from which to start binarizing the map.");
 
 	joboptions["lowpass_filter"] = JobOption("Lowpass filter map (A)", 15, 10, 100, 5, "Lowpass filter that will be applied to the input map, prior to binarization. To calculate solvent masks, a lowpass filter of 15-20A may work well.");
-	joboptions["angpix"] = JobOption("Pixel size (A)", 1, 0.3, 5, 0.1, "Provide the pixel size in Angstroms of the input map (to calculate the low-pass filter)");
+	joboptions["angpix"] = JobOption("Pixel size (A)", -1, 0.3, 5, 0.1, "Provide the pixel size of the input map in Angstroms to calculate the low-pass filter. This value is also used in the output image header.");
 
 	joboptions["inimask_threshold"] = JobOption("Initial binarisation threshold:", 0.02, 0., 0.5, 0.01, "This threshold is used to make an initial binary mask from the average of the two unfiltered half-reconstructions. \
 If you don't know what value to use, display one of the unfiltered half-maps in a 3D surface rendering viewer and find the lowest threshold that gives no noise peaks outside the reconstruction.");
@@ -4384,6 +4379,9 @@ bool RelionJob::getCommandsMaskcreateJob(std::string &outputname, std::vector<st
 	if (joboptions["lowpass_filter"].getNumber() > 0)
 	{
 		command += " --lowpass " + joboptions["lowpass_filter"].getString();
+	}
+	if (joboptions["angpix"].getNumber() > 0)
+	{
 		command += " --angpix " + joboptions["angpix"].getString();
 	}
 	command += " --ini_threshold " + joboptions["inimask_threshold"].getString();

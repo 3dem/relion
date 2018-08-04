@@ -642,7 +642,7 @@ int PipeLine::addScheduledJob(int job_type, std::string fn_options)
 	return current_job;
 }
 
-void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_repeat, long int minutes_wait, long int minutes_wait_before)
+void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_repeat, long int minutes_wait, long int minutes_wait_before, long int seconds_wait_after)
 {
 
 	std::vector<FileName> my_scheduled_processes;
@@ -730,8 +730,8 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 				long int mynode = processList[current_job].inputNodeList[inode];
 				while (!exists(nodeList[mynode].name))
 				{
-					fh << " + -- Warning " << nodeList[mynode].name << " does not exist. Waiting 10 seconds ... " << std::endl;
-					sleep(10);
+					fh << " + -- Warning " << nodeList[mynode].name << " does not exist. Waiting 60 seconds ... " << std::endl;
+					sleep(60);
 				}
 			}
 			now = time(0);
@@ -750,7 +750,7 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 					break;
 				}
 
-				sleep(10);
+				sleep(seconds_wait_after);
 				checkProcessCompletion();
 				if (processList[current_job].status == PROC_FINISHED)
 				{
@@ -1061,9 +1061,10 @@ bool PipeLine::setAliasJob(int this_job, std::string alias, std::string &error_m
 	}
 	else if (alias.find("*") != std::string::npos || alias.find("?") != std::string::npos || alias.find("(") != std::string::npos || alias.find(")") != std::string::npos ||
 	         alias.find("/") != std::string::npos || alias.find("\"") != std::string::npos || alias.find("\\") != std::string::npos || alias.find("|") != std::string::npos ||
-		 alias.find("#") != std::string::npos || alias.find("<") != std::string::npos || alias.find(">") != std::string::npos)
+		 alias.find("#") != std::string::npos || alias.find("<") != std::string::npos || alias.find(">") != std::string::npos || alias.find("&") != std::string::npos || 
+		 alias.find("%") != std::string::npos)
 	{
-		error_message = "Alias cannot contain following symbols: *, ?, (, ), /, \", \\, |, #, <, >";
+		error_message = "Alias cannot contain following symbols: *, ?, (, ), /, \", \\, |, #, <, >, &, %";
 		return false;
 	}
 	else
