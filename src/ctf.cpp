@@ -48,7 +48,7 @@
 #include "src/metadata_table.h"
 
 /* Read -------------------------------------------------------------------- */
-void CTF::read(const MetaDataTable &partMdt, const MetaDataTable &opticsMdt, long particle)
+void CTF::readByGroup(const MetaDataTable &partMdt, const MetaDataTable &opticsMdt, long particle)
 {
 	int opticsGroup;
 	partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, particle);

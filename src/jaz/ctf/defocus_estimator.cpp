@@ -80,7 +80,7 @@ void DefocusEstimator::processMicrograph(
 	if (!noGlobAstig)
 	{
 		CTF ctf0;
-		ctf0.read(mdt, obsModel->opticsMdt, 0);
+		ctf0.readByGroup(mdt, obsModel->opticsMdt, 0);
 
 		Image<RFLOAT> dataVis;
 
@@ -183,7 +183,7 @@ void DefocusEstimator::processMicrograph(
 		if (diag)
 		{
 			CTF ctf1;
-			ctf1.read(mdt, obsModel->opticsMdt, 0);
+			ctf1.readByGroup(mdt, obsModel->opticsMdt, 0);
 
 			Image<RFLOAT> ctfFit(s,s);
 			ctf1.getCenteredImage(ctfFit.data, angpix, false, false, false, false);
@@ -206,7 +206,7 @@ void DefocusEstimator::processMicrograph(
 		for (long p = 0; p < pc; p++)
 		{
 			CTF ctf0;
-			ctf0.read(mdt, obsModel->opticsMdt, p);
+			ctf0.readByGroup(mdt, obsModel->opticsMdt, p);
 
 			std::vector<d2Vector> cost = DefocusHelper::diagnoseDefocus(
 				pred[p], obs[p], freqWeight,
@@ -240,7 +240,7 @@ void DefocusEstimator::processMicrograph(
 		stsp << p;
 
 		CTF ctf0;
-		ctf0.read(mdt, obsModel->opticsMdt, p);
+		ctf0.readByGroup(mdt, obsModel->opticsMdt, p);
 
 		if (fitAstigmatism)
 		{

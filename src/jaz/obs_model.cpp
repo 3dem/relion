@@ -75,7 +75,7 @@ void ObservationModel::predictObservation(
     if (applyCtf)
     {
         CTF ctf;
-        ctf.read(mdt, opticsMdt, particle);        
+        ctf.readByGroup(mdt, opticsMdt, particle);        
 
         FilterHelper::modulate(dest, ctf, angpix[opticsGroup]);
     }
@@ -161,7 +161,7 @@ void ObservationModel::insertObservation(
     if (applyCtf)
     {
         CTF ctf;
-        ctf.read(mdt, opticsMdt, particle);
+        ctf.readByGroup(mdt, opticsMdt, particle);
 
         ctf.getFftwImage(Fctf, s, s, angpix[opticsGroup]);
 

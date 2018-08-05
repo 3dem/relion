@@ -127,7 +127,7 @@ public:
 	
 	/** Read CTF parameters from particle table partMdt and optics table opticsMdt     
 	*/
-    void read(const MetaDataTable &partMdt, const MetaDataTable &opticsMdt, long int particle);
+    void readByGroup(const MetaDataTable &partMdt, const MetaDataTable &opticsMdt, long int particle);
 
     /** Read CTF parameters from MetaDataTables MD1 and MD2 (deprecated)
      * If a parameter is not found in MD1 it is tried to be read from MD2

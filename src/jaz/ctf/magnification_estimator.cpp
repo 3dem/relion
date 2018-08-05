@@ -72,7 +72,7 @@ void MagnificationEstimator::processMicrograph(
 	for (long p = 0; p < pc; p++)
 	{
 		CTF ctf;
-		ctf.read(mdt, obsModel->opticsMdt, p);
+		ctf.readByGroup(mdt, obsModel->opticsMdt, p);
 		
 		int threadnum = omp_get_thread_num();
 	
