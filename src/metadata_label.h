@@ -114,7 +114,7 @@ enum EMDLabel
     EMDL_IMAGE_DIMENSIONALITY,
     EMDL_IMAGE_BEAMTILT_X,
     EMDL_IMAGE_BEAMTILT_Y,
-    EMDL_IMAGE_BEAMTILT_GROUP,
+	EMDL_IMAGE_OPTICS_GROUP,
     EMDL_IMAGE_COORD_X,
     EMDL_IMAGE_COORD_Y,
     EMDL_IMAGE_COORD_Z,
@@ -554,7 +554,7 @@ private:
         EMDL::addLabel(EMDL_IMAGE_DIMENSIONALITY, EMDL_INT, "rlnImageDimensionality", "Dimensionality of data stored in an image (i.e. 2 or 3)");
         EMDL::addLabel(EMDL_IMAGE_BEAMTILT_X, EMDL_DOUBLE, "rlnBeamTiltX", "Beam tilt in the X-direction (in mrad)");
         EMDL::addLabel(EMDL_IMAGE_BEAMTILT_Y, EMDL_DOUBLE, "rlnBeamTiltY", "Beam tilt in the Y-direction (in mrad)");
-        EMDL::addLabel(EMDL_IMAGE_BEAMTILT_GROUP, EMDL_STRING, "rlnBeamTiltGroupName", "Name of a group (of images) with assumedly identical beam-tilts");
+		EMDL::addLabel(EMDL_IMAGE_OPTICS_GROUP, EMDL_INT, "rlnOpticsGroup", "Group of particles with identical optical properties");
         EMDL::addLabel(EMDL_IMAGE_COORD_X, EMDL_DOUBLE, "rlnCoordinateX", "X-Position of an image in a micrograph (in pixels)");
         EMDL::addLabel(EMDL_IMAGE_COORD_Y, EMDL_DOUBLE, "rlnCoordinateY", "Y-Position of an image in a micrograph (in pixels)");
         EMDL::addLabel(EMDL_IMAGE_COORD_Z, EMDL_DOUBLE, "rlnCoordinateZ", "Z-Position of an image in a 3D micrograph, i.e. tomogram (in pixels)");

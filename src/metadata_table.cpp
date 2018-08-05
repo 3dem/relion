@@ -56,6 +56,7 @@ MetaDataTable::MetaDataTable()
 	isList(false),
 	name(""),
 	comment(""),
+	version(0),
 	activeLabels(0),
 	ignoreLabels(0)
 {
@@ -72,6 +73,7 @@ MetaDataTable::MetaDataTable(const MetaDataTable &MD)
 	isList(MD.isList),
 	name(MD.name),
 	comment(MD.comment),
+	version(MD.version),
 	activeLabels(MD.activeLabels),
 	ignoreLabels(MD.ignoreLabels)
 {
@@ -98,6 +100,7 @@ MetaDataTable& MetaDataTable::operator = (const MetaDataTable &MD)
 		isList = MD.isList;
 		name = MD.name;
 		comment = MD.comment;
+		version = MD.version;
 
 		activeLabels = MD.activeLabels;
 		ignoreLabels = MD.ignoreLabels;
@@ -154,6 +157,7 @@ void MetaDataTable::clear()
 	isList = false;
 	name = "";
 	comment = "";
+	version = 0;
 
 	activeLabels.clear();
 	ignoreLabels.clear();
@@ -182,6 +186,21 @@ void MetaDataTable::setName(const std::string newName)
 std::string MetaDataTable::getName() const
 {
 	return name;
+}
+
+void MetaDataTable::setVersion(int v)
+{
+	version = v;
+}
+
+int MetaDataTable::getVersion() const
+{
+	return version;
+}
+
+int MetaDataTable::getCurrentVersion()
+{
+	return CURRENT_MDT_VERSION;
 }
 
 bool MetaDataTable::getValueToString(EMDLabel label, std::string &value, long objectID) const
@@ -895,6 +914,15 @@ long int MetaDataTable::readStar(std::ifstream& in, const std::string &name, std
 	// The loop statement may be necessary for data blocks that have a list AND a table inside them
 	while (getline(in, line, '\n'))
 	{
+		if (line.find("version_") != std::string::npos)
+		{
+			token = line.substr(line.find("version_") 
+								+ std::string("version_").length());
+			
+			std::istringstream sts(token);
+			sts >> version;
+		}
+			
 		// Find data_ lines
 		if (line.find("data_") != std::string::npos)
 		{
@@ -941,13 +969,16 @@ long int MetaDataTable::read(const FileName &filename, const std::string &name, 
 	FileName fn_read = filename.removeFileFormat();
 
 	std::ifstream in(fn_read.data(), std::ios_base::in);
+	
 	if (in.fail())
+	{
 		REPORT_ERROR( (std::string) "MetaDataTable::read: File " + fn_read + " does not exist" );
+	}
 
 	FileName ext = filename.getFileFormat();
-	if (ext =="star")
+	
+	if (ext == "star")
 	{
-		//REPORT_ERROR("readSTAR not implemented yet...");
 		return readStar(in, name, desiredLabels, grep_pattern, do_only_count);
 	}
 	else
@@ -959,7 +990,6 @@ long int MetaDataTable::read(const FileName &filename, const std::string &name, 
 
 	// Go to the first object
 	firstObject();
-
 }
 
 void MetaDataTable::write(std::ostream& out) const
@@ -967,7 +997,9 @@ void MetaDataTable::write(std::ostream& out) const
 	// Only write tables that have something in them
 	if (isEmpty())
 		return;
-
+	
+	out << "\n";
+	out << "version_ " << getCurrentVersion() <<"\n";
 	out << "\n";
 	out << "data_" << getName() <<"\n";
 	if (containsComment())
@@ -1072,7 +1104,7 @@ void MetaDataTable::write(const FileName &fn_out) const
 	fh.open((fn_out).c_str(), std::ios::out);
 	if (!fh)
 		REPORT_ERROR( (std::string)"MetaDataTable::write: cannot write to file: " + fn_out);
-	fh << "# RELION; version " << RELION_VERSION << std::endl;
+//	fh << "# RELION; version " << RELION_VERSION << std::endl;
 	write(fh);
 	fh.close();
 

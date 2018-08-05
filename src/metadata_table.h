@@ -46,6 +46,8 @@
 #include "src/metadata_container.h"
 #include "src/metadata_label.h"
 
+#define CURRENT_MDT_VERSION 31000
+
 /** For all objects.
  @code
  FOR_ALL_OBJECTS_IN_METADATA(metadata) {
@@ -100,6 +102,9 @@ class MetaDataTable
 
 	// A comment for the metadata table
 	std::string comment;
+	
+	// The version number of the file format (multiplied by 10,000)
+	int version;
 
 
 public:
@@ -140,9 +145,13 @@ public:
 	void setComment(const std::string Comment);
 	std::string getComment() const;
 	bool containsComment() const;
-
+	
 	void setName(const std::string Name);
 	std::string getName() const;
+	
+	void setVersion(int v);
+	int getVersion() const;
+	static int getCurrentVersion();
 
 
 	//	getValue: returns true if the label exists
@@ -281,7 +290,7 @@ public:
 
 	// Randomise the order inside the STAR file
 	void randomiseOrder();
-
+	
 	// legacy error codes:
 	// @TODO: remove after changing:
 	//	 - particle_reposition.cpp, line ~127
