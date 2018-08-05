@@ -27,17 +27,19 @@ foreach(GUI_SRC_FILE ${REL_GUI_SRC})
 endforeach()
 
 file(GLOB REL_JAZ_SRC "${CMAKE_SOURCE_DIR}/src/jaz/*.cpp")
-file(GLOB REL_JAZ_SRC_H "${CMAKE_SOURCE_DIR}/src/jaz/*.h")
+file(GLOB REL_JAZ_H "${CMAKE_SOURCE_DIR}/src/jaz/*.h")
 file(GLOB REL_JAZ_OPT_SRC "${CMAKE_SOURCE_DIR}/src/jaz/optimization/*.cpp")
-file(GLOB REL_JAZ_OPT_SRC_H "${CMAKE_SOURCE_DIR}/src/jaz/optimization/*.h")
+file(GLOB REL_JAZ_OPT_H "${CMAKE_SOURCE_DIR}/src/jaz/optimization/*.h")
 file(GLOB REL_JAZ_CTF_SRC "${CMAKE_SOURCE_DIR}/src/jaz/ctf/*.cpp")
-file(GLOB REL_JAZ_CTF_SRC_H "${CMAKE_SOURCE_DIR}/src/jaz/ctf/*.h")
+file(GLOB REL_JAZ_CTF_H "${CMAKE_SOURCE_DIR}/src/jaz/ctf/*.h")
 file(GLOB REL_JAZ_MOTION_SRC "${CMAKE_SOURCE_DIR}/src/jaz/motion/*.cpp")
-file(GLOB REL_JAZ_MOTION_SRC_H "${CMAKE_SOURCE_DIR}/src/jaz/motion/*.h")
+file(GLOB REL_JAZ_MOTION_H "${CMAKE_SOURCE_DIR}/src/jaz/motion/*.h")
+file(GLOB REL_JAZ_MATH_SRC "${CMAKE_SOURCE_DIR}/src/jaz/math/*.cpp")
+file(GLOB REL_JAZ_MATH_H "${CMAKE_SOURCE_DIR}/src/jaz/math/*.h")
 file(GLOB REL_D3x3_SRC "${CMAKE_SOURCE_DIR}/src/jaz/d3x3/*.c")
-file(GLOB REL_D3x3_SRC_H "${CMAKE_SOURCE_DIR}/src/jaz/d3x3/*.h")
+file(GLOB REL_D3x3_H "${CMAKE_SOURCE_DIR}/src/jaz/d3x3/*.h")
 file(GLOB REL_LBFGS_SRC "${CMAKE_SOURCE_DIR}/src/jaz/lbfgs/*.c")
-file(GLOB REL_LBFGS_SRC_H "${CMAKE_SOURCE_DIR}/src/jaz/lbfgs/*.h")
+file(GLOB REL_LBFGS_H "${CMAKE_SOURCE_DIR}/src/jaz/lbfgs/*.h")
 
 file(GLOB REL_HP "${CMAKE_SOURCE_DIR}/src/Healpix_2.15a/*.cc")
 file(GLOB RELION_TARGETS "${CMAKE_SOURCE_DIR}/src/apps/*.cpp")
@@ -70,6 +72,7 @@ if(BUILD_SHARED_LIBS)
 		${REL_JAZ_OPT_SRC} ${REL_JAZ_OPT_H}
 		${REL_JAZ_CTF_SRC} ${REL_JAZ_CTF_H}
 		${REL_JAZ_MOTION_SRC} ${REL_JAZ_MOTION_H}
+		${REL_JAZ_MATH_SRC} ${REL_JAZ_MATH_H}		
 		${REL_D3x3_SRC} ${REL_D3x3_H}
 		${REL_LBFGS_SRC} ${REL_LBFGS_H})
 
@@ -85,6 +88,7 @@ else()
 		${REL_JAZ_OPT_SRC} ${REL_JAZ_OPT_H}
 		${REL_JAZ_CTF_SRC} ${REL_JAZ_CTF_H}
 		${REL_JAZ_MOTION_SRC} ${REL_JAZ_MOTION_H}
+		${REL_JAZ_MATH_SRC} ${REL_JAZ_MATH_H}
 		${REL_D3x3_SRC} ${REL_D3x3_H}
 		${REL_LBFGS_SRC} ${REL_LBFGS_H})
 
