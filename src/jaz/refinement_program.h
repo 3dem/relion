@@ -13,7 +13,7 @@
 #include <src/complex.h>
 #include <src/metadata_table.h>
 
-#include <src/jaz/obs_model.h>
+#include <src/jaz/legacy_obs_model.h>
 #include <src/jaz/stack_helper.h>
 
 #include "src/micrograph_model.h"
@@ -65,7 +65,7 @@ class RefinementProgram
             MetaDataTable mdt0;
             std::vector<MetaDataTable> mdts;
             RFLOAT Cs, lambda, kV;
-            ObservationModel obsModel;
+            LegacyObservationModel obsModel;
 
             int s, sh, fc;
             long g0, gc;

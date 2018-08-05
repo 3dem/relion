@@ -1,39 +1,26 @@
-#include "src/jaz/obs_model.h"
+#include "src/jaz/legacy_obs_model.h"
 #include "src/jaz/stack_helper.h"
 #include "src/jaz/filter_helper.h"
 #include "src/jaz/Fourier_helper.h"
 
 #include <src/backprojector.h>
 
-
-ObservationModel::ObservationModel()
+LegacyObservationModel::LegacyObservationModel()
+:   angpix(-1),
+    anisoTilt(false)
 {
 }
 
-ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
-:	opticsMdt(opticsMdt),
-	angpix(opticsMdt.numberOfObjects()),
-	lambda(opticsMdt.numberOfObjects()),
-	Cs(opticsMdt.numberOfObjects())
+LegacyObservationModel::LegacyObservationModel(double angpix, double Cs, double voltage)
+:   angpix(angpix),
+    lambda(12.2643247 / sqrt(voltage * (1.0 + voltage * 0.978466e-6))),
+    Cs(Cs),
+    anisoTilt(false)
 {
-	for (int i = 0; i < opticsMdt.numberOfObjects(); i++)
-	{
-		RFLOAT mag, dstep;
-		opticsMdt.getValue(EMDL_CTF_MAGNIFICATION, mag, i);
-		opticsMdt.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep, i);
-		angpix[i] = 10000 * dstep / mag;
-		
-		double kV;		
-		opticsMdt.getValue(EMDL_CTF_VOLTAGE, kV, i);		
-		double V = kV * 1e3;
-		lambda[i] = 12.2643247 / sqrt(V * (1.0 + V * 0.978466e-6));
-		
-		opticsMdt.getValue(EMDL_CTF_CS, Cs[i], i);
-	}
 }
 
-void ObservationModel::predictObservation(
-        Projector& proj, const MetaDataTable& mdt, long int particle,
+void LegacyObservationModel::predictObservation(
+        Projector& proj, const MetaDataTable& mdt, int particle,
 		MultidimArray<Complex>& dest,
         bool applyCtf, bool applyTilt, bool applyShift) const
 {
@@ -63,10 +50,6 @@ void ObservationModel::predictObservation(
 
     proj.get2DFourierTransform(dest, A3D, false);
 	
-	int opticsGroup;
-	mdt.getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, particle);
-	opticsGroup--;
-	
 	if (applyShift)
 	{
 		shiftImageInFourierTransform(dest, dest, s, s/2 - xoff, s/2 - yoff);
@@ -75,9 +58,9 @@ void ObservationModel::predictObservation(
     if (applyCtf)
     {
         CTF ctf;
-        ctf.read(mdt, opticsMdt, particle);        
+        ctf.readLegacy(mdt, mdt, particle);        
 
-        FilterHelper::modulate(dest, ctf, angpix[opticsGroup]);
+        FilterHelper::modulate(dest, ctf, angpix);
     }
 
     if (applyTilt)
@@ -89,15 +72,22 @@ void ObservationModel::predictObservation(
 
         if (tx != 0.0 && ty != 0.0)
         {
-            selfApplyBeamTilt(dest, -tx, -ty, 
-				lambda[opticsGroup], Cs[opticsGroup], angpix[opticsGroup], s);
+            if (anisoTilt)
+            {
+                selfApplyBeamTilt(
+					dest, -tx, -ty, beamtilt_xx, beamtilt_xy, beamtilt_yy, lambda, Cs, angpix, s);
+            }
+            else
+            {
+                selfApplyBeamTilt(dest, -tx, -ty, lambda, Cs, angpix, s);
+            }
         }
     }
 }
 
 
-Image<Complex> ObservationModel::predictObservation(
-        Projector& proj, const MetaDataTable& mdt, long int particle,
+Image<Complex> LegacyObservationModel::predictObservation(
+        Projector& proj, const MetaDataTable& mdt, int particle,
         bool applyCtf, bool applyTilt, bool applyShift) const
 {
     Image<Complex> pred;
@@ -106,7 +96,7 @@ Image<Complex> ObservationModel::predictObservation(
     return pred;
 }
 
-std::vector<Image<Complex>> ObservationModel::predictObservations(
+std::vector<Image<Complex>> LegacyObservationModel::predictObservations(
         Projector &proj, const MetaDataTable &mdt, int threads,
         bool applyCtf, bool applyTilt, bool applyShift) const
 {
@@ -122,9 +112,8 @@ std::vector<Image<Complex>> ObservationModel::predictObservations(
     return out;
 }
 
-void ObservationModel::insertObservation(
-		const Image<Complex>& img, BackProjector &bproj,
-        const MetaDataTable& mdt, long int particle,
+void LegacyObservationModel::insertObservation(const Image<Complex>& img, BackProjector &bproj,
+        const MetaDataTable& mdt, int particle,
         bool applyCtf, bool applyTilt, double shift_x, double shift_y)
 {
     const int s = img.data.ydim;
@@ -153,17 +142,13 @@ void ObservationModel::insertObservation(
     MultidimArray<RFLOAT> Fctf;
     Fctf.resize(F2D);
     Fctf.initConstant(1.);
-	
-	int opticsGroup;
-	mdt.getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, particle);
-	opticsGroup--;
 
     if (applyCtf)
     {
         CTF ctf;
-        ctf.read(mdt, opticsMdt, particle);
+        ctf.readLegacy(mdt, mdt, particle);
 
-        ctf.getFftwImage(Fctf, s, s, angpix[opticsGroup]);
+        ctf.getFftwImage(Fctf, s, s, angpix);
 
         FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F2D)
         {
@@ -187,45 +172,31 @@ void ObservationModel::insertObservation(
             mdt.getValue(EMDL_IMAGE_BEAMTILT_Y, my_tilt_y, particle);
         }
 
-        selfApplyBeamTilt(F2D, my_tilt_x, my_tilt_y, 
-			lambda[opticsGroup], Cs[opticsGroup], angpix[opticsGroup], sh);
+        selfApplyBeamTilt(F2D, my_tilt_x, my_tilt_y, lambda, Cs, angpix, sh);
     }
 
     bproj.set2DFourierTransform(F2D, A3D, IS_NOT_INV, &Fctf);
 }
 
-double ObservationModel::angToPix(double a, int s, int opticsGroup)
+void LegacyObservationModel::setAnisoTilt(double xx, double xy, double yy)
 {
-	return s * angpix[opticsGroup] / a;
+    beamtilt_xx = xx;
+    beamtilt_xy = xy;
+    beamtilt_yy = yy;
+    anisoTilt = true;
 }
 
-double ObservationModel::pixToAng(double p, int s, int opticsGroup)
+double LegacyObservationModel::angToPix(double a, int s)
 {
-	return s * angpix[opticsGroup] / p;
+    return s * angpix / a;
 }
 
-double ObservationModel::getPixelSize(int opticsGroup)
+double LegacyObservationModel::pixToAng(double p, int s)
 {
-	return angpix[opticsGroup];
+	return s * angpix / p;
 }
 
-bool ObservationModel::allPixelSizesIdentical()
-{
-	bool out = true;
-	
-	for (int i = 1; i < angpix.size(); i++)
-	{
-		if (angpix[i] != angpix[0])
-		{
-			out = false;
-			break;
-		}
-	}
-	
-	return out;
-}
-
-bool ObservationModel::containsAllNeededColumns(const MetaDataTable& mdt)
+bool LegacyObservationModel::containsAllNeededColumns(const MetaDataTable& mdt)
 {
 	return (mdt.containsLabel(EMDL_ORIENT_ORIGIN_X)
          && mdt.containsLabel(EMDL_ORIENT_ORIGIN_Y)

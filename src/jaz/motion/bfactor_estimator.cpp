@@ -3,7 +3,7 @@
 #include "motion_helper.h"
 
 #include <src/jaz/micrograph_handler.h>
-#include <src/jaz/obs_model.h>
+#include <src/jaz/legacy_obs_model.h>
 #include <src/jaz/stack_helper.h>
 #include <src/jaz/vtk_helper.h>
 #include <src/jaz/damage_helper.h>
@@ -39,7 +39,7 @@ void BFactorEstimator::read(IOParser& parser, int argc, char* argv[])
 void BFactorEstimator::init(
     int verb, int s, int fc, 
     int nr_omp_threads, std::string outPath, bool debug,
-    ObservationModel* obsModel,
+    LegacyObservationModel* obsModel,
     MicrographHandler* micrographHandler,
 	ReferenceMap* reference)
 {
@@ -128,7 +128,7 @@ void BFactorEstimator::process(const std::vector<MetaDataTable>& mdts)
 				subset -= 1;
 				
 				CTF ctf;
-				ctf.read(mdts[g], mdts[g], p);
+				ctf.readLegacy(mdts[g], mdts[g], p);
 				ctf.getFftwImage(ctfImg(), s, s, angpix, false, false, false, true);
 				
 				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(ctfImgSq())

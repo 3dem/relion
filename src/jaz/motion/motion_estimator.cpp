@@ -4,7 +4,7 @@
 #include "motion_refiner.h"
 
 #include <src/jaz/micrograph_handler.h>
-#include <src/jaz/obs_model.h>
+#include <src/jaz/legacy_obs_model.h>
 #include <src/jaz/reference_map.h>
 #include <src/jaz/damage_helper.h>
 #include <src/jaz/filter_helper.h>
@@ -66,7 +66,7 @@ void MotionEstimator::init(
 		int verb, int s, int fc, int nr_omp_threads,
 		bool debug, std::string outPath,
 		ReferenceMap* reference,
-		ObservationModel* obsModel,
+		LegacyObservationModel* obsModel,
 		MicrographHandler* micrographHandler)
 {
 	if (!paramsRead)

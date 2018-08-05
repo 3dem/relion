@@ -21,7 +21,7 @@
 
 class MotionEstimator;
 class ReferenceMap;
-class ObservationModel;
+class LegacyObservationModel;
 class ParFourierTransformer;
 
 class MotionParamEstimator
@@ -38,7 +38,7 @@ class MotionParamEstimator
                   const std::vector<MetaDataTable>& allMdts,
                   MotionEstimator* motionEstimator,
                   ReferenceMap* reference,
-                  ObservationModel* obsModel);
+                  LegacyObservationModel* obsModel);
 
         void run();
 
@@ -69,7 +69,7 @@ class MotionParamEstimator
             std::vector<MetaDataTable> mdts;
 
             MotionEstimator* motionEstimator;
-            ObservationModel* obsModel;
+            LegacyObservationModel* obsModel;
             ReferenceMap* reference;
 
             int fc, s, k_out, verb, nr_omp_threads;

@@ -413,7 +413,7 @@ void ParticleSorter::calculateFeaturesOneParticle(long int ipart)
 	{
 		CTF ctf;
 		MultidimArray<RFLOAT> Fctf;
-		ctf.read(MDin, MDin, ipart);
+		ctf.readLegacy(MDin, MDin, ipart);
 		Fctf.resize(Fref);
 		ctf.getFftwImage(Fctf, XSIZE(img()), YSIZE(img()), angpix, false, false, intact_ctf_first_peak, true);
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fref)

@@ -5,7 +5,7 @@
 #include <src/metadata_table.h>
 #include <src/image.h>
 #include <src/complex.h>
-#include <src/jaz/obs_model.h>
+#include <src/jaz/legacy_obs_model.h>
 #include <src/jaz/gravis/t2Vector.h>
 #include <src/jaz/parallel_ft.h>
 #include <vector>

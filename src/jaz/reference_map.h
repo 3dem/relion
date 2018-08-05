@@ -6,6 +6,7 @@
 #include <vector>
 
 class ObservationModel;
+class LegacyObservationModel;
 
 class ReferenceMap
 {
@@ -30,8 +31,8 @@ class ReferenceMap
         void load(int verb, bool debug);
 		
 		Image<RFLOAT> getHollowWeight(double kmin_px);
-
-        std::vector<Image<Complex>> predictAll(
+		
+		std::vector<Image<Complex>> predictAll(
 				const MetaDataTable& mdt,
                 const ObservationModel& obs,
                 HalfSet hs, int threads,
@@ -42,6 +43,22 @@ class ReferenceMap
         Image<Complex> predict(
                 const MetaDataTable& mdt, int p,
                 const ObservationModel& obs,
+                HalfSet hs,
+                bool applyCtf = true,
+                bool applyTilt = true, 
+				bool applyShift = true);
+		
+		std::vector<Image<Complex>> predictAll(
+				const MetaDataTable& mdt,
+                const LegacyObservationModel& obs,
+                HalfSet hs, int threads,
+                bool applyCtf = true,
+                bool applyTilt = true, 
+				bool applyShift = true);
+
+        Image<Complex> predict(
+                const MetaDataTable& mdt, int p,
+                const LegacyObservationModel& obs,
                 HalfSet hs,
                 bool applyCtf = true,
                 bool applyTilt = true, 

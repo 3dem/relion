@@ -58,7 +58,7 @@ int main(int argc, char *argv[])
 		std::vector<std::vector<double>> groupValues_double(0);
 		std::vector<int> opticsClasses(particleCount, -1);		
 		
-		for (int p = 0; p < particleCount; p++)
+		for (long int p = 0; p < particleCount; p++)
 		{
 			int foundGroup = -1;			 
 			
@@ -109,7 +109,7 @@ int main(int argc, char *argv[])
 		
 		mdtOut.addLabel(EMDL_IMAGE_OPTICS_GROUP);
 		
-		for (int p = 0; p < particleCount; p++)
+		for (long int p = 0; p < particleCount; p++)
 		{
 			mdtOut.setValue(EMDL_IMAGE_OPTICS_GROUP, opticsClasses[p] + 1, p);
 		}

@@ -124,7 +124,7 @@ void MotionRefiner::init()
 	
 	mdt0.read(starFn);	
 	
-	if (!ObservationModel::containsAllNeededColumns(mdt0))
+	if (!LegacyObservationModel::containsAllNeededColumns(mdt0))
 	{
 		REPORT_ERROR_STR(starFn << " does not contain all of the required columns ("
 			<< "rlnOriginX, rlnOriginY, rlnAngleRot, rlnAngleTilt, rlnAnglePsi and rlnRandomSubset)");
@@ -320,7 +320,7 @@ void MotionRefiner::init()
 		mdt0.getValue(EMDL_CTF_VOLTAGE, kV, 0);
 		mdt0.getValue(EMDL_CTF_CS, Cs, 0);
 		
-		obsModel = ObservationModel(angpix, Cs, kV * 1e3);
+		obsModel = LegacyObservationModel(angpix, Cs, kV * 1e3);
 		
 		// Read the first reference
 		// (even if there is no motion to estimate - only to learn the image size)

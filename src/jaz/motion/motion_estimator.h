@@ -8,7 +8,7 @@
 class IOParser;
 class ParFourierTransformer;
 class ReferenceMap;
-class ObservationModel;
+class LegacyObservationModel;
 class MicrographHandler;
 
 class MotionEstimator
@@ -23,7 +23,7 @@ class MotionEstimator
         void init(int verb, int s, int fc, int nr_omp_threads,
                   bool debug, std::string outPath,
                   ReferenceMap* reference,
-                  ObservationModel* obsModel,
+                  LegacyObservationModel* obsModel,
                   MicrographHandler* micrographHandler);
 
         void process(const std::vector<MetaDataTable> &mdts, long g_start, long g_end);
@@ -105,7 +105,7 @@ class MotionEstimator
             std::string outPath;
 
             ReferenceMap* reference;
-            ObservationModel* obsModel;
+            LegacyObservationModel* obsModel;
             MicrographHandler* micrographHandler;
 
 

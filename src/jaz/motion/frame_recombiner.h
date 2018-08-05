@@ -6,7 +6,7 @@
 #include <string>
 
 class IOParser;
-class ObservationModel;
+class LegacyObservationModel;
 class MicrographHandler;
 
 class FrameRecombiner
@@ -22,7 +22,7 @@ class FrameRecombiner
                   int verb, int s, int fc, 
 				  double maxFreq, int nr_omp_threads,
                   std::string outPath, bool debug,
-                  ObservationModel* obsModel,
+                  LegacyObservationModel* obsModel,
                   MicrographHandler* micrographHandler);
 
         void process(const std::vector<MetaDataTable>& mdts, long g_start, long g_end);
@@ -53,7 +53,7 @@ class FrameRecombiner
             bool debug;
             double angpix, maxFreq;
 
-            ObservationModel* obsModel;
+            LegacyObservationModel* obsModel;
             MicrographHandler* micrographHandler;
 
             // computed by weightsFromFCC or weightsFromBfacs:

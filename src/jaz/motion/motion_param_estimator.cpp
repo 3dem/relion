@@ -54,7 +54,7 @@ void MotionParamEstimator::init(
     const std::vector<MetaDataTable>& allMdts,
     MotionEstimator* motionEstimator,
     ReferenceMap* reference,
-    ObservationModel* obsModel)
+    LegacyObservationModel* obsModel)
 {
     if (!paramsRead)
     {

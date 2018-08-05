@@ -48,7 +48,52 @@
 #include "src/metadata_table.h"
 
 /* Read -------------------------------------------------------------------- */
-void CTF::read(const MetaDataTable &MD1, const MetaDataTable &MD2, long int objectID)
+void CTF::read(const MetaDataTable &partMdt, const MetaDataTable &opticsMdt, long particle)
+{
+	int opticsGroup;
+	partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, particle);
+	opticsGroup--;
+	
+	if (!partMdt.getValue(EMDL_CTF_VOLTAGE, kV, particle))
+		if (!opticsMdt.getValue(EMDL_CTF_VOLTAGE, kV, opticsGroup))
+			kV=200;
+
+	if (!partMdt.getValue(EMDL_CTF_DEFOCUSU, DeltafU, particle))
+		if (!opticsMdt.getValue(EMDL_CTF_DEFOCUSU, DeltafU, opticsGroup))
+			DeltafU=0;
+
+	if (!partMdt.getValue(EMDL_CTF_DEFOCUSV, DeltafV, particle))
+		if (!opticsMdt.getValue(EMDL_CTF_DEFOCUSV, DeltafV, opticsGroup))
+			DeltafV=DeltafU;
+
+	if (!partMdt.getValue(EMDL_CTF_DEFOCUS_ANGLE, azimuthal_angle, particle))
+		if (!opticsMdt.getValue(EMDL_CTF_DEFOCUS_ANGLE, azimuthal_angle, opticsGroup))
+			azimuthal_angle=0;
+
+	if (!partMdt.getValue(EMDL_CTF_CS, Cs, particle))
+		if (!opticsMdt.getValue(EMDL_CTF_CS, Cs, opticsGroup))
+			Cs=0;
+
+	if (!partMdt.getValue(EMDL_CTF_BFACTOR, Bfac, particle))
+		if (!opticsMdt.getValue(EMDL_CTF_BFACTOR, Bfac, opticsGroup))
+			Bfac=0;
+
+	if (!partMdt.getValue(EMDL_CTF_SCALEFACTOR, scale, particle))
+		if (!opticsMdt.getValue(EMDL_CTF_SCALEFACTOR, scale, opticsGroup))
+			scale=1;
+
+	if (!partMdt.getValue(EMDL_CTF_Q0, Q0, particle))
+		if (!opticsMdt.getValue(EMDL_CTF_Q0, Q0, opticsGroup))
+			Q0=0;
+
+	if (!partMdt.getValue(EMDL_CTF_PHASESHIFT, phase_shift, particle))
+		if (!opticsMdt.getValue(EMDL_CTF_PHASESHIFT, phase_shift, opticsGroup))
+			phase_shift=0;
+
+	initialise();	
+}
+
+void CTF::readLegacy(const MetaDataTable &MD1, const MetaDataTable &MD2, long int objectID)
 {
 
 	if (!MD1.getValue(EMDL_CTF_VOLTAGE, kV, objectID))
@@ -106,11 +151,11 @@ void CTF::setValues(RFLOAT _defU, RFLOAT _defV, RFLOAT _defAng, RFLOAT _voltage,
 	initialise();
 }
 /* Read from 1 MetaDataTable ----------------------------------------------- */
-void CTF::read(const MetaDataTable &MD)
+void CTF::readLegacy(const MetaDataTable &MD)
 {
 	MetaDataTable MDempty;
 	MDempty.addObject(); // add one empty object
-	read(MD, MDempty);
+	readLegacy(MD, MDempty);
 }
 
 /** Write to an existing object in a MetaDataTable. */

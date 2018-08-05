@@ -309,7 +309,7 @@ public:
 					}
 					else
 					{
-						ctf.read(MDang, MDang);
+						ctf.readLegacy(MDang, MDang);
 						Fctf.resize(F2D);
 						ctf.getFftwImage(Fctf, XSIZE(vol()), XSIZE(vol()), angpix, ctf_phase_flipped, false,  do_ctf_intact_1st_peak, true);
 					}

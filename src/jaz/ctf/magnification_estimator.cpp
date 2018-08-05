@@ -43,7 +43,7 @@ void MagnificationEstimator::init(
 	this->reference = reference;
 	this->obsModel = obsModel;
 	
-	angpix = obsModel->angpix;
+	angpix = obsModel->getPixelSize(0);
 	
 	ready = true;
 }
@@ -72,7 +72,7 @@ void MagnificationEstimator::processMicrograph(
 	for (long p = 0; p < pc; p++)
 	{
 		CTF ctf;
-		ctf.read(mdt, mdt, p);
+		ctf.read(mdt, obsModel->opticsMdt, p);
 		
 		int threadnum = omp_get_thread_num();
 	

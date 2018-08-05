@@ -124,20 +124,24 @@ public:
 
     /** Empty constructor. */
     CTF() { clear(); }
+	
+	/** Read CTF parameters from particle table partMdt and optics table opticsMdt     
+	*/
+    void read(const MetaDataTable &partMdt, const MetaDataTable &opticsMdt, long int particle);
 
-    /** Read CTF parameters from MetaDataTables MD1 and MD2
+    /** Read CTF parameters from MetaDataTables MD1 and MD2 (deprecated)
      * If a parameter is not found in MD1 it is tried to be read from MD2
      * Only if it is also not present in the second then a default value is used
      * This is useful if micrograph-specific parameters are stored in a separate MD from the image-specific parameters
      */
-    void read(const MetaDataTable &MD1, const MetaDataTable &MD2, long int objectID = -1);
+    void readLegacy(const MetaDataTable &MD1, const MetaDataTable &MD2, long int objectID = -1);
 
     /** Just set all values explicitly */
     void setValues(RFLOAT _defU, RFLOAT _defV, RFLOAT _defAng,
     		RFLOAT _voltage, RFLOAT _Cs, RFLOAT _Q0, RFLOAT _Bfac, RFLOAT _scale = 1., RFLOAT _phase_shift = 0.);
 
     /** Read from a single MetaDataTable */
-    void read(const MetaDataTable &MD);
+    void readLegacy(const MetaDataTable &MD);
 
     /** Write to MetaDataTable. */
     void write(MetaDataTable &MD);

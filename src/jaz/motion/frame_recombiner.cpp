@@ -3,7 +3,7 @@
 #include "motion_helper.h"
 
 #include <src/jaz/micrograph_handler.h>
-#include <src/jaz/obs_model.h>
+#include <src/jaz/legacy_obs_model.h>
 #include <src/jaz/stack_helper.h>
 #include <src/jaz/vtk_helper.h>
 #include <src/jaz/damage_helper.h>
@@ -31,7 +31,7 @@ void FrameRecombiner::init(
     const std::vector<MetaDataTable>& allMdts,
     int verb, int s, int fc, double maxFreq,
     int nr_omp_threads, std::string outPath, bool debug,
-    ObservationModel* obsModel,
+    LegacyObservationModel* obsModel,
     MicrographHandler* micrographHandler)
 {
     this->verb = verb;

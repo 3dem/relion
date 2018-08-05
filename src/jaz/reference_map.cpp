@@ -1,5 +1,6 @@
 #include "reference_map.h"
 #include <src/jaz/obs_model.h>
+#include <src/jaz/legacy_obs_model.h>
 #include <src/jaz/image_op.h>
 #include <src/jaz/refinement_helper.h>
 #include <src/jaz/motion/motion_helper.h>
@@ -165,6 +166,45 @@ std::vector<Image<Complex>> ReferenceMap::predictAll(
 Image<Complex> ReferenceMap::predict(
 		const MetaDataTable& mdt, int p,
 		const ObservationModel& obs,
+		HalfSet hs,
+		bool applyCtf, bool applyTilt, bool applyShift)
+{
+	Image<Complex> pred;
+	
+	int randSubset;
+	mdt.getValue(EMDL_PARTICLE_RANDOM_SUBSET, randSubset, p);
+	randSubset -= 1;
+	
+	int pi = (hs == Own)? randSubset : 1 - randSubset;
+	
+	pred = obs.predictObservation(projectors[pi], mdt, p, applyCtf, applyTilt, applyShift);
+	
+	return pred;
+}
+
+std::vector<Image<Complex>> ReferenceMap::predictAll(
+		const MetaDataTable& mdt,
+		const LegacyObservationModel& obs,
+		HalfSet hs, int threads,
+		bool applyCtf, bool applyTilt, bool applyShift)
+{
+	// declare on first line to prevent copying
+	std::vector<Image<Complex>> out(mdt.numberOfObjects());
+	
+	const int pc = mdt.numberOfObjects();
+	
+	#pragma omp parallel for num_threads(threads)
+	for (int p = 0; p < pc; p++)
+	{
+		out[p] = predict(mdt, p, obs, hs, applyCtf, applyTilt, applyShift);
+	}
+	
+	return out;
+}
+
+Image<Complex> ReferenceMap::predict(
+		const MetaDataTable& mdt, int p,
+		const LegacyObservationModel& obs,
 		HalfSet hs,
 		bool applyCtf, bool applyTilt, bool applyShift)
 {

@@ -26,7 +26,7 @@
 #include <src/image.h>
 #include <src/fftw.h>
 #include <src/micrograph_model.h>
-#include <src/jaz/obs_model.h>
+#include <src/jaz/legacy_obs_model.h>
 #include <src/jaz/gravis/t2Vector.h>
 #include <src/jaz/parallel_ft.h>
 
@@ -76,7 +76,7 @@ class MotionRefiner
 		BFactorEstimator bfactorEstimator;
 		
 		// required components
-		ObservationModel obsModel;
+		LegacyObservationModel obsModel;
 		ReferenceMap reference;
 		MicrographHandler micrographHandler;
 		

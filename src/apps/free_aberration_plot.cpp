@@ -14,7 +14,7 @@
 #include <src/metadata_table.h>
 #include <src/backprojector.h>
 
-#include <src/jaz/obs_model.h>
+#include <src/jaz/legacy_obs_model.h>
 #include <src/jaz/stack_helper.h>
 #include <src/jaz/image_log.h>
 #include <src/jaz/gravis/t3Matrix.h>
@@ -125,7 +125,7 @@ int main(int argc, char *argv[])
             int t = omp_get_thread_num();
 
             CTF ctf0;
-            ctf0.read(mdts[g], mdts[g], p);
+            ctf0.readLegacy(mdts[g], mdts[g], p);
             ctf0.Cs = 0.0;
             ctf0.initialise();
 

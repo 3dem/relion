@@ -52,7 +52,7 @@ void TiltEstimator::init(
 	this->reference = reference;
 	this->obsModel = obsModel;
 	
-	angpix = obsModel->angpix;
+	angpix = obsModel->getPixelSize(0);
 	
 	tiltClasses.clear();
 	
@@ -123,7 +123,7 @@ void TiltEstimator::processMicrograph(
 	for (long p = 0; p < pc; p++)
 	{
 		CTF ctf;
-		ctf.read(mdt, mdt, p);
+		ctf.read(mdt, obsModel->opticsMdt, p);
 		
 		int threadnum = omp_get_thread_num();
 		
@@ -139,7 +139,7 @@ void TiltEstimator::processMicrograph(
 		partsPerClass[ci]++;
 		
 		TiltHelper::updateTiltShift(
-			pred[p], obs[p], ctf, obsModel->angpix, 
+			pred[p], obs[p], ctf, angpix, 
 			xyAcc[cc*threadnum + ci], 
 			wAcc[cc*threadnum + ci]);
 	}
@@ -174,7 +174,6 @@ void TiltEstimator::processMicrograph(
 
 void TiltEstimator::parametricFit(
 		const std::vector<MetaDataTable>& mdts, 
-		double Cs, double lambda, 
 		MetaDataTable& mdtOut)
 {
 	if (!ready)
@@ -194,6 +193,10 @@ void TiltEstimator::parametricFit(
 	
 	for (int ci = 0; ci < cc; ci++)
 	{	
+		//@TODO: replace tilt classes by optical groups
+		double Cs = obsModel->Cs[0];
+		double lambda = obsModel->lambda[0];
+		
 		std::stringstream sts;
 		sts << tiltClasses[ci];
 		std::string cns = sts.str();
@@ -229,7 +232,7 @@ void TiltEstimator::parametricFit(
 		
 		Image<Complex> xyNrm(sh,s);
 	
-		double kmin_px = obsModel->angToPix(kmin, s);
+		double kmin_px = obsModel->angToPix(kmin, s, 0);
 				 
 		Image<RFLOAT> wgh0 = reference->getHollowWeight(kmin_px);
 	

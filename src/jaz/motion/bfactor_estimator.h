@@ -6,7 +6,7 @@
 #include <string>
 
 class IOParser;
-class ObservationModel;
+class LegacyObservationModel;
 class MicrographHandler;
 class ReferenceMap;
 
@@ -21,7 +21,7 @@ class BFactorEstimator
         void init(int verb, int s, int fc, 
 				  int nr_omp_threads,
                   std::string outPath, bool debug,
-                  ObservationModel* obsModel,
+                  LegacyObservationModel* obsModel,
                   MicrographHandler* micrographHandler,
 				  ReferenceMap* reference);
 
@@ -47,7 +47,7 @@ class BFactorEstimator
 		bool debug;
 		double angpix;
 
-		ObservationModel* obsModel;
+		LegacyObservationModel* obsModel;
 		MicrographHandler* micrographHandler;
 		ReferenceMap* reference;
 		

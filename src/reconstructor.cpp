@@ -399,7 +399,7 @@ void Reconstructor::backprojectOneParticle(long int p)
 		else
 		{
 			CTF ctf;
-			ctf.read(DF, DF, p);
+			ctf.readLegacy(DF, DF, p);
 
 			ctf.getFftwImage(Fctf, mysize, mysize, angpix,
 				 ctf_phase_flipped, only_flip_phases,

@@ -31,8 +31,7 @@ class TiltEstimator
 		// Sum up per-pixel information from all micrographs, 
 		// then fit beam-tilt model to the per-pixel fit
 		void parametricFit(
-				const std::vector<MetaDataTable>& mdts, 
-				double Cs, double lambda, 
+				const std::vector<MetaDataTable>& mdts,
 				MetaDataTable& mdtOut);
 		
 		// Has this mdt been processed already?

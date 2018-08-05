@@ -49,9 +49,7 @@ class CtfRefiner
 		
 		
 	protected:
-	
-		RFLOAT Cs, lambda, kV;
-		
+			
 		ObservationModel obsModel;
 		ReferenceMap reference;
 		
@@ -87,9 +85,9 @@ class CtfRefiner
 	
 		int nr_omp_threads;
 	
-		std::string starFn, outPath;
+		std::string starFn, opticsFn, outPath;
 	
-		MetaDataTable mdt0;
+		MetaDataTable mdt0, opticsMdt;
 		std::vector<MetaDataTable> allMdts, unfinishedMdts;	
 		
 		// s: full image size, sh: half-size + 1, fc: frame count

@@ -31,7 +31,7 @@
 #include <src/jaz/complex_io.h>
 #include <src/jaz/stack_helper.h>
 #include <src/jaz/image_op.h>
-#include <src/jaz/obs_model.h>
+#include <src/jaz/legacy_obs_model.h>
 
 class reconstruct_parameters
 {
@@ -371,7 +371,7 @@ class reconstruct_parameters
 				do_beamtilt = false;
 			}
 				
-			ObservationModel obsModel;
+			LegacyObservationModel obsModel;
 			
 			if (!mdt0.containsLabel(EMDL_CTF_CS))
 			{
@@ -388,7 +388,7 @@ class reconstruct_parameters
 			mdt0.getValue(EMDL_CTF_CS, Cs, 0);
 			mdt0.getValue(EMDL_CTF_VOLTAGE, kV, 0);
 			
-			obsModel = ObservationModel(angpix, Cs, kV * 1e3);
+			obsModel = LegacyObservationModel(angpix, Cs, kV * 1e3);
 			
 			Projector subProjector(mysize, interpolator, padding_factor, r_min_nn);
 			
@@ -566,7 +566,7 @@ class reconstruct_parameters
 							if (do_ctf || do_reconstruct_ctf)
 							{
 								CTF ctf;
-								ctf.read(mdts[g], mdts[g], p);
+								ctf.readLegacy(mdts[g], mdts[g], p);
 								
 								ctf.getFftwImage(Fctf, mysize, mysize, angpix,
 												 ctf_phase_flipped, only_flip_phases,

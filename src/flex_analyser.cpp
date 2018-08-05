@@ -532,7 +532,7 @@ void FlexAnalyser::subtractOneParticle(long int ori_particle, long int imgno, in
 		else
 		{
 			CTF ctf;
-			ctf.read(data.MDimg, data.MDimg, part_id);
+			ctf.readLegacy(data.MDimg, data.MDimg, part_id);
 			ctf.getFftwImage(Fctf, model.ori_size, model.ori_size, model.pixel_size,
 					ctf_phase_flipped, false, intact_ctf_first_peak, true);
 		}
