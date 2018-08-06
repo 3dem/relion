@@ -170,20 +170,26 @@ def appendJobOptionsFromRunJobFile(filename, job_options):
     f.close()
     return
 
-
-def addJob(jobtype, name_in_script, done_file, options, alias=None):
-
-    jobname = ""
+def getJobName(name_in_script, done_file):
+    jobname = None
     # See if we've done this job before, i.e. whether it is in the done_file
     if (os.path.isfile(done_file)):
         f = open(done_file,'r')
-        for line in f: 
-            if name_in_script in line:
-                jobname = line.split()[2]
+        for line in f:
+            elems = line.split()
+            if len(elems) < 3: continue 
+            if elems[0] == name_in_script:
+                jobname = elems[2]
+		break
         f.close()
-        
+
+    return jobname
+
+def addJob(jobtype, name_in_script, done_file, options, alias=None):
+    jobname = getJobName(name_in_script, done_file)
+
     # If we hadn't done it before, add it now
-    if (jobname != ""):
+    if (jobname is not None):
         already_had_it = True 
     else:
         already_had_it = False
