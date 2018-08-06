@@ -47,7 +47,7 @@ class RelionItOptions(object):
     angpix = 0.885
     # Acceleration voltage (in kV)
     voltage = 300
-    # Polara = 2.0; Talos/Krios = 2.7; Cryo-ARM = 1.4 
+    # Polara = 2.0; Talos/Krios = 2.7; some Cryo-ARM = 1.4 
     Cs = 1.4
 
 
@@ -466,19 +466,26 @@ def getSecondPassReference():
         angpix = '0'
     return filename.replace('\n',''), angpix.replace('\n','')
 
-def addJob(jobtype, name_in_script, done_file, options, alias=None):
-
-    jobname = ""
+def getJobName(name_in_script, done_file):
+    jobname = None
     # See if we've done this job before, i.e. whether it is in the done_file
     if (os.path.isfile(done_file)):
         f = open(done_file,'r')
-        for line in f: 
-            if name_in_script in line:
-                jobname = line.split()[2]
+        for line in f:
+            elems = line.split()
+            if len(elems) < 3: continue 
+            if elems[0] == name_in_script:
+                jobname = elems[2]
+		break
         f.close()
-        
+
+    return jobname
+
+def addJob(jobtype, name_in_script, done_file, options, alias=None):
+    jobname = getJobName(name_in_script, done_file)
+
     # If we hadn't done it before, add it now
-    if (jobname != ""):
+    if (jobname is not None):
         already_had_it = True 
     else:
         already_had_it = False
@@ -817,6 +824,7 @@ def run_pipeline(opts):
             #### Set up the Extract job
             extract_options = ['Input coordinates:  == {}coords_suffix_autopick.star'.format(autopick_job),
                                'micrograph STAR file:  == {}micrographs_ctf.star'.format(ctffind_job),
+                               'Diameter background circle (pix):  == {}'.format(opts.extract_bg_diameter),
                                'Particle box size (pix): == {}'.format(opts.extract_boxsize),
                                'Number of MPI procs: == {}'.format(opts.extract_mpi)]
 
