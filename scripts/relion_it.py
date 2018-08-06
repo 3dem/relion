@@ -905,8 +905,10 @@ def run_pipeline(opts):
 
             print ' RELION_IT: now entering an infinite loop for batch-processing of particles. You can stop this loop by deleting the file',RUNNING_FILE
             
-            # It could be that this is a restart, so check previous_batch1_size in the output directory
-            if os.path.isfile(split_job + 'particles_split001.star'):
+            # It could be that this is a restart, so check previous_batch1_size in the output directory.
+            # Also check the presence of class2d_job_batch_001 in case the first job was not submitted yet.
+            if getJobName("class2d_job_batch_001", SETUP_CHECK_FILE) is not None and \
+               os.path.isfile(split_job + 'particles_split001.star'):
                 batch1 = load_star(split_job + 'particles_split001.star')
                 previous_batch1_size = len(batch1['']['rlnMicrographName'])
             else:
