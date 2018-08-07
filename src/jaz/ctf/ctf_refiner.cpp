@@ -39,7 +39,6 @@
 
 #include <omp.h>
 
-
 using namespace gravis;
 
 

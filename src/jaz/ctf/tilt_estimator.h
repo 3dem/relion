@@ -36,6 +36,7 @@ class TiltEstimator
 		// Has this mdt been processed already?
 		bool isFinished(const MetaDataTable& mdt);
 		
+		
 	private:
 				
 		// cmd. line options (see read())
