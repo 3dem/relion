@@ -46,51 +46,45 @@
 #include "src/args.h"
 #include "src/fftw.h"
 #include "src/metadata_table.h"
+#include <src/jaz/obs_model.h>
 
 /* Read -------------------------------------------------------------------- */
-void CTF::readByGroup(const MetaDataTable &partMdt, const MetaDataTable &opticsMdt, long particle)
+void CTF::readByGroup(const MetaDataTable &partMdt, const ObservationModel* obs, int particle)
 {
-	int opticsGroup;
-	partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, particle);
-	opticsGroup--;
+	int opticsGroup = 0;
 	
-	if (!partMdt.getValue(EMDL_CTF_VOLTAGE, kV, particle))
-		if (!opticsMdt.getValue(EMDL_CTF_VOLTAGE, kV, opticsGroup))
-			kV=200;
-
-	if (!partMdt.getValue(EMDL_CTF_DEFOCUSU, DeltafU, particle))
-		if (!opticsMdt.getValue(EMDL_CTF_DEFOCUSU, DeltafU, opticsGroup))
-			DeltafU=0;
-
-	if (!partMdt.getValue(EMDL_CTF_DEFOCUSV, DeltafV, particle))
-		if (!opticsMdt.getValue(EMDL_CTF_DEFOCUSV, DeltafV, opticsGroup))
-			DeltafV=DeltafU;
-
-	if (!partMdt.getValue(EMDL_CTF_DEFOCUS_ANGLE, azimuthal_angle, particle))
-		if (!opticsMdt.getValue(EMDL_CTF_DEFOCUS_ANGLE, azimuthal_angle, opticsGroup))
-			azimuthal_angle=0;
-
-	if (!partMdt.getValue(EMDL_CTF_CS, Cs, particle))
-		if (!opticsMdt.getValue(EMDL_CTF_CS, Cs, opticsGroup))
-			Cs=0;
-
-	if (!partMdt.getValue(EMDL_CTF_BFACTOR, Bfac, particle))
-		if (!opticsMdt.getValue(EMDL_CTF_BFACTOR, Bfac, opticsGroup))
-			Bfac=0;
-
-	if (!partMdt.getValue(EMDL_CTF_SCALEFACTOR, scale, particle))
-		if (!opticsMdt.getValue(EMDL_CTF_SCALEFACTOR, scale, opticsGroup))
-			scale=1;
-
-	if (!partMdt.getValue(EMDL_CTF_Q0, Q0, particle))
-		if (!opticsMdt.getValue(EMDL_CTF_Q0, Q0, opticsGroup))
-			Q0=0;
-
-	if (!partMdt.getValue(EMDL_CTF_PHASESHIFT, phase_shift, particle))
-		if (!opticsMdt.getValue(EMDL_CTF_PHASESHIFT, phase_shift, opticsGroup))
-			phase_shift=0;
-
+	if (obs != 0) 
+	{
+		partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, particle);
+	}
+	
+	opticsGroup--;		
+	
+	readValue(EMDL_CTF_VOLTAGE,       kV,              200,     particle, opticsGroup, partMdt, obs);
+	readValue(EMDL_CTF_DEFOCUSU,      DeltafU,         0,       particle, opticsGroup, partMdt, obs);
+	readValue(EMDL_CTF_DEFOCUSV,      DeltafV,         DeltafU, particle, opticsGroup, partMdt, obs);
+	readValue(EMDL_CTF_DEFOCUS_ANGLE, azimuthal_angle, 0,       particle, opticsGroup, partMdt, obs);
+	readValue(EMDL_CTF_CS,            Cs,              0,       particle, opticsGroup, partMdt, obs);
+	readValue(EMDL_CTF_BFACTOR,       Bfac,            0,       particle, opticsGroup, partMdt, obs);
+	readValue(EMDL_CTF_SCALEFACTOR,   scale,           1,       particle, opticsGroup, partMdt, obs);
+	readValue(EMDL_CTF_Q0,            Q0,              0,       particle, opticsGroup, partMdt, obs);
+	readValue(EMDL_CTF_PHASESHIFT,    phase_shift,     0,       particle, opticsGroup, partMdt, obs);
+	
+	// get symmetrical higher-order aberrations from obs here
+	
 	initialise();	
+}
+
+void CTF::readValue(EMDLabel label, RFLOAT& dest, RFLOAT defaultVal, int particle, int opticsGroup, 
+					const MetaDataTable& partMdt, const ObservationModel* obs)
+{
+	if (!partMdt.getValue(label, dest, particle))
+	{
+		if (opticsGroup < 0 || !obs->opticsMdt.getValue(label, dest, opticsGroup))
+		{
+			dest = defaultVal;
+		}
+	}
 }
 
 void CTF::readLegacy(const MetaDataTable &MD1, const MetaDataTable &MD2, long int objectID)

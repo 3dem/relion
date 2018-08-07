@@ -36,8 +36,7 @@ void TiltEstimator::read(IOParser &parser, int argc, char *argv[])
 
 void TiltEstimator::init(
 		int verb, int s, int nr_omp_threads, 
-		bool debug, bool diag, std::string outPath, 
-		MetaDataTable& mdt0,
+		bool debug, bool diag, std::string outPath,
 		ReferenceMap* reference, ObservationModel* obsModel)
 {
 	this->verb = verb;
@@ -53,42 +52,7 @@ void TiltEstimator::init(
 	this->obsModel = obsModel;
 	
 	angpix = obsModel->getPixelSize(0);
-	
-	tiltClasses.clear();
-	
-	if (mdt0.containsLabel(EMDL_PARTICLE_BEAM_TILT_CLASS))
-	{
-		std::set<int> tiltClassSet;
-	
-		const long pc = mdt0.numberOfObjects();
 		
-		for (long p = 0; p < pc; p++)
-		{
-			int s = 0;
-			mdt0.getValue(EMDL_PARTICLE_BEAM_TILT_CLASS, s, p);
-			
-			tiltClassSet.insert(s);			
-		}
-		
-		if (verb > 0)
-		{
-			std::cout << " + " << tiltClassSet.size() << " beam tilt classes found." << std::endl;
-		}
-		
-		for (std::set<int>::iterator it = tiltClassSet.begin(); it != tiltClassSet.end(); it++)
-		{
-			tiltClasses.push_back(*it);
-			classNameToIndex[*it] = tiltClasses.size()-1;
-			
-			std::cout << tiltClasses[tiltClasses.size()-1] << "\n";
-		}
-	}
-	else
-	{
-		tiltClasses.push_back(0);
-		classNameToIndex[0] = 0;
-	}
-	
 	ready = true;
 }
 
@@ -103,7 +67,16 @@ void TiltEstimator::processMicrograph(
 	}
 	
 	const int pc = mdt.numberOfObjects();
-	const int cc = tiltClasses.size();
+	
+	std::vector<int> optGroups = obsModel->getOptGroupsPresent(mdt);	
+	const int cc = optGroups.size();
+	
+	std::vector<int> groupToIndex(obsModel->numberOfOpticsGroups()+1, -1);
+	
+	for (int i = 0; i < cc; i++)
+	{
+		groupToIndex[optGroups[i]] = i;
+	}
 		
 	std::vector<Image<Complex>> xyAcc(nr_omp_threads*cc);
 	std::vector<Image<RFLOAT>> wAcc(nr_omp_threads*cc);
@@ -117,27 +90,19 @@ void TiltEstimator::processMicrograph(
 		wAcc[i].data.initZeros();
 	}
 	
-	std::vector<int> partsPerClass(cc, 0);
-	
 	#pragma omp parallel for num_threads(nr_omp_threads)
 	for (long p = 0; p < pc; p++)
 	{
 		CTF ctf;
-		ctf.readByGroup(mdt, obsModel->opticsMdt, p);
+		ctf.readByGroup(mdt, obsModel, p);
 		
 		int threadnum = omp_get_thread_num();
 		
-		int cn = 0;
-		
-		if (cc > 1)
-		{
-			mdt.getValue(EMDL_PARTICLE_BEAM_TILT_CLASS, cn, p);
-		}
-		
-		const int ci = classNameToIndex[cn];
-		
-		partsPerClass[ci]++;
-		
+		int og;
+		mdt.getValue(EMDL_IMAGE_OPTICS_GROUP, og, p);
+
+		const int ci = groupToIndex[og];
+
 		TiltHelper::updateTiltShift(
 			pred[p], obs[p], ctf, angpix, 
 			xyAcc[cc*threadnum + ci], 
@@ -149,8 +114,6 @@ void TiltEstimator::processMicrograph(
 	
 	for (int ci = 0; ci < cc; ci++)
 	{
-		if (partsPerClass[ci] == 0) continue;
-		
 		Image<Complex> xyAccSum(sh,s);
 		Image<RFLOAT> wAccSum(sh,s);
 		
@@ -165,16 +128,16 @@ void TiltEstimator::processMicrograph(
 		std::string outRoot = CtfRefiner::getOutputFilenameRoot(mdt, outPath);
 		
 		std::stringstream sts;
-		sts << tiltClasses[ci];
+		sts << optGroups[ci];
 		
-		ComplexIO::write(xyAccSum(), outRoot + "_xyAcc_class_" + sts.str(), ".mrc");
-		wAccSum.write(outRoot+"_wAcc_class_" + sts.str() + ".mrc");
+		ComplexIO::write(xyAccSum(), outRoot + "_xyAcc_optics-class_" + sts.str(), ".mrc");
+		wAccSum.write(outRoot+"_wAcc_optics-class_" + sts.str() + ".mrc");
 	}
 }
 
 void TiltEstimator::parametricFit(
 		const std::vector<MetaDataTable>& mdts, 
-		MetaDataTable& mdtOut)
+		MetaDataTable& optOut)
 {
 	if (!ready)
 	{
@@ -187,18 +150,19 @@ void TiltEstimator::parametricFit(
 	}
 	
 	const int gc = mdts.size();	
-	const int cc = tiltClasses.size();
+	const int ogc = obsModel->numberOfOpticsGroups();
 	
-	std::vector<d2Vector> tiltPerClass(cc);
+	std::vector<d2Vector> tiltPerClass(ogc, d2Vector(0.0, 0.0));
 	
-	for (int ci = 0; ci < cc; ci++)
+	std::vector<bool> groupUsed(ogc,false);
+	
+	for (int og = 0; og < ogc; og++)
 	{	
-		//@TODO: replace tilt classes by optical groups
-		double Cs = obsModel->Cs[0];
-		double lambda = obsModel->lambda[0];
+		double Cs = obsModel->Cs[og];
+		double lambda = obsModel->lambda[og];
 		
 		std::stringstream sts;
-		sts << tiltClasses[ci];
+		sts << og+1;
 		std::string cns = sts.str();
 		
 		Image<Complex> xyAccSum(sh,s);
@@ -211,19 +175,26 @@ void TiltEstimator::parametricFit(
 		{
 			std::string outRoot = CtfRefiner::getOutputFilenameRoot(mdts[g], outPath);
 			
-			if (   exists(outRoot+"_xyAcc_class_"+cns+"_real.mrc")
-				&& exists(outRoot+"_xyAcc_class_"+cns+"_imag.mrc")
-				&& exists(outRoot+ "_wAcc_class_"+cns+".mrc"))
+			if (   exists(outRoot+"_xyAcc_optics-class_"+cns+"_real.mrc")
+				&& exists(outRoot+"_xyAcc_optics-class_"+cns+"_imag.mrc")
+				&& exists(outRoot+ "_wAcc_optics-class_"+cns+".mrc"))
 			{
 				Image<Complex> xyAcc;
 				Image<RFLOAT> wAcc;
 				
-				wAcc.read(outRoot+"_wAcc_class_"+cns+".mrc");
-				ComplexIO::read(xyAcc, outRoot+"_xyAcc_class_"+cns, ".mrc");
+				wAcc.read(outRoot+"_wAcc_optics-class_"+cns+".mrc");
+				ComplexIO::read(xyAcc, outRoot+"_xyAcc_optics-class_"+cns, ".mrc");
 				
 				xyAccSum() += xyAcc();
 				wAccSum()  +=  wAcc();
+				
+				groupUsed[og] = true;
 			}	
+		}
+		
+		if (!groupUsed[og])
+		{
+			continue;
 		}
 			
 		Image<RFLOAT> wgh, phase, fit, phaseFull, fitFull;
@@ -232,7 +203,7 @@ void TiltEstimator::parametricFit(
 		
 		Image<Complex> xyNrm(sh,s);
 	
-		double kmin_px = obsModel->angToPix(kmin, s, 0);
+		double kmin_px = obsModel->angToPix(kmin, s, og);
 				 
 		Image<RFLOAT> wgh0 = reference->getHollowWeight(kmin_px);
 	
@@ -249,12 +220,12 @@ void TiltEstimator::parametricFit(
 		
 		if (debug)
 		{
-			ImageLog::write(wghFull, outPath + "beamtilt_weight-full_class_"+cns);
+			ImageLog::write(wghFull, outPath + "beamtilt_weight-full_optics-class_"+cns);
 		}
 		
 		FftwHelper::decenterUnflip2D(phase.data, phaseFull.data);
 			
-		ImageLog::write(phaseFull, outPath + "beamtilt_delta-phase_per-pixel_class_"+cns);
+		ImageLog::write(phaseFull, outPath + "beamtilt_delta-phase_per-pixel_optics-class_"+cns);
 		
 		double shift_x, shift_y, tilt_x, tilt_y;
 		
@@ -264,9 +235,9 @@ void TiltEstimator::parametricFit(
 			
 		FftwHelper::decenterUnflip2D(fit.data, fitFull.data);
 		
-		ImageLog::write(fitFull, outPath + "beamtilt_delta-phase_lin-fit_class_"+cns);
+		ImageLog::write(fitFull, outPath + "beamtilt_delta-phase_lin-fit_optics-class_"+cns);
 		
-		std::ofstream os(outPath+"beamtilt_lin-fit_class_"+cns+".txt");
+		std::ofstream os(outPath+"beamtilt_lin-fit_optics-class_"+cns+".txt");
 		os << "beamtilt_x = " << tilt_x << "\n";
 		os << "beamtilt_y = " << tilt_y << "\n";
 		os.close();
@@ -291,32 +262,23 @@ void TiltEstimator::parametricFit(
 		
 		FftwHelper::decenterUnflip2D(fit.data, fitFull.data);
 		
-		ImageLog::write(fitFull, outPath+"beamtilt_delta-phase_iter-fit_class_"+cns);
+		ImageLog::write(fitFull, outPath+"beamtilt_delta-phase_iter-fit_optics-class_"+cns);
 		
-		std::ofstream os2(outPath+"beamtilt_iter-fit_class_"+cns+".txt");
+		std::ofstream os2(outPath+"beamtilt_iter-fit_optics-class_"+cns+".txt");
 		os2 << "beamtilt_x = " << tilt_x << "\n";
 		os2 << "beamtilt_y = " << tilt_y << "\n";
 		os2.close();
 		
-		tiltPerClass[ci] = d2Vector(tilt_x, tilt_y);
+		tiltPerClass[og] = d2Vector(tilt_x, tilt_y);
 	}
 	
-	// Now write the beamtilt into mdtOut	
-	const long tpc = mdtOut.numberOfObjects();
-	
-	for (long p = 0; p < tpc; p++)
+	// Now write the beamtilt into optOut	
+	for (long og = 0; og < ogc; og++)
 	{
-		int cn = 0;
+		const d2Vector t = tiltPerClass[og];		
 		
-		if (cc > 1)
-		{
-			mdtOut.getValue(EMDL_PARTICLE_BEAM_TILT_CLASS, cn, p);
-		}
-		
-		const d2Vector t = tiltPerClass[classNameToIndex[cn]];		
-		
-		mdtOut.setValue(EMDL_IMAGE_BEAMTILT_X, t.x, p);
-		mdtOut.setValue(EMDL_IMAGE_BEAMTILT_Y, t.y, p);
+		optOut.setValue(EMDL_IMAGE_BEAMTILT_X, t.x, og);
+		optOut.setValue(EMDL_IMAGE_BEAMTILT_Y, t.y, og);
 	}
 }
 
@@ -331,17 +293,17 @@ bool TiltEstimator::isFinished(const MetaDataTable &mdt)
 	
 	bool allDone = true;
 	
-	const int cc = tiltClasses.size();
+	const int ogc = obsModel->numberOfOpticsGroups();
 	
-	for (int ci = 0; ci < cc; ci++)
+	for (int og = 0; og < ogc; og++)
 	{	
 		std::stringstream sts;
-		sts << tiltClasses[ci];
-		std::string cns = sts.str();
+		sts << og+1;
+		std::string ogs = sts.str();
 		
-		if (   !exists(outRoot+"_xyAcc_class_"+cns+"_real.mrc")
-			|| !exists(outRoot+"_xyAcc_class_"+cns+"_imag.mrc")
-			|| !exists(outRoot+"_wAcc_class_"+cns+".mrc"))
+		if (   !exists(outRoot+"_xyAcc_optics-class_"+ogs+"_real.mrc")
+			|| !exists(outRoot+"_xyAcc_optics-class_"+ogs+"_imag.mrc")
+			|| !exists(outRoot+"_wAcc_optics-class_"+ogs+".mrc"))
 		{
 			allDone = false;
 			break;

@@ -130,6 +130,63 @@ void CtfRefiner::init()
 	
 	opticsMdt.read(opticsFn);
 
+	// Make sure output directory ends in a '/'
+	if (outPath[outPath.length()-1] != '/')
+	{
+		outPath+="/";
+	}
+		
+	obsModel = ObservationModel(opticsMdt);	
+
+	// read pixel sizes (and make sure they are all the same)	
+	
+	if (!obsModel.allPixelSizesIdentical())
+	{
+		REPORT_ERROR("ERROR: different pixel sizes detected. Please split your data set by pixel size.");
+	}
+	
+	angpix = obsModel.getPixelSize(0);
+	
+	if (verb > 0)
+	{
+		std::cout << "   - Using pixel size calculated from magnification and detector "
+				  << "pixel size in " << opticsFn << ": " << angpix << std::endl;
+	}
+	
+	// make sure all optics groups are defined
+	
+	std::vector<int> undefinedOptGroups = obsModel.findUndefinedOptGroups(mdt0);
+	
+	if (undefinedOptGroups.size() > 0)
+	{
+		std::stringstream sts;
+		
+		for (int i = 0; i < undefinedOptGroups.size(); i++)
+		{
+			sts << undefinedOptGroups[i];
+			
+			if (i < undefinedOptGroups.size()-1)
+			{
+				sts << ", ";
+			}
+		}
+		
+		REPORT_ERROR("ERROR: The following optics groups were not defined in "+
+					 opticsFn+": "+sts.str());
+	}
+	
+	// make sure the optics groups appear in the right order (and rename them if necessary)
+	
+	if (!obsModel.opticsGroupsSorted())
+	{
+		std::cerr << "   - Warning: the optics groups in " << opticsFn 
+				  << " are not in the right order - renaming them now" << std::endl;
+		
+		obsModel.sortOpticsGroups(mdt0);
+	}
+		
+	// after all the necessary changes to mdt0 have been applied, split it by micrograph
+	
 	allMdts = StackHelper::splitByMicrographName(&mdt0);
 
 	// Only work on a user-specified subset of the micrographs
@@ -160,27 +217,7 @@ void CtfRefiner::init()
 
 		allMdts = todo_mdts;
 	}
-
-	// Make sure output directory ends in a '/'
-	if (outPath[outPath.length()-1] != '/')
-	{
-		outPath+="/";
-	}
 	
-	obsModel = ObservationModel(opticsMdt);		
-	
-	if (!obsModel.allPixelSizesIdentical())
-	{
-		REPORT_ERROR("ERROR: different pixel sizes detected. Please split your data set by pixel size.");
-	}
-	
-	angpix = obsModel.getPixelSize(0);
-	
-	if (verb > 0)
-	{
-		std::cout << "   - Using pixel size calculated from magnification and detector "
-				  << "pixel size in the input STAR file: " << angpix << std::endl;
-	}
 		
 	if (verb > 0)
 	{
@@ -193,7 +230,7 @@ void CtfRefiner::init()
 	s = reference.s;
 	sh = s/2 + 1;
 
-	tiltEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, mdt0, &reference, &obsModel);
+	tiltEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
 	defocusEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
 	magnificationEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
 
@@ -321,6 +358,7 @@ void CtfRefiner::run()
 void CtfRefiner::finalise()
 {
 	MetaDataTable mdtOut = mdt0;
+	MetaDataTable optOut = obsModel.opticsMdt;
 
 	// Read back from disk the metadata-tables and eps-plots for the defocus fit
 	// Note: only micrographs for which the defoci were estimated (either now or before)
@@ -335,10 +373,10 @@ void CtfRefiner::finalise()
 	}
 
 	// Sum up the per-pixel beamtilt fits of all micrographs and fit a parametric model to them.
-	// Then, write the beamtilt parameters into mdtOut
+	// Then, write the beamtilt parameters into optOut
 	if (do_tilt_fit)
 	{
-		tiltEstimator.parametricFit(allMdts, mdtOut);
+		tiltEstimator.parametricFit(allMdts, optOut);
 	}
 
 	// Do the equivalent for mag. fit
@@ -348,6 +386,7 @@ void CtfRefiner::finalise()
 	}
 
 	mdtOut.write(outPath + "particles_ctf_refine.star");
+	optOut.write(outPath + "particles_ctf_refine_optics.star");
 
 	if (verb > 0)
 	{

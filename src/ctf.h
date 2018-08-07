@@ -49,6 +49,8 @@
 #include "src/metadata_table.h"
 #include <map>
 
+class ObservationModel;
+
 class CTF
 {
 protected:
@@ -125,9 +127,12 @@ public:
     /** Empty constructor. */
     CTF() { clear(); }
 	
-	/** Read CTF parameters from particle table partMdt and optics table opticsMdt     
+	/** Read CTF parameters from particle table partMdt and optics table opticsMdt.     
 	*/
-    void readByGroup(const MetaDataTable &partMdt, const MetaDataTable &opticsMdt, long int particle);
+    void readByGroup(const MetaDataTable &partMdt, const ObservationModel* obs, int particle);
+	
+	void readValue(EMDLabel label, RFLOAT& dest, RFLOAT defaultVal, int particle, int opticsGroup, 
+				   const MetaDataTable& partMdt, const ObservationModel* obs);
 
     /** Read CTF parameters from MetaDataTables MD1 and MD2 (deprecated)
      * If a parameter is not found in MD1 it is tried to be read from MD2

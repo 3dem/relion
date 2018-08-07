@@ -5,6 +5,8 @@
 
 #include <src/backprojector.h>
 
+#include <set>
+
 
 ObservationModel::ObservationModel()
 {
@@ -75,7 +77,7 @@ void ObservationModel::predictObservation(
     if (applyCtf)
     {
         CTF ctf;
-        ctf.readByGroup(mdt, opticsMdt, particle);        
+        ctf.readByGroup(mdt, this, particle);        
 
         FilterHelper::modulate(dest, ctf, angpix[opticsGroup]);
     }
@@ -161,7 +163,7 @@ void ObservationModel::insertObservation(
     if (applyCtf)
     {
         CTF ctf;
-        ctf.readByGroup(mdt, opticsMdt, particle);
+        ctf.readByGroup(mdt, this, particle);
 
         ctf.getFftwImage(Fctf, s, s, angpix[opticsGroup]);
 
@@ -219,6 +221,107 @@ bool ObservationModel::allPixelSizesIdentical()
 		{
 			out = false;
 			break;
+		}
+	}
+	
+	return out;
+}
+
+int ObservationModel::numberOfOpticsGroups()
+{
+	return opticsMdt.numberOfObjects();
+}
+
+bool ObservationModel::opticsGroupsSorted()
+{
+	for (int i = 0; i < opticsMdt.numberOfObjects(); i++)
+	{
+		int og;
+		opticsMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, og, i);	
+		
+		if (og != i+1)
+		{
+			return false;
+		}
+	}
+		
+	return true;
+}
+
+std::vector<int> ObservationModel::findUndefinedOptGroups(const MetaDataTable &partMdt)
+{
+	std::set<int> definedGroups;
+	
+	for (int i = 0; i < opticsMdt.numberOfObjects(); i++)
+	{
+		int og;
+		opticsMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, og, i);
+		
+		definedGroups.insert(og);
+	}
+	
+	std::vector<int> out;
+	out.reserve(opticsMdt.numberOfObjects());
+	
+	for (int i = 0; i < partMdt.numberOfObjects(); i++)
+	{
+		int og;
+		partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, og, i);
+		
+		if (definedGroups.find(og) == definedGroups.end())
+		{
+			out.push_back(og);
+		}
+	}
+	
+	return out;
+}
+
+void ObservationModel::sortOpticsGroups(MetaDataTable& partMdt)
+{
+	std::map<int,int> old2new;
+	
+	for (int i = 0; i < opticsMdt.numberOfObjects(); i++)
+	{
+		int og;
+		opticsMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, og, i);
+		
+		old2new[og] = i+1;
+		
+		opticsMdt.setValue(EMDL_IMAGE_OPTICS_GROUP, i+1, i);
+	}
+	
+	for (int i = 0; i < partMdt.numberOfObjects(); i++)
+	{
+		int og;
+		partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, og, i);
+		partMdt.setValue(EMDL_IMAGE_OPTICS_GROUP, old2new[og], i);
+	}
+}
+
+std::vector<int> ObservationModel::getOptGroupsPresent(const MetaDataTable& partMdt)
+{
+	const int gc = opticsMdt.numberOfObjects();
+	const int pc = partMdt.numberOfObjects();
+	
+	std::vector<bool> optGroupIsPresent(gc, false);
+	
+	for (int p = 0; p < pc; p++)
+	{
+		int og;
+		partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, og, p);
+		
+		optGroupIsPresent[og-1] = true;
+	}
+	
+	std::vector<int> out(0);
+	out.reserve(gc);
+	
+	for (int g = 0; g < gc; g++)
+	{
+		if (optGroupIsPresent[g])
+		{
+			out.push_back(g+1);
 		}
 	}
 	
