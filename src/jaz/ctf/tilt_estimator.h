@@ -39,7 +39,6 @@ class TiltEstimator
 	private:
 				
 		// cmd. line options (see read())
-		bool aniso;
 		double kmin;
 		
 		// parameters obtained through init()

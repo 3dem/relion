@@ -150,7 +150,7 @@ void CtfRefiner::init()
 	if (verb > 0)
 	{
 		std::cout << "   - Using pixel size calculated from magnification and detector "
-				  << "pixel size in " << opticsFn << ": " << angpix << std::endl;
+				  << "pixel size in " << opticsFn << ": " << angpix << " A" << std::endl;
 	}
 	
 	// make sure all optics groups are defined

@@ -30,8 +30,6 @@ void TiltEstimator::read(IOParser &parser, int argc, char *argv[])
 {
 	kmin = textToFloat(parser.getOption("--kmin_tilt", 
 						"Inner freq. threshold for beamtilt estimation [Angst]", "20.0"));
-		
-	aniso = parser.checkOption("--anisotropic_tilt", "Use anisotropic coma model");
 }
 
 void TiltEstimator::init(
@@ -215,11 +213,11 @@ void TiltEstimator::parametricFit(
 			xyNrm(y,x) = wAccSum(y,x) > 0.0? xyAccSum(y,x)/wAccSum(y,x) : Complex(0.0, 0.0);
 		}
 		
-		Image<RFLOAT> wghFull;
-		FftwHelper::decenterDouble2D(wgh(), wghFull());
-		
 		if (debug)
 		{
+			Image<RFLOAT> wghFull;
+			FftwHelper::decenterDouble2D(wgh(), wghFull());
+			
 			ImageLog::write(wghFull, outPath + "beamtilt_weight-full_optics-class_"+cns);
 		}
 		
@@ -229,40 +227,29 @@ void TiltEstimator::parametricFit(
 		
 		double shift_x, shift_y, tilt_x, tilt_y;
 		
-		TiltHelper::fitTiltShift(
-			phase, wgh, Cs, lambda, angpix,
-			&shift_x, &shift_y, &tilt_x, &tilt_y, &fit);
-			
-		FftwHelper::decenterUnflip2D(fit.data, fitFull.data);
-		
-		ImageLog::write(fitFull, outPath + "beamtilt_delta-phase_lin-fit_optics-class_"+cns);
-		
-		std::ofstream os(outPath+"beamtilt_lin-fit_optics-class_"+cns+".txt");
-		os << "beamtilt_x = " << tilt_x << "\n";
-		os << "beamtilt_y = " << tilt_y << "\n";
-		os.close();
-		
-		double tilt_xx, tilt_xy, tilt_yy;
-		
-		if (aniso)
 		{
-			TiltHelper::optimizeAnisoTilt(
-				xyNrm, wgh, Cs, lambda, angpix, false,
-				shift_x, shift_y, tilt_x, tilt_y,
-				&shift_x, &shift_y, &tilt_x, &tilt_y,
-				&tilt_xx, &tilt_xy, &tilt_yy, &fit);
-		}
-		else
-		{
-			TiltHelper::optimizeTilt(
-				xyNrm, wgh, Cs, lambda, angpix, false,
-				shift_x, shift_y, tilt_x, tilt_y,
+			TiltHelper::fitTiltShift(
+				phase, wgh, Cs, lambda, angpix,
 				&shift_x, &shift_y, &tilt_x, &tilt_y, &fit);
+				
+			FftwHelper::decenterUnflip2D(fit.data, fitFull.data);
+			
+			ImageLog::write(fitFull, outPath + "beamtilt_delta-phase_lin-fit_optics-class_"+cns);
+			
+			std::ofstream os(outPath+"beamtilt_lin-fit_optics-class_"+cns+".txt");
+			os << "beamtilt_x = " << tilt_x << "\n";
+			os << "beamtilt_y = " << tilt_y << "\n";
+			os.close();
+			
+			TiltHelper::optimizeTilt(
+					xyNrm, wgh, Cs, lambda, angpix, false,
+					shift_x, shift_y, tilt_x, tilt_y,
+					&shift_x, &shift_y, &tilt_x, &tilt_y, &fit);
+			
+			FftwHelper::decenterUnflip2D(fit.data, fitFull.data);
+			
+			ImageLog::write(fitFull, outPath+"beamtilt_delta-phase_iter-fit_optics-class_"+cns);
 		}
-		
-		FftwHelper::decenterUnflip2D(fit.data, fitFull.data);
-		
-		ImageLog::write(fitFull, outPath+"beamtilt_delta-phase_iter-fit_optics-class_"+cns);
 		
 		std::ofstream os2(outPath+"beamtilt_iter-fit_optics-class_"+cns+".txt");
 		os2 << "beamtilt_x = " << tilt_x << "\n";
