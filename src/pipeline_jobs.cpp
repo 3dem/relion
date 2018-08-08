@@ -5058,6 +5058,11 @@ bool RelionJob::getCommandsMotionrefineJob(std::string &outputname, std::vector<
 		}
 		else
 		{
+			if (joboptions["opt_params"].getString() == "")
+			{
+				error_message = "ERROR: Please specify an optimised parameter file OR choose 'use own paramaeters' and set three sigma values.";
+				return false;
+			}
 			command += " --params_file " + joboptions["opt_params"].getString();
 		}
 
