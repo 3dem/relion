@@ -87,7 +87,7 @@ void CTF::readValue(EMDLabel label, RFLOAT& dest, RFLOAT defaultVal, int particl
 	}
 }
 
-void CTF::readLegacy(const MetaDataTable &MD1, const MetaDataTable &MD2, long int objectID)
+void CTF::read(const MetaDataTable &MD1, const MetaDataTable &MD2, long int objectID)
 {
 
 	if (!MD1.getValue(EMDL_CTF_VOLTAGE, kV, objectID))
@@ -145,11 +145,11 @@ void CTF::setValues(RFLOAT _defU, RFLOAT _defV, RFLOAT _defAng, RFLOAT _voltage,
 	initialise();
 }
 /* Read from 1 MetaDataTable ----------------------------------------------- */
-void CTF::readLegacy(const MetaDataTable &MD)
+void CTF::read(const MetaDataTable &MD)
 {
 	MetaDataTable MDempty;
 	MDempty.addObject(); // add one empty object
-	readLegacy(MD, MDempty);
+	read(MD, MDempty);
 }
 
 /** Write to an existing object in a MetaDataTable. */

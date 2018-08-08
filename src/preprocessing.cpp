@@ -776,7 +776,7 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 
 	CTF ctf;
 	if (star_has_ctf || do_phase_flip || do_premultiply_ctf)
-		ctf.readLegacy(MDmics, MDmics, imic);
+		ctf.read(MDmics, MDmics, imic);
 
 	if (do_phase_flip || do_premultiply_ctf)
 	{

@@ -805,7 +805,7 @@ void ParticlePolisher::calculateSingleFrameReconstruction(int iframe, int this_h
 				Fctf.initConstant(1.);
 				if (do_ctf)
 				{
-					ctf.readLegacy(exp_model.MDimg, exp_model.MDimg);
+					ctf.read(exp_model.MDimg, exp_model.MDimg);
 					ctf.getFftwImage(Fctf, ori_size, ori_size, angpix, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);
 					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F2D)
 					{
@@ -1324,7 +1324,7 @@ void ParticlePolisher::reconstructShinyParticlesOneHalf(int this_half, Experimen
 			Fctf.initConstant(1.);
 			if (do_ctf)
 			{
-				ctf.readLegacy(exp_model.MDimg, exp_model.MDimg);
+				ctf.read(exp_model.MDimg, exp_model.MDimg);
 				ctf.getFftwImage(Fctf, ori_size, ori_size, angpix, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);
 				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F2D)
 				{

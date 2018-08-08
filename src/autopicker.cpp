@@ -2885,7 +2885,7 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 			MDmic.getValue(EMDL_MICROGRAPH_NAME, fn_tmp);
 			if (fn_tmp==fn_mic)
 			{
-				ctf.readLegacy(MDmic, MDmic);
+				ctf.read(MDmic, MDmic);
 				Fctf.resize(downsize_mic, downsize_mic/2 + 1);
 				ctf.getFftwImage(Fctf, micrograph_size, micrograph_size, angpix, false, false, intact_ctf_first_peak, true);
 				break;

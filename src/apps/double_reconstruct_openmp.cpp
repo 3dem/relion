@@ -566,7 +566,7 @@ class reconstruct_parameters
 							if (do_ctf || do_reconstruct_ctf)
 							{
 								CTF ctf;
-								ctf.readLegacy(mdts[g], mdts[g], p);
+								ctf.read(mdts[g], mdts[g], p);
 								
 								ctf.getFftwImage(Fctf, mysize, mysize, angpix,
 												 ctf_phase_flipped, only_flip_phases,

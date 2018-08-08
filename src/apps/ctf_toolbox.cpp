@@ -209,7 +209,7 @@ class ctf_toolbox_parameters
 		{
 
   			CTF ctf;
-			ctf.readLegacy(MD, MD);
+			ctf.read(MD, MD);
 
 			FileName fn_img, my_fn_out;
     		if (do_image_name)

@@ -157,7 +157,7 @@ int CsFit::_run()
             stsp << p;
 
             CTF ctf0;
-            ctf0.readLegacy(mdts[g], mdts[g], p);
+            ctf0.read(mdts[g], mdts[g], p);
 
             Image<Complex> pred;
 

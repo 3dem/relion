@@ -125,7 +125,7 @@ int main(int argc, char *argv[])
             int t = omp_get_thread_num();
 
             CTF ctf0;
-            ctf0.readLegacy(mdts[g], mdts[g], p);
+            ctf0.read(mdts[g], mdts[g], p);
             ctf0.Cs = 0.0;
             ctf0.initialise();
 

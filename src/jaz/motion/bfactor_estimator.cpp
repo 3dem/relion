@@ -128,7 +128,7 @@ void BFactorEstimator::process(const std::vector<MetaDataTable>& mdts)
 				subset -= 1;
 				
 				CTF ctf;
-				ctf.readLegacy(mdts[g], mdts[g], p);
+				ctf.read(mdts[g], mdts[g], p);
 				ctf.getFftwImage(ctfImg(), s, s, angpix, false, false, false, true);
 				
 				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(ctfImgSq())

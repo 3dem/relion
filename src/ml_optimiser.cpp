@@ -2172,7 +2172,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 				if (do_ctf_correction && mymodel.data_dim != 3)
 				{
 					CTF ctf;
-					ctf.readLegacy(MDimg, MDimg);
+					ctf.read(MDimg, MDimg);
 					ctf.getFftwImage(Fctf, mymodel.ori_size, mymodel.ori_size, mymodel.pixel_size,
 						ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);
 					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fimg)

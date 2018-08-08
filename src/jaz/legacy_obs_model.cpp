@@ -58,7 +58,7 @@ void LegacyObservationModel::predictObservation(
     if (applyCtf)
     {
         CTF ctf;
-        ctf.readLegacy(mdt, mdt, particle);        
+        ctf.read(mdt, mdt, particle);        
 
         FilterHelper::modulate(dest, ctf, angpix);
     }
@@ -146,7 +146,7 @@ void LegacyObservationModel::insertObservation(const Image<Complex>& img, BackPr
     if (applyCtf)
     {
         CTF ctf;
-        ctf.readLegacy(mdt, mdt, particle);
+        ctf.read(mdt, mdt, particle);
 
         ctf.getFftwImage(Fctf, s, s, angpix);
 
