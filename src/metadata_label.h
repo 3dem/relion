@@ -115,6 +115,8 @@ enum EMDLabel
     EMDL_IMAGE_BEAMTILT_X,
     EMDL_IMAGE_BEAMTILT_Y,
 	EMDL_IMAGE_OPTICS_GROUP,
+	EMDL_IMAGE_ODD_ZERNIKE_COEFFS,
+	EMDL_IMAGE_EVEN_ZERNIKE_COEFFS,
     EMDL_IMAGE_COORD_X,
     EMDL_IMAGE_COORD_Y,
     EMDL_IMAGE_COORD_Z,
@@ -430,7 +432,7 @@ enum EMDLabel
 
 enum EMDLabelType
 {
-    EMDL_INT, EMDL_BOOL, EMDL_DOUBLE, EMDL_FLOAT, EMDL_STRING
+    EMDL_INT, EMDL_BOOL, EMDL_DOUBLE, EMDL_FLOAT, EMDL_STRING, EMDL_DOUBLE_VECTOR
 };
 
 class EMDL
@@ -459,6 +461,10 @@ static bool isBool(const EMDLabel &label);
 static bool isString(const EMDLabel &label);
 static bool isDouble(const EMDLabel &label);
 static bool isNumber(const EMDLabel &label);
+static bool isDoubleVector(const EMDLabel &label);
+static bool isVector(const EMDLabel &label);
+
+
 static bool isValidLabel(const EMDLabel &label);
 static bool isValidLabel(const std::string &labelName);
 
@@ -555,6 +561,8 @@ private:
         EMDL::addLabel(EMDL_IMAGE_BEAMTILT_X, EMDL_DOUBLE, "rlnBeamTiltX", "Beam tilt in the X-direction (in mrad)");
         EMDL::addLabel(EMDL_IMAGE_BEAMTILT_Y, EMDL_DOUBLE, "rlnBeamTiltY", "Beam tilt in the Y-direction (in mrad)");
 		EMDL::addLabel(EMDL_IMAGE_OPTICS_GROUP, EMDL_INT, "rlnOpticsGroup", "Group of particles with identical optical properties");
+		EMDL::addLabel(EMDL_IMAGE_ODD_ZERNIKE_COEFFS, EMDL_DOUBLE_VECTOR, "rlnOddZernike", "Coefficients for the antisymmetrical Zernike polynomials");
+		EMDL::addLabel(EMDL_IMAGE_EVEN_ZERNIKE_COEFFS, EMDL_DOUBLE_VECTOR, "rlnEvenZernike", "Coefficients for the symmetrical Zernike polynomials");
         EMDL::addLabel(EMDL_IMAGE_COORD_X, EMDL_DOUBLE, "rlnCoordinateX", "X-Position of an image in a micrograph (in pixels)");
         EMDL::addLabel(EMDL_IMAGE_COORD_Y, EMDL_DOUBLE, "rlnCoordinateY", "Y-Position of an image in a micrograph (in pixels)");
         EMDL::addLabel(EMDL_IMAGE_COORD_Z, EMDL_DOUBLE, "rlnCoordinateZ", "Z-Position of an image in a 3D micrograph, i.e. tomogram (in pixels)");

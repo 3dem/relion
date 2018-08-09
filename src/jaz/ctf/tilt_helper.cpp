@@ -4,6 +4,8 @@
 #include <src/jaz/gravis/t4Matrix.h>
 #include <src/jaz/optimization/nelder_mead.h>
 
+#include <src/jaz/math/Zernike.h>
+
 using namespace gravis;
 
 void TiltHelper::updateTiltShift(
@@ -214,7 +216,116 @@ void TiltHelper::optimizeTilt(
 
         *fit = Image<RFLOAT>(w,h);
         drawPhaseShift(opt[0], opt[1], opt[2], opt[3], w, h, as, d2Matrix(), fit);
-    }
+	}
+}
+
+std::vector<double> TiltHelper::fitOddZernike(
+	const Image<Complex>& xy, 
+	const Image<RFLOAT>& weight, 
+	double angpix, 
+	int n_max,
+	Image<RFLOAT>* fit)
+{
+	const int w = xy.data.xdim;
+	const int h = xy.data.ydim;
+	const int cc = Zernike::numberOfOddCoeffs(n_max);
+	
+	const double as = (double)h * angpix;
+	
+	std::vector<Image<RFLOAT>> basis(cc);
+	
+	for (int c = 0; c < cc; c++)
+	{
+		basis[c] = Image<RFLOAT>(w,h);
+		
+		int m, n;
+		
+		Zernike::oddIndexToMN(c, m, n);
+		
+		for (int y = 0; y < h; y++)
+		for (int x = 0; x < w; x++)
+		{
+			const double xx = x/as;
+			const double yy = y < w? y/as : (y-h)/as;
+	
+			basis[c](y,x) = Zernike::Z_cart(m, n, xx, yy);
+		}
+	}
+	
+	std::vector<double> out = fitBasisLin(xy, weight, basis);
+	
+	if (fit != 0)
+	{
+		*fit = Image<RFLOAT>(w,h);
+		
+		for (int y = 0; y < h; y++)
+		for (int x = 0; x < w; x++)
+		{
+			for (int c = 0; c < cc; c++)
+			{
+				(*fit)(y,x) += out[c] * basis[c](y,x);
+			}
+		}
+	}
+	
+	return out;
+}
+
+std::vector<double> TiltHelper::fitBasisLin(
+	const Image<Complex>& xy, 
+	const Image<RFLOAT>& weight, 
+	const std::vector<Image<RFLOAT>>& basis)
+{
+	const int cc = basis.size();
+	const int w = xy.data.xdim;
+	const int h = xy.data.ydim;
+	
+	Matrix2D<RFLOAT> A(cc,cc);
+	Matrix1D<RFLOAT> b(cc);
+	
+	Image<RFLOAT> phase(w,h);
+	
+	for (int y = 0; y < h; y++)
+	for (int x = 0; x < w; x++)
+	{
+		phase(y,x) = xy(y,x).arg();
+	}
+	
+	for (int c1 = 0; c1 < cc; c1++)
+	{
+		for (int y = 0; y < h; y++)
+		for (int x = 0; x < w; x++)
+		{
+			b(c1) += weight(y,x) * basis[c1](y,x) * phase(y,x);
+		}
+		
+		for (int c2 = c1; c2 < cc; c2++)
+		{
+			for (int y = 0; y < h; y++)
+			for (int x = 0; x < w; x++)
+			{
+				A(c1,c2) += weight(y,x) * basis[c1](y,x) * basis[c2](y,x);
+			}
+		}
+		
+		for (int c2 = 0; c2 < c1; c2++)
+		{
+			A(c1,c2) = A(c2,c1);
+		}
+	}
+	
+	const double tol = 1e-20;
+	Matrix1D<RFLOAT> x(cc);
+	solve(A, b, x, tol);
+	
+	std::vector<double> out(cc);
+	
+	for (int c = 0; c < cc; c++)
+	{
+		out[c] = x(c);
+	}
+	
+	return out;
 }
 
 void TiltHelper::optimizeAnisoTilt(

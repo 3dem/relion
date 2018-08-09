@@ -67,6 +67,17 @@ class TiltHelper
                 double* shift_x, double* shift_y,
                 double* tilt_x, double* tilt_y,
                 Image<RFLOAT>* fit);
+		
+		static std::vector<double> fitOddZernike(
+				const Image<Complex>& xy,
+                const Image<RFLOAT>& weight,
+				double angpix, int n_max, 
+				Image<RFLOAT>* fit = 0);
+		
+		static std::vector<double> fitBasisLin(
+				const Image<Complex>& xy,
+                const Image<RFLOAT>& weight,
+				const std::vector<Image<RFLOAT>>& basis);
 
         static void optimizeAnisoTilt(
                 const Image<Complex>& xy,

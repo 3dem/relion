@@ -29,7 +29,12 @@ TiltEstimator::TiltEstimator()
 void TiltEstimator::read(IOParser &parser, int argc, char *argv[])
 {
 	kmin = textToFloat(parser.getOption("--kmin_tilt", 
-						"Inner freq. threshold for beamtilt estimation [Angst]", "20.0"));
+		"Inner freq. threshold for beamtilt estimation [Angst]", "20.0"));
+	
+	std::string aberrToken = "--odd_aberr_max_n";
+	
+	aberr_n_max  = textToInteger(parser.getOption(aberrToken, 
+		"Maximum degree of Zernike polynomials used to fit odd (i.e. antisymmetrical) aberrations", "0"));
 }
 
 void TiltEstimator::init(
@@ -227,6 +232,7 @@ void TiltEstimator::parametricFit(
 		
 		double shift_x, shift_y, tilt_x, tilt_y;
 		
+		if (aberr_n_max < 3)
 		{
 			TiltHelper::fitTiltShift(
 				phase, wgh, Cs, lambda, angpix,
@@ -249,6 +255,30 @@ void TiltEstimator::parametricFit(
 			FftwHelper::decenterUnflip2D(fit.data, fitFull.data);
 			
 			ImageLog::write(fitFull, outPath+"beamtilt_delta-phase_iter-fit_optics-class_"+cns);
+		}
+		else
+		{
+			Image<RFLOAT> one(sh,s);
+			one.data.initConstant(1);
+			
+			std::vector<double> Zernike_coeffs = TiltHelper::fitOddZernike(
+						xyNrm, wgh, angpix, aberr_n_max, &fit);
+						
+			FftwHelper::decenterUnflip2D(fit.data, fitFull.data);
+			
+			std::stringstream sts;
+			sts << aberr_n_max;
+			
+			ImageLog::write(fitFull, outPath + "beamtilt_delta-phase_lin-fit_optics-class_"
+							+cns+"_N-"+sts.str());
+			
+			Image<RFLOAT> residual;
+			residual.data = phaseFull.data - fitFull.data;
+			
+			ImageLog::write(residual, outPath + "beamtilt_delta-phase_lin-fit_optics-class_"
+							+cns+"_N-"+sts.str()+"_residual");
+			
+			optOut.setValue(EMDL_IMAGE_ODD_ZERNIKE_COEFFS, Zernike_coeffs, og);
 		}
 		
 		std::ofstream os2(outPath+"beamtilt_iter-fit_optics-class_"+cns+".txt");

@@ -521,6 +521,11 @@ class star_handler_parameters
 			{
 				REPORT_ERROR("ERROR: cannot operate on a boolean!");
 			}
+			else if (EMDL::isBool(label1))
+			{
+				// @TODO:
+				REPORT_ERROR("ERROR: cannot operate on vectors (yet)!");
+			}
 
 		}
 
@@ -646,6 +651,14 @@ class star_handler_parameters
 				else MD.getValue(source_label, aux);
 
 				MD.setValue(label, add_col_value);
+			}
+			else if (EMDL::isString(label))
+			{
+				std::string auxStr;
+				if (set_value) auxStr = add_col_value;
+				else MD.getValueToString(source_label, auxStr);
+
+				MD.setValueFromString(label, add_col_value);
 			}
 		}
 

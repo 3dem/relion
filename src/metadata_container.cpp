@@ -20,18 +20,19 @@
 #include "src/metadata_container.h"
 
 MetaDataContainer::MetaDataContainer()
-    :   doubles(0), ints(0), bools(0), strings(0)
+    :   doubles(0), ints(0), bools(0), strings(0), doubleVectors(0)
 {}
 
 
 MetaDataContainer::MetaDataContainer(
         MetaDataTable *table, long doubleCount, long intCount,
-        long boolCount, long stringCount)
+        long boolCount, long stringCount, long doubleVectorCount)
 : table(table),
   doubles(doubleCount, 0),
   ints(intCount, 0),
   bools(boolCount, false),
-  strings(stringCount, "")
+  strings(stringCount, ""),
+  doubleVectors(doubleVectorCount)
 {}
 
 MetaDataContainer::MetaDataContainer(
@@ -40,7 +41,8 @@ MetaDataContainer::MetaDataContainer(
   doubles(mdc->doubles),
   ints(mdc->ints),
   bools(mdc->bools),
-  strings(mdc->strings)
+  strings(mdc->strings),
+  doubleVectors(mdc->doubleVectors)
 {}
 
 void MetaDataContainer::getValue(long offset, double& dest) const
@@ -66,6 +68,11 @@ void MetaDataContainer::getValue(long offset, long& dest) const
 void MetaDataContainer::getValue(long offset, bool& dest) const
 {
     dest = bools[offset];
+}
+	  
+void MetaDataContainer::getValue(long offset, std::vector<double>& dest) const
+{
+    dest = doubleVectors[offset];
 }
 
 void MetaDataContainer::getValue(long offset, std::string& dest) const
@@ -103,3 +110,9 @@ void MetaDataContainer::setValue(long offset, const std::string& src)
 {
     strings[offset] = src;
 }
+
+void MetaDataContainer::setValue(long offset, const std::vector<double>& src)
+{
+    doubleVectors[offset] = src;
+}
+	  

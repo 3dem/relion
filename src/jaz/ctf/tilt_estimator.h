@@ -43,7 +43,7 @@ class TiltEstimator
 		double kmin;
 		
 		// parameters obtained through init()
-		int verb, s, sh, nr_omp_threads;
+		int verb, s, sh, nr_omp_threads, aberr_n_max;
 		bool debug, diag, ready;
 		std::string outPath;
 		double angpix;

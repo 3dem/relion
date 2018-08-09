@@ -53,6 +53,7 @@ MetaDataTable::MetaDataTable()
 	intLabels(0),
 	boolLabels(0),
 	stringLabels(0),
+	doubleVectorLabels(0),
 	isList(false),
 	name(""),
 	comment(""),
@@ -70,6 +71,7 @@ MetaDataTable::MetaDataTable(const MetaDataTable &MD)
 	intLabels(MD.intLabels),
 	boolLabels(MD.boolLabels),
 	stringLabels(MD.stringLabels),
+	doubleVectorLabels(MD.doubleVectorLabels),
 	isList(MD.isList),
 	name(MD.name),
 	comment(MD.comment),
@@ -205,10 +207,14 @@ int MetaDataTable::getCurrentVersion()
 
 bool MetaDataTable::getValueToString(EMDLabel label, std::string &value, long objectID) const
 {
-
-	// SHWS 18jul2018: this function previously had a stringstream, but it greatly slowed down writing of large STAR files in
-	// some strange circumstances (with large data.star and model.star files in refinement)
+	// SHWS 18jul2018: this function previously had a stringstream, but it greatly slowed down 
+	// writing of large STAR files in some strange circumstances (with large data.star 
+	// and model.star files in refinement)
 	// Therefore replaced the strstream with faster snprintf
+	//
+	// JZ 9aug2018: still using a stringstream for vector<double> fields
+	// => Avoid vector-valued columns in particle star-files.
+	
 	char buffer[14];
 
 	if (EMDL::isString(label))
@@ -217,7 +223,6 @@ bool MetaDataTable::getValueToString(EMDLabel label, std::string &value, long ob
 	}
 	else
 	{
-
 		if (EMDL::isDouble(label))
 		{
 			double v;
@@ -259,11 +264,32 @@ bool MetaDataTable::getValueToString(EMDLabel label, std::string &value, long ob
 			getValue(label, v, objectID);
 			snprintf(buffer,13, "%12d", (int)v);
 		}
+		else if (EMDL::isDoubleVector(label))
+		{		
+			std::vector<double> v;
+			getValue(label, v, objectID);
+						
+			std::stringstream sts;
+			
+			sts << std::setprecision(12);
+			sts << '[';
+			
+			for (int i = 0; i < v.size()-1; i++)
+			{
+				sts << v[i] << ',';
+			}
+			
+			sts << v[v.size()-1] << ']';
+			
+			value = sts.str();
+			return true;
+		}
 
 		std::string tt(buffer);
 		value = tt;
 	}
-
+	
+	return true;
 }
 
 size_t MetaDataTable::size()
@@ -271,8 +297,8 @@ size_t MetaDataTable::size()
 	return objects.size();
 }
 
-bool MetaDataTable::setValueFromString(EMDLabel label, const std::string &value,
-						long int objectID)
+bool MetaDataTable::setValueFromString(
+		EMDLabel label, const std::string &value, long int objectID)
 {
 	if (EMDL::isString(label))
 	{
@@ -298,6 +324,30 @@ bool MetaDataTable::setValueFromString(EMDLabel label, const std::string &value,
 		{
 			bool v;
 			i >> v;
+			return setValue(label, v, objectID);
+		}
+		else if (EMDL::isDoubleVector(label))
+		{
+			std::vector<double> v;
+			v.reserve(32);
+			
+			char* temp = new char[value.size()+1];
+			strcpy(temp, value.c_str());
+				
+			char* token;
+			char* rest = temp;
+					
+			while ((token = strtok_r(rest, "[,]", &rest)) != 0)
+			{
+				double d;
+				std::stringstream sts(token);
+				sts >> d;
+				
+				v.push_back(d);
+			}
+			
+			delete[] temp;
+			
 			return setValue(label, v, objectID);
 		}
 	}
@@ -382,15 +432,19 @@ bool MetaDataTable::setValueFromString(EMDLabel label, const std::string &value,
 
 void MetaDataTable::sort(EMDLabel name, bool do_reverse, bool only_set_index, bool do_random)
 {
-
 	if (do_random)
+	{
 		srand (time(NULL));			  /* initialize random seed: */
-	else if (!(EMDL::isInt(name) || EMDL::isDouble(name)) )
+	}
+	else if (!EMDL::isNumber(name))
+	{
 		REPORT_ERROR("MetadataTable::sort%% ERROR: can only sorted numbers");
+	}
 
 	std::vector<std::pair<double,long int> > vp;
 	vp.reserve(objects.size());
 	long int i = 0;
+	
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(*this)
 	{
 		double dval;
@@ -564,6 +618,17 @@ void MetaDataTable::addLabel(EMDLabel label)
 
 			stringLabels++;
 		}
+		else if (EMDL::isDoubleVector(label))
+		{
+			id = doubleVectorLabels;
+
+			for (long i = 0; i < objects.size(); i++)
+			{
+				objects[i]->doubleVectors.push_back(std::vector<double>());
+			}
+
+			doubleVectorLabels++;
+		}
 
 		label2offset[label] = id;
 	}
@@ -602,7 +667,7 @@ void MetaDataTable::append(const MetaDataTable& mdt)
 	for (long i = 0; i < mdt.objects.size(); i++)
 	{
 		objects.push_back(new MetaDataContainer(
-			this, doubleLabels, intLabels, boolLabels, stringLabels));
+			this, doubleLabels, intLabels, boolLabels, stringLabels, doubleVectorLabels));
 
 		setObjectUnsafe(mdt.getObject(i), objects.size() - 1);
 	}
@@ -674,13 +739,17 @@ void MetaDataTable::setObjectUnsafe(MetaDataContainer* data, long objectID)
 		{
 			obj->strings[myOff] = data->strings[srcOff];
 		}
+		else if (EMDL::isDoubleVector(label))
+		{
+			obj->doubleVectors[myOff] = data->doubleVectors[srcOff];
+		}
 	}
 }
 
 void MetaDataTable::addObject()
 {
 	objects.push_back(new MetaDataContainer(
-		this, doubleLabels, intLabels, boolLabels, stringLabels));
+		this, doubleLabels, intLabels, boolLabels, stringLabels, doubleVectorLabels));
 
 	current_objectID = objects.size()-1;
 }
@@ -688,7 +757,7 @@ void MetaDataTable::addObject()
 void MetaDataTable::addObject(MetaDataContainer* data)
 {
 	objects.push_back(new MetaDataContainer(
-		this, doubleLabels, intLabels, boolLabels, stringLabels));
+		this, doubleLabels, intLabels, boolLabels, stringLabels, doubleVectorLabels));
 
 	setObject(data, objects.size()-1);
 	current_objectID = objects.size()-1;
@@ -697,7 +766,7 @@ void MetaDataTable::addObject(MetaDataContainer* data)
 void MetaDataTable::addValuesOfDefinedLabels(MetaDataContainer* data)
 {
 	objects.push_back(new MetaDataContainer(
-		this, doubleLabels, intLabels, boolLabels, stringLabels));
+		this, doubleLabels, intLabels, boolLabels, stringLabels, doubleVectorLabels));
 
 	setValuesOfDefinedLabels(data, objects.size()-1);
 	current_objectID = objects.size()-1;
@@ -1140,7 +1209,9 @@ void MetaDataTable::columnHistogram(EMDLabel label, std::vector<RFLOAT> &histX, 
 			val = aux ? 1 : 0;
 		}
 		else
+		{
 			REPORT_ERROR("Cannot use --stat_column for this type of column");
+		}
 
 		values.push_back(val);
 		sum += val;

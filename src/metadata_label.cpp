@@ -63,25 +63,41 @@ void EMDL::addAltLabel(EMDLabel label, std::string name)
 
 void EMDL::printDefinitions(std::ostream& out)
 {
-	out << "+++ RELION MetaDataLabel (EMDL) definitions: +++" <<std::endl;
-	 std::map<std::string, std::string>::const_iterator strIt;
+	out << "+++ RELION MetaDataLabel (EMDL) definitions: +++" << std::endl;
+	std::map<std::string, std::string>::const_iterator strIt;
+	
 	for (strIt = definitions.begin(); strIt != definitions.end(); strIt++)
 	{
 		out << std::setw(30) <<strIt->first;
+		
 		if (EMDL::isInt(names[strIt->first]))
+		{
 			out << " (int)    ";
+		}
 		else if (EMDL::isBool(names[strIt->first]))
+		{
 			out << " (bool)   ";
+		}
 		else if (EMDL::isDouble(names[strIt->first]))
+		{
 			out << " (double) ";
+		}
 		else if (EMDL::isString(names[strIt->first]))
+		{
 			out << " (string) ";
+		}
+		else if (EMDL::isDoubleVector(names[strIt->first]))
+		{
+			out << " (vector<double>) ";
+		}
 		else
+		{
 			REPORT_ERROR("EMDL::printDefinitions: unrecognised type");
+		}
+		
 		out << ": " << strIt->second <<std::endl;
 	}
 }
-
 
 
 EMDLabel  EMDL::str2Label(const std::string &labelName)
@@ -117,6 +133,14 @@ bool EMDL::isDouble(const EMDLabel &label)
 bool EMDL::isNumber(const EMDLabel &label)
 {
     return (data[label].type == EMDL_DOUBLE || data[label].type == EMDL_INT);
+}
+bool EMDL::isDoubleVector(const EMDLabel &label)
+{
+    return (data[label].type == EMDL_DOUBLE_VECTOR);
+}
+bool EMDL::isVector(const EMDLabel &label)
+{
+    return (data[label].type == EMDL_DOUBLE_VECTOR);
 }
 
 bool EMDL::isValidLabel(const EMDLabel &label)

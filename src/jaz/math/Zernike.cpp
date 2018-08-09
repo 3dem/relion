@@ -18,6 +18,18 @@ double Zernike::Z(int m, int n, double rho, double phi)
 	}
 }
 
+double Zernike::Z_cart(int m, int n, double x, double y)
+{
+	if (x == 0 && y == 0)
+	{
+		return Z(m, n, sqrt(x*x + y*y), 0.0);
+	}
+	else
+	{
+		return Z(m, n, sqrt(x*x + y*y), atan2(y,x));
+	}
+}
+
 double Zernike::R(int m, int n, double rho)
 {
 	if (m > n)
@@ -40,6 +52,21 @@ double Zernike::R(int m, int n, double rho)
 	}
 	
 	return out;
+}
+
+void Zernike::oddIndexToMN(int i, int& m, int& n)
+{
+	const int k = (int)((sqrt(1 + 4 * i) - 1.0) / 2.0);
+	const int i0 = k*k + k;
+			
+	n = 2 * k + 1;
+	m = 2 * (i - i0) - n;
+}
+
+int Zernike::numberOfOddCoeffs(int n_max)
+{
+	const int l = (n_max - 1) / 2 + 1;
+	return l * l + l;
 }
 
 double Zernike::factorial(int k)

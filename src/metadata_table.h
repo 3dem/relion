@@ -92,7 +92,7 @@ class MetaDataTable
 	long current_objectID;
 
 	// Number of labels of each type
-	long doubleLabels, intLabels, boolLabels, stringLabels;
+	long doubleLabels, intLabels, boolLabels, stringLabels, doubleVectorLabels;
 
 	// Is this a 2D table or a 1D list?
 	bool isList;
