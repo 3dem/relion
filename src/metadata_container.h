@@ -41,7 +41,7 @@ class MetaDataContainer
         std::vector<long> ints;
         std::vector<bool> bools;
 		std::vector<std::string> strings;
-		std::vector<std::vector<double>> doubleVectors;
+		std::vector<std::vector<double> > doubleVectors;
 
         MetaDataContainer();
         MetaDataContainer(MetaDataTable* table, long doubleCount, long intCount,
