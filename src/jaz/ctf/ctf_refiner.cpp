@@ -31,6 +31,7 @@
 #include <src/jaz/stack_helper.h>
 #include <src/jaz/image_op.h>
 #include <src/jaz/parallel_ft.h>
+#include <src/jaz/legacy_obs_model.h>
 
 #include <src/ctf.h>
 #include <src/image.h>
@@ -112,38 +113,15 @@ void CtfRefiner::init()
 	{
 		std::cout << " + Reading " << starFn << "..." << std::endl;
 	}
-
-	mdt0.read(starFn);
 	
-	if (mdt0.getVersion() < 31000)
-	{
-		REPORT_ERROR_STR(starFn << " is from a pre-3.1 version of Relion. "
-			<< "Please use relion_convert_star to generate an up-to-date file.");
-	}
-
-	if (!ObservationModel::containsAllNeededColumns(mdt0))
-	{
-		REPORT_ERROR_STR(starFn << " does not contain all of the required columns ("
-			<< "rlnOriginX, rlnOriginY, rlnAngleRot, rlnAngleTilt, rlnAnglePsi and rlnRandomSubset)");
-	}
-	
-	opticsMdt.read(opticsFn);
-
 	// Make sure output directory ends in a '/'
 	if (outPath[outPath.length()-1] != '/')
 	{
-		outPath+="/";
+		outPath += "/";
 	}
-		
-	obsModel = ObservationModel(opticsMdt);	
 
-	// read pixel sizes (and make sure they are all the same)	
-	
-	if (!obsModel.allPixelSizesIdentical())
-	{
-		REPORT_ERROR("ERROR: different pixel sizes detected. Please split your data set by pixel size.");
-	}
-	
+	ObservationModel::loadSafely(starFn, opticsFn, obsModel, mdt0, opticsMdt);
+		
 	angpix = obsModel.getPixelSize(0);
 	
 	if (verb > 0)
@@ -152,38 +130,6 @@ void CtfRefiner::init()
 				  << "pixel size in " << opticsFn << ": " << angpix << " A" << std::endl;
 	}
 	
-	// make sure all optics groups are defined
-	
-	std::vector<int> undefinedOptGroups = obsModel.findUndefinedOptGroups(mdt0);
-	
-	if (undefinedOptGroups.size() > 0)
-	{
-		std::stringstream sts;
-		
-		for (int i = 0; i < undefinedOptGroups.size(); i++)
-		{
-			sts << undefinedOptGroups[i];
-			
-			if (i < undefinedOptGroups.size()-1)
-			{
-				sts << ", ";
-			}
-		}
-		
-		REPORT_ERROR("ERROR: The following optics groups were not defined in "+
-					 opticsFn+": "+sts.str());
-	}
-	
-	// make sure the optics groups appear in the right order (and rename them if necessary)
-	
-	if (!obsModel.opticsGroupsSorted())
-	{
-		std::cerr << "   - Warning: the optics groups in " << opticsFn 
-				  << " are not in the right order - renaming them now" << std::endl;
-		
-		obsModel.sortOpticsGroups(mdt0);
-	}
-		
 	// after all the necessary changes to mdt0 have been applied, split it by micrograph
 	
 	allMdts = StackHelper::splitByMicrographName(&mdt0);
@@ -224,11 +170,11 @@ void CtfRefiner::init()
 	}
 
 	reference.load(verb, debug);
-
+	
 	// Get dimensions
 	s = reference.s;
 	sh = s/2 + 1;
-
+	
 	tiltEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
 	defocusEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
 	magnificationEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);

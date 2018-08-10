@@ -34,7 +34,7 @@ class ReferenceMap
 		
 		std::vector<Image<Complex>> predictAll(
 				const MetaDataTable& mdt,
-                const ObservationModel& obs,
+                ObservationModel& obs,
                 HalfSet hs, int threads,
                 bool applyCtf = true,
                 bool applyTilt = true, 
@@ -42,7 +42,7 @@ class ReferenceMap
 
         Image<Complex> predict(
                 const MetaDataTable& mdt, int p,
-                const ObservationModel& obs,
+                ObservationModel& obs,
                 HalfSet hs,
                 bool applyCtf = true,
                 bool applyTilt = true, 

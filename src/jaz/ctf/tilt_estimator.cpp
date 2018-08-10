@@ -230,7 +230,7 @@ void TiltEstimator::parametricFit(
 			
 		ImageLog::write(phaseFull, outPath + "beamtilt_delta-phase_per-pixel_optics-class_"+cns);
 		
-		double shift_x, shift_y, tilt_x, tilt_y;
+		double shift_x(0), shift_y(0), tilt_x(0), tilt_y(0);
 		
 		if (aberr_n_max < 3)
 		{
@@ -241,12 +241,7 @@ void TiltEstimator::parametricFit(
 			FftwHelper::decenterUnflip2D(fit.data, fitFull.data);
 			
 			ImageLog::write(fitFull, outPath + "beamtilt_delta-phase_lin-fit_optics-class_"+cns);
-			
-			std::ofstream os(outPath+"beamtilt_lin-fit_optics-class_"+cns+".txt");
-			os << "beamtilt_x = " << tilt_x << "\n";
-			os << "beamtilt_y = " << tilt_y << "\n";
-			os.close();
-			
+						
 			TiltHelper::optimizeTilt(
 					xyNrm, wgh, Cs, lambda, angpix, false,
 					shift_x, shift_y, tilt_x, tilt_y,
@@ -255,6 +250,9 @@ void TiltEstimator::parametricFit(
 			FftwHelper::decenterUnflip2D(fit.data, fitFull.data);
 			
 			ImageLog::write(fitFull, outPath+"beamtilt_delta-phase_iter-fit_optics-class_"+cns);
+			
+			optOut.setValue(EMDL_IMAGE_BEAMTILT_X, tilt_x, og);
+			optOut.setValue(EMDL_IMAGE_BEAMTILT_Y, tilt_y, og);
 		}
 		else
 		{
@@ -272,30 +270,38 @@ void TiltEstimator::parametricFit(
 			ImageLog::write(fitFull, outPath + "beamtilt_delta-phase_lin-fit_optics-class_"
 							+cns+"_N-"+sts.str());
 			
-			Image<RFLOAT> residual;
-			residual.data = phaseFull.data - fitFull.data;
+			if (debug)
+			{
+				Image<RFLOAT> residual;
+				residual.data = phaseFull.data - fitFull.data;
+				
+				ImageLog::write(residual, outPath + "beamtilt_delta-phase_lin-fit_optics-class_"
+								+cns+"_N-"+sts.str()+"_residual");
+			}
 			
-			ImageLog::write(residual, outPath + "beamtilt_delta-phase_lin-fit_optics-class_"
-							+cns+"_N-"+sts.str()+"_residual");
+			Image<RFLOAT> plot0 = TiltHelper::plotOddZernike(Zernike_coeffs, s, angpix);
+			ImageLog::write(plot0, outPath + "debug_Z0");
 			
+			TiltHelper::extractTilt(Zernike_coeffs, tilt_x, tilt_y, Cs, lambda);
+			
+			/*
+			{
+				Image<RFLOAT> plot1 = TiltHelper::plotOddZernike(Zernike_coeffs, s, angpix);
+				ImageLog::write(plot1, outPath + "debug_Z1");
+				
+				Image<RFLOAT> plot2 = TiltHelper::plotTilt(tilt_x, tilt_y, s, angpix, Cs, lambda);
+				ImageLog::write(plot2, outPath + "debug_t");
+				
+				Image<RFLOAT> plot3;
+				plot3() = plot1() - plot2();
+				ImageLog::write(plot3, outPath + "debug_t+Z1");
+			}
+			*/
+			
+			optOut.setValue(EMDL_IMAGE_BEAMTILT_X, tilt_x, og);
+			optOut.setValue(EMDL_IMAGE_BEAMTILT_Y, tilt_y, og);
 			optOut.setValue(EMDL_IMAGE_ODD_ZERNIKE_COEFFS, Zernike_coeffs, og);
 		}
-		
-		std::ofstream os2(outPath+"beamtilt_iter-fit_optics-class_"+cns+".txt");
-		os2 << "beamtilt_x = " << tilt_x << "\n";
-		os2 << "beamtilt_y = " << tilt_y << "\n";
-		os2.close();
-		
-		tiltPerClass[og] = d2Vector(tilt_x, tilt_y);
-	}
-	
-	// Now write the beamtilt into optOut	
-	for (long og = 0; og < ogc; og++)
-	{
-		const d2Vector t = tiltPerClass[og];		
-		
-		optOut.setValue(EMDL_IMAGE_BEAMTILT_X, t.x, og);
-		optOut.setValue(EMDL_IMAGE_BEAMTILT_Y, t.y, og);
 	}
 }
 

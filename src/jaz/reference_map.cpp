@@ -145,7 +145,7 @@ Image<RFLOAT> ReferenceMap::getHollowWeight(double kmin_px)
 
 std::vector<Image<Complex>> ReferenceMap::predictAll(
 		const MetaDataTable& mdt,
-		const ObservationModel& obs,
+		ObservationModel& obs,
 		HalfSet hs, int threads,
 		bool applyCtf, bool applyTilt, bool applyShift)
 {
@@ -165,7 +165,7 @@ std::vector<Image<Complex>> ReferenceMap::predictAll(
 
 Image<Complex> ReferenceMap::predict(
 		const MetaDataTable& mdt, int p,
-		const ObservationModel& obs,
+		ObservationModel& obs,
 		HalfSet hs,
 		bool applyCtf, bool applyTilt, bool applyShift)
 {

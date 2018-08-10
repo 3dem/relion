@@ -68,11 +68,33 @@ class TiltHelper
                 double* tilt_x, double* tilt_y,
                 Image<RFLOAT>* fit);
 		
+		
 		static std::vector<double> fitOddZernike(
 				const Image<Complex>& xy,
                 const Image<RFLOAT>& weight,
 				double angpix, int n_max, 
 				Image<RFLOAT>* fit = 0);
+		
+		
+		static Image<RFLOAT> plotOddZernike(
+				const std::vector<double>& coeffs,
+				int s, double angpix);
+		
+		static Image<RFLOAT> plotTilt(
+				double tx, double ty, int s, double angpix, 
+				double Cs, double lambda);
+		
+		
+		static void extractTilt(
+				std::vector<double>& oddZernikeCoeffs,
+				double& tilt_x, double& tilt_y, 
+				double Cs, double lambda);
+		
+		static void insertTilt(
+				std::vector<double>& oddZernikeCoeffs,
+				double tilt_x, double tilt_y, 
+				double Cs, double lambda);
+		
 		
 		static std::vector<double> fitBasisLin(
 				const Image<Complex>& xy,

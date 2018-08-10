@@ -271,6 +271,99 @@ std::vector<double> TiltHelper::fitOddZernike(
 	return out;
 }
 
+Image<RFLOAT> TiltHelper::plotOddZernike(const std::vector<double>& coeffs, int s, double angpix)
+{
+	Image<RFLOAT> out(s,s);
+	
+	const double as = (double)s * angpix;
+	
+	for (int y = 0; y < s; y++)
+	for (int x = 0; x < s; x++)
+	{
+		const double xx = (x - s/2) / as;
+		const double yy = (y - s/2) / as;
+		
+		for (int c = 0; c < coeffs.size(); c++)
+		{
+			int m, n;
+			Zernike::oddIndexToMN(c, m, n);
+			
+			out(y,x) += coeffs[c] * Zernike::Z_cart(m, n, xx, yy);
+		}
+	}
+	
+	return out;
+}
+
+Image<RFLOAT> TiltHelper::plotTilt(
+		double tx, double ty, int s, double angpix, 
+		double Cs, double lambda)
+{
+	Image<RFLOAT> out(s,s);
+		
+	/*double boxsize = angpix * s;
+    double factor = 0.360 * Cs * 10000000 * lambda * lambda / (boxsize * boxsize * boxsize);*/
+	
+	const double scale = Cs * 20000 * lambda * lambda * 3.141592654;
+	const double as = (double)s * angpix;
+			
+	for (int y = 0; y < s; y++)
+	for (int x = 0; x < s; x++)
+	{
+		/*const double xx = (x - s/2);
+		const double yy = (y - s/2);
+		
+		out(y,x) = factor * (yy * yy + xx * xx) * (yy * ty + xx * tx);*/
+		
+		const double xx = (x - s/2) / as;
+		const double yy = (y - s/2) / as;
+		
+		out(y,x) = scale * (xx*xx + yy*yy) * (xx*tx + yy*ty);
+	}
+	
+	return out;
+}
+
+void TiltHelper::extractTilt(
+	std::vector<double>& oddZernikeCoeffs, 
+	double& tilt_x, double& tilt_y, 
+	double Cs, double lambda)
+{
+	const double scale = Cs * 20000 * lambda * lambda * 3.141592654;
+	
+	const double Z3x = oddZernikeCoeffs[4];
+	const double Z3y = oddZernikeCoeffs[3];
+	
+	// p = Z1x x + Z3x (3r² - 2) x
+	//   = (Z1x - 2 Z3x) x + 3 Z3x r² x
+	//   = Z1x' x - tx r² x
+	
+	oddZernikeCoeffs[4] = 0.0;
+	oddZernikeCoeffs[3] = 0.0;
+	
+	oddZernikeCoeffs[1] -= 2.0 * Z3x;
+	oddZernikeCoeffs[0] -= 2.0 * Z3y;
+		
+	tilt_x = -3.0 * Z3x / scale;
+	tilt_y = -3.0 * Z3y / scale;
+}
+
+void TiltHelper::insertTilt(
+	std::vector<double>& oddZernikeCoeffs, 
+	double tilt_x, double tilt_y, 
+	double Cs, double lambda)
+{
+	const double scale = Cs * 20000 * lambda * lambda * 3.141592654;
+	const double Z3x = -scale * tilt_x / 3.0;
+	const double Z3y = -scale * tilt_y / 3.0;
+	
+	oddZernikeCoeffs[1] += 2.0 * Z3x;
+	oddZernikeCoeffs[0] += 2.0 * Z3y;
+	
+	oddZernikeCoeffs[4] = Z3x;
+	oddZernikeCoeffs[3] = Z3y;
+}
+
 std::vector<double> TiltHelper::fitBasisLin(
 	const Image<Complex>& xy, 
 	const Image<RFLOAT>& weight, 

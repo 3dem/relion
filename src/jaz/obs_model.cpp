@@ -2,11 +2,76 @@
 #include "src/jaz/stack_helper.h"
 #include "src/jaz/filter_helper.h"
 #include "src/jaz/Fourier_helper.h"
+#include "src/jaz/ctf/tilt_helper.h"
+#include "src/jaz/math/Zernike.h"
 
 #include <src/backprojector.h>
 
 #include <set>
 
+
+void ObservationModel::loadSafely(
+	std::string particlesFn, std::string opticsFn, 
+	ObservationModel& obsModel, 
+	MetaDataTable& particlesMdt, MetaDataTable& opticsMdt)
+{
+	particlesMdt.read(particlesFn);
+	
+	if (particlesMdt.getVersion() < 31000)
+	{
+		REPORT_ERROR_STR(particlesFn << " is from a pre-3.1 version of Relion. "
+			<< "Please use relion_convert_star to generate an up-to-date file.");
+	}
+
+	if (!containsAllNeededColumns(particlesMdt))
+	{
+		REPORT_ERROR_STR(particlesFn << " does not contain all of the required columns ("
+			<< "rlnOriginX, rlnOriginY, rlnAngleRot, rlnAngleTilt, rlnAnglePsi and rlnRandomSubset)");
+	}
+	
+	opticsMdt.read(opticsFn);
+		
+	obsModel = ObservationModel(opticsMdt);	
+
+	// read pixel sizes (and make sure they are all the same)	
+	
+	if (!obsModel.allPixelSizesIdentical())
+	{
+		REPORT_ERROR("ERROR: different pixel sizes detected. Please split your dataset by pixel size.");
+	}
+	
+	// make sure all optics groups are defined
+	
+	std::vector<int> undefinedOptGroups = obsModel.findUndefinedOptGroups(particlesMdt);
+	
+	if (undefinedOptGroups.size() > 0)
+	{
+		std::stringstream sts;
+		
+		for (int i = 0; i < undefinedOptGroups.size(); i++)
+		{
+			sts << undefinedOptGroups[i];
+			
+			if (i < undefinedOptGroups.size()-1)
+			{
+				sts << ", ";
+			}
+		}
+		
+		REPORT_ERROR("ERROR: The following optics groups were not defined in "+
+					 opticsFn+": "+sts.str());
+	}
+	
+	// make sure the optics groups appear in the right order (and rename them if necessary)
+	
+	if (!obsModel.opticsGroupsSorted())
+	{
+		std::cerr << "   - Warning: the optics groups in " << opticsFn 
+				  << " are not in the right order - renaming them now" << std::endl;
+		
+		obsModel.sortOpticsGroups(particlesMdt);
+	}
+}
 
 ObservationModel::ObservationModel()
 {
@@ -18,6 +83,25 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 	lambda(opticsMdt.numberOfObjects()),
 	Cs(opticsMdt.numberOfObjects())
 {
+	if (   !opticsMdt.containsLabel(EMDL_CTF_MAGNIFICATION)
+	    || !opticsMdt.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE)
+	    || !opticsMdt.containsLabel(EMDL_CTF_VOLTAGE)
+	    || !opticsMdt.containsLabel(EMDL_CTF_CS))
+	{
+		REPORT_ERROR_STR("ERROR: not all necessary variables defined in _optics.star file: "
+			<< "rlnMagnification, rlnDetectorPixelSize, rlnVoltage and rlnSphericalAberration.");
+	}
+	
+	const bool hasTilt = opticsMdt.containsLabel(EMDL_IMAGE_BEAMTILT_X)
+	                  || opticsMdt.containsLabel(EMDL_IMAGE_BEAMTILT_Y);
+	
+	const bool hasOddZernike = opticsMdt.containsLabel(EMDL_IMAGE_ODD_ZERNIKE_COEFFS);
+	
+	oddZernikeCoeffs = std::vector<std::vector<double>>(
+			opticsMdt.numberOfObjects(), std::vector<double>(0));
+	
+	phaseCorr = std::vector<std::map<int,Image<Complex>>>(opticsMdt.numberOfObjects());
+								 
 	for (int i = 0; i < opticsMdt.numberOfObjects(); i++)
 	{
 		RFLOAT mag, dstep;
@@ -31,13 +115,35 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 		lambda[i] = 12.2643247 / sqrt(V * (1.0 + V * 0.978466e-6));
 		
 		opticsMdt.getValue(EMDL_CTF_CS, Cs[i], i);
+		
+		if (hasOddZernike)
+		{
+			opticsMdt.getValue(EMDL_IMAGE_ODD_ZERNIKE_COEFFS, oddZernikeCoeffs[i], i);
+		}
+		
+		if (hasTilt)
+		{
+			double tx(0), ty(0);
+			
+			opticsMdt.getValue(EMDL_IMAGE_BEAMTILT_X, tx, i);
+			opticsMdt.getValue(EMDL_IMAGE_BEAMTILT_Y, ty, i);			
+			
+			if (!hasOddZernike)
+			{
+				oddZernikeCoeffs[i] = std::vector<double>(6, 0.0);
+			}
+			
+			TiltHelper::insertTilt(oddZernikeCoeffs[i], tx, ty, Cs[i], lambda[i]);
+		}
 	}
+	
+	// @TODO: make sure tilt is in opticsMDT, not in particlesMDT!
 }
 
 void ObservationModel::predictObservation(
         Projector& proj, const MetaDataTable& mdt, long int particle,
 		MultidimArray<Complex>& dest,
-        bool applyCtf, bool applyTilt, bool applyShift) const
+        bool applyCtf, bool shiftPhases, bool applyShift)
 {
     const int s = proj.ori_size;
     const int sh = s/2 + 1;
@@ -82,35 +188,32 @@ void ObservationModel::predictObservation(
         FilterHelper::modulate(dest, ctf, angpix[opticsGroup]);
     }
 
-    if (applyTilt)
+    if (shiftPhases && oddZernikeCoeffs.size() > opticsGroup 
+			&& oddZernikeCoeffs[opticsGroup].size() > 0)
     {
-        double tx = 0.0, ty = 0.0;
-
-        mdt.getValue(EMDL_IMAGE_BEAMTILT_X, tx, particle);
-        mdt.getValue(EMDL_IMAGE_BEAMTILT_Y, ty, particle);
-
-        if (tx != 0.0 && ty != 0.0)
-        {
-            selfApplyBeamTilt(dest, -tx, -ty, 
-				lambda[opticsGroup], Cs[opticsGroup], angpix[opticsGroup], s);
-        }
+		const Image<Complex>& corr = getPhaseCorrection(opticsGroup, s);
+		
+		for (int y = 0; y < s;  y++)
+		for (int x = 0; x < sh; x++)
+		{
+			dest(y,x) *= corr(y,x);
+		}
     }
 }
 
-
 Image<Complex> ObservationModel::predictObservation(
         Projector& proj, const MetaDataTable& mdt, long int particle,
-        bool applyCtf, bool applyTilt, bool applyShift) const
+        bool applyCtf, bool shiftPhases, bool applyShift)
 {
     Image<Complex> pred;
 	
-	predictObservation(proj, mdt, particle, pred.data, applyCtf, applyTilt, applyShift);
+	predictObservation(proj, mdt, particle, pred.data, applyCtf, shiftPhases, applyShift);
     return pred;
 }
 
 std::vector<Image<Complex>> ObservationModel::predictObservations(
         Projector &proj, const MetaDataTable &mdt, int threads,
-        bool applyCtf, bool applyTilt, bool applyShift) const
+        bool applyCtf, bool shiftPhases, bool applyShift)
 {
     const int pc = mdt.numberOfObjects();
     std::vector<Image<Complex>> out(pc);
@@ -118,100 +221,13 @@ std::vector<Image<Complex>> ObservationModel::predictObservations(
     #pragma omp parallel for num_threads(threads)
     for (int p = 0; p < pc; p++)
     {
-        out[p] = predictObservation(proj, mdt, p, applyCtf, applyTilt, applyShift);
+        out[p] = predictObservation(proj, mdt, p, applyCtf, shiftPhases, applyShift);
     }
 
     return out;
 }
 
-void ObservationModel::insertObservation(
-		const Image<Complex>& img, BackProjector &bproj,
-        const MetaDataTable& mdt, long int particle,
-        bool applyCtf, bool applyTilt, double shift_x, double shift_y)
-{
-    const int s = img.data.ydim;
-    const int sh = img.data.xdim;
-
-    RFLOAT rot, tilt, psi;
-    Matrix2D<RFLOAT> A3D;
-    double tx = 0.0, ty = 0.0;
-
-    mdt.getValue(EMDL_ORIENT_ROT, rot, particle);
-    mdt.getValue(EMDL_ORIENT_TILT, tilt, particle);
-    mdt.getValue(EMDL_ORIENT_PSI, psi, particle);
-
-    Euler_angles2matrix(rot, tilt, psi, A3D);
-
-    mdt.getValue(EMDL_ORIENT_ORIGIN_X, tx, particle);
-    mdt.getValue(EMDL_ORIENT_ORIGIN_Y, ty, particle);
-
-    tx += shift_x;
-    ty += shift_y;
-
-    MultidimArray<Complex> F2D = img.data;
-
-    shiftImageInFourierTransform(F2D, F2D, s, tx, ty);
-
-    MultidimArray<RFLOAT> Fctf;
-    Fctf.resize(F2D);
-    Fctf.initConstant(1.);
-	
-	int opticsGroup;
-	mdt.getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, particle);
-	opticsGroup--;
-
-    if (applyCtf)
-    {
-        CTF ctf;
-        ctf.readByGroup(mdt, this, particle);
-
-        ctf.getFftwImage(Fctf, s, s, angpix[opticsGroup]);
-
-        FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F2D)
-        {
-            DIRECT_MULTIDIM_ELEM(F2D, n)  *= DIRECT_MULTIDIM_ELEM(Fctf, n);
-            DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
-        }
-    }
-
-    if (applyTilt)
-    {
-        double my_tilt_x = 0.0;
-        double my_tilt_y = 0.0;
-
-        if (mdt.containsLabel(EMDL_IMAGE_BEAMTILT_X))
-        {
-            mdt.getValue(EMDL_IMAGE_BEAMTILT_X, my_tilt_x, particle);
-        }
-
-        if (mdt.containsLabel(EMDL_IMAGE_BEAMTILT_Y))
-        {
-            mdt.getValue(EMDL_IMAGE_BEAMTILT_Y, my_tilt_y, particle);
-        }
-
-        selfApplyBeamTilt(F2D, my_tilt_x, my_tilt_y, 
-			lambda[opticsGroup], Cs[opticsGroup], angpix[opticsGroup], sh);
-    }
-
-    bproj.set2DFourierTransform(F2D, A3D, IS_NOT_INV, &Fctf);
-}
-
-double ObservationModel::angToPix(double a, int s, int opticsGroup)
-{
-	return s * angpix[opticsGroup] / a;
-}
-
-double ObservationModel::pixToAng(double p, int s, int opticsGroup)
-{
-	return s * angpix[opticsGroup] / p;
-}
-
-double ObservationModel::getPixelSize(int opticsGroup)
-{
-	return angpix[opticsGroup];
-}
-
-bool ObservationModel::allPixelSizesIdentical()
+bool ObservationModel::allPixelSizesIdentical() const
 {
 	bool out = true;
 	
@@ -227,12 +243,27 @@ bool ObservationModel::allPixelSizesIdentical()
 	return out;
 }
 
-int ObservationModel::numberOfOpticsGroups()
+double ObservationModel::angToPix(double a, int s, int opticsGroup) const
+{
+	return s * angpix[opticsGroup] / a;
+}
+
+double ObservationModel::pixToAng(double p, int s, int opticsGroup) const
+{
+	return s * angpix[opticsGroup] / p;
+}
+
+double ObservationModel::getPixelSize(int opticsGroup) const
+{
+	return angpix[opticsGroup];
+}
+
+int ObservationModel::numberOfOpticsGroups() const
 {
 	return opticsMdt.numberOfObjects();
 }
 
-bool ObservationModel::opticsGroupsSorted()
+bool ObservationModel::opticsGroupsSorted() const
 {
 	for (int i = 0; i < opticsMdt.numberOfObjects(); i++)
 	{
@@ -248,7 +279,7 @@ bool ObservationModel::opticsGroupsSorted()
 	return true;
 }
 
-std::vector<int> ObservationModel::findUndefinedOptGroups(const MetaDataTable &partMdt)
+std::vector<int> ObservationModel::findUndefinedOptGroups(const MetaDataTable &partMdt) const
 {
 	std::set<int> definedGroups;
 	
@@ -299,7 +330,7 @@ void ObservationModel::sortOpticsGroups(MetaDataTable& partMdt)
 	}
 }
 
-std::vector<int> ObservationModel::getOptGroupsPresent(const MetaDataTable& partMdt)
+std::vector<int> ObservationModel::getOptGroupsPresent(const MetaDataTable& partMdt) const
 {
 	const int gc = opticsMdt.numberOfObjects();
 	const int pc = partMdt.numberOfObjects();
@@ -328,12 +359,51 @@ std::vector<int> ObservationModel::getOptGroupsPresent(const MetaDataTable& part
 	return out;
 }
 
-bool ObservationModel::containsAllNeededColumns(const MetaDataTable& mdt)
+const Image<Complex>& ObservationModel::getPhaseCorrection(int optGroup, int s)
 {
-	return (mdt.containsLabel(EMDL_ORIENT_ORIGIN_X)
-         && mdt.containsLabel(EMDL_ORIENT_ORIGIN_Y)
-         && mdt.containsLabel(EMDL_ORIENT_ROT)
-         && mdt.containsLabel(EMDL_ORIENT_TILT)
-         && mdt.containsLabel(EMDL_ORIENT_PSI)
-         && mdt.containsLabel(EMDL_PARTICLE_RANDOM_SUBSET));
+	if (phaseCorr[optGroup].find(s) == phaseCorr[optGroup].end())
+	{
+		if (phaseCorr[optGroup].size() > 100)
+		{
+			std::cerr << "Warning: " << (phaseCorr[optGroup].size()+1)
+					  << " phase shift images in cache for the same ObservationModel." << std::endl;
+		}
+				
+		const int sh = s/2 + 1;
+		phaseCorr[optGroup][s] = Image<Complex>(sh,s);
+		
+		const double as = angpix[optGroup] * s;
+		
+		for (int y = 0; y < s;  y++)
+		for (int x = 0; x < sh; x++)
+		{
+			double phase = 0.0;
+			
+			for (int i = 0; i < oddZernikeCoeffs[optGroup].size(); i++)
+			{
+				int m, n;
+				Zernike::oddIndexToMN(i, m, n);
+				
+				const double xx = x/as;
+				const double yy = y < sh? y/as : (y-s)/as;
+				
+				phase += oddZernikeCoeffs[optGroup][i] * Zernike::Z_cart(m,n,xx,yy);
+			}
+			
+			phaseCorr[optGroup][s](y,x).real = cos(phase);
+			phaseCorr[optGroup][s](y,x).imag = sin(phase);
+		}
+	}
+	
+	return phaseCorr[optGroup][s];
+}
+
+bool ObservationModel::containsAllNeededColumns(const MetaDataTable& partMdt)
+{
+	return (partMdt.containsLabel(EMDL_ORIENT_ORIGIN_X)
+         && partMdt.containsLabel(EMDL_ORIENT_ORIGIN_Y)
+         && partMdt.containsLabel(EMDL_ORIENT_ROT)
+         && partMdt.containsLabel(EMDL_ORIENT_TILT)
+         && partMdt.containsLabel(EMDL_ORIENT_PSI)
+         && partMdt.containsLabel(EMDL_PARTICLE_RANDOM_SUBSET));
 }
