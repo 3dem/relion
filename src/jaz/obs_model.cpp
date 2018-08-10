@@ -141,7 +141,7 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 }
 
 void ObservationModel::predictObservation(
-        Projector& proj, const MetaDataTable& mdt, long int particle,
+        Projector& proj, const MetaDataTable& partMdt, long int particle,
 		MultidimArray<Complex>& dest,
         bool applyCtf, bool shiftPhases, bool applyShift)
 {
@@ -150,15 +150,15 @@ void ObservationModel::predictObservation(
 
     double xoff, yoff;
 
-    mdt.getValue(EMDL_ORIENT_ORIGIN_X, xoff, particle);
-    mdt.getValue(EMDL_ORIENT_ORIGIN_Y, yoff, particle);
+    partMdt.getValue(EMDL_ORIENT_ORIGIN_X, xoff, particle);
+    partMdt.getValue(EMDL_ORIENT_ORIGIN_Y, yoff, particle);
 
     double rot, tilt, psi;
 
     Matrix2D<RFLOAT> A3D;
-    mdt.getValue(EMDL_ORIENT_ROT, rot, particle);
-    mdt.getValue(EMDL_ORIENT_TILT, tilt, particle);
-    mdt.getValue(EMDL_ORIENT_PSI, psi, particle);
+    partMdt.getValue(EMDL_ORIENT_ROT, rot, particle);
+    partMdt.getValue(EMDL_ORIENT_TILT, tilt, particle);
+    partMdt.getValue(EMDL_ORIENT_PSI, psi, particle);
 
     Euler_angles2matrix(rot, tilt, psi, A3D);
 
@@ -172,7 +172,7 @@ void ObservationModel::predictObservation(
     proj.get2DFourierTransform(dest, A3D, false);
 	
 	int opticsGroup;
-	mdt.getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, particle);
+	partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, particle);
 	opticsGroup--;
 	
 	if (applyShift)
@@ -183,7 +183,7 @@ void ObservationModel::predictObservation(
     if (applyCtf)
     {
         CTF ctf;
-        ctf.readByGroup(mdt, this, particle);        
+        ctf.readByGroup(partMdt, this, particle);        
 
         FilterHelper::modulate(dest, ctf, angpix[opticsGroup]);
     }
@@ -202,29 +202,52 @@ void ObservationModel::predictObservation(
 }
 
 Image<Complex> ObservationModel::predictObservation(
-        Projector& proj, const MetaDataTable& mdt, long int particle,
+        Projector& proj, const MetaDataTable& partMdt, long int particle,
         bool applyCtf, bool shiftPhases, bool applyShift)
 {
     Image<Complex> pred;
 	
-	predictObservation(proj, mdt, particle, pred.data, applyCtf, shiftPhases, applyShift);
+	predictObservation(proj, partMdt, particle, pred.data, applyCtf, shiftPhases, applyShift);
     return pred;
 }
 
 std::vector<Image<Complex>> ObservationModel::predictObservations(
-        Projector &proj, const MetaDataTable &mdt, int threads,
+        Projector &proj, const MetaDataTable &partMdt, int threads,
         bool applyCtf, bool shiftPhases, bool applyShift)
 {
-    const int pc = mdt.numberOfObjects();
+    const int pc = partMdt.numberOfObjects();
     std::vector<Image<Complex>> out(pc);
 
     #pragma omp parallel for num_threads(threads)
     for (int p = 0; p < pc; p++)
     {
-        out[p] = predictObservation(proj, mdt, p, applyCtf, shiftPhases, applyShift);
+        out[p] = predictObservation(proj, partMdt, p, applyCtf, shiftPhases, applyShift);
     }
 
-    return out;
+	return out;
+}
+
+void ObservationModel::demodulatePhase(
+		const MetaDataTable& partMdt, long particle, MultidimArray<Complex>& obsImage)
+{
+	int opticsGroup;
+	partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, particle);
+	opticsGroup--;
+	
+	const int s = obsImage.ydim;
+	const int sh = obsImage.xdim;
+	
+	if (oddZernikeCoeffs.size() > opticsGroup 
+			&& oddZernikeCoeffs[opticsGroup].size() > 0)
+    {
+		const Image<Complex>& corr = getPhaseCorrection(opticsGroup, s);
+		
+		for (int y = 0; y < s;  y++)
+		for (int x = 0; x < sh; x++)
+		{
+			obsImage(y,x) *= corr(y,x).conj();
+		}
+    }
 }
 
 bool ObservationModel::allPixelSizesIdentical() const

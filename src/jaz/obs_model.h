@@ -26,20 +26,29 @@ class ObservationModel
 		std::vector<std::vector<double>> oddZernikeCoeffs;
 		std::vector<std::map<int,Image<Complex>>> phaseCorr;
 
+		
+		// prediction
 			
 		void predictObservation(
-				Projector &proj, const MetaDataTable &mdt, long int particle,
+				Projector &proj, const MetaDataTable &partMdt, long int particle,
 				MultidimArray<Complex>& dest,
 				bool applyCtf = true, bool shiftPhases = true, bool applyShift = true);
 		
 		Image<Complex> predictObservation(
-				Projector &proj, const MetaDataTable &mdt, long int particle,
+				Projector &proj, const MetaDataTable &partMdt, long int particle,
 				bool applyCtf = true, bool shiftPhases = true, bool applyShift = true);
 
         std::vector<Image<Complex>> predictObservations(
-                Projector &proj, const MetaDataTable &mdt, int threads,
+                Projector &proj, const MetaDataTable &partMdt, int threads,
                 bool applyCtf = true, bool shiftPhases = true, bool applyShift = true);
 
+		
+		// correction
+		
+		void demodulatePhase(
+				const MetaDataTable &partMdt, 
+				long int particle,
+				MultidimArray<Complex>& obsImage);
 		
 		/* for now, the programs assume that all optics groups have the same pixel size */
 		bool allPixelSizesIdentical() const;
