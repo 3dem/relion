@@ -25,6 +25,7 @@ void Reconstructor::read(int argc, char **argv)
 
 	int general_section = parser.addSection("General options");
 	fn_sel = parser.getOption("--i", "Input STAR file with the projection images and their orientations", "");
+	fn_opt = parser.getOption("--io", "Corresponding optics STAR file", "");
 	fn_out = parser.getOption("--o", "Name for output reconstruction","relion.mrc");
 	fn_sym = parser.getOption("--sym", "Symmetry group", "c1");
 	angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms)", "1"));
@@ -39,10 +40,7 @@ void Reconstructor::read(int argc, char **argv)
 	ctf_phase_flipped = parser.checkOption("--ctf_phase_flipped", "Images have been phase flipped");
 	only_flip_phases = parser.checkOption("--only_flip_phases", "Do not correct CTF-amplitudes, only flip phases");
 	ctf_premultiplied = parser.checkOption("--ctf_multiplied", "Have the data been premultiplied with their CTF?");
-	beamtilt_x = textToFloat(parser.getOption("--beamtilt_x", "Beamtilt in the X-direction (in mrad)", "0."));
-	beamtilt_y = textToFloat(parser.getOption("--beamtilt_y", "Beamtilt in the Y-direction (in mrad)", "0."));
-	cl_beamtilt = (ABS(beamtilt_x) > 0. || ABS(beamtilt_y) > 0.);
-
+	
 	int ewald_section = parser.addSection("Ewald-sphere correction options");
 	do_ewald = parser.checkOption("--ewald", "Correct for Ewald-sphere curvature (developmental)");
 	mask_diameter  = textToFloat(parser.getOption("--mask_diameter", "Diameter (in A) of mask for Ewald-sphere curvature correction", "-1."));
@@ -105,7 +103,9 @@ void Reconstructor::initialise()
 
 	// Read MetaData file, which should have the image names and their angles!
 	if (fn_debug == "")
-		DF.read(fn_sel);
+	{
+		ObservationModel::loadSafely(fn_sel, fn_opt, obsModel, DF, DFopt);
+	}
 
 	if (verb > 0 && (subset == 1 || subset == 2) && !DF.containsLabel(EMDL_PARTICLE_RANDOM_SUBSET))
 	{
@@ -114,7 +114,7 @@ void Reconstructor::initialise()
 
 	randomize_random_generator();
 
-	if (cl_beamtilt || do_ewald)
+	//if (cl_beamtilt || do_ewald)
 		do_ctf = true;
 
 	// Is this 2D or 3D data?
@@ -143,41 +143,13 @@ void Reconstructor::initialise()
 			mysize = newbox;
 	}
 
-
-	if (DF.containsLabel(EMDL_CTF_MAGNIFICATION) && DF.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
-	{
-		RFLOAT mag, dstep;
-		DF.getValue(EMDL_CTF_MAGNIFICATION, mag);
-		DF.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
-		angpix = 10000. * dstep / mag;
-		if (verb > 0)
-			std::cout << " + Using pixel size calculated from magnification and detector pixel size in the input STAR file: " << angpix << std::endl;
-	}
+	angpix = obsModel.getPixelSize(0);
 
 	if (maxres < 0.)
 		r_max = -1;
 	else
 		r_max = CEIL(mysize * angpix / maxres);
-
-	// Check for beam-tilt parameters in the input star file
-	if (cl_beamtilt)
-	{
-		if (verb > 0)
-			std::cout << " + Using the beamtilt parameters from the command line" << std::endl;
-		do_beamtilt = true;
-	}
-	else if ( DF.containsLabel(EMDL_IMAGE_BEAMTILT_X) || DF.containsLabel(EMDL_IMAGE_BEAMTILT_Y) )
-	{
-		if (verb > 0)
-			std::cout << " + Using the beamtilt parameters in the input STAR file" << std::endl;
-		do_beamtilt = true;
-	}
-	else
-	{
-		if (verb > 0)
-			std::cout << " + Assuming zero beamtilt" << std::endl;
-		do_beamtilt = false;
-	}
+	
 }
 
 void Reconstructor::run()
@@ -399,31 +371,13 @@ void Reconstructor::backprojectOneParticle(long int p)
 		else
 		{
 			CTF ctf;
-			ctf.read(DF, DF, p);
+			ctf.readByGroup(DF, &obsModel, p);
 
 			ctf.getFftwImage(Fctf, mysize, mysize, angpix,
 				 ctf_phase_flipped, only_flip_phases,
 				 intact_ctf_first_peak, true);
 
-			if (do_beamtilt)
-			{
-				if (!cl_beamtilt)
-				{
-					if (DF.containsLabel(EMDL_IMAGE_BEAMTILT_X))
-					{
-						DF.getValue(EMDL_IMAGE_BEAMTILT_X, beamtilt_x, p);
-					}
-
-					if (DF.containsLabel(EMDL_IMAGE_BEAMTILT_Y))
-					{
-						DF.getValue(EMDL_IMAGE_BEAMTILT_Y, beamtilt_y, p);
-					}
-				}
-
-				selfApplyBeamTilt(
-					F2D, beamtilt_x, beamtilt_y,
-					ctf.lambda, ctf.Cs, angpix, mysize);
-			}
+			obsModel.demodulatePhase(DF, p, F2D);
 
 			// Ewald-sphere curvature correction
 			if (do_ewald)

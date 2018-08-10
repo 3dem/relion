@@ -27,6 +27,7 @@
 #include <src/error.h>
 #include <src/euler.h>
 #include <src/time.h>
+#include <src/jaz/obs_model.h>
 
 class Reconstructor
 {
@@ -35,9 +36,10 @@ public:
 	// I/O Parser
 	IOParser parser;
 
-	FileName fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_fsc, fn_debug, image_path;
+	FileName fn_out, fn_sel, fn_opt, fn_img, fn_sym, fn_sub, fn_fsc, fn_debug, image_path;
 
-	MetaDataTable DF;
+	MetaDataTable DF, DFopt;
+	ObservationModel obsModel;
 
 	int r_max, r_min_nn, blob_order, ref_dim, interpolator, iter,
 	    debug_ori_size, debug_size,
@@ -45,11 +47,10 @@ public:
 	    data_dim, mysize, verb;
 
 	RFLOAT blob_radius, blob_alpha, angular_error, shift_error, angpix, maxres,
-	       beamtilt_x, beamtilt_y,
 	       helical_rise, helical_twist;
 
 	bool do_ctf, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, ctf_premultiplied,
-	     do_fom_weighting, do_3d_rot, do_reconstruct_ctf, do_beamtilt, cl_beamtilt, do_ewald, skip_weighting, skip_mask, do_debug;
+	     do_fom_weighting, do_3d_rot, do_reconstruct_ctf, do_ewald, skip_weighting, skip_mask, do_debug;
 
 	bool skip_gridding, do_reconstruct_ctf2, do_reconstruct_meas, is_reverse, read_weights;
 
