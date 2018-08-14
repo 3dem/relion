@@ -193,12 +193,12 @@ std::vector<MetaDataTable> MicrographHandler::findLongEnoughMovies(
 		if (bad.size() == 1)
 		{
 			std::cerr << " - The following micrograph does not contain "
-					  << fc << " frames:\n";
+					  << fc << " frames. Particles in it will be ignored:\n";
 		}
 		else
 		{
 			std::cerr << " - The following micrographs do not contain "
-					  << fc << " frames:\n";
+					  << fc << " frames. Particles in them will be ignored:\n";
 		}
 
 		for (int i = 0; i < bad.size(); i++)
