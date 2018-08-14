@@ -1139,6 +1139,7 @@ void MetaDataTable::columnHistogram(EMDLabel label, std::vector<RFLOAT> &histX, 
 			hist_max = values[n_row - 1];
 			bin_width = 2 * iqr / std::pow(n_row, 1.0 / 3); // Freedman-Diaconis rule
 			bin_size = int(std::ceil((hist_max - hist_min) / bin_width));
+			if (bin_size > 5000) bin_size = 5000; // FIXME: Ad hoc upper limit to avoid using too much memory
 		}
 		else
 		{
