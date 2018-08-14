@@ -1148,6 +1148,11 @@ void MetaDataTable::columnHistogram(EMDLabel label, std::vector<RFLOAT> &histX, 
 		}
 		bin_width = (hist_max - hist_min) / bin_size;
 	}
+	else
+	{
+		if (!std::isfinite(hist_min)) hist_min = values[0];
+		if (!std::isfinite(hist_max)) hist_max = values[n_row - 1];
+	}
 
 	bin_size += 2; // for -inf and +inf
 	if (verb > 0) std::cout << "Bin size: " << bin_size << " width: " << bin_width << std::endl;
