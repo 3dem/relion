@@ -88,8 +88,6 @@ void CtfRefiner::read(int argc, char **argv)
 
 	debug = parser.checkOption("--debug", "Write debugging data");
 	verb = textToInteger(parser.getOption("--verb", "Verbosity", "1"));
-
-	int expert_section = parser.addSection("Expert options");
 	
 	JazConfig::writeMrc = !debug;
 	JazConfig::writeVtk = debug;

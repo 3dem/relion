@@ -269,7 +269,7 @@ void TiltEstimator::parametricFit(
 			
 			ImageLog::write(fitFull, outPath + "beamtilt_delta-phase_lin-fit_optics-class_"
 							+cns+"_N-"+sts.str());
-			
+				
 			if (debug)
 			{
 				Image<RFLOAT> residual;
@@ -278,11 +278,16 @@ void TiltEstimator::parametricFit(
 				ImageLog::write(residual, outPath + "beamtilt_delta-phase_lin-fit_optics-class_"
 								+cns+"_N-"+sts.str()+"_residual");
 			}
+						
+			std::vector<double> Zernike_coeffs_opt = TiltHelper::optimiseOddZernike(
+						xyNrm, wgh, angpix, aberr_n_max, Zernike_coeffs, &fit);
+				
+			FftwHelper::decenterUnflip2D(fit.data, fitFull.data);
+						
+			ImageLog::write(fitFull, outPath + "beamtilt_delta-phase_iter-fit_optics-class_"
+							+cns+"_N-"+sts.str());
 			
-			Image<RFLOAT> plot0 = TiltHelper::plotOddZernike(Zernike_coeffs, s, angpix);
-			ImageLog::write(plot0, outPath + "debug_Z0");
-			
-			TiltHelper::extractTilt(Zernike_coeffs, tilt_x, tilt_y, Cs, lambda);
+			TiltHelper::extractTilt(Zernike_coeffs_opt, tilt_x, tilt_y, Cs, lambda);
 			
 			/*
 			{
@@ -300,7 +305,7 @@ void TiltEstimator::parametricFit(
 			
 			optOut.setValue(EMDL_IMAGE_BEAMTILT_X, tilt_x, og);
 			optOut.setValue(EMDL_IMAGE_BEAMTILT_Y, tilt_y, og);
-			optOut.setValue(EMDL_IMAGE_ODD_ZERNIKE_COEFFS, Zernike_coeffs, og);
+			optOut.setValue(EMDL_IMAGE_ODD_ZERNIKE_COEFFS, Zernike_coeffs_opt, og);
 		}
 	}
 }
