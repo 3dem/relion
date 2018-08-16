@@ -906,8 +906,6 @@ std::vector<Image<RFLOAT> > StackHelper::inverseFourierTransform(std::vector<Ima
 	std::vector<Image<RFLOAT> > out(stack.size());
 	const long ic = stack.size();
 	
-	std::cout << ic << " images in stack.\n";
-	
 	const int h = stack[0].data.ydim;
 	const int ww = stack[0].data.xdim;
 	const int w = 2*(ww - 1);

@@ -288,21 +288,7 @@ void TiltEstimator::parametricFit(
 							+cns+"_N-"+sts.str());
 			
 			TiltHelper::extractTilt(Zernike_coeffs_opt, tilt_x, tilt_y, Cs, lambda);
-			
-			/*
-			{
-				Image<RFLOAT> plot1 = TiltHelper::plotOddZernike(Zernike_coeffs, s, angpix);
-				ImageLog::write(plot1, outPath + "debug_Z1");
-				
-				Image<RFLOAT> plot2 = TiltHelper::plotTilt(tilt_x, tilt_y, s, angpix, Cs, lambda);
-				ImageLog::write(plot2, outPath + "debug_t");
-				
-				Image<RFLOAT> plot3;
-				plot3() = plot1() - plot2();
-				ImageLog::write(plot3, outPath + "debug_t+Z1");
-			}
-			*/
-			
+						
 			optOut.setValue(EMDL_IMAGE_BEAMTILT_X, tilt_x, og);
 			optOut.setValue(EMDL_IMAGE_BEAMTILT_Y, tilt_y, og);
 			optOut.setValue(EMDL_IMAGE_ODD_ZERNIKE_COEFFS, Zernike_coeffs_opt, og);

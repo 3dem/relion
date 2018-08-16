@@ -75,7 +75,7 @@ int main(int argc, char *argv[])
 			std::stringstream sts;
 			sts << (p+1) << "@" << outPath << "/" << name;
 			
-			mdts[m].setValue(EMDL_IMAGE_NAME, fullName, p);
+			mdts[m].setValue(EMDL_IMAGE_NAME, sts.str(), p);
 		}
 		
 		std::vector<Image<RFLOAT>> demodulated = StackHelper::inverseFourierTransform(obs);
@@ -83,8 +83,16 @@ int main(int argc, char *argv[])
 		
 		FileName fn_pre, fn_jobnr, fn_post;
 		decomposePipelineFileName(name, fn_pre, fn_jobnr, fn_post);
-	
-		out.write(outPath + fn_post);		
+		
+		std::string outFn = outPath + fn_post;
+		
+		if (outFn.find_last_of("/") != std::string::npos)
+		{
+			std::string command = " mkdir -p " + outFn.substr(0, outFn.find_last_of("/"));
+			int res = system(command.c_str());
+		}
+		
+		out.write(outPath + fn_post);
 	}
 	
 	MetaDataTable mdt1;
