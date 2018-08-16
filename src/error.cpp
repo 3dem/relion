@@ -63,6 +63,7 @@ RelionError::RelionError(const std::string &what, const std::string &fileArg, co
     line=lineArg;
 
     std::cerr << "in: " << file << ", line " << line << "\n";
+	std::cerr << msg << std::endl;  
 }
 
 // Show message
