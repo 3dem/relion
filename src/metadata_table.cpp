@@ -1065,14 +1065,24 @@ void MetaDataTable::write(std::ostream& out) const
 {
 	// Only write tables that have something in them
 	if (isEmpty())
+	{
 		return;
+	}
+	
+	if (version >= 31000)
+	{
+		out << "\n";
+		out << "version_ " << getCurrentVersion() <<"\n";
+	}
 	
 	out << "\n";
-	out << "version_ " << getCurrentVersion() <<"\n";
-	out << "\n";
 	out << "data_" << getName() <<"\n";
+	
 	if (containsComment())
+	{
 		out << "# "<< comment << "\n";
+	}
+	
 	out << "\n";
 
 	if (!isList)

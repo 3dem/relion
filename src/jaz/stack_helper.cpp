@@ -923,6 +923,29 @@ std::vector<Image<RFLOAT> > StackHelper::inverseFourierTransform(std::vector<Ima
 	return out;
 }
 
+Image<RFLOAT> StackHelper::toSingleImage(const std::vector<Image<RFLOAT>> stack)
+{
+	const int s = stack.size();
+	
+	if (s < 1) return Image<RFLOAT>(0,0,0);
+	
+	const int w = stack[0].data.xdim;
+	const int h = stack[0].data.ydim;
+	
+	Image<RFLOAT> out(w,h,1,s);
+	
+	for (int n = 0; n < s; n++)
+	{
+		for (int y = 0; y < h; y++)
+		for (int x = 0; x < w; x++)
+		{
+			DIRECT_NZYX_ELEM(out(),n,0,y,x) = stack[n](y,x);
+		}
+	}
+	
+	return out;
+}
+
 std::vector<Image<Complex> > StackHelper::applyBeamTilt(std::vector<Image<Complex> > &stack,
 														RFLOAT Cs, RFLOAT lambda, RFLOAT angpix,
 														RFLOAT tilt_x, RFLOAT tilt_y,

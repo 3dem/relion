@@ -71,6 +71,8 @@ class StackHelper
 		
 		static std::vector<Image<RFLOAT>> inverseFourierTransform(std::vector<Image<Complex> >& stack);
 		
+		static Image<RFLOAT> toSingleImage(const std::vector<Image<RFLOAT>> stack);
+		
 		static std::vector<Image<Complex> > applyBeamTilt(
 					std::vector<Image<Complex> >& stack,
 					RFLOAT Cs, RFLOAT lambda, RFLOAT angpix,
