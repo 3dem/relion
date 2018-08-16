@@ -71,11 +71,6 @@ int main(int argc, char *argv[])
 		for (int p = 0; p < pc; p++)
 		{
 			obsModel.demodulatePhase(mdts[m], p, obs[p].data);
-			
-			std::stringstream sts;
-			sts << (p+1) << "@" << outPath << "/" << name;
-			
-			mdts[m].setValue(EMDL_IMAGE_NAME, sts.str(), p);
 		}
 		
 		std::vector<Image<RFLOAT>> demodulated = StackHelper::inverseFourierTransform(obs);
@@ -92,7 +87,15 @@ int main(int argc, char *argv[])
 			int res = system(command.c_str());
 		}
 		
-		out.write(outPath + fn_post);
+		for (int p = 0; p < pc; p++)
+		{
+			std::stringstream sts;
+			sts << (p+1) << "@" << outFn;
+			
+			mdts[m].setValue(EMDL_IMAGE_NAME, sts.str(), p);
+		}
+		
+		out.write(outFn);
 	}
 	
 	MetaDataTable mdt1;
