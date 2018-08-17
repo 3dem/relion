@@ -135,6 +135,8 @@ int main(int argc, char *argv[])
 			}
 		}
 		
+		opticsMdt.deactivateLabel(EMDL_IMAGE_OPTICS_GROUP);
+		
 		mdt1.setVersion(30000);
 	}
 	else
