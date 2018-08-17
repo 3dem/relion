@@ -57,7 +57,7 @@ MetaDataTable::MetaDataTable()
 	isList(false),
 	name(""),
 	comment(""),
-	version(0),
+	version(CURRENT_MDT_VERSION),
 	activeLabels(0),
 	ignoreLabels(0)
 {
@@ -159,7 +159,7 @@ void MetaDataTable::clear()
 	isList = false;
 	name = "";
 	comment = "";
-	version = 0;
+	version = CURRENT_MDT_VERSION;
 
 	activeLabels.clear();
 	ignoreLabels.clear();
