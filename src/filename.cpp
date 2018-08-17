@@ -537,16 +537,22 @@ bool decomposePipelineSymlinkName(FileName fn_in, FileName &fn_pre, FileName &fn
 		dont_expand = true;
 
 	// Check whether this is a symbol link
-	char linkname[500];
-	ssize_t len = ::readlink(second_dir.c_str(), linkname, sizeof(linkname) - 1);
+	char linkname[4096];
+	ssize_t len_max = sizeof(linkname) - 1;
+	ssize_t len = ::readlink(second_dir.c_str(), linkname, len_max);
+	if (len == len_max)
+		REPORT_ERROR("Too long path in decomposePipelineSymlinkName.");
 	if (!dont_expand && len != -1)
 	{
 	    	// This is a symbolic link!
+		if (linkname[len - 1] == '/')
+			linkname[len - 1] = '\0'; // remove trailing '/'	
 	    	linkname[len] = '\0';
 	    	FileName fn_link = std::string(linkname);
     		if (fn_link.substr(0, 3) == "../")
 	    	{
     			fn_link = fn_link.substr(3) + fn_in.substr(slashpos);
+//			std::cout << "fn_link=" << fn_link << std::endl;
         		return decomposePipelineFileName(fn_link, fn_pre, fn_jobnr, fn_post);
 	    	}
 		else
