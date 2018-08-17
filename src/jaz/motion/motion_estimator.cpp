@@ -246,8 +246,8 @@ void MotionEstimator::process(const std::vector<MetaDataTable>& mdts, long g_sta
 			std::string mgName;
 			mdts[g].getValue(EMDL_MICROGRAPH_NAME, mgName, 0);
 			
-			std::cerr << " - Warning: unable to load " << mgName << ". "
-					  << " File is missing or corrupted." << std::endl;
+			std::cerr << " - Warning: unable to load raw movie frames for " << mgName << ". "
+					  << " Possible reasons include lack of the metadata STAR file, the gain reference and/or the movie." << std::endl;
 			
 			continue;
 		}
