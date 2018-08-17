@@ -41,9 +41,11 @@ class TiltEstimator
 				
 		// cmd. line options (see read())
 		double kmin;
+		int aberr_n_max;
+		double xring0, xring1;
 		
 		// parameters obtained through init()
-		int verb, s, sh, nr_omp_threads, aberr_n_max;
+		int verb, s, sh, nr_omp_threads;
 		bool debug, diag, ready;
 		std::string outPath;
 		double angpix;

@@ -35,6 +35,13 @@ void TiltEstimator::read(IOParser &parser, int argc, char *argv[])
 	
 	aberr_n_max  = textToInteger(parser.getOption(aberrToken, 
 		"Maximum degree of Zernike polynomials used to fit odd (i.e. antisymmetrical) aberrations", "0"));
+	
+	xring0 = textToDouble(parser.getOption("--xr0", 
+		"Exclusion ring start (A)", "-1"));
+	
+	xring1 = textToDouble(parser.getOption("--xr1", 
+		"Exclusion ring end (A)", "-1"));
+			
 }
 
 void TiltEstimator::init(
@@ -209,8 +216,25 @@ void TiltEstimator::parametricFit(
 		double kmin_px = obsModel->angToPix(kmin, s, og);
 				 
 		Image<RFLOAT> wgh0 = reference->getHollowWeight(kmin_px);
-	
+		
 		FilterHelper::multiply(wAccSum, wgh0, wgh);
+	
+		if (xring1 > 0.0)
+		{
+			for (int y = 0; y < s; y++)
+			for (int x = 0; x < sh; x++)
+			{
+				double xx = x;
+				double yy = y <= sh? y : y - s;
+				double rp = sqrt(xx*xx + yy*yy);
+				double ra = s * angpix / rp;
+				
+				if (ra > xring0 && ra <= xring1)
+				{
+					wgh(y,x) = 0.0;
+				}
+			}
+		}
 		
 		for (int y = 0; y < s; y++)
 		for (int x = 0; x < sh; x++)
