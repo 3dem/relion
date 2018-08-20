@@ -114,6 +114,7 @@ int main(int argc, char *argv[])
 			mdtOut.setValue(EMDL_IMAGE_OPTICS_GROUP, opticsClasses[p] + 1, p);
 		}
 		
+		mdtOut.setVersion(31000);
 		mdtOut.write(std::string(argv[2])+".star");
 		
 		
@@ -135,6 +136,7 @@ int main(int argc, char *argv[])
 			}
 		}
 		
+		optOut.setVersion(31000);
 		optOut.write(std::string(argv[2])+"_optics.star");
 	}
 	
