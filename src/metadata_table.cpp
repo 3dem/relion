@@ -978,6 +978,9 @@ long int MetaDataTable::readStar(std::ifstream& in, const std::string &name, std
 
 	// Start reading the ifstream at the top
 	in.seekg(0);
+	
+	// Set the version to 30000 by default, in case there is no version tag
+	version = 30000;
 
 	// Proceed until the next data_ or _loop statement
 	// The loop statement may be necessary for data blocks that have a list AND a table inside them
