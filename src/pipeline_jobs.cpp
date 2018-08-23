@@ -4718,14 +4718,22 @@ bool RelionJob::getCommandsPostprocessJob(std::string &outputname, std::vector<s
 	inputNodes.push_back(node3);
 
 	// Input half map (one of them)
-	if (joboptions["fn_in"].getString() == "")
+	FileName fn_half1 = joboptions["fn_in"].getString();
+	if (fn_half1 == "")
 	{
 		error_message = "ERROR: empty field for input half-map...";
 		return false;
 	}
-	Node node(joboptions["fn_in"].getString(), joboptions["fn_in"].node_type);
+	FileName fn_half2;
+	if (!fn_half1.getTheOtherHalf(fn_half2))
+	{
+		error_message = "ERROR: cannot find 'half' substring in the input filename...";
+		return false;
+	}
+
+	Node node(fn_half1, joboptions["fn_in"].node_type);
 	inputNodes.push_back(node);
-	command += " --i " + joboptions["fn_in"].getString();
+	command += " --i " + fn_half1;
 	// The output name contains a directory: use it for output
 	command += " --o " + outputname + "postprocess";
 	command += "  --angpix " + joboptions["angpix"].getString();
@@ -4780,9 +4788,9 @@ void RelionJob::initialiseLocalresJob()
 
 	// Check for environment variable RELION_RESMAP_TEMPLATE
 	char * default_location = getenv ("RELION_RESMAP_EXECUTABLE");
+	char mydefault[] = DEFAULTRESMAPLOCATION;
 	if (default_location == NULL)
 	{
-		char mydefault[] = DEFAULTRESMAPLOCATION;
 		default_location = mydefault;
 	}
 
@@ -4825,16 +4833,11 @@ bool RelionJob::getCommandsLocalresJob(std::string &outputname, std::vector<std:
 		return false;
 	}
 	// Get the two half-reconstruction names from the single one
-	std::string fn_half1, fn_half2;
-	int pos_half = joboptions["fn_in"].getString().rfind("_half");
-	if (pos_half < joboptions["fn_in"].getString().size())
+	FileName fn_half1 = joboptions["fn_in"].getString();
+	FileName fn_half2;
+	if (!fn_half1.getTheOtherHalf(fn_half2))
 	{
-		fn_half1 = joboptions["fn_in"].getString().substr(0, pos_half) + "_half1_class001_unfil.mrc";
-		fn_half2 = joboptions["fn_in"].getString().substr(0, pos_half) + "_half2_class001_unfil.mrc";
-	}
-	else
-	{
-		error_message = "ERROR: cannot find _half substring in input filenames...";
+		error_message = "ERROR: cannot find 'half' substring in the input filename...";
 		return false;
 	}
 

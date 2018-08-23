@@ -111,14 +111,8 @@ void Postprocessing::initialise()
 	// Read in the input maps
 	if (fn_I2 == "")
 	{
-		fn_I2 = fn_I1;
-		if (fn_I1.contains("half1"))
-			fn_I2.replaceAllSubstrings("half1", "half2");
-		else if (fn_I1.contains("half2"))
-			fn_I2.replaceAllSubstrings("half2", "half1");
-		else
-			REPORT_ERROR("ERROR: cannot find half1 or half2 substring in the input filename");
-
+		if (!fn_I1.getTheOtherHalf(fn_I2))
+			REPORT_ERROR("The input filename does not contain 'half1' or 'half2'");
 	}
 	if (verb > 0)
 	{

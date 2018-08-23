@@ -425,6 +425,24 @@ int FileName::globFiles(std::vector<FileName> &files, bool do_clear) const
 	return files.size();
 }
 
+bool FileName::getTheOtherHalf(FileName &fn_out) const
+{
+	FileName ret = this->afterLastOf("/");
+
+	if (ret.contains("half1"))
+		ret.replaceAllSubstrings("half1", "half2");
+	else if (ret.contains("half2"))
+		ret.replaceAllSubstrings("half2", "half1");
+	else
+		return false;
+
+	if (this->contains("/"))
+		ret = this->beforeLastOf("/") + "/" + ret;
+
+	fn_out = ret;
+	return true;
+}
+
 bool exists(const FileName &fn)
 {
 
