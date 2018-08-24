@@ -204,11 +204,20 @@ void CtfRefiner::init()
 				unfinishedMdts.push_back(allMdts[g]);
 			}
 		}
+		
 		if (verb > 0)
 		{
-			std::cout << "   - Will only process " << unfinishedMdts.size()
+			if (unfinishedMdts.size() < allMdts.size())
+			{
+				std::cout << "   - Will only process " << unfinishedMdts.size()
 					  << " unfinished (out of " << allMdts.size()
 					  << ") micrographs" << std::endl;
+			}
+			else
+			{
+				std::cout << "   - Will process all " << unfinishedMdts.size()
+					  << " micrographs" << std::endl;
+			}
 		}
 	}
 	else
@@ -251,7 +260,7 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 			int res = system(command.c_str());
 		}
 
-		std::vector<Image<Complex>> predSame, predOpp, predDemod;
+		std::vector<Image<Complex>> predSame, predOpp, predDbl;
 
 		// use prediction from same half-set for defocus estimation (overfitting danger):
 		if (do_defocus_fit)
@@ -271,9 +280,18 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 		
 		if (do_aberr_fit)
 		{
-			predDemod = reference.predictAll(
+			std::vector<Image<Complex>> predDemod0 = reference.predictAll(
+				unfinishedMdts[g], obsModel, ReferenceMap::Own, nr_omp_threads,
+				false, true, false);
+			
+			std::vector<Image<Complex>> predDemod1 = reference.predictAll(
 				unfinishedMdts[g], obsModel, ReferenceMap::Opposite, nr_omp_threads,
 				false, true, false);
+			
+			for (int p = 0; p < predDemod0.size(); p++)
+			{
+				predDbl[p]() = predDemod0[p]() + predDemod1[p]();
+			}
 		}
 
 		if (do_defocus_fit)
@@ -288,7 +306,7 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 		
 		if (do_aberr_fit)
 		{
-			aberrationEstimator.processMicrograph(g, unfinishedMdts[g], obs, predDemod);
+			aberrationEstimator.processMicrograph(g, unfinishedMdts[g], obs, predDbl);
 		}
 		
 		if (do_mag_fit)

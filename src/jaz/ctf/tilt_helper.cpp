@@ -397,6 +397,38 @@ std::vector<double> TiltHelper::fitEvenZernike(
 	return out;
 }
 
+std::vector<double> TiltHelper::optimiseEvenZernike(
+	const Image<Complex>& xy,
+	const Image<RFLOAT>& weight,
+	double angpix, int n_max,
+	const std::vector<double>& coeffs,
+	Image<RFLOAT>* fit)		
+{
+	const int w = xy.data.xdim;
+	const int h = xy.data.ydim;
+	const int cc = Zernike::numberOfEvenCoeffs(n_max);
+		
+	std::vector<Image<RFLOAT>> basis = computeEvenZernike(h, angpix, n_max);
+	
+	std::vector<double> opt = optimiseBasis(xy, weight, basis, coeffs);
+	
+	if (fit != 0)
+	{
+		*fit = Image<RFLOAT>(w,h);
+		
+		for (int y = 0; y < h; y++)
+		for (int x = 0; x < w; x++)
+		{
+			for (int c = 0; c < cc; c++)
+			{
+				(*fit)(y,x) += opt[c] * basis[c](y,x);
+			}
+		}
+	}
+	
+	return opt;
+}
+
 
 std::vector<Image<RFLOAT> > TiltHelper::computeEvenZernike(int s, double angpix, int n_max)
 {

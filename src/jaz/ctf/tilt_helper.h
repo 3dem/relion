@@ -125,6 +125,13 @@ class TiltHelper
 				double angpix, int n_max, 
 				Image<RFLOAT>* fit = 0);
 		
+		static std::vector<double> optimiseEvenZernike(
+                const Image<Complex>& xy,
+                const Image<RFLOAT>& weight,
+                double angpix, int n_max,
+                const std::vector<double>& coeffs,
+                Image<RFLOAT>* fit);
+		
 		static std::vector<Image<RFLOAT>> computeEvenZernike(
 				int s, double angpix, int n_max);
 		

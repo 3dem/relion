@@ -58,7 +58,7 @@ void Zernike::evenIndexToMN(int i, int &m, int &n)
 {
 	const int k = (int)sqrt((double)i);
 	
-	m = i - k*k - k;
+	m = 2*(i - k*k - k);
 	n = 2*k;
 }
 

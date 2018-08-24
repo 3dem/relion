@@ -241,7 +241,8 @@ void AberrationEstimator::parametricFit(
 			continue;
 		}
 			
-		Image<RFLOAT> wgh(sh,s), phase(sh,s), cosPhi(sh,s), sinPhi(sh,s); 
+		Image<RFLOAT> wgh(sh,s), phase(sh,s);
+		Image<Complex> optXY(sh,s); 
 				
 		double kmin_px = obsModel->angToPix(kmin, s, og);
 		wgh = reference->getHollowWeight(kmin_px);
@@ -256,7 +257,7 @@ void AberrationEstimator::parametricFit(
 			d2Vector b(bxSum(y,x), bySum(y,x));
 
 			double det = A(0,0) * A(1,1) - A(1,0) * A(0,1);
-
+			
 			if (det != 0.0)
 			{
 				d2Matrix Ai = A;
@@ -264,14 +265,15 @@ void AberrationEstimator::parametricFit(
 
 				d2Vector opt = Ai * b;
 
-				cosPhi(y,x) = opt.x;
-				sinPhi(y,x) = opt.y;
-
+				optXY(y,x) = Complex(opt.x, opt.y);
 				phase(y,x) = std::abs(opt.x) > 0.0? atan2(opt.y, opt.x) : 0.0;
+				wgh(y,x) *= sqrt(std::abs(det));
 			}
 			else
 			{
+				optXY(y,x) = 0.0;
 				phase(y,x) = 0.0;
+				wgh(y,x) = 0.0;
 			}
 		}
 		
@@ -294,14 +296,17 @@ void AberrationEstimator::parametricFit(
 				
 		if (debug)
 		{
-			Image<RFLOAT> wghFull;
-			FftwHelper::decenterDouble2D(wgh(), wghFull());			
-			ImageLog::write(wghFull, outPath + "aberr_weight-full_optics-class_"+cns);
+			Image<RFLOAT> full;
+			FftwHelper::decenterDouble2D(wgh(), full());
+			ImageLog::write(full, outPath + "aberr_weight-full_optics-class_"+cns);
 		}
 		
 		Image<RFLOAT> fit, phaseFull, fitFull;		
-		FftwHelper::decenterDouble2D(phase.data, phaseFull.data);		
+		FftwHelper::decenterDouble2D(phase.data, phaseFull.data);
 		ImageLog::write(phaseFull, outPath + "aberr_delta-phase_per-pixel_optics-class_"+cns);
+		
+		
+		
 		
 		{
 			std::vector<double> Zernike_coeffs = TiltHelper::fitEvenZernike(
@@ -322,20 +327,18 @@ void AberrationEstimator::parametricFit(
 				ImageLog::write(residual, outPath + "aberr_delta-phase_lin-fit_optics-class_"
 								+cns+"_N-"+sts.str()+"_residual");
 			}
-						
-			/*std::vector<double> Zernike_coeffs_opt = TiltHelper::optimiseOddZernike(
-						xyNrm, wgh, angpix, aberr_n_max, Zernike_coeffs, &fit);
+			
+			std::vector<double> Zernike_coeffs_opt = TiltHelper::optimiseEvenZernike(
+						optXY, wgh, angpix, aberr_n_max, Zernike_coeffs, &fit);
 				
 			FftwHelper::decenterDouble2D(fit.data, fitFull.data);
 						
 			ImageLog::write(fitFull, outPath + "aberr_delta-phase_iter-fit_optics-class_"
 							+cns+"_N-"+sts.str());
 			
-			TiltHelper::extractTilt(Zernike_coeffs_opt, tilt_x, tilt_y, Cs, lambda);
-						
-			optOut.setValue(EMDL_IMAGE_BEAMTILT_X, tilt_x, og);
-			optOut.setValue(EMDL_IMAGE_BEAMTILT_Y, tilt_y, og);
-			optOut.setValue(EMDL_IMAGE_ODD_ZERNIKE_COEFFS, Zernike_coeffs_opt, og);*/
+			// extract Q0, Cs, defocus and astigmatism?
+			
+			optOut.setValue(EMDL_IMAGE_EVEN_ZERNIKE_COEFFS, Zernike_coeffs_opt, og);
 		}
 	}
 }
