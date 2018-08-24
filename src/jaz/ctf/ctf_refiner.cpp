@@ -104,10 +104,13 @@ void CtfRefiner::read(int argc, char **argv)
 		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 	}
 
-	// Make sure outPath ends with a slash
+	// Make sure outPath ends with a slash and exists
 	if (outPath[outPath.length()-1] != '/')
 	{
 		outPath += "/";
+		
+		std::string command = " mkdir -p " + outPath;
+		int ret = system(command.c_str());
 	}
 }
 
@@ -309,7 +312,7 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 
 void CtfRefiner::run()
 {
-	if (do_defocus_fit || do_tilt_fit || do_mag_fit)
+	if (do_defocus_fit || do_tilt_fit || do_aberr_fit || do_mag_fit)
 	{
 		// The subsets will be used in openMPI parallelisation:
 		// instead of over g0->gc, they will be over smaller subsets
@@ -344,7 +347,7 @@ void CtfRefiner::finalise()
 	}
 	
 	// Do the equivalent for the symmetrical aberrations...
-	if (do_tilt_fit)
+	if (do_aberr_fit)
 	{
 		aberrationEstimator.parametricFit(allMdts, optOut);
 	}

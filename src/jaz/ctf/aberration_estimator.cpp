@@ -34,7 +34,7 @@ void AberrationEstimator::read(IOParser &parser, int argc, char *argv[])
 	std::string aberrToken = "--even_aberr_max_n";
 	
 	aberr_n_max  = textToInteger(parser.getOption(aberrToken, 
-		"Maximum degree of Zernike polynomials used to fit even (i.e. symmetrical) aberrations", "0"));
+		"Maximum degree of Zernike polynomials used to fit even (i.e. symmetrical) aberrations", "4"));
 	
 	xring0 = textToDouble(parser.getOption("--xr0", 
 		"Exclusion ring start (A)", "-1"));
