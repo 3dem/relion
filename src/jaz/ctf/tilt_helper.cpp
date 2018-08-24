@@ -262,7 +262,7 @@ std::vector<double> TiltHelper::optimiseOddZernike(
 	const int h = xy.data.ydim;
 	const int cc = Zernike::numberOfOddCoeffs(n_max);
 		
-	std::vector<Image<RFLOAT>> basis = TiltHelper::computeOddZernike(h, angpix, n_max);
+	std::vector<Image<RFLOAT>> basis = computeOddZernike(h, angpix, n_max);
 	
 	std::vector<double> opt = optimiseBasis(xy, weight, basis, coeffs);
 	
@@ -365,6 +365,68 @@ Image<RFLOAT> TiltHelper::plotTilt(
 	return out;
 }
 
+
+std::vector<double> TiltHelper::fitEvenZernike(
+		const Image<RFLOAT>& phase,
+		const Image<RFLOAT>& weight,
+		double angpix, int n_max, 
+		Image<RFLOAT>* fit)
+{
+	const int w = phase.data.xdim;
+	const int h = phase.data.ydim;
+	const int cc = Zernike::numberOfEvenCoeffs(n_max);
+		
+	std::vector<Image<RFLOAT>> basis = computeEvenZernike(h, angpix, n_max);
+	
+	std::vector<double> out = fitBasisLin(phase, weight, basis);
+	
+	if (fit != 0)
+	{
+		*fit = Image<RFLOAT>(w,h);
+		
+		for (int y = 0; y < h; y++)
+		for (int x = 0; x < w; x++)
+		{
+			for (int c = 0; c < cc; c++)
+			{
+				(*fit)(y,x) += out[c] * basis[c](y,x);
+			}
+		}
+	}
+	
+	return out;
+}
+
+
+std::vector<Image<RFLOAT> > TiltHelper::computeEvenZernike(int s, double angpix, int n_max)
+{
+	const int cc = Zernike::numberOfEvenCoeffs(n_max);	
+	const double as = (double)s * angpix;
+	const int sh = s/2 + 1;
+	
+	std::vector<Image<RFLOAT>> basis(cc);
+	
+	for (int c = 0; c < cc; c++)
+	{
+		basis[c] = Image<RFLOAT>(sh,s);
+		
+		int m, n;
+		
+		Zernike::evenIndexToMN(c, m, n);
+		
+		for (int y = 0; y < s; y++)
+		for (int x = 0; x < sh; x++)
+		{
+			const double xx = x/as;
+			const double yy = y < sh? y/as : (y-s)/as;
+	
+			basis[c](y,x) = Zernike::Z_cart(m, n, xx, yy);
+		}
+	}
+	
+	return basis;
+}
+
 void TiltHelper::extractTilt(
 	std::vector<double>& oddZernikeCoeffs, 
 	double& tilt_x, double& tilt_y, 
@@ -410,12 +472,8 @@ std::vector<double> TiltHelper::fitBasisLin(
 	const Image<RFLOAT>& weight, 
 	const std::vector<Image<RFLOAT>>& basis)
 {
-	const int cc = basis.size();
 	const int w = xy.data.xdim;
 	const int h = xy.data.ydim;
-	
-	Matrix2D<RFLOAT> A(cc,cc);
-	Matrix1D<RFLOAT> b(cc);
 	
 	Image<RFLOAT> phase(w,h);
 	
@@ -425,6 +483,21 @@ std::vector<double> TiltHelper::fitBasisLin(
 		phase(y,x) = xy(y,x).arg();
 	}
 	
+	return fitBasisLin(phase, weight, basis);
+}
+	
+std::vector<double> TiltHelper::fitBasisLin(
+	const Image<RFLOAT>& phase, 
+	const Image<RFLOAT>& weight, 
+	const std::vector<Image<RFLOAT>>& basis)
+{
+	const int cc = basis.size();
+	const int w = phase.data.xdim;
+	const int h = phase.data.ydim;
+	
+	Matrix2D<RFLOAT> A(cc,cc);
+	Matrix1D<RFLOAT> b(cc);
+		
 	for (int c1 = 0; c1 < cc; c1++)
 	{
 		for (int y = 0; y < h; y++)

@@ -162,8 +162,6 @@ void TiltEstimator::parametricFit(
 	const int gc = mdts.size();	
 	const int ogc = obsModel->numberOfOpticsGroups();
 	
-	std::vector<d2Vector> tiltPerClass(ogc, d2Vector(0.0, 0.0));
-	
 	std::vector<bool> groupUsed(ogc,false);
 	
 	for (int og = 0; og < ogc; og++)
@@ -324,19 +322,19 @@ bool TiltEstimator::isFinished(const MetaDataTable &mdt)
 {
 	if (!ready)
 	{
-		REPORT_ERROR("ERROR: TiltEstimator::isFinished: DefocusEstimator not initialized.");
+		REPORT_ERROR("ERROR: TiltEstimator::isFinished: TiltEstimator not initialized.");
 	}
 	
 	std::string outRoot = CtfRefiner::getOutputFilenameRoot(mdt, outPath);
 	
 	bool allDone = true;
 	
-	const int ogc = obsModel->numberOfOpticsGroups();
+	std::vector<int> ogp = obsModel->getOptGroupsPresent(mdt);
 	
-	for (int og = 0; og < ogc; og++)
+	for (int i = 0; i < ogp.size(); i++)
 	{	
 		std::stringstream sts;
-		sts << og+1;
+		sts << ogp[i];
 		std::string ogs = sts.str();
 		
 		if (   !exists(outRoot+"_xyAcc_optics-class_"+ogs+"_real.mrc")

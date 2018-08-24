@@ -74,7 +74,13 @@ void CtfRefiner::read(int argc, char **argv)
 		"Perform refinement of beamtilt");
 	
 	tiltEstimator.read(parser, argc, argv);
-
+	
+	int aberr_section = parser.addSection("Symmetric aberrations options");
+	do_aberr_fit = parser.checkOption("--fit_aberr", 
+		"Estimate symmetric aberrations");
+	
+	aberrationEstimator.read(parser, argc, argv);
+	
 	int aniso_section = parser.addSection("Anisotropic magnification options");
 	do_mag_fit = parser.checkOption("--fit_aniso", 
 		"Estimate anisotropic magnification");
@@ -120,7 +126,7 @@ void CtfRefiner::init()
 
 	ObservationModel::loadSafely(starFn, opticsFn, obsModel, mdt0, opticsMdt);
 		
-	angpix = obsModel.getPixelSize(0);
+	const double angpix = obsModel.getPixelSize(0);
 	
 	if (verb > 0)
 	{
@@ -128,7 +134,8 @@ void CtfRefiner::init()
 				  << "pixel size in " << opticsFn << ": " << angpix << " A" << std::endl;
 	}
 	
-	// after all the necessary changes to mdt0 have been applied, split it by micrograph
+	// after all the necessary changes to mdt0 have been applied 
+	// in ObservationModel::loadSafely(), split it by micrograph
 	
 	allMdts = StackHelper::splitByMicrographName(&mdt0);
 
@@ -174,6 +181,7 @@ void CtfRefiner::init()
 	sh = s/2 + 1;
 	
 	tiltEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
+	aberrationEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
 	defocusEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
 	magnificationEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
 
@@ -183,9 +191,10 @@ void CtfRefiner::init()
 		for (long int g = minMG; g <= maxMG; g++ )
 		{
 			bool is_done =
-				   (!do_tilt_fit || tiltEstimator.isFinished(allMdts[g]))
-				&& (!do_defocus_fit || defocusEstimator.isFinished(allMdts[g]))
-				&& (!do_mag_fit || magnificationEstimator.isFinished(allMdts[g]));
+				   (!do_defocus_fit || defocusEstimator.isFinished(allMdts[g]))
+				&& (!do_tilt_fit    || tiltEstimator.isFinished(allMdts[g]))
+				&& (!do_aberr_fit   || aberrationEstimator.isFinished(allMdts[g]))
+				&& (!do_mag_fit     || magnificationEstimator.isFinished(allMdts[g]));
 
 			if (!is_done)
 			{
@@ -239,7 +248,7 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 			int res = system(command.c_str());
 		}
 
-		std::vector<Image<Complex>> predSame, predOpp;
+		std::vector<Image<Complex>> predSame, predOpp, predDemod;
 
 		// use prediction from same half-set for defocus estimation (overfitting danger):
 		if (do_defocus_fit)
@@ -256,17 +265,29 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 				unfinishedMdts[g], obsModel, ReferenceMap::Opposite, nr_omp_threads,
 				false, false, false);
 		}
+		
+		if (do_aberr_fit)
+		{
+			predDemod = reference.predictAll(
+				unfinishedMdts[g], obsModel, ReferenceMap::Opposite, nr_omp_threads,
+				false, true, false);
+		}
 
 		if (do_defocus_fit)
 		{
 			defocusEstimator.processMicrograph(g, unfinishedMdts[g], obs, predSame);
 		}
-
+		
 		if (do_tilt_fit)
 		{
 			tiltEstimator.processMicrograph(g, unfinishedMdts[g], obs, predOpp);
 		}
-
+		
+		if (do_aberr_fit)
+		{
+			aberrationEstimator.processMicrograph(g, unfinishedMdts[g], obs, predDemod);
+		}
+		
 		if (do_mag_fit)
 		{
 			magnificationEstimator.processMicrograph(g, unfinishedMdts[g], obs, predOpp);
@@ -321,8 +342,14 @@ void CtfRefiner::finalise()
 	{
 		tiltEstimator.parametricFit(allMdts, optOut);
 	}
+	
+	// Do the equivalent for the symmetrical aberrations...
+	if (do_tilt_fit)
+	{
+		aberrationEstimator.parametricFit(allMdts, optOut);
+	}
 
-	// Do the equivalent for mag. fit
+	// ...and for the magnification fit
 	if (do_mag_fit)
 	{
 		magnificationEstimator.parametricFit(allMdts, mdtOut);

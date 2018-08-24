@@ -54,6 +54,20 @@ double Zernike::R(int m, int n, double rho)
 	return out;
 }
 
+void Zernike::evenIndexToMN(int i, int &m, int &n)
+{
+	const int k = (int)sqrt((double)i);
+	
+	m = i - k*k - k;
+	n = 2*k;
+}
+
+int Zernike::numberOfEvenCoeffs(int n_max)
+{
+	const int l = n_max / 2;	
+	return l*l + 2*l + 1;
+}
+
 void Zernike::oddIndexToMN(int i, int& m, int& n)
 {
 	const int k = (int)((sqrt(1 + 4 * i) - 1.0) / 2.0);

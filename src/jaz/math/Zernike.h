@@ -11,6 +11,9 @@ class Zernike
 		static double Z_cart(int m, int n, double x, double y);
 		static double R(int m, int n, double rho);
 		
+		static void evenIndexToMN(int i, int& m, int& n);
+		static int numberOfEvenCoeffs(int n_max);
+		
 		static void oddIndexToMN(int i, int& m, int& n);
 		static int numberOfOddCoeffs(int n_max);
 		

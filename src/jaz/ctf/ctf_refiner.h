@@ -28,6 +28,7 @@
 #include "tilt_estimator.h"
 #include "defocus_estimator.h"
 #include "magnification_estimator.h"
+#include "aberration_estimator.h"
 
 class CtfRefiner
 {	
@@ -55,6 +56,7 @@ class CtfRefiner
 		
 		TiltEstimator tiltEstimator;
 		DefocusEstimator defocusEstimator;
+		AberrationEstimator aberrationEstimator;
 		MagnificationEstimator magnificationEstimator;
 	
 		// Verbosity
@@ -69,20 +71,18 @@ class CtfRefiner
 		// Estimate beamtilt?
 		bool do_tilt_fit;
 		
+		// Estimate symmetric aberrations?
+		bool do_aberr_fit;
+		
 		// Estimate anisotropic magnification?
 		bool do_mag_fit;
 	
+		
 		bool debug,     // write out debugging info
-		     diag,      // write out diagnostic info
-		     clTilt,    // tilt from cmd. line
-		     anisoTilt; // use experimental anisotropic tilt model
+		     diag;      // write out diagnostic info
 	
 		long maxMG, minMG;
-	
-		RFLOAT angpix,
-			beamtilt_x, beamtilt_y,
-			beamtilt_xx, beamtilt_xy, beamtilt_yy;
-	
+		
 		int nr_omp_threads;
 	
 		std::string starFn, opticsFn, outPath;
