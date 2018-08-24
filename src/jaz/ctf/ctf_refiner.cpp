@@ -288,9 +288,17 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 				unfinishedMdts[g], obsModel, ReferenceMap::Opposite, nr_omp_threads,
 				false, true, false);
 			
+			predDbl.resize(predDemod0.size());
+					
 			for (int p = 0; p < predDemod0.size(); p++)
 			{
-				predDbl[p]() = predDemod0[p]() + predDemod1[p]();
+				predDbl[p] = Image<Complex>(sh,s);
+				
+				for (int y = 0; y < s; y++)
+				for (int x = 0; x < sh; x++)
+				{
+					predDbl[p](y,x) = predDemod0[p](y,x) + predDemod1[p](y,x);
+				}
 			}
 		}
 
