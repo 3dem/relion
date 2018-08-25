@@ -17,17 +17,31 @@ class ObservationModel
 				std::string particlesFn, std::string opticsFn, 
 				ObservationModel& obsModel, 
 				MetaDataTable& particlesMdt, MetaDataTable& opticsMdt);
+		
+		static bool containsAllNeededColumns(const MetaDataTable& partMdt);
+		
 
         ObservationModel();
         ObservationModel(const MetaDataTable &opticsMdt);
 		
-		MetaDataTable opticsMdt;
-		std::vector<double> angpix, lambda, Cs;
-		std::vector<std::vector<double>> oddZernikeCoeffs;
-		std::vector<std::map<int,Image<Complex>>> phaseCorr;
-
 		
-		// prediction
+			MetaDataTable opticsMdt;
+			bool hasEvenZernike, hasOddZernike;
+			std::vector<double> angpix, lambda, Cs;
+			std::vector<std::vector<double>> evenZernikeCoeffs, oddZernikeCoeffs;
+			
+		
+	protected:
+			
+			// cached aberration effects for a set of given image sizes
+			// e.g.: phaseCorr[opt. group][img. height](y,x)
+			std::vector<std::map<int,Image<Complex>>> phaseCorr;
+			std::vector<std::map<int,Image<RFLOAT>>> gammaOffset;
+
+			
+	public:
+			
+	// Prediction //
 			
 		void predictObservation(
 				Projector &proj, const MetaDataTable &partMdt, long int particle,
@@ -43,14 +57,24 @@ class ObservationModel
                 bool applyCtf = true, bool shiftPhases = true, bool applyShift = true);
 
 		
-		// correction
+	// Correction //
 		
+		// apply effect of antisymmetric aberration (using cache)
 		void demodulatePhase(
 				const MetaDataTable &partMdt, 
 				long int particle,
 				MultidimArray<Complex>& obsImage);
 		
-		/* for now, the programs assume that all optics groups have the same pixel size */
+		// effect of antisymmetric aberration (cached)
+		const Image<Complex>& getPhaseCorrection(int optGroup, int s);
+				
+		// effect of symmetric aberration (cached)
+		const Image<RFLOAT>& getGammaOffset(int optGroup, int s);
+		
+		
+	// Bureaucracy //
+		
+		// for now, the programs assume that all optics groups have the same pixel size
 		bool allPixelSizesIdentical() const;
 		
         double angToPix(double a, int s, int opticsGroup = 0) const;
@@ -82,9 +106,7 @@ class ObservationModel
 		std::vector<int> getOptGroupsPresent(const MetaDataTable& partMdt) const;
 		
 		
-		const Image<Complex>& getPhaseCorrection(int optGroup, int s);
 		
-		static bool containsAllNeededColumns(const MetaDataTable& partMdt);
 
 };
 

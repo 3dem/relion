@@ -4,6 +4,7 @@
 #include "src/jaz/Fourier_helper.h"
 #include "src/jaz/ctf/tilt_helper.h"
 #include "src/jaz/math/Zernike.h"
+#include "src/jaz/vtk_helper.h"
 
 #include <src/backprojector.h>
 
@@ -92,16 +93,21 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 			<< "rlnMagnification, rlnDetectorPixelSize, rlnVoltage and rlnSphericalAberration.");
 	}
 	
-	const bool hasTilt = opticsMdt.containsLabel(EMDL_IMAGE_BEAMTILT_X)
-	                  || opticsMdt.containsLabel(EMDL_IMAGE_BEAMTILT_Y);
+	// symmetrical high-order aberrations:
+	hasEvenZernike = opticsMdt.containsLabel(EMDL_IMAGE_EVEN_ZERNIKE_COEFFS);
+	evenZernikeCoeffs = std::vector<std::vector<double>>(
+			opticsMdt.numberOfObjects(), std::vector<double>(0));
+	gammaOffset = std::vector<std::map<int,Image<RFLOAT>>>(opticsMdt.numberOfObjects());
 	
-	const bool hasOddZernike = opticsMdt.containsLabel(EMDL_IMAGE_ODD_ZERNIKE_COEFFS);
-	
+	// antisymmetrical high-order aberrations:
+	hasOddZernike = opticsMdt.containsLabel(EMDL_IMAGE_ODD_ZERNIKE_COEFFS);		
 	oddZernikeCoeffs = std::vector<std::vector<double>>(
 			opticsMdt.numberOfObjects(), std::vector<double>(0));
-	
 	phaseCorr = std::vector<std::map<int,Image<Complex>>>(opticsMdt.numberOfObjects());
-								 
+	
+	const bool hasTilt = opticsMdt.containsLabel(EMDL_IMAGE_BEAMTILT_X)
+	                  || opticsMdt.containsLabel(EMDL_IMAGE_BEAMTILT_Y);							 
+	
 	for (int i = 0; i < opticsMdt.numberOfObjects(); i++)
 	{
 		RFLOAT mag, dstep;
@@ -116,6 +122,11 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 		
 		opticsMdt.getValue(EMDL_CTF_CS, Cs[i], i);
 		
+		if (hasEvenZernike)
+		{
+			opticsMdt.getValue(EMDL_IMAGE_EVEN_ZERNIKE_COEFFS, evenZernikeCoeffs[i], i);
+		}
+		
 		if (hasOddZernike)
 		{
 			opticsMdt.getValue(EMDL_IMAGE_ODD_ZERNIKE_COEFFS, oddZernikeCoeffs[i], i);
@@ -123,6 +134,8 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 		
 		if (hasTilt)
 		{
+			hasOddZernike = true;
+			
 			double tx(0), ty(0);
 			
 			opticsMdt.getValue(EMDL_IMAGE_BEAMTILT_X, tx, i);
@@ -183,9 +196,16 @@ void ObservationModel::predictObservation(
     if (applyCtf)
     {
         CTF ctf;
-        ctf.readByGroup(partMdt, this, particle);        
+        ctf.readByGroup(partMdt, this, particle);
+		
+		Image<RFLOAT> ctfImg(sh,s);
+		ctf.getFftwImage(ctfImg(), s, s, angpix[opticsGroup]);
 
-        FilterHelper::modulate(dest, ctf, angpix[opticsGroup]);
+		for (int y = 0; y < s;  y++)
+		for (int x = 0; x < sh; x++)
+		{
+			dest(y,x) *= ctfImg(y,x);
+		}
     }
 
     if (shiftPhases && oddZernikeCoeffs.size() > opticsGroup 
@@ -386,39 +406,93 @@ const Image<Complex>& ObservationModel::getPhaseCorrection(int optGroup, int s)
 {
 	if (phaseCorr[optGroup].find(s) == phaseCorr[optGroup].end())
 	{
-		if (phaseCorr[optGroup].size() > 100)
+		// critical section strictly within cache update
+		#pragma omp critical
 		{
-			std::cerr << "Warning: " << (phaseCorr[optGroup].size()+1)
-					  << " phase shift images in cache for the same ObservationModel." << std::endl;
-		}
-				
-		const int sh = s/2 + 1;
-		phaseCorr[optGroup][s] = Image<Complex>(sh,s);
-		
-		const double as = angpix[optGroup] * s;
-		
-		for (int y = 0; y < s;  y++)
-		for (int x = 0; x < sh; x++)
-		{
-			double phase = 0.0;
-			
-			for (int i = 0; i < oddZernikeCoeffs[optGroup].size(); i++)
+			// repeat check for newly awoken threads
+			if (phaseCorr[optGroup].find(s) == phaseCorr[optGroup].end())
 			{
-				int m, n;
-				Zernike::oddIndexToMN(i, m, n);
+				if (phaseCorr[optGroup].size() > 100)
+				{
+					std::cerr << "Warning: " << (phaseCorr[optGroup].size()+1)
+							  << " phase shift images in cache for the same ObservationModel." << std::endl;
+				}
+						
+				const int sh = s/2 + 1;
+				phaseCorr[optGroup][s] = Image<Complex>(sh,s);
 				
-				const double xx = x/as;
-				const double yy = y < sh? y/as : (y-s)/as;
+				const double as = angpix[optGroup] * s;
 				
-				phase += oddZernikeCoeffs[optGroup][i] * Zernike::Z_cart(m,n,xx,yy);
+				for (int y = 0; y < s;  y++)
+				for (int x = 0; x < sh; x++)
+				{
+					double phase = 0.0;
+					
+					for (int i = 0; i < oddZernikeCoeffs[optGroup].size(); i++)
+					{
+						int m, n;
+						Zernike::oddIndexToMN(i, m, n);
+						
+						const double xx = x/as;
+						const double yy = y < sh? y/as : (y-s)/as;
+						
+						phase += oddZernikeCoeffs[optGroup][i] * Zernike::Z_cart(m,n,xx,yy);
+					}
+					
+					phaseCorr[optGroup][s](y,x).real = cos(phase);
+					phaseCorr[optGroup][s](y,x).imag = sin(phase);
+				}
 			}
-			
-			phaseCorr[optGroup][s](y,x).real = cos(phase);
-			phaseCorr[optGroup][s](y,x).imag = sin(phase);
 		}
 	}
 	
 	return phaseCorr[optGroup][s];
+}
+
+const Image<RFLOAT>& ObservationModel::getGammaOffset(int optGroup, int s)
+{
+	if (gammaOffset[optGroup].find(s) == gammaOffset[optGroup].end())
+	{
+		// critical section strictly within cache update
+		#pragma omp critical
+		{
+			// repeat check for newly awoken threads
+			if (gammaOffset[optGroup].find(s) == gammaOffset[optGroup].end())
+			{				
+				if (gammaOffset[optGroup].size() > 100)
+				{
+					std::cerr << "Warning: " << (gammaOffset[optGroup].size()+1)
+							  << " gamma offset images in cache for the same ObservationModel." << std::endl;
+				}
+						
+				const int sh = s/2 + 1;
+				gammaOffset[optGroup][s] = Image<RFLOAT>(sh,s);
+				
+				const double as = angpix[optGroup] * s;
+				
+				for (int y = 0; y < s;  y++)
+				for (int x = 0; x < sh; x++)
+				{
+					double phase = 0.0;
+					
+					for (int i = 0; i < evenZernikeCoeffs[optGroup].size(); i++)
+					{
+						int m, n;
+						Zernike::evenIndexToMN(i, m, n);
+						
+						const double xx = x/as;
+						const double yy = y < sh? y/as : (y-s)/as;
+						
+						phase += evenZernikeCoeffs[optGroup][i] * Zernike::Z_cart(m,n,xx,yy);
+					}
+					
+					gammaOffset[optGroup][s](y,x) = phase;
+				}
+			}
+		}
+	}
+	
+	return gammaOffset[optGroup][s];
 }
 
 bool ObservationModel::containsAllNeededColumns(const MetaDataTable& partMdt)

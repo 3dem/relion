@@ -36,12 +36,8 @@ void AberrationEstimator::read(IOParser &parser, int argc, char *argv[])
 	aberr_n_max  = textToInteger(parser.getOption(aberrToken, 
 		"Maximum degree of Zernike polynomials used to fit even (i.e. symmetrical) aberrations", "4"));
 	
-	xring0 = textToDouble(parser.getOption("--xr0", 
-		"Exclusion ring start (A)", "-1"));
-	
-	xring1 = textToDouble(parser.getOption("--xr1", 
-		"Exclusion ring end (A)", "-1"));
-			
+	xring0 = textToDouble(parser.getOption("--xr0", "Exclusion ring start (A)", "-1"));	
+	xring1 = textToDouble(parser.getOption("--xr1", "Exclusion ring end (A)", "-1"));
 }
 
 void AberrationEstimator::init(
@@ -112,13 +108,24 @@ void AberrationEstimator::processMicrograph(
 		
 		const int t = cc * threadnum + ci;
 		
+		Image<RFLOAT> gammaOff;
+		
+		if (obsModel->hasEvenZernike)
+		{
+			gammaOff = obsModel->getGammaOffset(og-1, s);
+		}
+		else
+		{
+			gammaOff = Image<RFLOAT>(sh,s);
+		}
+		
 		for (int y = 0; y < s;  y++)
 		for (int x = 0; x < sh; x++)
 		{
 			const double xf = x;
 			const double yf = y < sh? y : y - s;
 			
-			const double gamma_i = ctf.getGamma(xf/as, yf/as);
+			const double gamma_i = ctf.getGamma(xf/as, yf/as) + gammaOff(y,x);
 			const double cg = cos(gamma_i);
 			const double sg = sin(gamma_i);
 

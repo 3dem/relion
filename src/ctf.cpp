@@ -49,9 +49,9 @@
 #include <src/jaz/obs_model.h>
 
 /* Read -------------------------------------------------------------------- */
-void CTF::readByGroup(const MetaDataTable &partMdt, const ObservationModel* obs, int particle)
+void CTF::readByGroup(const MetaDataTable &partMdt, ObservationModel* obs, int particle)
 {
-	int opticsGroup = 0;
+	opticsGroup = 0;
 	
 	if (obs != 0) 
 	{
@@ -69,10 +69,10 @@ void CTF::readByGroup(const MetaDataTable &partMdt, const ObservationModel* obs,
 	readValue(EMDL_CTF_SCALEFACTOR,   scale,           1,       particle, opticsGroup, partMdt, obs);
 	readValue(EMDL_CTF_Q0,            Q0,              0,       particle, opticsGroup, partMdt, obs);
 	readValue(EMDL_CTF_PHASESHIFT,    phase_shift,     0,       particle, opticsGroup, partMdt, obs);
+		
+	initialise();
 	
-	// get symmetrical higher-order aberrations from obs here
-	
-	initialise();	
+	obsModel = obs;
 }
 
 void CTF::readValue(EMDLabel label, RFLOAT& dest, RFLOAT defaultVal, int particle, int opticsGroup, 
@@ -175,20 +175,9 @@ void CTF::write(std::ostream &out)
     MD.write(out);
 }
 
-/* Default values ---------------------------------------------------------- */
-void CTF::clear()
-{
-    kV = 200;
-    DeltafU = DeltafV = azimuthal_angle = phase_shift = 0;
-    Cs = Bfac = 0;
-    Q0 = 0;
-    scale = 1;
-}
-
 /* Initialise the CTF ------------------------------------------------------ */
 void CTF::initialise()
 {
-
 	// Change units
     RFLOAT local_Cs = Cs * 1e7;
     RFLOAT local_kV = kV * 1e3;
@@ -251,13 +240,43 @@ void CTF::getFftwImage(MultidimArray<RFLOAT> &result, int orixdim, int oriydim, 
 {
 	RFLOAT xs = (RFLOAT)orixdim * angpix;
 	RFLOAT ys = (RFLOAT)oriydim * angpix;
-
-	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(result)
+	
+	if (obsModel != 0 && obsModel->hasEvenZernike)
 	{
-		RFLOAT x = (RFLOAT)jp / xs;
-		RFLOAT y = (RFLOAT)ip / ys;
-		DIRECT_A2D_ELEM(result, i, j) = getCTF(x, y, do_abs, do_only_flip_phases, do_intact_until_first_peak, do_damping);
-    }
+		const int s = result.ydim;
+		const int sh = result.xdim;
+		
+		if (orixdim != oriydim || s != oriydim)
+		{
+			REPORT_ERROR_STR("CTF::getFftwImage: symmetric aberrations are currently only "
+			              << "supported for square images.\n");
+		}
+		
+		const Image<RFLOAT>& gammaOffset = obsModel->getGammaOffset(opticsGroup, oriydim);
+		
+		for (int yy = 0; yy < s; yy++)
+		for (int xx = 0; xx < sh; xx++)
+		{
+			RFLOAT x = xx / xs;
+			RFLOAT y = yy < sh? yy / ys : (yy - s) / ys;
+			
+			DIRECT_A2D_ELEM(result, yy, xx) = 
+				getCTF(x, y, do_abs, do_only_flip_phases, 
+					   do_intact_until_first_peak, do_damping, gammaOffset(yy,xx));
+		}
+	}
+	else
+	{
+		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(result)
+		{
+			RFLOAT x = (RFLOAT)jp / xs;
+			RFLOAT y = (RFLOAT)ip / ys;
+			
+			DIRECT_A2D_ELEM(result, i, j) = 
+				getCTF(x, y, do_abs, do_only_flip_phases, 
+					   do_intact_until_first_peak, do_damping);
+		}
+	}
 }
 
 /* Generate a complete CTFP (complex) image (with sector along angle) ------------------------------------------------------ */
