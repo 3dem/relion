@@ -9,6 +9,7 @@
 #include <src/backprojector.h>
 
 #include <set>
+#include <omp.h>
 
 
 void ObservationModel::loadSafely(
@@ -404,44 +405,40 @@ std::vector<int> ObservationModel::getOptGroupsPresent(const MetaDataTable& part
 
 const Image<Complex>& ObservationModel::getPhaseCorrection(int optGroup, int s)
 {
-	if (phaseCorr[optGroup].find(s) == phaseCorr[optGroup].end())
+	#pragma omp critical
 	{
-		// critical section strictly within cache update
-		#pragma omp critical
+		if (phaseCorr[optGroup].find(s) == phaseCorr[optGroup].end())
 		{
-			// repeat check for newly awoken threads
-			if (phaseCorr[optGroup].find(s) == phaseCorr[optGroup].end())
+			if (phaseCorr[optGroup].size() > 100)
 			{
-				if (phaseCorr[optGroup].size() > 100)
-				{
-					std::cerr << "Warning: " << (phaseCorr[optGroup].size()+1)
-							  << " phase shift images in cache for the same ObservationModel." << std::endl;
-				}
-						
-				const int sh = s/2 + 1;
-				phaseCorr[optGroup][s] = Image<Complex>(sh,s);
-				
-				const double as = angpix[optGroup] * s;
-				
-				for (int y = 0; y < s;  y++)
-				for (int x = 0; x < sh; x++)
-				{
-					double phase = 0.0;
+				std::cerr << "Warning: " << (phaseCorr[optGroup].size()+1)
+						  << " phase shift images in cache for the same ObservationModel." << std::endl;
+			}
 					
-					for (int i = 0; i < oddZernikeCoeffs[optGroup].size(); i++)
-					{
-						int m, n;
-						Zernike::oddIndexToMN(i, m, n);
-						
-						const double xx = x/as;
-						const double yy = y < sh? y/as : (y-s)/as;
-						
-						phase += oddZernikeCoeffs[optGroup][i] * Zernike::Z_cart(m,n,xx,yy);
-					}
+			const int sh = s/2 + 1;
+			phaseCorr[optGroup][s] = Image<Complex>(sh,s);
+			Image<Complex>& img = phaseCorr[optGroup][s];
+			
+			const double as = angpix[optGroup] * s;
+			
+			for (int y = 0; y < s;  y++)
+			for (int x = 0; x < sh; x++)
+			{
+				double phase = 0.0;
+				
+				for (int i = 0; i < oddZernikeCoeffs[optGroup].size(); i++)
+				{
+					int m, n;
+					Zernike::oddIndexToMN(i, m, n);
 					
-					phaseCorr[optGroup][s](y,x).real = cos(phase);
-					phaseCorr[optGroup][s](y,x).imag = sin(phase);
+					const double xx = x/as;
+					const double yy = y < sh? y/as : (y-s)/as;
+					
+					phase += oddZernikeCoeffs[optGroup][i] * Zernike::Z_cart(m,n,xx,yy);
 				}
+				
+				img(y,x).real = cos(phase);
+				img(y,x).imag = sin(phase);
 			}
 		}
 	}
@@ -451,45 +448,41 @@ const Image<Complex>& ObservationModel::getPhaseCorrection(int optGroup, int s)
 
 const Image<RFLOAT>& ObservationModel::getGammaOffset(int optGroup, int s)
 {
-	if (gammaOffset[optGroup].find(s) == gammaOffset[optGroup].end())
+	#pragma omp critical
 	{
-		// critical section strictly within cache update
-		#pragma omp critical
+		if (gammaOffset[optGroup].find(s) == gammaOffset[optGroup].end())
 		{
-			// repeat check for newly awoken threads
-			if (gammaOffset[optGroup].find(s) == gammaOffset[optGroup].end())
-			{				
-				if (gammaOffset[optGroup].size() > 100)
-				{
-					std::cerr << "Warning: " << (gammaOffset[optGroup].size()+1)
-							  << " gamma offset images in cache for the same ObservationModel." << std::endl;
-				}
-						
-				const int sh = s/2 + 1;
-				gammaOffset[optGroup][s] = Image<RFLOAT>(sh,s);
-				
-				const double as = angpix[optGroup] * s;
-				
-				for (int y = 0; y < s;  y++)
-				for (int x = 0; x < sh; x++)
-				{
-					double phase = 0.0;
-					
-					for (int i = 0; i < evenZernikeCoeffs[optGroup].size(); i++)
-					{
-						int m, n;
-						Zernike::evenIndexToMN(i, m, n);
-						
-						const double xx = x/as;
-						const double yy = y < sh? y/as : (y-s)/as;
-						
-						phase += evenZernikeCoeffs[optGroup][i] * Zernike::Z_cart(m,n,xx,yy);
-					}
-					
-					gammaOffset[optGroup][s](y,x) = phase;
-				}
+			if (gammaOffset[optGroup].size() > 100)
+			{
+				std::cerr << "Warning: " << (gammaOffset[optGroup].size()+1)
+						  << " gamma offset images in cache for the same ObservationModel." << std::endl;
 			}
-		}
+					
+			const int sh = s/2 + 1;
+			gammaOffset[optGroup][s] = Image<RFLOAT>(sh,s);
+			Image<RFLOAT>& img = gammaOffset[optGroup][s];
+			
+			const double as = angpix[optGroup] * s;
+			
+			for (int y = 0; y < s;  y++)
+			for (int x = 0; x < sh; x++)
+			{
+				double phase = 0.0;
+				
+				for (int i = 0; i < evenZernikeCoeffs[optGroup].size(); i++)
+				{
+					int m, n;
+					Zernike::evenIndexToMN(i, m, n);
+					
+					const double xx = x/as;
+					const double yy = y < sh? y/as : (y-s)/as;
+					
+					phase += evenZernikeCoeffs[optGroup][i] * Zernike::Z_cart(m,n,xx,yy);
+				}
+				
+				img(y,x) = phase;
+			}
+		}	
 	}
 	
 	return gammaOffset[optGroup][s];
