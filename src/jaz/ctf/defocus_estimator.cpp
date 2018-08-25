@@ -232,7 +232,7 @@ void DefocusEstimator::processMicrograph(
 		}
 	}
 
-	// Parallel loop over all particles on this micrograph
+	// Parallel loop over all particles in this micrograph
 	#pragma omp parallel for num_threads(nr_omp_threads)
 	for (long p = 0; p < pc; p++)
 	{

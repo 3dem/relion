@@ -15,21 +15,20 @@ void MagnificationHelper::updateScaleFreq(
 	const long w = prediction.data.xdim;
 	const long h = prediction.data.ydim;
 	
-	const double as = (double)h * angpix;
 	Volume<gravis::d2Vector> gradReal(w,h,1), gradImg(w,h,1);
 	
 	FilterHelper::centralGrad2D(prediction, gradReal, gradImg);
 	
+	Image<RFLOAT> ctfImg(w,h);
+	ctf.getFftwImage(ctfImg(), h, h, angpix);
+	
 	for (long y = 0; y < h; y++)
 	for (long x = 0; x < w; x++)
 	{
-		const double xf = x;
-		const double yf = y < w? y : y - h;
-		
 		Complex vx = DIRECT_A2D_ELEM(prediction.data, y, x);
 		Complex vy = DIRECT_A2D_ELEM(observation.data, y, x);
 		
-		double c = ctf.getCTF(xf/as, yf/as);
+		double c = ctfImg(y,x);
 		
 		gravis::d2Vector gr = gradReal(x,y,0);
 		gravis::d2Vector gi = gradImg(x,y,0);
@@ -54,21 +53,19 @@ void MagnificationHelper::updateScaleReal(
 	const long w = prediction.data.xdim;
 	const long h = prediction.data.ydim;
 	
-	const double as = (double)h * angpix;
-	
 	Image<Complex> pred2(w,h), obs2(w,h);
 	Image<RFLOAT> realPred(ww, h), realObs(ww, h);
+	
+	Image<RFLOAT> ctfImg(w,h);
+	ctf.getFftwImage(ctfImg(), h, h, angpix);
 	
 	for (long y = 0; y < h; y++)
 	for (long x = 0; x < w; x++)
 	{
-		const double xf = x;
-		const double yf = y < w? y : y - h;
-		
 		Complex vx = DIRECT_A2D_ELEM(prediction.data, y, x);
 		Complex vy = DIRECT_A2D_ELEM(observation.data, y, x);
 		Complex sn = DIRECT_A2D_ELEM(snr.data, y, x);
-		double c = ctf.getCTF(xf/as, yf/as);
+		double c = ctfImg(y,x);
 		
 		DIRECT_A2D_ELEM(pred2.data, y, x) = sn * c * vx;
 		DIRECT_A2D_ELEM(obs2.data, y, x) = sn * vy;
@@ -287,7 +284,8 @@ void MagnificationHelper::updatePowSpec(
 	const long w = prediction.data.xdim;
 	const long h = prediction.data.ydim;
 	
-	const double as = (double)h * angpix;
+	Image<RFLOAT> ctfImg(w,h);
+	ctf.getFftwImage(ctfImg(), h, h, angpix);
 	
 	for (long y = 0; y < h; y++)
 	for (long x = 0; x < w; x++)
@@ -297,7 +295,7 @@ void MagnificationHelper::updatePowSpec(
 		
 		Complex vx = DIRECT_A2D_ELEM(prediction.data, y, x);
 		Complex vy = DIRECT_A2D_ELEM(observation.data, y, x);
-		double c = ctf.getCTF(xf/as, yf/as);
+		double c = ctfImg(y,x);
 		
 		DIRECT_A2D_ELEM(powSpecPred.data, y, x) += (c * vx).abs();
 		DIRECT_A2D_ELEM(powSpecObs.data, y, x) += vy.abs();

@@ -61,14 +61,13 @@ class TiltHelper
         static void updateTiltShift(
                 const Image<Complex>& prediction,
                 const Image<Complex>& observation,
-                const CTF& ctf, double angpix,
+                CTF& ctf, double angpix,
                 Image<Complex>& xyDest,
                 Image<RFLOAT>& wDest);
 
-        static void updateTiltShiftPar(
-                const Image<Complex>& prediction,
+        static void updateTiltShiftPar(const Image<Complex>& prediction,
                 const Image<Complex>& observation,
-                const CTF& ctf, double angpix,
+                CTF &ctf, double angpix,
                 Image<Complex>& xyDest,
                 Image<RFLOAT>& wDest);
 

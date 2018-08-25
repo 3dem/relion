@@ -288,18 +288,16 @@ double AstigmatismOptimizationAcc::f(const std::vector<double> &x, void* tempSto
     const long h = data.data.ydim;
 
     double out = 0.0;
-
-    const RFLOAT as = (RFLOAT)h * angpix;
+	
+	Image<RFLOAT> ctfImg(w,h);
+	ctf.getFftwImage(ctfImg(), h, h, angpix);
 
     for (long y = 0; y < h; y++)
     for (long x = 0; x < w; x++)
     {
         Complex vd = DIRECT_A2D_ELEM(data.data, y, x);
 
-        const double xf = x;
-        const double yf = y < w? y : y - h;
-
-        RFLOAT vm = ctf.getCTF(xf/as, yf/as);
+        RFLOAT vm = ctfImg(y,x);
         RFLOAT dx = vd.real - vm;
         out += vd.imag * dx * dx;
     }

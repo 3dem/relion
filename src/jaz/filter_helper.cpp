@@ -625,15 +625,15 @@ void FilterHelper::modulate(Image<RFLOAT>& img, CTF& ctf, RFLOAT angpix, Image<R
 
 void FilterHelper::modulate(Image<Complex>& imgFreq, CTF& ctf, RFLOAT angpix, Image<RFLOAT>& dest)
 {
-    RFLOAT as = (RFLOAT)imgFreq.data.ydim * angpix;
+    const int w = imgFreq.data.xdim;
+	const int h = imgFreq.data.ydim;
 
+	Image<RFLOAT> ctfImg(w,h);
+	ctf.getFftwImage(ctfImg(), h, h, angpix);
+	
     FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(imgFreq())
     {
-        const int x = j;
-        const int y = i < imgFreq().ydim/2? i : i - imgFreq().ydim;
-
-        RFLOAT c = ctf.getCTF(x/as, y/as);
-        DIRECT_A2D_ELEM(imgFreq(), i, j) *= c;
+        DIRECT_A2D_ELEM(imgFreq(), i, j) *= DIRECT_A2D_ELEM(ctfImg(), i, j);
     }
 
     if (dest.data.xdim != 2*(imgFreq.data.xdim-1) || dest.data.ydim != imgFreq.data.ydim)
@@ -647,29 +647,29 @@ void FilterHelper::modulate(Image<Complex>& imgFreq, CTF& ctf, RFLOAT angpix, Im
 
 void FilterHelper::modulate(MultidimArray<Complex>& imgFreq, CTF& ctf, RFLOAT angpix)
 {
-    RFLOAT as = (RFLOAT)imgFreq.ydim * angpix;
+	const int w = imgFreq.xdim;
+	const int h = imgFreq.ydim;
+
+	Image<RFLOAT> ctfImg(w,h);
+	ctf.getFftwImage(ctfImg(), h, h, angpix);
 
     FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(imgFreq)
     {
-        const int x = j;
-        const int y = i < imgFreq.ydim/2? i : i - imgFreq.ydim;
-
-        RFLOAT c = ctf.getCTF(x/as, y/as);
-        DIRECT_A2D_ELEM(imgFreq, i, j) *= c;
+        DIRECT_A2D_ELEM(imgFreq, i, j) *= DIRECT_A2D_ELEM(ctfImg(), i, j);
     }
 }
 
 void FilterHelper::drawCtf(CTF &ctf, RFLOAT angpix, Image<Complex> &dest)
 {
-    RFLOAT as = (RFLOAT)dest.data.ydim * angpix;
+	const int w = dest.data.xdim;
+	const int h = dest.data.ydim;
+
+	Image<RFLOAT> ctfImg(w,h);
+	ctf.getFftwImage(ctfImg(), h, h, angpix);
 
     FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(dest())
     {
-        const int x = j;
-        const int y = i <= dest().ydim/2? i : i - dest().ydim;
-
-        RFLOAT c = ctf.getCTF(x/as, y/as);
-        DIRECT_A2D_ELEM(dest(), i, j) = Complex(c,0.0);
+        DIRECT_A2D_ELEM(dest(), i, j) = DIRECT_A2D_ELEM(ctfImg(), i, j);
     }
 }
 

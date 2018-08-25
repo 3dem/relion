@@ -11,26 +11,23 @@ using namespace gravis;
 void TiltHelper::updateTiltShift(
         const Image<Complex> &prediction,
         const Image<Complex> &observation,
-        const CTF& ctf, double angpix,
+        CTF& ctf, double angpix,
         Image<Complex>& xyDest,
         Image<RFLOAT>& wDest)
 {
-
     const long w = prediction.data.xdim;
     const long h = prediction.data.ydim;
 
-    const RFLOAT as = (RFLOAT)h * angpix;
-
+	Image<RFLOAT> ctfImg(w,h);
+	ctf.getFftwImage(ctfImg(), h, h, angpix);
+	
     for (long y = 0; y < h; y++)
     for (long x = 0; x < w; x++)
     {
-        const double xf = x;
-        const double yf = y < w? y : y - h;
-
         Complex vx = DIRECT_A2D_ELEM(prediction.data, y, x);
         Complex vy = DIRECT_A2D_ELEM(observation.data, y, x);
 
-        RFLOAT c = ctf.getCTF(xf/as, yf/as);
+        RFLOAT c = ctfImg(y,x);
 
         DIRECT_A2D_ELEM(xyDest.data, y, x) += c * vx.conj() * vy;
         DIRECT_A2D_ELEM(wDest.data, y, x) += c * c * vx.norm();
@@ -40,14 +37,15 @@ void TiltHelper::updateTiltShift(
 void TiltHelper::updateTiltShiftPar(
         const Image<Complex> &prediction,
         const Image<Complex> &observation,
-        const CTF& ctf, double angpix,
+        CTF& ctf, double angpix,
         Image<Complex>& xyDest,
         Image<RFLOAT>& wDest)
 {
     const long w = prediction.data.xdim;
     const long h = prediction.data.ydim;
 
-    const RFLOAT as = (RFLOAT)h * angpix;
+	Image<RFLOAT> ctfImg(w,h);
+	ctf.getFftwImage(ctfImg(), h, h, angpix);
 
     #pragma omp parallel for
     for (long y = 0; y < h; y++)
@@ -59,7 +57,7 @@ void TiltHelper::updateTiltShiftPar(
         Complex vx = DIRECT_A2D_ELEM(prediction.data, y, x);
         Complex vy = DIRECT_A2D_ELEM(observation.data, y, x);
 
-        RFLOAT c = ctf.getCTF(xf/as, yf/as);
+        RFLOAT c = ctfImg(y,x);
 
         DIRECT_A2D_ELEM(xyDest.data, y, x) += c * vx.conj() * vy;
         DIRECT_A2D_ELEM(wDest.data, y, x) += c * c * vx.norm();
