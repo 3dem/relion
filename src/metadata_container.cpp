@@ -72,7 +72,7 @@ void MetaDataContainer::getValue(long offset, bool& dest) const
 	  
 void MetaDataContainer::getValue(long offset, std::vector<double>& dest) const
 {
-    dest = doubleVectors[offset];
+	dest = doubleVectors[offset];
 }
 
 void MetaDataContainer::getValue(long offset, std::string& dest) const
@@ -113,6 +113,6 @@ void MetaDataContainer::setValue(long offset, const std::string& src)
 
 void MetaDataContainer::setValue(long offset, const std::vector<double>& src)
 {
-    doubleVectors[offset] = src;
+	doubleVectors[offset] = src;
 }
 	  

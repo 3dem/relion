@@ -199,9 +199,6 @@ void AberrationEstimator::parametricFit(
 	
 	for (int og = 0; og < ogc; og++)
 	{	
-		double Cs = obsModel->Cs[og];
-		double lambda = obsModel->lambda[og];
-		
 		std::stringstream sts;
 		sts << og+1;
 		std::string cns = sts.str();

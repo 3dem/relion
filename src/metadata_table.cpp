@@ -99,6 +99,8 @@ MetaDataTable& MetaDataTable::operator = (const MetaDataTable &MD)
 		intLabels = MD.intLabels;
 		boolLabels = MD.boolLabels;
 		stringLabels = MD.stringLabels;
+		doubleVectorLabels = MD.doubleVectorLabels;
+		
 		isList = MD.isList;
 		name = MD.name;
 		comment = MD.comment;
@@ -621,7 +623,7 @@ void MetaDataTable::addLabel(EMDLabel label)
 		else if (EMDL::isDoubleVector(label))
 		{
 			id = doubleVectorLabels;
-
+			
 			for (long i = 0; i < objects.size(); i++)
 			{
 				objects[i]->doubleVectors.push_back(std::vector<double>());
@@ -980,6 +982,7 @@ long int MetaDataTable::readStar(std::ifstream& in, const std::string &name, std
 	in.seekg(0);
 	
 	// Set the version to 30000 by default, in case there is no version tag
+	// (version tags were introduced in version 31000)
 	version = 30000;
 
 	// Proceed until the next data_ or _loop statement
