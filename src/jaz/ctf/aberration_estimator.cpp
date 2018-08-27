@@ -271,7 +271,7 @@ void AberrationEstimator::parametricFit(
 
 				optXY(y,x) = Complex(opt.x, opt.y);
 				phase(y,x) = std::abs(opt.x) > 0.0? atan2(opt.y, opt.x) : 0.0;
-				wgh(y,x) *= sqrt(std::abs(det));
+				wgh(y,x) *= sqrt(sqrt(std::abs(det)));
 			}
 			else
 			{
