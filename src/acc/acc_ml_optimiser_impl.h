@@ -37,7 +37,9 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		// What is my particle_id?
 		long int part_id = baseMLO->mydata.ori_particles[my_ori_particle].particles_id[ipart];
 		// Which group do I belong?
-		int group_id =baseMLO->mydata.getGroupId(part_id);
+		int group_id = baseMLO->mydata.getGroupId(part_id);
+		// What is my optics group?
+		int optics_group = baseMLO->mydata.getOpticsGroup(part_id);
 
 		// Get the right line in the exp_fn_img strings (also exp_fn_recimg and exp_fn_ctfs)
 		int istop = 0;
@@ -486,9 +488,9 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		// This will only be used for reconstruction, not for alignment
 		// But beamtilt only affects very high-resolution components anyway...
 		//
-		
-		baseMLO->mydata.obsModel.demodulatePhase(
-			baseMLO->mydata.opticsGroups[op.metadata_offset + ipart], Fimg);
+		// - Not necessarily true anymore (hopefully)
+				
+		baseMLO->mydata.obsModel.demodulatePhase(optics_group, Fimg);
 
 		CTOC(accMLO->timer,"selfApplyBeamTilt");
 
