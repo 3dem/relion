@@ -36,8 +36,8 @@ void AberrationEstimator::read(IOParser &parser, int argc, char *argv[])
 	aberr_n_max  = textToInteger(parser.getOption(aberrToken, 
 		"Maximum degree of Zernike polynomials used to fit even (i.e. symmetrical) aberrations", "4"));
 	
-	xring0 = textToDouble(parser.getOption("--xr0", "Exclusion ring start (A)", "-1"));	
-	xring1 = textToDouble(parser.getOption("--xr1", "Exclusion ring end (A)", "-1"));
+	xring0 = textToDouble(parser.getOption("--xr0_a", "Exclusion ring start (A)", "-1"));	
+	xring1 = textToDouble(parser.getOption("--xr1_a", "Exclusion ring end (A)", "-1"));
 }
 
 void AberrationEstimator::init(

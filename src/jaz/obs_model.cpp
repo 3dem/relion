@@ -135,8 +135,6 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 		
 		if (hasTilt)
 		{
-			hasOddZernike = true;
-			
 			double tx(0), ty(0);
 			
 			opticsMdt.getValue(EMDL_IMAGE_BEAMTILT_X, tx, i);
@@ -148,6 +146,8 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 			}
 			
 			TiltHelper::insertTilt(oddZernikeCoeffs[i], tx, ty, Cs[i], lambda[i]);
+			
+			hasOddZernike = true;
 		}
 	}
 	
