@@ -491,8 +491,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	fn_opt = parser.getOption("--io", "Optics groups", "");
     fn_out = parser.getOption("--o", "Output rootname", "");
     nr_iter = textToInteger(parser.getOption("--iter", "Maximum number of iterations to perform", "50"));
-    mymodel.pixel_size = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms)", "-1"));
-	mymodel.tau2_fudge_factor = textToFloat(parser.getOption("--tau2_fudge", "Regularisation parameter (values higher than 1 give more weight to the data)", "1"));
+    mymodel.tau2_fudge_factor = textToFloat(parser.getOption("--tau2_fudge", "Regularisation parameter (values higher than 1 give more weight to the data)", "1"));
 	mymodel.nr_classes = textToInteger(parser.getOption("--K", "Number of references to be refined", "1"));
     particle_diameter = textToFloat(parser.getOption("--particle_diameter", "Diameter of the circular mask that will be applied to the experimental images (in Angstroms)", "-1"));
 	do_zero_mask = parser.checkOption("--zero_mask","Mask surrounding background in particles to zero (by default the solvent area is filled with random noise)");
@@ -1468,7 +1467,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 	// If we are not continuing an old run, now read in the data and the reference images
 	if (iter == 0)
 	{
-
 		// Read in the experimental image metadata
 		// If do_preread_images: only the master reads all images into RAM
 		bool do_preread = (do_preread_images) ? (do_parallel_disc_io || rank == 0) : false;
@@ -1487,40 +1485,10 @@ void MlOptimiser::initialiseGeneral(int rank)
 		int refdim = (fn_ref == "denovo") ? 3 : 2;
 		mymodel.readImages(fn_ref, is_3d_model, ori_size, mydata,
 				do_average_unaligned, do_generate_seeds, refs_are_ctf_corrected, do_sgd);
-
-    	// Check consistency of EMDL_CTF_MAGNIFICATION and MEBL_CTF_DETECTOR_PIXEL_SIZE with mymodel.pixel_size
-    	RFLOAT mag, dstep, first_angpix, my_angpix;
-    	bool has_magn = false;
-    	if (mydata.MDimg.containsLabel(EMDL_CTF_MAGNIFICATION) && mydata.MDimg.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
-    	{
-    		FOR_ALL_OBJECTS_IN_METADATA_TABLE(mydata.MDimg)
-			{
-    			mydata.MDimg.getValue(EMDL_CTF_MAGNIFICATION, mag);
-    			mydata.MDimg.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
-    			my_angpix = 10000. * dstep / mag;
-    			if (!has_magn)
-    			{
-    				first_angpix = my_angpix;
-    				has_magn = true;
-    			}
-    			else if (ABS(first_angpix - my_angpix) > 0.01)
-    			{
-    				std::cerr << " first_angpix= " << first_angpix << " my_angpix= " << my_angpix << " mag= " << mag  << " dstep= " << dstep << std::endl;
-    				REPORT_ERROR("MlOptimiser::initialiseGeneral: ERROR inconsistent magnification and detector pixel sizes in images in input STAR file");
-    			}
-			}
-
-    	}
-    	if (has_magn && ABS(first_angpix - mymodel.pixel_size) > 0.01)
-    	{
-    		if (verb > 0 && mymodel.pixel_size > 0.)
-    			std::cout << "MlOptimiser::initialiseGeneral: WARNING modifying pixel size from " << mymodel.pixel_size <<" to "<<first_angpix << " based on magnification information in the input STAR file" << std::endl;
-    		mymodel.pixel_size = first_angpix;
-    	}
-
-    	if (!has_magn && mymodel.pixel_size < 0.)
-    		REPORT_ERROR("ERROR: you did not specify the pixel size. Use the --angpix option to do so.");
+				
+		mymodel.pixel_size = mydata.obsModel.getPixelSize(0);
 	}
+	
 	// Expand movies if fn_data_movie is given AND we were not doing expanded movies already
 	else if (fn_data_movie != "" && !do_realign_movies)
 	{
@@ -2024,7 +1992,6 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 
 	for (long int ori_part_id = my_first_ori_particle_id; ori_part_id <= my_last_ori_particle_id; ori_part_id++, nr_ori_particles_done++)
 	{
-
 		for (long int i = 0; i < mydata.ori_particles[ori_part_id].particles_id.size(); i++)
 		{
 			long int part_id = mydata.ori_particles[ori_part_id].particles_id[i];
@@ -2159,7 +2126,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 				// Randomize the initial orientations for initial reference generation at this step....
 				// TODO: this is not an even angular distribution....
 				RFLOAT rot  = (mymodel.ref_dim == 2) ? 0. : rnd_unif() * 360.;
-				RFLOAT tilt = (mymodel.ref_dim == 2) ? 0. :rnd_unif() * 180.;
+				RFLOAT tilt = (mymodel.ref_dim == 2) ? 0. : rnd_unif() * 180.;
 				RFLOAT psi  = rnd_unif() * 360.;
 				int iclass  = rnd_unif() * mymodel.nr_classes;
 				Matrix2D<RFLOAT> A;
@@ -2169,20 +2136,23 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 	   			windowFourierTransform(Faux, Fimg, wsum_model.current_size);
 				Fctf.resize(Fimg);
 				Fctf.initConstant(1.);
+				
 				// Apply CTF if necessary (skip this for subtomograms!)
 				if (do_ctf_correction && mymodel.data_dim != 3)
 				{
 					CTF ctf;
-					ctf.read(MDimg, MDimg);
+					ctf.readByGroup(MDimg, &mydata.obsModel, 0);
 					ctf.getFftwImage(Fctf, mymodel.ori_size, mymodel.ori_size, mymodel.pixel_size,
 						ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);
+					
 					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fimg)
 					{
 						DIRECT_MULTIDIM_ELEM(Fimg, n)  *= DIRECT_MULTIDIM_ELEM(Fctf, n);
 						DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
 					}
 				}
-				(wsum_model.BPref[iclass]).set2DFourierTransform(Fimg, A, IS_NOT_INV, &Fctf);
+				
+				wsum_model.BPref[iclass].set2DFourierTransform(Fimg, A, IS_NOT_INV, &Fctf);
 			}
 
 			// For sub-tomogram averaging: take effect of rotations on stddev of images into account here
