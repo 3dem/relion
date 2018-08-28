@@ -28,7 +28,7 @@ class ObservationModel
 			MetaDataTable opticsMdt;
 			bool hasEvenZernike, hasOddZernike;
 			std::vector<double> angpix, lambda, Cs;
-			std::vector<std::vector<double>> evenZernikeCoeffs, oddZernikeCoeffs;
+			std::vector<std::vector<double> > evenZernikeCoeffs, oddZernikeCoeffs;
 			
 		
 	protected:
@@ -52,7 +52,7 @@ class ObservationModel
 				Projector &proj, const MetaDataTable &partMdt, long int particle,
 				bool applyCtf = true, bool shiftPhases = true, bool applyShift = true);
 
-        std::vector<Image<Complex>> predictObservations(
+        std::vector<Image<Complex> > predictObservations(
                 Projector &proj, const MetaDataTable &partMdt, int threads,
                 bool applyCtf = true, bool shiftPhases = true, bool applyShift = true);
 
