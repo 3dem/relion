@@ -487,7 +487,8 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 
 	// General optimiser I/O stuff
     int general_section = parser.addSection("General options");
-    fn_data = parser.getOption("--i", "Input images (in a star-file or a stack)", "");
+	fn_data = parser.getOption("--i", "Input images (in a star-file)", "");
+	fn_opt = parser.getOption("--io", "Optics groups", "");
     fn_out = parser.getOption("--o", "Output rootname", "");
     nr_iter = textToInteger(parser.getOption("--iter", "Maximum number of iterations to perform", "50"));
     mymodel.pixel_size = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms)", "-1"));
@@ -916,7 +917,7 @@ void MlOptimiser::read(FileName fn_in, int rank)
 #endif
     bool do_preread = (do_preread_images) ? (do_parallel_disc_io || rank == 0) : false;
     bool is_helical_segment = (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
-    mydata.read(fn_data, false, false, do_preread, is_helical_segment);
+    mydata.read(fn_data, fn_opt, false, false, do_preread, is_helical_segment);
 
 #ifdef DEBUG_READ
     std::cerr<<"MlOptimiser::readStar before model."<<std::endl;
@@ -1474,7 +1475,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		if (do_realign_movies)
 			do_preread = false; // as we will overwrite mydata.read with the movies anyway....
 		bool is_helical_segment = (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
-		mydata.read(fn_data, true, false, do_preread, is_helical_segment); // true means ignore original particle name
+		mydata.read(fn_data, fn_opt, true, false, do_preread, is_helical_segment); // true means ignore original particle name
 
 		// Also get original size of the images to pass to mymodel.read()
 		int ori_size = -1;
@@ -1537,7 +1538,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		if (verb > 0)
 			std::cout << " Reading in pre-expanded data model for movie frames... " << std::endl;
 
-		mydata.read(fn_data_movie, false, false, do_preread_images);
+		mydata.read(fn_data_movie, fn_opt, false, false, do_preread_images);
 
 		// The group numbering might be different: re-assign groups based on group_names
 		mymodel.reassignGroupsForMovies(mydata, movie_identifier);
@@ -4667,7 +4668,8 @@ void MlOptimiser::calculateRunningAveragesOfMovieFrames(long int my_ori_particle
 
 }
 
-void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibody, int metadata_offset,
+void MlOptimiser::getFourierTransformsAndCtfs(
+		long int my_ori_particle, int ibody, int metadata_offset,
 		std::vector<MultidimArray<Complex > > &exp_Fimgs,
 		std::vector<MultidimArray<Complex > > &exp_Fimgs_nomask,
 		std::vector<MultidimArray<RFLOAT> > &exp_Fctfs,
@@ -4684,7 +4686,6 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 	FourierTransformer transformer;
 	for (int ipart = 0; ipart < mydata.ori_particles[my_ori_particle].particles_id.size(); ipart++)
 	{
-		FileName fn_img;
 		Image<RFLOAT> img, rec_img;
 		MultidimArray<Complex > Fimg, Faux;
 		MultidimArray<RFLOAT> Fctf;
@@ -4699,8 +4700,10 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 
 		// What is my particle_id?
 		long int part_id = mydata.ori_particles[my_ori_particle].particles_id[ipart];
-		// Which group do I belong?
+		// To which group do I belong?
 		int group_id = mydata.getGroupId(part_id);
+		// What is my optics group?
+		int optics_group = mydata.getOpticsGroup(part_id);
 
 		// Get the norm_correction (for multi-body refinement: still use the one from the consensus refinement!)
 		RFLOAT normcorr = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_NORM);
@@ -5135,17 +5138,8 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 		transformer.FourierTransform(img_aux, Faux);
 		windowFourierTransform(Faux, Fimg, mymodel.current_size);
 
-		// Here apply the beamtilt correction if necessary
-		// This will only be used for reconstruction, not for alignment
-		// But beamtilt only affects very high-resolution components anyway...
-		//
-		RFLOAT beamtilt_x = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_BEAMTILT_X);
-		RFLOAT beamtilt_y = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_BEAMTILT_Y);
-		RFLOAT Cs = DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_CTF_CS);
-		RFLOAT V = 1000. * DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_CTF_VOLTAGE);
-		RFLOAT lambda = 12.2643247 / sqrt(V * (1. + V * 0.978466e-6));
-		if (ABS(beamtilt_x) > 0. || ABS(beamtilt_y) > 0.)
-			selfApplyBeamTilt(Fimg, beamtilt_x, beamtilt_y, lambda, Cs, mymodel.pixel_size, mymodel.ori_size);
+		// Here apply the beamtilt correction if necessary		
+		mydata.obsModel.demodulatePhase(optics_group, Fimg);
 		exp_Fimgs_nomask.at(ipart) = Fimg;
 
 		MultidimArray<RFLOAT> Mnoise;
@@ -5262,9 +5256,8 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 		windowFourierTransform(Faux, Fimg, mymodel.current_size);
 
 		// Also perform beamtilt correction on the masked image (which will be used for alignment)
-		if (ABS(beamtilt_x) > 0. || ABS(beamtilt_y) > 0.)
-			selfApplyBeamTilt(Fimg, beamtilt_x, beamtilt_y, lambda, Cs, mymodel.pixel_size, mymodel.ori_size);
-
+		mydata.obsModel.demodulatePhase(optics_group, Fimg);
+		
 		// Store Fimg
 		exp_Fimgs.at(ipart) = Fimg;
 
@@ -5309,19 +5302,12 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 			}
 			else
 			{
-				CTF ctf;
-				ctf.setValues(DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_CTF_DEFOCUS_U),
-							  DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_CTF_DEFOCUS_V),
-							  DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_CTF_DEFOCUS_ANGLE),
-							  DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_CTF_VOLTAGE),
-							  DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_CTF_CS),
-							  DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_CTF_Q0),
-							  DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_CTF_BFAC),
-							  1.,
-							  DIRECT_A2D_ELEM(exp_metadata, metadata_offset + ipart, METADATA_CTF_PHASE_SHIFT));
-
-				ctf.getFftwImage(Fctf, mymodel.ori_size, mymodel.ori_size, mymodel.pixel_size,
-						ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);
+				// assumption: (metadata_offset + ipart) is the index of this particle
+				// assigned in getMetaAndImageDataSubset (i.e. my_image_no)
+				// (same as the index in exp_metadata)
+				imageCTFs[metadata_offset + ipart].getFftwImage(
+					Fctf, mymodel.ori_size, mymodel.ori_size, mymodel.pixel_size,
+					ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);
 			}
 //#define DEBUG_CTF_FFTW_IMAGE
 #ifdef DEBUG_CTF_FFTW_IMAGE
@@ -8160,7 +8146,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_ori_particle,
 		RFLOAT acc_rot_class = 0.;
 		RFLOAT acc_trans_class = 0.;
 		// Particles are already in random order, so just move from 0 to n_trials
-		for (long int ori_part_id = my_first_ori_particle, my_metadata_entry = 0, ipart = 0; ori_part_id <= my_last_ori_particle; ori_part_id++)
+		for (long int ori_part_id = my_first_ori_particle, my_metadata_entry = 0; ori_part_id <= my_last_ori_particle; ori_part_id++)
 	    {
 			for (long int ipart = 0; ipart < mydata.ori_particles[ori_part_id].particles_id.size(); ipart++, my_metadata_entry++)
 			{
@@ -8196,19 +8182,14 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_ori_particle,
 					}
 					else
 					{
-						CTF ctf;
-						ctf.setValues(DIRECT_A2D_ELEM(exp_metadata, my_metadata_entry, METADATA_CTF_DEFOCUS_U),
-									  DIRECT_A2D_ELEM(exp_metadata, my_metadata_entry, METADATA_CTF_DEFOCUS_V),
-									  DIRECT_A2D_ELEM(exp_metadata, my_metadata_entry, METADATA_CTF_DEFOCUS_ANGLE),
-									  DIRECT_A2D_ELEM(exp_metadata, my_metadata_entry, METADATA_CTF_VOLTAGE),
-									  DIRECT_A2D_ELEM(exp_metadata, my_metadata_entry, METADATA_CTF_CS),
-									  DIRECT_A2D_ELEM(exp_metadata, my_metadata_entry, METADATA_CTF_Q0),
-									  DIRECT_A2D_ELEM(exp_metadata, my_metadata_entry, METADATA_CTF_BFAC),
-									  1.,
-									  DIRECT_A2D_ELEM(exp_metadata, my_metadata_entry, METADATA_CTF_PHASE_SHIFT));
-
 						Fctf.resize(current_image_size, current_image_size/ 2 + 1);
-						ctf.getFftwImage(Fctf, mymodel.ori_size, mymodel.ori_size, mymodel.pixel_size, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);
+						
+						// assumption: my_metadata_entry is the index of this particle
+						// assigned in getMetaAndImageDataSubset (i.e. my_image_no)
+						// (same as the index in exp_metadata)
+						imageCTFs[my_metadata_entry].getFftwImage(
+							Fctf, mymodel.ori_size, mymodel.ori_size, mymodel.pixel_size, 
+							ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);
 					}
 				}
 
@@ -8983,6 +8964,8 @@ void MlOptimiser::getMetaAndImageDataSubset(int first_ori_particle_id, int last_
 	}
 
 	exp_metadata.initZeros(nr_images, METADATA_LINE_LENGTH_BEFORE_BODIES + (mymodel.nr_bodies) * METADATA_NR_BODY_PARAMS);
+	imageCTFs.resize(nr_images);
+	
 	if (do_also_imagedata)
 	{
 		if (mymodel.data_dim == 3)
@@ -9169,61 +9152,12 @@ void MlOptimiser::getMetaAndImageDataSubset(int first_ori_particle_id, int last_
 			DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_NR_SIGN) = (RFLOAT)iaux;
 			if (!mydata.MDimg.getValue(EMDL_IMAGE_NORM_CORRECTION, DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_NORM), part_id))
 				DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_NORM) = 1.;
+			
 			if (do_ctf_correction)
 			{
-				long int mic_id = mydata.getMicrographId(part_id);
-				RFLOAT kV, DeltafU, DeltafV, azimuthal_angle, Cs, Bfac, Q0, phase_shift;
-				if (!mydata.MDimg.getValue(EMDL_CTF_VOLTAGE, kV, part_id))
-					if (!mydata.MDmic.getValue(EMDL_CTF_VOLTAGE, kV, mic_id))
-						kV=200;
-
-				if (!mydata.MDimg.getValue(EMDL_CTF_DEFOCUSU, DeltafU, part_id))
-					if (!mydata.MDmic.getValue(EMDL_CTF_DEFOCUSU, DeltafU, mic_id))
-						DeltafU=0;
-
-				if (!mydata.MDimg.getValue(EMDL_CTF_DEFOCUSV, DeltafV, part_id))
-					if (!mydata.MDmic.getValue(EMDL_CTF_DEFOCUSV, DeltafV, mic_id))
-						DeltafV=DeltafU;
-
-				if (!mydata.MDimg.getValue(EMDL_CTF_DEFOCUS_ANGLE, azimuthal_angle, part_id))
-					if (!mydata.MDmic.getValue(EMDL_CTF_DEFOCUS_ANGLE, azimuthal_angle, mic_id))
-						azimuthal_angle=0;
-
-				if (!mydata.MDimg.getValue(EMDL_CTF_CS, Cs, part_id))
-					if (!mydata.MDmic.getValue(EMDL_CTF_CS, Cs, mic_id))
-						Cs=0;
-
-				if (!mydata.MDimg.getValue(EMDL_CTF_BFACTOR, Bfac, part_id))
-					if (!mydata.MDmic.getValue(EMDL_CTF_BFACTOR, Bfac, mic_id))
-						Bfac=0;
-
-				if (!mydata.MDimg.getValue(EMDL_CTF_Q0, Q0, part_id))
-					if (!mydata.MDmic.getValue(EMDL_CTF_Q0, Q0, mic_id))
-						Q0=0;
-
-				if (!mydata.MDimg.getValue(EMDL_CTF_PHASESHIFT, phase_shift, part_id))
-					if (!mydata.MDmic.getValue(EMDL_CTF_PHASESHIFT, phase_shift, mic_id))
-						phase_shift=0;
-
-				DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_CTF_VOLTAGE) = kV;
-				DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_CTF_DEFOCUS_U) = DeltafU;
-				DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_CTF_DEFOCUS_V) = DeltafV;
-				DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_CTF_DEFOCUS_ANGLE) = azimuthal_angle;
-				DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_CTF_CS) = Cs;
-				DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_CTF_BFAC) = Bfac;
-				DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_CTF_Q0) = Q0;
-				DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_CTF_PHASE_SHIFT) = phase_shift;
-
+				// assumption: part_id is the row index of this particle in mydata.MDimg
+				imageCTFs[my_image_no].readByGroup(mydata.MDimg, &mydata.obsModel, part_id);
 			}
-
-			// beamtilt
-			RFLOAT beamtilt_x = 0., beamtilt_y = 0.;
-			if (mydata.MDimg.containsLabel(EMDL_IMAGE_BEAMTILT_X))
-				mydata.MDimg.getValue(EMDL_IMAGE_BEAMTILT_X, beamtilt_x, part_id);
-			if (mydata.MDimg.containsLabel(EMDL_IMAGE_BEAMTILT_Y))
-				mydata.MDimg.getValue(EMDL_IMAGE_BEAMTILT_Y, beamtilt_y, part_id);
-			DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_BEAMTILT_X) = beamtilt_x;
-			DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_BEAMTILT_Y) = beamtilt_y;
 
 			// If the priors are NOT set, then set their values to 999.
 			if (!mydata.MDimg.getValue(EMDL_ORIENT_ROT_PRIOR,  DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_ROT_PRIOR), part_id))

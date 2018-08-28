@@ -61,6 +61,11 @@ class ObservationModel
 		
 		// apply effect of antisymmetric aberration (using cache)
 		void demodulatePhase(
+				int optGroup,
+				MultidimArray<Complex>& obsImage);
+		
+		// syntactic sugar
+		void demodulatePhase(
 				const MetaDataTable &partMdt, 
 				long int particle,
 				MultidimArray<Complex>& obsImage);

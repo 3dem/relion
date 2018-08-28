@@ -255,7 +255,7 @@ void ParticlePolisherMpi::reconstructShinyParticlesAndFscWeight(int ipass)
 
 	// Re-read the shiny particles' metadatatable (ignore original particle names here...)
 	Experiment exp_model;
-	exp_model.read(fn_out + "shiny.star", true);
+	exp_model.read(fn_out + "shiny.star", "", true);
 
 	 // Do the reconstructions for both halves
 	if (node->rank == 0)

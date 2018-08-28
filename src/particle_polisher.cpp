@@ -1220,7 +1220,7 @@ void ParticlePolisher::reconstructShinyParticlesAndFscWeight(int ipass)
 
 	// Re-read the shiny particles' MetaDataTable into exp_model
 	Experiment exp_model;
-	exp_model.read(fn_out + "shiny.star", true);
+	exp_model.read(fn_out + "shiny.star", "", true);
 
 	// Do the reconstructions for both halves
 	reconstructShinyParticlesOneHalf(1, exp_model);

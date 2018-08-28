@@ -56,26 +56,15 @@
 #define METADATA_NR_SIGN 9
 #define METADATA_NORM 10
 
-#define METADATA_CTF_DEFOCUS_U 11
-#define METADATA_CTF_DEFOCUS_V 12
-#define METADATA_CTF_DEFOCUS_ANGLE 13
-#define METADATA_CTF_VOLTAGE 14
-#define METADATA_CTF_Q0 15
-#define METADATA_CTF_CS 16
-#define METADATA_CTF_BFAC 17
-#define METADATA_CTF_PHASE_SHIFT 18
+#define METADATA_ROT_PRIOR 11
+#define METADATA_TILT_PRIOR 12
+#define METADATA_PSI_PRIOR 13
+#define METADATA_XOFF_PRIOR 14
+#define METADATA_YOFF_PRIOR 15
+#define METADATA_ZOFF_PRIOR 16
+#define METADATA_PSI_PRIOR_FLIP_RATIO 17
 
-#define METADATA_ROT_PRIOR 19
-#define METADATA_TILT_PRIOR 20
-#define METADATA_PSI_PRIOR 21
-#define METADATA_XOFF_PRIOR 22
-#define METADATA_YOFF_PRIOR 23
-#define METADATA_ZOFF_PRIOR 24
-#define METADATA_PSI_PRIOR_FLIP_RATIO 25
-
-#define METADATA_BEAMTILT_X 26
-#define METADATA_BEAMTILT_Y 27
-#define METADATA_LINE_LENGTH_BEFORE_BODIES 28
+#define METADATA_LINE_LENGTH_BEFORE_BODIES 28 // @TODO: -> 20?
 #define METADATA_NR_BODY_PARAMS 6
 
 #define DO_WRITE_DATA true
@@ -124,7 +113,7 @@ public:
 
 	// Experimental metadata model
 	Experiment mydata;
-
+	
 	// Current ML model
 	MlModel mymodel;
 
@@ -136,6 +125,9 @@ public:
 
 	// Filename for the experimental images
 	FileName fn_data;
+	
+	// Optics star file
+	FileName fn_opt;
 
 	// Output root filename
 	FileName fn_out;
@@ -589,6 +581,7 @@ public:
 
 	long int exp_my_first_ori_particle, exp_my_last_ori_particle;
 	MultidimArray<RFLOAT> exp_metadata, exp_imagedata;
+	std::vector<CTF> imageCTFs;
 	std::string exp_fn_img, exp_fn_ctf, exp_fn_recimg;
 	std::vector<MultidimArray<RFLOAT> > exp_imgs;
 	std::vector<int> exp_random_class_some_particles;

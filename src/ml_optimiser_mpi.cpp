@@ -749,7 +749,6 @@ void MlOptimiserMpi::expectation()
 #endif
 
 	MultidimArray<long int> first_last_nr_images(6);
-	MultidimArray<RFLOAT> metadata;
 	int first_slave = 1;
 	// Use maximum of 100 particles for 3D and 10 particles for 2D estimations
 	int n_trials_acc = (mymodel.ref_dim==3 && mymodel.data_dim != 3) ? 100 : 10;
@@ -775,7 +774,6 @@ void MlOptimiserMpi::expectation()
 		MlOptimiser::expectationSetup();
 
 		mydata.MDimg.clear();
-		mydata.MDmic.clear();
 
 #if !defined(__APPLE__)
 		malloc_trim(0);

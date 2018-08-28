@@ -25,6 +25,7 @@
 #include "src/multidim_array.h"
 #include "src/metadata_table.h"
 #include "src/time.h"
+#include "src/jaz/obs_model.h"
 
 /// Reserve large vectors with some reasonable estimate
 // Larger numbers will still be OK, but memory management might suffer
@@ -45,6 +46,8 @@ public:
 
 	// ID of the group that this particle comes from
 	long int group_id;
+	
+	int optics_group;
 
 	// Random subset this particle belongs to
 	int random_subset;
@@ -80,10 +83,10 @@ public:
 	// Name of this particle (by this name it will be recognised upon reading)
 	std::string name;
 
-	// Random subset this original_particle belongs to
-	int random_subset;
-
-	// All the id's of the particles that were derived from this original particle
+	// Random subset and opt. group this original_particle belongs to
+	int random_subset, optics_group;
+	
+	// All the ids of the particles that were derived from this original particle
 	std::vector<long int> particles_id;
 
 	// Order of those particles in the original particle (extracted from mic_name)
@@ -241,9 +244,12 @@ public:
 
 	// Experiment-related metadata
     MetaDataTable MDexp;
-
-    // One large MetaDataTable for all images
+	
+	// One large MetaDataTable for all images
     MetaDataTable MDimg;
+	
+	// One small MetaDataTable for all optics groups
+    MetaDataTable MDopt;
 
     // Number of bodies in multi-body refinement
     int nr_bodies;
@@ -251,9 +257,12 @@ public:
     // Vector with MetaDataTables for orientations of different bodies in the multi-body refinement
     std::vector<MetaDataTable> MDbodies;
 
-    // One large MetaDataTable for all micrographs
-    MetaDataTable MDmic;
-
+    // Removed: One large MetaDataTable for all micrographs
+    // MetaDataTable MDmic;
+	
+	// Observation model holding the data for all optics groups
+	ObservationModel obsModel;
+	
     // Directory on scratch disk to copy particles to
     FileName fn_scratch;
 
@@ -296,10 +305,7 @@ public:
 		MDimg.clear();
 		MDimg.setIsList(false);
 		MDbodies.clear();
-		MDmic.clear();
-		MDmic.setIsList(false);
 		MDimg.setName("images");
-		MDmic.setName("micrographs");
 		MDexp.setName("experiment");
 	}
 
@@ -323,15 +329,18 @@ public:
 
 	// Get the group_id for the N'th image for this particle
 	long int getGroupId(long int part_id);
+	
+	int getOpticsGroup(long int part_id);
 
 	// Get the metadata-row for this image in a separate MetaDataTable
 	MetaDataTable getMetaDataImage(long int part_id);
 
 	// Add a particle
-	long int addParticle(long int group_id, long int micrograph_id, int random_subset = 0);
+	long int addParticle(long int group_id, long int micrograph_id, 
+						 int optics_group, int random_subset = 0);
 
 	// Add an original particle
-	long int addOriginalParticle(std::string part_name, int random_subset = 0);
+	long int addOriginalParticle(std::string part_name, int optics_group, int random_subset = 0);
 
 	// Add a group
 	long int addGroup(std::string mic_name);
@@ -376,14 +385,13 @@ public:
 	// in that case, stop copying, and keep reading particles from where they were...
 	void copyParticlesToScratch(int verb, bool do_copy = true, bool also_do_ctf_image = false, long int free_scratch_Gb = 10);
 
-
-	// Print help message for possible command-line options
-	void usage();
-
 	// Read from file
-	void read(FileName fn_in, bool do_ignore_original_particle_name = false,
-			bool do_ignore_group_name = false, bool do_preread_images = false,
-			bool need_tiltpsipriors_for_helical_refine = false);
+	void read(
+		FileName fn_in, 
+		FileName fn_opt = "", 
+		bool do_ignore_original_particle_name = false,
+		bool do_ignore_group_name = false, bool do_preread_images = false,
+		bool need_tiltpsipriors_for_helical_refine = false);
 
 	// Write
 	void write(FileName fn_root);

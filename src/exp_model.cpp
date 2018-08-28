@@ -29,6 +29,7 @@ void ExpOriginalParticle::addParticle(long int _particle_id, int _random_subset,
 		std::cerr << " particles_id.size()= " << particles_id.size() << " name= "<<name << std::endl;
 		REPORT_ERROR("ExpOriginalParticle:addParticle: incompatible random subsets between particle and its original particle.");
 	}
+	
 	particles_id.push_back(_particle_id);
 	particles_order.push_back(_order);
 }
@@ -98,6 +99,11 @@ long int Experiment::getGroupId(long int part_id)
 	return (particles[part_id]).group_id;
 }
 
+int Experiment::getOpticsGroup(long part_id)
+{
+	return particles[part_id].optics_group;
+}
+
 int Experiment::getRandomSubset(long int part_id)
 {
 	return particles[part_id].random_subset;
@@ -111,7 +117,7 @@ MetaDataTable Experiment::getMetaDataImage(long int part_id)
 }
 
 long int Experiment::addParticle(long int group_id,
-		long int micrograph_id, int random_subset)
+		long int micrograph_id, int optics_group, int random_subset)
 {
 
 	if (group_id >= groups.size())
@@ -124,7 +130,9 @@ long int Experiment::addParticle(long int group_id,
 	particle.id = particles.size();
 	particle.group_id = group_id;
 	particle.micrograph_id = micrograph_id;
+	particle.optics_group = optics_group;
 	particle.random_subset = random_subset;
+	
 	// Push back this particle in the particles vector
 	particles.push_back(particle);
 	(micrographs[micrograph_id].particle_ids).push_back(particle.id);
@@ -134,12 +142,13 @@ long int Experiment::addParticle(long int group_id,
 
 }
 
-long int Experiment::addOriginalParticle(std::string part_name, int _random_subset)
+long int Experiment::addOriginalParticle(std::string part_name, int optics_group, int _random_subset)
 {
 
 	ExpOriginalParticle ori_particle;
 	ori_particle.random_subset = _random_subset;
 	ori_particle.name = part_name;
+	ori_particle.optics_group = optics_group;
 	long int id = ori_particles.size();
 	ori_particles.push_back(ori_particle);
 
@@ -790,15 +799,10 @@ void Experiment::copyParticlesToScratch(int verb, bool do_copy, bool also_do_ctf
 
 }
 
-void Experiment::usage()
-{
-	std::cout
-	<< "  -i                     : Starfile with input images\n"
-	;
-}
-
 // Read from file
-void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name,
+void Experiment::read(
+		FileName fn_exp, FileName fn_opt, 
+		bool do_ignore_original_particle_name,
 		bool do_ignore_group_name, bool do_preread_images,
 		bool need_tiltpsipriors_for_helical_refine)
 {
@@ -828,10 +832,11 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name,
 	// Initialize by emptying everything
 	clear();
 	long int group_id, mic_id, part_id;
-
+	
 	if (!fn_exp.isStarFile())
 	{
 		// Read images from stack. Ignore all metadata, just use filenames
+		
 		// Add a single Micrograph
 		group_id = addGroup("group");
 		mic_id = addMicrograph("micrograph");
@@ -847,13 +852,16 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name,
 		// allocate 1 block of memory
 		particles.reserve(NSIZE(img()));
 		ori_particles.reserve(NSIZE(img()));
+		
 		for (long int n = 0; n <  NSIZE(img()); n++)
 		{
 			FileName fn_img;
 			fn_img.compose(n+1, fn_exp); // fn_img = integerToString(n) + "@" + fn_exp;
 			// Add the particle to my_area = 0
-			part_id = addParticle(group_id, mic_id);
+			part_id = addParticle(group_id, mic_id, 0);
+			
 			MDimg.addObject();
+			
 			if (do_preread_images)
 			{
 				Image<float> img;
@@ -868,7 +876,7 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name,
 				particles[part_id].img = img();
 			}
 			// Also add OriginalParticle
-			(ori_particles[addOriginalParticle("particle")]).addParticle(part_id, 0, -1);
+			(ori_particles[addOriginalParticle("particle", 0)]).addParticle(part_id, 0, -1);
 			// Set the filename and other metadata parameters
 			MDimg.setValue(EMDL_IMAGE_NAME, fn_img, part_id);
 		}
@@ -876,8 +884,16 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name,
 	}
 	else
 	{
-		// Just read first data block
-		MDimg.read(fn_exp);
+		if (fn_opt != "")
+		{
+			// MDimg and MDopt have to be read at the same time, so that the optics groups can be
+			// renamed in case they are non-contiguous or not sorted
+			ObservationModel::loadSafely(fn_exp, fn_opt, obsModel, MDimg, MDopt);
+		}
+		else
+		{
+			MDimg.read(fn_exp);
+		}
 
 		// If this for movie-processing, then the STAR file might be a list of STAR files with original movie particles.
 		// If that is the case: then just append all into a new MDimg.
@@ -1021,11 +1037,19 @@ void Experiment::read(FileName fn_exp, bool do_ignore_original_particle_name,
 
 			// If there is an EMDL_PARTICLE_RANDOM_SUBSET entry in the input STAR-file, then set the random_subset, otherwise use default (0)
 			int my_random_subset;
+			
 			if (!MDimg.getValue(EMDL_PARTICLE_RANDOM_SUBSET, my_random_subset))
+			{
 				my_random_subset = 0;
+			}
+			
+			// Set the optics group - this is always defined
+			int my_optics_group;
+			MDimg.getValue(EMDL_IMAGE_OPTICS_GROUP, my_optics_group);
+			my_optics_group--;
 
 			// Create a new particle
-			part_id = addParticle(group_id, mic_id, my_random_subset);
+			part_id = addParticle(group_id, mic_id, my_optics_group, my_random_subset);
 
 #ifdef DEBUG_READ
 			timer.tic(tori);

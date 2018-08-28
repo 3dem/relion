@@ -486,13 +486,10 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 		// This will only be used for reconstruction, not for alignment
 		// But beamtilt only affects very high-resolution components anyway...
 		//
-		RFLOAT beamtilt_x = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_BEAMTILT_X);
-		RFLOAT beamtilt_y = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_BEAMTILT_Y);
-		RFLOAT Cs = DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CTF_CS);
-		RFLOAT V = 1000. * DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CTF_VOLTAGE);
-		RFLOAT lambda = 12.2643247 / sqrt(V * (1. + V * 0.978466e-6));
-		if (ABS(beamtilt_x) > 0. || ABS(beamtilt_y) > 0.)
-			selfApplyBeamTilt(Fimg, beamtilt_x, beamtilt_y, lambda, Cs,baseMLO->mymodel.pixel_size, baseMLO->mymodel.ori_size);
+		
+		baseMLO->mydata.obsModel.demodulatePhase(
+			baseMLO->mydata.opticsGroups[op.metadata_offset + ipart], Fimg);
+
 		CTOC(accMLO->timer,"selfApplyBeamTilt");
 
 		op.Fimgs_nomask.at(ipart) = Fimg;
@@ -717,20 +714,13 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			else
 			{
 				CTIC(accMLO->timer,"CTFRead2D");
-				CTF ctf;
-				ctf.setValues(DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CTF_DEFOCUS_U),
-							  DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CTF_DEFOCUS_V),
-							  DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CTF_DEFOCUS_ANGLE),
-							  DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CTF_VOLTAGE),
-							  DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CTF_CS),
-							  DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CTF_Q0),
-							  DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CTF_BFAC),
-                                                          1.,
-                                                          DIRECT_A2D_ELEM(baseMLO->exp_metadata, op.metadata_offset + ipart, METADATA_CTF_PHASE_SHIFT));
-
-				ctf.getFftwImage(Fctf, baseMLO->mymodel.ori_size, baseMLO->mymodel.ori_size, baseMLO->mymodel.pixel_size,
-						baseMLO->ctf_phase_flipped, baseMLO->only_flip_phases, baseMLO->intact_ctf_first_peak, true);
-				CTIC(accMLO->timer,"CTFRead2D");
+				
+				baseMLO->imageCTFs[metadata_offset + ipart].getFftwImage(
+					Fctf, baseMLO->mymodel.ori_size, baseMLO->mymodel.ori_size, 
+					baseMLO->mymodel.pixel_size, baseMLO->ctf_phase_flipped, 
+					baseMLO->only_flip_phases, baseMLO->intact_ctf_first_peak, true);
+				
+				CTOC(accMLO->timer,"CTFRead2D");
 			}
 		}
 		else

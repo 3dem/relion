@@ -255,6 +255,12 @@ void ObservationModel::demodulatePhase(
 	partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, particle);
 	opticsGroup--;
 	
+	demodulatePhase(opticsGroup, obsImage);
+}
+
+void ObservationModel::demodulatePhase(
+		int opticsGroup, MultidimArray<Complex>& obsImage)
+{
 	const int s = obsImage.ydim;
 	const int sh = obsImage.xdim;
 	
