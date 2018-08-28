@@ -35,8 +35,8 @@ class ObservationModel
 			
 			// cached aberration effects for a set of given image sizes
 			// e.g.: phaseCorr[opt. group][img. height](y,x)
-			std::vector<std::map<int,Image<Complex>>> phaseCorr;
-			std::vector<std::map<int,Image<RFLOAT>>> gammaOffset;
+			std::vector<std::map<int,Image<Complex> > > phaseCorr;
+			std::vector<std::map<int,Image<RFLOAT> > > gammaOffset;
 
 			
 	public:

@@ -96,15 +96,15 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 	
 	// symmetrical high-order aberrations:
 	hasEvenZernike = opticsMdt.containsLabel(EMDL_IMAGE_EVEN_ZERNIKE_COEFFS);
-	evenZernikeCoeffs = std::vector<std::vector<double>>(
+	evenZernikeCoeffs = std::vector<std::vector<double> >(
 			opticsMdt.numberOfObjects(), std::vector<double>(0));
-	gammaOffset = std::vector<std::map<int,Image<RFLOAT>>>(opticsMdt.numberOfObjects());
+	gammaOffset = std::vector<std::map<int,Image<RFLOAT> > >(opticsMdt.numberOfObjects());
 	
 	// antisymmetrical high-order aberrations:
 	hasOddZernike = opticsMdt.containsLabel(EMDL_IMAGE_ODD_ZERNIKE_COEFFS);		
-	oddZernikeCoeffs = std::vector<std::vector<double>>(
+	oddZernikeCoeffs = std::vector<std::vector<double> >(
 			opticsMdt.numberOfObjects(), std::vector<double>(0));
-	phaseCorr = std::vector<std::map<int,Image<Complex>>>(opticsMdt.numberOfObjects());
+	phaseCorr = std::vector<std::map<int,Image<Complex> > >(opticsMdt.numberOfObjects());
 	
 	const bool hasTilt = opticsMdt.containsLabel(EMDL_IMAGE_BEAMTILT_X)
 	                  || opticsMdt.containsLabel(EMDL_IMAGE_BEAMTILT_Y);							 
@@ -232,12 +232,12 @@ Image<Complex> ObservationModel::predictObservation(
     return pred;
 }
 
-std::vector<Image<Complex>> ObservationModel::predictObservations(
+std::vector<Image<Complex> > ObservationModel::predictObservations(
         Projector &proj, const MetaDataTable &partMdt, int threads,
         bool applyCtf, bool shiftPhases, bool applyShift)
 {
     const int pc = partMdt.numberOfObjects();
-    std::vector<Image<Complex>> out(pc);
+    std::vector<Image<Complex> > out(pc);
 
     #pragma omp parallel for num_threads(threads)
     for (int p = 0; p < pc; p++)
