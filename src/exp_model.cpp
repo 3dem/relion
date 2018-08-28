@@ -142,13 +142,12 @@ long int Experiment::addParticle(long int group_id,
 
 }
 
-long int Experiment::addOriginalParticle(std::string part_name, int optics_group, int _random_subset)
+long int Experiment::addOriginalParticle(std::string part_name, int _random_subset)
 {
 
 	ExpOriginalParticle ori_particle;
 	ori_particle.random_subset = _random_subset;
 	ori_particle.name = part_name;
-	ori_particle.optics_group = optics_group;
 	long int id = ori_particles.size();
 	ori_particles.push_back(ori_particle);
 

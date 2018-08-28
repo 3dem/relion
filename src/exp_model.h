@@ -83,8 +83,8 @@ public:
 	// Name of this particle (by this name it will be recognised upon reading)
 	std::string name;
 
-	// Random subset and opt. group this original_particle belongs to
-	int random_subset, optics_group;
+	// Random subset this original_particle belongs to
+	int random_subset;
 	
 	// All the ids of the particles that were derived from this original particle
 	std::vector<long int> particles_id;
@@ -340,7 +340,7 @@ public:
 						 int optics_group, int random_subset = 0);
 
 	// Add an original particle
-	long int addOriginalParticle(std::string part_name, int optics_group, int random_subset = 0);
+	long int addOriginalParticle(std::string part_name, int random_subset = 0);
 
 	// Add a group
 	long int addGroup(std::string mic_name);
