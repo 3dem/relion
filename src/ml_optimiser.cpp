@@ -8549,7 +8549,7 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 		// AND the hidden variables have not changed during the last 2 iterations
 		RFLOAT old_rottilt_step = sampling.getAngularSampling(adaptive_oversampling);
 
-		// Only use a finer angular sampling is the angular accuracy is still above 75% of the estimated accuracy
+		// Only use a finer angular sampling if the angular accuracy is still above 75% of the estimated accuracy
 		// If it is already below, nothing will change and eventually nr_iter_wo_resol_gain or nr_iter_wo_large_hidden_variable_changes will go above MAX_NR_ITER_WO_RESOL_GAIN
 		if (nr_iter_wo_resol_gain >= MAX_NR_ITER_WO_RESOL_GAIN && nr_iter_wo_large_hidden_variable_changes >= MAX_NR_ITER_WO_LARGE_HIDDEN_VARIABLE_CHANGES)
 		{

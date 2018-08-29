@@ -711,13 +711,13 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 					// Use negative kp,ip and jp indices, because the origin in the ctf_img lies half a pixel to the right of the actual center....
 					DIRECT_A3D_ELEM(Fctf, k, i, j) = A3D_ELEM(Ictf(), -kp, -ip, -jp);
 				}
-				CTIC(accMLO->timer,"CTFSet3D_array");
+				CTOC(accMLO->timer,"CTFSet3D_array");
 			}
 			else
 			{
 				CTIC(accMLO->timer,"CTFRead2D");
 				
-				baseMLO->imageCTFs[metadata_offset + ipart].getFftwImage(
+				baseMLO->mydata.particles[part_id].getFftwImage(
 					Fctf, baseMLO->mymodel.ori_size, baseMLO->mymodel.ori_size, 
 					baseMLO->mymodel.pixel_size, baseMLO->ctf_phase_flipped, 
 					baseMLO->only_flip_phases, baseMLO->intact_ctf_first_peak, true);
