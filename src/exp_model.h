@@ -25,6 +25,7 @@
 #include "src/multidim_array.h"
 #include "src/metadata_table.h"
 #include "src/time.h"
+#include "src/ctf.h"
 #include "src/jaz/obs_model.h"
 
 /// Reserve large vectors with some reasonable estimate
@@ -51,6 +52,9 @@ public:
 
 	// Random subset this particle belongs to
 	int random_subset;
+	
+	// the CTF of this particle (NOTE: it contains a pointer to the obsModel of this Experiment)
+	CTF ctf;
 
 	// Pre-read array of the image in RAM
 	MultidimArray<float> img;
@@ -337,7 +341,7 @@ public:
 
 	// Add a particle
 	long int addParticle(long int group_id, long int micrograph_id, 
-						 int optics_group, int random_subset = 0);
+						 int optics_group, const CTF& ctf, int random_subset = 0);
 
 	// Add an original particle
 	long int addOriginalParticle(std::string part_name, int random_subset = 0);

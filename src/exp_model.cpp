@@ -117,7 +117,7 @@ MetaDataTable Experiment::getMetaDataImage(long int part_id)
 }
 
 long int Experiment::addParticle(long int group_id,
-		long int micrograph_id, int optics_group, int random_subset)
+		long int micrograph_id, int optics_group, const CTF& ctf, int random_subset)
 {
 
 	if (group_id >= groups.size())
@@ -131,6 +131,7 @@ long int Experiment::addParticle(long int group_id,
 	particle.group_id = group_id;
 	particle.micrograph_id = micrograph_id;
 	particle.optics_group = optics_group;
+	particle.ctf = ctf;
 	particle.random_subset = random_subset;
 	
 	// Push back this particle in the particles vector
@@ -857,7 +858,8 @@ void Experiment::read(
 			FileName fn_img;
 			fn_img.compose(n+1, fn_exp); // fn_img = integerToString(n) + "@" + fn_exp;
 			// Add the particle to my_area = 0
-			part_id = addParticle(group_id, mic_id, 0);
+			CTF ctf;
+			part_id = addParticle(group_id, mic_id, 0, ctf);
 			
 			MDimg.addObject();
 			
@@ -875,7 +877,7 @@ void Experiment::read(
 				particles[part_id].img = img();
 			}
 			// Also add OriginalParticle
-			(ori_particles[addOriginalParticle("particle", 0)]).addParticle(part_id, 0, -1);
+			ori_particles[addOriginalParticle("particle", 0)].addParticle(part_id, 0, -1);
 			// Set the filename and other metadata parameters
 			MDimg.setValue(EMDL_IMAGE_NAME, fn_img, part_id);
 		}
@@ -957,7 +959,9 @@ void Experiment::read(
 
 		// Now Loop over all objects in the metadata file and fill the logical tree of the experiment
 		long int last_oripart_idx = -1;
-		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDimg)
+		
+		//FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDimg)
+		for (long int partID = 0; partID < MDimg.numberOfObjects(); partID++)
 		{
 			// Add new micrographs or get mic_id for existing micrograph
 			FileName mic_name=""; // Filename instead of string because will decompose below
@@ -966,7 +970,7 @@ void Experiment::read(
 				long int idx = micrographs.size();
 				std::string last_mic_name = (idx > 0) ? micrographs[idx-1].name : "";
 
-				MDimg.getValue(EMDL_MICROGRAPH_NAME, mic_name);
+				MDimg.getValue(EMDL_MICROGRAPH_NAME, mic_name, partID);
 
 				// All frames of a movie belong to the same micrograph
 				if (is_mic_a_movie)
@@ -999,7 +1003,7 @@ void Experiment::read(
 					// Check whether there is a group label, if not use a group for each micrograph
 					if (MDimg.containsLabel(EMDL_MLMODEL_GROUP_NAME))
 					{
-						MDimg.getValue(EMDL_MLMODEL_GROUP_NAME, group_name);
+						MDimg.getValue(EMDL_MLMODEL_GROUP_NAME, group_name, partID);
 					}
 					else
 					{
@@ -1037,18 +1041,27 @@ void Experiment::read(
 			// If there is an EMDL_PARTICLE_RANDOM_SUBSET entry in the input STAR-file, then set the random_subset, otherwise use default (0)
 			int my_random_subset;
 			
-			if (!MDimg.getValue(EMDL_PARTICLE_RANDOM_SUBSET, my_random_subset))
+			if (!MDimg.getValue(EMDL_PARTICLE_RANDOM_SUBSET, my_random_subset, partID))
 			{
 				my_random_subset = 0;
 			}
 			
 			// Set the optics group - this is always defined
 			int my_optics_group;
-			MDimg.getValue(EMDL_IMAGE_OPTICS_GROUP, my_optics_group);
+			MDimg.getValue(EMDL_IMAGE_OPTICS_GROUP, my_optics_group, partID);
 			my_optics_group--;
+			
+			CTF ctf;
+			ctf.readByGroup(MDimg, &obsModel, partID);
 
 			// Create a new particle
-			part_id = addParticle(group_id, mic_id, my_optics_group, my_random_subset);
+			part_id = addParticle(group_id, mic_id, my_optics_group, ctf, my_random_subset);
+			
+			if (partID != part_id)
+			{
+				REPORT_ERROR_STR("Experiment::read: particle indices out of sync: " 
+								 << partID << " != " << part_id);
+			}
 
 #ifdef DEBUG_READ
 			timer.tic(tori);
@@ -1057,7 +1070,7 @@ void Experiment::read(
 			if (do_preread_images)
 			{
 				FileName fn_img;
-				MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
+				MDimg.getValue(EMDL_IMAGE_NAME, fn_img, partID);
 				Image<float> img;
 				fn_img.decompose(dump, fn_stack);
 				if (fn_stack != fn_open_stack)
@@ -1075,9 +1088,9 @@ void Experiment::read(
 			long int ori_part_id = -1;
 
 			if (MDimg.containsLabel(EMDL_PARTICLE_ORI_NAME))
-				MDimg.getValue(EMDL_PARTICLE_ORI_NAME, ori_part_name);
+				MDimg.getValue(EMDL_PARTICLE_ORI_NAME, ori_part_name, partID);
 			else
-				MDimg.getValue(EMDL_IMAGE_NAME, ori_part_name);
+				MDimg.getValue(EMDL_IMAGE_NAME, ori_part_name, partID);
 
 			if (MDimg.containsLabel(EMDL_PARTICLE_ORI_NAME) && !do_ignore_original_particle_name)
 			{
@@ -1113,12 +1126,12 @@ void Experiment::read(
 			std::string fnt;
 			long int my_order;
 			mic_name.decompose(my_order, fnt);
-			(ori_particles[ori_part_id]).addParticle(part_id, my_random_subset, my_order);
+			ori_particles[ori_part_id].addParticle(part_id, my_random_subset, my_order);
 
 			// The group number is only set upon reading: it is not read from the STAR file itself,
 			// there the only thing that matters is the order of the micrograph_names
 			// Write igroup+1, to start numbering at one instead of at zero
-			MDimg.setValue(EMDL_MLMODEL_GROUP_NO, group_id + 1, part_id);
+			MDimg.setValue(EMDL_MLMODEL_GROUP_NO, group_id + 1, partID);
 
 #ifdef DEBUG_READ
 			nr_read++;

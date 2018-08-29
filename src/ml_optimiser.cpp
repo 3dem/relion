@@ -5272,13 +5272,11 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 			}
 			else
 			{
-				// assumption: (metadata_offset + ipart) is the index of this particle
-				// assigned in getMetaAndImageDataSubset (i.e. my_image_no)
-				// (same as the index in exp_metadata)
-				imageCTFs[metadata_offset + ipart].getFftwImage(
+				mydata.particles[part_id].ctf.getFftwImage(
 					Fctf, mymodel.ori_size, mymodel.ori_size, mymodel.pixel_size,
 					ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);
 			}
+			
 //#define DEBUG_CTF_FFTW_IMAGE
 #ifdef DEBUG_CTF_FFTW_IMAGE
 			Image<RFLOAT> tt;
@@ -8154,10 +8152,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_ori_particle,
 					{
 						Fctf.resize(current_image_size, current_image_size/ 2 + 1);
 						
-						// assumption: my_metadata_entry is the index of this particle
-						// assigned in getMetaAndImageDataSubset (i.e. my_image_no)
-						// (same as the index in exp_metadata)
-						imageCTFs[my_metadata_entry].getFftwImage(
+						mydata.particles[part_id].ctf.getFftwImage(
 							Fctf, mymodel.ori_size, mymodel.ori_size, mymodel.pixel_size, 
 							ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);
 					}
@@ -8934,7 +8929,6 @@ void MlOptimiser::getMetaAndImageDataSubset(int first_ori_particle_id, int last_
 	}
 
 	exp_metadata.initZeros(nr_images, METADATA_LINE_LENGTH_BEFORE_BODIES + (mymodel.nr_bodies) * METADATA_NR_BODY_PARAMS);
-	imageCTFs.resize(nr_images);
 	
 	if (do_also_imagedata)
 	{
@@ -9122,12 +9116,6 @@ void MlOptimiser::getMetaAndImageDataSubset(int first_ori_particle_id, int last_
 			DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_NR_SIGN) = (RFLOAT)iaux;
 			if (!mydata.MDimg.getValue(EMDL_IMAGE_NORM_CORRECTION, DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_NORM), part_id))
 				DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_NORM) = 1.;
-			
-			if (do_ctf_correction)
-			{
-				// assumption: part_id is the row index of this particle in mydata.MDimg
-				imageCTFs[my_image_no].readByGroup(mydata.MDimg, &mydata.obsModel, part_id);
-			}
 
 			// If the priors are NOT set, then set their values to 999.
 			if (!mydata.MDimg.getValue(EMDL_ORIENT_ROT_PRIOR,  DIRECT_A2D_ELEM(exp_metadata, my_image_no, METADATA_ROT_PRIOR), part_id))
