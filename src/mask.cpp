@@ -20,6 +20,13 @@
 #include <omp.h>
 #include "src/mask.h"
 
+// https://stackoverflow.com/questions/48273190/undefined-symbol-error-for-stdstringempty-c-standard-method-linking-error/48273604#48273604
+#if defined(__APPLE__)
+// explicit instantiation of std::string needed, otherwise we get a linker error on osx
+// thats a bug in libc++, because of interaction with __attribute__ ((__visibility__("hidden"), __always_inline__)) in std::string
+template class std::basic_string<char>;
+#endif
+
 // Workaround for compiler versions before 2018 update 2
 #ifdef __INTEL_COMPILER
 # if (__INTEL_COMPILER<1800)

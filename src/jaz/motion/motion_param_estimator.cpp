@@ -496,7 +496,9 @@ void MotionParamEstimator::prepAlignment()
 
     // release all unneeded heap space back to the OS
     // (this can free tens of Gb)
+#if !defined(__APPLE__)
     malloc_trim(0);
+#endif
 
     std::cout << "   done\n";
 }
