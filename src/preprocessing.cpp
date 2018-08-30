@@ -161,11 +161,14 @@ void Preprocessing::initialise()
 		if (!star_has_ctf && (do_phase_flip || do_premultiply_ctf))
 			REPORT_ERROR("Preprocessing:: ERROR: cannot phase flip or premultiply CTF without input CTF parameters in the STAR file");
 
-		// Get pixel size from the manually set value (pixel size is only used for ctf-premultiplictaion or phase flipping...)
+		// Get pixel size from the manually set value
 		if (set_angpix > 0.)
 		{
 			if (verb > 0)
+			{
 				std::cout << " + Setting pixel size in output STAR file to " << set_angpix << " Angstroms" << std::endl;
+				std::cerr << "WARNING: You manually changed the pixel size by the --set_angpix option. You can no longer use Bayesian Polishing on the resulting particles." << std::endl;
+			}
 
 			angpix = set_angpix;
 		}
