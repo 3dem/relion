@@ -246,7 +246,7 @@ void CTF::getFftwImage(MultidimArray<RFLOAT> &result, int orixdim, int oriydim, 
 		const int s = result.ydim;
 		const int sh = result.xdim;
 		
-		if (orixdim != oriydim || s != oriydim)
+		if (orixdim != oriydim)
 		{
 			REPORT_ERROR_STR("CTF::getFftwImage: symmetric aberrations are currently only "
 			              << "supported for square images.\n");
@@ -254,8 +254,16 @@ void CTF::getFftwImage(MultidimArray<RFLOAT> &result, int orixdim, int oriydim, 
 		
 		const Image<RFLOAT>& gammaOffset = obsModel->getGammaOffset(opticsGroup, oriydim);
 		
-		for (int yy = 0; yy < s; yy++)
-		for (int xx = 0; xx < sh; xx++)
+		if (   gammaOffset.data.xdim < result.xdim
+		    || gammaOffset.data.ydim < result.ydim)
+		{
+			REPORT_ERROR_STR("CTF::getFftwImage: requested output image is larger than the original: "
+				<< gammaOffset.data.xdim << "x" << gammaOffset.data.ydim << " available, "
+				<< result.xdim << "x" << result.ydim << " requested\n");
+		}
+		
+		for (int yy = 0; yy < result.ydim; yy++)
+		for (int xx = 0; xx < result.xdim; xx++)
 		{
 			RFLOAT x = xx / xs;
 			RFLOAT y = yy < sh? yy / ys : (yy - s) / ys;
