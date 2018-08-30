@@ -717,7 +717,7 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 			{
 				CTIC(accMLO->timer,"CTFRead2D");
 				
-				baseMLO->mydata.particles[part_id].getFftwImage(
+				baseMLO->mydata.particles[part_id].ctf.getFftwImage(
 					Fctf, baseMLO->mymodel.ori_size, baseMLO->mymodel.ori_size, 
 					baseMLO->mymodel.pixel_size, baseMLO->ctf_phase_flipped, 
 					baseMLO->only_flip_phases, baseMLO->intact_ctf_first_peak, true);
