@@ -301,8 +301,7 @@ std::vector<d2Vector> MotionHelper::getGlobalOffsets(
         if (out_p.x >= sh) out_p.x -= s;
         if (out_p.y >= sh) out_p.y -= s;
 
-        #pragma omp_atomic
-            out[p] = out_p/cc_pad;
+        out[p] = out_p/cc_pad;
     }
 
     return out;
