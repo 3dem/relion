@@ -252,10 +252,10 @@ Matrix2D<RFLOAT> MagnificationHelper::solveLinearlyFreq(
 	
 	d4Vector opt = Ai * b;
 	
-	mat(0,0) = opt[0] + 1.0;
-	mat(0,1) = opt[1];
-	mat(1,0) = opt[2];
-	mat(1,1) = opt[3] + 1.0;
+	mat(0,0) = -opt[0] + 1.0;
+	mat(0,1) = -opt[1];
+	mat(1,0) = -opt[2];
+	mat(1,1) = -opt[3] + 1.0;
 	
 	std::cout << opt[0] << ", " << opt[1] << "\n" 
 	          << opt[2] << ", " << opt[3] << "\n";

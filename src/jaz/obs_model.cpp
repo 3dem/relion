@@ -162,10 +162,11 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 		{
 			magMatrices[i] = Matrix2D<RFLOAT>(3,3);
 			magMatrices[i].initIdentity();
-			
+		
+			// transpose the matrix, since the transpose is used in Projector::get2DFourierTransform
 			opticsMdt.getValue(EMDL_IMAGE_MAG_MATRIX_00, magMatrices[i](0,0), i);
-			opticsMdt.getValue(EMDL_IMAGE_MAG_MATRIX_01, magMatrices[i](0,1), i);
-			opticsMdt.getValue(EMDL_IMAGE_MAG_MATRIX_10, magMatrices[i](1,0), i);
+			opticsMdt.getValue(EMDL_IMAGE_MAG_MATRIX_01, magMatrices[i](1,0), i);
+			opticsMdt.getValue(EMDL_IMAGE_MAG_MATRIX_10, magMatrices[i](0,1), i);
 			opticsMdt.getValue(EMDL_IMAGE_MAG_MATRIX_11, magMatrices[i](1,1), i);
 		}
 	}
@@ -199,17 +200,25 @@ void ObservationModel::predictObservation(
 
     Euler_angles2matrix(rot, tilt, psi, A3D);
 	
-	if (hasMagMatrices)
-	{
-		A3D = A3D * magMatrices[opticsGroup];
-	}
-
+	
 	if (dest.xdim != sh || dest.ydim != s)
 	{
 		dest.resize(s,sh);
 	}
 	
 	dest.initZeros();
+	
+	if (hasMagMatrices)
+	{
+		/*if (particle == 0)
+		{
+			std::cout << A3D << "\n->\n" 
+			          << (magMatrices[opticsGroup] * A3D) << "\n->\n" 
+					  << (A3D * magMatrices[opticsGroup]) << "\n\n";
+		}*/
+		// multiply from the left, due to the transposition in Projector::get2DFourierTransform
+		A3D = magMatrices[opticsGroup] * A3D;
+	}
 
     proj.get2DFourierTransform(dest, A3D, false);
 	
