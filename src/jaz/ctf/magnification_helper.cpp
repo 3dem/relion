@@ -269,6 +269,8 @@ Matrix2D<RFLOAT> MagnificationHelper::solveLinearlyFreq(
 		DIRECT_A2D_ELEM(vx.data, yi, xi) = opt[0] * x + opt[1] * y;
 		DIRECT_A2D_ELEM(vy.data, yi, xi) = opt[2] * x + opt[3] * y;
 	}
+	
+	return mat;
 }
 
 void MagnificationHelper::readEQs(std::string path, Volume<Equation2x2> &eqs)
