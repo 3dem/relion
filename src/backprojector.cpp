@@ -1679,13 +1679,6 @@ void BackProjector::applyPointGroupSymmetry(int threads)
 		Matrix2D<RFLOAT> L(4, 4), R(4, 4); // A matrix from the list
 		MultidimArray<RFLOAT> sum_weight;
 		MultidimArray<Complex > sum_data;
-        RFLOAT x, y, z, fx, fy, fz, xp, yp, zp, r2;
-        bool is_neg_x;
-        int x0, x1, y0, y1, z0, z1;
-    	Complex d000, d001, d010, d011, d100, d101, d110, d111;
-    	Complex dx00, dx01, dx10, dx11, dxy0, dxy1;
-    	RFLOAT dd000, dd001, dd010, dd011, dd100, dd101, dd110, dd111;
-    	RFLOAT ddx00, ddx01, ddx10, ddx11, ddxy0, ddxy1;
 
         // First symmetry operator (not stored in SL) is the identity matrix
 		sum_weight = weight;
@@ -1704,17 +1697,20 @@ void BackProjector::applyPointGroupSymmetry(int threads)
 			for (long int i=STARTINGY(sum_weight); i<=FINISHINGY(sum_weight); i++)
 			for (long int j=STARTINGX(sum_weight); j<=FINISHINGX(sum_weight); j++)
 	        {
-	        	x = (RFLOAT)j; // STARTINGX(sum_weight) is zero!
-	        	y = (RFLOAT)i;
-	        	z = (RFLOAT)k;
-	        	r2 = x*x + y*y + z*z;
+	        	RFLOAT x = (RFLOAT)j; // STARTINGX(sum_weight) is zero!
+	        	RFLOAT y = (RFLOAT)i;
+	        	RFLOAT z = (RFLOAT)k;
+	        	RFLOAT r2 = x*x + y*y + z*z;
+				
 	        	if (r2 <= rmax2)
 	        	{
 	        		// coords_output(x,y) = A * coords_input (xp,yp)
-					xp = x * R(0, 0) + y * R(0, 1) + z * R(0, 2);
-					yp = x * R(1, 0) + y * R(1, 1) + z * R(1, 2);
-					zp = x * R(2, 0) + y * R(2, 1) + z * R(2, 2);
-
+					RFLOAT xp = x * R(0, 0) + y * R(0, 1) + z * R(0, 2);
+					RFLOAT yp = x * R(1, 0) + y * R(1, 1) + z * R(1, 2);
+					RFLOAT zp = x * R(2, 0) + y * R(2, 1) + z * R(2, 2);
+					
+					bool is_neg_x;
+					
 					// Only asymmetric half is stored
 					if (xp < 0)
 					{
@@ -1732,19 +1728,19 @@ void BackProjector::applyPointGroupSymmetry(int threads)
 					// Trilinear interpolation (with physical coords)
 					// Subtract STARTINGY and STARTINGZ to accelerate access to data (STARTINGX=0)
 					// In that way use DIRECT_A3D_ELEM, rather than A3D_ELEM
-	    			x0 = FLOOR(xp);
-					fx = xp - x0;
-					x1 = x0 + 1;
+	    			int x0 = FLOOR(xp);
+					RFLOAT fx = xp - x0;
+					int x1 = x0 + 1;
 
-					y0 = FLOOR(yp);
-					fy = yp - y0;
+					int y0 = FLOOR(yp);
+					RFLOAT fy = yp - y0;
 					y0 -=  STARTINGY(data);
-					y1 = y0 + 1;
+					int y1 = y0 + 1;
 
-					z0 = FLOOR(zp);
-					fz = zp - z0;
+					int z0 = FLOOR(zp);
+					RFLOAT fz = zp - z0;
 					z0 -= STARTINGZ(data);
-					z1 = z0 + 1;
+					int z1 = z0 + 1;
 
 #ifdef CHECK_SIZE
 					if (x0 < 0 || y0 < 0 || z0 < 0 ||
@@ -1759,46 +1755,52 @@ void BackProjector::applyPointGroupSymmetry(int threads)
 					}
 #endif
 					// First interpolate (complex) data
-					d000 = DIRECT_A3D_ELEM(data, z0, y0, x0);
-					d001 = DIRECT_A3D_ELEM(data, z0, y0, x1);
-					d010 = DIRECT_A3D_ELEM(data, z0, y1, x0);
-					d011 = DIRECT_A3D_ELEM(data, z0, y1, x1);
-					d100 = DIRECT_A3D_ELEM(data, z1, y0, x0);
-					d101 = DIRECT_A3D_ELEM(data, z1, y0, x1);
-					d110 = DIRECT_A3D_ELEM(data, z1, y1, x0);
-					d111 = DIRECT_A3D_ELEM(data, z1, y1, x1);
+					Complex d000 = DIRECT_A3D_ELEM(data, z0, y0, x0);
+					Complex d001 = DIRECT_A3D_ELEM(data, z0, y0, x1);
+					Complex d010 = DIRECT_A3D_ELEM(data, z0, y1, x0);
+					Complex d011 = DIRECT_A3D_ELEM(data, z0, y1, x1);
+					Complex d100 = DIRECT_A3D_ELEM(data, z1, y0, x0);
+					Complex d101 = DIRECT_A3D_ELEM(data, z1, y0, x1);
+					Complex d110 = DIRECT_A3D_ELEM(data, z1, y1, x0);
+					Complex d111 = DIRECT_A3D_ELEM(data, z1, y1, x1);
 
-					dx00 = LIN_INTERP(fx, d000, d001);
-					dx01 = LIN_INTERP(fx, d100, d101);
-					dx10 = LIN_INTERP(fx, d010, d011);
-					dx11 = LIN_INTERP(fx, d110, d111);
-					dxy0 = LIN_INTERP(fy, dx00, dx10);
-					dxy1 = LIN_INTERP(fy, dx01, dx11);
+					Complex dx00 = LIN_INTERP(fx, d000, d001);
+					Complex dx01 = LIN_INTERP(fx, d100, d101);
+					Complex dx10 = LIN_INTERP(fx, d010, d011);
+					Complex dx11 = LIN_INTERP(fx, d110, d111);
+					
+					Complex dxy0 = LIN_INTERP(fy, dx00, dx10);
+					Complex dxy1 = LIN_INTERP(fy, dx01, dx11);
 
 					// Take complex conjugated for half with negative x
 					if (is_neg_x)
+					{
 						A3D_ELEM(sum_data, k, i, j) += conj(LIN_INTERP(fz, dxy0, dxy1));
+					}
 					else
+					{
 						A3D_ELEM(sum_data, k, i, j) += LIN_INTERP(fz, dxy0, dxy1);
+					}
 
 					// Then interpolate (real) weight
-					dd000 = DIRECT_A3D_ELEM(weight, z0, y0, x0);
-					dd001 = DIRECT_A3D_ELEM(weight, z0, y0, x1);
-					dd010 = DIRECT_A3D_ELEM(weight, z0, y1, x0);
-					dd011 = DIRECT_A3D_ELEM(weight, z0, y1, x1);
-					dd100 = DIRECT_A3D_ELEM(weight, z1, y0, x0);
-					dd101 = DIRECT_A3D_ELEM(weight, z1, y0, x1);
-					dd110 = DIRECT_A3D_ELEM(weight, z1, y1, x0);
-					dd111 = DIRECT_A3D_ELEM(weight, z1, y1, x1);
+					RFLOAT dd000 = DIRECT_A3D_ELEM(weight, z0, y0, x0);
+					RFLOAT dd001 = DIRECT_A3D_ELEM(weight, z0, y0, x1);
+					RFLOAT dd010 = DIRECT_A3D_ELEM(weight, z0, y1, x0);
+					RFLOAT dd011 = DIRECT_A3D_ELEM(weight, z0, y1, x1);
+					RFLOAT dd100 = DIRECT_A3D_ELEM(weight, z1, y0, x0);
+					RFLOAT dd101 = DIRECT_A3D_ELEM(weight, z1, y0, x1);
+					RFLOAT dd110 = DIRECT_A3D_ELEM(weight, z1, y1, x0);
+					RFLOAT dd111 = DIRECT_A3D_ELEM(weight, z1, y1, x1);
 
-					ddx00 = LIN_INTERP(fx, dd000, dd001);
-					ddx01 = LIN_INTERP(fx, dd100, dd101);
-					ddx10 = LIN_INTERP(fx, dd010, dd011);
-					ddx11 = LIN_INTERP(fx, dd110, dd111);
-					ddxy0 = LIN_INTERP(fy, ddx00, ddx10);
-					ddxy1 = LIN_INTERP(fy, ddx01, ddx11);
+					RFLOAT ddx00 = LIN_INTERP(fx, dd000, dd001);
+					RFLOAT ddx01 = LIN_INTERP(fx, dd100, dd101);
+					RFLOAT ddx10 = LIN_INTERP(fx, dd010, dd011);
+					RFLOAT ddx11 = LIN_INTERP(fx, dd110, dd111);
+					
+					RFLOAT ddxy0 = LIN_INTERP(fy, ddx00, ddx10);
+					RFLOAT ddxy1 = LIN_INTERP(fy, ddx01, ddx11);
 
-					A3D_ELEM(sum_weight, k, i, j) +=  LIN_INTERP(fz, ddxy0, ddxy1);
+					A3D_ELEM(sum_weight, k, i, j) += LIN_INTERP(fz, ddxy0, ddxy1);
 
 	        	} // end if r2 <= rmax2
 
