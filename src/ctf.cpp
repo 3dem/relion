@@ -243,9 +243,6 @@ void CTF::getFftwImage(MultidimArray<RFLOAT> &result, int orixdim, int oriydim, 
 	
 	if (obsModel != 0 && obsModel->hasEvenZernike)
 	{
-		const int s = result.ydim;
-		const int sh = result.xdim;
-		
 		if (orixdim != oriydim)
 		{
 			REPORT_ERROR_STR("CTF::getFftwImage: symmetric aberrations are currently only "
@@ -262,15 +259,18 @@ void CTF::getFftwImage(MultidimArray<RFLOAT> &result, int orixdim, int oriydim, 
 				<< result.xdim << "x" << result.ydim << " requested\n");
 		}
 		
-		for (int yy = 0; yy < result.ydim; yy++)
-		for (int xx = 0; xx < result.xdim; xx++)
+		for (int y1 = 0; y1 < result.ydim; y1++)
+		for (int x1 = 0; x1 < result.xdim; x1++)
 		{
-			RFLOAT x = xx / xs;
-			RFLOAT y = yy < sh? yy / ys : (yy - s) / ys;
+			RFLOAT x = x1 / xs;
+			RFLOAT y = y1 <= result.ydim/2? y1 / ys : (y1 - result.ydim) / ys;
 			
-			DIRECT_A2D_ELEM(result, yy, xx) = 
+			const int x0 = x1;
+			const int y0 = y1 <= result.ydim/2? y1 : gammaOffset.data.ydim + y1 - result.ydim;
+			
+			DIRECT_A2D_ELEM(result, y1, x1) = 
 				getCTF(x, y, do_abs, do_only_flip_phases, 
-					   do_intact_until_first_peak, do_damping, gammaOffset(yy,xx));
+					   do_intact_until_first_peak, do_damping, gammaOffset(y0,x0));
 		}
 	}
 	else
