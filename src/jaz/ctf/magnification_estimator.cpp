@@ -143,6 +143,17 @@ void MagnificationEstimator::parametricFit(
 	os.close();
 	
 	// @TODO: Add support for optics groups!
+	
+	Matrix2D<RFLOAT> mat0(2,2);
+	mat0.initIdentity();
+	
+	optOut.getValue(EMDL_IMAGE_MAG_MATRIX_00, mat0(0,0), 0);
+	optOut.getValue(EMDL_IMAGE_MAG_MATRIX_01, mat0(0,1), 0);
+	optOut.getValue(EMDL_IMAGE_MAG_MATRIX_10, mat0(1,0), 0);
+	optOut.getValue(EMDL_IMAGE_MAG_MATRIX_11, mat0(1,1), 0);
+	
+	mat = mat * mat0;
+	
 	optOut.setValue(EMDL_IMAGE_MAG_MATRIX_00, mat(0,0), 0);
 	optOut.setValue(EMDL_IMAGE_MAG_MATRIX_01, mat(0,1), 0);
 	optOut.setValue(EMDL_IMAGE_MAG_MATRIX_10, mat(1,0), 0);
