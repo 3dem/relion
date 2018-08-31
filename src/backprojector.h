@@ -299,7 +299,7 @@ public:
 
 	/*  Enforce Hermitian symmetry, apply helical symmetry as well as point-group symmetry
 	 */
-	void symmetrise(int nr_helical_asu = 1, RFLOAT helical_twist = 0., RFLOAT helical_rise = 0.);
+	void symmetrise(int nr_helical_asu = 1, RFLOAT helical_twist = 0., RFLOAT helical_rise = 0., int threads = 1);
 
 	/* Enforce hermitian symmetry on data and on weight (all points in the x==0 plane)
 	* Because the interpolations are numerical, hermitian symmetry may be broken.
@@ -313,11 +313,11 @@ public:
 
 	/* Applies the symmetry from the SymList object to the weight and the data array
 	 */
-	void applyPointGroupSymmetry();
+	void applyPointGroupSymmetry(int threads = 1);
 
 
    /* Convolute in Fourier-space with the blob by multiplication in real-space
-	 * Note the convlution is done on the complex array inside the transformer object!!
+	 * Note the convolution is done on the complex array inside the transformer object!!
 	 */
     void convoluteBlobRealSpace(FourierTransformer &transformer, bool do_mask = false, int threads = 1);
 

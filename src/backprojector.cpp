@@ -1471,7 +1471,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
     fourier_coverage_out = fourier_coverage;
 }
 
-void BackProjector::symmetrise(int nr_helical_asu, RFLOAT helical_twist, RFLOAT helical_rise)
+void BackProjector::symmetrise(int nr_helical_asu, RFLOAT helical_twist, RFLOAT helical_rise, int threads)
 {
 	// First make sure the input arrays are obeying Hermitian symmetry,
 	// which is assumed in the rotation operators of both helical and point group symmetry
@@ -1480,7 +1480,7 @@ void BackProjector::symmetrise(int nr_helical_asu, RFLOAT helical_twist, RFLOAT 
 	// Then apply helical and point group symmetry (order irrelevant?)
 	applyHelicalSymmetry(nr_helical_asu, helical_twist, helical_rise);
 
-	applyPointGroupSymmetry();
+	applyPointGroupSymmetry(threads);
 }
 
 void BackProjector::enforceHermitianSymmetry()
@@ -1664,7 +1664,7 @@ void BackProjector::applyHelicalSymmetry(int nr_helical_asu, RFLOAT helical_twis
 
 }
 
-void BackProjector::applyPointGroupSymmetry()
+void BackProjector::applyPointGroupSymmetry(int threads)
 {
 
 //#define DEBUG_SYMM
@@ -1697,11 +1697,13 @@ void BackProjector::applyPointGroupSymmetry()
 #ifdef DEBUG_SYMM
 	        std::cerr << " isym= " << isym << " R= " << R << std::endl;
 #endif
-
 	        // Loop over all points in the output (i.e. rotated, or summed) array
-	        FOR_ALL_ELEMENTS_IN_ARRAY3D(sum_weight)
+			
+			#pragma omp parallel for num_threads(threads) 
+			for (long int k=STARTINGZ(sum_weight); k<=FINISHINGZ(sum_weight); k++)
+			for (long int i=STARTINGY(sum_weight); i<=FINISHINGY(sum_weight); i++)
+			for (long int j=STARTINGX(sum_weight); j<=FINISHINGX(sum_weight); j++)
 	        {
-
 	        	x = (RFLOAT)j; // STARTINGX(sum_weight) is zero!
 	        	y = (RFLOAT)i;
 	        	z = (RFLOAT)k;

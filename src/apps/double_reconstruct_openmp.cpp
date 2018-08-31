@@ -682,7 +682,8 @@ class reconstruct_parameters
 					
 					std::cerr << " + Symmetrising half-set " << (j+1) << "...\n";
 					
-					backprojector[j]->symmetrise(nr_helical_asu, helical_twist, helical_rise/angpix);
+					backprojector[j]->symmetrise(
+						nr_helical_asu, helical_twist, helical_rise/angpix, nr_omp_threads);
 				}
 				
 				bool do_map = true;
