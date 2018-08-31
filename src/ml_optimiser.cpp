@@ -106,6 +106,7 @@ void MlOptimiser::read(int argc, char **argv, int rank)
 		do_parallel_disc_io = !checkParameter(argc, argv, "--no_parallel_disc_io");
 
 		parser.addSection("Continue options");
+		fn_opt = parser.getOption("--io", "Optics groups", "");
 		FileName fn_in = parser.getOption("--continue", "_optimiser.star file of the iteration after which to continue");
 		// Read in previously calculated parameters
 		if (fn_in != "")
