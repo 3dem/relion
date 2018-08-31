@@ -199,7 +199,11 @@ void ObservationModel::predictObservation(
     partMdt.getValue(EMDL_ORIENT_PSI, psi, particle);
 
     Euler_angles2matrix(rot, tilt, psi, A3D);
-	
+
+	if (hasMagMatrices)
+	{
+		A3D = magMatrices[opticsGroup] * A3D;
+	}
 	
 	if (dest.xdim != sh || dest.ydim != s)
 	{
@@ -208,18 +212,6 @@ void ObservationModel::predictObservation(
 	
 	dest.initZeros();
 	
-	if (hasMagMatrices)
-	{
-		/*if (particle == 0)
-		{
-			std::cout << A3D << "\n->\n" 
-			          << (magMatrices[opticsGroup] * A3D) << "\n->\n" 
-					  << (A3D * magMatrices[opticsGroup]) << "\n\n";
-		}*/
-		// multiply from the left, due to the transposition in Projector::get2DFourierTransform
-		A3D = magMatrices[opticsGroup] * A3D;
-	}
-
     proj.get2DFourierTransform(dest, A3D, false);
 	
 	if (applyShift)

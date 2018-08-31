@@ -416,10 +416,19 @@ class reconstruct_parameters
 							
 							Euler_angles2matrix(rot, tilt, psi, A3D);
 							
+							int opticsGroup;
+							mdts[g].getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, p);
+							opticsGroup--;
+							
+							if (obsModel.hasMagMatrices)
+							{
+								A3D = obsModel.magMatrices[opticsGroup] * A3D;
+							}
+							
 							// Translations (either through phase-shifts or in real space
 							trans.initZeros();
-							mdts[g].getValue( EMDL_ORIENT_ORIGIN_X, XX(trans), p);
-							mdts[g].getValue( EMDL_ORIENT_ORIGIN_Y, YY(trans), p);
+							mdts[g].getValue(EMDL_ORIENT_ORIGIN_X, XX(trans), p);
+							mdts[g].getValue(EMDL_ORIENT_ORIGIN_Y, YY(trans), p);
 							
 							if (shift_error > 0.)
 							{
