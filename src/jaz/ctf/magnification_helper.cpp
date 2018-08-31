@@ -5,8 +5,63 @@
 #include <src/jaz/filter_helper.h>
 #include <src/jaz/optimization/nelder_mead.h>
 #include <src/jaz/gravis/t4Matrix.h>
+#include <src/jaz/d3x3/dsyev2.h>
 
 using namespace gravis;
+
+Matrix2D<RFLOAT> MagnificationHelper::polarToMatrix(
+		double scaleMajor, double scaleMinor, double angleDeg)
+{
+	// based on definition by T. Nakane
+	
+	Matrix2D<RFLOAT> out(2,2);
+	
+	const double angle = DEG2RAD(angleDeg);
+	const double si = sin(angle), co = cos(angle);
+	const double si2 = si * si, co2 = co * co;
+
+	/*
+ 	    Out = Rot(angle) * Diag(scale_major, scale_minor) * Rot(-angle), where
+	    Rot(angle) = [[cos(angle), -sin(angle)], [sin(angle), cos(angle)]]
+		
+		[  c s ] [ j 0 ] [ c -s ]
+		[ -s c ] [ 0 n ] [ s  c ]		
+		=		
+		[  c s ] [ jc -js ]
+		[ -s c ] [ ns  nc ]
+		=
+		[  jcc+nss -jcs+ncs ]
+		[ -jcs+ncs  jss+ncc ]
+	*/
+
+	out(0, 0) =  scaleMajor * co2 + scaleMinor * si2;
+	out(1, 1) =  scaleMajor * si2 + scaleMinor * co2;
+	out(0, 1) = (-scaleMajor + scaleMinor) * si * co;
+	out(1, 0) = out(0, 1);
+	
+	return out;
+}
+
+void MagnificationHelper::matrixToPolar(		
+		const Matrix2D<RFLOAT>& mat,
+		RFLOAT& scaleMajor, 
+		RFLOAT& scaleMinor,
+		RFLOAT& angleDeg)
+{
+	const double m00 = mat(0,0);
+	const double m11 = mat(1,1);
+	const double m01 = 0.5 * (mat(0,1) + mat(1,0));
+	
+	double ev0, ev1, cs, sn;
+	
+	dsyev2(m00, m01, m11, &ev0, &ev1, &cs, &sn);
+	
+	scaleMajor = ev0;
+	scaleMinor = ev1;
+	angleDeg = RAD2DEG(atan2(sn,cs));
+	
+	return;
+}
 
 void MagnificationHelper::updateScaleFreq(
 		const Image<Complex> &prediction, const Image<Complex> &observation,
@@ -137,18 +192,18 @@ void MagnificationHelper::solvePerPixel(
 	}
 }
 
-void MagnificationHelper::solveLinearlyFreq(
+Matrix2D<RFLOAT> MagnificationHelper::solveLinearlyFreq(
 		const Volume<Equation2x2> &eqs,
 		const Image<RFLOAT>& snr,
-		Image<RFLOAT> &mat,
 		Image<RFLOAT> &vx, Image<RFLOAT> &vy)
 {
+	Matrix2D<RFLOAT> mat(2,2);
+	
 	const long w = eqs.dimx;
 	const long h = eqs.dimy;
 	
 	vx = Image<RFLOAT>(w,h);
 	vy = Image<RFLOAT>(w,h);
-	mat = Image<RFLOAT>(2,2);
 	
 	d4Vector b(0.0, 0.0, 0.0, 0.0);
 	
@@ -197,10 +252,10 @@ void MagnificationHelper::solveLinearlyFreq(
 	
 	d4Vector opt = Ai * b;
 	
-	DIRECT_A2D_ELEM(mat.data, 0, 0) = opt[0];
-	DIRECT_A2D_ELEM(mat.data, 0, 1) = opt[1];
-	DIRECT_A2D_ELEM(mat.data, 1, 0) = opt[2];
-	DIRECT_A2D_ELEM(mat.data, 1, 1) = opt[3];
+	mat(0,0) = opt[0] + 1.0;
+	mat(0,1) = opt[1];
+	mat(1,0) = opt[2];
+	mat(1,1) = opt[3] + 1.0;
 	
 	std::cout << opt[0] << ", " << opt[1] << "\n" 
 	          << opt[2] << ", " << opt[3] << "\n";

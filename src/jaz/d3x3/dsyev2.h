@@ -19,13 +19,14 @@
 #ifndef __DSYEV3_H
 #define __DSYEV3_H
 
-/*#ifdef __cplusplus
+#ifdef __cplusplus
 extern "C" {
-#endif*/
+#endif
 
 void dsyev2(double A, double B, double C, double *rt1, double *rt2,
                    double *cs, double *sn);
-/*#ifdef __cplusplus
+#ifdef __cplusplus
 }
-#endif*/
+#endif
+
 #endif

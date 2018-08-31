@@ -15,6 +15,17 @@ class MagnificationHelper
 {
 	public:
 		
+		static Matrix2D<RFLOAT> polarToMatrix(
+						double scaleMajor = 1.0, 
+						double scaleMinor = 1.0,
+						double angleDeg = 0.0);
+		
+		static void matrixToPolar(
+						const Matrix2D<RFLOAT>& mat,
+						RFLOAT& scaleMajor, 
+						RFLOAT& scaleMinor,
+						RFLOAT& angleDeg);
+		
 		static void updateScaleFreq( 
 						const Image<Complex>& prediction,
 						const Image<Complex>& observation,
@@ -32,10 +43,9 @@ class MagnificationHelper
 						const Volume<Equation2x2>& eqs,
 						Image<RFLOAT>& vx, Image<RFLOAT>& vy);
 		
-		static void solveLinearlyFreq( 
+		static Matrix2D<RFLOAT> solveLinearlyFreq( 
 						const Volume<Equation2x2>& eqs,
 						const Image<RFLOAT>& snr,
-						Image<RFLOAT>& mat,
 						Image<RFLOAT>& vx, Image<RFLOAT>& vy);
 		
 		static void readEQs(std::string path, Volume<Equation2x2>& eqs);

@@ -6,6 +6,7 @@
 #include <src/jaz/reference_map.h>
 #include <src/jaz/fftw_helper.h>
 #include <src/jaz/vtk_helper.h>
+#include <src/jaz/image_log.h>
 
 #include <omp.h>
 
@@ -90,7 +91,7 @@ void MagnificationEstimator::processMicrograph(
 }
 
 void MagnificationEstimator::parametricFit(
-		const std::vector<MetaDataTable> &mdts, MetaDataTable &mdtOut)
+		const std::vector<MetaDataTable> &mdts, MetaDataTable &optOut)
 {
 	if (!ready)
 	{
@@ -118,45 +119,34 @@ void MagnificationEstimator::parametricFit(
 	
 	Image<RFLOAT> flowx, flowy;
 	MagnificationHelper::solvePerPixel(magEqs, flowx, flowy);
-	
-	if (debug)
-	{
-		flowx.write(outPath+"_mag_disp_x.mrc");
-		flowy.write(outPath+"_mag_disp_y.mrc");
-	}
-	
+		
 	Image<RFLOAT> flowxFull, flowyFull;
 	FftwHelper::decenterUnflip2D(flowx.data, flowxFull.data);
 	FftwHelper::decenterUnflip2D(flowy.data, flowyFull.data);
 	
-	if (debug)
-	{
-		VtkHelper::writeVTK(flowxFull, outPath+"_mag_disp_x.vtk");
-		VtkHelper::writeVTK(flowyFull, outPath+"_mag_disp_y.vtk");
-	}
+	ImageLog::write(flowxFull, outPath + "mag_disp_x");
+	ImageLog::write(flowyFull, outPath + "mag_disp_y");
 	
 	Image<RFLOAT> freqWght = reference->getHollowWeight(kmin);
 	
-	Image<RFLOAT> mat;
-	MagnificationHelper::solveLinearlyFreq(magEqs, freqWght, mat, flowx, flowy);
+	Matrix2D<RFLOAT> mat = MagnificationHelper::solveLinearlyFreq(magEqs, freqWght, flowx, flowy);
 	
-	if (debug)
-	{
-		flowx.write(outPath+"_mag_disp_x_fit.mrc");
-		flowy.write(outPath+"_mag_disp_y_fit.mrc");
-		mat.write(outPath+"_mag_disp_mat.mrc");
+	FftwHelper::decenterUnflip2D(flowx.data, flowxFull.data);
+	FftwHelper::decenterUnflip2D(flowy.data, flowyFull.data);
 	
-		FftwHelper::decenterUnflip2D(flowx.data, flowxFull.data);
-		FftwHelper::decenterUnflip2D(flowy.data, flowyFull.data);
-		
-		VtkHelper::writeVTK(flowxFull, outPath+"_mag_disp_x_fit.vtk");
-		VtkHelper::writeVTK(flowyFull, outPath+"_mag_disp_y_fit.vtk");
-	}
+	ImageLog::write(flowxFull, outPath + "mag_disp_x_fit");
+	ImageLog::write(flowyFull, outPath + "mag_disp_y_fit");
 	
-	std::ofstream os(outPath+"_mag_mat.txt");
-	os << DIRECT_A2D_ELEM(mat.data, 0, 0) << " " << DIRECT_A2D_ELEM(mat.data, 0, 1) << "\n";
-	os << DIRECT_A2D_ELEM(mat.data, 1, 0) << " " << DIRECT_A2D_ELEM(mat.data, 1, 1) << "\n";
+	std::ofstream os(outPath + "mag_matrix.txt");
+	os << mat(0,0) << " " << mat(0,1) << "\n";
+	os << mat(1,0) << " " << mat(1,1) << "\n";
 	os.close();
+	
+	// @TODO: Add support for optics groups!
+	optOut.setValue(EMDL_IMAGE_MAG_MATRIX_00, mat(0,0), 0);
+	optOut.setValue(EMDL_IMAGE_MAG_MATRIX_01, mat(0,1), 0);
+	optOut.setValue(EMDL_IMAGE_MAG_MATRIX_10, mat(1,0), 0);
+	optOut.setValue(EMDL_IMAGE_MAG_MATRIX_11, mat(1,1), 0);
 }
 
 bool MagnificationEstimator::isFinished(

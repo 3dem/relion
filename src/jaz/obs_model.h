@@ -6,6 +6,7 @@
 #include <src/complex.h>
 #include <src/metadata_table.h>
 #include <src/projector.h>
+#include <src/jaz/gravis/t2Matrix.h>
 
 class BackProjector;
 
@@ -26,9 +27,10 @@ class ObservationModel
 		
 		
 			MetaDataTable opticsMdt;
-			bool hasEvenZernike, hasOddZernike;
+			bool hasEvenZernike, hasOddZernike, hasMagMatrices;
 			std::vector<double> angpix, lambda, Cs;
 			std::vector<std::vector<double> > evenZernikeCoeffs, oddZernikeCoeffs;
+			std::vector<Matrix2D<RFLOAT>> magMatrices;
 			
 		
 	protected:

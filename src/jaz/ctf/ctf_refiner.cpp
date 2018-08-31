@@ -381,7 +381,7 @@ void CtfRefiner::finalise()
 	// ...and for the magnification fit
 	if (do_mag_fit)
 	{
-		magnificationEstimator.parametricFit(allMdts, mdtOut);
+		magnificationEstimator.parametricFit(allMdts, optOut);
 	}
 
 	mdtOut.write(outPath + "particles_ctf_refine.star");

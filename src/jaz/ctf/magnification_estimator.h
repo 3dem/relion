@@ -35,7 +35,7 @@ class MagnificationEstimator
 		// then fit beam-tilt model to the per-pixel fit
 		void parametricFit(
 				const std::vector<MetaDataTable>& mdts, 
-				MetaDataTable& mdtOut);
+				MetaDataTable& optOut);
 		
 		// Has this mdt been processed already?
 		bool isFinished(const MetaDataTable& mdt);

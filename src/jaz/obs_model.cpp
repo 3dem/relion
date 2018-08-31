@@ -107,7 +107,15 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 	phaseCorr = std::vector<std::map<int,Image<Complex> > >(opticsMdt.numberOfObjects());
 	
 	const bool hasTilt = opticsMdt.containsLabel(EMDL_IMAGE_BEAMTILT_X)
-	                  || opticsMdt.containsLabel(EMDL_IMAGE_BEAMTILT_Y);							 
+	                  || opticsMdt.containsLabel(EMDL_IMAGE_BEAMTILT_Y);
+	
+	// anisotropic magnification:
+	hasMagMatrices = opticsMdt.containsLabel(EMDL_IMAGE_MAG_MATRIX_00)
+			      || opticsMdt.containsLabel(EMDL_IMAGE_MAG_MATRIX_01)
+			      || opticsMdt.containsLabel(EMDL_IMAGE_MAG_MATRIX_10)
+			      || opticsMdt.containsLabel(EMDL_IMAGE_MAG_MATRIX_11);
+	
+	if (hasMagMatrices) magMatrices.resize(opticsMdt.numberOfObjects());
 	
 	for (int i = 0; i < opticsMdt.numberOfObjects(); i++)
 	{
@@ -149,6 +157,17 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 			
 			hasOddZernike = true;
 		}
+		
+		if (hasMagMatrices)
+		{
+			magMatrices[i] = Matrix2D<RFLOAT>(3,3);
+			magMatrices[i].initIdentity();
+			
+			opticsMdt.getValue(EMDL_IMAGE_MAG_MATRIX_00, magMatrices[i](0,0), i);
+			opticsMdt.getValue(EMDL_IMAGE_MAG_MATRIX_01, magMatrices[i](0,1), i);
+			opticsMdt.getValue(EMDL_IMAGE_MAG_MATRIX_10, magMatrices[i](1,0), i);
+			opticsMdt.getValue(EMDL_IMAGE_MAG_MATRIX_11, magMatrices[i](1,1), i);
+		}
 	}
 	
 	// @TODO: make sure tilt is in opticsMDT, not in particlesMDT!
@@ -161,7 +180,11 @@ void ObservationModel::predictObservation(
 {
     const int s = proj.ori_size;
     const int sh = s/2 + 1;
-
+	
+	int opticsGroup;
+	partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, particle);
+	opticsGroup--;
+	
     double xoff, yoff;
 
     partMdt.getValue(EMDL_ORIENT_ORIGIN_X, xoff, particle);
@@ -175,6 +198,11 @@ void ObservationModel::predictObservation(
     partMdt.getValue(EMDL_ORIENT_PSI, psi, particle);
 
     Euler_angles2matrix(rot, tilt, psi, A3D);
+	
+	if (hasMagMatrices)
+	{
+		A3D = A3D * magMatrices[opticsGroup];
+	}
 
 	if (dest.xdim != sh || dest.ydim != s)
 	{
@@ -184,10 +212,6 @@ void ObservationModel::predictObservation(
 	dest.initZeros();
 
     proj.get2DFourierTransform(dest, A3D, false);
-	
-	int opticsGroup;
-	partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, particle);
-	opticsGroup--;
 	
 	if (applyShift)
 	{

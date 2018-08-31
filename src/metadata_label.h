@@ -117,6 +117,10 @@ enum EMDLabel
 	EMDL_IMAGE_OPTICS_GROUP,
 	EMDL_IMAGE_ODD_ZERNIKE_COEFFS,
 	EMDL_IMAGE_EVEN_ZERNIKE_COEFFS,
+	EMDL_IMAGE_MAG_MATRIX_00,
+	EMDL_IMAGE_MAG_MATRIX_01,
+	EMDL_IMAGE_MAG_MATRIX_10,
+	EMDL_IMAGE_MAG_MATRIX_11,
     EMDL_IMAGE_COORD_X,
     EMDL_IMAGE_COORD_Y,
     EMDL_IMAGE_COORD_Z,
@@ -563,6 +567,10 @@ private:
 		EMDL::addLabel(EMDL_IMAGE_OPTICS_GROUP, EMDL_INT, "rlnOpticsGroup", "Group of particles with identical optical properties");
 		EMDL::addLabel(EMDL_IMAGE_ODD_ZERNIKE_COEFFS, EMDL_DOUBLE_VECTOR, "rlnOddZernike", "Coefficients for the antisymmetrical Zernike polynomials");
 		EMDL::addLabel(EMDL_IMAGE_EVEN_ZERNIKE_COEFFS, EMDL_DOUBLE_VECTOR, "rlnEvenZernike", "Coefficients for the symmetrical Zernike polynomials");
+		EMDL::addLabel(EMDL_IMAGE_MAG_MATRIX_00, EMDL_DOUBLE, "rlnMagMat00", "Anisotropic magnification matrix, element 1,1");
+		EMDL::addLabel(EMDL_IMAGE_MAG_MATRIX_01, EMDL_DOUBLE, "rlnMagMat01", "Anisotropic magnification matrix, element 1,2");
+		EMDL::addLabel(EMDL_IMAGE_MAG_MATRIX_10, EMDL_DOUBLE, "rlnMagMat10", "Anisotropic magnification matrix, element 2,1");
+		EMDL::addLabel(EMDL_IMAGE_MAG_MATRIX_11, EMDL_DOUBLE, "rlnMagMat11", "Anisotropic magnification matrix, element 2,2");
         EMDL::addLabel(EMDL_IMAGE_COORD_X, EMDL_DOUBLE, "rlnCoordinateX", "X-Position of an image in a micrograph (in pixels)");
         EMDL::addLabel(EMDL_IMAGE_COORD_Y, EMDL_DOUBLE, "rlnCoordinateY", "Y-Position of an image in a micrograph (in pixels)");
         EMDL::addLabel(EMDL_IMAGE_COORD_Z, EMDL_DOUBLE, "rlnCoordinateZ", "Z-Position of an image in a 3D micrograph, i.e. tomogram (in pixels)");
