@@ -34,7 +34,7 @@ class MagnificationEstimator
 		// Sum up per-pixel information from all micrographs, 
 		// then fit beam-tilt model to the per-pixel fit
 		void parametricFit(
-				const std::vector<MetaDataTable>& mdts, 
+				std::vector<MetaDataTable>& mdts, 
 				MetaDataTable& optOut);
 		
 		// Has this mdt been processed already?
@@ -45,6 +45,7 @@ class MagnificationEstimator
 				
 		// cmd. line options (see read())
 		double kmin;
+		bool adaptAstig, perMgAstig;
 		
 		// parameters obtained through init()
 		int verb, s, sh, nr_omp_threads;

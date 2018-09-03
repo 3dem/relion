@@ -48,6 +48,17 @@ void MagnificationHelper::matrixToPolar(
 		RFLOAT& scaleMinor,
 		RFLOAT& angleDeg)
 {
+	matrixToPolar(
+		d2Matrix(mat(0,0), mat(0,1), mat(1,0), mat(1,1)),
+		scaleMajor, scaleMinor, angleDeg);
+}
+
+void MagnificationHelper::matrixToPolar(		
+		const d2Matrix& mat,
+		RFLOAT& scaleMajor, 
+		RFLOAT& scaleMinor,
+		RFLOAT& angleDeg)
+{
 	const double m00 = mat(0,0);
 	const double m11 = mat(1,1);
 	const double m01 = 0.5 * (mat(0,1) + mat(1,0));
@@ -356,6 +367,101 @@ void MagnificationHelper::updatePowSpec(
 		
 		DIRECT_A2D_ELEM(powSpecPred.data, y, x) += (c * vx).abs();
 		DIRECT_A2D_ELEM(powSpecObs.data, y, x) += vy.abs();
+	}
+}
+
+void MagnificationHelper::adaptAstigmatism(
+		const Matrix2D<RFLOAT>& dM, 
+		std::vector<MetaDataTable>& partMdts, 
+		bool perParticle)
+{
+	const long int mc = partMdts.size();
+	
+	d2Matrix M(dM(0,0), dM(0,1), dM(1,0), dM(1,1));
+	
+	d2Matrix Mi = M;
+	Mi.invert();
+	
+	d2Matrix Mit = Mi;
+	Mit.transpose();
+	
+	for (long int m = 0; m < mc; m++)
+	{
+		const int pc = partMdts[m].size();
+		
+		std::vector<d2Matrix> A(pc), D(pc), Q(pc);
+		
+		for (long int p = 0; p < pc; p++)
+		{
+			double deltafU, deltafV, phiDeg;
+			
+			partMdts[m].getValue(EMDL_CTF_DEFOCUSU, deltafU, p);
+			partMdts[m].getValue(EMDL_CTF_DEFOCUSV, deltafV, p);
+			partMdts[m].getValue(EMDL_CTF_DEFOCUS_ANGLE, phiDeg, p);
+			
+			const double phi = DEG2RAD(phiDeg);
+			
+			//A[p] = polarToMatrix(-deltafU, -deltafV, phiDeg);
+			
+			const double si = sin(phi);
+			const double co = cos(phi);
+			
+			Q[p] = d2Matrix(co, si, -si, co);
+			D[p] = d2Matrix(-deltafU, 0.0, 0.0, -deltafV);			
+			d2Matrix Qt(co, -si, si, co);
+			
+			A[p] = Qt * D[p] * Q[p];
+		}
+		
+		if (perParticle)
+		{
+			for (long int p = 0; p < pc; p++)
+			{
+				d2Matrix A2 = Mit * A[p] * Mi;
+				
+				double deltafU_neg, deltafV_neg, phiDeg;				
+				matrixToPolar(A2, deltafU_neg, deltafV_neg, phiDeg);
+				
+				partMdts[m].setValue(EMDL_CTF_DEFOCUSU, -deltafU_neg, p);
+				partMdts[m].setValue(EMDL_CTF_DEFOCUSV, -deltafV_neg, p);
+				partMdts[m].setValue(EMDL_CTF_DEFOCUS_ANGLE, phiDeg, p);
+			}
+		}
+		else // keep difference between deltafU and deltafV, as well as the azimuth angle, constant
+		{
+			d2Matrix A_mean(0.0, 0.0, 0.0, 0.0);
+			
+			for (long int p = 0; p < pc; p++)
+			{
+				A_mean += A[p] * (1.0/(double)pc);
+			}
+						
+			double deltafU_mean_neg, deltafV_mean_neg, co, si;			
+			dsyev2(A_mean(0,0), A_mean(1,0), A_mean(1,1), 
+				   &deltafU_mean_neg, &deltafV_mean_neg, &co, &si);
+			
+			d2Matrix Q2(co, si, -si, co);
+			d2Matrix Qt2(co, -si, si, co);
+			
+			double meanDef_mean = 0.5 * (deltafU_mean_neg + deltafV_mean_neg);
+			
+			for (long int p = 0; p < pc; p++)
+			{
+				double meanDef_p = 0.5 * (D[p](0,0) + D[p](1,1));
+				
+				d2Matrix Dp2(deltafU_mean_neg - meanDef_mean + meanDef_p, 0.0,
+							 0.0, deltafV_mean_neg - meanDef_mean + meanDef_p);
+				
+				d2Matrix Ap2 = Qt2 * Dp2 * Q2;
+				
+				double deltafU_neg, deltafV_neg, phiDeg;
+				matrixToPolar(Ap2, deltafU_neg, deltafV_neg, phiDeg);
+				
+				partMdts[m].setValue(EMDL_CTF_DEFOCUSU, -deltafU_neg, p);
+				partMdts[m].setValue(EMDL_CTF_DEFOCUSV, -deltafV_neg, p);
+				partMdts[m].setValue(EMDL_CTF_DEFOCUS_ANGLE, phiDeg, p);
+			}			
+		}
 	}
 }
 

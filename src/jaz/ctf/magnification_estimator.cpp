@@ -23,6 +23,9 @@ void MagnificationEstimator::read(
 {
 	kmin = textToFloat(parser.getOption("--kmin_mag", 
 				"Inner freq. threshold for anisotropic magnification estimation [Angst]", "20.0"));
+	
+	adaptAstig = !parser.checkOption("--keep_astig", "Do not translate astigmatism into new coordinates");
+	perMgAstig = !parser.checkOption("--part_astig", "Allow astigmatism to vary among the particles of a micrograph");
 }
 
 void MagnificationEstimator::init(
@@ -91,7 +94,7 @@ void MagnificationEstimator::processMicrograph(
 }
 
 void MagnificationEstimator::parametricFit(
-		const std::vector<MetaDataTable> &mdts, MetaDataTable &optOut)
+		std::vector<MetaDataTable> &mdts, MetaDataTable &optOut)
 {
 	if (!ready)
 	{
@@ -152,12 +155,17 @@ void MagnificationEstimator::parametricFit(
 	optOut.getValue(EMDL_IMAGE_MAG_MATRIX_10, mat0(1,0), 0);
 	optOut.getValue(EMDL_IMAGE_MAG_MATRIX_11, mat0(1,1), 0);
 	
-	mat = mat * mat0;
+	Matrix2D<RFLOAT> mat1 = mat * mat0;
 	
-	optOut.setValue(EMDL_IMAGE_MAG_MATRIX_00, mat(0,0), 0);
-	optOut.setValue(EMDL_IMAGE_MAG_MATRIX_01, mat(0,1), 0);
-	optOut.setValue(EMDL_IMAGE_MAG_MATRIX_10, mat(1,0), 0);
-	optOut.setValue(EMDL_IMAGE_MAG_MATRIX_11, mat(1,1), 0);
+	optOut.setValue(EMDL_IMAGE_MAG_MATRIX_00, mat1(0,0), 0);
+	optOut.setValue(EMDL_IMAGE_MAG_MATRIX_01, mat1(0,1), 0);
+	optOut.setValue(EMDL_IMAGE_MAG_MATRIX_10, mat1(1,0), 0);
+	optOut.setValue(EMDL_IMAGE_MAG_MATRIX_11, mat1(1,1), 0);
+	
+	if (adaptAstig)
+	{
+		MagnificationHelper::adaptAstigmatism(mat, mdts, !perMgAstig);
+	}
 }
 
 bool MagnificationEstimator::isFinished(

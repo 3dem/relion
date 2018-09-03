@@ -26,6 +26,12 @@ class MagnificationHelper
 						RFLOAT& scaleMinor,
 						RFLOAT& angleDeg);
 		
+		static void matrixToPolar(
+						const gravis::d2Matrix& mat,
+						RFLOAT& scaleMajor, 
+						RFLOAT& scaleMinor,
+						RFLOAT& angleDeg);
+		
 		static void updateScaleFreq( 
 						const Image<Complex>& prediction,
 						const Image<Complex>& observation,
@@ -57,6 +63,11 @@ class MagnificationHelper
 						CTF& ctf, double angpix,
 						Image<RFLOAT>& powSpecPred,
 						Image<RFLOAT>& powSpecObs);
+		
+		static void adaptAstigmatism(
+						const Matrix2D<RFLOAT>& dM, 
+						std::vector<MetaDataTable>& partMdts,
+						bool perParticle);
 };
 
 #endif
