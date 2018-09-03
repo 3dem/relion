@@ -47,6 +47,9 @@
 #include "src/fftw.h"
 #include "src/metadata_table.h"
 #include <src/jaz/obs_model.h>
+#include <src/jaz/gravis/t2Matrix.h>
+
+using namespace gravis;
 
 /* Read -------------------------------------------------------------------- */
 void CTF::readByGroup(const MetaDataTable &partMdt, ObservationModel* obs, int particle)
@@ -212,7 +215,21 @@ void CTF::initialise()
 
     if (ABS(DeltafU) < 1e-6 && ABS(DeltafV) < 1e-6 && ABS(Q0) < 1e-6 && ABS(Cs) < 1e-6)
     	REPORT_ERROR("CTF::initialise: ERROR: CTF initialises to all-zero values. Was a correct STAR file provided?");
-
+	
+	// express astigmatism as a bilinear form:
+	
+	const double sin_az = sin(rad_azimuth);
+	const double cos_az = cos(rad_azimuth);
+	
+	d2Matrix Q(cos_az, sin_az, -sin_az, cos_az);
+	d2Matrix Qt(cos_az, -sin_az, sin_az, cos_az);
+	d2Matrix D(-DeltafU, 0.0, 0.0, -DeltafV);
+	
+	d2Matrix A = Qt * D * Q;
+	
+	Axx = A(0,0);
+	Axy = A(0,1);
+	Ayy = A(1,1);
 }
 
 double CTF::getGamma(double X, double Y)
@@ -220,8 +237,7 @@ double CTF::getGamma(double X, double Y)
     RFLOAT u2 = X * X + Y * Y;
     RFLOAT u4 = u2 * u2;
 
-    RFLOAT deltaf = getDeltaF(X, Y);
-    return K1 * deltaf * u2 + K2 * u4 - K5 - K3;
+    return K1 * (Axx*X*X + 2.0*Axy*X*Y + Ayy*Y*Y) + K2 * u4 - K5 - K3;
 }
 
 RFLOAT CTF::getCtfFreq(RFLOAT X, RFLOAT Y)

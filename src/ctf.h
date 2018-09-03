@@ -61,6 +61,9 @@ protected:
     RFLOAT K3;
     RFLOAT K4;
     RFLOAT K5;
+	
+	// Astigmatism stored in symmetrical matrix form
+	RFLOAT Axx, Axy, Ayy;
 
     // Azimuthal angle in radians
     RFLOAT rad_azimuth;
@@ -71,9 +74,9 @@ protected:
     // defocus_deviation = (defocus_u - defocus_v)/2
     RFLOAT defocus_deviation;
 	
-	// kept after a call to readByGroup() to enable caching of symmetric aberrations
-	// (CTF instances can be reallocated for each particle, while the same obs. model
-	// lives for the entire duration of the program)
+	// Pointer to observation model kept after a call to readByGroup() to enable 
+	// caching of symmetric aberrations (CTF instances can be reallocated for each particle, 
+	// while the same obs. model lives for the entire duration of the program)
 	ObservationModel* obsModel;
 	int opticsGroup;
 
@@ -186,8 +189,9 @@ public:
         RFLOAT u4 = u2 * u2;
 
         // if (u2>=ua2) return 0;
-        RFLOAT deltaf = getDeltaF(X, Y);
-        RFLOAT gamma = K1 * deltaf * u2 + K2 * u4 - K5 - K3 + gammaOffset;
+        //RFLOAT deltaf = getDeltaF(X, Y);
+        //RFLOAT gamma = K1 * deltaf * u2 + K2 * u4 - K5 - K3 + gammaOffset;
+		RFLOAT gamma = K1 * (Axx*X*X + 2.0*Axy*X*Y + Ayy*Y*Y) + K2 * u4 - K5 - K3 + gammaOffset;
 		
         RFLOAT retval;
 		
@@ -248,7 +252,7 @@ public:
 
     }
 
-    /// Compute Deltaf at a given direction
+    /// Compute Deltaf at a given direction (no longer used by getCTF)
     inline RFLOAT getDeltaF(RFLOAT X, RFLOAT Y) const
     {
         if (ABS(X) < XMIPP_EQUAL_ACCURACY &&
