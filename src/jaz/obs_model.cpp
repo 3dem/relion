@@ -165,8 +165,8 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 		
 			// transpose the matrix, since the transpose is used in Projector::get2DFourierTransform
 			opticsMdt.getValue(EMDL_IMAGE_MAG_MATRIX_00, magMatrices[i](0,0), i);
-			opticsMdt.getValue(EMDL_IMAGE_MAG_MATRIX_01, magMatrices[i](1,0), i);
-			opticsMdt.getValue(EMDL_IMAGE_MAG_MATRIX_10, magMatrices[i](0,1), i);
+			opticsMdt.getValue(EMDL_IMAGE_MAG_MATRIX_01, magMatrices[i](0,1), i);
+			opticsMdt.getValue(EMDL_IMAGE_MAG_MATRIX_10, magMatrices[i](1,0), i);
 			opticsMdt.getValue(EMDL_IMAGE_MAG_MATRIX_11, magMatrices[i](1,1), i);
 		}
 	}
@@ -200,10 +200,7 @@ void ObservationModel::predictObservation(
 
     Euler_angles2matrix(rot, tilt, psi, A3D);
 
-	if (hasMagMatrices)
-	{
-		A3D = magMatrices[opticsGroup] * A3D;
-	}
+	A3D = applyAnisoMagTransp(A3D, opticsGroup);
 	
 	if (dest.xdim != sh || dest.ydim != s)
 	{
@@ -517,6 +514,22 @@ const Image<RFLOAT>& ObservationModel::getGammaOffset(int optGroup, int s)
 	}
 	
 	return gammaOffset[optGroup][s];
+}
+
+Matrix2D<RFLOAT> ObservationModel::applyAnisoMagTransp(Matrix2D<RFLOAT> A3D_transp, int opticsGroup)
+{
+	Matrix2D<RFLOAT> out;
+	
+	if (hasMagMatrices)
+	{
+		out = magMatrices[opticsGroup].transpose() * A3D_transp;
+	}
+	else
+	{
+		out = A3D_transp;
+	}
+	
+	return out;
 }
 
 bool ObservationModel::containsAllNeededColumns(const MetaDataTable& partMdt)

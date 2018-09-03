@@ -47,9 +47,9 @@
 
 #include "src/multidim_array.h"
 #include "src/metadata_table.h"
+#include "src/jaz/obs_model.h"
 #include <map>
 
-class ObservationModel;
 
 class CTF
 {
@@ -172,6 +172,16 @@ public:
             bool do_intact_until_first_peak = false, bool do_damping = true,
 			double gammaOffset = 0.0) const
     {
+		if (obsModel != 0 && obsModel->hasMagMatrices)
+		{
+			const Matrix2D<RFLOAT>& M = obsModel->magMatrices[opticsGroup];
+			RFLOAT XX = M(0,0) * X + M(0,1) * Y;
+			RFLOAT YY = M(1,0) * X + M(1,1) * Y;
+			
+			X = XX;
+			Y = YY;
+		}
+		
         RFLOAT u2 = X * X + Y * Y;
         RFLOAT u4 = u2 * u2;
 

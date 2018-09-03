@@ -30,7 +30,7 @@ class ObservationModel
 			bool hasEvenZernike, hasOddZernike, hasMagMatrices;
 			std::vector<double> angpix, lambda, Cs;
 			std::vector<std::vector<double> > evenZernikeCoeffs, oddZernikeCoeffs;
-			std::vector<Matrix2D<RFLOAT>> magMatrices;
+			std::vector<Matrix2D<RFLOAT> > magMatrices;
 			
 		
 	protected:
@@ -77,6 +77,8 @@ class ObservationModel
 				
 		// effect of symmetric aberration (cached)
 		const Image<RFLOAT>& getGammaOffset(int optGroup, int s);
+				
+		Matrix2D<RFLOAT> applyAnisoMagTransp(Matrix2D<RFLOAT> A3D_transp, int opticsGroup);
 		
 		
 	// Bureaucracy //

@@ -420,10 +420,7 @@ class reconstruct_parameters
 							mdts[g].getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, p);
 							opticsGroup--;
 							
-							if (obsModel.hasMagMatrices)
-							{
-								A3D = obsModel.magMatrices[opticsGroup] * A3D;
-							}
+							A3D = obsModel.applyAnisoMagTransp(A3D, opticsGroup);
 							
 							// Translations (either through phase-shifts or in real space
 							trans.initZeros();
