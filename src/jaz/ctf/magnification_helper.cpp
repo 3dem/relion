@@ -401,8 +401,6 @@ void MagnificationHelper::adaptAstigmatism(
 			
 			const double phi = DEG2RAD(phiDeg);
 			
-			//A[p] = polarToMatrix(-deltafU, -deltafV, phiDeg);
-			
 			const double si = sin(phi);
 			const double co = cos(phi);
 			
@@ -435,6 +433,8 @@ void MagnificationHelper::adaptAstigmatism(
 			{
 				A_mean += A[p] * (1.0/(double)pc);
 			}
+			
+			A_mean = Mit * A_mean * Mi;
 						
 			double deltafU_mean_neg, deltafV_mean_neg, co, si;			
 			dsyev2(A_mean(0,0), A_mean(1,0), A_mean(1,1), 
@@ -447,18 +447,24 @@ void MagnificationHelper::adaptAstigmatism(
 			
 			for (long int p = 0; p < pc; p++)
 			{
-				double meanDef_p = 0.5 * (D[p](0,0) + D[p](1,1));
+				d2Matrix Ap2 = Mit * A[p] * Mi;
+				
+				double deltafU_p_neg, deltafV_p_neg, cop, sip;			
+				dsyev2(Ap2(0,0), Ap2(1,0), Ap2(1,1), 
+					   &deltafU_p_neg, &deltafV_p_neg, &cop, &sip);
+				
+				double meanDef_p = 0.5 * (deltafU_p_neg + deltafV_p_neg);
 				
 				d2Matrix Dp2(deltafU_mean_neg - meanDef_mean + meanDef_p, 0.0,
 							 0.0, deltafV_mean_neg - meanDef_mean + meanDef_p);
 				
-				d2Matrix Ap2 = Qt2 * Dp2 * Q2;
+				d2Matrix Apa2 = Qt2 * Dp2 * Q2;
 				
-				double deltafU_neg, deltafV_neg, phiDeg;
-				matrixToPolar(Ap2, deltafU_neg, deltafV_neg, phiDeg);
+				double deltafU_pa_neg, deltafV_pa_neg, phiDeg;
+				matrixToPolar(Apa2, deltafU_pa_neg, deltafV_pa_neg, phiDeg);
 				
-				partMdts[m].setValue(EMDL_CTF_DEFOCUSU, -deltafU_neg, p);
-				partMdts[m].setValue(EMDL_CTF_DEFOCUSV, -deltafV_neg, p);
+				partMdts[m].setValue(EMDL_CTF_DEFOCUSU, -deltafU_pa_neg, p);
+				partMdts[m].setValue(EMDL_CTF_DEFOCUSV, -deltafV_pa_neg, p);
 				partMdts[m].setValue(EMDL_CTF_DEFOCUS_ANGLE, phiDeg, p);
 			}			
 		}
