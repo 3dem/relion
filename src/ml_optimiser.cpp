@@ -2132,6 +2132,8 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 				int iclass  = rnd_unif() * mymodel.nr_classes;
 				Matrix2D<RFLOAT> A;
 				Euler_angles2matrix(rot, tilt, psi, A, true);
+				
+				mydata.obsModel.applyAnisoMagTransp(A, 0);
 
 				// Construct initial references from random subsets
 	   			windowFourierTransform(Faux, Fimg, wsum_model.current_size);
@@ -7090,11 +7092,33 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 						psi = oversampled_psi[iover_rot];
 						// Get the Euler matrix
 						Euler_angles2matrix(rot, tilt, psi, A, false);
-
+						
+						// Assumption: all particles in mydata.ori_particles[my_ori_particle]
+						// share the same optics group
+						
+						if (mydata.ori_particles[my_ori_particle].particles_id.size() < 1)
+						{
+							REPORT_ERROR("REVERSE-ENGINEERING ERROR: mydata.ori_particles[my_ori_particle].size() < 1");
+						}
+						
+						const int first_part_id = mydata.ori_particles[my_ori_particle].particles_id[0];
+						
+						if (first_part_id >= mydata.particles.size())
+						{
+							REPORT_ERROR("REVERSE-ENGINEERING ERROR: first_part_id >= mydata.particles.size()");
+						}
+						
+						const int optics_group = mydata.particles[first_part_id].optics_group;
+					
 						// For multi-body refinements, A are only 'residual' orientations, Abody is the complete Euler matrix
 						if (mymodel.nr_bodies > 1)
 						{
 							Abody = Aori * (mymodel.orient_bodies[ibody]).transpose() * A_rot90 * A * mymodel.orient_bodies[ibody];
+							mydata.obsModel.applyAnisoMagTransp(Abody, optics_group); 
+						}
+						else
+						{
+							mydata.obsModel.applyAnisoMagTransp(A, optics_group); 
 						}
 
 #ifdef TIMING
@@ -7107,10 +7131,12 @@ void MlOptimiser::storeWeightedSums(long int my_ori_particle, int ibody, int exp
 						{
 							if (mymodel.nr_bodies > 1)
 							{
-								(mymodel.PPref[ibody]).get2DFourierTransform(Fref, Abody, IS_NOT_INV);
+								mymodel.PPref[ibody].get2DFourierTransform(Fref, Abody, IS_NOT_INV);
 							}
 							else
-								(mymodel.PPref[exp_iclass]).get2DFourierTransform(Fref, A, IS_NOT_INV);
+							{
+								mymodel.PPref[exp_iclass].get2DFourierTransform(Fref, A, IS_NOT_INV);
+							}
 						}
 #ifdef TIMING
 						// Only time one thread, as I also only time one MPI process
