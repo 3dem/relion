@@ -274,7 +274,7 @@ void DefocusEstimator::processMicrograph(
 	mdt.write(outRoot + "_defocus_fit.star");
 }
 
-void DefocusEstimator::merge(const std::vector<MetaDataTable>& mdts, MetaDataTable& mdtOut)
+std::vector<MetaDataTable> DefocusEstimator::merge(const std::vector<MetaDataTable>& mdts)
 {
 	int gc = mdts.size();
 	int barstep;
@@ -286,7 +286,7 @@ void DefocusEstimator::merge(const std::vector<MetaDataTable>& mdts, MetaDataTab
 		barstep = 1;
 	}
 
-	mdtOut.clear();
+	std::vector<MetaDataTable> mdtOut;
 	std::vector<FileName> fn_eps;
 
 	for (long g = 0; g < gc; g++)
@@ -297,7 +297,7 @@ void DefocusEstimator::merge(const std::vector<MetaDataTable>& mdts, MetaDataTab
 		MetaDataTable mdt;
 		mdt.read(outRoot+"_defocus_fit.star");
 
-		mdtOut.append(mdt);
+		mdtOut.push_back(mdt);
 
 		if (exists(outRoot+"_defocus_fit.eps"))
 		{
@@ -319,6 +319,8 @@ void DefocusEstimator::merge(const std::vector<MetaDataTable>& mdts, MetaDataTab
 	{
 		joinMultipleEPSIntoSinglePDF(outPath + "logfile.pdf", fn_eps);
 	}
+	
+	return mdtOut;
 }
 
 void DefocusEstimator::writeEPS(const MetaDataTable& mdt)

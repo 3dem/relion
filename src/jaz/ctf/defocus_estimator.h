@@ -31,7 +31,7 @@ class DefocusEstimator
 				const std::vector<Image<Complex>>& pred);
 		
 		// Combine all .stars and .eps files
-		void merge(const std::vector<MetaDataTable>& mdts, MetaDataTable& mdtOut);
+		std::vector<MetaDataTable> merge(const std::vector<MetaDataTable>& mdts);
 	
 		// Write PostScript file with per-particle defocus 
 		// plotted onto micrograph in blue-red color scale

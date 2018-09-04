@@ -350,7 +350,7 @@ void CtfRefiner::run()
 
 void CtfRefiner::finalise()
 {
-	MetaDataTable mdtOut = mdt0;
+	std::vector<MetaDataTable> mdtOut;
 	MetaDataTable optOut = obsModel.opticsMdt;
 
 	// Read back from disk the metadata-tables and eps-plots for the defocus fit
@@ -358,33 +358,35 @@ void CtfRefiner::finalise()
 	// will end up in mdtOut - micrographs excluded through min_MG and max_MG will not.
 	if (do_defocus_fit)
 	{
-		defocusEstimator.merge(allMdts, mdtOut);
+		mdtOut = defocusEstimator.merge(allMdts);
 	}
 	else
 	{
-		mdtOut = mdt0;
+		mdtOut = allMdts;
 	}
-
+	
 	// Sum up the per-pixel beamtilt fits of all micrographs and fit a parametric model to them.
 	// Then, write the beamtilt parameters into optOut
 	if (do_tilt_fit)
 	{
-		tiltEstimator.parametricFit(allMdts, optOut);
+		tiltEstimator.parametricFit(mdtOut, optOut);
 	}
 	
 	// Do the equivalent for the symmetrical aberrations...
 	if (do_aberr_fit)
 	{
-		aberrationEstimator.parametricFit(allMdts, optOut);
+		aberrationEstimator.parametricFit(mdtOut, optOut);
 	}
 
 	// ...and for the magnification fit
 	if (do_mag_fit)
 	{
-		magnificationEstimator.parametricFit(allMdts, optOut);
+		magnificationEstimator.parametricFit(mdtOut, optOut);
 	}
 
-	mdtOut.write(outPath + "particles_ctf_refine.star");
+	MetaDataTable mdtOutAll = StackHelper::merge(mdtOut);
+	
+	mdtOutAll.write(outPath + "particles_ctf_refine.star");
 	optOut.write(outPath + "particles_ctf_refine_optics.star");
 
 	if (verb > 0)
