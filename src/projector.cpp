@@ -418,6 +418,13 @@ void Projector::project(MultidimArray<Complex > &f2d, Matrix2D<RFLOAT> &A, bool 
 				fz = zp - z0;
 				z0 -= STARTINGZ(data);
 				z1 = z0 + 1;
+				
+				if (x0 < 0 || x0+1 >= data.xdim
+				 || y0 < 0 || y0+1 >= data.ydim
+				 || z0 < 0 || z0+1 >= data.zdim)
+				{
+					continue;
+				}
 
 				// Matrix access can be accelerated through pre-calculation of z0*xydim etc.
 				d000 = DIRECT_A3D_ELEM(data, z0, y0, x0);
@@ -440,7 +447,9 @@ void Projector::project(MultidimArray<Complex > &f2d, Matrix2D<RFLOAT> &A, bool 
 
 				// Take complex conjugated for half with negative x
 				if (is_neg_x)
+				{
 					DIRECT_A2D_ELEM(f2d, i, x) = conj(DIRECT_A2D_ELEM(f2d, i, x));
+				}
 
 			} // endif TRILINEAR
 			else if (interpolator == NEAREST_NEIGHBOUR )
@@ -448,14 +457,45 @@ void Projector::project(MultidimArray<Complex > &f2d, Matrix2D<RFLOAT> &A, bool 
 				x0 = ROUND(xp);
 				y0 = ROUND(yp);
 				z0 = ROUND(zp);
+
 				if (x0 < 0)
-					DIRECT_A2D_ELEM(f2d, i, x) = conj(A3D_ELEM(data, -z0, -y0, -x0));
+				{
+					// Get complex conjugated hermitian symmetry pair
+					x0 = -x0;
+					y0 = -y0;
+					z0 = -z0;
+					is_neg_x = true;
+				}
 				else
-					DIRECT_A2D_ELEM(f2d, i, x) = A3D_ELEM(data, z0, y0, x0);
+				{
+					is_neg_x = false;
+				}
+				
+				const int xr = x0 - STARTINGX(data);
+				const int yr = y0 - STARTINGY(data);
+				const int zr = z0 - STARTINGZ(data);
+				
+				if (xr < 0 || xr >= data.xdim
+				 || yr < 0 || yr >= data.ydim
+				 || zr < 0 || zr >= data.zdim)
+				{
+					continue;
+				}
+				
+				if (is_neg_x)
+				{
+					DIRECT_A2D_ELEM(f2d, i, x) = conj(DIRECT_A3D_ELEM(data, zr, yr, xr));
+				}
+				else
+				{
+					DIRECT_A2D_ELEM(f2d, i, x) = A3D_ELEM(data, zr, yr, xr);
+				}
 
 			} // endif NEAREST_NEIGHBOUR
 			else
+			{
 				REPORT_ERROR("Unrecognized interpolator in Projector::project");
+			}
 
 		} // endif x-loop
 	} // endif y-loop

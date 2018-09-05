@@ -236,22 +236,44 @@ void BackProjector::backproject2Dto3D(const MultidimArray<Complex > &f2d,
 				} // endif TRILINEAR
 				else if (interpolator == NEAREST_NEIGHBOUR )
 				{
-
 					x0 = ROUND(xp);
 					y0 = ROUND(yp);
 					z0 = ROUND(zp);
-
+					
 					if (x0 < 0)
 					{
-						A3D_ELEM(data, -z0, -y0, -x0) += conj(my_val);
-						A3D_ELEM(weight, -z0, -y0, -x0) += my_weight;
+						// Get complex conjugated hermitian symmetry pair
+						x0 = -x0;
+						y0 = -y0;
+						z0 = -z0;
+						is_neg_x = true;
 					}
 					else
 					{
-						A3D_ELEM(data, z0, y0, x0) += my_val;
-						A3D_ELEM(weight, z0, y0, x0) += my_weight;
+						is_neg_x = false;
 					}
-
+					
+					const int xr = x0 - STARTINGX(data);
+					const int yr = y0 - STARTINGY(data);
+					const int zr = z0 - STARTINGZ(data);
+					
+					if (xr < 0 || xr >= data.xdim
+					 || yr < 0 || yr >= data.ydim
+					 || zr < 0 || zr >= data.zdim)
+					{
+						continue;
+					}
+					
+					if (is_neg_x)
+					{
+						DIRECT_A3D_ELEM(data, zr, yr, xr) += conj(my_val);
+						DIRECT_A3D_ELEM(weight, zr, yr, xr) += my_weight;
+					}
+					else
+					{
+						DIRECT_A3D_ELEM(data, zr, yr, xr) += my_val;
+						DIRECT_A3D_ELEM(weight, zr, yr, xr) += my_weight;
+					}
 				} // endif NEAREST_NEIGHBOUR
 				else
 				{
