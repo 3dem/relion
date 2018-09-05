@@ -234,6 +234,16 @@ void CTF::initialise()
 
 double CTF::getGamma(double X, double Y)
 {
+	if (obsModel != 0 && obsModel->hasMagMatrices)
+	{
+		const Matrix2D<RFLOAT>& M = obsModel->magMatrices[opticsGroup];
+		RFLOAT XX = M(0,0) * X + M(0,1) * Y;
+		RFLOAT YY = M(1,0) * X + M(1,1) * Y;
+		
+		X = XX;
+		Y = YY;
+	}
+	
     RFLOAT u2 = X * X + Y * Y;
     RFLOAT u4 = u2 * u2;
 

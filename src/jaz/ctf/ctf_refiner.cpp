@@ -260,66 +260,52 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 			int res = system(command.c_str());
 		}
 
-		std::vector<Image<Complex>> predSame, predOpp, predDbl;
+		std::vector<Image<Complex>> 
+				predSameT, // phase-demodulated (defocus)
+				predOppNT, // not phase-demodulated (tilt)
+				predOppT;  // phase-demodulated (mag and aberr)
 
 		// use prediction from same half-set for defocus estimation (overfitting danger):
 		if (do_defocus_fit)
 		{
-			predSame = reference.predictAll(
+			predSameT = reference.predictAll(
 				unfinishedMdts[g], obsModel, ReferenceMap::Own, nr_omp_threads,
 				false, true, false);
 		}
 
-		// use prediction from opposite half-set otherwise:
-		if (do_tilt_fit || do_mag_fit)
+		// use predictions from opposite half-set otherwise:
+		if (do_tilt_fit)
 		{
-			predOpp = reference.predictAll(
+			predOppNT = reference.predictAll(
 				unfinishedMdts[g], obsModel, ReferenceMap::Opposite, nr_omp_threads,
 				false, false, false);
 		}
 		
-		if (do_aberr_fit)
+		if (do_aberr_fit || do_mag_fit)
 		{
-			std::vector<Image<Complex>> predDemod0 = reference.predictAll(
-				unfinishedMdts[g], obsModel, ReferenceMap::Own, nr_omp_threads,
-				false, true, false);
-			
-			std::vector<Image<Complex>> predDemod1 = reference.predictAll(
+			predOppT = reference.predictAll(
 				unfinishedMdts[g], obsModel, ReferenceMap::Opposite, nr_omp_threads,
 				false, true, false);
-			
-			predDbl.resize(predDemod0.size());
-					
-			for (int p = 0; p < predDemod0.size(); p++)
-			{
-				predDbl[p] = Image<Complex>(sh,s);
-				
-				for (int y = 0; y < s; y++)
-				for (int x = 0; x < sh; x++)
-				{
-					predDbl[p](y,x) = predDemod0[p](y,x) + predDemod1[p](y,x);
-				}
-			}
 		}
 
 		if (do_defocus_fit)
 		{
-			defocusEstimator.processMicrograph(g, unfinishedMdts[g], obs, predSame);
+			defocusEstimator.processMicrograph(g, unfinishedMdts[g], obs, predSameT);
 		}
 		
 		if (do_tilt_fit)
 		{
-			tiltEstimator.processMicrograph(g, unfinishedMdts[g], obs, predOpp);
+			tiltEstimator.processMicrograph(g, unfinishedMdts[g], obs, predOppNT);
 		}
 		
 		if (do_aberr_fit)
 		{
-			aberrationEstimator.processMicrograph(g, unfinishedMdts[g], obs, predDbl);
+			aberrationEstimator.processMicrograph(g, unfinishedMdts[g], obs, predOppT);
 		}
 		
 		if (do_mag_fit)
 		{
-			magnificationEstimator.processMicrograph(g, unfinishedMdts[g], obs, predOpp);
+			magnificationEstimator.processMicrograph(g, unfinishedMdts[g], obs, predOppT);
 		}
 
 		nr_done++;
