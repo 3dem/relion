@@ -188,6 +188,13 @@ void BackProjector::backproject2Dto3D(const MultidimArray<Complex > &f2d,
 					fz = zp - z0;
 					z0 -= STARTINGZ(data);
 					z1 = z0 + 1;
+					
+					if (x0 < 0 || x0+1 >= data.xdim
+					 || y0 < 0 || y0+1 >= data.ydim
+					 || z0 < 0 || z0+1 >= data.zdim)
+					{
+						continue;
+					}
 
 					mfx = 1. - fx;
 					mfy = 1. - fy;
@@ -203,7 +210,9 @@ void BackProjector::backproject2Dto3D(const MultidimArray<Complex > &f2d,
 					dd111 =  fz *  fy *  fx;
 
 					if (is_neg_x)
+					{
 						my_val = conj(my_val);
+					}
 
 					// Store slice in 3D weighted sum
 					DIRECT_A3D_ELEM(data, z0, y0, x0) += dd000 * my_val;
