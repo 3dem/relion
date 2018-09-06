@@ -75,15 +75,17 @@ void MagnificationHelper::matrixToPolar(
 }
 
 void MagnificationHelper::updateScaleFreq(
-		const Image<Complex> &prediction, const Image<Complex> &observation,
+		const Image<Complex> &prediction,
+		const Volume<t2Vector<Complex>>& predGradient,
+		const Image<Complex> &observation,
 		CTF &ctf, double angpix, Volume<Equation2x2> &eqs)
 {
 	const long w = prediction.data.xdim;
 	const long h = prediction.data.ydim;
 	
-	Volume<gravis::d2Vector> gradReal(w,h,1), gradImg(w,h,1);
+	/*Volume<gravis::d2Vector> gradReal(w,h,1), gradImg(w,h,1);
 	
-	FilterHelper::centralGrad2D(prediction, gradReal, gradImg);
+	FilterHelper::centralGrad2D(prediction, gradReal, gradImg);*/
 	
 	Image<RFLOAT> ctfImg(w,h);
 	ctf.getFftwImage(ctfImg(), h, h, angpix);
@@ -96,8 +98,8 @@ void MagnificationHelper::updateScaleFreq(
 		
 		double c = ctfImg(y,x);
 		
-		gravis::d2Vector gr = gradReal(x,y,0);
-		gravis::d2Vector gi = gradImg(x,y,0);
+		gravis::d2Vector gr(predGradient(x,y,0).x.real, predGradient(x,y,0).y.real);
+		gravis::d2Vector gi(predGradient(x,y,0).x.imag, predGradient(x,y,0).y.imag);
 		
 		eqs(x,y,0).Axx += c * c * (gr.x * gr.x + gi.x * gi.x);
 		eqs(x,y,0).Axy += c * c * (gr.x * gr.y + gi.x * gi.y);

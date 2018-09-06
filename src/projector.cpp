@@ -18,6 +18,7 @@
  * author citations must be preserved.
  ***************************************************************************/
 #include "src/projector.h"
+#include "src/jaz/gravis/t3Vector.h"
 #include <src/time.h>
 //#define DEBUG
 
@@ -40,7 +41,7 @@
 #define TIMING_TOC(id)
 #endif
 
-
+using namespace gravis;
 
 void Projector::initialiseData(int current_size)
 {
@@ -505,6 +506,124 @@ void Projector::project(MultidimArray<Complex > &f2d, Matrix2D<RFLOAT> &A, bool 
     std::cerr << "done with project..." << std::endl;
 #endif
 }
+
+void Projector::projectGradient(Volume<t2Vector<Complex>>& img_out, Matrix2D<double>& At)
+{
+	const int s = img_out.dimy;
+	const int sh = img_out.dimx;
+	
+	Matrix2D<RFLOAT> A = At.transpose();
+
+	// Go from the 2D slice coordinates to the 3D coordinates
+    A *= (RFLOAT)padding_factor;  // take scaling into account directly
+
+	for (int yy = 0; yy < s; yy++)
+	{
+		const double y = yy < sh? yy : yy - s;		
+		const double y2 = y * y;
+		
+		for (int xx = 0; xx < sh; xx++)
+		{
+			const double x = xx;
+			
+			if (x*x + y2 > sh*sh) continue;
+			
+			// Get logical coordinates in the 3D map
+			double xp = A(0,0) * x + A(0,1) * y;
+			double yp = A(1,0) * x + A(1,1) * y;
+			double zp = A(2,0) * x + A(2,1) * y;
+
+			bool is_neg_x;
+			
+			// Only asymmetric half is stored
+			if (xp < 0)
+			{
+				// Get complex conjugated hermitian symmetry pair
+				xp = -xp;
+				yp = -yp;
+				zp = -zp;
+				is_neg_x = true;
+			}
+			else
+			{
+				is_neg_x = false;
+			}
+
+			// Trilinear interpolation (with physical coords)
+			// Subtract STARTINGY and STARTINGZ to accelerate access to data (STARTINGX=0)
+			// In that way use DIRECT_A3D_ELEM, rather than A3D_ELEM
+			
+			int x0 = FLOOR(xp);
+			double fx = xp - x0;
+			int x1 = x0 + 1;
+
+			int y0 = FLOOR(yp);
+			double fy = yp - y0;
+			y0 -=  STARTINGY(data);
+			int y1 = y0 + 1;
+
+			int z0 = FLOOR(zp);
+			double fz = zp - z0;
+			z0 -= STARTINGZ(data);
+			int z1 = z0 + 1;
+			
+			if (x0 < 0 || x0+1 >= data.xdim
+			 || y0 < 0 || y0+1 >= data.ydim
+			 || z0 < 0 || z0+1 >= data.zdim)
+			{
+				img_out(xx, yy, 0) = t2Vector<Complex>(Complex(0.0, 0.0), Complex(0.0, 0.0));
+				continue;
+			}
+
+			Complex v000 = DIRECT_A3D_ELEM(data, z0, y0, x0);
+			Complex v001 = DIRECT_A3D_ELEM(data, z0, y0, x1);
+			Complex v010 = DIRECT_A3D_ELEM(data, z0, y1, x0);
+			Complex v011 = DIRECT_A3D_ELEM(data, z0, y1, x1);
+			Complex v100 = DIRECT_A3D_ELEM(data, z1, y0, x0);
+			Complex v101 = DIRECT_A3D_ELEM(data, z1, y0, x1);
+			Complex v110 = DIRECT_A3D_ELEM(data, z1, y1, x0);
+			Complex v111 = DIRECT_A3D_ELEM(data, z1, y1, x1);
+
+			Complex v00 = LIN_INTERP(fx, v000, v001);
+			Complex v10 = LIN_INTERP(fx, v100, v101);
+			Complex v01 = LIN_INTERP(fx, v010, v011);
+			Complex v11 = LIN_INTERP(fx, v110, v111);
+			
+			Complex v0 = LIN_INTERP(fy, v00, v01);
+			Complex v1 = LIN_INTERP(fy, v10, v11);
+			
+			// Complex v = LIN_INTERP(fz, v0, v1);
+			
+			Complex v00_dx = v001 - v000;
+			Complex v10_dx = v101 - v100; 
+			Complex v01_dx = v011 - v010;
+			Complex v11_dx = v111 - v110;			
+			Complex v0_dx = LIN_INTERP(fy, v00_dx, v01_dx);
+			Complex v1_dx = LIN_INTERP(fy, v10_dx, v11_dx);			
+			Complex v_dx = LIN_INTERP(fz, v0_dx, v1_dx);			
+			
+			Complex v0_dy = v01 - v00;
+			Complex v1_dy = v11 - v10;			
+			Complex v_dy = LIN_INTERP(fz, v0_dy, v1_dy);
+						
+			Complex v_dz = v1 - v0;
+			
+			t3Vector<Complex> grad3D(v_dx, v_dy, v_dz);
+
+			// Take complex conjugated for half with negative x
+			if (is_neg_x)
+			{
+				grad3D.x = -(grad3D.x).conj();
+				grad3D.y = -(grad3D.y).conj();
+				grad3D.z = -(grad3D.z).conj();
+			}
+			
+			img_out(xx, yy, 0).x = A(0,0) * grad3D.x + A(1,0) * grad3D.y + A(2,0) * grad3D.z;
+			img_out(xx, yy, 0).y = A(0,1) * grad3D.x + A(1,1) * grad3D.y + A(2,1) * grad3D.z;
+		} // endif x-loop
+	} // endif y-loop
+}
+
 void Projector::project2Dto1D(MultidimArray<Complex > &f1d, Matrix2D<RFLOAT> &A, bool inv)
 {
 	RFLOAT fx, fy, xp, yp;

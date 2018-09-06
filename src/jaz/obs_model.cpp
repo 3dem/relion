@@ -11,6 +11,7 @@
 #include <set>
 #include <omp.h>
 
+using namespace gravis;
 
 void ObservationModel::loadSafely(
 	std::string particlesFn, std::string opticsFn, 
@@ -267,6 +268,59 @@ std::vector<Image<Complex> > ObservationModel::predictObservations(
         out[p] = predictObservation(proj, partMdt, p, applyCtf, shiftPhases, applyShift);
     }
 
+	return out;
+}
+
+Volume<t2Vector<Complex>> ObservationModel::predictComplexGradient(
+		Projector &proj, const MetaDataTable &partMdt, long particle, 
+		bool applyCtf, bool shiftPhases, bool applyShift)
+{
+	if (applyCtf || applyShift)
+	{
+		REPORT_ERROR_STR("ObservationModel::predictComplexGradient: "
+						 << "applyCtf and applyShift are currently not supported\n");
+	}
+	
+	const int s = proj.ori_size;
+    const int sh = s/2 + 1;
+	
+	Volume<t2Vector<Complex>> out(sh,s,1);
+		
+	int opticsGroup;
+	partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, particle);
+	opticsGroup--;
+	
+    double xoff, yoff;
+
+    partMdt.getValue(EMDL_ORIENT_ORIGIN_X, xoff, particle);
+    partMdt.getValue(EMDL_ORIENT_ORIGIN_Y, yoff, particle);
+
+    double rot, tilt, psi;
+
+    Matrix2D<RFLOAT> A3D;
+    partMdt.getValue(EMDL_ORIENT_ROT, rot, particle);
+    partMdt.getValue(EMDL_ORIENT_TILT, tilt, particle);
+    partMdt.getValue(EMDL_ORIENT_PSI, psi, particle);
+
+    Euler_angles2matrix(rot, tilt, psi, A3D);
+
+	A3D = applyAnisoMagTransp(A3D, opticsGroup);
+	
+    proj.projectGradient(out, A3D);
+
+    if (shiftPhases && oddZernikeCoeffs.size() > opticsGroup 
+			&& oddZernikeCoeffs[opticsGroup].size() > 0)
+    {
+		const Image<Complex>& corr = getPhaseCorrection(opticsGroup, s);
+		
+		for (int y = 0; y < s;  y++)
+		for (int x = 0; x < sh; x++)
+		{
+			out(y,x,0).x *= corr(y,x);
+			out(y,x,0).y *= corr(y,x);
+		}
+    }
+	
 	return out;
 }
 

@@ -7,6 +7,8 @@
 #include <src/args.h>
 #include <omp.h>
 
+using namespace gravis;
+
 ReferenceMap::ReferenceMap()
 :	reconFn0(""),
 	reconFn1(""),
@@ -178,6 +180,46 @@ Image<Complex> ReferenceMap::predict(
 	int pi = (hs == Own)? randSubset : 1 - randSubset;
 	
 	pred = obs.predictObservation(projectors[pi], mdt, p, applyCtf, applyTilt, applyShift);
+	
+	return pred;
+}
+
+std::vector<Volume<gravis::t2Vector<Complex>>> ReferenceMap::predictAllComplexGradients(
+		const MetaDataTable &mdt, 
+		ObservationModel &obs, 
+		ReferenceMap::HalfSet hs, 
+		int threads, 
+		bool applyCtf, bool applyTilt, bool applyShift)
+{
+	// declare on first line to prevent copying
+	std::vector<Volume<t2Vector<Complex>>> out(mdt.numberOfObjects());
+	
+	const int pc = mdt.numberOfObjects();
+	
+	#pragma omp parallel for num_threads(threads)
+	for (int p = 0; p < pc; p++)
+	{
+		out[p] = predictComplexGradient(mdt, p, obs, hs, applyCtf, applyTilt, applyShift);
+	}
+	
+	return out;
+}
+
+Volume<t2Vector<Complex>> ReferenceMap::predictComplexGradient(
+		const MetaDataTable &mdt, 
+		int p, ObservationModel &obs, 
+		ReferenceMap::HalfSet hs, 
+		bool applyCtf, bool applyTilt, bool applyShift)
+{
+	Volume<t2Vector<Complex>> pred;
+	
+	int randSubset;
+	mdt.getValue(EMDL_PARTICLE_RANDOM_SUBSET, randSubset, p);
+	randSubset -= 1;
+	
+	int pi = (hs == Own)? randSubset : 1 - randSubset;
+	
+	pred = obs.predictComplexGradient(projectors[pi], mdt, p, applyCtf, applyTilt, applyShift);
 	
 	return pred;
 }

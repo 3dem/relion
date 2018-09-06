@@ -55,7 +55,8 @@ void MagnificationEstimator::init(
 void MagnificationEstimator::processMicrograph(
 		long g, MetaDataTable& mdt, 
 		const std::vector<Image<Complex>>& obs, 
-		const std::vector<Image<Complex>>& pred)
+		const std::vector<Image<Complex>>& pred,
+		const std::vector<Volume<t2Vector<Complex>>>& predGradient)
 {
 	if (!ready)
 	{
@@ -80,7 +81,8 @@ void MagnificationEstimator::processMicrograph(
 		
 		int threadnum = omp_get_thread_num();
 	
-		MagnificationHelper::updateScaleFreq(pred[p], obs[p], ctf, angpix, magEqs[threadnum]);
+		MagnificationHelper::updateScaleFreq(
+			pred[p], predGradient[p], obs[p], ctf, angpix, magEqs[threadnum]);
 	}
 	
 	for (int i = 1; i < nr_omp_threads; i++)

@@ -3,6 +3,8 @@
 
 #include <src/image.h>
 #include <src/projector.h>
+#include <src/jaz/volume.h>
+#include <src/jaz/gravis/t2Vector.h>
 #include <vector>
 
 class ObservationModel;
@@ -41,6 +43,22 @@ class ReferenceMap
 				bool applyShift = true);
 
         Image<Complex> predict(
+                const MetaDataTable& mdt, int p,
+                ObservationModel& obs,
+                HalfSet hs,
+                bool applyCtf = true,
+                bool applyTilt = true, 
+				bool applyShift = true);
+		
+		std::vector<Volume<gravis::t2Vector<Complex> > > predictAllComplexGradients(
+				const MetaDataTable& mdt,
+                ObservationModel& obs,
+                HalfSet hs, int threads,
+                bool applyCtf = true,
+                bool applyTilt = true, 
+				bool applyShift = true);
+		
+		Volume<gravis::t2Vector<Complex>> predictComplexGradient(
                 const MetaDataTable& mdt, int p,
                 ObservationModel& obs,
                 HalfSet hs,

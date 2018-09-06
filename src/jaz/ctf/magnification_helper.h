@@ -34,6 +34,7 @@ class MagnificationHelper
 		
 		static void updateScaleFreq( 
 						const Image<Complex>& prediction,
+						const Volume<gravis::t2Vector<Complex>>& predGradient,
 						const Image<Complex>& observation,
 						CTF& ctf, double angpix,
 						Volume<Equation2x2>& eqs);

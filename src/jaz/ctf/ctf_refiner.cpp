@@ -287,6 +287,11 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 				unfinishedMdts[g], obsModel, ReferenceMap::Opposite, nr_omp_threads,
 				false, true, false);
 		}
+		
+		
+		if (do_mag_fit)
+		{
+		}
 
 		if (do_defocus_fit)
 		{
@@ -305,7 +310,12 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 		
 		if (do_mag_fit)
 		{
-			magnificationEstimator.processMicrograph(g, unfinishedMdts[g], obs, predOppT);
+			std::vector<Volume<t2Vector<Complex>>> predGradient = 
+				reference.predictAllComplexGradients(
+					unfinishedMdts[g], obsModel, ReferenceMap::Opposite, nr_omp_threads,
+					false, true, false);
+			
+			magnificationEstimator.processMicrograph(g, unfinishedMdts[g], obs, predOppT, predGradient);
 		}
 
 		nr_done++;

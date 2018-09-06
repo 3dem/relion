@@ -57,6 +57,12 @@ class ObservationModel
         std::vector<Image<Complex> > predictObservations(
                 Projector &proj, const MetaDataTable &partMdt, int threads,
                 bool applyCtf = true, bool shiftPhases = true, bool applyShift = true);
+		
+		
+		Volume<gravis::t2Vector<Complex> > predictComplexGradient(
+				Projector &proj, const MetaDataTable &partMdt, long int particle,
+				bool applyCtf = true, bool shiftPhases = true, bool applyShift = true);
+		
 
 		
 	// Correction //

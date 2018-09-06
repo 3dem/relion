@@ -24,6 +24,10 @@
 #include "src/multidim_array.h"
 #include "src/image.h"
 
+#include "src/jaz/volume.h"
+#include "src/jaz/gravis/t2Vector.h"
+
+
 #define NEAREST_NEIGHBOUR 0
 #define TRILINEAR 1
 #define CONVOLUTE_BLOB 2
@@ -236,11 +240,19 @@ public:
 			}
 		}
 	}
-
+	
 	/*
 	* Get a 2D slice from the 3D map (forward projection)
 	*/
 	void project(MultidimArray<Complex > &img_out, Matrix2D<RFLOAT> &A, bool inv);
+	
+	/*
+	* Get the two gradients (real and imaginary) of that slice.
+	* Note: the gradient has to be computed in 3D and then mapped to 2D.
+	*       Computing the gradient from a 2D projection would systematically 
+	*       underestimate the magnitude of the gradient.
+	*/
+	void projectGradient(Volume<gravis::t2Vector<Complex> >& img_out, Matrix2D<RFLOAT>& A);
 
 	/*
 	* Get a 1D slice from the 2D map (forward projection)

@@ -6,6 +6,8 @@
 
 #include <src/complex.h>
 #include <src/image.h>
+#include <src/jaz/volume.h>
+#include <src/jaz/gravis/t2Vector.h>
 
 class IOParser;
 class ReferenceMap;
@@ -29,7 +31,8 @@ class MagnificationEstimator
 		void processMicrograph(
 				long g, MetaDataTable& mdt, 
 				const std::vector<Image<Complex>>& obs,
-				const std::vector<Image<Complex>>& pred);
+				const std::vector<Image<Complex>>& pred,
+				const std::vector<Volume<gravis::t2Vector<Complex>>>& predGradient);
 		
 		// Sum up per-pixel information from all micrographs, 
 		// then fit beam-tilt model to the per-pixel fit
