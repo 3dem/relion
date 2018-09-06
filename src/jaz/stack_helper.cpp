@@ -10,6 +10,7 @@
 #include <src/micrograph_model.h>
 #include <src/jaz/resampling_helper.h>
 #include <src/jaz/parallel_ft.h>
+#include <src/jaz/new_ft.h>
 
 #include <omp.h>
 
@@ -130,18 +131,73 @@ std::vector<Image<RFLOAT> > StackHelper::loadStack(const MetaDataTable* mdt, std
 		name = path + "/" + name.substr(name.find_last_of("/")+1);
 	}
 	
-#pragma omp parallel for num_threads(threads)
+	#pragma omp parallel for num_threads(threads)
 	for (long i = 0; i < ic; i++)
 	{
 		std::string sliceName;
 		mdt->getValue(EMDL_IMAGE_NAME, sliceName, i);
-		std::string indStr = sliceName.substr(0,sliceName.find("@"));
+		std::string indStr = sliceName.substr(0, sliceName.find("@"));
 		
 		std::istringstream str(indStr);
 		int j;
 		str >> j;
 		
 		out[i].read(name, true, j-1, false, true);
+	}
+	
+	return out;
+}
+
+std::vector<Image<Complex> > StackHelper::loadStackFS(
+		const MetaDataTable *mdt, std::string path,
+		int threads, bool centerParticle)
+{
+	std::vector<Image<Complex> > out(mdt->numberOfObjects());
+	const long ic = mdt->numberOfObjects();
+	
+	std::string name, fullName;
+	mdt->getValue(EMDL_IMAGE_NAME, fullName, 0);
+	name = fullName.substr(fullName.find("@")+1);
+	
+	if (path != "")
+	{
+		name = path + "/" + name.substr(name.find_last_of("/")+1);
+	}
+	
+	Image<RFLOAT> dummy;
+	dummy.read(name, false);
+	
+	const int s = dummy.data.xdim;
+	
+	NewFFT::DoublePlan plan(s,s,1);
+	
+	#pragma omp parallel for num_threads(threads)
+	for (long i = 0; i < ic; i++)
+	{
+		std::string sliceName;
+		mdt->getValue(EMDL_IMAGE_NAME, sliceName, i);
+		std::string indStr = sliceName.substr(0, sliceName.find("@"));
+		
+		std::istringstream str(indStr);
+		int j;
+		str >> j;
+		
+		Image<RFLOAT> in;
+		in.read(name, true, j-1, false, true);
+		
+		NewFFT::FourierTransform(in(), out[i](), plan);
+		
+		if (centerParticle)
+		{
+			const int s = in.data.ydim;
+			
+			double xoff, yoff;
+		
+			mdt->getValue(EMDL_ORIENT_ORIGIN_X, xoff, i);
+			mdt->getValue(EMDL_ORIENT_ORIGIN_Y, yoff, i);
+			
+			shiftImageInFourierTransform(out[i](), out[i](), s, xoff - s/2, yoff - s/2);
+		}
 	}
 	
 	return out;

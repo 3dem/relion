@@ -28,6 +28,13 @@ class StackHelper
 				const MetaDataTable* mdt, 
 				std::string path = "",
 				int threads = 1,
+				bool centerParticle = false);
+		
+		// deprecated, use the one above
+		static std::vector<Image<Complex> > loadStackFS(
+				const MetaDataTable* mdt, 
+				std::string path = "",
+				int threads = 1,
 				std::vector<ParFourierTransformer>* fts = 0,
 				bool centerParticle = false);
 		
