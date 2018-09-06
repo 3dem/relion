@@ -18,7 +18,7 @@ int main(int argc, char *argv[])
 	ReferenceMap reference;
 	
 	IOParser parser;
-
+	
 	parser.setCommandLine(argc, argv);
 	int gen_section = parser.addSection("General options");
 	
@@ -43,7 +43,7 @@ int main(int argc, char *argv[])
 	// Get dimensions
 	const int s = reference.s;
 	const int sh = s/2 + 1;
-		
+	
 	ObservationModel obsModel;	
 	MetaDataTable mdt0, opticsMdt;
 	
@@ -55,24 +55,25 @@ int main(int argc, char *argv[])
 	
 	
 	Image<RFLOAT> freqWgh(sh,s);
+	freqWgh.data.initConstant(1.0);
 	
-	FilterHelper::ButterworthEnvFreq2D(
-		freqWgh, reference.k_out-1, reference.k_out+1);
+	freqWgh = FilterHelper::ButterworthEnvFreq2D(
+				freqWgh, reference.k_out-1, reference.k_out+1);
 	
 	
 	const double pad = 1.0;
 	
 	std::vector<Image<dComplex>> ccsFs(nr_omp_threads);
-    std::vector<Image<double>> ccsRs(nr_omp_threads);
+	std::vector<Image<double>> ccsRs(nr_omp_threads);
 	
 	const int s2 = (int)(pad * s);
 	const int sh2 = s2/2 + 1;
-
-    for (int t = 0; t < nr_omp_threads; t++)
-    {
-        ccsFs[t] = Image<dComplex>(sh2,s2);
-        ccsRs[t] = Image<double>(s2,s2);
-    }
+	
+	for (int t = 0; t < nr_omp_threads; t++)
+	{
+		ccsFs[t] = Image<dComplex>(sh2,s2);
+		ccsRs[t] = Image<double>(s2,s2);
+	}
 	
 	NewFFT::DoublePlan plan(s,s,1);
 	
@@ -80,31 +81,33 @@ int main(int argc, char *argv[])
 	
 	for (int m = 0; m < mgc; m++)
 	{
+		std::cout << m << " / " << mgc << "\n";
+		
 		const int pc = allMdts[m].numberOfObjects();
 		
 		std::vector<Image<Complex>> pred = reference.predictAll(
-			allMdts[m], obsModel, ReferenceMap::Own, nr_omp_threads,
-			true, true, false);
+					allMdts[m], obsModel, ReferenceMap::Own, nr_omp_threads,
+					true, true, false);
 		
 		std::vector<Image<Complex>> obs = StackHelper::loadStackFS(&allMdts[m], "", nr_omp_threads, true);
-				
+		
 		#pragma omp parallel for num_threads(nr_omp_threads)
 		for (int p = 0; p < pc; p++)
 		{
 			int t = omp_get_thread_num();
-
-            for (int y = 0; y < s; y++)
-            for (int x = 0; x < sh; x++)
-            {
-                Complex z = obs[p](y,x) * freqWgh(y,x) * pred[p](y,x).conj();
+			
+			for (int y = 0; y < s; y++)
+			for (int x = 0; x < sh; x++)
+			{
+				Complex z = obs[p](y,x) * freqWgh(y,x) * pred[p](y,x).conj();
 				
 				const int yy = y < sh? y : s2 - (s - y);
 				
-                ccsFs[t](yy,x) = dComplex(z.real, z.imag);
-            }
-
-            NewFFT::inverseFourierTransform(ccsFs[t](), ccsRs[t](), plan);
-
+				ccsFs[t](yy,x) = dComplex(z.real, z.imag);
+			}
+			
+			NewFFT::inverseFourierTransform(ccsFs[t](), ccsRs[t](), plan);
+			
 			d2Vector shift = Interpolation::quadraticMaxWrapXY(
 						ccsRs[t], 1e-12, max_shift, max_shift);
 			
@@ -112,7 +115,7 @@ int main(int argc, char *argv[])
 			if (shift.y >= sh2) shift.y -= s2;
 			
 			double xoff, yoff;
-		
+			
 			allMdts[m].getValue(EMDL_ORIENT_ORIGIN_X, xoff, p);
 			allMdts[m].getValue(EMDL_ORIENT_ORIGIN_Y, yoff, p);
 			
@@ -133,7 +136,7 @@ int main(int argc, char *argv[])
 	
 	std::string command = " mkdir -p " + outFn;
 	int res = system(command.c_str());
-		
+	
 	outMdt.write(outFn+"repositioned.star");
 	
 	return 0;
