@@ -593,7 +593,7 @@ void Projector::projectGradient(Volume<t2Vector<Complex>>& img_out, Matrix2D<dou
 			Complex v1 = LIN_INTERP(fy, v10, v11);
 			
 			// Complex v = LIN_INTERP(fz, v0, v1);
-			
+								
 			Complex v00_dx = v001 - v000;
 			Complex v10_dx = v101 - v100; 
 			Complex v01_dx = v011 - v010;

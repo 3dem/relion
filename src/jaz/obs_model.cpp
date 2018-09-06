@@ -153,9 +153,9 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 			{
 				oddZernikeCoeffs[i] = std::vector<double>(6, 0.0);
 			}
-			
+
 			TiltHelper::insertTilt(oddZernikeCoeffs[i], tx, ty, Cs[i], lambda[i]);
-			
+					
 			hasOddZernike = true;
 		}
 		
@@ -316,8 +316,8 @@ Volume<t2Vector<Complex>> ObservationModel::predictComplexGradient(
 		for (int y = 0; y < s;  y++)
 		for (int x = 0; x < sh; x++)
 		{
-			out(y,x,0).x *= corr(y,x);
-			out(y,x,0).y *= corr(y,x);
+			out(x,y,0).x *= corr(y,x);
+			out(x,y,0).y *= corr(y,x);
 		}
     }
 	
