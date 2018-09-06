@@ -581,18 +581,25 @@ bool Experiment::getImageNameOnScratch(long int part_id, FileName &fn_img, bool 
 
 }
 
-FileName Experiment::initialiseScratchLock(FileName _fn_scratch, FileName _fn_out)
+void Experiment::setScratchDirectory(FileName _fn_scratch)
 {
-    // Make sure fn_scratch ends with a slash
+	// Make sure fn_scratch ends with a slash
 	if (_fn_scratch[_fn_scratch.length()-1] != '/')
 		_fn_scratch += '/';
 	fn_scratch = _fn_scratch + "relion_volatile/";
 
+	// This is updated in copyParticlesToScratch()
+	// FIXME: --reuse_scratch will not work with --keep_free_scratch_Gb
+	nr_parts_on_scratch = MDimg.numberOfObjects();
+}
+
+FileName Experiment::initialiseScratchLock(FileName _fn_scratch, FileName _fn_out)
+{
 	// Get a unique lockname for this run
 	int uniqnr = rand() % 100000;
 	FileName fn_uniq = _fn_out;
-    fn_uniq.replaceAllSubstrings("/", "_");
-    fn_uniq += "_lock" + integerToString(uniqnr);
+	fn_uniq.replaceAllSubstrings("/", "_");
+	fn_uniq += "_lock" + integerToString(uniqnr);
 	FileName fn_lock = fn_scratch + fn_uniq;
 
 	if (exists(fn_lock))
@@ -603,24 +610,18 @@ FileName Experiment::initialiseScratchLock(FileName _fn_scratch, FileName _fn_ou
 
 bool Experiment::prepareScratchDirectory(FileName _fn_scratch, FileName fn_lock)
 {
-
-    // Make sure fn_scratch ends with a slash
-	if (_fn_scratch[_fn_scratch.length()-1] != '/')
-		_fn_scratch += '/';
-	fn_scratch = _fn_scratch + "relion_volatile/";
-
 	if (fn_lock != "" && exists(fn_lock))
 	{
 		// Still measure how much free space there is
 		struct statvfs vfs;
 		statvfs(_fn_scratch.c_str(), &vfs);
 		long int free_Gb = vfs.f_bsize*vfs.f_bfree/(1024*1024*1024);
-	    char nodename[64] = "undefined";
-	    gethostname(nodename,sizeof(nodename));
-	    std::string myhost(nodename);
-	    free_space_Gb = vfs.f_bsize*vfs.f_bfree/(1024*1024*1024);
+		char nodename[64] = "undefined";
+		gethostname(nodename,sizeof(nodename));
+		std::string myhost(nodename);
+		free_space_Gb = vfs.f_bsize*vfs.f_bfree/(1024*1024*1024);
 
-	    return false;
+		return false;
 	}
 	else
 	{
@@ -646,10 +647,10 @@ bool Experiment::prepareScratchDirectory(FileName _fn_scratch, FileName fn_lock)
 		struct statvfs vfs;
 		statvfs(_fn_scratch.c_str(), &vfs);
 		long int free_Gb = vfs.f_bsize*vfs.f_bfree/(1024*1024*1024);
-	    char nodename[64] = "undefined";
-	    gethostname(nodename,sizeof(nodename));
-	    std::string myhost(nodename);
-	    free_space_Gb = vfs.f_bsize*vfs.f_bfree/(1024*1024*1024);
+		char nodename[64] = "undefined";
+		gethostname(nodename,sizeof(nodename));
+		std::string myhost(nodename);
+		free_space_Gb = vfs.f_bsize*vfs.f_bfree/(1024*1024*1024);
 		std::cout << " + On host " << myhost << ": free scratch space = " << free_space_Gb << " Gb." << std::endl;
 
 		return true;
@@ -671,7 +672,6 @@ void Experiment::deleteDataOnScratch()
 
 void Experiment::copyParticlesToScratch(int verb, bool do_copy, bool also_do_ctf_image, long int keep_free_scratch_Gb)
 {
-
 	// This function relies on prepareScratchDirectory() being called before!
 
 	long int nr_part = MDimg.numberOfObjects();
@@ -1253,20 +1253,20 @@ void Experiment::write(FileName fn_root)
 
 	std::ofstream  fh;
 	FileName fn_tmp = fn_root+"_data.star";
-    fh.open((fn_tmp).c_str(), std::ios::out);
-    if (!fh)
-        REPORT_ERROR( (std::string)"Experiment::write: Cannot write file: " + fn_tmp);
+	fh.open((fn_tmp).c_str(), std::ios::out);
+	if (!fh)
+		REPORT_ERROR( (std::string)"Experiment::write: Cannot write file: " + fn_tmp);
 
-    // Always write MDimg
-    MDimg.write(fh);
+	// Always write MDimg
+	MDimg.write(fh);
 
-    if (nr_bodies > 1)
-    {
+	if (nr_bodies > 1)
+	{
 		for (int ibody = 0; ibody < nr_bodies; ibody++)
 		{
 			MDbodies[ibody].write(fh);
 		}
-    }
+	}
 
 	fh.close();
 

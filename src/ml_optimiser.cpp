@@ -396,7 +396,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	do_preread_images  = parser.checkOption("--preread_images", "Use this to let the master process read all particles into memory. Be careful you have enough RAM for large data sets!");
 	fn_scratch = parser.getOption("--scratch_dir", "If provided, particle stacks will be copied to this local scratch disk prior to refinement.", "");
 	keep_free_scratch_Gb = textToInteger(parser.getOption("--keep_free_scratch", "Space available for copying particle stacks (in Gb)", "10"));
-	do_reuse_scratch = parser.checkOption("--reuse_scratch", "Re-use data on scratchdir, instead of wiping it and re-copying all data.");
+	do_reuse_scratch = parser.checkOption("--reuse_scratch", "Re-use data on scratchdir, instead of wiping it and re-copying all data. This works only when ALL particles have already been cached.");
 
 #ifdef ALTCPU
 	do_cpu = parser.checkOption("--cpu", "Use intel vectorisation implementation for CPU");
@@ -1965,11 +1965,16 @@ void MlOptimiser::initialiseWorkLoad()
     divide_equally(mydata.numberOfOriginalParticles(), 1, 0, my_first_ori_particle_id, my_last_ori_particle_id);
 
     // Now copy particle stacks to scratch if needed
-    if (fn_scratch != "" && !do_preread_images && !do_reuse_scratch)
+    if (fn_scratch != "" && !do_preread_images)
     {
-    	mydata.prepareScratchDirectory(fn_scratch);
-    	bool also_do_ctfimage = (mymodel.data_dim == 3 && do_ctf_correction);
-    	mydata.copyParticlesToScratch(1, true, also_do_ctfimage, keep_free_scratch_Gb);
+	mydata.setScratchDirectory(fn_scratch);
+
+	if (!do_reuse_scratch)
+	{
+	    	mydata.prepareScratchDirectory(fn_scratch);
+	    	bool also_do_ctfimage = (mymodel.data_dim == 3 && do_ctf_correction);
+    		mydata.copyParticlesToScratch(1, true, also_do_ctfimage, keep_free_scratch_Gb);
+	}
     }
 
 }
