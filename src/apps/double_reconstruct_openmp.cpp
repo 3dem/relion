@@ -51,6 +51,8 @@ class reconstruct_parameters
 		
 		bool skip_gridding, debug, do_reconstruct_meas, is_positive, read_weights, div_avg;
 		
+		bool no_Wiener;
+		
 		bool L1_freq, L1_ring, L1_particle, L1_micrograph, L1_any;
 		int L1_iters;
 		double L1_eps;
@@ -99,6 +101,7 @@ class reconstruct_parameters
 			
 			int expert_section = parser.addSection("Expert options");
 			fn_sub = parser.getOption("--subtract","Subtract projections of this map from the images used for reconstruction", "");
+			no_Wiener = parser.checkOption("--legacy", "Use gridding instead of Wiener filter");
 			
 			if (parser.checkOption("--NN", "Use nearest-neighbour instead of linear interpolation before gridding correction"))
 			{
@@ -683,15 +686,19 @@ class reconstruct_parameters
 						nr_helical_asu, helical_twist, helical_rise/angpix, nr_omp_threads);
 				}
 				
-				bool do_map = true;
-				bool do_use_fsc = true;
+				bool do_map = !no_Wiener;
+				bool do_use_fsc = !no_Wiener;
 				
-				MultidimArray<Complex> avg0, avg1;
-				MultidimArray<RFLOAT> fsc;
+				MultidimArray<RFLOAT> fsc(mysize/2+1);
 				
-				backprojector[0]->getDownsampledAverage(avg0, div_avg);
-				backprojector[1]->getDownsampledAverage(avg1, div_avg);
-				backprojector[0]->calculateDownSampledFourierShellCorrelation(avg0, avg1, fsc);
+				if (!no_Wiener)
+				{
+					MultidimArray<Complex> avg0, avg1;
+					
+					backprojector[0]->getDownsampledAverage(avg0, div_avg);
+					backprojector[1]->getDownsampledAverage(avg1, div_avg);
+					backprojector[0]->calculateDownSampledFourierShellCorrelation(avg0, avg1, fsc);
+				}
 				
 				if (debug)
 				{
