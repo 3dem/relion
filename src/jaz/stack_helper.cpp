@@ -25,9 +25,6 @@ std::vector<MetaDataTable> StackHelper::splitByMicrographName(const MetaDataTabl
 		REPORT_ERROR("StackHelper::splitByMicrographName: "+EMDL::label2Str(EMDL_MICROGRAPH_NAME)+" missing in meta_data_table.\n");
 	}
 	
-	std::string testString;
-	mdt->getValue(EMDL_MICROGRAPH_NAME, testString, 0);
-	
 	MetaDataTable md2(*mdt);
 	md2.newSort(EMDL_MICROGRAPH_NAME);
 	
