@@ -63,6 +63,9 @@ void FlexAnalyser::read(int argc, char **argv)
 	// Initialise verb for non-parallel execution
 	verb = textToInteger(parser.getOption("--verb", "Verbosity", "1"));
 
+	if (do_subtract && fn_keepmask == "")
+		REPORT_ERROR("You have to specify --fn_keepmask with -subtract");
+
 	// Check for errors in the command-line option
 	if (parser.checkForErrors())
 		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
