@@ -437,7 +437,7 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 	std::vector<std::vector<Image<Complex>>> out = loadMovie(
 				mdt, s, angpix, fts, offsets_in, offsets_out);
 
-	if (!hasCorrMic || micrograph.model == 0)
+	if (!hasCorrMic)
 	{
 		tracks.resize(0);
 	}
