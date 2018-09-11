@@ -252,12 +252,35 @@ double CTF::getGamma(double X, double Y)
 
 RFLOAT CTF::getCtfFreq(RFLOAT X, RFLOAT Y)
 {
-    RFLOAT u2 = X * X + Y * Y;
+	RFLOAT u2 = X * X + Y * Y;
     RFLOAT u = sqrt(u2);
 
     RFLOAT deltaf = getDeltaF(X, Y);
 
-    return 2.0 * K1 * deltaf * u + 4.0 * K2 * u * u * u;
+	return 2.0 * K1 * deltaf * u + 4.0 * K2 * u * u * u;
+}
+
+t2Vector<RFLOAT> CTF::getGammaGrad(double X, double Y)
+{
+	if (obsModel != 0 && obsModel->hasMagMatrices)
+	{
+		const Matrix2D<RFLOAT>& M = obsModel->magMatrices[opticsGroup];
+		RFLOAT XX = M(0,0) * X + M(0,1) * Y;
+		RFLOAT YY = M(1,0) * X + M(1,1) * Y;
+		
+		X = XX;
+		Y = YY;
+	}
+	
+    RFLOAT u2 = X * X + Y * Y;
+    //RFLOAT u4 = u2 * u2;
+	
+	// u4 = (X² + Y²)²
+	// du4/dx = 2 (X² + Y²) 2 X = 4 (X³ + XY²) = 4 u2 X
+
+	return t2Vector<RFLOAT>(
+		2.0 * K1 * Axx * X + 2.0 * Axy * Y + 4.0 * K2 * u2 * X,
+		2.0 * K1 * Ayy * Y + 2.0 * Axy * X + 4.0 * K2 * u2 * Y);
 }
 
 /* Generate a complete CTF Image ------------------------------------------------------ */

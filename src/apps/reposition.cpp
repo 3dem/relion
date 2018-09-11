@@ -58,7 +58,7 @@ int main(int argc, char *argv[])
 	Image<RFLOAT> freqWgh(sh,s);
 	freqWgh.data.initConstant(1.0);
 	
-	freqWgh = FilterHelper::ButterworthEnvFreq2D(
+	freqWgh = FilterHelper::raisedCosEnvFreq2D(
 				freqWgh, reference.k_out-1, reference.k_out+1);
 	
 	std::vector<Image<dComplex>> ccsFs(nr_omp_threads);

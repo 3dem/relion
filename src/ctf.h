@@ -226,7 +226,10 @@ public:
 
     // compute the local frequency of the ctf 
 	// (i.e. the radial slope of 'double gamma' in getCTF())
-    RFLOAT getCtfFreq(RFLOAT X, RFLOAT Y);
+	// -- deprecated, use getGammaGrad().length()
+	RFLOAT getCtfFreq(RFLOAT X, RFLOAT Y);
+	
+	gravis::t2Vector<RFLOAT> getGammaGrad(RFLOAT X, RFLOAT Y);
 
     inline Complex getCTFP(RFLOAT X, RFLOAT Y, bool is_positive) const
     {

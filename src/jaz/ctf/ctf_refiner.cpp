@@ -288,11 +288,6 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 				false, true, false);
 		}
 		
-		
-		if (do_mag_fit)
-		{
-		}
-
 		if (do_defocus_fit)
 		{
 			defocusEstimator.processMicrograph(g, unfinishedMdts[g], obs, predSameT);

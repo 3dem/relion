@@ -142,7 +142,7 @@ void MotionEstimator::init(
 		
 		if (cutoffOut)
 		{
-			dmgWeight[f] = FilterHelper::ButterworthEnvFreq2D(
+			dmgWeight[f] = FilterHelper::raisedCosEnvFreq2D(
 						dmgWeight[f], reference->k_out-1, reference->k_out+1);
 		}
 	}

@@ -108,24 +108,13 @@ void AberrationEstimator::processMicrograph(
 		
 		const int t = cc * threadnum + ci;
 		
-		/*Image<RFLOAT> gammaOff;
-		
-		if (obsModel->hasEvenZernike)
-		{
-			gammaOff = obsModel->getGammaOffset(og-1, s);
-		}
-		else
-		{
-			gammaOff = Image<RFLOAT>(sh,s);
-		}*/
-		
 		for (int y = 0; y < s;  y++)
 		for (int x = 0; x < sh; x++)
 		{
 			const double xf = x;
 			const double yf = y < sh? y : y - s;
 			
-			const double gamma_i = ctf.getGamma(xf/as, yf/as);// + gammaOff(y,x);
+			const double gamma_i = ctf.getGamma(xf/as, yf/as);
 			const double cg = cos(gamma_i);
 			const double sg = sin(gamma_i);
 

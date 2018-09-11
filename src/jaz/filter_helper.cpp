@@ -436,7 +436,7 @@ void FilterHelper::GaussianEnvelopeCorner2D(Image<RFLOAT> &img, double sigma)
     }
 }
 
-Image<RFLOAT> FilterHelper::ButterworthEnvCorner2D(Image<RFLOAT> &img, double radIn, double radOut)
+Image<RFLOAT> FilterHelper::raisedCosEnvCorner2D(Image<RFLOAT> &img, double radIn, double radOut)
 {
     const int w = img.data.xdim;
     const int h = img.data.ydim;
@@ -472,7 +472,7 @@ Image<RFLOAT> FilterHelper::ButterworthEnvCorner2D(Image<RFLOAT> &img, double ra
 
 }
 
-Image<RFLOAT> FilterHelper::ButterworthEnvFreq2D(const Image<RFLOAT>& img, double radIn, double radOut)
+Image<RFLOAT> FilterHelper::raisedCosEnvFreq2D(const Image<RFLOAT>& img, double radIn, double radOut)
 {
     const int w = img.data.xdim;
     const int h = img.data.ydim;
@@ -504,7 +504,48 @@ Image<RFLOAT> FilterHelper::ButterworthEnvFreq2D(const Image<RFLOAT>& img, doubl
         }
     }
 
-    return out;
+	return out;
+}
+
+Image<RFLOAT> FilterHelper::raisedCosEnvRingFreq2D(
+		const Image<RFLOAT> &img, 
+		double rad0, double rad1, double stepWidth)
+{
+	const int w = img.data.xdim;
+    const int h = img.data.ydim;
+
+    Image<RFLOAT> out(w,h);
+
+    for (int y = 0; y < h; y++)
+    for (int x = 0; x < w; x++)
+    {
+        double xx = x;
+        double yy = y <= h/2? y : y - h;
+
+        double r = sqrt(xx*xx + yy*yy);
+		double r0 = rad0 > 0.0? r - rad0 : 1.0;
+		double r1 = rad1 - r;
+		
+		double re = 2.0 * XMIPP_MIN(r0, r1) / stepWidth;
+		
+        if (re > 1.0)
+        {
+            DIRECT_A2D_ELEM(out.data, y, x) = DIRECT_A2D_ELEM(img.data, y, x);
+        }
+        else if (re > -1.0)
+        {
+            double t = (re + 1.0)/2.0;
+            double a = 0.5 * (1.0 - cos(PI * t));
+
+            DIRECT_A2D_ELEM(out.data, y, x) = a * DIRECT_A2D_ELEM(img.data, y, x);
+        }
+        else
+        {
+            DIRECT_A2D_ELEM(out.data, y, x) = 0.0;
+        }
+    }
+
+	return out;	
 }
 
 void FilterHelper::lowPassFilter(Image<RFLOAT>& img, double maxFreq0, double maxFreq1, Image<RFLOAT>& dest)
