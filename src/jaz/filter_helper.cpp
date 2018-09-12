@@ -472,6 +472,45 @@ Image<RFLOAT> FilterHelper::raisedCosEnvCorner2D(Image<RFLOAT> &img, double radI
 
 }
 
+Image<RFLOAT> FilterHelper::raisedCosEnvCorner3D(Image<RFLOAT> &img, double radIn, double radOut)
+{
+    const int w = img.data.xdim;
+	const int h = img.data.ydim;
+	const int d = img.data.zdim;
+
+    Image<RFLOAT> out(w,h,d);
+	
+	for (int z = 0; z < d; z++)
+	for (int y = 0; y < h; y++)
+    for (int x = 0; x < w; x++)
+    {
+        double xx = x < w/2? x : x - w;
+		double yy = y < h/2? y : y - h;
+		double zz = z < d/2? z : z - d;
+
+        double r = sqrt(xx*xx + yy*yy + zz*zz);
+
+        if (r < radIn)
+        {
+            DIRECT_A3D_ELEM(out.data, z, y, x) = DIRECT_A3D_ELEM(img.data, z, y, x);
+        }
+        else if (r < radOut)
+        {
+            double t = (r - radIn)/(radOut - radIn);
+            double a = 0.5 * (1.0 + cos(PI * t));
+
+            DIRECT_A3D_ELEM(out.data, z, y, x) = a * DIRECT_A3D_ELEM(img.data, z, y, x);
+        }
+        else
+        {
+            DIRECT_A3D_ELEM(out.data, z, y, x) = 0.0;
+        }
+    }
+
+    return out;
+
+}
+
 Image<RFLOAT> FilterHelper::raisedCosEnvFreq2D(const Image<RFLOAT>& img, double radIn, double radOut)
 {
     const int w = img.data.xdim;
@@ -523,7 +562,7 @@ Image<RFLOAT> FilterHelper::raisedCosEnvRingFreq2D(
         double yy = y <= h/2? y : y - h;
 
         double r = sqrt(xx*xx + yy*yy);
-		double r0 = rad0 > 0.0? r - rad0 : 1.0;
+		double r0 = rad0 > 0.0? r - rad0 : stepWidth/2;
 		double r1 = rad1 - r;
 		
 		double re = 2.0 * XMIPP_MIN(r0, r1) / stepWidth;

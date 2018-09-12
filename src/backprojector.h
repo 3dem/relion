@@ -342,6 +342,70 @@ public:
 			   DIRECT_A3D_ELEM(Mout, k, i, j) = A3D_ELEM(Min, kp, ip, jp);
 	   }
    }
+   
+	/*
+	 * The same, but without the spherical cropping and thus invertible
+	 */
+   template <typename T1, typename T2>
+   static void decenterWhole(MultidimArray<T1> &Min, MultidimArray<T2> &Mout)
+   {
+	   if (Mout.xdim != Min.xdim || Mout.ydim != Min.ydim || Mout.zdim != Min.zdim)
+	   {
+		   Mout = MultidimArray<T2>(Min.zdim, Min.ydim, Min.xdim);
+	   }
+	   
+	   Mout.initZeros();
+		   
+	   const int s = Min.ydim;
+	   
+	   for (long int z = 0; z < Min.zdim; z++)
+	   for (long int y = 0; y < Min.ydim; y++)
+	   for (long int x = 0; x < Min.xdim; x++)
+	   {
+		   long int zz = z < Min.xdim? z + s/2 : z - s/2 - 1;
+		   long int yy = y < Min.xdim? y + s/2 : y - s/2 - 1;
+		   long int xx = x;
+		   
+		   if (   xx >= 0 && xx < Min.xdim
+			   && yy >= 0 && yy < Min.ydim
+			   && zz >= 0 && zz < Min.zdim)
+		   {
+			   DIRECT_A3D_ELEM(Mout, z, y, x) = T2(DIRECT_A3D_ELEM(Min, zz, yy, xx));
+		   }
+	   }
+   }
+   
+   /*
+	* Inverse of the above
+	*/
+   template <typename T1, typename T2>
+   static void recenterWhole(MultidimArray<T1> &Min, MultidimArray<T2> &Mout)
+   {
+	   if (Mout.xdim != Min.xdim || Mout.ydim != Min.ydim || Mout.zdim != Min.zdim)
+	   {
+		   Mout = MultidimArray<T2>(Min.zdim, Min.ydim, Min.xdim);
+	   }
+	   
+	   Mout.initZeros();
+		   
+	   const int s = Min.ydim;
+	   
+	   for (long int z = 0; z < Min.zdim; z++)
+	   for (long int y = 0; y < Min.ydim; y++)
+	   for (long int x = 0; x < Min.xdim; x++)
+	   {
+		   long int zz = z < Min.xdim? z + s/2 : z - s/2 - 1;
+		   long int yy = y < Min.xdim? y + s/2 : y - s/2 - 1;
+		   long int xx = x;
+		   
+		   if (   xx >= 0 && xx < Min.xdim
+			   && yy >= 0 && yy < Min.ydim
+			   && zz >= 0 && zz < Min.zdim)
+		   {
+			   DIRECT_A3D_ELEM(Mout, zz, yy, xx) = T2(DIRECT_A3D_ELEM(Min, z, y, x));
+		   }
+	   }
+   }
 
 #ifdef RELION_SINGLE_PRECISION
    // Fnewweight needs decentering, but has to be in double-precision for correct calculations!

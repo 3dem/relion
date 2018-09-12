@@ -85,6 +85,21 @@ class tComplex
 
             return *this;
         }
+		
+		bool operator == (const tComplex& arg) const
+		{
+			return (real == arg.real && imag == arg.imag);
+		}
+  
+		bool operator != (const tComplex& arg) const
+		{
+			return !(*this == arg);
+		}
+		
+		operator T() const
+		{
+			return real;
+		}
 
         tComplex conj() const
         {

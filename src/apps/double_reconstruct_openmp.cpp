@@ -32,6 +32,8 @@
 #include <src/jaz/stack_helper.h>
 #include <src/jaz/image_op.h>
 #include <src/jaz/obs_model.h>
+#include <src/jaz/new_ft.h>
+#include <src/jaz/filter_helper.h>
 
 class reconstruct_parameters
 {
@@ -57,7 +59,7 @@ class reconstruct_parameters
 		int L1_iters;
 		double L1_eps;
 		
-		float padding_factor, mask_diameter;
+		float padding_factor, mask_diameter, mask_diameter_filt, flank_width;
 		
 		// I/O Parser
 		IOParser parser;
@@ -79,6 +81,8 @@ class reconstruct_parameters
 			fn_sym = parser.getOption("--sym", "Symmetry group", "c1");
 			maxres = textToFloat(parser.getOption("--maxres", "Maximum resolution (in Angstrom) to consider in Fourier space (default Nyquist)", "-1"));
 			padding_factor = textToFloat(parser.getOption("--pad", "Padding factor", "2"));
+			mask_diameter_filt = textToFloat(parser.getOption("--filter_diameter", "Diameter of filter-mask applied before division", "-1"));
+			flank_width = textToFloat(parser.getOption("--filter_softness", "Width of filter-mask width", "30"));
 			nr_omp_threads = textToInteger(parser.getOption("--j", "Number of open-mp threads to use. Memory footprint is multiplied by this value.", "16"));
 			
 			int ctf_section = parser.addSection("CTF options");
@@ -709,10 +713,34 @@ class reconstruct_parameters
 						fscNew << i << " " << fsc(i) << "\n";
 					}
 				}
-				
+						
 				for (int j = 0; j < 2; j++)
 				{
-					std::cerr << " + Starting the reconstruction ..." << std::endl;
+					if (mask_diameter_filt > 0.0)
+					{	
+						std::cout << " + Applying spherical mask of diameter " << 
+								  mask_diameter_filt << " ..." << std::endl;
+						
+						const double r0 = padding_factor * mask_diameter_filt;
+						const double r1 = r0 + flank_width;
+						
+						Image<Complex> tempC;
+						Image<RFLOAT> tempR;
+						
+						BackProjector::decenterWhole(backprojector[j]->data, tempC());
+						NewFFT::inverseFourierTransform(tempC(), tempR(), NewFFT::FwdOnly, false);	
+						tempR = FilterHelper::raisedCosEnvCorner3D(tempR, r0, r1);
+						NewFFT::FourierTransform(tempR(), tempC(), NewFFT::FwdOnly);
+						BackProjector::recenterWhole(tempC(), backprojector[j]->data);
+						
+						BackProjector::decenterWhole(backprojector[j]->weight, tempC());
+						NewFFT::inverseFourierTransform(tempC(), tempR(), NewFFT::FwdOnly, false);
+						tempR = FilterHelper::raisedCosEnvCorner3D(tempR, r0, r1);
+						NewFFT::FourierTransform(tempR(), tempC(), NewFFT::FwdOnly);
+						BackProjector::recenterWhole(tempC(), backprojector[j]->weight);
+					}
+						
+					std::cout << " + Starting the reconstruction ..." << std::endl;
 					backprojector[j]->reconstruct(vol(), grid_iters, do_map, 1., dummy, dummy, dummy, dummy,
 												  fsc, 1., do_use_fsc, true, nr_omp_threads, -1, false);
 															
