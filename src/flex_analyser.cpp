@@ -45,6 +45,7 @@ void FlexAnalyser::read(int argc, char **argv)
 	select_eigenvalue = textToInteger(parser.getOption("--select_eigenvalue", "Output a selection particle.star file based on eigenvalues along this eigenvector", "-1"));
 	select_eigenvalue_min = textToFloat(parser.getOption("--select_eigenvalue_min", "Minimum for eigenvalue to include particles in selection output star file", "-99999."));
 	select_eigenvalue_max = textToFloat(parser.getOption("--select_eigenvalue_max", "Maximum for eigenvalue to include particles in selection output star file", "99999."));
+	do_write_all_pca_projections = parser.checkOption("--write_pca_projections", "Write out a text file with all PCA projections for all particles");
 
 	int subtract_section = parser.addSection("Subtract options");
 	do_subtract = parser.checkOption("--subtract", "Generate subtracted experimental particles");
@@ -61,6 +62,9 @@ void FlexAnalyser::read(int argc, char **argv)
 
 	// Initialise verb for non-parallel execution
 	verb = textToInteger(parser.getOption("--verb", "Verbosity", "1"));
+
+	if (do_subtract && fn_keepmask == "")
+		REPORT_ERROR("You have to specify --fn_keepmask with -subtract");
 
 	// Check for errors in the command-line option
 	if (parser.checkForErrors())
@@ -432,7 +436,7 @@ void FlexAnalyser::loopThroughParticles(int rank, int size)
 				std::cout << std::endl;
 			}
 		}
-		
+
 		f_evec.close();
 
 		makePCAhistograms(projected_data, eigenvalues, means);
@@ -441,9 +445,16 @@ void FlexAnalyser::loopThroughParticles(int rank, int size)
 		if (do_generate_maps)
 			make3DModelsAlongPrincipalComponents(projected_data, eigenvectors, means);
 
+		if (do_write_all_pca_projections)
+		{
+			writeAllPCAProjections(projected_data);
+		}
+
 		// Output a particle selection, if requested
 		if (select_eigenvalue > 0)
+		{
 			outputSelectedParticles(projected_data);
+		}
 	}
 
 }
@@ -1003,6 +1014,30 @@ void FlexAnalyser::make3DModelsAlongPrincipalComponents(std::vector< std::vector
 
 	} // end loop components
 
+}
+
+void FlexAnalyser::writeAllPCAProjections(std::vector< std::vector<double> > &projected_input)
+{
+	FileName fnt = fn_out+"_projections_along_eigenvectors_all_particles.txt";
+	std::ofstream  fh;
+	fh.open((fnt).c_str(), std::ios::out);
+	if (!fh)
+		REPORT_ERROR( (std::string)" FlexAnalyser::writeAllPCAProjections: cannot write to file: " + fnt);
+
+	for (long int ipart = 0; ipart < projected_input.size(); ipart++)
+	{
+		data.MDimg.getValue(EMDL_IMAGE_NAME, fnt, ipart);
+		fh << fnt << " ";
+		for (int ival = 0; ival < projected_input[ipart].size(); ival++)
+		{
+			fh.width(15);
+			fh << projected_input[ipart][ival];
+
+		}
+		fh << " \n";
+	}
+
+	fh.close();
 }
 
 void FlexAnalyser::outputSelectedParticles(std::vector< std::vector<double> > &projected_input)

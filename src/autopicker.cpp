@@ -427,7 +427,8 @@ void AutoPicker::initialise()
 			{
 				if (fabs(angpix_header - angpix) > 1e-3)
 				{
-					std::cerr << " WARNING!!! Pixel size in reference image header= " << angpix_header << " but you have not provided --angpix_ref" << std::endl;
+					std::cerr << " WARNING!!! Pixel size in reference image header= " << angpix_header << " but you have not provided --angpix_ref." << std::endl;
+					std::cerr << " The pixel size of the reference is assumed to be the same as that of the input micrographs (= " << angpix << ")" << std::endl;
 				}
 			}
 			else
@@ -483,13 +484,14 @@ void AutoPicker::initialise()
 				Euler_angles2matrix(rot, tilt, 0., A, false);
 				Fref.initZeros();
 				projector.get2DFourierTransform(Fref, A, IS_NOT_INV);
-	        	transformer.inverseFourierTransform();
-	        	// Shift the image back to the center...
-	        	CenterFFT(Mref, false);
-	        	Mrefs.push_back(Mref);
+				transformer.inverseFourierTransform();
+				// Shift the image back to the center...
+				CenterFFT(Mref, false);
+				Mref.setXmippOrigin();
+				Mrefs.push_back(Mref);
 
-	        	if (verb > 0)
-	        	{
+				if (verb > 0)
+				{
 					// Also write out a stack with the 2D reference projections
 					Iprojs()=Mref;
 					fn_img.compose(idir+1,fn_proj);
@@ -497,8 +499,7 @@ void AutoPicker::initialise()
 						Iprojs.write(fn_img, -1, false, WRITE_OVERWRITE);
 					else
 						Iprojs.write(fn_img, -1, false, WRITE_APPEND);
-	        	}
-
+				}
 			}
 		}
 		else

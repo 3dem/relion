@@ -148,6 +148,7 @@ class mask_create_parameters
 		if (fn_and != "")
 		{
 			Ip.read(fn_and);
+			Ip().setXmippOrigin();
 			if (!Ip().sameShape(Iin()))
 				REPORT_ERROR("ERROR: --i and --and maps are different shapes!");
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Ip())
@@ -161,6 +162,7 @@ class mask_create_parameters
 		else if  (fn_or != "")
 		{
 			Ip.read(fn_or);
+			Ip().setXmippOrigin();
 			if (!Ip().sameShape(Iin()))
 				REPORT_ERROR("ERROR: --i and --or maps are different shapes!");
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Ip())
@@ -174,6 +176,7 @@ class mask_create_parameters
 		else if  (fn_andnot != "")
 		{
 			Ip.read(fn_andnot);
+			Ip().setXmippOrigin();
 			if (!Ip().sameShape(Iin()))
 				REPORT_ERROR("ERROR: --i and --not maps are different shapes!");
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Ip())
@@ -187,6 +190,7 @@ class mask_create_parameters
 		else if  (fn_ornot != "")
 		{
 			Ip.read(fn_ornot);
+			Ip().setXmippOrigin();
 			if (!Ip().sameShape(Iin()))
 				REPORT_ERROR("ERROR: --i and --not maps are different shapes!");
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Ip())

@@ -193,12 +193,12 @@ std::vector<MetaDataTable> MicrographHandler::findLongEnoughMovies(
 		if (bad.size() == 1)
 		{
 			std::cerr << " - The following micrograph does not contain "
-					  << fc << " frames:\n";
+					  << fc << " frames. Particles in it will be ignored:\n";
 		}
 		else
 		{
 			std::cerr << " - The following micrographs do not contain "
-					  << fc << " frames:\n";
+					  << fc << " frames. Particles in them will be ignored:\n";
 		}
 
 		for (int i = 0; i < bad.size(); i++)
@@ -437,7 +437,7 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 	std::vector<std::vector<Image<Complex>>> out = loadMovie(
 				mdt, s, angpix, fts, offsets_in, offsets_out);
 
-	if (!hasCorrMic || micrograph.model == 0)
+	if (!hasCorrMic)
 	{
 		tracks.resize(0);
 	}

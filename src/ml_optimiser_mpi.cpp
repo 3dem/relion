@@ -651,32 +651,36 @@ void MlOptimiserMpi::initialiseWorkLoad()
 	}
 
 	// Now copy particle stacks to scratch if needed
-    if (fn_scratch != "" && !do_preread_images && !do_reuse_scratch)
+    if (fn_scratch != "" && !do_preread_images)
     {
-    	bool also_do_ctfimage = (mymodel.data_dim == 3 && do_ctf_correction);
-    	if (do_parallel_disc_io)
+	mydata.setScratchDirectory(fn_scratch);
+
+	if (!do_reuse_scratch)
+	{
+	    	bool also_do_ctfimage = (mymodel.data_dim == 3 && do_ctf_correction);
+	    	if (do_parallel_disc_io)
 		{
 
-    		FileName fn_lock = mydata.initialiseScratchLock(fn_scratch, fn_out);
-    		// One rank after the other, all slaves pass through  mydata.prepareScratchDirectory()
-    		// This way, only the first rank on each hostname will actually copy the particle stacks
-    		// The rest will just update the filenames in exp_model
-    		bool need_to_copy = false;
-    		for (int inode = 0; inode < node->size; inode++)
-    		{
-    			if (inode > 0 && inode == node->rank)
-    			{
-    				// The master removes the lock if it existed
-    				need_to_copy = mydata.prepareScratchDirectory(fn_scratch, fn_lock);
-    			}
-    			MPI_Barrier(MPI_COMM_WORLD);
-    		}
+	    		FileName fn_lock = mydata.initialiseScratchLock(fn_scratch, fn_out);
+    			// One rank after the other, all slaves pass through mydata.prepareScratchDirectory()
+    			// This way, only the first rank on each hostname will actually copy the particle stacks
+	    		// The rest will just update the filenames in exp_model
+    			bool need_to_copy = false;
+    			for (int inode = 0; inode < node->size; inode++)
+	    		{
+    				if (inode > 0 && inode == node->rank)
+    				{
+    					// The master removes the lock if it existed
+    					need_to_copy = mydata.prepareScratchDirectory(fn_scratch, fn_lock);
+	    			}
+    				MPI_Barrier(MPI_COMM_WORLD);
+	    		}
 
-    		int myverb = (node->rank == 1) ? ori_verb : 0; // Only the first slave
-    		if (!node->isMaster())
-    		{
-    			mydata.copyParticlesToScratch(myverb, need_to_copy, also_do_ctfimage, keep_free_scratch_Gb);
-    		}
+    			int myverb = (node->rank == 1) ? ori_verb : 0; // Only the first slave
+    			if (!node->isMaster())
+	    		{
+    				mydata.copyParticlesToScratch(myverb, need_to_copy, also_do_ctfimage, keep_free_scratch_Gb);
+	    		}
 		}
 		else
 		{
@@ -687,6 +691,7 @@ void MlOptimiserMpi::initialiseWorkLoad()
 				mydata.copyParticlesToScratch(1, true, also_do_ctfimage, keep_free_scratch_Gb);
 			}
 		}
+	}
     }
 
     MPI_Barrier(MPI_COMM_WORLD);

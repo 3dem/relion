@@ -434,6 +434,9 @@ public:
      */
     size_t getFileSize() const;
 
+    // Get the other half map by swapping half1 and half2
+    bool getTheOtherHalf(FileName &fn_out) const;
+
     /** From a wild-card containing filename get a vector with all existing filenames,
      * return number of existing filenames
      * If do_clear, the output vector will be clear when starting, when false, files will just be added to the vector

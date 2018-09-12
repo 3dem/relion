@@ -47,7 +47,7 @@ class RelionItOptions(object):
     angpix = 0.885
     # Acceleration voltage (in kV)
     voltage = 300
-    # Polara = 2.0; Talos/Krios = 2.7; Cryo-ARM = 1.4 
+    # Polara = 2.0; Talos/Krios = 2.7; some Cryo-ARM = 1.4 
     Cs = 1.4
 
 
@@ -398,6 +398,15 @@ class RelionItOptions(object):
                 else:
                     print 'Unrecognised option {}'.format(key)
 
+def safe_load_star(filename, max_try=5, wait=10):
+    for _ in xrange(max_try):
+        try:
+            return load_star(filename)
+        except:
+            import time
+            time.sleep(wait)
+    assert False, "Failed to read a star file: " + filename
+
 def load_star(filename):
     from collections import OrderedDict
     
@@ -466,19 +475,26 @@ def getSecondPassReference():
         angpix = '0'
     return filename.replace('\n',''), angpix.replace('\n','')
 
-def addJob(jobtype, name_in_script, done_file, options, alias=None):
-
-    jobname = ""
+def getJobName(name_in_script, done_file):
+    jobname = None
     # See if we've done this job before, i.e. whether it is in the done_file
     if (os.path.isfile(done_file)):
         f = open(done_file,'r')
-        for line in f: 
-            if name_in_script in line:
-                jobname = line.split()[2]
+        for line in f:
+            elems = line.split()
+            if len(elems) < 3: continue 
+            if elems[0] == name_in_script:
+                jobname = elems[2]
+		break
         f.close()
-        
+
+    return jobname
+
+def addJob(jobtype, name_in_script, done_file, options, alias=None):
+    jobname = getJobName(name_in_script, done_file)
+
     # If we hadn't done it before, add it now
-    if (jobname != ""):
+    if (jobname is not None):
         already_had_it = True 
     else:
         already_had_it = False
@@ -491,7 +507,7 @@ def addJob(jobtype, name_in_script, done_file, options, alias=None):
                 command += ' --setJobAlias "' + alias + '"'
         os.system(command)
 
-        pipeline = load_star(PIPELINE_STAR)
+        pipeline = safe_load_star(PIPELINE_STAR)
         jobname = pipeline['pipeline_processes']['rlnPipeLineProcessName'][-1]
         
         # Now add the jobname to the done_file
@@ -516,7 +532,7 @@ def WaitForJob(wait_for_this_job, seconds_wait):
     time.sleep(seconds_wait)
     print " RELION_IT: waiting for job to finish in", wait_for_this_job
     while True:
-        pipeline = load_star(PIPELINE_STAR)
+        pipeline = safe_load_star(PIPELINE_STAR)
         myjobnr = -1
         for jobnr in range(0,len(pipeline['pipeline_processes']['rlnPipeLineProcessName'])):
             jobname = pipeline['pipeline_processes']['rlnPipeLineProcessName'][jobnr]
@@ -558,7 +574,7 @@ White value: == 0
 
 def findBestClass(model_star_file, use_resol=True):
 
-    model_star = load_star(model_star_file)
+    model_star = safe_load_star(model_star_file)
     best_resol = 999
     best_size = 0 
     best_class = 0
@@ -577,7 +593,7 @@ def findBestClass(model_star_file, use_resol=True):
 def findOutputModelStar(job_dir):
     found = None
     try:
-        job_star = load_star(job_dir + "job_pipeline.star")
+        job_star = safe_load_star(job_dir + "job_pipeline.star")
         for output_file in job_star["pipeline_output_edges"]['rlnPipeLineEdgeToNode']:
             if output_file.endswith("_model.star"):
                 found = output_file
@@ -817,6 +833,7 @@ def run_pipeline(opts):
             #### Set up the Extract job
             extract_options = ['Input coordinates:  == {}coords_suffix_autopick.star'.format(autopick_job),
                                'micrograph STAR file:  == {}micrographs_ctf.star'.format(ctffind_job),
+                               'Diameter background circle (pix):  == {}'.format(opts.extract_bg_diameter),
                                'Particle box size (pix): == {}'.format(opts.extract_boxsize),
                                'Number of MPI procs: == {}'.format(opts.extract_mpi)]
 
@@ -897,9 +914,11 @@ def run_pipeline(opts):
 
             print ' RELION_IT: now entering an infinite loop for batch-processing of particles. You can stop this loop by deleting the file',RUNNING_FILE
             
-            # It could be that this is a restart, so check previous_batch1_size in the output directory
-            if os.path.isfile(split_job + 'particles_split001.star'):
-                batch1 = load_star(split_job + 'particles_split001.star')
+            # It could be that this is a restart, so check previous_batch1_size in the output directory.
+            # Also check the presence of class2d_job_batch_001 in case the first job was not submitted yet.
+            if getJobName("class2d_job_batch_001", SETUP_CHECK_FILE) is not None and \
+               os.path.isfile(split_job + 'particles_split001.star'):
+                batch1 = safe_load_star(split_job + 'particles_split001.star')
                 previous_batch1_size = len(batch1['']['rlnMicrographName'])
             else:
                 previous_batch1_size = 0
@@ -913,7 +932,7 @@ def run_pipeline(opts):
                     iibatch = ibatch + 1
                     batch_name = split_job + 'particles_split%03d.star' % iibatch
 
-                    batch = load_star(batch_name)
+                    batch = safe_load_star(batch_name)
                     batch_size = len(batch['']['rlnMicrographName'])
                     rerun_batch1 = False
                     if ( iibatch == 1 and batch_size > previous_batch1_size and batch_size > opts.minimum_batch_size ):

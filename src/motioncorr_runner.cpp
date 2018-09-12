@@ -1358,6 +1358,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 			NewFFT::FourierTransform(Iframes[iframe](), Fframes[iframe]);
 		} else {
 			MultidimArray<fComplex> Fframe;
+			NewFFT::FourierTransform(Iframes[iframe](), Fframe);
 			Fframes[iframe].reshape(ny, nx / 2 + 1);
 			cropInFourierSpace(Fframe, Fframes[iframe]);
 		}

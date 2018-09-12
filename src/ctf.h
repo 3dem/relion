@@ -243,9 +243,9 @@ public:
         argument += PI/2.;
         RFLOAT sinx, cosx;
 #ifdef RELION_SINGLE_PRECISION
-        sincosf( argument, &sinx, &cosx );
+        SINCOSF( argument, &sinx, &cosx );
 #else
-        sincos( argument, &sinx, &cosx );
+        SINCOS( argument, &sinx, &cosx );
 #endif
         Complex retval;
         retval.real = cosx;

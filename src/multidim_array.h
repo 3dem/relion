@@ -3886,6 +3886,11 @@ public:
         *ptr = ABS(*ptr);
     }
 
+#if defined(__APPLE__)
+#undef MIN
+#undef MAX
+#endif
+
     /** MAX
      *
      * Each component of the result is the maximum of the correspoing

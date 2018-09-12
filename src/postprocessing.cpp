@@ -37,6 +37,7 @@ void Postprocessing::read(int argc, char **argv)
 	extend_ini_mask = textToFloat(parser.getOption("--extend_inimask", "Number of pixels to extend the initial seed mask", "3."));
 	width_soft_mask_edge  = textToFloat(parser.getOption("--width_mask_edge", "Width for the raised cosine soft mask edge (in pixels)", "6."));
 	fn_mask = parser.getOption("--mask", "Filename of a user-provided mask (1=protein, 0=solvent, all values in range [0,1])", "");
+	force_mask = parser.checkOption("--force_mask", "Use the mask even when the masked resolution is worse than the unmasked resolution");
 
 	int sharp_section = parser.addSection("Sharpening options");
 	fn_mtf = parser.getOption("--mtf", "User-provided STAR-file with the MTF-curve of the detector", "");
@@ -110,14 +111,8 @@ void Postprocessing::initialise()
 	// Read in the input maps
 	if (fn_I2 == "")
 	{
-		fn_I2 = fn_I1;
-		if (fn_I1.contains("half1"))
-			fn_I2.replaceAllSubstrings("half1", "half2");
-		else if (fn_I1.contains("half2"))
-			fn_I2.replaceAllSubstrings("half2", "half1");
-		else
-			REPORT_ERROR("ERROR: cannot find half1 or half2 substring in the input filename");
-
+		if (!fn_I1.getTheOtherHalf(fn_I2))
+			REPORT_ERROR("The input filename does not contain 'half1' or 'half2'");
 	}
 	if (verb > 0)
 	{
@@ -1196,9 +1191,17 @@ void Postprocessing::run()
 		// Check whether global_resol is worse than the unmasked one
 		if (unmasked_resol_i > global_resol_i)
 		{
-			std::cerr << " WARNING: the unmasked FSC extends beyond the solvent-corrected FSC. Skip masking for now, but you may want to adjust you mask!" << std::endl;
-			fsc_true = fsc_unmasked;
-			global_resol = XSIZE(I1())*angpix/(RFLOAT)unmasked_resol_i;
+			if (force_mask)
+			{
+				std::cerr << " WARNING: the unmasked FSC extends beyond the solvent-corrected FSC." << std::endl;
+			}
+			else 
+			{
+				std::cerr << " WARNING: the unmasked FSC extends beyond the solvent-corrected FSC. Skip masking for now, but you may want to adjust you mask!" << std::endl;
+				std::cerr << "          You can force the mask by the '--force_mask' option." << std::endl;
+				fsc_true = fsc_unmasked;
+				global_resol = XSIZE(I1())*angpix/(RFLOAT)unmasked_resol_i;
+			}
 		}
 		// Check whether the phase-randomised FSC is less than 5% at the resolution estimate, otherwise warn the user
 		else if (DIRECT_A1D_ELEM(fsc_random_masked, global_resol_i) > 0.1)

@@ -78,6 +78,9 @@ public:
 	// Filename for a user-provided mask
 	FileName fn_mask;
 
+	// Use the mask even when the resolution becomes worse
+	bool force_mask;
+
 	/////// Local-resolution
 
 	// Perform automated masking (based on a density threshold)

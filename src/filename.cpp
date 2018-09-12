@@ -425,6 +425,24 @@ int FileName::globFiles(std::vector<FileName> &files, bool do_clear) const
 	return files.size();
 }
 
+bool FileName::getTheOtherHalf(FileName &fn_out) const
+{
+	FileName ret = this->afterLastOf("/");
+
+	if (ret.contains("half1"))
+		ret.replaceAllSubstrings("half1", "half2");
+	else if (ret.contains("half2"))
+		ret.replaceAllSubstrings("half2", "half1");
+	else
+		return false;
+
+	if (this->contains("/"))
+		ret = this->beforeLastOf("/") + "/" + ret;
+
+	fn_out = ret;
+	return true;
+}
+
 bool exists(const FileName &fn)
 {
 
@@ -511,6 +529,8 @@ bool decomposePipelineFileName(FileName fn_in, FileName &fn_pre, FileName &fn_jo
 
 bool decomposePipelineSymlinkName(FileName fn_in, FileName &fn_pre, FileName &fn_jobnr, FileName &fn_post)
 {
+	bool dont_expand = false;
+
 	// Symlinks are always in the second directory. (e.g. Refine3D/JOB_ALIAS_AS_LINK/...)
 	size_t slashpos = 0;
 	int i = 0;
@@ -522,17 +542,35 @@ bool decomposePipelineSymlinkName(FileName fn_in, FileName &fn_pre, FileName &fn
 			break;
 	}
 
+	// We ignore links in the first directory (link/XXX)
+	if (i != 2)
+		dont_expand = true;
+
+	FileName second_dir = fn_in.substr(0, slashpos);
+//	std::cout << second_dir << std::endl;
+	// We also ignore jobXXX even if it is a symbolic link.
+	//    e.g. MotionCorr/job003 ==> /path/to/online_processing/MotionCorr/job003
+	// This is safe because we don't allow an alias name to start from 'job'.
+	if (second_dir.afterLastOf("/").substr(0, 3) == "job")
+		dont_expand = true;
+
 	// Check whether this is a symbol link
-	char linkname[100];
-	ssize_t len = ::readlink(fn_in.substr(0, slashpos).c_str(), linkname, sizeof(linkname)-1);
-	if (i == 2 && len != -1) // we ignore links in the first directory (link/XXX)
+	char linkname[4096];
+	ssize_t len_max = sizeof(linkname) - 1;
+	ssize_t len = ::readlink(second_dir.c_str(), linkname, len_max);
+	if (len == len_max)
+		REPORT_ERROR("Too long path in decomposePipelineSymlinkName.");
+	if (!dont_expand && len != -1)
 	{
 	    	// This is a symbolic link!
+		if (linkname[len - 1] == '/')
+			linkname[len - 1] = '\0'; // remove trailing '/'	
 	    	linkname[len] = '\0';
 	    	FileName fn_link = std::string(linkname);
-    		if (fn_link.substr(0,3) == "../")
+    		if (fn_link.substr(0, 3) == "../")
 	    	{
-    			fn_link = fn_link.substr(3) + fn_in.substr(slashpos+1);
+    			fn_link = fn_link.substr(3) + fn_in.substr(slashpos);
+//			std::cout << "fn_link=" << fn_link << std::endl;
         		return decomposePipelineFileName(fn_link, fn_pre, fn_jobnr, fn_post);
 	    	}
 		else
@@ -545,7 +583,6 @@ bool decomposePipelineSymlinkName(FileName fn_in, FileName &fn_pre, FileName &fn
 
 	// If it is not a symlink, just decompose the filename
 	return decomposePipelineFileName(fn_in, fn_pre, fn_jobnr, fn_post);
-
 }
 
 FileName getOutputFileWithNewUniqueDate(FileName fn_input, FileName fn_new_outputdir)

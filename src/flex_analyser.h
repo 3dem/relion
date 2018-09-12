@@ -94,6 +94,8 @@ public:
 	// Select particles based on this eigenvalue minimim
 	float select_eigenvalue_max;
 
+	// Write out text file with eigenvalues for all particles
+	bool do_write_all_pca_projections;
 
 	// Write out subtracted particles
 	bool do_subtract;
@@ -144,6 +146,9 @@ public:
 	// Generate maps to make movies of the variance along the most significant eigenvectors
 	void make3DModelsAlongPrincipalComponents(std::vector< std::vector<double> > &projected_input,
 			std::vector< std::vector<double> > &eigenvectors, std::vector<double> &means);
+
+	// Dump all projections to a text file
+	void writeAllPCAProjections(std::vector< std::vector<double> > &projected_input);
 
 	// Output a particle.star file with a selection based on eigenvalues
 	void outputSelectedParticles(std::vector< std::vector<double> > &projected_input);

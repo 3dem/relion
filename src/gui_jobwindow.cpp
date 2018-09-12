@@ -245,7 +245,7 @@ void JobWindow::setupRunTab()
 	place("qsub");
 
 	char * extra_count_text = getenv ("RELION_QSUB_EXTRA_COUNT");
-	const char extra_count_val = (extra_count_text ? atoi(extra_count_text) : 0);
+	const char extra_count_val = (extra_count_text ? atoi(extra_count_text) : 2);
 	for (int i=1; i<=extra_count_val; i++)
 	{
 		std::stringstream out;
