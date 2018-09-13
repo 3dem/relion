@@ -721,7 +721,7 @@ class reconstruct_parameters
 						std::cout << " + Applying spherical mask of diameter " << 
 								  mask_diameter_filt << " ..." << std::endl;
 						
-						const double r0 = (padding_factor * mask_diameter_filt)/2.0;
+						const double r0 = mask_diameter_filt/2.0;
 						const double r1 = r0 + flank_width;
 						
 						Image<Complex> tempC;
