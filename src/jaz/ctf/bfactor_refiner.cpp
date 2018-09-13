@@ -24,10 +24,19 @@ BFactorRefiner::BFactorRefiner()
 
 void BFactorRefiner::read(IOParser &parser, int argc, char *argv[])
 {
-	perMicrograph = parser.checkOption("--bfac_per_mg", 
-		"Estimate B-factors per micrograph, instead of per particle");
+	/*perMicrograph = parser.checkOption("--bfac_per_mg", 
+		"Estimate B-factors per micrograph, instead of per particle");*/
 	
-	kmin = textToFloat(parser.getOption("--kmin_bfac",
+	min_B = textToDouble(parser.getOption("--bfac_min_B",
+		"Minimal allowed B-factor", "-20"));
+	
+	max_B = textToDouble(parser.getOption("--bfac_max_B",
+		"Maximal allowed B-factor", "200"));
+	
+	min_scale = textToDouble(parser.getOption("--bfac_min_scale",
+		"Minimal allowed scale-factor (essential for outlier rejection)", "0.2"));
+	
+	kmin = textToDouble(parser.getOption("--kmin_bfac",
 		"Inner freq. threshold for B-factor estimation [Angst]", "30.0"));
 }
 
@@ -72,7 +81,11 @@ void BFactorRefiner::processMicrograph(
 	stsg << g;
 
 	std::vector<std::vector<std::pair<int,d2Vector>>> valsPerPart(nr_omp_threads);
-
+	
+	const double as = s * angpix;
+	const double min_B_px = min_B / (as*as);
+	const double max_B_px = max_B / (as*as);
+			
 	// Parallel loop over all particles in this micrograph
 	#pragma omp parallel for num_threads(nr_omp_threads)
 	for (long p = 0; p < pc; p++)
@@ -90,15 +103,13 @@ void BFactorRefiner::processMicrograph(
 		ImageOp::multiply(ctfImg, pred[p], predCTF);
 		
 		d2Vector sigmaK = BFactorRefiner::findBKRec2D(
-			obs[p], predCTF, freqWeight, -0.01, 0.01, 20, 5, 0.1);
+			obs[p], predCTF, freqWeight, min_B_px, max_B_px, min_scale, 20, 5, 0.1);
 		
 		
 		int threadnum = omp_get_thread_num();
 		
 		valsPerPart[threadnum].push_back(std::make_pair(p, sigmaK));
 	}
-	
-	const double as = s * angpix;
 	
 	for (int t = 0; t < nr_omp_threads; t++)
 	{
@@ -267,7 +278,7 @@ d2Vector BFactorRefiner::findBKRec2D(
 		const Image<Complex> &obs, 
 		const Image<Complex> &pred, 
 		const Image<RFLOAT> &weight, 
-		double B0, double B1, 
+		double B0, double B1, double min_scale,
 		int steps, int depth, double rangeItFract)
 {
 	double minErr = std::numeric_limits<double>::max();
@@ -288,7 +299,7 @@ d2Vector BFactorRefiner::findBKRec2D(
 			sigVals[r] = exp(-B * r * r / 4.0);
 		}
 
-        // find A
+        // find optimal scale-factor for hypothetical B-factor
         double num = 0.0, denom = 0.0;
 
 		for (long y = 0; y < s;  y++)
@@ -311,6 +322,8 @@ d2Vector BFactorRefiner::findBKRec2D(
 		
         const double eps = 1e-20;
         double a = denom > eps? num / denom : num / eps;
+		
+		if (a < min_scale) a = min_scale;
 
         double sum = 0.0;
 
@@ -346,7 +359,7 @@ d2Vector BFactorRefiner::findBKRec2D(
         double Bnext1 = bestB + rangeItFract*hrange;
 
         return findBKRec2D(
-			obs, pred, weight, Bnext0, Bnext1, 
+			obs, pred, weight, Bnext0, Bnext1, min_scale, 
 			steps, depth - 1, rangeItFract);
     }
 

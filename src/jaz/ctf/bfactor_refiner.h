@@ -45,7 +45,7 @@ class BFactorRefiner
 	private:
 		
 		// cmd. line options (see read()):
-		double kmin;	
+		double kmin, min_scale, min_B, max_B;	
 		bool perMicrograph;
 		
 		// set at init:
@@ -71,7 +71,7 @@ class BFactorRefiner
 				const Image<Complex>& obs,
 				const Image<Complex>& pred,
 				const Image<RFLOAT>& weight,
-                double B0, double B1,
+                double B0, double B1, double min_scale,
                 int steps, int depth, double rangeItFract);
 };
 
