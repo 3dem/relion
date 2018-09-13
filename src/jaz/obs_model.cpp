@@ -1,6 +1,6 @@
 #include "src/jaz/obs_model.h"
 #include "src/jaz/stack_helper.h"
-#include "src/jaz/filter_helper.h"
+#include "src/jaz/img_proc/filter_helper.h"
 #include "src/jaz/Fourier_helper.h"
 #include "src/jaz/ctf/tilt_helper.h"
 #include "src/jaz/math/Zernike.h"

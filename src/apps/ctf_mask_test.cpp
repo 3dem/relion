@@ -6,7 +6,7 @@
 #include <src/args.h>
 #include <src/image.h>
 #include <src/metadata_table.h>
-#include <src/jaz/filter_helper.h>
+#include <src/jaz/img_proc/filter_helper.h>
 #include <src/jaz/stack_helper.h>
 #include <src/jaz/obs_model.h>
 #include <src/jaz/image_log.h>

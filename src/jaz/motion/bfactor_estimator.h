@@ -1,5 +1,5 @@
-#ifndef B_FACTOR_ESTIMATOR_H
-#define B_FACTOR_ESTIMATOR_H
+#ifndef OLD_B_FACTOR_ESTIMATOR_H
+#define OLD_B_FACTOR_ESTIMATOR_H
 
 #include <src/image.h>
 #include <vector>
@@ -10,11 +10,11 @@ class LegacyObservationModel;
 class MicrographHandler;
 class ReferenceMap;
 
-class BFactorEstimator
+class OldBFactorEstimator
 {
 	public:
 		
-		BFactorEstimator();
+		OldBFactorEstimator();
 		
 		void read(IOParser& parser, int argc, char *argv[]);
 

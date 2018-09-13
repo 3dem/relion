@@ -1,7 +1,7 @@
 #include "src/jaz/noise_helper.h"
 #include "src/jaz/vtk_helper.h"
 #include "src/jaz/distribution_helper.h"
-#include "src/jaz/filter_helper.h"
+#include "src/jaz/img_proc/filter_helper.h"
 #include <omp.h>
 
 

@@ -9,7 +9,7 @@
 #include <src/complex.h>
 #include <src/metadata_table.h>
 #include <src/jaz/slice_helper.h>
-#include <src/jaz/filter_helper.h>
+#include <src/jaz/img_proc/filter_helper.h>
 #include <src/jaz/backprojection_helper.h>
 #include <src/jaz/volume_converter.h>
 

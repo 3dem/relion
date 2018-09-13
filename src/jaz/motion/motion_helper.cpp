@@ -1,7 +1,7 @@
 #include "motion_helper.h"
 
-#include <src/jaz/filter_helper.h>
-#include <src/jaz/image_op.h>
+#include <src/jaz/img_proc/filter_helper.h>
+#include <src/jaz/img_proc/image_op.h>
 #include <src/jaz/image_log.h>
 #include <src/jaz/interpolation.h>
 #include <src/jaz/optimization/nelder_mead.h>

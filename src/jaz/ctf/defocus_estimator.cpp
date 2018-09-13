@@ -9,7 +9,7 @@
 #include <src/jaz/reference_map.h>
 #include <src/jaz/fftw_helper.h>
 #include <src/jaz/image_log.h>
-#include <src/jaz/filter_helper.h>
+#include <src/jaz/img_proc/filter_helper.h>
 #include <src/jaz/gravis/t2Vector.h>
 
 using namespace gravis;
@@ -274,6 +274,7 @@ void DefocusEstimator::processMicrograph(
 	mdt.write(outRoot + "_defocus_fit.star");
 }
 
+// only called if no B-factors are being estimated:
 std::vector<MetaDataTable> DefocusEstimator::merge(const std::vector<MetaDataTable>& mdts)
 {
 	int gc = mdts.size();
@@ -299,9 +300,9 @@ std::vector<MetaDataTable> DefocusEstimator::merge(const std::vector<MetaDataTab
 
 		mdtOut.push_back(mdt);
 
-		if (exists(outRoot+"_defocus_fit.eps"))
+		if (exists(outRoot+"_ctf-refine_fit.eps"))
 		{
-			fn_eps.push_back(outRoot+"_defocus_fit.eps");
+			fn_eps.push_back(outRoot+"_ctf-refine_fit.eps");
 		}
 
 		if (verb > 0)
@@ -332,7 +333,7 @@ void DefocusEstimator::writeEPS(const MetaDataTable& mdt)
 
 	std::string outRoot = CtfRefiner::getOutputFilenameRoot(mdt, outPath);
 
-	FileName fn_eps = outRoot + "_defocus_fit.eps";
+	FileName fn_eps = outRoot + "_ctf-refine_fit.eps";
 
 	CPlot2D plot2D(fn_eps);
 	plot2D.SetXAxisSize(600);

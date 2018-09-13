@@ -13,7 +13,7 @@
 #include <src/jaz/image_log.h>
 #include <src/jaz/slice_helper.h>
 #include <src/jaz/spectral_helper.h>
-#include <src/jaz/filter_helper.h>
+#include <src/jaz/img_proc/filter_helper.h>
 #include <src/jaz/backprojection_helper.h>
 #include <src/jaz/volume_converter.h>
 #include <src/jaz/complex_io.h>
@@ -22,7 +22,7 @@
 #include <src/jaz/ctf_helper.h>
 #include <src/jaz/refinement_helper.h>
 #include <src/jaz/stack_helper.h>
-#include <src/jaz/image_op.h>
+#include <src/jaz/img_proc/image_op.h>
 #include <src/jaz/refinement_program.h>
 #include <src/jaz/parallel_ft.h>
 

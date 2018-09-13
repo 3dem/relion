@@ -22,14 +22,14 @@
 #include "tilt_helper.h"
 
 #include <src/jaz/image_log.h>
-#include <src/jaz/filter_helper.h>
+#include <src/jaz/img_proc/filter_helper.h>
 #include <src/jaz/complex_io.h>
 #include <src/jaz/fftw_helper.h>
 #include <src/jaz/resampling_helper.h>
 #include <src/jaz/ctf_helper.h>
 #include <src/jaz/refinement_helper.h>
 #include <src/jaz/stack_helper.h>
-#include <src/jaz/image_op.h>
+#include <src/jaz/img_proc/image_op.h>
 #include <src/jaz/parallel_ft.h>
 #include <src/jaz/legacy_obs_model.h>
 
@@ -68,6 +68,12 @@ void CtfRefiner::read(int argc, char **argv)
 		"Perform refinement of per-particle defocus values?");
 	
 	defocusEstimator.read(parser, argc, argv);
+	
+	int bfac_section = parser.addSection("B-factor options");
+	do_bfac_fit = parser.checkOption("--fit_bfacs", 
+		"Estimate CTF B-factors");
+	
+	bfactorEstimator.read(parser, argc, argv);
 
 	int tilt_section = parser.addSection("Beam-tilt options");
 	do_tilt_fit = parser.checkOption("--fit_beamtilt", 
@@ -186,6 +192,7 @@ void CtfRefiner::init()
 	tiltEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
 	aberrationEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
 	defocusEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
+	bfactorEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
 	magnificationEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
 
 	// check whether output files exist and skip the micrographs for which they do
@@ -195,6 +202,7 @@ void CtfRefiner::init()
 		{
 			bool is_done =
 				   (!do_defocus_fit || defocusEstimator.isFinished(allMdts[g]))
+				&& (!do_bfac_fit    || bfactorEstimator.isFinished(allMdts[g]))
 				&& (!do_tilt_fit    || tiltEstimator.isFinished(allMdts[g]))
 				&& (!do_aberr_fit   || aberrationEstimator.isFinished(allMdts[g]))
 				&& (!do_mag_fit     || magnificationEstimator.isFinished(allMdts[g]));
@@ -242,7 +250,7 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 
 	long nr_done = 0;
 	FileName prevdir = "";
-
+	
 	for (long g = g_start; g <= g_end; g++)
 	{
 		std::vector<Image<Complex> > obs;
@@ -266,7 +274,7 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 				predOppT;  // phase-demodulated (mag and aberr)
 
 		// use prediction from same half-set for defocus estimation (overfitting danger):
-		if (do_defocus_fit)
+		if (do_defocus_fit || do_bfac_fit)
 		{
 			predSameT = reference.predictAll(
 				unfinishedMdts[g], obsModel, ReferenceMap::Own, nr_omp_threads,
@@ -291,6 +299,13 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 		if (do_defocus_fit)
 		{
 			defocusEstimator.processMicrograph(g, unfinishedMdts[g], obs, predSameT);
+		}
+		
+		// B-factor fit is always performed after the defocus fit (so it can use the optimal CTFs)
+		// The prediction is *not* CTF-weighted, so an up-to-date CTF can be used internally
+		if (do_bfac_fit)
+		{
+			bfactorEstimator.processMicrograph(g, unfinishedMdts[g], obs, predSameT);
 		}
 		
 		if (do_tilt_fit)
@@ -329,7 +344,7 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 
 void CtfRefiner::run()
 {
-	if (do_defocus_fit || do_tilt_fit || do_aberr_fit || do_mag_fit)
+	if (do_defocus_fit || do_bfac_fit || do_tilt_fit || do_aberr_fit || do_mag_fit)
 	{
 		// The subsets will be used in openMPI parallelisation:
 		// instead of over g0->gc, they will be over smaller subsets
@@ -344,10 +359,17 @@ void CtfRefiner::finalise()
 	std::vector<MetaDataTable> mdtOut;
 	MetaDataTable optOut = obsModel.opticsMdt;
 
-	// Read back from disk the metadata-tables and eps-plots for the defocus fit
-	// Note: only micrographs for which the defoci were estimated (either now or before)
+	// Read back from disk the metadata-tables and eps-plots for the B-factor or defocus fit.
+	// If a B-factor fit has been performed, then this has been done after a potential defocus fit,
+	// so the B-factor fit files are more up-to-date.
+	// Note: only micrographs for which the defoci or B-factors were estimated (either now or before)
 	// will end up in mdtOut - micrographs excluded through min_MG and max_MG will not.
-	if (do_defocus_fit)
+	
+	if (do_bfac_fit)
+	{
+		mdtOut = bfactorEstimator.merge(allMdts);
+	}
+	else if (do_defocus_fit)
 	{
 		mdtOut = defocusEstimator.merge(allMdts);
 	}

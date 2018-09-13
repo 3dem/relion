@@ -73,7 +73,7 @@ class MotionRefiner
 		MotionParamEstimator motionParamEstimator;
 		MotionEstimator motionEstimator;
 		FrameRecombiner frameRecombiner;
-		BFactorEstimator bfactorEstimator;
+		OldBFactorEstimator bfactorEstimator;
 		
 		// required components
 		LegacyObservationModel obsModel;

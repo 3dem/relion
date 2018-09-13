@@ -2,7 +2,7 @@
 
 #include <src/jaz/slice_helper.h>
 #include <src/projector.h>
-#include <src/jaz/filter_helper.h>
+#include <src/jaz/img_proc/filter_helper.h>
 #include <src/jaz/optimization/nelder_mead.h>
 #include <src/jaz/gravis/t4Matrix.h>
 #include <src/jaz/d3x3/dsyev2.h>

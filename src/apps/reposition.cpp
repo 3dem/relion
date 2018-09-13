@@ -3,7 +3,7 @@
 #include <src/jaz/image_log.h>
 #include <src/jaz/stack_helper.h>
 #include <src/jaz/reference_map.h>
-#include <src/jaz/filter_helper.h>
+#include <src/jaz/img_proc/filter_helper.h>
 #include <src/jaz/interpolation.h>
 #include <src/jaz/new_ft.h>
 #include <src/ctf.h>

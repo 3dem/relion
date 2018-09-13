@@ -1,5 +1,5 @@
 #include <src/jaz/structure_tensor.h>
-#include <src/jaz/filter_helper.h>
+#include <src/jaz/img_proc/filter_helper.h>
 
 using namespace gravis;
 
