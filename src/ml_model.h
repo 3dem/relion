@@ -219,7 +219,7 @@ public:
 
 	// Normalize overlapping regions in multibody masks
 	bool norm_body_mask_overlap;
-	
+
 public:
 
 	// Constructor
@@ -398,10 +398,6 @@ public:
 	// Also set do_average_unaligned and do_generate_seeds flags
 	void readImages(FileName fn_ref, bool _is_3d_model, int _ori_size, Experiment &_mydata,
 			bool &do_average_unaligned, bool &do_generate_seeds, bool &refs_are_ctf_corrected, bool _do_sgd = false);
-
-	// The group numbering in mydata may be different from the one in this model.
-	// Readjust all group_ids in the Experiment based on their group names
-	void reassignGroupsForMovies(Experiment &mydata, std::string &movie_name);
 
 	RFLOAT getResolution(int ipix)	{ return (RFLOAT)ipix/(pixel_size * ori_size); }
 

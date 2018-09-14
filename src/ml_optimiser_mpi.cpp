@@ -60,7 +60,6 @@ void MlOptimiserMpi::read(int argc, char **argv)
     MlOptimiser::read(argc, argv, node->rank);
 
     int mpi_section = parser.addSection("MPI options");
-    only_do_unfinished_movies = parser.checkOption("--only_do_unfinished_movies", "When processing movies on a per-micrograph basis, ignore those movies for which the output STAR file already exists.");
     halt_all_slaves_except_this = textToInteger(parser.getOption("--halt_all_slaves_except", "For debugging: keep all slaves except this one waiting", "-1"));
     do_keep_debug_reconstruct_files  = parser.checkOption("--keep_debug_reconstruct_files", "For debugging: keep temporary data and weight files for debug-reconstructions.");
 
@@ -97,8 +96,7 @@ void MlOptimiserMpi::initialise()
 #endif
 
 	// Print information about MPI nodes:
-    if (!do_movies_in_batches)
-    	printMpiNodesMachineNames(*node, nr_threads);
+    printMpiNodesMachineNames(*node, nr_threads);
 #ifdef CUDA
     /************************************************************************/
 	//Setup GPU related resources
@@ -531,13 +529,12 @@ will still yield good performance and possibly a more stable execution. \n" << s
 
 	// Only master writes out initial mymodel (do not gather metadata yet)
 	int my_nr_subsets = (do_split_random_halves) ? 2 : 1;
-	if (node->isMaster() && !do_movies_in_batches)
+	if (node->isMaster())
 		MlOptimiser::write(DONT_WRITE_SAMPLING, DO_WRITE_DATA, DONT_WRITE_OPTIMISER, DONT_WRITE_MODEL, node->rank);
 	else if (node->rank <= my_nr_subsets)
 	{
 		//Only the first_slave of each subset writes model to disc
-		if (!do_movies_in_batches)
-			MlOptimiser::write(DO_WRITE_SAMPLING, DONT_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, node->rank);
+		MlOptimiser::write(DO_WRITE_SAMPLING, DONT_WRITE_DATA, DO_WRITE_OPTIMISER, DO_WRITE_MODEL, node->rank);
 
 		bool do_warn = false;
 		for (int igroup = 0; igroup< mymodel.nr_groups; igroup++)
@@ -556,22 +553,6 @@ will still yield good performance and possibly a more stable execution. \n" << s
 			std:: cout << "WARNING: You may want to consider joining some micrographs into larger groups to obtain more robust noise estimates. " << std::endl;
 			std:: cout << "         You can do so by using the same rlnMicrographName for particles from multiple different micrographs in the input STAR file. " << std::endl;
             std:: cout << "         It is then best to join micrographs with similar defocus values and similar apparent signal-to-noise ratios. " << std::endl;
-		}
-	}
-
-	// Do this after writing out the model, so that still the random halves are written in separate files.
-	if (do_realign_movies)
-	{
-		// Resolution seems to decrease again after 1 iteration. Therefore, just perform a single iteration until we figure out what exactly happens here...
-		has_converged = true;
-		// Then use join random halves
-		do_join_random_halves = true;
-
-		// If we skip the maximization step, then there is no use in using all data
-		if (!do_skip_maximization)
-		{
-			// Use all data out to Nyquist because resolution gains may be substantial
-			do_use_all_data = true;
 		}
 	}
 
@@ -611,15 +592,15 @@ void MlOptimiserMpi::initialiseWorkLoad()
     // Split the data into two random halves
 	if (do_split_random_halves)
 	{
-		mydata.divideOriginalParticlesInRandomHalves(random_seed, do_helical_refine);
+		mydata.divideParticlesInRandomHalves(random_seed, do_helical_refine);
 		my_halfset = node->myRandomSubset();
 	}
 
 	if (node->isMaster())
 	{
 		// The master never participates in any actual work
-		my_first_ori_particle_id = 0;
-		my_last_ori_particle_id = -1;
+		my_first_particle_id = 0;
+		my_last_particle_id = -1;
 	}
 	else
 	{
@@ -632,20 +613,20 @@ void MlOptimiserMpi::initialiseWorkLoad()
 	    	if (node->myRandomSubset() == 1)
 	    	{
 	    		// Divide first half of the images
-	    		divide_equally(mydata.numberOfOriginalParticles(1), nr_slaves_halfset1, node->rank / 2, my_first_ori_particle_id, my_last_ori_particle_id);
+	    		divide_equally(mydata.numberOfParticles(1), nr_slaves_halfset1, node->rank / 2, my_first_particle_id, my_last_particle_id);
 	    	}
 	    	else
 	    	{
 	    		// Divide second half of the images
-	    		divide_equally(mydata.numberOfOriginalParticles(2), nr_slaves_halfset2, node->rank / 2 - 1, my_first_ori_particle_id, my_last_ori_particle_id);
-	    		my_first_ori_particle_id += mydata.numberOfOriginalParticles(1);
-	    		my_last_ori_particle_id += mydata.numberOfOriginalParticles(1);
+	    		divide_equally(mydata.numberOfParticles(2), nr_slaves_halfset2, node->rank / 2 - 1, my_first_particle_id, my_last_particle_id);
+	    		my_first_particle_id += mydata.numberOfParticles(1);
+	    		my_last_particle_id += mydata.numberOfParticles(1);
 	    	}
 		}
 		else
 		{
 			int nr_slaves = (node->size - 1);
-			divide_equally(mydata.numberOfOriginalParticles(), nr_slaves, node->rank - 1, my_first_ori_particle_id, my_last_ori_particle_id);
+			divide_equally(mydata.numberOfParticles(), nr_slaves, node->rank - 1, my_first_particle_id, my_last_particle_id);
 		}
 
 	}
@@ -715,7 +696,7 @@ void MlOptimiserMpi::initialiseWorkLoad()
 	}
 //#define DEBUG_WORKLOAD
 #ifdef DEBUG_WORKLOAD
-	std::cerr << " node->rank= " << node->rank << " my_first_ori_particle_id= " << my_first_ori_particle_id << " my_last_ori_particle_id= " << my_last_ori_particle_id << std::endl;
+	std::cerr << " node->rank= " << node->rank << " my_first_particle_id= " << my_first_particle_id << " my_last_particle_id= " << my_last_particle_id << std::endl;
 #endif
 }
 
@@ -757,7 +738,7 @@ void MlOptimiserMpi::expectation()
 	int first_slave = 1;
 	// Use maximum of 100 particles for 3D and 10 particles for 2D estimations
 	int n_trials_acc = (mymodel.ref_dim==3 && mymodel.data_dim != 3) ? 100 : 10;
-	n_trials_acc = XMIPP_MIN(n_trials_acc, mydata.numberOfOriginalParticles());
+	n_trials_acc = XMIPP_MIN(n_trials_acc, mydata.numberOfParticles());
 	MPI_Status status;
 
 #ifdef MKLFFT
@@ -1065,7 +1046,7 @@ void MlOptimiserMpi::expectation()
 			catch (std::bad_alloc& ba)
 			{
 				CRITICAL(RAMERR);
-			}			
+			}
 
 			std::complex<XFLOAT> *pData = mdlClassComplex[iclass];
 
@@ -1095,7 +1076,7 @@ void MlOptimiserMpi::expectation()
 #ifdef TIMING
 		timer.toc(TIMING_EXP_4);
 #endif
-	long int my_nr_ori_particles = (subset_size > 0) ? subset_size : mydata.numberOfOriginalParticles();
+	long int my_nr_particles = (subset_size > 0) ? subset_size : mydata.numberOfParticles();
 	if (node->isMaster())
     {
 #ifdef TIMING
@@ -1104,14 +1085,14 @@ void MlOptimiserMpi::expectation()
         try
         {
 
-        	long int progress_bar_step_size = XMIPP_MAX(1, my_nr_ori_particles / 60);
+        	long int progress_bar_step_size = XMIPP_MAX(1, my_nr_particles / 60);
             long int prev_barstep = 0;
-        	long int my_first_ori_particle = 0.;
-        	long int my_last_ori_particle = my_nr_ori_particles - 1;
-        	long int my_first_ori_particle_halfset1 = 0;
-        	long int my_last_ori_particle_halfset1 = mydata.numberOfOriginalParticles(1) - 1;
-        	long int my_first_ori_particle_halfset2 = mydata.numberOfOriginalParticles(1);
-        	long int my_last_ori_particle_halfset2 = mydata.numberOfOriginalParticles() - 1;
+        	long int my_first_particle = 0.;
+        	long int my_last_particle = my_nr_particles - 1;
+        	long int my_first_particle_halfset1 = 0;
+        	long int my_last_particle_halfset1 = mydata.numberOfParticles(1) - 1;
+        	long int my_first_particle_halfset2 = mydata.numberOfParticles(1);
+        	long int my_last_particle_halfset2 = mydata.numberOfParticles() - 1;
         	if (verb > 0)
         	{
         		if (do_sgd)
@@ -1123,28 +1104,16 @@ void MlOptimiserMpi::expectation()
         			std::cout << " Expectation iteration " << iter;
         			if (!do_auto_refine)
         				std::cout << " of " << nr_iter;
-        			if (my_nr_ori_particles < mydata.numberOfOriginalParticles())
-        				std::cout << " (with " << my_nr_ori_particles << " particles)";
+        			if (my_nr_particles < mydata.numberOfParticles())
+        				std::cout << " (with " << my_nr_particles << " particles)";
         		}
         		std::cout << std::endl;
-        		init_progress_bar(my_nr_ori_particles);
+        		init_progress_bar(my_nr_particles);
         	}
 
 			// Master distributes all packages of SomeParticles
 			int nr_slaves_done = 0;
 			int random_halfset = 0;
-			long int nr_ori_particles_done, nr_ori_particles_done_halfset1, nr_ori_particles_done_halfset2;
-			if (do_split_random_halves)
-			{
-				nr_ori_particles_done_halfset1 = my_first_ori_particle_halfset1;
-				nr_ori_particles_done_halfset2 = my_first_ori_particle_halfset2 - mydata.numberOfOriginalParticles(1);
-				nr_ori_particles_done = nr_ori_particles_done_halfset1 + nr_ori_particles_done_halfset2;
-			}
-			else
-			{
-				nr_ori_particles_done = my_first_ori_particle; // 0 normally
-			}
-
 			long int nr_particles_todo, nr_particles_done = 0;
 			long int nr_particles_done_halfset1 = 0;
 			long int nr_particles_done_halfset2 = 0;
@@ -1176,39 +1145,39 @@ void MlOptimiserMpi::expectation()
 
 					// The master then updates the mydata.MDimg table
 					MlOptimiser::setMetaDataSubset(JOB_FIRST, JOB_LAST);
-					if (verb > 0 && nr_ori_particles_done - prev_barstep> progress_bar_step_size)
+					if (verb > 0 && nr_particles_done - prev_barstep> progress_bar_step_size)
 					{
-						prev_barstep = nr_ori_particles_done;
-						progress_bar(nr_ori_particles_done + JOB_NPAR);
+						prev_barstep = nr_particles_done;
+						progress_bar(nr_particles_done + JOB_NPAR);
 					}
 				}
 
-				// See which random_halfset this slave belongs to, and keep track of the number of ori_particles that have been processed already
+				// See which random_halfset this slave belongs to, and keep track of the number of particles that have been processed already
 				if (do_split_random_halves)
 				{
 					random_halfset = (this_slave % 2 == 1) ? 1 : 2;
 					if (random_halfset == 1)
 					{
 						my_nr_particles_done = nr_particles_done_halfset1;
-						nr_particles_todo = my_last_ori_particle_halfset1 - my_first_ori_particle_halfset1 + 1;
-						JOB_FIRST = nr_ori_particles_done_halfset1;
-						JOB_LAST  = XMIPP_MIN(my_last_ori_particle_halfset1, JOB_FIRST + nr_pool - 1);
+						nr_particles_todo = my_last_particle_halfset1 - my_first_particle_halfset1 + 1;
+						JOB_FIRST = nr_particles_done_halfset1;
+						JOB_LAST  = XMIPP_MIN(my_last_particle_halfset1, JOB_FIRST + nr_pool - 1);
 					}
 					else
 					{
 						my_nr_particles_done = nr_particles_done_halfset2;
-						nr_particles_todo = my_last_ori_particle_halfset2 - my_first_ori_particle_halfset2 + 1;
-						JOB_FIRST = mydata.numberOfOriginalParticles(1) + nr_ori_particles_done_halfset2;
-						JOB_LAST  = XMIPP_MIN(my_last_ori_particle_halfset2, JOB_FIRST + nr_pool - 1);
+						nr_particles_todo = my_last_particle_halfset2 - my_first_particle_halfset2 + 1;
+						JOB_FIRST = mydata.numberOfParticles(1) + nr_particles_done_halfset2;
+						JOB_LAST  = XMIPP_MIN(my_last_particle_halfset2, JOB_FIRST + nr_pool - 1);
 					}
 				}
 				else
 				{
 					random_halfset = 0;
 					my_nr_particles_done = nr_particles_done;
-					nr_particles_todo =  my_last_ori_particle - my_first_ori_particle + 1;
-					JOB_FIRST = nr_ori_particles_done;
-					JOB_LAST  = XMIPP_MIN(my_last_ori_particle, JOB_FIRST + nr_pool - 1);
+					nr_particles_todo =  my_last_particle - my_first_particle + 1;
+					JOB_FIRST = nr_particles_done;
+					JOB_LAST  = XMIPP_MIN(my_last_particle, JOB_FIRST + nr_pool - 1);
 				}
 
 				// Now send out a new job
@@ -1267,19 +1236,16 @@ void MlOptimiserMpi::expectation()
 				}
 
 				// Update the total number of particles that has been done already
-				nr_ori_particles_done += JOB_NPAR;
 				nr_particles_done += JOB_NPAR;
 				if (do_split_random_halves)
 				{
 					// Also update the number of particles that has been done for each subset
 					if (random_halfset == 1)
 					{
-						nr_ori_particles_done_halfset1 += JOB_NPAR;
 						nr_particles_done_halfset1 += JOB_NPAR;
 					}
 					else
 					{
-						nr_ori_particles_done_halfset2 += JOB_NPAR;
 						nr_particles_done_halfset2 += JOB_NPAR;
 					}
 				}
@@ -1583,7 +1549,7 @@ void MlOptimiserMpi::expectation()
 
 	if (verb > 0)
 	{
-		progress_bar(my_nr_ori_particles);
+		progress_bar(my_nr_particles);
 	}
 
 #ifdef TIMING
@@ -2997,7 +2963,7 @@ void MlOptimiserMpi::iterate()
 		updateSubsetSize(node->isMaster());
 
 		// Randomly take different subset of the particles each time we do a new "iteration" in SGD
-		mydata.randomiseOriginalParticlesOrder(random_seed+iter, do_split_random_halves,  subset_size < mydata.numberOfOriginalParticles() );
+		mydata.randomiseParticlesOrder(random_seed+iter, do_split_random_halves,  subset_size < mydata.numberOfParticles() );
 
 		// Nobody can start the next iteration until everyone has finished
 		MPI_Barrier(MPI_COMM_WORLD);
@@ -3300,79 +3266,3 @@ void MlOptimiserMpi::iterate()
 
 }
 
-void MlOptimiserMpi::processMoviesPerMicrograph(int argc, char **argv)
-{
-
-	if (!(do_movies_in_batches && fn_data_movie != "" && do_skip_maximization))
-		REPORT_ERROR("MlOptimiserMpi::processMoviesPerMicrograp BUG: you should not be here...");
-
-	// Print out the MPI nodes, as this is disabled inside the loop
-	printMpiNodesMachineNames(*node, nr_threads);
-
-	// Read in a list with all micrographs and basically run the entire relion_refine procedure separately for each micropgraph
-	// Only save some time reading in stuff...
-	MetaDataTable MDbatches;
-	MDbatches.read(fn_data_movie);
-	int nr_batches = MDbatches.numberOfObjects();
-
-	// Get original outname
-	FileName fn_out_ori = fn_out;//.beforeLastOf("/");
-	int imic = 0;
-	FileName fn_pre, fn_jobnr, fn_post, fn_olddir="";
-	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDbatches)
-	{
-		FileName fn_star;
-		MDbatches.getValue(EMDL_STARFILE_MOVIE_PARTICLES, fn_star);
-		fn_data_movie = fn_star;
-		decomposePipelineFileName(fn_star, fn_pre, fn_jobnr, fn_post);
-		fn_out = fn_out_ori + fn_post.without(".star");
-
-		// Set new output star file back into MDbatches, to be written out at the end
-		FileName fn_data = fn_out + "_data.star";
-		MDbatches.setValue(EMDL_STARFILE_MOVIE_PARTICLES, fn_data);
-
-		if (!(only_do_unfinished_movies && exists(fn_data)))
-		{
-
-			if (node->isMaster())
-				std::cout <<std::endl << " + Now processing movie batch " << imic+1 << " out of " << nr_batches <<std::endl <<std::endl;
-
-			// Make output directory structure like the input Micrographs
-			FileName fn_dir = fn_out.beforeLastOf("/");
-			if (fn_dir != fn_olddir)
-			{
-				std::string command = "mkdir -p " + fn_dir;
-				int res = std::system(command.c_str());
-				fn_olddir = fn_dir;
-			}
-
-			// be quiet
-			verb = node->isMaster();
-
-			// Initialise a lot of stuff
-			// (In theory, I could save time omitting part of this. In practice it's complicated...)
-			initialise();
-
-			// Run the final iteration for this batch
-			iterate();
-
-			// Read the start back in
-			// (I tried doing only partial re-starts, but these attempts all lead to (small) differences from processing without batches...)
-			MlOptimiser::read(argc, argv, node->rank);
-
-		}
-
-		imic++;
-	}
-
-	if (node->isMaster())
-	{
-		// At the end, the master also writes out a STAR file with the output STAR files of all micrographs
-		MDbatches.write(fn_out_ori + "_data.star");
-		std::cout << " Done processing all movie batches!" << std::endl;
-	}
-
-
-
-
-}

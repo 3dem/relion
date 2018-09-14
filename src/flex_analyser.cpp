@@ -121,7 +121,7 @@ void FlexAnalyser::initialise()
 	if (do_PCA_orient)
 	{
 
-		if (model.nr_bodies * 6 > data.numberOfOriginalParticles())
+		if (model.nr_bodies * 6 > data.numberOfParticles())
 			REPORT_ERROR("ERROR: there are not enough particles to perform PCA!");
 
 		if (do_generate_maps)
@@ -314,12 +314,12 @@ void FlexAnalyser::setup3DModels()
 
 void FlexAnalyser::loopThroughParticles(int rank, int size)
 {
-	long int total_nr_particles = data.numberOfOriginalParticles();
+	long int total_nr_particles = data.numberOfParticles();
 	// Allow parallelisation
-	long int my_first_ori_particle = 0, my_last_ori_particle = total_nr_particles-1;
+	long int my_first_particle = 0, my_last_particle = total_nr_particles-1;
 	if (size > 1)
-		divide_equally(total_nr_particles, size, rank, my_first_ori_particle, my_last_ori_particle);
-	long int todo_particles = my_last_ori_particle-my_first_ori_particle+1;
+		divide_equally(total_nr_particles, size, rank, my_first_particle, my_last_particle);
+	long int todo_particles = my_last_particle-my_first_particle+1;
 	long int update_interval = XMIPP_MAX(1, todo_particles / 60);
 	if (verb > 0)
 	{
@@ -332,13 +332,13 @@ void FlexAnalyser::loopThroughParticles(int rank, int size)
 
 	std::vector< std::vector<double> > inputdata;
 	long int imgno = 0;
-	for (long int ori_particle = my_first_ori_particle; ori_particle <= my_last_ori_particle; ori_particle++)
+	for (long int part_id = my_first_particle; part_id <= my_last_particle; part_id++)
 	{
 
 		std::vector<double> datarow;
 		if (do_subtract)
 		{
-			subtractOneParticle(ori_particle, imgno, rank, size);
+			subtractOneParticle(part_id, imgno, rank, size);
 
 			// Remove origin prior columns if present, as we have re-centered.
 			if (DFo.containsLabel(EMDL_ORIENT_ORIGIN_X_PRIOR)) {
@@ -350,7 +350,7 @@ void FlexAnalyser::loopThroughParticles(int rank, int size)
 		}
 		else if (do_3dmodels || do_PCA_orient)
 		{
-			make3DModelOneParticle(ori_particle, imgno, datarow, rank, size);
+			make3DModelOneParticle(part_id, imgno, datarow, rank, size);
 			if (do_PCA_orient)
 				inputdata.push_back(datarow);
 		}
@@ -459,13 +459,8 @@ void FlexAnalyser::loopThroughParticles(int rank, int size)
 
 }
 
-void FlexAnalyser::subtractOneParticle(long int ori_particle, long int imgno, int rank, int size)
+void FlexAnalyser::subtractOneParticle(long int part_id, long int imgno, int rank, int size)
 {
-	// don't allow multiple particles per ori_particle!!!!
-	if (data.ori_particles[ori_particle].particles_id.size() > 1)
-		REPORT_ERROR("BUG: no movie particles allowed here...");
-
-	long int part_id = data.ori_particles[ori_particle].particles_id[0];
 
 	Image<RFLOAT> img;
 	FileName fn_img;
@@ -697,13 +692,8 @@ void FlexAnalyser::subtractOneParticle(long int ori_particle, long int imgno, in
 	DFo.setValue(EMDL_IMAGE_NAME,fn_img);
 }
 
-void FlexAnalyser::make3DModelOneParticle(long int ori_particle, long int imgno, std::vector<double> &datarow, int rank, int size)
+void FlexAnalyser::make3DModelOneParticle(long int part_id, long int imgno, std::vector<double> &datarow, int rank, int size)
 {
-	// don't allow multiple particles per ori_particle!!!!
-	if (data.ori_particles[ori_particle].particles_id.size() > 1)
-		REPORT_ERROR("BUG: no movie particles allowed here...");
-
-	long int part_id = data.ori_particles[ori_particle].particles_id[0];
 
 	// Get the consensus class, orientational parameters and norm (if present)
 	Matrix2D<RFLOAT> Aori;
