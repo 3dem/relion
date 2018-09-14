@@ -116,7 +116,7 @@ void BFactorRefiner::processMicrograph(
 		for (int i = 0; i < valsPerPart[t].size(); i++)
 		{
 			int p = valsPerPart[t][i].first;
-			d2Vector BK =  valsPerPart[t][i].second;
+			d2Vector BK = valsPerPart[t][i].second;
 			
 			if (debug)
 			{
@@ -357,6 +357,9 @@ d2Vector BFactorRefiner::findBKRec2D(
         const double hrange = 0.5 * (B1 - B0);
         double Bnext0 = bestB - rangeItFract*hrange;
         double Bnext1 = bestB + rangeItFract*hrange;
+		
+		if (Bnext0 < B0) Bnext0 = B0;
+		if (Bnext1 < B1) Bnext1 = B1;
 
         return findBKRec2D(
 			obs, pred, weight, Bnext0, Bnext1, min_scale, 
