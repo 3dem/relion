@@ -39,7 +39,7 @@ public:
 	FileName fn_in, fn_out, fn_sym;
 	RFLOAT angpix, maxres, search_step;
 	int nr_uniform, padding_factor, interpolator, r_min_nn, boxsize, search_range;
-	bool keep_centre;
+	bool keep_centre, only_rot;
 	// I/O Parser
 	IOParser parser;
 
@@ -61,6 +61,7 @@ public:
 			REPORT_ERROR("The working box size (--box_size) must be an even number.");
 		keep_centre = parser.checkOption("--keep_centre", "Do not re-centre the input");
 		angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms)", "-1"));
+		only_rot = parser.checkOption("--only_rot", "Keep TILT and PSI fixed and search only ROT (rotation along the Z axis)");
 		nr_uniform = textToInteger(parser.getOption("--nr_uniform", "Randomly search this many orientations", "400"));
 		maxres = textToFloat(parser.getOption("--maxres", "Maximum resolution (in Angstrom) to consider in Fourier space (default Nyquist)", "-1"));
 		search_range = textToInteger(parser.getOption("--local_search_range", "Local search range (1 + 2 * this number)", "2"));
@@ -165,17 +166,24 @@ public:
 			std::cout << " Generating " << nr_uniform << " projections taken randomly from a uniform angular distribution." << std::endl;
 			MDang.clear();
 			randomize_random_generator();
+			tilt = 0;
+			psi = 0;
 			for (long int i = 0; i < nr_uniform; i++)
 			{
 				rot = rnd_unif() * 360.;
-				bool ok_tilt = false;
-				while (!ok_tilt)
+
+				if (!only_rot)
 				{
-					tilt = rnd_unif() * 180.;
-					if (rnd_unif() < fabs(SIND(tilt)))
-						ok_tilt = true;
+					bool ok_tilt = false;
+					while (!ok_tilt)
+					{
+						tilt = rnd_unif() * 180.;
+						if (rnd_unif() < fabs(SIND(tilt)))
+							ok_tilt = true;
+					}
+					psi = rnd_unif() * 360.;
 				}
-				psi = rnd_unif() * 360.;
+
 				MDang.addObject();
 				MDang.setValue(EMDL_ORIENT_ROT, rot);
 				MDang.setValue(EMDL_ORIENT_TILT, tilt);
