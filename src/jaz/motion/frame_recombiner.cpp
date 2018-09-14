@@ -231,12 +231,8 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
             mdtOut.setValue(EMDL_IMAGE_NAME, sts.str() + "@" + fn_root+"_shiny.mrcs", p);
 			
 			double mag;
-			mdtOut.getValue(EMDL_CTF_MAGNIFICATION, mag, p);
-			
-			std::cout << mag << " -> ";
-			mag *= angpix_ref / angpix_out;
-			std::cout << mag << "\n";
-			
+			mdtOut.getValue(EMDL_CTF_MAGNIFICATION, mag, p);			
+			mag *= angpix_ref / angpix_out;			
 			mdtOut.setValue(EMDL_CTF_MAGNIFICATION, mag, p);
         }
 
