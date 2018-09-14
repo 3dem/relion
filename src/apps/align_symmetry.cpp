@@ -226,8 +226,12 @@ public:
 		{
 			for (int j = -search_range; j <= search_range; j++)
 			{
+				if (only_rot && j != 0) continue;
+
 				for (int k = -search_range; k <= search_range; k++)
 				{
+					if (only_rot && k != 0) continue;
+
 					MDang.addObject();
 					MDang.setValue(EMDL_ORIENT_ROT, rot + i * search_step);
 					MDang.setValue(EMDL_ORIENT_TILT, tilt + j * search_step);
