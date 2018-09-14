@@ -35,7 +35,9 @@ class VtkHelper
 
         static void writeVTK_Complex(const MultidimArray<Complex>& img, std::string fn, bool binary = false);
         static void writeVTK_d3(MultidimArray<gravis::t3Vector<RFLOAT> >& img, std::string fn, bool binary = false);
-        static void writeTomoVTK(Image<RFLOAT>& img, std::string fn, bool binary = false);
+        static void writeTomoVTK(Image<RFLOAT>& img, std::string fn, bool binary = false, 
+								 double pixelSize = 1.0, 
+								 gravis::d3Vector origin = gravis::d3Vector(0.0,0.0,0.0));
 
         static void write(std::vector<Image<double> >& img, std::string fn,
                           double originX = 0.0, double originY = 0.0,

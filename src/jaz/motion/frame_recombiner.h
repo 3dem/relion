@@ -19,7 +19,7 @@ class FrameRecombiner
         void read(IOParser& parser, int argc, char *argv[]);
 
         void init(const std::vector<MetaDataTable>& allMdts,
-                  int verb, int s, int fc, 
+                  int verb, int s_ref, int fc, 
 				  double maxFreq, int nr_omp_threads,
                   std::string outPath, bool debug,
                   ObservationModel* obsModel,
@@ -42,16 +42,16 @@ class FrameRecombiner
 
             // read from cmd. line:
             bool doCombineFrames, bfac_diag;
-            int k0, k1, box_arg;
+            int k0, k1, box_arg, scale_arg;
             double k0a, k1a;
             std::string bfacFn;
 
             // set at init:
-            int s, sh, fc, s_box, sh_box;
+            int s_ref, sh_ref, fc, s_out, sh_out;
             int verb, nr_omp_threads;
             std::string outPath;
             bool debug;
-            double angpix, maxFreq;
+            double angpix_ref, angpix_out, maxFreq;
 
             ObservationModel* obsModel;
             MicrographHandler* micrographHandler;
