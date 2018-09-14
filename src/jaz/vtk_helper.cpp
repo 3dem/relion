@@ -292,7 +292,8 @@ void VtkHelper :: writeVTK_d3(MultidimArray<gravis::t3Vector<RFLOAT> >& img, std
     }
 }
 
-void VtkHelper :: writeTomoVTK(Image<RFLOAT>& img, std::string fn, bool binary)
+void VtkHelper :: writeTomoVTK(Image<RFLOAT>& img, std::string fn, bool binary, 
+							   double pixelSize, d3Vector origin)
 {
     const size_t size = (img.data.xdim * img.data.ydim * img.data.ndim);
     std::ofstream os(fn.c_str(), std::ios::binary);
@@ -317,8 +318,8 @@ void VtkHelper :: writeTomoVTK(Image<RFLOAT>& img, std::string fn, bool binary)
 
     os << "DATASET STRUCTURED_POINTS\n";
     os << "DIMENSIONS " << img.data.xdim << " " << img.data.ydim << " " << img.data.ndim << "\n";
-    os << "SPACING 1 1 1\n";
-    os << "ORIGIN 0 0 0\n";
+    os << "SPACING " << pixelSize << " " << pixelSize << " " << pixelSize << "\n";
+    os << "ORIGIN " << origin.x << " " << origin.y << " " << origin.z << "\n";
     os << "POINT_DATA " << size << "\n";
     os << "SCALARS volume_scalars " << sizetype << " 1\n";
     os << "LOOKUP_TABLE default\n";
