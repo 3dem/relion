@@ -62,10 +62,10 @@ class BFactorRefiner
 		bool ready;
 		
 		static gravis::d2Vector findSigmaKRec1D(
-				const std::vector<Complex>& obs,
-				const std::vector<Complex>& pred,
-                double sig0, double sig1,
-                int steps, int depth, double rangeItFract);
+				const std::vector<double>& t_rad, 
+				const std::vector<double>& s_rad, 
+				double B0, double B1, double min_scale,
+				int steps, int depth);
 		
 		static gravis::d2Vector findBKRec2D(
 				const Image<Complex>& obs,

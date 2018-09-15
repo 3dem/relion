@@ -81,7 +81,7 @@ void BFactorRefiner::processMicrograph(
 	stsg << g;
 
 	std::vector<std::vector<std::pair<int,d2Vector>>> valsPerPart(nr_omp_threads);
-	
+		
 	const double as = s * angpix;
 	const double min_B_px = min_B / (as*as);
 	const double max_B_px = max_B / (as*as);
@@ -98,13 +98,54 @@ void BFactorRefiner::processMicrograph(
 		Image<RFLOAT> ctfImg(sh,s);
 		ctf.getFftwImage(ctfImg(), s, s, angpix, false, false, false, false);
 		
+		
+			/*Image<Complex> fakeObs(sh,s);
+			
+			const double fakeB = p / (as*as);
+			
+			for (int y = 0; y < s;  y++)
+			for (int x = 0; x < sh; x++)
+			{
+				const double xx = x;
+				const double yy = (y + s/2) % s - s/2;
+				
+				const int ri = (int)(sqrt(xx*xx + yy*yy) + 0.5);
+				
+				fakeObs(y,x) = pred[p](y,x) * ctfImg(y,x) * exp(-fakeB*ri*ri/4.0);
+			}*/
+		
+		
 		Image<Complex> predCTF;
 		
 		ImageOp::multiply(ctfImg, pred[p], predCTF);
 		
-		d2Vector sigmaK = BFactorRefiner::findBKRec2D(
-			obs[p], predCTF, freqWeight, min_B_px, max_B_px, min_scale, 20, 5);
+		std::vector<double> t_rad(sh, 0.0), s_rad(sh, 0.0);
 		
+		for (int y = 0; y < s;  y++)
+		for (int x = 0; x < sh; x++)
+		{
+			const double xx = x;
+			const double yy = (y + s/2) % s - s/2;
+			
+			const int ri = (int)(sqrt(xx*xx + yy*yy) + 0.5);
+			
+			if (ri < sh)
+			{
+				const Complex zobs = obs[p](y,x);
+				const Complex zpred = ctfImg(y,x) * pred[p](y,x);
+				const double wp = freqWeight(y,x);
+				
+				t_rad[ri] += wp * (zpred.real * zpred.real + zpred.imag * zpred.imag);
+				s_rad[ri] += wp * (zpred.real * zobs.real + zpred.imag * zobs.imag);
+			}
+		}
+		
+		// slower and surprisingly inaccurate:
+		/*d2Vector sigmaK = BFactorRefiner::findBKRec2D(
+			fakeObs, predCTF, freqWeight, min_B_px, max_B_px, min_scale, 20, 5);*/
+		
+		d2Vector sigmaK = BFactorRefiner::findSigmaKRec1D(
+					t_rad, s_rad, min_B_px, max_B_px, min_scale, 20, 5);
 		
 		int threadnum = omp_get_thread_num();
 		
@@ -123,7 +164,7 @@ void BFactorRefiner::processMicrograph(
 				std::cout << p << ": " << as*as*BK[0] << " \t " << BK[1] << "\n";
 			}
 			
-			mdt.setValue(EMDL_CTF_BFACTOR, as*as*BK[0], p);
+			mdt.setValue(EMDL_CTF_BFACTOR, as*as*BK[0] - min_B, p);
 			mdt.setValue(EMDL_CTF_SCALEFACTOR, BK[1], p);
 		}
 	}
@@ -266,11 +307,89 @@ bool BFactorRefiner::isFinished(const MetaDataTable &mdt)
 }
 
 d2Vector BFactorRefiner::findSigmaKRec1D(
-		const std::vector<Complex> &obs, 
-		const std::vector<Complex> &pred, 
-		double sig0, double sig1, 
-		int steps, int depth, double rangeItFract)
+		const std::vector<double>& t_rad, 
+		const std::vector<double>& s_rad, 
+		double B0, double B1, double min_scale,
+		int steps, int depth)
 {
+	double minErr = std::numeric_limits<double>::max();
+    double bestB = B0;
+    double bestA = 1.0;
+	
+	const double eps = 1e-10;
+
+	const int sh = t_rad.size();
+	
+	std::vector<double> sigVals(sh);
+
+    for (int st = 0; st < steps; st++)
+    {
+        const double B = B0 + st*(B1 - B0)/(steps-1);
+		
+		for (int r = 0; r < sh; r++)
+		{
+			sigVals[r] = exp(-B * r * r / 4.0);
+		}
+
+        // find optimal scale-factor for hypothetical B-factor
+        double num = 0.0, denom = 0.0;
+
+		for (int r = 0; r < sh; r++)
+		{
+			const double tr = t_rad[r];
+			
+			if (tr < eps) continue;
+			
+			const double sr = s_rad[r];
+			const double br = sigVals[r];
+			
+			num   += sr * br;
+			denom += tr * br * br;
+		}
+		
+        double a = denom > eps? num / denom : num / eps;
+		
+		if (a < min_scale) a = min_scale;
+
+        double sum = 0.0;
+
+		for (int r = 0; r < sh; r++)
+		{
+			const double tr = t_rad[r];
+			
+			if (tr < eps) continue;
+			
+			const double sr = s_rad[r];
+			const double br = sigVals[r];
+			
+			const double er = a * br - sr / tr;
+			
+			sum += tr * er * er;
+		}
+
+        if (sum < minErr)
+        {
+            minErr = sum;
+            bestB = B;
+            bestA = a;
+        }
+    }
+
+    if (depth > 0)
+    {
+        const double hrange = (B1 - B0) / (steps - 1.0);
+        double Bnext0 = bestB - hrange;
+        double Bnext1 = bestB + hrange;
+		
+		if (Bnext0 < B0) Bnext0 = B0;
+		if (Bnext1 > B1) Bnext1 = B1;
+
+        return findSigmaKRec1D(
+			t_rad, s_rad, Bnext0, Bnext1, min_scale, 
+			steps, depth - 1);
+    }
+
+    return d2Vector(bestB, bestA);
 	
 }
 
@@ -359,7 +478,7 @@ d2Vector BFactorRefiner::findBKRec2D(
         double Bnext1 = bestB + hrange;
 		
 		if (Bnext0 < B0) Bnext0 = B0;
-		if (Bnext1 < B1) Bnext1 = B1;
+		if (Bnext1 > B1) Bnext1 = B1;
 
         return findBKRec2D(
 			obs, pred, weight, Bnext0, Bnext1, min_scale, 
