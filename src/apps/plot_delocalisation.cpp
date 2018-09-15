@@ -37,7 +37,7 @@ int main(int argc, char *argv[])
 		opticsFn = parser.getOption("--io", "Input optics *.star file");
 		rad = textToDouble(parser.getOption("--rad", "Particle radius [Å]"));
 		maxFreqAng = textToDouble(parser.getOption("--max_freq", "Max. image frequency [Å] (default is Nyquist)", "-1"));
-		minFreqAng = textToDouble(parser.getOption("--min_freq", "Min. image frequency [Å]", "-1"));
+		minFreqAng = textToDouble(parser.getOption("--min_freq", "Min. image frequency [Å]", "0"));
 		name = parser.getOption("--name", "Name of dataset (for the plot)", "");
 		allParts = parser.checkOption("--all_part", "Consider all particles, instead of only the first one in each micrograph");
 		s = textToInteger(parser.getOption("--s", "Square size for estimation", "256"));
@@ -157,9 +157,22 @@ int main(int argc, char *argv[])
 	std::stringstream pssts;
 	pssts << angpix;
 	
-	std::stringstream frqsts;
-	frqsts << maxFreqAng;
-	title = title + " at " + pssts.str() + " A/px (up to " + frqsts.str() + " A)";
+	std::stringstream frq0sts;
+	frq0sts << minFreqAng;
+	
+	std::stringstream frq1sts;
+	frq1sts << maxFreqAng;
+	
+	title = title + " at " + pssts.str() + " A/px";
+	
+	if (minFreqAng <= 0)
+	{
+		title = title + " (up to " + frq1sts.str() + " A)";
+	}
+	else
+	{
+		title = title + " (" + frq0sts.str() + " A - " + frq1sts.str() + " A)";
+	}
 	
 	plot2D.SetTitle(title);
 	plot2D.SetDrawLegend(true);
