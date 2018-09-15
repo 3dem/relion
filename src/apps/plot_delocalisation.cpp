@@ -22,7 +22,7 @@ int main(int argc, char *argv[])
 {
     std::string starFn, opticsFn, outPath, name;
     int threads, s;
-	double rad, maxFreqAng;
+	double rad, maxFreqAng, minFreqAng;
 	bool allParts;
 
     IOParser parser;
@@ -36,7 +36,8 @@ int main(int argc, char *argv[])
 		starFn = parser.getOption("--i", "Input particle *.star file");
 		opticsFn = parser.getOption("--io", "Input optics *.star file");
 		rad = textToDouble(parser.getOption("--rad", "Particle radius [Å]"));
-		maxFreqAng = textToDouble(parser.getOption("--freq", "Max. image frequency [Å] (default is Nyquist)", "-1"));
+		maxFreqAng = textToDouble(parser.getOption("--max_freq", "Max. image frequency [Å] (default is Nyquist)", "-1"));
+		minFreqAng = textToDouble(parser.getOption("--min_freq", "Min. image frequency [Å]", "-1"));
 		name = parser.getOption("--name", "Name of dataset (for the plot)", "");
 		allParts = parser.checkOption("--all_part", "Consider all particles, instead of only the first one in each micrograph");
 		s = textToInteger(parser.getOption("--s", "Square size for estimation", "256"));
@@ -65,51 +66,60 @@ int main(int argc, char *argv[])
 	
 	if (maxFreqAng < 0) maxFreqAng = 2*angpix;
 	
-	const double r2crit = 1.0 / (maxFreqAng * maxFreqAng);
+	const double r2max = 1.0 / (maxFreqAng * maxFreqAng);
+	const double r2min = minFreqAng > 0? 1.0 / (minFreqAng * minFreqAng) : -1;
 			
 	const int radPx = (int)(rad / angpix + 0.5);
 	
 	const int maxBin = 5*s;
 	
+	const double as = s * angpix;
+		
 	std::vector<double> histCent(maxBin, 0.0);
 	std::vector<double> histWorst(maxBin, 0.0);
 	
 	for (int m = 0; m < allMdts.size(); m++)
 	{
-		CTF ctf;
-		ctf.readByGroup(allMdts[m], &obsModel, 0);
+		const int pc = allMdts[m].size();
 		
-		const double as = s * angpix;
+		const double mgContrib = allParts? 1.0 : pc;
+		const int p_max = allParts? pc : 1;
 		
-		for (int y = 0; y < s;  y++)
-		for (int x = 0; x < sh; x++)
+		for (int p = 0; p < p_max; p++)
 		{
-			double xx = x/as;
-			double yy = y < sh? y/as : (y - s)/as;
+			CTF ctf;
+			ctf.readByGroup(allMdts[m], &obsModel, p);
 			
-			const double r2 = xx*xx + yy*yy;
-			
-			if (r2 > r2crit) continue;
-			
-			
-			d2Vector delocCent = (1.0 / (2 * angpix * PI)) * ctf.getGammaGrad(xx,yy);
-			
-			double delocCentVal = delocCent.normLInf();			
-			
-			int sic = (int)(delocCentVal + 0.5);			
-			if (sic >= maxBin) sic = maxBin - 1;
-			
-			histCent[sic]++;
-			
-			
-			d2Vector delocWorst(std::abs(delocCent.x) + radPx, std::abs(delocCent.y) + radPx);
-			
-			double delocWorstVal = delocWorst.normLInf();
-			
-			int siw = (int)(delocWorstVal + 0.5);			
-			if (siw >= maxBin) siw = maxBin - 1;
-			
-			histWorst[siw]++;
+			for (int y = 0; y < s;  y++)
+			for (int x = 0; x < sh; x++)
+			{
+				double xx = x/as;
+				double yy = y < sh? y/as : (y - s)/as;
+				
+				const double r2 = xx*xx + yy*yy;
+				
+				if (r2 > r2max || r2 < r2min) continue;
+				
+				
+				d2Vector delocCent = (1.0 / (2 * angpix * PI)) * ctf.getGammaGrad(xx,yy);
+				
+				double delocCentVal = delocCent.normLInf();			
+				
+				int sic = (int)(delocCentVal + 0.5);			
+				if (sic >= maxBin) sic = maxBin - 1;
+				
+				histCent[sic] += mgContrib;
+				
+				
+				d2Vector delocWorst(std::abs(delocCent.x) + radPx, std::abs(delocCent.y) + radPx);
+				
+				double delocWorstVal = delocWorst.normLInf();
+				
+				int siw = (int)(delocWorstVal + 0.5);			
+				if (siw >= maxBin) siw = maxBin - 1;
+				
+				histWorst[siw] += mgContrib;
+			}
 		}
 	}
 	
