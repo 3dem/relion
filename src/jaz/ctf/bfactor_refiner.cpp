@@ -170,60 +170,11 @@ void BFactorRefiner::processMicrograph(
 	}
 
 	// Output a diagnostic Postscript file
-	//writeEPS(mdt);
+	writeEPS(mdt);
 
 	// Now write out STAR file with optimised values for this micrograph
 	std::string outRoot = CtfRefiner::getOutputFilenameRoot(mdt, outPath);
 	mdt.write(outRoot + "_bfactor_fit.star");
-}
-
-std::vector<MetaDataTable> BFactorRefiner::merge(const std::vector<MetaDataTable>& mdts)
-{
-	int gc = mdts.size();
-	int barstep;
-
-	if (verb > 0)
-	{
-		std::cout << " + Combining data for all micrographs " << std::endl;
-		init_progress_bar(gc);
-		barstep = 1;
-	}
-
-	std::vector<MetaDataTable> mdtOut;
-	std::vector<FileName> fn_eps;
-
-	for (long g = 0; g < gc; g++)
-	{
-		std::string outRoot = CtfRefiner::getOutputFilenameRoot(mdts[g], outPath);
-
-		// Read in STAR file with B-factor fit data
-		MetaDataTable mdt;
-		mdt.read(outRoot+"_bfactor_fit.star");
-
-		mdtOut.push_back(mdt);
-
-		if (exists(outRoot+"_ctf-refine_fit.eps"))
-		{
-			fn_eps.push_back(outRoot+"_ctf-refine_fit.eps");
-		}
-
-		if (verb > 0)
-		{
-			progress_bar(g);
-		}
-	}
-
-	if (verb > 0)
-	{
-		progress_bar(gc);
-	}
-
-	if (fn_eps.size() > 0)
-	{
-		joinMultipleEPSIntoSinglePDF(outPath + "logfile.pdf", fn_eps);
-	}
-	
-	return mdtOut;
 }
 
 void BFactorRefiner::writeEPS(const MetaDataTable& mdt)
@@ -233,9 +184,9 @@ void BFactorRefiner::writeEPS(const MetaDataTable& mdt)
 		REPORT_ERROR("ERROR: BFactorRefiner::writeEPS: BFactorRefiner not initialized.");
 	}
 
-	/*std::string outRoot = CtfRefiner::getOutputFilenameRoot(mdt, outPath);
+	std::string outRoot = CtfRefiner::getOutputFilenameRoot(mdt, outPath);
 
-	FileName fn_eps = outRoot + "_defocus_fit.eps";
+	FileName fn_eps = outRoot + "_bfactor_fit.eps";
 
 	CPlot2D plot2D(fn_eps);
 	plot2D.SetXAxisSize(600);
@@ -243,42 +194,27 @@ void BFactorRefiner::writeEPS(const MetaDataTable& mdt)
 	plot2D.SetDrawLegend(false);
 	plot2D.SetFlipY(true);
 
-	RFLOAT min_defocus = 99.e10;
-	RFLOAT max_defocus = -99.e10;
-
 	const int pc = mdt.numberOfObjects();
 
 	for (int p = 0; p < pc; p++)
 	{
-		RFLOAT defU, defV;
-		mdt.getValue(EMDL_CTF_DEFOCUSU, defU, p);
-		mdt.getValue(EMDL_CTF_DEFOCUSV, defV, p);
-		defU = (defU + defV) / 2.;
-
-		min_defocus = XMIPP_MIN(min_defocus, defU);
-		max_defocus = XMIPP_MAX(max_defocus, defU);
-	}
-
-	for (int p = 0; p < pc; p++)
-	{
-		RFLOAT defU, defV;
+		RFLOAT B, a;
 		RFLOAT xcoor, ycoor;
 
 		mdt.getValue(EMDL_IMAGE_COORD_X, xcoor, p);
 		mdt.getValue(EMDL_IMAGE_COORD_Y, ycoor, p);
-		mdt.getValue(EMDL_CTF_DEFOCUSU, defU, p);
-		mdt.getValue(EMDL_CTF_DEFOCUSV, defV, p);
-
-		defU = (defU + defV) / 2.;
-
-		RFLOAT val  = (defU - min_defocus) / (max_defocus - min_defocus);
+		mdt.getValue(EMDL_CTF_BFACTOR, B, p);
+		mdt.getValue(EMDL_CTF_SCALEFACTOR, a, p);
+		
+		RFLOAT aval = 1.0 - a/2.0;
+		RFLOAT bval = 1.01 - (B - min_B) / (max_B - min_B);
 
 		CDataSet dataSet;
 
 		dataSet.SetDrawMarker(true);
 		dataSet.SetDrawLine(false);
-		dataSet.SetMarkerSize(10);
-		dataSet.SetDatasetColor(val, 0.8 * val, 1.0 - val);
+		dataSet.SetMarkerSize(50*bval);
+		dataSet.SetDatasetColor(aval, aval, aval);
 
 		CDataPoint point(xcoor, ycoor);
 
@@ -287,11 +223,10 @@ void BFactorRefiner::writeEPS(const MetaDataTable& mdt)
 		plot2D.AddDataSet(dataSet);
 	}
 
-	char title[256];
-	snprintf(title, 255, "Defocus range from blue to orange: %.0f A", max_defocus - min_defocus);
+	std::string title = "B-factor (size) and CTF-scale (intensity)";
 	plot2D.SetXAxisTitle(title);
 
-	plot2D.OutputPostScriptPlot(fn_eps);*/
+	plot2D.OutputPostScriptPlot(fn_eps);
 }
 
 bool BFactorRefiner::isFinished(const MetaDataTable &mdt)

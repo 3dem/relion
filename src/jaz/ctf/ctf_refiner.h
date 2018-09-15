@@ -89,6 +89,9 @@ class CtfRefiner
 			
 		// Fit CTF parameters for all particles on a subset of the micrographs micrograph
 		void processSubsetMicrographs(long g_start, long g_end);
+		
+		// Combine all .stars and .eps files
+		std::vector<MetaDataTable> merge(const std::vector<MetaDataTable>& mdts);
 };
 
 

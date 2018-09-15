@@ -274,56 +274,6 @@ void DefocusEstimator::processMicrograph(
 	mdt.write(outRoot + "_defocus_fit.star");
 }
 
-// only called if no B-factors are being estimated:
-std::vector<MetaDataTable> DefocusEstimator::merge(const std::vector<MetaDataTable>& mdts)
-{
-	int gc = mdts.size();
-	int barstep;
-
-	if (verb > 0)
-	{
-		std::cout << " + Combining data for all micrographs " << std::endl;
-		init_progress_bar(gc);
-		barstep = 1;
-	}
-
-	std::vector<MetaDataTable> mdtOut;
-	std::vector<FileName> fn_eps;
-
-	for (long g = 0; g < gc; g++)
-	{
-		std::string outRoot = CtfRefiner::getOutputFilenameRoot(mdts[g], outPath);
-
-		// Read in STAR file with defocus fit data
-		MetaDataTable mdt;
-		mdt.read(outRoot+"_defocus_fit.star");
-
-		mdtOut.push_back(mdt);
-
-		if (exists(outRoot+"_ctf-refine_fit.eps"))
-		{
-			fn_eps.push_back(outRoot+"_ctf-refine_fit.eps");
-		}
-
-		if (verb > 0)
-		{
-			progress_bar(g);
-		}
-	}
-
-	if (verb > 0)
-	{
-		progress_bar(gc);
-	}
-
-	if (fn_eps.size() > 0)
-	{
-		joinMultipleEPSIntoSinglePDF(outPath + "logfile.pdf", fn_eps);
-	}
-	
-	return mdtOut;
-}
-
 void DefocusEstimator::writeEPS(const MetaDataTable& mdt)
 {
 	if (!ready)

@@ -360,18 +360,12 @@ void CtfRefiner::finalise()
 	MetaDataTable optOut = obsModel.opticsMdt;
 
 	// Read back from disk the metadata-tables and eps-plots for the B-factor or defocus fit.
-	// If a B-factor fit has been performed, then this has been done after a potential defocus fit,
-	// so the B-factor fit files are more up-to-date.
 	// Note: only micrographs for which the defoci or B-factors were estimated (either now or before)
 	// will end up in mdtOut - micrographs excluded through min_MG and max_MG will not.
 	
-	if (do_bfac_fit)
+	if (do_bfac_fit || do_defocus_fit)
 	{
-		mdtOut = bfactorEstimator.merge(allMdts);
-	}
-	else if (do_defocus_fit)
-	{
-		mdtOut = defocusEstimator.merge(allMdts);
+		mdtOut = merge(allMdts);
 	}
 	else
 	{
@@ -406,6 +400,71 @@ void CtfRefiner::finalise()
 	{
 		std::cout << " + Done! Written out : " << outPath << "particles_ctf_refine.star" << std::endl;
 	}
+}
+
+std::vector<MetaDataTable> CtfRefiner::merge(const std::vector<MetaDataTable>& mdts)
+{
+	int gc = mdts.size();
+	int barstep;
+
+	if (verb > 0)
+	{
+		std::cout << " + Combining data for all micrographs " << std::endl;
+		init_progress_bar(gc);
+		barstep = 1;
+	}
+
+	std::vector<MetaDataTable> mdtOut;
+	std::vector<FileName> fn_eps;
+	
+	for (long g = 0; g < gc; g++)
+	{
+		std::string outRoot = getOutputFilenameRoot(mdts[g], outPath);
+		
+		MetaDataTable mdt;
+		
+		// If a B-factor fit has been performed, then this has been done after a potential defocus fit,
+		// so the B-factor fit files are always more up-to-date.
+		if (do_bfac_fit)
+		{
+			// Read in STAR file with B-factor fit data
+			mdt.read(outRoot+"_bfactor_fit.star");
+		}
+		else if (do_defocus_fit)
+		{
+			// Read in STAR file with defocus fit data
+			mdt.read(outRoot+"_defocus_fit.star");
+		}
+
+		mdtOut.push_back(mdt);
+
+		if (exists(outRoot+"_defocus_fit.eps"))
+		{
+			fn_eps.push_back(outRoot+"_defocus_fit.eps");
+		}
+		
+		if (exists(outRoot+"_bfactor_fit.eps"))
+		{
+			fn_eps.push_back(outRoot+"_bfactor_fit.eps");
+		}
+
+		if (verb > 0)
+		{
+			progress_bar(g);
+		}
+	}
+
+	if (verb > 0)
+	{
+		progress_bar(gc);
+	}
+
+	if (fn_eps.size() > 0)
+	{
+		joinMultipleEPSIntoSinglePDF(outPath + "logfile.pdf", fn_eps);
+	}
+	
+	return mdtOut;
 }
 
 int CtfRefiner::getVerbosityLevel()
