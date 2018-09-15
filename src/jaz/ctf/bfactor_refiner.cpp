@@ -103,7 +103,7 @@ void BFactorRefiner::processMicrograph(
 		ImageOp::multiply(ctfImg, pred[p], predCTF);
 		
 		d2Vector sigmaK = BFactorRefiner::findBKRec2D(
-			obs[p], predCTF, freqWeight, min_B_px, max_B_px, min_scale, 20, 5, 0.1);
+			obs[p], predCTF, freqWeight, min_B_px, max_B_px, min_scale, 20, 5);
 		
 		
 		int threadnum = omp_get_thread_num();
@@ -279,7 +279,7 @@ d2Vector BFactorRefiner::findBKRec2D(
 		const Image<Complex> &pred, 
 		const Image<RFLOAT> &weight, 
 		double B0, double B1, double min_scale,
-		int steps, int depth, double rangeItFract)
+		int steps, int depth)
 {
 	double minErr = std::numeric_limits<double>::max();
     double bestB = B0;
@@ -354,16 +354,16 @@ d2Vector BFactorRefiner::findBKRec2D(
 
     if (depth > 0)
     {
-        const double hrange = 0.5 * (B1 - B0);
-        double Bnext0 = bestB - rangeItFract*hrange;
-        double Bnext1 = bestB + rangeItFract*hrange;
+        const double hrange = (B1 - B0) / (steps - 1.0);
+        double Bnext0 = bestB - hrange;
+        double Bnext1 = bestB + hrange;
 		
 		if (Bnext0 < B0) Bnext0 = B0;
 		if (Bnext1 < B1) Bnext1 = B1;
 
         return findBKRec2D(
 			obs, pred, weight, Bnext0, Bnext1, min_scale, 
-			steps, depth - 1, rangeItFract);
+			steps, depth - 1);
     }
 
     return d2Vector(bestB, bestA);

@@ -72,7 +72,7 @@ class BFactorRefiner
 				const Image<Complex>& pred,
 				const Image<RFLOAT>& weight,
                 double B0, double B1, double min_scale,
-                int steps, int depth, double rangeItFract);
+                int steps, int depth);
 };
 
 #endif
