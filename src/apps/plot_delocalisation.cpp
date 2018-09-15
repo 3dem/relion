@@ -66,8 +66,6 @@ int main(int argc, char *argv[])
 	if (maxFreqAng < 0) maxFreqAng = 2*angpix;
 	
 	const double r2crit = 1.0 / (maxFreqAng * maxFreqAng);
-	
-	std::cout << "r2crit = " << r2crit << "\n";
 			
 	const int radPx = (int)(rad / angpix + 0.5);
 	
@@ -94,7 +92,7 @@ int main(int argc, char *argv[])
 			if (r2 > r2crit) continue;
 			
 			
-			d2Vector delocCent = (sh / (as * PI)) * ctf.getGammaGrad(xx,yy);
+			d2Vector delocCent = (1.0 / (2 * angpix * PI)) * ctf.getGammaGrad(xx,yy);
 			
 			double delocCentVal = delocCent.normLInf();			
 			
@@ -175,13 +173,13 @@ int main(int argc, char *argv[])
 	{
 		if (i < maxBin && i <= first)
 		{
-			CDataPoint point(i, histCentCumul[i]/histCentCumul[0]);
+			CDataPoint point(2*i, histCentCumul[i]/histCentCumul[0]);
 			center.AddDataPoint(point);
 		}
 		
 		if (i < maxBin && i <= first)
 		{
-			CDataPoint point(i, histWorstCumul[i]/histWorstCumul[0]);
+			CDataPoint point(2*i, histWorstCumul[i]/histWorstCumul[0]);
 			edge.AddDataPoint(point);
 		}
 	}
