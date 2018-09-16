@@ -24,20 +24,20 @@ BFactorRefiner::BFactorRefiner()
 
 void BFactorRefiner::read(IOParser &parser, int argc, char *argv[])
 {
-	/*perMicrograph = parser.checkOption("--bfac_per_mg", 
-		"Estimate B-factors per micrograph, instead of per particle");*/
+	perMicrograph = parser.checkOption("--bfac_per_mg", 
+		"Estimate B-factors per micrograph, instead of per particle");
 	
 	min_B = textToDouble(parser.getOption("--bfac_min_B",
-										  "Minimal allowed B-factor", "-20"));
+		"Minimal allowed B-factor", "-20"));
 	
 	max_B = textToDouble(parser.getOption("--bfac_max_B",
-										  "Maximal allowed B-factor", "200"));
+		"Maximal allowed B-factor", "200"));
 	
 	min_scale = textToDouble(parser.getOption("--bfac_min_scale",
-											  "Minimal allowed scale-factor (essential for outlier rejection)", "0.2"));
+		"Minimal allowed scale-factor (essential for outlier rejection)", "0.2"));
 	
 	kmin = textToDouble(parser.getOption("--kmin_bfac",
-										 "Inner freq. threshold for B-factor estimation [Angst]", "30.0"));
+		"Inner freq. threshold for B-factor estimation [Angst]", "20.0"));
 }
 
 void BFactorRefiner::init(
@@ -86,22 +86,31 @@ void BFactorRefiner::processMicrograph(
 	const double min_B_px = min_B / (as*as);
 	const double max_B_px = max_B / (as*as);
 	
-	// Parallel loop over all particles in this micrograph
-#pragma omp parallel for num_threads(nr_omp_threads)
-	for (long p = 0; p < pc; p++)
+	// search recursively numIters times, scanning the range at stepsPerIter points each time:
+	const int stepsPerIter = 20;
+	const int numIters = 5;
+	
+	
+	if (perMicrograph)
 	{
-		std::stringstream stsp;
-		stsp << p;
+		std::vector<std::vector<double>>  t_rad(nr_omp_threads), s_rad(nr_omp_threads);
 		
-		CTF ctf;
-		ctf.readByGroup(mdt, obsModel, p);
-		Image<RFLOAT> ctfImg(sh,s);
-		ctf.getFftwImage(ctfImg(), s, s, angpix, false, false, false, false);
+		for (int t = 0; t < nr_omp_threads; t++)
+		{
+			t_rad[t] = std::vector<double>(sh, 0.0);
+			s_rad[t] = std::vector<double>(sh, 0.0);
+		}
 		
-		
-		/*Image<Complex> fakeObs(sh,s);
-		  
-			const double fakeB = p / (as*as);
+		// Parallel loop over all particles in this micrograph
+		#pragma omp parallel for num_threads(nr_omp_threads)
+		for (long p = 0; p < pc; p++)
+		{
+			int t = omp_get_thread_num();
+			
+			CTF ctf;
+			ctf.readByGroup(mdt, obsModel, p);
+			Image<RFLOAT> ctfImg(sh,s);
+			ctf.getFftwImage(ctfImg(), s, s, angpix, false, false, false, false);
 			
 			for (int y = 0; y < s;  y++)
 			for (int x = 0; x < sh; x++)
@@ -111,77 +120,279 @@ void BFactorRefiner::processMicrograph(
 				
 				const int ri = (int)(sqrt(xx*xx + yy*yy) + 0.5);
 				
-				fakeObs(y,x) = pred[p](y,x) * ctfImg(y,x) * exp(-fakeB*ri*ri/4.0);
-			}*/
-		
-		
-		Image<Complex> predCTF;
-		
-		ImageOp::multiply(ctfImg, pred[p], predCTF);
-		
-		std::vector<double> t_rad(sh, 0.0), s_rad(sh, 0.0);
-		
-		for (int y = 0; y < s;  y++)
-		for (int x = 0; x < sh; x++)
-		{
-			const double xx = x;
-			const double yy = (y + s/2) % s - s/2;
-			
-			const int ri = (int)(sqrt(xx*xx + yy*yy) + 0.5);
-			
-			if (ri < sh)
-			{
-				const Complex zobs = obs[p](y,x);
-				const Complex zpred = ctfImg(y,x) * pred[p](y,x);
-				const double wp = freqWeight(y,x);
-				
-				t_rad[ri] += wp * (zpred.real * zpred.real + zpred.imag * zpred.imag);
-				s_rad[ri] += wp * (zpred.real * zobs.real + zpred.imag * zobs.imag);
+				if (ri < sh)
+				{
+					const Complex zobs = obs[p](y,x);
+					const Complex zpred = ctfImg(y,x) * pred[p](y,x);
+					const double wp = freqWeight(y,x);
+					
+					t_rad[t][ri] += wp * (zpred.real * zpred.real + zpred.imag * zpred.imag);
+					s_rad[t][ri] += wp * (zpred.real * zobs.real + zpred.imag * zobs.imag);
+				}
 			}
 		}
 		
-		// search recursively numIters times, scanning the range at stepsPerIter points each time:
-		const int stepsPerIter = 20;
-		const int numIters = 5;
-		
-		// slower, but will be necessary for anisotropic B-factors:
-		/*d2Vector sigmaK = BFactorRefiner::findBKRec2D(
-			obs[p], predCTF, freqWeight, min_B_px, max_B_px, min_scale, stepsPerIter, numIters);*/
-		
-		d2Vector sigmaK = BFactorRefiner::findSigmaKRec1D(
-					t_rad, s_rad, min_B_px, max_B_px, min_scale, stepsPerIter, numIters);
-		
-		int threadnum = omp_get_thread_num();
-		
-		valsPerPart[threadnum].push_back(std::make_pair(p, sigmaK));
-	}
-	
-	for (int t = 0; t < nr_omp_threads; t++)
-	{
-		for (int i = 0; i < valsPerPart[t].size(); i++)
+		for (int t = 1; t < nr_omp_threads; t++)
 		{
-			int p = valsPerPart[t][i].first;
-			d2Vector BK = valsPerPart[t][i].second;
-			
-			if (debug)
+			for (int r = 0; r < sh; r++)
 			{
-				std::cout << p << ": " << as*as*BK[0] << " \t " << BK[1] << "\n";
+				t_rad[0][r] += t_rad[t][r];
+				s_rad[0][r] += s_rad[t][r];
 			}
-			
+		}
+		
+		d2Vector BK = BFactorRefiner::findBKRec1D(
+			t_rad[0], s_rad[0], min_B_px, max_B_px, min_scale, stepsPerIter, numIters);
+		
+		for (int p = 0; p < pc; p++)
+		{
 			mdt.setValue(EMDL_CTF_BFACTOR, as*as*BK[0] - min_B, p);
 			mdt.setValue(EMDL_CTF_SCALEFACTOR, BK[1], p);
 		}
+		
+		writePerMicrographEPS(mdt, s_rad[0], t_rad[0]);
+		
 	}
-	
-	// Output a diagnostic Postscript file
-	writeEPS(mdt);
+	else
+	{
+		#pragma omp parallel for num_threads(nr_omp_threads)
+		for (long p = 0; p < pc; p++)
+		{
+			CTF ctf;
+			ctf.readByGroup(mdt, obsModel, p);
+			Image<RFLOAT> ctfImg(sh,s);
+			ctf.getFftwImage(ctfImg(), s, s, angpix, false, false, false, false);
+			
+			std::vector<double> t_rad(sh, 0.0), s_rad(sh, 0.0);
+			
+			for (int y = 0; y < s;  y++)
+			for (int x = 0; x < sh; x++)
+			{
+				const double xx = x;
+				const double yy = (y + s/2) % s - s/2;
+				
+				const int ri = (int)(sqrt(xx*xx + yy*yy) + 0.5);
+				
+				if (ri < sh)
+				{
+					const Complex zobs = obs[p](y,x);
+					const Complex zpred = ctfImg(y,x) * pred[p](y,x);
+					const double wp = freqWeight(y,x);
+					
+					t_rad[ri] += wp * (zpred.real * zpred.real + zpred.imag * zpred.imag);
+					s_rad[ri] += wp * (zpred.real * zobs.real + zpred.imag * zobs.imag);
+				}
+			}
+			
+			// slower, but will be necessary for anisotropic B-factors:
+			/*
+				Image<Complex> predCTF;			
+				ImageOp::multiply(ctfImg, pred[p], predCTF);
+
+				d2Vector sigmaK = BFactorRefiner::findBKRec2D(
+				obs[p], predCTF, freqWeight, min_B_px, max_B_px, min_scale, stepsPerIter, numIters);
+			*/
+			
+			d2Vector BK = BFactorRefiner::findBKRec1D(
+						t_rad, s_rad, min_B_px, max_B_px, min_scale, stepsPerIter, numIters);
+			
+			int threadnum = omp_get_thread_num();				
+			valsPerPart[threadnum].push_back(std::make_pair(p, BK));
+			
+			if (diag) writePerParticleDiagEPS(mdt, BK, s_rad, t_rad, p);
+
+			
+			for (int t = 0; t < nr_omp_threads; t++)
+			{
+				for (int i = 0; i < valsPerPart[t].size(); i++)
+				{
+					int p = valsPerPart[t][i].first;
+					d2Vector BK = valsPerPart[t][i].second;
+					
+					if (debug)
+					{
+						std::cout << p << ": " << as*as*BK[0] << " \t " << BK[1] << "\n";
+					}
+					
+					mdt.setValue(EMDL_CTF_BFACTOR, as*as*BK[0] - min_B, p);
+					mdt.setValue(EMDL_CTF_SCALEFACTOR, BK[1], p);
+				}
+			}
+			
+			// Output a diagnostic Postscript file
+			writePerParticleEPS(mdt);
+		}
+		
+		if (diag)
+		{
+			std::string outRoot = CtfRefiner::getOutputFilenameRoot(mdt, outPath);
+			
+			std::vector<FileName> diagFns;
+			
+			for (int p = 0; p < pc; p++)
+			{
+				std::stringstream sts;
+				sts << p;
+				
+				FileName fn_eps = outRoot + "_diag_particle_" + sts.str() + ".eps";
+				
+				if (exists(fn_eps))
+				{
+					diagFns.push_back(fn_eps);
+				}
+			}
+			
+			if (diagFns.size() > 0)
+			{
+				joinMultipleEPSIntoSinglePDF(outRoot + "_bfactors_per-particle.pdf", diagFns);
+			}
+		}
+	}
 	
 	// Now write out STAR file with optimised values for this micrograph
 	std::string outRoot = CtfRefiner::getOutputFilenameRoot(mdt, outPath);
 	mdt.write(outRoot + "_bfactor_fit.star");
 }
 
-void BFactorRefiner::writeEPS(const MetaDataTable& mdt)
+void BFactorRefiner::writePerMicrographEPS(
+		const MetaDataTable& mdt, 
+		const std::vector<double>& s_rad,
+		const std::vector<double>& t_rad)
+{
+	if (!ready)
+	{
+		REPORT_ERROR("ERROR: BFactorRefiner::writeEPS: BFactorRefiner not initialized.");
+	}
+	
+	std::string outRoot = CtfRefiner::getOutputFilenameRoot(mdt, outPath);
+	
+	FileName fn_eps = outRoot + "_bfactor_fit.eps";
+	
+	CPlot2D plot2D(fn_eps);
+	plot2D.SetXAxisSize(600);
+	plot2D.SetYAxisSize(600);
+	plot2D.SetDrawLegend(false);
+	plot2D.SetFlipY(false);
+	
+	RFLOAT B, a;
+	mdt.getValue(EMDL_CTF_BFACTOR, B, 0);
+	mdt.getValue(EMDL_CTF_SCALEFACTOR, a, 0);
+	
+	CDataSet curve;	
+	curve.SetDrawMarker(false);
+	curve.SetDrawLine(true);
+	curve.SetDatasetColor(0,0,0);	
+	
+	const double as = s * angpix;
+	
+	double tMax = 0.0;
+	
+	for (int r = 0; r < sh; r++)
+	{
+		if (t_rad[r] > tMax) tMax = t_rad[r];
+	}
+	
+	for (int r = 0; r < sh; r++)
+	{
+		const double ra = r / as;
+		double cval = a * exp(-(B+min_B) * ra*ra / 4.0);
+		
+		CDataPoint cp(r, cval);		
+		curve.AddDataPoint(cp);
+		
+		if (t_rad[r] > 1e-10)
+		{
+			double pval = s_rad[r] / t_rad[r];
+			double ucert = 0.9*(1.0 - t_rad[r] / tMax);
+			
+			CDataSet dataPts;
+			dataPts.SetDrawMarker(true);
+			dataPts.SetDrawLine(false);
+			dataPts.SetMarkerSize(10);
+			dataPts.SetDatasetColor(ucert,ucert,ucert);
+					
+			CDataPoint dp(r, pval);		
+			dataPts.AddDataPoint(dp);
+			
+			plot2D.AddDataSet(dataPts);
+		}
+	}
+	
+	plot2D.AddDataSet(curve);
+	
+	std::string title = "CTF amplitude and B/k-factor fit";
+	plot2D.SetXAxisTitle(title);
+	
+	plot2D.OutputPostScriptPlot(fn_eps);
+}
+
+void BFactorRefiner::writePerParticleDiagEPS(
+		const MetaDataTable& mdt,
+		d2Vector BKpixels, 
+		const std::vector<double> &s_rad, 
+		const std::vector<double> &t_rad,
+		int particle_index)
+{
+	std::string outRoot = CtfRefiner::getOutputFilenameRoot(mdt, outPath);
+	
+	std::stringstream sts;
+	sts << particle_index;
+	FileName fn_eps = outRoot + "_diag_particle_" + sts.str() + ".eps";
+	
+	CPlot2D plot2D(fn_eps);
+	plot2D.SetXAxisSize(600);
+	plot2D.SetYAxisSize(600);
+	plot2D.SetDrawLegend(false);
+	plot2D.SetFlipY(false);
+		
+	CDataSet curve;	
+	curve.SetDrawMarker(false);
+	curve.SetDrawLine(true);
+	curve.SetDatasetColor(0,0,0);	
+		
+	double tMax = 0.0;
+	
+	for (int r = 0; r < sh; r++)
+	{
+		if (t_rad[r] > tMax) tMax = t_rad[r];
+	}
+	
+	for (int r = 0; r < sh; r++)
+	{
+		double cval = BKpixels[1] * exp(-BKpixels[0] * r*r / 4.0);
+		
+		CDataPoint cp(r, cval);		
+		curve.AddDataPoint(cp);
+		
+		if (t_rad[r] > 1e-10)
+		{
+			double pval = s_rad[r] / t_rad[r];
+			double ucert = 0.9*(1.0 - t_rad[r] / tMax);
+			
+			CDataSet dataPts;
+			dataPts.SetDrawMarker(true);
+			dataPts.SetDrawLine(false);
+			dataPts.SetMarkerSize(10);
+			dataPts.SetDatasetColor(ucert,ucert,ucert);
+					
+			CDataPoint dp(r, pval);		
+			dataPts.AddDataPoint(dp);
+			
+			plot2D.AddDataSet(dataPts);
+		}
+	}
+	
+	plot2D.AddDataSet(curve);
+	
+	std::string title = "CTF amplitude and B/k-factor fit";
+	plot2D.SetXAxisTitle(title);
+	
+	plot2D.OutputPostScriptPlot(fn_eps);
+	
+}
+
+
+void BFactorRefiner::writePerParticleEPS(const MetaDataTable& mdt)
 {
 	if (!ready)
 	{
@@ -245,7 +456,7 @@ bool BFactorRefiner::isFinished(const MetaDataTable &mdt)
 	return exists(outRoot + "_bfactor_fit.star");
 }
 
-d2Vector BFactorRefiner::findSigmaKRec1D(
+d2Vector BFactorRefiner::findBKRec1D(
 		const std::vector<double>& t_rad, 
 		const std::vector<double>& s_rad, 
 		double B0, double B1, double min_scale,
@@ -322,7 +533,7 @@ d2Vector BFactorRefiner::findSigmaKRec1D(
 		if (Bnext0 < B0) Bnext0 = B0;
 		if (Bnext1 > B1) Bnext1 = B1;
 		
-		return findSigmaKRec1D(
+		return findBKRec1D(
 			t_rad, s_rad, Bnext0, Bnext1, min_scale, steps, depth - 1);
 	}
 	

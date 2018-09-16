@@ -34,9 +34,20 @@ class BFactorRefiner
 		// Combine all .stars and .eps files
 		std::vector<MetaDataTable> merge(const std::vector<MetaDataTable>& mdts);
 	
-		// Write PostScript file with per-particle defocus 
-		// plotted onto micrograph in blue-red color scale
-		void writeEPS(const MetaDataTable &mdt);
+		// Write PostScript file with per-particle B-factors plotted onto micrograph
+		void writePerParticleEPS(const MetaDataTable &mdt);
+		
+		void writePerMicrographEPS(
+				const MetaDataTable& mdt, 
+				const std::vector<double>& s_rad,
+				const std::vector<double>& t_rad);
+		
+		void writePerParticleDiagEPS(
+				const MetaDataTable& mdt,
+				gravis::d2Vector BKpixels, 
+				const std::vector<double>& s_rad,
+				const std::vector<double>& t_rad,
+				int particle_index);
 		
 		// Has this mdt been processed already?
 		bool isFinished(const MetaDataTable& mdt);
@@ -61,7 +72,7 @@ class BFactorRefiner
 		
 		bool ready;
 		
-		static gravis::d2Vector findSigmaKRec1D(
+		static gravis::d2Vector findBKRec1D(
 				const std::vector<double>& t_rad, 
 				const std::vector<double>& s_rad, 
 				double B0, double B1, double min_scale,
