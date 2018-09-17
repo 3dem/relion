@@ -25,25 +25,15 @@ int main(int argc, char **argv)
 	MlOptimiserMpi optimiser;
     try
     {
-    	
+
     	// Read in parameters from the command line
     	optimiser.read(argc, argv);
 
-    	// Dirty hack to loop around movies one micrograph at a time
-    	if (optimiser.do_movies_in_batches && optimiser.fn_data_movie != "" && optimiser.do_skip_maximization)
-    	{
-    		optimiser.processMoviesPerMicrograph(argc, argv);
-    	}
-    	else
-    	{
-    		// normal code
+    	// Set things up
+    	optimiser.initialise();
 
-			// Set things up
-			optimiser.initialise();
-
-			// Iterate
-			optimiser.iterate();
-    	}
+    	// Iterate
+    	optimiser.iterate();
 
     }
     catch (RelionError XE)
