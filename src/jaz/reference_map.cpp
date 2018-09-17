@@ -262,3 +262,26 @@ Image<Complex> ReferenceMap::predict(
 	
 	return pred;
 }
+
+// perhaps some other day:
+/*void ReferenceMap::predictOccupancy(const MetaDataTable &particles, int threads)
+{
+	for (int half = 0; half < 1; half++)
+	{
+		occupancies[half] = Projector(s, TRILINEAR, 1.0, 10, 2);
+		occupancies[half].data = MultidimArray<Complex>(1,s,s,sh);
+		
+		const int pc
+		std::vector<CTF> ctfs(
+				
+		#pragma omp parallel for num_threads(threads)
+		for (int z = 0; z < s; z++)
+		{
+			for (int y = 0; y < s;  y++)
+			for (int x = 0; x < sh; x++)
+			{
+				
+			}
+		}
+	}
+}*/

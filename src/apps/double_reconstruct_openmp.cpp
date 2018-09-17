@@ -53,7 +53,7 @@ class reconstruct_parameters
 		
 		bool skip_gridding, debug, do_reconstruct_meas, is_positive, read_weights, div_avg;
 		
-		bool no_Wiener;
+		bool no_Wiener, writeWeights;
 		
 		bool L1_freq, L1_ring, L1_particle, L1_micrograph, L1_any;
 		int L1_iters;
@@ -91,6 +91,7 @@ class reconstruct_parameters
 			only_flip_phases = parser.checkOption("--only_flip_phases", "Do not correct CTF-amplitudes, only flip phases");
 			
 			read_weights = parser.checkOption("--read_weights", "Read freq. weight files");
+			writeWeights = parser.checkOption("--write_weights", "Write the weights volume");
 			do_ewald = parser.checkOption("--ewald", "Correct for Ewald-sphere curvature (developmental)");
 			mask_diameter  = textToFloat(parser.getOption("--mask_diameter", "Diameter (in A) of mask for Ewald-sphere curvature correction", "-1."));
 			width_mask_edge = textToInteger(parser.getOption("--width_mask_edge", "Width (in pixels) of the soft edge on the mask", "3"));
@@ -739,10 +740,23 @@ class reconstruct_parameters
 						NewFFT::FourierTransform(tempR(), tempC(), NewFFT::FwdOnly);
 						BackProjector::recenterWhole(tempC(), backprojector[j]->weight);
 					}
+					
+					Image<RFLOAT> weightOut;
 						
 					std::cout << " + Starting the reconstruction ..." << std::endl;
-					backprojector[j]->reconstruct(vol(), grid_iters, do_map, 1., dummy, dummy, dummy, dummy,
-												  fsc, 1., do_use_fsc, true, nr_omp_threads, -1, false);
+					
+					backprojector[j]->reconstruct(
+						vol(), grid_iters, do_map, 1., dummy, dummy, dummy, dummy,
+						fsc, 1., do_use_fsc, true, nr_omp_threads, -1, false, false, 
+						writeWeights? &weightOut : 0);
+					
+					if (writeWeights)
+					{
+						std::stringstream sts;
+						sts << (j+1);
+						std::string fnWgh = fn_out + "_half" + sts.str() + "_class001_unfil_weight.mrc";
+						weightOut.write(fnWgh);
+					}
 															
 					prevRefs[j] = vol;
 					
