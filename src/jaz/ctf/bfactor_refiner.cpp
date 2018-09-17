@@ -300,7 +300,7 @@ void BFactorRefiner::writePerMicrographEPS(
 		CDataPoint cp(r, cval);		
 		curve.AddDataPoint(cp);
 		
-		if (t_rad[r] > 1e-10 && std::abs(s_rad[r] / t_rad[r]) < 5)
+		if (t_rad[r] > 1e-10 /*&& std::abs(s_rad[r] / t_rad[r]) < 5*/)
 		{
 			double pval = s_rad[r] / t_rad[r];
 			double ucert = 0.9*(1.0 - t_rad[r] / tMax);
@@ -364,7 +364,7 @@ void BFactorRefiner::writePerParticleDiagEPS(
 		CDataPoint cp(r, cval);		
 		curve.AddDataPoint(cp);
 		
-		if (t_rad[r] > 1e-10 && std::abs(s_rad[r] / t_rad[r]) < 5)
+		if (t_rad[r] > 1e-10 /*&& std::abs(s_rad[r] / t_rad[r]) < 5*/)
 		{
 			double pval = s_rad[r] / t_rad[r];
 			double ucert = 0.9*(1.0 - t_rad[r] / tMax);
