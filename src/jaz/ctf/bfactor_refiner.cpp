@@ -28,16 +28,16 @@ void BFactorRefiner::read(IOParser &parser, int argc, char *argv[])
 		"Estimate B-factors per micrograph, instead of per particle");
 	
 	min_B = textToDouble(parser.getOption("--bfac_min_B",
-		"Minimal allowed B-factor", "-20"));
+		"Minimal allowed B-factor", "-30"));
 	
 	max_B = textToDouble(parser.getOption("--bfac_max_B",
-		"Maximal allowed B-factor", "200"));
+		"Maximal allowed B-factor", "300"));
 	
 	min_scale = textToDouble(parser.getOption("--bfac_min_scale",
 		"Minimal allowed scale-factor (essential for outlier rejection)", "0.2"));
 	
 	kmin = textToDouble(parser.getOption("--kmin_bfac",
-		"Inner freq. threshold for B-factor estimation [Angst]", "20.0"));
+		"Inner freq. threshold for B-factor estimation [Angst]", "30.0"));
 }
 
 void BFactorRefiner::init(
@@ -200,28 +200,27 @@ void BFactorRefiner::processMicrograph(
 			valsPerPart[threadnum].push_back(std::make_pair(p, BK));
 			
 			if (diag) writePerParticleDiagEPS(mdt, BK, s_rad, t_rad, p);
-
-			
-			for (int t = 0; t < nr_omp_threads; t++)
-			{
-				for (int i = 0; i < valsPerPart[t].size(); i++)
-				{
-					int p = valsPerPart[t][i].first;
-					d2Vector BK = valsPerPart[t][i].second;
-					
-					if (debug)
-					{
-						std::cout << p << ": " << as*as*BK[0] << " \t " << BK[1] << "\n";
-					}
-					
-					mdt.setValue(EMDL_CTF_BFACTOR, as*as*BK[0] - min_B, p);
-					mdt.setValue(EMDL_CTF_SCALEFACTOR, BK[1], p);
-				}
-			}
-			
-			// Output a diagnostic Postscript file
-			writePerParticleEPS(mdt);
 		}
+
+		for (int t = 0; t < nr_omp_threads; t++)
+		{
+			for (int i = 0; i < valsPerPart[t].size(); i++)
+			{
+				int p = valsPerPart[t][i].first;
+				d2Vector BK = valsPerPart[t][i].second;
+				
+				if (debug)
+				{
+					std::cout << p << ": " << as*as*BK[0] << " \t " << BK[1] << "\n";
+				}
+				
+				mdt.setValue(EMDL_CTF_BFACTOR, as*as*BK[0] - min_B, p);
+				mdt.setValue(EMDL_CTF_SCALEFACTOR, BK[1], p);
+			}
+		}
+		
+		// Output a diagnostic Postscript file
+		writePerParticleEPS(mdt);
 		
 		if (diag)
 		{
