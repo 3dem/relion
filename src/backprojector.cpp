@@ -1528,6 +1528,8 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 			}		 
 		}
 		
+		const double pad3 = padding_factor * padding_factor * padding_factor;
+		
 		for (long int z = 0; z < ori_size; z++)
 		for (long int y = 0; y < ori_size; y++)
 		for (long int x = 0; x < ori_size/2 + 1; x++)
@@ -1536,7 +1538,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 			
 			if (c > 0.0)
 			{
-				DIRECT_A3D_ELEM(weight_out->data, z, y, x) /= c;
+				DIRECT_A3D_ELEM(weight_out->data, z, y, x) *= pad3/c;
 			}
 		}
 	}
