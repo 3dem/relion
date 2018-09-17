@@ -1519,9 +1519,9 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 			const long int yy = ROUND(y / padding_factor);
 			const long int zz = ROUND(z / padding_factor);
 			
-			if (xx > 0 && xx < ori_size/2+1
-			 && yy > 0 && yy < ori_size
-			 && zz > 0 && zz < ori_size)
+			if (xx >= 0 && xx < ori_size/2+1
+			 && yy >= 0 && yy < ori_size
+			 && zz >= 0 && zz < ori_size)
 			{
 				DIRECT_A3D_ELEM(weight_out->data, zz, yy, xx) += DIRECT_A3D_ELEM(Fweight, z, y, x);
 				DIRECT_A3D_ELEM(count.data, zz, yy, xx) += 1.0;
