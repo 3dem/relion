@@ -48,16 +48,9 @@ class ObservationModel
 		void predictObservation(
 				Projector &proj, const MetaDataTable &partMdt, long int particle,
 				MultidimArray<Complex>& dest,
-				bool applyCtf = true, bool shiftPhases = true, bool applyShift = true);
-		
-		Image<Complex> predictObservation(
-				Projector &proj, const MetaDataTable &partMdt, long int particle,
-				bool applyCtf = true, bool shiftPhases = true, bool applyShift = true);
-
-        std::vector<Image<Complex> > predictObservations(
-                Projector &proj, const MetaDataTable &partMdt, int threads,
-                bool applyCtf = true, bool shiftPhases = true, bool applyShift = true);
-		
+				bool applyCtf = true, bool shiftPhases = true, bool applyShift = true,
+				Projector* weightProjector = 0,            // <-}
+				MultidimArray<Complex>* observation = 0);  // <-} for self-subtraction 
 		
 		Volume<gravis::t2Vector<Complex> > predictComplexGradient(
 				Projector &proj, const MetaDataTable &partMdt, long int particle,

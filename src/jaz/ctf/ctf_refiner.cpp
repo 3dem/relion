@@ -278,7 +278,7 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 		{
 			predSameT = reference.predictAll(
 				unfinishedMdts[g], obsModel, ReferenceMap::Own, nr_omp_threads,
-				false, true, false);
+				false, true, false, &obs);
 		}
 
 		// use predictions from opposite half-set otherwise:

@@ -178,7 +178,9 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 void ObservationModel::predictObservation(
         Projector& proj, const MetaDataTable& partMdt, long int particle,
 		MultidimArray<Complex>& dest,
-        bool applyCtf, bool shiftPhases, bool applyShift)
+        bool applyCtf, bool shiftPhases, bool applyShift,
+		Projector* weightProjector, 
+		MultidimArray<Complex>* observation)
 {
     const int s = proj.ori_size;
     const int sh = s/2 + 1;
@@ -216,13 +218,16 @@ void ObservationModel::predictObservation(
 	{
 		shiftImageInFourierTransform(dest, dest, s, s/2 - xoff, s/2 - yoff);
 	}
-
-    if (applyCtf)
+	
+	const bool selfSubtract = weightProjector != 0 && observation != 0;
+	
+	Image<RFLOAT> ctfImg(sh,s);
+	
+    if (applyCtf && !selfSubtract)
     {
         CTF ctf;
         ctf.readByGroup(partMdt, this, particle);
 		
-		Image<RFLOAT> ctfImg(sh,s);
 		ctf.getFftwImage(ctfImg(), s, s, angpix[opticsGroup]);
 
 		for (int y = 0; y < s;  y++)
@@ -243,32 +248,43 @@ void ObservationModel::predictObservation(
 			dest(y,x) *= corr(y,x);
 		}
     }
-}
-
-Image<Complex> ObservationModel::predictObservation(
-        Projector& proj, const MetaDataTable& partMdt, long int particle,
-        bool applyCtf, bool shiftPhases, bool applyShift)
-{
-    Image<Complex> pred;
 	
-	predictObservation(proj, partMdt, particle, pred.data, applyCtf, shiftPhases, applyShift);
-    return pred;
-}
-
-std::vector<Image<Complex> > ObservationModel::predictObservations(
-        Projector &proj, const MetaDataTable &partMdt, int threads,
-        bool applyCtf, bool shiftPhases, bool applyShift)
-{
-    const int pc = partMdt.numberOfObjects();
-    std::vector<Image<Complex> > out(pc);
-
-    #pragma omp parallel for num_threads(threads)
-    for (int p = 0; p < pc; p++)
-    {
-        out[p] = predictObservation(proj, partMdt, p, applyCtf, shiftPhases, applyShift);
-    }
-
-	return out;
+	if (selfSubtract)
+	{
+		Image<Complex> weight(sh,s);
+		weightProjector->get2DFourierTransform(weight.data, A3D, false);
+		
+		/*if (particle < 5)
+		{
+			std::stringstream sts;
+			sts << particle;
+			VtkHelper::writeVTK_Complex(weight.data, "debug_wgh_"+sts.str()+".vtk");
+		}*/
+				
+		CTF ctf;
+		ctf.readByGroup(partMdt, this, particle);
+		
+		ctf.getFftwImage(ctfImg(), s, s, angpix[opticsGroup]);
+		
+		for (int y = 0; y < s;  y++)
+		for (int x = 0; x < sh; x++)
+		{
+			const double w = 0.30 * s * weight(y,x);
+			const double c = ctfImg(y,x);
+			const double cc = c*c;
+			
+			if (w - cc < 1e-15)
+			{
+				dest(y,x) = Complex(0,0);
+			}
+			else
+			{		
+				dest(y,x) = (w * dest(y,x) - c*(*observation)(y,x))/(w - cc);
+			}
+			
+			if (applyCtf) dest(y,x) *= c;
+		}
+	}
 }
 
 Volume<t2Vector<Complex>> ObservationModel::predictComplexGradient(

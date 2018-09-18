@@ -1511,13 +1511,26 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 		Image<RFLOAT> count(ori_size/2+1, ori_size, ori_size);
 		count.data.initZeros();
 		
+		// downsample while considering padding:
+		
 		for (long int z = 0; z < Fweight.zdim; z++)
 		for (long int y = 0; y < Fweight.ydim; y++)
 		for (long int x = 0; x < Fweight.xdim; x++)
 		{
-			const long int xx = ROUND(x / padding_factor);
-			const long int yy = ROUND(y / padding_factor);
-			const long int zz = ROUND(z / padding_factor);
+			int xl = x;
+			int yl = y < Fweight.ydim/2? y : y - Fweight.ydim;
+			int zl = z < Fweight.zdim/2? z : z - Fweight.zdim;
+			
+			if (xl == Fweight.xdim - 1
+			 || yl == Fweight.ydim/2 || yl == -Fweight.ydim/2 - 1
+			 || zl == Fweight.zdim/2 || zl == -Fweight.zdim/2 - 1)
+			{
+				continue;
+			}
+			
+			int xx = ROUND(xl / padding_factor);
+			int yy = (ROUND(yl / padding_factor) + ori_size) % ori_size;
+			int zz = (ROUND(zl / padding_factor) + ori_size) % ori_size;
 			
 			if (xx >= 0 && xx < ori_size/2+1
 			 && yy >= 0 && yy < ori_size
