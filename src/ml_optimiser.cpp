@@ -7590,7 +7590,6 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody, int exp_current
 		dLL = log(exp_sum_weight) - exp_min_diff2 - logsigma2;
 
 	// Store dLL of each image in the output array, and keep track of total sum
-	std::cerr << " part_id= " << part_id << " metadata_offset= " << metadata_offset << " dLL= " << dLL << std::endl;
 	DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_DLL) = dLL;
 	thr_sum_dLL += dLL;
 
