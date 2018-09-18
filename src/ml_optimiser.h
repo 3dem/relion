@@ -56,15 +56,22 @@
 #define METADATA_NR_SIGN 9
 #define METADATA_NORM 10
 
-#define METADATA_ROT_PRIOR 11
-#define METADATA_TILT_PRIOR 12
-#define METADATA_PSI_PRIOR 13
-#define METADATA_XOFF_PRIOR 14
-#define METADATA_YOFF_PRIOR 15
-#define METADATA_ZOFF_PRIOR 16
-#define METADATA_PSI_PRIOR_FLIP_RATIO 17
+#define METADATA_CTF_DEFOCUS_U 11
+#define METADATA_CTF_DEFOCUS_V 12
+#define METADATA_CTF_DEFOCUS_ANGLE 13
+#define METADATA_CTF_BFACTOR 14
+#define METADATA_CTF_KFACTOR 15
+#define METADATA_CTF_PHASE_SHIFT 16
 
-#define METADATA_LINE_LENGTH_BEFORE_BODIES 28 // @TODO: -> 20?
+#define METADATA_ROT_PRIOR 17
+#define METADATA_TILT_PRIOR 18
+#define METADATA_PSI_PRIOR 19
+#define METADATA_XOFF_PRIOR 20
+#define METADATA_YOFF_PRIOR 21
+#define METADATA_ZOFF_PRIOR 22
+#define METADATA_PSI_PRIOR_FLIP_RATIO 23
+
+#define METADATA_LINE_LENGTH_BEFORE_BODIES 24 // @TODO: -> 20?
 #define METADATA_NR_BODY_PARAMS 6
 
 #define DO_WRITE_DATA true
@@ -557,7 +564,7 @@ public:
 	//for catching exceptions in threads
 	RelionError * threadException;
 
-	long int exp_my_first_particle, exp_my_last_particle;
+	long int exp_my_first_random_particle, exp_my_last_random_particle;
 	MultidimArray<RFLOAT> exp_metadata, exp_imagedata;
 	std::string exp_fn_img, exp_fn_ctf, exp_fn_recimg;
 	std::vector<MultidimArray<RFLOAT> > exp_imgs;
@@ -679,7 +686,7 @@ public:
 		do_calculate_initial_sigma_noise(0),
 		fix_sigma_offset(0),
 		do_firstiter_cc(0),
-		exp_my_last_particle(0),
+		exp_my_last_random_particle(0),
 		particle_diameter(0),
 		smallest_changes_optimal_orientations(0),
 		verb(0),
@@ -695,7 +702,7 @@ public:
 		do_map(0),
 		combine_weights_thru_disc(0),
 		smallest_changes_optimal_offsets(0),
-		exp_my_first_particle(0),
+		exp_my_first_random_particle(0),
 		iter(0),
 		my_last_particle_id(0),
 		ini_high(0),
@@ -953,14 +960,14 @@ public:
 			RFLOAT &exp_local_sqrtXi2);
 
 	/** Monitor the changes in the optimal translations, orientations and class assignments for some particles */
-	void monitorHiddenVariableChanges(long int my_first_particle, long int my_last_particle);
+	void monitorHiddenVariableChanges(long int my_first_random_particle, long int my_last_random_particle);
 
 	// Updates the overall changes in the hidden variables and keeps track of nr_iter_wo_large_changes_in_hidden_variables
 	void updateOverallChangesInHiddenVariables();
 
 	// Calculate expected error in orientational assignments
 	// Based on comparing projections of the model and see how many degrees apart gives rise to difference of power > 3*sigma^ of the noise
-	void calculateExpectedAngularErrors(long int my_first_particle, long int my_last_particle);
+	void calculateExpectedAngularErrors(long int my_first_random_particle, long int my_last_random_particle);
 
 	// Adjust angular sampling based on the expected angular accuracies for auto-refine procedure
 	void updateAngularSampling(bool verb = true);
@@ -973,10 +980,10 @@ public:
 	void checkConvergence(bool myverb = true);
 
 	// Set metadata of a subset of particles to the experimental model
-	void setMetaDataSubset(int first_particle_id, int last_particle_id);
+	void setMetaDataSubset(int my_first_random_particle, int my_last_random_particle);
 
 	// Get metadata array of a subset of particles from the experimental model
-	void getMetaAndImageDataSubset(int first_particle_id, int last_particle_id, bool do_also_imagedata = true);
+	void getMetaAndImageDataSubset(int my_first_random_particle, int my_last_random_particle, bool do_also_imagedata = true);
 
 };
 

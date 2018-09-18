@@ -86,7 +86,7 @@ MetaDataTable Experiment::getMetaDataImage(long int part_id)
 }
 
 long int Experiment::addParticle(std::string part_name, long int group_id,
-		long int micrograph_id, int optics_group, const CTF& ctf, int random_subset)
+		long int micrograph_id, int optics_group, int random_subset)
 {
 
 	if (group_id >= groups.size())
@@ -101,7 +101,6 @@ long int Experiment::addParticle(std::string part_name, long int group_id,
 	particle.group_id = group_id;
 	particle.micrograph_id = micrograph_id;
 	particle.optics_group = optics_group;
-	particle.ctf = ctf;
 	particle.random_subset = random_subset;
 
 	// Push back this particle in the particles vector
@@ -388,30 +387,17 @@ void Experiment::randomiseParticlesOrder(int seed, bool do_split_random_halves, 
 			std::random_shuffle(particle_list2.begin(), particle_list2.end());
 
             // First fill new_ori_particles with the first subset, then with the second
-            for (long int i = 0; i < particle_list1.size(); i++)
-                    new_particles.push_back(particles[particle_list1[i]]);
-            for (long int i = 0; i < particle_list2.size(); i++)
-                    new_particles.push_back(particles[particle_list2[i]]);
+			randomised_particle_order = particle_list1;
+			randomised_particle_order.insert(randomised_particle_order.end(), particle_list2.begin(), particle_list2.end());
 
 		}
 		else
 		{
-            // First fill in order
-             std::vector<long int> particle_list;
-             particle_list.resize(particles.size());
-             for (long int i = 0; i < particle_list.size(); i++)
-                     particle_list[i] = i;
-
-             // Randomise
-             std::random_shuffle(particle_list.begin(), particle_list.end());
-
-             // Refill new_ori_particles
-             for (long int i = 0; i < particle_list.size(); i++)
-                     new_particles.push_back(particles[particle_list[i]]);
+             // Just randomise
+             std::random_shuffle(randomised_particle_order.begin(), randomised_particle_order.end());
 
 		}
 
-		particles=new_particles;
 		randomised = true;
 
 	}
@@ -746,8 +732,7 @@ void Experiment::read(
 			FileName fn_img;
 			fn_img.compose(n+1, fn_exp); // fn_img = integerToString(n) + "@" + fn_exp;
 			// Add the particle to my_area = 0
-			CTF ctf;
-			part_id = addParticle(fn_img, group_id, mic_id, 0, ctf);
+			part_id = addParticle(fn_img, group_id, mic_id, 0);
 
 			MDimg.addObject();
 
@@ -933,18 +918,17 @@ void Experiment::read(
 				my_random_subset = 0;
 			}
 
-			// Set the optics group - this is always defined
-			int my_optics_group;
-			MDimg.getValue(EMDL_IMAGE_OPTICS_GROUP, my_optics_group, partID);
-			my_optics_group--;
-
-			CTF ctf;
-			ctf.readByGroup(MDimg, &obsModel, partID);
+			// Set the optics group - this may not be defined, for example if we don't do CTF correction or for sub-tomograms, then set to 0
+			int my_optics_group = 0;
+			if (!MDimg.getValue(EMDL_IMAGE_OPTICS_GROUP, my_optics_group, partID))
+			{
+				my_optics_group--;
+			}
 
 			// Create a new particle
 			FileName part_name;
 			MDimg.getValue(EMDL_IMAGE_NAME, part_name, partID);
-			part_id = addParticle(part_name, group_id, mic_id, my_optics_group, ctf, my_random_subset);
+			part_id = addParticle(part_name, group_id, mic_id, my_optics_group, my_random_subset);
 
 			// The group number is only set upon reading: it is not read from the STAR file itself,
 			// there the only thing that matters is the order of the micrograph_names
@@ -1017,6 +1001,14 @@ void Experiment::read(
 	//std::cerr << "Press any key to continue..." << std::endl;
 	//std::cin >> c;
 #endif
+
+
+	// Make ordered randomised_particle_order
+    randomised_particle_order.resize(particles.size());
+    for (long int i = 0; i < randomised_particle_order.size(); i++)
+    {
+   	 randomised_particle_order[i] = i;
+    }
 
 	// Make sure some things are always set in the MDimg
 	bool have_rot  = MDimg.containsLabel(EMDL_ORIENT_ROT);

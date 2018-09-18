@@ -39,7 +39,7 @@
 class ExpParticle
 {
 public:
-	// Particle id
+	// Position of the particle in the original input STAR file
 	long int id;
 
 	// Name of this particle (by this name it will be recognised upon reading)
@@ -223,6 +223,9 @@ public:
 	// All particles in the experiment
 	std::vector<ExpParticle> particles;
 
+	// Randomised order of the particles
+	std::vector<long int> randomised_particle_order;
+
 	// Number of particles in random subsets 1 and 2;
 	long int nr_particles_subset1, nr_particles_subset2;
 
@@ -317,7 +320,7 @@ public:
 
 	// Add a particle
 	long int addParticle(std::string part_name, long int group_id, long int micrograph_id,
-						 int optics_group, const CTF& ctf, int random_subset = 0);
+						 int optics_group, int random_subset = 0);
 
 	// Add a group
 	long int addGroup(std::string mic_name);

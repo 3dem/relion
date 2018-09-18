@@ -106,7 +106,6 @@ void MlOptimiser::read(int argc, char **argv, int rank)
 		do_parallel_disc_io = !checkParameter(argc, argv, "--no_parallel_disc_io");
 
 		parser.addSection("Continue options");
-		fn_opt = parser.getOption("--io", "Optics groups", "");
 		FileName fn_in = parser.getOption("--continue", "_optimiser.star file of the iteration after which to continue");
 		// Read in previously calculated parameters
 		if (fn_in != "")
@@ -477,6 +476,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	fn_opt = parser.getOption("--io", "Optics groups", "");
     fn_out = parser.getOption("--o", "Output rootname", "");
     nr_iter = textToInteger(parser.getOption("--iter", "Maximum number of iterations to perform", "50"));
+    mymodel.pixel_size = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms)", "-1"));
     mymodel.tau2_fudge_factor = textToFloat(parser.getOption("--tau2_fudge", "Regularisation parameter (values higher than 1 give more weight to the data)", "1"));
 	mymodel.nr_classes = textToInteger(parser.getOption("--K", "Number of references to be refined", "1"));
     particle_diameter = textToFloat(parser.getOption("--particle_diameter", "Diameter of the circular mask that will be applied to the experimental images (in Angstroms)", "-1"));
@@ -761,6 +761,7 @@ void MlOptimiser::read(FileName fn_in, int rank)
     if (!MD.getValue(EMDL_OPTIMISER_OUTPUT_ROOTNAME, fn_out) ||
         !MD.getValue(EMDL_OPTIMISER_MODEL_STARFILE, fn_model) ||
 		!MD.getValue(EMDL_OPTIMISER_DATA_STARFILE, fn_data) ||
+		!MD.getValue(EMDL_OPTIMISER_OPTICS_STARFILE, fn_opt) ||
 		!MD.getValue(EMDL_OPTIMISER_SAMPLING_STARFILE, fn_sampling) ||
         !MD.getValue(EMDL_OPTIMISER_ITERATION_NO, iter) ||
         !MD.getValue(EMDL_OPTIMISER_NR_ITERATIONS, nr_iter) ||
@@ -992,6 +993,7 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 			MD.setValue(EMDL_OPTIMISER_MODEL_STARFILE, fn_model);
 		}
 		MD.setValue(EMDL_OPTIMISER_DATA_STARFILE, fn_data);
+		MD.setValue(EMDL_OPTIMISER_OPTICS_STARFILE, fn_opt);
 		MD.setValue(EMDL_OPTIMISER_SAMPLING_STARFILE, fn_sampling);
 		MD.setValue(EMDL_OPTIMISER_ITERATION_NO, iter);
 		MD.setValue(EMDL_OPTIMISER_NR_ITERATIONS, nr_iter);
@@ -1448,7 +1450,47 @@ void MlOptimiser::initialiseGeneral(int rank)
 		mymodel.readImages(fn_ref, is_3d_model, ori_size, mydata,
 				do_average_unaligned, do_generate_seeds, refs_are_ctf_corrected, do_sgd);
 
-		mymodel.pixel_size = mydata.obsModel.getPixelSize(0);
+		if (fn_opt == "")
+		{
+	    	// Check consistency of EMDL_CTF_MAGNIFICATION and MEBL_CTF_DETECTOR_PIXEL_SIZE with mymodel.pixel_size
+	    	RFLOAT mag, dstep, first_angpix, my_angpix;
+	    	bool has_magn = false;
+	    	if (mydata.MDimg.containsLabel(EMDL_CTF_MAGNIFICATION) && mydata.MDimg.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
+	    	{
+	    		FOR_ALL_OBJECTS_IN_METADATA_TABLE(mydata.MDimg)
+				{
+	    			mydata.MDimg.getValue(EMDL_CTF_MAGNIFICATION, mag);
+	    			mydata.MDimg.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
+	    			my_angpix = 10000. * dstep / mag;
+	    			if (!has_magn)
+	    			{
+	    				first_angpix = my_angpix;
+	    				has_magn = true;
+	    			}
+	    			else if (ABS(first_angpix - my_angpix) > 0.01)
+	    			{
+	    				std::cerr << " first_angpix= " << first_angpix << " my_angpix= " << my_angpix << " mag= " << mag  << " dstep= " << dstep << std::endl;
+	    				REPORT_ERROR("MlOptimiser::initialiseGeneral: ERROR inconsistent magnification and detector pixel sizes in images in input STAR file");
+	    			}
+				}
+
+	    	}
+	    	if (has_magn && ABS(first_angpix - mymodel.pixel_size) > 0.01)
+	    	{
+	    		if (verb > 0 && mymodel.pixel_size > 0.)
+	    			std::cout << "MlOptimiser::initialiseGeneral: WARNING modifying pixel size from " << mymodel.pixel_size <<" to "<<first_angpix << " based on magnification information in the input STAR file" << std::endl;
+	    		mymodel.pixel_size = first_angpix;
+	    	}
+
+	    	if (!has_magn && mymodel.pixel_size < 0.)
+	    	{
+	    		REPORT_ERROR("ERROR: you did not specify the pixel size. Use the --angpix option to do so.");
+	    	}
+		}
+		else
+		{
+			mymodel.pixel_size = mydata.obsModel.getPixelSize(0);
+		}
 	}
 
 	if (mymodel.nr_classes > 1 && do_split_random_halves)
@@ -1908,8 +1950,9 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 		wsum_model.current_size  = mymodel.getPixelFromResolution(1./ini_high);
 	wsum_model.initZeros();
 
-	for (long int part_id = my_first_particle_id; part_id <= my_last_particle_id; part_id++, nr_particles_done++)
+	for (long int my_random_particle = my_first_particle_id; my_random_particle <= my_last_particle_id; my_random_particle++, nr_particles_done++)
 	{
+		long int part_id = mydata.randomised_particle_order[my_random_particle];
 		long int group_id = mydata.getGroupId(part_id);
 
 		// May24,2015 - Shaoda & Sjors, Helical refinement
@@ -2004,7 +2047,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 		}
 
 		// Keep track of the average image (only to correct power spectra, no longer for initial references!)
-		if (part_id == my_first_particle_id)
+		if (my_random_particle == my_first_particle_id)
 			Mavg = img();
 		else
 			Mavg += img();
@@ -2030,7 +2073,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 		wsum_model.sumw_group[group_id] += 1.;
 
 		// When doing SGD, only take the first sgd_ini_subset_size*mymodel.nr_classes images to calculate the initial reconstruction
-		if (fn_ref == "None" && !(do_sgd && part_id < sgd_ini_subset_size*mymodel.nr_classes) )
+		if (fn_ref == "None" && !(do_sgd && my_random_particle < sgd_ini_subset_size*mymodel.nr_classes) )
 		{
 
 			MultidimArray<RFLOAT> Fctf, Fweight;
@@ -2047,7 +2090,10 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 			Matrix2D<RFLOAT> A;
 			Euler_angles2matrix(rot, tilt, psi, A, true);
 
-			mydata.obsModel.applyAnisoMagTransp(A, 0);
+			if (fn_opt != "")
+			{
+				mydata.obsModel.applyAnisoMagTransp(A, 0);
+			}
 
 			// Construct initial references from random subsets
 			windowFourierTransform(Faux, Fimg, wsum_model.current_size);
@@ -2668,8 +2714,8 @@ void MlOptimiser::expectation()
 	long int my_nr_particles = (subset_size > 0) ? subset_size : mydata.numberOfParticles();
 	int barstep = XMIPP_MAX(1, my_nr_particles / 60);
     long int prev_barstep = 0;
-	long int my_first_particle = 0.;
-	long int my_last_particle = my_nr_particles - 1;
+	long int my_first_random_particle = 0.;
+	long int my_last_random_particle = my_nr_particles - 1;
 	long int nr_particles_done = 0;
 	if (verb > 0)
 	{
@@ -2696,25 +2742,25 @@ void MlOptimiser::expectation()
 		timer.tic(TIMING_EXP_METADATA);
 #endif
 
-		long int my_pool_first_particle = my_first_particle + nr_particles_done;
-		long int my_pool_last_particle = XMIPP_MIN(my_last_particle, my_pool_first_particle + nr_pool - 1);
+		long int my_pool_first_random_particle = my_first_random_particle + nr_particles_done;
+		long int my_pool_last_random_particle = XMIPP_MIN(my_last_random_particle, my_pool_first_random_particle + nr_pool - 1);
 
 		// Get the metadata for these particles
-		getMetaAndImageDataSubset(my_pool_first_particle, my_pool_last_particle, !do_parallel_disc_io);
+		getMetaAndImageDataSubset(my_pool_first_random_particle, my_pool_last_random_particle, !do_parallel_disc_io);
 
 #ifdef TIMING
 		timer.toc(TIMING_EXP_METADATA);
 #endif
 
 		// perform the actual expectation step on several particles
-		expectationSomeParticles(my_pool_first_particle, my_pool_last_particle);
+		expectationSomeParticles(my_pool_first_random_particle, my_pool_last_random_particle);
 
 #ifdef TIMING
 		timer.tic(TIMING_EXP_CHANGES);
 #endif
 
 		// Also monitor the changes in the optimal orientations and classes
-		monitorHiddenVariableChanges(my_pool_first_particle, my_pool_last_particle);
+		monitorHiddenVariableChanges(my_pool_first_random_particle, my_pool_last_random_particle);
 
 #ifdef TIMING
 		timer.toc(TIMING_EXP_CHANGES);
@@ -2722,14 +2768,13 @@ void MlOptimiser::expectation()
 #endif
 
 		// Set the metadata for these particles
-		setMetaDataSubset(my_pool_first_particle, my_pool_last_particle);
+		setMetaDataSubset(my_pool_first_random_particle, my_pool_last_random_particle);
 
 #ifdef TIMING
 		timer.toc(TIMING_EXP_METADATA);
 #endif
 
-		nr_particles_done += my_pool_last_particle - my_pool_first_particle + 1;
-
+		nr_particles_done += my_pool_last_random_particle - my_pool_first_random_particle + 1;
 		if (verb > 0 && nr_particles_done - prev_barstep > barstep)
 		{
 			prev_barstep = nr_particles_done;
@@ -3081,7 +3126,7 @@ void MlOptimiser::precalculateABMatrices()
 
 }
 
-void MlOptimiser::expectationSomeParticles(long int my_first_particle, long int my_last_particle)
+void MlOptimiser::expectationSomeParticles(long int my_first_random_particle, long int my_last_random_particle)
 {
 
 #ifdef TIMING
@@ -3094,17 +3139,17 @@ void MlOptimiser::expectationSomeParticles(long int my_first_particle, long int 
 #endif
 
     // Use global variables for thread visibility (before there were local ones for similar call in MPI version!)
-	exp_my_first_particle = my_first_particle;
-    exp_my_last_particle = my_last_particle;
+	exp_my_first_random_particle = my_first_random_particle;
+    exp_my_last_random_particle = my_last_random_particle;
 
 	// Make sure random division is always the same with the same seed
     if (do_generate_seeds && ((do_firstiter_cc && iter == 2) || (!do_firstiter_cc && iter == 1)) )
 	{
     	// calculate the random class for these SomeParticles
     	exp_random_class_some_particles.clear();
-    	for (long int part_id = my_first_particle; part_id <= my_last_particle; part_id++)
+    	for (long int my_random_particle = my_first_random_particle; my_random_particle <= my_last_random_particle; my_random_particle++)
     	{
-        	init_random_generator(random_seed + part_id);
+        	init_random_generator(random_seed + my_random_particle);
     		int random_class = rand() % mymodel.nr_classes;
     		exp_random_class_some_particles.push_back(random_class);
     	}
@@ -3117,14 +3162,16 @@ void MlOptimiser::expectationSomeParticles(long int my_first_particle, long int 
 
 	// Store total number of particle images in this bunch of SomeParticles, and set translations and orientations for skip_align/rotate
     exp_nr_images = 0;
-    long int istop = 0;
     exp_imgs.clear();
-    for (long int part_id = my_first_particle; part_id <= my_last_particle; part_id++)
+    for (long int my_random_particle = my_first_random_particle; my_random_particle <= my_last_random_particle; my_random_particle++)
 	{
 
-		// If skipping alignment or rotations, then store the old translation and orientation for each particle
+		long int part_id = mydata.randomised_particle_order[my_random_particle];
+		int nth_particle = my_random_particle - my_first_random_particle;
+
+    	// If skipping alignment or rotations, then store the old translation and orientation for each particle
 		// If we do local angular searches, get the previously assigned angles to center the prior
-    	bool do_clear = (part_id == my_first_particle);
+    	bool do_clear = (my_random_particle == my_first_random_particle);
 		if (do_skip_align || do_skip_rotate)
 		{
 			// Also set the rotations
@@ -3178,7 +3225,7 @@ void MlOptimiser::expectationSomeParticles(long int my_first_particle, long int 
 			if (!mydata.getImageNameOnScratch(part_id, fn_img))
 			{
 				std::istringstream split(exp_fn_img);
-				for (int i = 0; i <= istop; i++)
+				for (int i = 0; i <= nth_particle; i++)
 				{
 					getline(split, fn_img);
 				}
@@ -3205,14 +3252,14 @@ void MlOptimiser::expectationSomeParticles(long int my_first_particle, long int 
 
 
 #ifdef DEBUG_EXPSOME
-	std::cerr << " exp_my_first_particle= " << exp_my_first_particle << " exp_my_last_particle= " << exp_my_last_particle << std::endl;
+	std::cerr << " exp_my_first_random_particle= " << exp_my_first_random_particle << " exp_my_last_random_particle= " << exp_my_last_random_particle << std::endl;
 	std::cerr << " exp_nr_images= " << exp_nr_images << std::endl;
 #endif
 	if (!do_cpu)
 	{
 		// GPU and traditional CPU case - use RELION's built-in task manager to
 		// process multiple particles at once
-		exp_ipart_ThreadTaskDistributor->resize(my_last_particle - my_first_particle + 1, 1);
+		exp_ipart_ThreadTaskDistributor->resize(my_last_random_particle - my_first_random_particle + 1, 1);
 		exp_ipart_ThreadTaskDistributor->reset();
 		global_ThreadManager->run(globalThreadExpectationSomeParticles);
 	}
@@ -3226,8 +3273,8 @@ void MlOptimiser::expectationSomeParticles(long int my_first_particle, long int 
 		int tCount = 0;
 
 		// process all passed particles in parallel
-		//for(unsigned long i=my_first_particle; i<=my_last_particle; i++) {
-		tbb::parallel_for(my_first_particle, my_last_particle+1, [&](int i) {
+		//for(unsigned long i=my_first_random_particle; i<=my_last_random_particle; i++) {
+		tbb::parallel_for(my_first_random_particle, my_last_random_particle+1, [&](int i) {
 			CpuOptimiserType::reference ref = tbbCpuOptimiser.local();
 			MlOptimiserCpu *cpuOptimiser = (MlOptimiserCpu *)ref;
 			if(cpuOptimiser == NULL) {
@@ -3272,7 +3319,7 @@ void MlOptimiser::doThreadExpectationSomeParticles(int thread_id)
 #ifdef DEBUG_EXPSOMETHR
 		pthread_mutex_lock(&global_mutex);
 		std::cerr << " thread_id= " << thread_id << " first_ipart= " << first_ipart << " last_ipart= " << last_ipart << std::endl;
-		std::cerr << " exp_my_first_particle= " << exp_my_first_particle << " exp_my_last_particle= " << exp_my_last_particle << std::endl;
+		std::cerr << " exp_my_first_random_particle= " << exp_my_first_random_particle << " exp_my_last_random_particle= " << exp_my_last_random_particle << std::endl;
 		pthread_mutex_unlock(&global_mutex);
 #endif
 
@@ -3285,7 +3332,7 @@ void MlOptimiser::doThreadExpectationSomeParticles(int thread_id)
 			else if (thread_id == nr_threads -1)
 				timer.tic(TIMING_ESP_ONEPARTN);
 #endif
-			expectationOneParticle(exp_my_first_particle + ipart, thread_id);
+			expectationOneParticle(exp_my_first_random_particle + ipart, thread_id);
 
 #ifdef TIMING
 			// Only time one thread
@@ -3307,10 +3354,10 @@ void MlOptimiser::doThreadExpectationSomeParticles(int thread_id)
 }
 
 
-void MlOptimiser::expectationOneParticle(long int part_id, int thread_id)
+void MlOptimiser::expectationOneParticle(long int my_random_particle, int thread_id)
 {
 #ifdef TIMING
-	if (part_id == exp_my_first_particle)
+	if (my_random_particle == exp_my_first_random_particle)
 		timer.tic(TIMING_ESP_INI);
 #endif
 
@@ -3336,7 +3383,7 @@ void MlOptimiser::expectationOneParticle(long int part_id, int thread_id)
     		// Now select a single random class
     		// exp_part_id is already in randomized order (controlled by -seed)
     		// WARNING: USING SAME iclass_min AND iclass_max FOR SomeParticles!!
-    		long int idx = part_id - exp_my_first_particle;
+    		long int idx = my_random_particle - exp_my_first_random_particle;
     		if (idx >= exp_random_class_some_particles.size())
     			REPORT_ERROR("BUG: expectationOneParticle idx>random_class_some_particles.size()");
     		exp_iclass_min = exp_iclass_max = exp_random_class_some_particles[idx];
@@ -3385,12 +3432,12 @@ void MlOptimiser::expectationOneParticle(long int part_id, int thread_id)
 		Matrix1D<RFLOAT> exp_old_offset, exp_prior;
 		MultidimArray<RFLOAT> exp_wsum_scale_correction_XA, exp_wsum_scale_correction_AA, exp_power_imgs;
 
-		int metadata_offset = part_id - exp_my_first_particle;
-
+		int metadata_offset = my_random_particle - exp_my_first_random_particle;
+		long int part_id = mydata.randomised_particle_order[my_random_particle];
 
 		// Then calculate all Fourier Transform of masked and unmasked image and the CTF
 #ifdef TIMING
-		if (part_id == exp_my_first_particle)
+		if (my_random_particle == exp_my_first_random_particle)
 		{
 			timer.toc(TIMING_ESP_INI);
 			timer.tic(TIMING_ESP_FT);
@@ -3401,7 +3448,7 @@ void MlOptimiser::expectationOneParticle(long int part_id, int thread_id)
 				exp_pointer_dir_nonzeroprior, exp_pointer_psi_nonzeroprior, exp_directions_prior, exp_psi_prior);
 
 #ifdef TIMING
-		if (part_id == exp_my_first_particle)
+		if (my_random_particle == exp_my_first_random_particle)
 			timer.toc(TIMING_ESP_FT);
 #endif
 
@@ -3420,7 +3467,7 @@ void MlOptimiser::expectationOneParticle(long int part_id, int thread_id)
 		int exp_itrans_min, exp_itrans_max, exp_idir_min, exp_idir_max, exp_ipsi_min, exp_ipsi_max;
 		if (do_skip_align)
 		{
-			exp_itrans_min = exp_itrans_max = part_id - exp_my_first_particle;
+			exp_itrans_min = exp_itrans_max = my_random_particle - exp_my_first_random_particle;
 		}
 		else
 		{
@@ -3430,13 +3477,13 @@ void MlOptimiser::expectationOneParticle(long int part_id, int thread_id)
 		if (do_skip_align || do_skip_rotate)
 		{
 			exp_idir_min = exp_idir_max = exp_ipsi_min = exp_ipsi_max =
-					part_id - exp_my_first_particle;
+					my_random_particle - exp_my_first_random_particle;
 		}
 		else if (do_only_sample_tilt)
 		{
 			exp_idir_min = 0;
 			exp_idir_max = sampling.NrDirections(0, &exp_pointer_dir_nonzeroprior) - 1;
-			exp_ipsi_min = exp_ipsi_max = part_id - exp_my_first_particle;
+			exp_ipsi_min = exp_ipsi_max = my_random_particle - exp_my_first_random_particle;
 		}
 		else
 		{
@@ -4507,7 +4554,6 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 	Matrix2D<RFLOAT> Aori;
 	Matrix1D<RFLOAT> my_projected_com(mymodel.data_dim), my_refined_ibody_offset(mymodel.data_dim);
 
-
 	// To which group do I belong?
 	int group_id = mydata.getGroupId(part_id);
 	// What is my optics group?
@@ -4947,7 +4993,10 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 	windowFourierTransform(Faux, exp_Fimg_nomask, mymodel.current_size);
 
 	// Here apply the beamtilt correction if necessary
-	mydata.obsModel.demodulatePhase(optics_group, exp_Fimg_nomask);
+	if (fn_opt != "")
+	{
+		mydata.obsModel.demodulatePhase(optics_group, exp_Fimg_nomask);
+	}
 
 	MultidimArray<RFLOAT> Mnoise;
 	bool is_helical_segment = (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
@@ -5054,8 +5103,10 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 	windowFourierTransform(Faux, exp_Fimg, mymodel.current_size);
 
 	// Also perform beamtilt correction on the masked image (which will be used for alignment)
-	mydata.obsModel.demodulatePhase(optics_group, exp_Fimg);
-
+	if (fn_opt != "")
+	{
+		mydata.obsModel.demodulatePhase(optics_group, exp_Fimg);
+	}
 
 	// Also store its CTF
 	exp_Fctf.resize(exp_Fimg);
@@ -5098,9 +5149,27 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 		}
 		else
 		{
-			mydata.particles[part_id].ctf.getFftwImage(
-				exp_Fctf, mymodel.ori_size, mymodel.ori_size, mymodel.pixel_size,
-				ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);
+			//Get kV, Cs and Q0 from this optics group
+			RFLOAT kV, Cs, Q0;
+			mydata.obsModel.opticsMdt.getValue(EMDL_CTF_VOLTAGE, kV, optics_group);
+			mydata.obsModel.opticsMdt.getValue(EMDL_CTF_CS, Cs, optics_group);
+			mydata.obsModel.opticsMdt.getValue(EMDL_CTF_Q0, Q0, optics_group);
+
+			// Get parameters that change per-particle from the exp_metadata
+			CTF ctf;
+			ctf.setValues(DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_U),
+						  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_V),
+						  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_ANGLE),
+						  kV,
+						  Cs,
+						  Q0,
+						  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_BFACTOR),
+						  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_KFACTOR),
+						  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_PHASE_SHIFT));
+
+			ctf.getFftwImage(exp_Fctf, mymodel.ori_size, mymodel.ori_size, mymodel.pixel_size,
+					ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);
+
 		}
 
 //#define DEBUG_CTF_FFTW_IMAGE
@@ -5336,7 +5405,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 {
 
 #ifdef TIMING
-	if (my_ori_particle == exp_my_first_ori_particle)
+	if (my_ori_particle == exp_my_first_random_particle)
 	{
 		if (do_also_unmasked)
 			timer.tic(TIMING_ESP_PRECW);
@@ -5528,7 +5597,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 		}
 	}
 #ifdef TIMING
-	if (part_id == exp_my_first_particle)
+	if (my_random_particle == exp_my_first_random_particle)
 	{
 		if (do_also_unmasked)
 			timer.toc(TIMING_ESP_PRECW);
@@ -5581,7 +5650,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,  int exp
 {
 
 #ifdef TIMING
-	if (part_id == exp_my_first_particle)
+	if (my_random_particle == exp_my_first_random_particle)
 	{
 		if (exp_ipass == 0) timer.tic(TIMING_ESP_DIFF1);
 		else timer.tic(TIMING_ESP_DIFF2);
@@ -5700,7 +5769,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,  int exp
 							// Project the reference map (into Fref)
 #ifdef TIMING
 							// Only time one thread, as I also only time one MPI process
-							if (part_id == exp_my_first_particle)
+							if (my_random_particle == exp_my_first_random_particle)
 								timer.tic(TIMING_DIFF_PROJ);
 #endif
 
@@ -5717,7 +5786,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,  int exp
 
 #ifdef TIMING
 							// Only time one thread, as I also only time one MPI process
-							if (part_id == exp_my_first_particle)
+							if (my_random_particle == exp_my_first_random_particle)
 								timer.toc(TIMING_DIFF_PROJ);
 #endif
 #ifdef DEBUG_CHECKSIZES
@@ -5790,7 +5859,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,  int exp
 									{
 #ifdef TIMING
 										// Only time one thread, as I also only time one MPI process
-										if (my_ori_particle == exp_my_first_ori_particle)
+										if (my_ori_particle == exp_my_first_random_particle)
 											timer.tic(TIMING_DIFF2_GETSHIFT);
 #endif
 										/// Now get the shifted image
@@ -5882,13 +5951,13 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,  int exp
 										}
 #ifdef TIMING
 										// Only time one thread, as I also only time one MPI process
-										if (part_id == exp_my_first_particle)
+										if (my_random_particle == exp_my_first_random_particle)
 											timer.toc(TIMING_DIFF2_GETSHIFT);
 #endif
 
 #ifdef TIMING
 										// Only time one thread, as I also only time one MPI process
-										if (part_id == exp_my_first_particle)
+										if (my_random_particle == exp_my_first_random_particle)
 											timer.tic(TIMING_DIFF_DIFF2);
 #endif
 										RFLOAT diff2;
@@ -5923,7 +5992,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,  int exp
 										}
 #ifdef TIMING
 										// Only time one thread, as I also only time one MPI process
-										if (part_id == exp_my_first_particle)
+										if (my_random_particle == exp_my_first_random_particle)
 											timer.toc(TIMING_DIFF_DIFF2);
 #endif
 
@@ -6107,7 +6176,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,  int exp
 	} // end loop iclass
 
 #ifdef TIMING
-	if (part_id == exp_my_first_particle)
+	if (my_random_particle == exp_my_first_random_particle)
 	{
 		if (exp_ipass == 0) timer.toc(TIMING_ESP_DIFF1);
 		else timer.toc(TIMING_ESP_DIFF2);
@@ -6128,7 +6197,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
 {
 
 #ifdef TIMING
-	if (part_id == exp_my_first_particle)
+	if (my_random_particle == exp_my_first_random_particle)
 	{
 		if (exp_ipass == 0) timer.tic(TIMING_ESP_WEIGHT1);
 		else timer.tic(TIMING_ESP_WEIGHT2);
@@ -6365,7 +6434,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
 
 #ifdef TIMING
 						// Only time one thread, as I also only time one MPI process
-						if (part_id == exp_my_first_particle)
+						if (my_random_particle == exp_my_first_random_particle)
 							timer.tic(TIMING_WEIGHT_EXP);
 #endif
 						// Now first loop over iover_rot, because that is the order in exp_Mweight as well
@@ -6434,7 +6503,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
 						}// end loop iover_rot
 #ifdef TIMING
 						// Only time one thread, as I also only time one MPI process
-						if (part_id == exp_my_first_particle)
+						if (my_random_particle == exp_my_first_random_particle)
 							timer.toc(TIMING_WEIGHT_EXP);
 #endif
 					} // end loop itrans
@@ -6512,7 +6581,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
 	exp_significant_weight = 0.;
 
 #ifdef TIMING
-	if (my_ori_particle == exp_my_first_ori_particle)
+	if (my_ori_particle == exp_my_first_random_particle)
 		timer.tic(TIMING_WEIGHT_SORT);
 #endif
 	MultidimArray<RFLOAT> sorted_weight = exp_Mweight;
@@ -6533,7 +6602,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
 	sorted_weight.sort();
 
 #ifdef TIMING
-	if (part_id == exp_my_first_particle)
+	if (my_random_particle == exp_my_first_random_particle)
 		timer.toc(TIMING_WEIGHT_SORT);
 #endif
 	RFLOAT frac_weight = 0.;
@@ -6625,7 +6694,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
 
 
 #ifdef TIMING
-	if (part_id == exp_my_first_particle)
+	if (my_random_particle == exp_my_first_random_particle)
 	{
 		if (exp_ipass == 0) timer.toc(TIMING_ESP_WEIGHT1);
 		else timer.toc(TIMING_ESP_WEIGHT2);
@@ -6660,7 +6729,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody, int exp_current
 		RFLOAT &exp_local_sqrtXi2)
 {
 #ifdef TIMING
-	if (part_id == exp_my_first_ori_particle)
+	if (part_id == exp_my_first_random_particle)
 		timer.tic(TIMING_ESP_WSUM);
 #endif
 
@@ -6793,16 +6862,22 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody, int exp_current
 						if (mymodel.nr_bodies > 1)
 						{
 							Abody = Aori * (mymodel.orient_bodies[ibody]).transpose() * A_rot90 * A * mymodel.orient_bodies[ibody];
-							mydata.obsModel.applyAnisoMagTransp(Abody, optics_group);
+							if (fn_opt != "")
+							{
+								mydata.obsModel.applyAnisoMagTransp(Abody, optics_group);
+							}
 						}
 						else
 						{
-							mydata.obsModel.applyAnisoMagTransp(A, optics_group);
+							if (fn_opt != "")
+							{
+								mydata.obsModel.applyAnisoMagTransp(A, optics_group);
+							}
 						}
 
 #ifdef TIMING
 						// Only time one thread, as I also only time one MPI process
-						if (part_id == exp_my_first_particle)
+						if (my_random_particle == exp_my_first_random_particle)
 							timer.tic(TIMING_WSUM_PROJ);
 #endif
 						// Project the reference map (into Fref)
@@ -6819,7 +6894,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody, int exp_current
 						}
 #ifdef TIMING
 						// Only time one thread, as I also only time one MPI process
-						if (part_id == exp_my_first_particle)
+						if (my_random_particle == exp_my_first_random_particle)
 							timer.toc(TIMING_WSUM_PROJ);
 #endif
 						// Inside the loop over all translations and all part_id sum all shift Fimg's and their weights
@@ -6949,7 +7024,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody, int exp_current
 
 #ifdef TIMING
 										// Only time one thread, as I also only time one MPI process
-										if (part_id == exp_my_first_particle)
+										if (my_random_particle == exp_my_first_random_particle)
 											timer.tic(TIMING_WSUM_GETSHIFT);
 #endif
 
@@ -7027,7 +7102,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody, int exp_current
 										}
 #ifdef TIMING
 										// Only time one thread, as I also only time one MPI process
-										if (part_id == exp_my_first_ori_particle)
+										if (part_id == exp_my_first_random_particle)
 										{
 											timer.toc(TIMING_WSUM_GETSHIFT);
 											timer.tic(TIMING_WSUM_DIFF2);
@@ -7063,7 +7138,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody, int exp_current
 										}
 #ifdef TIMING
 										// Only time one thread, as I also only time one MPI process
-										if (part_id == exp_my_first_particle)
+										if (my_random_particle == exp_my_first_random_particle)
 										{
 											timer.toc(TIMING_WSUM_DIFF2);
 											timer.tic(TIMING_WSUM_LOCALSUMS);
@@ -7137,7 +7212,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody, int exp_current
 
 #ifdef TIMING
 										// Only time one thread, as I also only time one MPI process
-										if (part_id == exp_my_first_ori_particle)
+										if (part_id == exp_my_first_random_particle)
 										{
 											timer.toc(TIMING_WSUM_LOCALSUMS);
 											timer.tic(TIMING_WSUM_SUMSHIFT);
@@ -7219,7 +7294,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody, int exp_current
 
 #ifdef TIMING
 										// Only time one thread, as I also only time one MPI process
-										if (part_id == exp_my_first_particle)
+										if (my_random_particle == exp_my_first_random_particle)
 											timer.toc(TIMING_WSUM_SUMSHIFT);
 #endif
 									} // end if !do_skip_maximization
@@ -7386,7 +7461,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody, int exp_current
 						{
 #ifdef TIMING
 							// Only time one thread, as I also only time one MPI process
-							if (part_id == exp_my_first_particle)
+							if (my_random_particle == exp_my_first_random_particle)
 								timer.tic(TIMING_WSUM_BACKPROJ);
 #endif
 							// Perform the actual back-projection.
@@ -7401,7 +7476,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody, int exp_current
 							pthread_mutex_unlock(&global_mutex2[my_mutex]);
 #ifdef TIMING
 							// Only time one thread, as I also only time one MPI process
-							if (part_id == exp_my_first_particle)
+							if (my_random_particle == exp_my_first_random_particle)
 								timer.toc(TIMING_WSUM_BACKPROJ);
 #endif
 						} // end if !do_skip_maximization
@@ -7515,6 +7590,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody, int exp_current
 		dLL = log(exp_sum_weight) - exp_min_diff2 - logsigma2;
 
 	// Store dLL of each image in the output array, and keep track of total sum
+	std::cerr << " part_id= " << part_id << " metadata_offset= " << metadata_offset << " dLL= " << dLL << std::endl;
 	DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_DLL) = dLL;
 	thr_sum_dLL += dLL;
 
@@ -7565,7 +7641,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody, int exp_current
 	} // end if !do_skip_maximization
 
 #ifdef TIMING
-	if (part_id == exp_my_first_particle)
+	if (my_random_particle == exp_my_first_random_particle)
 		timer.toc(TIMING_ESP_WSUM);
 #endif
 }
@@ -7574,10 +7650,11 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody, int exp_current
 void MlOptimiser::monitorHiddenVariableChanges(long int my_first_ori_particle, long int my_last_ori_particle)
 {
 
-	for (long int part_id = my_first_ori_particle; part_id <= my_last_ori_particle; part_id++)
+	for (long int my_random_particle = my_first_ori_particle; my_random_particle <= my_last_ori_particle; my_random_particle++)
 	{
 
-		int metadata_offset = part_id - my_first_ori_particle;
+		int metadata_offset = my_random_particle - my_first_ori_particle;
+		long int part_id = mydata.randomised_particle_order[my_random_particle];
 #ifdef DEBUG_CHECKSIZES
 		if (part_id >= mydata.particles.size())
 		{
@@ -7652,7 +7729,7 @@ void MlOptimiser::monitorHiddenVariableChanges(long int my_first_ori_particle, l
 				sum_changes_optimal_classes += 1.;
 			sum_changes_count += 1.;
 		}
-	} //end loop part_id
+	} //end loop my_random_particle
 
 
 }
@@ -7704,7 +7781,7 @@ void MlOptimiser::updateOverallChangesInHiddenVariables()
 }
 
 
-void MlOptimiser::calculateExpectedAngularErrors(long int my_first_particle, long int my_last_particle)
+void MlOptimiser::calculateExpectedAngularErrors(long int my_first_random_particle, long int my_last_random_particle)
 {
 
 	//int current_image_size = (strict_highres_exp > 0. && !do_acc_currentsize_despite_highres_exp) ? coarse_size : mymodel.current_size;
@@ -7731,7 +7808,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_particle, lon
 	//	pvalue *= 2.;
 
 	std::cout << " Estimating accuracies in the orientational assignment ... " << std::endl;
-	int nr_particles = (my_last_particle - my_first_particle + 1);
+	int nr_particles = (my_last_random_particle - my_first_random_particle + 1);
 	init_progress_bar( nr_particles * mymodel.nr_classes * mymodel.nr_bodies);
 	for (int iclass = 0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++)
 	{
@@ -7758,10 +7835,11 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_particle, lon
 		RFLOAT acc_rot_class = 0.;
 		RFLOAT acc_trans_class = 0.;
 		// Particles are already in random order, so just move from 0 to n_trials
-		for (long int part_id = my_first_particle; part_id <= my_last_particle; part_id++)
+		for (long int my_random_particle = my_first_random_particle; my_random_particle <= my_last_random_particle; my_random_particle++)
 	    {
-			int metadata_offset = part_id - my_first_particle;
-
+			int metadata_offset = my_random_particle - my_first_random_particle;
+			long int part_id = mydata.randomised_particle_order[my_random_particle];
+			const int optics_group = mydata.particles[part_id].optics_group;
 
 			MultidimArray<RFLOAT> Fctf;
 			// Get CTF for this particle
@@ -7794,9 +7872,26 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_particle, lon
 				{
 					Fctf.resize(current_image_size, current_image_size/ 2 + 1);
 
-					mydata.particles[part_id].ctf.getFftwImage(
-						Fctf, mymodel.ori_size, mymodel.ori_size, mymodel.pixel_size,
-						ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);
+					//Get kV, Cs and Q0 from this optics group
+					RFLOAT kV, Cs, Q0;
+					mydata.obsModel.opticsMdt.getValue(EMDL_CTF_VOLTAGE, kV, optics_group);
+					mydata.obsModel.opticsMdt.getValue(EMDL_CTF_CS, Cs, optics_group);
+					mydata.obsModel.opticsMdt.getValue(EMDL_CTF_Q0, Q0, optics_group);
+
+					// Get parameters that change per-particle from the exp_metadata
+					CTF ctf;
+					ctf.setValues(DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_U),
+								  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_V),
+								  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_ANGLE),
+								  kV,
+								  Cs,
+								  Q0,
+								  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_BFACTOR),
+								  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_KFACTOR),
+								  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_PHASE_SHIFT));
+
+					ctf.getFftwImage(Fctf, mymodel.ori_size, mymodel.ori_size, mymodel.pixel_size,
+							ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);
 				}
 			}
 
@@ -8384,13 +8479,15 @@ void MlOptimiser::checkConvergence(bool myverb)
 
 }
 
-void MlOptimiser::setMetaDataSubset(int first_particle_id, int last_particle_id)
+void MlOptimiser::setMetaDataSubset(int first_random_particle, int last_random_particle)
 {
 
-	for (long int part_id = first_particle_id; part_id <= last_particle_id; part_id++)
+	for (long int my_random_particle = first_random_particle; my_random_particle <= last_random_particle; my_random_particle++)
     {
 
-		int metadata_offset = part_id - first_particle_id;
+		long int part_id = mydata.randomised_particle_order[my_random_particle];
+
+		int metadata_offset = my_random_particle - first_random_particle;
 #ifdef DEBUG_CHECKSIZES
 		if (part_id >= mydata.particles.size())
 		{
@@ -8473,7 +8570,7 @@ void MlOptimiser::setMetaDataSubset(int first_particle_id, int last_particle_id)
 
 }
 
-void MlOptimiser::getMetaAndImageDataSubset(int first_particle_id, int last_particle_id, bool do_also_imagedata)
+void MlOptimiser::getMetaAndImageDataSubset(int first_random_particle, int last_random_particle, bool do_also_imagedata)
 {
 
     // In case we're reading images here, only open stacks once and then read multiple images
@@ -8489,7 +8586,7 @@ void MlOptimiser::getMetaAndImageDataSubset(int first_particle_id, int last_part
 		exp_fn_recimg = "";
 	}
 
-	int nr_particles = last_particle_id - first_particle_id + 1;
+	int nr_particles = last_random_particle - first_random_particle + 1;
 	exp_metadata.initZeros(nr_particles, METADATA_LINE_LENGTH_BEFORE_BODIES + (mymodel.nr_bodies) * METADATA_NR_BODY_PARAMS);
 
 	if (do_also_imagedata)
@@ -8523,9 +8620,10 @@ void MlOptimiser::getMetaAndImageDataSubset(int first_particle_id, int last_part
 		}
 	}
 
-	for (long int part_id = first_particle_id; part_id <= last_particle_id; part_id++)
+	for (long int my_random_particle = first_random_particle; my_random_particle <= last_random_particle; my_random_particle++)
     {
-		int metadata_offset = part_id - first_particle_id;
+		int metadata_offset = my_random_particle - first_random_particle;
+		long int part_id = mydata.randomised_particle_order[my_random_particle];
 
 #ifdef DEBUG_CHECKSIZES
 		if (part_id >= mydata.MDimg.numberOfObjects())
@@ -8688,6 +8786,40 @@ void MlOptimiser::getMetaAndImageDataSubset(int first_particle_id, int last_part
 				DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_ZOFF_PRIOR) = 999.;
 		if (!mydata.MDimg.getValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO,  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_PSI_PRIOR_FLIP_RATIO), part_id))
 			DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_PSI_PRIOR_FLIP_RATIO) = 999.;
+
+		// The following per-particle parameters are passed around through metadata
+		// Note beamtilt is no longer part of this: it is now in the optics group
+		if (do_ctf_correction)
+		{
+			long int mic_id = mydata.getMicrographId(part_id);
+			RFLOAT DeltafU, DeltafV, azimuthal_angle, Bfac, kfac, phase_shift;
+
+			if (!mydata.MDimg.getValue(EMDL_CTF_DEFOCUSU, DeltafU, part_id))
+				DeltafU=0;
+
+			if (!mydata.MDimg.getValue(EMDL_CTF_DEFOCUSV, DeltafV, part_id))
+				DeltafV=DeltafU;
+
+			if (!mydata.MDimg.getValue(EMDL_CTF_DEFOCUS_ANGLE, azimuthal_angle, part_id))
+				azimuthal_angle=0;
+
+			if (!mydata.MDimg.getValue(EMDL_CTF_BFACTOR, Bfac, part_id))
+				Bfac=0.;
+
+			if (!mydata.MDimg.getValue(EMDL_CTF_SCALEFACTOR, kfac, part_id))
+				kfac=1.;
+
+			if (!mydata.MDimg.getValue(EMDL_CTF_PHASESHIFT, phase_shift, part_id))
+				phase_shift=0.;
+
+			DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_U) = DeltafU;
+			DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_V) = DeltafV;
+			DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_ANGLE) = azimuthal_angle;
+			DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_BFACTOR) = Bfac;
+			DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_KFACTOR) = kfac;
+			DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_PHASE_SHIFT) = phase_shift;
+
+		}
 
 		// For multi-body refinement
 		if (mymodel.nr_bodies > 1)
