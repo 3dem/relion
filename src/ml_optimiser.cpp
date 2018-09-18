@@ -7829,7 +7829,6 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 		// Particles are already in random order, so just move from 0 to n_trials
 		for (long int part_id = my_first_part_id, metadata_offset = 0; part_id <= my_last_part_id; part_id++, metadata_offset++)
 	    {
-			long int ori_part_id = mydata.getOriginalParticleId(part_id);
 			const int optics_group = mydata.getOpticsGroup(part_id);
 
 			MultidimArray<RFLOAT> Fctf;
@@ -7936,7 +7935,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 						break;
 
 					// ori_part_id instead of part_id to keep exactly the same as in relion-3.0....
-					init_random_generator(random_seed + ori_part_id);
+					init_random_generator(random_seed + mydata.getOriginalParticleId(part_id));
 
 					int group_id = mydata.getGroupId(part_id);
 					MultidimArray<Complex > F1, F2;
