@@ -78,6 +78,12 @@ int Experiment::getRandomSubset(long int part_id)
 	return particles[part_id].random_subset;
 }
 
+int Experiment::getOriginalParticleId(long part_id)
+{
+	return particles[part_id].id;
+}
+
+
 MetaDataTable Experiment::getMetaDataImage(long int part_id)
 {
 	MetaDataTable result;
@@ -357,11 +363,10 @@ void Experiment::randomiseParticlesOrder(int seed, bool do_split_random_halves, 
 	{
 
 		srand(seed);
-		std::vector<ExpParticle> new_particles;
 
 		if (do_split_random_halves)
 		{
-			std::vector<long int> particle_list1, particle_list2;
+			std::vector<ExpParticle> particle_list1, particle_list2;
 			particle_list1.clear();
 			particle_list2.clear();
 			// Fill the two particle lists
@@ -369,9 +374,9 @@ void Experiment::randomiseParticlesOrder(int seed, bool do_split_random_halves, 
 			{
 				int random_subset = particles[i].random_subset;
 				if (random_subset == 1)
-					particle_list1.push_back(i);
+					particle_list1.push_back(particles[i]);
 				else if (random_subset == 2)
-					particle_list2.push_back(i);
+					particle_list2.push_back(particles[i]);
 				else
 					REPORT_ERROR("ERROR Experiment::randomiseParticlesOrder: invalid number for random subset (i.e. not 1 or 2): " + integerToString(random_subset));
 			}
@@ -387,14 +392,14 @@ void Experiment::randomiseParticlesOrder(int seed, bool do_split_random_halves, 
 			std::random_shuffle(particle_list2.begin(), particle_list2.end());
 
             // First fill new_ori_particles with the first subset, then with the second
-			randomised_particle_order = particle_list1;
-			randomised_particle_order.insert(randomised_particle_order.end(), particle_list2.begin(), particle_list2.end());
+			particles = particle_list1;
+			particles.insert(particles.end(), particle_list2.begin(), particle_list2.end());
 
 		}
 		else
 		{
              // Just randomise
-             std::random_shuffle(randomised_particle_order.begin(), randomised_particle_order.end());
+             std::random_shuffle(particles.begin(), particles.end());
 
 		}
 
@@ -444,18 +449,19 @@ void Experiment::initialiseBodies(int _nr_bodies)
 
 bool Experiment::getImageNameOnScratch(long int part_id, FileName &fn_img, bool is_ctf_image)
 {
-	if (fn_scratch != "" && part_id < nr_parts_on_scratch)
+	long int ori_part_id = getOriginalParticleId(part_id);
+	if (fn_scratch != "" && ori_part_id < nr_parts_on_scratch)
 	{
 		if (is_3D)
 		{
 			if (is_ctf_image)
-				fn_img = fn_scratch + "particle_ctf" + integerToString(part_id+1, 5)+".mrc";
+				fn_img = fn_scratch + "particle_ctf" + integerToString(ori_part_id+1, 5)+".mrc";
 			else
-				fn_img = fn_scratch + "particle" + integerToString(part_id+1, 5)+".mrc";
+				fn_img = fn_scratch + "particle" + integerToString(ori_part_id+1, 5)+".mrc";
 		}
 		else
 		{
-			fn_img.compose(part_id+1, fn_scratch + "particles.mrcs");
+			fn_img.compose(ori_part_id+1, fn_scratch + "particles.mrcs");
 		}
 		return true;
 	}
@@ -1002,13 +1008,6 @@ void Experiment::read(
 	//std::cin >> c;
 #endif
 
-
-	// Make ordered randomised_particle_order
-    randomised_particle_order.resize(particles.size());
-    for (long int i = 0; i < randomised_particle_order.size(); i++)
-    {
-   	 randomised_particle_order[i] = i;
-    }
 
 	// Make sure some things are always set in the MDimg
 	bool have_rot  = MDimg.containsLabel(EMDL_ORIENT_ROT);

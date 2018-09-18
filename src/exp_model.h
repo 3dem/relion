@@ -223,9 +223,6 @@ public:
 	// All particles in the experiment
 	std::vector<ExpParticle> particles;
 
-	// Randomised order of the particles
-	std::vector<long int> randomised_particle_order;
-
 	// Number of particles in random subsets 1 and 2;
 	long int nr_particles_subset1, nr_particles_subset2;
 
@@ -313,7 +310,11 @@ public:
 	// Get the group_id for the N'th image for this particle
 	long int getGroupId(long int part_id);
 
+	// Get the optics group to which this particle belongs
 	int getOpticsGroup(long int part_id);
+
+	// Get the original position in the input STAR file for this particle
+	int getOriginalParticleId(long part_id);
 
 	// Get the metadata-row for this image in a separate MetaDataTable
 	MetaDataTable getMetaDataImage(long int part_id);
@@ -342,8 +343,8 @@ public:
 	// by copying the relevant entries from MDimg into MDbodies
 	void initialiseBodies(int _nr_bodies);
 
-	// Get the image name for a given particle_id
-	bool getImageNameOnScratch(long int particle_id, FileName &fn_img, bool is_ctf_image = false);
+	// Get the image name for a given part_id
+	bool getImageNameOnScratch(long int part_id, FileName &fn_img, bool is_ctf_image = false);
 
 	// For parallel executions, lock the scratch directory with a unique code, so we won't copy the same data many times to the same position
 	// This determines the lockname and removes the lock if it exists
