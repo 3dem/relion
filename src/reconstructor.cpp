@@ -25,7 +25,6 @@ void Reconstructor::read(int argc, char **argv)
 
 	int general_section = parser.addSection("General options");
 	fn_sel = parser.getOption("--i", "Input STAR file with the projection images and their orientations", "");
-	fn_opt = parser.getOption("--io", "Corresponding optics STAR file", "");
 	fn_out = parser.getOption("--o", "Name for output reconstruction","relion.mrc");
 	fn_sym = parser.getOption("--sym", "Symmetry group", "c1");
 	angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms)", "1"));
@@ -104,7 +103,7 @@ void Reconstructor::initialise()
 	// Read MetaData file, which should have the image names and their angles!
 	if (fn_debug == "")
 	{
-		ObservationModel::loadSafely(fn_sel, fn_opt, obsModel, DF, DFopt);
+		ObservationModel::loadSafely(fn_sel, obsModel, DF, DFopt);
 	}
 
 	if (verb > 0 && (subset == 1 || subset == 2) && !DF.containsLabel(EMDL_PARTICLE_RANDOM_SUBSET))

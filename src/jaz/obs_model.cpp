@@ -25,6 +25,7 @@
 #include "src/jaz/ctf/tilt_helper.h"
 #include "src/jaz/math/Zernike.h"
 #include "src/jaz/vtk_helper.h"
+#include "src/jaz/io/star_converter.h"
 
 #include <src/backprojector.h>
 
@@ -34,20 +35,24 @@
 using namespace gravis;
 
 void ObservationModel::loadSafely(
-	std::string particlesFn, std::string opticsFn,
+	std::string filename,
 	ObservationModel& obsModel,
 	MetaDataTable& particlesMdt, MetaDataTable& opticsMdt)
 {
-	particlesMdt.read(particlesFn);
+	particlesMdt.read(filename, "particles");
+	opticsMdt.read(filename, "optics");
 
-	if (particlesMdt.getVersion() < 31000)
+	if (particlesMdt.numberOfObjects() == 0 && particlesMdt.numberOfObjects() == 0)
 	{
-		REPORT_ERROR_STR(particlesFn << " is from a pre-3.1 version of Relion. "
-			<< "Please use relion_convert_star to generate an up-to-date file.");
+		std::cerr << "WARNING: " << filename << " seems to be from an outdated version of Relion or a bad file\n"
+				  << "         Attempting conversion...\n";
+
+		MetaDataTable oldMdt;
+		oldMdt.read(filename);
+		
+		StarConverter::convert_3p0_particlesTo_3p1(oldMdt, particlesMdt, opticsMdt);
 	}
-
-	opticsMdt.read(opticsFn);
-
+	
 	obsModel = ObservationModel(opticsMdt);
 
 	// read pixel sizes (and make sure they are all the same)
@@ -76,14 +81,14 @@ void ObservationModel::loadSafely(
 		}
 
 		REPORT_ERROR("ERROR: The following optics groups were not defined in "+
-					 opticsFn+": "+sts.str());
+					 filename+": "+sts.str());
 	}
 
 	// make sure the optics groups appear in the right order (and rename them if necessary)
 
 	if (!obsModel.opticsGroupsSorted())
 	{
-		std::cerr << "   - Warning: the optics groups in " << opticsFn
+		std::cerr << "   - Warning: the optics groups in " << filename
 				  << " are not in the right order - renaming them now" << std::endl;
 
 		obsModel.sortOpticsGroups(particlesMdt);
@@ -100,13 +105,12 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 	lambda(opticsMdt.numberOfObjects()),
 	Cs(opticsMdt.numberOfObjects())
 {
-	if (   !opticsMdt.containsLabel(EMDL_CTF_MAGNIFICATION)
-	    || !opticsMdt.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE)
+	if (   !opticsMdt.containsLabel(EMDL_MLMODEL_PIXEL_SIZE)
 	    || !opticsMdt.containsLabel(EMDL_CTF_VOLTAGE)
 	    || !opticsMdt.containsLabel(EMDL_CTF_CS))
 	{
 		REPORT_ERROR_STR("ERROR: not all necessary variables defined in _optics.star file: "
-			<< "rlnMagnification, rlnDetectorPixelSize, rlnVoltage and rlnSphericalAberration.");
+			<< "rlnPixelSize, rlnVoltage and rlnSphericalAberration.");
 	}
 
 	// symmetrical high-order aberrations:

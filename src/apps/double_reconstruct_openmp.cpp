@@ -39,7 +39,7 @@ class reconstruct_parameters
 {
 	public:
 		
-		FileName fn_out, fn_sel, fn_opt, fn_img, fn_sym, fn_sub;
+		FileName fn_out, fn_sel, fn_img, fn_sym, fn_sub;
 		
 		int r_max, r_min_nn, blob_order, ref_dim, interpolator, grid_iters,
 			nr_omp_threads,
@@ -76,7 +76,6 @@ class reconstruct_parameters
 			
 			int general_section = parser.addSection("General options");
 			fn_sel = parser.getOption("--i", "Input STAR file with the projection images and their orientations", "");
-			fn_opt = parser.getOption("--io", "Corresponding optics STAR file", "");
 			fn_out = parser.getOption("--o", "Name for output reconstruction");
 			fn_sym = parser.getOption("--sym", "Symmetry group", "c1");
 			maxres = textToFloat(parser.getOption("--maxres", "Maximum resolution (in Angstrom) to consider in Fourier space (default Nyquist)", "-1"));
@@ -287,7 +286,7 @@ class reconstruct_parameters
 			ObservationModel obsModel;
 			MetaDataTable mdt0, mdtOpt;
 			
-			ObservationModel::loadSafely(fn_sel, fn_opt, obsModel, mdt0, mdtOpt);
+			ObservationModel::loadSafely(fn_sel, obsModel, mdt0, mdtOpt);
 			double angpix = obsModel.getPixelSize(0);
 			
 			// Get dimension of the images

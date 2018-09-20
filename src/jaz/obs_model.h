@@ -35,7 +35,7 @@ class ObservationModel
     public:
 		
 		static void loadSafely(
-				std::string particlesFn, std::string opticsFn, 
+				std::string filename, 
 				ObservationModel& obsModel, 
 				MetaDataTable& particlesMdt, MetaDataTable& opticsMdt);
 		

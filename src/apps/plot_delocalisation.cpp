@@ -20,7 +20,7 @@ using namespace gravis;
 
 int main(int argc, char *argv[])
 {
-    std::string starFn, opticsFn, outPath, name;
+    std::string starFn, outPath, name;
     int threads, s;
 	double rad, maxFreqAng, minFreqAng;
 	bool allParts;
@@ -34,7 +34,6 @@ int main(int argc, char *argv[])
         parser.addSection("General options");
 		
 		starFn = parser.getOption("--i", "Input particle *.star file");
-		opticsFn = parser.getOption("--io", "Input optics *.star file");
 		rad = textToDouble(parser.getOption("--rad", "Particle radius [Å]"));
 		maxFreqAng = textToDouble(parser.getOption("--max_freq", "Max. image frequency [Å] (default is Nyquist)", "-1"));
 		minFreqAng = textToDouble(parser.getOption("--min_freq", "Min. image frequency [Å]", "0"));
@@ -56,7 +55,7 @@ int main(int argc, char *argv[])
 	ObservationModel obsModel;	
 	MetaDataTable mdt0, opticsMdt;
 	
-	ObservationModel::loadSafely(starFn, opticsFn, obsModel, mdt0, opticsMdt);
+	ObservationModel::loadSafely(starFn, obsModel, mdt0, opticsMdt);
 	
 	std::vector<MetaDataTable> allMdts = StackHelper::splitByMicrographName(&mdt0);
 	

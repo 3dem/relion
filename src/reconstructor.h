@@ -36,7 +36,7 @@ public:
 	// I/O Parser
 	IOParser parser;
 
-	FileName fn_out, fn_sel, fn_opt, fn_img, fn_sym, fn_sub, fn_fsc, fn_debug, image_path;
+	FileName fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_fsc, fn_debug, image_path;
 
 	MetaDataTable DF, DFopt;
 	ObservationModel obsModel;

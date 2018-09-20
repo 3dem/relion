@@ -989,10 +989,10 @@ long int MetaDataTable::readStar(std::ifstream& in, const std::string &name, std
 	// The loop statement may be necessary for data blocks that have a list AND a table inside them
 	while (getline(in, line, '\n'))
 	{
-		if (line.find("version_") != std::string::npos)
+		if (line.find("# version ") != std::string::npos)
 		{
-			token = line.substr(line.find("version_") 
-								+ std::string("version_").length());
+			token = line.substr(line.find("# version ") 
+								+ std::string("# version ").length());
 			
 			std::istringstream sts(token);
 			sts >> version;
@@ -1075,10 +1075,10 @@ void MetaDataTable::write(std::ostream& out) const
 		return;
 	}
 	
-	if (version >= 31000)
+	if (version >= 30000)
 	{
 		out << "\n";
-		out << "version_ " << getCurrentVersion() <<"\n";
+		out << "# version " << getCurrentVersion() <<"\n";
 	}
 	
 	out << "\n";

@@ -79,7 +79,7 @@ class CtfRefiner
 		
 		int nr_omp_threads;
 	
-		std::string starFn, opticsFn, outPath;
+		std::string starFn, outPath;
 	
 		MetaDataTable mdt0, opticsMdt;
 		std::vector<MetaDataTable> allMdts, unfinishedMdts;	

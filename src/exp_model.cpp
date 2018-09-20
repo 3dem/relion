@@ -767,7 +767,7 @@ void Experiment::read(
 		{
 			// MDimg and MDopt have to be read at the same time, so that the optics groups can be
 			// renamed in case they are non-contiguous or not sorted
-			ObservationModel::loadSafely(fn_exp, fn_opt, obsModel, MDimg, MDopt);
+			ObservationModel::loadSafely(fn_exp, obsModel, MDimg, MDopt);
 		}
 		else
 		{

@@ -46,7 +46,7 @@
 #include "src/metadata_container.h"
 #include "src/metadata_label.h"
 
-#define CURRENT_MDT_VERSION 31000
+#define CURRENT_MDT_VERSION 30001
 
 /** For all objects.
  @code

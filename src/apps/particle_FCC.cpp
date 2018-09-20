@@ -21,7 +21,7 @@ using namespace gravis;
 
 int main(int argc, char *argv[])
 {
-    std::string starFn, opticsFn, outPath;
+    std::string starFn, outPath;
 	double minFreqPx;
 	bool oppositeHalf, predictCTF;
 	int minMG, maxMG, threads;
@@ -37,7 +37,6 @@ int main(int argc, char *argv[])
         parser.addSection("General options");
 		
 		starFn = parser.getOption("--i", "Input particle *.star file");
-		opticsFn = parser.getOption("--io", "Input optics *.star file");
 		reference.read(parser, argc, argv);
 		
 		minFreqPx = textToDouble(parser.getOption("--min_freq", "Min. image frequency [px]", "0"));
@@ -63,7 +62,7 @@ int main(int argc, char *argv[])
 	ObservationModel obsModel;	
 	MetaDataTable mdt0, opticsMdt;
 	
-	ObservationModel::loadSafely(starFn, opticsFn, obsModel, mdt0, opticsMdt);
+	ObservationModel::loadSafely(starFn, obsModel, mdt0, opticsMdt);
 	
 	std::vector<MetaDataTable> allMdts = StackHelper::splitByMicrographName(&mdt0);
 	

@@ -91,12 +91,12 @@ enum EMDLabel
     EMDL_CTF_DEFOCUS_ANGLE, ///< Defocus angle (degrees)
     EMDL_CTF_CS, ///< Spherical aberration
     EMDL_CTF_CA, ///< Chromatic aberration
-    EMDL_CTF_DETECTOR_PIXEL_SIZE, ///< Pixel size for detector as used in CTF-determination
+    EMDL_CTF_DETECTOR_PIXEL_SIZE, ///< Pixel size for detector as used in CTF-determination (deprecated)
     EMDL_CTF_ENERGY_LOSS, ///< Energy loss
     EMDL_CTF_FOM, ///< ctffind FOM (CC) for quality of CTF-fit
     EMDL_CTF_IMAGE, ///< name of an image describing the CTF model
     EMDL_CTF_LENS_STABILITY, ///< Lens stability
-    EMDL_CTF_MAGNIFICATION, ///< Magnification used for CTF-determination
+    EMDL_CTF_MAGNIFICATION, ///< Magnification used for CTF-determination (deprecated)
     EMDL_CTF_PHASESHIFT, ///< Phase-shift from a phase plate
     EMDL_CTF_CONVERGENCE_CONE, ///< Convergence cone
     EMDL_CTF_LONGITUDINAL_DISPLACEMENT, ///< Longitudinal displacement
@@ -333,12 +333,15 @@ enum EMDLabel
 
     EMDL_ORIENT_FLIP,
     EMDL_ORIENT_ID,
-    EMDL_ORIENT_ORIGIN_X,
+	EMDL_ORIENT_ORIGIN_X, // (deprecated)
     EMDL_ORIENT_ORIGIN_X_PRIOR,
-    EMDL_ORIENT_ORIGIN_Y,
+    EMDL_ORIENT_ORIGIN_Y, // (deprecated)
     EMDL_ORIENT_ORIGIN_Y_PRIOR,
-    EMDL_ORIENT_ORIGIN_Z,
+    EMDL_ORIENT_ORIGIN_Z, // (deprecated)
     EMDL_ORIENT_ORIGIN_Z_PRIOR,
+	EMDL_ORIENT_ORIGIN_X_ANGSTROM,
+    EMDL_ORIENT_ORIGIN_Y_ANGSTROM,
+    EMDL_ORIENT_ORIGIN_Z_ANGSTROM,
     EMDL_ORIENT_ROT,
     EMDL_ORIENT_ROT_PRIOR,
     EMDL_ORIENT_TILT,
@@ -548,7 +551,7 @@ private:
         EMDL::addLabel(EMDL_CTF_IMAGE, EMDL_STRING, "rlnCtfImage", "Name of an image with all CTF values");
         EMDL::addLabel(EMDL_CTF_LENS_STABILITY, EMDL_DOUBLE, "rlnLensStability", "Lens stability (in ppm)");
         EMDL::addLabel(EMDL_CTF_MAGNIFICATION, EMDL_DOUBLE, "rlnMagnification", "Magnification at the detector (in times)");
-        EMDL::addLabel(EMDL_CTF_PHASESHIFT, EMDL_DOUBLE, "rlnPhaseShift", "Phase-shift from a phase-plate (in degrees)");
+		EMDL::addLabel(EMDL_CTF_PHASESHIFT, EMDL_DOUBLE, "rlnPhaseShift", "Phase-shift from a phase-plate (in degrees)");
         EMDL::addLabel(EMDL_CTF_CONVERGENCE_CONE, EMDL_DOUBLE, "rlnConvergenceCone", "Convergence cone (in mrad)");
         EMDL::addLabel(EMDL_CTF_LONGITUDINAL_DISPLACEMENT, EMDL_DOUBLE, "rlnLongitudinalDisplacement", "Longitudinal displacement (in Angstroms)");
         EMDL::addLabel(EMDL_CTF_TRANSVERSAL_DISPLACEMENT, EMDL_DOUBLE, "rlnTransversalDisplacement", "Transversal displacement (in Angstroms)");
@@ -790,6 +793,11 @@ private:
         EMDL::addLabel(EMDL_ORIENT_ORIGIN_Y_PRIOR, EMDL_DOUBLE, "rlnOriginYPrior", "Center of the prior on the X-coordinate (in pixels) for the origin of rotation");
         EMDL::addLabel(EMDL_ORIENT_ORIGIN_Z, EMDL_DOUBLE, "rlnOriginZ", "Z-coordinate (in pixels) for the origin of rotation");
         EMDL::addLabel(EMDL_ORIENT_ORIGIN_Z_PRIOR, EMDL_DOUBLE, "rlnOriginZPrior", "Center of the prior on the X-coordinate (in pixels) for the origin of rotation");
+		
+		EMDL::addLabel(EMDL_ORIENT_ORIGIN_X_ANGSTROM, EMDL_DOUBLE, "rlnOriginXAngst", "X-coordinate (in Angstrom) for the origin of rotation");        
+        EMDL::addLabel(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, EMDL_DOUBLE, "rlnOriginYAngst", "Y-coordinate (in Angstrom) for the origin of rotation");
+        EMDL::addLabel(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, EMDL_DOUBLE, "rlnOriginZAngst", "Z-coordinate (in Angstrom) for the origin of rotation");
+		
         EMDL::addLabel(EMDL_ORIENT_ROT, EMDL_DOUBLE, "rlnAngleRot", "First Euler angle (rot, in degrees)");
         EMDL::addLabel(EMDL_ORIENT_ROT_PRIOR, EMDL_DOUBLE, "rlnAngleRotPrior", "Center of the prior (in degrees) on the first Euler angle (rot)");
         EMDL::addLabel(EMDL_ORIENT_TILT, EMDL_DOUBLE, "rlnAngleTilt", "Second Euler angle (tilt, in degrees)");
