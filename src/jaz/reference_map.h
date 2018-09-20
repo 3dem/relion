@@ -19,16 +19,15 @@ class ReferenceMap
         ReferenceMap();
 	
 			// input parameters:
-            std::string reconFn0, reconFn1, weightFn0, weightFn1, maskFn, fscFn;
+            std::string reconFn0, reconFn1, maskFn, fscFn;
             double paddingFactor;
 
             // data:
             Image<RFLOAT> freqWeight, mask;
             std::vector<double> freqWeight1D;
 			Projector projectors[2];
-			Projector occupancies[2];
             int k_out, s, sh;
-			bool hasMask, hasOccupancies;
+			bool hasMask;
 
         void read(IOParser& parser, int argc, char *argv[]);
         void load(int verb, bool debug);
@@ -41,8 +40,7 @@ class ReferenceMap
                 HalfSet hs, int threads,
                 bool applyCtf = true,
                 bool applyTilt = true, 
-				bool applyShift = true,
-				std::vector<Image<Complex>>* observations = 0);
+				bool applyShift = true);
 
         Image<Complex> predict(
                 const MetaDataTable& mdt, int p,
@@ -50,8 +48,7 @@ class ReferenceMap
                 HalfSet hs,
                 bool applyCtf = true,
                 bool applyTilt = true, 
-				bool applyShift = true,
-				Image<Complex>* observation = 0);
+				bool applyShift = true);
 		
 		std::vector<Volume<gravis::t2Vector<Complex> > > predictAllComplexGradients(
 				const MetaDataTable& mdt,
@@ -84,9 +81,6 @@ class ReferenceMap
                 bool applyCtf = true,
                 bool applyTilt = true, 
 				bool applyShift = true);
-		
-		//void predictOccupancy(const MetaDataTable& particles, int threads);
-
 };
 
 #endif

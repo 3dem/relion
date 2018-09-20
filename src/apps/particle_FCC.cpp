@@ -86,7 +86,7 @@ int main(int argc, char *argv[])
 		pred = reference.predictAll(
 			allMdts[m], obsModel, 
 			oppositeHalf? ReferenceMap::Opposite : ReferenceMap::Own, 
-			threads, predictCTF, true, false, &obs);
+			threads, predictCTF, true, false);
 		
 		const int pc = obs.size();
 		

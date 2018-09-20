@@ -48,9 +48,7 @@ class ObservationModel
 		void predictObservation(
 				Projector &proj, const MetaDataTable &partMdt, long int particle,
 				MultidimArray<Complex>& dest,
-				bool applyCtf = true, bool shiftPhases = true, bool applyShift = true,
-				Projector* weightProjector = 0,            // <-}
-				MultidimArray<Complex>* observation = 0);  // <-} for self-subtraction 
+				bool applyCtf = true, bool shiftPhases = true, bool applyShift = true);
 		
 		Volume<gravis::t2Vector<Complex> > predictComplexGradient(
 				Projector &proj, const MetaDataTable &partMdt, long int particle,
@@ -78,6 +76,7 @@ class ObservationModel
 		const Image<RFLOAT>& getGammaOffset(int optGroup, int s);
 				
 		Matrix2D<RFLOAT> applyAnisoMagTransp(Matrix2D<RFLOAT> A3D_transp, int opticsGroup);
+		
 		
 		
 	// Bureaucracy //

@@ -18,8 +18,7 @@ ReferenceMap::ReferenceMap()
 	maskFn(""),
 	fscFn(""),
 	paddingFactor(2.0),	
-	hasMask(false),	
-	hasOccupancies(false)
+	hasMask(false)
 {
 }
 
@@ -29,8 +28,6 @@ void ReferenceMap::read(IOParser& parser, int argc, char* argv[])
 	reconFn1 = parser.getOption("--m2", "Reference map, half 2");
 	maskFn = parser.getOption("--mask", "Reference mask", "");
 	fscFn = parser.getOption("--f", "Input STAR file with the FSC of the reference");
-	weightFn0 = parser.getOption("--w1", "Weight volume, half 1", "");
-	weightFn1 = parser.getOption("--w2", "Weight volume, half 2", "");
 	paddingFactor = textToFloat(parser.getOption("--pad", "Padding factor", "2"));
 }
 
@@ -63,11 +60,6 @@ void ReferenceMap::load(int verb, bool debug)
 	  || maps[0].data.zdim != maps[1].data.zdim)
 	{
 		REPORT_ERROR(reconFn0 + " and " + reconFn1 + " are of unequal size.\n");
-	}
-	
-	if ((weightFn0 == "") != (weightFn0 == ""))
-	{
-		REPORT_ERROR("Both weight volumes (--w1 and --w2) have to be set.\n");
 	}
 	
 	s = maps[0].data.ydim;
@@ -134,37 +126,6 @@ void ReferenceMap::load(int verb, bool debug)
 			break;
 		}
 	}
-	
-	if (weightFn0 != "" && weightFn1 != "")
-	{
-		std::vector<std::string> wfns = {weightFn0, weightFn1};
-		
-		for (int i = 0; i < 2; i++)
-		{
-			Image<RFLOAT> weightVol;		
-			weightVol.read(wfns[i]);
-			
-			MultidimArray<RFLOAT> powSpecDummy;
-					
-			occupancies[i] = Projector(s, TRILINEAR, 1, 10, 2);	
-			// trick the Projector into allocating the right volume and setting the right fields:
-			occupancies[i].computeFourierTransformMap(maps[0](), powSpecDummy, s);
-						
-			for (long int z = 0; z < s; z++)
-			for (long int y = 0; y < s; y++)
-			for (long int x = 0; x < sh; x++)
-			{
-				long int zz = (z + s - sh)%s;
-				long int yy = (y + s - sh)%s;
-				long int xx = x;
-								
-				DIRECT_A3D_ELEM(occupancies[i].data, z, y, x)
-					= DIRECT_A3D_ELEM(weightVol.data, zz, yy, xx);
-			}
-		}
-		
-		hasOccupancies = true;
-	}
 }
 
 Image<RFLOAT> ReferenceMap::getHollowWeight(double kmin_px)
@@ -191,8 +152,7 @@ std::vector<Image<Complex>> ReferenceMap::predictAll(
 		const MetaDataTable& mdt,
 		ObservationModel& obs,
 		HalfSet hs, int threads,
-		bool applyCtf, bool applyTilt, bool applyShift, 
-		std::vector<Image<Complex>>* observations)
+		bool applyCtf, bool applyTilt, bool applyShift)
 {
 	// declare on first line to prevent copying
 	std::vector<Image<Complex>> out(mdt.numberOfObjects());
@@ -202,8 +162,7 @@ std::vector<Image<Complex>> ReferenceMap::predictAll(
 	#pragma omp parallel for num_threads(threads)
 	for (int p = 0; p < pc; p++)
 	{
-		out[p] = predict(mdt, p, obs, hs, applyCtf, applyTilt, applyShift,
-						 (observations != 0)? &(*observations)[p] : 0);
+		out[p] = predict(mdt, p, obs, hs, applyCtf, applyTilt, applyShift);
 	}
 	
 	return out;
@@ -213,8 +172,7 @@ Image<Complex> ReferenceMap::predict(
 		const MetaDataTable& mdt, int p,
 		ObservationModel& obs,
 		HalfSet hs,
-		bool applyCtf, bool applyTilt, bool applyShift,
-		Image<Complex>* observation)
+		bool applyCtf, bool applyTilt, bool applyShift)
 {
 	Image<Complex> pred;
 	
@@ -224,15 +182,7 @@ Image<Complex> ReferenceMap::predict(
 	
 	int pi = (hs == Own)? randSubset : 1 - randSubset;
 	
-	if (hasOccupancies && observation != 0 && hs == Own)
-	{
-		obs.predictObservation(projectors[pi], mdt, p, pred(), applyCtf, applyTilt, applyShift,
-		                       &(occupancies[pi]), &(observation->data));
-	}
-	else
-	{
-		obs.predictObservation(projectors[pi], mdt, p, pred(), applyCtf, applyTilt, applyShift);
-	}
+	obs.predictObservation(projectors[pi], mdt, p, pred(), applyCtf, applyTilt, applyShift);
 	
 	return pred;
 }
