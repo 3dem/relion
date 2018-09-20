@@ -266,10 +266,12 @@ void ObservationModel::predictObservation(
 		
 		ctf.getFftwImage(ctfImg(), s, s, angpix[opticsGroup]);
 		
+		const double fudge = 0.25 * s;
+		
 		for (int y = 0; y < s;  y++)
 		for (int x = 0; x < sh; x++)
 		{
-			const double w = 0.30 * s * weight(y,x);
+			const double w = fudge * weight(y,x);
 			const double c = ctfImg(y,x);
 			const double cc = c*c;
 			
