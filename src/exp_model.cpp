@@ -255,21 +255,21 @@ void Experiment::divideParticlesInRandomHalves(int seed, bool do_helical_refine)
 				map_mics.insert(vec_mics[ii]);
 			}
 
-			for (long int part_id = 0; part_id < MDimg.numberOfObjects(); part_id++)
+			for (long int ori_part_id = 0; ori_part_id < MDimg.numberOfObjects(); ori_part_id++)
 			{
-				MDimg.getValue(EMDL_MICROGRAPH_NAME, img_name, part_id);
+				MDimg.getValue(EMDL_MICROGRAPH_NAME, img_name, ori_part_id);
 				mic_name = img_name;
 
 				if (divide_according_to_helical_tube_id)
 				{
-					MDimg.getValue(EMDL_PARTICLE_HELICAL_TUBE_ID, helical_tube_id, part_id);
+					MDimg.getValue(EMDL_PARTICLE_HELICAL_TUBE_ID, helical_tube_id, ori_part_id);
 					if (helical_tube_id < 1)
 						REPORT_ERROR("ERROR Experiment::divideParticlesInRandomHalves: Helical tube ID should be positive integer!");
 					mic_name += std::string("_TUBEID_");
 					mic_name += std::string(integerToString(helical_tube_id));
 				}
-				MDimg.setValue(EMDL_PARTICLE_RANDOM_SUBSET, map_mics[mic_name], part_id);
-				particles[part_id].random_subset = map_mics[mic_name];
+				MDimg.setValue(EMDL_PARTICLE_RANDOM_SUBSET, map_mics[mic_name], ori_part_id);
+				particles[ori_part_id].random_subset = map_mics[mic_name];
 			}
 
 			nr_particles_subset1 = nr_segments_subset1;
@@ -398,7 +398,7 @@ void Experiment::randomiseParticlesOrder(int seed, bool do_split_random_halves, 
 		}
 		else
 		{
-             // Just randomise
+             // Just randomise the entire vector
              std::random_shuffle(particles.begin(), particles.end());
 
 		}
@@ -839,7 +839,7 @@ void Experiment::read(
 		long int last_part_idx = -1;
 
 		//FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDimg)
-		for (long int partID = 0; partID < MDimg.numberOfObjects(); partID++)
+		for (long int ori_part_id = 0; ori_part_id < MDimg.numberOfObjects(); ori_part_id++)
 		{
 			// Add new micrographs or get mic_id for existing micrograph
 			FileName mic_name=""; // Filename instead of string because will decompose below
@@ -848,7 +848,7 @@ void Experiment::read(
 				long int idx = micrographs.size();
 				std::string last_mic_name = (idx > 0) ? micrographs[idx-1].name : "";
 
-				MDimg.getValue(EMDL_MICROGRAPH_NAME, mic_name, partID);
+				MDimg.getValue(EMDL_MICROGRAPH_NAME, mic_name, ori_part_id);
 
 				// All frames of a movie belong to the same micrograph
 				if (is_mic_a_movie)
@@ -881,7 +881,7 @@ void Experiment::read(
 					// Check whether there is a group label, if not use a group for each micrograph
 					if (MDimg.containsLabel(EMDL_MLMODEL_GROUP_NAME))
 					{
-						MDimg.getValue(EMDL_MLMODEL_GROUP_NAME, group_name, partID);
+						MDimg.getValue(EMDL_MLMODEL_GROUP_NAME, group_name, ori_part_id);
 					}
 					else
 					{
@@ -919,32 +919,32 @@ void Experiment::read(
 			// If there is an EMDL_PARTICLE_RANDOM_SUBSET entry in the input STAR-file, then set the random_subset, otherwise use default (0)
 			int my_random_subset;
 
-			if (!MDimg.getValue(EMDL_PARTICLE_RANDOM_SUBSET, my_random_subset, partID))
+			if (!MDimg.getValue(EMDL_PARTICLE_RANDOM_SUBSET, my_random_subset, ori_part_id))
 			{
 				my_random_subset = 0;
 			}
 
 			// Set the optics group - this may not be defined, for example if we don't do CTF correction or for sub-tomograms, then set to 0
 			int my_optics_group = 0;
-			if (!MDimg.getValue(EMDL_IMAGE_OPTICS_GROUP, my_optics_group, partID))
+			if (!MDimg.getValue(EMDL_IMAGE_OPTICS_GROUP, my_optics_group, ori_part_id))
 			{
 				my_optics_group--;
 			}
 
 			// Create a new particle
 			FileName part_name;
-			MDimg.getValue(EMDL_IMAGE_NAME, part_name, partID);
+			MDimg.getValue(EMDL_IMAGE_NAME, part_name, ori_part_id);
 			part_id = addParticle(part_name, group_id, mic_id, my_optics_group, my_random_subset);
 
 			// The group number is only set upon reading: it is not read from the STAR file itself,
 			// there the only thing that matters is the order of the micrograph_names
 			// Write igroup+1, to start numbering at one instead of at zero
-			MDimg.setValue(EMDL_MLMODEL_GROUP_NO, group_id + 1, partID);
+			MDimg.setValue(EMDL_MLMODEL_GROUP_NO, group_id + 1, ori_part_id);
 
-			if (partID != part_id)
+			if (ori_part_id != part_id)
 			{
 				REPORT_ERROR_STR("Experiment::read: particle indices out of sync: "
-								 << partID << " != " << part_id);
+								 << ori_part_id << " != " << part_id);
 			}
 
 #ifdef DEBUG_READ
@@ -972,7 +972,7 @@ void Experiment::read(
 #ifdef DEBUG_READ
 			nr_read++;
 #endif
-		} // end loop over all objects in MDimg
+		} // end loop over all objects in MDimg (ori_part_id)
 
 #ifdef DEBUG_READ
 		timer.toc(tfill);
