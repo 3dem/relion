@@ -26,20 +26,6 @@ void ObservationModel::loadSafely(
 			<< "Please use relion_convert_star to generate an up-to-date file.");
 	}
 
-	/* These columns are not necessarily always there.....
-	 * TODO: Jasenko, confirm this is still OK
-	 * TODO: Jasenko, confirm this is still OK
-	 * TODO: Jasenko, confirm this is still OK
-	 * TODO: Jasenko, confirm this is still OK
-	 * TODO: Jasenko, confirm this is still OK
-	 * TODO: Jasenko, confirm this is still OK
-	if (!containsAllNeededColumns(particlesMdt))
-	{
-		REPORT_ERROR_STR(particlesFn << " does not contain all of the required columns ("
-			<< "rlnOriginX, rlnOriginY, rlnAngleRot, rlnAngleTilt, rlnAnglePsi and rlnRandomSubset)");
-	}
-	*/
-
 	opticsMdt.read(opticsFn);
 
 	obsModel = ObservationModel(opticsMdt);
