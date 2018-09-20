@@ -412,6 +412,10 @@ public:
         hFile.openFile(name);
         err = _read(name, hFile, readdata, select_img, mapData, is_2D);
         // the destructor of fImageHandler will close the file
+        if (err < 0)
+        {
+        	REPORT_ERROR_STR("ERROR: reading image "<<name<<" has returned an error of "<<err<<std::endl);
+        }
 
         // Negative errors are bad
         return err;
@@ -424,6 +428,10 @@ public:
     {
     	int err = 0;
     	err = _read(name, hFile, true, select_img, false, is_2D);
+        if (err < 0)
+        {
+        	REPORT_ERROR_STR("ERROR: reading image "<<name<<" has returned an error of "<<err<<std::endl);
+        }
     	// Reposition file pointer for a next read
     	rewind(fimg);
     	return err;
