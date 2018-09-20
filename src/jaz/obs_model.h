@@ -39,7 +39,7 @@ class ObservationModel
 				ObservationModel& obsModel, 
 				MetaDataTable& particlesMdt, MetaDataTable& opticsMdt);
 		
-		static bool containsAllNeededColumns(const MetaDataTable& partMdt);
+		static bool containsAllColumnsNeededForPrediction(const MetaDataTable& partMdt);
 		
 
         ObservationModel();

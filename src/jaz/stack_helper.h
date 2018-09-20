@@ -48,7 +48,8 @@ class StackHelper
 				const MetaDataTable* mdt, 
 				std::string path = "",
 				int threads = 1,
-				bool centerParticle = false);
+				bool centerParticle = false,
+				double angpix = -1.0);
 		
 		// deprecated, use the one above
 		static std::vector<Image<Complex> > loadStackFS(
@@ -56,7 +57,8 @@ class StackHelper
 				std::string path = "",
 				int threads = 1,
 				std::vector<ParFourierTransformer>* fts = 0,
-				bool centerParticle = false);
+				bool centerParticle = false,
+				double angpix = -1.0);
 		
 		static void saveStack(std::vector<Image<RFLOAT> >& stack, std::string fn);
 		
@@ -86,15 +88,7 @@ class StackHelper
 				RFLOAT hot = -1.0, bool verbose = false, bool saveMemory = false,
 				const std::vector<std::vector<gravis::d2Vector>>* offsets_in = 0,
 				std::vector<std::vector<gravis::d2Vector>>* offsets_out = 0);
-		
-		static Image<Complex> projectView(Projector* projector, const MetaDataTable* mdt, int index);
-		
-		static std::vector<Image<Complex>> projectStack(
-				Projector* projector, const MetaDataTable* mdt);
-		
-		static std::vector<Image<Complex>> projectStackPar(
-				Projector* projector, const MetaDataTable* mdt, int numThreads);
-		
+				
 		static std::vector<Image<Complex>> FourierTransform(std::vector<Image<RFLOAT> >& stack);
 		
 		static std::vector<Image<RFLOAT>> inverseFourierTransform(std::vector<Image<Complex> >& stack);

@@ -133,6 +133,13 @@ void CtfRefiner::init()
 	}
 
 	ObservationModel::loadSafely(starFn, obsModel, mdt0, opticsMdt);
+	
+	if (!ObservationModel::containsAllColumnsNeededForPrediction(mdt0))
+	{
+		REPORT_ERROR_STR(starFn << " does not contain all columns needed for view prediction: \n"
+						 << "rlnOriginXAngst, rlnOriginYAngst, "
+						 << "rlnAngleRot, rlnAngleTilt, rlnAnglePsi and rlnRandomSubset");
+	}
 		
 	const double angpix = obsModel.getPixelSize(0);
 	
@@ -252,9 +259,15 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 	for (long g = g_start; g <= g_end; g++)
 	{
 		std::vector<Image<Complex> > obs;
-
+		
+		int opticsGroup;
+		unfinishedMdts[g].getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, 0);
+		opticsGroup--;
+		
+		double angpix = obsModel.angpix[opticsGroup];
+		
 		// both defocus_tit and tilt_fit need the same observations
-		obs = StackHelper::loadStackFS(&unfinishedMdts[g], "", nr_omp_threads, &fts, true);
+		obs = StackHelper::loadStackFS(&unfinishedMdts[g], "", nr_omp_threads, &fts, true, angpix);
 
 		// Make sure output directory exists
 		FileName newdir = getOutputFilenameRoot(unfinishedMdts[g], outPath);

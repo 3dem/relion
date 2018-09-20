@@ -167,9 +167,12 @@ void OldBFactorEstimator::process(const std::vector<MetaDataTable>& mdts)
 				
 				Matrix1D<RFLOAT> trans(2);
 				trans.initZeros();
-				mdts[g].getValue(EMDL_ORIENT_ORIGIN_X, XX(trans), p);
-				mdts[g].getValue(EMDL_ORIENT_ORIGIN_Y, YY(trans), p);
 				
+				if (!mdts[g].getValue(EMDL_ORIENT_ORIGIN_X, XX(trans), p)
+				 || !mdts[g].getValue(EMDL_ORIENT_ORIGIN_Y, YY(trans), p))
+				{
+					REPORT_ERROR("Old B-factor estimation does not support the Relion 3.1 file format");
+				}
 				
 				#pragma omp parallel for num_threads(nr_omp_threads)
 				for (int f = 0; f < fcb; f++)

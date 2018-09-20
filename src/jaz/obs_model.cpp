@@ -138,10 +138,7 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 
 	for (int i = 0; i < opticsMdt.numberOfObjects(); i++)
 	{
-		RFLOAT mag, dstep;
-		opticsMdt.getValue(EMDL_CTF_MAGNIFICATION, mag, i);
-		opticsMdt.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep, i);
-		angpix[i] = 10000 * dstep / mag;
+		opticsMdt.getValue(EMDL_MLMODEL_PIXEL_SIZE, angpix[i], i);
 
 		double kV;
 		opticsMdt.getValue(EMDL_CTF_VOLTAGE, kV, i);
@@ -207,8 +204,11 @@ void ObservationModel::predictObservation(
 
     double xoff, yoff;
 
-    partMdt.getValue(EMDL_ORIENT_ORIGIN_X, xoff, particle);
-    partMdt.getValue(EMDL_ORIENT_ORIGIN_Y, yoff, particle);
+    partMdt.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff, particle);
+    partMdt.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff, particle);
+	
+	xoff /= angpix[opticsGroup];
+	yoff /= angpix[opticsGroup];
 
     double rot, tilt, psi;
 
@@ -282,10 +282,13 @@ Volume<t2Vector<Complex>> ObservationModel::predictComplexGradient(
 	partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, particle);
 	opticsGroup--;
 
-    double xoff, yoff;
+	double xoff, yoff;
 
-    partMdt.getValue(EMDL_ORIENT_ORIGIN_X, xoff, particle);
-    partMdt.getValue(EMDL_ORIENT_ORIGIN_Y, yoff, particle);
+    partMdt.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff, particle);
+    partMdt.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff, particle);
+	
+	xoff /= angpix[opticsGroup];
+	yoff /= angpix[opticsGroup];
 
     double rot, tilt, psi;
 
@@ -578,10 +581,10 @@ Matrix2D<RFLOAT> ObservationModel::applyAnisoMagTransp(Matrix2D<RFLOAT> A3D_tran
 	return out;
 }
 
-bool ObservationModel::containsAllNeededColumns(const MetaDataTable& partMdt)
+bool ObservationModel::containsAllColumnsNeededForPrediction(const MetaDataTable& partMdt)
 {
-	return (partMdt.containsLabel(EMDL_ORIENT_ORIGIN_X)
-         && partMdt.containsLabel(EMDL_ORIENT_ORIGIN_Y)
+	return (partMdt.containsLabel(EMDL_ORIENT_ORIGIN_X_ANGSTROM)
+         && partMdt.containsLabel(EMDL_ORIENT_ORIGIN_Y_ANGSTROM)
          && partMdt.containsLabel(EMDL_ORIENT_ROT)
          && partMdt.containsLabel(EMDL_ORIENT_TILT)
          && partMdt.containsLabel(EMDL_ORIENT_PSI)

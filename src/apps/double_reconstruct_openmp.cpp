@@ -431,8 +431,11 @@ class reconstruct_parameters
 							
 							// Translations (either through phase-shifts or in real space
 							trans.initZeros();
-							mdts[g].getValue(EMDL_ORIENT_ORIGIN_X, XX(trans), p);
-							mdts[g].getValue(EMDL_ORIENT_ORIGIN_Y, YY(trans), p);
+							mdts[g].getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, XX(trans), p);
+							mdts[g].getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, YY(trans), p);
+							
+							XX(trans) /= obsModel.angpix[opticsGroup];
+							YY(trans) /= obsModel.angpix[opticsGroup];
 							
 							if (shift_error > 0.)
 							{

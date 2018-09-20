@@ -400,8 +400,12 @@ void MotionHelper::writeTracks(
         for (int f = 0; f < fc; f++)
         {
             mdt.addObject();
-            mdt.setValue(EMDL_ORIENT_ORIGIN_X, tracks[p][f].x);
-            mdt.setValue(EMDL_ORIENT_ORIGIN_Y, tracks[p][f].y);
+			
+            if (!mdt.setValue(EMDL_ORIENT_ORIGIN_X, tracks[p][f].x)
+             || !mdt.setValue(EMDL_ORIENT_ORIGIN_Y, tracks[p][f].y))
+			{
+				REPORT_ERROR("MotionHelper::writeTracks does not support the Relion 3.1 file format yet.");
+			}
         }
 
         mdt.write(ofs);

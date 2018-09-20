@@ -167,9 +167,15 @@ std::vector<Image<RFLOAT> > StackHelper::loadStack(const MetaDataTable* mdt, std
 
 std::vector<Image<Complex> > StackHelper::loadStackFS(
 		const MetaDataTable *mdt, std::string path,
-		int threads, bool centerParticle)
+		int threads, bool centerParticle, double angpix)
 {
 	std::vector<Image<Complex> > out(mdt->numberOfObjects());
+	
+	if (centerParticle && angpix < 0.0)
+	{
+		REPORT_ERROR("StackHelper::loadStackFS: centering particles requires a pixel size.");
+	}
+	
 	const long ic = mdt->numberOfObjects();
 	
 	std::string name, fullName;
@@ -210,8 +216,11 @@ std::vector<Image<Complex> > StackHelper::loadStackFS(
 			
 			double xoff, yoff;
 		
-			mdt->getValue(EMDL_ORIENT_ORIGIN_X, xoff, i);
-			mdt->getValue(EMDL_ORIENT_ORIGIN_Y, yoff, i);
+			mdt->getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff, i);
+			mdt->getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff, i);
+			
+			xoff /= angpix;
+			yoff /= angpix;
 			
 			shiftImageInFourierTransform(out[i](), out[i](), s, xoff - s/2, yoff - s/2);
 		}
@@ -223,9 +232,15 @@ std::vector<Image<Complex> > StackHelper::loadStackFS(
 std::vector<Image<Complex> > StackHelper::loadStackFS(
 		const MetaDataTable *mdt, std::string path,
 		int threads, std::vector<ParFourierTransformer> *fts,
-		bool centerParticle)
+		bool centerParticle, double angpix)
 {
 	std::vector<Image<Complex> > out(mdt->numberOfObjects());
+	
+	if (centerParticle && angpix < 0.0)
+	{
+		REPORT_ERROR("StackHelper::loadStackFS: centering particles requires a pixel size.");
+	}
+	
 	const long ic = mdt->numberOfObjects();
 	
 	std::string name, fullName;
@@ -261,8 +276,11 @@ std::vector<Image<Complex> > StackHelper::loadStackFS(
 			
 			double xoff, yoff;
 		
-			mdt->getValue(EMDL_ORIENT_ORIGIN_X, xoff, i);
-			mdt->getValue(EMDL_ORIENT_ORIGIN_Y, yoff, i);
+			mdt->getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff, i);
+			mdt->getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff, i);
+			
+			xoff /= angpix;
+			yoff /= angpix;
 			
 			shiftImageInFourierTransform(out[i](), out[i](), s, xoff - s/2, yoff - s/2);
 		}
@@ -874,99 +892,6 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 			
 			out[p][f](0,0) = Complex(0.0,0.0);
 		}
-	}
-	
-	return out;
-}
-
-Image<Complex> StackHelper::projectView(Projector* projector, const MetaDataTable* mdt, int index)
-{
-	const int s = projector->ori_size;
-	const int sh = s/2 + 1;
-	
-	double xoff, yoff;
-	
-	mdt->getValue(EMDL_ORIENT_ORIGIN_X, xoff, index);
-	mdt->getValue(EMDL_ORIENT_ORIGIN_Y, yoff, index);
-	
-	double rot, tilt, psi;
-	
-	Matrix2D<RFLOAT> A3D;
-	mdt->getValue(EMDL_ORIENT_ROT, rot, index);
-	mdt->getValue(EMDL_ORIENT_TILT, tilt, index);
-	mdt->getValue(EMDL_ORIENT_PSI, psi, index);
-	Euler_angles2matrix(rot, tilt, psi, A3D);
-	
-	Image<Complex> out(sh, s);
-	out.data.initZeros();
-	
-	projector->get2DFourierTransform(out.data, A3D, false);
-	shiftImageInFourierTransform(out(), out(), s, s/2 - xoff, s/2 - yoff);
-	
-	return out;
-}
-
-std::vector<Image<Complex> > StackHelper::projectStack(Projector* projector, const MetaDataTable* mdt)
-{
-	std::vector<Image<Complex> > out(mdt->numberOfObjects());
-	const long ic = mdt->numberOfObjects();
-	
-	const int s = projector->ori_size;
-	const int sh = s/2 + 1;
-	
-	for (long i = 0; i < ic; i++)
-	{
-		double xoff, yoff;
-		
-		mdt->getValue(EMDL_ORIENT_ORIGIN_X, xoff, i);
-		mdt->getValue(EMDL_ORIENT_ORIGIN_Y, yoff, i);
-		
-		double rot, tilt, psi;
-		
-		Matrix2D<RFLOAT> A3D;
-		mdt->getValue(EMDL_ORIENT_ROT, rot, i);
-		mdt->getValue(EMDL_ORIENT_TILT, tilt, i);
-		mdt->getValue(EMDL_ORIENT_PSI, psi, i);
-		Euler_angles2matrix(rot, tilt, psi, A3D);
-		
-		out[i] = Image<Complex>(sh, s);
-		out[i].data.initZeros();
-		projector->get2DFourierTransform(out[i].data, A3D, false);
-		shiftImageInFourierTransform(out[i](), out[i](), s, s/2 - xoff, s/2 - yoff);
-	}
-	
-	return out;
-}
-
-std::vector<Image<Complex> > StackHelper::projectStackPar(
-		Projector* projector, const MetaDataTable* mdt, int numThreads)
-{
-	std::vector<Image<Complex> > out(mdt->numberOfObjects());
-	const long ic = mdt->numberOfObjects();
-	
-	const int s = projector->ori_size;
-	const int sh = s/2 + 1;
-	
-	#pragma omp parallel for num_threads(numThreads)
-	for (long i = 0; i < ic; i++)
-	{
-		double xoff, yoff;
-		
-		mdt->getValue(EMDL_ORIENT_ORIGIN_X, xoff, i);
-		mdt->getValue(EMDL_ORIENT_ORIGIN_Y, yoff, i);
-		
-		double rot, tilt, psi;
-		
-		Matrix2D<RFLOAT> A3D;
-		mdt->getValue(EMDL_ORIENT_ROT, rot, i);
-		mdt->getValue(EMDL_ORIENT_TILT, tilt, i);
-		mdt->getValue(EMDL_ORIENT_PSI, psi, i);
-		Euler_angles2matrix(rot, tilt, psi, A3D);
-		
-		out[i] = Image<Complex>(sh, s);
-		out[i].data.initZeros();
-		projector->get2DFourierTransform(out[i].data, A3D, false);
-		shiftImageInFourierTransform(out[i](), out[i](), s, s/2 - xoff, s/2 - yoff);
 	}
 	
 	return out;
