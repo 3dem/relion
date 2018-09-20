@@ -1,3 +1,23 @@
+/***************************************************************************
+ *
+ * Author: "Jasenko Zivanov"
+ * MRC Laboratory of Molecular Biology
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * This complete copyright notice must be included in any revised version of the
+ * source code. Additional authorship citations may be added, but existing
+ * author citations must be preserved.
+ ***************************************************************************/
+
 #include "motion_param_estimator.h"
 #include "motion_refiner.h"
 #include "two_hyperparameter_fit.h"
@@ -30,10 +50,10 @@ int MotionParamEstimator::read(IOParser& parser, int argc, char *argv[])
 	align_frac = textToDouble(parser.getOption("--align_frac", "Fraction of pixels to be used for alignment", "0.5"));
 	eval_frac = textToDouble(parser.getOption("--eval_frac", "Fraction of pixels to be used for evaluation", "0.5"));
 	
-	/*k_cutoff = textToFloat(parser.getOption("--k_cut", "Freq. cutoff for parameter estimation [Pixels]", "-1.0"));
-    k_cutoff_Angst = textToFloat(parser.getOption("--k_cut_A", "Freq. cutoff for parameter estimation [Angstrom]", "-1.0"));
-    k_eval = textToFloat(parser.getOption("--k_eval", "Threshold freq. for parameter evaluation [Pixels]", "-1.0"));
-    k_eval_Angst = textToFloat(parser.getOption("--k_eval_A", "Threshold freq. for parameter evaluation [Angstrom]", "-1.0"));*/
+	/*k_cutoff = textToDouble(parser.getOption("--k_cut", "Freq. cutoff for parameter estimation [Pixels]", "-1.0"));
+    k_cutoff_Angst = textToDouble(parser.getOption("--k_cut_A", "Freq. cutoff for parameter estimation [Angstrom]", "-1.0"));
+    k_eval = textToDouble(parser.getOption("--k_eval", "Threshold freq. for parameter evaluation [Pixels]", "-1.0"));
+    k_eval_Angst = textToDouble(parser.getOption("--k_eval_A", "Threshold freq. for parameter evaluation [Angstrom]", "-1.0"));*/
 
     minParticles = textToInteger(parser.getOption("--min_p", "Minimum number of particles on which to estimate the parameters", "1000"));
     sV = textToDouble(parser.getOption("--s_vel_0", "Initial s_vel", "0.6"));

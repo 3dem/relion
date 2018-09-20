@@ -80,13 +80,13 @@ void MotionRefiner::read(int argc, char **argv)
 	parser.addSection("Expert options");
 	
 	findShortestMovie = parser.checkOption("--find_shortest", "Load only as many frames as are present in all movies.");
-	angpix = textToFloat(parser.getOption("--angpix", "Pixel resolution (angst/pix) - read from STAR file by default", "-1"));
+	angpix = textToDouble(parser.getOption("--angpix", "Pixel resolution (angst/pix) - read from STAR file by default", "-1"));
 	debug = parser.checkOption("--debug", "Write debugging data");
 	
-	micrographHandler.corrMicFn = parser.getOption("--corr_mic", "List of uncorrected micrographs (e.g. corrected_micrographs.star)", "");
-	micrographHandler.movie_angpix = textToFloat(parser.getOption("--mps", "Pixel size of input movies (Angst/pix)", "-1"));
-	micrographHandler.coords_angpix = textToFloat(parser.getOption("--cps", "Pixel size of particle coordinates in star-file (Angst/pix)", "-1"));
-	micrographHandler.hotCutoff = textToFloat(parser.getOption("--hot", "Clip hot pixels to this max. value (-1 = off, TIFF only)", "-1"));
+	micrographHandler.corrMicFn = parser.getOption("--corr_mic", "List of uncorrected micrographs (e.g. corrected_micrographs.star)");
+	micrographHandler.movie_angpix = textToDouble(parser.getOption("--mps", "Pixel size of input movies (Angst/pix)", "-1"));
+	micrographHandler.coords_angpix = textToDouble(parser.getOption("--cps", "Pixel size of particle coordinates in star-file (Angst/pix)", "-1"));
+	micrographHandler.hotCutoff = textToDouble(parser.getOption("--hot", "Clip hot pixels to this max. value (-1 = off, TIFF only)", "-1"));
 	micrographHandler.debug = parser.checkOption("--debug_mov", "Write debugging data for movie loading");
 	
 	movie_toReplace = parser.getOption("--mov_toReplace", "Replace this string in micrograph names...", "");
@@ -105,16 +105,6 @@ void MotionRefiner::read(int argc, char **argv)
 
 void MotionRefiner::init()
 {
-	if (micrographHandler.movie_angpix <= 0 && micrographHandler.corrMicFn == "")
-	{
-		REPORT_ERROR("ERROR: Movie pixel size (--mps) is required unless a corrected_micrographs.star (--corr_mic) is provided.");
-	}
-	
-	if (micrographHandler.coords_angpix <= 0 && micrographHandler.corrMicFn == "")
-	{
-		REPORT_ERROR("ERROR: Coordinates pixel size (--cps) is required unless a corrected_micrographs.star (--corr_mic) is provided.");
-	}
-	
 	if (outPath[outPath.length()-1] != '/')
 	{
 		outPath += "/";

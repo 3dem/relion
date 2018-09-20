@@ -1,3 +1,23 @@
+/***************************************************************************
+ *
+ * Author: "Jasenko Zivanov"
+ * MRC Laboratory of Molecular Biology
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * This complete copyright notice must be included in any revised version of the
+ * source code. Additional authorship citations may be added, but existing
+ * author citations must be preserved.
+ ***************************************************************************/
+
 #ifndef VTK_HELPER_H
 #define VTK_HELPER_H
 
@@ -35,7 +55,9 @@ class VtkHelper
 
         static void writeVTK_Complex(const MultidimArray<Complex>& img, std::string fn, bool binary = false);
         static void writeVTK_d3(MultidimArray<gravis::t3Vector<RFLOAT> >& img, std::string fn, bool binary = false);
-        static void writeTomoVTK(Image<RFLOAT>& img, std::string fn, bool binary = false);
+        static void writeTomoVTK(Image<RFLOAT>& img, std::string fn, bool binary = false, 
+								 double pixelSize = 1.0, 
+								 gravis::d3Vector origin = gravis::d3Vector(0.0,0.0,0.0));
 
         static void write(std::vector<Image<double> >& img, std::string fn,
                           double originX = 0.0, double originY = 0.0,
