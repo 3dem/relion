@@ -2103,14 +2103,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 			if (do_ctf_correction && mymodel.data_dim != 3)
 			{
 				CTF ctf;
-
-				/// TODO: Jasenko confirm that particle number is 0 here.... shouldn't it be part_id?
-				/// TODO: Jasenko confirm that particle number is 0 here....
-				/// TODO: Jasenko confirm that particle number is 0 here....
-				/// TODO: Jasenko confirm that particle number is 0 here....
-				/// TODO: Jasenko confirm that particle number is 0 here....
-				/// TODO: Jasenko confirm that particle number is 0 here....
-				ctf.readByGroup(MDimg, &mydata.obsModel, 0);
+				ctf.readByGroup(MDimg, &mydata.obsModel, part_id);
 				ctf.getFftwImage(Fctf, mymodel.ori_size, mymodel.ori_size, mymodel.pixel_size,
 					ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);
 
@@ -4344,10 +4337,12 @@ void MlOptimiser::updateCurrentResolution()
 									float higher = mymodel.getResolutionAngstrom(ires2);
 									float lower  = mymodel.getResolutionAngstrom(ires);
 									if (mymodel.nr_bodies > 1)
+									{
 										std::cerr << " WARNING: For the " << ibody+1 << "th body:" << std::endl;
-									std::cerr << " WARNING: FSC dipped below 0.5 and rose again. Using higher resolution of "
-											  << higher << " A, instead of " << lower << " A." << std::endl;
-									std::cerr << "          This is not necessarily a bad thing. Often it is caused by too tight masks." << std::endl;
+										std::cerr << " WARNING: FSC dipped below 0.5 and rose again. Using higher resolution of "
+												  << higher << " A, instead of " << lower << " A." << std::endl;
+										std::cerr << "          This is not necessarily a bad thing. Often it is caused by too tight masks." << std::endl;
+									}
 								}
 								ires = ires2;
 							}
@@ -5144,28 +5139,13 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 		}
 		else
 		{
-			//Get kV, Cs and Q0 from this optics group
-			/*RFLOAT kV, Cs, Q0;
-			mydata.obsModel.opticsMdt.getValue(EMDL_CTF_VOLTAGE, kV, optics_group);
-			mydata.obsModel.opticsMdt.getValue(EMDL_CTF_CS, Cs, optics_group);
-			mydata.obsModel.opticsMdt.getValue(EMDL_CTF_Q0, Q0, optics_group);*/
 
 			// Get parameters that change per-particle from the exp_metadata
 			CTF ctf;
-			/*ctf.setValues(DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_U),
-						  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_V),
-						  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_ANGLE),
-						  kV,
-						  Cs,
-						  Q0,
-						  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_BFACTOR),
-						  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_KFACTOR),
-						  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_PHASE_SHIFT));*/
-			
 			ctf.setValuesByGroup(
-				&mydata.obsModel, optics_group, 
-				DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_U), 
-				DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_V),  
+				&mydata.obsModel, optics_group,
+				DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_U),
+				DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_V),
 				DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_ANGLE),
 				DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_BFACTOR),
 				DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_KFACTOR),
@@ -6167,7 +6147,9 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,  int exp
 
 										// Keep track of minimum of all diff2, only for the last image in this series
 										if (diff2 < exp_min_diff2)
+										{
 											exp_min_diff2 = diff2;
+										}
 
 									} // end loop iover_trans
 								} // end if do_proceed translations
@@ -7871,23 +7853,16 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 				{
 					Fctf.resize(current_image_size, current_image_size/ 2 + 1);
 
-					//Get kV, Cs and Q0 from this optics group
-					RFLOAT kV, Cs, Q0;
-					mydata.obsModel.opticsMdt.getValue(EMDL_CTF_VOLTAGE, kV, optics_group);
-					mydata.obsModel.opticsMdt.getValue(EMDL_CTF_CS, Cs, optics_group);
-					mydata.obsModel.opticsMdt.getValue(EMDL_CTF_Q0, Q0, optics_group);
-
 					// Get parameters that change per-particle from the exp_metadata
 					CTF ctf;
-					ctf.setValues(DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_U),
-								  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_V),
-								  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_ANGLE),
-								  kV,
-								  Cs,
-								  Q0,
-								  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_BFACTOR),
-								  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_KFACTOR),
-								  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_PHASE_SHIFT));
+					ctf.setValuesByGroup(
+						&mydata.obsModel, optics_group,
+						DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_U),
+						DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_V),
+						DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_ANGLE),
+						DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_BFACTOR),
+						DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_KFACTOR),
+						DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_PHASE_SHIFT));
 
 					ctf.getFftwImage(Fctf, mymodel.ori_size, mymodel.ori_size, mymodel.pixel_size,
 							ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);
