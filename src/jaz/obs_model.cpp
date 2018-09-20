@@ -95,6 +95,16 @@ void ObservationModel::loadSafely(
 	}
 }
 
+void ObservationModel::save(
+		const MetaDataTable &particlesMdt, 
+		const MetaDataTable &opticsMdt, 
+		std::string filename)
+{
+	std::ofstream of(filename);
+	opticsMdt.write(of);
+	particlesMdt.write(of);
+}
+
 ObservationModel::ObservationModel()
 {
 }

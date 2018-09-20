@@ -404,8 +404,7 @@ void CtfRefiner::finalise()
 
 	MetaDataTable mdtOutAll = StackHelper::merge(mdtOut);
 	
-	mdtOutAll.write(outPath + "particles_ctf_refine.star");
-	optOut.write(outPath + "particles_ctf_refine_optics.star");
+	ObservationModel::save(mdtOutAll, optOut, outPath + "particles_ctf_refine.star");
 
 	if (verb > 0)
 	{
