@@ -81,7 +81,7 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms", "-1"));
 	first_frame_sum =  textToInteger(parser.getOption("--first_frame_sum", "First movie frame used in output sum (start at 1)", "1"));
 	if (first_frame_sum < 1) first_frame_sum = 1;
-	last_frame_sum =  textToInteger(parser.getOption("--last_frame_sum", "Last movie frame used in output sum (0: use all)", "0"));
+	last_frame_sum =  textToInteger(parser.getOption("--last_frame_sum", "Last movie frame used in output sum (0 or negative: use all)", "-1"));
 
 	int motioncor2_section = parser.addSection("MOTIONCOR2 options");
 	do_motioncor2 = parser.checkOption("--use_motioncor2", "Use Shawn Zheng's MOTIONCOR2 instead of UNBLUR.");
@@ -753,7 +753,7 @@ bool MotioncorrRunner::executeUnblur(Micrograph &mic)
 	getShiftsUnblur(fn_shifts, mic);
 
 	// If the requested sum is only a subset, then use summovie to make the average
-	int mylastsum = (last_frame_sum == 0) ? Nframes : last_frame_sum;
+	int mylastsum = (last_frame_sum <= 0) ? Nframes : last_frame_sum;
 	if (first_frame_sum != 1 || mylastsum != Nframes)
 	{
 		FileName fn_com2 = fn_root + "_summovie.com";

@@ -136,8 +136,8 @@ public:
 
 	void loopThroughParticles(int rank = 0, int size = 1);
 
-	void subtractOneParticle(long int ori_particle, long int imgno, int rank = 0, int size = 1);
-	void make3DModelOneParticle(long int ori_particle, long int imgno, std::vector<double> &datarow, int rank = 0, int size = 1);
+	void subtractOneParticle(long int part_id, long int imgno, int rank = 0, int size = 1);
+	void make3DModelOneParticle(long int part_id, long int imgno, std::vector<double> &datarow, int rank = 0, int size = 1);
 
 	// Output logfile.pdf with histograms of all eigenvalues
 	void makePCAhistograms(std::vector< std::vector<double> > &projected_input,

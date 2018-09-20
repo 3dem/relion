@@ -796,39 +796,6 @@ void MlModel::readImages(FileName fn_ref, bool _is_3d_model, int _ori_size, Expe
 
 }
 
-void MlModel::reassignGroupsForMovies(Experiment &mydata, std::string &movie_name)
-{
-
-	std::vector<long int> rename_ids(mydata.groups.size());
-	for (long int igr = 0; igr < mydata.groups.size(); igr++)
-	{
-		FileName data_name = (mydata.groups[igr].name);
-		data_name = data_name.beforeLastOf("_"+movie_name);
-		long int rename_id = -1;
-		for (long int id = 0; id < group_names.size(); id++)
-		{
-			if (data_name == group_names[id].withoutExtension())
-			{
-				rename_id = id;
-				break;
-			}
-		}
-
-		if (rename_id < 0)
-			REPORT_ERROR("MlModel::adjustGroupsForMovies ERROR: cannot find " + data_name + " among the groups of the model!");
-
-		rename_ids[igr] = rename_id;
-	}
-
-	// Now change the group_ids of all particles!
-	for (long int ipart = 0; ipart < mydata.particles.size(); ipart++)
-	{
-		long int old_id = mydata.particles[ipart].group_id;
-		mydata.particles[ipart].group_id = rename_ids[old_id];
-	}
-
-}
-
 void MlModel::initialisePdfDirection(int newsize)
 {
 
@@ -1039,26 +1006,26 @@ void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool als
 	// Find the overlap of the bodies, and extend the Iref, PPref and masks_bodies vectors
 	pointer_body_overlap.resize(nr_bodies, nr_bodies);
 	pointer_body_overlap_inv.resize(nr_bodies);
-	
+
 //#define DEBUG_OVERLAP
 	if (norm_body_mask_overlap)
 	{
 		MultidimArray<RFLOAT> sum_mask = masks_bodies[0];
 		for (int ibody = 1; ibody < nr_bodies; ibody++)
 			sum_mask += masks_bodies[ibody];
-		
+
 		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(sum_mask)
 			if (DIRECT_A1D_ELEM(sum_mask, i) > 1.)
 				for (int ibody = 0; ibody < nr_bodies; ibody++)
 					DIRECT_A1D_ELEM(masks_bodies[ibody], i) /= DIRECT_A1D_ELEM(sum_mask, i);
-					
+
 		for (int ibody = 0; ibody < nr_bodies; ibody++)
 		{
 			for (int obody = 0; obody < nr_bodies; obody++)
 				DIRECT_A2D_ELEM(pointer_body_overlap, ibody, obody) = obody;
 			pointer_body_overlap_inv[ibody] = ibody;
 		}
-		
+
 #ifdef DEBUG_OVERLAP
 		for (int ibody = 0; ibody < nr_bodies; ibody++)
 		{

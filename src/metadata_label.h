@@ -314,6 +314,7 @@ enum EMDLabel
     EMDL_OPTIMISER_NR_ITERATIONS,
     EMDL_OPTIMISER_NR_ITER_WO_RESOL_GAIN,
     EMDL_OPTIMISER_NR_ITER_WO_HIDDEN_VAR_CHANGES,
+	EMDL_OPTIMISER_OPTICS_STARFILE,
     EMDL_OPTIMISER_OUTPUT_ROOTNAME,
     EMDL_OPTIMISER_PARTICLE_DIAMETER,
     EMDL_OPTIMISER_RADIUS_MASK_3D_MAP,
@@ -482,7 +483,7 @@ private:
 
 	static void addLabel(EMDLabel label, EMDLabelType type, std::string name, std::string definition = "undocumented");
 	static void addAltLabel(EMDLabel label, std::string name);
-    
+
     friend class StaticInitialization;
 }
 ;//close class MLD definition
@@ -764,6 +765,7 @@ private:
         EMDL::addLabel(EMDL_OPTIMISER_NR_ITERATIONS, EMDL_INT, "rlnNumberOfIterations", "Maximum number of iterations to be performed");
         EMDL::addLabel(EMDL_OPTIMISER_NR_ITER_WO_RESOL_GAIN, EMDL_INT, "rlnNumberOfIterWithoutResolutionGain", "Number of iterations that have passed without a gain in resolution");
         EMDL::addLabel(EMDL_OPTIMISER_NR_ITER_WO_HIDDEN_VAR_CHANGES, EMDL_INT, "rlnNumberOfIterWithoutChangingAssignments", "Number of iterations that have passed without large changes in orientation and class assignments");
+        EMDL::addLabel(EMDL_OPTIMISER_OPTICS_STARFILE, EMDL_STRING, "rlnOpticsStarFile", "STAR file with metadata for the optical groups (new as of version 3.1)");
         EMDL::addLabel(EMDL_OPTIMISER_OUTPUT_ROOTNAME, EMDL_STRING, "rlnOutputRootName", "Rootname for all output files (this may include a directory structure, which should then exist)");
         EMDL::addLabel(EMDL_OPTIMISER_PARTICLE_DIAMETER, EMDL_DOUBLE, "rlnParticleDiameter", "Diameter of the circular mask to be applied to all experimental images (in Angstroms)");
         EMDL::addLabel(EMDL_OPTIMISER_RADIUS_MASK_3D_MAP, EMDL_INT, "rlnRadiusMaskMap", "Radius of the spherical mask to be applied to all references (in Angstroms)");
@@ -807,7 +809,7 @@ private:
 		EMDL::addLabel(EMDL_PARTICLE_KL_DIVERGENCE, EMDL_DOUBLE, "rlnKullbackLeiblerDivergence", "Kullback-Leibler divergence for a particle");
 		EMDL::addAltLabel(EMDL_PARTICLE_KL_DIVERGENCE,           "rlnKullbackLeibnerDivergence"); // wrong spelling for backwards compatibility
 		EMDL::addLabel(EMDL_PARTICLE_RANDOM_SUBSET, EMDL_INT, "rlnRandomSubset", "Random subset to which this particle belongs");
-		EMDL::addLabel(EMDL_PARTICLE_BEAM_TILT_CLASS, EMDL_INT, "rlnBeamTiltClass", "Beam-tilt class of a particle");		
+		EMDL::addLabel(EMDL_PARTICLE_BEAM_TILT_CLASS, EMDL_INT, "rlnBeamTiltClass", "Beam-tilt class of a particle");
         EMDL::addLabel(EMDL_PARTICLE_NAME, EMDL_STRING, "rlnParticleName", "Name for a particle");
         EMDL::addLabel(EMDL_PARTICLE_ORI_NAME, EMDL_STRING, "rlnOriginalParticleName", "Original name for a particles");
         EMDL::addLabel(EMDL_PARTICLE_NR_SIGNIFICANT_SAMPLES, EMDL_INT, "rlnNrOfSignificantSamples", "Number of orientational/class assignments (for a particle) with sign.probabilities in the 1st pass of adaptive oversampling"); /**< particle, Number of orientations contributing to weights*/

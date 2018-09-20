@@ -56,15 +56,22 @@
 #define METADATA_NR_SIGN 9
 #define METADATA_NORM 10
 
-#define METADATA_ROT_PRIOR 11
-#define METADATA_TILT_PRIOR 12
-#define METADATA_PSI_PRIOR 13
-#define METADATA_XOFF_PRIOR 14
-#define METADATA_YOFF_PRIOR 15
-#define METADATA_ZOFF_PRIOR 16
-#define METADATA_PSI_PRIOR_FLIP_RATIO 17
+#define METADATA_CTF_DEFOCUS_U 11
+#define METADATA_CTF_DEFOCUS_V 12
+#define METADATA_CTF_DEFOCUS_ANGLE 13
+#define METADATA_CTF_BFACTOR 14
+#define METADATA_CTF_KFACTOR 15
+#define METADATA_CTF_PHASE_SHIFT 16
 
-#define METADATA_LINE_LENGTH_BEFORE_BODIES 28 // @TODO: -> 20?
+#define METADATA_ROT_PRIOR 17
+#define METADATA_TILT_PRIOR 18
+#define METADATA_PSI_PRIOR 19
+#define METADATA_XOFF_PRIOR 20
+#define METADATA_YOFF_PRIOR 21
+#define METADATA_ZOFF_PRIOR 22
+#define METADATA_PSI_PRIOR_FLIP_RATIO 23
+
+#define METADATA_LINE_LENGTH_BEFORE_BODIES 24 // @TODO: -> 20?
 #define METADATA_NR_BODY_PARAMS 6
 
 #define DO_WRITE_DATA true
@@ -113,7 +120,7 @@ public:
 
 	// Experimental metadata model
 	Experiment mydata;
-	
+
 	// Current ML model
 	MlModel mymodel;
 
@@ -125,7 +132,7 @@ public:
 
 	// Filename for the experimental images
 	FileName fn_data;
-	
+
 	// Optics star file
 	FileName fn_opt;
 
@@ -160,7 +167,7 @@ public:
 	RFLOAT debug1, debug2, debug3;
 
 	// Starting and finishing particles (for parallelisation)
-	long int my_first_ori_particle_id, my_last_ori_particle_id;
+	long int my_first_particle_id, my_last_particle_id;
 
 	// Total number iterations and current iteration
 	int iter, nr_iter;
@@ -457,28 +464,6 @@ public:
 	// Flag to switch off error message about normalisation
 	bool dont_raise_norm_error;
 
-	///////// Re-align individual frames of movies /////////////
-
-	// Flag whether to realign frames of movies
-	bool do_realign_movies;
-
-	// Process movies one micrograph at a time?
-	// This prevents memory problems with very large data sets, but may negatively affect overall parallelization efficiency
-	bool do_movies_in_batches;
-
-	// Starfile with the movie-frames
-	FileName fn_data_movie;
-
-	// Movie identifier string
-	FileName movie_identifier;
-
-	// How many individual frames contribute to the priors?
-	int nr_frames_per_prior;
-
-	// How wide are the running averages of the frames to use for alignment?
-	// If set to 1, then running averages will be n-1, n, n+1, i.e. 3 frames wide
-	int movie_frame_running_avg_side;
-
 	///////////// Helical symmetry /////////////
 	// Flag whether to do helical refinement
 	bool do_helical_refine;
@@ -579,7 +564,7 @@ public:
 	//for catching exceptions in threads
 	RelionError * threadException;
 
-	long int exp_my_first_ori_particle, exp_my_last_ori_particle;
+	long int exp_my_first_part_id, exp_my_last_part_id;
 	MultidimArray<RFLOAT> exp_metadata, exp_imagedata;
 	std::string exp_fn_img, exp_fn_ctf, exp_fn_recimg;
 	std::vector<MultidimArray<RFLOAT> > exp_imgs;
@@ -666,7 +651,6 @@ public:
 		do_use_reconstruct_images(0),
 		fix_sigma_noise(0),
 		current_changes_optimal_offsets(0),
-		nr_frames_per_prior(0),
 		smallest_changes_optimal_classes(0),
 		do_print_metadata_labels(0),
 		adaptive_fraction(0),
@@ -676,7 +660,7 @@ public:
 		minres_map(0),
 		debug2(0),
 		do_always_join_random_halves(0),
-		my_first_ori_particle_id(0),
+		my_first_particle_id(0),
 		x_pool(1),
 		nr_threads(0),
 		do_shifts_onthefly(0),
@@ -702,12 +686,11 @@ public:
 		do_calculate_initial_sigma_noise(0),
 		fix_sigma_offset(0),
 		do_firstiter_cc(0),
-		exp_my_last_ori_particle(0),
+		exp_my_last_part_id(0),
 		particle_diameter(0),
 		smallest_changes_optimal_orientations(0),
 		verb(0),
 		do_norm_correction(0),
-		movie_frame_running_avg_side(0),
 		fix_tau(0),
 		directions_have_changed(0),
 		acc_rot(0),
@@ -719,12 +702,10 @@ public:
 		do_map(0),
 		combine_weights_thru_disc(0),
 		smallest_changes_optimal_offsets(0),
-		exp_my_first_ori_particle(0),
+		exp_my_first_part_id(0),
 		iter(0),
-		my_last_ori_particle_id(0),
+		my_last_particle_id(0),
 		ini_high(0),
-		do_realign_movies(0),
-		do_movies_in_batches(0),
 		do_ctf_correction(0),
 		max_coarse_size(0),
 		autosampling_hporder_local_searches(0),
@@ -841,7 +822,7 @@ public:
 	void doThreadExpectationSomeParticles(int thread_id);
 
 	/* Perform the expectation integration over all k, phi and series elements for a given particle */
-	void expectationOneParticle(long int my_ori_particle, int thread_id);
+	void expectationOneParticle(long int part_id, int thread_id);
 
 	/* Function to call symmetrise of BackProjector helical objects for each class or body
 	 * Do rise and twist for all asymmetrical units in Fourier space
@@ -888,23 +869,16 @@ public:
 	 */
 	void updateImageSizeAndResolutionPointers();
 
-	/* From the vectors of Fourier transforms of the images, calculate running averages over the movie frames
-	 */
-	void calculateRunningAveragesOfMovieFrames(long int my_ori_particle,
-		std::vector<MultidimArray<Complex > > &exp_Fimgs,
-		std::vector<MultidimArray<RFLOAT> > &exp_power_imgs,
-		std::vector<RFLOAT> &exp_highres_Xi2_imgs);
-
 	/* Read image and its metadata from disc (threaded over all pooled particles)
 	 */
-	void getFourierTransformsAndCtfs(long int my_ori_particle, int ibody, int metadata_offset,
-			std::vector<MultidimArray<Complex > > &exp_Fimgs,
-			std::vector<MultidimArray<Complex > > &exp_Fimgs_nomask,
-			std::vector<MultidimArray<RFLOAT> > &exp_Fctfs,
-			std::vector<Matrix1D<RFLOAT> > &exp_old_offset,
-			std::vector<Matrix1D<RFLOAT> > &exp_prior,
-			std::vector<MultidimArray<RFLOAT> > &exp_power_imgs,
-			std::vector<RFLOAT> &exp_highres_Xi2_imgs,
+	void getFourierTransformsAndCtfs(long int part_id, int ibody, int metadata_offset,
+			MultidimArray<Complex >  &exp_Fimg,
+			MultidimArray<Complex >  &exp_Fimg_nomask,
+			MultidimArray<RFLOAT>  &exp_Fctf,
+			Matrix1D<RFLOAT>  &exp_old_offset,
+			Matrix1D<RFLOAT>  &exp_prior,
+			MultidimArray<RFLOAT>  &exp_power_img,
+			RFLOAT &exp_highres_Xi2_img,
 			std::vector<int> &exp_pointer_dir_nonzeroprior,
 			std::vector<int> &exp_pointer_psi_nonzeroprior,
 			std::vector<RFLOAT> &exp_directions_prior,
@@ -913,88 +887,87 @@ public:
 	/* Store all shifted FourierTransforms in a vector
 	 * also store precalculated 2D matrices with 1/sigma2_noise
 	 */
-	void precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmasked, long int my_ori_particle,
+	void precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmasked, long int my_particle,
 			int exp_current_image_size, int exp_current_oversampling, int metadata_offset,
 			int exp_itrans_min, int exp_itrans_max,
-			std::vector<MultidimArray<Complex > > &exp_Fimgs,
-			std::vector<MultidimArray<Complex > > &exp_Fimgs_nomask,
-			std::vector<MultidimArray<RFLOAT> > &exp_Fctfs,
+			MultidimArray<Complex > &exp_Fimg,
+			MultidimArray<Complex > &exp_Fimg_nomask,
+			MultidimArray<RFLOAT>  &exp_Fctf,
 			std::vector<MultidimArray<Complex > > &exp_local_Fimgs_shifted,
 			std::vector<MultidimArray<Complex > > &exp_local_Fimgs_shifted_nomask,
-			std::vector<MultidimArray<RFLOAT> > &exp_local_Fctfs,
-			std::vector<RFLOAT> &exp_local_sqrtXi2,
-			std::vector<MultidimArray<RFLOAT> > &exp_local_Minvsigma2s);
+			MultidimArray<RFLOAT> &exp_local_Fctf,
+			RFLOAT &exp_local_sqrtXi2,
+			MultidimArray<RFLOAT> &exp_local_Minvsigma2);
 
 	// Given exp_Mcoarse_significant, check for iorient whether any of the particles has any significant (coarsely sampled) translation
-	bool isSignificantAnyParticleAnyTranslation(long int iorient,
+	bool isSignificantAnyTranslation(long int iorient,
 			int exp_itrans_min, int exp_itrans_max, MultidimArray<bool> &exp_Mcoarse_significant);
 
 	// Get squared differences for all iclass, idir, ipsi and itrans...
-	void getAllSquaredDifferences(long int my_ori_particle, int ibody, int exp_current_image_size,
+	void getAllSquaredDifferences(long int part_id, int ibody, int exp_current_image_size,
 			int exp_ipass, int exp_current_oversampling, int metadata_offset,
 			int exp_idir_min, int exp_idir_max, int exp_ipsi_min, int exp_ipsi_max,
 			int exp_itrans_min, int exp_itrans_max, int my_iclass_min, int my_iclass_max,
-			std::vector<RFLOAT> &exp_min_diff2,
-			std::vector<RFLOAT> &exp_highres_Xi2_imgs,
-			std::vector<MultidimArray<Complex > > &exp_Fimgs,
-			std::vector<MultidimArray<RFLOAT> > &exp_Fctfs,
+			RFLOAT &exp_min_diff2,
+			RFLOAT &exp_highres_Xi2_img,
+			MultidimArray<Complex > &exp_Fimg,
+			MultidimArray<RFLOAT> &exp_Fctf,
 			MultidimArray<RFLOAT> &exp_Mweight,
 			MultidimArray<bool> &exp_Mcoarse_significant,
 			std::vector<int> &exp_pointer_dir_nonzeroprior, std::vector<int> &exp_pointer_psi_nonzeroprior,
 			std::vector<RFLOAT> &exp_directions_prior, std::vector<RFLOAT> &exp_psi_prior,
 			std::vector<MultidimArray<Complex > > &exp_local_Fimgs_shifted,
-			std::vector<MultidimArray<RFLOAT> > &exp_local_Minvsigma2s,
-			std::vector<MultidimArray<RFLOAT> > &exp_local_Fctfs,
-			std::vector<RFLOAT> &exp_local_sqrtXi2);
+			MultidimArray<RFLOAT> &exp_local_Minvsigma2,
+			MultidimArray<RFLOAT> &exp_local_Fctf,
+			RFLOAT &exp_local_sqrtXi);
 
 	// Convert all squared difference terms to weights.
 	// Also calculates exp_sum_weight and, for adaptive approach, also exp_significant_weight
-	void convertAllSquaredDifferencesToWeights(long int my_ori_particle, int ibody, int exp_ipass,
+	void convertAllSquaredDifferencesToWeights(long int part_id, int ibody, int exp_ipass,
 			int exp_current_oversampling, int metadata_offset,
 			int exp_idir_min, int exp_idir_max, int exp_ipsi_min, int exp_ipsi_max,
 			int exp_itrans_min, int exp_itrans_max, int my_iclass_min, int my_iclass_max,
 			MultidimArray<RFLOAT> &exp_Mweight, MultidimArray<bool> &exp_Mcoarse_significant,
-			std::vector<RFLOAT> &exp_significant_weight, std::vector<RFLOAT> &exp_sum_weight,
-			std::vector<Matrix1D<RFLOAT> > &exp_old_offset, std::vector<Matrix1D<RFLOAT> > &exp_prior,
-			std::vector<RFLOAT> &exp_min_diff2,
+			RFLOAT &exp_significant_weight, RFLOAT &exp_sum_weight,
+			Matrix1D<RFLOAT> &exp_old_offset, Matrix1D<RFLOAT> &exp_prior, RFLOAT &exp_min_diff2,
 			std::vector<int> &exp_pointer_dir_nonzeroprior, std::vector<int> &exp_pointer_psi_nonzeroprior,
 			std::vector<RFLOAT> &exp_directions_prior, std::vector<RFLOAT> &exp_psi_prior);
 
 	// Store all relevant weighted sums, also return optimal hidden variables, max_weight and dLL
-	void storeWeightedSums(long int my_ori_particle, int ibody, int exp_current_image_size,
+	void storeWeightedSums(long int part_id, int ibody, int exp_current_image_size,
 			int exp_current_oversampling, int metadata_offset,
 			int exp_idir_min, int exp_idir_max, int exp_ipsi_min, int exp_ipsi_max,
 			int exp_itrans_min, int exp_itrans_max, int my_iclass_min, int my_iclass_max,
-			std::vector<RFLOAT> &exp_min_diff2,
-			std::vector<RFLOAT> &exp_highres_Xi2_imgs,
-			std::vector<MultidimArray<Complex > > &exp_Fimgs,
-			std::vector<MultidimArray<Complex > > &exp_Fimgs_nomask,
-			std::vector<MultidimArray<RFLOAT> > &exp_Fctfs,
-			std::vector<MultidimArray<RFLOAT> > &exp_power_imgs,
-			std::vector<Matrix1D<RFLOAT> > &exp_old_offset,
-			std::vector<Matrix1D<RFLOAT> > &exp_prior,
+			RFLOAT &exp_min_diff2,
+			RFLOAT &exp_highres_Xi2_img,
+			MultidimArray<Complex > &exp_Fimg,
+			MultidimArray<Complex > &exp_Fimg_nomask,
+			MultidimArray<RFLOAT> &exp_Fctf,
+			MultidimArray<RFLOAT> &exp_power_img,
+			Matrix1D<RFLOAT> &exp_old_offset,
+			Matrix1D<RFLOAT> &exp_prior,
 			MultidimArray<RFLOAT> &exp_Mweight,
 			MultidimArray<bool> &exp_Mcoarse_significant,
-			std::vector<RFLOAT> &exp_significant_weight,
-			std::vector<RFLOAT> &exp_sum_weight,
-			std::vector<RFLOAT> &exp_max_weight,
+			RFLOAT &exp_significant_weight,
+			RFLOAT &exp_sum_weight,
+			RFLOAT &exp_max_weight,
 			std::vector<int> &exp_pointer_dir_nonzeroprior, std::vector<int> &exp_pointer_psi_nonzeroprior,
 			std::vector<RFLOAT> &exp_directions_prior, std::vector<RFLOAT> &exp_psi_prior,
 			std::vector<MultidimArray<Complex > > &exp_local_Fimgs_shifted,
 			std::vector<MultidimArray<Complex > > &exp_local_Fimgs_shifted_nomask,
-			std::vector<MultidimArray<RFLOAT> > &exp_local_Minvsigma2s,
-			std::vector<MultidimArray<RFLOAT> > &exp_local_Fctfs,
-			std::vector<RFLOAT> &exp_local_sqrtXi2);
+			MultidimArray<RFLOAT> &exp_local_Minvsigma2,
+			MultidimArray<RFLOAT> &exp_local_Fctf,
+			RFLOAT &exp_local_sqrtXi2);
 
 	/** Monitor the changes in the optimal translations, orientations and class assignments for some particles */
-	void monitorHiddenVariableChanges(long int my_first_ori_particle, long int my_last_ori_particle);
+	void monitorHiddenVariableChanges(long int my_first_part_id, long int my_last_part_id);
 
 	// Updates the overall changes in the hidden variables and keeps track of nr_iter_wo_large_changes_in_hidden_variables
 	void updateOverallChangesInHiddenVariables();
 
 	// Calculate expected error in orientational assignments
 	// Based on comparing projections of the model and see how many degrees apart gives rise to difference of power > 3*sigma^ of the noise
-	void calculateExpectedAngularErrors(long int my_first_ori_particle, long int my_last_ori_particle);
+	void calculateExpectedAngularErrors(long int my_first_part_id, long int my_last_part_id);
 
 	// Adjust angular sampling based on the expected angular accuracies for auto-refine procedure
 	void updateAngularSampling(bool verb = true);
@@ -1007,10 +980,10 @@ public:
 	void checkConvergence(bool myverb = true);
 
 	// Set metadata of a subset of particles to the experimental model
-	void setMetaDataSubset(int first_ori_particle_id, int last_ori_particle_id);
+	void setMetaDataSubset(long int my_first_part_id, long int my_last_part_id);
 
 	// Get metadata array of a subset of particles from the experimental model
-	void getMetaAndImageDataSubset(int first_ori_particle_id, int last_ori_particle_id, bool do_also_imagedata = true);
+	void getMetaAndImageDataSubset(long int my_first_part_id, long int my_last_part_id, bool do_also_imagedata = true);
 
 };
 

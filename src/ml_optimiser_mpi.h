@@ -36,10 +36,6 @@ public:
     int MPIR_PACK, MPIR_ALLREDUCE, MPIR_UNPACK, MPIR_EXP, MPIR_MAX, MPIR_BCAST;
 #endif
 
-    // Only process unfinished micrographs in movie-refinement on a per-micrograph basis
-    bool only_do_unfinished_movies;
-
-
     // For debugging: keep temporary/debug weight and data mrc files
     bool do_keep_debug_reconstruct_files;
 
@@ -133,14 +129,6 @@ public:
      * Expectation is split in image subsets over all nodes, each reconstruction is done on a separate node
      */
     void iterate();
-
-
-    /**
-     * Process movies one micrograph at a time
-     * This reduces time and RAM for movie expansion and may thus be very useful for large data sets (with millions of particle movie frames)
-     * It does affect the parallelisatione efficiency though, especially when there are few particles per micrograph
-     */
-    void processMoviesPerMicrograph(int argc, char **argv);
 
 
 };

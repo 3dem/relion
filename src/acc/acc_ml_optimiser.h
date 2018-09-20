@@ -23,7 +23,6 @@ public:
 	nr_trans,
 	nr_oversampled_rot,
 	nr_oversampled_trans,
-	nr_particles,
 	current_oversampling,
 	current_image_size,
 	iclass_min, iclass_max,
@@ -38,7 +37,6 @@ public:
 		nr_trans(0),
 		nr_oversampled_rot(0),
 		nr_oversampled_trans(0),
-		nr_particles(0),
 		current_oversampling(0),
 		current_image_size(0),
 		iclass_min(0), iclass_max(0),
@@ -134,33 +132,26 @@ class OptimisationParamters
 public:
 	unsigned metadata_offset;
 
-	unsigned long my_ori_particle;
+	unsigned long part_id;
 
-	std::vector<MultidimArray<Complex > > Fimgs, Fimgs_nomask, local_Fimgs_shifted, local_Fimgs_shifted_nomask;
-	std::vector<MultidimArray<RFLOAT> > Fctfs, local_Fctfs, local_Minvsigma2s;
+	MultidimArray<Complex > Fimg, Fimg_nomask;
+	std::vector<MultidimArray<Complex > > local_Fimgs_shifted, local_Fimgs_shifted_nomask;
+	MultidimArray<RFLOAT> Fctf, local_Fctf, local_Minvsigma2;
 	std::vector<int> pointer_dir_nonzeroprior, pointer_psi_nonzeroprior;
-	std::vector<RFLOAT> directions_prior, psi_prior, local_sqrtXi2;
-	std::vector<RFLOAT> highres_Xi2_imgs, min_diff2;
+	RFLOAT highres_Xi2_img, min_diff2, local_sqrtXi2;
+	std::vector<RFLOAT> directions_prior, psi_prior;
 	MultidimArray<bool> Mcoarse_significant;
 	// And from storeWeightedSums
-	std::vector<RFLOAT> sum_weight, significant_weight, max_weight;
-	std::vector<Matrix1D<RFLOAT> > old_offset, prior;
-	std::vector<MultidimArray<RFLOAT> > power_imgs;
+	RFLOAT sum_weight, significant_weight, max_weight;
+	Matrix1D<RFLOAT> old_offset, prior;
+	MultidimArray<RFLOAT> power_img;
 	MultidimArray<XFLOAT> Mweight;
-	std::vector<Indices> max_index;
+	Indices max_index;
 
-	OptimisationParamters (unsigned nr_particles, unsigned long my_ori_particle):
+	OptimisationParamters (unsigned long part_id):
 		metadata_offset(0),
-		my_ori_particle(my_ori_particle)
+		part_id(part_id)
 	{
-		power_imgs.resize(nr_particles);
-		highres_Xi2_imgs.resize(nr_particles);
-		Fimgs.resize(nr_particles);
-		Fimgs_nomask.resize(nr_particles);
-		Fctfs.resize(nr_particles);
-		old_offset.resize(nr_particles);
-		prior.resize(nr_particles);
-		max_index.resize(nr_particles);
 	};
 };
 
@@ -256,17 +247,17 @@ public:
 
 	size_t firstPos, lastPos; // positions in indexedDataArray data and index arrays to slice out
 	size_t weightNum, jobNum; // number of weights and jobs this class
-	
+
 
 public:
-		
+
 	IndexedDataArrayMask(AccPtrFactory ptrFactory) :
 		firstPos(), lastPos(), weightNum(), jobNum()
 	{
 		jobOrigin = ptrFactory.make<size_t>();
 		jobExtent = ptrFactory.make<size_t>();
 	}
-	
+
 	void setNumberOfJobs(size_t newSize)
 	{
 		jobNum=newSize;
@@ -303,7 +294,7 @@ public:
 	AccPtr<size_t> rot_id, rot_idx, trans_idx, ihidden_overs;
 
 public:
-	
+
 	inline
 	 IndexedDataArray(AccPtrFactory ptrFactory):
 	 	weights(ptrFactory.make<XFLOAT>()),
@@ -366,7 +357,7 @@ public:
 		host_alloc_all();
 		device_alloc_all();
 	}
-	
+
 	void dual_free_all()
 	{
 		weights.freeDeviceIfSet();
@@ -380,7 +371,7 @@ public:
 		trans_idx.freeHostIfSet();
 		ihidden_overs.freeHostIfSet();
 	}
-	
+
 	~IndexedDataArray()
 	{
 		dual_free_all();
