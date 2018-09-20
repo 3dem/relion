@@ -5145,14 +5145,14 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 		else
 		{
 			//Get kV, Cs and Q0 from this optics group
-			RFLOAT kV, Cs, Q0;
+			/*RFLOAT kV, Cs, Q0;
 			mydata.obsModel.opticsMdt.getValue(EMDL_CTF_VOLTAGE, kV, optics_group);
 			mydata.obsModel.opticsMdt.getValue(EMDL_CTF_CS, Cs, optics_group);
-			mydata.obsModel.opticsMdt.getValue(EMDL_CTF_Q0, Q0, optics_group);
+			mydata.obsModel.opticsMdt.getValue(EMDL_CTF_Q0, Q0, optics_group);*/
 
 			// Get parameters that change per-particle from the exp_metadata
 			CTF ctf;
-			ctf.setValues(DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_U),
+			/*ctf.setValues(DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_U),
 						  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_V),
 						  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_ANGLE),
 						  kV,
@@ -5160,7 +5160,16 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 						  Q0,
 						  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_BFACTOR),
 						  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_KFACTOR),
-						  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_PHASE_SHIFT));
+						  DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_PHASE_SHIFT));*/
+			
+			ctf.setValuesByGroup(
+				&mydata.obsModel, optics_group, 
+				DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_U), 
+				DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_V),  
+				DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_DEFOCUS_ANGLE),
+				DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_BFACTOR),
+				DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_KFACTOR),
+				DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_PHASE_SHIFT));
 
 			ctf.getFftwImage(exp_Fctf, mymodel.ori_size, mymodel.ori_size, mymodel.pixel_size,
 					ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);

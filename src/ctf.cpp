@@ -132,6 +132,7 @@ void CTF::read(const MetaDataTable &MD1, const MetaDataTable &MD2, long int obje
 	initialise();
 
 }
+
 void CTF::setValues(RFLOAT _defU, RFLOAT _defV, RFLOAT _defAng, RFLOAT _voltage,
 		RFLOAT _Cs, RFLOAT _Q0, RFLOAT _Bfac, RFLOAT _scale, RFLOAT _phase_shift)
 {
@@ -147,6 +148,29 @@ void CTF::setValues(RFLOAT _defU, RFLOAT _defV, RFLOAT _defAng, RFLOAT _voltage,
 
 	initialise();
 }
+
+void CTF::setValuesByGroup(
+		ObservationModel *obs, int opticsGroup, 
+		double _defU, double _defV, double _defAng, 
+		double _Bfac, double _scale, double _phase_shift)
+{
+	DeltafU         = _defU;
+	DeltafV         = _defV;
+	azimuthal_angle = _defAng;
+	
+	Bfac            = _Bfac;
+	scale           = _scale;
+	phase_shift     = _phase_shift;
+	
+	obs->opticsMdt.getValue(EMDL_CTF_VOLTAGE, kV, opticsGroup);
+	obs->opticsMdt.getValue(EMDL_CTF_CS, Cs, opticsGroup);
+	obs->opticsMdt.getValue(EMDL_CTF_Q0, Q0, opticsGroup);
+	
+	initialise();
+	
+	obsModel = obs;
+}
+
 /* Read from 1 MetaDataTable ----------------------------------------------- */
 void CTF::read(const MetaDataTable &MD)
 {

@@ -152,10 +152,17 @@ public:
      */
     void read(const MetaDataTable &MD1, const MetaDataTable &MD2, long int objectID = -1);
 
-    /** Just set all values explicitly */
+	/** Just set all values explicitly */
     void setValues(RFLOAT _defU, RFLOAT _defV, RFLOAT _defAng,
     		RFLOAT _voltage, RFLOAT _Cs, RFLOAT _Q0, RFLOAT _Bfac, RFLOAT _scale = 1., RFLOAT _phase_shift = 0.);
 
+	/** Set all values explicitly in 3.1 */
+    void setValuesByGroup(
+			ObservationModel* obs, int opticsGroup, 
+			RFLOAT _defU, RFLOAT _defV, RFLOAT _defAng,
+			RFLOAT _Bfac = 0.0, RFLOAT _scale = 1.0, RFLOAT _phase_shift = 0.0);
+
+	
     /** Read from a single MetaDataTable */
     void read(const MetaDataTable &MD);
 
