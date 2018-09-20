@@ -40,8 +40,8 @@ class ObservationModel
 				MetaDataTable& particlesMdt, MetaDataTable& opticsMdt);
 		
 		static void save(
-				const MetaDataTable& particlesMdt, 
-				const MetaDataTable& opticsMdt,
+				MetaDataTable& particlesMdt, 
+				MetaDataTable& opticsMdt,
 				std::string filename);
 		
 		static bool containsAllColumnsNeededForPrediction(const MetaDataTable& partMdt);

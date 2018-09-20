@@ -41,7 +41,7 @@ void ObservationModel::loadSafely(
 {
 	particlesMdt.read(filename, "particles");
 	opticsMdt.read(filename, "optics");
-
+	
 	if (particlesMdt.numberOfObjects() == 0 && particlesMdt.numberOfObjects() == 0)
 	{
 		std::cerr << "WARNING: " << filename << " seems to be from an outdated version of Relion or a bad file\n"
@@ -96,12 +96,16 @@ void ObservationModel::loadSafely(
 }
 
 void ObservationModel::save(
-		const MetaDataTable &particlesMdt, 
-		const MetaDataTable &opticsMdt, 
+		MetaDataTable &particlesMdt, 
+		MetaDataTable &opticsMdt, 
 		std::string filename)
 {
 	std::ofstream of(filename);
+	
+	opticsMdt.setName("optics");
 	opticsMdt.write(of);
+	
+	particlesMdt.setName("particles");
 	particlesMdt.write(of);
 }
 
