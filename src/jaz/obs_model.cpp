@@ -20,11 +20,12 @@
 
 #include "src/jaz/obs_model.h"
 #include "src/jaz/stack_helper.h"
-#include "src/jaz/filter_helper.h"
+#include "src/jaz/img_proc/filter_helper.h"
 #include "src/jaz/Fourier_helper.h"
 #include "src/jaz/ctf/tilt_helper.h"
 #include "src/jaz/math/Zernike.h"
 #include "src/jaz/vtk_helper.h"
+#include "src/jaz/io/star_converter.h"
 
 #include <src/backprojector.h>
 
@@ -34,20 +35,24 @@
 using namespace gravis;
 
 void ObservationModel::loadSafely(
-	std::string particlesFn, std::string opticsFn,
+	std::string filename,
 	ObservationModel& obsModel,
 	MetaDataTable& particlesMdt, MetaDataTable& opticsMdt)
 {
-	particlesMdt.read(particlesFn);
-
-	if (particlesMdt.getVersion() < 31000)
+	particlesMdt.read(filename, "particles");
+	opticsMdt.read(filename, "optics");
+	
+	if (particlesMdt.numberOfObjects() == 0 && particlesMdt.numberOfObjects() == 0)
 	{
-		REPORT_ERROR_STR(particlesFn << " is from a pre-3.1 version of Relion. "
-			<< "Please use relion_convert_star to generate an up-to-date file.");
+		std::cerr << "WARNING: " << filename << " seems to be from an outdated version of Relion or a bad file\n"
+				  << "         Attempting conversion...\n";
+
+		MetaDataTable oldMdt;
+		oldMdt.read(filename);
+		
+		StarConverter::convert_3p0_particlesTo_3p1(oldMdt, particlesMdt, opticsMdt);
 	}
-
-	opticsMdt.read(opticsFn);
-
+	
 	obsModel = ObservationModel(opticsMdt);
 
 	// read pixel sizes (and make sure they are all the same)
@@ -76,18 +81,32 @@ void ObservationModel::loadSafely(
 		}
 
 		REPORT_ERROR("ERROR: The following optics groups were not defined in "+
-					 opticsFn+": "+sts.str());
+					 filename+": "+sts.str());
 	}
 
 	// make sure the optics groups appear in the right order (and rename them if necessary)
 
 	if (!obsModel.opticsGroupsSorted())
 	{
-		std::cerr << "   - Warning: the optics groups in " << opticsFn
+		std::cerr << "   - Warning: the optics groups in " << filename
 				  << " are not in the right order - renaming them now" << std::endl;
 
 		obsModel.sortOpticsGroups(particlesMdt);
 	}
+}
+
+void ObservationModel::save(
+		MetaDataTable &particlesMdt, 
+		MetaDataTable &opticsMdt, 
+		std::string filename)
+{
+	std::ofstream of(filename);
+	
+	opticsMdt.setName("optics");
+	opticsMdt.write(of);
+	
+	particlesMdt.setName("particles");
+	particlesMdt.write(of);
 }
 
 ObservationModel::ObservationModel()
@@ -100,13 +119,12 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 	lambda(opticsMdt.numberOfObjects()),
 	Cs(opticsMdt.numberOfObjects())
 {
-	if (   !opticsMdt.containsLabel(EMDL_CTF_MAGNIFICATION)
-	    || !opticsMdt.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE)
+	if (   !opticsMdt.containsLabel(EMDL_IMAGE_PIXEL_SIZE)
 	    || !opticsMdt.containsLabel(EMDL_CTF_VOLTAGE)
 	    || !opticsMdt.containsLabel(EMDL_CTF_CS))
 	{
 		REPORT_ERROR_STR("ERROR: not all necessary variables defined in _optics.star file: "
-			<< "rlnMagnification, rlnDetectorPixelSize, rlnVoltage and rlnSphericalAberration.");
+			<< "rlnPixelSize, rlnVoltage and rlnSphericalAberration.");
 	}
 
 	// symmetrical high-order aberrations:
@@ -134,10 +152,7 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 
 	for (int i = 0; i < opticsMdt.numberOfObjects(); i++)
 	{
-		RFLOAT mag, dstep;
-		opticsMdt.getValue(EMDL_CTF_MAGNIFICATION, mag, i);
-		opticsMdt.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep, i);
-		angpix[i] = 10000 * dstep / mag;
+		opticsMdt.getValue(EMDL_IMAGE_PIXEL_SIZE, angpix[i], i);
 
 		double kV;
 		opticsMdt.getValue(EMDL_CTF_VOLTAGE, kV, i);
@@ -203,8 +218,11 @@ void ObservationModel::predictObservation(
 
     double xoff, yoff;
 
-    partMdt.getValue(EMDL_ORIENT_ORIGIN_X, xoff, particle);
-    partMdt.getValue(EMDL_ORIENT_ORIGIN_Y, yoff, particle);
+    partMdt.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff, particle);
+    partMdt.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff, particle);
+	
+	xoff /= angpix[opticsGroup];
+	yoff /= angpix[opticsGroup];
 
     double rot, tilt, psi;
 
@@ -230,12 +248,12 @@ void ObservationModel::predictObservation(
 	{
 		shiftImageInFourierTransform(dest, dest, s, s/2 - xoff, s/2 - yoff);
 	}
-
+		
     if (applyCtf)
     {
         CTF ctf;
         ctf.readByGroup(partMdt, this, particle);
-
+		
 		Image<RFLOAT> ctfImg(sh,s);
 		ctf.getFftwImage(ctfImg(), s, s, angpix[opticsGroup]);
 
@@ -259,32 +277,6 @@ void ObservationModel::predictObservation(
     }
 }
 
-Image<Complex> ObservationModel::predictObservation(
-        Projector& proj, const MetaDataTable& partMdt, long int particle,
-        bool applyCtf, bool shiftPhases, bool applyShift)
-{
-    Image<Complex> pred;
-
-	predictObservation(proj, partMdt, particle, pred.data, applyCtf, shiftPhases, applyShift);
-    return pred;
-}
-
-std::vector<Image<Complex> > ObservationModel::predictObservations(
-        Projector &proj, const MetaDataTable &partMdt, int threads,
-        bool applyCtf, bool shiftPhases, bool applyShift)
-{
-    const int pc = partMdt.numberOfObjects();
-    std::vector<Image<Complex> > out(pc);
-
-    #pragma omp parallel for num_threads(threads)
-    for (int p = 0; p < pc; p++)
-    {
-        out[p] = predictObservation(proj, partMdt, p, applyCtf, shiftPhases, applyShift);
-    }
-
-	return out;
-}
-
 Volume<t2Vector<Complex>> ObservationModel::predictComplexGradient(
 		Projector &proj, const MetaDataTable &partMdt, long particle,
 		bool applyCtf, bool shiftPhases, bool applyShift)
@@ -304,10 +296,13 @@ Volume<t2Vector<Complex>> ObservationModel::predictComplexGradient(
 	partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, particle);
 	opticsGroup--;
 
-    double xoff, yoff;
+	double xoff, yoff;
 
-    partMdt.getValue(EMDL_ORIENT_ORIGIN_X, xoff, particle);
-    partMdt.getValue(EMDL_ORIENT_ORIGIN_Y, yoff, particle);
+    partMdt.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff, particle);
+    partMdt.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff, particle);
+	
+	xoff /= angpix[opticsGroup];
+	yoff /= angpix[opticsGroup];
 
     double rot, tilt, psi;
 
@@ -600,10 +595,10 @@ Matrix2D<RFLOAT> ObservationModel::applyAnisoMagTransp(Matrix2D<RFLOAT> A3D_tran
 	return out;
 }
 
-bool ObservationModel::containsAllNeededColumns(const MetaDataTable& partMdt)
+bool ObservationModel::containsAllColumnsNeededForPrediction(const MetaDataTable& partMdt)
 {
-	return (partMdt.containsLabel(EMDL_ORIENT_ORIGIN_X)
-         && partMdt.containsLabel(EMDL_ORIENT_ORIGIN_Y)
+	return (partMdt.containsLabel(EMDL_ORIENT_ORIGIN_X_ANGSTROM)
+         && partMdt.containsLabel(EMDL_ORIENT_ORIGIN_Y_ANGSTROM)
          && partMdt.containsLabel(EMDL_ORIENT_ROT)
          && partMdt.containsLabel(EMDL_ORIENT_TILT)
          && partMdt.containsLabel(EMDL_ORIENT_PSI)

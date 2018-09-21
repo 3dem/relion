@@ -948,7 +948,8 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
                                 int nr_threads,
                                 int minres_map,
                                 bool printTimes,
-								bool do_fsc0999)
+								bool do_fsc0999,
+								Image<RFLOAT>* weight_out)
 {
 
 #ifdef TIMING
@@ -1459,12 +1460,14 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
         transformer.FourierTransform();
 		RCTOC(ReconTimer,ReconS_21);
 		RCTIC(ReconTimer,ReconS_22);
+		
 	    FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fconv)
 	    {
 	    	long int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
 	    	spectrum(idx) += norm(dAkij(Fconv, k, i, j));
 	        count(idx) += 1.;
 	    }
+		
 	    spectrum /= count;
 
 		// Factor two because of two-dimensionality of the complex plane
@@ -1500,6 +1503,58 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
     sigma2_out = sigma2;
     data_vs_prior_out = data_vs_prior;
     fourier_coverage_out = fourier_coverage;
+	
+	if (weight_out != 0)
+	{
+		weight_out->data = MultidimArray<RFLOAT>(1, ori_size, ori_size, ori_size/2+1);
+		
+		Image<RFLOAT> count(ori_size/2+1, ori_size, ori_size);
+		count.data.initZeros();
+		
+		// downsample while considering padding:
+		
+		for (long int z = 0; z < Fweight.zdim; z++)
+		for (long int y = 0; y < Fweight.ydim; y++)
+		for (long int x = 0; x < Fweight.xdim; x++)
+		{
+			int xl = x;
+			int yl = y < Fweight.ydim/2? y : y - Fweight.ydim;
+			int zl = z < Fweight.zdim/2? z : z - Fweight.zdim;
+			
+			if (xl == Fweight.xdim - 1
+			 || yl == Fweight.ydim/2 || yl == -Fweight.ydim/2 - 1
+			 || zl == Fweight.zdim/2 || zl == -Fweight.zdim/2 - 1)
+			{
+				continue;
+			}
+			
+			int xx = ROUND(xl / padding_factor);
+			int yy = (ROUND(yl / padding_factor) + ori_size) % ori_size;
+			int zz = (ROUND(zl / padding_factor) + ori_size) % ori_size;
+			
+			if (xx >= 0 && xx < ori_size/2+1
+			 && yy >= 0 && yy < ori_size
+			 && zz >= 0 && zz < ori_size)
+			{
+				DIRECT_A3D_ELEM(weight_out->data, zz, yy, xx) += DIRECT_A3D_ELEM(Fweight, z, y, x);
+				DIRECT_A3D_ELEM(count.data, zz, yy, xx) += 1.0;
+			}		 
+		}
+		
+		const double pad3 = padding_factor * padding_factor * padding_factor;
+		
+		for (long int z = 0; z < ori_size; z++)
+		for (long int y = 0; y < ori_size; y++)
+		for (long int x = 0; x < ori_size/2 + 1; x++)
+		{
+			const RFLOAT c = DIRECT_A3D_ELEM(count.data, z, y, x);
+			
+			if (c > 0.0)
+			{
+				DIRECT_A3D_ELEM(weight_out->data, z, y, x) *= pad3/c;
+			}
+		}
+	}
 }
 
 void BackProjector::symmetrise(int nr_helical_asu, RFLOAT helical_twist, RFLOAT helical_rise, int threads)

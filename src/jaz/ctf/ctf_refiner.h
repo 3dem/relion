@@ -27,6 +27,7 @@
 
 #include "tilt_estimator.h"
 #include "defocus_estimator.h"
+#include "bfactor_refiner.h"
 #include "magnification_estimator.h"
 #include "aberration_estimator.h"
 
@@ -56,6 +57,7 @@ class CtfRefiner
 		
 		TiltEstimator tiltEstimator;
 		DefocusEstimator defocusEstimator;
+		BFactorRefiner bfactorEstimator;
 		AberrationEstimator aberrationEstimator;
 		MagnificationEstimator magnificationEstimator;
 	
@@ -65,17 +67,9 @@ class CtfRefiner
 		// Allow continuation of crashed jobs
 		bool only_do_unfinished;
 	
-		// Estimate per-particle defocus?
-		bool do_defocus_fit;
-	
-		// Estimate beamtilt?
-		bool do_tilt_fit;
-		
-		// Estimate symmetric aberrations?
-		bool do_aberr_fit;
-		
-		// Estimate anisotropic magnification?
-		bool do_mag_fit;
+		// Whether to estimate defoci, B-factors, antisymmetric aberrations (incl. beam tilt),
+		// symmetric aberrations and anisotropic magnification, respectively
+		bool do_defocus_fit, do_bfac_fit, do_tilt_fit, do_aberr_fit, do_mag_fit;
 	
 		
 		bool debug,     // write out debugging info
@@ -85,7 +79,7 @@ class CtfRefiner
 		
 		int nr_omp_threads;
 	
-		std::string starFn, opticsFn, outPath;
+		std::string starFn, outPath;
 	
 		MetaDataTable mdt0, opticsMdt;
 		std::vector<MetaDataTable> allMdts, unfinishedMdts;	
@@ -95,6 +89,9 @@ class CtfRefiner
 			
 		// Fit CTF parameters for all particles on a subset of the micrographs micrograph
 		void processSubsetMicrographs(long g_start, long g_end);
+		
+		// Combine all .stars and .eps files
+		std::vector<MetaDataTable> merge(const std::vector<MetaDataTable>& mdts);
 };
 
 

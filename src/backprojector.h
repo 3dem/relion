@@ -294,7 +294,8 @@ public:
                      int nr_threads = 1,
                      int minres_map = -1,
                      bool printTimes= false,
-					 bool do_fsc0999 = false);
+					 bool do_fsc0999 = false,
+					 Image<RFLOAT>* weight_out = 0);
 
 
 	/*  Enforce Hermitian symmetry, apply helical symmetry as well as point-group symmetry

@@ -36,6 +36,10 @@ file(GLOB REL_JAZ_MOTION_SRC "${CMAKE_SOURCE_DIR}/src/jaz/motion/*.cpp")
 file(GLOB REL_JAZ_MOTION_H "${CMAKE_SOURCE_DIR}/src/jaz/motion/*.h")
 file(GLOB REL_JAZ_MATH_SRC "${CMAKE_SOURCE_DIR}/src/jaz/math/*.cpp")
 file(GLOB REL_JAZ_MATH_H "${CMAKE_SOURCE_DIR}/src/jaz/math/*.h")
+file(GLOB REL_JAZ_IMG_PROC_SRC "${CMAKE_SOURCE_DIR}/src/jaz/img_proc/*.cpp")
+file(GLOB REL_JAZ_IMG_PROC_H "${CMAKE_SOURCE_DIR}/src/jaz/img_proc/*.h")
+file(GLOB REL_JAZ_IO_SRC "${CMAKE_SOURCE_DIR}/src/jaz/io/*.cpp")
+file(GLOB REL_JAZ_IO_H "${CMAKE_SOURCE_DIR}/src/jaz/io/*.h")
 file(GLOB REL_D3x3_SRC "${CMAKE_SOURCE_DIR}/src/jaz/d3x3/*.c")
 file(GLOB REL_D3x3_H "${CMAKE_SOURCE_DIR}/src/jaz/d3x3/*.h")
 file(GLOB REL_LBFGS_SRC "${CMAKE_SOURCE_DIR}/src/jaz/lbfgs/*.c")
@@ -72,7 +76,9 @@ if(BUILD_SHARED_LIBS)
 		${REL_JAZ_OPT_SRC} ${REL_JAZ_OPT_H}
 		${REL_JAZ_CTF_SRC} ${REL_JAZ_CTF_H}
 		${REL_JAZ_MOTION_SRC} ${REL_JAZ_MOTION_H}
-		${REL_JAZ_MATH_SRC} ${REL_JAZ_MATH_H}		
+		${REL_JAZ_MATH_SRC} ${REL_JAZ_MATH_H}
+		${REL_JAZ_IMG_PROC_SRC} ${REL_JAZ_IMG_PROC_H}
+		${REL_JAZ_IO_SRC} ${REL_JAZ_IO_H}
 		${REL_D3x3_SRC} ${REL_D3x3_H}
 		${REL_LBFGS_SRC} ${REL_LBFGS_H})
 
@@ -89,6 +95,8 @@ else()
 		${REL_JAZ_CTF_SRC} ${REL_JAZ_CTF_H}
 		${REL_JAZ_MOTION_SRC} ${REL_JAZ_MOTION_H}
 		${REL_JAZ_MATH_SRC} ${REL_JAZ_MATH_H}
+		${REL_JAZ_IMG_PROC_SRC} ${REL_JAZ_IMG_PROC_H}
+		${REL_JAZ_IO_SRC} ${REL_JAZ_IO_H}
 		${REL_D3x3_SRC} ${REL_D3x3_H}
 		${REL_LBFGS_SRC} ${REL_LBFGS_H})
 

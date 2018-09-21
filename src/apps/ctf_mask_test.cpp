@@ -6,7 +6,7 @@
 #include <src/args.h>
 #include <src/image.h>
 #include <src/metadata_table.h>
-#include <src/jaz/filter_helper.h>
+#include <src/jaz/img_proc/filter_helper.h>
 #include <src/jaz/stack_helper.h>
 #include <src/jaz/obs_model.h>
 #include <src/jaz/image_log.h>
@@ -20,7 +20,7 @@ using namespace gravis;
 
 int main(int argc, char *argv[])
 {
-    std::string starFn, opticsFn, outPath;
+    std::string starFn, outPath;
     int s, threads, mg;
 	double rad, step, flankWidth;
 
@@ -33,7 +33,6 @@ int main(int argc, char *argv[])
         parser.addSection("General options");
 		
 		starFn = parser.getOption("--i", "Input particle *.star file");
-		opticsFn = parser.getOption("--io", "Input optics *.star file");
 		s = textToInteger(parser.getOption("--s", "Image size"));
 		rad = textToDouble(parser.getOption("--r", "Particle radius"));
 		step = textToDouble(parser.getOption("--t", "Frequency step"));
@@ -54,7 +53,7 @@ int main(int argc, char *argv[])
 	ObservationModel obsModel;	
 	MetaDataTable mdt0, opticsMdt;
 	
-	ObservationModel::loadSafely(starFn, opticsFn, obsModel, mdt0, opticsMdt);
+	ObservationModel::loadSafely(starFn, obsModel, mdt0, opticsMdt);
 	
 	std::vector<MetaDataTable> allMdts = StackHelper::splitByMicrographName(&mdt0);
 	

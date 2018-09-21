@@ -21,9 +21,12 @@
 #include "reference_map.h"
 #include <src/jaz/obs_model.h>
 #include <src/jaz/legacy_obs_model.h>
-#include <src/jaz/image_op.h>
+#include <src/jaz/img_proc/image_op.h>
 #include <src/jaz/refinement_helper.h>
 #include <src/jaz/motion/motion_helper.h>
+#include <src/jaz/new_ft.h>
+#include <src/jaz/vtk_helper.h>
+#include <src/backprojector.h>
 #include <src/args.h>
 #include <omp.h>
 
@@ -199,7 +202,7 @@ Image<Complex> ReferenceMap::predict(
 	
 	int pi = (hs == Own)? randSubset : 1 - randSubset;
 	
-	pred = obs.predictObservation(projectors[pi], mdt, p, applyCtf, applyTilt, applyShift);
+	obs.predictObservation(projectors[pi], mdt, p, pred(), applyCtf, applyTilt, applyShift);
 	
 	return pred;
 }
@@ -282,3 +285,26 @@ Image<Complex> ReferenceMap::predict(
 	
 	return pred;
 }
+
+// perhaps some other day:
+/*void ReferenceMap::predictOccupancy(const MetaDataTable &particles, int threads)
+{
+	for (int half = 0; half < 1; half++)
+	{
+		occupancies[half] = Projector(s, TRILINEAR, 1.0, 10, 2);
+		occupancies[half].data = MultidimArray<Complex>(1,s,s,sh);
+		
+		const int pc
+		std::vector<CTF> ctfs(
+				
+		#pragma omp parallel for num_threads(threads)
+		for (int z = 0; z < s; z++)
+		{
+			for (int y = 0; y < s;  y++)
+			for (int x = 0; x < sh; x++)
+			{
+				
+			}
+		}
+	}
+}*/

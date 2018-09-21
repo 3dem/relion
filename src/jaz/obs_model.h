@@ -35,11 +35,16 @@ class ObservationModel
     public:
 		
 		static void loadSafely(
-				std::string particlesFn, std::string opticsFn, 
+				std::string filename, 
 				ObservationModel& obsModel, 
 				MetaDataTable& particlesMdt, MetaDataTable& opticsMdt);
 		
-		static bool containsAllNeededColumns(const MetaDataTable& partMdt);
+		static void save(
+				MetaDataTable& particlesMdt, 
+				MetaDataTable& opticsMdt,
+				std::string filename);
+		
+		static bool containsAllColumnsNeededForPrediction(const MetaDataTable& partMdt);
 		
 
         ObservationModel();
@@ -70,15 +75,6 @@ class ObservationModel
 				MultidimArray<Complex>& dest,
 				bool applyCtf = true, bool shiftPhases = true, bool applyShift = true);
 		
-		Image<Complex> predictObservation(
-				Projector &proj, const MetaDataTable &partMdt, long int particle,
-				bool applyCtf = true, bool shiftPhases = true, bool applyShift = true);
-
-        std::vector<Image<Complex> > predictObservations(
-                Projector &proj, const MetaDataTable &partMdt, int threads,
-                bool applyCtf = true, bool shiftPhases = true, bool applyShift = true);
-		
-		
 		Volume<gravis::t2Vector<Complex> > predictComplexGradient(
 				Projector &proj, const MetaDataTable &partMdt, long int particle,
 				bool applyCtf = true, bool shiftPhases = true, bool applyShift = true);
@@ -105,6 +101,7 @@ class ObservationModel
 		const Image<RFLOAT>& getGammaOffset(int optGroup, int s);
 				
 		Matrix2D<RFLOAT> applyAnisoMagTransp(Matrix2D<RFLOAT> A3D_transp, int opticsGroup);
+		
 		
 		
 	// Bureaucracy //

@@ -30,16 +30,16 @@
 #include <src/jaz/image_log.h>
 #include <src/jaz/complex_io.h>
 #include <src/jaz/stack_helper.h>
-#include <src/jaz/image_op.h>
+#include <src/jaz/img_proc/image_op.h>
 #include <src/jaz/obs_model.h>
 #include <src/jaz/new_ft.h>
-#include <src/jaz/filter_helper.h>
+#include <src/jaz/img_proc/filter_helper.h>
 
 class reconstruct_parameters
 {
 	public:
 		
-		FileName fn_out, fn_sel, fn_opt, fn_img, fn_sym, fn_sub;
+		FileName fn_out, fn_sel, fn_img, fn_sym, fn_sub;
 		
 		int r_max, r_min_nn, blob_order, ref_dim, interpolator, grid_iters,
 			nr_omp_threads,
@@ -53,7 +53,7 @@ class reconstruct_parameters
 		
 		bool skip_gridding, debug, do_reconstruct_meas, is_positive, read_weights, div_avg;
 		
-		bool no_Wiener;
+		bool no_Wiener, writeWeights;
 		
 		bool L1_freq, L1_ring, L1_particle, L1_micrograph, L1_any;
 		int L1_iters;
@@ -76,7 +76,6 @@ class reconstruct_parameters
 			
 			int general_section = parser.addSection("General options");
 			fn_sel = parser.getOption("--i", "Input STAR file with the projection images and their orientations", "");
-			fn_opt = parser.getOption("--io", "Corresponding optics STAR file", "");
 			fn_out = parser.getOption("--o", "Name for output reconstruction");
 			fn_sym = parser.getOption("--sym", "Symmetry group", "c1");
 			maxres = textToFloat(parser.getOption("--maxres", "Maximum resolution (in Angstrom) to consider in Fourier space (default Nyquist)", "-1"));
@@ -91,6 +90,7 @@ class reconstruct_parameters
 			only_flip_phases = parser.checkOption("--only_flip_phases", "Do not correct CTF-amplitudes, only flip phases");
 			
 			read_weights = parser.checkOption("--read_weights", "Read freq. weight files");
+			writeWeights = parser.checkOption("--write_weights", "Write the weights volume");
 			do_ewald = parser.checkOption("--ewald", "Correct for Ewald-sphere curvature (developmental)");
 			mask_diameter  = textToFloat(parser.getOption("--mask_diameter", "Diameter (in A) of mask for Ewald-sphere curvature correction", "-1."));
 			width_mask_edge = textToInteger(parser.getOption("--width_mask_edge", "Width (in pixels) of the soft edge on the mask", "3"));
@@ -286,7 +286,7 @@ class reconstruct_parameters
 			ObservationModel obsModel;
 			MetaDataTable mdt0, mdtOpt;
 			
-			ObservationModel::loadSafely(fn_sel, fn_opt, obsModel, mdt0, mdtOpt);
+			ObservationModel::loadSafely(fn_sel, obsModel, mdt0, mdtOpt);
 			double angpix = obsModel.getPixelSize(0);
 			
 			// Get dimension of the images
@@ -431,8 +431,11 @@ class reconstruct_parameters
 							
 							// Translations (either through phase-shifts or in real space
 							trans.initZeros();
-							mdts[g].getValue(EMDL_ORIENT_ORIGIN_X, XX(trans), p);
-							mdts[g].getValue(EMDL_ORIENT_ORIGIN_Y, YY(trans), p);
+							mdts[g].getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, XX(trans), p);
+							mdts[g].getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, YY(trans), p);
+							
+							XX(trans) /= obsModel.angpix[opticsGroup];
+							YY(trans) /= obsModel.angpix[opticsGroup];
 							
 							if (shift_error > 0.)
 							{
@@ -721,7 +724,7 @@ class reconstruct_parameters
 						std::cout << " + Applying spherical mask of diameter " << 
 								  mask_diameter_filt << " ..." << std::endl;
 						
-						const double r0 = (padding_factor * mask_diameter_filt)/2.0;
+						const double r0 = mask_diameter_filt/2.0;
 						const double r1 = r0 + flank_width;
 						
 						Image<Complex> tempC;
@@ -739,10 +742,23 @@ class reconstruct_parameters
 						NewFFT::FourierTransform(tempR(), tempC(), NewFFT::FwdOnly);
 						BackProjector::recenterWhole(tempC(), backprojector[j]->weight);
 					}
+					
+					Image<RFLOAT> weightOut;
 						
 					std::cout << " + Starting the reconstruction ..." << std::endl;
-					backprojector[j]->reconstruct(vol(), grid_iters, do_map, 1., dummy, dummy, dummy, dummy,
-												  fsc, 1., do_use_fsc, true, nr_omp_threads, -1, false);
+					
+					backprojector[j]->reconstruct(
+						vol(), grid_iters, do_map, 1., dummy, dummy, dummy, dummy,
+						fsc, 1., do_use_fsc, true, nr_omp_threads, -1, false, false, 
+						writeWeights? &weightOut : 0);
+					
+					if (writeWeights)
+					{
+						std::stringstream sts;
+						sts << (j+1);
+						std::string fnWgh = fn_out + "_half" + sts.str() + "_class001_unfil_weight.mrc";
+						weightOut.write(fnWgh);
+					}
 															
 					prevRefs[j] = vol;
 					

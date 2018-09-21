@@ -19,7 +19,7 @@
  ***************************************************************************/
 
 #include <src/jaz/slice_helper.h>
-#include <src/jaz/filter_helper.h>
+#include <src/jaz/img_proc/filter_helper.h>
 #include <src/jaz/interpolation.h>
 
 using namespace gravis;

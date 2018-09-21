@@ -45,7 +45,7 @@ class ReferenceMap
             // data:
             Image<RFLOAT> freqWeight, mask;
             std::vector<double> freqWeight1D;
-            Projector projectors[2];
+			Projector projectors[2];
             int k_out, s, sh;
 			bool hasMask;
 
@@ -101,7 +101,6 @@ class ReferenceMap
                 bool applyCtf = true,
                 bool applyTilt = true, 
 				bool applyShift = true);
-
 };
 
 #endif

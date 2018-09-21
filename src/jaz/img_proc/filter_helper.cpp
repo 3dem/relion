@@ -18,7 +18,7 @@
  * author citations must be preserved.
  ***************************************************************************/
 
-#include <src/jaz/filter_helper.h>
+#include <src/jaz/img_proc/filter_helper.h>
 #include <src/jaz/image_log.h>
 #include <src/jaz/index_sort.h>
 #include <src/jaz/gravis/t2Vector.h>

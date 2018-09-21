@@ -33,10 +33,10 @@
 
 using namespace gravis;
 
-BFactorEstimator::BFactorEstimator()
+OldBFactorEstimator::OldBFactorEstimator()
 {}
 
-void BFactorEstimator::read(IOParser& parser, int argc, char* argv[])
+void OldBFactorEstimator::read(IOParser& parser, int argc, char* argv[])
 {
     parser.addSection("Old B-factor estimation options");
 
@@ -56,7 +56,7 @@ void BFactorEstimator::read(IOParser& parser, int argc, char* argv[])
 
 }
 
-void BFactorEstimator::init(
+void OldBFactorEstimator::init(
     int verb, int s, int fc, 
     int nr_omp_threads, std::string outPath, bool debug,
     LegacyObservationModel* obsModel,
@@ -76,7 +76,7 @@ void BFactorEstimator::init(
 	this->reference = reference;
 }
 
-void BFactorEstimator::process(const std::vector<MetaDataTable>& mdts)
+void OldBFactorEstimator::process(const std::vector<MetaDataTable>& mdts)
 {	
 	if (f_max < 0) f_max = fc-1;
 	
@@ -167,9 +167,12 @@ void BFactorEstimator::process(const std::vector<MetaDataTable>& mdts)
 				
 				Matrix1D<RFLOAT> trans(2);
 				trans.initZeros();
-				mdts[g].getValue(EMDL_ORIENT_ORIGIN_X, XX(trans), p);
-				mdts[g].getValue(EMDL_ORIENT_ORIGIN_Y, YY(trans), p);
 				
+				if (!mdts[g].getValue(EMDL_ORIENT_ORIGIN_X, XX(trans), p)
+				 || !mdts[g].getValue(EMDL_ORIENT_ORIGIN_Y, YY(trans), p))
+				{
+					REPORT_ERROR("Old B-factor estimation does not support the Relion 3.1 file format");
+				}
 				
 				#pragma omp parallel for num_threads(nr_omp_threads)
 				for (int f = 0; f < fcb; f++)
@@ -306,12 +309,12 @@ void BFactorEstimator::process(const std::vector<MetaDataTable>& mdts)
 	writeStarFileBfactors(perframe_bfactors);
 }
 
-bool BFactorEstimator::doingAnything()
+bool OldBFactorEstimator::doingAnything()
 {
 	return doAnything;
 }
 
-MultidimArray<RFLOAT> BFactorEstimator::maskedFSC( 
+MultidimArray<RFLOAT> OldBFactorEstimator::maskedFSC( 
 		Image<RFLOAT>& I1, 
 		Image<RFLOAT>& I2,
 		const Image<RFLOAT>& Imask)
@@ -326,7 +329,7 @@ MultidimArray<RFLOAT> BFactorEstimator::maskedFSC(
 	return out;
 }
 
-bool BFactorEstimator::calculateBfactorSingleFrameReconstruction(
+bool OldBFactorEstimator::calculateBfactorSingleFrameReconstruction(
 		int frame,
 		const MultidimArray<RFLOAT>& fsc_frame,
 		const MultidimArray<RFLOAT>& fsc_average,
@@ -434,7 +437,7 @@ bool BFactorEstimator::calculateBfactorSingleFrameReconstruction(
 	return true;
 }
 
-void BFactorEstimator::writeStarFileBfactors(
+void OldBFactorEstimator::writeStarFileBfactors(
 		MultidimArray<RFLOAT>& perframe_bfactors)
 {
 	MetaDataTable MDout;

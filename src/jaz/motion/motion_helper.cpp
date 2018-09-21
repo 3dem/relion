@@ -20,8 +20,8 @@
 
 #include "motion_helper.h"
 
-#include <src/jaz/filter_helper.h>
-#include <src/jaz/image_op.h>
+#include <src/jaz/img_proc/filter_helper.h>
+#include <src/jaz/img_proc/image_op.h>
 #include <src/jaz/image_log.h>
 #include <src/jaz/interpolation.h>
 #include <src/jaz/optimization/nelder_mead.h>
@@ -400,8 +400,12 @@ void MotionHelper::writeTracks(
         for (int f = 0; f < fc; f++)
         {
             mdt.addObject();
-            mdt.setValue(EMDL_ORIENT_ORIGIN_X, tracks[p][f].x);
-            mdt.setValue(EMDL_ORIENT_ORIGIN_Y, tracks[p][f].y);
+			
+            if (!mdt.setValue(EMDL_ORIENT_ORIGIN_X, tracks[p][f].x)
+             || !mdt.setValue(EMDL_ORIENT_ORIGIN_Y, tracks[p][f].y))
+			{
+				REPORT_ERROR("MotionHelper::writeTracks does not support the Relion 3.1 file format yet.");
+			}
         }
 
         mdt.write(ofs);

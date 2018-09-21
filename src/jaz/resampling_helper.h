@@ -22,7 +22,7 @@
 #define RESAMPLING_HELPER_H
 
 #include <src/multidim_array.h>
-#include <src/jaz/filter_helper.h>
+#include <src/jaz/img_proc/filter_helper.h>
 #include <src/jaz/interpolation.h>
 
 class ResamplingHelper
