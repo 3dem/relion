@@ -36,79 +36,104 @@
 
 ////////////// Hierarchical metadata model
 
-class ExpParticle
+class ExpImage
 {
 public:
-	// Position of the particle in the original input STAR file
+	// Position of the image in the original input STAR file
 	long int id;
 
-	// Name of this particle (by this name it will be recognised upon reading)
+	// To which particle does this image belong
+	long int particle_id;
+
+	// Name of this image (by this name it will be recognised upon reading)
 	std::string name;
 
-	// ID of the micrograph that this particle comes from
+	// ID of the micrograph that this image comes from
 	long int micrograph_id;
 
-	// ID of the group that this particle comes from
+	// ID of the group that this image comes from
 	long int group_id;
 
+	// The optics group for this image
 	int optics_group;
-
-	// Random subset this particle belongs to
-	int random_subset;
-
-	// the CTF of this particle (NOTE: it contains a pointer to the obsModel of this Experiment)
-	CTF ctf;
 
 	// Pre-read array of the image in RAM
 	MultidimArray<float> img;
 
 	// Empty Constructor
-	ExpParticle()
-	{
-		clear();
-	}
+	ExpImage() {}
 
 	// Destructor needed for work with vectors
-	~ExpParticle()
-	{
-		clear();
-	}
+	~ExpImage() {}
 
 	// Copy constructor needed for work with vectors
-	ExpParticle(ExpParticle const& copy)
+	ExpImage(ExpImage const& copy)
 	{
 		id = copy.id;
+		particle_id = copy.particle_id;
 		name = copy.name;
 		micrograph_id = copy.micrograph_id;
 		group_id = copy.group_id;
-		random_subset = copy.random_subset;
-		ctf = copy.ctf;
+		optics_group = copy.optics_group;
 		img = copy.img;
 
     }
 
 	// Define assignment operator in terms of the copy constructor
-	ExpParticle& operator=(ExpParticle const& copy)
+	ExpImage& operator=(ExpImage const& copy)
 	{
 		id = copy.id;
+		particle_id = copy.particle_id;
 		name = copy.name;
 		micrograph_id = copy.micrograph_id;
 		group_id = copy.group_id;
-		random_subset = copy.random_subset;
-		ctf = copy.ctf;
+		optics_group = copy.optics_group;
 		img = copy.img;
 		return *this;
 	}
 
-	// Initialise
-	void clear()
+};
+
+class ExpParticle
+{
+public:
+
+	// Name of this particle (by this name all the images inside it will be grouped)
+	std::string name;
+
+	// Random subset this particle belongs to
+	int random_subset;
+
+	// Vector of all the images for this particle
+	std::vector<ExpImage> images;
+
+	// Empty Constructor
+	ExpParticle() {}
+
+	// Destructor needed for work with vectors
+	~ExpParticle() {}
+
+	// Copy constructor needed for work with vectors
+	ExpParticle(ExpParticle const& copy)
 	{
-		name="undefined";
-		id = micrograph_id = group_id = optics_group = -1;
-		random_subset = 0;
-		img.clear();
+		name = copy.name;
+		random_subset = copy.random_subset;
+		images = copy.images;
+    }
+
+	// Define assignment operator in terms of the copy constructor
+	ExpParticle& operator=(ExpParticle const& copy)
+	{
+		name = copy.name;
+		random_subset = copy.random_subset;
+		images = copy.images;
+		return *this;
 	}
 
+	int numberOfImages()
+	{
+		return images.size();
+	}
 };
 
 
@@ -121,27 +146,21 @@ public:
 	// Name of this micrograph (by this name it will be recognised upon reading)
 	std::string name;
 
-	// All the particles that were recorded on this micrograph
-	std::vector<long int> particle_ids;
+	// All the original images that were recorded on this micrograph
+	std::vector<long int> image_ids;
 
 	// Empty Constructor
-	ExpMicrograph()
-	{
-		clear();
-	}
+	ExpMicrograph() {}
 
 	// Destructor needed for work with vectors
-	~ExpMicrograph()
-	{
-		clear();
-	}
+	~ExpMicrograph() {}
 
 	// Copy constructor needed for work with vectors
 	ExpMicrograph(ExpMicrograph const& copy)
 	{
 		id = copy.id;
 		name = copy.name;
-		particle_ids = copy.particle_ids;
+		image_ids = copy.image_ids;
 
 	}
 
@@ -150,18 +169,10 @@ public:
 	{
 		id = copy.id;
 		name = copy.name;
-		particle_ids = copy.particle_ids;
+		image_ids = copy.image_ids;
 		return *this;
 	}
 
-	// Initialise
-	void clear()
-	{
-		id = -1;
-		name="";
-		particle_ids.clear();
-		particle_ids.reserve(MAX_NR_PARTICLES_PER_MICROGRAPH);
-	}
 
 };
 
@@ -175,16 +186,10 @@ public:
 	std::string name;
 
 	// Empty Constructor
-	ExpGroup()
-	{
-		clear();
-	}
+	ExpGroup() {}
 
 	// Destructor needed for work with vectors
-	~ExpGroup()
-	{
-		clear();
-	}
+	~ExpGroup() {}
 
 	// Copy constructor needed for work with vectors
 	ExpGroup(ExpGroup const& copy)
@@ -199,13 +204,6 @@ public:
 		id = copy.id;
 		name = copy.name;
 		return *this;
-	}
-
-	// Initialise
-	void clear()
-	{
-		id = -1;
-		name="";
 	}
 
 };
@@ -295,6 +293,9 @@ public:
 	// Calculate the total number of particles in this experiment
 	long int numberOfParticles(int random_subset = 0);
 
+	// Get the total number of images in a given particle
+	long int numberOfImagesInParticle(long int part_id);
+
 	// Calculate the total number of micrographs in this experiment
 	long int numberOfMicrographs();
 
@@ -305,23 +306,26 @@ public:
 	int getRandomSubset(long int part_id);
 
 	// Get the micrograph_id for the N'th image for this particle
-	long int getMicrographId(long int part_id);
+	long int getMicrographId(long int part_id, int img_id);
 
 	// Get the group_id for the N'th image for this particle
-	long int getGroupId(long int part_id);
+	long int getGroupId(long int part_id, int img_id);
 
-	// Get the optics group to which this particle belongs
-	int getOpticsGroup(long int part_id);
+	// Get the optics group to which the N'th image for this particle belongs
+	int getOpticsGroup(long int part_id, int img_id);
 
-	// Get the original position in the input STAR file for this particle
-	int getOriginalParticleId(long part_id);
+	// Get the original position in the input STAR file for the N'th image for this particle
+	int getOriginalImageId(long part_id, int img_id);
 
 	// Get the metadata-row for this image in a separate MetaDataTable
-	MetaDataTable getMetaDataImage(long int part_id);
+	MetaDataTable getMetaDataImage(long int part_id, int img_id);
 
 	// Add a particle
-	long int addParticle(std::string part_name, long int group_id, long int micrograph_id,
-						 int optics_group, int random_subset = 0);
+	long int addParticle(std::string part_name, int random_subset = 0);
+
+ 	// Add an image to the given particle
+	int addImageToParticle(long int part_id, std::string img_name, long int ori_img_id, long int group_id, long int micrograph_id,
+			 int optics_group);
 
 	// Add a group
 	long int addGroup(std::string mic_name);
@@ -335,16 +339,15 @@ public:
 	// Randomise the order of the particles
 	void randomiseParticlesOrder(int seed, bool do_split_random_halves = false, bool do_subsets = false);
 
-	// Make sure the particles inside each orriginal_particle are in the right order
-	// After they have been ordered, get rid of the particles_order vector inside the ori_particles
-	void orderParticlesInOriginalParticles();
+	// Make sure the images inside each particle are in the right order
+	void orderImagesInParticles();
 
 	// Add a given number of new bodies (for multi-body refinement) to the Experiment,
 	// by copying the relevant entries from MDimg into MDbodies
 	void initialiseBodies(int _nr_bodies);
 
 	// Get the image name for a given part_id
-	bool getImageNameOnScratch(long int part_id, FileName &fn_img, bool is_ctf_image = false);
+	bool getImageNameOnScratch(long int part_id, int img_id, FileName &fn_img, bool is_ctf_image = false);
 
 	// For parallel executions, lock the scratch directory with a unique code, so we won't copy the same data many times to the same position
 	// This determines the lockname and removes the lock if it exists
@@ -368,8 +371,7 @@ public:
 	// Read from file
 	void read(
 		FileName fn_in,
-		FileName fn_opt = "",
-		bool do_ignore_original_particle_name = false,
+		bool do_ignore_particle_name = false,
 		bool do_ignore_group_name = false, bool do_preread_images = false,
 		bool need_tiltpsipriors_for_helical_refine = false);
 
