@@ -145,7 +145,7 @@ void StarConverter::unifyPixelSize(MetaDataTable& outOptics)
 		
 		double angpix = 10000 * dstep / mag;
 		
-		outOptics.setValue(EMDL_MLMODEL_PIXEL_SIZE, angpix, i);
+		outOptics.setValue(EMDL_IMAGE_PIXEL_SIZE, angpix, i);
 	}
 	
 	outOptics.deactivateLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE);
@@ -161,7 +161,7 @@ void StarConverter::translateOffsets(MetaDataTable &outParticles, const MetaData
 		og--;
 		
 		double angpix;
-		optics.getValue(EMDL_MLMODEL_PIXEL_SIZE, angpix, og);
+		optics.getValue(EMDL_IMAGE_PIXEL_SIZE, angpix, og);
 		
 		double x, y, z;
 		

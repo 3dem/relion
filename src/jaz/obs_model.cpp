@@ -119,7 +119,7 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 	lambda(opticsMdt.numberOfObjects()),
 	Cs(opticsMdt.numberOfObjects())
 {
-	if (   !opticsMdt.containsLabel(EMDL_MLMODEL_PIXEL_SIZE)
+	if (   !opticsMdt.containsLabel(EMDL_IMAGE_PIXEL_SIZE)
 	    || !opticsMdt.containsLabel(EMDL_CTF_VOLTAGE)
 	    || !opticsMdt.containsLabel(EMDL_CTF_CS))
 	{
@@ -152,7 +152,7 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 
 	for (int i = 0; i < opticsMdt.numberOfObjects(); i++)
 	{
-		opticsMdt.getValue(EMDL_MLMODEL_PIXEL_SIZE, angpix[i], i);
+		opticsMdt.getValue(EMDL_IMAGE_PIXEL_SIZE, angpix[i], i);
 
 		double kV;
 		opticsMdt.getValue(EMDL_CTF_VOLTAGE, kV, i);

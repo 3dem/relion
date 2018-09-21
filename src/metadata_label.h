@@ -117,6 +117,7 @@ enum EMDLabel
 	EMDL_IMAGE_OPTICS_GROUP,
 	EMDL_IMAGE_ODD_ZERNIKE_COEFFS,
 	EMDL_IMAGE_EVEN_ZERNIKE_COEFFS,
+	EMDL_IMAGE_PIXEL_SIZE,
 	EMDL_IMAGE_MAG_MATRIX_00,
 	EMDL_IMAGE_MAG_MATRIX_01,
 	EMDL_IMAGE_MAG_MATRIX_10,
@@ -571,6 +572,7 @@ private:
 		EMDL::addLabel(EMDL_IMAGE_OPTICS_GROUP, EMDL_INT, "rlnOpticsGroup", "Group of particles with identical optical properties");
 		EMDL::addLabel(EMDL_IMAGE_ODD_ZERNIKE_COEFFS, EMDL_DOUBLE_VECTOR, "rlnOddZernike", "Coefficients for the antisymmetrical Zernike polynomials");
 		EMDL::addLabel(EMDL_IMAGE_EVEN_ZERNIKE_COEFFS, EMDL_DOUBLE_VECTOR, "rlnEvenZernike", "Coefficients for the symmetrical Zernike polynomials");
+		EMDL::addLabel(EMDL_IMAGE_PIXEL_SIZE, EMDL_DOUBLE, "rlnImagePixelSize", "Pixel size (in Angstrom)");
 		EMDL::addLabel(EMDL_IMAGE_MAG_MATRIX_00, EMDL_DOUBLE, "rlnMagMat00", "Anisotropic magnification matrix, element 1,1");
 		EMDL::addLabel(EMDL_IMAGE_MAG_MATRIX_01, EMDL_DOUBLE, "rlnMagMat01", "Anisotropic magnification matrix, element 1,2");
 		EMDL::addLabel(EMDL_IMAGE_MAG_MATRIX_10, EMDL_DOUBLE, "rlnMagMat10", "Anisotropic magnification matrix, element 2,1");
