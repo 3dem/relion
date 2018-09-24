@@ -679,6 +679,10 @@ void MlModel::readImages(FileName fn_ref, bool _is_3d_model, int _ori_size, Expe
 	// Data dimensionality
 	_mydata.MDexp.getValue(EMDL_IMAGE_DIMENSIONALITY, data_dim);
 
+	// Set pixel size in the model to be equal as the one in the first optics_group
+	// TODO: change this for refinable pixel sizes....
+	pixel_size = _mydata.obsModel.getPixelSize(0);
+
 	// Read references into memory
 	Image<RFLOAT> img;
 	FileName fn_tmp;
@@ -1302,6 +1306,7 @@ void MlModel::calculateTotalFourierCoverage()
 /////////// MlWsumModel
 void MlWsumModel::initialise(MlModel &_model, FileName fn_sym, bool asymmetric_padding, bool _skip_gridding)
 {
+	pixel_size = _model.pixel_size;
 	nr_classes = _model.nr_classes;
 	nr_bodies = _model.nr_bodies;
     nr_groups = _model.nr_groups;

@@ -101,9 +101,6 @@ long int Experiment::addParticle(std::string part_name, int random_subset)
 int Experiment::addImageToParticle(long int part_id, std::string img_name, long int ori_img_id, long int group_id, long int micrograph_id,
 		 int optics_group)
 {
-	ExpImage img;
-	img.name = img_name;
-
 	if (group_id >= groups.size())
 		REPORT_ERROR("Experiment::addImageToParticle: group_id out of range");
 
@@ -664,7 +661,7 @@ void Experiment::read(
 		FileName fn_exp,
 		bool do_ignore_particle_name,
 		bool do_ignore_group_name, bool do_preread_images,
-		bool need_tiltpsipriors_for_helical_refine)
+		bool need_tiltpsipriors_for_helical_refine, int verb)
 {
 
 //#define DEBUG_READ
@@ -738,6 +735,7 @@ void Experiment::read(
 
 			// Set the filename and other metadata parameters
 			MDimg.setValue(EMDL_IMAGE_NAME, fn_img, part_id);
+			MDimg.setValue(EMDL_IMAGE_OPTICS_GROUP, 1, part_id);
 		}
 
 	}
@@ -745,7 +743,7 @@ void Experiment::read(
 	{
 		// MDimg and MDopt have to be read at the same time, so that the optics groups can be
 		// renamed in case they are non-contiguous or not sorted
-		ObservationModel::loadSafely(fn_exp, obsModel, MDimg, MDopt);
+		ObservationModel::loadSafely(fn_exp, obsModel, MDimg, MDopt, verb);
 
 #ifdef DEBUG_READ
 		std::cerr << "Done reading MDimg" << std::endl;
@@ -876,18 +874,14 @@ void Experiment::read(
 
 			// If there is an EMDL_PARTICLE_RANDOM_SUBSET entry in the input STAR-file, then set the random_subset, otherwise use default (0)
 			int my_random_subset;
-
 			if (!MDimg.getValue(EMDL_PARTICLE_RANDOM_SUBSET, my_random_subset, ori_img_id))
 			{
 				my_random_subset = 0;
 			}
 
-			// Set the optics group - this may not be defined, for example if we don't do CTF correction or for sub-tomograms, then set to 0
-			int optics_group = 0;
-			if (!MDimg.getValue(EMDL_IMAGE_OPTICS_GROUP, optics_group, ori_img_id))
-			{
+			int optics_group;
+			if (MDimg.getValue(EMDL_IMAGE_OPTICS_GROUP, optics_group, ori_img_id))
 				optics_group--;
-			}
 
 			// Add this image to an existing particle, or create a new particle
 			std::string part_name;
@@ -1109,6 +1103,8 @@ void Experiment::write(FileName fn_root)
 	fh.open((fn_tmp).c_str(), std::ios::out);
 	if (!fh)
 		REPORT_ERROR( (std::string)"Experiment::write: Cannot write file: " + fn_tmp);
+
+	MDopt.write(fh);
 
 	// Always write MDimg
 	MDimg.write(fh);

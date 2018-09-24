@@ -133,9 +133,6 @@ public:
 	// Filename for the experimental images
 	FileName fn_data;
 
-	// Optics star file
-	FileName fn_opt;
-
 	// Output root filename
 	FileName fn_out;
 
@@ -569,7 +566,6 @@ public:
 	std::string exp_fn_img, exp_fn_ctf, exp_fn_recimg;
 	std::vector<MultidimArray<RFLOAT> > exp_imgs;
 	std::vector<int> exp_random_class_some_particles;
-	int exp_nr_images;
 
 	// Calculate translated images on-the-fly
 	bool do_shifts_onthefly;
@@ -676,7 +672,6 @@ public:
 		sum_changes_optimal_offsets(0),
 		do_scale_correction(0),
 		ctf_phase_flipped(0),
-		exp_nr_images(0),
 		nr_iter_wo_large_hidden_variable_changes(0),
 		adaptive_oversampling(0),
 		nr_iter(0),
@@ -872,13 +867,13 @@ public:
 	/* Read image and its metadata from disc (threaded over all pooled particles)
 	 */
 	void getFourierTransformsAndCtfs(long int part_id, int ibody, int metadata_offset,
-			MultidimArray<Complex >  &exp_Fimg,
-			MultidimArray<Complex >  &exp_Fimg_nomask,
-			MultidimArray<RFLOAT>  &exp_Fctf,
-			Matrix1D<RFLOAT>  &exp_old_offset,
-			Matrix1D<RFLOAT>  &exp_prior,
-			MultidimArray<RFLOAT>  &exp_power_img,
-			RFLOAT &exp_highres_Xi2_img,
+			std::vector<MultidimArray<Complex > > &exp_Fimg,
+			std::vector<MultidimArray<Complex > > &exp_Fimg_nomask,
+			std::vector<MultidimArray<RFLOAT> > &exp_Fctf,
+			std::vector<Matrix1D<RFLOAT> > &exp_old_offset,
+			std::vector<Matrix1D<RFLOAT> > &exp_prior,
+			std::vector<MultidimArray<RFLOAT> > &exp_power_img,
+			std::vector<RFLOAT> &exp_highres_Xi2_img,
 			std::vector<int> &exp_pointer_dir_nonzeroprior,
 			std::vector<int> &exp_pointer_psi_nonzeroprior,
 			std::vector<RFLOAT> &exp_directions_prior,
@@ -890,17 +885,17 @@ public:
 	void precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmasked, long int my_particle,
 			int exp_current_image_size, int exp_current_oversampling, int metadata_offset,
 			int exp_itrans_min, int exp_itrans_max,
-			MultidimArray<Complex > &exp_Fimg,
-			MultidimArray<Complex > &exp_Fimg_nomask,
-			MultidimArray<RFLOAT>  &exp_Fctf,
+			std::vector<MultidimArray<Complex > > &exp_Fimg,
+			std::vector<MultidimArray<Complex > > &exp_Fimg_nomask,
+			std::vector<MultidimArray<RFLOAT> > &exp_Fctf,
 			std::vector<MultidimArray<Complex > > &exp_local_Fimgs_shifted,
 			std::vector<MultidimArray<Complex > > &exp_local_Fimgs_shifted_nomask,
-			MultidimArray<RFLOAT> &exp_local_Fctf,
-			RFLOAT &exp_local_sqrtXi2,
-			MultidimArray<RFLOAT> &exp_local_Minvsigma2);
+			std::vector<MultidimArray<RFLOAT> > &exp_local_Fctf,
+			std::vector<RFLOAT> &exp_local_sqrtXi2,
+			std::vector<MultidimArray<RFLOAT> > &exp_local_Minvsigma2);
 
 	// Given exp_Mcoarse_significant, check for iorient whether any of the particles has any significant (coarsely sampled) translation
-	bool isSignificantAnyTranslation(long int iorient,
+	bool isSignificantAnyImageAnyTranslation(long int iorient,
 			int exp_itrans_min, int exp_itrans_max, MultidimArray<bool> &exp_Mcoarse_significant);
 
 	// Get squared differences for all iclass, idir, ipsi and itrans...
@@ -908,18 +903,18 @@ public:
 			int exp_ipass, int exp_current_oversampling, int metadata_offset,
 			int exp_idir_min, int exp_idir_max, int exp_ipsi_min, int exp_ipsi_max,
 			int exp_itrans_min, int exp_itrans_max, int my_iclass_min, int my_iclass_max,
-			RFLOAT &exp_min_diff2,
-			RFLOAT &exp_highres_Xi2_img,
-			MultidimArray<Complex > &exp_Fimg,
-			MultidimArray<RFLOAT> &exp_Fctf,
+			std::vector<RFLOAT> &exp_min_diff2,
+			std::vector<RFLOAT> &exp_highres_Xi2_img,
+			std::vector<MultidimArray<Complex > > &exp_Fimg,
+			std::vector<MultidimArray<RFLOAT> > &exp_Fctf,
 			MultidimArray<RFLOAT> &exp_Mweight,
 			MultidimArray<bool> &exp_Mcoarse_significant,
 			std::vector<int> &exp_pointer_dir_nonzeroprior, std::vector<int> &exp_pointer_psi_nonzeroprior,
 			std::vector<RFLOAT> &exp_directions_prior, std::vector<RFLOAT> &exp_psi_prior,
 			std::vector<MultidimArray<Complex > > &exp_local_Fimgs_shifted,
-			MultidimArray<RFLOAT> &exp_local_Minvsigma2,
-			MultidimArray<RFLOAT> &exp_local_Fctf,
-			RFLOAT &exp_local_sqrtXi);
+			std::vector<MultidimArray<RFLOAT> > &exp_local_Minvsigma2,
+			std::vector<MultidimArray<RFLOAT> > &exp_local_Fctf,
+			std::vector<RFLOAT> &exp_local_sqrtXi);
 
 	// Convert all squared difference terms to weights.
 	// Also calculates exp_sum_weight and, for adaptive approach, also exp_significant_weight
@@ -928,8 +923,8 @@ public:
 			int exp_idir_min, int exp_idir_max, int exp_ipsi_min, int exp_ipsi_max,
 			int exp_itrans_min, int exp_itrans_max, int my_iclass_min, int my_iclass_max,
 			MultidimArray<RFLOAT> &exp_Mweight, MultidimArray<bool> &exp_Mcoarse_significant,
-			RFLOAT &exp_significant_weight, RFLOAT &exp_sum_weight,
-			Matrix1D<RFLOAT> &exp_old_offset, Matrix1D<RFLOAT> &exp_prior, RFLOAT &exp_min_diff2,
+			std::vector<RFLOAT> &exp_significant_weight, std::vector<RFLOAT> &exp_sum_weight,
+			std::vector<Matrix1D<RFLOAT> > &exp_old_offset, std::vector<Matrix1D<RFLOAT> > &exp_prior, std::vector<RFLOAT> &exp_min_diff2,
 			std::vector<int> &exp_pointer_dir_nonzeroprior, std::vector<int> &exp_pointer_psi_nonzeroprior,
 			std::vector<RFLOAT> &exp_directions_prior, std::vector<RFLOAT> &exp_psi_prior);
 
@@ -938,26 +933,26 @@ public:
 			int exp_current_oversampling, int metadata_offset,
 			int exp_idir_min, int exp_idir_max, int exp_ipsi_min, int exp_ipsi_max,
 			int exp_itrans_min, int exp_itrans_max, int my_iclass_min, int my_iclass_max,
-			RFLOAT &exp_min_diff2,
-			RFLOAT &exp_highres_Xi2_img,
-			MultidimArray<Complex > &exp_Fimg,
-			MultidimArray<Complex > &exp_Fimg_nomask,
-			MultidimArray<RFLOAT> &exp_Fctf,
-			MultidimArray<RFLOAT> &exp_power_img,
-			Matrix1D<RFLOAT> &exp_old_offset,
-			Matrix1D<RFLOAT> &exp_prior,
+			std::vector<RFLOAT> &exp_min_diff2,
+			std::vector<RFLOAT> &exp_highres_Xi2_img,
+			std::vector<MultidimArray<Complex > > &exp_Fimg,
+			std::vector<MultidimArray<Complex > > &exp_Fimg_nomask,
+			std::vector<MultidimArray<RFLOAT> > &exp_Fctf,
+			std::vector<MultidimArray<RFLOAT> > &exp_power_img,
+			std::vector<Matrix1D<RFLOAT> > &exp_old_offset,
+			std::vector<Matrix1D<RFLOAT> > &exp_prior,
 			MultidimArray<RFLOAT> &exp_Mweight,
 			MultidimArray<bool> &exp_Mcoarse_significant,
-			RFLOAT &exp_significant_weight,
-			RFLOAT &exp_sum_weight,
-			RFLOAT &exp_max_weight,
+			std::vector<RFLOAT> &exp_significant_weight,
+			std::vector<RFLOAT> &exp_sum_weight,
+			std::vector<RFLOAT> &exp_max_weight,
 			std::vector<int> &exp_pointer_dir_nonzeroprior, std::vector<int> &exp_pointer_psi_nonzeroprior,
 			std::vector<RFLOAT> &exp_directions_prior, std::vector<RFLOAT> &exp_psi_prior,
 			std::vector<MultidimArray<Complex > > &exp_local_Fimgs_shifted,
 			std::vector<MultidimArray<Complex > > &exp_local_Fimgs_shifted_nomask,
-			MultidimArray<RFLOAT> &exp_local_Minvsigma2,
-			MultidimArray<RFLOAT> &exp_local_Fctf,
-			RFLOAT &exp_local_sqrtXi2);
+			std::vector<MultidimArray<RFLOAT> > &exp_local_Minvsigma2,
+			std::vector<MultidimArray<RFLOAT> > &exp_local_Fctf,
+			std::vector<RFLOAT> &exp_local_sqrtXi2);
 
 	/** Monitor the changes in the optimal translations, orientations and class assignments for some particles */
 	void monitorHiddenVariableChanges(long int my_first_part_id, long int my_last_part_id);

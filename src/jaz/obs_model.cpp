@@ -37,22 +37,25 @@ using namespace gravis;
 void ObservationModel::loadSafely(
 	std::string filename,
 	ObservationModel& obsModel,
-	MetaDataTable& particlesMdt, MetaDataTable& opticsMdt)
+	MetaDataTable& particlesMdt, MetaDataTable& opticsMdt, int verb)
 {
 	particlesMdt.read(filename, "particles");
 	opticsMdt.read(filename, "optics");
-	
+
 	if (particlesMdt.numberOfObjects() == 0 && particlesMdt.numberOfObjects() == 0)
 	{
-		std::cerr << "WARNING: " << filename << " seems to be from an outdated version of Relion or a bad file\n"
-				  << "         Attempting conversion...\n";
+		if (verb > 0)
+		{
+			std::cerr << "WARNING: " << filename << " seems to be from an outdated version of Relion or a bad file\n"
+					  << "         Attempting conversion...\n";
+		}
 
 		MetaDataTable oldMdt;
 		oldMdt.read(filename);
-		
+
 		StarConverter::convert_3p0_particlesTo_3p1(oldMdt, particlesMdt, opticsMdt);
 	}
-	
+
 	obsModel = ObservationModel(opticsMdt);
 
 	// read pixel sizes (and make sure they are all the same)
@@ -88,23 +91,26 @@ void ObservationModel::loadSafely(
 
 	if (!obsModel.opticsGroupsSorted())
 	{
-		std::cerr << "   - Warning: the optics groups in " << filename
-				  << " are not in the right order - renaming them now" << std::endl;
+		if (verb > 0)
+		{
+			std::cerr << "   - Warning: the optics groups in " << filename
+					  << " are not in the right order - renaming them now" << std::endl;
+		}
 
 		obsModel.sortOpticsGroups(particlesMdt);
 	}
 }
 
 void ObservationModel::save(
-		MetaDataTable &particlesMdt, 
-		MetaDataTable &opticsMdt, 
+		MetaDataTable &particlesMdt,
+		MetaDataTable &opticsMdt,
 		std::string filename)
 {
 	std::ofstream of(filename);
-	
+
 	opticsMdt.setName("optics");
 	opticsMdt.write(of);
-	
+
 	particlesMdt.setName("particles");
 	particlesMdt.write(of);
 }
@@ -220,7 +226,7 @@ void ObservationModel::predictObservation(
 
     partMdt.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff, particle);
     partMdt.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff, particle);
-	
+
 	xoff /= angpix[opticsGroup];
 	yoff /= angpix[opticsGroup];
 
@@ -248,12 +254,12 @@ void ObservationModel::predictObservation(
 	{
 		shiftImageInFourierTransform(dest, dest, s, s/2 - xoff, s/2 - yoff);
 	}
-		
+
     if (applyCtf)
     {
         CTF ctf;
         ctf.readByGroup(partMdt, this, particle);
-		
+
 		Image<RFLOAT> ctfImg(sh,s);
 		ctf.getFftwImage(ctfImg(), s, s, angpix[opticsGroup]);
 
@@ -300,7 +306,7 @@ Volume<t2Vector<Complex>> ObservationModel::predictComplexGradient(
 
     partMdt.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff, particle);
     partMdt.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff, particle);
-	
+
 	xoff /= angpix[opticsGroup];
 	yoff /= angpix[opticsGroup];
 

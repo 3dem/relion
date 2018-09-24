@@ -61,7 +61,7 @@ protected:
     RFLOAT K3;
     RFLOAT K4;
     RFLOAT K5;
-	
+
 	// Astigmatism stored in symmetrical matrix form
 	RFLOAT Axx, Axy, Ayy;
 
@@ -73,9 +73,9 @@ protected:
 
     // defocus_deviation = (defocus_u - defocus_v)/2
     RFLOAT defocus_deviation;
-	
-	// Pointer to observation model kept after a call to readByGroup() to enable 
-	// caching of symmetric aberrations (CTF instances can be reallocated for each particle, 
+
+	// Pointer to observation model kept after a call to readByGroup() to enable
+	// caching of symmetric aberrations (CTF instances can be reallocated for each particle,
 	// while the same obs. model lives for the entire duration of the program)
 	ObservationModel* obsModel;
 	int opticsGroup;
@@ -134,15 +134,15 @@ public:
     RFLOAT phase_shift;
 
     /** Empty constructor. */
-    CTF() : 
+    CTF() :
 		kV(200), DeltafU(0), DeltafV(0), azimuthal_angle(0), phase_shift(0),
 		Cs(0), Bfac(0), Q0(0), scale(1), obsModel(0), opticsGroup(0)
 	{}
-	
-	// Read CTF parameters from particle table partMdt and optics table opticsMdt.     
-    void readByGroup(const MetaDataTable &partMdt, ObservationModel* obs, int particle);
-	
-	void readValue(EMDLabel label, RFLOAT& dest, RFLOAT defaultVal, int particle, int opticsGroup, 
+
+	// Read CTF parameters from particle table partMdt and optics table opticsMdt.
+    void readByGroup(const MetaDataTable &partMdt, ObservationModel* obs, long int particle);
+
+	void readValue(EMDLabel label, RFLOAT& dest, RFLOAT defaultVal, long int particle, int opticsGroup,
 				   const MetaDataTable& partMdt, const ObservationModel* obs);
 
     /** Read CTF parameters from MetaDataTables MD1 and MD2 (deprecated)
@@ -158,11 +158,11 @@ public:
 
 	/** Set all values explicitly in 3.1 */
     void setValuesByGroup(
-			ObservationModel* obs, int opticsGroup, 
+			ObservationModel* obs, int opticsGroup,
 			RFLOAT _defU, RFLOAT _defV, RFLOAT _defAng,
 			RFLOAT _Bfac = 0.0, RFLOAT _scale = 1.0, RFLOAT _phase_shift = 0.0);
 
-	
+
     /** Read from a single MetaDataTable */
     void read(const MetaDataTable &MD);
 
@@ -187,11 +187,11 @@ public:
 			const Matrix2D<RFLOAT>& M = obsModel->magMatrices[opticsGroup];
 			RFLOAT XX = M(0,0) * X + M(0,1) * Y;
 			RFLOAT YY = M(1,0) * X + M(1,1) * Y;
-			
+
 			X = XX;
 			Y = YY;
 		}
-		
+
         RFLOAT u2 = X * X + Y * Y;
         RFLOAT u4 = u2 * u2;
 
@@ -199,9 +199,9 @@ public:
         //RFLOAT deltaf = getDeltaF(X, Y);
         //RFLOAT gamma = K1 * deltaf * u2 + K2 * u4 - K5 - K3 + gammaOffset;
 		RFLOAT gamma = K1 * (Axx*X*X + 2.0*Axy*X*Y + Ayy*Y*Y) + K2 * u4 - K5 - K3 + gammaOffset;
-		
+
         RFLOAT retval;
-		
+
         if (do_intact_until_first_peak && ABS(gamma) < PI/2.)
         {
         	retval = 1.;
@@ -210,13 +210,13 @@ public:
         {
             retval = -sin(gamma);
         }
-		
+
         if (do_damping)
         {
         	RFLOAT E = exp(K4 * u2); // B-factor decay (K4 = -Bfac/4);
         	retval *= E;
         }
-		
+
         if (do_abs)
         {
         	retval = ABS(retval);
@@ -225,17 +225,17 @@ public:
         {
         	retval = (retval < 0.) ? -1. : 1.;
         }
-		
+
         return scale * retval;
     }
 
     double getGamma(double X, double Y);
 
-    // compute the local frequency of the ctf 
+    // compute the local frequency of the ctf
 	// (i.e. the radial slope of 'double gamma' in getCTF())
 	// -- deprecated, use getGammaGrad().length()
 	RFLOAT getCtfFreq(RFLOAT X, RFLOAT Y);
-	
+
 	gravis::t2Vector<RFLOAT> getGammaGrad(RFLOAT X, RFLOAT Y);
 
     inline Complex getCTFP(RFLOAT X, RFLOAT Y, bool is_positive) const
