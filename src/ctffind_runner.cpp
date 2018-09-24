@@ -18,6 +18,7 @@
  * author citations must be preserved.
  ***************************************************************************/
 #include "src/ctffind_runner.h"
+#include <cmath>
 
 #ifdef CUDA
 #include "src/acc/cuda/cuda_mem_utils.h"
@@ -374,6 +375,7 @@ void CtffindRunner::joinCtffindResults()
 			MDctf.setValue(EMDL_CTF_Q0, AmpCnst);
 			MDctf.setValue(EMDL_CTF_MAGNIFICATION, XMAG);
 			MDctf.setValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, DStep);
+			if (!std::isfinite(CC)) CC = 0.0; // GCTF might return NaN
 			MDctf.setValue(EMDL_CTF_FOM, CC);
 			if (fabs(maxres + 999.) > 0.)
 			{
@@ -776,7 +778,8 @@ bool CtffindRunner::getCtffind3Results(FileName fn_microot, RFLOAT &defU, RFLOAT
 	{
 		// Find data_ lines
 
-		if (line.find("CS[mm], HT[kV], AmpCnst, XMAG, DStep[um]") != std::string::npos)
+		if (line.find("CS[mm], HT[kV], AmpCnst, XMAG, DStep[um]") != std::string::npos ||
+                    line.find("CS[mm], HT[kV], ac, XMAG, DStep[um]") != std::string::npos) // GCTF 1.18 B1 changed the line...
 		{
 			getline(in, line, '\n');
 			tokenize(line, words);
