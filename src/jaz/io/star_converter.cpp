@@ -128,7 +128,8 @@ void StarConverter::convert_3p0_particlesTo_3p1(
 	}
 
 	unifyPixelSize(outOptics);
-	translateOffsets(outParticles, outOptics);
+	// TODO: SHWS 24sep2018 put this back in once offsets in Angstroms work fine
+	//translateOffsets(outParticles, outOptics);
 
 	outOptics.setName("optics");
 	outOptics.setVersion(outVer);

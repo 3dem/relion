@@ -13,7 +13,7 @@ long int makeJobsForDiff2Fine(
 		ProjectionParams &FineProjectionData,
 		std::vector< long unsigned > &iover_transes,
 		std::vector< long unsigned > &ihiddens,
-		long int nr_over_orient, long int nr_over_trans,
+		long int nr_over_orient, long int nr_over_trans, int img_id,
 		IndexedDataArray &FPW, // FPW=FinePassWeights
 		IndexedDataArrayMask &dataMask,
 		int chunk)
@@ -37,7 +37,7 @@ long int makeJobsForDiff2Fine(
 			long int iover_trans = iover_transes[j];
 			long int ihidden = FineProjectionData.iorientclasses[i] * sp.nr_trans + ihiddens[j];
 
-			if(DIRECT_A1D_ELEM(op.Mcoarse_significant, ihidden)==1)
+			if(DIRECT_A2D_ELEM(op.Mcoarse_significant, img_id, ihidden)==1)
 			{
 				FPW.rot_id[w_base+w] = FineProjectionData.iorientclasses[i] % (sp.nr_dir*sp.nr_psi); 	// where to look for priors etc
 				FPW.rot_idx[w_base+w] = i;					// which rot for this significant task
@@ -146,22 +146,23 @@ void mapWeights(
 void buildCorrImage(MlOptimiser *baseMLO,
 		OptimisationParamters &op,
 		AccPtr<XFLOAT> &corr_img,
+		int img_id,
 		long int group_id)
 {
 	// CC or not
 	if((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
 		for(size_t i = 0; i < corr_img.getSize(); i++)
-			corr_img[i] = 1. / (op.local_sqrtXi2*op.local_sqrtXi2);
+			corr_img[i] = 1. / (op.local_sqrtXi2[img_id]*op.local_sqrtXi2[img_id]);
 	else
 		for(size_t i = 0; i < corr_img.getSize(); i++)
-			corr_img[i] = *(op.local_Minvsigma2.data + i );
+			corr_img[i] = *(op.local_Minvsigma2[img_id].data + i );
 
 	// ctf-correction or not ( NOTE this is not were the difference metric is ctf-corrected, but
 	// rather where we apply the additional correction to make the GPU-specific arithmetic equal
 	// to the CPU method)
 	if (baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected)
 		for(size_t i = 0; i < corr_img.getSize(); i++)
-			corr_img[i] *= DIRECT_MULTIDIM_ELEM(op.local_Fctf, i)*DIRECT_MULTIDIM_ELEM(op.local_Fctf, i);
+			corr_img[i] *= DIRECT_MULTIDIM_ELEM(op.local_Fctf[img_id], i)*DIRECT_MULTIDIM_ELEM(op.local_Fctf[img_id], i);
 	// scale-correction or not ( NOTE this is not were the difference metric is scale-corrected, but
 	// rather where we apply the additional correction to make the GPU-specific arithmetic equal
 	// to the CPU method)
@@ -259,11 +260,11 @@ long unsigned generateProjectionSetupFine(
 
 	for (long int idir = sp.idir_min, iorient = 0; idir <= sp.idir_max; idir++)
 	{
-		for (long int ipsi = sp.ipsi_min, ipart = 0; ipsi <= sp.ipsi_max; ipsi++, iorient++)
+		for (long int ipsi = sp.ipsi_min; ipsi <= sp.ipsi_max; ipsi++, iorient++)
 		{
 			long int iorientclass = iclass * sp.nr_dir * sp.nr_psi + iorient;
 
-			if (baseMLO->isSignificantAnyTranslation(iorientclass, sp.itrans_min, sp.itrans_max, op.Mcoarse_significant))
+			if (baseMLO->isSignificantAnyImageAnyTranslation(iorientclass, sp.itrans_min, sp.itrans_max, op.Mcoarse_significant))
 			{
 				// Now get the oversampled (rot, tilt, psi) triplets
 				// This will be only the original (rot,tilt,psi) triplet in the first pass (sp.current_oversampling==0)
@@ -271,7 +272,7 @@ long unsigned generateProjectionSetupFine(
 						op.pointer_dir_nonzeroprior, op.directions_prior, op.pointer_psi_nonzeroprior, op.psi_prior);
 
 				// Loop over all oversampled orientations (only a single one in the first pass)
-				for (long int iover_rot = 0; iover_rot < sp.nr_oversampled_rot; iover_rot++, ipart++)
+				for (long int iover_rot = 0; iover_rot < sp.nr_oversampled_rot; iover_rot++)
 				{
 					ProjectionData.pushBackAll(	(long unsigned)iclass,
 												oversampled_rot[iover_rot],
@@ -305,6 +306,7 @@ void runWavgKernel(
 		long unsigned orientation_num,
 		long unsigned translation_num,
 		unsigned long image_size,
+		int img_id,
 		int group_id,
 		int exp_iclass,
 		XFLOAT part_scale,
@@ -333,8 +335,8 @@ void runWavgKernel(
 				wdiff2s_AA,
 				wdiff2s_XA,
 				translation_num,
-				(XFLOAT) op.sum_weight,
-				(XFLOAT) op.significant_weight,
+				(XFLOAT) op.sum_weight[img_id],
+				(XFLOAT) op.significant_weight[img_id],
 				part_scale,
 				stream
 				);
@@ -355,8 +357,8 @@ void runWavgKernel(
 				wdiff2s_AA,
 				wdiff2s_XA,
 				translation_num,
-				(XFLOAT) op.sum_weight,
-				(XFLOAT) op.significant_weight,
+				(XFLOAT) op.sum_weight[img_id],
+				(XFLOAT) op.significant_weight[img_id],
 				part_scale,
 				stream
 				);
@@ -377,8 +379,8 @@ void runWavgKernel(
 				wdiff2s_AA,
 				wdiff2s_XA,
 				translation_num,
-				(XFLOAT) op.sum_weight,
-				(XFLOAT) op.significant_weight,
+				(XFLOAT) op.sum_weight[img_id],
+				(XFLOAT) op.significant_weight[img_id],
 				part_scale,
 				stream
 				);
@@ -402,8 +404,8 @@ void runWavgKernel(
 				wdiff2s_AA,
 				wdiff2s_XA,
 				translation_num,
-				(XFLOAT) op.sum_weight,
-				(XFLOAT) op.significant_weight,
+				(XFLOAT) op.sum_weight[img_id],
+				(XFLOAT) op.significant_weight[img_id],
 				part_scale,
 				stream
 				);
@@ -424,8 +426,8 @@ void runWavgKernel(
 				wdiff2s_AA,
 				wdiff2s_XA,
 				translation_num,
-				(XFLOAT) op.sum_weight,
-				(XFLOAT) op.significant_weight,
+				(XFLOAT) op.sum_weight[img_id],
+				(XFLOAT) op.significant_weight[img_id],
 				part_scale,
 				stream
 				);
@@ -446,8 +448,8 @@ void runWavgKernel(
 				wdiff2s_AA,
 				wdiff2s_XA,
 				translation_num,
-				(XFLOAT) op.sum_weight,
-				(XFLOAT) op.significant_weight,
+				(XFLOAT) op.sum_weight[img_id],
+				(XFLOAT) op.significant_weight[img_id],
 				part_scale,
 				stream
 				);
@@ -1154,6 +1156,7 @@ void runDiff2KernelFine(
 		long unsigned translation_num,
 		long unsigned significant_num,
 		unsigned long image_size,
+		int img_id,
 		int exp_iclass,
 		cudaStream_t stream,
 		long unsigned job_num_count,
@@ -1180,7 +1183,7 @@ void runDiff2KernelFine(
 					corr_img,    // in these non-CC kernels this is effectively an adjusted MinvSigma2
 					diff2s,
 					image_size,
-					op.highres_Xi2_img / 2.,
+					op.highres_Xi2_img[img_id] / 2.,
 					orientation_num,
 					translation_num,
 					job_num_count, //significant_num,
@@ -1203,7 +1206,7 @@ void runDiff2KernelFine(
 					corr_img,    // in these non-CC kernels this is effectively an adjusted MinvSigma2
 					diff2s,
 					image_size,
-					op.highres_Xi2_img / 2.,
+					op.highres_Xi2_img[img_id] / 2.,
 					orientation_num,
 					translation_num,
 					job_num_count, //significant_num,
@@ -1226,7 +1229,7 @@ void runDiff2KernelFine(
 					corr_img,    // in these non-CC kernels this is effectively an adjusted MinvSigma2
 					diff2s,
 					image_size,
-					op.highres_Xi2_img / 2.,
+					op.highres_Xi2_img[img_id] / 2.,
 					orientation_num,
 					translation_num,
 					job_num_count, //significant_num,
@@ -1255,8 +1258,8 @@ void runDiff2KernelFine(
 				corr_img,
 				diff2s,
 				image_size,
-				op.highres_Xi2_img / 2.,
-				(XFLOAT) op.local_sqrtXi2,
+				op.highres_Xi2_img[img_id] / 2.,
+				(XFLOAT) op.local_sqrtXi2[img_id],
 				orientation_num,
 				translation_num,
 				job_num_count, //significant_num,
@@ -1279,8 +1282,8 @@ void runDiff2KernelFine(
 				corr_img,
 				diff2s,
 				image_size,
-				op.highres_Xi2_img / 2.,
-				(XFLOAT) op.local_sqrtXi2,
+				op.highres_Xi2_img[img_id] / 2.,
+				(XFLOAT) op.local_sqrtXi2[img_id],
 				orientation_num,
 				translation_num,
 				job_num_count, //significant_num,
@@ -1303,8 +1306,8 @@ void runDiff2KernelFine(
 				corr_img,
 				diff2s,
 				image_size,
-				op.highres_Xi2_img / 2.,
-				(XFLOAT) op.local_sqrtXi2,
+				op.highres_Xi2_img[img_id] / 2.,
+				(XFLOAT) op.local_sqrtXi2[img_id],
 				orientation_num,
 				translation_num,
 				job_num_count, //significant_num,

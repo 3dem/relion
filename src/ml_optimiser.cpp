@@ -3377,7 +3377,7 @@ void MlOptimiser::expectationOneParticle(long int part_id, int thread_id)
 		{
 			if (iori == part_id)
 				break;
-			metadata_offset += mydata.numberOfImagesInParticle(part_id);
+			metadata_offset += mydata.numberOfImagesInParticle(iori);
 		}
 
 		// Resize vectors for all particles
@@ -4279,9 +4279,11 @@ void MlOptimiser::updateCurrentResolution()
 					int ires;
 					for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 					{
+						int iclassbody = (mymodel.nr_bodies > 1) ? ibody : iclass;
+
 						for (ires = 1; ires < mymodel.ori_size/2; ires++)
 						{
-							if (DIRECT_A1D_ELEM(mymodel.data_vs_prior_class[iclass], ires) < 1.)
+							if (DIRECT_A1D_ELEM(mymodel.data_vs_prior_class[iclassbody], ires) < 1.)
 								break;
 						}
 						// Subtract one shell to be back on the safe side
@@ -4293,7 +4295,7 @@ void MlOptimiser::updateCurrentResolution()
 							int ires2;
 							for (ires2 = mymodel.ori_size/2-1; ires2 >= ires; ires2--)
 							{
-								if (DIRECT_A1D_ELEM(mymodel.data_vs_prior_class[iclass], ires2) > 1.)
+								if (DIRECT_A1D_ELEM(mymodel.data_vs_prior_class[iclassbody], ires2) > 1.)
 									break;
 							}
 							if (ires2 > ires + 3)
@@ -5026,8 +5028,8 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 #ifdef DEBUG_SOFTMASK
 		tt()=img();
 		tt.write("Fimg_masked.spi");
-		std::cerr << "written Fimg_masked.spi; press any key to continue..." << std::endl;
-		std::cin >> c;
+		std::cerr << "written Fimg_masked.spi; dying now..." << std::endl;
+		exit(0);
 #endif
 
 		// Inside Projector and Backprojector the origin of the Fourier Transform is centered!
@@ -5757,10 +5759,20 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,  int exp
 							if (mymodel.nr_bodies > 1)
 							{
 								Abody =  Aori * (mymodel.orient_bodies[ibody]).transpose() * A_rot90 * A * mymodel.orient_bodies[ibody];
+								// TODO: if we want different optics_groups for each image, then the img_id loop needs to move up
+								// TODO: if we want different optics_groups for each image, then the img_id loop needs to move up
+								// TODO: if we want different optics_groups for each image, then the img_id loop needs to move up
+								// TODO: if we want different optics_groups for each image, then the img_id loop needs to move up
+								//mydata.obsModel.applyAnisoMagTransp(Abody, optics_group);
 								(mymodel.PPref[ibody]).get2DFourierTransform(Fref, Abody, IS_NOT_INV);
 							}
 							else
 							{
+								// TODO: if we want different optics_groups for each image, then the img_id loop needs to move up
+								// TODO: if we want different optics_groups for each image, then the img_id loop needs to move up
+								// TODO: if we want different optics_groups for each image, then the img_id loop needs to move up
+								// TODO: if we want different optics_groups for each image, then the img_id loop needs to move up
+								//mydata.obsModel.applyAnisoMagTransp(A, optics_group);
 								(mymodel.PPref[exp_iclass]).get2DFourierTransform(Fref, A, IS_NOT_INV);
 							}
 
@@ -6143,13 +6155,22 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,  int exp
 												REPORT_ERROR("ihidden_over >= XSIZE(Mweight)");
 											}
 #endif
-											//std::cerr << " part_id= " << part_id << " ihidden_over= " << ihidden_over << " diff2= " << diff2 << " x= " << oversampled_translations_x[iover_trans] << " y=" <<oversampled_translations_x[iover_trans] <<std::endl;
 											DIRECT_A2D_ELEM(exp_Mweight, img_id, ihidden_over) = diff2;
 
 											// Keep track of minimum of all diff2, only for the last image in this series
 											if (diff2 < exp_min_diff2[img_id])
 											{
 												exp_min_diff2[img_id] = diff2;
+												/*
+												if (mydata.getOriginalImageId(part_id,img_id) == 1)
+												{
+													std::cerr << " part_id= " << part_id << " ihidden_over= " << ihidden_over << " diff2= " << diff2
+													<< " x= " << oversampled_translations_x[iover_trans] << " y=" <<oversampled_translations_y[iover_trans]
+											        << " iover_trans= "<<iover_trans << "Xi2= " << exp_highres_Xi2_img[img_id] << " Minv_sigma2= " << DIRECT_MULTIDIM_ELEM(exp_local_Minvsigma2[img_id], 10)
+													<< " A= " << A << " Frefctf= " << (DIRECT_MULTIDIM_ELEM(Frefctf, 10)).real
+													<< " Fimgshift= " << (*(Fimg_shift + 10)).real << std::endl;
+												}
+												*/
 											}
 
 										} // end loop iover_trans
@@ -6217,7 +6238,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
 	long int opt_ihidden, opt_ihidden_over;
 #endif
 
-	// loop over all particles inside this ori_particle
+	// loop over all images inside this particle
 	for (int img_id = 0; img_id < exp_nr_images; img_id++)
 	{
 		int my_metadata_offset = metadata_offset + img_id;
@@ -7580,9 +7601,8 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody, int exp_current
 void MlOptimiser::monitorHiddenVariableChanges(long int my_first_part_id, long int my_last_part_id)
 {
 
-	for (long int part_id = my_first_part_id, metadata_offset = 0; part_id <= my_last_part_id; part_id++, metadata_offset++)
+	for (long int part_id = my_first_part_id, metadata_offset = 0; part_id <= my_last_part_id; part_id++)
 	{
-
 
 		for (int img_id = 0; img_id < mydata.numberOfImagesInParticle(part_id); img_id++, metadata_offset++)
 		{
