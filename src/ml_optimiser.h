@@ -572,7 +572,7 @@ public:
 
 	// Calculate translated images on-the-fly
 	bool do_shifts_onthefly;
-	std::vector<MultidimArray<Complex> > global_fftshifts_ab_coarse, global_fftshifts_ab_current, global_fftshifts_ab2_coarse, global_fftshifts_ab2_current;
+	std::vector< std::vector<MultidimArray<Complex> > > global_fftshifts_ab_coarse, global_fftshifts_ab_current, global_fftshifts_ab2_coarse, global_fftshifts_ab2_current;
 
 	//TMP DEBUGGING
 	MultidimArray<RFLOAT> DEBUGGING_COPY_exp_Mweight;

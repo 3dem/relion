@@ -3008,76 +3008,81 @@ void MlOptimiser::precalculateABMatrices()
 {
 
 
-	// TODO: this will not work if there are particles with different pixel sizes!!
-	// TODO: this will not work if there are particles with different pixel sizes!!
-	// TODO: this will not work if there are particles with different pixel sizes!!
-	// TODO: this will not work if there are particles with different pixel sizes!!
-	// TODO: this will not work if there are particles with different pixel sizes!!
-	// TODO: this will not work if there are particles with different pixel sizes!!
-	// TODO: this will not work if there are particles with different pixel sizes!!
-	RFLOAT my_pixel_size = mydata.getImagePixelSize(0, 0);
 
-	// Set the global AB-matrices for the FFT phase-shifted images
 	global_fftshifts_ab_coarse.clear();
 	global_fftshifts_ab_current.clear();
 	global_fftshifts_ab2_coarse.clear();
 	global_fftshifts_ab2_current.clear();
-	MultidimArray<Complex> Fab_current, Fab_coarse;
-	if (mymodel.data_dim == 3)
-		Fab_current.resize(mymodel.current_size, mymodel.current_size, mymodel.current_size / 2 + 1);
-	else
-		Fab_current.resize(mymodel.current_size, mymodel.current_size / 2 + 1);
-	long int exp_nr_trans = sampling.NrTranslationalSamplings();
-	std::vector<RFLOAT> oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
-	// Note that do_shifts_onthefly is incompatible with do_skip_align because of the loop below
-	for (long int itrans = 0; itrans < exp_nr_trans; itrans++)
+	for (int optics_group = 0; optics_group < mydata.MDopt.numberOfObjects(); optics_group++)
 	{
-		// First get the non-oversampled translations as defined by the sampling object
-		// Feb01,2017 - Shaoda, obsolete, helical reconstuctions never call this function
 
-		// TODO: see how this works with multiple pixel sizes......
-		sampling.getTranslationsInPixel(itrans, 0, my_pixel_size, oversampled_translations_x, oversampled_translations_y, oversampled_translations_z,
-				(do_helical_refine) && (!ignore_helical_symmetry)); // need getTranslations to add random_perturbation
+		std::vector<MultidimArray<Complex> > dummy;
+		global_fftshifts_ab_coarse.push_back(dummy);
+		global_fftshifts_ab_current.push_back(dummy);
+		global_fftshifts_ab2_coarse.push_back(dummy);
+		global_fftshifts_ab2_current.push_back(dummy);
 
-		// Precalculate AB-matrices
-		RFLOAT tmp_zoff = (mymodel.data_dim == 2) ? (0.) : oversampled_translations_z[0];
-		getAbMatricesForShiftImageInFourierTransform(Fab_current, Fab_current, (RFLOAT)mymodel.ori_size, oversampled_translations_x[0], oversampled_translations_y[0], tmp_zoff);
+		RFLOAT my_pixel_size;
+		mydata.MDopt.getValue(EMDL_IMAGE_PIXEL_SIZE, my_pixel_size, optics_group);
 
-		windowFourierTransform(Fab_current, Fab_coarse, coarse_size);
-		global_fftshifts_ab_coarse.push_back(Fab_coarse);
-		if (adaptive_oversampling == 0)
-		{
-			global_fftshifts_ab_current.push_back(Fab_current);
-		}
+		// Set the global AB-matrices for the FFT phase-shifted images
+		MultidimArray<Complex> Fab_current, Fab_coarse;
+		if (mymodel.data_dim == 3)
+			Fab_current.resize(mymodel.current_size, mymodel.current_size, mymodel.current_size / 2 + 1);
 		else
+			Fab_current.resize(mymodel.current_size, mymodel.current_size / 2 + 1);
+		long int exp_nr_trans = sampling.NrTranslationalSamplings();
+		std::vector<RFLOAT> oversampled_translations_x, oversampled_translations_y, oversampled_translations_z;
+		// Note that do_shifts_onthefly is incompatible with do_skip_align because of the loop below
+		for (long int itrans = 0; itrans < exp_nr_trans; itrans++)
 		{
-			// Then also loop over all its oversampled relatives
-			// Then loop over all its oversampled relatives
+			// First get the non-oversampled translations as defined by the sampling object
 			// Feb01,2017 - Shaoda, obsolete, helical reconstuctions never call this function
-			sampling.getTranslationsInPixel(itrans, adaptive_oversampling, my_pixel_size, oversampled_translations_x, oversampled_translations_y, oversampled_translations_z,
-					(do_helical_refine) && (!ignore_helical_symmetry));
-			for (long int iover_trans = 0; iover_trans < oversampled_translations_x.size(); iover_trans++)
+
+			// TODO: see how this works with multiple pixel sizes......
+			sampling.getTranslationsInPixel(itrans, 0, my_pixel_size, oversampled_translations_x, oversampled_translations_y, oversampled_translations_z,
+					(do_helical_refine) && (!ignore_helical_symmetry)); // need getTranslations to add random_perturbation
+
+			// Precalculate AB-matrices
+			RFLOAT tmp_zoff = (mymodel.data_dim == 2) ? (0.) : oversampled_translations_z[0];
+			getAbMatricesForShiftImageInFourierTransform(Fab_current, Fab_current, (RFLOAT)mymodel.ori_size, oversampled_translations_x[0], oversampled_translations_y[0], tmp_zoff);
+
+			windowFourierTransform(Fab_current, Fab_coarse, coarse_size);
+			global_fftshifts_ab_coarse[optics_group].push_back(Fab_coarse);
+			if (adaptive_oversampling == 0)
 			{
-				// Shift through phase-shifts in the Fourier transform
-				// Note that the shift search range is centered around (exp_old_xoff, exp_old_yoff)
-
-				RFLOAT tmp_zoff = (mymodel.data_dim == 2) ? (0.) : oversampled_translations_z[iover_trans];
-				getAbMatricesForShiftImageInFourierTransform(Fab_current, Fab_current, (RFLOAT)mymodel.ori_size, oversampled_translations_x[iover_trans], oversampled_translations_y[iover_trans], tmp_zoff);
-
-				global_fftshifts_ab2_current.push_back(Fab_current);
-				if (strict_highres_exp > 0.)
-				{
-					windowFourierTransform(Fab_current, Fab_coarse, coarse_size);
-					global_fftshifts_ab2_coarse.push_back(Fab_coarse);
-				}
+				global_fftshifts_ab_current[optics_group].push_back(Fab_current);
 			}
-		} // end else (adaptive_oversampling == 0)
-	} // end loop itrans
+			else
+			{
+				// Then also loop over all its oversampled relatives
+				// Then loop over all its oversampled relatives
+				// Feb01,2017 - Shaoda, obsolete, helical reconstuctions never call this function
+				sampling.getTranslationsInPixel(itrans, adaptive_oversampling, my_pixel_size, oversampled_translations_x, oversampled_translations_y, oversampled_translations_z,
+						(do_helical_refine) && (!ignore_helical_symmetry));
+				for (long int iover_trans = 0; iover_trans < oversampled_translations_x.size(); iover_trans++)
+				{
+					// Shift through phase-shifts in the Fourier transform
+					// Note that the shift search range is centered around (exp_old_xoff, exp_old_yoff)
+
+					RFLOAT tmp_zoff = (mymodel.data_dim == 2) ? (0.) : oversampled_translations_z[iover_trans];
+					getAbMatricesForShiftImageInFourierTransform(Fab_current, Fab_current, (RFLOAT)mymodel.ori_size, oversampled_translations_x[iover_trans], oversampled_translations_y[iover_trans], tmp_zoff);
+
+					global_fftshifts_ab2_current[optics_group].push_back(Fab_current);
+					if (strict_highres_exp > 0.)
+					{
+						windowFourierTransform(Fab_current, Fab_coarse, coarse_size);
+						global_fftshifts_ab2_coarse[optics_group].push_back(Fab_coarse);
+					}
+				}
+			} // end else (adaptive_oversampling == 0)
+		} // end loop itrans
 
 #ifdef DEBUG_AB
-	std::cerr << " global_fftshifts_ab_coarse.size()= " << global_fftshifts_ab_coarse.size() << " global_fftshifts_ab_current.size()= " << global_fftshifts_ab_current.size() << std::endl;
-	std::cerr << " global_fftshifts_ab2_coarse.size()= " << global_fftshifts_ab2_coarse.size() << " global_fftshifts_ab2_current.size()= " << global_fftshifts_ab2_current.size() << std::endl;
+		std::cerr << " global_fftshifts_ab_coarse[optics_group].size()= " << global_fftshifts_ab_coarse[optics_group].size() << " global_fftshifts_ab_current[optics_group].size()= " << global_fftshifts_ab_current[optics_group].size() << std::endl;
+		std::cerr << " global_fftshifts_ab2_coarse[optics_group].size()= " << global_fftshifts_ab2_coarse[optics_group].size() << " global_fftshifts_ab2_current[optics_group].size()= " << global_fftshifts_ab2_current[optics_group].size() << std::endl;
 #endif
+	} // end loop optics_group
 
 }
 
@@ -5821,6 +5826,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,  int exp
 
 								int my_metadata_offset = metadata_offset + img_id;
 								RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id, img_id);
+								int optics_group = mydata.getOpticsGroup(part_id, img_id);
 
 								Minvsigma2 = exp_local_Minvsigma2[img_id].data;
 
@@ -5940,26 +5946,14 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,  int exp
 													Complex *myAB;
 													if (exp_current_oversampling == 0)
 													{
-														#ifdef DEBUG_CHECKSIZES
-														if (YSIZE(Frefctf) == coarse_size && itrans >= global_fftshifts_ab_coarse.size())
-														{
-															std::cerr<< "itrans= "<<itrans<<" global_fftshifts_ab_coarse.size()= "<< global_fftshifts_ab_coarse.size() <<std::endl;
-															REPORT_ERROR("itrans >= global_fftshifts_ab_coarse.size()");
-														}
-														if (YSIZE(Frefctf) != coarse_size && itrans >= global_fftshifts_ab_current.size())
-														{
-															std::cerr<< "itrans= "<<itrans<<" global_fftshifts_ab_current.size()= "<< global_fftshifts_ab_current.size() <<std::endl;
-															REPORT_ERROR("itrans >= global_fftshifts_ab_current.size()");
-														}
-														#endif
-														myAB = (YSIZE(Frefctf) == coarse_size) ? global_fftshifts_ab_coarse[itrans].data
-																: global_fftshifts_ab_current[itrans].data;
+														myAB = (YSIZE(Frefctf) == coarse_size) ? global_fftshifts_ab_coarse[optics_group][itrans].data
+																: global_fftshifts_ab_current[optics_group][itrans].data;
 													}
 													else
 													{
 														int iitrans = itrans * exp_nr_oversampled_trans +  iover_trans;
-														myAB = (strict_highres_exp > 0.) ? global_fftshifts_ab2_coarse[iitrans].data
-																: global_fftshifts_ab2_current[iitrans].data;
+														myAB = (strict_highres_exp > 0.) ? global_fftshifts_ab2_coarse[optics_group][iitrans].data
+																: global_fftshifts_ab2_current[optics_group][iitrans].data;
 													}
 													FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Fimgs_shifted[img_id])
 													{
@@ -7122,7 +7116,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody, int exp_current
 												else
 												{
 													Complex* myAB;
-													myAB = (adaptive_oversampling == 0 ) ? global_fftshifts_ab_current[iitrans].data : global_fftshifts_ab2_current[iitrans].data;
+													myAB = (adaptive_oversampling == 0 ) ? global_fftshifts_ab_current[optics_group][iitrans].data : global_fftshifts_ab2_current[optics_group][iitrans].data;
 													FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Fimgs_shifted[img_id])
 													{
 														RFLOAT a = (*(myAB + n)).real;
@@ -7788,7 +7782,6 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 		}
     }
 
-	//int current_image_size = (strict_highres_exp > 0. && !do_acc_currentsize_despite_highres_exp) ? coarse_size : mymodel.current_size;
 	// Set current_image_size to the coarse_size to calculate exepcted angular errors
 	int current_image_size;
 	if (strict_highres_exp > 0. && !do_acc_currentsize_despite_highres_exp)
