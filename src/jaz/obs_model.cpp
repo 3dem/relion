@@ -46,8 +46,7 @@ void ObservationModel::loadSafely(
 	{
 		if (verb > 0)
 		{
-			std::cerr << "WARNING: " << filename << " seems to be from an outdated version of Relion or a bad file\n"
-					  << "         Attempting conversion...\n";
+			std::cerr << "WARNING: " << filename << " seems to be from a previous version of Relion. Attempting conversion...\n";
 		}
 
 		MetaDataTable oldMdt;

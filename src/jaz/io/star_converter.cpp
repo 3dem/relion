@@ -128,8 +128,7 @@ void StarConverter::convert_3p0_particlesTo_3p1(
 	}
 
 	unifyPixelSize(outOptics);
-	// TODO: SHWS 24sep2018 put this back in once offsets in Angstroms work fine
-	//translateOffsets(outParticles, outOptics);
+	translateOffsets(outParticles, outOptics);
 
 	outOptics.setName("optics");
 	outOptics.setVersion(outVer);
@@ -165,7 +164,7 @@ void StarConverter::translateOffsets(MetaDataTable &outParticles, const MetaData
 		double angpix;
 		optics.getValue(EMDL_IMAGE_PIXEL_SIZE, angpix, og);
 
-		double x, y, z;
+		double x, y, z, d;
 
 		if (outParticles.containsLabel(EMDL_ORIENT_ORIGIN_X))
 		{
@@ -184,9 +183,37 @@ void StarConverter::translateOffsets(MetaDataTable &outParticles, const MetaData
 			outParticles.getValue(EMDL_ORIENT_ORIGIN_Z, z, i);
 			outParticles.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, z*angpix, i);
 		}
+
+		if (outParticles.containsLabel(EMDL_ORIENT_ORIGIN_X_PRIOR))
+		{
+			outParticles.getValue(EMDL_ORIENT_ORIGIN_X_PRIOR, x, i);
+			outParticles.setValue(EMDL_ORIENT_ORIGIN_X_PRIOR_ANGSTROM, x*angpix, i);
+		}
+
+		if (outParticles.containsLabel(EMDL_ORIENT_ORIGIN_Y_PRIOR))
+		{
+			outParticles.getValue(EMDL_ORIENT_ORIGIN_Y_PRIOR, y, i);
+			outParticles.setValue(EMDL_ORIENT_ORIGIN_Y_PRIOR_ANGSTROM, y*angpix, i);
+		}
+
+		if (outParticles.containsLabel(EMDL_ORIENT_ORIGIN_Z_PRIOR))
+		{
+			outParticles.getValue(EMDL_ORIENT_ORIGIN_Z_PRIOR, z, i);
+			outParticles.setValue(EMDL_ORIENT_ORIGIN_Z_PRIOR_ANGSTROM, z*angpix, i);
+		}
+		if (outParticles.containsLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM))
+		{
+			outParticles.getValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, d, i);
+			outParticles.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM, d*angpix, i);
+		}
+
 	}
 
 	outParticles.deactivateLabel(EMDL_ORIENT_ORIGIN_X);
 	outParticles.deactivateLabel(EMDL_ORIENT_ORIGIN_Y);
 	outParticles.deactivateLabel(EMDL_ORIENT_ORIGIN_Z);
+	outParticles.deactivateLabel(EMDL_ORIENT_ORIGIN_X_PRIOR);
+	outParticles.deactivateLabel(EMDL_ORIENT_ORIGIN_Y_PRIOR);
+	outParticles.deactivateLabel(EMDL_ORIENT_ORIGIN_Z_PRIOR);
+	outParticles.deactivateLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH);
 }

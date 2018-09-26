@@ -966,6 +966,7 @@ void getAllSquaredDifferencesCoarse(
 	{
 		int my_metadata_offset = op.metadata_offset + img_id;
 		long int group_id = baseMLO->mydata.getGroupId(op.part_id, img_id);
+		RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id, img_id);
 
 		/*====================================
 				Generate Translations
@@ -991,9 +992,9 @@ void getAllSquaredDifferencesCoarse(
 
 		for (long int itrans = 0; itrans < translation_num; itrans++)
 		{
-			baseMLO->sampling.getTranslations(itrans, 0, oversampled_translations_x,
+			baseMLO->sampling.getTranslationsInPixel(itrans, 0, my_pixel_size, oversampled_translations_x,
 					oversampled_translations_y, oversampled_translations_z,
-					(baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry), baseMLO->helical_rise_initial / baseMLO->mymodel.pixel_size, baseMLO->helical_twist_initial);
+					(baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry));
 
 			RFLOAT xshift = 0., yshift = 0., zshift = 0.;
 
@@ -1173,6 +1174,7 @@ void getAllSquaredDifferencesFine(
 
 		int my_metadata_offset = op.metadata_offset + img_id;
 		long int group_id = baseMLO->mydata.getGroupId(op.part_id, img_id);
+		RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id, img_id);
 
 		/*====================================
 				Generate Translations
@@ -1199,9 +1201,9 @@ void getAllSquaredDifferencesFine(
 		int j = 0;
 		for (long int itrans = 0; itrans < (sp.itrans_max - sp.itrans_min + 1); itrans++)
 		{
-			baseMLO->sampling.getTranslations(itrans, baseMLO->adaptive_oversampling, oversampled_translations_x,
+			baseMLO->sampling.getTranslationsInPixel(itrans, baseMLO->adaptive_oversampling, my_pixel_size, oversampled_translations_x,
 					oversampled_translations_y, oversampled_translations_z,
-					(baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry), baseMLO->helical_rise_initial / baseMLO->mymodel.pixel_size, baseMLO->helical_twist_initial);
+					(baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry));
 
 			for (long int iover_trans = 0; iover_trans < oversampled_translations_x.size(); iover_trans++)
 			{
@@ -1561,6 +1563,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 	for (int img_id = 0; img_id < sp.nr_images; img_id++)
 	{
 		int my_metadata_offset = op.metadata_offset + img_id;
+		RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id, img_id);
 
 		RFLOAT old_offset_x, old_offset_y, old_offset_z;
 
@@ -1688,6 +1691,9 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 						if ( (! baseMLO->do_helical_refine) || (baseMLO->ignore_helical_symmetry) )
 							tdiff2 += (offset_z - myprior_z) * (offset_z - myprior_z);
 					}
+
+					// As of version 3.1, sigma_offsets are in Angstroms!
+					tdiff2 *= my_pixel_size * my_pixel_size;
 
 					// P(offset|sigma2_offset)
 					// This is the probability of the offset, given the model offset and variance.
@@ -2119,6 +2125,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		int my_metadata_offset = op.metadata_offset + img_id;
 		int group_id = baseMLO->mydata.getGroupId(op.part_id, img_id);
 		const int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, img_id);
+		RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id, img_id);
+
+
 		CTIC(accMLO->timer,"collect_data_2_pre_kernel");
 		for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		{
@@ -2164,9 +2173,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			//Pregenerate oversampled translation objects for kernel-call
 			for (long int itrans = 0, iitrans = 0; itrans < sp.nr_trans; itrans++)
 			{
-				baseMLO->sampling.getTranslations(itrans, baseMLO->adaptive_oversampling,
+				baseMLO->sampling.getTranslationsInPixel(itrans, baseMLO->adaptive_oversampling, my_pixel_size,
 						oversampled_translations_x, oversampled_translations_y, oversampled_translations_z,
-						(baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry), baseMLO->helical_rise_initial / baseMLO->mymodel.pixel_size, baseMLO->helical_twist_initial);
+						(baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry));
 				for (long int iover_trans = 0; iover_trans < sp.nr_oversampled_trans; iover_trans++, iitrans++)
 				{
 					oo_otrans_x[fake_class*nr_transes+iitrans] = old_offset_x + oversampled_translations_x[iover_trans];
@@ -2302,12 +2311,12 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				DIRECT_MULTIDIM_ELEM(thr_wsum_pdf_direction[ithr_wsum_pdf_direction], mydir) += p_weights[n];
 				thr_sumw_group[group_id]                                                     += p_weights[n];
 				thr_wsum_pdf_class[iclass]                                                   += p_weights[n];
-				thr_wsum_sigma2_offset                                                       += p_thr_wsum_sigma2_offset[n];
+				thr_wsum_sigma2_offset                                                       += my_pixel_size * my_pixel_size * p_thr_wsum_sigma2_offset[n];
 
 				if (baseMLO->mymodel.ref_dim == 2)
 				{
-					thr_wsum_prior_offsetx_class[iclass] += p_thr_wsum_prior_offsetx_class[n];
-					thr_wsum_prior_offsety_class[iclass] += p_thr_wsum_prior_offsety_class[n];
+					thr_wsum_prior_offsetx_class[iclass] += my_pixel_size * p_thr_wsum_prior_offsetx_class[n];
+					thr_wsum_prior_offsety_class[iclass] += my_pixel_size * p_thr_wsum_prior_offsety_class[n];
 				}
 			}
 			partial_pos+=block_num;
@@ -2323,6 +2332,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	for (long int img_id = 0; img_id < sp.nr_images; img_id++)
 	{
 		int my_metadata_offset = op.metadata_offset + img_id;
+		RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id, img_id);
 
 		CTIC(accMLO->timer,"setMetadata");
 
@@ -2331,9 +2341,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		else
 			op.max_index[img_id].coarseIndexToCoarseIndices(sp);
 
-		baseMLO->sampling.getTranslations(op.max_index[img_id].itrans, baseMLO->adaptive_oversampling,
+		baseMLO->sampling.getTranslationsInPixel(op.max_index[img_id].itrans, baseMLO->adaptive_oversampling, my_pixel_size,
 				oversampled_translations_x, oversampled_translations_y, oversampled_translations_z,
-				(baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry), baseMLO->helical_rise_initial / baseMLO->mymodel.pixel_size, baseMLO->helical_twist_initial);
+				(baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry));
 
 		//TODO We already have rot, tilt and psi don't calculated them again
 		if(baseMLO->do_skip_align || baseMLO->do_skip_rotate)
@@ -2407,6 +2417,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		int my_metadata_offset = op.metadata_offset + img_id;
 		int group_id = baseMLO->mydata.getGroupId(op.part_id, img_id);
 		const int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, img_id);
+		RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id, img_id);
 
 
 		/*======================================================
@@ -2427,9 +2438,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		for (long int itrans = 0; itrans < (sp.itrans_max - sp.itrans_min + 1); itrans++)
 		{
 			//TODO Called multiple time to generate same list, reuse the same list
-			baseMLO->sampling.getTranslations(itrans, baseMLO->adaptive_oversampling, oversampled_translations_x,
-					oversampled_translations_y, oversampled_translations_z,
-					(baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry), baseMLO->helical_rise_initial / baseMLO->mymodel.pixel_size, baseMLO->helical_twist_initial);
+			baseMLO->sampling.getTranslationsInPixel(itrans, baseMLO->adaptive_oversampling, my_pixel_size,
+					oversampled_translations_x, oversampled_translations_y, oversampled_translations_z,
+					(baseMLO->do_helical_refine) && (! baseMLO->ignore_helical_symmetry));
 
 			for (long int iover_trans = 0; iover_trans < oversampled_translations_x.size(); iover_trans++)
 			{

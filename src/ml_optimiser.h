@@ -169,6 +169,9 @@ public:
 	// Total number iterations and current iteration
 	int iter, nr_iter;
 
+	// User-specified pixel size for the model (in A)
+	RFLOAT model_pixel_size;
+
 	// Flag whether to split data from the beginning into two random halves
 	bool do_split_random_halves;
 
@@ -486,7 +489,7 @@ public:
 	// Flag whether to do local refinement of helical parameters
 	bool do_helical_symmetry_local_refinement;
 
-	// Sigma of distance along the helical tracks
+	// Sigma of distance along the helical tracks (in Angstroms)
 	RFLOAT helical_sigma_distance;
 
 	// Keep helical tilt priors fixed (at 90 degrees) in global angular searches?

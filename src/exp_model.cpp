@@ -74,7 +74,13 @@ int Experiment::getOriginalImageId(long part_id, int img_id)
 {
 	return particles[part_id].images[img_id].id;
 }
-
+RFLOAT Experiment::getImagePixelSize(long int part_id, int img_id)
+{
+	int optics_group = particles[part_id].images[img_id].optics_group;
+	RFLOAT result;
+	MDopt.getValue(EMDL_IMAGE_SIZE, result, optics_group);
+	return result;
+}
 
 MetaDataTable Experiment::getMetaDataImage(long int part_id, int img_id)
 {
@@ -400,15 +406,15 @@ void Experiment::initialiseBodies(int _nr_bodies)
 			MDbody.addObject();
 			RFLOAT norm, zero=0., ninety=90.;
 			MDimg.getValue(EMDL_IMAGE_NORM_CORRECTION, norm);
-			MDbody.setValue(EMDL_ORIENT_ORIGIN_X, zero);
-			MDbody.setValue(EMDL_ORIENT_ORIGIN_Y, zero);
+			MDbody.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, zero);
+			MDbody.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, zero);
 			MDbody.setValue(EMDL_ORIENT_ROT, zero);
 			MDbody.setValue(EMDL_ORIENT_TILT, ninety);
 			MDbody.setValue(EMDL_ORIENT_PSI, zero);
 			MDbody.setValue(EMDL_IMAGE_NORM_CORRECTION, norm);
 			if (is_3d)
 			{
-				MDbody.setValue(EMDL_ORIENT_ORIGIN_Z, zero);
+				MDbody.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, zero);
 			}
 		}
 		// Now just fill all bodies with that MDbody
@@ -990,9 +996,9 @@ void Experiment::read(
 	bool have_rot  = MDimg.containsLabel(EMDL_ORIENT_ROT);
 	bool have_tilt = MDimg.containsLabel(EMDL_ORIENT_TILT);
 	bool have_psi  = MDimg.containsLabel(EMDL_ORIENT_PSI);
-	bool have_xoff = MDimg.containsLabel(EMDL_ORIENT_ORIGIN_X);
-	bool have_yoff = MDimg.containsLabel(EMDL_ORIENT_ORIGIN_Y);
-	bool have_zoff = MDimg.containsLabel(EMDL_ORIENT_ORIGIN_Z);
+	bool have_xoff = MDimg.containsLabel(EMDL_ORIENT_ORIGIN_X_ANGSTROM);
+	bool have_yoff = MDimg.containsLabel(EMDL_ORIENT_ORIGIN_Y_ANGSTROM);
+	bool have_zoff = MDimg.containsLabel(EMDL_ORIENT_ORIGIN_Z_ANGSTROM);
 	bool have_zcoord = MDimg.containsLabel(EMDL_IMAGE_COORD_Z);
 	bool have_clas = MDimg.containsLabel(EMDL_PARTICLE_CLASS);
 	bool have_norm = MDimg.containsLabel(EMDL_IMAGE_NORM_CORRECTION);
@@ -1021,11 +1027,11 @@ void Experiment::read(
 		if (!have_psi)
 			MDimg.setValue(EMDL_ORIENT_PSI, dzero);
 		if (!have_xoff)
-			MDimg.setValue(EMDL_ORIENT_ORIGIN_X, dzero);
+			MDimg.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, dzero);
 		if (!have_yoff)
-			MDimg.setValue(EMDL_ORIENT_ORIGIN_Y, dzero);
+			MDimg.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, dzero);
 		if ( (!have_zoff) && (have_zcoord) )
-			MDimg.setValue(EMDL_ORIENT_ORIGIN_Z, dzero);
+			MDimg.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, dzero);
 		if (!have_clas)
 			MDimg.setValue(EMDL_PARTICLE_CLASS, izero);
 		if (!have_norm)

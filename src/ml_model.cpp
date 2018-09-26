@@ -120,7 +120,6 @@ void MlModel::read(FileName fn_in)
 		!MDlog.getValue(EMDL_MLMODEL_NR_GROUPS, nr_groups) ||
 		!MDlog.getValue(EMDL_MLMODEL_TAU2_FUDGE_FACTOR, tau2_fudge_factor) ||
 		!MDlog.getValue(EMDL_MLMODEL_NORM_CORRECTION_AVG, avg_norm_correction) ||
-		!MDlog.getValue(EMDL_MLMODEL_SIGMA_OFFSET, sigma2_offset) ||
 		!MDlog.getValue(EMDL_MLMODEL_PRIOR_MODE, orientational_prior_mode) ||
 		!MDlog.getValue(EMDL_MLMODEL_SIGMA_ROT, sigma2_rot) ||
 		!MDlog.getValue(EMDL_MLMODEL_SIGMA_TILT, sigma2_tilt) ||
@@ -128,6 +127,19 @@ void MlModel::read(FileName fn_in)
 		!MDlog.getValue(EMDL_MLMODEL_LL, LL) ||
 		!MDlog.getValue(EMDL_MLMODEL_AVE_PMAX, ave_Pmax) )
 		REPORT_ERROR("MlModel::readStar: incorrect model_general table");
+
+    if (!MDlog.getValue(EMDL_MLMODEL_SIGMA_OFFSET_ANGSTROM, sigma2_offset))
+    {
+    	if (MDlog.getValue(EMDL_MLMODEL_SIGMA_OFFSET, sigma2_offset))
+    	{
+    		sigma2_offset *= pixel_size;
+    	}
+    	else
+    	{
+    		REPORT_ERROR("MlModel::readStar: incorrect model_general table: cannot find sigma_offset");
+    	}
+    }
+
 
 	// Retain compability with model files written by Relion prior to 1.4
 	if (!MDlog.getValue(EMDL_MLMODEL_DIMENSIONALITY_DATA, data_dim))
@@ -187,10 +199,21 @@ void MlModel::read(FileName fn_in)
 	do_sgd = false;
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDclass)
 	{
+		if (!MDclass.getValue(EMDL_MLMODEL_ACCURACY_TRANS_ANGSTROM, acc_trans[iclass]))
+		{
+			if (MDclass.getValue(EMDL_MLMODEL_ACCURACY_TRANS, acc_trans[iclass]))
+			{
+				acc_trans[iclass] *= pixel_size;
+			}
+			else
+			{
+				REPORT_ERROR("MlModel::readStar: incorrect model_classes/bodies table: no acc_trans");
+			}
+		}
+
 		if (!MDclass.getValue(EMDL_MLMODEL_REF_IMAGE, fn_tmp) ||
-			!MDclass.getValue(EMDL_MLMODEL_ACCURACY_ROT, acc_rot[iclass]) ||
-			!MDclass.getValue(EMDL_MLMODEL_ACCURACY_TRANS, acc_trans[iclass]) 	)
-			REPORT_ERROR("MlModel::readStar: incorrect model_classes/bodies table");
+			!MDclass.getValue(EMDL_MLMODEL_ACCURACY_ROT, acc_rot[iclass]) )
+			REPORT_ERROR("MlModel::readStar: incorrect model_classes/bodies table: no ref_image or acc_rot");
 		// backwards compatible
 		if (!MDclass.getValue(EMDL_MLMODEL_ESTIM_RESOL_REF, estimated_resolution[iclass]))
 			estimated_resolution[iclass] = 0.;
@@ -476,7 +499,7 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 	MDlog.setValue(EMDL_MLMODEL_NR_GROUPS, nr_groups);
 	MDlog.setValue(EMDL_MLMODEL_TAU2_FUDGE_FACTOR, tau2_fudge_factor);
 	MDlog.setValue(EMDL_MLMODEL_NORM_CORRECTION_AVG, avg_norm_correction);
-	MDlog.setValue(EMDL_MLMODEL_SIGMA_OFFSET, sqrt(sigma2_offset));
+	MDlog.setValue(EMDL_MLMODEL_SIGMA_OFFSET_ANGSTROM, sqrt(sigma2_offset));
 	MDlog.setValue(EMDL_MLMODEL_PRIOR_MODE, orientational_prior_mode);
 	MDlog.setValue(EMDL_MLMODEL_SIGMA_ROT, sqrt(sigma2_rot));
 	MDlog.setValue(EMDL_MLMODEL_SIGMA_TILT, sqrt(sigma2_tilt));
@@ -538,7 +561,7 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 		int myclass = (nr_bodies > 1) ? 0 : iclass; // for multi-body: just set iclass=0
 		MDclass.setValue(EMDL_MLMODEL_PDF_CLASS, pdf_class[myclass]);
 		MDclass.setValue(EMDL_MLMODEL_ACCURACY_ROT, acc_rot[iclass]);
-		MDclass.setValue(EMDL_MLMODEL_ACCURACY_TRANS, acc_trans[iclass]);
+		MDclass.setValue(EMDL_MLMODEL_ACCURACY_TRANS_ANGSTROM, acc_trans[iclass]);
 		MDclass.setValue(EMDL_MLMODEL_ESTIM_RESOL_REF, estimated_resolution[iclass]);
 		MDclass.setValue(EMDL_MLMODEL_FOURIER_COVERAGE_TOTAL_REF, total_fourier_coverage[iclass]);
 		if (nr_bodies > 1)
@@ -667,21 +690,18 @@ void  MlModel::readTauSpectrum(FileName fn_tau, int verb)
 }
 
 // Reading images from disc
-void MlModel::readImages(FileName fn_ref, bool _is_3d_model, int _ori_size, Experiment &_mydata,
-			bool &do_average_unaligned, bool &do_generate_seeds, bool &refs_are_ctf_corrected, bool _do_sgd)
+void MlModel::readImages(FileName fn_ref, bool _is_3d_model, int _ori_size, RFLOAT user_pixel_size, Experiment &_mydata,
+			bool &do_average_unaligned, bool &do_generate_seeds, bool &refs_are_ctf_corrected, bool _do_sgd, bool verb)
 {
 
 	// Set some stuff
 	nr_groups = _mydata.groups.size();
 	ori_size = _ori_size;
 	RFLOAT avg_norm_correction = 1.;
+	RFLOAT header_pixel_size;
 
 	// Data dimensionality
 	_mydata.MDexp.getValue(EMDL_IMAGE_DIMENSIONALITY, data_dim);
-
-	// Set pixel size in the model to be equal as the one in the first optics_group
-	// TODO: change this for refinable pixel sizes....
-	pixel_size = _mydata.obsModel.getPixelSize(0);
 
 	// Read references into memory
 	Image<RFLOAT> img;
@@ -710,6 +730,19 @@ void MlModel::readImages(FileName fn_ref, bool _is_3d_model, int _ori_size, Expe
 				MDref.getValue(EMDL_MLMODEL_REF_IMAGE, fn_tmp);
 				img.read(fn_tmp);
 				img().setXmippOrigin();
+				if (nr_classes == 0)
+				{
+					img.MDMainHeader.getValue(EMDL_IMAGE_SAMPLINGRATE_X, header_pixel_size);
+				}
+				else
+				{
+					RFLOAT aux_pixel_size;
+					img.MDMainHeader.getValue(EMDL_IMAGE_SAMPLINGRATE_X, aux_pixel_size);
+					if (fabs(aux_pixel_size-header_pixel_size) > 0.001)
+					{
+						REPORT_ERROR("MlModel::readImages ERROR: different models have different pixel sizes in their headers!");
+					}
+				}
 				ref_dim = img().getDim();
 				if (ori_size != XSIZE(img()) || ori_size != YSIZE(img()))
 				{
@@ -730,6 +763,7 @@ void MlModel::readImages(FileName fn_ref, bool _is_3d_model, int _ori_size, Expe
 		{
 			img.read(fn_ref);
 			img().setXmippOrigin();
+			img.MDMainHeader.getValue(EMDL_IMAGE_SAMPLINGRATE_X, header_pixel_size);
 			ref_dim = img().getDim();
 			if (ori_size != XSIZE(img()) || ori_size != YSIZE(img()))
 			{
@@ -764,6 +798,14 @@ void MlModel::readImages(FileName fn_ref, bool _is_3d_model, int _ori_size, Expe
 			else
 				do_generate_seeds = false;
 		}
+
+		if (user_pixel_size > 0. && verb && fabs(header_pixel_size - user_pixel_size) > 0.001)
+		{
+			std::cerr << " WARNING: user-defined pixel size = " << user_pixel_size << " is not equal to the one found in reference header = " << header_pixel_size << std::endl;
+			std::cerr << " WARNING: Using the pixel size from the reference header ..." << std::endl;
+		}
+		pixel_size = header_pixel_size;
+
 	}
 	else
 	{
@@ -789,6 +831,16 @@ void MlModel::readImages(FileName fn_ref, bool _is_3d_model, int _ori_size, Expe
 			Iref.push_back(img());
 			if (_do_sgd)
 				Igrad.push_back(img());
+		}
+
+
+		if (user_pixel_size > 0.)
+		{
+			pixel_size = user_pixel_size;
+		}
+		else
+		{
+			REPORT_ERROR("MlModel::readImages ERROR: user_pixel_size should be provided if no reference image are given!");
 		}
 	}
 
@@ -912,12 +964,17 @@ void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool als
 			sigma_psi_bodies[nr_bodies] = val;
 		}
 
-		if (!MD.containsLabel(EMDL_BODY_SIGMA_OFFSET))
-			REPORT_ERROR("ERROR: the body STAR file should contain a rlnBodySigmaOffset column for the prior on the offsets for each body");
+		if (MD.getValue(EMDL_BODY_SIGMA_OFFSET_ANGSTROM, val))
+		{
+			sigma_offset_bodies[nr_bodies] = val;
+		}
+		else if (MD.getValue(EMDL_BODY_SIGMA_OFFSET, val))
+		{
+			val *= pixel_size;
+		}
 		else
 		{
-			MD.getValue(EMDL_BODY_SIGMA_OFFSET, val);
-			sigma_offset_bodies[nr_bodies] = val;
+			REPORT_ERROR("ERROR: the body STAR file should contain a rlnBodySigmaOffsetAngst column for the prior on the offsets for each body");
 		}
 
 		// Also write the mask with the standard name to disk

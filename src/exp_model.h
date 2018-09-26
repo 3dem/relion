@@ -315,7 +315,10 @@ public:
 	int getOpticsGroup(long int part_id, int img_id);
 
 	// Get the original position in the input STAR file for the N'th image for this particle
-	int getOriginalImageId(long part_id, int img_id);
+	int getOriginalImageId(long int part_id, int img_id);
+
+	// Get the pixel size for the N-th image of this particle
+	RFLOAT getImagePixelSize(long int part_id, int img_id);
 
 	// Get the metadata-row for this image in a separate MetaDataTable
 	MetaDataTable getMetaDataImage(long int part_id, int img_id);

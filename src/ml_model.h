@@ -396,8 +396,8 @@ public:
 
 	// Read images from disc and initialise
 	// Also set do_average_unaligned and do_generate_seeds flags
-	void readImages(FileName fn_ref, bool _is_3d_model, int _ori_size, Experiment &_mydata,
-			bool &do_average_unaligned, bool &do_generate_seeds, bool &refs_are_ctf_corrected, bool _do_sgd = false);
+	void readImages(FileName fn_ref, bool _is_3d_model, int _ori_size, RFLOAT user_pixel_size, Experiment &_mydata,
+			bool &do_average_unaligned, bool &do_generate_seeds, bool &refs_are_ctf_corrected, bool _do_sgd = false, bool verb = false);
 
 	RFLOAT getResolution(int ipix)	{ return (RFLOAT)ipix/(pixel_size * ori_size); }
 
