@@ -8329,7 +8329,7 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 				else
 					std:: cout << "false" << std::endl;
 			}
-			std::cout << " Auto-refine: Offset search range= " << sampling.offset_range << " pixels; offset step= " << sampling.getTranslationalSampling(adaptive_oversampling) << " pixels";
+			std::cout << " Auto-refine: Offset search range= " << sampling.offset_range << " pixels; offset step= " << sampling.getTranslationalSampling(adaptive_oversampling) << " Anstroms";
 			if ( (do_helical_refine) && (!ignore_helical_symmetry) )
 				std::cout << "; offset step along helical axis= " << sampling.getHelicalTranslationalSampling(adaptive_oversampling) << " pixels";
 			std::cout << std::endl;
