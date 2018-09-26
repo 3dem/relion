@@ -341,11 +341,11 @@ void FlexAnalyser::loopThroughParticles(int rank, int size)
 			subtractOneParticle(part_id, imgno, rank, size);
 
 			// Remove origin prior columns if present, as we have re-centered.
-			if (DFo.containsLabel(EMDL_ORIENT_ORIGIN_X_PRIOR)) {
-				DFo.deactivateLabel(EMDL_ORIENT_ORIGIN_X_PRIOR);
+			if (DFo.containsLabel(EMDL_ORIENT_ORIGIN_X_PRIOR_ANGSTROM)) {
+				DFo.deactivateLabel(EMDL_ORIENT_ORIGIN_X_PRIOR_ANGSTROM);
 			}
-			if (DFo.containsLabel(EMDL_ORIENT_ORIGIN_Y_PRIOR)) {
-				DFo.deactivateLabel(EMDL_ORIENT_ORIGIN_Y_PRIOR);
+			if (DFo.containsLabel(EMDL_ORIENT_ORIGIN_Y_PRIOR_ANGSTROM)) {
+				DFo.deactivateLabel(EMDL_ORIENT_ORIGIN_Y_PRIOR_ANGSTROM);
 			}
 		}
 		else if (do_3dmodels || do_PCA_orient)
@@ -468,6 +468,8 @@ void FlexAnalyser::subtractOneParticle(long int part_id, long int imgno, int ran
 	img.read(fn_img);
 	img().setXmippOrigin();
 
+	RFLOAT my_pixel_size = data.getImagePixelSize(part_id, 0);
+
 	// Get the consensus class, orientational parameters and norm (if present)
 	Matrix1D<RFLOAT> my_old_offset(3), my_residual_offset(3), centering_offset(3);
 	Matrix2D<RFLOAT> Aori;
@@ -478,10 +480,14 @@ void FlexAnalyser::subtractOneParticle(long int part_id, long int imgno, int ran
 	data.MDimg.getValue(EMDL_ORIENT_ROT, rot, part_id);
 	data.MDimg.getValue(EMDL_ORIENT_TILT, tilt, part_id);
 	data.MDimg.getValue(EMDL_ORIENT_PSI, psi, part_id);
-	data.MDimg.getValue(EMDL_ORIENT_ORIGIN_X, XX(my_old_offset), part_id);
-	data.MDimg.getValue(EMDL_ORIENT_ORIGIN_Y, YY(my_old_offset), part_id);
+	data.MDimg.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, XX(my_old_offset), part_id);
+	data.MDimg.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, YY(my_old_offset), part_id);
 	if (model.data_dim == 3)
-		data.MDimg.getValue(EMDL_ORIENT_ORIGIN_Z, ZZ(my_old_offset), part_id);
+		data.MDimg.getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, ZZ(my_old_offset), part_id);
+
+	// As of v3.1, offsets are in Angstrom: convert back to pixels!
+	my_old_offset /= my_pixel_size;
+
 	if (!data.MDimg.getValue(EMDL_IMAGE_NORM_CORRECTION, norm, part_id))
 		norm = 1.;
 
@@ -496,10 +502,13 @@ void FlexAnalyser::subtractOneParticle(long int part_id, long int imgno, int ran
 	my_residual_offset = my_old_offset;
 
 	// Also get refined offset for this body
-	data.MDbodies[subtract_body].getValue(EMDL_ORIENT_ORIGIN_X, XX(my_refined_ibody_offset), part_id);
-	data.MDbodies[subtract_body].getValue(EMDL_ORIENT_ORIGIN_Y, YY(my_refined_ibody_offset), part_id);
+	data.MDbodies[subtract_body].getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, XX(my_refined_ibody_offset), part_id);
+	data.MDbodies[subtract_body].getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, YY(my_refined_ibody_offset), part_id);
 	if (model.data_dim == 3)
-		data.MDbodies[subtract_body].getValue(EMDL_ORIENT_ORIGIN_Z, ZZ(my_refined_ibody_offset), part_id);
+		data.MDbodies[subtract_body].getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, ZZ(my_refined_ibody_offset), part_id);
+
+	// As of v3.1, offsets are in Angstrom: convert back to pixels!
+	my_refined_ibody_offset /= my_pixel_size;
 
 	// Apply the norm_correction term
 	if (do_norm)
@@ -560,10 +569,13 @@ void FlexAnalyser::subtractOneParticle(long int part_id, long int imgno, int ran
 		data.MDbodies[obody].getValue(EMDL_ORIENT_ROT, body_rot, part_id);
 		data.MDbodies[obody].getValue(EMDL_ORIENT_TILT, body_tilt, part_id);
 		data.MDbodies[obody].getValue(EMDL_ORIENT_PSI,  body_psi, part_id);
-		data.MDbodies[obody].getValue(EMDL_ORIENT_ORIGIN_X, XX(body_offset), part_id);
-		data.MDbodies[obody].getValue(EMDL_ORIENT_ORIGIN_Y, YY(body_offset), part_id);
+		data.MDbodies[obody].getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, XX(body_offset), part_id);
+		data.MDbodies[obody].getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, YY(body_offset), part_id);
 		if (model.data_dim == 3)
-			data.MDbodies[obody].getValue(EMDL_ORIENT_ORIGIN_Z, ZZ(body_offset), part_id);
+			data.MDbodies[obody].getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, ZZ(body_offset), part_id);
+
+		// As of v3.1, offsets are in Angstrom: convert back to pixels!
+		body_offset /= my_pixel_size;
 
 		Matrix2D<RFLOAT> Aresi,  Abody;
 		// Aresi is the residual orientation for this obody
@@ -641,10 +653,10 @@ void FlexAnalyser::subtractOneParticle(long int part_id, long int imgno, int ran
 	selfTranslate(img(), centering_offset, DONT_WRAP);
 
 	// Set the difference between the rounded my_old_offset and the actual offsets, plus (for multibody) my_refined_ibody_offset
-	DFo.setValue(EMDL_ORIENT_ORIGIN_X, XX(my_residual_offset));
-	DFo.setValue(EMDL_ORIENT_ORIGIN_Y, YY(my_residual_offset));
+	DFo.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, my_pixel_size * XX(my_residual_offset));
+	DFo.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, my_pixel_size * YY(my_residual_offset));
 	if (model.data_dim == 3)
-		DFo.setValue(EMDL_ORIENT_ORIGIN_Z, ZZ(my_residual_offset));
+		DFo.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, my_pixel_size * ZZ(my_residual_offset));
 
 	// Rebox the image
 	if (boxsize > 0)
@@ -703,6 +715,7 @@ void FlexAnalyser::make3DModelOneParticle(long int part_id, long int imgno, std:
 	data.MDimg.getValue(EMDL_ORIENT_PSI, psi, part_id);
 	Euler_angles2matrix(rot, tilt, psi, Aori, false);
 
+	RFLOAT my_pixel_size = data.getImagePixelSize(part_id, 0);
 
 	Image<RFLOAT> img;
 	MultidimArray<RFLOAT> sumw;
@@ -721,10 +734,13 @@ void FlexAnalyser::make3DModelOneParticle(long int part_id, long int imgno, std:
 		data.MDbodies[ibody].getValue(EMDL_ORIENT_ROT, body_rot, part_id);
 		data.MDbodies[ibody].getValue(EMDL_ORIENT_TILT, body_tilt, part_id);
 		data.MDbodies[ibody].getValue(EMDL_ORIENT_PSI,  body_psi, part_id);
-		data.MDbodies[ibody].getValue(EMDL_ORIENT_ORIGIN_X, XX(body_offset), part_id);
-		data.MDbodies[ibody].getValue(EMDL_ORIENT_ORIGIN_Y, YY(body_offset), part_id);
+		data.MDbodies[ibody].getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, XX(body_offset), part_id);
+		data.MDbodies[ibody].getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, YY(body_offset), part_id);
 		if (model.data_dim == 3)
-			data.MDbodies[ibody].getValue(EMDL_ORIENT_ORIGIN_Z, ZZ(body_offset), part_id);
+			data.MDbodies[ibody].getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, ZZ(body_offset), part_id);
+
+		// As of v3.1, offsets are in Angstrom: convert back to pixels!
+		body_offset /= my_pixel_size;
 
 		// Keep rescaling into account!
 		body_offset *= rescale_3dmodels;
