@@ -200,7 +200,7 @@ void SchedulerWindow::cb_execute_i()
 		command += " --RunJobs " + jobids;
 		// Run this in the background, so control returns to the window
 		command += " &";
-		int res = system(command.c_str()); 
+		int res = system(command.c_str());
 		std::cout << " Launching: " << command << std::endl;
 		std::cout << " Stop execution of this set of scheduled jobs by deleting file: " << fn_check << std::endl;
 
@@ -445,12 +445,6 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	gui_jobwindows[5] = new JobWindow();
 	gui_jobwindows[5]->initialise(PROC_EXTRACT, maingui_do_old_style);
     browse_grp[5]->end();
-
-    browse_grp[6] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-	browser->add("Particle sorting");
-	gui_jobwindows[6] = new JobWindow();
-	gui_jobwindows[6]->initialise(PROC_SORT);
-    browse_grp[6]->end();
 
     browse_grp[7] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("Subset selection");

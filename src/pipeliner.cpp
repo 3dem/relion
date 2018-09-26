@@ -587,8 +587,6 @@ int PipeLine::addScheduledJob(std::string typestring, std::string fn_options)
 		type = PROC_AUTOPICK;
 	else if (typestring == PROC_EXTRACT_NAME)
 		type = PROC_EXTRACT;
-	else if (typestring == PROC_SORT_NAME)
-		type = PROC_SORT;
 	else if (typestring == PROC_CLASSSELECT_NAME)
 		type = PROC_CLASSSELECT;
 	else if (typestring == PROC_2DCLASS_NAME)
@@ -1061,7 +1059,7 @@ bool PipeLine::setAliasJob(int this_job, std::string alias, std::string &error_m
 	}
 	else if (alias.find("*") != std::string::npos || alias.find("?") != std::string::npos || alias.find("(") != std::string::npos || alias.find(")") != std::string::npos ||
 	         alias.find("/") != std::string::npos || alias.find("\"") != std::string::npos || alias.find("\\") != std::string::npos || alias.find("|") != std::string::npos ||
-		 alias.find("#") != std::string::npos || alias.find("<") != std::string::npos || alias.find(">") != std::string::npos || alias.find("&") != std::string::npos || 
+		 alias.find("#") != std::string::npos || alias.find("<") != std::string::npos || alias.find(">") != std::string::npos || alias.find("&") != std::string::npos ||
 		 alias.find("%") != std::string::npos)
 	{
 		error_message = "Alias cannot contain following symbols: *, ?, (, ), /, \", \\, |, #, <, >, &, %";
@@ -1236,7 +1234,6 @@ bool PipeLine::cleanupJob(int this_job, bool do_harsh, std::string &error_messag
 	// These job types do not have cleanup:
 	if (processList[this_job].type == PROC_IMPORT ||
 		processList[this_job].type == PROC_MANUALPICK ||
-		processList[this_job].type == PROC_SORT ||
 		processList[this_job].type == PROC_CLASSSELECT ||
 		processList[this_job].type == PROC_MASKCREATE ||
 		processList[this_job].type == PROC_JOINSTAR ||
@@ -2290,11 +2287,6 @@ long int PipeLineFlowChart::addProcessToUpwardsFlowChart(std::ofstream &fh, Pipe
 					is_right = (mynodetype == NODE_MIC_COORDS);
 					right_label = "coords";
 	        	}
-	        }
-	        else if (pipeline.processList[new_process].type == PROC_SORT)
-	        {
-	        	is_right = (mynodetype == NODE_MODEL || mynodetype == NODE_2DREFS);
-	        	right_label = "refs";
 	        }
 	        else if (pipeline.processList[new_process].type == PROC_3DCLASS)
 	        {

@@ -143,7 +143,6 @@ static bool do_allow_change_minimum_dedicated;
 #define PROC_MANUALPICK_NAME    "ManualPick"   // Manually pick particle coordinates from micrographs
 #define PROC_AUTOPICK_NAME		"AutoPick"     // Automatically pick particle coordinates from micrographs, their CTF and 2D references
 #define PROC_EXTRACT_NAME		"Extract"      // Window particles, normalize, downsize etc from micrographs (also combine CTF into metadata file)
-#define PROC_SORT_NAME          "Sort"         // Sort particles based on their Z-scores
 #define PROC_CLASSSELECT_NAME   "Select" 	   // Read in model.star file, and let user interactively select classes through the display (later: auto-selection as well)
 #define PROC_2DCLASS_NAME 		"Class2D"      // 2D classification (from input particles)
 #define PROC_3DCLASS_NAME		"Class3D"      // 3D classification (from input 2D/3D particles, an input 3D-reference, and possibly a 3D mask)
@@ -166,7 +165,7 @@ static bool do_allow_change_minimum_dedicated;
 #define PROC_MANUALPICK 	3 // Manually pick particle coordinates from micrographs
 #define PROC_AUTOPICK		4 // Automatically pick particle coordinates from micrographs, their CTF and 2D references
 #define PROC_EXTRACT		5 // Window particles, normalize, downsize etc from micrographs (also combine CTF into metadata file)
-#define PROC_SORT           6 // Sort particles based on their Z-scores
+//#define PROC_SORT           6 // Sort particles based on their Z-scores
 #define PROC_CLASSSELECT    7 // Read in model.star file, and let user interactively select classes through the display (later: auto-selection as well)
 #define PROC_2DCLASS		8 // 2D classification (from input particles)
 #define PROC_3DCLASS		9 // 3D classification (from input 2D/3D particles, an input 3D-reference, and possibly a 3D mask)
@@ -392,10 +391,6 @@ public:
 
 	void initialiseExtractJob();
 	bool getCommandsExtractJob(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
-
-	void initialiseSortJob();
-	bool getCommandsSortJob(std::string &outputname, std::vector<std::string> &commands,
 			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
 
 	void initialiseSelectJob();
