@@ -78,7 +78,7 @@ RFLOAT Experiment::getImagePixelSize(long int part_id, int img_id)
 {
 	int optics_group = particles[part_id].images[img_id].optics_group;
 	RFLOAT result;
-	MDopt.getValue(EMDL_IMAGE_SIZE, result, optics_group);
+	MDopt.getValue(EMDL_IMAGE_PIXEL_SIZE, result, optics_group);
 	return result;
 }
 
