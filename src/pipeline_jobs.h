@@ -165,7 +165,7 @@ static bool do_allow_change_minimum_dedicated;
 #define PROC_MANUALPICK 	3 // Manually pick particle coordinates from micrographs
 #define PROC_AUTOPICK		4 // Automatically pick particle coordinates from micrographs, their CTF and 2D references
 #define PROC_EXTRACT		5 // Window particles, normalize, downsize etc from micrographs (also combine CTF into metadata file)
-//#define PROC_SORT           6 // Sort particles based on their Z-scores
+//#define PROC_SORT         6 // Sort particles based on their Z-scores
 #define PROC_CLASSSELECT    7 // Read in model.star file, and let user interactively select classes through the display (later: auto-selection as well)
 #define PROC_2DCLASS		8 // 2D classification (from input particles)
 #define PROC_3DCLASS		9 // 3D classification (from input 2D/3D particles, an input 3D-reference, and possibly a 3D mask)
@@ -181,7 +181,7 @@ static bool do_allow_change_minimum_dedicated;
 #define PROC_MULTIBODY      19// Multi-body refinement
 #define PROC_MOTIONREFINE   20// Jasenko's motion_refine
 #define PROC_CTFREFINE      21// Jasenko's ctf_refine
-#define NR_BROWSE_TABS      20
+#define NR_BROWSE_TABS      19
 
 // Status a Process may have
 #define PROC_RUNNING   0

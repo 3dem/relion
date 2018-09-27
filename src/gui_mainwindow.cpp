@@ -410,120 +410,140 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	browser = new Fl_Hold_Browser(10,MENUHEIGHT+5,WCOL0-20,h-MENUHEIGHT-60);
     current_job = -1;
 
-    browse_grp[0] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+    int i = 0;
+    browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
     browser->add("Import");
-    gui_jobwindows[0] = new JobWindow();
-    gui_jobwindows[0]->initialise(PROC_IMPORT, maingui_do_old_style);
-    browse_grp[0]->end();
+    gui_jobwindows[i] = new JobWindow();
+    gui_jobwindows[i]->initialise(PROC_IMPORT, maingui_do_old_style);
+    browse_grp[i]->end();
+    i++;
 
-    browse_grp[1] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+    browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
     browser->add("Motion correction");
-	gui_jobwindows[1] = new JobWindow();
-	gui_jobwindows[1]->initialise(PROC_MOTIONCORR, maingui_do_old_style);
-    browse_grp[1]->end();
+	gui_jobwindows[i] = new JobWindow();
+	gui_jobwindows[i]->initialise(PROC_MOTIONCORR, maingui_do_old_style);
+    browse_grp[i]->end();
+    i++;
 
-    browse_grp[2] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+    browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
     browser->add("CTF estimation");
-	gui_jobwindows[2] = new JobWindow();
-	gui_jobwindows[2]->initialise(PROC_CTFFIND, maingui_do_old_style);
-    browse_grp[2]->end();
+	gui_jobwindows[i] = new JobWindow();
+	gui_jobwindows[i]->initialise(PROC_CTFFIND, maingui_do_old_style);
+    browse_grp[i]->end();
+    i++;
 
-    browse_grp[3] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+    browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("Manual picking");
-	gui_jobwindows[3] = new JobWindow();
-	gui_jobwindows[3]->initialise(PROC_MANUALPICK, maingui_do_old_style);
-	browse_grp[3]->end();
+	gui_jobwindows[i] = new JobWindow();
+	gui_jobwindows[i]->initialise(PROC_MANUALPICK, maingui_do_old_style);
+	browse_grp[i]->end();
+	i++;
 
-    browse_grp[4] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+    browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("Auto-picking");
-	gui_jobwindows[4] = new JobWindow();
-	gui_jobwindows[4]->initialise(PROC_AUTOPICK, maingui_do_old_style);
-    browse_grp[4]->end();
+	gui_jobwindows[i] = new JobWindow();
+	gui_jobwindows[i]->initialise(PROC_AUTOPICK, maingui_do_old_style);
+    browse_grp[i]->end();
+    i++;
 
-    browse_grp[5] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+    browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("Particle extraction");
-	gui_jobwindows[5] = new JobWindow();
-	gui_jobwindows[5]->initialise(PROC_EXTRACT, maingui_do_old_style);
-    browse_grp[5]->end();
+	gui_jobwindows[i] = new JobWindow();
+	gui_jobwindows[i]->initialise(PROC_EXTRACT, maingui_do_old_style);
+    browse_grp[i]->end();
+    i++;
 
-    browse_grp[7] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+    browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("Subset selection");
-	gui_jobwindows[7] = new JobWindow();
-	gui_jobwindows[7]->initialise(PROC_CLASSSELECT, maingui_do_old_style);
-    browse_grp[7]->end();
+	gui_jobwindows[i] = new JobWindow();
+	gui_jobwindows[i]->initialise(PROC_CLASSSELECT, maingui_do_old_style);
+    browse_grp[i]->end();
+    i++;
 
-    browse_grp[8] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+    browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("2D classification");
-	gui_jobwindows[8] = new JobWindow();
-	gui_jobwindows[8]->initialise(PROC_2DCLASS, maingui_do_old_style);
-    browse_grp[8]->end();
+	gui_jobwindows[i] = new JobWindow();
+	gui_jobwindows[i]->initialise(PROC_2DCLASS, maingui_do_old_style);
+    browse_grp[i]->end();
+    i++;
 
-    browse_grp[9] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+    browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("3D initial model");
-	gui_jobwindows[9] = new JobWindow();
-	gui_jobwindows[9]->initialise(PROC_INIMODEL, maingui_do_old_style);
-    browse_grp[9]->end();
+	gui_jobwindows[i] = new JobWindow();
+	gui_jobwindows[i]->initialise(PROC_INIMODEL, maingui_do_old_style);
+    browse_grp[i]->end();
+    i++;
 
-    browse_grp[10] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+    browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("3D classification");
-	gui_jobwindows[10] = new JobWindow();
-	gui_jobwindows[10]->initialise(PROC_3DCLASS, maingui_do_old_style);
-    browse_grp[10]->end();
+	gui_jobwindows[i] = new JobWindow();
+	gui_jobwindows[i]->initialise(PROC_3DCLASS, maingui_do_old_style);
+    browse_grp[i]->end();
+    i++;
 
-    browse_grp[11] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+    browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("3D auto-refine");
-	gui_jobwindows[11] = new JobWindow();
-	gui_jobwindows[11]->initialise(PROC_3DAUTO, maingui_do_old_style);
-    browse_grp[11]->end();
+	gui_jobwindows[i] = new JobWindow();
+	gui_jobwindows[i]->initialise(PROC_3DAUTO, maingui_do_old_style);
+    browse_grp[i]->end();
+    i++;
 
-    browse_grp[12] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+    browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("3D multi-body");
-	gui_jobwindows[12] = new JobWindow();
-	gui_jobwindows[12]->initialise(PROC_MULTIBODY, maingui_do_old_style);
-    browse_grp[12]->end();
+	gui_jobwindows[i] = new JobWindow();
+	gui_jobwindows[i]->initialise(PROC_MULTIBODY, maingui_do_old_style);
+    browse_grp[i]->end();
+    i++;
 
-    browse_grp[13] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+    browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("CTF refinement");
-	gui_jobwindows[13] = new JobWindow();
-	gui_jobwindows[13]->initialise(PROC_CTFREFINE, maingui_do_old_style);
-    browse_grp[13]->end();
+	gui_jobwindows[i] = new JobWindow();
+	gui_jobwindows[i]->initialise(PROC_CTFREFINE, maingui_do_old_style);
+    browse_grp[i]->end();
+    i++;
 
-    browse_grp[14] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+    browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("Bayesian polishing");
-	gui_jobwindows[14] = new JobWindow();
-	gui_jobwindows[14]->initialise(PROC_MOTIONREFINE, maingui_do_old_style);
-    browse_grp[14]->end();
+	gui_jobwindows[i] = new JobWindow();
+	gui_jobwindows[i]->initialise(PROC_MOTIONREFINE, maingui_do_old_style);
+    browse_grp[i]->end();
+    i++;
 
-    browse_grp[15] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+    browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("Mask creation");
-	gui_jobwindows[15] = new JobWindow();
-	gui_jobwindows[15]->initialise(PROC_MASKCREATE, maingui_do_old_style);
-    browse_grp[15]->end();
+	gui_jobwindows[i] = new JobWindow();
+	gui_jobwindows[i]->initialise(PROC_MASKCREATE, maingui_do_old_style);
+    browse_grp[i]->end();
+    i++;
 
-    browse_grp[16] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+    browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("Join star files");
-	gui_jobwindows[16] = new JobWindow();
-	gui_jobwindows[16]->initialise(PROC_JOINSTAR, maingui_do_old_style);
-    browse_grp[16]->end();
+	gui_jobwindows[i] = new JobWindow();
+	gui_jobwindows[i]->initialise(PROC_JOINSTAR, maingui_do_old_style);
+    browse_grp[i]->end();
+    i++;
 
-    browse_grp[17] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+    browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("Particle subtraction");
-	gui_jobwindows[17] = new JobWindow();
-	gui_jobwindows[17]->initialise(PROC_SUBTRACT, maingui_do_old_style);
-    browse_grp[17]->end();
+	gui_jobwindows[i] = new JobWindow();
+	gui_jobwindows[i]->initialise(PROC_SUBTRACT, maingui_do_old_style);
+    browse_grp[i]->end();
+    i++;
 
-    browse_grp[18] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+    browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("Post-processing");
-	gui_jobwindows[18] = new JobWindow();
-	gui_jobwindows[18]->initialise(PROC_POST, maingui_do_old_style);
-    browse_grp[18]->end();
+	gui_jobwindows[i] = new JobWindow();
+	gui_jobwindows[i]->initialise(PROC_POST, maingui_do_old_style);
+    browse_grp[i]->end();
+    i++;
 
-    browse_grp[19] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+    browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("Local resolution");
-	gui_jobwindows[19] = new JobWindow();
-	gui_jobwindows[19]->initialise(PROC_RESMAP, maingui_do_old_style);
-    browse_grp[19]->end();
+	gui_jobwindows[i] = new JobWindow();
+	gui_jobwindows[i]->initialise(PROC_RESMAP, maingui_do_old_style);
+    browse_grp[i]->end();
 
+    std::cerr << " i= " << i << std::endl;
     browser->callback(cb_select_browsegroup);
     browser->textsize(RLN_FONTSIZE);
     browser->end();
