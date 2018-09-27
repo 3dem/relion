@@ -885,9 +885,11 @@ void Experiment::read(
 				my_random_subset = 0;
 			}
 
-			int optics_group;
+			int optics_group = 0;
 			if (MDimg.getValue(EMDL_IMAGE_OPTICS_GROUP, optics_group, ori_img_id))
+			{
 				optics_group--;
+			}
 
 			// Add this image to an existing particle, or create a new particle
 			std::string part_name;
@@ -1110,9 +1112,11 @@ void Experiment::write(FileName fn_root)
 	if (!fh)
 		REPORT_ERROR( (std::string)"Experiment::write: Cannot write file: " + fn_tmp);
 
+	MDopt.setName("optics");
 	MDopt.write(fh);
 
 	// Always write MDimg
+	MDimg.setName("particles");
 	MDimg.write(fh);
 
 	if (nr_bodies > 1)
