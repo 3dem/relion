@@ -285,17 +285,17 @@ void HelixAligner::readImages()
 		RFLOAT xoff = 0.;
 		RFLOAT yoff = 0.;
 		RFLOAT psi = 0.;
-		if (MD.containsLabel(EMDL_ORIENT_ORIGIN_X))
-			MD.getValue(EMDL_ORIENT_ORIGIN_X, xoff);
-		if (MD.containsLabel(EMDL_ORIENT_ORIGIN_Y))
-			MD.getValue(EMDL_ORIENT_ORIGIN_Y, yoff);
+		if (MD.containsLabel(EMDL_ORIENT_ORIGIN_X_ANGSTROM))
+			MD.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff);
+		if (MD.containsLabel(EMDL_ORIENT_ORIGIN_Y_ANGSTROM))
+			MD.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff);
 		if (MD.containsLabel(EMDL_ORIENT_PSI))
 			MD.getValue(EMDL_ORIENT_PSI, psi);
 		// Apply the actual transformation
 		Matrix2D<RFLOAT> A;
 		rotation2DMatrix(psi, A);
-		MAT_ELEM(A,0, 2) = xoff;
-		MAT_ELEM(A,1, 2) = yoff;
+		MAT_ELEM(A,0, 2) = xoff / angpix; // as of v3.1, origin offsets are in Angstrom!
+		MAT_ELEM(A,1, 2) = yoff / angpix;
 		selfApplyGeometry(img(), A, IS_NOT_INV, DONT_WRAP);
 
 
