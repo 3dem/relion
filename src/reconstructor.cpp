@@ -27,7 +27,6 @@ void Reconstructor::read(int argc, char **argv)
 	fn_sel = parser.getOption("--i", "Input STAR file with the projection images and their orientations", "");
 	fn_out = parser.getOption("--o", "Name for output reconstruction","relion.mrc");
 	fn_sym = parser.getOption("--sym", "Symmetry group", "c1");
-	angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms)", "1"));
 	maxres = textToFloat(parser.getOption("--maxres", "Maximum resolution (in Angstrom) to consider in Fourier space (default Nyquist)", "-1"));
 	padding_factor = textToFloat(parser.getOption("--pad", "Padding factor", "2"));
 	image_path = parser.getOption("--img", "Optional: image path prefix", "");
@@ -39,7 +38,7 @@ void Reconstructor::read(int argc, char **argv)
 	ctf_phase_flipped = parser.checkOption("--ctf_phase_flipped", "Images have been phase flipped");
 	only_flip_phases = parser.checkOption("--only_flip_phases", "Do not correct CTF-amplitudes, only flip phases");
 	ctf_premultiplied = parser.checkOption("--ctf_multiplied", "Have the data been premultiplied with their CTF?");
-	
+
 	int ewald_section = parser.addSection("Ewald-sphere correction options");
 	do_ewald = parser.checkOption("--ewald", "Correct for Ewald-sphere curvature (developmental)");
 	mask_diameter  = textToFloat(parser.getOption("--mask_diameter", "Diameter (in A) of mask for Ewald-sphere curvature correction", "-1."));
@@ -67,7 +66,7 @@ void Reconstructor::read(int argc, char **argv)
 	iter = textToInteger(parser.getOption("--iter", "Number of gridding-correction iterations", "10"));
 	ref_dim = textToInteger(parser.getOption("--refdim", "Dimension of the reconstruction (2D or 3D)", "3"));
 	angular_error = textToFloat(parser.getOption("--angular_error", "Apply random deviations with this standard deviation (in degrees) to each of the 3 Euler angles", "0."));
-	shift_error = textToFloat(parser.getOption("--shift_error", "Apply random deviations with this standard deviation (in pixels) to each of the 2 translations", "0."));
+	shift_error = textToFloat(parser.getOption("--shift_error", "Apply random deviations with this standard deviation (in Angstrom) to each of the 2 translations", "0."));
 	do_fom_weighting = parser.checkOption("--fom_weighting", "Weight particles according to their figure-of-merit (_rlnParticleFigureOfMerit)");
 	fn_fsc = parser.getOption("--fsc", "FSC-curve for regularized reconstruction", "");
 	do_3d_rot = parser.checkOption("--3d_rot", "Perform 3D rotations instead of backprojections from 2D images");
@@ -148,7 +147,7 @@ void Reconstructor::initialise()
 		r_max = -1;
 	else
 		r_max = CEIL(mysize * angpix / maxres);
-	
+
 }
 
 void Reconstructor::run()
@@ -291,8 +290,8 @@ void Reconstructor::backprojectOneParticle(long int p)
 
 	// Translations (either through phase-shifts or in real space
 	trans.initZeros();
-	DF.getValue( EMDL_ORIENT_ORIGIN_X, XX(trans), p);
-	DF.getValue( EMDL_ORIENT_ORIGIN_Y, YY(trans), p);
+	DF.getValue( EMDL_ORIENT_ORIGIN_X_ANGSTROM, XX(trans), p);
+	DF.getValue( EMDL_ORIENT_ORIGIN_Y_ANGSTROM, YY(trans), p);
 
 	if (shift_error > 0.)
 	{
@@ -303,13 +302,16 @@ void Reconstructor::backprojectOneParticle(long int p)
 	if (do_3d_rot)
 	{
 		trans.resize(3);
-		DF.getValue( EMDL_ORIENT_ORIGIN_Z, ZZ(trans), p);
+		DF.getValue( EMDL_ORIENT_ORIGIN_Z_ANGSTROM, ZZ(trans), p);
 
 		if (shift_error > 0.)
 		{
 			ZZ(trans) += rnd_gaus(0., shift_error);
 		}
 	}
+
+	// As of v3.1, shifts are in Angstroms in the STAR files, convert back to pixels here
+	trans/= angpix;
 
 	if (do_fom_weighting)
 	{
