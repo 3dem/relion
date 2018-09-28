@@ -812,7 +812,7 @@ def run_pipeline(opts):
             else:
                 autopick_options.append('Ignore CTFs until first peak? == No')
 
-            if opts.autopick_do_gpu:
+            if opts.autopick_do_gpu and (not opts.autopick_do_LoG):
                 autopick_options.append('Use GPU acceleration? == Yes')
             else:
                 autopick_options.append('Use GPU acceleration? == No')
