@@ -498,6 +498,8 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	do_solvent = parser.checkOption("--flatten_solvent", "Perform masking on the references as well?");
 	fn_mask = parser.getOption("--solvent_mask", "User-provided mask for the references (default is to use spherical mask with particle_diameter)", "None");
 	fn_mask2 = parser.getOption("--solvent_mask2", "User-provided secondary mask (with its own average density)", "None");
+	fn_lowpass_mask = parser.getOption("--lowpass_mask", "User-provided mask for low-pass filtering", "None");
+	lowpass = textToFloat(parser.getOption("--lowpass", "User-provided cutoff for region specified above", "0"));
     fn_tau = parser.getOption("--tau", "STAR file with input tau2-spectrum (to be kept constant)", "None");
 	fn_local_symmetry = parser.getOption("--local_symmetry", "Local symmetry description file containing list of masks and their operators", "None");
     do_split_random_halves = parser.checkOption("--split_random_halves", "Refine two random halves of the data completely separately");
@@ -2530,7 +2532,7 @@ void MlOptimiser::iterate()
 		}
 
                 // Directly use fn_out, without "_it" specifier, so unmasked refs will be overwritten at every iteration
-                if (do_write_unmasked_refs)
+                if (do_write_unmasked_refs || do_solvent)
                     mymodel.write(fn_out+"_unmasked", sampling, false, true);
 
 #ifdef TIMING
@@ -4291,8 +4293,8 @@ void MlOptimiser::solventFlatten()
 	}
 
 	// First read solvent mask from disc, or pre-calculate it
-	Image<RFLOAT> Isolvent, Isolvent2;
-    Isolvent().resize(mymodel.Iref[0]);
+	Image<RFLOAT> Isolvent, Isolvent2, Ilowpass;
+	Isolvent().resize(mymodel.Iref[0]);
 	Isolvent().setXmippOrigin();
 	Isolvent().initZeros();
 	if (fn_mask.contains("None"))
@@ -4352,12 +4354,32 @@ void MlOptimiser::solventFlatten()
 			REPORT_ERROR("MlOptimiser::solventFlatten ERROR: second solvent mask is of incorrect size.");
 	}
 
+	// Also read a lowpass mask if necessary
+	if (!fn_lowpass_mask.contains("None"))
+	{
+		Ilowpass.read(fn_lowpass_mask);
+		Ilowpass().setXmippOrigin();
+		if (!Ilowpass().sameShape(Isolvent()))
+			REPORT_ERROR("MlOptimiser::solventFlatten ERROR: second solvent mask is of incorrect size.");
+	}
+
 	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 	{
+		MultidimArray<RFLOAT> Itmp;
+		if (!fn_lowpass_mask.contains("None"))
+		{
+			Itmp = mymodel.Iref[iclass];
+			Itmp *= Ilowpass();
+//			std::cout << "low pass filter: angpix=" << mymodel.pixel_size << " xsize=" << XSIZE(mymodel.Iref[iclass]) << std::endl;
+			lowPassFilterMap(Itmp, lowpass, mymodel.pixel_size);
+		}
 
 		// Then apply the expanded solvent mask to the map
-		mymodel.Iref[iclass] *= Isolvent();
+		mymodel.Iref[iclass] *= Isolvent(); // this is the tight mask
 
+		if (!fn_lowpass_mask.contains("None"))
+			mymodel.Iref[iclass] += Itmp;	
+		
 		// Apply a second solvent mask if necessary
 		// This may for example be useful to set the interior of icosahedral viruses to a constant density value that is higher than the solvent
 		// Invert the solvent mask, so that an input mask can be given where 1 is the masked area and 0 is protein....

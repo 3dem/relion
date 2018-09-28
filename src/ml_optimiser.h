@@ -303,6 +303,10 @@ public:
 	// This solvent mask will have its own average density and may be useful for example to fill the interior of an icosahedral virus
 	FileName fn_mask2;
 
+	// Mask for regions to be low-pass filtered
+	FileName fn_lowpass_mask;
+	RFLOAT lowpass;
+
 	// Width of the soft-edges of the circular masks
 	int width_mask_edge;
 
