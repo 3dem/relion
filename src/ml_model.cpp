@@ -325,6 +325,7 @@ void MlModel::read(FileName fn_in)
 			spectral_sizes[igroup] = 0;
 			sigma2_noise[igroup].resize(spectral_sizes[igroup]);
 		}
+
 	}
 
 	// Read pdf_direction models for each class
@@ -702,22 +703,23 @@ void  MlModel::readTauSpectrum(FileName fn_tau, int verb)
 }
 
 // Reading images from disc
-void MlModel::readImages(FileName fn_ref, bool _is_3d_model, int _ori_size, RFLOAT user_pixel_size, Experiment &_mydata,
+void MlModel::readImages(FileName fn_ref, bool _is_3d_model, int user_model_size, RFLOAT user_pixel_size, Experiment &_mydata,
 			bool &do_average_unaligned, bool &do_generate_seeds, bool &refs_are_ctf_corrected, bool _do_sgd, bool verb)
 {
 
-	// Set some stuff
+	// Set some group stuff
 	nr_groups = _mydata.groups.size();
+	sigma2_noise.resize(nr_groups);
 	spectral_sizes.resize(nr_groups);
 	for (long int igroup = 0; igroup < nr_groups; igroup++)
 	{
 		int optics_group = _mydata.groups[igroup].optics_group;
-		int my_image_size = _mydata.getImageSize(optics_group);
+		int my_image_size = _mydata.getOpticsImageSize(optics_group);
 		spectral_sizes[igroup] = my_image_size / 2 + 1;
+		sigma2_noise[igroup].initZeros(spectral_sizes[igroup]);
+		std::cerr << igroup << " spectral_sizes[igroup]= " << spectral_sizes[igroup] << std::endl;
 	}
 
-	ori_size = _ori_size;
-	RFLOAT avg_norm_correction = 1.;
 	RFLOAT header_pixel_size;
 
 	// Data dimensionality
@@ -750,6 +752,7 @@ void MlModel::readImages(FileName fn_ref, bool _is_3d_model, int _ori_size, RFLO
 				MDref.getValue(EMDL_MLMODEL_REF_IMAGE, fn_tmp);
 				img.read(fn_tmp);
 				img().setXmippOrigin();
+				ori_size = XSIZE(img());
 				if (nr_classes == 0)
 				{
 					img.MDMainHeader.getValue(EMDL_IMAGE_SAMPLINGRATE_X, header_pixel_size);
@@ -764,11 +767,6 @@ void MlModel::readImages(FileName fn_ref, bool _is_3d_model, int _ori_size, RFLO
 					}
 				}
 				ref_dim = img().getDim();
-				if (ori_size != XSIZE(img()) || ori_size != YSIZE(img()))
-				{
-					std::cerr << " ori_size= " << ori_size << " XSIZE(img())= " << XSIZE(img()) << std::endl;
-					REPORT_ERROR("MlOptimiser::read: size of reference images is not the same as the experimental images!");
-				}
 				Iref.push_back(img());
 				if (_do_sgd)
 				{
@@ -784,6 +782,7 @@ void MlModel::readImages(FileName fn_ref, bool _is_3d_model, int _ori_size, RFLO
 			img.read(fn_ref);
 			img().setXmippOrigin();
 			img.MDMainHeader.getValue(EMDL_IMAGE_SAMPLINGRATE_X, header_pixel_size);
+			ori_size = XSIZE(img());
 			ref_dim = img().getDim();
 			if (ori_size != XSIZE(img()) || ori_size != YSIZE(img()))
 			{
@@ -819,17 +818,24 @@ void MlModel::readImages(FileName fn_ref, bool _is_3d_model, int _ori_size, RFLO
 				do_generate_seeds = false;
 		}
 
-		if (user_pixel_size > 0. && verb && fabs(header_pixel_size - user_pixel_size) > 0.001)
-		{
-			std::cerr << " WARNING: user-defined pixel size = " << user_pixel_size << " is not equal to the one found in reference header = " << header_pixel_size << std::endl;
-			std::cerr << " WARNING: Using the pixel size from the reference header ..." << std::endl;
-		}
 		pixel_size = header_pixel_size;
 
 	}
 	else
 	{
-		// If no -ref is given, calculate average of all unaligned images later on.
+		pixel_size = user_pixel_size;
+		ori_size = user_model_size;
+		// If no -ref is given, get image size and pixel size from the input data, or by user-provided values
+		if (user_pixel_size < 0.)
+		{
+			REPORT_ERROR("ERROR: trying to set negative pixel size in mymodel");
+		}
+		if (user_model_size < 0.)
+		{
+			REPORT_ERROR("ERROR: trying to set negative image size in mymodel");
+		}
+
+		// Calculate average of all unaligned images later on.
 		do_average_unaligned = true;
 		do_generate_seeds = false; // after SGD introduction, this is now done in the estimation of initial sigma2 step!
 		refs_are_ctf_corrected = true;
@@ -853,15 +859,6 @@ void MlModel::readImages(FileName fn_ref, bool _is_3d_model, int _ori_size, RFLO
 				Igrad.push_back(img());
 		}
 
-
-		if (user_pixel_size > 0.)
-		{
-			pixel_size = user_pixel_size;
-		}
-		else
-		{
-			REPORT_ERROR("MlModel::readImages ERROR: user_pixel_size should be provided if no reference image are given!");
-		}
 	}
 
 	initialise(_do_sgd);
@@ -1279,11 +1276,17 @@ void MlModel::initialiseDataVersusPrior(bool fix_tau)
 
 	// Calculate average sigma2_noise over all image groups
 	MultidimArray<RFLOAT> avg_sigma2_noise;
-	avg_sigma2_noise.initZeros(ori_size /2 + 1);
+	avg_sigma2_noise.initZeros(sigma2_noise[0]);
 	for (int igroup = 0; igroup < nr_particles_group.size(); igroup++)
 	{
 		/// TODO: go from arbitrary-size vectors of spectral_sizes to the
+		/// TODO: go from arbitrary-size vectors of spectral_sizes to the
+		/// TODO: go from arbitrary-size vectors of spectral_sizes to the
+		/// TODO: go from arbitrary-size vectors of spectral_sizes to the
+		/// TODO: go from arbitrary-size vectors of spectral_sizes to the
+		std::cerr << " ori_size= " << ori_size << std::endl;
 
+		std::cerr << " XSIZE(avg_sigma2_noise)= " << XSIZE(avg_sigma2_noise) << " sigma2_noise[igroup]= " << XSIZE(sigma2_noise[igroup]) << std::endl;
 		avg_sigma2_noise += (RFLOAT)(nr_particles_group[igroup]) * sigma2_noise[igroup];
 	}
 	avg_sigma2_noise /= nr_particles;
@@ -1389,6 +1392,7 @@ void MlWsumModel::initialise(MlModel &_model, FileName fn_sym, bool asymmetric_p
 	nr_classes = _model.nr_classes;
 	nr_bodies = _model.nr_bodies;
     nr_groups = _model.nr_groups;
+    spectral_sizes = _model.spectral_sizes;
     nr_directions = _model.nr_directions;
     ref_dim = _model.ref_dim;
     data_dim = _model.data_dim;
@@ -1438,9 +1442,13 @@ void MlWsumModel::initialise(MlModel &_model, FileName fn_sym, bool asymmetric_p
 		helical_rise[iclass] = _model.helical_rise[iclass];
 	}
 
-    MultidimArray<RFLOAT> aux(ori_size / 2 + 1);
-    wsum_signal_product_spectra.resize(nr_groups, aux);
-    wsum_reference_power_spectra.resize(nr_groups, aux);
+	wsum_signal_product_spectra.resize(nr_groups);
+	wsum_reference_power_spectra.resize(nr_groups);
+	for (long int igroup = 0; igroup < nr_groups; igroup++)
+	{
+		wsum_signal_product_spectra[igroup].initZeros(sigma2_noise[igroup]);
+		wsum_reference_power_spectra[igroup].initZeros(sigma2_noise[igroup]);
+	}
 
     // Resize MlWsumModel-specific vectors
     BackProjector BP(ori_size, ref_dim, fn_sym, interpolator, padding_factor, r_min_nn,
@@ -1498,9 +1506,9 @@ void MlWsumModel::initZeros()
 
 void MlWsumModel::pack(MultidimArray<RFLOAT> &packed)
 {
-    // for LL & avePmax & sigma2_offset & avg_norm_correction & sigma2_rot & sigma2_tilt & sigma2_psi
     unsigned long long packed_size = 0;
 
+    // for LL & avePmax & sigma2_offset & avg_norm_correction & sigma2_rot & sigma2_tilt & sigma2_psi
     packed_size += 7 ;
     // for group-related spectra
     for (int igroup = 0; igroup < nr_groups; igroup++)
@@ -1693,6 +1701,7 @@ void MlWsumModel::pack(MultidimArray<RFLOAT> &packed, int &piece, int &nr_pieces
     for (int igroup = 0; igroup < nr_groups; igroup++)
     {
     	packed_size += 3 * spectral_sizes[igroup];
+    	std::cerr << " BBBB igroup= " << igroup << " spectral_size[igroup]= " << spectral_sizes[igroup] << std::endl;
     }
     // for sumw_group
     packed_size += nr_groups;

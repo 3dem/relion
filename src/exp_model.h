@@ -302,8 +302,11 @@ public:
 	// Calculate the total number of optics groups in this experiment
 	int numberOfOpticsGroups();
 
+	// Get the pixel size for this optics group
+	RFLOAT getOpticsPixelSize(int optics_group);
+
 	// Get the original image size for this optics group
-	int getImageSize(int optics_group);
+	int getOpticsImageSize(int optics_group);
 
 	// Get the random_subset for this particle
 	int getRandomSubset(long int part_id);

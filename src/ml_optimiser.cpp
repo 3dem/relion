@@ -1436,20 +1436,14 @@ void MlOptimiser::initialiseGeneral(int rank)
 		int myverb = (rank==0) ? 1 : 0;
 		mydata.read(fn_data, true, false, do_preread, is_helical_segment, myverb); // true means ignore original particle name
 
-		// Also get original size of the images to pass to mymodel.read()
-		int ori_size = -1;
-		mydata.MDopt.getValue(EMDL_IMAGE_SIZE, ori_size);
-		if (ori_size%2 != 0)
-			REPORT_ERROR("This program only works with even values for the image dimensions!");
-
 		// If no model pixel size was provided, get pixel size from the first optics group
 		if (model_pixel_size < 0.)
 		{
-			mydata.MDopt.getValue(EMDL_IMAGE_PIXEL_SIZE, model_pixel_size, 0);
+			model_pixel_size = mydata.getOpticsPixelSize(0);
 		}
 		if (model_image_size < 0.)
 		{
-			mydata.MDopt.getValue(EMDL_IMAGE_SIZE, model_image_size, 0);
+			model_image_size = mydata.getOpticsImageSize(0);
 		}
 
 		// Read in the reference(s) and initialise mymodel
@@ -3017,8 +3011,7 @@ void MlOptimiser::precalculateABMatrices()
 		global_fftshifts_ab2_coarse.push_back(dummy);
 		global_fftshifts_ab2_current.push_back(dummy);
 
-		RFLOAT my_pixel_size;
-		mydata.MDopt.getValue(EMDL_IMAGE_PIXEL_SIZE, my_pixel_size, optics_group);
+		RFLOAT my_pixel_size = mydata.getOpticsPixelSize(optics_group);
 
 		// Set the global AB-matrices for the FFT phase-shifted images
 		MultidimArray<Complex> Fab_current, Fab_coarse;
@@ -4420,10 +4413,9 @@ void MlOptimiser::updateImageSizeAndResolutionPointers()
 	for (int optics_group = 0; optics_group < nr_optics_groups; optics_group++)
 	{
 
-		RFLOAT my_pixel_size;
-		mydata.MDopt.getValue(EMDL_IMAGE_SIZE, my_pixel_size, optics_group);
+		RFLOAT my_pixel_size = mydata.getOpticsPixelSize(optics_group);
 
-		image_full_size[optics_group] = mydata.getImageSize(optics_group);
+		image_full_size[optics_group] = mydata.getOpticsImageSize(optics_group);
 		// Current size can never become bigger than original image size for this optics_group!
 		image_current_size[optics_group] = XMIPP_MIN(image_full_size[optics_group], mymodel.current_size * mymodel.pixel_size / my_pixel_size);
 

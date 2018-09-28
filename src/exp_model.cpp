@@ -55,7 +55,14 @@ int Experiment::numberOfOpticsGroups()
 	return MDopt.numberOfObjects();
 }
 
-int Experiment::getImageSize(int optics_group)
+RFLOAT Experiment::getOpticsPixelSize(int optics_group)
+{
+	RFLOAT result;
+	MDopt.getValue(EMDL_IMAGE_PIXEL_SIZE, result, optics_group);
+	return result;
+}
+
+int Experiment::getOpticsImageSize(int optics_group)
 {
 	int result;
 	MDopt.getValue(EMDL_IMAGE_SIZE, result, optics_group);
