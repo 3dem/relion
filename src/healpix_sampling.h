@@ -62,7 +62,7 @@ public:
 
     /* Translational search range and sampling rate (as of v3.1 in Angstroms!)
      */
-    // Jun19,2015 - Shaoda, Helical refinement
+    // Jun19,2015 - Shaoda, Helical refinement (all in Angstroms!)
     RFLOAT offset_range, offset_step, helical_offset_step;
 
     /** Flag whether this is a real 3D sampling */

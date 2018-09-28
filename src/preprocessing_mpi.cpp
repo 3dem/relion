@@ -72,10 +72,7 @@ void PreprocessingMpi::runExtractParticles()
 		{
 			if (imic >= my_first_mic && imic <= my_last_mic)
 			{
-				if (do_movie_extract)
-					MDmics.getValue(EMDL_MICROGRAPH_MOVIE_NAME, fn_mic);
-				else
-					MDmics.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
+				MDmics.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
 
 				// Check new-style outputdirectory exists and make it if not!
 				FileName fn_dir = getOutputFileNameRoot(fn_mic);

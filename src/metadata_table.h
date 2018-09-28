@@ -102,7 +102,7 @@ class MetaDataTable
 
 	// A comment for the metadata table
 	std::string comment;
-	
+
 	// The version number of the file format (multiplied by 10,000)
 	int version;
 
@@ -145,10 +145,10 @@ public:
 	void setComment(const std::string Comment);
 	std::string getComment() const;
 	bool containsComment() const;
-	
+
 	void setName(const std::string Name);
 	std::string getName() const;
-	
+
 	void setVersion(int v);
 	int getVersion() const;
 	static int getCurrentVersion();
@@ -290,7 +290,7 @@ public:
 
 	// Randomise the order inside the STAR file
 	void randomiseOrder();
-	
+
 	// legacy error codes:
 	// @TODO: remove after changing:
 	//	 - particle_reposition.cpp, line ~127

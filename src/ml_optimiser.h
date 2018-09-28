@@ -172,6 +172,9 @@ public:
 	// User-specified pixel size for the model (in A)
 	RFLOAT model_pixel_size;
 
+	// User-specified image size for the model (in pix)
+	RFLOAT model_image_size;
+
 	// Flag whether to split data from the beginning into two random halves
 	bool do_split_random_halves;
 
@@ -274,8 +277,9 @@ public:
 	// Flag to keep sigma2_noise fixed
 	bool fix_sigma_noise;
 
-	//  Use images only up to a certain resolution in the expectation step
-	int coarse_size;
+	//  Use images only up to a certain resolution in the expectation step (one for each optics_group)
+	// image_coarse_size is for first pass, image_current_size is for second pass, image_full_size is original image size
+	std::vector<int> image_coarse_size, image_current_size, image_full_size;
 
 	// Use images only up to a certain resolution in the expectation step
 	int max_coarse_size;
@@ -548,8 +552,8 @@ public:
 
 	/////////// Some internal stuff ////////////////////////
 
-	// Array with pointers to the resolution of each point in a Fourier-space FFTW-like array
-	MultidimArray<int> Mresol_fine, Mresol_coarse, Npix_per_shell;
+	// Array with pointers to the resolution of each point in a Fourier-space FFTW-like array (one for each optics_group)
+	std::vector<MultidimArray<int> > Mresol_fine, Mresol_coarse, Npix_per_shell;
 
 	// Verbosity flag
 	int verb;
@@ -628,7 +632,6 @@ public:
 		do_write_unmasked_refs(0),
 		do_generate_seeds(0),
 		sum_changes_count(0),
-		coarse_size(0),
 		current_changes_optimal_orientations(0),
 		do_average_unaligned(0),
 		sigma2_fudge(0),
@@ -886,7 +889,7 @@ public:
 	 * also store precalculated 2D matrices with 1/sigma2_noise
 	 */
 	void precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmasked, long int my_particle,
-			int exp_current_image_size, int exp_current_oversampling, int metadata_offset,
+			int exp_current_oversampling, int metadata_offset,
 			int exp_itrans_min, int exp_itrans_max,
 			std::vector<MultidimArray<Complex > > &exp_Fimg,
 			std::vector<MultidimArray<Complex > > &exp_Fimg_nomask,
@@ -902,7 +905,7 @@ public:
 			int exp_itrans_min, int exp_itrans_max, MultidimArray<bool> &exp_Mcoarse_significant);
 
 	// Get squared differences for all iclass, idir, ipsi and itrans...
-	void getAllSquaredDifferences(long int part_id, int ibody, int exp_current_image_size,
+	void getAllSquaredDifferences(long int part_id, int ibody,
 			int exp_ipass, int exp_current_oversampling, int metadata_offset,
 			int exp_idir_min, int exp_idir_max, int exp_ipsi_min, int exp_ipsi_max,
 			int exp_itrans_min, int exp_itrans_max, int my_iclass_min, int my_iclass_max,
@@ -932,7 +935,7 @@ public:
 			std::vector<RFLOAT> &exp_directions_prior, std::vector<RFLOAT> &exp_psi_prior);
 
 	// Store all relevant weighted sums, also return optimal hidden variables, max_weight and dLL
-	void storeWeightedSums(long int part_id, int ibody, int exp_current_image_size,
+	void storeWeightedSums(long int part_id, int ibody,
 			int exp_current_oversampling, int metadata_offset,
 			int exp_idir_min, int exp_idir_max, int exp_ipsi_min, int exp_ipsi_max,
 			int exp_itrans_min, int exp_itrans_max, int my_iclass_min, int my_iclass_max,

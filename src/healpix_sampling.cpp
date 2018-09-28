@@ -385,7 +385,7 @@ void HealpixSampling::setTranslations(
 			}
 			else
 			{
-				if (max2 <= (offset_range * offset_range))
+				if (max2 < (offset_range * offset_range) + 0.001)  // +0.001 prevent precision errors in relion-3.1
 				{
 					translations_x.push_back(xoff);
 					translations_y.push_back(yoff);

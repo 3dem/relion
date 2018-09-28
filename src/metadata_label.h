@@ -361,7 +361,7 @@ enum EMDLabel
     EMDL_PARTICLE_AUTOPICK_FOM,
     EMDL_PARTICLE_HELICAL_TUBE_ID,
     EMDL_PARTICLE_HELICAL_TUBE_PITCH,
-    EMDL_PARTICLE_HELICAL_TRACK_LENGTH,
+    EMDL_PARTICLE_HELICAL_TRACK_LENGTH, //deprecated
     EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM,
     EMDL_PARTICLE_CLASS,
     EMDL_PARTICLE_DLL,
@@ -885,7 +885,6 @@ private:
         EMDL::addLabel(EMDL_SAMPLING_IS_3D_TRANS, EMDL_BOOL, "rlnIs3DTranslationalSampling", "Flag to indicate this concerns a x,y,z-translational sampling ");
         EMDL::addLabel(EMDL_SAMPLING_HEALPIX_ORDER, EMDL_INT, "rlnHealpixOrder", "Healpix order for the sampling of the first two Euler angles (rot, tilt) on the 3D sphere");
         EMDL::addLabel(EMDL_SAMPLING_LIMIT_TILT, EMDL_DOUBLE, "rlnTiltAngleLimit", "Values to which to limit the tilt angles (positive for keeping side views, negative for keeping top views)");
-        // Jun19,2015 - Shaoda, I think all of these 3 offsets are in PIXELS.
         EMDL::addLabel(EMDL_SAMPLING_OFFSET_RANGE, EMDL_DOUBLE, "rlnOffsetRange", "Search range for the origin offsets (in Angstroms)");
         EMDL::addLabel(EMDL_SAMPLING_OFFSET_STEP, EMDL_DOUBLE, "rlnOffsetStep", "Step size for the searches in the origin offsets (in Angstroms)");
         EMDL::addLabel(EMDL_SAMPLING_HELICAL_OFFSET_STEP, EMDL_DOUBLE, "rlnHelicalOffsetStep", "Step size for the searches of offsets along helical axis (in Angstroms)");

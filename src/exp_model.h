@@ -182,6 +182,9 @@ public:
 	// ID of this group
 	long int id;
 
+	// The optics_group for this group
+	int optics_group;
+
 	// Name of this group (by this name it will be recognised upon reading)
 	std::string name;
 
@@ -223,9 +226,6 @@ public:
 
 	// Number of particles in random subsets 1 and 2;
 	long int nr_particles_subset1, nr_particles_subset2;
-
-	// Experiment-related metadata
-    MetaDataTable MDexp;
 
 	// One large MetaDataTable for all images
     MetaDataTable MDimg;
@@ -281,13 +281,10 @@ public:
 		nr_parts_on_scratch = 0;
 		free_space_Gb = 10;
 		is_3D = false;
-		MDexp.clear();
-		MDexp.setIsList(true);
 		MDimg.clear();
 		MDimg.setIsList(false);
 		MDbodies.clear();
 		MDimg.setName("images");
-		MDexp.setName("experiment");
 	}
 
 	// Calculate the total number of particles in this experiment
@@ -301,6 +298,12 @@ public:
 
 	// Calculate the total number of groups in this experiment
 	long int numberOfGroups();
+
+	// Calculate the total number of optics groups in this experiment
+	int numberOfOpticsGroups();
+
+	// Get the original image size for this optics group
+	int getImageSize(int optics_group);
 
 	// Get the random_subset for this particle
 	int getRandomSubset(long int part_id);
@@ -331,7 +334,7 @@ public:
 			 int optics_group);
 
 	// Add a group
-	long int addGroup(std::string mic_name);
+	long int addGroup(std::string mic_name, int optics_group);
 
 	// Add a micrograph
 	long int addMicrograph(std::string mic_name);

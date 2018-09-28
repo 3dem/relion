@@ -201,7 +201,7 @@ void StarConverter::translateOffsets(MetaDataTable &outParticles, const MetaData
 			outParticles.getValue(EMDL_ORIENT_ORIGIN_Z_PRIOR, z, i);
 			outParticles.setValue(EMDL_ORIENT_ORIGIN_Z_PRIOR_ANGSTROM, z*angpix, i);
 		}
-		if (outParticles.containsLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM))
+		if (outParticles.containsLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH))
 		{
 			outParticles.getValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, d, i);
 			outParticles.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM, d*angpix, i);

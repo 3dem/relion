@@ -119,6 +119,9 @@ public:
 	// One name for each group
 	std::vector<FileName> group_names;
 
+	// Number of elements in the noise spectrum of each group (can be different because of different image sizes in different optics groups)
+	std::vector<int> spectral_sizes;
+
 	// One noise spectrum for each group
 	std::vector<MultidimArray<RFLOAT > > sigma2_noise;
 
@@ -176,7 +179,7 @@ public:
 	// Is this body kept fixed in refinement?
 	std::vector<int> keep_fixed_bodies;
 
-	// Maximum radius of mask
+	// Maximum radius of mask (in Angstrom!)
 	std::vector<int> max_radius_mask_bodies;
 
 	// 2D Matrix with pointers to the PPrefs for overlapping bodies
@@ -384,6 +387,9 @@ public:
 
 	// Initialise vectors with the right size
 	void initialise(bool _do_sgd = false);
+
+	// Set spectral sizes of all groups in the Experiment
+	void setSpectralSizes(Experiment &mydata);
 
 	//Read a model from a file
 	void read(FileName fn_in);

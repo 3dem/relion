@@ -50,6 +50,18 @@ long int Experiment::numberOfGroups()
 	return groups.size();
 }
 
+int Experiment::numberOfOpticsGroups()
+{
+	return MDopt.numberOfObjects();
+}
+
+int Experiment::getImageSize(int optics_group)
+{
+	int result;
+	MDopt.getValue(EMDL_IMAGE_SIZE, result, optics_group);
+	return result;
+}
+
 long int Experiment::getMicrographId(long int part_id, int img_id)
 {
 	return (particles[part_id].images[img_id]).micrograph_id;
@@ -133,11 +145,12 @@ int Experiment::addImageToParticle(long int part_id, std::string img_name, long 
 }
 
 
-long int Experiment::addGroup(std::string group_name)
+long int Experiment::addGroup(std::string group_name, int _optics_group)
 {
 	// Add new group to this Experiment
 	ExpGroup group;
 	group.id = groups.size(); // start counting groups at 0!
+	group.optics_group = _optics_group;
 	group.name = group_name;
 
 	// Push back this micrograph
@@ -700,7 +713,7 @@ void Experiment::read(
 		// Read images from stack. Ignore all metadata, just use filenames
 
 		// Add a single Micrograph
-		group_id = addGroup("group");
+		group_id = addGroup("group", 0);
 		mic_id = addMicrograph("micrograph");
 
 		// Check that a MRC stack ends in .mrcs, not .mrc (which will be read as a MRC 3D map!)
@@ -779,12 +792,12 @@ void Experiment::read(
 			}
 
 			if (do_ignore_group_name)
-				group_id = addGroup("group");
+				group_id = addGroup("group", 0);
 		}
 		else
 		{
 			// If there is no EMDL_MICROGRAPH_NAME, then just use a single group and micrograph
-			group_id = addGroup("group");
+			group_id = addGroup("group", 0);
 			mic_id = addMicrograph("micrograph");
 		}
 #ifdef DEBUG_READ
@@ -803,6 +816,14 @@ void Experiment::read(
 		//FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDimg)
 		for (long int ori_img_id = 0; ori_img_id < MDimg.numberOfObjects(); ori_img_id++)
 		{
+
+			// Get the optics group of this particle
+			int optics_group = 0;
+			if (MDimg.getValue(EMDL_IMAGE_OPTICS_GROUP, optics_group, ori_img_id))
+			{
+				optics_group--;
+			}
+
 			// Add new micrographs or get mic_id for existing micrograph
 			FileName mic_name=""; // Filename instead of string because will decompose below
 			if (star_contains_micname)
@@ -863,7 +884,7 @@ void Experiment::read(
 						}
 					}
 					if (group_id < 0)
-						group_id = addGroup(group_name);
+						group_id = addGroup(group_name, optics_group);
 				}
 
 #ifdef DEBUG_READ
@@ -883,12 +904,6 @@ void Experiment::read(
 			if (!MDimg.getValue(EMDL_PARTICLE_RANDOM_SUBSET, my_random_subset, ori_img_id))
 			{
 				my_random_subset = 0;
-			}
-
-			int optics_group = 0;
-			if (MDimg.getValue(EMDL_IMAGE_OPTICS_GROUP, optics_group, ori_img_id))
-			{
-				optics_group--;
 			}
 
 			// Add this image to an existing particle, or create a new particle
@@ -1062,34 +1077,56 @@ void Experiment::read(
 	//std::cin >> c;
 #endif
 
-	// Also set the image_size (use the last image for that, still in fn_img)
-	FileName fn_img;
-	Image<RFLOAT> img;
-	MDimg.getValue(EMDL_IMAGE_NAME, fn_img, MDimg.firstObject());
-	if (fn_img != "")
+	// Also set the image_size for each optics_group
+	int nr_optics_groups_found = 0;
+	std::vector<bool> found_this_group;
+	found_this_group.resize(numberOfOpticsGroups(), false);
+	for (long int part_id = 0; part_id < particles.size(); part_id++)
 	{
-		img.read(fn_img, false); //false means read only header, skip real data
-		is_3D = (ZSIZE(img()) > 1);
-		int image_size = XSIZE(img());
-		if (image_size != YSIZE(img()))
-			REPORT_ERROR("Experiment::read: xsize != ysize: only squared images allowed");
-		// Add a single object to MDexp
-		MDexp.addObject();
-		MDexp.setValue(EMDL_IMAGE_SIZE, image_size);
-		if (ZSIZE(img()) > 1)
+		for (int img_id = 0; img_id < numberOfImagesInParticle(part_id); img_id++)
 		{
-			if (image_size != ZSIZE(img()))
-				REPORT_ERROR("Experiment::read: xsize != zsize: only cubed images allowed");
-			MDexp.setValue(EMDL_IMAGE_DIMENSIONALITY, 3);
+			int optics_group = getOpticsGroup(part_id, img_id);
+			if (!found_this_group[optics_group])
+			{
+				FileName fn_img = particles[part_id].images[img_id].name;
+				Image<RFLOAT> img;
+				img.read(fn_img, false); //false means read only header, skip real data
+				int image_size = XSIZE(img());
+				if (image_size%2 != 0)
+					REPORT_ERROR("ERROR: this program only works with even values for the image dimensions!");
+
+				if (image_size != YSIZE(img()))
+					REPORT_ERROR("Experiment::read: xsize != ysize: only squared images allowed");
+				MDopt.setValue(EMDL_IMAGE_SIZE, image_size, optics_group);
+				found_this_group[optics_group] = true;
+				nr_optics_groups_found++;
+				if (ZSIZE(img()) > 1)
+				{
+					if (image_size != ZSIZE(img()))
+						REPORT_ERROR("Experiment::read: xsize != zsize: only cubed images allowed");
+					is_3D = true;
+					MDopt.setValue(EMDL_IMAGE_DIMENSIONALITY, 3, optics_group);
+				}
+				else
+				{
+					is_3D = false;
+					MDopt.setValue(EMDL_IMAGE_DIMENSIONALITY, 2, optics_group);
+				}
+			}
+			if (nr_optics_groups_found == numberOfOpticsGroups())
+			{
+				break;
+			}
 		}
-		else
+		if (nr_optics_groups_found == numberOfOpticsGroups())
 		{
-			MDexp.setValue(EMDL_IMAGE_DIMENSIONALITY, 2);
+			break;
 		}
 	}
-	else
+
+	if (nr_optics_groups_found != numberOfOpticsGroups())
 	{
-		REPORT_ERROR("There are no images read in: please check your input file...");
+		REPORT_ERROR("BUG: something went wrong with finding the optics groups...");
 	}
 
 #ifdef DEBUG_READ
