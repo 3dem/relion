@@ -880,8 +880,9 @@ void getAllSquaredDifferencesCoarse(
 	unsigned long weightsPerPart(baseMLO->mymodel.nr_classes * sp.nr_dir * sp.nr_psi * sp.nr_trans * sp.nr_oversampled_rot * sp.nr_oversampled_trans);
 
 	std::vector<MultidimArray<Complex > > dummy;
+	std::vector<std::vector<MultidimArray<Complex > > > dummy2;
 	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, op.part_id, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
-			sp.itrans_min, sp.itrans_max, op.Fimg, dummy, op.Fctf, dummy, dummy,
+			sp.itrans_min, sp.itrans_max, op.Fimg, dummy, op.Fctf, dummy2, dummy2,
 			op.local_Fctf, op.local_sqrtXi2, op.local_Minvsigma2);
 
 	unsigned long image_size = op.local_Minvsigma2[0].nzyxdim;
@@ -1155,8 +1156,9 @@ void getAllSquaredDifferencesFine(
 
 	CTIC(accMLO->timer,"precalculateShiftedImagesCtfsAndInvSigma2s");
 	std::vector<MultidimArray<Complex > > dummy;
+	std::vector<std::vector<MultidimArray<Complex > > > dummy2;
 	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, op.part_id, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
-			sp.itrans_min, sp.itrans_max, op.Fimg, dummy, op.Fctf, dummy, dummy,
+			sp.itrans_min, sp.itrans_max, op.Fimg, dummy, op.Fctf, dummy2, dummy2,
 			op.local_Fctf, op.local_sqrtXi2, op.local_Minvsigma2);
 	CTOC(accMLO->timer,"precalculateShiftedImagesCtfsAndInvSigma2s");
 	MultidimArray<Complex > Fref;
@@ -2042,8 +2044,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 	// Re-do below because now also want unmasked images AND if (stricht_highres_exp >0.) then may need to resize
 	std::vector<MultidimArray<Complex > > dummy;
+	std::vector<std::vector<MultidimArray<Complex > > > dummy2;
 	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, op.part_id, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
-			sp.itrans_min, sp.itrans_max, op.Fimg, op.Fimg_nomask, op.Fctf, dummy, dummy,
+			sp.itrans_min, sp.itrans_max, op.Fimg, op.Fimg_nomask, op.Fctf, dummy2, dummy2,
 			op.local_Fctf, op.local_sqrtXi2, op.local_Minvsigma2);
 
 	// In doThreadPrecalculateShiftedImagesCtfsAndInvSigma2s() the origin of the op.local_Minvsigma2s was omitted.

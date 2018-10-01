@@ -433,7 +433,7 @@ public:
 
 	/* Initialises the radial average of the data-versus-prior ratio
 	 */
-	void initialiseDataVersusPrior(bool fix_tau);
+	void initialiseDataVersusPrior(bool fix_tau, Experiment &mydata);
 
 	void initialiseHelicalParametersLists(RFLOAT _helical_twist, RFLOAT _helical_rise);
 

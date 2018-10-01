@@ -894,8 +894,8 @@ public:
 			std::vector<MultidimArray<Complex > > &exp_Fimg,
 			std::vector<MultidimArray<Complex > > &exp_Fimg_nomask,
 			std::vector<MultidimArray<RFLOAT> > &exp_Fctf,
-			std::vector<MultidimArray<Complex > > &exp_local_Fimgs_shifted,
-			std::vector<MultidimArray<Complex > > &exp_local_Fimgs_shifted_nomask,
+			std::vector<std::vector<MultidimArray<Complex > > > &exp_local_Fimgs_shifted,
+			std::vector<std::vector<MultidimArray<Complex > > > &exp_local_Fimgs_shifted_nomask,
 			std::vector<MultidimArray<RFLOAT> > &exp_local_Fctf,
 			std::vector<RFLOAT> &exp_local_sqrtXi2,
 			std::vector<MultidimArray<RFLOAT> > &exp_local_Minvsigma2);
@@ -917,7 +917,7 @@ public:
 			MultidimArray<bool> &exp_Mcoarse_significant,
 			std::vector<int> &exp_pointer_dir_nonzeroprior, std::vector<int> &exp_pointer_psi_nonzeroprior,
 			std::vector<RFLOAT> &exp_directions_prior, std::vector<RFLOAT> &exp_psi_prior,
-			std::vector<MultidimArray<Complex > > &exp_local_Fimgs_shifted,
+			std::vector<std::vector<MultidimArray<Complex > > > &exp_local_Fimgs_shifted,
 			std::vector<MultidimArray<RFLOAT> > &exp_local_Minvsigma2,
 			std::vector<MultidimArray<RFLOAT> > &exp_local_Fctf,
 			std::vector<RFLOAT> &exp_local_sqrtXi);
@@ -954,8 +954,8 @@ public:
 			std::vector<RFLOAT> &exp_max_weight,
 			std::vector<int> &exp_pointer_dir_nonzeroprior, std::vector<int> &exp_pointer_psi_nonzeroprior,
 			std::vector<RFLOAT> &exp_directions_prior, std::vector<RFLOAT> &exp_psi_prior,
-			std::vector<MultidimArray<Complex > > &exp_local_Fimgs_shifted,
-			std::vector<MultidimArray<Complex > > &exp_local_Fimgs_shifted_nomask,
+			std::vector<std::vector<MultidimArray<Complex > > > &exp_local_Fimgs_shifted,
+			std::vector<std::vector<MultidimArray<Complex > > > &exp_local_Fimgs_shifted_nomask,
 			std::vector<MultidimArray<RFLOAT> > &exp_local_Minvsigma2,
 			std::vector<MultidimArray<RFLOAT> > &exp_local_Fctf,
 			std::vector<RFLOAT> &exp_local_sqrtXi2);

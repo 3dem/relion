@@ -92,13 +92,6 @@ void MlModel::initialise(bool _do_sgd)
 
 }
 
-void MlModel::setSpectralSizes(Experiment &mydata)
-{
-	nr_groups = mydata.numberOfGroups();
-
-}
-
-
 // Reading from a file
 void MlModel::read(FileName fn_in)
 {
@@ -717,7 +710,6 @@ void MlModel::readImages(FileName fn_ref, bool _is_3d_model, int user_model_size
 		int my_image_size = _mydata.getOpticsImageSize(optics_group);
 		spectral_sizes[igroup] = my_image_size / 2 + 1;
 		sigma2_noise[igroup].initZeros(spectral_sizes[igroup]);
-		std::cerr << igroup << " spectral_sizes[igroup]= " << spectral_sizes[igroup] << std::endl;
 	}
 
 	RFLOAT header_pixel_size;
@@ -1266,7 +1258,7 @@ void MlModel::setFourierTransformMaps(bool update_tau2_spectra, int nr_threads, 
 
 }
 
-void MlModel::initialiseDataVersusPrior(bool fix_tau)
+void MlModel::initialiseDataVersusPrior(bool fix_tau, Experiment &_mydata)
 {
 
     // Get total number of particles
@@ -1275,21 +1267,44 @@ void MlModel::initialiseDataVersusPrior(bool fix_tau)
 		nr_particles += (RFLOAT)nr_particles_group[igroup];
 
 	// Calculate average sigma2_noise over all image groups
-	MultidimArray<RFLOAT> avg_sigma2_noise;
-	avg_sigma2_noise.initZeros(sigma2_noise[0]);
+	MultidimArray<RFLOAT> avg_sigma2_noise, sum_parts;
+	avg_sigma2_noise.initZeros(ori_size /2 + 1);
+	sum_parts.initZeros(ori_size /2 + 1);
 	for (int igroup = 0; igroup < nr_particles_group.size(); igroup++)
 	{
-		/// TODO: go from arbitrary-size vectors of spectral_sizes to the
-		/// TODO: go from arbitrary-size vectors of spectral_sizes to the
-		/// TODO: go from arbitrary-size vectors of spectral_sizes to the
-		/// TODO: go from arbitrary-size vectors of spectral_sizes to the
-		/// TODO: go from arbitrary-size vectors of spectral_sizes to the
-		std::cerr << " ori_size= " << ori_size << std::endl;
 
-		std::cerr << " XSIZE(avg_sigma2_noise)= " << XSIZE(avg_sigma2_noise) << " sigma2_noise[igroup]= " << XSIZE(sigma2_noise[igroup]) << std::endl;
+		int optics_group = _mydata.groups[igroup].optics_group;
+		int my_image_size = _mydata.getOpticsImageSize(optics_group);
+		RFLOAT my_pixel_size= _mydata.getOpticsPixelSize(optics_group);
+
+		spectral_sizes[igroup] = my_image_size / 2 + 1;
+		// go from arbitrary image_size and pixel_size of the images to the ori_size and pxeil_size of the model
+		for (int x = 0; x < XSIZE(sigma2_noise[igroup]); x++)
+		{
+			int ipix = ROUND(((RFLOAT)ori_size * pixel_size * (RFLOAT)x) / ((RFLOAT)my_image_size * my_pixel_size));
+			DIRECT_A1D_ELEM(avg_sigma2_noise, ipix) += (RFLOAT)(nr_particles_group[igroup]) * DIRECT_A1D_ELEM(sigma2_noise[igroup], x);
+			DIRECT_A1D_ELEM(sum_parts, ipix) += (RFLOAT)(nr_particles_group[igroup]);
+		}
 		avg_sigma2_noise += (RFLOAT)(nr_particles_group[igroup]) * sigma2_noise[igroup];
 	}
-	avg_sigma2_noise /= nr_particles;
+
+	// Calculate average sigma2_noise
+	for (int x = 0; x < XSIZE(avg_sigma2_noise); x++)
+	{
+		if (DIRECT_A1D_ELEM(sum_parts, x) > 0.)
+		{
+			DIRECT_A1D_ELEM(avg_sigma2_noise, x) /= DIRECT_A1D_ELEM(sum_parts, x);
+		}
+		else if (x > 0)
+		{
+			std::cerr << "WARNING: POSSIBLE BUG: zero avg_sigma2_noise for x-coordinate: " << x << "; take value from previous coordinate..." << std::endl;
+			DIRECT_A1D_ELEM(avg_sigma2_noise, x) = DIRECT_A1D_ELEM(avg_sigma2_noise, x - 1);
+		}
+		else
+		{
+			REPORT_ERROR_STR("ERROR: BUG: zero avg_sigma2_noise for x-coordinate: "<< x);
+		}
+	}
 
 	// Get the FT of all reference structures
     // The Fourier Transforms are all "normalised" for 2D transforms of size = ori_size x ori_size
