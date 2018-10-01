@@ -398,11 +398,18 @@ class RelionItOptions(object):
                 else:
                     print 'Unrecognised option {}'.format(key)
 
-def safe_load_star(filename, max_try=5, wait=10):
+def safe_load_star(filename, max_try=5, wait=10, expected=[]):
     for _ in xrange(max_try):
         try:
-            return load_star(filename)
+            star = load_star(filename)
+            entry = star
+
+            # make sure the expected key is present
+            for key in expected:
+               entry = entry[key]
+            return star
         except:
+            print "safe_load_star is retrying to read: ", filename, ", expected key:", expected
             import time
             time.sleep(wait)
     assert False, "Failed to read a star file: " + filename
@@ -507,7 +514,7 @@ def addJob(jobtype, name_in_script, done_file, options, alias=None):
                 command += ' --setJobAlias "' + alias + '"'
         os.system(command)
 
-        pipeline = safe_load_star(PIPELINE_STAR)
+        pipeline = safe_load_star(PIPELINE_STAR, expected=['pipeline_processes', 'rlnPipeLineProcessName'])
         jobname = pipeline['pipeline_processes']['rlnPipeLineProcessName'][-1]
         
         # Now add the jobname to the done_file
@@ -532,7 +539,7 @@ def WaitForJob(wait_for_this_job, seconds_wait):
     time.sleep(seconds_wait)
     print " RELION_IT: waiting for job to finish in", wait_for_this_job
     while True:
-        pipeline = safe_load_star(PIPELINE_STAR)
+        pipeline = safe_load_star(PIPELINE_STAR, expected=['pipeline_processes', 'rlnPipeLineProcessName'])
         myjobnr = -1
         for jobnr in range(0,len(pipeline['pipeline_processes']['rlnPipeLineProcessName'])):
             jobname = pipeline['pipeline_processes']['rlnPipeLineProcessName'][jobnr]
@@ -573,7 +580,6 @@ White value: == 0
 
 
 def findBestClass(model_star_file, use_resol=True):
-
     model_star = safe_load_star(model_star_file)
     best_resol = 999
     best_size = 0 
@@ -593,7 +599,7 @@ def findBestClass(model_star_file, use_resol=True):
 def findOutputModelStar(job_dir):
     found = None
     try:
-        job_star = safe_load_star(job_dir + "job_pipeline.star")
+        job_star = safe_load_star(job_dir + "job_pipeline.star", expected=['pipeline_output_edges', 'rlnPipeLineEdgeToNode'])
         for output_file in job_star["pipeline_output_edges"]['rlnPipeLineEdgeToNode']:
             if output_file.endswith("_model.star"):
                 found = output_file
@@ -912,13 +918,13 @@ def run_pipeline(opts):
                     os.system(command)
 
 
-            print ' RELION_IT: now entering an infinite loop for batch-processing of particles. You can stop this loop by deleting the file',RUNNING_FILE
+            print ' RELION_IT: now entering an infinite loop for batch-processing of particles. You can stop this loop by deleting the file', RUNNING_FILE
             
             # It could be that this is a restart, so check previous_batch1_size in the output directory.
             # Also check the presence of class2d_job_batch_001 in case the first job was not submitted yet.
             if getJobName("class2d_job_batch_001", SETUP_CHECK_FILE) is not None and \
                os.path.isfile(split_job + 'particles_split001.star'):
-                batch1 = safe_load_star(split_job + 'particles_split001.star')
+                batch1 = safe_load_star(split_job + 'particles_split001.star', expected=['', 'rlnMicrographName'])
                 previous_batch1_size = len(batch1['']['rlnMicrographName'])
             else:
                 previous_batch1_size = 0
@@ -932,7 +938,7 @@ def run_pipeline(opts):
                     iibatch = ibatch + 1
                     batch_name = split_job + 'particles_split%03d.star' % iibatch
 
-                    batch = safe_load_star(batch_name)
+                    batch = safe_load_star(batch_name, expected=['', 'rlnMicrographName'])
                     batch_size = len(batch['']['rlnMicrographName'])
                     rerun_batch1 = False
                     if ( iibatch == 1 and batch_size > previous_batch1_size and batch_size > opts.minimum_batch_size ):
