@@ -2114,7 +2114,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	// wsum_sigma2_offset is just a RFLOAT
 	thr_wsum_sigma2_offset = 0.;
 	unsigned long image_size = op.Fimg[0].nzyxdim;
-
 	CTOC(accMLO->timer,"store_init");
 
 	/*=======================================================================================
@@ -2145,7 +2144,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		int group_id = baseMLO->mydata.getGroupId(op.part_id, img_id);
 		const int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, img_id);
 		RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id, img_id);
-
 
 		CTIC(accMLO->timer,"collect_data_2_pre_kernel");
 		for (unsigned long exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
@@ -2823,18 +2821,18 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			}
 			AAXA_pos += image_size;
 		} // end loop iclass
+
 		for (unsigned long j = 0; j < image_size; j++)
 		{
 			int ires = DIRECT_MULTIDIM_ELEM(baseMLO->Mresol_fine[optics_group], j);
 			if (ires > -1)
 			{
-				thr_wsum_sigma2_noise[group_id].data[ires] += (RFLOAT) wdiff2s_sum[j];
+				thr_wsum_sigma2_noise[img_id].data[ires] += (RFLOAT) wdiff2s_sum[j];
 				exp_wsum_norm_correction[img_id] += (RFLOAT) wdiff2s_sum[j]; //TODO could be gpu-reduced
 			}
 		}
 	} // end loop img_id
 	CTOC(accMLO->timer,"maximization");
-
 
 	CTIC(accMLO->timer,"store_post_gpu");
 
@@ -2853,7 +2851,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		// If the current images were smaller than the original size, fill the rest of wsum_model.sigma2_noise with the power_class spectrum of the images
 		for (unsigned long ires = baseMLO->image_current_size[optics_group]/2 + 1; ires < baseMLO->image_full_size[optics_group]/2 + 1; ires++)
 		{
-			DIRECT_A1D_ELEM(thr_wsum_sigma2_noise[group_id], ires) += DIRECT_A1D_ELEM(op.power_img[img_id], ires);
+			DIRECT_A1D_ELEM(thr_wsum_sigma2_noise[img_id], ires) += DIRECT_A1D_ELEM(op.power_img[img_id], ires);
 			// Also extend the weighted sum of the norm_correction
 			exp_wsum_norm_correction[img_id] += DIRECT_A1D_ELEM(op.power_img[img_id], ires);
 		}
