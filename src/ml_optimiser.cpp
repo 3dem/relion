@@ -4470,7 +4470,6 @@ void MlOptimiser::updateImageSizeAndResolutionPointers()
 				Npix_per_shell[optics_group](ires) += 1;
 		}
 
-		std::cerr << " optics_group= " << optics_group << " image_current_size[optics_group]= " << image_current_size[optics_group] << " image_coarse_size[optics_group]= " << image_coarse_size[optics_group] << std::endl;
 		if (mymodel.data_dim == 3)
 			Mresol_fine[optics_group].resize(image_current_size[optics_group], image_current_size[optics_group], (image_current_size[optics_group] / 2 + 1));
 		else

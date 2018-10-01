@@ -2930,8 +2930,11 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			baseMLO->wsum_model.sigma2_noise[igroup] += thr_wsum_sigma2_noise[img_id];
 			baseMLO->wsum_model.sumw_group[igroup] += thr_sumw_group[img_id];
-			baseMLO->wsum_model.wsum_signal_product_spectra[igroup] += thr_wsum_signal_product_spectra[img_id];
-			baseMLO->wsum_model.wsum_reference_power_spectra[igroup] += thr_wsum_reference_power_spectra[img_id];
+			if (baseMLO->do_scale_correction)
+			{
+				baseMLO->wsum_model.wsum_signal_product_spectra[igroup] += thr_wsum_signal_product_spectra[img_id];
+				baseMLO->wsum_model.wsum_reference_power_spectra[igroup] += thr_wsum_reference_power_spectra[img_id];
+			}
 		}
 		for (int n = 0; n < baseMLO->mymodel.nr_classes; n++)
 		{
