@@ -660,7 +660,6 @@ void getFourierTransformsAndCtfs(long int part_id,
 			op.highres_Xi2_img.at(img_id) = 0.;
 		}
 		CTOC(accMLO->timer,"powerClass");
-		std::cerr << " part_id= " << part_id <<" x= "<<current_size_x<< " ftsize= " << accMLO->transformer1.fouriers.getSize() << " currsize= " << baseMLO->image_current_size[optics_group] << " full_size= " << baseMLO->image_full_size[optics_group] << " op.highres_Xi2_img.size()= " << op.highres_Xi2_img.size() << " op.highres_Xi2_img[op.highres_Xi2_img.size()-1]= " << op.highres_Xi2_img[op.highres_Xi2_img.size()-1] << std::endl;
 
 		Fctf.resize(Fimg);
 		// Now calculate the actual CTF
@@ -1125,7 +1124,6 @@ void getAllSquaredDifferencesCoarse(
 		op.min_diff2[img_id] = AccUtilities::getMinOnDevice<XFLOAT>(allWeights);
 
 	} // end loop img_id
-	std::cerr << " op.part_id= " << op.part_id << " op.min_diff2[0]= " << op.min_diff2[0] << std::endl;
 
 #ifdef TIMING
 	if (op.part_id == baseMLO->exp_my_first_part_id))
