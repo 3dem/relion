@@ -133,6 +133,66 @@ void StarConverter::convert_3p0_particlesTo_3p1(
 	outOptics.setName("optics");
 	outOptics.setVersion(outVer);
 
+
+	// Also read in one image for each optics group to set the image sizes in the outOptics table
+	// Also set the image_size for each optics_group
+	int nr_optics_groups_found = 0;
+	int nr_optics_groups = groupValues_double.size();
+	std::vector<bool> found_this_group;
+	found_this_group.resize(nr_optics_groups, false);
+	for (long int p = 0; p < particleCount; p++)
+	{
+		int g = opticsClasses[p];
+		if (!found_this_group[g])
+		{
+			FileName fn_img;
+			if (!outParticles.getValue(EMDL_IMAGE_NAME, fn_img, p))
+			{
+				REPORT_ERROR("BUG: cannot find name for particle...");
+			}
+			Image<double> img;
+			img.read(fn_img, false); //false means read only header, skip real data
+			int image_size = img().xdim;
+			if (image_size%2 != 0)
+			{
+				REPORT_ERROR("ERROR: this program only works with even values for the image dimensions!");
+			}
+			if (image_size != img().ydim)
+			{
+				REPORT_ERROR("ERROR: xsize != ysize: only square eD images allowed");
+			}
+			outOptics.setValue(EMDL_IMAGE_SIZE, image_size, g);
+			found_this_group[g] = true;
+			nr_optics_groups_found++;
+			if (img().zdim > 1)
+			{
+				if (image_size != img().zdim)
+				{
+					REPORT_ERROR("ERROR: xsize != zsize: only cube 3D images allowed");
+				}
+				outOptics.setValue(EMDL_IMAGE_DIMENSIONALITY, 3, g);
+			}
+			else
+			{
+				outOptics.setValue(EMDL_IMAGE_DIMENSIONALITY, 2, g);
+			}
+		}
+
+		if (nr_optics_groups_found == nr_optics_groups)
+		{
+			break;
+		}
+	}
+
+
+	if (nr_optics_groups_found != nr_optics_groups)
+	{
+		REPORT_ERROR("BUG: something went wrong with finding the optics groups...");
+	}
+
+
+
+
 }
 
 void StarConverter::unifyPixelSize(MetaDataTable& outOptics)

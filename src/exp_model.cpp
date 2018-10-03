@@ -1080,68 +1080,14 @@ void Experiment::read(
 		}
 	}
 
+	// Set is_3D from MDopt
+	int mydim;
+	MDopt.getValue(EMDL_IMAGE_DIMENSIONALITY, mydim, 0);
+	is_3D = (mydim == 3);
+
 #ifdef DEBUG_READ
 	timer.toc(tdef);
 	std::cerr << "Done setting defaults MDimg" << std::endl;
-	timer.tic(tend);
-	//std::cerr << "Press any key to continue..." << std::endl;
-	//std::cin >> c;
-#endif
-
-	// Also set the image_size for each optics_group
-	int nr_optics_groups_found = 0;
-	std::vector<bool> found_this_group;
-	found_this_group.resize(numberOfOpticsGroups(), false);
-	for (long int part_id = 0; part_id < particles.size(); part_id++)
-	{
-		for (int img_id = 0; img_id < numberOfImagesInParticle(part_id); img_id++)
-		{
-			int optics_group = getOpticsGroup(part_id, img_id);
-			if (!found_this_group[optics_group])
-			{
-				FileName fn_img = particles[part_id].images[img_id].name;
-				Image<RFLOAT> img;
-				img.read(fn_img, false); //false means read only header, skip real data
-				int image_size = XSIZE(img());
-				if (image_size%2 != 0)
-					REPORT_ERROR("ERROR: this program only works with even values for the image dimensions!");
-
-				if (image_size != YSIZE(img()))
-					REPORT_ERROR("Experiment::read: xsize != ysize: only squared images allowed");
-				MDopt.setValue(EMDL_IMAGE_SIZE, image_size, optics_group);
-				found_this_group[optics_group] = true;
-				nr_optics_groups_found++;
-				if (ZSIZE(img()) > 1)
-				{
-					if (image_size != ZSIZE(img()))
-						REPORT_ERROR("Experiment::read: xsize != zsize: only cubed images allowed");
-					is_3D = true;
-					MDopt.setValue(EMDL_IMAGE_DIMENSIONALITY, 3, optics_group);
-				}
-				else
-				{
-					is_3D = false;
-					MDopt.setValue(EMDL_IMAGE_DIMENSIONALITY, 2, optics_group);
-				}
-			}
-			if (nr_optics_groups_found == numberOfOpticsGroups())
-			{
-				break;
-			}
-		}
-		if (nr_optics_groups_found == numberOfOpticsGroups())
-		{
-			break;
-		}
-	}
-
-	if (nr_optics_groups_found != numberOfOpticsGroups())
-	{
-		REPORT_ERROR("BUG: something went wrong with finding the optics groups...");
-	}
-
-#ifdef DEBUG_READ
-	timer.toc(tend);
 	timer.toc(tall);
 	timer.printTimes(false);
 	//std::cerr << "Writing out debug_data.star" << std::endl;
