@@ -4422,7 +4422,7 @@ void MlOptimiser::updateImageSizeAndResolutionPointers()
 
 		image_full_size[optics_group] = mydata.getOpticsImageSize(optics_group);
 		// Current size can never become bigger than original image size for this optics_group!
-		image_current_size[optics_group] = XMIPP_MIN(image_full_size[optics_group], mymodel.current_size * mymodel.pixel_size / my_pixel_size);
+		image_current_size[optics_group] = XMIPP_MIN(image_full_size[optics_group], ROUND((RFLOAT)(mymodel.current_size) * (mymodel.pixel_size / my_pixel_size)));
 
 		// This is no longer the strictly the same resolution for all optics groups.... Not used much anyway...
 		int my_max_coarse_size = (max_coarse_size > 0) ?  max_coarse_size : image_full_size[optics_group];
@@ -4431,7 +4431,7 @@ void MlOptimiser::updateImageSizeAndResolutionPointers()
 		if (strict_highres_exp > 0.)
 		{
 			// Strictly limit the coarse size to the one corresponding to strict_highres_exp
-			image_coarse_size[optics_group] = 2 * ROUND(image_full_size[optics_group] * my_pixel_size / strict_highres_exp);
+			image_coarse_size[optics_group] = 2 * ROUND((RFLOAT)(image_full_size[optics_group]) * (my_pixel_size / strict_highres_exp));
 		}
 		else if (adaptive_oversampling > 0.)
 		{
@@ -4440,7 +4440,7 @@ void MlOptimiser::updateImageSizeAndResolutionPointers()
 			RFLOAT keepsafe_factor = (mymodel.ref_dim == 3) ? 1.2 : 1.5;
 			RFLOAT coarse_resolution = rotated_distance / keepsafe_factor;
 			// Note coarse_size should be even-valued!
-			image_coarse_size[optics_group] = 2 * CEIL(my_pixel_size * image_full_size[optics_group] / coarse_resolution);
+			image_coarse_size[optics_group] = 2 * CEIL(my_pixel_size * (RFLOAT)(image_full_size[optics_group]) / coarse_resolution);
 			// Coarse size can never be larger than max_coarse_size
 			image_coarse_size[optics_group] = XMIPP_MIN(my_max_coarse_size, image_coarse_size[optics_group]);
 		}
@@ -5457,6 +5457,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 			exp_current_image_size = image_current_size[optics_group];
 		bool do_ctf_invsig = (exp_local_Fctf.size() > 0) ? YSIZE(exp_local_Fctf[0])  != exp_current_image_size : true; // size has changed
 		bool do_masked_shifts = (do_ctf_invsig || nr_shifts != exp_local_Fimgs_shifted[img_id].size()); // size or nr_shifts has changed
+
 
 		if (do_masked_shifts)
 		{
