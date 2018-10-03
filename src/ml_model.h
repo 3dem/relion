@@ -388,9 +388,6 @@ public:
 	// Initialise vectors with the right size
 	void initialise(bool _do_sgd = false);
 
-	// Set spectral sizes of all groups in the Experiment
-	void setSpectralSizes(Experiment &mydata);
-
 	//Read a model from a file
 	void read(FileName fn_in);
 
