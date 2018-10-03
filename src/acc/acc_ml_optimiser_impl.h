@@ -611,7 +611,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 		// ------------------------------------------------------------------------------------------
 
 		CTIC(accMLO->timer,"powerClass");
-		// Store the power_class spectrum of the whole image (to fill sigma2_noise between current_size and ori_size
+		// Store the power_class spectrum of the whole image (to fill sigma2_noise between current_size and full_size
 		if (baseMLO->image_current_size[optics_group] < baseMLO->image_full_size[optics_group])
 		{
 			AccPtr<XFLOAT> spectrumAndXi2 = ptrFactory.make<XFLOAT>((size_t)((baseMLO->image_full_size[optics_group]/2+1)+1), 0); // last +1 is the Xi2, to remove an expensive memcpy
@@ -660,6 +660,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 			op.highres_Xi2_img.at(img_id) = 0.;
 		}
 		CTOC(accMLO->timer,"powerClass");
+		std::cerr << " part_id= " << part_id <<" x= "<<current_size_x<< " ftsize= " << accMLO->transformer1.fouriers.getSize() << " currsize= " << baseMLO->image_current_size[optics_group] << " full_size= " << baseMLO->image_full_size[optics_group] << " op.highres_Xi2_img.size()= " << op.highres_Xi2_img.size() << " op.highres_Xi2_img[op.highres_Xi2_img.size()-1]= " << op.highres_Xi2_img[op.highres_Xi2_img.size()-1] << std::endl;
 
 		Fctf.resize(Fimg);
 		// Now calculate the actual CTF
@@ -717,7 +718,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 					DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_CTF_KFACTOR),
 					DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_CTF_PHASE_SHIFT));
 
-				ctf.getFftwImage(Fctf, baseMLO->image_full_size[optics_group], baseMLO->image_full_size[optics_group], baseMLO->mymodel.pixel_size,
+				ctf.getFftwImage(Fctf, baseMLO->image_full_size[optics_group], baseMLO->image_full_size[optics_group], my_pixel_size,
 						baseMLO->ctf_phase_flipped, baseMLO->only_flip_phases, baseMLO->intact_ctf_first_peak, true);
 				CTIC(accMLO->timer,"CTFRead2D");
 			}
@@ -885,8 +886,6 @@ void getAllSquaredDifferencesCoarse(
 			sp.itrans_min, sp.itrans_max, op.Fimg, dummy, op.Fctf, dummy2, dummy2,
 			op.local_Fctf, op.local_sqrtXi2, op.local_Minvsigma2);
 
-	unsigned long image_size = op.local_Minvsigma2[0].nzyxdim;
-
 	CTOC(accMLO->timer,"diff_pre_gpu");
 
 	std::vector< AccProjectorPlan > projectorPlans(0, (CudaCustomAllocator *)accMLO->getAllocator());
@@ -970,6 +969,7 @@ void getAllSquaredDifferencesCoarse(
 		long int group_id = baseMLO->mydata.getGroupId(op.part_id, img_id);
 		RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id, img_id);
 		int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, img_id);
+		unsigned long image_size = op.local_Minvsigma2[img_id].nzyxdim;
 
 		/*====================================
 				Generate Translations
@@ -1022,7 +1022,8 @@ void getAllSquaredDifferencesCoarse(
 		XFLOAT scale_correction = baseMLO->do_scale_correction ? baseMLO->mymodel.scale_correction[group_id] : 1;
 
 		MultidimArray<Complex > Fimg;
-		windowFourierTransform(op.Fimg[img_id], Fimg, baseMLO->image_current_size[optics_group]); //TODO PO isen't this already done in getFourierTransformsAndCtfs?
+		// Size could be coarse_size, or perhaps current_size?
+		windowFourierTransform(op.Fimg[img_id], Fimg, baseMLO->image_coarse_size[optics_group]);
 
 		for (unsigned long i = 0; i < image_size; i ++)
 		{
@@ -1039,6 +1040,8 @@ void getAllSquaredDifferencesCoarse(
 			Fimg_real[i] = Fimg.data[i].real * pixel_correction;
 			Fimg_imag[i] = Fimg.data[i].imag * pixel_correction;
 		}
+		//std::cerr << " Fimg_real[100]= " << Fimg_real[100] << " Fimg_imag[100]= " << Fimg_imag[100] << "image_size" <<image_size << " xsize(Fimg)= "<< XSIZE(Fimg)
+		//		<< " baseMLO->image_current_size[optics_group]="<< baseMLO->image_current_size[optics_group]<< " baseMLO->image_coarse_size[optics_group]="<< baseMLO->image_coarse_size[optics_group]<<" baseMLO->mymodel.current_size= " << baseMLO->mymodel.current_size<< std::endl;
 
 		trans_x.cpToDevice();
 		trans_y.cpToDevice();
@@ -1122,6 +1125,7 @@ void getAllSquaredDifferencesCoarse(
 		op.min_diff2[img_id] = AccUtilities::getMinOnDevice<XFLOAT>(allWeights);
 
 	} // end loop img_id
+	std::cerr << " op.part_id= " << op.part_id << " op.min_diff2[0]= " << op.min_diff2[0] << std::endl;
 
 #ifdef TIMING
 	if (op.part_id == baseMLO->exp_my_first_part_id))
@@ -1161,10 +1165,7 @@ void getAllSquaredDifferencesFine(
 			sp.itrans_min, sp.itrans_max, op.Fimg, dummy, op.Fctf, dummy2, dummy2,
 			op.local_Fctf, op.local_sqrtXi2, op.local_Minvsigma2);
 	CTOC(accMLO->timer,"precalculateShiftedImagesCtfsAndInvSigma2s");
-	MultidimArray<Complex > Fref;
-	Fref.resize(op.local_Minvsigma2[0]);
 
-	unsigned long image_size = op.local_Minvsigma2[0].nzyxdim;
 
 	CTOC(accMLO->timer,"diff_pre_gpu");
 
@@ -1180,6 +1181,9 @@ void getAllSquaredDifferencesFine(
 		long int group_id = baseMLO->mydata.getGroupId(op.part_id, img_id);
 		RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id, img_id);
 		int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, img_id);
+		unsigned long image_size = op.local_Minvsigma2[img_id].nzyxdim;
+		MultidimArray<Complex > Fref;
+		Fref.resize(op.local_Minvsigma2[img_id]);
 
 		/*====================================
 				Generate Translations
@@ -1412,10 +1416,10 @@ void getAllSquaredDifferencesFine(
 				CTIC(accMLO->timer,"Diff2MakeKernel");
 				AccProjectorKernel projKernel = AccProjectorKernel::makeKernel(
 						accMLO->bundle->projectors[iproj],
-						op.local_Minvsigma2[0].xdim,
-						op.local_Minvsigma2[0].ydim,
-						op.local_Minvsigma2[0].zdim,
-						op.local_Minvsigma2[0].xdim-1);
+						op.local_Minvsigma2[img_id].xdim,
+						op.local_Minvsigma2[img_id].ydim,
+						op.local_Minvsigma2[img_id].zdim,
+						op.local_Minvsigma2[img_id].xdim-1);
 				CTOC(accMLO->timer,"Diff2MakeKernel");
 
 				// Use the constructed mask to construct a partial class-specific input
@@ -2113,7 +2117,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	}
 	// wsum_sigma2_offset is just a RFLOAT
 	thr_wsum_sigma2_offset = 0.;
-	unsigned long image_size = op.Fimg[0].nzyxdim;
 	CTOC(accMLO->timer,"store_init");
 
 	/*=======================================================================================
@@ -2128,6 +2131,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 	for (int img_id = 0; img_id < sp.nr_images; img_id++)
 	{
+		unsigned long image_size = op.Fimg[img_id].nzyxdim;
+
 		// Allocate space for all classes, so that we can pre-calculate data for all classes, copy in one operation, call kenrels on all classes, and copy back in one operation
 		AccPtr<XFLOAT>          oo_otrans_x = ptrFactory.make<XFLOAT>((size_t)nr_fake_classes*nr_transes); // old_offset_oversampled_trans_x
 		AccPtr<XFLOAT>          oo_otrans_y = ptrFactory.make<XFLOAT>((size_t)nr_fake_classes*nr_transes);
@@ -2435,6 +2440,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		int group_id = baseMLO->mydata.getGroupId(op.part_id, img_id);
 		const int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, img_id);
 		RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id, img_id);
+		unsigned long image_size = op.Fimg[img_id].nzyxdim;
 
 
 		/*======================================================
@@ -2713,10 +2719,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			AccProjectorKernel projKernel = AccProjectorKernel::makeKernel(
 					accMLO->bundle->projectors[iproj],
-					op.local_Minvsigma2[0].xdim,
-					op.local_Minvsigma2[0].ydim,
-					op.local_Minvsigma2[0].zdim,
-					op.local_Minvsigma2[0].xdim-1);
+					op.local_Minvsigma2[img_id].xdim,
+					op.local_Minvsigma2[img_id].ydim,
+					op.local_Minvsigma2[img_id].zdim,
+					op.local_Minvsigma2[img_id].xdim-1);
 
 			runWavgKernel(
 					projKernel,
@@ -2769,9 +2775,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				(XFLOAT) op.significant_weight[img_id],
 				(XFLOAT) op.sum_weight[img_id],
 				~eulers[iclass],
-				op.local_Minvsigma2[0].xdim,
-				op.local_Minvsigma2[0].ydim,
-				op.local_Minvsigma2[0].zdim,
+				op.local_Minvsigma2[img_id].xdim,
+				op.local_Minvsigma2[img_id].ydim,
+				op.local_Minvsigma2[img_id].zdim,
 				orientation_num,
 				accMLO->dataIs3D,
 				baseMLO->do_sgd,
