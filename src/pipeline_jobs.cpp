@@ -1601,7 +1601,7 @@ The samplings are approximate numbers and vary slightly over the sphere.\n\n For
 
 	joboptions["shrink"] = JobOption("Shrink factor:", 1, 0, 1, 0.1, "This is useful to speed up the calculations, and to make them less memory-intensive. The micrographs will be downscaled (shrunk) to calculate the cross-correlations, and peak searching will be done in the downscaled FOM maps. When set to 0, the micrographs will de downscaled to the lowpass filter of the references, a value between 0 and 1 will downscale the micrographs by that factor. Note that the results will not be exactly the same when you shrink micrographs!\
 \n\nIn the Laplacian-of-Gaussian picker, this option is ignored and the shrink factor always becomes 0.");
-	joboptions["use_gpu"] = JobOption("Use GPU acceleration?", false, "If set to Yes, the job will try to use GPU acceleration.");
+	joboptions["use_gpu"] = JobOption("Use GPU acceleration?", false, "If set to Yes, the job will try to use GPU acceleration. The Laplacian-of-Gaussian picker does not support GPU.");
 	joboptions["gpu_ids"] = JobOption("Which GPUs to use:", std::string(""), "This argument is not necessary. If left empty, the job itself will try to allocate available GPU resources. You can override the default allocation by providing a list of which GPUs (0,1,2,3, etc) to use. MPI-processes are separated by ':'. For example: 0:1:0:1:0:1");
 
 	joboptions["do_pick_helical_segments"] = JobOption("Pick 2D helical segments?", false, "Set to Yes if you want to pick 2D helical segments.");
@@ -1655,6 +1655,12 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 
 	if (joboptions["do_log"].getBoolean())
 	{
+		if (joboptions["use_gpu"].getBoolean())
+		{
+			error_message ="ERROR: The Laplacian-of-Gaussian picker does not support GPU.";
+			return false;
+		}
+
 		command += " --LoG ";
 		command += " --LoG_diam_min " + joboptions["log_diam_min"].getString();
 		command += " --LoG_diam_max " + joboptions["log_diam_max"].getString();

@@ -84,14 +84,24 @@ void MagnificationEstimator::processMicrograph(
 						 << "MagnificationEstimator not initialized.");
 	}
 	
-	std::vector<Volume<Equation2x2>> magEqs(nr_omp_threads);
+	const int pc = mdt.numberOfObjects();
 	
-	for (int i = 0; i < nr_omp_threads; i++)
+	std::vector<int> optGroups = obsModel->getOptGroupsPresent(mdt);	
+	const int cc = optGroups.size();
+	
+	std::vector<int> groupToIndex(obsModel->numberOfOpticsGroups()+1, -1);
+	
+	for (int i = 0; i < cc; i++)
+	{
+		groupToIndex[optGroups[i]] = i;
+	}
+	
+	std::vector<Volume<Equation2x2>> magEqs(nr_omp_threads*cc);
+	
+	for (int i = 0; i < nr_omp_threads*cc; i++)
 	{
 		magEqs[i] = Volume<Equation2x2>(sh,s,1);
 	}
-	
-	const int pc = mdt.numberOfObjects();
 	
 	#pragma omp parallel for num_threads(nr_omp_threads)
 	for (long p = 0; p < pc; p++)
@@ -100,19 +110,32 @@ void MagnificationEstimator::processMicrograph(
 		ctf.readByGroup(mdt, obsModel, p);
 		
 		int threadnum = omp_get_thread_num();
-	
-		MagnificationHelper::updateScaleFreq(
-			pred[p], predGradient[p], obs[p], ctf, angpix, magEqs[threadnum]);
-	}
-	
-	for (int i = 1; i < nr_omp_threads; i++)
-	{
-		magEqs[0] += magEqs[i];
-	}
-	
-	std::string outRoot = CtfRefiner::getOutputFilenameRoot(mdt, outPath);
 		
-	MagnificationHelper::writeEQs(magEqs[0], outRoot+"_mag");
+		int og;
+		mdt.getValue(EMDL_IMAGE_OPTICS_GROUP, og, p);
+
+		const int ci = groupToIndex[og];
+		
+		MagnificationHelper::updateScaleFreq(
+			pred[p], predGradient[p], obs[p], ctf, angpix, magEqs[cc*threadnum + ci]);
+	}
+	
+	for (int ci = 0; ci < cc; ci++)
+	{
+		Volume<Equation2x2> magEq(sh,s,1);
+				
+		for (int threadnum = 0; threadnum < nr_omp_threads; threadnum++)
+		{
+			magEq += magEqs[cc*threadnum + ci];
+		}
+		
+		std::string outRoot = CtfRefiner::getOutputFilenameRoot(mdt, outPath);
+		
+		std::stringstream sts;
+		sts << optGroups[ci];
+		
+		MagnificationHelper::writeEQs(magEq, outRoot+"_mag_optics-class_" + sts.str());
+	}
 }
 
 void MagnificationEstimator::parametricFit(
@@ -129,64 +152,80 @@ void MagnificationEstimator::parametricFit(
 		std::cout << " + Fitting anisotropic magnification ..." << std::endl;
 	}
 	
-	Volume<Equation2x2> magEqs(sh,s,1), magEqsG(sh,s,1);
-	
 	const int gc = mdts.size();
-				
-	for (long g = 0; g < gc; g++)
+	const int ogc = obsModel->numberOfOpticsGroups();
+	
+	std::vector<Matrix2D<RFLOAT>> mat_by_optGroup(ogc);
+	
+	for (int og = 0; og < ogc; og++)
 	{
-		std::string outRoot = CtfRefiner::getOutputFilenameRoot(mdts[g], outPath);
+		Volume<Equation2x2> magEqs(sh,s,1), magEqsG(sh,s,1);
 		
-		MagnificationHelper::readEQs(outRoot+"_mag", magEqsG);
+		std::stringstream sts;
+		sts << (og+1);
 		
-		magEqs += magEqsG;
+		for (long g = 0; g < gc; g++)
+		{
+			std::string outRoot = CtfRefiner::getOutputFilenameRoot(mdts[g], outPath);
+			
+			try
+			{
+				MagnificationHelper::readEQs(outRoot + "_mag_optics-class_" + sts.str(), magEqsG);
+			
+				magEqs += magEqsG;
+			}
+			catch (RelionError e)
+			{}
+		}
+		
+		Image<RFLOAT> flowx, flowy;
+		MagnificationHelper::solvePerPixel(magEqs, flowx, flowy);
+			
+		Image<RFLOAT> flowxFull, flowyFull;
+		FftwHelper::decenterUnflip2D(flowx.data, flowxFull.data);
+		FftwHelper::decenterUnflip2D(flowy.data, flowyFull.data);
+		
+		ImageLog::write(flowxFull, outPath + "mag_disp_x_optics-class_" + sts.str());
+		ImageLog::write(flowyFull, outPath + "mag_disp_y_optics-class_" + sts.str());
+		
+		Image<RFLOAT> freqWght = reference->getHollowWeight(kmin);
+		
+		Matrix2D<RFLOAT> mat = MagnificationHelper::solveLinearlyFreq(magEqs, freqWght, flowx, flowy);
+		
+		FftwHelper::decenterUnflip2D(flowx.data, flowxFull.data);
+		FftwHelper::decenterUnflip2D(flowy.data, flowyFull.data);
+		
+		ImageLog::write(flowxFull, outPath + "mag_disp_x_fit_optics-class_" + sts.str());
+		ImageLog::write(flowyFull, outPath + "mag_disp_y_fit_optics-class_" + sts.str());
+		
+		std::ofstream os(outPath + "mag_matrix_optics-class_" + sts.str() + ".txt");
+		os << mat(0,0) << " " << mat(0,1) << "\n";
+		os << mat(1,0) << " " << mat(1,1) << "\n";
+		os.close();
+		
+		mat_by_optGroup[og] = mat;
+		
+		// @TODO: Add support for optics groups!
+		
+		Matrix2D<RFLOAT> mat0(2,2);
+		mat0.initIdentity();
+		
+		optOut.getValue(EMDL_IMAGE_MAG_MATRIX_00, mat0(0,0), 0);
+		optOut.getValue(EMDL_IMAGE_MAG_MATRIX_01, mat0(0,1), 0);
+		optOut.getValue(EMDL_IMAGE_MAG_MATRIX_10, mat0(1,0), 0);
+		optOut.getValue(EMDL_IMAGE_MAG_MATRIX_11, mat0(1,1), 0);
+		
+		Matrix2D<RFLOAT> mat1 = mat * mat0;
+		
+		optOut.setValue(EMDL_IMAGE_MAG_MATRIX_00, mat1(0,0), 0);
+		optOut.setValue(EMDL_IMAGE_MAG_MATRIX_01, mat1(0,1), 0);
+		optOut.setValue(EMDL_IMAGE_MAG_MATRIX_10, mat1(1,0), 0);
+		optOut.setValue(EMDL_IMAGE_MAG_MATRIX_11, mat1(1,1), 0);		
 	}
-	
-	Image<RFLOAT> flowx, flowy;
-	MagnificationHelper::solvePerPixel(magEqs, flowx, flowy);
-		
-	Image<RFLOAT> flowxFull, flowyFull;
-	FftwHelper::decenterUnflip2D(flowx.data, flowxFull.data);
-	FftwHelper::decenterUnflip2D(flowy.data, flowyFull.data);
-	
-	ImageLog::write(flowxFull, outPath + "mag_disp_x");
-	ImageLog::write(flowyFull, outPath + "mag_disp_y");
-	
-	Image<RFLOAT> freqWght = reference->getHollowWeight(kmin);
-	
-	Matrix2D<RFLOAT> mat = MagnificationHelper::solveLinearlyFreq(magEqs, freqWght, flowx, flowy);
-	
-	FftwHelper::decenterUnflip2D(flowx.data, flowxFull.data);
-	FftwHelper::decenterUnflip2D(flowy.data, flowyFull.data);
-	
-	ImageLog::write(flowxFull, outPath + "mag_disp_x_fit");
-	ImageLog::write(flowyFull, outPath + "mag_disp_y_fit");
-	
-	std::ofstream os(outPath + "mag_matrix.txt");
-	os << mat(0,0) << " " << mat(0,1) << "\n";
-	os << mat(1,0) << " " << mat(1,1) << "\n";
-	os.close();
-	
-	// @TODO: Add support for optics groups!
-	
-	Matrix2D<RFLOAT> mat0(2,2);
-	mat0.initIdentity();
-	
-	optOut.getValue(EMDL_IMAGE_MAG_MATRIX_00, mat0(0,0), 0);
-	optOut.getValue(EMDL_IMAGE_MAG_MATRIX_01, mat0(0,1), 0);
-	optOut.getValue(EMDL_IMAGE_MAG_MATRIX_10, mat0(1,0), 0);
-	optOut.getValue(EMDL_IMAGE_MAG_MATRIX_11, mat0(1,1), 0);
-	
-	Matrix2D<RFLOAT> mat1 = mat * mat0;
-	
-	optOut.setValue(EMDL_IMAGE_MAG_MATRIX_00, mat1(0,0), 0);
-	optOut.setValue(EMDL_IMAGE_MAG_MATRIX_01, mat1(0,1), 0);
-	optOut.setValue(EMDL_IMAGE_MAG_MATRIX_10, mat1(1,0), 0);
-	optOut.setValue(EMDL_IMAGE_MAG_MATRIX_11, mat1(1,1), 0);
 	
 	if (adaptAstig)
 	{
-		MagnificationHelper::adaptAstigmatism(mat, mdts, !perMgAstig);
+		MagnificationHelper::adaptAstigmatism(mat_by_optGroup, mdts, !perMgAstig, obsModel);
 	}
 }
 

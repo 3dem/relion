@@ -53,7 +53,7 @@ void joinMultipleEPSIntoSinglePDF(FileName fn_pdf, std::vector<FileName> fn_eps)
     bool have_error_in_gs = false;
     if (have_at_least_one)
     {
-		command += " > /dev/null &";
+		command += " > /dev/null";
 
 		if (system(command.c_str()))
 		{

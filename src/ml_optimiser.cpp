@@ -4294,8 +4294,7 @@ void MlOptimiser::updateCurrentResolution()
 					int ires;
 					for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 					{
-						int iclass_body = (mymodel.nr_bodies > 1) ? ibody : iclass;
-
+						int iclass_body = (mymodel.nr_bodies > 1) ? ibody: iclass;
 						for (ires = 1; ires < mymodel.ori_size/2; ires++)
 						{
 							if (DIRECT_A1D_ELEM(mymodel.data_vs_prior_class[iclass_body], ires) < 1.)

@@ -730,7 +730,7 @@ class star_handler_parameters
 			std::cout << " + Assuming the pixel size of original micrographs before extraction is also " << extract_angpix << std::endl;
 		}
 
-		RFLOAT scale = extract_angpix / particle_angpix;
+		RFLOAT scale = particle_angpix / extract_angpix;
 		RFLOAT duplicate_threshold_in_px = duplicate_threshold / extract_angpix;
 
 		std::cout << " + The minimum inter-particle distance " << duplicate_threshold << " A corresponds to " << duplicate_threshold_in_px << " px in the micrograph coordinate (rlnCoordinateX/Y)." << std::endl;
