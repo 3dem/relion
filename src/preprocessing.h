@@ -51,6 +51,11 @@ public:
 	// Does the input micrograph STAR file have CTF information?
 	bool star_has_ctf;
 
+	// If input micrograph STAR file has CTF and so does input particle STAR (fn_data), then
+	// by default the fn_data CTF parameters will be in the output particles.star file (as they could have been refined in ctf_refine)
+	// Use the option below to let the micrographs_ctf.star CTF parameters be output. (This is useful for example, when CTF estimation has been re-run with a calibrated pixel size)
+	bool keep_ctf_from_micrographs;
+
 	/////////////////? Do phase flipping?
 	bool do_phase_flip;
 	bool do_premultiply_ctf;

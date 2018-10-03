@@ -54,6 +54,7 @@ void Preprocessing::read(int argc, char **argv, int rank)
 	fn_part_star = parser.getOption("--part_star", "Output STAR file with all particles metadata", "");
 	fn_list_star = parser.getOption("--list_star", "Output STAR file with a list to the output STAR files of individual micrographs", "");
 	fn_data = parser.getOption("--reextract_data_star", "A _data.star file from a refinement to re-extract, e.g. with different binning or re-centered (instead of --coord_suffix)", "");
+	keep_ctf_from_micrographs  = parser.checkOption("--keep_ctfs_micrographs", "By default, CTFs from fn_data will be kept. Use this flag to keep CTFs from input micrographs STAR file");
 	do_reset_offsets = parser.checkOption("--reset_offsets", "reset the origin offsets from the input _data.star file to zero?");
 	do_recenter = parser.checkOption("--recenter", "Re-center particle according to rlnOriginX/Y in --reextract_data_star STAR file");
 	recenter_x = textToFloat(parser.getOption("--recenter_x", "X-coordinate (in pixel inside the reference) to recenter re-extracted data on", "0."));
@@ -997,7 +998,7 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 				}
 
 				// Only set CTF parameters from the micrographs STAR file if the input STAR file did not contain it!
-				if (!MDin_has_ctf)
+				if (!MDin_has_ctf || keep_ctf_from_micrographs)
 				{
 					ctf.write(MD);
 				}
