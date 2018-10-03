@@ -567,6 +567,9 @@ bool decomposePipelineSymlinkName(FileName fn_in, FileName &fn_pre, FileName &fn
 			linkname[len - 1] = '\0'; // remove trailing '/'	
 	    	linkname[len] = '\0';
 	    	FileName fn_link = std::string(linkname);
+		// TODO: FIXME: This condition is still not perfect. For example,
+		// Micrograph/mic001.mrc -> ../../../storage/mic001.mrc breaks the code.
+		// Meanwhile one can circumvent this case by using an absolute path in the symlink.
     		if (fn_link.substr(0, 3) == "../")
 	    	{
     			fn_link = fn_link.substr(3) + fn_in.substr(slashpos);
