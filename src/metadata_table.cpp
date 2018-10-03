@@ -1655,10 +1655,10 @@ MetaDataTable removeDuplicatedParticles(MetaDataTable &MDin, EMDLabel mic_label,
 		RFLOAT val1, val2;
 		MDin.getValue(EMDL_ORIENT_ORIGIN_X, val1);
 		MDin.getValue(EMDL_IMAGE_COORD_X, val2);
-		xs[current_object] = val1 * origin_scale + val2;
+		xs[current_object] = -val1 * origin_scale + val2;
 		MDin.getValue(EMDL_ORIENT_ORIGIN_Y, val1);
 		MDin.getValue(EMDL_IMAGE_COORD_Y, val2);
-		ys[current_object] = val1 * origin_scale + val2;
+		ys[current_object] = -val1 * origin_scale + val2;
 
 		grouped[mic_name].push_back(current_object);
 	}

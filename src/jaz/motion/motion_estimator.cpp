@@ -1,3 +1,23 @@
+/***************************************************************************
+ *
+ * Author: "Jasenko Zivanov"
+ * MRC Laboratory of Molecular Biology
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * This complete copyright notice must be included in any revised version of the
+ * source code. Additional authorship citations may be added, but existing
+ * author citations must be preserved.
+ ***************************************************************************/
+
 #include "motion_estimator.h"
 #include "motion_helper.h"
 #include "gp_motion_fit.h"
@@ -25,10 +45,10 @@ void MotionEstimator::read(IOParser& parser, int argc, char *argv[])
 {
 	parser.addSection("Motion fit options (basic)");
 	
-	dosePerFrame = textToFloat(parser.getOption("--fdose", "Electron dose per frame (in e^-/A^2)", "-1"));
-	sig_vel = textToFloat(parser.getOption("--s_vel", "Velocity sigma [Angst/dose]", "0.5"));
-	sig_div = textToFloat(parser.getOption("--s_div", "Divergence sigma [Angst]", "5000.0"));
-	sig_acc = textToFloat(parser.getOption("--s_acc", "Acceleration sigma [Angst/dose]", "2.0"));
+	dosePerFrame = textToDouble(parser.getOption("--fdose", "Electron dose per frame (in e^-/A^2)", "-1"));
+	sig_vel = textToDouble(parser.getOption("--s_vel", "Velocity sigma [Angst/dose]", "0.5"));
+	sig_div = textToDouble(parser.getOption("--s_div", "Divergence sigma [Angst]", "5000.0"));
+	sig_acc = textToDouble(parser.getOption("--s_acc", "Acceleration sigma [Angst/dose]", "2.0"));
 	
 	paramsFn = parser.getOption("--params_file", "File containing s_vel, s_div and s_acc (overrides command line parameters)", "");
 			
@@ -36,14 +56,14 @@ void MotionEstimator::read(IOParser& parser, int argc, char *argv[])
 	
 	parser.addSection("Motion fit options (advanced)");
 	
-	cc_pad = textToFloat(parser.getOption("--cc_pad", "Cross-correlation Fourier-padding", "1.0"));
+	cc_pad = textToDouble(parser.getOption("--cc_pad", "Cross-correlation Fourier-padding", "1.0"));
 	
-	dmga = textToFloat(parser.getOption("--dmg_a", "Damage model, parameter a", " 3.40"));
-	dmgb = textToFloat(parser.getOption("--dmg_b", "                        b", "-1.06"));
-	dmgc = textToFloat(parser.getOption("--dmg_c", "                        c", "-0.54"));
+	dmga = textToDouble(parser.getOption("--dmg_a", "Damage model, parameter a", " 3.40"));
+	dmgb = textToDouble(parser.getOption("--dmg_b", "                        b", "-1.06"));
+	dmgc = textToDouble(parser.getOption("--dmg_c", "                        c", "-0.54"));
 	
 	maxIters = textToInteger(parser.getOption("--max_iters", "Maximum number of iterations", "10000"));
-	optEps = textToFloat(parser.getOption("--eps", "Terminate optimization after gradient length falls below this value", "1e-5"));
+	optEps = textToDouble(parser.getOption("--eps", "Terminate optimization after gradient length falls below this value", "1e-5"));
 	
 	no_whitening = parser.checkOption("--no_whiten", "Do not whiten the noise spectrum");
 	unregGlob = parser.checkOption("--unreg_glob", "Do not regularize global component of motion");

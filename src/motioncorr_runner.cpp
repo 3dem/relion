@@ -81,7 +81,7 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms", "-1"));
 	first_frame_sum =  textToInteger(parser.getOption("--first_frame_sum", "First movie frame used in output sum (start at 1)", "1"));
 	if (first_frame_sum < 1) first_frame_sum = 1;
-	last_frame_sum =  textToInteger(parser.getOption("--last_frame_sum", "Last movie frame used in output sum (0: use all)", "0"));
+	last_frame_sum =  textToInteger(parser.getOption("--last_frame_sum", "Last movie frame used in output sum (0 or negative: use all)", "-1"));
 
 	int motioncor2_section = parser.addSection("MOTIONCOR2 options");
 	do_motioncor2 = parser.checkOption("--use_motioncor2", "Use Shawn Zheng's MOTIONCOR2 instead of UNBLUR.");
@@ -107,8 +107,8 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	int doseweight_section = parser.addSection("Dose-weighting options");
 	do_dose_weighting = parser.checkOption("--dose_weighting", "Use MOTIONCOR2s or UNBLURs dose-weighting scheme");
 	voltage = textToFloat(parser.getOption("--voltage","Voltage (in kV) for dose-weighting inside MOTIONCOR2/UNBLUR", "300"));
-	dose_per_frame = textToFloat(parser.getOption("--dose_per_frame", "Electron dose (in electrons/A2/frame) for dose-weighting inside MOTIONCOR2/UNBLUR", "1"));
-	pre_exposure = textToFloat(parser.getOption("--preexposure", "Pre-exposure (in electrons/A2) for dose-weighting inside UNBLUR", "0"));
+	dose_per_frame = textToFloat(parser.getOption("--dose_per_frame", "Electron dose (in electrons/A2/frame) for dose-weighting", "1"));
+	pre_exposure = textToFloat(parser.getOption("--preexposure", "Pre-exposure (in electrons/A2) for dose-weighting", "0"));
 
 	parser.addSection("Own motion correction options");
 	do_own = parser.checkOption("--use_own", "Use our own implementation of motion correction");
@@ -753,7 +753,7 @@ bool MotioncorrRunner::executeUnblur(Micrograph &mic)
 	getShiftsUnblur(fn_shifts, mic);
 
 	// If the requested sum is only a subset, then use summovie to make the average
-	int mylastsum = (last_frame_sum == 0) ? Nframes : last_frame_sum;
+	int mylastsum = (last_frame_sum <= 0) ? Nframes : last_frame_sum;
 	if (first_frame_sum != 1 || mylastsum != Nframes)
 	{
 		FileName fn_com2 = fn_root + "_summovie.com";

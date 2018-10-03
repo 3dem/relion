@@ -1,3 +1,23 @@
+/***************************************************************************
+ *
+ * Author: "Jasenko Zivanov"
+ * MRC Laboratory of Molecular Biology
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * This complete copyright notice must be included in any revised version of the
+ * source code. Additional authorship citations may be added, but existing
+ * author citations must be preserved.
+ ***************************************************************************/
+
 #include <src/jaz/vtk_helper.h>
 
 using namespace gravis;
@@ -292,7 +312,8 @@ void VtkHelper :: writeVTK_d3(MultidimArray<gravis::t3Vector<RFLOAT> >& img, std
     }
 }
 
-void VtkHelper :: writeTomoVTK(Image<RFLOAT>& img, std::string fn, bool binary)
+void VtkHelper :: writeTomoVTK(Image<RFLOAT>& img, std::string fn, bool binary, 
+							   double pixelSize, d3Vector origin)
 {
     const size_t size = (img.data.xdim * img.data.ydim * img.data.ndim);
     std::ofstream os(fn.c_str(), std::ios::binary);
@@ -317,8 +338,8 @@ void VtkHelper :: writeTomoVTK(Image<RFLOAT>& img, std::string fn, bool binary)
 
     os << "DATASET STRUCTURED_POINTS\n";
     os << "DIMENSIONS " << img.data.xdim << " " << img.data.ydim << " " << img.data.ndim << "\n";
-    os << "SPACING 1 1 1\n";
-    os << "ORIGIN 0 0 0\n";
+    os << "SPACING " << pixelSize << " " << pixelSize << " " << pixelSize << "\n";
+    os << "ORIGIN " << origin.x << " " << origin.y << " " << origin.z << "\n";
     os << "POINT_DATA " << size << "\n";
     os << "SCALARS volume_scalars " << sizetype << " 1\n";
     os << "LOOKUP_TABLE default\n";
