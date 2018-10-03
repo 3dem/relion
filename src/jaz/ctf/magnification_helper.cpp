@@ -393,19 +393,25 @@ void MagnificationHelper::updatePowSpec(
 }
 
 void MagnificationHelper::adaptAstigmatism(
-		const Matrix2D<RFLOAT>& dM, 
+		const std::vector<Matrix2D<RFLOAT>>& dMs, 
 		std::vector<MetaDataTable>& partMdts, 
-		bool perParticle)
+		bool perParticle, ObservationModel* obsModel)
 {
 	const long int mc = partMdts.size();
+	const int ogc = dMs.size();
+		
+	std::vector<d2Matrix> M(ogc), Mi(ogc), Mit(ogc);
 	
-	d2Matrix M(dM(0,0), dM(0,1), dM(1,0), dM(1,1));
-	
-	d2Matrix Mi = M;
-	Mi.invert();
-	
-	d2Matrix Mit = Mi;
-	Mit.transpose();
+	for (int og = 0; og < ogc; og++)
+	{
+		M[og] = d2Matrix(dMs[og](0,0), dMs[og](0,1), dMs[og](1,0), dMs[og](1,1));
+		
+		Mi[og] = M[og];
+		Mi[og].invert();
+		
+		Mit[og] = Mi[og];
+		Mit[og].transpose();
+	}
 	
 	for (long int m = 0; m < mc; m++)
 	{
@@ -437,7 +443,11 @@ void MagnificationHelper::adaptAstigmatism(
 		{
 			for (long int p = 0; p < pc; p++)
 			{
-				d2Matrix A2 = Mit * A[p] * Mi;
+				int og;
+				partMdts[m].getValue(EMDL_IMAGE_OPTICS_GROUP, og, p);
+				og--;
+				
+				d2Matrix A2 = Mit[og] * A[p] * Mi[og];
 				
 				double deltafU_neg, deltafV_neg, phiDeg;				
 				matrixToPolar(A2, deltafU_neg, deltafV_neg, phiDeg);
@@ -447,47 +457,78 @@ void MagnificationHelper::adaptAstigmatism(
 				partMdts[m].setValue(EMDL_CTF_DEFOCUS_ANGLE, phiDeg, p);
 			}
 		}
-		else // keep difference between deltafU and deltafV, as well as the azimuth angle, constant
+		else // keep difference between deltafU and deltafV, as well as the azimuth angle, 
+		     // constant for all particles in the same micrograph and optics group
 		{
-			d2Matrix A_mean(0.0, 0.0, 0.0, 0.0);
+			std::vector<int> optGroups = obsModel->getOptGroupsPresent(partMdts[m]);	
+			const int cc = optGroups.size();
 			
-			for (long int p = 0; p < pc; p++)
+			std::vector<int> groupToIndex(obsModel->numberOfOpticsGroups()+1, -1);
+			
+			for (int i = 0; i < cc; i++)
 			{
-				A_mean += A[p] * (1.0/(double)pc);
+				groupToIndex[optGroups[i]] = i;
 			}
 			
-			A_mean = Mit * A_mean * Mi;
-						
-			double deltafU_mean_neg, deltafV_mean_neg, co, si;			
-			dsyev2(A_mean(0,0), A_mean(1,0), A_mean(1,1), 
-				   &deltafU_mean_neg, &deltafV_mean_neg, &co, &si);
-			
-			d2Matrix Q2(co, si, -si, co);
-			d2Matrix Qt2(co, -si, si, co);
-			
-			double meanDef_mean = 0.5 * (deltafU_mean_neg + deltafV_mean_neg);
-			
-			for (long int p = 0; p < pc; p++)
+			for (int c = 0; c < cc; c++)
 			{
-				d2Matrix Ap2 = Mit * A[p] * Mi;
+				const int og = optGroups[c] - 1;
 				
-				double deltafU_p_neg, deltafV_p_neg, cop, sip;			
-				dsyev2(Ap2(0,0), Ap2(1,0), Ap2(1,1), 
-					   &deltafU_p_neg, &deltafV_p_neg, &cop, &sip);
+				d2Matrix A_mean(0.0, 0.0, 0.0, 0.0);
 				
-				double meanDef_p = 0.5 * (deltafU_p_neg + deltafV_p_neg);
+				for (long int p = 0; p < pc; p++)
+				{
+					int ogp;
+					partMdts[m].getValue(EMDL_IMAGE_OPTICS_GROUP, ogp, p);
+					ogp--;
+					
+					if (ogp == og)
+					{
+						A_mean += A[p] * (1.0/(double)pc);
+					}
+				}
 				
-				d2Matrix Dp2(deltafU_mean_neg - meanDef_mean + meanDef_p, 0.0,
-							 0.0, deltafV_mean_neg - meanDef_mean + meanDef_p);
 				
-				d2Matrix Apa2 = Qt2 * Dp2 * Q2;
+				A_mean = Mit[og] * A_mean * Mi[og];
+							
+				double deltafU_mean_neg, deltafV_mean_neg, co, si;			
+				dsyev2(A_mean(0,0), A_mean(1,0), A_mean(1,1), 
+					   &deltafU_mean_neg, &deltafV_mean_neg, &co, &si);
 				
-				double deltafU_pa_neg, deltafV_pa_neg, phiDeg;
-				matrixToPolar(Apa2, deltafU_pa_neg, deltafV_pa_neg, phiDeg);
+				d2Matrix Q2(co, si, -si, co);
+				d2Matrix Qt2(co, -si, si, co);
 				
-				partMdts[m].setValue(EMDL_CTF_DEFOCUSU, -deltafU_pa_neg, p);
-				partMdts[m].setValue(EMDL_CTF_DEFOCUSV, -deltafV_pa_neg, p);
-				partMdts[m].setValue(EMDL_CTF_DEFOCUS_ANGLE, phiDeg, p);
+				double meanDef_mean = 0.5 * (deltafU_mean_neg + deltafV_mean_neg);
+				
+				for (long int p = 0; p < pc; p++)
+				{
+					int ogp;
+					partMdts[m].getValue(EMDL_IMAGE_OPTICS_GROUP, ogp, p);
+					ogp--;
+					
+					if (ogp == og)
+					{
+						d2Matrix Ap2 = Mit[og] * A[p] * Mi[og];
+						
+						double deltafU_p_neg, deltafV_p_neg, cop, sip;			
+						dsyev2(Ap2(0,0), Ap2(1,0), Ap2(1,1), 
+							   &deltafU_p_neg, &deltafV_p_neg, &cop, &sip);
+						
+						double meanDef_p = 0.5 * (deltafU_p_neg + deltafV_p_neg);
+						
+						d2Matrix Dp2(deltafU_mean_neg - meanDef_mean + meanDef_p, 0.0,
+									 0.0, deltafV_mean_neg - meanDef_mean + meanDef_p);
+						
+						d2Matrix Apa2 = Qt2 * Dp2 * Q2;
+						
+						double deltafU_pa_neg, deltafV_pa_neg, phiDeg;
+						matrixToPolar(Apa2, deltafU_pa_neg, deltafV_pa_neg, phiDeg);
+						
+						partMdts[m].setValue(EMDL_CTF_DEFOCUSU, -deltafU_pa_neg, p);
+						partMdts[m].setValue(EMDL_CTF_DEFOCUSV, -deltafV_pa_neg, p);
+						partMdts[m].setValue(EMDL_CTF_DEFOCUS_ANGLE, phiDeg, p);
+					}
+				}
 			}			
 		}
 	}

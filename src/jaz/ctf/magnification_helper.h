@@ -86,9 +86,9 @@ class MagnificationHelper
 						Image<RFLOAT>& powSpecObs);
 		
 		static void adaptAstigmatism(
-						const Matrix2D<RFLOAT>& dM, 
+						const std::vector<Matrix2D<RFLOAT>>& dMs, 
 						std::vector<MetaDataTable>& partMdts,
-						bool perParticle);
+						bool perParticle, ObservationModel* obsModel);
 };
 
 #endif
