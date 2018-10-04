@@ -2130,41 +2130,48 @@ void MlOptimiser::setSigmaNoiseEstimatesAndSetAverageImage(MultidimArray<RFLOAT>
 		for (int igroup = 0; igroup < wsum_model.nr_groups; igroup++)
 		{
 			// Factor 2 because of 2-dimensionality of the complex plane
-			mymodel.sigma2_noise[igroup] = wsum_model.sigma2_noise[igroup] / ( 2. * wsum_model.sumw_group[igroup] );
-
-			// Now subtract power spectrum of the average image from the average power spectrum of the individual images
-			mymodel.sigma2_noise[igroup] -= spect;
-
-			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(spect)
+			if (wsum_model.sumw_group[igroup] > 0.)
 			{
-				// Remove any negative sigma2_noise values: replace by positive neighbouring value
-				if (DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) < 0. )
+				mymodel.sigma2_noise[igroup] = wsum_model.sigma2_noise[igroup] / ( 2. * wsum_model.sumw_group[igroup] );
+
+				// Now subtract power spectrum of the average image from the average power spectrum of the individual images
+				mymodel.sigma2_noise[igroup] -= spect;
+
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(spect)
 				{
-					// First try the previous value
-					if (n - 1 >= 0 && DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n - 1) > 0.)
+					// Remove any negative sigma2_noise values: replace by positive neighbouring value
+					if (DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) < 0. )
 					{
-						DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) = DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n - 1);
-					}
-					else
-					{
-						bool is_positive = false;
-						int nn = n;
-						while (!is_positive)
+						// First try the previous value
+						if (n - 1 >= 0 && DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n - 1) > 0.)
 						{
-							nn++;
-							if (nn > XSIZE(mymodel.sigma2_noise[igroup]))
+							DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) = DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n - 1);
+						}
+						else
+						{
+							bool is_positive = false;
+							int nn = n;
+							while (!is_positive)
 							{
-								std::cerr << " igroup= " << igroup << " n= " << n << " mymodel.sigma2_noise[igroup]= " << mymodel.sigma2_noise[igroup] << std::endl;
-								REPORT_ERROR("BUG! cannot find positive values in sigma2_noise spectrum");
-							}
-							if (DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], nn) > 0.)
-							{
-								is_positive = true;
-								DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) = DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], nn);
+								nn++;
+								if (nn > XSIZE(mymodel.sigma2_noise[igroup]))
+								{
+									std::cerr << " igroup= " << igroup << " n= " << n << " mymodel.sigma2_noise[igroup]= " << mymodel.sigma2_noise[igroup] << std::endl;
+									REPORT_ERROR("BUG! cannot find positive values in sigma2_noise spectrum");
+								}
+								if (DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], nn) > 0.)
+								{
+									is_positive = true;
+									DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) = DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], nn);
+								}
 							}
 						}
 					}
 				}
+			}
+			else // no particles in this group...
+			{
+				mymodel.sigma2_noise[igroup].initZeros();
 			}
 
 		}
