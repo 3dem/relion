@@ -298,25 +298,17 @@ void MlModel::read(FileName fn_in)
 	spectral_sizes.resize(nr_groups);
 	for (int igroup = 0; igroup < nr_groups; igroup++)
 	{
-		if (nr_particles_group[igroup] > 0)
+		MDsigma.readStar(in, "model_group_" + integerToString(igroup + 1));
+		// Allow sigma2_noise with different sizes!
+		spectral_sizes[igroup] = MDsigma.numberOfObjects();
+		sigma2_noise[igroup].resize(spectral_sizes[igroup]);
+		int idx;
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsigma)
 		{
-			MDsigma.readStar(in, "model_group_" + integerToString(igroup + 1));
-			// Allow sigma2_noise with different sizes!
-			spectral_sizes[igroup] = MDsigma.numberOfObjects();
-			sigma2_noise[igroup].resize(spectral_sizes[igroup]);
-			int idx;
-			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsigma)
-			{
-				if (!MDsigma.getValue(EMDL_SPECTRAL_IDX, idx))
-					REPORT_ERROR("MlModel::readStar: incorrect table model_group_"+integerToString(igroup));
-				if (!MDsigma.getValue(EMDL_MLMODEL_SIGMA2_NOISE, sigma2_noise[igroup](idx)))
-					REPORT_ERROR("MlModel::readStar: incorrect table model_group_"+integerToString(igroup));
-			}
-		}
-		else
-		{
-			spectral_sizes[igroup] = 0;
-			sigma2_noise[igroup].resize(spectral_sizes[igroup]);
+			if (!MDsigma.getValue(EMDL_SPECTRAL_IDX, idx))
+				REPORT_ERROR("MlModel::readStar: incorrect table model_group_"+integerToString(igroup));
+			if (!MDsigma.getValue(EMDL_MLMODEL_SIGMA2_NOISE, sigma2_noise[igroup](idx)))
+				REPORT_ERROR("MlModel::readStar: incorrect table model_group_"+integerToString(igroup));
 		}
 
 	}
@@ -1716,7 +1708,6 @@ void MlWsumModel::pack(MultidimArray<RFLOAT> &packed, int &piece, int &nr_pieces
     for (int igroup = 0; igroup < nr_groups; igroup++)
     {
     	packed_size += 3 * spectral_sizes[igroup];
-    	std::cerr << " BBBB igroup= " << igroup << " spectral_size[igroup]= " << spectral_sizes[igroup] << std::endl;
     }
     // for sumw_group
     packed_size += nr_groups;
