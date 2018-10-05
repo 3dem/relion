@@ -387,9 +387,9 @@ void readRelionFormatMasksAndOperators(
 			|| (!MD.containsLabel(EMDL_ORIENT_ROT))
 			|| (!MD.containsLabel(EMDL_ORIENT_TILT))
 			|| (!MD.containsLabel(EMDL_ORIENT_PSI))
-			|| (!MD.containsLabel(EMDL_ORIENT_ORIGIN_X))
-			|| (!MD.containsLabel(EMDL_ORIENT_ORIGIN_Y))
-			|| (!MD.containsLabel(EMDL_ORIENT_ORIGIN_Z)) )
+			|| (!MD.containsLabel(EMDL_ORIENT_ORIGIN_X_ANGSTROM))
+			|| (!MD.containsLabel(EMDL_ORIENT_ORIGIN_Y_ANGSTROM))
+			|| (!MD.containsLabel(EMDL_ORIENT_ORIGIN_Z_ANGSTROM)) )
 		REPORT_ERROR("ERROR: Some of the MetaDataLabels are missing in STAR file " + (std::string)(fn_info) + " !");
 
 	// Load mask names
@@ -437,9 +437,9 @@ void readRelionFormatMasksAndOperators(
 			MD.getValue(EMDL_ORIENT_ROT, aa);
 			MD.getValue(EMDL_ORIENT_TILT, bb);
 			MD.getValue(EMDL_ORIENT_PSI, gg);
-			MD.getValue(EMDL_ORIENT_ORIGIN_X, dx);
-			MD.getValue(EMDL_ORIENT_ORIGIN_Y, dy);
-			MD.getValue(EMDL_ORIENT_ORIGIN_Z, dz);
+			MD.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, dx);
+			MD.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, dy);
+			MD.getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, dz);
 
 			// Re-calculate angles so that they follow the conventions in RELION!
 			standardiseEulerAngles(aa, bb, gg, aa, bb, gg);
@@ -669,9 +669,9 @@ void writeRelionFormatMasksAndOperators(
 	MD.addLabel(EMDL_ORIENT_ROT);
 	MD.addLabel(EMDL_ORIENT_TILT);
 	MD.addLabel(EMDL_ORIENT_PSI);
-	MD.addLabel(EMDL_ORIENT_ORIGIN_X);
-	MD.addLabel(EMDL_ORIENT_ORIGIN_Y);
-	MD.addLabel(EMDL_ORIENT_ORIGIN_Z);
+	MD.addLabel(EMDL_ORIENT_ORIGIN_X_ANGSTROM);
+	MD.addLabel(EMDL_ORIENT_ORIGIN_Y_ANGSTROM);
+	MD.addLabel(EMDL_ORIENT_ORIGIN_Z_ANGSTROM);
 	for (int imask = 0; imask < fn_mask_list.size(); imask++)
 	{
 		if (ops[imask].size() < 1)
@@ -683,9 +683,9 @@ void writeRelionFormatMasksAndOperators(
 			MD.setValue(EMDL_ORIENT_ROT, VEC_ELEM(ops[imask][iop], AA_POS));
 			MD.setValue(EMDL_ORIENT_TILT, VEC_ELEM(ops[imask][iop], BB_POS));
 			MD.setValue(EMDL_ORIENT_PSI, VEC_ELEM(ops[imask][iop], GG_POS));
-			MD.setValue(EMDL_ORIENT_ORIGIN_X, angpix * VEC_ELEM(ops[imask][iop], DX_POS));
-			MD.setValue(EMDL_ORIENT_ORIGIN_Y, angpix * VEC_ELEM(ops[imask][iop], DY_POS));
-			MD.setValue(EMDL_ORIENT_ORIGIN_Z, angpix * VEC_ELEM(ops[imask][iop], DZ_POS));
+			MD.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, angpix * VEC_ELEM(ops[imask][iop], DX_POS));
+			MD.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, angpix * VEC_ELEM(ops[imask][iop], DY_POS));
+			MD.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, angpix * VEC_ELEM(ops[imask][iop], DZ_POS));
 		}
 	}
 	MD.write(fn_info);
@@ -709,9 +709,9 @@ void writeRelionFormatLocalSearchOperatorResults(
 	MD.addLabel(EMDL_ORIENT_ROT);
 	MD.addLabel(EMDL_ORIENT_TILT);
 	MD.addLabel(EMDL_ORIENT_PSI);
-	MD.addLabel(EMDL_ORIENT_ORIGIN_X);
-	MD.addLabel(EMDL_ORIENT_ORIGIN_Y);
-	MD.addLabel(EMDL_ORIENT_ORIGIN_Z);
+	MD.addLabel(EMDL_ORIENT_ORIGIN_X_ANGSTROM);
+	MD.addLabel(EMDL_ORIENT_ORIGIN_Y_ANGSTROM);
+	MD.addLabel(EMDL_ORIENT_ORIGIN_Z_ANGSTROM);
 	MD.addLabel(EMDL_IMAGE_WEIGHT);
 
 	for (int iop = 0; iop < op_samplings.size(); iop++)
@@ -723,9 +723,9 @@ void writeRelionFormatLocalSearchOperatorResults(
 		MD.setValue(EMDL_ORIENT_ROT, VEC_ELEM(op_samplings[iop], AA_POS));
 		MD.setValue(EMDL_ORIENT_TILT, VEC_ELEM(op_samplings[iop], BB_POS));
 		MD.setValue(EMDL_ORIENT_PSI, VEC_ELEM(op_samplings[iop], GG_POS));
-		MD.setValue(EMDL_ORIENT_ORIGIN_X, angpix * VEC_ELEM(op_samplings[iop], DX_POS));
-		MD.setValue(EMDL_ORIENT_ORIGIN_Y, angpix * VEC_ELEM(op_samplings[iop], DY_POS));
-		MD.setValue(EMDL_ORIENT_ORIGIN_Z, angpix * VEC_ELEM(op_samplings[iop], DZ_POS));
+		MD.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, angpix * VEC_ELEM(op_samplings[iop], DX_POS));
+		MD.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, angpix * VEC_ELEM(op_samplings[iop], DY_POS));
+		MD.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, angpix * VEC_ELEM(op_samplings[iop], DZ_POS));
 		MD.setValue(EMDL_IMAGE_WEIGHT, VEC_ELEM(op_samplings[iop], CC_POS));
 	}
 	MD.write(fn_out);

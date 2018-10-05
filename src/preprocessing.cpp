@@ -69,15 +69,6 @@ void Preprocessing::read(int argc, char **argv, int rank)
 	extract_size = textToInteger(parser.getOption("--extract_size", "Size of the box to extract the particles in (in pixels)", "-1"));
 	extract_bias_x  = textToInteger(parser.getOption("--extract_bias_x", "Bias in X-direction of picked particles (this value in pixels will be added to the coords)", "0"));
 	extract_bias_y  = textToInteger(parser.getOption("--extract_bias_y", "Bias in Y-direction of picked particles (this value in pixels will be added to the coords)", "0"));
-	do_movie_extract = parser.checkOption("--extract_movies", "Extract particles from movie stacks?");
-	movie_name = parser.getOption("--movie_name", "Movie-identifier to extract particles from movie stacks (e.g. for _movie.mrcs)", "movie");
-	join_nr_mics = textToInteger(parser.getOption("--join_nr_mics", "How many micrographs are joined in batches of movie-particles? (default is make no batches)", "-1"));
-	avg_n_frames = textToInteger(parser.getOption("--avg_movie_frames", "Average over this number of individual movie frames", "1"));
-	movie_first_frame = textToInteger(parser.getOption("--first_movie_frame", "Extract from this movie frame onwards", "1"));
-	movie_first_frame--; // (start counting at 0, not 1)
-	movie_last_frame = textToInteger(parser.getOption("--last_movie_frame", "Extract until this movie frame (default=all movie frames)", "0"));
-	movie_last_frame--; // (start counting at 0, not 1)
-	fn_movie = parser.getOption("--movie_rootname", "Common name to relate movies to the single micrographs (e.g. mic001_movie.mrcs related to mic001.mrc)", "movie");
 	only_extract_unfinished = parser.checkOption("--only_extract_unfinished", "Extract only particles if the STAR file for that micrograph does not yet exist.");
 
 	int perpart_section = parser.addSection("Particle operations");
@@ -143,16 +134,8 @@ void Preprocessing::initialise()
 		// Read in the micrographs STAR file
 		MDmics.read(fn_star_in);
 
-		if ( do_movie_extract && !MDmics.containsLabel(EMDL_MICROGRAPH_MOVIE_NAME) )
-			REPORT_ERROR("Preprocessing::initialise ERROR: Input micrograph STAR file has no rlnMicrographMovieName column!");
-		else if ( !do_movie_extract && !MDmics.containsLabel(EMDL_MICROGRAPH_NAME) )
+		if ( !MDmics.containsLabel(EMDL_MICROGRAPH_NAME) )
 			REPORT_ERROR("Preprocessing::initialise ERROR: Input micrograph STAR file has no rlnMicrographName column!");
-
-		if (do_movie_extract)
-		{
-			if (fn_data == "")
-				REPORT_ERROR("Preprocessing::initialise ERROR: when extracting movies, you have to provide a --reextract_data_star file.");
-		}
 
 		if ((do_phase_flip||do_premultiply_ctf) && !MDmics.containsLabel(EMDL_CTF_DEFOCUSU))
 			REPORT_ERROR("Preprocessing::initialise ERROR: No CTF information found in the input micrograph STAR-file");
@@ -186,7 +169,7 @@ void Preprocessing::initialise()
 				std::cout << " + Using pixel size from input STAR file of " << angpix << " Angstroms" << std::endl;
 
 		}
-		else if (!do_movie_extract && (do_recenter || fn_data != ""))
+		else if (do_recenter || fn_data != "")
 		{
 			REPORT_ERROR("Preprocessing:: ERROR: cannot use --recenter or --reextract_data_star without providing angpix info in the input micrograph STAR file or by using --set_angpix!");
 		}
@@ -200,6 +183,9 @@ void Preprocessing::initialise()
 			}
 			if (do_recenter && verb > 0)
 				std::cout << " + And re-centering particles based on refined coordinates in the _data.star file" << std::endl;
+
+			// Read the input data file (into the new v3.1 structure)
+			ObservationModel::loadSafely(fn_data, obsModel, MDimg, MDopt);
 
 		}
 		else
@@ -217,8 +203,6 @@ void Preprocessing::initialise()
 				{
 					MDmics.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
 					FileName fn_coord = getCoordinateFileName(fn_mic);
-					if (do_movie_extract)
-						fn_mic = fn_mic.withoutExtension() + "_" + movie_name + ".mrcs";
 					if (!exists(fn_coord))
 						std::cerr << "Warning: coordinate file " << fn_coord << " does not exist..." << std::endl;
 					if (!exists(fn_mic))
@@ -301,8 +285,6 @@ void Preprocessing::joinAllStarFiles()
 {
 
 	FileName fn_ostar;
-	if (do_movie_extract && fn_list_star != "" && join_nr_mics > 0)
-		fn_ostar = fn_list_star.beforeLastOf("/") + "/batch_" + integerToString(join_nr_mics) + "mics_nr";
 
 	std::cout << " Joining metadata of all particles from " << MDmics.numberOfObjects() << " micrographs in one STAR file..." << std::endl;
 
@@ -314,45 +296,10 @@ void Preprocessing::joinAllStarFiles()
 	{
 		// Micrograph filename
 		FileName fn_mic;
-		if (do_movie_extract)
-			MDmics.getValue(EMDL_MICROGRAPH_MOVIE_NAME, fn_mic);
-		else
-			MDmics.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
+		MDmics.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
 
 		// Get the filename of the STAR file for just this micrograph
 		FileName fn_star = getOutputFileNameRoot(fn_mic) + "_extract.star";
-		//std::cerr << "fn_star " << fn_star <<" exists=" << exists(fn_star) << " imic= "<<imic<<" ibatch= " <<ibatch << " fn_list_star= "<<fn_list_star<<std::endl;
-		if (do_movie_extract && fn_list_star != "")
-		{
-			if (join_nr_mics > 0)
-			{
-				if (exists(fn_star))
-				{
-					MDbatch.addObject();
-					MDbatch.setValue(EMDL_STARFILE_MOVIE_PARTICLES, fn_star);
-				}
-
-				//std::cerr << " join_nr_mics= " << join_nr_mics << " %=" <<((imic+1) % join_nr_mics)<<std::endl;
-				if ( (((imic+1) % join_nr_mics) == 0 || (imic+1) == MDmics.numberOfObjects()) && MDbatch.numberOfObjects() > 0)
-				{
-					ibatch++;
-					FileName fn_batch = fn_ostar + integerToString(ibatch,3) + ".star";
-					MDbatch.write(fn_batch);
-					MDbatch.clear();
-					MDmicnames.addObject();
-					MDmicnames.setValue(EMDL_STARFILE_MOVIE_PARTICLES, fn_batch);
-				}
-			}
-			else
-			{
-				if (exists(fn_star))
-				{
-					// Store the names of all micrographs
-					MDmicnames.addObject();
-					MDmicnames.setValue(EMDL_STARFILE_MOVIE_PARTICLES, fn_star);
-				}
-			}
-		}
 
 		if (fn_part_star != "")
 		{
@@ -389,12 +336,6 @@ void Preprocessing::joinAllStarFiles()
 		std::cout << " The new pixel size of the extracted particles are " << output_angpix << " Angstrom/pixel." << std::endl;
 	}
 
-	if (do_movie_extract && fn_list_star != "")
-	{
-		MDmicnames.write(fn_list_star);
-		std::cout << " Written out list of " << MDmicnames.numberOfObjects() << " movie-particle STAR files of individual micrographs in " << fn_list_star<< std::endl;
-	}
-
 }
 
 void Preprocessing::runExtractParticles()
@@ -415,10 +356,7 @@ void Preprocessing::runExtractParticles()
 	bool micIsUsed;
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDmics)
 	{
-		if (do_movie_extract)
-			MDmics.getValue(EMDL_MICROGRAPH_MOVIE_NAME, fn_mic);
-		else
-			MDmics.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
+		MDmics.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
 
 		// Check new-style outputdirectory exists and make it if not!
 		FileName fn_dir = getOutputFileNameRoot(fn_mic);
@@ -544,7 +482,7 @@ void Preprocessing::readHelicalCoordinates(FileName fn_mic, FileName fn_coord, M
 {
 	MD.clear();
 
-	// Get movie or normal micrograph name and check it exists
+	// Get micrograph name and check it exists
 	if (!exists(fn_mic))
 	{
 		std::cerr << "WARNING: cannot find micrograph file " << fn_mic << std::endl;
@@ -668,7 +606,7 @@ bool Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 			std::cerr << "Warning: There are only " << npos << " particles in micrograph " << fn_mic <<". Consider joining multiple micrographs into one group. "<< std::endl;
 		}
 
-		// Get movie or normal micrograph name and check it exists
+		// Get micrograph name and check it exists
 		if (!exists(fn_mic))
 		{
 			std::cerr << "WARNING: Skipping " << fn_mic << ", which has " << npos << " particles, because cannot find the file..." << std::endl;
@@ -683,15 +621,8 @@ bool Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 		long int ndim;
 		Imic.getDimensions(xdim, ydim, zdim, ndim);
 		dimensionality = (zdim > 1) ? 3 : 2;
-		if (dimensionality == 3 || do_movie_extract)
+		if (dimensionality == 3)
 			do_ramp = false;
-
-		// Just to be sure...
-		if (do_movie_extract && ndim < movie_last_frame)
-		{
-			std::cerr << "WARNING: Skipping " << fn_mic << ", which has " << npos << " particles,  because it has only " << ndim << " frames..." << std::endl;
-			return(false);
-		}
 
 		long int my_current_nr_images = 0;
 		RFLOAT all_avg = 0;
@@ -699,26 +630,13 @@ bool Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 		RFLOAT all_minval = LARGE_NUMBER;
 		RFLOAT all_maxval = -LARGE_NUMBER;
 
-		// To deal with default movie_last_frame value
-		if (movie_last_frame < 0)
-			movie_last_frame = ndim - 1;
+		extractParticlesFromOneMicrograph(MDin, fn_mic, imic, fn_output_img_root, fn_oristack,
+				my_current_nr_images, npos, all_avg, all_stddev, all_minval, all_maxval);
 
+		MDout.append(MDin);
+		// Keep track of total number of images extracted thus far
+		my_current_nr_images += npos;
 
-		int n_frames = movie_last_frame - movie_first_frame + 1;
-		// The total number of images to be extracted
-		long int my_total_nr_images = npos * n_frames;
-
-		TIMING_TIC(TIMING_EXTCT_FROM_FRAME);
-		for (long int iframe = movie_first_frame; iframe <= movie_last_frame; iframe += avg_n_frames)
-		{
-			extractParticlesFromOneFrame(MDin, fn_mic, imic, iframe, n_frames, fn_output_img_root, fn_oristack,
-					my_current_nr_images, my_total_nr_images, all_avg, all_stddev, all_minval, all_maxval);
-
-			MDout.append(MDin);
-			// Keep track of total number of images extracted thus far
-			my_current_nr_images += npos;
-
-		}
 		TIMING_TOC(TIMING_EXTCT_FROM_FRAME);
 
 		MDout.setName("images");
@@ -733,9 +651,9 @@ bool Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 
 }
 
-// Actually extract particles. This can be from one (average) micrograph or from a single movie frame
-void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
-		FileName fn_mic, int imic, int iframe, int n_frames,
+// Actually extract particles. This can be from one micrograph
+void Preprocessing::extractParticlesFromOneMicrograph(MetaDataTable &MD,
+		FileName fn_mic, int imic,
 		FileName fn_output_img_root, FileName fn_oristack, long int &my_current_nr_images, long int my_total_nr_images,
 		RFLOAT &all_avg, RFLOAT &all_stddev, RFLOAT &all_minval, RFLOAT &all_maxval)
 {
@@ -747,34 +665,8 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 
 	TIMING_TIC(TIMING_READ_IMG);
 
-	FileName fn_frame;
-	// If movies, then average over avg_n_frames
-	if (n_frames > 1)
-	{
-		for (int ii =0; ii < avg_n_frames; ii++)
-		{
-			int iiframe = iframe + ii;
-			// If we run over the size of the movie, then discard these frames
-			if (iiframe >= movie_first_frame + n_frames)
-				break;
-			fn_frame.compose(iiframe + 1, fn_mic);
-			if (ii==0)
-			{
-				Imic.read(fn_frame, true, -1, false, true); // readData = true, select_image = -1, mapData= false, is_2D = true
-			}
-			else
-			{
-				Itmp.read(fn_frame, true, -1, false, true); // readData = true, select_image = -1, mapData= false, is_2D = true
-				Imic() += Itmp();
-				Itmp.clear();
-			}
-		}
-	}
-	else
-	{
-		fn_frame = fn_mic;
-		Imic.read(fn_frame);
-	}
+	Imic.read(fn_mic);
+
 	TIMING_TOC(TIMING_READ_IMG);
 
 	CTF ctf;
@@ -940,7 +832,7 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 			}
 
 			TIMING_TIC(TIMING_PRE_IMG_OPS);
-			performPerImageOperations(Ipart, fn_output_img_root, n_frames, my_current_nr_images + ipos, my_total_nr_images,
+			performPerImageOperations(Ipart, fn_output_img_root, my_current_nr_images + ipos, my_total_nr_images,
 					tilt_deg, psi_deg,
 					all_avg, all_stddev, all_minval, all_maxval);
 			TIMING_TOC(TIMING_PRE_IMG_OPS);
@@ -953,20 +845,8 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 				fn_img.compose(fn_output_img_root, my_current_nr_images + ipos + 1, "mrc");
 			else
 				fn_img.compose(my_current_nr_images + ipos + 1, fn_output_img_root + ".mrcs"); // start image counting in stacks at 1!
-			if (do_movie_extract && fn_data == "")
-			{
-				FileName fn_part;
-				fn_part.compose(ipos + 1,  fn_oristack); // start image counting in stacks at 1!
-				// for automated re-alignment of particles in relion_refine: have rlnParticleName equal to rlnImageName in non-movie star file
-				MD.setValue(EMDL_PARTICLE_ORI_NAME, fn_part);
-			}
 			MD.setValue(EMDL_IMAGE_NAME, fn_img);
-			MD.setValue(EMDL_MICROGRAPH_NAME, fn_frame);
-			if (do_movie_extract)
-			{
-				MD.setValue(EMDL_PARTICLE_NR_FRAMES, movie_last_frame - movie_first_frame + 1);
-				MD.setValue(EMDL_PARTICLE_NR_FRAMES_AVG, avg_n_frames);
-			}
+			MD.setValue(EMDL_MICROGRAPH_NAME, fn_mic);
 
 			// Also fill in the CTF parameters
 			if (star_has_ctf)
@@ -1019,29 +899,6 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 				}
 
 			}
-
-			// If the image was re-scaled, then also rescale the rlnOriginX/Y/Z
-			if (do_rescale)
-			{
-				RFLOAT xoff, yoff, zoff=0.;
-				RFLOAT rescale_factor = (RFLOAT)scale/(RFLOAT)extract_size;
-
-				MD.getValue(EMDL_ORIENT_ORIGIN_X, xoff);
-				MD.getValue(EMDL_ORIENT_ORIGIN_Y, yoff);
-				xoff *= rescale_factor;
-				yoff *= rescale_factor;
-				MD.setValue(EMDL_ORIENT_ORIGIN_X, xoff);
-				MD.setValue(EMDL_ORIENT_ORIGIN_Y, yoff);
-
-				if (MD.containsLabel(EMDL_ORIENT_ORIGIN_Z))
-				{
-					MD.getValue(EMDL_ORIENT_ORIGIN_Z, zoff);
-					zoff *= rescale_factor;
-					MD.setValue(EMDL_ORIENT_ORIGIN_Z, zoff);
-				}
-
-			}
-
 
 			TIMING_TOC(TIMING_REST);
 
@@ -1114,7 +971,7 @@ void Preprocessing::runOperateOnInputFile()
 
 		RFLOAT tilt_deg, psi_deg;
 		tilt_deg = psi_deg = 0.;
-		performPerImageOperations(Ipart, fn_operate_out.withoutExtension(), 1, i, Nimg,
+		performPerImageOperations(Ipart, fn_operate_out.withoutExtension(), i, Nimg,
 				tilt_deg, psi_deg,
 				all_avg, all_stddev, all_minval, all_maxval);
 
@@ -1135,7 +992,6 @@ void Preprocessing::runOperateOnInputFile()
 void Preprocessing::performPerImageOperations(
 		Image<RFLOAT> &Ipart,
 		FileName fn_output_img_root,
-		int nframes,
 		long int image_nr,
 		long int nr_of_images,
 		RFLOAT tilt_deg,
@@ -1169,10 +1025,6 @@ void Preprocessing::performPerImageOperations(
 	TIMING_TIC(TIMING_INV_CONT);
 	if (do_invert_contrast) invert_contrast(Ipart);
 	TIMING_TOC(TIMING_INV_CONT);
-
-	// For movies: multiple the image intensities by sqrt(nframes) so the stddev in the average of the normalised frames is again 1
-	if (nframes > 1)
-		Ipart() *= sqrt((RFLOAT)nframes/(RFLOAT)avg_n_frames);
 
 	// Calculate mean, stddev, min and max
 	RFLOAT avg, stddev, minval, maxval;
@@ -1234,14 +1086,15 @@ MetaDataTable Preprocessing::getCoordinateMetaDataTable(FileName fn_mic)
 
 	// Get the micropgraph name without the UNIQDATE string into fn_post, and only read that micrograph in the MDresult table
 	FileName fn_pre, fn_jobnr, fn_post;
-	MetaDataTable MDresult;
 	decomposePipelineFileName(fn_mic, fn_pre, fn_jobnr, fn_post);
-	// Also, when movies, replace _moviename.mrcs with .mrc
-	if (do_movie_extract)
-		// by saying beforeFirstOf("_" + movie_name + ".mrc" instead of ".mrcs" also movies that had an .mrc extension will be handled correctly
-		fn_post = fn_post.beforeFirstOf("_" + movie_name + ".mrc") + ".mrc";
 
-	MDresult.read(fn_data, "", NULL, fn_post);
+	//// TODO: get MDresult, which is sbuset of lines from MDimg that have fn_post as rlnMicrographName
+	//// TODO: get MDresult, which is sbuset of lines from MDimg that have fn_post as rlnMicrographName
+	//// TODO: get MDresult, which is sbuset of lines from MDimg that have fn_post as rlnMicrographName
+	//// TODO: get MDresult, which is sbuset of lines from MDimg that have fn_post as rlnMicrographName
+	//// TODO: get MDresult, which is sbuset of lines from MDimg that have fn_post as rlnMicrographName
+	MetaDataTable MDresult;
+	//MDresult.read(fn_data, "", NULL, fn_post);
 
 	if (!MDresult.containsLabel(EMDL_CTF_MAGNIFICATION) || !MDresult.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
 	{
@@ -1253,7 +1106,7 @@ MetaDataTable Preprocessing::getCoordinateMetaDataTable(FileName fn_mic)
 	{
 		MDresult.goToObject(0);
 
-		if (!do_movie_extract && (MDresult.containsLabel(EMDL_CTF_MAGNIFICATION) && MDresult.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE)))
+		if (MDresult.containsLabel(EMDL_CTF_MAGNIFICATION) && MDresult.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
 		{
 			MDresult.getValue(EMDL_CTF_MAGNIFICATION, mag2);
 			MDresult.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep2);
@@ -1261,8 +1114,8 @@ MetaDataTable Preprocessing::getCoordinateMetaDataTable(FileName fn_mic)
 			rescale_fndata = angpix2 / angpix;
 		}
 
-		bool do_contains_xy = (MDresult.containsLabel(EMDL_ORIENT_ORIGIN_X) && MDresult.containsLabel(EMDL_ORIENT_ORIGIN_Y));
-		bool do_contains_z = (MDresult.containsLabel(EMDL_ORIENT_ORIGIN_Z));
+		bool do_contains_xy = (MDresult.containsLabel(EMDL_ORIENT_ORIGIN_X_ANGSTROM) && MDresult.containsLabel(EMDL_ORIENT_ORIGIN_Y_ANGSTROM));
+		bool do_contains_z = (MDresult.containsLabel(EMDL_ORIENT_ORIGIN_Z_ANGSTROM));
 
 		if (do_recenter && !do_contains_xy)
 		{
@@ -1272,107 +1125,88 @@ MetaDataTable Preprocessing::getCoordinateMetaDataTable(FileName fn_mic)
 		RFLOAT xoff, yoff, zoff, rot, tilt, psi, xcoord, ycoord, zcoord, diffx, diffy, diffz;
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDresult)
 		{
-			if (do_movie_extract)
+			// reset input offsets
+			if (do_reset_offsets)
 			{
-				// for movie-extraction: ignore rescaling of originOffsets!
-				// for movies the extracted movie frames should always be the same size as the refined particles anyway
-
-				// The current rlnImageName becomes the new rlnOriginalParticleName
-				FileName fn_curr_img;
-				MDresult.getValue(EMDL_IMAGE_NAME, fn_curr_img);
-				MDresult.setValue(EMDL_PARTICLE_ORI_NAME, fn_curr_img);
-
-				MDresult.getValue(EMDL_ORIENT_ROT, rot);
-				MDresult.getValue(EMDL_ORIENT_TILT, tilt);
-				MDresult.getValue(EMDL_ORIENT_PSI, psi);
-				MDresult.getValue(EMDL_ORIENT_ORIGIN_X, xoff);
-				MDresult.getValue(EMDL_ORIENT_ORIGIN_Y, yoff);
-				MDresult.setValue(EMDL_ORIENT_ROT_PRIOR, rot);
-				MDresult.setValue(EMDL_ORIENT_TILT_PRIOR, tilt);
-				MDresult.setValue(EMDL_ORIENT_PSI_PRIOR, psi);
-				MDresult.setValue(EMDL_ORIENT_ORIGIN_X_PRIOR, xoff);
-				MDresult.setValue(EMDL_ORIENT_ORIGIN_Y_PRIOR, yoff);
-			}
-			else
-			{
-				// reset input offsets
-				if (do_reset_offsets)
+				RFLOAT zero = 0.;
+				if (do_contains_xy)
 				{
-					RFLOAT zero = 0.;
-					if (do_contains_xy)
-					{
 
-						MDresult.setValue(EMDL_ORIENT_ORIGIN_X, zero);
-						MDresult.setValue(EMDL_ORIENT_ORIGIN_Y, zero);
-					}
-					if (do_contains_z)
-					{
-						MDresult.setValue(EMDL_ORIENT_ORIGIN_Z, zero);
-					}
+					MDresult.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, zero);
+					MDresult.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, zero);
 				}
-				// re-scale or re-center (irrelevant if do_reset_offsets)
-				else if (ABS(rescale_fndata - 1.) > 1e-6 || do_recenter)
+				if (do_contains_z)
 				{
-					Matrix1D<RFLOAT>  my_projected_center(3);
-					my_projected_center.initZeros();
+					MDresult.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, zero);
+				}
+			}
+			// re-scale or re-center (irrelevant if do_reset_offsets)
+			else if (ABS(rescale_fndata - 1.) > 1e-6 || do_recenter)
+			{
+				Matrix1D<RFLOAT>  my_projected_center(3);
+				my_projected_center.initZeros();
 
-					MDresult.getValue(EMDL_ORIENT_ORIGIN_X, xoff);
-					MDresult.getValue(EMDL_ORIENT_ORIGIN_Y, yoff);
+				MDresult.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff);
+				MDresult.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff);
 
-					if (do_recenter && (fabs(recenter_x) > 0. || fabs(recenter_y) > 0. || fabs(recenter_z) > 0.))
-					{
-						MDresult.getValue(EMDL_ORIENT_ROT, rot);
-						MDresult.getValue(EMDL_ORIENT_TILT, tilt);
-						MDresult.getValue(EMDL_ORIENT_PSI, psi);
+				xoff /= angpix;
+				yoff /= angpix;
 
-						// Project the center-coordinates
-						Matrix1D<RFLOAT> my_center(3);
-						Matrix2D<RFLOAT> A3D;
-						XX(my_center) = recenter_x;
-						YY(my_center) = recenter_y;
-						ZZ(my_center) = recenter_z;
-						Euler_angles2matrix(rot, tilt, psi, A3D, false);
-						my_projected_center = A3D * my_center;
-					}
+				if (do_recenter && (fabs(recenter_x) > 0. || fabs(recenter_y) > 0. || fabs(recenter_z) > 0.))
+				{
+					MDresult.getValue(EMDL_ORIENT_ROT, rot);
+					MDresult.getValue(EMDL_ORIENT_TILT, tilt);
+					MDresult.getValue(EMDL_ORIENT_PSI, psi);
 
-					xoff -= XX(my_projected_center);
-					yoff -= YY(my_projected_center);
-					xoff *= rescale_fndata;
-					yoff *= rescale_fndata;
+					// Project the center-coordinates
+					Matrix1D<RFLOAT> my_center(3);
+					Matrix2D<RFLOAT> A3D;
+					XX(my_center) = recenter_x;
+					YY(my_center) = recenter_y;
+					ZZ(my_center) = recenter_z;
+					Euler_angles2matrix(rot, tilt, psi, A3D, false);
+					my_projected_center = A3D * my_center;
+				}
 
+				xoff -= XX(my_projected_center);
+				yoff -= YY(my_projected_center);
+				xoff *= rescale_fndata;
+				yoff *= rescale_fndata;
+
+				if (do_recenter)
+				{
+					MDresult.getValue(EMDL_IMAGE_COORD_X, xcoord);
+					MDresult.getValue(EMDL_IMAGE_COORD_Y, ycoord);
+					diffx = xoff - ROUND(xoff);
+					diffy = yoff - ROUND(yoff);
+					xcoord -= ROUND(xoff);
+					ycoord -= ROUND(yoff);
+					xoff = diffx;
+					yoff = diffy;
+					MDresult.setValue(EMDL_IMAGE_COORD_X, xcoord);
+					MDresult.setValue(EMDL_IMAGE_COORD_Y, ycoord);
+				}
+
+				MDresult.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, angpix * xoff);
+				MDresult.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, angpix * yoff);
+				if (do_contains_z)
+				{
+					MDresult.getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, zoff);
+					zoff /= angpix;
+
+					zoff -= ZZ(my_projected_center);
+					zoff *= rescale_fndata;
 					if (do_recenter)
 					{
-						MDresult.getValue(EMDL_IMAGE_COORD_X, xcoord);
-						MDresult.getValue(EMDL_IMAGE_COORD_Y, ycoord);
-						diffx = xoff - ROUND(xoff);
-						diffy = yoff - ROUND(yoff);
-						xcoord -= ROUND(xoff);
-						ycoord -= ROUND(yoff);
-						xoff = diffx;
-						yoff = diffy;
-						MDresult.setValue(EMDL_IMAGE_COORD_X, xcoord);
-						MDresult.setValue(EMDL_IMAGE_COORD_Y, ycoord);
+						MDresult.getValue(EMDL_IMAGE_COORD_Z, zcoord);
+						diffz = zoff - ROUND(zoff);
+						zcoord -= ROUND(zoff);
+						zoff = diffz;
+						MDresult.setValue(EMDL_IMAGE_COORD_Z, zcoord);
 					}
-
-					MDresult.setValue(EMDL_ORIENT_ORIGIN_X, xoff);
-					MDresult.setValue(EMDL_ORIENT_ORIGIN_Y, yoff);
-					if (do_contains_z)
-					{
-						MDresult.getValue(EMDL_ORIENT_ORIGIN_Z, zoff);
-						zoff -= ZZ(my_projected_center);
-						zoff *= rescale_fndata;
-						if (do_recenter)
-						{
-							MDresult.getValue(EMDL_IMAGE_COORD_Z, zcoord);
-							diffz = zoff - ROUND(zoff);
-							zcoord -= ROUND(zoff);
-							zoff = diffz;
-							MDresult.setValue(EMDL_IMAGE_COORD_Z, zcoord);
-						}
-						MDresult.setValue(EMDL_ORIENT_ORIGIN_Z, zoff);
-					}
-				} // end if recenter
-			} // end if do_movie_extract
+					MDresult.setValue(EMDL_ORIENT_ORIGIN_Z, angpix * zoff);
+				}
+			} // end if recenter
 
 		} // end loop all objects
 	}

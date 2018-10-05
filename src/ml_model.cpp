@@ -51,7 +51,7 @@ void MlModel::initialise(bool _do_sgd)
 	pdf_class.resize(nr_classes, 1./(RFLOAT)nr_classes);
     pdf_direction.resize(nr_classes * nr_bodies);
     group_names.resize(nr_groups, "");
-    sigma2_noise.resize(nr_groups, aux);
+    sigma2_noise.resize(nr_groups);
     nr_particles_group.resize(nr_groups);
     tau2_class.resize(nr_classes * nr_bodies, aux);
     fsc_halves_class.resize(nr_classes * nr_bodies, aux);
@@ -120,7 +120,6 @@ void MlModel::read(FileName fn_in)
 		!MDlog.getValue(EMDL_MLMODEL_NR_GROUPS, nr_groups) ||
 		!MDlog.getValue(EMDL_MLMODEL_TAU2_FUDGE_FACTOR, tau2_fudge_factor) ||
 		!MDlog.getValue(EMDL_MLMODEL_NORM_CORRECTION_AVG, avg_norm_correction) ||
-		!MDlog.getValue(EMDL_MLMODEL_SIGMA_OFFSET, sigma2_offset) ||
 		!MDlog.getValue(EMDL_MLMODEL_PRIOR_MODE, orientational_prior_mode) ||
 		!MDlog.getValue(EMDL_MLMODEL_SIGMA_ROT, sigma2_rot) ||
 		!MDlog.getValue(EMDL_MLMODEL_SIGMA_TILT, sigma2_tilt) ||
@@ -128,6 +127,19 @@ void MlModel::read(FileName fn_in)
 		!MDlog.getValue(EMDL_MLMODEL_LL, LL) ||
 		!MDlog.getValue(EMDL_MLMODEL_AVE_PMAX, ave_Pmax) )
 		REPORT_ERROR("MlModel::readStar: incorrect model_general table");
+
+    if (!MDlog.getValue(EMDL_MLMODEL_SIGMA_OFFSET_ANGSTROM, sigma2_offset))
+    {
+    	if (MDlog.getValue(EMDL_MLMODEL_SIGMA_OFFSET, sigma2_offset))
+    	{
+    		sigma2_offset *= pixel_size;
+    	}
+    	else
+    	{
+    		REPORT_ERROR("MlModel::readStar: incorrect model_general table: cannot find sigma_offset");
+    	}
+    }
+
 
 	// Retain compability with model files written by Relion prior to 1.4
 	if (!MDlog.getValue(EMDL_MLMODEL_DIMENSIONALITY_DATA, data_dim))
@@ -187,10 +199,21 @@ void MlModel::read(FileName fn_in)
 	do_sgd = false;
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDclass)
 	{
+		if (!MDclass.getValue(EMDL_MLMODEL_ACCURACY_TRANS_ANGSTROM, acc_trans[iclass]))
+		{
+			if (MDclass.getValue(EMDL_MLMODEL_ACCURACY_TRANS, acc_trans[iclass]))
+			{
+				acc_trans[iclass] *= pixel_size;
+			}
+			else
+			{
+				REPORT_ERROR("MlModel::readStar: incorrect model_classes/bodies table: no acc_trans");
+			}
+		}
+
 		if (!MDclass.getValue(EMDL_MLMODEL_REF_IMAGE, fn_tmp) ||
-			!MDclass.getValue(EMDL_MLMODEL_ACCURACY_ROT, acc_rot[iclass]) ||
-			!MDclass.getValue(EMDL_MLMODEL_ACCURACY_TRANS, acc_trans[iclass]) 	)
-			REPORT_ERROR("MlModel::readStar: incorrect model_classes/bodies table");
+			!MDclass.getValue(EMDL_MLMODEL_ACCURACY_ROT, acc_rot[iclass]) )
+			REPORT_ERROR("MlModel::readStar: incorrect model_classes/bodies table: no ref_image or acc_rot");
 		// backwards compatible
 		if (!MDclass.getValue(EMDL_MLMODEL_ESTIM_RESOL_REF, estimated_resolution[iclass]))
 			estimated_resolution[iclass] = 0.;
@@ -272,27 +295,22 @@ void MlModel::read(FileName fn_in)
 	}
 
 	// Read sigma models for each group
+	spectral_sizes.resize(nr_groups);
 	for (int igroup = 0; igroup < nr_groups; igroup++)
 	{
-		if (nr_particles_group[igroup] > 0)
+		MDsigma.readStar(in, "model_group_" + integerToString(igroup + 1));
+		// Allow sigma2_noise with different sizes!
+		spectral_sizes[igroup] = MDsigma.numberOfObjects();
+		sigma2_noise[igroup].resize(spectral_sizes[igroup]);
+		int idx;
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsigma)
 		{
-			MDsigma.readStar(in, "model_group_" + integerToString(igroup + 1));
-			int idx;
-			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsigma)
-			{
-				if (!MDsigma.getValue(EMDL_SPECTRAL_IDX, idx))
-					REPORT_ERROR("MlModel::readStar: incorrect table model_group_"+integerToString(igroup));
-				if (!MDsigma.getValue(EMDL_MLMODEL_SIGMA2_NOISE, sigma2_noise[igroup](idx)))
-					REPORT_ERROR("MlModel::readStar: incorrect table model_group_"+integerToString(igroup));
-			}
+			if (!MDsigma.getValue(EMDL_SPECTRAL_IDX, idx))
+				REPORT_ERROR("MlModel::readStar: incorrect table model_group_"+integerToString(igroup));
+			if (!MDsigma.getValue(EMDL_MLMODEL_SIGMA2_NOISE, sigma2_noise[igroup](idx)))
+				REPORT_ERROR("MlModel::readStar: incorrect table model_group_"+integerToString(igroup));
 		}
-		else
-		{
-			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(sigma2_noise[igroup])
-			{
-				DIRECT_MULTIDIM_ELEM(sigma2_noise[igroup], n) = 0.;
-			}
-		}
+
 	}
 
 	// Read pdf_direction models for each class
@@ -476,7 +494,7 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 	MDlog.setValue(EMDL_MLMODEL_NR_GROUPS, nr_groups);
 	MDlog.setValue(EMDL_MLMODEL_TAU2_FUDGE_FACTOR, tau2_fudge_factor);
 	MDlog.setValue(EMDL_MLMODEL_NORM_CORRECTION_AVG, avg_norm_correction);
-	MDlog.setValue(EMDL_MLMODEL_SIGMA_OFFSET, sqrt(sigma2_offset));
+	MDlog.setValue(EMDL_MLMODEL_SIGMA_OFFSET_ANGSTROM, sqrt(sigma2_offset));
 	MDlog.setValue(EMDL_MLMODEL_PRIOR_MODE, orientational_prior_mode);
 	MDlog.setValue(EMDL_MLMODEL_SIGMA_ROT, sqrt(sigma2_rot));
 	MDlog.setValue(EMDL_MLMODEL_SIGMA_TILT, sqrt(sigma2_tilt));
@@ -538,7 +556,7 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 		int myclass = (nr_bodies > 1) ? 0 : iclass; // for multi-body: just set iclass=0
 		MDclass.setValue(EMDL_MLMODEL_PDF_CLASS, pdf_class[myclass]);
 		MDclass.setValue(EMDL_MLMODEL_ACCURACY_ROT, acc_rot[iclass]);
-		MDclass.setValue(EMDL_MLMODEL_ACCURACY_TRANS, acc_trans[iclass]);
+		MDclass.setValue(EMDL_MLMODEL_ACCURACY_TRANS_ANGSTROM, acc_trans[iclass]);
 		MDclass.setValue(EMDL_MLMODEL_ESTIM_RESOL_REF, estimated_resolution[iclass]);
 		MDclass.setValue(EMDL_MLMODEL_FOURIER_COVERAGE_TOTAL_REF, total_fourier_coverage[iclass]);
 		if (nr_bodies > 1)
@@ -605,21 +623,24 @@ void MlModel::write(FileName fn_out, HealpixSampling &sampling, bool do_write_bi
 	// Write sigma models for each group
 	for (int igroup = 0; igroup < nr_groups; igroup++)
 	{
-		MDsigma.clear();
-		MDsigma.setName("model_group_"+integerToString(igroup+1));
-		for (int ii = 0; ii < XSIZE(sigma2_noise[igroup]); ii++)
+		if (nr_particles_group[igroup] > 0)
 		{
-			MDsigma.addObject();
-			// Some points in sigma2_noise arrays are never used...
-			aux = sigma2_noise[igroup](ii);
-			if (aux > 0.)
+			MDsigma.clear();
+			MDsigma.setName("model_group_"+integerToString(igroup+1));
+			for (int ii = 0; ii < XSIZE(sigma2_noise[igroup]); ii++)
 			{
-				MDsigma.setValue(EMDL_SPECTRAL_IDX, ii);
-				MDsigma.setValue(EMDL_RESOLUTION, getResolution(ii));
-				MDsigma.setValue(EMDL_MLMODEL_SIGMA2_NOISE, aux);
+				MDsigma.addObject();
+				// Some points in sigma2_noise arrays are never used...
+				aux = sigma2_noise[igroup](ii);
+				if (aux > 0.)
+				{
+					MDsigma.setValue(EMDL_SPECTRAL_IDX, ii);
+					MDsigma.setValue(EMDL_RESOLUTION, getResolution(ii));
+					MDsigma.setValue(EMDL_MLMODEL_SIGMA2_NOISE, aux);
+				}
 			}
+			MDsigma.write(fh);
 		}
-		MDsigma.write(fh);
 	}
 
 	// Write pdf_direction models for each class
@@ -667,17 +688,26 @@ void  MlModel::readTauSpectrum(FileName fn_tau, int verb)
 }
 
 // Reading images from disc
-void MlModel::readImages(FileName fn_ref, bool _is_3d_model, int _ori_size, Experiment &_mydata,
-			bool &do_average_unaligned, bool &do_generate_seeds, bool &refs_are_ctf_corrected, bool _do_sgd)
+void MlModel::readImages(FileName fn_ref, bool _is_3d_model, int user_model_size, RFLOAT user_pixel_size, Experiment &_mydata,
+			bool &do_average_unaligned, bool &do_generate_seeds, bool &refs_are_ctf_corrected, bool _do_sgd, bool verb)
 {
 
-	// Set some stuff
+	// Set some group stuff
 	nr_groups = _mydata.groups.size();
-	ori_size = _ori_size;
-	RFLOAT avg_norm_correction = 1.;
+	sigma2_noise.resize(nr_groups);
+	spectral_sizes.resize(nr_groups);
+	for (long int igroup = 0; igroup < nr_groups; igroup++)
+	{
+		int optics_group = _mydata.groups[igroup].optics_group;
+		int my_image_size = _mydata.getOpticsImageSize(optics_group);
+		spectral_sizes[igroup] = my_image_size / 2 + 1;
+		sigma2_noise[igroup].initZeros(spectral_sizes[igroup]);
+	}
+
+	RFLOAT header_pixel_size;
 
 	// Data dimensionality
-	_mydata.MDexp.getValue(EMDL_IMAGE_DIMENSIONALITY, data_dim);
+	_mydata.MDopt.getValue(EMDL_IMAGE_DIMENSIONALITY, data_dim, 0);
 
 	// Read references into memory
 	Image<RFLOAT> img;
@@ -706,12 +736,21 @@ void MlModel::readImages(FileName fn_ref, bool _is_3d_model, int _ori_size, Expe
 				MDref.getValue(EMDL_MLMODEL_REF_IMAGE, fn_tmp);
 				img.read(fn_tmp);
 				img().setXmippOrigin();
-				ref_dim = img().getDim();
-				if (ori_size != XSIZE(img()) || ori_size != YSIZE(img()))
+				ori_size = XSIZE(img());
+				if (nr_classes == 0)
 				{
-					std::cerr << " ori_size= " << ori_size << " XSIZE(img())= " << XSIZE(img()) << std::endl;
-					REPORT_ERROR("MlOptimiser::read: size of reference images is not the same as the experimental images!");
+					img.MDMainHeader.getValue(EMDL_IMAGE_SAMPLINGRATE_X, header_pixel_size);
 				}
+				else
+				{
+					RFLOAT aux_pixel_size;
+					img.MDMainHeader.getValue(EMDL_IMAGE_SAMPLINGRATE_X, aux_pixel_size);
+					if (fabs(aux_pixel_size-header_pixel_size) > 0.001)
+					{
+						REPORT_ERROR("MlModel::readImages ERROR: different models have different pixel sizes in their headers!");
+					}
+				}
+				ref_dim = img().getDim();
 				Iref.push_back(img());
 				if (_do_sgd)
 				{
@@ -726,6 +765,8 @@ void MlModel::readImages(FileName fn_ref, bool _is_3d_model, int _ori_size, Expe
 		{
 			img.read(fn_ref);
 			img().setXmippOrigin();
+			img.MDMainHeader.getValue(EMDL_IMAGE_SAMPLINGRATE_X, header_pixel_size);
+			ori_size = XSIZE(img());
 			ref_dim = img().getDim();
 			if (ori_size != XSIZE(img()) || ori_size != YSIZE(img()))
 			{
@@ -760,10 +801,25 @@ void MlModel::readImages(FileName fn_ref, bool _is_3d_model, int _ori_size, Expe
 			else
 				do_generate_seeds = false;
 		}
+
+		pixel_size = header_pixel_size;
+
 	}
 	else
 	{
-		// If no -ref is given, calculate average of all unaligned images later on.
+		pixel_size = user_pixel_size;
+		ori_size = user_model_size;
+		// If no -ref is given, get image size and pixel size from the input data, or by user-provided values
+		if (user_pixel_size < 0.)
+		{
+			REPORT_ERROR("ERROR: trying to set negative pixel size in mymodel");
+		}
+		if (user_model_size < 0.)
+		{
+			REPORT_ERROR("ERROR: trying to set negative image size in mymodel");
+		}
+
+		// Calculate average of all unaligned images later on.
 		do_average_unaligned = true;
 		do_generate_seeds = false; // after SGD introduction, this is now done in the estimation of initial sigma2 step!
 		refs_are_ctf_corrected = true;
@@ -786,6 +842,7 @@ void MlModel::readImages(FileName fn_ref, bool _is_3d_model, int _ori_size, Expe
 			if (_do_sgd)
 				Igrad.push_back(img());
 		}
+
 	}
 
 	initialise(_do_sgd);
@@ -869,7 +926,7 @@ void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool als
 				max_d2 = XMIPP_MAX(max_d2, d2);
 			}
 		}
-		max_radius_mask_bodies[nr_bodies] = CEIL(sqrt((RFLOAT)max_d2));
+		max_radius_mask_bodies[nr_bodies] = CEIL(pixel_size * sqrt((RFLOAT)max_d2));
 
 		// Get which body to rotate relative to
 		int relative_to = -1;
@@ -908,12 +965,17 @@ void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool als
 			sigma_psi_bodies[nr_bodies] = val;
 		}
 
-		if (!MD.containsLabel(EMDL_BODY_SIGMA_OFFSET))
-			REPORT_ERROR("ERROR: the body STAR file should contain a rlnBodySigmaOffset column for the prior on the offsets for each body");
+		if (MD.getValue(EMDL_BODY_SIGMA_OFFSET_ANGSTROM, val))
+		{
+			sigma_offset_bodies[nr_bodies] = val;
+		}
+		else if (MD.getValue(EMDL_BODY_SIGMA_OFFSET, val))
+		{
+			val *= pixel_size;
+		}
 		else
 		{
-			MD.getValue(EMDL_BODY_SIGMA_OFFSET, val);
-			sigma_offset_bodies[nr_bodies] = val;
+			REPORT_ERROR("ERROR: the body STAR file should contain a rlnBodySigmaOffsetAngst column for the prior on the offsets for each body");
 		}
 
 		// Also write the mask with the standard name to disk
@@ -1188,7 +1250,7 @@ void MlModel::setFourierTransformMaps(bool update_tau2_spectra, int nr_threads, 
 
 }
 
-void MlModel::initialiseDataVersusPrior(bool fix_tau)
+void MlModel::initialiseDataVersusPrior(bool fix_tau, Experiment &_mydata)
 {
 
     // Get total number of particles
@@ -1197,13 +1259,44 @@ void MlModel::initialiseDataVersusPrior(bool fix_tau)
 		nr_particles += (RFLOAT)nr_particles_group[igroup];
 
 	// Calculate average sigma2_noise over all image groups
-	MultidimArray<RFLOAT> avg_sigma2_noise;
-	avg_sigma2_noise.initZeros(sigma2_noise[0]);
+	MultidimArray<RFLOAT> avg_sigma2_noise, sum_parts;
+	avg_sigma2_noise.initZeros(ori_size /2 + 1);
+	sum_parts.initZeros(ori_size /2 + 1);
 	for (int igroup = 0; igroup < nr_particles_group.size(); igroup++)
 	{
+
+		int optics_group = _mydata.groups[igroup].optics_group;
+		int my_image_size = _mydata.getOpticsImageSize(optics_group);
+		RFLOAT my_pixel_size= _mydata.getOpticsPixelSize(optics_group);
+
+		spectral_sizes[igroup] = my_image_size / 2 + 1;
+		// go from arbitrary image_size and pixel_size of the images to the ori_size and pxeil_size of the model
+		for (int x = 0; x < XSIZE(sigma2_noise[igroup]); x++)
+		{
+			int ipix = ROUND(((RFLOAT)ori_size * pixel_size * (RFLOAT)x) / ((RFLOAT)my_image_size * my_pixel_size));
+			DIRECT_A1D_ELEM(avg_sigma2_noise, ipix) += (RFLOAT)(nr_particles_group[igroup]) * DIRECT_A1D_ELEM(sigma2_noise[igroup], x);
+			DIRECT_A1D_ELEM(sum_parts, ipix) += (RFLOAT)(nr_particles_group[igroup]);
+		}
 		avg_sigma2_noise += (RFLOAT)(nr_particles_group[igroup]) * sigma2_noise[igroup];
 	}
-	avg_sigma2_noise /= nr_particles;
+
+	// Calculate average sigma2_noise
+	for (int x = 0; x < XSIZE(avg_sigma2_noise); x++)
+	{
+		if (DIRECT_A1D_ELEM(sum_parts, x) > 0.)
+		{
+			DIRECT_A1D_ELEM(avg_sigma2_noise, x) /= DIRECT_A1D_ELEM(sum_parts, x);
+		}
+		else if (x > 0)
+		{
+			std::cerr << "WARNING: POSSIBLE BUG: zero avg_sigma2_noise for x-coordinate: " << x << "; take value from previous coordinate..." << std::endl;
+			DIRECT_A1D_ELEM(avg_sigma2_noise, x) = DIRECT_A1D_ELEM(avg_sigma2_noise, x - 1);
+		}
+		else
+		{
+			REPORT_ERROR_STR("ERROR: BUG: zero avg_sigma2_noise for x-coordinate: "<< x);
+		}
+	}
 
 	// Get the FT of all reference structures
     // The Fourier Transforms are all "normalised" for 2D transforms of size = ori_size x ori_size
@@ -1214,10 +1307,10 @@ void MlModel::initialiseDataVersusPrior(bool fix_tau)
     for (int iclass = 0; iclass < nr_classes_bodies; iclass++)
 	{
 		// Initialise output arrays to correct size
-		tau2_class[iclass].resize(sigma2_noise[0]);
+		tau2_class[iclass].resize(ori_size /2 + 1);
 
 		// Get the power spectrum of the reference
-		MultidimArray<RFLOAT> spectrum(sigma2_noise[0]);
+		MultidimArray<RFLOAT> spectrum(ori_size /2 + 1);
 		getSpectrum(Iref[iclass], spectrum, POWER_SPECTRUM);
 
 		// Factor two because of two-dimensionality of the complex plane
@@ -1302,9 +1395,11 @@ void MlModel::calculateTotalFourierCoverage()
 /////////// MlWsumModel
 void MlWsumModel::initialise(MlModel &_model, FileName fn_sym, bool asymmetric_padding, bool _skip_gridding)
 {
+	pixel_size = _model.pixel_size;
 	nr_classes = _model.nr_classes;
 	nr_bodies = _model.nr_bodies;
     nr_groups = _model.nr_groups;
+    spectral_sizes = _model.spectral_sizes;
     nr_directions = _model.nr_directions;
     ref_dim = _model.ref_dim;
     data_dim = _model.data_dim;
@@ -1354,9 +1449,13 @@ void MlWsumModel::initialise(MlModel &_model, FileName fn_sym, bool asymmetric_p
 		helical_rise[iclass] = _model.helical_rise[iclass];
 	}
 
-    MultidimArray<RFLOAT> aux(ori_size / 2 + 1);
-    wsum_signal_product_spectra.resize(nr_groups, aux);
-    wsum_reference_power_spectra.resize(nr_groups, aux);
+	wsum_signal_product_spectra.resize(nr_groups);
+	wsum_reference_power_spectra.resize(nr_groups);
+	for (long int igroup = 0; igroup < nr_groups; igroup++)
+	{
+		wsum_signal_product_spectra[igroup].initZeros(sigma2_noise[igroup]);
+		wsum_reference_power_spectra[igroup].initZeros(sigma2_noise[igroup]);
+	}
 
     // Resize MlWsumModel-specific vectors
     BackProjector BP(ori_size, ref_dim, fn_sym, interpolator, padding_factor, r_min_nn,
@@ -1414,15 +1513,15 @@ void MlWsumModel::initZeros()
 
 void MlWsumModel::pack(MultidimArray<RFLOAT> &packed)
 {
-    // for LL & avePmax & sigma2_offset & avg_norm_correction & sigma2_rot & sigma2_tilt & sigma2_psi
     unsigned long long packed_size = 0;
-    int spectral_size = (ori_size / 2) + 1;
 
+    // for LL & avePmax & sigma2_offset & avg_norm_correction & sigma2_rot & sigma2_tilt & sigma2_psi
     packed_size += 7 ;
-    // for all group-related stuff
-    packed_size += nr_groups * spectral_size;
-    packed_size += nr_groups * spectral_size;
-    packed_size += nr_groups * spectral_size;
+    // for group-related spectra
+    for (int igroup = 0; igroup < nr_groups; igroup++)
+    {
+    	packed_size += 3 * spectral_sizes[igroup];
+    }
     // for sumw_group
     packed_size += nr_groups;
     // for all class-related stuff
@@ -1520,7 +1619,6 @@ void MlWsumModel::pack(MultidimArray<RFLOAT> &packed)
 }
 void MlWsumModel::unpack(MultidimArray<RFLOAT> &packed)
 {
-    int spectral_size = (ori_size / 2) + 1;
 
     unsigned long long idx = 0;
 
@@ -1534,17 +1632,17 @@ void MlWsumModel::unpack(MultidimArray<RFLOAT> &packed)
 
     for (int igroup = 0; igroup < nr_groups; igroup++)
     {
-    	sigma2_noise[igroup].resize(spectral_size);
+    	sigma2_noise[igroup].resize(spectral_sizes[igroup]);
         FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(sigma2_noise[igroup])
         {
         	DIRECT_MULTIDIM_ELEM(sigma2_noise[igroup], n) = DIRECT_MULTIDIM_ELEM(packed, idx++);
         }
-        wsum_signal_product_spectra[igroup].resize(spectral_size);
+        wsum_signal_product_spectra[igroup].resize(spectral_sizes[igroup]);
         FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(wsum_signal_product_spectra[igroup])
         {
         	DIRECT_MULTIDIM_ELEM(wsum_signal_product_spectra[igroup], n) = DIRECT_MULTIDIM_ELEM(packed, idx++);
         }
-        wsum_reference_power_spectra[igroup].resize(spectral_size);
+        wsum_reference_power_spectra[igroup].resize(spectral_sizes[igroup]);
         FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(wsum_reference_power_spectra[igroup])
         {
         	DIRECT_MULTIDIM_ELEM(wsum_reference_power_spectra[igroup], n) = DIRECT_MULTIDIM_ELEM(packed, idx++);
@@ -1601,16 +1699,16 @@ void MlWsumModel::pack(MultidimArray<RFLOAT> &packed, int &piece, int &nr_pieces
     int nr_groups = sigma2_noise.size();
     int nr_classes_bodies = BPref.size();
     int nr_classes = pdf_class.size();
-    int spectral_size = (ori_size / 2) + 1;
     unsigned long long packed_size = 0;
     unsigned long long idx_start, idx_stop;
 
 	// for LL & avePmax & sigma2_offset & avg_norm_correction & sigma2_rot & sigma2_tilt & sigma2_psi
     packed_size += 7 ;
-    // for all group-related stuff
-    packed_size += nr_groups * spectral_size;
-    packed_size += nr_groups * spectral_size;
-    packed_size += nr_groups * spectral_size;
+    // for group-related spectra
+    for (int igroup = 0; igroup < nr_groups; igroup++)
+    {
+    	packed_size += 3 * spectral_sizes[igroup];
+    }
     // for sumw_group
     packed_size += nr_groups;
     // for all class-related stuff
@@ -1771,7 +1869,6 @@ void MlWsumModel::unpack(MultidimArray<RFLOAT> &packed, int piece, bool do_clear
     int nr_groups = sigma2_noise.size();
     int nr_classes_bodies = BPref.size();
     int nr_classes = pdf_class.size();
-    int spectral_size = (ori_size / 2) + 1;
     unsigned long long idx_start;
     unsigned long long idx_stop;
     if (piece < 0)
@@ -1810,7 +1907,7 @@ void MlWsumModel::unpack(MultidimArray<RFLOAT> &packed, int piece, bool do_clear
     {
 
     	if (idx == ori_idx)
-    		sigma2_noise[igroup].resize(spectral_size);
+    		sigma2_noise[igroup].resize(spectral_sizes[igroup]);
         FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(sigma2_noise[igroup])
         {
             if (ori_idx >= idx_start && ori_idx < idx_stop)
@@ -1819,7 +1916,7 @@ void MlWsumModel::unpack(MultidimArray<RFLOAT> &packed, int piece, bool do_clear
         }
 
         if (idx == ori_idx)
-    		wsum_signal_product_spectra[igroup].resize(spectral_size);
+    		wsum_signal_product_spectra[igroup].resize(spectral_sizes[igroup]);
         FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(wsum_signal_product_spectra[igroup])
         {
             if (ori_idx >= idx_start && ori_idx < idx_stop)
@@ -1828,7 +1925,7 @@ void MlWsumModel::unpack(MultidimArray<RFLOAT> &packed, int piece, bool do_clear
         }
 
         if (idx == ori_idx)
-    		wsum_reference_power_spectra[igroup].resize(spectral_size);
+    		wsum_reference_power_spectra[igroup].resize(spectral_sizes[igroup]);
         FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(wsum_reference_power_spectra[igroup])
         {
             if (ori_idx >= idx_start && ori_idx < idx_stop)

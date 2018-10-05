@@ -367,8 +367,8 @@ int writeMRC(long int img_select, bool isStack=false, int mode=WRITE_OVERWRITE)
         else
         	header->arms  = (float)data.computeStddev();
 
-        if(MDMainHeader.getValue(EMDL_ORIENT_ORIGIN_X, aux))
-        	SAFESET(header->nxStart,(int)(aux-0.5));
+        //if(MDMainHeader.getValue(EMDL_ORIENT_ORIGIN_X, aux))
+        //	SAFESET(header->nxStart,(int)(aux-0.5));
 
         if (MDMainHeader.getValue(EMDL_IMAGE_SAMPLINGRATE_X,aux2))//header is init to zero
         {
@@ -376,8 +376,8 @@ int writeMRC(long int img_select, bool isStack=false, int mode=WRITE_OVERWRITE)
         	SAFESET(header->a,(float)aux2*header->nx);
         }
 
-        if (MDMainHeader.getValue(EMDL_ORIENT_ORIGIN_Y, aux))
-        	SAFESET(header->nyStart,(int)(aux-0.5));
+        //if (MDMainHeader.getValue(EMDL_ORIENT_ORIGIN_Y, aux))
+        //	SAFESET(header->nyStart,(int)(aux-0.5));
 
         if (MDMainHeader.getValue(EMDL_IMAGE_SAMPLINGRATE_Y,aux2))//header is init to zero
         {
@@ -385,8 +385,8 @@ int writeMRC(long int img_select, bool isStack=false, int mode=WRITE_OVERWRITE)
         	SAFESET(header->b,(float)aux2*header->ny);
         }
 
-        if (MDMainHeader.getValue(EMDL_ORIENT_ORIGIN_Z, aux))
-        	SAFESET(header->nzStart,(int)(aux-0.5));
+        //if (MDMainHeader.getValue(EMDL_ORIENT_ORIGIN_Z, aux))
+        //	SAFESET(header->nzStart,(int)(aux-0.5));
 
         if (MDMainHeader.getValue(EMDL_IMAGE_SAMPLINGRATE_Z,aux2))//header is init to zero
         {

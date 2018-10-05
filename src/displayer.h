@@ -24,10 +24,12 @@
 #include "src/image.h"
 #include "src/metadata_label.h"
 #include "src/metadata_table.h"
+#include "src/jaz/obs_model.h"
 #include <src/matrix2d.h>
 #include <src/fftw.h>
 #include <src/time.h>
 #include <src/args.h>
+
 
 #include <FL/Fl.H>
 #include <FL/Fl_Shared_Image.H>
@@ -142,7 +144,7 @@ public:
 	// Constructor with w x h size of the window and a title
 	basisViewerWindow(int W, int H, const char* title=0): Fl_Window(W, H, title){}
 
-	int fillCanvas(int viewer_type, MetaDataTable &MDin, EMDLabel display_label, bool _do_read_whole_stacks, bool _do_apply_orient,
+	int fillCanvas(int viewer_type, MetaDataTable &MDin, MetaDataTable *MDopt, EMDLabel display_label, bool _do_read_whole_stacks, bool _do_apply_orient,
 			RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast,
 			RFLOAT _scale, RFLOAT _ori_scale, int _ncol, long int max_nr_images = -1, RFLOAT lowpass = -1.0 , RFLOAT highpass = -1.0,
 			bool do_class = false, MetaDataTable *MDdata = NULL,
@@ -185,7 +187,7 @@ public:
 
 	void SetScroll(Fl_Scroll *val) { scroll = val; }
 
-	int fill(MetaDataTable &MDin, EMDLabel display_label, bool _do_apply_orient, RFLOAT _minval, RFLOAT _maxval,
+	int fill(MetaDataTable &MDin, MetaDataTable *MDopt, EMDLabel display_label, bool _do_apply_orient, RFLOAT _minval, RFLOAT _maxval,
 			RFLOAT _sigma_contrast, RFLOAT _scale, int _ncol, bool do_recenter = false, long int max_images = -1,
 			RFLOAT lowpass = -1.0, RFLOAT highpass = -1.0);
 	int fill(MultidimArray<RFLOAT> &image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale = 1.);
@@ -229,6 +231,9 @@ public:
 
 	// pointer to the MetaDataTable for the individually aligned particles when do_class (the data.star file)
 	MetaDataTable *MDdata;
+
+	// pointer to the MetaDataTable for the optics groups
+	MetaDataTable *MDopt;
 
 	// pointer to the MetaDataTable for the groups when do_class and do_regroup (the data.star file)
 	MetaDataTable *MDgroups;
@@ -596,6 +601,9 @@ public:
 	// Input metadata
 	MetaDataTable MDin;
 
+	// Optics group metadata
+	MetaDataTable MDopt;
+
 	// For the multiviewer
 	std::vector<DisplayBox*> boxes;
 
@@ -605,7 +613,7 @@ public:
 	// Highpass filter for picker images
 	RFLOAT highpass;
 
-	// Pixel size to calculate lowpass filter in Angstroms
+	// Pixel size to calculate lowpass filter in Angstroms and translations in apply_orient
 	RFLOAT angpix;
 
 	// Show Fourier amplitudes?

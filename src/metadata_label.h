@@ -73,7 +73,8 @@ enum EMDLabel
 	EMDL_BODY_ROTATE_DIRECTION_Z,
     EMDL_BODY_ROTATE_RELATIVE_TO,
 	EMDL_BODY_SIGMA_ANG,
-    EMDL_BODY_SIGMA_OFFSET,
+    EMDL_BODY_SIGMA_OFFSET, // deprecated
+    EMDL_BODY_SIGMA_OFFSET_ANGSTROM,
     EMDL_BODY_SIGMA_ROT,
     EMDL_BODY_SIGMA_TILT,
     EMDL_BODY_SIGMA_PSI,
@@ -183,7 +184,8 @@ enum EMDLabel
     EMDL_MASK_NAME,
 
     EMDL_MLMODEL_ACCURACY_ROT,
-    EMDL_MLMODEL_ACCURACY_TRANS,
+    EMDL_MLMODEL_ACCURACY_TRANS, // deprecated
+    EMDL_MLMODEL_ACCURACY_TRANS_ANGSTROM,
     EMDL_MLMODEL_AVE_PMAX,
     EMDL_MLMODEL_CURRENT_RESOLUTION,
     EMDL_MLMODEL_CURRENT_SIZE,
@@ -226,7 +228,8 @@ enum EMDLabel
     EMDL_MLMODEL_PIXEL_SIZE,
     EMDL_MLMODEL_POWER_REF,
     EMDL_MLMODEL_PRIOR_MODE,
-    EMDL_MLMODEL_SIGMA_OFFSET,
+    EMDL_MLMODEL_SIGMA_OFFSET, // deprecated
+    EMDL_MLMODEL_SIGMA_OFFSET_ANGSTROM,
     EMDL_MLMODEL_SIGMA_ROT,
     EMDL_MLMODEL_SIGMA_TILT,
     EMDL_MLMODEL_SIGMA_PSI,
@@ -239,7 +242,8 @@ enum EMDLabel
     EMDL_MLMODEL_TAU2_REF,
 
     EMDL_OPTIMISER_ACCURACY_ROT,
-    EMDL_OPTIMISER_ACCURACY_TRANS,
+    EMDL_OPTIMISER_ACCURACY_TRANS, // deprecated
+    EMDL_OPTIMISER_ACCURACY_TRANS_ANGSTROM,
     EMDL_OPTIMISER_ADAPTIVE_FRACTION,
     EMDL_OPTIMISER_ADAPTIVE_OVERSAMPLING,
     EMDL_OPTIMISER_AUTO_LOCAL_HP_ORDER,
@@ -335,14 +339,17 @@ enum EMDLabel
     EMDL_ORIENT_FLIP,
     EMDL_ORIENT_ID,
 	EMDL_ORIENT_ORIGIN_X, // (deprecated)
-    EMDL_ORIENT_ORIGIN_X_PRIOR,
     EMDL_ORIENT_ORIGIN_Y, // (deprecated)
-    EMDL_ORIENT_ORIGIN_Y_PRIOR,
     EMDL_ORIENT_ORIGIN_Z, // (deprecated)
-    EMDL_ORIENT_ORIGIN_Z_PRIOR,
+    EMDL_ORIENT_ORIGIN_X_PRIOR, // (deprecated)
+    EMDL_ORIENT_ORIGIN_Y_PRIOR, // (deprecated)
+    EMDL_ORIENT_ORIGIN_Z_PRIOR, // (deprecated)
 	EMDL_ORIENT_ORIGIN_X_ANGSTROM,
     EMDL_ORIENT_ORIGIN_Y_ANGSTROM,
     EMDL_ORIENT_ORIGIN_Z_ANGSTROM,
+    EMDL_ORIENT_ORIGIN_X_PRIOR_ANGSTROM,
+    EMDL_ORIENT_ORIGIN_Y_PRIOR_ANGSTROM,
+    EMDL_ORIENT_ORIGIN_Z_PRIOR_ANGSTROM,
     EMDL_ORIENT_ROT,
     EMDL_ORIENT_ROT_PRIOR,
     EMDL_ORIENT_TILT,
@@ -354,7 +361,8 @@ enum EMDLabel
     EMDL_PARTICLE_AUTOPICK_FOM,
     EMDL_PARTICLE_HELICAL_TUBE_ID,
     EMDL_PARTICLE_HELICAL_TUBE_PITCH,
-    EMDL_PARTICLE_HELICAL_TRACK_LENGTH,
+    EMDL_PARTICLE_HELICAL_TRACK_LENGTH, //deprecated
+    EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM,
     EMDL_PARTICLE_CLASS,
     EMDL_PARTICLE_DLL,
     EMDL_PARTICLE_ID,
@@ -530,6 +538,7 @@ private:
         EMDL::addLabel(EMDL_BODY_ROTATE_RELATIVE_TO, EMDL_INT, "rlnBodyRotateRelativeTo", "Number of the body relative to which this body rotates (if negative, use rlnBodyRotateDirectionXYZ)");
         EMDL::addLabel(EMDL_BODY_SIGMA_ANG, EMDL_DOUBLE, "rlnBodySigmaAngles", "Width of prior on all three Euler angles of a body in multibody refinement (in degrees)");
         EMDL::addLabel(EMDL_BODY_SIGMA_OFFSET, EMDL_DOUBLE, "rlnBodySigmaOffset", "Width of prior on origin offsets of a body in multibody refinement (in pixels)");
+        EMDL::addLabel(EMDL_BODY_SIGMA_OFFSET_ANGSTROM, EMDL_DOUBLE, "rlnBodySigmaOffsetAngst", "Width of prior on origin offsets of a body in multibody refinement (in Angstroms)");
 		EMDL::addLabel(EMDL_BODY_SIGMA_ROT, EMDL_DOUBLE, "rlnBodySigmaRot", "Width of prior on rot angles of a body in multibody refinement (in degrees)");
         EMDL::addLabel(EMDL_BODY_SIGMA_TILT, EMDL_DOUBLE, "rlnBodySigmaTilt", "Width of prior on tilt angles of a body in multibody refinement (in degrees)");
         EMDL::addLabel(EMDL_BODY_SIGMA_PSI, EMDL_DOUBLE, "rlnBodySigmaPsi", "Width of prior on psi angles of a body in multibody refinement (in degrees)");
@@ -639,6 +648,7 @@ private:
 
         EMDL::addLabel(EMDL_MLMODEL_ACCURACY_ROT, EMDL_DOUBLE, "rlnAccuracyRotations", "Estimated accuracy (in degrees) with which rotations can be assigned");
         EMDL::addLabel(EMDL_MLMODEL_ACCURACY_TRANS, EMDL_DOUBLE, "rlnAccuracyTranslations", "Estimated accuracy (in pixels) with which translations can be assigned");
+        EMDL::addLabel(EMDL_MLMODEL_ACCURACY_TRANS_ANGSTROM, EMDL_DOUBLE, "rlnAccuracyTranslationsAngst", "Estimated accuracy (in Angstroms) with which translations can be assigned");
         EMDL::addLabel(EMDL_MLMODEL_AVE_PMAX, EMDL_DOUBLE, "rlnAveragePmax", "Average value (over all images) of the maxima of the probability distributions");
         EMDL::addLabel(EMDL_MLMODEL_CURRENT_RESOLUTION, EMDL_DOUBLE, "rlnCurrentResolution", "Current resolution where SSNR^MAP drops below 1 (in 1/Angstroms)");
         EMDL::addLabel(EMDL_MLMODEL_CURRENT_SIZE, EMDL_INT, "rlnCurrentImageSize", "Current size of the images used in the refinement");
@@ -683,7 +693,8 @@ private:
         EMDL::addLabel(EMDL_MLMODEL_PRIOR_MODE, EMDL_INT, "rlnOrientationalPriorMode", "Mode for prior distributions on the orientations (0=no prior; 1=(rot,tilt,psi); 2=(rot,tilt); 3=rot; 4=tilt; 5=psi) ");
         EMDL::addLabel(EMDL_MLMODEL_REF_IMAGE, EMDL_STRING, "rlnReferenceImage", "Name of a reference image");
         EMDL::addLabel(EMDL_MLMODEL_SGD_GRADIENT_IMAGE, EMDL_STRING, "rlnSGDGradientImage", "Name of image containing the SGD gradient");
-        EMDL::addLabel(EMDL_MLMODEL_SIGMA_OFFSET, EMDL_DOUBLE, "rlnSigmaOffsets","Standard deviation in the origin offsets (in Angstroms)");
+        EMDL::addLabel(EMDL_MLMODEL_SIGMA_OFFSET, EMDL_DOUBLE, "rlnSigmaOffsets","Standard deviation in the origin offsets (in pixels)");
+        EMDL::addLabel(EMDL_MLMODEL_SIGMA_OFFSET_ANGSTROM, EMDL_DOUBLE, "rlnSigmaOffsetsAngst","Standard deviation in the origin offsets (in Angstroms)");
         EMDL::addLabel(EMDL_MLMODEL_SIGMA2_NOISE, EMDL_DOUBLE, "rlnSigma2Noise", "Spherical average of the standard deviation in the noise (sigma)");
         EMDL::addLabel(EMDL_MLMODEL_SIGMA2_REF, EMDL_DOUBLE, "rlnReferenceSigma2", "Spherical average of the estimated power in the noise of a reference");
         EMDL::addLabel(EMDL_MLMODEL_SIGMA_ROT, EMDL_DOUBLE, "rlnSigmaPriorRotAngle", "Standard deviation of the prior on the rot (i.e. first Euler) angle");
@@ -695,6 +706,7 @@ private:
 
         EMDL::addLabel(EMDL_OPTIMISER_ACCURACY_ROT, EMDL_DOUBLE, "rlnOverallAccuracyRotations", "Overall accuracy of the rotational assignments (in degrees)");
         EMDL::addLabel(EMDL_OPTIMISER_ACCURACY_TRANS, EMDL_DOUBLE, "rlnOverallAccuracyTranslations", "Overall accuracy of the translational assignments (in pixels)");
+        EMDL::addLabel(EMDL_OPTIMISER_ACCURACY_TRANS_ANGSTROM, EMDL_DOUBLE, "rlnOverallAccuracyTranslationsAngst", "Overall accuracy of the translational assignments (in Angstroms)");
         EMDL::addLabel(EMDL_OPTIMISER_ADAPTIVE_FRACTION, EMDL_DOUBLE, "rlnAdaptiveOversampleFraction", "Fraction of the weights that will be oversampled in a second pass of the adaptive oversampling strategy");
 		EMDL::addLabel(EMDL_OPTIMISER_ADAPTIVE_OVERSAMPLING, EMDL_INT, "rlnAdaptiveOversampleOrder", "Order of the adaptive oversampling (0=no oversampling, 1= 2x oversampling; 2= 4x oversampling, etc)");
 		EMDL::addLabel(EMDL_OPTIMISER_AUTO_LOCAL_HP_ORDER, EMDL_INT, "rlnAutoLocalSearchesHealpixOrder", "Healpix order (before oversampling) from which autosampling procedure will use local angular searches");
@@ -790,16 +802,19 @@ private:
         EMDL::addLabel(EMDL_ORIENT_FLIP, EMDL_BOOL, "rlnIsFlip", "Flag to indicate that an image should be mirrored");
         EMDL::addLabel(EMDL_ORIENT_ID, EMDL_INT, "rlnOrientationsID", "ID (i.e. a unique number) for an orientation");
         EMDL::addLabel(EMDL_ORIENT_ORIGIN_X, EMDL_DOUBLE, "rlnOriginX", "X-coordinate (in pixels) for the origin of rotation");
-        EMDL::addLabel(EMDL_ORIENT_ORIGIN_X_PRIOR, EMDL_DOUBLE, "rlnOriginXPrior", "Center of the prior on the X-coordinate (in pixels) for the origin of rotation");
         EMDL::addLabel(EMDL_ORIENT_ORIGIN_Y, EMDL_DOUBLE, "rlnOriginY", "Y-coordinate (in pixels) for the origin of rotation");
-        EMDL::addLabel(EMDL_ORIENT_ORIGIN_Y_PRIOR, EMDL_DOUBLE, "rlnOriginYPrior", "Center of the prior on the X-coordinate (in pixels) for the origin of rotation");
         EMDL::addLabel(EMDL_ORIENT_ORIGIN_Z, EMDL_DOUBLE, "rlnOriginZ", "Z-coordinate (in pixels) for the origin of rotation");
-        EMDL::addLabel(EMDL_ORIENT_ORIGIN_Z_PRIOR, EMDL_DOUBLE, "rlnOriginZPrior", "Center of the prior on the X-coordinate (in pixels) for the origin of rotation");
-		
-		EMDL::addLabel(EMDL_ORIENT_ORIGIN_X_ANGSTROM, EMDL_DOUBLE, "rlnOriginXAngst", "X-coordinate (in Angstrom) for the origin of rotation");        
+        EMDL::addLabel(EMDL_ORIENT_ORIGIN_X_PRIOR, EMDL_DOUBLE, "rlnOriginXPrior", "Center of the prior on the X-coordinate (in pixels) for the origin of rotation");
+        EMDL::addLabel(EMDL_ORIENT_ORIGIN_Y_PRIOR, EMDL_DOUBLE, "rlnOriginYPrior", "Center of the prior on the Y-coordinate (in pixels) for the origin of rotation");
+        EMDL::addLabel(EMDL_ORIENT_ORIGIN_Z_PRIOR, EMDL_DOUBLE, "rlnOriginZPrior", "Center of the prior on the Z-coordinate (in pixels) for the origin of rotation");
+
+        EMDL::addLabel(EMDL_ORIENT_ORIGIN_X_ANGSTROM, EMDL_DOUBLE, "rlnOriginXAngst", "X-coordinate (in Angstrom) for the origin of rotation");
         EMDL::addLabel(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, EMDL_DOUBLE, "rlnOriginYAngst", "Y-coordinate (in Angstrom) for the origin of rotation");
         EMDL::addLabel(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, EMDL_DOUBLE, "rlnOriginZAngst", "Z-coordinate (in Angstrom) for the origin of rotation");
-		
+        EMDL::addLabel(EMDL_ORIENT_ORIGIN_X_PRIOR_ANGSTROM, EMDL_DOUBLE, "rlnOriginXPriorAngst", "Center of the prior on the X-coordinate (in Angstrom) for the origin of rotation");
+        EMDL::addLabel(EMDL_ORIENT_ORIGIN_Y_PRIOR_ANGSTROM, EMDL_DOUBLE, "rlnOriginYPriorAngst", "Center of the prior on the Y-coordinate (in Angstrom) for the origin of rotation");
+        EMDL::addLabel(EMDL_ORIENT_ORIGIN_Z_PRIOR_ANGSTROM, EMDL_DOUBLE, "rlnOriginZPriorAngst", "Center of the prior on the Z-coordinate (in Angstrom) for the origin of rotation");
+
         EMDL::addLabel(EMDL_ORIENT_ROT, EMDL_DOUBLE, "rlnAngleRot", "First Euler angle (rot, in degrees)");
         EMDL::addLabel(EMDL_ORIENT_ROT_PRIOR, EMDL_DOUBLE, "rlnAngleRotPrior", "Center of the prior (in degrees) on the first Euler angle (rot)");
         EMDL::addLabel(EMDL_ORIENT_TILT, EMDL_DOUBLE, "rlnAngleTilt", "Second Euler angle (tilt, in degrees)");
@@ -811,7 +826,8 @@ private:
         EMDL::addLabel(EMDL_PARTICLE_AUTOPICK_FOM, EMDL_DOUBLE, "rlnAutopickFigureOfMerit", "Autopicking FOM for a particle");
         EMDL::addLabel(EMDL_PARTICLE_HELICAL_TUBE_ID, EMDL_INT, "rlnHelicalTubeID", "Helical tube ID for a helical segment");
         EMDL::addLabel(EMDL_PARTICLE_HELICAL_TUBE_PITCH, EMDL_DOUBLE, "rlnHelicalTubePitch", "Cross-over distance for a helical segment (A)");
-        EMDL::addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, EMDL_DOUBLE, "rlnHelicalTrackLength", "Distance from the position of this helical segment to the starting point of the tube");
+        EMDL::addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, EMDL_DOUBLE, "rlnHelicalTrackLength", "Distance (in pix) from the position of this helical segment to the starting point of the tube");
+        EMDL::addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM, EMDL_DOUBLE, "rlnHelicalTrackLengthAngst", "Distance (in A) from the position of this helical segment to the starting point of the tube");
         EMDL::addLabel(EMDL_PARTICLE_CLASS, EMDL_INT, "rlnClassNumber", "Class number for which a particle has its highest probability");
         EMDL::addLabel(EMDL_PARTICLE_DLL, EMDL_DOUBLE, "rlnLogLikeliContribution", "Contribution of a particle to the log-likelihood target function");
         EMDL::addLabel(EMDL_PARTICLE_ID, EMDL_INT, "rlnParticleId", "ID (i.e. a unique number) for a particle");
@@ -869,7 +885,6 @@ private:
         EMDL::addLabel(EMDL_SAMPLING_IS_3D_TRANS, EMDL_BOOL, "rlnIs3DTranslationalSampling", "Flag to indicate this concerns a x,y,z-translational sampling ");
         EMDL::addLabel(EMDL_SAMPLING_HEALPIX_ORDER, EMDL_INT, "rlnHealpixOrder", "Healpix order for the sampling of the first two Euler angles (rot, tilt) on the 3D sphere");
         EMDL::addLabel(EMDL_SAMPLING_LIMIT_TILT, EMDL_DOUBLE, "rlnTiltAngleLimit", "Values to which to limit the tilt angles (positive for keeping side views, negative for keeping top views)");
-        // Jun19,2015 - Shaoda, I think all of these 3 offsets are in PIXELS.
         EMDL::addLabel(EMDL_SAMPLING_OFFSET_RANGE, EMDL_DOUBLE, "rlnOffsetRange", "Search range for the origin offsets (in Angstroms)");
         EMDL::addLabel(EMDL_SAMPLING_OFFSET_STEP, EMDL_DOUBLE, "rlnOffsetStep", "Step size for the searches in the origin offsets (in Angstroms)");
         EMDL::addLabel(EMDL_SAMPLING_HELICAL_OFFSET_STEP, EMDL_DOUBLE, "rlnHelicalOffsetStep", "Step size for the searches of offsets along helical axis (in Angstroms)");

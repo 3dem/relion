@@ -111,7 +111,6 @@ private:
 	void initialiseManualpickWindow();
 	void initialiseAutopickWindow();
 	void initialiseExtractWindow();
-	void initialiseSortWindow();
 	void initialiseSelectWindow();
 	void initialiseClass2DWindow();
 	void initialiseInimodelWindow();

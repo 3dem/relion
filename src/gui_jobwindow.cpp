@@ -433,11 +433,6 @@ void JobWindow::initialise(int my_job_type, bool _do_oldstyle)
 		myjob.initialise(my_job_type);
 		initialiseExtractWindow();
 	}
-	else if (my_job_type == PROC_SORT)
-	{
-		myjob.initialise(my_job_type);
-		initialiseSortWindow();
-	}
 	else if (my_job_type == PROC_CLASSSELECT)
 	{
 		myjob.initialise(my_job_type);
@@ -1042,46 +1037,7 @@ Pixels values higher than this many times the image stddev will be replaced with
 	tab3->end();
 
 }
-void JobWindow::initialiseSortWindow()
-{
-	setupTabs(2);
 
-	tab1->begin();
-	tab1->label("I/O");
-	resetHeight();
-
-	place("input_star", TOGGLE_DEACTIVATE);
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	place("model_refs", TOGGLE_DEACTIVATE);
-	place("autopick_refs", TOGGLE_DEACTIVATE);
-
-	tab1->end();
-
-	tab2->begin();
-	tab2->label("References");
-	resetHeight();
-
-	place("angpix_ref", TOGGLE_DEACTIVATE);
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group2->end();
-
-	place("do_ctf", TOGGLE_DEACTIVATE, group2);
-
-	group2->begin();
-	place("do_ignore_first_ctfpeak", TOGGLE_DEACTIVATE);
-	group2->end();
-	guientries["do_ctf"].cb_menu_i();
-
-	tab2->end();
-
-}
 void JobWindow::initialiseSelectWindow()
 {
 	setupTabs(4);

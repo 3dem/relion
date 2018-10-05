@@ -447,8 +447,8 @@ public:
 			{
 				displayEmptyLine();
 				std::cout << " Convert EMAN2 / XIMDISP coordinates of helical segments into RELION STAR format" << std::endl;
-				std::cout << "  USAGE (EMAN2 format)  : --coords_emn2rln --i_root _helix_ptcl_coords.txt --o_root _segments.star --xdim 4096 --ydim 4096 --boxdim 320 --bimodal" << std::endl;
-				std::cout << "  USAGE (XIMDISP format): --coords_xim2rln --i_root .mrc.coords            --o_root _segments.star --xdim 4096 --ydim 4096 --boxdim 320 --bimodal" << std::endl;
+				std::cout << "  USAGE (EMAN2 format)  : --coords_emn2rln --i_root _helix_ptcl_coords.txt --o_root _segments.star --angpix 1.126 --xdim 4096 --ydim 4096 --boxdim 320 --bimodal" << std::endl;
+				std::cout << "  USAGE (XIMDISP format): --coords_xim2rln --i_root .mrc.coords            --o_root _segments.star --angpix 1.126 --xdim 4096 --ydim 4096 --boxdim 320 --bimodal" << std::endl;
 				displayEmptyLine();
 				return;
 			}
@@ -462,6 +462,7 @@ public:
 					fn_in_root,
 					fn_out_root,
 					format_tag,
+					pixel_size_A,
 					Xdim,
 					Ydim,
 					boxdim,

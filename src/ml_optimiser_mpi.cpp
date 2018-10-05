@@ -426,7 +426,7 @@ void MlOptimiserMpi::initialise()
 				Experiment temp;
 				temp.read(fn_data);
 				int t_ori_size = -1;
-				temp.MDexp.getValue(EMDL_IMAGE_SIZE, t_ori_size);
+				temp.MDopt.getValue(EMDL_IMAGE_SIZE, t_ori_size, 0);
 
 				if(LowBoxLim < t_ori_size)
 				{
@@ -523,7 +523,7 @@ will still yield good performance and possibly a more stable execution. \n" << s
 
 	// Initialise the data_versus_prior ratio to get the initial current_size right
 	if (iter == 0 && !do_initialise_bodies && !node->isMaster())
-		mymodel.initialiseDataVersusPrior(fix_tau); // fix_tau was set in initialiseGeneral
+		mymodel.initialiseDataVersusPrior(fix_tau, mydata); // fix_tau was set in initialiseGeneral
 
 	//std::cout << " Hello world! I am node " << node->rank << " out of " << node->size <<" and my hostname= "<< getenv("HOSTNAME")<< std::endl;
 

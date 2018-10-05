@@ -100,7 +100,7 @@ MetaDataTable& MetaDataTable::operator = (const MetaDataTable &MD)
 		boolLabels = MD.boolLabels;
 		stringLabels = MD.stringLabels;
 		doubleVectorLabels = MD.doubleVectorLabels;
-		
+
 		isList = MD.isList;
 		name = MD.name;
 		comment = MD.comment;
@@ -209,14 +209,14 @@ int MetaDataTable::getCurrentVersion()
 
 bool MetaDataTable::getValueToString(EMDLabel label, std::string &value, long objectID) const
 {
-	// SHWS 18jul2018: this function previously had a stringstream, but it greatly slowed down 
-	// writing of large STAR files in some strange circumstances (with large data.star 
+	// SHWS 18jul2018: this function previously had a stringstream, but it greatly slowed down
+	// writing of large STAR files in some strange circumstances (with large data.star
 	// and model.star files in refinement)
 	// Therefore replaced the strstream with faster snprintf
 	//
 	// JZ 9aug2018: still using a stringstream for vector<double> fields
 	// => Avoid vector-valued columns in particle star-files.
-	
+
 	char buffer[14];
 
 	if (EMDL::isString(label))
@@ -267,22 +267,22 @@ bool MetaDataTable::getValueToString(EMDLabel label, std::string &value, long ob
 			snprintf(buffer,13, "%12d", (int)v);
 		}
 		else if (EMDL::isDoubleVector(label))
-		{		
+		{
 			std::vector<double> v;
 			getValue(label, v, objectID);
-						
+
 			std::stringstream sts;
-			
+
 			sts << std::setprecision(12);
 			sts << '[';
-			
+
 			for (int i = 0; i < v.size()-1; i++)
 			{
 				sts << v[i] << ',';
 			}
-			
+
 			sts << v[v.size()-1] << ']';
-			
+
 			value = sts.str();
 			return true;
 		}
@@ -290,7 +290,7 @@ bool MetaDataTable::getValueToString(EMDLabel label, std::string &value, long ob
 		std::string tt(buffer);
 		value = tt;
 	}
-	
+
 	return true;
 }
 
@@ -332,24 +332,24 @@ bool MetaDataTable::setValueFromString(
 		{
 			std::vector<double> v;
 			v.reserve(32);
-			
+
 			char* temp = new char[value.size()+1];
 			strcpy(temp, value.c_str());
-				
+
 			char* token;
 			char* rest = temp;
-					
+
 			while ((token = strtok_r(rest, "[,]", &rest)) != 0)
 			{
 				double d;
 				std::stringstream sts(token);
 				sts >> d;
-				
+
 				v.push_back(d);
 			}
-			
+
 			delete[] temp;
-			
+
 			return setValue(label, v, objectID);
 		}
 	}
@@ -446,7 +446,7 @@ void MetaDataTable::sort(EMDLabel name, bool do_reverse, bool only_set_index, bo
 	std::vector<std::pair<double,long int> > vp;
 	vp.reserve(objects.size());
 	long int i = 0;
-	
+
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(*this)
 	{
 		double dval;
@@ -623,7 +623,7 @@ void MetaDataTable::addLabel(EMDLabel label)
 		else if (EMDL::isDoubleVector(label))
 		{
 			id = doubleVectorLabels;
-			
+
 			for (long i = 0; i < objects.size(); i++)
 			{
 				objects[i]->doubleVectors.push_back(std::vector<double>());
@@ -980,7 +980,7 @@ long int MetaDataTable::readStar(std::ifstream& in, const std::string &name, std
 
 	// Start reading the ifstream at the top
 	in.seekg(0);
-	
+
 	// Set the version to 30000 by default, in case there is no version tag
 	// (version tags were introduced in version 31000)
 	version = 30000;
@@ -991,13 +991,13 @@ long int MetaDataTable::readStar(std::ifstream& in, const std::string &name, std
 	{
 		if (line.find("# version ") != std::string::npos)
 		{
-			token = line.substr(line.find("# version ") 
+			token = line.substr(line.find("# version ")
 								+ std::string("# version ").length());
-			
+
 			std::istringstream sts(token);
 			sts >> version;
 		}
-			
+
 		// Find data_ lines
 		if (line.find("data_") != std::string::npos)
 		{
@@ -1044,14 +1044,14 @@ long int MetaDataTable::read(const FileName &filename, const std::string &name, 
 	FileName fn_read = filename.removeFileFormat();
 
 	std::ifstream in(fn_read.data(), std::ios_base::in);
-	
+
 	if (in.fail())
 	{
 		REPORT_ERROR( (std::string) "MetaDataTable::read: File " + fn_read + " does not exist" );
 	}
 
 	FileName ext = filename.getFileFormat();
-	
+
 	if (ext == "star")
 	{
 		return readStar(in, name, desiredLabels, grep_pattern, do_only_count);
@@ -1074,21 +1074,21 @@ void MetaDataTable::write(std::ostream& out) const
 	{
 		return;
 	}
-	
+
 	if (version >= 30000)
 	{
 		out << "\n";
 		out << "# version " << getCurrentVersion() <<"\n";
 	}
-	
+
 	out << "\n";
 	out << "data_" << getName() <<"\n";
-	
+
 	if (containsComment())
 	{
 		out << "# "<< comment << "\n";
 	}
-	
+
 	out << "\n";
 
 	if (!isList)

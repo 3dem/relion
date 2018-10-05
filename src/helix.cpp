@@ -593,16 +593,16 @@ bool localSearchHelicalSymmetry(
 };
 
 RFLOAT getHelicalSigma2Rot(
-		RFLOAT helical_rise_pix,
+		RFLOAT helical_rise_Angst,
 		RFLOAT helical_twist_deg,
-		RFLOAT helical_offset_step_pix,
+		RFLOAT helical_offset_step_Angst,
 		RFLOAT rot_step_deg,
 		RFLOAT old_sigma2_rot)
 {
-	if ( (helical_offset_step_pix < 0.) || (rot_step_deg < 0.) || (old_sigma2_rot < 0.) )
+	if ( (helical_offset_step_Angst < 0.) || (rot_step_deg < 0.) || (old_sigma2_rot < 0.) )
 		REPORT_ERROR("helix.cpp::getHelicalSigma2Rot: Helical offset step, rot step or sigma2_rot cannot be negative!");
 
-	RFLOAT nr_samplings_along_helical_axis = (fabs(helical_rise_pix)) / helical_offset_step_pix;
+	RFLOAT nr_samplings_along_helical_axis = (fabs(helical_rise_Angst)) / helical_offset_step_Angst;
 	RFLOAT rot_search_range = (fabs(helical_twist_deg)) / nr_samplings_along_helical_axis;
 	RFLOAT new_rot_step = rot_search_range / 6.;
 	RFLOAT factor = ceil(new_rot_step / rot_step_deg);
@@ -1881,7 +1881,7 @@ void convertHelicalTubeCoordsToMetaDataTable(
     MD_out.addLabel(EMDL_PARTICLE_HELICAL_TUBE_ID);
     MD_out.addLabel(EMDL_ORIENT_TILT_PRIOR);
     MD_out.addLabel(EMDL_ORIENT_PSI_PRIOR);
-    MD_out.addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH);
+    MD_out.addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM);
     MD_out.addLabel(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO);
     if (MDin_has_id)
     	MD_out.addLabel(EMDL_PARTICLE_HELICAL_TUBE_ID);
@@ -1915,7 +1915,7 @@ void convertHelicalTubeCoordsToMetaDataTable(
 	    	MD_out.setValue(EMDL_PARTICLE_HELICAL_TUBE_ID, (tube_id + 1));
 	    	MD_out.setValue(EMDL_ORIENT_TILT_PRIOR, 90.);
 	    	MD_out.setValue(EMDL_ORIENT_PSI_PRIOR, -psi_deg);
-	        MD_out.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, 0.);
+	        MD_out.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM, 0.);
 	        MD_out.setValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, psi_prior_flip_ratio);
 			if (MDin_has_id)
 				MD_out.setValue(EMDL_PARTICLE_HELICAL_TUBE_ID, id);
@@ -1959,7 +1959,7 @@ void convertHelicalTubeCoordsToMetaDataTable(
     	    	MD_out.setValue(EMDL_PARTICLE_HELICAL_TUBE_ID, (tube_id + 1));
     	    	MD_out.setValue(EMDL_ORIENT_TILT_PRIOR, 90.);
     	    	MD_out.setValue(EMDL_ORIENT_PSI_PRIOR, -psi_deg);
-    	        MD_out.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, len_pix);
+    	        MD_out.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM, pixel_size_A * len_pix);
     	        MD_out.setValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, psi_prior_flip_ratio);
     			if (MDin_has_id)
     				MD_out.setValue(EMDL_PARTICLE_HELICAL_TUBE_ID, id);
@@ -2113,160 +2113,6 @@ void combineParticlePriorsWithKaiLocalCTF(
 	return;
 }
 
-/*
-void addPriorsToParticleDataFile(
-		FileName& fn_priors,
-		FileName& fn_data,
-		FileName& fn_out)
-{
-	MetaDataTable MD_priors, MD_data;
-	bool have_rot, have_tilt, have_psi, have_xoff, have_yoff, have_tube_id, have_tube_len, have_psi_flip_ratio;
-	std::string str_img_name;
-	RFLOAT x1, y1, x2, y2, rot, tilt, psi, xoff, yoff, tube_len, psi_flip_ratio;
-	int tube_id;
-	std::map<std::string, MetaDataContainer*> priors_list;
-	std::map<std::string, MetaDataContainer*>::iterator prior_iterator;
-	MetaDataContainer* aux;
-
-	if ( (fn_priors.getFileFormat() != "star") || (fn_data.getFileFormat() != "star") || (fn_out.getFileFormat() != "star") )
-		REPORT_ERROR("helix.cpp::combineParticlePriorsWithClass2DDataStar(): MetaDataTable should have .star extension.");
-	if ( (fn_priors == fn_data) || (fn_data == fn_out) || (fn_out == fn_priors) )
-		REPORT_ERROR("helix.cpp::combineParticlePriorsWithClass2DDataStar(): File names must be different.");
-
-	std::cout << " Loading input files..." << std::endl;
-	MD_priors.clear();
-	MD_data.clear();
-	MD_priors.read(fn_priors);
-	MD_data.read(fn_data);
-
-	if ( (!MD_priors.containsLabel(EMDL_IMAGE_COORD_X))
-			|| (!MD_priors.containsLabel(EMDL_IMAGE_COORD_Y))
-			|| (!MD_priors.containsLabel(EMDL_IMAGE_NAME))
-			|| (!MD_data.containsLabel(EMDL_IMAGE_COORD_X))
-			|| (!MD_data.containsLabel(EMDL_IMAGE_COORD_Y))
-			|| (!MD_data.containsLabel(EMDL_IMAGE_NAME))
-			|| (!MD_data.containsLabel(EMDL_CTF_DEFOCUSU))
-			|| (!MD_data.containsLabel(EMDL_CTF_DEFOCUSV))
-			|| (!MD_data.containsLabel(EMDL_CTF_DEFOCUS_ANGLE))
-			|| (!MD_data.containsLabel(EMDL_CTF_VOLTAGE))
-			|| (!MD_data.containsLabel(EMDL_CTF_CS))
-			|| (!MD_data.containsLabel(EMDL_CTF_Q0))
-			|| (!MD_data.containsLabel(EMDL_CTF_MAGNIFICATION))
-			|| (!MD_data.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE)) )
-		REPORT_ERROR("helix.cpp::combineParticlePriorsWithClass2DDataStar(): Labels missing in MetaDataTables.");
-
-	have_rot = MD_priors.containsLabel(EMDL_ORIENT_ROT_PRIOR);
-	have_tilt = MD_priors.containsLabel(EMDL_ORIENT_TILT_PRIOR);
-	have_psi = MD_priors.containsLabel(EMDL_ORIENT_PSI_PRIOR);
-	have_xoff = MD_priors.containsLabel(EMDL_ORIENT_ORIGIN_X_PRIOR);
-	have_yoff = MD_priors.containsLabel(EMDL_ORIENT_ORIGIN_Y_PRIOR);
-	have_tube_id = MD_priors.containsLabel(EMDL_PARTICLE_HELICAL_TUBE_ID);
-	have_tube_len = MD_priors.containsLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH);
-	have_psi_flip_ratio = MD_priors.containsLabel(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO);
-	if ( (!have_rot) && (!have_tilt) && (!have_psi) && (!have_xoff) && (!have_yoff) && (!have_tube_id) && (!have_tube_len) && (!have_psi_flip_ratio) )
-		REPORT_ERROR("helix.cpp::combineParticlePriorsWithClass2DDataStar(): No priors are found in the input file.");
-
-	if ( (have_tube_id) && (!MD_data.containsLabel(EMDL_PARTICLE_HELICAL_TUBE_ID)) )
-		MD_data.addLabel(EMDL_PARTICLE_HELICAL_TUBE_ID);
-	if ( (have_rot) && (!MD_data.containsLabel(EMDL_ORIENT_ROT_PRIOR)) )
-		MD_data.addLabel(EMDL_ORIENT_ROT_PRIOR);
-	if ( (have_tilt) && (!MD_data.containsLabel(EMDL_ORIENT_TILT_PRIOR)) )
-		MD_data.addLabel(EMDL_ORIENT_TILT_PRIOR);
-	if ( (have_psi) && (!MD_data.containsLabel(EMDL_ORIENT_PSI_PRIOR)) )
-		MD_data.addLabel(EMDL_ORIENT_PSI_PRIOR);
-	if ( (have_xoff) && (!MD_data.containsLabel(EMDL_ORIENT_ORIGIN_X_PRIOR)) )
-		MD_data.addLabel(EMDL_ORIENT_ORIGIN_X_PRIOR);
-	if ( (have_yoff) && (!MD_data.containsLabel(EMDL_ORIENT_ORIGIN_Y_PRIOR)) )
-		MD_data.addLabel(EMDL_ORIENT_ORIGIN_Y_PRIOR);
-	if ( (have_tube_len) && (!MD_data.containsLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH)) )
-		MD_data.addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH);
-	if ( (have_psi_flip_ratio) && (!MD_data.containsLabel(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO)) )
-		MD_data.addLabel(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO);
-
-	std::cout << " Number of segments in the prior / data files = " << MD_priors.numberOfObjects() << " / " << MD_data.numberOfObjects() << std::endl;
-	std::cout << " Adding orientational and translational priors to the data file..." << std::endl;
-
-	priors_list.clear();
-	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD_priors)
-	{
-		aux = MD_priors.getObject();
-		MD_priors.getValue(EMDL_IMAGE_NAME, str_img_name);
-		priors_list.insert(std::pair<std::string, MetaDataContainer*>(str_img_name, aux));
-	}
-
-	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD_data)
-	{
-		MD_data.getValue(EMDL_IMAGE_NAME, str_img_name);
-		prior_iterator = priors_list.find(str_img_name);
-		if (prior_iterator != priors_list.end())
-		{
-			aux = prior_iterator->second;
-
-			aux->getValue(EMDL_IMAGE_COORD_X, x1);
-			aux->getValue(EMDL_IMAGE_COORD_Y, y1);
-			MD_data.getValue(EMDL_IMAGE_COORD_X, x2);
-			MD_data.getValue(EMDL_IMAGE_COORD_Y, y2);
-			if ( (fabs(x1 - x2) > 1.) || (fabs(y1 - y2) > 1.) )
-				REPORT_ERROR("helix.cpp::combineParticlePriorsWithClass2DDataStar(): Some pairs of particles have the same EMDL_IMAGE_NAME values but different XY coordinates. Check if the two files come from the same set of particles.");
-			else
-			{
-				if (have_rot)
-				{
-					aux->getValue(EMDL_ORIENT_ROT_PRIOR, rot);
-					MD_data.setValue(EMDL_ORIENT_ROT_PRIOR, rot);
-				}
-				if (have_tilt)
-				{
-					aux->getValue(EMDL_ORIENT_TILT_PRIOR, tilt);
-					MD_data.setValue(EMDL_ORIENT_TILT_PRIOR, tilt);
-				}
-				if (have_psi)
-				{
-					aux->getValue(EMDL_ORIENT_PSI_PRIOR, psi);
-					MD_data.setValue(EMDL_ORIENT_PSI_PRIOR, psi);
-				}
-				if (have_xoff)
-				{
-					aux->getValue(EMDL_ORIENT_ORIGIN_X_PRIOR, xoff);
-					MD_data.setValue(EMDL_ORIENT_ORIGIN_X_PRIOR, xoff);
-				}
-				if (have_yoff)
-				{
-					aux->getValue(EMDL_ORIENT_ORIGIN_Y_PRIOR, yoff);
-					MD_data.setValue(EMDL_ORIENT_ORIGIN_Y_PRIOR, yoff);
-				}
-				if (have_tube_id)
-				{
-					aux->getValue(EMDL_PARTICLE_HELICAL_TUBE_ID, tube_id);
-					MD_data.setValue(EMDL_PARTICLE_HELICAL_TUBE_ID, tube_id);
-				}
-				if (have_tube_len)
-				{
-					aux->getValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, tube_len);
-					MD_data.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, tube_len);
-				}
-				if (have_psi_flip_ratio)
-				{
-					aux->getValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, psi_flip_ratio);
-					MD_data.setValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, psi_flip_ratio);
-				}
-			}
-		}
-		else
-		{
-			std::cout << "  EMDL_IMAGE_NAME = " << str_img_name << std::endl;
-			REPORT_ERROR("helix.cpp::combineParticlePriorsWithClass2DDataStar(): Priors are missing for some particles in the data file.");
-		}
-	}
-
-	std::cout << " Writing output file..." << std::endl;
-	MD_data.write(fn_out);
-	std::cout << " Done!" << std::endl;
-
-	return;
-}
-*/
-
 void combineParticlePriorsWithKaiLocalCTF_Multiple(
 		std::string& suffix_priors,
 		std::string& suffix_local_ctf,
@@ -2400,6 +2246,7 @@ void convertHelicalSegmentCoordsToStarFile_Multiple(
 		FileName& suffix_coords,
 		FileName& suffix_out,
 		int format_tag,
+		RFLOAT pixel_size_A,
 		RFLOAT Xdim,
 		RFLOAT Ydim,
 		RFLOAT boxsize,
@@ -2421,9 +2268,9 @@ void convertHelicalSegmentCoordsToStarFile_Multiple(
 		FileName fn_out;
 		fn_out = fn_coords_list[ii].beforeFirstOf(suffix_coords) + suffix_out;
 		if (format_tag == XIMDISP_COORDS_FORMAT)
-			convertXimdispHelicalSegmentCoordsToMetaDataTable(fn_coords_list[ii], MD_out, nr_segments, nr_tubes, Xdim, Ydim, boxsize, bimodal_angular_priors);
+			convertXimdispHelicalSegmentCoordsToMetaDataTable(fn_coords_list[ii], MD_out, nr_segments, nr_tubes, pixel_size_A, Xdim, Ydim, boxsize, bimodal_angular_priors);
 		else if (format_tag == EMAN2_FORMAT)
-			convertEmanHelicalSegmentCoordsToMetaDataTable(fn_coords_list[ii], MD_out, nr_segments, nr_tubes, Xdim, Ydim, boxsize, bimodal_angular_priors);
+			convertEmanHelicalSegmentCoordsToMetaDataTable(fn_coords_list[ii], MD_out, nr_segments, nr_tubes, pixel_size_A, Xdim, Ydim, boxsize, bimodal_angular_priors);
 		else
 			REPORT_ERROR("helix.cpp::convertHelicalCoordsToStarFile_Multiple(): BUG Invalid format tag!");
 		total_segments += nr_segments;
@@ -2469,7 +2316,7 @@ void convertHelicalSegmentCoordsToMetaDataTable(
 			|| (!MD_in.containsLabel(EMDL_PARTICLE_HELICAL_TUBE_ID))
 			|| (!MD_in.containsLabel(EMDL_ORIENT_TILT_PRIOR))
 			|| (!MD_in.containsLabel(EMDL_ORIENT_PSI_PRIOR))
-			|| (!MD_in.containsLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH))
+			|| (!MD_in.containsLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM))
 			|| (!MD_in.containsLabel(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO)) )
 		REPORT_ERROR("helix.cpp::convertHelicalSegmentCoordsToMetaDataTable(): Prior information of helical segments is missing in " + fn_in);
 
@@ -2509,6 +2356,7 @@ void convertXimdispHelicalSegmentCoordsToMetaDataTable(
 		MetaDataTable& MD_out,
 		int& total_segments,
 		int& total_tubes,
+		RFLOAT pixel_size_A,
 		RFLOAT Xdim,
 		RFLOAT Ydim,
 		RFLOAT box_size_pix,
@@ -2530,7 +2378,7 @@ void convertXimdispHelicalSegmentCoordsToMetaDataTable(
 	MD_out.addLabel(EMDL_PARTICLE_HELICAL_TUBE_ID);
 	MD_out.addLabel(EMDL_ORIENT_TILT_PRIOR);
 	MD_out.addLabel(EMDL_ORIENT_PSI_PRIOR);
-    MD_out.addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH);
+    MD_out.addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM);
     MD_out.addLabel(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO);
 
     half_box_size_pix = box_size_pix / 2.;
@@ -2593,7 +2441,7 @@ void convertXimdispHelicalSegmentCoordsToMetaDataTable(
 		MD_out.setValue(EMDL_PARTICLE_HELICAL_TUBE_ID, nr_tubes);
 		MD_out.setValue(EMDL_ORIENT_TILT_PRIOR, 90.);
 		MD_out.setValue(EMDL_ORIENT_PSI_PRIOR, -psi_deg);
-	    MD_out.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, len_pix);
+	    MD_out.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM, pixel_size_A * len_pix);
 	    MD_out.setValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, psi_prior_flip_ratio);
 
 	    line.clear();
@@ -2699,7 +2547,7 @@ void convertXimdispHelicalTubeCoordsToMetaDataTable(
 	    	MD_out.setValue(EMDL_PARTICLE_HELICAL_TUBE_ID, nr_tubes);
 	    	MD_out.setValue(EMDL_ORIENT_TILT_PRIOR, 90.);
 	    	MD_out.setValue(EMDL_ORIENT_PSI_PRIOR, -psi_deg);
-	        MD_out.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, 0.);
+	        MD_out.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM, 0.);
 	        MD_out.setValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, psi_prior_flip_ratio);
 			continue;
 		}
@@ -2738,7 +2586,7 @@ void convertXimdispHelicalTubeCoordsToMetaDataTable(
     	    	MD_out.setValue(EMDL_PARTICLE_HELICAL_TUBE_ID, nr_tubes);
     	    	MD_out.setValue(EMDL_ORIENT_TILT_PRIOR, 90.);
     	    	MD_out.setValue(EMDL_ORIENT_PSI_PRIOR, -psi_deg);
-    	        MD_out.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, len_pix);
+    	        MD_out.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM, pixel_size_A * len_pix);
     	        MD_out.setValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, psi_prior_flip_ratio);
 
     			nr_segments++;
@@ -2759,6 +2607,7 @@ void convertEmanHelicalSegmentCoordsToMetaDataTable(
 		MetaDataTable& MD_out,
 		int& total_segments,
 		int& total_tubes,
+		RFLOAT pixel_size_A,
 		RFLOAT Xdim,
 		RFLOAT Ydim,
 		RFLOAT box_size_pix,
@@ -2780,7 +2629,7 @@ void convertEmanHelicalSegmentCoordsToMetaDataTable(
 	MD_out.addLabel(EMDL_PARTICLE_HELICAL_TUBE_ID);
 	MD_out.addLabel(EMDL_ORIENT_TILT_PRIOR);
 	MD_out.addLabel(EMDL_ORIENT_PSI_PRIOR);
-    MD_out.addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH);
+    MD_out.addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM);
     MD_out.addLabel(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO);
 
     half_box_size_pix = box_size_pix / 2.;
@@ -2854,7 +2703,7 @@ void convertEmanHelicalSegmentCoordsToMetaDataTable(
 		MD_out.setValue(EMDL_PARTICLE_HELICAL_TUBE_ID, nr_tubes);
 		MD_out.setValue(EMDL_ORIENT_TILT_PRIOR, 90.);
 		MD_out.setValue(EMDL_ORIENT_PSI_PRIOR, -psi_deg);
-	    MD_out.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, len_pix);
+	    MD_out.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM, pixel_size_A * len_pix);
 	    MD_out.setValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, psi_prior_flip_ratio);
 
 	    line.clear();
@@ -2902,7 +2751,7 @@ void convertEmanHelicalTubeCoordsToMetaDataTable(
 	MD_out.addLabel(EMDL_PARTICLE_HELICAL_TUBE_ID);
 	MD_out.addLabel(EMDL_ORIENT_TILT_PRIOR);
 	MD_out.addLabel(EMDL_ORIENT_PSI_PRIOR);
-    MD_out.addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH);
+    MD_out.addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM);
     MD_out.addLabel(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO);
 
 	half_box_size_pix = box_size_pix / 2.;
@@ -2978,7 +2827,7 @@ void convertEmanHelicalTubeCoordsToMetaDataTable(
 	    	MD_out.setValue(EMDL_PARTICLE_HELICAL_TUBE_ID, nr_tubes);
 	    	MD_out.setValue(EMDL_ORIENT_TILT_PRIOR, 90.);
 	    	MD_out.setValue(EMDL_ORIENT_PSI_PRIOR, -psi_deg);
-	        MD_out.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, 0.);
+	        MD_out.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM, 0.);
 	        MD_out.setValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, psi_prior_flip_ratio);
 			continue;
 		}
@@ -3017,7 +2866,7 @@ void convertEmanHelicalTubeCoordsToMetaDataTable(
     	    	MD_out.setValue(EMDL_PARTICLE_HELICAL_TUBE_ID, nr_tubes);
     	    	MD_out.setValue(EMDL_ORIENT_TILT_PRIOR, 90.);
     	    	MD_out.setValue(EMDL_ORIENT_PSI_PRIOR, -psi_deg);
-    	        MD_out.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, len_pix);
+    	        MD_out.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM, pixel_size_A * len_pix);
     	        MD_out.setValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, psi_prior_flip_ratio);
 
     			nr_segments++;
@@ -3525,62 +3374,6 @@ void makeHelicalReference3DWithPolarity(
 	return;
 }
 
-/*
-void makeHelicalReconstructionStarFileFromSingle2DClassAverage(
-		FileName& fn_in_class2D,
-		FileName& fn_out_star,
-		RFLOAT pixel_size_A,
-		RFLOAT twist_deg,
-		RFLOAT rise_A,
-		RFLOAT tilt_deg,
-		RFLOAT psi_deg,
-		int nr_projections)
-{
-	RFLOAT twist_deg_acc, offset_pix_acc, rise_pix;
-	MetaDataTable MD;
-
-	if (fn_out_star.getExtension() != "star")
-		REPORT_ERROR("helix.cpp::makeReconstructionStarFileFromSingle2DClassAverage: Output file should be in .star format!");
-	if (pixel_size_A < 0.001)
-		REPORT_ERROR("helix.cpp::makeReconstructionStarFileFromSingle2DClassAverage: Pixel size (in Angstroms) should be larger than 0.001!");
-	if ((rise_A / pixel_size_A) < 0.001)
-		REPORT_ERROR("helix.cpp::makeReconstructionStarFileFromSingle2DClassAverage: Wrong helical rise!");
-	if (nr_projections < 1)
-		REPORT_ERROR("helix.cpp::makeReconstructionStarFileFromSingle2DClassAverage: Number of projections should be larger than 1!");
-
-	rise_pix = rise_A / pixel_size_A;
-
-	// TODO: EMDL_xxx or EMDL_xxx_PRIOR ?
-	MD.clear();
-	MD.addLabel(EMDL_IMAGE_NAME);
-	MD.addLabel(EMDL_ORIENT_ROT);
-	MD.addLabel(EMDL_ORIENT_TILT);
-	MD.addLabel(EMDL_ORIENT_PSI);
-	MD.addLabel(EMDL_ORIENT_ORIGIN_X);
-	MD.addLabel(EMDL_ORIENT_ORIGIN_Y);
-
-	twist_deg_acc = -twist_deg;
-	offset_pix_acc = -rise_pix;
-	for (int ii = 0; ii < nr_projections; ii++)
-	{
-		twist_deg_acc += twist_deg;
-		offset_pix_acc += rise_pix;
-
-		// TODO: EMDL_xxx or EMDL_xxx_PRIOR ?
-		MD.addObject();
-		MD.setValue(EMDL_IMAGE_NAME, fn_in_class2D);
-		MD.setValue(EMDL_ORIENT_ROT, twist_deg_acc);
-		MD.setValue(EMDL_ORIENT_TILT, tilt_deg);
-		MD.setValue(EMDL_ORIENT_PSI, psi_deg);
-		MD.setValue(EMDL_ORIENT_ORIGIN_X, 0.);
-		MD.setValue(EMDL_ORIENT_ORIGIN_Y, offset_pix_acc);
-	}
-
-	MD.write(fn_out_star);
-	return;
-}
-*/
-
 void divideStarFile(
 		FileName& fn_in,
 		int nr)
@@ -3692,7 +3485,7 @@ void sortHelicalTubeID(MetaDataTable& MD)
 			|| (!MD.containsLabel(EMDL_ORIENT_TILT_PRIOR))
 			|| (!MD.containsLabel(EMDL_ORIENT_PSI_PRIOR))
 			|| (!MD.containsLabel(EMDL_PARTICLE_HELICAL_TUBE_ID))
-			|| (!MD.containsLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH))
+			|| (!MD.containsLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM))
 			|| (!MD.containsLabel(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO)) )
 		REPORT_ERROR("helix.cpp::sortHelicalTubeID: Labels of helical prior information are missing!");
 
@@ -3824,14 +3617,14 @@ void simulateHelicalSegments(
     MD.addLabel(EMDL_ORIENT_ROT);
     MD.addLabel(EMDL_ORIENT_TILT);
     MD.addLabel(EMDL_ORIENT_PSI);
-    MD.addLabel(EMDL_ORIENT_ORIGIN_X);
-    MD.addLabel(EMDL_ORIENT_ORIGIN_Y);
+    MD.addLabel(EMDL_ORIENT_ORIGIN_X_ANGSTROM);
+    MD.addLabel(EMDL_ORIENT_ORIGIN_Y_ANGSTROM);
     if (is_3d_tomo)
-    	MD.addLabel(EMDL_ORIENT_ORIGIN_Z);
+    	MD.addLabel(EMDL_ORIENT_ORIGIN_Z_ANGSTROM);
     MD.addLabel(EMDL_ORIENT_ROT_PRIOR);
     MD.addLabel(EMDL_ORIENT_TILT_PRIOR);
     MD.addLabel(EMDL_ORIENT_PSI_PRIOR);
-    MD.addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH);
+    MD.addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM);
     MD.addLabel(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO);
     MD.addLabel(EMDL_PARTICLE_HELICAL_TUBE_ID);
     MD.addLabel(EMDL_IMAGE_NAME);
@@ -3880,27 +3673,9 @@ void simulateHelicalSegments(
 		xoff = yoff = zoff = new_xoff = new_yoff = new_zoff = 0.;
 		if (sigma_offset > 0.0001)
 		{
-			/*
-			xoff = rnd_gaus(0., sigma_offset);
-			yoff = rnd_gaus(0., sigma_offset);
-			zoff = rnd_gaus(0., sigma_offset);
-			transformCartesianAndHelicalCoords(
-					xoff, yoff, zoff,
-					new_xoff, new_yoff, new_zoff,
-					rot, new_tilt, new_psi,
-					(is_3d_tomo) ? (3) : (2),
-					CART_TO_HELICAL_COORDS);
-			new_xoff = 0.;
-			transformCartesianAndHelicalCoords(
-					new_xoff, new_yoff, new_zoff,
-					xoff, yoff, zoff,
-					rot, new_tilt, new_psi,
-					(is_3d_tomo) ? (3) : (2),
-					HELICAL_TO_CART_COORDS);
-			*/
-			new_xoff = (is_3d_tomo) ? (rnd_gaus(0., sigma_offset)) : (rnd_unif(-0.5 * rise_A / angpix, 0.5 * rise_A / angpix));
+			new_xoff = (is_3d_tomo) ? (rnd_gaus(0., sigma_offset)) : (rnd_unif(-0.5 * rise_A, 0.5 * rise_A));
 			new_yoff = rnd_gaus(0., sigma_offset);
-			new_zoff = (is_3d_tomo) ? (rnd_unif(-0.5 * rise_A / angpix, 0.5 * rise_A / angpix)) : (0.);
+			new_zoff = (is_3d_tomo) ? (rnd_unif(-0.5 * rise_A, 0.5 * rise_A)) : (0.);
 			transformCartesianAndHelicalCoords(
 					new_xoff, new_yoff, new_zoff,
 					xoff, yoff, zoff,
@@ -3913,14 +3688,14 @@ void simulateHelicalSegments(
     	MD.setValue(EMDL_ORIENT_ROT, rot);
     	MD.setValue(EMDL_ORIENT_TILT, new_tilt);
     	MD.setValue(EMDL_ORIENT_PSI, new_psi);
-    	MD.setValue(EMDL_ORIENT_ORIGIN_X, xoff);
-    	MD.setValue(EMDL_ORIENT_ORIGIN_Y, yoff);
+    	MD.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff);
+    	MD.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff);
     	if (is_3d_tomo)
-    		MD.setValue(EMDL_ORIENT_ORIGIN_Z, zoff);
+    		MD.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, zoff);
     	MD.setValue(EMDL_ORIENT_ROT_PRIOR, rot);
     	MD.setValue(EMDL_ORIENT_TILT_PRIOR, new_tilt);
     	MD.setValue(EMDL_ORIENT_PSI_PRIOR, new_psi);
-    	MD.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, len_pix);
+    	MD.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM, angpix * len_pix);
     	MD.setValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, psi_flip_ratio);
     	MD.setValue(EMDL_PARTICLE_HELICAL_TUBE_ID, tube_id);
     	if (is_3d_tomo)
@@ -3987,10 +3762,10 @@ void simulateHelicalSegments(
     		MD.setValue(EMDL_ORIENT_TILT, 90.);
     		MD.setValue(EMDL_ORIENT_TILT_PRIOR, 90.);
     	}
-    	MD.setValue(EMDL_ORIENT_ORIGIN_X, 0.);
-    	MD.setValue(EMDL_ORIENT_ORIGIN_Y, 0.);
+    	MD.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, 0.);
+    	MD.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, 0.);
     	if (is_3d_tomo)
-    		MD.setValue(EMDL_ORIENT_ORIGIN_Z, 0.);
+    		MD.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, 0.);
 
 		MD.getValue(EMDL_IMAGE_NAME, fn_mic);
 		fn_ext = fn_mic.getExtension();
@@ -4007,7 +3782,7 @@ void simulateHelicalSegments(
 	}
 	MD.deactivateLabel(EMDL_ORIENT_TILT_PRIOR);
 	MD.deactivateLabel(EMDL_ORIENT_PSI_PRIOR);
-	MD.deactivateLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH);
+	MD.deactivateLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM);
 	MD.deactivateLabel(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO);
 	MD.deactivateLabel(EMDL_PARTICLE_HELICAL_TUBE_ID);
 	MD.write(fn_star_out_wopriors);
@@ -4202,13 +3977,13 @@ void HelicalSegmentPriorInfoEntry::clear()
 	helical_tube_name.clear();
 	MDobjectID = -1;
 	rot_deg = psi_deg = tilt_deg = 0.;
-	dx_pix = dy_pix = dz_pix = 0.;
-	track_pos_pix = 0.;
+	dx_A = dy_A = dz_A = 0.;
+	track_pos_A = 0.;
 	has_wrong_polarity = false;
 	subset = classID = 0;
 
 	psi_prior_deg = tilt_prior_deg = 0.;
-	dx_prior_pix = dy_prior_pix = dz_prior_pix = 0.;
+	dx_prior_A = dy_prior_A = dz_prior_A = 0.;
 	psi_flip_ratio = 0.;
 };
 
@@ -4223,13 +3998,13 @@ bool HelicalSegmentPriorInfoEntry::operator<(const HelicalSegmentPriorInfoEntry 
 	if (helical_tube_name != rhs.helical_tube_name)
 		return (helical_tube_name < rhs.helical_tube_name);
 
-	if (fabs(track_pos_pix - rhs.track_pos_pix) < (1e-5))
+	if (fabs(track_pos_A - rhs.track_pos_A) < (1e-5))
 	{
 		std::cerr << "Compare # " << MDobjectID << " with # " << rhs.MDobjectID << std::endl;
 		REPORT_ERROR("helix.h::HelicalSegmentPriorInfoEntry::operator<(): A pair of same helical segments is found!");
 	}
 
-	return (track_pos_pix < rhs.track_pos_pix);
+	return (track_pos_A < rhs.track_pos_A);
 };
 
 void HelicalSegmentPriorInfoEntry::checkPolarity()
@@ -4333,7 +4108,7 @@ void updatePriorsForOneHelicalTube(
 		sum_trans_vec.initZeros(data_dim);
 
 		// Check position
-		center_pos = this_pos = list[id].track_pos_pix;
+		center_pos = this_pos = list[id].track_pos_A;
 
 		// Calculate weights
 		sum_w = this_w = ((do_avg) ? (gaussian1D(this_pos, sigma_segment_dist, center_pos)) : (1.));
@@ -4349,10 +4124,10 @@ void updatePriorsForOneHelicalTube(
 		// Analyze translations
 		if (do_exclude_out_of_range_trans)
 		{
-			XX(this_trans_vec) = list[id].dx_prior_pix = list[id].dx_pix; // REFRESH XOFF PRIOR
-			YY(this_trans_vec) = list[id].dy_prior_pix = list[id].dy_pix; // REFRESH YOFF PRIOR
+			XX(this_trans_vec) = list[id].dx_prior_A = list[id].dx_A; // REFRESH XOFF PRIOR
+			YY(this_trans_vec) = list[id].dy_prior_A = list[id].dy_A; // REFRESH YOFF PRIOR
 			if (is_3D)
-				ZZ(this_trans_vec) = list[id].dz_prior_pix = list[id].dz_pix; // REFRESH ZOFF PRIOR
+				ZZ(this_trans_vec) = list[id].dz_prior_A = list[id].dz_A; // REFRESH ZOFF PRIOR
 
 			transformCartesianAndHelicalCoords(this_trans_vec, this_trans_vec, (is_3D) ? (this_rot) : (0.), (is_3D) ? (this_tilt) : (0.), this_psi, CART_TO_HELICAL_COORDS);
 			center_trans_vec = this_trans_vec; // Record helical coordinates of the central segment
@@ -4373,7 +4148,7 @@ void updatePriorsForOneHelicalTube(
 					continue;
 
 				// Check position
-				this_pos = list[idd].track_pos_pix;
+				this_pos = list[idd].track_pos_A;
 				if (fabs(this_pos - center_pos) > (sigma_segment_dist * sigma_cutoff))
 					continue;
 
@@ -4392,10 +4167,10 @@ void updatePriorsForOneHelicalTube(
 				// Analyze translations
 				if (do_exclude_out_of_range_trans)
 				{
-					XX(this_trans_vec) = list[idd].dx_pix;
-					YY(this_trans_vec) = list[idd].dy_pix;
+					XX(this_trans_vec) = list[idd].dx_A;
+					YY(this_trans_vec) = list[idd].dy_A;
 					if (is_3D)
-						ZZ(this_trans_vec) = list[idd].dz_pix;
+						ZZ(this_trans_vec) = list[idd].dz_A;
 
 					transformCartesianAndHelicalCoords(this_trans_vec, this_trans_vec, (is_3D) ? (this_rot) : (0.), (is_3D) ? (this_tilt) : (0.), this_psi, CART_TO_HELICAL_COORDS);
 					if (!is_3D)
@@ -4436,10 +4211,10 @@ void updatePriorsForOneHelicalTube(
 					ZZ(sum_trans_vec) = ZZ(center_trans_vec);
 				}
 				transformCartesianAndHelicalCoords(sum_trans_vec, sum_trans_vec, (is_3D) ? (this_rot) : (0.), (is_3D) ? (this_tilt) : (0.), this_psi, HELICAL_TO_CART_COORDS); // Averaged translations - use respective averaged tilt and psi
-				list[id].dx_prior_pix = XX(sum_trans_vec); // REFRESH XOFF PRIOR
-				list[id].dy_prior_pix = YY(sum_trans_vec); // REFRESH YOFF PRIOR
+				list[id].dx_prior_A = XX(sum_trans_vec); // REFRESH XOFF PRIOR
+				list[id].dy_prior_A = YY(sum_trans_vec); // REFRESH YOFF PRIOR
 				if (is_3D)
-					list[id].dz_prior_pix = ZZ(sum_trans_vec); // REFRESH ZOFF PRIOR
+					list[id].dz_prior_A = ZZ(sum_trans_vec); // REFRESH ZOFF PRIOR
 			}
 		}
 	}
@@ -4492,13 +4267,13 @@ void updatePriorsForHelicalReconstruction(
 	if ( ( (is_3D) && (!MD.containsLabel(EMDL_ORIENT_ROT)) )
 			|| (!MD.containsLabel(EMDL_ORIENT_TILT))
 			|| (!MD.containsLabel(EMDL_ORIENT_PSI))
-			|| (!MD.containsLabel(EMDL_ORIENT_ORIGIN_X))
-			|| (!MD.containsLabel(EMDL_ORIENT_ORIGIN_Y))
-			|| ( (is_3D) && (!MD.containsLabel(EMDL_ORIENT_ORIGIN_Z)) )
+			|| (!MD.containsLabel(EMDL_ORIENT_ORIGIN_X_ANGSTROM))
+			|| (!MD.containsLabel(EMDL_ORIENT_ORIGIN_Y_ANGSTROM))
+			|| ( (is_3D) && (!MD.containsLabel(EMDL_ORIENT_ORIGIN_Z_ANGSTROM)) )
 			|| (!MD.containsLabel(EMDL_ORIENT_TILT_PRIOR))
 			|| (!MD.containsLabel(EMDL_ORIENT_PSI_PRIOR))
 			|| (!MD.containsLabel(EMDL_PARTICLE_HELICAL_TUBE_ID))
-			|| (!MD.containsLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH))
+			|| (!MD.containsLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM))
 			|| (!MD.containsLabel(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO))
 			|| ( (do_auto_refine) && (!MD.containsLabel(EMDL_PARTICLE_RANDOM_SUBSET)) ) )
 		REPORT_ERROR("helix.cpp::updatePriorsForHelicalReconstruction: Labels of helical prior information are missing!");
@@ -4518,7 +4293,7 @@ void updatePriorsForHelicalReconstruction(
 		MD.getValue(EMDL_MICROGRAPH_NAME, str_mic);
 		MD.getValue(EMDL_PARTICLE_HELICAL_TUBE_ID, tube_id);
 		segment.helical_tube_name = str_mic + integerToString(tube_id);
-		MD.getValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, segment.track_pos_pix);
+		MD.getValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM, segment.track_pos_A);
 		if (is_3D)
 			MD.getValue(EMDL_ORIENT_ROT, segment.rot_deg);
 		MD.getValue(EMDL_ORIENT_TILT, segment.tilt_deg);
@@ -4535,10 +4310,10 @@ void updatePriorsForHelicalReconstruction(
 
 		if (do_exclude_out_of_range_trans)
 		{
-			MD.getValue(EMDL_ORIENT_ORIGIN_X, segment.dx_pix);
-			MD.getValue(EMDL_ORIENT_ORIGIN_Y, segment.dy_pix);
+			MD.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, segment.dx_A);
+			MD.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, segment.dy_A);
 			if (is_3D)
-				MD.getValue(EMDL_ORIENT_ORIGIN_Z, segment.dz_pix);
+				MD.getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, segment.dz_A);
 		}
 
 		segment.checkPolarity();
@@ -4582,10 +4357,10 @@ void updatePriorsForHelicalReconstruction(
 
 			if (do_exclude_out_of_range_trans)
 			{
-				MD.setValue(EMDL_ORIENT_ORIGIN_X, list[id].dx_prior_pix, list[id].MDobjectID);
-				MD.setValue(EMDL_ORIENT_ORIGIN_Y, list[id].dy_prior_pix, list[id].MDobjectID);
+				MD.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, list[id].dx_prior_A, list[id].MDobjectID);
+				MD.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, list[id].dy_prior_A, list[id].MDobjectID);
 				if (is_3D)
-					MD.setValue(EMDL_ORIENT_ORIGIN_Z, list[id].dz_prior_pix, list[id].MDobjectID);
+					MD.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, list[id].dz_prior_A, list[id].MDobjectID);
 			}
 		}
 
@@ -4626,35 +4401,6 @@ void updateAngularPriorsForHelicalReconstruction(
 		}
 	}
 }
-
-/*
-void testDataFileTransformXY(MetaDataTable& MD)
-{
-	if (MD.numberOfObjects() < 1)
-		return;
-
-	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
-	{
-		RFLOAT xoff, yoff, psi_deg, tilt_deg;
-		Matrix1D<RFLOAT> vec_cart, vec_helix;
-
-		MD.getValue(EMDL_ORIENT_ORIGIN_X, xoff);
-		MD.getValue(EMDL_ORIENT_ORIGIN_Y, yoff);
-		MD.getValue(EMDL_ORIENT_PSI, psi_deg);
-		MD.getValue(EMDL_ORIENT_TILT, tilt_deg);
-
-		vec_cart.resize(2);
-		XX(vec_cart) = xoff;
-		YY(vec_cart) = yoff;
-		vec_helix.resize(2);
-
-		transformCartesianAndHelicalCoords(vec_cart, vec_helix, 0., 90., psi_deg, CART_TO_HELICAL_COORDS);
-
-		MD.setValue(EMDL_ORIENT_ORIGIN_X, XX(vec_helix));
-		MD.setValue(EMDL_ORIENT_ORIGIN_Y, YY(vec_helix));
-	}
-}
-*/
 
 void setPsiFlipRatioInStarFile(MetaDataTable& MD, RFLOAT ratio)
 {
@@ -4788,7 +4534,7 @@ void transformCartesianToHelicalCoordsForStarFiles(
 		MetaDataTable& MD_out)
 {
 	RFLOAT rot, tilt, psi, xoff, yoff, zoff;
-	bool is_3d_trans = MD_in.containsLabel(EMDL_ORIENT_ORIGIN_Z);
+	bool is_3d_trans = MD_in.containsLabel(EMDL_ORIENT_ORIGIN_Z_ANGSTROM);
 
 	MD_out.clear();
 	MD_out = MD_in;
@@ -4798,10 +4544,10 @@ void transformCartesianToHelicalCoordsForStarFiles(
 		MD_in.getValue(EMDL_ORIENT_ROT, rot);
 		MD_in.getValue(EMDL_ORIENT_TILT, tilt);
 		MD_in.getValue(EMDL_ORIENT_PSI, psi);
-		MD_in.getValue(EMDL_ORIENT_ORIGIN_X, xoff);
-		MD_in.getValue(EMDL_ORIENT_ORIGIN_Y, yoff);
+		MD_in.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff);
+		MD_in.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff);
 		if (is_3d_trans)
-			MD_in.getValue(EMDL_ORIENT_ORIGIN_Z, zoff);
+			MD_in.getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, zoff);
 
 		transformCartesianAndHelicalCoords(
 				xoff, yoff, zoff,
@@ -4810,10 +4556,10 @@ void transformCartesianToHelicalCoordsForStarFiles(
 				((is_3d_trans) ? (3) : (2)),
 				CART_TO_HELICAL_COORDS);
 
-		MD_out.setValue(EMDL_ORIENT_ORIGIN_X, xoff);
-		MD_out.setValue(EMDL_ORIENT_ORIGIN_Y, yoff);
+		MD_out.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff);
+		MD_out.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff);
 		if (is_3d_trans)
-			MD_out.setValue(EMDL_ORIENT_ORIGIN_Z, zoff);
+			MD_out.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, zoff);
 		MD_out.nextObject();
 	}
 }
@@ -5014,7 +4760,7 @@ void HermiteInterpolateOne3DHelicalFilament(
 	MD_out.addLabel(EMDL_PARTICLE_HELICAL_TUBE_ID);
 	MD_out.addLabel(EMDL_ORIENT_TILT_PRIOR);
 	MD_out.addLabel(EMDL_ORIENT_PSI_PRIOR);
-    MD_out.addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH);
+    MD_out.addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM);
     MD_out.addLabel(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO);
 
 	//half_box_size_pix = box_size_pix / 2.;
@@ -5132,7 +4878,7 @@ void HermiteInterpolateOne3DHelicalFilament(
     	    	MD_out.setValue(EMDL_ORIENT_TILT_PRIOR, tilt_deg);
     	    	MD_out.setValue(EMDL_ORIENT_PSI_PRIOR, psi_deg);
 
-    	        MD_out.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH, accu_len_pix);
+    	        MD_out.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM, accu_len_pix * pixel_size_A);
     	        MD_out.setValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, psi_prior_flip_ratio);
     		}
     	}

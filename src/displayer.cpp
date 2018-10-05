@@ -181,7 +181,7 @@ int DisplayBox::unSelect()
 	return selected;
 }
 
-int basisViewerWindow::fillCanvas(int viewer_type, MetaDataTable &MDin, EMDLabel display_label, bool _do_read_whole_stacks, bool _do_apply_orient,
+int basisViewerWindow::fillCanvas(int viewer_type, MetaDataTable &MDin, MetaDataTable *MDopt, EMDLabel display_label, bool _do_read_whole_stacks, bool _do_apply_orient,
 		RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale, RFLOAT _ori_scale, int _ncol, long int max_nr_images, RFLOAT lowpass, RFLOAT highpass, bool _do_class,
 		MetaDataTable *_MDdata, int _nr_regroup, bool _do_recenter,  bool _is_data, MetaDataTable *_MDgroups,
 		bool do_allow_save, FileName fn_selected_imgs, FileName fn_selected_parts, int max_nr_parts_per_class)
@@ -213,10 +213,11 @@ int basisViewerWindow::fillCanvas(int viewer_type, MetaDataTable &MDin, EMDLabel
 		canvas.fn_selected_imgs= fn_selected_imgs;
 		canvas.fn_selected_parts = fn_selected_parts;
 		canvas.max_nr_parts_per_class = max_nr_parts_per_class;
-		canvas.fill(MDin, display_label, _do_apply_orient, _minval, _maxval, _sigma_contrast, _scale, _ncol, _do_recenter, max_nr_images, lowpass, highpass);
+		canvas.fill(MDin, MDopt, display_label, _do_apply_orient, _minval, _maxval, _sigma_contrast, _scale, _ncol, _do_recenter, max_nr_images, lowpass, highpass);
 		canvas.nr_regroups = _nr_regroup;
 		canvas.do_recenter = _do_recenter;
 		canvas.do_apply_orient = _do_apply_orient;
+		canvas.MDopt = MDopt;
 		if (canvas.nr_regroups > 0)
 			canvas.MDgroups = _MDgroups;
 		if (_do_class)
@@ -252,7 +253,7 @@ int basisViewerWindow::fillCanvas(int viewer_type, MetaDataTable &MDin, EMDLabel
 		int ysize_canvas = CEIL(YSIZE(img())*_scale);
 		singleViewerCanvas canvas(0, 0, xsize_canvas, ysize_canvas);
 		canvas.SetScroll(&scroll);
-		canvas.fill(MDin, display_label, _do_apply_orient, _minval, _maxval, _sigma_contrast, _scale, 1);
+		canvas.fill(MDin, MDopt, display_label, _do_apply_orient, _minval, _maxval, _sigma_contrast, _scale, 1);
 		canvas.do_read_whole_stacks = false;
 		resizable(*this);
 		show();
@@ -309,7 +310,7 @@ int basisViewerWindow::fillSingleViewerCanvas(MultidimArray<RFLOAT> image, RFLOA
 	return Fl::run();
 
 }
-int basisViewerCanvas::fill(MetaDataTable &MDin, EMDLabel display_label, bool _do_apply_orient, RFLOAT _minval, RFLOAT _maxval,
+int basisViewerCanvas::fill(MetaDataTable &MDin, MetaDataTable *MDopt, EMDLabel display_label, bool _do_apply_orient, RFLOAT _minval, RFLOAT _maxval,
 		RFLOAT _sigma_contrast, RFLOAT _scale, int _ncol, bool _do_recenter, long int max_images, RFLOAT lowpass, RFLOAT highpass)
 {
 
@@ -387,17 +388,27 @@ int basisViewerCanvas::fill(MetaDataTable &MDin, EMDLabel display_label, bool _d
 					img.readFromOpenFile(fn_my_stack, hFile, numbers_in_stack[inum]);
 				long int my_ipos = my_stack_first_ipos + inum;
 
+				RFLOAT angpix;
+
+				if (_do_apply_orient || lowpass > 0. || highpass > 0.)
+				{
+					int optics_group;
+					MDin.getValue(EMDL_IMAGE_OPTICS_GROUP, optics_group, my_ipos);
+					optics_group--;
+					MDopt->getValue(EMDL_IMAGE_PIXEL_SIZE, angpix, optics_group);
+				}
+
 				if (_do_apply_orient)
 				{
 					RFLOAT psi,rot,tilt;
 					Matrix1D<RFLOAT> offset(3);
 					Matrix2D<RFLOAT> A;
 					MDin.getValue(EMDL_ORIENT_PSI, psi, my_ipos);
-					MDin.getValue(EMDL_ORIENT_ORIGIN_X, XX(offset), my_ipos);
-					MDin.getValue(EMDL_ORIENT_ORIGIN_Y, YY(offset), my_ipos);
-
+					MDin.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, XX(offset), my_ipos);
+					MDin.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, YY(offset), my_ipos);
 					if(img().getDim()==2)
 					{
+						offset /= angpix;
 						rotation2DMatrix(psi, A);
 						MAT_ELEM(A, 0, 2) = COSD(psi) * XX(offset) - SIND(psi) * YY(offset);
 						MAT_ELEM(A, 1, 2) = COSD(psi) * YY(offset) + SIND(psi) * XX(offset);
@@ -405,10 +416,10 @@ int basisViewerCanvas::fill(MetaDataTable &MDin, EMDLabel display_label, bool _d
 					}
 					else
 					{
-						MDin.getValue(EMDL_ORIENT_PSI, psi, my_ipos);
 						MDin.getValue(EMDL_ORIENT_ROT, rot, my_ipos);
 						MDin.getValue(EMDL_ORIENT_TILT, tilt, my_ipos);
-						MDin.getValue(EMDL_ORIENT_ORIGIN_Z, ZZ(offset), my_ipos);
+						MDin.getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, ZZ(offset), my_ipos);
+						offset /= angpix;
 						Euler_rotation3DMatrix(rot,tilt,psi, A);
 						MAT_ELEM(A, 0, 3) = MAT_ELEM(A, 0, 0) * XX(offset) + MAT_ELEM(A, 0, 1) * YY(offset) + MAT_ELEM(A, 0, 2) * ZZ(offset);
 						MAT_ELEM(A, 1, 3) = MAT_ELEM(A, 1, 0) * XX(offset) + MAT_ELEM(A, 1, 1) * YY(offset) + MAT_ELEM(A, 1, 2) * ZZ(offset);
@@ -422,9 +433,9 @@ int basisViewerCanvas::fill(MetaDataTable &MDin, EMDLabel display_label, bool _d
 				}
 
 				if (lowpass > 0.)
-					lowPassFilterMap(img(), lowpass, 1.0);
+					lowPassFilterMap(img(), lowpass, angpix);
 				if (highpass > 0.)
-					highPassFilterMap(img(), highpass, 1.0);
+					highPassFilterMap(img(), highpass, angpix);
 
 				// Dont change the user-provided _minval and _maxval in the getImageContrast routine!
 				RFLOAT myminval = _minval;
@@ -1103,7 +1114,7 @@ void multiViewerCanvas::saveSelectedParticles(int save_selected)
 	int nparts = MDpart.numberOfObjects();
 	if (nparts > 0)
 	{
-		MDpart.write(fn_selected_parts);
+		ObservationModel::save(MDpart, *MDopt, fn_selected_parts);
 		std::cout << "Saved "<< fn_selected_parts << " with " << nparts << " selected particles." << std::endl;
 	}
 	else
@@ -1183,7 +1194,7 @@ void multiViewerCanvas::showSelectedParticles(int save_selected)
 	if (nparts > 0)
 	{
         basisViewerWindow win(MULTIVIEW_WINDOW_WIDTH, MULTIVIEW_WINDOW_HEIGHT, "Particles in the selected classes");
-        win.fillCanvas(MULTIVIEWER, MDpart, EMDL_IMAGE_NAME, do_read_whole_stacks, do_apply_orient, 0., 0., 0., boxes[0]->scale, ori_scale, ncol, multi_max_nr_images);
+        win.fillCanvas(MULTIVIEWER, MDpart, MDopt, EMDL_IMAGE_NAME, do_read_whole_stacks, do_apply_orient, 0., 0., 0., boxes[0]->scale, ori_scale, ncol, multi_max_nr_images);
 	}
 	else
 		std::cout <<" No classes selected. First select one or more classes..." << std::endl;
@@ -1605,10 +1616,10 @@ int pickerViewerCanvas::handle(int ev)
 					MDcoords.setValue(EMDL_ORIENT_ROT, aux);
 				if (MDcoords.getValue(EMDL_ORIENT_TILT, aux2))
 					MDcoords.setValue(EMDL_ORIENT_TILT, aux);
-				if (MDcoords.getValue(EMDL_ORIENT_ORIGIN_X, aux2))
-					MDcoords.setValue(EMDL_ORIENT_ORIGIN_X, zero);
-				if (MDcoords.getValue(EMDL_ORIENT_ORIGIN_Y, aux2))
-					MDcoords.setValue(EMDL_ORIENT_ORIGIN_Y, zero);
+				if (MDcoords.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, aux2))
+					MDcoords.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, zero);
+				if (MDcoords.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, aux2))
+					MDcoords.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, zero);
 			}
 			else
 				MDcoords.addObject();
@@ -2220,6 +2231,7 @@ void Displayer::read(int argc, char **argv)
 	int disp_section  = parser.addSection("Multiviewer options");
 	ncol = textToInteger(parser.getOption("--col", "Number of columns", "5"));
 	do_apply_orient = parser.checkOption("--apply_orient","Apply the orientation as stored in the input STAR file angles and offsets");
+	angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in A) to calculate lowpass filter and/or translational offsets ", "-1"));
 	ori_scale = textToFloat(parser.getOption("--ori_scale", "Relative scale for viewing individual images in multiviewer", "1"));
 	sort_label = EMDL::str2Label(parser.getOption("--sort", "Metadata label to sort images on", "EMDL_UNDEFINED"));
 	random_sort = parser.checkOption("--random_sort", "Use random order in the sorting");
@@ -2241,7 +2253,6 @@ void Displayer::read(int argc, char **argv)
 	particle_radius = textToFloat(parser.getOption("--particle_radius", "Particle radius in pixels", "100"));
 	lowpass = textToFloat(parser.getOption("--lowpass", "Lowpass filter (in A) to filter micrograph before displaying", "0"));
 	highpass = textToFloat(parser.getOption("--highpass", "Highpass filter (in A) to filter micrograph before displaying", "0"));
-	angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in A) to calculate lowpass filter", "-1"));
 	fn_color = parser.getOption("--color_star", "STAR file with a column for red-blue coloring (a subset of) the particles", "");
 	color_label = parser.getOption("--color_label", "MetaDataLabel to color particles on (e.g. rlnParticleSelectZScore)", "");
 	color_blue_value = textToFloat(parser.getOption("--blue", "Value of the blue color", "1."));
@@ -2281,7 +2292,9 @@ void Displayer::initialise()
 			fn_data = fn_in.without("_half2_model.star") + "_data.star";
 		else
 			fn_data = fn_in.without("_model.star") + "_data.star";
-		MDdata.read(fn_data);
+
+		ObservationModel obsModel;
+		ObservationModel::loadSafely(fn_data, obsModel, MDdata, MDopt);
 
 		// If regrouping, also read the model_groups table into memory
 		if (nr_regroups > 0)
@@ -2314,34 +2327,64 @@ void Displayer::initialise()
 	}
 
 	// Check if input STAR file contains pixel-size information
-
-	if ((lowpass > 0 || highpass > 0) && angpix < 0)
+	if (!do_class && (do_apply_orient || lowpass > 0 || highpass > 0))
 	{
+		if (fn_in.isStarFile())
+		{
+			MetaDataTable MD;
 
-	    	if (fn_in.isStarFile())
-    		{
-	    		MetaDataTable MD;
-    			MD.read(fn_in);
-    			RFLOAT mag, dstep;
+			// Try v3.1 first
+			if (MD.read(fn_in,"optics"))
+			{
+				ObservationModel obsModel;
+				ObservationModel::loadSafely(fn_in, obsModel, MD, MDopt);
+				angpix = MDopt.getValue(EMDL_IMAGE_PIXEL_SIZE, angpix, 0);
+			}
+			else
+			{
+    			// Non-particle-type STAR files
+				MD.read(fn_in);
+    			MDopt.addObject();
     			if (MD.containsLabel(EMDL_CTF_MAGNIFICATION) && MD.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
-	    		{
-    				MD.goToObject(0);
-    				MD.getValue(EMDL_CTF_MAGNIFICATION, mag);
-    				MD.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
-	    			angpix = 10000. * dstep / mag;
-    				if (verb > 0)
-    					std::cout << " Using pixel size from input STAR file of " << angpix << " Angstroms" << std::endl;
-	    		}
-    			else if (verb > 0 && (lowpass > 0 || highpass > 0))
     			{
-    				REPORT_ERROR("Displayer::initialise ERROR: you provided a low- or highpass filter in Angstroms, but the input STAR file does not contain the pixel size. Please provide --angpix.");
-	    		}
-    		}
-	    	else
-    		{
-    			REPORT_ERROR("Displayer::initialise ERROR: you provided a low- or highpass filter in Angstroms, so please also provide --angpix.");
-	    	}
+					RFLOAT mag, dstep;
+					MD.goToObject(0);
+					MD.getValue(EMDL_CTF_MAGNIFICATION, mag);
+					MD.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
+					angpix = 10000. * dstep / mag;
+					MDopt.setValue(EMDL_IMAGE_PIXEL_SIZE, 10000. * dstep / mag);
+					if (verb > 0)
+						std::cout << " Using pixel size from input STAR file of " << 10000. * dstep / mag << " Angstroms" << std::endl;
+    			}
+       			else if (angpix > 0.)
+       			{
+       				std::cout << " Using pixel size from command-line input of " << angpix << " Angstroms" << std::endl;
+					MDopt.setValue(EMDL_IMAGE_PIXEL_SIZE, angpix);
+       			}
+       			else
+       			{
+       				REPORT_ERROR("Displayer::initialise ERROR: you provided a apply_orient, low- or highpass filter in Angstroms, but the input STAR file does not contain the pixel size. Please provide --angpix.");
+    	    	}
+
+			}
+
+		}
+		else
+		{
+			// if not a STAR file: always need command-line input for pixel
+			MDopt.addObject();
+			if (angpix > 0.)
+			{
+				std::cout << " Using pixel size from command-line input of " << angpix << " Angstroms" << std::endl;
+				MDopt.setValue(EMDL_IMAGE_PIXEL_SIZE, angpix);
+			}
+			else
+			{
+				REPORT_ERROR("Displayer::initialise ERROR: you provided a apply_orient, low- or highpass filter in Angstroms, but the input STAR file does not contain the pixel size. Please provide --angpix.");
+			}
+		}
 	}
+
 
 	if (show_fourier_amplitudes && show_fourier_phase_angles)
 		REPORT_ERROR("Displayer::initialise ERROR: cannot display Fourier amplitudes and phase angles at the same time!");
@@ -2475,7 +2518,14 @@ int Displayer::run()
 	}
 	else if (fn_in.isStarFile())
 	{
-		MDin.read(fn_in, table_name);
+		if (MDin.read(fn_in, "optics"))
+		{
+			MDin.read(fn_in, "particles");
+		}
+		else
+		{
+			MDin.read(fn_in, table_name);
+		}
 		// Check that label to display is present in the table
 		if (!MDin.containsLabel(display_label))
 			REPORT_ERROR("Cannot find metadata label in input STAR file");
@@ -2498,13 +2548,14 @@ int Displayer::run()
 			do_read_whole_stacks = false;
 		}
 
+
 		basisViewerWindow win(MULTIVIEW_WINDOW_WIDTH, MULTIVIEW_WINDOW_HEIGHT, fn_in.c_str());
 		if ((lowpass>0 || highpass>0) && angpix>0)
-			win.fillCanvas(MULTIVIEWER, MDin, display_label, do_read_whole_stacks, do_apply_orient, minval, maxval, sigma_contrast, scale, ori_scale, ncol,
+			win.fillCanvas(MULTIVIEWER, MDin, &MDopt, display_label, do_read_whole_stacks, do_apply_orient, minval, maxval, sigma_contrast, scale, ori_scale, ncol,
 			               max_nr_images,  lowpass/angpix, highpass/angpix, do_class, &MDdata, nr_regroups, do_recenter, fn_in.contains("_data.star"), &MDgroups,
 		                       do_allow_save, fn_selected_imgs, fn_selected_parts, max_nr_parts_per_class);
 		else
-			win.fillCanvas(MULTIVIEWER, MDin, display_label, do_read_whole_stacks, do_apply_orient, minval, maxval, sigma_contrast, scale, ori_scale, ncol,
+			win.fillCanvas(MULTIVIEWER, MDin, &MDopt, display_label, do_read_whole_stacks, do_apply_orient, minval, maxval, sigma_contrast, scale, ori_scale, ncol,
 			               max_nr_images, -1, -1, do_class, &MDdata, nr_regroups, do_recenter, fn_in.contains("_data.star"), &MDgroups,
 			               do_allow_save, fn_selected_imgs, fn_selected_parts, max_nr_parts_per_class);
 	}
@@ -2527,9 +2578,9 @@ int Displayer::run()
 			}
 			basisViewerWindow win(MULTIVIEW_WINDOW_WIDTH, MULTIVIEW_WINDOW_HEIGHT, fn_in.c_str());
 			if ((lowpass>0 || highpass>0) && angpix>0)
-				win.fillCanvas(MULTIVIEWER, MDin, EMDL_IMAGE_NAME, true, false, minval, maxval, sigma_contrast, scale, ori_scale, ncol, max_nr_images, lowpass/angpix, highpass/angpix);
+				win.fillCanvas(MULTIVIEWER, MDin, NULL, EMDL_IMAGE_NAME, true, false, minval, maxval, sigma_contrast, scale, ori_scale, ncol, max_nr_images, lowpass/angpix, highpass/angpix);
 			else
-				win.fillCanvas(MULTIVIEWER, MDin, EMDL_IMAGE_NAME, true, false, minval, maxval, sigma_contrast, scale, ori_scale, ncol, max_nr_images);
+				win.fillCanvas(MULTIVIEWER, MDin, NULL, EMDL_IMAGE_NAME, true, false, minval, maxval, sigma_contrast, scale, ori_scale, ncol, max_nr_images);
 		}
 		else if (ZSIZE(img()) > 1)
 		{
@@ -2558,7 +2609,7 @@ int Displayer::run()
 			}
 
 			basisViewerWindow win(MULTIVIEW_WINDOW_WIDTH, MULTIVIEW_WINDOW_HEIGHT, fn_in.c_str());
-			win.fillCanvas(MULTIVIEWER, MDin, EMDL_IMAGE_NAME, true, false, minval, maxval, sigma_contrast, scale, ori_scale, ncol, max_nr_images);
+			win.fillCanvas(MULTIVIEWER, MDin, &MDopt, EMDL_IMAGE_NAME, true, false, minval, maxval, sigma_contrast, scale, ori_scale, ncol, max_nr_images);
 		}
 		else
 		{

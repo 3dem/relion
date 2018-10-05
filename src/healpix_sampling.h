@@ -60,9 +60,9 @@ public:
      */
     int orientational_prior_mode;
 
-    /* Translational search range and sampling rate
+    /* Translational search range and sampling rate (as of v3.1 in Angstroms!)
      */
-    // Jun19,2015 - Shaoda, Helical refinement
+    // Jun19,2015 - Shaoda, Helical refinement (all in Angstroms!)
     RFLOAT offset_range, offset_step, helical_offset_step;
 
     /** Flag whether this is a real 3D sampling */
@@ -93,7 +93,7 @@ public:
     /** vector with the psi-samples */
     std::vector<RFLOAT> psi_angles;
 
-    /** vector with the X,Y(,Z)-translations */
+    /** vector with the X,Y(,Z)-translations (as of v3.1 in Angstroms!) */
     std::vector<RFLOAT> translations_x, translations_y, translations_z;
 
 
@@ -163,7 +163,7 @@ public:
 			bool do_warnpsi = false,
 			bool do_local_searches = false,
 			bool do_helical_refine = false,
-			RFLOAT rise_pix  = 0.,
+			RFLOAT rise_Angst  = 0.,
 			RFLOAT twist_deg = 0.);
 
     // Reset the random perturbation
@@ -183,17 +183,17 @@ public:
     // Write the sampling information to a STAR file
     void write(FileName fn_out);
 
-    /* Set the non-oversampled list of translations
+    /* Set the non-oversampled list of translations in Angstroms
      * For single particles, offset ranges are equal along different directions
      * For helices, x offsets (along helical axis) should be less within -+0.5 * rise
      * */
     void setTranslations(
-    		RFLOAT new_offset_step = -1.,
+			RFLOAT new_offset_step = -1.,
     		RFLOAT new_offset_range = -1.,
     		bool do_local_searches = false,
     		bool do_helical_refine = false,
 			RFLOAT new_helical_offset_step = -1.,
-    		RFLOAT helical_rise_pix = 0.,
+    		RFLOAT helical_rise_Angst = 0.,
     		RFLOAT helical_twist_deg = 0.);
 
     /* Add a single translation */
@@ -264,10 +264,10 @@ public:
      */
     void getDirectionFromHealPix(long int ipix, RFLOAT &rot, RFLOAT &tilt);
 
-    /* Get the translational sampling step in pixels */
+    /* Get the translational sampling step in Angstroms */
     RFLOAT getTranslationalSampling(int adaptive_oversampling = 0);
 
-    /* Get the translational sampling step along helical axis in pixels */
+    /* Get the translational sampling step along helical axis in Angstroms */
     RFLOAT getHelicalTranslationalSampling(int adaptive_oversampling = 0);
 
     /* Get approximate angular sampling in degrees for any adaptive oversampling
@@ -312,7 +312,7 @@ public:
 
     /* Get the value for the itrans'th precalculated translations
      */
-    void getTranslation(long int itrans, RFLOAT &trans_x, RFLOAT &trans_y, RFLOAT &trans_z);
+    void getTranslationInPixel(long int itrans, RFLOAT my_pixel_size, RFLOAT &trans_x, RFLOAT &trans_y, RFLOAT &trans_z);
 
     /* Get the position of this sampling point in the original array */
     long int getPositionSamplingPoint(int iclass, long int idir, long int ipsi, long int itrans);
@@ -327,13 +327,11 @@ public:
      * An oversampling_order == 2 will give rise to 4*4 new (rot, tilt) pairs.
      * etc.
      */
-    void getTranslations(long int itrans, int oversampling_order,
+    void getTranslationsInPixel(long int itrans, int oversampling_order, RFLOAT my_pixel_size,
     		std::vector<RFLOAT > &my_translations_x,
     		std::vector<RFLOAT > &my_translations_y,
     		std::vector<RFLOAT > &my_translations_z,
-			bool do_helical_refine = false,
-			RFLOAT rise_pix = 0.,
-			RFLOAT twist_deg = 0.);
+			bool do_helical_refine = false);
 
     /* Get the vectors of (rot, tilt, psi) angle triplets for a more finely (oversampled) sampling
      * The oversampling_order is the difference in order of the original (coarse) and the oversampled (fine) sampling

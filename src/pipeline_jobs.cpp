@@ -305,8 +305,6 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 			type = PROC_AUTOPICK;
 		else if (typestring == PROC_EXTRACT_NAME)
 			type = PROC_EXTRACT;
-		else if (typestring == PROC_SORT_NAME)
-			type = PROC_SORT;
 		else if (typestring == PROC_CLASSSELECT_NAME)
 			type = PROC_CLASSSELECT;
 		else if (typestring == PROC_2DCLASS_NAME)
@@ -346,7 +344,6 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 		    type != PROC_MANUALPICK &&
 		    type != PROC_AUTOPICK &&
 		    type != PROC_EXTRACT &&
-		    type != PROC_SORT &&
 		    type != PROC_CLASSSELECT &&
 		    type != PROC_2DCLASS &&
 		    type != PROC_3DCLASS &&
@@ -665,12 +662,6 @@ void RelionJob::initialise(int _job_type)
 		has_thread = false;
 		initialiseExtractJob();
 	}
-	else if (type == PROC_SORT)
-	{
-		has_mpi = true;
-		has_thread = false;
-		initialiseSortJob();
-	}
 	else if (type == PROC_CLASSSELECT)
 	{
 		has_mpi = has_thread = false;
@@ -892,10 +883,6 @@ bool RelionJob::getCommands(std::string &outputname, std::vector<std::string> &c
 	else if (type == PROC_EXTRACT)
 	{
 		result = getCommandsExtractJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
-	}
-	else if (type == PROC_SORT)
-	{
-		result = getCommandsSortJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
 	}
 	else if (type == PROC_CLASSSELECT)
 	{
@@ -1988,103 +1975,6 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 
 }
 
-void RelionJob::initialiseSortJob()
-{
-	hidden_name = ".gui_sort";
-
-	joboptions["input_star"] = JobOption("Input particles to be sorted:", NODE_PART_DATA, "", "Input particles(*.{star})", "This STAR file should contain in-plane rotations, in-plane translations and a class number that were obtained by alignment (class2D/class3D or auto3D) OR auto-picking. A column called rlnParticleSelectZScore will be added to this same STAR file with the sorting result. This column can then be used in the display programs to sort the particles on.");
-	joboptions["model_refs"] = JobOption("References from model.star:", NODE_MODEL, "", "References(*.{star})", "This model.STAR file should correspond to the refinement/classification performed with the input particles");
-	joboptions["autopick_refs"] = JobOption("OR autopicking references:", NODE_2DREFS, "", "References(*.{star})", "This STAR file should contain the 2D references that were used for the auto-picking");
-
-	joboptions["angpix_ref"] = JobOption("Pixel size in references (A)", -1, 0.3, 5, 0.1, "Pixel size in Angstroms for the provided reference images. This will be used to calculate the filters and the particle diameter in pixels. If a negative value is given here, the pixel size in the references will be assumed to be the same as the one in the micrographs, i.e. the particles that were used to make the references were not rescaled upon extraction.");
-	joboptions["do_ctf"] = JobOption("Are References CTF corrected?", true, "Set to Yes if the references were created with CTF-correction inside RELION. \n ");
-	joboptions["do_ignore_first_ctfpeak"] = JobOption("Ignore CTFs until first peak?", false,"Set this to Yes, only if this option was also used to generate the references.");
-
-
-}
-
-bool RelionJob::getCommandsSortJob(std::string &outputname, std::vector<std::string> &commands,
-		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
-{
-
-	commands.clear();
-	initialisePipeline(outputname, PROC_SORT_NAME, job_counter);
-	std::string command;
-
-	if (joboptions["nr_mpi"].getNumber() > 1)
-		command="`which relion_particle_sort_mpi`";
-	else
-		command="`which relion_particle_sort`";
-
-	if (joboptions["input_star"].getString() == "")
-	{
-		error_message = "ERROR: empty field for input STAR file...";
-		return false;
-	}
-
-	if (joboptions["input_star"].getString() == "")
-	{
-		error_message = "ERROR: empty field for continuation STAR file...";
-		return false;
-	}
-	if (joboptions["model_refs"].getString() == "" && joboptions["autopick_refs"].getString() == "")
-	{
-		error_message = "ERROR: provide either model.star or autopicking references...";
-		return false;
-	}
-
-	if (joboptions["model_refs"].getString() != "" && joboptions["autopick_refs"].getString() != "")
-	{
-		error_message = "ERROR: you cannot provide both a model.star and autopicking references...";
-		return false;
-	}
-
-	command += " --i " + joboptions["input_star"].getString();
-	Node node(joboptions["input_star"].getString(), joboptions["input_star"].node_type);
-	inputNodes.push_back(node);
-
-	FileName fn_ref;
-	int node_type;
-	if (joboptions["model_refs"].getString() != "")
-	{
-		node_type = NODE_MODEL;
-		fn_ref = joboptions["model_refs"].getString();
-	}
-	else if (joboptions["autopick_refs"].getString() != "")
-	{
-
-		node_type = NODE_2DREFS;
-		fn_ref = joboptions["autopick_refs"].getString();
-	}
-	command += " --ref " + fn_ref;
-	Node node2(fn_ref, node_type);
-	inputNodes.push_back(node2);
-
-	if (joboptions["angpix_ref"].getNumber() > 0.)
-		command += " --angpix_ref " + joboptions["angpix_ref"].getString();
-
-	command += " --o " + outputname + "particles_sort.star";
-	Node node3(outputname + "particles_sort.star", NODE_PART_DATA);
-	outputNodes.push_back(node3);
-
-	Node node4(outputname + "logfile.pdf", NODE_PDF_LOGFILE);
-	outputNodes.push_back(node4);
-
-	if (joboptions["do_ctf"].getBoolean())
-	{
-		command += " --ctf ";
-		if (joboptions["do_ignore_first_ctfpeak"].getBoolean())
-			command += " --ctf_intact_first_peak ";
-	}
-
-	// Other arguments for extraction
-	command += " " + joboptions["other_args"].getString();
-
-	commands.push_back(command);
-
-	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
-
-}
 
 void RelionJob::initialiseSelectJob()
 {
@@ -2513,11 +2403,11 @@ This requires that the optimal orientations of all particles are already stored 
 	joboptions["psi_sampling"] = JobOption("In-plane angular sampling:", 6., 0.5, 20, 0.5, "The sampling rate for the in-plane rotation angle (psi) in degrees. \
 Using fine values will slow down the program. Recommended value for most 2D refinements: 5 degrees.\n\n \
 If auto-sampling is used, this will be the value for the first iteration(s) only, and the sampling rate will be increased automatically after that.");
-	joboptions["offset_range"] = JobOption("Offset search range (pix):", 5, 0, 30, 1, "Probabilities will be calculated only for translations \
+	joboptions["offset_range"] = JobOption("Offset search range (A):", 5, 0, 30, 1, "Probabilities will be calculated only for translations \
 in a circle with this radius (in pixels). The center of this circle changes at every iteration and is placed at the optimal translation \
 for each image in the previous iteration.\n\n \
 If auto-sampling is used, this will be the value for the first iteration(s) only, and the sampling rate will be increased automatically after that.");
-	joboptions["offset_step"] = JobOption("Offset search step (pix):", 1, 0.1, 5, 0.1, "Translations will be sampled with this step-size (in pixels).\
+	joboptions["offset_step"] = JobOption("Offset search step (A):", 1, 0.1, 5, 0.1, "Translations will be sampled with this step-size (in pixels).\
 Translational sampling is also done using the adaptive approach. \
 Therefore, if adaptive=1, the translations will first be evaluated on a 2x coarser grid.\n\n \
 If auto-sampling is used, this will be the value for the first iteration(s) only, and the sampling rate will be increased automatically after that.");
@@ -2769,10 +2659,10 @@ Therefore, this option is not generally recommended: try increasing amplitude co
 	joboptions["sampling"] = JobOption("Initial angular sampling:", RADIO_SAMPLING, 1, "There are only a few discrete \
 angular samplings possible because we use the HealPix library to generate the sampling of the first two Euler angles on the sphere. \
 The samplings are approximate numbers and vary slightly over the sphere.\n\n For initial model generation at low resolutions, coarser angular samplings can often be used than in normal 3D classifications/refinements, e.g. 15 degrees. During the inbetween and final SGD iterations, the sampling will be adjusted to the resolution, given the particle size.");
-	joboptions["offset_range"] = JobOption("Offset search range (pix):", 6, 0, 30, 1, "Probabilities will be calculated only for translations \
+	joboptions["offset_range"] = JobOption("Offset search range (A):", 6, 0, 30, 1, "Probabilities will be calculated only for translations \
 in a circle with this radius (in pixels). The center of this circle changes at every iteration and is placed at the optimal translation \
 for each image in the previous iteration.\n\n");
-	joboptions["offset_step"] = JobOption("Offset search step (pix):", 2, 0.1, 5, 0.1, "Translations will be sampled with this step-size (in pixels).\
+	joboptions["offset_step"] = JobOption("Offset search step (A):", 2, 0.1, 5, 0.1, "Translations will be sampled with this step-size (in pixels).\
 Translational sampling is also done using the adaptive approach. \
 Therefore, if adaptive=1, the translations will first be evaluated on a 2x coarser grid.\n\n ");
 
@@ -3035,11 +2925,11 @@ This requires that the optimal orientations of all particles are already stored 
 angular samplings possible because we use the HealPix library to generate the sampling of the first two Euler angles on the sphere. \
 The samplings are approximate numbers and vary slightly over the sphere.\n\n \
 If auto-sampling is used, this will be the value for the first iteration(s) only, and the sampling rate will be increased automatically after that.");
-	joboptions["offset_range"] = JobOption("Offset search range (pix):", 5, 0, 30, 1, "Probabilities will be calculated only for translations \
+	joboptions["offset_range"] = JobOption("Offset search range (A):", 5, 0, 30, 1, "Probabilities will be calculated only for translations \
 in a circle with this radius (in pixels). The center of this circle changes at every iteration and is placed at the optimal translation \
 for each image in the previous iteration.\n\n \
 If auto-sampling is used, this will be the value for the first iteration(s) only, and the sampling rate will be increased automatically after that.");
-	joboptions["offset_step"] = JobOption("Offset search step (pix):", 1, 0.1, 5, 0.1, "Translations will be sampled with this step-size (in pixels).\
+	joboptions["offset_step"] = JobOption("Offset search step (A):", 1, 0.1, 5, 0.1, "Translations will be sampled with this step-size (in pixels).\
 Translational sampling is also done using the adaptive approach. \
 Therefore, if adaptive=1, the translations will first be evaluated on a 2x coarser grid.\n\n \
 If auto-sampling is used, this will be the value for the first iteration(s) only, and the sampling rate will be increased automatically after that.");
@@ -3430,11 +3320,11 @@ This may yield higher-resolution maps, especially when the mask contains only a 
 angular samplings possible because we use the HealPix library to generate the sampling of the first two Euler angles on the sphere. \
 The samplings are approximate numbers and vary slightly over the sphere.\n\n \
 Note that this will only be the value for the first few iteration(s): the sampling rate will be increased automatically after that.");
-	joboptions["offset_range"] = JobOption("Initial offset range (pix):", 5, 0, 30, 1, "Probabilities will be calculated only for translations \
+	joboptions["offset_range"] = JobOption("Initial offset range (A):", 5, 0, 30, 1, "Probabilities will be calculated only for translations \
 in a circle with this radius (in pixels). The center of this circle changes at every iteration and is placed at the optimal translation \
 for each image in the previous iteration.\n\n \
 Note that this will only be the value for the first few iteration(s): the sampling rate will be increased automatically after that.");
-	joboptions["offset_step"] = JobOption("Initial offset step (pix):", 1, 0.1, 5, 0.1, "Translations will be sampled with this step-size (in pixels).\
+	joboptions["offset_step"] = JobOption("Initial offset step (A):", 1, 0.1, 5, 0.1, "Translations will be sampled with this step-size (in pixels).\
 Translational sampling is also done using the adaptive approach. \
 Therefore, if adaptive=1, the translations will first be evaluated on a 2x coarser grid.\n\n \
 Note that this will only be the value for the first few iteration(s): the sampling rate will be increased automatically after that.");
@@ -3772,11 +3662,11 @@ useful insights about how well the subtraction worked. If set to No, the origina
 angular samplings possible because we use the HealPix library to generate the sampling of the first two Euler angles on the sphere. \
 The samplings are approximate numbers and vary slightly over the sphere.\n\n \
 Note that this will only be the value for the first few iteration(s): the sampling rate will be increased automatically after that.");
-	joboptions["offset_range"] = JobOption("Initial offset range (pix):", 3, 0, 30, 1, "Probabilities will be calculated only for translations \
+	joboptions["offset_range"] = JobOption("Initial offset range (A):", 3, 0, 30, 1, "Probabilities will be calculated only for translations \
 in a circle with this radius (in pixels). The center of this circle changes at every iteration and is placed at the optimal translation \
 for each image in the previous iteration.\n\n \
 Note that this will only be the value for the first few iteration(s): the sampling rate will be increased automatically after that.");
-	joboptions["offset_step"] = JobOption("Initial offset step (pix):", 0.75, 0.1, 5, 0.1, "Translations will be sampled with this step-size (in pixels).\
+	joboptions["offset_step"] = JobOption("Initial offset step (A):", 0.75, 0.1, 5, 0.1, "Translations will be sampled with this step-size (in pixels).\
 Translational sampling is also done using the adaptive approach. \
 Therefore, if adaptive=1, the translations will first be evaluated on a 2x coarser grid.\n\n \
 Note that this will only be the value for the first few iteration(s): the sampling rate will be increased automatically after that.");

@@ -52,17 +52,17 @@
 using namespace gravis;
 
 /* Read -------------------------------------------------------------------- */
-void CTF::readByGroup(const MetaDataTable &partMdt, ObservationModel* obs, int particle)
+void CTF::readByGroup(const MetaDataTable &partMdt, ObservationModel* obs, long int particle)
 {
 	opticsGroup = 0;
-	
-	if (obs != 0) 
+
+	if (obs != 0)
 	{
 		partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, particle);
 	}
-	
-	opticsGroup--;		
-	
+
+	opticsGroup--;
+
 	readValue(EMDL_CTF_VOLTAGE,       kV,              200,     particle, opticsGroup, partMdt, obs);
 	readValue(EMDL_CTF_DEFOCUSU,      DeltafU,         0,       particle, opticsGroup, partMdt, obs);
 	readValue(EMDL_CTF_DEFOCUSV,      DeltafV,         DeltafU, particle, opticsGroup, partMdt, obs);
@@ -72,13 +72,13 @@ void CTF::readByGroup(const MetaDataTable &partMdt, ObservationModel* obs, int p
 	readValue(EMDL_CTF_SCALEFACTOR,   scale,           1,       particle, opticsGroup, partMdt, obs);
 	readValue(EMDL_CTF_Q0,            Q0,              0,       particle, opticsGroup, partMdt, obs);
 	readValue(EMDL_CTF_PHASESHIFT,    phase_shift,     0,       particle, opticsGroup, partMdt, obs);
-		
+
 	initialise();
-	
+
 	obsModel = obs;
 }
 
-void CTF::readValue(EMDLabel label, RFLOAT& dest, RFLOAT defaultVal, int particle, int opticsGroup, 
+void CTF::readValue(EMDLabel label, RFLOAT& dest, RFLOAT defaultVal, long int particle, int opticsGroup,
 					const MetaDataTable& partMdt, const ObservationModel* obs)
 {
 	if (!partMdt.getValue(label, dest, particle))
@@ -150,24 +150,24 @@ void CTF::setValues(RFLOAT _defU, RFLOAT _defV, RFLOAT _defAng, RFLOAT _voltage,
 }
 
 void CTF::setValuesByGroup(
-		ObservationModel *obs, int opticsGroup, 
-		double _defU, double _defV, double _defAng, 
+		ObservationModel *obs, int opticsGroup,
+		double _defU, double _defV, double _defAng,
 		double _Bfac, double _scale, double _phase_shift)
 {
 	DeltafU         = _defU;
 	DeltafV         = _defV;
 	azimuthal_angle = _defAng;
-	
+
 	Bfac            = _Bfac;
 	scale           = _scale;
 	phase_shift     = _phase_shift;
-	
+
 	obs->opticsMdt.getValue(EMDL_CTF_VOLTAGE, kV, opticsGroup);
 	obs->opticsMdt.getValue(EMDL_CTF_CS, Cs, opticsGroup);
 	obs->opticsMdt.getValue(EMDL_CTF_Q0, Q0, opticsGroup);
-	
+
 	initialise();
-	
+
 	obsModel = obs;
 }
 
@@ -239,18 +239,18 @@ void CTF::initialise()
 
     if (ABS(DeltafU) < 1e-6 && ABS(DeltafV) < 1e-6 && ABS(Q0) < 1e-6 && ABS(Cs) < 1e-6)
     	REPORT_ERROR("CTF::initialise: ERROR: CTF initialises to all-zero values. Was a correct STAR file provided?");
-	
+
 	// express astigmatism as a bilinear form:
-	
+
 	const double sin_az = sin(rad_azimuth);
 	const double cos_az = cos(rad_azimuth);
-	
+
 	d2Matrix Q(cos_az, sin_az, -sin_az, cos_az);
 	d2Matrix Qt(cos_az, -sin_az, sin_az, cos_az);
 	d2Matrix D(-DeltafU, 0.0, 0.0, -DeltafV);
-	
+
 	d2Matrix A = Qt * D * Q;
-	
+
 	Axx = A(0,0);
 	Axy = A(0,1);
 	Ayy = A(1,1);
@@ -263,11 +263,11 @@ double CTF::getGamma(double X, double Y) const
 		const Matrix2D<RFLOAT>& M = obsModel->magMatrices[opticsGroup];
 		RFLOAT XX = M(0,0) * X + M(0,1) * Y;
 		RFLOAT YY = M(1,0) * X + M(1,1) * Y;
-		
+
 		X = XX;
 		Y = YY;
 	}
-	
+
     RFLOAT u2 = X * X + Y * Y;
     RFLOAT u4 = u2 * u2;
 
@@ -291,14 +291,14 @@ t2Vector<RFLOAT> CTF::getGammaGrad(double X, double Y)
 		const Matrix2D<RFLOAT>& M = obsModel->magMatrices[opticsGroup];
 		RFLOAT XX = M(0,0) * X + M(0,1) * Y;
 		RFLOAT YY = M(1,0) * X + M(1,1) * Y;
-		
+
 		X = XX;
 		Y = YY;
 	}
-	
+
     RFLOAT u2 = X * X + Y * Y;
     //RFLOAT u4 = u2 * u2;
-	
+
 	// u4 = (X² + Y²)²
 	// du4/dx = 2 (X² + Y²) 2 X = 4 (X³ + XY²) = 4 u2 X
 
@@ -313,7 +313,7 @@ void CTF::getFftwImage(MultidimArray<RFLOAT> &result, int orixdim, int oriydim, 
 {
 	RFLOAT xs = (RFLOAT)orixdim * angpix;
 	RFLOAT ys = (RFLOAT)oriydim * angpix;
-	
+
 	if (obsModel != 0 && obsModel->hasEvenZernike)
 	{
 		if (orixdim != oriydim)
@@ -321,9 +321,9 @@ void CTF::getFftwImage(MultidimArray<RFLOAT> &result, int orixdim, int oriydim, 
 			REPORT_ERROR_STR("CTF::getFftwImage: symmetric aberrations are currently only "
 			              << "supported for square images.\n");
 		}
-		
+
 		const Image<RFLOAT>& gammaOffset = obsModel->getGammaOffset(opticsGroup, oriydim);
-		
+
 		if (   gammaOffset.data.xdim < result.xdim
 		    || gammaOffset.data.ydim < result.ydim)
 		{
@@ -331,18 +331,18 @@ void CTF::getFftwImage(MultidimArray<RFLOAT> &result, int orixdim, int oriydim, 
 				<< gammaOffset.data.xdim << "x" << gammaOffset.data.ydim << " available, "
 				<< result.xdim << "x" << result.ydim << " requested\n");
 		}
-		
+
 		for (int y1 = 0; y1 < result.ydim; y1++)
 		for (int x1 = 0; x1 < result.xdim; x1++)
 		{
 			RFLOAT x = x1 / xs;
 			RFLOAT y = y1 <= result.ydim/2? y1 / ys : (y1 - result.ydim) / ys;
-			
+
 			const int x0 = x1;
 			const int y0 = y1 <= result.ydim/2? y1 : gammaOffset.data.ydim + y1 - result.ydim;
-			
-			DIRECT_A2D_ELEM(result, y1, x1) = 
-				getCTF(x, y, do_abs, do_only_flip_phases, 
+
+			DIRECT_A2D_ELEM(result, y1, x1) =
+				getCTF(x, y, do_abs, do_only_flip_phases,
 					   do_intact_until_first_peak, do_damping, gammaOffset(y0,x0));
 		}
 	}
@@ -352,9 +352,9 @@ void CTF::getFftwImage(MultidimArray<RFLOAT> &result, int orixdim, int oriydim, 
 		{
 			RFLOAT x = (RFLOAT)jp / xs;
 			RFLOAT y = (RFLOAT)ip / ys;
-			
-			DIRECT_A2D_ELEM(result, i, j) = 
-				getCTF(x, y, do_abs, do_only_flip_phases, 
+
+			DIRECT_A2D_ELEM(result, i, j) =
+				getCTF(x, y, do_abs, do_only_flip_phases,
 					   do_intact_until_first_peak, do_damping);
 		}
 	}

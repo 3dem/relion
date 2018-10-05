@@ -98,9 +98,9 @@ bool localSearchHelicalSymmetry(
 		std::ostream* o_ptr = NULL);
 
 RFLOAT getHelicalSigma2Rot(
-		RFLOAT helical_rise_pix,
+		RFLOAT helical_rise_Angst,
 		RFLOAT helical_twist_deg,
-		RFLOAT helical_offset_step_pix,
+		RFLOAT helical_offset_step_Angst,
 		RFLOAT rot_step_deg,
 		RFLOAT old_sigma2_rot);
 
@@ -132,44 +132,6 @@ void imposeHelicalSymmetryInRealSpace(
 		RFLOAT rise_A,
 		RFLOAT twist_deg,
 		RFLOAT cosine_width_pix);
-
-/*
-void searchCnZSymmetry(
-		const MultidimArray<RFLOAT>& v,
-		RFLOAT r_min_pix,
-		RFLOAT r_max_pix,
-		int cn_start,
-		int cn_end,
-		std::vector<RFLOAT>& cn_list,
-		std::vector<RFLOAT>& cc_list,
-		std::vector<int>& nr_asym_voxels_list,
-		std::ofstream* fout_ptr = NULL);
-*/
-
-/*
-RFLOAT calcCCofPsiFor2DHelicalSegment(
-		const MultidimArray<RFLOAT>& v,
-		RFLOAT psi_deg,
-		RFLOAT pixel_size_A,
-		RFLOAT sphere_radius_A,
-		RFLOAT cyl_outer_radius_A);
-
-
-RFLOAT localSearchPsiFor2DHelicalSegment(
-		const MultidimArray<RFLOAT>& v,
-		RFLOAT pixel_size_A,
-		RFLOAT sphere_radius_A,
-		RFLOAT cyl_outer_radius_A,
-		RFLOAT ori_psi_deg,
-		RFLOAT search_half_range_deg,
-		RFLOAT search_step_deg);
-
-RFLOAT searchPsiFor2DHelicalSegment(
-		const MultidimArray<RFLOAT>& v,
-		RFLOAT pixel_size_A,
-		RFLOAT sphere_radius_A,
-		RFLOAT cyl_outer_radius_A);
-*/
 
 // Some functions only for specific testing
 void calcRadialAverage(
@@ -217,14 +179,6 @@ void transformCartesianAndHelicalCoords(
 		int dim,
 		bool direction);
 
-/*
-void makeBlot(
-		MultidimArray<RFLOAT>& v,
-		RFLOAT y,
-		RFLOAT x,
-		RFLOAT r);
-*/
-
 // C1 Helix
 // If radius_A < 0, detect the radius of original assembly and calculate r as sqrt(x^2 + y^2)
 void makeSimpleHelixFromPDBParticle(
@@ -235,15 +189,6 @@ void makeSimpleHelixFromPDBParticle(
 		RFLOAT rise_A,
 		int nr_copy,
 		bool do_center = false);
-
-/*
-void normalise2DImageSlices(
-		const FileName& fn_in,
-		const FileName& fn_out,
-		int bg_radius,
-		RFLOAT white_dust_stddev = -1.,
-		RFLOAT black_dust_stddev = -1.);
-*/
 
 void applySoftSphericalMask(
 		MultidimArray<RFLOAT>& v,
@@ -282,13 +227,6 @@ void combineParticlePriorsWithKaiLocalCTF(
 		FileName& fn_local_ctf,
 		FileName& fn_combined);
 
-/*
-void addPriorsToParticleDataFile(
-		FileName& fn_priors,
-		FileName& fn_data,
-		FileName& fn_out);
-*/
-
 // Files of priors: mic1_priors.star, files of local CTF: mic1_local.star
 // Then suffix_priors = _priors.star, suffix_local_ctf = _local.star
 void combineParticlePriorsWithKaiLocalCTF_Multiple(
@@ -314,6 +252,7 @@ void convertHelicalSegmentCoordsToStarFile_Multiple(
 		FileName& suffix_coords,
 		FileName& suffix_out,
 		int format_tag,
+		RFLOAT pixel_size_A,
 		RFLOAT Xdim,
 		RFLOAT Ydim,
 		RFLOAT boxsize,
@@ -335,6 +274,7 @@ void convertXimdispHelicalSegmentCoordsToMetaDataTable(
 		MetaDataTable& MD_out,
 		int& total_segments,
 		int& total_tubes,
+		RFLOAT pixel_size_A,
 		RFLOAT Xdim,
 		RFLOAT Ydim,
 		RFLOAT box_size_pix,
@@ -359,6 +299,7 @@ void convertEmanHelicalSegmentCoordsToMetaDataTable(
 		MetaDataTable& MD_out,
 		int& total_segments,
 		int& total_tubes,
+		RFLOAT pixel_size_A,
 		RFLOAT Xdim,
 		RFLOAT Ydim,
 		RFLOAT box_size_pix,
@@ -378,13 +319,6 @@ void convertEmanHelicalTubeCoordsToMetaDataTable(
 		bool bimodal_angular_priors = true,
 		bool cut_into_segments = true);
 
-/*
-void divideHelicalSegmentsFromMultipleMicrographsIntoRandomHalves(
-		FileName& fn_in,
-		FileName& fn_out,
-		int random_seed = -1);
-*/
-
 void makeHelicalReference2D(
 		MultidimArray<RFLOAT>& out,
 		int box_size,
@@ -392,18 +326,6 @@ void makeHelicalReference2D(
 		RFLOAT tube_diameter_A,
 		RFLOAT pixel_size_A,
 		bool is_tube_white = true);
-
-/*
-void makeHelicalReference3D(
-		MultidimArray<RFLOAT>& out,
-		int box_size,
-		RFLOAT pixel_size_A,
-		RFLOAT twist_deg,
-		RFLOAT rise_A,
-		RFLOAT tube_diameter_A,
-		RFLOAT particle_diameter_A,
-		int sym_Cn);
-*/
 
 void makeHelicalReference3DWithPolarity(
 		MultidimArray<RFLOAT>& out,
@@ -417,18 +339,6 @@ void makeHelicalReference3DWithPolarity(
 		RFLOAT topbottom_ratio,
 		int sym_Cn = 1,
 		int nr_filaments_helix_with_seam = -1);
-
-/*
-void makeHelicalReconstructionStarFileFromSingle2DClassAverage(
-		FileName& fn_in_class2D,
-		FileName& fn_out_star,
-		RFLOAT pixel_size_A,
-		RFLOAT twist_deg,
-		RFLOAT rise_A,
-		RFLOAT tilt_deg,
-		RFLOAT psi_deg,
-		int nr_projections);
-*/
 
 void divideStarFile(
 		FileName& fn_in,
@@ -497,13 +407,13 @@ public:
 	std::string helical_tube_name;
 	long int MDobjectID;
 	RFLOAT rot_deg, psi_deg, tilt_deg;
-	RFLOAT dx_pix, dy_pix, dz_pix;
-	RFLOAT track_pos_pix;
+	RFLOAT dx_A, dy_A, dz_A;
+	RFLOAT track_pos_A;
 	bool has_wrong_polarity;
 	int subset, classID;
 
 	RFLOAT psi_prior_deg, tilt_prior_deg;
-	RFLOAT dx_prior_pix, dy_prior_pix, dz_prior_pix;
+	RFLOAT dx_prior_A, dy_prior_A, dz_prior_A;
 	RFLOAT psi_flip_ratio;
 
 	void clear();

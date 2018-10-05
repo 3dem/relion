@@ -119,6 +119,9 @@ public:
 	// One name for each group
 	std::vector<FileName> group_names;
 
+	// Number of elements in the noise spectrum of each group (can be different because of different image sizes in different optics groups)
+	std::vector<int> spectral_sizes;
+
 	// One noise spectrum for each group
 	std::vector<MultidimArray<RFLOAT > > sigma2_noise;
 
@@ -176,7 +179,7 @@ public:
 	// Is this body kept fixed in refinement?
 	std::vector<int> keep_fixed_bodies;
 
-	// Maximum radius of mask
+	// Maximum radius of mask (in Angstrom!)
 	std::vector<int> max_radius_mask_bodies;
 
 	// 2D Matrix with pointers to the PPrefs for overlapping bodies
@@ -396,8 +399,8 @@ public:
 
 	// Read images from disc and initialise
 	// Also set do_average_unaligned and do_generate_seeds flags
-	void readImages(FileName fn_ref, bool _is_3d_model, int _ori_size, Experiment &_mydata,
-			bool &do_average_unaligned, bool &do_generate_seeds, bool &refs_are_ctf_corrected, bool _do_sgd = false);
+	void readImages(FileName fn_ref, bool _is_3d_model, int _ori_size, RFLOAT user_pixel_size, Experiment &_mydata,
+			bool &do_average_unaligned, bool &do_generate_seeds, bool &refs_are_ctf_corrected, bool _do_sgd = false, bool verb = false);
 
 	RFLOAT getResolution(int ipix)	{ return (RFLOAT)ipix/(pixel_size * ori_size); }
 
@@ -427,7 +430,7 @@ public:
 
 	/* Initialises the radial average of the data-versus-prior ratio
 	 */
-	void initialiseDataVersusPrior(bool fix_tau);
+	void initialiseDataVersusPrior(bool fix_tau, Experiment &mydata);
 
 	void initialiseHelicalParametersLists(RFLOAT _helical_twist, RFLOAT _helical_rise);
 

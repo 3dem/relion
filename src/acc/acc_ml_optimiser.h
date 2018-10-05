@@ -23,6 +23,7 @@ public:
 	nr_trans,
 	nr_oversampled_rot,
 	nr_oversampled_trans,
+	nr_images,
 	current_oversampling,
 	current_image_size,
 	iclass_min, iclass_max,
@@ -37,6 +38,7 @@ public:
 		nr_trans(0),
 		nr_oversampled_rot(0),
 		nr_oversampled_trans(0),
+		nr_images(0),
 		current_oversampling(0),
 		current_image_size(0),
 		iclass_min(0), iclass_max(0),
@@ -134,24 +136,31 @@ public:
 
 	unsigned long part_id;
 
-	MultidimArray<Complex > Fimg, Fimg_nomask;
-	std::vector<MultidimArray<Complex > > local_Fimgs_shifted, local_Fimgs_shifted_nomask;
-	MultidimArray<RFLOAT> Fctf, local_Fctf, local_Minvsigma2;
+	std::vector<MultidimArray<Complex > > Fimg, Fimg_nomask, local_Fimgs_shifted, local_Fimgs_shifted_nomask;
+	std::vector<MultidimArray<RFLOAT> > Fctf, local_Fctf, local_Minvsigma2;
 	std::vector<int> pointer_dir_nonzeroprior, pointer_psi_nonzeroprior;
-	RFLOAT highres_Xi2_img, min_diff2, local_sqrtXi2;
-	std::vector<RFLOAT> directions_prior, psi_prior;
+	std::vector<RFLOAT> directions_prior, psi_prior, local_sqrtXi2;
+	std::vector<RFLOAT> highres_Xi2_img, min_diff2;
 	MultidimArray<bool> Mcoarse_significant;
 	// And from storeWeightedSums
-	RFLOAT sum_weight, significant_weight, max_weight;
-	Matrix1D<RFLOAT> old_offset, prior;
-	MultidimArray<RFLOAT> power_img;
+	std::vector<RFLOAT> sum_weight, significant_weight, max_weight;
+	std::vector<Matrix1D<RFLOAT> > old_offset, prior;
+	std::vector<MultidimArray<RFLOAT> > power_img;
 	MultidimArray<XFLOAT> Mweight;
-	Indices max_index;
+	std::vector<Indices> max_index;
 
-	OptimisationParamters (unsigned long part_id):
+	OptimisationParamters (unsigned nr_images, unsigned long part_id):
 		metadata_offset(0),
 		part_id(part_id)
 	{
+		power_img.resize(nr_images);
+		highres_Xi2_img.resize(nr_images);
+		Fimg.resize(nr_images);
+		Fimg_nomask.resize(nr_images);
+		Fctf.resize(nr_images);
+		old_offset.resize(nr_images);
+		prior.resize(nr_images);
+		max_index.resize(nr_images);
 	};
 };
 
@@ -247,17 +256,17 @@ public:
 
 	size_t firstPos, lastPos; // positions in indexedDataArray data and index arrays to slice out
 	size_t weightNum, jobNum; // number of weights and jobs this class
-
+	
 
 public:
-
+		
 	IndexedDataArrayMask(AccPtrFactory ptrFactory) :
 		firstPos(), lastPos(), weightNum(), jobNum()
 	{
 		jobOrigin = ptrFactory.make<size_t>();
 		jobExtent = ptrFactory.make<size_t>();
 	}
-
+	
 	void setNumberOfJobs(size_t newSize)
 	{
 		jobNum=newSize;
@@ -294,7 +303,7 @@ public:
 	AccPtr<size_t> rot_id, rot_idx, trans_idx, ihidden_overs;
 
 public:
-
+	
 	inline
 	 IndexedDataArray(AccPtrFactory ptrFactory):
 	 	weights(ptrFactory.make<XFLOAT>()),
@@ -357,7 +366,7 @@ public:
 		host_alloc_all();
 		device_alloc_all();
 	}
-
+	
 	void dual_free_all()
 	{
 		weights.freeDeviceIfSet();
@@ -371,7 +380,7 @@ public:
 		trans_idx.freeHostIfSet();
 		ihidden_overs.freeHostIfSet();
 	}
-
+	
 	~IndexedDataArray()
 	{
 		dual_free_all();

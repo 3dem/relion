@@ -67,24 +67,6 @@ public:
 	// Skip gathering CTF information from the ctffind logfiles (e.g. when the info is already there from Gctf)?
 	bool do_skip_ctf_logfiles;
 
-	// Extract particles from movies instead of single micrographs
-	bool do_movie_extract;
-
-	// Movie identifier for extraction from movies (e.g. movie for movies called _movie.mrcs or _movie.mrc)
-	FileName movie_name;
-
-	// First frame to extract from movies
-	int movie_first_frame;
-
-	// Last frame to extract from movies
-	int movie_last_frame;
-
-	// Number of individual movie frames to average over
-	int avg_n_frames;
-
-	// Rootname to identify movies, e.g. mic001_movie.mrcs will be the movie of mic001.mrc if fn_movie="movie"
-	FileName fn_movie;
-
 	// STAR file with all (selected) micrographs, the suffix of the coordinates files, and the directory where the coordinate files are
 	FileName fn_star_in, fn_coord_suffix, fn_coord_dir ;
 
@@ -104,7 +86,8 @@ public:
 	RFLOAT recenter_x, recenter_y, recenter_z;
 
 	// MetadataTable with all refined particle coordinates (given through fn_data)
-	//MetaDataTable MDdata;
+	MetaDataTable MDimg, MDopt;
+	ObservationModel obsModel;
 
 	// Filenames of all the coordinate files to use for particle extraction
 	std::vector<FileName> fn_coords;
@@ -210,9 +193,9 @@ public:
 	// For the given coordinate file, read the micrograph and/or movie and extract all particles
 	bool extractParticlesFromFieldOfView(FileName fn_mic, long int imic);
 
-	// Actually extract particles. This can be from one (average) micrgraph or from a single frame from a movie
-	void extractParticlesFromOneFrame(MetaDataTable &MD,
-			FileName fn_mic, int ipos, int iframe, int n_frames, FileName fn_output_img_root, FileName fn_oristack,
+	// Actually extract particles. This can be from one micrgraph
+	void extractParticlesFromOneMicrograph(MetaDataTable &MD,
+			FileName fn_mic, int ipos, FileName fn_output_img_root, FileName fn_oristack,
 			long int &my_current_nr_images, long int my_total_nr_images,
 			RFLOAT &all_avg, RFLOAT &all_stddev, RFLOAT &all_minval, RFLOAT &all_maxval);
 
@@ -224,7 +207,6 @@ public:
 	void performPerImageOperations(
 			Image<RFLOAT> &Ipart,
 			FileName fn_output_img_root,
-			int nframes,
 			long int image_nr,
 			long int nr_of_images,
 			RFLOAT tilt_deg,
