@@ -229,7 +229,7 @@ public:
         return scale * retval;
     }
 
-    double getGamma(double X, double Y);
+    double getGamma(double X, double Y) const;
 
     // compute the local frequency of the ctf 
 	// (i.e. the radial slope of 'double gamma' in getCTF())

@@ -489,7 +489,41 @@ Image<RFLOAT> FilterHelper::raisedCosEnvCorner2D(Image<RFLOAT> &img, double radI
     }
 
     return out;
+}
 
+Image<Complex> FilterHelper::raisedCosEnvCorner2DFull(Image<Complex> &img, double radIn, double radOut)
+{
+	const int w = img.data.xdim;
+    const int h = img.data.ydim;
+
+    Image<Complex> out(w,h);
+
+    for (int y = 0; y < h; y++)
+    for (int x = 0; x < w; x++)
+    {
+        double xx = x < w/2? x : x - w;
+        double yy = y < h/2? y : y - h;
+
+        double r = sqrt(xx*xx + yy*yy);
+
+        if (r < radIn)
+        {
+            DIRECT_A2D_ELEM(out.data, y, x) = DIRECT_A2D_ELEM(img.data, y, x);
+        }
+        else if (r < radOut)
+        {
+            double t = (r - radIn)/(radOut - radIn);
+            double a = 0.5 * (1.0 + cos(PI * t));
+
+            DIRECT_A2D_ELEM(out.data, y, x) = a * DIRECT_A2D_ELEM(img.data, y, x);
+        }
+        else
+        {
+            DIRECT_A2D_ELEM(out.data, y, x) = 0.0;
+        }
+    }
+
+    return out;
 }
 
 Image<RFLOAT> FilterHelper::raisedCosEnvCorner3D(Image<RFLOAT> &img, double radIn, double radOut)
@@ -1797,7 +1831,39 @@ t3Vector<RFLOAT> FilterHelper::centralGradient(const Volume<RFLOAT>& src, size_t
         out.z = src(x,y,z) - src(x,y,z-1);
     }
 
-    return out;
+	return out;
+}
+
+MultidimArray<Complex> FilterHelper::FriedelExpand(const MultidimArray<Complex> &half)
+{
+	const int wh = half.xdim;
+	const int h = half.ydim;
+	const int d = half.zdim;
+	const int c = half.ndim;
+	
+	const int w = 2*(wh-1);
+	
+	MultidimArray<Complex> out(d,h,w);
+	
+	for (int n = 0; n < c; n++)
+	for (int z = 0; z < d; z++)
+	for (int y = 0; y < h; y++)
+	{
+		const int zz = (d - z) % d;
+		const int yy = (h - y) % h;
+		
+		for (int x = 0; x < wh; x++)
+		{
+			DIRECT_NZYX_ELEM(out, n, z, y, x) = DIRECT_NZYX_ELEM(half, n, z, y, x);
+		}
+		
+		for (int x = wh; x < w; x++)
+		{
+			DIRECT_NZYX_ELEM(out, n, z, y, x) = DIRECT_NZYX_ELEM(half, n, zz, yy, w-x).conj();
+		}
+	}	
+	
+	return out;
 }
 
 void FilterHelper::uniqueInfluenceMask(std::vector<gravis::d3Vector> pts, Image<RFLOAT>& dest, Image<RFLOAT>& indexDest, RFLOAT thresh)

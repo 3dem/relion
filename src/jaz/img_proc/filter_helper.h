@@ -68,6 +68,7 @@ class FilterHelper
         static Image<RFLOAT> zeroOutsideCorner2D(Image<RFLOAT>& img, double radius);
         static void GaussianEnvelopeCorner2D(Image<RFLOAT>& img, double sigma);
 		static Image<RFLOAT> raisedCosEnvCorner2D(Image<RFLOAT>& img, double radIn, double radOut);
+		static Image<Complex> raisedCosEnvCorner2DFull(Image<Complex>& img, double radIn, double radOut);
 		static Image<RFLOAT> raisedCosEnvCorner3D(Image<RFLOAT>& img, double radIn, double radOut);
 		static Image<RFLOAT> raisedCosEnvFreq2D(const Image<RFLOAT>& img, double radIn, double radOut);
 		static Image<RFLOAT> raisedCosEnvRingFreq2D(const Image<RFLOAT>& img, double rad0, double rad1, double stepWidth);
@@ -183,6 +184,8 @@ class FilterHelper
 
         static void centralGradient(const Volume<RFLOAT>& src, Volume<gravis::t3Vector<RFLOAT> >& dest);
         static gravis::t3Vector<RFLOAT> centralGradient(const Volume<RFLOAT>& src, size_t x, size_t y, size_t z);
+		
+		static MultidimArray<Complex> FriedelExpand(const MultidimArray<Complex>& half);
 
 
 };

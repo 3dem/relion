@@ -256,7 +256,7 @@ void CTF::initialise()
 	Ayy = A(1,1);
 }
 
-double CTF::getGamma(double X, double Y)
+double CTF::getGamma(double X, double Y) const
 {
 	if (obsModel != 0 && obsModel->hasMagMatrices)
 	{
