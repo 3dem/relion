@@ -17,8 +17,8 @@ using namespace gravis;
 
 int main(int argc, char *argv[])
 {
-    std::string inPath = "/beegfs/zivanov/tomograms/ts_05/";
-    std::string inName = "05";
+    std::string inPath = "./";
+    std::string inName = "TS_03";
 
     Image<RFLOAT> img0;
     img0.read(inPath+inName+".st:mrcs", true);
