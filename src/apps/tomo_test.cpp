@@ -32,12 +32,17 @@ int main(int argc, char *argv[])
 		
 	std::cout << "loading done.\n";
 	
+	const double fullWidth = 3710.0;
+	const int res = 200;
+	const int resz = 80;
 	
-	d3Vector cc(0, 0, -250);
+	d3Vector cc(0.0, 0.0, -250.0);
+	const double spacing = fullWidth/(res-1);
+	
     //double areaSize = 200;
 	
-	Volume<RFLOAT> dest(200,200,80);
-	Volume<RFLOAT> maskDest(200,200,80);
+	Volume<RFLOAT> dest(res,res,resz);
+	Volume<RFLOAT> maskDest(res,res,resz);
 	
 	dest.fill(0.0);
 	maskDest.fill(0.0);
@@ -50,13 +55,17 @@ int main(int argc, char *argv[])
 				
 				//ts, wbp, origin, 2, 100, 100, 100);
 	
-	const double spacing = 3710.0/200.0;
 	BackprojectionHelper::backprojectRaw(ts, dest, maskDest, cc, spacing);
+	
 	
 	VtkHelper::writeVTK(
 		dest, "test00.vtk", 
-		cc.x/2, cc.y/2, cc.z/2, 
-		spacing/2, spacing/2, spacing/2);
+		(cc.x - spacing/2)/2, 
+		(cc.y - spacing/2)/2, 
+		(cc.z - spacing/2)/2, 
+		spacing/2, 
+		spacing/2, 
+		spacing/2);
 	
 	
 	return 0;
