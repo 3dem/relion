@@ -74,7 +74,7 @@ void AberrationEstimator::processMicrograph(
 	
 	const int pc = mdt.numberOfObjects();
 	
-	std::vector<int> optGroups = obsModel->getOptGroupsPresent(mdt);	
+	std::vector<int> optGroups = obsModel->getOptGroupsPresent_oneBased(mdt);	
 	const int cc = optGroups.size();
 	
 	std::vector<int> groupToIndex(obsModel->numberOfOpticsGroups()+1, -1);
@@ -158,12 +158,12 @@ void AberrationEstimator::processMicrograph(
 		std::stringstream sts;
 		sts << optGroups[ci];
 		
-		AxxSum.write(outRoot+"_aberr-Axx_optics-class_" + sts.str() + ".mrc");
-		AxySum.write(outRoot+"_aberr-Axy_optics-class_" + sts.str() + ".mrc");
-		AyySum.write(outRoot+"_aberr-Ayy_optics-class_" + sts.str() + ".mrc");
+		AxxSum.write(outRoot+"_aberr-Axx_optics-group_" + sts.str() + ".mrc");
+		AxySum.write(outRoot+"_aberr-Axy_optics-group_" + sts.str() + ".mrc");
+		AyySum.write(outRoot+"_aberr-Ayy_optics-group_" + sts.str() + ".mrc");
 		
-		bxSum.write(outRoot+"_aberr-bx_optics-class_" + sts.str() + ".mrc");
-		bySum.write(outRoot+"_aberr-by_optics-class_" + sts.str() + ".mrc");
+		bxSum.write(outRoot+"_aberr-bx_optics-group_" + sts.str() + ".mrc");
+		bySum.write(outRoot+"_aberr-by_optics-group_" + sts.str() + ".mrc");
 	}
 }
 
@@ -200,23 +200,23 @@ void AberrationEstimator::parametricFit(
 		{
 			std::string outRoot = CtfRefiner::getOutputFilenameRoot(mdts[g], outPath);
 			
-			if (   exists(outRoot+"_aberr-Axx_optics-class_" + sts.str() + ".mrc")
-				&& exists(outRoot+"_aberr-Axy_optics-class_" + sts.str() + ".mrc")
-				&& exists(outRoot+"_aberr-Ayy_optics-class_" + sts.str() + ".mrc")
-				&& exists(outRoot+"_aberr-bx_optics-class_" + sts.str() + ".mrc")
-				&& exists(outRoot+"_aberr-by_optics-class_" + sts.str() + ".mrc"))
+			if (   exists(outRoot+"_aberr-Axx_optics-group_" + sts.str() + ".mrc")
+				&& exists(outRoot+"_aberr-Axy_optics-group_" + sts.str() + ".mrc")
+				&& exists(outRoot+"_aberr-Ayy_optics-group_" + sts.str() + ".mrc")
+				&& exists(outRoot+"_aberr-bx_optics-group_" + sts.str() + ".mrc")
+				&& exists(outRoot+"_aberr-by_optics-group_" + sts.str() + ".mrc"))
 			{
 				
 				Image<RFLOAT> 
 					Axx(sh,s), Axy(sh,s), Ayy(sh,s),
 					bx(sh,s), by(sh,s);
 				
-				Axx.read(outRoot+"_aberr-Axx_optics-class_" + sts.str() + ".mrc");
-				Axy.read(outRoot+"_aberr-Axy_optics-class_" + sts.str() + ".mrc");
-				Ayy.read(outRoot+"_aberr-Ayy_optics-class_" + sts.str() + ".mrc");
+				Axx.read(outRoot+"_aberr-Axx_optics-group_" + sts.str() + ".mrc");
+				Axy.read(outRoot+"_aberr-Axy_optics-group_" + sts.str() + ".mrc");
+				Ayy.read(outRoot+"_aberr-Ayy_optics-group_" + sts.str() + ".mrc");
 				
-				bx.read(outRoot+"_aberr-bx_optics-class_" + sts.str() + ".mrc");
-				by.read(outRoot+"_aberr-by_optics-class_" + sts.str() + ".mrc");
+				bx.read(outRoot+"_aberr-bx_optics-group_" + sts.str() + ".mrc");
+				by.read(outRoot+"_aberr-by_optics-group_" + sts.str() + ".mrc");
 				
 				AxxSum() += Axx();
 				AxySum() += Axy();
@@ -291,12 +291,12 @@ void AberrationEstimator::parametricFit(
 		{
 			Image<RFLOAT> full;
 			FftwHelper::decenterDouble2D(wgh(), full());
-			ImageLog::write(full, outPath + "aberr_weight-full_optics-class_"+cns);
+			ImageLog::write(full, outPath + "aberr_weight-full_optics-group_"+cns);
 		}
 		
 		Image<RFLOAT> fit, phaseFull, fitFull;		
 		FftwHelper::decenterDouble2D(phase.data, phaseFull.data);
-		ImageLog::write(phaseFull, outPath + "aberr_delta-phase_per-pixel_optics-class_"+cns);
+		ImageLog::write(phaseFull, outPath + "aberr_delta-phase_per-pixel_optics-group_"+cns);
 		
 		
 		
@@ -310,14 +310,14 @@ void AberrationEstimator::parametricFit(
 			std::stringstream sts;
 			sts << aberr_n_max;
 			
-			ImageLog::write(fitFull, outPath + "aberr_delta-phase_lin-fit_optics-class_"
+			ImageLog::write(fitFull, outPath + "aberr_delta-phase_lin-fit_optics-group_"
 							+cns+"_N-"+sts.str());
 			if (debug)
 			{
 				Image<RFLOAT> residual;
 				residual.data = phaseFull.data - fitFull.data;
 				
-				ImageLog::write(residual, outPath + "aberr_delta-phase_lin-fit_optics-class_"
+				ImageLog::write(residual, outPath + "aberr_delta-phase_lin-fit_optics-group_"
 								+cns+"_N-"+sts.str()+"_residual");
 			}
 			
@@ -326,7 +326,7 @@ void AberrationEstimator::parametricFit(
 				
 			FftwHelper::decenterDouble2D(fit.data, fitFull.data);
 						
-			ImageLog::write(fitFull, outPath + "aberr_delta-phase_iter-fit_optics-class_"
+			ImageLog::write(fitFull, outPath + "aberr_delta-phase_iter-fit_optics-group_"
 							+cns+"_N-"+sts.str());
 			
 			// extract Q0, Cs, defocus and astigmatism?
@@ -347,7 +347,7 @@ bool AberrationEstimator::isFinished(const MetaDataTable &mdt)
 	
 	bool allDone = true;
 	
-	std::vector<int> ogs = obsModel->getOptGroupsPresent(mdt);
+	std::vector<int> ogs = obsModel->getOptGroupsPresent_oneBased(mdt);
 	
 	for (int i = 0; i < ogs.size(); i++)
 	{	
@@ -356,11 +356,11 @@ bool AberrationEstimator::isFinished(const MetaDataTable &mdt)
 		std::stringstream sts;
 		sts << og;
 		
-		if (   !exists(outRoot+"_aberr-Axx_optics-class_" + sts.str() + ".mrc")
-			|| !exists(outRoot+"_aberr-Axy_optics-class_" + sts.str() + ".mrc")
-			|| !exists(outRoot+"_aberr-Ayy_optics-class_" + sts.str() + ".mrc")
-			|| !exists(outRoot+"_aberr-bx_optics-class_"  + sts.str() + ".mrc")
-			|| !exists(outRoot+"_aberr-by_optics-class_"  + sts.str() + ".mrc"))
+		if (   !exists(outRoot+"_aberr-Axx_optics-group_" + sts.str() + ".mrc")
+			|| !exists(outRoot+"_aberr-Axy_optics-group_" + sts.str() + ".mrc")
+			|| !exists(outRoot+"_aberr-Ayy_optics-group_" + sts.str() + ".mrc")
+			|| !exists(outRoot+"_aberr-bx_optics-group_"  + sts.str() + ".mrc")
+			|| !exists(outRoot+"_aberr-by_optics-group_"  + sts.str() + ".mrc"))
 		{
 			allDone = false;
 			break;

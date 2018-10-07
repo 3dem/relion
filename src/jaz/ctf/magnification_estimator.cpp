@@ -86,7 +86,7 @@ void MagnificationEstimator::processMicrograph(
 	
 	const int pc = mdt.numberOfObjects();
 	
-	std::vector<int> optGroups = obsModel->getOptGroupsPresent(mdt);	
+	std::vector<int> optGroups = obsModel->getOptGroupsPresent_oneBased(mdt);	
 	const int cc = optGroups.size();
 	
 	std::vector<int> groupToIndex(obsModel->numberOfOpticsGroups()+1, -1);
@@ -134,7 +134,7 @@ void MagnificationEstimator::processMicrograph(
 		std::stringstream sts;
 		sts << optGroups[ci];
 		
-		MagnificationHelper::writeEQs(magEq, outRoot+"_mag_optics-class_" + sts.str());
+		MagnificationHelper::writeEQs(magEq, outRoot+"_mag_optics-group_" + sts.str());
 	}
 }
 
@@ -170,7 +170,7 @@ void MagnificationEstimator::parametricFit(
 			
 			try
 			{
-				MagnificationHelper::readEQs(outRoot + "_mag_optics-class_" + sts.str(), magEqsG);
+				MagnificationHelper::readEQs(outRoot + "_mag_optics-group_" + sts.str(), magEqsG);
 			
 				magEqs += magEqsG;
 			}
@@ -185,8 +185,8 @@ void MagnificationEstimator::parametricFit(
 		FftwHelper::decenterUnflip2D(flowx.data, flowxFull.data);
 		FftwHelper::decenterUnflip2D(flowy.data, flowyFull.data);
 		
-		ImageLog::write(flowxFull, outPath + "mag_disp_x_optics-class_" + sts.str());
-		ImageLog::write(flowyFull, outPath + "mag_disp_y_optics-class_" + sts.str());
+		ImageLog::write(flowxFull, outPath + "mag_disp_x_optics-group_" + sts.str());
+		ImageLog::write(flowyFull, outPath + "mag_disp_y_optics-group_" + sts.str());
 		
 		Image<RFLOAT> freqWght = reference->getHollowWeight(kmin);
 		
@@ -195,10 +195,10 @@ void MagnificationEstimator::parametricFit(
 		FftwHelper::decenterUnflip2D(flowx.data, flowxFull.data);
 		FftwHelper::decenterUnflip2D(flowy.data, flowyFull.data);
 		
-		ImageLog::write(flowxFull, outPath + "mag_disp_x_fit_optics-class_" + sts.str());
-		ImageLog::write(flowyFull, outPath + "mag_disp_y_fit_optics-class_" + sts.str());
+		ImageLog::write(flowxFull, outPath + "mag_disp_x_fit_optics-group_" + sts.str());
+		ImageLog::write(flowyFull, outPath + "mag_disp_y_fit_optics-group_" + sts.str());
 		
-		std::ofstream os(outPath + "mag_matrix_optics-class_" + sts.str() + ".txt");
+		std::ofstream os(outPath + "mag_matrix_optics-group_" + sts.str() + ".txt");
 		os << mat(0,0) << " " << mat(0,1) << "\n";
 		os << mat(1,0) << " " << mat(1,1) << "\n";
 		os.close();

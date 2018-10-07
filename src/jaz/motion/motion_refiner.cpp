@@ -135,7 +135,7 @@ void MotionRefiner::init()
 		}
 	}
 	
-	allMdts = StackHelper::splitByMicrographName(&mdt0);
+	allMdts = StackHelper::splitByMicrographName(mdt0);
 	
 	if (minMG >= allMdts.size())
 	{

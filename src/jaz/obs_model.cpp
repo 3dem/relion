@@ -435,7 +435,7 @@ int ObservationModel::getBoxSize(int opticsGroup) const
 	return boxSizes[opticsGroup];
 }
 
-void ObservationModel::getBoxSizes(std::vector<double>& sDest, std::vector<double>& shDest) const
+void ObservationModel::getBoxSizes(std::vector<int>& sDest, std::vector<int>& shDest) const
 {
 	if (!hasBoxSizes)
 	{
@@ -543,7 +543,7 @@ void ObservationModel::sortOpticsGroups(MetaDataTable& partMdt)
 	}
 }
 
-std::vector<int> ObservationModel::getOptGroupsPresent(const MetaDataTable& partMdt) const
+std::vector<int> ObservationModel::getOptGroupsPresent_oneBased(const MetaDataTable& partMdt) const
 {
 	const int gc = opticsMdt.numberOfObjects();
 	const int pc = partMdt.numberOfObjects();
@@ -569,6 +569,74 @@ std::vector<int> ObservationModel::getOptGroupsPresent(const MetaDataTable& part
 		}
 	}
 
+	return out;
+}
+
+std::vector<int> ObservationModel::getOptGroupsPresent_zeroBased(const MetaDataTable& partMdt) const
+{
+	const int gc = opticsMdt.numberOfObjects();
+	const int pc = partMdt.numberOfObjects();
+
+	std::vector<bool> optGroupIsPresent(gc, false);
+
+	for (int p = 0; p < pc; p++)
+	{
+		int og;
+		partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, og, p);
+
+		optGroupIsPresent[og-1] = true;
+	}
+
+	std::vector<int> out(0);
+	out.reserve(gc);
+
+	for (int g = 0; g < gc; g++)
+	{
+		if (optGroupIsPresent[g])
+		{
+			out.push_back(g);
+		}
+	}
+
+	return out;
+}
+
+std::vector<std::pair<int, std::vector<int>>> ObservationModel::splitParticlesByOpticsGroup(
+		const MetaDataTable &partMdt) const
+{
+	std::vector<int> presentGroups = ObservationModel::getOptGroupsPresent_zeroBased(partMdt);
+	
+	const int pogc = presentGroups.size();
+	const int ogc = opticsMdt.numberOfObjects();
+	
+	std::vector<int> groupToPresentGroup(ogc, -1);
+	
+	for (int pog = 0; pog < pogc; pog++)
+	{
+		const int og = presentGroups[pog];
+		groupToPresentGroup[og] = pog;
+	}
+	
+	std::vector<std::pair<int, std::vector<int>>> out(pogc);
+	
+	for (int pog = 0; pog < pogc; pog++)
+	{
+		out[pog] = std::make_pair(presentGroups[pog], std::vector<int>(0));
+	}
+	
+	const int pc = partMdt.numberOfObjects();
+	
+	for (int p = 0; p < pc; p++)
+	{
+		int og;
+		partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, og, p);
+		og--;
+		
+		int pog = groupToPresentGroup[og];
+		
+		out[pog].second.push_back(p);
+	}
+	
 	return out;
 }
 

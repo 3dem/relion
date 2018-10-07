@@ -127,7 +127,7 @@ class ObservationModel
 		std::vector<double> getSphericalAberrations() const;
 	
 		int getBoxSize(int opticsGroup) const;
-		void getBoxSizes(std::vector<double>& sDest, std::vector<double>& shDest) const;
+		void getBoxSizes(std::vector<int>& sDest, std::vector<int>& shDest) const;
 
 		Matrix2D<RFLOAT> getMagMatrix(int opticsGroup) const;
 		std::vector<Matrix2D<RFLOAT> > getMagMatrices() const;
@@ -152,11 +152,15 @@ class ObservationModel
 		   and translate the indices in particle table partMdt.
 		   (Merely changing the order in opticsMdt would fail if groups were missing.) */
 		void sortOpticsGroups(MetaDataTable& partMdt);
-
+		
 		/* Return the set of optics groups present in partMdt */
-		std::vector<int> getOptGroupsPresent(const MetaDataTable& partMdt) const;
+		std::vector<int> getOptGroupsPresent_oneBased(const MetaDataTable& partMdt) const;
+		
+		/* Return the set of optics groups present in partMdt */
+		std::vector<int> getOptGroupsPresent_zeroBased(const MetaDataTable& partMdt) const;
 
-
+		std::vector<std::pair<int, std::vector<int> > > splitParticlesByOpticsGroup(
+				const MetaDataTable& partMdt) const;
 
 
 };

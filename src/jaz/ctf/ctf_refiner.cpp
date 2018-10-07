@@ -151,7 +151,7 @@ void CtfRefiner::init()
 	// after all the necessary changes to mdt0 have been applied 
 	// in ObservationModel::loadSafely(), split it by micrograph
 	
-	allMdts = StackHelper::splitByMicrographName(&mdt0);
+	allMdts = StackHelper::splitByMicrographName(mdt0);
 
 	// Only work on a user-specified subset of the micrographs
 	if (maxMG < 0 || maxMG >= allMdts.size())
@@ -191,10 +191,9 @@ void CtfRefiner::init()
 	reference.load(verb, debug);
 	
 	// Get dimensions
-	s = reference.s;
-	sh = s/2 + 1;
+	int s = reference.s;
 	
-	tiltEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
+	tiltEstimator.init(verb, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
 	aberrationEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
 	defocusEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
 	bfactorEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);

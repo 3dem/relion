@@ -460,7 +460,7 @@ void MagnificationHelper::adaptAstigmatism(
 		else // keep difference between deltafU and deltafV, as well as the azimuth angle, 
 		     // constant for all particles in the same micrograph and optics group
 		{
-			std::vector<int> optGroups = obsModel->getOptGroupsPresent(partMdts[m]);	
+			std::vector<int> optGroups = obsModel->getOptGroupsPresent_oneBased(partMdts[m]);	
 			const int cc = optGroups.size();
 			
 			std::vector<int> groupToIndex(obsModel->numberOfOpticsGroups()+1, -1);
