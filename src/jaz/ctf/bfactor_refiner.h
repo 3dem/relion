@@ -18,7 +18,7 @@ class BFactorRefiner
 		void read(IOParser& parser, int argc, char *argv[]);
 
         void init(
-				int verb, int s, int nr_omp_threads,
+				int verb, int nr_omp_threads,
 				bool debug, bool diag,
 				std::string outPath,
 				ReferenceMap* reference,
@@ -40,7 +40,8 @@ class BFactorRefiner
 		void writePerMicrographEPS(
 				const MetaDataTable& mdt, 
 				const std::vector<double>& s_rad,
-				const std::vector<double>& t_rad);
+				const std::vector<double>& t_rad,
+				int ogRef);
 		
 		void writePerParticleDiagEPS(
 				const MetaDataTable& mdt,
@@ -60,12 +61,13 @@ class BFactorRefiner
 		bool perMicrograph;
 		
 		// set at init:
-		int verb, s, sh, nr_omp_threads;
+		int verb, nr_omp_threads;
 		bool debug, diag;
 		std::string outPath;
-		double angpix;
 		
-		Image<RFLOAT> freqWeight;
+		std::vector<int> s, sh;
+		std::vector<double> angpix;		
+		std::vector<Image<RFLOAT> > freqWeights;
 		
 		ReferenceMap* reference;
 		ObservationModel* obsModel;
