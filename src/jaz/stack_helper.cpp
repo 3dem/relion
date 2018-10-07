@@ -88,46 +88,6 @@ MetaDataTable StackHelper::merge(const std::vector<MetaDataTable> &mdts)
 	return out;
 }
 
-std::vector<MetaDataTable> StackHelper::splitByOpticsGroup(const MetaDataTable &mdt)
-{
-	std::vector<MetaDataTable> out(0);
-	
-	if (!mdt.labelExists(EMDL_IMAGE_OPTICS_GROUP))
-	{
-		REPORT_ERROR("StackHelper::splitByOpticsGroup: "
-					 + EMDL::label2Str(EMDL_IMAGE_OPTICS_GROUP)
-					 + " missing from MetaDataTable.\n");
-	}
-	
-	MetaDataTable md2(mdt);
-	md2.newSort(EMDL_IMAGE_OPTICS_GROUP);
-	
-	const long lc = md2.numberOfObjects();
-	int lastGroup = -1, curGroup;
-	long curInd = -1;
-	
-	for (int i = 0; i < lc; i++)
-	{
-		md2.getValue(EMDL_IMAGE_OPTICS_GROUP, curGroup, i);
-		
-		if (curGroup != lastGroup)
-		{
-			lastGroup = curGroup;
-			curInd++;
-			out.push_back(MetaDataTable());
-		}
-		
-		out[curInd].addObject(md2.getObject(i));
-	}
-	
-	for (int i = 0; i <= curInd; i++)
-	{
-		out[i].newSort(EMDL_IMAGE_NAME, false, false, true);
-	}
-	
-	return out;
-}
-
 std::vector<MetaDataTable> StackHelper::splitByStack(const MetaDataTable* mdt)
 {
 	std::vector<MetaDataTable> out(0);

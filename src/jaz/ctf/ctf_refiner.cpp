@@ -140,13 +140,6 @@ void CtfRefiner::init()
 						 << "rlnOriginXAngst, rlnOriginYAngst, "
 						 << "rlnAngleRot, rlnAngleTilt, rlnAnglePsi and rlnRandomSubset");
 	}
-		
-	const double angpix = obsModel.getPixelSize(0);
-	
-	if (verb > 0)
-	{
-		std::cout << "   - Using pixel size from " << starFn << ": " << angpix << " A" << std::endl;
-	}
 	
 	// after all the necessary changes to mdt0 have been applied 
 	// in ObservationModel::loadSafely(), split it by micrograph
@@ -194,7 +187,7 @@ void CtfRefiner::init()
 	int s = reference.s;
 	
 	tiltEstimator.init(verb, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
-	aberrationEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
+	aberrationEstimator.init(verb, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
 	defocusEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
 	bfactorEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
 	magnificationEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);

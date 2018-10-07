@@ -140,6 +140,11 @@ void Reconstructor::initialise()
 		if (do_ewald && newbox > 0)
 			mysize = newbox;
 	}
+	
+	if (!obsModel.allPixelSizesIdentical())
+	{
+		REPORT_ERROR("Reconstructor does not support varying pixel sizes yet.");
+	}
 
 	angpix = obsModel.getPixelSize(0);
 

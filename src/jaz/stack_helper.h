@@ -40,8 +40,6 @@ class StackHelper
 		static std::vector<MetaDataTable> splitByMicrographName(const MetaDataTable& mdt);
 		
 		static MetaDataTable merge(const std::vector<MetaDataTable>& mdts);
-				
-		static std::vector<MetaDataTable> splitByOpticsGroup(const MetaDataTable& mdt);
 		
 		static std::vector<MetaDataTable> splitByStack(const MetaDataTable* mdt);
 		

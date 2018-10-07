@@ -49,7 +49,7 @@ TiltEstimator::TiltEstimator()
 void TiltEstimator::read(IOParser &parser, int argc, char *argv[])
 {
 	kmin = textToFloat(parser.getOption("--kmin_tilt", 
-		"Inner freq. threshold for beamtilt estimation [Angstrom]", "20.0"));
+		"Inner freq. threshold for beamtilt estimation [Å]", "20.0"));
 	
 	std::string aberrToken = "--odd_aberr_max_n";
 	
@@ -57,10 +57,10 @@ void TiltEstimator::read(IOParser &parser, int argc, char *argv[])
 		"Maximum degree of Zernike polynomials used to fit odd (i.e. antisymmetrical) aberrations", "0"));
 	
 	xring0 = textToDouble(parser.getOption("--xr0_t", 
-		"Exclusion ring start [Angstrom] - use to exclude dominant frequency (e.g. for helices)", "-1"));
+		"Exclusion ring start [Å] - use to exclude dominant frequency (e.g. for helices)", "-1"));
 	
 	xring1 = textToDouble(parser.getOption("--xr1_t", 
-		"Exclusion ring end [Angstrom]", "-1"));
+		"Exclusion ring end [Å]", "-1"));
 			
 }
 
