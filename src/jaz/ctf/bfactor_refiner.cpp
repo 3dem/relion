@@ -59,8 +59,7 @@ void BFactorRefiner::init(
 	
 	angpix = obsModel->getPixelSize(0);
 	
-	double kmin_px = obsModel->angToPix(kmin, s, 0);
-	freqWeight = reference->getHollowWeight(kmin_px);
+	freqWeight = reference->getHollowWeight(kmin, s, angpix);
 	
 	ready = true;
 }

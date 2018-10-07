@@ -227,8 +227,7 @@ void AberrationEstimator::parametricFit(
 		Image<RFLOAT> wgh(sh[og],s[og]), phase(sh[og],s[og]);
 		Image<Complex> optXY(sh[og],s[og]); 
 				
-		double kmin_px = obsModel->angToPix(kmin, s[og], og);
-		wgh = reference->getHollowWeight(kmin_px);
+		wgh = reference->getHollowWeight(kmin, s[og], angpix[og]);
 		
 		for (int y = 0; y < s[og];  y++)
 		for (int x = 0; x < sh[og]; x++)

@@ -222,9 +222,7 @@ void TiltEstimator::parametricFit(
 		
 		Image<Complex> xyNrm(sh[og],s[og]);
 	
-		double kmin_px = obsModel->angToPix(kmin, s[og], og);
-				 
-		Image<RFLOAT> wgh0 = reference->getHollowWeight(kmin_px);
+		Image<RFLOAT> wgh0 = reference->getHollowWeight(kmin, s[og], angpix[og]);
 		
 		FilterHelper::multiply(wAccSum, wgh0, wgh);
 	

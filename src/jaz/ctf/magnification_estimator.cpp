@@ -188,7 +188,7 @@ void MagnificationEstimator::parametricFit(
 		ImageLog::write(flowxFull, outPath + "mag_disp_x_optics-group_" + sts.str());
 		ImageLog::write(flowyFull, outPath + "mag_disp_y_optics-group_" + sts.str());
 		
-		Image<RFLOAT> freqWght = reference->getHollowWeight(kmin);
+		Image<RFLOAT> freqWght = reference->getHollowWeight(kmin, s, angpix);
 		
 		Matrix2D<RFLOAT> mat = MagnificationHelper::solveLinearlyFreq(magEqs, freqWght, flowx, flowy);
 		

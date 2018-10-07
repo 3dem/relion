@@ -46,9 +46,10 @@ void ReferenceMap::read(IOParser& parser, int argc, char* argv[])
 {
 	reconFn0 = parser.getOption("--m1", "Reference map, half 1");
 	reconFn1 = parser.getOption("--m2", "Reference map, half 2");
+	angpix = textToDouble(parser.getOption("--angpix_ref", "Pixel size of the reference map"));
 	maskFn = parser.getOption("--mask", "Reference mask", "");
 	fscFn = parser.getOption("--f", "Input STAR file with the FSC of the reference");
-	paddingFactor = textToFloat(parser.getOption("--pad", "Padding factor", "2"));
+	paddingFactor = textToDouble(parser.getOption("--pad", "Padding factor", "2"));
 }
 
 void ReferenceMap::load(int verb, bool debug)
@@ -148,20 +149,40 @@ void ReferenceMap::load(int verb, bool debug)
 	}
 }
 
-Image<RFLOAT> ReferenceMap::getHollowWeight(double kmin_px)
+Image<RFLOAT> ReferenceMap::getHollowWeight(
+		double kmin_ang, int s_out, double angpix_out)
 {
-	Image<RFLOAT> out = freqWeight;
+	const int sh_out = s_out/2 + 1;
 	
-	for (int y = 0; y < s; y++)
-	for (int x = 0; x < sh; x++)
+	Image<RFLOAT> out(sh_out, s_out);
+	
+	const double as_out = s_out * angpix_out;
+	const double as_in = s * angpix;
+	
+	for (int y = 0; y < s_out; y++)
+	for (int x = 0; x < sh_out; x++)
 	{
-		double xx = x;
-		double yy = y <= sh? y : y - s;
-		double r = sqrt(xx*xx + yy*yy);
+		const double x_out = x;
+		const double y_out = y <= sh_out? y : y - s_out;
 		
-		if (r < kmin_px)
+		const double x_ang = x_out / as_out;
+		const double y_ang = y_out / as_out;
+		
+		const double x_in = x_out * as_in;
+		const double y_in = y_out * as_in;
+		
+		const int xx_in = (int)(x_in + 0.5);
+		const int yy_in = y_in >= 0.0? (int)(y_in + 0.5) : (int)(y_in + s + 0.5);
+		
+		double r = sqrt(x_ang * x_ang + y_ang * y_ang);
+		
+		if (r < kmin_ang || xx_in >= sh || yy_in < 0 || yy_in >= s)
 		{
 			out(y,x) = 0.0;
+		}
+		else
+		{
+			out(y,x) = freqWeight(yy_in, xx_in);
 		}
 	}
 	
