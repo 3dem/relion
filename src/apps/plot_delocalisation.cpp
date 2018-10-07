@@ -21,7 +21,7 @@ using namespace gravis;
 int main(int argc, char *argv[])
 {
     std::string starFn, outPath, name;
-    int threads, s;
+    int threads, s, optGroup;
 	double rad, maxFreqAng, minFreqAng;
 	bool allParts;
 
@@ -35,6 +35,7 @@ int main(int argc, char *argv[])
 		
 		starFn = parser.getOption("--i", "Input particle *.star file");
 		rad = textToDouble(parser.getOption("--rad", "Particle radius [Å]"));
+		optGroup = textToInteger(parser.getOption("--og", "Optics group", "1")) - 1;
 		maxFreqAng = textToDouble(parser.getOption("--max_freq", "Max. image frequency [Å] (default is Nyquist)", "-1"));
 		minFreqAng = textToDouble(parser.getOption("--min_freq", "Min. image frequency [Å]", "0"));
 		name = parser.getOption("--name", "Name of dataset (for the plot)", "");
@@ -61,7 +62,7 @@ int main(int argc, char *argv[])
 	
 	const int sh = s/2 + 1;
 	
-	const double angpix = obsModel.getPixelSize();
+	const double angpix = obsModel.getPixelSize(optGroup);
 	
 	if (maxFreqAng < 0) maxFreqAng = 2*angpix;
 	
@@ -86,6 +87,10 @@ int main(int argc, char *argv[])
 		
 		for (int p = 0; p < p_max; p++)
 		{
+			int ogp = obsModel.getOpticsGroup(allMdts[m], p);
+			
+			if (ogp != optGroup) continue;
+					
 			CTF ctf;
 			ctf.readByGroup(allMdts[m], &obsModel, p);
 			
@@ -150,8 +155,11 @@ int main(int argc, char *argv[])
 	
 	CPlot2D plot2D("");
 	
+	std::stringstream ogsts;
+	ogsts << (optGroup + 1);
+	
 	std::string title = "Delocalisation";
-	if (name != "") title = title + " for " + name;
+	if (name != "") title = title + " for " + name + " (opt. gr. " + ogsts.str() + ")";
 	
 	std::stringstream pssts;
 	pssts << angpix;

@@ -117,7 +117,7 @@ int main(int argc, char *argv[])
 
         std::vector<Image<Complex> > obsF;
 
-        obsF = StackHelper::loadStackFS(&mdts[g], imgPath, nr_omp_threads, &fts);
+        obsF = StackHelper::loadStackFS(mdts[g], imgPath, nr_omp_threads);
 
         #pragma omp parallel for num_threads(nr_omp_threads)
         for (long p = 0; p < pc; p++)

@@ -31,6 +31,7 @@
 #include <vector>
 
 class Projector;
+class ObservationModel;
 
 class StackHelper
 {
@@ -45,20 +46,11 @@ class StackHelper
 				const MetaDataTable* mdt, std::string path = "", int threads = 1);
 		
 		static std::vector<Image<Complex> > loadStackFS(
-				const MetaDataTable* mdt, 
+				const MetaDataTable& mdt, 
 				std::string path = "",
 				int threads = 1,
 				bool centerParticle = false,
-				double angpix = -1.0);
-		
-		// deprecated, use the one above
-		static std::vector<Image<Complex> > loadStackFS(
-				const MetaDataTable* mdt, 
-				std::string path = "",
-				int threads = 1,
-				std::vector<ParFourierTransformer>* fts = 0,
-				bool centerParticle = false,
-				double angpix = -1.0);
+				ObservationModel* obs = 0);
 		
 		static void saveStack(std::vector<Image<RFLOAT> >& stack, std::string fn);
 		

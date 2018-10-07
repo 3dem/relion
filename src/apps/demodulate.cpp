@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
 		const int pc = mdts[m].size();		
 		
 		std::vector<Image<Complex>> obs;		
-		obs = StackHelper::loadStackFS(&mdts[m], "", nr_omp_threads, &fts, false);
+		obs = StackHelper::loadStackFS(mdts[m], "", nr_omp_threads, false);
 				
 		std::string name, fullName;
 		mdts[m].getValue(EMDL_IMAGE_NAME, fullName, 0);

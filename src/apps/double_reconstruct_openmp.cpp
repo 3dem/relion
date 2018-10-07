@@ -45,7 +45,7 @@ class reconstruct_parameters
 			nr_omp_threads,
 			nr_helical_asu, newbox, width_mask_edge, nr_sectors;
 		
-		RFLOAT blob_radius, blob_alpha, angular_error, shift_error, maxres,
+		RFLOAT blob_radius, blob_alpha, angular_error, shift_error,
 			helical_rise, helical_twist;
 		
 		bool ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak,
@@ -78,7 +78,6 @@ class reconstruct_parameters
 			fn_sel = parser.getOption("--i", "Input STAR file with the projection images and their orientations", "");
 			fn_out = parser.getOption("--o", "Name for output reconstruction");
 			fn_sym = parser.getOption("--sym", "Symmetry group", "c1");
-			maxres = textToFloat(parser.getOption("--maxres", "Maximum resolution (in Angstrom) to consider in Fourier space (default Nyquist)", "-1"));
 			padding_factor = textToFloat(parser.getOption("--pad", "Padding factor", "2"));
 			mask_diameter_filt = textToFloat(parser.getOption("--filter_diameter", "Diameter of filter-mask applied before division", "-1"));
 			flank_width = textToFloat(parser.getOption("--filter_softness", "Width of filter-mask width", "30"));
@@ -287,7 +286,10 @@ class reconstruct_parameters
 			MetaDataTable mdt0, mdtOpt;
 			
 			ObservationModel::loadSafely(fn_sel, obsModel, mdt0, mdtOpt);
-			double angpix = obsModel.getPixelSize(0);
+			std::vector<double> angpix = obsModel.getPixelSizes();
+			
+			// Use pixel size of first opt. group for output;
+			double angpixOut = angpix[0];
 			
 			// Get dimension of the images
 			
@@ -305,14 +307,7 @@ class reconstruct_parameters
 			
 			Projector subProjector(mysize, interpolator, padding_factor, r_min_nn);
 			
-			if (maxres < 0.)
-			{
-				r_max = -1;
-			}
-			else
-			{
-				r_max = CEIL(mysize * angpix / maxres);
-			}
+			r_max = -1;
 			
 			if (fn_sub != "")
 			{
@@ -427,15 +422,15 @@ class reconstruct_parameters
 							mdts[g].getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, p);
 							opticsGroup--;
 							
-							A3D = obsModel.applyAnisoMagTransp(A3D, opticsGroup);
+							A3D = obsModel.applyAnisoMagTransp(A3D, opticsGroup, angpixOut);
 							
 							// Translations (either through phase-shifts or in real space
 							trans.initZeros();
 							mdts[g].getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, XX(trans), p);
 							mdts[g].getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, YY(trans), p);
 							
-							XX(trans) /= obsModel.angpix[opticsGroup];
-							YY(trans) /= obsModel.angpix[opticsGroup];
+							XX(trans) /= angpix[opticsGroup];
+							YY(trans) /= angpix[opticsGroup];
 							
 							if (shift_error > 0.)
 							{
@@ -484,7 +479,7 @@ class reconstruct_parameters
 							CTF ctf;
 							ctf.readByGroup(mdts[g], &obsModel, p);
 							
-							ctf.getFftwImage(Fctf, mysize, mysize, angpix,
+							ctf.getFftwImage(Fctf, mysize, mysize, angpix[opticsGroup],
 											 ctf_phase_flipped, only_flip_phases,
 											 intact_ctf_first_peak, true);
 							
@@ -494,18 +489,18 @@ class reconstruct_parameters
 							{
 								// Ewald-sphere curvature correction
 								
-								applyCTFPandCTFQ(F2D, ctf, transformer, F2DP, F2DQ, angpix);
+								applyCTFPandCTFQ(F2D, ctf, transformer, F2DP, F2DQ, angpix[opticsGroup]);
 								
 								// Also calculate W, store again in Fctf
 								//std::cerr << " temporarily using very large diameter for weight for debugging...." << std::endl;
 								//ctf.applyWeightEwaldSphereCurvature(Fctf, mysize, mysize, angpix, 100000.*mask_diameter);
 								ctf.applyWeightEwaldSphereCurvature(
-									Fctf, mysize, mysize, angpix, mask_diameter);
+									Fctf, mysize, mysize, angpix[opticsGroup], mask_diameter);
 								
 								// Also calculate the radius of the Ewald sphere (in pixels)
 								//std::cerr << " temporarily switching off Ewald sphere curvature for debugging...." << std::endl;
 								//r_ewald_sphere = -1.;
-								r_ewald_sphere = mysize * angpix / ctf.lambda;
+								r_ewald_sphere = mysize * angpix[opticsGroup] / ctf.lambda;
 							}
 							
 							// Subtract reference projection
@@ -690,7 +685,7 @@ class reconstruct_parameters
 					std::cerr << " + Symmetrising half-set " << (j+1) << "...\n";
 					
 					backprojector[j]->symmetrise(
-						nr_helical_asu, helical_twist, helical_rise/angpix, nr_omp_threads);
+						nr_helical_asu, helical_twist, helical_rise/angpixOut, nr_omp_threads);
 				}
 				
 				bool do_map = !no_Wiener;

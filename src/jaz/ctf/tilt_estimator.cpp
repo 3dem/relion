@@ -186,8 +186,8 @@ void TiltEstimator::parametricFit(
 	
 	for (int og = 0; og < ogc; og++)
 	{	
-		double Cs = obsModel->Cs[og];
-		double lambda = obsModel->lambda[og];
+		double Cs = obsModel->getSphericalAberration(og);
+		double lambda = obsModel->getWavelength(og);
 		
 		std::stringstream sts;
 		sts << og+1;

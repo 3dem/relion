@@ -136,7 +136,7 @@ int CsFit::_run()
 
         std::vector<Image<Complex> > obsF;
 
-        obsF = StackHelper::loadStackFS(&mdts[g], imgPath, nr_omp_threads, &fts);
+        obsF = StackHelper::loadStackFS(mdts[g], imgPath, nr_omp_threads, &fts);
 
         if (applyTilt)
         {

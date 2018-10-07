@@ -260,14 +260,8 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 	{
 		std::vector<Image<Complex> > obs;
 		
-		int opticsGroup;
-		unfinishedMdts[g].getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, 0);
-		opticsGroup--;
-		
-		double angpix = obsModel.angpix[opticsGroup];
-		
-		// both defocus_tit and tilt_fit need the same observations
-		obs = StackHelper::loadStackFS(&unfinishedMdts[g], "", nr_omp_threads, &fts, true, angpix);
+		// all CTF-refinement programs need the same observations
+		obs = StackHelper::loadStackFS(unfinishedMdts[g], "", nr_omp_threads, true, &obsModel);
 
 		// Make sure output directory exists
 		FileName newdir = getOutputFilenameRoot(unfinishedMdts[g], outPath);

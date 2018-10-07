@@ -86,19 +86,16 @@ int main(int argc, char *argv[])
 					allMdts[m], obsModel, ReferenceMap::Own, nr_omp_threads,
 					true, true, false);
 		
-		int opticsGroup;
-		allMdts[m].getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, 0);
-		opticsGroup--;
-		
-		double angpix = obsModel.angpix[opticsGroup];
-		
 		std::vector<Image<Complex>> obs = StackHelper::loadStackFS(
-					&allMdts[m], "", nr_omp_threads, true, angpix);
+					allMdts[m], "", nr_omp_threads, true, &obsModel);
 		
 		#pragma omp parallel for num_threads(nr_omp_threads)
 		for (int p = 0; p < pc; p++)
 		{
 			int t = omp_get_thread_num();
+			
+			int opticsGroup = obsModel.getOpticsGroup(allMdts[m], p);		
+			double angpix = obsModel.getPixelSize(opticsGroup);
 			
 			for (int y = 0; y < s; y++)
 			for (int x = 0; x < sh; x++)
@@ -123,14 +120,14 @@ int main(int argc, char *argv[])
 			allMdts[m].getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff, p);
 			allMdts[m].getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff, p);
 			
-			xoff /= obsModel.angpix[opticsGroup];
-			yoff /= obsModel.angpix[opticsGroup];
+			xoff /= angpix;
+			yoff /= angpix;
 			
 			xoff -= shift.x;
 			yoff -= shift.y;
 			
-			xoff *= obsModel.angpix[opticsGroup];
-			yoff *= obsModel.angpix[opticsGroup];
+			xoff *= angpix;
+			yoff *= angpix;
 			
 			allMdts[m].setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff, p);
 			allMdts[m].setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff, p);

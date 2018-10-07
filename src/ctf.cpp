@@ -260,7 +260,7 @@ double CTF::getGamma(double X, double Y) const
 {
 	if (obsModel != 0 && obsModel->hasMagMatrices)
 	{
-		const Matrix2D<RFLOAT>& M = obsModel->magMatrices[opticsGroup];
+		const Matrix2D<RFLOAT>& M = obsModel->getMagMatrix(opticsGroup);
 		RFLOAT XX = M(0,0) * X + M(0,1) * Y;
 		RFLOAT YY = M(1,0) * X + M(1,1) * Y;
 
@@ -288,7 +288,7 @@ t2Vector<RFLOAT> CTF::getGammaGrad(double X, double Y)
 {
 	if (obsModel != 0 && obsModel->hasMagMatrices)
 	{
-		const Matrix2D<RFLOAT>& M = obsModel->magMatrices[opticsGroup];
+		const Matrix2D<RFLOAT>& M = obsModel->getMagMatrix(opticsGroup);
 		RFLOAT XX = M(0,0) * X + M(0,1) * Y;
 		RFLOAT YY = M(1,0) * X + M(1,1) * Y;
 

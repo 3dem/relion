@@ -122,7 +122,8 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 :	opticsMdt(opticsMdt),
 	angpix(opticsMdt.numberOfObjects()),
 	lambda(opticsMdt.numberOfObjects()),
-	Cs(opticsMdt.numberOfObjects())
+	Cs(opticsMdt.numberOfObjects()),
+	boxSizes(opticsMdt.numberOfObjects(), 0.0)
 {
 	if (   !opticsMdt.containsLabel(EMDL_IMAGE_PIXEL_SIZE)
 	    || !opticsMdt.containsLabel(EMDL_CTF_VOLTAGE)
@@ -154,10 +155,13 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 			      || opticsMdt.containsLabel(EMDL_IMAGE_MAG_MATRIX_11);
 
 	if (hasMagMatrices) magMatrices.resize(opticsMdt.numberOfObjects());
+	
+	hasBoxSizes = opticsMdt.containsLabel(EMDL_IMAGE_SIZE);
 
 	for (int i = 0; i < opticsMdt.numberOfObjects(); i++)
 	{
 		opticsMdt.getValue(EMDL_IMAGE_PIXEL_SIZE, angpix[i], i);
+		opticsMdt.getValue(EMDL_IMAGE_SIZE, boxSizes[i], i);
 
 		double kV;
 		opticsMdt.getValue(EMDL_CTF_VOLTAGE, kV, i);
@@ -205,8 +209,6 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 			opticsMdt.getValue(EMDL_IMAGE_MAG_MATRIX_11, magMatrices[i](1,1), i);
 		}
 	}
-
-	// @TODO: make sure tilt is in opticsMDT, not in particlesMDT!
 }
 
 void ObservationModel::predictObservation(
@@ -398,6 +400,77 @@ double ObservationModel::getPixelSize(int opticsGroup) const
 	return angpix[opticsGroup];
 }
 
+std::vector<double> ObservationModel::getPixelSizes() const
+{
+	return angpix;
+}
+
+double ObservationModel::getWavelength(int opticsGroup) const
+{
+	return lambda[opticsGroup];
+}
+
+std::vector<double> ObservationModel::getWavelengths() const
+{
+	return lambda;
+}
+
+double ObservationModel::getSphericalAberration(int opticsGroup) const
+{
+	return Cs[opticsGroup];
+}
+
+std::vector<double> ObservationModel::getSphericalAberrations() const
+{
+	return Cs;
+}
+
+int ObservationModel::getBoxSize(int opticsGroup) const
+{
+	if (!hasBoxSizes)
+	{
+		REPORT_ERROR("ObservationModel::getBoxSize: box sizes not available\n");
+	}
+	
+	return boxSizes[opticsGroup];
+}
+
+void ObservationModel::getBoxSizes(std::vector<double>& sDest, std::vector<double>& shDest) const
+{
+	if (!hasBoxSizes)
+	{
+		REPORT_ERROR("ObservationModel::getBoxSizes: box sizes not available\n");
+	}
+	
+	sDest.resize(boxSizes.size());
+	shDest.resize(boxSizes.size());
+	
+	for (int i = 0; i < boxSizes.size(); i++)
+	{
+		sDest[i] = boxSizes[i];
+		shDest[i] = boxSizes[i]/2 + 1;
+	}
+}
+
+Matrix2D<double> ObservationModel::getMagMatrix(int opticsGroup) const
+{
+	return magMatrices[opticsGroup];
+}
+
+std::vector<Matrix2D<double> > ObservationModel::getMagMatrices() const
+{
+	return magMatrices;
+}
+
+int ObservationModel::getOpticsGroup(const MetaDataTable &particlesMdt, int particle) const
+{
+	int opticsGroup;
+	particlesMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, particle);
+	opticsGroup--;
+	
+	return opticsGroup;
+}
+
 int ObservationModel::numberOfOpticsGroups() const
 {
 	return opticsMdt.numberOfObjects();
@@ -584,7 +657,8 @@ const Image<RFLOAT>& ObservationModel::getGammaOffset(int optGroup, int s)
 	return gammaOffset[optGroup][s];
 }
 
-Matrix2D<RFLOAT> ObservationModel::applyAnisoMagTransp(Matrix2D<RFLOAT> A3D_transp, int opticsGroup)
+Matrix2D<RFLOAT> ObservationModel::applyAnisoMagTransp(
+		Matrix2D<RFLOAT> A3D_transp, int opticsGroup, double angpixDest)
 {
 	Matrix2D<RFLOAT> out;
 
@@ -595,6 +669,11 @@ Matrix2D<RFLOAT> ObservationModel::applyAnisoMagTransp(Matrix2D<RFLOAT> A3D_tran
 	else
 	{
 		out = A3D_transp;
+	}
+	
+	if (angpixDest > 0)
+	{
+		out *= angpixDest / angpix[opticsGroup];
 	}
 
 	return out;

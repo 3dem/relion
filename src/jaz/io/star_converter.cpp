@@ -157,7 +157,7 @@ void StarConverter::convert_3p0_particlesTo_3p1(
 			try
 			{
 				Image<double> img;
-				img.read(fn_img, false); //false means read only header, skip real data
+				img.read(fn_img, false); // false means read only header, skip real data
 				int image_size = img().xdim;
 				
 				if (image_size%2 != 0)
