@@ -190,7 +190,7 @@ void CtfRefiner::init()
 	aberrationEstimator.init(verb, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
 	defocusEstimator.init(verb, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
 	bfactorEstimator.init(verb, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
-	magnificationEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
+	magnificationEstimator.init(verb, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
 
 	// check whether output files exist and skip the micrographs for which they do
 	if (only_do_unfinished)

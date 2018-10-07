@@ -49,15 +49,13 @@ void MagnificationEstimator::read(
 }
 
 void MagnificationEstimator::init(
-		int verb, int s, int nr_omp_threads, 
+		int verb, int nr_omp_threads, 
 		bool debug, bool diag, 
 		std::string outPath, 
 		ReferenceMap* reference, 
 		ObservationModel* obsModel)
 {
 	this->verb = verb;
-	this->s = s;
-	sh = s/2 + 1;
 	this->nr_omp_threads = nr_omp_threads;
 	
 	this->debug = debug;
@@ -67,7 +65,8 @@ void MagnificationEstimator::init(
 	this->reference = reference;
 	this->obsModel = obsModel;
 	
-	angpix = obsModel->getPixelSize(0);
+	angpix = obsModel->getPixelSizes();
+	obsModel->getBoxSizes(s, sh);
 	
 	ready = true;
 }
@@ -84,57 +83,51 @@ void MagnificationEstimator::processMicrograph(
 						 << "MagnificationEstimator not initialized.");
 	}
 	
-	const int pc = mdt.numberOfObjects();
+	std::vector<std::pair<int, std::vector<int>>> particlesByOpticsGroup 
+			= obsModel->splitParticlesByOpticsGroup(mdt);
 	
-	std::vector<int> optGroups = obsModel->getOptGroupsPresent_oneBased(mdt);	
-	const int cc = optGroups.size();
-	
-	std::vector<int> groupToIndex(obsModel->numberOfOpticsGroups()+1, -1);
-	
-	for (int i = 0; i < cc; i++)
-	{
-		groupToIndex[optGroups[i]] = i;
-	}
-	
-	std::vector<Volume<Equation2x2>> magEqs(nr_omp_threads*cc);
-	
-	for (int i = 0; i < nr_omp_threads*cc; i++)
-	{
-		magEqs[i] = Volume<Equation2x2>(sh,s,1);
-	}
-	
-	#pragma omp parallel for num_threads(nr_omp_threads)
-	for (long p = 0; p < pc; p++)
-	{
-		CTF ctf;
-		ctf.readByGroup(mdt, obsModel, p);
+	for (int pog = 0; pog < particlesByOpticsGroup.size(); pog++)
+	{			
+		const int og = particlesByOpticsGroup[pog].first;
+		const std::vector<int>& partIndices = particlesByOpticsGroup[pog].second;
 		
-		int threadnum = omp_get_thread_num();
+		const int pc = partIndices.size();
 		
-		int og;
-		mdt.getValue(EMDL_IMAGE_OPTICS_GROUP, og, p);
-
-		const int ci = groupToIndex[og];
+		std::vector<Volume<Equation2x2>> magEqs(nr_omp_threads);
 		
-		MagnificationHelper::updateScaleFreq(
-			pred[p], predGradient[p], obs[p], ctf, angpix, magEqs[cc*threadnum + ci]);
-	}
-	
-	for (int ci = 0; ci < cc; ci++)
-	{
-		Volume<Equation2x2> magEq(sh,s,1);
+		for (int i = 0; i < nr_omp_threads; i++)
+		{
+			magEqs[i] = Volume<Equation2x2>(sh[og],s[og],1);
+		}
+		
+		#pragma omp parallel for num_threads(nr_omp_threads)
+		for (long pp = 0; pp < pc; pp++)
+		{
+			const int p = partIndices[pp];
+			
+			CTF ctf;
+			ctf.readByGroup(mdt, obsModel, p);
+			
+			int threadnum = omp_get_thread_num();
+			
+			MagnificationHelper::updateScaleFreq(
+				pred[p], predGradient[p], obs[p], ctf, angpix[og], magEqs[threadnum]);
+		}
+		
+		Volume<Equation2x2> magEq(sh[og], s[og],1);
 				
 		for (int threadnum = 0; threadnum < nr_omp_threads; threadnum++)
 		{
-			magEq += magEqs[cc*threadnum + ci];
+			magEq += magEqs[threadnum];
 		}
 		
 		std::string outRoot = CtfRefiner::getOutputFilenameRoot(mdt, outPath);
 		
 		std::stringstream sts;
-		sts << optGroups[ci];
+		sts << (og+1);
 		
 		MagnificationHelper::writeEQs(magEq, outRoot+"_mag_optics-group_" + sts.str());
+		
 	}
 }
 
@@ -159,7 +152,7 @@ void MagnificationEstimator::parametricFit(
 	
 	for (int og = 0; og < ogc; og++)
 	{
-		Volume<Equation2x2> magEqs(sh,s,1), magEqsG(sh,s,1);
+		Volume<Equation2x2> magEqs(sh[og],s[og],1), magEqsG(sh[og],s[og],1);
 		
 		std::stringstream sts;
 		sts << (og+1);
@@ -188,7 +181,7 @@ void MagnificationEstimator::parametricFit(
 		ImageLog::write(flowxFull, outPath + "mag_disp_x_optics-group_" + sts.str());
 		ImageLog::write(flowyFull, outPath + "mag_disp_y_optics-group_" + sts.str());
 		
-		Image<RFLOAT> freqWght = reference->getHollowWeight(kmin, s, angpix);
+		Image<RFLOAT> freqWght = reference->getHollowWeight(kmin, s[og], angpix[og]);
 		
 		Matrix2D<RFLOAT> mat = MagnificationHelper::solveLinearlyFreq(magEqs, freqWght, flowx, flowy);
 		
@@ -205,7 +198,6 @@ void MagnificationEstimator::parametricFit(
 		
 		mat_by_optGroup[og] = mat;
 		
-		// @TODO: Add support for optics groups!
 		
 		Matrix2D<RFLOAT> mat0(2,2);
 		mat0.initIdentity();
@@ -238,10 +230,29 @@ bool MagnificationEstimator::isFinished(
 	}
 	
 	std::string outRoot = CtfRefiner::getOutputFilenameRoot(mdt, outPath);
+
+	bool allThere = true;
 	
-	return exists(outRoot+"_mag_Axx.mrc")
-	    && exists(outRoot+"_mag_Axy.mrc")
-		&& exists(outRoot+"_mag_Ayy.mrc")
-		&& exists(outRoot+"_mag_bx.mrc")
-		&& exists(outRoot+"_mag_by.mrc");
+	std::vector<int> ogp = obsModel->getOptGroupsPresent_zeroBased(mdt);
+	
+	for (int pog = 0; pog < ogp.size(); pog++)
+	{
+		const int og = ogp[pog];
+		
+		std::stringstream sts;
+		sts << (og+1);
+		std::string ogstr = sts.str();
+		
+		if(  !exists(outRoot+"_mag_optics-group_"+ogstr+"_Axx.mrc")
+		  || !exists(outRoot+"_mag_optics-group_"+ogstr+"_Axy.mrc")
+		  || !exists(outRoot+"_mag_optics-group_"+ogstr+"_Ayy.mrc")
+		  || !exists(outRoot+"_mag_optics-group_"+ogstr+"_bx.mrc")
+		  || !exists(outRoot+"_mag_optics-group_"+ogstr+"_by.mrc"))
+		{
+			allThere = false;
+			break;
+		}
+	}
+	
+	return allThere;
 }
