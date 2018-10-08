@@ -168,15 +168,15 @@ Image<RFLOAT> ReferenceMap::getHollowWeight(
 		const double x_ang = x_out / as_out;
 		const double y_ang = y_out / as_out;
 		
-		const double x_ref = x_out * as_ref;
-		const double y_ref = y_out * as_ref;
+		const double x_ref = x_ang * as_ref;
+		const double y_ref = y_ang * as_ref;
 		
 		const int xx_ref = (int)(x_ref + 0.5);
 		const int yy_ref = y_ref >= 0.0? (int)(y_ref + 0.5) : (int)(y_ref + s + 0.5);
 		
 		double r = sqrt(x_ang * x_ang + y_ang * y_ang);
 		
-		if (r < kmin_ang || xx_ref >= sh || yy_ref < 0 || yy_ref >= s)
+		if (r < 1.0 / kmin_ang || xx_ref >= sh || yy_ref < 0 || yy_ref >= s)
 		{
 			out(y,x) = 0.0;
 		}
