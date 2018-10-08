@@ -288,8 +288,9 @@ class reconstruct_parameters
 			ObservationModel::loadSafely(fn_sel, obsModel, mdt0, mdtOpt);
 			std::vector<double> angpix = obsModel.getPixelSizes();
 			
-			// Use pixel size of first opt. group for output;
+			// Use pixel and box size of first opt. group for output;
 			double angpixOut = angpix[0];
+			int boxOut = obsModel.getBoxSize(0);
 			
 			// Get dimension of the images
 			
@@ -422,7 +423,7 @@ class reconstruct_parameters
 							mdts[g].getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, p);
 							opticsGroup--;
 							
-							A3D = obsModel.applyAnisoMagTransp(A3D, opticsGroup, angpixOut);
+							A3D = obsModel.applyAnisoMagTransp(A3D, opticsGroup, boxOut, angpixOut);
 							
 							// Translations (either through phase-shifts or in real space
 							trans.initZeros();

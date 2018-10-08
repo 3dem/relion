@@ -213,15 +213,23 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 
 void ObservationModel::predictObservation(
         Projector& proj, const MetaDataTable& partMdt, long int particle,
-		MultidimArray<Complex>& dest,
+		MultidimArray<Complex>& dest, double angpix_ref,
         bool applyCtf, bool shiftPhases, bool applyShift)
 {
-    const int s = proj.ori_size;
-    const int sh = s/2 + 1;
+	const int s_ref = proj.ori_size;
 
 	int opticsGroup;
 	partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, particle);
 	opticsGroup--;
+	
+	if (!hasBoxSizes)
+	{
+		REPORT_ERROR_STR("ObservationModel::predictObservation: Unable to make a prediction "
+						 << "without knowing the box size.\n");
+	}
+	
+	const int s_out = boxSizes[opticsGroup];
+    const int sh_out = s_out/2 + 1;
 
     double xoff, yoff;
 
@@ -240,11 +248,11 @@ void ObservationModel::predictObservation(
 
     Euler_angles2matrix(rot, tilt, psi, A3D);
 
-	A3D = applyAnisoMagTransp(A3D, opticsGroup);
+	A3D = applyAnisoMagTransp(A3D, opticsGroup, s_ref, angpix_ref);
 
-	if (dest.xdim != sh || dest.ydim != s)
+	if (dest.xdim != sh_out || dest.ydim != s_out)
 	{
-		dest.resize(s,sh);
+		dest.resize(s_out,sh_out);
 	}
 
 	dest.initZeros();
@@ -253,7 +261,7 @@ void ObservationModel::predictObservation(
 
 	if (applyShift)
 	{
-		shiftImageInFourierTransform(dest, dest, s, s/2 - xoff, s/2 - yoff);
+		shiftImageInFourierTransform(dest, dest, s_out, s_out/2 - xoff, s_out/2 - yoff);
 	}
 
     if (applyCtf)
@@ -261,11 +269,11 @@ void ObservationModel::predictObservation(
         CTF ctf;
         ctf.readByGroup(partMdt, this, particle);
 
-		Image<RFLOAT> ctfImg(sh,s);
-		ctf.getFftwImage(ctfImg(), s, s, angpix[opticsGroup]);
+		Image<RFLOAT> ctfImg(sh_out,s_out);
+		ctf.getFftwImage(ctfImg(), s_out, s_out, angpix[opticsGroup]);
 
-		for (int y = 0; y < s;  y++)
-		for (int x = 0; x < sh; x++)
+		for (int y = 0; y < s_out;  y++)
+		for (int x = 0; x < sh_out; x++)
 		{
 			dest(y,x) *= ctfImg(y,x);
 		}
@@ -274,10 +282,10 @@ void ObservationModel::predictObservation(
     if (shiftPhases && oddZernikeCoeffs.size() > opticsGroup
 			&& oddZernikeCoeffs[opticsGroup].size() > 0)
     {
-		const Image<Complex>& corr = getPhaseCorrection(opticsGroup, s);
+		const Image<Complex>& corr = getPhaseCorrection(opticsGroup, s_out);
 
-		for (int y = 0; y < s;  y++)
-		for (int x = 0; x < sh; x++)
+		for (int y = 0; y < s_out;  y++)
+		for (int x = 0; x < sh_out; x++)
 		{
 			dest(y,x) *= corr(y,x);
 		}
@@ -285,7 +293,7 @@ void ObservationModel::predictObservation(
 }
 
 Volume<t2Vector<Complex>> ObservationModel::predictComplexGradient(
-		Projector &proj, const MetaDataTable &partMdt, long particle,
+		Projector &proj, const MetaDataTable &partMdt, long particle, double angpix_ref,
 		bool applyCtf, bool shiftPhases, bool applyShift)
 {
 	if (applyCtf || applyShift)
@@ -293,16 +301,18 @@ Volume<t2Vector<Complex>> ObservationModel::predictComplexGradient(
 		REPORT_ERROR_STR("ObservationModel::predictComplexGradient: "
 						 << "applyCtf and applyShift are currently not supported\n");
 	}
-
-	const int s = proj.ori_size;
-    const int sh = s/2 + 1;
-
-	Volume<t2Vector<Complex>> out(sh,s,1);
-
+	
+	const int s_ref = proj.ori_size;
+	
 	int opticsGroup;
 	partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, particle);
 	opticsGroup--;
-
+	
+	const int s_out = boxSizes[opticsGroup];
+    const int sh_out = s_out/2 + 1;
+	
+	Volume<t2Vector<Complex>> out(sh_out,s_out,1);
+	
 	double xoff, yoff;
 
     partMdt.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff, particle);
@@ -320,17 +330,17 @@ Volume<t2Vector<Complex>> ObservationModel::predictComplexGradient(
 
     Euler_angles2matrix(rot, tilt, psi, A3D);
 
-	A3D = applyAnisoMagTransp(A3D, opticsGroup);
+	A3D = applyAnisoMagTransp(A3D, opticsGroup, s_ref, angpix_ref);
 
     proj.projectGradient(out, A3D);
 
     if (shiftPhases && oddZernikeCoeffs.size() > opticsGroup
 			&& oddZernikeCoeffs[opticsGroup].size() > 0)
     {
-		const Image<Complex>& corr = getPhaseCorrection(opticsGroup, s);
+		const Image<Complex>& corr = getPhaseCorrection(opticsGroup, s_out);
 
-		for (int y = 0; y < s;  y++)
-		for (int x = 0; x < sh; x++)
+		for (int y = 0; y < s_out;  y++)
+		for (int x = 0; x < sh_out; x++)
 		{
 			out(x,y,0).x *= corr(y,x);
 			out(x,y,0).y *= corr(y,x);
@@ -726,7 +736,7 @@ const Image<RFLOAT>& ObservationModel::getGammaOffset(int optGroup, int s)
 }
 
 Matrix2D<RFLOAT> ObservationModel::applyAnisoMagTransp(
-		Matrix2D<RFLOAT> A3D_transp, int opticsGroup, double angpixDest)
+		Matrix2D<RFLOAT> A3D_transp, int opticsGroup, int s3D, double angpix3D)
 {
 	Matrix2D<RFLOAT> out;
 
@@ -739,9 +749,9 @@ Matrix2D<RFLOAT> ObservationModel::applyAnisoMagTransp(
 		out = A3D_transp;
 	}
 	
-	if (angpixDest > 0)
+	if (angpix3D > 0 && s3D > 0)
 	{
-		out *= angpixDest / angpix[opticsGroup];
+		out *= (s3D * angpix3D) / (boxSizes[opticsGroup] * angpix[opticsGroup]);
 	}
 
 	return out;
