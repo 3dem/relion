@@ -185,11 +185,11 @@ public:
 		if (obsModel != 0 && obsModel->hasMagMatrices)
 		{
 			const Matrix2D<RFLOAT>& M = obsModel->getMagMatrix(opticsGroup);
-			RFLOAT XX = M(0,0) * X + M(0,1) * Y;
-			RFLOAT YY = M(1,0) * X + M(1,1) * Y;
+			RFLOAT Xd = M(0,0) * X + M(0,1) * Y;
+			RFLOAT Yd = M(1,0) * X + M(1,1) * Y;
 
-			X = XX;
-			Y = YY;
+			X = Xd;
+			Y = Yd;
 		}
 
         RFLOAT u2 = X * X + Y * Y;
@@ -238,7 +238,37 @@ public:
 
 	gravis::t2Vector<RFLOAT> getGammaGrad(RFLOAT X, RFLOAT Y);
 
-    inline Complex getCTFP(RFLOAT X, RFLOAT Y, bool is_positive) const
+	inline Complex getCTFP(RFLOAT X, RFLOAT Y, bool is_positive) const
+    {
+		if (obsModel != 0 && obsModel->hasMagMatrices)
+		{
+			const Matrix2D<RFLOAT>& M = obsModel->getMagMatrix(opticsGroup);
+			RFLOAT Xd = M(0,0) * X + M(0,1) * Y;
+			RFLOAT Yd = M(1,0) * X + M(1,1) * Y;
+
+			X = Xd;
+			Y = Yd;
+		}
+
+        RFLOAT u2 = X * X + Y * Y;
+        RFLOAT u4 = u2 * u2;
+		
+		RFLOAT gamma = K1 * (Axx*X*X + 2.0*Axy*X*Y + Ayy*Y*Y) + K2 * u4 - K5 - K3 + PI/2.;
+
+        RFLOAT sinx, cosx;
+#ifdef RELION_SINGLE_PRECISION
+        SINCOSF( gamma, &sinx, &cosx );
+#else
+        SINCOS( gamma, &sinx, &cosx );
+#endif
+        Complex retval;
+        retval.real = cosx;
+        retval.imag = (is_positive) ? sinx : -sinx;
+
+        return retval;
+    }
+	
+	inline Complex getCTFP_noAniso(RFLOAT X, RFLOAT Y, bool is_positive) const
     {
         RFLOAT u2 = X * X + Y * Y;
         RFLOAT u = sqrt(u2);
@@ -301,10 +331,15 @@ public:
     /// The dimensions of the result array should have been set correctly already, i.e. at the image size!
     void get1DProfile(MultidimArray < RFLOAT > &result, RFLOAT angle, RFLOAT angpix,
     		bool do_abs = false, bool do_only_flip_phases = false, bool do_intact_until_first_peak = false, bool do_damping = true);
+	
+	// Calculate weight W for Ewald-sphere curvature correction: apply this to the result from getFftwImage
+    void applyWeightEwaldSphereCurvature(
+			MultidimArray<RFLOAT>& result, int orixdim, int oriydim, 
+			RFLOAT angpix, RFLOAT particle_diameter);
 
-    // Calculate weight W for Ewald-sphere curvature correction: apply this to the result from getFftwImage
-    void applyWeightEwaldSphereCurvature(MultidimArray < RFLOAT > &result, int orixdim, int oriydim, RFLOAT angpix, RFLOAT particle_diameter);
-
+	// Calculate weight W for Ewald-sphere curvature correction: apply this to the result from getFftwImage
+    void applyWeightEwaldSphereCurvature_noAniso(MultidimArray < RFLOAT > &result, int orixdim, int oriydim, RFLOAT angpix, RFLOAT particle_diameter);
+	
 };
 //@}
 #endif

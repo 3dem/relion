@@ -364,9 +364,11 @@ void CTF::getFftwImage(MultidimArray<RFLOAT> &result, int orixdim, int oriydim, 
 void CTF::getCTFPImage(MultidimArray<Complex> &result, int orixdim, int oriydim, RFLOAT angpix,
 					bool is_positive, float angle)
 {
-
 	if (angle < 0 || angle >= 360.)
+	{
 		REPORT_ERROR("CTF::getCTFPImage: angle should be in [0,360>");
+	}
+	
 	// Angles larger than 180, are the inverse of the other half!
 	if (angle >= 180.)
 	{
@@ -378,15 +380,21 @@ void CTF::getCTFPImage(MultidimArray<Complex> &result, int orixdim, int oriydim,
 
 	RFLOAT xs = (RFLOAT)orixdim * angpix;
 	RFLOAT ys = (RFLOAT)oriydim * angpix;
+	
 	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(result)
 	{
 		RFLOAT x = (RFLOAT)jp / xs;
 		RFLOAT y = (RFLOAT)ip / ys;
 		RFLOAT myangle = (x*x+y*y > 0) ? acos(y/sqrt(x*x+y*y)) : 0; // dot-product with Y-axis: (0,1)
+		
 		if (myangle >= anglerad)
+		{
 			DIRECT_A2D_ELEM(result, i, j) = getCTFP(x, y, is_positive);
+		}
 		else
+		{
 			DIRECT_A2D_ELEM(result, i, j) = getCTFP(x, y, !is_positive);
+		}
 	}
 
 	// Special line along the vertical Y-axis, where FFTW stores both Friedel mates and Friedel symmetry needs to remain
@@ -394,10 +402,12 @@ void CTF::getCTFPImage(MultidimArray<Complex> &result, int orixdim, int oriydim,
 	{
 		int dim = YSIZE(result);
 		int hdim = dim/2;
+		
 		for (int i = hdim + 1; i < dim; i++)
+		{
 			DIRECT_A2D_ELEM(result, i, 0) = conj(DIRECT_A2D_ELEM(result, dim-i, 0));
+		}
 	}
-
 }
 
 void CTF::getCenteredImage(MultidimArray<RFLOAT> &result, RFLOAT Tm,
@@ -415,6 +425,7 @@ void CTF::getCenteredImage(MultidimArray<RFLOAT> &result, RFLOAT Tm,
 	}
 
 }
+
 void CTF::get1DProfile(MultidimArray < RFLOAT > &result, RFLOAT angle, RFLOAT Tm,
 		bool do_abs, bool do_only_flip_phases, bool do_intact_until_first_peak, bool do_damping)
 {
@@ -428,9 +439,51 @@ void CTF::get1DProfile(MultidimArray < RFLOAT > &result, RFLOAT angle, RFLOAT Tm
 		RFLOAT y = (SIND(angle) * (RFLOAT)i) / xs;
 		A1D_ELEM(result, i) = getCTF(x, y, do_abs, do_only_flip_phases, do_intact_until_first_peak, do_damping);
 	}
-
 }
-void CTF::applyWeightEwaldSphereCurvature(MultidimArray < RFLOAT > &result, int orixdim, int oriydim,
+
+void CTF::applyWeightEwaldSphereCurvature(
+		MultidimArray<RFLOAT>& result, int orixdim, int oriydim,
+		RFLOAT angpix, RFLOAT particle_diameter)
+{
+	RFLOAT xs = (RFLOAT)orixdim * angpix;
+	RFLOAT ys = (RFLOAT)oriydim * angpix;
+	
+	Matrix2D<RFLOAT> M;
+	
+	if (obsModel != 0 && obsModel->hasMagMatrices)
+	{
+		M = obsModel->getMagMatrix(opticsGroup);
+	}
+	else
+	{
+		M.initIdentity();
+	}
+	
+	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(result)
+	{
+		RFLOAT xu = (RFLOAT)jp / xs;
+		RFLOAT yu = (RFLOAT)ip / ys;
+		
+		RFLOAT x = M(0,0) * xu + M(0,1) * yu;
+		RFLOAT y = M(1,0) * xu + M(1,1) * yu;
+		
+		const RFLOAT astigDefocus = Axx*x*x + 2.0*Axy*x*y + Ayy*y*y;
+		RFLOAT u2 = x * x + y * y;
+        RFLOAT u4 = u2 * u2;
+		RFLOAT gamma = K1 * astigDefocus + K2 * u4 - K5 - K3;
+		
+		RFLOAT deltaf = u2 > 0.0? astigDefocus / u2 : 0.0;
+		RFLOAT inv_d = sqrt(u2);
+		RFLOAT aux = 2.0 * deltaf * lambda * inv_d / particle_diameter;
+		RFLOAT A = (aux > 1.0)? 0.0 : (2.0/PI) * (acos(aux) - aux * sin(acos(aux)));
+		
+		DIRECT_A2D_ELEM(result, i, j) = 1.0 + A * (2.0 * fabs(-sin(gamma)) - 1.0);
+		// Keep everything on the same scale inside RELION, where we use sin(chi), not 2sin(chi)
+		DIRECT_A2D_ELEM(result, i, j) *= 0.5;
+	}
+}
+
+void CTF::applyWeightEwaldSphereCurvature_noAniso(MultidimArray < RFLOAT > &result, int orixdim, int oriydim,
 		RFLOAT angpix, RFLOAT particle_diameter)
 {
 	RFLOAT xs = (RFLOAT)orixdim * angpix;
