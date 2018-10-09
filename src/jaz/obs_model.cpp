@@ -759,11 +759,8 @@ Matrix2D<RFLOAT> ObservationModel::applyScaleDifference(
 {
 	Matrix2D<RFLOAT> out = A3D_transp;
 	
-	if (angpix3D > 0 && s3D > 0)
-	{
-		out *= (s3D * angpix3D) / (boxSizes[opticsGroup] * angpix[opticsGroup]);
-	}
-
+	out *= (s3D * angpix3D) / (boxSizes[opticsGroup] * angpix[opticsGroup]);
+	
 	return out;
 }
 

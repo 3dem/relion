@@ -425,6 +425,7 @@ class reconstruct_parameters
 							
 							// If we're considering Ewald sphere curvature, the mag. matrix
 							// has to be provided to the backprojector explicitly
+							// (to avoid creating an Ewald ellipsoid)
 							if (!do_ewald)
 							{								
 								A3D = obsModel.applyAnisoMagTransp(A3D, opticsGroup);
@@ -502,7 +503,7 @@ class reconstruct_parameters
 								// Also calculate W, store again in Fctf
 								//std::cerr << " temporarily using very large diameter for weight for debugging...." << std::endl;
 								//ctf.applyWeightEwaldSphereCurvature(Fctf, mysize, mysize, angpix, 100000.*mask_diameter);
-								ctf.applyWeightEwaldSphereCurvature(
+								ctf.applyWeightEwaldSphereCurvature_noAniso(
 									Fctf, mysize, mysize, angpix[opticsGroup], mask_diameter);
 								
 								// Also calculate the radius of the Ewald sphere (in pixels)

@@ -65,6 +65,23 @@ void BackProjector::backproject2Dto3D(const MultidimArray<Complex > &f2d,
 	Complex my_val;
 	Matrix2D<RFLOAT> Ainv;
 	RFLOAT my_weight = 1.;
+	
+	RFLOAT m00, m10, m01, m11;
+	
+	if (magMatrix != 0)
+	{
+		m00 = (*magMatrix)(0,0);
+		m10 = (*magMatrix)(1,0);
+		m01 = (*magMatrix)(0,1);
+		m11 = (*magMatrix)(1,1);
+	}
+	else
+	{
+		m00 = 1.0;
+		m10 = 0.0;
+		m01 = 0.0;
+		m11 = 1.0;
+	}
 
 	// f2d should already be in the right size (ori_size,orihalfdim)
     // AND the points outside max_r should already be zero...
@@ -149,29 +166,20 @@ void BackProjector::backproject2Dto3D(const MultidimArray<Complex > &f2d,
 
 	                        The error is < 0.0005 reciprocal voxel even for extreme cases like 200kV, 1500 A particle, 1 A / pix.
 				*/
-
-				// In case of mag anisotropy, spread the points correctly across the Ewald sphere:
-				if (magMatrix != 0)
-				{
-					RFLOAT x0 = (*magMatrix)(0,0) * x + (*magMatrix)(0,1) * y;
-					RFLOAT y0 = (*magMatrix)(1,0) * x + (*magMatrix)(1,1) * y;
-					
-					RFLOAT z_on_ewaldp = inv_diam_ewald * (x0 * x0 + y0 * y0);
-					
-					xp = Ainv(0,0) * x0 + Ainv(0,1) * y0 + Ainv(0,2) * z_on_ewaldp;
-					yp = Ainv(1,0) * x0 + Ainv(1,1) * y0 + Ainv(1,2) * z_on_ewaldp;
-					zp = Ainv(2,0) * x0 + Ainv(2,1) * y0 + Ainv(2,2) * z_on_ewaldp;
-				}
-				else // skip all of this otherwise
-				{
-					// Get logical coordinates in the 3D map
-					RFLOAT z_on_ewaldp = inv_diam_ewald * (x * x + y * y);
-					xp = Ainv(0,0) * x + Ainv(0,1) * y + Ainv(0,2) * z_on_ewaldp;
-					yp = Ainv(1,0) * x + Ainv(1,1) * y + Ainv(1,2) * z_on_ewaldp;
-					zp = Ainv(2,0) * x + Ainv(2,1) * y + Ainv(2,2) * z_on_ewaldp;
-				}
 				
-
+				// Get logical coordinates in the 3D map.
+				// Make sure that the Ewald sphere is spherical even under anisotropic mag
+				// by first undistorting (x,y) to obtain the true frequencies (xu,yu)
+				
+				RFLOAT xu = m00 * x + m01 * y;
+				RFLOAT yu = m10 * x + m11 * y;
+				
+				RFLOAT z_on_ewaldp = inv_diam_ewald * (xu * xu + yu * yu);
+				
+				xp = Ainv(0,0) * xu + Ainv(0,1) * yu + Ainv(0,2) * z_on_ewaldp;
+				yp = Ainv(1,0) * xu + Ainv(1,1) * yu + Ainv(1,2) * z_on_ewaldp;
+				zp = Ainv(2,0) * xu + Ainv(2,1) * yu + Ainv(2,2) * z_on_ewaldp;
+				
 				if (interpolator == TRILINEAR || r2 < min_r2_nn)
 				{
 

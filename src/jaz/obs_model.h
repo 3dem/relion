@@ -109,7 +109,7 @@ class ObservationModel
 		
 		Matrix2D<RFLOAT> applyScaleDifference(
 				Matrix2D<RFLOAT> A3D_transp, int opticsGroup, 
-				int s3D = -1, double angpix3D = -1);
+				int s3D, double angpix3D);
 
 
 
