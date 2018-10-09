@@ -263,7 +263,7 @@ Volume<t2Vector<Complex>> ReferenceMap::predictComplexGradient(
 	
 	int pi = (hs == Own)? randSubset : 1 - randSubset;
 	
-	pred = obs.predictComplexGradient(projectors[pi], mdt, p, applyCtf, applyTilt, applyShift);
+	pred = obs.predictComplexGradient(projectors[pi], mdt, p, angpix, applyCtf, applyTilt, applyShift);
 	
 	return pred;
 }
