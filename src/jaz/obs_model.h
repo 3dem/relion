@@ -103,8 +103,11 @@ class ObservationModel
 
 		// effect of symmetric aberration (cached)
 		const Image<RFLOAT>& getGammaOffset(int optGroup, int s);
-
+		
 		Matrix2D<RFLOAT> applyAnisoMagTransp(
+				Matrix2D<RFLOAT> A3D_transp, int opticsGroup);
+		
+		Matrix2D<RFLOAT> applyScaleDifference(
 				Matrix2D<RFLOAT> A3D_transp, int opticsGroup, 
 				int s3D = -1, double angpix3D = -1);
 

@@ -247,8 +247,9 @@ void ObservationModel::predictObservation(
     partMdt.getValue(EMDL_ORIENT_PSI, psi, particle);
 
     Euler_angles2matrix(rot, tilt, psi, A3D);
-
-	A3D = applyAnisoMagTransp(A3D, opticsGroup, s_ref, angpix_ref);
+	
+	A3D = applyAnisoMagTransp(A3D, opticsGroup);
+	A3D = applyScaleDifference(A3D, opticsGroup, s_ref, angpix_ref);
 
 	if (dest.xdim != sh_out || dest.ydim != s_out)
 	{
@@ -330,7 +331,8 @@ Volume<t2Vector<Complex>> ObservationModel::predictComplexGradient(
 
     Euler_angles2matrix(rot, tilt, psi, A3D);
 
-	A3D = applyAnisoMagTransp(A3D, opticsGroup, s_ref, angpix_ref);
+	A3D = applyAnisoMagTransp(A3D, opticsGroup);
+	A3D = applyScaleDifference(A3D, opticsGroup, s_ref, angpix_ref);
 
     proj.projectGradient(out, A3D);
 
@@ -736,7 +738,7 @@ const Image<RFLOAT>& ObservationModel::getGammaOffset(int optGroup, int s)
 }
 
 Matrix2D<RFLOAT> ObservationModel::applyAnisoMagTransp(
-		Matrix2D<RFLOAT> A3D_transp, int opticsGroup, int s3D, double angpix3D)
+		Matrix2D<RFLOAT> A3D_transp, int opticsGroup)
 {
 	Matrix2D<RFLOAT> out;
 
@@ -748,6 +750,14 @@ Matrix2D<RFLOAT> ObservationModel::applyAnisoMagTransp(
 	{
 		out = A3D_transp;
 	}
+	
+	return out;
+}
+
+Matrix2D<RFLOAT> ObservationModel::applyScaleDifference(
+		Matrix2D<RFLOAT> A3D_transp, int opticsGroup, int s3D, double angpix3D)
+{
+	Matrix2D<RFLOAT> out = A3D_transp;
 	
 	if (angpix3D > 0 && s3D > 0)
 	{

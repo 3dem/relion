@@ -423,7 +423,14 @@ class reconstruct_parameters
 							mdts[g].getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, p);
 							opticsGroup--;
 							
-							A3D = obsModel.applyAnisoMagTransp(A3D, opticsGroup, boxOut, angpixOut);
+							// If we're considering Ewald sphere curvature, the mag. matrix
+							// has to be provided to the backprojector explicitly
+							if (!do_ewald)
+							{								
+								A3D = obsModel.applyAnisoMagTransp(A3D, opticsGroup);
+							}
+							
+							A3D = obsModel.applyScaleDifference(A3D, opticsGroup, boxOut, angpixOut);
 							
 							// Translations (either through phase-shifts or in real space
 							trans.initZeros();
@@ -631,12 +638,14 @@ class reconstruct_parameters
 								}
 								
 								if (do_ewald)
-								{									
-									backprojectors[randSubset][threadnum].set2DFourierTransform(
-												F2DP, A3D, IS_NOT_INV, &Fctf, r_ewald_sphere, true);
+								{
+									Matrix2D<RFLOAT> magMat = obsModel.getMagMatrix(opticsGroup);
 									
 									backprojectors[randSubset][threadnum].set2DFourierTransform(
-												F2DQ, A3D, IS_NOT_INV, &Fctf, r_ewald_sphere, false);
+										F2DP, A3D, IS_NOT_INV, &Fctf, r_ewald_sphere, true, &magMat);
+									
+									backprojectors[randSubset][threadnum].set2DFourierTransform(
+										F2DQ, A3D, IS_NOT_INV, &Fctf, r_ewald_sphere, false, &magMat);
 								}
 								else
 								{

@@ -55,7 +55,8 @@ void BackProjector::initZeros(int current_size)
 void BackProjector::backproject2Dto3D(const MultidimArray<Complex > &f2d,
 		                        const Matrix2D<RFLOAT> &A, bool inv,
 		                        const MultidimArray<RFLOAT> *Mweight,
-								RFLOAT r_ewald_sphere, bool is_positive_curvature)
+								RFLOAT r_ewald_sphere, bool is_positive_curvature,
+								Matrix2D<RFLOAT>* magMatrix)
 {
 	RFLOAT fx, fy, fz, mfx, mfy, mfz, xp, yp, zp;
 	int first_x, x0, x1, y0, y1, z0, z1, y, y2, r2;
@@ -149,11 +150,27 @@ void BackProjector::backproject2Dto3D(const MultidimArray<Complex > &f2d,
 	                        The error is < 0.0005 reciprocal voxel even for extreme cases like 200kV, 1500 A particle, 1 A / pix.
 				*/
 
-				// Get logical coordinates in the 3D map
-				RFLOAT z_on_ewaldp = inv_diam_ewald * (x * x	+ y * y);
-				xp = Ainv(0,0) * x + Ainv(0,1) * y + Ainv(0,2) * z_on_ewaldp;
-				yp = Ainv(1,0) * x + Ainv(1,1) * y + Ainv(1,2) * z_on_ewaldp;
-				zp = Ainv(2,0) * x + Ainv(2,1) * y + Ainv(2,2) * z_on_ewaldp;
+				// In case of mag anisotropy, spread the points correctly across the Ewald sphere:
+				if (magMatrix != 0)
+				{
+					RFLOAT x0 = (*magMatrix)(0,0) * x + (*magMatrix)(0,1) * y;
+					RFLOAT y0 = (*magMatrix)(1,0) * x + (*magMatrix)(1,1) * y;
+					
+					RFLOAT z_on_ewaldp = inv_diam_ewald * (x0 * x0 + y0 * y0);
+					
+					xp = Ainv(0,0) * x0 + Ainv(0,1) * y0 + Ainv(0,2) * z_on_ewaldp;
+					yp = Ainv(1,0) * x0 + Ainv(1,1) * y0 + Ainv(1,2) * z_on_ewaldp;
+					zp = Ainv(2,0) * x0 + Ainv(2,1) * y0 + Ainv(2,2) * z_on_ewaldp;
+				}
+				else // skip all of this otherwise
+				{
+					// Get logical coordinates in the 3D map
+					RFLOAT z_on_ewaldp = inv_diam_ewald * (x * x + y * y);
+					xp = Ainv(0,0) * x + Ainv(0,1) * y + Ainv(0,2) * z_on_ewaldp;
+					yp = Ainv(1,0) * x + Ainv(1,1) * y + Ainv(1,2) * z_on_ewaldp;
+					zp = Ainv(2,0) * x + Ainv(2,1) * y + Ainv(2,2) * z_on_ewaldp;
+				}
+				
 
 				if (interpolator == TRILINEAR || r2 < min_r2_nn)
 				{
