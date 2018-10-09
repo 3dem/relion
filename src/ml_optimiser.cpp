@@ -5321,12 +5321,22 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 						DIRECT_A3D_ELEM(Ictf(), k, i, j) = DIRECT_A3D_ELEM(exp_imagedata, mymodel.ori_size + k, i, j);
 					}
 				}
-				// Set the CTF-image in Fctf
-				Ictf().setXmippOrigin();
-				FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fctf)
+
+				// If there is a redundant half, get rid of it
+				if (XSIZE(Ictf()) == YSIZE(Ictf()))
 				{
-					// Use negative kp,ip and jp indices, because the origin in the ctf_img lies half a pixel to the right of the actual center....
-					DIRECT_A3D_ELEM(Fctf, k, i, j) = A3D_ELEM(Ictf(), -kp, -ip, -jp);
+					// Set the CTF-image in Fctf
+					Ictf().setXmippOrigin();
+					FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fctf)
+					{
+						// Use negative kp,ip and jp indices, because the origin in the ctf_img lies half a pixel to the right of the actual center....
+						DIRECT_A3D_ELEM(Fctf, k, i, j) = A3D_ELEM(Ictf(), -kp, -ip, -jp);
+					}
+				}
+				// otherwise, just window the CTF to the current resolution
+				else
+				{
+					windowFourierTransform(Ictf(), Fctf, YSIZE(Fctf));
 				}
 			}
 			else
@@ -8206,14 +8216,23 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_ori_particle,
 								getline(split, fn_ctf);
 						}
 						Ictf.read(fn_ctf);
-
-						// Set the CTF-image in Fctf
-						Ictf().setXmippOrigin();
-						Fctf.resize(current_image_size, current_image_size, current_image_size/ 2 + 1);
-						FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fctf)
+						
+						// If there is a redundant half, get rid of it
+						if (XSIZE(Ictf()) == YSIZE(Ictf()))
 						{
-							// Use negative kp, ip and jp indices, because the origin in the ctf_img lies half a pixel to the right of the actual center....
-							DIRECT_A3D_ELEM(Fctf, k, i, j) = A3D_ELEM(Ictf(), -kp, -ip, -jp);
+							// Set the CTF-image in Fctf
+							Ictf().setXmippOrigin();
+							Fctf.resize(current_image_size, current_image_size, current_image_size / 2 + 1);
+							FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fctf)
+							{
+								// Use negative kp, ip and jp indices, because the origin in the ctf_img lies half a pixel to the right of the actual center....
+								DIRECT_A3D_ELEM(Fctf, k, i, j) = A3D_ELEM(Ictf(), -kp, -ip, -jp);
+							}
+						}
+						// otherwise, just window the CTF to the current resolution
+						else
+						{
+							windowFourierTransform(Ictf(), Fctf, YSIZE(Fctf));
 						}
 					}
 					else

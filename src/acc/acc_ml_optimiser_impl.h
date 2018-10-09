@@ -706,12 +706,23 @@ void getFourierTransformsAndCtfs(long int my_ori_particle,
 				}
 				// Set the CTF-image in Fctf
 				CTIC(accMLO->timer,"CTFSet3D_array");
-				Ictf().setXmippOrigin();
-				FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fctf)
+
+				// If there is a redundant half, get rid of it
+				if (XSIZE(Ictf()) == YSIZE(Ictf()))
 				{
-					// Use negative kp,ip and jp indices, because the origin in the ctf_img lies half a pixel to the right of the actual center....
-					DIRECT_A3D_ELEM(Fctf, k, i, j) = A3D_ELEM(Ictf(), -kp, -ip, -jp);
+					Ictf().setXmippOrigin();
+					FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fctf)
+					{
+						// Use negative kp,ip and jp indices, because the origin in the ctf_img lies half a pixel to the right of the actual center....
+						DIRECT_A3D_ELEM(Fctf, k, i, j) = A3D_ELEM(Ictf(), -kp, -ip, -jp);
+					}
 				}
+				// otherwise, just window the CTF to the current resolution
+				else
+				{
+					windowFourierTransform(Ictf(), Fctf, YSIZE(Fctf));
+				}
+
 				CTIC(accMLO->timer,"CTFSet3D_array");
 			}
 			else
