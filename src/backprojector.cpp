@@ -94,6 +94,7 @@ void BackProjector::backproject2Dto3D(const MultidimArray<Complex > &f2d,
 
     // Go from the 2D slice coordinates to the 3D coordinates
     Ainv *= (RFLOAT)padding_factor;  // take scaling into account directly
+    int max_r2 = r_max * r_max;
     int min_r2_nn = r_min_nn * r_min_nn;
 
 //#define DEBUG_BACKP
@@ -111,51 +112,40 @@ void BackProjector::backproject2Dto3D(const MultidimArray<Complex > &f2d,
 
 	// precalculate inverse of Ewald sphere diameter
     RFLOAT inv_diam_ewald = (r_ewald_sphere > 0.) ? 1./(2. * r_ewald_sphere) : 0.;
-	
 	if (!is_positive_curvature)
-	{
 		inv_diam_ewald *= -1.;
-	}
 
-	const int s = YSIZE(f2d);
-	const int sh = s/2 + 1;
-	
-	const int max_r2 = sh*sh;
-	
-	for (int i=0; i < s; i++)
+    for (int i=0; i < YSIZE(f2d); i++)
 	{
-		if (i < sh)
+		// Dont search beyond square with side max_r
+		if (i <= r_max)
 		{
 			y = i;
 			first_x = 0;
 		}
-		else
+		else if (i >= YSIZE(f2d) - r_max)
 		{
-			y = i - s;
-			// x==0 plane is stored twice in the FFTW format. Don't set it twice in BACKPROJECTION!
+			y = i - YSIZE(f2d);
+			// x==0 plane is stored twice in the FFTW format. Dont set it twice in BACKPROJECTION!
 			first_x = 1;
 		}
+		else
+			continue;
 
 		y2 = y * y;
-		
-		for (int x=first_x; x < sh; x++)
+		for (int x=first_x; x <= r_max; x++)
 		{
-			// Only include points with radius < max_r (exclude points outside circle in square)
+	    	// Only include points with radius < max_r (exclude points outside circle in square)
 			r2 = x * x + y2;
-			
 			if (r2 > max_r2)
-			{
 				continue;
-			}
-						
+
 			// Get the relevant value in the input image
 			my_val = DIRECT_A2D_ELEM(f2d, i, x);
 
 			// Get the weight
 			if (Mweight != NULL)
-			{
 				my_weight = DIRECT_A2D_ELEM(*Mweight, i, x);
-			}
 			// else: my_weight was already initialised to 1.
 
 			if (my_weight > 0.)

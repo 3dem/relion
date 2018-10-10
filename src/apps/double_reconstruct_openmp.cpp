@@ -521,6 +521,8 @@ class reconstruct_parameters
 							}
 							
 							DIRECT_A2D_ELEM(F2D, 0, 0) = 0.0;
+							
+							backprojectors[randSubset][threadnum].r_max = F2D.xdim;
 															
 							if (do_ewald)
 							{
