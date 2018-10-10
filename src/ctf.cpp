@@ -472,7 +472,7 @@ void CTF::applyWeightEwaldSphereCurvature(
         RFLOAT u4 = u2 * u2;
 		RFLOAT gamma = K1 * astigDefocus + K2 * u4 - K5 - K3;
 		
-		RFLOAT deltaf = u2 > 0.0? astigDefocus / u2 : 0.0;
+		RFLOAT deltaf = u2 > 0.0? std::abs(astigDefocus / u2) : 0.0;
 		RFLOAT inv_d = sqrt(u2);
 		RFLOAT aux = 2.0 * deltaf * lambda * inv_d / particle_diameter;
 		RFLOAT A = (aux > 1.0)? 0.0 : (2.0/PI) * (acos(aux) - aux * sin(acos(aux)));
