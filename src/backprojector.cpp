@@ -120,6 +120,8 @@ void BackProjector::backproject2Dto3D(const MultidimArray<Complex > &f2d,
 	const int s = YSIZE(f2d);
 	const int sh = s/2 + 1;
 	
+	const int max_r2 = sh*sh;
+	
 	for (int i=0; i < s; i++)
 	{
 		if (i < sh)
@@ -138,6 +140,14 @@ void BackProjector::backproject2Dto3D(const MultidimArray<Complex > &f2d,
 		
 		for (int x=first_x; x < sh; x++)
 		{
+			// Only include points with radius < max_r (exclude points outside circle in square)
+			r2 = x * x + y2;
+			
+			if (r2 > max_r2)
+			{
+				continue;
+			}
+						
 			// Get the relevant value in the input image
 			my_val = DIRECT_A2D_ELEM(f2d, i, x);
 
