@@ -389,11 +389,11 @@ void CTF::getCTFPImage(MultidimArray<Complex> &result, int orixdim, int oriydim,
 		
 		if (myangle >= anglerad)
 		{
-			DIRECT_A2D_ELEM(result, i, j) = getCTFP_noAniso(x, y, is_positive);
+			DIRECT_A2D_ELEM(result, i, j) = getCTFP(x, y, is_positive);
 		}
 		else
 		{
-			DIRECT_A2D_ELEM(result, i, j) = getCTFP_noAniso(x, y, !is_positive);
+			DIRECT_A2D_ELEM(result, i, j) = getCTFP(x, y, !is_positive);
 		}
 	}
 

@@ -223,7 +223,7 @@ Image<Complex> ReferenceMap::predict(
 	
 	int pi = (hs == Own)? randSubset : 1 - randSubset;
 	
-	obs.predictObservation(projectors[pi], mdt, p, pred(), applyCtf, applyTilt, applyShift);
+	obs.predictObservation(projectors[pi], mdt, p, pred(), angpix, applyCtf, applyTilt, applyShift);
 	
 	return pred;
 }

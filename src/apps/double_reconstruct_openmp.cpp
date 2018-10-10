@@ -496,19 +496,14 @@ class reconstruct_parameters
 							
 							if (do_ewald)
 							{
-								// Ewald-sphere curvature correction
-								
+								// Ewald-sphere curvature correction								
 								applyCTFPandCTFQ(F2D, ctf, transformer, F2DP, F2DQ, angpix[opticsGroup]);
 								
 								// Also calculate W, store again in Fctf
-								//std::cerr << " temporarily using very large diameter for weight for debugging...." << std::endl;
-								//ctf.applyWeightEwaldSphereCurvature(Fctf, mysize, mysize, angpix, 100000.*mask_diameter);
-								ctf.applyWeightEwaldSphereCurvature_noAniso(
+								ctf.applyWeightEwaldSphereCurvature(
 									Fctf, mysize, mysize, angpix[opticsGroup], mask_diameter);
 								
 								// Also calculate the radius of the Ewald sphere (in pixels)
-								//std::cerr << " temporarily switching off Ewald sphere curvature for debugging...." << std::endl;
-								//r_ewald_sphere = -1.;
 								r_ewald_sphere = mysize * angpix[opticsGroup] / ctf.lambda;
 							}
 							
