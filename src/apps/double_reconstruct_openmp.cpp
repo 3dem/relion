@@ -55,10 +55,6 @@ class reconstruct_parameters
 		
 		bool no_Wiener, writeWeights;
 		
-		bool L1_freq, L1_ring, L1_particle, L1_micrograph, L1_any;
-		int L1_iters;
-		double L1_eps;
-		
 		float padding_factor, mask_diameter, mask_diameter_filt, flank_width;
 		double padding_factor_2D;
 		
@@ -129,35 +125,6 @@ class reconstruct_parameters
 			do_3d_rot = parser.checkOption("--3d_rot", "Perform 3D rotations instead of backprojections from 2D images");
 			skip_gridding = !parser.checkOption("--grid", "Perform gridding part of the reconstruction");
 			div_avg = parser.checkOption("--div_avg", "Divide the per-voxel average by its weight prior to computing the preliminary FSC");
-			
-			L1_freq = false;
-			L1_ring = false;
-			L1_particle = false;
-			L1_micrograph = false;
-			
-			L1_freq = parser.checkOption("--L1_voxel", "Perform per-voxel L1 averaging");
-			L1_ring = parser.checkOption("--L1_shell", "Perform per-shell L1 averaging");
-			L1_particle = parser.checkOption("--L1_particle", "Perform per-particle L1 averaging");
-			L1_micrograph = parser.checkOption("--L1_micrograph", "Perform per-micrograph L1 averaging");
-			
-			L1_iters = textToInteger(parser.getOption("--L1_iters", "Number of L1-averaging iterations", "5"));
-			L1_eps = textToFloat(parser.getOption("--L1_eps", "L1-weight epsilon", "0.0001"));
-			
-			int numL1s = 0;
-			
-			if (L1_freq) numL1s++;
-			if (L1_ring) numL1s++;
-			if (L1_particle) numL1s++;
-			if (L1_micrograph) numL1s++;
-			
-			if (numL1s > 1)
-			{
-				REPORT_ERROR("Only one type of L1 averaging can be performed at a time.");
-			}
-			
-			L1_any = numL1s > 0;
-			
-			if (!L1_any) L1_iters = 1;
 			
 			debug = parser.checkOption("--debug", "Write out debugging data");
 			
@@ -416,7 +383,7 @@ class reconstruct_parameters
 						
 						int opticsGroup = obsModel.getOpticsGroup(mdts[g], p);
 						
-						// If we're considering Ewald sphere curvature, the mag. matrix
+						// If we are considering Ewald sphere curvature, the mag. matrix
 						// has to be provided to the backprojector explicitly
 						// (to avoid creating an Ewald ellipsoid)
 						if (!do_ewald)
