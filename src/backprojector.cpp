@@ -88,9 +88,13 @@ void BackProjector::backproject2Dto3D(const MultidimArray<Complex > &f2d,
 
 	// Use the inverse matrix
     if (inv)
+	{
     	Ainv = A;
+	}
     else
+	{
     	Ainv = A.transpose();
+	}
 
     // Go from the 2D slice coordinates to the 3D coordinates
     Ainv *= (RFLOAT)padding_factor;  // take scaling into account directly
@@ -112,41 +116,48 @@ void BackProjector::backproject2Dto3D(const MultidimArray<Complex > &f2d,
 
 	// precalculate inverse of Ewald sphere diameter
     RFLOAT inv_diam_ewald = (r_ewald_sphere > 0.) ? 1./(2. * r_ewald_sphere) : 0.;
+	
 	if (!is_positive_curvature)
-		inv_diam_ewald *= -1.;
-
-    for (int i=0; i < YSIZE(f2d); i++)
 	{
-		// Dont search beyond square with side max_r
-		if (i <= r_max)
+		inv_diam_ewald *= -1.;
+	}
+	
+	const int s  = YSIZE(f2d);
+	const int sh = XSIZE(f2d);
+
+    for (int i=0; i < s; i++)
+	{
+		if (i < sh)
 		{
 			y = i;
 			first_x = 0;
 		}
-		else if (i >= YSIZE(f2d) - r_max)
+		else
 		{
-			y = i - YSIZE(f2d);
+			y = i - s;
 			// x==0 plane is stored twice in the FFTW format. Dont set it twice in BACKPROJECTION!
 			first_x = 1;
 		}
-		else
-			continue;
 
 		y2 = y * y;
-		for (int x=first_x; x <= r_max; x++)
+		
+		// @TODO: constrain first_x and last_x to only iterate over the ellipse
+		// in the 2D-image corresponding to the sphere in 3D
+		
+		for (int x=first_x; x < sh; x++)
 		{
-	    	// Only include points with radius < max_r (exclude points outside circle in square)
-			r2 = x * x + y2;
-			if (r2 > max_r2)
-				continue;
-
 			// Get the relevant value in the input image
 			my_val = DIRECT_A2D_ELEM(f2d, i, x);
 
 			// Get the weight
 			if (Mweight != NULL)
+			{
 				my_weight = DIRECT_A2D_ELEM(*Mweight, i, x);
-			// else: my_weight was already initialised to 1.
+			}
+			else
+			{
+				my_weight = 1.0;
+			}
 
 			if (my_weight > 0.)
 			{
@@ -180,9 +191,15 @@ void BackProjector::backproject2Dto3D(const MultidimArray<Complex > &f2d,
 				yp = Ainv(1,0) * xu + Ainv(1,1) * yu + Ainv(1,2) * z_on_ewaldp;
 				zp = Ainv(2,0) * xu + Ainv(2,1) * yu + Ainv(2,2) * z_on_ewaldp;
 				
+				double r2_3D = xp*xp + yp*yp + zp*zp;
+				
+				if (r2_3D > max_r2)
+				{
+					continue;
+				}
+				
 				if (interpolator == TRILINEAR || r2 < min_r2_nn)
 				{
-
 					// Only asymmetric half is stored
 					if (xp < 0)
 					{
