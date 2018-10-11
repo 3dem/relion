@@ -3817,6 +3817,12 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 	initialisePipeline(outputname, PROC_MULTIBODY_NAME, job_counter);
 	std::string command;
 
+	if (!exists(joboptions["fn_bodies"].getString()))
+	{
+		error_message = "ERROR: you have to specify an existing body STAR file.";
+		return false;
+	}
+
 	if (is_continue && joboptions["fn_cont"].getString() == "" && !joboptions["do_analyse"].getBoolean())
 	{
 		error_message = "ERROR: either specify a optimiser file to continue multibody refinement from; OR run flexibility analysis...";
