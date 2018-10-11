@@ -2567,7 +2567,10 @@ void MlOptimiser::iterate()
 			if (verb > 0)
 			{
 				std::cout << " Auto-refine: Refinement has converged, stopping now... " << std::endl;
-				std::cout << " Auto-refine: + Final reconstruction from all particles is saved as: " <<  fn_out << "_class001.mrc" << std::endl;
+				if (mymodel.nr_bodies == 1)
+					std::cout << " Auto-refine: + Final reconstruction from all particles is saved as: " <<  fn_out << "_class001.mrc" << std::endl;
+				else
+					std::cout << " Auto-refine: + Final reconstructions of each body from all particles are saved as " <<  fn_out << "_bodyNNN.mrc, where NNN is the body number" << std::endl;
 				std::cout << " Auto-refine: + Final model parameters are stored in: " << fn_out << "_model.star" << std::endl;
 				std::cout << " Auto-refine: + Final data parameters are stored in: " << fn_out << "_data.star" << std::endl;
 				if (mymodel.tau2_fudge_factor > 1.)
