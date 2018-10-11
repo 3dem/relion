@@ -5334,9 +5334,14 @@ void MlOptimiser::getFourierTransformsAndCtfs(long int my_ori_particle, int ibod
 					}
 				}
 				// otherwise, just window the CTF to the current resolution
-				else
+				else if (XSIZE(Ictf()) == YSIZE(Ictf()) / 2 + 1)
 				{
 					windowFourierTransform(Ictf(), Fctf, YSIZE(Fctf));
+				}
+				// if dimensions are neither cubical nor FFTW, stop
+				else
+				{
+					REPORT_ERROR("3D CTF volume must be either cubical or adhere to FFTW format!");
 				}
 			}
 			else
@@ -8230,9 +8235,14 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_ori_particle,
 							}
 						}
 						// otherwise, just window the CTF to the current resolution
-						else
+						else if (XSIZE(Ictf()) == YSIZE(Ictf()) / 2 + 1)
 						{
 							windowFourierTransform(Ictf(), Fctf, YSIZE(Fctf));
+						}
+						// if dimensions are neither cubical nor FFTW, stop
+						else
+						{
+							REPORT_ERROR("3D CTF volume must be either cubical or adhere to FFTW format!");
 						}
 					}
 					else
