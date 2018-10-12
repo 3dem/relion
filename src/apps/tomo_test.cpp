@@ -2,6 +2,7 @@
 #include <src/jaz/tomo/tomo_stack.h>
 #include <src/jaz/tomo/backprojection_helper.h>
 #include <src/jaz/vtk_helper.h>
+#include <src/jaz/volume_converter.h>
 
 using namespace gravis;
 
@@ -83,6 +84,10 @@ int main(int argc, char *argv[])
 		spacing, 
 		spacing);
 	
+	Image<RFLOAT> destImg;
+	VolumeConverter::convert(dest, destImg);
+	destImg.write("test00.mrc");
+	
 	// add fiducials
 	
 	std::ifstream fidFile(fiducialsFile);
@@ -121,7 +126,7 @@ int main(int argc, char *argv[])
 	
 	// add particles
 	
-	const double z_offset = 400.0;
+	const double z_offset = 450.0;
 	
 	MetaDataTable partMdt;
 	partMdt.read(particlesStar);

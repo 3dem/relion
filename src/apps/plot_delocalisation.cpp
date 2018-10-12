@@ -107,9 +107,9 @@ int main(int argc, char *argv[])
 				
 				d2Vector delocCent = (1.0 / (2 * angpix * PI)) * ctf.getGammaGrad(xx,yy);
 				
-				double delocCentVal = delocCent.normLInf();			
+				double delocCentVal = delocCent.normLInf();
 				
-				int sic = (int)(delocCentVal + 0.5);			
+				int sic = (int)(delocCentVal + 0.5);
 				if (sic >= maxBin) sic = maxBin - 1;
 				
 				histCent[sic] += mgContrib;

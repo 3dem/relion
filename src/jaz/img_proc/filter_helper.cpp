@@ -1174,32 +1174,6 @@ void FilterHelper::linearCombination(const Volume<RFLOAT>& src0, const Volume<RF
     }
 }
 
-void FilterHelper::normalizeToUnitRange(const Image<RFLOAT> &src, Image<RFLOAT> &dest)
-{
-    RFLOAT vMin = std::numeric_limits<RFLOAT>::max();
-    RFLOAT vMax = -std::numeric_limits<RFLOAT>::max();
-
-    for (long int n = 0; n < src.data.ndim; n++)
-    for (long int z = 0; z < src.data.zdim; z++)
-    for (long int y = 0; y < src.data.ydim; y++)
-    for (long int x = 0; x < src.data.xdim; x++)
-    {
-        RFLOAT v = DIRECT_NZYX_ELEM(src.data, n, z, y, x);
-
-        if (v < vMin) vMin = v;
-        if (v > vMax) vMax = v;
-    }
-
-    for (long int n = 0; n < src.data.ndim; n++)
-    for (long int z = 0; z < src.data.zdim; z++)
-    for (long int y = 0; y < src.data.ydim; y++)
-    for (long int x = 0; x < src.data.xdim; x++)
-    {
-        RFLOAT v = DIRECT_NZYX_ELEM(src.data, n, z, y, x);
-        DIRECT_NZYX_ELEM(dest.data, n, z, y, x) = (v - vMin)/(vMax - vMin);
-    }
-}
-
 void FilterHelper::sumUp(const std::vector<Image<RFLOAT> > & src, Image<RFLOAT> &dest)
 {
     const int w = src[0].data.xdim;
@@ -1862,6 +1836,74 @@ MultidimArray<Complex> FilterHelper::FriedelExpand(const MultidimArray<Complex> 
 			DIRECT_NZYX_ELEM(out, n, z, y, x) = DIRECT_NZYX_ELEM(half, n, zz, yy, w-x).conj();
 		}
 	}	
+	
+	return out;
+}
+
+Image<RFLOAT> FilterHelper::normaliseToUnitInterval(const Image<RFLOAT> &img)
+{
+	const int w = img.data.xdim;
+	const int h = img.data.ydim;
+	const int d = img.data.zdim;
+	const int c = img.data.ndim;
+	
+	RFLOAT minVal = std::numeric_limits<RFLOAT>::max();
+	RFLOAT maxVal = -std::numeric_limits<RFLOAT>::max();
+			
+	for (int n = 0; n < c; n++)
+	for (int z = 0; z < d; z++)
+	for (int y = 0; y < h; y++)
+	for (int x = 0; x < w; x++)
+	{
+		RFLOAT v = DIRECT_NZYX_ELEM(img.data, n, z, y, x);
+		
+		if (v > maxVal) maxVal = v;
+		if (v < minVal) minVal = v;
+	}
+	
+	Image<RFLOAT> out(w,h,d,c);
+	
+	for (int n = 0; n < c; n++)
+	for (int z = 0; z < d; z++)
+	for (int y = 0; y < h; y++)
+	for (int x = 0; x < w; x++)
+	{
+		RFLOAT v = DIRECT_NZYX_ELEM(img.data, n, z, y, x);
+		DIRECT_NZYX_ELEM(out.data, n, z, y, x) = (v - minVal)/(maxVal - minVal);
+	}
+	
+	return out;
+}
+
+Image<RFLOAT> FilterHelper::normaliseToUnitIntervalSigned(const Image<RFLOAT> &img)
+{
+	const int w = img.data.xdim;
+	const int h = img.data.ydim;
+	const int d = img.data.zdim;
+	const int c = img.data.ndim;
+	
+	RFLOAT maxAbs = 0;
+			
+	for (int n = 0; n < c; n++)
+	for (int z = 0; z < d; z++)
+	for (int y = 0; y < h; y++)
+	for (int x = 0; x < w; x++)
+	{
+		RFLOAT v = std::abs(DIRECT_NZYX_ELEM(img.data, n, z, y, x));
+		
+		if (v > maxAbs) maxAbs = v;
+	}
+	
+	Image<RFLOAT> out(w,h,d,c);
+	
+	for (int n = 0; n < c; n++)
+	for (int z = 0; z < d; z++)
+	for (int y = 0; y < h; y++)
+	for (int x = 0; x < w; x++)
+	{
+		RFLOAT v = DIRECT_NZYX_ELEM(img.data, n, z, y, x);
+		DIRECT_NZYX_ELEM(out.data, n, z, y, x) = v / maxAbs;
+	}
 	
 	return out;
 }

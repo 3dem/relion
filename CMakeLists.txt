@@ -320,6 +320,12 @@ if(TIFF_FOUND)
 	add_definitions(-DHAVE_TIFF)
 endif()
 
+find_package(ZLIB)
+find_package(PNG)
+if(PNG_FOUND)
+	add_definitions(-DHAVE_PNG)
+endif()
+
 # ----------------------------------------------------------------------COPY SCRIPTS--
 
 if(FORCE_OWN_FFTW)

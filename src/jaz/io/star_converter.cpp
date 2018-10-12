@@ -132,8 +132,7 @@ void StarConverter::convert_3p0_particlesTo_3p1(
 
 	outOptics.setName("optics");
 	outOptics.setVersion(outVer);
-
-
+	
 	// Also read in one image for each optics group to set the image sizes in the outOptics table
 	// Also set the image_size for each optics_group
 	int nr_optics_groups_found = 0;

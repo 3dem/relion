@@ -10,7 +10,7 @@
 **
 ******************************************************************************/
 
-#include <gravis/tRGB.h>
+#include "tRGB.h"
 #include <iostream>
 #include <stdexcept>
 #include <sstream>

@@ -229,24 +229,24 @@ void ObservationModel::predictObservation(
 	}
 	
 	const int s_out = boxSizes[opticsGroup];
-    const int sh_out = s_out/2 + 1;
+	const int sh_out = s_out/2 + 1;
 
-    double xoff, yoff;
+	double xoff, yoff;
 
-    partMdt.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff, particle);
-    partMdt.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff, particle);
+	partMdt.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff, particle);
+	partMdt.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff, particle);
 
 	xoff /= angpix[opticsGroup];
 	yoff /= angpix[opticsGroup];
 
-    double rot, tilt, psi;
+	double rot, tilt, psi;
 
-    Matrix2D<RFLOAT> A3D;
-    partMdt.getValue(EMDL_ORIENT_ROT, rot, particle);
-    partMdt.getValue(EMDL_ORIENT_TILT, tilt, particle);
-    partMdt.getValue(EMDL_ORIENT_PSI, psi, particle);
-
-    Euler_angles2matrix(rot, tilt, psi, A3D);
+	Matrix2D<RFLOAT> A3D;
+	partMdt.getValue(EMDL_ORIENT_ROT, rot, particle);
+	partMdt.getValue(EMDL_ORIENT_TILT, tilt, particle);
+	partMdt.getValue(EMDL_ORIENT_PSI, psi, particle);
+	
+	Euler_angles2matrix(rot, tilt, psi, A3D);
 	
 	A3D = applyAnisoMagTransp(A3D, opticsGroup);
 	A3D = applyScaleDifference(A3D, opticsGroup, s_ref, angpix_ref);
@@ -258,17 +258,17 @@ void ObservationModel::predictObservation(
 
 	dest.initZeros();
 
-    proj.get2DFourierTransform(dest, A3D, false);
+	proj.get2DFourierTransform(dest, A3D, false);
 
 	if (applyShift)
 	{
 		shiftImageInFourierTransform(dest, dest, s_out, s_out/2 - xoff, s_out/2 - yoff);
 	}
 
-    if (applyCtf)
-    {
-        CTF ctf;
-        ctf.readByGroup(partMdt, this, particle);
+	if (applyCtf)
+	{
+		CTF ctf;
+		ctf.readByGroup(partMdt, this, particle);
 
 		Image<RFLOAT> ctfImg(sh_out,s_out);
 		ctf.getFftwImage(ctfImg(), s_out, s_out, angpix[opticsGroup]);
@@ -278,11 +278,11 @@ void ObservationModel::predictObservation(
 		{
 			dest(y,x) *= ctfImg(y,x);
 		}
-    }
+	}
 
-    if (shiftPhases && oddZernikeCoeffs.size() > opticsGroup
+	if (shiftPhases && oddZernikeCoeffs.size() > opticsGroup
 			&& oddZernikeCoeffs[opticsGroup].size() > 0)
-    {
+	{
 		const Image<Complex>& corr = getPhaseCorrection(opticsGroup, s_out);
 
 		for (int y = 0; y < s_out;  y++)
@@ -290,7 +290,7 @@ void ObservationModel::predictObservation(
 		{
 			dest(y,x) *= corr(y,x);
 		}
-    }
+	}
 }
 
 Volume<t2Vector<Complex>> ObservationModel::predictComplexGradient(
@@ -310,35 +310,35 @@ Volume<t2Vector<Complex>> ObservationModel::predictComplexGradient(
 	opticsGroup--;
 	
 	const int s_out = boxSizes[opticsGroup];
-    const int sh_out = s_out/2 + 1;
+	const int sh_out = s_out/2 + 1;
 	
 	Volume<t2Vector<Complex>> out(sh_out,s_out,1);
 	
 	double xoff, yoff;
 
-    partMdt.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff, particle);
-    partMdt.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff, particle);
+	partMdt.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff, particle);
+	partMdt.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff, particle);
 
 	xoff /= angpix[opticsGroup];
 	yoff /= angpix[opticsGroup];
 
-    double rot, tilt, psi;
-
-    Matrix2D<RFLOAT> A3D;
-    partMdt.getValue(EMDL_ORIENT_ROT, rot, particle);
-    partMdt.getValue(EMDL_ORIENT_TILT, tilt, particle);
-    partMdt.getValue(EMDL_ORIENT_PSI, psi, particle);
-
-    Euler_angles2matrix(rot, tilt, psi, A3D);
+	double rot, tilt, psi;
+	
+	Matrix2D<RFLOAT> A3D;
+	partMdt.getValue(EMDL_ORIENT_ROT, rot, particle);
+	partMdt.getValue(EMDL_ORIENT_TILT, tilt, particle);
+	partMdt.getValue(EMDL_ORIENT_PSI, psi, particle);
+	
+	Euler_angles2matrix(rot, tilt, psi, A3D);
 
 	A3D = applyAnisoMagTransp(A3D, opticsGroup);
 	A3D = applyScaleDifference(A3D, opticsGroup, s_ref, angpix_ref);
 
-    proj.projectGradient(out, A3D);
-
-    if (shiftPhases && oddZernikeCoeffs.size() > opticsGroup
+	proj.projectGradient(out, A3D);
+	
+	if (shiftPhases && oddZernikeCoeffs.size() > opticsGroup
 			&& oddZernikeCoeffs[opticsGroup].size() > 0)
-    {
+	{
 		const Image<Complex>& corr = getPhaseCorrection(opticsGroup, s_out);
 
 		for (int y = 0; y < s_out;  y++)
@@ -347,7 +347,7 @@ Volume<t2Vector<Complex>> ObservationModel::predictComplexGradient(
 			out(x,y,0).x *= corr(y,x);
 			out(x,y,0).y *= corr(y,x);
 		}
-    }
+	}
 
 	return out;
 }
@@ -370,7 +370,7 @@ void ObservationModel::demodulatePhase(
 
 	if (oddZernikeCoeffs.size() > opticsGroup
 			&& oddZernikeCoeffs[opticsGroup].size() > 0)
-    {
+	{
 		const Image<Complex>& corr = getPhaseCorrection(opticsGroup, s);
 
 		for (int y = 0; y < s;  y++)
@@ -378,7 +378,7 @@ void ObservationModel::demodulatePhase(
 		{
 			obsImage(y,x) *= corr(y,x).conj();
 		}
-    }
+	}
 }
 
 bool ObservationModel::allPixelSizesIdentical() const
@@ -767,9 +767,9 @@ Matrix2D<RFLOAT> ObservationModel::applyScaleDifference(
 bool ObservationModel::containsAllColumnsNeededForPrediction(const MetaDataTable& partMdt)
 {
 	return (partMdt.containsLabel(EMDL_ORIENT_ORIGIN_X_ANGSTROM)
-         && partMdt.containsLabel(EMDL_ORIENT_ORIGIN_Y_ANGSTROM)
-         && partMdt.containsLabel(EMDL_ORIENT_ROT)
-         && partMdt.containsLabel(EMDL_ORIENT_TILT)
-         && partMdt.containsLabel(EMDL_ORIENT_PSI)
-         && partMdt.containsLabel(EMDL_PARTICLE_RANDOM_SUBSET));
+	     && partMdt.containsLabel(EMDL_ORIENT_ORIGIN_Y_ANGSTROM)
+	     && partMdt.containsLabel(EMDL_ORIENT_ROT)
+	     && partMdt.containsLabel(EMDL_ORIENT_TILT)
+	     && partMdt.containsLabel(EMDL_ORIENT_PSI)
+	     && partMdt.containsLabel(EMDL_PARTICLE_RANDOM_SUBSET));
 }

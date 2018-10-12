@@ -236,7 +236,7 @@ public:
 	// -- deprecated, use getGammaGrad().length()
 	RFLOAT getCtfFreq(RFLOAT X, RFLOAT Y);
 
-	gravis::t2Vector<RFLOAT> getGammaGrad(RFLOAT X, RFLOAT Y);
+	gravis::t2Vector<RFLOAT> getGammaGrad(RFLOAT X, RFLOAT Y) const;
 
 	inline Complex getCTFP(RFLOAT X, RFLOAT Y, bool is_positive) const
     {

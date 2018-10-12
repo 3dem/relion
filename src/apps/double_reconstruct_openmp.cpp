@@ -34,6 +34,7 @@
 #include <src/jaz/obs_model.h>
 #include <src/jaz/new_ft.h>
 #include <src/jaz/img_proc/filter_helper.h>
+#include <src/jaz/ctf/delocalisation_helper.h>
 
 class reconstruct_parameters
 {
@@ -48,14 +49,14 @@ class reconstruct_parameters
 		RFLOAT blob_radius, blob_alpha, angular_error, shift_error,
 			helical_rise, helical_twist;
 		
-		bool ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak,
+		bool deloc_supp, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak,
 			do_fom_weighting, do_3d_rot, do_ewald;
 		
 		bool skip_gridding, debug, do_reconstruct_meas, is_positive, read_weights, div_avg;
 		
 		bool no_Wiener, writeWeights;
 		
-		float padding_factor, mask_diameter, mask_diameter_filt, flank_width;
+		float padding_factor, mask_diameter_ds, mask_diameter, mask_diameter_filt, flank_width;
 		double padding_factor_2D;
 		
 		// I/O Parser
@@ -76,13 +77,16 @@ class reconstruct_parameters
 			fn_out = parser.getOption("--o", "Name for output reconstruction");
 			fn_sym = parser.getOption("--sym", "Symmetry group", "c1");
 			padding_factor = textToFloat(parser.getOption("--pad", "Padding factor", "2"));
-			padding_factor_2D = textToDouble(parser.getOption("--pad2D", "Padding factor for 2D images", "2"));
+			padding_factor_2D = textToDouble(parser.getOption("--pad2D", "Padding factor for 2D images", "1"));
 			
 			mask_diameter_filt = textToFloat(parser.getOption("--filter_diameter", "Diameter of filter-mask applied before division", "-1"));
 			flank_width = textToFloat(parser.getOption("--filter_softness", "Width of filter-mask width", "30"));
 			nr_omp_threads = textToInteger(parser.getOption("--j", "Number of open-mp threads to use. Memory footprint is multiplied by this value.", "16"));
 			
 			int ctf_section = parser.addSection("CTF options");
+			
+			deloc_supp = parser.checkOption("--dm", "Apply delocalisation masking");
+			mask_diameter_ds = textToDouble(parser.getOption("--mask_diameter_ds", "Diameter (in A) of mask for delocalisation suppression", "50"));
 			intact_ctf_first_peak = parser.checkOption("--ctf_intact_first_peak", "Leave CTFs intact until first peak");
 			ctf_phase_flipped = parser.checkOption("--ctf_phase_flipped", "Images have been phase flipped");
 			only_flip_phases = parser.checkOption("--only_flip_phases", "Do not correct CTF-amplitudes, only flip phases");
@@ -275,10 +279,12 @@ class reconstruct_parameters
 			}
 			
 			std::vector<int> paddedSizes2D(optGroupCount);
+			std::vector<int> origSizes2D(optGroupCount);
 			
 			for (int i = 0; i < optGroupCount; i++)
 			{
 				paddedSizes2D[i] = (int) (padding_factor_2D * obsModel.getBoxSize(i));
+				origSizes2D[i] = (int) obsModel.getBoxSize(i);
 			}
 			
 			// Get dimension of the images
@@ -460,6 +466,14 @@ class reconstruct_parameters
 						ctf.getFftwImage(Fctf, sPad2D, sPad2D, angpix[opticsGroup],
 										 ctf_phase_flipped, only_flip_phases,
 										 intact_ctf_first_peak, true);
+						
+						if (deloc_supp)
+						{
+							DelocalisationHelper::maskOutsideBox(
+								ctf, mask_diameter_ds/(2.0 * angpix[opticsGroup]), 
+								angpix[opticsGroup], origSizes2D[opticsGroup], 
+								Fctf, XX(trans), YY(trans));
+						}
 						
 						obsModel.demodulatePhase(mdts[g], p, F2D);
 						

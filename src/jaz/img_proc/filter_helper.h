@@ -105,7 +105,6 @@ class FilterHelper
         static void linearTransform(Image<RFLOAT>& src, RFLOAT m, RFLOAT q, Image<RFLOAT>& dest);
         static void linearCombination(Image<RFLOAT>& src0, Image<RFLOAT>& src1, RFLOAT a0, RFLOAT a1, Image<RFLOAT>& dest);
         static void linearCombination(const Volume<RFLOAT>& src0, const Volume<RFLOAT>& src1, RFLOAT a0, RFLOAT a1, Volume<RFLOAT>& dest);
-        static void normalizeToUnitRange(const Image<RFLOAT>& src, Image<RFLOAT>& dest);
         static void sumUp(const std::vector<Image<RFLOAT> >& src, Image<RFLOAT>& dest);
 
         static double L1distance(const Image<RFLOAT>& i0, const Image<RFLOAT>& i1, int x0 = 0, int y0 = 0, int w = -1, int h = -1);
@@ -186,6 +185,9 @@ class FilterHelper
         static gravis::t3Vector<RFLOAT> centralGradient(const Volume<RFLOAT>& src, size_t x, size_t y, size_t z);
 		
 		static MultidimArray<Complex> FriedelExpand(const MultidimArray<Complex>& half);
+		
+		static Image<RFLOAT> normaliseToUnitInterval(const Image<RFLOAT>& img);
+		static Image<RFLOAT> normaliseToUnitIntervalSigned(const Image<RFLOAT>& img);
 
 
 };
