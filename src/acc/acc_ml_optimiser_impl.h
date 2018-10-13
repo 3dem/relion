@@ -1376,7 +1376,8 @@ void getAllSquaredDifferencesFine(
 						&(eulers[exp_iclass-sp.iclass_min])[0],
 						true,
 						MBL,
-						MBR);
+						MBR,
+						baseMLO->mydata.obsModel.getMag3x3(optics_group));
 
 				AllEulers.pack(eulers[exp_iclass-sp.iclass_min]);
 
@@ -2668,7 +2669,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					&eulers[iclass][0],
 					true,
 					MBL,
-					MBR);
+					MBR,
+					baseMLO->mydata.obsModel.getMag3x3(optics_group));
 
 			eulers[iclass].deviceAlloc();
 			eulers[iclass].cpToDevice();

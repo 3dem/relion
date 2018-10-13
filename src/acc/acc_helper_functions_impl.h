@@ -177,7 +177,8 @@ void generateEulerMatrices(
 		XFLOAT *eulers,
 		bool inverse,
 		Matrix2D<RFLOAT> &L,
-		Matrix2D<RFLOAT> &R)
+		Matrix2D<RFLOAT> &R,
+		Matrix2D<RFLOAT> &MAG)
 {
 	RFLOAT alpha, beta, gamma;
     RFLOAT ca, sa, cb, sb, cg, sg;
@@ -187,6 +188,7 @@ void generateEulerMatrices(
 
     bool doL = (L.mdimx == 3 && L.mdimy == 3);
     bool doR = (R.mdimx == 3 && R.mdimy == 3);
+	bool doMag = (MAG.mdimx == 2 && MAG.mdimy == 2);
 
 	for (long int i = 0; i < ProjectionData.rots.size(); i++)
 	{
@@ -231,6 +233,9 @@ void generateEulerMatrices(
 		if(inverse)
 			A = A.transpose();
 
+		if (doMag)			
+			A = A * MAG;
+		
 		for (int m = 0; m < 3; m ++)
 			for (int n = 0; n < 3; n ++)
 				eulers[9 * i + (m*3 + n)] = A(m, n);

@@ -2044,7 +2044,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 				Matrix2D<RFLOAT> A;
 				Euler_angles2matrix(rot, tilt, psi, A, true);
 
-				mydata.obsModel.applyAnisoMagTransp(A, 0);
+				mydata.obsModel.applyAnisoMagTransp(A, optics_group);
 				// Construct initial references from random subsets
 				windowFourierTransform(Faux, Fimg, wsum_model.current_size);
 				Fctf.resize(Fimg);
@@ -5435,6 +5435,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 
 
 	// Use pre-sized vectors instead of push_backs!!
+	// NO! Use .reserve()!!!  --JZ
 	exp_local_Fimgs_shifted.resize(exp_nr_images);
 	if (do_also_unmasked)
 		exp_local_Fimgs_shifted_nomask.resize(exp_nr_images);
@@ -5824,6 +5825,8 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 								timer.tic(TIMING_DIFF_PROJ);
 #endif
 
+							int optics_group = mydata.getOpticsGroup(part_id, 0);
+							
 							// For multi-body refinements, A are only 'residual' orientations, Abody is the complete Euler matrix
 							if (mymodel.nr_bodies > 1)
 							{
@@ -5832,7 +5835,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 								// TODO: if we want different optics_groups for each image, then the img_id loop needs to move up
 								// TODO: if we want different optics_groups for each image, then the img_id loop needs to move up
 								// TODO: if we want different optics_groups for each image, then the img_id loop needs to move up
-								//mydata.obsModel.applyAnisoMagTransp(Abody, optics_group);
+								mydata.obsModel.applyAnisoMagTransp(Abody, optics_group);
 								(mymodel.PPref[ibody]).get2DFourierTransform(Fref, Abody, IS_NOT_INV);
 							}
 							else
@@ -5841,7 +5844,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 								// TODO: if we want different optics_groups for each image, then the img_id loop needs to move up
 								// TODO: if we want different optics_groups for each image, then the img_id loop needs to move up
 								// TODO: if we want different optics_groups for each image, then the img_id loop needs to move up
-								//mydata.obsModel.applyAnisoMagTransp(A, optics_group);
+								mydata.obsModel.applyAnisoMagTransp(A, optics_group);
 								(mymodel.PPref[exp_iclass]).get2DFourierTransform(Fref, A, IS_NOT_INV);
 							}
 

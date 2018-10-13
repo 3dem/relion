@@ -107,6 +107,8 @@ class ObservationModel
 		Matrix2D<RFLOAT> applyAnisoMagTransp(
 				Matrix2D<RFLOAT> A3D_transp, int opticsGroup);
 		
+		Matrix2D<RFLOAT> getMag3x3(int opticsGroup);
+		
 		Matrix2D<RFLOAT> applyScaleDifference(
 				Matrix2D<RFLOAT> A3D_transp, int opticsGroup, 
 				int s3D, double angpix3D);

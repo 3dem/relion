@@ -754,6 +754,27 @@ Matrix2D<RFLOAT> ObservationModel::applyAnisoMagTransp(
 	return out;
 }
 
+Matrix2D<RFLOAT> ObservationModel::getMag3x3(int opticsGroup)
+{
+	Matrix2D<RFLOAT> out(3,3);
+	
+	for (int r = 0; r < 2; r++)
+	for (int c = 0; c < 2; c++)
+	{
+		out(r,c) = magMatrices[opticsGroup](r,c);
+	}
+	
+	for (int i = 0; i < 2; i++)
+	{
+		out(i,0) = 0.0;
+		out(0,i) = 0.0;
+	}
+	
+	out(2,2) = 1.0;
+	
+	return out;
+}
+
 Matrix2D<RFLOAT> ObservationModel::applyScaleDifference(
 		Matrix2D<RFLOAT> A3D_transp, int opticsGroup, int s3D, double angpix3D)
 {
