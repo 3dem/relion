@@ -336,6 +336,10 @@ public:
     void applyWeightEwaldSphereCurvature(
 			MultidimArray<RFLOAT>& result, int orixdim, int oriydim, 
 			RFLOAT angpix, RFLOAT particle_diameter);
+	
+	void applyWeightEwaldSphereCurvature_new(
+			MultidimArray<RFLOAT>& result, int orixdim, int oriydim, 
+			RFLOAT angpix, RFLOAT particle_diameter);
 
 	// Calculate weight W for Ewald-sphere curvature correction: apply this to the result from getFftwImage
     void applyWeightEwaldSphereCurvature_noAniso(MultidimArray < RFLOAT > &result, int orixdim, int oriydim, RFLOAT angpix, RFLOAT particle_diameter);

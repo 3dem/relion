@@ -483,7 +483,7 @@ class reconstruct_parameters
 							applyCTFPandCTFQ(F2D, ctf, transformer, F2DP, F2DQ, angpix[opticsGroup]);
 							
 							// Also calculate W, store again in Fctf
-							ctf.applyWeightEwaldSphereCurvature(
+							ctf.applyWeightEwaldSphereCurvature_new(
 								Fctf, sPad2D, sPad2D, angpix[opticsGroup], mask_diameter);
 							
 							// Also calculate the radius of the Ewald sphere (in pixels)

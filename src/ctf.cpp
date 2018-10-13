@@ -448,7 +448,7 @@ void CTF::applyWeightEwaldSphereCurvature(
 	RFLOAT xs = (RFLOAT)orixdim * angpix;
 	RFLOAT ys = (RFLOAT)oriydim * angpix;
 	
-	Matrix2D<RFLOAT> M;
+	Matrix2D<RFLOAT> M(2,2);
 	
 	if (obsModel != 0 && obsModel->hasMagMatrices)
 	{
@@ -480,6 +480,41 @@ void CTF::applyWeightEwaldSphereCurvature(
 		DIRECT_A2D_ELEM(result, i, j) = 1.0 + A * (2.0 * fabs(-sin(gamma)) - 1.0);
 		// Keep everything on the same scale inside RELION, where we use sin(chi), not 2sin(chi)
 		DIRECT_A2D_ELEM(result, i, j) *= 0.5;
+	}
+}
+
+void CTF::applyWeightEwaldSphereCurvature_new(
+		MultidimArray<RFLOAT>& result, int orixdim, int oriydim,
+		RFLOAT angpix, RFLOAT particle_diameter)
+{
+	const int s = oriydim;
+	const int sh = s/2 + 1;
+	const double as = angpix * s;
+	const double Dpx = particle_diameter / angpix;
+	
+	for (int yi = 0; yi < s;  yi++)
+	for (int xi = 0; xi < sh; xi++)
+	{
+		const double x = xi / as;
+		const double y = yi < sh? yi / as : (yi - s) / as;
+		
+		// shift of this frequency resulting from CTF:
+		const d2Vector shift2D = (1.0 / (2 * angpix * PI)) * getGammaGrad(x,y);
+		const double shift1D = 2.0 * shift2D.length();
+		
+		// angle between the intersection points of the two circles and the center
+		const double alpha = shift1D > Dpx? 0.0 : 2.0 * acos(shift1D / Dpx);
+		
+		// area of intersection between the two circles, divided by the area of the circle
+		RFLOAT A = (alpha == 0.0)? 0.0 : (1.0/PI) * (alpha - sin(alpha));
+		
+		// abs. value of CTFR (no damping):
+		const double ctf_val = getCTF(x, y, true, false, false, false, 0.0);
+		
+		DIRECT_A2D_ELEM(result, yi, xi) = 1.0 + A * (2.0 * ctf_val - 1.0);
+		
+		// Keep everything on the same scale inside RELION, where we use sin(chi), not 2sin(chi)
+		DIRECT_A2D_ELEM(result, yi, xi) *= 0.5;
 	}
 }
 
