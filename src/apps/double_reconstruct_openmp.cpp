@@ -54,7 +54,7 @@ class reconstruct_parameters
 		
 		bool skip_gridding, debug, do_reconstruct_meas, is_positive, read_weights, div_avg;
 		
-		bool no_Wiener, writeWeights;
+		bool no_Wiener, writeWeights, new_Ewald_weight;
 		
 		float padding_factor, mask_diameter_ds, mask_diameter, mask_diameter_filt, flank_width;
 		double padding_factor_2D;
@@ -80,7 +80,7 @@ class reconstruct_parameters
 			padding_factor_2D = textToDouble(parser.getOption("--pad2D", "Padding factor for 2D images", "1"));
 			
 			mask_diameter_filt = textToFloat(parser.getOption("--filter_diameter", "Diameter of filter-mask applied before division", "-1"));
-			flank_width = textToFloat(parser.getOption("--filter_softness", "Width of filter-mask width", "30"));
+			flank_width = textToFloat(parser.getOption("--filter_softness", "Width of filter-mask edge", "30"));
 			nr_omp_threads = textToInteger(parser.getOption("--j", "Number of open-mp threads to use. Memory footprint is multiplied by this value.", "16"));
 			
 			int ctf_section = parser.addSection("CTF options");
@@ -108,6 +108,7 @@ class reconstruct_parameters
 			int expert_section = parser.addSection("Expert options");
 			fn_sub = parser.getOption("--subtract","Subtract projections of this map from the images used for reconstruction", "");
 			no_Wiener = parser.checkOption("--legacy", "Use gridding instead of Wiener filter");
+			new_Ewald_weight = parser.checkOption("--new_Ewald_weight", "Use Ewald weight W that considers Cs as well");
 			
 			if (parser.checkOption("--NN", "Use nearest-neighbour instead of linear interpolation before gridding correction"))
 			{
@@ -483,8 +484,17 @@ class reconstruct_parameters
 							applyCTFPandCTFQ(F2D, ctf, transformer, F2DP, F2DQ, angpix[opticsGroup]);
 							
 							// Also calculate W, store again in Fctf
-							ctf.applyWeightEwaldSphereCurvature_new(
-								Fctf, sPad2D, sPad2D, angpix[opticsGroup], mask_diameter);
+							
+							if (new_Ewald_weight)
+							{
+								ctf.applyWeightEwaldSphereCurvature_new(
+									Fctf, sPad2D, sPad2D, angpix[opticsGroup], mask_diameter);
+							}
+							else
+							{
+								ctf.applyWeightEwaldSphereCurvature(
+									Fctf, sPad2D, sPad2D, angpix[opticsGroup], mask_diameter);
+							}
 							
 							// Also calculate the radius of the Ewald sphere (in pixels)
 							r_ewald_sphere = boxOut * angpix[opticsGroup] / ctf.lambda;
