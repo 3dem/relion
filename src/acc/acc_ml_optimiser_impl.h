@@ -1371,13 +1371,20 @@ void getAllSquaredDifferencesFine(
 				CTIC(accMLO->timer,"generateEulerMatrices");
 				eulers[exp_iclass-sp.iclass_min].setSize(9*FineProjectionData[img_id].class_entries[exp_iclass]);
 				eulers[exp_iclass-sp.iclass_min].hostAlloc();
+				
+				Matrix2D<RFLOAT> mag;
+				if (baseMLO->mydata.obsModel.hasMagMatrices)
+				{
+					mag = baseMLO->mydata.obsModel.getMag3x3(optics_group);
+				}
+			
 				generateEulerMatrices(
 						thisClassProjectionData,
 						&(eulers[exp_iclass-sp.iclass_min])[0],
 						true,
 						MBL,
 						MBR,
-						baseMLO->mydata.obsModel.getMag3x3(optics_group));
+						mag);
 
 				AllEulers.pack(eulers[exp_iclass-sp.iclass_min]);
 
@@ -2663,14 +2670,20 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			eulers[iclass].hostAlloc();
 
 			CTIC(accMLO->timer,"generateEulerMatricesProjector");
-
+	
+			Matrix2D<RFLOAT> mag;
+			if (baseMLO->mydata.obsModel.hasMagMatrices)
+			{
+				mag = baseMLO->mydata.obsModel.getMag3x3(optics_group);
+			}
+				
 			generateEulerMatrices(
 					thisClassProjectionData,
 					&eulers[iclass][0],
 					true,
 					MBL,
 					MBR,
-					baseMLO->mydata.obsModel.getMag3x3(optics_group));
+					mag);
 
 			eulers[iclass].deviceAlloc();
 			eulers[iclass].cpToDevice();
