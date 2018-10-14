@@ -54,7 +54,7 @@ class reconstruct_parameters
 		
 		bool skip_gridding, debug, do_reconstruct_meas, is_positive, read_weights, div_avg;
 		
-		bool no_Wiener, writeWeights, new_Ewald_weight;
+		bool no_Wiener, writeWeights, new_Ewald_weight, Ewald_ellipsoid;
 		
 		float padding_factor, mask_diameter_ds, mask_diameter, mask_diameter_filt, flank_width;
 		double padding_factor_2D;
@@ -109,6 +109,7 @@ class reconstruct_parameters
 			fn_sub = parser.getOption("--subtract","Subtract projections of this map from the images used for reconstruction", "");
 			no_Wiener = parser.checkOption("--legacy", "Use gridding instead of Wiener filter");
 			new_Ewald_weight = parser.checkOption("--new_Ewald_weight", "Use Ewald weight W that considers Cs as well");
+			Ewald_ellipsoid = parser.checkOption("--Ewald_ellipsoid", "Allow Ewald sphere to become an ellipsoid under aniso. mag.");
 			
 			if (parser.checkOption("--NN", "Use nearest-neighbour instead of linear interpolation before gridding correction"))
 			{
@@ -393,7 +394,7 @@ class reconstruct_parameters
 						// If we are considering Ewald sphere curvature, the mag. matrix
 						// has to be provided to the backprojector explicitly
 						// (to avoid creating an Ewald ellipsoid)
-						if (!do_ewald)
+						if (!do_ewald || Ewald_ellipsoid)
 						{								
 							A3D = obsModel.applyAnisoMagTransp(A3D, opticsGroup);
 						}
@@ -550,7 +551,7 @@ class reconstruct_parameters
 							{
 								Matrix2D<RFLOAT> magMat;
 								
-								if (obsModel.hasMagMatrices)
+								if (obsModel.hasMagMatrices && !Ewald_ellipsoid)
 								{
 									magMat = obsModel.getMagMatrix(opticsGroup);
 								}
