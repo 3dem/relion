@@ -548,7 +548,17 @@ class reconstruct_parameters
 																						
 							if (do_ewald)
 							{
-								Matrix2D<RFLOAT> magMat = obsModel.getMagMatrix(opticsGroup);
+								Matrix2D<RFLOAT> magMat;
+								
+								if (obsModel.hasMagMatrices)
+								{
+									magMat = obsModel.getMagMatrix(opticsGroup);
+								}
+								else
+								{
+									magMat = Matrix2D<RFLOAT>(2,2);
+									magMat.initIdentity();
+								}
 								
 								backprojectors[randSubset][threadnum].set2DFourierTransform(
 									F2DP, A3D, IS_NOT_INV, &Fctf, r_ewald_sphere, true, &magMat);
