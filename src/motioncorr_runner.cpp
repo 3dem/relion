@@ -184,6 +184,13 @@ void MotioncorrRunner::initialise()
 		{
 			REPORT_ERROR("You supplied -RotGain and/or -FlipGain to MotionCor2. Please use --gain_rot and--gain_flip instead.");
 		}
+
+		if (verb > 0 && fn_other_motioncor2_args.contains("Mag"))
+		{
+			std::cerr << "WARNING: You are applying anisotropic magnification correction (-Mag) in MotionCor2." << std::endl;
+			std::cerr << "WARNING: The current version of Bayesian Polishing does not support anisotropic magnification correction." << std::endl;
+			std::cerr << "WARNING: Thus, particles will revert to an un-corrected state when you run Bayesian Polishing." << std::endl;
+		}
 	}
 	else if (do_own) {
 		if (fn_defect != "") {
