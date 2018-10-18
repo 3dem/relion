@@ -157,7 +157,7 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 	if (hasMagMatrices) magMatrices.resize(opticsMdt.numberOfObjects());
 	
 	hasBoxSizes = opticsMdt.containsLabel(EMDL_IMAGE_SIZE);
-
+	
 	for (int i = 0; i < opticsMdt.numberOfObjects(); i++)
 	{
 		opticsMdt.getValue(EMDL_IMAGE_PIXEL_SIZE, angpix[i], i);
@@ -193,8 +193,6 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 			}
 
 			TiltHelper::insertTilt(oddZernikeCoeffs[i], tx, ty, Cs[i], lambda[i]);
-
-			hasOddZernike = true;
 		}
 
 		if (hasMagMatrices)
@@ -209,6 +207,8 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 			opticsMdt.getValue(EMDL_IMAGE_MAG_MATRIX_11, magMatrices[i](1,1), i);
 		}
 	}
+	
+	if (hasTilt) hasOddZernike = true;
 }
 
 void ObservationModel::predictObservation(

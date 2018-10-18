@@ -41,10 +41,11 @@ int main(int argc, char *argv[])
 		for (int g = 0; g < ogc; g++)
 		{
 			opticsOut.addObject(opticsMdts[i].getObject(g));
+			
 			const int ogNew = opticsOut.numberOfObjects() - 1;
+			
 			opticsOut.setValue(EMDL_IMAGE_OPTICS_GROUP, ogNew+1, ogNew);
 			
-			std::cout << "[" << i << ", " << g << "] -> " << ogNew << "\n";
 			optGrTransl[i][g] = ogNew;
 		}
 		
