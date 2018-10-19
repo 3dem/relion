@@ -1856,7 +1856,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		// Don't do norm correction for volume averaging at this stage....
 		do_norm_correction = false;
 
-		if (!((do_helical_refine) && (!ignore_helical_symmetry))) // For 3D helical sub-tomogram averaging, either is OK, so let the user decide
+		if (!((do_helical_refine) && (!ignore_helical_symmetry)) && !(do_cpu || do_gpu)) // For 3D helical sub-tomogram averaging, either is OK, so let the user decide
 			do_shifts_onthefly = true; // save RAM for volume data (storing all shifted versions would take a lot!)
 
 		if (do_skip_align)
