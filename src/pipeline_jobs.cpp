@@ -3863,6 +3863,9 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 			outputNodes = getOutputNodesRefine(outputname + "run", -1, 1, 3, nr_bodies, false, false); // false false means dont do movies
 			command += " --solvent_correct_fsc --multibody_masks " + joboptions["fn_bodies"].getString();
 
+			Node node(joboptions["fn_in"].getString(), joboptions["fn_in"].node_type);
+			inputNodes.push_back(node);
+
 			if (joboptions["do_subtracted_bodies"].getBoolean())
 				command += " --reconstruct_subtracted_bodies ";
 
