@@ -266,14 +266,17 @@ important logic is in the `run_pipeline()' function so that's a good place to st
 
 import argparse
 import glob
+import inspect
 import math
 import os
 import runpy
 import time
+import traceback
 
 try:
     import Tkinter as tk
     import tkMessageBox
+    import tkFileDialog
 except ImportError:
     # The GUI is optional. If the user requests it, it will fail when it tries
     # to open so we can ignore the error for now.
@@ -383,7 +386,7 @@ class RelionItOptions(object):
     #
     ### 3D-classification parameters
     # Number of 3D classes to use
-    class3d_nr_classes  = 4
+    class3d_nr_classes = 4
     # Have initial 3D model? If not, calculate one using SGD initial model generation
     have_3d_reference = False
     # Initial reference model
@@ -635,6 +638,8 @@ class RelionItOptions(object):
     queue_submission_template = '/public/EM/RELION/relion/bin/qsub.csh'
     # Minimum number of dedicated cores that need to be requested on each node
     queue_minimum_dedicated = 1
+
+    ### End of options
     
     #######################################################################
     ############ typically no need to change anything below this line
@@ -654,7 +659,7 @@ class RelionItOptions(object):
                 if hasattr(self, key):
                     setattr(self, key, value)
                 else:
-                    print 'Unrecognised option {}'.format(key)
+                    print " RELION_IT: Unrecognised option '{}'".format(key)
     
     def print_options(self, out_file=None):
         """
@@ -667,11 +672,44 @@ class RelionItOptions(object):
             out_file: A file object (optional). If supplied, options will be
                 written to this file, otherwise they will be printed to
                 sys.stdout.
+
+        Raises:
+            ValueError: If there is a problem printing the options.
         """
-        for key in sorted(dir(self)):
-            if (not (key.startswith('__') and key.endswith('__'))
-                and not callable(getattr(self, key))):
-                print >>out_file, '{} = {}'.format(key, repr(getattr(self, key)))
+        print >>out_file, "# Options file for relion_it.py"
+        print >>out_file
+        seen_start = False
+        option_names = [key for key in dir(self) if (not (key.startswith('__') and key.endswith('__'))
+                                                     and not callable(getattr(self, key)))]
+
+        # Parse the source code for this class, and write out all comments along with option lines containing new values
+        for line in inspect.getsourcelines(RelionItOptions)[0]:
+            line = line.strip()
+            if not seen_start:
+                if line != "### General parameters":
+                    # Ignore lines until this one
+                    continue
+                seen_start = True
+            if line == "### End of options":
+                # Stop here
+                break
+            if line.startswith('#') or len(line) == 0:
+                # Print comments or blank lines as-is
+                print >>out_file, line
+            else:
+                # Assume all other lines define an option name and value. Replace with new value.
+                equals_index = line.find('=')
+                if equals_index > 0:
+                    option_name = line[:equals_index].strip()
+                    if option_name in option_names:
+                        print >>out_file, '{} = {}'.format(option_name, repr(getattr(self, option_name)))
+                        option_names.remove(option_name)
+                    else:
+                        # This error should not occur. If it does, there is probably a programming error.
+                        raise ValueError("Unrecognised option name '{}'".format(option_name))
+        if len(option_names) > 0:
+            # This error should not occur. If it does, there is probably a programming error.
+            raise ValueError("Some options were not written to the output file: {}".format(option_names))
 
 
 class RelionItGui(object):
@@ -679,6 +717,17 @@ class RelionItGui(object):
     def __init__(self, main_window, options):
         self.main_window = main_window
         self.options = options
+
+        # Convenience function for making file browser buttons
+        def new_browse_button(master, var_to_set, filetypes=(('MRC file', '*.mrc'), ('All files', '*'))):
+            def browse_command():
+                chosen_file = tkFileDialog.askopenfilename(filetypes=filetypes)
+                if chosen_file is not None:
+                    # Make path relative if it's in the current directory
+                    if chosen_file.startswith(os.getcwd()):
+                        chosen_file = os.path.relpath(chosen_file)
+                    var_to_set.set(chosen_file)
+            return tk.Button(master, text="Browse...", command=browse_command)
 
         ### Create GUI
 
@@ -744,14 +793,14 @@ class RelionItGui(object):
 
         tk.Label(particle_frame, text=u"Longest diameter (\u212B):").grid(row=row, sticky=tk.W)
         self.particle_max_diam_entry = tk.Entry(particle_frame)
-        self.particle_max_diam_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
+        self.particle_max_diam_entry.grid(row=row, column=1, sticky=tk.W+tk.E, columnspan=2)
         self.particle_max_diam_entry.insert(0, str(options.autopick_LoG_diam_max))
 
         row += 1
 
         tk.Label(particle_frame, text=u"Shortest diameter (\u212B):").grid(row=row, sticky=tk.W)
         self.particle_min_diam_entry = tk.Entry(particle_frame)
-        self.particle_min_diam_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
+        self.particle_min_diam_entry.grid(row=row, column=1, sticky=tk.W+tk.E, columnspan=2)
         self.particle_min_diam_entry.insert(0, str(options.autopick_LoG_diam_min))
 
         row += 1
@@ -762,6 +811,8 @@ class RelionItGui(object):
         self.ref_3d_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
         self.ref_3d_entry.insert(0, str(options.autopick_3dreference))
 
+        new_browse_button(particle_frame, ref_3d_var).grid(row=row, column=2)
+
         ###
 
         project_frame = tk.LabelFrame(left_frame, text="Project details", padx=5, pady=5)
@@ -771,21 +822,29 @@ class RelionItGui(object):
         row = 0
 
         tk.Label(project_frame, text="Project directory:").grid(row=row, sticky=tk.W)
-        tk.Label(project_frame, text=os.getcwd(), anchor=tk.W).grid(row=row, column=1, sticky=tk.W)
+        tk.Label(project_frame, text=os.getcwd(), anchor=tk.W).grid(row=row, column=1, sticky=tk.W, columnspan=2)
 
         row += 1
 
-        tk.Label(project_frame, text="Path to movies:").grid(row=row, sticky=tk.W)
-        self.import_images_entry = tk.Entry(project_frame)
+        tk.Label(project_frame, text="Pattern for movies:").grid(row=row, sticky=tk.W)
+        import_images_var = tk.StringVar()  # for data binding
+        self.import_images_entry = tk.Entry(project_frame, textvariable=import_images_var)
         self.import_images_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
         self.import_images_entry.insert(0, self.options.import_images)
+
+        import_button = new_browse_button(project_frame, import_images_var,
+                                          filetypes=(('Image file', '{*.mrc, *.mrcs, *.tif, *.tiff}'), ('All files', '*')))
+        import_button.grid(row=row, column=2)
 
         row += 1
         
         tk.Label(project_frame, text="Gain reference (optional):").grid(row=row, sticky=tk.W)
-        self.gainref_entry = tk.Entry(project_frame)
+        gainref_var = tk.StringVar()  # for data binding
+        self.gainref_entry = tk.Entry(project_frame, textvariable=gainref_var)
         self.gainref_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
         self.gainref_entry.insert(0, self.options.motioncor_gainreference)
+
+        new_browse_button(project_frame, gainref_var).grid(row=row, column=2)
 
         ###
 
@@ -958,6 +1017,8 @@ class RelionItGui(object):
         opts.import_images = self.import_images_entry.get()
         if opts.import_images.startswith(('/', '..')):
             warnings.append("- Movies should be located inside the project directory")
+        if '*' not in opts.import_images:
+            warnings.append("- Pattern for input movies should normally contain a '*' to select more than one file")
 
         opts.motioncor_gainreference = self.gainref_entry.get()
         if len(opts.motioncor_gainreference) > 0 and not os.path.isfile(opts.motioncor_gainreference):
@@ -1034,6 +1095,7 @@ class RelionItGui(object):
                 return True
         except Exception as ex:
             tkMessageBox.showerror("Error", ex.message)
+            traceback.print_exc()
         return False
 
     def run_pipeline(self):
@@ -1548,6 +1610,7 @@ def run_pipeline(opts):
         if (ipass == 0 and (opts.do_class2d or opts.do_class3d)) or (ipass == 1 and (opts.do_class2d_pass2 or opts.do_class3d_pass2)):
 
             ### If necessary, rescale the 3D reference in the second pass!
+            # TODO: rescale initial reference if different from movies?
             if ipass == 1 and (opts.extract_downscale or opts.extract2_downscale):
                 particles_angpix = opts.angpix
                 if opts.images_are_movies:
