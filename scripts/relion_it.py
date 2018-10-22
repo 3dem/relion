@@ -1037,11 +1037,11 @@ class RelionItGui(object):
 
         particle_size_pixels = opts.autopick_LoG_diam_max / opts.angpix
 
-        # Set mask diameter to next multiple of ten above (1.1 * particle size)
-        opts.mask_diameter = 10 * math.ceil(1.1 * particle_size_pixels / 10.0)
+        # Set mask diameter (in A) to 110 % of particle maximum diameter
+        opts.mask_diameter = 1.1 * opts.autopick_LoG_diam_max
 
         # Calculate required box size and round up to next size in sequence
-        minimum_box_size = 1.8 * particle_size_pixels
+        minimum_box_size = 1.2 * particle_size_pixels
         for box in (32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024):
             if box > minimum_box_size:
                 opts.extract_boxsize = box
