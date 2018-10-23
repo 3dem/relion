@@ -60,6 +60,7 @@ void Preprocessing::read(int argc, char **argv, int rank)
 	recenter_y = textToFloat(parser.getOption("--recenter_y", "Y-coordinate (in pixel inside the reference) to recenter re-extracted data on", "0."));
 	recenter_z = textToFloat(parser.getOption("--recenter_z", "Z-coordinate (in pixel inside the reference) to recenter re-extracted data on", "0."));
 	set_angpix = textToFloat(parser.getOption("--set_angpix", "Manually set pixel size in Angstroms (only necessary if magnification and detector pixel size are not in the input micrograph STAR file)", "-1."));
+	use_ctf_in_mic = parser.checkOption("--use_ctf_in_mic", "Use CTF parameters in the micrograph STAR file, ignoring values in the particle STAR file");
 
 	int extract_section = parser.addSection("Particle extraction");
 	do_extract = parser.checkOption("--extract", "Extract all particles from the micrographs");
@@ -997,7 +998,7 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 				}
 
 				// Only set CTF parameters from the micrographs STAR file if the input STAR file did not contain it!
-				if (!MDin_has_ctf)
+				if (!MDin_has_ctf || use_ctf_in_mic)
 				{
 					ctf.write(MD);
 				}
