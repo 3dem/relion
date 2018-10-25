@@ -109,29 +109,22 @@ files, you can give those too, for example "relion_it.py /path/to/site/options.p
 
 The window that appears should be self-explanatory. Fill in the options as needed for your project, and use the check
 boxes on the right to control what processing steps will be done. When you're ready, click either "Save options" or
-"Save & run". The program will check the values you've entered and then use them to calculate the full set of options
-for relion_it.py. The options will then be saved to a file called `relion_it_options.py', and if you clicked "Save &
-run" the processing run will start immediately.
+"Save & run". The program will check the values you've entered and then use them to calculate a few extra options for
+relion_it.py. The options will then be saved to a file called `relion_it_options.py', and if you clicked "Save & run"
+the processing run will start immediately.
 
 If any of the entered values are invalid (for example, if there are letters in a field which should be a number), the
 GUI will display a message box with an error when you click one of the buttons. It will also display a warning if any
 values appear to be incorrect (but you can choose to ignore the warning by clicking "OK").
 
-The GUI will try to calculate a sensible set of options from the values you enter using the following steps:
+The GUI will try to calculate some extra options from the values you enter using the following steps:
 
-1. Set the mask diameter to the next multiple of 10 above (1.1 * particle longest diameter in pixels) - for example,
-   if the particle size is 180 pixels, the mask diameter will be 190 pixels.
+1. Set the mask diameter to 1.1 times the particle size.
 
-2. Set the box size to (1.8 * particle longest diameter in pixels), rounded up to the next value in the sequence (32,
-   48, 64,..., 768, 1024) - for example, if the particle size is 180 pixels, the box size will be 384 pixels.
+2a. If a 3D reference is given, use a single pass with reference-based autopicking, minimum distance between particles
+    of 0.7 times the particle size, and a batch size of 100,000 particles.
 
-3. If the box size is larger than 256 pixels, downscale the particles to 256-pixel boxes when they are extracted. (Or
-   128 pixels in the first pass of a reference-free run.)
-
-4a. If a 3D reference is given, use a single pass with reference-based autopicking and a batch size of 100,000
-    particles.
-
-4b. If no 3D reference is given, run a first pass with reference-free LoG autopicking and a batch size of 10,000, and
+2b. If no 3D reference is given, run a first pass with reference-free LoG autopicking and a batch size of 10,000, and
     then a second pass with reference-based autopicking and a batch size of 100,000.
 
 These options should be sensible in many cases, but if you'd like to change them, save the options from the GUI using
@@ -263,6 +256,8 @@ more substantial changes, you might need to edit the script's Python code to get
 important logic is in the `run_pipeline()' function so that's a good place to start. Good luck!
 
 """
+
+from __future__ import division  # always use float division
 
 import argparse
 import glob
@@ -772,7 +767,8 @@ class RelionItGui(object):
         row += 1
 
         tk.Label(expt_frame, text=u"Pixel size (\u212B):").grid(row=row, sticky=tk.W)
-        self.angpix_entry = tk.Entry(expt_frame)
+        self.angpix_var = tk.StringVar()  # for data binding
+        self.angpix_entry = tk.Entry(expt_frame, textvariable=self.angpix_var)
         self.angpix_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
         self.angpix_entry.insert(0, str(options.angpix))
 
@@ -792,7 +788,8 @@ class RelionItGui(object):
         row = 0
 
         tk.Label(particle_frame, text=u"Longest diameter (\u212B):").grid(row=row, sticky=tk.W)
-        self.particle_max_diam_entry = tk.Entry(particle_frame)
+        self.particle_max_diam_var = tk.StringVar()  # for data binding
+        self.particle_max_diam_entry = tk.Entry(particle_frame, textvariable=self.particle_max_diam_var)
         self.particle_max_diam_entry.grid(row=row, column=1, sticky=tk.W+tk.E, columnspan=2)
         self.particle_max_diam_entry.insert(0, str(options.autopick_LoG_diam_max))
 
@@ -806,12 +803,40 @@ class RelionItGui(object):
         row += 1
         
         tk.Label(particle_frame, text="3D reference (optional):").grid(row=row, sticky=tk.W)
-        ref_3d_var = tk.StringVar()  # for data binding
-        self.ref_3d_entry = tk.Entry(particle_frame, textvariable=ref_3d_var)
+        self.ref_3d_var = tk.StringVar()  # for data binding
+        self.ref_3d_entry = tk.Entry(particle_frame, textvariable=self.ref_3d_var)
         self.ref_3d_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
         self.ref_3d_entry.insert(0, str(options.autopick_3dreference))
 
-        new_browse_button(particle_frame, ref_3d_var).grid(row=row, column=2)
+        new_browse_button(particle_frame, self.ref_3d_var).grid(row=row, column=2)
+
+        row += 1
+
+        tk.Label(particle_frame, text="Box size (px):").grid(row=row, sticky=tk.W)
+        self.box_size_var = tk.StringVar()  # for data binding
+        self.box_size_entry = tk.Entry(particle_frame, textvariable=self.box_size_var)
+        self.box_size_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
+        self.box_size_entry.insert(0, str(options.extract_boxsize))
+        self.box_size_in_angstrom = tk.Label(particle_frame, text=u"= NNN \u212B")
+        self.box_size_in_angstrom.grid(row=row, column=2,sticky=tk.W)
+
+        row += 1
+
+        tk.Label(particle_frame, text="Down-sample to (px):").grid(row=row, sticky=tk.W)
+        self.extract_small_boxsize_var = tk.StringVar()  # for data binding
+        self.extract_small_boxsize_entry = tk.Entry(particle_frame, textvariable=self.extract_small_boxsize_var)
+        self.extract_small_boxsize_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
+        self.extract_small_boxsize_entry.insert(0, str(options.extract_small_boxsize))
+        self.extract_angpix = tk.Label(particle_frame, text=u"= NNN \u212B/px")
+        self.extract_angpix.grid(row=row, column=2,sticky=tk.W)
+
+        row += 1
+
+        tk.Label(particle_frame, text="Calculate for me:").grid(row=row, sticky=tk.W)
+        self.auto_boxsize_var = tk.IntVar()
+        auto_boxsize_button = tk.Checkbutton(particle_frame, var=self.auto_boxsize_var)
+        auto_boxsize_button.grid(row=row, column=1, sticky=tk.W)
+        auto_boxsize_button.select()
 
         ###
 
@@ -827,24 +852,24 @@ class RelionItGui(object):
         row += 1
 
         tk.Label(project_frame, text="Pattern for movies:").grid(row=row, sticky=tk.W)
-        import_images_var = tk.StringVar()  # for data binding
-        self.import_images_entry = tk.Entry(project_frame, textvariable=import_images_var)
+        self.import_images_var = tk.StringVar()  # for data binding
+        self.import_images_entry = tk.Entry(project_frame, textvariable=self.import_images_var)
         self.import_images_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
         self.import_images_entry.insert(0, self.options.import_images)
 
-        import_button = new_browse_button(project_frame, import_images_var,
+        import_button = new_browse_button(project_frame, self.import_images_var,
                                           filetypes=(('Image file', '{*.mrc, *.mrcs, *.tif, *.tiff}'), ('All files', '*')))
         import_button.grid(row=row, column=2)
 
         row += 1
         
         tk.Label(project_frame, text="Gain reference (optional):").grid(row=row, sticky=tk.W)
-        gainref_var = tk.StringVar()  # for data binding
-        self.gainref_entry = tk.Entry(project_frame, textvariable=gainref_var)
+        self.gainref_var = tk.StringVar()  # for data binding
+        self.gainref_entry = tk.Entry(project_frame, textvariable=self.gainref_var)
         self.gainref_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
         self.gainref_entry.insert(0, self.options.motioncor_gainreference)
 
-        new_browse_button(project_frame, gainref_var).grid(row=row, column=2)
+        new_browse_button(project_frame, self.gainref_var).grid(row=row, column=2)
 
         ###
 
@@ -907,27 +932,107 @@ class RelionItGui(object):
         if options.do_class3d_pass2:
             class3d_pass2_button.select()
 
-        ### Now add logic to the check boxes
+        ### Add logic to the box size boxes
 
-        def update_gui_state(*args_ignored, **kwargs_ignored):
+        def calculate_box_size(particle_size_pixels):
+            # Calculate required box size and round up to next size in sequence
+            minimum_box_size = 1.2 * particle_size_pixels
+            for box in (48, 64, 96, 128, 192, 256, 384, 512, 768, 1024):
+                if box > minimum_box_size:
+                    return box
+            else:
+                return "Box size is too large!"
+
+        def calculate_downscaled_box_size(box_size_pix, angpix):
+            for small_box_pix in (48, 64, 96, 128, 192, 256, 384, 512, 768):
+                # Don't go larger than the original box
+                if small_box_pix > box_size_pix:
+                    return box_size_pix
+                # If Nyquist freq. is better than 8.5 A, use this downscaled box, otherwise continue to next size up
+                small_box_angpix = angpix * box_size_pix / small_box_pix
+                if small_box_angpix < 4.25:
+                    return small_box_pix
+            # Fall back to the original box size
+            return box_size_pix
+
+        def update_box_size_labels(*args_ignored, **kwargs_ignored):
+            try:
+                angpix = float(self.angpix_entry.get())
+                box_size = float(self.box_size_entry.get())
+            except ValueError:
+                # Can't update the box size in angstrom without both values
+                self.box_size_in_angstrom.config(text=u"= NNN \u212B")
+                self.extract_angpix.config(text=u"= NNN \u212B/px")
+                return
+            box_angpix = angpix * box_size
+            self.box_size_in_angstrom.config(text=u"= {:.1f} \u212B".format(box_angpix))
+            try:
+                extract_small_boxsize = float(self.extract_small_boxsize_entry.get())
+            except ValueError:
+                # Can't update the downscaled pixel size unless the downscaled box size is valid
+                self.extract_angpix.config(text=u"= NNN \u212B/px")
+                return
+            small_box_angpix = box_angpix / extract_small_boxsize
+            self.extract_angpix.config(text=u"= {:.3f} \u212B/px".format(small_box_angpix))
+
+        def update_box_sizes(*args_ignored, **kwargs_ignored):
+            # Always activate entry boxes - either we're activating them anyway, or we need to edit the text.
+            # For text editing we need to activate the box first then deactivate again afterwards.
+            self.box_size_entry.config(state=tk.NORMAL)
+            self.extract_small_boxsize_entry.config(state=tk.NORMAL)
+            if self.get_var_as_bool(self.auto_boxsize_var):
+                try:
+                    angpix = float(self.angpix_entry.get())
+                    particle_size_angstroms = float(self.particle_max_diam_entry.get())
+                    particle_size_pixels = particle_size_angstroms / angpix
+                    box_size = calculate_box_size(particle_size_pixels)
+                    self.box_size_entry.delete(0, tk.END)
+                    self.box_size_entry.insert(0, str(box_size))
+                    small_boxsize = calculate_downscaled_box_size(int(box_size), angpix)
+                    self.extract_small_boxsize_entry.delete(0, tk.END)
+                    self.extract_small_boxsize_entry.insert(0, str(small_boxsize))
+                except:
+                    # Ignore errors - they will be picked up if the user tries to save the options
+                    pass
+                self.box_size_entry.config(state=tk.DISABLED)
+                self.extract_small_boxsize_entry.config(state=tk.DISABLED)
+            update_box_size_labels()
+
+        self.box_size_var.trace('w', update_box_size_labels)
+        self.extract_small_boxsize_var.trace('w', update_box_size_labels)
+
+        self.angpix_var.trace('w', update_box_sizes)
+        self.particle_max_diam_var.trace('w', update_box_sizes)
+        auto_boxsize_button.config(command=update_box_sizes)
+
+        ### Add logic to the check boxes
+
+        def update_pipeline_control_state(*args_ignored, **kwargs_ignored):
             new_state = tk.DISABLED if self.stop_after_ctf_var.get() else tk.NORMAL
             class2d_button.config(state=new_state)
             class3d_button.config(state=new_state)
             self.particle_max_diam_entry.config(state=new_state)
             self.particle_min_diam_entry.config(state=new_state)
             self.ref_3d_entry.config(state=new_state)
+            # Update the box size controls with care to avoid activating them when we shouldn't
+            auto_boxsize_button.config(state=new_state)
+            if new_state == tk.DISABLED:
+                self.box_size_entry.config(state=new_state)
+                self.extract_small_boxsize_entry.config(state=new_state)
+            else:
+                update_box_sizes()
             can_do_second_pass = (self.class3d_var.get()
-                                  and len(ref_3d_var.get()) == 0
+                                  and len(self.ref_3d_var.get()) == 0
                                   and not self.stop_after_ctf_var.get())
             second_pass_button.config(state=tk.NORMAL if can_do_second_pass else tk.DISABLED)
             will_do_second_pass = can_do_second_pass and self.second_pass_var.get()
             class2d_pass2_button.config(state=tk.NORMAL if will_do_second_pass else tk.DISABLED)
             class3d_pass2_button.config(state=tk.NORMAL if will_do_second_pass else tk.DISABLED)
 
-        stop_after_ctf_button.config(command=update_gui_state)
-        class3d_button.config(command=update_gui_state)
-        second_pass_button.config(command=update_gui_state)
-        ref_3d_var.trace('w', update_gui_state)
+        stop_after_ctf_button.config(command=update_pipeline_control_state)
+        class3d_button.config(command=update_pipeline_control_state)
+        second_pass_button.config(command=update_pipeline_control_state)
+        self.ref_3d_var.trace('w', update_pipeline_control_state)
 
         ###
 
@@ -940,6 +1045,13 @@ class RelionItGui(object):
         self.save_button = tk.Button(button_frame, text="Save options", command=self.save_options)
         self.save_button.pack(padx=5, pady=5, side=tk.RIGHT)
 
+        # Show initial pixel sizes
+        update_box_sizes()
+
+    def get_var_as_bool(self, var):
+        """Helper function to convert a Tk IntVar (linked to a checkbox) to a boolean value"""
+        return True if var.get() == 1 else False
+
     def fetch_options_from_gui(self):
         """
         Fetch the current values from the GUI widgets and store them in the options object.
@@ -950,19 +1062,16 @@ class RelionItGui(object):
         Raises:
             ValueError: If an option value is invalid.
         """
-        # Helper function to convert a Tk IntVar (linked to a checkbox) to a boolean value
-        def get_var_as_bool(var):
-            return True if var.get() == 1 else False
 
         opts = self.options
         warnings = []
 
-        opts.stop_after_ctf_estimation = get_var_as_bool(self.stop_after_ctf_var)
-        opts.do_class2d = get_var_as_bool(self.class2d_var)
-        opts.do_class3d = get_var_as_bool(self.class3d_var)
-        opts.do_second_pass = get_var_as_bool(self.second_pass_var)
-        opts.do_class2d_pass2 = get_var_as_bool(self.class2d_pass2_var)
-        opts.do_class3d_pass2 = get_var_as_bool(self.class3d_pass2_var)
+        opts.stop_after_ctf_estimation = self.get_var_as_bool(self.stop_after_ctf_var)
+        opts.do_class2d = self.get_var_as_bool(self.class2d_var)
+        opts.do_class3d = self.get_var_as_bool(self.class3d_var)
+        opts.do_second_pass = self.get_var_as_bool(self.second_pass_var)
+        opts.do_class2d_pass2 = self.get_var_as_bool(self.class2d_pass2_var)
+        opts.do_class3d_pass2 = self.get_var_as_bool(self.class3d_pass2_var)
 
         try:
             opts.voltage = float(self.voltage_entry.get())
@@ -976,7 +1085,7 @@ class RelionItGui(object):
         except ValueError:
             raise ValueError("Cs must be a number")
 
-        opts.ctffind_do_phaseshift = get_var_as_bool(self.phaseplate_var)
+        opts.ctffind_do_phaseshift = self.get_var_as_bool(self.phaseplate_var)
 
         try:
             opts.angpix = float(self.angpix_entry.get())
@@ -1014,6 +1123,20 @@ class RelionItGui(object):
         if len(opts.autopick_3dreference) > 0 and not os.path.isfile(opts.autopick_3dreference):
             warnings.append("- 3D reference file '{}' does not exist".format(opts.autopick_3dreference))
 
+        try:
+            opts.extract_boxsize = int(self.box_size_entry.get())
+        except ValueError:
+            raise ValueError("Box size must be a number")
+        if opts.extract_boxsize <= 0:
+            warnings.append("- Box size should be a positive number")
+
+        try:
+            opts.extract_small_boxsize = int(self.extract_small_boxsize_entry.get())
+        except ValueError:
+            raise ValueError("Down-sampled box size must be a number")
+        if opts.extract_small_boxsize <= 0:
+            warnings.append("- Down-sampled box size should be a positive number")
+
         opts.import_images = self.import_images_entry.get()
         if opts.import_images.startswith(('/', '..')):
             warnings.append("- Movies should be located inside the project directory")
@@ -1035,19 +1158,8 @@ class RelionItGui(object):
         """
         opts = self.options
 
-        particle_size_pixels = opts.autopick_LoG_diam_max / opts.angpix
-
         # Set mask diameter (in A) to 110 % of particle maximum diameter
         opts.mask_diameter = 1.1 * opts.autopick_LoG_diam_max
-
-        # Calculate required box size and round up to next size in sequence
-        minimum_box_size = 1.2 * particle_size_pixels
-        for box in (32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024):
-            if box > minimum_box_size:
-                opts.extract_boxsize = box
-                break
-        else:
-            raise ValueError("Required box size {} is too large!".format(minimum_box_size))
 
         # If we have a 3D reference, do a single pass with a large batch size
         if len(opts.autopick_3dreference) > 0:
@@ -1060,20 +1172,11 @@ class RelionItGui(object):
             opts.autopick_do_LoG = True
             opts.class3d_reference = ''
 
-        # Now set sensible batch size and downscaling options (leaving batch_size_pass2 at its default 100,000)
+        # Now set a sensible batch size (leaving batch_size_pass2 at its default 100,000)
         if opts.do_second_pass:
             opts.batch_size = 10000
-            if opts.extract_boxsize > 128:
-                opts.extract_downscale = True
-                opts.extract_small_boxsize = 128
-            if opts.extract_boxsize > 256:
-                opts.extract2_downscale = True
-                opts.extract2_small_boxsize = 256
         else:
             opts.batch_size = 100000
-            if opts.extract_boxsize > 256:
-                opts.extract_downscale = True
-                opts.extract_small_boxsize = 256
 
     def save_options(self):
         """
