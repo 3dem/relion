@@ -1,26 +1,281 @@
 #!/usr/bin/env python2.7
 """
-relion_it
----------
+relion_it.py
+============
 
-Pipeline setup script for live processing with RELION 3.
+Script for automated, on-the-fly single-particle analysis in RELION 3
 
-Authors: Sjors H.W. Scheres, Takanori Nakane & Colin Palmer
-
-Call this from the intended location of the RELION project directory, and provide
-the name of a file containing options if needed. See the relion_it_options.py
-file for an example.
+Authors: Sjors H.W. Scheres, Takanori Nakane & Colin M. Palmer
 
 Usage:
-    /path/to/relion_it.py [options_file...]
+    relion_it.py  [extra_options.py [extra_options2.py ....] ] [--gui] [--continue]
+
+To get started, go to the intended location of your RELION project directory and make sure your micrographs are
+accessible from within it (e.g. in a subdirectory called `Movies/' - use a symlink if necessary). Then run this
+script, providing the names of files containing options if needed. (To call the script, you'll need to enter the full
+path to it, put the directory containing it on your PATH environment variable, or put a copy of the script in the
+current directory.)
+
+Run with the `--gui' option to launch a simple GUI which will set up a run from a few basic options. (The GUI can
+also be used to save a complete options file that you can then edit as required.)
+
+Once the script is running, open a normal RELION GUI to see what's happening and visualise the results.
+
+See below for full instructions including how to handle errors. If you have any problems, please edit the script as
+needed, call on your local Python expert or email the CCP-EM mailing list (https://www.jiscmail.ac.uk/ccpem).
+
+
+Overview
+--------
+
+relion_it.py creates a number of RELION jobs and then runs one or more `relion_pipeliner' processes to schedule them
+(exactly like using the "Schedule" button in the RELION GUI). Instructions and information are printed to the terminal
+by relion_it.py as it runs.
+
+relion_it.py uses a large number of options to control how the jobs are run. It's designed to be very flexible and so
+these options can be changed in a number of ways:
+
+- The easiest way is to use the simple GUI (enabled by passing the `--gui' argument), which allows you to set a few
+  simple options. These are then used to calculate appropriate values for the complete set of options. (See "Using the
+  GUI" below for more information on this.)
+
+- For more control, options can be put into one or more Python files (with a simple "option_name = value" format or
+  with more complicated calculations - see "Options files" below for more information). The names of these options
+  files can passed as command line arguments to relion_it.py.
+
+- For maximum control, you can make your own copy of this script and change the option values and the code itself
+  however you want.
+
+Before running relion_it.py, you need to make sure you're in your intended RELION project directory, and that your
+movie files are accessible by relative paths within that directory (as usual for a RELION project). You could do this
+by moving the files from the microscope straight into the project directory, using a symlink from your project
+directory to the real location of the data, or running a script to create a new symlink to each micrograph as it is
+collected.
+
+
+Options files
+-------------
+
+relion_it.py uses a large number of options for controlling both the flow of the script and the parameters for
+individual jobs. These options can be read from Python script files when relion_it.py is started.
+
+The options are all listed the body of the script below, with a comment to explain each option. One way to use this
+script is to copy it in its entirety into your project directory, edit the options directly in the script and then
+run it (with no command line arguments). However, it's often better to keep the script in the RELION source directory
+(where it can be updated easily) and use options files to configure it.
+
+An example of a simple options file is:
+
+angpix = 1.06
+
+This would override the default pixel size value, but leave all other options at their defaults.
+
+The options files are read and interpreted as Python scripts. A simple list of "option_name = value" lines is all
+that is needed, though you can also use any Python commands you like to do more complex calculations. To generate
+an example file containing all of the options, run "relion_it.py --gui" and then click the "Save options" button,
+which will save all the current options to a file called `relion_it_options.py' in the working directory.
+
+The options are named descriptively so you can probably understand what most of them do quite easily. For more help on
+any particular option, look at the comment above its definition in this script, or search the script's code to see
+how it is used.
+
+Options files can be useful as templates. As an example, at Diamond Light Source's eBIC facility, we have a template
+file called `dls_cluster_options.py' that contains the necessary settings to make relion_it.py submit most of its jobs
+to run on the DLS GPU cluster. You could also set up standard templates for a particular microscope (say, voltage and
+Cs settings) or for a particular project or computer configuration.
+
+When relion_it.py starts, it reads all options files in the order they are given on the command line. Subsequent files
+will override earlier ones, so the last value given for any particular option will be the value that is used.
+
+If you start relion_it.py with the `--continue' argument, it will automatically add `relion_it_options.py' to the end
+of the list of options files. This means that if you are in a project directory where the relion_it.py GUI has
+previously been used, all options will be defined in the relion_it_options.py file and they will override any other
+options files given on the command line. (This is very useful for restarting the script after a problem, but it would
+be pointless to combine `--continue' with any options template files.)
+
+Note that if relion_it.py finds option names that it doesn't recognise while it's reading an options file, it will
+print a warning (but continue anyway). If you've been editing options files by hand, you should check the output from
+relion_it.py when it starts to make sure there are no typos in the options you wanted to set. (If you're using local
+variables for intermediate Python calculations in an options file, it's a good idea to use names starting with a
+leading underscore so you can immediately tell them apart from warnings about genuine spelling mistakes.)
+
+
+Using the GUI
+-------------
+
+The GUI provides a simple way to start new projects with relion_it.py. If you want to use it, prepare your project
+directory as described above, then start the GUI with "relion_it.py --gui". (If you're using any template options
+files, you can give those too, for example "relion_it.py /path/to/site/options.py --gui".)
+
+The window that appears should be self-explanatory. Fill in the options as needed for your project, and use the check
+boxes on the right to control what processing steps will be done. When you're ready, click either "Save options" or
+"Save & run". The program will check the values you've entered and then use them to calculate a few extra options for
+relion_it.py. The options will then be saved to a file called `relion_it_options.py', and if you clicked "Save & run"
+the processing run will start immediately.
+
+If any of the entered values are invalid (for example, if there are letters in a field which should be a number), the
+GUI will display a message box with an error when you click one of the buttons. It will also display a warning if any
+values appear to be incorrect (but you can choose to ignore the warning by clicking "OK").
+
+The GUI will try to calculate some extra options from the values you enter using the following steps:
+
+1. Set the mask diameter to 1.1 times the particle size.
+
+2a. If a 3D reference is given, use a single pass with reference-based autopicking, minimum distance between particles
+    of 0.7 times the particle size, and a batch size of 100,000 particles.
+
+2b. If no 3D reference is given, run a first pass with reference-free LoG autopicking and a batch size of 10,000, and
+    then a second pass with reference-based autopicking and a batch size of 100,000.
+
+These options should be sensible in many cases, but if you'd like to change them, save the options from the GUI using
+the "Save options" button, close the GUI, and edit the `relion_it_options.py' file to change the option values as
+needed. You can then start the processing run with "relion_it.py --continue".
+
+
+Running the pipelines
+---------------------
+
+relion_it.py uses several different scheduling pipelines to run its jobs. While each one is running, a file is
+created in the project directory called `RUNNING_PIPELINER_<name>'. A log of the jobs run by that pipeline is stored
+in `pipeline_<name>.log'.
+
+If you want to stop one of the pipelines for any reason, delete its `RUNNING_' file and within a minute or two the
+pipeliner will notice that the file has been removed and stop.
+
+relion_it.py itself uses a similar file called `RUNNING_RELION_IT', and you can delete this to stop the script (which
+will not affect any pipelines that are already running). It keeps a list of all of the jobs it has submitted in a
+file called `RELION_IT_SUBMITTED_JOBS'. This file can be edited manually if necessary (but not while the script is
+running!) Most of the jobs are run by the `preprocessing' pipeline. This will do the following:
+
+  1. Import movies
+  2. Motion correction
+  3. CTF estimation
+  4. Particle auto-picking
+  5. Particle extraction
+  6. Batch selection
+
+After a number of particles have been extracted (1,000 by default), a 2D classification job will be run to provide
+feedback on the quality of the data collection and particle picking.
+
+Particles are split into batches of a fixed size (default 10,000 for the first pass with no reference, or 100,000
+otherwise). The first batch is special: as it grows, the 2D classification job is re-run repeatedly to provide early
+feedback on the quality of the data. For subsequent batches, the script waits for each batch to be complete before
+running 2D classification on it.
+
+You can provide reference structures for auto-picking and 3D classification. (If you provide a 3D reference in the
+GUI it will automatically be used for both tasks.)
+
+If you do not provide a reference for auto-picking, reference-free LoG picking will be used. If you do not provide a
+reference for classification, relion_it.py will run the preprocessing pipeline twice. In the first pass, an initial
+model will be generated, and then a second pass of preprocessing will be done using the initial model as a reference
+for auto-picking and classification.
+
+relion_it.py makes an effort to try to identify a suitable reference to use from the classes produced by the
+InitialModel job, but if it selects an inappropriate reference, you can change it by stopping the pipelines and
+script ("rm RUNNING_*"), updating the reference filename stored in the file named `RELION_IT_2NDPASS_3DREF', deleting
+the relevant jobs (`autopick2_job' and those following) from the `RELION_IT_SUBMITTED_JOBS' file, then restarting the
+pipeline with "relion_it.py --continue".
+
+
+Fixing problems
+---------------
+
+One-off job failure
+```````````````````
+Occasionally, a single job can fail with an isolated error, for example if there are temporary network problems while
+working on a remote filesystem. If this happens, RELION will wait forever for the files to appear that would indicate
+the job has finished. In the meantime, no new jobs will be run, which can cause a backlog of micrographs to build up.
+
+To fix this (for a preprocessing job), you can just try to re-run the job from the RELION GUI. Select the job in the
+"Running jobs" list, then click "Job actions" -> "Mark as finished". Select the job again in the "Finished jobs"
+list, then click "Continue!" to re-start the job.
+
+That approach should work for preprocessing jobs, but probably won't work for classification or inital model
+generation jobs, since those cannot be continued and must instead be restarted from the beginning. The best way to do
+that is to restart the job manually, outside the RELION GUI, and then when the job finishes RELION should continue as
+if the job had never failed.
+
+For example, with a failed local job:
+
+    ps -e | grep relion                            # to check if the job is still active
+    kill <process_id>                              # to stop the job
+    # now re-run the commands from the job's `note.txt' file
+
+or with a job that was submitted to an SGE cluster queue:
+
+    qstat                                          # to check if the job is still active in the queue
+    qdel <job_id>                                  # to remove the job from the queue
+    qsub job_type/job_directory/run_submit.script  # to re-submit the job
+
+The other option is to just run a new job from the RELION GUI in the normal way (select the job you want to "copy" in
+the jobs list, make a "new" job by clicking on the job type in the list in the top-left of the GUI, then click
+"Run!"). However, if you do this, relion_it.py will not know about the new job and will not run any further
+downstream processing based on it. In this situation, you can either continue to process your data manually in RELION,
+or you could edit the `RELION_IT_SUBMITTED_JOBS' file to replace the failed job with the manual one, and delete the
+jobs that followed the original one. After that, if you re-run the script it should continue as normal from that
+job onwards.
+
+
+Repeated job failure
+````````````````````
+If a job fails repeatedly, it usually indicates that there is some problem with the job parameters or the files that
+the job needs to access.
+
+In favourable cases, it's possible you could fix the problem by selecting the job in the RELION GUI, changing one of
+the parameters that is not greyed out, then clicking "Continue!". Often, though, the problem will be with one of the
+parameters that can't be changed for a job that already exists, so the job will need to be deleted and recreated with
+a different set of parameters.
+
+To handle this situation, stop all of the pipelines and the relion_it.py script ("rm RUNNING_*"), then identify and
+fix the problem. Often, the problem will be an error in one of the job parameters, which can usually be fixed by
+changing one of the script options (for example by changing the settings in `relion_it_options.py', if you originally
+used the GUI to start the run).
+
+If the problem is caused by missing files from an upstream job, you might need to check the output of previous jobs
+and look in the job directories to figure out what the problem is. Again, if it's an error in the parameters for a
+job, you can probably fix it by editing `relion_it_options.py'.
+
+After changing any script options, you'll need to use the RELION GUI to delete the affected job and all jobs
+downstream of it, and also remove them from the list in the `RELION_IT_SUBMITTED_JOBS' file. Then you should be able
+to restart the pipelines by running "relion_it.py --continue".
+
+If you still can't get a particular job to run without errors, you can at least continue to run the upstream jobs
+that are working properly. You can do this either by changing the options for relion_it.py (there are options to
+switch off 2D or 3D classification, or to stop after CTF estimation), or by manually scheduling the jobs you want
+using the RELION GUI. Remember that after running relion_it.py, you have a normal RELION project, so if the script
+can't do what you want, you can simply stop it and then use all of RELION's normal job management and scheduling
+abilities.
+
+
+Advanced usage
+--------------
+
+It's possible to customise many aspects of the way relion_it.py works, but the details go beyond the scope of this
+introduction. Simple customisation can be done by setting appropriate option values (see "Option files" above). For
+more substantial changes, you might need to edit the script's Python code to get the behaviour you want. Most of the
+important logic is in the `run_pipeline()' function so that's a good place to start. Good luck!
+
 """
 
-import collections
+from __future__ import division  # always use float division
+
+import argparse
+import glob
+import inspect
+import math
 import os
 import runpy
-import sys
 import time
-import glob
+import traceback
+
+try:
+    import Tkinter as tk
+    import tkMessageBox
+    import tkFileDialog
+except ImportError:
+    # The GUI is optional. If the user requests it, it will fail when it tries
+    # to open so we can ignore the error for now.
+    pass  
 
 # Constants
 PIPELINE_STAR = 'default_pipeline.star'
@@ -29,6 +284,7 @@ SECONDPASS_REF3D_FILE = 'RELION_IT_2NDPASS_3DREF'
 SETUP_CHECK_FILE = 'RELION_IT_SUBMITTED_JOBS'
 PREPROCESS_SCHEDULE_PASS1 = 'PREPROCESS'
 PREPROCESS_SCHEDULE_PASS2 = 'PREPROCESS_PASS2'
+OPTIONS_FILE = 'relion_it_options.py'
 
 class RelionItOptions(object):
     """
@@ -46,13 +302,13 @@ class RelionItOptions(object):
     # Pixel size in Angstroms in the input movies
     angpix = 0.885
     # Acceleration voltage (in kV)
-    voltage = 300
+    voltage = 200
     # Polara = 2.0; Talos/Krios = 2.7; some Cryo-ARM = 1.4 
     Cs = 1.4
 
 
     ### Import images (Linux wild card; movies as *.mrc, *.mrcs, *.tiff or *.tif; single-frame micrographs as *.mrc)
-    import_images = 'Movies/*tiff'
+    import_images = 'Movies/*.tiff'
     # Are these multi-frame movies? Set to False for single-frame micrographs (and motion-correction will be skipped)
     images_are_movies = True
 
@@ -125,7 +381,7 @@ class RelionItOptions(object):
     #
     ### 3D-classification parameters
     # Number of 3D classes to use
-    class3d_nr_classes  = 4
+    class3d_nr_classes = 4
     # Have initial 3D model? If not, calculate one using SGD initial model generation
     have_3d_reference = False
     # Initial reference model
@@ -377,6 +633,8 @@ class RelionItOptions(object):
     queue_submission_template = '/public/EM/RELION/relion/bin/qsub.csh'
     # Minimum number of dedicated cores that need to be requested on each node
     queue_minimum_dedicated = 1
+
+    ### End of options
     
     #######################################################################
     ############ typically no need to change anything below this line
@@ -396,7 +654,561 @@ class RelionItOptions(object):
                 if hasattr(self, key):
                     setattr(self, key, value)
                 else:
-                    print 'Unrecognised option {}'.format(key)
+                    print " RELION_IT: Unrecognised option '{}'".format(key)
+    
+    def print_options(self, out_file=None):
+        """
+        Print the current options.
+        
+        This method prints the options in the same format as they are read,
+        allowing options to be written to a file and re-used.
+
+        Args:
+            out_file: A file object (optional). If supplied, options will be
+                written to this file, otherwise they will be printed to
+                sys.stdout.
+
+        Raises:
+            ValueError: If there is a problem printing the options.
+        """
+        print >>out_file, "# Options file for relion_it.py"
+        print >>out_file
+        seen_start = False
+        option_names = [key for key in dir(self) if (not (key.startswith('__') and key.endswith('__'))
+                                                     and not callable(getattr(self, key)))]
+
+        # Parse the source code for this class, and write out all comments along with option lines containing new values
+        for line in inspect.getsourcelines(RelionItOptions)[0]:
+            line = line.strip()
+            if not seen_start:
+                if line != "### General parameters":
+                    # Ignore lines until this one
+                    continue
+                seen_start = True
+            if line == "### End of options":
+                # Stop here
+                break
+            if line.startswith('#') or len(line) == 0:
+                # Print comments or blank lines as-is
+                print >>out_file, line
+            else:
+                # Assume all other lines define an option name and value. Replace with new value.
+                equals_index = line.find('=')
+                if equals_index > 0:
+                    option_name = line[:equals_index].strip()
+                    if option_name in option_names:
+                        print >>out_file, '{} = {}'.format(option_name, repr(getattr(self, option_name)))
+                        option_names.remove(option_name)
+                    else:
+                        # This error should not occur. If it does, there is probably a programming error.
+                        raise ValueError("Unrecognised option name '{}'".format(option_name))
+        if len(option_names) > 0:
+            # This error should not occur. If it does, there is probably a programming error.
+            raise ValueError("Some options were not written to the output file: {}".format(option_names))
+
+
+class RelionItGui(object):
+
+    def __init__(self, main_window, options):
+        self.main_window = main_window
+        self.options = options
+
+        # Convenience function for making file browser buttons
+        def new_browse_button(master, var_to_set, filetypes=(('MRC file', '*.mrc'), ('All files', '*'))):
+            def browse_command():
+                chosen_file = tkFileDialog.askopenfilename(filetypes=filetypes)
+                if chosen_file is not None:
+                    # Make path relative if it's in the current directory
+                    if chosen_file.startswith(os.getcwd()):
+                        chosen_file = os.path.relpath(chosen_file)
+                    var_to_set.set(chosen_file)
+            return tk.Button(master, text="Browse...", command=browse_command)
+
+        ### Create GUI
+
+        main_frame = tk.Frame(main_window)
+        main_frame.pack(fill=tk.BOTH, expand=1)
+
+        left_frame = tk.Frame(main_frame)
+        left_frame.pack(side=tk.LEFT, anchor=tk.N, fill=tk.X, expand=1)
+
+        right_frame = tk.Frame(main_frame)
+        right_frame.pack(side=tk.LEFT, anchor=tk.N, fill=tk.X, expand=1)
+
+        ###
+        
+        expt_frame = tk.LabelFrame(left_frame, text="Experimental details", padx=5, pady=5)
+        expt_frame.pack(padx=5, pady=5, fill=tk.X, expand=1)
+        tk.Grid.columnconfigure(expt_frame, 1, weight=1)
+
+        row = 0
+
+        tk.Label(expt_frame, text="Voltage (kV):").grid(row=row, sticky=tk.W)
+        self.voltage_entry = tk.Entry(expt_frame)
+        self.voltage_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
+        self.voltage_entry.insert(0, str(options.voltage))
+
+        row += 1
+        
+        tk.Label(expt_frame, text="Cs (mm):").grid(row=row, sticky=tk.W)
+        self.cs_entry = tk.Entry(expt_frame)
+        self.cs_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
+        self.cs_entry.insert(0, str(options.Cs))
+
+        row += 1
+        
+        tk.Label(expt_frame, text="Phase plate?").grid(row=row, sticky=tk.W)
+        self.phaseplate_var = tk.IntVar()
+        phaseplate_button = tk.Checkbutton(expt_frame, var=self.phaseplate_var)
+        phaseplate_button.grid(row=row, column=1, sticky=tk.W)
+        if options.ctffind_do_phaseshift:
+            phaseplate_button.select()
+
+        row += 1
+
+        tk.Label(expt_frame, text=u"Pixel size (\u212B):").grid(row=row, sticky=tk.W)
+        self.angpix_var = tk.StringVar()  # for data binding
+        self.angpix_entry = tk.Entry(expt_frame, textvariable=self.angpix_var)
+        self.angpix_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
+        self.angpix_entry.insert(0, str(options.angpix))
+
+        row += 1
+        
+        tk.Label(expt_frame, text=u"Exposure rate (e\u207B / \u212B\u00B2 / frame):").grid(row=row, sticky=tk.W)
+        self.exposure_entry = tk.Entry(expt_frame)
+        self.exposure_entry.grid(row=row, column=1, sticky=tk.W + tk.E)
+        self.exposure_entry.insert(0, str(options.motioncor_doseperframe))
+
+        ###
+
+        particle_frame = tk.LabelFrame(left_frame, text="Particle details", padx=5, pady=5)
+        particle_frame.pack(padx=5, pady=5, fill=tk.X, expand=1)
+        tk.Grid.columnconfigure(particle_frame, 1, weight=1)
+
+        row = 0
+
+        tk.Label(particle_frame, text=u"Longest diameter (\u212B):").grid(row=row, sticky=tk.W)
+        self.particle_max_diam_var = tk.StringVar()  # for data binding
+        self.particle_max_diam_entry = tk.Entry(particle_frame, textvariable=self.particle_max_diam_var)
+        self.particle_max_diam_entry.grid(row=row, column=1, sticky=tk.W+tk.E, columnspan=2)
+        self.particle_max_diam_entry.insert(0, str(options.autopick_LoG_diam_max))
+
+        row += 1
+
+        tk.Label(particle_frame, text=u"Shortest diameter (\u212B):").grid(row=row, sticky=tk.W)
+        self.particle_min_diam_entry = tk.Entry(particle_frame)
+        self.particle_min_diam_entry.grid(row=row, column=1, sticky=tk.W+tk.E, columnspan=2)
+        self.particle_min_diam_entry.insert(0, str(options.autopick_LoG_diam_min))
+
+        row += 1
+        
+        tk.Label(particle_frame, text="3D reference (optional):").grid(row=row, sticky=tk.W)
+        self.ref_3d_var = tk.StringVar()  # for data binding
+        self.ref_3d_entry = tk.Entry(particle_frame, textvariable=self.ref_3d_var)
+        self.ref_3d_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
+        self.ref_3d_entry.insert(0, str(options.autopick_3dreference))
+
+        new_browse_button(particle_frame, self.ref_3d_var).grid(row=row, column=2)
+
+        row += 1
+
+        tk.Label(particle_frame, text="Box size (px):").grid(row=row, sticky=tk.W)
+        self.box_size_var = tk.StringVar()  # for data binding
+        self.box_size_entry = tk.Entry(particle_frame, textvariable=self.box_size_var)
+        self.box_size_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
+        self.box_size_entry.insert(0, str(options.extract_boxsize))
+        self.box_size_in_angstrom = tk.Label(particle_frame, text=u"= NNN \u212B")
+        self.box_size_in_angstrom.grid(row=row, column=2,sticky=tk.W)
+
+        row += 1
+
+        tk.Label(particle_frame, text="Down-sample to (px):").grid(row=row, sticky=tk.W)
+        self.extract_small_boxsize_var = tk.StringVar()  # for data binding
+        self.extract_small_boxsize_entry = tk.Entry(particle_frame, textvariable=self.extract_small_boxsize_var)
+        self.extract_small_boxsize_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
+        self.extract_small_boxsize_entry.insert(0, str(options.extract_small_boxsize))
+        self.extract_angpix = tk.Label(particle_frame, text=u"= NNN \u212B/px")
+        self.extract_angpix.grid(row=row, column=2,sticky=tk.W)
+
+        row += 1
+
+        tk.Label(particle_frame, text="Calculate for me:").grid(row=row, sticky=tk.W)
+        self.auto_boxsize_var = tk.IntVar()
+        auto_boxsize_button = tk.Checkbutton(particle_frame, var=self.auto_boxsize_var)
+        auto_boxsize_button.grid(row=row, column=1, sticky=tk.W)
+        auto_boxsize_button.select()
+
+        ###
+
+        project_frame = tk.LabelFrame(left_frame, text="Project details", padx=5, pady=5)
+        project_frame.pack(padx=5, pady=5, fill=tk.X, expand=1)
+        tk.Grid.columnconfigure(project_frame, 1, weight=1)
+
+        row = 0
+
+        tk.Label(project_frame, text="Project directory:").grid(row=row, sticky=tk.W)
+        tk.Label(project_frame, text=os.getcwd(), anchor=tk.W).grid(row=row, column=1, sticky=tk.W, columnspan=2)
+
+        row += 1
+
+        tk.Label(project_frame, text="Pattern for movies:").grid(row=row, sticky=tk.W)
+        self.import_images_var = tk.StringVar()  # for data binding
+        self.import_images_entry = tk.Entry(project_frame, textvariable=self.import_images_var)
+        self.import_images_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
+        self.import_images_entry.insert(0, self.options.import_images)
+
+        import_button = new_browse_button(project_frame, self.import_images_var,
+                                          filetypes=(('Image file', '{*.mrc, *.mrcs, *.tif, *.tiff}'), ('All files', '*')))
+        import_button.grid(row=row, column=2)
+
+        row += 1
+        
+        tk.Label(project_frame, text="Gain reference (optional):").grid(row=row, sticky=tk.W)
+        self.gainref_var = tk.StringVar()  # for data binding
+        self.gainref_entry = tk.Entry(project_frame, textvariable=self.gainref_var)
+        self.gainref_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
+        self.gainref_entry.insert(0, self.options.motioncor_gainreference)
+
+        new_browse_button(project_frame, self.gainref_var).grid(row=row, column=2)
+
+        ###
+
+        pipeline_frame = tk.LabelFrame(right_frame, text="Pipeline control", padx=5, pady=5)
+        pipeline_frame.pack(padx=5, pady=5, fill=tk.X, expand=1)
+        tk.Grid.columnconfigure(expt_frame, 1, weight=1)
+
+        row = 0
+
+        tk.Label(pipeline_frame, text="Stop after CTF estimation?").grid(row=row, sticky=tk.W)
+        self.stop_after_ctf_var = tk.IntVar()
+        stop_after_ctf_button = tk.Checkbutton(pipeline_frame, var=self.stop_after_ctf_var)
+        stop_after_ctf_button.grid(row=row, column=1, sticky=tk.W)
+        if options.stop_after_ctf_estimation:
+            stop_after_ctf_button.select()
+
+        row += 1
+
+        tk.Label(pipeline_frame, text="Do 2D classification?").grid(row=row, sticky=tk.W)
+        self.class2d_var = tk.IntVar()
+        class2d_button = tk.Checkbutton(pipeline_frame, var=self.class2d_var)
+        class2d_button.grid(row=row, column=1, sticky=tk.W)
+        if options.do_class2d:
+            class2d_button.select()
+
+        row += 1
+
+        tk.Label(pipeline_frame, text="Do 3D classification?").grid(row=row, sticky=tk.W)
+        self.class3d_var = tk.IntVar()
+        class3d_button = tk.Checkbutton(pipeline_frame, var=self.class3d_var)
+        class3d_button.grid(row=row, column=1, sticky=tk.W)
+        if options.do_class3d:
+            class3d_button.select()
+
+        row += 1
+
+        tk.Label(pipeline_frame, text="Do second pass? (only if no 3D ref)").grid(row=row, sticky=tk.W)
+        self.second_pass_var = tk.IntVar()
+        second_pass_button = tk.Checkbutton(pipeline_frame, var=self.second_pass_var)
+        second_pass_button.grid(row=row, column=1, sticky=tk.W)
+        if options.do_second_pass:
+            second_pass_button.select()
+
+        row += 1
+
+        tk.Label(pipeline_frame, text="Do 2D classification (2nd pass)?").grid(row=row, sticky=tk.W)
+        self.class2d_pass2_var = tk.IntVar()
+        class2d_pass2_button = tk.Checkbutton(pipeline_frame, var=self.class2d_pass2_var)
+        class2d_pass2_button.grid(row=row, column=1, sticky=tk.W)
+        class2d_pass2_button.select()
+        if options.do_class2d_pass2:
+            class2d_pass2_button.select()
+
+        row += 1
+
+        tk.Label(pipeline_frame, text="Do 3D classification (2nd pass)?").grid(row=row, sticky=tk.W)
+        self.class3d_pass2_var = tk.IntVar()
+        class3d_pass2_button = tk.Checkbutton(pipeline_frame, var=self.class3d_pass2_var)
+        class3d_pass2_button.grid(row=row, column=1, sticky=tk.W)
+        if options.do_class3d_pass2:
+            class3d_pass2_button.select()
+
+        ### Add logic to the box size boxes
+
+        def calculate_box_size(particle_size_pixels):
+            # Calculate required box size and round up to next size in sequence
+            minimum_box_size = 1.2 * particle_size_pixels
+            for box in (48, 64, 96, 128, 192, 256, 384, 512, 768, 1024):
+                if box > minimum_box_size:
+                    return box
+            else:
+                return "Box size is too large!"
+
+        def calculate_downscaled_box_size(box_size_pix, angpix):
+            for small_box_pix in (48, 64, 96, 128, 192, 256, 384, 512, 768):
+                # Don't go larger than the original box
+                if small_box_pix > box_size_pix:
+                    return box_size_pix
+                # If Nyquist freq. is better than 8.5 A, use this downscaled box, otherwise continue to next size up
+                small_box_angpix = angpix * box_size_pix / small_box_pix
+                if small_box_angpix < 4.25:
+                    return small_box_pix
+            # Fall back to the original box size
+            return box_size_pix
+
+        def update_box_size_labels(*args_ignored, **kwargs_ignored):
+            try:
+                angpix = float(self.angpix_entry.get())
+                box_size = float(self.box_size_entry.get())
+            except ValueError:
+                # Can't update the box size in angstrom without both values
+                self.box_size_in_angstrom.config(text=u"= NNN \u212B")
+                self.extract_angpix.config(text=u"= NNN \u212B/px")
+                return
+            box_angpix = angpix * box_size
+            self.box_size_in_angstrom.config(text=u"= {:.1f} \u212B".format(box_angpix))
+            try:
+                extract_small_boxsize = float(self.extract_small_boxsize_entry.get())
+            except ValueError:
+                # Can't update the downscaled pixel size unless the downscaled box size is valid
+                self.extract_angpix.config(text=u"= NNN \u212B/px")
+                return
+            small_box_angpix = box_angpix / extract_small_boxsize
+            self.extract_angpix.config(text=u"= {:.3f} \u212B/px".format(small_box_angpix))
+
+        def update_box_sizes(*args_ignored, **kwargs_ignored):
+            # Always activate entry boxes - either we're activating them anyway, or we need to edit the text.
+            # For text editing we need to activate the box first then deactivate again afterwards.
+            self.box_size_entry.config(state=tk.NORMAL)
+            self.extract_small_boxsize_entry.config(state=tk.NORMAL)
+            if self.get_var_as_bool(self.auto_boxsize_var):
+                try:
+                    angpix = float(self.angpix_entry.get())
+                    particle_size_angstroms = float(self.particle_max_diam_entry.get())
+                    particle_size_pixels = particle_size_angstroms / angpix
+                    box_size = calculate_box_size(particle_size_pixels)
+                    self.box_size_entry.delete(0, tk.END)
+                    self.box_size_entry.insert(0, str(box_size))
+                    small_boxsize = calculate_downscaled_box_size(int(box_size), angpix)
+                    self.extract_small_boxsize_entry.delete(0, tk.END)
+                    self.extract_small_boxsize_entry.insert(0, str(small_boxsize))
+                except:
+                    # Ignore errors - they will be picked up if the user tries to save the options
+                    pass
+                self.box_size_entry.config(state=tk.DISABLED)
+                self.extract_small_boxsize_entry.config(state=tk.DISABLED)
+            update_box_size_labels()
+
+        self.box_size_var.trace('w', update_box_size_labels)
+        self.extract_small_boxsize_var.trace('w', update_box_size_labels)
+
+        self.angpix_var.trace('w', update_box_sizes)
+        self.particle_max_diam_var.trace('w', update_box_sizes)
+        auto_boxsize_button.config(command=update_box_sizes)
+
+        ### Add logic to the check boxes
+
+        def update_pipeline_control_state(*args_ignored, **kwargs_ignored):
+            new_state = tk.DISABLED if self.stop_after_ctf_var.get() else tk.NORMAL
+            class2d_button.config(state=new_state)
+            class3d_button.config(state=new_state)
+            self.particle_max_diam_entry.config(state=new_state)
+            self.particle_min_diam_entry.config(state=new_state)
+            self.ref_3d_entry.config(state=new_state)
+            # Update the box size controls with care to avoid activating them when we shouldn't
+            auto_boxsize_button.config(state=new_state)
+            if new_state == tk.DISABLED:
+                self.box_size_entry.config(state=new_state)
+                self.extract_small_boxsize_entry.config(state=new_state)
+            else:
+                update_box_sizes()
+            can_do_second_pass = (self.class3d_var.get()
+                                  and len(self.ref_3d_var.get()) == 0
+                                  and not self.stop_after_ctf_var.get())
+            second_pass_button.config(state=tk.NORMAL if can_do_second_pass else tk.DISABLED)
+            will_do_second_pass = can_do_second_pass and self.second_pass_var.get()
+            class2d_pass2_button.config(state=tk.NORMAL if will_do_second_pass else tk.DISABLED)
+            class3d_pass2_button.config(state=tk.NORMAL if will_do_second_pass else tk.DISABLED)
+
+        stop_after_ctf_button.config(command=update_pipeline_control_state)
+        class3d_button.config(command=update_pipeline_control_state)
+        second_pass_button.config(command=update_pipeline_control_state)
+        self.ref_3d_var.trace('w', update_pipeline_control_state)
+
+        ###
+
+        button_frame = tk.Frame(right_frame)
+        button_frame.pack(padx=5, pady=5, fill=tk.X, expand=1)
+
+        self.run_button = tk.Button(button_frame, text="Save & run", command=self.run_pipeline)
+        self.run_button.pack(padx=5, pady=5, side=tk.RIGHT)
+
+        self.save_button = tk.Button(button_frame, text="Save options", command=self.save_options)
+        self.save_button.pack(padx=5, pady=5, side=tk.RIGHT)
+
+        # Show initial pixel sizes
+        update_box_sizes()
+
+    def get_var_as_bool(self, var):
+        """Helper function to convert a Tk IntVar (linked to a checkbox) to a boolean value"""
+        return True if var.get() == 1 else False
+
+    def fetch_options_from_gui(self):
+        """
+        Fetch the current values from the GUI widgets and store them in the options object.
+
+        Returns:
+            A list of warning messages about possible incorrect option values.
+
+        Raises:
+            ValueError: If an option value is invalid.
+        """
+
+        opts = self.options
+        warnings = []
+
+        opts.stop_after_ctf_estimation = self.get_var_as_bool(self.stop_after_ctf_var)
+        opts.do_class2d = self.get_var_as_bool(self.class2d_var)
+        opts.do_class3d = self.get_var_as_bool(self.class3d_var)
+        opts.do_second_pass = self.get_var_as_bool(self.second_pass_var)
+        opts.do_class2d_pass2 = self.get_var_as_bool(self.class2d_pass2_var)
+        opts.do_class3d_pass2 = self.get_var_as_bool(self.class3d_pass2_var)
+
+        try:
+            opts.voltage = float(self.voltage_entry.get())
+        except ValueError:
+            raise ValueError("Voltage must be a number")
+        if opts.voltage <= 0.0:
+            warnings.append("- Voltage should be a positive number")
+
+        try:
+            opts.Cs = float(self.cs_entry.get())
+        except ValueError:
+            raise ValueError("Cs must be a number")
+
+        opts.ctffind_do_phaseshift = self.get_var_as_bool(self.phaseplate_var)
+
+        try:
+            opts.angpix = float(self.angpix_entry.get())
+        except ValueError:
+            raise ValueError("Pixel size must be a number")
+        if opts.angpix <= 0.0:
+            warnings.append("- Pixel size should be a positive number")
+
+        try:
+            opts.motioncor_doseperframe = float(self.exposure_entry.get())
+        except ValueError:
+            raise ValueError("Exposure rate must be a number")
+        if opts.motioncor_doseperframe <= 0.0:
+            warnings.append("- Exposure rate should be a positive number")
+
+        try:
+            opts.autopick_LoG_diam_max = float(self.particle_max_diam_entry.get())
+        except ValueError:
+            if len(self.particle_max_diam_entry.get()) == 0 and opts.stop_after_ctf_estimation:
+                # This was left blank and won't be used, set to zero to avoid errors in calculations later
+                opts.autopick_LoG_diam_max = 0.0
+            else:
+                raise ValueError("Particle longest diameter must be a number")
+
+        try:
+            opts.autopick_LoG_diam_min = float(self.particle_min_diam_entry.get())
+        except ValueError:
+            if len(self.particle_min_diam_entry.get()) == 0 and opts.stop_after_ctf_estimation:
+                # This was left blank and won't be used, set to zero to avoid errors in calculations later
+                opts.autopick_LoG_diam_min = 0.0
+            else:
+                raise ValueError("Particle shortest diameter must be a number")
+
+        opts.autopick_3dreference = self.ref_3d_entry.get()
+        if len(opts.autopick_3dreference) > 0 and not os.path.isfile(opts.autopick_3dreference):
+            warnings.append("- 3D reference file '{}' does not exist".format(opts.autopick_3dreference))
+
+        try:
+            opts.extract_boxsize = int(self.box_size_entry.get())
+        except ValueError:
+            raise ValueError("Box size must be a number")
+        if opts.extract_boxsize <= 0:
+            warnings.append("- Box size should be a positive number")
+
+        try:
+            opts.extract_small_boxsize = int(self.extract_small_boxsize_entry.get())
+        except ValueError:
+            raise ValueError("Down-sampled box size must be a number")
+        if opts.extract_small_boxsize <= 0:
+            warnings.append("- Down-sampled box size should be a positive number")
+
+        opts.import_images = self.import_images_entry.get()
+        if opts.import_images.startswith(('/', '..')):
+            warnings.append("- Movies should be located inside the project directory")
+        if '*' not in opts.import_images:
+            warnings.append("- Pattern for input movies should normally contain a '*' to select more than one file")
+
+        opts.motioncor_gainreference = self.gainref_entry.get()
+        if len(opts.motioncor_gainreference) > 0 and not os.path.isfile(opts.motioncor_gainreference):
+            warnings.append("- Gain reference file '{}' does not exist".format(opts.motioncor_gainreference))
+
+        return warnings
+
+    def calculate_full_options(self):
+        """
+        Update the options from the values that have been fetched from the GUI.
+
+        This method uses the values that the user has set in the GUI to calculate a number of other options for the
+        script.
+        """
+        opts = self.options
+
+        # Set mask diameter (in A) to 110 % of particle maximum diameter
+        opts.mask_diameter = 1.1 * opts.autopick_LoG_diam_max
+
+        # If we have a 3D reference, do a single pass with a large batch size
+        if len(opts.autopick_3dreference) > 0:
+            opts.autopick_do_LoG = False
+            opts.autopick_refs_min_distance = opts.autopick_LoG_diam_max * 0.7
+            opts.class3d_reference = opts.autopick_3dreference
+            opts.do_second_pass = False
+        else:
+            # No 3D reference - do LoG autopicking in the first pass
+            opts.autopick_do_LoG = True
+            opts.class3d_reference = ''
+
+        # Now set a sensible batch size (leaving batch_size_pass2 at its default 100,000)
+        if opts.do_second_pass:
+            opts.batch_size = 10000
+        else:
+            opts.batch_size = 100000
+
+    def save_options(self):
+        """
+        Update the full set of options from the values in the GUI, and save them to a file.
+
+        Returns:
+            True if the options were valid and saved successfully, otherwise False.
+        """
+        try:
+            warnings = self.fetch_options_from_gui()
+            if len(warnings) == 0 or tkMessageBox.askokcancel("Warning", "\n".join(warnings), icon='warning'):
+                self.calculate_full_options()
+                print " RELION_IT: Writing all options to {}".format(OPTIONS_FILE)
+                if os.path.isfile(OPTIONS_FILE):
+                    print " RELION_IT: File {0} already exists; renaming old copy to {0}~".format(OPTIONS_FILE)
+                    os.rename(OPTIONS_FILE, OPTIONS_FILE + '~')
+                with open(OPTIONS_FILE, 'w') as optfile:
+                    self.options.print_options(optfile)
+                return True
+        except Exception as ex:
+            tkMessageBox.showerror("Error", ex.message)
+            traceback.print_exc()
+        return False
+
+    def run_pipeline(self):
+        """
+        Update the full set of options from the values in the GUI, close the GUI and run the pipeline.
+        """
+        if self.save_options():
+            self.main_window.destroy()
+            run_pipeline(self.options)
+
 
 def safe_load_star(filename, max_try=5, wait=10, expected=[]):
     for _ in xrange(max_try):
@@ -492,7 +1304,7 @@ def getJobName(name_in_script, done_file):
             if len(elems) < 3: continue 
             if elems[0] == name_in_script:
                 jobname = elems[2]
-		break
+                break
         f.close()
 
     return jobname
@@ -664,8 +1476,8 @@ def run_pipeline(opts):
         if not secondpass_ref3d == '':
             print ' RELION_IT: found', secondpass_ref3d,'with angpix=',secondpass_ref3d_angpix,'as a 3D reference for second pass in file',SECONDPASS_REF3D_FILE
             print ' RELION_IT: if the automatic selection of the reference turned out to be unsatisfactory,'
-            print ' RELION_IT: you can re-run the second pass with another reference by'
-            print ' RELION_IT:  stopping the pipeline by deleteing RUNNING_*'
+            print ' RELION_IT: you can re-run the second pass with another reference by:'
+            print ' RELION_IT:  stopping the pipeline by deleting RUNNING_*'
             print ' RELION_IT:  updating the reference filename in',SECONDPASS_REF3D_FILE
             print ' RELION_IT:  deleting relevant jobs (autopick2_job and followings) in',SETUP_CHECK_FILE
             print ' RELION_IT:  and restarting the pipeline.'
@@ -901,6 +1713,7 @@ def run_pipeline(opts):
         if (ipass == 0 and (opts.do_class2d or opts.do_class3d)) or (ipass == 1 and (opts.do_class2d_pass2 or opts.do_class3d_pass2)):
 
             ### If necessary, rescale the 3D reference in the second pass!
+            # TODO: rescale initial reference if different from movies?
             if ipass == 1 and (opts.extract_downscale or opts.extract2_downscale):
                 particles_angpix = opts.angpix
                 if opts.images_are_movies:
@@ -1109,7 +1922,7 @@ def run_pipeline(opts):
                             if sgd_model_star is None:
                                 print " RELION_IT: Initial model generation " + inimodel_job + " does not contain expected output maps."
                                 print " RELION_IT: This job should have finished, but you may continue it from the GUI. "
-                                raise " ERROR!! quitting the pipeline." # TODO: MAKE MORE ROBUST
+                                raise Exception("ERROR!! quitting the pipeline.") # TODO: MAKE MORE ROBUST
 
                             # Use the model of the largest class for the 3D classification below
                             total_iter = opts.inimodel_nr_iter_initial + opts.inimodel_nr_iter_inbetween + opts.inimodel_nr_iter_final
@@ -1246,11 +2059,21 @@ def main():
     Options files given as command line arguments will be opened in order and
     used to update the default options.
     """
+    # Start by parsing arguments
+    # (If --help is given, the program will print a usage message and exit)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("extra_options", nargs="*", metavar="extra_options.py",
+                        help="Python files containing options for relion_it.py")
+    parser.add_argument("--gui", action="store_true", help="launch a simple GUI to set options")
+    parser.add_argument("--continue", action="store_true", dest="continue_",
+                        help="continue a previous run by loading options from ./relion_it_options.py")
+    args = parser.parse_args()
+
     print ' RELION_IT: -------------------------------------------------------------------------------------------------------------------'
     print ' RELION_IT: script for automated, on-the-fly single-particle analysis in RELION (>= 3.0-alpha-5)'
-    print ' RELION_IT: authors: Sjors H.W. Scheres, Takanori Nakane & Colin Palmer'
+    print ' RELION_IT: authors: Sjors H.W. Scheres, Takanori Nakane & Colin M. Palmer'
     print ' RELION_IT: '
-    print ' RELION_IT: usage: ./relion_it.py [extra_options.py [extra_options2.py ....] ]'
+    print ' RELION_IT: usage: ./relion_it.py [extra_options.py [extra_options2.py ....] ] [--gui] [--continue]'
     print ' RELION_IT: '
     print ' RELION_IT: this script will check whether processes are still running using files with names starting with RUNNING' 
     print ' RELION_IT:   you can restart this script after stopping previous processes by deleting all RUNNING files'
@@ -1272,18 +2095,28 @@ def main():
             print " RELION_IT: ERROR:", checkfile, "is already present: delete this file and make sure no relion_pipeliner job is still running. Exiting now ..."
             exit(0)
 
+    if args.continue_:
+        print ' RELION_IT: continuing a previous run. Options will be loaded from ./relion_it_options.py'
+        args.extra_options.append(OPTIONS_FILE)
+
     opts = RelionItOptions()
-    for user_opt_file in sys.argv[1:]:
+    for user_opt_file in args.extra_options:
         print ' RELION_IT: reading options from {}'.format(user_opt_file)
         user_opts = runpy.run_path(user_opt_file)
         opts.update_from(user_opts)
-    run_pipeline(opts)
+
+    if args.gui:
+        print ' RELION_IT: launching GUI...'
+        tk_root = tk.Tk()
+        tk_root.title("relion_it.py setup")
+        RelionItGui(tk_root, opts)
+        tk_root.mainloop()
+    else:
+        run_pipeline(opts)
 
 
 if __name__ == "__main__":
     main()
-
-
 
 
 

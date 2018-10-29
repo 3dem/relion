@@ -397,6 +397,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	fn_scratch = parser.getOption("--scratch_dir", "If provided, particle stacks will be copied to this local scratch disk prior to refinement.", "");
 	keep_free_scratch_Gb = textToInteger(parser.getOption("--keep_free_scratch", "Space available for copying particle stacks (in Gb)", "10"));
 	do_reuse_scratch = parser.checkOption("--reuse_scratch", "Re-use data on scratchdir, instead of wiping it and re-copying all data. This works only when ALL particles have already been cached.");
+	keep_scratch = parser.checkOption("--keep_scratch", "Don't remove scratch after convergence. Following jobs that use EXACTLY the same particles should use --reuse_scratch.");
 
 #ifdef ALTCPU
 	do_cpu = parser.checkOption("--cpu", "Use intel vectorisation implementation for CPU");
@@ -639,6 +640,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	fn_scratch = parser.getOption("--scratch_dir", "If provided, particle stacks will be copied to this local scratch disk prior to refinement.", "");
 	keep_free_scratch_Gb = textToInteger(parser.getOption("--keep_free_scratch", "Space available for copying particle stacks (in Gb)", "10"));
 	do_reuse_scratch = parser.checkOption("--reuse_scratch", "Re-use data on scratchdir, instead of wiping it and re-copying all data.");
+	keep_scratch = parser.checkOption("--keep_scratch", "Don't remove scratch after convergence. Following jobs that use EXACTLY the same particles should use --reuse_scratch.");
 	do_fast_subsets = parser.checkOption("--fast_subsets", "Use faster optimisation by using subsets of the data in the first 15 iterations");
 #ifdef ALTCPU
 	do_cpu = parser.checkOption("--cpu", "Use intel vectorisation implementation for CPU");
@@ -1854,7 +1856,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		// Don't do norm correction for volume averaging at this stage....
 		do_norm_correction = false;
 
-		if (!((do_helical_refine) && (!ignore_helical_symmetry))) // For 3D helical sub-tomogram averaging, either is OK, so let the user decide
+		if (!((do_helical_refine) && (!ignore_helical_symmetry)) && !(do_cpu || do_gpu)) // For 3D helical sub-tomogram averaging, either is OK, so let the user decide
 			do_shifts_onthefly = true; // save RAM for volume data (storing all shifted versions would take a lot!)
 
 		if (do_skip_align)
@@ -2362,12 +2364,13 @@ void MlOptimiser::iterateWrapUp()
 {
 
 	// delete barrier, threads and task distributors
-    delete global_barrier;
+	delete global_barrier;
 	delete global_ThreadManager;
-    delete exp_ipart_ThreadTaskDistributor;
+	delete exp_ipart_ThreadTaskDistributor;
 
-    // Delete volatile space on scratch
-    mydata.deleteDataOnScratch();
+	// Delete volatile space on scratch
+	if (!keep_scratch)
+		mydata.deleteDataOnScratch();
 
 #ifdef MKLFFT
 	fftw_cleanup_threads();
@@ -2564,7 +2567,10 @@ void MlOptimiser::iterate()
 			if (verb > 0)
 			{
 				std::cout << " Auto-refine: Refinement has converged, stopping now... " << std::endl;
-				std::cout << " Auto-refine: + Final reconstruction from all particles is saved as: " <<  fn_out << "_class001.mrc" << std::endl;
+				if (mymodel.nr_bodies == 1)
+					std::cout << " Auto-refine: + Final reconstruction from all particles is saved as: " <<  fn_out << "_class001.mrc" << std::endl;
+				else
+					std::cout << " Auto-refine: + Final reconstructions of each body from all particles are saved as " <<  fn_out << "_bodyNNN.mrc, where NNN is the body number" << std::endl;
 				std::cout << " Auto-refine: + Final model parameters are stored in: " << fn_out << "_model.star" << std::endl;
 				std::cout << " Auto-refine: + Final data parameters are stored in: " << fn_out << "_data.star" << std::endl;
 				if (mymodel.tau2_fudge_factor > 1.)

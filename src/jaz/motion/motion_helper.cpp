@@ -358,7 +358,7 @@ void MotionHelper::noiseNormalize(
 
         const int r = (int) sqrt(xx*xx + yy*yy);
 
-        if (r >= wf)
+        if (r >= wf || sigma2[r] == 0.0)
         {
             dest(y,x) = Complex(0.0);
         }

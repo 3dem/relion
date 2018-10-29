@@ -3817,6 +3817,12 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 	initialisePipeline(outputname, PROC_MULTIBODY_NAME, job_counter);
 	std::string command;
 
+	if (!exists(joboptions["fn_bodies"].getString()))
+	{
+		error_message = "ERROR: you have to specify an existing body STAR file.";
+		return false;
+	}
+
 	if (is_continue && joboptions["fn_cont"].getString() == "" && !joboptions["do_analyse"].getBoolean())
 	{
 		error_message = "ERROR: either specify a optimiser file to continue multibody refinement from; OR run flexibility analysis...";
@@ -3856,6 +3862,9 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 			command += " --o " + outputname + fn_run;
 			outputNodes = getOutputNodesRefine(outputname + "run", -1, 1, 3, nr_bodies, false, false); // false false means dont do movies
 			command += " --solvent_correct_fsc --multibody_masks " + joboptions["fn_bodies"].getString();
+
+			Node node(joboptions["fn_in"].getString(), joboptions["fn_in"].node_type);
+			inputNodes.push_back(node);
 
 			if (joboptions["do_subtracted_bodies"].getBoolean())
 				command += " --reconstruct_subtracted_bodies ";

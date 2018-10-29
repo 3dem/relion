@@ -184,6 +184,13 @@ void MotioncorrRunner::initialise()
 		{
 			REPORT_ERROR("You supplied -RotGain and/or -FlipGain to MotionCor2. Please use --gain_rot and--gain_flip instead.");
 		}
+
+		if (verb > 0 && fn_other_motioncor2_args.contains("Mag"))
+		{
+			std::cerr << "WARNING: You are applying anisotropic magnification correction (-Mag) in MotionCor2." << std::endl;
+			std::cerr << "WARNING: The current version of Bayesian Polishing does not support anisotropic magnification correction." << std::endl;
+			std::cerr << "WARNING: Thus, particles will revert to an un-corrected state when you run Bayesian Polishing." << std::endl;
+		}
 	}
 	else if (do_own) {
 		if (fn_defect != "") {
@@ -1733,11 +1740,11 @@ void MotioncorrRunner::realSpaceInterpolation(Image <float> &Isum, std::vector<I
 			const RFLOAT z = iframe;
 
 			#pragma omp parallel for num_threads(n_threads)
-			for (int ix = 0; ix < nx; ix++) {
-				const RFLOAT x = (RFLOAT)ix / nx - 0.5;
-				for (int iy = 0; iy < ny; iy++) {
+			for (int iy = 0; iy < ny; iy++) {
+				const RFLOAT y = (RFLOAT)iy / ny - 0.5;
+				for (int ix = 0; ix < nx; ix++) {
+					const RFLOAT x = (RFLOAT)ix / nx - 0.5;
 					bool valid = true;
-					const RFLOAT y = (RFLOAT)iy / ny - 0.5;
 
 					RFLOAT x_fitted, y_fitted;
 					model->getShiftAt(z, x, y, x_fitted, y_fitted);
@@ -1809,11 +1816,11 @@ void MotioncorrRunner::realSpaceInterpolation_ThirdOrderPolynomial(Image <float>
 		const RFLOAT y_C5 = coeffY(15) * z + coeffY(16) * z2 + coeffY(17) * z3;
 
 		#pragma omp parallel for num_threads(n_threads)
-		for (int ix = 0; ix < nx; ix++) {
-			const RFLOAT x = (RFLOAT)ix / nx - 0.5;
-			for (int iy = 0; iy < ny; iy++) {
+		for (int iy = 0; iy < ny; iy++) {
+			const RFLOAT y = (RFLOAT)iy / ny - 0.5;
+			for (int ix = 0; ix < nx; ix++) {
+				const RFLOAT x = (RFLOAT)ix / nx - 0.5;
 				bool valid = true;
-				const RFLOAT y = (RFLOAT)iy / ny - 0.5;
 
 				RFLOAT x_fitted = x_C0 + (x_C1 + x_C2 * x) * x + (x_C3 + x_C4 * y + x_C5 * x) * y;
 				RFLOAT y_fitted = y_C0 + (y_C1 + y_C2 * x) * x + (y_C3 + y_C4 * y + y_C5 * x) * y;

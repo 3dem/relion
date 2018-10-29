@@ -53,6 +53,9 @@ void Reconstructor::read(int argc, char **argv)
 	skip_mask = parser.checkOption("--skip_mask", "Do not apply real space mask during Ewald sphere correction");
 	skip_weighting = parser.checkOption("--skip_weighting", "Do not apply weighting during Ewald sphere correction");
 
+	if (verb > 0 && do_ewald && mask_diameter < 0 && !(skip_mask && skip_weighting))
+		REPORT_ERROR("To apply Ewald sphere correction (--ewald), you have to specify the mask diameter(--mask_diameter).");
+
 	int helical_section = parser.addSection("Helical options");
 	nr_helical_asu = textToInteger(parser.getOption("--nr_helical_asu", "Number of helical asymmetrical units", "1"));
 	helical_rise = textToFloat(parser.getOption("--helical_rise", "Helical rise (in Angstroms)", "0."));

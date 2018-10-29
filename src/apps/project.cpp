@@ -300,7 +300,9 @@ public:
 						MDang.getValue(EMDL_CTF_IMAGE, fn_ctf);
 						Ictf.read(fn_ctf);
 						Ictf().setXmippOrigin();
+
 						// Set the CTF-image in Fctf
+						Fctf.resize(F2D);
 						FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fctf)
 						{
 							// Use negative kp,ip and jp indices, because the origin in the ctf_img lies half a pixel to the right of the actual center....
