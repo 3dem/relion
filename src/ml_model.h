@@ -407,7 +407,7 @@ public:
 
 	RFLOAT getResolutionAngstrom(int ipix)	{ return (ipix==0) ? 999. : (pixel_size * ori_size)/(RFLOAT)ipix; }
 
-	int getPixelFromResolution(RFLOAT resol)	{ return (int)(resol * pixel_size * ori_size); }
+	int getPixelFromResolution(RFLOAT resol)	{ return (int)ROUND(resol * pixel_size * ori_size); }
 
 	/** Initialise pdf_orient arrays to the given size
 	* If the pdf_orient vectors were empty, resize them to the given size and initialise with an even distribution
