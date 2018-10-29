@@ -148,6 +148,11 @@ void MagnificationEstimator::parametricFit(
 	const int gc = mdts.size();
 	const int ogc = obsModel->numberOfOpticsGroups();
 	
+	bool hasMagMatrices = optOut.labelExists(EMDL_IMAGE_MAG_MATRIX_00)
+	                   && optOut.labelExists(EMDL_IMAGE_MAG_MATRIX_01)
+	                   && optOut.labelExists(EMDL_IMAGE_MAG_MATRIX_10)
+	                   && optOut.labelExists(EMDL_IMAGE_MAG_MATRIX_11);
+			
 	std::vector<Matrix2D<RFLOAT>> mat_by_optGroup(ogc);
 	
 	for (int og = 0; og < ogc; og++)
@@ -157,19 +162,32 @@ void MagnificationEstimator::parametricFit(
 		std::stringstream sts;
 		sts << (og+1);
 		
+		bool groupPresent = false;
+		
 		for (long g = 0; g < gc; g++)
 		{
 			std::string outRoot = CtfRefiner::getOutputFilenameRoot(mdts[g], outPath);
 			
-			try
-			{
-				MagnificationHelper::readEQs(outRoot + "_mag_optics-group_" + sts.str(), magEqsG);
+			std::string fn = outRoot + "_mag_optics-group_" + sts.str();
 			
-				magEqs += magEqsG;
+			if (exists(fn+"_Axx.mrc")
+			 || exists(fn+"_Axy.mrc")
+			 || exists(fn+"_Ayy.mrc")
+			 || exists(fn+"_bx.mrc")
+			 || exists(fn+"_by.mrc"))
+			{
+				try
+				{
+					MagnificationHelper::readEQs(fn, magEqsG);
+					magEqs += magEqsG;
+					groupPresent = true;
+				}
+				catch (RelionError e)
+				{}			
 			}
-			catch (RelionError e)
-			{}
 		}
+		
+		if (!groupPresent) continue;
 		
 		Image<RFLOAT> flowx, flowy;
 		MagnificationHelper::solvePerPixel(magEqs, flowx, flowy);
@@ -198,14 +216,16 @@ void MagnificationEstimator::parametricFit(
 		
 		mat_by_optGroup[og] = mat;
 		
-		
 		Matrix2D<RFLOAT> mat0(2,2);
 		mat0.initIdentity();
 		
-		optOut.getValue(EMDL_IMAGE_MAG_MATRIX_00, mat0(0,0), og);
-		optOut.getValue(EMDL_IMAGE_MAG_MATRIX_01, mat0(0,1), og);
-		optOut.getValue(EMDL_IMAGE_MAG_MATRIX_10, mat0(1,0), og);
-		optOut.getValue(EMDL_IMAGE_MAG_MATRIX_11, mat0(1,1), og);
+		if (hasMagMatrices)
+		{
+			optOut.getValue(EMDL_IMAGE_MAG_MATRIX_00, mat0(0,0), og);
+			optOut.getValue(EMDL_IMAGE_MAG_MATRIX_01, mat0(0,1), og);
+			optOut.getValue(EMDL_IMAGE_MAG_MATRIX_10, mat0(1,0), og);
+			optOut.getValue(EMDL_IMAGE_MAG_MATRIX_11, mat0(1,1), og);
+		}
 		
 		Matrix2D<RFLOAT> mat1 = mat * mat0;
 		
