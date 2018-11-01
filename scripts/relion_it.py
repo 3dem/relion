@@ -260,6 +260,7 @@ from __future__ import division  # always use float division
 import argparse
 import glob
 import inspect
+import math
 import os
 import runpy
 import time
@@ -282,7 +283,6 @@ SETUP_CHECK_FILE = 'RELION_IT_SUBMITTED_JOBS'
 PREPROCESS_SCHEDULE_PASS1 = 'PREPROCESS'
 PREPROCESS_SCHEDULE_PASS2 = 'PREPROCESS_PASS2'
 OPTIONS_FILE = 'relion_it_options.py'
-GOOD_BOX_SIZES = (48, 64, 96, 128, 160, 192, 256, 288, 300, 320, 360, 384, 400, 420, 450, 480, 512, 640, 768, 896, 1024)
 
 class RelionItOptions(object):
     """
@@ -943,16 +943,14 @@ class RelionItGui(object):
         ### Add logic to the box size boxes
 
         def calculate_box_size(particle_size_pixels):
-            # Calculate required box size and round up to next size in sequence
-            minimum_box_size = 1.2 * particle_size_pixels
-            for box in GOOD_BOX_SIZES:
-                if box > minimum_box_size:
-                    return box
-            else:
-                return "Box size is too large!"
+            # Use box 20% larger than particle and ensure size is even
+            box_size_exact = 1.2 * particle_size_pixels
+            box_size_int = int(math.ceil(box_size_exact))
+            return box_size_int + box_size_int % 2
 
         def calculate_downscaled_box_size(box_size_pix, angpix):
-            for small_box_pix in GOOD_BOX_SIZES:
+            for small_box_pix in (48, 64, 96, 128, 160, 192, 256, 288, 300, 320, 360,
+                                  384, 400, 420, 450, 480, 512, 640, 768, 896, 1024):
                 # Don't go larger than the original box
                 if small_box_pix > box_size_pix:
                     return box_size_pix
@@ -960,8 +958,8 @@ class RelionItGui(object):
                 small_box_angpix = angpix * box_size_pix / small_box_pix
                 if small_box_angpix < 4.25:
                     return small_box_pix
-            # Fall back to the original box size
-            return box_size_pix
+            # Fall back to a warning message
+            return "Box size is too large!"
 
         def update_box_size_labels(*args_ignored, **kwargs_ignored):
             try:
@@ -1151,7 +1149,7 @@ class RelionItGui(object):
             warnings.append("- 3D reference file '{}' does not exist".format(opts.autopick_3dreference))
 
         try:
-            opts.mask_diameter = int(self.mask_diameter_entry.get())
+            opts.mask_diameter = float(self.mask_diameter_entry.get())
         except ValueError:
             raise ValueError("Mask diameter must be a number")
         if opts.mask_diameter <= 0:
@@ -1221,7 +1219,8 @@ class RelionItGui(object):
         """
         try:
             warnings = self.fetch_options_from_gui()
-            if len(warnings) == 0 or tkMessageBox.askokcancel("Warning", "\n".join(warnings), icon='warning'):
+            if len(warnings) == 0 or tkMessageBox.askokcancel("Warning", "\n".join(warnings), icon='warning',
+                                                              default=tkMessageBox.CANCEL):
                 self.calculate_full_options()
                 print " RELION_IT: Writing all options to {}".format(OPTIONS_FILE)
                 if os.path.isfile(OPTIONS_FILE):
