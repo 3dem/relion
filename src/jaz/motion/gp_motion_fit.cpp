@@ -68,7 +68,19 @@ GpMotionFit::GpMotionFit(
 
     SvdHelper::decompose(A, U, S, Vt);
 
-    dc = (maxDims < 0 || maxDims > pc)? pc : maxDims;
+	dc = (maxDims < 0 || maxDims > pc)? pc : maxDims;
+	
+	// remove eigendeformations with too small eigenvalues
+	const double eps = 1e-10;
+	
+	for (int d = 0; d < dc; d++)
+    {
+		if (S(d) < eps)
+		{
+			dc = d;
+			break;
+		}
+	}
 
     basis = Matrix2D<RFLOAT>(pc,dc);
 

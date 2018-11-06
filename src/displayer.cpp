@@ -1014,7 +1014,15 @@ void multiViewerCanvas::showFourierPhaseAngles(int ipos)
 
 void multiViewerCanvas::showHelicalLayerLineProfile(int ipos)
 {
-	std::string mydefault = std::string(DEFAULTPDFVIEWER);
+
+	const char * default_pdf_viewer = getenv ("RELION_PDFVIEWER_EXECUTABLE");
+	char hardcoded_pdf_viewer[]=DEFAULTPDFVIEWER;
+	if (default_pdf_viewer == NULL)
+	{
+		default_pdf_viewer=hardcoded_pdf_viewer;
+	}
+
+	std::string mydefault = std::string(default_pdf_viewer);
 	std::string command;
 	FileName fn_img, fn_out;
 	Image<RFLOAT> img;

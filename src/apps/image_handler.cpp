@@ -87,7 +87,7 @@ class image_handler_parameters
 		highpass = textToFloat(parser.getOption("--highpass", "High-pass filter frequency (in A)", "-1."));
 		directional = parser.getOption("--directional", "Directionality of low-pass filter frequency ('X', 'Y' or 'Z', default non-directional)", "");
 		logfilter = textToFloat(parser.getOption("--LoG", "Diameter for optimal response of Laplacian of Gaussian filter (in A)", "-1."));
-		angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in A)", "1."));
+		angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in A)", "-1"));
 		new_angpix = textToFloat(parser.getOption("--rescale_angpix", "Scale input image(s) to this new pixel size (in A)", "-1."));
 		new_box = textToInteger(parser.getOption("--new_box", "Resize the image(s) to this new box size (in pixel) ", "-1"));
 		filter_edge_width = textToInteger(parser.getOption("--filter_edge_width", "Width of the raised cosine on the low/high-pass filter edge (in resolution shells)", "2"));
@@ -146,6 +146,14 @@ class image_handler_parameters
 
 		Image<RFLOAT> Iout;
 		Iout().resize(Iin());
+
+		if (angpix < 0 && (new_angpix > 0 || fn_fsc != "" || randomize_at > 0 || 
+		                   do_power || fn_cosDPhi != "" || fn_correct_ampl != "" || 
+		                   fabs(bfactor) > 0 || logfilter > 0 || lowpass > 0 || highpass > 0))
+		{
+			angpix = Iin.samplingRateX();
+			std::cerr << "WARNING: You did not specify --angpix. The pixel size in the image header, " << angpix << " A/px, is used." << std::endl;
+		}
 
 		if (do_add_edge)
 		{
