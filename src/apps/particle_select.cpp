@@ -30,8 +30,8 @@ int main(int argc, char *argv[])
 	sourceAll.read(sourceFn);
 	refAll.read(refFn);
 	
-	std::vector<MetaDataTable> sourceByMic = StackHelper::splitByMicrographName(&sourceAll);
-	std::vector<MetaDataTable> refByMic = StackHelper::splitByMicrographName(&refAll);
+	std::vector<MetaDataTable> sourceByMic = StackHelper::splitByMicrographName(sourceAll);
+	std::vector<MetaDataTable> refByMic = StackHelper::splitByMicrographName(refAll);
 	
 	std::map<std::string, MetaDataTable*> micToSource;
 	

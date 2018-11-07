@@ -26,7 +26,9 @@
 #include <src/jaz/gravis/t4Matrix.h>
 
 
-std::vector<CTF> CtfHelper :: loadCtffind4(std::string path, int imageCount, double voltage, double Cs, double Q0, double Bfac, double scale)
+std::vector<CTF> CtfHelper :: loadCtffind4(
+		std::string path, int imageCount, 
+		double voltage, double Cs, double Q0, double Bfac, double scale)
 {
     /*
      example:
@@ -37,68 +39,101 @@ std::vector<CTF> CtfHelper :: loadCtffind4(std::string path, int imageCount, dou
     # Columns: #1 - micrograph number; #2 - defocus 1 [Angstroms]; #3 - defocus 2; #4 - azimuth of astigmatism; #5 - additional phase shift [radians]; #6 - cross correlation; #7 - spacing (in Angstroms) up to which CTF rings were fit successfully
     1.000000 10295.926758 10012.275391 -38.856349 0.000000 0.030650 5.279412
     */
-
+	
+	std::vector<CTF> ctfs(imageCount);
+	
     size_t ast = path.find_first_of('*');
+	
     if (ast == std::string::npos)
     {
-        REPORT_ERROR("CtfHelper::loadCtffind4: asterisk required in path.\n");
+		std::ifstream file(path);
+		int currImg = 0;
+		
+		char text[4096];
+
+		while (file.getline(text, 4096))
+		{
+			if (text[0] == '#') continue;
+			
+			std::stringstream line(text);
+
+			ctfs[currImg] = setFromFile(line, voltage, Cs, Q0, Bfac, scale);
+			currImg++;
+			
+			if (currImg >= imageCount)
+			{
+				break;
+			}
+		}
+		
+		if (currImg < imageCount)
+		{
+			REPORT_ERROR_STR("Insufficient number of CTFs found in " << path << ".\n"
+							 << imageCount << " requested, " << currImg << " found.\n");
+		}
     }
+	else
+	{
+		std::string fnBase, fnEnd;
+		fnBase = path.substr(0, ast);
+		fnEnd = path.substr(ast+1);
+		
+		for (int i = 0; i < imageCount; i++)
+		{
+			std::stringstream sts;
+			sts << i;
+			std::string fnm;
+			sts >> fnm;
+	
+			std::string fn = fnBase + fnm + fnEnd;
+			std::ifstream file(fn.c_str());
+	
+			if (!file.is_open())
+			{
+				REPORT_ERROR("failed to open " + fn + '\n');
+			}
+			
+			char text[4096];
+	
+			while (file.getline(text, 4096))
+			{
+				if (text[0] == '#') continue;
+	
+				std::stringstream line(text);
+	
+				ctfs[i] = setFromFile(line, voltage, Cs, Q0, Bfac, scale);
+			}
+		}
+	}
+	
+	return ctfs;
+}
 
-    std::string fnBase = path.substr(0, ast);
-    std::string fnEnd = path.substr(ast+1);
+CTF CtfHelper::setFromFile(std::stringstream& line,
+						   double voltage, double Cs, double Q0, double Bfac, double scale)
+{
+	/*
+	#1 - micrograph number;
+	#2 - defocus 1 [Angstroms];
+	#3 - defocus 2;
+	#4 - azimuth of astigmatism;
+	#5 - additional phase shift [radians];
+	#6 - cross correlation;
+	#7 - spacing (in Angstroms) up to which CTF rings were fit successfully
+	*/
 
-    std::vector<CTF> ctfs(imageCount);
+	double imgNumber, defocus1, defocus2, azimuth, phaseShift, crossCorr, bestBefore;
 
-    char text[4096];
+	line >> imgNumber;
+	line >> defocus1;
+	line >> defocus2;
+	line >> azimuth;
+	line >> phaseShift;
+	line >> crossCorr;
+	line >> bestBefore;
 
-    for (int i = 0; i < imageCount; i++)
-    {
-        std::stringstream sts;
-        sts << i;
-        std::string fnm;
-        sts >> fnm;
-
-        std::string fn = fnBase + fnm + fnEnd;
-        std::ifstream file(fn.c_str());
-
-        if (!file.is_open())
-        {
-            REPORT_ERROR("failed to open " + fn + '\n');
-        }
-
-        while (file.getline(text, 4096))
-        {
-            if (text[0] == '#') continue;
-
-            std::stringstream line(text);
-
-            /*
-            #1 - micrograph number;
-            #2 - defocus 1 [Angstroms];
-            #3 - defocus 2;
-            #4 - azimuth of astigmatism;
-            #5 - additional phase shift [radians];
-            #6 - cross correlation;
-            #7 - spacing (in Angstroms) up to which CTF rings were fit successfully
-            */
-
-            double imgNumber, defocus1, defocus2, azimuth, phaseShift, crossCorr, bestBefore;
-
-            line >> imgNumber;
-            line >> defocus1;
-            line >> defocus2;
-            line >> azimuth;
-            line >> phaseShift;
-            line >> crossCorr;
-            line >> bestBefore;
-
-            ctfs[i].setValues(defocus1, defocus2, azimuth, voltage, Cs, Q0, Bfac, scale, phaseShift);
-
-                    /*RFLOAT _defU, RFLOAT _defV, RFLOAT _defAng,
-                    RFLOAT _voltage, RFLOAT _Cs, RFLOAT _Q0,
-                    RFLOAT _Bfac, RFLOAT _scale = 1., RFLOAT _phase_shift = 0.*/
-        }
-    }
-
-    return ctfs;
+	CTF ctf;
+	ctf.setValues(defocus1, defocus2, azimuth, voltage, Cs, Q0, Bfac, scale, phaseShift);
+	
+	return ctf;
 }

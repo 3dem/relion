@@ -49,29 +49,27 @@ TiltEstimator::TiltEstimator()
 void TiltEstimator::read(IOParser &parser, int argc, char *argv[])
 {
 	kmin = textToFloat(parser.getOption("--kmin_tilt", 
-		"Inner freq. threshold for beamtilt estimation [Angst]", "20.0"));
+		"Inner freq. threshold for beamtilt estimation [Å]", "20.0"));
 	
 	std::string aberrToken = "--odd_aberr_max_n";
 	
 	aberr_n_max  = textToInteger(parser.getOption(aberrToken, 
 		"Maximum degree of Zernike polynomials used to fit odd (i.e. antisymmetrical) aberrations", "0"));
 	
-	xring0 = textToDouble(parser.getOption("--xr0", 
-		"Exclusion ring start (A)", "-1"));
+	xring0 = textToDouble(parser.getOption("--xr0_t", 
+		"Exclusion ring start [Å] - use to exclude dominant frequency (e.g. for helices)", "-1"));
 	
-	xring1 = textToDouble(parser.getOption("--xr1", 
-		"Exclusion ring end (A)", "-1"));
+	xring1 = textToDouble(parser.getOption("--xr1_t", 
+		"Exclusion ring end [Å]", "-1"));
 			
 }
 
 void TiltEstimator::init(
-		int verb, int s, int nr_omp_threads, 
+		int verb, int nr_omp_threads, 
 		bool debug, bool diag, std::string outPath,
 		ReferenceMap* reference, ObservationModel* obsModel)
 {
 	this->verb = verb;
-	this->s = s;
-	sh = s/2 + 1;
 	this->nr_omp_threads = nr_omp_threads;
 	
 	this->debug = debug;
@@ -81,7 +79,8 @@ void TiltEstimator::init(
 	this->reference = reference;
 	this->obsModel = obsModel;
 	
-	angpix = obsModel->getPixelSize(0);
+	angpix = obsModel->getPixelSizes();
+	obsModel->getBoxSizes(s, sh);
 		
 	ready = true;
 }
@@ -96,72 +95,64 @@ void TiltEstimator::processMicrograph(
 		REPORT_ERROR("ERROR: TiltEstimator::processMicrograph: TiltEstimator not initialized.");
 	}
 	
-	const int pc = mdt.numberOfObjects();
+	std::vector<std::pair<int, std::vector<int>>> particlesByOpticsGroup 
+			= obsModel->splitParticlesByOpticsGroup(mdt);
 	
-	std::vector<int> optGroups = obsModel->getOptGroupsPresent(mdt);	
-	const int cc = optGroups.size();
-	
-	std::vector<int> groupToIndex(obsModel->numberOfOpticsGroups()+1, -1);
-	
-	for (int i = 0; i < cc; i++)
-	{
-		groupToIndex[optGroups[i]] = i;
-	}
+	for (int pog = 0; pog < particlesByOpticsGroup.size(); pog++)
+	{			
+		const int og = particlesByOpticsGroup[pog].first;
+		const std::vector<int>& partIndices = particlesByOpticsGroup[pog].second;
 		
-	std::vector<Image<Complex>> xyAcc(nr_omp_threads*cc);
-	std::vector<Image<RFLOAT>> wAcc(nr_omp_threads*cc);
-	
-	for (int i = 0; i < nr_omp_threads*cc; i++)
-	{
-		xyAcc[i] = Image<Complex>(sh,s);
-		xyAcc[i].data.initZeros();
+		const int pc = partIndices.size();
+			
+		std::vector<Image<Complex>> xyAcc(nr_omp_threads);
+		std::vector<Image<RFLOAT>> wAcc(nr_omp_threads);
 		
-		wAcc[i] = Image<RFLOAT>(sh,s);
-		wAcc[i].data.initZeros();
-	}
-	
-	#pragma omp parallel for num_threads(nr_omp_threads)
-	for (long p = 0; p < pc; p++)
-	{
-		CTF ctf;
-		ctf.readByGroup(mdt, obsModel, p);
-		
-		int threadnum = omp_get_thread_num();
-		
-		int og;
-		mdt.getValue(EMDL_IMAGE_OPTICS_GROUP, og, p);
-
-		const int ci = groupToIndex[og];
-
-		TiltHelper::updateTiltShift(
-			pred[p], obs[p], ctf, angpix, 
-			xyAcc[cc*threadnum + ci], 
-			wAcc[cc*threadnum + ci]);
-	}
-	
-	// Combine the accumulated weights from all threads for this subset, 
-	// store weighted sums in xyAccSum and wAccSum
-	
-	for (int ci = 0; ci < cc; ci++)
-	{
-		Image<Complex> xyAccSum(sh,s);
-		Image<RFLOAT> wAccSum(sh,s);
-		
-		for (int threadnum = 0; threadnum < nr_omp_threads; threadnum++)
+		for (int i = 0; i < nr_omp_threads; i++)
 		{
-			ImageOp::linearCombination(xyAccSum, xyAcc[cc*threadnum + ci], 1.0, 1.0, xyAccSum);
-			ImageOp::linearCombination(wAccSum, wAcc[cc*threadnum + ci], 1.0, 1.0, wAccSum);
+			xyAcc[i] = Image<Complex>(sh[og],s[og]);
+			xyAcc[i].data.initZeros();
+			
+			wAcc[i] = Image<RFLOAT>(sh[og],s[og]);
+			wAcc[i].data.initZeros();
 		}
 		
-		// Write out the intermediate results per-micrograph:
+		#pragma omp parallel for num_threads(nr_omp_threads)
+		for (long pp = 0; pp < pc; pp++)
+		{
+			const int p = partIndices[pp];
+			
+			CTF ctf;
+			ctf.readByGroup(mdt, obsModel, p);
+			
+			int threadnum = omp_get_thread_num();
+			
+			TiltHelper::updateTiltShift(
+				pred[p], obs[p], ctf, angpix[og], 
+				xyAcc[threadnum], wAcc[threadnum]);
+		}
+		
+		// Combine the accumulated weights from all threads for this subset, 
+		// store weighted sums in xyAccSum and wAccSum
+		
+		Image<Complex> xyAccSum(sh[og], s[og]);
+		Image<RFLOAT> wAccSum(sh[og], s[og]);
+			
+		for (int threadnum = 0; threadnum < nr_omp_threads; threadnum++)
+		{
+			ImageOp::linearCombination(xyAccSum, xyAcc[threadnum], 1.0, 1.0, xyAccSum);
+			ImageOp::linearCombination(wAccSum, wAcc[threadnum], 1.0, 1.0, wAccSum);
+		}
+			
+		// Write out the intermediate results for this micrograph:
 		
 		std::string outRoot = CtfRefiner::getOutputFilenameRoot(mdt, outPath);
 		
 		std::stringstream sts;
-		sts << optGroups[ci];
+		sts << (og+1);
 		
-		ComplexIO::write(xyAccSum(), outRoot + "_xyAcc_optics-class_" + sts.str(), ".mrc");
-		wAccSum.write(outRoot+"_wAcc_optics-class_" + sts.str() + ".mrc");
+		ComplexIO::write(xyAccSum(), outRoot + "_xyAcc_optics-group_" + sts.str(), ".mrc");
+		wAccSum.write(outRoot+"_wAcc_optics-group_" + sts.str() + ".mrc");
 	}
 }
 
@@ -186,15 +177,15 @@ void TiltEstimator::parametricFit(
 	
 	for (int og = 0; og < ogc; og++)
 	{	
-		double Cs = obsModel->Cs[og];
-		double lambda = obsModel->lambda[og];
+		double Cs = obsModel->getSphericalAberration(og);
+		double lambda = obsModel->getWavelength(og);
 		
 		std::stringstream sts;
-		sts << og+1;
-		std::string cns = sts.str();
+		sts << (og+1);
+		std::string ogstr = sts.str();
 		
-		Image<Complex> xyAccSum(sh,s);
-		Image<RFLOAT> wAccSum(sh,s);
+		Image<Complex> xyAccSum(sh[og], s[og]);
+		Image<RFLOAT> wAccSum(sh[og], s[og]);
 		
 		xyAccSum.data.initZeros();
 		wAccSum.data.initZeros();
@@ -203,15 +194,15 @@ void TiltEstimator::parametricFit(
 		{
 			std::string outRoot = CtfRefiner::getOutputFilenameRoot(mdts[g], outPath);
 			
-			if (   exists(outRoot+"_xyAcc_optics-class_"+cns+"_real.mrc")
-				&& exists(outRoot+"_xyAcc_optics-class_"+cns+"_imag.mrc")
-				&& exists(outRoot+ "_wAcc_optics-class_"+cns+".mrc"))
+			if (   exists(outRoot+"_xyAcc_optics-group_"+ogstr+"_real.mrc")
+				&& exists(outRoot+"_xyAcc_optics-group_"+ogstr+"_imag.mrc")
+				&& exists(outRoot+ "_wAcc_optics-group_"+ogstr+".mrc"))
 			{
 				Image<Complex> xyAcc;
 				Image<RFLOAT> wAcc;
 				
-				wAcc.read(outRoot+"_wAcc_optics-class_"+cns+".mrc");
-				ComplexIO::read(xyAcc, outRoot+"_xyAcc_optics-class_"+cns, ".mrc");
+				wAcc.read(outRoot+"_wAcc_optics-group_"+ogstr+".mrc");
+				ComplexIO::read(xyAcc, outRoot+"_xyAcc_optics-group_"+ogstr, ".mrc");
 				
 				xyAccSum() += xyAcc();
 				wAccSum()  +=  wAcc();
@@ -229,23 +220,21 @@ void TiltEstimator::parametricFit(
 		
 		FilterHelper::getPhase(xyAccSum, phase);
 		
-		Image<Complex> xyNrm(sh,s);
+		Image<Complex> xyNrm(sh[og],s[og]);
 	
-		double kmin_px = obsModel->angToPix(kmin, s, og);
-				 
-		Image<RFLOAT> wgh0 = reference->getHollowWeight(kmin_px);
+		Image<RFLOAT> wgh0 = reference->getHollowWeight(kmin, s[og], angpix[og]);
 		
 		FilterHelper::multiply(wAccSum, wgh0, wgh);
 	
 		if (xring1 > 0.0)
 		{
-			for (int y = 0; y < s; y++)
-			for (int x = 0; x < sh; x++)
+			for (int y = 0; y < s[og]; y++)
+			for (int x = 0; x < sh[og]; x++)
 			{
 				double xx = x;
-				double yy = y <= sh? y : y - s;
+				double yy = y <= sh[og]? y : y - s[og];
 				double rp = sqrt(xx*xx + yy*yy);
-				double ra = s * angpix / rp;
+				double ra = s[og] * angpix[og] / rp;
 				
 				if (ra > xring0 && ra <= xring1)
 				{
@@ -254,8 +243,8 @@ void TiltEstimator::parametricFit(
 			}
 		}
 		
-		for (int y = 0; y < s; y++)
-		for (int x = 0; x < sh; x++)
+		for (int y = 0; y < s[og]; y++)
+		for (int x = 0; x < sh[og]; x++)
 		{
 			xyNrm(y,x) = wAccSum(y,x) > 0.0? xyAccSum(y,x)/wAccSum(y,x) : Complex(0.0, 0.0);
 		}
@@ -265,69 +254,69 @@ void TiltEstimator::parametricFit(
 			Image<RFLOAT> wghFull;
 			FftwHelper::decenterDouble2D(wgh(), wghFull());
 			
-			ImageLog::write(wghFull, outPath + "beamtilt_weight-full_optics-class_"+cns);
+			ImageLog::write(wghFull, outPath + "beamtilt_weight-full_optics-group_"+ogstr);
 		}
 		
 		FftwHelper::decenterUnflip2D(phase.data, phaseFull.data);
 			
-		ImageLog::write(phaseFull, outPath + "beamtilt_delta-phase_per-pixel_optics-class_"+cns);
+		ImageLog::write(phaseFull, outPath + "beamtilt_delta-phase_per-pixel_optics-group_"+ogstr);
 		
 		double shift_x(0), shift_y(0), tilt_x(0), tilt_y(0);
 		
 		if (aberr_n_max < 3)
 		{
 			TiltHelper::fitTiltShift(
-				phase, wgh, Cs, lambda, angpix,
+				phase, wgh, Cs, lambda, angpix[og],
 				&shift_x, &shift_y, &tilt_x, &tilt_y, &fit);
 				
 			FftwHelper::decenterUnflip2D(fit.data, fitFull.data);
 			
-			ImageLog::write(fitFull, outPath + "beamtilt_delta-phase_lin-fit_optics-class_"+cns);
+			ImageLog::write(fitFull, outPath + "beamtilt_delta-phase_lin-fit_optics-group_"+ogstr);
 						
 			TiltHelper::optimizeTilt(
-					xyNrm, wgh, Cs, lambda, angpix, false,
+					xyNrm, wgh, Cs, lambda, angpix[og], false,
 					shift_x, shift_y, tilt_x, tilt_y,
 					&shift_x, &shift_y, &tilt_x, &tilt_y, &fit);
 			
 			FftwHelper::decenterUnflip2D(fit.data, fitFull.data);
 			
-			ImageLog::write(fitFull, outPath+"beamtilt_delta-phase_iter-fit_optics-class_"+cns);
+			ImageLog::write(fitFull, outPath+"beamtilt_delta-phase_iter-fit_optics-group_"+ogstr);
 			
 			optOut.setValue(EMDL_IMAGE_BEAMTILT_X, tilt_x, og);
 			optOut.setValue(EMDL_IMAGE_BEAMTILT_Y, tilt_y, og);
 		}
 		else
 		{
-			Image<RFLOAT> one(sh,s);
+			Image<RFLOAT> one(sh[og],s[og]);
 			one.data.initConstant(1);
 			
 			std::vector<double> Zernike_coeffs = TiltHelper::fitOddZernike(
-						xyNrm, wgh, angpix, aberr_n_max, &fit);
+						xyNrm, wgh, angpix[og], aberr_n_max, &fit);
 						
 			FftwHelper::decenterUnflip2D(fit.data, fitFull.data);
 			
 			std::stringstream sts;
 			sts << aberr_n_max;
 			
-			ImageLog::write(fitFull, outPath + "beamtilt_delta-phase_lin-fit_optics-class_"
-							+cns+"_N-"+sts.str());
+			ImageLog::write(fitFull, outPath + "beamtilt_delta-phase_lin-fit_optics-group_"
+							+ogstr+"_N-"+sts.str());
 				
 			if (debug)
 			{
 				Image<RFLOAT> residual;
 				residual.data = phaseFull.data - fitFull.data;
 				
-				ImageLog::write(residual, outPath + "beamtilt_delta-phase_lin-fit_optics-class_"
-								+cns+"_N-"+sts.str()+"_residual");
+				ImageLog::write(residual, outPath + "beamtilt_delta-phase_lin-fit_optics-group_"
+								+ogstr+"_N-"+sts.str()+"_residual");
 			}
 						
 			std::vector<double> Zernike_coeffs_opt = TiltHelper::optimiseOddZernike(
-						xyNrm, wgh, angpix, aberr_n_max, Zernike_coeffs, &fit);
+						xyNrm, wgh, angpix[og], aberr_n_max, Zernike_coeffs, &fit);
 				
 			FftwHelper::decenterUnflip2D(fit.data, fitFull.data);
 						
-			ImageLog::write(fitFull, outPath + "beamtilt_delta-phase_iter-fit_optics-class_"
-							+cns+"_N-"+sts.str());
+			ImageLog::write(fitFull, outPath + "beamtilt_delta-phase_iter-fit_optics-group_"
+							+ogstr+"_N-"+sts.str());
 			
 			TiltHelper::extractTilt(Zernike_coeffs_opt, tilt_x, tilt_y, Cs, lambda);
 						
@@ -349,17 +338,17 @@ bool TiltEstimator::isFinished(const MetaDataTable &mdt)
 	
 	bool allDone = true;
 	
-	std::vector<int> ogp = obsModel->getOptGroupsPresent(mdt);
+	std::vector<int> ogp = obsModel->getOptGroupsPresent_zeroBased(mdt);
 	
 	for (int i = 0; i < ogp.size(); i++)
 	{	
 		std::stringstream sts;
-		sts << ogp[i];
+		sts << (ogp[i]+1);
 		std::string ogs = sts.str();
 		
-		if (   !exists(outRoot+"_xyAcc_optics-class_"+ogs+"_real.mrc")
-			|| !exists(outRoot+"_xyAcc_optics-class_"+ogs+"_imag.mrc")
-			|| !exists(outRoot+"_wAcc_optics-class_"+ogs+".mrc"))
+		if (   !exists(outRoot+"_xyAcc_optics-group_"+ogs+"_real.mrc")
+			|| !exists(outRoot+"_xyAcc_optics-group_"+ogs+"_imag.mrc")
+			|| !exists(outRoot+"_wAcc_optics-group_"+ogs+".mrc"))
 		{
 			allDone = false;
 			break;

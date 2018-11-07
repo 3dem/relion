@@ -64,7 +64,7 @@ int main(int argc, char *argv[])
 	
 	ObservationModel::loadSafely(starFn, obsModel, mdt0, opticsMdt);
 	
-	std::vector<MetaDataTable> allMdts = StackHelper::splitByMicrographName(&mdt0);
+	std::vector<MetaDataTable> allMdts = StackHelper::splitByMicrographName(mdt0);
 	
 	reference.load(1, false);
 	
@@ -84,7 +84,7 @@ int main(int argc, char *argv[])
 		opticsGroup--;
 		
 		// both defocus_tit and tilt_fit need the same observations
-		obs = StackHelper::loadStackFS(&allMdts[m], "", threads, true, obsModel.angpix[opticsGroup]);
+		obs = StackHelper::loadStackFS(allMdts[m], "", threads, true, &obsModel);
 		
 		pred = reference.predictAll(
 			allMdts[m], obsModel, 

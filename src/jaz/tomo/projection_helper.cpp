@@ -18,7 +18,7 @@
  * author citations must be preserved.
  ***************************************************************************/
 
-#include <src/jaz/projection_helper.h>
+#include "projection_helper.h"
 #include <fstream>
 #include <cmath>
 #include <src/error.h>

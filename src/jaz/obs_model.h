@@ -52,13 +52,17 @@ class ObservationModel
 
 
 			MetaDataTable opticsMdt;
-			bool hasEvenZernike, hasOddZernike, hasMagMatrices;
-			std::vector<double> angpix, lambda, Cs;
-			std::vector<std::vector<double> > evenZernikeCoeffs, oddZernikeCoeffs;
-			std::vector<Matrix2D<RFLOAT> > magMatrices;
+			bool hasEvenZernike, hasOddZernike, hasMagMatrices, hasBoxSizes;
 
 
 	protected:
+			
+			// cached values - protected to prevent users from accidentally changing them,
+			// expecting the changes to propagate into the optics star-file
+			std::vector<double> angpix, lambda, Cs;
+			std::vector<int> boxSizes;
+			std::vector<std::vector<double> > evenZernikeCoeffs, oddZernikeCoeffs;
+			std::vector<Matrix2D<RFLOAT> > magMatrices;
 
 			// cached aberration effects for a set of given image sizes
 			// e.g.: phaseCorr[opt. group][img. height](y,x)
@@ -72,11 +76,11 @@ class ObservationModel
 
 		void predictObservation(
 				Projector &proj, const MetaDataTable &partMdt, long int particle,
-				MultidimArray<Complex>& dest,
+				MultidimArray<Complex>& dest, double angpix_ref,
 				bool applyCtf = true, bool shiftPhases = true, bool applyShift = true);
 
 		Volume<gravis::t2Vector<Complex> > predictComplexGradient(
-				Projector &proj, const MetaDataTable &partMdt, long int particle,
+				Projector &proj, const MetaDataTable &partMdt, long int particle, double angpix_ref,
 				bool applyCtf = true, bool shiftPhases = true, bool applyShift = true);
 
 
@@ -99,8 +103,15 @@ class ObservationModel
 
 		// effect of symmetric aberration (cached)
 		const Image<RFLOAT>& getGammaOffset(int optGroup, int s);
-
-		Matrix2D<RFLOAT> applyAnisoMagTransp(Matrix2D<RFLOAT> A3D_transp, int opticsGroup);
+		
+		Matrix2D<RFLOAT> applyAnisoMagTransp(
+				Matrix2D<RFLOAT> A3D_transp, int opticsGroup);
+		
+		Matrix2D<RFLOAT> getMag3x3(int opticsGroup);
+		
+		Matrix2D<RFLOAT> applyScaleDifference(
+				Matrix2D<RFLOAT> A3D_transp, int opticsGroup, 
+				int s3D, double angpix3D);
 
 
 
@@ -111,9 +122,23 @@ class ObservationModel
 
         double angToPix(double a, int s, int opticsGroup = 0) const;
         double pixToAng(double p, int s, int opticsGroup = 0) const;
+		
+		double getPixelSize(int opticsGroup) const;
+		std::vector<double> getPixelSizes() const;
+		
+		double getWavelength(int opticsGroup) const;
+		std::vector<double> getWavelengths() const;
+		
+		double getSphericalAberration(int opticsGroup) const;
+		std::vector<double> getSphericalAberrations() const;
+	
+		int getBoxSize(int opticsGroup) const;
+		void getBoxSizes(std::vector<int>& sDest, std::vector<int>& shDest) const;
 
-		double getPixelSize(int opticsGroup = 0) const;
-
+		Matrix2D<RFLOAT> getMagMatrix(int opticsGroup) const;
+		std::vector<Matrix2D<RFLOAT> > getMagMatrices() const;
+		
+		int getOpticsGroup(const MetaDataTable &particlesMdt, int particle) const;
 
 		/* duh */
 		int numberOfOpticsGroups() const;
@@ -133,11 +158,15 @@ class ObservationModel
 		   and translate the indices in particle table partMdt.
 		   (Merely changing the order in opticsMdt would fail if groups were missing.) */
 		void sortOpticsGroups(MetaDataTable& partMdt);
-
+		
 		/* Return the set of optics groups present in partMdt */
-		std::vector<int> getOptGroupsPresent(const MetaDataTable& partMdt) const;
+		std::vector<int> getOptGroupsPresent_oneBased(const MetaDataTable& partMdt) const;
+		
+		/* Return the set of optics groups present in partMdt */
+		std::vector<int> getOptGroupsPresent_zeroBased(const MetaDataTable& partMdt) const;
 
-
+		std::vector<std::pair<int, std::vector<int> > > splitParticlesByOpticsGroup(
+				const MetaDataTable& partMdt) const;
 
 
 };

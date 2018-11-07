@@ -32,7 +32,8 @@ class TomoStack
     public:
 
         TomoStack(){}
-        TomoStack(std::string imagesFn, int imgCount, std::string angles, std::string affineTransforms, std::string ctfPath,
+        TomoStack(std::string imagesFn, int imgCount, std::string angles, 
+				  std::string affineTransforms, std::string ctfPath,
                   double angpix, double scaleFactor = 1.0, bool loadImgs = true);
 
         TomoStack extractSubStack(gravis::d3Vector center, int w, int h);

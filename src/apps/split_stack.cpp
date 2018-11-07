@@ -10,7 +10,6 @@
 #include <src/metadata_table.h>
 #include <src/jaz/slice_helper.h>
 #include <src/jaz/img_proc/filter_helper.h>
-#include <src/jaz/backprojection_helper.h>
 #include <src/jaz/volume_converter.h>
 
 #include <src/jaz/gravis/t4Matrix.h>
@@ -18,8 +17,8 @@ using namespace gravis;
 
 int main(int argc, char *argv[])
 {
-    std::string inPath = "/beegfs/zivanov/tomograms/ts_05/";
-    std::string inName = "05";
+    std::string inPath = "./";
+    std::string inName = "TS_03";
 
     Image<RFLOAT> img0;
     img0.read(inPath+inName+".st:mrcs", true);

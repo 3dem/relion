@@ -18,8 +18,8 @@
  * author citations must be preserved.
  ***************************************************************************/
 
-#include <src/jaz/tomo_stack.h>
-#include <src/jaz/projection_helper.h>
+#include "tomo_stack.h"
+#include "projection_helper.h"
 #include <src/jaz/slice_helper.h>
 #include <src/jaz/image_log.h>
 #include <src/jaz/ctf_helper.h>
@@ -29,7 +29,8 @@
 
 using namespace gravis;
 
-TomoStack :: TomoStack(std::string imagesFn, int imgCount, std::string angles, std::string affineTransforms, std::string ctfPath,
+TomoStack :: TomoStack(std::string imagesFn, int imgCount, std::string angles, 
+					   std::string affineTransforms, std::string ctfPath,
                        double angpix, double scaleFactor, bool loadImgs)
 :   angpix(angpix),
     scaleFactor(scaleFactor)
@@ -59,12 +60,13 @@ TomoStack :: TomoStack(std::string imagesFn, int imgCount, std::string angles, s
             if (!loadImgs) break;
         }
 
-    double cx = images[0].data.xdim/(2.0 * scaleFactor);
-    double cy = images[0].data.ydim/(2.0 * scaleFactor);
+	d2Vector center;
+    center.x = images[0].data.xdim/(2.0 * scaleFactor);
+    center.y = images[0].data.ydim/(2.0 * scaleFactor);
 
-    tiltProjs = ProjectionHelper::loadTiltProjections(angles, cx, cy);
-    affineXforms = ProjectionHelper::loadAffineTransforms(affineTransforms, cx, cy);
-    ctfs = CtfHelper::loadCtffind4(ctfPath, imgCount, 300.0, 2.7, 0.1);
+    tiltProjs = ProjectionHelper::loadTiltProjections(angles, center.x, center.y);
+    affineXforms = ProjectionHelper::loadAffineTransforms(affineTransforms, center.x, center.y);
+    ctfs = CtfHelper::loadCtffind4(ctfPath, imgCount, 300.0, 2.7, 0.07);
 
     if (tiltProjs.size() < imgCount)
     {
@@ -144,6 +146,9 @@ void TomoStack :: downsample(int factor, int f0, int fc)
     {
         SliceHelper::downsample(images[i], temp);
         images[i] = temp;
+		
+		worldToImage[i] /= factor;
+		worldToImage[i](3,3) = 1.0;
     }
 
     angpix *= factor;

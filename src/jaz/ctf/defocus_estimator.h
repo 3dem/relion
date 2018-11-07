@@ -37,7 +37,7 @@ class DefocusEstimator
 		void read(IOParser& parser, int argc, char *argv[]);
 
         void init(
-				int verb, int s, int nr_omp_threads,
+				int verb, int nr_omp_threads,
 				bool debug, bool diag,
 				std::string outPath,
 				ReferenceMap* reference,
@@ -65,12 +65,13 @@ class DefocusEstimator
 		bool fitAstigmatism, noGlobAstig, fitPhase, fitCs, globOnly;
 		
 		// set at init:
-		int verb, s, sh, nr_omp_threads;
+		int verb, nr_omp_threads;
 		bool debug, diag;
 		std::string outPath;
-		double angpix;
 		
-		Image<RFLOAT> freqWeight;
+		std::vector<int> s, sh;
+		std::vector<double> angpix;		
+		std::vector<Image<RFLOAT> > freqWeights;
 		
 		ReferenceMap* reference;
 		ObservationModel* obsModel;

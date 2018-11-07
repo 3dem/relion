@@ -33,10 +33,15 @@ class CtfHelper
 {
     public:
 
+		
         static std::vector<CTF> loadCtffind4(std::string path, int imageCount,
                                              double voltage = 300.0, double Cs = 2.2,
                                              double Q0 = 0.1, double Bfac = 0.0,
                                              double scale = 1.0);
+		
+		static CTF setFromFile(
+				std::stringstream& line, 
+				double voltage, double Cs, double Q0, double Bfac, double scale);
 };
 
 #endif

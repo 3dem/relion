@@ -123,7 +123,8 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 :	opticsMdt(opticsMdt),
 	angpix(opticsMdt.numberOfObjects()),
 	lambda(opticsMdt.numberOfObjects()),
-	Cs(opticsMdt.numberOfObjects())
+	Cs(opticsMdt.numberOfObjects()),
+	boxSizes(opticsMdt.numberOfObjects(), 0.0)
 {
 	if (   !opticsMdt.containsLabel(EMDL_IMAGE_PIXEL_SIZE)
 	    || !opticsMdt.containsLabel(EMDL_CTF_VOLTAGE)
@@ -155,10 +156,13 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 			      || opticsMdt.containsLabel(EMDL_IMAGE_MAG_MATRIX_11);
 
 	if (hasMagMatrices) magMatrices.resize(opticsMdt.numberOfObjects());
-
+	
+	hasBoxSizes = opticsMdt.containsLabel(EMDL_IMAGE_SIZE);
+	
 	for (int i = 0; i < opticsMdt.numberOfObjects(); i++)
 	{
 		opticsMdt.getValue(EMDL_IMAGE_PIXEL_SIZE, angpix[i], i);
+		opticsMdt.getValue(EMDL_IMAGE_SIZE, boxSizes[i], i);
 
 		double kV;
 		opticsMdt.getValue(EMDL_CTF_VOLTAGE, kV, i);
@@ -190,8 +194,6 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 			}
 
 			TiltHelper::insertTilt(oddZernikeCoeffs[i], tx, ty, Cs[i], lambda[i]);
-
-			hasOddZernike = true;
 		}
 
 		if (hasMagMatrices)
@@ -206,85 +208,94 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 			opticsMdt.getValue(EMDL_IMAGE_MAG_MATRIX_11, magMatrices[i](1,1), i);
 		}
 	}
-
-	// @TODO: make sure tilt is in opticsMDT, not in particlesMDT!
+	
+	if (hasTilt) hasOddZernike = true;
 }
 
 void ObservationModel::predictObservation(
         Projector& proj, const MetaDataTable& partMdt, long int particle,
-		MultidimArray<Complex>& dest,
+		MultidimArray<Complex>& dest, double angpix_ref,
         bool applyCtf, bool shiftPhases, bool applyShift)
 {
-    const int s = proj.ori_size;
-    const int sh = s/2 + 1;
+	const int s_ref = proj.ori_size;
 
 	int opticsGroup;
 	partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, particle);
 	opticsGroup--;
+	
+	if (!hasBoxSizes)
+	{
+		REPORT_ERROR_STR("ObservationModel::predictObservation: Unable to make a prediction "
+						 << "without knowing the box size.\n");
+	}
+	
+	const int s_out = boxSizes[opticsGroup];
+	const int sh_out = s_out/2 + 1;
 
-    double xoff, yoff;
+	double xoff, yoff;
 
-    partMdt.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff, particle);
-    partMdt.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff, particle);
+	partMdt.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff, particle);
+	partMdt.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff, particle);
 
 	xoff /= angpix[opticsGroup];
 	yoff /= angpix[opticsGroup];
 
-    double rot, tilt, psi;
+	double rot, tilt, psi;
 
-    Matrix2D<RFLOAT> A3D;
-    partMdt.getValue(EMDL_ORIENT_ROT, rot, particle);
-    partMdt.getValue(EMDL_ORIENT_TILT, tilt, particle);
-    partMdt.getValue(EMDL_ORIENT_PSI, psi, particle);
-
-    Euler_angles2matrix(rot, tilt, psi, A3D);
-
+	Matrix2D<RFLOAT> A3D;
+	partMdt.getValue(EMDL_ORIENT_ROT, rot, particle);
+	partMdt.getValue(EMDL_ORIENT_TILT, tilt, particle);
+	partMdt.getValue(EMDL_ORIENT_PSI, psi, particle);
+	
+	Euler_angles2matrix(rot, tilt, psi, A3D);
+	
 	A3D = applyAnisoMagTransp(A3D, opticsGroup);
+	A3D = applyScaleDifference(A3D, opticsGroup, s_ref, angpix_ref);
 
-	if (dest.xdim != sh || dest.ydim != s)
+	if (dest.xdim != sh_out || dest.ydim != s_out)
 	{
-		dest.resize(s,sh);
+		dest.resize(s_out,sh_out);
 	}
 
 	dest.initZeros();
 
-    proj.get2DFourierTransform(dest, A3D, false);
+	proj.get2DFourierTransform(dest, A3D, false);
 
 	if (applyShift)
 	{
-		shiftImageInFourierTransform(dest, dest, s, s/2 - xoff, s/2 - yoff);
+		shiftImageInFourierTransform(dest, dest, s_out, s_out/2 - xoff, s_out/2 - yoff);
 	}
 
-    if (applyCtf)
-    {
-        CTF ctf;
-        ctf.readByGroup(partMdt, this, particle);
+	if (applyCtf)
+	{
+		CTF ctf;
+		ctf.readByGroup(partMdt, this, particle);
 
-		Image<RFLOAT> ctfImg(sh,s);
-		ctf.getFftwImage(ctfImg(), s, s, angpix[opticsGroup]);
+		Image<RFLOAT> ctfImg(sh_out,s_out);
+		ctf.getFftwImage(ctfImg(), s_out, s_out, angpix[opticsGroup]);
 
-		for (int y = 0; y < s;  y++)
-		for (int x = 0; x < sh; x++)
+		for (int y = 0; y < s_out;  y++)
+		for (int x = 0; x < sh_out; x++)
 		{
 			dest(y,x) *= ctfImg(y,x);
 		}
-    }
+	}
 
-    if (shiftPhases && oddZernikeCoeffs.size() > opticsGroup
+	if (shiftPhases && oddZernikeCoeffs.size() > opticsGroup
 			&& oddZernikeCoeffs[opticsGroup].size() > 0)
-    {
-		const Image<Complex>& corr = getPhaseCorrection(opticsGroup, s);
+	{
+		const Image<Complex>& corr = getPhaseCorrection(opticsGroup, s_out);
 
-		for (int y = 0; y < s;  y++)
-		for (int x = 0; x < sh; x++)
+		for (int y = 0; y < s_out;  y++)
+		for (int x = 0; x < sh_out; x++)
 		{
 			dest(y,x) *= corr(y,x);
 		}
-    }
+	}
 }
 
 Volume<t2Vector<Complex>> ObservationModel::predictComplexGradient(
-		Projector &proj, const MetaDataTable &partMdt, long particle,
+		Projector &proj, const MetaDataTable &partMdt, long particle, double angpix_ref,
 		bool applyCtf, bool shiftPhases, bool applyShift)
 {
 	if (applyCtf || applyShift)
@@ -292,49 +303,52 @@ Volume<t2Vector<Complex>> ObservationModel::predictComplexGradient(
 		REPORT_ERROR_STR("ObservationModel::predictComplexGradient: "
 						 << "applyCtf and applyShift are currently not supported\n");
 	}
-
-	const int s = proj.ori_size;
-    const int sh = s/2 + 1;
-
-	Volume<t2Vector<Complex>> out(sh,s,1);
-
+	
+	const int s_ref = proj.ori_size;
+	
 	int opticsGroup;
 	partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, particle);
 	opticsGroup--;
-
+	
+	const int s_out = boxSizes[opticsGroup];
+	const int sh_out = s_out/2 + 1;
+	
+	Volume<t2Vector<Complex>> out(sh_out,s_out,1);
+	
 	double xoff, yoff;
 
-    partMdt.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff, particle);
-    partMdt.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff, particle);
+	partMdt.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff, particle);
+	partMdt.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff, particle);
 
 	xoff /= angpix[opticsGroup];
 	yoff /= angpix[opticsGroup];
 
-    double rot, tilt, psi;
-
-    Matrix2D<RFLOAT> A3D;
-    partMdt.getValue(EMDL_ORIENT_ROT, rot, particle);
-    partMdt.getValue(EMDL_ORIENT_TILT, tilt, particle);
-    partMdt.getValue(EMDL_ORIENT_PSI, psi, particle);
-
-    Euler_angles2matrix(rot, tilt, psi, A3D);
+	double rot, tilt, psi;
+	
+	Matrix2D<RFLOAT> A3D;
+	partMdt.getValue(EMDL_ORIENT_ROT, rot, particle);
+	partMdt.getValue(EMDL_ORIENT_TILT, tilt, particle);
+	partMdt.getValue(EMDL_ORIENT_PSI, psi, particle);
+	
+	Euler_angles2matrix(rot, tilt, psi, A3D);
 
 	A3D = applyAnisoMagTransp(A3D, opticsGroup);
+	A3D = applyScaleDifference(A3D, opticsGroup, s_ref, angpix_ref);
 
-    proj.projectGradient(out, A3D);
-
-    if (shiftPhases && oddZernikeCoeffs.size() > opticsGroup
+	proj.projectGradient(out, A3D);
+	
+	if (shiftPhases && oddZernikeCoeffs.size() > opticsGroup
 			&& oddZernikeCoeffs[opticsGroup].size() > 0)
-    {
-		const Image<Complex>& corr = getPhaseCorrection(opticsGroup, s);
+	{
+		const Image<Complex>& corr = getPhaseCorrection(opticsGroup, s_out);
 
-		for (int y = 0; y < s;  y++)
-		for (int x = 0; x < sh; x++)
+		for (int y = 0; y < s_out;  y++)
+		for (int x = 0; x < sh_out; x++)
 		{
 			out(x,y,0).x *= corr(y,x);
 			out(x,y,0).y *= corr(y,x);
 		}
-    }
+	}
 
 	return out;
 }
@@ -357,7 +371,7 @@ void ObservationModel::demodulatePhase(
 
 	if (oddZernikeCoeffs.size() > opticsGroup
 			&& oddZernikeCoeffs[opticsGroup].size() > 0)
-    {
+	{
 		const Image<Complex>& corr = getPhaseCorrection(opticsGroup, s);
 
 		for (int y = 0; y < s;  y++)
@@ -365,7 +379,7 @@ void ObservationModel::demodulatePhase(
 		{
 			obsImage(y,x) *= corr(y,x).conj();
 		}
-    }
+	}
 }
 
 bool ObservationModel::allPixelSizesIdentical() const
@@ -397,6 +411,77 @@ double ObservationModel::pixToAng(double p, int s, int opticsGroup) const
 double ObservationModel::getPixelSize(int opticsGroup) const
 {
 	return angpix[opticsGroup];
+}
+
+std::vector<double> ObservationModel::getPixelSizes() const
+{
+	return angpix;
+}
+
+double ObservationModel::getWavelength(int opticsGroup) const
+{
+	return lambda[opticsGroup];
+}
+
+std::vector<double> ObservationModel::getWavelengths() const
+{
+	return lambda;
+}
+
+double ObservationModel::getSphericalAberration(int opticsGroup) const
+{
+	return Cs[opticsGroup];
+}
+
+std::vector<double> ObservationModel::getSphericalAberrations() const
+{
+	return Cs;
+}
+
+int ObservationModel::getBoxSize(int opticsGroup) const
+{
+	if (!hasBoxSizes)
+	{
+		REPORT_ERROR("ObservationModel::getBoxSize: box sizes not available\n");
+	}
+	
+	return boxSizes[opticsGroup];
+}
+
+void ObservationModel::getBoxSizes(std::vector<int>& sDest, std::vector<int>& shDest) const
+{
+	if (!hasBoxSizes)
+	{
+		REPORT_ERROR("ObservationModel::getBoxSizes: box sizes not available\n");
+	}
+	
+	sDest.resize(boxSizes.size());
+	shDest.resize(boxSizes.size());
+	
+	for (int i = 0; i < boxSizes.size(); i++)
+	{
+		sDest[i] = boxSizes[i];
+		shDest[i] = boxSizes[i]/2 + 1;
+	}
+}
+
+Matrix2D<double> ObservationModel::getMagMatrix(int opticsGroup) const
+{
+	return magMatrices[opticsGroup];
+}
+
+std::vector<Matrix2D<double> > ObservationModel::getMagMatrices() const
+{
+	return magMatrices;
+}
+
+int ObservationModel::getOpticsGroup(const MetaDataTable &particlesMdt, int particle) const
+{
+	int opticsGroup;
+	particlesMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, particle);
+	opticsGroup--;
+	
+	return opticsGroup;
 }
 
 int ObservationModel::numberOfOpticsGroups() const
@@ -471,7 +556,7 @@ void ObservationModel::sortOpticsGroups(MetaDataTable& partMdt)
 	}
 }
 
-std::vector<int> ObservationModel::getOptGroupsPresent(const MetaDataTable& partMdt) const
+std::vector<int> ObservationModel::getOptGroupsPresent_oneBased(const MetaDataTable& partMdt) const
 {
 	const int gc = opticsMdt.numberOfObjects();
 	const int pc = partMdt.numberOfObjects();
@@ -497,6 +582,74 @@ std::vector<int> ObservationModel::getOptGroupsPresent(const MetaDataTable& part
 		}
 	}
 
+	return out;
+}
+
+std::vector<int> ObservationModel::getOptGroupsPresent_zeroBased(const MetaDataTable& partMdt) const
+{
+	const int gc = opticsMdt.numberOfObjects();
+	const int pc = partMdt.numberOfObjects();
+
+	std::vector<bool> optGroupIsPresent(gc, false);
+
+	for (int p = 0; p < pc; p++)
+	{
+		int og;
+		partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, og, p);
+
+		optGroupIsPresent[og-1] = true;
+	}
+
+	std::vector<int> out(0);
+	out.reserve(gc);
+
+	for (int g = 0; g < gc; g++)
+	{
+		if (optGroupIsPresent[g])
+		{
+			out.push_back(g);
+		}
+	}
+
+	return out;
+}
+
+std::vector<std::pair<int, std::vector<int>>> ObservationModel::splitParticlesByOpticsGroup(
+		const MetaDataTable &partMdt) const
+{
+	std::vector<int> presentGroups = ObservationModel::getOptGroupsPresent_zeroBased(partMdt);
+	
+	const int pogc = presentGroups.size();
+	const int ogc = opticsMdt.numberOfObjects();
+	
+	std::vector<int> groupToPresentGroup(ogc, -1);
+	
+	for (int pog = 0; pog < pogc; pog++)
+	{
+		const int og = presentGroups[pog];
+		groupToPresentGroup[og] = pog;
+	}
+	
+	std::vector<std::pair<int, std::vector<int>>> out(pogc);
+	
+	for (int pog = 0; pog < pogc; pog++)
+	{
+		out[pog] = std::make_pair(presentGroups[pog], std::vector<int>(0));
+	}
+	
+	const int pc = partMdt.numberOfObjects();
+	
+	for (int p = 0; p < pc; p++)
+	{
+		int og;
+		partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, og, p);
+		og--;
+		
+		int pog = groupToPresentGroup[og];
+		
+		out[pog].second.push_back(p);
+	}
+	
 	return out;
 }
 
@@ -585,7 +738,8 @@ const Image<RFLOAT>& ObservationModel::getGammaOffset(int optGroup, int s)
 	return gammaOffset[optGroup][s];
 }
 
-Matrix2D<RFLOAT> ObservationModel::applyAnisoMagTransp(Matrix2D<RFLOAT> A3D_transp, int opticsGroup)
+Matrix2D<RFLOAT> ObservationModel::applyAnisoMagTransp(
+		Matrix2D<RFLOAT> A3D_transp, int opticsGroup)
 {
 	Matrix2D<RFLOAT> out;
 
@@ -597,16 +751,47 @@ Matrix2D<RFLOAT> ObservationModel::applyAnisoMagTransp(Matrix2D<RFLOAT> A3D_tran
 	{
 		out = A3D_transp;
 	}
+	
+	return out;
+}
 
+Matrix2D<RFLOAT> ObservationModel::getMag3x3(int opticsGroup)
+{
+	Matrix2D<RFLOAT> out(3,3);
+	
+	for (int r = 0; r < 2; r++)
+	for (int c = 0; c < 2; c++)
+	{
+		out(r,c) = magMatrices[opticsGroup](r,c);
+	}
+	
+	for (int i = 0; i < 2; i++)
+	{
+		out(i,0) = 0.0;
+		out(0,i) = 0.0;
+	}
+	
+	out(2,2) = 1.0;
+	
+	return out;
+}
+
+Matrix2D<RFLOAT> ObservationModel::applyScaleDifference(
+		Matrix2D<RFLOAT> A3D_transp, int opticsGroup, int s3D, double angpix3D)
+{
+	Matrix2D<RFLOAT> out = A3D_transp;
+	
+	out *= (s3D * angpix3D) / (boxSizes[opticsGroup] * angpix[opticsGroup]);
+	
 	return out;
 }
 
 bool ObservationModel::containsAllColumnsNeededForPrediction(const MetaDataTable& partMdt)
 {
 	return (partMdt.containsLabel(EMDL_ORIENT_ORIGIN_X_ANGSTROM)
-         && partMdt.containsLabel(EMDL_ORIENT_ORIGIN_Y_ANGSTROM)
-         && partMdt.containsLabel(EMDL_ORIENT_ROT)
-         && partMdt.containsLabel(EMDL_ORIENT_TILT)
-         && partMdt.containsLabel(EMDL_ORIENT_PSI)
-         && partMdt.containsLabel(EMDL_PARTICLE_RANDOM_SUBSET));
+	     && partMdt.containsLabel(EMDL_ORIENT_ORIGIN_Y_ANGSTROM)
+	     && partMdt.containsLabel(EMDL_ORIENT_ROT)
+	     && partMdt.containsLabel(EMDL_ORIENT_TILT)
+	     && partMdt.containsLabel(EMDL_ORIENT_PSI)
+	     && partMdt.containsLabel(EMDL_PARTICLE_RANDOM_SUBSET));
 }

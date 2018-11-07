@@ -18,7 +18,7 @@
  * author citations must be preserved.
  ***************************************************************************/
 
-#include <src/jaz/imod_helper.h>
+#include "imod_helper.h"
 #include <src/error.h>
 #include <src/macros.h>
 #include <fstream>

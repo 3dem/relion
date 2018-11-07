@@ -120,7 +120,7 @@ int AberrationPlot::_run()
             std::vector<Image<Complex>> obsF;
 
             pred = obsModel.predictObservations(projectors[0], mdts[g], nr_omp_threads, false, true);
-            obsF = StackHelper::loadStackFS(&mdts[g], imgPath, nr_omp_threads, &fts);
+            obsF = StackHelper::loadStackFS(mdts[g], imgPath, nr_omp_threads);
 
             #pragma omp parallel for num_threads(nr_omp_threads)
             for (long p = 0; p < pc; p++)
@@ -215,7 +215,7 @@ int AberrationPlot::_run()
                 std::vector<Image<Complex> > obsF;
 
                 pred = obsModel.predictObservations(projectors[0], mdts[g], nr_omp_threads, false, true);
-                obsF = StackHelper::loadStackFS(&mdts[g], imgPath, nr_omp_threads, &fts);
+                obsF = StackHelper::loadStackFS(mdts[g], imgPath, nr_omp_threads);
 
                 #pragma omp parallel for num_threads(nr_omp_threads)
                 for (long p = 0; p < pc; p++)

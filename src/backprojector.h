@@ -182,7 +182,8 @@ public:
 							   const Matrix2D<RFLOAT> &A, bool inv,
 						       const MultidimArray<RFLOAT> *Mweight = NULL,
 							   RFLOAT r_ewald_sphere = -1.,
-							   bool is_positive_curvature = true)
+							   bool is_positive_curvature = true,
+							   Matrix2D<RFLOAT>* magMatrix = 0)
 	{
 		// Back-rotation of a 3D Fourier Transform
 		if (img_in.getDim() == 3)
@@ -205,7 +206,7 @@ public:
 				backrotate2D(img_in, A, inv, Mweight);
 				break;
 			case 3:
-				backproject2Dto3D(img_in, A, inv, Mweight, r_ewald_sphere, is_positive_curvature);
+				backproject2Dto3D(img_in, A, inv, Mweight, r_ewald_sphere, is_positive_curvature, magMatrix);
 				break;
 			default:
 				REPORT_ERROR("Backprojector::set2DSlice%%ERROR: Dimension of the data array should be 2 or 3");
@@ -237,7 +238,8 @@ public:
 			         const Matrix2D<RFLOAT> &A, bool inv,
 			         const MultidimArray<RFLOAT> *Mweight = NULL,
 					 RFLOAT r_ewald_sphere = -1.,
-					 bool is_positive_curvature = true);
+					 bool is_positive_curvature = true,
+					 Matrix2D<RFLOAT>* magMatrix = 0);
 
 	/*
 	* Set a 1D slice in the 2D map (backward projection)

@@ -25,7 +25,6 @@
 #include <src/jaz/slice_helper.h>
 #include <src/jaz/spectral_helper.h>
 #include <src/jaz/img_proc/filter_helper.h>
-#include <src/jaz/backprojection_helper.h>
 #include <src/jaz/complex_io.h>
 #include <src/jaz/fftw_helper.h>
 #include <src/jaz/refinement_helper.h>
@@ -136,7 +135,7 @@ void MotionRefiner::init()
 		}
 	}
 	
-	allMdts = StackHelper::splitByMicrographName(&mdt0);
+	allMdts = StackHelper::splitByMicrographName(mdt0);
 	
 	if (minMG >= allMdts.size())
 	{

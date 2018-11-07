@@ -20,13 +20,14 @@
 
 
 #include <src/jaz/gravis/t4Matrix.h>
-#include <src/jaz/backprojection_helper.h>
+#include "backprojection_helper.h"
 #include <src/jaz/slice_helper.h>
 #include <src/jaz/config.h>
 #include <src/jaz/volume_converter.h>
 #include <src/jaz/image_log.h>
 #include <src/jaz/img_proc/filter_helper.h>
 #include <src/jaz/interpolation.h>
+#include <src/jaz/image_log.h>
 
 #include <src/fftw.h>
 
@@ -126,9 +127,12 @@ void BackprojectionHelper::backprojectRaw(
     }
 }
 
-void BackprojectionHelper::backprojectRaw(const TomoStack& stack,
+void BackprojectionHelper::backprojectRaw(
+		const TomoStack& stack,
         Volume<RFLOAT>& dest, Volume<RFLOAT>& maskDest,
-        gravis::d3Vector origin, double spacing, InterpolationType interpolation, double taperX, double taperY, double wMin, int frame0, int frames)
+        gravis::d3Vector origin, double spacing, 
+		InterpolationType interpolation, double taperX, double taperY, 
+		double wMin, int frame0, int frames)
 {
     d4Matrix vol2world;
 
@@ -138,6 +142,11 @@ void BackprojectionHelper::backprojectRaw(const TomoStack& stack,
     vol2world(0,3) = origin.x;
     vol2world(1,3) = origin.y;
     vol2world(2,3) = origin.z;
+	
+	/*std::cout << "vol2world: \n" << vol2world << "\n";
+	std::cout << "stack.worldToImage[0]: \n" << stack.worldToImage[0] << "\n";
+	std::cout << "vol2img[0]: \n" << (stack.worldToImage[0] * vol2world) << "\n";*/
+	
 
     const int ic = frames > 0? frames + frame0 : stack.images.size();
 
@@ -150,9 +159,16 @@ void BackprojectionHelper::backprojectRaw(const TomoStack& stack,
         vol2img[im] = stack.worldToImage[im] * vol2world;
     }
 
-    #if JAZ_USE_OPENMP
+    /*#if JAZ_USE_OPENMP
     #pragma omp parallel for
-    #endif
+    #endif*/
+	
+	/*std::vector<Image<RFLOAT>> debugImgs(ic);
+	for (int im = frame0; im < ic; im++)
+	{
+		debugImgs[im] = stack.images[im];
+	}*/
+	
     FOR_ALL_VOXELS(dest)
     {
         double sum = 0.0;
@@ -176,6 +192,8 @@ void BackprojectionHelper::backprojectRaw(const TomoStack& stack,
                 {
                     sum += wghi * Interpolation::cubicXY(stack.images[im], pi.x, pi.y, 0);
                 }
+				
+				//debugImgs[im]((int)(pi.y+0.5), (int)(pi.x+0.5)) += 1000.0;
 
                 wgh += wghi;
             }
@@ -189,6 +207,10 @@ void BackprojectionHelper::backprojectRaw(const TomoStack& stack,
         dest(x,y,z) = sum;
         maskDest(x,y,z) = wgh;
     }
+	
+	/*JazConfig::writeMrc = false;
+	JazConfig::writeVtk = true;
+	ImageLog::write(debugImgs, "debug_imgs");*/
 
     double mean = 0.0, sum = 0.0;
 
@@ -198,7 +220,10 @@ void BackprojectionHelper::backprojectRaw(const TomoStack& stack,
         sum += maskDest(x,y,z);
     }
 
-    mean /= sum;
+	if (sum > 0.0)
+	{
+		mean /= sum;
+	}
 
     #if JAZ_USE_OPENMP
     #pragma omp parallel for

@@ -140,18 +140,11 @@ void CtfRefiner::init()
 						 << "rlnOriginXAngst, rlnOriginYAngst, "
 						 << "rlnAngleRot, rlnAngleTilt, rlnAnglePsi and rlnRandomSubset");
 	}
-		
-	const double angpix = obsModel.getPixelSize(0);
-	
-	if (verb > 0)
-	{
-		std::cout << "   - Using pixel size from " << starFn << ": " << angpix << " A" << std::endl;
-	}
 	
 	// after all the necessary changes to mdt0 have been applied 
 	// in ObservationModel::loadSafely(), split it by micrograph
 	
-	allMdts = StackHelper::splitByMicrographName(&mdt0);
+	allMdts = StackHelper::splitByMicrographName(mdt0);
 
 	// Only work on a user-specified subset of the micrographs
 	if (maxMG < 0 || maxMG >= allMdts.size())
@@ -191,14 +184,13 @@ void CtfRefiner::init()
 	reference.load(verb, debug);
 	
 	// Get dimensions
-	s = reference.s;
-	sh = s/2 + 1;
+	int s = reference.s;
 	
-	tiltEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
-	aberrationEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
-	defocusEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
-	bfactorEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
-	magnificationEstimator.init(verb, s, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
+	tiltEstimator.init(verb, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
+	aberrationEstimator.init(verb, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
+	defocusEstimator.init(verb, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
+	bfactorEstimator.init(verb, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
+	magnificationEstimator.init(verb, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
 
 	// check whether output files exist and skip the micrographs for which they do
 	if (only_do_unfinished)
@@ -260,14 +252,8 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 	{
 		std::vector<Image<Complex> > obs;
 		
-		int opticsGroup;
-		unfinishedMdts[g].getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, 0);
-		opticsGroup--;
-		
-		double angpix = obsModel.angpix[opticsGroup];
-		
-		// both defocus_tit and tilt_fit need the same observations
-		obs = StackHelper::loadStackFS(&unfinishedMdts[g], "", nr_omp_threads, &fts, true, angpix);
+		// all CTF-refinement programs need the same observations
+		obs = StackHelper::loadStackFS(unfinishedMdts[g], "", nr_omp_threads, true, &obsModel);
 
 		// Make sure output directory exists
 		FileName newdir = getOutputFilenameRoot(unfinishedMdts[g], outPath);
