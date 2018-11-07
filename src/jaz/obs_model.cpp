@@ -58,11 +58,12 @@ void ObservationModel::loadSafely(
 	obsModel = ObservationModel(opticsMdt);
 
 	// read pixel sizes (and make sure they are all the same)
-
+	/*
 	if (!obsModel.allPixelSizesIdentical())
 	{
 		REPORT_ERROR("ERROR: different pixel sizes detected. Please split your dataset by pixel size.");
 	}
+	*/
 
 	// make sure all optics groups are defined
 
