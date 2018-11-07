@@ -5819,52 +5819,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 						// Loop over all oversampled orientations (only a single one in the first pass)
 						for (long int iover_rot = 0; iover_rot < exp_nr_oversampled_rot; iover_rot++)
 						{
-							// Get the Euler matrix
-							Euler_angles2matrix(oversampled_rot[iover_rot],
-												oversampled_tilt[iover_rot],
-												oversampled_psi[iover_rot], A, false);
 
-							// Project the reference map (into Fref)
-#ifdef TIMING
-							// Only time one thread, as I also only time one MPI process
-							if (my_part_id == exp_my_first_part_id)
-								timer.tic(TIMING_DIFF_PROJ);
-#endif
-
-							int optics_group = mydata.getOpticsGroup(part_id, 0);
-							
-							// For multi-body refinements, A are only 'residual' orientations, Abody is the complete Euler matrix
-							if (mymodel.nr_bodies > 1)
-							{
-								Abody =  Aori * (mymodel.orient_bodies[ibody]).transpose() * A_rot90 * A * mymodel.orient_bodies[ibody];
-								// TODO: if we want different optics_groups for each image, then the img_id loop needs to move up
-								// TODO: if we want different optics_groups for each image, then the img_id loop needs to move up
-								// TODO: if we want different optics_groups for each image, then the img_id loop needs to move up
-								// TODO: if we want different optics_groups for each image, then the img_id loop needs to move up
-								mydata.obsModel.applyAnisoMagTransp(Abody, optics_group);
-								(mymodel.PPref[ibody]).get2DFourierTransform(Fref, Abody, IS_NOT_INV);
-							}
-							else
-							{
-								// TODO: if we want different optics_groups for each image, then the img_id loop needs to move up
-								// TODO: if we want different optics_groups for each image, then the img_id loop needs to move up
-								// TODO: if we want different optics_groups for each image, then the img_id loop needs to move up
-								// TODO: if we want different optics_groups for each image, then the img_id loop needs to move up
-								mydata.obsModel.applyAnisoMagTransp(A, optics_group);
-								(mymodel.PPref[exp_iclass]).get2DFourierTransform(Fref, A, IS_NOT_INV);
-							}
-
-#ifdef TIMING
-							// Only time one thread, as I also only time one MPI process
-							if (my_part_id == exp_my_first_part_id)
-								timer.toc(TIMING_DIFF_PROJ);
-#endif
-
-							//// TODO: if we want different orientations for each image, then this loop needs to move up.
-							//// TODO: if we want different orientations for each image, then this loop needs to move up.
-							//// TODO: if we want different orientations for each image, then this loop needs to move up.
-							//// TODO: if we want different orientations for each image, then this loop needs to move up.
-							//// TODO: if we want different orientations for each image, then this loop needs to move up.
 							// loop over all images inside this particle
 							for (int img_id = 0; img_id < mydata.numberOfImagesInParticle(part_id); img_id++)
 							{
@@ -5872,6 +5827,38 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 								int my_metadata_offset = metadata_offset + img_id;
 								RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id, img_id);
 								int optics_group = mydata.getOpticsGroup(part_id, img_id);
+
+								// Get the Euler matrix
+								Euler_angles2matrix(oversampled_rot[iover_rot],
+										oversampled_tilt[iover_rot],
+										oversampled_psi[iover_rot], A, false);
+
+								// Project the reference map (into Fref)
+#ifdef TIMING
+								// Only time one thread, as I also only time one MPI process
+								if (my_part_id == exp_my_first_part_id)
+									timer.tic(TIMING_DIFF_PROJ);
+#endif
+
+
+								// For multi-body refinements, A are only 'residual' orientations, Abody is the complete Euler matrix
+								if (mymodel.nr_bodies > 1)
+								{
+									Abody =  Aori * (mymodel.orient_bodies[ibody]).transpose() * A_rot90 * A * mymodel.orient_bodies[ibody];
+									mydata.obsModel.applyAnisoMagTransp(Abody, optics_group);
+									(mymodel.PPref[ibody]).get2DFourierTransform(Fref, Abody, IS_NOT_INV);
+								}
+								else
+								{
+									mydata.obsModel.applyAnisoMagTransp(A, optics_group);
+									(mymodel.PPref[exp_iclass]).get2DFourierTransform(Fref, A, IS_NOT_INV);
+								}
+
+#ifdef TIMING
+								// Only time one thread, as I also only time one MPI process
+								if (my_part_id == exp_my_first_part_id)
+									timer.toc(TIMING_DIFF_PROJ);
+#endif
 
 								Minvsigma2 = exp_local_Minvsigma2[img_id].data;
 
