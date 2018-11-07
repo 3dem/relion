@@ -288,9 +288,29 @@ void MotionEstimator::process(const std::vector<MetaDataTable>& mdts, long g_sta
 			tracks = initialTracks;
 		}
 		
-		updateFCC(movie, tracks, mdts[g], tables, weights0, weights1);
-		
 		std::string fn_root = MotionRefiner::getOutputFileNameRoot(outPath, mdts[g]);
+		
+		bool hasNaNs = false;
+		
+		// find NaNs:
+		for (int p = 0; p < pc; p++)
+		for (int f = 0; f < fc; f++)
+		{
+			if (!(tracks[p][f].x == tracks[p][f].x)
+			 || !(tracks[p][f].y == tracks[p][f].y))
+			{
+				tracks[p][f] = d2Vector(0.0, 0.0);
+				hasNaNs = true;
+			}
+		}
+		
+		if (hasNaNs)
+		{
+			std::cerr << "NaNs detected in " << fn_root 
+			          << "! Please inspect this movie." << std::endl;
+		}
+		
+		updateFCC(movie, tracks, mdts[g], tables, weights0, weights1);
 		
 		writeOutput(tracks, tables, weights0, weights1, positions, fn_root, 30.0);
 		

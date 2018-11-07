@@ -1,22 +1,22 @@
 // A large amount of this code is direct from cuda_ml_optimizer and so could
 // be shared (but possibly with difficulty since it is enough different that
 // we either need a lot of #ifdefs, or a lot of macros/some other mechanism to
-// abstract the differences).  The biggest differences are the type of memory  
-// objects used (std::vector vs. CudaGlobalPtr and CudaCustomAllocator), the 
-// lack of transfers to/from the device, and on-device operations (which are 
+// abstract the differences).  The biggest differences are the type of memory
+// objects used (std::vector vs. CudaGlobalPtr and CudaCustomAllocator), the
+// lack of transfers to/from the device, and on-device operations (which are
 // replaced by loops/function calls).
 //
-// CudaFFT has been replaced with lib FFTW, if RELION is configured with mix 
+// CudaFFT has been replaced with lib FFTW, if RELION is configured with mix
 // precision, both single and double precision FFTW are linked into RELION.
 // Install fftw-static.x86_64 and fftw-static.i686 to get the libraries without
 // having to pull them at build time.  Over time we hope to replace FFTW with
 // MKL.
 //
-// All Cuda kernels in gpu_utils and gpu_utils/cuda_kernels have been converted 
+// All Cuda kernels in gpu_utils and gpu_utils/cuda_kernels have been converted
 // to C functions
 //
-// Hot spot loops in the converted C functions have been vectorized with ICC 
-// auto-vectorization with or without #pragma. Loop layout has been modified 
+// Hot spot loops in the converted C functions have been vectorized with ICC
+// auto-vectorization with or without #pragma. Loop layout has been modified
 // to get the best performance on CPU.
 //
 // NOTE:  Since the GPU code was ported back to CPU there may be additional
@@ -118,7 +118,7 @@ void MlDataBundle::setup(MlOptimiser *baseMLO)
 
 	unsigned nr_classes = baseMLO->mymodel.nr_classes;
 	coarseProjectionPlans.resize(nr_classes);
-	
+
 	//Can we pre-generate projector plan and corresponding euler matrices for all particles
 	if (!baseMLO->do_skip_align && !baseMLO->do_skip_rotate && !baseMLO->do_auto_refine && baseMLO->mymodel.orientational_prior_mode == NOPRIOR)
 		for (int iclass = 0; iclass < nr_classes; iclass++)
@@ -174,10 +174,10 @@ void MlOptimiserCpu::resetData()
 	classStreams.resize(baseMLO->mymodel.nr_classes, 0);
 };
 
-void MlOptimiserCpu::expectationOneParticle(unsigned long my_ori_particle, int thread_id)
+void MlOptimiserCpu::expectationOneParticle(unsigned long my_part_id, int thread_id)
 {
 	AccPtrFactory ptrFactory(AccType::accCPU);
-	accDoExpectationOneParticle<MlOptimiserCpu>(this, my_ori_particle, thread_id, ptrFactory);
+	accDoExpectationOneParticle<MlOptimiserCpu>(this, my_part_id, thread_id, ptrFactory);
 };
 
 #endif // ALTCPU

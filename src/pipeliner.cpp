@@ -1147,7 +1147,7 @@ bool PipeLine::makeFlowChart(long int current_job, bool do_display_pdf, std::str
 		return false;
 	}
 
-	const char * default_pdf_viewer = getenv ("RELION_CTFFIND_EXECUTABLE");
+	const char * default_pdf_viewer = getenv ("RELION_PDFVIEWER_EXECUTABLE");
 	char mydefault[]=DEFAULTPDFVIEWER;
 	if (default_pdf_viewer == NULL)
 	{

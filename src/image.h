@@ -476,7 +476,7 @@ public:
                 else
                 {
                     unsigned char * ptr = (unsigned char *) page;
-                    for(int i=0; i<pageSize; i++)
+                    for(size_t i=0; i<pageSize; i++)
                         ptrDest[i]=(T) ptr[i];
                 }
                 break;
@@ -490,7 +490,7 @@ public:
                     else
                     {
                         signed char * ptr = (signed char *) page;
-                        for(int i=0; i<pageSize; i++)
+                        for(size_t i=0; i<pageSize; i++)
                             ptrDest[i]=(T) ptr[i];
                     }
                 break;
@@ -504,7 +504,7 @@ public:
                     else
                     {
                         unsigned short * ptr = (unsigned short *) page;
-                        for(int i=0; i<pageSize; i++)
+                        for(size_t i=0; i<pageSize; i++)
                             ptrDest[i]=(T) ptr[i];
                     }
                 break;
@@ -518,7 +518,7 @@ public:
                     else
                     {
                         short * ptr = (short *) page;
-                        for(int i=0; i<pageSize; i++)
+                        for(size_t i=0; i<pageSize; i++)
                             ptrDest[i]=(T) ptr[i];
                     }
                 break;
@@ -532,7 +532,7 @@ public:
                     else
                     {
                         unsigned int * ptr = (unsigned int *) page;
-                        for(int i=0; i<pageSize; i++)
+                        for(size_t i=0; i<pageSize; i++)
                             ptrDest[i]=(T) ptr[i];
                     }
                 break;
@@ -546,7 +546,7 @@ public:
                     else
                     {
                         int * ptr = (int *) page;
-                        for(int i=0; i<pageSize; i++)
+                        for(size_t i=0; i<pageSize; i++)
                             ptrDest[i]=(T) ptr[i];
                     }
                 break;
@@ -560,7 +560,7 @@ public:
                     else
                     {
                         long * ptr = (long *) page;
-                        for(int i=0; i<pageSize; i++)
+                        for(size_t i=0; i<pageSize; i++)
                             ptrDest[i]=(T) ptr[i];
                     }
                 break;
@@ -574,7 +574,7 @@ public:
                     else
                     {
                         float * ptr = (float *) page;
-                        for(int i=0; i<pageSize; i++)
+                        for(size_t i=0; i<pageSize; i++)
                             ptrDest[i]=(T) ptr[i];
                     }
                 break;
@@ -588,7 +588,7 @@ public:
                     else
                     {
                         RFLOAT * ptr = (RFLOAT *) page;
-                        for(int i=0; i<pageSize; i++)
+                        for(size_t i=0; i<pageSize; i++)
                             ptrDest[i]=(T) ptr[i];
                     }
                 break;
@@ -618,7 +618,7 @@ public:
                 else
                 {
                     float * ptr = (float *) page;
-                    for(int i=0; i<pageSize; i++)
+                    for(size_t i=0; i<pageSize; i++)
                         ptr[i] = (float)srcPtr[i];
                 }
                 break;
@@ -632,7 +632,7 @@ public:
                     else
                     {
                         RFLOAT * ptr = (RFLOAT *) page;
-                        for(int i=0; i<pageSize; i++)
+                        for(size_t i=0; i<pageSize; i++)
                             ptr[i] = (RFLOAT)srcPtr[i];
                     }
                 break;
@@ -646,7 +646,7 @@ public:
                     else
                     {
                         unsigned short * ptr = (unsigned short *) page;
-                        for(int i=0; i<pageSize; i++)
+                        for(size_t i=0; i<pageSize; i++)
                             ptr[i] = (unsigned short)srcPtr[i];
                     }
                 break;
@@ -660,7 +660,7 @@ public:
                     else
                     {
                         unsigned char * ptr = (unsigned char *) page;
-                        for(int i=0; i<pageSize; i++)
+                        for(size_t i=0; i<pageSize; i++)
                             ptr[i] = (unsigned char)srcPtr[i];
                     }
                 break;

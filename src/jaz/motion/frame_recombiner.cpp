@@ -323,9 +323,9 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromFCC(
         for (int y = 0; y < fc; y++)
         for (int x = 0; x < sh_ref; x++)
         {
-            fccData(y,x) += fccDataMg(y,x);
-            fccWgh0(y,x) += fccWgh0Mg(y,x);
-            fccWgh1(y,x) += fccWgh1Mg(y,x);
+			if (fccDataMg(y,x) == fccDataMg(y,x)) fccData(y,x) += fccDataMg(y,x);
+			if (fccWgh0Mg(y,x) == fccWgh0Mg(y,x)) fccWgh0(y,x) += fccWgh0Mg(y,x);
+			if (fccWgh1Mg(y,x) == fccWgh1Mg(y,x)) fccWgh1(y,x) += fccWgh1Mg(y,x);
         }
     }
 

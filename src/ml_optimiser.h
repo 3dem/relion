@@ -402,6 +402,9 @@ public:
 	// Re-use data on scratch dir, i.e. dont delete data already there and copy again
 	bool do_reuse_scratch;
 
+	// Don't delete scratch after finishing
+	bool keep_scratch;
+
 	// Print the symmetry transformation matrices
 	bool do_print_symmetry_ops;
 
