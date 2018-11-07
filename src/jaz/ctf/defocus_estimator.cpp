@@ -58,13 +58,11 @@ void DefocusEstimator::read(IOParser &parser, int argc, char *argv[])
 }
 
 void DefocusEstimator::init(
-		int verb, int s, int nr_omp_threads,
+		int verb, int nr_omp_threads,
 		bool debug, bool diag, std::string outPath,
 		ReferenceMap *reference, ObservationModel *obsModel)
 {
 	this->verb = verb;
-	this->s = s;
-	sh = s/2 + 1;
 	this->nr_omp_threads = nr_omp_threads;
 
 	this->debug = debug;
@@ -74,10 +72,15 @@ void DefocusEstimator::init(
 	this->reference = reference;
 	this->obsModel = obsModel;
 
-	angpix = obsModel->getPixelSize(0);
+	angpix = obsModel->getPixelSizes();
+	obsModel->getBoxSizes(s, sh);
 
-	double kmin_px = obsModel->angToPix(kmin, s, 0);
-	freqWeight = reference->getHollowWeight(kmin_px);
+	freqWeights.resize(angpix.size());
+	
+	for (int i = 0; i < angpix.size(); i++)
+	{
+		freqWeights[i] = reference->getHollowWeight(kmin, s[i], angpix[i]);
+	}
 
 	ready = true;
 }
@@ -99,7 +102,9 @@ void DefocusEstimator::processMicrograph(
 
 	if (!noGlobAstig)
 	{
-		CTF ctf0;
+		REPORT_ERROR("Per-micrograph CTF-refinement temporarily disabled.");
+		
+		/*CTF ctf0;
 		ctf0.readByGroup(mdt, obsModel, 0);
 
 		Image<RFLOAT> dataVis;
@@ -213,7 +218,7 @@ void DefocusEstimator::processMicrograph(
 
 			Image<RFLOAT> vis = FilterHelper::sectorBlend(dataVis, ctfFit, 12);
 			ImageLog::write(vis, outPath+"diag_m"+stsg.str()+"_global_CTF-vis_final");
-		}
+		}*/
 	}
 
 	if (globOnly) return;
@@ -225,12 +230,14 @@ void DefocusEstimator::processMicrograph(
 
 		for (long p = 0; p < pc; p++)
 		{
+			const int og = obsModel->getOpticsGroup(mdt, p);
+			
 			CTF ctf0;
 			ctf0.readByGroup(mdt, obsModel, p);
 
 			std::vector<d2Vector> cost = DefocusHelper::diagnoseDefocus(
-				pred[p], obs[p], freqWeight,
-				ctf0, angpix, defocusRange, 100, nr_omp_threads);
+				pred[p], obs[p], freqWeights[og],
+				ctf0, angpix[og], defocusRange, 100, nr_omp_threads);
 
 			double cMin = cost[0][1];
 			double dOpt = cost[0][0];
@@ -256,6 +263,8 @@ void DefocusEstimator::processMicrograph(
 	#pragma omp parallel for num_threads(nr_omp_threads)
 	for (long p = 0; p < pc; p++)
 	{
+		const int og = obsModel->getOpticsGroup(mdt, p);
+		
 		std::stringstream stsp;
 		stsp << p;
 
@@ -266,8 +275,8 @@ void DefocusEstimator::processMicrograph(
 		{
 			double u, v, phi;
 			DefocusHelper::findAstigmatismNM(
-				pred[p], obs[p], freqWeight, ctf0,
-				angpix, &u, &v, &phi);
+				pred[p], obs[p], freqWeights[og], ctf0,
+				angpix[og], &u, &v, &phi);
 
 			mdt.setValue(EMDL_CTF_DEFOCUSU, u, p);
 			mdt.setValue(EMDL_CTF_DEFOCUSV, v, p);
@@ -277,8 +286,8 @@ void DefocusEstimator::processMicrograph(
 		{
 			double u, v;
 			DefocusHelper::findDefocus1D(
-				pred[p], obs[p], freqWeight, ctf0,
-				angpix, &u, &v, defocusRange);
+				pred[p], obs[p], freqWeights[og], ctf0,
+				angpix[og], &u, &v, defocusRange);
 
 			mdt.setValue(EMDL_CTF_DEFOCUSU, u, p);
 			mdt.setValue(EMDL_CTF_DEFOCUSV, v, p);

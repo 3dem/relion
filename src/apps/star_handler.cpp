@@ -27,8 +27,13 @@
 class star_handler_parameters
 {
 	public:
-	FileName fn_in, fn_out, fn_compare, fn_label1, fn_label2, fn_label3, select_label, select_str_label, discard_label;
-	FileName fn_check, fn_operate, fn_operate2, fn_operate3, fn_set;
+	
+		FileName 
+			fn_in, tablename_in, fn_out, fn_compare, tablename_compare, 
+			fn_label1, fn_label2, fn_label3, 
+			select_label, select_str_label, discard_label, 
+			fn_check, fn_operate, fn_operate2, fn_operate3, fn_set;
+	
 	std::string remove_col_label, add_col_label, add_col_value, add_col_from, hist_col_label, select_include_str, select_exclude_str;
 	RFLOAT eps, select_minval, select_maxval, multiply_by, add_to, center_X, center_Y, center_Z, hist_min, hist_max;
 	bool do_combine, do_split, do_center, do_random_order, show_frac, show_cumulative, do_discard;
@@ -50,10 +55,12 @@ class star_handler_parameters
 
 		int general_section = parser.addSection("General options");
 		fn_in = parser.getOption("--i", "Input STAR file");
+		tablename_in = parser.getOption("--i_table", "Name of table in input STAR file", "");
 		fn_out = parser.getOption("--o", "Output STAR file", "out.star");
 
 		int compare_section = parser.addSection("Compare options");
 		fn_compare = parser.getOption("--compare", "STAR file name to compare the input STAR file with", "");
+		tablename_compare = parser.getOption("--compare_table", "Name of table in STAR file to compare", "");
 		fn_label1 = parser.getOption("--label1", "1st metadata label for the comparison (may be string, int or RFLOAT)", "");
 		fn_label2 = parser.getOption("--label2", "2nd metadata label for the comparison (RFLOAT only) for 2D/3D-distance)", "");
 		fn_label3 = parser.getOption("--label3", "3rd metadata label for the comparison (RFLOAT only) for 3D-distance)", "");
@@ -161,8 +168,8 @@ class star_handler_parameters
 	{
 	   	MetaDataTable MD1, MD2, MDonly1, MDonly2, MDboth;
 		EMDLabel label1, label2, label3;
-		MD1.read(fn_in);
-		MD2.read(fn_compare);
+		MD1.read(fn_in, tablename_in);
+		MD2.read(fn_compare, tablename_compare);
 
 		label1 = EMDL::str2Label(fn_label1);
 		label2 = (fn_label2 == "") ? EMDL_UNDEFINED : EMDL::str2Label(fn_label2);
@@ -194,7 +201,7 @@ class star_handler_parameters
 		}
 		else
 		{
-			MDin.read(fn_in);
+			MDin.read(fn_in, tablename_in);
 		}
 
 		MDout = subsetMetaDataTable(MDin, EMDL::str2Label(select_label), select_minval, select_maxval);
@@ -221,7 +228,7 @@ class star_handler_parameters
 		}
 		else
 		{
-			MDin.read(fn_in);
+			MDin.read(fn_in, tablename_in);
 		}
 
 		if (select_include_str != "")
@@ -238,7 +245,7 @@ class star_handler_parameters
 	{
 
 		MetaDataTable MDin, MDout;
-		MDin.read(fn_in);
+		MDin.read(fn_in, tablename_in);
 
 		std::cout << " Calculating average and stddev for all images ... " << std::endl;
 		time_config();
@@ -323,7 +330,7 @@ class star_handler_parameters
 		for (int i = 0; i < fns_in.size(); i++)
 		{
 			MetaDataTable MDin;
-			MDin.read(fns_in[i]);
+			MDin.read(fns_in[i], tablename_in);
 			MDsin.push_back(MDin);
 		}
 
@@ -371,7 +378,7 @@ class star_handler_parameters
 	{
 
 		MetaDataTable MD;
-		MD.read(fn_in);
+		MD.read(fn_in, tablename_in);
 
 		// Randomise if neccesary
 		if (do_random_order)
@@ -451,7 +458,7 @@ class star_handler_parameters
 		}
 
 		MetaDataTable MD;
-		MD.read(fn_in);
+		MD.read(fn_in, tablename_in);
 
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
 		{
@@ -548,7 +555,7 @@ class star_handler_parameters
 	void center()
 	{
 		MetaDataTable MD;
-		MD.read(fn_in);
+		MD.read(fn_in, tablename_in);
 		bool do_contains_xy = (MD.containsLabel(EMDL_ORIENT_ORIGIN_X) && MD.containsLabel(EMDL_ORIENT_ORIGIN_Y));
 		bool do_contains_z = (MD.containsLabel(EMDL_ORIENT_ORIGIN_Z));
 
@@ -601,7 +608,7 @@ class star_handler_parameters
 	void remove_column()
 	{
 		MetaDataTable MD;
-		MD.read(fn_in);
+		MD.read(fn_in, tablename_in);
 		MD.deactivateLabel(EMDL::str2Label(remove_col_label));
 		MD.write(fn_out);
 		std::cout << " Written: " << fn_out << std::endl;
@@ -619,7 +626,7 @@ class star_handler_parameters
 		EMDLabel label = EMDL::str2Label(add_col_label);
 		EMDLabel source_label;
 
-		MD.read(fn_in);
+		MD.read(fn_in, tablename_in);
 		MD.addLabel(label);
 
 		if (add_col_from != "")
@@ -684,7 +691,7 @@ class star_handler_parameters
 
 		std::vector<RFLOAT> values;
 
-		MD.read(fn_in);
+		MD.read(fn_in, tablename_in);
 		if (!MD.containsLabel(label))
 			REPORT_ERROR("ERROR: The column specified in --hist_column is not present in the input STAR file.");
 
@@ -701,7 +708,7 @@ class star_handler_parameters
 	void remove_duplicate()
 	{
 		MetaDataTable MD;
-		MD.read(fn_in);
+		MD.read(fn_in, tablename_in);
 
 		EMDLabel mic_label;
 		if (MD.containsLabel(EMDL_MICROGRAPH_NAME)) mic_label = EMDL_MICROGRAPH_NAME;

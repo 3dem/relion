@@ -41,13 +41,11 @@ void BFactorRefiner::read(IOParser &parser, int argc, char *argv[])
 }
 
 void BFactorRefiner::init(
-		int verb, int s, int nr_omp_threads,
+		int verb, int nr_omp_threads,
 		bool debug, bool diag, std::string outPath,
 		ReferenceMap *reference, ObservationModel *obsModel)
 {
 	this->verb = verb;
-	this->s = s;
-	sh = s/2 + 1;
 	this->nr_omp_threads = nr_omp_threads;
 	
 	this->debug = debug;
@@ -57,10 +55,15 @@ void BFactorRefiner::init(
 	this->reference = reference;
 	this->obsModel = obsModel;
 	
-	angpix = obsModel->getPixelSize(0);
+	angpix = obsModel->getPixelSizes();
+	obsModel->getBoxSizes(s, sh);
+
+	freqWeights.resize(angpix.size());
 	
-	double kmin_px = obsModel->angToPix(kmin, s, 0);
-	freqWeight = reference->getHollowWeight(kmin_px);
+	for (int i = 0; i < angpix.size(); i++)
+	{
+		freqWeights[i] = reference->getHollowWeight(kmin, s[i], angpix[i]);
+	}
 	
 	ready = true;
 }
@@ -82,49 +85,81 @@ void BFactorRefiner::processMicrograph(
 	
 	std::vector<std::vector<std::pair<int,d2Vector>>> valsPerPart(nr_omp_threads);
 	
-	const double as = s * angpix;
-	const double min_B_px = min_B / (as*as);
-	const double max_B_px = max_B / (as*as);
+	const int ogc = obsModel->numberOfOpticsGroups();
+	
+	std::vector<double> as(ogc), min_B_px(ogc), max_B_px(ogc);
+			
+	for (int og = 0; og < ogc; og++)
+	{
+		as[og] = s[og] * angpix[og];
+		min_B_px[og] = min_B / (as[og]*as[og]);
+		max_B_px[og] = max_B / (as[og]*as[og]);
+	}
 	
 	// search recursively numIters times, scanning the range at stepsPerIter points each time:
 	const int stepsPerIter = 20;
 	const int numIters = 5;
 	
-	
 	if (perMicrograph)
 	{
 		std::vector<std::vector<double>>  t_rad(nr_omp_threads), s_rad(nr_omp_threads);
 		
+		// find optics group of minimal pixel size present in this micrograph
+		
+		std::vector<int> pogs = obsModel->getOptGroupsPresent_zeroBased(mdt);
+		
+		int ogRef = pogs[0];
+		double angpixMin = angpix[pogs[0]];
+		
+		for (int i = 1; i < pogs.size(); i++)
+		{
+			const int og = pogs[i];
+			
+			if (angpix[og] < angpixMin)
+			{
+				angpixMin = angpix[og];
+				ogRef = og;
+			}
+		}
+		
+		const int s_ref = s[ogRef];
+		const int sh_ref = sh[ogRef];
+			
 		for (int t = 0; t < nr_omp_threads; t++)
 		{
-			t_rad[t] = std::vector<double>(sh, 0.0);
-			s_rad[t] = std::vector<double>(sh, 0.0);
+			t_rad[t] = std::vector<double>(sh_ref, 0.0);
+			s_rad[t] = std::vector<double>(sh_ref, 0.0);
 		}
 		
 		// Parallel loop over all particles in this micrograph
 		#pragma omp parallel for num_threads(nr_omp_threads)
 		for (long p = 0; p < pc; p++)
 		{
-			int t = omp_get_thread_num();
+			const int og = obsModel->getOpticsGroup(mdt, p);
+			
+			const double as_ref = s_ref * angpix[ogRef];
+			const double as_p = s[og] * angpix[og];
+			
+			const int t = omp_get_thread_num();
 			
 			CTF ctf;
 			ctf.readByGroup(mdt, obsModel, p);
-			Image<RFLOAT> ctfImg(sh,s);
-			ctf.getFftwImage(ctfImg(), s, s, angpix, false, false, false, false);
+			Image<RFLOAT> ctfImg(sh[og],s[og]);
+			ctf.getFftwImage(ctfImg(), s[og], s[og], angpix[og], false, false, false, false);
 			
-			for (int y = 0; y < s;  y++)
-			for (int x = 0; x < sh; x++)
+			for (int y = 0; y < s[og];  y++)
+			for (int x = 0; x < sh[og]; x++)
 			{
 				const double xx = x;
-				const double yy = (y + s/2) % s - s/2;
+				const double yy = (y + s[og]/2) % s[og] - s[og]/2;
 				
-				const int ri = (int)(sqrt(xx*xx + yy*yy) + 0.5);
+				const int ri = (int)(as_ref * sqrt(xx*xx + yy*yy) / as_p + 0.5);
 				
-				if (ri < sh)
+				if (ri < sh_ref)
 				{
 					const Complex zobs = obs[p](y,x);
 					const Complex zpred = ctfImg(y,x) * pred[p](y,x);
-					const double wp = freqWeight(y,x);
+					const double wp = freqWeights[og](y,x);
 					
 					t_rad[t][ri] += wp * (zpred.real * zpred.real + zpred.imag * zpred.imag);
 					s_rad[t][ri] += wp * (zpred.real * zobs.real + zpred.imag * zobs.imag);
@@ -134,7 +169,7 @@ void BFactorRefiner::processMicrograph(
 		
 		for (int t = 1; t < nr_omp_threads; t++)
 		{
-			for (int r = 0; r < sh; r++)
+			for (int r = 0; r < sh_ref; r++)
 			{
 				t_rad[0][r] += t_rad[t][r];
 				s_rad[0][r] += s_rad[t][r];
@@ -142,42 +177,43 @@ void BFactorRefiner::processMicrograph(
 		}
 		
 		d2Vector BK = BFactorRefiner::findBKRec1D(
-			t_rad[0], s_rad[0], min_B_px, max_B_px, min_scale, stepsPerIter, numIters);
+			t_rad[0], s_rad[0], min_B_px[ogRef], max_B_px[ogRef], min_scale, stepsPerIter, numIters);
 		
-		for (int p = 0; p < pc; p++)
+		for (long p = 0; p < pc; p++)
 		{
-			mdt.setValue(EMDL_CTF_BFACTOR, as*as*BK[0] - min_B, p);
+			mdt.setValue(EMDL_CTF_BFACTOR, as[ogRef]*as[ogRef]*BK[0] - min_B, p);
 			mdt.setValue(EMDL_CTF_SCALEFACTOR, BK[1], p);
 		}
 		
-		writePerMicrographEPS(mdt, s_rad[0], t_rad[0]);
-		
+		writePerMicrographEPS(mdt, s_rad[0], t_rad[0], ogRef);
 	}
 	else
 	{
 		#pragma omp parallel for num_threads(nr_omp_threads)
 		for (long p = 0; p < pc; p++)
 		{
+			const int og = obsModel->getOpticsGroup(mdt, p);
+			
 			CTF ctf;
 			ctf.readByGroup(mdt, obsModel, p);
-			Image<RFLOAT> ctfImg(sh,s);
-			ctf.getFftwImage(ctfImg(), s, s, angpix, false, false, false, false);
+			Image<RFLOAT> ctfImg(sh[og],s[og]);
+			ctf.getFftwImage(ctfImg(), s[og], s[og], angpix[og], false, false, false, false);
 			
-			std::vector<double> t_rad(sh, 0.0), s_rad(sh, 0.0);
+			std::vector<double> t_rad(sh[og], 0.0), s_rad(sh[og], 0.0);
 			
-			for (int y = 0; y < s;  y++)
-			for (int x = 0; x < sh; x++)
+			for (int y = 0; y < s[og];  y++)
+			for (int x = 0; x < sh[og]; x++)
 			{
 				const double xx = x;
-				const double yy = (y + s/2) % s - s/2;
+				const double yy = (y + s[og]/2) % s[og] - s[og]/2;
 				
 				const int ri = (int)(sqrt(xx*xx + yy*yy) + 0.5);
 				
-				if (ri < sh)
+				if (ri < sh[og])
 				{
 					const Complex zobs = obs[p](y,x);
 					const Complex zpred = ctfImg(y,x) * pred[p](y,x);
-					const double wp = freqWeight(y,x);
+					const double wp = freqWeights[og](y,x);
 					
 					t_rad[ri] += wp * (zpred.real * zpred.real + zpred.imag * zpred.imag);
 					s_rad[ri] += wp * (zpred.real * zobs.real + zpred.imag * zobs.imag);
@@ -194,7 +230,7 @@ void BFactorRefiner::processMicrograph(
 			*/
 			
 			d2Vector BK = BFactorRefiner::findBKRec1D(
-						t_rad, s_rad, min_B_px, max_B_px, min_scale, stepsPerIter, numIters);
+						t_rad, s_rad, min_B_px[og], max_B_px[og], min_scale, stepsPerIter, numIters);
 			
 			int threadnum = omp_get_thread_num();				
 			valsPerPart[threadnum].push_back(std::make_pair(p, BK));
@@ -209,12 +245,14 @@ void BFactorRefiner::processMicrograph(
 				int p = valsPerPart[t][i].first;
 				d2Vector BK = valsPerPart[t][i].second;
 				
+				const int og = obsModel->getOpticsGroup(mdt, p);
+				
 				if (debug)
 				{
-					std::cout << p << ": " << as*as*BK[0] << " \t " << BK[1] << "\n";
+					std::cout << p << ": " << as[og]*as[og]*BK[0] << " \t " << BK[1] << "\n";
 				}
 				
-				mdt.setValue(EMDL_CTF_BFACTOR, as*as*BK[0] - min_B, p);
+				mdt.setValue(EMDL_CTF_BFACTOR, as[og]*as[og]*BK[0] - min_B, p);
 				mdt.setValue(EMDL_CTF_SCALEFACTOR, BK[1], p);
 			}
 		}
@@ -256,15 +294,15 @@ void BFactorRefiner::processMicrograph(
 void BFactorRefiner::writePerMicrographEPS(
 		const MetaDataTable& mdt, 
 		const std::vector<double>& s_rad,
-		const std::vector<double>& t_rad)
+		const std::vector<double>& t_rad,
+		int ogRef)
 {
 	if (!ready)
 	{
 		REPORT_ERROR("ERROR: BFactorRefiner::writeEPS: BFactorRefiner not initialized.");
 	}
 	
-	std::string outRoot = CtfRefiner::getOutputFilenameRoot(mdt, outPath);
-	
+	std::string outRoot = CtfRefiner::getOutputFilenameRoot(mdt, outPath);		
 	FileName fn_eps = outRoot + "_bfactor_fit.eps";
 	
 	CPlot2D plot2D(fn_eps);
@@ -282,16 +320,16 @@ void BFactorRefiner::writePerMicrographEPS(
 	curve.SetDrawLine(true);
 	curve.SetDatasetColor(0,0,0);	
 	
-	const double as = s * angpix;
+	const double as = s[ogRef] * angpix[ogRef];
 	
 	double tMax = 0.0;
 	
-	for (int r = 0; r < sh; r++)
+	for (int r = 0; r < sh[ogRef]; r++)
 	{
 		if (t_rad[r] > tMax) tMax = t_rad[r];
 	}
 	
-	for (int r = 0; r < sh; r++)
+	for (int r = 0; r < sh[ogRef]; r++)
 	{
 		const double ra = r / as;
 		double cval = a * exp(-(B+min_B) * ra*ra / 4.0);
@@ -332,6 +370,8 @@ void BFactorRefiner::writePerParticleDiagEPS(
 		const std::vector<double> &t_rad,
 		int particle_index)
 {
+	const int og = obsModel->getOpticsGroup(mdt, particle_index);
+	
 	std::string outRoot = CtfRefiner::getOutputFilenameRoot(mdt, outPath);
 	
 	std::stringstream sts;
@@ -351,12 +391,12 @@ void BFactorRefiner::writePerParticleDiagEPS(
 		
 	double tMax = 0.0;
 	
-	for (int r = 0; r < sh; r++)
+	for (int r = 0; r < sh[og]; r++)
 	{
 		if (t_rad[r] > tMax) tMax = t_rad[r];
 	}
 	
-	for (int r = 0; r < sh; r++)
+	for (int r = 0; r < sh[og]; r++)
 	{
 		double cval = BKpixels[1] * exp(-BKpixels[0] * r*r / 4.0);
 		
@@ -387,9 +427,7 @@ void BFactorRefiner::writePerParticleDiagEPS(
 	plot2D.SetXAxisTitle(title);
 	
 	plot2D.OutputPostScriptPlot(fn_eps);
-	
 }
-
 
 void BFactorRefiner::writePerParticleEPS(const MetaDataTable& mdt)
 {

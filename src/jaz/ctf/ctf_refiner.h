@@ -83,10 +83,7 @@ class CtfRefiner
 	
 		MetaDataTable mdt0, opticsMdt;
 		std::vector<MetaDataTable> allMdts, unfinishedMdts;	
-		
-		// s: full image size, sh: half-size + 1, fc: frame count
-		int s, sh, fc;
-			
+
 		// Fit CTF parameters for all particles on a subset of the micrographs micrograph
 		void processSubsetMicrographs(long g_start, long g_end);
 		

@@ -55,14 +55,15 @@ int main(int argc, char *argv[])
 	
 	ObservationModel::loadSafely(starFn, obsModel, mdt0, opticsMdt);
 	
-	std::vector<MetaDataTable> allMdts = StackHelper::splitByMicrographName(&mdt0);
+	std::vector<MetaDataTable> allMdts = StackHelper::splitByMicrographName(mdt0);
+	int opticsGroup = obsModel.getOpticsGroup(allMdts[mg], 0);
 	
 	const int sh = s/2 + 1;
 	
 	Image<RFLOAT> ctfImg(sh,s), one(sh,s);
 	one.data.initConstant(1.0);
 	
-	const double angpix = obsModel.getPixelSize();
+	const double angpix = obsModel.getPixelSize(opticsGroup);
 	
 	CTF ctf;
 	ctf.readByGroup(allMdts[mg], &obsModel, 0);

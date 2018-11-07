@@ -37,7 +37,7 @@ class TiltEstimator
 		void read(IOParser& parser, int argc, char *argv[]);
 		
 		void init(
-				int verb, int s, int nr_omp_threads,
+				int verb, int nr_omp_threads,
 				bool debug, bool diag, std::string outPath,
 				ReferenceMap* reference, ObservationModel* obsModel);
 		
@@ -65,10 +65,12 @@ class TiltEstimator
 		double xring0, xring1;
 		
 		// parameters obtained through init()
-		int verb, s, sh, nr_omp_threads;
+		int verb, nr_omp_threads;
 		bool debug, diag, ready;
 		std::string outPath;
-		double angpix;
+		
+		std::vector<int> s, sh;
+		std::vector<double> angpix;
 		
 		ReferenceMap* reference;
 		ObservationModel* obsModel;

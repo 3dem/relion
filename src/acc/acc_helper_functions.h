@@ -57,7 +57,8 @@ void generateEulerMatrices(
 		XFLOAT *eulers,
 		bool inverse,
 		Matrix2D<RFLOAT> &L,
-		Matrix2D<RFLOAT> &R);
+		Matrix2D<RFLOAT> &R,
+		Matrix2D<RFLOAT> &MAG);
 
 long unsigned generateProjectionSetupFine(
 		OptimisationParamters &op,

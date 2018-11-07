@@ -48,11 +48,12 @@ class ReferenceMap
 			Projector projectors[2];
             int k_out, s, sh;
 			bool hasMask;
+			double angpix;
 
         void read(IOParser& parser, int argc, char *argv[]);
         void load(int verb, bool debug);
 		
-		Image<RFLOAT> getHollowWeight(double kmin_px);
+		Image<RFLOAT> getHollowWeight(double kmin_ang, int s_out, double angpix_out);
 		
 		std::vector<Image<Complex>> predictAll(
 				const MetaDataTable& mdt,

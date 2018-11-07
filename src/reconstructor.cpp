@@ -143,6 +143,11 @@ void Reconstructor::initialise()
 		if (do_ewald && newbox > 0)
 			mysize = newbox;
 	}
+	
+	if (!obsModel.allPixelSizesIdentical())
+	{
+		REPORT_ERROR("Reconstructor does not support varying pixel sizes yet.");
+	}
 
 	angpix = obsModel.getPixelSize(0);
 
@@ -391,7 +396,7 @@ void Reconstructor::backprojectOneParticle(long int p)
 				if (!skip_weighting)
 				{
 					// Also calculate W, store again in Fctf
-					ctf.applyWeightEwaldSphereCurvature(Fctf, mysize, mysize, angpix, mask_diameter);
+					ctf.applyWeightEwaldSphereCurvature_noAniso(Fctf, mysize, mysize, angpix, mask_diameter);
 				}
 
 				// Also calculate the radius of the Ewald sphere (in pixels)

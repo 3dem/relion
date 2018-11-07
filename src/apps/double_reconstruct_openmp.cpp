@@ -34,6 +34,7 @@
 #include <src/jaz/obs_model.h>
 #include <src/jaz/new_ft.h>
 #include <src/jaz/img_proc/filter_helper.h>
+#include <src/jaz/ctf/delocalisation_helper.h>
 
 class reconstruct_parameters
 {
@@ -45,21 +46,18 @@ class reconstruct_parameters
 			nr_omp_threads,
 			nr_helical_asu, newbox, width_mask_edge, nr_sectors;
 		
-		RFLOAT blob_radius, blob_alpha, angular_error, shift_error, maxres,
+		RFLOAT blob_radius, blob_alpha, angular_error, shift_error,
 			helical_rise, helical_twist;
 		
-		bool ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak,
+		bool deloc_supp, ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak,
 			do_fom_weighting, do_3d_rot, do_ewald;
 		
 		bool skip_gridding, debug, do_reconstruct_meas, is_positive, read_weights, div_avg;
 		
-		bool no_Wiener, writeWeights;
+		bool no_Wiener, writeWeights, new_Ewald_weight, Ewald_ellipsoid;
 		
-		bool L1_freq, L1_ring, L1_particle, L1_micrograph, L1_any;
-		int L1_iters;
-		double L1_eps;
-		
-		float padding_factor, mask_diameter, mask_diameter_filt, flank_width;
+		float padding_factor, mask_diameter_ds, mask_diameter, mask_diameter_filt, flank_width;
+		double padding_factor_2D;
 		
 		// I/O Parser
 		IOParser parser;
@@ -78,13 +76,17 @@ class reconstruct_parameters
 			fn_sel = parser.getOption("--i", "Input STAR file with the projection images and their orientations", "");
 			fn_out = parser.getOption("--o", "Name for output reconstruction");
 			fn_sym = parser.getOption("--sym", "Symmetry group", "c1");
-			maxres = textToFloat(parser.getOption("--maxres", "Maximum resolution (in Angstrom) to consider in Fourier space (default Nyquist)", "-1"));
 			padding_factor = textToFloat(parser.getOption("--pad", "Padding factor", "2"));
+			padding_factor_2D = textToDouble(parser.getOption("--pad2D", "Padding factor for 2D images", "1"));
+			
 			mask_diameter_filt = textToFloat(parser.getOption("--filter_diameter", "Diameter of filter-mask applied before division", "-1"));
-			flank_width = textToFloat(parser.getOption("--filter_softness", "Width of filter-mask width", "30"));
+			flank_width = textToFloat(parser.getOption("--filter_softness", "Width of filter-mask edge", "30"));
 			nr_omp_threads = textToInteger(parser.getOption("--j", "Number of open-mp threads to use. Memory footprint is multiplied by this value.", "16"));
 			
 			int ctf_section = parser.addSection("CTF options");
+			
+			deloc_supp = parser.checkOption("--dm", "Apply delocalisation masking");
+			mask_diameter_ds = textToDouble(parser.getOption("--mask_diameter_ds", "Diameter (in A) of mask for delocalisation suppression", "50"));
 			intact_ctf_first_peak = parser.checkOption("--ctf_intact_first_peak", "Leave CTFs intact until first peak");
 			ctf_phase_flipped = parser.checkOption("--ctf_phase_flipped", "Images have been phase flipped");
 			only_flip_phases = parser.checkOption("--only_flip_phases", "Do not correct CTF-amplitudes, only flip phases");
@@ -106,6 +108,8 @@ class reconstruct_parameters
 			int expert_section = parser.addSection("Expert options");
 			fn_sub = parser.getOption("--subtract","Subtract projections of this map from the images used for reconstruction", "");
 			no_Wiener = parser.checkOption("--legacy", "Use gridding instead of Wiener filter");
+			new_Ewald_weight = parser.checkOption("--new_Ewald_weight", "Use Ewald weight W that considers Cs as well");
+			Ewald_ellipsoid = parser.checkOption("--Ewald_ellipsoid", "Allow Ewald sphere to become an ellipsoid under aniso. mag.");
 			
 			if (parser.checkOption("--NN", "Use nearest-neighbour instead of linear interpolation before gridding correction"))
 			{
@@ -127,35 +131,6 @@ class reconstruct_parameters
 			do_3d_rot = parser.checkOption("--3d_rot", "Perform 3D rotations instead of backprojections from 2D images");
 			skip_gridding = !parser.checkOption("--grid", "Perform gridding part of the reconstruction");
 			div_avg = parser.checkOption("--div_avg", "Divide the per-voxel average by its weight prior to computing the preliminary FSC");
-			
-			L1_freq = false;
-			L1_ring = false;
-			L1_particle = false;
-			L1_micrograph = false;
-			
-			L1_freq = parser.checkOption("--L1_voxel", "Perform per-voxel L1 averaging");
-			L1_ring = parser.checkOption("--L1_shell", "Perform per-shell L1 averaging");
-			L1_particle = parser.checkOption("--L1_particle", "Perform per-particle L1 averaging");
-			L1_micrograph = parser.checkOption("--L1_micrograph", "Perform per-micrograph L1 averaging");
-			
-			L1_iters = textToInteger(parser.getOption("--L1_iters", "Number of L1-averaging iterations", "5"));
-			L1_eps = textToFloat(parser.getOption("--L1_eps", "L1-weight epsilon", "0.0001"));
-			
-			int numL1s = 0;
-			
-			if (L1_freq) numL1s++;
-			if (L1_ring) numL1s++;
-			if (L1_particle) numL1s++;
-			if (L1_micrograph) numL1s++;
-			
-			if (numL1s > 1)
-			{
-				REPORT_ERROR("Only one type of L1 averaging can be performed at a time.");
-			}
-			
-			L1_any = numL1s > 0;
-			
-			if (!L1_any) L1_iters = 1;
 			
 			debug = parser.checkOption("--debug", "Write out debugging data");
 			
@@ -280,39 +255,48 @@ class reconstruct_parameters
 			int data_dim = (do_3d_rot) ? 3 : 2;
 			
 			MultidimArray<RFLOAT> dummy;
-			Image<RFLOAT> vol, img0, sub;
-			int mysize;
+			Image<RFLOAT> vol, sub;
 				
 			ObservationModel obsModel;
 			MetaDataTable mdt0, mdtOpt;
 			
 			ObservationModel::loadSafely(fn_sel, obsModel, mdt0, mdtOpt);
-			double angpix = obsModel.getPixelSize(0);
+			std::vector<double> angpix = obsModel.getPixelSizes();
 			
-			// Get dimension of the images
-			
-			mdt0.getValue(EMDL_IMAGE_NAME, fn_img, 0);
-			
-			img0.read(fn_img);
-			mysize = (int)XSIZE(img0());
+			const int optGroupCount = obsModel.numberOfOpticsGroups();
+					
+			// Use pixel and box size of first opt. group for output;
+			double angpixOut = angpix[0];
+			int boxOut;
 			
 			// When doing Ewald-curvature correction: allow reconstructing smaller
 			// box than the input images (which should have large boxes!!)
 			if (do_ewald && newbox > 0)
 			{
-				mysize = newbox;
-			}
-			
-			Projector subProjector(mysize, interpolator, padding_factor, r_min_nn);
-			
-			if (maxres < 0.)
-			{
-				r_max = -1;
+				boxOut = newbox;
 			}
 			else
 			{
-				r_max = CEIL(mysize * angpix / maxres);
+				boxOut = obsModel.getBoxSize(0);
 			}
+			
+			std::vector<int> paddedSizes2D(optGroupCount);
+			std::vector<int> origSizes2D(optGroupCount);
+			
+			for (int i = 0; i < optGroupCount; i++)
+			{
+				paddedSizes2D[i] = (int) (padding_factor_2D * obsModel.getBoxSize(i));
+				origSizes2D[i] = (int) obsModel.getBoxSize(i);
+			}
+			
+			// Get dimension of the images
+			
+			mdt0.getValue(EMDL_IMAGE_NAME, fn_img, 0);
+			
+			
+			Projector subProjector(sub.data.xdim, interpolator, padding_factor, r_min_nn);
+			
+			r_max = -1;
 			
 			if (fn_sub != "")
 			{
@@ -324,462 +308,386 @@ class reconstruct_parameters
 			const long gc = mdts.size();
 			
 			std::vector<Image<RFLOAT>> prevRefs(2);
+			std::vector<std::vector<BackProjector>> backprojectors(2);
 			
-			for (int iter = 0; iter < L1_iters; iter++)
+			for (int j = 0; j < 2; j++)
 			{
-				std::vector<std::vector<BackProjector>> backprojectors(2);
+				backprojectors[j] = std::vector<BackProjector>(nr_omp_threads);
 				
-				for (int j = 0; j < 2; j++)
+				for (int i = 0; i < nr_omp_threads; i++)
 				{
-					backprojectors[j] = std::vector<BackProjector>(nr_omp_threads);
-					
-					for (int i = 0; i < nr_omp_threads; i++)
-					{
-						backprojectors[j][i] = BackProjector(
-							mysize, ref_dim, fn_sym, interpolator,
-							padding_factor, r_min_nn, blob_order,
-							blob_radius, blob_alpha, data_dim, skip_gridding);
-					}
+					backprojectors[j][i] = BackProjector(
+						boxOut, ref_dim, fn_sym, interpolator,
+						padding_factor, r_min_nn, blob_order,
+						blob_radius, blob_alpha, data_dim, skip_gridding);
 				}
+			}
+			
+			std::cout << "Back-projecting all images ..." << std::endl;
+			
+			time_config();
+			init_progress_bar(gc/nr_omp_threads);
+			
+			
+			#pragma omp parallel num_threads(nr_omp_threads)
+			{
+				int threadnum = omp_get_thread_num();
 				
-				std::cout << "Back-projecting all images ..." << std::endl;
+				backprojectors[0][threadnum].initZeros(2 * r_max);
+				backprojectors[1][threadnum].initZeros(2 * r_max);
 				
-				time_config();
-				init_progress_bar(gc/nr_omp_threads);
+				RFLOAT rot, tilt, psi, fom, r_ewald_sphere;
+				Matrix2D<RFLOAT> A3D;
+				MultidimArray<RFLOAT> Fctf;
+				Matrix1D<RFLOAT> trans(2);
+				FourierTransformer transformer;
 				
-				std::vector<Projector> prevProjectors(2);
-				
-				if (iter > 0)
+				#pragma omp for
+				for (int g = 0; g < gc; g++)
 				{
-					for (int j = 0; j < 2; j++)
+					std::vector<Image<RFLOAT> > obsR;
+					
+					try
 					{
-						prevProjectors[j] = Projector(mysize, interpolator, 
-													  padding_factor, r_min_nn);
-						
-						prevProjectors[j].computeFourierTransformMap(prevRefs[j](), dummy, 2 * r_max);
+						obsR = StackHelper::loadStack(&mdts[g]);
 					}
-				}
-				
-				#pragma omp parallel num_threads(nr_omp_threads)
-				{
-					int threadnum = omp_get_thread_num();
-					
-					backprojectors[0][threadnum].initZeros(2 * r_max);
-					backprojectors[1][threadnum].initZeros(2 * r_max);
-					
-					RFLOAT rot, tilt, psi, fom, r_ewald_sphere;
-					Matrix2D<RFLOAT> A3D;
-					MultidimArray<RFLOAT> Fctf;
-					MultidimArray<Complex> prevSlice;
-					Matrix1D<RFLOAT> trans(2);
-					FourierTransformer transformer;
-					
-					MultidimArray<double> L1_weights(mysize, mysize/2 + 1);
-					
-					#pragma omp for
-					for (int g = 0; g < gc; g++)
+					catch (RelionError XE)
 					{
-						std::vector<Image<RFLOAT> > obsR;
+						std::cerr << "warning: unable to load micrograph #" << (g+1) << "\n";
+						continue;
+					}
+					
+					const long pc = obsR.size();
+					
+					for (int p = 0; p < pc; p++)
+					{
+						int randSubset;
+						mdts[g].getValue(EMDL_PARTICLE_RANDOM_SUBSET, randSubset, p);
+						randSubset = randSubset - 1;
 						
-						try
+						// Rotations
+						if (ref_dim == 2)
 						{
-							obsR = StackHelper::loadStack(&mdts[g]);
+							rot = tilt = 0.;
 						}
-						catch (RelionError XE)
+						else
 						{
-							std::cerr << "warning: unable to load micrograph #" << (g+1) << "\n";
-							continue;
+							mdts[g].getValue(EMDL_ORIENT_ROT, rot, p);
+							mdts[g].getValue(EMDL_ORIENT_TILT, tilt, p);
 						}
 						
-						const long pc = obsR.size();
+						psi = 0.;
+						mdts[g].getValue(EMDL_ORIENT_PSI, psi, p);
 						
-						for (int p = 0; p < pc; p++)
+						if (angular_error > 0.)
 						{
-							int randSubset;
-							mdts[g].getValue(EMDL_PARTICLE_RANDOM_SUBSET, randSubset, p);
-							randSubset = randSubset - 1;
-							
-							// Rotations
-							if (ref_dim == 2)
-							{
-								rot = tilt = 0.;
-							}
-							else
-							{
-								mdts[g].getValue(EMDL_ORIENT_ROT, rot, p);
-								mdts[g].getValue(EMDL_ORIENT_TILT, tilt, p);
-							}
-							
-							psi = 0.;
-							mdts[g].getValue(EMDL_ORIENT_PSI, psi, p);
-							
-							if (angular_error > 0.)
-							{
-								rot += rnd_gaus(0., angular_error);
-								tilt += rnd_gaus(0., angular_error);
-								psi += rnd_gaus(0., angular_error);
-								//std::cout << rnd_gaus(0., angular_error) << std::endl;
-							}
-							
-							Euler_angles2matrix(rot, tilt, psi, A3D);
-							
-							int opticsGroup;
-							mdts[g].getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, p);
-							opticsGroup--;
-							
+							rot += rnd_gaus(0., angular_error);
+							tilt += rnd_gaus(0., angular_error);
+							psi += rnd_gaus(0., angular_error);
+							//std::cout << rnd_gaus(0., angular_error) << std::endl;
+						}
+						
+						Euler_angles2matrix(rot, tilt, psi, A3D);
+						
+						int opticsGroup = obsModel.getOpticsGroup(mdts[g], p);
+						
+						// If we are considering Ewald sphere curvature, the mag. matrix
+						// has to be provided to the backprojector explicitly
+						// (to avoid creating an Ewald ellipsoid)
+						if (!do_ewald || Ewald_ellipsoid)
+						{								
 							A3D = obsModel.applyAnisoMagTransp(A3D, opticsGroup);
-							
-							// Translations (either through phase-shifts or in real space
-							trans.initZeros();
-							mdts[g].getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, XX(trans), p);
-							mdts[g].getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, YY(trans), p);
-							
-							XX(trans) /= obsModel.angpix[opticsGroup];
-							YY(trans) /= obsModel.angpix[opticsGroup];
+						}
+						
+						A3D = obsModel.applyScaleDifference(A3D, opticsGroup, boxOut, angpixOut);
+						A3D /= padding_factor_2D;
+						
+						// Translations (either through phase-shifts or in real space
+						trans.initZeros();
+						mdts[g].getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, XX(trans), p);
+						mdts[g].getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, YY(trans), p);
+						
+						XX(trans) /= angpix[opticsGroup];
+						YY(trans) /= angpix[opticsGroup];
+						
+						if (shift_error > 0.)
+						{
+							XX(trans) += rnd_gaus(0., shift_error);
+							YY(trans) += rnd_gaus(0., shift_error);
+						}
+						
+						if (do_3d_rot)
+						{
+							trans.resize(3);
+							mdts[g].getValue( EMDL_ORIENT_ORIGIN_Z, ZZ(trans), p);
 							
 							if (shift_error > 0.)
 							{
-								XX(trans) += rnd_gaus(0., shift_error);
-								YY(trans) += rnd_gaus(0., shift_error);
+								ZZ(trans) += rnd_gaus(0., shift_error);
 							}
-							
+						}
+						
+						if (do_fom_weighting)
+						{
+							mdts[g].getValue( EMDL_PARTICLE_FOM, fom, p);
+						}
+													
+						MultidimArray<Complex> Fsub, F2D, F2DP, F2DQ;
+						
+						CenterFFT(obsR[p](), true);
+						
+						const int sPad2D = paddedSizes2D[opticsGroup];
+						
+						if (padding_factor_2D > 1.0)
+						{
+							obsR[p] = FilterHelper::padCorner2D(obsR[p], sPad2D, sPad2D);
+						}
+						
+						transformer.FourierTransform(obsR[p](), F2D);
+						
+						if (ABS(XX(trans)) > 0. || ABS(YY(trans)) > 0.)
+						{
 							if (do_3d_rot)
 							{
-								trans.resize(3);
-								mdts[g].getValue( EMDL_ORIENT_ORIGIN_Z, ZZ(trans), p);
-								
-								if (shift_error > 0.)
-								{
-									ZZ(trans) += rnd_gaus(0., shift_error);
-								}
-							}
-							
-							if (do_fom_weighting)
-							{
-								mdts[g].getValue( EMDL_PARTICLE_FOM, fom, p);
-							}
-														
-							MultidimArray<Complex> Fsub, F2D, F2DP, F2DQ;
-							CenterFFT(obsR[p](), true);
-							
-							transformer.FourierTransform(obsR[p](), F2D);
-							
-							if (ABS(XX(trans)) > 0. || ABS(YY(trans)) > 0.)
-							{
-								if (do_3d_rot)
-								{
-									shiftImageInFourierTransform(
-										F2D, F2D, XSIZE(obsR[p]()), XX(trans), YY(trans), ZZ(trans));
-								}
-								else
-								{
-									shiftImageInFourierTransform(
-										F2D, F2D, XSIZE(obsR[p]()), XX(trans), YY(trans));
-								}
-							}
-							
-							Fctf.resize(F2D);
-							Fctf.initConstant(1.);
-						
-							CTF ctf;
-							ctf.readByGroup(mdts[g], &obsModel, p);
-							
-							ctf.getFftwImage(Fctf, mysize, mysize, angpix,
-											 ctf_phase_flipped, only_flip_phases,
-											 intact_ctf_first_peak, true);
-							
-							obsModel.demodulatePhase(mdts[g], p, F2D);
-							
-							if (do_ewald)
-							{
-								// Ewald-sphere curvature correction
-								
-								applyCTFPandCTFQ(F2D, ctf, transformer, F2DP, F2DQ, angpix);
-								
-								// Also calculate W, store again in Fctf
-								//std::cerr << " temporarily using very large diameter for weight for debugging...." << std::endl;
-								//ctf.applyWeightEwaldSphereCurvature(Fctf, mysize, mysize, angpix, 100000.*mask_diameter);
-								ctf.applyWeightEwaldSphereCurvature(
-									Fctf, mysize, mysize, angpix, mask_diameter);
-								
-								// Also calculate the radius of the Ewald sphere (in pixels)
-								//std::cerr << " temporarily switching off Ewald sphere curvature for debugging...." << std::endl;
-								//r_ewald_sphere = -1.;
-								r_ewald_sphere = mysize * angpix / ctf.lambda;
-							}
-							
-							// Subtract reference projection
-							if (fn_sub != "")
-							{
-								obsModel.predictObservation(
-									subProjector, mdts[g], p, Fsub, true, true, true); 
-																
-								FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fsub)
-								{
-									DIRECT_MULTIDIM_ELEM(F2D, n) -= DIRECT_MULTIDIM_ELEM(Fsub, n);
-								}
-								
-								// Back-project difference image
-								backprojectors[randSubset][threadnum].set2DFourierTransform(
-											F2D, A3D, IS_NOT_INV);
+								shiftImageInFourierTransform(
+									F2D, F2D, sPad2D, XX(trans), YY(trans), ZZ(trans));
 							}
 							else
 							{
-								if (do_ewald)
+								shiftImageInFourierTransform(
+									F2D, F2D, sPad2D, XX(trans), YY(trans));
+							}
+						}
+						
+						Fctf.resize(F2D);
+						Fctf.initConstant(1.);
+					
+						CTF ctf;
+						ctf.readByGroup(mdts[g], &obsModel, p);
+						
+						ctf.getFftwImage(Fctf, sPad2D, sPad2D, angpix[opticsGroup],
+										 ctf_phase_flipped, only_flip_phases,
+										 intact_ctf_first_peak, true);
+						
+						if (deloc_supp)
+						{
+							DelocalisationHelper::maskOutsideBox(
+								ctf, mask_diameter_ds/(2.0 * angpix[opticsGroup]), 
+								angpix[opticsGroup], origSizes2D[opticsGroup], 
+								Fctf, XX(trans), YY(trans));
+						}
+						
+						obsModel.demodulatePhase(mdts[g], p, F2D);
+						
+						if (do_ewald)
+						{
+							// Ewald-sphere curvature correction								
+							applyCTFPandCTFQ(F2D, ctf, transformer, F2DP, F2DQ, angpix[opticsGroup]);
+							
+							// Also calculate W, store again in Fctf
+							
+							if (new_Ewald_weight)
+							{
+								ctf.applyWeightEwaldSphereCurvature_new(
+									Fctf, sPad2D, sPad2D, angpix[opticsGroup], mask_diameter);
+							}
+							else
+							{
+								ctf.applyWeightEwaldSphereCurvature(
+									Fctf, sPad2D, sPad2D, angpix[opticsGroup], mask_diameter);
+							}
+							
+							// Also calculate the radius of the Ewald sphere (in pixels)
+							r_ewald_sphere = boxOut * angpix[opticsGroup] / ctf.lambda;
+						}
+						
+						// Subtract reference projection
+						if (fn_sub != "")
+						{
+							obsModel.predictObservation(
+								subProjector, mdts[g], p, Fsub, true, true, true); 
+															
+							FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fsub)
+							{
+								DIRECT_MULTIDIM_ELEM(F2D, n) -= DIRECT_MULTIDIM_ELEM(Fsub, n);
+							}
+							
+							// Back-project difference image
+							backprojectors[randSubset][threadnum].set2DFourierTransform(
+										F2D, A3D, IS_NOT_INV);
+						}
+						else
+						{
+							if (do_ewald)
+							{
+								FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F2D)
 								{
-									FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F2D)
-									{
-										DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
-									}
+									DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
 								}
-								// "Normal" reconstruction, multiply X by CTF, and W by CTF^2
-								else
+							}
+							// "Normal" reconstruction, multiply X by CTF, and W by CTF^2
+							else
+							{
+								FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F2D)
 								{
-									FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F2D)
-									{
-										DIRECT_MULTIDIM_ELEM(F2D, n)  *= DIRECT_MULTIDIM_ELEM(Fctf, n);
-										DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
-									}
-								}
-								
-								// Do the following after squaring the CTFs!
-								if (do_fom_weighting)
-								{
-									FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F2D)
-									{
-										DIRECT_MULTIDIM_ELEM(F2D, n)  *= fom;
-										DIRECT_MULTIDIM_ELEM(Fctf, n) *= fom;
-									}
-								}
-								
-								if (read_weights)
-								{
-									std::string name, fullName;
-									
-									mdts[g].getValue(EMDL_IMAGE_NAME, fullName, 0);
-									name = fullName.substr(fullName.find("@")+1);
-									
-									std::string wghName = name;
-									wghName = wghName.substr(0, wghName.find_last_of('.')) + "_weight.mrc";
-									
-									Image<RFLOAT> wgh;
-									wgh.read(wghName);
-									
-									if (   Fctf.ndim != wgh().ndim
-										|| Fctf.zdim != wgh().zdim
-										|| Fctf.ydim != wgh().ydim
-										|| Fctf.xdim != wgh().xdim)
-									{
-										REPORT_ERROR(wghName + " and " + name + " are of unequal size.\n");
-									}
-									
-									for (long int n = 0; n < Fctf.ndim; n++)
-									for (long int z = 0; z < Fctf.zdim; z++)
-									for (long int y = 0; y < Fctf.ydim; y++)
-									for (long int x = 0; x < Fctf.xdim; x++)
-									{
-										DIRECT_NZYX_ELEM(Fctf, n, z, y, x)
-												*= DIRECT_NZYX_ELEM(wgh(), n, z, y, x);
-									}
-								}
-								
-								DIRECT_A2D_ELEM(F2D, 0, 0) = 0.0;
-								
-								if (iter > 0)
-								{
-									obsModel.predictObservation(
-										prevProjectors[randSubset], mdts[g], p, prevSlice,
-										true, true, true);
-																		
-									if (L1_freq)
-									{
-										for (long int y = 0; y < F2D.ydim; y++)
-										for (long int x = 0; x < F2D.xdim; x++)
-										{
-											RFLOAT w1 = DIRECT_NZYX_ELEM(Fctf, 0, 0, y, x);
-											
-											if (w1 == 0.0) 
-											{
-												DIRECT_NZYX_ELEM(L1_weights, 0, 0, y, x) = 0.0;
-												continue;
-											}
-											
-											Complex z0 = DIRECT_NZYX_ELEM(prevSlice, 0, 0, y, x);
-											Complex z1 = DIRECT_NZYX_ELEM(F2D, 0, 0, y, x) / w1;
-											
-											double dl = (z1 - z0).abs();
-											
-											DIRECT_NZYX_ELEM(L1_weights, 0, 0, y, x) = 
-													1.0 / (dl + L1_eps);
-										}
-									}
-									
-									double avgW = 0.0;
-									
-									for (long int y = 0; y < L1_weights.ydim; y++)
-									for (long int x = 0; x < L1_weights.xdim; x++)
-									{
-										avgW += DIRECT_NZYX_ELEM(L1_weights, 0, 0, y, x);
-									}
-									
-									avgW /= (L1_weights.xdim * L1_weights.ydim);
-									
-									for (long int y = 0; y < L1_weights.ydim; y++)
-									for (long int x = 0; x < L1_weights.xdim; x++)
-									{
-										double wn = DIRECT_NZYX_ELEM(L1_weights, 0, 0, y, x) / avgW;
-										
-										DIRECT_NZYX_ELEM(F2D, 0, 0, y, x) *= wn;
-										DIRECT_NZYX_ELEM(Fctf, 0, 0, y, x) *= wn;
-									}
-								}
-								
-								if (do_ewald)
-								{									
-									backprojectors[randSubset][threadnum].set2DFourierTransform(
-												F2DP, A3D, IS_NOT_INV, &Fctf, r_ewald_sphere, true);
-									
-									backprojectors[randSubset][threadnum].set2DFourierTransform(
-												F2DQ, A3D, IS_NOT_INV, &Fctf, r_ewald_sphere, false);
-								}
-								else
-								{
-									backprojectors[randSubset][threadnum].set2DFourierTransform(
-												F2D, A3D, IS_NOT_INV, &Fctf);
+									DIRECT_MULTIDIM_ELEM(F2D, n)  *= DIRECT_MULTIDIM_ELEM(Fctf, n);
+									DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
 								}
 							}
 							
-							if (threadnum == 0)
+							// Do the following after squaring the CTFs!
+							if (do_fom_weighting)
 							{
-								progress_bar(g);
+								FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F2D)
+								{
+									DIRECT_MULTIDIM_ELEM(F2D, n)  *= fom;
+									DIRECT_MULTIDIM_ELEM(Fctf, n) *= fom;
+								}
+							}
+							
+							DIRECT_A2D_ELEM(F2D, 0, 0) = 0.0;
+																						
+							if (do_ewald)
+							{
+								Matrix2D<RFLOAT> magMat;
+								
+								if (obsModel.hasMagMatrices && !Ewald_ellipsoid)
+								{
+									magMat = obsModel.getMagMatrix(opticsGroup);
+								}
+								else
+								{
+									magMat = Matrix2D<RFLOAT>(2,2);
+									magMat.initIdentity();
+								}
+								
+								backprojectors[randSubset][threadnum].set2DFourierTransform(
+									F2DP, A3D, IS_NOT_INV, &Fctf, r_ewald_sphere, true, &magMat);
+								
+								backprojectors[randSubset][threadnum].set2DFourierTransform(
+									F2DQ, A3D, IS_NOT_INV, &Fctf, r_ewald_sphere, false, &magMat);
+							}
+							else
+							{
+								backprojectors[randSubset][threadnum].set2DFourierTransform(
+											F2D, A3D, IS_NOT_INV, &Fctf);
 							}
 						}
-					}
-				}
-				
-				progress_bar(gc/nr_omp_threads);
-				
-				
-				std::vector<BackProjector*> backprojector(2);
-				
-				for (int j = 0; j < 2; j++)
-				{
-					std::cerr << " + Merging volumes for half-set " << (j+1) << "...\n";
-					
-					backprojector[j] = &backprojectors[j][0];
-					
-					for (int bpi = 1; bpi < nr_omp_threads; bpi++)
-					{
-						FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(backprojector[j]->data)
+						
+						if (threadnum == 0)
 						{
-							DIRECT_MULTIDIM_ELEM(backprojector[j]->data, n)
-									+= DIRECT_MULTIDIM_ELEM(backprojectors[j][bpi].data, n);
+							progress_bar(g);
 						}
-						
-						backprojectors[j][bpi].data.clear();
-						
-						FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(backprojector[j]->weight)
-						{
-							DIRECT_MULTIDIM_ELEM(backprojector[j]->weight, n)
-									+= DIRECT_MULTIDIM_ELEM(backprojectors[j][bpi].weight, n);
-						}
-						
-						backprojectors[j][bpi].weight.clear();
-					}
-					
-					std::cerr << " + Symmetrising half-set " << (j+1) << "...\n";
-					
-					backprojector[j]->symmetrise(
-						nr_helical_asu, helical_twist, helical_rise/angpix, nr_omp_threads);
-				}
-				
-				bool do_map = !no_Wiener;
-				bool do_use_fsc = !no_Wiener;
-				
-				MultidimArray<RFLOAT> fsc(mysize/2+1);
-				
-				if (!no_Wiener)
-				{
-					MultidimArray<Complex> avg0, avg1;
-					
-					backprojector[0]->getDownsampledAverage(avg0, div_avg);
-					backprojector[1]->getDownsampledAverage(avg1, div_avg);
-					backprojector[0]->calculateDownSampledFourierShellCorrelation(avg0, avg1, fsc);
-				}
-				
-				if (debug)
-				{
-					std::ofstream fscNew(fn_out+"_prelim_FSC.dat");
-					
-					for (int i = 0; i < fsc.xdim; i++)
-					{
-						fscNew << i << " " << fsc(i) << "\n";
 					}
 				}
-						
-				for (int j = 0; j < 2; j++)
-				{
-					if (mask_diameter_filt > 0.0)
-					{	
-						std::cout << " + Applying spherical mask of diameter " << 
-								  mask_diameter_filt << " ..." << std::endl;
-						
-						const double r0 = mask_diameter_filt/2.0;
-						const double r1 = r0 + flank_width;
-						
-						Image<Complex> tempC;
-						Image<RFLOAT> tempR;
-						
-						BackProjector::decenterWhole(backprojector[j]->data, tempC());
-						NewFFT::inverseFourierTransform(tempC(), tempR(), NewFFT::FwdOnly, false);	
-						tempR = FilterHelper::raisedCosEnvCorner3D(tempR, r0, r1);
-						NewFFT::FourierTransform(tempR(), tempC(), NewFFT::FwdOnly);
-						BackProjector::recenterWhole(tempC(), backprojector[j]->data);
-						
-						BackProjector::decenterWhole(backprojector[j]->weight, tempC());
-						NewFFT::inverseFourierTransform(tempC(), tempR(), NewFFT::FwdOnly, false);
-						tempR = FilterHelper::raisedCosEnvCorner3D(tempR, r0, r1);
-						NewFFT::FourierTransform(tempR(), tempC(), NewFFT::FwdOnly);
-						BackProjector::recenterWhole(tempC(), backprojector[j]->weight);
-					}
-					
-					Image<RFLOAT> weightOut;
-						
-					std::cout << " + Starting the reconstruction ..." << std::endl;
-					
-					backprojector[j]->reconstruct(
-						vol(), grid_iters, do_map, 1., dummy, dummy, dummy, dummy,
-						fsc, 1., do_use_fsc, true, nr_omp_threads, -1, false, false, 
-						writeWeights? &weightOut : 0);
-					
-					if (writeWeights)
-					{
-						std::stringstream sts;
-						sts << (j+1);
-						std::string fnWgh = fn_out + "_half" + sts.str() + "_class001_unfil_weight.mrc";
-						weightOut.write(fnWgh);
-					}
-															
-					prevRefs[j] = vol;
-					
-					if (debug)
-					{
-						std::stringstream sts;
-						sts << (j+1);
-						
-						std::stringstream sts2;
-						sts2 << iter;
-						
-						std::string fnFull = fn_out + "_iter_" + sts2.str()
-									+ "_half" + sts.str() + "_class001_unfil.mrc";
-						
-						prevRefs[j].write(fnFull);
-						std::cout << " Done writing map in " << fnFull << "\n";
-					}
-					
-				} // halves
+			}
+			
+			progress_bar(gc/nr_omp_threads);
+			
+			
+			std::vector<BackProjector*> backprojector(2);
+			
+			for (int j = 0; j < 2; j++)
+			{
+				std::cerr << " + Merging volumes for half-set " << (j+1) << "...\n";
 				
-			} // iters
+				backprojector[j] = &backprojectors[j][0];
+				
+				for (int bpi = 1; bpi < nr_omp_threads; bpi++)
+				{
+					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(backprojector[j]->data)
+					{
+						DIRECT_MULTIDIM_ELEM(backprojector[j]->data, n)
+								+= DIRECT_MULTIDIM_ELEM(backprojectors[j][bpi].data, n);
+					}
+					
+					backprojectors[j][bpi].data.clear();
+					
+					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(backprojector[j]->weight)
+					{
+						DIRECT_MULTIDIM_ELEM(backprojector[j]->weight, n)
+								+= DIRECT_MULTIDIM_ELEM(backprojectors[j][bpi].weight, n);
+					}
+					
+					backprojectors[j][bpi].weight.clear();
+				}
+				
+				std::cerr << " + Symmetrising half-set " << (j+1) << "...\n";
+				
+				backprojector[j]->symmetrise(
+					nr_helical_asu, helical_twist, helical_rise/angpixOut, nr_omp_threads);
+			}
+			
+			bool do_map = !no_Wiener;
+			bool do_use_fsc = !no_Wiener;
+			
+			MultidimArray<RFLOAT> fsc(boxOut/2 + 1);
+			
+			if (!no_Wiener)
+			{
+				MultidimArray<Complex> avg0, avg1;
+				
+				backprojector[0]->getDownsampledAverage(avg0, div_avg);
+				backprojector[1]->getDownsampledAverage(avg1, div_avg);
+				backprojector[0]->calculateDownSampledFourierShellCorrelation(avg0, avg1, fsc);
+			}
+			
+			if (debug)
+			{
+				std::ofstream fscNew(fn_out+"_prelim_FSC.dat");
+				
+				for (int i = 0; i < fsc.xdim; i++)
+				{
+					fscNew << i << " " << fsc(i) << "\n";
+				}
+			}
+					
+			for (int j = 0; j < 2; j++)
+			{
+				if (mask_diameter_filt > 0.0)
+				{	
+					std::cout << " + Applying spherical mask of diameter " << 
+							  mask_diameter_filt << " ..." << std::endl;
+					
+					const double r0 = mask_diameter_filt/2.0;
+					const double r1 = r0 + flank_width;
+					
+					Image<Complex> tempC;
+					Image<RFLOAT> tempR;
+					
+					BackProjector::decenterWhole(backprojector[j]->data, tempC());
+					NewFFT::inverseFourierTransform(tempC(), tempR(), NewFFT::FwdOnly, false);	
+					tempR = FilterHelper::raisedCosEnvCorner3D(tempR, r0, r1);
+					NewFFT::FourierTransform(tempR(), tempC(), NewFFT::FwdOnly);
+					BackProjector::recenterWhole(tempC(), backprojector[j]->data);
+					
+					BackProjector::decenterWhole(backprojector[j]->weight, tempC());
+					NewFFT::inverseFourierTransform(tempC(), tempR(), NewFFT::FwdOnly, false);
+					tempR = FilterHelper::raisedCosEnvCorner3D(tempR, r0, r1);
+					NewFFT::FourierTransform(tempR(), tempC(), NewFFT::FwdOnly);
+					BackProjector::recenterWhole(tempC(), backprojector[j]->weight);
+				}
+				
+				Image<RFLOAT> weightOut;
+					
+				std::cout << " + Starting the reconstruction ..." << std::endl;
+				
+				backprojector[j]->reconstruct(
+					vol(), grid_iters, do_map, 1., dummy, dummy, dummy, dummy,
+					fsc, 1., do_use_fsc, true, nr_omp_threads, -1, false, false, 
+					writeWeights? &weightOut : 0);
+				
+				if (writeWeights)
+				{
+					std::stringstream sts;
+					sts << (j+1);
+					std::string fnWgh = fn_out + "_half" + sts.str() + "_class001_unfil_weight.mrc";
+					weightOut.write(fnWgh);
+				}
+														
+				prevRefs[j] = vol;
+				
+			} // halves
 			
 			for (int j = 0; j < 2; j++)
 			{

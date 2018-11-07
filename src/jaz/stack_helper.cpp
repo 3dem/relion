@@ -36,16 +36,18 @@
 
 using namespace gravis;
 
-std::vector<MetaDataTable> StackHelper::splitByMicrographName(const MetaDataTable* mdt)
+std::vector<MetaDataTable> StackHelper::splitByMicrographName(const MetaDataTable& mdt)
 {
 	std::vector<MetaDataTable> out(0);
 	
-	if (!mdt->labelExists(EMDL_MICROGRAPH_NAME))
+	if (!mdt.labelExists(EMDL_MICROGRAPH_NAME))
 	{
-		REPORT_ERROR("StackHelper::splitByMicrographName: "+EMDL::label2Str(EMDL_MICROGRAPH_NAME)+" missing in meta_data_table.\n");
+		REPORT_ERROR("StackHelper::splitByMicrographName: "
+					 + EMDL::label2Str(EMDL_MICROGRAPH_NAME)
+					 + " missing from MetaDataTable.\n");
 	}
 	
-	MetaDataTable md2(*mdt);
+	MetaDataTable md2(mdt);
 	md2.newSort(EMDL_MICROGRAPH_NAME);
 	
 	const long lc = md2.numberOfObjects();
@@ -166,20 +168,20 @@ std::vector<Image<RFLOAT> > StackHelper::loadStack(const MetaDataTable* mdt, std
 }
 
 std::vector<Image<Complex> > StackHelper::loadStackFS(
-		const MetaDataTable *mdt, std::string path,
-		int threads, bool centerParticle, double angpix)
+		const MetaDataTable& mdt, std::string path,
+		int threads, bool centerParticle, ObservationModel* obs)
 {
-	std::vector<Image<Complex> > out(mdt->numberOfObjects());
+	std::vector<Image<Complex> > out(mdt.numberOfObjects());
 	
-	if (centerParticle && angpix < 0.0)
+	if (centerParticle && obs == 0)
 	{
-		REPORT_ERROR("StackHelper::loadStackFS: centering particles requires a pixel size.");
+		REPORT_ERROR("StackHelper::loadStackFS: centering particles requires an observation model.");
 	}
 	
-	const long ic = mdt->numberOfObjects();
+	const long ic = mdt.numberOfObjects();
 	
 	std::string name, fullName;
-	mdt->getValue(EMDL_IMAGE_NAME, fullName, 0);
+	mdt.getValue(EMDL_IMAGE_NAME, fullName, 0);
 	name = fullName.substr(fullName.find("@")+1);
 	
 	if (path != "")
@@ -197,8 +199,11 @@ std::vector<Image<Complex> > StackHelper::loadStackFS(
 	#pragma omp parallel for num_threads(threads)
 	for (long i = 0; i < ic; i++)
 	{
+		int optGroup = obs->getOpticsGroup(mdt, i);
+		double angpix = obs->getPixelSize(optGroup);
+				
 		std::string sliceName;
-		mdt->getValue(EMDL_IMAGE_NAME, sliceName, i);
+		mdt.getValue(EMDL_IMAGE_NAME, sliceName, i);
 		std::string indStr = sliceName.substr(0, sliceName.find("@"));
 		
 		std::istringstream str(indStr);
@@ -216,68 +221,8 @@ std::vector<Image<Complex> > StackHelper::loadStackFS(
 			
 			double xoff, yoff;
 		
-			mdt->getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff, i);
-			mdt->getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff, i);
-			
-			xoff /= angpix;
-			yoff /= angpix;
-			
-			shiftImageInFourierTransform(out[i](), out[i](), s, xoff - s/2, yoff - s/2);
-		}
-	}
-	
-	return out;
-}
-
-std::vector<Image<Complex> > StackHelper::loadStackFS(
-		const MetaDataTable *mdt, std::string path,
-		int threads, std::vector<ParFourierTransformer> *fts,
-		bool centerParticle, double angpix)
-{
-	std::vector<Image<Complex> > out(mdt->numberOfObjects());
-	
-	if (centerParticle && angpix < 0.0)
-	{
-		REPORT_ERROR("StackHelper::loadStackFS: centering particles requires a pixel size.");
-	}
-	
-	const long ic = mdt->numberOfObjects();
-	
-	std::string name, fullName;
-	mdt->getValue(EMDL_IMAGE_NAME, fullName, 0);
-	name = fullName.substr(fullName.find("@")+1);
-	
-	if (path != "")
-	{
-		name = path + "/" + name.substr(name.find_last_of("/")+1);
-	}
-	
-	#pragma omp parallel for num_threads(threads)
-	for (long i = 0; i < ic; i++)
-	{
-		int threadnum = omp_get_thread_num();
-		
-		std::string sliceName;
-		mdt->getValue(EMDL_IMAGE_NAME, sliceName, i);
-		std::string indStr = sliceName.substr(0,sliceName.find("@"));
-		
-		std::istringstream str(indStr);
-		int j;
-		str >> j;
-		
-		Image<RFLOAT> in;
-		in.read(name, true, j-1, false, true);
-		
-		(*fts)[threadnum].FourierTransform(in(), out[i]());
-		
-		if (centerParticle)
-		{
-			const int s = in.data.ydim;
-			
-			double xoff, yoff;
-		
-			mdt->getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff, i);
-			mdt->getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff, i);
+			mdt.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff, i);
+			mdt.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff, i);
 			
 			xoff /= angpix;
 			yoff /= angpix;

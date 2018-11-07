@@ -256,11 +256,11 @@ void CTF::initialise()
 	Ayy = A(1,1);
 }
 
-double CTF::getGamma(double X, double Y)
+double CTF::getGamma(double X, double Y) const
 {
 	if (obsModel != 0 && obsModel->hasMagMatrices)
 	{
-		const Matrix2D<RFLOAT>& M = obsModel->magMatrices[opticsGroup];
+		const Matrix2D<RFLOAT>& M = obsModel->getMagMatrix(opticsGroup);
 		RFLOAT XX = M(0,0) * X + M(0,1) * Y;
 		RFLOAT YY = M(1,0) * X + M(1,1) * Y;
 
@@ -284,11 +284,11 @@ RFLOAT CTF::getCtfFreq(RFLOAT X, RFLOAT Y)
 	return 2.0 * K1 * deltaf * u + 4.0 * K2 * u * u * u;
 }
 
-t2Vector<RFLOAT> CTF::getGammaGrad(double X, double Y)
+t2Vector<RFLOAT> CTF::getGammaGrad(double X, double Y) const
 {
 	if (obsModel != 0 && obsModel->hasMagMatrices)
 	{
-		const Matrix2D<RFLOAT>& M = obsModel->magMatrices[opticsGroup];
+		const Matrix2D<RFLOAT>& M = obsModel->getMagMatrix(opticsGroup);
 		RFLOAT XX = M(0,0) * X + M(0,1) * Y;
 		RFLOAT YY = M(1,0) * X + M(1,1) * Y;
 
@@ -303,8 +303,8 @@ t2Vector<RFLOAT> CTF::getGammaGrad(double X, double Y)
 	// du4/dx = 2 (X² + Y²) 2 X = 4 (X³ + XY²) = 4 u2 X
 
 	return t2Vector<RFLOAT>(
-		2.0 * K1 * Axx * X + 2.0 * Axy * Y + 4.0 * K2 * u2 * X,
-		2.0 * K1 * Ayy * Y + 2.0 * Axy * X + 4.0 * K2 * u2 * Y);
+		2.0 * K1 * Axx * X + 2.0 * K1 * Axy * Y + 4.0 * K2 * u2 * X,
+		2.0 * K1 * Ayy * Y + 2.0 * K1 * Axy * X + 4.0 * K2 * u2 * Y);
 }
 
 /* Generate a complete CTF Image ------------------------------------------------------ */
@@ -364,9 +364,11 @@ void CTF::getFftwImage(MultidimArray<RFLOAT> &result, int orixdim, int oriydim, 
 void CTF::getCTFPImage(MultidimArray<Complex> &result, int orixdim, int oriydim, RFLOAT angpix,
 					bool is_positive, float angle)
 {
-
 	if (angle < 0 || angle >= 360.)
+	{
 		REPORT_ERROR("CTF::getCTFPImage: angle should be in [0,360>");
+	}
+	
 	// Angles larger than 180, are the inverse of the other half!
 	if (angle >= 180.)
 	{
@@ -378,15 +380,21 @@ void CTF::getCTFPImage(MultidimArray<Complex> &result, int orixdim, int oriydim,
 
 	RFLOAT xs = (RFLOAT)orixdim * angpix;
 	RFLOAT ys = (RFLOAT)oriydim * angpix;
+	
 	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(result)
 	{
 		RFLOAT x = (RFLOAT)jp / xs;
 		RFLOAT y = (RFLOAT)ip / ys;
 		RFLOAT myangle = (x*x+y*y > 0) ? acos(y/sqrt(x*x+y*y)) : 0; // dot-product with Y-axis: (0,1)
+		
 		if (myangle >= anglerad)
+		{
 			DIRECT_A2D_ELEM(result, i, j) = getCTFP(x, y, is_positive);
+		}
 		else
+		{
 			DIRECT_A2D_ELEM(result, i, j) = getCTFP(x, y, !is_positive);
+		}
 	}
 
 	// Special line along the vertical Y-axis, where FFTW stores both Friedel mates and Friedel symmetry needs to remain
@@ -394,10 +402,12 @@ void CTF::getCTFPImage(MultidimArray<Complex> &result, int orixdim, int oriydim,
 	{
 		int dim = YSIZE(result);
 		int hdim = dim/2;
+		
 		for (int i = hdim + 1; i < dim; i++)
+		{
 			DIRECT_A2D_ELEM(result, i, 0) = conj(DIRECT_A2D_ELEM(result, dim-i, 0));
+		}
 	}
-
 }
 
 void CTF::getCenteredImage(MultidimArray<RFLOAT> &result, RFLOAT Tm,
@@ -415,6 +425,7 @@ void CTF::getCenteredImage(MultidimArray<RFLOAT> &result, RFLOAT Tm,
 	}
 
 }
+
 void CTF::get1DProfile(MultidimArray < RFLOAT > &result, RFLOAT angle, RFLOAT Tm,
 		bool do_abs, bool do_only_flip_phases, bool do_intact_until_first_peak, bool do_damping)
 {
@@ -428,9 +439,86 @@ void CTF::get1DProfile(MultidimArray < RFLOAT > &result, RFLOAT angle, RFLOAT Tm
 		RFLOAT y = (SIND(angle) * (RFLOAT)i) / xs;
 		A1D_ELEM(result, i) = getCTF(x, y, do_abs, do_only_flip_phases, do_intact_until_first_peak, do_damping);
 	}
-
 }
-void CTF::applyWeightEwaldSphereCurvature(MultidimArray < RFLOAT > &result, int orixdim, int oriydim,
+
+void CTF::applyWeightEwaldSphereCurvature(
+		MultidimArray<RFLOAT>& result, int orixdim, int oriydim,
+		RFLOAT angpix, RFLOAT particle_diameter)
+{
+	RFLOAT xs = (RFLOAT)orixdim * angpix;
+	RFLOAT ys = (RFLOAT)oriydim * angpix;
+	
+	Matrix2D<RFLOAT> M(2,2);
+	
+	if (obsModel != 0 && obsModel->hasMagMatrices)
+	{
+		M = obsModel->getMagMatrix(opticsGroup);
+	}
+	else
+	{
+		M.initIdentity();
+	}
+	
+	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(result)
+	{
+		RFLOAT xu = (RFLOAT)jp / xs;
+		RFLOAT yu = (RFLOAT)ip / ys;
+		
+		RFLOAT x = M(0,0) * xu + M(0,1) * yu;
+		RFLOAT y = M(1,0) * xu + M(1,1) * yu;
+		
+		const RFLOAT astigDefocus = Axx*x*x + 2.0*Axy*x*y + Ayy*y*y;
+		RFLOAT u2 = x * x + y * y;
+        RFLOAT u4 = u2 * u2;
+		RFLOAT gamma = K1 * astigDefocus + K2 * u4 - K5 - K3;
+		
+		RFLOAT deltaf = u2 > 0.0? std::abs(astigDefocus / u2) : 0.0;
+		RFLOAT inv_d = sqrt(u2);
+		RFLOAT aux = 2.0 * deltaf * lambda * inv_d / particle_diameter;
+		RFLOAT A = (aux > 1.0)? 0.0 : (2.0/PI) * (acos(aux) - aux * sin(acos(aux)));
+		
+		DIRECT_A2D_ELEM(result, i, j) = 1.0 + A * (2.0 * fabs(-sin(gamma)) - 1.0);
+		// Keep everything on the same scale inside RELION, where we use sin(chi), not 2sin(chi)
+		DIRECT_A2D_ELEM(result, i, j) *= 0.5;
+	}
+}
+
+void CTF::applyWeightEwaldSphereCurvature_new(
+		MultidimArray<RFLOAT>& result, int orixdim, int oriydim,
+		RFLOAT angpix, RFLOAT particle_diameter)
+{
+	const int s = oriydim;
+	const int sh = s/2 + 1;
+	const double as = angpix * s;
+	const double Dpx = particle_diameter / angpix;
+	
+	for (int yi = 0; yi < s;  yi++)
+	for (int xi = 0; xi < sh; xi++)
+	{
+		const double x = xi / as;
+		const double y = yi < sh? yi / as : (yi - s) / as;
+		
+		// shift of this frequency resulting from CTF:
+		const d2Vector shift2D = (1.0 / (2 * angpix * PI)) * getGammaGrad(x,y);
+		const double shift1D = 2.0 * shift2D.length();
+		
+		// angle between the intersection points of the two circles and the center
+		const double alpha = shift1D > Dpx? 0.0 : 2.0 * acos(shift1D / Dpx);
+		
+		// area of intersection between the two circles, divided by the area of the circle
+		RFLOAT A = (alpha == 0.0)? 0.0 : (1.0/PI) * (alpha - sin(alpha));
+		
+		// abs. value of CTFR (no damping):
+		const double ctf_val = getCTF(x, y, true, false, false, false, 0.0);
+		
+		DIRECT_A2D_ELEM(result, yi, xi) = 1.0 + A * (2.0 * ctf_val - 1.0);
+		
+		// Keep everything on the same scale inside RELION, where we use sin(chi), not 2sin(chi)
+		DIRECT_A2D_ELEM(result, yi, xi) *= 0.5;
+	}
+}
+
+void CTF::applyWeightEwaldSphereCurvature_noAniso(MultidimArray < RFLOAT > &result, int orixdim, int oriydim,
 		RFLOAT angpix, RFLOAT particle_diameter)
 {
 	RFLOAT xs = (RFLOAT)orixdim * angpix;

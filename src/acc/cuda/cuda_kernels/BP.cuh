@@ -249,13 +249,16 @@ __global__ void cuda_kernel_backproject3D(
 			else
 				continue;
 		}
-
-		if(DATA3D)
-			if ( ( x * x + y * y  + z * z ) > max_r2)
-				continue;
-		else
-			if ( ( x * x + y * y ) > max_r2)
-				continue;
+		
+		// Removed to ensure compliance with varying box and pixel sizes and anisotropic magnification.
+		// Replaced by corresponding condition in output coordinates below  --JZ, Oct. 18. 2018
+		//
+		//if(DATA3D)
+		//	if ( ( x * x + y * y  + z * z ) > max_r2)
+		//		continue;
+		//else
+		//	if ( ( x * x + y * y ) > max_r2)
+		//		continue;
 
 		//WAVG
 		minvsigma2 = __ldg(&g_Minvsigma2s[pixel]);
@@ -305,6 +308,12 @@ __global__ void cuda_kernel_backproject3D(
 				yp = (s_eulers[3] * x + s_eulers[4] * y ) * padding_factor;
 				zp = (s_eulers[6] * x + s_eulers[7] * y ) * padding_factor;
 			}
+			
+			// Only consider pixels that are projected inside the sphere in output coordinates.
+			//     --JZ, Oct. 18. 2018			
+			if ( ( xp * xp + yp * yp  + zp * zp ) > max_r2)
+				continue;
+		
 			// Only asymmetric half is stored
 			if (xp < (XFLOAT) 0.0)
 			{
