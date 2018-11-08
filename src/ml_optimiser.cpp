@@ -2160,7 +2160,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 				MultidimArray<RFLOAT> Fctf, Fweight;
 				MultidimArray<Complex > Fimg;
 
-				// Make sure MPI and sequentialo behave exactly the same
+				// Make sure MPI and sequential behave exactly the same
 				init_random_generator(random_seed + part_id);
 				// Randomize the initial orientations for initial reference generation at this step....
 				// TODO: this is not an even angular distribution....
@@ -2168,6 +2168,8 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 				RFLOAT tilt = (mymodel.ref_dim == 2) ? 0. :rnd_unif() * 180.;
 				RFLOAT psi  = rnd_unif() * 360.;
 				int iclass  = rnd_unif() * mymodel.nr_classes;
+				if (iclass == mymodel.nr_classes)
+					iclass = mymodel.nr_classes - 1;
 				Matrix2D<RFLOAT> A;
 				Euler_angles2matrix(rot, tilt, psi, A, true);
 
