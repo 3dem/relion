@@ -2170,6 +2170,14 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 				int iclass  = rnd_unif() * mymodel.nr_classes;
 				if (iclass == mymodel.nr_classes)
 					iclass = mymodel.nr_classes - 1;
+				if (iclass >= mymodel.nr_classes)
+				{
+					// Should not happen but without this some people get errors in Set2DFourierTransform
+					// TODO: investigate
+					std::cerr << "WARNING: numerical issue in initial class assignment. Your result is NOT compromised but please report this to our issue tracker.\n";
+					std::cerr << "         iclass = " << iclass << " nr_classes = " << mymodel.nr_classes << " sizeof(RFLOAT) = " << sizeof(RFLOAT) << std::endl;
+					iclass = mymodel.nr_classes - 1;
+				}
 				Matrix2D<RFLOAT> A;
 				Euler_angles2matrix(rot, tilt, psi, A, true);
 
