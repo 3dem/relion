@@ -27,6 +27,7 @@
 #include <src/jaz/fftw_helper.h>
 #include <src/jaz/vtk_helper.h>
 #include <src/jaz/image_log.h>
+#include <src/jaz/img_proc/color_helper.h>
 
 #include <omp.h>
 
@@ -198,6 +199,10 @@ void MagnificationEstimator::parametricFit(
 		
 		ImageLog::write(flowxFull, outPath + "mag_disp_x_optics-group_" + sts.str());
 		ImageLog::write(flowyFull, outPath + "mag_disp_y_optics-group_" + sts.str());
+		ColorHelper::writeSignedToPNG(flowxFull, 
+			outPath + "mag_disp_x_optics-group_" + sts.str() + "_[-1,+1]");
+		ColorHelper::writeSignedToPNG(flowyFull, 
+			outPath + "mag_disp_y_optics-group_" + sts.str() + "_[-1,+1]");
 		
 		Image<RFLOAT> freqWght = reference->getHollowWeight(kmin, s[og], angpix[og]);
 		
@@ -208,6 +213,10 @@ void MagnificationEstimator::parametricFit(
 		
 		ImageLog::write(flowxFull, outPath + "mag_disp_x_fit_optics-group_" + sts.str());
 		ImageLog::write(flowyFull, outPath + "mag_disp_y_fit_optics-group_" + sts.str());
+		ColorHelper::writeSignedToPNG(flowxFull, 
+			outPath + "mag_disp_x_fit_optics-group_" + sts.str() + "_[-1,+1]");
+		ColorHelper::writeSignedToPNG(flowyFull, 
+			outPath + "mag_disp_y_fit_optics-group_" + sts.str() + "_[-1,+1]");
 		
 		std::ofstream os(outPath + "mag_matrix_optics-group_" + sts.str() + ".txt");
 		os << mat(0,0) << " " << mat(0,1) << "\n";

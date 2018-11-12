@@ -11,6 +11,7 @@
 #include <src/jaz/vtk_helper.h>
 #include <src/jaz/image_log.h>
 #include <src/jaz/gravis/t2Vector.h>
+#include <src/jaz/img_proc/color_helper.h>
 
 #include <src/args.h>
 #include <src/ctf.h>
@@ -286,6 +287,9 @@ void AberrationEstimator::parametricFit(
 		Image<RFLOAT> fit, phaseFull, fitFull;		
 		FftwHelper::decenterDouble2D(phase.data, phaseFull.data);
 		ImageLog::write(phaseFull, outPath + "aberr_delta-phase_per-pixel_optics-group_"+ogstr);
+		ColorHelper::writeAngleToPNG(phaseFull, 
+				outPath + "aberr_delta-phase_per-pixel_optics-group_"+ogstr);
+		
 		 
 		{
 			std::vector<double> Zernike_coeffs = TiltHelper::fitEvenZernike(
@@ -298,12 +302,16 @@ void AberrationEstimator::parametricFit(
 			
 			ImageLog::write(fitFull, outPath + "aberr_delta-phase_lin-fit_optics-group_"
 							+ogstr+"_N-"+sts.str());
-			if (debug)
+			ColorHelper::writeAngleToPNG(fitFull, outPath + "aberr_delta-phase_lin-fit_optics-group_"
+							+ogstr+"_N-"+sts.str());
+
 			{
 				Image<RFLOAT> residual;
 				residual.data = phaseFull.data - fitFull.data;
 				
 				ImageLog::write(residual, outPath + "aberr_delta-phase_lin-fit_optics-group_"
+								+ogstr+"_N-"+sts.str()+"_residual");
+				ColorHelper::writeAngleToPNG(residual, outPath + "aberr_delta-phase_lin-fit_optics-group_"
 								+ogstr+"_N-"+sts.str()+"_residual");
 			}
 			
@@ -311,8 +319,10 @@ void AberrationEstimator::parametricFit(
 						optXY, wgh, angpix[og], aberr_n_max, Zernike_coeffs, &fit);
 				
 			FftwHelper::decenterDouble2D(fit.data, fitFull.data);
-						
+			
 			ImageLog::write(fitFull, outPath + "aberr_delta-phase_iter-fit_optics-group_"
+							+ogstr+"_N-"+sts.str());
+			ColorHelper::writeAngleToPNG(fitFull, outPath + "aberr_delta-phase_iter-fit_optics-group_"
 							+ogstr+"_N-"+sts.str());
 			
 			// extract Q0, Cs, defocus and astigmatism?
