@@ -506,7 +506,7 @@ will still yield good performance and possibly a more stable execution. \n" << s
 	}
 	else if (do_calculate_initial_sigma_noise || do_average_unaligned)
 	{
-		MultidimArray<RFLOAT> Mavg;
+		std::vector<MultidimArray<RFLOAT> > Mavg;
 		// Calculate initial sigma noise model from power_class spectra of the individual images
 		// This is done in parallel
 		//std::cout << " Hello world1! I am node " << node->rank << " out of " << node->size <<" and my hostname= "<< getenv("HOSTNAME")<< std::endl;
@@ -634,7 +634,7 @@ void MlOptimiserMpi::initialiseWorkLoad()
 	// Now copy particle stacks to scratch if needed
     if (fn_scratch != "" && !do_preread_images)
     {
-		mydata.setScratchDirectory(fn_scratch);
+		mydata.setScratchDirectory(fn_scratch, do_reuse_scratch);
 
 		if (!do_reuse_scratch)
 		{
@@ -700,7 +700,7 @@ void MlOptimiserMpi::initialiseWorkLoad()
 #endif
 }
 
-void MlOptimiserMpi::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT> &Mavg)
+void MlOptimiserMpi::calculateSumOfPowerSpectraAndAverageImage(std::vector<MultidimArray<RFLOAT> > &Mavg)
 {
 
 	// First calculate the sum of all individual power spectra on each subset
@@ -715,13 +715,16 @@ void MlOptimiserMpi::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFL
 
 	// After introducing SGD code in Dec 2016: no longer calculate Mavg for the 2 halves separately...
 	// Just calculate Mavg from AllReduce, and divide by 2 * the accumulated wsum_group
-	MultidimArray<RFLOAT> Msum;
-	Msum.initZeros(Mavg);
-	MPI_Allreduce(MULTIDIM_ARRAY(Mavg), MULTIDIM_ARRAY(Msum), MULTIDIM_SIZE(Msum), MY_MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-	Mavg = Msum;
-	// When doing random halves, the wsum_model.sumw_group[igroup], which will be used to divide Mavg by is only calculated over half the particles!
-	if (do_split_random_halves)
-		Mavg /= 2.;
+	for (int optics_group = 0; optics_group < mydata.obsModel.numberOfOpticsGroups(); optics_group++)
+	{
+		MultidimArray<RFLOAT> Msum;
+		Msum.initZeros(Mavg[optics_group]);
+		MPI_Allreduce(MULTIDIM_ARRAY(Mavg[optics_group]), MULTIDIM_ARRAY(Msum), MULTIDIM_SIZE(Msum), MY_MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+		Mavg[optics_group] = Msum;
+		// When doing random halves, the wsum_model.sumw_group[igroup], which will be used to divide Mavg by is only calculated over half the particles!
+		if (do_split_random_halves)
+			Mavg[optics_group] /= 2.;
+	}
 
 }
 
