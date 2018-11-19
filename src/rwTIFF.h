@@ -45,14 +45,17 @@ int readTIFF(TIFF* ftiff, long int img_select, bool readdata=false, bool isStack
     uint32 width, length;
     uint16 sampleFormat, bitsPerSample;
     
-    TIFFGetField(ftiff, TIFFTAG_IMAGEWIDTH, &width);
-    TIFFGetField(ftiff, TIFFTAG_IMAGELENGTH, &length);
+    if (TIFFGetField(ftiff, TIFFTAG_IMAGEWIDTH, &width) != 1 ||
+        TIFFGetField(ftiff, TIFFTAG_IMAGELENGTH, &length) != 1)
+    {
+        REPORT_ERROR("The input TIFF file does not have the width or height field.");
+    }
     _xDim = width;
     _yDim = length;
     _zDim = 1;
     _nDim = 1;
-    TIFFGetField(ftiff, TIFFTAG_BITSPERSAMPLE, &bitsPerSample);
-    TIFFGetField(ftiff, TIFFTAG_SAMPLEFORMAT, &sampleFormat);
+    TIFFGetFieldDefaulted(ftiff, TIFFTAG_BITSPERSAMPLE, &bitsPerSample);
+    TIFFGetFieldDefaulted(ftiff, TIFFTAG_SAMPLEFORMAT, &sampleFormat);
 
     // Find the number of frames
     while (TIFFSetDirectory(ftiff, _nDim) != 0) _nDim++;
@@ -125,10 +128,14 @@ int readTIFF(TIFF* ftiff, long int img_select, bool readdata=false, bool isStack
             // Make sure image property is consistent for all frames
             uint32 cur_width, cur_length;
             uint16 cur_sampleFormat, cur_bitsPerSample;
-            TIFFGetField(ftiff, TIFFTAG_IMAGEWIDTH, &cur_width);
-            TIFFGetField(ftiff, TIFFTAG_IMAGELENGTH, &cur_length);
-            TIFFGetField(ftiff, TIFFTAG_BITSPERSAMPLE, &cur_bitsPerSample);
-            TIFFGetField(ftiff, TIFFTAG_SAMPLEFORMAT, &cur_sampleFormat);
+
+            if (TIFFGetField(ftiff, TIFFTAG_IMAGEWIDTH, &cur_width) != 1 ||
+                TIFFGetField(ftiff, TIFFTAG_IMAGELENGTH, &cur_length) != 1)
+            {
+                REPORT_ERROR("The input TIFF file does not have the width or height field.");
+            }
+            TIFFGetFieldDefaulted(ftiff, TIFFTAG_BITSPERSAMPLE, &cur_bitsPerSample);
+            TIFFGetFieldDefaulted(ftiff, TIFFTAG_SAMPLEFORMAT, &cur_sampleFormat);
             if ((cur_width != width) || (cur_length != length) || (cur_bitsPerSample != bitsPerSample) ||
                 (cur_sampleFormat != sampleFormat)) {
                 REPORT_ERROR("All frames in a TIFF should have same width, height and pixel format.\n");
