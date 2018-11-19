@@ -550,7 +550,7 @@ class image_handler_parameters
 
 	void run()
 	{
-
+		bool input_is_stack = (fn_in.getExtension() == "mrcs" || fn_in.getExtension() == "tif" || fn_in.getExtension() == "tiff") && !fn_in.contains("@");
 		// By default: write single output images
 
 		// Get a MetaDataTable
@@ -558,7 +558,7 @@ class image_handler_parameters
 		{
 			MD.read(fn_in);
 		}
-		else if (fn_in.getExtension() == "mrcs" && !fn_in.contains("@"))
+		else if (input_is_stack)
 		{
 			if (bin_avg > 0 || (avg_first >= 0 && avg_last >= 0))
 			{
@@ -815,7 +815,7 @@ class image_handler_parameters
 				}
 				else
 				{
-					if (fn_in.getExtension() == "star" || (fn_in.getExtension() == "mrcs" && !fn_in.contains("@")))
+					if (input_is_stack)
 					{
 						my_fn_out = fn_img.insertBeforeExtension("_" + fn_out);
 					}
