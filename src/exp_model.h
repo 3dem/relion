@@ -45,7 +45,7 @@ public:
 	// To which particle does this image belong
 	long int particle_id;
 
-	// This is the Nth image in this optics_group
+	// This is the Nth image in this optics_group, for writing to scratch disk: filenames
 	long int optics_group_id;
 
 	// Name of this image (by this name it will be recognised upon reading)
@@ -74,6 +74,7 @@ public:
 	{
 		id = copy.id;
 		particle_id = copy.particle_id;
+		optics_group_id = copy.optics_group_id;
 		name = copy.name;
 		micrograph_id = copy.micrograph_id;
 		group_id = copy.group_id;
@@ -87,6 +88,7 @@ public:
 	{
 		id = copy.id;
 		particle_id = copy.particle_id;
+		optics_group_id = copy.optics_group_id;
 		name = copy.name;
 		micrograph_id = copy.micrograph_id;
 		group_id = copy.group_id;

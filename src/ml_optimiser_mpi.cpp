@@ -649,6 +649,10 @@ void MlOptimiserMpi::initialiseWorkLoad()
 				bool need_to_copy = false;
 				for (int inode = 0; inode < node->size; inode++)
 				{
+					if (inode == 0)
+					{
+						need_to_copy = false;
+					}
 					if (inode > 0 && inode == node->rank)
 					{
 						// The master removes the lock if it existed
@@ -658,10 +662,7 @@ void MlOptimiserMpi::initialiseWorkLoad()
 				}
 
 				int myverb = (node->rank == 1) ? ori_verb : 0; // Only the first slave
-				if (!node->isMaster())
-				{
-					mydata.copyParticlesToScratch(myverb, need_to_copy, also_do_ctfimage, keep_free_scratch_Gb);
-				}
+				mydata.copyParticlesToScratch(myverb, need_to_copy, also_do_ctfimage, keep_free_scratch_Gb);
 			}
 			else
 			{
@@ -670,6 +671,10 @@ void MlOptimiserMpi::initialiseWorkLoad()
 				{
 					mydata.prepareScratchDirectory(fn_scratch);
 					mydata.copyParticlesToScratch(1, true, also_do_ctfimage, keep_free_scratch_Gb);
+				}
+				else
+				{
+					mydata.copyParticlesToScratch(0, false, also_do_ctfimage, keep_free_scratch_Gb);
 				}
 			}
 		}
