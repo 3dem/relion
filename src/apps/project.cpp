@@ -256,7 +256,7 @@ public:
 				}
 			}
 
-			transformer.inverseFourierTransform();
+			transformer.inverseFourierTransform(F2D, img());
 			// Shift the image back to the center...
 			CenterFFT(img(), false);
 			img.setSamplingRateInHeader(angpix);
@@ -415,7 +415,7 @@ public:
 				}
 
 				img().initZeros();
-				transformer.inverseFourierTransform();
+				transformer.inverseFourierTransform(F2D, img());
 				// Shift the image back to the center...
 				CenterFFT(img(), false);
 
