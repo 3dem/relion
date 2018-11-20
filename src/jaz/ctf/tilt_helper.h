@@ -74,6 +74,33 @@ class BasisOptimisation : public Optimization
         const bool L1;
 };
 
+class AnisoBasisOptimisation : public Optimization
+{
+    public:
+
+        AnisoBasisOptimisation(
+                const Image<Complex>& xy,
+				const Image<RFLOAT>& weight0,
+				const Image<RFLOAT>& Axx,
+				const Image<RFLOAT>& Axy,
+				const Image<RFLOAT>& Ayy,
+                const std::vector<Image<RFLOAT>>& basis,
+                bool L1 = false);
+
+        double f(const std::vector<double>& x, void* tempStorage) const;
+		
+		void* allocateTempStorage() const;		
+		void deallocateTempStorage(void* ts);
+
+    private:
+
+		const int w, h, cc;
+        const Image<Complex>& xy;
+        const Image<RFLOAT>& weight0, &Axx, &Axy, &Ayy;
+		const std::vector<Image<RFLOAT>>& basis;
+        const bool L1;
+};
+
 class TiltHelper
 {
     public:
@@ -151,6 +178,16 @@ class TiltHelper
                 const std::vector<double>& coeffs,
                 Image<RFLOAT>* fit);
 		
+		static std::vector<double> optimiseEvenZernike(
+                const Image<Complex>& xy,
+				const Image<RFLOAT>& weight0,
+				const Image<RFLOAT>& Axx,
+				const Image<RFLOAT>& Axy,
+				const Image<RFLOAT>& Ayy,
+                double angpix, int n_max,
+                const std::vector<double>& coeffs,
+                Image<RFLOAT>* fit);
+		
 		static std::vector<Image<RFLOAT>> computeEvenZernike(
 				int s, double angpix, int n_max);
 		
@@ -180,6 +217,15 @@ class TiltHelper
 		static std::vector<double> optimiseBasis(
 				const Image<Complex>& xy,
                 const Image<RFLOAT>& weight,
+				const std::vector<Image<RFLOAT>>& basis,
+				const std::vector<double>& initial);
+		
+		static std::vector<double> optimiseBasis(
+				const Image<Complex>& xy,
+				const Image<RFLOAT>& weight0,
+				const Image<RFLOAT>& Axx,
+				const Image<RFLOAT>& Axy,
+				const Image<RFLOAT>& Ayy,
 				const std::vector<Image<RFLOAT>>& basis,
 				const std::vector<double>& initial);
 

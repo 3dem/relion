@@ -225,10 +225,10 @@ void AberrationEstimator::parametricFit(
 			continue;
 		}
 			
-		Image<RFLOAT> wgh(sh[og],s[og]), phase(sh[og],s[og]);
+		Image<RFLOAT> wgh0(sh[og],s[og]), wgh(sh[og],s[og]), phase(sh[og],s[og]);
 		Image<Complex> optXY(sh[og],s[og]); 
-				
-		wgh = reference->getHollowWeight(kmin, s[og], angpix[og]);
+		
+		wgh0 = reference->getHollowWeight(kmin, s[og], angpix[og]);
 		
 		for (int y = 0; y < s[og];  y++)
 		for (int x = 0; x < sh[og]; x++)
@@ -250,12 +250,13 @@ void AberrationEstimator::parametricFit(
 
 				optXY(y,x) = Complex(opt.x, opt.y);
 				phase(y,x) = std::abs(opt.x) > 0.0? atan2(opt.y, opt.x) : 0.0;
-				wgh(y,x) *= sqrt(sqrt(std::abs(det)));
+				wgh(y,x) = wgh0(y,x) * sqrt(std::abs(det));
 			}
 			else
 			{
 				optXY(y,x) = 0.0;
 				phase(y,x) = 0.0;
+				wgh0(y,x) = 0.0;
 				wgh(y,x) = 0.0;
 			}
 		}
@@ -272,6 +273,7 @@ void AberrationEstimator::parametricFit(
 				
 				if (ra > xring0 && ra <= xring1)
 				{
+					wgh0(y,x) = 0.0;
 					wgh(y,x) = 0.0;
 				}
 			}
@@ -316,7 +318,8 @@ void AberrationEstimator::parametricFit(
 			}
 			
 			std::vector<double> Zernike_coeffs_opt = TiltHelper::optimiseEvenZernike(
-						optXY, wgh, angpix[og], aberr_n_max, Zernike_coeffs, &fit);
+						optXY, wgh0, AxxSum, AxySum, AyySum, angpix[og], 
+						aberr_n_max, Zernike_coeffs, &fit);
 				
 			FftwHelper::decenterDouble2D(fit.data, fitFull.data);
 			

@@ -447,6 +447,40 @@ std::vector<double> TiltHelper::optimiseEvenZernike(
 	return opt;
 }
 
+std::vector<double> TiltHelper::optimiseEvenZernike(
+	const Image<Complex>& xy,
+	const Image<RFLOAT>& weight0,
+	const Image<RFLOAT>& Axx,
+	const Image<RFLOAT>& Axy,
+	const Image<RFLOAT>& Ayy,
+	double angpix, int n_max,
+	const std::vector<double>& coeffs,
+	Image<RFLOAT>* fit)		
+{
+	const int w = xy.data.xdim;
+	const int h = xy.data.ydim;
+	const int cc = Zernike::numberOfEvenCoeffs(n_max);
+		
+	std::vector<Image<RFLOAT>> basis = computeEvenZernike(h, angpix, n_max);
+	
+	std::vector<double> opt = optimiseBasis(xy, weight0, Axx, Axy, Ayy, basis, coeffs);
+	
+	if (fit != 0)
+	{
+		*fit = Image<RFLOAT>(w,h);
+		
+		for (int y = 0; y < h; y++)
+		for (int x = 0; x < w; x++)
+		{
+			for (int c = 0; c < cc; c++)
+			{
+				(*fit)(y,x) += opt[c] * basis[c](y,x);
+			}
+		}
+	}
+	
+	return opt;
+}
 
 std::vector<Image<RFLOAT> > TiltHelper::computeEvenZernike(int s, double angpix, int n_max)
 {
@@ -592,6 +626,23 @@ std::vector<double> TiltHelper::optimiseBasis(
 		const std::vector<double>& initial)
 {
 	BasisOptimisation prob(xy, weight, basis, false);
+			
+	std::vector<double> opt = NelderMead::optimize(
+		initial, prob, 0.01, 0.000001, 100000, 1.0, 2.0, 0.5, 0.5, false);
+	
+	return opt;
+}
+
+std::vector<double> TiltHelper::optimiseBasis(
+		const Image<Complex>& xy, 
+		const Image<double>& weight0,
+		const Image<RFLOAT>& Axx,
+		const Image<RFLOAT>& Axy,
+		const Image<RFLOAT>& Ayy, 
+		const std::vector<Image<RFLOAT>>& basis, 
+		const std::vector<double>& initial)
+{
+	AnisoBasisOptimisation prob(xy, weight0, Axx, Axy, Ayy, basis, false);
 			
 	std::vector<double> opt = NelderMead::optimize(
 		initial, prob, 0.01, 0.000001, 100000, 1.0, 2.0, 0.5, 0.5, false);
@@ -800,6 +851,62 @@ void *BasisOptimisation::allocateTempStorage() const
 }
 
 void BasisOptimisation::deallocateTempStorage(void *ts)
+{
+	delete (Image<RFLOAT>*)ts;
+}
+
+AnisoBasisOptimisation::AnisoBasisOptimisation(
+		const Image<Complex> &xy, 
+		const Image<double> &weight0,
+		const Image<RFLOAT>& Axx,
+		const Image<RFLOAT>& Axy,
+		const Image<RFLOAT>& Ayy, 
+		const std::vector<Image<double> > &basis, 
+		bool L1)
+:	w(xy.data.xdim),
+	h(xy.data.ydim),
+	cc(basis.size()),
+	xy(xy),
+	weight0(weight0),
+	Axx(Axx),
+	Axy(Axy),
+	Ayy(Ayy),
+	basis(basis),
+	L1(L1)
+{	
+}
+
+double AnisoBasisOptimisation::f(const std::vector<double> &x, void *tempStorage) const
+{
+	Image<RFLOAT>& recomb = *((Image<RFLOAT>*)tempStorage);
+	recomb.data.initZeros();
+		
+	for (int c  = 0; c < cc; c++)
+	for (int yp = 0; yp < h; yp++)
+	for (int xp = 0; xp < w; xp++)
+	{
+		recomb(yp,xp) += x[c] * basis[c](yp,xp);
+	}
+	
+	double sum = 0.0;
+	
+	for (int y = 0; y < h; y++)
+	for (int x = 0; x < w; x++)
+	{
+		d2Vector e(cos(recomb(y,x)) - xy(y,x).real, sin(recomb(y,x)) - xy(y,x).imag);
+		
+		sum += weight0(y,x) * (Axx(y,x)*e.x*e.x + 2.0*Axy(y,x)*e.x*e.y + Ayy(y,x)*e.y*e.y);
+	}
+	
+	return sum;
+}
+
+void* AnisoBasisOptimisation::allocateTempStorage() const
+{
+	return new Image<RFLOAT>(w,h);
+}
+
+void AnisoBasisOptimisation::deallocateTempStorage(void *ts)
 {
 	delete (Image<RFLOAT>*)ts;
 }
