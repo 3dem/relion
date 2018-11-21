@@ -49,7 +49,7 @@ void FlexAnalyser::read(int argc, char **argv)
 
 	int subtract_section = parser.addSection("Subtract options");
 	do_subtract = parser.checkOption("--subtract", "Generate subtracted experimental particles");
-	fn_keepmask = parser.getOption("--keep_inside", "Subtract everything except the density inside this mask", "");
+	fn_keepmask = parser.getOption("--keep_inside", "Subtract everything except the density inside this mask, where 1 means keep, while 0 means remove.", "");
 	boxsize = textToInteger(parser.getOption("--boxsize", "Boxsize (in pixels) of the subtracted particles (default is keep original)", "-1"));
 	bg_radius = textToFloat(parser.getOption("--normalise_bg_radius", "Background radius (in pixels) for normalisation (default is no normalisation)", "-1"));
 	// TODO: implement scale correction!
@@ -64,7 +64,7 @@ void FlexAnalyser::read(int argc, char **argv)
 	verb = textToInteger(parser.getOption("--verb", "Verbosity", "1"));
 
 	if (do_subtract && fn_keepmask == "")
-		REPORT_ERROR("You have to specify --fn_keepmask with -subtract");
+		REPORT_ERROR("To use --subtract, you have to specify the region you want to keep by the --keep_inside option.");
 
 	// Check for errors in the command-line option
 	if (parser.checkForErrors())
