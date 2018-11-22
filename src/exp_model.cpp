@@ -599,7 +599,7 @@ void Experiment::copyParticlesToScratch(int verb, bool do_copy, bool also_do_ctf
 
 	long int nr_part = MDimg.numberOfObjects();
 	int barstep;
-	if (verb > 0)
+	if (verb > 0 && do_copy)
 	{
 		std::cout << " Copying particles to scratch directory: " << fn_scratch << std::endl;
 		init_progress_bar(nr_part);
@@ -645,22 +645,22 @@ void Experiment::copyParticlesToScratch(int verb, bool do_copy, bool also_do_ctf
 			}
 		}
 
-		// Now we have the particle in memory
-		// See how much space it occupies
-		used_space += one_part_space;
-		// If there is no more space, exit the loop over all objects to stop copying files and change filenames in MDimg
-		if (used_space > max_space)
-		{
-			char nodename[64] = "undefined";
-			gethostname(nodename,sizeof(nodename));
-			std::string myhost(nodename);
-			std::cerr << " Warning: scratch space full on " << myhost << ". Remaining " << nr_part - total_nr_parts_on_scratch << " particles will be read from where they were."<< std::endl;
-			break;
-		}
-
 		// Read in the particle image, and write out on scratch
 		if (do_copy)
 		{
+			// Now we have the particle in memory
+			// See how much space it occupies
+			used_space += one_part_space;
+			// If there is no more space, exit the loop over all objects to stop copying files and change filenames in MDimg
+			if (used_space > max_space)
+			{
+				char nodename[64] = "undefined";
+				gethostname(nodename,sizeof(nodename));
+				std::string myhost(nodename);
+				std::cerr << " Warning: scratch space full on " << myhost << ". Remaining " << nr_part - total_nr_parts_on_scratch << " particles will be read from where they were."<< std::endl;
+				break;
+			}
+
 			if (is_3D)
 			{
 				// For subtomograms, write individual .mrc files,possibly also CTF images
