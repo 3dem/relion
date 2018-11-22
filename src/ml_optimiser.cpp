@@ -3244,7 +3244,6 @@ void MlOptimiser::expectationSomeParticles(long int my_first_part_id, long int m
 					fn_open_stack = fn_stack;
 				}
 				Image<RFLOAT> img;
-				std::cerr << " fn_img= " << fn_img << " part_id= " << part_id << std::endl;
 #ifdef DEBUG_BODIES
 				std::cerr << " fn_img= " << fn_img << " part_id= " << part_id << std::endl;
 #endif
