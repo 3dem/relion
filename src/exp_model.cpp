@@ -52,25 +52,17 @@ long int Experiment::numberOfGroups()
 
 int Experiment::numberOfOpticsGroups()
 {
-	return MDopt.numberOfObjects();
+	return obsModel.numberOfOpticsGroups();
 }
 
 RFLOAT Experiment::getOpticsPixelSize(int optics_group)
 {
-	RFLOAT result;
-	if (optics_group > MDopt.numberOfObjects())
-		REPORT_ERROR("BUG: optics_group > MDopt.numberOfObjects()!");
-	MDopt.getValue(EMDL_IMAGE_PIXEL_SIZE, result, optics_group);
-	return result;
+	return obsModel.getPixelSize(optics_group);
 }
 
 int Experiment::getOpticsImageSize(int optics_group)
 {
-	int result;
-	if (optics_group > MDopt.numberOfObjects())
-		REPORT_ERROR("BUG: optics_group > MDopt.numberOfObjects()!");
-	MDopt.getValue(EMDL_IMAGE_SIZE, result, optics_group);
-	return result;
+	return obsModel.getBoxSize(optics_group);
 }
 
 long int Experiment::getMicrographId(long int part_id, int img_id)
@@ -100,9 +92,7 @@ int Experiment::getOriginalImageId(long part_id, int img_id)
 RFLOAT Experiment::getImagePixelSize(long int part_id, int img_id)
 {
 	int optics_group = particles[part_id].images[img_id].optics_group;
-	RFLOAT result;
-	MDopt.getValue(EMDL_IMAGE_PIXEL_SIZE, result, optics_group);
-	return result;
+	return obsModel.getPixelSize(optics_group);
 }
 
 MetaDataTable Experiment::getMetaDataImage(long int part_id, int img_id)

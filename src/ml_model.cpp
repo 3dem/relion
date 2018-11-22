@@ -34,7 +34,7 @@ void MlModel::initialise(bool _do_sgd)
 
 	// Auxiliary vector with relevant size in Fourier space
 	MultidimArray<RFLOAT > aux;
-    aux.initZeros(ori_size / 2 + 1);
+	aux.initZeros(ori_size / 2 + 1);
 
 	// Now resize all relevant vectors
     Iref.resize(nr_classes * nr_bodies);
@@ -703,7 +703,7 @@ void MlModel::readImages(FileName fn_ref, bool _is_3d_model, int user_model_size
 	nr_groups = _mydata.groups.size();
 	sigma2_noise.resize(nr_groups);
 	spectral_sizes.resize(nr_groups);
-	optics_group_per_group.resize(_mydata.numberOfOpticsGroups());
+	optics_group_per_group.resize(nr_groups);
 	for (long int igroup = 0; igroup < nr_groups; igroup++)
 	{
 		int optics_group = _mydata.groups[igroup].optics_group;

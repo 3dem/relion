@@ -425,8 +425,9 @@ void MlOptimiserMpi::initialise()
 
 				Experiment temp;
 				temp.read(fn_data);
-				int t_ori_size = -1;
-				temp.MDopt.getValue(EMDL_IMAGE_SIZE, t_ori_size, 0);
+
+				int t_ori_size = temp.getOpticsImageSize(0);
+				//temp.MDopt.getValue(EMDL_IMAGE_SIZE, t_ori_size, 0);
 
 				if(LowBoxLim < t_ori_size)
 				{
