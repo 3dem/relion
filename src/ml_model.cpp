@@ -1280,7 +1280,7 @@ void MlModel::initialiseDataVersusPrior(bool fix_tau, Experiment &_mydata)
 
 		spectral_sizes[igroup] = my_image_size / 2 + 1;
 		// go from arbitrary image_size and pixel_size of the images to the ori_size and pxeil_size of the model
-		for (int x = 0; x < XSIZE(sigma2_noise[igroup]); x++)
+		for (int x = 0; x < XSIZE(avg_sigma2_noise); x++)
 		{
 			int ipix = ROUND(((RFLOAT)ori_size * pixel_size * (RFLOAT)x) / ((RFLOAT)my_image_size * my_pixel_size));
 			DIRECT_A1D_ELEM(avg_sigma2_noise, ipix) += (RFLOAT)(nr_particles_group[igroup]) * DIRECT_A1D_ELEM(sigma2_noise[igroup], x);
@@ -1696,6 +1696,7 @@ void MlWsumModel::unpack(MultidimArray<RFLOAT> &packed)
        	std::cerr << "idx= " << idx << " packed_size= " << packed_size << std::endl;
         REPORT_ERROR("MlWsumModel::unpack: idx != idx_stop-idx_start");
     }
+
 }
 
 
