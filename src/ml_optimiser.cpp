@@ -789,12 +789,12 @@ void MlOptimiser::read(FileName fn_in, int rank)
 	    !MD.getValue(EMDL_OPTIMISER_NR_ITER_WO_HIDDEN_VAR_CHANGES, nr_iter_wo_large_hidden_variable_changes) ||
 		!MD.getValue(EMDL_OPTIMISER_DO_SKIP_ALIGN, do_skip_align) ||
 		//!MD.getValue(EMDL_OPTIMISER_DO_SKIP_ROTATE, do_skip_rotate) ||
-	    !MD.getValue(EMDL_OPTIMISER_ACCURACY_ROT, acc_rot) ||
+		!MD.getValue(EMDL_OPTIMISER_ACCURACY_ROT, acc_rot) ||
 	    !MD.getValue(EMDL_OPTIMISER_ACCURACY_TRANS_ANGSTROM, acc_trans) ||
-	    !MD.getValue(EMDL_OPTIMISER_CHANGES_OPTIMAL_ORIENTS, current_changes_optimal_orientations) ||
+		!MD.getValue(EMDL_OPTIMISER_CHANGES_OPTIMAL_ORIENTS, current_changes_optimal_orientations) ||
 	    !MD.getValue(EMDL_OPTIMISER_CHANGES_OPTIMAL_OFFSETS, current_changes_optimal_offsets) ||
 	    !MD.getValue(EMDL_OPTIMISER_CHANGES_OPTIMAL_CLASSES, current_changes_optimal_classes) ||
-	    !MD.getValue(EMDL_OPTIMISER_SMALLEST_CHANGES_OPT_ORIENTS, smallest_changes_optimal_orientations) ||
+		!MD.getValue(EMDL_OPTIMISER_SMALLEST_CHANGES_OPT_ORIENTS, smallest_changes_optimal_orientations) ||
 	    !MD.getValue(EMDL_OPTIMISER_SMALLEST_CHANGES_OPT_OFFSETS, smallest_changes_optimal_offsets) ||
 	    !MD.getValue(EMDL_OPTIMISER_SMALLEST_CHANGES_OPT_CLASSES, smallest_changes_optimal_classes) ||
 	    !MD.getValue(EMDL_OPTIMISER_HAS_CONVERGED, has_converged) ||
@@ -1038,7 +1038,7 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		MD.setValue(EMDL_OPTIMISER_DO_SKIP_ALIGN, do_skip_align);
 		MD.setValue(EMDL_OPTIMISER_DO_SKIP_ROTATE, do_skip_rotate);
 	    MD.setValue(EMDL_OPTIMISER_ACCURACY_ROT, acc_rot);
-	    MD.setValue(EMDL_OPTIMISER_ACCURACY_TRANS, acc_trans);
+	    MD.setValue(EMDL_OPTIMISER_ACCURACY_TRANS_ANGSTROM, acc_trans);
 	    MD.setValue(EMDL_OPTIMISER_CHANGES_OPTIMAL_ORIENTS, current_changes_optimal_orientations);
 	    MD.setValue(EMDL_OPTIMISER_CHANGES_OPTIMAL_OFFSETS, current_changes_optimal_offsets);
 	    MD.setValue(EMDL_OPTIMISER_CHANGES_OPTIMAL_CLASSES, current_changes_optimal_classes);
@@ -2017,14 +2017,11 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(std::vector<Multidim
 			CenterFFT(img(), true);
 			MultidimArray<RFLOAT> ind_spectrum, count;
 			ind_spectrum.initZeros(mymodel.spectral_sizes[group_id]);
-			// Make sure the transformer is reset if the input image changes size, otherwise one can get horrible bugs with the transformer....
-			if (YSIZE(img()) != YSIZE(Faux))
-			{
-				transformer.clear();
-			}
 			count.initZeros(mymodel.spectral_sizes[group_id]);
 			// recycle the same transformer for all images
-			transformer.FourierTransform(img(), Faux, false);
+			// But make sure the transformer is reset if the input image changes size, otherwise one can get horrible bugs with the transformer....
+			bool force_new_fftw_plans = (YSIZE(img()) != YSIZE(Faux));
+			transformer.FourierTransform(img(), Faux, false, force_new_fftw_plans);
 			FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Faux)
 			{
 				long int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));

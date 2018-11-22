@@ -193,9 +193,9 @@ public:
         change the data.
         */
     template <typename T, typename T1>
-        void FourierTransform(T& v, T1& V, bool getCopy=true)
+        void FourierTransform(T& v, T1& V, bool getCopy=true, bool force_new_plans = false)
         {
-            setReal(v);
+            setReal(v, force_new_plans);
             Transform(FFTW_FORWARD);
             if (getCopy) getFourierCopy(V);
             else         getFourierAlias(V);
@@ -361,14 +361,14 @@ public:
         transforms it is not modified, but in backward transforms,
         the result will be stored in img. This means that the size
         of img cannot change between calls. */
-    void setReal(MultidimArray<RFLOAT> &img);
+    void setReal(MultidimArray<RFLOAT> &img, bool force_new_plans = false);
 
     /** Set a Multidimarray for input.
         The data of img will be the one of fComplex. In forward
         transforms it is not modified, but in backward transforms,
         the result will be stored in img. This means that the size
         of img cannot change between calls. */
-    void setReal(MultidimArray<Complex > &img);
+    void setReal(MultidimArray<Complex > &img, bool force_new_plans = false);
 
     /** Set a Multidimarray for the Fourier transform.
         The values of the input array are copied in the internal array.
@@ -617,16 +617,16 @@ void CenterFFT(MultidimArray< T >& v, bool forward)
 		int  batchSize = 1;
 		int xSize = XSIZE(v);
 		int ySize = YSIZE(v);
-		
+
 		int xshift = (xSize / 2);
 		int yshift = (ySize / 2);
-		
+
 		if (!forward)
 		{
 			xshift = -xshift;
 			yshift = -yshift;
 		}
-		
+
 		size_t image_size = xSize*ySize;
 		size_t isize2 = image_size/2;
 		int blocks = ceilf((float)(image_size/(float)(2*CFTT_BLOCK_SIZE)));
@@ -637,7 +637,7 @@ void CenterFFT(MultidimArray< T >& v, bool forward)
 			size_t pixel_end = (i+1)*(CFTT_BLOCK_SIZE);
 			if (pixel_end > isize2)
 				pixel_end = isize2;
-			
+
 			CpuKernels::centerFFT_2D<T>(batchSize,
 				pixel_start,
 				pixel_end,
@@ -656,7 +656,7 @@ void CenterFFT(MultidimArray< T >& v, bool forward)
 		int xSize = XSIZE(v);
 		int ySize = YSIZE(v);
 		int zSize = ZSIZE(v);
-		
+
 		if(zSize>1)
 		{
 			int xshift = (xSize / 2);
@@ -679,7 +679,7 @@ void CenterFFT(MultidimArray< T >& v, bool forward)
 				size_t pixel_end = (i+1)*(CFTT_BLOCK_SIZE);
 				if (pixel_end > isize2)
 					pixel_end = isize2;
-			
+
 				CpuKernels::centerFFT_3D<T>(batchSize,
 					pixel_start,
 					pixel_end,
