@@ -1920,20 +1920,40 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(std::vector<Multidim
 		for (int img_id = 0; img_id < mydata.numberOfImagesInParticle(part_id); img_id++)
 		{
 			long int group_id = mydata.getGroupId(part_id, img_id);
+			RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id, img_id);
+			int optics_group = mydata.getOpticsGroup(part_id, img_id);
+
+			// Read image from disc
+			Image<RFLOAT> img;
+			if (do_preread_images && do_parallel_disc_io)
+			{
+				img().reshape(mydata.particles[part_id].images[img_id].img);
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mydata.particles[part_id].images[img_id].img)
+				{
+					DIRECT_MULTIDIM_ELEM(img(), n) = (RFLOAT)DIRECT_MULTIDIM_ELEM(mydata.particles[part_id].images[img_id].img, n);
+				}
+			}
+			else
+			{
+				// Extract the relevant MetaDataTable row from MDimg
+				MDimg = mydata.getMetaDataImage(part_id, img_id);
+
+				if (!mydata.getImageNameOnScratch(part_id, img_id, fn_img))
+					MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
+
+				fn_img.decompose(dump, fn_stack);
+				if (fn_stack != fn_open_stack)
+				{
+					hFile.openFile(fn_stack, WRITE_READONLY);
+					fn_open_stack = fn_stack;
+				}
+				img.readFromOpenFile(fn_img, hFile, -1, false);
+				img().setXmippOrigin();
+			}
 
 			// May24,2015 - Shaoda & Sjors, Helical refinement
 			RFLOAT psi_deg = 0., tilt_deg = 0.;
 			bool is_helical_segment = (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
-			RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id, img_id);
-			int optics_group = mydata.getOpticsGroup(part_id, img_id);
-
-			// Extract the relevant MetaDataTable row from MDimg
-			MDimg = mydata.getMetaDataImage(part_id, img_id);
-
-			if (!mydata.getImageNameOnScratch(part_id, img_id, fn_img))
-				MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
-
-			// May24,2015 - Shaoda & Sjors, Helical refinement
 			if (is_helical_segment)
 			{
 				if (!MDimg.getValue(EMDL_ORIENT_PSI_PRIOR, psi_deg))
@@ -1948,31 +1968,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(std::vector<Multidim
 				}
 			}
 
-			// Read image from disc
-			Image<RFLOAT> img;
-			if (do_preread_images && do_parallel_disc_io)
-			{
-				img().reshape(mydata.particles[part_id].images[img_id].img);
-				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mydata.particles[part_id].images[img_id].img)
-				{
-					DIRECT_MULTIDIM_ELEM(img(), n) = (RFLOAT)DIRECT_MULTIDIM_ELEM(mydata.particles[part_id].images[img_id].img, n);
-				}
-			}
-			else
-			{
-				fn_img.decompose(dump, fn_stack);
-				if (fn_stack != fn_open_stack)
-				{
-					hFile.openFile(fn_stack, WRITE_READONLY);
-					fn_open_stack = fn_stack;
-				}
-				img.readFromOpenFile(fn_img, hFile, -1, false);
-				img().setXmippOrigin();
-			}
-
-			// May24,2015 - Shaoda & Sjors, Helical refinement
 			// Check that the average in the noise area is approximately zero and the stddev is one
-
 			if (!dont_raise_norm_error && verb > 0)
 			{
 				// NEW METHOD
@@ -2020,20 +2016,27 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(std::vector<Multidim
 			// Calculate the power spectrum of this particle
 			CenterFFT(img(), true);
 			MultidimArray<RFLOAT> ind_spectrum, count;
-			ind_spectrum.initZeros(XSIZE(img()));
-			count.initZeros(XSIZE(img()));
+			ind_spectrum.initZeros(mymodel.spectral_sizes[group_id]);
+			// Make sure Faux is on the same size as img(), with different sizes, otherwise one can get horrible bugs with the transformer....
+			if (YSIZE(img()) != YSIZE(Faux))
+			{
+				Faux.resize(ZSIZE(img()), YSIZE(img()), XSIZE(img()) / 2 + 1);
+			}
+			count.initZeros(mymodel.spectral_sizes[group_id]);
 			// recycle the same transformer for all images
 			transformer.FourierTransform(img(), Faux, false);
 			FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Faux)
 			{
 				long int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
-				ind_spectrum(idx) += norm(dAkij(Faux, k, i, j));
-				count(idx) += 1.;
+				if (idx < mymodel.spectral_sizes[group_id])
+				{
+					ind_spectrum(idx) += norm(dAkij(Faux, k, i, j));
+					count(idx) += 1.;
+				}
 			}
 			ind_spectrum /= count;
 
 			// Resize the power_class spectrum to the correct size and keep sum
-			ind_spectrum.resize(wsum_model.sigma2_noise[group_id]); // Store sum of all groups in group 0
 			wsum_model.sigma2_noise[group_id] += ind_spectrum;
 			wsum_model.sumw_group[group_id] += 1.;
 
@@ -2072,7 +2075,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(std::vector<Multidim
 
 					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fimg)
 					{
-						DIRECT_MULTIDIM_ELEM(Fimg, n)  *= DIRECT_MULTIDIM_ELEM(Fctf, n);
+						DIRECT_MULTIDIM_ELEM(Fimg, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
 						DIRECT_MULTIDIM_ELEM(Fctf, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
 					}
 				}
@@ -2086,7 +2089,6 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(std::vector<Multidim
 			progress_bar(nr_particles_done);
 
 	} // end loop part_id
-
 
 	// Clean up the fftw object completely
 	// This is something that needs to be done manually, as among multiple threads only one of them may actually do this
@@ -2158,6 +2160,7 @@ void MlOptimiser::setSigmaNoiseEstimatesAndSetAverageImage(std::vector<MultidimA
 			// Factor 2 because of 2-dimensionality of the complex plane
 			if (wsum_model.sumw_group[igroup] > 0.)
 			{
+				std::cerr << " igroup= " << igroup << " wsum_model.sigma2_noise[igroup].sum()= " << wsum_model.sigma2_noise[igroup].sum() << " wsum_model.sumw_group[igroup]= " << wsum_model.sumw_group[igroup] << std::endl;
 				mymodel.sigma2_noise[igroup] = wsum_model.sigma2_noise[igroup] / ( 2. * wsum_model.sumw_group[igroup] );
 
 				// Now subtract power spectrum of the average image from the average power spectrum of the individual images
@@ -2325,7 +2328,14 @@ void MlOptimiser::iterate()
 		updateSubsetSize();
 
 		// Randomly take different subset of the particles each time we do a new "iteration" in SGD
-		mydata.randomiseParticlesOrder(random_seed+iter, do_split_random_halves, subset_size < mydata.numberOfParticles() );
+		if (random_seed > 0)
+		{
+			mydata.randomiseParticlesOrder(random_seed+iter, do_split_random_halves,  subset_size < mydata.numberOfParticles() );
+		}
+		else if (verb > 0)
+		{
+			std::cerr << " WARNING: skipping randomisation of particle order because random_seed equals zero..." << std::endl;
+		}
 
 		if (do_auto_refine)
 		{
@@ -3234,6 +3244,7 @@ void MlOptimiser::expectationSomeParticles(long int my_first_part_id, long int m
 					fn_open_stack = fn_stack;
 				}
 				Image<RFLOAT> img;
+				std::cerr << " fn_img= " << fn_img << " part_id= " << part_id << std::endl;
 #ifdef DEBUG_BODIES
 				std::cerr << " fn_img= " << fn_img << " part_id= " << part_id << std::endl;
 #endif
@@ -4581,7 +4592,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 		std::vector<RFLOAT> &exp_psi_prior)
 {
 
-	FourierTransformer transformer;
+    FourierTransformer transformer;
 	for (int img_id = 0; img_id < mydata.numberOfImagesInParticle(part_id); img_id++)
 	{
 		Image<RFLOAT> img, rec_img;
@@ -5426,6 +5437,8 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 		} // end if mymodel.nr_bodies > 1
 
 	} // end loop img_id
+
+
 	transformer.clear();
 
 #ifdef DEBUG
@@ -5880,6 +5893,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 									(mymodel.PPref[exp_iclass]).get2DFourierTransform(Fref, A, IS_NOT_INV);
 								}
 
+
 #ifdef TIMING
 								// Only time one thread, as I also only time one MPI process
 								if (my_part_id == exp_my_first_part_id)
@@ -6075,7 +6089,6 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 											// Store all diff2 in exp_Mweight
 											long int ihidden_over = sampling.getPositionOversampledSamplingPoint(ihidden, exp_current_oversampling,
 																											iover_rot, iover_trans);
-//#define DEBUG_GETALLDIFF2
 #ifdef DEBUG_GETALLDIFF2
 											pthread_mutex_lock(&global_mutex);
 											if (ibody==1 && part_id == 0 && exp_ipass==0 && ihidden_over == 40217)
@@ -6099,12 +6112,21 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 
 												FourierTransformer transformer;
 												MultidimArray<Complex> Fish;
-												Fish.resize(exp_local_Minvsigma2);
+												Fish.resize(exp_local_Minvsigma2[img_id]);
 												FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fish)
 												{
 													DIRECT_MULTIDIM_ELEM(Fish, n) = *(Fimg_shift + n);
 												}
 												Image<RFLOAT> tt;
+												int exp_current_image_size;
+												if (strict_highres_exp > 0.)
+													// Use smaller images in both passes and keep a maximum on coarse_size, just like in FREALIGN
+													exp_current_image_size = image_coarse_size[optics_group];
+												else if (adaptive_oversampling > 0)
+													// Use smaller images in the first pass, larger ones in the second pass
+													exp_current_image_size = (exp_current_oversampling == 0) ? image_coarse_size[optics_group] : image_current_size[optics_group];
+												else
+													exp_current_image_size = image_current_size[optics_group];
 												if (mymodel.data_dim == 3)
 													tt().resize(exp_current_image_size, exp_current_image_size, exp_current_image_size);
 												else
@@ -6120,9 +6142,10 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 												fnt.compose("Fref1_i", ihidden_over, "spi");
 												tt.write(fnt);
 
-												int group_id = mydata.getGroupId(part_id);
+
 												//for (int i = 0; i< mymodel.scale_correction.size(); i++)
 												//	std::cerr << i << " scale="<<mymodel.scale_correction[i]<<std::endl;
+												int group_id = mydata.getGroupId(part_id, img_id);
 												RFLOAT myscale = mymodel.scale_correction[group_id];
 												//std::cerr << " oversampled_rot[iover_rot]= " << oversampled_rot[iover_rot] << " oversampled_tilt[iover_rot]= " << oversampled_tilt[iover_rot] << " oversampled_psi[iover_rot]= " << oversampled_psi[iover_rot] << std::endl;
 												//std::cerr << " group_id= " << group_id << " myscale= " << myscale <<std::endl;
@@ -6134,7 +6157,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 												//std::cerr << "Written Fimg_shift.spi and Fref.spi. Press any key to continue... part_id= " << part_id<< std::endl;
 												char c;
 												std::cin >> c;
-												//exit(0);
+												exit(0);
 											}
 											pthread_mutex_unlock(&global_mutex);
 
@@ -6153,7 +6176,8 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 												std::cerr << " iover_rot= " << iover_rot << " iover_trans= " << iover_trans << " ihidden= " << ihidden << std::endl;
 												std::cerr << " exp_current_oversampling= " << exp_current_oversampling << std::endl;
 												std::cerr << " ihidden_over= " << ihidden_over << " XSIZE(Mweight)= " << XSIZE(exp_Mweight) << std::endl;
-												int group_id = mydata.getGroupId(part_id);
+												std::cerr << " (mymodel.PPref[exp_iclass]).ori_size= " << (mymodel.PPref[exp_iclass]).ori_size << " (mymodel.PPref[exp_iclass]).r_max= " << (mymodel.PPref[exp_iclass]).r_max << std::endl;
+												int group_id = mydata.getGroupId(part_id, img_id);
 												std::cerr << " mymodel.scale_correction[group_id]= " << mymodel.scale_correction[group_id] << std::endl;
 												if (std::isnan(mymodel.scale_correction[group_id]))
 												{
@@ -6164,7 +6188,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 												Image<RFLOAT> It;
 												std::cerr << "Frefctf shape= "; Frefctf.printShape(std::cerr);
 												MultidimArray<Complex> Fish;
-												Fish.resize(exp_local_Minvsigma2s[0]);
+												Fish.resize(exp_local_Minvsigma2[img_id]);
 												FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fish)
 												{
 													DIRECT_MULTIDIM_ELEM(Fish, n) = *(Fimg_shift + n);
@@ -6175,6 +6199,15 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 												std::cerr << "written exp_local_Fctf.spi" << std::endl;
 												FourierTransformer transformer;
 												Image<RFLOAT> tt;
+												int exp_current_image_size;
+												if (strict_highres_exp > 0.)
+													// Use smaller images in both passes and keep a maximum on coarse_size, just like in FREALIGN
+													exp_current_image_size = image_coarse_size[optics_group];
+												else if (adaptive_oversampling > 0)
+													// Use smaller images in the first pass, larger ones in the second pass
+													exp_current_image_size = (exp_current_oversampling == 0) ? image_coarse_size[optics_group] : image_current_size[optics_group];
+												else
+													exp_current_image_size = image_current_size[optics_group];
 												tt().resize(exp_current_image_size, exp_current_image_size);
 												transformer.inverseFourierTransform(Fish, tt());
 												CenterFFT(tt(),false);
@@ -6196,7 +6229,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 												std::cerr << "written Frefctf.spi" << std::endl;
 
 												std::cerr << " exp_iclass= " << exp_iclass << std::endl;
-												Fref.resize(exp_local_Minvsigma2s[0]);
+												Fref.resize(exp_local_Minvsigma2[img_id]);
 												(mymodel.PPref[exp_iclass]).get2DFourierTransform(Fref, A, IS_NOT_INV);
 												transformer3.inverseFourierTransform(Fref, tt());
 												CenterFFT(tt(),false);
@@ -6211,6 +6244,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 												Itt.write("PPref_data.spi");
 												REPORT_ERROR("diff2 is not a number");
 												pthread_mutex_unlock(&global_mutex);
+												exit(0);
 											}
 #endif
 //#define DEBUG_VERBOSE
@@ -6249,12 +6283,11 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 													std::cerr << " part_id= " << part_id << " ihidden_over= " << ihidden_over << " diff2= " << diff2
 													<< " x= " << oversampled_translations_x[iover_trans] << " y=" <<oversampled_translations_y[iover_trans]
 											        << " iover_trans= "<<iover_trans << "Xi2= " << exp_highres_Xi2_img[img_id] << " Minv_sigma2= " << DIRECT_MULTIDIM_ELEM(exp_local_Minvsigma2[img_id], 10)
-													<< " A= " << A << " Frefctf= " << (DIRECT_MULTIDIM_ELEM(Frefctf, 10)).real
-													<< " sampling.helical_offset_step= " << sampling.helical_offset_step << " range= " << sampling.offset_range
+													<< " Frefctf= " << (DIRECT_MULTIDIM_ELEM(Frefctf, 10)).real
 													<< " Fimgshift= " << (*(Fimg_shift + 10)).real
 													<< std::endl;
-												}
-												*/
+												 }
+												 */
 											}
 
 										} // end loop iover_trans
