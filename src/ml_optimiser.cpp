@@ -2017,10 +2017,10 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(std::vector<Multidim
 			CenterFFT(img(), true);
 			MultidimArray<RFLOAT> ind_spectrum, count;
 			ind_spectrum.initZeros(mymodel.spectral_sizes[group_id]);
-			// Make sure Faux is on the same size as img(), with different sizes, otherwise one can get horrible bugs with the transformer....
+			// Make sure the transformer is reset if the input image changes size, otherwise one can get horrible bugs with the transformer....
 			if (YSIZE(img()) != YSIZE(Faux))
 			{
-				Faux.resize(ZSIZE(img()), YSIZE(img()), XSIZE(img()) / 2 + 1);
+				transformer.clear();
 			}
 			count.initZeros(mymodel.spectral_sizes[group_id]);
 			// recycle the same transformer for all images
@@ -2160,7 +2160,7 @@ void MlOptimiser::setSigmaNoiseEstimatesAndSetAverageImage(std::vector<MultidimA
 			// Factor 2 because of 2-dimensionality of the complex plane
 			if (wsum_model.sumw_group[igroup] > 0.)
 			{
-				std::cerr << " igroup= " << igroup << " wsum_model.sigma2_noise[igroup].sum()= " << wsum_model.sigma2_noise[igroup].sum() << " wsum_model.sumw_group[igroup]= " << wsum_model.sumw_group[igroup] << std::endl;
+				//std::cerr << " igroup= " << igroup << " wsum_model.sigma2_noise[igroup].sum()= " << wsum_model.sigma2_noise[igroup].sum() << " wsum_model.sumw_group[igroup]= " << wsum_model.sumw_group[igroup] << std::endl;
 				mymodel.sigma2_noise[igroup] = wsum_model.sigma2_noise[igroup] / ( 2. * wsum_model.sumw_group[igroup] );
 
 				// Now subtract power spectrum of the average image from the average power spectrum of the individual images
@@ -6277,11 +6277,12 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 											{
 												exp_min_diff2[img_id] = diff2;
 												/*
-												if (mydata.getOriginalImageId(part_id,img_id) == 56)
+												if (part_id == 0)
 												{
 													std::cerr << " part_id= " << part_id << " ihidden_over= " << ihidden_over << " diff2= " << diff2
 													<< " x= " << oversampled_translations_x[iover_trans] << " y=" <<oversampled_translations_y[iover_trans]
 											        << " iover_trans= "<<iover_trans << "Xi2= " << exp_highres_Xi2_img[img_id] << " Minv_sigma2= " << DIRECT_MULTIDIM_ELEM(exp_local_Minvsigma2[img_id], 10)
+													<< " xsize= " << XSIZE(Frefctf)
 													<< " Frefctf= " << (DIRECT_MULTIDIM_ELEM(Frefctf, 10)).real
 													<< " Fimgshift= " << (*(Fimg_shift + 10)).real
 													<< std::endl;
