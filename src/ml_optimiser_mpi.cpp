@@ -510,6 +510,7 @@ will still yield good performance and possibly a more stable execution. \n" << s
 		// Calculate initial sigma noise model from power_class spectra of the individual images
 		// This is done in parallel
 		//std::cout << " Hello world1! I am node " << node->rank << " out of " << node->size <<" and my hostname= "<< getenv("HOSTNAME")<< std::endl;
+
 		calculateSumOfPowerSpectraAndAverageImage(Mavg);
 
 		// Set sigma2_noise and Iref from averaged poser spectra and Mavg
@@ -728,7 +729,9 @@ void MlOptimiserMpi::calculateSumOfPowerSpectraAndAverageImage(std::vector<Multi
 		Mavg[optics_group] = Msum;
 		// When doing random halves, the wsum_model.sumw_group[igroup], which will be used to divide Mavg by is only calculated over half the particles!
 		if (do_split_random_halves)
+		{
 			Mavg[optics_group] /= 2.;
+		}
 	}
 
 }
@@ -1705,7 +1708,6 @@ void MlOptimiserMpi::combineAllWeightedSums()
 	// And then sends results back to all those slaves
 	// When splitting the data into two random halves, perform two passes: one for each subset
 	int nr_halfsets = (do_split_random_halves) ? 2 : 1;
-
 #ifdef DEBUG
 	std::cerr << " starting combineAllWeightedSums..." << std::endl;
 #endif
@@ -2971,7 +2973,14 @@ void MlOptimiserMpi::iterate()
 		updateSubsetSize(node->isMaster());
 
 		// Randomly take different subset of the particles each time we do a new "iteration" in SGD
-		mydata.randomiseParticlesOrder(random_seed+iter, do_split_random_halves,  subset_size < mydata.numberOfParticles() );
+		if (random_seed > 0)
+		{
+			mydata.randomiseParticlesOrder(random_seed+iter, do_split_random_halves,  subset_size < mydata.numberOfParticles() );
+		}
+		else if (verb > 0)
+		{
+			std::cerr << " WARNING: skipping randomisation of particle order because random_seed equals zero..." << std::endl;
+		}
 
 		// Nobody can start the next iteration until everyone has finished
 		MPI_Barrier(MPI_COMM_WORLD);
