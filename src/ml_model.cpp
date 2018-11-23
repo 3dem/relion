@@ -775,6 +775,7 @@ void MlModel::readImages(FileName fn_ref, bool _is_3d_model, int user_model_size
 			img.read(fn_ref);
 			img().setXmippOrigin();
 			img.MDMainHeader.getValue(EMDL_IMAGE_SAMPLINGRATE_X, header_pixel_size);
+			pixel_size = header_pixel_size;
 			ori_size = XSIZE(img());
 			ref_dim = img().getDim();
 			if (ori_size != XSIZE(img()) || ori_size != YSIZE(img()))
@@ -811,7 +812,6 @@ void MlModel::readImages(FileName fn_ref, bool _is_3d_model, int user_model_size
 				do_generate_seeds = false;
 		}
 
-		pixel_size = header_pixel_size;
 
 	}
 	else
@@ -1265,7 +1265,9 @@ void MlModel::initialiseDataVersusPrior(bool fix_tau, Experiment &_mydata)
     // Get total number of particles
 	RFLOAT nr_particles = 0.;
 	for (int igroup = 0; igroup < nr_particles_group.size(); igroup++)
+	{
 		nr_particles += (RFLOAT)nr_particles_group[igroup];
+	}
 
 	// Calculate average sigma2_noise over all image groups
 	MultidimArray<RFLOAT> avg_sigma2_noise, sum_parts;
@@ -1280,11 +1282,14 @@ void MlModel::initialiseDataVersusPrior(bool fix_tau, Experiment &_mydata)
 
 		spectral_sizes[igroup] = my_image_size / 2 + 1;
 		// go from arbitrary image_size and pixel_size of the images to the ori_size and pxeil_size of the model
-		for (int x = 0; x < XSIZE(avg_sigma2_noise); x++)
+		for (int x = 0; x < XSIZE(sigma2_noise[igroup]); x++)
 		{
 			int ipix = ROUND(((RFLOAT)ori_size * pixel_size * (RFLOAT)x) / ((RFLOAT)my_image_size * my_pixel_size));
-			DIRECT_A1D_ELEM(avg_sigma2_noise, ipix) += (RFLOAT)(nr_particles_group[igroup]) * DIRECT_A1D_ELEM(sigma2_noise[igroup], x);
-			DIRECT_A1D_ELEM(sum_parts, ipix) += (RFLOAT)(nr_particles_group[igroup]);
+			if (ipix < XSIZE(avg_sigma2_noise))
+			{
+				DIRECT_A1D_ELEM(avg_sigma2_noise, ipix) += (RFLOAT)(nr_particles_group[igroup]) * DIRECT_A1D_ELEM(sigma2_noise[igroup], x);
+				DIRECT_A1D_ELEM(sum_parts, ipix) += (RFLOAT)(nr_particles_group[igroup]);
+			}
 		}
 	}
 
@@ -1320,7 +1325,6 @@ void MlModel::initialiseDataVersusPrior(bool fix_tau, Experiment &_mydata)
 		// Get the power spectrum of the reference
 		MultidimArray<RFLOAT> spectrum(ori_size /2 + 1);
 		getSpectrum(Iref[iclass], spectrum, POWER_SPECTRUM);
-
 		// Factor two because of two-dimensionality of the complex plane
 		// (just like sigma2_noise estimates, the power spectra should be divided by 2)
 		spectrum *= normfft / 2.;
@@ -1336,9 +1340,12 @@ void MlModel::initialiseDataVersusPrior(bool fix_tau, Experiment &_mydata)
 		}
 
 		// Calculate data_vs_prior_class as spectral_nr_observations_per_class/sigma2_noise vs 1/tau2_class
-		data_vs_prior_class[iclass].resize(sigma2_noise[0]);
+		data_vs_prior_class[iclass].resize(ori_size /2 + 1);
 		if (nr_bodies > 1)
-			fsc_halves_class[iclass].initZeros(sigma2_noise[0]);
+		{
+			fsc_halves_class[iclass].initZeros(ori_size /2 + 1);
+		}
+
 		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(tau2_class[iclass])
 		{
 			RFLOAT evidence = nr_particles * pdf_class[iclass] / DIRECT_A1D_ELEM(avg_sigma2_noise, i);
