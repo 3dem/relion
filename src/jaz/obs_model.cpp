@@ -477,27 +477,10 @@ std::vector<Matrix2D<double> > ObservationModel::getMagMatrices() const
 
 int ObservationModel::getOpticsGroup(const MetaDataTable &particlesMdt, long int particle) const
 {
-	int opticsGroup, opticsGroupNumber;
-	particlesMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroupNumber, particle);
-
-	bool found = false;
-	for (int i = 0; i < opticsMdt.numberOfObjects(); i++)
-	{
-		int og;
-		opticsMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, og, i);
-		if (og == opticsGroupNumber)
-		{
-			found = true;
-			opticsGroup = i;
-			break;
-		}
-	}
-
-	if (!found)
-	{
-		REPORT_ERROR("ERROR: could not find optics group for particle.");
-	}
-
+	int opticsGroup;
+	particlesMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, particle);
+	opticsGroup--;
+	
 	return opticsGroup;
 }
 
