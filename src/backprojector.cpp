@@ -368,115 +368,113 @@ void BackProjector::backproject2Dto3D(const MultidimArray<Complex > &f2d,
 void BackProjector::backproject1Dto2D(const MultidimArray<Complex > &f1d,
 		                        const Matrix2D<RFLOAT> &A, bool inv,
 		                        const MultidimArray<RFLOAT> *Mweight)
-{
+{	
+	Matrix2D<RFLOAT> Ainv = inv? A : A.transpose();
+	Ainv *= (RFLOAT)padding_factor;  // take scaling into account directly
 
-	RFLOAT fx, fy, mfx, mfy, xp, yp;
-	int first_x, x0, x1, y0, y1, y, y2, r2;
-	bool is_neg_x;
-	RFLOAT dd00, dd01, dd10, dd11;
-	Complex my_val;
-	Matrix2D<RFLOAT> Ainv;
-	RFLOAT my_weight = 1.;
-
-	// f1d should already be in the right size (ori_size,orihalfdim)
-    // AND the points outside max_r should already be zero...
-
-	// Use the inverse matrix
-    if (inv)
-    	Ainv = A;
-    else
-    	Ainv = A.transpose();
-
-    // Go from the 1D slice coordinates to the data-array coordinates
-    Ainv *= (RFLOAT)padding_factor;  // take scaling into account directly
-
-	for (int x=0; x <= r_max; x++)
+	const int r_max_src = XSIZE(f1d) - 1;
+	
+	const int r_max_ref = r_max * padding_factor;
+	const int r_max_ref_2 = r_max_ref * r_max_ref;
+	
+	// currently not used for some reason
+    //const int r_min_NN_ref_2 = r_min_nn * r_min_nn * padding_factor * padding_factor;
+	
+	for (int x = 0; x <= r_max_src; x++)
 	{
-		// Get the relevant value in the input image
-		my_val = DIRECT_A1D_ELEM(f1d, x);
-
-		// Get the weight
+		RFLOAT my_weight;
+		
 		if (Mweight != NULL)
-			my_weight = DIRECT_A1D_ELEM(*Mweight, x);
-		// else: my_weight was already initialised to 1.
-
-		if (my_weight > 0.)
 		{
-			// Get logical coordinates in the 3D map
-			xp = Ainv(0,0) * x;
-			yp = Ainv(1,0) * x;
+			my_weight = DIRECT_A1D_ELEM(*Mweight, x);
+			
+			if (my_weight <= 0.) continue;
+		}
+		else
+		{
+			my_weight = 1.;
+		}
+		
+		Complex my_val = DIRECT_A1D_ELEM(f1d, x);
+		
+		// Get logical coordinates in the 3D map
+		RFLOAT xp = Ainv(0,0) * x;
+		RFLOAT yp = Ainv(1,0) * x;
+		
+		const RFLOAT r_ref_2 = xp*xp + yp*yp;
+		
+		if (r_ref_2 > r_max_ref_2) continue;
 
-			if (interpolator == TRILINEAR)
+		if (interpolator == TRILINEAR /* && r_ref_2 < r_min_NN_ref_2*/)
+		{
+			// Only asymmetric half is stored
+			const bool is_neg_x = xp < 0;
+			
+			if (is_neg_x)
 			{
-				// Only asymmetric half is stored
-				if (xp < 0)
-				{
-					// Get complex conjugated hermitian symmetry pair
-					xp = -xp;
-					yp = -yp;
-					is_neg_x = true;
-				}
-				else
-				{
-					is_neg_x = false;
-				}
+				// Get complex conjugated hermitian symmetry pair
+				xp = -xp;
+				yp = -yp;
+			}
 
-				// Trilinear interpolation (with physical coords)
-				// Subtract STARTINGY to accelerate access to data (STARTINGX=0)
-				// In that way use DIRECT_A2D_ELEM, rather than A2D_ELEM
-				x0 = FLOOR(xp);
-				fx = xp - x0;
-				x1 = x0 + 1;
+			// Trilinear interpolation (with physical coords)
+			// Subtract STARTINGY to accelerate access to data (STARTINGX=0)
+			// In that way use DIRECT_A2D_ELEM, rather than A2D_ELEM
+			const int x0 = FLOOR(xp);
+			const RFLOAT fx = xp - x0;
+			const int x1 = x0 + 1;
 
-				y0 = FLOOR(yp);
-				fy = yp - y0;
-				y0 -=  STARTINGY(data);
-				y1 = y0 + 1;
+			int y0 = FLOOR(yp);
+			const RFLOAT fy = yp - y0;
+			y0 -=  STARTINGY(data);
+			const int y1 = y0 + 1;
 
-				mfx = 1. - fx;
-				mfy = 1. - fy;
+			const RFLOAT mfx = 1. - fx;
+			const RFLOAT mfy = 1. - fy;
 
-				dd00 = mfy * mfx;
-				dd01 = mfy *  fx;
-				dd10 =  fy * mfx;
-				dd11 =  fy *  fx;
+			const RFLOAT dd00 = mfy * mfx;
+			const RFLOAT dd01 = mfy *  fx;
+			const RFLOAT dd10 =  fy * mfx;
+			const RFLOAT dd11 =  fy *  fx;
 
-				if (is_neg_x)
-					my_val = conj(my_val);
-
-				// Store slice in 3D weighted sum
-				DIRECT_A2D_ELEM(data, y0, x0) += dd00 * my_val;
-				DIRECT_A2D_ELEM(data, y0, x1) += dd01 * my_val;
-				DIRECT_A2D_ELEM(data, y1, x0) += dd10 * my_val;
-				DIRECT_A2D_ELEM(data, y1, x1) += dd11 * my_val;
-
-				// Store corresponding weights
-				DIRECT_A2D_ELEM(weight, y0, x0) += dd00 * my_weight;
-				DIRECT_A2D_ELEM(weight, y0, x1) += dd01 * my_weight;
-				DIRECT_A2D_ELEM(weight, y1, x0) += dd10 * my_weight;
-				DIRECT_A2D_ELEM(weight, y1, x1) += dd11 * my_weight;
-
-			} // endif TRILINEAR
-			else if (interpolator == NEAREST_NEIGHBOUR )
+			if (is_neg_x)
 			{
-				x0 = ROUND(xp);
-				y0 = ROUND(yp);
-				if (x0 < 0)
-				{
-					A2D_ELEM(data, -y0, -x0) += conj(my_val);
-					A2D_ELEM(weight, -y0, -x0) += my_weight;
-				}
-				else
-				{
-					A2D_ELEM(data, y0, x0) += my_val;
-					A2D_ELEM(weight, y0, x0) += my_weight;
-				}
-			} // endif NEAREST_NEIGHBOUR
+				my_val = conj(my_val);	
+			}
+
+			// Store slice in 3D weighted sum
+			DIRECT_A2D_ELEM(data, y0, x0) += dd00 * my_val;
+			DIRECT_A2D_ELEM(data, y0, x1) += dd01 * my_val;
+			DIRECT_A2D_ELEM(data, y1, x0) += dd10 * my_val;
+			DIRECT_A2D_ELEM(data, y1, x1) += dd11 * my_val;
+
+			// Store corresponding weights
+			DIRECT_A2D_ELEM(weight, y0, x0) += dd00 * my_weight;
+			DIRECT_A2D_ELEM(weight, y0, x1) += dd01 * my_weight;
+			DIRECT_A2D_ELEM(weight, y1, x0) += dd10 * my_weight;
+			DIRECT_A2D_ELEM(weight, y1, x1) += dd11 * my_weight;
+
+		} // endif TRILINEAR
+		else if (interpolator == NEAREST_NEIGHBOUR )
+		{
+			const int x0 = ROUND(xp);
+			const int y0 = ROUND(yp);
+			
+			if (x0 < 0)
+			{
+				A2D_ELEM(data, -y0, -x0) += conj(my_val);
+				A2D_ELEM(weight, -y0, -x0) += my_weight;
+			}
 			else
 			{
-				REPORT_ERROR("FourierInterpolator::backproject1Dto2D%%ERROR: unrecognized interpolator ");
+				A2D_ELEM(data, y0, x0) += my_val;
+				A2D_ELEM(weight, y0, x0) += my_weight;
 			}
-		} // endif weight > 0.
+		} // endif NEAREST_NEIGHBOUR
+		else
+		{
+			REPORT_ERROR("FourierInterpolator::backproject1Dto2D%%ERROR: unrecognized interpolator ");
+		}
 	} // endif x-loop
 
 }
@@ -486,13 +484,8 @@ void BackProjector::backrotate2D(const MultidimArray<Complex > &f2d,
 		                         const MultidimArray<RFLOAT> *Mweight,
 								 Matrix2D<RFLOAT>* magMatrix)
 {
-	RFLOAT fx, fy, mfx, mfy, xp, yp;
-	int first_x, x0, x1, y0, y1, y, y2, r2;
-	bool is_neg_x;
-	RFLOAT dd00, dd01, dd10, dd11;
-	Complex my_val;
-	Matrix2D<RFLOAT> Ainv;
-	RFLOAT my_weight = 1.;
+	Matrix2D<RFLOAT> Ainv = inv? A : A.transpose();
+	Ainv *= (RFLOAT)padding_factor;  // take scaling into account directly
 
 	RFLOAT m00, m10, m01, m11;
 
@@ -510,21 +503,11 @@ void BackProjector::backrotate2D(const MultidimArray<Complex > &f2d,
 		m01 = 0.0;
 		m11 = 1.0;
 	}
-
-	// f2d should already be in the right size (ori_size,orihalfdim)
-    // AND the points outside max_r should already be zero...
-
-	// Use the inverse matrix
-    if (inv)
-    	Ainv = A;
-    else
-    	Ainv = A.transpose();
-
-    // Go from the 2D slice coordinates to the data-array coordinates
-    Ainv *= (RFLOAT)padding_factor;  // take scaling into account directly
-    // SHWS: 12nov18..... ????? int max_r2 = r_max * r_max;
-    int max_r2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
-    int min_r2_nn = r_min_nn * r_min_nn;
+	
+	const int r_max_ref = r_max * padding_factor;
+	const int r_max_ref_2 = r_max_ref * r_max_ref;
+	
+    int min_r2_nn = r_min_nn * r_min_nn * padding_factor * padding_factor;
 
 	// precalculated coefficients for ellipse determination (see further down)
 
@@ -584,7 +567,7 @@ void BackProjector::backrotate2D(const MultidimArray<Complex > &f2d,
 		// where: q := -AtA_xy y / AtA_xx,
 		//        d := sqrt((AtA_xy y)^2 - AtA_xx (AtA_yy y^2 - R^2)) / AtA_xx
 
-		RFLOAT discr = AtA_xy2 * y*y - AtA_xx * (AtA_yy * y*y - max_r2);
+		RFLOAT discr = AtA_xy2 * y*y - AtA_xx * (AtA_yy * y*y - r_max_ref_2);
 
 		if (discr < 0.0) continue; // no points inside ellipse for this y
 
@@ -599,102 +582,100 @@ void BackProjector::backrotate2D(const MultidimArray<Complex > &f2d,
 
 		for (int x = first_x; x <= last_x; x++)
 		{
-
-	    	// Only include points with radius < max_r (exclude points outside circle in square)
-			r2 = x * x + y2;
-
-			// Redundant: (?)
-			//if (r2 > max_r2)
-			//	continue;
+			RFLOAT my_weight;
+			
+			if (Mweight != NULL)
+			{
+				my_weight = DIRECT_A2D_ELEM(*Mweight, i, x);
+				
+				if (my_weight <= 0.f) continue;
+			}
+			else
+			{
+				my_weight = 1.;
+			}
 
 			// Get the relevant value in the input image
-			my_val = DIRECT_A2D_ELEM(f2d, i, x);
+			Complex my_val = DIRECT_A2D_ELEM(f2d, i, x);
+			
+			// Get logical coordinates in the 3D map
+			RFLOAT xu = m00 * x + m01 * y;
+			RFLOAT yu = m10 * x + m11 * y;
 
-			// Get the weight
-			if (Mweight != NULL)
-				my_weight = DIRECT_A2D_ELEM(*Mweight, i, x);
-			// else: my_weight was already initialised to 1.
+			RFLOAT xp = Ainv(0,0) * xu + Ainv(0,1) * yu;
+			RFLOAT yp = Ainv(1,0) * xu + Ainv(1,1) * yu;
+			
+			RFLOAT r_ref_2 = xp * xp + yp * yp;
 
-			if (my_weight > 0.)
+			if (interpolator == TRILINEAR || r_ref_2 < min_r2_nn)
 			{
-				// Get logical coordinates in the 3D map
-				RFLOAT xu = m00 * x + m01 * y;
-				RFLOAT yu = m10 * x + m11 * y;
-
-				RFLOAT xp = Ainv(0,0) * xu + Ainv(0,1) * yu;
-				RFLOAT yp = Ainv(1,0) * xu + Ainv(1,1) * yu;
-
-				if (interpolator == TRILINEAR || r2 < min_r2_nn)
+				const bool is_neg_x = xp < 0;
+				// Only asymmetric half is stored
+				if (is_neg_x)
 				{
-					// Only asymmetric half is stored
-					if (xp < 0)
-					{
-						// Get complex conjugated hermitian symmetry pair
-						xp = -xp;
-						yp = -yp;
-						is_neg_x = true;
-					}
-					else
-					{
-						is_neg_x = false;
-					}
+					// Get complex conjugated hermitian symmetry pair
+					xp = -xp;
+					yp = -yp;
+				}
 
-					// Trilinear interpolation (with physical coords)
-					// Subtract STARTINGY to accelerate access to data (STARTINGX=0)
-					// In that way use DIRECT_A2D_ELEM, rather than A2D_ELEM
-					x0 = FLOOR(xp);
-					fx = xp - x0;
-					x1 = x0 + 1;
+				// Trilinear interpolation (with physical coords)
+				// Subtract STARTINGY to accelerate access to data (STARTINGX=0)
+				// In that way use DIRECT_A2D_ELEM, rather than A2D_ELEM
+				const int x0 = FLOOR(xp);
+				const RFLOAT fx = xp - x0;
+				const int x1 = x0 + 1;
 
-					y0 = FLOOR(yp);
-					fy = yp - y0;
-					y0 -=  STARTINGY(data);
-					y1 = y0 + 1;
+				int y0 = FLOOR(yp);
+				const RFLOAT fy = yp - y0;
+				y0 -=  STARTINGY(data);
+				const int y1 = y0 + 1;
 
-					mfx = 1. - fx;
-					mfy = 1. - fy;
+				const RFLOAT mfx = 1. - fx;
+				const RFLOAT mfy = 1. - fy;
 
-					dd00 = mfy * mfx;
-					dd01 = mfy *  fx;
-					dd10 =  fy * mfx;
-					dd11 =  fy *  fx;
+				const RFLOAT dd00 = mfy * mfx;
+				const RFLOAT dd01 = mfy *  fx;
+				const RFLOAT dd10 =  fy * mfx;
+				const RFLOAT dd11 =  fy *  fx;
 
-					if (is_neg_x)
-						my_val = conj(my_val);
-
-					// Store slice in 3D weighted sum
-					DIRECT_A2D_ELEM(data, y0, x0) += dd00 * my_val;
-					DIRECT_A2D_ELEM(data, y0, x1) += dd01 * my_val;
-					DIRECT_A2D_ELEM(data, y1, x0) += dd10 * my_val;
-					DIRECT_A2D_ELEM(data, y1, x1) += dd11 * my_val;
-
-					// Store corresponding weights
-					DIRECT_A2D_ELEM(weight, y0, x0) += dd00 * my_weight;
-					DIRECT_A2D_ELEM(weight, y0, x1) += dd01 * my_weight;
-					DIRECT_A2D_ELEM(weight, y1, x0) += dd10 * my_weight;
-					DIRECT_A2D_ELEM(weight, y1, x1) += dd11 * my_weight;
-
-				} // endif TRILINEAR
-				else if (interpolator == NEAREST_NEIGHBOUR )
+				if (is_neg_x)
 				{
-					x0 = ROUND(xp);
-					y0 = ROUND(yp);
-					if (x0 < 0)
-					{
-						A2D_ELEM(data, -y0, -x0) += conj(my_val);
-						A2D_ELEM(weight, -y0, -x0) += my_weight;
-					}
-					else
-					{
-						A2D_ELEM(data, y0, x0) += my_val;
-						A2D_ELEM(weight, y0, x0) += my_weight;
-					}
-				} // endif NEAREST_NEIGHBOUR
+					my_val = conj(my_val);
+				}
+
+				// Store slice in 3D weighted sum
+				DIRECT_A2D_ELEM(data, y0, x0) += dd00 * my_val;
+				DIRECT_A2D_ELEM(data, y0, x1) += dd01 * my_val;
+				DIRECT_A2D_ELEM(data, y1, x0) += dd10 * my_val;
+				DIRECT_A2D_ELEM(data, y1, x1) += dd11 * my_val;
+
+				// Store corresponding weights
+				DIRECT_A2D_ELEM(weight, y0, x0) += dd00 * my_weight;
+				DIRECT_A2D_ELEM(weight, y0, x1) += dd01 * my_weight;
+				DIRECT_A2D_ELEM(weight, y1, x0) += dd10 * my_weight;
+				DIRECT_A2D_ELEM(weight, y1, x1) += dd11 * my_weight;
+
+			} // endif TRILINEAR
+			else if (interpolator == NEAREST_NEIGHBOUR )
+			{
+				const int x0 = ROUND(xp);
+				const int y0 = ROUND(yp);
+				
+				if (x0 < 0)
+				{
+					A2D_ELEM(data, -y0, -x0) += conj(my_val);
+					A2D_ELEM(weight, -y0, -x0) += my_weight;
+				}
 				else
 				{
-					REPORT_ERROR("FourierInterpolator::backrotate2D%%ERROR: unrecognized interpolator ");
+					A2D_ELEM(data, y0, x0) += my_val;
+					A2D_ELEM(weight, y0, x0) += my_weight;
 				}
-			} // endif weight > 0.
+			} // endif NEAREST_NEIGHBOUR
+			else
+			{
+				REPORT_ERROR("FourierInterpolator::backrotate2D%%ERROR: unrecognized interpolator ");
+			}
 		} // endif x-loop
 	} // endif y-loop
 }
@@ -703,28 +684,20 @@ void BackProjector::backrotate3D(const MultidimArray<Complex > &f3d,
 		                         const Matrix2D<RFLOAT> &A, bool inv,
 		                         const MultidimArray<RFLOAT> *Mweight)
 {
-	RFLOAT fx, fy, fz, mfx, mfy, mfz, xp, yp, zp;
-	int first_x, x0, x1, y0, y1, z0, z1, y, y2, z, z2, r2;
-	bool is_neg_x;
-	RFLOAT dd000, dd010, dd100, dd110, dd001, dd011, dd101, dd111;
-	Complex my_val;
-	Matrix2D<RFLOAT> Ainv;
-	RFLOAT my_weight = 1.;
-
 	// f3d should already be in the right size (ori_size,orihalfdim)
-    // AND the points outside max_r should already be zero...
-
-	// Use the inverse matrix
-    if (inv)
-    	Ainv = A;
-    else
-    	Ainv = A.transpose();
-
-    // Go from the 2D slice coordinates to the data-array coordinates
-    Ainv *= (RFLOAT)padding_factor;  // take scaling into account directly
-    int max_r2 = r_max * r_max;
-    int min_r2_nn = r_min_nn * r_min_nn;
-
+    // AND the points outside max_r should already be zero.
+	
+	Matrix2D<RFLOAT> Ainv = inv? A : A.transpose();
+	Ainv *= (RFLOAT)padding_factor;  // take scaling into account directly
+	
+	const int r_max_src = XSIZE(f3d) - 1;
+    const int r_max_src_2 = r_max_src * r_max_src;
+	
+	const int r_max_ref = r_max * padding_factor;
+	const int r_max_ref_2 = r_max_ref * r_max_ref;
+	
+    const int r_min_NN_ref_2 = r_min_nn * r_min_nn * padding_factor * padding_factor;
+    
 //#define DEBUG_BACKROTATE
 #ifdef DEBUG_BACKROTATE
     std::cerr << " XSIZE(f3d)= "<< XSIZE(f3d) << std::endl;
@@ -738,155 +711,156 @@ void BackProjector::backrotate3D(const MultidimArray<Complex > &f3d,
     std::cerr << " Ainv= " << Ainv << std::endl;
 #endif
 
-    for (int k=0; k < ZSIZE(f3d); k++)
+    for (int k = 0; k < ZSIZE(f3d); k++)
 	{
+		int z, x_min;
+		
 		// Don't search beyond square with side max_r
-		if (k <= r_max)
+		if (k <= r_max_src)
 		{
 			z = k;
-			first_x = 0;
-		}
-		else if (k >= YSIZE(f3d) - r_max)
-		{
-			z = k - YSIZE(f3d);
-			/// TODO: still check this better in the 3D case!!!
-			// x==0 (y,z)-plane is stored twice in the FFTW format. Don't set it twice in BACKPROJECTION!
-			first_x = 1;
+			x_min = 0;
 		}
 		else
-			continue;
-
-		z2 = z * z;
-		for (int i=0; i < YSIZE(f3d); i++)
 		{
-			// Don't search beyond square with side max_r
-			if (i <= r_max)
-			{
-				y = i;
-			}
-			else if (i >= YSIZE(f3d) - r_max)
-			{
-				y = i - YSIZE(f3d);
-			}
-			else
-				continue;
+			z = k - ZSIZE(f3d);
+			/// TODO: still check this better in the 3D case!!!
+			// x==0 (y,z)-plane is stored twice in the FFTW format. Don't set it twice in BACKPROJECTION!
+			x_min = 1;
+		}
 
-			y2 = y * y;
-			for (int x = first_x; x <= r_max; x++)
+		int z2 = z * z;
+		
+		for (int i = 0; i < YSIZE(f3d); i++)
+		{
+			int y = (i <= r_max_src)? i : i - YSIZE(f3d);
+			int y2 = y * y;
+						
+			const RFLOAT yz2 = y2 + z2;
+			
+			// avoid negative square root
+			if (yz2 > r_max_src_2) continue;
+			
+			const int x_max = FLOOR(sqrt(r_max_src_2 - yz2));
+			
+			for (int x = x_min; x <= x_max; x++)
 			{
-				// Only include points with radius < max_r (exclude points outside circle in square)
-				r2 = x * x + y2 + z2;
-				if (r2 > max_r2)
-					continue;
+				// Get logical coordinates in the 3D map
+				int xp = Ainv(0,0) * x + Ainv(0,1) * y + Ainv(0,2) * z;
+				int yp = Ainv(1,0) * x + Ainv(1,1) * y + Ainv(1,2) * z;
+				int zp = Ainv(2,0) * x + Ainv(2,1) * y + Ainv(2,2) * z;
+				
+				const int r_ref_2 = xp*xp + yp*yp + zp*zp;
+				
+				if (r_ref_2 > r_max_ref_2) continue;
 
-				// Get the relevant value in the input image
-				my_val = DIRECT_A3D_ELEM(f3d, k, i, x);
+				RFLOAT my_weight;
 
 				// Get the weight
 				if (Mweight != NULL)
-					my_weight = DIRECT_A3D_ELEM(*Mweight, k, i, x);
-				// else: my_weight was already initialised to 1.
-
-				if (my_weight > 0.)
 				{
-					// Get logical coordinates in the 3D map
-					xp = Ainv(0,0) * x + Ainv(0,1) * y + Ainv(0,2) * z;
-					yp = Ainv(1,0) * x + Ainv(1,1) * y + Ainv(1,2) * z;
-					zp = Ainv(2,0) * x + Ainv(2,1) * y + Ainv(2,2) * z;
-
-					if (interpolator == TRILINEAR || r2 < min_r2_nn)
+					my_weight = DIRECT_A3D_ELEM(*Mweight, k, i, x);
+					
+					if (my_weight <= 0.) continue;
+				}
+				else
+				{
+					my_weight = 1.;
+				}
+				
+				Complex my_val = DIRECT_A3D_ELEM(f3d, k, i, x);				
+				
+				if (interpolator == TRILINEAR || r_ref_2 < r_min_NN_ref_2)
+				{
+					// Only asymmetric half is stored
+					bool is_neg_x = xp < 0;
+					
+					if (is_neg_x)
 					{
-						// Only asymmetric half is stored
-						if (xp < 0)
-						{
-							// Get complex conjugated hermitian symmetry pair
-							xp = -xp;
-							yp = -yp;
-							zp = -zp;
-							is_neg_x = true;
-						}
-						else
-						{
-							is_neg_x = false;
-						}
+						// Get complex conjugated hermitian symmetry pair
+						xp = -xp;
+						yp = -yp;
+						zp = -zp;
+					}
 
-						// Trilinear interpolation (with physical coords)
-						// Subtract STARTINGY to accelerate access to data (STARTINGX=0)
-						// In that way use DIRECT_A3D_ELEM, rather than A3D_ELEM
-						x0 = FLOOR(xp);
-						fx = xp - x0;
-						x1 = x0 + 1;
+					// Trilinear interpolation (with physical coords)
+					// Subtract STARTINGY to accelerate access to data (STARTINGX=0)
+					// In that way use DIRECT_A3D_ELEM, rather than A3D_ELEM
+					const int x0 = FLOOR(xp);
+					const RFLOAT fx = xp - x0;
+					const int x1 = x0 + 1;
 
-						y0 = FLOOR(yp);
-						fy = yp - y0;
-						y0 -=  STARTINGY(data);
-						y1 = y0 + 1;
+					int y0 = FLOOR(yp);
+					const RFLOAT fy = yp - y0;
+					y0 -=  STARTINGY(data);
+					const int y1 = y0 + 1;
 
-						z0 = FLOOR(zp);
-						fz = zp - z0;
-						z0 -=  STARTINGZ(data);
-						z1 = z0 + 1;
+					int z0 = FLOOR(zp);
+					const RFLOAT fz = zp - z0;
+					z0 -=  STARTINGZ(data);
+					const int z1 = z0 + 1;
 
-						mfx = 1. - fx;
-						mfy = 1. - fy;
-						mfz = 1. - fz;
+					const RFLOAT mfx = 1. - fx;
+					const RFLOAT mfy = 1. - fy;
+					const RFLOAT mfz = 1. - fz;
 
-						dd000 = mfz * mfy * mfx;
-						dd001 = mfz * mfy *  fx;
-						dd010 = mfz *  fy * mfx;
-						dd011 = mfz *  fy *  fx;
-						dd100 =  fz * mfy * mfx;
-						dd101 =  fz * mfy *  fx;
-						dd110 =  fz *  fy * mfx;
-						dd111 =  fz *  fy *  fx;
+					const RFLOAT dd000 = mfz * mfy * mfx;
+					const RFLOAT dd001 = mfz * mfy *  fx;
+					const RFLOAT dd010 = mfz *  fy * mfx;
+					const RFLOAT dd011 = mfz *  fy *  fx;
+					const RFLOAT dd100 =  fz * mfy * mfx;
+					const RFLOAT dd101 =  fz * mfy *  fx;
+					const RFLOAT dd110 =  fz *  fy * mfx;
+					const RFLOAT dd111 =  fz *  fy *  fx;
 
-						if (is_neg_x)
-							my_val = conj(my_val);
-
-						// Store slice in 3D weighted sum
-						DIRECT_A3D_ELEM(data, z0, y0, x0) += dd000 * my_val;
-						DIRECT_A3D_ELEM(data, z0, y0, x1) += dd001 * my_val;
-						DIRECT_A3D_ELEM(data, z0, y1, x0) += dd010 * my_val;
-						DIRECT_A3D_ELEM(data, z0, y1, x1) += dd011 * my_val;
-						DIRECT_A3D_ELEM(data, z1, y0, x0) += dd100 * my_val;
-						DIRECT_A3D_ELEM(data, z1, y0, x1) += dd101 * my_val;
-						DIRECT_A3D_ELEM(data, z1, y1, x0) += dd110 * my_val;
-						DIRECT_A3D_ELEM(data, z1, y1, x1) += dd111 * my_val;
-						// Store corresponding weights
-						DIRECT_A3D_ELEM(weight, z0, y0, x0) += dd000 * my_weight;
-						DIRECT_A3D_ELEM(weight, z0, y0, x1) += dd001 * my_weight;
-						DIRECT_A3D_ELEM(weight, z0, y1, x0) += dd010 * my_weight;
-						DIRECT_A3D_ELEM(weight, z0, y1, x1) += dd011 * my_weight;
-						DIRECT_A3D_ELEM(weight, z1, y0, x0) += dd100 * my_weight;
-						DIRECT_A3D_ELEM(weight, z1, y0, x1) += dd101 * my_weight;
-						DIRECT_A3D_ELEM(weight, z1, y1, x0) += dd110 * my_weight;
-						DIRECT_A3D_ELEM(weight, z1, y1, x1) += dd111 * my_weight;
-
-
-					} // endif TRILINEAR
-					else if (interpolator == NEAREST_NEIGHBOUR )
+					if (is_neg_x)
 					{
-						x0 = ROUND(xp);
-						y0 = ROUND(yp);
-						z0 = ROUND(zp);
+						my_val = conj(my_val);
+					}
 
-						if (x0 < 0)
-						{
-							A3D_ELEM(data, -z0, -y0, -x0) += conj(my_val);
-							A3D_ELEM(weight, -z0, -y0, -x0) += my_weight;
-						}
-						else
-						{
-							A3D_ELEM(data, z0, y0, x0) += my_val;
-							A3D_ELEM(weight, z0, y0, x0) += my_weight;
-						}
+					// Store slice in 3D weighted sum
+					DIRECT_A3D_ELEM(data, z0, y0, x0) += dd000 * my_val;
+					DIRECT_A3D_ELEM(data, z0, y0, x1) += dd001 * my_val;
+					DIRECT_A3D_ELEM(data, z0, y1, x0) += dd010 * my_val;
+					DIRECT_A3D_ELEM(data, z0, y1, x1) += dd011 * my_val;
+					DIRECT_A3D_ELEM(data, z1, y0, x0) += dd100 * my_val;
+					DIRECT_A3D_ELEM(data, z1, y0, x1) += dd101 * my_val;
+					DIRECT_A3D_ELEM(data, z1, y1, x0) += dd110 * my_val;
+					DIRECT_A3D_ELEM(data, z1, y1, x1) += dd111 * my_val;
+					
+					// Store corresponding weights
+					DIRECT_A3D_ELEM(weight, z0, y0, x0) += dd000 * my_weight;
+					DIRECT_A3D_ELEM(weight, z0, y0, x1) += dd001 * my_weight;
+					DIRECT_A3D_ELEM(weight, z0, y1, x0) += dd010 * my_weight;
+					DIRECT_A3D_ELEM(weight, z0, y1, x1) += dd011 * my_weight;
+					DIRECT_A3D_ELEM(weight, z1, y0, x0) += dd100 * my_weight;
+					DIRECT_A3D_ELEM(weight, z1, y0, x1) += dd101 * my_weight;
+					DIRECT_A3D_ELEM(weight, z1, y1, x0) += dd110 * my_weight;
+					DIRECT_A3D_ELEM(weight, z1, y1, x1) += dd111 * my_weight;
 
-					} // endif NEAREST_NEIGHBOUR
+				} // endif TRILINEAR
+				else if (interpolator == NEAREST_NEIGHBOUR )
+				{
+					const int x0 = ROUND(xp);
+					const int y0 = ROUND(yp);
+					const int z0 = ROUND(zp);
+
+					if (x0 < 0)
+					{
+						A3D_ELEM(data, -z0, -y0, -x0) += conj(my_val);
+						A3D_ELEM(weight, -z0, -y0, -x0) += my_weight;
+					}
 					else
 					{
-						REPORT_ERROR("BackProjector::backrotate3D%%ERROR: unrecognized interpolator ");
+						A3D_ELEM(data, z0, y0, x0) += my_val;
+						A3D_ELEM(weight, z0, y0, x0) += my_weight;
 					}
-				} // endif weight > 0.
+
+				} // endif NEAREST_NEIGHBOUR
+				else
+				{
+					REPORT_ERROR("BackProjector::backrotate3D%%ERROR: unrecognized interpolator ");
+				}
 			} // endif x-loop
 		} // endif y-loop
 	} // endif z-loop

@@ -856,7 +856,12 @@ void Projector::rotate3D(MultidimArray<Complex > &f3d, Matrix2D<RFLOAT> &A, bool
 			const int y = (i <= r_max_out)? i : i - YSIZE(f3d);
 			const int y2 = y * y;
 			
-			const int x_max = FLOOR(sqrt(r_max_out_2 - y2 - z2));
+			const RFLOAT yz2 = y2 + z2;
+			
+			// avoid negative square root
+			if (yz2 > r_max_out_2) continue;
+			
+			const int x_max = FLOOR(sqrt(r_max_out_2 - yz2));
 			
 			for (int x = 0; x <= x_max; x++)
 			{
@@ -865,7 +870,7 @@ void Projector::rotate3D(MultidimArray<Complex > &f3d, Matrix2D<RFLOAT> &A, bool
 				RFLOAT yp = Ainv(1,0) * x + Ainv(1,1) * y + Ainv(1,2) * z;
 				RFLOAT zp = Ainv(2,0) * x + Ainv(2,1) * y + Ainv(2,2) * z;
 
-				const int r_ref_2 = x * x + y2 + z2;
+				const int r_ref_2 = xp*xp + yp*yp + zp*zp;
 				
 				if (r_ref_2 > r_max_ref_2) continue;
 				
