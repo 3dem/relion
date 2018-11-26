@@ -41,7 +41,9 @@ __global__ void cuda_kernel_backproject2D(
 {
 	unsigned tid = threadIdx.x;
 	unsigned img = blockIdx.x;
-
+	
+	int img_y_half = img_y / 2;
+	
 	__shared__ XFLOAT s_eulers[4];
 
 	XFLOAT minvsigma2, ctf, img_real, img_imag, Fweight, real, imag, weight;
@@ -69,17 +71,10 @@ __global__ void cuda_kernel_backproject2D(
 		int x = pixel % img_x;
 		int y = (int)floorf( (float)pixel / (float)img_x);
 
-		// Don't search beyond square with side max_r
-		if (y > max_r)
+		if (y > img_y_half)
 		{
-			if (y >= img_y - max_r)
-				y -= img_y;
-			else
-				continue;
+			y -= img_y;
 		}
-
-		if (x * x + y * y > max_r2)
-			continue;
 
 		//WAVG
 		minvsigma2 = __ldg(&g_Minvsigma2s[pixel]);
@@ -115,7 +110,12 @@ __global__ void cuda_kernel_backproject2D(
 			// Get logical coordinates in the 3D map
 			XFLOAT xp = (s_eulers[0] * x + s_eulers[1] * y );
 			XFLOAT yp = (s_eulers[2] * x + s_eulers[3] * y );
-
+			
+			// Only consider pixels that are projected inside the allowed circle in output coordinates.
+			//     --JZ, Nov. 26th 2018			
+			if ( ( xp * xp + yp * yp ) > max_r2)
+				continue;
+			
 			// Only asymmetric half is stored
 			if (xp < 0)
 			{
@@ -192,6 +192,11 @@ __global__ void cuda_kernel_backproject3D(
 {
 	unsigned tid = threadIdx.x;
 	unsigned img = blockIdx.x;
+	
+	int img_y_half = img_y / 2;
+	int img_z_half = img_z / 2;
+	
+	int max_r2_vol = max_r2 * padding_factor * padding_factor;
 
 	__shared__ XFLOAT s_eulers[9];
 	XFLOAT minvsigma2, ctf, img_real, img_imag, Fweight, real, imag, weight;
@@ -226,12 +231,10 @@ __global__ void cuda_kernel_backproject3D(
 			xy = pixel % (img_x*img_y);
 			x =             xy  % img_x;
 			y = floorfracf( xy,   img_x);
-			if (z > max_r)
+			
+			if (z > img_z_half)
 			{
-				if (z >= img_z - max_r)
-					z = z - img_z;
-				else
-					continue;
+				z = z - img_z;
 
 				if(x==0)
 					continue;
@@ -242,24 +245,11 @@ __global__ void cuda_kernel_backproject3D(
 			x =             pixel % img_x;
 			y = floorfracf( pixel , img_x);
 		}
-		if (y > max_r)
+		if (y > img_y_half)
 		{
-			if (y >= img_y - max_r)
-				y = y - img_y;
-			else
-				continue;
+			y = y - img_y;
 		}
 		
-		// Removed to ensure compliance with varying box and pixel sizes and anisotropic magnification.
-		// Replaced by corresponding condition in output coordinates below  --JZ, Oct. 18. 2018
-		//
-		//if(DATA3D)
-		//	if ( ( x * x + y * y  + z * z ) > max_r2)
-		//		continue;
-		//else
-		//	if ( ( x * x + y * y ) > max_r2)
-		//		continue;
-
 		//WAVG
 		minvsigma2 = __ldg(&g_Minvsigma2s[pixel]);
 		ctf = __ldg(&g_ctfs[pixel]);
@@ -311,7 +301,7 @@ __global__ void cuda_kernel_backproject3D(
 			
 			// Only consider pixels that are projected inside the sphere in output coordinates.
 			//     --JZ, Oct. 18. 2018			
-			if ( ( xp * xp + yp * yp  + zp * zp ) > max_r2)
+			if ( ( xp * xp + yp * yp  + zp * zp ) > max_r2_vol)
 				continue;
 		
 			// Only asymmetric half is stored
@@ -427,6 +417,11 @@ __global__ void cuda_kernel_backprojectSGD(
 {
 	unsigned tid = threadIdx.x;
 	unsigned img = blockIdx.x;
+	
+	int img_y_half = img_y / 2;
+	int img_z_half = img_z / 2;
+	
+	int max_r2_vol = max_r2 * padding_factor * padding_factor;
 
 	__shared__ XFLOAT s_eulers[9];
 	XFLOAT minvsigma2, ctf, img_real, img_imag, Fweight, real, imag, weight;
@@ -461,12 +456,10 @@ __global__ void cuda_kernel_backprojectSGD(
 			xy = pixel % (img_x*img_y);
 			x =             xy  % img_x;
 			y = floorfracf( xy,   img_x);
-			if (z > max_r)
+			
+			if (z > img_z_half)
 			{
-				if (z >= img_z - max_r)
-					z = z - img_z;
-				else
-					continue;
+				z = z - img_z;
 
 				if(x==0)
 					continue;
@@ -477,20 +470,10 @@ __global__ void cuda_kernel_backprojectSGD(
 			x =             pixel % img_x;
 			y = floorfracf( pixel , img_x);
 		}
-		if (y > max_r)
+		if (y > img_y_half)
 		{
-			if (y >= img_y - max_r)
-				y = y - img_y;
-			else
-				continue;
+			y = y - img_y;
 		}
-
-		if(DATA3D)
-			if ( ( x * x + y * y  + z * z ) > max_r2)
-				continue;
-		else
-			if ( ( x * x + y * y ) > max_r2)
-				continue;
 
 		XFLOAT ref_real = (XFLOAT) 0.0;
 		XFLOAT ref_imag = (XFLOAT) 0.0;
@@ -560,6 +543,12 @@ __global__ void cuda_kernel_backprojectSGD(
 				yp = (s_eulers[3] * x + s_eulers[4] * y ) * padding_factor;
 				zp = (s_eulers[6] * x + s_eulers[7] * y ) * padding_factor;
 			}
+			
+			// Only consider pixels that are projected inside the sphere in output coordinates.
+			//     --JZ, Nov. 26th 2018			
+			if ( ( xp * xp + yp * yp  + zp * zp ) > max_r2_vol)
+				continue;
+			
 			// Only asymmetric half is stored
 			if (xp < (XFLOAT) 0.0)
 			{
