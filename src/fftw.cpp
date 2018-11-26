@@ -167,7 +167,7 @@ const MultidimArray<Complex > &FourierTransformer::getComplex() const
 }
 
 
-void FourierTransformer::setReal(MultidimArray<RFLOAT> &input)
+void FourierTransformer::setReal(MultidimArray<RFLOAT> &input, bool force_new_plans)
 {
 	bool recomputePlan = false;
 
@@ -179,7 +179,7 @@ void FourierTransformer::setReal(MultidimArray<RFLOAT> &input)
 		recomputePlan = true;
 	}
 
-    if (recomputePlan)
+    if (recomputePlan || force_new_plans)
     {
 		fFourier.reshape(ZSIZE(input),YSIZE(input),XSIZE(input)/2+1);
 		fReal=&input;
@@ -246,7 +246,7 @@ void FourierTransformer::setReal(MultidimArray<RFLOAT> &input)
 	}
 }
 
-void FourierTransformer::setReal(MultidimArray<Complex > &input)
+void FourierTransformer::setReal(MultidimArray<Complex > &input, bool force_new_plans)
 {
     bool recomputePlan=false;
     if (fComplex==NULL)
@@ -259,7 +259,7 @@ void FourierTransformer::setReal(MultidimArray<Complex > &input)
     fFourier.resize(input);
     fComplex=&input;
 
-    if (recomputePlan)
+    if (recomputePlan || force_new_plans)
     {
         int ndim=3;
         if (ZSIZE(input)==1)

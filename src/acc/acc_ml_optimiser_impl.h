@@ -404,13 +404,12 @@ void getFourierTransformsAndCtfs(long int part_id,
 		d_img.allInit(0);
 
 		XFLOAT normcorr_val = baseMLO->do_norm_correction ? (XFLOAT)(baseMLO->mymodel.avg_norm_correction / normcorr) : 1;
-
 		AccUtilities::TranslateAndNormCorrect(	img.data,	// input   	host-side 	MultidimArray
 												d_img,		// output  	acc-side  	Array
 												normcorr_val,
 												XX(my_old_offset),
 												YY(my_old_offset),
-												ZZ(my_old_offset),
+												(accMLO->dataIs3D) ? ZZ(my_old_offset) : 0.,
 												accMLO->dataIs3D);
 		LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 
@@ -430,7 +429,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 													normcorr_val,
 													XX(my_old_offset),
 													YY(my_old_offset),
-													ZZ(my_old_offset),
+													(accMLO->dataIs3D) ? ZZ(my_old_offset) : 0.,
 													accMLO->dataIs3D);
 			LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
 			CTOC(accMLO->timer,"TranslateAndNormCorrect_recImg");
@@ -795,7 +794,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 					other_projected_com += my_old_offset;
 
 					shiftImageInFourierTransform(FTo, Faux, (RFLOAT)baseMLO->image_full_size[optics_group],
-							XX(other_projected_com), YY(other_projected_com), ZZ(other_projected_com));
+							XX(other_projected_com), YY(other_projected_com), (accMLO->dataIs3D) ? ZZ(other_projected_com) : 0.);
 
 					// Sum the Fourier transforms of all the obodies
 					Fsum_obody += Faux;
@@ -837,10 +836,10 @@ void getFourierTransformsAndCtfs(long int part_id,
 			// 23jul17: NEW: as we haven't applied the (nonROUNDED!!)  my_refined_ibody_offset yet, do this now in the FourierTransform
 			Faux = op.Fimg.at(img_id);
 			shiftImageInFourierTransform(Faux, op.Fimg.at(img_id), (RFLOAT)baseMLO->image_full_size[optics_group],
-					XX(my_refined_ibody_offset), YY(my_refined_ibody_offset), ZZ(my_refined_ibody_offset));
+					XX(my_refined_ibody_offset), YY(my_refined_ibody_offset), (accMLO->dataIs3D) ? ZZ(my_refined_ibody_offset) : 0);
 			Faux = op.Fimg_nomask.at(img_id);
 			shiftImageInFourierTransform(Faux, op.Fimg_nomask.at(img_id), (RFLOAT)baseMLO->image_full_size[optics_group],
-					XX(my_refined_ibody_offset), YY(my_refined_ibody_offset), ZZ(my_refined_ibody_offset));
+					XX(my_refined_ibody_offset), YY(my_refined_ibody_offset), (accMLO->dataIs3D) ? ZZ(my_refined_ibody_offset) : 0);
 		} // end if mymodel.nr_bodies > 1
 
 
@@ -1371,13 +1370,13 @@ void getAllSquaredDifferencesFine(
 				CTIC(accMLO->timer,"generateEulerMatrices");
 				eulers[exp_iclass-sp.iclass_min].setSize(9*FineProjectionData[img_id].class_entries[exp_iclass]);
 				eulers[exp_iclass-sp.iclass_min].hostAlloc();
-				
+
 				Matrix2D<RFLOAT> mag;
 				if (baseMLO->mydata.obsModel.hasMagMatrices)
 				{
 					mag = baseMLO->mydata.obsModel.getMag3x3(optics_group);
 				}
-			
+
 				generateEulerMatrices(
 						thisClassProjectionData,
 						&(eulers[exp_iclass-sp.iclass_min])[0],
@@ -2670,13 +2669,13 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			eulers[iclass].hostAlloc();
 
 			CTIC(accMLO->timer,"generateEulerMatricesProjector");
-	
+
 			Matrix2D<RFLOAT> mag;
 			if (baseMLO->mydata.obsModel.hasMagMatrices)
 			{
 				mag = baseMLO->mydata.obsModel.getMag3x3(optics_group);
 			}
-				
+
 			generateEulerMatrices(
 					thisClassProjectionData,
 					&eulers[iclass][0],

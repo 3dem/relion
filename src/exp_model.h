@@ -45,6 +45,9 @@ public:
 	// To which particle does this image belong
 	long int particle_id;
 
+	// This is the Nth image in this optics_group, for writing to scratch disk: filenames
+	long int optics_group_id;
+
 	// Name of this image (by this name it will be recognised upon reading)
 	std::string name;
 
@@ -71,6 +74,7 @@ public:
 	{
 		id = copy.id;
 		particle_id = copy.particle_id;
+		optics_group_id = copy.optics_group_id;
 		name = copy.name;
 		micrograph_id = copy.micrograph_id;
 		group_id = copy.group_id;
@@ -84,6 +88,7 @@ public:
 	{
 		id = copy.id;
 		particle_id = copy.particle_id;
+		optics_group_id = copy.optics_group_id;
 		name = copy.name;
 		micrograph_id = copy.micrograph_id;
 		group_id = copy.group_id;
@@ -198,6 +203,7 @@ public:
 	ExpGroup(ExpGroup const& copy)
 	{
 		id = copy.id;
+		optics_group = copy.optics_group;
 		name = copy.name;
 	}
 
@@ -205,6 +211,7 @@ public:
 	ExpGroup& operator=(ExpGroup const& copy)
 	{
 		id = copy.id;
+		optics_group = copy.optics_group;
 		name = copy.name;
 		return *this;
 	}
@@ -227,6 +234,9 @@ public:
 	// Number of particles in random subsets 1 and 2;
 	long int nr_particles_subset1, nr_particles_subset2;
 
+	// Number of images per optics group
+	std::vector<long int> nr_images_per_optics_group;
+
 	// One large MetaDataTable for all images
     MetaDataTable MDimg;
 
@@ -248,8 +258,8 @@ public:
     // Directory on scratch disk to copy particles to
     FileName fn_scratch;
 
-    // Number of particles saved on the scratchdir
-    long int nr_parts_on_scratch;
+    // Number of particles saved on the scratchdir, one for each optics_group
+    std::vector<long int> nr_parts_on_scratch;
 
     // Number of Gb on scratch disk before copying particles
     long int free_space_Gb;
@@ -278,7 +288,7 @@ public:
 		nr_particles_subset1 = nr_particles_subset2 = 0;
 		nr_bodies = 1;
 		fn_scratch = "";
-		nr_parts_on_scratch = 0;
+		nr_parts_on_scratch.clear();
 		free_space_Gb = 10;
 		is_3D = false;
 		MDimg.clear();
@@ -367,7 +377,7 @@ public:
 	// Also checks how much free space there is on the scratch dir
 	bool prepareScratchDirectory(FileName _fn_scratch, FileName fn_lock = "");
 
-	void setScratchDirectory(FileName _fn_scratch);
+	void setScratchDirectory(FileName _fn_scratch, bool do_reuse_scratch);
 
 	// Wipe the generic scratch directory clean
 	void deleteDataOnScratch();

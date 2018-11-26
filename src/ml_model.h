@@ -122,6 +122,9 @@ public:
 	// Number of elements in the noise spectrum of each group (can be different because of different image sizes in different optics groups)
 	std::vector<int> spectral_sizes;
 
+	// To which optics_group does each group belong
+	std::vector<int> optics_group_per_group;
+
 	// One noise spectrum for each group
 	std::vector<MultidimArray<RFLOAT > > sigma2_noise;
 

@@ -59,7 +59,7 @@ void BackProjector::backproject2Dto3D(const MultidimArray<Complex > &f2d,
 								Matrix2D<RFLOAT>* magMatrix)
 {
 	RFLOAT m00, m10, m01, m11;
-	
+
 	if (magMatrix != 0)
 	{
 		m00 = (*magMatrix)(0,0);
@@ -75,11 +75,11 @@ void BackProjector::backproject2Dto3D(const MultidimArray<Complex > &f2d,
 		m11 = 1.0;
 	}
 
-	// Use the inverse matrix 
+	// Use the inverse matrix
 	// (Don't! Anisotropy handling on the outside would fail  --Jaz)
-	
+
 	Matrix2D<RFLOAT> Ainv;
-	
+
 	if (inv)
 	{
 		Ainv = A;
@@ -91,13 +91,13 @@ void BackProjector::backproject2Dto3D(const MultidimArray<Complex > &f2d,
 
 	// Go from the 2D slice coordinates to the 3D coordinates
 	Ainv *= (RFLOAT)padding_factor;  // take scaling into account directly
-	
+
 	// max_r2 and min_r2_nn are defined in 3D-space
 	int max_r2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
 	int min_r2_nn = ROUND(r_min_nn * padding_factor) * ROUND(r_min_nn * padding_factor);
-	
+
 	// precalculated coefficients for ellipse determination (see further down)
-	
+
 	// first, make sure A contains 2D distortion (lowercase 2D, uppercase 3D):
 	const RFLOAT Am_Xx = Ainv(0,0) * m00 + Ainv(0,1) * m10;
 	const RFLOAT Am_Xy = Ainv(0,0) * m01 + Ainv(0,1) * m11;
@@ -105,7 +105,7 @@ void BackProjector::backproject2Dto3D(const MultidimArray<Complex > &f2d,
 	const RFLOAT Am_Yy = Ainv(1,0) * m01 + Ainv(1,1) * m11;
 	const RFLOAT Am_Zx = Ainv(2,0) * m00 + Ainv(2,1) * m10;
 	const RFLOAT Am_Zy = Ainv(2,0) * m01 + Ainv(2,1) * m11;
-	
+
 	// next, precompute (Am)^t Am into AtA:
 	const RFLOAT AtA_xx = Am_Xx * Am_Xx + Am_Yx * Am_Yx + Am_Zx * Am_Zx;
 	const RFLOAT AtA_xy = Am_Xx * Am_Xy + Am_Yx * Am_Yy + Am_Zx * Am_Zy;
@@ -127,19 +127,19 @@ void BackProjector::backproject2Dto3D(const MultidimArray<Complex > &f2d,
 
 	// precalculate inverse of Ewald sphere diameter
 	RFLOAT inv_diam_ewald = (r_ewald_sphere > 0.0)? 1.0 / (2.0 * r_ewald_sphere) : 0.0;
-	
+
 	if (!is_positive_curvature)
 	{
 		inv_diam_ewald *= -1.0;
 	}
-	
+
 	const int s  = YSIZE(f2d);
 	const int sh = XSIZE(f2d);
 
 	for (int i = 0; i < s; i++)
 	{
 		int y, first_allowed_x;
-		
+
 		if (i < sh)
 		{
 			y = i;
@@ -151,38 +151,38 @@ void BackProjector::backproject2Dto3D(const MultidimArray<Complex > &f2d,
 			// x == 0 plane is stored twice in the FFTW format. Don't set it twice in backprojection!
 			first_allowed_x = 1;
 		}
-		
+
 		// Only iterate over the ellipse in the 2D-image corresponding to the sphere in 3D.
 		// Find the x-range inside that ellipse for every given y:
 		// |A*v|^2 <= R^2    (for v = (x,y)^t)
-		// = v^t A^t A v =: v^t AtA v      
+		// = v^t A^t A v =: v^t AtA v
 		//   <=>
 		// (AtA_xx) x^2 + (2 AtA_xy y) x + (AtA_yy y^2 - R^2) <= 0   (quadratic eq. in x)
-		//   <=> 
-		// x in [q - d, q + d], 
-		// where: q := -AtA_xy y / AtA_xx, 
+		//   <=>
+		// x in [q - d, q + d],
+		// where: q := -AtA_xy y / AtA_xx,
 		//        d := sqrt((AtA_xy y)^2 - AtA_xx (AtA_yy y^2 - R^2)) / AtA_xx
-		
+
 		RFLOAT discr = AtA_xy2 * y*y - AtA_xx * (AtA_yy * y*y - max_r2);
-		
+
 		if (discr < 0.0) continue; // no points inside ellipse for this y
-		
+
 		RFLOAT d = sqrt(discr) / AtA_xx;
 		RFLOAT q = - AtA_xy * y / AtA_xx;
-		
+
 		int first_x = CEIL(q - d);
 		int last_x = FLOOR(q + d);
-		
+
 		if (first_x < first_allowed_x) first_x = first_allowed_x;
 		if (last_x > sh - 1) last_x = sh - 1;
-		
+
 		for (int x = first_x; x <= last_x; x++)
 		{
 			// Get the value from the input image
 			Complex my_val = DIRECT_A2D_ELEM(f2d, i, x);
 
 			RFLOAT my_weight;
-			
+
 			// Get the weight
 			if (Mweight != NULL)
 			{
@@ -194,7 +194,7 @@ void BackProjector::backproject2Dto3D(const MultidimArray<Complex > &f2d,
 			}
 
 			if (my_weight <= 0.) continue;
-		
+
 			/*
 			In our implementation, (x, y) are not scaled because:
 
@@ -209,35 +209,35 @@ void BackProjector::backproject2Dto3D(const MultidimArray<Complex > &f2d,
 			           ~ r - r * (1 - (x * x + y * y) / (2 * r * r) + O(1/r^4)) # binomial expansion
 			           = (x * x + y * y) / (2 * r) + O(1/r^3)
 
-			The error is < 0.0005 reciprocal voxel even for extreme cases 
+			The error is < 0.0005 reciprocal voxel even for extreme cases
 			like 200kV, 1500 A particle, 1 A / pix.
 			*/
-			
+
 			// Get logical coordinates in the 3D map.
 			// Make sure that the Ewald sphere is spherical even under anisotropic mag
 			// by first undistorting (x,y) to obtain the true frequencies (xu,yu)
-			
+
 			RFLOAT xu = m00 * x + m01 * y;
 			RFLOAT yu = m10 * x + m11 * y;
-			
+
 			RFLOAT z_on_ewaldp = inv_diam_ewald * (xu * xu + yu * yu);
-			
+
 			RFLOAT xp = Ainv(0,0) * xu + Ainv(0,1) * yu + Ainv(0,2) * z_on_ewaldp;
 			RFLOAT yp = Ainv(1,0) * xu + Ainv(1,1) * yu + Ainv(1,2) * z_on_ewaldp;
 			RFLOAT zp = Ainv(2,0) * xu + Ainv(2,1) * yu + Ainv(2,2) * z_on_ewaldp;
-			
+
 			double r2_3D = xp*xp + yp*yp + zp*zp;
-			
+
 			// redundant:
 			if (r2_3D > max_r2)
 			{
 				continue;
 			}
-			
+
 			if (interpolator == TRILINEAR || r2_3D < min_r2_nn)
 			{
 				bool is_neg_x;
-				
+
 				// Only asymmetric half is stored
 				if (xp < 0)
 				{
@@ -268,7 +268,7 @@ void BackProjector::backproject2Dto3D(const MultidimArray<Complex > &f2d,
 				RFLOAT fz = zp - z0;
 				z0 -= STARTINGZ(data);
 				int z1 = z0 + 1;
-				
+
 				if (x0 < 0 || x0+1 >= data.xdim
 				 || y0 < 0 || y0+1 >= data.ydim
 				 || z0 < 0 || z0+1 >= data.zdim)
@@ -319,9 +319,9 @@ void BackProjector::backproject2Dto3D(const MultidimArray<Complex > &f2d,
 				int x0 = ROUND(xp);
 				int y0 = ROUND(yp);
 				int z0 = ROUND(zp);
-				
+
 				bool is_neg_x;
-				
+
 				if (x0 < 0)
 				{
 					// Get complex conjugated hermitian symmetry pair
@@ -334,18 +334,18 @@ void BackProjector::backproject2Dto3D(const MultidimArray<Complex > &f2d,
 				{
 					is_neg_x = false;
 				}
-				
+
 				const int xr = x0 - STARTINGX(data);
 				const int yr = y0 - STARTINGY(data);
 				const int zr = z0 - STARTINGZ(data);
-				
+
 				if (xr < 0 || xr >= data.xdim
 				 || yr < 0 || yr >= data.ydim
 				 || zr < 0 || zr >= data.zdim)
 				{
 					continue;
 				}
-				
+
 				if (is_neg_x)
 				{
 					DIRECT_A3D_ELEM(data, zr, yr, xr) += conj(my_val);
@@ -483,7 +483,8 @@ void BackProjector::backproject1Dto2D(const MultidimArray<Complex > &f1d,
 
 void BackProjector::backrotate2D(const MultidimArray<Complex > &f2d,
 		                         const Matrix2D<RFLOAT> &A, bool inv,
-		                         const MultidimArray<RFLOAT> *Mweight)
+		                         const MultidimArray<RFLOAT> *Mweight,
+								 Matrix2D<RFLOAT>* magMatrix)
 {
 	RFLOAT fx, fy, mfx, mfy, xp, yp;
 	int first_x, x0, x1, y0, y1, y, y2, r2;
@@ -492,6 +493,23 @@ void BackProjector::backrotate2D(const MultidimArray<Complex > &f2d,
 	Complex my_val;
 	Matrix2D<RFLOAT> Ainv;
 	RFLOAT my_weight = 1.;
+
+	RFLOAT m00, m10, m01, m11;
+
+	if (magMatrix != 0)
+	{
+		m00 = (*magMatrix)(0,0);
+		m10 = (*magMatrix)(1,0);
+		m01 = (*magMatrix)(0,1);
+		m11 = (*magMatrix)(1,1);
+	}
+	else
+	{
+		m00 = 1.0;
+		m10 = 0.0;
+		m01 = 0.0;
+		m11 = 1.0;
+	}
 
 	// f2d should already be in the right size (ori_size,orihalfdim)
     // AND the points outside max_r should already be zero...
@@ -504,8 +522,23 @@ void BackProjector::backrotate2D(const MultidimArray<Complex > &f2d,
 
     // Go from the 2D slice coordinates to the data-array coordinates
     Ainv *= (RFLOAT)padding_factor;  // take scaling into account directly
-    int max_r2 = r_max * r_max;
+    // SHWS: 12nov18..... ????? int max_r2 = r_max * r_max;
+    int max_r2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
     int min_r2_nn = r_min_nn * r_min_nn;
+
+	// precalculated coefficients for ellipse determination (see further down)
+
+	// first, make sure A contains 2D distortion (lowercase 2D, uppercase 3D):
+	const RFLOAT Am_Xx = Ainv(0,0) * m00 + Ainv(0,1) * m10;
+	const RFLOAT Am_Xy = Ainv(0,0) * m01 + Ainv(0,1) * m11;
+	const RFLOAT Am_Yx = Ainv(1,0) * m00 + Ainv(1,1) * m10;
+	const RFLOAT Am_Yy = Ainv(1,0) * m01 + Ainv(1,1) * m11;
+
+	// next, precompute (Am)^t Am into AtA:
+	const RFLOAT AtA_xx = Am_Xx * Am_Xx + Am_Yx * Am_Yx;
+	const RFLOAT AtA_xy = Am_Xx * Am_Xy + Am_Yx * Am_Yy;
+	const RFLOAT AtA_yy = Am_Xy * Am_Xy + Am_Yy * Am_Yy;
+	const RFLOAT AtA_xy2 = AtA_xy * AtA_xy;
 
 //#define DEBUG_BACKROTATE
 #ifdef DEBUG_BACKROTATE
@@ -520,30 +553,59 @@ void BackProjector::backrotate2D(const MultidimArray<Complex > &f2d,
     std::cerr << " Ainv= " << Ainv << std::endl;
 #endif
 
-    for (int i=0; i < YSIZE(f2d); i++)
+
+	const int s  = YSIZE(f2d);
+	const int sh = XSIZE(f2d);
+
+	for (int i = 0; i < s; i++)
 	{
-		// Don't search beyond square with side max_r
-		if (i <= r_max)
+		int y, first_allowed_x;
+
+		if (i < sh)
 		{
 			y = i;
-			first_x = 0;
-		}
-		else if (i >= YSIZE(f2d) - r_max)
-		{
-			y = i - YSIZE(f2d);
-			// x==0 plane is stored twice in the FFTW format. Dont set it twice in BACKPROJECTION!
-			first_x = 1;
+			first_allowed_x = 0;
 		}
 		else
-			continue;
-
-		y2 = y * y;
-		for (int x=first_x; x <= r_max; x++)
 		{
+			y = i - s;
+			// x == 0 plane is stored twice in the FFTW format. Don't set it twice in backprojection!
+			first_allowed_x = 1;
+		}
+
+		// Only iterate over the ellipse in the 2D-image corresponding to the sphere in 3D.
+		// Find the x-range inside that ellipse for every given y:
+		// |A*v|^2 <= R^2    (for v = (x,y)^t)
+		// = v^t A^t A v =: v^t AtA v
+		//   <=>
+		// (AtA_xx) x^2 + (2 AtA_xy y) x + (AtA_yy y^2 - R^2) <= 0   (quadratic eq. in x)
+		//   <=>
+		// x in [q - d, q + d],
+		// where: q := -AtA_xy y / AtA_xx,
+		//        d := sqrt((AtA_xy y)^2 - AtA_xx (AtA_yy y^2 - R^2)) / AtA_xx
+
+		RFLOAT discr = AtA_xy2 * y*y - AtA_xx * (AtA_yy * y*y - max_r2);
+
+		if (discr < 0.0) continue; // no points inside ellipse for this y
+
+		RFLOAT d = sqrt(discr) / AtA_xx;
+		RFLOAT q = - AtA_xy * y / AtA_xx;
+
+		int first_x = CEIL(q - d);
+		int last_x = FLOOR(q + d);
+
+		if (first_x < first_allowed_x) first_x = first_allowed_x;
+		if (last_x > sh - 1) last_x = sh - 1;
+
+		for (int x = first_x; x <= last_x; x++)
+		{
+
 	    	// Only include points with radius < max_r (exclude points outside circle in square)
 			r2 = x * x + y2;
-			if (r2 > max_r2)
-				continue;
+
+			// Redundant: (?)
+			//if (r2 > max_r2)
+			//	continue;
 
 			// Get the relevant value in the input image
 			my_val = DIRECT_A2D_ELEM(f2d, i, x);
@@ -556,8 +618,11 @@ void BackProjector::backrotate2D(const MultidimArray<Complex > &f2d,
 			if (my_weight > 0.)
 			{
 				// Get logical coordinates in the 3D map
-				xp = Ainv(0,0) * x + Ainv(0,1) * y;
-				yp = Ainv(1,0) * x + Ainv(1,1) * y;
+				RFLOAT xu = m00 * x + m01 * y;
+				RFLOAT yu = m10 * x + m11 * y;
+
+				RFLOAT xp = Ainv(0,0) * xu + Ainv(0,1) * yu;
+				RFLOAT yp = Ainv(1,0) * xu + Ainv(1,1) * yu;
 
 				if (interpolator == TRILINEAR || r2 < min_r2_nn)
 				{
@@ -1541,14 +1606,14 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
         transformer.FourierTransform();
 		RCTOC(ReconTimer,ReconS_21);
 		RCTIC(ReconTimer,ReconS_22);
-		
+
 	    FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fconv)
 	    {
 	    	long int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
 	    	spectrum(idx) += norm(dAkij(Fconv, k, i, j));
 	        count(idx) += 1.;
 	    }
-		
+
 	    spectrum /= count;
 
 		// Factor two because of two-dimensionality of the complex plane
@@ -1584,16 +1649,16 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
     sigma2_out = sigma2;
     data_vs_prior_out = data_vs_prior;
     fourier_coverage_out = fourier_coverage;
-	
+
 	if (weight_out != 0)
 	{
 		weight_out->data = MultidimArray<RFLOAT>(1, ori_size, ori_size, ori_size/2+1);
-		
+
 		Image<RFLOAT> count(ori_size/2+1, ori_size, ori_size);
 		count.data.initZeros();
-		
+
 		// downsample while considering padding:
-		
+
 		for (long int z = 0; z < Fweight.zdim; z++)
 		for (long int y = 0; y < Fweight.ydim; y++)
 		for (long int x = 0; x < Fweight.xdim; x++)
@@ -1601,35 +1666,35 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 			int xl = x;
 			int yl = y < Fweight.ydim/2? y : y - Fweight.ydim;
 			int zl = z < Fweight.zdim/2? z : z - Fweight.zdim;
-			
+
 			if (xl == Fweight.xdim - 1
 			 || yl == Fweight.ydim/2 || yl == -Fweight.ydim/2 - 1
 			 || zl == Fweight.zdim/2 || zl == -Fweight.zdim/2 - 1)
 			{
 				continue;
 			}
-			
+
 			int xx = ROUND(xl / padding_factor);
 			int yy = (ROUND(yl / padding_factor) + ori_size) % ori_size;
 			int zz = (ROUND(zl / padding_factor) + ori_size) % ori_size;
-			
+
 			if (xx >= 0 && xx < ori_size/2+1
 			 && yy >= 0 && yy < ori_size
 			 && zz >= 0 && zz < ori_size)
 			{
 				DIRECT_A3D_ELEM(weight_out->data, zz, yy, xx) += DIRECT_A3D_ELEM(Fweight, z, y, x);
 				DIRECT_A3D_ELEM(count.data, zz, yy, xx) += 1.0;
-			}		 
+			}
 		}
-		
+
 		const double pad3 = padding_factor * padding_factor * padding_factor;
-		
+
 		for (long int z = 0; z < ori_size; z++)
 		for (long int y = 0; y < ori_size; y++)
 		for (long int x = 0; x < ori_size/2 + 1; x++)
 		{
 			const RFLOAT c = DIRECT_A3D_ELEM(count.data, z, y, x);
-			
+
 			if (c > 0.0)
 			{
 				DIRECT_A3D_ELEM(weight_out->data, z, y, x) *= pad3/c;
@@ -1858,8 +1923,8 @@ void BackProjector::applyPointGroupSymmetry(int threads)
 	        std::cerr << " isym= " << isym << " R= " << R << std::endl;
 #endif
 	        // Loop over all points in the output (i.e. rotated, or summed) array
-			
-			#pragma omp parallel for num_threads(threads) 
+
+			#pragma omp parallel for num_threads(threads)
 			for (long int k=STARTINGZ(sum_weight); k<=FINISHINGZ(sum_weight); k++)
 			for (long int i=STARTINGY(sum_weight); i<=FINISHINGY(sum_weight); i++)
 			for (long int j=STARTINGX(sum_weight); j<=FINISHINGX(sum_weight); j++)
@@ -1868,16 +1933,16 @@ void BackProjector::applyPointGroupSymmetry(int threads)
 	        	RFLOAT y = (RFLOAT)i;
 	        	RFLOAT z = (RFLOAT)k;
 	        	RFLOAT r2 = x*x + y*y + z*z;
-				
+
 	        	if (r2 <= rmax2)
 	        	{
 	        		// coords_output(x,y) = A * coords_input (xp,yp)
 					RFLOAT xp = x * R(0, 0) + y * R(0, 1) + z * R(0, 2);
 					RFLOAT yp = x * R(1, 0) + y * R(1, 1) + z * R(1, 2);
 					RFLOAT zp = x * R(2, 0) + y * R(2, 1) + z * R(2, 2);
-					
+
 					bool is_neg_x;
-					
+
 					// Only asymmetric half is stored
 					if (xp < 0)
 					{
@@ -1935,7 +2000,7 @@ void BackProjector::applyPointGroupSymmetry(int threads)
 					Complex dx01 = LIN_INTERP(fx, d100, d101);
 					Complex dx10 = LIN_INTERP(fx, d010, d011);
 					Complex dx11 = LIN_INTERP(fx, d110, d111);
-					
+
 					Complex dxy0 = LIN_INTERP(fy, dx00, dx10);
 					Complex dxy1 = LIN_INTERP(fy, dx01, dx11);
 
@@ -1963,7 +2028,7 @@ void BackProjector::applyPointGroupSymmetry(int threads)
 					RFLOAT ddx01 = LIN_INTERP(fx, dd100, dd101);
 					RFLOAT ddx10 = LIN_INTERP(fx, dd010, dd011);
 					RFLOAT ddx11 = LIN_INTERP(fx, dd110, dd111);
-					
+
 					RFLOAT ddxy0 = LIN_INTERP(fy, ddx00, ddx10);
 					RFLOAT ddxy1 = LIN_INTERP(fy, ddx01, ddx11);
 

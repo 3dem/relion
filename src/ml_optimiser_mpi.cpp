@@ -425,8 +425,9 @@ void MlOptimiserMpi::initialise()
 
 				Experiment temp;
 				temp.read(fn_data);
-				int t_ori_size = -1;
-				temp.MDopt.getValue(EMDL_IMAGE_SIZE, t_ori_size, 0);
+
+				int t_ori_size = temp.getOpticsImageSize(0);
+				//temp.MDopt.getValue(EMDL_IMAGE_SIZE, t_ori_size, 0);
 
 				if(LowBoxLim < t_ori_size)
 				{
@@ -506,10 +507,11 @@ will still yield good performance and possibly a more stable execution. \n" << s
 	}
 	else if (do_calculate_initial_sigma_noise || do_average_unaligned)
 	{
-		MultidimArray<RFLOAT> Mavg;
+		std::vector<MultidimArray<RFLOAT> > Mavg;
 		// Calculate initial sigma noise model from power_class spectra of the individual images
 		// This is done in parallel
 		//std::cout << " Hello world1! I am node " << node->rank << " out of " << node->size <<" and my hostname= "<< getenv("HOSTNAME")<< std::endl;
+
 		calculateSumOfPowerSpectraAndAverageImage(Mavg);
 
 		// Set sigma2_noise and Iref from averaged poser spectra and Mavg
@@ -634,7 +636,7 @@ void MlOptimiserMpi::initialiseWorkLoad()
 	// Now copy particle stacks to scratch if needed
     if (fn_scratch != "" && !do_preread_images)
     {
-		mydata.setScratchDirectory(fn_scratch);
+		mydata.setScratchDirectory(fn_scratch, do_reuse_scratch);
 
 		if (!do_reuse_scratch)
 		{
@@ -649,6 +651,10 @@ void MlOptimiserMpi::initialiseWorkLoad()
 				bool need_to_copy = false;
 				for (int inode = 0; inode < node->size; inode++)
 				{
+					if (inode == 0)
+					{
+						need_to_copy = false;
+					}
 					if (inode > 0 && inode == node->rank)
 					{
 						// The master removes the lock if it existed
@@ -658,10 +664,7 @@ void MlOptimiserMpi::initialiseWorkLoad()
 				}
 
 				int myverb = (node->rank == 1) ? ori_verb : 0; // Only the first slave
-				if (!node->isMaster())
-				{
-					mydata.copyParticlesToScratch(myverb, need_to_copy, also_do_ctfimage, keep_free_scratch_Gb);
-				}
+				mydata.copyParticlesToScratch(myverb, need_to_copy, also_do_ctfimage, keep_free_scratch_Gb);
 			}
 			else
 			{
@@ -670,6 +673,10 @@ void MlOptimiserMpi::initialiseWorkLoad()
 				{
 					mydata.prepareScratchDirectory(fn_scratch);
 					mydata.copyParticlesToScratch(1, true, also_do_ctfimage, keep_free_scratch_Gb);
+				}
+				else
+				{
+					mydata.copyParticlesToScratch(0, false, also_do_ctfimage, keep_free_scratch_Gb);
 				}
 			}
 		}
@@ -700,7 +707,7 @@ void MlOptimiserMpi::initialiseWorkLoad()
 #endif
 }
 
-void MlOptimiserMpi::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT> &Mavg)
+void MlOptimiserMpi::calculateSumOfPowerSpectraAndAverageImage(std::vector<MultidimArray<RFLOAT> > &Mavg)
 {
 
 	// First calculate the sum of all individual power spectra on each subset
@@ -715,13 +722,18 @@ void MlOptimiserMpi::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFL
 
 	// After introducing SGD code in Dec 2016: no longer calculate Mavg for the 2 halves separately...
 	// Just calculate Mavg from AllReduce, and divide by 2 * the accumulated wsum_group
-	MultidimArray<RFLOAT> Msum;
-	Msum.initZeros(Mavg);
-	MPI_Allreduce(MULTIDIM_ARRAY(Mavg), MULTIDIM_ARRAY(Msum), MULTIDIM_SIZE(Msum), MY_MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-	Mavg = Msum;
-	// When doing random halves, the wsum_model.sumw_group[igroup], which will be used to divide Mavg by is only calculated over half the particles!
-	if (do_split_random_halves)
-		Mavg /= 2.;
+	for (int optics_group = 0; optics_group < mydata.obsModel.numberOfOpticsGroups(); optics_group++)
+	{
+		MultidimArray<RFLOAT> Msum;
+		Msum.initZeros(Mavg[optics_group]);
+		MPI_Allreduce(MULTIDIM_ARRAY(Mavg[optics_group]), MULTIDIM_ARRAY(Msum), MULTIDIM_SIZE(Msum), MY_MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+		Mavg[optics_group] = Msum;
+		// When doing random halves, the wsum_model.sumw_group[igroup], which will be used to divide Mavg by is only calculated over half the particles!
+		if (do_split_random_halves)
+		{
+			Mavg[optics_group] /= 2.;
+		}
+	}
 
 }
 
@@ -1697,7 +1709,6 @@ void MlOptimiserMpi::combineAllWeightedSums()
 	// And then sends results back to all those slaves
 	// When splitting the data into two random halves, perform two passes: one for each subset
 	int nr_halfsets = (do_split_random_halves) ? 2 : 1;
-
 #ifdef DEBUG
 	std::cerr << " starting combineAllWeightedSums..." << std::endl;
 #endif
@@ -2963,7 +2974,14 @@ void MlOptimiserMpi::iterate()
 		updateSubsetSize(node->isMaster());
 
 		// Randomly take different subset of the particles each time we do a new "iteration" in SGD
-		mydata.randomiseParticlesOrder(random_seed+iter, do_split_random_halves,  subset_size < mydata.numberOfParticles() );
+		if (random_seed > 0)
+		{
+			mydata.randomiseParticlesOrder(random_seed+iter, do_split_random_halves,  subset_size < mydata.numberOfParticles() );
+		}
+		else if (verb > 0)
+		{
+			std::cerr << " WARNING: skipping randomisation of particle order because random_seed equals zero..." << std::endl;
+		}
 
 		// Nobody can start the next iteration until everyone has finished
 		MPI_Barrier(MPI_COMM_WORLD);

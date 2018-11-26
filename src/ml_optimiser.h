@@ -775,13 +775,13 @@ public:
 	/* Calculates the sum of all individual power spectra and the average of all images for initial sigma_noise estimation
 	 * The rank is passed so that if one splits the data into random halves one can know which random half to treat
 	 */
-	void calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT> &Mavg, bool myverb = true);
+	void calculateSumOfPowerSpectraAndAverageImage(std::vector<MultidimArray<RFLOAT> > &Mavg, bool myverb = true);
 
 	/** Use the sum of the individual power spectra to calculate their average and set this in sigma2_noise
 	 * Also subtract the power spectrum of the average images,
 	 * and if (do_average_unaligned) then also set Mavg to all Iref
 	 */
-	void setSigmaNoiseEstimatesAndSetAverageImage(MultidimArray<RFLOAT> &Mavg);
+	void setSigmaNoiseEstimatesAndSetAverageImage(std::vector<MultidimArray<RFLOAT> > &Mavg);
 
 	/* Perform an initial low-pass filtering of the references
 	 * Note that because of the MAP estimation, this is not necessary inside the refinement

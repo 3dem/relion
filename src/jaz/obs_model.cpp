@@ -58,11 +58,12 @@ void ObservationModel::loadSafely(
 	obsModel = ObservationModel(opticsMdt);
 
 	// read pixel sizes (and make sure they are all the same)
-
+	/*
 	if (!obsModel.allPixelSizesIdentical())
 	{
 		REPORT_ERROR("ERROR: different pixel sizes detected. Please split your dataset by pixel size.");
 	}
+	*/
 
 	// make sure all optics groups are defined
 
@@ -155,9 +156,9 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 			      || opticsMdt.containsLabel(EMDL_IMAGE_MAG_MATRIX_11);
 
 	if (hasMagMatrices) magMatrices.resize(opticsMdt.numberOfObjects());
-	
+
 	hasBoxSizes = opticsMdt.containsLabel(EMDL_IMAGE_SIZE);
-	
+
 	for (int i = 0; i < opticsMdt.numberOfObjects(); i++)
 	{
 		opticsMdt.getValue(EMDL_IMAGE_PIXEL_SIZE, angpix[i], i);
@@ -207,7 +208,7 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 			opticsMdt.getValue(EMDL_IMAGE_MAG_MATRIX_11, magMatrices[i](1,1), i);
 		}
 	}
-	
+
 	if (hasTilt) hasOddZernike = true;
 }
 
@@ -221,13 +222,13 @@ void ObservationModel::predictObservation(
 	int opticsGroup;
 	partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, particle);
 	opticsGroup--;
-	
+
 	if (!hasBoxSizes)
 	{
 		REPORT_ERROR_STR("ObservationModel::predictObservation: Unable to make a prediction "
 						 << "without knowing the box size.\n");
 	}
-	
+
 	const int s_out = boxSizes[opticsGroup];
 	const int sh_out = s_out/2 + 1;
 
@@ -245,9 +246,9 @@ void ObservationModel::predictObservation(
 	partMdt.getValue(EMDL_ORIENT_ROT, rot, particle);
 	partMdt.getValue(EMDL_ORIENT_TILT, tilt, particle);
 	partMdt.getValue(EMDL_ORIENT_PSI, psi, particle);
-	
+
 	Euler_angles2matrix(rot, tilt, psi, A3D);
-	
+
 	A3D = applyAnisoMagTransp(A3D, opticsGroup);
 	A3D = applyScaleDifference(A3D, opticsGroup, s_ref, angpix_ref);
 
@@ -302,18 +303,18 @@ Volume<t2Vector<Complex>> ObservationModel::predictComplexGradient(
 		REPORT_ERROR_STR("ObservationModel::predictComplexGradient: "
 						 << "applyCtf and applyShift are currently not supported\n");
 	}
-	
+
 	const int s_ref = proj.ori_size;
-	
+
 	int opticsGroup;
 	partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, particle);
 	opticsGroup--;
-	
+
 	const int s_out = boxSizes[opticsGroup];
 	const int sh_out = s_out/2 + 1;
-	
+
 	Volume<t2Vector<Complex>> out(sh_out,s_out,1);
-	
+
 	double xoff, yoff;
 
 	partMdt.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff, particle);
@@ -323,19 +324,19 @@ Volume<t2Vector<Complex>> ObservationModel::predictComplexGradient(
 	yoff /= angpix[opticsGroup];
 
 	double rot, tilt, psi;
-	
+
 	Matrix2D<RFLOAT> A3D;
 	partMdt.getValue(EMDL_ORIENT_ROT, rot, particle);
 	partMdt.getValue(EMDL_ORIENT_TILT, tilt, particle);
 	partMdt.getValue(EMDL_ORIENT_PSI, psi, particle);
-	
+
 	Euler_angles2matrix(rot, tilt, psi, A3D);
 
 	A3D = applyAnisoMagTransp(A3D, opticsGroup);
 	A3D = applyScaleDifference(A3D, opticsGroup, s_ref, angpix_ref);
 
 	proj.projectGradient(out, A3D);
-	
+
 	if (shiftPhases && oddZernikeCoeffs.size() > opticsGroup
 			&& oddZernikeCoeffs[opticsGroup].size() > 0)
 	{
@@ -443,7 +444,7 @@ int ObservationModel::getBoxSize(int opticsGroup) const
 	{
 		REPORT_ERROR("ObservationModel::getBoxSize: box sizes not available\n");
 	}
-	
+
 	return boxSizes[opticsGroup];
 }
 
@@ -453,10 +454,10 @@ void ObservationModel::getBoxSizes(std::vector<int>& sDest, std::vector<int>& sh
 	{
 		REPORT_ERROR("ObservationModel::getBoxSizes: box sizes not available\n");
 	}
-	
+
 	sDest.resize(boxSizes.size());
 	shDest.resize(boxSizes.size());
-	
+
 	for (int i = 0; i < boxSizes.size(); i++)
 	{
 		sDest[i] = boxSizes[i];
@@ -474,12 +475,29 @@ std::vector<Matrix2D<double> > ObservationModel::getMagMatrices() const
 	return magMatrices;
 }
 
-int ObservationModel::getOpticsGroup(const MetaDataTable &particlesMdt, int particle) const
+int ObservationModel::getOpticsGroup(const MetaDataTable &particlesMdt, long int particle) const
 {
-	int opticsGroup;
-	particlesMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, particle);
-	opticsGroup--;
-	
+	int opticsGroup, opticsGroupNumber;
+	particlesMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroupNumber, particle);
+
+	bool found = false;
+	for (int i = 0; i < opticsMdt.numberOfObjects(); i++)
+	{
+		int og;
+		opticsMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, og, i);
+		if (og == opticsGroupNumber)
+		{
+			found = true;
+			opticsGroup = i;
+			break;
+		}
+	}
+
+	if (!found)
+	{
+		REPORT_ERROR("ERROR: could not find optics group for particle.");
+	}
+
 	return opticsGroup;
 }
 
@@ -617,38 +635,38 @@ std::vector<std::pair<int, std::vector<int>>> ObservationModel::splitParticlesBy
 		const MetaDataTable &partMdt) const
 {
 	std::vector<int> presentGroups = ObservationModel::getOptGroupsPresent_zeroBased(partMdt);
-	
+
 	const int pogc = presentGroups.size();
 	const int ogc = opticsMdt.numberOfObjects();
-	
+
 	std::vector<int> groupToPresentGroup(ogc, -1);
-	
+
 	for (int pog = 0; pog < pogc; pog++)
 	{
 		const int og = presentGroups[pog];
 		groupToPresentGroup[og] = pog;
 	}
-	
+
 	std::vector<std::pair<int, std::vector<int>>> out(pogc);
-	
+
 	for (int pog = 0; pog < pogc; pog++)
 	{
 		out[pog] = std::make_pair(presentGroups[pog], std::vector<int>(0));
 	}
-	
+
 	const int pc = partMdt.numberOfObjects();
-	
+
 	for (int p = 0; p < pc; p++)
 	{
 		int og;
 		partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, og, p);
 		og--;
-		
+
 		int pog = groupToPresentGroup[og];
-		
+
 		out[pog].second.push_back(p);
 	}
-	
+
 	return out;
 }
 
@@ -750,28 +768,28 @@ Matrix2D<RFLOAT> ObservationModel::applyAnisoMagTransp(
 	{
 		out = A3D_transp;
 	}
-	
+
 	return out;
 }
 
 Matrix2D<RFLOAT> ObservationModel::getMag3x3(int opticsGroup)
 {
 	Matrix2D<RFLOAT> out(3,3);
-	
+
 	for (int r = 0; r < 2; r++)
 	for (int c = 0; c < 2; c++)
 	{
 		out(r,c) = magMatrices[opticsGroup](r,c);
 	}
-	
+
 	for (int i = 0; i < 2; i++)
 	{
 		out(i,0) = 0.0;
 		out(0,i) = 0.0;
 	}
-	
+
 	out(2,2) = 1.0;
-	
+
 	return out;
 }
 
@@ -779,9 +797,9 @@ Matrix2D<RFLOAT> ObservationModel::applyScaleDifference(
 		Matrix2D<RFLOAT> A3D_transp, int opticsGroup, int s3D, double angpix3D)
 {
 	Matrix2D<RFLOAT> out = A3D_transp;
-	
+
 	out *= (s3D * angpix3D) / (boxSizes[opticsGroup] * angpix[opticsGroup]);
-	
+
 	return out;
 }
 

@@ -203,7 +203,7 @@ public:
 			switch (ref_dim)
 			{
 			case 2:
-				backrotate2D(img_in, A, inv, Mweight);
+				backrotate2D(img_in, A, inv, Mweight, magMatrix);
 				break;
 			case 3:
 				backproject2Dto3D(img_in, A, inv, Mweight, r_ewald_sphere, is_positive_curvature, magMatrix);
@@ -220,7 +220,8 @@ public:
 	*/
 	void backrotate2D(const MultidimArray<Complex > &img_in,
 			          const Matrix2D<RFLOAT> &A, bool inv,
-			          const MultidimArray<RFLOAT> *Mweight = NULL);
+			          const MultidimArray<RFLOAT> *Mweight = NULL,
+					  Matrix2D<RFLOAT>* magMatrix = 0);
 
 	/*
 	* Set a 3D-rotated version of the 3D map into the data array (mere interpolation)
@@ -345,7 +346,7 @@ public:
 			   DIRECT_A3D_ELEM(Mout, k, i, j) = A3D_ELEM(Min, kp, ip, jp);
 	   }
    }
-   
+
 	/*
 	 * The same, but without the spherical cropping and thus invertible
 	 */
@@ -356,11 +357,11 @@ public:
 	   {
 		   Mout = MultidimArray<T2>(Min.zdim, Min.ydim, Min.xdim);
 	   }
-	   
+
 	   Mout.initZeros();
-		   
+
 	   const int s = Min.ydim;
-	   
+
 	   for (long int z = 0; z < Min.zdim; z++)
 	   for (long int y = 0; y < Min.ydim; y++)
 	   for (long int x = 0; x < Min.xdim; x++)
@@ -368,7 +369,7 @@ public:
 		   long int zz = z < Min.xdim? z + s/2 : z - s/2 - 1;
 		   long int yy = y < Min.xdim? y + s/2 : y - s/2 - 1;
 		   long int xx = x;
-		   
+
 		   if (   xx >= 0 && xx < Min.xdim
 			   && yy >= 0 && yy < Min.ydim
 			   && zz >= 0 && zz < Min.zdim)
@@ -377,7 +378,7 @@ public:
 		   }
 	   }
    }
-   
+
    /*
 	* Inverse of the above
 	*/
@@ -388,11 +389,11 @@ public:
 	   {
 		   Mout = MultidimArray<T2>(Min.zdim, Min.ydim, Min.xdim);
 	   }
-	   
+
 	   Mout.initZeros();
-		   
+
 	   const int s = Min.ydim;
-	   
+
 	   for (long int z = 0; z < Min.zdim; z++)
 	   for (long int y = 0; y < Min.ydim; y++)
 	   for (long int x = 0; x < Min.xdim; x++)
@@ -400,7 +401,7 @@ public:
 		   long int zz = z < Min.xdim? z + s/2 : z - s/2 - 1;
 		   long int yy = y < Min.xdim? y + s/2 : y - s/2 - 1;
 		   long int xx = x;
-		   
+
 		   if (   xx >= 0 && xx < Min.xdim
 			   && yy >= 0 && yy < Min.ydim
 			   && zz >= 0 && zz < Min.zdim)
