@@ -16,7 +16,7 @@ public:
 		imgX, imgY, imgZ,
 		mdlInitY, mdlInitZ,
 		padding_factor,
-		maxR, maxR2;
+		maxR, maxR2, maxR2_padded;
 
 	PROJECTOR_PTR_TYPE mdlReal;
 	PROJECTOR_PTR_TYPE mdlImag;
@@ -42,7 +42,7 @@ public:
 			imgX(imgX), imgY(imgY), imgZ(imgZ),
 			mdlInitY(mdlInitY), mdlInitZ(mdlInitZ),
 			padding_factor(padding_factor),
-			maxR(maxR), maxR2(maxR*maxR),
+			maxR(maxR), maxR2(maxR*maxR), maxR2_padded(maxR*maxR*padding_factor*padding_factor),
 			mdlComplex(mdlComplex)
 		{};
 
@@ -58,7 +58,7 @@ public:
 				imgX(imgX), imgY(imgY), imgZ(imgZ),
 				mdlInitY(mdlInitY), mdlInitZ(mdlInitZ),
 				padding_factor(padding_factor),
-				maxR(maxR), maxR2(maxR*maxR),
+				maxR(maxR), maxR2(maxR*maxR), maxR2_padded(maxR*maxR*padding_factor*padding_factor),
 				mdlReal(mdlReal), mdlImag(mdlImag)
 			{
 #ifndef CUDA		
@@ -93,14 +93,16 @@ public:
 		
         real=(XFLOAT)0;
 		imag=(XFLOAT)0;
-
-		r2 = x*x + y*y + z*z;
-		if (r2 <= maxR2)
+		
+		XFLOAT xp = (e0 * x + e1 * y + e2 * z) * padding_factor;
+		XFLOAT yp = (e3 * x + e4 * y + e5 * z) * padding_factor;
+		XFLOAT zp = (e6 * x + e7 * y + e8 * z) * padding_factor;
+		
+		r2 = xp*xp + yp*yp + zp*zp;
+		
+		if (r2 <= maxR2_padded)
 		{
-			XFLOAT xp = (e0 * x + e1 * y + e2 * z ) * padding_factor;
-			XFLOAT yp = (e3 * x + e4 * y + e5 * z ) * padding_factor;
-			XFLOAT zp = (e6 * x + e7 * y + e8 * z ) * padding_factor;
-
+			
 #ifdef PROJECTOR_NO_TEXTURES
 			bool invers(xp < 0);
 			if (invers)
@@ -172,13 +174,15 @@ public:
         real=(XFLOAT)0;
 		imag=(XFLOAT)0;
 
-		r2 = x*x + y*y;
-		if (r2 <= maxR2)
-		{
-			XFLOAT xp = (e0 * x + e1 * y ) * padding_factor;
-			XFLOAT yp = (e3 * x + e4 * y ) * padding_factor;
-			XFLOAT zp = (e6 * x + e7 * y ) * padding_factor;
+		XFLOAT xp = (e0 * x + e1 * y ) * padding_factor;
+		XFLOAT yp = (e3 * x + e4 * y ) * padding_factor;
+		XFLOAT zp = (e6 * x + e7 * y ) * padding_factor;
+		
+		r2 = xp*xp + yp*yp + zp*zp;
 
+		if (r2 <= maxR2_padded)
+		{
+			
 #ifdef PROJECTOR_NO_TEXTURES
 			bool invers(xp < 0);
 			if (invers)
@@ -246,11 +250,13 @@ public:
         real=(XFLOAT)0;
 		imag=(XFLOAT)0;
 		
-		r2 = x*x + y*y;
-		if (r2 <= maxR2)
+		XFLOAT xp = (e0 * x + e1 * y ) * padding_factor;
+		XFLOAT yp = (e3 * x + e4 * y ) * padding_factor;
+		
+		r2 = xp*xp + yp*yp;
+		
+		if (r2 <= maxR2_padded)
 		{
-			XFLOAT xp = (e0 * x + e1 * y ) * padding_factor;
-			XFLOAT yp = (e3 * x + e4 * y ) * padding_factor;
 #ifdef PROJECTOR_NO_TEXTURES
 			bool invers(xp < 0);
 			if (invers)

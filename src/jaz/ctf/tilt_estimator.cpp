@@ -31,6 +31,7 @@
 #include <src/jaz/vtk_helper.h>
 #include <src/jaz/image_log.h>
 #include <src/jaz/gravis/t2Vector.h>
+#include <src/jaz/img_proc/color_helper.h>
 
 #include <src/args.h>
 #include <src/ctf.h>
@@ -260,6 +261,8 @@ void TiltEstimator::parametricFit(
 		FftwHelper::decenterUnflip2D(phase.data, phaseFull.data);
 			
 		ImageLog::write(phaseFull, outPath + "beamtilt_delta-phase_per-pixel_optics-group_"+ogstr);
+		ColorHelper::writeAngleToPNG(phaseFull, 
+			outPath + "beamtilt_delta-phase_per-pixel_optics-group_"+ogstr);
 		
 		double shift_x(0), shift_y(0), tilt_x(0), tilt_y(0);
 		
@@ -272,6 +275,8 @@ void TiltEstimator::parametricFit(
 			FftwHelper::decenterUnflip2D(fit.data, fitFull.data);
 			
 			ImageLog::write(fitFull, outPath + "beamtilt_delta-phase_lin-fit_optics-group_"+ogstr);
+			ColorHelper::writeAngleToPNG(fitFull, 
+				outPath + "beamtilt_delta-phase_lin-fit_optics-group_"+ogstr);
 						
 			TiltHelper::optimizeTilt(
 					xyNrm, wgh, Cs, lambda, angpix[og], false,
@@ -281,6 +286,8 @@ void TiltEstimator::parametricFit(
 			FftwHelper::decenterUnflip2D(fit.data, fitFull.data);
 			
 			ImageLog::write(fitFull, outPath+"beamtilt_delta-phase_iter-fit_optics-group_"+ogstr);
+			ColorHelper::writeAngleToPNG(fitFull, 
+				outPath + "beamtilt_delta-phase_iter-fit_optics-group_"+ogstr);
 			
 			optOut.setValue(EMDL_IMAGE_BEAMTILT_X, tilt_x, og);
 			optOut.setValue(EMDL_IMAGE_BEAMTILT_Y, tilt_y, og);
@@ -298,25 +305,32 @@ void TiltEstimator::parametricFit(
 			std::stringstream sts;
 			sts << aberr_n_max;
 			
-			ImageLog::write(fitFull, outPath + "beamtilt_delta-phase_lin-fit_optics-group_"
-							+ogstr+"_N-"+sts.str());
+			ImageLog::write(fitFull, 
+				outPath + "beamtilt_delta-phase_lin-fit_optics-group_"+ogstr+"_N-"+sts.str());
+			ColorHelper::writeAngleToPNG(fitFull, 
+				outPath + "beamtilt_delta-phase_lin-fit_optics-group_"+ogstr+"_N-"+sts.str());
 				
-			if (debug)
 			{
 				Image<RFLOAT> residual;
 				residual.data = phaseFull.data - fitFull.data;
 				
-				ImageLog::write(residual, outPath + "beamtilt_delta-phase_lin-fit_optics-group_"
-								+ogstr+"_N-"+sts.str()+"_residual");
+				ImageLog::write(residual, 
+					outPath + "beamtilt_delta-phase_lin-fit_optics-group_"
+						+ogstr+"_N-"+sts.str()+"_residual");
+				ColorHelper::writeAngleToPNG(residual, 
+					outPath + "beamtilt_delta-phase_lin-fit_optics-group_"
+						+ogstr+"_N-"+sts.str()+"_residual");
 			}
 						
 			std::vector<double> Zernike_coeffs_opt = TiltHelper::optimiseOddZernike(
 						xyNrm, wgh, angpix[og], aberr_n_max, Zernike_coeffs, &fit);
 				
 			FftwHelper::decenterUnflip2D(fit.data, fitFull.data);
-						
+			
 			ImageLog::write(fitFull, outPath + "beamtilt_delta-phase_iter-fit_optics-group_"
-							+ogstr+"_N-"+sts.str());
+				+ogstr+"_N-"+sts.str());
+			ColorHelper::writeAngleToPNG(fitFull, 
+				outPath + "beamtilt_delta-phase_iter-fit_optics-group_"+ogstr+"_N-"+sts.str());
 			
 			TiltHelper::extractTilt(Zernike_coeffs_opt, tilt_x, tilt_y, Cs, lambda);
 						

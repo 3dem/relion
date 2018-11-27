@@ -64,6 +64,10 @@ void backproject2D(
 		int mdl_inity,
 		tbb::spin_mutex *mutexes)
 {
+	int img_y_half = img_y / 2;
+	
+	int max_r2_out = max_r2 * padding_factor * padding_factor;
+	
 	for (unsigned long img=0; img<imageCount; img++) {
 		XFLOAT s_eulers[4];
 
@@ -91,17 +95,10 @@ void backproject2D(
 				int x = pixel % img_x;
 				int y = (int)floorf( (float)pixel / (float)img_x);
 
-				// Don't search beyond square with side max_r
-				if (y > max_r)
+				if (y > img_y_half)
 				{
-					if (y >= img_y - max_r)
-						y -= img_y;
-					else
-						continue;
+					y -= img_y;
 				}
-
-				if (x * x + y * y > max_r2)
-					continue;
 
 				//WAVG
 				minvsigma2 = g_Minvsigma2s[pixel];
@@ -136,6 +133,11 @@ void backproject2D(
 					// Get logical coordinates in the 3D map
 					XFLOAT xp = (s_eulers[0] * x + s_eulers[1] * y );
 					XFLOAT yp = (s_eulers[2] * x + s_eulers[3] * y );
+					
+					// Only consider pixels that are projected inside the allowed circle in output coordinates.
+					//     --JZ, Nov. 26th 2018			
+					if ( ( xp * xp + yp * yp ) > max_r2_out)
+						continue;
 
 					// Only asymmetric half is stored
 					if (xp < 0)
@@ -224,6 +226,11 @@ void backproject3D(
 		int mdl_initz,
 		tbb::spin_mutex *mutexes)
 {
+	int img_y_half = img_y / 2;
+	int img_z_half = img_z / 2;
+	
+	int max_r2_vol = max_r2 * padding_factor * padding_factor;
+	
 	for (unsigned long img=0; img<imageCount; img++) {
 		XFLOAT s_eulers[9];
 
@@ -269,12 +276,10 @@ void backproject3D(
 					xy = pixel % (img_x*img_y);
 					x =             xy  % img_x;
 					y = CpuKernels::floorfracf( xy,   (size_t)img_x);
-					if (z > max_r)
+					
+					if (z > img_z_half)
 					{
-						if (z >= img_z - max_r)
-							z = z - img_z;
-						else
-							ok_for_next=0;
+						z = z - img_z;
 
 						if(x==0)
 							ok_for_next=0;	
@@ -285,23 +290,30 @@ void backproject3D(
 					x =             pixel % img_x;
 					y = CpuKernels::floorfracf( pixel , (size_t)img_x);
 				}
-				if (y > max_r)
+				if (y > img_y_half)
 				{
-					if (y >= img_y - max_r)
-						y = y - img_y;
-					else
-						ok_for_next=0;
+					y = y - img_y;
 				}
+				// Get logical coordinates in the 3D map
 
 				if(DATA3D)
 				{
-					if ( ( x * x + y * y  + z * z ) > max_r2)
-						ok_for_next=0;
+					xp[tid] = (s_eulers[0] * x + s_eulers[1] * y + s_eulers[2] * z) * padding_factor;
+					yp[tid] = (s_eulers[3] * x + s_eulers[4] * y + s_eulers[5] * z) * padding_factor;
+					zp[tid] = (s_eulers[6] * x + s_eulers[7] * y + s_eulers[8] * z) * padding_factor;
 				}
 				else
 				{
-					if ( ( x * x + y * y ) > max_r2)
-						ok_for_next=0;
+					xp[tid] = (s_eulers[0] * x + s_eulers[1] * y ) * padding_factor;
+					yp[tid] = (s_eulers[3] * x + s_eulers[4] * y ) * padding_factor;
+					zp[tid] = (s_eulers[6] * x + s_eulers[7] * y ) * padding_factor;
+				}
+				
+				// Only consider pixels that are projected inside the sphere in output coordinates.
+				//     --JZ, Nov. 26th 2018			
+				if ( ( xp[tid] * xp[tid] + yp[tid] * yp[tid] + zp[tid] * zp[tid] ) > max_r2_vol)
+				{
+					ok_for_next = 0;
 				}
 
 				if(ok_for_next)
@@ -339,20 +351,7 @@ void backproject3D(
 					//BP
 					if (Fweight[tid] > (XFLOAT) 0.0)
 					{
-						// Get logical coordinates in the 3D map
-
-						if(DATA3D)
-						{
-							xp[tid] = (s_eulers[0] * x + s_eulers[1] * y + s_eulers[2] * z) * padding_factor;
-							yp[tid] = (s_eulers[3] * x + s_eulers[4] * y + s_eulers[5] * z) * padding_factor;
-							zp[tid] = (s_eulers[6] * x + s_eulers[7] * y + s_eulers[8] * z) * padding_factor;
-						}
-						else
-						{
-							xp[tid] = (s_eulers[0] * x + s_eulers[1] * y ) * padding_factor;
-							yp[tid] = (s_eulers[3] * x + s_eulers[4] * y ) * padding_factor;
-							zp[tid] = (s_eulers[6] * x + s_eulers[7] * y ) * padding_factor;
-						}
+						
 						// Only asymmetric half is stored
 
 						if (xp[tid] < (XFLOAT) 0.0)
@@ -524,6 +523,12 @@ void backprojectRef3D(
 		int      mdl_initz,
 		tbb::spin_mutex *mutexes)
 {
+	int img_y_half = img_y / 2;
+	int img_y_half_2 = img_y_half * img_y_half;
+	int img_z_half = img_z / 2;
+	
+	int max_r2_vol = max_r2 * padding_factor * padding_factor;
+	
 	for (unsigned long img=0; img<imageCount; img++) {
 		XFLOAT s_eulers[9];
 		
@@ -546,17 +551,12 @@ void backprojectRef3D(
 		size_t pixel = 0;
 		for(int iy = 0; iy < img_y; iy++) {
 			int y = iy;
-			if (iy > max_r) {
-				if (iy >= img_y - max_r)
-					y = iy - img_y;
-				else {
-					pixel += (size_t)img_x;
-					continue;
-				}
+			if (iy > img_y_half) {
+				y = iy - img_y;
 			}
 
 			int y2 = y * y;
-			int xmax = sqrt((XFLOAT)(max_r2 - y2));
+			int xmax = sqrt((XFLOAT)(img_y_half_2 - y2));
 
 			memset(Fweight,0,sizeof(XFLOAT)*img_x);
 			memset(real,   0,sizeof(XFLOAT)*img_x);
@@ -613,6 +613,14 @@ void backprojectRef3D(
 				xp[x] = (s_eulers[0] * x + s_eulers[1] * y ) * padding_factor;
 				yp[x] = (s_eulers[3] * x + s_eulers[4] * y ) * padding_factor;
 				zp[x] = (s_eulers[6] * x + s_eulers[7] * y ) * padding_factor;
+				
+				// Use Fweight to discard pixels that project outside the sphere
+				// (pixels with Fweight <= 0 will be skipped further down)
+				//     --JZ, Nov. 26th 2018		
+				if (xp[x]*xp[x] + yp[x]*yp[x] + zp[x]*zp[x] > max_r2_vol)
+				{
+					Fweight[x] = (XFLOAT) 0.0;
+				}
 
 				// Only asymmetric half is stored            
 				if (xp[x] < (XFLOAT) 0.0) {
@@ -757,6 +765,11 @@ void backprojectSGD(
 		int mdl_initz,
 		tbb::spin_mutex *mutexes)
 {
+	int img_y_half = img_y / 2;
+	int img_z_half = img_z / 2;
+	
+	int max_r2_vol = max_r2 * padding_factor * padding_factor;
+	
 	for (unsigned long img=0; img<imageCount; img++) {
 		XFLOAT s_eulers[9];
 
@@ -803,12 +816,10 @@ void backprojectSGD(
 					xy = pixel % (img_x*img_y);
 					x =             xy  % img_x;
 					y = CpuKernels::floorfracf( xy,   (size_t)img_x);
-					if (z > max_r)
+					
+					if (z > img_z_half)
 					{
-						if (z >= img_z - max_r)
-							z = z - img_z;
-						else
-							ok_for_next=0;
+						z = z - img_z;
 
 						if(x==0)
 							ok_for_next=0;
@@ -819,20 +830,29 @@ void backprojectSGD(
 					x =             pixel % img_x;
 					y = CpuKernels::floorfracf( pixel , (size_t)img_x);
 				}
-				if (y > max_r)
+				if (y > img_y_half)
 				{
-					if (y >= img_y - max_r)
-						y = y - img_y;
-					else
-						ok_for_next=0;
+					y = y - img_y;
 				}
+				// Get logical coordinates in the 3D map
 
 				if(DATA3D)
-					if ( ( x * x + y * y  + z * z ) > max_r2)
-						ok_for_next=0;
+				{
+					xp[tid] = (s_eulers[0] * x + s_eulers[1] * y + s_eulers[2] * z) * padding_factor;
+					yp[tid] = (s_eulers[3] * x + s_eulers[4] * y + s_eulers[5] * z) * padding_factor;
+					zp[tid] = (s_eulers[6] * x + s_eulers[7] * y + s_eulers[8] * z) * padding_factor;
+				}
 				else
-					if ( ( x * x + y * y ) > max_r2)
-						ok_for_next=0;
+				{
+					xp[tid] = (s_eulers[0] * x + s_eulers[1] * y ) * padding_factor;
+					yp[tid] = (s_eulers[3] * x + s_eulers[4] * y ) * padding_factor;
+					zp[tid] = (s_eulers[6] * x + s_eulers[7] * y ) * padding_factor;
+				}
+				
+				if (xp[tid]*xp[tid] + yp[tid]*yp[tid] + zp[tid]*zp[tid] > max_r2_vol)
+				{
+					ok_for_next = 0;
+				}
 
 				if(ok_for_next)
 				{	
@@ -890,20 +910,6 @@ void backprojectSGD(
 					//BP
 					if (Fweight[tid] > (XFLOAT) 0.0)
 					{
-						// Get logical coordinates in the 3D map
-
-						if(DATA3D)
-						{
-							xp[tid] = (s_eulers[0] * x + s_eulers[1] * y + s_eulers[2] * z) * padding_factor;
-							yp[tid] = (s_eulers[3] * x + s_eulers[4] * y + s_eulers[5] * z) * padding_factor;
-							zp[tid] = (s_eulers[6] * x + s_eulers[7] * y + s_eulers[8] * z) * padding_factor;
-						}
-						else
-						{
-							xp[tid] = (s_eulers[0] * x + s_eulers[1] * y ) * padding_factor;
-							yp[tid] = (s_eulers[3] * x + s_eulers[4] * y ) * padding_factor;
-							zp[tid] = (s_eulers[6] * x + s_eulers[7] * y ) * padding_factor;
-						}
 						// Only asymmetric half is stored
 						if (xp[tid] < (XFLOAT) 0.0)
 						{
