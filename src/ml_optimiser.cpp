@@ -1259,7 +1259,7 @@ void MlOptimiser::initialise()
 
 	// Initialise the data_versus_prior ratio to get the initial current_size right
 	if (iter == 0 && !do_initialise_bodies)
-		mymodel.initialiseDataVersusPrior(fix_tau, mydata); // fix_tau was set in initialiseGeneral
+		mymodel.initialiseDataVersusPrior(fix_tau); // fix_tau was set in initialiseGeneral
 
 	// Check minimum group size of 10 particles
 	if (verb > 0)
@@ -1267,9 +1267,9 @@ void MlOptimiser::initialise()
 		bool do_warn = false;
 		for (int igroup = 0; igroup< mymodel.nr_groups; igroup++)
 		{
-			if (mymodel.nr_particles_group[igroup] < 10)
+			if (mymodel.nr_particles_per_group[igroup] < 10)
 			{
-				std:: cout << "WARNING: There are only " << mymodel.nr_particles_group[igroup] << " particles in group " << igroup + 1 << std::endl;
+				std:: cout << "WARNING: There are only " << mymodel.nr_particles_per_group[igroup] << " particles in group " << igroup + 1 << std::endl;
 				do_warn = true;
 			}
 		}
@@ -1450,7 +1450,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 		// Read in the reference(s) and initialise mymodel
 		int refdim = (fn_ref == "denovo") ? 3 : 2;
-		mymodel.readImages(fn_ref, is_3d_model, model_image_size, model_pixel_size, mydata,
+		mymodel.initialiseFromImages(fn_ref, is_3d_model, model_image_size, model_pixel_size, mydata,
 				do_average_unaligned, do_generate_seeds, refs_are_ctf_corrected, do_sgd, (rank==0));
 
 	}
@@ -2016,8 +2016,9 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(std::vector<Multidim
 			// Calculate the power spectrum of this particle
 			CenterFFT(img(), true);
 			MultidimArray<RFLOAT> ind_spectrum, count;
-			ind_spectrum.initZeros(mymodel.spectral_sizes[group_id]);
-			count.initZeros(mymodel.spectral_sizes[group_id]);
+			int spectral_size = mymodel.image_size_per_group[group_id] / 2 + 1;
+			ind_spectrum.initZeros(spectral_size);
+			count.initZeros(spectral_size);
 			// recycle the same transformer for all images
 			// But make sure the transformer is reset if the input image changes size, otherwise one can get horrible bugs with the transformer....
 			bool force_new_fftw_plans = (YSIZE(img()) != YSIZE(Faux));
@@ -2025,7 +2026,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(std::vector<Multidim
 			FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Faux)
 			{
 				long int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
-				if (idx < mymodel.spectral_sizes[group_id])
+				if (idx < spectral_size)
 				{
 					ind_spectrum(idx) += norm(dAkij(Faux, k, i, j));
 					count(idx) += 1.;
@@ -2111,7 +2112,7 @@ void MlOptimiser::setSigmaNoiseEstimatesAndSetAverageImage(std::vector<MultidimA
 	std::vector<RFLOAT> total_sum(mydata.obsModel.numberOfOpticsGroups(), 0.);
     for (int igroup = 0; igroup < mymodel.nr_groups; igroup++)
     {
-    	mymodel.nr_particles_group[igroup] = ROUND(wsum_model.sumw_group[igroup]);
+    	mymodel.nr_particles_per_group[igroup] = ROUND(wsum_model.sumw_group[igroup]);
     	int optics_group = mydata.groups[igroup].optics_group;
     	total_sum[optics_group] += wsum_model.sumw_group[igroup];
     }
@@ -4003,8 +4004,8 @@ void MlOptimiser::maximizationOtherParameters()
 			else if (mymodel.scale_correction[igroup] < median / 5.)
 				mymodel.scale_correction[igroup] =  median / 5.;
 
-			avg_scale_correction += (RFLOAT)(mymodel.nr_particles_group[igroup]) * mymodel.scale_correction[igroup];
-			nr_part += (RFLOAT)(mymodel.nr_particles_group[igroup]);
+			avg_scale_correction += (RFLOAT)(mymodel.nr_particles_per_group[igroup]) * mymodel.scale_correction[igroup];
+			nr_part += (RFLOAT)(mymodel.nr_particles_per_group[igroup]);
 		}
 
 		// Constrain average scale_correction to one.

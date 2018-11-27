@@ -525,7 +525,7 @@ will still yield good performance and possibly a more stable execution. \n" << s
 
 	// Initialise the data_versus_prior ratio to get the initial current_size right
 	if (iter == 0 && !do_initialise_bodies && !node->isMaster())
-		mymodel.initialiseDataVersusPrior(fix_tau, mydata); // fix_tau was set in initialiseGeneral
+		mymodel.initialiseDataVersusPrior(fix_tau); // fix_tau was set in initialiseGeneral
 
 	//std::cout << " Hello world! I am node " << node->rank << " out of " << node->size <<" and my hostname= "<< getenv("HOSTNAME")<< std::endl;
 
@@ -541,12 +541,12 @@ will still yield good performance and possibly a more stable execution. \n" << s
 		bool do_warn = false;
 		for (int igroup = 0; igroup< mymodel.nr_groups; igroup++)
 		{
-			if (mymodel.nr_particles_group[igroup] < 5 && node->rank == 1) // only warn for half1 to avoid messy output
+			if (mymodel.nr_particles_per_group[igroup] < 5 && node->rank == 1) // only warn for half1 to avoid messy output
 			{
 				if (my_nr_subsets == 1)
-					std:: cout << "WARNING: There are only " << mymodel.nr_particles_group[igroup] << " particles in group " << igroup + 1 << std::endl;
+					std:: cout << "WARNING: There are only " << mymodel.nr_particles_per_group[igroup] << " particles in group " << igroup + 1 << std::endl;
 				else
-					std:: cout << "WARNING: There are only " << mymodel.nr_particles_group[igroup] << " particles in group " << igroup + 1 << " of half-set " << node->rank << std::endl;
+					std:: cout << "WARNING: There are only " << mymodel.nr_particles_per_group[igroup] << " particles in group " << igroup + 1 << " of half-set " << node->rank << std::endl;
 				do_warn = true;
 			}
 		}

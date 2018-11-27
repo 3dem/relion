@@ -65,7 +65,16 @@ public:
 	bool do_sgd;
 
 	// Number of particles in each group
-	std::vector<long int> nr_particles_group;
+	std::vector<long int> nr_particles_per_group;
+
+	// Pixel size for each group
+	std::vector<RFLOAT> pixel_size_per_group;
+
+	// Box size for each group
+	std::vector<int> image_size_per_group;
+
+	// To which optics_group does each group belong
+	std::vector<int> optics_group_per_group;
 
 	// Number of directions (size of pdf_direction);
 	int nr_directions;
@@ -118,12 +127,6 @@ public:
 
 	// One name for each group
 	std::vector<FileName> group_names;
-
-	// Number of elements in the noise spectrum of each group (can be different because of different image sizes in different optics groups)
-	std::vector<int> spectral_sizes;
-
-	// To which optics_group does each group belong
-	std::vector<int> optics_group_per_group;
 
 	// One noise spectrum for each group
 	std::vector<MultidimArray<RFLOAT > > sigma2_noise;
@@ -333,7 +336,7 @@ public:
     		pdf_class = MD.pdf_class;
     		pdf_direction = MD.pdf_direction;
     		prior_offset_class = MD.prior_offset_class;
-    		nr_particles_group = MD.nr_particles_group;
+    		nr_particles_per_group = MD.nr_particles_per_group;
     		acc_rot = MD.acc_rot;
     		acc_trans = MD.acc_trans;
     		estimated_resolution = MD.estimated_resolution;
@@ -341,6 +344,9 @@ public:
     		orientability_contrib = MD.orientability_contrib;
     		helical_twist = MD.helical_twist;
     		helical_rise = MD.helical_rise;
+    		pixel_size_per_group = MD.pixel_size_per_group;
+    		image_size_per_group = MD.image_size_per_group;
+    		optics_group_per_group = MD.optics_group_per_group;
 
         }
         return *this;
@@ -373,7 +379,7 @@ public:
 		prior_offset_class.clear();
 		pdf_class.clear();
 		pdf_direction.clear();
-		nr_particles_group.clear();
+		nr_particles_per_group.clear();
 		ref_dim = data_dim = ori_size = nr_classes = nr_bodies = nr_groups = nr_directions = interpolator = r_min_nn;
 		padding_factor = 0.;
 		ave_Pmax = avg_norm_correction = LL = sigma2_offset = tau2_fudge_factor = 0.;
@@ -386,6 +392,9 @@ public:
 		helical_twist.clear();
 		helical_rise.clear();
 		do_sgd=false;
+		pixel_size_per_group.clear();
+		image_size_per_group.clear();
+		optics_group_per_group.clear();
 	}
 
 	// Initialise vectors with the right size
@@ -402,12 +411,16 @@ public:
 
 	// Read images from disc and initialise
 	// Also set do_average_unaligned and do_generate_seeds flags
-	void readImages(FileName fn_ref, bool _is_3d_model, int _ori_size, RFLOAT user_pixel_size, Experiment &_mydata,
+	void initialiseFromImages(FileName fn_ref, bool _is_3d_model, int _ori_size, RFLOAT user_pixel_size, Experiment &_mydata,
 			bool &do_average_unaligned, bool &do_generate_seeds, bool &refs_are_ctf_corrected, bool _do_sgd = false, bool verb = false);
 
 	RFLOAT getResolution(int ipix)	{ return (RFLOAT)ipix/(pixel_size * ori_size); }
 
+	RFLOAT getResolutionForGroup(int ipix, int igroup)	{ return (RFLOAT)ipix/(pixel_size_per_group[igroup] * image_size_per_group[igroup]); }
+
 	RFLOAT getResolutionAngstrom(int ipix)	{ return (ipix==0) ? 999. : (pixel_size * ori_size)/(RFLOAT)ipix; }
+
+	RFLOAT getResolutionAngstromForGroup(int ipix, int igroup)	{ return (ipix==0) ? 999. : (pixel_size_per_group[igroup] * image_size_per_group[igroup])/(RFLOAT)ipix; }
 
 	int getPixelFromResolution(RFLOAT resol)	{ return (int)ROUND(resol * pixel_size * ori_size); }
 
@@ -433,7 +446,7 @@ public:
 
 	/* Initialises the radial average of the data-versus-prior ratio
 	 */
-	void initialiseDataVersusPrior(bool fix_tau, Experiment &mydata);
+	void initialiseDataVersusPrior(bool fix_tau);
 
 	void initialiseHelicalParametersLists(RFLOAT _helical_twist, RFLOAT _helical_rise);
 
