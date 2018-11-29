@@ -4094,9 +4094,7 @@ void MlOptimiser::maximizationOtherParameters()
 	{
 		for (int igroup = 0; igroup < mymodel.nr_groups; igroup++)
 		{
-			float tsum = 0;
-			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.sigma2_noise[igroup])
-				tsum += wsum_model.sigma2_noise[igroup].data[n];
+			RFLOAT tsum = mymodel.sigma2_noise[igroup].sum();
 
 //			if(tsum==0) //if nothing has been done for this group, use previous intr noise2_sigma
 //				wsum_model.sigma2_noise[igroup].data = mymodel.sigma2_noise[igroup].data;
@@ -4113,6 +4111,12 @@ void MlOptimiser::maximizationOtherParameters()
 					if (ctf_premultiplied)
 						DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) = XMIPP_MAX(DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n), 1e-15);
 
+					// With unequal box sizes and pixel sizes in optics groups, some pixels in the 1D-spectra may contain zeros:
+					// in that case, set sigma2_noise to the value in the previous pixel.
+					if (DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) < 1e-14 && n > 0)
+					{
+						DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) = DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n-1);
+					}
 				}
 			}
 		}

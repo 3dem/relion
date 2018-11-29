@@ -839,9 +839,11 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, int user_
 	{
 		RFLOAT my_pixel_size = _mydata.getOpticsPixelSize(optics_group);
 		int my_image_size = _mydata.getOpticsImageSize(optics_group);
-		if (fabs((my_pixel_size * my_image_size) - (pixel_size * ori_size)) > 0.001)
+		if ( (my_pixel_size - pixel_size) < -0.001)
 		{
-			REPORT_ERROR("ERROR: reference is in a smaller box (in Angstroms) than the largest images among the input particles.");
+			std::cerr << "REF:  pixel_size= " << pixel_size << " ori_size= " << ori_size << std::endl;
+			std::cerr << "DATA: optics_group= " << optics_group << " my_pixel_size= " << my_pixel_size << " my_image_size= " << my_image_size << std::endl;
+			REPORT_ERROR("ERROR: reference has larger pixel size than some of the input particles.");
 		}
 	}
 
