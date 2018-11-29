@@ -104,7 +104,8 @@ int readTIFF(TIFF* ftiff, long int img_select, bool readdata=false, bool isStack
     } else if (bitsPerSample == 32 && sampleFormat == 3) {
         datatype = Float;
     } else {
-        REPORT_ERROR("Unsupported TIFF format\n");
+        std::cerr << "Unsupported TIFF format: sample format = " << sampleFormat << ", bits per sample = " << bitsPerSample << std::endl;
+        REPORT_ERROR("Unsupported TIFF format.\n");
     }
     
     MDMainHeader.setValue(EMDL_IMAGE_DATATYPE,(int)datatype);
