@@ -439,6 +439,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	do_always_cc  = checkParameter(argc, argv, "--always_cc");
 	do_only_sample_tilt  = checkParameter(argc, argv, "--only_sample_tilt");
 	minimum_angular_sampling = textToFloat(getParameter(argc, argv, "--minimum_angular_sampling", "0"));
+	maximum_angular_sampling = textToFloat(getParameter(argc, argv, "--maximum_angular_sampling", "0"));
 	asymmetric_padding = parser.checkOption("--asymmetric_padding", "", "false", true);
 	maximum_significants = textToInteger(parser.getOption("--maxsig", "", "0", true));
 	skip_gridding = parser.checkOption("--skip_gridding", "", "false", true);
@@ -726,6 +727,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	do_use_all_data = checkParameter(argc, argv, "--use_all_data");
 	do_only_sample_tilt  = checkParameter(argc, argv, "--only_sample_tilt");
 	minimum_angular_sampling = textToFloat(getParameter(argc, argv, "--minimum_angular_sampling", "0"));
+	maximum_angular_sampling = textToFloat(getParameter(argc, argv, "--maximum_angular_sampling", "0"));
 	asymmetric_padding = parser.checkOption("--asymmetric_padding", "", "false", true);
 	maximum_significants = textToInteger(parser.getOption("--maxsig", "", "0", true));
 	skip_gridding = parser.checkOption("--skip_gridding", "", "false", true);
@@ -1244,7 +1246,7 @@ void MlOptimiser::initialise()
 	}
 	else if (do_calculate_initial_sigma_noise || do_average_unaligned)
 	{
-		std::vector<MultidimArray<RFLOAT> > Mavg;
+		MultidimArray<RFLOAT> Mavg;
 
 		// Calculate initial sigma noise model from power_class spectra of the individual images
 		calculateSumOfPowerSpectraAndAverageImage(Mavg);
@@ -1855,7 +1857,7 @@ void MlOptimiser::initialiseWorkLoad()
 
 }
 
-void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(std::vector<MultidimArray<RFLOAT> > &Mavg, bool myverb)
+void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT> &Mavg, bool myverb)
 {
 
 #ifdef DEBUG_INI
@@ -1864,26 +1866,21 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(std::vector<Multidim
 
     int barstep, my_nr_particles = my_last_particle_id - my_first_particle_id + 1;
 
-    // Initialise all Mavg (one for each optics_group
-    Mavg.resize(mydata.obsModel.numberOfOpticsGroups());
-	for (int optics_group = 0; optics_group < mydata.obsModel.numberOfOpticsGroups(); optics_group++)
+	// Initialise Mavg
+    if (mydata.is_3D)
 	{
-		int box_size = mydata.getOpticsImageSize(optics_group);
-		if (mymodel.data_dim == 3)
-		{
-			Mavg[optics_group].resize(box_size, box_size, box_size);
-		}
-		else
-		{
-			Mavg[optics_group].resize(box_size, box_size);
-		}
-    	Mavg[optics_group].initZeros();
-    	Mavg[optics_group].setXmippOrigin();
+		Mavg.initZeros(mymodel.ori_size, mymodel.ori_size, mymodel.ori_size);
 	}
+	else
+	{
+		Mavg.initZeros(mymodel.ori_size, mymodel.ori_size);
+	}
+    Mavg.setXmippOrigin();
 
 	if (my_nr_particles < 1)
     {
-    	// Master doesn't do anything, except for initialising Mavg vector above ...
+    	// Master doesn't do anything here...
+    	// But still set Mavg the right size for AllReduce later on
     	return;
     }
 
@@ -1920,8 +1917,9 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(std::vector<Multidim
 		for (int img_id = 0; img_id < mydata.numberOfImagesInParticle(part_id); img_id++)
 		{
 			long int group_id = mydata.getGroupId(part_id, img_id);
-			RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id, img_id);
 			int optics_group = mydata.getOpticsGroup(part_id, img_id);
+			RFLOAT my_pixel_size = mydata.getOpticsPixelSize(optics_group);
+			int my_image_size = mydata.getOpticsImageSize(optics_group);
 
 			// Read image from disc
 			Image<RFLOAT> img;
@@ -2011,21 +2009,38 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(std::vector<Multidim
 			}
 
 			// Keep track of the average image (only to correct power spectra, no longer for initial references!)
-			Mavg[optics_group] += img();
+
+			// Rescale img() onto Mavg, as optics_groups may have different box sizes and pixel sizes...
+			if (fabs(my_pixel_size - mymodel.pixel_size) > 0.0001)
+			{
+				int rescalesize = ROUND(XSIZE(img()) * (my_pixel_size/ mymodel.pixel_size));
+				rescalesize -= rescalesize%2; //make even in case it is not already
+				resizeMap(img(), rescalesize);
+			}
+			img().setXmippOrigin();
+			if (fabs(mymodel.ori_size - my_image_size) > 0)
+			{
+				img().window(FIRST_XMIPP_INDEX(mymodel.ori_size), FIRST_XMIPP_INDEX(mymodel.ori_size),
+											  LAST_XMIPP_INDEX(mymodel.ori_size),  LAST_XMIPP_INDEX(mymodel.ori_size));
+			}
+			Mavg += img();
 
 			// Calculate the power spectrum of this particle
 			CenterFFT(img(), true);
 			MultidimArray<RFLOAT> ind_spectrum, count;
-			int spectral_size = mymodel.image_size_per_group[group_id] / 2 + 1;
+			int spectral_size = (mymodel.ori_size / 2) + 1;
 			ind_spectrum.initZeros(spectral_size);
 			count.initZeros(spectral_size);
 			// recycle the same transformer for all images
 			// But make sure the transformer is reset if the input image changes size, otherwise one can get horrible bugs with the transformer....
 			bool force_new_fftw_plans = (YSIZE(img()) != YSIZE(Faux));
 			transformer.FourierTransform(img(), Faux, false, force_new_fftw_plans);
+
+			// remapping: divide by own pixe*boxsize, multiply with the new ones on which to map!!
+			RFLOAT remap_image_sizes = (mymodel.ori_size * mymodel.pixel_size) / (my_pixel_size * my_image_size);
 			FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Faux)
 			{
-				long int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
+				long int idx = ROUND(remap_image_sizes * sqrt(kp*kp + ip*ip + jp*jp));
 				if (idx < spectral_size)
 				{
 					ind_spectrum(idx) += norm(dAkij(Faux, k, i, j));
@@ -2101,7 +2116,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(std::vector<Multidim
 
 }
 
-void MlOptimiser::setSigmaNoiseEstimatesAndSetAverageImage(std::vector<MultidimArray<RFLOAT> > &Mavg)
+void MlOptimiser::setSigmaNoiseEstimatesAndSetAverageImage(MultidimArray<RFLOAT> &Mavg)
 {
 
 #ifdef DEBUG_INI
@@ -2109,18 +2124,13 @@ void MlOptimiser::setSigmaNoiseEstimatesAndSetAverageImage(std::vector<MultidimA
 #endif
 
 	// First calculate average image
-	std::vector<RFLOAT> total_sum(mydata.obsModel.numberOfOpticsGroups(), 0.);
+	RFLOAT total_sum = 0.;
     for (int igroup = 0; igroup < mymodel.nr_groups; igroup++)
     {
     	mymodel.nr_particles_per_group[igroup] = ROUND(wsum_model.sumw_group[igroup]);
-    	int optics_group = mydata.groups[igroup].optics_group;
-    	total_sum[optics_group] += wsum_model.sumw_group[igroup];
+    	total_sum += wsum_model.sumw_group[igroup];
     }
-
-    for (int optics_group = 0; optics_group < mydata.obsModel.numberOfOpticsGroups(); optics_group++)
-    {
-    	Mavg[optics_group] /= total_sum[optics_group];
-    }
+    Mavg /= total_sum;
 
 	if (fn_ref == "None")
 	{
@@ -2138,23 +2148,15 @@ void MlOptimiser::setSigmaNoiseEstimatesAndSetAverageImage(std::vector<MultidimA
 	// Calculate sigma2_noise estimates as average of power class spectra, and subtract power spectrum of the average image from that
 	if (do_calculate_initial_sigma_noise)
 	{
-		// Calculate power spectrum of the average image, once for each optics_group
-		std::vector<MultidimArray<RFLOAT> > spect;
-		spect.resize(mydata.obsModel.numberOfOpticsGroups());
-	    for (int optics_group = 0; optics_group < mydata.obsModel.numberOfOpticsGroups(); optics_group++)
-	    {
-			getSpectrum(Mavg[optics_group], spect[optics_group], POWER_SPECTRUM);
-			spect[optics_group] /= 2.; // because of 2-dimensionality of the complex plane
-	    }
+		// Calculate power spectrum of the average image
+		MultidimArray<RFLOAT> spect;
+		getSpectrum(Mavg, spect, POWER_SPECTRUM);
+		spect /= 2.; // because of 2-dimensionality of the complex plane
+		spect.resize(mymodel.sigma2_noise[0]);
 
 	    // Set noise spectra, once for each group
 		for (int igroup = 0; igroup < wsum_model.nr_groups; igroup++)
 		{
-			int optics_group = mydata.groups[igroup].optics_group;
-
-			// resize spect to sigma2_noise
-			spect[optics_group].resize(mymodel.sigma2_noise[igroup]);
-
 			// Factor 2 because of 2-dimensionality of the complex plane
 			if (wsum_model.sumw_group[igroup] > 0.)
 			{
@@ -2162,9 +2164,9 @@ void MlOptimiser::setSigmaNoiseEstimatesAndSetAverageImage(std::vector<MultidimA
 				mymodel.sigma2_noise[igroup] = wsum_model.sigma2_noise[igroup] / ( 2. * wsum_model.sumw_group[igroup] );
 
 				// Now subtract power spectrum of the average image from the average power spectrum of the individual images
-				mymodel.sigma2_noise[igroup] -= spect[optics_group];
+				mymodel.sigma2_noise[igroup] -= spect;
 
-				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(spect[optics_group])
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(spect)
 				{
 					// Remove any negative sigma2_noise values: replace by positive neighbouring value
 					if (DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) < 0. )
@@ -3434,7 +3436,7 @@ void MlOptimiser::expectationOneParticle(long int part_id, int thread_id)
 		std::vector<RFLOAT> exp_sum_weight, exp_significant_weight, exp_max_weight;
 		std::vector<Matrix1D<RFLOAT> > exp_old_offset, exp_prior;
 		std::vector<RFLOAT> exp_wsum_norm_correction;
-		std::vector<MultidimArray<RFLOAT> > exp_wsum_scale_correction_XA, exp_wsum_scale_correction_AA, exp_power_imgs;
+		std::vector<MultidimArray<RFLOAT> > exp_power_imgs;
 
 		int my_nr_images = mydata.numberOfImagesInParticle(part_id);
 		// Global exp_metadata array has metadata of all ori_particles. Where does my_ori_particle start?
@@ -3980,10 +3982,8 @@ void MlOptimiser::maximizationOtherParameters()
 		for (int igroup = 0; igroup < mymodel.nr_groups; igroup++)
 		{
 			mymodel.scale_correction[igroup] *= mu;
-			RFLOAT sumXA = wsum_model.wsum_signal_product_spectra[igroup].sum();
-			RFLOAT sumAA = wsum_model.wsum_reference_power_spectra[igroup].sum();
-			if (sumAA > 0.)
-				mymodel.scale_correction[igroup] += (1. - mu) * sumXA / sumAA;
+			if (wsum_model.wsum_reference_power[igroup] > 0.)
+				mymodel.scale_correction[igroup] += (1. - mu) * wsum_model.wsum_signal_product[igroup] / wsum_model.wsum_reference_power[igroup];
 			else
 				mymodel.scale_correction[igroup] += (1. - mu);
 		}
@@ -4018,11 +4018,11 @@ void MlOptimiser::maximizationOtherParameters()
 			if (verb > 0)
 			{
 				std::cerr<< "Group "<<igroup+1<<": scale_correction= "<<mymodel.scale_correction[igroup]<<std::endl;
-				for (int i = 0; i < XSIZE(wsum_model.wsum_reference_power_spectra[igroup]); i++)
-					if (wsum_model.wsum_reference_power_spectra[igroup](i)> 0.)
-						std::cerr << " i= " << i << " XA= " << wsum_model.wsum_signal_product_spectra[igroup](i)
-											<< " A2= " << wsum_model.wsum_reference_power_spectra[igroup](i)
-											<< " XA/A2= " << wsum_model.wsum_signal_product_spectra[igroup](i)/wsum_model.wsum_reference_power_spectra[igroup](i) << std::endl;
+				for (int i = 0; i < XSIZE(wsum_model.wsum_reference_power[igroup]); i++)
+					if (wsum_model.wsum_reference_power[igroup](i)> 0.)
+						std::cerr << " i= " << i << " XA= " << wsum_model.wsum_signal_product[igroup](i)
+											<< " A2= " << wsum_model.wsum_reference_power[igroup](i)
+											<< " XA/A2= " << wsum_model.wsum_signal_product[igroup](i)/wsum_model.wsum_reference_power[igroup](i) << std::endl;
 
 			}
 #endif
@@ -4094,12 +4094,9 @@ void MlOptimiser::maximizationOtherParameters()
 	{
 		for (int igroup = 0; igroup < mymodel.nr_groups; igroup++)
 		{
-			int my_optics_group = mydata.groups[igroup].optics_group;
 			float tsum = 0;
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.sigma2_noise[igroup])
-			{
 				tsum += wsum_model.sigma2_noise[igroup].data[n];
-			}
 
 //			if(tsum==0) //if nothing has been done for this group, use previous intr noise2_sigma
 //				wsum_model.sigma2_noise[igroup].data = mymodel.sigma2_noise[igroup].data;
@@ -4111,7 +4108,7 @@ void MlOptimiser::maximizationOtherParameters()
 					DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) *= mu;
 					DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) +=
 							(1. - mu) * DIRECT_MULTIDIM_ELEM(wsum_model.sigma2_noise[igroup], n ) /
-								(2. * wsum_model.sumw_group[igroup] * DIRECT_MULTIDIM_ELEM(Npix_per_shell[my_optics_group], n));
+								(2. * wsum_model.sumw_group[igroup] * DIRECT_MULTIDIM_ELEM(Npix_per_shell, n));
 					// Watch out for all-zero sigma2 in case of CTF-premultiplication!
 					if (ctf_premultiplied)
 						DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) = XMIPP_MAX(DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n), 1e-15);
@@ -4451,12 +4448,27 @@ void MlOptimiser::updateImageSizeAndResolutionPointers()
 	// The current size is also used in wsum_model (in unpacking)
 	wsum_model.current_size = mymodel.current_size;
 
+	// Calculate number of pixels per resolution shell
+	Npix_per_shell.initZeros(mymodel.ori_size / 2 + 1);
+	MultidimArray<RFLOAT> aux;
+	if (mymodel.data_dim == 3)
+		aux.resize(mymodel.ori_size, mymodel.ori_size, mymodel.ori_size / 2 + 1);
+	else
+		aux.resize(mymodel.ori_size, mymodel.ori_size / 2 + 1);
+	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(aux)
+	{
+		int ires = ROUND(sqrt((RFLOAT)(kp*kp + ip*ip + jp*jp)));
+		// TODO: better check for volume_refine, but the same still seems to hold... Half of the yz plane (either ip<0 or kp<0 is redundant at jp==0)
+		// Exclude points beyond XSIZE(Npix_per_shell), and exclude half of the x=0 column that is stored twice in FFTW
+		if (ires < mymodel.ori_size / 2 + 1 && !(jp==0 && ip < 0))
+			Npix_per_shell(ires) += 1;
+	}
+
 	// Also set sizes for the images in all optics groups
 	int nr_optics_groups = mydata.numberOfOpticsGroups();
 	image_coarse_size.resize(nr_optics_groups);
 	image_current_size.resize(nr_optics_groups);
 	image_full_size.resize(nr_optics_groups);
-	Npix_per_shell.resize(nr_optics_groups);
 	Mresol_fine.resize(nr_optics_groups);
 	Mresol_coarse.resize(nr_optics_groups);
 	for (int optics_group = 0; optics_group < nr_optics_groups; optics_group++)
@@ -4497,22 +4509,6 @@ void MlOptimiser::updateImageSizeAndResolutionPointers()
 		image_coarse_size[optics_group] = XMIPP_MIN(image_current_size[optics_group], image_coarse_size[optics_group]);
 
 		/// Also update the resolution pointers here
-
-		// Calculate number of pixels per resolution shell
-		Npix_per_shell[optics_group].initZeros(image_full_size[optics_group] / 2 + 1);
-		MultidimArray<RFLOAT> aux;
-		if (mymodel.data_dim == 3)
-			aux.resize(image_full_size[optics_group], image_full_size[optics_group], image_full_size[optics_group] / 2 + 1);
-		else
-			aux.resize(image_full_size[optics_group], image_full_size[optics_group] / 2 + 1);
-		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(aux)
-		{
-			int ires = ROUND(sqrt((RFLOAT)(kp*kp + ip*ip + jp*jp)));
-			// TODO: better check for volume_refine, but the same still seems to hold... Half of the yz plane (either ip<0 or kp<0 is redundant at jp==0)
-			// Exclude points beyond XSIZE(Npix_per_shell), and exclude half of the x=0 column that is stored twice in FFTW
-			if (ires < image_full_size[optics_group] / 2 + 1 && !(jp==0 && ip < 0))
-				Npix_per_shell[optics_group](ires) += 1;
-		}
 
 		if (mymodel.data_dim == 3)
 			Mresol_fine[optics_group].resize(image_current_size[optics_group], image_current_size[optics_group], (image_current_size[optics_group] / 2 + 1));
@@ -4608,7 +4604,8 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 		int group_id = mydata.getGroupId(part_id, img_id);
 		// What is my optics group?
 		int optics_group = mydata.getOpticsGroup(part_id, img_id);
-		RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id, img_id);
+		RFLOAT my_pixel_size = mydata.getOpticsPixelSize(optics_group);
+		int my_image_size = mydata.getOpticsImageSize(optics_group);
 
 		// metadata offset for this image in the particle
 		int my_metadata_offset = metadata_offset + img_id;
@@ -5070,11 +5067,13 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 			Mnoise.resize(img());
 			transformer.setReal(Mnoise);
 			transformer.getFourierAlias(Fnoise);
+			// Map from model_size sigma2_noise array to my_image_size
+			RFLOAT remap_image_sizes = (my_image_size * my_pixel_size) / (mymodel.ori_size * mymodel.pixel_size);
 			// Fill Fnoise with random numbers, use power spectrum of the noise for its variance
 			FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fnoise)
 			{
-				int ires = ROUND( sqrt( (RFLOAT)(kp * kp + ip * ip + jp * jp) ) );
-				if (ires >= 0 && ires < XSIZE(Fnoise))
+				int ires = ROUND( remap_image_sizes * sqrt( (RFLOAT)(kp * kp + ip * ip + jp * jp) ) );
+				if (ires >= 0 && ires < XSIZE(mymodel.sigma2_noise[group_id]))
 				{
 					RFLOAT sigma = sqrt(sigma2_fudge * DIRECT_A1D_ELEM(mymodel.sigma2_noise[group_id], ires));
 					DIRECT_A3D_ELEM(Fnoise, k, i, j).real = rnd_gaus(0., sigma);
@@ -5489,7 +5488,8 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 
 		int group_id = mydata.getGroupId(part_id, img_id);
 		int optics_group = mydata.getOpticsGroup(part_id, img_id);
-		RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id, img_id);
+		RFLOAT my_pixel_size = mydata.getOpticsPixelSize(optics_group);
+		int my_image_size = mydata.getOpticsImageSize(optics_group);
 
 		int my_metadata_offset = metadata_offset + img_id;
 
@@ -5544,15 +5544,18 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 			else
 				exp_local_Minvsigma2[img_id].initZeros(YSIZE(Fimg), XSIZE(Fimg));
 
+			// Map from model_size sigma2_noise array to my_image_size
+			RFLOAT remap_image_sizes = (my_image_size * my_pixel_size) / (mymodel.ori_size * mymodel.pixel_size);
 			int *myMresol = (YSIZE(Fimg) == image_coarse_size[optics_group]) ? Mresol_coarse[optics_group].data : Mresol_fine[optics_group].data;
 			// With group_id and relevant size of Fimg, calculate inverse of sigma^2 for relevant parts of Mresol
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Minvsigma2[img_id])
 			{
 				int ires = *(myMresol + n);
+				int ires_remapped = ROUND(remap_image_sizes * ires);
 				// Exclude origin (ires==0) from the Probability-calculation
 				// This way we are invariant to additive factors
-				if (ires > 0)
-					DIRECT_MULTIDIM_ELEM(exp_local_Minvsigma2[img_id], n) = 1. / (sigma2_fudge * DIRECT_A1D_ELEM(mymodel.sigma2_noise[group_id], ires));
+				if (ires > 0 && ires_remapped < XSIZE(mymodel.sigma2_noise[group_id]))
+					DIRECT_MULTIDIM_ELEM(exp_local_Minvsigma2[img_id], n) = 1. / (sigma2_fudge * DIRECT_A1D_ELEM(mymodel.sigma2_noise[group_id], ires_remapped));
 			}
 		}
 
@@ -6895,8 +6898,8 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 
 	// For norm_correction and scale_correction of this particle
 	std::vector<RFLOAT> exp_wsum_norm_correction;
-	std::vector<MultidimArray<RFLOAT> > exp_wsum_scale_correction_XA, exp_wsum_scale_correction_AA;
-	std::vector<MultidimArray<RFLOAT> > thr_wsum_signal_product_spectra, thr_wsum_reference_power_spectra;
+	std::vector<RFLOAT> exp_wsum_scale_correction_XA, exp_wsum_scale_correction_AA;
+	std::vector<RFLOAT> thr_wsum_signal_product_spectra, thr_wsum_reference_power_spectra;
 	exp_wsum_norm_correction.resize(exp_nr_images, 0.);
 
 	// For scale_correction
@@ -6919,10 +6922,10 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 		thr_wsum_sigma2_noise[img_id].initZeros(image_full_size[optics_group]/2 + 1);
 		if (do_scale_correction)
 		{
-			exp_wsum_scale_correction_XA[img_id].initZeros(image_full_size[optics_group]/2 + 1);
-			exp_wsum_scale_correction_AA[img_id].initZeros(image_full_size[optics_group]/2 + 1);
-			thr_wsum_signal_product_spectra[img_id].initZeros(image_full_size[optics_group]/2 + 1);
-			thr_wsum_reference_power_spectra[img_id].initZeros(image_full_size[optics_group]/2 + 1);
+			exp_wsum_scale_correction_XA[img_id] = 0.;
+			exp_wsum_scale_correction_AA[img_id] = 0.;
+			thr_wsum_signal_product_spectra[img_id] = 0.;
+			thr_wsum_reference_power_spectra[img_id] = 0.;
 		}
 	}
 
@@ -7274,10 +7277,10 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 														RFLOAT sumXA, sumA2;
 														sumXA = (DIRECT_MULTIDIM_ELEM(Frefctf, n)).real * (*(Fimg_shift + n)).real;
 														sumXA += (DIRECT_MULTIDIM_ELEM(Frefctf, n)).imag * (*(Fimg_shift + n)).imag;
-														DIRECT_A1D_ELEM(exp_wsum_scale_correction_XA[img_id], ires) += weight * sumXA;
+														exp_wsum_scale_correction_XA[img_id] += weight * sumXA;
 														sumA2 = (DIRECT_MULTIDIM_ELEM(Frefctf, n)).real * (DIRECT_MULTIDIM_ELEM(Frefctf, n)).real;
 														sumA2 += (DIRECT_MULTIDIM_ELEM(Frefctf, n)).imag * (DIRECT_MULTIDIM_ELEM(Frefctf, n)).imag;
-														DIRECT_A1D_ELEM(exp_wsum_scale_correction_AA[img_id], ires) += weight * sumA2;
+														exp_wsum_scale_correction_AA[img_id] += weight * sumA2;
 													}
 												}
 											}
@@ -7695,12 +7698,23 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 		for (int img_id = 0; img_id < exp_nr_images; img_id++)
 		{
 			long int igroup = mydata.getGroupId(part_id, img_id);
-			wsum_model.sigma2_noise[igroup] += thr_wsum_sigma2_noise[img_id];
+			int optics_group = mydata.getOpticsGroup(part_id, img_id);
+			int my_image_size = mydata.getOpticsImageSize(optics_group);
+			RFLOAT my_pixel_size = mydata.getOpticsPixelSize(optics_group);
+			RFLOAT remap_image_sizes = (mymodel.ori_size * mymodel.pixel_size) / (my_image_size * my_pixel_size);
+			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(thr_wsum_sigma2_noise[img_id])
+			{
+				int i_resam = ROUND(i * remap_image_sizes);
+				if (i_resam < XSIZE(wsum_model.sigma2_noise[igroup]))
+				{
+					DIRECT_A1D_ELEM(wsum_model.sigma2_noise[igroup], i_resam) += DIRECT_A1D_ELEM(thr_wsum_sigma2_noise[img_id], i);
+				}
+			}
 			wsum_model.sumw_group[igroup] += thr_sumw_group[img_id];
 			if (do_scale_correction)
 			{
-				wsum_model.wsum_signal_product_spectra[igroup] += thr_wsum_signal_product_spectra[img_id];
-				wsum_model.wsum_reference_power_spectra[igroup] += thr_wsum_reference_power_spectra[img_id];
+				wsum_model.wsum_signal_product[igroup] += thr_wsum_signal_product_spectra[img_id];
+				wsum_model.wsum_reference_power[igroup] += thr_wsum_reference_power_spectra[img_id];
 			}
 		}
 		for (int n = 0; n < mymodel.nr_classes; n++)
@@ -8306,7 +8320,9 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 
 			// Old rottilt step is already below 75% of estimated accuracy: have to stop refinement?
 			// If a minimum_angular_sampling is given and we're not there yet, also just continue
-			if (all_bodies_are_done || (old_rottilt_step < 0.75 * acc_rot && !(minimum_angular_sampling > 0. && old_rottilt_step > minimum_angular_sampling)) )
+			if (all_bodies_are_done
+					|| (maximum_angular_sampling > 0. && old_rottilt_step < maximum_angular_sampling)
+					|| (old_rottilt_step < 0.75 * acc_rot && !(minimum_angular_sampling > 0. && old_rottilt_step > minimum_angular_sampling)))
 			{
 				// don't change angular sampling, as it is already fine enough
 				has_fine_enough_angular_sampling = true;

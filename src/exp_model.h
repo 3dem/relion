@@ -240,9 +240,6 @@ public:
 	// One large MetaDataTable for all images
     MetaDataTable MDimg;
 
-	// One small MetaDataTable for all optics groups
-    MetaDataTable MDopt;
-
     // Number of bodies in multi-body refinement
     int nr_bodies;
 

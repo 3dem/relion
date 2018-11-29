@@ -268,8 +268,8 @@ public:
 	// Flag to indicate that angular sampling in auto-sampling has reached its limit
 	bool has_fine_enough_angular_sampling;
 
-	// Minimum angular sampling to achieve in auto-refinement (in degrees)
-	RFLOAT minimum_angular_sampling;
+	// Minimum and maximum angular sampling to achieve in auto-refinement (in degrees)
+	RFLOAT minimum_angular_sampling, maximum_angular_sampling;
 
 	// Flag to keep sigma2_offset fixed
 	bool fix_sigma_offset;
@@ -556,7 +556,8 @@ public:
 	/////////// Some internal stuff ////////////////////////
 
 	// Array with pointers to the resolution of each point in a Fourier-space FFTW-like array (one for each optics_group)
-	std::vector<MultidimArray<int> > Mresol_fine, Mresol_coarse, Npix_per_shell;
+	std::vector<MultidimArray<int> > Mresol_fine, Mresol_coarse;
+	MultidimArray<int> Npix_per_shell;
 
 	// Verbosity flag
 	int verb;
@@ -775,13 +776,13 @@ public:
 	/* Calculates the sum of all individual power spectra and the average of all images for initial sigma_noise estimation
 	 * The rank is passed so that if one splits the data into random halves one can know which random half to treat
 	 */
-	void calculateSumOfPowerSpectraAndAverageImage(std::vector<MultidimArray<RFLOAT> > &Mavg, bool myverb = true);
+	void calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT> &Mavg, bool myverb = true);
 
 	/** Use the sum of the individual power spectra to calculate their average and set this in sigma2_noise
 	 * Also subtract the power spectrum of the average images,
 	 * and if (do_average_unaligned) then also set Mavg to all Iref
 	 */
-	void setSigmaNoiseEstimatesAndSetAverageImage(std::vector<MultidimArray<RFLOAT> > &Mavg);
+	void setSigmaNoiseEstimatesAndSetAverageImage(MultidimArray<RFLOAT> &Mavg);
 
 	/* Perform an initial low-pass filtering of the references
 	 * Note that because of the MAP estimation, this is not necessary inside the refinement

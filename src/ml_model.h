@@ -67,15 +67,6 @@ public:
 	// Number of particles in each group
 	std::vector<long int> nr_particles_per_group;
 
-	// Pixel size for each group
-	std::vector<RFLOAT> pixel_size_per_group;
-
-	// Box size for each group
-	std::vector<int> image_size_per_group;
-
-	// To which optics_group does each group belong
-	std::vector<int> optics_group_per_group;
-
 	// Number of directions (size of pdf_direction);
 	int nr_directions;
 
@@ -344,9 +335,6 @@ public:
     		orientability_contrib = MD.orientability_contrib;
     		helical_twist = MD.helical_twist;
     		helical_rise = MD.helical_rise;
-    		pixel_size_per_group = MD.pixel_size_per_group;
-    		image_size_per_group = MD.image_size_per_group;
-    		optics_group_per_group = MD.optics_group_per_group;
 
         }
         return *this;
@@ -392,9 +380,6 @@ public:
 		helical_twist.clear();
 		helical_rise.clear();
 		do_sgd=false;
-		pixel_size_per_group.clear();
-		image_size_per_group.clear();
-		optics_group_per_group.clear();
 	}
 
 	// Initialise vectors with the right size
@@ -416,11 +401,7 @@ public:
 
 	RFLOAT getResolution(int ipix)	{ return (RFLOAT)ipix/(pixel_size * ori_size); }
 
-	RFLOAT getResolutionForGroup(int ipix, int igroup)	{ return (RFLOAT)ipix/(pixel_size_per_group[igroup] * image_size_per_group[igroup]); }
-
 	RFLOAT getResolutionAngstrom(int ipix)	{ return (ipix==0) ? 999. : (pixel_size * ori_size)/(RFLOAT)ipix; }
-
-	RFLOAT getResolutionAngstromForGroup(int ipix, int igroup)	{ return (ipix==0) ? 999. : (pixel_size_per_group[igroup] * image_size_per_group[igroup])/(RFLOAT)ipix; }
 
 	int getPixelFromResolution(RFLOAT resol)	{ return (int)ROUND(resol * pixel_size * ori_size); }
 
@@ -465,10 +446,10 @@ public:
 
 	// For the refinement of group intensity scales and bfactors
 	// For each group store weighted sums of experimental image times reference image as a function of resolution
-	std::vector<MultidimArray<RFLOAT > > wsum_signal_product_spectra;
+	std::vector<RFLOAT > wsum_signal_product;
 
 	// For each group store weighted sums of squared reference as a function of resolution
-	std::vector<MultidimArray<RFLOAT > > wsum_reference_power_spectra;
+	std::vector<RFLOAT > wsum_reference_power;
 
 	// Constructor
 	MlWsumModel()

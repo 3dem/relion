@@ -806,7 +806,8 @@ void Experiment::read(
 	{
 		// MDimg and MDopt have to be read at the same time, so that the optics groups can be
 		// renamed in case they are non-contiguous or not sorted
-		ObservationModel::loadSafely(fn_exp, obsModel, MDimg, MDopt, verb);
+		MetaDataTable MDopt_tmp;
+		ObservationModel::loadSafely(fn_exp, obsModel, MDimg, MDopt_tmp, verb);
 		nr_images_per_optics_group.resize(obsModel.numberOfOpticsGroups(), 0);
 
 #ifdef DEBUG_READ
@@ -1113,9 +1114,8 @@ void Experiment::read(
 
 	// Set is_3D from MDopt
 	int mydim;
-	MDopt.getValue(EMDL_IMAGE_DIMENSIONALITY, mydim, 0);
+	obsModel.opticsMdt.getValue(EMDL_IMAGE_DIMENSIONALITY, mydim, 0);
 	is_3D = (mydim == 3);
-
 
 #ifdef DEBUG_READ
 	timer.toc(tdef);
@@ -1138,8 +1138,8 @@ void Experiment::write(FileName fn_root)
 	if (!fh)
 		REPORT_ERROR( (std::string)"Experiment::write: Cannot write file: " + fn_tmp);
 
-	MDopt.setName("optics");
-	MDopt.write(fh);
+	obsModel.opticsMdt.setName("optics");
+	obsModel.opticsMdt.write(fh);
 
 	// Always write MDimg
 	MDimg.setName("particles");

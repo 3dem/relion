@@ -2068,8 +2068,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 	// For norm_correction and scale_correction of all images of this particle
 	std::vector<RFLOAT> exp_wsum_norm_correction;
-	std::vector<MultidimArray<RFLOAT> > exp_wsum_scale_correction_XA, exp_wsum_scale_correction_AA;
-	std::vector<MultidimArray<RFLOAT> > thr_wsum_signal_product_spectra, thr_wsum_reference_power_spectra;
+	std::vector<RFLOAT> exp_wsum_scale_correction_XA, exp_wsum_scale_correction_AA;
+	std::vector<RFLOAT> thr_wsum_signal_product_spectra, thr_wsum_reference_power_spectra;
 	exp_wsum_norm_correction.resize(sp.nr_images, 0.);
 	std::vector<MultidimArray<RFLOAT> > thr_wsum_sigma2_noise;
 
@@ -2092,10 +2092,10 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		thr_wsum_sigma2_noise[img_id].initZeros(baseMLO->image_full_size[optics_group]/2 + 1);
 		if (baseMLO->do_scale_correction)
 		{
-			exp_wsum_scale_correction_AA[img_id].initZeros(baseMLO->image_full_size[optics_group]/2 + 1);
-			exp_wsum_scale_correction_XA[img_id].initZeros(baseMLO->image_full_size[optics_group]/2 + 1);
-			thr_wsum_signal_product_spectra[img_id].initZeros(baseMLO->image_full_size[optics_group]/2 + 1);
-			thr_wsum_reference_power_spectra[img_id].initZeros(baseMLO->image_full_size[optics_group]/2 + 1);
+			exp_wsum_scale_correction_AA[img_id] = 0.;
+			exp_wsum_scale_correction_XA[img_id] = 0.;
+			thr_wsum_signal_product_spectra[img_id] = 0.;
+			thr_wsum_reference_power_spectra[img_id] = 0.;
 		}
 	}
 
@@ -2833,8 +2833,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				if (ires > -1 && baseMLO->do_scale_correction &&
 						DIRECT_A1D_ELEM(baseMLO->mymodel.data_vs_prior_class[exp_iclass], ires) > 3.)
 				{
-					DIRECT_A1D_ELEM(exp_wsum_scale_correction_AA[img_id], ires) += wdiff2s_AA[AAXA_pos+j];
-					DIRECT_A1D_ELEM(exp_wsum_scale_correction_XA[img_id], ires) += wdiff2s_XA[AAXA_pos+j];
+					exp_wsum_scale_correction_AA[img_id] += wdiff2s_AA[AAXA_pos+j];
+					exp_wsum_scale_correction_XA[img_id] += wdiff2s_XA[AAXA_pos+j];
 				}
 			}
 			AAXA_pos += image_size;
@@ -2943,13 +2943,23 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		for (int img_id = 0; img_id < sp.nr_images; img_id++)
 		{
 			long int igroup = baseMLO->mydata.getGroupId(op.part_id, img_id);
-
-			baseMLO->wsum_model.sigma2_noise[igroup] += thr_wsum_sigma2_noise[img_id];
+			int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, img_id);
+			int my_image_size = baseMLO->mydata.getOpticsImageSize(optics_group);
+			RFLOAT my_pixel_size = baseMLO->mydata.getOpticsPixelSize(optics_group);
+			RFLOAT remap_image_sizes = (baseMLO->mymodel.ori_size * baseMLO->mymodel.pixel_size) / (my_image_size * my_pixel_size);
+			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(thr_wsum_sigma2_noise[img_id])
+			{
+				int i_resam = ROUND(i * remap_image_sizes);
+				if (i_resam < XSIZE(baseMLO->wsum_model.sigma2_noise[igroup]))
+				{
+					DIRECT_A1D_ELEM(baseMLO->wsum_model.sigma2_noise[igroup], i_resam) += DIRECT_A1D_ELEM(thr_wsum_sigma2_noise[img_id], i);
+				}
+			}
 			baseMLO->wsum_model.sumw_group[igroup] += thr_sumw_group[img_id];
 			if (baseMLO->do_scale_correction)
 			{
-				baseMLO->wsum_model.wsum_signal_product_spectra[igroup] += thr_wsum_signal_product_spectra[img_id];
-				baseMLO->wsum_model.wsum_reference_power_spectra[igroup] += thr_wsum_reference_power_spectra[img_id];
+				baseMLO->wsum_model.wsum_signal_product[igroup] += thr_wsum_signal_product_spectra[img_id];
+				baseMLO->wsum_model.wsum_reference_power[igroup] += thr_wsum_reference_power_spectra[img_id];
 			}
 		}
 		for (int n = 0; n < baseMLO->mymodel.nr_classes; n++)
