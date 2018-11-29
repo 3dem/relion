@@ -188,7 +188,7 @@ void generateEulerMatrices(
 
     bool doL = (L.mdimx == 3 && L.mdimy == 3);
     bool doR = (R.mdimx == 3 && R.mdimy == 3);
-	bool doMag = (MAG.mdimx == 2 && MAG.mdimy == 2);
+	bool doMag = (MAG.mdimx == 3 && MAG.mdimy == 3);
 
 	for (long int i = 0; i < ProjectionData.rots.size(); i++)
 	{
@@ -233,9 +233,9 @@ void generateEulerMatrices(
 		if(inverse)
 			A = A.transpose();
 
-		if (doMag)			
+		if (doMag)
 			A = A * MAG;
-		
+
 		for (int m = 0; m < 3; m ++)
 			for (int n = 0; n < 3; n ++)
 				eulers[9 * i + (m*3 + n)] = A(m, n);

@@ -38,7 +38,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 		int group_id =baseMLO->mydata.getGroupId(part_id, img_id);
 		// What is my optics group?
 		int optics_group = baseMLO->mydata.getOpticsGroup(part_id, img_id);
-		RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id, img_id);
+		RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(part_id, img_id);
 
 		// metadata offset for this image in the particle
 		int my_metadata_offset = op.metadata_offset + img_id;
@@ -1372,10 +1372,9 @@ void getAllSquaredDifferencesFine(
 				eulers[exp_iclass-sp.iclass_min].hostAlloc();
 
 				Matrix2D<RFLOAT> mag;
-				if (baseMLO->mydata.obsModel.hasMagMatrices)
-				{
-					mag = baseMLO->mydata.obsModel.getMag3x3(optics_group);
-				}
+				mag.initIdentity(3);
+				mag = baseMLO->mydata.obsModel.applyAnisoMagTransp(mag, optics_group);
+				mag = baseMLO->mydata.obsModel.applyScaleDifference(mag, optics_group, baseMLO->mymodel.ori_size, baseMLO->mymodel.pixel_size);
 
 				generateEulerMatrices(
 						thisClassProjectionData,
@@ -2671,10 +2670,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			CTIC(accMLO->timer,"generateEulerMatricesProjector");
 
 			Matrix2D<RFLOAT> mag;
-			if (baseMLO->mydata.obsModel.hasMagMatrices)
-			{
-				mag = baseMLO->mydata.obsModel.getMag3x3(optics_group);
-			}
+			mag.initIdentity(3);
+			mag = baseMLO->mydata.obsModel.applyAnisoMagTransp(mag, optics_group);
+			mag = baseMLO->mydata.obsModel.applyScaleDifference(mag, optics_group, baseMLO->mymodel.ori_size, baseMLO->mymodel.pixel_size);
 
 			generateEulerMatrices(
 					thisClassProjectionData,
