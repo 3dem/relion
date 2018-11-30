@@ -245,15 +245,18 @@ void CtffindRunner::initialise()
 
 	if (do_use_gctf && fn_micrographs.size()>0)
 	{
-#ifdef CUDA
 		untangleDeviceIDs(gpu_ids, allThreadIDs);
 		if (allThreadIDs[0].size()==0 || (!std::isdigit(*gpu_ids.begin())) )
 		{
+#ifdef CUDA
 			if (verb>0)
-				std::cout << "gpu-ids not specified, threads will automatically be mapped to devices (incrementally)."<< std::endl;
+				std::cout << "gpu-ids were not specified, so threads will automatically be mapped to devices (incrementally)."<< std::endl;
 			HANDLE_ERROR(cudaGetDeviceCount(&devCount));
-		}
+#else
+			if (verb>0)
+				REPORT_ERROR("gpu-ids were not specified, but we could not figure out which GPU to use because RELION was not compiled with CUDA support.");
 #endif
+		}
 
 		// Find the dimensions of the first micrograph, to later on ensure all micrographs are the same size
 		Image<double> Itmp;
