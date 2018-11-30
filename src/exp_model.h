@@ -218,6 +218,8 @@ public:
 
 };
 
+// for sorting particles based on the optics_group of their first image;
+bool compareOpticsGroupsParticles(ExpParticle a, ExpParticle b);
 
 class Experiment
 {

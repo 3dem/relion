@@ -352,6 +352,12 @@ void Experiment::divideParticlesInRandomHalves(int seed, bool do_helical_refine)
 
 }
 
+// for sorting particles, based on the optics group of their first image
+bool compareOpticsGroupsParticles(ExpParticle a, ExpParticle b)
+{
+	return (a.images[0].optics_group < b.images[0].optics_group);
+}
+
 void Experiment::randomiseParticlesOrder(int seed, bool do_split_random_halves, bool do_subsets)
 {
 	//This static flag is for only randomize once
@@ -388,6 +394,11 @@ void Experiment::randomiseParticlesOrder(int seed, bool do_split_random_halves, 
 			std::random_shuffle(particle_list1.begin(), particle_list1.end());
 			std::random_shuffle(particle_list2.begin(), particle_list2.end());
 
+			// Make sure the particles are sorted on their optics_group.
+			// Otherwise CudaFFT re-calculation of plans every time image size changes slows down things a lot!
+			std::stable_sort(particle_list1.begin(), particle_list1.end(), compareOpticsGroupsParticles);
+			std::stable_sort(particle_list2.begin(), particle_list2.end(), compareOpticsGroupsParticles);
+
             // First fill new_ori_particles with the first subset, then with the second
 			particles = particle_list1;
 			particles.insert(particles.end(), particle_list2.begin(), particle_list2.end());
@@ -395,8 +406,12 @@ void Experiment::randomiseParticlesOrder(int seed, bool do_split_random_halves, 
 		}
 		else
 		{
-             // Just randomise the entire vector
-             std::random_shuffle(particles.begin(), particles.end());
+			// Just randomise the entire vector
+			std::random_shuffle(particles.begin(), particles.end());
+
+			// Make sure the particles are sorted on their optics_group.
+			// Otherwise CudaFFT re-calculation of plans every time image size changes slows down things a lot!
+ 			std::stable_sort(particles.begin(), particles.end(), compareOpticsGroupsParticles);
 
 		}
 
