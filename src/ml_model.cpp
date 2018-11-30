@@ -688,7 +688,7 @@ void  MlModel::readTauSpectrum(FileName fn_tau, int verb)
 }
 
 // Reading images from disc
-void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, int user_model_size, RFLOAT user_pixel_size, Experiment &_mydata,
+void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experiment &_mydata,
 			bool &do_average_unaligned, bool &do_generate_seeds, bool &refs_are_ctf_corrected, bool _do_sgd, bool verb)
 {
 
@@ -696,6 +696,24 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, int user_
 
 	// Data dimensionality
 	_mydata.obsModel.opticsMdt.getValue(EMDL_IMAGE_DIMENSIONALITY, data_dim, 0);
+
+	// Make sure that the model has a bigger box (in Angstroms) than the optics_group with largest images in mydata
+	// Also make sure it has the smallest pixel size
+	RFLOAT largest_box = -1.;
+	RFLOAT smallest_pixel_size = 99e99;
+	for (int optics_group = 0; optics_group < _mydata.numberOfOpticsGroups(); optics_group++)
+	{
+		RFLOAT my_pixel_size = _mydata.getOpticsPixelSize(optics_group);
+		int my_image_size = _mydata.getOpticsImageSize(optics_group);
+		if (my_image_size * my_pixel_size > largest_box)
+		{
+			largest_box = my_image_size * my_pixel_size;
+		}
+		if (my_pixel_size < smallest_pixel_size)
+		{
+			smallest_pixel_size = my_pixel_size;
+		}
+	}
 
 	// Read references into memory
 	Image<RFLOAT> img;
@@ -793,21 +811,83 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, int user_
 				do_generate_seeds = false;
 		}
 
+	}
+
+	if (fn_ref != "None")
+	{
+
+		// The reference should be at the highest resolution of the input images
+		if (fabs(pixel_size - smallest_pixel_size) > 0.001)
+		{
+
+			int input_size = XSIZE(Iref[0]);
+			int rescale_size = ROUND(input_size * (pixel_size / smallest_pixel_size));
+			rescale_size += rescale_size%2; //make even in case it is not already
+			pixel_size *= (RFLOAT)(input_size)/(RFLOAT)(rescale_size);
+			ori_size = rescale_size;
+
+			if (verb > 0)
+			{
+				std::cerr << " WARNING: rescaling input reference to a pixel size of " << pixel_size<< " Angstroms, in a box of " << rescale_size << " pixels..." << std::endl;
+			}
+
+			for (int iclass = 0; iclass < nr_classes*nr_bodies; iclass++)
+			{
+				resizeMap(Iref[iclass], rescale_size);
+				if (_do_sgd)
+				{
+					resizeMap(Igrad[iclass], rescale_size);
+				}
+			}
+
+		}
+		// The reference should also be in the biggest box of the input images
+		if (XSIZE(Iref[0]) * pixel_size <  largest_box)
+		{
+
+			int new_size = ROUND(largest_box / pixel_size);
+			new_size += new_size%2; //make even in case it is not already
+			ori_size = new_size;
+
+			if (verb > 0)
+			{
+				std::cerr << " WARNING: rewindowing input reference to a box size of " << new_size<< " pixels..." << std::endl;
+			}
+
+			for (int iclass = 0; iclass < nr_classes*nr_bodies; iclass++)
+			{
+				Iref[iclass].setXmippOrigin();
+				if (ref_dim == 3)
+				{
+					Iref[iclass].window(FIRST_XMIPP_INDEX(new_size), FIRST_XMIPP_INDEX(new_size), FIRST_XMIPP_INDEX(new_size),
+									    LAST_XMIPP_INDEX(new_size), LAST_XMIPP_INDEX(new_size),  LAST_XMIPP_INDEX(new_size));
+					if (_do_sgd)
+					{
+						Igrad[iclass].window(FIRST_XMIPP_INDEX(new_size), FIRST_XMIPP_INDEX(new_size), FIRST_XMIPP_INDEX(new_size),
+										    LAST_XMIPP_INDEX(new_size), LAST_XMIPP_INDEX(new_size),  LAST_XMIPP_INDEX(new_size));
+					}
+				}
+				else
+				{
+					Iref[iclass].window(FIRST_XMIPP_INDEX(new_size), FIRST_XMIPP_INDEX(new_size),
+									    LAST_XMIPP_INDEX(new_size), LAST_XMIPP_INDEX(new_size));
+					if (_do_sgd)
+					{
+						Igrad[iclass].window(FIRST_XMIPP_INDEX(new_size), FIRST_XMIPP_INDEX(new_size),
+							    LAST_XMIPP_INDEX(new_size), LAST_XMIPP_INDEX(new_size));
+					}
+				}
+			}
+
+		}
 
 	}
 	else
 	{
-		pixel_size = user_pixel_size;
-		ori_size = user_model_size;
-		// If no -ref is given, get image size and pixel size from the input data, or by user-provided values
-		if (user_pixel_size < 0.)
-		{
-			REPORT_ERROR("ERROR: trying to set negative pixel size in mymodel");
-		}
-		if (user_model_size < 0.)
-		{
-			REPORT_ERROR("ERROR: trying to set negative image size in mymodel");
-		}
+		pixel_size = smallest_pixel_size;
+		ori_size = ROUND(largest_box / smallest_pixel_size);
+		// Make sure ori_size is even
+		ori_size += ori_size%2;
 
 		// Calculate average of all unaligned images later on.
 		do_average_unaligned = true;
@@ -834,18 +914,6 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, int user_
 		}
 	}
 
-	// Check that the model has a bigger box (in Angstroms) than the optics_group with largest images in mydata
-	for (int optics_group =0; optics_group < _mydata.numberOfOpticsGroups(); optics_group++)
-	{
-		RFLOAT my_pixel_size = _mydata.getOpticsPixelSize(optics_group);
-		int my_image_size = _mydata.getOpticsImageSize(optics_group);
-		if ( (my_pixel_size - pixel_size) < -0.001)
-		{
-			std::cerr << "REF:  pixel_size= " << pixel_size << " ori_size= " << ori_size << std::endl;
-			std::cerr << "DATA: optics_group= " << optics_group << " my_pixel_size= " << my_pixel_size << " my_image_size= " << my_image_size << std::endl;
-			REPORT_ERROR("ERROR: reference has larger pixel size than some of the input particles.");
-		}
-	}
 
 	// Set some group stuff
 	nr_groups = _mydata.groups.size();

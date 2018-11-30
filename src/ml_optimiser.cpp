@@ -479,8 +479,6 @@ void MlOptimiser::parseInitial(int argc, char **argv)
     nr_iter = textToInteger(parser.getOption("--iter", "Maximum number of iterations to perform", "50"));
     mymodel.tau2_fudge_factor = textToFloat(parser.getOption("--tau2_fudge", "Regularisation parameter (values higher than 1 give more weight to the data)", "1"));
 	mymodel.nr_classes = textToInteger(parser.getOption("--K", "Number of references to be refined", "1"));
-    model_pixel_size = textToFloat(parser.getOption("--model_angpix", "Pixel size (in Angstrom) for the model (by default same as first opticsGroup in the data)", "-1"));
-    model_image_size = textToFloat(parser.getOption("--model_size", "Image size (in pixels) for the model (by default same as first opticsGroup in the data)", "-1"));
 	particle_diameter = textToFloat(parser.getOption("--particle_diameter", "Diameter of the circular mask that will be applied to the experimental images (in Angstroms)", "-1"));
 	do_zero_mask = parser.checkOption("--zero_mask","Mask surrounding background in particles to zero (by default the solvent area is filled with random noise)");
 	do_solvent = parser.checkOption("--flatten_solvent", "Perform masking on the references as well?");
@@ -1440,19 +1438,9 @@ void MlOptimiser::initialiseGeneral(int rank)
 		int myverb = (rank==0) ? 1 : 0;
 		mydata.read(fn_data, true, false, do_preread, is_helical_segment, myverb); // true means ignore original particle name
 
-		// If no model pixel size was provided, get pixel size from the first optics group
-		if (model_pixel_size < 0.)
-		{
-			model_pixel_size = mydata.getOpticsPixelSize(0);
-		}
-		if (model_image_size < 0.)
-		{
-			model_image_size = mydata.getOpticsImageSize(0);
-		}
-
 		// Read in the reference(s) and initialise mymodel
 		int refdim = (fn_ref == "denovo") ? 3 : 2;
-		mymodel.initialiseFromImages(fn_ref, is_3d_model, model_image_size, model_pixel_size, mydata,
+		mymodel.initialiseFromImages(fn_ref, is_3d_model, mydata,
 				do_average_unaligned, do_generate_seeds, refs_are_ctf_corrected, do_sgd, (rank==0));
 
 	}
@@ -3363,7 +3351,7 @@ void MlOptimiser::doThreadExpectationSomeParticles(int thread_id)
 void MlOptimiser::expectationOneParticle(long int part_id, int thread_id)
 {
 #ifdef TIMING
-	if (my_part_id == exp_my_first_part_id)
+	if (part_id == exp_my_first_part_id)
 		timer.tic(TIMING_ESP_INI);
 #endif
 
@@ -5690,7 +5678,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 		}
 	}
 #ifdef TIMING
-	if (my_part_id == exp_my_first_part_id)
+	if (part_id == exp_my_first_part_id)
 	{
 		if (do_also_unmasked)
 			timer.toc(TIMING_ESP_PRECW);
@@ -5746,7 +5734,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 {
 
 #ifdef TIMING
-	if (my_part_id == exp_my_first_part_id)
+	if (part_id == exp_my_first_part_id)
 	{
 		if (exp_ipass == 0) timer.tic(TIMING_ESP_DIFF1);
 		else timer.tic(TIMING_ESP_DIFF2);
@@ -5877,7 +5865,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 								// Project the reference map (into Fref)
 #ifdef TIMING
 								// Only time one thread, as I also only time one MPI process
-								if (my_part_id == exp_my_first_part_id)
+								if (part_id == exp_my_first_part_id)
 									timer.tic(TIMING_DIFF_PROJ);
 #endif
 
@@ -5900,7 +5888,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 
 #ifdef TIMING
 								// Only time one thread, as I also only time one MPI process
-								if (my_part_id == exp_my_first_part_id)
+								if (part_id == exp_my_first_part_id)
 									timer.toc(TIMING_DIFF_PROJ);
 #endif
 
@@ -6045,13 +6033,13 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 											}
 #ifdef TIMING
 											// Only time one thread, as I also only time one MPI process
-											if (my_part_id == exp_my_first_part_id)
+											if (part_id == exp_my_first_part_id)
 												timer.toc(TIMING_DIFF2_GETSHIFT);
 #endif
 
 #ifdef TIMING
 											// Only time one thread, as I also only time one MPI process
-											if (my_part_id == exp_my_first_part_id)
+											if (part_id == exp_my_first_part_id)
 												timer.tic(TIMING_DIFF_DIFF2);
 #endif
 											RFLOAT diff2;
@@ -6086,7 +6074,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 											}
 #ifdef TIMING
 											// Only time one thread, as I also only time one MPI process
-											if (my_part_id == exp_my_first_part_id)
+											if (part_id == exp_my_first_part_id)
 												timer.toc(TIMING_DIFF_DIFF2);
 #endif
 
@@ -6307,7 +6295,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 	} // end loop iclass
 
 #ifdef TIMING
-	if (my_part_id == exp_my_first_part_id)
+	if (part_id == exp_my_first_part_id)
 	{
 		if (exp_ipass == 0) timer.toc(TIMING_ESP_DIFF1);
 		else timer.toc(TIMING_ESP_DIFF2);
@@ -6328,7 +6316,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
 {
 
 #ifdef TIMING
-	if (my_part_id == exp_my_first_part_id)
+	if (part_id == exp_my_first_part_id)
 	{
 		if (exp_ipass == 0) timer.tic(TIMING_ESP_WEIGHT1);
 		else timer.tic(TIMING_ESP_WEIGHT2);
@@ -6574,7 +6562,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
 
 #ifdef TIMING
 							// Only time one thread, as I also only time one MPI process
-							if (my_part_id == exp_my_first_part_id)
+							if (part_id == exp_my_first_part_id)
 								timer.tic(TIMING_WEIGHT_EXP);
 #endif
 							// Now first loop over iover_rot, because that is the order in exp_Mweight as well
@@ -6636,7 +6624,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
 							}// end loop iover_rot
 #ifdef TIMING
 							// Only time one thread, as I also only time one MPI process
-							if (my_part_id == exp_my_first_part_id)
+							if (part_id == exp_my_first_part_id)
 								timer.toc(TIMING_WEIGHT_EXP);
 #endif
 						} // end loop itrans
@@ -6744,7 +6732,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
 		sorted_weight.sort();
 
 #ifdef TIMING
-		if (my_part_id == exp_my_first_part_id)
+		if (part_id == exp_my_first_part_id)
 			timer.toc(TIMING_WEIGHT_SORT);
 #endif
 		RFLOAT frac_weight = 0.;
@@ -6837,7 +6825,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
 	} // end loop img_id
 
 #ifdef TIMING
-	if (my_part_id == exp_my_first_part_id)
+	if (part_id == exp_my_first_part_id)
 	{
 		if (exp_ipass == 0) timer.toc(TIMING_ESP_WEIGHT1);
 		else timer.toc(TIMING_ESP_WEIGHT2);
@@ -7042,7 +7030,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 
 #ifdef TIMING
 							// Only time one thread, as I also only time one MPI process
-							if (my_part_id == exp_my_first_part_id)
+							if (part_id == exp_my_first_part_id)
 								timer.tic(TIMING_WSUM_PROJ);
 #endif
 							// Project the reference map (into Fref)
@@ -7059,7 +7047,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 							}
 #ifdef TIMING
 							// Only time one thread, as I also only time one MPI process
-							if (my_part_id == exp_my_first_part_id)
+							if (part_id == exp_my_first_part_id)
 								timer.toc(TIMING_WSUM_PROJ);
 #endif
 							// Inside the loop over all translations and all part_id sum all shift Fimg's and their weights
@@ -7175,7 +7163,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 
 #ifdef TIMING
 											// Only time one thread, as I also only time one MPI process
-											if (my_part_id == exp_my_first_part_id)
+											if (part_id == exp_my_first_part_id)
 												timer.tic(TIMING_WSUM_GETSHIFT);
 #endif
 
@@ -7290,7 +7278,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 											}
 #ifdef TIMING
 											// Only time one thread, as I also only time one MPI process
-											if (my_part_id == exp_my_first_part_id)
+											if (part_id == exp_my_first_part_id)
 											{
 												timer.toc(TIMING_WSUM_DIFF2);
 												timer.tic(TIMING_WSUM_LOCALSUMS);
@@ -7439,7 +7427,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 
 #ifdef TIMING
 											// Only time one thread, as I also only time one MPI process
-											if (my_part_id == exp_my_first_part_id)
+											if (part_id == exp_my_first_part_id)
 												timer.toc(TIMING_WSUM_SUMSHIFT);
 #endif
 										} // end if !do_skip_maximization
@@ -7575,7 +7563,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 							{
 #ifdef TIMING
 								// Only time one thread, as I also only time one MPI process
-								if (my_part_id == exp_my_first_part_id)
+								if (part_id == exp_my_first_part_id)
 									timer.tic(TIMING_WSUM_BACKPROJ);
 #endif
 								// Perform the actual back-projection.
@@ -7590,7 +7578,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 								pthread_mutex_unlock(&global_mutex2[my_mutex]);
 	#ifdef TIMING
 								// Only time one thread, as I also only time one MPI process
-								if (my_part_id == exp_my_first_part_id)
+								if (part_id == exp_my_first_part_id)
 									timer.toc(TIMING_WSUM_BACKPROJ);
 	#endif
 							} // end if !do_skip_maximization
@@ -7751,7 +7739,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 	} // end if !do_skip_maximization
 
 #ifdef TIMING
-	if (my_part_id == exp_my_first_part_id)
+	if (part_id == exp_my_first_part_id)
 		timer.toc(TIMING_ESP_WSUM);
 #endif
 }
@@ -7843,7 +7831,7 @@ void MlOptimiser::monitorHiddenVariableChanges(long int my_first_part_id, long i
 
 		} // end loop img_id
 
-	} //end loop my_part_id
+	} //end loop part_id
 
 
 }

@@ -169,12 +169,6 @@ public:
 	// Total number iterations and current iteration
 	int iter, nr_iter;
 
-	// User-specified pixel size for the model (in A)
-	RFLOAT model_pixel_size;
-
-	// User-specified image size for the model (in pix)
-	RFLOAT model_image_size;
-
 	// Flag whether to split data from the beginning into two random halves
 	bool do_split_random_halves;
 
