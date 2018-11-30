@@ -557,6 +557,8 @@ class image_handler_parameters
 		if (fn_in.getExtension() == "star")
 		{
 			MD.read(fn_in);
+			std::cout << "NOTE: the input (--i) is a STAR file. The output (--o) is treated as a suffix, not a path." << std::endl;
+			input_is_stack = true;
 		}
 		else if (input_is_stack)
 		{
@@ -848,7 +850,7 @@ class image_handler_parameters
 		if (do_md_out && fn_in.getExtension() == "star")
 		{
 			FileName fn_md_out = fn_in.insertBeforeExtension("_" + fn_out);
-			std::cout << " Written out new STAR file: " << fn_md_out;
+			std::cout << " Written out new STAR file: " << fn_md_out << std::endl;
 			MD.write(fn_md_out);
 		}
 
