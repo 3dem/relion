@@ -43,6 +43,7 @@ __global__ void cuda_kernel_backproject2D(
 	unsigned img = blockIdx.x;
 	
 	int img_y_half = img_y / 2;
+	int max_r2_out = max_r2 * padding_factor * padding_factor;
 	
 	__shared__ XFLOAT s_eulers[4];
 
@@ -113,7 +114,7 @@ __global__ void cuda_kernel_backproject2D(
 			
 			// Only consider pixels that are projected inside the allowed circle in output coordinates.
 			//     --JZ, Nov. 26th 2018			
-			if ( ( xp * xp + yp * yp ) > max_r2)
+			if ( ( xp * xp + yp * yp ) > max_r2_out )
 				continue;
 			
 			// Only asymmetric half is stored
