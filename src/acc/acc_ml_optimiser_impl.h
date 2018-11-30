@@ -1125,7 +1125,7 @@ void getAllSquaredDifferencesCoarse(
 	} // end loop img_id
 
 #ifdef TIMING
-	if (op.part_id == baseMLO->exp_my_first_part_id))
+	if (op.part_id == baseMLO->exp_my_first_part_id)
 		baseMLO->timer.toc(baseMLO->TIMING_ESP_DIFF1);
 #endif
 }
