@@ -117,18 +117,21 @@ extern std::string current_browse_directory;
 //version-2.1 #define GUI_BUTTON_COLOR (fl_rgb_color(100, 200, 50))
 //version-2.1 #define GUI_BUTTON_DARK_COLOR (fl_rgb_color(70, 140, 30))
 //version-2.1 #define GUI_RUNBUTTON_COLOR (fl_rgb_color(0, 130, 0))
-//version-3.0
-//#define GUI_BUTTON_COLOR (fl_rgb_color(255, 180, 132))
-//#define GUI_BUTTON_DARK_COLOR (fl_rgb_color(250, 150, 124))
-//#define GUI_RUNBUTTON_COLOR (fl_rgb_color(235, 130, 0))
-//#define GUI_BACKGROUND_COLOR (fl_rgb_color(230,230,240)) // slightly blue because of blue buttons in 2.0!
-//#define GUI_BACKGROUND_COLOR2 (fl_rgb_color(180,180,190)) // slightly blue because of blue buttons in 2.0!
+//version-3.0 #define GUI_BUTTON_COLOR (fl_rgb_color(255, 180, 132))
+//version-3.0 #define GUI_BUTTON_DARK_COLOR (fl_rgb_color(250, 150, 124))
+//version-3.0 #define GUI_RUNBUTTON_COLOR (fl_rgb_color(235, 130, 0))
+//version-3.1
+#define GUI_BUTTON_COLOR (fl_rgb_color(238,130,238))
+#define GUI_BUTTON_DARK_COLOR (fl_rgb_color(200, 110, 200))
+#define GUI_RUNBUTTON_COLOR (fl_rgb_color(170, 0, 170))
+#define GUI_BACKGROUND_COLOR (fl_rgb_color(230,230,240)) // slightly blue because of blue buttons in 2.0!
+#define GUI_BACKGROUND_COLOR2 (fl_rgb_color(180,180,190)) // slightly blue because of blue buttons in 2.0!
 // devel-version
-#define GUI_BUTTON_COLOR (fl_rgb_color(255, 150, 150))
-#define GUI_BUTTON_DARK_COLOR (fl_rgb_color(200, 120, 120))
-#define GUI_RUNBUTTON_COLOR (fl_rgb_color(170, 0, 0))
-#define GUI_BACKGROUND_COLOR (fl_rgb_color(255,200,200)) // slightly red
-#define GUI_BACKGROUND_COLOR2 (fl_rgb_color(230,180,180)) // slightly red
+//#define GUI_BUTTON_COLOR (fl_rgb_color(255, 150, 150))
+//#define GUI_BUTTON_DARK_COLOR (fl_rgb_color(200, 120, 120))
+//#define GUI_RUNBUTTON_COLOR (fl_rgb_color(170, 0, 0))
+//#define GUI_BACKGROUND_COLOR (fl_rgb_color(255,200,200)) // slightly red
+//#define GUI_BACKGROUND_COLOR2 (fl_rgb_color(230,180,180)) // slightly red
 //possible?#define GUI_BUTTON_COLOR (fl_rgb_color(50, 200, 255))
 //devel-version
 //possible #define GUI_RUNBUTTON_COLOR (fl_rgb_color(205,0,155))

@@ -543,7 +543,6 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	gui_jobwindows[i]->initialise(PROC_RESMAP, maingui_do_old_style);
     browse_grp[i]->end();
 
-    std::cerr << " i= " << i << std::endl;
     browser->callback(cb_select_browsegroup);
     browser->textsize(RLN_FONTSIZE);
     browser->end();
