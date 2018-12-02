@@ -541,7 +541,17 @@ std::vector<MetaDataTable> FrameRecombiner::findUnfinishedJobs(
         }
     }
 
-    return out;
+	return out;
+}
+
+double FrameRecombiner::getOutputPixelSize()
+{
+	return angpix_out;
+}
+
+int FrameRecombiner::getOutputBoxSize()
+{
+	return s_out;
 }
 
 bool FrameRecombiner::isJobFinished(std::string filenameRoot)
