@@ -31,7 +31,6 @@
 #include <src/jaz/stack_helper.h>
 #include <src/jaz/img_proc/image_op.h>
 #include <src/jaz/parallel_ft.h>
-#include <src/jaz/legacy_obs_model.h>
 
 #include <src/ctf.h>
 #include <src/image.h>
@@ -132,7 +131,7 @@ void CtfRefiner::init()
 		outPath += "/";
 	}
 
-	ObservationModel::loadSafely(starFn, obsModel, mdt0, opticsMdt);
+	ObservationModel::loadSafely(starFn, obsModel, mdt0);
 	
 	if (!ObservationModel::containsAllColumnsNeededForPrediction(mdt0))
 	{
@@ -354,7 +353,6 @@ void CtfRefiner::run()
 void CtfRefiner::finalise()
 {
 	std::vector<MetaDataTable> mdtOut;
-	MetaDataTable optOut = obsModel.opticsMdt;
 
 	// Read back from disk the metadata-tables and eps-plots for the B-factor or defocus fit.
 	// Note: only micrographs for which the defoci or B-factors were estimated (either now or before)
@@ -370,27 +368,27 @@ void CtfRefiner::finalise()
 	}
 	
 	// Sum up the per-pixel beamtilt fits of all micrographs and fit a parametric model to them.
-	// Then, write the beamtilt parameters into optOut
+	// Then, write the beamtilt parameters into obsModel.opticsMdt
 	if (do_tilt_fit)
 	{
-		tiltEstimator.parametricFit(mdtOut, optOut);
+		tiltEstimator.parametricFit(mdtOut, obsModel.opticsMdt);
 	}
 	
 	// Do the equivalent for the symmetrical aberrations...
 	if (do_aberr_fit)
 	{
-		aberrationEstimator.parametricFit(mdtOut, optOut);
+		aberrationEstimator.parametricFit(mdtOut, obsModel.opticsMdt);
 	}
 
 	// ...and for the magnification fit
 	if (do_mag_fit)
 	{
-		magnificationEstimator.parametricFit(mdtOut, optOut);
+		magnificationEstimator.parametricFit(mdtOut, obsModel.opticsMdt);
 	}
 
 	MetaDataTable mdtOutAll = StackHelper::merge(mdtOut);
 	
-	ObservationModel::save(mdtOutAll, optOut, outPath + "particles_ctf_refine.star");
+	obsModel.save(mdtOutAll, outPath + "particles_ctf_refine.star");
 
 	if (verb > 0)
 	{

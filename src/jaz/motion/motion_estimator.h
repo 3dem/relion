@@ -28,7 +28,7 @@
 class IOParser;
 class ParFourierTransformer;
 class ReferenceMap;
-class LegacyObservationModel;
+class ObservationModel;
 class MicrographHandler;
 
 class MotionEstimator
@@ -40,10 +40,10 @@ class MotionEstimator
 
         void read(IOParser& parser, int argc, char *argv[]);
 
-        void init(int verb, int s, int fc, int nr_omp_threads,
+        void init(int verb, int fc, int nr_omp_threads,
                   bool debug, std::string outPath,
                   ReferenceMap* reference,
-                  LegacyObservationModel* obsModel,
+                  ObservationModel* obsModel,
                   MicrographHandler* micrographHandler);
 
         void process(const std::vector<MetaDataTable> &mdts, long g_start, long g_end);
@@ -55,7 +55,7 @@ class MotionEstimator
         void prepMicrograph(
             // in:
             const MetaDataTable& mdt, std::vector<ParFourierTransformer>& fts,
-            const std::vector<Image<RFLOAT>>& dmgWeight,
+			int ogmg,
             // out:
             std::vector<std::vector<Image<Complex>>>& movie,
             std::vector<std::vector<Image<RFLOAT>>>& movieCC,
@@ -79,8 +79,8 @@ class MotionEstimator
             const std::vector<gravis::d2Vector>& positions,
             const std::vector<gravis::d2Vector>& globComp) const;
 
-        const std::vector<Image<RFLOAT>>& getDamageWeights();
-
+		std::vector<Image<RFLOAT>> computeDamageWeights(int opticsGroup);
+		
         bool isReady();
 
         double getDosePerFrame();
@@ -93,9 +93,9 @@ class MotionEstimator
 
         // translates the given parameters (in A or A/dose) into pixels
         // done in one place to ensure consistency
-        double normalizeSigVel(double sig_vel);
-        double normalizeSigDiv(double sig_div);
-        double normalizeSigAcc(double sig_acc);
+        double normalizeSigVel(double sig_vel, double angpix);
+        double normalizeSigDiv(double sig_div, double angpix);
+        double normalizeSigAcc(double sig_acc, double angpix);
 
 
     protected:
@@ -115,17 +115,19 @@ class MotionEstimator
 			
 			std::string paramsFn;
 
+			// @TODO: allow for varying fc (frame count)
             // set at init
-            int s, sh, fc, verb, nr_omp_threads;
-            double angpix;
+            int fc, verb, nr_omp_threads, s_ref, sh_ref;
+			std::vector<int> s, sh;
+			
+			double angpix_ref;
+            std::vector<double> angpix;			
             bool debug, no_whitening;
-
-            std::vector<Image<RFLOAT>> dmgWeight;
 
             std::string outPath;
 
             ReferenceMap* reference;
-            LegacyObservationModel* obsModel;
+            ObservationModel* obsModel;
             MicrographHandler* micrographHandler;
 
 

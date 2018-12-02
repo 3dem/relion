@@ -125,20 +125,8 @@ void FscHelper::initFscTable(int kc, int tc, Image<RFLOAT> &table, Image<RFLOAT>
     weight1.data.initZeros();
 }
 
-void FscHelper::updateFscTable(const std::vector<std::vector<Image<Complex> > >& frames,
-                               const std::vector<Image<Complex> >& predictions,
-                               Image<RFLOAT> &table, Image<RFLOAT> &weight0, Image<RFLOAT> &weight1)
-{
-    const int pc = frames.size();
-
-    for (int p = 0; p < pc; p++)
-    {
-        updateFscTable(frames[p], predictions[p], table, weight0, weight1);
-    }
-}
-
 void FscHelper::updateFscTable(const std::vector<Image<Complex> > &frames,
-                               const Image<Complex> &prediction,
+                               const Image<Complex> &prediction, double scale,
                                Image<RFLOAT> &table,
                                Image<RFLOAT> &weight0,
                                Image<RFLOAT> &weight1)
@@ -147,13 +135,13 @@ void FscHelper::updateFscTable(const std::vector<Image<Complex> > &frames,
 
     for (int f = 0; f < fc; f++)
     {
-        updateFscTable(frames[f], f, prediction, table, weight0, weight1);
+        updateFscTable(frames[f], f, prediction, scale, table, weight0, weight1);
     }
 }
 
 void FscHelper::updateFscTable(const Image<Complex> &frame,
                                int f,
-                               const Image<Complex> &prediction,
+                               const Image<Complex> &prediction, double scale,
                                Image<RFLOAT> &table,
                                Image<RFLOAT> &weight0,
                                Image<RFLOAT> &weight1)
@@ -162,7 +150,7 @@ void FscHelper::updateFscTable(const Image<Complex> &frame,
 
     FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(frame())
     {
-        int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
+        int idx = ROUND(scale * sqrt(kp*kp + ip*ip + jp*jp));
 
         if (idx >= w)
         {
@@ -171,34 +159,6 @@ void FscHelper::updateFscTable(const Image<Complex> &frame,
 
         Complex z1 = DIRECT_A3D_ELEM(frame(), k, i, j);
         Complex z2 = DIRECT_A3D_ELEM(prediction(), k, i, j);
-
-        DIRECT_A2D_ELEM(table.data, f, idx) += z1.real * z2.real + z1.imag * z2.imag;
-        DIRECT_A2D_ELEM(weight0.data, f, idx) += z1.norm();
-        DIRECT_A2D_ELEM(weight1.data, f, idx) += z2.norm();
-    }
-}
-
-void FscHelper::updateFscTable(const Image<Complex> &frame,
-                               const Image<RFLOAT> &ctf, int f,
-                               const Image<Complex> &prediction,
-                               Image<RFLOAT> &table,
-                               Image<RFLOAT> &weight0,
-                               Image<RFLOAT> &weight1)
-{
-    const int w = prediction.data.xdim;
-
-    FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(frame())
-    {
-        int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
-
-        if (idx >= w)
-        {
-            continue;
-        }
-
-        Complex c = DIRECT_A3D_ELEM(ctf(), k, i, j);
-        Complex z1 = c*DIRECT_A3D_ELEM(frame(), k, i, j);
-        Complex z2 = c*DIRECT_A3D_ELEM(prediction(), k, i, j);
 
         DIRECT_A2D_ELEM(table.data, f, idx) += z1.real * z2.real + z1.imag * z2.imag;
         DIRECT_A2D_ELEM(weight0.data, f, idx) += z1.norm();

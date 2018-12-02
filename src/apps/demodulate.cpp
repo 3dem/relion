@@ -8,7 +8,7 @@
 int main(int argc, char *argv[])
 {
 	std::string particlesFn, outPath;
-	MetaDataTable particlesMdt, opticsMdt;
+	MetaDataTable particlesMdt;
 	int nr_omp_threads;
 	bool r31;
 		
@@ -45,7 +45,7 @@ int main(int argc, char *argv[])
 	ObservationModel obsModel;
 	
 	ObservationModel::loadSafely(
-		particlesFn, obsModel, particlesMdt, opticsMdt);
+		particlesFn, obsModel, particlesMdt);
 		
 	
 	particlesMdt.read(particlesFn);
@@ -129,22 +129,22 @@ int main(int argc, char *argv[])
 				opticsGroup--;
 				
 				double v;
-				opticsMdt.getValue(lab, v, opticsGroup);
+				obsModel.opticsMdt.getValue(lab, v, opticsGroup);
 				mdt1.setValue(lab, v, p);
 			}
 		}
 		
-		opticsMdt.deactivateLabel(EMDL_IMAGE_OPTICS_GROUP);
+		obsModel.opticsMdt.deactivateLabel(EMDL_IMAGE_OPTICS_GROUP);
 		
 		mdt1.setVersion(30000);
 	}
 	else
 	{
-		opticsMdt.deactivateLabel(EMDL_IMAGE_BEAMTILT_X);
-		opticsMdt.deactivateLabel(EMDL_IMAGE_BEAMTILT_Y);		
-		opticsMdt.deactivateLabel(EMDL_IMAGE_ODD_ZERNIKE_COEFFS);
+		obsModel.opticsMdt.deactivateLabel(EMDL_IMAGE_BEAMTILT_X);
+		obsModel.opticsMdt.deactivateLabel(EMDL_IMAGE_BEAMTILT_Y);		
+		obsModel.opticsMdt.deactivateLabel(EMDL_IMAGE_ODD_ZERNIKE_COEFFS);
 		
-		opticsMdt.write(outPath+"demodulated_particles_optics.star");
+		obsModel.opticsMdt.write(outPath+"demodulated_particles_optics.star");
 	}
 	
 	mdt1.write(outPath+"demodulated_particles.star");

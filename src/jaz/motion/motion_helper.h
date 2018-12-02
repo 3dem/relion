@@ -30,7 +30,7 @@
 #include <src/jaz/volume.h>
 #include <src/jaz/gravis/t2Matrix.h>
 #include <src/jaz/gravis/t3Vector.h>
-#include <src/jaz/legacy_obs_model.h>
+#include <src/jaz/obs_model.h>
 #include <src/jaz/parallel_ft.h>
 #include <vector>
 

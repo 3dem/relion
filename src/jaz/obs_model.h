@@ -37,11 +37,15 @@ class ObservationModel
 		static void loadSafely(
 				std::string filename,
 				ObservationModel& obsModel,
-				MetaDataTable& particlesMdt, MetaDataTable& opticsMdt, int verb = 0);
-
-		static void save(
+				MetaDataTable& particlesMdt, int verb = 0);
+		
+		static void saveNew(
 				MetaDataTable& particlesMdt,
 				MetaDataTable& opticsMdt,
+				std::string filename);
+		
+		void save(
+				MetaDataTable& particlesMdt,
 				std::string filename);
 
 		static bool containsAllColumnsNeededForPrediction(const MetaDataTable& partMdt);

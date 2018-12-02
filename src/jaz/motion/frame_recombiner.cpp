@@ -23,7 +23,7 @@
 #include "motion_helper.h"
 
 #include <src/jaz/micrograph_handler.h>
-#include <src/jaz/legacy_obs_model.h>
+#include <src/jaz/obs_model.h>
 #include <src/jaz/stack_helper.h>
 #include <src/jaz/vtk_helper.h>
 #include <src/jaz/damage_helper.h>
@@ -68,9 +68,9 @@ void FrameRecombiner::read(IOParser& parser, int argc, char* argv[])
 
 void FrameRecombiner::init(
     const std::vector<MetaDataTable>& allMdts,
-    int verb, int s_ref, int fc, double maxFreq,
+    int verb, int s_ref, int fc, double maxFreq, double angpix_ref,
     int nr_omp_threads, std::string outPath, bool debug,
-    LegacyObservationModel* obsModel,
+    ObservationModel* obsModel,
     MicrographHandler* micrographHandler)
 {
     this->verb = verb;
@@ -82,7 +82,7 @@ void FrameRecombiner::init(
     this->debug = debug;
     this->obsModel = obsModel;
     this->micrographHandler = micrographHandler;
-    this->angpix_ref = obsModel->angpix;
+    this->angpix_ref = angpix_ref;
 	this->maxFreq = maxFreq;
 	
 	/*

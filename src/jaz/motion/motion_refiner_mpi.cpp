@@ -81,10 +81,12 @@ void MotionRefinerMpi::run()
                        my_first_micrograph, my_last_micrograph);
         my_nr_micrographs = my_last_micrograph - my_first_micrograph + 1;
 		
-		double k_out_A = obsModel.pixToAng(reference.k_out, s);
+		double k_out_A = reference.pixToAng(reference.k_out);
 		
         frameRecombiner.init(
-            allMdts, verb, s, fc, k_out_A, nr_omp_threads, outPath, debug,
+            allMdts, 
+			verb, reference.s, fc, k_out_A, reference.angpix,
+			nr_omp_threads, outPath, debug,
             &obsModel, &micrographHandler);
 
         frameRecombiner.process(recombMdts, my_first_micrograph, my_last_micrograph);

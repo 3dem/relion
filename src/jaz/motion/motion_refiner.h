@@ -26,7 +26,7 @@
 #include <src/image.h>
 #include <src/fftw.h>
 #include <src/micrograph_model.h>
-#include <src/jaz/legacy_obs_model.h>
+#include <src/jaz/obs_model.h>
 #include <src/jaz/gravis/t2Vector.h>
 #include <src/jaz/parallel_ft.h>
 
@@ -36,7 +36,6 @@
 #include "motion_param_estimator.h"
 #include "motion_estimator.h"
 #include "frame_recombiner.h"
-#include "bfactor_estimator.h"
 
 #include <omp.h>
 
@@ -73,22 +72,20 @@ class MotionRefiner
 		MotionParamEstimator motionParamEstimator;
 		MotionEstimator motionEstimator;
 		FrameRecombiner frameRecombiner;
-		OldBFactorEstimator bfactorEstimator;
 		
 		// required components
-		LegacyObservationModel obsModel;
+		ObservationModel obsModel;
 		ReferenceMap reference;
 		MicrographHandler micrographHandler;
 		
 		// s: full image size, sh: half-size + 1, fc: frame count
-		int s, sh, fc;
+		int s_ref, sh_ref, fc;
 		
 		// Verbosity
 		int verb;
 		
 		bool debug, findShortestMovie;
 		
-		double angpix;
 		int nr_omp_threads;
 		std::string outPath;
 		
@@ -100,7 +97,6 @@ class MotionRefiner
 		bool estimateParams,
 		     estimateMotion,
 		     recombineFrames,
-		     estimateOldBfacs,
 		     generateStar;
 		
 		long maxMG, minMG;

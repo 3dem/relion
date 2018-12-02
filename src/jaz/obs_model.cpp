@@ -37,8 +37,10 @@ using namespace gravis;
 void ObservationModel::loadSafely(
 	std::string filename,
 	ObservationModel& obsModel,
-	MetaDataTable& particlesMdt, MetaDataTable& opticsMdt, int verb)
+	MetaDataTable& particlesMdt, int verb)
 {
+	MetaDataTable opticsMdt;
+	
 	particlesMdt.read(filename, "particles");
 	opticsMdt.read(filename, "optics");
 
@@ -101,9 +103,22 @@ void ObservationModel::loadSafely(
 	}
 }
 
+void ObservationModel::saveNew(
+		MetaDataTable &particlesMdt, 
+		MetaDataTable &opticsMdt, 
+		std::string filename)
+{
+	std::ofstream of(filename);
+
+	opticsMdt.setName("optics");
+	opticsMdt.write(of);
+
+	particlesMdt.setName("particles");
+	particlesMdt.write(of);
+}
+
 void ObservationModel::save(
 		MetaDataTable &particlesMdt,
-		MetaDataTable &opticsMdt,
 		std::string filename)
 {
 	std::ofstream of(filename);
