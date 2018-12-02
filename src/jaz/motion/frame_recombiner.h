@@ -28,6 +28,7 @@
 class IOParser;
 class ObservationModel;
 class MicrographHandler;
+class ReferenceMap;
 
 class FrameRecombiner
 {
@@ -43,6 +44,7 @@ class FrameRecombiner
 				  double maxFreq, double angpix_ref,
 				  int nr_omp_threads,
                   std::string outPath, bool debug,
+				  ReferenceMap* reference,
                   ObservationModel* obsModel,
                   MicrographHandler* micrographHandler);
 
@@ -74,6 +76,7 @@ class FrameRecombiner
             bool debug;
             double angpix_ref, angpix_out, maxFreq;
 
+			ReferenceMap* reference;
             ObservationModel* obsModel;
             MicrographHandler* micrographHandler;
 

@@ -285,8 +285,7 @@ void MotionRefiner::init()
 	
 	
 	bool doAnything = estimateParams || estimateMotion || recombineFrames;
-	bool needsReference = estimateParams || estimateMotion 
-			|| !frameRecombiner.outerFreqKnown();
+	bool needsReference = doAnything;
 	
 	if (!doAnything) 
 	{
@@ -345,7 +344,7 @@ void MotionRefiner::run()
 		frameRecombiner.init(
 			allMdts, verb, reference.s, fc, k_out_A, reference.angpix,
 			nr_omp_threads, outPath, debug,
-			&obsModel, &micrographHandler);
+			&reference, &obsModel, &micrographHandler);
 		
 		frameRecombiner.process(recombMdts, 0, recombMdts.size()-1);
 	}

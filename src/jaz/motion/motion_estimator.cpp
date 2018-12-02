@@ -339,7 +339,7 @@ void MotionEstimator::process(const std::vector<MetaDataTable>& mdts, long g_sta
 		
 		updateFCC(movie, tracks, mdts[g], tables, weights0, weights1);
 		
-		writeOutput(tracks, tables, weights0, weights1, positions, fn_root, 30.0);
+		writeOutput(tracks, angpix[ogmg], tables, weights0, weights1, positions, fn_root, 30.0);
 		
 		for (int i = 0; i < nr_omp_threads; i++)
 		{
@@ -628,6 +628,7 @@ void MotionEstimator::updateFCC(
 
 void MotionEstimator::writeOutput(
 		const std::vector<std::vector<d2Vector>>& tracks,
+		double angpix_mg,
 		const std::vector<Image<RFLOAT>>& fccData,
 		const std::vector<Image<RFLOAT>>& fccWeight0,
 		const std::vector<Image<RFLOAT>>& fccWeight1,
@@ -640,7 +641,7 @@ void MotionEstimator::writeOutput(
 	
 	const int fc = tracks[0].size();
 	
-	MotionHelper::writeTracks(tracks, fn_root + "_tracks.star");
+	MotionHelper::writeTracks(tracks, fn_root + "_tracks.star", angpix_mg);
 	
 	Image<RFLOAT> fccDataSum(sh_ref,fc), fccWeight0Sum(sh_ref,fc), fccWeight1Sum(sh_ref,fc);
 	fccDataSum.data.initZeros();

@@ -124,8 +124,8 @@ class ObservationModel
 		// for now, the programs assume that all optics groups have the same pixel size
 		bool allPixelSizesIdentical() const;
 
-        double angToPix(double a, int s, int opticsGroup = 0) const;
-        double pixToAng(double p, int s, int opticsGroup = 0) const;
+        double angToPix(double a, int s, int opticsGroup) const;
+        double pixToAng(double p, int s, int opticsGroup) const;
 
 		double getPixelSize(int opticsGroup) const;
 		std::vector<double> getPixelSizes() const;

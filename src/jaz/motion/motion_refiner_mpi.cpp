@@ -87,7 +87,7 @@ void MotionRefinerMpi::run()
             allMdts, 
 			verb, reference.s, fc, k_out_A, reference.angpix,
 			nr_omp_threads, outPath, debug,
-            &obsModel, &micrographHandler);
+            &reference, &obsModel, &micrographHandler);
 
         frameRecombiner.process(recombMdts, my_first_micrograph, my_last_micrograph);
 	}

@@ -76,11 +76,11 @@ class MotionHelper
                 Image<Complex>& dest);
 
         static void writeTracks(
-                const std::vector<std::vector<gravis::d2Vector>>& tracks,
-                std::string fn);
+                const std::vector<std::vector<gravis::d2Vector>>& tracksInPix,
+                std::string fn, double angpix);
 
-        static std::vector<std::vector<gravis::d2Vector>> readTracks(
-                std::string fn);
+        static std::vector<std::vector<gravis::d2Vector>> readTracksInPix(
+                std::string fn, double angpix);
 
 };
 

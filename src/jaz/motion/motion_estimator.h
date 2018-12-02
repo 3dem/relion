@@ -141,6 +141,7 @@ class MotionEstimator
 
         void writeOutput(
             const std::vector<std::vector<gravis::d2Vector>>& tracks,
+			double angpix_mg,
             const std::vector<Image<RFLOAT>>& fccData,
             const std::vector<Image<RFLOAT>>& fccWeight0,
             const std::vector<Image<RFLOAT>>& fccWeight1,
