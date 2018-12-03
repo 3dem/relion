@@ -118,6 +118,11 @@ void CtffindRunner::initialise()
 	if (do_use_gctf && ctf_win>0)
 		REPORT_ERROR("ERROR: Running Gctf together with --ctfWin is not implemented, please use CTFFIND instead.");
 
+	if (!do_phaseshift && (additional_gctf_options.find("--phase_shift_L") != std::string::npos ||
+	                       additional_gctf_options.find("--phase_shift_H") != std::string::npos ||
+	                       additional_gctf_options.find("--phase_shift_S") != std::string::npos))
+		REPORT_ERROR("ERROR: Please don't specify --phase_shift_L, H, S in 'Other Gctf options' (--extra_gctf_options). Use 'Estimate phase shifts' (--do_phaseshift) and 'Phase shift - Min, Max, Step' (--phase_min, --phase_max, --phase_step) instead.");
+
 	// Make sure fn_out ends with a slash
 	if (fn_out[fn_out.length()-1] != '/')
 		fn_out += "/";
