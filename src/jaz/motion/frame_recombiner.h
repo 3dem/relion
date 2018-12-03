@@ -26,8 +26,9 @@
 #include <string>
 
 class IOParser;
-class LegacyObservationModel;
+class ObservationModel;
 class MicrographHandler;
+class ReferenceMap;
 
 class FrameRecombiner
 {
@@ -40,9 +41,11 @@ class FrameRecombiner
 
         void init(const std::vector<MetaDataTable>& allMdts,
                   int verb, int s_ref, int fc, 
-				  double maxFreq, int nr_omp_threads,
+				  double maxFreq, double angpix_ref,
+				  int nr_omp_threads,
                   std::string outPath, bool debug,
-                  LegacyObservationModel* obsModel,
+				  ReferenceMap* reference,
+                  ObservationModel* obsModel,
                   MicrographHandler* micrographHandler);
 
         void process(const std::vector<MetaDataTable>& mdts, long g_start, long g_end);
@@ -56,6 +59,9 @@ class FrameRecombiner
 
         static std::vector<MetaDataTable> findUnfinishedJobs(
                 const std::vector<MetaDataTable>& mdts, std::string path);
+		
+		double getOutputPixelSize();
+		int getOutputBoxSize();
 
 
     protected:
@@ -73,7 +79,8 @@ class FrameRecombiner
             bool debug;
             double angpix_ref, angpix_out, maxFreq;
 
-            LegacyObservationModel* obsModel;
+			ReferenceMap* reference;
+            ObservationModel* obsModel;
             MicrographHandler* micrographHandler;
 
             // computed by weightsFromFCC or weightsFromBfacs:

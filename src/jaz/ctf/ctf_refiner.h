@@ -81,7 +81,7 @@ class CtfRefiner
 	
 		std::string starFn, outPath;
 	
-		MetaDataTable mdt0, opticsMdt;
+		MetaDataTable mdt0;
 		std::vector<MetaDataTable> allMdts, unfinishedMdts;	
 
 		// Fit CTF parameters for all particles on a subset of the micrographs micrograph

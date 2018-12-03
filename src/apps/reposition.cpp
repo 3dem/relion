@@ -45,9 +45,9 @@ int main(int argc, char *argv[])
 	const int sh = s/2 + 1;
 	
 	ObservationModel obsModel;	
-	MetaDataTable mdt0, opticsMdt;
+	MetaDataTable mdt0;
 	
-	ObservationModel::loadSafely(starFn, obsModel, mdt0, opticsMdt);
+	ObservationModel::loadSafely(starFn, obsModel, mdt0);
 	
 	std::vector<MetaDataTable> allMdts = StackHelper::splitByMicrographName(mdt0);
 	

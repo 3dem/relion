@@ -38,7 +38,7 @@ public:
 
 	FileName fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_fsc, fn_debug, image_path;
 
-	MetaDataTable DF, DFopt;
+	MetaDataTable DF;
 	ObservationModel obsModel;
 
 	int r_max, r_min_nn, blob_order, ref_dim, interpolator, iter,

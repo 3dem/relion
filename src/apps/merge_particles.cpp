@@ -13,7 +13,7 @@ int main(int argc, char *argv[])
 	const int srcCount = argc - 2;
 	std::string destFn = argv[argc-1];
 	
-	std::vector<MetaDataTable> particleMdts(srcCount), opticsMdts(srcCount);
+	std::vector<MetaDataTable> particleMdts(srcCount);
 	std::vector<ObservationModel> obsModels(srcCount);
 	
 	std::cout << "merging: " << std::endl;
@@ -23,7 +23,7 @@ int main(int argc, char *argv[])
 		std::string srcFn = argv[i+1];
 		
 		std::cout << "    " << srcFn << std::endl;
-		ObservationModel::loadSafely(srcFn, obsModels[i], particleMdts[i], opticsMdts[i]);
+		ObservationModel::loadSafely(srcFn, obsModels[i], particleMdts[i]);
 	}
 	
 	std::cout << "into: " << destFn << std::endl;
@@ -35,12 +35,12 @@ int main(int argc, char *argv[])
 	
 	for (int i = 0; i < srcCount; i++)
 	{
-		const int ogc = opticsMdts[i].numberOfObjects();
+		const int ogc = obsModels[i].opticsMdt.numberOfObjects();
 		optGrTransl[i].resize(ogc);
 		
 		for (int g = 0; g < ogc; g++)
 		{
-			opticsOut.addObject(opticsMdts[i].getObject(g));
+			opticsOut.addObject(obsModels[i].opticsMdt.getObject(g));
 			
 			const int ogNew = opticsOut.numberOfObjects() - 1;
 			
@@ -66,7 +66,7 @@ int main(int argc, char *argv[])
 		}
 	}
 	
-	ObservationModel::save(particleOut, opticsOut, destFn);
+	ObservationModel::saveNew(particleOut, opticsOut, destFn);
 	
 	return 0;
 }

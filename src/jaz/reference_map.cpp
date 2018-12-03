@@ -307,6 +307,16 @@ Image<Complex> ReferenceMap::predict(
 	return pred;
 }
 
+double ReferenceMap::angToPix(double a) const
+{
+	return s * angpix / a;
+}
+
+double ReferenceMap::pixToAng(double p) const
+{
+	return s * angpix / p;
+}
+
 // perhaps some other day:
 /*void ReferenceMap::predictOccupancy(const MetaDataTable &particles, int threads)
 {

@@ -258,9 +258,9 @@ class reconstruct_parameters
 			Image<RFLOAT> vol, sub;
 				
 			ObservationModel obsModel;
-			MetaDataTable mdt0, mdtOpt;
+			MetaDataTable mdt0;
 			
-			ObservationModel::loadSafely(fn_sel, obsModel, mdt0, mdtOpt);
+			ObservationModel::loadSafely(fn_sel, obsModel, mdt0);
 			std::vector<double> angpix = obsModel.getPixelSizes();
 			
 			const int optGroupCount = obsModel.numberOfOpticsGroups();

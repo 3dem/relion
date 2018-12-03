@@ -69,13 +69,8 @@ class FscHelper
                 Image<RFLOAT>& weight1);
 
         static void updateFscTable(
-                const std::vector<std::vector<Image<Complex> > >& frames,
-                const std::vector<Image<Complex> >& predictions,
-                Image<RFLOAT>& table, Image<RFLOAT>& weight0, Image<RFLOAT>& weight1);
-
-        static void updateFscTable(
                 const std::vector<Image<Complex> >& frames,
-                const Image<Complex>& predictions,
+                const Image<Complex>& predictions, double scale,
                 Image<RFLOAT>& table,
                 Image<RFLOAT>& weight0,
                 Image<RFLOAT>& weight1);
@@ -83,16 +78,7 @@ class FscHelper
         static void updateFscTable(
                 const Image<Complex>& frame,
                 int f,
-                const Image<Complex>& prediction,
-                Image<RFLOAT>& table,
-                Image<RFLOAT>& weight0,
-                Image<RFLOAT>& weight1);
-
-        static void updateFscTable(
-                const Image<Complex>& frame,
-                const Image<RFLOAT>& ctf,
-                int f,
-                const Image<Complex>& prediction,
+                const Image<Complex>& prediction, double scale,
                 Image<RFLOAT>& table,
                 Image<RFLOAT>& weight0,
                 Image<RFLOAT>& weight1);
