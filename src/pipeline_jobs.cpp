@@ -1347,8 +1347,8 @@ void RelionJob::initialiseCtffindJob()
 		default_location=mydefault2;
 	}
 	joboptions["fn_gctf_exe"] = JobOption("Gctf executable:", std::string(default_location), "*", ".", "Location of the Gctf executable. You can control the default of this field by setting environment variable RELION_GCTF_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
-	joboptions["do_ignore_ctffind_params"] = JobOption("Ignore 'Searches' parameters?", true, "If set to Yes, all parameters on the 'Searches' tab will be ignored, and Gctf's default parameters will be used (box.size=1024; min.resol=50; max.resol=4; min.defocus=500; max.defocus=90000; step.defocus=500; astigm=1000) \n \
-\n If set to No, all parameters on the CTFFIND tab will be passed to Gctf.");
+	joboptions["do_ignore_ctffind_params"] = JobOption("Ignore 'Searches' parameters?", true, "If set to Yes, all parameters EXCEPT for phase shift search and its ranges on the 'Searches' tab will be ignored, and Gctf's default parameters will be used (box.size=1024; min.resol=50; max.resol=4; min.defocus=500; max.defocus=90000; step.defocus=500; astigm=1000) \n \
+\nIf set to No, all parameters on the CTFFIND tab will be passed to Gctf.");
 	joboptions["do_EPA"] = JobOption("Perform equi-phase averaging?", false, "If set to Yes, equi-phase averaging is used in the defocus refinement, otherwise basic rotational averaging will be performed.");
 	joboptions["other_gctf_args"] = JobOption("Other Gctf options:", std::string(""), "Provide additional gctf options here.");
 	joboptions["gpu_ids"] = JobOption("Which GPUs to use:", std::string(""), "This argument is not necessary. If left empty, the job itself will try to allocate available GPU resources. You can override the default allocation by providing a list of which GPUs (0,1,2,3, etc) to use. MPI-processes are separated by ':', threads by ','. ");
@@ -1425,6 +1425,14 @@ bool RelionJob::getCommandsCtffindJob(std::string &outputname, std::vector<std::
 
 		// GPU-allocation
 		command += " --gpu \"" + joboptions["gpu_ids"].getString() + "\"";
+
+		if (joboptions["other_gctf_args"].getString().find("--phase_shift_H") != std::string::npos ||
+	            joboptions["other_gctf_args"].getString().find("--phase_shift_L") != std::string::npos ||
+		    joboptions["other_gctf_args"].getString().find("--phase_shift_S") != std::string::npos)
+		{
+			error_message = "Please don't specify --phase_shift_L, H, S in 'Other Gctf options'. Use 'Estimate phase shifts' and 'Phase shift - Min, Max, Step' instead.";
+			return false;
+		}
 
 		if ((joboptions["other_gctf_args"].getString()).length() > 0)
 			command += " --extra_gctf_options \" " + joboptions["other_gctf_args"].getString() + " \"";
