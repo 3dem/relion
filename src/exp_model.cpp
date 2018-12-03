@@ -715,14 +715,12 @@ void Experiment::copyParticlesToScratch(int verb, bool do_copy, bool also_do_ctf
 
 	if (verb)
 	{
+		progress_bar(nr_part);
 		for (int i = 0; i < nr_parts_on_scratch.size(); i++)
 		{
 			std::cout << " For optics_group " << i << ", there are " << nr_parts_on_scratch[i] << " particles on the scratch disk." << std::endl;
 		}
 	}
-
-	if (verb > 0)
-		progress_bar(nr_part);
 
 	if (do_copy && total_nr_parts_on_scratch>1)
 	{
