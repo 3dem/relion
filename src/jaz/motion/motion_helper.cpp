@@ -371,11 +371,11 @@ void MotionHelper::noiseNormalize(
 }
 
 void MotionHelper::writeTracks(
-    const std::vector<std::vector<d2Vector>>& tracks,
-    std::string fn)
+    const std::vector<std::vector<d2Vector>>& tracksInPix,
+    std::string fn, double angpix)
 {
-    const int pc = tracks.size();
-    const int fc = tracks[0].size();
+    const int pc = tracksInPix.size();
+    const int fc = tracksInPix[0].size();
 
     std::string path = fn.substr(0, fn.find_last_of('/'));
     mktree(path);
@@ -401,11 +401,8 @@ void MotionHelper::writeTracks(
         {
             mdt.addObject();
 			
-            if (!mdt.setValue(EMDL_ORIENT_ORIGIN_X, tracks[p][f].x)
-             || !mdt.setValue(EMDL_ORIENT_ORIGIN_Y, tracks[p][f].y))
-			{
-				REPORT_ERROR("MotionHelper::writeTracks does not support the Relion 3.1 file format yet.");
-			}
+            mdt.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, angpix * tracksInPix[p][f].x);
+            mdt.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, angpix * tracksInPix[p][f].y);
         }
 
         mdt.write(ofs);
@@ -413,7 +410,7 @@ void MotionHelper::writeTracks(
     }
 }
 
-std::vector<std::vector<d2Vector>> MotionHelper::readTracks(std::string fn)
+std::vector<std::vector<d2Vector>> MotionHelper::readTracksInPix(std::string fn, double angpix)
 {
     std::ifstream ifs(fn);
 
@@ -455,8 +452,10 @@ std::vector<std::vector<d2Vector>> MotionHelper::readTracks(std::string fn)
 
         for (int f = 0; f < fc; f++)
         {
-            mdt.getValue(EMDL_ORIENT_ORIGIN_X, out[p][f].x, f);
-            mdt.getValue(EMDL_ORIENT_ORIGIN_Y, out[p][f].y, f);
+            mdt.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, out[p][f].x, f);
+            mdt.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, out[p][f].y, f);
+			
+			out[p][f] /= angpix;
         }
     }
 

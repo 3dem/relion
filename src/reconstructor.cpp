@@ -105,7 +105,7 @@ void Reconstructor::initialise()
 	// Read MetaData file, which should have the image names and their angles!
 	if (fn_debug == "")
 	{
-		ObservationModel::loadSafely(fn_sel, obsModel, DF, DFopt);
+		ObservationModel::loadSafely(fn_sel, obsModel, DF);
 	}
 
 	if (verb > 0 && (subset == 1 || subset == 2) && !DF.containsLabel(EMDL_PARTICLE_RANDOM_SUBSET))

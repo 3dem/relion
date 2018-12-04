@@ -23,7 +23,7 @@
 #include "motion_helper.h"
 
 #include <src/jaz/micrograph_handler.h>
-#include <src/jaz/legacy_obs_model.h>
+#include <src/jaz/obs_model.h>
 #include <src/jaz/stack_helper.h>
 #include <src/jaz/vtk_helper.h>
 #include <src/jaz/damage_helper.h>
@@ -68,9 +68,10 @@ void FrameRecombiner::read(IOParser& parser, int argc, char* argv[])
 
 void FrameRecombiner::init(
     const std::vector<MetaDataTable>& allMdts,
-    int verb, int s_ref, int fc, double maxFreq,
+    int verb, int s_ref, int fc, double maxFreq, double angpix_ref,
     int nr_omp_threads, std::string outPath, bool debug,
-    LegacyObservationModel* obsModel,
+	ReferenceMap* reference,
+    ObservationModel* obsModel,
     MicrographHandler* micrographHandler)
 {
     this->verb = verb;
@@ -80,9 +81,10 @@ void FrameRecombiner::init(
     this->nr_omp_threads = nr_omp_threads;
     this->outPath = outPath;
     this->debug = debug;
+	this->reference = reference;
     this->obsModel = obsModel;
     this->micrographHandler = micrographHandler;
-    this->angpix_ref = obsModel->angpix;
+    this->angpix_ref = angpix_ref;
 	this->maxFreq = maxFreq;
 	
 	/*
@@ -180,18 +182,8 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 		
 		FileName fn_root = MotionRefiner::getOutputFileNameRoot(outPath, mdts[g]);
         std::vector<std::vector<d2Vector>> shift0;
-        shift0 = MotionHelper::readTracks(fn_root + "_tracks.star");
-		
-		// shifts are given at reference resolution: rescale if necessary
-		if (angpix_out != angpix_ref)
-		{
-			for (int p = 0; p < pc; p++)
-			for (int f = 0; f < fc; f++)
-			{
-				shift0[p][f] *= angpix_ref / angpix_out;
-			}
-		}
-
+        shift0 = MotionHelper::readTracksInPix(fn_root + "_tracks.star", angpix_out);
+	
 		std::vector<std::vector<d2Vector>> shift = shift0;
 		
         std::vector<std::vector<Image<Complex>>> movie;
@@ -348,14 +340,14 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromFCC(
 
     if (debug) std::cout << "done\n";
 
-    k0 = (int) obsModel->angToPix(k0a, s_ref);
+    k0 = (int) reference->angToPix(k0a);
 
     if (!outerFreqKnown())
     {
         k1a = maxFreq;
     }
 	
-	k1 = (int) obsModel->angToPix(k1a, s_ref);
+	k1 = (int) reference->angToPix(k1a);
 
     if (verb > 0)
     {
@@ -549,7 +541,17 @@ std::vector<MetaDataTable> FrameRecombiner::findUnfinishedJobs(
         }
     }
 
-    return out;
+	return out;
+}
+
+double FrameRecombiner::getOutputPixelSize()
+{
+	return angpix_out;
+}
+
+int FrameRecombiner::getOutputBoxSize()
+{
+	return s_out;
 }
 
 bool FrameRecombiner::isJobFinished(std::string filenameRoot)

@@ -79,7 +79,6 @@ void MotionRefiner::read(int argc, char **argv)
 	parser.addSection("Expert options");
 	
 	findShortestMovie = parser.checkOption("--find_shortest", "Load only as many frames as are present in all movies.");
-	angpix = textToDouble(parser.getOption("--angpix", "Pixel resolution (angst/pix) - read from STAR file by default", "-1"));
 	debug = parser.checkOption("--debug", "Write debugging data");
 	
 	micrographHandler.corrMicFn = parser.getOption("--corr_mic", "List of uncorrected micrographs (e.g. corrected_micrographs.star)");
@@ -90,8 +89,6 @@ void MotionRefiner::read(int argc, char **argv)
 	
 	movie_toReplace = parser.getOption("--mov_toReplace", "Replace this string in micrograph names...", "");
 	movie_replaceBy = parser.getOption("--mov_replaceBy", "..by this one", "");
-	
-	bfactorEstimator.read(parser, argc, argv);
 			
 	// Check for errors in the command-line option
 	if (parser.checkForErrors())
@@ -113,27 +110,16 @@ void MotionRefiner::init()
 	
 	mdt0.read(starFn);	
 	
-	if (!LegacyObservationModel::containsAllNeededColumns(mdt0))
+	ObservationModel::loadSafely(starFn, obsModel, mdt0);
+	
+	//@CHECK
+	if (!ObservationModel::containsAllColumnsNeededForPrediction(mdt0))
 	{
 		REPORT_ERROR_STR(starFn << " does not contain all of the required columns ("
 			<< "rlnOriginX, rlnOriginY, rlnAngleRot, rlnAngleTilt, rlnAnglePsi and rlnRandomSubset)");
 	}
 	
 	adaptMovieNames();
-	
-	if (angpix <= 0.0)
-	{
-		RFLOAT mag, dstep;
-		mdt0.getValue(EMDL_CTF_MAGNIFICATION, mag, 0);
-		mdt0.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep, 0);
-		angpix = 10000 * dstep / mag;
-		
-		if (verb > 0)
-		{
-			std::cout << "   - Using pixel size calculated from magnification and "
-					  << "detector pixel size in the input STAR file: " << angpix << std::endl;
-		}
-	}
 	
 	allMdts = StackHelper::splitByMicrographName(mdt0);
 	
@@ -199,8 +185,8 @@ void MotionRefiner::init()
 		// of the first movie (or read corrected_micrographs.star) to obtain:
 		//  frame count, micrograph size and the fractional dose
 		micrographHandler.init(
-					chosenMdts[0], angpix, verb, nr_omp_threads, // in
-				fc0, fractDose, metaFn); // out
+			chosenMdts[0], reference.angpix, verb, nr_omp_threads, // in
+			fc0, fractDose, metaFn); // out
 		
 		chosenMdts = micrographHandler.cullMissingMovies(chosenMdts, verb);
 		
@@ -295,56 +281,42 @@ void MotionRefiner::init()
 	estimateParams = motionParamEstimator.anythingToDo();
 	estimateMotion = motionMdts.size() > 0;
 	recombineFrames = frameRecombiner.doingRecombination() && (recombMdts.size() > 0);
-	estimateOldBfacs = bfactorEstimator.doingAnything();
 	generateStar = frameRecombiner.doingRecombination();
 	
 	
-	bool doAnything = estimateParams || estimateMotion || recombineFrames || estimateOldBfacs;
-	bool needsReference = estimateParams || estimateMotion 
-			|| !frameRecombiner.outerFreqKnown() || estimateOldBfacs;
+	bool doAnything = estimateParams || estimateMotion || recombineFrames;
+	bool needsReference = doAnything;
 	
-	if (doAnything)
+	if (!doAnything) 
 	{
-		double kV, Cs;		
-		mdt0.getValue(EMDL_CTF_VOLTAGE, kV, 0);
-		mdt0.getValue(EMDL_CTF_CS, Cs, 0);
+		REPORT_ERROR("Nothing to do");
+	}
+	
+	if (needsReference)
+	{
+		if (verb > 0) std::cout << " + Reading references ..." << std::endl;
 		
-		obsModel = LegacyObservationModel(angpix, Cs, kV * 1e3);
-		
-		// Read the first reference
-		// (even if there is no motion to estimate - only to learn the image size)
-		// @TODO: replace this once the data is tree-structured
-		Image<RFLOAT> map0;
-		map0.read(reference.reconFn0, false);
-		
-		// Get dimensions
-		s = map0.data.xdim;
-		sh = s/2 + 1;
-		
-		if (needsReference)
-		{
-			if (verb > 0) std::cout << " + Reading references ..." << std::endl;
-			
-			reference.load(verb, debug);
-		}
-		
+		reference.load(verb, debug);
 	}
 	
 	if (estimateMotion || estimateParams)
 	{
 		if (verb > 0) std::cout << " + Initializing motion estimator ..." << std::endl;
 		
-		motionEstimator.init(verb, s, fc, nr_omp_threads, debug, outPath,
-							 &reference, &obsModel, &micrographHandler);
+		motionEstimator.init(
+			verb, fc, nr_omp_threads, debug, outPath,
+			&reference, &obsModel, &micrographHandler);
 	}
 	
 	if (estimateParams)
 	{
+		REPORT_ERROR("Parameter estimation currently not supported");
+		/*
 		if (verb > 0) std::cout << " + Initializing motion parameter estimator ..." << std::endl;
 		
 		motionParamEstimator.init(
-					verb, nr_omp_threads, debug, outPath,
-					s, fc, chosenMdts, &motionEstimator, &reference, &obsModel);
+			verb, nr_omp_threads, debug, outPath,
+			fc, chosenMdts, &motionEstimator, &reference, &obsModel);*/
 	}
 }
 
@@ -365,21 +337,14 @@ void MotionRefiner::run()
 		motionEstimator.process(motionMdts, 0, motionMdts.size()-1);
 	}
 	
-	if (estimateOldBfacs)
-	{
-		bfactorEstimator.init(verb, s, fc, nr_omp_threads, outPath, debug,
-							  &obsModel, &micrographHandler, &reference);
-		
-		bfactorEstimator.process(chosenMdts);
-	}
-	
 	if (recombineFrames)
 	{
-		double k_out_A = obsModel.pixToAng(reference.k_out, s);
+		double k_out_A = reference.pixToAng(reference.k_out);
 		
 		frameRecombiner.init(
-					allMdts, verb, s, fc, k_out_A, nr_omp_threads, outPath, debug,
-					&obsModel, &micrographHandler);
+			allMdts, verb, reference.s, fc, k_out_A, reference.angpix,
+			nr_omp_threads, outPath, debug,
+			&reference, &obsModel, &micrographHandler);
 		
 		frameRecombiner.process(recombMdts, 0, recombMdts.size()-1);
 	}
@@ -444,7 +409,13 @@ void MotionRefiner::combineEPSAndSTARfiles()
 	
 	if (frameRecombiner.doingRecombination())
 	{
-		mdtAll.write(outPath+"shiny.star");
+		for (int og = 0; og < obsModel.numberOfOpticsGroups(); og++)
+		{
+			obsModel.opticsMdt.setValue(EMDL_IMAGE_PIXEL_SIZE, frameRecombiner.getOutputPixelSize(), og);
+			obsModel.opticsMdt.setValue(EMDL_IMAGE_SIZE, frameRecombiner.getOutputBoxSize(), og);
+		}
+		
+		obsModel.save(mdtAll, outPath+"shiny.star");
 	}
 	
 	if (verb > 0)

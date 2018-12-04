@@ -1122,7 +1122,7 @@ void multiViewerCanvas::saveSelectedParticles(int save_selected)
 	int nparts = MDpart.numberOfObjects();
 	if (nparts > 0)
 	{
-		ObservationModel::save(MDpart, *MDopt, fn_selected_parts);
+		ObservationModel::saveNew(MDpart, *MDopt, fn_selected_parts);
 		std::cout << "Saved "<< fn_selected_parts << " with " << nparts << " selected particles." << std::endl;
 	}
 	else
@@ -2302,7 +2302,8 @@ void Displayer::initialise()
 			fn_data = fn_in.without("_model.star") + "_data.star";
 
 		ObservationModel obsModel;
-		ObservationModel::loadSafely(fn_data, obsModel, MDdata, MDopt);
+		ObservationModel::loadSafely(fn_data, obsModel, MDdata);
+		MDopt = obsModel.opticsMdt;
 
 		// If regrouping, also read the model_groups table into memory
 		if (nr_regroups > 0)
@@ -2345,7 +2346,9 @@ void Displayer::initialise()
 			if (MD.read(fn_in,"optics"))
 			{
 				ObservationModel obsModel;
-				ObservationModel::loadSafely(fn_in, obsModel, MD, MDopt);
+				ObservationModel::loadSafely(fn_in, obsModel, MD);
+				MDopt = obsModel.opticsMdt;
+				// @TODO: fix this
 				angpix = MDopt.getValue(EMDL_IMAGE_PIXEL_SIZE, angpix, 0);
 			}
 			else

@@ -74,7 +74,7 @@ void MotionParamEstimator::init(
     const std::vector<MetaDataTable>& allMdts,
     MotionEstimator* motionEstimator,
     ReferenceMap* reference,
-    LegacyObservationModel* obsModel)
+    ObservationModel* obsModel)
 {
     if (!paramsRead)
     {
@@ -114,15 +114,15 @@ void MotionParamEstimator::init(
 			
     if (verb > 0)
     {
-		double k_cutoff_Angst = obsModel->angToPix(k_cutoff, s);
-		double k_eval_Angst = obsModel->angToPix(k_eval, s); 
+		double k_cutoff_Angst = reference->angToPix(k_cutoff);
+		double k_eval_Angst = reference->angToPix(k_eval); 
 		
         std::cout << " + maximum frequency to consider for alignment: "
-            << k_cutoff_Angst << " A (" << k_cutoff << " px)" << std::endl;
+            << k_cutoff_Angst << " A (" << k_cutoff << " ref. px)" << std::endl;
 
         std::cout << " + frequency range to consider for evaluation:  "
-            << k_eval_Angst << " - " << obsModel->pixToAng(reference->k_out,s) << " A ("
-            << k_eval << " - " << reference->k_out << " px)" << std::endl;
+            << k_eval_Angst << " - " << reference->pixToAng(reference->k_out) << " A ("
+            << k_eval << " - " << reference->k_out << " ref. px)" << std::endl;
     }
 
     const long mc = allMdts.size();
@@ -328,9 +328,9 @@ void MotionParamEstimator::evaluateParams(
 
     for (int i = 0; i < paramCount; i++)
     {
-        sig_v_vals_px[i] = motionEstimator->normalizeSigVel(sig_vals[i][0]);
-        sig_d_vals_px[i] = motionEstimator->normalizeSigDiv(sig_vals[i][1]);
-        sig_a_vals_px[i] = motionEstimator->normalizeSigAcc(sig_vals[i][2]);
+        sig_v_vals_px[i] = motionEstimator->normalizeSigVel(sig_vals[i][0], reference->angpix);
+        sig_d_vals_px[i] = motionEstimator->normalizeSigDiv(sig_vals[i][1], reference->angpix);
+        sig_a_vals_px[i] = motionEstimator->normalizeSigAcc(sig_vals[i][2], reference->angpix);
     }
 
     int pctot = 0;
@@ -423,7 +423,7 @@ void MotionParamEstimator::prepAlignment()
 {
     std::cout << " + preparing alignment data... " << std::endl;
 
-    const std::vector<Image<RFLOAT>>& dmgWgh = motionEstimator->getDamageWeights();
+    const std::vector<Image<RFLOAT>>& dmgWgh = motionEstimator->computeDamageWeights(0);
     std::vector<Image<RFLOAT>> alignDmgWgh(fc);
 
     for (int f = 0; f < fc; f++)
@@ -461,7 +461,8 @@ void MotionParamEstimator::prepAlignment()
         try
         {
             motionEstimator->prepMicrograph(
-                mdts[g], fts, alignDmgWgh,
+                mdts[g], fts,
+				0,
                 movie, movieCC,
                 alignmentSet.positions[g],
                 alignmentSet.initialTracks[g],

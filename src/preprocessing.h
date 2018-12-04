@@ -92,7 +92,7 @@ public:
 	RFLOAT recenter_x, recenter_y, recenter_z;
 
 	// MetadataTable with all refined particle coordinates (given through fn_data)
-	MetaDataTable MDimg, MDopt;
+	MetaDataTable MDimg;
 	ObservationModel obsModel;
 
 	// Filenames of all the coordinate files to use for particle extraction

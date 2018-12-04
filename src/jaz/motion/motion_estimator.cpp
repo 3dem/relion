@@ -24,7 +24,7 @@
 #include "motion_refiner.h"
 
 #include <src/jaz/micrograph_handler.h>
-#include <src/jaz/legacy_obs_model.h>
+#include <src/jaz/obs_model.h>
 #include <src/jaz/reference_map.h>
 #include <src/jaz/damage_helper.h>
 #include <src/jaz/img_proc/filter_helper.h>
@@ -83,10 +83,10 @@ void MotionEstimator::read(IOParser& parser, int argc, char *argv[])
 }
 
 void MotionEstimator::init(
-		int verb, int s, int fc, int nr_omp_threads,
+		int verb, int fc, int nr_omp_threads,
 		bool debug, std::string outPath,
 		ReferenceMap* reference,
-		LegacyObservationModel* obsModel,
+		ObservationModel* obsModel,
 		MicrographHandler* micrographHandler)
 {
 	if (!paramsRead)
@@ -95,8 +95,7 @@ void MotionEstimator::init(
 	}
 	
 	this->verb = verb;
-	this->s = s;
-	this->sh = s/2 + 1;
+	obsModel->getBoxSizes(s, sh);
 	this->fc = fc;
 	this->nr_omp_threads = nr_omp_threads;
 	this->debug = debug;
@@ -104,8 +103,11 @@ void MotionEstimator::init(
 	this->reference = reference;
 	this->obsModel = obsModel;
 	this->micrographHandler = micrographHandler;
-	angpix = obsModel->angpix;
+	angpix = obsModel->getPixelSizes();
 	
+	s_ref = reference->s;
+	sh_ref = s_ref/2 + 1;
+	angpix_ref = reference->angpix;
 	
 	if (!global_init && micrographHandler->corrMicFn == "")
 	{
@@ -121,7 +123,7 @@ void MotionEstimator::init(
 	if (verb > 0 && cutoffOut)
 	{
 		std::cout << " + maximum frequency to consider: "
-		          << (s * angpix)/(RFLOAT)reference->k_out << " A (" << reference->k_out << " px)" 
+		          << (s_ref * angpix_ref)/(RFLOAT)reference->k_out << " A (" << reference->k_out << " ref. px)" 
 		          << std::endl;
 	}
 	
@@ -152,21 +154,6 @@ void MotionEstimator::init(
 	
 	if (debug) std::cout << "computing damage weights..." << std::endl;
 	
-	dmgWeight = DamageHelper::damageWeights(
-		s, angpix, micrographHandler->firstFrame, fc, dosePerFrame, dmga, dmgb, dmgc);
-	
-	for (int f = 0; f < fc; f++)
-	{
-		dmgWeight[f].data.xinit = 0;
-		dmgWeight[f].data.yinit = 0;
-		
-		if (cutoffOut)
-		{
-			dmgWeight[f] = FilterHelper::raisedCosEnvFreq2D(
-						dmgWeight[f], reference->k_out-1, reference->k_out+1);
-		}
-	}
-	
 	ready = true;
 }
 
@@ -195,12 +182,8 @@ void MotionEstimator::process(const std::vector<MetaDataTable>& mdts, long g_sta
 	
 	for (int i = 0; i < nr_omp_threads; i++)
 	{
-		FscHelper::initFscTable(sh, fc, tables[i], weights0[i], weights1[i]);
+		FscHelper::initFscTable(sh_ref, fc, tables[i], weights0[i], weights1[i]);
 	}
-	
-	const double sig_vel_px = normalizeSigVel(sig_vel);
-	const double sig_acc_px = normalizeSigAcc(sig_acc);
-	const double sig_div_px = normalizeSigDiv(sig_div);
 	
 	int pctot = 0;
 	
@@ -215,6 +198,44 @@ void MotionEstimator::process(const std::vector<MetaDataTable>& mdts, long g_sta
 		if (debug)
 		{
 			std::cout << g << "/" << g_end << " (" << pc << " particles)" << std::endl;
+		}
+		
+		// optics group representative of this micrograph 
+		// (only the pixel and box sizes have to be identical)
+		int ogmg = 0;
+		
+		// Make sure that all pixel and box sizes are identical within this micrograph:
+		{
+			int og0 = obsModel->getOpticsGroup(mdts[g], 0);
+			ogmg = og0;
+			
+			int boxSize0 = obsModel->getBoxSize(og0);
+			double angpix0 = obsModel->getPixelSize(og0);
+			
+			bool allGood = true;
+			
+			for (int p = 1; p < pc; p++)
+			{
+				int og = obsModel->getOpticsGroup(mdts[g], p);
+				
+				int boxSize = obsModel->getBoxSize(og);
+				double angpix = obsModel->getPixelSize(og);
+				
+				if (boxSize != boxSize0 || angpix != angpix0)
+				{
+					allGood = false;
+					break;
+				}
+			}
+			
+			if (!allGood)
+			{
+				std::cerr << "WARNING: varying pixel or box sizes detected in "
+						  << MotionRefiner::getOutputFileNameRoot(outPath, mdts[g])
+						  << " - skipping micrograph." << std::endl;
+				
+				continue;
+			}
 		}
 		
 		// Make sure output directory exists
@@ -258,8 +279,9 @@ void MotionEstimator::process(const std::vector<MetaDataTable>& mdts, long g_sta
 		
 		try
 		{
-			prepMicrograph(mdts[g], fts, dmgWeight,
-						   movie, movieCC, positions, initialTracks, globComp);
+			prepMicrograph(
+				mdts[g], fts, ogmg,
+				movie, movieCC, positions, initialTracks, globComp);
 		}
 		catch (RelionError e)
 		{
@@ -267,21 +289,26 @@ void MotionEstimator::process(const std::vector<MetaDataTable>& mdts, long g_sta
 			mdts[g].getValue(EMDL_MICROGRAPH_NAME, mgName, 0);
 			
 			std::cerr << " - Warning: unable to load raw movie frames for " << mgName << ". "
-					  << " Possible reasons include lack of the metadata STAR file, the gain reference and/or the movie." << std::endl;
+			          << " Possible reasons include lack of the metadata STAR file, "
+			          << "the gain reference and/or the movie." << std::endl;
 			
 			continue;
 		}
 		
 		pctot += pc;
 		
+		const double sig_vel_px = normalizeSigVel(sig_vel, angpix[ogmg]);
+		const double sig_acc_px = normalizeSigAcc(sig_acc, angpix[ogmg]);
+		const double sig_div_px = normalizeSigDiv(sig_div, angpix[ogmg]);
+		
 		std::vector<std::vector<gravis::d2Vector>> tracks;
 		
 		if (pc > 1)
 		{
 			tracks = optimize(
-						movieCC, initialTracks,
-						sig_vel_px, sig_acc_px, sig_div_px,
-						positions, globComp);
+				movieCC, initialTracks,
+				sig_vel_px, sig_acc_px, sig_div_px,
+				positions, globComp);
 		}
 		else
 		{
@@ -312,7 +339,7 @@ void MotionEstimator::process(const std::vector<MetaDataTable>& mdts, long g_sta
 		
 		updateFCC(movie, tracks, mdts[g], tables, weights0, weights1);
 		
-		writeOutput(tracks, tables, weights0, weights1, positions, fn_root, 30.0);
+		writeOutput(tracks, angpix[ogmg], tables, weights0, weights1, positions, fn_root, 30.0);
 		
 		for (int i = 0; i < nr_omp_threads; i++)
 		{
@@ -338,7 +365,7 @@ void MotionEstimator::process(const std::vector<MetaDataTable>& mdts, long g_sta
 
 void MotionEstimator::prepMicrograph(
 		const MetaDataTable &mdt, std::vector<ParFourierTransformer>& fts,
-		const std::vector<Image<RFLOAT>>& dmgWeight,
+		int ogmg,
 		std::vector<std::vector<Image<Complex>>>& movie,
 		std::vector<std::vector<Image<RFLOAT>>>& movieCC,
 		std::vector<d2Vector>& positions,
@@ -357,7 +384,8 @@ void MotionEstimator::prepMicrograph(
 	}
 	
 	movie = micrographHandler->loadMovie(
-				mdt, s, angpix, fts, positions, myInitialTracks, unregGlob, myGlobComp); // throws exceptions
+				mdt, s[ogmg], angpix[ogmg], fts, 
+				positions, myInitialTracks, unregGlob, myGlobComp); // throws exceptions
 	
 	std::vector<Image<Complex>> preds = reference->predictAll(
 				mdt, *obsModel, ReferenceMap::Own, nr_omp_threads);
@@ -378,6 +406,25 @@ void MotionEstimator::prepMicrograph(
 		}
 	}
 	
+	std::vector<Image<RFLOAT>> dmgWeight = computeDamageWeights(ogmg);
+
+	// @TODO: make filter flank width (around FSC=.143) a parameter (and greater than 3 pixels)
+	for (int f = 0; f < fc; f++)
+	{
+		dmgWeight[f].data.xinit = 0;
+		dmgWeight[f].data.yinit = 0;
+		
+		if (cutoffOut)
+		{
+			double conv_fact = (s[ogmg] * angpix[ogmg]) / (s_ref * angpix_ref);
+					
+			dmgWeight[f] = FilterHelper::raisedCosEnvFreq2D(
+				dmgWeight[f], 
+				conv_fact * (reference->k_out - 1), 
+				conv_fact * (reference->k_out + 1));
+		}
+	}
+	
 	movieCC = MotionHelper::movieCC(movie, preds, dmgWeight, cc_pad, nr_omp_threads);
 	
 	if (global_init || myInitialTracks.size() == 0)
@@ -394,7 +441,7 @@ void MotionEstimator::prepMicrograph(
 		{
 			std::vector<std::vector<gravis::d2Vector>> initialTracks(pc, globTrack);
 			globOffsets = MotionHelper::getGlobalOffsets(
-					movieCC, initialTracks, cc_pad, 0.25*s, globOffMax, globOffMax, nr_omp_threads);
+					movieCC, initialTracks, cc_pad, 0.25*s[ogmg], globOffMax, globOffMax, nr_omp_threads);
 		}
 		
 		if (diag)
@@ -429,7 +476,7 @@ void MotionEstimator::prepMicrograph(
 		std::vector<gravis::d2Vector> globOffsets;
 		
 		globOffsets = MotionHelper::getGlobalOffsets(
-					movieCC, myInitialTracks, cc_pad, 0.25*s, globOffMax, globOffMax, nr_omp_threads);
+					movieCC, myInitialTracks, cc_pad, 0.25*s[ogmg], globOffMax, globOffMax, nr_omp_threads);
 		
 		for (int p = 0; p < pc; p++)
 		{
@@ -537,6 +584,13 @@ std::vector<std::vector<d2Vector>> MotionEstimator::optimize(
 	return optimize(CCd, inTracks, sig_vel_px, sig_acc_px, sig_div_px, positions, globComp);
 }
 
+std::vector<Image<double>> MotionEstimator::computeDamageWeights(int opticsGroup)
+{
+	return DamageHelper::damageWeights(
+		s[opticsGroup], angpix[opticsGroup], micrographHandler->firstFrame, fc, 
+		dosePerFrame, dmga, dmgb, dmgc);
+}
+
 void MotionEstimator::updateFCC(
 		const std::vector<std::vector<Image<Complex>>>& movie,
 		const std::vector<std::vector<d2Vector>>& tracks,
@@ -551,24 +605,30 @@ void MotionEstimator::updateFCC(
 	for (int p = 0; p < pc; p++)
 	{
 		int threadnum = omp_get_thread_num();
+		const int og = obsModel->getOpticsGroup(mdt, p);
 		
 		std::vector<Image<Complex>> obs = movie[p];
 		
 		for (int f = 0; f < fc; f++)
 		{
-			shiftImageInFourierTransform(obs[f](), obs[f](), s, -tracks[p][f].x, -tracks[p][f].y);
+			shiftImageInFourierTransform(obs[f](), obs[f](), s[og], -tracks[p][f].x, -tracks[p][f].y);
 		}
 		
 		Image<Complex> pred = reference->predict(
 				mdt, p, *obsModel, ReferenceMap::Opposite);
 				
-		FscHelper::updateFscTable(obs, pred, tables[threadnum],
-								  weights0[threadnum], weights1[threadnum]);
+		const double scale = (s_ref * angpix_ref)/(s[og] * angpix[og]);
+		
+		FscHelper::updateFscTable(
+			obs, pred, scale, 
+			tables[threadnum],
+			weights0[threadnum], weights1[threadnum]);
 	}
 }
 
 void MotionEstimator::writeOutput(
 		const std::vector<std::vector<d2Vector>>& tracks,
+		double angpix_mg,
 		const std::vector<Image<RFLOAT>>& fccData,
 		const std::vector<Image<RFLOAT>>& fccWeight0,
 		const std::vector<Image<RFLOAT>>& fccWeight1,
@@ -581,9 +641,9 @@ void MotionEstimator::writeOutput(
 	
 	const int fc = tracks[0].size();
 	
-	MotionHelper::writeTracks(tracks, fn_root + "_tracks.star");
+	MotionHelper::writeTracks(tracks, fn_root + "_tracks.star", angpix_mg);
 	
-	Image<RFLOAT> fccDataSum(sh,fc), fccWeight0Sum(sh,fc), fccWeight1Sum(sh,fc);
+	Image<RFLOAT> fccDataSum(sh_ref,fc), fccWeight0Sum(sh_ref,fc), fccWeight1Sum(sh_ref,fc);
 	fccDataSum.data.initZeros();
 	fccWeight0Sum.data.initZeros();
 	fccWeight1Sum.data.initZeros();
@@ -591,7 +651,7 @@ void MotionEstimator::writeOutput(
 	for (int i = 0; i < fccData.size(); i++)
 	{
 		for (int y = 0; y < fc; y++)
-		for (int x = 0; x < sh; x++)
+		for (int x = 0; x < sh_ref; x++)
 		{
 			fccDataSum(y,x) += fccData[i](y,x);
 			fccWeight0Sum(y,x) += fccWeight0[i](y,x);
@@ -751,11 +811,6 @@ void MotionEstimator::writeOutput(
 	}	
 }
 
-const std::vector<Image<RFLOAT>>& MotionEstimator::getDamageWeights()
-{
-	return dmgWeight;
-}
-
 bool MotionEstimator::isReady()
 {
 	return ready;
@@ -821,17 +876,17 @@ std::vector<MetaDataTable> MotionEstimator::findUnfinishedJobs(
 	return out;
 }
 
-double MotionEstimator::normalizeSigVel(double sig_vel)
+double MotionEstimator::normalizeSigVel(double sig_vel, double angpix)
 {
 	return params_scaled_by_dose? dosePerFrame * sig_vel / angpix : sig_vel / angpix;
 }
 
-double MotionEstimator::normalizeSigDiv(double sig_div)
+double MotionEstimator::normalizeSigDiv(double sig_div, double angpix)
 {
 	return sig_div / micrographHandler->coords_angpix;
 }
 
-double MotionEstimator::normalizeSigAcc(double sig_acc)
+double MotionEstimator::normalizeSigAcc(double sig_acc, double angpix)
 {
 	return params_scaled_by_dose? dosePerFrame * sig_acc / angpix : sig_acc / angpix;
 }

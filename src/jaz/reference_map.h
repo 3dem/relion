@@ -102,6 +102,9 @@ class ReferenceMap
                 bool applyCtf = true,
                 bool applyTilt = true, 
 				bool applyShift = true);
+		
+		double angToPix(double a) const;
+        double pixToAng(double p) const;
 };
 
 #endif

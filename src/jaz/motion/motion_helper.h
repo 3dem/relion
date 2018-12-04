@@ -30,7 +30,7 @@
 #include <src/jaz/volume.h>
 #include <src/jaz/gravis/t2Matrix.h>
 #include <src/jaz/gravis/t3Vector.h>
-#include <src/jaz/legacy_obs_model.h>
+#include <src/jaz/obs_model.h>
 #include <src/jaz/parallel_ft.h>
 #include <vector>
 
@@ -76,11 +76,11 @@ class MotionHelper
                 Image<Complex>& dest);
 
         static void writeTracks(
-                const std::vector<std::vector<gravis::d2Vector>>& tracks,
-                std::string fn);
+                const std::vector<std::vector<gravis::d2Vector>>& tracksInPix,
+                std::string fn, double angpix);
 
-        static std::vector<std::vector<gravis::d2Vector>> readTracks(
-                std::string fn);
+        static std::vector<std::vector<gravis::d2Vector>> readTracksInPix(
+                std::string fn, double angpix);
 
 };
 

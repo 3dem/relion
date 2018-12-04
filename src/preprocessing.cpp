@@ -187,7 +187,7 @@ void Preprocessing::initialise()
 				std::cout << " + And re-centering particles based on refined coordinates in the _data.star file" << std::endl;
 
 			// Read the input data file (into the new v3.1 structure)
-			ObservationModel::loadSafely(fn_data, obsModel, MDimg, MDopt);
+			ObservationModel::loadSafely(fn_data, obsModel, MDimg);
 
 		}
 		else

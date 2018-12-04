@@ -37,11 +37,15 @@ class ObservationModel
 		static void loadSafely(
 				std::string filename,
 				ObservationModel& obsModel,
-				MetaDataTable& particlesMdt, MetaDataTable& opticsMdt, int verb = 0);
-
-		static void save(
+				MetaDataTable& particlesMdt, int verb = 0);
+		
+		static void saveNew(
 				MetaDataTable& particlesMdt,
 				MetaDataTable& opticsMdt,
+				std::string filename);
+		
+		void save(
+				MetaDataTable& particlesMdt,
 				std::string filename);
 
 		static bool containsAllColumnsNeededForPrediction(const MetaDataTable& partMdt);
@@ -120,8 +124,8 @@ class ObservationModel
 		// for now, the programs assume that all optics groups have the same pixel size
 		bool allPixelSizesIdentical() const;
 
-        double angToPix(double a, int s, int opticsGroup = 0) const;
-        double pixToAng(double p, int s, int opticsGroup = 0) const;
+        double angToPix(double a, int s, int opticsGroup) const;
+        double pixToAng(double p, int s, int opticsGroup) const;
 
 		double getPixelSize(int opticsGroup) const;
 		std::vector<double> getPixelSizes() const;

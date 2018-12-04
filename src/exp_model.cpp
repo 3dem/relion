@@ -819,8 +819,7 @@ void Experiment::read(
 	{
 		// MDimg and MDopt have to be read at the same time, so that the optics groups can be
 		// renamed in case they are non-contiguous or not sorted
-		MetaDataTable MDopt_tmp;
-		ObservationModel::loadSafely(fn_exp, obsModel, MDimg, MDopt_tmp, verb);
+		ObservationModel::loadSafely(fn_exp, obsModel, MDimg, verb);
 		nr_images_per_optics_group.resize(obsModel.numberOfOpticsGroups(), 0);
 
 #ifdef DEBUG_READ
