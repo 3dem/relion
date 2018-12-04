@@ -1050,16 +1050,7 @@ long int MetaDataTable::read(const FileName &filename, const std::string &name, 
 		REPORT_ERROR( (std::string) "MetaDataTable::read: File " + fn_read + " does not exist" );
 	}
 
-	FileName ext = filename.getFileFormat();
-
-	if (ext == "star")
-	{
-		return readStar(in, name, desiredLabels, grep_pattern, do_only_count);
-	}
-	else
-	{
-		REPORT_ERROR("MetaDataTable::read ERROR: metadata table should have a .star extension");
-	}
+	return readStar(in, name, desiredLabels, grep_pattern, do_only_count);
 
 	in.close();
 

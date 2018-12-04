@@ -959,7 +959,23 @@ void RelionJob::initialiseImportJob()
 
 	hidden_name = ".gui_import";
 
-	joboptions["fn_in"] = JobOption("Input files:", "Micrographs/*.mrcs", "Input file (*.*)", ".", "Select any file(s), possibly using Linux wildcards for 2D micrographs or 3D tomograms that you want to import into a STAR file, which will also be saved as a data Node. \n \n \
+	joboptions["do_raw"] = JobOption("Import raw movies/micrographs?", true, "Set this to Yes if you plan to import raw movies or micrographs");
+
+    joboptions["fn_in_raw"] = JobOption("Raw input files:", (std::string)"Micrographs/*.mrcs", "Provide a Linux wildcard that selects all raw movies or micrographs to be imported.");
+	joboptions["is_multiframe"] = JobOption("Are these multi-frame movies?", true, "Set to Yes for multi-frame movies, set to No for single-frame micrographs.");
+
+	joboptions["optics_group_name"] = JobOption("Optics group name:", (std::string)"opticsGroup1", "Name of this optics group. Each group of movies/micrographs with different optics characteristics for CTF refinement should have a unique name.");
+	joboptions["angpix"] = JobOption("Pixel size (Angstrom):", 1.4, 0.5, 3, 0.1, "Pixel size in Angstroms. ");
+	joboptions["kV"] = JobOption("Voltage (kV):", 300, 50, 500, 10, "Voltage the microscope was operated on (in kV)");
+	joboptions["Cs"] = JobOption("Spherical aberration (mm):", 2.7, 0, 8, 0.1, "Spherical aberration of the microscope used to collect these images (in mm). Typical values are 2.7 (FEI Titan & Talos, most JEOL CRYO-ARM), 2.0 (FEI Polara), 1.4 (some JEOL CRYO-ARM) and 0.01 (microscopes with a Cs corrector).");
+	joboptions["Q0"] = JobOption("Amplitude contrast:", 0.1, 0, 0.3, 0.01, "Fraction of amplitude contrast. Often values around 10% work better than theoretically more accurate lower values...");
+	joboptions["beamtilt_x"] = JobOption("Beamtilt in X (mrad):", 0.0, -1.0, 1.0, 0.1, "Known beamtilt in the X-direction (in mrad). Set to zero if unknown.");
+	joboptions["beamtilt_y"] = JobOption("Beamtilt in Y (mrad):", 0.0, -1.0, 1.0, 0.1, "Known beamtilt in the Y-direction (in mrad). Set to zero if unknown.");
+
+
+	joboptions["do_other"] = JobOption("Import other node types?", false, "Set this to Yes  if you plan to import anything else than movies or micrographs");
+
+	joboptions["fn_in_other"] = JobOption("Input file:", "ref.mrc", "Input file (*.*)", ".", "Select any file(s) to import. \n \n \
 Note that for importing coordinate files, one has to give a Linux wildcard, where the *-symbol is before the coordinate-file suffix, e.g. if the micrographs are called mic1.mrc and the coordinate files mic1.box or mic1_autopick.star, one HAS to give '*.box' or '*_autopick.star', respectively.\n \n \
 Also note that micrographs, movies and coordinate files all need to be in the same directory (with the same rootnames, e.g.mic1 in the example above) in order to be imported correctly. 3D masks or references can be imported from anywhere. \n \n \
 Note that movie-particle STAR files cannot be imported from a previous version of RELION, as the way movies are handled has changed in RELION-2.0. \n \n \
@@ -967,6 +983,7 @@ For the import of a particle, 2D references or micrograph STAR file or of a 3D r
 Note that due to a bug in a fltk library, you cannot import from directories that contain a substring  of the current directory, e.g. dont important from /home/betagal if your current directory is called /home/betagal_r2. In this case, just change one of the directory names.");
 
 	joboptions["node_type"] = JobOption("Node type:", RADIO_NODETYPE, 0, "Select the type of Node this is.");
+
 
 }
 
@@ -978,137 +995,139 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 	commands.clear();
 	initialisePipeline(outputname, PROC_IMPORT_NAME, job_counter);
 
-	commands.push_back("echo importing...");
-
 	std::string command;
-	FileName outputstar;
+	FileName fn_out, fn_in;
+	command = "relion_import ";
 
-	std::string fn_in = joboptions["fn_in"].getString();
-	std::string node_type = joboptions["node_type"].getString();
-	if (node_type == "2D micrograph movies (*.mrcs)" || node_type == "2D micrograph movies (*.mrcs, *.tiff)")
-	{
-		outputstar = outputname+"movies.star";
-		command = "relion_star_loopheader rlnMicrographMovieName > " + outputstar;;
-		commands.push_back(command);
-		command = "ls -rt " + fn_in + " >> " + outputstar;
-		commands.push_back(command);
-		Node node(outputstar, NODE_MOVIES);
-		outputNodes.push_back(node);
-	}
-	else if (node_type == "2D micrographs/tomograms (*.mrc)")
-	{
-		outputstar = outputname+"micrographs.star";
-		command = "relion_star_loopheader rlnMicrographName > " + outputstar;;
-		commands.push_back(command);
-		command = "ls -rt " + fn_in + " >> " + outputstar;
-		commands.push_back(command);
-		Node node(outputstar, NODE_MICS);
-		outputNodes.push_back(node);
-	}
-	else if (node_type == "2D/3D particle coordinates (*.box, *_pick.star)")
-	{
+	bool do_raw = joboptions["do_raw"].getBoolean();
+	bool do_other = joboptions["do_other"].getBoolean();
 
-		// Make the same directory structure of the coordinates
-		// Copy all coordinate files into the same subdirectory in the Import directory
-		// But remove directory structure from pipeline if that exists
-		// Dereference symbolic links if needed
-		FileName fn_dir = fn_in;
-		if (fn_dir.contains("/"))
-			fn_dir = fn_dir.beforeLastOf("/");
-		else
-			fn_dir = ".";
-		FileName fn_pre, fn_jobnr, fn_post;
-		if (decomposePipelineSymlinkName(fn_dir, fn_pre, fn_jobnr, fn_post))
+	if (do_raw && do_other)
+	{
+		error_message = "ERROR: you cannot import BOTH raw movies/micrographs AND other node types at the same time...";
+		return false;
+	}
+	if ((!do_raw) && (!do_other))
+	{
+		error_message = "ERROR: nothing to do... ";
+		return false;
+	}
+
+	if (do_raw)
+	{
+		fn_in = joboptions["fn_in_raw"].getString();
+		if (joboptions["is_multiframe"].getBoolean())
 		{
-			// Make the output directory
-			command = "mkdir -p " + outputname + fn_post;
-			commands.push_back(command);
-			// Copy the coordinates there
-			command = "cp " + fn_in + " " + outputname + fn_post;
-			commands.push_back(command);
+			fn_out = "movies.star";
+			Node node(outputname + fn_out, NODE_MOVIES);
+			outputNodes.push_back(node);
+			command += " --do_movies ";
 		}
 		else
 		{
-			command = "cp --parents " + fn_in + " " + outputname;
-			commands.push_back(command);
+			fn_out = "micrographs.star";
+			Node node(outputname + fn_out, NODE_MICS);
+			outputNodes.push_back(node);
+			command += " --do_micrographs ";
 		}
 
-		// Make a suffix file, which contains the actual suffix as a suffix
-		// Get the coordinate-file suffix
-		FileName fn_suffix = fn_in;
-		FileName fn_suffix2 = fn_suffix.beforeLastOf("*");
-		fn_suffix = fn_suffix.afterLastOf("*");
-		fn_suffix = "coords_suffix" + fn_suffix;
-		Node node(outputname + fn_suffix, NODE_MIC_COORDS);
-		outputNodes.push_back(node);
-		command = " echo \\\"" + fn_suffix2 + "*.mrc\\\" > " + outputname + fn_suffix;
-		commands.push_back(command);
+		command += " --optics_group_name " + joboptions["optics_group_name"].getString();
+		command += " --angpix " + joboptions["angpix"].getString();
+		command += " --kV " + joboptions["kV"].getString();
+		command += " --Cs " + joboptions["Cs"].getString();
+		command += " --Q0 " + joboptions["Q0"].getString();
+		command += " --beamtilt_x " + joboptions["beamtilt_x"].getString();
+		command += " --beamtilt_y " + joboptions["beamtilt_y"].getString();
 
 	}
-	else if (node_type == "Particles STAR file (.star)" ||
-			 node_type == "Movie-particles STAR file (.star)" ||
-			 node_type == "Micrographs STAR file (.star)" ||
-			 node_type == "2D references (.star or .mrcs)" ||
-			 node_type == "3D reference (.mrc)" ||
-			 node_type == "3D mask (.mrc)" ||
-			 node_type == "Unfiltered half-map (unfil.mrc)")
+
+
+	if (do_other)
 	{
-		FileName fnt = "/" + fn_in;
-		fnt = fnt.afterLastOf("/");
-		command = "cp " + fn_in + " " + outputname + fnt;
-		commands.push_back(command);
+		fn_in = joboptions["fn_in_other"].getString();
+		std::string node_type = joboptions["node_type"].getString();
 
-		int mynodetype;
-		if (node_type == "Particles STAR file (.star)")
-			mynodetype = NODE_PART_DATA;
-		else if (node_type == "Movie-particles STAR file (.star)")
-			mynodetype = NODE_MOVIE_DATA;
-		else if (node_type == "Micrographs STAR file (.star)")
-			mynodetype = NODE_MICS;
-		else if (node_type == "2D references (.star or .mrcs)")
-			mynodetype = NODE_2DREFS;
-		else if (node_type == "3D reference (.mrc)")
-			mynodetype = NODE_3DREF;
-		else if (node_type == "3D mask (.mrc)")
-			mynodetype = NODE_MASK;
-		else if (node_type == "Unfiltered half-map (unfil.mrc)")
-			mynodetype = NODE_HALFMAP;
-
-		Node node(outputname + fnt, mynodetype);
-		outputNodes.push_back(node);
-
-		// Also get the other half-map
-		if (mynodetype == NODE_HALFMAP)
+		if (node_type == "2D/3D particle coordinates (*.box, *_pick.star)")
 		{
-			FileName fn_inb = fn_in;
-			size_t pos = fn_inb.find("half1");
-			if (pos != std::string::npos)
+
+			// Make a suffix file, which contains the actual suffix as a suffix
+			// Get the coordinate-file suffix
+			fn_out = "coords_suffix" + fn_in.afterLastOf("*");
+			Node node(outputname + fn_out, NODE_MIC_COORDS);
+			outputNodes.push_back(node);
+		}
+		else if (node_type == "Particles STAR file (.star)" ||
+				 node_type == "Movie-particles STAR file (.star)" ||
+				 node_type == "Micrographs STAR file (.star)" ||
+				 node_type == "2D references (.star or .mrcs)" ||
+				 node_type == "3D reference (.mrc)" ||
+				 node_type == "3D mask (.mrc)" ||
+				 node_type == "Unfiltered half-map (unfil.mrc)")
+		{
+			fn_out = "/" + fn_in;
+			fn_out = fn_out.afterLastOf("/");
+
+			int mynodetype;
+			if (node_type == "Particles STAR file (.star)")
+				mynodetype = NODE_PART_DATA;
+			else if (node_type == "Movie-particles STAR file (.star)")
+				mynodetype = NODE_MOVIE_DATA;
+			else if (node_type == "Micrographs STAR file (.star)")
+				mynodetype = NODE_MICS;
+			else if (node_type == "2D references (.star or .mrcs)")
+				mynodetype = NODE_2DREFS;
+			else if (node_type == "3D reference (.mrc)")
+				mynodetype = NODE_3DREF;
+			else if (node_type == "3D mask (.mrc)")
+				mynodetype = NODE_MASK;
+			else if (node_type == "Unfiltered half-map (unfil.mrc)")
+				mynodetype = NODE_HALFMAP;
+			else
+				REPORT_ERROR("ImportJobWindow::getCommands ERROR: Unrecognized menu option for node_type= " + node_type);
+
+			Node node(outputname + fn_out, mynodetype);
+			outputNodes.push_back(node);
+
+			// Also get the other half-map
+			if (mynodetype == NODE_HALFMAP)
 			{
-				fn_inb.replace(pos, 5, "half2");
-
+				FileName fn_inb = "/" + fn_in;
+				size_t pos = fn_inb.find("half1");
+				if (pos != std::string::npos)
+				{
+					fn_inb.replace(pos, 5, "half2");
+				}
+				else
+				{
+					pos = fn_inb.find("half2");
+					if (pos != std::string::npos)
+					{
+						fn_inb.replace(pos, 5, "half1");
+					}
+				}
+				fn_inb = fn_inb.afterLastOf("/");
+				Node node2(outputname + fn_inb, mynodetype);
+				outputNodes.push_back(node2);
+				command += " --do_halfmaps";
 			}
 			else
 			{
-				pos = fn_inb.find("half2");
-				if (pos != std::string::npos)
-				{
-					fn_inb.replace(pos, 5, "half1");
-				}
+				command += " --do_other";
 			}
-			fnt = "/" + fn_inb;
-			fnt = fnt.afterLastOf("/");
-			command = "cp " + fn_inb + " " + outputname + fnt;
-			commands.push_back(command);
 
-			Node node2(outputname + fnt, mynodetype);
-			outputNodes.push_back(node2);
 		}
 
 	}
-	else
-	{
-		REPORT_ERROR("ImportJobWindow::getCommands ERROR: Unrecognized menu option for node_type= " + node_type);
-	}
+
+	// Now finish the command call to relion_import program, which does the actual copying
+	command += " --i \"" + fn_in + "\"";
+	command += " --odir " + outputname;
+	command += " --ofile " + fn_out;
+
+	if (is_continue)
+		command += " --continue ";
+
+	commands.push_back(command);
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 

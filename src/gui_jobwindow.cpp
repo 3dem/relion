@@ -524,20 +524,59 @@ void JobWindow::initialise(int my_job_type, bool _do_oldstyle)
 void JobWindow::initialiseImportWindow()
 {
 
-	setupTabs(1);
+	setupTabs(2);
 
 	tab1->begin();
-	tab1->label("I/O");
+	tab1->label("Movies/mics");
 	resetHeight();
 
-	place("fn_in");
+
+	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group1->end();
+
+
+	place("do_raw", TOGGLE_DEACTIVATE, group1, false);
 
 	// Add a little spacer
 	current_y += STEPY/2;
 
-	place("node_type");
+	group1->begin();
+	place("fn_in_raw");
+	place("is_multiframe");
 
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	place("optics_group_name");
+	place("angpix");
+	place("kV");
+	place("Cs");
+	place("Q0");
+	place("beamtilt_x");
+	place("beamtilt_y");
+	group1->end();
+
+	guientries["do_raw"].cb_menu_i(); // make default active
 	tab1->end();
+
+	tab2->begin();
+	tab2->label("Others");
+	resetHeight();
+
+	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group2->end();
+	place("do_other", TOGGLE_DEACTIVATE, group2, false);
+	group2->begin();
+	// Add a little spacer
+	current_y += STEPY/2;
+	place("fn_in_other");
+	place("node_type");
+	group2->end();
+
+	guientries["do_other"].cb_menu_i(); // make default active
+
+
+	tab2->end();
 
 	// Always deactivate the queue option
 	guientries["do_queue"].deactivate_option = TOGGLE_ALWAYS_DEACTIVATE;

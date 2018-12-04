@@ -164,8 +164,6 @@ static Fl_Menu_Item fl_node_type_options[] = {
 	{job_nodetype_options[5]},
 	{job_nodetype_options[6]},
 	{job_nodetype_options[7]},
-	{job_nodetype_options[8]},
-	{job_nodetype_options[9]},
 	{0} // this should be the last entry
 };
 

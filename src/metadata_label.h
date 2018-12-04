@@ -116,6 +116,7 @@ enum EMDLabel
     EMDL_IMAGE_BEAMTILT_X,
     EMDL_IMAGE_BEAMTILT_Y,
 	EMDL_IMAGE_OPTICS_GROUP,
+	EMDL_IMAGE_OPTICS_GROUP_NAME,
 	EMDL_IMAGE_ODD_ZERNIKE_COEFFS,
 	EMDL_IMAGE_EVEN_ZERNIKE_COEFFS,
 	EMDL_IMAGE_PIXEL_SIZE,
@@ -579,6 +580,7 @@ private:
         EMDL::addLabel(EMDL_IMAGE_BEAMTILT_X, EMDL_DOUBLE, "rlnBeamTiltX", "Beam tilt in the X-direction (in mrad)");
         EMDL::addLabel(EMDL_IMAGE_BEAMTILT_Y, EMDL_DOUBLE, "rlnBeamTiltY", "Beam tilt in the Y-direction (in mrad)");
 		EMDL::addLabel(EMDL_IMAGE_OPTICS_GROUP, EMDL_INT, "rlnOpticsGroup", "Group of particles with identical optical properties");
+		EMDL::addLabel(EMDL_IMAGE_OPTICS_GROUP_NAME, EMDL_STRING, "rlnOpticsGroupName", "The name of a group of particles with identical optical properties");
 		EMDL::addLabel(EMDL_IMAGE_ODD_ZERNIKE_COEFFS, EMDL_DOUBLE_VECTOR, "rlnOddZernike", "Coefficients for the antisymmetrical Zernike polynomials");
 		EMDL::addLabel(EMDL_IMAGE_EVEN_ZERNIKE_COEFFS, EMDL_DOUBLE_VECTOR, "rlnEvenZernike", "Coefficients for the symmetrical Zernike polynomials");
 		EMDL::addLabel(EMDL_IMAGE_PIXEL_SIZE, EMDL_DOUBLE, "rlnImagePixelSize", "Pixel size (in Angstrom)");

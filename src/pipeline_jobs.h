@@ -82,8 +82,6 @@ static const char* job_sampling_options[] = {
 };
 
 static const char* job_nodetype_options[] = {
-	"2D micrograph movies (*.mrcs, *.tiff)",
-	"2D micrographs/tomograms (*.mrc)",
 	"2D/3D particle coordinates (*.box, *_pick.star)",
 	"Particles STAR file (.star)",
 	"Movie-particles STAR file (.star)",
