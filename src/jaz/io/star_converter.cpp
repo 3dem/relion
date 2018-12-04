@@ -19,8 +19,6 @@ void StarConverter::convert_3p0_particlesTo_3p1(
 			<< "You are either using an outdated copy of Relion, or the file is from the future.\n");
 	}
 
-	const int outVer = 30001;
-
 	const int particleCount = in.numberOfObjects();
 
 	std::vector<EMDLabel> allOpticsLabels_double(0);
@@ -106,7 +104,7 @@ void StarConverter::convert_3p0_particlesTo_3p1(
 	}
 
 	outParticles.setName("particles");
-	outParticles.setVersion(outVer);
+	outParticles.setVersion(curVer);
 
 
 	outOptics.addLabel(EMDL_IMAGE_OPTICS_GROUP);
@@ -131,48 +129,48 @@ void StarConverter::convert_3p0_particlesTo_3p1(
 	translateOffsets(outParticles, outOptics);
 
 	outOptics.setName("optics");
-	outOptics.setVersion(outVer);
-	
+	outOptics.setVersion(curVer);
+
 	// Also read in one image for each optics group to set the image sizes in the outOptics table
 	// Also set the image_size for each optics_group
 	int nr_optics_groups_found = 0;
 	int nr_optics_groups = groupValues_double.size();
 	std::vector<bool> found_this_group;
 	found_this_group.resize(nr_optics_groups, false);
-	
+
 	for (long int p = 0; p < particleCount; p++)
 	{
 		int g = opticsClasses[p];
-		
+
 		if (!found_this_group[g])
 		{
 			FileName fn_img;
-			
+
 			if (!outParticles.getValue(EMDL_IMAGE_NAME, fn_img, p))
 			{
 				REPORT_ERROR("BUG: cannot find name for particle...");
 			}
-			
+
 			try
 			{
 				Image<double> img;
 				img.read(fn_img, false); // false means read only header, skip real data
 				int image_size = img().xdim;
-				
+
 				if (image_size%2 != 0)
 				{
 					REPORT_ERROR("ERROR: this program only works with even values for the image dimensions!");
 				}
-				
+
 				if (image_size != img().ydim)
 				{
-					REPORT_ERROR("ERROR: xsize != ysize: only square eD images allowed");
+					REPORT_ERROR("ERROR: xsize != ysize: only squared images allowed");
 				}
-				
+
 				outOptics.setValue(EMDL_IMAGE_SIZE, image_size, g);
 				found_this_group[g] = true;
 				nr_optics_groups_found++;
-				
+
 				if (img().zdim > 1)
 				{
 					if (image_size != img().zdim)
@@ -203,7 +201,7 @@ void StarConverter::convert_3p0_particlesTo_3p1(
 	{
 		std::cerr << "Warning: not all image files could be found.\n";
 		std::cerr << "         Image sizes and dimensionalities will be missing from the star file.\n";
-		
+
 		//REPORT_ERROR("BUG: something went wrong with finding the optics groups...");
 	}
 }
