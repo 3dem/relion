@@ -1067,7 +1067,7 @@ void MlOptimiserMpi::expectation()
 			catch (std::bad_alloc& ba)
 			{
 				CRITICAL(RAMERR);
-			}			
+			}
 
 			std::complex<XFLOAT> *pData = mdlClassComplex[iclass];
 
@@ -2224,11 +2224,11 @@ void MlOptimiserMpi::maximization()
 										mymodel.helical_rise_min,
 										mymodel.helical_rise_max,
 										mymodel.helical_rise_inistep,
-										helical_rise_half2,
+										mymodel.helical_rise[ith_recons],
 										mymodel.helical_twist_min,
 										mymodel.helical_twist_max,
 										mymodel.helical_twist_inistep,
-										helical_twist_half2);
+										mymodel.helical_twist[ith_recons]);
 							}
 							// Sjors & Shaoda Apr 2015 - Apply real space helical symmetry and real space Z axis expansion.
 							if( (do_helical_refine) && (!ignore_helical_symmetry) && (!has_converged) )
@@ -2240,10 +2240,12 @@ void MlOptimiserMpi::maximization()
 										(helical_tube_inner_diameter / 2.),
 										(helical_tube_outer_diameter / 2.),
 										helical_z_percentage,
-										helical_rise_half2,
-										helical_twist_half2,
+										mymodel.helical_rise[ith_recons],
+										mymodel.helical_twist[ith_recons],
 										width_mask_edge);
 							}
+							helical_rise_half2 = mymodel.helical_rise[ith_recons];
+							helical_twist_half2 = mymodel.helical_twist[ith_recons];
 						} // end if !do_join_random_halves
 
 						// But rank 2 always does the unfiltered reconstruction
