@@ -1121,7 +1121,7 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 				// Histogram
 				std::vector<RFLOAT> histX, histY;
 				CPlot2D *plot2D=new CPlot2D("");
-				MDavg.columnHistogram(label,histX,histY,0, plot2D);
+				MDavg.columnHistogram(label,histX,histY, 0, plot2D);
 				fn_eps = fn_eps_root + "_hist_" + EMDL::label2Str(label) + ".eps";
 				plot2D->OutputPostScriptPlot(fn_eps);
 				all_fn_eps.push_back(fn_eps);

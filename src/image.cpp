@@ -33,6 +33,7 @@ unsigned long  gettypesize(DataType type)
         case Float:              size = sizeof(float); break;
         case Double:             size = sizeof(RFLOAT); break;
         case Bool:				  size = sizeof(bool); break;
+        case UHalf: REPORT_ERROR("Logic error: UHalf (4-bit) needs special consideration. Don't use this function."); break;
         default: size = 0;
     }
 

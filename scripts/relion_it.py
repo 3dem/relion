@@ -117,15 +117,13 @@ If any of the entered values are invalid (for example, if there are letters in a
 GUI will display a message box with an error when you click one of the buttons. It will also display a warning if any
 values appear to be incorrect (but you can choose to ignore the warning by clicking "OK").
 
-The GUI will try to calculate some extra options from the values you enter using the following steps:
+The GUI will try to calculate some extra options from the values you enter using the following rules:
 
-1. Set the mask diameter to 1.1 times the particle size.
+1. If a 3D reference is given, use a single pass with reference-based autopicking, minimum distance between particles
+   of 0.7 times the particle size, and a batch size of 100,000 particles.
 
-2a. If a 3D reference is given, use a single pass with reference-based autopicking, minimum distance between particles
-    of 0.7 times the particle size, and a batch size of 100,000 particles.
-
-2b. If no 3D reference is given, run a first pass with reference-free LoG autopicking and a batch size of 10,000, and
-    then a second pass with reference-based autopicking and a batch size of 100,000.
+2. If no 3D reference is given, run a first pass with reference-free LoG autopicking and a batch size of 10,000, and
+   then a second pass with reference-based autopicking and a batch size of 100,000.
 
 These options should be sensible in many cases, but if you'd like to change them, save the options from the GUI using
 the "Save options" button, close the GUI, and edit the `relion_it_options.py' file to change the option values as
@@ -812,6 +810,16 @@ class RelionItGui(object):
 
         row += 1
 
+        tk.Label(particle_frame, text=u"Mask diameter (\u212B):").grid(row=row, sticky=tk.W)
+        self.mask_diameter_var = tk.StringVar()  # for data binding
+        self.mask_diameter_entry = tk.Entry(particle_frame, textvariable=self.mask_diameter_var)
+        self.mask_diameter_entry.grid(row=row, column=1, sticky=tk.W+tk.E)
+        self.mask_diameter_entry.insert(0, str(options.mask_diameter))
+        self.mask_diameter_px = tk.Label(particle_frame, text="= NNN px")
+        self.mask_diameter_px.grid(row=row, column=2,sticky=tk.W)
+
+        row += 1
+
         tk.Label(particle_frame, text="Box size (px):").grid(row=row, sticky=tk.W)
         self.box_size_var = tk.StringVar()  # for data binding
         self.box_size_entry = tk.Entry(particle_frame, textvariable=self.box_size_var)
@@ -840,7 +848,7 @@ class RelionItGui(object):
 
         ###
 
-        project_frame = tk.LabelFrame(left_frame, text="Project details", padx=5, pady=5)
+        project_frame = tk.LabelFrame(right_frame, text="Project details", padx=5, pady=5)
         project_frame.pack(padx=5, pady=5, fill=tk.X, expand=1)
         tk.Grid.columnconfigure(project_frame, 1, weight=1)
 
@@ -935,16 +943,14 @@ class RelionItGui(object):
         ### Add logic to the box size boxes
 
         def calculate_box_size(particle_size_pixels):
-            # Calculate required box size and round up to next size in sequence
-            minimum_box_size = 1.2 * particle_size_pixels
-            for box in (48, 64, 96, 128, 192, 256, 384, 512, 768, 1024):
-                if box > minimum_box_size:
-                    return box
-            else:
-                return "Box size is too large!"
+            # Use box 20% larger than particle and ensure size is even
+            box_size_exact = 1.2 * particle_size_pixels
+            box_size_int = int(math.ceil(box_size_exact))
+            return box_size_int + box_size_int % 2
 
         def calculate_downscaled_box_size(box_size_pix, angpix):
-            for small_box_pix in (48, 64, 96, 128, 192, 256, 384, 512, 768):
+            for small_box_pix in (48, 64, 96, 128, 160, 192, 256, 288, 300, 320, 360,
+                                  384, 400, 420, 450, 480, 512, 640, 768, 896, 1024):
                 # Don't go larger than the original box
                 if small_box_pix > box_size_pix:
                     return box_size_pix
@@ -952,38 +958,55 @@ class RelionItGui(object):
                 small_box_angpix = angpix * box_size_pix / small_box_pix
                 if small_box_angpix < 4.25:
                     return small_box_pix
-            # Fall back to the original box size
-            return box_size_pix
+            # Fall back to a warning message
+            return "Box size is too large!"
 
         def update_box_size_labels(*args_ignored, **kwargs_ignored):
             try:
                 angpix = float(self.angpix_entry.get())
-                box_size = float(self.box_size_entry.get())
             except ValueError:
-                # Can't update the box size in angstrom without both values
+                # Can't update any of the labels without angpix
+                self.mask_diameter_px.config(text="= NNN px")
                 self.box_size_in_angstrom.config(text=u"= NNN \u212B")
                 self.extract_angpix.config(text=u"= NNN \u212B/px")
                 return
-            box_angpix = angpix * box_size
-            self.box_size_in_angstrom.config(text=u"= {:.1f} \u212B".format(box_angpix))
             try:
-                extract_small_boxsize = float(self.extract_small_boxsize_entry.get())
+                mask_diameter = float(self.mask_diameter_entry.get())
+                mask_diameter_px = mask_diameter / angpix
+                self.mask_diameter_px.config(text="= {:.1f} px".format(mask_diameter_px))
+            except (ValueError, ZeroDivisionError):
+                self.mask_diameter_px.config(text="= NNN px")
+                # Don't return - an error here doesn't stop us calculating the other labels
+            try:
+                box_size = float(self.box_size_entry.get())
+                box_angpix = angpix * box_size
+                self.box_size_in_angstrom.config(text=u"= {:.1f} \u212B".format(box_angpix))
             except ValueError:
-                # Can't update the downscaled pixel size unless the downscaled box size is valid
+                # Can't update these without the box size
+                self.box_size_in_angstrom.config(text=u"= NNN \u212B")
                 self.extract_angpix.config(text=u"= NNN \u212B/px")
                 return
-            small_box_angpix = box_angpix / extract_small_boxsize
-            self.extract_angpix.config(text=u"= {:.3f} \u212B/px".format(small_box_angpix))
+            try:
+                extract_small_boxsize = float(self.extract_small_boxsize_entry.get())
+                small_box_angpix = box_angpix / extract_small_boxsize
+                self.extract_angpix.config(text=u"= {:.3f} \u212B/px".format(small_box_angpix))
+            except (ValueError, ZeroDivisionError):
+                # Can't update the downscaled pixel size unless the downscaled box size is valid
+                self.extract_angpix.config(text=u"= NNN \u212B/px")
 
         def update_box_sizes(*args_ignored, **kwargs_ignored):
             # Always activate entry boxes - either we're activating them anyway, or we need to edit the text.
             # For text editing we need to activate the box first then deactivate again afterwards.
+            self.mask_diameter_entry.config(state=tk.NORMAL)
             self.box_size_entry.config(state=tk.NORMAL)
             self.extract_small_boxsize_entry.config(state=tk.NORMAL)
             if self.get_var_as_bool(self.auto_boxsize_var):
                 try:
-                    angpix = float(self.angpix_entry.get())
                     particle_size_angstroms = float(self.particle_max_diam_entry.get())
+                    mask_diameter = 1.1 * particle_size_angstroms
+                    self.mask_diameter_entry.delete(0, tk.END)
+                    self.mask_diameter_entry.insert(0, str(mask_diameter))
+                    angpix = float(self.angpix_entry.get())
                     particle_size_pixels = particle_size_angstroms / angpix
                     box_size = calculate_box_size(particle_size_pixels)
                     self.box_size_entry.delete(0, tk.END)
@@ -994,6 +1017,7 @@ class RelionItGui(object):
                 except:
                     # Ignore errors - they will be picked up if the user tries to save the options
                     pass
+                self.mask_diameter_entry.config(state=tk.DISABLED)
                 self.box_size_entry.config(state=tk.DISABLED)
                 self.extract_small_boxsize_entry.config(state=tk.DISABLED)
             update_box_size_labels()
@@ -1017,6 +1041,7 @@ class RelionItGui(object):
             # Update the box size controls with care to avoid activating them when we shouldn't
             auto_boxsize_button.config(state=new_state)
             if new_state == tk.DISABLED:
+                self.mask_diameter_entry.config(state=new_state)
                 self.box_size_entry.config(state=new_state)
                 self.extract_small_boxsize_entry.config(state=new_state)
             else:
@@ -1124,6 +1149,13 @@ class RelionItGui(object):
             warnings.append("- 3D reference file '{}' does not exist".format(opts.autopick_3dreference))
 
         try:
+            opts.mask_diameter = float(self.mask_diameter_entry.get())
+        except ValueError:
+            raise ValueError("Mask diameter must be a number")
+        if opts.mask_diameter <= 0:
+            warnings.append("- Mask diameter should be a positive number")
+
+        try:
             opts.extract_boxsize = int(self.box_size_entry.get())
         except ValueError:
             raise ValueError("Box size must be a number")
@@ -1132,6 +1164,9 @@ class RelionItGui(object):
 
         try:
             opts.extract_small_boxsize = int(self.extract_small_boxsize_entry.get())
+            opts.extract2_small_boxsize = opts.extract_small_boxsize
+            opts.extract_downscale = True
+            opts.extract2_downscale = True
         except ValueError:
             raise ValueError("Down-sampled box size must be a number")
         if opts.extract_small_boxsize <= 0:
@@ -1157,9 +1192,6 @@ class RelionItGui(object):
         script.
         """
         opts = self.options
-
-        # Set mask diameter (in A) to 110 % of particle maximum diameter
-        opts.mask_diameter = 1.1 * opts.autopick_LoG_diam_max
 
         # If we have a 3D reference, do a single pass with a large batch size
         if len(opts.autopick_3dreference) > 0:
@@ -1187,7 +1219,8 @@ class RelionItGui(object):
         """
         try:
             warnings = self.fetch_options_from_gui()
-            if len(warnings) == 0 or tkMessageBox.askokcancel("Warning", "\n".join(warnings), icon='warning'):
+            if len(warnings) == 0 or tkMessageBox.askokcancel("Warning", "\n".join(warnings), icon='warning',
+                                                              default=tkMessageBox.CANCEL):
                 self.calculate_full_options()
                 print " RELION_IT: Writing all options to {}".format(OPTIONS_FILE)
                 if os.path.isfile(OPTIONS_FILE):

@@ -387,6 +387,8 @@ void DefocusEstimator::writeEPS(const MetaDataTable& mdt)
 		defU = (defU + defV) / 2.;
 
 		RFLOAT val  = (defU - min_defocus) / (max_defocus - min_defocus);
+		const RFLOAT eps = 1e-10;
+		if (max_defocus - min_defocus < eps) val = 0.5; // to avoid NaN in color
 
 		CDataSet dataSet;
 

@@ -118,6 +118,11 @@ void CtffindRunner::initialise()
 	if (do_use_gctf && ctf_win>0)
 		REPORT_ERROR("ERROR: Running Gctf together with --ctfWin is not implemented, please use CTFFIND instead.");
 
+	if (!do_phaseshift && (additional_gctf_options.find("--phase_shift_L") != std::string::npos ||
+	                       additional_gctf_options.find("--phase_shift_H") != std::string::npos ||
+	                       additional_gctf_options.find("--phase_shift_S") != std::string::npos))
+		REPORT_ERROR("ERROR: Please don't specify --phase_shift_L, H, S in 'Other Gctf options' (--extra_gctf_options). Use 'Estimate phase shifts' (--do_phaseshift) and 'Phase shift - Min, Max, Step' (--phase_min, --phase_max, --phase_step) instead.");
+
 	// Make sure fn_out ends with a slash
 	if (fn_out[fn_out.length()-1] != '/')
 		fn_out += "/";
@@ -245,15 +250,18 @@ void CtffindRunner::initialise()
 
 	if (do_use_gctf && fn_micrographs.size()>0)
 	{
-#ifdef CUDA
 		untangleDeviceIDs(gpu_ids, allThreadIDs);
 		if (allThreadIDs[0].size()==0 || (!std::isdigit(*gpu_ids.begin())) )
 		{
+#ifdef CUDA
 			if (verb>0)
-				std::cout << "gpu-ids not specified, threads will automatically be mapped to devices (incrementally)."<< std::endl;
+				std::cout << "gpu-ids were not specified, so threads will automatically be mapped to devices (incrementally)."<< std::endl;
 			HANDLE_ERROR(cudaGetDeviceCount(&devCount));
-		}
+#else
+			if (verb>0)
+				REPORT_ERROR("gpu-ids were not specified, but we could not figure out which GPU to use because RELION was not compiled with CUDA support.");
 #endif
+		}
 
 		// Find the dimensions of the first micrograph, to later on ensure all micrographs are the same size
 		Image<double> Itmp;
