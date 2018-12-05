@@ -77,8 +77,6 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	fn_movie = parser.getOption("--movie", "Rootname to identify movies", "movie");
 	continue_old = parser.checkOption("--only_do_unfinished", "Only run motion correction for those micrographs for which there is not yet an output micrograph.");
 	do_at_most = textToInteger(parser.getOption("--do_at_most", "Only process at most this number of (unprocessed) micrographs.", "-1"));
-	do_save_movies  = parser.checkOption("--save_movies", "Also save the motion-corrected movies.");
-	angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms", "-1"));
 	first_frame_sum =  textToInteger(parser.getOption("--first_frame_sum", "First movie frame used in output sum (start at 1)", "1"));
 	if (first_frame_sum < 1) first_frame_sum = 1;
 	last_frame_sum =  textToInteger(parser.getOption("--last_frame_sum", "Last movie frame used in output sum (0 or negative: use all)", "-1"));
@@ -106,7 +104,8 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 
 	int doseweight_section = parser.addSection("Dose-weighting options");
 	do_dose_weighting = parser.checkOption("--dose_weighting", "Use MOTIONCOR2s or UNBLURs dose-weighting scheme");
-	voltage = textToFloat(parser.getOption("--voltage","Voltage (in kV) for dose-weighting inside MOTIONCOR2/UNBLUR", "300"));
+	angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms", "-1"));
+	voltage = textToFloat(parser.getOption("--voltage","Voltage (in kV) for dose-weighting inside MOTIONCOR2/UNBLUR", "-1"));
 	dose_per_frame = textToFloat(parser.getOption("--dose_per_frame", "Electron dose (in electrons/A2/frame) for dose-weighting", "1"));
 	pre_exposure = textToFloat(parser.getOption("--preexposure", "Pre-exposure (in electrons/A2) for dose-weighting", "0"));
 
@@ -160,14 +159,12 @@ void MotioncorrRunner::initialise()
 				REPORT_ERROR("ERROR: You have to specify the path to SUMMOVIE as --summovie_exe or the RELION_SUMMOVIE_EXECUTABLE variable");
 		}
 
-		if (angpix < 0)
-			REPORT_ERROR("ERROR: For Unblur it is mandatory to provide the pixel size in Angstroms through --angpix.");
 	}
 	else if (do_motioncor2)
 	{
 		if (fn_defect != "") {
 			std::cerr << "WARNING: Although the defect file will be used by MotionCor2, Bayesian Polishing will work on uncorrected raw movies and ignore the defect file." << std::endl;
-		}	
+		}
 
 		// Get the MOTIONCOR2 executable
 		if (fn_motioncor2_exe == "")
@@ -203,16 +200,18 @@ void MotioncorrRunner::initialise()
 			// If patch_x == patch_y == 1, the user actually wants global alignment alone, so do not warn.
 			std::cerr << "The number of patches is too small (<= 2). Patch based alignment will be skipped." << std::endl;
 		}
-		if (do_save_movies) {
-			std::cerr << "WARNING: In our own implementation of motion correction, we do not save aligned movies. --save_movies was ignored." << std::endl;
-			do_save_movies = false;
-		}
 	} else {
 		REPORT_ERROR(" ERROR: You have to specify which programme to use through either --use_motioncor2 or --use_unblur");
 	}
 
-	if (angpix < 0)
-		REPORT_ERROR("ERROR: It is mandatory to provide the pixel size in Angstroms through --angpix.");
+	if (!fn_in.isStarFile() && angpix < 0)
+	{
+		REPORT_ERROR("ERROR: when not providing an input STAR file, it is mandatory to provide the pixel size in Angstroms through --angpix.");
+	}
+	if (!fn_in.isStarFile() && voltage < 0.)
+	{
+		REPORT_ERROR("ERROR: when not providing an input STAR file, it is mandatory to provide the voltage in kV through --voltage.");
+	}
 
 #ifdef CUDA
 	if (do_motioncor2)
@@ -229,26 +228,62 @@ void MotioncorrRunner::initialise()
 	if (fn_in.isStarFile())
 	{
 		MetaDataTable MDin;
-		MDin.read(fn_in);
+		ObservationModel::loadSafely(fn_in, obsModel, MDin, "movies", verb);
+
 		fn_micrographs.clear();
+		optics_group_micrographs.clear();
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
 		{
 			FileName fn_mic;
 			MDin.getValue(EMDL_MICROGRAPH_MOVIE_NAME, fn_mic);
 			fn_micrographs.push_back(fn_mic);
+
+			int optics_group;
+			MDin.getValue(EMDL_IMAGE_OPTICS_GROUP, optics_group);
+			optics_group_micrographs.push_back(optics_group);
 		}
 	}
 	else
 	{
 		fn_in.globFiles(fn_micrographs);
+		optics_group_micrographs.resize(fn_in.size(), 1);
+		obsModel.opticsMdt.clear();
+		obsModel.opticsMdt.addObject();
+	}
+
+	// Make sure obsModel.opticsMdt has all the necessary information
+	if (!obsModel.opticsMdt.containsLabel(EMDL_CTF_VOLTAGE))
+	{
+		if (voltage < 0.)
+		{
+			REPORT_ERROR("ERROR: the input STAR file does not contain the acceleration voltage, and no voltage is given through --voltage.");
+		}
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(obsModel.opticsMdt)
+		{
+			obsModel.opticsMdt.setValue(EMDL_CTF_VOLTAGE, voltage);
+		}
+	}
+	if (!obsModel.opticsMdt.containsLabel(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE))
+	{
+		if (angpix < 0.)
+		{
+			REPORT_ERROR("ERROR: the input STAR file does not contain the pixel size, and no pixel size is given through --angpix.");
+		}
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(obsModel.opticsMdt)
+		{
+			obsModel.opticsMdt.setValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, angpix);
+		}
 	}
 
 	// First backup the given list of all micrographs
+	std::vector<int> optics_group_given_all = optics_group_micrographs;
 	std::vector<FileName> fn_mic_given_all = fn_micrographs;
 	// This list contains those for the output STAR & PDF files
 	fn_ori_micrographs.clear();
+	optics_group_ori_micrographs.clear();
 	// These are micrographs to be processed
 	fn_micrographs.clear();
+	optics_group_micrographs.clear();
 
 	bool warned = false;
 
@@ -263,7 +298,7 @@ void MotioncorrRunner::initialise()
 			FileName fn_avg, fn_mov;
 			getOutputFileNames(fn_mic_given_all[imic], fn_avg, fn_mov);
 			if (exists(fn_avg) && exists(fn_avg.withoutExtension() + ".star") &&
-			    (!do_save_movies || exists(fn_mov)))
+			    (exists(fn_mov)))
 			{
 				process_this = false; // already done
 			}
@@ -285,10 +320,16 @@ void MotioncorrRunner::initialise()
 		}
 
 		if (process_this)
+		{
 			fn_micrographs.push_back(fn_mic_given_all[imic]);
+			optics_group_micrographs.push_back(optics_group_given_all[imic]);
+		}
 
 		if (!ignore_this)
+		{
 			fn_ori_micrographs.push_back(fn_mic_given_all[imic]);
+			optics_group_ori_micrographs.push_back(optics_group_given_all[imic]);
+		}
 	}
 
 	// Make sure fn_out ends with a slash
@@ -419,6 +460,10 @@ void MotioncorrRunner::run()
 
 		Micrograph mic(fn_micrographs[imic], fn_gain_reference, bin_factor);
 
+		// Get angpix and voltage from the optics groups:
+		obsModel.opticsMdt.getValue(EMDL_CTF_VOLTAGE, voltage, optics_group_micrographs[imic]-1);
+		obsModel.opticsMdt.getValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, angpix, optics_group_micrographs[imic]-1);
+
 		bool result = false;
 		if (do_own)
 			result = executeOwnMotionCorrection(mic);
@@ -471,9 +516,6 @@ bool MotioncorrRunner::executeMotioncor2(Micrograph &mic, int rank)
         command += " -LogFile " + fn_avg.withoutExtension();
 	command += " -Bft " + floatToString(bfactor);
 	command += " -PixSize " + floatToString(angpix);
-
-	if (do_save_movies)
-		command += " -OutStack 1";
 
 	command += " -Patch " + integerToString(patch_x) + " " + integerToString(patch_y);
 
@@ -575,17 +617,6 @@ bool MotioncorrRunner::executeMotioncor2(Micrograph &mic, int rank)
 			if (std::rename(fn_tmp.c_str(), fn_avg.c_str()))
 			{
 				std::cerr << "ERROR in renaming: " << fn_tmp << " to " << fn_avg <<std::endl;
-				return false;
-			}
-		}
-
-		if (do_save_movies)
-		{
-			// Move movie .mrc to new .mrcs filename
-			FileName fn_tmp = fn_avg.withoutExtension() + "_Stk.mrc";
-			if (std::rename(fn_tmp.c_str(), fn_mov.c_str()))
-			{
-				std::cerr << "ERROR in renaming: " << fn_tmp << " to " << fn_mov <<std::endl;
 				return false;
 			}
 		}
@@ -735,15 +766,7 @@ bool MotioncorrRunner::executeUnblur(Micrograph &mic)
 	{
 		fh << "NO" << std::endl; // no dose filtering
 	}
-	if (do_save_movies)
-	{
-		fh << "YES" << std::endl; // save movie frames
-		fh << fn_tmp_mov << std::endl;
-	}
-	else
-	{
-		fh << "NO" << std::endl; // dont set expert options
-	}
+	fh << "NO" << std::endl; // dont save movies
 	fh << "NO" << std::endl; // dont set expert options
 	fh <<"EOF"<<std::endl;
 	fh.close();
@@ -798,16 +821,6 @@ bool MotioncorrRunner::executeUnblur(Micrograph &mic)
 
 		// Plot the FRC
 		plotFRC(fn_frc);
-	}
-
-	// Move movie .mrc to new .mrcs filename
-	if (do_save_movies)
-	{
-		if (std::rename(fn_tmp_mov.c_str(), fn_mov.c_str()))
-		{
-			std::cerr << "ERROR in renaming: " << fn_tmp_mov << " to " << fn_mov <<std::endl;
-			return false;
-		}
 	}
 
 	// remove symbolic link
@@ -1043,13 +1056,7 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 			}
 			MDavg.setValue(EMDL_MICROGRAPH_NAME, fn_avg);
 			MDavg.setValue(EMDL_MICROGRAPH_METADATA_NAME, fn_avg.withoutExtension() + ".star");
-			if (do_save_movies && exists(fn_mov))
-			{
-				MDmov.addObject();
-				MDmov.setValue(EMDL_MICROGRAPH_MOVIE_NAME, fn_mov);
-				MDmov.setValue(EMDL_MICROGRAPH_NAME, fn_avg);
-			}
-
+			MDavg.setValue(EMDL_IMAGE_OPTICS_GROUP, optics_group_ori_micrographs[imic]);
 			FileName fn_star = fn_avg.withoutExtension() + ".star";
 			if (exists(fn_star))
 			{
@@ -1092,9 +1099,16 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 	}
 
 	// Write out STAR files at the end
-	MDavg.write(fn_out + "corrected_micrographs.star");
-	if (do_save_movies)
-		MDmov.write(fn_out + "corrected_micrograph_movies.star");
+	// In the opticsMdt, replace EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE by EMDL_MICROGRAPH_PIXEL_SIZE (i.e. possibly binned pixel size)
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(obsModel.opticsMdt)
+	{
+		RFLOAT my_angpix;
+		obsModel.opticsMdt.getValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, my_angpix);
+		my_angpix *= bin_factor;
+		obsModel.opticsMdt.setValue(EMDL_MICROGRAPH_PIXEL_SIZE, my_angpix);
+	}
+	obsModel.opticsMdt.deactivateLabel(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE);
+	obsModel.save(MDavg, fn_out + "corrected_micrographs.star", "micrographs");
 
 	// Now generate EPS plot with histograms and combine all EPS into a logfile.pdf
 	std::vector<EMDLabel> plot_labels;

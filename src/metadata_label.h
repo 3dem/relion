@@ -170,6 +170,7 @@ enum EMDLabel
     EMDL_MICROGRAPH_TILT_AXIS_DIRECTION,
     EMDL_MICROGRAPH_TILT_AXIS_OUTOFPLANE,
     EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE,
+    EMDL_MICROGRAPH_PIXEL_SIZE,
     EMDL_MICROGRAPH_PRE_EXPOSURE,
     EMDL_MICROGRAPH_DOSE_RATE,
     EMDL_MICROGRAPH_BINNING,
@@ -636,6 +637,7 @@ private:
         EMDL::addLabel(EMDL_MICROGRAPH_TILT_AXIS_DIRECTION, EMDL_DOUBLE, "rlnMicrographTiltAxisDirection", "Direction of the tilt-axis (in degrees) used to collect a micrograph");
         EMDL::addLabel(EMDL_MICROGRAPH_TILT_AXIS_OUTOFPLANE, EMDL_DOUBLE, "rlnMicrographTiltAxisOutOfPlane", "Out-of-plane angle (in degrees) of the tilt-axis used to collect a micrograph (90=in-plane)");
         EMDL::addLabel(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, EMDL_DOUBLE, "rlnMicrographOriginalPixelSize", "Pixel size of original movie before binning in Angstrom/pixel.");
+        EMDL::addLabel(EMDL_MICROGRAPH_PIXEL_SIZE, EMDL_DOUBLE, "rlnMicrographPixelSize", "Pixel size of (averaged) micrographs after binning in Angstrom/pixel.");
         EMDL::addLabel(EMDL_MICROGRAPH_PRE_EXPOSURE, EMDL_DOUBLE, "rlnMicrographPreExposure", "Pre-exposure dose in electrons per square Angstrom");
         EMDL::addLabel(EMDL_MICROGRAPH_DOSE_RATE, EMDL_DOUBLE, "rlnMicrographDoseRate", "Dose rate in electrons per square Angstrom per frame");
         EMDL::addLabel(EMDL_MICROGRAPH_BINNING, EMDL_DOUBLE, "rlnMicrographBinning", "Micrograph binning factor");

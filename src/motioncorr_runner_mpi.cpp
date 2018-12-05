@@ -67,6 +67,10 @@ void MotioncorrRunnerMpi::run()
 
 		Micrograph mic(fn_micrographs[imic], fn_gain_reference, bin_factor);
 
+		// Get angpix and voltage from the optics groups:
+		obsModel.opticsMdt.getValue(EMDL_CTF_VOLTAGE, voltage, optics_group_micrographs[imic]-1);
+		obsModel.opticsMdt.getValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, angpix, optics_group_micrographs[imic]-1);
+
 		bool result;
 		if (do_own)
 			result = executeOwnMotionCorrection(mic);

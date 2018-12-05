@@ -37,16 +37,16 @@ class ObservationModel
 		static void loadSafely(
 				std::string filename,
 				ObservationModel& obsModel,
-				MetaDataTable& particlesMdt, int verb = 0);
-		
+				MetaDataTable& particlesMdt, std::string tablename = "particles", int verb = 0);
+
 		static void saveNew(
 				MetaDataTable& particlesMdt,
 				MetaDataTable& opticsMdt,
-				std::string filename);
-		
+				std::string filename, std::string _tablename = "particles");
+
 		void save(
 				MetaDataTable& particlesMdt,
-				std::string filename);
+				std::string filename, std::string _tablename = "particles");
 
 		static bool containsAllColumnsNeededForPrediction(const MetaDataTable& partMdt);
 
@@ -57,7 +57,7 @@ class ObservationModel
 
 			MetaDataTable opticsMdt;
 			bool hasEvenZernike, hasOddZernike, hasMagMatrices, hasBoxSizes;
-
+			std::string tablename; // "particles, "micrographs" or "movies"
 
 	protected:
 

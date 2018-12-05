@@ -1,7 +1,7 @@
 #include "star_converter.h"
 
 void StarConverter::convert_3p0_particlesTo_3p1(
-		const MetaDataTable &in, MetaDataTable &outParticles, MetaDataTable &outOptics)
+		const MetaDataTable &in, MetaDataTable &outParticles, MetaDataTable &outOptics, std::string tablename)
 {
 	int ver = in.getVersion();
 	int curVer = MetaDataTable::getCurrentVersion();
@@ -103,10 +103,12 @@ void StarConverter::convert_3p0_particlesTo_3p1(
 		outParticles.setValue(EMDL_IMAGE_OPTICS_GROUP, opticsClasses[p] + 1, p);
 	}
 
-	outParticles.setName("particles");
+	outParticles.setName(tablename);
 	outParticles.setVersion(curVer);
 
 
+	outOptics.setName("optics");
+	outOptics.setVersion(curVer);
 	outOptics.addLabel(EMDL_IMAGE_OPTICS_GROUP);
 
 	for (int l = 0; l < opticsLabelCount_double; l++)
@@ -125,84 +127,86 @@ void StarConverter::convert_3p0_particlesTo_3p1(
 		}
 	}
 
-	unifyPixelSize(outOptics);
-	translateOffsets(outParticles, outOptics);
-
-	outOptics.setName("optics");
-	outOptics.setVersion(curVer);
-
-	// Also read in one image for each optics group to set the image sizes in the outOptics table
-	// Also set the image_size for each optics_group
-	int nr_optics_groups_found = 0;
-	int nr_optics_groups = groupValues_double.size();
-	std::vector<bool> found_this_group;
-	found_this_group.resize(nr_optics_groups, false);
-
-	for (long int p = 0; p < particleCount; p++)
+	if (tablename == "particles")
 	{
-		int g = opticsClasses[p];
+		// set IMAGE_PIXEL_SIZE instead of DETECTOR_PIXEL_SIZE and MAGNIFICATION
+		unifyPixelSize(outOptics);
+		// Make translations in Angstroms instead of in pixels
+		translateOffsets(outParticles, outOptics);
 
-		if (!found_this_group[g])
+		// Also read in one image for each optics group to set the image sizes in the outOptics table
+		// Also set the image_size for each optics_group
+		int nr_optics_groups_found = 0;
+		int nr_optics_groups = groupValues_double.size();
+		std::vector<bool> found_this_group;
+		found_this_group.resize(nr_optics_groups, false);
+
+		for (long int p = 0; p < particleCount; p++)
 		{
-			FileName fn_img;
+			int g = opticsClasses[p];
 
-			if (!outParticles.getValue(EMDL_IMAGE_NAME, fn_img, p))
+			if (!found_this_group[g])
 			{
-				REPORT_ERROR("BUG: cannot find name for particle...");
-			}
+				FileName fn_img;
 
-			try
-			{
-				Image<double> img;
-				img.read(fn_img, false); // false means read only header, skip real data
-				int image_size = img().xdim;
-
-				if (image_size%2 != 0)
+				if (!outParticles.getValue(EMDL_IMAGE_NAME, fn_img, p))
 				{
-					REPORT_ERROR("ERROR: this program only works with even values for the image dimensions!");
+					REPORT_ERROR("BUG: cannot find name for particle...");
 				}
 
-				if (image_size != img().ydim)
+				try
 				{
-					REPORT_ERROR("ERROR: xsize != ysize: only squared images allowed");
-				}
+					Image<double> img;
+					img.read(fn_img, false); // false means read only header, skip real data
+					int image_size = img().xdim;
 
-				outOptics.setValue(EMDL_IMAGE_SIZE, image_size, g);
-				found_this_group[g] = true;
-				nr_optics_groups_found++;
-
-				if (img().zdim > 1)
-				{
-					if (image_size != img().zdim)
+					if (image_size%2 != 0)
 					{
-						REPORT_ERROR("ERROR: xsize != zsize: only cube 3D images allowed");
+						REPORT_ERROR("ERROR: this program only works with even values for the image dimensions!");
 					}
-					outOptics.setValue(EMDL_IMAGE_DIMENSIONALITY, 3, g);
+
+					if (image_size != img().ydim)
+					{
+						REPORT_ERROR("ERROR: xsize != ysize: only squared images allowed");
+					}
+
+					outOptics.setValue(EMDL_IMAGE_SIZE, image_size, g);
+					found_this_group[g] = true;
+					nr_optics_groups_found++;
+
+					if (img().zdim > 1)
+					{
+						if (image_size != img().zdim)
+						{
+							REPORT_ERROR("ERROR: xsize != zsize: only cube 3D images allowed");
+						}
+						outOptics.setValue(EMDL_IMAGE_DIMENSIONALITY, 3, g);
+					}
+					else
+					{
+						outOptics.setValue(EMDL_IMAGE_DIMENSIONALITY, 2, g);
+					}
 				}
-				else
+				catch (RelionError e)
 				{
-					outOptics.setValue(EMDL_IMAGE_DIMENSIONALITY, 2, g);
+					std::cerr << "Warning: " << fn_img << " not found.\n";
+					break;
 				}
 			}
-			catch (RelionError e)
+
+			if (nr_optics_groups_found == nr_optics_groups)
 			{
-				std::cerr << "Warning: " << fn_img << " not found.\n";
 				break;
 			}
 		}
 
-		if (nr_optics_groups_found == nr_optics_groups)
+		if (nr_optics_groups_found != nr_optics_groups)
 		{
-			break;
+			std::cerr << "Warning: not all image files could be found.\n";
+			std::cerr << "         Image sizes and dimensionalities will be missing from the star file.\n";
+
+			//REPORT_ERROR("BUG: something went wrong with finding the optics groups...");
 		}
-	}
-
-	if (nr_optics_groups_found != nr_optics_groups)
-	{
-		std::cerr << "Warning: not all image files could be found.\n";
-		std::cerr << "         Image sizes and dimensionalities will be missing from the star file.\n";
-
-		//REPORT_ERROR("BUG: something went wrong with finding the optics groups...");
 	}
 }
 

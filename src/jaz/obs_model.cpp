@@ -37,11 +37,11 @@ using namespace gravis;
 void ObservationModel::loadSafely(
 	std::string filename,
 	ObservationModel& obsModel,
-	MetaDataTable& particlesMdt, int verb)
+	MetaDataTable& particlesMdt, std::string tablename, int verb)
 {
 	MetaDataTable opticsMdt;
-	
-	particlesMdt.read(filename, "particles");
+
+	particlesMdt.read(filename, tablename);
 	opticsMdt.read(filename, "optics");
 
 	if (particlesMdt.numberOfObjects() == 0 && particlesMdt.numberOfObjects() == 0)
@@ -54,7 +54,7 @@ void ObservationModel::loadSafely(
 		MetaDataTable oldMdt;
 		oldMdt.read(filename);
 
-		StarConverter::convert_3p0_particlesTo_3p1(oldMdt, particlesMdt, opticsMdt);
+		StarConverter::convert_3p0_particlesTo_3p1(oldMdt, particlesMdt, opticsMdt, tablename);
 	}
 
 	obsModel = ObservationModel(opticsMdt);
@@ -104,29 +104,31 @@ void ObservationModel::loadSafely(
 }
 
 void ObservationModel::saveNew(
-		MetaDataTable &particlesMdt, 
-		MetaDataTable &opticsMdt, 
-		std::string filename)
+		MetaDataTable &particlesMdt,
+		MetaDataTable &opticsMdt,
+		std::string filename,
+		std::string tablename)
 {
 	std::ofstream of(filename);
 
 	opticsMdt.setName("optics");
 	opticsMdt.write(of);
 
-	particlesMdt.setName("particles");
+	particlesMdt.setName(tablename);
 	particlesMdt.write(of);
 }
 
 void ObservationModel::save(
 		MetaDataTable &particlesMdt,
-		std::string filename)
+		std::string filename,
+		std::string tablename)
 {
 	std::ofstream of(filename);
 
 	opticsMdt.setName("optics");
 	opticsMdt.write(of);
 
-	particlesMdt.setName("particles");
+	particlesMdt.setName(tablename);
 	particlesMdt.write(of);
 }
 
@@ -495,7 +497,7 @@ int ObservationModel::getOpticsGroup(const MetaDataTable &particlesMdt, long int
 	int opticsGroup;
 	particlesMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, particle);
 	opticsGroup--;
-	
+
 	return opticsGroup;
 }
 

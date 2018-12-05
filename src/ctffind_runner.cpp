@@ -41,11 +41,10 @@ void CtffindRunner::read(int argc, char **argv, int rank)
 
 	int mic_section = parser.addSection("Microscopy parameters");
 	// First parameter line in CTFFIND
-	Cs = textToFloat(parser.getOption("--CS", "Spherical Aberration (mm) ","2.0"));
-	Voltage = textToFloat(parser.getOption("--HT", "Voltage (kV)","300"));
-	AmplitudeConstrast = textToFloat(parser.getOption("--AmpCnst", "Amplitude constrast", "0.1"));
-	Magnification = textToFloat(parser.getOption("--XMAG", "Magnification", "60000"));
-	PixelSize = textToFloat(parser.getOption("--DStep", "Detector pixel size (um)", "14"));
+	Cs = textToFloat(parser.getOption("--CS", "Spherical Aberration (mm) ","-1"));
+	Voltage = textToFloat(parser.getOption("--HT", "Voltage (kV)","-1"));
+	AmplitudeConstrast = textToFloat(parser.getOption("--AmpCnst", "Amplitude constrast", "-1"));
+	angpix = textToFloat(parser.getOption("--angpix", "Pixel size in the input micrographs (A)", "-1"));
 
 	int ctffind_section = parser.addSection("CTFFIND parameters");
 
@@ -127,12 +126,13 @@ void CtffindRunner::initialise()
 	if (fn_in.isStarFile())
 	{
 		MetaDataTable MDin;
-		MDin.read(fn_in);
+		ObservationModel::loadSafely(fn_in, obsModel, MDin, "micrographs", verb);
 
 		if (do_use_without_doseweighting && !MDin.containsLabel(EMDL_MICROGRAPH_NAME_WODOSE))
 			REPORT_ERROR("ERROR: You are using --use_noDW, but there is no rlnMicrographNameNoDW label in the input micrograph STAR file.");
 
 		fn_micrographs_all.clear();
+		optics_group_micrographs_all.clear();
 		fn_micrographs_widose_all.clear();
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
 		{
@@ -149,20 +149,76 @@ void CtffindRunner::initialise()
 				MDin.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
 				fn_micrographs_all.push_back(fn_mic);
 			}
+			int optics_group;
+			MDin.getValue(EMDL_IMAGE_OPTICS_GROUP, optics_group);
+			optics_group_micrographs_all.push_back(optics_group);
 		}
 	}
 	else
 	{
 		fn_in.globFiles(fn_micrographs_all);
+		optics_group_micrographs_all.resize(fn_in.size(), 1);
+		obsModel.opticsMdt.clear();
+		obsModel.opticsMdt.addObject();
+	}
+
+	// Make sure obsModel.opticsMdt has all the necessary information
+	// If voltage or pixel size were not in the input STAR file, set them from the command line options
+	if (!obsModel.opticsMdt.containsLabel(EMDL_CTF_CS))
+	{
+		if (Cs < 0.)
+		{
+			REPORT_ERROR("ERROR: the input STAR file does not contain the spherical aberration, and it is not given through --CS.");
+		}
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(obsModel.opticsMdt)
+		{
+			obsModel.opticsMdt.setValue(EMDL_CTF_CS, Cs);
+		}
+	}
+	if (!obsModel.opticsMdt.containsLabel(EMDL_CTF_VOLTAGE))
+	{
+		if (Voltage < 0.)
+		{
+			REPORT_ERROR("ERROR: the input STAR file does not contain the acceleration voltage, and it is not given through --HT.");
+		}
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(obsModel.opticsMdt)
+		{
+			obsModel.opticsMdt.setValue(EMDL_CTF_VOLTAGE, Voltage);
+		}
+	}
+	if (!obsModel.opticsMdt.containsLabel(EMDL_CTF_Q0))
+	{
+		if (AmplitudeConstrast < 0.)
+		{
+			REPORT_ERROR("ERROR: the input STAR file does not contain the amplitude contrast, and it is not given through --AmpCnst.");
+		}
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(obsModel.opticsMdt)
+		{
+			obsModel.opticsMdt.setValue(EMDL_CTF_Q0, AmplitudeConstrast);
+		}
+	}
+	if (!obsModel.opticsMdt.containsLabel(EMDL_MICROGRAPH_PIXEL_SIZE))
+	{
+		if (angpix < 0.)
+		{
+			REPORT_ERROR("ERROR: the input STAR file does not contain the micrograph pixel size, and it is not given through --angpix.");
+		}
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(obsModel.opticsMdt)
+		{
+			obsModel.opticsMdt.setValue(EMDL_MICROGRAPH_PIXEL_SIZE, angpix);
+		}
 	}
 
 	// First backup the given list of all micrographs
+	std::vector<int> optics_group_given_all = optics_group_micrographs_all;
 	std::vector<FileName> fn_mic_given_all = fn_micrographs_all;
 	std::vector<FileName> fn_mic_widose_given_all = fn_micrographs_widose_all;
 	// These lists contain those for the output STAR & PDF files
+	optics_group_micrographs_all.clear();
 	fn_micrographs_all.clear();
 	fn_micrographs_widose_all.clear();
 	// These are micrographs to be processed
+	optics_group_micrographs.clear();
 	fn_micrographs.clear();
 	fn_micrographs_widose.clear();
 
@@ -182,7 +238,7 @@ void CtffindRunner::initialise()
 				process_this = false; // already done
 			}
 		}
-			
+
 		if (do_at_most >= 0 && fn_micrographs.size() >= do_at_most)
 		{
 			if (process_this) {
@@ -200,6 +256,7 @@ void CtffindRunner::initialise()
 
 		if (process_this)
 		{
+			optics_group_micrographs.push_back(optics_group_given_all[imic]);
 			fn_micrographs.push_back(fn_mic_given_all[imic]);
 			if (do_use_without_doseweighting)
 				fn_micrographs_widose.push_back(fn_mic_widose_given_all[imic]);
@@ -207,6 +264,7 @@ void CtffindRunner::initialise()
 
 		if (!ignore_this)
 		{
+			optics_group_micrographs_all.push_back(optics_group_given_all[imic]);
 			fn_micrographs_all.push_back(fn_mic_given_all[imic]);
 			if (do_use_without_doseweighting)
 				fn_micrographs_widose_all.push_back(fn_mic_widose_given_all[imic]);
@@ -304,6 +362,12 @@ void CtffindRunner::run()
 		for (long int imic = 0; imic < fn_micrographs.size(); imic++)
 		{
 
+			// Get angpix and voltage from the optics groups:
+			obsModel.opticsMdt.getValue(EMDL_CTF_CS, Cs, optics_group_micrographs[imic]-1);
+			obsModel.opticsMdt.getValue(EMDL_CTF_VOLTAGE, Voltage, optics_group_micrographs[imic]-1);
+			obsModel.opticsMdt.getValue(EMDL_CTF_Q0, AmplitudeConstrast, optics_group_micrographs[imic]-1);
+			obsModel.opticsMdt.getValue(EMDL_MICROGRAPH_PIXEL_SIZE, angpix, optics_group_micrographs[imic]-1);
+
 			if (do_use_gctf)
 			{
 				//addToGctfJobList(imic, allmicnames);
@@ -365,16 +429,12 @@ void CtffindRunner::joinCtffindResults()
 			}
 			else
 				MDctf.setValue(EMDL_MICROGRAPH_NAME, fn_micrographs_all[imic]);
+			MDctf.setValue(EMDL_IMAGE_OPTICS_GROUP, optics_group_micrographs_all[imic]);
 			MDctf.setValue(EMDL_CTF_IMAGE, fn_ctf);
 			MDctf.setValue(EMDL_CTF_DEFOCUSU, defU);
 			MDctf.setValue(EMDL_CTF_DEFOCUSV, defV);
 			MDctf.setValue(EMDL_CTF_ASTIGMATISM, fabs(defU-defV));
 			MDctf.setValue(EMDL_CTF_DEFOCUS_ANGLE, defAng);
-			MDctf.setValue(EMDL_CTF_VOLTAGE, HT);
-			MDctf.setValue(EMDL_CTF_CS, CS);
-			MDctf.setValue(EMDL_CTF_Q0, AmpCnst);
-			MDctf.setValue(EMDL_CTF_MAGNIFICATION, XMAG);
-			MDctf.setValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, DStep);
 			if (!std::isfinite(CC)) CC = 0.0; // GCTF might return NaN
 			MDctf.setValue(EMDL_CTF_FOM, CC);
 			if (fabs(maxres + 999.) > 0.)
@@ -391,8 +451,7 @@ void CtffindRunner::joinCtffindResults()
 		if (verb > 0 && imic % 60 == 0) progress_bar(imic);
 	}
 
-	MDctf.write(fn_out+"micrographs_ctf.star");
-
+	obsModel.save(MDctf, fn_out+"micrographs_ctf.star", "micrographs");
 
 	std::vector<EMDLabel> plot_labels;
 	plot_labels.push_back(EMDL_CTF_DEFOCUSU);
@@ -585,7 +644,7 @@ void CtffindRunner::executeCtffind3(long int imic)
 	// line 2: diagnostic .ctf image
 	fh << fn_ctf << std::endl;
 	// line 3: CS[mm], HT[kV], AmpCnst, XMAG, DStep[um]
-	fh << Cs << ", " << Voltage << ", " << AmplitudeConstrast << ", " << Magnification << ", " << PixelSize<< std::endl;
+	fh << Cs << ", " << Voltage << ", " << AmplitudeConstrast << ", 10000, " << angpix<< std::endl;
 	// line 4: Box, ResMin[A], ResMax[A], dFMin[A], dFMax[A], FStep[A], dAst[A]
 	fh << box_size << ", " << resol_min << ", " << resol_max << ", " << min_defocus << ", " << max_defocus << ", " << step_defocus << ", " << amount_astigmatism << std::endl;
 	if (is_ctffind4)
@@ -677,7 +736,7 @@ void CtffindRunner::executeCtffind4(long int imic)
 		fh << fn_mic_win << std::endl;
 	// line 2: diagnostic .ctf image
 	fh << fn_ctf << std::endl;
-	fh << PixelSize << std::endl;
+	fh << angpix << std::endl;
 	fh << Voltage << std::endl;
 	fh << Cs << std::endl;
 	fh << AmplitudeConstrast << std::endl;

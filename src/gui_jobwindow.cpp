@@ -599,8 +599,6 @@ void JobWindow::initialiseMotioncorrWindow()
 
 	place("first_frame_sum", TOGGLE_DEACTIVATE);
 	place("last_frame_sum", TOGGLE_DEACTIVATE);
-	place("angpix", TOGGLE_DEACTIVATE);
-	place("voltage", TOGGLE_DEACTIVATE);
 	place("dose_per_frame", TOGGLE_DEACTIVATE);
 	place("pre_exposure", TOGGLE_DEACTIVATE);
 
@@ -650,7 +648,7 @@ void JobWindow::initialiseMotioncorrWindow()
 void JobWindow::initialiseCtffindWindow()
 {
 
-	setupTabs(4);
+	setupTabs(3);
 
 	tab1->begin();
 	tab1->label("I/O");
@@ -658,32 +656,6 @@ void JobWindow::initialiseCtffindWindow()
 
 	place("input_star_mics", TOGGLE_DEACTIVATE);
 	place("use_noDW", TOGGLE_DEACTIVATE);
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	place("cs", TOGGLE_DEACTIVATE);
-	place("kv", TOGGLE_DEACTIVATE);
-	place("q0", TOGGLE_DEACTIVATE);
-	place("angpix", TOGGLE_DEACTIVATE);
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	place("dast", TOGGLE_DEACTIVATE);
-
-	tab1->end();
-
-	tab2->begin();
-	tab2->label("Searches");
-	resetHeight();
-
-	place("box", TOGGLE_DEACTIVATE);
-	place("resmin", TOGGLE_DEACTIVATE);
-	place("resmax", TOGGLE_DEACTIVATE);
-	place("dfmin", TOGGLE_DEACTIVATE);
-	place("dfmax", TOGGLE_DEACTIVATE);
-	place("dfstep", TOGGLE_DEACTIVATE);
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -698,11 +670,16 @@ void JobWindow::initialiseCtffindWindow()
 
 	group1->end();
 	guientries["do_phaseshift"].cb_menu_i(); // make default active
-	tab2->end();
 
+	// Add a little spacer
+	current_y += STEPY/2;
 
-	tab3->begin();
-	tab3->label("CTFFIND-4.1");
+	place("dast", TOGGLE_DEACTIVATE);
+
+	tab1->end();
+
+	tab2->begin();
+	tab2->label("CTFFIND-4.1");
 	resetHeight();
 
 	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
@@ -714,18 +691,26 @@ void JobWindow::initialiseCtffindWindow()
 	place("fn_ctffind_exe", TOGGLE_DEACTIVATE);
 	place("slow_search", TOGGLE_DEACTIVATE);
 
-	// Add a little spacer
-	current_y += STEPY/2;
-
 	place("ctf_win", TOGGLE_DEACTIVATE);
 
 	group2->end();
 	guientries["use_ctffind4"].cb_menu_i(); // make default active
 
-	tab3->end();
+	// Add a little spacer
+	current_y += STEPY/2;
 
-	tab4->begin();
-	tab4->label("Gctf");
+	place("box", TOGGLE_DEACTIVATE);
+	place("resmin", TOGGLE_DEACTIVATE);
+	place("resmax", TOGGLE_DEACTIVATE);
+	place("dfmin", TOGGLE_DEACTIVATE);
+	place("dfmax", TOGGLE_DEACTIVATE);
+	place("dfstep", TOGGLE_DEACTIVATE);
+
+	tab2->end();
+
+
+	tab3->begin();
+	tab3->label("Gctf");
 	resetHeight();
 
 	group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
@@ -750,7 +735,7 @@ void JobWindow::initialiseCtffindWindow()
 	group4->end();
 	guientries["use_gctf"].cb_menu_i(); // make default active
 
-	tab4->end();
+	tab3->end();
 
 
 }

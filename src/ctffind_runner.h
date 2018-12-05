@@ -30,6 +30,7 @@
 #include "src/metadata_table.h"
 #include "src/image.h"
 #include <src/time.h>
+#include "src/jaz/obs_model.h"
 
 class CtffindRunner
 {
@@ -49,6 +50,12 @@ public:
 
 	// Filenames of all the micrographs to estimate the CTF from
 	std::vector<FileName> fn_micrographs, fn_micrographs_widose, fn_micrographs_all, fn_micrographs_widose_all;
+
+	// Optics groups for all micrographs
+	std::vector<int> optics_group_micrographs, optics_group_micrographs_all;
+
+	// Information about the optics groups
+	ObservationModel obsModel;
 
 	// Dimension of squared area of the micrograph to use for CTF estimation
 	int ctf_win;
@@ -122,9 +129,6 @@ public:
 
 	// Magnification
 	RFLOAT Magnification;
-
-	// Detector pixel size (um)
-	RFLOAT PixelSize;
 
 	// For Gctf: directly provide angpix!
 	RFLOAT angpix;

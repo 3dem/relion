@@ -32,6 +32,7 @@
 #include "src/image.h"
 #include "src/micrograph_model.h"
 #include "src/jaz/new_ft.h"
+#include "src/jaz/obs_model.h"
 
 class MotioncorrRunner
 {
@@ -52,6 +53,12 @@ public:
 
 	// Filenames of all the micrographs to run Motioncorr on
 	std::vector<FileName> fn_micrographs, fn_ori_micrographs;
+
+	// Optics group number for all original micrographs
+	std::vector<int> optics_group_micrographs, optics_group_ori_micrographs;
+
+	// Information about the optics groups
+	ObservationModel obsModel;
 
 	// Use our own implementation
 	bool do_own;
@@ -81,9 +88,6 @@ public:
 
 	// Dose at which to distinguish between early/late global motion in output statistics
 	double dose_motionstats_cutoff;
-
-	// Also save the aligned movies?
-	bool do_save_movies;
 
 	// Additional arguments that need to be passed to MOTIONCORR
 	FileName fn_other_motioncor2_args;

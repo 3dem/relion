@@ -62,6 +62,12 @@ void CtffindRunnerMpi::run()
 		for (long int imic = my_first_micrograph; imic <= my_last_micrograph; imic++)
 		{
 
+			// Get angpix and voltage from the optics groups:
+			obsModel.opticsMdt.getValue(EMDL_CTF_CS, Cs, optics_group_micrographs[imic]-1);
+			obsModel.opticsMdt.getValue(EMDL_CTF_VOLTAGE, Voltage, optics_group_micrographs[imic]-1);
+			obsModel.opticsMdt.getValue(EMDL_CTF_Q0, AmplitudeConstrast, optics_group_micrographs[imic]-1);
+			obsModel.opticsMdt.getValue(EMDL_MICROGRAPH_PIXEL_SIZE, angpix, optics_group_micrographs[imic]-1);
+
 			if (do_use_gctf)
 			{
 				//addToGctfJobList(imic, allmicnames);

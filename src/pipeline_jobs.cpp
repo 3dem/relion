@@ -1143,7 +1143,6 @@ void RelionJob::initialiseMotioncorrJob()
 	joboptions["input_star_mics"] = JobOption("Input movies STAR file:", NODE_MOVIES, "", "STAR files (*.star)", "A STAR file with all micrographs to run MOTIONCORR on");
 	joboptions["first_frame_sum"] = JobOption("First frame for corrected sum:", 1, 1, 32, 1, "First frame to use in corrected average (starts counting at 1). ");
 	joboptions["last_frame_sum"] = JobOption("Last frame for corrected sum:", -1, 0, 32, 1, "Last frame to use in corrected average. Values equal to or smaller than 0 mean 'use all frames'.");
-	joboptions["angpix"] = JobOption("Pixel size (A):", 1, 0.5, 4.0, 0.1, "Provide the pixel size in Angstroms of the input movies. This is the original pixel size before binning.");
 
 	// Motioncor2
 
@@ -1178,7 +1177,6 @@ Note that multiple MotionCor2 processes should not share a GPU; otherwise, it ca
 	// Dose-weight
 	joboptions["do_dose_weighting"] = JobOption("Do dose-weighting?", false ,"If set to Yes, the averaged micrographs will be dose-weighted.");
 	joboptions["save_noDW"] = JobOption("Save non-dose weighted as well?", false, "Aligned but non-dose weighted images are sometimes useful in CTF estimation, although there is no difference in most cases. Whichever the choice, CTF refinement job is always done on dose-weighted particles.");
-	joboptions["voltage"] = JobOption("Voltage (kV):", 300, 80, 300, 20, "Acceleration voltage in kV.");
 	joboptions["dose_per_frame"] = JobOption("Dose per frame (e/A2):", 1, 0, 5, 0.2, "Dose per movie frame (in electrons per squared Angstrom).");
 	joboptions["pre_exposure"] = JobOption("Pre-exposure (e/A2):", 0, 0, 5, 0.5, "Pre-exposure dose (in electrons per squared Angstrom).");
 
@@ -1240,8 +1238,6 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 
 	command += " --bin_factor " + joboptions["bin_factor"].getString();
 	command += " --bfactor " + joboptions["bfactor"].getString();
-	command += " --angpix " +  joboptions["angpix"].getString();
-	command += " --voltage " + joboptions["voltage"].getString();
 	command += " --dose_per_frame " + joboptions["dose_per_frame"].getString();
 	command += " --preexposure " + joboptions["pre_exposure"].getString();
 	command += " --patch_x " + joboptions["patch_x"].getString();
@@ -1309,25 +1305,14 @@ void RelionJob::initialiseCtffindJob()
 	joboptions["input_star_mics"] = JobOption("Input micrographs STAR file:", NODE_MICS, "", "STAR files (*.star)", "A STAR file with all micrographs to run CTFFIND or Gctf on");
 	joboptions["use_noDW"] = JobOption("Use micrograph without dose-weighting?", false, "If set to Yes, the CTF estimation will be done using the micrograph without dose-weighting as in rlnMicrographNameNoDW (_noDW.mrc from MotionCor2). If set to No, the normal rlnMicrographName will be used.");
 
-	joboptions["cs"] = JobOption("Spherical aberration (mm):", 2.7, 0, 8, 0.1, "Spherical aberration of the microscope used to collect these images (in mm). Typical values are 2.7 (FEI Titan & Talos, most JEOL CRYO-ARM), 2.0 (FEI Polara), 1.4 (some JEOL CRYO-ARM) and 0.01 (microscopes with a Cs corrector).");
-	joboptions["kv"] = JobOption("Voltage (kV):", 300, 50, 500, 10, "Voltage the microscope was operated on (in kV)");
-	joboptions["q0"] = JobOption("Amplitude contrast:", 0.1, 0, 0.3, 0.01, "Fraction of amplitude contrast. Often values around 10% work better than theoretically more accurate lower values...");
-	joboptions["angpix"] = JobOption("Magnified pixel size (Angstrom):", 1.4, 0.5, 3, 0.1, "Pixel size in Angstroms. ");
-	joboptions["dast"] = JobOption("Amount of astigmatism (A):", 100, 0, 2000, 100,"CTFFIND's dAst parameter, GCTFs -astm parameter");
-
-	// CTFFIND options
-
-	joboptions["box"] = JobOption("FFT box size (pix):", 512, 64, 1024, 8, "CTFFIND's Box parameter");
-	joboptions["resmin"] = JobOption("Minimum resolution (A):", 30, 10, 200, 10, "CTFFIND's ResMin parameter");
-	joboptions["resmax"] = JobOption("Maximum resolution (A):", 5, 1, 20, 1, "CTFFIND's ResMax parameter");
-	joboptions["dfmin"] = JobOption("Minimum defocus value (A):", 5000, 0, 25000, 1000, "CTFFIND's dFMin parameter");
-	joboptions["dfmax"] = JobOption("Maximum defocus value (A):", 50000, 20000, 100000, 1000, "CTFFIND's dFMax parameter");
-	joboptions["dfstep"] = JobOption("Defocus step size (A):", 500, 200, 2000, 100,"CTFFIND's FStep parameter");
-
 	joboptions["do_phaseshift"] = JobOption("Estimate phase shifts?", false, "If set to Yes, CTFFIND4 will estimate the phase shift, e.g. as introduced by a Volta phase-plate");
 	joboptions["phase_min"] = JobOption("Phase shift (deg) - Min:", std::string("0"), "Minimum, maximum and step size (in degrees) for the search of the phase shift");
 	joboptions["phase_max"] = JobOption("Phase shift (deg) - Max:", std::string("180"), "Minimum, maximum and step size (in degrees) for the search of the phase shift");
 	joboptions["phase_step"] = JobOption("Phase shift (deg) - Step:", std::string("10"), "Minimum, maximum and step size (in degrees) for the search of the phase shift");
+
+	joboptions["dast"] = JobOption("Amount of astigmatism (A):", 100, 0, 2000, 100,"CTFFIND's dAst parameter, GCTFs -astm parameter");
+
+	// CTFFIND options
 
 	// Check for environment variable RELION_CTFFIND_EXECUTABLE
 	joboptions["use_ctffind4"] = JobOption("Use CTFFIND-4.1?", false, "If set to Yes, the wrapper will use CTFFIND4 (version 4.1) for CTF estimation. This includes thread-support, calculation of Thon rings from movie frames and phase-shift estimation for phase-plate data.");
@@ -1340,8 +1325,15 @@ void RelionJob::initialiseCtffindJob()
 	}
 	joboptions["fn_ctffind_exe"] = JobOption("CTFFIND-4.1 executable:", std::string(default_location), "*", ".", "Location of the CTFFIND (release 4.1 or later) executable. You can control the default of this field by setting environment variable RELION_CTFFIND_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
 	joboptions["slow_search"] = JobOption("Use exhaustive search?", false, "If set to Yes, CTFFIND4 will use slower but more exhaustive search. This option is recommended for CTFFIND version 4.1.8 and earlier, but probably not necessary for 4.1.10 and later. It is also worth trying this option when astigmatism and/or phase shifts are difficult to fit.");
-	joboptions["ctf_win"] = JobOption("Estimate CTF on window size (pix) ", -1, -16, 4096, 16, "If a positive value is given, a squared window of this size at the center of the micrograph will be used to estimate the CTF. This may be useful to exclude parts of the micrograph that are unsuitable for CTF estimation, e.g. the labels at the edge of phtographic film. \n \n The original micrograph will be used (i.e. this option will be ignored) if a negative value is given.");
 
+	joboptions["box"] = JobOption("FFT box size (pix):", 512, 64, 1024, 8, "CTFFIND's Box parameter");
+	joboptions["resmin"] = JobOption("Minimum resolution (A):", 30, 10, 200, 10, "CTFFIND's ResMin parameter");
+	joboptions["resmax"] = JobOption("Maximum resolution (A):", 5, 1, 20, 1, "CTFFIND's ResMax parameter");
+	joboptions["dfmin"] = JobOption("Minimum defocus value (A):", 5000, 0, 25000, 1000, "CTFFIND's dFMin parameter");
+	joboptions["dfmax"] = JobOption("Maximum defocus value (A):", 50000, 20000, 100000, 1000, "CTFFIND's dFMax parameter");
+	joboptions["dfstep"] = JobOption("Defocus step size (A):", 500, 200, 2000, 100,"CTFFIND's FStep parameter");
+
+	joboptions["ctf_win"] = JobOption("Estimate CTF on window size (pix) ", -1, -16, 4096, 16, "If a positive value is given, a squared window of this size at the center of the micrograph will be used to estimate the CTF. This may be useful to exclude parts of the micrograph that are unsuitable for CTF estimation, e.g. the labels at the edge of phtographic film. \n \n The original micrograph will be used (i.e. this option will be ignored) if a negative value is given.");
 
 	joboptions["use_gctf"] = JobOption("Use Gctf instead?", false, "If set to Yes, Kai Zhang's Gctf program (which runs on NVIDIA GPUs) will be used instead of Niko Grigorieff's CTFFIND4.");
 	// Check for environment variable RELION_CTFFIND_EXECUTABLE
@@ -1352,8 +1344,8 @@ void RelionJob::initialiseCtffindJob()
 		default_location=mydefault2;
 	}
 	joboptions["fn_gctf_exe"] = JobOption("Gctf executable:", std::string(default_location), "*", ".", "Location of the Gctf executable. You can control the default of this field by setting environment variable RELION_GCTF_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code.");
-	joboptions["do_ignore_ctffind_params"] = JobOption("Ignore 'Searches' parameters?", true, "If set to Yes, all parameters on the 'Searches' tab will be ignored, and Gctf's default parameters will be used (box.size=1024; min.resol=50; max.resol=4; min.defocus=500; max.defocus=90000; step.defocus=500; astigm=1000) \n \
-\n If set to No, all parameters on the CTFFIND tab will be passed to Gctf.");
+	joboptions["do_ignore_ctffind_params"] = JobOption("Ignore CTFFIND parameters?", true, "If set to Yes, all parameters EXCEPT for phase shift search and its ranges on the 'Searches' tab will be ignored, and Gctf's default parameters will be used (box.size=1024; min.resol=50; max.resol=4; min.defocus=500; max.defocus=90000; step.defocus=500; astigm=1000) \n \
+\nIf set to No, all parameters on the CTFFIND tab will be passed to Gctf.");
 	joboptions["do_EPA"] = JobOption("Perform equi-phase averaging?", false, "If set to Yes, equi-phase averaging is used in the defocus refinement, otherwise basic rotational averaging will be performed.");
 	joboptions["other_gctf_args"] = JobOption("Other Gctf options:", std::string(""), "Provide additional gctf options here.");
 	joboptions["gpu_ids"] = JobOption("Which GPUs to use:", std::string(""), "This argument is not necessary. If left empty, the job itself will try to allocate available GPU resources. You can override the default allocation by providing a list of which GPUs (0,1,2,3, etc) to use. MPI-processes are separated by ':', threads by ','. ");
@@ -1390,16 +1382,8 @@ bool RelionJob::getCommandsCtffindJob(std::string &outputname, std::vector<std::
 	else
 		command="`which relion_run_ctffind`";
 
-	// Just use 10000 for magnification, so dstep==angpix
-	RFLOAT magn = 10000.;
-
 	command += " --i " + joboptions["input_star_mics"].getString();
 	command += " --o " + outputname;
-	command += " --CS " + joboptions["cs"].getString();
-	command += " --HT " + joboptions["kv"].getString();
-	command += " --AmpCnst " + joboptions["q0"].getString();
-	command += " --XMAG " + floatToString(magn);
-	command += " --DStep " + joboptions["angpix"].getString();
 	command += " --Box " + joboptions["box"].getString();
 	command += " --ResMin " + joboptions["resmin"].getString();
 	command += " --ResMax " + joboptions["resmax"].getString();
