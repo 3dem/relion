@@ -522,7 +522,20 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	sampling.healpix_order = textToInteger(parser.getOption("--healpix_order", "Healpix order for the angular sampling (before oversampling) on the (3D) sphere: hp2=15deg, hp3=7.5deg, etc", "2"));
 	sampling.psi_step = textToFloat(parser.getOption("--psi_step", "Sampling rate (before oversampling) for the in-plane angle (default=10deg for 2D, hp sampling for 3D)", "-1"));
 	sampling.limit_tilt = textToFloat(parser.getOption("--limit_tilt", "Limited tilt angle: positive for keeping side views, negative for keeping top views", "-91"));
-	sampling.fn_sym = parser.getOption("--sym", "Symmetry group", "c1");
+
+	std::string sym_ = parser.getOption("--sym", "Symmetry group", "c1");
+
+	//Check if a comma separated list was provided
+	if (sym_.find(",") != std::string::npos)
+	{
+		std::stringstream ss(sym_);
+		std::string item;
+		while (std::getline(ss, item, ','))
+			fn_multi_sym.push_back(item);
+	}
+	else
+		sampling.fn_sym = sym_;
+
 	sampling.offset_range = textToFloat(parser.getOption("--offset_range", "Search range for origin offsets (in pixels)", "6"));
 	sampling.offset_step = textToFloat(parser.getOption("--offset_step", "Sampling rate (before oversampling) for origin offsets (in pixels)", "2"));
 	// Jun19,2015 - Shaoda, Helical refinement
@@ -3795,6 +3808,14 @@ void MlOptimiser::symmetriseReconstructions()
 							mymodel.helical_nr_asu,
 							mymodel.helical_twist[ith_recons],
 							mymodel.helical_rise[ith_recons] / mymodel.pixel_size);
+
+				if (fn_multi_sym.size() > ith_recons) // Always false if size=0
+				{
+					//Modify symmetry settings
+					wsum_model.BPref[ith_recons].SL.read_sym_file(fn_multi_sym[ith_recons]);
+					std::cerr << " Applying point symmetry " << fn_multi_sym[ith_recons] << " to body/class " << ith_recons << std::endl;
+				}
+
 
 				wsum_model.BPref[ith_recons].applyPointGroupSymmetry();
 			}
