@@ -751,6 +751,7 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 
 	Image<RFLOAT> Ipart, Imic, Itmp;
 
+	// MDin = particle STAR file, MDmics = micrograph STAR file
 	bool MDin_has_beamtilt = (MD.containsLabel(EMDL_IMAGE_BEAMTILT_X) || MD.containsLabel(EMDL_IMAGE_BEAMTILT_Y));
 	bool MDin_has_ctf = MD.containsLabel(EMDL_CTF_DEFOCUSU);
 
@@ -1027,6 +1028,13 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 					}
 				}
 
+				// Copy rlnBeamTiltGroupName from the micrograph STAR file only when absent in the particle STAR file
+				if (!MD.containsLabel(EMDL_IMAGE_BEAMTILT_GROUP) && MDmics.containsLabel(EMDL_IMAGE_BEAMTILT_GROUP))
+				{
+					FileName tilt_group;
+					MDmics.getValue(EMDL_IMAGE_BEAMTILT_GROUP, tilt_group, imic);
+					MD.setValue(EMDL_IMAGE_BEAMTILT_GROUP, tilt_group);
+				}
 			}
 
 			// If the image was re-scaled, then also rescale the rlnOriginX/Y/Z

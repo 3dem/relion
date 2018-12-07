@@ -1373,6 +1373,8 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	}
 	RCTOC(TIMING_GLOBAL_FFT);
 
+	// TODO: write power spectrum for CTF estimation
+
 	// Global alignment
 	// TODO: Consider frame grouping in global alignment.
 	logfile << std::endl << "Global alignment:" << std::endl;
