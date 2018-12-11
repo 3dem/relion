@@ -15,7 +15,7 @@ class StarConverter
 
 	protected:
 
-		static void unifyPixelSize(MetaDataTable& outOptics);
+		static void unifyPixelSize(MetaDataTable& outOptics, std::string tablename = "particles");
 		static void translateOffsets(MetaDataTable& outParticles, const MetaDataTable& optics);
 };
 

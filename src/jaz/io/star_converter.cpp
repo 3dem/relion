@@ -127,10 +127,12 @@ void StarConverter::convert_3p0_particlesTo_3p1(
 		}
 	}
 
+	// set IMAGE_PIXEL_SIZE instead of DETECTOR_PIXEL_SIZE and MAGNIFICATION
+	// This does not do anything if DETECTOR_PIXEL_SIZE or MAGNIFICATION are not in the input STAR file
+	unifyPixelSize(outOptics, tablename);
+
 	if (tablename == "particles")
 	{
-		// set IMAGE_PIXEL_SIZE instead of DETECTOR_PIXEL_SIZE and MAGNIFICATION
-		unifyPixelSize(outOptics);
 		// Make translations in Angstroms instead of in pixels
 		translateOffsets(outParticles, outOptics);
 
@@ -210,22 +212,36 @@ void StarConverter::convert_3p0_particlesTo_3p1(
 	}
 }
 
-void StarConverter::unifyPixelSize(MetaDataTable& outOptics)
+void StarConverter::unifyPixelSize(MetaDataTable& outOptics, std::string tablename)
 {
-	for (int i = 0; i < outOptics.numberOfObjects(); i++)
+	if (outOptics.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE) && outOptics.containsLabel(EMDL_CTF_MAGNIFICATION))
 	{
-		double dstep, mag;
+		for (int i = 0; i < outOptics.numberOfObjects(); i++)
+		{
+			double dstep, mag;
 
-		outOptics.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep, i);
-		outOptics.getValue(EMDL_CTF_MAGNIFICATION, mag, i);
+			outOptics.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep, i);
+			outOptics.getValue(EMDL_CTF_MAGNIFICATION, mag, i);
 
-		double angpix = 10000 * dstep / mag;
+			double angpix = 10000 * dstep / mag;
 
-		outOptics.setValue(EMDL_IMAGE_PIXEL_SIZE, angpix, i);
+			if (tablename == "particles")
+			{
+				outOptics.setValue(EMDL_IMAGE_PIXEL_SIZE, angpix, i);
+			}
+			else if (tablename == "micrographs")
+			{
+				outOptics.setValue(EMDL_MICROGRAPH_PIXEL_SIZE, angpix, i);
+			}
+			else if (tablename == "movies")
+			{
+				outOptics.setValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, angpix, i);
+			}
+		}
+
+		outOptics.deactivateLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE);
+		outOptics.deactivateLabel(EMDL_CTF_MAGNIFICATION);
 	}
-
-	outOptics.deactivateLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE);
-	outOptics.deactivateLabel(EMDL_CTF_MAGNIFICATION);
 }
 
 void StarConverter::translateOffsets(MetaDataTable &outParticles, const MetaDataTable &optics)
