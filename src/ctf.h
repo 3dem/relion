@@ -140,7 +140,7 @@ public:
 	{}
 
 	// Read CTF parameters from particle table partMdt and optics table opticsMdt.
-    void readByGroup(const MetaDataTable &partMdt, ObservationModel* obs, long int particle);
+    void readByGroup(const MetaDataTable &partMdt, ObservationModel* obs, long int particle = -1);
 
 	void readValue(EMDLabel label, RFLOAT& dest, RFLOAT defaultVal, long int particle, int opticsGroup,
 				   const MetaDataTable& partMdt, const ObservationModel* obs);
@@ -252,7 +252,7 @@ public:
 
         RFLOAT u2 = X * X + Y * Y;
         RFLOAT u4 = u2 * u2;
-		
+
 		RFLOAT gamma = K1 * (Axx*X*X + 2.0*Axy*X*Y + Ayy*Y*Y) + K2 * u4 - K5 - K3 + PI/2.;
 
         RFLOAT sinx, cosx;
@@ -267,7 +267,7 @@ public:
 
         return retval;
     }
-	
+
 	inline Complex getCTFP_noAniso(RFLOAT X, RFLOAT Y, bool is_positive) const
     {
         RFLOAT u2 = X * X + Y * Y;
@@ -331,19 +331,19 @@ public:
     /// The dimensions of the result array should have been set correctly already, i.e. at the image size!
     void get1DProfile(MultidimArray < RFLOAT > &result, RFLOAT angle, RFLOAT angpix,
     		bool do_abs = false, bool do_only_flip_phases = false, bool do_intact_until_first_peak = false, bool do_damping = true);
-	
+
 	// Calculate weight W for Ewald-sphere curvature correction: apply this to the result from getFftwImage
     void applyWeightEwaldSphereCurvature(
-			MultidimArray<RFLOAT>& result, int orixdim, int oriydim, 
+			MultidimArray<RFLOAT>& result, int orixdim, int oriydim,
 			RFLOAT angpix, RFLOAT particle_diameter);
-	
+
 	void applyWeightEwaldSphereCurvature_new(
-			MultidimArray<RFLOAT>& result, int orixdim, int oriydim, 
+			MultidimArray<RFLOAT>& result, int orixdim, int oriydim,
 			RFLOAT angpix, RFLOAT particle_diameter);
 
 	// Calculate weight W for Ewald-sphere curvature correction: apply this to the result from getFftwImage
     void applyWeightEwaldSphereCurvature_noAniso(MultidimArray < RFLOAT > &result, int orixdim, int oriydim, RFLOAT angpix, RFLOAT particle_diameter);
-	
+
 };
 //@}
 #endif
