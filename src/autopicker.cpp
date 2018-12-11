@@ -216,7 +216,7 @@ void AutoPicker::initialise()
 
 	if (fn_in.isStarFile())
 	{
-		MDmic.read(fn_in);
+		ObservationModel::loadSafely(fn_in, obsModel, MDmic, "micrographs", verb);
 		fn_micrographs.clear();
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDmic)
 		{
@@ -225,21 +225,15 @@ void AutoPicker::initialise()
 			fn_micrographs.push_back(fn_mic);
 		}
 
-        RFLOAT mag, dstep;
-        if (MDmic.containsLabel(EMDL_CTF_MAGNIFICATION) && MDmic.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
-        {
-			MDmic.goToObject(0);
-        	MDmic.getValue(EMDL_CTF_MAGNIFICATION, mag);
-			MDmic.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
-			angpix = 10000. * dstep / mag;
-			if (verb > 0)
-				std::cout << " + Using (micrograph) pixel size from input STAR file of " << angpix << " Angstroms" << std::endl;
-        }
-        else if (verb > 0 )
-        {
-        	std::cout << " + Warning: input (micrograph) STAR file does not contain information about pixel size!" << std::endl;
-        	std::cout << " + Warning: use --angpix_ref to provide the correct value. Now using " << angpix << " Angstroms" << std::endl;
-        }
+        // Check all optics groups have the same pixel size (check for same micrograph size is performed while running through all of them)
+		angpix = obsModel.getPixelSize(0);
+		for (int optics_group = 1; optics_group < obsModel.numberOfOpticsGroups(); optics_group++)
+		{
+			if (fabs(angpix - obsModel.getPixelSize(optics_group)) > 0.01)
+			{
+				REPORT_ERROR("ERROR: different pixel size for the different optics groups, perform autopicking separately per optics group.");
+			}
+		}
 	}
 	else
 	{
@@ -2891,7 +2885,7 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 			MDmic.getValue(EMDL_MICROGRAPH_NAME, fn_tmp);
 			if (fn_tmp==fn_mic)
 			{
-				ctf.read(MDmic, MDmic);
+				ctf.readByGroup(MDmic, &obsModel);
 				Fctf.resize(downsize_mic, downsize_mic/2 + 1);
 				ctf.getFftwImage(Fctf, micrograph_size, micrograph_size, angpix, false, false, intact_ctf_first_peak, true);
 				break;
