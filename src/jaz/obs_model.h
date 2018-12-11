@@ -57,7 +57,6 @@ class ObservationModel
 
 			MetaDataTable opticsMdt;
 			bool hasEvenZernike, hasOddZernike, hasMagMatrices, hasBoxSizes;
-			std::string tablename; // "particles, "micrographs" or "movies"
 
 	protected:
 
