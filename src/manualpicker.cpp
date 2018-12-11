@@ -607,7 +607,9 @@ void ManualPicker::run()
 	manualpickerGuiWindow win(TOTALWIDTH, TOTALHEIGHT, "RELION manual-picking GUI");
 	if (fn_in.isStarFile())
 	{
-		MDin.read(fn_in);
+		// First try reading "micrographs" table from 3.1+-type observationModel STAR files, otherwise as before
+		if (!MDin.read(fn_in, "micrographs")) MDin.read(fn_in);
+
 	}
 	else
 	{
