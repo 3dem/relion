@@ -533,11 +533,26 @@ void FlexAnalyser::subtractOneParticle(long int ori_particle, long int imgno, in
 			FileName fn_ctf;
 			data.MDimg.getValue(EMDL_CTF_IMAGE, fn_ctf, part_id);
 			Ictf.read(fn_ctf);
-			Ictf().setXmippOrigin();
-			FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fctf)
+
+			// If there is a redundant half, get rid of it
+			if (XSIZE(Ictf()) == YSIZE(Ictf()))
 			{
-				// Use negative kp,ip and jp indices, because the origin in the ctf_img lies half a pixel to the right of the actual center....
-				DIRECT_A3D_ELEM(Fctf, k, i, j) = A3D_ELEM(Ictf(), -kp, -ip, -jp);
+				Ictf().setXmippOrigin();
+				FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fctf)
+				{
+					// Use negative kp,ip and jp indices, because the origin in the ctf_img lies half a pixel to the right of the actual center....
+					DIRECT_A3D_ELEM(Fctf, k, i, j) = A3D_ELEM(Ictf(), -kp, -ip, -jp);
+				}
+			}
+			// otherwise, just window the CTF to the current resolution
+			else if (XSIZE(Ictf()) == YSIZE(Ictf()) / 2 + 1)
+			{
+				windowFourierTransform(Ictf(), Fctf, YSIZE(Fctf));
+			}
+			// if dimensions are neither cubical nor FFTW, stop
+			else
+			{
+				REPORT_ERROR("3D CTF volume must be either cubical or adhere to FFTW format!");
 			}
 		}
 		else
