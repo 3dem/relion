@@ -576,7 +576,7 @@ void ObservationModel::sortOpticsGroups(MetaDataTable& partMdt)
 std::vector<int> ObservationModel::getOptGroupsPresent_oneBased(const MetaDataTable& partMdt) const
 {
 	const int gc = opticsMdt.numberOfObjects();
-	const long int pc = partMdt.numberOfObjects();
+	const long long int pc = partMdt.numberOfObjects();
 
 	std::vector<bool> optGroupIsPresent(gc, false);
 
@@ -605,7 +605,7 @@ std::vector<int> ObservationModel::getOptGroupsPresent_oneBased(const MetaDataTa
 std::vector<int> ObservationModel::getOptGroupsPresent_zeroBased(const MetaDataTable& partMdt) const
 {
 	const int gc = opticsMdt.numberOfObjects();
-	const long int pc = partMdt.numberOfObjects();
+	const long long int pc = partMdt.numberOfObjects();
 
 	std::vector<bool> optGroupIsPresent(gc, false);
 
@@ -654,7 +654,7 @@ std::vector<std::pair<int, std::vector<int>>> ObservationModel::splitParticlesBy
 		out[pog] = std::make_pair(presentGroups[pog], std::vector<int>(0));
 	}
 
-	const long int pc = partMdt.numberOfObjects();
+	const long long int pc = partMdt.numberOfObjects();
 
 	for (long int p = 0; p < pc; p++)
 	{
