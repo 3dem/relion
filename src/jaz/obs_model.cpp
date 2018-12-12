@@ -148,7 +148,7 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 	    || !opticsMdt.containsLabel(EMDL_CTF_CS))
 	{
 		REPORT_ERROR_STR("ERROR: not all necessary variables defined in _optics.star file: "
-			<< "rlnPixelSize, rlnVoltage and rlnSphericalAberration.");
+			<< "rlnPixelSize, rlnVoltage and rlnSphericalAberration. Make sure to import older STAR files anew in version-3.1.");
 	}
 
 	// symmetrical high-order aberrations:
@@ -537,7 +537,7 @@ std::vector<int> ObservationModel::findUndefinedOptGroups(const MetaDataTable &p
 	std::vector<int> out;
 	out.reserve(opticsMdt.numberOfObjects());
 
-	for (int i = 0; i < partMdt.numberOfObjects(); i++)
+	for (long int i = 0; i < partMdt.numberOfObjects(); i++)
 	{
 		int og;
 		partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, og, i);
@@ -565,7 +565,7 @@ void ObservationModel::sortOpticsGroups(MetaDataTable& partMdt)
 		opticsMdt.setValue(EMDL_IMAGE_OPTICS_GROUP, i+1, i);
 	}
 
-	for (int i = 0; i < partMdt.numberOfObjects(); i++)
+	for (long int i = 0; i < partMdt.numberOfObjects(); i++)
 	{
 		int og;
 		partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, og, i);
@@ -576,11 +576,11 @@ void ObservationModel::sortOpticsGroups(MetaDataTable& partMdt)
 std::vector<int> ObservationModel::getOptGroupsPresent_oneBased(const MetaDataTable& partMdt) const
 {
 	const int gc = opticsMdt.numberOfObjects();
-	const int pc = partMdt.numberOfObjects();
+	const long int pc = partMdt.numberOfObjects();
 
 	std::vector<bool> optGroupIsPresent(gc, false);
 
-	for (int p = 0; p < pc; p++)
+	for (long int p = 0; p < pc; p++)
 	{
 		int og;
 		partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, og, p);
@@ -605,11 +605,11 @@ std::vector<int> ObservationModel::getOptGroupsPresent_oneBased(const MetaDataTa
 std::vector<int> ObservationModel::getOptGroupsPresent_zeroBased(const MetaDataTable& partMdt) const
 {
 	const int gc = opticsMdt.numberOfObjects();
-	const int pc = partMdt.numberOfObjects();
+	const long int pc = partMdt.numberOfObjects();
 
 	std::vector<bool> optGroupIsPresent(gc, false);
 
-	for (int p = 0; p < pc; p++)
+	for (long int p = 0; p < pc; p++)
 	{
 		int og;
 		partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, og, p);
@@ -654,9 +654,9 @@ std::vector<std::pair<int, std::vector<int>>> ObservationModel::splitParticlesBy
 		out[pog] = std::make_pair(presentGroups[pog], std::vector<int>(0));
 	}
 
-	const int pc = partMdt.numberOfObjects();
+	const long int pc = partMdt.numberOfObjects();
 
-	for (int p = 0; p < pc; p++)
+	for (long int p = 0; p < pc; p++)
 	{
 		int og;
 		partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, og, p);
