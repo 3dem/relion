@@ -142,14 +142,8 @@ std::vector<Image<RFLOAT> > StackHelper::loadStack(const MetaDataTable* mdt, std
 	for (long i = 0; i < ic; i++)
 	{
 		std::string sliceName;
-		mdt->getValue(EMDL_IMAGE_NAME, sliceName, i);
-		std::string indStr = sliceName.substr(0,sliceName.find("@"));
-		
-		std::istringstream str(indStr);
-		int j;
-		str >> j;
-		
-		out[i].read(name, true, j-1, false, true);
+		mdt->getValue(EMDL_IMAGE_NAME, sliceName, i);	
+		out[i].read(sliceName, true, -1, false, true);
 	}
 	
 	return out;
@@ -179,14 +173,8 @@ std::vector<Image<Complex> > StackHelper::loadStackFS(
 		
 		std::string sliceName;
 		mdt->getValue(EMDL_IMAGE_NAME, sliceName, i);
-		std::string indStr = sliceName.substr(0,sliceName.find("@"));
-		
-		std::istringstream str(indStr);
-		int j;
-		str >> j;
-		
 		Image<RFLOAT> in;
-		in.read(name, true, j-1, false, true);
+		in.read(sliceName, true, -1, false, true);
 		
 		(*fts)[threadnum].FourierTransform(in(), out[i]());
 		
