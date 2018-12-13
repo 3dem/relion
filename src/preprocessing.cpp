@@ -136,8 +136,23 @@ void Preprocessing::initialise()
 		// Read in the micrographs STAR file
 		MDmics.read(fn_star_in);
 
-		if ( !MDmics.containsLabel(EMDL_MICROGRAPH_NAME) )
-			REPORT_ERROR("Preprocessing::initialise ERROR: Input micrograph STAR file has no rlnMicrographName column!");
+		if (MDmics.numberOfObjects() > 0)
+		{
+			if ( do_movie_extract && !MDmics.containsLabel(EMDL_MICROGRAPH_MOVIE_NAME) )
+				REPORT_ERROR("Preprocessing::initialise ERROR: Input micrograph STAR file has no rlnMicrographMovieName column!");
+			else if ( !do_movie_extract && !MDmics.containsLabel(EMDL_MICROGRAPH_NAME) )
+				REPORT_ERROR("Preprocessing::initialise ERROR: Input micrograph STAR file has no rlnMicrographName column!");
+		}
+		else
+		{
+			std::cerr << "WARNING: You do not have any micrographs in the input." << std::endl;
+		}
+
+		if (do_movie_extract)
+		{
+			if (fn_data == "")
+				REPORT_ERROR("Preprocessing::initialise ERROR: when extracting movies, you have to provide a --reextract_data_star file.");
+		}
 
 		if ((do_phase_flip||do_premultiply_ctf) && !MDmics.containsLabel(EMDL_CTF_DEFOCUSU))
 			REPORT_ERROR("Preprocessing::initialise ERROR: No CTF information found in the input micrograph STAR-file");
