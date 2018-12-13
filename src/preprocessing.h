@@ -32,6 +32,7 @@
 #include "src/metadata_table.h"
 #include "src/ctffind_runner.h"
 #include "src/helix.h"
+#include "src/jaz/obs_model.h"
 #include <src/fftw.h>
 #include <src/time.h>
 
@@ -93,7 +94,7 @@ public:
 
 	// MetadataTable with all refined particle coordinates (given through fn_data)
 	MetaDataTable MDimg;
-	ObservationModel obsModel;
+	ObservationModel obsModelMic, obsModelPart;
 
 	// Filenames of all the coordinate files to use for particle extraction
 	std::vector<FileName> fn_coords;

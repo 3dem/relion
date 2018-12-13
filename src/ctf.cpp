@@ -182,15 +182,16 @@ void CTF::read(const MetaDataTable &MD)
 /** Write to an existing object in a MetaDataTable. */
 void CTF::write(MetaDataTable &MD)
 {
-    MD.setValue(EMDL_CTF_VOLTAGE, kV);
+    // From version-3.1 onwards: store kV, Cs, Q0 in optics table
+	//MD.setValue(EMDL_CTF_VOLTAGE, kV);
     MD.setValue(EMDL_CTF_DEFOCUSU, DeltafU);
     MD.setValue(EMDL_CTF_DEFOCUSV, DeltafV);
     MD.setValue(EMDL_CTF_DEFOCUS_ANGLE, azimuthal_angle);
-    MD.setValue(EMDL_CTF_CS, Cs);
+    //MD.setValue(EMDL_CTF_CS, Cs);
     MD.setValue(EMDL_CTF_BFACTOR, Bfac);
     MD.setValue(EMDL_CTF_SCALEFACTOR, scale);
     MD.setValue(EMDL_CTF_PHASESHIFT, phase_shift);
-    MD.setValue(EMDL_CTF_Q0, Q0);
+    //MD.setValue(EMDL_CTF_Q0, Q0);
 }
 
 /* Write ------------------------------------------------------------------- */
@@ -368,7 +369,7 @@ void CTF::getCTFPImage(MultidimArray<Complex> &result, int orixdim, int oriydim,
 	{
 		REPORT_ERROR("CTF::getCTFPImage: angle should be in [0,360>");
 	}
-	
+
 	// Angles larger than 180, are the inverse of the other half!
 	if (angle >= 180.)
 	{
@@ -380,13 +381,13 @@ void CTF::getCTFPImage(MultidimArray<Complex> &result, int orixdim, int oriydim,
 
 	RFLOAT xs = (RFLOAT)orixdim * angpix;
 	RFLOAT ys = (RFLOAT)oriydim * angpix;
-	
+
 	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(result)
 	{
 		RFLOAT x = (RFLOAT)jp / xs;
 		RFLOAT y = (RFLOAT)ip / ys;
 		RFLOAT myangle = (x*x+y*y > 0) ? acos(y/sqrt(x*x+y*y)) : 0; // dot-product with Y-axis: (0,1)
-		
+
 		if (myangle >= anglerad)
 		{
 			DIRECT_A2D_ELEM(result, i, j) = getCTFP(x, y, is_positive);
@@ -402,7 +403,7 @@ void CTF::getCTFPImage(MultidimArray<Complex> &result, int orixdim, int oriydim,
 	{
 		int dim = YSIZE(result);
 		int hdim = dim/2;
-		
+
 		for (int i = hdim + 1; i < dim; i++)
 		{
 			DIRECT_A2D_ELEM(result, i, 0) = conj(DIRECT_A2D_ELEM(result, dim-i, 0));
@@ -447,9 +448,9 @@ void CTF::applyWeightEwaldSphereCurvature(
 {
 	RFLOAT xs = (RFLOAT)orixdim * angpix;
 	RFLOAT ys = (RFLOAT)oriydim * angpix;
-	
+
 	Matrix2D<RFLOAT> M(2,2);
-	
+
 	if (obsModel != 0 && obsModel->hasMagMatrices)
 	{
 		M = obsModel->getMagMatrix(opticsGroup);
@@ -458,25 +459,25 @@ void CTF::applyWeightEwaldSphereCurvature(
 	{
 		M.initIdentity();
 	}
-	
+
 	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(result)
 	{
 		RFLOAT xu = (RFLOAT)jp / xs;
 		RFLOAT yu = (RFLOAT)ip / ys;
-		
+
 		RFLOAT x = M(0,0) * xu + M(0,1) * yu;
 		RFLOAT y = M(1,0) * xu + M(1,1) * yu;
-		
+
 		const RFLOAT astigDefocus = Axx*x*x + 2.0*Axy*x*y + Ayy*y*y;
 		RFLOAT u2 = x * x + y * y;
         RFLOAT u4 = u2 * u2;
 		RFLOAT gamma = K1 * astigDefocus + K2 * u4 - K5 - K3;
-		
+
 		RFLOAT deltaf = u2 > 0.0? std::abs(astigDefocus / u2) : 0.0;
 		RFLOAT inv_d = sqrt(u2);
 		RFLOAT aux = 2.0 * deltaf * lambda * inv_d / particle_diameter;
 		RFLOAT A = (aux > 1.0)? 0.0 : (2.0/PI) * (acos(aux) - aux * sin(acos(aux)));
-		
+
 		DIRECT_A2D_ELEM(result, i, j) = 1.0 + A * (2.0 * fabs(-sin(gamma)) - 1.0);
 		// Keep everything on the same scale inside RELION, where we use sin(chi), not 2sin(chi)
 		DIRECT_A2D_ELEM(result, i, j) *= 0.5;
@@ -491,28 +492,28 @@ void CTF::applyWeightEwaldSphereCurvature_new(
 	const int sh = s/2 + 1;
 	const double as = angpix * s;
 	const double Dpx = particle_diameter / angpix;
-	
+
 	for (int yi = 0; yi < s;  yi++)
 	for (int xi = 0; xi < sh; xi++)
 	{
 		const double x = xi / as;
 		const double y = yi < sh? yi / as : (yi - s) / as;
-		
+
 		// shift of this frequency resulting from CTF:
 		const d2Vector shift2D = (1.0 / (2 * angpix * PI)) * getGammaGrad(x,y);
 		const double shift1D = 2.0 * shift2D.length();
-		
+
 		// angle between the intersection points of the two circles and the center
 		const double alpha = shift1D > Dpx? 0.0 : 2.0 * acos(shift1D / Dpx);
-		
+
 		// area of intersection between the two circles, divided by the area of the circle
 		RFLOAT A = (alpha == 0.0)? 0.0 : (1.0/PI) * (alpha - sin(alpha));
-		
+
 		// abs. value of CTFR (no damping):
 		const double ctf_val = getCTF(x, y, true, false, false, false, 0.0);
-		
+
 		DIRECT_A2D_ELEM(result, yi, xi) = 1.0 + A * (2.0 * ctf_val - 1.0);
-		
+
 		// Keep everything on the same scale inside RELION, where we use sin(chi), not 2sin(chi)
 		DIRECT_A2D_ELEM(result, yi, xi) *= 0.5;
 	}

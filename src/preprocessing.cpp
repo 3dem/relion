@@ -134,25 +134,10 @@ void Preprocessing::initialise()
 		}
 
 		// Read in the micrographs STAR file
-		MDmics.read(fn_star_in);
+		ObservationModel::loadSafely(fn_star_in, obsModelMic, MDmics, "micrographs", verb);
 
-		if (MDmics.numberOfObjects() > 0)
-		{
-			if ( do_movie_extract && !MDmics.containsLabel(EMDL_MICROGRAPH_MOVIE_NAME) )
-				REPORT_ERROR("Preprocessing::initialise ERROR: Input micrograph STAR file has no rlnMicrographMovieName column!");
-			else if ( !do_movie_extract && !MDmics.containsLabel(EMDL_MICROGRAPH_NAME) )
-				REPORT_ERROR("Preprocessing::initialise ERROR: Input micrograph STAR file has no rlnMicrographName column!");
-		}
-		else
-		{
-			std::cerr << "WARNING: You do not have any micrographs in the input." << std::endl;
-		}
-
-		if (do_movie_extract)
-		{
-			if (fn_data == "")
-				REPORT_ERROR("Preprocessing::initialise ERROR: when extracting movies, you have to provide a --reextract_data_star file.");
-		}
+		if ( !MDmics.containsLabel(EMDL_MICROGRAPH_NAME) )
+			REPORT_ERROR("Preprocessing::initialise ERROR: Input micrograph STAR file has no rlnMicrographName column!");
 
 		if ((do_phase_flip||do_premultiply_ctf) && !MDmics.containsLabel(EMDL_CTF_DEFOCUSU))
 			REPORT_ERROR("Preprocessing::initialise ERROR: No CTF information found in the input micrograph STAR-file");
@@ -160,36 +145,6 @@ void Preprocessing::initialise()
 		star_has_ctf = MDmics.containsLabel(EMDL_CTF_DEFOCUSU);
 		if (!star_has_ctf && (do_phase_flip || do_premultiply_ctf))
 			REPORT_ERROR("Preprocessing:: ERROR: cannot phase flip or premultiply CTF without input CTF parameters in the STAR file");
-
-		// Get pixel size from the manually set value
-		if (set_angpix > 0.)
-		{
-			if (verb > 0)
-			{
-				std::cout << " + Setting pixel size in output STAR file to " << set_angpix << " Angstroms" << std::endl;
-				std::cerr << "WARNING: You manually changed the pixel size by the --set_angpix option. You can no longer use Bayesian Polishing on the resulting particles." << std::endl;
-			}
-
-			angpix = set_angpix;
-		}
-		// Otherwise get pixel size from the input STAR file
-		else if (MDmics.containsLabel(EMDL_CTF_MAGNIFICATION) && MDmics.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
-		{
-
-			MDmics.goToObject(0);
-			RFLOAT mag, dstep;
-			MDmics.getValue(EMDL_CTF_MAGNIFICATION, mag);
-			MDmics.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
-			angpix = 10000. * dstep / mag;
-
-			if (verb > 0)
-				std::cout << " + Using pixel size from input STAR file of " << angpix << " Angstroms" << std::endl;
-
-		}
-		else if (do_recenter || fn_data != "")
-		{
-			REPORT_ERROR("Preprocessing:: ERROR: cannot use --recenter or --reextract_data_star without providing angpix info in the input micrograph STAR file or by using --set_angpix!");
-		}
 
 		if (fn_data != "")
 		{
@@ -201,8 +156,7 @@ void Preprocessing::initialise()
 			if (do_recenter && verb > 0)
 				std::cout << " + And re-centering particles based on refined coordinates in the _data.star file" << std::endl;
 
-			// Read the input data file (into the new v3.1 structure)
-			ObservationModel::loadSafely(fn_data, obsModel, MDimg);
+			ObservationModel::loadSafely(fn_star_in, obsModelPart, MDimg, "particles", verb);
 
 		}
 		else
@@ -256,9 +210,6 @@ void Preprocessing::initialise()
 
 	}
 
-	output_angpix = angpix;
-	if (do_rescale)
-		output_angpix *= (RFLOAT)extract_size / (RFLOAT)scale;
 }
 
 void Preprocessing::run()
@@ -324,18 +275,6 @@ void Preprocessing::joinAllStarFiles()
 			{
 				MetaDataTable MDonestack;
 				MDonestack.read(fn_star);
-				if (set_angpix > 0.)
-				{
-					RFLOAT mag = 10000;
-					RFLOAT dstep = mag * set_angpix / 10000;
-					if (do_rescale)
-						dstep *= (RFLOAT)extract_size/(RFLOAT)scale;
-					FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDonestack)
-					{
-						MDonestack.setValue(EMDL_CTF_MAGNIFICATION, mag);
-						MDonestack.setValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
-					}
-				}
 				MDout.append(MDonestack);
 			}
 		}
@@ -348,7 +287,21 @@ void Preprocessing::joinAllStarFiles()
 	// Write out the joined star files
 	if (fn_part_star != "")
 	{
-		MDout.write(fn_part_star);
+		RFLOAT my_angpix;
+
+		// Set the (possibly rescale output_angpix and the output image size in the opticsMdt
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(obsModelMic.opticsMdt)
+		{
+			// Set the pixel size for this micrograph
+			obsModelMic.opticsMdt.getValue(EMDL_MICROGRAPH_PIXEL_SIZE, my_angpix);
+			if (do_rescale)
+				my_angpix *= (RFLOAT)extract_size / (RFLOAT)scale;
+			obsModelMic.opticsMdt.setValue(EMDL_IMAGE_PIXEL_SIZE, my_angpix);
+			obsModelMic.opticsMdt.setValue(EMDL_IMAGE_SIZE, extract_size);
+			obsModelMic.opticsMdt.setValue(EMDL_IMAGE_DIMENSIONALITY, dimensionality);
+		}
+
+		ObservationModel::saveNew(MDout, obsModelMic.opticsMdt, fn_part_star, "particles");
 		std::cout << " Written out STAR file with " << MDout.numberOfObjects() << " particles in " << fn_part_star<< std::endl;
 		std::cout << " The new pixel size of the extracted particles are " << output_angpix << " Angstrom/pixel." << std::endl;
 	}
@@ -374,6 +327,14 @@ void Preprocessing::runExtractParticles()
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDmics)
 	{
 		MDmics.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
+		int optics_group = obsModelMic.getOpticsGroup(MDmics);
+
+		// Set the pixel size for this micrograph
+		angpix = obsModelMic.getPixelSize(optics_group);
+		// Also set the output_angpix (which could be rescaled)
+		output_angpix = angpix;
+		if (do_rescale)
+			output_angpix *= (RFLOAT)extract_size / (RFLOAT)scale;
 
 		// Check new-style outputdirectory exists and make it if not!
 		FileName fn_dir = getOutputFileNameRoot(fn_mic);
@@ -677,11 +638,8 @@ void Preprocessing::extractParticlesFromOneMicrograph(MetaDataTable &MD,
 
 	Image<RFLOAT> Ipart, Imic, Itmp;
 
-	// MDin = particle STAR file, MDmics = micrograph STAR file
-	// These checks must be done here because MD will be modified within the loop
 	bool MDin_has_beamtilt = (MD.containsLabel(EMDL_IMAGE_BEAMTILT_X) || MD.containsLabel(EMDL_IMAGE_BEAMTILT_Y));
 	bool MDin_has_ctf = MD.containsLabel(EMDL_CTF_DEFOCUSU);
-	bool MDin_has_tiltgroup = MD.containsLabel(EMDL_IMAGE_BEAMTILT_GROUP);
 
 	TIMING_TIC(TIMING_READ_IMG);
 
@@ -691,7 +649,7 @@ void Preprocessing::extractParticlesFromOneMicrograph(MetaDataTable &MD,
 
 	CTF ctf;
 	if (star_has_ctf || do_phase_flip || do_premultiply_ctf)
-		ctf.read(MDmics, MDmics, imic);
+		ctf.readByGroup(MDmics, &obsModelMic, imic);
 
 	if (do_phase_flip || do_premultiply_ctf)
 	{
@@ -868,23 +826,16 @@ void Preprocessing::extractParticlesFromOneMicrograph(MetaDataTable &MD,
 			MD.setValue(EMDL_IMAGE_NAME, fn_img);
 			MD.setValue(EMDL_MICROGRAPH_NAME, fn_mic);
 
-			// Also fill in the CTF parameters
+			// Set the optics group for this particle to the one from the micrograph
+			int optics_group;
+			MDmics.getValue(EMDL_IMAGE_OPTICS_GROUP, optics_group, imic);
+			MD.setValue(EMDL_IMAGE_OPTICS_GROUP, optics_group);
+
+			// Also fill in the per-particle CTF parameters
 			if (star_has_ctf)
 			{
 
-				RFLOAT mag, dstep, maxres, fom;
-				if (MDmics.containsLabel(EMDL_CTF_MAGNIFICATION))
-				{
-					MDmics.getValue(EMDL_CTF_MAGNIFICATION, mag, imic);
-					MD.setValue(EMDL_CTF_MAGNIFICATION, mag);
-				}
-				if (MDmics.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
-				{
-					MDmics.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep, imic);
-					if (do_rescale)
-						dstep *= (RFLOAT)extract_size/(RFLOAT)scale;
-					MD.setValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
-				}
+				RFLOAT maxres, fom;
 				if (MDmics.containsLabel(EMDL_CTF_MAXRES))
 				{
 					MDmics.getValue(EMDL_CTF_MAXRES, maxres, imic);
@@ -903,7 +854,7 @@ void Preprocessing::extractParticlesFromOneMicrograph(MetaDataTable &MD,
 				}
 
 				// Only set beamtilt from the micrographs STAR file if the input STAR file did not contain it!
-				if (!MDin_has_beamtilt)
+				if (!MDin_has_beamtilt || keep_ctf_from_micrographs)
 				{
 					RFLOAT tilt_x, tilt_y;
 					if (MDmics.containsLabel(EMDL_IMAGE_BEAMTILT_X))
@@ -918,13 +869,6 @@ void Preprocessing::extractParticlesFromOneMicrograph(MetaDataTable &MD,
 					}
 				}
 
-				// Copy rlnBeamTiltGroupName from the micrograph STAR file only when absent in the particle STAR file
-				if (!MDin_has_tiltgroup && MDmics.containsLabel(EMDL_IMAGE_BEAMTILT_GROUP))
-				{
-					FileName tilt_group;
-					MDmics.getValue(EMDL_IMAGE_BEAMTILT_GROUP, tilt_group, imic);
-					MD.setValue(EMDL_IMAGE_BEAMTILT_GROUP, tilt_group);
-				}
 			}
 
 			TIMING_TOC(TIMING_REST);
@@ -1035,7 +979,7 @@ void Preprocessing::performPerImageOperations(
 
 	if (do_rewindow) rewindow(Ipart, window);
 
-        Ipart().setXmippOrigin();
+	Ipart().setXmippOrigin();
 
 	TIMING_TIC(TIMING_NORMALIZE);
 	// Jun24,2015 - Shaoda, helical segments
@@ -1115,43 +1059,31 @@ MetaDataTable Preprocessing::getCoordinateMetaDataTable(FileName fn_mic)
 	FileName fn_pre, fn_jobnr, fn_post;
 	decomposePipelineFileName(fn_mic, fn_pre, fn_jobnr, fn_post);
 
-	//// TODO: get MDresult, which is sbuset of lines from MDimg that have fn_post as rlnMicrographName
-	//// TODO: get MDresult, which is sbuset of lines from MDimg that have fn_post as rlnMicrographName
-	//// TODO: get MDresult, which is sbuset of lines from MDimg that have fn_post as rlnMicrographName
-	//// TODO: get MDresult, which is sbuset of lines from MDimg that have fn_post as rlnMicrographName
-	//// TODO: get MDresult, which is sbuset of lines from MDimg that have fn_post as rlnMicrographName
 	MetaDataTable MDresult;
-	//MDresult.read(fn_data, "", NULL, fn_post);
-
-	if (!MDresult.containsLabel(EMDL_CTF_MAGNIFICATION) || !MDresult.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
-	{
-		REPORT_ERROR("Preprocessing::initialise ERROR: input _data.star should contain rlnMagnification and rlnDetectorPixelSize.");
-	}
+	MDresult.read(fn_data, "particles", NULL, fn_post);
 
 	RFLOAT mag2, dstep2, angpix2, rescale_fndata = 1.0;
 	if (MDresult.numberOfObjects() > 0)
 	{
 		MDresult.goToObject(0);
 
-		if (MDresult.containsLabel(EMDL_CTF_MAGNIFICATION) && MDresult.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
-		{
-			MDresult.getValue(EMDL_CTF_MAGNIFICATION, mag2);
-			MDresult.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep2);
-			angpix2 = 10000. * dstep2 / mag2;
-			rescale_fndata = angpix2 / angpix;
-		}
-
 		bool do_contains_xy = (MDresult.containsLabel(EMDL_ORIENT_ORIGIN_X_ANGSTROM) && MDresult.containsLabel(EMDL_ORIENT_ORIGIN_Y_ANGSTROM));
 		bool do_contains_z = (MDresult.containsLabel(EMDL_ORIENT_ORIGIN_Z_ANGSTROM));
 
 		if (do_recenter && !do_contains_xy)
 		{
-			REPORT_ERROR("Preprocessing::initialise ERROR: input _data.star file does not contain rlnOriginX/Y for re-centering.");
+			REPORT_ERROR("Preprocessing::initialise ERROR: input _data.star file does not contain rlnOriginX/YAngst for re-centering.");
 		}
 
 		RFLOAT xoff, yoff, zoff, rot, tilt, psi, xcoord, ycoord, zcoord, diffx, diffy, diffz;
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDresult)
 		{
+
+			// Get the optics group for this particle
+			int optics_group = obsModelMic.getOpticsGroup(MDresult);
+			angpix2 = obsModelPart.getPixelSize(optics_group);
+			rescale_fndata = angpix2 / angpix;
+
 			// reset input offsets
 			if (do_reset_offsets)
 			{

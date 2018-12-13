@@ -141,7 +141,7 @@ class ObservationModel
 		Matrix2D<RFLOAT> getMagMatrix(int opticsGroup) const;
 		std::vector<Matrix2D<RFLOAT> > getMagMatrices() const;
 
-		int getOpticsGroup(const MetaDataTable &particlesMdt, long int particle) const;
+		int getOpticsGroup(const MetaDataTable &particlesMdt, long int particle = -1) const;
 
 		/* duh */
 		int numberOfOpticsGroups() const;
