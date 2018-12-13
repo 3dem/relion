@@ -197,11 +197,11 @@ std::vector<Image<Complex> > StackHelper::loadStackFS(
 		double angpix = obs->getPixelSize(optGroup);
 
 		std::string sliceName;
-		mdt->getValue(EMDL_IMAGE_NAME, sliceName, i);
+		mdt.getValue(EMDL_IMAGE_NAME, sliceName, i);
 		Image<RFLOAT> in;
 		in.read(sliceName, true, -1, false, true);
 		
-		(*fts)[threadnum].FourierTransform(in(), out[i]());
+		NewFFT::FourierTransform(in(), out[i](), plan);
 
 		if (centerParticle)
 		{
