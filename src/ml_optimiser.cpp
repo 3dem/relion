@@ -2056,6 +2056,16 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 				RFLOAT tilt = (mymodel.ref_dim == 2) ? 0. : rnd_unif() * 180.;
 				RFLOAT psi  = rnd_unif() * 360.;
 				int iclass  = rnd_unif() * mymodel.nr_classes;
+				if (iclass == mymodel.nr_classes)
+					iclass = mymodel.nr_classes - 1;
+				if (iclass >= mymodel.nr_classes)
+				{
+					// Should not happen but without this some people get errors in Set2DFourierTransform
+					// TODO: investigate
+					std::cerr << "WARNING: numerical issue in initial class assignment. Your result is NOT compromised but please report this to our issue tracker.\n";
+					std::cerr << "         iclass = " << iclass << " nr_classes = " << mymodel.nr_classes << " sizeof(RFLOAT) = " << sizeof(RFLOAT) << std::endl;
+					iclass = mymodel.nr_classes - 1;
+				}
 				Matrix2D<RFLOAT> A;
 				Euler_angles2matrix(rot, tilt, psi, A, true);
 
@@ -5183,12 +5193,27 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 						DIRECT_A3D_ELEM(Ictf(), k, i, j) = DIRECT_A3D_ELEM(exp_imagedata, image_full_size[optics_group] + k, i, j);
 					}
 				}
-				// Set the CTF-image in Fctf
-				Ictf().setXmippOrigin();
-				FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fctf)
+
+				// If there is a redundant half, get rid of it
+				if (XSIZE(Ictf()) == YSIZE(Ictf()))
 				{
-					// Use negative kp,ip and jp indices, because the origin in the ctf_img lies half a pixel to the right of the actual center....
-					DIRECT_A3D_ELEM(Fctf, k, i, j) = A3D_ELEM(Ictf(), -kp, -ip, -jp);
+					// Set the CTF-image in Fctf
+					Ictf().setXmippOrigin();
+					FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fctf)
+					{
+						// Use negative kp,ip and jp indices, because the origin in the ctf_img lies half a pixel to the right of the actual center....
+						DIRECT_A3D_ELEM(Fctf, k, i, j) = A3D_ELEM(Ictf(), -kp, -ip, -jp);
+					}
+				}
+				// otherwise, just window the CTF to the current resolution
+				else if (XSIZE(Ictf()) == YSIZE(Ictf()) / 2 + 1)
+				{
+					windowFourierTransform(Ictf(), Fctf, YSIZE(Fctf));
+				}
+				// if dimensions are neither cubical nor FFTW, stop
+				else
+				{
+					REPORT_ERROR("3D CTF volume must be either cubical or adhere to FFTW format!");
 				}
 			}
 			else
@@ -7975,14 +8000,28 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 								getline(split, fn_ctf);
 						}
 						Ictf.read(fn_ctf);
-
-						// Set the CTF-image in Fctf
-						Ictf().setXmippOrigin();
-						Fctf.resize(current_image_size, current_image_size, current_image_size/ 2 + 1);
-						FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fctf)
+						
+						// If there is a redundant half, get rid of it
+						if (XSIZE(Ictf()) == YSIZE(Ictf()))
 						{
-							// Use negative kp, ip and jp indices, because the origin in the ctf_img lies half a pixel to the right of the actual center....
-							DIRECT_A3D_ELEM(Fctf, k, i, j) = A3D_ELEM(Ictf(), -kp, -ip, -jp);
+							// Set the CTF-image in Fctf
+							Ictf().setXmippOrigin();
+							Fctf.resize(current_image_size, current_image_size, current_image_size / 2 + 1);
+							FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fctf)
+							{
+								// Use negative kp, ip and jp indices, because the origin in the ctf_img lies half a pixel to the right of the actual center....
+								DIRECT_A3D_ELEM(Fctf, k, i, j) = A3D_ELEM(Ictf(), -kp, -ip, -jp);
+							}
+						}
+						// otherwise, just window the CTF to the current resolution
+						else if (XSIZE(Ictf()) == YSIZE(Ictf()) / 2 + 1)
+						{
+							windowFourierTransform(Ictf(), Fctf, YSIZE(Fctf));
+						}
+						// if dimensions are neither cubical nor FFTW, stop
+						else
+						{
+							REPORT_ERROR("3D CTF volume must be either cubical or adhere to FFTW format!");
 						}
 					}
 					else

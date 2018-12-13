@@ -1253,16 +1253,16 @@ void MetaDataTable::columnHistogram(EMDLabel label, std::vector<RFLOAT> &histX, 
 		}
 		else
 		{
-			if (!std::isfinite(hist_min)) hist_min = values[0];
-			if (!std::isfinite(hist_max)) hist_max = values[n_row - 1];
+			if (!std::isfinite(hist_min) || hist_min == -LARGE_NUMBER) hist_min = values[0];
+			if (!std::isfinite(hist_max) || hist_max == LARGE_NUMBER) hist_max = values[n_row - 1];
 			bin_size = nr_bin;
 		}
 		bin_width = (hist_max - hist_min) / bin_size;
 	}
 	else
 	{
-		if (!std::isfinite(hist_min)) hist_min = values[0];
-		if (!std::isfinite(hist_max)) hist_max = values[n_row - 1];
+		if (!std::isfinite(hist_min) || hist_min == -LARGE_NUMBER) hist_min = values[0];
+		if (!std::isfinite(hist_max) || hist_max == LARGE_NUMBER) hist_max = values[n_row - 1];
 	}
 
 	bin_size += 2; // for -inf and +inf

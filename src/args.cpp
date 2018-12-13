@@ -425,5 +425,15 @@ void untangleDeviceIDs(std::string &tangled, std::vector < std::vector < std::st
 		}
 		untangled[i].push_back(allRankIDs[i]);
 	}
+#ifdef DEBUG
+	std::cout << "untangled.size() == " << untangled.size() << std::endl;
+	for (int irank = 0; irank < untangled.size(); irank++)
+	{
+		std::cout << "untangled[" << irank << "]: ";
+		for (int ithread = 0; ithread < untangled[irank].size(); ithread++)
+			std::cout << untangled[irank][ithread] << " ";
+		std::cout << std::endl;
+	}
+#endif
 }
 

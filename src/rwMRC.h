@@ -205,24 +205,36 @@ int readMRC(long int img_select, bool isStack=false, const FileName &name="")
     data.setDimensions(_xDim, _yDim, _zDim, _nDim);
 
     DataType datatype;
-    switch ( header->mode%5 )
+    if (header-> mode == 101)
     {
-    case 0:
-        datatype = UChar; // The image2010 web page says map-mode 0 is signed, but Jude's code interpretes the data as unsigned
-        break;
-    case 1:
-        datatype = Short;
-        break;
-    case 2:
-        datatype = Float;
-        break;
-    case 3:
-    	REPORT_ERROR("readMRC: only real-space images may be read into RELION.");
-    case 4:
-    	REPORT_ERROR("readMRC: only real-space images may be read into RELION.");
-    default:
-        datatype = UChar;
-        break;
+        // This is SerialEM's non-standard extension.
+        // https://bio3d.colorado.edu/imod/doc/mrc_format.txt
+        // http://bio3d.colorado.edu/SerialEM/hlp/html/hidd_k2_save_options.htm
+        if (_xDim % 2 == 1 && _yDim % 2 == 1)
+            REPORT_ERROR("Currently we support 4-bit MRC (mode 101) only when nx * ny is an even number.");
+        datatype = UHalf;
+    }
+    else 
+    {
+        switch (header->mode%5)
+        {
+        case 0:
+            datatype = UChar; // The image2010 web page says map-mode 0 is signed, but Jude's code interpretes the data as unsigned
+            break;
+        case 1:
+            datatype = Short;
+            break;
+        case 2:
+            datatype = Float;
+            break;
+        case 3:
+            REPORT_ERROR("readMRC: only real-space images may be read into RELION.");
+        case 4:
+            REPORT_ERROR("readMRC: only real-space images may be read into RELION.");
+        default:
+            datatype = UChar;
+            break;
+        }
     }
     offset = MRCSIZE + header->nsymbt;
 

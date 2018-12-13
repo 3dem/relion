@@ -550,15 +550,17 @@ class image_handler_parameters
 
 	void run()
 	{
-
+		bool input_is_stack = (fn_in.getExtension() == "mrcs" || fn_in.getExtension() == "tif" || fn_in.getExtension() == "tiff") && !fn_in.contains("@");
 		// By default: write single output images
 
 		// Get a MetaDataTable
 		if (fn_in.getExtension() == "star")
 		{
 			MD.read(fn_in);
+			std::cout << "NOTE: the input (--i) is a STAR file. The output (--o) is treated as a suffix, not a path." << std::endl;
+			input_is_stack = true;
 		}
-		else if (fn_in.getExtension() == "mrcs" && !fn_in.contains("@"))
+		else if (input_is_stack)
 		{
 			if (bin_avg > 0 || (avg_first >= 0 && avg_last >= 0))
 			{
@@ -815,7 +817,7 @@ class image_handler_parameters
 				}
 				else
 				{
-					if (fn_in.getExtension() == "star" || (fn_in.getExtension() == "mrcs" && !fn_in.contains("@")))
+					if (input_is_stack)
 					{
 						my_fn_out = fn_img.insertBeforeExtension("_" + fn_out);
 					}
@@ -848,7 +850,7 @@ class image_handler_parameters
 		if (do_md_out && fn_in.getExtension() == "star")
 		{
 			FileName fn_md_out = fn_in.insertBeforeExtension("_" + fn_out);
-			std::cout << " Written out new STAR file: " << fn_md_out;
+			std::cout << " Written out new STAR file: " << fn_md_out << std::endl;
 			MD.write(fn_md_out);
 		}
 
