@@ -71,7 +71,11 @@ static bool has_shift;
 static int preshift_ipos;
 
 static int current_selection_type;
-static bool do_color;
+static int colour_scheme;
+#define GREYSCALE 0
+#define RAINBOWSCALE 1
+#define REDBLUESCALE 2
+
 /*
 static RFLOAT current_minval;
 static RFLOAT current_maxval;
@@ -79,8 +83,10 @@ static RFLOAT current_scale;
 static RFLOAT current_sigma_contrast;
 */
 
-void greyToRedBlue(const RFLOAT grey, unsigned char &red, unsigned char &green, unsigned char &blue);
-RFLOAT redBlueToGrey(const unsigned char red, const unsigned char green, const unsigned char blue);
+void greyToRedBlue(const unsigned char grey, unsigned char &red, unsigned char &green, unsigned char &blue);
+unsigned char redBlueToGrey(const unsigned char red, const unsigned char green, const unsigned char blue);
+void greyToRainbow(const unsigned char grey, unsigned char &red, unsigned char &green, unsigned char &blue);
+unsigned char rainbowToGrey(const unsigned char red, const unsigned char green, const unsigned char blue);
 
 class DisplayBox : public Fl_Box
 {
@@ -470,7 +476,7 @@ public:
 	long int max_nr_images;
 
 	// Display image in color
-	bool do_display_color;
+	int colour_scheme;
 
 	// FileName for selected class average images and particles
 	FileName fn_imgs, fn_parts;
@@ -478,15 +484,16 @@ public:
 	// Label option to display or to sort on
 	std::vector<std::string> display_labels;
 	std::vector<std::string> sort_labels;
+	std::vector<std::string> colour_schemes;
 
 	// Input for the display parameters
 	Fl_Input *black_input, *white_input, *sigma_contrast_input, *scale_input, *lowpass_input, *highpass_input, *angpix_input;
 	Fl_Input *col_input, *ori_scale_input, *max_nr_images_input, *max_parts_per_class_input;
-	Fl_Check_Button *sort_button, *reverse_sort_button, *apply_orient_button, *read_whole_stack_button, *color_display_button;
-	Fl_Choice *display_choice, *sort_choice;
+	Fl_Check_Button *sort_button, *reverse_sort_button, *apply_orient_button, *read_whole_stack_button;
+	Fl_Choice *display_choice, *sort_choice, *colour_scheme_choice;
 
 	// Constructor with w x h size of the window and a title
-	displayerGuiWindow(int W, int H, const char* title=0): Fl_Window(W, H, title),	sort_button(NULL), reverse_sort_button(NULL), apply_orient_button(NULL), read_whole_stack_button(NULL), color_display_button(NULL) {}
+	displayerGuiWindow(int W, int H, const char* title=0): Fl_Window(W, H, title),	sort_button(NULL), reverse_sort_button(NULL), apply_orient_button(NULL), read_whole_stack_button(NULL) {}
 
 	// Fill all except for the browser
 	int fill(FileName &fn_in);

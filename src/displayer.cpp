@@ -34,7 +34,7 @@ void DisplayBox::draw()
 	//fl_push_clip(x(),y(),w(),h());
 
 	/* Redraw the whole image */
-	int depth = (do_color) ? 3 : 1;
+	int depth = (colour_scheme) ? 3 : 1;
 	fl_draw_image((const uchar *)img_data, xpos, ypos, (short)xsize_data, (short)ysize_data, depth);
 
 	/* Draw a red rectangle around the particle if it is selected */
@@ -66,7 +66,7 @@ void DisplayBox::draw()
 	//fl_pop_clip();
 }
 // input to this function is values from 0->255; output is three channels from 0->255
-void greyToRedBlue(const RFLOAT grey, unsigned char &red, unsigned char &green, unsigned char &blue)
+void greyToRedBlue(const unsigned char grey, unsigned char &red, unsigned char &green, unsigned char &blue)
 {
 
 	const RFLOAT d_rb = 3. * (grey - 128);
@@ -79,36 +79,64 @@ void greyToRedBlue(const RFLOAT grey, unsigned char &red, unsigned char &green, 
 	return;
 }
 
-RFLOAT redBlueToGrey(const unsigned char red, const unsigned char green, const unsigned char blue)
+
+unsigned char redBlueToGrey(const unsigned char red, const unsigned char green, const unsigned char blue)
 {
-	RFLOAT grey;
+	unsigned grey;
 	if (red >0)
 	{
-		if (red < 255)
-		{
-			grey = (RFLOAT)red / 3. + 128;
-		}
-		else
-		{
-			// Take grey from green value
-			grey = (RFLOAT)green/3. + 42 + 128;
-		}
+		if (red < 255) grey = (unsigned char)FLOOR((RFLOAT)red / 3. + 128);
+		else grey = (unsigned char)FLOOR((RFLOAT)green/3. + 42 + 128);
 	}
 	else
 	{
-		if (blue < 255)
-		{
-			grey = (RFLOAT)-blue / 3. + 128;
-		}
-		else
-		{
-			// Take grey from green value
-			grey = -((RFLOAT)green)/3. - 42 + 128;
-		}
+		if (blue < 255) grey = (unsigned char)FLOOR((RFLOAT)-blue / 3. + 128);
+		else grey = (unsigned char)FLOOR(-((RFLOAT)green)/3. - 42 + 128);
 	}
 	return grey;
 
 }
+void greyToRainbow(const unsigned char grey, unsigned char &red, unsigned char &green, unsigned char &blue)
+{
+
+	/*plot short rainbow RGB*/
+	RFLOAT a=(255-grey)/64.;	//invert and group
+	int X=FLOOR(a);	//this is the integer part
+	unsigned char Y = FLOOR(255*(a-X)); //fractional part from 0 to 255
+	switch(X)
+	{
+	    case 0: red=255;green=Y;blue=0;break;
+	    case 1: red=255-Y;green=255;blue=0;break;
+	    case 2: red=0;green=255;blue=Y;break;
+	    case 3: red=0;green=255-Y;blue=255;break;
+	    case 4: red=0;green=0;blue=255;break;
+	}
+
+	return;
+}
+
+unsigned char rainbowToGrey(const unsigned char red, const unsigned char green, const unsigned char blue)
+{
+	unsigned char Y;
+	int X;
+	if (red > 0)
+	{
+		if (red == 255) {Y = green; X = 0;}
+		else {Y = 255-red; X = 1;}
+	}
+	else if (green > 0)
+	{
+		if (green == 255) {Y = blue; X = 2;}
+		else {Y = 255 - green; X = 3;}
+	}
+	else {Y = 255; X = 4;}
+
+	unsigned char grey = 255 - CEIL(64*((RFLOAT)Y/255. + X));
+
+	return grey;
+
+}
+
 
 void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, int _ipos,
 		RFLOAT _minval, RFLOAT _maxval, RFLOAT _scale, bool do_relion_scale)
@@ -137,8 +165,7 @@ void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, i
 	ysize_data = CEIL(YSIZE(img) * scale);
 	xoff = (xsize_data < w() ) ? (w() - xsize_data) / 2 : 0;
 	yoff = (ysize_data < h() ) ? (h() - ysize_data) / 2 : 0;
-	std::cerr << " do_color= " << do_color << std::endl;
-	if (do_color)
+	if (colour_scheme)
 	{
 		img_data = new unsigned char [3 * xsize_data * ysize_data];
 	}
@@ -173,14 +200,12 @@ void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, i
 			for (dx = xsize_data, xerr = xsize_data, old_ptr = img.data + sy * line_d; dx > 0; dx --, n++)
 			{
 
-				if (do_color)
+				unsigned char val = FLOOR((*old_ptr - minval) / step);
+				switch (colour_scheme)
 				{
-					RFLOAT val = (*old_ptr - minval) / step;
-					greyToRedBlue(val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]);
-				}
-				else
-				{
-					img_data[n] = (unsigned char)FLOOR((*old_ptr - minval) / step);
+					case (GREYSCALE): img_data[n] = val; break;
+					case (REDBLUESCALE): greyToRedBlue(val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]); break;
+					case (RAINBOWSCALE): greyToRainbow(val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]); break;
 				}
 				old_ptr += xstep;
 				xerr    -= xmod;
@@ -205,22 +230,12 @@ void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, i
 	{
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(img, n, old_ptr)
 		{
-			if (do_color)
+			unsigned char val = FLOOR((*old_ptr - minval) / step);
+			switch (colour_scheme)
 			{
-				RFLOAT val = FLOOR((*old_ptr - minval) / step);//(*old_ptr - middle) / range;
-				greyToRedBlue(val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]);
-				/*
-				char r, g, b;
-				greyToRedBlue(val, r, g, b);
-				//std::cerr << " val= " << val << " r= " << (int)r << " g= " << (int)g << " b= " << (int)(b) << "\n";
-				img_data[3*n] = r;
-				img_data[3*n+1] = g;
-				img_data[3*n+2] = b;
-				*/
-			}
-			else
-			{
-				img_data[n] = (unsigned char)FLOOR((*old_ptr - minval) / step);
+				case (GREYSCALE): img_data[n] = val; break;
+				case (REDBLUESCALE): greyToRedBlue(val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]); break;
+				case (RAINBOWSCALE): greyToRainbow(val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]); break;
 			}
 		}
 	}
@@ -1464,15 +1479,13 @@ int singleViewerCanvas::handle(int ev)
 
 		if (rx < boxes[0]->xsize_data && ry < boxes[0]->ysize_data && rx >= 0 && ry >=0)
 		{
-			int ival;
-			if (do_color)
+			unsigned char ival;
+			int n = ry*boxes[0]->xsize_data + rx;
+			switch (colour_scheme)
 			{
-				int n = ry*boxes[0]->xsize_data + rx;
-				ival = redBlueToGrey(boxes[0]->img_data[3*n], boxes[0]->img_data[3*n+1], boxes[0]->img_data[3*n+2]);
-			}
-			else
-			{
-				ival = boxes[0]->img_data[ry*boxes[0]->xsize_data + rx];
+				case (GREYSCALE): ival = boxes[0]->img_data[n]; break;
+				case (REDBLUESCALE): ival = redBlueToGrey(boxes[0]->img_data[3*n], boxes[0]->img_data[3*n+1], boxes[0]->img_data[3*n+2]); break;
+				case (RAINBOWSCALE): ival = rainbowToGrey(boxes[0]->img_data[3*n], boxes[0]->img_data[3*n+1], boxes[0]->img_data[3*n+2]); break;
 			}
 			RFLOAT step = (boxes[0]->maxval - boxes[0]->minval) / 255.;
 			RFLOAT dval = ival * step + boxes[0]->minval;
@@ -2006,12 +2019,17 @@ int displayerGuiWindow::fill(FileName &_fn_in)
 	white_input->value("0");
 	white_input->color(GUI_INPUT_COLOR);
 	y += ystep;
-	color_display_button  = new Fl_Check_Button(x2-112, y, inputwidth, height, "Display in colour?");
-	color_display_button->color(GUI_INPUT_COLOR);
 
 	sigma_contrast_input = new Fl_Input(x, y, inputwidth, height, "Sigma contrast:");
 	sigma_contrast_input->value("0");
 	sigma_contrast_input->color(GUI_INPUT_COLOR);
+
+	colour_scheme_choice = new Fl_Choice(x2-110, y, inputwidth+110, height, "Color:");
+	colour_scheme_choice->add("greyscale", 0, 0,0, FL_MENU_VALUE);
+	colour_scheme_choice->add("rainbow", 0, 0,0, FL_MENU_VALUE);
+	colour_scheme_choice->add("blue-red", 0, 0,0, FL_MENU_VALUE);
+	colour_scheme_choice->picked(colour_scheme_choice->menu());
+	colour_scheme_choice->color(GUI_INPUT_COLOR);
 
 	y += ROUND(1.75*ystep);
 
@@ -2150,6 +2168,8 @@ void displayerGuiWindow::readLastSettings()
 			black_input->value(value.c_str());
 		else if (label == white_input->label())
 			white_input->value(value.c_str());
+		else if (label == colour_scheme_choice->label())
+			colour_scheme_choice->value(textToInteger(value));
 		else if (label == sigma_contrast_input->label())
 			sigma_contrast_input->value(value.c_str());
 		else if (is_multi && label == col_input->label())
@@ -2184,6 +2204,7 @@ void displayerGuiWindow::writeLastSettings()
 	fh << scale_input->label() << " = " << scale_input->value() << std::endl;
 	fh << black_input->label() << " = " << black_input->value() << std::endl;
 	fh << white_input->label() << " = " << white_input->value() << std::endl;
+	fh << colour_scheme_choice->label() << " = " << colour_scheme_choice->value() << std::endl;
 	fh << sigma_contrast_input->label() << " = " << sigma_contrast_input->value() << std::endl;
 	if (is_multi)
 	{
@@ -2223,7 +2244,11 @@ void displayerGuiWindow::cb_display_i()
 	cl += " --black " + (std::string)black_input->value();
 	cl += " --white " + (std::string)white_input->value();
 	cl += " --sigma_contrast " + (std::string)sigma_contrast_input->value();
-	if (getValue(color_display_button)) cl += " --colour ";
+
+	// Get the colour scheme
+	const Fl_Menu_Item* m3 = colour_scheme_choice->mvalue();
+	if ((std::string)m3->label() == "rainbow") cl += " --colour_rainbow ";
+	else if ((std::string)m3->label() == "blue-red") cl += " --colour_bluered ";
 
 	if (is_star)
 	{
@@ -2327,7 +2352,10 @@ void Displayer::read(int argc, char **argv)
 	do_read_whole_stacks = parser.checkOption("--read_whole_stack", "Read entire stacks at once (to speed up when many images of each stack are displayed)");
 	show_fourier_amplitudes = parser.checkOption("--show_fourier_amplitudes", "Show amplitudes of 2D Fourier transform?");
 	show_fourier_phase_angles = parser.checkOption("--show_fourier_phase_angles", "Show phase angles of 2D Fourier transforms?");
-	do_color = parser.checkOption("--colour", "Show images in cyan-blue-black-red-yellow colour scheme?");
+	if (parser.checkOption("--colour_rainbow", "Show images in cyan-blue-black-red-yellow colour scheme?")) colour_scheme = RAINBOWSCALE;
+	else if (parser.checkOption("--colour_bluered", "Show images in blue-cyan-green-yellow-red colour scheme (for difference images)?")) colour_scheme = REDBLUESCALE;
+	else colour_scheme = GREYSCALE;
+
 
 	int disp_section  = parser.addSection("Multiviewer options");
 	ncol = textToInteger(parser.getOption("--col", "Number of columns", "5"));
@@ -2602,6 +2630,26 @@ int Displayer::runGui()
 
 int Displayer::run()
 {
+
+	/* test color scheme conversions */
+	if (false)
+	{
+		for (int val = 0; val < 256; val++)
+		{
+			unsigned char grey,red,green,blue;
+			if (colour_scheme == RAINBOWSCALE)
+			{
+				greyToRainbow(val,red,green,blue);
+				grey = rainbowToGrey(red,green,blue);
+			}
+			else if (colour_scheme == REDBLUESCALE)
+			{
+				greyToRedBlue(val,red,green,blue);
+				grey = redBlueToGrey(red,green,blue);
+			}
+			std::cout << val << "  " << (int)grey << "  " << (int)red << "  " << (int)green << "  " << (int)blue << std::endl;
+		}
+	}
 
 	if (do_gui)
 	{
