@@ -71,12 +71,16 @@ static bool has_shift;
 static int preshift_ipos;
 
 static int current_selection_type;
+static bool do_color;
 /*
 static RFLOAT current_minval;
 static RFLOAT current_maxval;
 static RFLOAT current_scale;
 static RFLOAT current_sigma_contrast;
 */
+
+void greyToRedBlue(const RFLOAT grey, unsigned char &red, unsigned char &green, unsigned char &blue);
+RFLOAT redBlueToGrey(const unsigned char red, const unsigned char green, const unsigned char blue);
 
 class DisplayBox : public Fl_Box
 {
@@ -102,7 +106,7 @@ public:
 	MetaDataTable MDimg;
 
 	// The actual image data array
-	char * img_data;
+	unsigned char * img_data;
 
 	// For getting back close the original image values from the uchar ones...
 	RFLOAT minval;
@@ -114,6 +118,7 @@ public:
 
 	void setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, int ipos, RFLOAT minval, RFLOAT maxval,
 			RFLOAT _scale, bool do_relion_scale = false);
+
 
 	// Destructor
 	~DisplayBox()
@@ -464,6 +469,9 @@ public:
 	// Maximum number of images to show
 	long int max_nr_images;
 
+	// Display image in color
+	bool do_display_color;
+
 	// FileName for selected class average images and particles
 	FileName fn_imgs, fn_parts;
 
@@ -474,11 +482,11 @@ public:
 	// Input for the display parameters
 	Fl_Input *black_input, *white_input, *sigma_contrast_input, *scale_input, *lowpass_input, *highpass_input, *angpix_input;
 	Fl_Input *col_input, *ori_scale_input, *max_nr_images_input, *max_parts_per_class_input;
-	Fl_Check_Button *sort_button, *reverse_sort_button, *apply_orient_button, *read_whole_stack_button;
+	Fl_Check_Button *sort_button, *reverse_sort_button, *apply_orient_button, *read_whole_stack_button, *color_display_button;
 	Fl_Choice *display_choice, *sort_choice;
 
 	// Constructor with w x h size of the window and a title
-	displayerGuiWindow(int W, int H, const char* title=0): Fl_Window(W, H, title),	sort_button(NULL), reverse_sort_button(NULL), apply_orient_button(NULL), read_whole_stack_button(NULL) {}
+	displayerGuiWindow(int W, int H, const char* title=0): Fl_Window(W, H, title),	sort_button(NULL), reverse_sort_button(NULL), apply_orient_button(NULL), read_whole_stack_button(NULL), color_display_button(NULL) {}
 
 	// Fill all except for the browser
 	int fill(FileName &fn_in);

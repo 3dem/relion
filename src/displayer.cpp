@@ -21,6 +21,7 @@
 #include "src/displayer.h"
 //#define DEBUG
 
+
 /************************************************************************/
 void DisplayBox::draw()
 {
@@ -33,7 +34,9 @@ void DisplayBox::draw()
 	//fl_push_clip(x(),y(),w(),h());
 
 	/* Redraw the whole image */
-	fl_draw_image((const uchar *)img_data, xpos, ypos, (short)xsize_data, (short)ysize_data, 1);
+	int depth = (do_color) ? 3 : 1;
+	fl_draw_image((const uchar *)img_data, xpos, ypos, (short)xsize_data, (short)ysize_data, depth);
+
 	/* Draw a red rectangle around the particle if it is selected */
 	if (selected == 1)
 		fl_color(FL_RED);
@@ -61,6 +64,50 @@ void DisplayBox::draw()
 	fl_line(x2, y1, x1, y1);
 
 	//fl_pop_clip();
+}
+// input to this function is values from 0->255; output is three channels from 0->255
+void greyToRedBlue(const RFLOAT grey, unsigned char &red, unsigned char &green, unsigned char &blue)
+{
+
+	const RFLOAT d_rb = 3. * (grey - 128);
+	const RFLOAT d_g = 3. * (std::abs(grey - 128) - 42);
+
+	red   = (unsigned char)(FLOOR(std::min(255., std::max(0.0,  d_rb))));
+	green = (unsigned char)(FLOOR(std::min(255., std::max(0.0,  d_g))));
+	blue  = (unsigned char)(FLOOR(std::min(255., std::max(0.0, -d_rb))));
+
+	return;
+}
+
+RFLOAT redBlueToGrey(const unsigned char red, const unsigned char green, const unsigned char blue)
+{
+	RFLOAT grey;
+	if (red >0)
+	{
+		if (red < 255)
+		{
+			grey = (RFLOAT)red / 3. + 128;
+		}
+		else
+		{
+			// Take grey from green value
+			grey = (RFLOAT)green/3. + 42 + 128;
+		}
+	}
+	else
+	{
+		if (blue < 255)
+		{
+			grey = (RFLOAT)-blue / 3. + 128;
+		}
+		else
+		{
+			// Take grey from green value
+			grey = -((RFLOAT)green)/3. - 42 + 128;
+		}
+	}
+	return grey;
+
 }
 
 void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, int _ipos,
@@ -90,8 +137,17 @@ void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, i
 	ysize_data = CEIL(YSIZE(img) * scale);
 	xoff = (xsize_data < w() ) ? (w() - xsize_data) / 2 : 0;
 	yoff = (ysize_data < h() ) ? (h() - ysize_data) / 2 : 0;
-	img_data = new char [xsize_data * ysize_data];
+	std::cerr << " do_color= " << do_color << std::endl;
+	if (do_color)
+	{
+		img_data = new unsigned char [3 * xsize_data * ysize_data];
+	}
+	else
+	{
+		img_data = new unsigned char [xsize_data * ysize_data];
+	}
 	RFLOAT range = maxval - minval;
+	RFLOAT middle = range/2.;
 	RFLOAT step = range / 255; // 8-bit scaling range from 0 to 255
 	RFLOAT* old_ptr=NULL;
 	long int n;
@@ -104,7 +160,7 @@ void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, i
 	// Use the same nearest-neighbor algorithm as in the copy function of Fl_Image...
 	if (ABS(scale - 1.0) > 0.01 && !do_relion_scale)
 	{
-    		int xmod   = XSIZE(img) % xsize_data;
+		int xmod   = XSIZE(img) % xsize_data;
 		int xstep  = XSIZE(img) / xsize_data;
 		int ymod   = YSIZE(img) % ysize_data;
 		int ystep  = YSIZE(img) / ysize_data;
@@ -116,7 +172,16 @@ void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, i
 		{
 			for (dx = xsize_data, xerr = xsize_data, old_ptr = img.data + sy * line_d; dx > 0; dx --, n++)
 			{
-				img_data[n] = (char)FLOOR((*old_ptr - minval) / step);
+
+				if (do_color)
+				{
+					RFLOAT val = (*old_ptr - minval) / step;
+					greyToRedBlue(val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]);
+				}
+				else
+				{
+					img_data[n] = (unsigned char)FLOOR((*old_ptr - minval) / step);
+				}
 				old_ptr += xstep;
 				xerr    -= xmod;
 				if (xerr <= 0)
@@ -140,7 +205,23 @@ void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, i
 	{
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(img, n, old_ptr)
 		{
-    			img_data[n] = (char)FLOOR((*old_ptr - minval) / step);
+			if (do_color)
+			{
+				RFLOAT val = FLOOR((*old_ptr - minval) / step);//(*old_ptr - middle) / range;
+				greyToRedBlue(val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]);
+				/*
+				char r, g, b;
+				greyToRedBlue(val, r, g, b);
+				//std::cerr << " val= " << val << " r= " << (int)r << " g= " << (int)g << " b= " << (int)(b) << "\n";
+				img_data[3*n] = r;
+				img_data[3*n+1] = g;
+				img_data[3*n+2] = b;
+				*/
+			}
+			else
+			{
+				img_data[n] = (unsigned char)FLOOR((*old_ptr - minval) / step);
+			}
 		}
 	}
 }
@@ -1383,8 +1464,16 @@ int singleViewerCanvas::handle(int ev)
 
 		if (rx < boxes[0]->xsize_data && ry < boxes[0]->ysize_data && rx >= 0 && ry >=0)
 		{
-			int ival = boxes[0]->img_data[ry*boxes[0]->xsize_data + rx];
-			if (ival < 0) ival += 256;
+			int ival;
+			if (do_color)
+			{
+				int n = ry*boxes[0]->xsize_data + rx;
+				ival = redBlueToGrey(boxes[0]->img_data[3*n], boxes[0]->img_data[3*n+1], boxes[0]->img_data[3*n+2]);
+			}
+			else
+			{
+				ival = boxes[0]->img_data[ry*boxes[0]->xsize_data + rx];
+			}
 			RFLOAT step = (boxes[0]->maxval - boxes[0]->minval) / 255.;
 			RFLOAT dval = ival * step + boxes[0]->minval;
 			int ysc = ROUND(ry/boxes[0]->scale);
@@ -1910,18 +1999,20 @@ int displayerGuiWindow::fill(FileName &_fn_in)
 	scale_input->color(GUI_INPUT_COLOR);
 	scale_input->value("1");
 
-	black_input = new Fl_Input(x2, y, inputwidth, height, "Black value:");
+	black_input = new Fl_Input(x2-110, y, inputwidth, height, "Black:");
 	black_input->value("0");
 	black_input->color(GUI_INPUT_COLOR);
+	white_input = new Fl_Input(x2, y, inputwidth, height, "White:");
+	white_input->value("0");
+	white_input->color(GUI_INPUT_COLOR);
 	y += ystep;
+	color_display_button  = new Fl_Check_Button(x2-112, y, inputwidth, height, "Display in colour?");
+	color_display_button->color(GUI_INPUT_COLOR);
 
 	sigma_contrast_input = new Fl_Input(x, y, inputwidth, height, "Sigma contrast:");
 	sigma_contrast_input->value("0");
 	sigma_contrast_input->color(GUI_INPUT_COLOR);
 
-	white_input = new Fl_Input(x2, y, inputwidth, height, "White value:");
-	white_input->value("0");
-	white_input->color(GUI_INPUT_COLOR);
 	y += ROUND(1.75*ystep);
 
 	if (is_star)
@@ -2132,6 +2223,7 @@ void displayerGuiWindow::cb_display_i()
 	cl += " --black " + (std::string)black_input->value();
 	cl += " --white " + (std::string)white_input->value();
 	cl += " --sigma_contrast " + (std::string)sigma_contrast_input->value();
+	if (getValue(color_display_button)) cl += " --colour ";
 
 	if (is_star)
 	{
@@ -2235,6 +2327,7 @@ void Displayer::read(int argc, char **argv)
 	do_read_whole_stacks = parser.checkOption("--read_whole_stack", "Read entire stacks at once (to speed up when many images of each stack are displayed)");
 	show_fourier_amplitudes = parser.checkOption("--show_fourier_amplitudes", "Show amplitudes of 2D Fourier transform?");
 	show_fourier_phase_angles = parser.checkOption("--show_fourier_phase_angles", "Show phase angles of 2D Fourier transforms?");
+	do_color = parser.checkOption("--colour", "Show images in cyan-blue-black-red-yellow colour scheme?");
 
 	int disp_section  = parser.addSection("Multiviewer options");
 	ncol = textToInteger(parser.getOption("--col", "Number of columns", "5"));
@@ -2509,6 +2602,7 @@ int Displayer::runGui()
 
 int Displayer::run()
 {
+
 	if (do_gui)
 	{
 	}
