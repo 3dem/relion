@@ -2012,10 +2012,10 @@ int displayerGuiWindow::fill(FileName &_fn_in)
 	scale_input->color(GUI_INPUT_COLOR);
 	scale_input->value("1");
 
-	black_input = new Fl_Input(x2-110, y, inputwidth, height, "Black:");
+	black_input = new Fl_Input(x2-110, y, inputwidth, height, "Min:");
 	black_input->value("0");
 	black_input->color(GUI_INPUT_COLOR);
-	white_input = new Fl_Input(x2, y, inputwidth, height, "White:");
+	white_input = new Fl_Input(x2, y, inputwidth, height, "Max:");
 	white_input->value("0");
 	white_input->color(GUI_INPUT_COLOR);
 	y += ystep;
