@@ -532,7 +532,10 @@ bool MotioncorrRunner::executeMotioncor2(Micrograph &mic, int rank)
 	{
 		if (rank >= allThreadIDs.size())
 			REPORT_ERROR("ERROR: not enough MPI nodes specified for the GPU IDs.");
-		command += " -Gpu " + allThreadIDs[rank][0];
+
+		command += " -Gpu ";
+		for (int igpu = 0; igpu < allThreadIDs[rank].size(); igpu++)
+			command += allThreadIDs[rank][igpu] + " ";
 	}
 
 	command += " >> " + fn_out + " 2>> " + fn_err;
