@@ -28,7 +28,7 @@
 #include "src/funcs.h"
 #include <omp.h>
 
-//#define TIMING
+#define TIMING
 #ifdef TIMING
 	#define RCTIC(label) (timer.tic(label))
 	#define RCTOC(label) (timer.toc(label))
@@ -1260,8 +1260,8 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	// Apply gain
 	RCTIC(TIMING_APPLY_GAIN);
 	if (fn_gain_reference != "") {
+		#pragma omp parallel for num_threads(n_threads)
 		for (int iframe = 0; iframe < n_frames; iframe++) {
-			#pragma omp parallel for num_threads(n_threads)
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Igain()) {
 				DIRECT_MULTIDIM_ELEM(Iframes[iframe](), n) *= DIRECT_MULTIDIM_ELEM(Igain(), n);
 			}
