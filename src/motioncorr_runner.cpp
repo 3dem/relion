@@ -28,7 +28,7 @@
 #include "src/funcs.h"
 #include <omp.h>
 
-#define TIMING
+//#define TIMING
 #ifdef TIMING
 	#define RCTIC(label) (timer.tic(label))
 	#define RCTOC(label) (timer.toc(label))
@@ -114,6 +114,9 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	do_own = parser.checkOption("--use_own", "Use our own implementation of motion correction");
 	skip_defect = parser.checkOption("--skip_defect", "Skip hot pixel detection");
 	save_noDW = parser.checkOption("--save_noDW", "Save aligned but non dose weighted micrograph.");
+	max_iter = textToInteger(parser.getOption("--max_iter", "Maximum number of iterations for alignment. Only valid with --use_own", "5"));
+	if (max_iter != 5 && !do_own)
+		REPORT_ERROR("--max_iter is valid only with --do_own");
 	interpolate_shifts = parser.checkOption("--interpolate_shifts", "(EXPERIMENTAL) Interpolate shifts");
 	ccf_downsample = textToFloat(parser.getOption("--ccf_downsample", "(EXPERT) Downsampling rate of CC map. default = 0 = automatic based on B factor", "0"));
 	early_binning = parser.checkOption("--early_binning", "(EXPERT) Do binning before alignment to reduce memory usage. This might dampen signal near Nyquist.");
@@ -1891,7 +1894,6 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<fComplex> > &Fframes
 	bool converged = false;
 
 	// Parameters TODO: make an option
-	const int max_iter = 5;
 	int search_range = 50; // px
 	const RFLOAT tolerance = 0.5; // px
 	const RFLOAT EPS = 1e-15;
