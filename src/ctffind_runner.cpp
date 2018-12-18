@@ -357,6 +357,13 @@ void CtffindRunner::joinCtffindResults()
 		bool has_this_ctf = getCtffindResults(fn_microot, defU, defV, defAng, CC,
 		                                      HT, CS, AmpCnst, XMAG, DStep, maxres, valscore, phaseshift);
 
+		// Don't read the pixel size from log files to avoid loss of precision
+		XMAG = 10000;
+		if (is_ctffind4)
+			DStep = PixelSize;
+		else
+			DStep = angpix;
+
 		if (!has_this_ctf)
 		{
 			std::cerr << " WARNING: skipping, since cannot get CTF values for " << fn_micrographs_all[imic] <<std::endl;
@@ -748,12 +755,12 @@ bool CtffindRunner::getCtffindResults(FileName fn_microot, RFLOAT &defU, RFLOAT 
 	if (is_ctffind4)
 	{
 		return getCtffind4Results(fn_microot, defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep,
-				maxres, phaseshift, do_warn);
+		                          maxres, phaseshift, do_warn);
 	}
 	else
 	{
 		return getCtffind3Results(fn_microot, defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep,
-				maxres, phaseshift, valscore, do_warn);
+		                          maxres, phaseshift, valscore, do_warn);
 	}
 
 
