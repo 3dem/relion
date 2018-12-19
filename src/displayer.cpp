@@ -2416,7 +2416,7 @@ void Displayer::read(int argc, char **argv)
 	else if (parser.checkOption("--colour_rainbow", "Show images in cyan-blue-black-red-yellow colour scheme?")) colour_scheme = RAINBOWSCALE;
 	else if (parser.checkOption("--colour_difference", "Show images in cyan-blue-black-red-yellow colour scheme (for difference images)?")) colour_scheme = CYANBLACKYELLOWSCALE;
 	else colour_scheme = GREYSCALE;
-	do_scalebar = parser.checkOption("--colour_scalebar", "Show colour scalebar image?");
+	do_colourbar = parser.checkOption("--colour_bar", "Show colourbar image?");
 
 	int disp_section  = parser.addSection("Multiviewer options");
 	ncol = textToInteger(parser.getOption("--col", "Number of columns", "5"));
@@ -2709,7 +2709,7 @@ int Displayer::run()
 	if (do_gui)
 	{
 	}
-	else if (do_scalebar)
+	else if (do_colourbar)
 	{
 		Image<RFLOAT> img(256, 10);
 		FOR_ALL_ELEMENTS_IN_ARRAY2D(img())

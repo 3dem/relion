@@ -669,7 +669,7 @@ public:
 	bool do_read_whole_stacks;
 
 	// Flag to show colour scalebar image
-	bool do_scalebar;
+	bool do_colourbar;
 
 	// data.star metadata (for do_class)
 	MetaDataTable MDdata;
