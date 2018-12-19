@@ -141,6 +141,65 @@ unsigned char rainbowToGrey(const unsigned char red, const unsigned char green, 
 }
 
 
+void greyToBlackRed(const unsigned char grey, unsigned char &red, unsigned char &green, unsigned char &blue)
+{
+
+	if (grey >= 128)
+	{
+		red = 255;
+		blue = green = FLOOR((RFLOAT)(255.-grey)*2.);
+	}
+	else
+	{
+		red = green = blue = FLOOR((RFLOAT)(grey*2.));
+	}
+
+}
+
+unsigned char blackRedToGrey(const unsigned char red, const unsigned char green, const unsigned char blue)
+{
+
+	if (red == 255)
+	{
+		return FLOOR((RFLOAT)(255. - blue/2.));
+	}
+	else
+	{
+		return FLOOR((RFLOAT)(red/2.));
+	}
+
+}
+
+void greyToBlueWhite(const unsigned char grey, unsigned char &red, unsigned char &green, unsigned char &blue)
+{
+
+	if (grey >= 128)
+	{
+	    red = green = blue = FLOOR((RFLOAT)((grey-128.)*2.));
+	}
+	else
+	{
+	    red = green = 0;
+	    blue = FLOOR((RFLOAT)(255.-2.*grey));
+	}
+
+}
+
+unsigned char blueWhiteToGrey(const unsigned char red, const unsigned char green, const unsigned char blue)
+{
+
+	if (red == 0)
+	{
+		return FLOOR((RFLOAT)(255.-blue)/2.);
+	}
+	else
+	{
+		return FLOOR((RFLOAT)(red/2. + 128.));
+	}
+
+}
+
+
 void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, int _ipos,
 		RFLOAT _minval, RFLOAT _maxval, RFLOAT _scale, bool do_relion_scale)
 {
@@ -207,6 +266,8 @@ void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, i
 				switch (colour_scheme)
 				{
 					case (GREYSCALE): img_data[n] = val; break;
+					case (BLACKREDSCALE): greyToBlackRed(val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]); break;
+					case (BLUEWHITESCALE): greyToBlueWhite(val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]); break;
 					case (REDBLUESCALE): greyToRedBlue(val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]); break;
 					case (RAINBOWSCALE): greyToRainbow(val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]); break;
 				}
@@ -237,6 +298,8 @@ void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, i
 			switch (colour_scheme)
 			{
 				case (GREYSCALE): img_data[n] = val; break;
+				case (BLACKREDSCALE): greyToBlackRed(val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]); break;
+				case (BLUEWHITESCALE): greyToBlueWhite(val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]); break;
 				case (REDBLUESCALE): greyToRedBlue(val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]); break;
 				case (RAINBOWSCALE): greyToRainbow(val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]); break;
 			}
@@ -1536,6 +1599,8 @@ int singleViewerCanvas::handle(int ev)
 			switch (colour_scheme)
 			{
 				case (GREYSCALE): ival = boxes[0]->img_data[n]; break;
+				case (BLACKREDSCALE): ival = blackRedToGrey(boxes[0]->img_data[3*n], boxes[0]->img_data[3*n+1], boxes[0]->img_data[3*n+2]); break;
+				case (BLUEWHITESCALE): ival = blueWhiteToGrey(boxes[0]->img_data[3*n], boxes[0]->img_data[3*n+1], boxes[0]->img_data[3*n+2]); break;
 				case (REDBLUESCALE): ival = redBlueToGrey(boxes[0]->img_data[3*n], boxes[0]->img_data[3*n+1], boxes[0]->img_data[3*n+2]); break;
 				case (RAINBOWSCALE): ival = rainbowToGrey(boxes[0]->img_data[3*n], boxes[0]->img_data[3*n+1], boxes[0]->img_data[3*n+2]); break;
 			}
@@ -2081,6 +2146,8 @@ int displayerGuiWindow::fill(FileName &_fn_in)
 
 	colour_scheme_choice = new Fl_Choice(x2-110, y, inputwidth+110, height, "Color:");
 	colour_scheme_choice->add("greyscale", 0, 0,0, FL_MENU_VALUE);
+	colour_scheme_choice->add("black-red", 0, 0,0, FL_MENU_VALUE);
+	colour_scheme_choice->add("blue-white", 0, 0,0, FL_MENU_VALUE);
 	colour_scheme_choice->add("rainbow", 0, 0,0, FL_MENU_VALUE);
 	colour_scheme_choice->add("blue-red", 0, 0,0, FL_MENU_VALUE);
 	colour_scheme_choice->picked(colour_scheme_choice->menu());
@@ -2303,6 +2370,8 @@ void displayerGuiWindow::cb_display_i()
 	// Get the colour scheme
 	const Fl_Menu_Item* m3 = colour_scheme_choice->mvalue();
 	if ((std::string)m3->label() == "rainbow") cl += " --colour_rainbow ";
+	else if ((std::string)m3->label() == "black-red") cl += " --colour_blackred ";
+	else if ((std::string)m3->label() == "blue-white") cl += " --colour_bluewhite ";
 	else if ((std::string)m3->label() == "blue-red") cl += " --colour_bluered ";
 
 	if (is_star)
@@ -2409,8 +2478,10 @@ void Displayer::read(int argc, char **argv)
 	show_fourier_phase_angles = parser.checkOption("--show_fourier_phase_angles", "Show phase angles of 2D Fourier transforms?");
 	if (parser.checkOption("--colour_rainbow", "Show images in cyan-blue-black-red-yellow colour scheme?")) colour_scheme = RAINBOWSCALE;
 	else if (parser.checkOption("--colour_bluered", "Show images in blue-cyan-green-yellow-red colour scheme (for difference images)?")) colour_scheme = REDBLUESCALE;
+	else if (parser.checkOption("--colour_blackred", "Show images in black-grey-white-red colour scheme (for positive signal)?")) colour_scheme = BLACKREDSCALE;
+	else if (parser.checkOption("--colour_bluewhite", "Show images in blue-black-grey-white colour scheme (for negative signal)?")) colour_scheme = BLUEWHITESCALE;
 	else colour_scheme = GREYSCALE;
-
+	do_scalebar = parser.checkOption("--colour_scalebar", "Show colour scalebar image?");
 
 	int disp_section  = parser.addSection("Multiviewer options");
 	ncol = textToInteger(parser.getOption("--col", "Number of columns", "5"));
@@ -2702,12 +2773,33 @@ int Displayer::run()
 				greyToRedBlue(val,red,green,blue);
 				grey = redBlueToGrey(red,green,blue);
 			}
+			else if (colour_scheme == BLACKREDSCALE)
+			{
+				greyToBlackRed(val,red,green,blue);
+				grey = blackRedToGrey(red,green,blue);
+			}
+			else if (colour_scheme == BLUEWHITESCALE)
+			{
+				greyToBlueWhite(val,red,green,blue);
+				grey = blueWhiteToGrey(red,green,blue);
+			}
 			std::cout << val << "  " << (int)grey << "  " << (int)red << "  " << (int)green << "  " << (int)blue << std::endl;
 		}
 	}
 
 	if (do_gui)
 	{
+	}
+	else if (do_scalebar)
+	{
+		Image<RFLOAT> img(256, 10);
+		FOR_ALL_ELEMENTS_IN_ARRAY2D(img())
+		{
+			A2D_ELEM(img(), i, j) = (RFLOAT)j;
+		}
+		FileName fnt="colour scheme";
+		basisViewerWindow win(CEIL(scale*XSIZE(img())), CEIL(scale*YSIZE(img())), fnt.c_str());
+		win.fillSingleViewerCanvas(img(), 0., 255., 0., scale);
 	}
 	else if (do_pick || do_pick_startend)
 	{
