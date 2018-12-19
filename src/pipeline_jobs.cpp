@@ -1912,6 +1912,11 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 	else
 	{
 		FileName mysuffix = joboptions["coords_suffix"].getString();
+		if (mysuffix == "")
+		{
+			error_message = "ERROR: empty field for coordinate STAR file...";
+			return false;
+		}
 		command += " --coord_dir " + mysuffix.beforeLastOf("/") + "/";
 		command += " --coord_suffix " + (mysuffix.afterLastOf("/")).without("coords_suffix");
 		Node node2(joboptions["coords_suffix"].getString(), joboptions["coords_suffix"].node_type);
