@@ -41,7 +41,28 @@ void ObservationModel::loadSafely(
 {
 	MetaDataTable opticsMdt;
 
-	particlesMdt.read(filename, tablename);
+	std::string mytablename;
+
+	if (tablename == "discover")
+	{
+		if (particlesMdt.read(filename, "particles"))
+		{
+			mytablename = "particles";
+		}
+		else if (particlesMdt.read(filename, "micrographs"))
+		{
+			mytablename = "micrographs";
+		}
+		else if (particlesMdt.read(filename, "movies"))
+		{
+			mytablename = "movies";
+		}
+	}
+	else
+	{
+		particlesMdt.read(filename, tablename);
+		mytablename = tablename;
+	}
 	opticsMdt.read(filename, "optics");
 
 	if (particlesMdt.numberOfObjects() == 0 && particlesMdt.numberOfObjects() == 0)
@@ -54,7 +75,7 @@ void ObservationModel::loadSafely(
 		MetaDataTable oldMdt;
 		oldMdt.read(filename);
 
-		StarConverter::convert_3p0_particlesTo_3p1(oldMdt, particlesMdt, opticsMdt, tablename);
+		StarConverter::convert_3p0_particlesTo_3p1(oldMdt, particlesMdt, opticsMdt, mytablename);
 	}
 
 	obsModel = ObservationModel(opticsMdt);
@@ -685,8 +706,7 @@ const Image<Complex>& ObservationModel::getPhaseCorrection(int optGroup, int s)
 			const int sh = s/2 + 1;
 			phaseCorr[optGroup][s] = Image<Complex>(sh,s);
 			Image<Complex>& img = phaseCorr[optGroup][s];
-
-			const double as = angpix[optGroup] * s;
+			const double as = angpix[optGroup] * boxSizes[optGroup];
 
 			for (int y = 0; y < s;  y++)
 			for (int x = 0; x < sh; x++)
@@ -729,7 +749,7 @@ const Image<RFLOAT>& ObservationModel::getGammaOffset(int optGroup, int s)
 			gammaOffset[optGroup][s] = Image<RFLOAT>(sh,s);
 			Image<RFLOAT>& img = gammaOffset[optGroup][s];
 
-			const double as = angpix[optGroup] * s;
+			const double as = angpix[optGroup] * boxSizes[optGroup];
 
 			for (int y = 0; y < s;  y++)
 			for (int x = 0; x < sh; x++)

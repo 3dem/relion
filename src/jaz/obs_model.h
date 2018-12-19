@@ -34,6 +34,8 @@ class ObservationModel
 {
     public:
 
+		// tablename can be "particles", "micrographs" or "movies".
+		// If tablename is "discover", the function will try to read the data table with all three names (in that order).
 		static void loadSafely(
 				std::string filename,
 				ObservationModel& obsModel,
