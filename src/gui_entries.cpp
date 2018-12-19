@@ -137,6 +137,8 @@ void GuiEntry::initialise(int x, int y, Fl_Group * deactivate_this_group, bool _
 		choice = new Fl_Choice(XCOL2, y, WCOL2, height);
 		if (joboption.joboption_type == JOBOPTION_RADIO)
 		{
+			// !!! IMPORTANT !!!
+			// The number of elements must match the array defined in pipeline_jobs.h.
 			if (joboption.radio_menu == RADIO_SAMPLING)
 			{
 				choice->menu(fl_sampling_options);
@@ -147,7 +149,7 @@ void GuiEntry::initialise(int x, int y, Fl_Group * deactivate_this_group, bool _
 			else if (joboption.radio_menu == RADIO_NODETYPE)
 			{
 				choice->menu(fl_node_type_options);
-				for (int i = 0; i < 10; i++)
+				for (int i = 0; i < 8; i++)
 					if (std::string(job_nodetype_options[i]) == joboption.default_value)
 						choice->picked(&fl_node_type_options[i]);
 			}

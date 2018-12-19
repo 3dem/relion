@@ -79,6 +79,7 @@ void Reconstructor::read(int argc, char **argv)
 	fn_debug = parser.getOption("--debug", "Rootname for debug reconstruction files", "");
 	debug_ori_size =  textToInteger(parser.getOption("--debug_ori_size", "Rootname for debug reconstruction files", "1"));
 	debug_size =  textToInteger(parser.getOption("--debug_size", "Rootname for debug reconstruction files", "1"));
+	fn_noise = parser.getOption("--reconstruct_noise","Reconstruct noise using sigma2 values in this model STAR file", "");
 	read_weights = parser.checkOption("--read_weights", "Developmental: read freq. weight files");
 	do_debug = parser.checkOption("--write_debug_output", "Write out arrays with data and weight terms prior to reconstruct");
 	verb = textToInteger(parser.getOption("--verb", "Verbosity", "1"));
@@ -121,6 +122,9 @@ void Reconstructor::initialise()
 	// Is this 2D or 3D data?
 	data_dim = (do_3d_rot) ? 3 : 2;
 
+	if (fn_noise != "")
+		model.read(fn_noise);
+
 	// Get dimension of the images
 	if (do_reconstruct_ctf)
 	{
@@ -143,7 +147,7 @@ void Reconstructor::initialise()
 		if (do_ewald && newbox > 0)
 			mysize = newbox;
 	}
-
+	
 	if (!obsModel.allPixelSizesIdentical())
 	{
 		REPORT_ERROR("Reconstructor does not support varying pixel sizes yet.");
@@ -332,35 +336,72 @@ void Reconstructor::backprojectOneParticle(long int p)
 	MultidimArray<Complex> Fsub, F2D, F2DP, F2DQ;
 	FileName fn_img;
 	Image<RFLOAT> img;
-    if (do_reconstruct_ctf)
-    {
-        mysize = ctf_dim;
-        img().initZeros(ctf_dim, ctf_dim);
-        img().setXmippOrigin();
-    }
-    else
-    {
-		DF.getValue( EMDL_IMAGE_NAME, fn_img, p);
+
+	if (!do_reconstruct_ctf && fn_noise == "")
+	{
+		DF.getValue(EMDL_IMAGE_NAME, fn_img, p);
 		img.read(fn_img);
 		img().setXmippOrigin();
 		CenterFFT(img(), true);
 		transformer.FourierTransform(img(), F2D);
-    }
 
-	if (do_3d_rot)
-	{
-		if (ABS(XX(trans)) > 0. || ABS(YY(trans)) > 0. || ABS(ZZ(trans)) > 0. )
+		if (do_3d_rot)
 		{
-			shiftImageInFourierTransform(F2D, F2D,
-				XSIZE(img()), XX(trans), YY(trans), ZZ(trans));
+			if (ABS(XX(trans)) > 0. || ABS(YY(trans)) > 0. || ABS(ZZ(trans)) > 0. )
+			{
+				shiftImageInFourierTransform(F2D, F2D,
+				                             XSIZE(img()), XX(trans), YY(trans), ZZ(trans));
+			}
+		}
+		else
+		{
+			if (ABS(XX(trans)) > 0. || ABS(YY(trans)) > 0.)
+			{
+				shiftImageInFourierTransform(F2D, F2D,
+				                             XSIZE(img()), XX(trans), YY(trans));
+			}
 		}
 	}
 	else
 	{
-		if (ABS(XX(trans)) > 0. || ABS(YY(trans)) > 0.)
+		F2D.resize(mysize, mysize / 2 + 1);
+	}
+
+	if (fn_noise != "")
+	{
+		// TODO: Refactor code duplication from relion_project!
+		FileName fn_group;
+		if (DF.containsLabel(EMDL_MLMODEL_GROUP_NAME))
+			DF.getValue(EMDL_MLMODEL_GROUP_NAME, fn_group);
+		else if (DF.containsLabel(EMDL_MICROGRAPH_NAME))
+			DF.getValue(EMDL_MICROGRAPH_NAME, fn_group);
+		else
+			REPORT_ERROR("ERROR: cannot find rlnGroupName or rlnMicrographName in the input --i file...");
+
+		int my_mic_id = -1;
+		for (int mic_id = 0; mic_id < model.group_names.size(); mic_id++)
 		{
-			shiftImageInFourierTransform(F2D, F2D,
-				 XSIZE(img()), XX(trans), YY(trans));
+			if (fn_group == model.group_names[mic_id])
+			{
+				my_mic_id = mic_id;
+				break;
+			}
+		}
+
+		if (my_mic_id < 0) REPORT_ERROR("ERROR: cannot find " + fn_group + " in the input model file...");
+
+		RFLOAT normcorr = 1.;
+		if (DF.containsLabel(EMDL_IMAGE_NORM_CORRECTION)) DF.getValue(EMDL_IMAGE_NORM_CORRECTION, normcorr);
+
+		// Make coloured noise image
+		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(F2D)
+		{
+			int ires = ROUND(sqrt((RFLOAT)(kp*kp + ip*ip + jp*jp)));
+			ires = XMIPP_MIN(ires, model.ori_size/2); // at freqs higher than Nyquist: use last sigma2 value
+
+			RFLOAT sigma = sqrt(DIRECT_A1D_ELEM(model.sigma2_noise[my_mic_id], ires));
+			DIRECT_A3D_ELEM(F2D, k, i, j).real += rnd_gaus(0., sigma);
+			DIRECT_A3D_ELEM(F2D, k, i, j).imag += rnd_gaus(0., sigma);
 		}
 	}
 

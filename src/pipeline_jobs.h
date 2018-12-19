@@ -69,6 +69,9 @@
 #define DEFAULTNRTHREADS 1
 #define DEFAULTTHREADMAX 16
 
+// !!! IMPORTANT !!!
+// When you change the number of items here, you must update GuiEntry::initialise()
+ 
 static const char* job_sampling_options[] = {
 	"30 degrees",
 	"15 degrees",
