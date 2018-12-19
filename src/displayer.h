@@ -79,23 +79,74 @@ static int colour_scheme;
 #define RAINBOWSCALE 4
 #define CYANBLACKYELLOWSCALE 5
 
-/*
-static RFLOAT current_minval;
-static RFLOAT current_maxval;
-static RFLOAT current_scale;
-static RFLOAT current_sigma_contrast;
-*/
 
-void greyToBlackGreyRed(const unsigned char grey, unsigned char &red, unsigned char &green, unsigned char &blue);
-unsigned char blackGreyRedToGrey(const unsigned char red, const unsigned char green, const unsigned char blue);
-void greyToBlueGreyWhite(const unsigned char grey, unsigned char &red, unsigned char &green, unsigned char &blue);
-unsigned char blueGreyWhiteToGrey(const unsigned char red, const unsigned char green, const unsigned char blue);
-void greyToBlueGreyRed(const unsigned char grey, unsigned char &red, unsigned char &green, unsigned char &blue);
-unsigned char blueGreyRedToGrey(const unsigned char red, const unsigned char green, const unsigned char blue);
-void greyToRainbow(const unsigned char grey, unsigned char &red, unsigned char &green, unsigned char &blue);
-unsigned char rainbowToGrey(const unsigned char red, const unsigned char green, const unsigned char blue);
-void greyToCyanBlackYellow(const unsigned char grey, unsigned char &red, unsigned char &green, unsigned char &blue);
-unsigned char cyanBlackYellowToGrey(const unsigned char red, const unsigned char green, const unsigned char blue);
+inline void greyToRGB(const unsigned char grey, unsigned char &red, unsigned char &green, unsigned char &blue)
+{
+
+	switch (colour_scheme)
+	{
+	case (BLACKGREYREDSCALE):
+	{
+		if (grey >= 128) { red = 255; blue = green = FLOOR((RFLOAT)(255.-grey)*2.); }
+		else { red = green = blue = FLOOR((RFLOAT)(grey*2.)); }
+		break;
+	}
+	case (BLUEGREYWHITESCALE):
+	{
+		if (grey >= 128) { red = green = blue = FLOOR((RFLOAT)((grey-128.)*2.)); }
+		else { red = 0; blue = green = FLOOR((RFLOAT)(255.-2.*grey)); }
+		break;
+	}
+	case (BLUEGREYREDSCALE):
+	{
+
+		RFLOAT a=(grey)/85.;	//group
+		int X=FLOOR(a);	//this is the integer part
+		unsigned char Y = FLOOR(255*(a-X)); //fractional part from 0 to 255
+		switch(X)
+		{
+		    case 0: red=0;green=255-Y;blue=255-Y;break;
+		    case 1: red=Y;green=Y;blue=Y;break;
+		    case 2: red=255;green=255-Y;blue=255-Y;break;
+		    case 3: red=255;green=0;blue=0;break;
+		}
+
+		break;
+	}
+	case (RAINBOWSCALE):
+	{
+
+		RFLOAT a=(255-grey)/64.;	//invert and group
+		int X=FLOOR(a);	//this is the integer part
+		unsigned char Y = FLOOR(255*(a-X)); //fractional part from 0 to 255
+		switch(X)
+		{
+		    case 0: red=255;green=Y;blue=0;break;
+		    case 1: red=255-Y;green=255;blue=0;break;
+		    case 2: red=0;green=255;blue=Y;break;
+		    case 3: red=0;green=255-Y;blue=255;break;
+		    case 4: red=0;green=0;blue=255;break;
+		}
+
+		break;
+	}
+	case (CYANBLACKYELLOWSCALE):
+	{
+
+		const RFLOAT d_rb = 3. * (grey - 128);
+		const RFLOAT d_g = 3. * (std::abs(grey - 128) - 42);
+		red   = (unsigned char)(FLOOR(std::min(255., std::max(0.0,  d_rb))));
+		green = (unsigned char)(FLOOR(std::min(255., std::max(0.0,  d_g))));
+		blue  = (unsigned char)(FLOOR(std::min(255., std::max(0.0, -d_rb))));
+
+		break;
+	}
+	}
+
+	return;
+
+}
+
 
 class DisplayBox : public Fl_Box
 {
@@ -622,7 +673,7 @@ public:
 	bool do_read_whole_stacks;
 
 	// Flag to show colour scalebar image
-	bool do_scalebar;
+	bool do_colourbar;
 
 	// data.star metadata (for do_class)
 	MetaDataTable MDdata;
