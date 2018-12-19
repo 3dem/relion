@@ -173,6 +173,7 @@ public:
 
 	// The actual image data array
 	unsigned char * img_data;
+	std::string img_label;
 
 	// For getting back close the original image values from the uchar ones...
 	RFLOAT minval;
@@ -180,7 +181,7 @@ public:
 	RFLOAT scale;
 
 	// Constructor with an image and its metadata
-	DisplayBox(int X, int Y, int W, int H, const char *L=0) : Fl_Box(X,Y,W,H,L) { img_data = NULL; MDimg.clear(); }
+	DisplayBox(int X, int Y, int W, int H, const char *L=0) : Fl_Box(X,Y,W,H,L) { img_data = NULL; img_label = ""; MDimg.clear(); }
 
 	void setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, int ipos, RFLOAT minval, RFLOAT maxval,
 			RFLOAT _scale, bool do_relion_scale = false);
@@ -215,7 +216,7 @@ public:
 	// Constructor with w x h size of the window and a title
 	basisViewerWindow(int W, int H, const char* title=0): Fl_Window(W, H, title){}
 
-	int fillCanvas(int viewer_type, MetaDataTable &MDin, MetaDataTable *MDopt, EMDLabel display_label, bool _do_read_whole_stacks, bool _do_apply_orient,
+	int fillCanvas(int viewer_type, MetaDataTable &MDin, MetaDataTable *MDopt, EMDLabel display_label, EMDLabel text_label, bool _do_read_whole_stacks, bool _do_apply_orient,
 			RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast,
 			RFLOAT _scale, RFLOAT _ori_scale, int _ncol, long int max_nr_images = -1, RFLOAT lowpass = -1.0 , RFLOAT highpass = -1.0,
 			bool do_class = false, MetaDataTable *MDdata = NULL,
@@ -259,7 +260,7 @@ public:
 
 	void SetScroll(Fl_Scroll *val) { scroll = val; }
 
-	int fill(MetaDataTable &MDin, MetaDataTable *MDopt, EMDLabel display_label, bool _do_apply_orient, RFLOAT _minval, RFLOAT _maxval,
+	int fill(MetaDataTable &MDin, MetaDataTable *MDopt, EMDLabel display_label, EMDLabel text_label, bool _do_apply_orient, RFLOAT _minval, RFLOAT _maxval,
 			RFLOAT _sigma_contrast, RFLOAT _scale, int _ncol, bool do_recenter = false, long int max_images = -1,
 			RFLOAT lowpass = -1.0, RFLOAT highpass = -1.0);
 	int fill(MultidimArray<RFLOAT> &image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale = 1.);
@@ -318,6 +319,9 @@ public:
 
 	// To know which original image to display
 	EMDLabel display_label;
+
+	// Label for text display
+	EMDLabel text_label;
 
 	// To know which contrast to apply to original image display
 	RFLOAT sigma_contrast, minval, maxval;
@@ -590,7 +594,7 @@ public:
 	int verb;
 
 	// Which metadatalabel to display
-	EMDLabel display_label, sort_label;
+	EMDLabel display_label, sort_label, text_label;
 
 	// Use random sort
 	bool random_sort;
