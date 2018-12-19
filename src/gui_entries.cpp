@@ -234,8 +234,10 @@ void GuiEntry::place(JobOption &_joboption, int &y, int _deactivate_option, Fl_G
 void GuiEntry::setValue(std::string _value)
 {
 	// Dirty hack to keep backward compatibility...
-	if (_value == "2D micrograph movies (*.mrcs)")
-		_value = "2D micrograph movies (*.mrcs, *.tiff)";
+	if (_value == "2D micrograph movies (*.mrcs)" || _value == "2D micrograph movies (*.mrcs, *.tiff)" || _value == "2D micrographs/tomograms (*.mrc)")
+	{
+		return;
+	}
 
 	joboption.value = _value;
 	inp->value(_value.c_str());
@@ -243,10 +245,8 @@ void GuiEntry::setValue(std::string _value)
 	if (menu != NULL)
 	{
 		const Fl_Menu_Item *p = menu->find_item(inp->value());
-		if ( p )
-			menu->picked(p);
-		else
-			REPORT_ERROR("Error readValue: Menu item not found:" + std::string(inp->value()) + " for joboption label= " + joboption.label);
+		if ( p ) menu->picked(p);
+		else REPORT_ERROR("Error readValue: Menu item not found:" + std::string(inp->value()) + " for joboption label= " + joboption.label);
 	}
 	if (slider != NULL)
 	{
