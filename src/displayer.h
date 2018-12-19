@@ -320,7 +320,7 @@ public:
 	EMDLabel display_label;
 
 	// To know which contrast to apply to original image display
-	RFLOAT sigma_contrast;
+	RFLOAT sigma_contrast, minval, maxval;
 
 	// Limit number of images to be shown
 	long int multi_max_nr_images;

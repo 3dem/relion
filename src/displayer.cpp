@@ -309,6 +309,8 @@ int basisViewerWindow::fillCanvas(int viewer_type, MetaDataTable &MDin, MetaData
 		canvas.ori_scale = _ori_scale;
 		canvas.display_label = display_label;
 		canvas.sigma_contrast = _sigma_contrast;
+		canvas.minval = _minval;
+		canvas.maxval = _maxval;
 		canvas.do_allow_save = do_allow_save;
 		canvas.fn_selected_imgs= fn_selected_imgs;
 		canvas.fn_selected_parts = fn_selected_parts;
@@ -1048,8 +1050,18 @@ void multiViewerCanvas::showOriginalImage(int ipos)
 	boxes[ipos]->MDimg.getValue(display_label, fn_img);
 
 	std::string cl = "relion_display  --i " + fn_img + " --scale " + floatToString(ori_scale);
-	if (sigma_contrast > 0.)
-    	cl += " --sigma_contrast " + floatToString(sigma_contrast);
+	cl += " --sigma_contrast " + floatToString(sigma_contrast);
+	cl += " --black " + floatToString(minval);
+	cl += " --white " + floatToString(maxval);
+
+	switch (colour_scheme)
+	{
+	case (BLACKGREYREDSCALE): { cl += " --colour_fire"; break; }
+	case (BLUEGREYWHITESCALE): { cl += " --colour_ice"; break; }
+	case (BLUEGREYREDSCALE): { cl += " --colour_fire-n-ice"; break; }
+	case (RAINBOWSCALE): { cl += " --colour_raindow"; break; }
+	case (CYANBLACKYELLOWSCALE): { cl += " --colour_difference"; break; }
+	}
 	// send job in the background
 	cl += " &";
 
