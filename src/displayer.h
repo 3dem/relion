@@ -73,10 +73,11 @@ static int preshift_ipos;
 static int current_selection_type;
 static int colour_scheme;
 #define GREYSCALE 0
-#define BLACKREDSCALE 1
-#define BLUEWHITESCALE 2
-#define RAINBOWSCALE 3
-#define REDBLUESCALE 4
+#define BLACKGREYREDSCALE 1
+#define BLUEGREYWHITESCALE 2
+#define BLUEGREYREDSCALE 3
+#define RAINBOWSCALE 4
+#define CYANBLACKYELLOWSCALE 5
 
 /*
 static RFLOAT current_minval;
@@ -85,14 +86,16 @@ static RFLOAT current_scale;
 static RFLOAT current_sigma_contrast;
 */
 
-void greyToRedBlue(const unsigned char grey, unsigned char &red, unsigned char &green, unsigned char &blue);
-unsigned char redBlueToGrey(const unsigned char red, const unsigned char green, const unsigned char blue);
+void greyToBlackGreyRed(const unsigned char grey, unsigned char &red, unsigned char &green, unsigned char &blue);
+unsigned char blackGreyRedToGrey(const unsigned char red, const unsigned char green, const unsigned char blue);
+void greyToBlueGreyWhite(const unsigned char grey, unsigned char &red, unsigned char &green, unsigned char &blue);
+unsigned char blueGreyWhiteToGrey(const unsigned char red, const unsigned char green, const unsigned char blue);
+void greyToBlueGreyRed(const unsigned char grey, unsigned char &red, unsigned char &green, unsigned char &blue);
+unsigned char blueGreyRedToGrey(const unsigned char red, const unsigned char green, const unsigned char blue);
 void greyToRainbow(const unsigned char grey, unsigned char &red, unsigned char &green, unsigned char &blue);
 unsigned char rainbowToGrey(const unsigned char red, const unsigned char green, const unsigned char blue);
-void greyToBlackRed(const unsigned char grey, unsigned char &red, unsigned char &green, unsigned char &blue);
-unsigned char blackRedToGrey(const unsigned char red, const unsigned char green, const unsigned char blue);
-void greyToBlueWhite(const unsigned char grey, unsigned char &red, unsigned char &green, unsigned char &blue);
-unsigned char blueWhiteToGrey(const unsigned char red, const unsigned char green, const unsigned char blue);
+void greyToCyanBlackYellow(const unsigned char grey, unsigned char &red, unsigned char &green, unsigned char &blue);
+unsigned char cyanBlackYellowToGrey(const unsigned char red, const unsigned char green, const unsigned char blue);
 
 class DisplayBox : public Fl_Box
 {

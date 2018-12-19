@@ -68,136 +68,193 @@ void DisplayBox::draw()
 
 	//fl_pop_clip();
 }
-// input to this function is values from 0->255; output is three channels from 0->255
-void greyToRedBlue(const unsigned char grey, unsigned char &red, unsigned char &green, unsigned char &blue)
+unsigned char rgbToGrey(const unsigned char red, const unsigned char green, const unsigned char blue)
+{
+	switch (colour_scheme)
+	{
+	case (BLACKGREYREDSCALE):
+	{
+
+		if (red == 255)
+		{
+			return FLOOR((RFLOAT)(255. - blue/2.));
+		}
+		else
+		{
+			return FLOOR((RFLOAT)(red/2.));
+		}
+
+		break;
+	}
+	case (BLUEGREYWHITESCALE):
+	{
+		if (red == 0)
+		{
+			return FLOOR((RFLOAT)(255.-blue)/2.);
+		}
+		else
+		{
+			return FLOOR((RFLOAT)(red/2. + 128.));
+		}
+
+		break;
+	}
+	case (BLUEGREYREDSCALE):
+	{
+
+		unsigned char Y;
+		int X;
+		if (red == 0)
+		{
+			Y = 255-blue;
+			X = 0;
+		}
+		else if (red == 255)
+		{
+			Y = 255-blue;
+			X = 2;
+		}
+		else
+		{
+			Y = blue;
+			X = 1;
+		}
+
+		unsigned char grey = CEIL(85*((RFLOAT)Y/256. + X));
+
+		return grey;
+
+		break;
+	}
+	case (RAINBOWSCALE):
+	{
+
+		unsigned char Y;
+		int X;
+		if (red > 0)
+		{
+			if (red == 255) {Y = green; X = 0;}
+			else {Y = 255-red; X = 1;}
+		}
+		else if (green > 0)
+		{
+			if (green == 255) {Y = blue; X = 2;}
+			else {Y = 255 - green; X = 3;}
+		}
+		else {Y = 255; X = 4;}
+
+		unsigned char grey = 255 - CEIL(64*((RFLOAT)Y/255. + X));
+
+		return grey;
+		break;
+	}
+	case (CYANBLACKYELLOWSCALE):
+	{
+
+		if (red >0)
+		{
+			if (red < 255) return (unsigned char)FLOOR((RFLOAT)red / 3. + 128);
+			else return (unsigned char)FLOOR((RFLOAT)green/3. + 42 + 128);
+		}
+		else
+		{
+			if (blue < 255) return (unsigned char)FLOOR((RFLOAT)-blue / 3. + 128);
+			else return (unsigned char)FLOOR(-((RFLOAT)green)/3. - 42 + 128);
+		}
+
+		break;
+	}
+	}
+
+
+}
+
+void greyToRGB(const unsigned char grey, unsigned char &red, unsigned char &green, unsigned char &blue)
 {
 
-	const RFLOAT d_rb = 3. * (grey - 128);
-	const RFLOAT d_g = 3. * (std::abs(grey - 128) - 42);
+	switch (colour_scheme)
+	{
+	case (BLACKGREYREDSCALE):
+	{
 
-	red   = (unsigned char)(FLOOR(std::min(255., std::max(0.0,  d_rb))));
-	green = (unsigned char)(FLOOR(std::min(255., std::max(0.0,  d_g))));
-	blue  = (unsigned char)(FLOOR(std::min(255., std::max(0.0, -d_rb))));
+		if (grey >= 128)
+		{
+			red = 255;
+			blue = green = FLOOR((RFLOAT)(255.-grey)*2.);
+		}
+		else
+		{
+			red = green = blue = FLOOR((RFLOAT)(grey*2.));
+		}
+
+		break;
+	}
+	case (BLUEGREYWHITESCALE):
+	{
+
+		if (grey >= 128)
+		{
+		    red = green = blue = FLOOR((RFLOAT)((grey-128.)*2.));
+		}
+		else
+		{
+		    red = green = 0;
+		    blue = FLOOR((RFLOAT)(255.-2.*grey));
+		}
+
+		break;
+	}
+	case (BLUEGREYREDSCALE):
+	{
+
+		RFLOAT a=(grey)/85.;	//group
+		int X=FLOOR(a);	//this is the integer part
+		unsigned char Y = FLOOR(255*(a-X)); //fractional part from 0 to 255
+		switch(X)
+		{
+		    case 0: red=0;green=0;blue=255-Y;break;
+		    case 1: red=Y;green=Y;blue=Y;break;
+		    case 2: red=255;green=255-Y;blue=255-Y;break;
+		    case 3: red=255;green=0;blue=0;break;
+		}
+
+		break;
+	}
+	case (RAINBOWSCALE):
+	{
+
+		RFLOAT a=(255-grey)/64.;	//invert and group
+		int X=FLOOR(a);	//this is the integer part
+		unsigned char Y = FLOOR(255*(a-X)); //fractional part from 0 to 255
+		switch(X)
+		{
+		    case 0: red=255;green=Y;blue=0;break;
+		    case 1: red=255-Y;green=255;blue=0;break;
+		    case 2: red=0;green=255;blue=Y;break;
+		    case 3: red=0;green=255-Y;blue=255;break;
+		    case 4: red=0;green=0;blue=255;break;
+		}
+
+		break;
+	}
+	case (CYANBLACKYELLOWSCALE):
+	{
+
+		const RFLOAT d_rb = 3. * (grey - 128);
+		const RFLOAT d_g = 3. * (std::abs(grey - 128) - 42);
+
+		red   = (unsigned char)(FLOOR(std::min(255., std::max(0.0,  d_rb))));
+		green = (unsigned char)(FLOOR(std::min(255., std::max(0.0,  d_g))));
+		blue  = (unsigned char)(FLOOR(std::min(255., std::max(0.0, -d_rb))));
+
+		break;
+	}
+	}
 
 	return;
-}
-
-
-unsigned char redBlueToGrey(const unsigned char red, const unsigned char green, const unsigned char blue)
-{
-	unsigned grey;
-	if (red >0)
-	{
-		if (red < 255) grey = (unsigned char)FLOOR((RFLOAT)red / 3. + 128);
-		else grey = (unsigned char)FLOOR((RFLOAT)green/3. + 42 + 128);
-	}
-	else
-	{
-		if (blue < 255) grey = (unsigned char)FLOOR((RFLOAT)-blue / 3. + 128);
-		else grey = (unsigned char)FLOOR(-((RFLOAT)green)/3. - 42 + 128);
-	}
-	return grey;
-
-}
-void greyToRainbow(const unsigned char grey, unsigned char &red, unsigned char &green, unsigned char &blue)
-{
-
-	/*plot short rainbow RGB*/
-	RFLOAT a=(255-grey)/64.;	//invert and group
-	int X=FLOOR(a);	//this is the integer part
-	unsigned char Y = FLOOR(255*(a-X)); //fractional part from 0 to 255
-	switch(X)
-	{
-	    case 0: red=255;green=Y;blue=0;break;
-	    case 1: red=255-Y;green=255;blue=0;break;
-	    case 2: red=0;green=255;blue=Y;break;
-	    case 3: red=0;green=255-Y;blue=255;break;
-	    case 4: red=0;green=0;blue=255;break;
-	}
-
-	return;
-}
-
-unsigned char rainbowToGrey(const unsigned char red, const unsigned char green, const unsigned char blue)
-{
-	unsigned char Y;
-	int X;
-	if (red > 0)
-	{
-		if (red == 255) {Y = green; X = 0;}
-		else {Y = 255-red; X = 1;}
-	}
-	else if (green > 0)
-	{
-		if (green == 255) {Y = blue; X = 2;}
-		else {Y = 255 - green; X = 3;}
-	}
-	else {Y = 255; X = 4;}
-
-	unsigned char grey = 255 - CEIL(64*((RFLOAT)Y/255. + X));
-
-	return grey;
 
 }
 
-
-void greyToBlackRed(const unsigned char grey, unsigned char &red, unsigned char &green, unsigned char &blue)
-{
-
-	if (grey >= 128)
-	{
-		red = 255;
-		blue = green = FLOOR((RFLOAT)(255.-grey)*2.);
-	}
-	else
-	{
-		red = green = blue = FLOOR((RFLOAT)(grey*2.));
-	}
-
-}
-
-unsigned char blackRedToGrey(const unsigned char red, const unsigned char green, const unsigned char blue)
-{
-
-	if (red == 255)
-	{
-		return FLOOR((RFLOAT)(255. - blue/2.));
-	}
-	else
-	{
-		return FLOOR((RFLOAT)(red/2.));
-	}
-
-}
-
-void greyToBlueWhite(const unsigned char grey, unsigned char &red, unsigned char &green, unsigned char &blue)
-{
-
-	if (grey >= 128)
-	{
-	    red = green = blue = FLOOR((RFLOAT)((grey-128.)*2.));
-	}
-	else
-	{
-	    red = green = 0;
-	    blue = FLOOR((RFLOAT)(255.-2.*grey));
-	}
-
-}
-
-unsigned char blueWhiteToGrey(const unsigned char red, const unsigned char green, const unsigned char blue)
-{
-
-	if (red == 0)
-	{
-		return FLOOR((RFLOAT)(255.-blue)/2.);
-	}
-	else
-	{
-		return FLOOR((RFLOAT)(red/2. + 128.));
-	}
-
-}
 
 
 void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, int _ipos,
@@ -263,14 +320,8 @@ void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, i
 			{
 
 				unsigned char val = FLOOR((*old_ptr - minval) / step);
-				switch (colour_scheme)
-				{
-					case (GREYSCALE): img_data[n] = val; break;
-					case (BLACKREDSCALE): greyToBlackRed(val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]); break;
-					case (BLUEWHITESCALE): greyToBlueWhite(val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]); break;
-					case (REDBLUESCALE): greyToRedBlue(val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]); break;
-					case (RAINBOWSCALE): greyToRainbow(val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]); break;
-				}
+				if (colour_scheme == GREYSCALE) img_data[n] = val;
+				else greyToRGB(val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]);
 				old_ptr += xstep;
 				xerr    -= xmod;
 				if (xerr <= 0)
@@ -295,14 +346,8 @@ void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, i
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(img, n, old_ptr)
 		{
 			unsigned char val = FLOOR((*old_ptr - minval) / step);
-			switch (colour_scheme)
-			{
-				case (GREYSCALE): img_data[n] = val; break;
-				case (BLACKREDSCALE): greyToBlackRed(val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]); break;
-				case (BLUEWHITESCALE): greyToBlueWhite(val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]); break;
-				case (REDBLUESCALE): greyToRedBlue(val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]); break;
-				case (RAINBOWSCALE): greyToRainbow(val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]); break;
-			}
+			if (colour_scheme == GREYSCALE) img_data[n] = val;
+			else greyToRGB(val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]);
 		}
 	}
 }
@@ -1596,14 +1641,8 @@ int singleViewerCanvas::handle(int ev)
 		{
 			unsigned char ival;
 			int n = ry*boxes[0]->xsize_data + rx;
-			switch (colour_scheme)
-			{
-				case (GREYSCALE): ival = boxes[0]->img_data[n]; break;
-				case (BLACKREDSCALE): ival = blackRedToGrey(boxes[0]->img_data[3*n], boxes[0]->img_data[3*n+1], boxes[0]->img_data[3*n+2]); break;
-				case (BLUEWHITESCALE): ival = blueWhiteToGrey(boxes[0]->img_data[3*n], boxes[0]->img_data[3*n+1], boxes[0]->img_data[3*n+2]); break;
-				case (REDBLUESCALE): ival = redBlueToGrey(boxes[0]->img_data[3*n], boxes[0]->img_data[3*n+1], boxes[0]->img_data[3*n+2]); break;
-				case (RAINBOWSCALE): ival = rainbowToGrey(boxes[0]->img_data[3*n], boxes[0]->img_data[3*n+1], boxes[0]->img_data[3*n+2]); break;
-			}
+			if (colour_scheme == GREYSCALE) ival = boxes[0]->img_data[n];
+			else ival = rgbToGrey(boxes[0]->img_data[3*n], boxes[0]->img_data[3*n+1], boxes[0]->img_data[3*n+2]);
 			RFLOAT step = (boxes[0]->maxval - boxes[0]->minval) / 255.;
 			RFLOAT dval = ival * step + boxes[0]->minval;
 			int ysc = ROUND(ry/boxes[0]->scale);
@@ -2146,10 +2185,11 @@ int displayerGuiWindow::fill(FileName &_fn_in)
 
 	colour_scheme_choice = new Fl_Choice(x2-110, y, inputwidth+110, height, "Color:");
 	colour_scheme_choice->add("greyscale", 0, 0,0, FL_MENU_VALUE);
-	colour_scheme_choice->add("black-red", 0, 0,0, FL_MENU_VALUE);
-	colour_scheme_choice->add("blue-white", 0, 0,0, FL_MENU_VALUE);
+	colour_scheme_choice->add("fire", 0, 0,0, FL_MENU_VALUE);
+	colour_scheme_choice->add("ice", 0, 0,0, FL_MENU_VALUE);
+	colour_scheme_choice->add("fire-n-ice", 0, 0,0, FL_MENU_VALUE);
 	colour_scheme_choice->add("rainbow", 0, 0,0, FL_MENU_VALUE);
-	colour_scheme_choice->add("blue-red", 0, 0,0, FL_MENU_VALUE);
+	colour_scheme_choice->add("difference", 0, 0,0, FL_MENU_VALUE);
 	colour_scheme_choice->picked(colour_scheme_choice->menu());
 	colour_scheme_choice->color(GUI_INPUT_COLOR);
 
@@ -2369,10 +2409,11 @@ void displayerGuiWindow::cb_display_i()
 
 	// Get the colour scheme
 	const Fl_Menu_Item* m3 = colour_scheme_choice->mvalue();
-	if ((std::string)m3->label() == "rainbow") cl += " --colour_rainbow ";
-	else if ((std::string)m3->label() == "black-red") cl += " --colour_blackred ";
-	else if ((std::string)m3->label() == "blue-white") cl += " --colour_bluewhite ";
-	else if ((std::string)m3->label() == "blue-red") cl += " --colour_bluered ";
+	if ((std::string)m3->label() == "fire") cl += " --colour_fire ";
+	else if ((std::string)m3->label() == "ice") cl += " --colour_ice ";
+	else if ((std::string)m3->label() == "fire-n-ice") cl += " --colour_fire-n-ice ";
+	else if ((std::string)m3->label() == "rainbow") cl += " --colour_rainbow ";
+	else if ((std::string)m3->label() == "difference") cl += " --colour_difference ";
 
 	if (is_star)
 	{
@@ -2476,10 +2517,11 @@ void Displayer::read(int argc, char **argv)
 	do_read_whole_stacks = parser.checkOption("--read_whole_stack", "Read entire stacks at once (to speed up when many images of each stack are displayed)");
 	show_fourier_amplitudes = parser.checkOption("--show_fourier_amplitudes", "Show amplitudes of 2D Fourier transform?");
 	show_fourier_phase_angles = parser.checkOption("--show_fourier_phase_angles", "Show phase angles of 2D Fourier transforms?");
-	if (parser.checkOption("--colour_rainbow", "Show images in cyan-blue-black-red-yellow colour scheme?")) colour_scheme = RAINBOWSCALE;
-	else if (parser.checkOption("--colour_bluered", "Show images in blue-cyan-green-yellow-red colour scheme (for difference images)?")) colour_scheme = REDBLUESCALE;
-	else if (parser.checkOption("--colour_blackred", "Show images in black-grey-white-red colour scheme (for positive signal)?")) colour_scheme = BLACKREDSCALE;
-	else if (parser.checkOption("--colour_bluewhite", "Show images in blue-black-grey-white colour scheme (for negative signal)?")) colour_scheme = BLUEWHITESCALE;
+	if (parser.checkOption("--colour_fire", "Show images in black-grey-white-red colour scheme (highlight high signal)?")) colour_scheme = BLACKGREYREDSCALE;
+	else if (parser.checkOption("--colour_ice", "Show images in blue-black-grey-white colour scheme (highlight low signal)?")) colour_scheme = BLUEGREYWHITESCALE;
+	else if (parser.checkOption("--colour_fire-n-ice", "Show images in blue-grey-red colour scheme (highlight high&low signal)?")) colour_scheme = BLUEGREYREDSCALE;
+	else if (parser.checkOption("--colour_rainbow", "Show images in cyan-blue-black-red-yellow colour scheme?")) colour_scheme = RAINBOWSCALE;
+	else if (parser.checkOption("--colour_difference", "Show images in cyan-blue-black-red-yellow colour scheme (for difference images)?")) colour_scheme = CYANBLACKYELLOWSCALE;
 	else colour_scheme = GREYSCALE;
 	do_scalebar = parser.checkOption("--colour_scalebar", "Show colour scalebar image?");
 
@@ -2757,35 +2799,19 @@ int Displayer::runGui()
 int Displayer::run()
 {
 
-	/* test color scheme conversions */
-	if (false)
+//#define DEBUG_CLOOURS
+#ifdef DEBUG_COLOURS
+	if (colour_scheme > GREYSCALE)
 	{
 		for (int val = 0; val < 256; val++)
 		{
 			unsigned char grey,red,green,blue;
-			if (colour_scheme == RAINBOWSCALE)
-			{
-				greyToRainbow(val,red,green,blue);
-				grey = rainbowToGrey(red,green,blue);
-			}
-			else if (colour_scheme == REDBLUESCALE)
-			{
-				greyToRedBlue(val,red,green,blue);
-				grey = redBlueToGrey(red,green,blue);
-			}
-			else if (colour_scheme == BLACKREDSCALE)
-			{
-				greyToBlackRed(val,red,green,blue);
-				grey = blackRedToGrey(red,green,blue);
-			}
-			else if (colour_scheme == BLUEWHITESCALE)
-			{
-				greyToBlueWhite(val,red,green,blue);
-				grey = blueWhiteToGrey(red,green,blue);
-			}
+			greyToRGB(val,red,green,blue);
+			grey = rgbToGrey(red,green,blue);
 			std::cout << val << "  " << (int)grey << "  " << (int)red << "  " << (int)green << "  " << (int)blue << std::endl;
 		}
 	}
+#endif
 
 	if (do_gui)
 	{
