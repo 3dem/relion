@@ -73,8 +73,10 @@ static int preshift_ipos;
 static int current_selection_type;
 static int colour_scheme;
 #define GREYSCALE 0
-#define RAINBOWSCALE 1
-#define REDBLUESCALE 2
+#define BLACKREDSCALE 1
+#define BLUEWHITESCALE 2
+#define RAINBOWSCALE 3
+#define REDBLUESCALE 4
 
 /*
 static RFLOAT current_minval;
@@ -87,6 +89,10 @@ void greyToRedBlue(const unsigned char grey, unsigned char &red, unsigned char &
 unsigned char redBlueToGrey(const unsigned char red, const unsigned char green, const unsigned char blue);
 void greyToRainbow(const unsigned char grey, unsigned char &red, unsigned char &green, unsigned char &blue);
 unsigned char rainbowToGrey(const unsigned char red, const unsigned char green, const unsigned char blue);
+void greyToBlackRed(const unsigned char grey, unsigned char &red, unsigned char &green, unsigned char &blue);
+unsigned char blackRedToGrey(const unsigned char red, const unsigned char green, const unsigned char blue);
+void greyToBlueWhite(const unsigned char grey, unsigned char &red, unsigned char &green, unsigned char &blue);
+unsigned char blueWhiteToGrey(const unsigned char red, const unsigned char green, const unsigned char blue);
 
 class DisplayBox : public Fl_Box
 {
@@ -174,6 +180,7 @@ class basisViewerCanvas : public Fl_Widget
 protected:
 
 	void draw();
+	void saveImage(int ipos=0);
 
 public:
 
@@ -606,6 +613,9 @@ public:
 
 	// Flag for reading whole stacks instead of individual images
 	bool do_read_whole_stacks;
+
+	// Flag to show colour scalebar image
+	bool do_scalebar;
 
 	// data.star metadata (for do_class)
 	MetaDataTable MDdata;
