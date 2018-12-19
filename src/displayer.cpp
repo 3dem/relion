@@ -75,28 +75,14 @@ unsigned char rgbToGrey(const unsigned char red, const unsigned char green, cons
 	case (BLACKGREYREDSCALE):
 	{
 
-		if (red == 255)
-		{
-			return FLOOR((RFLOAT)(255. - blue/2.));
-		}
-		else
-		{
-			return FLOOR((RFLOAT)(red/2.));
-		}
-
+		if (red == 255) return FLOOR((RFLOAT)(255. - blue/2.));
+		else return FLOOR((RFLOAT)(red/2.));
 		break;
 	}
 	case (BLUEGREYWHITESCALE):
 	{
-		if (red == 0)
-		{
-			return FLOOR((RFLOAT)(255.-blue)/2.);
-		}
-		else
-		{
-			return FLOOR((RFLOAT)(red/2. + 128.));
-		}
-
+		if (red == 0) return FLOOR((RFLOAT)(255.-blue)/2.);
+		else return FLOOR((RFLOAT)(red/2. + 128.));
 		break;
 	}
 	case (BLUEGREYREDSCALE):
@@ -104,26 +90,10 @@ unsigned char rgbToGrey(const unsigned char red, const unsigned char green, cons
 
 		unsigned char Y;
 		int X;
-		if (red == 0)
-		{
-			Y = 255-blue;
-			X = 0;
-		}
-		else if (red == 255)
-		{
-			Y = 255-blue;
-			X = 2;
-		}
-		else
-		{
-			Y = blue;
-			X = 1;
-		}
-
-		unsigned char grey = CEIL(85*((RFLOAT)Y/256. + X));
-
-		return grey;
-
+		if (red == 0) { Y = 255-blue; X = 0; }
+		else if (red == 255) { Y = 255-blue; X = 2; }
+		else { Y = blue; X = 1; }
+		return CEIL(85*((RFLOAT)Y/256. + X));
 		break;
 	}
 	case (RAINBOWSCALE):
@@ -143,9 +113,7 @@ unsigned char rgbToGrey(const unsigned char red, const unsigned char green, cons
 		}
 		else {Y = 255; X = 4;}
 
-		unsigned char grey = 255 - CEIL(64*((RFLOAT)Y/255. + X));
-
-		return grey;
+		return 255 - CEIL(64*((RFLOAT)Y/255. + X));
 		break;
 	}
 	case (CYANBLACKYELLOWSCALE):
@@ -161,100 +129,11 @@ unsigned char rgbToGrey(const unsigned char red, const unsigned char green, cons
 			if (blue < 255) return (unsigned char)FLOOR((RFLOAT)-blue / 3. + 128);
 			else return (unsigned char)FLOOR(-((RFLOAT)green)/3. - 42 + 128);
 		}
-
 		break;
 	}
 	}
-
 
 }
-
-void greyToRGB(const unsigned char grey, unsigned char &red, unsigned char &green, unsigned char &blue)
-{
-
-	switch (colour_scheme)
-	{
-	case (BLACKGREYREDSCALE):
-	{
-
-		if (grey >= 128)
-		{
-			red = 255;
-			blue = green = FLOOR((RFLOAT)(255.-grey)*2.);
-		}
-		else
-		{
-			red = green = blue = FLOOR((RFLOAT)(grey*2.));
-		}
-
-		break;
-	}
-	case (BLUEGREYWHITESCALE):
-	{
-
-		if (grey >= 128)
-		{
-		    red = green = blue = FLOOR((RFLOAT)((grey-128.)*2.));
-		}
-		else
-		{
-		    red = green = 0;
-		    blue = FLOOR((RFLOAT)(255.-2.*grey));
-		}
-
-		break;
-	}
-	case (BLUEGREYREDSCALE):
-	{
-
-		RFLOAT a=(grey)/85.;	//group
-		int X=FLOOR(a);	//this is the integer part
-		unsigned char Y = FLOOR(255*(a-X)); //fractional part from 0 to 255
-		switch(X)
-		{
-		    case 0: red=0;green=0;blue=255-Y;break;
-		    case 1: red=Y;green=Y;blue=Y;break;
-		    case 2: red=255;green=255-Y;blue=255-Y;break;
-		    case 3: red=255;green=0;blue=0;break;
-		}
-
-		break;
-	}
-	case (RAINBOWSCALE):
-	{
-
-		RFLOAT a=(255-grey)/64.;	//invert and group
-		int X=FLOOR(a);	//this is the integer part
-		unsigned char Y = FLOOR(255*(a-X)); //fractional part from 0 to 255
-		switch(X)
-		{
-		    case 0: red=255;green=Y;blue=0;break;
-		    case 1: red=255-Y;green=255;blue=0;break;
-		    case 2: red=0;green=255;blue=Y;break;
-		    case 3: red=0;green=255-Y;blue=255;break;
-		    case 4: red=0;green=0;blue=255;break;
-		}
-
-		break;
-	}
-	case (CYANBLACKYELLOWSCALE):
-	{
-
-		const RFLOAT d_rb = 3. * (grey - 128);
-		const RFLOAT d_g = 3. * (std::abs(grey - 128) - 42);
-
-		red   = (unsigned char)(FLOOR(std::min(255., std::max(0.0,  d_rb))));
-		green = (unsigned char)(FLOOR(std::min(255., std::max(0.0,  d_g))));
-		blue  = (unsigned char)(FLOOR(std::min(255., std::max(0.0, -d_rb))));
-
-		break;
-	}
-	}
-
-	return;
-
-}
-
 
 
 void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, int _ipos,
@@ -314,41 +193,55 @@ void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, i
 		int dx, dy, sy, xerr, yerr;
 
 		// scale the image using a nearest-neighbor algorithm...
-		for (dy = ysize_data, sy = 0, yerr = ysize_data, n = 0; dy > 0; dy --)
+		if (colour_scheme == GREYSCALE)
 		{
-			for (dx = xsize_data, xerr = xsize_data, old_ptr = img.data + sy * line_d; dx > 0; dx --, n++)
-			{
-
-				unsigned char val = FLOOR((*old_ptr - minval) / step);
-				if (colour_scheme == GREYSCALE) img_data[n] = val;
-				else greyToRGB(val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]);
-				old_ptr += xstep;
-				xerr    -= xmod;
-				if (xerr <= 0)
+			for (dy = ysize_data, sy = 0, yerr = ysize_data, n = 0; dy > 0; dy --)
+				for (dx = xsize_data, xerr = xsize_data, old_ptr = img.data + sy * line_d; dx > 0; dx --, n++)
 				{
-					xerr    += xsize_data;
-					old_ptr += 1;
+					img_data[n] = FLOOR((*old_ptr - minval) / step);
+					old_ptr += xstep;
+					xerr    -= xmod;
+					if (xerr <= 0) { xerr += xsize_data; old_ptr += 1; }
 				}
-			}
+				sy += ystep; yerr -= ymod;
+				if (yerr <= 0) { yerr += ysize_data; sy ++; }
 
-			sy   += ystep;
-			yerr -= ymod;
-			if (yerr <= 0)
-			{
-				yerr += ysize_data;
-				sy ++;
-			}
 		}
+		else
+		{
+			for (dy = ysize_data, sy = 0, yerr = ysize_data, n = 0; dy > 0; dy --)
+				for (dx = xsize_data, xerr = xsize_data, old_ptr = img.data + sy * line_d; dx > 0; dx --, n++)
+				{
 
+					unsigned char val = FLOOR((*old_ptr - minval) / step);
+					greyToRGB(val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]);
+					old_ptr += xstep;
+					xerr    -= xmod;
+					if (xerr <= 0) { xerr += xsize_data; old_ptr += 1; }
+				}
+				sy += ystep; yerr -= ymod;
+				if (yerr <= 0) { yerr += ysize_data; sy ++; }
+		}
 	}
 	else
 	{
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(img, n, old_ptr)
+
+		if (colour_scheme == GREYSCALE)
 		{
-			unsigned char val = FLOOR((*old_ptr - minval) / step);
-			if (colour_scheme == GREYSCALE) img_data[n] = val;
-			else greyToRGB(val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]);
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(img, n, old_ptr)
+			{
+				img_data[n] = FLOOR((*old_ptr - minval) / step);
+			}
 		}
+		else
+		{
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(img, n, old_ptr)
+			{
+				unsigned char val = FLOOR((*old_ptr - minval) / step);
+				greyToRGB(val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]);
+			}
+		}
+
 	}
 }
 
@@ -2799,7 +2692,7 @@ int Displayer::runGui()
 int Displayer::run()
 {
 
-//#define DEBUG_CLOOURS
+//#define DEBUG_COLOURS
 #ifdef DEBUG_COLOURS
 	if (colour_scheme > GREYSCALE)
 	{

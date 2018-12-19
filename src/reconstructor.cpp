@@ -143,7 +143,7 @@ void Reconstructor::initialise()
 		if (do_ewald && newbox > 0)
 			mysize = newbox;
 	}
-	
+
 	if (!obsModel.allPixelSizesIdentical())
 	{
 		REPORT_ERROR("Reconstructor does not support varying pixel sizes yet.");
@@ -332,11 +332,20 @@ void Reconstructor::backprojectOneParticle(long int p)
 	MultidimArray<Complex> Fsub, F2D, F2DP, F2DQ;
 	FileName fn_img;
 	Image<RFLOAT> img;
-	DF.getValue( EMDL_IMAGE_NAME, fn_img, p);
-	img.read(fn_img);
-	img().setXmippOrigin();
-	CenterFFT(img(), true);
-	transformer.FourierTransform(img(), F2D);
+    if (do_reconstruct_ctf)
+    {
+        mysize = ctf_dim;
+        img().initZeros(ctf_dim, ctf_dim);
+        img().setXmippOrigin();
+    }
+    else
+    {
+		DF.getValue( EMDL_IMAGE_NAME, fn_img, p);
+		img.read(fn_img);
+		img().setXmippOrigin();
+		CenterFFT(img(), true);
+		transformer.FourierTransform(img(), F2D);
+    }
 
 	if (do_3d_rot)
 	{
