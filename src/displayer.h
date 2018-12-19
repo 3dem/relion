@@ -174,6 +174,7 @@ class basisViewerCanvas : public Fl_Widget
 protected:
 
 	void draw();
+	void saveImage(int ipos=0);
 
 public:
 
