@@ -807,12 +807,12 @@ bool CtffindRunner::getCtffindResults(FileName fn_microot, RFLOAT &defU, RFLOAT 
 	if (is_ctffind4)
 	{
 		return getCtffind4Results(fn_microot, defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep,
-				maxres, phaseshift, do_warn);
+		                          maxres, phaseshift, do_warn);
 	}
 	else
 	{
 		return getCtffind3Results(fn_microot, defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep,
-				maxres, phaseshift, valscore, do_warn);
+		                          maxres, phaseshift, valscore, do_warn);
 	}
 
 

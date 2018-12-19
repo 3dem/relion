@@ -640,6 +640,7 @@ void Preprocessing::extractParticlesFromOneMicrograph(MetaDataTable &MD,
 
 	bool MDin_has_beamtilt = (MD.containsLabel(EMDL_IMAGE_BEAMTILT_X) || MD.containsLabel(EMDL_IMAGE_BEAMTILT_Y));
 	bool MDin_has_ctf = MD.containsLabel(EMDL_CTF_DEFOCUSU);
+	bool MDin_has_tiltgroup = MD.containsLabel(EMDL_PARTICLE_BEAM_TILT_CLASS);
 
 	TIMING_TIC(TIMING_READ_IMG);
 
@@ -869,6 +870,13 @@ void Preprocessing::extractParticlesFromOneMicrograph(MetaDataTable &MD,
 					}
 				}
 
+				// Copy rlnBeamTiltGroupName from the micrograph STAR file only when absent in the particle STAR file
+				if (!MDin_has_tiltgroup && MDmics.containsLabel(EMDL_PARTICLE_BEAM_TILT_CLASS))
+				{
+					int tilt_class;
+					MDmics.getValue(EMDL_PARTICLE_BEAM_TILT_CLASS, tilt_class, imic);
+					MD.setValue(EMDL_PARTICLE_BEAM_TILT_CLASS, tilt_class);
+				}
 			}
 
 			TIMING_TOC(TIMING_REST);
