@@ -27,6 +27,7 @@
 #include <src/error.h>
 #include <src/euler.h>
 #include <src/time.h>
+#include <src/ml_model.h>
 #include <src/jaz/obs_model.h>
 
 class Reconstructor
@@ -36,10 +37,11 @@ public:
 	// I/O Parser
 	IOParser parser;
 
-	FileName fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_fsc, fn_debug, image_path;
+	FileName fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_fsc, fn_debug, fn_noise, image_path;
 
 	MetaDataTable DF;
 	ObservationModel obsModel;
+	MlModel model;
 
 	int r_max, r_min_nn, blob_order, ref_dim, interpolator, iter,
 	    debug_ori_size, debug_size,
