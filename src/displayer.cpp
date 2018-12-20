@@ -167,13 +167,13 @@ void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, i
 	ysize_data = CEIL(YSIZE(img) * scale);
 	xoff = (xsize_data < w() ) ? (w() - xsize_data) / 2 : 0;
 	yoff = (ysize_data < h() ) ? (h() - ysize_data) / 2 : 0;
-	if (colour_scheme)
+	if (colour_scheme == GREYSCALE)
 	{
-		img_data = new unsigned char [3 * xsize_data * ysize_data];
+		img_data = new unsigned char [xsize_data * ysize_data];
 	}
 	else
 	{
-		img_data = new unsigned char [xsize_data * ysize_data];
+		img_data = new unsigned char [3 * xsize_data * ysize_data];
 	}
 	RFLOAT range = maxval - minval;
 	RFLOAT middle = range/2.;
@@ -199,32 +199,59 @@ void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, i
 		// scale the image using a nearest-neighbor algorithm...
 		if (colour_scheme == GREYSCALE)
 		{
+			// scale the image using a nearest-neighbor algorithm...
 			for (dy = ysize_data, sy = 0, yerr = ysize_data, n = 0; dy > 0; dy --)
+			{
 				for (dx = xsize_data, xerr = xsize_data, old_ptr = img.data + sy * line_d; dx > 0; dx --, n++)
 				{
-					img_data[n] = FLOOR((*old_ptr - minval) / step);
+					img_data[n] = (char)FLOOR((*old_ptr - minval) / step);
 					old_ptr += xstep;
 					xerr    -= xmod;
-					if (xerr <= 0) { xerr += xsize_data; old_ptr += 1; }
+					if (xerr <= 0)
+					{
+						xerr    += xsize_data;
+						old_ptr += 1;
+					}
 				}
-				sy += ystep; yerr -= ymod;
-				if (yerr <= 0) { yerr += ysize_data; sy ++; }
 
+				sy   += ystep;
+				yerr -= ymod;
+				if (yerr <= 0)
+				{
+					yerr += ysize_data;
+					sy ++;
+				}
+			}
 		}
 		else
 		{
+
+			// scale the image using a nearest-neighbor algorithm...
 			for (dy = ysize_data, sy = 0, yerr = ysize_data, n = 0; dy > 0; dy --)
+			{
 				for (dx = xsize_data, xerr = xsize_data, old_ptr = img.data + sy * line_d; dx > 0; dx --, n++)
 				{
-
 					unsigned char val = FLOOR((*old_ptr - minval) / step);
 					greyToRGB(val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]);
 					old_ptr += xstep;
 					xerr    -= xmod;
-					if (xerr <= 0) { xerr += xsize_data; old_ptr += 1; }
+					if (xerr <= 0)
+					{
+						xerr    += xsize_data;
+						old_ptr += 1;
+					}
 				}
-				sy += ystep; yerr -= ymod;
-				if (yerr <= 0) { yerr += ysize_data; sy ++; }
+
+				sy   += ystep;
+				yerr -= ymod;
+				if (yerr <= 0)
+				{
+					yerr += ysize_data;
+					sy ++;
+				}
+			}
+
+
 		}
 	}
 	else
@@ -2671,7 +2698,18 @@ int Displayer::runGui()
 		}
 		else
 		{
-			MD.read(fn_in);
+			// TODO: make obsModel work displayer. Currently conflicts with Complex definition
+			if (MD.read(fn_in, "optics"))
+			{
+				MD.clear();
+				if (!MD.read(fn_in, "particles"))
+					if (!MD.read(fn_in, "micrographs"))
+						MD.read(fn_in, "movies");
+			}
+			else
+			{
+				MD.read(fn_in);
+			}
 		}
 
 		// Get which labels are stored in this metadatatable and generate choice menus for display and sorting
@@ -2759,9 +2797,13 @@ int Displayer::run()
 	}
 	else if (fn_in.isStarFile())
 	{
+		// TODO: make obsModel work displayer. Currently conflicts with Complex definition
 		if (MDin.read(fn_in, "optics"))
 		{
-			MDin.read(fn_in, "particles");
+			MDin.clear();
+			if (!MDin.read(fn_in, "particles"))
+				if (!MDin.read(fn_in, "micrographs"))
+					MDin.read(fn_in, "movies");
 		}
 		else
 		{
