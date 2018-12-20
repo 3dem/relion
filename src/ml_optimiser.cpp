@@ -1911,6 +1911,9 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 			RFLOAT my_pixel_size = mydata.getOpticsPixelSize(optics_group);
 			int my_image_size = mydata.getOpticsImageSize(optics_group);
 
+			// Extract the relevant MetaDataTable row from MDimg
+			MDimg = mydata.getMetaDataImage(part_id, img_id);
+
 			// Read image from disc
 			Image<RFLOAT> img;
 			if (do_preread_images && do_parallel_disc_io)
@@ -1923,9 +1926,6 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 			}
 			else
 			{
-				// Extract the relevant MetaDataTable row from MDimg
-				MDimg = mydata.getMetaDataImage(part_id, img_id);
-
 				if (!mydata.getImageNameOnScratch(part_id, img_id, fn_img))
 					MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
 
@@ -2083,7 +2083,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 				{
 					CTF ctf;
 					ctf.readByGroup(MDimg, &mydata.obsModel, 0); // This MDimg only contains one particle!
-					ctf.getFftwImage(Fctf, image_full_size[optics_group], image_full_size[optics_group], my_pixel_size,
+					ctf.getFftwImage(Fctf, my_image_size, my_image_size, my_pixel_size,
 						ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);
 
 					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fimg)
@@ -8021,7 +8021,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 								getline(split, fn_ctf);
 						}
 						Ictf.read(fn_ctf);
-						
+
 						// If there is a redundant half, get rid of it
 						if (XSIZE(Ictf()) == YSIZE(Ictf()))
 						{

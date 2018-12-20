@@ -297,9 +297,14 @@ void Preprocessing::joinAllStarFiles()
 			if (do_rescale)
 				my_angpix *= (RFLOAT)extract_size / (RFLOAT)scale;
 			obsModelMic.opticsMdt.setValue(EMDL_IMAGE_PIXEL_SIZE, my_angpix);
-			obsModelMic.opticsMdt.setValue(EMDL_IMAGE_SIZE, extract_size);
+
+			if (do_rewindow) obsModelMic.opticsMdt.setValue(EMDL_IMAGE_SIZE, window);
+			else if (do_rescale) obsModelMic.opticsMdt.setValue(EMDL_IMAGE_SIZE, scale);
+			else obsModelMic.opticsMdt.setValue(EMDL_IMAGE_SIZE, extract_size);
+
 			obsModelMic.opticsMdt.setValue(EMDL_IMAGE_DIMENSIONALITY, dimensionality);
 		}
+		obsModelMic.opticsMdt.deactivateLabel(EMDL_MICROGRAPH_PIXEL_SIZE);
 
 		ObservationModel::saveNew(MDout, obsModelMic.opticsMdt, fn_part_star, "particles");
 		std::cout << " Written out STAR file with " << MDout.numberOfObjects() << " particles in " << fn_part_star<< std::endl;
