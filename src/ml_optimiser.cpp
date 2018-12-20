@@ -1909,6 +1909,9 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 			RFLOAT my_pixel_size = mydata.getOpticsPixelSize(optics_group);
 			int my_image_size = mydata.getOpticsImageSize(optics_group);
 
+			// Extract the relevant MetaDataTable row from MDimg
+			MDimg = mydata.getMetaDataImage(part_id, img_id);
+
 			// Read image from disc
 			Image<RFLOAT> img;
 			if (do_preread_images && do_parallel_disc_io)
@@ -1921,9 +1924,6 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 			}
 			else
 			{
-				// Extract the relevant MetaDataTable row from MDimg
-				MDimg = mydata.getMetaDataImage(part_id, img_id);
-
 				if (!mydata.getImageNameOnScratch(part_id, img_id, fn_img))
 					MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
 
@@ -8000,7 +8000,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 								getline(split, fn_ctf);
 						}
 						Ictf.read(fn_ctf);
-						
+
 						// If there is a redundant half, get rid of it
 						if (XSIZE(Ictf()) == YSIZE(Ictf()))
 						{
