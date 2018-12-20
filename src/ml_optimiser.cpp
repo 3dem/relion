@@ -1781,7 +1781,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 	Image<RFLOAT> Isolvent;
 	Isolvent().resize(mymodel.Iref[0]);
 	bool mask1(false),mask2(false);
-	if(!fn_mask.contains("None"))
+	if(fn_mask != "None")
 	{
 			Isolvent.read(fn_mask);
 			if (Isolvent().computeMin() < 0. || Isolvent().computeMax() > 1.)
@@ -1789,7 +1789,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 	}
 
 	// Check second mask [0,1] compliance right away.
-	if(!fn_mask2.contains("None"))
+	if(fn_mask2 != "None")
 	{
 			Isolvent.read(fn_mask2);
 			if (Isolvent().computeMin() < 0. || Isolvent().computeMax() > 1.)
@@ -2441,7 +2441,7 @@ void MlOptimiser::iterate()
 		}
 
                 // Directly use fn_out, without "_it" specifier, so unmasked refs will be overwritten at every iteration
-                if (do_write_unmasked_refs || do_solvent)
+                if (do_write_unmasked_refs)
                     mymodel.write(fn_out+"_unmasked", sampling, false, true);
 
 #ifdef TIMING
@@ -4218,7 +4218,7 @@ void MlOptimiser::solventFlatten()
 	Isolvent().resize(mymodel.Iref[0]);
 	Isolvent().setXmippOrigin();
 	Isolvent().initZeros();
-	if (fn_mask.contains("None"))
+	if (fn_mask == "None")
 	{
 		// Jun09,2015 - Shaoda, Helical refinement
 		// Solvent flatten for helices has already been done in 'makeHelicalReferenceInRealSpace()'
@@ -4267,7 +4267,7 @@ void MlOptimiser::solventFlatten()
 	}
 
 	// Also read a second solvent mask if necessary
-	if (!fn_mask2.contains("None"))
+	if (fn_mask2 != "None")
 	{
 		Isolvent2.read(fn_mask2);
 		Isolvent2().setXmippOrigin();
@@ -4276,7 +4276,7 @@ void MlOptimiser::solventFlatten()
 	}
 
 	// Also read a lowpass mask if necessary
-	if (!fn_lowpass_mask.contains("None"))
+	if (fn_lowpass_mask != "None")
 	{
 		Ilowpass.read(fn_lowpass_mask);
 		Ilowpass().setXmippOrigin();
@@ -4287,24 +4287,23 @@ void MlOptimiser::solventFlatten()
 	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
 	{
 		MultidimArray<RFLOAT> Itmp;
-		if (!fn_lowpass_mask.contains("None"))
+		if (fn_lowpass_mask != "None")
 		{
 			Itmp = mymodel.Iref[iclass];
 			Itmp *= Ilowpass();
-//			std::cout << "low pass filter: angpix=" << mymodel.pixel_size << " xsize=" << XSIZE(mymodel.Iref[iclass]) << std::endl;
 			lowPassFilterMap(Itmp, lowpass, mymodel.pixel_size);
 		}
 
 		// Then apply the expanded solvent mask to the map
 		mymodel.Iref[iclass] *= Isolvent(); // this is the tight mask
 
-		if (!fn_lowpass_mask.contains("None"))
+		if (fn_lowpass_mask != "None")
 			mymodel.Iref[iclass] += Itmp;	
 		
 		// Apply a second solvent mask if necessary
 		// This may for example be useful to set the interior of icosahedral viruses to a constant density value that is higher than the solvent
 		// Invert the solvent mask, so that an input mask can be given where 1 is the masked area and 0 is protein....
-		if (!fn_mask2.contains("None"))
+		if (fn_mask2 != "None")
 			softMaskOutsideMap(mymodel.Iref[iclass], Isolvent2(), true);
 
 	} // end for iclass
