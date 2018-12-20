@@ -1095,7 +1095,7 @@ void multiViewerCanvas::showOriginalImage(int ipos)
 	case (BLACKGREYREDSCALE): { cl += " --colour_fire"; break; }
 	case (BLUEGREYWHITESCALE): { cl += " --colour_ice"; break; }
 	case (BLUEGREYREDSCALE): { cl += " --colour_fire-n-ice"; break; }
-	case (RAINBOWSCALE): { cl += " --colour_raindow"; break; }
+	case (RAINBOWSCALE): { cl += " --colour_rainbow"; break; }
 	case (CYANBLACKYELLOWSCALE): { cl += " --colour_difference"; break; }
 	}
 	// send job in the background
