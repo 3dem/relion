@@ -226,10 +226,12 @@ void AutoPicker::initialise()
 		}
 
         // Check all optics groups have the same pixel size (check for same micrograph size is performed while running through all of them)
-		angpix = obsModel.getPixelSize(0);
+		obsModel.opticsMdt.getValue(EMDL_MICROGRAPH_PIXEL_SIZE, angpix, 0);
 		for (int optics_group = 1; optics_group < obsModel.numberOfOpticsGroups(); optics_group++)
 		{
-			if (fabs(angpix - obsModel.getPixelSize(optics_group)) > 0.01)
+			RFLOAT my_angpix;
+			obsModel.opticsMdt.getValue(EMDL_MICROGRAPH_PIXEL_SIZE, my_angpix, optics_group);
+			if (fabs(angpix - my_angpix) > 0.01)
 			{
 				REPORT_ERROR("ERROR: different pixel size for the different optics groups, perform autopicking separately per optics group.");
 			}
@@ -319,19 +321,20 @@ void AutoPicker::initialise()
 		for (int i = 2; i <= LoG_max_search; i++)
 			diams_LoG.push_back(ROUND(LoG_max_diameter*(RFLOAT)(i)));
 
-		std::cout << " + Will use following diameters for Laplacian-of-Gaussian filter: " << std::endl;
-		for (int i = 0; i < diams_LoG.size(); i++)
+		if (verb > 0)
 		{
-			RFLOAT myd = diams_LoG[i];
-			if (myd < LoG_min_diameter)
-				std::cout << "   * " << myd << " (too low)" << std::endl;
-			else if (myd > LoG_max_diameter)
-				std::cout << "   * " << myd << " (too high)" << std::endl;
-			else
-				std::cout << "   * " << myd << " (ok)" << std::endl;
-
+			std::cout << " + Will use following diameters for Laplacian-of-Gaussian filter: " << std::endl;
+			for (int i = 0; i < diams_LoG.size(); i++)
+			{
+				RFLOAT myd = diams_LoG[i];
+				if (myd < LoG_min_diameter)
+					std::cout << "   * " << myd << " (too low)" << std::endl;
+				else if (myd > LoG_max_diameter)
+					std::cout << "   * " << myd << " (too high)" << std::endl;
+				else
+					std::cout << "   * " << myd << " (ok)" << std::endl;
+			}
 		}
-
 	}
 	else if (fn_ref == "")
 	{
@@ -667,7 +670,6 @@ void AutoPicker::initialise()
 	 * the input micrographs, we simply adjust the frequencies used in fourier space by cropping the frequency-space images in
 	 * intermediate calculations.
 	 */
-
 
 	if(workFrac>1) // set size directly
 	{
