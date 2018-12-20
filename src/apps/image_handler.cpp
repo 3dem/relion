@@ -853,7 +853,7 @@ class image_handler_parameters
 		{
 			FileName fn_md_out = fn_in.insertBeforeExtension("_" + fn_out);
 			std::cout << " Written out new STAR file: " << fn_md_out << std::endl;
-			MD.write(fn_md_out);
+			obsModel.save(MD, fn_md_out);
 		}
 
 	}
