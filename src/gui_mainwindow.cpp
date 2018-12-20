@@ -307,7 +307,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	{
 		// Initial screen picture with some explanation on how to use the GUI
             //image_box = new Fl_Box(WCOL0-8, 0 ,w-WCOL0, h-35); // widget that will contain image
-		image_box = new Fl_Box(WCOL0-8, 45 ,w-WCOL0, h-120); // widget that will contain image
+		image_box = new Fl_Box(WCOL0-8, 50 ,w-WCOL0, h-120); // widget that will contain image
 		xpm_image = new Fl_XPM_Image(fn_bg.c_str());
 		image_box->image(xpm_image); // attach xpm image to box
 	 }
