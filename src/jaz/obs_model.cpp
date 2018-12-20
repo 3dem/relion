@@ -164,7 +164,9 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 	Cs(opticsMdt.numberOfObjects()),
 	boxSizes(opticsMdt.numberOfObjects(), 0.0)
 {
-	if (   !opticsMdt.containsLabel(EMDL_IMAGE_PIXEL_SIZE)
+	if (   !(opticsMdt.containsLabel(EMDL_IMAGE_PIXEL_SIZE) ||
+			opticsMdt.containsLabel(EMDL_MICROGRAPH_PIXEL_SIZE) ||
+			opticsMdt.containsLabel(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE) )
 	    || !opticsMdt.containsLabel(EMDL_CTF_VOLTAGE)
 	    || !opticsMdt.containsLabel(EMDL_CTF_CS))
 	{
