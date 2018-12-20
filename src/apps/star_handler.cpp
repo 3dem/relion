@@ -22,23 +22,24 @@
 #include <src/metadata_table.h>
 #include <src/filename.h>
 #include <src/time.h>
+#include <src/jaz/obs_model.h>
 #include <cmath>
 
 class star_handler_parameters
 {
 	public:
-	
-		FileName 
-			fn_in, tablename_in, fn_out, fn_compare, tablename_compare, 
-			fn_label1, fn_label2, fn_label3, 
-			select_label, select_str_label, discard_label, 
-			fn_check, fn_operate, fn_operate2, fn_operate3, fn_set;
-	
+
+	FileName fn_in, tablename_in, fn_out, fn_compare, tablename_compare,
+		     fn_label1, fn_label2, fn_label3,
+			 select_label, select_str_label, discard_label,
+			 fn_check, fn_operate, fn_operate2, fn_operate3, fn_set;
+
 	std::string remove_col_label, add_col_label, add_col_value, add_col_from, hist_col_label, select_include_str, select_exclude_str;
 	RFLOAT eps, select_minval, select_maxval, multiply_by, add_to, center_X, center_Y, center_Z, hist_min, hist_max;
-	bool do_combine, do_split, do_center, do_random_order, show_frac, show_cumulative, do_discard;
+	bool do_ignore_optics, do_combine, do_split, do_center, do_random_order, show_frac, show_cumulative, do_discard;
 	long int nr_split, size_split, nr_bin;
 	RFLOAT discard_sigma, duplicate_threshold, extract_angpix;
+	ObservationModel obsModel;
 	// I/O Parser
 	IOParser parser;
 
@@ -55,12 +56,12 @@ class star_handler_parameters
 
 		int general_section = parser.addSection("General options");
 		fn_in = parser.getOption("--i", "Input STAR file");
-		tablename_in = parser.getOption("--i_table", "Name of table in input STAR file", "");
 		fn_out = parser.getOption("--o", "Output STAR file", "out.star");
+		do_ignore_optics = parser.checkOption("--ignore_optics", "Provide this option for relion-3.0 functionality, without optics groups");
+		tablename_in = parser.getOption("--i_tablename", "If ignoring optics, then read table with this name", "");
 
 		int compare_section = parser.addSection("Compare options");
 		fn_compare = parser.getOption("--compare", "STAR file name to compare the input STAR file with", "");
-		tablename_compare = parser.getOption("--compare_table", "Name of table in STAR file to compare", "");
 		fn_label1 = parser.getOption("--label1", "1st metadata label for the comparison (may be string, int or RFLOAT)", "");
 		fn_label2 = parser.getOption("--label2", "2nd metadata label for the comparison (RFLOAT only) for 2D/3D-distance)", "");
 		fn_label3 = parser.getOption("--label3", "3rd metadata label for the comparison (RFLOAT only) for 3D-distance)", "");
@@ -122,6 +123,8 @@ class star_handler_parameters
 		// Check for errors in the command-line option
 		if (parser.checkForErrors())
 			REPORT_ERROR("Errors encountered on the command line, exiting...");
+
+
 	}
 
 	void run()
@@ -147,6 +150,7 @@ class star_handler_parameters
 		if (fn_out == "" && hist_col_label == "")
 			REPORT_ERROR("ERROR: specify the output file name (--o)");
 
+
 		if (fn_compare != "") compare();
 		if (select_label != "") select();
 		if (select_str_label != "") select_by_str();
@@ -163,18 +167,32 @@ class star_handler_parameters
 		std::cout << " Done!" << std::endl;
 	}
 
+	void read_check_ignore_optics(MetaDataTable &MD, FileName fn, std::string tablename = "discover")
+	{
+		if (do_ignore_optics) MD.read(fn, tablename_in);
+		else ObservationModel::loadSafely(fn, obsModel, MD, tablename, 1);
+	}
+
+	void write_check_ignore_optics(MetaDataTable &MD, FileName fn, std::string tablename)
+	{
+		if (do_ignore_optics) MD.write(fn_in);
+		else obsModel.save(MD, fn, tablename);
+	}
+
+
 
 	void compare()
 	{
 	   	MetaDataTable MD1, MD2, MDonly1, MDonly2, MDboth;
 		EMDLabel label1, label2, label3;
-		MD1.read(fn_in, tablename_in);
-		MD2.read(fn_compare, tablename_compare);
+
+		// Read in the observationModel
+		read_check_ignore_optics(MD1, fn_in);
+		read_check_ignore_optics(MD2, fn_compare);
 
 		label1 = EMDL::str2Label(fn_label1);
 		label2 = (fn_label2 == "") ? EMDL_UNDEFINED : EMDL::str2Label(fn_label2);
 		label3 = (fn_label3 == "") ? EMDL_UNDEFINED : EMDL::str2Label(fn_label3);
-
 
 		compareMetaDataTable(MD1, MD2, MDboth, MDonly1, MDonly2, label1, eps, label2, label3);
 
@@ -182,11 +200,11 @@ class star_handler_parameters
 		std::cout << MDonly1.numberOfObjects() << " entries occur only in the 1st input STAR file." << std::endl;
 		std::cout << MDonly2.numberOfObjects() << " entries occur only in the 2nd input STAR file." << std::endl;
 
-		MDboth.write(fn_out.insertBeforeExtension("_both"));
+		write_check_ignore_optics(MDboth, fn_out.insertBeforeExtension("_both"), MD1.getName());
 		std::cout << " Written: " << fn_out.insertBeforeExtension("_both") << std::endl;
-		MDonly1.write(fn_out.insertBeforeExtension("_only1"));
+		write_check_ignore_optics(MDonly1, fn_out.insertBeforeExtension("_only1"), MD1.getName());
 		std::cout << " Written: " << fn_out.insertBeforeExtension("_only1") << std::endl;
-		MDonly2.write(fn_out.insertBeforeExtension("_only2"));
+		write_check_ignore_optics(MDonly2, fn_out.insertBeforeExtension("_only2"), MD1.getName());
 		std::cout << " Written: " << fn_out.insertBeforeExtension("_only2") << std::endl;
 	}
 
@@ -195,18 +213,11 @@ class star_handler_parameters
 
 		MetaDataTable MDin, MDout;
 
-		if (fn_in.contains("_model.star"))
-		{
-			MDin.read(fn_in, "model_classes");
-		}
-		else
-		{
-			MDin.read(fn_in, tablename_in);
-		}
+		read_check_ignore_optics(MDin, fn_in);
 
 		MDout = subsetMetaDataTable(MDin, EMDL::str2Label(select_label), select_minval, select_maxval);
 
-		MDout.write(fn_out);
+		write_check_ignore_optics(MDout, fn_out, MDin.getName());
 		std::cout << " Written: " << fn_out << std::endl;
 
 	}
@@ -222,21 +233,14 @@ class star_handler_parameters
 
 		MetaDataTable MDin, MDout;
 
-		if (fn_in.contains("_model.star"))
-		{
-			MDin.read(fn_in, "model_classes");
-		}
-		else
-		{
-			MDin.read(fn_in, tablename_in);
-		}
+		read_check_ignore_optics(MDin, fn_in);
 
 		if (select_include_str != "")
 			MDout = subsetMetaDataTable(MDin, EMDL::str2Label(select_str_label), select_include_str, false);
 		else
 			MDout = subsetMetaDataTable(MDin, EMDL::str2Label(select_str_label), select_exclude_str, true);
 
-		MDout.write(fn_out);
+		write_check_ignore_optics(MDout, fn_out, MDin.getName());
 		std::cout << " Written: " << fn_out << std::endl;
 
 	}
@@ -245,7 +249,7 @@ class star_handler_parameters
 	{
 
 		MetaDataTable MDin, MDout;
-		MDin.read(fn_in, tablename_in);
+		read_check_ignore_optics(MDin, fn_in);
 
 		std::cout << " Calculating average and stddev for all images ... " << std::endl;
 		time_config();
@@ -308,7 +312,7 @@ class star_handler_parameters
 
 		std::cout << " Discarded " << nr_discard << " Images because of too large or too small average/stddev values " << std::endl;
 
-		MDout.write(fn_out);
+		write_check_ignore_optics(MDout, fn_out, MDin.getName());
 		std::cout << " Written: " << fn_out << std::endl;
 
 	}
@@ -330,7 +334,7 @@ class star_handler_parameters
 		for (int i = 0; i < fns_in.size(); i++)
 		{
 			MetaDataTable MDin;
-			MDin.read(fns_in[i], tablename_in);
+			read_check_ignore_optics(MDin, fns_in[i]);
 			MDsin.push_back(MDin);
 		}
 
@@ -369,7 +373,7 @@ class star_handler_parameters
 				std::cerr << " WARNING: Total number of duplicate "<< fn_check << " entries: " << nr_duplicates << std::endl;
 		}
 
-		MDout.write(fn_out);
+		write_check_ignore_optics(MDout, fn_out, MDsin[0].getName());
 		std::cout << " Written: " << fn_out << std::endl;
 
 	}
@@ -378,7 +382,7 @@ class star_handler_parameters
 	{
 
 		MetaDataTable MD;
-		MD.read(fn_in, tablename_in);
+		read_check_ignore_optics(MD, fn_in);
 
 		// Randomise if neccesary
 		if (do_random_order)
@@ -434,7 +438,7 @@ class star_handler_parameters
 				fnt0 = fnt;
 				fnt = fnt + ".tmp";
 			}
-			MDouts[isplit].write(fnt);
+			write_check_ignore_optics(MDouts[isplit], fnt, MD.getName());
 			std::cout << " Written: " <<fnt << " with " << MDouts[isplit].numberOfObjects() << " objects." << std::endl;
 		}
 
@@ -458,7 +462,7 @@ class star_handler_parameters
 		}
 
 		MetaDataTable MD;
-		MD.read(fn_in, tablename_in);
+		read_check_ignore_optics(MD, fn_in);
 
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
 		{
@@ -547,7 +551,7 @@ class star_handler_parameters
 
 		}
 
-		MD.write(fn_out);
+		write_check_ignore_optics(MD, fn_out, MD.getName());
 		std::cout << " Written: " << fn_out << std::endl;
 
 	}
@@ -555,7 +559,7 @@ class star_handler_parameters
 	void center()
 	{
 		MetaDataTable MD;
-		MD.read(fn_in, tablename_in);
+		read_check_ignore_optics(MD, fn_in, "particles");
 		bool do_contains_xy = (MD.containsLabel(EMDL_ORIENT_ORIGIN_X) && MD.containsLabel(EMDL_ORIENT_ORIGIN_Y));
 		bool do_contains_z = (MD.containsLabel(EMDL_ORIENT_ORIGIN_Z));
 
@@ -601,16 +605,16 @@ class star_handler_parameters
 			}
 		}
 
-		MD.write(fn_out);
+		write_check_ignore_optics(MD, fn_out, MD.getName());
 		std::cout << " Written: " << fn_out << std::endl;
 	}
 
 	void remove_column()
 	{
 		MetaDataTable MD;
-		MD.read(fn_in, tablename_in);
+		read_check_ignore_optics(MD, fn_in);
 		MD.deactivateLabel(EMDL::str2Label(remove_col_label));
-		MD.write(fn_out);
+		write_check_ignore_optics(MD, fn_out, MD.getName());
 		std::cout << " Written: " << fn_out << std::endl;
 	}
 
@@ -626,7 +630,7 @@ class star_handler_parameters
 		EMDLabel label = EMDL::str2Label(add_col_label);
 		EMDLabel source_label;
 
-		MD.read(fn_in, tablename_in);
+		read_check_ignore_optics(MD, fn_in);
 		MD.addLabel(label);
 
 		if (add_col_from != "")
@@ -680,7 +684,7 @@ class star_handler_parameters
 			}
 		}
 
-		MD.write(fn_out);
+		write_check_ignore_optics(MD, fn_out, MD.getName());
 		std::cout << " Written: " << fn_out << std::endl;
 	}
 
@@ -691,7 +695,7 @@ class star_handler_parameters
 
 		std::vector<RFLOAT> values;
 
-		MD.read(fn_in, tablename_in);
+		read_check_ignore_optics(MD, fn_in);
 		if (!MD.containsLabel(label))
 			REPORT_ERROR("ERROR: The column specified in --hist_column is not present in the input STAR file.");
 
@@ -708,23 +712,33 @@ class star_handler_parameters
 	void remove_duplicate()
 	{
 		MetaDataTable MD;
-		MD.read(fn_in, tablename_in);
+		read_check_ignore_optics(MD, fn_in, "particles");
 
 		EMDLabel mic_label;
 		if (MD.containsLabel(EMDL_MICROGRAPH_NAME)) mic_label = EMDL_MICROGRAPH_NAME;
 		else REPORT_ERROR("The input STAR file does not contain rlnMicrographName column.");
 
-		RFLOAT particle_angpix = 1.0;
-		if (MD.containsLabel(EMDL_CTF_MAGNIFICATION) && MD.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
+		RFLOAT particle_angpix = -1.0;
+		if (do_ignore_optics)
 		{
-			RFLOAT mag, dstep;
-			MD.getValue(EMDL_CTF_MAGNIFICATION, mag);
-			MD.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
-			particle_angpix = 10000. * dstep / mag;
-			std::cout << " + Using pixel size calculated from magnification and detector pixel size in the input STAR file: " << particle_angpix << std::endl;
+			if (MD.containsLabel(EMDL_CTF_MAGNIFICATION) && MD.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
+			{
+				RFLOAT mag, dstep;
+				MD.getValue(EMDL_CTF_MAGNIFICATION, mag);
+				MD.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
+				particle_angpix = 10000. * dstep / mag;
+				std::cout << " + Using pixel size calculated from magnification and detector pixel size in the input STAR file: " << particle_angpix << std::endl;
+			}
+			else
+			{
+				std::cerr << "WARNING: The given STAR file does not contain the pixel size. Assuming 1 A/pix." << std::endl;
+				particle_angpix = 1.0;
+			}
 		}
-		else {
-			std::cerr << "WARNING: The given STAR file does not contain the pixel size. Assuming 1 A/pix." << std::endl;
+		else
+		{
+			if (obsModel.numberOfOpticsGroups() > 1) REPORT_ERROR("TODO: no implemented multiple optics groups yet!!!");
+			particle_angpix = obsModel.getPixelSize(0);
 		}
 
 		if (extract_angpix > 0)
@@ -736,16 +750,17 @@ class star_handler_parameters
 			extract_angpix = particle_angpix;
 			std::cout << " + Assuming the pixel size of original micrographs before extraction is also " << extract_angpix << std::endl;
 		}
-
 		RFLOAT scale = particle_angpix / extract_angpix;
 		RFLOAT duplicate_threshold_in_px = duplicate_threshold / extract_angpix;
 
 		std::cout << " + The minimum inter-particle distance " << duplicate_threshold << " A corresponds to " << duplicate_threshold_in_px << " px in the micrograph coordinate (rlnCoordinateX/Y)." << std::endl;
 		std::cout << " + The particle shifts (rlnOriginX/Y) are multiplied by " << scale << " to bring it to the same scale as rlnCoordinateX/Y." << std::endl;
 		FileName fn_removed = fn_out.withoutExtension() + "_removed.star";
+
+
 		MetaDataTable MDout = removeDuplicatedParticles(MD, mic_label, duplicate_threshold_in_px, scale, fn_removed, true);
-	
-		MDout.write(fn_out);
+
+		write_check_ignore_optics(MDout, fn_out, "particles");
 		std::cout << " Written: " << fn_out << std::endl;
 	}
 };
