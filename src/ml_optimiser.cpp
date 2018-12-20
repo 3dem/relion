@@ -2081,7 +2081,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 				{
 					CTF ctf;
 					ctf.readByGroup(MDimg, &mydata.obsModel, 0); // This MDimg only contains one particle!
-					ctf.getFftwImage(Fctf, image_full_size[optics_group], image_full_size[optics_group], my_pixel_size,
+					ctf.getFftwImage(Fctf, my_image_size, my_image_size, my_pixel_size,
 						ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);
 
 					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fimg)
