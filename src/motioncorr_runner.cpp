@@ -114,6 +114,9 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	do_own = parser.checkOption("--use_own", "Use our own implementation of motion correction");
 	skip_defect = parser.checkOption("--skip_defect", "Skip hot pixel detection");
 	save_noDW = parser.checkOption("--save_noDW", "Save aligned but non dose weighted micrograph.");
+	max_iter = textToInteger(parser.getOption("--max_iter", "Maximum number of iterations for alignment. Only valid with --use_own", "5"));
+	if (max_iter != 5 && !do_own)
+		REPORT_ERROR("--max_iter is valid only with --do_own");
 	interpolate_shifts = parser.checkOption("--interpolate_shifts", "(EXPERIMENTAL) Interpolate shifts");
 	ccf_downsample = textToFloat(parser.getOption("--ccf_downsample", "(EXPERT) Downsampling rate of CC map. default = 0 = automatic based on B factor", "0"));
 	early_binning = parser.checkOption("--early_binning", "(EXPERT) Do binning before alignment to reduce memory usage. This might dampen signal near Nyquist.");
@@ -532,7 +535,10 @@ bool MotioncorrRunner::executeMotioncor2(Micrograph &mic, int rank)
 	{
 		if (rank >= allThreadIDs.size())
 			REPORT_ERROR("ERROR: not enough MPI nodes specified for the GPU IDs.");
-		command += " -Gpu " + allThreadIDs[rank][0];
+
+		command += " -Gpu ";
+		for (int igpu = 0; igpu < allThreadIDs[rank].size(); igpu++)
+			command += allThreadIDs[rank][igpu] + " ";
 	}
 
 	command += " >> " + fn_out + " 2>> " + fn_err;
@@ -1257,8 +1263,8 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	// Apply gain
 	RCTIC(TIMING_APPLY_GAIN);
 	if (fn_gain_reference != "") {
+		#pragma omp parallel for num_threads(n_threads)
 		for (int iframe = 0; iframe < n_frames; iframe++) {
-			#pragma omp parallel for num_threads(n_threads)
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Igain()) {
 				DIRECT_MULTIDIM_ELEM(Iframes[iframe](), n) *= DIRECT_MULTIDIM_ELEM(Igain(), n);
 			}
@@ -1888,7 +1894,6 @@ bool MotioncorrRunner::alignPatch(std::vector<MultidimArray<fComplex> > &Fframes
 	bool converged = false;
 
 	// Parameters TODO: make an option
-	const int max_iter = 5;
 	int search_range = 50; // px
 	const RFLOAT tolerance = 0.5; // px
 	const RFLOAT EPS = 1e-15;

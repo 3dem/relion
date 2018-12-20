@@ -1912,6 +1912,11 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 	else
 	{
 		FileName mysuffix = joboptions["coords_suffix"].getString();
+		if (mysuffix == "")
+		{
+			error_message = "ERROR: empty field for coordinate STAR file...";
+			return false;
+		}
 		command += " --coord_dir " + mysuffix.beforeLastOf("/") + "/";
 		command += " --coord_suffix " + (mysuffix.afterLastOf("/")).without("coords_suffix");
 		Node node2(joboptions["coords_suffix"].getString(), joboptions["coords_suffix"].node_type);
@@ -2125,7 +2130,7 @@ void RelionJob::initialiseSelectJob()
 
 	joboptions["do_remove_duplicates"] = JobOption("OR: remove duplicates?", false, "If set to Yes, duplicated particles that are within a given distance are removed leaving only one. Duplicated particles are sometimes generated when particles drift into the same position during alignment. They inflate and invalidate gold-standard FSC calculation.");
 	joboptions["duplicate_threshold"] = JobOption("Minimum inter-particle distance (A)", 30, 0, 1000, 1, "Particles within this distance are removed leaving only one.");
-	joboptions["image_angpix"] = JobOption("Pixel size before extraction (A)", -1, -1, 10, 0.01, "The pixel size of particles (relevant to rlnOriginX/Y) is read from the STAR file. When the pixel size of the original micrograph used for extraction (relevant to rlnCoordinateX/Y) is different, specify it here");
+	joboptions["image_angpix"] = JobOption("Pixel size before extraction (A)", -1, -1, 10, 0.01, "The pixel size of particles (relevant to rlnOriginX/Y) is read from the STAR file. When the pixel size of the original micrograph used for auto-picking and extraction (relevant to rlnCoordinateX/Y) is different, specify it here. In other words, this is the pixel size after binning during motion correction, but before down-sampling during extraction.");
 
 }
 

@@ -755,7 +755,7 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 	// These checks must be done here because MD will be modified within the loop
 	bool MDin_has_beamtilt = (MD.containsLabel(EMDL_IMAGE_BEAMTILT_X) || MD.containsLabel(EMDL_IMAGE_BEAMTILT_Y));
 	bool MDin_has_ctf = MD.containsLabel(EMDL_CTF_DEFOCUSU);
-	bool MDin_has_tiltgroup = MD.containsLabel(EMDL_IMAGE_BEAMTILT_GROUP);
+	bool MDin_has_tiltgroup = MD.containsLabel(EMDL_PARTICLE_BEAM_TILT_CLASS);
 
 	TIMING_TIC(TIMING_READ_IMG);
 
@@ -1031,11 +1031,11 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 				}
 
 				// Copy rlnBeamTiltGroupName from the micrograph STAR file only when absent in the particle STAR file
-				if (!MDin_has_tiltgroup && MDmics.containsLabel(EMDL_IMAGE_BEAMTILT_GROUP))
+				if (!MDin_has_tiltgroup && MDmics.containsLabel(EMDL_PARTICLE_BEAM_TILT_CLASS))
 				{
-					FileName tilt_group;
-					MDmics.getValue(EMDL_IMAGE_BEAMTILT_GROUP, tilt_group, imic);
-					MD.setValue(EMDL_IMAGE_BEAMTILT_GROUP, tilt_group);
+					int tilt_class;
+					MDmics.getValue(EMDL_PARTICLE_BEAM_TILT_CLASS, tilt_class, imic);
+					MD.setValue(EMDL_PARTICLE_BEAM_TILT_CLASS, tilt_class);
 				}
 			}
 

@@ -57,6 +57,9 @@ public:
 	bool do_own;
 	bool interpolate_shifts;
 
+	// Maximum number of iterations
+	int max_iter;
+
 	// Save aligned but non-dose weighted micrograph.
 	// With MOTIONCOR2, this flag is always assumed to be true
 	bool save_noDW;
