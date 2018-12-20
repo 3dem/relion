@@ -24,6 +24,7 @@
 #include <src/fftw.h>
 #include <src/time.h>
 #include <src/symmetries.h>
+#include <src/jaz/obs_model.h>
 
 class image_handler_parameters
 {
@@ -36,6 +37,7 @@ class image_handler_parameters
    	int verb;
 	// I/O Parser
 	IOParser parser;
+	ObservationModel obsModel;
 
 	Image<RFLOAT> Iout;
 	Image<RFLOAT> Iop;
@@ -147,8 +149,8 @@ class image_handler_parameters
 		Image<RFLOAT> Iout;
 		Iout().resize(Iin());
 
-		if (angpix < 0 && (new_angpix > 0 || fn_fsc != "" || randomize_at > 0 || 
-		                   do_power || fn_cosDPhi != "" || fn_correct_ampl != "" || 
+		if (angpix < 0 && (new_angpix > 0 || fn_fsc != "" || randomize_at > 0 ||
+		                   do_power || fn_cosDPhi != "" || fn_correct_ampl != "" ||
 		                   fabs(bfactor) > 0 || logfilter > 0 || lowpass > 0 || highpass > 0))
 		{
 			angpix = Iin.samplingRateX();
@@ -440,7 +442,7 @@ class image_handler_parameters
 				long int dest_x = (j == 0) ? 0 : (XSIZE(Iin()) - j);
 				DIRECT_A3D_ELEM(Iout(), k, i, j) = A3D_ELEM(Iin(), k, i, dest_x);
 			}
-		}	
+		}
 
 		// Shifting
 		if (do_shiftCOM)
@@ -556,7 +558,7 @@ class image_handler_parameters
 		// Get a MetaDataTable
 		if (fn_in.getExtension() == "star")
 		{
-			MD.read(fn_in);
+			ObservationModel::loadSafely(fn_in, obsModel, MD, "discover", verb);
 			std::cout << "NOTE: the input (--i) is a STAR file. The output (--o) is treated as a suffix, not a path." << std::endl;
 			input_is_stack = true;
 		}
