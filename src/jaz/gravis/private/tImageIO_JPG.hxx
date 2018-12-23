@@ -288,7 +288,7 @@ namespace gravis
 
     template <class T>
     inline
-    void JPGImageWriter<T>::write (const tImage<T>& image, const std::string& filename, int quality=100)
+    void JPGImageWriter<T>::write (const tImage<T>& image, const std::string& filename, int quality)
     {
 
       tImageConverter<tImage<T>, tImage< tRGB<unsigned char> > > convert;
