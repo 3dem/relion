@@ -1103,6 +1103,7 @@ MetaDataTable Preprocessing::getCoordinateMetaDataTable(FileName fn_mic)
 			int optics_group = obsModelMic.getOpticsGroup(MDresult);
 			particle_angpix = obsModelPart.getPixelSize(optics_group);
 			rescale_fndata = particle_angpix / angpix; // angpix is the pixel size of this micrograph
+
 			// reset input offsets
 			if (do_reset_offsets)
 			{
@@ -1127,7 +1128,7 @@ MetaDataTable Preprocessing::getCoordinateMetaDataTable(FileName fn_mic)
 				MDresult.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff);
 				MDresult.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff);
 
-				xoff /= particle_angpix;
+				xoff /= particle_angpix; // Now in run_data's pixels
 				yoff /= particle_angpix;
 
 				if (do_recenter && (fabs(recenter_x) > 0. || fabs(recenter_y) > 0. || fabs(recenter_z) > 0.))
@@ -1139,7 +1140,7 @@ MetaDataTable Preprocessing::getCoordinateMetaDataTable(FileName fn_mic)
 					// Project the center-coordinates
 					Matrix1D<RFLOAT> my_center(3);
 					Matrix2D<RFLOAT> A3D;
-					XX(my_center) = recenter_x;
+					XX(my_center) = recenter_x; // in run_data's pixels
 					YY(my_center) = recenter_y;
 					ZZ(my_center) = recenter_z;
 					Euler_angles2matrix(rot, tilt, psi, A3D, false);
@@ -1148,11 +1149,14 @@ MetaDataTable Preprocessing::getCoordinateMetaDataTable(FileName fn_mic)
 
 				xoff -= XX(my_projected_center);
 				yoff -= YY(my_projected_center);
+				xoff *= rescale_fndata; // now in micrograph's pixel 
+				yoff *= rescale_fndata;
 
 				if (do_recenter)
 				{
 					MDresult.getValue(EMDL_IMAGE_COORD_X, xcoord);
 					MDresult.getValue(EMDL_IMAGE_COORD_Y, ycoord);
+					
 					diffx = xoff - ROUND(xoff);
 					diffy = yoff - ROUND(yoff);
 					xcoord -= ROUND(xoff);
@@ -1169,8 +1173,9 @@ MetaDataTable Preprocessing::getCoordinateMetaDataTable(FileName fn_mic)
 				{
 					MDresult.getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, zoff);
 					zoff /= particle_angpix;
-
 					zoff -= ZZ(my_projected_center);
+					zoff *= rescale_fndata;
+
 					if (do_recenter)
 					{
 						MDresult.getValue(EMDL_IMAGE_COORD_Z, zcoord);
