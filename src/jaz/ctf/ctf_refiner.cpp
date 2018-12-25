@@ -432,9 +432,9 @@ std::vector<MetaDataTable> CtfRefiner::merge(const std::vector<MetaDataTable>& m
 
 		mdtOut.push_back(mdt);
 
-		if (exists(outRoot+"_defocus_fit.eps"))
+		if (exists(outRoot+"_ctf-refine_fit.eps"))
 		{
-			fn_eps.push_back(outRoot+"_defocus_fit.eps");
+			fn_eps.push_back(outRoot+"_ctf-refine_fit.eps");
 		}
 		
 		if (exists(outRoot+"_bfactor_fit.eps"))
