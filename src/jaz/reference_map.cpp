@@ -46,7 +46,7 @@ void ReferenceMap::read(IOParser& parser, int argc, char* argv[])
 {
 	reconFn0 = parser.getOption("--m1", "Reference map, half 1");
 	reconFn1 = parser.getOption("--m2", "Reference map, half 2");
-	angpix = textToDouble(parser.getOption("--angpix_ref", "Pixel size of the reference map"));
+	angpix = textToDouble(parser.getOption("--angpix_ref", "Pixel size of the reference map", "-1"));
 	maskFn = parser.getOption("--mask", "Reference mask", "");
 	fscFn = parser.getOption("--f", "Input STAR file with the FSC of the reference");
 	paddingFactor = textToDouble(parser.getOption("--pad", "Padding factor", "2"));
@@ -82,7 +82,12 @@ void ReferenceMap::load(int verb, bool debug)
 	{
 		REPORT_ERROR(reconFn0 + " and " + reconFn1 + " are of unequal size.\n");
 	}
-	
+
+	if (angpix < 0)
+	{
+		angpix = maps[0].samplingRateX();
+		std::cerr << "WARNING: You did not specify --ref_angpix. The pixel size in the image header of " << reconFn0 << ", " << angpix << " A/px, is used." << std::endl;
+	}
 	s = maps[0].data.ydim;
 	sh = s/2 + 1;
 	
