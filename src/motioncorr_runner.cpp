@@ -334,6 +334,9 @@ void MotioncorrRunner::initialise()
 void MotioncorrRunner::prepareGainReference(bool write_gain)
 {
 	if (fn_gain_reference == "") return;
+	if (fn_gain_reference.getExtension().find("dm") != std::string::npos)
+		REPORT_ERROR("Gain reference in Digital Micrograph format is not supported in RELION. Although UCSF MotionCor2 accepts it, you cannot run Bayesian Polishing afterwards. Please convert the gain reference to MRC format by other programs, for example, dm2mrc in IMOD or e2proc2d.py in EMAN2.");
+
 	if (gain_rotation == 0 && gain_flip == 0) return;
 
 	// Need gain rotation and/or flipping
