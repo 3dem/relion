@@ -77,6 +77,10 @@ public:
 	// First and last movie frames to use in alignment and written-out corrected average and movie (default: do all)
 	int first_frame_ali, last_frame_ali, first_frame_sum, last_frame_sum;
 
+	// Group this number of frames and write summed power spectrum. -1 == do not write
+	int grouping_for_ps;
+	int ps_size;
+
 	// Binning factor for binning inside MOTIONCORR/MOTIONCOR2
 	double bin_factor;
 
