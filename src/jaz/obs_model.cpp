@@ -201,7 +201,9 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 
 	for (int i = 0; i < opticsMdt.numberOfObjects(); i++)
 	{
-		opticsMdt.getValue(EMDL_IMAGE_PIXEL_SIZE, angpix[i], i);
+		if (!opticsMdt.getValue(EMDL_IMAGE_PIXEL_SIZE, angpix[i], i))
+			if (!opticsMdt.getValue(EMDL_MICROGRAPH_PIXEL_SIZE, angpix[i], i))
+				opticsMdt.getValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, angpix[i], i);;
 		opticsMdt.getValue(EMDL_IMAGE_SIZE, boxSizes[i], i);
 
 		double kV;

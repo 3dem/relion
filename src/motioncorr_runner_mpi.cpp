@@ -49,8 +49,6 @@ void MotioncorrRunnerMpi::run()
 	{
 		if (do_own)
 			 std::cout << " Correcting beam-induced motions using our own implementation ..." << std::endl;
-		else if (do_unblur)
-			std::cout << " Correcting beam-induced motions using Tim Grant's UNBLUR ..." << std::endl;
 		else if (do_motioncor2)
 			std::cout << " Correcting beam-induced motions using Shawn Zheng's MOTIONCOR2 ..." << std::endl;
 		else
@@ -74,8 +72,6 @@ void MotioncorrRunnerMpi::run()
 		bool result;
 		if (do_own)
 			result = executeOwnMotionCorrection(mic);
-		else if (do_unblur)
-			result = executeUnblur(mic);
 		else if (do_motioncor2)
 			result = executeMotioncor2(mic, node->rank);
 		else

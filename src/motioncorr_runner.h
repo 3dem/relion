@@ -77,6 +77,10 @@ public:
 	// First and last movie frames to use in alignment and written-out corrected average and movie (default: do all)
 	int first_frame_ali, last_frame_ali, first_frame_sum, last_frame_sum;
 
+	// Group this number of frames and write summed power spectrum. -1 == do not write
+	int grouping_for_ps;
+	int ps_size;
+
 	// Binning factor for binning inside MOTIONCORR/MOTIONCOR2
 	double bin_factor;
 
@@ -123,12 +127,6 @@ public:
 	// How many frames to group in MOTIONCOR2
 	int group;
 
-	// Use Unblur/summovie instead of MOTIONCORR?
-	bool do_unblur;
-
-	// UNBLUR, SUMMOVIE executable
-	FileName fn_unblur_exe, fn_summovie_exe;
-
 	// Pixel size for UNBLUR
 	double angpix;
 
@@ -162,7 +160,7 @@ public:
 	void run();
 
 	// Given an input fn_mic filename, this function will determine the names of the output corrected image (fn_avg) and the corrected movie (fn_mov).
-	void getOutputFileNames(FileName fn_mic, FileName &fn_avg, FileName &fn_mov);
+	FileName getOutputFileNames(FileName fn_mic);
 
 	// Execute MOTIONCOR2 for a single micrograph
 	bool executeMotioncor2(Micrograph &mic, int rank = 0);
@@ -170,17 +168,8 @@ public:
 	// Get the shifts from MOTIONCOR2
 	void getShiftsMotioncor2(FileName fn_log, Micrograph &mic);
 
-	// Execute UNBLUR for a single micrograph
-	bool executeUnblur(Micrograph &mic);
-
 	// Execute our own implementation for a single micrograph
 	bool executeOwnMotionCorrection(Micrograph &mic);
-
-	// Get the shifts from UNBLUR
-	void getShiftsUnblur(FileName fn_mic, Micrograph &mic);
-
-	// Plot the FRC curve from SUMMOVIE
-	void plotFRC(FileName fn_frc);
 
 	// Plot the shifts
 	void plotShifts(FileName fn_mic, Micrograph &mic);

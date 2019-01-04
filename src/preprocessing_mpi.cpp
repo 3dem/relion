@@ -73,6 +73,14 @@ void PreprocessingMpi::runExtractParticles()
 			if (imic >= my_first_mic && imic <= my_last_mic)
 			{
 				MDmics.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
+				int optics_group = obsModelMic.getOpticsGroup(MDmics);
+
+				// Set the pixel size for this micrograph
+				angpix = obsModelMic.getPixelSize(optics_group);
+				// Also set the output_angpix (which could be rescaled)
+				output_angpix = angpix;
+				if (do_rescale)
+					output_angpix *= (RFLOAT)extract_size / (RFLOAT)scale;
 
 				// Check new-style outputdirectory exists and make it if not!
 				FileName fn_dir = getOutputFileNameRoot(fn_mic);

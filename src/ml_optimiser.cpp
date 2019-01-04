@@ -2111,7 +2111,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 		progress_bar(my_nr_particles);
 
 #ifdef DEBUG_INI
-    std::cerr<<"MlOptimiser::calculateSumOfPowerSpectraAndAverageImage Leaving"<<std::endl;
+	std::cerr<<"MlOptimiser::calculateSumOfPowerSpectraAndAverageImage Leaving"<<std::endl;
 #endif
 
 }
@@ -2120,17 +2120,17 @@ void MlOptimiser::setSigmaNoiseEstimatesAndSetAverageImage(MultidimArray<RFLOAT>
 {
 
 #ifdef DEBUG_INI
-    std::cerr<<"MlOptimiser::setSigmaNoiseEstimatesAndSetAverageImage Entering"<<std::endl;
+	std::cerr<<"MlOptimiser::setSigmaNoiseEstimatesAndSetAverageImage Entering"<<std::endl;
 #endif
 
 	// First calculate average image
 	RFLOAT total_sum = 0.;
-    for (int igroup = 0; igroup < mymodel.nr_groups; igroup++)
-    {
-    	mymodel.nr_particles_per_group[igroup] = ROUND(wsum_model.sumw_group[igroup]);
-    	total_sum += wsum_model.sumw_group[igroup];
-    }
-    Mavg /= total_sum;
+	for (int igroup = 0; igroup < mymodel.nr_groups; igroup++)
+	{
+		mymodel.nr_particles_per_group[igroup] = ROUND(wsum_model.sumw_group[igroup]);
+		total_sum += wsum_model.sumw_group[igroup];
+	}
+	Mavg /= total_sum;
 
 	if (fn_ref == "None")
 	{
@@ -2254,7 +2254,7 @@ void MlOptimiser::iterateSetup()
 	// Make a barrier where all working threads wait
 	global_barrier = new Barrier(nr_threads - 1);
 
-    // Create threads to start working
+	// Create threads to start working
 	global_ThreadManager = new ThreadManager(nr_threads, this);
 
 	// Set up the thread task distributors for the particles and the orientations (will be resized later on)
@@ -2306,7 +2306,7 @@ void MlOptimiser::iterate()
 
 	bool has_already_reached_convergence = false;
 	for (iter = iter + 1; iter <= nr_iter; iter++)
-    {
+	{
 #ifdef DEBUG_HELICAL_ORIENTATIONAL_SEARCH
 		// May18,2015 - Shaoda & Sjors, Helical refinement (orientational searches)
 		std::cerr << std::endl << std::endl;
@@ -2470,39 +2470,6 @@ void MlOptimiser::iterate()
 #ifdef TIMING
 		timer.toc(TIMING_ITER_WRITE);
 #endif
-		if (do_auto_refine && has_converged)
-		{
-			if (verb > 0)
-			{
-				std::cout << " Auto-refine: Refinement has converged, stopping now... " << std::endl;
-				if (mymodel.nr_bodies == 1)
-					std::cout << " Auto-refine: + Final reconstruction from all particles is saved as: " <<  fn_out << "_class001.mrc" << std::endl;
-				else
-					std::cout << " Auto-refine: + Final reconstructions of each body from all particles are saved as " <<  fn_out << "_bodyNNN.mrc, where NNN is the body number" << std::endl;
-				std::cout << " Auto-refine: + Final model parameters are stored in: " << fn_out << "_model.star" << std::endl;
-				std::cout << " Auto-refine: + Final data parameters are stored in: " << fn_out << "_data.star" << std::endl;
-				if (mymodel.tau2_fudge_factor > 1.)
-				{
-					std::cout << " Auto-refine: + SEVERE WARNING: Because you used a tau2_fudge of " << mymodel.tau2_fudge_factor << " your resolution during this refinement will be inflated!" << std::endl;
-					std::cout << " Auto-refine: + SEVERE WARNING: You have to run a postprocessing on the unfil.mrc maps to get a gold-standard resolution estimate!"  << std::endl;
-				}
-				else if (do_phase_random_fsc)
-					std::cout << " Auto-refine: + Final resolution (already with masking) is: " << 1./mymodel.current_resolution << std::endl;
-				else
-				{
-					std::cout << " Auto-refine: + Final resolution (without masking) is: " << 1./mymodel.current_resolution << std::endl;
-					std::cout << " Auto-refine: + But you may want to run relion_postprocess to mask the unfil.mrc maps and calculate a higher resolution FSC" << std::endl;
-				}
-				if (acc_rot > 10.)
-				{
-					std::cout << " Auto-refine: + SEVERE WARNING: The angular accuracy is worse than 10 degrees, so basically you cannot align your particles!" << std::endl;
-					std::cout << " Auto-refine: + SEVERE WARNING: This has been observed to lead to spurious FSC curves, so be VERY wary of inflated resolution estimates..." << std::endl;
-					std::cout << " Auto-refine: + SEVERE WARNING: You most probably do NOT want to publish these results!" << std::endl;
-					std::cout << " Auto-refine: + SEVERE WARNING: Sometimes it is better to tune resolution yourself by adjusting T in a 3D-classification with a single class." << std::endl;
-				}
-			}
-			break;
-		}
 
 #ifdef TIMING
 		if (verb > 0)
@@ -2510,7 +2477,7 @@ void MlOptimiser::iterate()
 #endif
 
 
-    } // end loop iters
+	} // end loop iters
 
 	// delete threads etc
 	iterateWrapUp();

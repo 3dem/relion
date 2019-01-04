@@ -156,12 +156,10 @@ void Preprocessing::initialise()
 			if (do_recenter && verb > 0)
 				std::cout << " + And re-centering particles based on refined coordinates in the _data.star file" << std::endl;
 
-			ObservationModel::loadSafely(fn_star_in, obsModelPart, MDimg, "particles", verb);
-
+			ObservationModel::loadSafely(fn_data, obsModelPart, MDimg, "particles", verb);
 		}
 		else
 		{
-
 			// Make sure the coordinate file directory names end with a '/'
 			if (fn_coord_dir != "ASINPUT" && fn_coord_dir[fn_coord_dir.length()-1] != '/')
 				fn_coord_dir+="/";
@@ -303,12 +301,15 @@ void Preprocessing::joinAllStarFiles()
 			else obsModelMic.opticsMdt.setValue(EMDL_IMAGE_SIZE, extract_size);
 
 			obsModelMic.opticsMdt.setValue(EMDL_IMAGE_DIMENSIONALITY, dimensionality);
+
+			int igroup;
+			obsModelMic.opticsMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, igroup);
+			std::cout << " The new pixel size of the extracted particles in optics group " << igroup << " is " << output_angpix << " Angstrom/pixel." << std::endl;
 		}
 		obsModelMic.opticsMdt.deactivateLabel(EMDL_MICROGRAPH_PIXEL_SIZE);
 
 		ObservationModel::saveNew(MDout, obsModelMic.opticsMdt, fn_part_star, "particles");
 		std::cout << " Written out STAR file with " << MDout.numberOfObjects() << " particles in " << fn_part_star<< std::endl;
-		std::cout << " The new pixel size of the extracted particles are " << output_angpix << " Angstrom/pixel." << std::endl;
 	}
 
 }
@@ -969,9 +970,7 @@ void Preprocessing::runOperateOnInputFile()
 	MD.setName("images");
 	MD.write(fn_star);
 	std::cout << " Also written a STAR file with the image names as " << fn_star << std::endl;
-
 }
-
 
 void Preprocessing::performPerImageOperations(
 		Image<RFLOAT> &Ipart,
@@ -1067,15 +1066,23 @@ void Preprocessing::performPerImageOperations(
 // Get the coordinate file from a given micrograph filename from MDdata
 MetaDataTable Preprocessing::getCoordinateMetaDataTable(FileName fn_mic)
 {
-
 	// Get the micropgraph name without the UNIQDATE string into fn_post, and only read that micrograph in the MDresult table
 	FileName fn_pre, fn_jobnr, fn_post;
 	decomposePipelineFileName(fn_mic, fn_pre, fn_jobnr, fn_post);
 
 	MetaDataTable MDresult;
-	MDresult.read(fn_data, "particles", NULL, fn_post);
 
-	RFLOAT mag2, dstep2, angpix2, rescale_fndata = 1.0;
+	// To upgrade to ObsModel, the following no longer works.
+	// MDresult.read(fn_data, "particles", NULL, fn_post);
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDimg)
+	{
+		FileName fn_mic_in_particle_star;
+		MDimg.getValue(EMDL_MICROGRAPH_NAME, fn_mic_in_particle_star);
+		if (fn_mic_in_particle_star.contains(fn_post))
+			MDresult.addObject(MDimg.getObject(current_object));
+	}
+	
+	RFLOAT mag2, dstep2, particle_angpix, rescale_fndata = 1.0;
 	if (MDresult.numberOfObjects() > 0)
 	{
 		MDresult.goToObject(0);
@@ -1091,11 +1098,11 @@ MetaDataTable Preprocessing::getCoordinateMetaDataTable(FileName fn_mic)
 		RFLOAT xoff, yoff, zoff, rot, tilt, psi, xcoord, ycoord, zcoord, diffx, diffy, diffz;
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDresult)
 		{
-
 			// Get the optics group for this particle
+			// TODO: FIXME: How can we guarantee optics group IDs are consistent among Part and Mic?
 			int optics_group = obsModelMic.getOpticsGroup(MDresult);
-			angpix2 = obsModelPart.getPixelSize(optics_group);
-			rescale_fndata = angpix2 / angpix;
+			particle_angpix = obsModelPart.getPixelSize(optics_group);
+			rescale_fndata = particle_angpix / angpix; // angpix is the pixel size of this micrograph
 
 			// reset input offsets
 			if (do_reset_offsets)
@@ -1121,8 +1128,8 @@ MetaDataTable Preprocessing::getCoordinateMetaDataTable(FileName fn_mic)
 				MDresult.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff);
 				MDresult.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff);
 
-				xoff /= angpix;
-				yoff /= angpix;
+				xoff /= particle_angpix; // Now in run_data's pixels
+				yoff /= particle_angpix;
 
 				if (do_recenter && (fabs(recenter_x) > 0. || fabs(recenter_y) > 0. || fabs(recenter_z) > 0.))
 				{
@@ -1133,7 +1140,7 @@ MetaDataTable Preprocessing::getCoordinateMetaDataTable(FileName fn_mic)
 					// Project the center-coordinates
 					Matrix1D<RFLOAT> my_center(3);
 					Matrix2D<RFLOAT> A3D;
-					XX(my_center) = recenter_x;
+					XX(my_center) = recenter_x; // in run_data's pixels
 					YY(my_center) = recenter_y;
 					ZZ(my_center) = recenter_z;
 					Euler_angles2matrix(rot, tilt, psi, A3D, false);
@@ -1142,13 +1149,14 @@ MetaDataTable Preprocessing::getCoordinateMetaDataTable(FileName fn_mic)
 
 				xoff -= XX(my_projected_center);
 				yoff -= YY(my_projected_center);
-				xoff *= rescale_fndata;
+				xoff *= rescale_fndata; // now in micrograph's pixel 
 				yoff *= rescale_fndata;
 
 				if (do_recenter)
 				{
 					MDresult.getValue(EMDL_IMAGE_COORD_X, xcoord);
 					MDresult.getValue(EMDL_IMAGE_COORD_Y, ycoord);
+					
 					diffx = xoff - ROUND(xoff);
 					diffy = yoff - ROUND(yoff);
 					xcoord -= ROUND(xoff);
@@ -1164,10 +1172,10 @@ MetaDataTable Preprocessing::getCoordinateMetaDataTable(FileName fn_mic)
 				if (do_contains_z)
 				{
 					MDresult.getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, zoff);
-					zoff /= angpix;
-
+					zoff /= particle_angpix;
 					zoff -= ZZ(my_projected_center);
 					zoff *= rescale_fndata;
+
 					if (do_recenter)
 					{
 						MDresult.getValue(EMDL_IMAGE_COORD_Z, zcoord);
