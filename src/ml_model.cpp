@@ -834,19 +834,16 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experimen
 			for (int iclass = 0; iclass < nr_classes*nr_bodies; iclass++)
 			{
 				resizeMap(Iref[iclass], rescale_size);
-				if (_do_sgd)
-				{
-					resizeMap(Igrad[iclass], rescale_size);
-				}
+				if (_do_sgd) resizeMap(Igrad[iclass], rescale_size);
 			}
 
 		}
-		// The reference should also be in the biggest box of the input images
-		if (XSIZE(Iref[0]) * pixel_size <  largest_box)
-		{
 
-			int new_size = ROUND(largest_box / pixel_size);
-			new_size += new_size%2; //make even in case it is not already
+		// The reference should also be in the biggest box of the input images
+		int new_size = ROUND(largest_box / pixel_size);
+		new_size += new_size%2; //make even in case it is not already
+		if (XSIZE(Iref[0]) < new_size)
+		{
 			ori_size = new_size;
 
 			if (verb > 0)
