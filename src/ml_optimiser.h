@@ -142,6 +142,9 @@ public:
 	// Generate a 3D model from 2D particles de novo?
 	bool is_3d_model;
 
+	//User-specified pixel size for the reference
+	RFLOAT ref_angpix;
+
 	// Filename for input tau2-spectrum
 	FileName fn_tau;
 

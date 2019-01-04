@@ -656,6 +656,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	// Expert options
 	int expert_section = parser.addSection("Expert options");
 	mymodel.padding_factor = textToFloat(parser.getOption("--pad", "Oversampling factor for the Fourier transforms of the references", "2"));
+	ref_angpix = textToFloat(parser.getOption("--ref_angpix", "Pixel size (in A) for the input reference (default is to read from header)", "-1."));
 	mymodel.interpolator = (parser.checkOption("--NN", "Perform nearest-neighbour instead of linear Fourier-space interpolation?")) ? NEAREST_NEIGHBOUR : TRILINEAR;
 	mymodel.r_min_nn = textToInteger(parser.getOption("--r_min_nn", "Minimum number of Fourier shells to perform linear Fourier-space interpolation", "10"));
 	verb = textToInteger(parser.getOption("--verb", "Verbosity (1=normal, 0=silent)", "1"));
@@ -1443,7 +1444,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		// Read in the reference(s) and initialise mymodel
 		int refdim = (fn_ref == "denovo") ? 3 : 2;
 		mymodel.initialiseFromImages(fn_ref, is_3d_model, mydata,
-				do_average_unaligned, do_generate_seeds, refs_are_ctf_corrected, do_sgd, (rank==0));
+				do_average_unaligned, do_generate_seeds, refs_are_ctf_corrected, ref_angpix, do_sgd, (rank==0));
 
 	}
 
@@ -4265,8 +4266,8 @@ void MlOptimiser::solventFlatten()
 		mymodel.Iref[iclass] *= Isolvent(); // this is the tight mask
 
 		if (fn_lowpass_mask != "None")
-			mymodel.Iref[iclass] += Itmp;	
-		
+			mymodel.Iref[iclass] += Itmp;
+
 		// Apply a second solvent mask if necessary
 		// This may for example be useful to set the interior of icosahedral viruses to a constant density value that is higher than the solvent
 		// Invert the solvent mask, so that an input mask can be given where 1 is the masked area and 0 is protein....

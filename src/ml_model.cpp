@@ -689,10 +689,10 @@ void  MlModel::readTauSpectrum(FileName fn_tau, int verb)
 
 // Reading images from disc
 void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experiment &_mydata,
-			bool &do_average_unaligned, bool &do_generate_seeds, bool &refs_are_ctf_corrected, bool _do_sgd, bool verb)
+			bool &do_average_unaligned, bool &do_generate_seeds, bool &refs_are_ctf_corrected,
+			RFLOAT _ref_angpix, bool _do_sgd, bool verb)
 {
 
-	RFLOAT header_pixel_size;
 
 	// Data dimensionality
 	_mydata.obsModel.opticsMdt.getValue(EMDL_IMAGE_DIMENSIONALITY, data_dim, 0);
@@ -742,22 +742,29 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experimen
 				MDref.getValue(EMDL_MLMODEL_REF_IMAGE, fn_tmp);
 				img.read(fn_tmp);
 				img().setXmippOrigin();
-				img.MDMainHeader.getValue(EMDL_IMAGE_SAMPLINGRATE_X, header_pixel_size);
-				pixel_size = header_pixel_size;
-				ori_size = XSIZE(img());
-				if (nr_classes == 0)
+				if (_ref_angpix > 0.)
 				{
-					img.MDMainHeader.getValue(EMDL_IMAGE_SAMPLINGRATE_X, header_pixel_size);
+					pixel_size = _ref_angpix;
 				}
 				else
 				{
-					RFLOAT aux_pixel_size;
-					img.MDMainHeader.getValue(EMDL_IMAGE_SAMPLINGRATE_X, aux_pixel_size);
-					if (fabs(aux_pixel_size-header_pixel_size) > 0.001)
+					RFLOAT header_pixel_size;
+					if (nr_classes == 0)
 					{
-						REPORT_ERROR("MlModel::readImages ERROR: different models have different pixel sizes in their headers!");
+						img.MDMainHeader.getValue(EMDL_IMAGE_SAMPLINGRATE_X, header_pixel_size);
+						pixel_size = header_pixel_size;
+					}
+					else
+					{
+						img.MDMainHeader.getValue(EMDL_IMAGE_SAMPLINGRATE_X, header_pixel_size);
+						if (fabs(header_pixel_size - pixel_size) > 0.001)
+						{
+							REPORT_ERROR("MlModel::readImages ERROR: different models have different pixel sizes in their headers!");
+						}
 					}
 				}
+
+				ori_size = XSIZE(img());
 				ref_dim = img().getDim();
 				Iref.push_back(img());
 				if (_do_sgd)
@@ -773,8 +780,16 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experimen
 		{
 			img.read(fn_ref);
 			img().setXmippOrigin();
-			img.MDMainHeader.getValue(EMDL_IMAGE_SAMPLINGRATE_X, header_pixel_size);
-			pixel_size = header_pixel_size;
+			if (_ref_angpix > 0.)
+			{
+				pixel_size = _ref_angpix;
+			}
+			else
+			{
+				RFLOAT header_pixel_size;
+				img.MDMainHeader.getValue(EMDL_IMAGE_SAMPLINGRATE_X, header_pixel_size);
+				pixel_size = header_pixel_size;
+			}
 			ori_size = XSIZE(img());
 			ref_dim = img().getDim();
 			if (ori_size != XSIZE(img()) || ori_size != YSIZE(img()))
