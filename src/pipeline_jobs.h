@@ -54,8 +54,6 @@
 #define DEFAULTQSUBLOCATION "/public/EM/RELION/relion/bin/relion_qsub.csh"
 #define DEFAULTCTFFINDLOCATION "/public/EM/ctffind/ctffind.exe"
 #define DEFAULTMOTIONCOR2LOCATION "/public/EM/MOTIONCOR2/MotionCor2"
-#define DEFAULTUNBLURLOCATION "/public/EM/UNBLUR/unblur.exe"
-#define DEFAULTSUMMOVIELOCATION "/public/EM/SUMMOVIE/summovie.exe"
 #define DEFAULTGCTFLOCATION "/public/EM/Gctf/bin/Gctf"
 #define DEFAULTRESMAPLOCATION "/public/EM/ResMap/ResMap-1.1.4-linux64"
 #define DEFAULTQSUBCOMMAND "qsub"

@@ -105,11 +105,6 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	fn_other_motioncor2_args = parser.getOption("--other_motioncor2_args", "Additional arguments to MOTIONCOR2", "");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread, e.g 0:1:2:3", "");
 
-	int unblur_section = parser.addSection("UNBLUR/SUMMOVIE options");
-	do_unblur = parser.checkOption("--use_unblur", "Use Niko Grigorieff's UNBLUR instead of MOTIONCOR2.");
-	fn_unblur_exe = parser.getOption("--unblur_exe","Location of UNBLUR (v1.0.2) executable (or through RELION_UNBLUR_EXECUTABLE environment variable)","");
-	fn_summovie_exe = parser.getOption("--summovie_exe","Location of SUMMOVIE(v1.0.2) executable (or through RELION_SUMMOVIE_EXECUTABLE environment variable)","");
-
 	int doseweight_section = parser.addSection("Dose-weighting options");
 	do_dose_weighting = parser.checkOption("--dose_weighting", "Use MOTIONCOR2s or UNBLURs dose-weighting scheme");
 	angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms", "-1"));
@@ -147,31 +142,7 @@ void MotioncorrRunner::usage()
 void MotioncorrRunner::initialise()
 {
 
-	if (do_unblur)
-	{
-		// Get the UNBLUR executable
-		if (fn_unblur_exe == "")
-		{
-			char * penv;
-			penv = getenv ("RELION_UNBLUR_EXECUTABLE");
-			if (penv!=NULL)
-				fn_unblur_exe = (std::string)penv;
-			else
-				REPORT_ERROR("ERROR: You have to specify the path to UNBLUR as --unblur_exe or the RELION_UNBLUR_EXECUTABLE variable");
-		}
-		// Get the SUMMOVIE executable
-		if (fn_summovie_exe == "")
-		{
-			char * penv;
-			penv = getenv ("RELION_SUMMOVIE_EXECUTABLE");
-			if (penv!=NULL)
-				fn_summovie_exe = (std::string)penv;
-			else
-				REPORT_ERROR("ERROR: You have to specify the path to SUMMOVIE as --summovie_exe or the RELION_SUMMOVIE_EXECUTABLE variable");
-		}
-
-	}
-	else if (do_motioncor2)
+	if (do_motioncor2)
 	{
 		if (fn_defect != "") {
 			std::cerr << "WARNING: Although the defect file will be used by MotionCor2, Bayesian Polishing will work on uncorrected raw movies and ignore the defect file." << std::endl;
@@ -200,7 +171,8 @@ void MotioncorrRunner::initialise()
 			std::cerr << "WARNING: Thus, particles will revert to an un-corrected state when you run Bayesian Polishing." << std::endl;
 		}
 	}
-	else if (do_own) {
+	else if (do_own)
+	{
 		if (fn_defect != "") {
 			std::cerr << "WARNING: Our own implementation of motion correction detects hot pixels by itself. The defect file is not used." << std::endl;
 		}
@@ -211,8 +183,10 @@ void MotioncorrRunner::initialise()
 			// If patch_x == patch_y == 1, the user actually wants global alignment alone, so do not warn.
 			std::cerr << "The number of patches is too small (<= 2). Patch based alignment will be skipped." << std::endl;
 		}
-	} else {
-		REPORT_ERROR(" ERROR: You have to specify which programme to use through either --use_motioncor2 or --use_unblur");
+	}
+	else
+	{
+		REPORT_ERROR(" ERROR: You have to specify which programme to use through either --use_motioncor2 or --use_own");
 	}
 
 	if (!fn_in.isStarFile() && angpix < 0)
@@ -306,10 +280,9 @@ void MotioncorrRunner::initialise()
 
 		if (continue_old)
 		{
-			FileName fn_avg, fn_mov;
-			getOutputFileNames(fn_mic_given_all[imic], fn_avg, fn_mov);
-			if (exists(fn_avg) && exists(fn_avg.withoutExtension() + ".star") &&
-			    (exists(fn_mov)))
+			FileName fn_avg = getOutputFileNames(fn_mic_given_all[imic]);
+			if (exists(fn_avg) && exists(fn_avg.withoutExtension() + ".star") && 
+                            (grouping_for_ps <= 0 || exists(fn_avg.withoutExtension() + "_ps.mrc")))
 			{
 				process_this = false; // already done
 			}
@@ -365,9 +338,7 @@ void MotioncorrRunner::initialise()
 
 	if (verb > 0)
 	{
-		if (do_unblur)
-			std::cout << " Using UNBLUR executable in: " << fn_unblur_exe << std::endl;
-		else if (do_motioncor2)
+		if (do_motioncor2)
 			std::cout << " Using MOTIONCOR2 executable in: " << fn_motioncor2_exe << std::endl;
 		else if (do_own)
 			std::cout << " Using our own implementation based on MOTIONCOR2 algorithm" << std::endl;
@@ -425,7 +396,7 @@ void MotioncorrRunner::prepareGainReference(bool write_gain)
 	fn_gain_reference =fn_new_gain;
 }
 
-void MotioncorrRunner::getOutputFileNames(FileName fn_mic, FileName &fn_avg, FileName &fn_mov)
+FileName MotioncorrRunner::getOutputFileNames(FileName fn_mic)
 {
 	// If there are any dots in the filename, replace them by underscores
 	FileName fn_root = fn_mic.withoutExtension();
@@ -441,10 +412,8 @@ void MotioncorrRunner::getOutputFileNames(FileName fn_mic, FileName &fn_avg, Fil
 		fn_root.replace(pos, 1, "_");
 	}
 
-	fn_avg = fn_out + fn_root + ".mrc";
-	fn_mov = fn_out + fn_root + "_" + fn_movie + ".mrcs";
+	return fn_out + fn_root + ".mrc";
 }
-
 
 void MotioncorrRunner::run()
 {
@@ -455,8 +424,6 @@ void MotioncorrRunner::run()
 	{
 		if (do_own)
 			std::cout << " Correcting beam-induced motions using our own implementation ..." << std::endl;
-		else if (do_unblur)
-			std::cout << " Correcting beam-induced motions using Tim Grant's UNBLUR ..." << std::endl;
 		else if (do_motioncor2)
 			std::cout << " Correcting beam-induced motions using Shawn Zheng's MOTIONCOR2 ..." << std::endl;
 		else
@@ -481,8 +448,6 @@ void MotioncorrRunner::run()
 		bool result = false;
 		if (do_own)
 			result = executeOwnMotionCorrection(mic);
-		else if (do_unblur)
-			result = executeUnblur(mic);
 		else if (do_motioncor2)
 			result = executeMotioncor2(mic);
 		else
@@ -511,8 +476,7 @@ void MotioncorrRunner::run()
 bool MotioncorrRunner::executeMotioncor2(Micrograph &mic, int rank)
 {
 	FileName fn_mic = mic.getMovieFilename();
-	FileName fn_avg, fn_mov;
-	getOutputFileNames(fn_mic, fn_avg, fn_mov);
+	FileName fn_avg = getOutputFileNames(fn_mic);
 
 	FileName fn_out = fn_avg.withoutExtension() + ".out";
 	FileName fn_log = fn_avg.withoutExtension() + ".log";
@@ -721,234 +685,11 @@ void MotioncorrRunner::getShiftsMotioncor2(FileName fn_log, Micrograph &mic)
 	}
 }
 
-bool MotioncorrRunner::executeUnblur(Micrograph &mic)
-{
-	FileName fn_mic = mic.getMovieFilename();
-	FileName fn_avg, fn_mov;
-	getOutputFileNames(fn_mic, fn_avg, fn_mov);
-	FileName fn_root = fn_avg.withoutExtension();
-	FileName fn_log = fn_root + "_unblur.log";
-	FileName fn_com = fn_root + "_unblur.com";
-	FileName fn_shifts = fn_root + "_shifts.txt";
-
-	FileName fn_tmp_mic;
-	// Unblur cannot handle .mrcs extensions
-	if (fn_mic.getExtension() == "mrcs")
-	{
-		fn_tmp_mic = fn_out + fn_mic.withoutExtension() + "_in.mrc";
-
-		// See how many directories deep is the output name
-		size_t ndir = std::count(fn_tmp_mic.begin(), fn_tmp_mic.end(), '/');
-		FileName fn_link = "";
-		for (size_t i =0; i < ndir; i++)
-		{
-			fn_link += "../";
-		}
-		// Make the symbolic link relative to the project dir
-		fn_link += fn_mic;
-		int res = symlink(fn_link.c_str(), fn_tmp_mic.c_str());
-	}
-	else
-	{
-		fn_tmp_mic = fn_mic;
-	}
-	FileName fn_tmp_mov = fn_mov.withoutExtension() + ".mrc";
-
-	Image<RFLOAT> Itest;
-	Itest.read(fn_mic, false, -1, false, true); // select_img -1, mmap false, is_2D true
-	int Nframes = NSIZE(Itest());
-
-	std::ofstream  fh;
-	fh.open((fn_com).c_str(), std::ios::out);
-	if (!fh)
-	 REPORT_ERROR( (std::string)"executeUnblur cannot create file: " + fn_com);
-
-	// Write script to run Unblur
-	fh << "#!/usr/bin/env csh"<<std::endl;
-	fh << "setenv  OMP_NUM_THREADS " << integerToString(n_threads)<<std::endl;
-	fh << fn_unblur_exe << " > " << fn_log << "  << EOF"<<std::endl;
-	fh << fn_tmp_mic << std::endl;
-	fh << Nframes << std::endl;
-	fh << fn_avg << std::endl;
-	fh << fn_shifts << std::endl;
-	fh << angpix << std::endl; // pixel size
-	if (do_dose_weighting)
-	{
-		fh << "YES" << std::endl; // apply dose weighting
-		fh << dose_per_frame << std::endl;
-		fh << voltage << std::endl;
-		fh << pre_exposure << std::endl;
-	}
-	else
-	{
-		fh << "NO" << std::endl; // no dose filtering
-	}
-	fh << "NO" << std::endl; // dont save movies
-	fh << "NO" << std::endl; // dont set expert options
-	fh <<"EOF"<<std::endl;
-	fh.close();
-
-	// Execute unblur
-	std::string command = "csh "+ fn_com;
-	if (system(command.c_str()))
-	{
-		std::cerr << "ERROR in executing: " << command << std::endl;
-		return false;
-    }
-
-	// Also analyse the shifts
-	getShiftsUnblur(fn_shifts, mic);
-
-	// If the requested sum is only a subset, then use summovie to make the average
-	int mylastsum = (last_frame_sum <= 0) ? Nframes : last_frame_sum;
-	if (first_frame_sum != 1 || mylastsum != Nframes)
-	{
-		FileName fn_com2 = fn_root + "_summovie.com";
-		FileName fn_log2 = fn_root + "_summovie.log";
-		FileName fn_frc = fn_root + "_frc.txt";
-
-		std::ofstream  fh2;
-		fh2.open((fn_com2).c_str(), std::ios::out);
-		if (!fh2)
-		 REPORT_ERROR( (std::string)"executeUnblur cannot create file: " + fn_com2);
-
-		// Write script to run ctffind
-		fh2 << "#!/usr/bin/env csh"<<std::endl;
-		fh2 << "setenv  OMP_NUM_THREADS " << integerToString(n_threads)<<std::endl;
-		fh2 << fn_summovie_exe << " > " << fn_log2 << "  << EOF"<<std::endl;
-		fh2 << fn_tmp_mic << std::endl;
-		fh2 << Nframes << std::endl;
-		fh2 << fn_avg << std::endl;
-		fh2 << fn_shifts << std::endl;
-		fh2 << fn_frc << std::endl;
-		fh2 << first_frame_sum << std::endl;
-		fh2 << mylastsum << std::endl;
-		fh2 << angpix << std::endl; // pixel size
-		fh2 << "NO" << std::endl; // dont set expert options
-		fh2 <<"EOF"<<std::endl;
-		fh2.close();
-
-		// Execute summovie
-		std::string command2 = "csh "+ fn_com2;
-		if (system(command2.c_str()))
-		{
-			std::cerr << "ERROR in executing: " << command2 <<std::endl;
-			return false;
-		}
-
-		// Plot the FRC
-		plotFRC(fn_frc);
-	}
-
-	// remove symbolic link
-	std::remove(fn_tmp_mic.c_str());
-
-	// Success!
-	return true;
-}
-
-void MotioncorrRunner::getShiftsUnblur(FileName fn_shifts, Micrograph &mic)
-{
-
-	std::ifstream in(fn_shifts.data(), std::ios_base::in);
-	if (in.fail())
-		return;
-
-	std::vector<RFLOAT> xshifts, yshifts;
-	std::string line, token;
-
-	// Start reading the ifstream at the top
-	in.seekg(0);
-
-	// Read throught the shifts file
-	int i = 0;
-	while (getline(in, line, '\n'))
-	{
-		// ignore all commented lines, just read first two lines with data
-		if (line[0] != '#')
-		{
-			if (i>1)
-				REPORT_ERROR("ERROR: reading more than 2 data lines from " + fn_shifts);
-
-			std::vector<std::string> words;
-			tokenize(line, words);
-			for (int j = 0; j < words.size(); j++)
-			{
-				float sh = textToFloat(words[j]);
-				if (i==0)
-					xshifts.push_back(sh);
-				else if (i==1)
-					yshifts.push_back(sh);
-			}
-			i++;
-		}
-	}
-	in.close();
-
-	if (xshifts.size() != yshifts.size())
-		REPORT_ERROR("ERROR: got an unequal number of x and yshifts from " + fn_shifts);
-
-	for (int i = 0, ilim = xshifts.size(); i < ilim; i++) {
-		int frame = i + first_frame_sum; // make 1-indexed
-		// shifts from Unblur are in angstrom not pixel
-		mic.setGlobalShift(frame, xshifts[i] / angpix, yshifts[i] / angpix);
-	}
-	mic.first_frame = first_frame_sum;
-}
-
-// Plot the UNBLUR FRC curve
-void MotioncorrRunner::plotFRC(FileName fn_frc)
-{
-
-	std::ifstream in(fn_frc.data(), std::ios_base::in);
-	if (in.fail())
-		return;
-
-	FileName fn_eps = fn_frc.withoutExtension() + ".eps";
-	CPlot2D *plot2D=new CPlot2D(fn_eps);
- 	plot2D->SetXAxisSize(600);
- 	plot2D->SetYAxisSize(600);
- 	CDataSet dataSet;
-	dataSet.SetDrawMarker(false);
-	dataSet.SetDatasetColor(0.0,0.0,0.0);
-
- 	std::string line, token;
-	// Read through the frc file
-	while (getline(in, line, '\n'))
-	{
-		// ignore all commented lines, just read first two lines with data
-		if (line[0] != '#')
-		{
-			std::vector<std::string> words;
-			tokenize(line, words);
-			if (words.size() < 2)
-			{
-				break;
-			}
-			else
-			{
-				CDataPoint point(textToFloat(words[0]), textToFloat(words[1]));
-			}
-		}
-	}
-	in.close();
-
-	plot2D->SetXAxisTitle("Resolution (1/Angstrom)");
-	plot2D->SetYAxisTitle("FRC");
-	plot2D->OutputPostScriptPlot(fn_eps);
-
-	delete plot2D;
-
-}
-
 // Plot the shifts
 void MotioncorrRunner::plotShifts(FileName fn_mic, Micrograph &mic)
 {
 	const RFLOAT SCALE = 40;
 	RFLOAT shift_scale = SCALE;
-	if (do_unblur) {
-		shift_scale = 1.0 / angpix; // convert from A to pix, no scaling
-	}
 
 	// Global shift
 	FileName fn_eps = fn_out + fn_mic.withoutExtension() + "_shifts.eps";
@@ -963,8 +704,8 @@ void MotioncorrRunner::plotShifts(FileName fn_mic, Micrograph &mic)
 	dataSet.SetDatasetColor(0.0,0.0,1.0);
 	RFLOAT xshift, yshift;
 	// UNBLUR does not provide local trajectories, so start the global trajectory from the origin.
-	const RFLOAT xcenter = (!do_unblur) ? mic.getWidth() / 2.0 : 0;
-	const RFLOAT ycenter = (!do_unblur) ? mic.getHeight() / 2.0 : 0;
+	const RFLOAT xcenter = mic.getWidth() / 2.0;
+	const RFLOAT ycenter = mic.getHeight() / 2.0;
 	for (int j = mic.first_frame, jlim = mic.getNframes(); j <= jlim; j++) // 1-indexed
 	{
 		if (mic.getShiftAt(j, 0, 0, xshift, yshift, false) == 0) {
@@ -1038,8 +779,7 @@ void MotioncorrRunner::saveModel(Micrograph &mic) {
 	mic.pre_exposure = pre_exposure;
 	mic.fnDefect = fn_defect;
 
-	FileName fn_avg, fn_mov;
-	getOutputFileNames(mic.getMovieFilename(), fn_avg, fn_mov);
+	FileName fn_avg = getOutputFileNames(mic.getMovieFilename());
 
 	mic.write(fn_avg.withoutExtension() + ".star");
 }
@@ -1061,8 +801,7 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 	for (long int imic = 0; imic < fn_ori_micrographs.size(); imic++)
 	{
 		// For output STAR file
-		FileName fn_avg, fn_mov;
-		getOutputFileNames(fn_ori_micrographs[imic], fn_avg, fn_mov);
+		FileName fn_avg = getOutputFileNames(fn_ori_micrographs[imic]);
 		if (exists(fn_avg))
 		{
 			MDavg.addObject();
@@ -1185,8 +924,7 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 
 bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	FileName fn_mic = mic.getMovieFilename();
-	FileName fn_avg, fn_mov;
-	getOutputFileNames(fn_mic, fn_avg, fn_mov);
+	FileName fn_avg = getOutputFileNames(fn_mic);
 	FileName fn_avg_noDW = fn_avg.withoutExtension() + "_noDW.mrc";
 	FileName fn_log = fn_avg.withoutExtension() + ".log";
 	FileName fn_ps = fn_avg.withoutExtension() + "_PS.mrc";
