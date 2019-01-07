@@ -2806,7 +2806,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				op.local_Minvsigma2[img_id].zdim,
 				orientation_num,
 				accMLO->dataIs3D,
-				baseMLO->do_sgd,
+				(baseMLO->do_sgd && !baseMLO->do_avoid_sgd),
 				accMLO->classStreams[iclass]);
 
 			CTOC(accMLO->timer,"backproject");

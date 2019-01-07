@@ -316,7 +316,9 @@ public:
 	//////////////// Stochastic gradient descent
 	bool do_sgd;
 
-	// 12Feb2018: new parameters to follow cryoSPARC more closely
+	// Avoid problems with SGD patent in cryoSPARC: don't accumulate gradient, but do minibatch maximisation steps instead
+	bool do_avoid_sgd;
+
 	// Number of initial iterations at low resolution, and without annealing of references
 	int sgd_ini_iter;
 

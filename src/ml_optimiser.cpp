@@ -601,6 +601,9 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	// SGD stuff
 	int sgd_section = parser.addSection("Stochastic Gradient Descent");
 	do_sgd = parser.checkOption("--sgd", "Perform stochastic gradient descent instead of default expectation-maximization");
+	do_avoid_sgd = parser.checkOption("--stochastic_em", "Perform stochastic EM instead of SGD to avoid patent problems for initial model generation by commercial users");
+	// Stochastic EM is implemented as a variant of SGD, though it is really a different algorithm!
+	if (do_avoid_sgd) do_sgd = true;
 	sgd_ini_iter = textToInteger(parser.getOption("--sgd_ini_iter", "Number of initial SGD iterations", "50"));
 	sgd_fin_iter = textToInteger(parser.getOption("--sgd_fin_iter", "Number of final SGD iterations", "50"));
 	sgd_inbetween_iter = textToInteger(parser.getOption("--sgd_inbetween_iter", "Number of SGD iterations between the initial and final ones", "200"));
@@ -843,6 +846,8 @@ void MlOptimiser::read(FileName fn_in, int rank)
 	// New SGD (13Feb2018)
 	if (!MD.getValue(EMDL_OPTIMISER_DO_SGD, do_sgd))
 		do_sgd = false;
+	if (!MD.getValue(EMDL_OPTIMISER_DO_STOCHASTIC_EM, do_avoid_sgd))
+		do_avoid_sgd = false;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_INI_ITER, sgd_ini_iter))
 		sgd_ini_iter = 50;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_FIN_ITER, sgd_fin_iter))
@@ -1019,6 +1024,7 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		MD.setValue(EMDL_OPTIMISER_DO_MAP, do_map);
 		MD.setValue(EMDL_OPTIMISER_FAST_SUBSETS, do_fast_subsets);
 		MD.setValue(EMDL_OPTIMISER_DO_SGD, do_sgd);
+		MD.setValue(EMDL_OPTIMISER_DO_STOCHASTIC_EM, do_avoid_sgd);
 		MD.setValue(EMDL_OPTIMISER_SGD_INI_ITER, sgd_ini_iter);
 		MD.setValue(EMDL_OPTIMISER_SGD_FIN_ITER, sgd_fin_iter);
 		MD.setValue(EMDL_OPTIMISER_SGD_INBETWEEN_ITER, sgd_inbetween_iter);
@@ -2668,7 +2674,8 @@ void MlOptimiser::expectation()
 	{
 		if (do_sgd)
 		{
-			std::cout << " Stochastic Gradient Descent iteration " << iter << " of " << nr_iter;
+			if(do_avoid_sgd) std::cout << " Stochastic Expectation Maximisation iteration " << iter << " of " << nr_iter;
+			else std::cout << " Stochastic Gradient Descent iteration " << iter << " of " << nr_iter;
 		}
 		else
 		{
@@ -3818,40 +3825,27 @@ void MlOptimiser::maximization()
 			if ((wsum_model.BPref[iclass].weight).sum() > XMIPP_EQUAL_ACCURACY)
 			{
 				MultidimArray<RFLOAT> Iref_old;
-				long int total_nr_subsets;
-				RFLOAT total_mu_fraction, number_of_effective_particles, tau2_fudge;
-				if (do_sgd)
-				{
-					Iref_old = mymodel.Iref[iclass];
-					// Still regularise here. tau2 comes from the reconstruction, sum of sigma2 is only over a single subset
-					// Gradually increase tau2_fudge to account for ever increasing number of effective particles in the reconstruction
-					total_mu_fraction = pow (mu, (RFLOAT)iter);
-					number_of_effective_particles = XMIPP_MIN(iter * subset_size, mydata.numberOfParticles());
-					number_of_effective_particles *= (1. - total_mu_fraction);
-					tau2_fudge = number_of_effective_particles * mymodel.tau2_fudge_factor / subset_size;
-				}
-				else
-				{
-					tau2_fudge = mymodel.tau2_fudge_factor;
-				}
+
+				if (do_sgd) Iref_old = mymodel.Iref[iclass];
 
 				(wsum_model.BPref[iclass]).reconstruct(mymodel.Iref[iclass], gridding_nr_iter, do_map,
-								tau2_fudge, mymodel.tau2_class[iclass], mymodel.sigma2_class[iclass],
+								mymodel.tau2_fudge_factor, mymodel.tau2_class[iclass], mymodel.sigma2_class[iclass],
 								mymodel.data_vs_prior_class[iclass], mymodel.fourier_coverage_class[iclass],
 								mymodel.fsc_halves_class[0], wsum_model.pdf_class[iclass], false, false, nr_threads, minres_map, (iclass==0), do_fsc0999);
 
 				if(do_sgd)
 				{
+					// Use stochastic expectation maximisation, instead of SGD.
+					if(do_avoid_sgd) mymodel.Iref[iclass] = mymodel.Iref[iclass] - Iref_old;
+
 					// Now update formula: dV_kl^(n) = (mu) * dV_kl^(n-1) + (1-mu)*step_size*G_kl^(n)
 					// where G_kl^(n) is now in mymodel.Iref[iclass]!!!
 					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.Igrad[iclass])
-						DIRECT_MULTIDIM_ELEM(mymodel.Igrad[iclass], n) = mu * DIRECT_MULTIDIM_ELEM(mymodel.Igrad[iclass], n) + (1. - mu) * sgd_stepsize * DIRECT_MULTIDIM_ELEM(mymodel.Iref[iclass], n);
+						DIRECT_MULTIDIM_ELEM(mymodel.Igrad[iclass], n) = mu * DIRECT_MULTIDIM_ELEM(mymodel.Igrad[iclass], n) +
+						(1. - mu) * sgd_stepsize * DIRECT_MULTIDIM_ELEM(mymodel.Iref[iclass], n);
 
 					// update formula: V_kl^(n+1) = V_kl^(n) + dV_kl^(n)
-					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.Iref[iclass])
-					{
-						DIRECT_MULTIDIM_ELEM(mymodel.Iref[iclass], n) = DIRECT_MULTIDIM_ELEM(Iref_old, n) + DIRECT_MULTIDIM_ELEM(mymodel.Igrad[iclass], n);
-					}
+					mymodel.Iref[iclass] = Iref_old + mymodel.Igrad[iclass];
 
 //#define DEBUG_SGD
 #ifdef DEBUG_SGD
@@ -4062,7 +4056,7 @@ void MlOptimiser::maximizationOtherParameters()
 	{
 		for (int igroup = 0; igroup < mymodel.nr_groups; igroup++)
 		{
-			RFLOAT tsum = mymodel.sigma2_noise[igroup].sum();
+			RFLOAT tsum = wsum_model.sigma2_noise[igroup].sum();
 
 //			if(tsum==0) //if nothing has been done for this group, use previous intr noise2_sigma
 //				wsum_model.sigma2_noise[igroup].data = mymodel.sigma2_noise[igroup].data;
@@ -6958,7 +6952,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 		Fimg_otfshift.resize(Frefctf);
 		Fimg_otfshift_nomask.resize(Frefctf);
 	}
-	if (do_sgd)
+	if (do_sgd && ! do_avoid_sgd)
 	{
 		Fimg_store_sgd.resize(Frefctf);
 	}
@@ -7367,7 +7361,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 #endif
 
 											Complex *Fimg_store;
-											if (do_sgd)
+											if (do_sgd && !do_avoid_sgd)
 											{
 												FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Frefctf)
 												{
