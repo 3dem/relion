@@ -398,8 +398,9 @@ void AutoPicker::initialise()
 				{
 					if (fabs(angpix_header - angpix) > 1e-3)
 					{
-						std::cerr << " WARNING!!! Pixel size in reference image header= " << angpix_header << " but you have not provided --angpix_ref" << std::endl;
+						std::cout << " + Using pixel size in reference image header= " << angpix_header << std::endl;
 					}
+					angpix_ref = angpix_header;
 				}
 				else
 				{
