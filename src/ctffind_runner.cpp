@@ -146,7 +146,7 @@ void CtffindRunner::initialise()
 			REPORT_ERROR("ERROR: You are using --use_noDW, but there is no rlnMicrographNameNoDW label in the input micrograph STAR file.");
 
 		if (use_given_ps && !MDin.containsLabel(EMDL_CTF_POWER_SPECTRUM))
-			REPORT_ERROR("ERROR: You are using --use_given_ps, but there is no rlnCtfImage label in the input micrograph STAR file.");
+			REPORT_ERROR("ERROR: You are using --use_given_ps, but there is no rlnCtfPowerSpectrum label in the input micrograph STAR file.");
 
 		fn_micrographs_all.clear();
 		optics_group_micrographs_all.clear();
@@ -759,7 +759,7 @@ void CtffindRunner::executeCtffind4(long int imic)
 
 	// line 2: diagnostic .ctf image
 	fh << fn_ctf << std::endl;
-	fh << angpix << std::endl;
+	fh << ctf_angpix << std::endl;
 	fh << Voltage << std::endl;
 	fh << Cs << std::endl;
 	fh << AmplitudeConstrast << std::endl;
