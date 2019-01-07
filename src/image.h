@@ -83,7 +83,7 @@ typedef enum
 	Long = 7,         // Signed integer (4 or 8 byte, depending on system)
 	Float = 8,        // Floating point (4-byte)
 	Double = 9,       // Double precision floating point (8-byte)
-	Bool = 10,        // Boolean (1-byte?)
+	Boolean = 10,     // Boolean (1-byte?)
 	UHalf = 11,       // Signed 4-bit integer (SerialEM extension)
 	LastEntry = 15    // This must be the last entry
 } DataType;
@@ -596,7 +596,7 @@ public:
 					// However, the default is MSB2LSB for TIFF.
 					ptrDest[i * 2] = (T)(page[i] & 15); // 1111 = 1+2+4+8 = 15
 					ptrDest[i * 2 + 1] = (T)((page[i] >> 4) & 15);
-				}	
+				}
 				break;
 			}
 		default:
@@ -1174,7 +1174,7 @@ public:
 		case Double:
 			o << "Double precision floating point (8-byte)";
 			break;
-		case Bool:
+		case Boolean:
 			o << "Boolean (1-byte?)";
 			break;
 		case UHalf:

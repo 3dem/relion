@@ -20,11 +20,8 @@
 
 #ifndef MANUALPICKER_H_
 #define MANUALPICKER_H_
-#include "src/metadata_table.h"
-#include "src/args.h"
-#include "src/funcs.h"
-#include "src/filename.h"
-#include "src/gui_entries.h"
+// this define, and the undef below the FL includes, protects against another Complex definition in fltk
+#define Complex tmpComplex
 #include <FL/Fl.H>
 #include <FL/Fl_Shared_Image.H>
 #include <FL/Fl_Double_Window.H>
@@ -37,6 +34,13 @@
 #include <FL/Fl_File_Chooser.H>
 #include <FL/Fl_Float_Input.H>
 #include <FL/Fl_Text_Display.H>
+#undef Complex
+#include "src/metadata_table.h"
+#include "src/args.h"
+#include "src/funcs.h"
+#include "src/filename.h"
+#include "src/gui_entries.h"
+#include "src/jaz/obs_model.h"
 
 #define MWCOL1 300
 #define MWCOL2 60
