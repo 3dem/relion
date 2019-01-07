@@ -90,7 +90,7 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	last_frame_sum =  textToInteger(parser.getOption("--last_frame_sum", "Last movie frame used in output sum (0 or negative: use all)", "-1"));
 
 	int motioncor2_section = parser.addSection("MOTIONCOR2 options");
-	do_motioncor2 = parser.checkOption("--use_motioncor2", "Use Shawn Zheng's MOTIONCOR2 instead of UNBLUR.");
+	do_motioncor2 = parser.checkOption("--use_motioncor2", "Use Shawn Zheng's MOTIONCOR2.");
 	fn_motioncor2_exe = parser.getOption("--motioncor2_exe","Location of MOTIONCOR2 executable (or through RELION_MOTIONCOR2_EXECUTABLE environment variable)","");
 	bin_factor =  textToFloat(parser.getOption("--bin_factor", "Binning factor (can be non-integer)", "1"));
 	bfactor =  textToFloat(parser.getOption("--bfactor", "B-factor (in pix^2) that will be used inside MOTIONCOR2", "150"));
@@ -106,9 +106,9 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread, e.g 0:1:2:3", "");
 
 	int doseweight_section = parser.addSection("Dose-weighting options");
-	do_dose_weighting = parser.checkOption("--dose_weighting", "Use MOTIONCOR2s or UNBLURs dose-weighting scheme");
+	do_dose_weighting = parser.checkOption("--dose_weighting", "Use dose-weighting scheme");
 	angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms", "-1"));
-	voltage = textToFloat(parser.getOption("--voltage","Voltage (in kV) for dose-weighting inside MOTIONCOR2/UNBLUR", "-1"));
+	voltage = textToFloat(parser.getOption("--voltage","Voltage (in kV) for dose-weighting", "-1"));
 	dose_per_frame = textToFloat(parser.getOption("--dose_per_frame", "Electron dose (in electrons/A2/frame) for dose-weighting", "1"));
 	pre_exposure = textToFloat(parser.getOption("--preexposure", "Pre-exposure (in electrons/A2) for dose-weighting", "0"));
 
@@ -209,7 +209,7 @@ void MotioncorrRunner::initialise()
 	}
 #endif
 
-	// Set up which micrograph movies to run MOTIONCOR2 on
+	// Set up which micrograph movies to process 
 	if (fn_in.isStarFile())
 	{
 		MetaDataTable MDin;
@@ -282,7 +282,7 @@ void MotioncorrRunner::initialise()
 		{
 			FileName fn_avg = getOutputFileNames(fn_mic_given_all[imic]);
 			if (exists(fn_avg) && exists(fn_avg.withoutExtension() + ".star") && 
-                            (grouping_for_ps <= 0 || exists(fn_avg.withoutExtension() + "_ps.mrc")))
+                            (grouping_for_ps <= 0 || exists(fn_avg.withoutExtension() + "_PS.mrc")))
 			{
 				process_this = false; // already done
 			}
@@ -451,7 +451,7 @@ void MotioncorrRunner::run()
 		else if (do_motioncor2)
 			result = executeMotioncor2(mic);
 		else
-			REPORT_ERROR("Bug: by now it should be clear whether to use MotionCor2 or Unblur...");
+			REPORT_ERROR("Bug: by now it should be clear whether to use MotionCor2 or own implementation ...");
 
 		if (result) {
 			saveModel(mic);
@@ -703,7 +703,7 @@ void MotioncorrRunner::plotShifts(FileName fn_mic, Micrograph &mic)
 	dataSet.SetDrawMarker(false);
 	dataSet.SetDatasetColor(0.0,0.0,1.0);
 	RFLOAT xshift, yshift;
-	// UNBLUR does not provide local trajectories, so start the global trajectory from the origin.
+
 	const RFLOAT xcenter = mic.getWidth() / 2.0;
 	const RFLOAT ycenter = mic.getHeight() / 2.0;
 	for (int j = mic.first_frame, jlim = mic.getNframes(); j <= jlim; j++) // 1-indexed
@@ -809,6 +809,10 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 			{
 				FileName fn_avg_wodose = fn_avg.withoutExtension() + "_noDW.mrc";
 				MDavg.setValue(EMDL_MICROGRAPH_NAME_WODOSE, fn_avg_wodose);
+			}
+			if (grouping_for_ps > 0)
+			{
+				MDavg.setValue(EMDL_CTF_POWER_SPECTRUM, fn_avg.withoutExtension() + "_PS.mrc");
 			}
 			MDavg.setValue(EMDL_MICROGRAPH_NAME, fn_avg);
 			MDavg.setValue(EMDL_MICROGRAPH_METADATA_NAME, fn_avg.withoutExtension() + ".star");
@@ -1235,6 +1239,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 		RCTOC(TIMING_POWER_SPECTRUM_RESIZE);
 
 		// 4. Write
+		PS_sum.setSamplingRateInHeader(ps_angpix, ps_angpix);
 		PS_sum.write(fn_ps);
 		logfile << "Written the power spectrum for CTF estimation: " << fn_ps << std::endl;
 		logfile << "The pixel size for CTF estimation: " << ps_angpix << std::endl;

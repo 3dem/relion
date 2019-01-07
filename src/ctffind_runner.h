@@ -49,7 +49,7 @@ public:
 	bool do_use_without_doseweighting;
 
 	// Filenames of all the micrographs to estimate the CTF from
-	std::vector<FileName> fn_micrographs, fn_micrographs_widose, fn_micrographs_all, fn_micrographs_widose_all;
+	std::vector<FileName> fn_micrographs, fn_micrographs_ctf, fn_micrographs_all, fn_micrographs_ctf_all;
 
 	// Optics groups for all micrographs
 	std::vector<int> optics_group_micrographs, optics_group_micrographs_all;
@@ -68,6 +68,9 @@ public:
 
 	// Number of OMP threads for CTFFIND4
 	int nr_threads;
+
+	// Use pre-calculated power spectra
+	bool use_given_ps;
 
 	// Calculate Thon rings from movies?
 	bool do_movie_thon_rings;

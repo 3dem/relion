@@ -93,6 +93,7 @@ enum EMDLabel
     EMDL_CTF_CS, ///< Spherical aberration
     EMDL_CTF_CA, ///< Chromatic aberration
     EMDL_CTF_DETECTOR_PIXEL_SIZE, ///< Pixel size for detector as used in CTF-determination (deprecated)
+    EMDL_CTF_POWER_SPECTRUM,
     EMDL_CTF_ENERGY_LOSS, ///< Energy loss
     EMDL_CTF_FOM, ///< ctffind FOM (CC) for quality of CTF-fit
     EMDL_CTF_IMAGE, ///< name of an image describing the CTF model
@@ -559,6 +560,7 @@ private:
         EMDL::addLabel(EMDL_CTF_CS, EMDL_DOUBLE, "rlnSphericalAberration", "Spherical aberration (in millimeters)");
         EMDL::addLabel(EMDL_CTF_CA, EMDL_DOUBLE, "rlnChromaticAberration", "Chromatic aberration (in millimeters)");
         EMDL::addLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE, EMDL_DOUBLE, "rlnDetectorPixelSize", "Pixel size of the detector (in micrometers)");
+	EMDL::addLabel(EMDL_CTF_POWER_SPECTRUM, EMDL_STRING, "rlnCtfPowerSpectrum", "Power spectrum for CTF estimation");
         EMDL::addLabel(EMDL_CTF_ENERGY_LOSS, EMDL_DOUBLE, "rlnEnergyLoss", "Energy loss (in eV)");
         EMDL::addLabel(EMDL_CTF_FOM, EMDL_DOUBLE, "rlnCtfFigureOfMerit", "Figure of merit for the fit of the CTF (not used inside relion_refine)");
         EMDL::addLabel(EMDL_CTF_IMAGE, EMDL_STRING, "rlnCtfImage", "Name of an image with all CTF values");
