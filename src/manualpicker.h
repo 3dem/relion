@@ -78,6 +78,9 @@ public:
 	// MetaDataTable of input micrographs
 	MetaDataTable MDin;
 
+	// Observation model of input micrographs
+	ObservationModel obsModel;
+
 	// Constructor with w x h size of the window and a title
 	manualpickerGuiWindow(int W, int H, const char* title=0): Fl_Window(W, H, title){}
 
@@ -112,6 +115,9 @@ public:
 
 	// The input micrographs
 	MetaDataTable MDin;
+
+	// Observation model for the input mirographs
+	ObservationModel obsModel;
 
 	// Input, picking & output names
 	FileName fn_in, fn_sel;

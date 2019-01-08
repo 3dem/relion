@@ -345,7 +345,8 @@ void manualpickerGuiWindow::readOutputStarfile()
 		for (int imic = 0; imic < selected.size(); imic++)
 			selected[imic] = false;
 		MetaDataTable MDout;
-		MDout.read(fn_sel);
+
+		ObservationModel::loadSafely(fn_sel, obsModel, MDout, "micrographs");
 		FileName fn_mic, fn_mic_in;
 		for (int imic = 0; imic < selected.size(); imic++)
 		{
@@ -400,7 +401,14 @@ void manualpickerGuiWindow::writeOutputStarfile()
 		}
 	}
 
-	MDout.write(fn_sel);
+	if (obsModel.opticsMdt.numberOfObjects() > 0)
+	{
+		obsModel.save(MDout, fn_sel, "micrographs");
+	}
+	else
+	{
+		MDout.write(fn_sel);
+	}
 
 }
 void manualpickerGuiWindow::cb_menubar_save(Fl_Widget* w, void* v)
@@ -560,34 +568,43 @@ void ManualPicker::usage()
 void ManualPicker::initialise()
 {
 
-	if (global_angpix < 0.)
+	if (fn_in.isStarFile())
 	{
-		if (fn_in.isStarFile())
+		ObservationModel::loadSafely(fn_in, obsModel, MDin, "micrographs");
+		if (obsModel.opticsMdt.containsLabel(EMDL_MICROGRAPH_PIXEL_SIZE))
 		{
-			MetaDataTable MDt;
-			MDt.read(fn_in);
-
-			if (MDt.containsLabel(EMDL_CTF_MAGNIFICATION) && MDt.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
-			{
-				RFLOAT mag, dstep;
-				MDt.getValue(EMDL_CTF_MAGNIFICATION, mag);
-				MDt.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
-				global_angpix = 10000. * dstep / mag;
-				std::cout << " Setting angpix to " << global_angpix << " based on the input STAR file... " << std::endl;
-			}
-			else
-			{
-				std::cerr << " WARNING: no --angpix provided and no information about pixel size in input STAR file. Setting angpix to 1..." << std::endl;
-				global_angpix = 1.;
-			}
+			obsModel.opticsMdt.getValue(EMDL_MICROGRAPH_PIXEL_SIZE, global_angpix, 0);
+			std::cout << " Setting angpix to " << global_angpix << " based on the input STAR file... " << std::endl;
 		}
 		else
+		{
+			if (global_angpix < 0.)
+			{
+				REPORT_ERROR("ERROR: the input STAR file does not contain the micrograph pixel size, and it is not given through --angpix.");
+			}
+			std::cout << " Setting angpix to " << global_angpix << " based on command-line input... " << std::endl;
+			FOR_ALL_OBJECTS_IN_METADATA_TABLE(obsModel.opticsMdt)
+			{
+				obsModel.opticsMdt.setValue(EMDL_MICROGRAPH_PIXEL_SIZE, global_angpix);
+			}
+		}
+	}
+	else
+	{
+		std::vector<FileName> glob_fn_mics;
+		fn_in.globFiles(glob_fn_mics);
+		for (int imic = 0; imic < glob_fn_mics.size(); imic++)
+		{
+			MDin.addObject();
+			MDin.setValue(EMDL_MICROGRAPH_NAME, glob_fn_mics[imic]);
+		}
+
+		if (global_angpix < 0.)
 		{
 			std::cerr << " WARNING: no --angpix provided and no information about pixel size in input STAR file. Setting angpix to 1..." << std::endl;
 			global_angpix = 1.;
 		}
 	}
-
 
 	// If we down-scale the micrograph: always low-pass filter to get better displays
 	if (global_micscale < 1.)
@@ -605,25 +622,10 @@ void ManualPicker::run()
 	Fl::scheme("gtk+");
 
 	manualpickerGuiWindow win(TOTALWIDTH, TOTALHEIGHT, "RELION manual-picking GUI");
-	if (fn_in.isStarFile())
-	{
-		// First try reading "micrographs" table from 3.1+-type observationModel STAR files, otherwise as before
-		if (!MDin.read(fn_in, "micrographs")) MDin.read(fn_in);
-
-	}
-	else
-	{
-		std::vector<FileName> glob_fn_mics;
-		fn_in.globFiles(glob_fn_mics);
-		for (int imic = 0; imic < glob_fn_mics.size(); imic++)
-		{
-			MDin.addObject();
-			MDin.setValue(EMDL_MICROGRAPH_NAME, glob_fn_mics[imic]);
-		}
-	}
 
 	// Transfer all parameters to the gui
 	win.MDin = MDin;
+	win.obsModel = obsModel;
 	win.fn_sel = fn_sel;
 	win.do_allow_save = do_allow_save;
 	win.do_fast_save = do_fast_save;
