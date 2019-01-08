@@ -2045,7 +2045,17 @@ void MlOptimiserMpi::maximization()
 						{
 
 							// Use stochastic expectation maximisation, instead of SGD.
-							if(do_avoid_sgd) mymodel.Iref[ith_recons] = mymodel.Iref[ith_recons] - Iref_old;
+							if(do_avoid_sgd)
+							{
+								if (iter < sgd_ini_iter)
+								{
+									FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.Iref[ith_recons])
+									{
+										DIRECT_MULTIDIM_ELEM(mymodel.Iref[ith_recons], n) = XMIPP_MAX(0., DIRECT_MULTIDIM_ELEM(mymodel.Iref[ith_recons], n));
+									}
+								}
+								mymodel.Iref[ith_recons] = mymodel.Iref[ith_recons] - Iref_old;
+							}
 
 							// Now update formula: dV_kl^(n) = (mu) * dV_kl^(n-1) + (1-mu)*step_size*G_kl^(n)
 							// where G_kl^(n) is now in mymodel.Iref[iclass]!!!
@@ -2138,7 +2148,10 @@ void MlOptimiserMpi::maximization()
 						if (!do_join_random_halves)
 						{
 							MultidimArray<RFLOAT> Iref_old;
-							if(do_sgd) Iref_old = mymodel.Iref[ith_recons];
+							if(do_sgd)
+							{
+								Iref_old = mymodel.Iref[ith_recons];
+							}
 
 							(wsum_model.BPref[ith_recons]).reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
 									mymodel.tau2_fudge_factor, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
@@ -2149,7 +2162,17 @@ void MlOptimiserMpi::maximization()
 							if (do_sgd)
 							{
 								// Use stochastic expectation maximisation, instead of SGD.
-								if(do_avoid_sgd) mymodel.Iref[ith_recons] = mymodel.Iref[ith_recons] - Iref_old;
+								if(do_avoid_sgd)
+								{
+									if (iter < sgd_ini_iter)
+									{
+										FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.Iref[ith_recons])
+										{
+											DIRECT_MULTIDIM_ELEM(mymodel.Iref[ith_recons], n) = XMIPP_MAX(0., DIRECT_MULTIDIM_ELEM(mymodel.Iref[ith_recons], n));
+										}
+									}
+									mymodel.Iref[ith_recons] = mymodel.Iref[ith_recons] - Iref_old;
+								}
 
 								// Now update formula: dV_kl^(n) = (mu) * dV_kl^(n-1) + (1-mu)*step_size*G_kl^(n)
 								// where G_kl^(n) is now in mymodel.Iref[iclass]!!!

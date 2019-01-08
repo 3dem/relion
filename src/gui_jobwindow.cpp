@@ -1370,6 +1370,12 @@ void JobWindow::initialiseInimodelWindow()
 
 	place("sgd_sigma2fudge_halflife", TOGGLE_DEACTIVATE);
 
+	// Add a little spacer
+	current_y += STEPY/2;
+
+	place("sem_instead_of_sgd", TOGGLE_DEACTIVATE);
+
+
 	tab4->end();
 
 	tab5->begin();

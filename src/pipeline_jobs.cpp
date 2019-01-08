@@ -2638,9 +2638,12 @@ together with the mini-batch or subset size. In case of a multi-class refinement
 
 	joboptions["sgd_write_iter"] = JobOption("Write-out frequency (iter):", 10, 1, 50, 1, "Every how many iterations do you want to write the model to disk?");
 
-	joboptions["sgd_sigma2fudge_halflife"] = JobOption("SGD increased noise variance half-life:", -1, -100, 10000, 100, "When set to a positive value, the initial estimates of the noise variance will internally be multiplied by 8, and then be gradually reduced, \
+	joboptions["sgd_sigma2fudge_halflife"] = JobOption("Increased noise variance half-life:", -1, -100, 10000, 100, "When set to a positive value, the initial estimates of the noise variance will internally be multiplied by 8, and then be gradually reduced, \
 having 50% after this many particles have been processed. By default, this option is switched off by setting this value to a negative number. \
 In some difficult cases, switching this option on helps. In such cases, values around 1000 have been found to be useful. Change the factor of eight with the additional argument --sgd_sigma2fudge_ini");
+
+	joboptions["sem_instead_of_sgd"] = JobOption("Perform SEM instead of SGD?", false, "When set to Yes, a stochastic expectation maximisation algorithm is used instead of the default stochastic gradient descent. This avoids problems with a (pending) patent on the use of SGD for initial model generation by the cryoSPARC team. Academic users can use the SGD version of the algorithm without any problem, but commercial users \
+(in the US and Canada?) may need to use the SEM version. \n\n One needs to use bigger mini-batch sizes for SEM, e.g. increasing from 1000 to 5000.");
 
 	joboptions["nr_classes"] = JobOption("Number of classes:", 1, 1, 50, 1, "The number of classes (K) for a multi-reference ab initio SGD refinement. \
 These classes will be made in an unsupervised manner, starting from a single reference in the initial iterations of the SGD, and the references will become increasingly dissimilar during the inbetween iterations.");
@@ -2757,6 +2760,11 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 	if (!is_continue)
 	{
 		command += " --sgd ";
+
+		if (joboptions["sem_instead_of_sgd"].getBoolean())
+		{
+			command += " --stochastic_em ";
+		}
 
 		if (joboptions["fn_img"].getString() == "")
 		{

@@ -3836,7 +3836,17 @@ void MlOptimiser::maximization()
 				if(do_sgd)
 				{
 					// Use stochastic expectation maximisation, instead of SGD.
-					if(do_avoid_sgd) mymodel.Iref[iclass] = mymodel.Iref[iclass] - Iref_old;
+					if(do_avoid_sgd)
+					{
+						if (iter < sgd_ini_iter)
+						{
+							FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.Iref[iclass])
+							{
+								DIRECT_MULTIDIM_ELEM(mymodel.Iref[iclass], n) = XMIPP_MAX(0., DIRECT_MULTIDIM_ELEM(mymodel.Iref[iclass], n));
+							}
+						}
+						mymodel.Iref[iclass] = mymodel.Iref[iclass] - Iref_old;
+					}
 
 					// Now update formula: dV_kl^(n) = (mu) * dV_kl^(n-1) + (1-mu)*step_size*G_kl^(n)
 					// where G_kl^(n) is now in mymodel.Iref[iclass]!!!
@@ -4057,9 +4067,6 @@ void MlOptimiser::maximizationOtherParameters()
 		for (int igroup = 0; igroup < mymodel.nr_groups; igroup++)
 		{
 			RFLOAT tsum = wsum_model.sigma2_noise[igroup].sum();
-
-//			if(tsum==0) //if nothing has been done for this group, use previous intr noise2_sigma
-//				wsum_model.sigma2_noise[igroup].data = mymodel.sigma2_noise[igroup].data;
 			if(tsum!=0)
 			{
 				// Factor 2 because of the 2-dimensionality of the complex-plane
