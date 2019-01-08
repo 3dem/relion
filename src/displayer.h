@@ -21,16 +21,8 @@
 #ifndef DISPLAYER_H_
 #define DISPLAYER_H_
 
-#include "src/image.h"
-#include "src/metadata_label.h"
-#include "src/metadata_table.h"
-#include "src/jaz/obs_model.h"
-#include <src/matrix2d.h>
-#include <src/fftw.h>
-#include <src/time.h>
-#include <src/args.h>
-
-
+// this define, and the undef below the FL includes, protects against another Complex definition in fltk
+#define Complex tmpComplex
 #include <FL/Fl.H>
 #include <FL/Fl_Shared_Image.H>
 #include <FL/Fl_Double_Window.H>
@@ -43,6 +35,17 @@
 #include <FL/Fl_File_Chooser.H>
 #include <FL/Fl_Float_Input.H>
 #include <FL/Fl_Text_Display.H>
+#undef Complex
+
+#include "src/image.h"
+#include "src/metadata_label.h"
+#include "src/metadata_table.h"
+#include "src/jaz/obs_model.h"
+#include <src/matrix2d.h>
+#include <src/fftw.h>
+#include <src/time.h>
+#include <src/args.h>
+
 
 #define GUI_BACKGROUND_COLOR (fl_rgb_color(240,240,240))
 #define GUI_INPUT_COLOR (fl_rgb_color(255,255,230))
@@ -214,7 +217,7 @@ public:
 	// Constructor with w x h size of the window and a title
 	basisViewerWindow(int W, int H, const char* title=0): Fl_Window(W, H, title){}
 
-	int fillCanvas(int viewer_type, MetaDataTable &MDin, MetaDataTable *MDopt, EMDLabel display_label, EMDLabel text_label, bool _do_read_whole_stacks, bool _do_apply_orient,
+	int fillCanvas(int viewer_type, MetaDataTable &MDin, ObservationModel *obsModel, EMDLabel display_label, EMDLabel text_label, bool _do_read_whole_stacks, bool _do_apply_orient,
 			RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast,
 			RFLOAT _scale, RFLOAT _ori_scale, int _ncol, long int max_nr_images = -1, RFLOAT lowpass = -1.0 , RFLOAT highpass = -1.0,
 			bool do_class = false, MetaDataTable *MDdata = NULL,
@@ -258,7 +261,7 @@ public:
 
 	void SetScroll(Fl_Scroll *val) { scroll = val; }
 
-	int fill(MetaDataTable &MDin, MetaDataTable *MDopt, EMDLabel display_label, EMDLabel text_label, bool _do_apply_orient, RFLOAT _minval, RFLOAT _maxval,
+	int fill(MetaDataTable &MDin, ObservationModel *obsModel, EMDLabel display_label, EMDLabel text_label, bool _do_apply_orient, RFLOAT _minval, RFLOAT _maxval,
 			RFLOAT _sigma_contrast, RFLOAT _scale, int _ncol, bool do_recenter = false, long int max_images = -1,
 			RFLOAT lowpass = -1.0, RFLOAT highpass = -1.0);
 	int fill(MultidimArray<RFLOAT> &image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale = 1.);
@@ -304,7 +307,7 @@ public:
 	MetaDataTable *MDdata;
 
 	// pointer to the MetaDataTable for the optics groups
-	MetaDataTable *MDopt;
+	ObservationModel *obsModel;
 
 	// pointer to the MetaDataTable for the groups when do_class and do_regroup (the data.star file)
 	MetaDataTable *MDgroups;
@@ -676,14 +679,14 @@ public:
 	// data.star metadata (for do_class)
 	MetaDataTable MDdata;
 
+	// Observation model
+	ObservationModel obsModel;
+
 	// model_groups  metadata (for do_class and regrouping)
 	MetaDataTable MDgroups;
 
 	// Input metadata
 	MetaDataTable MDin;
-
-	// Optics group metadata
-	MetaDataTable MDopt;
 
 	// For the multiviewer
 	std::vector<DisplayBox*> boxes;
