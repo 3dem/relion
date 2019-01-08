@@ -595,7 +595,15 @@ bool RelionJob::prepareFinalCommand(std::string &outputname, std::vector<std::st
 			if (nr_mpi > 1 &&
 					(commands[icom]).find("_mpi`") != std::string::npos &&
 					(commands[icom]).find("relion_") != std::string::npos)
-				one_command = "mpirun -n " + floatToString(nr_mpi) + " " + commands[icom] ;
+			{
+				
+				const char *default_mpirun = getenv("RELION_MPIRUN");
+				if (default_mpirun == NULL)
+				{
+					default_mpirun = DEFAULTMPIRUN;
+				}
+				one_command = std::string(default_mpirun) + " -n " + floatToString(nr_mpi) + " " + commands[icom] ;
+			}
 			else
 				one_command = commands[icom];
 
@@ -787,7 +795,7 @@ the job will be executed locally. Note that only MPI jobs may be sent to a queue
 	joboptions["queuename"] = JobOption("Queue name: ", std::string(default_queue), "Name of the queue to which to submit the job. The default name can be set through the environment variable RELION_QUEUE_NAME.");
 
 	// Check for environment variable RELION_QSUB_COMMAND
-	const char * default_command = getenv ("RELION_QSUB_COMMAND");
+	const char * default_command = getenv("RELION_QSUB_COMMAND");
 	if (default_command==NULL)
 	{
 		default_command = DEFAULTQSUBCOMMAND;
