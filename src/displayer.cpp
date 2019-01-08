@@ -743,15 +743,15 @@ int multiViewerCanvas::handle(int ev)
 						{ "Show helical layer line profile" },
 						{ "Show particles from selected classes" },
 						{ "Set selection type" },
-						{ "Save selected classes" },
+						{ "Save selected classes" }, // idx = 14; change below when re-ordered!!
 						{ "Quit" },
 						{ 0 }
 					};
 
 					if (!do_allow_save)
-				    {
-						rclick_menu[13].deactivate();
-				    }
+					{
+						rclick_menu[14].deactivate();
+					}
 
 				    const Fl_Menu_Item *m = rclick_menu->popup(Fl::event_x(), Fl::event_y(), 0, 0, 0);
 					if ( !m )
@@ -811,14 +811,14 @@ int multiViewerCanvas::handle(int ev)
 						{ "Show helical layer line profile" },
 						{ "Set selection type" },
 						{ "Show metadata" },
-						{ "Save STAR with selected images" },
+						{ "Save STAR with selected images" }, // idx = 15; change below when re-ordered!!
 						{ "Quit" },
 						{ 0 }
 					};
 					if (!do_allow_save)
-				    {
-						rclick_menu[14].deactivate();
-				    }
+					{
+						rclick_menu[15].deactivate();
+					}
 
 					const Fl_Menu_Item *m = rclick_menu->popup(Fl::event_x(), Fl::event_y(), 0, 0, 0);
 					if ( !m )
