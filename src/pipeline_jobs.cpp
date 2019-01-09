@@ -4005,10 +4005,13 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 
 			// Add output node: selected particles star file
 			FileName fnt = outputname + "analyse_eval"+integerToString(joboptions["select_eigenval"].getNumber(),3)+"_select";
-			if (joboptions["eigenval_min"].getNumber() > -99998)
-				fnt += "_min"+integerToString(joboptions["eigenval_min"].getNumber());
-			if (joboptions["eigenval_max"].getNumber() < 99998)
-				fnt += "_max"+integerToString(joboptions["eigenval_max"].getNumber());
+			int min = ROUND(joboptions["eigenval_min"].getNumber());
+			int max = ROUND(joboptions["eigenval_max"].getNumber());
+
+			if (min > -99998)
+				fnt += "_min"+integerToString(min);
+			if (max < 99998)
+				fnt += "_max"+integerToString(max);
 			fnt += ".star";
 			Node node2(fnt, NODE_PART_DATA);
 			outputNodes.push_back(node2);
