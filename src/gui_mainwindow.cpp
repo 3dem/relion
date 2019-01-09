@@ -20,11 +20,10 @@
 
 
 #include "src/gui_mainwindow.h"
+#include "src/gui_background.xpm"
 
 #define STR_HELPER(x) #x
 #define STR(x) STR_HELPER(x)
-#define INSTD_BG 	STR(INSTALL_LIBRARY_DIR) "gui_background.xpm"
-#define SRCD_BG 	STR(SOURCE_DIR) "gui_background.xpm"
 
 // The StdOutDisplay allows looking at the entire stdout or stderr file
 int StdOutDisplay::handle(int ev)
@@ -295,22 +294,12 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	// TODO: control file location and use better figure
 	background_grp = new Fl_Group(WCOL0-10, 0 ,w-WCOL0, h-55);
 
-    // First look for image in the binary install directory,
-    // then in the source tree.
-
-    FileName fn_bg = std::string(INSTD_BG);
-
-    if(!exists(fn_bg))
-        fn_bg = std::string(SRCD_BG);
-
-	if (exists(fn_bg))
-	{
-		// Initial screen picture with some explanation on how to use the GUI
-            //image_box = new Fl_Box(WCOL0-8, 0 ,w-WCOL0, h-35); // widget that will contain image
-		image_box = new Fl_Box(WCOL0-8, 50 ,w-WCOL0, h-120); // widget that will contain image
-		xpm_image = new Fl_XPM_Image(fn_bg.c_str());
-		image_box->image(xpm_image); // attach xpm image to box
-	 }
+	// Initial screen picture with some explanation on how to use the GUI
+        //image_box = new Fl_Box(WCOL0-8, 0 ,w-WCOL0, h-35); // widget that will contain image
+	image_box = new Fl_Box(WCOL0-8, 50 ,w-WCOL0, h-120); // widget that will contain image
+	xpm_image = new Fl_Pixmap(gui_background);
+	image_box->image(xpm_image); // attach xpm image to box
+	
 	background_grp->end();
 
     if (!maingui_do_old_style)
