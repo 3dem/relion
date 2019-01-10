@@ -27,7 +27,7 @@ int main(int argc, char *argv[])
 	AutoPicker prm;
 
 	try
-    {
+	{
 		prm.read(argc, argv);
 
 		prm.initialise();
@@ -54,17 +54,15 @@ int main(int argc, char *argv[])
 		std::cout << "timings:" << std::endl;
 		prm.timer.printTimes(false);
 #endif
-    }
+	}
+	catch (RelionError XE)
+	{
+		//prm.usage();
+		std::cerr << XE;
 
-    catch (RelionError XE)
-    {
-        //prm.usage();
-        std::cerr << XE;
+		return EXIT_FAILURE;
+	}
 
-        return EXIT_FAILURE;
-    }
-
-    return EXIT_SUCCESS;
-
+	return EXIT_SUCCESS;
 }
 

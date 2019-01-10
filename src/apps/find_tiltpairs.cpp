@@ -33,7 +33,7 @@ public:
 	MetaDataTable MDunt, MDtil;
 	RFLOAT tilt, tilt0, tiltF, tiltStep;
 	RFLOAT rot, rot0, rotF, rotStep;
-        int size, dim;
+	int size, dim;
 	int x0, xF, xStep;
 	int y0, yF, yStep;
 	RFLOAT acc;
@@ -53,7 +53,6 @@ public:
 
 	void read(int argc, char **argv)
 	{
-
 		parser.setCommandLine(argc, argv);
 
 		int general_section = parser.addSection("General Options");
@@ -85,9 +84,9 @@ public:
 		yF = textToInteger(parser.getOption("--yF", "Maximum Y offset (pixels)","99999"));
 		yStep = textToInteger(parser.getOption("--yStep", "Y offset step size (pixels)","-1"));
 
-       	// Check for errors in the command-line option
-    	if (parser.checkForErrors())
-    		REPORT_ERROR("Errors encountered on the command line, exiting...");
+		// Check for errors in the command-line option
+		if (parser.checkForErrors())
+			REPORT_ERROR("Errors encountered on the command line, exiting...");
 
 		// If tilt and rot were given: do not search those
 		if (tilt != 99999.)
@@ -148,12 +147,10 @@ public:
 		// Initialize best transformation params
 		best_x = best_y = 9999;
 		best_rot = best_tilt = 9999.;
-
 	}
 
 	int getNumberOfPairs(int dx=0, int dy=0)
 	{
-
 		pairs_t2u.clear();
 		pairs_t2u.resize(p_til.size()/2, -1);
 		int result = 0;
@@ -179,13 +176,10 @@ public:
 			}
 		}
 		return result;
-
 	}
 
 	RFLOAT getAverageDistance(int dx=0, int dy=0)
 	{
-
-
 		std::ofstream  fh;
 		FileName fn_map;
 		fn_map = "dist.txt";
@@ -216,7 +210,6 @@ public:
 
 	int prunePairs(int dx=0, int dy=0)
 	{
-
 		int nprune = 0;
 		// Prune for RFLOAT pairs
 		for (int t = 0; t < pairs_t2u.size(); t++)
@@ -306,16 +299,16 @@ public:
 						else
 							score = -getAverageDistance(x, y); // negative because smaller distance is better!
 
-                                                bool is_best = false;
-                                                if (do_optimise_nr_pairs && score==best_score)
-                                                {
-                                                    RFLOAT dist = getAverageDistance(x, y);
-                                                    if (dist < best_dist)
-                                                    {
-                                                        best_dist = dist;
-                                                        is_best = true;
-                                                    }
-                                                }
+						bool is_best = false;
+						if (do_optimise_nr_pairs && score==best_score)
+						{
+							RFLOAT dist = getAverageDistance(x, y);
+							if (dist < best_dist)
+							{
+								best_dist = dist;
+								is_best = true;
+							}
+						}
 						if (score > best_score || is_best)
 						{
 							best_score = score;
@@ -348,16 +341,16 @@ public:
 	{
 		// Get coordinates of all pairs:
 		Matrix2D<RFLOAT> Au, Bt;
-	    Au.initZeros(3, 3);
-	    Bt.initZeros(3, 3);
-	    Pass.initZeros(4,4);
+		Au.initZeros(3, 3);
+		Bt.initZeros(3, 3);
+		Pass.initZeros(4,4);
 
-	    // Add all pairs to dependent matrices (adapted from add_point in Xmipps micrograph_mark main_widget_mark.cpp)
+		// Add all pairs to dependent matrices (adapted from add_point in Xmipps micrograph_mark main_widget_mark.cpp)
 		for (int t = 0; t < pairs_t2u.size(); t++)
 		{
 			int u = pairs_t2u[t];
 			if (u >= 0)
-	        {
+			{
 				Au(0, 0) += (RFLOAT)(p_unt[2*u] * p_unt[2*u]);
 				Au(0, 1) += (RFLOAT)(p_unt[2*u] * p_unt[2*u+1]);
 				Au(0, 2) += (RFLOAT)(p_unt[2*u]);
@@ -377,22 +370,22 @@ public:
 				Bt(2, 0) += (RFLOAT)(p_til[2*t]);
 				Bt(2, 1) += (RFLOAT)(p_til[2*t+1]);
 				Bt(2,2) += 1.;
-	        }
-	    }
+			}
+		}
 
-	    // Solve equations
-	    solve(Au, Bt, Pass);
-	    Pass = Pass.transpose();
-	    std::cout << " Optimised passing matrix= " << Pass << std::endl;
-	    //These values can be complete CRAP. Better not show them at all....
-	    //RFLOAT rotp, tiltp, psip;
-	    //tiltp = acos(Pass(1,1));
-	    //rotp = acos(Pass(1,0)/sin(tiltp));
-	    //psip = acos(Pass(0,1)/-sin(tiltp));
-	    //std::cout << " Optimised tilt angle= " << RAD2DEG(tiltp) << std::endl;
-	    //std::cout << " Optimised in-plane rot angles= " << RAD2DEG(rotp) <<" and "<< RAD2DEG(psip) << std::endl;
-	    // Map using the new matrix
-	    mapOntoTilt();
+		// Solve equations
+		solve(Au, Bt, Pass);
+		Pass = Pass.transpose();
+		std::cout << " Optimised passing matrix= " << Pass << std::endl;
+		//These values can be complete CRAP. Better not show them at all....
+		//RFLOAT rotp, tiltp, psip;
+		//tiltp = acos(Pass(1,1));
+		//rotp = acos(Pass(1,0)/sin(tiltp));
+		//psip = acos(Pass(0,1)/-sin(tiltp));
+		//std::cout << " Optimised tilt angle= " << RAD2DEG(tiltp) << std::endl;
+		//std::cout << " Optimised in-plane rot angles= " << RAD2DEG(rotp) <<" and "<< RAD2DEG(psip) << std::endl;
+		// Map using the new matrix
+		mapOntoTilt();
 
 	}
 
@@ -408,9 +401,9 @@ public:
 		// Calculate average distance between the pairs
 		RFLOAT avgdist = getAverageDistance(best_x, best_y);
 		std::cout << " Before optimization of the passing matrix: "<<std::endl;
-		std::cout << "  - Number of pruned pairs= "<<nprune<<std::endl;
-		std::cout << "  - best_rot= " << best_rot << " best_tilt= " << best_tilt << " best_x= " << best_x << " best_y= " << best_y << std::endl;
-		std::cout << "  - Number of particle pairs= " << npart << " average distance= " <<avgdist<<std::endl;
+		std::cout << "	- Number of pruned pairs= "<<nprune<<std::endl;
+		std::cout << "	- best_rot= " << best_rot << " best_tilt= " << best_tilt << " best_x= " << best_x << " best_y= " << best_y << std::endl;
+		std::cout << "	- Number of particle pairs= " << npart << " average distance= " <<avgdist<<std::endl;
 
 #define WRITE_MAPPED
 #ifdef WRITE_MAPPED
@@ -420,7 +413,7 @@ public:
 		fh.open(fn_map.c_str(), std::ios::out);
 		for (int i = 0; i < p_map.size()/2; i++)
 		{
-                    fh << p_map[2*i] + best_x -dim/2<< " " << p_map[2*i+1] + best_y -dim/2<< " "<<dim<<" "<<dim<<" -3"<<std::endl;
+			fh << p_map[2*i] + best_x -dim/2<< " " << p_map[2*i+1] + best_y -dim/2<< " "<<dim<<" "<<dim<<" -3"<<std::endl;
 			//if (pairs[i]>=0)
 			//	std::cerr << " i= " << i << " pairs[i]= " << pairs[i] << std::endl;
 		}
@@ -434,8 +427,8 @@ public:
 			nprune = prunePairs();
 			avgdist = getAverageDistance();
 			std::cout << " After optimization of the passing matrix: "<<std::endl;
-			std::cout << "  - Number of pruned pairs= "<<nprune<<std::endl;
-			std::cout << "  - Final number of particle pairs= " << npart << " average distance= " <<avgdist<<std::endl;
+			std::cout << "	- Number of pruned pairs= "<<nprune<<std::endl;
+			std::cout << "	- Final number of particle pairs= " << npart << " average distance= " <<avgdist<<std::endl;
 
 		}
 
@@ -444,7 +437,7 @@ public:
 		fh.open(fn_map.c_str(), std::ios::out);
 		for (int i = 0; i < p_map.size()/2; i++)
 		{
-                    fh << p_map[2*i] -dim/2<< " " << p_map[2*i+1] -dim/2<<" "<<dim<<" "<<dim<<" -3"<< std::endl;
+			fh << p_map[2*i] -dim/2<< " " << p_map[2*i+1] -dim/2<<" "<<dim<<" "<<dim<<" -3"<< std::endl;
 		}
 		fh.close();
 #endif
@@ -482,22 +475,17 @@ int main(int argc, char *argv[])
 	angular_error_parameters prm;
 
 	try
-    {
+	{
 		prm.read(argc, argv);
-
 		prm.run();
+	}
+	catch (RelionError XE)
+	{
+		std::cerr << XE;
+		exit(1);
+	}
 
-    }
-
-    catch (RelionError XE)
-    {
-        std::cerr << XE;
-        //prm.usage();
-        exit(1);
-    }
-
-    return 0;
-
+	return 0;
 }
 
 

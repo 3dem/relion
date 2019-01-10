@@ -23,32 +23,32 @@
 
 int main(int argc, char *argv[])
 {
-    FlexAnalyser prm;
+	FlexAnalyser prm;
 
-    int rank, size;
+	int rank, size;
 
-    MPI_Init(&argc, &argv);
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
-    // Handle errors
-    MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
+	MPI_Init(&argc, &argv);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	MPI_Comm_size(MPI_COMM_WORLD, &size);
+	// Handle errors
+	MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
 
-    try
-    {
-        prm.read(argc, argv);
-        // Don't put any output to screen for mpi slaves
-        prm.verb = (rank == 0) ? 1 : 0;
+	try
+	{
+		prm.read(argc, argv);
+		// Don't put any output to screen for mpi slaves
+		prm.verb = (rank == 0) ? 1 : 0;
 
-       	prm.initialise();
-       	prm.run(rank, size);
+		prm.initialise();
+		prm.run(rank, size);
 
-    }
+	}
 
-    catch (RelionError XE)
-    {
-        std::cerr << XE;
-        exit(1);
-    }
+	catch (RelionError XE)
+	{
+		std::cerr << XE;
+		exit(1);
+	}
 
-    return 0;
+	return 0;
 }

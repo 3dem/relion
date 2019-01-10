@@ -25,24 +25,19 @@ int main(int argc, char *argv[])
 	ParticlePolisher prm;
 
 	try
-    {
+	{
 		prm.read(argc, argv);
-
 		prm.generateMicrographList();
-
 		prm.initialise();
-
 		prm.run();
-    }
+	}
+	catch (RelionError XE)
+	{
+		//prm.usage();
+		std::cerr << XE;
+		exit(1);
+	}
 
-    catch (RelionError XE)
-    {
-        //prm.usage();
-        std::cerr << XE;
-        exit(1);
-    }
-
-    return 0;
-
+	return 0;
 }
 

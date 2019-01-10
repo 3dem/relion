@@ -27,7 +27,7 @@ int main(int argc, char *argv[])
 	AutoPickerMpi prm;
 
 	try
-    {
+	{
 		prm.read(argc, argv);
 
 		prm.initialise();
@@ -50,19 +50,18 @@ int main(int argc, char *argv[])
 
 		if (prm.getRank() == 0)
 			prm.generatePDFLogfile();
-    }
+	}
 
-    catch (RelionError XE)
-    {
-    	if (prm.verb > 0)
-    		//prm.usage();
-        std::cerr << XE;
-        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+	catch (RelionError XE)
+	{
+		if (prm.verb > 0)
+    			//prm.usage();
+		std::cerr << XE;
+		MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
 
-        return EXIT_FAILURE;
-    }
+		return EXIT_FAILURE;
+	}
 
-    return EXIT_SUCCESS;
-
+	return EXIT_SUCCESS;
 }
 

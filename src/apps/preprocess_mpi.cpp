@@ -25,23 +25,20 @@ int main(int argc, char *argv[])
 	PreprocessingMpi prm;
 
 	try
-    {
+	{
 		prm.read(argc, argv);
-
 		prm.initialise();
-
 		prm.run();
-    }
+	}
 
-    catch (RelionError XE)
-    {
-        //prm.usage();
-        std::cerr << XE;
-        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
-    }
+	catch (RelionError XE)
+	{
+	        //prm.usage();
+	        std::cerr << XE;
+	        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+	}
 
-    return 0;
-
+	return 0;
 }
 
 
