@@ -66,6 +66,7 @@
 #define DEFAULTMPIMAX 64
 #define DEFAULTNRTHREADS 1
 #define DEFAULTTHREADMAX 16
+#define DEFAULTMPIRUN "mpirun"
 
 // !!! IMPORTANT !!!
 // When you change the number of items here, you must update GuiEntry::initialise()

@@ -592,7 +592,15 @@ bool RelionJob::prepareFinalCommand(std::string &outputname, std::vector<std::st
 			if (nr_mpi > 1 &&
 					(commands[icom]).find("_mpi`") != std::string::npos &&
 					(commands[icom]).find("relion_") != std::string::npos)
-				one_command = "mpirun -n " + floatToString(nr_mpi) + " " + commands[icom] ;
+			{
+				
+				const char *default_mpirun = getenv("RELION_MPIRUN");
+				if (default_mpirun == NULL)
+				{
+					default_mpirun = DEFAULTMPIRUN;
+				}
+				one_command = std::string(default_mpirun) + " -n " + floatToString(nr_mpi) + " " + commands[icom] ;
+			}
 			else
 				one_command = commands[icom];
 
@@ -778,7 +786,7 @@ the job will be executed locally. Note that only MPI jobs may be sent to a queue
 	joboptions["queuename"] = JobOption("Queue name: ", std::string(default_queue), "Name of the queue to which to submit the job. The default name can be set through the environment variable RELION_QUEUE_NAME.");
 
 	// Check for environment variable RELION_QSUB_COMMAND
-	const char * default_command = getenv ("RELION_QSUB_COMMAND");
+	const char * default_command = getenv("RELION_QSUB_COMMAND");
 	if (default_command==NULL)
 	{
 		default_command = DEFAULTQSUBCOMMAND;
@@ -3898,10 +3906,13 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 
 			// Add output node: selected particles star file
 			FileName fnt = outputname + "analyse_eval"+integerToString(joboptions["select_eigenval"].getNumber(),3)+"_select";
-			if (joboptions["eigenval_min"].getNumber() > -99998)
-				fnt += "_min"+integerToString(joboptions["eigenval_min"].getNumber());
-			if (joboptions["eigenval_max"].getNumber() < 99998)
-				fnt += "_max"+integerToString(joboptions["eigenval_max"].getNumber());
+			int min = ROUND(joboptions["eigenval_min"].getNumber());
+			int max = ROUND(joboptions["eigenval_max"].getNumber());
+
+			if (min > -99998)
+				fnt += "_min"+integerToString(min);
+			if (max < 99998)
+				fnt += "_max"+integerToString(max);
 			fnt += ".star";
 			Node node2(fnt, NODE_PART_DATA);
 			outputNodes.push_back(node2);

@@ -23,33 +23,26 @@
 int main(int argc, char **argv)
 {
 	MlOptimiserMpi optimiser;
-    try
-    {
 
-    	// Read in parameters from the command line
-    	optimiser.read(argc, argv);
+	try
+	{
+		// Read in parameters from the command line
+		optimiser.read(argc, argv);
 
-    	// Set things up
-    	optimiser.initialise();
+		// Set things up
+		optimiser.initialise();
 
-    	// Iterate
-    	optimiser.iterate();
+		// Iterate
+    		optimiser.iterate();
+	}
+	catch (RelionError XE)
+	{
+		std::cerr << XE;
+		MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
 
-    }
-    catch (RelionError XE)
-    {
-//        if (optimiser.verb > 0)
-//        {
-//        	optimiser.usage();
-//        }
-    	std::cerr << XE;
-        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+		return EXIT_FAILURE;
+	}
 
-        return EXIT_FAILURE;
-
-    }
-
-    return EXIT_SUCCESS;
-
+	return EXIT_SUCCESS;
 }
 

@@ -73,7 +73,6 @@ public:
 		// Check for errors in the command-line option
 		if (parser.checkForErrors())
 			REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
-
 	}
 
 	void run()
@@ -102,9 +101,7 @@ public:
 		{
 			pipeline.runScheduledJobs(fn_sched, fn_jobids, nr_repeat, minutes_wait, minutes_wait_before, seconds_wait_after);
 		}
-
 	}
-
 };
 
 int main(int argc, char *argv[])
@@ -114,11 +111,8 @@ int main(int argc, char *argv[])
 
 	try
 	{
-
 		prm.read(argc, argv);
-
 		prm.run();
-
 	}
 	catch (RelionError XE)
 	{
@@ -126,5 +120,4 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 	return 0;
-
-  }
+}

@@ -353,8 +353,6 @@ install( DIRECTORY ${CMAKE_BINARY_DIR}/bin
          USE_SOURCE_PERMISSIONS
          FILES_MATCHING PATTERN "*")
 
-install(FILES ${CMAKE_SOURCE_DIR}/src/gui_background.xpm DESTINATION lib)
-
 # install fltk if we built our own version
 if(INSTALL_OWN_FLTK)
     install(DIRECTORY external/fltk/lib/ DESTINATION lib FILES_MATCHING PATTERN "*")

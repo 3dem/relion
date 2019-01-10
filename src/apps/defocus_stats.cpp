@@ -7,17 +7,17 @@ using namespace gravis;
 
 int main(int argc, char *argv[])
 {
-    IOParser parser;
-    std::string starFn;
+	IOParser parser;
+	std::string starFn;
 
-    parser.setCommandLine(argc, argv);
-    parser.addSection("General options");
-    starFn = parser.getOption("--i", "Input STAR file with a list of particles");
+	parser.setCommandLine(argc, argv);
+	parser.addSection("General options");
+	starFn = parser.getOption("--i", "Input STAR file with a list of particles");
 	
 	if (parser.checkForErrors()) return 1;
 
-    MetaDataTable mdt0;
-    mdt0.read(starFn);
+	MetaDataTable mdt0;
+	mdt0.read(starFn);
 	
 	double mu(0.0), var(0.0);
 	

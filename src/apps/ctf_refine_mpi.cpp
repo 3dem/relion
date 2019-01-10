@@ -26,28 +26,21 @@ int main(int argc, char *argv[])
 	CtfRefinerMpi prm;
 
 	try
-    {
+	{
 		prm.read(argc, argv);
-
 		prm.init();
 
 		MPI_Barrier(MPI_COMM_WORLD);
-
 		prm.run();
-    }
+	}
+	catch (RelionError XE)
+	{
+		//prm.usage();
+		std::cerr << XE;
+	
+		MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+	}
 
-    catch (RelionError XE)
-    {
-    	if (prm.getVerbosityLevel() > 0)
-		{
-    		//prm.usage();
-			std::cerr << XE;
-		}
-		
-        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
-    }
-
-    return 0;
-
+	return 0;
 }
 

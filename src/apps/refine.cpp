@@ -21,32 +21,30 @@
 #include <src/ml_optimiser.h>
 
 /**************************************************************************
-        Main
+		Main
  **************************************************************************/
 int main(int argc, char **argv)
 {
 	 MlOptimiser optimiser;
 
-    try
-    {
-    	// Read in parameters from the command line
-    	optimiser.read(argc, argv);
+	try
+	{
+		// Read in parameters from the command line
+		optimiser.read(argc, argv);
 
-    	// Set up things
-    	optimiser.initialise();
+		// Set up things
+		optimiser.initialise();
 
-    	// Do the real work
-    	optimiser.iterate();
+		// Do the real work
+		optimiser.iterate();
+	}
+	catch (RelionError XE)
+	{
+		//optimiser.usage();
+		std::cerr << XE;
 
-    }
+		return EXIT_FAILURE;
+	}
 
-    catch (RelionError XE)
-    {
-        //optimiser.usage();
-        std::cerr << XE;
-
-        return EXIT_FAILURE;
-    }
-
-    return EXIT_SUCCESS;
+	return EXIT_SUCCESS;
 }

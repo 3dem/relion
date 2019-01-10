@@ -48,20 +48,18 @@ public:
 		fn_in  = parser.getOption("--i", "Input STAR file with rlnMicrographName's ");
 		fn_out = parser.getOption("--o", "Output rootname, to be added to input micrograph names", "reposition");
 		fn_odir = parser.getOption("--odir", "Output directory (default is same as input micrographs directory", "");
-       	fn_opt = parser.getOption("--opt", "Optimiser STAR file with the 2D classes or 3D maps to be repositioned");
-       	fn_dat = parser.getOption("--data", "Data STAR file with selected particles (default is to use all particles)", "");
-       	micrograph_background = textToFloat(parser.getOption("--background", "The fraction of micrograph background noise in the output micrograph", "0.1"));
-       	do_invert= parser.checkOption("--invert", "Invert the contrast in the references?");
+		fn_opt = parser.getOption("--opt", "Optimiser STAR file with the 2D classes or 3D maps to be repositioned");
+		fn_dat = parser.getOption("--data", "Data STAR file with selected particles (default is to use all particles)", "");
+		micrograph_background = textToFloat(parser.getOption("--background", "The fraction of micrograph background noise in the output micrograph", "0.1"));
+		do_invert= parser.checkOption("--invert", "Invert the contrast in the references?");
 
-       	// Check for errors in the command-line option
-    	if (parser.checkForErrors())
-    		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
-
+		// Check for errors in the command-line option
+		if (parser.checkForErrors())
+			REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 	}
 
 	void run()
 	{
-
 		int xdim, ydim, radius;
 		MetaDataTable DFi, DFopt;
 		DFi.read(fn_in);
@@ -156,8 +154,8 @@ public:
 					Matrix1D<RFLOAT> offsets(3);
 
 					MDcoord.addObject();
-		            MDcoord.setObject(optimiser.mydata.MDimg.getObject());
-		            MDcoord.setValue(EMDL_MICROGRAPH_NAME,fn_mic_out);
+					MDcoord.setObject(optimiser.mydata.MDimg.getObject());
+					MDcoord.setValue(EMDL_MICROGRAPH_NAME,fn_mic_out);
 
 					optimiser.mydata.MDimg.getValue(EMDL_IMAGE_COORD_X,  xcoord);
 					optimiser.mydata.MDimg.getValue(EMDL_IMAGE_COORD_Y,  ycoord);
@@ -252,11 +250,7 @@ public:
 		progress_bar(DFi.numberOfObjects());
 
 		std::cout << " Done!" << std::endl;
-
 	}// end run function
-
-
-
 };
 
 int main(int argc, char *argv[])
@@ -265,19 +259,16 @@ int main(int argc, char *argv[])
 	particle_reposition_parameters prm;
 
 	try
-    {
+	{
 		prm.read(argc, argv);
-
 		prm.run();
-    }
+	}
+	catch (RelionError XE)
+	{
+		//prm.usage();
+		std::cerr << XE;
+		exit(1);
+	}
 
-    catch (RelionError XE)
-    {
-        //prm.usage();
-        std::cerr << XE;
-        exit(1);
-    }
-
-    return 0;
-
+	return 0;
 }

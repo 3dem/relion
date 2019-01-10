@@ -241,9 +241,9 @@ public:
 		ofs.open(fn_cmd.c_str(), std::ofstream::out | std::ofstream::app);
 
 		time_t now = time(0);
-	    char nodename[64] = "undefined";
-	    gethostname(nodename,sizeof(nodename));
-	    std::string hostname(nodename);
+		char nodename[64] = "undefined";
+		gethostname(nodename,sizeof(nodename));
+		std::string hostname(nodename);
 		ofs << std::endl << " ++++ Executed the following command at host " << hostname << " on " << ctime(&now);
 		ofs << "  `which relion_helix_toolbox` " << std::flush;
 		parser.writeCommandLine(ofs);
@@ -414,9 +414,9 @@ public:
 			{
 				displayEmptyLine();
 				std::cout << " Extract coordinates of helical segments from specified straight tubes" << std::endl;
-				std::cout << "  USAGE (EMAN2 format)  : --extract_emn --i_root _boxes.txt  --o_root _segments.star --nr_asu 30 --rise 1.408 --angpix 1.126 --xdim 4096 --ydim 4096 --boxdim 320 --bimodal --segments" << std::endl;
-				std::cout << "  USAGE (RELION format) : --extract_rln --i_root _tubes.star --o_root _segments.star --nr_asu 30 --rise 1.408 --angpix 1.126 --xdim 4096 --ydim 4096 --boxdim 320 --bimodal --segments" << std::endl;
-				std::cout << "  USAGE (XIMDISP format): --extract_xim --i_root .mrc.coords --o_root _segments.star --nr_asu 30 --rise 1.408 --angpix 1.126 --xdim 4096 --ydim 4096 --boxdim 320 --bimodal --segments" << std::endl;
+				std::cout << "	USAGE (EMAN2 format)  : --extract_emn --i_root _boxes.txt  --o_root _segments.star --nr_asu 30 --rise 1.408 --angpix 1.126 --xdim 4096 --ydim 4096 --boxdim 320 --bimodal --segments" << std::endl;
+				std::cout << "	USAGE (RELION format) : --extract_rln --i_root _tubes.star --o_root _segments.star --nr_asu 30 --rise 1.408 --angpix 1.126 --xdim 4096 --ydim 4096 --boxdim 320 --bimodal --segments" << std::endl;
+				std::cout << "	USAGE (XIMDISP format): --extract_xim --i_root .mrc.coords --o_root _segments.star --nr_asu 30 --rise 1.408 --angpix 1.126 --xdim 4096 --ydim 4096 --boxdim 320 --bimodal --segments" << std::endl;
 				displayEmptyLine();
 				return;
 			}
@@ -474,7 +474,7 @@ public:
 			{
 				displayEmptyLine();
 				std::cout << " Combine Autopicker priors (tilt and psi) with Gctf local search results" << std::endl;
-				std::cout << "  USAGE: --combine_gctf --i1_root _autopick.star --i2_root _gctf_local.star --o_root _combined.star" << std::endl;
+				std::cout << "	USAGE: --combine_gctf --i1_root _autopick.star --i2_root _gctf_local.star --o_root _combined.star" << std::endl;
 				displayEmptyLine();
 				return;
 			}
@@ -490,7 +490,7 @@ public:
 			{
 				displayEmptyLine();
 				std::cout << " Apply soft spherical mask to 3D helical reference" << std::endl;
-				std::cout << "  USAGE: --spherical_mask --i in.mrc --o out.mrc (--sphere_percentage 0.9 --width 5)" << std::endl;
+				std::cout << "	USAGE: --spherical_mask --i in.mrc --o out.mrc (--sphere_percentage 0.9 --width 5)" << std::endl;
 				displayEmptyLine();
 				return;
 			}
@@ -515,7 +515,7 @@ public:
 			{
 				displayEmptyLine();
 				std::cout << " Crop the central part of a helix" << std::endl;
-				std::cout << "  USAGE: --central_mask --i in.mrc --o out.mrc (--z_percentage 0.3 --width 5)" << std::endl;
+				std::cout << "	USAGE: --central_mask --i in.mrc --o out.mrc (--z_percentage 0.3 --width 5)" << std::endl;
 				displayEmptyLine();
 				return;
 			}
@@ -534,7 +534,7 @@ public:
 			{
 				displayEmptyLine();
 				std::cout << " Create a cylinder for 3D initial reference" << std::endl;
-				std::cout << "  USAGE: --cylinder --o out.mrc --boxdim 300 (--cyl_inner_diameter -1) --cyl_outer_diameter 200 --angpix 1.34 (--polar --topbottom_ratio 0.5) (--sphere_percentage 0.9 --width 5)" << std::endl;
+				std::cout << "	USAGE: --cylinder --o out.mrc --boxdim 300 (--cyl_inner_diameter -1) --cyl_outer_diameter 200 --angpix 1.34 (--polar --topbottom_ratio 0.5) (--sphere_percentage 0.9 --width 5)" << std::endl;
 				displayEmptyLine();
 				return;
 			}
@@ -570,7 +570,7 @@ public:
 			{
 				displayEmptyLine();
 				std::cout << " Set tilt angles to 90 degrees for all helical segments" << std::endl;
-				std::cout << "  USAGE: --init_tilt --i in.star --o out.star" << std::endl;
+				std::cout << "	USAGE: --init_tilt --i in.star --o out.star" << std::endl;
 				displayEmptyLine();
 				return;
 			}
@@ -585,7 +585,7 @@ public:
 			{
 				displayEmptyLine();
 				std::cout << " Remove helical segments with large tilt angle deviation (away from 90 degrees)" << std::endl;
-				std::cout << "  USAGE: --remove_bad_tilt --i in.star --o out.star --tilt_max_dev 15" << std::endl;
+				std::cout << "	USAGE: --remove_bad_tilt --i in.star --o out.star --tilt_max_dev 15" << std::endl;
 				displayEmptyLine();
 				return;
 			}
@@ -601,7 +601,7 @@ public:
 			{
 				displayEmptyLine();
 				std::cout << " Remove helical segments with large psi angle deviation (away from psi prior)" << std::endl;
-				std::cout << "  USAGE: --remove_bad_psi --i in.star --o out.star --psi_max_dev 15" << std::endl;
+				std::cout << "	USAGE: --remove_bad_psi --i in.star --o out.star --psi_max_dev 15" << std::endl;
 				displayEmptyLine();
 				return;
 			}
@@ -617,7 +617,7 @@ public:
 			{
 				displayEmptyLine();
 				std::cout << " Remove micrographs with poor-quality CTF" << std::endl;
-				std::cout << "  USAGE: --remove_bad_ctf --i in.star --o out.star (--ctf_fom_min 0.1 --EPA_lowest_res 5 --df_min 10000 --df_max 30000)" << std::endl;
+				std::cout << "	USAGE: --remove_bad_ctf --i in.star --o out.star (--ctf_fom_min 0.1 --EPA_lowest_res 5 --df_min 10000 --df_max 30000)" << std::endl;
 				displayEmptyLine();
 				return;
 			}
@@ -636,7 +636,7 @@ public:
 			{
 				displayEmptyLine();
 				std::cout << " Create a helical 3D reference of spheres" << std::endl;
-				std::cout << "  USAGE: --simulate_helix --o ref.mrc --subunit_diameter 30 --cyl_outer_diameter 200 --angpix 1.126 --rise 1.408 --twist 22.03 --boxdim 300 (--sym_Cn 1) (--polar --topbottom_ratio 0.5 --cyl_inner_diameter 20) (--sphere_percentage 0.9 --width 5) (--seam_nr_filaments 13)" << std::endl;
+				std::cout << "	USAGE: --simulate_helix --o ref.mrc --subunit_diameter 30 --cyl_outer_diameter 200 --angpix 1.126 --rise 1.408 --twist 22.03 --boxdim 300 (--sym_Cn 1) (--polar --topbottom_ratio 0.5 --cyl_inner_diameter 20) (--sphere_percentage 0.9 --width 5) (--seam_nr_filaments 13)" << std::endl;
 				displayEmptyLine();
 				return;
 			}
@@ -676,7 +676,7 @@ public:
 			{
 				displayEmptyLine();
 				std::cout << " Impose helical symmetry (in real space)" << std::endl;
-				std::cout << "  USAGE: --impose --i in.mrc --o out.mrc (--cyl_inner_diameter -1) --cyl_outer_diameter 200 --angpix 1.126 --rise 1.408 --twist 22.03 (--z_percentage 0.3 --sphere_percentage 0.9 --width 5)" << std::endl;
+				std::cout << "	USAGE: --impose --i in.mrc --o out.mrc (--cyl_inner_diameter -1) --cyl_outer_diameter 200 --angpix 1.126 --rise 1.408 --twist 22.03 (--z_percentage 0.3 --sphere_percentage 0.9 --width 5)" << std::endl;
 				displayEmptyLine();
 				return;
 			}
@@ -713,7 +713,7 @@ public:
 			{
 				displayEmptyLine();
 				std::cout << " Local search of helical symmetry" << std::endl;
-				std::cout << "  USAGE: --search --i in.mrc (--cyl_inner_diameter -1) --cyl_outer_diameter 200 --angpix 1.126 --rise_min 1.3 --rise_max 1.5 (--rise_inistep -1) --twist_min 20 --twist_max 24 (--twist_inistep -1) (--z_percentage 0.3) (--verb)" << std::endl;
+				std::cout << "	USAGE: --search --i in.mrc (--cyl_inner_diameter -1) --cyl_outer_diameter 200 --angpix 1.126 --rise_min 1.3 --rise_max 1.5 (--rise_inistep -1) --twist_min 20 --twist_max 24 (--twist_inistep -1) (--z_percentage 0.3) (--verb)" << std::endl;
 				displayEmptyLine();
 				return;
 			}
@@ -753,7 +753,7 @@ public:
 			{
 				displayEmptyLine();
 				std::cout << " Simulate a helix from a single PDB file of protein molecule" << std::endl;
-				std::cout << "  USAGE: --pdb_helix --i in.pdb --o out.pdb --cyl_outer_diameter 50 --rise 1.408 --twist 22.03 --nr_subunits 300 (--center_pdb)" << std::endl;
+				std::cout << "	USAGE: --pdb_helix --i in.pdb --o out.pdb --cyl_outer_diameter 50 --rise 1.408 --twist 22.03 --nr_subunits 300 (--center_pdb)" << std::endl;
 				displayEmptyLine();
 				return;
 			}
@@ -781,7 +781,7 @@ public:
 			{
 				displayEmptyLine();
 				std::cout << " Divide one huge STAR file into many small ones" << std::endl;
-				std::cout << "  USAGE: --divide --i in.star (--nr_outfiles 10)" << std::endl;
+				std::cout << "	USAGE: --divide --i in.star (--nr_outfiles 10)" << std::endl;
 				displayEmptyLine();
 				return;
 			}
@@ -794,7 +794,7 @@ public:
 			{
 				displayEmptyLine();
 				std::cout << " Merge small STAR files into a huge one" << std::endl;
-				std::cout << "  USAGE: --merge --i_root _subset.star" << std::endl;
+				std::cout << "	USAGE: --merge --i_root _subset.star" << std::endl;
 				displayEmptyLine();
 				return;
 			}
@@ -807,7 +807,7 @@ public:
 			{
 				displayEmptyLine();
 				std::cout << " Sort segments in _data.star file according to helical tube IDs" << std::endl;
-				std::cout << "  USAGE: --sort_tube_id --i in.star --o out.star" << std::endl;
+				std::cout << "	USAGE: --sort_tube_id --i in.star --o out.star" << std::endl;
 				displayEmptyLine();
 				return;
 			}
@@ -823,8 +823,8 @@ public:
 			{
 				displayEmptyLine();
 				std::cout << " Simulate helical segments / subtomograms using a STAR file" << std::endl;
-				std::cout << "  USAGE: --simulate_segments --i 3dvol-for-projection.mrc --o segments.star --boxdim 200 --nr_subunits 5000 --nr_asu 5 --nr_tubes 20 --twist 22.03 --rise 1.408 --cyl_outer_diameter 200 --angpix 1.126 (--bimodal --3d_tomo --sigma_tilt 5 --sigma_psi 5 --sigma_offset 5 --white_noise 1 --random_seed 1400014000)" << std::endl;
-				std::cout << "  BEWARE: '--boxdim' is the shrunk box size of the simulated output (2D or 3D). It should not be bigger than the box size of the input 3D volume." << std::endl;
+				std::cout << "	USAGE: --simulate_segments --i 3dvol-for-projection.mrc --o segments.star --boxdim 200 --nr_subunits 5000 --nr_asu 5 --nr_tubes 20 --twist 22.03 --rise 1.408 --cyl_outer_diameter 200 --angpix 1.126 (--bimodal --3d_tomo --sigma_tilt 5 --sigma_psi 5 --sigma_offset 5 --white_noise 1 --random_seed 1400014000)" << std::endl;
+				std::cout << "	BEWARE: '--boxdim' is the shrunk box size of the simulated output (2D or 3D). It should not be bigger than the box size of the input 3D volume." << std::endl;
 				displayEmptyLine();
 				return;
 			}
@@ -859,7 +859,7 @@ public:
 			{
 				displayEmptyLine();
 				std::cout << " Cut out a small part of the helix" << std::endl;
-				std::cout << "  USAGE: --cut_out --i in.mrc --o out.mrc (--boxdim 100 --z_percentage 0.3 --ang 30)" << std::endl;
+				std::cout << "	USAGE: --cut_out --i in.mrc --o out.mrc (--boxdim 100 --z_percentage 0.3 --ang 30)" << std::endl;
 				displayEmptyLine();
 				return;
 			}
@@ -877,7 +877,7 @@ public:
 			{
 				displayEmptyLine();
 				std::cout << " Set Xmipp origin" << std::endl;
-				std::cout << "  USAGE: --set_xmipp_origin --i in.mrc --o out.mrc" << std::endl;
+				std::cout << "	USAGE: --set_xmipp_origin --i in.mrc --o out.mrc" << std::endl;
 				displayEmptyLine();
 				return;
 			}
@@ -893,7 +893,7 @@ public:
 			{
 				displayEmptyLine();
 				std::cout << " Impose helical symmetry (Fourier space simulation)" << std::endl;
-				std::cout << "  USAGE: --impose_fourier --i in.mrc --o out.mrc --angpix 1.126 --nr_asu 5 --rise 1.408 --twist 22.03" << std::endl;
+				std::cout << "	USAGE: --impose_fourier --i in.mrc --o out.mrc --angpix 1.126 --nr_asu 5 --rise 1.408 --twist 22.03" << std::endl;
 				displayEmptyLine();
 				return;
 			}
@@ -946,7 +946,7 @@ public:
 			{
 				displayEmptyLine();
 				std::cout << " Check parameters for 3D helical reconstruction in RELION" << std::endl;
-				std::cout << "  USAGE: --check --boxdim 300 --angpix 1.126 --sphere_percentage 0.9 (--cyl_inner_diameter 20) --cyl_outer_diameter 240 (--ignore_helical_symmetry --search_sym --z_percentage 0.3 --nr_asu 20 --rise 1.408 --rise_min 1.3 --rise_max 1.5 --twist 22.03 --twist_min 21 --twist_max 23)" << std::endl;
+				std::cout << "	USAGE: --check --boxdim 300 --angpix 1.126 --sphere_percentage 0.9 (--cyl_inner_diameter 20) --cyl_outer_diameter 240 (--ignore_helical_symmetry --search_sym --z_percentage 0.3 --nr_asu 20 --rise 1.408 --rise_min 1.3 --rise_max 1.5 --twist 22.03 --twist_min 21 --twist_max 23)" << std::endl;
 				displayEmptyLine();
 				return;
 			}
@@ -976,7 +976,7 @@ public:
 			{
 				displayEmptyLine();
 				std::cout << " Normalise 2D/3D helical segments in a STAR file" << std::endl;
-				std::cout << "  USAGE: --norm --i imgs_input.star --o_root _norm --angpix 1.126 --cyl_outer_diameter 200" << std::endl;
+				std::cout << "	USAGE: --norm --i imgs_input.star --o_root _norm --angpix 1.126 --cyl_outer_diameter 200" << std::endl;
 				displayEmptyLine();
 				return;
 			}
@@ -992,7 +992,7 @@ public:
 			{
 				displayEmptyLine();
 				std::cout << " Interpolate 3D curve for 3D helical sub-tomogram extraction" << std::endl;
-				std::cout << "  USAGE: --interpo --i_root Btub_tomo1 --o_root _interpo --nr_asu 1 --rise 52.77 --angpix 2.18 --boxdim 200 --bin 1 (--bimodal)" << std::endl;
+				std::cout << "	USAGE: --interpo --i_root Btub_tomo1 --o_root _interpo --nr_asu 1 --rise 52.77 --angpix 2.18 --boxdim 200 --bin 1 (--bimodal)" << std::endl;
 				displayEmptyLine();
 				return;
 			}
@@ -1012,7 +1012,7 @@ public:
 			{
 				displayEmptyLine();
 				std::cout << " Select 3D subtomograms given 2D projections" << std::endl;
-				std::cout << "  USAGE: --select_3dtomo --i1 selected_2d_proj.star --i2 particle_3d_subtomo.star --o selected_3d_subtomo.star" << std::endl;
+				std::cout << "	USAGE: --select_3dtomo --i1 selected_2d_proj.star --i2 particle_3d_subtomo.star --o selected_3d_subtomo.star" << std::endl;
 				displayEmptyLine();
 				return;
 			}
@@ -1301,54 +1301,54 @@ public:
 		std::cout << " Doing FT..." << std::endl;
 		transformer.FourierTransform(img(), Faux);
 
-        Complex fzero;
-        fzero.real = fzero.imag = 0.;
-        std::cout << " Modifying..." << std::endl;
-	    FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Faux)
-	    {
-	    	int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
-	        if (idx >= XSIZE(Faux))
-	        	continue;
+		Complex fzero;
+		fzero.real = fzero.imag = 0.;
+		std::cout << " Modifying..." << std::endl;
+		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Faux)
+		{
+			int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
+			if (idx >= XSIZE(Faux))
+				continue;
 
-	        // Sphere, centered 0, 0, 76
-	        //RFLOAT rr1 = sqrt((ABS(kp) - 76) * (ABS(kp) - 76) + ip*ip + jp*jp);
-	        //if (rr1 < 5.01)
-	        //	FFTW_ELEM(Faux, kp, ip, jp) = fzero;
+			// Sphere, centered 0, 0, 76
+			//RFLOAT rr1 = sqrt((ABS(kp) - 76) * (ABS(kp) - 76) + ip*ip + jp*jp);
+			//if (rr1 < 5.01)
+			//	FFTW_ELEM(Faux, kp, ip, jp) = fzero;
 
-	        // Sphere, centered 0, 0, 46
-	        //RFLOAT rr2 = sqrt((ABS(kp) - 46) * (ABS(kp) - 46) + ip*ip + jp*jp);
-	        //if (rr2 < 5.01)
-	        //	FFTW_ELEM(Faux, kp, ip, jp) = fzero;
+			// Sphere, centered 0, 0, 46
+			//RFLOAT rr2 = sqrt((ABS(kp) - 46) * (ABS(kp) - 46) + ip*ip + jp*jp);
+			//if (rr2 < 5.01)
+			//	FFTW_ELEM(Faux, kp, ip, jp) = fzero;
 
-	        // Disk, centered 0, 0, 76
-	        //if (ABS(ABS(kp) - 76) < 5)
-	        //{
-	        //	RFLOAT rr1 = sqrt(ip*ip + jp*jp);
-	        //	if (rr1 < 5.)
-	        //		FFTW_ELEM(Faux, kp, ip, jp) = fzero;
-	        //}
+			// Disk, centered 0, 0, 76
+			//if (ABS(ABS(kp) - 76) < 5)
+			//{
+			//	RFLOAT rr1 = sqrt(ip*ip + jp*jp);
+			//	if (rr1 < 5.)
+			//		FFTW_ELEM(Faux, kp, ip, jp) = fzero;
+			//}
 
-	        // Disk, centered 0, 0, 46
-	        //if (ABS(ABS(kp) - 46) < 5)
-	        //{
-	        //	RFLOAT rr1 = sqrt(ip*ip + jp*jp);
-	        //	if (rr1 < 5.)
-	        //		FFTW_ELEM(Faux, kp, ip, jp) = fzero;
-	        //}
+			// Disk, centered 0, 0, 46
+			//if (ABS(ABS(kp) - 46) < 5)
+			//{
+			//	RFLOAT rr1 = sqrt(ip*ip + jp*jp);
+			//	if (rr1 < 5.)
+			//		FFTW_ELEM(Faux, kp, ip, jp) = fzero;
+			//}
 
-	        if (ABS(kp) > 44)
-	        {
-	        	RFLOAT rr1 = sqrt(ip*ip + jp*jp);
-	        	if (rr1 < 25.)
-	        		FFTW_ELEM(Faux, kp, ip, jp) = fzero;
-	        }
+			if (ABS(kp) > 44)
+			{
+				RFLOAT rr1 = sqrt(ip*ip + jp*jp);
+				if (rr1 < 25.)
+					FFTW_ELEM(Faux, kp, ip, jp) = fzero;
+			}
 
-        	//RFLOAT rr1 = sqrt(ip*ip + jp*jp);
-        	//if (rr1 < 5.)
-        	//	FFTW_ELEM(Faux, kp, ip, jp) = fzero;
+			//RFLOAT rr1 = sqrt(ip*ip + jp*jp);
+			//if (rr1 < 5.)
+			//	FFTW_ELEM(Faux, kp, ip, jp) = fzero;
 
-	    }
-	    std::cout << " Doing IFT..." << std::endl;
+		}
+		std::cout << " Doing IFT..." << std::endl;
 		transformer.inverseFourierTransform(Faux, img());
 		CenterFFT(img(), false);
 		img.write(fn_out);
@@ -1407,18 +1407,18 @@ public:
 		{
 			if(dim == 2)
 			{
-				std::cout << "  Please input psi angle (in degrees): " << std::flush;
+				std::cout << "	Please input psi angle (in degrees): " << std::flush;
 				std::cin >> psi_deg;
-				std::cout << "  Please input x, y coordinates (in pixels): " << std::flush;
+				std::cout << "	Please input x, y coordinates (in pixels): " << std::flush;
 				std::cin >> x >> y;
 				XX(in) = x;
 				YY(in) = y;
 			}
 			else
 			{
-				std::cout << "  Please input psi and tilt angles (in degrees): " << std::flush;
+				std::cout << "	Please input psi and tilt angles (in degrees): " << std::flush;
 				std::cin >> psi_deg >> tilt_deg;
-				std::cout << "  Please input x, y, z coordinates (in pixels): " << std::flush;
+				std::cout << "	Please input x, y, z coordinates (in pixels): " << std::flush;
 				std::cin >> x >> y >> z;
 				XX(in) = x;
 				YY(in) = y;
@@ -1428,12 +1428,12 @@ public:
 			out /= angpix;
 			if(dim == 2)
 			{
-				std::cout << "  Output coordinates (x, y) in Angstroms = "
+				std::cout << "	Output coordinates (x, y) in Angstroms = "
 						<< XX(out) << ", " << YY(out) << std::endl;
 			}
 			else
 			{
-				std::cout << "  Output coordinates (x, y, z) in Angstroms = "
+				std::cout << "	Output coordinates (x, y, z) in Angstroms = "
 						<< XX(out) << ", " << YY(out) << ", " << ZZ(out) << std::endl;
 			}
 		}
@@ -1499,16 +1499,16 @@ int main(int argc, char *argv[])
 	helix_bilder_parameters prm;
 
 	try
-    {
+	{
 		prm.read(argc, argv);
 		prm.run();
-    }
-    catch (RelionError XE)
-    {
-    	prm.usage();
-        std::cout << XE;
-        exit(1);
-    }
+	}
+	catch (RelionError XE)
+	{
+		prm.usage();
+		std::cout << XE;
+		exit(1);
+	}
 
-    return 0;
+	return 0;
 }

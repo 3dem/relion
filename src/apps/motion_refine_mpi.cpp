@@ -23,31 +23,25 @@
 
 int main(int argc, char *argv[])
 {
-    MotionRefinerMpi prm;
+	MotionRefinerMpi prm;
 
 	try
-    {
+	{
 		prm.read(argc, argv);
-
-        prm.init();
+		prm.init();
 
 		MPI_Barrier(MPI_COMM_WORLD);
-
 		prm.run();
-    }
+	}
 
-    catch (RelionError XE)
-    {
-        if (prm.getVerbosityLevel() > 0)
-        {
-            std::cerr << XE;
-        }
+	catch (RelionError XE)
+	{
+		std::cerr << XE;
 
-        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
-    }
+		MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+	}
 
-    return 0;
-
+	return 0;
 }
 
 

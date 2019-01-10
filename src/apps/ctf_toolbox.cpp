@@ -108,7 +108,6 @@ class ctf_toolbox_parameters
 		n--;
 		if (n >= 0) // This is a stack...
 		{
-
 			// The following assumes the images in the stack come ordered...
 			if (n == 0)
 				img.write(fn_tmp, n, true, WRITE_OVERWRITE); // make a new stack
@@ -237,14 +236,11 @@ class ctf_toolbox_parameters
 			i_img++;
 			if (verb > 0)
 				progress_bar(i_img);
-
 		}
 
 		if (verb > 0)
 			progress_bar(MD.numberOfObjects());
-
 	}
-
 };
 
 
@@ -254,11 +250,8 @@ int main(int argc, char *argv[])
 
 	try
 	{
-
 		prm.read(argc, argv);
-
 		prm.run();
-
 	}
 	catch (RelionError XE)
 	{
