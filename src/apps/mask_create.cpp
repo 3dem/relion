@@ -137,7 +137,7 @@ class mask_create_parameters
 		{
 			angpix = Iin.samplingRateX();
 			std::cerr << "WARNING: The pixel size (--angpix) was not specified." << std::endl;
-			std::cerr << "		   The value in the input image header (= " << angpix << ") is used instead." << std::endl;
+			std::cerr << "         The value in the input image header (= " << angpix << ") is used instead." << std::endl;
 		}
 
 		if (lowpass > 0)

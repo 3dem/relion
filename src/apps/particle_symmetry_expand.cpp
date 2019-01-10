@@ -98,8 +98,8 @@ public:
 				int istart = -(nr_asu-1)/2;
 				int istop = nr_asu/2;
 				z_start = (RFLOAT)istart;
-				z_stop	= (RFLOAT)istop;
-				z_step	= 1.;
+				z_stop  = (RFLOAT)istop;
+				z_step  = 1.;
 			}
 			else if (frac_sampling > 1)
 			{
@@ -138,19 +138,17 @@ public:
 					// TMP
 					//if (fabs(z_pos) > 0.01)
 					{
-
-					// Translation along the X-axis in the rotated image is along the helical axis in 3D.
-					// Tilted images shift less: sin(tilt)
-					RFLOAT xxt = SIND(tilt) * z_pos * rise / angpix;
-					xp = x + COSD(-psi) * xxt;
-					yp = y + SIND(-psi) * xxt;
-					rotp = rot + z_pos * twist;
-					DFo.addObject();
-					DFo.setObject(DFi.getObject());
-					DFo.setValue(EMDL_ORIENT_ROT, rotp);
-					DFo.setValue(EMDL_ORIENT_ORIGIN_X, xp);
-					DFo.setValue(EMDL_ORIENT_ORIGIN_Y, yp);
-
+						// Translation along the X-axis in the rotated image is along the helical axis in 3D.
+						// Tilted images shift less: sin(tilt)
+						RFLOAT xxt = SIND(tilt) * z_pos * rise / angpix;
+						xp = x + COSD(-psi) * xxt;
+						yp = y + SIND(-psi) * xxt;
+							rotp = rot + z_pos * twist;
+						DFo.addObject();
+						DFo.setObject(DFi.getObject());
+						DFo.setValue(EMDL_ORIENT_ROT, rotp);
+						DFo.setValue(EMDL_ORIENT_ORIGIN_X, xp);
+						DFo.setValue(EMDL_ORIENT_ORIGIN_Y, yp);
 					}
 				}
 			}

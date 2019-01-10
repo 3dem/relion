@@ -64,8 +64,8 @@ class ctf_toolbox_parameters
 		int cst_section = parser.addSection("Options");
 		do_ctf_phaseflip = parser.checkOption("--ctf_phaseflip", "Phase-flip the image(s) in the input STAR file?");
 		do_ctf_multiply = parser.checkOption("--ctf_multiply", "Multiply the image(s) in the input STAR file with their CTF?");
-		do_2dimage	= parser.checkOption("--write_ctf_image", "Write out images with the 2D CTFs?");
-		do_1dprofile  = parser.checkOption("--write_ctf_profile", "Write out a STAR file with the 1D CTF profiles?");
+		do_2dimage = parser.checkOption("--write_ctf_image", "Write out images with the 2D CTFs?");
+		do_1dprofile = parser.checkOption("--write_ctf_profile", "Write out a STAR file with the 1D CTF profiles?");
 		profile_angle = textToFloat(parser.getOption("--1dprofile_angle", "Angle along which to calculate 1D CTF profiles (0=X, 90=Y)", "0"));
 		do_intact_ctf_first_peak = parser.checkOption("--ctf_intact_first_peak", "Leave CTFs intact until first peak");
 
