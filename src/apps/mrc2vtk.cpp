@@ -5,7 +5,7 @@ int main(int argc, char *argv[])
 {
 	if (argc < 2)
 	{
-		std::cout << "usage: relion_mrc2vtk X.(mrc/mrcs/tiff/spi)\n		  -> X.vtk\n";
+		std::cout << "usage: relion_mrc2vtk X.(mrc/mrcs/tiff/spi)\n -> X.vtk\n";
 		return 666;
 	}
 

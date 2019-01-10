@@ -129,7 +129,7 @@ int main(int argc, char *argv[])
 			ctf0.Cs = 0.0;
 			ctf0.initialise();
 
-			for (int y = 0; y < s;	y++)
+			for (int y = 0; y < s;  y++)
 			for (int x = 0; x < sh; x++)
 			{
 				const double xf = x;
@@ -178,7 +178,7 @@ int main(int argc, char *argv[])
 
 	Image<RFLOAT> xx(sh,s), xy(sh,s), xz(sh,s);
 
-	for (int y = 0; y < s;	y++)
+	for (int y = 0; y < s;  y++)
 	for (int x = 0; x < sh; x++)
 	{
 		d3Matrix A(

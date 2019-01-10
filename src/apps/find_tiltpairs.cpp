@@ -401,9 +401,9 @@ public:
 		// Calculate average distance between the pairs
 		RFLOAT avgdist = getAverageDistance(best_x, best_y);
 		std::cout << " Before optimization of the passing matrix: "<<std::endl;
-		std::cout << "	- Number of pruned pairs= "<<nprune<<std::endl;
-		std::cout << "	- best_rot= " << best_rot << " best_tilt= " << best_tilt << " best_x= " << best_x << " best_y= " << best_y << std::endl;
-		std::cout << "	- Number of particle pairs= " << npart << " average distance= " <<avgdist<<std::endl;
+		std::cout << "  - Number of pruned pairs= "<<nprune<<std::endl;
+		std::cout << "  - best_rot= " << best_rot << " best_tilt= " << best_tilt << " best_x= " << best_x << " best_y= " << best_y << std::endl;
+		std::cout << "  - Number of particle pairs= " << npart << " average distance= " <<avgdist<<std::endl;
 
 #define WRITE_MAPPED
 #ifdef WRITE_MAPPED
@@ -427,8 +427,8 @@ public:
 			nprune = prunePairs();
 			avgdist = getAverageDistance();
 			std::cout << " After optimization of the passing matrix: "<<std::endl;
-			std::cout << "	- Number of pruned pairs= "<<nprune<<std::endl;
-			std::cout << "	- Final number of particle pairs= " << npart << " average distance= " <<avgdist<<std::endl;
+			std::cout << "  - Number of pruned pairs= "<<nprune<<std::endl;
+			std::cout << "  - Final number of particle pairs= " << npart << " average distance= " <<avgdist<<std::endl;
 
 		}
 
