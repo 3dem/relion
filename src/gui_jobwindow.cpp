@@ -2389,7 +2389,19 @@ void JobWindow::initialiseCtfrefineWindow()
 
 	current_y += STEPY /2 ;
 
-	place("do_tilt", TOGGLE_LEAVE_ACTIVE);
+	group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group3->end();
+	place("do_tilt", TOGGLE_LEAVE_ACTIVE, group3);
+
+	group3->begin();
+	place("do_trefoil", TOGGLE_LEAVE_ACTIVE);
+	group3->end();
+
+	guientries["do_tilt"].cb_menu_i();
+
+	current_y += STEPY /2 ;
+
+	place("do_4thorder", TOGGLE_LEAVE_ACTIVE);
 
 	tab2->end();
 

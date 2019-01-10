@@ -593,7 +593,7 @@ bool RelionJob::prepareFinalCommand(std::string &outputname, std::vector<std::st
 					(commands[icom]).find("_mpi`") != std::string::npos &&
 					(commands[icom]).find("relion_") != std::string::npos)
 			{
-				
+
 				const char *default_mpirun = getenv("RELION_MPIRUN");
 				if (default_mpirun == NULL)
 				{
@@ -5063,8 +5063,11 @@ This gives higher resolution estimates, as it disregards ill-defined regions nea
 	joboptions["do_astig"] = JobOption("Fit per-particle astigmatism?", false, "If set to Yes, astigmatism will be estimated on a per-particle basis. This requires very strong data, i.e. very large particles with excellent signal-to-noise ratios.");
 	joboptions["do_phase"] = JobOption("Fit per-micrograph phase-shift?", false, "If set to Yes, ctf_refine will try to refine a phase-shift (amplitude contrast) on a per-micrograph basis. This may be useful for Volta-phase plate data, but will require many particles and good signal-to-noise ratios per micrograph.");
 
-	// Beamtilt fit
-	joboptions["do_tilt"] = JobOption("Perform beamtilt estimation?", false, "If set to Yes, then relion_ctf_refine will also estimate the beamtilt over the entire data set. This option is only recommended for high-resolution data sets, i.e. significantly beyond 3 Angstrom resolution.");
+	// aberrations
+	joboptions["do_tilt"] = JobOption("Estimate beamtilt?", false, "If set to Yes, then relion_ctf_refine will also estimate the beamtilt per optics group. This option is only recommended for data sets that extend beyond 4.5 Angstrom resolution.");
+	joboptions["do_trefoil"] = JobOption("Also estimate trefoil?", false, "If set to Yes, then relion_ctf_refine will also estimate the trefoil (3-fold astigmatism) per optics group. This option is only recommended for data sets that extend beyond 3.5 Angstrom resolution.");
+
+	joboptions["do_4thorder"] = JobOption("Estimate 4th order aberrations?", false, "If set to Yes, then relion_ctf_refine will also estimate the Cs and the tetrafoil (4-fold astigmatism) per optics group. This option is only recommended for data sets that extend beyond 3 Angstrom resolution.");
 
 
 }
@@ -5161,6 +5164,17 @@ bool RelionJob::getCommandsCtfrefineJob(std::string &outputname, std::vector<std
 	{
 		command += " --fit_beamtilt";
 		command += " --kmin_tilt " + joboptions["minres"].getString();
+
+		if (joboptions["do_trefoil"].getBoolean())
+		{
+			command += " --odd_aberr_max_n 3";
+		}
+	}
+
+
+	if (joboptions["do_4thorder"].getBoolean())
+	{
+		command += " --fit_aberr";
 	}
 
 	// If this is a continue job, then only process unfinished micrographs
