@@ -197,6 +197,10 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	if (fnt != "OLD")
 		fn_mask2 = fnt;
 
+	// These are still experimental; so not in the optimiser.star yet.
+	fn_lowpass_mask = parser.getOption("--lowpass_mask", "User-provided mask for low-pass filtering", "None");
+	lowpass = textToFloat(parser.getOption("--lowpass", "User-provided cutoff for region specified above", "0"));
+
 	// Check whether tau2-spectrum has changed
 	fnt = parser.getOption("--tau", "STAR file with input tau2-spectrum (to be kept constant)", "OLD");
 	if (fnt != "OLD")
@@ -424,11 +428,11 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	// Debugging/analysis/hidden stuff
 	do_map = !checkParameter(argc, argv, "--no_map");
 	minres_map = textToInteger(getParameter(argc, argv, "--minres_map", "5"));
-    gridding_nr_iter = textToInteger(getParameter(argc, argv, "--gridding_iter", "10"));
+	gridding_nr_iter = textToInteger(getParameter(argc, argv, "--gridding_iter", "10"));
 	debug1 = textToFloat(getParameter(argc, argv, "--debug1", "0."));
 	debug2 = textToFloat(getParameter(argc, argv, "--debug2", "0."));
 	debug3 = textToFloat(getParameter(argc, argv, "--debug3", "0."));
-    do_bfactor = checkParameter(argc, argv, "--bfactor");
+	do_bfactor = checkParameter(argc, argv, "--bfactor");
 	// Read in initial sigmaNoise spectrum
 	fn_sigma = getParameter(argc, argv, "--sigma","");
 	sigma2_fudge = textToFloat(getParameter(argc, argv, "--sigma2_fudge", "1."));
@@ -460,24 +464,24 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 #endif
 
 	// Read/initialise mymodel and sampling from a STAR file
-    FileName fn_model = getParameter(argc, argv, "--model", "None");
+	FileName fn_model = getParameter(argc, argv, "--model", "None");
 	if (fn_model != "None")
 	{
 		mymodel.read(fn_model);
 	}
 	// Read in the sampling information from a _sampling.star file
-    FileName fn_sampling = getParameter(argc, argv, "--sampling", "None");
+	FileName fn_sampling = getParameter(argc, argv, "--sampling", "None");
 	if (fn_sampling != "None")
 	{
 		sampling.read(fn_sampling);
 	}
 
 	// General optimiser I/O stuff
-    int general_section = parser.addSection("General options");
+	int general_section = parser.addSection("General options");
 	fn_data = parser.getOption("--i", "Input images (in a star-file)", "");
-    fn_out = parser.getOption("--o", "Output rootname", "");
-    nr_iter = textToInteger(parser.getOption("--iter", "Maximum number of iterations to perform", "50"));
-    mymodel.tau2_fudge_factor = textToFloat(parser.getOption("--tau2_fudge", "Regularisation parameter (values higher than 1 give more weight to the data)", "1"));
+	fn_out = parser.getOption("--o", "Output rootname", "");
+	nr_iter = textToInteger(parser.getOption("--iter", "Maximum number of iterations to perform", "50"));
+	mymodel.tau2_fudge_factor = textToFloat(parser.getOption("--tau2_fudge", "Regularisation parameter (values higher than 1 give more weight to the data)", "1"));
 	mymodel.nr_classes = textToInteger(parser.getOption("--K", "Number of references to be refined", "1"));
 	particle_diameter = textToFloat(parser.getOption("--particle_diameter", "Diameter of the circular mask that will be applied to the experimental images (in Angstroms)", "-1"));
 	do_zero_mask = parser.checkOption("--zero_mask","Mask surrounding background in particles to zero (by default the solvent area is filled with random noise)");
@@ -486,9 +490,9 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	fn_mask2 = parser.getOption("--solvent_mask2", "User-provided secondary mask (with its own average density)", "None");
 	fn_lowpass_mask = parser.getOption("--lowpass_mask", "User-provided mask for low-pass filtering", "None");
 	lowpass = textToFloat(parser.getOption("--lowpass", "User-provided cutoff for region specified above", "0"));
-    fn_tau = parser.getOption("--tau", "STAR file with input tau2-spectrum (to be kept constant)", "None");
+	fn_tau = parser.getOption("--tau", "STAR file with input tau2-spectrum (to be kept constant)", "None");
 	fn_local_symmetry = parser.getOption("--local_symmetry", "Local symmetry description file containing list of masks and their operators", "None");
-    do_split_random_halves = parser.checkOption("--split_random_halves", "Refine two random halves of the data completely separately");
+	do_split_random_halves = parser.checkOption("--split_random_halves", "Refine two random halves of the data completely separately");
 	low_resol_join_halves = textToFloat(parser.getOption("--low_resol_join_halves", "Resolution (in Angstrom) up to which the two random half-reconstructions will not be independent to prevent diverging orientations","-1"));
 
 	// Initialisation
@@ -503,7 +507,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	ini_high = textToFloat(parser.getOption("--ini_high", "Resolution (in Angstroms) to which to limit refinement in the first iteration ", "-1"));
 
 	// Set the orientations
-    int orientations_section = parser.addSection("Orientations");
+	int orientations_section = parser.addSection("Orientations");
 	// Move these to sampling
 	adaptive_oversampling = textToInteger(parser.getOption("--oversampling", "Adaptive oversampling order to speed-up calculations (0=no oversampling, 1=2x, 2=4x, etc)", "1"));
 	sampling.healpix_order = textToInteger(parser.getOption("--healpix_order", "Healpix order for the angular sampling (before oversampling) on the (3D) sphere: hp2=15deg, hp3=7.5deg, etc", "2"));
@@ -548,41 +552,41 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	do_skip_maximization = false;
 
 	// Helical reconstruction
-    int helical_section = parser.addSection("Helical reconstruction (in development...)");
-    do_helical_refine = parser.checkOption("--helix", "Perform 3D classification or refinement for helices?");
-    ignore_helical_symmetry = parser.checkOption("--ignore_helical_symmetry", "Ignore helical symmetry?");
-    mymodel.helical_nr_asu = textToInteger(parser.getOption("--helical_nr_asu", "Number of new helical asymmetric units (asu) per box (1 means no helical symmetry is present)", "1"));
-    helical_twist_initial = textToFloat(parser.getOption("--helical_twist_initial", "Helical twist (in degrees, positive values for right-handedness)", "0."));
-    mymodel.helical_twist_min = textToFloat(parser.getOption("--helical_twist_min", "Minimum helical twist (in degrees, positive values for right-handedness)", "0."));
-    mymodel.helical_twist_max = textToFloat(parser.getOption("--helical_twist_max", "Maximum helical twist (in degrees, positive values for right-handedness)", "0."));
-    mymodel.helical_twist_inistep = textToFloat(parser.getOption("--helical_twist_inistep", "Initial step of helical twist search (in degrees)", "0."));
-    helical_rise_initial = textToFloat(parser.getOption("--helical_rise_initial", "Helical rise (in Angstroms)", "0."));
-    mymodel.helical_rise_min = textToFloat(parser.getOption("--helical_rise_min", "Minimum helical rise (in Angstroms)", "0."));
-    mymodel.helical_rise_max = textToFloat(parser.getOption("--helical_rise_max", "Maximum helical rise (in Angstroms)", "0."));
-    mymodel.helical_rise_inistep = textToFloat(parser.getOption("--helical_rise_inistep", "Initial step of helical rise search (in Angstroms)", "0."));
-    helical_z_percentage = textToFloat(parser.getOption("--helical_z_percentage", "This box length along the center of Z axis contains good information of the helix. Important in imposing and refining symmetry", "0.3"));
-    helical_tube_inner_diameter = textToFloat(parser.getOption("--helical_inner_diameter", "Inner diameter of helical tubes in Angstroms (for masks of helical references and particles)", "-1."));
-    helical_tube_outer_diameter = textToFloat(parser.getOption("--helical_outer_diameter", "Outer diameter of helical tubes in Angstroms (for masks of helical references and particles)", "-1."));
-    do_helical_symmetry_local_refinement = parser.checkOption("--helical_symmetry_search", "Perform local refinement of helical symmetry?");
-    helical_sigma_distance = textToFloat(parser.getOption("--helical_sigma_distance", "Sigma of distance along the helical tracks", "-1."));
-    helical_keep_tilt_prior_fixed = parser.checkOption("--helical_keep_tilt_prior_fixed", "Keep helical tilt priors fixed (at 90 degrees) in global angular searches?");
-    if (ignore_helical_symmetry)
-    {
-    	mymodel.helical_nr_asu = 1; // IMPORTANT !
-    	do_helical_symmetry_local_refinement = false;
-    	helical_twist_initial = mymodel.helical_twist_min = mymodel.helical_twist_max = mymodel.helical_twist_inistep = 0.;
-    	helical_rise_initial = mymodel.helical_rise_min = mymodel.helical_rise_max = mymodel.helical_rise_inistep = 0.;
-    	helical_z_percentage = 0.;
-    }
-    mymodel.initialiseHelicalParametersLists(helical_twist_initial, helical_rise_initial);
-    mymodel.is_helix = do_helical_refine;
-    RFLOAT tmp_RFLOAT = 0.;
-    if (mymodel.helical_rise_min > mymodel.helical_rise_max)
-    	SWAP(mymodel.helical_rise_min, mymodel.helical_rise_max, tmp_RFLOAT);
-    if (mymodel.helical_twist_min > mymodel.helical_twist_max)
-    	SWAP(mymodel.helical_twist_min, mymodel.helical_twist_max, tmp_RFLOAT);
+	int helical_section = parser.addSection("Helical reconstruction (in development...)");
+	do_helical_refine = parser.checkOption("--helix", "Perform 3D classification or refinement for helices?");
+	ignore_helical_symmetry = parser.checkOption("--ignore_helical_symmetry", "Ignore helical symmetry?");
+	mymodel.helical_nr_asu = textToInteger(parser.getOption("--helical_nr_asu", "Number of new helical asymmetric units (asu) per box (1 means no helical symmetry is present)", "1"));
+	helical_twist_initial = textToFloat(parser.getOption("--helical_twist_initial", "Helical twist (in degrees, positive values for right-handedness)", "0."));
+	mymodel.helical_twist_min = textToFloat(parser.getOption("--helical_twist_min", "Minimum helical twist (in degrees, positive values for right-handedness)", "0."));
+	mymodel.helical_twist_max = textToFloat(parser.getOption("--helical_twist_max", "Maximum helical twist (in degrees, positive values for right-handedness)", "0."));
+	mymodel.helical_twist_inistep = textToFloat(parser.getOption("--helical_twist_inistep", "Initial step of helical twist search (in degrees)", "0."));
+	helical_rise_initial = textToFloat(parser.getOption("--helical_rise_initial", "Helical rise (in Angstroms)", "0."));
+	mymodel.helical_rise_min = textToFloat(parser.getOption("--helical_rise_min", "Minimum helical rise (in Angstroms)", "0."));
+	mymodel.helical_rise_max = textToFloat(parser.getOption("--helical_rise_max", "Maximum helical rise (in Angstroms)", "0."));
+	mymodel.helical_rise_inistep = textToFloat(parser.getOption("--helical_rise_inistep", "Initial step of helical rise search (in Angstroms)", "0."));
+	helical_z_percentage = textToFloat(parser.getOption("--helical_z_percentage", "This box length along the center of Z axis contains good information of the helix. Important in imposing and refining symmetry", "0.3"));
+	helical_tube_inner_diameter = textToFloat(parser.getOption("--helical_inner_diameter", "Inner diameter of helical tubes in Angstroms (for masks of helical references and particles)", "-1."));
+	helical_tube_outer_diameter = textToFloat(parser.getOption("--helical_outer_diameter", "Outer diameter of helical tubes in Angstroms (for masks of helical references and particles)", "-1."));
+	do_helical_symmetry_local_refinement = parser.checkOption("--helical_symmetry_search", "Perform local refinement of helical symmetry?");
+	helical_sigma_distance = textToFloat(parser.getOption("--helical_sigma_distance", "Sigma of distance along the helical tracks", "-1."));
+	helical_keep_tilt_prior_fixed = parser.checkOption("--helical_keep_tilt_prior_fixed", "Keep helical tilt priors fixed (at 90 degrees) in global angular searches?");
+	if (ignore_helical_symmetry)
+	{
+		mymodel.helical_nr_asu = 1; // IMPORTANT !
+		do_helical_symmetry_local_refinement = false;
+		helical_twist_initial = mymodel.helical_twist_min = mymodel.helical_twist_max = mymodel.helical_twist_inistep = 0.;
+		helical_rise_initial = mymodel.helical_rise_min = mymodel.helical_rise_max = mymodel.helical_rise_inistep = 0.;
+		helical_z_percentage = 0.;
+	}
+	mymodel.initialiseHelicalParametersLists(helical_twist_initial, helical_rise_initial);
+	mymodel.is_helix = do_helical_refine;
+	RFLOAT tmp_RFLOAT = 0.;
+	if (mymodel.helical_rise_min > mymodel.helical_rise_max)
+		SWAP(mymodel.helical_rise_min, mymodel.helical_rise_max, tmp_RFLOAT);
+	if (mymodel.helical_twist_min > mymodel.helical_twist_max)
+		SWAP(mymodel.helical_twist_min, mymodel.helical_twist_max, tmp_RFLOAT);
 
-    // CTF, norm, scale, bfactor correction etc.
+	// CTF, norm, scale, bfactor correction etc.
 	int corrections_section = parser.addSection("Corrections");
 	do_ctf_correction = parser.checkOption("--ctf", "Perform CTF correction?");
 	intact_ctf_first_peak = parser.checkOption("--ctf_intact_first_peak", "Ignore CTFs until their first peak?");
@@ -682,42 +686,42 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 
 	// When reading from the CL: always start at iteration 1 and subset 1
 	iter = 0;
-    // When starting from CL: always calculate initial sigma_noise
-    do_calculate_initial_sigma_noise = true;
-    // Start average norm correction at 1!
-    mymodel.avg_norm_correction = 1.;
-    // Always initialise the PDF of the directions
-    directions_have_changed = true;
+	// When starting from CL: always calculate initial sigma_noise
+	do_calculate_initial_sigma_noise = true;
+	// Start average norm correction at 1!
+	mymodel.avg_norm_correction = 1.;
+	// Always initialise the PDF of the directions
+	directions_have_changed = true;
 
-    // Only reconstruct and join random halves are only available when continuing an old run
-    do_join_random_halves = false;
+	// Only reconstruct and join random halves are only available when continuing an old run
+	do_join_random_halves = false;
 
-    // For auto-sampling and convergence check
-    nr_iter_wo_resol_gain = 0;
-    nr_iter_wo_large_hidden_variable_changes = 0;
-    current_changes_optimal_classes = 9999999;
-    current_changes_optimal_offsets = 999.;
-    current_changes_optimal_orientations = 999.;
-    smallest_changes_optimal_classes = 9999999;
-    smallest_changes_optimal_offsets = 999.;
-    smallest_changes_optimal_orientations = 999.;
-    acc_rot = acc_trans = 999.;
+	// For auto-sampling and convergence check
+	nr_iter_wo_resol_gain = 0;
+	nr_iter_wo_large_hidden_variable_changes = 0;
+	current_changes_optimal_classes = 9999999;
+	current_changes_optimal_offsets = 999.;
+	current_changes_optimal_orientations = 999.;
+	smallest_changes_optimal_classes = 9999999;
+	smallest_changes_optimal_offsets = 999.;
+	smallest_changes_optimal_orientations = 999.;
+	acc_rot = acc_trans = 999.;
 
-    best_resol_thus_far = 1./999.;
-    has_converged = false;
-    has_high_fsc_at_limit = false;
-    has_large_incr_size_iter_ago = 0;
-    do_initialise_bodies = false;
+	best_resol_thus_far = 1./999.;
+	has_converged = false;
+	has_high_fsc_at_limit = false;
+	has_large_incr_size_iter_ago = 0;
+	do_initialise_bodies = false;
 
-    // By default, start with nr_bodies to 1
-    mymodel.nr_bodies = 1;
-    fn_body_masks = "None";
+	// By default, start with nr_bodies to 1
+	mymodel.nr_bodies = 1;
+	fn_body_masks = "None";
 
-    // Debugging/analysis/hidden stuff
+	// Debugging/analysis/hidden stuff
 	do_map = !checkParameter(argc, argv, "--no_map");
 	minres_map = textToInteger(getParameter(argc, argv, "--minres_map", "5"));
-    do_bfactor = checkParameter(argc, argv, "--bfactor");
-    gridding_nr_iter = textToInteger(getParameter(argc, argv, "--gridding_iter", "10"));
+	do_bfactor = checkParameter(argc, argv, "--bfactor");
+	gridding_nr_iter = textToInteger(getParameter(argc, argv, "--gridding_iter", "10"));
 	debug1 = textToFloat(getParameter(argc, argv, "--debug1", "0"));
 	debug2 = textToFloat(getParameter(argc, argv, "--debug2", "0"));
 	debug3 = textToFloat(getParameter(argc, argv, "--debug3", "0"));
@@ -738,7 +742,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	do_fsc0999 = checkParameter(argc, argv, "--fsc0999");
 
 #ifdef DEBUG_READ
-    std::cerr<<"MlOptimiser::parseInitial Done"<<std::endl;
+	std::cerr<<"MlOptimiser::parseInitial Done"<<std::endl;
 #endif
 
 }
@@ -748,99 +752,99 @@ void MlOptimiser::read(FileName fn_in, int rank)
 {
 //#define DEBUG_READ
 #ifdef DEBUG_READ
-    std::cerr<<"MlOptimiser::readStar entering ..."<<std::endl;
+	std::cerr<<"MlOptimiser::readStar entering ..."<<std::endl;
 #endif
 
 	if (rank == 0)
 		std::cout << " Reading in optimiser.star ..." << std::endl;
 
 	// Open input file
-    std::ifstream in(fn_in.data(), std::ios_base::in);
-    if (in.fail())
-        REPORT_ERROR( (std::string) "MlOptimiser::readStar: File " + fn_in + " cannot be read." );
+	std::ifstream in(fn_in.data(), std::ios_base::in);
+	if (in.fail())
+		REPORT_ERROR( (std::string) "MlOptimiser::readStar: File " + fn_in + " cannot be read." );
 
-    MetaDataTable MD;
+	MetaDataTable MD;
 
-    // Read general stuff
-    FileName fn_model, fn_model2, fn_sampling;
-    MD.readStar(in, "optimiser_general");
-    in.close();
+	// Read general stuff
+	FileName fn_model, fn_model2, fn_sampling;
+	MD.readStar(in, "optimiser_general");
+	in.close();
 
-    if (!MD.getValue(EMDL_OPTIMISER_OUTPUT_ROOTNAME, fn_out) ||
-        !MD.getValue(EMDL_OPTIMISER_MODEL_STARFILE, fn_model) ||
-		!MD.getValue(EMDL_OPTIMISER_DATA_STARFILE, fn_data) ||
-		!MD.getValue(EMDL_OPTIMISER_SAMPLING_STARFILE, fn_sampling) ||
-        !MD.getValue(EMDL_OPTIMISER_ITERATION_NO, iter) ||
-        !MD.getValue(EMDL_OPTIMISER_NR_ITERATIONS, nr_iter) ||
-        !MD.getValue(EMDL_OPTIMISER_DO_SPLIT_RANDOM_HALVES, do_split_random_halves) ||
-        !MD.getValue(EMDL_OPTIMISER_LOWRES_JOIN_RANDOM_HALVES, low_resol_join_halves) ||
-        !MD.getValue(EMDL_OPTIMISER_ADAPTIVE_OVERSAMPLING, adaptive_oversampling) ||
-		!MD.getValue(EMDL_OPTIMISER_ADAPTIVE_FRACTION, adaptive_fraction) ||
-		!MD.getValue(EMDL_OPTIMISER_RANDOM_SEED, random_seed) ||
-		!MD.getValue(EMDL_OPTIMISER_PARTICLE_DIAMETER, particle_diameter) ||
-		!MD.getValue(EMDL_OPTIMISER_WIDTH_MASK_EDGE, width_mask_edge) ||
-		!MD.getValue(EMDL_OPTIMISER_DO_ZERO_MASK, do_zero_mask) ||
-		!MD.getValue(EMDL_OPTIMISER_DO_SOLVENT_FLATTEN, do_solvent) ||
-		!MD.getValue(EMDL_OPTIMISER_SOLVENT_MASK_NAME, fn_mask) ||
-		!MD.getValue(EMDL_OPTIMISER_SOLVENT_MASK2_NAME, fn_mask2) ||
-		!MD.getValue(EMDL_OPTIMISER_TAU_SPECTRUM_NAME, fn_tau) ||
-		!MD.getValue(EMDL_OPTIMISER_MAX_COARSE_SIZE, max_coarse_size) ||
-		!MD.getValue(EMDL_OPTIMISER_HIGHRES_LIMIT_EXP, strict_highres_exp) ||
-		!MD.getValue(EMDL_OPTIMISER_INCR_SIZE, incr_size) ||
-		!MD.getValue(EMDL_OPTIMISER_DO_MAP, do_map) ||
-		!MD.getValue(EMDL_OPTIMISER_DO_AUTO_REFINE, do_auto_refine) ||
-		!MD.getValue(EMDL_OPTIMISER_AUTO_LOCAL_HP_ORDER, autosampling_hporder_local_searches) ||
+	if (!MD.getValue(EMDL_OPTIMISER_OUTPUT_ROOTNAME, fn_out) ||
+            !MD.getValue(EMDL_OPTIMISER_MODEL_STARFILE, fn_model) ||
+	    !MD.getValue(EMDL_OPTIMISER_DATA_STARFILE, fn_data) ||
+	    !MD.getValue(EMDL_OPTIMISER_SAMPLING_STARFILE, fn_sampling) ||
+	    !MD.getValue(EMDL_OPTIMISER_ITERATION_NO, iter) ||
+	    !MD.getValue(EMDL_OPTIMISER_NR_ITERATIONS, nr_iter) ||
+	    !MD.getValue(EMDL_OPTIMISER_DO_SPLIT_RANDOM_HALVES, do_split_random_halves) ||
+	    !MD.getValue(EMDL_OPTIMISER_LOWRES_JOIN_RANDOM_HALVES, low_resol_join_halves) ||
+	    !MD.getValue(EMDL_OPTIMISER_ADAPTIVE_OVERSAMPLING, adaptive_oversampling) ||
+	    !MD.getValue(EMDL_OPTIMISER_ADAPTIVE_FRACTION, adaptive_fraction) ||
+	    !MD.getValue(EMDL_OPTIMISER_RANDOM_SEED, random_seed) ||
+	    !MD.getValue(EMDL_OPTIMISER_PARTICLE_DIAMETER, particle_diameter) ||
+	    !MD.getValue(EMDL_OPTIMISER_WIDTH_MASK_EDGE, width_mask_edge) ||
+	    !MD.getValue(EMDL_OPTIMISER_DO_ZERO_MASK, do_zero_mask) ||
+	    !MD.getValue(EMDL_OPTIMISER_DO_SOLVENT_FLATTEN, do_solvent) ||
+	    !MD.getValue(EMDL_OPTIMISER_SOLVENT_MASK_NAME, fn_mask) ||
+	    !MD.getValue(EMDL_OPTIMISER_SOLVENT_MASK2_NAME, fn_mask2) ||
+	    !MD.getValue(EMDL_OPTIMISER_TAU_SPECTRUM_NAME, fn_tau) ||
+	    !MD.getValue(EMDL_OPTIMISER_MAX_COARSE_SIZE, max_coarse_size) ||
+	    !MD.getValue(EMDL_OPTIMISER_HIGHRES_LIMIT_EXP, strict_highres_exp) ||
+	    !MD.getValue(EMDL_OPTIMISER_INCR_SIZE, incr_size) ||
+	    !MD.getValue(EMDL_OPTIMISER_DO_MAP, do_map) ||
+	    !MD.getValue(EMDL_OPTIMISER_DO_AUTO_REFINE, do_auto_refine) ||
+	    !MD.getValue(EMDL_OPTIMISER_AUTO_LOCAL_HP_ORDER, autosampling_hporder_local_searches) ||
 	    !MD.getValue(EMDL_OPTIMISER_NR_ITER_WO_RESOL_GAIN, nr_iter_wo_resol_gain) ||
 	    !MD.getValue(EMDL_OPTIMISER_BEST_RESOL_THUS_FAR, best_resol_thus_far) ||
 	    !MD.getValue(EMDL_OPTIMISER_NR_ITER_WO_HIDDEN_VAR_CHANGES, nr_iter_wo_large_hidden_variable_changes) ||
-		!MD.getValue(EMDL_OPTIMISER_DO_SKIP_ALIGN, do_skip_align) ||
-		//!MD.getValue(EMDL_OPTIMISER_DO_SKIP_ROTATE, do_skip_rotate) ||
-		!MD.getValue(EMDL_OPTIMISER_ACCURACY_ROT, acc_rot) ||
+	    !MD.getValue(EMDL_OPTIMISER_DO_SKIP_ALIGN, do_skip_align) ||
+	    //!MD.getValue(EMDL_OPTIMISER_DO_SKIP_ROTATE, do_skip_rotate) ||
+	    !MD.getValue(EMDL_OPTIMISER_ACCURACY_ROT, acc_rot) ||
 	    !MD.getValue(EMDL_OPTIMISER_ACCURACY_TRANS_ANGSTROM, acc_trans) ||
-		!MD.getValue(EMDL_OPTIMISER_CHANGES_OPTIMAL_ORIENTS, current_changes_optimal_orientations) ||
+	    !MD.getValue(EMDL_OPTIMISER_CHANGES_OPTIMAL_ORIENTS, current_changes_optimal_orientations) ||
 	    !MD.getValue(EMDL_OPTIMISER_CHANGES_OPTIMAL_OFFSETS, current_changes_optimal_offsets) ||
 	    !MD.getValue(EMDL_OPTIMISER_CHANGES_OPTIMAL_CLASSES, current_changes_optimal_classes) ||
-		!MD.getValue(EMDL_OPTIMISER_SMALLEST_CHANGES_OPT_ORIENTS, smallest_changes_optimal_orientations) ||
+	    !MD.getValue(EMDL_OPTIMISER_SMALLEST_CHANGES_OPT_ORIENTS, smallest_changes_optimal_orientations) ||
 	    !MD.getValue(EMDL_OPTIMISER_SMALLEST_CHANGES_OPT_OFFSETS, smallest_changes_optimal_offsets) ||
 	    !MD.getValue(EMDL_OPTIMISER_SMALLEST_CHANGES_OPT_CLASSES, smallest_changes_optimal_classes) ||
 	    !MD.getValue(EMDL_OPTIMISER_HAS_CONVERGED, has_converged) ||
 	    !MD.getValue(EMDL_OPTIMISER_HAS_HIGH_FSC_AT_LIMIT, has_high_fsc_at_limit) ||
 	    !MD.getValue(EMDL_OPTIMISER_HAS_LARGE_INCR_SIZE_ITER_AGO, has_large_incr_size_iter_ago) ||
-		!MD.getValue(EMDL_OPTIMISER_DO_CORRECT_NORM, do_norm_correction) ||
-		!MD.getValue(EMDL_OPTIMISER_DO_CORRECT_SCALE, do_scale_correction) ||
-		!MD.getValue(EMDL_OPTIMISER_DO_CORRECT_CTF, do_ctf_correction) ||
-		!MD.getValue(EMDL_OPTIMISER_IGNORE_CTF_UNTIL_FIRST_PEAK, intact_ctf_first_peak) ||
-		!MD.getValue(EMDL_OPTIMISER_DATA_ARE_CTF_PHASE_FLIPPED, ctf_phase_flipped) ||
-		!MD.getValue(EMDL_OPTIMISER_DO_ONLY_FLIP_CTF_PHASES, only_flip_phases) ||
-		!MD.getValue(EMDL_OPTIMISER_REFS_ARE_CTF_CORRECTED, refs_are_ctf_corrected) ||
-		!MD.getValue(EMDL_OPTIMISER_FIX_SIGMA_NOISE, fix_sigma_noise) ||
-		!MD.getValue(EMDL_OPTIMISER_FIX_SIGMA_OFFSET, fix_sigma_offset) ||
-		!MD.getValue(EMDL_OPTIMISER_MAX_NR_POOL, nr_pool)  )
-    	REPORT_ERROR("MlOptimiser::readStar: incorrect optimiser_general table");
+	    !MD.getValue(EMDL_OPTIMISER_DO_CORRECT_NORM, do_norm_correction) ||
+	    !MD.getValue(EMDL_OPTIMISER_DO_CORRECT_SCALE, do_scale_correction) ||
+	    !MD.getValue(EMDL_OPTIMISER_DO_CORRECT_CTF, do_ctf_correction) ||
+	    !MD.getValue(EMDL_OPTIMISER_IGNORE_CTF_UNTIL_FIRST_PEAK, intact_ctf_first_peak) ||
+	    !MD.getValue(EMDL_OPTIMISER_DATA_ARE_CTF_PHASE_FLIPPED, ctf_phase_flipped) ||
+	    !MD.getValue(EMDL_OPTIMISER_DO_ONLY_FLIP_CTF_PHASES, only_flip_phases) ||
+	    !MD.getValue(EMDL_OPTIMISER_REFS_ARE_CTF_CORRECTED, refs_are_ctf_corrected) ||
+	    !MD.getValue(EMDL_OPTIMISER_FIX_SIGMA_NOISE, fix_sigma_noise) ||
+	    !MD.getValue(EMDL_OPTIMISER_FIX_SIGMA_OFFSET, fix_sigma_offset) ||
+	    !MD.getValue(EMDL_OPTIMISER_MAX_NR_POOL, nr_pool)  )
+		REPORT_ERROR("MlOptimiser::readStar: incorrect optimiser_general table");
 
-    // Backward compatibility with RELION-1.4
-    if (!MD.getValue(EMDL_OPTIMISER_LOCAL_SYMMETRY_FILENAME, fn_local_symmetry))
-    	fn_local_symmetry = "None";
-    if (!MD.getValue(EMDL_OPTIMISER_DO_HELICAL_REFINE, do_helical_refine))
-    	do_helical_refine = false;
-    if (!MD.getValue(EMDL_OPTIMISER_IGNORE_HELICAL_SYMMETRY, ignore_helical_symmetry))
-    	ignore_helical_symmetry = false;
-    if (!MD.getValue(EMDL_OPTIMISER_HELICAL_TWIST_INITIAL, helical_twist_initial))
-    	helical_twist_initial = 0.;
-    if (!MD.getValue(EMDL_OPTIMISER_HELICAL_RISE_INITIAL, helical_rise_initial))
-    	helical_rise_initial = 0.;
+	// Backward compatibility with RELION-1.4
+	if (!MD.getValue(EMDL_OPTIMISER_LOCAL_SYMMETRY_FILENAME, fn_local_symmetry))
+		fn_local_symmetry = "None";
+	if (!MD.getValue(EMDL_OPTIMISER_DO_HELICAL_REFINE, do_helical_refine))
+		do_helical_refine = false;
+	if (!MD.getValue(EMDL_OPTIMISER_IGNORE_HELICAL_SYMMETRY, ignore_helical_symmetry))
+		ignore_helical_symmetry = false;
+	if (!MD.getValue(EMDL_OPTIMISER_HELICAL_TWIST_INITIAL, helical_twist_initial))
+		helical_twist_initial = 0.;
+	if (!MD.getValue(EMDL_OPTIMISER_HELICAL_RISE_INITIAL, helical_rise_initial))
+    		helical_rise_initial = 0.;
 	if (!MD.getValue(EMDL_OPTIMISER_HELICAL_Z_PERCENTAGE, helical_z_percentage))
 		helical_z_percentage = 0.3;
 	if (!MD.getValue(EMDL_OPTIMISER_HELICAL_TUBE_INNER_DIAMETER, helical_tube_inner_diameter))
 		helical_tube_inner_diameter = -1.;
 	if (!MD.getValue(EMDL_OPTIMISER_HELICAL_TUBE_OUTER_DIAMETER, helical_tube_outer_diameter))
 		helical_tube_outer_diameter = -1.;
-    if (!MD.getValue(EMDL_OPTIMISER_HELICAL_SYMMETRY_LOCAL_REFINEMENT, do_helical_symmetry_local_refinement))
-    	do_helical_symmetry_local_refinement = false;
-    if (!MD.getValue(EMDL_OPTIMISER_HELICAL_SIGMA_DISTANCE, helical_sigma_distance))
-    	helical_sigma_distance = -1.;
-    if (!MD.getValue(EMDL_OPTIMISER_HELICAL_KEEP_TILT_PRIOR_FIXED, helical_keep_tilt_prior_fixed))
-    	helical_keep_tilt_prior_fixed = false;
+	if (!MD.getValue(EMDL_OPTIMISER_HELICAL_SYMMETRY_LOCAL_REFINEMENT, do_helical_symmetry_local_refinement))
+		do_helical_symmetry_local_refinement = false;
+	if (!MD.getValue(EMDL_OPTIMISER_HELICAL_SIGMA_DISTANCE, helical_sigma_distance))
+		helical_sigma_distance = -1.;
+	if (!MD.getValue(EMDL_OPTIMISER_HELICAL_KEEP_TILT_PRIOR_FIXED, helical_keep_tilt_prior_fixed))
+    		helical_keep_tilt_prior_fixed = false;
 	if (!MD.getValue(EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED, ctf_premultiplied))
 		ctf_premultiplied = false;
 	// New SGD (13Feb2018)
@@ -883,36 +887,36 @@ void MlOptimiser::read(FileName fn_in, int rank)
 	if (!MD.getValue(EMDL_OPTIMISER_FAST_SUBSETS, do_fast_subsets))
 		do_fast_subsets = false;
 
-    if (do_split_random_halves &&
-    		!MD.getValue(EMDL_OPTIMISER_MODEL_STARFILE2, fn_model2))
-    	REPORT_ERROR("MlOptimiser::readStar: splitting data into two random halves, but rlnModelStarFile2 not found in optimiser_general table");
+	if (do_split_random_halves &&
+	    !MD.getValue(EMDL_OPTIMISER_MODEL_STARFILE2, fn_model2))
+	    	REPORT_ERROR("MlOptimiser::readStar: splitting data into two random halves, but rlnModelStarFile2 not found in optimiser_general table");
 
-    // Initialise some stuff for first-iteration only (not relevant here...)
-    do_calculate_initial_sigma_noise = false;
-    do_average_unaligned = false;
-    do_generate_seeds = false;
-    do_firstiter_cc = false;
-    ini_high = 0;
+	// Initialise some stuff for first-iteration only (not relevant here...)
+	do_calculate_initial_sigma_noise = false;
+	do_average_unaligned = false;
+	do_generate_seeds = false;
+	do_firstiter_cc = false;
+	ini_high = 0;
 
-    // Initialise some of the other, hidden or debugging stuff
-    minres_map = 5;
-    do_bfactor = false;
-    gridding_nr_iter = 10;
-    debug1 = debug2 = debug3 = 0.;
+	// Initialise some of the other, hidden or debugging stuff
+	minres_map = 5;
+	do_bfactor = false;
+	gridding_nr_iter = 10;
+	debug1 = debug2 = debug3 = 0.;
 
-    // Then read in sampling, mydata and mymodel stuff
-    // If do_preread_images: when not do_parallel_disc_io: only the master reads all images into RAM; otherwise: everyone reads in images into RAM
+	// Then read in sampling, mydata and mymodel stuff
+	// If do_preread_images: when not do_parallel_disc_io: only the master reads all images into RAM; otherwise: everyone reads in images into RAM
 #ifdef DEBUG_READ
-    std::cerr<<"MlOptimiser::readStar before data."<<std::endl;
+	std::cerr<<"MlOptimiser::readStar before data."<<std::endl;
 #endif
-    bool do_preread = (do_preread_images) ? (do_parallel_disc_io || rank == 0) : false;
-    bool is_helical_segment = (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
-    mydata.read(fn_data, false, false, do_preread, is_helical_segment);
+	bool do_preread = (do_preread_images) ? (do_parallel_disc_io || rank == 0) : false;
+	bool is_helical_segment = (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
+	mydata.read(fn_data, false, false, do_preread, is_helical_segment);
 
 #ifdef DEBUG_READ
-    std::cerr<<"MlOptimiser::readStar before model."<<std::endl;
+	std::cerr<<"MlOptimiser::readStar before model."<<std::endl;
 #endif
-    if (do_split_random_halves)
+	if (do_split_random_halves)
 	{
 		if (rank % 2 == 1)
 			mymodel.read(fn_model);
@@ -924,29 +928,27 @@ void MlOptimiser::read(FileName fn_in, int rank)
 		mymodel.read(fn_model);
 	}
 	// Set up the bodies in the model, if this is a continuation of a multibody refinement (otherwise this is done in initialiseGeneral)
-    if (fn_body_masks != "None")
-    {
-    	mymodel.initialiseBodies(fn_body_masks, fn_out);
+	if (fn_body_masks != "None")
+	{
+		mymodel.initialiseBodies(fn_body_masks, fn_out);
 
-    	if (mymodel.nr_bodies != mydata.nr_bodies)
-    		REPORT_ERROR("ERROR: Unequal number of bodies in model.star and data.star files!");
-    }
+		if (mymodel.nr_bodies != mydata.nr_bodies)
+			REPORT_ERROR("ERROR: Unequal number of bodies in model.star and data.star files!");
+	}
 
 #ifdef DEBUG_READ
-    std::cerr<<"MlOptimiser::readStar before sampling."<<std::endl;
+	std::cerr<<"MlOptimiser::readStar before sampling."<<std::endl;
 #endif
 	sampling.read(fn_sampling);
 
 #ifdef DEBUG_READ
-    std::cerr<<"MlOptimiser::readStar done."<<std::endl;
+	std::cerr<<"MlOptimiser::readStar done."<<std::endl;
 #endif
-
 }
 
 
 void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_write_optimiser, bool do_write_model, int random_subset)
 {
-
 	if (subset_size > 0 && (iter % write_every_sgd_iter) != 0)
 		return;
 
@@ -1041,33 +1043,33 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		MD.setValue(EMDL_OPTIMISER_SGD_STEPSIZE, sgd_stepsize);
 		MD.setValue(EMDL_OPTIMISER_DO_AUTO_REFINE, do_auto_refine);
 		MD.setValue(EMDL_OPTIMISER_AUTO_LOCAL_HP_ORDER, autosampling_hporder_local_searches);
-	    MD.setValue(EMDL_OPTIMISER_NR_ITER_WO_RESOL_GAIN, nr_iter_wo_resol_gain);
-	    MD.setValue(EMDL_OPTIMISER_BEST_RESOL_THUS_FAR,best_resol_thus_far);
-	    MD.setValue(EMDL_OPTIMISER_NR_ITER_WO_HIDDEN_VAR_CHANGES, nr_iter_wo_large_hidden_variable_changes);
+		MD.setValue(EMDL_OPTIMISER_NR_ITER_WO_RESOL_GAIN, nr_iter_wo_resol_gain);
+		MD.setValue(EMDL_OPTIMISER_BEST_RESOL_THUS_FAR,best_resol_thus_far);
+		MD.setValue(EMDL_OPTIMISER_NR_ITER_WO_HIDDEN_VAR_CHANGES, nr_iter_wo_large_hidden_variable_changes);
 		MD.setValue(EMDL_OPTIMISER_DO_SKIP_ALIGN, do_skip_align);
 		MD.setValue(EMDL_OPTIMISER_DO_SKIP_ROTATE, do_skip_rotate);
-	    MD.setValue(EMDL_OPTIMISER_ACCURACY_ROT, acc_rot);
-	    MD.setValue(EMDL_OPTIMISER_ACCURACY_TRANS_ANGSTROM, acc_trans);
-	    MD.setValue(EMDL_OPTIMISER_CHANGES_OPTIMAL_ORIENTS, current_changes_optimal_orientations);
-	    MD.setValue(EMDL_OPTIMISER_CHANGES_OPTIMAL_OFFSETS, current_changes_optimal_offsets);
-	    MD.setValue(EMDL_OPTIMISER_CHANGES_OPTIMAL_CLASSES, current_changes_optimal_classes);
-	    MD.setValue(EMDL_OPTIMISER_SMALLEST_CHANGES_OPT_ORIENTS, smallest_changes_optimal_orientations);
-	    MD.setValue(EMDL_OPTIMISER_SMALLEST_CHANGES_OPT_OFFSETS, smallest_changes_optimal_offsets);
-	    MD.setValue(EMDL_OPTIMISER_SMALLEST_CHANGES_OPT_CLASSES, smallest_changes_optimal_classes);
-	    MD.setValue(EMDL_OPTIMISER_LOCAL_SYMMETRY_FILENAME, fn_local_symmetry);
-	    MD.setValue(EMDL_OPTIMISER_DO_HELICAL_REFINE, do_helical_refine);
-	    MD.setValue(EMDL_OPTIMISER_IGNORE_HELICAL_SYMMETRY, ignore_helical_symmetry);
-	    MD.setValue(EMDL_OPTIMISER_HELICAL_TWIST_INITIAL, helical_twist_initial);
-	    MD.setValue(EMDL_OPTIMISER_HELICAL_RISE_INITIAL, helical_rise_initial);
-	    MD.setValue(EMDL_OPTIMISER_HELICAL_Z_PERCENTAGE, helical_z_percentage);
-	    MD.setValue(EMDL_OPTIMISER_HELICAL_TUBE_INNER_DIAMETER, helical_tube_inner_diameter);
-	    MD.setValue(EMDL_OPTIMISER_HELICAL_TUBE_OUTER_DIAMETER, helical_tube_outer_diameter);
-	    MD.setValue(EMDL_OPTIMISER_HELICAL_SYMMETRY_LOCAL_REFINEMENT, do_helical_symmetry_local_refinement);
-	    MD.setValue(EMDL_OPTIMISER_HELICAL_SIGMA_DISTANCE, helical_sigma_distance);
-	    MD.setValue(EMDL_OPTIMISER_HELICAL_KEEP_TILT_PRIOR_FIXED, helical_keep_tilt_prior_fixed);
-	    MD.setValue(EMDL_OPTIMISER_HAS_CONVERGED, has_converged);
-	    MD.setValue(EMDL_OPTIMISER_HAS_HIGH_FSC_AT_LIMIT, has_high_fsc_at_limit);
-	    MD.setValue(EMDL_OPTIMISER_HAS_LARGE_INCR_SIZE_ITER_AGO, has_large_incr_size_iter_ago);
+		MD.setValue(EMDL_OPTIMISER_ACCURACY_ROT, acc_rot);
+		MD.setValue(EMDL_OPTIMISER_ACCURACY_TRANS_ANGSTROM, acc_trans);
+		MD.setValue(EMDL_OPTIMISER_CHANGES_OPTIMAL_ORIENTS, current_changes_optimal_orientations);
+		MD.setValue(EMDL_OPTIMISER_CHANGES_OPTIMAL_OFFSETS, current_changes_optimal_offsets);
+		MD.setValue(EMDL_OPTIMISER_CHANGES_OPTIMAL_CLASSES, current_changes_optimal_classes);
+		MD.setValue(EMDL_OPTIMISER_SMALLEST_CHANGES_OPT_ORIENTS, smallest_changes_optimal_orientations);
+		MD.setValue(EMDL_OPTIMISER_SMALLEST_CHANGES_OPT_OFFSETS, smallest_changes_optimal_offsets);
+		MD.setValue(EMDL_OPTIMISER_SMALLEST_CHANGES_OPT_CLASSES, smallest_changes_optimal_classes);
+		MD.setValue(EMDL_OPTIMISER_LOCAL_SYMMETRY_FILENAME, fn_local_symmetry);
+		MD.setValue(EMDL_OPTIMISER_DO_HELICAL_REFINE, do_helical_refine);
+		MD.setValue(EMDL_OPTIMISER_IGNORE_HELICAL_SYMMETRY, ignore_helical_symmetry);
+		MD.setValue(EMDL_OPTIMISER_HELICAL_TWIST_INITIAL, helical_twist_initial);
+		MD.setValue(EMDL_OPTIMISER_HELICAL_RISE_INITIAL, helical_rise_initial);
+		MD.setValue(EMDL_OPTIMISER_HELICAL_Z_PERCENTAGE, helical_z_percentage);
+		MD.setValue(EMDL_OPTIMISER_HELICAL_TUBE_INNER_DIAMETER, helical_tube_inner_diameter);
+		MD.setValue(EMDL_OPTIMISER_HELICAL_TUBE_OUTER_DIAMETER, helical_tube_outer_diameter);
+		MD.setValue(EMDL_OPTIMISER_HELICAL_SYMMETRY_LOCAL_REFINEMENT, do_helical_symmetry_local_refinement);
+		MD.setValue(EMDL_OPTIMISER_HELICAL_SIGMA_DISTANCE, helical_sigma_distance);
+		MD.setValue(EMDL_OPTIMISER_HELICAL_KEEP_TILT_PRIOR_FIXED, helical_keep_tilt_prior_fixed);
+		MD.setValue(EMDL_OPTIMISER_HAS_CONVERGED, has_converged);
+		MD.setValue(EMDL_OPTIMISER_HAS_HIGH_FSC_AT_LIMIT, has_high_fsc_at_limit);
+		MD.setValue(EMDL_OPTIMISER_HAS_LARGE_INCR_SIZE_ITER_AGO, has_large_incr_size_iter_ago);
 		MD.setValue(EMDL_OPTIMISER_DO_CORRECT_NORM, do_norm_correction);
 		MD.setValue(EMDL_OPTIMISER_DO_CORRECT_SCALE, do_scale_correction);
 		MD.setValue(EMDL_OPTIMISER_DO_CORRECT_CTF, do_ctf_correction);
@@ -1100,7 +1102,6 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 	// And write the sampling object
 	if (do_write_sampling)
 		sampling.write(fn_root);
-
 }
 
 /** ========================== Initialisation  =========================== */
@@ -1108,7 +1109,7 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 void MlOptimiser::initialise()
 {
 #ifdef DEBUG
-    std::cerr<<"MlOptimiser::initialise Entering"<<std::endl;
+	std::cerr<<"MlOptimiser::initialise Entering"<<std::endl;
 #endif
 
 	if (do_gpu)
@@ -1205,9 +1206,9 @@ void MlOptimiser::initialise()
 #endif
 	}
 
-    initialiseGeneral();
+	initialiseGeneral();
 
-    initialiseWorkLoad();
+	initialiseWorkLoad();
 
 #ifdef ALTCPU
 	// Don't start threading until after most I/O is over
@@ -1392,53 +1393,53 @@ void MlOptimiser::initialiseGeneral(int rank)
             std::cout << " Running CPU instructions in double precision. " << std::endl;
 #endif
 
-    // print symmetry operators or metadata labels before doing anything else...
-    if (do_print_symmetry_ops)
-    {
+	// print symmetry operators or metadata labels before doing anything else...
+	if (do_print_symmetry_ops)
+	{
 		if (verb > 0)
 		{
 			SymList SL;
 			SL.writeDefinition(std::cout, sampling.symmetryGroup());
 		}
 		exit(0);
-    }
+	}
 
-    if (do_print_metadata_labels)
+	if (do_print_metadata_labels)
 	{
 		if (verb > 0)
 			EMDL::printDefinitions(std::cout);
 		exit(0);
 	}
 
-    if (fn_data == "" || fn_out == "")
-    {
-    	REPORT_ERROR("ERROR: provide both --i and --o arguments");
-    }
+	if (fn_data == "" || fn_out == "")
+	{
+		REPORT_ERROR("ERROR: provide both --i and --o arguments");
+	}
 
-    // For safeguarding the gold-standard separation
-    my_halfset = -1;
+	// For safeguarding the gold-standard separation
+	my_halfset = -1;
 
-    // Check if output directory exists
-    FileName fn_dir = fn_out.beforeLastOf("/");
-    if (!exists(fn_dir))
-    	REPORT_ERROR("ERROR: output directory does not exist!");
+	// Check if output directory exists
+	FileName fn_dir = fn_out.beforeLastOf("/");
+	if (!exists(fn_dir))
+		REPORT_ERROR("ERROR: output directory does not exist!");
 
-    // Just die if trying to use accelerators and skipping alignments
-    if (do_skip_align && (do_gpu || do_cpu))
-    	REPORT_ERROR("ERROR: you cannot use accelerators when skipping alignments");
+	// Just die if trying to use accelerators and skipping alignments
+	if (do_skip_align && (do_gpu || do_cpu))
+		REPORT_ERROR("ERROR: you cannot use accelerators when skipping alignments");
 
 	if (do_always_cc)
 		do_calculate_initial_sigma_noise = false;
 
 
-    if (do_shifts_onthefly && (do_gpu || do_cpu))
-    {
-    	std::cerr << "WARNING: --onthefly_shifts cannot be combined with --cpu or --gpu, setting do_shifts_onthefly to false" << std::endl;
-    	do_shifts_onthefly = false;
-    }
+	if (do_shifts_onthefly && (do_gpu || do_cpu))
+	{
+		std::cerr << "WARNING: --onthefly_shifts cannot be combined with --cpu or --gpu, setting do_shifts_onthefly to false" << std::endl;
+		do_shifts_onthefly = false;
+	}
 
 	// If we are not continuing an old run, now read in the data and the reference images
-    if (iter == 0)
+	if (iter == 0)
 	{
 		// Read in the experimental image metadata
 		// If do_preread_images: only the master reads all images into RAM
@@ -1660,17 +1661,17 @@ void MlOptimiser::initialiseGeneral(int rank)
     	particle_diameter = (mymodel.ori_size - width_mask_edge) * mymodel.pixel_size;
 
     // For do_average_unaligned, always use initial low_pass filter
-    if (do_average_unaligned && ini_high < 0.)
-    {
-    	// By default, use 0.07 dig.freq. low-pass filter
-    	// See S.H.W. Scheres (2010) Meth Enzym.
-    	ini_high = 1./mymodel.getResolution(ROUND(0.07 * mymodel.ori_size));
-    }
+	if (do_average_unaligned && ini_high < 0.)
+	{
+		// By default, use 0.07 dig.freq. low-pass filter
+		// See S.H.W. Scheres (2010) Meth Enzym.
+		ini_high = 1./mymodel.getResolution(ROUND(0.07 * mymodel.ori_size));
+	}
 
 	// For skipped alignments
 	// Also do not perturb this orientation, nor do oversampling or priors
 	// Switch off on-the-fly shifts, as that will not work when skipping alignments! (it isn't necessary anyway in that case)
-    if (do_skip_align || do_skip_rotate)
+	if (do_skip_align || do_skip_rotate)
 	{
 		mymodel.orientational_prior_mode = NOPRIOR;
 		sampling.orientational_prior_mode = NOPRIOR;
@@ -1680,11 +1681,11 @@ void MlOptimiser::initialiseGeneral(int rank)
 		sampling.addOneOrientation(0.,0.,0., true);
 		directions_have_changed = true;
 	}
-    else if (do_only_sample_tilt)
-    {
+	else if (do_only_sample_tilt)
+	{
 		std::cout << " Only sampling tilt, keep rot and psi fixed." << std::endl;
 
-    	mymodel.orientational_prior_mode = NOPRIOR;
+		mymodel.orientational_prior_mode = NOPRIOR;
 		sampling.orientational_prior_mode = NOPRIOR;
 		adaptive_oversampling = 0;
 		sampling.perturbation_factor = 0.;
@@ -1704,15 +1705,15 @@ void MlOptimiser::initialiseGeneral(int rank)
 		sampling.psi_angles.clear();
 		sampling.psi_angles.push_back(psi);
 		directions_have_changed = true;
-    }
-    if (do_skip_align)
+	}
+	if (do_skip_align)
 	{
 		RFLOAT dummy=0.;
 		sampling.addOneTranslation(dummy, dummy, dummy, true);
 		do_shifts_onthefly = false; // on-the-fly shifts are incompatible with do_skip_align!
 	}
-    if ( (do_bimodal_psi) && (mymodel.sigma2_psi > 0.) && (verb > 0) )
-    	std::cout << " Using bimodal priors on the psi angle..." << std::endl;
+	if ( (do_bimodal_psi) && (mymodel.sigma2_psi > 0.) && (verb > 0) )
+		std::cout << " Using bimodal priors on the psi angle..." << std::endl;
 
 	// Resize the pdf_direction arrays to the correct size and fill with an even distribution
 	if (directions_have_changed)
@@ -1834,15 +1835,15 @@ void MlOptimiser::initialiseWorkLoad()
 
 	// Randomise the order of the particles
 	if (random_seed == -1) random_seed = time(NULL);
-    // Also randomize random-number-generator for perturbations on the angles
-    init_random_generator(random_seed);
+	// Also randomize random-number-generator for perturbations on the angles
+	init_random_generator(random_seed);
 
-    divide_equally(mydata.numberOfParticles(), 1, 0, my_first_particle_id, my_last_particle_id);
+	divide_equally(mydata.numberOfParticles(), 1, 0, my_first_particle_id, my_last_particle_id);
 
-    // Now copy particle stacks to scratch if needed
-    if (fn_scratch != "" && !do_preread_images)
-    {
-    	mydata.setScratchDirectory(fn_scratch, do_reuse_scratch);
+	// Now copy particle stacks to scratch if needed
+	if (fn_scratch != "" && !do_preread_images)
+	{
+    		mydata.setScratchDirectory(fn_scratch, do_reuse_scratch);
 
 		if (!do_reuse_scratch)
 		{
@@ -1850,7 +1851,7 @@ void MlOptimiser::initialiseWorkLoad()
 			bool also_do_ctfimage = (mymodel.data_dim == 3 && do_ctf_correction);
 			mydata.copyParticlesToScratch(1, true, also_do_ctfimage, keep_free_scratch_Gb);
 		}
-    }
+	}
 
 }
 
@@ -1872,16 +1873,16 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 	{
 		Mavg.initZeros(mymodel.ori_size, mymodel.ori_size);
 	}
-    Mavg.setXmippOrigin();
+	Mavg.setXmippOrigin();
 
 	if (my_nr_particles < 1)
-    {
+	{
     	// Master doesn't do anything here...
     	// But still set Mavg the right size for AllReduce later on
     	return;
-    }
+	}
 
-    if (myverb > 0)
+	if (myverb > 0)
 	{
 		std::cout << " Estimating initial noise spectra " << std::endl;
 		init_progress_bar(my_nr_particles);
@@ -1898,7 +1899,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 	FileName fn_img, fn_stack;
 	// For spectrum calculation: recycle the transformer (so do not call getSpectrum all the time)
 	MultidimArray<Complex > Faux;
-    FourierTransformer transformer;
+	FourierTransformer transformer;
 	MetaDataTable MDimg;
 
 	// Start reconstructions at ini_high or 0.07 digital frequencies....
@@ -3345,31 +3346,31 @@ void MlOptimiser::expectationOneParticle(long int part_id, int thread_id)
 	// In the first iteration, multiple seeds will be generated
 	// A single random class is selected for each pool of images, and one does not marginalise over the orientations
 	// The optimal orientation is based on signal-product (rather than the signal-intensity sensitive Gaussian)
-    // If do_firstiter_cc, then first perform a single iteration with K=1 and cross-correlation criteria, afterwards
+	// If do_firstiter_cc, then first perform a single iteration with K=1 and cross-correlation criteria, afterwards
 
-    // Decide which classes to integrate over (for random class assignment in 1st iteration)
-    int exp_iclass_min = 0;
-    int exp_iclass_max = mymodel.nr_classes - 1;
-    // low-pass filter again and generate the seeds
-    if (do_generate_seeds)
-    {
-    	if (do_firstiter_cc && iter == 1)
-    	{
-    		// In first (CC) iter, use a single reference (and CC)
-    		exp_iclass_min = exp_iclass_max = 0;
-    	}
-    	else if ( (do_firstiter_cc && iter == 2) || (!do_firstiter_cc && iter == 1))
+	// Decide which classes to integrate over (for random class assignment in 1st iteration)
+	int exp_iclass_min = 0;
+	int exp_iclass_max = mymodel.nr_classes - 1;
+	// low-pass filter again and generate the seeds
+	if (do_generate_seeds)
+	{
+		if (do_firstiter_cc && iter == 1)
+		{
+			// In first (CC) iter, use a single reference (and CC)
+			exp_iclass_min = exp_iclass_max = 0;
+		}
+		else if ( (do_firstiter_cc && iter == 2) || (!do_firstiter_cc && iter == 1))
 		{
 			// In second CC iter, or first iter without CC: generate the seeds
-    		// Now select a single random class
-    		// exp_part_id is already in randomized order (controlled by -seed)
-    		// WARNING: USING SAME iclass_min AND iclass_max FOR SomeParticles!!
-    		long int idx = part_id - exp_my_first_part_id;
-    		if (idx >= exp_random_class_some_particles.size())
-    			REPORT_ERROR("BUG: expectationOneParticle idx>random_class_some_particles.size()");
-    		exp_iclass_min = exp_iclass_max = exp_random_class_some_particles[idx];
+			// Now select a single random class
+			// exp_part_id is already in randomized order (controlled by -seed)
+			// WARNING: USING SAME iclass_min AND iclass_max FOR SomeParticles!!
+			long int idx = part_id - exp_my_first_part_id;
+			if (idx >= exp_random_class_some_particles.size())
+				REPORT_ERROR("BUG: expectationOneParticle idx>random_class_some_particles.size()");
+			exp_iclass_min = exp_iclass_max = exp_random_class_some_particles[idx];
 		}
-    }
+	}
 
 
 // This debug is a good one to step through the separate steps of the expectation to see where trouble lies....
@@ -3377,27 +3378,27 @@ void MlOptimiser::expectationOneParticle(long int part_id, int thread_id)
 #ifdef DEBUG_ESP_MEM
 
 	std::cerr << "Entering MlOptimiser::expectationOneParticle" << std::endl;
-    std::cerr << " part_id= " << part_id << std::endl;
-    if (thread_id==0)
+	std::cerr << " part_id= " << part_id << std::endl;
+	if (thread_id==0)
 	{
 		char c;
 		std::cerr << "Before getFourierTransformsAndCtfs, press any key to continue... " << std::endl;
 		std::cin >> c;
 	}
-    global_barrier->wait();
+	global_barrier->wait();
 #endif
 
 
-    // Loop over all bodies of the multi-body refinement
-    // Basically, subsequently align and store weighted sums for each body
-    for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
-    {
+	// Loop over all bodies of the multi-body refinement
+	// Basically, subsequently align and store weighted sums for each body
+	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
+	{
 
 		// Skip this body if keep_fixed_bodies[ibody] or if it's angular accuracy is worse than 1.5x the sampling rate
-    	if ( mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody] > 0)
+		if ( mymodel.nr_bodies > 1 && mymodel.keep_fixed_bodies[ibody] > 0)
 			continue;
 
-    	// Here define all kind of local arrays that will be needed
+		// Here define all kind of local arrays that will be needed
 		std::vector<MultidimArray<Complex > > exp_Fimg, exp_Fimg_nomask;
 		std::vector<std::vector<MultidimArray<Complex > > > exp_local_Fimgs_shifted, exp_local_Fimgs_shifted_nomask;
 		std::vector<MultidimArray<RFLOAT> > exp_Fctf, exp_local_Fctf, exp_local_Minvsigma2;
