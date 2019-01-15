@@ -60,8 +60,8 @@ public:
 	// Dimension of squared area of the micrograph to use for CTF estimation
 	int ctf_win;
 
-	// CTFFIND and Gctf executables
-	FileName fn_ctffind_exe, fn_gctf_exe;
+	// CTFFIND and Gctf executables and shell
+	FileName fn_ctffind_exe, fn_gctf_exe, fn_shell;
 
 	// Is this ctffind4?
 	bool is_ctffind4;
