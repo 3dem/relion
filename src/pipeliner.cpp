@@ -473,9 +473,7 @@ bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, boo
 		                                processList[current_job].type == PROC_3DAUTO ||
 		                                processList[current_job].type == PROC_MULTIBODY ||
 		                                processList[current_job].type == PROC_MANUALPICK ||
-		                                processList[current_job].type == PROC_CLASSSELECT ||
-		                                processList[current_job].type == PROC_MOVIEREFINE ||
-		                                processList[current_job].type == PROC_POLISH);
+		                                processList[current_job].type == PROC_CLASSSELECT);
 
 		// For continuation of relion_refine jobs, remove the original output nodes from the list
 		if (processList[current_job].type == PROC_2DCLASS ||
@@ -595,8 +593,6 @@ int PipeLine::addScheduledJob(std::string typestring, std::string fn_options)
 		type = PROC_3DCLASS;
 	else if (typestring == PROC_3DAUTO_NAME)
 		type = PROC_3DAUTO;
-	else if (typestring == PROC_POLISH_NAME)
-		type = PROC_POLISH;
 	else if (typestring == PROC_MASKCREATE_NAME)
 		typestring = PROC_MASKCREATE;
 	else if (typestring == PROC_JOINSTAR_NAME)
@@ -607,8 +603,6 @@ int PipeLine::addScheduledJob(std::string typestring, std::string fn_options)
 		type = PROC_POST;
 	else if (typestring == PROC_RESMAP_NAME)
 		type = PROC_RESMAP;
-	else if (typestring == PROC_MOVIEREFINE_NAME)
-		type = PROC_MOVIEREFINE;
 	else if (typestring == PROC_INIMODEL_NAME)
 		type = PROC_INIMODEL;
 	else
@@ -765,7 +759,7 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 						int mytype = processList[current_job].type;
 						// The following jobtypes have functionality to only do the unfinished part of the job
 						if (mytype == PROC_MOTIONCORR || mytype == PROC_CTFFIND || mytype == PROC_AUTOPICK || mytype == PROC_EXTRACT
-								|| mytype == PROC_CLASSSELECT || mytype == PROC_MOVIEREFINE)
+								|| mytype == PROC_CLASSSELECT )
 						{
 							myjob.is_continue = true;
 							// Write the job again, now with the updated is_continue status
@@ -2129,11 +2123,6 @@ std::string PipeLineFlowChart::getDownwardsArrowLabel(PipeLine &pipeline, long i
 			mylabel = integerToString(nr_obj) + " particles";
 			break;
 		}
-		case NODE_MOVIE_DATA:
-		{
-			mylabel = "particle movie-frames";
-			break;
-		}
 		case NODE_2DREFS:
 		{
 			mylabel = "2Drefs";
@@ -2299,16 +2288,6 @@ long int PipeLineFlowChart::addProcessToUpwardsFlowChart(std::ofstream &fh, Pipe
 	        {
 	        	is_right = (mynodetype == NODE_3DREF);
 	        	right_label = "3D ref";
-	        	is_left = (mynodetype == NODE_MASK);
-	        	left_label = "mask";
-	        }
-	        else if (pipeline.processList[new_process].type == PROC_MOVIEREFINE)
-	        {
-	        	is_right = (mynodetype == NODE_MOVIES);
-	        	right_label = "movies";
-	        }
-	        else if (pipeline.processList[new_process].type == PROC_POLISH)
-	        {
 	        	is_left = (mynodetype == NODE_MASK);
 	        	left_label = "mask";
 	        }
