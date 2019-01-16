@@ -117,8 +117,6 @@ private:
 	void initialiseClass3DWindow();
 	void initialiseAutorefineWindow();
 	void initialiseMultiBodyWindow();
-	void initialiseMovierefineWindow();
-	void initialisePolishWindow();
 	void initialiseMaskcreateWindow();
 	void initialiseJoinstarWindow();
 	void initialiseSubtractWindow();
