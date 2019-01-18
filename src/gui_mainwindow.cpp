@@ -299,7 +299,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	image_box = new Fl_Box(WCOL0-8, 50 ,w-WCOL0, h-120); // widget that will contain image
 	xpm_image = new Fl_Pixmap(gui_background);
 	image_box->image(xpm_image); // attach xpm image to box
-	
+
 	background_grp->end();
 
     if (!maingui_do_old_style)
@@ -1514,7 +1514,7 @@ void GuiMainWindow::cb_clean_all_jobs_i(bool do_harsh)
 	if (do_harsh)
 	{
 		ask = "Are you sure you want to harshly clean up intermediate files from the entire pipeline? \n\n\
-Harsh cleaning will remove micrographs, movies and particle stacks from all MotionCorr, Extract, MovieRefine, \n\
+Harsh cleaning will remove micrographs, movies and particle stacks from all MotionCorr, Extract, \n\
 Polish and Subtract directories. This means you will NOT be able to use those images in subsequent runs anymore, \n\
 although you could always recreate the data by continuing the job (possibly at considerable computing costs).\n \n \
 You can protect specific jobs from harsh cleaning by creating a file called \"NO_HARSH_CLEAN\" inside their directory,\n\
@@ -1525,8 +1525,6 @@ e.g. by using \"touch Polish/job045/NO_HARSH_CLEAN\". Below is a list of current
 			if (pipeline.processList[myjob].status == PROC_FINISHED &&
 					(pipeline.processList[myjob].type == PROC_MOTIONCORR ||
 					pipeline.processList[myjob].type == PROC_EXTRACT ||
-					pipeline.processList[myjob].type == PROC_MOVIEREFINE ||
-					pipeline.processList[myjob].type == PROC_POLISH ||
 					pipeline.processList[myjob].type == PROC_SUBTRACT) )
 			{
 				if (exists(pipeline.processList[myjob].name + "NO_HARSH_CLEAN"))
@@ -2059,8 +2057,6 @@ If RELION is useful in your work, please cite us. Relevant papers are:\n \n \
      Bai et al. (2013) eLife (PMID: 23427024 )	 \n \n\
  * Correction of mask effects on the FSC curve by randomised phases: \n \
      Chen et al. (2013) Ultramicroscopy (PMID: 23872039)	 \n \n\
- * Particle-polishing: \n \
-     Scheres (2014) eLife (PMID: 25122622)	 \n \n\
  * Auto-picking : \n \
      Scheres (2014) J. Struct. Biol. (PMID: 25486611) \n \n \
  * Sub-tomogram averaging : \n \
