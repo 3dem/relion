@@ -399,6 +399,15 @@ void JobWindow::updateMyJob()
 
 }
 
+
+void JobWindow::initialiseGeneric(RelionJob &_myjob, bool _do_oldstyle)
+{
+	myjob = _myjob;
+
+
+}
+
+
 void JobWindow::initialise(int my_job_type, bool _do_oldstyle)
 {
 

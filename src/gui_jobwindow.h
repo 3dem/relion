@@ -71,6 +71,8 @@ public:
 	// General initialise
 	void initialise(int my_job_type, bool _do_oldstyle = false);
 
+	void initialiseGeneric(int my_job_type, bool _do_oldstyle = false);
+
 	void resetHeight();
 
 	// Place a single entry
@@ -103,6 +105,7 @@ private:
 
 	static void cb_menu_continue(Fl_Widget*, void*);
 	inline void cb_menu_continue_i();
+
 
 	// initialise the window for each of the jobtypes
 	void initialiseImportWindow();

@@ -129,7 +129,7 @@ void GuiEntry::initialise(int x, int y, Fl_Group * deactivate_this_group, bool _
 		browse = new Fl_Button( XCOL4, y, WCOL4, height, "Browse");
 		browse->callback( cb_browse_node, this );
 		browse->color(GUI_BUTTON_COLOR);
-	browse->labelsize(ENTRY_FONTSIZE);
+		browse->labelsize(ENTRY_FONTSIZE);
 	}
 	else if (joboption.joboption_type == JOBOPTION_RADIO || joboption.joboption_type == JOBOPTION_BOOLEAN)
 	{
@@ -137,39 +137,13 @@ void GuiEntry::initialise(int x, int y, Fl_Group * deactivate_this_group, bool _
 		choice = new Fl_Choice(XCOL2, y, WCOL2, height);
 		if (joboption.joboption_type == JOBOPTION_RADIO)
 		{
-			// !!! IMPORTANT !!!
-			// The number of elements must match the array defined in pipeline_jobs.h.
-			if (joboption.radio_menu == RADIO_SAMPLING)
+			// Add all items to the menu
+			for (int i = 0; i < joboption.radio_options.size(); i++)
 			{
-				choice->menu(fl_sampling_options);
-				for (int i = 0; i < 9; i++)
-					if (std::string(job_sampling_options[i]) == joboption.default_value)
-						choice->picked(&fl_sampling_options[i]);
+				// Add all items to the menu
+				choice->add(joboption.radio_options[i].c_str());
+				if (joboption.radio_options[i] == joboption.default_value) choice->picked(choice->mvalue());
 			}
-			else if (joboption.radio_menu == RADIO_NODETYPE)
-			{
-				choice->menu(fl_node_type_options);
-				for (int i = 0; i < 8; i++)
-					if (std::string(job_nodetype_options[i]) == joboption.default_value)
-						choice->picked(&fl_node_type_options[i]);
-			}
-			else if (joboption.radio_menu == RADIO_GAIN_ROTATION)
-			{
-				choice->menu(fl_gain_rotation_options);
-				for (int i = 0; i <= 3; i++)
-					if (std::string(job_gain_rotation_options[i]) == joboption.default_value)
-						choice->picked(&fl_gain_rotation_options[i]);
-			}
-			else if (joboption.radio_menu == RADIO_GAIN_FLIP)
-			{
-				choice->menu(fl_gain_flip_options);
-				for (int i = 0; i <= 2; i++)
-					if (std::string(job_gain_flip_options[i]) == joboption.default_value)
-						choice->picked(&fl_gain_flip_options[i]);
-			}
-			else
-				REPORT_ERROR("BUG: unrecognised radio menu type.");
-
 		}
 		else // boolean
 		{
@@ -248,7 +222,7 @@ void GuiEntry::setValue(std::string _value)
 	{
 		const Fl_Menu_Item *p = menu->find_item(inp->value());
 		if ( p ) menu->picked(p);
-		else REPORT_ERROR("Error readValue: Menu item not found:" + std::string(inp->value()) + " for joboption label= " + joboption.label);
+		//else REPORT_ERROR("Error readValue: Menu item not found:" + std::string(inp->value()) + " for joboption label= " + joboption.label);
 	}
 	if (slider != NULL)
 	{

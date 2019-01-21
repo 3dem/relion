@@ -68,10 +68,16 @@
 #define DEFAULTTHREADMAX 16
 #define DEFAULTMPIRUN "mpirun"
 
-// !!! IMPORTANT !!!
-// When you change the number of items here, you must update GuiEntry::initialise()
- 
-static const char* job_sampling_options[] = {
+static const std::vector<std::string> job_undefined_options{
+	"undefined"
+};
+
+static const std::vector<std::string> job_boolean_options{
+	"Yes",
+	"No"
+};
+
+static const std::vector<std::string> job_sampling_options{
 	"30 degrees",
 	"15 degrees",
 	"7.5 degrees",
@@ -80,10 +86,10 @@ static const char* job_sampling_options[] = {
 	"0.9 degrees",
 	"0.5 degrees",
 	"0.2 degrees",
-	"0.1 degrees",
+	"0.1 degrees"
 };
 
-static const char* job_nodetype_options[] = {
+static const std::vector<std::string> job_nodetype_options{
 	"2D/3D particle coordinates (*.box, *_pick.star)",
 	"Particles STAR file (.star)",
 	"Movie-particles STAR file (.star)",
@@ -91,17 +97,17 @@ static const char* job_nodetype_options[] = {
 	"Micrographs STAR file (.star)",
 	"3D reference (.mrc)",
 	"3D mask (.mrc)",
-	"Unfiltered half-map (unfil.mrc)",
+	"Unfiltered half-map (unfil.mrc)"
 };
 
-static const char* job_gain_rotation_options[] = {
+static const std::vector<std::string> job_gain_rotation_options{
 	"No rotation (0)",
 	"90 degrees (1)",
 	"180 degrees (2)",
-	"270 degrees (3)",
+	"270 degrees (3)"
 };
 
-static const char* job_gain_flip_options[] = {
+static const std::vector<std::string> job_gain_flip_options{
 	"No flipping (0)",
 	"Flip upside down (1)",
 	"Flip left to right (2)"
@@ -123,7 +129,7 @@ static bool do_allow_change_minimum_dedicated;
 #define NODE_MICS			1 // 2D micrograph(s), possibly with CTF information as well, e.g. Falcon001.mrc or micrographs.star
 #define NODE_MIC_COORDS		2 // Suffix for particle coordinates in micrographs (e.g. autopick.star or .box)
 #define NODE_PART_DATA		3 // A metadata (STAR) file with particles (e.g. particles.star or run1_data.star)
-#define NODE_MOVIE_DATA		4 // A metadata (STAR) file with particle movie-frames (e.g. particles_movie.star or run1_ct27_data.star)
+//#define NODE_MOVIE_DATA		4 // A metadata (STAR) file with particle movie-frames (e.g. particles_movie.star or run1_ct27_data.star)
 #define NODE_2DREFS       	5 // A STAR file with one or multiple 2D references, e.g. autopick_references.star
 #define NODE_3DREF       	6 // A single 3D-reference, e.g. map.mrc
 #define NODE_MASK			7 // 3D mask, e.g. mask.mrc or masks.star
@@ -147,13 +153,13 @@ static bool do_allow_change_minimum_dedicated;
 #define PROC_2DCLASS_NAME 		"Class2D"      // 2D classification (from input particles)
 #define PROC_3DCLASS_NAME		"Class3D"      // 3D classification (from input 2D/3D particles, an input 3D-reference, and possibly a 3D mask)
 #define PROC_3DAUTO_NAME        "Refine3D"     // 3D auto-refine (from input particles, an input 3Dreference, and possibly a 3D mask)
-#define PROC_POLISH_NAME	    "Polish"       // Particle-polishing (from movie-particles)
+//#define PROC_POLISH_NAME	    "Polish"       // Particle-polishing (from movie-particles)
 #define PROC_MASKCREATE_NAME    "MaskCreate"   // Process to create masks from input maps
 #define PROC_JOINSTAR_NAME      "JoinStar"     // Process to create masks from input maps
 #define PROC_SUBTRACT_NAME      "Subtract"     // Process to subtract projections of parts of the reference from experimental images
 #define PROC_POST_NAME			"PostProcess"  // Post-processing (from unfiltered half-maps and a possibly a 3D mask)
 #define PROC_RESMAP_NAME  	    "LocalRes"     // Local resolution estimation (from unfiltered half-maps and a 3D mask)
-#define PROC_MOVIEREFINE_NAME   "MovieRefine"  // Movie-particle extraction and refinement combined
+//#define PROC_MOVIEREFINE_NAME   "MovieRefine"  // Movie-particle extraction and refinement combined
 #define PROC_INIMODEL_NAME		"InitialModel" // De-novo generation of 3D initial model (using SGD)
 #define PROC_MULTIBODY_NAME		"MultiBody"    // Multi-body refinement
 #define PROC_MOTIONREFINE_NAME  "Polish"       // Jasenko's motion fitting program for Bayesian polishing (to replace MovieRefine?)
@@ -170,17 +176,18 @@ static bool do_allow_change_minimum_dedicated;
 #define PROC_2DCLASS		8 // 2D classification (from input particles)
 #define PROC_3DCLASS		9 // 3D classification (from input 2D/3D particles, an input 3D-reference, and possibly a 3D mask)
 #define PROC_3DAUTO         10// 3D auto-refine (from input particles, an input 3Dreference, and possibly a 3D mask)
-#define PROC_POLISH  		11// Particle-polishing (from movie-particles)
+//#define PROC_POLISH  		11// Particle-polishing (from movie-particles)
 #define PROC_MASKCREATE     12// Process to create masks from input maps
 #define PROC_JOINSTAR       13// Process to create masks from input maps
 #define PROC_SUBTRACT       14// Process to subtract projections of parts of the reference from experimental images
 #define PROC_POST			15// Post-processing (from unfiltered half-maps and a possibly a 3D mask)
 #define PROC_RESMAP 		16// Local resolution estimation (from unfiltered half-maps and a 3D mask)
-#define PROC_MOVIEREFINE    17// Movie-particle extraction and refinement combined
+//#define PROC_MOVIEREFINE    17// Movie-particle extraction and refinement combined
 #define PROC_INIMODEL		18// De-novo generation of 3D initial model (using SGD)
 #define PROC_MULTIBODY      19// Multi-body refinement
 #define PROC_MOTIONREFINE   20// Jasenko's motion_refine
 #define PROC_CTFREFINE      21// Jasenko's ctf_refine
+#define PROC_PLUGIN        999// General plugin-type
 #define NR_BROWSE_TABS      19
 
 // Status a Process may have
@@ -214,19 +221,28 @@ class Node
 };
 
 // Helper function to get the outputnames of refine jobs
-std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, int dim, int nr_bodies=1, bool do_movies=false, bool do_also_rot=false);
+std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, int dim, int nr_bodies=1);
 
 // Helper function for Jasenko's programs
 bool getFileNamesFromPostProcess(FileName fn_post, FileName &fn_half1, FileName &fn_half2, FileName &fn_mask);
+
+std::string prepareString(const std::string in);
+std::string restoreString(const std::string in);
+std::string prepareVectorString(const std::vector<std::string> in);
+std::vector<std::string> restoreVectorString(const std::string in);
 
 // One class to store any type of Option for a GUI entry
 class JobOption
 {
 public:
 
+	int gui_tab;
+	int gui_ypos;
+	int gui_toggle_continue;
 	std::string label;
 	std::string label_gui;
 	int joboption_type;
+	std::string variable;
 	std::string value;
 	std::string default_value;
 	std::string helptext;
@@ -236,27 +252,31 @@ public:
 	int node_type;
 	std::string pattern;
 	std::string directory;
-	int radio_menu;
+	std::vector<std::string> radio_options;
 
 public:
 
 	// Any constructor
-	JobOption(std::string _label, std::string _default_value, std::string _helptext);
+	JobOption(int _gui_tab, int _gui_ypos, int _gui_toggle_continue, std::string _label, std::string _default_value, std::string _helptext);
 
 	// FileName constructor
-	JobOption(std::string _label, std::string  _default_value, std::string _pattern, std::string _directory, std::string _helptext);
+	JobOption(int _gui_tab, int _gui_ypos, int _gui_toggle_continue, std::string _label, std::string  _default_value, std::string _pattern, std::string _directory, std::string _helptext);
 
 	// InputNode constructor
-	JobOption(std::string _label, int _nodetype, std::string _default_value, std::string _pattern, std::string _helptext);
+	JobOption(int _gui_tab, int _gui_ypos, int _gui_toggle_continue, std::string _label, int _nodetype, std::string _default_value, std::string _pattern, std::string _helptext);
 
 	// Radio constructor
-	JobOption(std::string _label, int radion_menu, int ioption,  std::string _helptext);
+	JobOption(int _gui_tab, int _gui_ypos, int _gui_toggle_continue, std::string _label, std::vector<std::string> radio_options, int ioption,  std::string _helptext);
 
 	// Boolean constructor
-	JobOption(std::string _label, bool _boolvalue, std::string _helptext);
+	JobOption(int _gui_tab, int _gui_ypos, int _gui_toggle_continue, std::string _label, bool _boolvalue, std::string _helptext);
 
 	// Slider constructor
-	JobOption(std::string _label, float _default_value, float _min_value, float _max_value, float _step_value, std::string _helptext);
+	JobOption(int _gui_tab, int _gui_ypos, int _gui_toggle_continue, std::string _label, float _default_value, float _min_value, float _max_value, float _step_value, std::string _helptext);
+
+
+	// Write to a STAR file
+	void writeToMetaDataTable(MetaDataTable& MD, bool do_full = false) const;
 
 	// Empty constructor
 	JobOption()	{ clear(); }
@@ -267,7 +287,7 @@ public:
 	void clear();
 
 	// Set values of label, value, default_value and helptext (common for all types)
-	void initialise(std::string _label, std::string _default_value, std::string _helptext);
+	void initialise(int _gui_tab, int _gui_ypos, int _gui_toggle_continue, std::string _label, std::string _default_value, std::string _helptext);
 
 	// Get a string value
 	std::string getString();
@@ -306,6 +326,9 @@ public:
 	// Name of the hidden file
 	std::string hidden_name;
 
+	// Command to execute for a plugin
+	std::string plugin_command;
+
 	// Which job type is this?
 	int type;
 
@@ -319,6 +342,7 @@ public:
 	std::vector<Node> outputNodes;
 
 	// All the options to this job
+	// Perhaps this could become a vector?
 	std::map<std::string, JobOption > joboptions;
 
 
@@ -333,6 +357,7 @@ public:
 	void clear()
 	{
 		outputName = alias = "";
+		plugin_command = "";
 		type = -1;
 		inputNodes.clear();
 		outputNodes.clear();
@@ -417,14 +442,6 @@ public:
 	bool getCommandsMultiBodyJob(std::string &outputname, std::vector<std::string> &commands,
 			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
 
-	void initialiseMovierefineJob();
-	bool getCommandsMovierefineJob(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
-
-	void initialisePolishJob();
-	bool getCommandsPolishJob(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
-
 	void initialiseMaskcreateJob();
 	bool getCommandsMaskcreateJob(std::string &outputname, std::vector<std::string> &commands,
 			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
@@ -453,6 +470,8 @@ public:
 	bool getCommandsCtfrefineJob(std::string &outputname, std::vector<std::string> &commands,
 			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
 
+	bool getCommandsPluginJob(std::string &outputname, std::vector<std::string> &commands,
+			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
 
 };
 

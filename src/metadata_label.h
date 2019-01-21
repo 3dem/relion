@@ -147,6 +147,24 @@ enum EMDLabel
     EMDL_IMAGE_STATS_KURT,
     EMDL_IMAGE_WEIGHT,
 
+	EMDL_JOB_IS_CONTINUE,
+	EMDL_JOB_TYPE,
+	EMDL_JOB_TYPE_NAME,
+	EMDL_JOB_PLUGIN_COMMAND,
+
+	EMDL_JOBOPTION_TYPE,
+	EMDL_JOBOPTION_VARIABLE,
+	EMDL_JOBOPTION_VALUE,
+	EMDL_JOBOPTION_LABEL,
+	EMDL_JOBOPTION_DEFAULT_VALUE,
+	EMDL_JOBOPTION_MINVAL,
+	EMDL_JOBOPTION_MAXVAL,
+	EMDL_JOBOPTION_STEPVAL,
+	EMDL_JOBOPTION_HELPTEXT,
+	EMDL_JOBOPTION_PATTERN,
+	EMDL_JOBOPTION_DIRECTORY,
+	EMDL_JOBOPTION_MENUOPTIONS,
+
     EMDL_MATRIX_1_1,
     EMDL_MATRIX_1_2,
     EMDL_MATRIX_1_3,
@@ -616,7 +634,25 @@ private:
 
         EMDL::addLabel(EMDL_MASK_NAME, EMDL_STRING, "rlnMaskName", "Name of an image that contains a [0,1] mask");
 
-        EMDL::addLabel(EMDL_MATRIX_1_1, EMDL_DOUBLE, "rlnMatrix_1_1", "Matrix element (1,1) of a 3x3 matrix");
+        EMDL::addLabel(EMDL_JOB_IS_CONTINUE, EMDL_BOOL, "rlnJobIsContinue", "Is tthis a continuation job?");
+		EMDL::addLabel(EMDL_JOB_TYPE, EMDL_INT, "rlnJobType", "Which type of job is this?");
+        EMDL::addLabel(EMDL_JOB_TYPE_NAME, EMDL_STRING, "rlnJobTypeName", "The name for this type of job (also name of main directory for output jobs)");
+        EMDL::addLabel(EMDL_JOB_PLUGIN_COMMAND, EMDL_STRING, "rlnJobPluginCommand", "The command to be executed by an external plugin)");
+
+        EMDL::addLabel(EMDL_JOBOPTION_TYPE, EMDL_INT, "rlnJoboptionType", "Which type of joboption is this?");
+        EMDL::addLabel(EMDL_JOBOPTION_VARIABLE, EMDL_STRING, "rlnJobOptionVariable", "Name of the joboption variable");
+        EMDL::addLabel(EMDL_JOBOPTION_VALUE, EMDL_STRING, "rlnJobOptionValue", "Value of a joboption");
+        EMDL::addLabel(EMDL_JOBOPTION_LABEL, EMDL_STRING, "rlnJobOptionGUILabel", "GUI label of a joboption");
+        EMDL::addLabel(EMDL_JOBOPTION_DEFAULT_VALUE, EMDL_STRING, "rlnJobOptionDefaultValue", "Default value of a joboption");
+        EMDL::addLabel(EMDL_JOBOPTION_MINVAL, EMDL_DOUBLE, "rlnJobOptionSliderMin", "Minimum value for slider of a joboption");
+        EMDL::addLabel(EMDL_JOBOPTION_MAXVAL, EMDL_DOUBLE, "rlnJobOptionSliderMax", "Maximum value for slider of a joboption");
+        EMDL::addLabel(EMDL_JOBOPTION_STEPVAL, EMDL_DOUBLE, "rlnJobOptionSliderStep", "Step value for slider of a joboption");
+        EMDL::addLabel(EMDL_JOBOPTION_HELPTEXT, EMDL_STRING, "rlnJobOptionHelpText", "Extra helptext of a joboption");
+        EMDL::addLabel(EMDL_JOBOPTION_PATTERN, EMDL_STRING, "rlnJobOptionFilePattern", "Pattern for file browser of a joboption");
+        EMDL::addLabel(EMDL_JOBOPTION_DIRECTORY, EMDL_STRING, "rlnJobOptionDirectoryDefault", "Default directory for file browser of a joboption");
+        EMDL::addLabel(EMDL_JOBOPTION_MENUOPTIONS, EMDL_STRING, "rlnJobOptionMenuOptions", "Options for pull-down menu");
+
+		EMDL::addLabel(EMDL_MATRIX_1_1, EMDL_DOUBLE, "rlnMatrix_1_1", "Matrix element (1,1) of a 3x3 matrix");
         EMDL::addLabel(EMDL_MATRIX_1_2, EMDL_DOUBLE, "rlnMatrix_1_2", "Matrix element (1,2) of a 3x3 matrix");
         EMDL::addLabel(EMDL_MATRIX_1_3, EMDL_DOUBLE, "rlnMatrix_1_3", "Matrix element (1,3) of a 3x3 matrix");
         EMDL::addLabel(EMDL_MATRIX_2_1, EMDL_DOUBLE, "rlnMatrix_2_1", "Matrix element (2,1) of a 3x3 matrix");

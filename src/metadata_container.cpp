@@ -69,7 +69,7 @@ void MetaDataContainer::getValue(long offset, bool& dest) const
 {
     dest = bools[offset];
 }
-	  
+
 void MetaDataContainer::getValue(long offset, std::vector<double>& dest) const
 {
 	dest = doubleVectors[offset];
@@ -77,7 +77,7 @@ void MetaDataContainer::getValue(long offset, std::vector<double>& dest) const
 
 void MetaDataContainer::getValue(long offset, std::string& dest) const
 {
-    dest = strings[offset];
+	dest = (strings[offset] == "\"\"") ? "" : strings[offset];
 }
 
 
@@ -108,11 +108,11 @@ void MetaDataContainer::setValue(long offset, const bool& src)
 
 void MetaDataContainer::setValue(long offset, const std::string& src)
 {
-    strings[offset] = src;
+	strings[offset] = (src.length() == 0) ? "\"\"" : src;
 }
 
 void MetaDataContainer::setValue(long offset, const std::vector<double>& src)
 {
 	doubleVectors[offset] = src;
 }
-	  
+
