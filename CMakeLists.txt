@@ -200,13 +200,28 @@ if (ALTCPU)
 	endif(FORCE_OWN_TBB)
 endif(ALTCPU)
 
-# ----------------------------------------------------------Intel Compiler support --
-# ----------------------------------  and build flags including MKL and TBB ---------
-#
+# -------------------------------------------------------------------------------MPI--
+find_package(MPI REQUIRED)
+
+include_directories("${MPI_INCLUDE_PATH}")
+message(STATUS "MPI_INCLUDE_PATH : ${MPI_INCLUDE_PATH}")
+message(STATUS "MPI_LIBRARIES : ${MPI_LIBRARIES}")
+message(STATUS "MPI_CXX_INCLUDE_PATH : ${MPI_CXX_INCLUDE_PATH}")
+message(STATUS "MPI_CXX_LIBRARIES : ${MPI_CXX_LIBRARIES}")
+
 message(STATUS "CMAKE_C_COMPILER : ${CMAKE_C_COMPILER}")
 message(STATUS "CMAKE_CXX_COMPILER : ${CMAKE_CXX_COMPILER}")
 message(STATUS "MPI_C_COMPILER : ${MPI_C_COMPILER}")
 message(STATUS "MPI_CXX_COMPILER : ${MPI_CXX_COMPILER}")
+
+SET(CMAKE_C_COMPILER ${MPI_C_COMPILER})
+SET(CMAKE_CXX_COMPILER ${MPI_CXX_COMPILER})
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
+# ----------------------------------------------------------Intel Compiler support --
+# ----------------------------------  and build flags including MKL and TBB ---------
 
 message(STATUS "CMAKE_CXX_COMPILER_ID : ${CMAKE_CXX_COMPILER_ID}")
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
@@ -238,23 +253,9 @@ if(NOT CudaTexture OR ALTCPU)
     add_definitions(-DPROJECTOR_NO_TEXTURES)
     message(STATUS "Texture interpolation is omitted.")
 endif(NOT CudaTexture OR ALTCPU)
-# -------------------------------------------------------------------------------MPI--
-find_package(MPI REQUIRED)
 
-include_directories("${MPI_INCLUDE_PATH}")
-message(STATUS "MPI_INCLUDE_PATH : ${MPI_INCLUDE_PATH}")
-message(STATUS "MPI_LIBRARIES : ${MPI_LIBRARIES}")
-message(STATUS "MPI_CXX_INCLUDE_PATH : ${MPI_CXX_INCLUDE_PATH}")
-message(STATUS "MPI_CXX_LIBRARIES : ${MPI_CXX_LIBRARIES}")
-
-SET(CMAKE_C_COMPILER ${MPI_C_COMPILER})
-SET(CMAKE_CXX_COMPILER ${MPI_CXX_COMPILER})
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-
-option(FORCE_OWN_FLTK "FORCE_OWN_FLTK" OFF)
 # --------------------------------------------------------------------------X11/FLTK--
+option(FORCE_OWN_FLTK "FORCE_OWN_FLTK" OFF)
 FIND_PACKAGE(X11)
 if(GUI)
     if(X11_FOUND)
