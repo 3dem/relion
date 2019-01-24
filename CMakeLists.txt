@@ -203,7 +203,7 @@ endif(ALTCPU)
 # -------------------------------------------------------------------------------MPI--
 find_package(MPI REQUIRED)
 
-include_directories("${MPI_INCLUDE_PATH}")
+include_directories("${MPI_CXX_INCLUDE_DIRS}")
 message(STATUS "MPI_INCLUDE_PATH : ${MPI_INCLUDE_PATH}")
 message(STATUS "MPI_LIBRARIES : ${MPI_LIBRARIES}")
 message(STATUS "MPI_CXX_INCLUDE_PATH : ${MPI_CXX_INCLUDE_PATH}")
