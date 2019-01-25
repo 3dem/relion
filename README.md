@@ -50,6 +50,10 @@ make install
 These steps will download the source-code, create a build-directory,
 then configure and build relion, and lastly install it to be generally
 available on the system.
+
+If FLTK related errors are reported, please add `-DFORCE_OWN_FLTK=ON` to
+`cmake`. For FFTW related errors, try `-DFORCE_OWN_FFTW=ON`.
+
 ## Updating
 
 
