@@ -203,7 +203,12 @@ endif(ALTCPU)
 # -------------------------------------------------------------------------------MPI--
 find_package(MPI REQUIRED)
 
-include_directories("${MPI_CXX_INCLUDE_DIRS}")
+if ("${MPI_CXX_INCLUDE_DIRS}" STREQUAL "")
+	include_directories("${MPI_CXX_INCLUDE_PATH}")
+else()
+	include_directories("${MPI_CXX_INCLUDE_DIRS}")
+endif()
+
 message(STATUS "MPI_INCLUDE_PATH : ${MPI_INCLUDE_PATH}")
 message(STATUS "MPI_LIBRARIES : ${MPI_LIBRARIES}")
 message(STATUS "MPI_CXX_INCLUDE_PATH : ${MPI_CXX_INCLUDE_PATH}")
