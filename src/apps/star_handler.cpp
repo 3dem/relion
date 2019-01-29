@@ -711,6 +711,9 @@ class star_handler_parameters
 
 	void remove_duplicate()
 	{
+		if (do_ignore_optics)
+			REPORT_ERROR("Duplicate removal is not compatible with --ignore_optics");
+
 		MetaDataTable MD;
 		read_check_ignore_optics(MD, fn_in, "particles");
 
@@ -718,28 +721,10 @@ class star_handler_parameters
 		if (MD.containsLabel(EMDL_MICROGRAPH_NAME)) mic_label = EMDL_MICROGRAPH_NAME;
 		else REPORT_ERROR("The input STAR file does not contain rlnMicrographName column.");
 
-		RFLOAT particle_angpix = -1.0;
-		if (do_ignore_optics)
-		{
-			if (MD.containsLabel(EMDL_CTF_MAGNIFICATION) && MD.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
-			{
-				RFLOAT mag, dstep;
-				MD.getValue(EMDL_CTF_MAGNIFICATION, mag);
-				MD.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
-				particle_angpix = 10000. * dstep / mag;
-				std::cout << " + Using pixel size calculated from magnification and detector pixel size in the input STAR file: " << particle_angpix << std::endl;
-			}
-			else
-			{
-				std::cerr << "WARNING: The given STAR file does not contain the pixel size. Assuming 1 A/pix." << std::endl;
-				particle_angpix = 1.0;
-			}
-		}
-		else
-		{
-			if (obsModel.numberOfOpticsGroups() > 1) REPORT_ERROR("TODO: no implemented multiple optics groups yet!!!");
-			particle_angpix = obsModel.getPixelSize(0);
-		}
+		RFLOAT particle_angpix = 1.0; // rlnOriginX/YAngst is always 1 A/px.
+
+		if (obsModel.numberOfOpticsGroups() > 1)
+			std::cerr << "WARNING: The input contains multiple optics groups. We assume that the pixel sizes of original micrographs before extraction are all the same. If this is not the case, you have to split the input and remove duplicates separately." << std::endl;
 
 		if (extract_angpix > 0)
 		{
@@ -747,14 +732,15 @@ class star_handler_parameters
 		}
 		else
 		{
-			extract_angpix = particle_angpix;
-			std::cout << " + Assuming the pixel size of original micrographs before extraction is also " << extract_angpix << std::endl;
+			extract_angpix = obsModel.getPixelSize(0);
+			std::cout << " + Assuming the pixel size of original micrographs before extraction is " << extract_angpix << std::endl;
 		}
+
 		RFLOAT scale = particle_angpix / extract_angpix;
 		RFLOAT duplicate_threshold_in_px = duplicate_threshold / extract_angpix;
 
 		std::cout << " + The minimum inter-particle distance " << duplicate_threshold << " A corresponds to " << duplicate_threshold_in_px << " px in the micrograph coordinate (rlnCoordinateX/Y)." << std::endl;
-		std::cout << " + The particle shifts (rlnOriginX/Y) are multiplied by " << scale << " to bring it to the same scale as rlnCoordinateX/Y." << std::endl;
+		std::cout << " + The particle shifts (rlnOriginXAngst, rlnOriginYAngst) are multiplied by " << scale << " to bring it to the same scale as rlnCoordinateX/Y." << std::endl;
 		FileName fn_removed = fn_out.withoutExtension() + "_removed.star";
 
 

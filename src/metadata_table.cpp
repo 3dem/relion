@@ -1742,9 +1742,11 @@ MetaDataTable subsetMetaDataTable(MetaDataTable &MDin, EMDLabel label, std::stri
 MetaDataTable removeDuplicatedParticles(MetaDataTable &MDin, EMDLabel mic_label, RFLOAT threshold, RFLOAT origin_scale, FileName fn_removed, bool verb)
 {
 	// Sanity check
-	if (!MDin.containsLabel(EMDL_ORIENT_ORIGIN_X) || !MDin.containsLabel(EMDL_ORIENT_ORIGIN_Y) ||
-	    !MDin.containsLabel(EMDL_IMAGE_COORD_X) || !MDin.containsLabel(EMDL_IMAGE_COORD_Y))
-		REPORT_ERROR("You need rlnCoordinateX, rlnCoordinateY, rlnOriginX and rlnOriginY to remove duplicated particles");
+	if (!MDin.containsLabel(EMDL_ORIENT_ORIGIN_X_ANGSTROM) || !MDin.containsLabel(EMDL_ORIENT_ORIGIN_Y_ANGSTROM))
+		REPORT_ERROR("You need rlnOriginXAngst and rlnOriginYAngst to remove duplicated particles");
+
+	if (!MDin.containsLabel(EMDL_IMAGE_COORD_X) && !MDin.containsLabel(EMDL_IMAGE_COORD_Y))
+		REPORT_ERROR("You need rlnCoordinateX, rlnCoordinateY to remove duplicated particles");
 
 	if (!MDin.containsLabel(mic_label))
 		REPORT_ERROR("STAR file does not contain " + EMDL::label2Str(mic_label));
@@ -1763,10 +1765,10 @@ MetaDataTable removeDuplicatedParticles(MetaDataTable &MDin, EMDLabel mic_label,
 		MDin.getValue(mic_label, mic_name);
 
 		RFLOAT val1, val2;
-		MDin.getValue(EMDL_ORIENT_ORIGIN_X, val1);
+		MDin.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, val1);
 		MDin.getValue(EMDL_IMAGE_COORD_X, val2);
 		xs[current_object] = -val1 * origin_scale + val2;
-		MDin.getValue(EMDL_ORIENT_ORIGIN_Y, val1);
+		MDin.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, val1);
 		MDin.getValue(EMDL_IMAGE_COORD_Y, val2);
 		ys[current_object] = -val1 * origin_scale + val2;
 
