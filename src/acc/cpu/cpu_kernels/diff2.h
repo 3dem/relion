@@ -32,7 +32,7 @@ namespace CpuKernels
 /* 
 template<bool REF3D, int eulers_per_block>
 void diff2_coarse_2D(                    
-		int     grid_size,
+		unsigned long     grid_size,
 		XFLOAT *g_eulers,
 		XFLOAT *g_trans_x,
 		XFLOAT *g_trans_y,
@@ -49,7 +49,7 @@ void diff2_coarse_2D(
 	//Prefetch euler matrices
 	XFLOAT s_eulers[eulers_per_block * 9];
  
-	for (int block = 0; block < grid_size; block++) {
+	for (unsigned long block = 0; block < grid_size; block++) {
 		for (int i = 0; i < eulers_per_block * 9; i++)
 			s_eulers[i] = g_eulers[(size_t)block * (size_t)eulers_per_block * (size_t)9 + i];		
 
@@ -166,7 +166,7 @@ void diff2_coarse_2D(
 
 template<int eulers_per_block>
 void diff2_coarse_3D(                    
-		int     grid_size,
+		unsigned long     grid_size,
 		XFLOAT *g_eulers,
 		XFLOAT *g_trans_x,
 		XFLOAT *g_trans_y,
@@ -183,7 +183,7 @@ void diff2_coarse_3D(
 	//Prefetch euler matrices
 	XFLOAT s_eulers[eulers_per_block * 9];
 	
-	for (int block = 0; block < grid_size; block++) {
+	for (unsigned long block = 0; block < grid_size; block++) {
 		for (int i = 0; i < eulers_per_block * 9; i++)
 			s_eulers[i] = g_eulers[(size_t)block * (size_t)eulers_per_block * (size_t)9 + i];		
 
@@ -323,7 +323,7 @@ void diff2_coarse_3D(
 */
 template<bool REF3D, bool DATA3D, int block_sz, int eulers_per_block, int prefetch_fraction>
 void diff2_coarse(                    
-		int     grid_size,
+		unsigned long     grid_size,
 		XFLOAT *g_eulers,
 		XFLOAT *trans_x,
 		XFLOAT *trans_y,
@@ -348,7 +348,7 @@ void diff2_coarse(
 	//Prefetch euler matrices
 	XFLOAT s_eulers[eulers_per_block * 9];
 
-	for (int block = 0; block < grid_size; block++) {
+	for (unsigned long block = 0; block < grid_size; block++) {
 		for (int i = 0; i < eulers_per_block * 9; i++)
 			s_eulers[i] = g_eulers[(size_t)block * (size_t)eulers_per_block * (size_t)9 + i];
 
@@ -475,7 +475,7 @@ void diff2_coarse(
 	
 template<bool REF3D>
 void diff2_fine_2D(
-		int     grid_size,
+		unsigned long     grid_size,
 		XFLOAT *g_eulers,
 #ifdef DEBUG_CUDA
 		XFLOAT *_g_imgs_real,
@@ -613,7 +613,7 @@ void diff2_fine_2D(
 
 inline
 void diff2_fine_3D(
-		int     grid_size,
+		unsigned long  grid_size,
 		XFLOAT *g_eulers,
 #ifdef DEBUG_CUDA
 		XFLOAT *_g_imgs_real,
@@ -785,7 +785,7 @@ void diff2_fine_3D(
  */
 template<bool REF3D>
  void diff2_CC_coarse_2D(
-		int     grid_size,
+		unsigned long     grid_size,
 		XFLOAT *g_eulers,
 #ifdef DEBUG_CUDA
 		XFLOAT *_g_imgs_real,
@@ -807,7 +807,7 @@ template<bool REF3D>
 	checkedArray<XFLOAT> g_imgs_real;
 	g_imgs_real.initCheckedArray(_g_imgs_real);
 #endif
-	for (int iorient = 0; iorient < grid_size; iorient++) {
+	for (unsigned long iorient = 0; iorient < grid_size; iorient++) {
 	
 		XFLOAT e0,e1,e3,e4,e6,e7;
 		e0 = g_eulers[iorient*9  ];
@@ -920,7 +920,7 @@ template<bool REF3D>
 
 inline 
 void diff2_CC_coarse_3D(
-		int     grid_size,
+		unsigned long     grid_size,
 		XFLOAT *g_eulers,
 #ifdef DEBUG_CUDA
 		XFLOAT *_g_imgs_real,
@@ -943,7 +943,7 @@ void diff2_CC_coarse_3D(
 	checkedArray<XFLOAT> g_imgs_real;
 	g_imgs_real.initCheckedArray(_g_imgs_real);
 #endif
-	for (int iorient = 0; iorient < grid_size; iorient++) {
+	for (unsigned long iorient = 0; iorient < grid_size; iorient++) {
 		XFLOAT e0, e1, e2, e3, e4, e5, e6, e7, e8;
 		e0 = g_eulers[iorient*9  ];
 		e1 = g_eulers[iorient*9+1];
@@ -1081,7 +1081,7 @@ void diff2_CC_coarse_3D(
 
 template<bool REF3D>
 void diff2_CC_fine_2D(
-		int     grid_size,
+		unsigned long     grid_size,
 		XFLOAT *g_eulers,
 #ifdef DEBUG_CUDA
 		XFLOAT *_g_imgs_real,
@@ -1107,7 +1107,7 @@ void diff2_CC_fine_2D(
 	checkedArray<XFLOAT> g_imgs_real;
 	g_imgs_real.initCheckedArray(_g_imgs_real);
 #endif
-	for (int bid = 0; bid < grid_size; bid++) {
+	for (unsigned long bid = 0; bid < grid_size; bid++) {
 
 		unsigned long trans_num   = d_job_num[bid]; //how many transes we have for this rot
 
@@ -1226,7 +1226,7 @@ void diff2_CC_fine_2D(
 
 inline
 void diff2_CC_fine_3D(
-		int     grid_size,
+		unsigned long     grid_size,
 		XFLOAT *g_eulers,
 #ifdef DEBUG_CUDA
 		XFLOAT *_g_imgs_real,
@@ -1254,7 +1254,7 @@ void diff2_CC_fine_3D(
 	g_imgs_real.initCheckedArray(_g_imgs_real);
 #endif
 
-	for (int bid = 0; bid < grid_size; bid++) {
+	for (unsigned long bid = 0; bid < grid_size; bid++) {
 
 		unsigned long trans_num   = d_job_num[bid]; //how many transes we have for this rot
 

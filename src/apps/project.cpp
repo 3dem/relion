@@ -464,10 +464,8 @@ int main(int argc, char *argv[])
 	try
 	{
 		prm.read(argc, argv);
-
 		prm.project();
 	}
-
 	catch (RelionError XE)
 	{
 	        //prm.usage();

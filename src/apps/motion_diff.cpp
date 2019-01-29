@@ -8,44 +8,44 @@ using namespace gravis;
 
 int main(int argc, char *argv[])
 {
-    IOParser parser;
-    std::string starFn, tracksPath0, tracksPath1;
+	IOParser parser;
+	std::string starFn, tracksPath0, tracksPath1;
 
-    parser.setCommandLine(argc, argv);
-    parser.addSection("General options");
-    starFn = parser.getOption("--i", "Input STAR file with a list of particles");
+	parser.setCommandLine(argc, argv);
+	parser.addSection("General options");
+	starFn = parser.getOption("--i", "Input STAR file with a list of particles");
 	tracksPath0 = parser.getOption("--t0", "Path to particle trajectories 0");
 	tracksPath1 = parser.getOption("--t1", "Path to particle trajectories 1");
 
-    if (parser.checkForErrors()) return 1;
+	if (parser.checkForErrors()) return 1;
 
-    MetaDataTable mdt0;
-    mdt0.read(starFn);
+	MetaDataTable mdt0;
+	mdt0.read(starFn);
 
-    std::vector<MetaDataTable> mdts = StackHelper::splitByStack(&mdt0);
+	std::vector<MetaDataTable> mdts = StackHelper::splitByStack(&mdt0);
 
-    const int mgc = mdts.size();
+	const int mgc = mdts.size();
 
-    double mu = 0.0;
-    long tpc = 0;
+	double mu = 0.0;
+	long tpc = 0;
 	int fc = 0;
 	
 	int bc = 10;
 	std::vector<double> bins(bc+1, 0.0);
 
-    for (int m = 0; m < mgc; m++)
-    {
-        std::stringstream stsg;
-        stsg << m;
+	for (int m = 0; m < mgc; m++)
+	{
+		std::stringstream stsg;
+		stsg << m;
 
-        if (m%100 == 0) std::cout << "micrograph " << (m+1) << " / " << mgc << "\n";
+		if (m%100 == 0) std::cout << "micrograph " << (m+1) << " / " << mgc << "\n";
 
-        const int pc = mdts[m].numberOfObjects();
-        tpc += pc;
+		const int pc = mdts[m].numberOfObjects();
+		tpc += pc;
 
-        std::string tag;
-        mdts[m].getValue(EMDL_IMAGE_NAME, tag, 0);
-        tag = tag.substr(0,tag.find_last_of('.'));
+		std::string tag;
+		mdts[m].getValue(EMDL_IMAGE_NAME, tag, 0);
+		tag = tag.substr(0,tag.find_last_of('.'));
 		tag = tag.substr(tag.find_first_of('@')+1);
 		tag = tag.substr(tag.find_last_of('/')+1);
 		
@@ -55,23 +55,23 @@ int main(int argc, char *argv[])
 		std::vector<std::vector<d2Vector>> shift0;
 		std::vector<std::vector<d2Vector>> shift1;
 
-        try
-        {
+		try
+		{
 			shift0 = MotionHelper::readTracks(tfn0);
 			shift1 = MotionHelper::readTracks(tfn1);
-        }
-        catch (RelionError XE)
-        {
-            std::cerr << "Warning: error reading tracks in " << tfn0 << ", " << tfn1 << "\n";
-            continue;
-        }
+		}
+		catch (RelionError XE)
+		{
+			std::cerr << "Warning: error reading tracks in " << tfn0 << ", " << tfn1 << "\n";
+			continue;
+		}
 		
 		fc = shift0[0].size();
 		
-        for (int p = 0; p < pc; p++)
-        for (int f = 0; f < fc; f++)
-        {
-            double d = (shift1[p][f] - shift0[p][f]).length(); 
+		for (int p = 0; p < pc; p++)
+		for (int f = 0; f < fc; f++)
+		{
+			double d = (shift1[p][f] - shift0[p][f]).length(); 
 			
 			mu += d;
 			
@@ -81,8 +81,8 @@ int main(int argc, char *argv[])
 			else if (b < 0) b = 0;
 			
 			bins[b] += 1.0;
-        }
-    }
+		}
+	}
 	
 	mu /= tpc;
 	

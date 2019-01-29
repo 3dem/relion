@@ -681,7 +681,7 @@ void runDiff2KernelCoarse(
 				CRITICAL(ERR_TRANSLIM);
 #endif
 
-			unsigned rest = orientation_num % blocks3D;
+			long unsigned rest = orientation_num % blocks3D;
 			long unsigned even_orientation_num = orientation_num - rest;
 // TODO - find a more compact way to represent these combinations resulting in
 // a single call to diff2_course?
@@ -691,7 +691,7 @@ void runDiff2KernelCoarse(
 				{
 					if(data_is_3D)
 						AccUtilities::diff2_coarse<true,true, D2C_BLOCK_SIZE_DATA3D, D2C_EULERS_PER_BLOCK_DATA3D, 4>(
-							even_orientation_num/D2C_EULERS_PER_BLOCK_DATA3D, 
+							even_orientation_num/(unsigned long)D2C_EULERS_PER_BLOCK_DATA3D, 
 							D2C_BLOCK_SIZE_DATA3D,
 							d_eulers,
 							trans_x,
@@ -707,7 +707,7 @@ void runDiff2KernelCoarse(
 							stream);
 					else
 						AccUtilities::diff2_coarse<true,false, D2C_BLOCK_SIZE_REF3D, D2C_EULERS_PER_BLOCK_REF3D, 4>(
-							even_orientation_num/D2C_EULERS_PER_BLOCK_REF3D, 
+							even_orientation_num/(unsigned long)D2C_EULERS_PER_BLOCK_REF3D, 
 							D2C_BLOCK_SIZE_REF3D,
 							d_eulers,
 							trans_x,
@@ -765,7 +765,7 @@ void runDiff2KernelCoarse(
 				{
 					if(data_is_3D)
 						AccUtilities::diff2_coarse<true,true, D2C_BLOCK_SIZE_DATA3D*2, D2C_EULERS_PER_BLOCK_DATA3D, 4>(
-							even_orientation_num/D2C_EULERS_PER_BLOCK_DATA3D,
+							even_orientation_num/(unsigned long)D2C_EULERS_PER_BLOCK_DATA3D,
 							D2C_BLOCK_SIZE_DATA3D*2,
 							d_eulers,
 							trans_x,
@@ -781,7 +781,7 @@ void runDiff2KernelCoarse(
 							stream);
 					else
 						AccUtilities::diff2_coarse<true,false, D2C_BLOCK_SIZE_REF3D*2, D2C_EULERS_PER_BLOCK_REF3D, 4>(
-							even_orientation_num/D2C_EULERS_PER_BLOCK_REF3D,
+							even_orientation_num/(unsigned long)D2C_EULERS_PER_BLOCK_REF3D,
 							D2C_BLOCK_SIZE_REF3D*2,
 							d_eulers,
 							trans_x,
@@ -840,7 +840,7 @@ void runDiff2KernelCoarse(
 				{
 					if(data_is_3D)
 						AccUtilities::diff2_coarse<true,true, D2C_BLOCK_SIZE_DATA3D*4, D2C_EULERS_PER_BLOCK_DATA3D, 4>(
-							even_orientation_num/D2C_EULERS_PER_BLOCK_DATA3D,
+							even_orientation_num/(unsigned long)D2C_EULERS_PER_BLOCK_DATA3D,
 							D2C_BLOCK_SIZE_DATA3D*4,
 							d_eulers,
 							trans_x,
@@ -856,7 +856,7 @@ void runDiff2KernelCoarse(
 							stream);
 					else
 						AccUtilities::diff2_coarse<true,false, D2C_BLOCK_SIZE_REF3D*4, D2C_EULERS_PER_BLOCK_REF3D, 4>(
-							even_orientation_num/D2C_EULERS_PER_BLOCK_REF3D,
+							even_orientation_num/(unsigned long)D2C_EULERS_PER_BLOCK_REF3D,
 							D2C_BLOCK_SIZE_REF3D*4,
 							d_eulers,
 							trans_x,
@@ -915,7 +915,7 @@ void runDiff2KernelCoarse(
 				{
 					if(data_is_3D)
 						AccUtilities::diff2_coarse<true,true, D2C_BLOCK_SIZE_DATA3D*8, D2C_EULERS_PER_BLOCK_DATA3D, 4>(
-							even_orientation_num/D2C_EULERS_PER_BLOCK_DATA3D,
+							even_orientation_num/(unsigned long)D2C_EULERS_PER_BLOCK_DATA3D,
 							D2C_BLOCK_SIZE_DATA3D*8,
 							d_eulers,
 							trans_x,
@@ -931,7 +931,7 @@ void runDiff2KernelCoarse(
 							stream);
 					else
 						AccUtilities::diff2_coarse<true,false, D2C_BLOCK_SIZE_REF3D*8, D2C_EULERS_PER_BLOCK_REF3D, 4>(
-							even_orientation_num/D2C_EULERS_PER_BLOCK_REF3D,
+							even_orientation_num/(unsigned long)D2C_EULERS_PER_BLOCK_REF3D,
 							D2C_BLOCK_SIZE_REF3D*8,
 							d_eulers,
 							trans_x,
@@ -996,14 +996,14 @@ void runDiff2KernelCoarse(
 			}
 
 
-			unsigned rest = orientation_num % D2C_EULERS_PER_BLOCK_2D;
+			long unsigned rest = orientation_num % (unsigned long)D2C_EULERS_PER_BLOCK_2D;
 			long unsigned even_orientation_num = orientation_num - rest;
 
 			if (even_orientation_num != 0)
 			{
 				if(data_is_3D)
 					AccUtilities::diff2_coarse<false,true, D2C_BLOCK_SIZE_2D, D2C_EULERS_PER_BLOCK_2D, 2>(
-						even_orientation_num/D2C_EULERS_PER_BLOCK_2D,
+						even_orientation_num/(unsigned long)D2C_EULERS_PER_BLOCK_2D,
 						D2C_BLOCK_SIZE_2D,
 						d_eulers,
 						trans_x,
@@ -1019,7 +1019,7 @@ void runDiff2KernelCoarse(
 						stream);
 				else
 					AccUtilities::diff2_coarse<false,false, D2C_BLOCK_SIZE_2D, D2C_EULERS_PER_BLOCK_2D, 2>(
-						even_orientation_num/D2C_EULERS_PER_BLOCK_2D,
+						even_orientation_num/(unsigned long)D2C_EULERS_PER_BLOCK_2D,
 						D2C_BLOCK_SIZE_2D,
 						d_eulers,
 						trans_x,
@@ -1163,7 +1163,7 @@ void runDiff2KernelFine(
 		bool do_CC,
 		bool data_is_3D)
 {
-    int block_dim = job_num_count;
+    long unsigned block_dim = job_num_count;
 
     if(!do_CC)
     {

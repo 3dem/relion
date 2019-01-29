@@ -25,25 +25,19 @@ int main(int argc, char *argv[])
 	ParticleSorter prm;
 
 	try
-    {
+	{
 		prm.read(argc, argv);
 
 		prm.initialise();
 
 		prm.run();
-    }
+	}
+	catch (RelionError XE)
+	{
+		//prm.usage();
+		std::cerr << XE;
+		exit(1);
+	}
 
-    catch (RelionError XE)
-    {
-        //prm.usage();
-        std::cerr << XE;
-        exit(1);
-    }
-
-    return 0;
-
+	return 0;
 }
-
-
-
-

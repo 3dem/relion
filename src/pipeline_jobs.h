@@ -68,6 +68,7 @@
 #define DEFAULTMPIMAX 64
 #define DEFAULTNRTHREADS 1
 #define DEFAULTTHREADMAX 16
+#define DEFAULTMPIRUN "mpirun"
 
 static const char* job_sampling_options[] = {
 	"30 degrees",

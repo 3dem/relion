@@ -65,7 +65,7 @@ static Fl_Group *background_grp;
 static Fl_Choice *display_io_node;
 static Fl_Select_Browser *finished_job_browser, *running_job_browser, *scheduled_job_browser, *input_job_browser, *output_job_browser;
 static Fl_Box *image_box;
-static Fl_XPM_Image *xpm_image;
+static Fl_Pixmap *xpm_image;
 // For keeping track of which process to use in the process browser on the GUI
 static std::vector<long int> running_processes, finished_processes, scheduled_processes, input_processes, output_processes, io_nodes;
 static bool is_main_continue;

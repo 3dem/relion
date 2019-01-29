@@ -27,12 +27,9 @@ int main(int argc, char *argv[])
 	try
 	{
 		prm.read(argc, argv);
-
 		prm.initialise();
-
 		prm.run();
 	}
-
 	catch (RelionError XE)
 	{
 		//prm.usage();
@@ -41,7 +38,4 @@ int main(int argc, char *argv[])
 	}
 
 	return 0;
-
 }
-
-

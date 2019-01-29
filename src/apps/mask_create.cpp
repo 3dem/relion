@@ -31,12 +31,12 @@
 class mask_create_parameters
 {
 	public:
-   	FileName fn_apply_in, fn_mask, fn_apply_out, fn_thr, fn_omask, fn_and, fn_or, fn_andnot, fn_ornot;
-   	RFLOAT ini_threshold, extend_ini_mask, width_soft_edge, lowpass, angpix, helical_z_percentage;
+	FileName fn_apply_in, fn_mask, fn_apply_out, fn_thr, fn_omask, fn_and, fn_or, fn_andnot, fn_ornot;
+	RFLOAT ini_threshold, extend_ini_mask, width_soft_edge, lowpass, angpix, helical_z_percentage;
 	RFLOAT inner_radius, outer_radius, center_x, center_y, center_z;
 	bool do_invert, do_helix, do_denovo;
 	int n_threads, box_size;
-   	IOParser parser;
+	IOParser parser;
 
 	void usage()
 	{
@@ -209,8 +209,6 @@ class mask_create_parameters
 			cutZCentralPartOfSoftMask(Iout(), helical_z_percentage, width_soft_edge);
 		}
 	}
-
-
 };
 
 
@@ -219,20 +217,17 @@ int main(int argc, char *argv[])
 	mask_create_parameters prm;
 
 	try
-    {
-
+	{
 		prm.read(argc, argv);
-
 		prm.run();
-
-    }
-    catch (RelionError XE)
-    {
-        std::cerr << XE;
-        //prm.usage();
-        exit(1);
-    }
-    return 0;
+	}
+	catch (RelionError XE)
+	{
+		std::cerr << XE;
+		//prm.usage();
+		exit(1);
+	}
+	return 0;
 }
 
 

@@ -627,7 +627,8 @@ void kernel_wavg(
 
 template<bool REF3D, bool DATA3D, int block_sz, int eulers_per_block, int prefetch_fraction>
 void diff2_coarse(
-		int grid_size, int block_size,
+		unsigned long grid_size, 
+		int block_size,
 		XFLOAT *g_eulers,
 		XFLOAT *trans_x,
 		XFLOAT *trans_y,
@@ -707,7 +708,8 @@ void diff2_coarse(
 
 template<bool REF3D, bool DATA3D, int block_sz>
 void diff2_CC_coarse(
-		int grid_size, int block_size,
+		unsigned long grid_size, 
+		int block_size,
 		XFLOAT *g_eulers,
 		XFLOAT *g_imgs_real,
 		XFLOAT *g_imgs_imag,
@@ -774,7 +776,8 @@ void diff2_CC_coarse(
 
 template<bool REF3D, bool DATA3D, int block_sz, int chunk_sz>
 void diff2_fine(
-		int grid_size, int block_size,
+		unsigned long grid_size, 
+		int block_size,
 		XFLOAT *g_eulers,
 		XFLOAT *g_imgs_real,
 		XFLOAT *g_imgs_imag,
@@ -784,7 +787,7 @@ void diff2_fine(
 		AccProjectorKernel projector,
 		XFLOAT *g_corr_img,
 		XFLOAT *g_diff2s,
-		unsigned image_size,
+		unsigned long image_size,
 		XFLOAT sum_init,
 		unsigned long orientation_num,
 		unsigned long translation_num,
@@ -862,7 +865,8 @@ void diff2_fine(
 
 template<bool REF3D, bool DATA3D, int block_sz,int chunk_sz>
 void diff2_CC_fine(
-		int grid_size, int block_size,
+		unsigned long grid_size, 
+		int block_size,
 		XFLOAT *g_eulers,
 		XFLOAT *g_imgs_real,
 		XFLOAT *g_imgs_imag,
