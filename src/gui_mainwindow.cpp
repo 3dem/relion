@@ -910,7 +910,7 @@ void GuiMainWindow::fillStdOutAndErr()
 		else
 		{
 			// Remove annoying carriage returns
-			std::string command = "awk -F\"\r\" '{if (NF>1) {print $NF} else {print}}' < " + fn_out + " | tail -6 > " + fn_outtail;
+			std::string command = "tail -n 6 < " + fn_out + " | awk -F\"\r\" '{if (NF>1) {print $NF} else {print}}' > " + fn_outtail;
 			int res = system(command.c_str());
 			std::ifstream in(fn_outtail.c_str(), std::ios_base::in);
 			if (in.fail())
