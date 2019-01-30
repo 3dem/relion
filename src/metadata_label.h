@@ -150,7 +150,6 @@ enum EMDLabel
 	EMDL_JOB_IS_CONTINUE,
 	EMDL_JOB_TYPE,
 	EMDL_JOB_TYPE_NAME,
-	EMDL_JOB_PLUGIN_COMMAND,
 
 	EMDL_JOBOPTION_TYPE,
 	EMDL_JOBOPTION_VARIABLE,
@@ -637,7 +636,6 @@ private:
         EMDL::addLabel(EMDL_JOB_IS_CONTINUE, EMDL_BOOL, "rlnJobIsContinue", "Is tthis a continuation job?");
 		EMDL::addLabel(EMDL_JOB_TYPE, EMDL_INT, "rlnJobType", "Which type of job is this?");
         EMDL::addLabel(EMDL_JOB_TYPE_NAME, EMDL_STRING, "rlnJobTypeName", "The name for this type of job (also name of main directory for output jobs)");
-        EMDL::addLabel(EMDL_JOB_PLUGIN_COMMAND, EMDL_STRING, "rlnJobPluginCommand", "The command to be executed by an external plugin)");
 
         EMDL::addLabel(EMDL_JOBOPTION_TYPE, EMDL_INT, "rlnJoboptionType", "Which type of joboption is this?");
         EMDL::addLabel(EMDL_JOBOPTION_VARIABLE, EMDL_STRING, "rlnJobOptionVariable", "Name of the joboption variable");

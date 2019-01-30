@@ -39,6 +39,13 @@
 #include <iostream>
 #include <sstream>
 #include <fstream>
+#define YSTEP 20
+
+#define TOGGLE_DEACTIVATE 0
+#define TOGGLE_REACTIVATE 1
+#define TOGGLE_ALWAYS_DEACTIVATE 2
+#define TOGGLE_LEAVE_ACTIVE 3
+
 
 #define HAS_MPI true
 #define HAS_NOT_MPI false
@@ -187,13 +194,22 @@ static bool do_allow_change_minimum_dedicated;
 #define PROC_MULTIBODY      19// Multi-body refinement
 #define PROC_MOTIONREFINE   20// Jasenko's motion_refine
 #define PROC_CTFREFINE      21// Jasenko's ctf_refine
-#define PROC_PLUGIN        999// General plugin-type
 #define NR_BROWSE_TABS      19
 
 // Status a Process may have
 #define PROC_RUNNING   0
 #define PROC_SCHEDULED 1
 #define PROC_FINISHED  2
+
+struct gui_layout
+{
+    /// Name for the tab
+    std::string tabname;
+    /// y-position
+    int ypos;
+    ///
+    RFLOAT w;
+};
 
 class Node
 {
@@ -231,14 +247,12 @@ std::string restoreString(const std::string in);
 std::string prepareVectorString(const std::vector<std::string> in);
 std::vector<std::string> restoreVectorString(const std::string in);
 
+
 // One class to store any type of Option for a GUI entry
 class JobOption
 {
 public:
 
-	int gui_tab;
-	int gui_ypos;
-	int gui_toggle_continue;
 	std::string label;
 	std::string label_gui;
 	int joboption_type;
@@ -257,22 +271,22 @@ public:
 public:
 
 	// Any constructor
-	JobOption(int _gui_tab, int _gui_ypos, int _gui_toggle_continue, std::string _label, std::string _default_value, std::string _helptext);
+	JobOption(std::string _label, std::string _default_value, std::string _helptext);
 
 	// FileName constructor
-	JobOption(int _gui_tab, int _gui_ypos, int _gui_toggle_continue, std::string _label, std::string  _default_value, std::string _pattern, std::string _directory, std::string _helptext);
+	JobOption(std::string _label, std::string  _default_value, std::string _pattern, std::string _directory, std::string _helptext);
 
 	// InputNode constructor
-	JobOption(int _gui_tab, int _gui_ypos, int _gui_toggle_continue, std::string _label, int _nodetype, std::string _default_value, std::string _pattern, std::string _helptext);
+	JobOption(std::string _label, int _nodetype, std::string _default_value, std::string _pattern, std::string _helptext);
 
 	// Radio constructor
-	JobOption(int _gui_tab, int _gui_ypos, int _gui_toggle_continue, std::string _label, std::vector<std::string> radio_options, int ioption,  std::string _helptext);
+	JobOption(std::string _label, std::vector<std::string> radio_options, int ioption,  std::string _helptext);
 
 	// Boolean constructor
-	JobOption(int _gui_tab, int _gui_ypos, int _gui_toggle_continue, std::string _label, bool _boolvalue, std::string _helptext);
+	JobOption(std::string _label, bool _boolvalue, std::string _helptext);
 
 	// Slider constructor
-	JobOption(int _gui_tab, int _gui_ypos, int _gui_toggle_continue, std::string _label, float _default_value, float _min_value, float _max_value, float _step_value, std::string _helptext);
+	JobOption(std::string _label, float _default_value, float _min_value, float _max_value, float _step_value, std::string _helptext);
 
 
 	// Write to a STAR file
@@ -287,7 +301,7 @@ public:
 	void clear();
 
 	// Set values of label, value, default_value and helptext (common for all types)
-	void initialise(int _gui_tab, int _gui_ypos, int _gui_toggle_continue, std::string _label, std::string _default_value, std::string _helptext);
+	void initialise(std::string _label, std::string _default_value, std::string _helptext);
 
 	// Get a string value
 	std::string getString();
@@ -326,9 +340,6 @@ public:
 	// Name of the hidden file
 	std::string hidden_name;
 
-	// Command to execute for a plugin
-	std::string plugin_command;
-
 	// Which job type is this?
 	int type;
 
@@ -342,7 +353,6 @@ public:
 	std::vector<Node> outputNodes;
 
 	// All the options to this job
-	// Perhaps this could become a vector?
 	std::map<std::string, JobOption > joboptions;
 
 
@@ -357,7 +367,6 @@ public:
 	void clear()
 	{
 		outputName = alias = "";
-		plugin_command = "";
 		type = -1;
 		inputNodes.clear();
 		outputNodes.clear();
@@ -468,9 +477,6 @@ public:
 
 	void initialiseCtfrefineJob();
 	bool getCommandsCtfrefineJob(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
-
-	bool getCommandsPluginJob(std::string &outputname, std::vector<std::string> &commands,
 			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
 
 };

@@ -54,8 +54,7 @@ ShowHelpText::~ShowHelpText(){};
 void GuiEntry::clear()
 {
 	deactivate_option = -1;
-	joboption.clear();
-	/* This only gives segfaults....
+	//joboption.clear();
 	if (inp != NULL)
 	{
 		delete inp;
@@ -71,11 +70,13 @@ void GuiEntry::clear()
 		delete browse;
 		browse = NULL;
 	}
+	/*
 	if (choice != NULL)
 	{
 		delete choice;
 		choice = NULL;
 	}
+	*/
 	if (menu != NULL)
 	{
 		delete menu;
@@ -91,7 +92,6 @@ void GuiEntry::clear()
 		delete slider;
 		slider = NULL;
 	}
-	*/
 
 }
 void GuiEntry::initialise(int x, int y, Fl_Group * deactivate_this_group, bool _actually_activate, int height, int wcol2, int wcol3)
@@ -222,7 +222,7 @@ void GuiEntry::setValue(std::string _value)
 	{
 		const Fl_Menu_Item *p = menu->find_item(inp->value());
 		if ( p ) menu->picked(p);
-		//else REPORT_ERROR("Error readValue: Menu item not found:" + std::string(inp->value()) + " for joboption label= " + joboption.label);
+		else REPORT_ERROR("Error readValue: Menu item not found:" + std::string(inp->value()) + " for joboption label= " + joboption.label);
 	}
 	if (slider != NULL)
 	{

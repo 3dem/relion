@@ -68,10 +68,7 @@ public:
 	// set up the tabs
 	void setupTabs(int nr_tabs);
 
-	// General initialise
 	void initialise(int my_job_type, bool _do_oldstyle = false);
-
-	void initialiseGeneric(int my_job_type, bool _do_oldstyle = false);
 
 	void resetHeight();
 

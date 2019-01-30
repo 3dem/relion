@@ -95,36 +95,37 @@ bool getFileNamesFromPostProcess(FileName fn_post, FileName &fn_half1, FileName 
 }
 
 
+
 // Any constructor
-JobOption::JobOption(int _gui_tab, int _gui_ypos, int _gui_toggle_continue, std::string _label, std::string _default_value, std::string _helptext)
+JobOption::JobOption(std::string _label, std::string _default_value, std::string _helptext)
 {
 	clear();
-	initialise(_gui_tab, _gui_ypos, _gui_toggle_continue, _label, _default_value, _helptext);
+	initialise(_label, _default_value, _helptext);
 	joboption_type = JOBOPTION_ANY;
 }
 
 // FileName constructor
-JobOption::JobOption(int _gui_tab, int _gui_ypos, int _gui_toggle_continue, std::string _label, std::string  _default_value, std::string _pattern, std::string _directory, std::string _helptext)
+JobOption::JobOption(std::string _label, std::string  _default_value, std::string _pattern, std::string _directory, std::string _helptext)
 {
 	clear();
-	initialise(_gui_tab, _gui_ypos, _gui_toggle_continue, _label, _default_value, _helptext);
+	initialise(_label, _default_value, _helptext);
 	joboption_type = JOBOPTION_FILENAME;
 	pattern = _pattern;
 	directory = _directory;
 }
 
 // InputNode constructor
-JobOption::JobOption(int _gui_tab, int _gui_ypos, int _gui_toggle_continue, std::string _label, int _nodetype, std::string _default_value, std::string _pattern, std::string _helptext)
+JobOption::JobOption(std::string _label, int _nodetype, std::string _default_value, std::string _pattern, std::string _helptext)
 {
 	clear();
-	initialise(_gui_tab, _gui_ypos, _gui_toggle_continue, _label, _default_value, _helptext);
+	initialise(_label, _default_value, _helptext);
 	joboption_type = JOBOPTION_INPUTNODE;
 	pattern = _pattern;
 	node_type = _nodetype;
 }
 
 // Radio constructor
-JobOption::JobOption(int _gui_tab, int _gui_ypos, int _gui_toggle_continue, std::string _label, std::vector<std::string> _radio_options, int ioption,  std::string _helptext)
+JobOption::JobOption(std::string _label, std::vector<std::string> _radio_options, int ioption,  std::string _helptext)
 {
 	clear();
 	std::string defaultval;
@@ -132,24 +133,24 @@ JobOption::JobOption(int _gui_tab, int _gui_ypos, int _gui_toggle_continue, std:
 
 	defaultval = radio_options[ioption];
 
-	initialise(_gui_tab, _gui_ypos, _gui_toggle_continue, _label, defaultval, _helptext);
+	initialise(_label, defaultval, _helptext);
 	joboption_type = JOBOPTION_RADIO;
 }
 
 // Boolean constructor
-JobOption::JobOption(int _gui_tab, int _gui_ypos, int _gui_toggle_continue, std::string _label, bool _boolvalue, std::string _helptext)
+JobOption::JobOption(std::string _label, bool _boolvalue, std::string _helptext)
 {
 	clear();
 	std::string _default_value = (_boolvalue) ? "Yes" : "No";
-	initialise(_gui_tab, _gui_ypos, _gui_toggle_continue, _label, _default_value, _helptext);
+	initialise(_label, _default_value, _helptext);
 	joboption_type = JOBOPTION_BOOLEAN;
 }
 
 // Slider constructor
-JobOption::JobOption(int _gui_tab, int _gui_ypos, int _gui_toggle_continue, std::string _label, float _default_value, float _min_value, float _max_value, float _step_value, std::string _helptext)
+JobOption::JobOption(std::string _label, float _default_value, float _min_value, float _max_value, float _step_value, std::string _helptext)
 {
 	clear();
-	initialise(_gui_tab, _gui_ypos, _gui_toggle_continue, _label, floatToString(_default_value), _helptext);
+	initialise(_label, floatToString(_default_value), _helptext);
 	joboption_type = JOBOPTION_SLIDER;
 	min_value = _min_value;
 	max_value = _max_value;
@@ -262,19 +263,14 @@ void JobOption::writeToMetaDataTable(MetaDataTable& MD, bool do_full) const
 
 void JobOption::clear()
 {
-	gui_tab = gui_ypos = gui_toggle_continue = 0;
 	label = value = default_value = helptext = label_gui = pattern = directory = "undefined";
 	joboption_type = JOBOPTION_UNDEFINED;
 	radio_options = job_undefined_options;
 	node_type = min_value = max_value = step_value = 0.;
 }
 
-void JobOption::initialise(int _gui_tab, int _gui_ypos, int _gui_toggle_continue,
-		std::string _label, std::string _default_value, std::string _helptext)
+void JobOption::initialise(std::string _label, std::string _default_value, std::string _helptext)
 {
-	gui_tab = _gui_tab;
-	gui_ypos = _gui_ypos;
-	gui_toggle_continue = _gui_toggle_continue;
 	label = label_gui = _label;
 	value = default_value = _default_value;
 	helptext = _helptext;
@@ -343,6 +339,8 @@ void JobOption::writeValue(std::ostream& out)
 	out << label << " == " << value << std::endl;
 }
 
+
+
 bool RelionJob::containsLabel(std::string _label, std::string &option)
 {
 	for (std::map<std::string,JobOption>::iterator it=joboptions.begin(); it!=joboptions.end(); ++it)
@@ -390,7 +388,6 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 		MDhead.read(myfilename+"job.star", "job");
 		MDhead.getValue(EMDL_JOB_TYPE, type);
 		MDhead.getValue(EMDL_JOB_IS_CONTINUE, is_continue);
-		MDhead.getValue(EMDL_JOB_PLUGIN_COMMAND, plugin_command);
 
 		if (do_initialise)
 			initialise(type);
@@ -467,8 +464,7 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 		type != PROC_RESMAP &&
 		type != PROC_INIMODEL &&
 		type != PROC_MOTIONREFINE &&
-		type != PROC_CTFREFINE &&
-		type != PROC_PLUGIN)
+		type != PROC_CTFREFINE )
 		REPORT_ERROR("ERROR: cannot find correct job type in " + myfilename + "run.job, with type= " + integerToString(type));
 
 
@@ -501,7 +497,7 @@ void RelionJob::write(std::string fn)
 	fh.close();
 
 
-	// TMP: test STAR file
+	// Also write 3.1-style STAR file
 	fh.open((myfilename+"job.star").c_str(), std::ios::out);
 	if (!fh)
 		REPORT_ERROR("ERROR: Cannot write to file: " + myfilename + "job.star");
@@ -513,7 +509,6 @@ void RelionJob::write(std::string fn)
 	MDhead.addObject();
 	MDhead.setValue(EMDL_JOB_TYPE, type);
 	MDhead.setValue(EMDL_JOB_IS_CONTINUE, is_continue);
-	MDhead.setValue(EMDL_JOB_PLUGIN_COMMAND, plugin_command);
 	// TODO: add name for output directories!!! make a std:;map between type and name for all options!
 	//MDhead.setValue(EMDL_JOB_TYPE_NAME, type);
 	MDhead.setName("job");
@@ -1068,10 +1063,6 @@ bool RelionJob::getCommands(std::string &outputname, std::vector<std::string> &c
 	{
 		result = getCommandsCtfrefineJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
 	}
-	else if (type == PROC_PLUGIN)
-	{
-		result = getCommandsPluginJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
-	}
 	else
 	{
 		REPORT_ERROR("ERROR: unrecognised job-type");
@@ -1088,7 +1079,6 @@ void RelionJob::initialiseImportJob()
 	hidden_name = ".gui_import";
 
 	joboptions["do_raw"] = JobOption("Import raw movies/micrographs?", true, "Set this to Yes if you plan to import raw movies or micrographs");
-
     joboptions["fn_in_raw"] = JobOption("Raw input files:", (std::string)"Micrographs/*.mrcs", "Provide a Linux wildcard that selects all raw movies or micrographs to be imported.");
 	joboptions["is_multiframe"] = JobOption("Are these multi-frame movies?", true, "Set to Yes for multi-frame movies, set to No for single-frame micrographs.");
 
@@ -1111,7 +1101,6 @@ For the import of a particle, 2D references or micrograph STAR file or of a 3D r
 Note that due to a bug in a fltk library, you cannot import from directories that contain a substring  of the current directory, e.g. dont important from /home/betagal if your current directory is called /home/betagal_r2. In this case, just change one of the directory names.");
 
 	joboptions["node_type"] = JobOption("Node type:", job_nodetype_options, 0, "Select the type of Node this is.");
-
 
 }
 
@@ -4967,18 +4956,3 @@ bool RelionJob::getCommandsCtfrefineJob(std::string &outputname, std::vector<std
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 
 }
-
-bool RelionJob::getCommandsPluginJob(std::string &outputname, std::vector<std::string> &commands,
-		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
-{
-
-	commands.clear();
-	initialisePipeline(outputname, "Plugin", job_counter);
-	std::string command = plugin_command + " " + outputname + "/job.star";
-
-	commands.push_back(plugin_command + " ");
-
-	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
-
-}
-

@@ -20,103 +20,18 @@
 #include "src/gui_jobwindow.h"
 JobWindow::JobWindow(int _x, int _y, int _w, int _h, const char* title ) : Fl_Box(x,y,w,h,title)
 {
-	tabs = NULL;
-	tab1 = tab2 = tab3 = tab4 = tab5 = tab6 = tab7 = runtab = NULL;
-	group1 = group2 = group3 = group4 = group5 = group6 = group7 = queue_group = NULL;
+	clear();
 	x = _x; y = _y; w = _w; h = _h;
-	current_y = start_y = 0;
-	is_continue = false;
 }
 
 void JobWindow::clear()
 {
-	/* This only gives segfaults....
-	if (group1 != NULL)
-	{
-		delete group1;
-		group1 = NULL;
-	}
-	if (group2 != NULL)
-	{
-		delete group2;
-		group2 = NULL;
-	}
-	if (group3 != NULL)
-	{
-		delete group3;
-		group3 = NULL;
-	}
-	if (group4 != NULL)
-	{
-		delete group4;
-		group4 = NULL;
-	}
-	if (group5 != NULL)
-	{
-		delete group5;
-		group5 = NULL;
-	}
-	if (group6 != NULL)
-	{
-		delete group6;
-		group6 = NULL;
-	}
-	if (group7 != NULL)
-	{
-		delete group7;
-		group7 = NULL;
-	}
-	if (queue_group != NULL)
-	{
-		delete queue_group;
-		queue_group = NULL;
-	}
-	if (tab1 != NULL)
-	{
-		delete tab1;
-		tab1 = NULL;
-	}
-	if (tab2 != NULL)
-	{
-		delete tab2;
-		tab2 = NULL;
-	}
-	if (tab3 != NULL)
-	{
-		delete tab3;
-		tab3 = NULL;
-	}
-	if (tab4 != NULL)
-	{
-		delete tab4;
-		tab4 = NULL;
-	}
-	if (tab5 != NULL)
-	{
-		delete tab5;
-		tab5 = NULL;
-	}
-	if (tab6 != NULL)
-	{
-		delete tab6;
-		tab6 = NULL;
-	}
-	if (tab7 != NULL)
-	{
-		delete tab7;
-		tab7 = NULL;
-	}
-	if (runtab != NULL)
-	{
-		delete runtab;
-		runtab = NULL;
-	}
-	if (tabs != NULL)
-	{
-		delete tabs;
-		tabs = NULL;
-	}
-	*/
+	tabs = NULL;
+	tab1 = tab2 = tab3 = tab4 = tab5 = tab6 = tab7 = runtab = NULL;
+	group1 = group2 = group3 = group4 = group5 = group6 = group7 = queue_group = NULL;
+	current_y = start_y = 0;
+	is_continue = false;
+	guientries.clear();
 }
 
 void JobWindow::setupTabs(int nr_tabs)
@@ -376,6 +291,7 @@ void JobWindow::resetHeight()
 // Update all values in the Fl_Input entries from the corresponding job_options
 void JobWindow::updateMyGui()
 {
+
 	for (std::map<std::string,GuiEntry>::iterator it=guientries.begin(); it!=guientries.end(); ++it)
 	{
 		if (myjob.joboptions.find(it->first) == myjob.joboptions.end())
@@ -383,7 +299,6 @@ void JobWindow::updateMyGui()
 
 		(it->second).setValue((myjob.joboptions[it->first]).value);
 	}
-
 }
 
 // Update all values in the Fl_Input entries into the corresponding job_options
@@ -398,15 +313,6 @@ void JobWindow::updateMyJob()
 	}
 
 }
-
-
-void JobWindow::initialiseGeneric(RelionJob &_myjob, bool _do_oldstyle)
-{
-	myjob = _myjob;
-
-
-}
-
 
 void JobWindow::initialise(int my_job_type, bool _do_oldstyle)
 {
