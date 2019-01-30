@@ -283,32 +283,73 @@ void Preprocessing::joinAllStarFiles()
 
 
 	// Write out the joined star files
+
+	//THIS REALLY DOESNT WORK YET!!!!
 	if (fn_part_star != "")
 	{
-		RFLOAT my_angpix;
 
-		// Set the (possibly rescale output_angpix and the output image size in the opticsMdt
-		FOR_ALL_OBJECTS_IN_METADATA_TABLE(obsModelMic.opticsMdt)
+		// Get pixel size in original micrograph from obsModelMic, as this may no longer be present in obsModelPart
+		std::map<std::string, RFLOAT> optics_group_mic_angpix;
+		if (fn_data != "")
 		{
-			// Set the pixel size for this micrograph
-			obsModelMic.opticsMdt.getValue(EMDL_MICROGRAPH_PIXEL_SIZE, my_angpix);
+			std::string optgroup_name;
+			RFLOAT mic_angpix;
+			FOR_ALL_OBJECTS_IN_METADATA_TABLE(obsModelMic.opticsMdt)
+			{
+				obsModelMic.opticsMdt.getValue(EMDL_MICROGRAPH_PIXEL_SIZE, mic_angpix);
+				obsModelMic.opticsMdt.getValue(EMDL_IMAGE_OPTICS_GROUP_NAME, optgroup_name);
+
+				optics_group_mic_angpix.insert(std::make_pair(optgroup_name, mic_angpix));
+			}
+		}
+
+		ObservationModel *myOutObsModel;
+		myOutObsModel = (fn_data == "") ? &obsModelMic : &obsModelPart;
+		RFLOAT my_angpix;
+		std::string optgroup_name;
+		// Set the (possibly rescale output_angpix and the output image size in the opticsMdt
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(myOutObsModel->opticsMdt)
+		{
+
+			// Find the pixel size for the original micrograph
+			if (fn_data == "")
+			{
+				obsModelMic.opticsMdt.getValue(EMDL_MICROGRAPH_PIXEL_SIZE, my_angpix);
+			}
+			else
+			{
+				myOutObsModel->opticsMdt.getValue(EMDL_IMAGE_OPTICS_GROUP_NAME, optgroup_name);
+				if (optics_group_mic_angpix.count(optgroup_name) == 0)
+				{
+					REPORT_ERROR("ERROR: optics group name " + optgroup_name + " does not exist in micrograph STAR file...");
+				}
+				else
+				{
+					my_angpix = optics_group_mic_angpix[optgroup_name];
+				}
+			}
+
 			if (do_rescale)
 				my_angpix *= (RFLOAT)extract_size / (RFLOAT)scale;
-			obsModelMic.opticsMdt.setValue(EMDL_IMAGE_PIXEL_SIZE, my_angpix);
+			myOutObsModel->opticsMdt.setValue(EMDL_IMAGE_PIXEL_SIZE, my_angpix);
 
-			if (do_rewindow) obsModelMic.opticsMdt.setValue(EMDL_IMAGE_SIZE, window);
-			else if (do_rescale) obsModelMic.opticsMdt.setValue(EMDL_IMAGE_SIZE, scale);
-			else obsModelMic.opticsMdt.setValue(EMDL_IMAGE_SIZE, extract_size);
+			if (do_rewindow) myOutObsModel->opticsMdt.setValue(EMDL_IMAGE_SIZE, window);
+			else if (do_rescale) myOutObsModel->opticsMdt.setValue(EMDL_IMAGE_SIZE, scale);
+			else myOutObsModel->opticsMdt.setValue(EMDL_IMAGE_SIZE, extract_size);
 
-			obsModelMic.opticsMdt.setValue(EMDL_IMAGE_DIMENSIONALITY, dimensionality);
+			myOutObsModel->opticsMdt.setValue(EMDL_IMAGE_DIMENSIONALITY, dimensionality);
 
 			int igroup;
 			obsModelMic.opticsMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, igroup);
-			std::cout << " The new pixel size of the extracted particles in optics group " << igroup << " is " << output_angpix << " Angstrom/pixel." << std::endl;
+			std::cout << " The pixel size of the extracted particles in optics group " << igroup+1 << " is " << output_angpix << " Angstrom/pixel." << std::endl;
 		}
-		obsModelMic.opticsMdt.deactivateLabel(EMDL_MICROGRAPH_PIXEL_SIZE);
 
-		ObservationModel::saveNew(MDout, obsModelMic.opticsMdt, fn_part_star, "particles");
+		if (fn_data == "")
+		{
+			myOutObsModel->opticsMdt.deactivateLabel(EMDL_MICROGRAPH_PIXEL_SIZE);
+		}
+
+		ObservationModel::saveNew(MDout, myOutObsModel->opticsMdt, fn_part_star, "particles");
 		std::cout << " Written out STAR file with " << MDout.numberOfObjects() << " particles in " << fn_part_star<< std::endl;
 	}
 
@@ -1081,7 +1122,7 @@ MetaDataTable Preprocessing::getCoordinateMetaDataTable(FileName fn_mic)
 		if (fn_mic_in_particle_star.contains(fn_post))
 			MDresult.addObject(MDimg.getObject(current_object));
 	}
-	
+
 	RFLOAT mag2, dstep2, particle_angpix, rescale_fndata = 1.0;
 	if (MDresult.numberOfObjects() > 0)
 	{
@@ -1149,14 +1190,14 @@ MetaDataTable Preprocessing::getCoordinateMetaDataTable(FileName fn_mic)
 
 				xoff -= XX(my_projected_center);
 				yoff -= YY(my_projected_center);
-				xoff *= rescale_fndata; // now in micrograph's pixel 
+				xoff *= rescale_fndata; // now in micrograph's pixel
 				yoff *= rescale_fndata;
 
 				if (do_recenter)
 				{
 					MDresult.getValue(EMDL_IMAGE_COORD_X, xcoord);
 					MDresult.getValue(EMDL_IMAGE_COORD_Y, ycoord);
-					
+
 					diffx = xoff - ROUND(xoff);
 					diffy = yoff - ROUND(yoff);
 					xcoord -= ROUND(xoff);

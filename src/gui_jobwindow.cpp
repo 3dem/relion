@@ -20,103 +20,18 @@
 #include "src/gui_jobwindow.h"
 JobWindow::JobWindow(int _x, int _y, int _w, int _h, const char* title ) : Fl_Box(x,y,w,h,title)
 {
-	tabs = NULL;
-	tab1 = tab2 = tab3 = tab4 = tab5 = tab6 = tab7 = runtab = NULL;
-	group1 = group2 = group3 = group4 = group5 = group6 = group7 = queue_group = NULL;
+	clear();
 	x = _x; y = _y; w = _w; h = _h;
-	current_y = start_y = 0;
-	is_continue = false;
 }
 
 void JobWindow::clear()
 {
-	/* This only gives segfaults....
-	if (group1 != NULL)
-	{
-		delete group1;
-		group1 = NULL;
-	}
-	if (group2 != NULL)
-	{
-		delete group2;
-		group2 = NULL;
-	}
-	if (group3 != NULL)
-	{
-		delete group3;
-		group3 = NULL;
-	}
-	if (group4 != NULL)
-	{
-		delete group4;
-		group4 = NULL;
-	}
-	if (group5 != NULL)
-	{
-		delete group5;
-		group5 = NULL;
-	}
-	if (group6 != NULL)
-	{
-		delete group6;
-		group6 = NULL;
-	}
-	if (group7 != NULL)
-	{
-		delete group7;
-		group7 = NULL;
-	}
-	if (queue_group != NULL)
-	{
-		delete queue_group;
-		queue_group = NULL;
-	}
-	if (tab1 != NULL)
-	{
-		delete tab1;
-		tab1 = NULL;
-	}
-	if (tab2 != NULL)
-	{
-		delete tab2;
-		tab2 = NULL;
-	}
-	if (tab3 != NULL)
-	{
-		delete tab3;
-		tab3 = NULL;
-	}
-	if (tab4 != NULL)
-	{
-		delete tab4;
-		tab4 = NULL;
-	}
-	if (tab5 != NULL)
-	{
-		delete tab5;
-		tab5 = NULL;
-	}
-	if (tab6 != NULL)
-	{
-		delete tab6;
-		tab6 = NULL;
-	}
-	if (tab7 != NULL)
-	{
-		delete tab7;
-		tab7 = NULL;
-	}
-	if (runtab != NULL)
-	{
-		delete runtab;
-		runtab = NULL;
-	}
-	if (tabs != NULL)
-	{
-		delete tabs;
-		tabs = NULL;
-	}
-	*/
+	tabs = NULL;
+	tab1 = tab2 = tab3 = tab4 = tab5 = tab6 = tab7 = runtab = NULL;
+	group1 = group2 = group3 = group4 = group5 = group6 = group7 = queue_group = NULL;
+	current_y = start_y = 0;
+	is_continue = false;
+	guientries.clear();
 }
 
 void JobWindow::setupTabs(int nr_tabs)
@@ -376,6 +291,7 @@ void JobWindow::resetHeight()
 // Update all values in the Fl_Input entries from the corresponding job_options
 void JobWindow::updateMyGui()
 {
+
 	for (std::map<std::string,GuiEntry>::iterator it=guientries.begin(); it!=guientries.end(); ++it)
 	{
 		if (myjob.joboptions.find(it->first) == myjob.joboptions.end())
@@ -383,7 +299,6 @@ void JobWindow::updateMyGui()
 
 		(it->second).setValue((myjob.joboptions[it->first]).value);
 	}
-
 }
 
 // Update all values in the Fl_Input entries into the corresponding job_options
@@ -462,16 +377,6 @@ void JobWindow::initialise(int my_job_type, bool _do_oldstyle)
 	{
 		myjob.initialise(my_job_type);
 		initialiseMultiBodyWindow();
-	}
-	else if (my_job_type == PROC_MOVIEREFINE)
-	{
-		myjob.initialise(my_job_type);
-		initialiseMovierefineWindow();
-	}
-	else if (my_job_type == PROC_POLISH)
-	{
-		myjob.initialise(my_job_type);
-		initialisePolishWindow();
 	}
 	else if (my_job_type == PROC_MASKCREATE)
 	{
@@ -1825,177 +1730,6 @@ void JobWindow::initialiseMultiBodyWindow()
 }
 
 
-void JobWindow::initialiseMovierefineWindow()
-{
-	setupTabs(4);
-
-
-	tab1->begin();
-	tab1->label("I/O");
-	resetHeight();
-
-	place("fn_movie_star", TOGGLE_DEACTIVATE);
-	place("movie_rootname", TOGGLE_DEACTIVATE);
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	place("fn_cont", TOGGLE_DEACTIVATE);
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	place("join_nr_mics", TOGGLE_DEACTIVATE);
-
-	tab1->end();
-
-	tab2->begin();
-	tab2->label("extract");
-	resetHeight();
-
-	place("first_movie_frame", TOGGLE_DEACTIVATE);
-	place("last_movie_frame", TOGGLE_DEACTIVATE);
-	place("avg_movie_frames", TOGGLE_DEACTIVATE);
-	place("max_mpi_nodes", TOGGLE_DEACTIVATE);
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	place("extract_size", TOGGLE_DEACTIVATE);
-	place("do_invert", TOGGLE_DEACTIVATE);
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group1->end();
-	place("do_rescale", TOGGLE_DEACTIVATE, group1);
-	group1->begin();
-	place("rescale", TOGGLE_DEACTIVATE);
-	group1->end();
-	guientries["do_rescale"].cb_menu_i();
-
-	tab2->end();
-	tab3->begin();
-	tab3->label("normalise");
-	resetHeight();
-
-	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group2->end();
-	place("do_norm", TOGGLE_DEACTIVATE, group2);
-
-	group2->begin();
-
-	place("bg_diameter", TOGGLE_DEACTIVATE);
-	place("white_dust", TOGGLE_DEACTIVATE);
-	place("black_dust", TOGGLE_DEACTIVATE);
-
-	group2->end();
-	guientries["do_norm"].cb_menu_i();
-
-	tab3->end();
-	tab4->begin();
-	tab4->label("refine");
-	resetHeight();
-
-	place("movie_runavg_window");
-	place("movie_sigma_offset");
-
-	group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group3->end();
-
-	place("do_alsorot_movies", TOGGLE_LEAVE_ACTIVE, group3);
-	group3->begin();
-
-	place("movie_sigma_angles", TOGGLE_LEAVE_ACTIVE);
-
-	group3->end();
-	guientries["do_alsorot_movies"].cb_menu_i(); // to make default effective
-
-	tab4->end();
-
-}
-void JobWindow::initialisePolishWindow()
-{
-	setupTabs(5);
-
-	tab1->begin();
-	tab1->label("I/O");
-	resetHeight();
-
-	place("fn_in", TOGGLE_DEACTIVATE);
-	place("fn_mask", TOGGLE_DEACTIVATE);
-
-	tab1->end();
-	tab2->begin();
-	tab2->label("Movement");
-	resetHeight();
-
-	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group1->end();
-
-
-	place("do_fit_movement", TOGGLE_LEAVE_ACTIVE, group1);
-
-	group1->begin();
-	place("sigma_nb");
-	group1->end();
-	guientries["do_fit_movement"].cb_menu_i();
-
-	tab2->end();
-	tab3->begin();
-	tab3->label("Damage");
-	resetHeight();
-
-	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group2->end();
-
-	place("do_bfactor_weighting", TOGGLE_LEAVE_ACTIVE, group2);
-	group2->begin();
-	place("perframe_highres");
-	place("perframe_bfac_lowres");
-	place("average_frame_bfactor");
-
-	group2->end();
-	guientries["do_bfactor_weighting"].cb_menu_i();
-
-	current_y += STEPY/2;
-
-	place("sym_name");
-
-	tab3->end();
-
-
-	tab4->begin();
-	tab4->label("Normalise");
-	resetHeight();
-
-	place("bg_diameter");
-	place("white_dust");
-	place("black_dust");
-
-	tab4->end();
-
-	tab5->begin();
-	tab5->label("Helix");
-	resetHeight();
-
-	group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group4->end();
-
-	place("do_helix", TOGGLE_DEACTIVATE, group4);
-	group4->begin();
-
-	place("helical_nr_asu");
-	place("helical_twist");
-	place("helical_rise");
-
-	group4->end();
-	guientries["do_helix"].cb_menu_i(); // to make default effective
-
-	tab5->end();
-
-}
 void JobWindow::initialiseMaskcreateWindow()
 {
 	setupTabs(3);
@@ -2040,6 +1774,8 @@ void JobWindow::initialiseMaskcreateWindow()
 	tab3->end();
 
 }
+
+
 void JobWindow::initialiseJoinstarWindow()
 {
 	setupTabs(3);

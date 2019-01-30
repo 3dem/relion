@@ -19,7 +19,7 @@
  ***************************************************************************/
 #include "src/pipeline_jobs.h"
 
-std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, int dim, int nr_bodies, bool do_movies, bool do_also_rot)
+std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, int dim, int nr_bodies)
 {
 	std::vector<Node> result;
 
@@ -52,35 +52,31 @@ std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, 
 	}
 	else // normal refinements/classifications
 	{
-		int node_type = (do_movies) ? NODE_MOVIE_DATA : NODE_PART_DATA;
-		Node node1(fn_out + "_data.star", node_type);
+		Node node1(fn_out + "_data.star", NODE_PART_DATA);
 		result.push_back(node1);
 
-		if (!do_movies || do_also_rot)
+		if (iter > 0)
 		{
-			if (iter > 0)
-			{
-				// For classifications: output node model.star to make selections
-				Node node2(fn_out + "_model.star", NODE_MODEL);
-				result.push_back(node2);
-			}
-			else
-			{
-				// For auto-refine: also output the run_half1_class001_unfil.mrc map
-				Node node4(fn_out+"_half1_class001_unfil.mrc", NODE_HALFMAP);
-				result.push_back(node4);
-			}
+			// For classifications: output node model.star to make selections
+			Node node2(fn_out + "_model.star", NODE_MODEL);
+			result.push_back(node2);
+		}
+		else
+		{
+			// For auto-refine: also output the run_half1_class001_unfil.mrc map
+			Node node4(fn_out+"_half1_class001_unfil.mrc", NODE_HALFMAP);
+			result.push_back(node4);
+		}
 
-			// For 3D classification or 3D auto-refine, also use individual 3D maps as outputNodes
-			if (dim == 3)
+		// For 3D classification or 3D auto-refine, also use individual 3D maps as outputNodes
+		if (dim == 3)
+		{
+			FileName fn_tmp;
+			for (int iclass = 0; iclass < K; iclass++)
 			{
-				FileName fn_tmp;
-				for (int iclass = 0; iclass < K; iclass++)
-				{
-					fn_tmp.compose(fn_out+"_class", iclass+1, "mrc", 3);
-					Node node3(fn_tmp, NODE_3DREF);
-					result.push_back(node3);
-				}
+				fn_tmp.compose(fn_out+"_class", iclass+1, "mrc", 3);
+				Node node3(fn_tmp, NODE_3DREF);
+				result.push_back(node3);
 			}
 		}
 	}
@@ -99,9 +95,11 @@ bool getFileNamesFromPostProcess(FileName fn_post, FileName &fn_half1, FileName 
 }
 
 
+
 // Any constructor
 JobOption::JobOption(std::string _label, std::string _default_value, std::string _helptext)
 {
+	clear();
 	initialise(_label, _default_value, _helptext);
 	joboption_type = JOBOPTION_ANY;
 }
@@ -109,6 +107,7 @@ JobOption::JobOption(std::string _label, std::string _default_value, std::string
 // FileName constructor
 JobOption::JobOption(std::string _label, std::string  _default_value, std::string _pattern, std::string _directory, std::string _helptext)
 {
+	clear();
 	initialise(_label, _default_value, _helptext);
 	joboption_type = JOBOPTION_FILENAME;
 	pattern = _pattern;
@@ -118,6 +117,7 @@ JobOption::JobOption(std::string _label, std::string  _default_value, std::strin
 // InputNode constructor
 JobOption::JobOption(std::string _label, int _nodetype, std::string _default_value, std::string _pattern, std::string _helptext)
 {
+	clear();
 	initialise(_label, _default_value, _helptext);
 	joboption_type = JOBOPTION_INPUTNODE;
 	pattern = _pattern;
@@ -125,22 +125,13 @@ JobOption::JobOption(std::string _label, int _nodetype, std::string _default_val
 }
 
 // Radio constructor
-JobOption::JobOption(std::string _label, int _radio_menu, int ioption,  std::string _helptext)
+JobOption::JobOption(std::string _label, std::vector<std::string> _radio_options, int ioption,  std::string _helptext)
 {
-	radio_menu = _radio_menu;
+	clear();
 	std::string defaultval;
-	if (radio_menu == RADIO_SAMPLING)
-		defaultval = std::string(job_sampling_options[ioption]);
-	else if (radio_menu == RADIO_NODETYPE)
-		defaultval = std::string(job_nodetype_options[ioption]);
-	else if (radio_menu == RADIO_GAIN_ROTATION)
-		defaultval = std::string(job_gain_rotation_options[ioption]);
-	else if (radio_menu == RADIO_GAIN_FLIP)
-		defaultval = std::string(job_gain_flip_options[ioption]);
-	else {
-		std::cout << "Debug: radio_menu == " << radio_menu << std::endl;
-		REPORT_ERROR("BUG: unrecognised radio_menu type");
-	}
+	radio_options = _radio_options;
+
+	defaultval = radio_options[ioption];
 
 	initialise(_label, defaultval, _helptext);
 	joboption_type = JOBOPTION_RADIO;
@@ -149,6 +140,7 @@ JobOption::JobOption(std::string _label, int _radio_menu, int ioption,  std::str
 // Boolean constructor
 JobOption::JobOption(std::string _label, bool _boolvalue, std::string _helptext)
 {
+	clear();
 	std::string _default_value = (_boolvalue) ? "Yes" : "No";
 	initialise(_label, _default_value, _helptext);
 	joboption_type = JOBOPTION_BOOLEAN;
@@ -157,6 +149,7 @@ JobOption::JobOption(std::string _label, bool _boolvalue, std::string _helptext)
 // Slider constructor
 JobOption::JobOption(std::string _label, float _default_value, float _min_value, float _max_value, float _step_value, std::string _helptext)
 {
+	clear();
 	initialise(_label, floatToString(_default_value), _helptext);
 	joboption_type = JOBOPTION_SLIDER;
 	min_value = _min_value;
@@ -164,11 +157,116 @@ JobOption::JobOption(std::string _label, float _default_value, float _min_value,
 	step_value = _step_value;
 }
 
+std::string prepareString(const std::string instring)
+{
+	std::string outstring = instring;
+	size_t index = 0;
+	while (true)
+	{
+		/* Locate the substring to replace. */
+		index = outstring.find("\n", index);
+		if (index == std::string::npos) break;
+
+		/* Make the replacement. */
+		outstring.replace(index, 2, "&&");
+
+		/* Advance index forward so the next iteration doesn't pick it up as well. */
+		index += 2;
+	}
+	// Also replace spaces by __
+	index = 0;
+	while (true)
+	{
+		/* Locate the substring to replace. */
+		index = outstring.find(" ", index);
+		if (index == std::string::npos) break;
+
+		/* Make the replacement. */
+		outstring.replace(index, 1, "__");
+
+		/* Advance index forward so the next iteration doesn't pick it up as well. */
+		index += 1;
+	}
+	return outstring;
+}
+
+std::string restoreString(const std::string instring)
+{
+	std::string outstring = instring;
+	size_t index = 0;
+	while (true)
+	{
+		/* Locate the substring to replace. */
+		index = outstring.find("&&", index);
+		if (index == std::string::npos) break;
+
+		/* Make the replacement. */
+		outstring.replace(index, 2, "\n");
+
+		/* Advance index forward so the next iteration doesn't pick it up as well. */
+		index += 2;
+	}
+	// Also replace spaces by __
+	index = 0;
+	while (true)
+	{
+		/* Locate the substring to replace. */
+		index = outstring.find("__", index);
+		if (index == std::string::npos) break;
+
+		/* Make the replacement. */
+		outstring.replace(index, 2, " ");
+
+		/* Advance index forward so the next iteration doesn't pick it up as well. */
+		index += 1;
+	}
+	return outstring;
+}
+
+std::string prepareVectorString(const std::vector<std::string> in)
+{
+	std::string outstring="++" + prepareString(in[0]);
+	for (int i = 1; i < in.size(); i++)
+	{
+		outstring += "++" + prepareString(in[i]);
+	}
+	outstring += "++";
+	return outstring;
+}
+
+void JobOption::writeToMetaDataTable(MetaDataTable& MD, bool do_full) const
+{
+
+	MD.addObject();
+	MD.setValue(EMDL_JOBOPTION_VARIABLE, variable);
+	if (!do_full)
+	{
+		MD.setValue(EMDL_JOBOPTION_VALUE, prepareString(value));
+	}
+	else
+	{
+		MD.setValue(EMDL_JOBOPTION_LABEL, prepareString(label));
+		MD.setValue(EMDL_JOBOPTION_TYPE, joboption_type);
+		MD.setValue(EMDL_JOBOPTION_DEFAULT_VALUE, prepareString(default_value));
+		MD.setValue(EMDL_JOBOPTION_MINVAL, min_value);
+		MD.setValue(EMDL_JOBOPTION_MAXVAL, max_value);
+		MD.setValue(EMDL_JOBOPTION_STEPVAL, step_value);
+		MD.setValue(EMDL_JOBOPTION_PATTERN, prepareString(pattern));
+		MD.setValue(EMDL_JOBOPTION_DIRECTORY, prepareString(directory));
+		MD.setValue(EMDL_JOBOPTION_HELPTEXT, prepareString(helptext));
+		MD.setValue(EMDL_JOBOPTION_MENUOPTIONS, prepareVectorString(radio_options));
+	}
+
+	return;
+}
+
+
 void JobOption::clear()
 {
-	label = value = default_value = helptext = label_gui = pattern = directory = "";
+	label = value = default_value = helptext = label_gui = pattern = directory = "undefined";
 	joboption_type = JOBOPTION_UNDEFINED;
-	node_type = min_value = max_value = step_value = radio_menu = 0.;
+	radio_options = job_undefined_options;
+	node_type = min_value = max_value = step_value = 0.;
 }
 
 void JobOption::initialise(std::string _label, std::string _default_value, std::string _helptext)
@@ -241,6 +339,8 @@ void JobOption::writeValue(std::ostream& out)
 	out << label << " == " << value << std::endl;
 }
 
+
+
 bool RelionJob::containsLabel(std::string _label, std::string &option)
 {
 	for (std::map<std::string,JobOption>::iterator it=joboptions.begin(); it!=joboptions.end(); ++it)
@@ -279,111 +379,94 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 	// If fn is empty, use the hidden name
 	FileName myfilename = (fn=="") ? hidden_name : fn;
 
-	std::ifstream fh;
-	fh.open((myfilename+"run.job").c_str(), std::ios_base::in);
-	if (fh.fail())
-		return false;
-	else
+	if (exists(myfilename+"job.star"))
 	{
-	    	std::string line;
+		// Read from STAR
+		MetaDataTable MDhead;
+		MetaDataTable MDvals;
 
-    		// Get job type from first line
-	    	getline(fh, line, '\n');
-    		size_t idx = line.find("==");
-	    	idx++;
-		// TMP to maintain backwards compatibility with a temporary development version towards 3.0....
-		std::string typestring = simplify((line.substr(idx+1,line.length()-idx)).c_str());
-		if (typestring == PROC_IMPORT_NAME)
-			type = PROC_IMPORT;
-		else if (typestring == PROC_MOTIONCORR_NAME)
-			type = PROC_MOTIONCORR;
-		else if (typestring == PROC_CTFFIND_NAME)
-			type = PROC_CTFFIND;
-		else if (typestring == PROC_MANUALPICK_NAME)
-			type = PROC_MANUALPICK;
-		else if (typestring == PROC_AUTOPICK_NAME)
-			type = PROC_AUTOPICK;
-		else if (typestring == PROC_EXTRACT_NAME)
-			type = PROC_EXTRACT;
-		else if (typestring == PROC_CLASSSELECT_NAME)
-			type = PROC_CLASSSELECT;
-		else if (typestring == PROC_2DCLASS_NAME)
-			type = PROC_2DCLASS;
-		else if (typestring == PROC_3DCLASS_NAME)
-			type = PROC_3DCLASS;
-		else if (typestring == PROC_3DAUTO_NAME)
-			type = PROC_3DAUTO;
-		else if (typestring == PROC_MULTIBODY_NAME)
-			type = PROC_MULTIBODY;
-		else if (typestring == PROC_POLISH_NAME)
-			type = PROC_POLISH;
-		else if (typestring == PROC_MASKCREATE_NAME)
-			type = PROC_MASKCREATE;
-		else if (typestring == PROC_JOINSTAR_NAME)
-		type = PROC_JOINSTAR;
-		else if (typestring == PROC_SUBTRACT_NAME)
-			type = PROC_SUBTRACT;
-		else if (typestring == PROC_POST_NAME)
-			type = PROC_POST;
-		else if (typestring == PROC_RESMAP_NAME)
-			type = PROC_RESMAP;
-		else if (typestring == PROC_MOVIEREFINE_NAME)
-			type = PROC_MOVIEREFINE;
-		else if (typestring == PROC_INIMODEL_NAME)
-			type = PROC_INIMODEL;
-		else if (typestring == PROC_MOTIONREFINE_NAME)
-			type = PROC_MOTIONREFINE;
-		else if (typestring == PROC_CTFREFINE_NAME)
-			type = PROC_CTFREFINE;
-		else
-			type = (int)textToFloat((line.substr(idx+1,line.length()-idx)).c_str());
-		// Just check that went OK
-		if (type != PROC_IMPORT &&
-		    type != PROC_MOTIONCORR &&
-		    type != PROC_CTFFIND &&
-		    type != PROC_MANUALPICK &&
-		    type != PROC_AUTOPICK &&
-		    type != PROC_EXTRACT &&
-		    type != PROC_CLASSSELECT &&
-		    type != PROC_2DCLASS &&
-		    type != PROC_3DCLASS &&
-		    type != PROC_3DAUTO &&
-		    type != PROC_MULTIBODY &&
-		    type != PROC_POLISH &&
-		    type != PROC_MASKCREATE &&
-		    type != PROC_JOINSTAR &&
-		    type != PROC_SUBTRACT &&
-		    type != PROC_POST &&
-		    type != PROC_RESMAP &&
-		    type != PROC_MOVIEREFINE &&
-		    type != PROC_INIMODEL &&
-		    type != PROC_MOTIONREFINE &&
-		    type != PROC_CTFREFINE)
-			REPORT_ERROR("ERROR: cannot find correct job type in " + myfilename + "run.job, with type= " + integerToString(type));
-
-		// Get is_continue from second line
-		getline(fh, line, '\n');
-		if (line.rfind("is_continue == true") == 0)
-			is_continue = true;
-		else
-			is_continue = false;
-		_is_continue = is_continue;
+		MDhead.read(myfilename+"job.star", "job");
+		MDhead.getValue(EMDL_JOB_TYPE, type);
+		MDhead.getValue(EMDL_JOB_IS_CONTINUE, is_continue);
 
 		if (do_initialise)
 			initialise(type);
 
-		// Read in all the stored options
-		bool read_all = true;
-		for (std::map<std::string,JobOption>::iterator it=joboptions.begin(); it!=joboptions.end(); ++it)
+		MDvals.read(myfilename+"job.star", "joboptions_values");
+		std::string label, value;
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDvals)
 		{
-			if (!(it->second).readValue(fh))
-				read_all = false;
+
+			MDvals.getValue(EMDL_JOBOPTION_VARIABLE, label);
+			MDvals.getValue(EMDL_JOBOPTION_VALUE, value);
+			joboptions[label].value = restoreString(value);
 		}
 
-		return read_all;
+	}
+	else // for backwards compatibility
+	{
+		std::ifstream fh;
+		fh.open((myfilename+"run.job").c_str(), std::ios_base::in);
+		if (fh.fail())
+			return false;
+		else
+		{
+			std::string line;
+
+			// Get job type from first line
+			getline(fh, line, '\n');
+			size_t idx = line.find("==");
+			idx++;
+
+			type = (int)textToFloat((line.substr(idx+1,line.length()-idx)).c_str());
+
+				// Get is_continue from second line
+			getline(fh, line, '\n');
+			if (line.rfind("is_continue == true") == 0)
+				is_continue = true;
+			else
+				is_continue = false;
+			_is_continue = is_continue;
+
+			if (do_initialise)
+				initialise(type);
+
+			// Read in all the stored options
+			bool read_all = true;
+			for (std::map<std::string,JobOption>::iterator it=joboptions.begin(); it!=joboptions.end(); ++it)
+			{
+				if (!(it->second).readValue(fh))
+					read_all = false;
+			}
+
+			return read_all;
+		}
+
+		fh.close();
 	}
 
-	fh.close();
+	// Just check that went OK
+	if (type != PROC_IMPORT &&
+		type != PROC_MOTIONCORR &&
+		type != PROC_CTFFIND &&
+		type != PROC_MANUALPICK &&
+		type != PROC_AUTOPICK &&
+		type != PROC_EXTRACT &&
+		type != PROC_CLASSSELECT &&
+		type != PROC_2DCLASS &&
+		type != PROC_3DCLASS &&
+		type != PROC_3DAUTO &&
+		type != PROC_MULTIBODY &&
+		type != PROC_MASKCREATE &&
+		type != PROC_JOINSTAR &&
+		type != PROC_SUBTRACT &&
+		type != PROC_POST &&
+		type != PROC_RESMAP &&
+		type != PROC_INIMODEL &&
+		type != PROC_MOTIONREFINE &&
+		type != PROC_CTFREFINE )
+		REPORT_ERROR("ERROR: cannot find correct job type in " + myfilename + "run.job, with type= " + integerToString(type));
+
 
 }
 
@@ -412,6 +495,44 @@ void RelionJob::write(std::string fn)
 	}
 
 	fh.close();
+
+
+	// Also write 3.1-style STAR file
+	fh.open((myfilename+"job.star").c_str(), std::ios::out);
+	if (!fh)
+		REPORT_ERROR("ERROR: Cannot write to file: " + myfilename + "job.star");
+
+	MetaDataTable MDhead;
+	MetaDataTable MDvals, MDopts;
+
+	MDhead.setIsList(true);
+	MDhead.addObject();
+	MDhead.setValue(EMDL_JOB_TYPE, type);
+	MDhead.setValue(EMDL_JOB_IS_CONTINUE, is_continue);
+	// TODO: add name for output directories!!! make a std:;map between type and name for all options!
+	//MDhead.setValue(EMDL_JOB_TYPE_NAME, type);
+	MDhead.setName("job");
+	MDhead.write(fh);
+
+	// Now make a table with all the values
+	for (std::map<std::string,JobOption>::iterator it=joboptions.begin(); it!=joboptions.end(); ++it)
+	{
+		(it->second).writeToMetaDataTable(MDvals, false);
+	}
+	MDvals.setName("joboptions_values");
+	MDvals.write(fh);
+
+	// Now make a table with all the options
+	for (std::map<std::string,JobOption>::iterator it=joboptions.begin(); it!=joboptions.end(); ++it)
+	{
+		(it->second).writeToMetaDataTable(MDopts, true);
+	}
+	MDopts.setName("joboptions_full_definition");
+	MDopts.write(fh);
+
+	fh.close();
+
+
 }
 
 bool RelionJob::saveJobSubmissionScript(std::string newfilename, std::string outputname, std::vector<std::string> commands, std::string &error_message)
@@ -700,16 +821,6 @@ void RelionJob::initialise(int _job_type)
 		has_mpi = has_thread = true;
 		initialiseMultiBodyJob();
 	}
-	else if (type == PROC_MOVIEREFINE)
-	{
-		has_mpi = has_thread = true;
-		initialiseMovierefineJob();
-	}
-	else if (type == PROC_POLISH)
-	{
-		has_mpi = has_thread = true;
-		initialisePolishJob();
-	}
 	else if (type == PROC_MASKCREATE)
 	{
 		has_mpi = false;
@@ -859,6 +970,14 @@ But note that (unlike all other entries in the GUI) the extra values are not rem
 This may be useful for testing developmental options and/or expert use of the program. \
 To print a list of possible options, run the corresponding program from the command line without any arguments.");
 
+	// Set the variable name in all joboptions
+
+	std::map<std::string, JobOption>::iterator it;
+	for ( it = joboptions.begin(); it != joboptions.end(); it++ )
+	{
+	    (it->second).variable = it->first;
+	}
+
 }
 
 
@@ -916,14 +1035,6 @@ bool RelionJob::getCommands(std::string &outputname, std::vector<std::string> &c
 	{
 		result = getCommandsMultiBodyJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
 	}
-	else if (type == PROC_MOVIEREFINE)
-	{
-		result = getCommandsMovierefineJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
-	}
-	else if (type == PROC_POLISH)
-	{
-		result = getCommandsPolishJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
-	}
 	else if (type == PROC_MASKCREATE)
 	{
 		result = getCommandsMaskcreateJob(outputname, commands, final_command, do_makedir, job_counter, error_message);
@@ -968,7 +1079,6 @@ void RelionJob::initialiseImportJob()
 	hidden_name = ".gui_import";
 
 	joboptions["do_raw"] = JobOption("Import raw movies/micrographs?", true, "Set this to Yes if you plan to import raw movies or micrographs");
-
     joboptions["fn_in_raw"] = JobOption("Raw input files:", (std::string)"Micrographs/*.mrcs", "Provide a Linux wildcard that selects all raw movies or micrographs to be imported.");
 	joboptions["is_multiframe"] = JobOption("Are these multi-frame movies?", true, "Set to Yes for multi-frame movies, set to No for single-frame micrographs.");
 
@@ -990,8 +1100,7 @@ Note that movie-particle STAR files cannot be imported from a previous version o
 For the import of a particle, 2D references or micrograph STAR file or of a 3D reference or mask, only a single file can be imported at a time. \n \n \
 Note that due to a bug in a fltk library, you cannot import from directories that contain a substring  of the current directory, e.g. dont important from /home/betagal if your current directory is called /home/betagal_r2. In this case, just change one of the directory names.");
 
-	joboptions["node_type"] = JobOption("Node type:", RADIO_NODETYPE, 0, "Select the type of Node this is.");
-
+	joboptions["node_type"] = JobOption("Node type:", job_nodetype_options, 0, "Select the type of Node this is.");
 
 }
 
@@ -1078,8 +1187,6 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 			int mynodetype;
 			if (node_type == "Particles STAR file (.star)")
 				mynodetype = NODE_PART_DATA;
-			else if (node_type == "Movie-particles STAR file (.star)")
-				mynodetype = NODE_MOVIE_DATA;
 			else if (node_type == "Micrographs STAR file (.star)")
 				mynodetype = NODE_MICS;
 			else if (node_type == "2D references (.star or .mrcs)")
@@ -1169,8 +1276,8 @@ void RelionJob::initialiseMotioncorrJob()
 	joboptions["group_frames"] = JobOption("Group frames:", 1, 1, 5, 1, "Average together this many frames before calculating the beam-induced shifts.");
 	joboptions["bin_factor"] = JobOption("Binning factor:", 1, 1, 2, 1, "Bin the micrographs this much by a windowing operation in the Fourier Tranform. Binning at this level is hard to un-do later on, but may be useful to down-scale super-resolution images. Float-values may be used. Do make sure though that the resulting micrograph size is even.");
 	joboptions["fn_gain_ref"] = JobOption("Gain-reference image:", "", "*.mrc", ".", "Location of the gain-reference file to be applied to the input micrographs. Leave this empty if the movies are already gain-corrected.");
-	joboptions["gain_rot"] = JobOption("Gain rotation:", RADIO_GAIN_ROTATION, 0, "Rotate the gain reference by this number times 90 degrees clockwise in relion_display. This is the same as -RotGain in MotionCor2. Note that MotionCor2 uses a different convention for rotation so it says 'counter-clockwise'. Valid values are 0, 1, 2 and 3.");
-	joboptions["gain_flip"] = JobOption("Gain flip:", RADIO_GAIN_FLIP, 0, "Flip the gain reference after rotation. This is the same as -FlipGain in MotionCor2. 0 means do nothing, 1 means flip Y (upside down) and 2 means flip X (left to right).");
+	joboptions["gain_rot"] = JobOption("Gain rotation:", job_gain_rotation_options, 0, "Rotate the gain reference by this number times 90 degrees clockwise in relion_display. This is the same as -RotGain in MotionCor2. Note that MotionCor2 uses a different convention for rotation so it says 'counter-clockwise'. Valid values are 0, 1, 2 and 3.");
+	joboptions["gain_flip"] = JobOption("Gain flip:", job_gain_flip_options, 0, "Flip the gain reference after rotation. This is the same as -FlipGain in MotionCor2. 0 means do nothing, 1 means flip Y (upside down) and 2 means flip X (left to right).");
 
 	// UCSF-wrapper
 	joboptions["do_own_motioncor"] = JobOption("Use RELION's own implementation?", true ,"If set to Yes, use RELION's own implementation of a MotionCor2-like algorithm by Takanori Nakane. Otherwise, wrap to the UCSF implementation. Note that Takanori's program only runs on CPUs but uses multiple threads, while the UCSF-implementation needs a GPU but uses only one CPU thread. Takanori's implementation is most efficient when the number of frames is divisible by the number of threads (e.g. 12 or 18 threads per MPI process for 36 frames). On some machines, setting the OMP_PROC_BIND environmental variable to TRUE accelerates the program.\n\
@@ -1259,7 +1366,7 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 		int gain_rot = -1, gain_flip = -1;
 		for (int i = 0; i <= 3; i++)
 		{
-			if (strcmp((joboptions["gain_rot"].getString()).c_str(), job_gain_rotation_options[i]) == 0)
+			if (strcmp((joboptions["gain_rot"].getString()).c_str(), job_gain_rotation_options[i].c_str()) == 0)
 			{
 				gain_rot = i;
 				break;
@@ -1268,7 +1375,7 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 
 		for (int i = 0; i <= 2; i++)
 		{
-			if (strcmp((joboptions["gain_flip"].getString()).c_str(), job_gain_flip_options[i]) == 0)
+			if (strcmp((joboptions["gain_flip"].getString()).c_str(), job_gain_flip_options[i].c_str()) == 0)
 			{
 				gain_flip = i;
 				break;
@@ -1594,7 +1701,7 @@ void RelionJob::initialiseAutopickJob()
 	joboptions["do_ref3d"]= JobOption("OR: provide a 3D reference?", false, "Set this option to Yes if you want to provide a 3D map, which will be projected into multiple directions to generate 2D references.");
 	joboptions["fn_ref3d_autopick"] = JobOption("3D reference:", NODE_3DREF, "", "Input reference (*.{mrc})", "Input MRC file with the 3D reference maps, from which 2D references will be made by projection. Note that the absolute greyscale needs to be correct, so only use maps created by RELION itself from this data set.");
 	joboptions["ref3d_symmetry"] = JobOption("Symmetry:", std::string("C1"), "Symmetry point group of the 3D reference. Only projections in the asymmetric part of the sphere will be generated.");
-	joboptions["ref3d_sampling"] = JobOption("3D angular sampling:", RADIO_SAMPLING, 0, "There are only a few discrete \
+	joboptions["ref3d_sampling"] = JobOption("3D angular sampling:", job_sampling_options, 0, "There are only a few discrete \
 angular samplings possible because we use the HealPix library to generate the sampling of the first two Euler angles on the sphere. \
 The samplings are approximate numbers and vary slightly over the sphere.\n\n For autopicking, 30 degrees is usually fine enough, but for highly symmetrical objects one may need to go finer to adequately sample the asymmetric part of the sphere.");
 
@@ -1709,7 +1816,7 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 			// Sampling
 			for (int i = 0; i < 10; i++)
 			{
-				if (strcmp((joboptions["ref3d_sampling"].getString()).c_str(), job_sampling_options[i]) == 0)
+				if (strcmp((joboptions["ref3d_sampling"].getString()).c_str(), job_sampling_options[i].c_str()) == 0)
 				{
 					// The sampling given in the GUI will be the oversampled one!
 					command += " --healpix_order " + floatToString((float)i + 1);
@@ -2273,7 +2380,7 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 
 			FileName fn_job = ".gui_manualpick";
 			bool iscont=false;
-			if (exists(fn_job+"run.job"))
+			if (exists(fn_job+"job.star") || exists(fn_job+"run.job"))
 			{
 				manualpickjob.read(fn_job.c_str(), iscont, true); // true means do initialise
 			}
@@ -2684,7 +2791,7 @@ Still, in general using higher amplitude contrast on the CTFs (e.g. 10-20%) ofte
 Therefore, this option is not generally recommended: try increasing amplitude contrast (in your input STAR file) first!");
 
 
-	joboptions["sampling"] = JobOption("Initial angular sampling:", RADIO_SAMPLING, 1, "There are only a few discrete \
+	joboptions["sampling"] = JobOption("Initial angular sampling:", job_sampling_options, 1, "There are only a few discrete \
 angular samplings possible because we use the HealPix library to generate the sampling of the first two Euler angles on the sphere. \
 The samplings are approximate numbers and vary slightly over the sphere.\n\n For initial model generation at low resolutions, coarser angular samplings can often be used than in normal 3D classifications/refinements, e.g. 15 degrees. During the inbetween and final SGD iterations, the sampling will be adjusted to the resolution, given the particle size.");
 	joboptions["offset_range"] = JobOption("Offset search range (A):", 6, 0, 30, 1, "Probabilities will be calculated only for translations \
@@ -2824,7 +2931,7 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 	command += " --oversampling " + floatToString((float)iover);
 	for (int i = 0; i < 10; i++)
 	{
-		if (strcmp((joboptions["sampling"].getString()).c_str(), job_sampling_options[i]) == 0)
+		if (strcmp((joboptions["sampling"].getString()).c_str(), job_sampling_options[i].c_str()) == 0)
 		{
 			// The sampling given in the GUI will be the oversampled one!
 			command += " --healpix_order " + floatToString((float)i + 1 - iover);
@@ -2954,7 +3061,7 @@ In such cases, values in the range of 7-12 Angstroms have proven useful.");
 	joboptions["dont_skip_align"] = JobOption("Perform image alignment?", true, "If set to No, then rather than \
 performing both alignment and classification, only classification will be performed. This allows the use of very focused masks.\
 This requires that the optimal orientations of all particles are already stored in the input STAR file. ");
-	joboptions["sampling"] = JobOption("Angular sampling interval:", RADIO_SAMPLING, 2, "There are only a few discrete \
+	joboptions["sampling"] = JobOption("Angular sampling interval:", job_sampling_options, 2, "There are only a few discrete \
 angular samplings possible because we use the HealPix library to generate the sampling of the first two Euler angles on the sphere. \
 The samplings are approximate numbers and vary slightly over the sphere.\n\n \
 If auto-sampling is used, this will be the value for the first iteration(s) only, and the sampling rate will be increased automatically after that.");
@@ -3180,7 +3287,7 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 		command += " --oversampling " + floatToString((float)iover);
 		for (int i = 0; i < 10; i++)
 		{
-			if (strcmp((joboptions["sampling"].getString()).c_str(), job_sampling_options[i]) == 0)
+			if (strcmp((joboptions["sampling"].getString()).c_str(), job_sampling_options[i].c_str()) == 0)
 			{
 				// The sampling given in the GUI will be the oversampled one!
 				command += " --healpix_order " + floatToString((float)i + 1 - iover);
@@ -3349,7 +3456,7 @@ High-resolution refinements (e.g. ribosomes or other large complexes in 3D auto-
 masked half-maps are used and a post-processing-like correction of the FSC curves (with phase-randomisation) is performed every iteration. This only works when a reference mask is provided on the I/O tab. \
 This may yield higher-resolution maps, especially when the mask contains only a relatively small volume inside the box.");
 
-	joboptions["sampling"] = JobOption("Initial angular sampling:", RADIO_SAMPLING, 2, "There are only a few discrete \
+	joboptions["sampling"] = JobOption("Initial angular sampling:", job_sampling_options, 2, "There are only a few discrete \
 angular samplings possible because we use the HealPix library to generate the sampling of the first two Euler angles on the sphere. \
 The samplings are approximate numbers and vary slightly over the sphere.\n\n \
 Note that this will only be the value for the first few iteration(s): the sampling rate will be increased automatically after that.");
@@ -3361,7 +3468,7 @@ Note that this will only be the value for the first few iteration(s): the sampli
 Translational sampling is also done using the adaptive approach. \
 Therefore, if adaptive=1, the translations will first be evaluated on a 2x coarser grid.\n\n \
 Note that this will only be the value for the first few iteration(s): the sampling rate will be increased automatically after that.");
-	joboptions["auto_local_sampling"] = JobOption("Local searches from auto-sampling:", RADIO_SAMPLING, 4, "In the automated procedure to \
+	joboptions["auto_local_sampling"] = JobOption("Local searches from auto-sampling:", job_sampling_options, 4, "In the automated procedure to \
 increase the angular samplings, local angular searches of -6/+6 times the sampling rate will be used from this angular sampling rate onwards. For most \
 lower-symmetric particles a value of 1.8 degrees will be sufficient. Perhaps icosahedral symmetries may benefit from a smaller value such as 0.9 degrees.");
 
@@ -3474,7 +3581,7 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 
 	command += " --o " + outputname + fn_run;
 	// TODO: add bodies!! (probably in next version)
-	outputNodes = getOutputNodesRefine(outputname + fn_run, -1, 1, 3, 1, false, false); // false false means dont do movies
+	outputNodes = getOutputNodesRefine(outputname + fn_run, -1, 1, 3, 1);
 
 	if (!is_continue)
 	{
@@ -3563,7 +3670,7 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 		command += " --oversampling " + floatToString((float)iover);
 		for (int i = 0; i < 10; i++)
 		{
-			if (strcmp((joboptions["sampling"].getString()).c_str(), job_sampling_options[i]) == 0)
+			if (strcmp((joboptions["sampling"].getString()).c_str(), job_sampling_options[i].c_str()) == 0)
 			{
 				// The sampling given in the GUI will be the oversampled one!
 				command += " --healpix_order " + floatToString((float)i + 1 - iover);
@@ -3573,7 +3680,7 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 		// Minimum sampling rate to perform local searches (may be changed upon continuation
 		for (int i = 0; i < 10; i++)
 		{
-			if (strcmp((joboptions["auto_local_sampling"].getString()).c_str(), job_sampling_options[i]) == 0)
+			if (strcmp((joboptions["auto_local_sampling"].getString()).c_str(), job_sampling_options[i].c_str()) == 0)
 			{
 				command += " --auto_local_healpix_order " + floatToString((float)i + 1 - iover);
 				break;
@@ -3691,7 +3798,7 @@ Also note that larger bodies should be above smaller bodies in the STAR file. Fo
 	joboptions["do_subtracted_bodies"] = JobOption("Reconstruct subtracted bodies?", true, "If set to Yes, then the reconstruction of each of the bodies will use the subtracted images. This may give \
 useful insights about how well the subtraction worked. If set to No, the original particles are used for reconstruction (while the subtracted ones are still used for alignment). This will result in fuzzy densities for bodies outside the one used for refinement.");
 
-	joboptions["sampling"] = JobOption("Initial angular sampling:", RADIO_SAMPLING, 4, "There are only a few discrete \
+	joboptions["sampling"] = JobOption("Initial angular sampling:", job_sampling_options, 4, "There are only a few discrete \
 angular samplings possible because we use the HealPix library to generate the sampling of the first two Euler angles on the sphere. \
 The samplings are approximate numbers and vary slightly over the sphere.\n\n \
 Note that this will only be the value for the first few iteration(s): the sampling rate will be increased automatically after that.");
@@ -3775,7 +3882,7 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 			fn_run = "run_ct" + floatToString(it);
 			command += " --continue " + joboptions["fn_cont"].getString();
 			command += " --o " + outputname + fn_run;
-			outputNodes = getOutputNodesRefine(outputname + fn_run, -1, 1, 3, nr_bodies, false, false); // false false means dont do movies
+			outputNodes = getOutputNodesRefine(outputname + fn_run, -1, 1, 3, nr_bodies);
 
 		}
 		else
@@ -3783,7 +3890,7 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 			fn_run = "run";
 			command += " --continue " + joboptions["fn_in"].getString();
 			command += " --o " + outputname + fn_run;
-			outputNodes = getOutputNodesRefine(outputname + "run", -1, 1, 3, nr_bodies, false, false); // false false means dont do movies
+			outputNodes = getOutputNodesRefine(outputname + "run", -1, 1, 3, nr_bodies);
 			command += " --solvent_correct_fsc --multibody_masks " + joboptions["fn_bodies"].getString();
 
 			Node node(joboptions["fn_in"].getString(), joboptions["fn_in"].node_type);
@@ -3797,7 +3904,7 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 			command += " --oversampling " + floatToString((float)iover);
 			for (int i = 0; i < 10; i++)
 			{
-				if (strcmp((joboptions["sampling"].getString()).c_str(), job_sampling_options[i]) == 0)
+				if (strcmp((joboptions["sampling"].getString()).c_str(), job_sampling_options[i].c_str()) == 0)
 				{
 					// The sampling given in the GUI will be the oversampled one!
 					command += " --healpix_order " + floatToString((float)i + 1 - iover);
@@ -3926,351 +4033,6 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 		commands.push_back(command);
 
 	}
-
-	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
-
-
-}
-
-void RelionJob::initialiseMovierefineJob()
-{
-
-	hidden_name = ".gui_movierefine";
-
-	joboptions["fn_movie_star"] = JobOption("Input movies STAR file:", NODE_MOVIES, "", "STAR Files (*.{star})", "Select the STAR file with the input movie micrographs, either from an Import or a Motion correction job.");
-    joboptions["movie_rootname"] = JobOption("Rootname of movies files:", std::string("movie"), "rootname to relate each movie to the single-frame averaged micropgraph. With a rootname of 'movie', the movie for mic001.mrc should be called mic001_movie.mrcs. If you've run the MOTIONCORR wrapper in RELION, then the correct rootname is 'movie'.");
-
-	joboptions["fn_cont"] = JobOption("Continue 3D auto-refine from: ", std::string(""), "STAR Files (*_optimiser.star)", "Refine3D/", "Select the *_optimiser.star file for the iteration \
-from which you want to continue a previous run. \
-Note that the Output rootname of the continued run and the rootname of the previous run cannot be the same. \
-If they are the same, the program will automatically add a '_ctX' to the output rootname, \
-with X being the iteration from which one continues the previous run. \n \
-Besides restarting jobs that were somehow stopped before convergence, also use the continue-option after the last iteration to do movie processing.");
-
-	joboptions["join_nr_mics"] = JobOption("Process micrographs in batches of: ", 50, 10, 200, 10, "All movie-particles will be extracted from each micrograph separately, but the resulting STAR files will be joined together into batches of the size specified here. The movie-refinement will be performed on these batches. \
-Very large batches cost more RAM, but the parallelisation in smaller batches is poorer. If a negative number is given, all micrographs are processed in one batch. Note that movie-refinement that INCLUDE rotational searches cannot be performed in batches!");
-
-	joboptions["first_movie_frame"] = JobOption("First movie frame to extract: ", 1, 1, 20, 1, "Extract from this movie frame onwards. The first frame is number 1.");
-	joboptions["last_movie_frame"] = JobOption("Last movie frame to extract: ", 0, 0, 64, 1, "Extract until this movie frame. Zero means: extract all frames in the movie. You may want to specify the last frame number though, as it will be useful to detect movies which accidentally have fewer frames.");
-	joboptions["avg_movie_frames"] = JobOption("Average every so many frames: ", 1, 1, 8, 1, "Average every so many movie frames together upon the extraction. For example, 32-frame movies may be reduced to 16-frame movie-particles when provding a value of 2 here. This will reduce computational costs in movie-refinement and polishing, but too large values will affect the results. Default is a value of 1, so no averaging");
-	joboptions["max_mpi_nodes"] = JobOption("Maximum number of MPI nodes: ", 8, 2, 24, 1, "The number of MPI nodes used by the relion_preprocess program will be limited to this value, regardless of the number of MPI nodes requested on the Running tab (which is also used for the refinement step). This is useful to protect the file system from too heavy disk I/O.");
-	joboptions["extract_size"] = JobOption("Particle box size (pix):", 128, 64, 512, 8, "Size of the extracted particles (in pixels). Use the same as for the refined particles!");
-	joboptions["do_invert"] = JobOption("Invert contrast?", true, "If set to Yes, the contrast in the particles will be inverted. Use the same as for the refined particles!");
-
-	joboptions["do_rescale"] = JobOption("Rescale particles?", false, "If set to Yes, particles will be re-scaled. Note that the particle diameter below will be in the down-scaled images.");
-	joboptions["rescale"] = JobOption("Re-scaled size (pixels): ", 128, 64, 512, 8, "The re-scaled value needs to be an even number. Use the same as for the refined particles! ");
-
-	joboptions["do_norm"] = JobOption("Normalize movie-particles?", true, "If set to Yes, particles will be normalized in the way RELION prefers it. Use the same values as for the refined particles!");
-	joboptions["bg_diameter"] = JobOption("Diameter background circle (pix): ", -1, -1, 600, 10, " Use the same as for the refined particles! Particles will be normalized to a mean value of zero and a standard-deviation of one for all pixels in the background area.\
-The background area is defined as all pixels outside a circle with this given diameter in pixels (before rescaling). When specifying a negative value, a default value of 75% of the Particle box size will be used.");
-	joboptions["white_dust"] = JobOption("Stddev for white dust removal: ", -1, -1, 10, 0.1, " Use the same as for the refined particles! Remove very white pixels from the extracted particles. \
-Pixels values higher than this many times the image stddev will be replaced with values from a Gaussian distribution. \n \n Use negative value to switch off dust removal.");
-	joboptions["black_dust"] = JobOption("Stddev for black dust removal: ", -1, -1, 10, 0.1, " Use the same as for the refined particles! Remove very black pixels from the extracted particles. \
-Pixels values higher than this many times the image stddev will be replaced with values from a Gaussian distribution. \n \n Use negative value to switch off dust removal.");
-
-	joboptions["movie_runavg_window"] = JobOption("Running average window:", 5, 1, 15, 1, "The individual movie frames will be averaged using a running \
-average window with the specified width. Use an odd number. The optimal value will depend on the SNR in the individual movie frames. For ribosomes, we used a value of 5, where \
-each movie frame integrated approximately 1 electron per squared Angstrom.");
-	joboptions["movie_sigma_offset"] = JobOption("Stddev on the translations (pix):", 1., 0.5, 10, 0.5, "A Gaussian prior with the specified standard deviation \
-will be centered at the rotations determined for the corresponding particle where all movie-frames were averaged. For ribosomes, we used a value of 2 pixels");
-	joboptions["do_alsorot_movies"] = JobOption("Also include rotational searches?", false, "If set to Yes, then running averages of the individual frames of recorded movies will also be aligned rotationally. \n \
-If one wants to perform particle polishing, then rotational alignments of the movie frames is NOT necessary and will only take more computing time.");
-	joboptions["movie_sigma_angles"] = JobOption("Stddev on the rotations (deg):", 1., 0.5, 10, 0.5, "A Gaussian prior with the specified standard deviation \
-will be centered at the rotations determined for the corresponding particle where all movie-frames were averaged. For ribosomes, we used a value of 1 degree");
-
-
-}
-
-bool RelionJob::getCommandsMovierefineJob(std::string &outputname, std::vector<std::string> &commands,
-		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
-{
-
-	commands.clear();
-	initialisePipeline(outputname, PROC_MOVIEREFINE_NAME, job_counter);
-	std::string command;
-
-	// A. First get the extract command
-	if (joboptions["nr_mpi"].getNumber() > 1)
-		command="`which relion_preprocess_mpi`";
-	else
-		command="`which relion_preprocess`";
-
-	// Input
-	if (joboptions["fn_movie_star"].getString() == "")
-	{
-		error_message = "ERROR: empty field for input STAR file...";
-		return false;
-	}
-	command += " --i " + joboptions["fn_movie_star"].getString();
-	Node node(joboptions["fn_movie_star"].getString(), joboptions["fn_movie_star"].node_type);
-	inputNodes.push_back(node);
-
-	// Get the data.star to be used for re-extraction from the optimiser name
-	if (joboptions["fn_cont"].getString() == "")
-	{
-		error_message = "ERROR: empty field for continuation STAR file...";
-		return false;
-	}
-	MetaDataTable MDopt;
-	MDopt.read(joboptions["fn_cont"].getString(), "optimiser_general");
-	FileName fn_data;
-	MDopt.getValue(EMDL_OPTIMISER_DATA_STARFILE, fn_data);
-	command += " --reextract_data_star " + fn_data;
-	Node node2(joboptions["fn_cont"].getString(), NODE_OPTIMISER);
-	inputNodes.push_back(node2);
-
-	// Output files of the extraction: to be used in the second step: movie-refinement
-	command += " --part_dir " + outputname;
-
-	FileName fn_ostar = outputname + "particles_" + joboptions["movie_rootname"].getString() + ".star";
-	FileName fn_olist = outputname + "micrographs_" + joboptions["movie_rootname"].getString() + "_list.star";
-	command += " --list_star " + fn_olist;
-	command += " --join_nr_mics " + joboptions["join_nr_mics"].getString();
-	if (joboptions["join_nr_mics"].getNumber() <= 0)
-	{
-		// Only write out a STAR file with all movie-particles if we're NOT processing on a per-micrograph basis
-		command += " --part_star " + fn_ostar;
-	}
-
-	// Extraction parameters
-	command += " --extract --extract_movies";
-	command += " --extract_size " + joboptions["extract_size"].getString();
-	command += " --movie_name " + joboptions["movie_rootname"].getString();
-	command += " --first_movie_frame " + joboptions["first_movie_frame"].getString();
-	command += " --last_movie_frame " + joboptions["last_movie_frame"].getString();
-	command += " --avg_movie_frames " + joboptions["avg_movie_frames"].getString();
-	// Limit MPI nodes
-	if (joboptions["nr_mpi"].getNumber() > ROUND(joboptions["max_mpi_nodes"].getNumber()))
-		command += " --max_mpi_nodes " + joboptions["max_mpi_nodes"].getString();
-
-	// Operate stuff
-	// Get an integer number for the bg_radius
-	RFLOAT bg_radius = (joboptions["bg_diameter"].getNumber() < 0.) ? 0.75 * joboptions["extract_size"].getNumber() : joboptions["bg_diameter"].getNumber();
-	bg_radius /= 2.; // Go from diameter to radius
-	if (joboptions["do_rescale"].getBoolean())
-	{
-		command += " --scale " + joboptions["rescale"].getString();
-		bg_radius *= joboptions["rescale"].getNumber() / joboptions["extract_size"].getNumber();
-	}
-	if (joboptions["do_norm"].getBoolean())
-	{
-		// Get an integer number for the bg_radius
-		bg_radius = (int)bg_radius;
-		command += " --norm --bg_radius " + floatToString(bg_radius);
-		command += " --white_dust " + joboptions["white_dust"].getString();
-		command += " --black_dust " + joboptions["black_dust"].getString();
-	}
-	if (joboptions["do_invert"].getBoolean())
-		command += " --invert_contrast ";
-
-	if (is_continue)
-		command += " --only_extract_unfinished ";
-
-	// Other arguments for extraction
-	command += " " + joboptions["other_args"].getString();
-	commands.push_back(command);
-
-	// B. Then get the actual movie-refinement command
-	if (joboptions["nr_mpi"].getNumber() > 1)
-		command="`which relion_refine_mpi`";
-	else
-		command="`which relion_refine`";
-
-	// Make specific run-names for different variables of ravg, sigma_offset and sigma_angles,
-	// This way you don't have to re-extract all movie particles each time you try a different parameter setting
-	std::string runname = "run_ravg" + joboptions["movie_runavg_window"].getString() + "_off" + joboptions["movie_sigma_offset"].getString();
-	if (joboptions["do_alsorot_movies"].getBoolean())
-		runname += "_ang" + joboptions["movie_sigma_angles"].getString();
-
-	command += " --o " + outputname + runname;
-	outputNodes = getOutputNodesRefine(outputname + runname, -1, 1, 3, 1, true, joboptions["do_alsorot_movies"].getBoolean() );
-
-	command += " --continue " + joboptions["fn_cont"].getString();
-
-	if (joboptions["join_nr_mics"].getNumber() > 0)
-	{
-		if (joboptions["do_alsorot_movies"].getBoolean())
-		{
-			error_message = "You cannot process micrographs in batches and perform rotational searches!";
-			return false;
-		}
-
-		command += " --process_movies_in_batches --realign_movie_frames " + fn_olist;
-
-		if (is_continue)
-			command += " --only_do_unfinished_movies ";
-	}
-	else
-	{
-		command += " --realign_movie_frames " + fn_ostar;
-	}
-
-	command += " --movie_frames_running_avg " + joboptions["movie_runavg_window"].getString();
-	command += " --movie_name " + joboptions["movie_rootname"].getString();
-	command += " --sigma_off " + joboptions["movie_sigma_offset"].getString();
-
-	if (joboptions["do_alsorot_movies"].getBoolean())
-	{
-		command += " --sigma_ang " + joboptions["movie_sigma_angles"].getString();
-	}
-	else
-	{
-		command += " --skip_rotate --skip_maximize ";
-	}
-
-	// Running stuff
-	command += " --j " + joboptions["nr_threads"].getString();
-
-	// Other arguments
-	command += " " + joboptions["other_args"].getString();
-
-	commands.push_back(command);
-
-	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
-
-
-}
-
-void RelionJob::initialisePolishJob()
-{
-
-	hidden_name = ".gui_polish";
-
-	joboptions["fn_in"] = JobOption("Input STAR file with aligned movies:", NODE_MOVIE_DATA, "", "STAR files (*_data.star)",  "Provide the data.star file that was output by the movie-processing option in the auto-refine job.");
-	joboptions["fn_mask"] = JobOption("Mask for the reconstructions", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "A continuous mask with values between 0 (solvent) and 1 (protein). You may provide the same map that was obtained in the post-processing of the corresponding auto-refine jobs before the movie processing.");
-
-	joboptions["do_fit_movement"] = JobOption("Linear fit particle movements?", true, "If set to Yes, then the program will fit linear tracks (in X-Y and in time) through \
-the estimated movie tracks in the input STAR file. For small particles (e.g. < 1MDa) this will lead to more robust beam-induced movement modelling. Because particles that are close to each other on a \
-micrograph often move in similar directions, the estimated tracks from neighbouring particles may also be included in the fitting of each particle. Again, in particular for smaller particles \
-this may improve the robustness of the fits.");
-	joboptions["sigma_nb"] = JobOption("Stddev on particle distance (pix)", 100, 0, 1000, 50, "This value determines how much neighbouring particles contribute to the fit of the movements of each particle. \
-This value is the standard deviation of a Gaussian on the inter-particle distance. Larger values mean that particles that are further away still contribute more. Particles beyond 3 standard deviations are excluded \
-from the fit. Very large values will lead to all fitted tracks pointing in the same direction. A value of zero means that each particle is fitted independently.");
-
-	joboptions["do_bfactor_weighting"] = JobOption("Perform B-factor weighting?", true, "If set to Yes, then the program will estimate a resolution-dependent weight for each movie frames by calculating independent half-reconstructions for each movie frame separately. \
-Gold-standard FSCs between these are then converted into relative Guinier plots, through which straight lines are fitted. Linear fits are often suitable beyond 20A resolution. Small particles may not yield such high resolutions for the individual-frame reconstructions. \
-Therefore, in some cases it may be better to skip this step. It is however recommended to always try and perform B-factor weighting, and to inspect the output bfactors.star and guinier.star files, as adequate weighting may significantly improve resolution in the final map.");
-	joboptions["perframe_highres"] = JobOption("Highres-limit per-frame maps (A)", 6, 1, 25, 1, "To estimate the resolution and dose dependency of the radiation damage, the program \
-will calculate reconstructions from all first movie frames, second movie frames, etc. These per-frame reconstructions will have lower resolution than the reconstruction from all-frames. \
-To speed up the calculations (and reduce memory requirements), the per-frame reconstructions may be limited in resolution using this parameter. One can inspect the output STAR files of the per-frame reconstructions \
-to check afterwards that this value was not chosen lower than the actual resolution of these reconstructions");
-	joboptions["perframe_bfac_lowres"] = JobOption("Lowres-limit B-factor estimation (A)", 20 , 1, 40, 1, "This value describes the lowest resolution that is included in the B-factor estimation of the per-frame reconstructions. \
-Because the power spectrum of per-frame reconstructions is compared to the power spectrum of the reconstruction from all frames, a much lower value than the 10A described in the Rosenthal and Henderson (2003) paper in JMB can be used. Probably a value around 20A is still OK.");
-	joboptions["average_frame_bfactor"] = JobOption("Average frames B-factor estimation", 1 , 1, 7, 1, "B-factors for each movie frame will be estimated from reconstructions of all particles for that movie frame. Single-frame reconstructions sometimes give not enough signal to estimate reliable B-factors. \
-This option allows one to calculate the B-factors from running averages of movie frames. The value specified should be an odd number. Calculating B-factors from multiple movie frames improves the SNR in the reconstructions, but limits the estimation of sudden changes in B-factors throughout the movie, for example in the first few frames when beam-induced movement is very rapid. \
-Therefore, one should not use higher values than strictly necessary.");
-	joboptions["sym_name"] = JobOption("Symmetry:", std::string("C1"), "If the molecule is asymmetric, \
-set Symmetry group to C1. Note their are multiple possibilities for icosahedral symmetry: \n \
-* I1: No-Crowther 222 (standard in Heymann, Chagoyen & Belnap, JSB, 151 (2005) 196–207) \n \
-* I2: Crowther 222 \n \
-* I3: 52-setting (as used in SPIDER?)\n \
-* I4: A different 52 setting \n \
-The command 'relion_refine --sym D2 --print_symmetry_ops' prints a list of all symmetry operators for symmetry group D2. \
-RELION uses XMIPP's libraries for symmetry operations. \
-Therefore, look at the XMIPP Wiki for more details:  http://xmipp.cnb.csic.es/twiki/bin/view/Xmipp/WebHome?topic=Symmetry");
-
-	joboptions["bg_diameter"] = JobOption("Diameter background circle (pix): ", -1, -1, 600, 10, "Particles will be normalized to a mean value of zero and a standard-deviation of one for all pixels in the background area.\
-The background area is defined as all pixels outside a circle with this given diameter in pixels (before rescaling). When specifying a negative value, a default value of 75% of the Particle box size will be used.");
-	joboptions["white_dust"] = JobOption("Stddev for white dust removal: ", -1, -1, 10, 0.1, "Remove very white pixels from the extracted particles. \
-Pixels values higher than this many times the image stddev will be replaced with values from a Gaussian distribution. \n \n Use negative value to switch off dust removal.");
-	joboptions["black_dust"] = JobOption("Stddev for black dust removal: ", -1, -1, 10, 0.1, "Remove very black pixels from the extracted particles. \
-Pixels values higher than this many times the image stddev will be replaced with values from a Gaussian distribution. \n \n Use negative value to switch off dust removal.");
-
-	joboptions["do_helix"] = JobOption("Do helical reconstruction?", false, "If set to Yes, then perform 3D helical reconstruction.");
-	joboptions["helical_nr_asu"] = JobOption("Number of asymmetrical units:", 1, 1, 100, 1, "Number of helical asymmetrical units in each segment box. If the interbox distance (set in segment picking step) \
-is 100 Angstroms and the estimated helical rise is ~20 Angstroms, then set this value to 100 / 20 = 5 (nearest integer). This integer should not be less than 1. The correct value is essential in measuring the \
-signal to noise ratio in helical reconstruction.\n\nPlease copy this value from previous 3D refinement.");
-	joboptions["helical_twist"] = JobOption("Helical twist (deg):", std::string("0"), "Helical symmetry. Set helical twist (in degrees) to positive value if it is a right-handed helix. \
-Helical rise is a positive value in Angstroms.\n\nPlease copy the refined helical symmetry from previous 3D refinement.");
-	joboptions["helical_rise"] = JobOption("Helical rise (A):", std::string("0"), "Helical symmetry. Set helical twist (in degrees) to positive value if it is a right-handed helix. \
-Helical rise is a positive value in Angstroms.\n\nPlease copy the refined helical symmetry from previous 3D refinement.");
-
-}
-
-bool RelionJob::getCommandsPolishJob(std::string &outputname, std::vector<std::string> &commands,
-		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
-{
-
-	commands.clear();
-	initialisePipeline(outputname, PROC_POLISH_NAME, job_counter);
-	std::string command;
-
-	if (joboptions["nr_mpi"].getNumber() > 1)
-		command="`which relion_particle_polish_mpi`";
-	else
-		command="`which relion_particle_polish`";
-
-	// General
-	if (joboptions["fn_in"].getString() == "")
-	{
-		error_message = "ERROR: empty field for input STAR file...";
-		return false;
-	}
-	command += " --i " + joboptions["fn_in"].getString();
-	Node node(joboptions["fn_in"].getString(), joboptions["fn_in"].node_type);
-	inputNodes.push_back(node);
-
-	if (joboptions["fn_mask"].getString() == "")
-	{
-		error_message = "ERROR: empty field for input mask...";
-		return false;
-	}
-	command += " --mask " + joboptions["fn_mask"].getString();
-	Node node2(joboptions["fn_mask"].getString(), joboptions["fn_mask"].node_type);
-	inputNodes.push_back(node2);
-
-	command += " --o " + outputname;
-	Node node3(outputname + "shiny.star", NODE_PART_DATA);
-	outputNodes.push_back(node3);
-
-	Node node4(outputname + "logfile.pdf", NODE_PDF_LOGFILE);
-	outputNodes.push_back(node4);
-
-	Node node5(outputname + "shiny_post.mrc", NODE_FINALMAP);
-	outputNodes.push_back(node5);
-
-	// If this is not a continue job, then re-start from scratch....
-	if (is_continue)
-		command += " --only_do_unfinished ";
-
-	// Beam-induced movement fitting options
-	if (joboptions["do_fit_movement"].getBoolean())
-		command += " --sigma_nb " + joboptions["sigma_nb"].getString();
-	else
-		command += " --no_fit ";
-
-	// Damage
-	if (joboptions["do_bfactor_weighting"].getBoolean())
-	{
-		command += " --perframe_highres " + joboptions["perframe_highres"].getString();
-		command += " --autob_lowres " + joboptions["perframe_bfac_lowres"].getString();
-		command += " --bfactor_running_avg " + joboptions["average_frame_bfactor"].getString();
-	}
-	else
-	{
-		command += " --skip_bfactor_weighting ";
-	}
-
-	// Symmetry group
-	command += " --sym " + joboptions["sym_name"].getString();
-
-	// Normalisation
-	command += " --bg_radius " + floatToString(FLOOR(joboptions["bg_diameter"].getNumber()/2.));
-	command += " --white_dust " + joboptions["white_dust"].getString();
-	command += " --black_dust " + joboptions["black_dust"].getString();
-
-	// Helix
-	if (joboptions["do_helix"].getBoolean())
-	{
-		command += " --helix --helical_nr_asu " + joboptions["helical_nr_asu"].getString();
-		command += " --helical_twist " + joboptions["helical_twist"].getString();
-		command += " --helical_rise " + joboptions["helical_rise"].getString();
-	}
-
-	// Other arguments for extraction
-	command += " " + joboptions["other_args"].getString();
-
-	commands.push_back(command);
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 
@@ -5194,4 +4956,3 @@ bool RelionJob::getCommandsCtfrefineJob(std::string &outputname, std::vector<std
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 
 }
-
