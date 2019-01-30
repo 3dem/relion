@@ -86,7 +86,7 @@ void ReferenceMap::load(int verb, bool debug)
 	if (angpix < 0)
 	{
 		angpix = maps[0].samplingRateX();
-		std::cerr << "WARNING: You did not specify --ref_angpix. The pixel size in the image header of " << reconFn0 << ", " << angpix << " A/px, is used." << std::endl;
+		std::cerr << "WARNING: You did not specify --angpix_ref. The pixel size in the image header of " << reconFn0 << ", " << angpix << " A/px, is used." << std::endl;
 	}
 	s = maps[0].data.ydim;
 	sh = s/2 + 1;

@@ -100,19 +100,25 @@ void CtffindRunner::initialise()
 	// Get the CTFFIND executable
 	if (fn_ctffind_exe == "")
 	{
-		char * penv;
-		penv = getenv ("RELION_CTFFIND_EXECUTABLE");
-		if (penv!=NULL)
+		char *penv;
+		penv = getenv("RELION_CTFFIND_EXECUTABLE");
+		if (penv != NULL)
 			fn_ctffind_exe = (std::string)penv;
 	}
 	// Get the GCTF executable
 	if (do_use_gctf && fn_gctf_exe == "")
 	{
-		char * penv;
-		penv = getenv ("RELION_GCTF_EXECUTABLE");
-		if (penv!=NULL)
+		char *penv;
+		penv = getenv("RELION_GCTF_EXECUTABLE");
+		if (penv != NULL)
 			fn_gctf_exe = (std::string)penv;
 	}
+
+	fn_shell = "csh";
+	char *shell_name;
+	shell_name = getenv("RELION_SHELL");
+	if (shell_name != NULL)
+		fn_shell = (std::string)shell_name;	
 
 	if (do_use_gctf && ctf_win>0)
 		REPORT_ERROR("ERROR: Running Gctf together with --ctfWin is not implemented, please use CTFFIND instead.");
@@ -647,7 +653,7 @@ void CtffindRunner::executeCtffind3(long int imic)
 	std::string ctffind4_options = (is_ctffind4) ? " --omp-num-threads " + integerToString(nr_threads) + " --old-school-input-ctffind4 " : "";
 
 	// Write script to run ctffind
-	fh << "#!/usr/bin/env csh"<<std::endl;
+	fh << "#!/usr/bin/env " << fn_shell << std::endl;
 	fh << fn_ctffind_exe << ctffind4_options << " > " << fn_log << " << EOF"<<std::endl;
 	// line 1: input image
 	if (do_movie_thon_rings)
@@ -677,7 +683,7 @@ void CtffindRunner::executeCtffind3(long int imic)
 	fh.close();
 
 	// Execute ctffind
-	std::string command = "csh "+ fn_script;
+	std::string command = fn_shell + " "+ fn_script;
 	if (system(command.c_str()))
 		std::cerr << "WARNING: there was an error in executing: " << command << std::endl;
 
@@ -743,7 +749,7 @@ void CtffindRunner::executeCtffind4(long int imic)
 		ctffind4_options += " --amplitude-spectrum-input";
 
 	// Write script to run ctffind
-	fh << "#!/usr/bin/env csh" << std::endl;
+	fh << "#!/usr/bin/env " << fn_shell << std::endl;
 	fh << fn_ctffind_exe << ctffind4_options << " > " << fn_log << " << EOF"<<std::endl;
 	// line 1: input image
 	if (do_movie_thon_rings)
@@ -801,7 +807,7 @@ void CtffindRunner::executeCtffind4(long int imic)
 	fh.close();
 
 	// Execute ctffind
-	FileName command = "csh "+ fn_script;
+	FileName command = fn_shell + " "+ fn_script;
 	if (system(command.c_str()))
 		std::cerr << "WARNING: there was an error in executing: " << command << std::endl;
 

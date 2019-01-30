@@ -53,7 +53,8 @@ void MicrographHandler::init(
 	if (corrMicFn != "")
 	{
 		MetaDataTable corrMic;
-		corrMic.read(corrMicFn);
+		ObservationModel obsModel;
+		ObservationModel::loadSafely(corrMicFn, obsModel, corrMic, "micrographs", verb);
 		mic2meta.clear();
 
 		std::string micName, metaName;
