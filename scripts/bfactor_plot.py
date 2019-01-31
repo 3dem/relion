@@ -114,13 +114,15 @@ def load_star(filename):
 
     for line in open(filename):
         line = line.strip()
-        
+
         # remove comments
         comment_pos = line.find('#')
         if comment_pos > 0:
             line = line[:comment_pos]
 
         if line == "":
+            if in_loop == 2:
+                in_loop = 0
             continue
 
         if line.startswith("data_"):
@@ -150,8 +152,8 @@ def load_star(filename):
             elems = line.split()
             assert len(elems) == len(current_colnames)
             for idx, e in enumerate(elems):
-                current_data[current_colnames[idx]].append(e)        
-        
+                current_data[current_colnames[idx]].append(e)
+
     return datasets
 
 def appendJobOptionsFromRunJobFile(filename, job_options):
@@ -314,7 +316,7 @@ def run_pipeline(opts):
         exit(1)
 
     all_particles = load_star(all_particles_star_file)
-    all_nr_particles = len(all_particles['']['rlnImageName'])
+    all_nr_particles = len(all_particles['particles']['rlnImageName'])
     all_particles_resolution, all_particles_bfactor = get_postprocess_result(opts.input_postprocess_job + 'postprocess.star') 
 
     nr_particles = []
@@ -475,7 +477,10 @@ def run_pipeline(opts):
         ax3.yaxis.set_label_position("right")
 	yticks = ax1.get_yticks()
 	yticks[yticks <= 0] = 1.0 / (999 * 999) # to avoid zero division and negative sqrt
-        ax3.set_yticklabels(np.sqrt(1 / yticks).round(1))
+        ndigits = 1
+        if np.max(yticks) > 0.25:
+            ndigits = 2
+        ax3.set_yticklabels(np.sqrt(1 / yticks).round(ndigits))
 
         output_name = opts.prefix + "rosenthal-henderson-plot.pdf"
         plt.savefig(output_name, bbox_inches='tight')
