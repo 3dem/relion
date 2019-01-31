@@ -142,14 +142,16 @@ class PipeLine
 	bool checkProcessCompletion();
 
 	// Get the command line arguments for thisjob
-	bool getCommandLineJob(RelionJob &thisjob, int current_job, bool is_main_continue, bool is_scheduled, bool do_makedir, std::vector<std::string> &commands,
-			std::string &final_command, std::string &error_message);
+	bool getCommandLineJob(RelionJob &thisjob, int current_job, bool is_main_continue,
+			bool is_scheduled, bool do_makedir, bool do_overwrite_current,
+			std::vector<std::string> &commands, std::string &final_command, std::string &error_message);
 
 	// Adds _job to the pipeline and return the id of the newprocess
 	long int addJob(RelionJob &_job, int as_status, bool do_overwrite);
 
 	// Runs a job and adds it to the pipeline
-	bool runJob(RelionJob &_job, int &current_job, bool only_schedule, bool is_main_continue, bool is_scheduled, std::string &error_message);
+	bool runJob(RelionJob &_job, int &current_job, bool only_schedule, bool is_main_continue,
+			bool is_scheduled, bool do_overwrite_current, std::string &error_message);
 
 	// Adds a scheduled job to the pipeline from the command line (with a name for job type)
 	int addScheduledJob(std::string job_type, std::string fn_options);
@@ -158,7 +160,8 @@ class PipeLine
 	int addScheduledJob(int job_type, std::string fn_options);
 
 	// Runs a series of scheduled jobs, possibly in a loop, from the command line
-	void runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_repeat, long int minutes_wait, long int minutes_wait_before = 0, long int seconds_wait_after = 10);
+	void runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_repeat,
+			long int minutes_wait, long int minutes_wait_before = 0, long int seconds_wait_after = 10, bool do_overwrite_current = false);
 
 	// If I'm deleting this_job from the pipeline, which Nodes and which Processes need to be deleted?
 	void deleteJobGetNodesAndProcesses(int this_job, bool do_recursive, std::vector<bool> &deleteNodes, std::vector<bool> &deleteProcesses);

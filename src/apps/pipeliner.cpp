@@ -33,7 +33,7 @@ class pipeliner_parameters
 public:
 	FileName fn_sched, fn_jobids, fn_options, fn_alias;
 	int nr_repeat;
-	bool do_check_complete;
+	bool do_check_complete, do_overwrite_current;
 	long int minutes_wait, minutes_wait_before, seconds_wait_after;
 	std::string add_type;
 
@@ -63,6 +63,7 @@ public:
 		int run_section = parser.addSection("Run scheduled jobs options");
 		fn_jobids  = parser.getOption("--RunJobs", "Run these jobs", "");
 		fn_sched = parser.getOption("--schedule", "Name of the scheduler for running the scheduled jobs", "");
+		do_overwrite_current = parser.checkOption("--overwrite_jobs", "Use this flag to overwrite existing jobs, instead of continuing them");
 		nr_repeat = textToInteger(parser.getOption("--repeat", "Run the scheduled jobs this many times", "1"));
 		minutes_wait = textToInteger(parser.getOption("--min_wait", "Wait at least this many minutes between each repeat", "0"));
 		minutes_wait_before = textToInteger(parser.getOption("--min_wait_before", "Wait this many minutes before starting the running the first job", "0"));
@@ -99,7 +100,7 @@ public:
 		}
 		else if (nr_repeat > 0)
 		{
-			pipeline.runScheduledJobs(fn_sched, fn_jobids, nr_repeat, minutes_wait, minutes_wait_before, seconds_wait_after);
+			pipeline.runScheduledJobs(fn_sched, fn_jobids, nr_repeat, minutes_wait, minutes_wait_before, seconds_wait_after, do_overwrite_current);
 		}
 	}
 };

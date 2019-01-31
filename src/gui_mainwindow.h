@@ -69,6 +69,7 @@ static Fl_Pixmap *xpm_image;
 // For keeping track of which process to use in the process browser on the GUI
 static std::vector<long int> running_processes, finished_processes, scheduled_processes, input_processes, output_processes, io_nodes;
 static bool is_main_continue;
+static bool do_overwrite_continue;
 
 static JobWindow *gui_jobwindows[NR_BROWSE_TABS];
 
@@ -325,6 +326,9 @@ private:
 
     static void cb_reactivate_runbutton(Fl_Widget*, void*);
     inline void cb_reactivate_runbutton_i();
+
+    static void cb_toggle_overwrite_continue(Fl_Widget*, void*);
+    inline void cb_toggle_overwrite_continue_i();
 
     static void cb_show_initial_screen(Fl_Widget*, void*);
     inline void cb_show_initial_screen_i();

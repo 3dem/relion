@@ -330,6 +330,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 		if (!maingui_do_read_only)
 			menubar->add("File/Remake .Nodes\\/",  FL_ALT+'n', cb_remake_nodesdir, this);
 		menubar->add("File/Display",  FL_ALT+'d', cb_display, this);
+		menubar->add("File/_Overwrite continue",  FL_ALT+'o', cb_toggle_overwrite_continue, this);
 		menubar->add("File/_Show initial screen",  FL_ALT+'z', cb_show_initial_screen, this);
 		if (!maingui_do_read_only)
 			menubar->add("File/_Empty trash",  FL_ALT+'t', cb_empty_trash, this);
@@ -1324,7 +1325,7 @@ void GuiMainWindow::cb_toggle_continue_oldstyle_i()
 void GuiMainWindow::cb_toggle_continue_i()
 {
 
-	if (is_main_continue)
+	if (is_main_continue && !do_overwrite_continue)
 	{
 		run_button->label("Continue!");
 		run_button->color(GUI_BUTTON_COLOR);
@@ -1342,7 +1343,7 @@ void GuiMainWindow::cb_toggle_continue_i()
 	}
 
 	int my_window = (browser->value() - 1);
-	gui_jobwindows[my_window]->toggle_new_continue(is_main_continue);
+	gui_jobwindows[my_window]->toggle_new_continue(is_main_continue && !do_overwrite_continue);
 
 }
 
@@ -1361,7 +1362,8 @@ void GuiMainWindow::cb_print_cl_i()
 	gui_jobwindows[iwin]->updateMyJob();
 
 	std::string error_message;
-	if (!pipeline.getCommandLineJob(gui_jobwindows[iwin]->myjob, current_job, is_main_continue, false, DONT_MKDIR, commands, final_command, error_message))
+	if (!pipeline.getCommandLineJob(gui_jobwindows[iwin]->myjob, current_job, is_main_continue, false,
+			DONT_MKDIR, do_overwrite_continue, commands, final_command, error_message))
 	{
 		fl_message("%s",error_message.c_str());
 	}
@@ -1403,7 +1405,7 @@ void GuiMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 	tickTimeLastChanged();
 
 	std::string error_message;
-	if (!pipeline.runJob(gui_jobwindows[iwin]->myjob, current_job, only_schedule, is_main_continue, false, error_message))
+	if (!pipeline.runJob(gui_jobwindows[iwin]->myjob, current_job, only_schedule, is_main_continue, false, do_overwrite_continue, error_message))
 	{
 		fl_message("%s",error_message.c_str());
 		// Allow the user to fix the error and submit this job again
@@ -1422,12 +1424,14 @@ void GuiMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 	}
 
 	// Also set alias from the alias_current_job input
-	if (!is_main_continue)
+	if (!(is_main_continue || do_overwrite_continue))
 	{
 		std::string alias= (std::string)alias_current_job->value();
 		if (alias != "Give_alias_here" && alias != pipeline.processList[current_job].name)
 			cb_set_alias_i(alias);
 	}
+
+	do_overwrite_continue = false;
 
 	// Select this job now
 	loadJobFromPipeline(current_job);
@@ -1956,6 +1960,20 @@ void GuiMainWindow::cb_reactivate_runbutton(Fl_Widget* o, void* v)
 void GuiMainWindow::cb_reactivate_runbutton_i()
 {
 	run_button->activate();
+}
+
+void GuiMainWindow::cb_toggle_overwrite_continue(Fl_Widget* o, void* v)
+{
+
+    GuiMainWindow* T=(GuiMainWindow*)v;
+    T->cb_toggle_overwrite_continue_i();
+}
+
+void GuiMainWindow::cb_toggle_overwrite_continue_i()
+{
+    do_overwrite_continue = !do_overwrite_continue;
+
+	cb_toggle_continue_i();
 }
 
 void GuiMainWindow::cb_show_initial_screen(Fl_Widget* o, void* v)

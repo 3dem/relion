@@ -376,12 +376,16 @@ bool PipeLine::checkProcessCompletion()
 
 }
 
-bool PipeLine::getCommandLineJob(RelionJob &thisjob, int current_job, bool is_main_continue, bool is_scheduled, bool do_makedir, std::vector<std::string> &commands,
-			std::string &final_command, std::string &error_message)
+bool PipeLine::getCommandLineJob(RelionJob &thisjob, int current_job, bool is_main_continue,
+		bool is_scheduled, bool do_makedir, bool do_overwrite_current,
+		std::vector<std::string> &commands, std::string &final_command, std::string &error_message)
 {
+
+	if (do_overwrite_current) is_main_continue = false;
+
 	// Except for continuation or scheduled jobs, all jobs get a new unique directory
 	std::string my_outputname;
-	if ((is_main_continue || is_scheduled) && current_job < processList.size())
+	if ((is_main_continue || is_scheduled || do_overwrite_current) && current_job < processList.size())
 	{
 		if (current_job < 0)
 			REPORT_ERROR("BUG: current_job < 0");
@@ -440,14 +444,17 @@ long int PipeLine::addJob(RelionJob &thisjob, int as_status, bool do_overwrite)
 
 }
 
-bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, bool is_main_continue, bool is_scheduled, std::string &error_message)
+bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, bool is_main_continue,
+		bool is_scheduled, bool do_overwrite_current, std::string &error_message)
 {
+
+	if (do_overwrite_current) is_main_continue = false;
 
 	std::vector<std::string> commands;
 	std::string final_command;
 
 	// true means makedir
-	if (!getCommandLineJob(_job, current_job, is_main_continue, is_scheduled, true, commands, final_command, error_message))
+	if (!getCommandLineJob(_job, current_job, is_main_continue, is_scheduled, true, do_overwrite_current, commands, final_command, error_message))
 	{
 		return false;
 	}
@@ -506,7 +513,7 @@ bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, boo
 	} // end if !only_schedule && is_main_continue
 
 	// If a job is executed with a non-continue scheduled job, then also move away any existing output node files
-	if (current_job >= 0 && is_scheduled && !is_main_continue)
+	if (current_job >= 0 && (is_scheduled && !is_main_continue) || do_overwrite_current)
 		do_move_output_nodes_to_old = true;
 
 	// Move away existing output nodes
@@ -534,7 +541,7 @@ bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, boo
 	bool allow_overwrite = is_main_continue || is_scheduled; // continuation and scheduled jobs always allow overwriting into the existing directory
 
 	// Add the job to the pipeline, and set current_job to the new one
-	current_job = addJob(_job, mynewstatus, allow_overwrite);
+	current_job = addJob(_job, mynewstatus, allow_overwrite || do_overwrite_current);
 
 	// Write out the new pipeline
 	write(DO_LOCK);
@@ -628,13 +635,14 @@ int PipeLine::addScheduledJob(int job_type, std::string fn_options)
 
 	std::string error_message;
 	int current_job = processList.size();
-	if (!runJob(job, current_job, true, job.is_continue, false, error_message)) // true is only_schedule, false means !is_scheduled
+	if (!runJob(job, current_job, true, job.is_continue, false, false, error_message)) // true is only_schedule, false means !is_scheduled, 2nd false means dont overwrite current
 		REPORT_ERROR(error_message.c_str());
 
 	return current_job;
 }
 
-void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_repeat, long int minutes_wait, long int minutes_wait_before, long int seconds_wait_after)
+void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_repeat,
+		long int minutes_wait, long int minutes_wait_before, long int seconds_wait_after, bool do_overwrite_current)
 {
 
 	std::vector<FileName> my_scheduled_processes;
@@ -730,7 +738,7 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 			fh << " + " << ctime(&now) << " ---- Executing " << processList[current_job].name  << std::endl;
 			std::string error_message;
 
-			if (!runJob(myjob, current_job, false, is_continue, true, error_message)) // true means is_scheduled!
+			if (!runJob(myjob, current_job, false, is_continue, true, do_overwrite_current, error_message)) // true means is_scheduled; false=dont overwrite current
 				REPORT_ERROR(error_message);
 
 			// Now wait until that job is done!
