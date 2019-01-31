@@ -283,8 +283,6 @@ void Preprocessing::joinAllStarFiles()
 
 
 	// Write out the joined star files
-
-	//THIS REALLY DOESNT WORK YET!!!!
 	if (fn_part_star != "")
 	{
 
