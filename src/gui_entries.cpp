@@ -54,6 +54,7 @@ ShowHelpText::~ShowHelpText(){};
 void GuiEntry::clear()
 {
 	deactivate_option = -1;
+	/*
 	//joboption.clear();
 	if (inp != NULL)
 	{
@@ -70,13 +71,11 @@ void GuiEntry::clear()
 		delete browse;
 		browse = NULL;
 	}
-	/*
 	if (choice != NULL)
 	{
 		delete choice;
 		choice = NULL;
 	}
-	*/
 	if (menu != NULL)
 	{
 		delete menu;
@@ -92,6 +91,7 @@ void GuiEntry::clear()
 		delete slider;
 		slider = NULL;
 	}
+	*/
 
 }
 void GuiEntry::initialise(int x, int y, Fl_Group * deactivate_this_group, bool _actually_activate, int height, int wcol2, int wcol3)
@@ -209,12 +209,6 @@ void GuiEntry::place(JobOption &_joboption, int &y, int _deactivate_option, Fl_G
 // Set the value back from the Fl_Input into the JobOption.value
 void GuiEntry::setValue(std::string _value)
 {
-	// Dirty hack to keep backward compatibility...
-	if (_value == "2D micrograph movies (*.mrcs)" || _value == "2D micrograph movies (*.mrcs, *.tiff)" || _value == "2D micrographs/tomograms (*.mrc)")
-	{
-		return;
-	}
-
 	joboption.value = _value;
 	inp->value(_value.c_str());
 	// Also update menu or slider if necessary
@@ -222,7 +216,8 @@ void GuiEntry::setValue(std::string _value)
 	{
 		const Fl_Menu_Item *p = menu->find_item(inp->value());
 		if ( p ) menu->picked(p);
-		else REPORT_ERROR("Error readValue: Menu item not found:" + std::string(inp->value()) + " for joboption label= " + joboption.label);
+		// if we cant find the menu option, just pick first menu entry
+		else menu->picked(&menu->menu()[0]);
 	}
 	if (slider != NULL)
 	{
