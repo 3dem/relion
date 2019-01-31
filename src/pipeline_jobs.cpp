@@ -364,12 +364,19 @@ void RelionJob::setOption(std::string setOptionLine)
 	label = setOptionLine.substr(0, equalsigns - 1);
 	value = setOptionLine.substr(equalsigns + 3, setOptionLine.length() - equalsigns - 3);
 
-	if (!containsLabel(label, option))
+	if (joboptions.find(label) != joboptions.end())
+	{
+		joboptions[label].setString(value);
+	}
+	else if (containsLabel(label, option))
+	{
+		joboptions[option].setString(value);
+	}
+	else
 	{
 		REPORT_ERROR(" ERROR: Job does not contain label: " + label);
 	}
 
-	joboptions[option].setString(value);
 
 }
 
