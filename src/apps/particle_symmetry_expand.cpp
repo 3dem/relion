@@ -143,7 +143,7 @@ public:
 						RFLOAT xxt = SIND(tilt) * z_pos * rise / angpix;
 						xp = x + COSD(-psi) * xxt;
 						yp = y + SIND(-psi) * xxt;
-							rotp = rot + z_pos * twist;
+						rotp = rot - z_pos * twist;
 						DFo.addObject();
 						DFo.setObject(DFi.getObject());
 						DFo.setValue(EMDL_ORIENT_ROT, rotp);
