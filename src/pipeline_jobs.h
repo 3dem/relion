@@ -97,7 +97,7 @@ static const std::vector<std::string> job_sampling_options{
 };
 
 static const std::vector<std::string> job_nodetype_options{
-	"2D/3D particle coordinates (*.box, *_pick.star)",
+	"Particle coordinates (*.box, *_pick.star)",
 	"Particles STAR file (.star)",
 	"Movie-particles STAR file (.star)",
 	"2D references (.star or .mrcs)",
