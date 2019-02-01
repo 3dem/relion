@@ -1177,12 +1177,15 @@ void MetaDataTable::write(std::ostream& out) const
 void MetaDataTable::write(const FileName &fn_out) const
 {
 	std::ofstream  fh;
-	fh.open((fn_out).c_str(), std::ios::out);
+	FileName fn_tmp = fn_out + ".tmp";
+	fh.open((fn_tmp).c_str(), std::ios::out);
 	if (!fh)
 		REPORT_ERROR( (std::string)"MetaDataTable::write: cannot write to file: " + fn_out);
 //	fh << "# RELION; version " << RELION_VERSION << std::endl;
 	write(fh);
 	fh.close();
+	// Rename to prevent errors with programs in pipeliner reading in incomplete STAR files
+	std::rename(fn_tmp.c_str(), fn_out.c_str());
 
 }
 

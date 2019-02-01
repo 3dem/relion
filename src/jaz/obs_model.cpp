@@ -130,13 +130,16 @@ void ObservationModel::saveNew(
 		std::string filename,
 		std::string tablename)
 {
-	std::ofstream of(filename);
+	std::string tmpfilename = filename + ".tmp";
+	std::ofstream of(tmpfilename);
 
 	opticsMdt.setName("optics");
 	opticsMdt.write(of);
 
 	particlesMdt.setName(tablename);
 	particlesMdt.write(of);
+
+	std::rename(tmpfilename.c_str(), filename.c_str());
 }
 
 void ObservationModel::save(
@@ -144,13 +147,16 @@ void ObservationModel::save(
 		std::string filename,
 		std::string tablename)
 {
-	std::ofstream of(filename);
+	std::string tmpfilename = filename + ".tmp";
+	std::ofstream of(tmpfilename);
 
 	opticsMdt.setName("optics");
 	opticsMdt.write(of);
 
 	particlesMdt.setName(tablename);
 	particlesMdt.write(of);
+
+	std::rename(tmpfilename.c_str(), filename.c_str());
 }
 
 ObservationModel::ObservationModel()
