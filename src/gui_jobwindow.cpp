@@ -2127,17 +2127,29 @@ void JobWindow::initialiseCtfrefineWindow()
 
 	group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group3->end();
-	place("do_tilt", TOGGLE_LEAVE_ACTIVE, group3);
+	place("do_aniso_mag", TOGGLE_LEAVE_ACTIVE, group3, true); //true means: activating aniso_mag will deactive higher-order aberrations
 
 	group3->begin();
-	place("do_trefoil", TOGGLE_LEAVE_ACTIVE);
-	group3->end();
-
-	guientries["do_tilt"].cb_menu_i();
 
 	current_y += STEPY /2 ;
 
+	group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group4->end();
+	place("do_tilt", TOGGLE_LEAVE_ACTIVE, group4);
+
+	group4->begin();
+
+	place("do_trefoil", TOGGLE_LEAVE_ACTIVE);
+
+	group4->end();
+	guientries["do_tilt"].cb_menu_i();
+
 	place("do_4thorder", TOGGLE_LEAVE_ACTIVE);
+
+	group3->end();
+	guientries["do_aniso_mag"].cb_menu_i();
+
+
 
 	tab2->end();
 

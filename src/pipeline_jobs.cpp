@@ -4833,6 +4833,9 @@ This gives higher resolution estimates, as it disregards ill-defined regions nea
 	joboptions["do_phase"] = JobOption("Fit per-micrograph phase-shift?", false, "If set to Yes, ctf_refine will try to refine a phase-shift (amplitude contrast) on a per-micrograph basis. This may be useful for Volta-phase plate data, but will require many particles and good signal-to-noise ratios per micrograph.");
 
 	// aberrations
+	joboptions["do_aniso_mag"] = JobOption("Estimate (anisotropic) magnification?", false, "If set to Yes, then relion_ctf_refine will also estimate the (anisotropic) magnification per optics group. \
+This option cannot be done simultaneously with higher-order aberration estimation. It's probably best to estimate the one that is most off first, and the other one second. It might be worth repeating the estimation if both are off.");
+
 	joboptions["do_tilt"] = JobOption("Estimate beamtilt?", false, "If set to Yes, then relion_ctf_refine will also estimate the beamtilt per optics group. This option is only recommended for data sets that extend beyond 4.5 Angstrom resolution.");
 	joboptions["do_trefoil"] = JobOption("Also estimate trefoil?", false, "If set to Yes, then relion_ctf_refine will also estimate the trefoil (3-fold astigmatism) per optics group. This option is only recommended for data sets that extend beyond 3.5 Angstrom resolution.");
 
@@ -4929,26 +4932,36 @@ bool RelionJob::getCommandsCtfrefineJob(std::string &outputname, std::vector<std
 		outputNodes.push_back(node6);
 	}
 
-	if (joboptions["do_tilt"].getBoolean())
+	if (joboptions["do_aniso_mag"].getBoolean())
 	{
-		command += " --fit_beamtilt";
-		command += " --kmin_tilt " + joboptions["minres"].getString();
-
-		if (joboptions["do_trefoil"].getBoolean())
-		{
-			command += " --odd_aberr_max_n 3";
-		}
+		command += " --fit_aniso";
 	}
-
-
-	if (joboptions["do_4thorder"].getBoolean())
+	else
 	{
-		command += " --fit_aberr";
+		// do not allow anisotropic magnification to be done simultaneously with higher-order aberrations
+		if (joboptions["do_tilt"].getBoolean())
+		{
+			command += " --fit_beamtilt";
+			command += " --kmin_tilt " + joboptions["minres"].getString();
+
+			if (joboptions["do_trefoil"].getBoolean())
+			{
+				command += " --odd_aberr_max_n 3";
+			}
+		}
+
+
+		if (joboptions["do_4thorder"].getBoolean())
+		{
+			command += " --fit_aberr";
+		}
 	}
 
 	// If this is a continue job, then only process unfinished micrographs
 	if (is_continue)
+	{
 		command += " --only_do_unfinished ";
+	}
 
 	Node node5(outputname+"particles_ctf_refine.star", NODE_PART_DATA);
 	outputNodes.push_back(node5);
