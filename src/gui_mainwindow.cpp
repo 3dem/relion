@@ -1325,9 +1325,16 @@ void GuiMainWindow::cb_toggle_continue_oldstyle_i()
 void GuiMainWindow::cb_toggle_continue_i()
 {
 
-	if (is_main_continue && !do_overwrite_continue)
+	if (is_main_continue || do_overwrite_continue)
 	{
-		run_button->label("Continue!");
+		if (do_overwrite_continue)
+		{
+			run_button->label("Overwrite!");
+		}
+		else
+		{
+			run_button->label("Continue!");
+		}
 		run_button->color(GUI_BUTTON_COLOR);
 		run_button->labelfont(FL_ITALIC);
 		run_button->labelsize(13);
@@ -1395,6 +1402,17 @@ void GuiMainWindow::cb_schedule(Fl_Widget* o, void* v) {
 
 void GuiMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 {
+
+	if (do_overwrite_continue)
+	{
+		std::string ask = "Are you sure you want to overwrite this job?";
+		int proceed =  fl_choice("%s", "Cancel", "Overwrite!", NULL, ask.c_str());
+		if (!proceed)
+		{
+			do_overwrite_continue = false;
+			return;
+		}
+	}
 
 	// Get which jobtype the GUI is on now
 	int iwin = browser->value() - 1;
