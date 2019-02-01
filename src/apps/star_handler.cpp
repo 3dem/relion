@@ -320,6 +320,8 @@ class star_handler_parameters
 	void combine()
 	{
 
+		REPORT_ERROR("TODO: implement optiocs groups joining!!");
+
 		std::vector<FileName> fns_in;
 		std::vector<std::string> words;
 		tokenize(fn_in, words);
