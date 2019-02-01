@@ -320,7 +320,7 @@ class star_handler_parameters
 	void combine()
 	{
 
-		REPORT_ERROR("TODO: implement optiocs groups joining!!");
+		std::cerr << "BE VERY CAREFUL TODO: implement optics groups joining!!" << std::endl;
 
 		std::vector<FileName> fns_in;
 		std::vector<std::string> words;
