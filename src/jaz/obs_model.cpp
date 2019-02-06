@@ -402,17 +402,19 @@ Volume<t2Vector<Complex>> ObservationModel::predictComplexGradient(
 }
 
 void ObservationModel::demodulatePhase(
-		const MetaDataTable& partMdt, long particle, MultidimArray<Complex>& obsImage)
+		const MetaDataTable& partMdt, long particle, MultidimArray<Complex>& obsImage,
+		bool do_modulate_instead)
 {
 	int opticsGroup;
 	partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, particle);
 	opticsGroup--;
 
-	demodulatePhase(opticsGroup, obsImage);
+	demodulatePhase(opticsGroup, obsImage, do_modulate_instead);
 }
 
 void ObservationModel::demodulatePhase(
-		int opticsGroup, MultidimArray<Complex>& obsImage)
+		int opticsGroup, MultidimArray<Complex>& obsImage,
+		bool do_modulate_instead)
 {
 	const int s = obsImage.ydim;
 	const int sh = obsImage.xdim;
@@ -422,10 +424,21 @@ void ObservationModel::demodulatePhase(
 	{
 		const Image<Complex>& corr = getPhaseCorrection(opticsGroup, s);
 
-		for (int y = 0; y < s;  y++)
-		for (int x = 0; x < sh; x++)
+		if (do_modulate_instead)
 		{
-			obsImage(y,x) *= corr(y,x).conj();
+			for (int y = 0; y < s;  y++)
+			for (int x = 0; x < sh; x++)
+			{
+				obsImage(y,x) *= corr(y,x);
+			}
+		}
+		else
+		{
+			for (int y = 0; y < s;  y++)
+			for (int x = 0; x < sh; x++)
+			{
+				obsImage(y,x) *= corr(y,x).conj();
+			}
 		}
 	}
 }
