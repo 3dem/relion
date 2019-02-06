@@ -25,6 +25,8 @@
 #include <src/time.h>
 #include <src/symmetries.h>
 
+#include <map>
+
 class image_handler_parameters
 {
 	public:
@@ -42,6 +44,7 @@ class image_handler_parameters
 	MultidimArray<RFLOAT> avg_ampl;
 	MetaDataTable MD;
 	FourierTransformer transformer;
+	std::map<FileName, long int> n_images;
 
 	// Image size
 	int xdim, ydim, zdim;
@@ -551,13 +554,15 @@ class image_handler_parameters
 	void run()
 	{
 		bool input_is_stack = (fn_in.getExtension() == "mrcs" || fn_in.getExtension() == "tif" || fn_in.getExtension() == "tiff") && !fn_in.contains("@");
+		bool input_is_star = (fn_in.getExtension() == "star");
 		// By default: write single output images
 
 		// Get a MetaDataTable
-		if (fn_in.getExtension() == "star")
+		if (input_is_star)
 		{
 			MD.read(fn_in);
-			std::cout << "NOTE: the input (--i) is a STAR file. The output (--o) is treated as a suffix, not a path." << std::endl;
+			if (fn_out.getExtension() != "mrcs")
+				std::cout << "NOTE: the input (--i) is a STAR file but the output (--o) does not have .mrcs extension. The output is treated as a suffix, not a path." << std::endl;
 			input_is_stack = true;
 		}
 		else if (input_is_stack)
@@ -810,7 +815,7 @@ class image_handler_parameters
 				Iin.read(fn_img);
 				FileName my_fn_out;
 
-				if(fn_out.getExtension() == "mrcs" && !fn_out.contains("@"))
+				if (fn_out.getExtension() == "mrcs" && !fn_out.contains("@"))
 				{
 					// current_object starts counting from 0, thus needs to be incremented.
 					my_fn_out.compose(current_object + 1, fn_out);
@@ -820,6 +825,14 @@ class image_handler_parameters
 					if (input_is_stack)
 					{
 						my_fn_out = fn_img.insertBeforeExtension("_" + fn_out);
+						if (input_is_star)
+						{
+							long int dummy;
+							FileName fn_tmp;
+							my_fn_out.decompose(dummy, fn_tmp);
+							n_images[fn_tmp]++; // this is safe. see https://stackoverflow.com/questions/16177596/stdmapstring-int-default-initialization-of-value.
+							my_fn_out.compose(n_images[fn_tmp], fn_tmp); 
+						}
 					}
 					else
 					{
