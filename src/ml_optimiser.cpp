@@ -748,7 +748,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 }
 
 
-void MlOptimiser::read(FileName fn_in, int rank)
+void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 {
 //#define DEBUG_READ
 #ifdef DEBUG_READ
@@ -771,7 +771,7 @@ void MlOptimiser::read(FileName fn_in, int rank)
 	in.close();
 
 	if (!MD.getValue(EMDL_OPTIMISER_OUTPUT_ROOTNAME, fn_out) ||
-            !MD.getValue(EMDL_OPTIMISER_MODEL_STARFILE, fn_model) ||
+		!MD.getValue(EMDL_OPTIMISER_MODEL_STARFILE, fn_model) ||
 	    !MD.getValue(EMDL_OPTIMISER_DATA_STARFILE, fn_data) ||
 	    !MD.getValue(EMDL_OPTIMISER_SAMPLING_STARFILE, fn_sampling) ||
 	    !MD.getValue(EMDL_OPTIMISER_ITERATION_NO, iter) ||
@@ -800,7 +800,6 @@ void MlOptimiser::read(FileName fn_in, int rank)
 	    !MD.getValue(EMDL_OPTIMISER_DO_SKIP_ALIGN, do_skip_align) ||
 	    //!MD.getValue(EMDL_OPTIMISER_DO_SKIP_ROTATE, do_skip_rotate) ||
 	    !MD.getValue(EMDL_OPTIMISER_ACCURACY_ROT, acc_rot) ||
-	    !MD.getValue(EMDL_OPTIMISER_ACCURACY_TRANS_ANGSTROM, acc_trans) ||
 	    !MD.getValue(EMDL_OPTIMISER_CHANGES_OPTIMAL_ORIENTS, current_changes_optimal_orientations) ||
 	    !MD.getValue(EMDL_OPTIMISER_CHANGES_OPTIMAL_OFFSETS, current_changes_optimal_offsets) ||
 	    !MD.getValue(EMDL_OPTIMISER_CHANGES_OPTIMAL_CLASSES, current_changes_optimal_classes) ||
@@ -886,6 +885,12 @@ void MlOptimiser::read(FileName fn_in, int rank)
 		do_phase_random_fsc = false;
 	if (!MD.getValue(EMDL_OPTIMISER_FAST_SUBSETS, do_fast_subsets))
 		do_fast_subsets = false;
+	// backward compatibility with relion-3.0
+	if (!MD.getValue(EMDL_OPTIMISER_ACCURACY_TRANS_ANGSTROM, acc_trans))
+	{
+		if (!MD.getValue(EMDL_OPTIMISER_ACCURACY_TRANS, acc_trans))
+			REPORT_ERROR("MlOptimiser::readStar::ERROR no accuracy of translations defined!");
+	}
 
 	if (do_split_random_halves &&
 	    !MD.getValue(EMDL_OPTIMISER_MODEL_STARFILE2, fn_model2))
@@ -910,6 +915,7 @@ void MlOptimiser::read(FileName fn_in, int rank)
 	std::cerr<<"MlOptimiser::readStar before data."<<std::endl;
 #endif
 	bool do_preread = (do_preread_images) ? (do_parallel_disc_io || rank == 0) : false;
+	if (do_prevent_preread) do_preread = false;
 	bool is_helical_segment = (do_helical_refine) || ((mymodel.ref_dim == 2) && (helical_tube_outer_diameter > 0.));
 	mydata.read(fn_data, false, false, do_preread, is_helical_segment);
 
