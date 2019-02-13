@@ -61,14 +61,14 @@ void Preprocessing::read(int argc, char **argv, int rank)
 	recenter_y = textToFloat(parser.getOption("--recenter_y", "Y-coordinate (in pixel inside the reference) to recenter re-extracted data on", "0."));
 	recenter_z = textToFloat(parser.getOption("--recenter_z", "Z-coordinate (in pixel inside the reference) to recenter re-extracted data on", "0."));
 	set_angpix = textToFloat(parser.getOption("--set_angpix", "Manually set pixel size in Angstroms (only necessary if magnification and detector pixel size are not in the input micrograph STAR file)", "-1."));
-	use_ctf_in_mic = parser.checkOption("--use_ctf_in_mic", "Use CTF parameters in the micrograph STAR file, ignoring values in the particle STAR file");
 
 	int extract_section = parser.addSection("Particle extraction");
 	do_extract = parser.checkOption("--extract", "Extract all particles from the micrographs");
+	extract_size = textToInteger(parser.getOption("--extract_size", "Size of the box to extract the particles in (in pixels)", "-1"));
 	do_premultiply_ctf = parser.checkOption("--premultiply_ctf", "Premultiply the micrograph/frame with its CTF prior to particle extraction");
+	premultiply_ctf_extract_size = textToInteger(parser.getOption("--premultiply_extract_size", "Size of the box to extract the particles in (in pixels) before CTF premultiplication", "-1"));
 	do_ctf_intact_first_peak = parser.checkOption("--ctf_intact_first_peak", "When premultiplying with the CTF, leave frequencies intact until the first peak");
 	do_phase_flip = parser.checkOption("--phase_flip", "Flip CTF-phases in the micrograph/frame prior to particle extraction");
-	extract_size = textToInteger(parser.getOption("--extract_size", "Size of the box to extract the particles in (in pixels)", "-1"));
 	extract_bias_x  = textToInteger(parser.getOption("--extract_bias_x", "Bias in X-direction of picked particles (this value in pixels will be added to the coords)", "0"));
 	extract_bias_y  = textToInteger(parser.getOption("--extract_bias_y", "Bias in Y-direction of picked particles (this value in pixels will be added to the coords)", "0"));
 	only_extract_unfinished = parser.checkOption("--only_extract_unfinished", "Extract only particles if the STAR file for that micrograph does not yet exist.");
@@ -142,9 +142,7 @@ void Preprocessing::initialise()
 		if ((do_phase_flip||do_premultiply_ctf) && !MDmics.containsLabel(EMDL_CTF_DEFOCUSU))
 			REPORT_ERROR("Preprocessing::initialise ERROR: No CTF information found in the input micrograph STAR-file");
 
-		star_has_ctf = MDmics.containsLabel(EMDL_CTF_DEFOCUSU);
-		if (!star_has_ctf && (do_phase_flip || do_premultiply_ctf))
-			REPORT_ERROR("Preprocessing:: ERROR: cannot phase flip or premultiply CTF without input CTF parameters in the STAR file");
+		mic_star_has_ctf = MDmics.containsLabel(EMDL_CTF_DEFOCUSU);
 
 		if (fn_data != "")
 		{
@@ -157,9 +155,11 @@ void Preprocessing::initialise()
 				std::cout << " + And re-centering particles based on refined coordinates in the _data.star file" << std::endl;
 
 			ObservationModel::loadSafely(fn_data, obsModelPart, MDimg, "particles", verb);
+			data_star_has_ctf = MDimg.containsLabel(EMDL_CTF_DEFOCUSU);
 		}
 		else
 		{
+			data_star_has_ctf = false;
 			// Make sure the coordinate file directory names end with a '/'
 			if (fn_coord_dir != "ASINPUT" && fn_coord_dir[fn_coord_dir.length()-1] != '/')
 				fn_coord_dir+="/";
@@ -179,6 +179,18 @@ void Preprocessing::initialise()
 				}
 			}
 		}
+
+		if (do_phase_flip || do_premultiply_ctf)
+		{
+
+			if (premultiply_ctf_extract_size < 0) premultiply_ctf_extract_size = extract_size;
+
+			if (!(mic_star_has_ctf  || data_star_has_ctf))
+			{
+				REPORT_ERROR("Preprocessing:: ERROR: cannot phase flip or premultiply CTF without input CTF parameters in the micrograph or data STAR file");
+			}
+		}
+
 	}
 
 	if (do_extract || fn_operate_in != "")
@@ -645,7 +657,13 @@ bool Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 		Imic.getDimensions(xdim, ydim, zdim, ndim);
 		dimensionality = (zdim > 1) ? 3 : 2;
 		if (dimensionality == 3)
+		{
 			do_ramp = false;
+			if (do_phase_flip || do_premultiply_ctf)
+			{
+				REPORT_ERROR("extractParticlesFromFieldOfView ERROR: cannot do CTF premultiplication or phase flipping as dimensionality is not 2!");
+			}
+		}
 
 		long int my_current_nr_images = 0;
 		RFLOAT all_avg = 0;
@@ -691,55 +709,21 @@ void Preprocessing::extractParticlesFromOneMicrograph(MetaDataTable &MD,
 
 	Imic.read(fn_mic);
 
+	// Calculate average value in the micrograph, for filling empty region around large-box extraction for premultiplication with CTF
+	RFLOAT mic_avg = Imic().computeAvg();
+
 	TIMING_TOC(TIMING_READ_IMG);
 
 	CTF ctf;
-	if (star_has_ctf || do_phase_flip || do_premultiply_ctf)
-		ctf.readByGroup(MDmics, &obsModelMic, imic);
-
-	if (do_phase_flip || do_premultiply_ctf)
+	if (mic_star_has_ctf || keep_ctf_from_micrographs)
 	{
-		if (dimensionality != 2)
-			REPORT_ERROR("extractParticlesFromFieldOfView ERROR: cannot do phase flipping as dimensionality is not 2!");
-
-		// FFTW only does square images
-		long int ori_xsize = XSIZE(Imic());
-		long int ori_ysize = YSIZE(Imic());
-
-		// First set XmippOrigin for window operations
-		Imic().setXmippOrigin();
-
-		if (ori_xsize > ori_ysize)
-			rewindow(Imic, ori_xsize);
-		else if (ori_ysize > ori_xsize)
-			rewindow(Imic, ori_ysize);
-
-		// Now do the actual phase flipping or CTF-multiplication
-		MultidimArray<Complex> FTmic;
-		FourierTransformer transformer;
-
-		transformer.FourierTransform(Imic(), FTmic, false);
-
-		RFLOAT xs = (RFLOAT)XSIZE(Imic()) * angpix;
-		RFLOAT ys = (RFLOAT)YSIZE(Imic()) * angpix;
-		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(FTmic)
-		{
-			RFLOAT x = (RFLOAT)jp / xs;
-			RFLOAT y = (RFLOAT)ip / ys;
-			DIRECT_A2D_ELEM(FTmic, i, j) *= ctf.getCTF(x, y, false, do_phase_flip, do_ctf_intact_first_peak, false); // true=do_only_phase_flip
-		}
-
-		transformer.inverseFourierTransform(FTmic, Imic());
-
-		if (ori_xsize != ori_ysize)
-			Imic().window(FIRST_XMIPP_INDEX(ori_ysize), FIRST_XMIPP_INDEX(ori_xsize),
-					LAST_XMIPP_INDEX(ori_ysize),  LAST_XMIPP_INDEX(ori_xsize));
-
-		// Set back original origin for particle window operations
-		Imic().xinit = Imic().yinit = Imic().zinit = 0;
+		ctf.readByGroup(MDmics, &obsModelMic, imic);
 	}
 
 	// Now window all particles from the micrograph
+	// Now do the actual phase flipping or CTF-multiplication
+	MultidimArray<Complex> FT;
+	FourierTransformer transformer;
 	int ipos = 0;
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
 	{
@@ -750,10 +734,12 @@ void Preprocessing::extractParticlesFromOneMicrograph(MetaDataTable &MD,
 		MD.getValue(EMDL_IMAGE_COORD_Y, dypos);
 		xpos = (long int)dxpos;
 		ypos = (long int)dypos;
-		x0 = xpos + FIRST_XMIPP_INDEX(extract_size);
-		xF = xpos + LAST_XMIPP_INDEX(extract_size);
-		y0 = ypos + FIRST_XMIPP_INDEX(extract_size);
-		yF = ypos + LAST_XMIPP_INDEX(extract_size);
+
+		int my_extract_size = (do_phase_flip || do_premultiply_ctf) ? premultiply_ctf_extract_size : extract_size;
+		x0 = xpos + FIRST_XMIPP_INDEX(my_extract_size);
+		xF = xpos + LAST_XMIPP_INDEX(my_extract_size);
+		y0 = ypos + FIRST_XMIPP_INDEX(my_extract_size);
+		yF = ypos + LAST_XMIPP_INDEX(my_extract_size);
 		if (dimensionality == 3)
 		{
 			MD.getValue(EMDL_IMAGE_COORD_Z, dzpos);
@@ -762,20 +748,9 @@ void Preprocessing::extractParticlesFromOneMicrograph(MetaDataTable &MD,
 			zF = zpos + LAST_XMIPP_INDEX(extract_size);
 		}
 
-		TIMING_TIC(TIMING_WINDOW);
-		// extract one particle in Ipart
-		if (dimensionality == 3)
-			Imic().window(Ipart(), z0, y0, x0, zF, yF, xF);
-		else
-			Imic().window(Ipart(), y0, x0, yF, xF);
-		TIMING_TOC(TIMING_WINDOW);
-
 		// Discard particles that are completely outside the micrograph and print a warning
 		if (yF < 0 || y0 >= YSIZE(Imic()) || xF < 0 || x0 >= XSIZE(Imic()) ||
-				(dimensionality==3 &&
-						(zF < 0 || z0 >= ZSIZE(Imic()))
-				)
-			)
+				(dimensionality==3 && (zF < 0 || z0 >= ZSIZE(Imic())) ) )
 		{
 			std::cerr << " micrograph x,y,z,n-size= " << XSIZE(Imic()) << " , " << YSIZE(Imic()) << " , " << ZSIZE(Imic()) << " , " << NSIZE(Imic()) << std::endl;
 			std::cerr << " particle position= " << xpos << " , " << ypos;
@@ -784,103 +759,144 @@ void Preprocessing::extractParticlesFromOneMicrograph(MetaDataTable &MD,
 			std::cerr << std::endl;
 					REPORT_ERROR("Preprocessing::extractParticlesFromOneFrame ERROR: particle" + integerToString(ipos+1) + " lies completely outside micrograph " + fn_mic);
 		}
+
+		// Read per-particle CTF
+		if (MDin_has_ctf && !keep_ctf_from_micrographs)
+		{
+			ctf.readByGroup(MD, &obsModelPart);
+		}
+
+		TIMING_TIC(TIMING_WINDOW);
+		// extract one particle in Ipart
+		if (dimensionality == 3)
+			Imic().window(Ipart(), z0, y0, x0, zF, yF, xF);
 		else
+			Imic().window(Ipart(), y0, x0, yF, xF, mic_avg);
+		Ipart().setXmippOrigin();
+		TIMING_TOC(TIMING_WINDOW);
+
+		// Premultiply the CTF of each particle, possibly in a bigger box (premultiply_ctf_extract_size)
+		if (do_phase_flip || do_premultiply_ctf)
 		{
 
-			TIMING_TIC(TIMING_BOUNDARY);
-			// Check boundaries: fill pixels outside the boundary with the nearest ones inside
-			// This will create lines at the edges, rather than zeros
-			Ipart().setXmippOrigin();
+			transformer.FourierTransform(Ipart(), FT, false);
 
-			// X-boundaries
-			if (x0 < 0 || xF >= XSIZE(Imic()) )
+			RFLOAT xs = (RFLOAT)XSIZE(Ipart()) * angpix;
+			RFLOAT ys = (RFLOAT)YSIZE(Ipart()) * angpix;
+			FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(FT)
+			{
+				RFLOAT x = (RFLOAT)jp / xs;
+				RFLOAT y = (RFLOAT)ip / ys;
+				DIRECT_A2D_ELEM(FT, i, j) *= ctf.getCTF(x, y, false, do_phase_flip, do_ctf_intact_first_peak, false);
+			}
+
+			transformer.inverseFourierTransform(FT, Ipart());
+
+			if (extract_size != premultiply_ctf_extract_size)
+			{
+				Ipart().window(FIRST_XMIPP_INDEX(extract_size), FIRST_XMIPP_INDEX(extract_size),
+						LAST_XMIPP_INDEX(extract_size),  LAST_XMIPP_INDEX(extract_size));
+			}
+		}
+
+
+		TIMING_TIC(TIMING_BOUNDARY);
+		// Check boundaries: fill pixels outside the boundary with the nearest ones inside
+		// This will create lines at the edges, rather than zeros
+		Ipart().setXmippOrigin();
+
+		// X-boundaries
+		if (x0 < 0 || xF >= XSIZE(Imic()) )
+		{
+			FOR_ALL_ELEMENTS_IN_ARRAY3D(Ipart())
+			{
+				if (j + xpos < 0)
+					A3D_ELEM(Ipart(), k, i, j) = A3D_ELEM(Ipart(), k, i, -xpos);
+				else if (j + xpos >= XSIZE(Imic()))
+					A3D_ELEM(Ipart(), k, i, j) = A3D_ELEM(Ipart(), k, i, XSIZE(Imic()) - xpos - 1);
+			}
+		}
+
+		// Y-boundaries
+		if (y0 < 0 || yF >= YSIZE(Imic()))
+		{
+			FOR_ALL_ELEMENTS_IN_ARRAY3D(Ipart())
+			{
+				if (i + ypos < 0)
+					A3D_ELEM(Ipart(), k, i, j) = A3D_ELEM(Ipart(), k, -ypos, j);
+				else if (i + ypos >= YSIZE(Imic()))
+					A3D_ELEM(Ipart(), k, i, j) = A3D_ELEM(Ipart(), k, YSIZE(Imic()) - ypos - 1, j);
+			}
+		}
+
+		if (dimensionality == 3)
+		{
+			// Z-boundaries
+			if (z0 < 0 || zF >= ZSIZE(Imic()))
 			{
 				FOR_ALL_ELEMENTS_IN_ARRAY3D(Ipart())
 				{
-					if (j + xpos < 0)
-						A3D_ELEM(Ipart(), k, i, j) = A3D_ELEM(Ipart(), k, i, -xpos);
-					else if (j + xpos >= XSIZE(Imic()))
-						A3D_ELEM(Ipart(), k, i, j) = A3D_ELEM(Ipart(), k, i, XSIZE(Imic()) - xpos - 1);
+					if (k + zpos < 0)
+						A3D_ELEM(Ipart(), k, i, j) = A3D_ELEM(Ipart(), -zpos, i, j);
+					else if (k + zpos >= ZSIZE(Imic()))
+						A3D_ELEM(Ipart(), k, i, j) = A3D_ELEM(Ipart(), ZSIZE(Imic()) - zpos - 1, i, j);
 				}
 			}
+		}
 
-			// Y-boundaries
-			if (y0 < 0 || yF >= YSIZE(Imic()))
+		// 2D projection of 3D sub-tomograms
+		if (dimensionality == 3 && do_project_3d)
+		{
+			// Project the 3D sub-tomogram into a 2D particle again
+			Image<RFLOAT> Iproj(YSIZE(Ipart()), XSIZE(Ipart()));
+			Iproj().setXmippOrigin();
+			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Ipart())
 			{
-				FOR_ALL_ELEMENTS_IN_ARRAY3D(Ipart())
-				{
-					if (i + ypos < 0)
-						A3D_ELEM(Ipart(), k, i, j) = A3D_ELEM(Ipart(), k, -ypos, j);
-					else if (i + ypos >= YSIZE(Imic()))
-						A3D_ELEM(Ipart(), k, i, j) = A3D_ELEM(Ipart(), k, YSIZE(Imic()) - ypos - 1, j);
-				}
+				DIRECT_A2D_ELEM(Iproj(), i, j) += DIRECT_A3D_ELEM(Ipart(), k, i, j);
 			}
+			Ipart = Iproj;
+		}
+		TIMING_TOC(TIMING_BOUNDARY);
 
-			if (dimensionality == 3)
+		// performPerImageOperations will also append the particle to the output stack in fn_stack
+		// Jun24,2015 - Shaoda, extract helical segments
+		RFLOAT tilt_deg, psi_deg;
+		tilt_deg = psi_deg = 0.;
+		if (do_extract_helix) // If priors do not exist, errors will occur in 'readHelicalCoordinates()'.
+		{
+			MD.getValue(EMDL_ORIENT_TILT_PRIOR, tilt_deg);
+			MD.getValue(EMDL_ORIENT_PSI_PRIOR, psi_deg);
+		}
+
+		TIMING_TIC(TIMING_PRE_IMG_OPS);
+		performPerImageOperations(Ipart, fn_output_img_root, my_current_nr_images + ipos, my_total_nr_images,
+				tilt_deg, psi_deg,
+				all_avg, all_stddev, all_minval, all_maxval);
+		TIMING_TOC(TIMING_PRE_IMG_OPS);
+
+
+		TIMING_TIC(TIMING_REST);
+		// Also store all the particles information in the STAR file
+		FileName fn_img;
+		if (Ipart().getDim() == 3)
+			fn_img.compose(fn_output_img_root, my_current_nr_images + ipos + 1, "mrc");
+		else
+			fn_img.compose(my_current_nr_images + ipos + 1, fn_output_img_root + ".mrcs"); // start image counting in stacks at 1!
+		MD.setValue(EMDL_IMAGE_NAME, fn_img);
+		MD.setValue(EMDL_MICROGRAPH_NAME, fn_mic);
+
+		// Set the optics group for this particle to the one from the micrograph
+		int optics_group;
+		MDmics.getValue(EMDL_IMAGE_OPTICS_GROUP, optics_group, imic);
+		MD.setValue(EMDL_IMAGE_OPTICS_GROUP, optics_group);
+
+		// Also fill in the per-particle CTF parameters
+		if (mic_star_has_ctf)
+		{
+
+			// Only set CTF parameters from the micrographs STAR file if the input STAR file did not contain it!
+			if (!MDin_has_ctf || keep_ctf_from_micrographs)
 			{
-				// Z-boundaries
-				if (z0 < 0 || zF >= ZSIZE(Imic()))
-				{
-					FOR_ALL_ELEMENTS_IN_ARRAY3D(Ipart())
-					{
-						if (k + zpos < 0)
-							A3D_ELEM(Ipart(), k, i, j) = A3D_ELEM(Ipart(), -zpos, i, j);
-						else if (k + zpos >= ZSIZE(Imic()))
-							A3D_ELEM(Ipart(), k, i, j) = A3D_ELEM(Ipart(), ZSIZE(Imic()) - zpos - 1, i, j);
-					}
-				}
-			}
-
-			//
-			if (dimensionality == 3 && do_project_3d)
-			{
-				// Project the 3D sub-tomogram into a 2D particle again
-				Image<RFLOAT> Iproj(YSIZE(Ipart()), XSIZE(Ipart()));
-				Iproj().setXmippOrigin();
-				FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(Ipart())
-				{
-					DIRECT_A2D_ELEM(Iproj(), i, j) += DIRECT_A3D_ELEM(Ipart(), k, i, j);
-				}
-				Ipart = Iproj;
-			}
-			TIMING_TOC(TIMING_BOUNDARY);
-
-			// performPerImageOperations will also append the particle to the output stack in fn_stack
-			// Jun24,2015 - Shaoda, extract helical segments
-			RFLOAT tilt_deg, psi_deg;
-			tilt_deg = psi_deg = 0.;
-			if (do_extract_helix) // If priors do not exist, errors will occur in 'readHelicalCoordinates()'.
-			{
-				MD.getValue(EMDL_ORIENT_TILT_PRIOR, tilt_deg);
-				MD.getValue(EMDL_ORIENT_PSI_PRIOR, psi_deg);
-			}
-
-			TIMING_TIC(TIMING_PRE_IMG_OPS);
-			performPerImageOperations(Ipart, fn_output_img_root, my_current_nr_images + ipos, my_total_nr_images,
-					tilt_deg, psi_deg,
-					all_avg, all_stddev, all_minval, all_maxval);
-			TIMING_TOC(TIMING_PRE_IMG_OPS);
-
-
-			TIMING_TIC(TIMING_REST);
-			// Also store all the particles information in the STAR file
-			FileName fn_img;
-			if (Ipart().getDim() == 3)
-				fn_img.compose(fn_output_img_root, my_current_nr_images + ipos + 1, "mrc");
-			else
-				fn_img.compose(my_current_nr_images + ipos + 1, fn_output_img_root + ".mrcs"); // start image counting in stacks at 1!
-			MD.setValue(EMDL_IMAGE_NAME, fn_img);
-			MD.setValue(EMDL_MICROGRAPH_NAME, fn_mic);
-
-			// Set the optics group for this particle to the one from the micrograph
-			int optics_group;
-			MDmics.getValue(EMDL_IMAGE_OPTICS_GROUP, optics_group, imic);
-			MD.setValue(EMDL_IMAGE_OPTICS_GROUP, optics_group);
-
-			// Also fill in the per-particle CTF parameters
-			if (star_has_ctf)
-			{
-
 				RFLOAT maxres, fom;
 				if (MDmics.containsLabel(EMDL_CTF_MAXRES))
 				{
@@ -893,40 +909,37 @@ void Preprocessing::extractParticlesFromOneMicrograph(MetaDataTable &MD,
 					MD.setValue(EMDL_CTF_FOM, fom);
 				}
 
-				// Only set CTF parameters from the micrographs STAR file if the input STAR file did not contain it!
-				if (!MDin_has_ctf || keep_ctf_from_micrographs)
-				{
-					ctf.write(MD);
-				}
+				ctf.write(MD);
+			}
 
-				// Only set beamtilt from the micrographs STAR file if the input STAR file did not contain it!
-				if (!MDin_has_beamtilt || keep_ctf_from_micrographs)
+			// Only set beamtilt from the micrographs STAR file if the input STAR file did not contain it!
+			if (!MDin_has_beamtilt || keep_ctf_from_micrographs)
+			{
+				RFLOAT tilt_x, tilt_y;
+				if (MDmics.containsLabel(EMDL_IMAGE_BEAMTILT_X))
 				{
-					RFLOAT tilt_x, tilt_y;
-					if (MDmics.containsLabel(EMDL_IMAGE_BEAMTILT_X))
-					{
-						MDmics.getValue(EMDL_IMAGE_BEAMTILT_X, tilt_x, imic);
-						MD.setValue(EMDL_IMAGE_BEAMTILT_X, tilt_x);
-					}
-					if (MDmics.containsLabel(EMDL_IMAGE_BEAMTILT_Y))
-					{
-						MDmics.getValue(EMDL_IMAGE_BEAMTILT_Y, tilt_y, imic);
-						MD.setValue(EMDL_IMAGE_BEAMTILT_Y, tilt_y);
-					}
+					MDmics.getValue(EMDL_IMAGE_BEAMTILT_X, tilt_x, imic);
+					MD.setValue(EMDL_IMAGE_BEAMTILT_X, tilt_x);
 				}
-
-				// Copy rlnBeamTiltGroupName from the micrograph STAR file only when absent in the particle STAR file
-				if (!MDin_has_tiltgroup && MDmics.containsLabel(EMDL_PARTICLE_BEAM_TILT_CLASS))
+				if (MDmics.containsLabel(EMDL_IMAGE_BEAMTILT_Y))
 				{
-					int tilt_class;
-					MDmics.getValue(EMDL_PARTICLE_BEAM_TILT_CLASS, tilt_class, imic);
-					MD.setValue(EMDL_PARTICLE_BEAM_TILT_CLASS, tilt_class);
+					MDmics.getValue(EMDL_IMAGE_BEAMTILT_Y, tilt_y, imic);
+					MD.setValue(EMDL_IMAGE_BEAMTILT_Y, tilt_y);
 				}
 			}
 
-			TIMING_TOC(TIMING_REST);
-
+			// Copy rlnBeamTiltGroupName from the micrograph STAR file only when absent in the particle STAR file
+			// for backwards compatibility with release 3.0
+			if (!MDin_has_tiltgroup && MDmics.containsLabel(EMDL_PARTICLE_BEAM_TILT_CLASS))
+			{
+				int tilt_class;
+				MDmics.getValue(EMDL_PARTICLE_BEAM_TILT_CLASS, tilt_class, imic);
+				MD.setValue(EMDL_PARTICLE_BEAM_TILT_CLASS, tilt_class);
+			}
 		}
+
+		TIMING_TOC(TIMING_REST);
+
 		ipos++;
 	}
 

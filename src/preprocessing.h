@@ -49,8 +49,8 @@ public:
 	// Name for directory of output Particle stacks and Particle STAR file
 	FileName fn_part_dir, fn_part_star, fn_list_star;
 
-	// Does the input micrograph STAR file have CTF information?
-	bool star_has_ctf;
+	// Does the input micrograph STAR file or the input data STAR file have CTF information?
+	bool mic_star_has_ctf, data_star_has_ctf;
 
 	// If input micrograph STAR file has CTF and so does input particle STAR (fn_data), then
 	// by default the fn_data CTF parameters will be in the output particles.star file (as they could have been refined in ctf_refine)
@@ -61,7 +61,6 @@ public:
 	bool do_phase_flip;
 	bool do_premultiply_ctf;
 	bool do_ctf_intact_first_peak;
-	bool use_ctf_in_mic;
 	RFLOAT angpix, output_angpix;
 
 	////////////////// Extract particles from the micrographs
@@ -113,6 +112,9 @@ public:
 
 	// Box size to extract the particles in
 	int extract_size;
+
+	// Box size to extract the particle for premultiplication with the CTF
+	int premultiply_ctf_extract_size;
 
 	// Bias in picked coordinates in X and in Y direction (in pixels)
 	RFLOAT extract_bias_x, extract_bias_y;
