@@ -13,8 +13,13 @@ and Erik Lindahl at Stockholm University.
 - Dari Kimanius
 
 However, it does also contain pieces of code from the following packages:
-XMIPP: http:/xmipp.cnb.csic.es
-BSOFT: http://lsbr.niams.nih.gov/bsoft/
-HEALPIX: http://healpix.jpl.nasa.gov/
 
-Original disclaimers in the code of these external packages have been maintained as much as possible. Please contact Sjors Scheres (scheres@mrc-lmb.cam.ac.uk) if you feel this has not been done correctly. 
+- XMIPP: http:/xmipp.cnb.csic.es
+- BSOFT: http://lsbr.niams.nih.gov/bsoft/
+- HEALPIX: http://healpix.jpl.nasa.gov/
+- libLBFGS http://www.chokkan.org/software/liblbfgs/
+- Numerical diagonalization of 3x3 matrices: https://www.mpi-hd.mpg.de/personalhomes/globes/3x3/index.html
+- Gravis: https://gravis.dmi.unibas.ch/index.html
+
+Original disclaimers in the code of these external packages have been maintained as much as possible.
+Please contact Sjors Scheres (scheres@mrc-lmb.cam.ac.uk) if you feel this has not been done correctly. 

@@ -54,6 +54,12 @@ available on the system.
 If FLTK related errors are reported, please add `-DFORCE_OWN_FLTK=ON` to
 `cmake`. For FFTW related errors, try `-DFORCE_OWN_FFTW=ON`.
 
+RELION requires libtiff to read TIFF movies. Most Linux distributions have packages like
+`libtiff-dev` or `libtiff-devel`. Note that you need a developer package. You need version 4.0.x
+to read BigTIFF files. If you installed libtiff in a non-standard location, specify the location by
+`-DTIFF_INCLUDE_DIR=/path/to/include -DTIFF_LIBRARY=/path/to/libtiff.so.5`.
+
+
 ## Updating
 
 
@@ -67,7 +73,6 @@ cd build
 make -j4
 make install    # (or "sudo make install")
 ```
-
 
 
 ## Options for accelerated versions
