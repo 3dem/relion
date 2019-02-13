@@ -231,7 +231,8 @@ class ctf_toolbox_parameters
 
 		if (do_ctf_multiply || do_ctf_phaseflip)
 		{
-			obsModel.save(MD, fn_in.insertBeforeExtension(fn_out));
+			obsModel.save(MD, fn_in.insertBeforeExtension("_"+fn_out));
+			std::cout << " + written out new particles STAR file in: " << fn_in.insertBeforeExtension("_"+fn_out) << std::endl;
 		}
 	}
 };
