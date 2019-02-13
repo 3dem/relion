@@ -60,6 +60,8 @@ public:
 
 public:
 
+    BackProjector(){}
+
     /** Empty constructor
 	 *
 	 * A BackProjector is created.
@@ -178,7 +180,9 @@ public:
 	*/
 	void set2DFourierTransform(const MultidimArray<Complex > &img_in,
 							   const Matrix2D<RFLOAT> &A, bool inv,
-						       const MultidimArray<RFLOAT> *Mweight = NULL)
+						       const MultidimArray<RFLOAT> *Mweight = NULL,
+							   RFLOAT r_ewald_sphere = -1.,
+							   bool is_positive_curvature = true)
 	{
 		// Back-rotation of a 3D Fourier Transform
 		if (img_in.getDim() == 3)
@@ -186,6 +190,12 @@ public:
 			if (ref_dim != 3)
 				REPORT_ERROR("Backprojector::set3DFourierTransform%%ERROR: Dimension of the data array should be 3");
 			backrotate3D(img_in, A, inv, Mweight);
+		}
+		else if (img_in.getDim() == 1)
+		{
+			if (ref_dim != 2)
+				REPORT_ERROR("Backprojector::set1DFourierTransform%%ERROR: Dimension of the data array should be 2");
+			backproject1Dto2D(img_in, A, inv, Mweight);
 		}
 		else
 		{
@@ -195,7 +205,7 @@ public:
 				backrotate2D(img_in, A, inv, Mweight);
 				break;
 			case 3:
-				backproject(img_in, A, inv, Mweight);
+				backproject2Dto3D(img_in, A, inv, Mweight, r_ewald_sphere, is_positive_curvature);
 				break;
 			default:
 				REPORT_ERROR("Backprojector::set2DSlice%%ERROR: Dimension of the data array should be 2 or 3");
@@ -223,7 +233,17 @@ public:
 	* Set a 2D slice in the 3D map (backward projection)
 	* If a exp_Mweight is given, rather than adding 1 to all relevant pixels in the weight array, we use exp_Mweight
 	*/
-	void backproject(const MultidimArray<Complex > &img_in,
+	void backproject2Dto3D(const MultidimArray<Complex > &img_in,
+			         const Matrix2D<RFLOAT> &A, bool inv,
+			         const MultidimArray<RFLOAT> *Mweight = NULL,
+					 RFLOAT r_ewald_sphere = -1.,
+					 bool is_positive_curvature = true);
+
+	/*
+	* Set a 1D slice in the 2D map (backward projection)
+	* If a exp_Mweight is given, rather than adding 1 to all relevant pixels in the weight array, we use exp_Mweight
+	*/
+	void backproject1Dto2D(const MultidimArray<Complex > &img_in,
 			         const Matrix2D<RFLOAT> &A, bool inv,
 			         const MultidimArray<RFLOAT> *Mweight = NULL);
 
@@ -245,15 +265,15 @@ public:
 	 *  Get complex array at the original size as the straightforward average
 	 *  padding_factor*padding_factor*padding_factor voxels
 	 *  This will then be used for FSC calculation between two random halves
-	 */
-	void getDownsampledAverage(MultidimArray<Complex > &avg);
+     */
+    void getDownsampledAverage(MultidimArray<Complex>& avg, bool divide = true) const;
 
-	/*
-	 * From two of the straightforward downsampled averages, calculate an FSC curve
-	 */
-	void calculateDownSampledFourierShellCorrelation(MultidimArray<Complex > &avg1,
-			                                         MultidimArray<Complex > &avg2,
-			                                         MultidimArray<RFLOAT> &fsc);
+    /*
+     * From two of the straightforward downsampled averages, calculate an FSC curve
+     */
+    void calculateDownSampledFourierShellCorrelation(const MultidimArray<Complex>& avg1,
+                                                     const MultidimArray<Complex>& avg2,
+                                                     MultidimArray<RFLOAT>& fsc) const;
 
 	/* Get the 3D reconstruction
          * If do_map is true, 1 will be added to all weights
@@ -263,17 +283,18 @@ public:
                      int max_iter_preweight,
                      bool do_map,
                      RFLOAT tau2_fudge,
-                     MultidimArray<RFLOAT> &tau2,
-                     MultidimArray<RFLOAT> &sigma2,
-                     MultidimArray<RFLOAT> &evidence_vs_prior,
-                     MultidimArray<RFLOAT> &fourier_coverage,
-                     MultidimArray<RFLOAT> fsc,
+                     MultidimArray<RFLOAT> &tau2_io,
+                     MultidimArray<RFLOAT> &sigma2_out,
+                     MultidimArray<RFLOAT> &evidence_vs_prior_out,
+                     MultidimArray<RFLOAT> &fourier_coverage_out,
+                     const MultidimArray<RFLOAT>& fsc,
                      RFLOAT normalise = 1.,
                      bool update_tau2_with_fsc = false,
                      bool is_whole_instead_of_half = false,
                      int nr_threads = 1,
                      int minres_map = -1,
-                     bool printTimes= false);
+                     bool printTimes= false,
+					 bool do_fsc0999 = false);
 
 
 	/*  Enforce Hermitian symmetry, apply helical symmetry as well as point-group symmetry
@@ -298,7 +319,7 @@ public:
    /* Convolute in Fourier-space with the blob by multiplication in real-space
 	 * Note the convlution is done on the complex array inside the transformer object!!
 	 */
-	void convoluteBlobRealSpace(FourierTransformer &transformer, bool do_mask = false);
+    void convoluteBlobRealSpace(FourierTransformer &transformer, bool do_mask = false, int threads = 1);
 
 	/* Calculate the inverse FFT of Fin and windows the result to ori_size
 	 * Also pass the transformer, to prevent making and clearing a new one before clearing the one in reconstruct()

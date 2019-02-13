@@ -21,15 +21,17 @@
 #ifndef MOTIONCORR_RUNNER_H_
 #define MOTIONCORR_RUNNER_H_
 
-#include  <glob.h>
-#include  <vector>
-#include  <string>
-#include  <stdlib.h>
-#include  <stdio.h>
+#include <glob.h>
+#include <vector>
+#include <string>
+#include <stdlib.h>
+#include <stdio.h>
+#include <algorithm>
 #include <src/time.h>
 #include "src/metadata_table.h"
 #include "src/image.h"
-#include <algorithm>
+#include "src/micrograph_model.h"
+#include "src/jaz/new_ft.h"
 
 class MotioncorrRunner
 {
@@ -41,11 +43,26 @@ public:
 	// Verbosity
 	int verb;
 
+	// Number of threads per process
+	int n_threads;
+	int max_io_threads;
+
 	// Output rootname
 	FileName fn_in, fn_out, fn_movie;
 
 	// Filenames of all the micrographs to run Motioncorr on
 	std::vector<FileName> fn_micrographs, fn_ori_micrographs;
+
+	// Use our own implementation
+	bool do_own;
+	bool interpolate_shifts;
+
+	// Maximum number of iterations
+	int max_iter;
+
+	// Save aligned but non-dose weighted micrograph.
+	// With MOTIONCOR2, this flag is always assumed to be true
+	bool save_noDW;
 
 	// Use MOTIONCOR2 instead of UNBLUR?
 	bool do_motioncor2;
@@ -56,8 +73,17 @@ public:
 	// Binning factor for binning inside MOTIONCORR/MOTIONCOR2
 	double bin_factor;
 
+	// Do binning before processing
+	bool early_binning;
+
 	// B-factor for MOTIONCOR2
 	double bfactor;
+
+	// Downsampling rate of CCF
+	double ccf_downsample;
+
+	// Dose at which to distinguish between early/late global motion in output statistics
+	double dose_motionstats_cutoff;
 
 	// Also save the aligned movies?
 	bool do_save_movies;
@@ -76,9 +102,13 @@ public:
 
 	// Gain reference file
 	FileName fn_gain_reference;
+	int gain_rotation, gain_flip;
 
 	// Defect file
 	FileName fn_defect;
+
+	// Skip hot pixel detection in own motioncorr
+	bool skip_defect;
 
 	// Archive directory
 	FileName fn_archive;
@@ -98,11 +128,11 @@ public:
 	// Pixel size for UNBLUR
 	double angpix;
 
-	// Number of threads for unblur
-	int nr_threads;
-
 	// Continue an old run: only estimate CTF if logfile WITH Final Values line does not yet exist, otherwise skip the micrograph
 	bool continue_old;
+
+	// Process at most this number of (unprocessed) micrographs
+	long do_at_most;
 
 	// Output STAR file
 	MetaDataTable MDavg, MDmov;
@@ -122,29 +152,37 @@ public:
 	// Initialise some stuff after reading
 	void initialise();
 
+	void prepareGainReference(bool write_gain);
+
 	// Execute all MOTIONCORR jobs
 	void run();
 
 	// Given an input fn_mic filename, this function will determine the names of the output corrected image (fn_avg) and the corrected movie (fn_mov).
 	void getOutputFileNames(FileName fn_mic, FileName &fn_avg, FileName &fn_mov);
 
-    // Execute MOTIONCOR2 for a single micrograph
-    bool executeMotioncor2(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts, int rank = 0);
+	// Execute MOTIONCOR2 for a single micrograph
+	bool executeMotioncor2(Micrograph &mic, int rank = 0);
 
-    // Get the shifts from MOTIONCOR2
-    void getShiftsMotioncor2(FileName fn_log, std::vector<float> &xshifts, std::vector<float> &yshifts);
+	// Get the shifts from MOTIONCOR2
+	void getShiftsMotioncor2(FileName fn_log, Micrograph &mic);
 
 	// Execute UNBLUR for a single micrograph
-    bool executeUnblur(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts);
+	bool executeUnblur(Micrograph &mic);
+
+	// Execute our own implementation for a single micrograph
+	bool executeOwnMotionCorrection(Micrograph &mic);
 
 	// Get the shifts from UNBLUR
-    void getShiftsUnblur(FileName fn_mic, std::vector<float> &xshifts, std::vector<float> &yshifts);
+	void getShiftsUnblur(FileName fn_mic, Micrograph &mic);
 
 	// Plot the FRC curve from SUMMOVIE
 	void plotFRC(FileName fn_frc);
 
 	// Plot the shifts
-    void plotShifts(FileName fn_eps, std::vector<float> &xshifts, std::vector<float> &yshifts);
+	void plotShifts(FileName fn_mic, Micrograph &mic);
+
+	// Save micrograph model
+	void saveModel(Micrograph &mic);
 
 	// Make a PDF file with all the shifts and write output STAR files
 	void generateLogFilePDFAndWriteStarFiles();
@@ -152,6 +190,28 @@ public:
 	// Write out final STAR file
 	void writeSTAR();
 
+private:
+	// shiftx, shifty is relative to the (real space) image size
+	void shiftNonSquareImageInFourierTransform(MultidimArray<fComplex> &frame, RFLOAT shiftx, RFLOAT shifty);
+
+	bool alignPatch(std::vector<MultidimArray<fComplex> > &Fframes, const int pnx, const int pny, const RFLOAT scaled_B, std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts, std::ostream &logfile);
+
+	void binNonSquareImage(Image<float> &Iwork, RFLOAT bin_factor);
+
+	void cropInFourierSpace(MultidimArray<fComplex> &Fref, MultidimArray<fComplex> &Fbinned);
+
+	int findGoodSize(int request);
+
+	void doseWeighting(std::vector<MultidimArray<fComplex> > &Fframes, std::vector<RFLOAT> doses, RFLOAT apix);
+
+	void realSpaceInterpolation(Image <float> &Isum, std::vector<Image<float> > &Iframes, MotionModel *model, std::ostream &logfile);
+
+	void realSpaceInterpolation_ThirdOrderPolynomial(Image <float> &Isum, std::vector<Image<float> > &Iframes, ThirdOrderPolynomialModel &model, std::ostream &logfile);
+
+	void interpolateShifts(std::vector<int> &group_start, std::vector<int> &group_size,
+	                       std::vector<RFLOAT> &xshifts, std::vector<RFLOAT> &yshifts,
+	                       int n_frames,
+	                       std::vector<RFLOAT> &interpolated_xshifts, std::vector<RFLOAT> &interpolated_yshifts);
 };
 
 

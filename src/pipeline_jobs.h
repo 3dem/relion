@@ -47,6 +47,8 @@
 
 #define RADIO_SAMPLING 0
 #define RADIO_NODETYPE 1
+#define RADIO_GAIN_ROTATION 2
+#define RADIO_GAIN_FLIP 3
 
 // Our own defaults at LMB are the hard-coded ones
 #define DEFAULTQSUBLOCATION "/public/EM/RELION/relion/bin/relion_qsub.csh"
@@ -56,33 +58,54 @@
 #define DEFAULTSUMMOVIELOCATION "/public/EM/SUMMOVIE/summovie.exe"
 #define DEFAULTGCTFLOCATION "/public/EM/Gctf/bin/Gctf"
 #define DEFAULTRESMAPLOCATION "/public/EM/ResMap/ResMap-1.1.4-linux64"
+#define DEFAULTQSUBCOMMAND "qsub"
+#define DEFAULTQUEUENAME "openmpi"
 #define DEFAULTMININIMUMDEDICATED 1
 #define DEFAULTWARNINGLOCALMPI 32
 #define DEFAULTALLOWCHANGEMINDEDICATED true
+#define DEFAULTQUEUEUSE false
+#define DEFAULTNRMPI 1
+#define DEFAULTMPIMAX 64
+#define DEFAULTNRTHREADS 1
+#define DEFAULTTHREADMAX 16
+#define DEFAULTMPIRUN "mpirun"
 
 static const char* job_sampling_options[] = {
-		      "30 degrees",
-		      "15 degrees",
-		      "7.5 degrees",
-		      "3.7 degrees",
-		      "1.8 degrees",
-		      "0.9 degrees",
-		      "0.5 degrees",
-		      "0.2 degrees",
-		      "0.1 degrees",
+	"30 degrees",
+	"15 degrees",
+	"7.5 degrees",
+	"3.7 degrees",
+	"1.8 degrees",
+	"0.9 degrees",
+	"0.5 degrees",
+	"0.2 degrees",
+	"0.1 degrees",
 };
 
 static const char* job_nodetype_options[] = {
-		      "2D micrograph movies (*.mrcs)",
-	          "2D micrographs/tomograms (*.mrc)",
-	          "2D/3D particle coordinates (*.box, *_pick.star)",
-	          "Particles STAR file (.star)",
-	          "Movie-particles STAR file (.star)",
-	          "2D references (.star or .mrcs)",
-	          "Micrographs STAR file (.star)",
-		      "3D reference (.mrc)",
-		      "3D mask (.mrc)",
-		      "Unfiltered half-map (unfil.mrc)",
+	"2D micrograph movies (*.mrcs, *.tiff)",
+	"2D micrographs/tomograms (*.mrc)",
+	"2D/3D particle coordinates (*.box, *_pick.star)",
+	"Particles STAR file (.star)",
+	"Movie-particles STAR file (.star)",
+	"2D references (.star or .mrcs)",
+	"Micrographs STAR file (.star)",
+	"3D reference (.mrc)",
+	"3D mask (.mrc)",
+	"Unfiltered half-map (unfil.mrc)",
+};
+
+static const char* job_gain_rotation_options[] = {
+	"No rotation (0)",
+	"90 degrees (1)",
+	"180 degrees (2)",
+	"270 degrees (3)",
+};
+
+static const char* job_gain_flip_options[] = {
+	"No flipping (0)",
+	"Flip upside down (1)",
+	"Flip left to right (2)"
 };
 
 // To have a line on the GUI to change the minimum number of dedicated in a job
@@ -110,29 +133,57 @@ static bool do_allow_change_minimum_dedicated;
 #define NODE_HALFMAP		10// Unfiltered half-maps from 3D auto-refine, e.g. run1_half?_class001_unfil.mrc
 #define NODE_FINALMAP		11// Sharpened final map from post-processing (cannot be used as input)
 #define NODE_RESMAP			12// Resmap with local resolution (cannot be used as input)
-#define NODE_PDF_LOGFILE    13//PDF logfile
+#define NODE_PDF_LOGFILE    13// PDF logfile
+#define NODE_POST           14// Postprocess STAR file (with FSC curve, unfil half-maps, masks etc in it: used by Jasenko's programs
+#define NODE_POLISH_PARAMS  15// Txt file with optimal parameters for Bayesian polishing
 
-// All the different types of jobs defined inside the pipeline
+// All the directory names of the different types of jobs defined inside the pipeline
+#define PROC_IMPORT_NAME        "Import"       // Import any file as a Node of a given type
+#define PROC_MOTIONCORR_NAME 	"MotionCorr"   // Import any file as a Node of a given type
+#define PROC_CTFFIND_NAME	    "CtfFind"  	   // Estimate CTF parameters from micrographs for either entire micrographs and/or particles
+#define PROC_MANUALPICK_NAME    "ManualPick"   // Manually pick particle coordinates from micrographs
+#define PROC_AUTOPICK_NAME		"AutoPick"     // Automatically pick particle coordinates from micrographs, their CTF and 2D references
+#define PROC_EXTRACT_NAME		"Extract"      // Window particles, normalize, downsize etc from micrographs (also combine CTF into metadata file)
+#define PROC_SORT_NAME          "Sort"         // Sort particles based on their Z-scores
+#define PROC_CLASSSELECT_NAME   "Select" 	   // Read in model.star file, and let user interactively select classes through the display (later: auto-selection as well)
+#define PROC_2DCLASS_NAME 		"Class2D"      // 2D classification (from input particles)
+#define PROC_3DCLASS_NAME		"Class3D"      // 3D classification (from input 2D/3D particles, an input 3D-reference, and possibly a 3D mask)
+#define PROC_3DAUTO_NAME        "Refine3D"     // 3D auto-refine (from input particles, an input 3Dreference, and possibly a 3D mask)
+#define PROC_POLISH_NAME	    "Polish"       // Particle-polishing (from movie-particles)
+#define PROC_MASKCREATE_NAME    "MaskCreate"   // Process to create masks from input maps
+#define PROC_JOINSTAR_NAME      "JoinStar"     // Process to create masks from input maps
+#define PROC_SUBTRACT_NAME      "Subtract"     // Process to subtract projections of parts of the reference from experimental images
+#define PROC_POST_NAME			"PostProcess"  // Post-processing (from unfiltered half-maps and a possibly a 3D mask)
+#define PROC_RESMAP_NAME  	    "LocalRes"     // Local resolution estimation (from unfiltered half-maps and a 3D mask)
+#define PROC_MOVIEREFINE_NAME   "MovieRefine"  // Movie-particle extraction and refinement combined
+#define PROC_INIMODEL_NAME		"InitialModel" // De-novo generation of 3D initial model (using SGD)
+#define PROC_MULTIBODY_NAME		"MultiBody"    // Multi-body refinement
+#define PROC_MOTIONREFINE_NAME  "Polish"       // Jasenko's motion fitting program for Bayesian polishing (to replace MovieRefine?)
+#define PROC_CTFREFINE_NAME     "CtfRefine"    // Jasenko's program for defocus and beamtilt optimisation
+
 #define PROC_IMPORT         0 // Import any file as a Node of a given type
 #define PROC_MOTIONCORR 	1 // Import any file as a Node of a given type
 #define PROC_CTFFIND	    2 // Estimate CTF parameters from micrographs for either entire micrographs and/or particles
-#define PROC_MANUALPICK		3 // Manually pick particle coordinates from micrographs
+#define PROC_MANUALPICK 	3 // Manually pick particle coordinates from micrographs
 #define PROC_AUTOPICK		4 // Automatically pick particle coordinates from micrographs, their CTF and 2D references
 #define PROC_EXTRACT		5 // Window particles, normalize, downsize etc from micrographs (also combine CTF into metadata file)
 #define PROC_SORT           6 // Sort particles based on their Z-scores
 #define PROC_CLASSSELECT    7 // Read in model.star file, and let user interactively select classes through the display (later: auto-selection as well)
 #define PROC_2DCLASS		8 // 2D classification (from input particles)
 #define PROC_3DCLASS		9 // 3D classification (from input 2D/3D particles, an input 3D-reference, and possibly a 3D mask)
-#define PROC_3DAUTO	        10 // 3D auto-refine (from input particles, an input 3Dreference, and possibly a 3D mask)
-#define PROC_POLISH			11// Particle-polishing (from movie-particles)
+#define PROC_3DAUTO         10// 3D auto-refine (from input particles, an input 3Dreference, and possibly a 3D mask)
+#define PROC_POLISH  		11// Particle-polishing (from movie-particles)
 #define PROC_MASKCREATE     12// Process to create masks from input maps
 #define PROC_JOINSTAR       13// Process to create masks from input maps
 #define PROC_SUBTRACT       14// Process to subtract projections of parts of the reference from experimental images
 #define PROC_POST			15// Post-processing (from unfiltered half-maps and a possibly a 3D mask)
-#define PROC_RESMAP			16// Local resolution estimation (from unfiltered half-maps and a 3D mask)
+#define PROC_RESMAP 		16// Local resolution estimation (from unfiltered half-maps and a 3D mask)
 #define PROC_MOVIEREFINE    17// Movie-particle extraction and refinement combined
 #define PROC_INIMODEL		18// De-novo generation of 3D initial model (using SGD)
-#define NR_BROWSE_TABS      19
+#define PROC_MULTIBODY      19// Multi-body refinement
+#define PROC_MOTIONREFINE   20// Jasenko's motion_refine
+#define PROC_CTFREFINE      21// Jasenko's ctf_refine
+#define NR_BROWSE_TABS      20
 
 // Status a Process may have
 #define PROC_RUNNING   0
@@ -167,6 +218,8 @@ class Node
 // Helper function to get the outputnames of refine jobs
 std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, int dim, int nr_bodies=1, bool do_movies=false, bool do_also_rot=false);
 
+// Helper function for Jasenko's programs
+bool getFileNamesFromPostProcess(FileName fn_post, FileName &fn_half1, FileName &fn_half2, FileName &fn_mask);
 
 // One class to store any type of Option for a GUI entry
 class JobOption
@@ -211,30 +264,33 @@ public:
 	JobOption()	{ clear(); }
 
 	// Empty destructor
-    ~JobOption() {	clear(); }
+	~JobOption() {	clear(); }
 
-    void clear();
+	void clear();
 
-    // Set values of label, value, default_value and helptext (common for all types)
-    void initialise(std::string _label, std::string _default_value, std::string _helptext);
+	// Set values of label, value, default_value and helptext (common for all types)
+	void initialise(std::string _label, std::string _default_value, std::string _helptext);
 
-    // Get a string value
-    std::string getString();
+	// Get a string value
+	std::string getString();
 
-    // Get a string value
-    Node getNode();
+	// Set a string value
+	void setString(std::string set_to);
 
-    // Get a numbered value
-    float getNumber();
+	// Get a string value
+	Node getNode();
 
-    // Get a boolean value
-    bool getBoolean();
+	// Get a numbered value
+	float getNumber();
 
-    // Read value from an ifstream. Return false if cannot find it
-    bool readValue(std::ifstream& in);
+	// Get a boolean value
+	bool getBoolean();
 
-    // Write value to an ostream
-    void writeValue(std::ostream& out);
+	// Read value from an ifstream. Return false if cannot find it
+	bool readValue(std::ifstream& in);
+
+	// Write value to an ostream
+	void writeValue(std::ostream& out);
 };
 
 
@@ -272,27 +328,27 @@ public:
 	// Constructor
 	RelionJob() { clear(); };
 
-    // Empty Destructor
-    ~RelionJob() { clear(); };
+	// Empty Destructor
+	~RelionJob() { clear(); };
 
-    // Clear everything
-    void clear()
-    {
-    	outputName = alias = "";
-    	type = -1;
-    	inputNodes.clear();
-    	outputNodes.clear();
-    	joboptions.clear();
-    	is_continue = false;
-    }
+	// Clear everything
+	void clear()
+	{
+		outputName = alias = "";
+		type = -1;
+		inputNodes.clear();
+		outputNodes.clear();
+		joboptions.clear();
+		is_continue = false;
+	}
 
-    // Returns true if the option is present in joboptions
-    bool containsOption(std::string option)
-    {
-    	return (joboptions.find(option) != joboptions.end());
-    }
+	// Returns true if the option is present in joboptions
+	bool containsLabel(std::string label, std::string &option);
 
-    // write/read settings to disc
+	// Set this option in the job
+	void setOption(std::string setOptionLine);
+
+	// write/read settings to disc
 	bool read(std::string fn, bool &_is_continue, bool do_initialise = false); // return false if unsuccessful
 	void write(std::string fn);
 
@@ -308,11 +364,11 @@ public:
 			bool do_makedir, std::string &warning_message);
 
 	// Initialise the generic RelionJob
-    void initialise(int job_type);
+	void initialise(int job_type);
 
-    // Generic getCommands
-    bool getCommands(std::string &outputname, std::vector<std::string> &commands,
-			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
+	// Generic getCommands
+	bool getCommands(std::string &outputname, std::vector<std::string> &commands,
+	 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
 
 	// Now all the specific job types are defined
 	void initialiseImportJob();
@@ -363,6 +419,10 @@ public:
 	bool getCommandsAutorefineJob(std::string &outputname, std::vector<std::string> &commands,
 			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
 
+	void initialiseMultiBodyJob();
+	bool getCommandsMultiBodyJob(std::string &outputname, std::vector<std::string> &commands,
+			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
+
 	void initialiseMovierefineJob();
 	bool getCommandsMovierefineJob(std::string &outputname, std::vector<std::string> &commands,
 			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
@@ -389,6 +449,14 @@ public:
 
 	void initialiseLocalresJob();
 	bool getCommandsLocalresJob(std::string &outputname, std::vector<std::string> &commands,
+			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
+
+	void initialiseMotionrefineJob();
+	bool getCommandsMotionrefineJob(std::string &outputname, std::vector<std::string> &commands,
+			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
+
+	void initialiseCtfrefineJob();
+	bool getCommandsCtfrefineJob(std::string &outputname, std::vector<std::string> &commands,
 			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
 
 

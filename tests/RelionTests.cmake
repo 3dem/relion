@@ -3,6 +3,7 @@ file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/tests/test_output)
 
 set(RELION_INPUT_DIR_RYR "/nethome/projects/RELION/refData/inputData/ryr")
 set(RELION_INPUT_DIR_EMP "/nethome/projects/RELION/refData/inputData/empiar")
+set(RELION_INPUT_DIR_TAG "/nethome/projects/RELION/refData/inputData/tagcase")
 
 #--------------------------------------------------------------------			   
 add_test(NAME GPU-2Dc_small
@@ -262,4 +263,48 @@ add_test(NAME CPU-3Dc_large
         --onthefly_shifts 
 	--perturb 0) 
 #--------------------------------------------------------------------
-
+add_test(NAME CPU-2Dc_tag_helix
+        WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/tests 
+        COMMAND refine --o test_output/cpu_2Dc_tag_helix
+        --i "${RELION_INPUT_DIR_TAG}/helixtest.star" 
+        --j 5 
+        --particle_diameter 160 
+        --angpix 2.8 
+        --iter 10 
+        --tau2_fudge 4 
+        --K 2 
+        --flatten_solvent 
+        --psi_step 5.625 
+        --zero_mask 
+        --oversampling 1 
+        --offset_range 5 
+        --offset_step 2 
+        --scale 
+        --random_seed 1 
+        --helical_outer_diameter 100
+        --bimodal_psi
+        --sigma_psi 3.3333) 
+        #--------------------------------------------------------------------
+add_test(NAME GPU-2Dc_tag_helix
+        WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/tests 
+        COMMAND refine --o test_output/gpu_2Dc_tag_helix
+        --i "${RELION_INPUT_DIR_TAG}/helixtest.star" 
+        --j 5 
+        --particle_diameter 160 
+        --angpix 2.8 
+        --iter 10 
+        --tau2_fudge 4 
+        --K 2 
+        --flatten_solvent 
+        --psi_step 5.625 
+        --zero_mask 
+        --oversampling 1 
+        --offset_range 5 
+        --offset_step 2 
+        --scale 
+        --random_seed 1 
+        --helical_outer_diameter 100
+        --bimodal_psi
+        --sigma_psi 3.3333
+        --gpu) 
+	

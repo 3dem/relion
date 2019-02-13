@@ -63,9 +63,9 @@ int main(int argc, char *argv[])
 #define TITLE ("RELION-" RELION_VERSION)
 	strcpy (titletext,TITLE);
 #ifdef PACKAGE_VERSION
-        strcat(titletext,PACKAGE_VERSION);
+	strcat(titletext,PACKAGE_VERSION);
 #endif
-        strcat(titletext,": ");
+	strcat(titletext,": ");
 
 	strcat (titletext, short_dir);
 
@@ -91,16 +91,13 @@ int main(int argc, char *argv[])
 		// Show and run the window
 		window.show();
 		Fl::run();
-
+	}
+	catch (RelionError XE)
+	{
+		std::cerr << XE;
+		exit(1);
 	}
 
-    catch (RelionError XE)
-    {
-        std::cerr << XE;
-        exit(1);
-    }
-
-
-    //return Fl::run();
-    return 0;
+	//return Fl::run();
+	return 0;
 }

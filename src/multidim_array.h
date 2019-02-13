@@ -1085,9 +1085,14 @@ public:
     {
         if (Ndim*Zdim*Ydim*Xdim == nzyxdimAlloc && data != NULL)
         {
-            if (Ndim != this -> ndim || Zdim != this -> zdim ||
-                Ydim != this -> ydim || Xdim != this -> xdim)
-                REPORT_ERROR("Unmatched resize. Maybe bug in window function?");
+            ndim = Ndim;
+            xdim = Xdim;
+            ydim = Ydim;
+            zdim = Zdim;
+            yxdim = Ydim * Xdim;
+            zyxdim = Zdim * yxdim;
+            nzyxdim = Ndim * zyxdim;
+            nzyxdimAlloc = nzyxdim;
             return;
         }
 
@@ -2338,12 +2343,12 @@ public:
      * This function returns the index of the minimum element of an array.
      * array(l,k,i,j). Returns -1 if the array is empty
      */
-    void minIndex(long int &lmin, long int& kmin, long int& imin, long int& jmin) const
+    T minIndex(long int &lmin, long int& kmin, long int& imin, long int& jmin) const
     {
         if (XSIZE(*this) == 0)
         {
             lmin = kmin = imin = jmin = -1;
-            return;
+            return 0;
         }
 
         kmin = STARTINGZ(*this);
@@ -2363,36 +2368,37 @@ public:
             jmin = j;
         }
 
+        return minval;
     }
 
     /** 3D Indices for the minimum element.
      *
      * This function just calls to the 4D function
      */
-    void minIndex(long int& kmin, long int& imin, long int& jmin) const
+    T minIndex(long int& kmin, long int& imin, long int& jmin) const
     {
         long int zeroInt=0;
-        minIndex(zeroInt,kmin,imin,jmin);
+        return minIndex(zeroInt,kmin,imin,jmin);
     }
 
     /** 2D Indices for the minimum element.
      *
      * This function just calls to the 4D function
      */
-    void minIndex(long int& imin, long int& jmin) const
+    T minIndex(long int& imin, long int& jmin) const
     {
         long int zeroInt=0;
-        minIndex(zeroInt,zeroInt,imin,jmin);
+        return minIndex(zeroInt,zeroInt,imin,jmin);
     }
 
     /** 1D Indices for the minimum element.
      *
      * This function just calls to the 4D function
      */
-    void minIndex(long int& jmin) const
+    T minIndex(long int& jmin) const
     {
         long int zeroInt=0;
-        minIndex(zeroInt,zeroInt,zeroInt,jmin);
+        return minIndex(zeroInt,zeroInt,zeroInt,jmin);
     }
 
     /** 4D Indices for the maximum element.
@@ -2400,12 +2406,12 @@ public:
      * This function returns the index of the maximum element of an array.
      * array(l,k,i,j). Returns -1 if the array is empty
      */
-    void maxIndex(long int &lmax, long int& kmax, long int& imax, long int& jmax) const
+    T maxIndex(long int &lmax, long int& kmax, long int& imax, long int& jmax) const
     {
         if (XSIZE(*this) == 0)
         {
             lmax = kmax = imax = jmax = -1;
-            return;
+            return 0;
         }
 
         kmax = STARTINGZ(*this);
@@ -2423,36 +2429,38 @@ public:
             imax = i;
             jmax = j;
         }
+
+        return maxval;
     }
 
     /** 3D Indices for the maximum element.
      *
      * This function just calls to the 4D function
      */
-    void maxIndex(long int& kmax, long int& imax, long int& jmax) const
+    T maxIndex(long int& kmax, long int& imax, long int& jmax) const
     {
         long int dum;
-        maxIndex(dum, kmax, imax, jmax);
+        return maxIndex(dum, kmax, imax, jmax);
     }
 
     /** 2D Indices for the maximum element.
      *
      * This function just calls to the 4D function
      */
-    void maxIndex(long int& imax, long int& jmax) const
+    T maxIndex(long int& imax, long int& jmax) const
     {
         long int dum;
-        maxIndex(dum, dum, imax, jmax);
+        return maxIndex(dum, dum, imax, jmax);
     }
 
     /** 1D Indices for the maximum element.
      *
      * This function just calls to the 4D function
      */
-    void maxIndex(long int& jmax) const
+    T maxIndex(long int& jmax) const
     {
         long int dum;
-        maxIndex(dum, dum, dum, jmax);
+        return maxIndex(dum, dum, dum, jmax);
     }
 
     /** Minimum and maximum of the values in the array.
@@ -2583,7 +2591,7 @@ public:
         double stddev = 0;
 
         double minval = std::numeric_limits<double>::max();
-        double maxval = std::numeric_limits<double>::min();
+        double maxval = -std::numeric_limits<double>::max();
 
         T* ptr = NULL;
         long int n;
@@ -2895,8 +2903,12 @@ public:
                                     char operation)
     {
         if (!op1.sameShape(op2))
-            REPORT_ERROR( (std::string) "Array_by_array: different shapes (" +
-                         operation + ")");
+        {
+        	op1.printShape();
+        	op2.printShape();
+        	REPORT_ERROR( (std::string) "Array_by_array: different shapes (" +
+        			operation + ")");
+        }
         if (result.data == NULL || !result.sameShape(op1))
             result.resize(op1);
         coreArrayByArray(op1, op2, result, operation);
@@ -3873,6 +3885,11 @@ public:
         FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(*this,n,ptr)
         *ptr = ABS(*ptr);
     }
+
+#if defined(__APPLE__)
+#undef MIN
+#undef MAX
+#endif
 
     /** MAX
      *

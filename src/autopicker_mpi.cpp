@@ -25,11 +25,15 @@ void AutoPickerMpi::read(int argc, char **argv)
     // Define a new MpiNode
     node = new MpiNode(argc, argv);
 
+    if (node->isMaster())
+    	PRINT_VERSION_INFO();
+
     // First read in non-parallelisation-dependent variables
     AutoPicker::read(argc, argv);
 
     // Don't put any output to screen for mpi slaves
-    verb = (node->isMaster()) ? 1 : 0;
+    if (!node->isMaster())
+    	verb = 0;
 
     if (do_write_fom_maps && node->isMaster())
     	std::cerr << "WARNING : --write_fom_maps is very heavy on disc I/O and is not advised in parallel execution. If possible, using --shrink 0 and lowpass makes I/O less significant." << std::endl;
@@ -104,7 +108,10 @@ void AutoPickerMpi::run()
 			fn_olddir = fn_dir;
 		}
 
-    	autoPickOneMicrograph(fn_micrographs[imic], imic);
+		if (do_LoG)
+			autoPickLoGOneMicrograph(fn_micrographs[imic], imic);
+		else
+			autoPickOneMicrograph(fn_micrographs[imic], imic);
 	}
 	if (verb > 0)
 		progress_bar(my_nr_micrographs);

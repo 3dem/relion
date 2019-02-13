@@ -130,14 +130,14 @@ public:
      * Only if it is also not present in the second then a default value is used
      * This is useful if micrograph-specific parameters are stored in a separate MD from the image-specific parameters
      */
-    void read(MetaDataTable &MD1, MetaDataTable &MD2, long int objectID = -1);
+    void read(const MetaDataTable &MD1, const MetaDataTable &MD2, long int objectID = -1);
 
     /** Just set all values explicitly */
     void setValues(RFLOAT _defU, RFLOAT _defV, RFLOAT _defAng,
     		RFLOAT _voltage, RFLOAT _Cs, RFLOAT _Q0, RFLOAT _Bfac, RFLOAT _scale = 1., RFLOAT _phase_shift = 0.);
 
     /** Read from a single MetaDataTable */
-    void read(MetaDataTable &MD);
+    void read(const MetaDataTable &MD);
 
     /** Write to MetaDataTable. */
     void write(MetaDataTable &MD);
@@ -153,15 +153,17 @@ public:
     void initialise();
 
     /// Compute CTF at (U,V). Continuous frequencies
+    // @TODO: Fx, Fy -> member variables (units are not meaningful)
     inline RFLOAT getCTF(RFLOAT X, RFLOAT Y,
-    		bool do_abs = false, bool do_only_flip_phases = false, bool do_intact_until_first_peak = false, bool do_damping = true) const
+            bool do_abs = false, bool do_only_flip_phases = false,
+            bool do_intact_until_first_peak = false, bool do_damping = true) const
     {
         RFLOAT u2 = X * X + Y * Y;
-        RFLOAT u = sqrt(u2);
         RFLOAT u4 = u2 * u2;
+
         // if (u2>=ua2) return 0;
         RFLOAT deltaf = getDeltaF(X, Y);
-        RFLOAT argument = K1 * deltaf * u2 + K2 * u4 - K5;
+        RFLOAT argument = K1 * deltaf * u2 + K2 * u4 - K5 - K3;
         RFLOAT retval;
         if (do_intact_until_first_peak && ABS(argument) < PI/2.)
         {
@@ -169,7 +171,7 @@ public:
         }
         else
         {
-            retval = -(K3*sin(argument) - Q0*cos(argument)); // Q0 should be positive
+            retval = -sin(argument);
         }
         if (do_damping)
         {
@@ -185,6 +187,36 @@ public:
         	retval = (retval < 0.) ? -1. : 1.;
         }
         return scale * retval;
+    }
+
+    double getGamma(double X, double Y);
+
+    // compute the local frequency of the ctf (i.e. the rate of change of
+    // 'double argument' in getCTF()
+    RFLOAT getCtfFreq(RFLOAT X, RFLOAT Y);
+
+    inline Complex getCTFP(RFLOAT X, RFLOAT Y, bool is_positive) const
+    {
+        RFLOAT u2 = X * X + Y * Y;
+        RFLOAT u = sqrt(u2);
+        RFLOAT u4 = u2 * u2;
+        // if (u2>=ua2) return 0;
+        RFLOAT deltaf = getDeltaF(X, Y);
+        RFLOAT argument = K1 * deltaf * u2 + K2 * u4 - K5 - K3;
+        // Add half pi phase shift
+        argument += PI/2.;
+        RFLOAT sinx, cosx;
+#ifdef RELION_SINGLE_PRECISION
+        SINCOSF( argument, &sinx, &cosx );
+#else
+        SINCOS( argument, &sinx, &cosx );
+#endif
+        Complex retval;
+        retval.real = cosx;
+        retval.imag = (is_positive) ? sinx : -sinx;
+
+        return retval;
+
     }
 
     /// Compute Deltaf at a given direction
@@ -211,7 +243,11 @@ public:
     /// Generate (Fourier-space, i.e. FFTW format) image with all CTF values.
     /// The dimensions of the result array should have been set correctly already
     void getFftwImage(MultidimArray < RFLOAT > &result, int orixdim, int oriydim, RFLOAT angpix,
-    		bool do_abs = false, bool do_only_flip_phases = false, bool do_intact_until_first_peak = false, bool do_damping = true);
+            bool do_abs = false, bool do_only_flip_phases = false, bool do_intact_until_first_peak = false, bool do_damping = true);
+
+    // Get a complex image with the CTFP/Q values, where the angle is in degrees between the Y-axis and the CTFP/Q sector line
+    void getCTFPImage(MultidimArray<Complex> &result, int orixdim, int oriydim, RFLOAT angpix,
+    					bool is_positive, float angle);
 
     /// Generate a centered image (with hermitian symmetry)
     /// The dimensions of the result array should have been set correctly already
@@ -223,6 +259,8 @@ public:
     void get1DProfile(MultidimArray < RFLOAT > &result, RFLOAT angle, RFLOAT angpix,
     		bool do_abs = false, bool do_only_flip_phases = false, bool do_intact_until_first_peak = false, bool do_damping = true);
 
+    // Calculate weight W for Ewald-sphere curvature correction: apply this to the result from getFftwImage
+    void applyWeightEwaldSphereCurvature(MultidimArray < RFLOAT > &result, int orixdim, int oriydim, RFLOAT angpix, RFLOAT particle_diameter);
 
 };
 //@}

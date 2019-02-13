@@ -321,6 +321,7 @@ void ParticlePolisher::fitMovementsOneMicrograph(long int imic)
 	plot2D->SetXAxisSize(600);
 	plot2D->SetYAxisSize(600);
 	plot2D->SetDrawLegend(false);
+	plot2D->SetFlipY(true);
 
 	std::vector<RFLOAT> x_pick, y_pick, x_off_prior, y_off_prior, x_start, x_end, dummy; // X and Y-coordinates for the average particles in the micrograph
 	std::vector< std::vector<RFLOAT> > x_off, y_off; // X and Y shifts w.r.t. the average for each movie frame
@@ -492,6 +493,8 @@ void ParticlePolisher::fitMovementsOneMicrograph(long int imic)
 	plot2D->SetXAxisTitle("X-coordinate");
 	plot2D->SetYAxisTitle("Y-coordinate");
 	plot2D->OutputPostScriptPlot(fn_eps);
+
+	delete plot2D;
 }
 
 void ParticlePolisher::calculateAllSingleFrameReconstructionsAndBfactors()
@@ -615,20 +618,21 @@ void ParticlePolisher::writeStarFileBfactors(FileName fn_star)
 	plot2D->SetXAxisSize(600);
 	plot2D->SetYAxisSize(400);
 	plot2D->SetDrawLegend(false);
+	MDout.addToCPlot2D(plot2D, EMDL_IMAGE_FRAME_NR, EMDL_POSTPROCESS_BFACTOR);
 	plot2D->SetXAxisTitle("movie frame");
 	plot2D->SetYAxisTitle("B-factor");
-	MDout.addToCPlot2D(plot2D, EMDL_IMAGE_FRAME_NR, EMDL_POSTPROCESS_BFACTOR);
 	plot2D->OutputPostScriptPlot(fn_out + "bfactors.eps");
+	delete plot2D;
 
 	CPlot2D *plot2Db=new CPlot2D("Polishing scale-factors");
 	plot2Db->SetXAxisSize(600);
 	plot2Db->SetYAxisSize(400);
 	plot2Db->SetDrawLegend(false);
+	MDout.addToCPlot2D(plot2Db, EMDL_IMAGE_FRAME_NR, EMDL_POSTPROCESS_GUINIER_FIT_INTERCEPT);
 	plot2Db->SetXAxisTitle("movie frame");
 	plot2Db->SetYAxisTitle("Scale-factor");
-	MDout.addToCPlot2D(plot2Db, EMDL_IMAGE_FRAME_NR, EMDL_POSTPROCESS_GUINIER_FIT_INTERCEPT);
 	plot2Db->OutputPostScriptPlot(fn_out + "scalefactors.eps");
-
+	delete plot2Db;
 
 }
 
@@ -939,11 +943,12 @@ void ParticlePolisher::calculateBfactorSingleFrameReconstruction(int iframe, RFL
 		CPlot2D *plot2D=new CPlot2D("Guinier plot frame " + integerToString(iframe+1));
 		plot2D->SetXAxisSize(600);
 		plot2D->SetYAxisSize(400);
-		plot2D->SetXAxisTitle("resolution (1/A^2)");
-		plot2D->SetYAxisTitle("ln(amplitudes)");
 		MDout.addToCPlot2D(plot2D, EMDL_POSTPROCESS_GUINIER_RESOL_SQUARED, EMDL_POSTPROCESS_GUINIER_VALUE_IN);
 		plot2D->AddDataSet(dataSet);
+		plot2D->SetXAxisTitle("resolution (1/A^2)");
+		plot2D->SetYAxisTitle("ln(amplitudes)");
 		plot2D->OutputPostScriptPlot(fn_out + "frame_"+integerToString(iframe+1, 3, '0')+"_guinier.eps");
+		delete plot2D;
 	}
 
 }
@@ -1242,7 +1247,7 @@ void ParticlePolisher::reconstructShinyParticlesAndFscWeight(int ipass)
 		Postprocessing prm;
 
 		prm.clear();
-		prm.fn_in = fn_out + "shiny";
+		prm.fn_I1 = fn_out + "shiny_half1_class001_unfil.mrc";
 		prm.fn_out = fn_out + fn_post;
 		prm.angpix = angpix;
 		prm.do_auto_mask = false;
@@ -1365,7 +1370,7 @@ void ParticlePolisher::generateLogFilePDF()
 			}
 		}
 
-		joinMultipleEPSIntoSinglePDF(fn_out + "logfile.pdf ", fn_eps);
+		joinMultipleEPSIntoSinglePDF(fn_out + "logfile.pdf", fn_eps);
 
 	}
 }

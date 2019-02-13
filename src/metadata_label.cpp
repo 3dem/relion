@@ -54,7 +54,12 @@ void EMDL::addLabel(EMDLabel label, EMDLabelType type, std::string name, std::st
     data[label] = EMDLabelData(type, name);
     names[name] = label;
     definitions[name] = definition;
-}//close function addLable
+}
+
+void EMDL::addAltLabel(EMDLabel label, std::string name)
+{
+    names[name] = label;
+}
 
 void EMDL::printDefinitions(std::ostream& out)
 {
@@ -65,12 +70,10 @@ void EMDL::printDefinitions(std::ostream& out)
 		out << std::setw(30) <<strIt->first;
 		if (EMDL::isInt(names[strIt->first]))
 			out << " (int)    ";
-		else if (EMDL::isLong(names[strIt->first]))
-			out << " (long)   ";
 		else if (EMDL::isBool(names[strIt->first]))
 			out << " (bool)   ";
 		else if (EMDL::isDouble(names[strIt->first]))
-			out << " (RFLOAT) ";
+			out << " (double) ";
 		else if (EMDL::isString(names[strIt->first]))
 			out << " (string) ";
 		else
@@ -99,10 +102,6 @@ bool EMDL::isInt(const EMDLabel &label)
 {
     return (data[label].type == EMDL_INT);
 }
-bool EMDL::isLong(const EMDLabel &label)
-{
-    return (data[label].type == EMDL_LONG);
-}
 bool EMDL::isBool(const EMDLabel &label)
 {
     return (data[label].type == EMDL_BOOL);
@@ -117,7 +116,7 @@ bool EMDL::isDouble(const EMDLabel &label)
 }
 bool EMDL::isNumber(const EMDLabel &label)
 {
-    return (data[label].type == EMDL_DOUBLE || data[label].type == EMDL_LONG || data[label].type == EMDL_INT);
+    return (data[label].type == EMDL_DOUBLE || data[label].type == EMDL_INT);
 }
 
 bool EMDL::isValidLabel(const EMDLabel &label)

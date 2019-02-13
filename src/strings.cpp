@@ -116,7 +116,7 @@ std::string simplify( const std::string& str )
 
     // Remove space left at the end of the string
     // if needed
-    if( temp[ temp.size( ) - 1 ] == ' ' )
+    if( temp.size( ) > 0 && temp[ temp.size( ) - 1 ] == ' ' )
     {
         temp.resize( temp.size() - 1 );
     }
@@ -198,6 +198,33 @@ int textToInteger(const char* str, int _errno, std::string errmsg)
     REPORT_ERROR( errmsg);
 
     return 0;
+}
+
+bool textToBool(const char* str, int _errno, std::string errmsg)
+{
+    bool retval;
+    int ok;
+
+    if (str == NULL)
+    	REPORT_ERROR( errmsg);
+
+    if ((strcasecmp(str, "true") == 0) ||
+	(strcasecmp(str, "yes") == 0))
+    {
+	retval = true;
+    } 
+    else if ((strcasecmp(str, "false") == 0) ||
+             (strcasecmp(str, "no") == 0))
+    {
+	retval = false;
+    }
+    else
+    {
+	REPORT_ERROR( errmsg);
+	return false;
+    }
+    
+    return retval;
 }
 
 long long textToLongLong(const char* str, int _errno, std::string errmsg)
@@ -297,9 +324,6 @@ std::string integerToString(int I, int _width, char fill_with)
     int width = _width;
     int Iaux = ABS(I);
 
-    if (SGN(I) < 0)
-        width--;
-
     if (width == 0)
         do
         {
@@ -307,6 +331,8 @@ std::string integerToString(int I, int _width, char fill_with)
             width++;
         }
         while (Iaux != 0);
+    else if (SGN(I) < 0)
+        width--;
 
     // Fill the number with the fill character
     for (int i = 0; i < width; i++)
@@ -436,7 +462,10 @@ int splitString(const std::string& input,
     newPos = input.find(delimiter, 0);
 
     if (newPos < 0)
-        return 0;
+    {
+    	results.push_back(input);
+    	return 1;
+    }
 
     int numFound = 0;
     while (newPos >= iPos)

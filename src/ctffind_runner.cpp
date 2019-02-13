@@ -18,9 +18,10 @@
  * author citations must be preserved.
  ***************************************************************************/
 #include "src/ctffind_runner.h"
+#include <cmath>
 
 #ifdef CUDA
-#include "src/gpu_utils/cuda_mem_utils.h"
+#include "src/acc/cuda/cuda_mem_utils.h"
 #endif
 
 void CtffindRunner::read(int argc, char **argv, int rank)
@@ -34,6 +35,7 @@ void CtffindRunner::read(int argc, char **argv, int rank)
 	fn_out = parser.getOption("--o", "Directory, where all output files will be stored", "CtfEstimate/");
 	do_only_join_results = parser.checkOption("--only_make_star", "Don't estimate any CTFs, only join all logfile results in a STAR file");
 	continue_old = parser.checkOption("--only_do_unfinished", "Only estimate CTFs for those micrographs for which there is not yet a logfile with Final values.");
+	do_at_most = textToInteger(parser.getOption("--do_at_most", "Only process up to this number of (unprocessed) micrographs.", "-1"));
 	// Use a smaller squared part of the micrograph to estimate CTF (e.g. to avoid film labels...)
 	ctf_win =  textToInteger(parser.getOption("--ctfWin", "Size (in pixels) of a centered, squared window to use for CTF-estimation", "-1"));
 
@@ -114,17 +116,27 @@ void CtffindRunner::initialise()
 	}
 
 	if (do_use_gctf && ctf_win>0)
-		REPORT_ERROR("CtffindRunner::initialise ERROR: Running Gctf together with --ctfWin is not implemented, please use CTFFIND instead.");
+		REPORT_ERROR("ERROR: Running Gctf together with --ctfWin is not implemented, please use CTFFIND instead.");
+
+	if (!do_phaseshift && (additional_gctf_options.find("--phase_shift_L") != std::string::npos ||
+	                       additional_gctf_options.find("--phase_shift_H") != std::string::npos ||
+	                       additional_gctf_options.find("--phase_shift_S") != std::string::npos))
+		REPORT_ERROR("ERROR: Please don't specify --phase_shift_L, H, S in 'Other Gctf options' (--extra_gctf_options). Use 'Estimate phase shifts' (--do_phaseshift) and 'Phase shift - Min, Max, Step' (--phase_min, --phase_max, --phase_step) instead.");
 
 	// Make sure fn_out ends with a slash
 	if (fn_out[fn_out.length()-1] != '/')
 		fn_out += "/";
+
 
 	// Set up which micrographs to estimate CTFs from
 	if (fn_in.isStarFile())
 	{
 		MetaDataTable MDin;
 		MDin.read(fn_in);
+
+		if (do_use_without_doseweighting && !MDin.containsLabel(EMDL_MICROGRAPH_NAME_WODOSE))
+			REPORT_ERROR("ERROR: You are using --use_noDW, but there is no rlnMicrographNameNoDW label in the input micrograph STAR file.");
+
 		fn_micrographs_all.clear();
 		fn_micrographs_widose_all.clear();
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
@@ -149,35 +161,73 @@ void CtffindRunner::initialise()
 		fn_in.globFiles(fn_micrographs_all);
 	}
 
-	// If we're continuing an old run, see which micrographs have not been finished yet...
-	if (continue_old)
+	// First backup the given list of all micrographs
+	std::vector<FileName> fn_mic_given_all = fn_micrographs_all;
+	std::vector<FileName> fn_mic_widose_given_all = fn_micrographs_widose_all;
+	// These lists contain those for the output STAR & PDF files
+	fn_micrographs_all.clear();
+	fn_micrographs_widose_all.clear();
+	// These are micrographs to be processed
+	fn_micrographs.clear();
+	fn_micrographs_widose.clear();
+
+	bool warned = false;
+	for (long int imic = 0; imic < fn_mic_given_all.size(); imic++)
 	{
-		fn_micrographs.clear();
-		fn_micrographs_widose.clear();
-		for (long int imic = 0; imic < fn_micrographs_all.size(); imic++)
+		bool ignore_this = false;
+		bool process_this = true;
+
+		if (continue_old)
 		{
-			FileName fn_microot = fn_micrographs_all[imic].without(".mrc");
+			FileName fn_microot = fn_mic_given_all[imic].without(".mrc");
 			RFLOAT defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep, maxres=-1., valscore = -1., phaseshift = 0.;
-			if (!getCtffindResults(fn_microot, defU, defV, defAng, CC,
-					HT, CS, AmpCnst, XMAG, DStep, maxres, valscore, phaseshift, false)) // false: dont warn if not found Final values
+			if (getCtffindResults(fn_microot, defU, defV, defAng, CC,
+			     HT, CS, AmpCnst, XMAG, DStep, maxres, valscore, phaseshift, false)) // false: dont warn if not found Final values
 			{
-				fn_micrographs.push_back(fn_micrographs_all[imic]);
-				if (do_use_without_doseweighting)
-					fn_micrographs_widose.push_back(fn_micrographs_widose_all[imic]);
+				process_this = false; // already done
 			}
 		}
+			
+		if (do_at_most >= 0 && fn_micrographs.size() >= do_at_most)
+		{
+			if (process_this) {
+				ignore_this = true;
+				process_this = false;
+				if (!warned)
+				{
+					warned = true;
+					std::cout << "NOTE: processing of some micrographs will be skipped as requested by --do_at_most" << std::endl;
+				}
+			}
+			// If this micrograph has already been processed, the result should be included in the output.
+			// So ignore_this remains false.
+		}
+
+		if (process_this)
+		{
+			fn_micrographs.push_back(fn_mic_given_all[imic]);
+			if (do_use_without_doseweighting)
+				fn_micrographs_widose.push_back(fn_mic_widose_given_all[imic]);
+		}
+
+		if (!ignore_this)
+		{
+			fn_micrographs_all.push_back(fn_mic_given_all[imic]);
+			if (do_use_without_doseweighting)
+				fn_micrographs_widose_all.push_back(fn_mic_widose_given_all[imic]);
+		}
 	}
-	else
-	{
-		fn_micrographs = fn_micrographs_all;
-		fn_micrographs_widose = fn_micrographs_widose_all;
+
+	if (false) {
+		std::cout << fn_mic_given_all.size() << " micrographs were given but we process only ";
+		std::cout  << do_at_most << " micrographs as specified in --do_at_most." << std::endl;
 	}
 
 	// Make symbolic links of the input micrographs in the output directory because ctffind and gctf write output files alongside the input micropgraph
-    char temp [180];
-    char *cwd = getcwd(temp, 180);
-    currdir = std::string(temp);
-    // Make sure fn_out ends with a slash
+	char temp [180];
+	char *cwd = getcwd(temp, 180);
+	currdir = std::string(temp);
+	// Make sure fn_out ends with a slash
 	if (currdir[currdir.length()-1] != '/')
 		currdir += "/";
 	FileName prevdir="";
@@ -200,15 +250,18 @@ void CtffindRunner::initialise()
 
 	if (do_use_gctf && fn_micrographs.size()>0)
 	{
-#ifdef CUDA
 		untangleDeviceIDs(gpu_ids, allThreadIDs);
 		if (allThreadIDs[0].size()==0 || (!std::isdigit(*gpu_ids.begin())) )
 		{
+#ifdef CUDA
 			if (verb>0)
-				std::cout << "gpu-ids not specified, threads will automatically be mapped to devices (incrementally)."<< std::endl;
+				std::cout << "gpu-ids were not specified, so threads will automatically be mapped to devices (incrementally)."<< std::endl;
 			HANDLE_ERROR(cudaGetDeviceCount(&devCount));
-		}
+#else
+			if (verb>0)
+				REPORT_ERROR("gpu-ids were not specified, but we could not figure out which GPU to use because RELION was not compiled with CUDA support.");
 #endif
+		}
 
 		// Find the dimensions of the first micrograph, to later on ensure all micrographs are the same size
 		Image<double> Itmp;
@@ -288,14 +341,28 @@ void CtffindRunner::run()
 void CtffindRunner::joinCtffindResults()
 {
 
+	long int barstep = XMIPP_MAX(1, fn_micrographs_all.size() / 60);
+	if (verb > 0)
+	{
+		std::cout << " Generating logfile.pdf ... " << std::endl;
+		init_progress_bar(fn_micrographs_all.size());
+	}
+
 	MetaDataTable MDctf;
 	for (long int imic = 0; imic < fn_micrographs_all.size(); imic++)
-    {
+	{
 		FileName fn_microot = fn_micrographs_all[imic].without(".mrc");
 		RFLOAT defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep;
 		RFLOAT maxres = -999., valscore = -999., phaseshift = -999.;
 		bool has_this_ctf = getCtffindResults(fn_microot, defU, defV, defAng, CC,
-				HT, CS, AmpCnst, XMAG, DStep, maxres, valscore, phaseshift);
+		                                      HT, CS, AmpCnst, XMAG, DStep, maxres, valscore, phaseshift);
+
+		// Don't read the pixel size from log files to avoid loss of precision
+		XMAG = 10000;
+		if (is_ctffind4)
+			DStep = PixelSize;
+		else
+			DStep = angpix;
 
 		if (!has_this_ctf)
 		{
@@ -316,23 +383,75 @@ void CtffindRunner::joinCtffindResults()
 			MDctf.setValue(EMDL_CTF_IMAGE, fn_ctf);
 			MDctf.setValue(EMDL_CTF_DEFOCUSU, defU);
 			MDctf.setValue(EMDL_CTF_DEFOCUSV, defV);
+			MDctf.setValue(EMDL_CTF_ASTIGMATISM, fabs(defU-defV));
 			MDctf.setValue(EMDL_CTF_DEFOCUS_ANGLE, defAng);
 			MDctf.setValue(EMDL_CTF_VOLTAGE, HT);
 			MDctf.setValue(EMDL_CTF_CS, CS);
 			MDctf.setValue(EMDL_CTF_Q0, AmpCnst);
 			MDctf.setValue(EMDL_CTF_MAGNIFICATION, XMAG);
 			MDctf.setValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, DStep);
+			if (!std::isfinite(CC)) CC = 0.0; // GCTF might return NaN
 			MDctf.setValue(EMDL_CTF_FOM, CC);
 			if (fabs(maxres + 999.) > 0.)
-				MDctf.setValue(EMDL_CTF_MAXRES, maxres);
+			{
+				// Put an upper limit on maxres, as gCtf may put 999. now max is 25.
+				MDctf.setValue(EMDL_CTF_MAXRES, XMIPP_MIN(25., maxres));
+			}
 			if (fabs(phaseshift + 999.) > 0.)
 				MDctf.setValue(EMDL_CTF_PHASESHIFT, phaseshift);
 			if (fabs(valscore + 999.) > 0.)
 				MDctf.setValue(EMDL_CTF_VALIDATIONSCORE, valscore);
 		}
-    }
+
+		if (verb > 0 && imic % 60 == 0) progress_bar(imic);
+	}
+
 	MDctf.write(fn_out+"micrographs_ctf.star");
-	std::cout << " Done! Written out: " << fn_out <<  "micrographs_ctf.star" << std::endl;
+
+
+	std::vector<EMDLabel> plot_labels;
+	plot_labels.push_back(EMDL_CTF_DEFOCUSU);
+	plot_labels.push_back(EMDL_CTF_DEFOCUS_ANGLE);
+	plot_labels.push_back(EMDL_CTF_ASTIGMATISM);
+	plot_labels.push_back(EMDL_CTF_MAXRES);
+	plot_labels.push_back(EMDL_CTF_PHASESHIFT);
+	plot_labels.push_back(EMDL_CTF_FOM);
+	plot_labels.push_back(EMDL_CTF_VALIDATIONSCORE);
+	FileName fn_eps, fn_eps_root = fn_out+"micrographs_ctf";
+	std::vector<FileName> all_fn_eps;
+	for (int i = 0; i < plot_labels.size(); i++)
+	{
+		EMDLabel label = plot_labels[i];
+		if (MDctf.containsLabel(label))
+		{
+			// Values for all micrographs
+			CPlot2D *plot2Db=new CPlot2D(EMDL::label2Str(label) + " for all micrographs");
+			MDctf.addToCPlot2D(plot2Db, EMDL_UNDEFINED, label, 1.);
+			plot2Db->SetDrawLegend(false);
+			fn_eps = fn_eps_root + "_all_" + EMDL::label2Str(label) + ".eps";
+			plot2Db->OutputPostScriptPlot(fn_eps);
+			all_fn_eps.push_back(fn_eps);
+			delete plot2Db;
+			if (MDctf.numberOfObjects() > 3)
+			{
+				// Histogram
+				std::vector<RFLOAT> histX, histY;
+				CPlot2D *plot2D=new CPlot2D("");
+				MDctf.columnHistogram(label,histX,histY,0, plot2D);
+				fn_eps = fn_eps_root + "_hist_" + EMDL::label2Str(label) + ".eps";
+				plot2D->OutputPostScriptPlot(fn_eps);
+				all_fn_eps.push_back(fn_eps);
+				delete plot2D;
+			}
+		}
+	}
+	joinMultipleEPSIntoSinglePDF(fn_out + "logfile.pdf", all_fn_eps);
+
+	if (verb > 0 )
+	{
+		progress_bar(fn_micrographs_all.size());
+		std::cout << " Done! Written out: " << fn_out <<  "micrographs_ctf.star and " << fn_out << "logfile.pdf" << std::endl;
+	}
 
 	if (do_use_gctf)
 	{
@@ -438,7 +557,7 @@ void CtffindRunner::executeCtffind3(long int imic)
 	FileName fn_script = fn_root + "_ctffind3.com";
 	FileName fn_log = fn_root + "_ctffind3.log";
 	FileName fn_ctf = fn_root + ".ctf";
-    FileName fn_mic_win;
+	FileName fn_mic_win;
 
 	std::ofstream  fh;
 	fh.open((fn_script).c_str(), std::ios::out);
@@ -468,9 +587,9 @@ void CtffindRunner::executeCtffind3(long int imic)
 		fn_mic_win = fn_mic;
 
 
-    std::string ctffind4_options = (is_ctffind4) ? " --omp-num-threads " + integerToString(nr_threads) + " --old-school-input-ctffind4 " : "";
+	std::string ctffind4_options = (is_ctffind4) ? " --omp-num-threads " + integerToString(nr_threads) + " --old-school-input-ctffind4 " : "";
 
-    // Write script to run ctffind
+	// Write script to run ctffind
 	fh << "#!/usr/bin/env csh"<<std::endl;
 	fh << fn_ctffind_exe << ctffind4_options << " > " << fn_log << " << EOF"<<std::endl;
 	// line 1: input image
@@ -522,7 +641,7 @@ void CtffindRunner::executeCtffind4(long int imic)
 	FileName fn_script = fn_root + "_ctffind4.com";
 	FileName fn_log = fn_root + "_ctffind4.log";
 	FileName fn_ctf = fn_root + ".ctf";
-    FileName fn_mic_win;
+	FileName fn_mic_win;
 
 	std::ofstream  fh;
 	fh.open((fn_script).c_str(), std::ios::out);
@@ -556,10 +675,10 @@ void CtffindRunner::executeCtffind4(long int imic)
 		fn_mic_win = fn_mic;
 
 
-    //std::string ctffind4_options = " --omp-num-threads " + integerToString(nr_threads);
+	//std::string ctffind4_options = " --omp-num-threads " + integerToString(nr_threads);
 	std::string ctffind4_options = "";
 
-    // Write script to run ctffind
+	// Write script to run ctffind
 	fh << "#!/usr/bin/env csh"<<std::endl;
 	fh << fn_ctffind_exe << ctffind4_options << " > " << fn_log << " << EOF"<<std::endl;
 	// line 1: input image
@@ -587,7 +706,7 @@ void CtffindRunner::executeCtffind4(long int imic)
 	fh << "no" << std::endl;
 	// Slower, more exhaustive search?
 	// The default was "no" in CTFFIND 4.1.5, but turned out to be less accurate.
-	// The default was changed to "yes" in CTFFIND 4.1.8. 
+	// The default was changed to "yes" in CTFFIND 4.1.8.
 	// Ref: http://grigoriefflab.janelia.org/ctffind4
 	// So, we say "yes" regardless of the version unless "--fast_search" is specified.
 	if (!do_fast_search)
@@ -636,12 +755,12 @@ bool CtffindRunner::getCtffindResults(FileName fn_microot, RFLOAT &defU, RFLOAT 
 	if (is_ctffind4)
 	{
 		return getCtffind4Results(fn_microot, defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep,
-				maxres, phaseshift, do_warn);
+		                          maxres, phaseshift, do_warn);
 	}
 	else
 	{
 		return getCtffind3Results(fn_microot, defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep,
-				maxres, phaseshift, valscore, do_warn);
+		                          maxres, phaseshift, valscore, do_warn);
 	}
 
 
@@ -658,43 +777,44 @@ bool CtffindRunner::getCtffind3Results(FileName fn_microot, RFLOAT &defU, RFLOAT
 		fn_log = fn_root + "_gctf.log";
 
 	std::ifstream in(fn_log.data(), std::ios_base::in);
-    if (in.fail())
-    	return false;
+	if (in.fail())
+		return false;
 
-    // Start reading the ifstream at the top
-    in.seekg(0);
+	// Start reading the ifstream at the top
+	in.seekg(0);
 
-    // Proceed until the next "Final values" statement
-    // The loop statement may be necessary for data blocks that have a list AND a table inside them
-    bool Final_is_found = false;
-    bool Cs_is_found = false;
-    std::string line;
-    std::vector<std::string> words;
-    while (getline(in, line, '\n'))
-    {
-        // Find data_ lines
+	// Proceed until the next "Final values" statement
+	// The loop statement may be necessary for data blocks that have a list AND a table inside them
+	bool Final_is_found = false;
+	bool Cs_is_found = false;
+	std::string line;
+	std::vector<std::string> words;
+	while (getline(in, line, '\n'))
+	{
+		// Find data_ lines
 
-    	 if (line.find("CS[mm], HT[kV], AmpCnst, XMAG, DStep[um]") != std::string::npos)
-    	 {
-    		 getline(in, line, '\n');
-    		 tokenize(line, words);
-    		 if (words.size() == 5)
-    		 {
-        		 Cs_is_found = true;
-				 CS = textToFloat(words[0]);
-				 HT = textToFloat(words[1]);
-				 AmpCnst = textToFloat(words[2]);
-				 XMAG = textToFloat(words[3]);
-				 DStep = textToFloat(words[4]);
-    		 }
-    	 }
+		if (line.find("CS[mm], HT[kV], AmpCnst, XMAG, DStep[um]") != std::string::npos ||
+                    line.find("CS[mm], HT[kV], ac, XMAG, DStep[um]") != std::string::npos) // GCTF 1.18 B1 changed the line...
+		{
+			getline(in, line, '\n');
+			tokenize(line, words);
+			if (words.size() == 5)
+			{
+    				Cs_is_found = true;
+				CS = textToFloat(words[0]);
+				HT = textToFloat(words[1]);
+				AmpCnst = textToFloat(words[2]);
+				XMAG = textToFloat(words[3]);
+				DStep = textToFloat(words[4]);
+			}
+		}
 
-    	int nr_exp_cols = (do_phaseshift) ? 7 : 6;
-    	if (line.find("Final Values") != std::string::npos)
-        {
-            tokenize(line, words);
-            if (words.size() == nr_exp_cols)
-            {
+		int nr_exp_cols = (do_phaseshift) ? 7 : 6;
+		if (line.find("Final Values") != std::string::npos)
+		{
+			tokenize(line, words);
+			if (words.size() == nr_exp_cols)
+			{
 				Final_is_found = true;
 				defU = textToFloat(words[0]);
 				defV = textToFloat(words[1]);
@@ -706,41 +826,41 @@ bool CtffindRunner::getCtffind3Results(FileName fn_microot, RFLOAT &defU, RFLOAT
 				}
 				else
 					CC = textToFloat(words[3]);
-            }
-        }
+			}
+		}
 
-    	if (do_use_gctf)
-    	{
-    		if (line.find("Resolution limit estimated by EPA:") != std::string::npos)
-    		{
-                tokenize(line, words);
-                maxres = textToFloat(words[words.size()-1]);
-    		}
+		if (do_use_gctf)
+		{
+			if (line.find("Resolution limit estimated by EPA:") != std::string::npos)
+			{
+				tokenize(line, words);
+				maxres = textToFloat(words[words.size()-1]);
+			}
 
-        	if (line.find("OVERALL_VALIDATION_SCORE:") != std::string::npos)
-        	{
-                tokenize(line, words);
-                valscore = textToFloat(words[words.size()-1]);
-        	}
-    	}
-    }
+			if (line.find("OVERALL_VALIDATION_SCORE:") != std::string::npos)
+			{
+				tokenize(line, words);
+				valscore = textToFloat(words[words.size()-1]);
+			}
+		}
+	}
 
-    if (!Cs_is_found)
-    {
-    	if (do_warn)
-    		std::cerr << "WARNING: cannot find line with Cs[mm], HT[kV], etc values in " << fn_log << std::endl;
-    	return false;
-    }
-    if (!Final_is_found)
-    {
-    	if (do_warn)
-    		std::cerr << "WARNING: cannot find line with Final values in " << fn_log << std::endl;
-    	return false;
-    }
+	if (!Cs_is_found)
+	{
+		if (do_warn)
+			std::cerr << "WARNING: cannot find line with Cs[mm], HT[kV], etc values in " << fn_log << std::endl;
+		return false;
+	}
+	if (!Final_is_found)
+	{
+		if (do_warn)
+			std::cerr << "WARNING: cannot find line with Final values in " << fn_log << std::endl;
+		return false;
+	}
 
-    in.close();
+	in.close();
 
-    return Final_is_found;
+	return Final_is_found;
 
 }
 
@@ -754,16 +874,16 @@ bool CtffindRunner::getCtffind4Results(FileName fn_microot, RFLOAT &defU, RFLOAT
 	FileName fn_log = fn_root + "_ctffind4.log";
 
 	std::ifstream in(fn_log.data(), std::ios_base::in);
-    if (in.fail())
-    	return false;
+	if (in.fail())
+    		return false;
 
-    // Start reading the ifstream at the top
-    in.seekg(0);
-    std::string line;
-    std::vector<std::string> words;
-    bool found_log = false;
-    while (getline(in, line, '\n'))
-    {
+	// Start reading the ifstream at the top
+	in.seekg(0);
+	std::string line;
+	std::vector<std::string> words;
+	bool found_log = false;
+	while (getline(in, line, '\n'))
+	{
 		// Find the file with the summary of the results
 		if (line.find("Summary of results") != std::string::npos)
 		{
@@ -772,7 +892,7 @@ bool CtffindRunner::getCtffind4Results(FileName fn_microot, RFLOAT &defU, RFLOAT
 			found_log = true;
 			break;
 		}
-    }
+	}
 	in.close();
 
 	if (!found_log)
@@ -780,19 +900,19 @@ bool CtffindRunner::getCtffind4Results(FileName fn_microot, RFLOAT &defU, RFLOAT
 
 	// Now open the file with the summry of the results
 	std::ifstream in2(fn_log.data(), std::ios_base::in);
-    if (in2.fail())
-    	return false;
-    bool Final_is_found = false;
-    bool Cs_is_found = false;
-    while (getline(in2, line, '\n'))
-    {
-    	// Find data_ lines
+	if (in2.fail())
+		return false;
+	bool Final_is_found = false;
+	bool Cs_is_found = false;
+	while (getline(in2, line, '\n'))
+	{
+		// Find data_ lines
 		if (line.find("acceleration voltage:") != std::string::npos)
 		{
 			Cs_is_found = true;
 			tokenize(line, words);
 			if (words.size() < 19)
-			 REPORT_ERROR("ERROR: Unexpected number of words on data line with acceleration voltage in " + fn_log);
+				REPORT_ERROR("ERROR: Unexpected number of words on data line with acceleration voltage in " + fn_log);
 			CS = textToFloat(words[13]);
 			HT = textToFloat(words[8]);
 			AmpCnst = textToFloat(words[18]);
@@ -804,38 +924,37 @@ bool CtffindRunner::getCtffind4Results(FileName fn_microot, RFLOAT &defU, RFLOAT
 			getline(in2, line, '\n');
 			tokenize(line, words);
 			if (words.size() < 7)
-			 REPORT_ERROR("ERROR: Unexpected number of words on data line below Columns line in " + fn_log);
+				REPORT_ERROR("ERROR: Unexpected number of words on data line below Columns line in " + fn_log);
 			Final_is_found = true;
 			defU = textToFloat(words[1]);
 			defV = textToFloat(words[2]);
 			defAng = textToFloat(words[3]);
 			if (do_phaseshift)
-			 phaseshift = RAD2DEG(textToFloat(words[4]));
+				phaseshift = RAD2DEG(textToFloat(words[4]));
 			CC = textToFloat(words[5]);
 			if (words[6] == "inf")
 				maxres= 999.;
 			else
 				maxres = textToFloat(words[6]);
 		}
-    }
+	}
 
-    if (!Cs_is_found)
-    {
-    	if (do_warn)
-    		std::cerr << " WARNING: cannot find line with acceleration voltage etc in " << fn_log << std::endl;
-    	return false;
-    }
-    if (!Final_is_found)
-    {
-    	if (do_warn)
-    		std::cerr << "WARNING: cannot find line with Final values in " << fn_log << std::endl;
-    	return false;
-    }
+	if (!Cs_is_found)
+	{
+		if (do_warn)
+			std::cerr << " WARNING: cannot find line with acceleration voltage etc in " << fn_log << std::endl;
+		return false;
+	}
+	if (!Final_is_found)
+	{
+		if (do_warn)
+			std::cerr << "WARNING: cannot find line with Final values in " << fn_log << std::endl;
+		return false;
+	}
 
-    in2.close();
+	in2.close();
 
-    return Final_is_found;
-
+	return Final_is_found;
 }
 
 

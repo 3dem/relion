@@ -74,13 +74,18 @@ extern std::string current_browse_directory;
 //#define XCOL3 460
 //#define XCOL4 475
 //#define XCOL5 535
+//Additional space in tab if more than 4 XXXextraiXXX template variables are used defined by
+//environment variable RELION_QSUB_EXTRA_COUNT
+#define GUIEXTRA \
+	( (getenv ("RELION_QSUB_EXTRA_COUNT"))? \
+	((atoi(getenv ("RELION_QSUB_EXTRA_COUNT"))-4)*STEPY) : 0 )
 #define MENUHEIGHT 30
 #define TABHEIGHT 25
 #define GUIWIDTH 800
-#define GUIHEIGHT_OLD 420
-#define GUIHEIGHT_EXT_START 370
+#define GUIHEIGHT_OLD 420+GUIEXTRA
+#define GUIHEIGHT_EXT_START 370+GUIEXTRA
 #define GUIHEIGHT_EXT_START2 (GUIHEIGHT_EXT_START+MENUHEIGHT+10)
-#define GUIHEIGHT_EXT 800
+#define GUIHEIGHT_EXT 800+GUIEXTRA
 #define XCOL0 200
 #define WCOL0 200
 #define XCOL1 ( (XCOL0) + 10  )
@@ -109,10 +114,13 @@ extern std::string current_browse_directory;
 //version-2.0 #define GUI_BUTTON_COLOR (fl_rgb_color(0, 200, 255))
 //version-2.0 #define GUI_BUTTON_DARK_COLOR (fl_rgb_color(0, 160, 200))
 //version-2.0 #define GUI_RUNBUTTON_COLOR (fl_rgb_color(70, 120, 255))
-//version-2.1
-#define GUI_BUTTON_COLOR (fl_rgb_color(100, 200, 50))
-#define GUI_BUTTON_DARK_COLOR (fl_rgb_color(70, 140, 30))
-#define GUI_RUNBUTTON_COLOR (fl_rgb_color(0, 130, 0))
+//version-2.1 #define GUI_BUTTON_COLOR (fl_rgb_color(100, 200, 50))
+//version-2.1 #define GUI_BUTTON_DARK_COLOR (fl_rgb_color(70, 140, 30))
+//version-2.1 #define GUI_RUNBUTTON_COLOR (fl_rgb_color(0, 130, 0))
+//version-3.0
+#define GUI_BUTTON_COLOR (fl_rgb_color(255, 180, 132))
+#define GUI_BUTTON_DARK_COLOR (fl_rgb_color(250, 150, 124))
+#define GUI_RUNBUTTON_COLOR (fl_rgb_color(235, 130, 0))
 // devel-version
 //#define GUI_BUTTON_COLOR (fl_rgb_color(255, 150, 150))
 //#define GUI_BUTTON_DARK_COLOR (fl_rgb_color(200, 120, 120))
@@ -130,32 +138,45 @@ extern std::string current_browse_directory;
 #define TOGGLE_LEAVE_ACTIVE 3
 
 static Fl_Menu_Item fl_sampling_options[] = {
-		      {job_sampling_options[0]},
-		      {job_sampling_options[1]},
-		      {job_sampling_options[2]},
-		      {job_sampling_options[3]},
-		      {job_sampling_options[4]},
-		      {job_sampling_options[5]},
-		      {job_sampling_options[6]},
-		      {job_sampling_options[7]},
-		      {job_sampling_options[8]},
-		      {0} // this should be the last entry
+	{job_sampling_options[0]},
+	{job_sampling_options[1]},
+	{job_sampling_options[2]},
+	{job_sampling_options[3]},
+	{job_sampling_options[4]},
+	{job_sampling_options[5]},
+	{job_sampling_options[6]},
+	{job_sampling_options[7]},
+	{job_sampling_options[8]},
+	{0} // this should be the last entry
 };
 
 static Fl_Menu_Item fl_node_type_options[] = {
-			  {job_nodetype_options[0]},
-			  {job_nodetype_options[1]},
-			  {job_nodetype_options[2]},
-			  {job_nodetype_options[3]},
-			  {job_nodetype_options[4]},
-			  {job_nodetype_options[5]},
-			  {job_nodetype_options[6]},
-			  {job_nodetype_options[7]},
-			  {job_nodetype_options[8]},
-			  {job_nodetype_options[9]},
-		      {0} // this should be the last entry
+	{job_nodetype_options[0]},
+	{job_nodetype_options[1]},
+	{job_nodetype_options[2]},
+	{job_nodetype_options[3]},
+	{job_nodetype_options[4]},
+	{job_nodetype_options[5]},
+	{job_nodetype_options[6]},
+	{job_nodetype_options[7]},
+	{job_nodetype_options[8]},
+	{job_nodetype_options[9]},
+	{0} // this should be the last entry
 };
 
+static Fl_Menu_Item fl_gain_rotation_options[] = {
+	{job_gain_rotation_options[0]},
+	{job_gain_rotation_options[1]},
+	{job_gain_rotation_options[2]},
+	{job_gain_rotation_options[3]},
+	{0} // this should be the last entry
+};
+static Fl_Menu_Item fl_gain_flip_options[] = {
+	{job_gain_flip_options[0]},
+	{job_gain_flip_options[1]},
+	{job_gain_flip_options[2]},
+	{0} // this should be the last entry
+};
 static Fl_Menu_Item bool_options[] = {
 			      {"Yes"},
 			      {"No"},
@@ -191,7 +212,7 @@ public:
 	// JobOption
 	JobOption joboption;
 
-    // Button to show additional help text
+	// Button to show additional help text
 	Fl_Button* help;
 
 	////////////// FileName entry
@@ -207,6 +228,7 @@ public:
     Fl_Menu_* menu;
     // Deactivate this group
     Fl_Group * my_deactivate_group;
+	bool actually_activate;
 
     ////////////// Slider entry
 
@@ -231,6 +253,7 @@ public:
 		choice = NULL;
 		menu = NULL;
 		my_deactivate_group = NULL;
+		actually_activate = false;
 		slider = NULL;
 		do_oldstyle = false;
     };
@@ -244,12 +267,12 @@ public:
 
 	/** Here really start the entry
 	 */
-	void initialise(int x, int y, Fl_Group * deactivate_this_group, int height, int wcol2, int wcol3);
+	void initialise(int x, int y, Fl_Group * deactivate_this_group, bool actually_activate, int height, int wcol2, int wcol3);
 
 	/** Place an entry on a window
 	 */
-	void place(JobOption &joboption, int &y, int _deactivate_option = TOGGLE_LEAVE_ACTIVE, Fl_Group * deactivate_this_group = NULL, bool _do_oldstyle = false,
-			int x = XCOL2, int h = STEPY, int wcol2 = WCOL2, int wcol3 = WCOL3 );
+	void place(JobOption &joboption, int &y, int _deactivate_option = TOGGLE_LEAVE_ACTIVE, Fl_Group * deactivate_this_group = NULL, bool actually_activate = false,
+	           bool _do_oldstyle = false, int x = XCOL2, int h = STEPY, int wcol2 = WCOL2, int wcol3 = WCOL3 );
 
     // Set _value in the Fl_Input on the GUI, and also in the joboptions. Also update menu/slider if necessary
     void setValue(std::string _value);

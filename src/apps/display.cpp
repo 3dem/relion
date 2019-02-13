@@ -32,30 +32,28 @@
 
 int main(int argc, char *argv[])
 {
-    Displayer prm;
+	Displayer prm;
 
-    try
-    {
-        prm.read(argc, argv);
+	try
+	{
+		prm.read(argc, argv);
 
+		if (prm.do_gui)
+		{
+			prm.runGui();
+		}
+		else
+		{
+			prm.initialise();
+			prm.run();
+		}
+	}
+	catch (RelionError XE)
+	{
+		//prm.usage();
+		std::cerr << XE;
+		exit(1);
+	}
 
-        if (prm.do_gui)
-        {
-        	prm.runGui();
-        }
-        else
-        {
-        	prm.initialise();
-        	prm.run();
-        }
-    }
-
-    catch (RelionError XE)
-    {
-        //prm.usage();
-        std::cerr << XE;
-        exit(1);
-    }
-
-        return 0;
+	return 0;
 }

@@ -65,19 +65,18 @@ static Fl_Group *background_grp;
 static Fl_Choice *display_io_node;
 static Fl_Select_Browser *finished_job_browser, *running_job_browser, *scheduled_job_browser, *input_job_browser, *output_job_browser;
 static Fl_Box *image_box;
-static Fl_XPM_Image *xpm_image;
+static Fl_Pixmap *xpm_image;
 // For keeping track of which process to use in the process browser on the GUI
 static std::vector<long int> running_processes, finished_processes, scheduled_processes, input_processes, output_processes, io_nodes;
 static bool is_main_continue;
 
-#define GUI_NR_BROWSE_TABS  19
-static JobWindow *gui_jobwindows[GUI_NR_BROWSE_TABS];
+static JobWindow *gui_jobwindows[NR_BROWSE_TABS];
 
 // Run button
+// Sjors 16feb2018: somehow suddenly this run_button needs to be a non-static: otherwise it doesn't change to 'continue now' and doesnt grey out...
 static Fl_Button *run_button;
 static Fl_Button *print_CL_button;
 static Fl_Button *schedule_button;
-static Fl_Button *forgot_button;
 static Fl_Input *alias_current_job;
 
 static Fl_Text_Buffer *textbuff_stdout;
@@ -144,14 +143,14 @@ public:
 
 	FileName pipeline_name; // Name of this pipeline (e.g. default)
 	std::vector<Fl_Check_Button*> check_buttons;
-	Fl_Input *repeat, *wait, *schedule_name;
-	std::vector<long int> my_jobs; // Which jobs to execute
+	Fl_Input *repeat, *wait_before, *wait, *schedule_name, *wait_after;
+	std::vector<FileName> my_jobs; // Which jobs to execute
 
 	SchedulerWindow(int w, int h, const char* title): Fl_Window(w, h, title){}
 
 	~SchedulerWindow() {};
 
-	int fill(FileName _pipeline_name, std::vector<FileName> _scheduled_jobs, std::vector<long int> _scheduled_job_ids);
+	int fill(FileName _pipeline_name, std::vector<FileName> _scheduled_jobs);
 
 private:
 
@@ -193,6 +192,9 @@ public:
 
     // Clear stuff
     void clear();
+
+    // How will jobs be displayed in the GUI job running, finished, in, out & scheduled job lists
+    std::string getJobNameForDisplay(Process &job);
 
     // Update the content of the finished, running and scheduled job lists
     void fillRunningJobLists();
@@ -290,9 +292,6 @@ private:
 
     static void cb_print_cl(Fl_Widget*, void*);
     inline void cb_print_cl_i();
-
-    static void cb_forgot(Fl_Widget*, void*);
-    inline void cb_forgot_i();
 
     static void cb_save(Fl_Widget*, void*);
     inline void cb_save_i();

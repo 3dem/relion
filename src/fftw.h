@@ -53,6 +53,20 @@
 #include "src/complex.h"
 #include "src/CPlot2D.h"
 
+//#define TIMING_FFTW
+#ifdef TIMING_FFTW
+	#include "src/time.h"
+	extern Timer timer_fftw;
+#endif
+
+#ifdef FAST_CENTERFFT   // defined if ALTCPU=on *AND* Intel Compiler used
+#include "src/acc/cpu/cuda_stubs.h"
+#include "src/acc/settings.h"
+#include "src/acc/cpu/cpu_settings.h"
+#include "src/acc/cpu/cpu_kernels/helper.h"
+#include <tbb/parallel_for.h>
+#endif
+
 /** @defgroup FourierW FFTW Fourier transforms
   * @ingroup DataLibrary
   */
@@ -209,7 +223,7 @@ public:
         matrix is already resized to the right size before entering
         in this function. */
     template <typename T, typename T1>
-        void inverseFourierTransform(T& V, T1& v)
+        void inverseFourierTransform(const T& V, T1& v)
         {
             setReal(v);
             setFourier(V);
@@ -361,11 +375,15 @@ public:
         It is assumed that the container for the real image as well as
         the one for the Fourier array are already resized.
         No plan is updated. */
-    void setFourier(MultidimArray<Complex > &imgFourier);
+    void setFourier(const MultidimArray<Complex> &imgFourier);
 };
 
-// Randomize phases beyond the given shell (index)
+// Randomize phases beyond the given F-space shell (index) of R-space input image
 void randomizePhasesBeyond(MultidimArray<RFLOAT> &I, int index);
+
+// // Randomize phases beyond the given F-space shell (index) of F-space input image
+// void randomizePhasesBeyond(MultidimArray<Complex> &v, int index);
+
 
 /** Center an array, to have its origin at the origin of the FFTW
  *
@@ -373,6 +391,7 @@ void randomizePhasesBeyond(MultidimArray<RFLOAT> &I, int index);
 template <typename T>
 void CenterFFT(MultidimArray< T >& v, bool forward)
 {
+#ifndef FAST_CENTERFFT
     if ( v.getDim() == 1 )
     {
         // 1D
@@ -562,6 +581,159 @@ void CenterFFT(MultidimArray< T >& v, bool forward)
     	v.printShape();
     	REPORT_ERROR("CenterFFT ERROR: Dimension should be 1, 2 or 3");
     }
+#else // FAST_CENTERFFT
+	if ( v.getDim() == 1 )
+	{
+        // 1D
+        MultidimArray< T > aux;
+        int l, shift;
+
+        l = XSIZE(v);
+        aux.reshape(l);
+        shift = (int)(l / 2);
+
+        if (!forward)
+            shift = -shift;
+
+        // Shift the input in an auxiliary vector
+        for (int i = 0; i < l; i++)
+        {
+            int ip = i + shift;
+
+            if (ip < 0)
+                ip += l;
+            else if (ip >= l)
+                ip -= l;
+
+            aux(ip) = DIRECT_A1D_ELEM(v, i);
+        }
+
+        // Copy the vector
+        for (int i = 0; i < l; i++)
+            DIRECT_A1D_ELEM(v, i) = DIRECT_A1D_ELEM(aux, i);
+    }
+    else if ( v.getDim() == 2 )
+    {
+		int  batchSize = 1;
+		int xSize = XSIZE(v);
+		int ySize = YSIZE(v);
+		
+		int xshift = (xSize / 2);
+		int yshift = (ySize / 2);
+		
+		if (!forward)
+		{
+			xshift = -xshift;
+			yshift = -yshift;
+		}
+		
+		size_t image_size = xSize*ySize;
+		size_t isize2 = image_size/2;
+		int blocks = ceilf((float)(image_size/(float)(2*CFTT_BLOCK_SIZE)));
+
+//		for(int i=0; i<blocks; i++) {
+		tbb::parallel_for(0, blocks, [&](int i) {
+			size_t pixel_start = i*(CFTT_BLOCK_SIZE);
+			size_t pixel_end = (i+1)*(CFTT_BLOCK_SIZE);
+			if (pixel_end > isize2)
+				pixel_end = isize2;
+			
+			CpuKernels::centerFFT_2D<T>(batchSize,
+				pixel_start,
+				pixel_end,
+				MULTIDIM_ARRAY(v),
+				(size_t)xSize*ySize,
+				xSize,
+				ySize,
+				xshift,
+				yshift);
+		}
+		);
+	}
+    else if ( v.getDim() == 3 )
+    {
+		int  batchSize = 1;
+		int xSize = XSIZE(v);
+		int ySize = YSIZE(v);
+		int zSize = ZSIZE(v);
+		
+		if(zSize>1)
+		{
+			int xshift = (xSize / 2);
+			int yshift = (ySize / 2);
+			int zshift = (zSize / 2);
+
+			if (!forward)
+			{
+				xshift = -xshift;
+				yshift = -yshift;
+				zshift = -zshift;
+			}
+
+			size_t image_size = xSize*ySize*zSize;
+			size_t isize2 = image_size/2;
+			int block =ceilf((float)(image_size/(float)(2*CFTT_BLOCK_SIZE)));
+//			for(int i=0; i<block; i++){
+			tbb::parallel_for(0, block, [&](int i) {
+				size_t pixel_start = i*(CFTT_BLOCK_SIZE);
+				size_t pixel_end = (i+1)*(CFTT_BLOCK_SIZE);
+				if (pixel_end > isize2)
+					pixel_end = isize2;
+			
+				CpuKernels::centerFFT_3D<T>(batchSize,
+					pixel_start,
+					pixel_end,
+					MULTIDIM_ARRAY(v),
+					(size_t)xSize*ySize*zSize,
+					xSize,
+					ySize,
+					zSize,
+					xshift,
+					yshift,
+					zshift);
+			}
+			);
+		}
+		else
+		{
+			int xshift = (xSize / 2);
+			int yshift = (ySize / 2);
+
+			if (!forward)
+			{
+				xshift = -xshift;
+				yshift = -yshift;
+			}
+
+			size_t image_size = xSize*ySize;
+			size_t isize2 = image_size/2;
+			int blocks = ceilf((float)(image_size/(float)(2*CFTT_BLOCK_SIZE)));
+//			for(int i=0; i<blocks; i++) {
+			tbb::parallel_for(0, blocks, [&](int i) {
+				size_t pixel_start = i*(CFTT_BLOCK_SIZE);
+				size_t pixel_end = (i+1)*(CFTT_BLOCK_SIZE);
+				if (pixel_end > isize2)
+					pixel_end = isize2;
+
+				CpuKernels::centerFFT_2D<T>(batchSize,
+					pixel_start,
+					pixel_end,
+					MULTIDIM_ARRAY(v),
+					(size_t)xSize*ySize,
+					xSize,
+					ySize,
+					xshift,
+					yshift);
+			}
+			);
+		}
+	}
+    else
+    {
+    	v.printShape();
+    	REPORT_ERROR("CenterFFT ERROR: Dimension should be 1, 2 or 3");
+    }
+#endif  // FAST_CENTERFFT
 }
 
 
@@ -751,6 +923,10 @@ void getAmplitudeCorrelationAndDifferentialPhaseResidual(MultidimArray< RFLOAT >
 		    MultidimArray< RFLOAT > &acorr,
 		    MultidimArray< RFLOAT > &dpr);
 
+void getCosDeltaPhase(MultidimArray< Complex > &FT1,
+                      MultidimArray< Complex > &FT2,
+                      MultidimArray< RFLOAT > &cosPhi);
+
 // Get precalculated AB-matrices for on-the-fly shift calculations (without tabulated sine and cosine)
 void getAbMatricesForShiftImageInFourierTransform(MultidimArray<Complex > &in,
 									MultidimArray<Complex > &out,
@@ -818,8 +994,8 @@ void adaptSpectrum(MultidimArray<RFLOAT> &Min,
                    int spectrum_type=AMPLITUDE_SPECTRUM,
                    bool leave_origin_intact=false);
 
-/** Kullback-Leibner divergence */
-RFLOAT getKullbackLeibnerDivergence(MultidimArray<Complex > &Fimg,
+/** Kullback-Leibler divergence */
+RFLOAT getKullbackLeiblerDivergence(MultidimArray<Complex > &Fimg,
 		MultidimArray<Complex > &Fref, MultidimArray<RFLOAT> &sigma2,
 		MultidimArray<RFLOAT> &p_i, MultidimArray<RFLOAT> &q_i,
 		int highshell = -1, int lowshell = -1);
@@ -834,6 +1010,12 @@ void applyBFactorToMap(MultidimArray<Complex > &FT, int ori_size, RFLOAT bfactor
 // Apply a B-factor to a map (given it's real-space array)
 void applyBFactorToMap(MultidimArray<RFLOAT > &img, RFLOAT bfactor, RFLOAT angpix);
 
+// Apply a Laplacian-of-Gaussian filter to a map (given it's Fourier transform)
+void LoGFilterMap(MultidimArray<Complex > &FT, int ori_size, RFLOAT sigma, RFLOAT angpix);
+
+// Apply a Laplacian-of-Gaussian filter to a map (given it's real-space array)
+void LoGFilterMap(MultidimArray<RFLOAT > &img, RFLOAT sigma, RFLOAT angpix);
+
 // Low-pass filter a map (given it's Fourier transform)
 void lowPassFilterMap(MultidimArray<Complex > &FT, int ori_size,
 		RFLOAT low_pass, RFLOAT angpix, int filter_edge_width = 2, bool do_highpass_instead = false);
@@ -842,13 +1024,25 @@ void lowPassFilterMap(MultidimArray<Complex > &FT, int ori_size,
 void lowPassFilterMap(MultidimArray<RFLOAT > &img, RFLOAT low_pass, RFLOAT angpix, int filter_edge_width = 2);
 void highPassFilterMap(MultidimArray<RFLOAT > &img, RFLOAT low_pass, RFLOAT angpix, int filter_edge_width = 2);
 
+// Directional filter a map (given it's Fourier transform)
+void directionalFilterMap(MultidimArray<Complex > &FT, int ori_size,
+		RFLOAT low_pass, RFLOAT angpix, std::string axis = "x", int filter_edge_width = 2);
+void directionalFilterMap(MultidimArray<RFLOAT > &img, RFLOAT low_pass, RFLOAT angpix, std::string axis = "x", int filter_edge_width = 2);
+
+
 /*
  *  Beamtilt x and y are given in mradians
  *  Wavelength in Angstrom, Cs in mm
  *  Phase shifts caused by the beamtilt will be calculated and applied to Fimg
  */
 void selfApplyBeamTilt(MultidimArray<Complex > &Fimg, RFLOAT beamtilt_x, RFLOAT beamtilt_y,
-		RFLOAT wavelength, RFLOAT Cs, RFLOAT angpix, int ori_size);
+        RFLOAT wavelength, RFLOAT Cs, RFLOAT angpix, int ori_size);
+
+/* same as above, but for the anisotropic coma model*/
+void selfApplyBeamTilt(MultidimArray<Complex > &Fimg,
+        RFLOAT beamtilt_x, RFLOAT beamtilt_y,
+        RFLOAT beamtilt_xx, RFLOAT beamtilt_xy, RFLOAT beamtilt_yy,
+        RFLOAT wavelength, RFLOAT Cs, RFLOAT angpix, int ori_size);
 
 void applyBeamTilt(const MultidimArray<Complex > &Fin, MultidimArray<Complex > &Fout, RFLOAT beamtilt_x, RFLOAT beamtilt_y,
 		RFLOAT wavelength, RFLOAT Cs, RFLOAT angpix, int ori_size);

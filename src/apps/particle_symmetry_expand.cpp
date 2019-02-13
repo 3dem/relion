@@ -53,32 +53,30 @@ public:
 
 		fn_in = parser.getOption("--i", "Input particle STAR file");
 		fn_out = parser.getOption("--o", "Output expanded particle STAR file", "expanded.star");
-        fn_sym = parser.getOption("--sym", "Symmetry point group", "C1");
+		fn_sym = parser.getOption("--sym", "Symmetry point group", "C1");
 
-        // Helical symmetry
+		// Helical symmetry
 		int helical_section = parser.addSection("Helix");
-        do_helix = parser.checkOption("--helix", "Do helical symmetry expansion");
-        twist = textToFloat(parser.getOption("--twist", "Helical twist (deg)", "0."));
-        rise = textToFloat(parser.getOption("--rise", "Helical rise (A)", "0."));
-        angpix = textToFloat(parser.getOption("--angpix", "Pixel size (A)", "1."));
-        nr_asu = textToFloat(parser.getOption("--asu", "Number of asymmetrical units to expand", "1"));
-        frac_sampling = textToFloat(parser.getOption("--frac_sampling", "Number of samplings in between a single asymmetrical unit", "1"));
-        frac_range = textToFloat(parser.getOption("--frac_range", "Range of the rise [-0.5, 0.5> to be sampled", "0.5"));
+		do_helix = parser.checkOption("--helix", "Do helical symmetry expansion");
+		twist = textToFloat(parser.getOption("--twist", "Helical twist (deg)", "0."));
+		rise = textToFloat(parser.getOption("--rise", "Helical rise (A)", "0."));
+		angpix = textToFloat(parser.getOption("--angpix", "Pixel size (A)", "1."));
+		nr_asu = textToFloat(parser.getOption("--asu", "Number of asymmetrical units to expand", "1"));
+		frac_sampling = textToFloat(parser.getOption("--frac_sampling", "Number of samplings in between a single asymmetrical unit", "1"));
+		frac_range = textToFloat(parser.getOption("--frac_range", "Range of the rise [-0.5, 0.5> to be sampled", "0.5"));
 
-       	// Check for errors in the command-line option
-    	if (parser.checkForErrors())
-    		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
+		// Check for errors in the command-line option
+		if (parser.checkForErrors())
+			REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 
-        if (do_helix)
-        {
-        	if (fn_sym != "C1")
-        		REPORT_ERROR("Provide either --sym OR --helix, but not both!");
+		if (do_helix)
+		{
+			if (fn_sym != "C1")
+				REPORT_ERROR("Provide either --sym OR --helix, but not both!");
 
-        	if ((nr_asu > 1 && frac_sampling > 1) || (nr_asu == 1 && frac_sampling == 1))
-        		REPORT_ERROR("Provide either --asu OR --frac_sampling, but not both!");
-
-        }
-
+			if ((nr_asu > 1 && frac_sampling > 1) || (nr_asu == 1 && frac_sampling == 1))
+				REPORT_ERROR("Provide either --asu OR --frac_sampling, but not both!");
+		}
 	}
 
 	void run()
@@ -140,19 +138,17 @@ public:
 					// TMP
 					//if (fabs(z_pos) > 0.01)
 					{
-
-					// Translation along the X-axis in the rotated image is along the helical axis in 3D.
-					// Tilted images shift less: sin(tilt)
-					RFLOAT xxt = SIND(tilt) * z_pos * rise / angpix;
-					xp = x + COSD(-psi) * xxt;
-					yp = y + SIND(-psi) * xxt;
-					rotp = rot + z_pos * twist;
-					DFo.addObject();
-					DFo.setObject(DFi.getObject());
-					DFo.setValue(EMDL_ORIENT_ROT, rotp);
-					DFo.setValue(EMDL_ORIENT_ORIGIN_X, xp);
-					DFo.setValue(EMDL_ORIENT_ORIGIN_Y, yp);
-
+						// Translation along the X-axis in the rotated image is along the helical axis in 3D.
+						// Tilted images shift less: sin(tilt)
+						RFLOAT xxt = SIND(tilt) * z_pos * rise / angpix;
+						xp = x + COSD(-psi) * xxt;
+						yp = y + SIND(-psi) * xxt;
+						rotp = rot - z_pos * twist;
+						DFo.addObject();
+						DFo.setObject(DFi.getObject());
+						DFo.setValue(EMDL_ORIENT_ROT, rotp);
+						DFo.setValue(EMDL_ORIENT_ORIGIN_X, xp);
+						DFo.setValue(EMDL_ORIENT_ORIGIN_Y, yp);
 					}
 				}
 			}
@@ -188,29 +184,24 @@ public:
 		std::cout << " Done! Written: " << fn_out << " with the expanded particle set." << std::endl;
 
 	}// end run function
-
-
-
 };
 
 int main(int argc, char *argv[])
 {
-    time_config();
-    particle_symmetry_expand_parameters prm;
+	time_config();
+	particle_symmetry_expand_parameters prm;
 
-    try
-    {
-        prm.read(argc, argv);
-        prm.run();
-    }
+	try
+	{
+		prm.read(argc, argv);
+		prm.run();
+	}
+	catch (RelionError XE)
+	{
+		//prm.usage();
+		std::cerr << XE;
+		exit(1);
+	}
 
-    catch (RelionError XE)
-    {
-        //prm.usage();
-        std::cerr << XE;
-        exit(1);
-    }
-
-    return 0;
-
+	return 0;
 }

@@ -1,1 +1,6 @@
-external/
+build
+external
+#Eclipse files
+.cproject
+.project
+Debug

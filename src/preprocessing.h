@@ -51,11 +51,17 @@ public:
 	// Does the input micrograph STAR file have CTF information?
 	bool star_has_ctf;
 
+	// If input micrograph STAR file has CTF and so does input particle STAR (fn_data), then
+	// by default the fn_data CTF parameters will be in the output particles.star file (as they could have been refined in ctf_refine)
+	// Use the option below to let the micrographs_ctf.star CTF parameters be output. (This is useful for example, when CTF estimation has been re-run with a calibrated pixel size)
+	bool keep_ctf_from_micrographs;
+
 	/////////////////? Do phase flipping?
 	bool do_phase_flip;
 	bool do_premultiply_ctf;
 	bool do_ctf_intact_first_peak;
-	RFLOAT angpix;
+	bool use_ctf_in_mic;
+	RFLOAT angpix, output_angpix;
 
 	////////////////// Extract particles from the micrographs
 	// Perform particle extraction?
@@ -94,8 +100,14 @@ public:
 	// How many micrographs are joined together in batches of movie-particles?
 	int join_nr_mics;
 
+	// Reset origin offsets in the input fn_data STAR file to zero
+	bool do_reset_offsets;
+
 	// Re-center particles according to rlnOriginX/Y in fn_data STAR file?
 	bool do_recenter;
+
+	// Coordinates (in pixel in the reference) to re-center re-extracted particles on
+	RFLOAT recenter_x, recenter_y, recenter_z;
 
 	// MetadataTable with all refined particle coordinates (given through fn_data)
 	//MetaDataTable MDdata;

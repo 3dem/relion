@@ -61,7 +61,7 @@ public:
     // Dimension of the reference (currently allowed 2 or 3)
     int ref_dim;
 
-    // Dimension of the projections (2 or 3)
+    // Dimension of the projections (1 or 2 or 3)
     int data_dim;
 
 public:
@@ -217,6 +217,10 @@ public:
 				REPORT_ERROR("Projector::get3DFourierTransform%%ERROR: Dimension of the data array should be 3");
 			rotate3D(img_out, A, inv);
 		}
+		else if (data_dim == 1)
+		{
+			project2Dto1D(img_out, A, inv);
+		}
 		else
 		{
 			switch (ref_dim)
@@ -237,6 +241,11 @@ public:
 	* Get a 2D slice from the 3D map (forward projection)
 	*/
 	void project(MultidimArray<Complex > &img_out, Matrix2D<RFLOAT> &A, bool inv);
+
+	/*
+	* Get a 1D slice from the 2D map (forward projection)
+	*/
+	void project2Dto1D(MultidimArray<Complex > &img_out, Matrix2D<RFLOAT> &A, bool inv);
 
 	/*
 	* Get an in-plane rotated version of the 2D map (mere interpolation)

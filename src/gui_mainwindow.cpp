@@ -20,11 +20,10 @@
 
 
 #include "src/gui_mainwindow.h"
+#include "src/gui_background.xpm"
 
 #define STR_HELPER(x) #x
 #define STR(x) STR_HELPER(x)
-#define INSTD_BG 	STR(INSTALL_LIBRARY_DIR) "gui_background.xpm"
-#define SRCD_BG 	STR(SOURCE_DIR) "gui_background.xpm"
 
 // The StdOutDisplay allows looking at the entire stdout or stderr file
 int StdOutDisplay::handle(int ev)
@@ -35,6 +34,7 @@ int StdOutDisplay::handle(int ev)
 		// double-click
 		if (Fl::event_clicks())
 		{
+			if (current_job < 0) return 0;
 			current_browse_directory = pipeline.processList[current_job].name;
 			FileName fn = current_browse_directory + fn_file;
 			std::string command;
@@ -71,7 +71,7 @@ int StdOutDisplay::handle(int ev)
 	return 0;
 }
 
-int SchedulerWindow::fill(FileName _pipeline_name, std::vector<FileName> _scheduled_jobs, std::vector<long int> _scheduled_job_ids)
+int SchedulerWindow::fill(FileName _pipeline_name, std::vector<FileName> _scheduled_jobs)
 {
 	//color(GUI_BACKGROUND_COLOR);
     int current_y = 2, max_y = 2;
@@ -87,7 +87,7 @@ int SchedulerWindow::fill(FileName _pipeline_name, std::vector<FileName> _schedu
     pipeline_name = _pipeline_name;
     for (int ijob = 0; ijob < _scheduled_jobs.size(); ijob++)
     {
-    	my_jobs.push_back(_scheduled_job_ids[ijob]);
+    	my_jobs.push_back(_scheduled_jobs[ijob]);
     	int xcoor = (ijob < 1+_scheduled_jobs.size()/2) ? 20 : w()-170;
     	if (ijob == 1+_scheduled_jobs.size()/2)
     		current_y = 2;
@@ -102,9 +102,13 @@ int SchedulerWindow::fill(FileName _pipeline_name, std::vector<FileName> _schedu
     current_y = max_y;
     schedule_name = new Fl_Input(xcol, current_y, 100, ystep-8, "Provide a name for this schedule: ");
     current_y += ystep;
+    wait_before = new Fl_Input(xcol, current_y, 100, ystep-8, "Wait this many minutes before starting?");
+    current_y += ystep;
     repeat = new Fl_Input(xcol, current_y, 100, ystep-8, "Run the jobs how many times?");
     current_y += ystep;
     wait = new Fl_Input(xcol, current_y, 100, ystep-8, "Wait at least in between (in minutes)?");
+    current_y += ystep;
+    wait_after = new Fl_Input(xcol, current_y, 100, ystep-8, "Wait at least after each job (in seconds)?");
     current_y += ystep;
 
     // Set the input value
@@ -120,6 +124,14 @@ int SchedulerWindow::fill(FileName _pipeline_name, std::vector<FileName> _schedu
 	wait->color(GUI_INPUT_COLOR);
 	wait->textsize(ENTRY_FONTSIZE);
 	wait->labelsize(ENTRY_FONTSIZE);
+    wait_before->value("0");
+	wait_before->color(GUI_INPUT_COLOR);
+	wait_before->textsize(ENTRY_FONTSIZE);
+	wait_before->labelsize(ENTRY_FONTSIZE);
+    wait_after->value("10");
+	wait_after->color(GUI_INPUT_COLOR);
+	wait_after->textsize(ENTRY_FONTSIZE);
+	wait_after->labelsize(ENTRY_FONTSIZE);
 
 	// Button to execute
 	Fl_Button *execute_button = new Fl_Button(w()-200, current_y, 80, 30, "Execute");
@@ -169,21 +181,25 @@ void SchedulerWindow::cb_execute_i()
 		for (int ijob = 0; ijob < my_jobs.size(); ijob++)
 		{
 			if (check_buttons[ijob]->value())
-				jobids += integerToString(my_jobs[ijob]) + " ";
+				jobids += my_jobs[ijob] + " ";
 		}
 		jobids += "\"";
 
 		std::string myrepeat(repeat->value());
 		std::string mywait(wait->value());
+		std::string mywait_before(wait_before->value());
+		std::string mywait_after(wait_after->value());
 
 		std::string command = "relion_pipeliner --pipeline " + pipeline_name;
 		command += " --schedule " + fn_sched;
 		command += " --repeat " + myrepeat;
 		command += " --min_wait " + mywait;
-		command += " --jobids " + jobids;
+		command += " --min_wait_before " + mywait_before;
+		command += " --sec_wait_after " + mywait_after;
+		command += " --RunJobs " + jobids;
 		// Run this in the background, so control returns to the window
 		command += " &";
-		int res = system(command.c_str());
+		int res = system(command.c_str()); 
 		std::cout << " Launching: " << command << std::endl;
 		std::cout << " Stop execution of this set of scheduled jobs by deleting file: " << fn_check << std::endl;
 
@@ -255,7 +271,6 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	maingui_do_read_only = _do_read_only;
 	maingui_do_old_style = _do_oldstyle;
 	pipeline.do_read_only = _do_read_only;
-
 	do_order_alphabetically = false;
 
 	FileName fn_lock=".gui_projectdir";
@@ -279,26 +294,12 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	// TODO: control file location and use better figure
 	background_grp = new Fl_Group(WCOL0-10, 0 ,w-WCOL0, h-55);
 
-    // First look for image in the binary install directory,
-    // then in the source tree.
-
-    FileName fn_bg = std::string(INSTD_BG);
-
-    if(!exists(fn_bg))
-        fn_bg = std::string(SRCD_BG);
-
-	if (exists(fn_bg))
-	{
-		// Initial screen picture with some explanation on how to use the GUI
-            //image_box = new Fl_Box(WCOL0-8, 0 ,w-WCOL0, h-35); // widget that will contain image
-		image_box = new Fl_Box(WCOL0-8, 45 ,w-WCOL0, h-120); // widget that will contain image
-		xpm_image = new Fl_XPM_Image(fn_bg.c_str());
-		image_box->image(xpm_image); // attach xpm image to box
-		//forgot_button = new Fl_Button(450, 143, 10, 32, "?");
-		//forgot_button->color(GUI_BUTTON_COLOR);
-		//forgot_button->labelsize(12);
-		//forgot_button->callback( cb_forgot, this);
-	 }
+	// Initial screen picture with some explanation on how to use the GUI
+        //image_box = new Fl_Box(WCOL0-8, 0 ,w-WCOL0, h-35); // widget that will contain image
+	image_box = new Fl_Box(WCOL0-8, 50 ,w-WCOL0, h-120); // widget that will contain image
+	xpm_image = new Fl_Pixmap(gui_background);
+	image_box->image(xpm_image); // attach xpm image to box
+	
 	background_grp->end();
 
     if (!maingui_do_old_style)
@@ -307,7 +308,8 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 		pipeline.name = fn_pipe;
 		if (exists(fn_pipe + "_pipeline.star"))
 		{
-			pipeline.read(DO_LOCK);
+			std::string lock_message = "mainGUI constructor";
+			pipeline.read(DO_LOCK, lock_message);
 			// With the locking system, each read needs to be followed soon with a write
 			pipeline.write(DO_LOCK);
 		}
@@ -370,7 +372,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 		if (maingui_do_read_only)
 			schedule_button->deactivate();
 
-		run_button = new Fl_Button(GUIWIDTH - 110 , h-90, 100, 32, "Run now");
+		run_button = new Fl_Button(GUIWIDTH - 110 , h-90, 100, 32, "Run!");
 		run_button->color(GUI_RUNBUTTON_COLOR);
 		run_button->labelfont(FL_ITALIC);
 		run_button->labelsize(14);
@@ -470,46 +472,52 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
     browse_grp[11]->end();
 
     browse_grp[12] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-	browser->add("Movie refinement");
+	browser->add("3D multi-body");
 	gui_jobwindows[12] = new JobWindow();
-	gui_jobwindows[12]->initialise(PROC_MOVIEREFINE, maingui_do_old_style);
+	gui_jobwindows[12]->initialise(PROC_MULTIBODY, maingui_do_old_style);
     browse_grp[12]->end();
 
     browse_grp[13] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-	browser->add("Particle polishing");
+	browser->add("CTF refinement");
 	gui_jobwindows[13] = new JobWindow();
-	gui_jobwindows[13]->initialise(PROC_POLISH, maingui_do_old_style);
+	gui_jobwindows[13]->initialise(PROC_CTFREFINE, maingui_do_old_style);
     browse_grp[13]->end();
 
     browse_grp[14] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-	browser->add("Mask creation");
+	browser->add("Bayesian polishing");
 	gui_jobwindows[14] = new JobWindow();
-	gui_jobwindows[14]->initialise(PROC_MASKCREATE, maingui_do_old_style);
+	gui_jobwindows[14]->initialise(PROC_MOTIONREFINE, maingui_do_old_style);
     browse_grp[14]->end();
 
     browse_grp[15] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-	browser->add("Join star files");
+	browser->add("Mask creation");
 	gui_jobwindows[15] = new JobWindow();
-	gui_jobwindows[15]->initialise(PROC_JOINSTAR, maingui_do_old_style);
+	gui_jobwindows[15]->initialise(PROC_MASKCREATE, maingui_do_old_style);
     browse_grp[15]->end();
 
     browse_grp[16] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-	browser->add("Particle subtraction");
+	browser->add("Join star files");
 	gui_jobwindows[16] = new JobWindow();
-	gui_jobwindows[16]->initialise(PROC_SUBTRACT, maingui_do_old_style);
+	gui_jobwindows[16]->initialise(PROC_JOINSTAR, maingui_do_old_style);
     browse_grp[16]->end();
 
     browse_grp[17] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-	browser->add("Post-processing");
+	browser->add("Particle subtraction");
 	gui_jobwindows[17] = new JobWindow();
-	gui_jobwindows[17]->initialise(PROC_POST, maingui_do_old_style);
+	gui_jobwindows[17]->initialise(PROC_SUBTRACT, maingui_do_old_style);
     browse_grp[17]->end();
 
     browse_grp[18] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-	browser->add("Local resolution");
+	browser->add("Post-processing");
 	gui_jobwindows[18] = new JobWindow();
-	gui_jobwindows[18]->initialise(PROC_RESMAP, maingui_do_old_style);
+	gui_jobwindows[18]->initialise(PROC_POST, maingui_do_old_style);
     browse_grp[18]->end();
+
+    browse_grp[19] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+	browser->add("Local resolution");
+	gui_jobwindows[19] = new JobWindow();
+	gui_jobwindows[19]->initialise(PROC_RESMAP, maingui_do_old_style);
+    browse_grp[19]->end();
 
     browser->callback(cb_select_browsegroup);
     browser->textsize(RLN_FONTSIZE);
@@ -625,6 +633,8 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 			Fl::add_timeout(update_every_sec, Gui_Timer_CB, (void*)this);
     }
 
+    cb_show_initial_screen_i();
+
     // Set and activate current selection from side-browser
 	cb_select_browsegroup_i(true); // make default active; true is used to show_initial_screen
 	is_main_continue = false; // default is a new run
@@ -671,6 +681,28 @@ void GuiMainWindow::clear()
 		menubar2 = NULL;
 	}
 }
+
+std::string GuiMainWindow::getJobNameForDisplay(Process &job)
+{
+	std::string result;
+	FileName fn_pre, fn_jobnr, fn_post;
+
+	if (!decomposePipelineFileName(job.name, fn_pre, fn_jobnr, fn_post))
+	{
+		result = job.name;
+	}
+	else
+	{
+		std::string numberonly = (fn_jobnr.afterFirstOf("b")).beforeFirstOf("/");
+		if (job.alias != "None")
+			result = numberonly + ": " + job.alias;
+		else
+			result = numberonly + ": " + job.name;
+	}
+
+	return result;
+}
+
 
 // Update the content of the finished, running and scheduled job lists
 void GuiMainWindow::fillRunningJobLists()
@@ -727,10 +759,7 @@ void GuiMainWindow::fillRunningJobLists()
 			if (pipeline.processList[i].status == PROC_FINISHED)
 			{
 				finished_processes.push_back(i);
-				if (pipeline.processList[i].alias != "None")
-					finished_job_browser->add(pipeline.processList[i].alias.c_str());
-				else
-					finished_job_browser->add(pipeline.processList[i].name.c_str());
+				finished_job_browser->add((getJobNameForDisplay(pipeline.processList[i])).c_str());
 			}
 		}
 	}
@@ -741,18 +770,12 @@ void GuiMainWindow::fillRunningJobLists()
 		if (pipeline.processList[i].status == PROC_RUNNING)
 		{
 			running_processes.push_back(i);
-			if (pipeline.processList[i].alias != "None")
-				running_job_browser->add(pipeline.processList[i].alias.c_str());
-			else
-				running_job_browser->add(pipeline.processList[i].name.c_str());
+			running_job_browser->add((getJobNameForDisplay(pipeline.processList[i])).c_str());
 		}
 		else if (pipeline.processList[i].status == PROC_SCHEDULED)
 		{
 			scheduled_processes.push_back(i);
-			if (pipeline.processList[i].alias != "None")
-				scheduled_job_browser->add(pipeline.processList[i].alias.c_str());
-			else
-				scheduled_job_browser->add(pipeline.processList[i].name.c_str());
+			scheduled_job_browser->add((getJobNameForDisplay(pipeline.processList[i])).c_str());
 		}
 	}
 
@@ -810,10 +833,7 @@ void GuiMainWindow::fillToAndFromJobLists()
 				if (!already_there)
 				{
 					input_processes.push_back(myproc);
-					if (pipeline.processList[myproc].alias != "None")
-						input_job_browser->add(pipeline.processList[myproc].alias.c_str());
-					else
-						input_job_browser->add(pipeline.processList[myproc].name.c_str());
+					input_job_browser->add((getJobNameForDisplay(pipeline.processList[myproc])).c_str());
 				}
 			}
 		}
@@ -846,10 +866,7 @@ void GuiMainWindow::fillToAndFromJobLists()
 				if (!already_there)
 				{
 					output_processes.push_back(myproc);
-					if (pipeline.processList[myproc].alias != "None")
-						output_job_browser->add(pipeline.processList[myproc].alias.c_str());
-					else
-						output_job_browser->add(pipeline.processList[myproc].name.c_str());
+					output_job_browser->add((getJobNameForDisplay(pipeline.processList[myproc])).c_str());
 				}
 			}
 		}
@@ -882,7 +899,7 @@ void GuiMainWindow::fillStdOutAndErr()
 		else
 		{
 			// Remove annoying carriage returns
-			std::string command = "awk -F\"\r\" '{if (NF>1) {print $NF} else {print}}' < " + fn_out + " | tail -6 > " + fn_outtail;
+			std::string command = "tail -n 6 < " + fn_out + " | awk -F\"\r\" '{if (NF>1) {print $NF} else {print}}' > " + fn_outtail;
 			int res = system(command.c_str());
 			std::ifstream in(fn_outtail.c_str(), std::ios_base::in);
 			if (in.fail())
@@ -946,7 +963,6 @@ void GuiMainWindow::loadJobFromPipeline(int this_job)
 	// Set the "static int" to which job we're currently pointing
 	current_job = this_job;
 	int itype = pipeline.processList[current_job].type;
-
 	// The following line allows certain browse buttons to only open the current directory (using CURRENT_ODIR)
 	current_browse_directory = pipeline.processList[current_job].name;
 
@@ -977,10 +993,7 @@ void GuiMainWindow::loadJobFromPipeline(int this_job)
     cb_toggle_continue_i();
 
     // Set the alias in the window
-    if (pipeline.processList[current_job].alias != "None")
-    	alias_current_job->value(pipeline.processList[current_job].alias.c_str());
-    else
-    	alias_current_job->value(pipeline.processList[current_job].name.c_str());
+    alias_current_job->value((getJobNameForDisplay(pipeline.processList[current_job])).c_str());
 
 	// Update all job lists in the main GUI
 	updateJobLists();
@@ -1239,15 +1252,15 @@ void GuiMainWindow::cb_display_io_node_i()
 	else if (pipeline.nodeList[mynode].type == NODE_PDF_LOGFILE)
 	{
 		const char * default_pdf_viewer = getenv ("RELION_PDFVIEWER_EXECUTABLE");
+		char mydefault[]=DEFAULTPDFVIEWER;
 		if (default_pdf_viewer == NULL)
 		{
-			char mydefault[]=DEFAULTPDFVIEWER;
 			default_pdf_viewer=mydefault;
 		}
 		std::string myviewer(default_pdf_viewer);
 		command = myviewer + " " + pipeline.nodeList[mynode].name + "&";
 	}
-	else
+	else if (pipeline.nodeList[mynode].type != NODE_POST)
 	{
 		command = "relion_display --gui --i " + pipeline.nodeList[mynode].name + " &";
 	}
@@ -1300,7 +1313,7 @@ void GuiMainWindow::cb_toggle_continue_i()
 
 	if (is_main_continue)
 	{
-		run_button->label("Continue now");
+		run_button->label("Continue!");
 		run_button->color(GUI_BUTTON_COLOR);
 		run_button->labelfont(FL_ITALIC);
 		run_button->labelsize(13);
@@ -1308,7 +1321,7 @@ void GuiMainWindow::cb_toggle_continue_i()
 	}
 	else
 	{
-		run_button->label("Run now!");
+		run_button->label("Run!");
 		run_button->color(GUI_RUNBUTTON_COLOR);
 		run_button->labelfont(FL_ITALIC);
 		run_button->labelsize(16);
@@ -1349,18 +1362,6 @@ void GuiMainWindow::cb_print_cl_i()
 }
 
 // Run button call-back functions
-void GuiMainWindow::cb_forgot(Fl_Widget* o, void* v) {
-
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_forgot_i(); // 1st true means only_schedule, do not run, 2nd true means open the note editor window
-}
-
-void GuiMainWindow::cb_forgot_i()
-{
-	fl_message("Really?! Perhaps you should spend fewer nights at the microscope and try to sleep a bit more...");
-}
-
-// Run button call-back functions
 void GuiMainWindow::cb_run(Fl_Widget* o, void* v) {
 
     GuiMainWindow* T=(GuiMainWindow*)v;
@@ -1392,6 +1393,8 @@ void GuiMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 	if (!pipeline.runJob(gui_jobwindows[iwin]->myjob, current_job, only_schedule, is_main_continue, false, error_message))
 	{
 		fl_message("%s",error_message.c_str());
+		// Allow the user to fix the error and submit this job again
+		run_button->activate();
 		return;
 	}
 
@@ -1925,7 +1928,8 @@ void GuiMainWindow::cb_reread_pipeline(Fl_Widget*, void* v)
 
 void GuiMainWindow::cb_reread_pipeline_i()
 {
-	pipeline.read(DO_LOCK);
+	std::string lock_message = " mainGUI reread_pipeline_i";
+	pipeline.read(DO_LOCK, lock_message);
 	// With the locking system, each read needs to be followed soon with a write
 	pipeline.write(DO_LOCK);
 }
@@ -1952,6 +1956,8 @@ void GuiMainWindow::cb_show_initial_screen(Fl_Widget* o, void* v)
 
 void GuiMainWindow::cb_show_initial_screen_i()
 {
+    run_button->deactivate();
+
 	cb_select_browsegroup_i(true);
 }
 
@@ -1966,17 +1972,14 @@ void GuiMainWindow::cb_start_pipeliner_i()
 {
 
 	std::vector<FileName> job_names;
-	std::vector<long int> job_ids;
 
 	for (long int ii =0; ii < scheduled_processes.size(); ii++)
 	{
 		long int id = scheduled_processes[ii];
-		job_ids.push_back(id);
 		job_names.push_back(pipeline.processList[id].name);
 	}
-	std::vector<long int> my_scheduled_processes = scheduled_processes;
 	SchedulerWindow* w = new SchedulerWindow(400, 300, "Select which jobs to execute");
-	w->fill(pipeline.name, job_names, job_ids);
+	w->fill(pipeline.name, job_names);
 
 }
 

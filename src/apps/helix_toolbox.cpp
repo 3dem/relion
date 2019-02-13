@@ -241,9 +241,9 @@ public:
 		ofs.open(fn_cmd.c_str(), std::ofstream::out | std::ofstream::app);
 
 		time_t now = time(0);
-	    char nodename[64] = "undefined";
-	    gethostname(nodename,sizeof(nodename));
-	    std::string hostname(nodename);
+		char nodename[64] = "undefined";
+		gethostname(nodename,sizeof(nodename));
+		std::string hostname(nodename);
 		ofs << std::endl << " ++++ Executed the following command at host " << hostname << " on " << ctime(&now);
 		ofs << "  `which relion_helix_toolbox` " << std::flush;
 		parser.writeCommandLine(ofs);
@@ -448,7 +448,7 @@ public:
 				displayEmptyLine();
 				std::cout << " Convert EMAN2 / XIMDISP coordinates of helical segments into RELION STAR format" << std::endl;
 				std::cout << "  USAGE (EMAN2 format)  : --coords_emn2rln --i_root _helix_ptcl_coords.txt --o_root _segments.star --xdim 4096 --ydim 4096 --boxdim 320 --bimodal" << std::endl;
-				std::cout << "  USAGE (XIMDISP format): --coords_xim2rln --i_root .mrc.coords            --o_root _segments.star --xdim 4096 --ydim 4096 --boxdim 320 --bimodal" << std::endl;
+				std::cout << "  USAGE (XIMDISP format): --coords_xim2rln --i_root .mrc.coords			 --o_root _segments.star --xdim 4096 --ydim 4096 --boxdim 320 --bimodal" << std::endl;
 				displayEmptyLine();
 				return;
 			}
@@ -1300,54 +1300,54 @@ public:
 		std::cout << " Doing FT..." << std::endl;
 		transformer.FourierTransform(img(), Faux);
 
-        Complex fzero;
-        fzero.real = fzero.imag = 0.;
-        std::cout << " Modifying..." << std::endl;
-	    FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Faux)
-	    {
-	    	int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
-	        if (idx >= XSIZE(Faux))
-	        	continue;
+		Complex fzero;
+		fzero.real = fzero.imag = 0.;
+		std::cout << " Modifying..." << std::endl;
+		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Faux)
+		{
+			int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
+			if (idx >= XSIZE(Faux))
+				continue;
 
-	        // Sphere, centered 0, 0, 76
-	        //RFLOAT rr1 = sqrt((ABS(kp) - 76) * (ABS(kp) - 76) + ip*ip + jp*jp);
-	        //if (rr1 < 5.01)
-	        //	FFTW_ELEM(Faux, kp, ip, jp) = fzero;
+			// Sphere, centered 0, 0, 76
+			//RFLOAT rr1 = sqrt((ABS(kp) - 76) * (ABS(kp) - 76) + ip*ip + jp*jp);
+			//if (rr1 < 5.01)
+			//	FFTW_ELEM(Faux, kp, ip, jp) = fzero;
 
-	        // Sphere, centered 0, 0, 46
-	        //RFLOAT rr2 = sqrt((ABS(kp) - 46) * (ABS(kp) - 46) + ip*ip + jp*jp);
-	        //if (rr2 < 5.01)
-	        //	FFTW_ELEM(Faux, kp, ip, jp) = fzero;
+			// Sphere, centered 0, 0, 46
+			//RFLOAT rr2 = sqrt((ABS(kp) - 46) * (ABS(kp) - 46) + ip*ip + jp*jp);
+			//if (rr2 < 5.01)
+			//	FFTW_ELEM(Faux, kp, ip, jp) = fzero;
 
-	        // Disk, centered 0, 0, 76
-	        //if (ABS(ABS(kp) - 76) < 5)
-	        //{
-	        //	RFLOAT rr1 = sqrt(ip*ip + jp*jp);
-	        //	if (rr1 < 5.)
-	        //		FFTW_ELEM(Faux, kp, ip, jp) = fzero;
-	        //}
+			// Disk, centered 0, 0, 76
+			//if (ABS(ABS(kp) - 76) < 5)
+			//{
+			//	RFLOAT rr1 = sqrt(ip*ip + jp*jp);
+			//	if (rr1 < 5.)
+			//		FFTW_ELEM(Faux, kp, ip, jp) = fzero;
+			//}
 
-	        // Disk, centered 0, 0, 46
-	        //if (ABS(ABS(kp) - 46) < 5)
-	        //{
-	        //	RFLOAT rr1 = sqrt(ip*ip + jp*jp);
-	        //	if (rr1 < 5.)
-	        //		FFTW_ELEM(Faux, kp, ip, jp) = fzero;
-	        //}
+			// Disk, centered 0, 0, 46
+			//if (ABS(ABS(kp) - 46) < 5)
+			//{
+			//	RFLOAT rr1 = sqrt(ip*ip + jp*jp);
+			//	if (rr1 < 5.)
+			//		FFTW_ELEM(Faux, kp, ip, jp) = fzero;
+			//}
 
-	        if (ABS(kp) > 44)
-	        {
-	        	RFLOAT rr1 = sqrt(ip*ip + jp*jp);
-	        	if (rr1 < 25.)
-	        		FFTW_ELEM(Faux, kp, ip, jp) = fzero;
-	        }
+			if (ABS(kp) > 44)
+			{
+				RFLOAT rr1 = sqrt(ip*ip + jp*jp);
+				if (rr1 < 25.)
+					FFTW_ELEM(Faux, kp, ip, jp) = fzero;
+			}
 
-        	//RFLOAT rr1 = sqrt(ip*ip + jp*jp);
-        	//if (rr1 < 5.)
-        	//	FFTW_ELEM(Faux, kp, ip, jp) = fzero;
+			//RFLOAT rr1 = sqrt(ip*ip + jp*jp);
+			//if (rr1 < 5.)
+			//	FFTW_ELEM(Faux, kp, ip, jp) = fzero;
 
-	    }
-	    std::cout << " Doing IFT..." << std::endl;
+		}
+		std::cout << " Doing IFT..." << std::endl;
 		transformer.inverseFourierTransform(Faux, img());
 		CenterFFT(img(), false);
 		img.write(fn_out);
@@ -1406,18 +1406,18 @@ public:
 		{
 			if(dim == 2)
 			{
-				std::cout << "  Please input psi angle (in degrees): " << std::flush;
+				std::cout << "	Please input psi angle (in degrees): " << std::flush;
 				std::cin >> psi_deg;
-				std::cout << "  Please input x, y coordinates (in pixels): " << std::flush;
+				std::cout << "	Please input x, y coordinates (in pixels): " << std::flush;
 				std::cin >> x >> y;
 				XX(in) = x;
 				YY(in) = y;
 			}
 			else
 			{
-				std::cout << "  Please input psi and tilt angles (in degrees): " << std::flush;
+				std::cout << "	Please input psi and tilt angles (in degrees): " << std::flush;
 				std::cin >> psi_deg >> tilt_deg;
-				std::cout << "  Please input x, y, z coordinates (in pixels): " << std::flush;
+				std::cout << "	Please input x, y, z coordinates (in pixels): " << std::flush;
 				std::cin >> x >> y >> z;
 				XX(in) = x;
 				YY(in) = y;
@@ -1427,12 +1427,12 @@ public:
 			out /= angpix;
 			if(dim == 2)
 			{
-				std::cout << "  Output coordinates (x, y) in Angstroms = "
+				std::cout << "	Output coordinates (x, y) in Angstroms = "
 						<< XX(out) << ", " << YY(out) << std::endl;
 			}
 			else
 			{
-				std::cout << "  Output coordinates (x, y, z) in Angstroms = "
+				std::cout << "	Output coordinates (x, y, z) in Angstroms = "
 						<< XX(out) << ", " << YY(out) << ", " << ZZ(out) << std::endl;
 			}
 		}
@@ -1498,16 +1498,16 @@ int main(int argc, char *argv[])
 	helix_bilder_parameters prm;
 
 	try
-    {
+	{
 		prm.read(argc, argv);
 		prm.run();
-    }
-    catch (RelionError XE)
-    {
-    	prm.usage();
-        std::cout << XE;
-        exit(1);
-    }
+	}
+	catch (RelionError XE)
+	{
+		prm.usage();
+		std::cout << XE;
+		exit(1);
+	}
 
-    return 0;
+	return 0;
 }

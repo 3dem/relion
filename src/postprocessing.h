@@ -44,7 +44,7 @@ public:
 	int verb;
 
 	// Input & Output rootname
-	FileName fn_in, fn_out, fn_I1, fn_I2;
+	FileName fn_out, fn_I1, fn_I2;
 
 	// Images for the two half-reconstructions and the mask
 	Image<RFLOAT> I1, I2, Im;
@@ -56,6 +56,9 @@ public:
 
 	// Perform automated masking (based on a density threshold)
 	bool do_auto_mask;
+
+	// Write half maps as well
+	bool write_halfmaps;
 
 	// Density threshold below which to calculate initial mask seed
 	RFLOAT ini_mask_density_threshold;
@@ -69,8 +72,14 @@ public:
 	// From the resolution where the FSC drops below this value, randomize the phases in the two maps
 	RFLOAT randomize_fsc_at;
 
+	// Or user-specified resolution (in A) for randomisation of phases
+	RFLOAT randomize_at_A;
+
 	// Filename for a user-provided mask
 	FileName fn_mask;
+
+	// Use the mask even when the resolution becomes worse
+	bool force_mask;
 
 	/////// Local-resolution
 
@@ -123,6 +132,9 @@ public:
 	// Width of raised cosine edge on low-pass filter
 	int filter_edge_width;
 
+	// Shell for randomisation of phases
+	int randomize_at;
+
 	// Arrays to store FSC, Guinier curves etc
 	MultidimArray<RFLOAT> fsc_unmasked, acorr_unmasked, acorr_masked, dpr_unmasked, dpr_masked;
 	MultidimArray<RFLOAT> fsc_masked, fsc_random_masked, fsc_true;
@@ -151,7 +163,8 @@ public:
 	void getAutoMask();
 
 	// Divide by MTF and perform FSC-weighted B-factor sharpening, as in Rosenthal and Henderson, 2003
-	void sharpenMap();
+	// Returns the applied filter resolution
+	RFLOAT sharpenMap();
 
 	// Map nay 3D FFTW pixel onto the surface of a sphere with radius myradius_count
 	bool findSurfacePixel(int idx, int kp, int ip, int jp,
@@ -173,6 +186,9 @@ public:
 
 	// Apply sqrt(2FSC/(FSC=1)) weighting prior to B-factor sharpening
 	void applyFscWeighting(MultidimArray<Complex > &FT, MultidimArray<RFLOAT> my_fsc);
+
+	// Output map and masked map
+	void writeMaps(FileName fn_root);
 
 	// Output map and STAR files with metadata, also write final resolution to screen
 	void writeOutput();

@@ -54,10 +54,12 @@ void softMaskOutsideMap(MultidimArray<RFLOAT> &vol, MultidimArray<RFLOAT> &msk, 
 // 3. Putting a raised-cosine edge on the mask with width width_soft_mask_edge
 // If verb, then output description of steps and progress bars
 void autoMask(MultidimArray<RFLOAT> &img_in, MultidimArray<RFLOAT> &msk_out,
-		RFLOAT  ini_mask_density_threshold, RFLOAT extend_ini_mask, RFLOAT width_soft_mask_edge, bool verb = false);
+		RFLOAT  ini_mask_density_threshold, RFLOAT extend_ini_mask, RFLOAT width_soft_mask_edge, bool verb = false, int n_threads = 1);
 
 // Fills mask with a soft-edge circular mask (soft-edge in between radius and radius_p), centred at (x, y, z)
 void raisedCosineMask(MultidimArray<RFLOAT> &mask, RFLOAT radius, RFLOAT radius_p, int x, int y, int z = 0);
 
+// Make a raised crown mask.
+void raisedCrownMask(MultidimArray<RFLOAT> &mask, RFLOAT inner_radius, RFLOAT outer_radius, RFLOAT width, RFLOAT x, RFLOAT y, RFLOAT z);
 
 #endif /* MASK_H_ */

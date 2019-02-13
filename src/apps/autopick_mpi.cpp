@@ -19,7 +19,7 @@
  ***************************************************************************/
 #include <src/autopicker_mpi.h>
 #ifdef CUDA
-#include <src/gpu_utils/cuda_autopicker.h>
+#include <src/acc/cuda/cuda_autopicker.h>
 #endif
 
 int main(int argc, char *argv[])
@@ -27,40 +27,41 @@ int main(int argc, char *argv[])
 	AutoPickerMpi prm;
 
 	try
-    {
+	{
 		prm.read(argc, argv);
 
 		prm.initialise();
 
-		if (prm.todo_anything)
-		{
 #ifdef CUDA
-			if (prm.do_gpu)
-			{
-				std::stringstream didSs;
-				didSs << "APr" << prm.getRank();
-				int dev_id = prm.deviceInitialise();
-				prm.cudaPicker = (void*) new AutoPickerCuda((AutoPickerMpi*)&prm, dev_id, didSs.str().c_str() );
+		if (prm.do_gpu)
+		{
+			std::stringstream didSs;
+			didSs << "APr" << prm.getRank();
+			int dev_id = prm.deviceInitialise();
+			prm.cudaPicker = (void*) new AutoPickerCuda((AutoPickerMpi*)&prm, dev_id, didSs.str().c_str() );
 
-				((AutoPickerCuda*)prm.cudaPicker)->run();
-			}
-			else
-#endif
-				prm.run();
+			((AutoPickerCuda*)prm.cudaPicker)->run();
 		}
-    }
+		else
+#endif
+		{
+			prm.run();
+		}
 
-    catch (RelionError XE)
-    {
-    	if (prm.verb > 0)
-    		//prm.usage();
-        std::cerr << XE;
-        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+		if (prm.getRank() == 0)
+			prm.generatePDFLogfile();
+	}
 
-        return EXIT_FAILURE;
-    }
+	catch (RelionError XE)
+	{
+		if (prm.verb > 0)
+    			//prm.usage();
+		std::cerr << XE;
+		MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
 
-    return EXIT_SUCCESS;
+		return EXIT_FAILURE;
+	}
 
+	return EXIT_SUCCESS;
 }
 

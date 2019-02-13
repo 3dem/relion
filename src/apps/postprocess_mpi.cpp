@@ -19,45 +19,38 @@
  ***************************************************************************/
 #include <src/postprocessing.h>
 
-
 int main(int argc, char *argv[])
 {
 	Postprocessing prm;
 
 	try
-    {
+	{
 		int rank, size;
 
 		MPI_Init(&argc, &argv);
-	    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-	    MPI_Comm_size(MPI_COMM_WORLD, &size);
-	    // Handle errors
-	    MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
+		MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+		MPI_Comm_size(MPI_COMM_WORLD, &size);
+		// Handle errors
+		MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
 
-	    prm.read(argc, argv);
+		prm.read(argc, argv);
 
-	    // Don't put any output to screen for mpi slaves
-	    prm.verb = (rank == 0) ? 1 : 0;
+		// Don't put any output to screen for mpi slaves
+		prm.verb = (rank == 0) ? 1 : 0;
 
-	    if (prm.do_locres)
+		if (prm.do_locres)
 			prm.run_locres(rank, size);
 		else
 			prm.run();
 
-	    MPI_Finalize();
+		MPI_Finalize();
+	}
+	catch (RelionError XE)
+	{
+		//prm.usage();
+		std::cerr << XE;
+		exit(1);
+	}
 
-    }
-
-    catch (RelionError XE)
-    {
-        //prm.usage();
-        std::cerr << XE;
-        exit(1);
-    }
-
-    return 0;
-
+	return 0;
 }
-
-
-

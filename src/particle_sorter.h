@@ -106,6 +106,9 @@ public:
 	// General function to decide what to do
 	void run();
 
+	// Generate a PDF with the values of all Z-scores and their histogram
+	void generateLogFilePDF();
+
 	// Initialise some general stuff after reading
 	void initialise();
 

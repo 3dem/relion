@@ -25,24 +25,20 @@ int main(int argc, char *argv[])
 	CtffindRunnerMpi prm;
 
 	try
-    {
+	{
 		prm.read(argc, argv);
-
 		prm.initialise();
-
 		prm.run();
-    }
+	}
+	catch (RelionError XE)
+	{
+		if (prm.verb > 0)
+		//prm.usage();
+		std::cerr << XE;
+		MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+	}
 
-    catch (RelionError XE)
-    {
-    	if (prm.verb > 0)
-    		//prm.usage();
-        std::cerr << XE;
-        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
-    }
-
-    return 0;
-
+	return 0;
 }
 
 

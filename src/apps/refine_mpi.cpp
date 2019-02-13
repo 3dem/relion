@@ -20,47 +20,45 @@
 
 #include <src/ml_optimiser_mpi.h>
 
-
 int main(int argc, char **argv)
 {
-
 	MlOptimiserMpi optimiser;
-    try
-    {
-    	// Read in parameters from the command line
-    	optimiser.read(argc, argv);
+	try
+	{
 
-    	// Dirty hack to loop around movies one micrograph at a time
-    	if (optimiser.do_movies_in_batches && optimiser.fn_data_movie != "" && optimiser.do_skip_maximization)
-    	{
-    		optimiser.processMoviesPerMicrograph(argc, argv);
-    	}
-    	else
-    	{
-    		// normal code
+		// Read in parameters from the command line
+		optimiser.read(argc, argv);
+
+		// Dirty hack to loop around movies one micrograph at a time
+		if (optimiser.do_movies_in_batches && optimiser.fn_data_movie != "" && optimiser.do_skip_maximization)
+		{
+			optimiser.processMoviesPerMicrograph(argc, argv);
+		}
+		else
+		{
+			// normal code
 
 			// Set things up
 			optimiser.initialise();
 
 			// Iterate
 			optimiser.iterate();
-    	}
+		}
 
-    }
-    catch (RelionError XE)
-    {
+	}
+	catch (RelionError XE)
+	{
 //        if (optimiser.verb > 0)
 //        {
 //        	optimiser.usage();
 //        }
-    	std::cerr << XE;
-        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+		std::cerr << XE;
+		MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
 
-        return EXIT_FAILURE;
+		return EXIT_FAILURE;
 
-    }
+	}
 
-    return EXIT_SUCCESS;
-
+	return EXIT_SUCCESS;
 }
 

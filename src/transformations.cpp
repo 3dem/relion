@@ -165,14 +165,14 @@ void alignWithZ(const Matrix1D<RFLOAT> &axis, Matrix2D<RFLOAT>& result,
     }
     else
     {
-        // I know that the Axis is the X axis
+        // I know that the Axis is the X axis, EITHER POSITIVE OR NEGATIVE!!
         MAT_ELEM(result,0, 0) = 0;
         MAT_ELEM(result,0, 1) = 0;
-        MAT_ELEM(result,0, 2) = -1;
+        MAT_ELEM(result,0, 2) = (XX(Axis) > 0)? -1 : 1;
         MAT_ELEM(result,1, 0) = 0;
         MAT_ELEM(result,1, 1) = 1;
         MAT_ELEM(result,1, 2) = 0;
-        MAT_ELEM(result,2, 0) = 1;
+        MAT_ELEM(result,2, 0) = (XX(Axis) > 0)? 1 : -1;
         MAT_ELEM(result,2, 1) = 0;
         MAT_ELEM(result,2, 2) = 0;
     }

@@ -45,19 +45,42 @@
  *  e-mail address 'xmipp@cnb.csic.es'
  ***************************************************************************/
 #include "src/error.h"
+#ifdef __GNUC__
+#include <execinfo.h>
+#endif
 
 // Object Constructor
 RelionError::RelionError(const std::string &what, const std::string &fileArg, const long lineArg)
 {
+#ifdef __GNUC__
+    const int SZ_BUF = 100;
+    backtrace_buffer = new void*[SZ_BUF];
+    size = backtrace(backtrace_buffer, SZ_BUF);
+#endif
+
     msg = "ERROR: \n" + what;
     file= fileArg;
     line=lineArg;
+
+    std::cerr << "in: " << file << ", line " << line << "\n";
 }
 
 // Show message
 std::ostream& operator << (std::ostream& o, RelionError& XE)
 {
-    o << XE.msg << std::endl
-      << "File: " << XE.file << " line: " << XE.line << std::endl;
+
+#ifdef __GNUC__
+    o << "=== Backtrace  ===" << std::endl;
+    char **bt_symbols = backtrace_symbols(XE.backtrace_buffer, XE.size);
+    for (int i = 0; i < XE.size; i++) {
+        o << bt_symbols[i] << std::endl;
+    }
+    o << "==================" << std::endl;
+    delete[] XE.backtrace_buffer;
+    free(bt_symbols);
+#endif
+
+    o << XE.msg << std::endl;
+
     return o;
 }

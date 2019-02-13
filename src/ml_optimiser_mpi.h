@@ -23,15 +23,7 @@
 #include "src/mpi.h"
 #include "src/ml_optimiser.h"
 
-#define MPITAG_JOB_REQUEST 0
-#define MPITAG_JOB_REPLY 1
-#define MPITAG_METADATA 2
-#define MPITAG_RANDOMSEED 3
-#define MPITAG_IMAGE 4
-#define MPITAG_PACK 5
-#define MPITAG_RFLOAT 6
-#define MPITAG_INT 7
-#define MPITAG_IDENTIFIER 8
+// definition of MPITAG has been moved to header mpi.h
 
 class MlOptimiserMpi: public MlOptimiser
 {
@@ -46,6 +38,13 @@ public:
 
     // Only process unfinished micrographs in movie-refinement on a per-micrograph basis
     bool only_do_unfinished_movies;
+
+
+    // For debugging: keep temporary/debug weight and data mrc files
+    bool do_keep_debug_reconstruct_files;
+
+    // For debugging: halt all slaves except this one
+    int halt_all_slaves_except_this;
 
     // Original verb
     int ori_verb;

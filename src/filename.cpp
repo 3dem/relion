@@ -301,7 +301,7 @@ FileName FileName::getFileFormat() const
     else if ( (first = rfind("."))!=std::string::npos)
         result = substr(first + 1);
     else
-        result="spi";
+        result="";
     return result.toLowercase();
 
 }
@@ -416,13 +416,31 @@ int FileName::globFiles(std::vector<FileName> &files, bool do_clear) const
 
 	glob_t glob_result;
 	glob((*this).c_str(), GLOB_TILDE, NULL, &glob_result);
-	for(unsigned  int  i = 0; i < glob_result.gl_pathc; ++i)
+	for(unsigned long int i = 0; i < glob_result.gl_pathc; ++i)
 	{
 		files.push_back(std::string(glob_result.gl_pathv[i]));
 	}
 	globfree(&glob_result);
 
 	return files.size();
+}
+
+bool FileName::getTheOtherHalf(FileName &fn_out) const
+{
+	FileName ret = this->afterLastOf("/");
+
+	if (ret.contains("half1"))
+		ret.replaceAllSubstrings("half1", "half2");
+	else if (ret.contains("half2"))
+		ret.replaceAllSubstrings("half2", "half1");
+	else
+		return false;
+
+	if (this->contains("/"))
+		ret = this->beforeLastOf("/") + "/" + ret;
+
+	fn_out = ret;
+	return true;
 }
 
 bool exists(const FileName &fn)
@@ -480,7 +498,6 @@ int mktree(const FileName &fn_dir, mode_t mode)
 
 bool decomposePipelineFileName(FileName fn_in, FileName &fn_pre, FileName &fn_jobnr, FileName &fn_post)
 {
-
 	size_t slashpos = 0;
 	int i = 0;
 	while (slashpos < fn_in.length())
@@ -499,18 +516,6 @@ bool decomposePipelineFileName(FileName fn_in, FileName &fn_pre, FileName &fn_jo
 			fn_post = fn_in.substr(slashpos2+1); // this has the rest
 			return true;
 		}
-	    // TODO: temporary check for - in uniq filename for backward compatibility with early alpha version. Remove in near future!!
-		else if (std::isdigit(fn_in[slashpos+1]) && std::isdigit(fn_in[slashpos+2]) && std::isdigit(fn_in[slashpos+3]) &&
-		    std::isdigit(fn_in[slashpos+4]) && std::isdigit(fn_in[slashpos+5]) && std::isdigit(fn_in[slashpos+6]) &&
-		    (fn_in[slashpos+7] == '.' || fn_in[slashpos+7] == '-') &&
-		    std::isdigit(fn_in[slashpos+8]) && std::isdigit(fn_in[slashpos+9]) && std::isdigit(fn_in[slashpos+10]) &&
-		    std::isdigit(fn_in[slashpos+11]) && std::isdigit(fn_in[slashpos+12]) && std::isdigit(fn_in[slashpos+13]) )
-		{
-			fn_pre = fn_in.substr(0, slashpos+1); // this has the first slash
-			fn_jobnr = fn_in.substr(slashpos+1,14); // this has the second slash
-			fn_post = fn_in.substr(slashpos+15); // this has the rest
-			return true;
-		}
 		if (i>20)
 			REPORT_ERROR("decomposePipelineFileName: BUG or found more than 20 directories deep structure for pipeline filename: " + fn_in);
 	}
@@ -524,8 +529,9 @@ bool decomposePipelineFileName(FileName fn_in, FileName &fn_pre, FileName &fn_jo
 
 bool decomposePipelineSymlinkName(FileName fn_in, FileName &fn_pre, FileName &fn_jobnr, FileName &fn_post)
 {
+	bool dont_expand = false;
 
-	// Symlinks are always in the second directory....
+	// Symlinks are always in the second directory. (e.g. Refine3D/JOB_ALIAS_AS_LINK/...)
 	size_t slashpos = 0;
 	int i = 0;
 	while (slashpos < fn_in.length())
@@ -536,31 +542,50 @@ bool decomposePipelineSymlinkName(FileName fn_in, FileName &fn_pre, FileName &fn
 			break;
 	}
 
+	// We ignore links in the first directory (link/XXX)
+	if (i != 2)
+		dont_expand = true;
+
+	FileName second_dir = fn_in.substr(0, slashpos);
+//	std::cout << second_dir << std::endl;
+	// We also ignore jobXXX even if it is a symbolic link.
+	//    e.g. MotionCorr/job003 ==> /path/to/online_processing/MotionCorr/job003
+	// This is safe because we don't allow an alias name to start from 'job'.
+	if (second_dir.afterLastOf("/").substr(0, 3) == "job")
+		dont_expand = true;
+
 	// Check whether this is a symbol link
-	char linkname[100];
-	ssize_t len = ::readlink(fn_in.substr(0, slashpos).c_str(), linkname, sizeof(linkname)-1);
-	if (len != -1)
-    {
-    	// This is a symbolic link!
-    	linkname[len] = '\0';
-    	FileName fn_link = std::string(linkname);
-    	fn_link = fn_link.afterFirstOf("../") + fn_in.substr(slashpos+1);
-    	// So dereference the link, BUT only if the second directory started with "job"!
-    	if (decomposePipelineFileName(fn_link, fn_pre, fn_jobnr, fn_post))
-    	{
-    		return true;
-    	}
-    	else
-    	{
-    		fn_pre = fn_jobnr = "";
-    		fn_post = fn_in;
-    		return false;
-    	}
-    }
+	char linkname[4096];
+	ssize_t len_max = sizeof(linkname) - 1;
+	ssize_t len = ::readlink(second_dir.c_str(), linkname, len_max);
+	if (len == len_max)
+		REPORT_ERROR("Too long path in decomposePipelineSymlinkName.");
+	if (!dont_expand && len != -1)
+	{
+	    	// This is a symbolic link!
+		if (linkname[len - 1] == '/')
+			linkname[len - 1] = '\0'; // remove trailing '/'	
+	    	linkname[len] = '\0';
+	    	FileName fn_link = std::string(linkname);
+		// TODO: FIXME: This condition is still not perfect. For example,
+		// Micrograph/mic001.mrc -> ../../../storage/mic001.mrc breaks the code.
+		// Meanwhile one can circumvent this case by using an absolute path in the symlink.
+    		if (fn_link.substr(0, 3) == "../")
+	    	{
+    			fn_link = fn_link.substr(3) + fn_in.substr(slashpos);
+//			std::cout << "fn_link=" << fn_link << std::endl;
+        		return decomposePipelineFileName(fn_link, fn_pre, fn_jobnr, fn_post);
+	    	}
+		else
+		{
+			fn_pre = fn_jobnr = "";
+			fn_post = fn_in;
+			return false;
+		}
+	}
 
 	// If it is not a symlink, just decompose the filename
-    return decomposePipelineFileName(fn_in, fn_pre, fn_jobnr, fn_post);
-
+	return decomposePipelineFileName(fn_in, fn_pre, fn_jobnr, fn_post);
 }
 
 FileName getOutputFileWithNewUniqueDate(FileName fn_input, FileName fn_new_outputdir)

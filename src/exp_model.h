@@ -343,7 +343,7 @@ public:
 	void divideOriginalParticlesInRandomHalves(int seed, bool do_helical_refine = false);
 
 	// Randomise the order of the original_particles
-	void randomiseOriginalParticlesOrder(int seed, bool do_split_random_halves = false);
+	void randomiseOriginalParticlesOrder(int seed, bool do_split_random_halves = false, bool do_subsets = false);
 
 	// calculate maximum number of images for a particle (possibly within a range of particles)
 	int maxNumberOfImagesPerOriginalParticle(long int first_particle_id = -1, long int last_particle_id = -1);
@@ -367,6 +367,8 @@ public:
 	// Returns false if the particles do not need to be copied. In that case, only the number of particles on the scratch disk needs to be counted
 	// Also checks how much free space there is on the scratch dir
 	bool prepareScratchDirectory(FileName _fn_scratch, FileName fn_lock = "");
+
+	void setScratchDirectory(FileName _fn_scratch);
 
 	// Wipe the generic scratch directory clean
 	void deleteDataOnScratch();
