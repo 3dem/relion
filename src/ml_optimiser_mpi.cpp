@@ -1713,7 +1713,6 @@ void MlOptimiserMpi::combineAllWeightedSums()
 		// Loop over possibly multiple instances of Mpack of maximum size
 		int piece = 0;
 		int nr_pieces = 1;
-		long int pack_size;
 		while (piece < nr_pieces)
 		{
 			// All nodes except those who will reset nr_pieces piece will pass while loop in next pass
