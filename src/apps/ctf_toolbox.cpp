@@ -39,6 +39,7 @@ class ctf_toolbox_parameters
 
 	MetaDataTable MD;
 	FourierTransformer transformer;
+	ObservationModel obsModel;
 
 	// Image size
 	int xdim, ydim, zdim;
@@ -85,17 +86,16 @@ class ctf_toolbox_parameters
 		Image<RFLOAT> img;
 		img.read(fn_img);
 
-		MultidimArray<Complex> Fimg;
-		transformer.FourierTransform(img(), Fimg, false);
 
-		RFLOAT xs = (RFLOAT)XSIZE(img()) * angpix;
-		RFLOAT ys = (RFLOAT)YSIZE(img()) * angpix;
-		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(Fimg)
+		MultidimArray<Complex> Fimg;
+		MultidimArray<RFLOAT> Fctf;
+		transformer.FourierTransform(img(), Fimg, false);
+		Fctf.resize(YSIZE(Fimg), XSIZE(Fimg));
+		ctf.getFftwImage(Fctf, XSIZE(img()), YSIZE(img()), angpix, false, do_ctf_phaseflip, do_intact_ctf_first_peak, false);
+
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fimg)
 		{
-			RFLOAT x = (RFLOAT)jp / xs;
-			RFLOAT y = (RFLOAT)ip / ys;
-			//bool do_abs = false, bool do_only_flip_phases = false, bool do_intact_until_first_peak = false, bool do_damping = true) const
-			DIRECT_A2D_ELEM(Fimg, i, j) *= ctf.getCTF(x, y, false, do_ctf_phaseflip, do_intact_ctf_first_peak, false);
+			DIRECT_MULTIDIM_ELEM(Fimg, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
 		}
 
 		transformer.inverseFourierTransform(Fimg, img());
@@ -163,22 +163,8 @@ class ctf_toolbox_parameters
 	void run()
 	{
 
-		MD.read(fn_in);
+		ObservationModel::loadSafely(fn_in, obsModel, MD);
 
-		if (angpix > 0.)
-		{
-			std::cout << " + Using user-provided pixel size: " << angpix << std::endl;
-		}
-		else if (MD.containsLabel(EMDL_CTF_MAGNIFICATION) && MD.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
-		{
-			RFLOAT mag, dstep;
-			MD.getValue(EMDL_CTF_MAGNIFICATION, mag);
-			MD.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
-			angpix = 10000. * dstep / mag;
-			std::cout << " + Using pixel size calculated from magnification and detector pixel size in the input STAR file: " << angpix << std::endl;
-		}
-		else
-			REPORT_ERROR("ERROR: provide angpix through magnification and detector pixel size in the input STAR file, or through the --angpix command line argument");
 
 		if (my_size_x > 0. && my_size_y > 0.)
 		{
@@ -208,7 +194,8 @@ class ctf_toolbox_parameters
 		{
 
 			CTF ctf;
-			ctf.read(MD, MD);
+			ctf.readByGroup(MD, &obsModel);
+			angpix = obsModel.getPixelSize(obsModel.getOpticsGroup(MD));
 
 			FileName fn_img, my_fn_out;
 			if (do_image_name)
@@ -227,6 +214,7 @@ class ctf_toolbox_parameters
 			{
 				MD.getValue(EMDL_IMAGE_NAME, fn_img);
 				imageOperations(fn_img, ctf, my_fn_out);
+				MD.setValue(EMDL_IMAGE_NAME, my_fn_out);
 			}
 			else if (do_1dprofile || do_2dimage)
 			{
@@ -240,6 +228,11 @@ class ctf_toolbox_parameters
 
 		if (verb > 0)
 			progress_bar(MD.numberOfObjects());
+
+		if (do_ctf_multiply || do_ctf_phaseflip)
+		{
+			obsModel.save(MD, fn_in.insertBeforeExtension(fn_out));
+		}
 	}
 };
 
