@@ -165,6 +165,11 @@ void CtfRefiner::init()
 		}
 	}
 
+	if (Cs <= 0.1 && verb > 0)
+	{
+		std::cerr << "WARNING: Your Cs value is very small. Beam tilt refinement might be unnecessary. Sometimes it gives unrealistically large tilts." << std::endl;
+	}
+
 	if (kV < 0.0)
 	{
 		mdt0.getValue(EMDL_CTF_VOLTAGE, kV, 0);
