@@ -2090,22 +2090,3 @@ void MotioncorrRunner::binNonSquareImage(Image<float> &Iwork, RFLOAT bin_factor)
 	Iwork().reshape(new_ny, new_nx);
 	NewFFT::inverseFourierTransform(Fbinned, Iwork());
 }
-
-void MotioncorrRunner::cropInFourierSpace(MultidimArray<fComplex> &Fref, MultidimArray<fComplex> &Fbinned) {
-	const int nfx = XSIZE(Fref), nfy = YSIZE(Fref);
-	const int new_nfx = XSIZE(Fbinned), new_nfy = YSIZE(Fbinned);
-	const int half_new_nfy = new_nfy / 2;
-
-	if (new_nfx > nfx || new_nfy > nfy) REPORT_ERROR("Invalid size given to cropInFourierSpace");
-
-	for (int y = 0; y < half_new_nfy; y++) {
-		for (int x = 0; x < new_nfx; x++) {
-			DIRECT_A2D_ELEM(Fbinned, y, x) =  DIRECT_A2D_ELEM(Fref, y, x);
-		}
-	}
-	for (int y = half_new_nfy; y < new_nfy; y++) {
-		for (int x = 0; x < new_nfx; x++) {
-			DIRECT_A2D_ELEM(Fbinned, y, x) =  DIRECT_A2D_ELEM(Fref, nfy - new_nfy + y, x);
-		}
-	}
-}

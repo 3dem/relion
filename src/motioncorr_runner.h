@@ -191,8 +191,6 @@ private:
 
 	void binNonSquareImage(Image<float> &Iwork, RFLOAT bin_factor);
 
-	void cropInFourierSpace(MultidimArray<fComplex> &Fref, MultidimArray<fComplex> &Fbinned);
-
 	int findGoodSize(int request);
 
 	void doseWeighting(std::vector<MultidimArray<fComplex> > &Fframes, std::vector<RFLOAT> doses, RFLOAT apix);
