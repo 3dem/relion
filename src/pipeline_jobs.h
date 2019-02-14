@@ -218,9 +218,6 @@ class Node
 // Helper function to get the outputnames of refine jobs
 std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, int dim, int nr_bodies=1, bool do_movies=false, bool do_also_rot=false);
 
-// Helper function for Jasenko's programs
-bool getFileNamesFromPostProcess(FileName fn_post, FileName &fn_half1, FileName &fn_half2, FileName &fn_mask);
-
 // One class to store any type of Option for a GUI entry
 class JobOption
 {
