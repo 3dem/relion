@@ -579,6 +579,10 @@ bool MotioncorrRunner::executeMotioncor2(Micrograph &mic, int rank)
 				}
 			}
 
+			fn_tmp = fn_avg.withoutExtension() + "_DWS.mrc";
+			if (exists(fn_tmp))
+				std::remove(fn_tmp.c_str());
+
 			// Move _DW.mrc to .mrc filename
 			fn_tmp = fn_avg.withoutExtension() + "_DW.mrc";
 			if (std::rename(fn_tmp.c_str(), fn_avg.c_str()))
