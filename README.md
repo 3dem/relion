@@ -74,6 +74,7 @@ make -j4
 make install    # (or "sudo make install")
 ```
 
+If something went wrong, remove the `build` directory and try again from `cmake`.
 
 ## Options for accelerated versions
 
