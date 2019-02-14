@@ -89,16 +89,6 @@ std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, 
 
 }
 
-bool getFileNamesFromPostProcess(FileName fn_post, FileName &fn_half1, FileName &fn_half2, FileName &fn_mask)
-{
-	MetaDataTable MD;
-	MD.read(fn_post, "general");
-	return (MD.getValue(EMDL_POSTPROCESS_UNFIL_HALFMAP1, fn_half1) &&
-			MD.getValue(EMDL_POSTPROCESS_UNFIL_HALFMAP2, fn_half2) &&
-			MD.getValue(EMDL_MASK_NAME, fn_mask));
-}
-
-
 // Any constructor
 JobOption::JobOption(std::string _label, std::string _default_value, std::string _helptext)
 {
@@ -178,7 +168,7 @@ void JobOption::initialise(std::string _label, std::string _default_value, std::
 	helptext = _helptext;
 }
 
-    // Get a string value
+// Get a string value
 std::string JobOption::getString()
 {
 	return value;
@@ -5047,28 +5037,12 @@ bool RelionJob::getCommandsMotionrefineJob(std::string &outputname, std::vector<
 	Node node(joboptions["fn_data"].getString(), joboptions["fn_data"].node_type);
 	inputNodes.push_back(node);
 
-	FileName fn_half1, fn_half2, fn_mask;
-	if (!getFileNamesFromPostProcess(joboptions["fn_post"].getString(), fn_half1, fn_half2, fn_mask))
-	{
-		error_message = "ERROR: could not get filenames for unfiltered half maps or mask from postprocess.star...";
-		return false;
-	}
-
 	Node node2(joboptions["fn_post"].getString(), joboptions["fn_post"].node_type);
-	inputNodes.push_back(node);
-
-	Node node3(fn_half1, NODE_HALFMAP);
-	inputNodes.push_back(node);
-
-	Node node4(fn_mask, NODE_MASK);
 	inputNodes.push_back(node);
 
 	command += " --i " + joboptions["fn_data"].getString();
 	command += " --f " + joboptions["fn_post"].getString();
 	command += " --corr_mic " + joboptions["fn_mic"].getString();
-	command += " --m1 " + fn_half1;
-	command += " --m2 " + fn_half2;
-	command += " --mask " + fn_mask;
 	command += " --first_frame " + joboptions["first_frame"].getString();
 	command += " --last_frame " + joboptions["last_frame"].getString();
 	command += " --o " + outputname;
@@ -5209,27 +5183,11 @@ bool RelionJob::getCommandsCtfrefineJob(std::string &outputname, std::vector<std
 	Node node(joboptions["fn_data"].getString(), joboptions["fn_data"].node_type);
 	inputNodes.push_back(node);
 
-	FileName fn_half1, fn_half2, fn_mask;
-	if (!getFileNamesFromPostProcess(joboptions["fn_post"].getString(), fn_half1, fn_half2, fn_mask))
-	{
-		error_message = "ERROR: could not get filenames for unfiltered half maps or mask from postprocess.star...";
-		return false;
-	}
-
 	Node node2(joboptions["fn_post"].getString(), joboptions["fn_post"].node_type);
-	inputNodes.push_back(node);
-
-	Node node3(fn_half1, NODE_HALFMAP);
-	inputNodes.push_back(node);
-
-	Node node4(fn_mask, NODE_MASK);
 	inputNodes.push_back(node);
 
 	command += " --i " + joboptions["fn_data"].getString();
 	command += " --f " + joboptions["fn_post"].getString();
-	command += " --m1 " + fn_half1;
-	command += " --m2 " + fn_half2;
-	command += " --mask " + fn_mask;
 	command += " --o " + outputname;
 
 	if (joboptions["do_ctf"].getBoolean())

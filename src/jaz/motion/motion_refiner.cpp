@@ -312,6 +312,13 @@ void MotionRefiner::init()
 		
 		obsModel = ObservationModel(angpix, Cs, kV * 1e3);
 		
+		if (needsReference)
+		{
+			if (verb > 0) std::cout << " + Reading references ..." << std::endl;
+			
+			reference.load(verb, debug);
+		}
+		
 		// Read the first reference
 		// (even if there is no motion to estimate - only to learn the image size)
 		// @TODO: replace this once the data is tree-structured
@@ -321,14 +328,6 @@ void MotionRefiner::init()
 		// Get dimensions
 		s = map0.data.xdim;
 		sh = s/2 + 1;
-		
-		if (needsReference)
-		{
-			if (verb > 0) std::cout << " + Reading references ..." << std::endl;
-			
-			reference.load(verb, debug);
-		}
-		
 	}
 	
 	if (estimateMotion || estimateParams)

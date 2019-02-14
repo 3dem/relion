@@ -38,15 +38,44 @@ ReferenceMap::ReferenceMap()
 
 void ReferenceMap::read(IOParser& parser, int argc, char* argv[])
 {
-	reconFn0 = parser.getOption("--m1", "Reference map, half 1");
-	reconFn1 = parser.getOption("--m2", "Reference map, half 2");
+	reconFn0 = parser.getOption("--m1", "Reference map, half 1", "");
+	reconFn1 = parser.getOption("--m2", "Reference map, half 2", "");
 	maskFn = parser.getOption("--mask", "Reference mask", "");
-	fscFn = parser.getOption("--f", "Input STAR file with the FSC of the reference");
+	fscFn = parser.getOption("--f", "Input STAR file with the FSC of the reference (usually from PostProcess)");
 	paddingFactor = textToFloat(parser.getOption("--pad", "Padding factor", "2"));
 }
 
 void ReferenceMap::load(int verb, bool debug)
 {
+	if (reconFn0 == "" || reconFn1 == "")
+	{
+		// Get half maps and masks from the PostProcess STAR file.
+		FileName fn_half1, fn_half2, fn_mask;
+		MetaDataTable MD;
+		MD.read(fscFn, "general");
+		bool star_is_valid = MD.getValue(EMDL_POSTPROCESS_UNFIL_HALFMAP1, fn_half1) &&
+		                     MD.getValue(EMDL_POSTPROCESS_UNFIL_HALFMAP2, fn_half2) &&
+		                     MD.getValue(EMDL_MASK_NAME, fn_mask);
+
+		if (star_is_valid)
+		{
+			if (verb > 0)
+			{
+				std::cout << " + The names of the reference half maps and the mask were taken from the PostProcess STAR file.\n";
+				std::cout << "   - Half map 1: " << fn_half1 << "\n";
+				std::cout << "   - Half map 2: " << fn_half2 << "\n";
+				std::cout << "   - Mask: " << fn_mask << std::endl;
+			}
+			reconFn0 = fn_half1;
+			reconFn1 = fn_half2;
+			maskFn = fn_mask;
+		}
+		else
+		{
+			REPORT_ERROR("could not get filenames for unfiltered half maps from the postprocess STAR file.");
+		}
+	}
+
 	Image<RFLOAT> maps[2], powSpec[2];
 	
 	if (debug) std::cout << "reading: " << reconFn0 << "\n";
