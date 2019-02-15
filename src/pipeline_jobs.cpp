@@ -841,7 +841,8 @@ void RelionJob::initialise(int _job_type)
 	}
 	else if (type == PROC_SUBTRACT)
 	{
-		has_mpi = has_thread = false;
+		has_mpi = true;
+		has_thread = false;
 		initialiseSubtractJob();
 	}
 	else if (type == PROC_POST)
@@ -4292,19 +4293,22 @@ void RelionJob::initialiseSubtractJob()
 
 	hidden_name = ".gui_subtract";
 
-	joboptions["fn_data"] = JobOption("Input particles:", NODE_PART_DATA, "", "STAR files (*.star)", "The input STAR file with the metadata of all particles.");
-	joboptions["do_subtract"] = JobOption("Subtract partial signal?", true, "If set to Yes, a copy of the entire set of particle images in this STAR file will be made that contains the subtracted particle images.");
-	joboptions["fn_in"] = JobOption("Map to be projected:", NODE_3DREF, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide the map that will be used to calculate projections, which will be subtracted from the experimental particles. Make sure this map was calculated by RELION from the same particles as above, and preferably with those orientations, as it is crucial that the absolute greyscale is the same as in the experimental particles.");
-    joboptions["fn_mask"] = JobOption("Mask to apply to this map:", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide a soft mask where the protein density you wish to subtract from the experimental particles is white (1) and the rest of the protein and the solvent is black (0).");
-    joboptions["do_fliplabel"] = JobOption("OR revert to original particles?", false, "If set to Yes, no signal subtraction is performed. Instead, the labels of rlnImageName and rlnImageOriginalName are flipped in the input STAR file. This will make the STAR file point back to the original, non-subtracted images.");
+	joboptions["fn_opt"] = JobOption("Input optimiser.star: ", std::string(""), "STAR Files (*_optimiser.star)", "./", "Select the *_optimiser.star file for the iteration of the 3D refinement/classification \
+which you want to use for subtraction. It will use the maps from this run for the subtraction, and of no particles input STAR file is given below, it will use all of the particles from this run.");
+	joboptions["fn_mask"] = JobOption("Mask of the signal to keep:", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide a soft mask where the protein density you wish to subtract from the experimental particles is black (0) and the density you wish to keep is white (1).");
+	joboptions["do_data"] = JobOption("Use different particles?", false, "If set to Yes, subtraction will be performed on the particles in the STAR file below, instead of on all the particles of the 3D refinement/classification from the optimiser.star file.");
+	joboptions["fn_data"] = JobOption("Input particle star file:", NODE_PART_DATA, "", "particle STAR file (*.star)", "The particle STAR files with particles that will be used in the subtraction. Leave this field empty if all particles from the input refinement/classification run are to be used.");
 
-	joboptions["do_ctf_correction"] = JobOption("Do apply CTFs?", true, "If set to Yes, CTFs will be applied to the projections to subtract from the experimental particles");
-	joboptions["ctf_phase_flipped"] = JobOption("Have data been phase-flipped?", false, "Set this to Yes if the experimental particles have been \
-ctf-phase corrected during the pre-processing steps. \
-Note that CTF-phase flipping is NOT a necessary pre-processing step for MAP-refinement in RELION, \
-as this can be done inside the internal CTF-correction. \
-However, if the phases have been flipped, you should tell the program about it by setting this option to Yes.");
-	joboptions["ctf_intact_first_peak"] = JobOption("Ignore CTFs until first peak?", false, "Set this to Yes when you have used the same option in the generation of the input map to be projected.");
+	joboptions["do_fliplabel"] = JobOption("OR revert to original particles?", false, "If set to Yes, no signal subtraction is performed. Instead, the labels of rlnImageName and rlnImageOriginalName are flipped in the input STAR file given in the field below. This will make the STAR file point back to the original, non-subtracted images.");
+	joboptions["fn_fliplabel"] = JobOption("revert this particle star file:", NODE_PART_DATA, "", "particle STAR file (*.star)", "The particle STAR files with particles that will be used for label reversion.");
+
+	joboptions["do_center_mask"] = JobOption("Do center subtracted images on mask?", true, "If set to Yes, the subtracted particles will be centered on projections of the center--of-mass of the input mask.");
+	joboptions["do_center_xyz"] = JobOption("Do center on my coordinates?", false, "If set to Yes, the subtracted particles will be centered on projections of the x,y,z coordinates below.");
+	joboptions["center_x"] = JobOption("Center coordinate (pix) - X:", std::string("0"), "X-coordinate of the 3D center (in pixels).");
+	joboptions["center_y"] = JobOption("Center coordinate (pix) - Y:", std::string("0"), "Y-coordinate of the 3D center (in pixels).");
+	joboptions["center_z"] = JobOption("Center coordinate (pix) - Z:", std::string("0"), "Z-coordinate of the 3D center (in pixels).");
+
+	joboptions["new_box"] = JobOption("New box size:", -1, 64, 512, 32, "Provide a non-negative value to re-window the subtracted particles in a smaller box size." );
 
 }
 
@@ -4315,68 +4319,72 @@ bool RelionJob::getCommandsSubtractJob(std::string &outputname, std::vector<std:
 	initialisePipeline(outputname, PROC_SUBTRACT_NAME, job_counter);
 	std::string command;
 
-	if (joboptions["do_subtract"].getBoolean())
+	if (joboptions["do_fliplabel"].getBoolean())
 	{
-		command="`which relion_project`";
-
-
-		// I/O
-		if (joboptions["fn_in"].getString() == "")
-		{
-			error_message = "ERROR: empty field for input map...";
-			return false;
-		}
-		command += " --subtract_exp --i " + joboptions["fn_in"].getString();
-		Node node(joboptions["fn_in"].getString(), joboptions["fn_in"].node_type);
-		inputNodes.push_back(node);
-		if (joboptions["fn_mask"].getString() == "")
-		{
-			error_message = "ERROR: empty field for input mask...";
-			return false;
-		}
-		command += " --mask " + joboptions["fn_mask"].getString();
-		Node node2(joboptions["fn_mask"].getString(), joboptions["fn_mask"].node_type);
-		inputNodes.push_back(node2);
-		if (joboptions["fn_data"].getString() == "")
-		{
-			error_message = "ERROR: empty field for input STAR file...";
-			return false;
-		}
-		command += " --ang " + joboptions["fn_data"].getString();
-		Node node3(joboptions["fn_data"].getString(), joboptions["fn_data"].node_type);
-		inputNodes.push_back(node3);
-
-		command += " --o " + outputname + "subtracted";
-		Node node4(outputname + "subtracted.star", NODE_PART_DATA);
-		outputNodes.push_back(node4);
-
-		if (joboptions["do_ctf_correction"].getBoolean())
-		{
-			command += " --ctf --angpix -1";
-			if (joboptions["ctf_phase_flipped"].getBoolean())
-				command += " --ctf_phase_flip";
-			if (joboptions["ctf_intact_first_peak"].getBoolean())
-				command += " --ctf_intact_first_peak";
-		}
-
-		// Other arguments
-		command += " " + joboptions["other_args"].getString();
-	}
-	else if (joboptions["do_fliplabel"].getBoolean())
-	{
-		Node node(joboptions["fn_data"].getString(), joboptions["fn_data"].node_type);
+		Node node(joboptions["fn_fliplabel"].getString(), joboptions["fn_fliplabel"].node_type);
 		inputNodes.push_back(node);
 
 		Node node2(outputname + "original.star", NODE_PART_DATA);
 		outputNodes.push_back(node2);
 
 		command = "awk '{if  ($1==\"_rlnImageName\") {$1=\"_rlnImageOriginalName\"} else if ($1==\"_rlnImageOriginalName\") {$1=\"_rlnImageName\"}; print }' < ";
-		command += joboptions["fn_data"].getString() + " > " + outputname + "original.star";
+		command += joboptions["fn_fliplabel"].getString() + " > " + outputname + "original.star";
 	}
 	else
 	{
-		error_message = "Choose either to subtract particle signal, or to revert to original particles";
-		return false;
+		if (joboptions["nr_mpi"].getNumber() > 1)
+			command="`which relion_particle_subtract_mpi`";
+		else
+			command="`which relion_particle_subtract`";
+
+
+		// I/O
+		if (joboptions["fn_opt"].getString() == "")
+		{
+			error_message = "ERROR: empty field for input optimiser.star...";
+			return false;
+		}
+		command += " --i " + joboptions["fn_opt"].getString();
+		Node node(joboptions["fn_opt"].getString(), NODE_OPTIMISER);
+		inputNodes.push_back(node);
+
+		if (joboptions["fn_mask"].getString() != "")
+		{
+			command += " --mask " + joboptions["fn_mask"].getString();
+			Node node2(joboptions["fn_mask"].getString(), joboptions["fn_mask"].node_type);
+			inputNodes.push_back(node2);
+		}
+		if (joboptions["do_data"].getBoolean())
+		{
+			if (joboptions["fn_data"].getString() == "")
+			{
+				error_message = "ERROR: empty field for the input particle STAR file...";
+				return false;
+			}
+			command += " --data " + joboptions["fn_data"].getString();
+			Node node3(joboptions["fn_data"].getString(), joboptions["fn_data"].node_type);
+			inputNodes.push_back(node3);
+		}
+
+		command += " --o " + outputname + "run";
+		Node node4(outputname + "subtracted.star", NODE_PART_DATA);
+		outputNodes.push_back(node4);
+
+		if (joboptions["do_center_mask"].getBoolean())
+		{
+			command += " --recenter_on_mask";
+		}
+		else if (joboptions["do_center_xyz"].getBoolean())
+		{
+			command += " --center_x " + joboptions["center_x"].getString();
+			command += " --center_y " + joboptions["center_y"].getString();
+			command += " --center_z " + joboptions["center_z"].getString();
+		}
+
+		if (joboptions["new_box"].getNumber() > 0)
+		{
+			command += " --new_box " + joboptions["new_box"].getString();
+		}
 	}
 
 	commands.push_back(command);
