@@ -941,14 +941,14 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experimen
 
 }
 
-void MlModel::initialisePdfDirection(int newsize)
+void MlModel::initialisePdfDirection(long long int newsize)
 {
 
 	// If the pdf_direction were already filled (size!=0), and newsize=oldsize then leave them as they were
 	// If they were still empty, or if the size changes, then initialise them with an even distribution
 	for (int iclass = 0; iclass < nr_classes * nr_bodies; iclass++)
 	{
-		int oldsize = MULTIDIM_SIZE(pdf_direction[iclass]);
+		long long int oldsize = MULTIDIM_SIZE(pdf_direction[iclass]);
 		if (oldsize == 0 || oldsize != newsize)
 		{
 			pdf_direction[iclass].resize(newsize);
@@ -1755,9 +1755,9 @@ void MlWsumModel::pack(MultidimArray<RFLOAT> &packed, int &piece, int &nr_pieces
 	packed_size += 3 * nr_groups; // wsum_signal_product, wsum_reference_power, sumw_group
 	// for all class-related stuff
 	// data is complex: multiply by two!
-	packed_size += nr_classes_bodies * 2 * BPref[0].getSize(); // BPref.data
-	packed_size += nr_classes_bodies * BPref[0].getSize(); // BPref.weight
-	packed_size += nr_classes_bodies * nr_directions; // pdf_directions
+	packed_size += nr_classes_bodies * 2 * (unsigned long long) BPref[0].getSize(); // BPref.data
+	packed_size += nr_classes_bodies * (unsigned long long) BPref[0].getSize(); // BPref.weight
+	packed_size += nr_classes_bodies * (unsigned long long) nr_directions; // pdf_directions
 	// for pdf_class
 	packed_size += nr_classes;
 	// for priors for each class

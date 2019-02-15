@@ -68,7 +68,7 @@ public:
 	std::vector<long int> nr_particles_per_group;
 
 	// Number of directions (size of pdf_direction);
-	int nr_directions;
+	long long int nr_directions;
 
 	// Log-likelihood target value
 	RFLOAT LL;
@@ -410,7 +410,7 @@ public:
 	* If they were not empty, check that the new size is equal to the old one, and otherwise throw an exception
 	* because one cannot use an old pdf_orient with size unequal to the new one
 	*/
-	void initialisePdfDirection(int newsize);
+	void initialisePdfDirection(long long int newsize);
 
 	/** Read in the binary masks provided by the user and then make a soft edge on those */
 	void initialiseBodies(FileName fn_masks, FileName fn_root_out, bool also_initialise_rest = false);
