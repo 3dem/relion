@@ -41,12 +41,6 @@ public:
 	// Output rootname
 	FileName fn_out;
 
-	// CTF settings
-	bool do_ctf;
-	bool intact_ctf_first_peak;
-	bool ctf_phase_flipped;
-	bool ctf_premultiplied;
-
 	// The model and the data from the refinement to be analysed
 	FileName fn_model, fn_data;
 	MlModel model;
@@ -97,27 +91,8 @@ public:
 	// Write out text file with eigenvalues for all particles
 	bool do_write_all_pca_projections;
 
-	// Write out subtracted particles
-	bool do_subtract;
-
-	// Which orientations/masks to use for the subtraction, i.e. relative to which body?
-	int subtract_body;
-
-	// Boxsize of the output particles
-	int boxsize;
-
-	// Perform norm and scale corrections in the subtraction?
-	bool do_norm;
-	bool do_scale;
-
-	// Mask with density to keep when doing subtractions
-	FileName fn_keepmask;
-
 	// center of mass of the above
 	Matrix1D<RFLOAT> com_mask;
-
-	// background radius for normalisation
-	float bg_radius;
 
 	// Pre-calculated rotation matrix for (0,90,0) rotation, and its transpose
 	Matrix2D<RFLOAT> A_rot90, A_rot90T;

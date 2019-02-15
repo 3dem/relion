@@ -478,6 +478,7 @@ class image_handler_parameters
 			int newsize = ROUND(oldsize * (angpix / new_angpix));
 			newsize -= newsize%2; //make even in case it is not already
 			resizeMap(Iout(), newsize);
+			new_box = newsize;
 
 			if ( oldxsize != oldysize && Iout().getDim() == 2)
 			{
@@ -493,8 +494,9 @@ class image_handler_parameters
 			// Also reset the sampling rate in the header
 			Iout.setSamplingRateInHeader(new_angpix);
 		}
+
 		// Re-window
-		if (new_box > 0)
+		if (new_box > 0 && XSIZE(Iout()) != new_box)
 		{
 			Iout().setXmippOrigin();
 			if (Iout().getDim() == 2)
@@ -853,6 +855,22 @@ class image_handler_parameters
 		{
 			FileName fn_md_out = fn_in.insertBeforeExtension("_" + fn_out);
 			std::cout << " Written out new STAR file: " << fn_md_out << std::endl;
+
+			if (new_box > 0)
+			{
+				FOR_ALL_OBJECTS_IN_METADATA_TABLE(obsModel.opticsMdt)
+				{
+					obsModel.opticsMdt.setValue(EMDL_IMAGE_SIZE, new_box);
+				}
+			}
+			if (new_angpix > 0)
+			{
+				FOR_ALL_OBJECTS_IN_METADATA_TABLE(obsModel.opticsMdt)
+				{
+					obsModel.opticsMdt.setValue(EMDL_IMAGE_PIXEL_SIZE, new_angpix);
+				}
+			}
+
 			obsModel.save(MD, fn_md_out);
 		}
 

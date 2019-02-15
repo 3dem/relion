@@ -32,6 +32,7 @@
 #include <src/ml_model.h>
 #include <src/exp_model.h>
 #include <src/healpix_sampling.h>
+#include <src/jaz/obs_model.h>
 class project_parameters
 {
 public:
@@ -46,7 +47,7 @@ public:
 	// I/O Parser
 	IOParser parser;
 	MlModel model;
-
+	ObservationModel obsModel;
 
 	void usage()
 	{
@@ -164,7 +165,7 @@ public:
 		else if (!do_only_one)
 		{
 			std::cout << " Reading STAR file with all angles " << fn_ang << std::endl;
-			MDang.read(fn_ang);
+			ObservationModel::loadSafely(fn_ang, obsModel, MDang);
 			std::cout << " Done reading STAR file!" << std::endl;
 
 
@@ -181,17 +182,13 @@ public:
 
 		}
 
-
 		if (angpix < 0.)
 		{
-			if (!do_only_one && MDang.containsLabel(EMDL_CTF_MAGNIFICATION) && MDang.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
+			if (!do_only_one)
 			{
-				MDang.goToObject(0);
-				RFLOAT mag, dstep;
-				MDang.getValue(EMDL_CTF_MAGNIFICATION, mag);
-				MDang.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
-				angpix = 10000. * dstep / mag;
-				std::cout << " + Using pixel size calculated from magnification and detector pixel size in the input STAR file: " << angpix << std::endl;
+				// Get angpix from the first optics group in the obsModel
+				angpix = obsModel.getPixelSize(0);
+				std::cout << " + Using pixel size from the first optics group in the --ang STAR file: " << angpix << std::endl;
 			}
 			else
 			{
@@ -601,7 +598,7 @@ public:
 
 			// Write out STAR file with all information
 			fn_img = fn_out + ".star";
-			DFo.write(fn_img);
+			obsModel.save(DFo, fn_img);
 			std::cout<<" Done writing "<<imgno<<" images in "<<fn_img<<std::endl;
 
 		} // end else do_only_one

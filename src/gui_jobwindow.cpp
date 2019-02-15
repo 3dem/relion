@@ -1839,40 +1839,56 @@ void JobWindow::initialiseSubtractWindow()
 	tab1->label("I/O");
 	resetHeight();
 
-	place("fn_data", TOGGLE_DEACTIVATE);
+	place("fn_opt", TOGGLE_DEACTIVATE);
+	place("fn_mask", TOGGLE_DEACTIVATE);
 
-	current_y += STEPY/2;
 	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group1->end();
-
-	place("do_subtract", TOGGLE_DEACTIVATE, group1);
+	place("do_data", TOGGLE_DEACTIVATE, group1);
 
 	group1->begin();
-	place("fn_in", TOGGLE_DEACTIVATE);
-	place("fn_mask", TOGGLE_DEACTIVATE);
+	place("fn_data", TOGGLE_DEACTIVATE);
 	group1->end();
-	guientries["do_subtract"].cb_menu_i(); // make default active
+	guientries["do_data"].cb_menu_i(); // make default active
 
-	place("do_fliplabel", TOGGLE_DEACTIVATE);
+	current_y += STEPY/2;
+
+	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group2->end();
+	place("do_fliplabel", TOGGLE_DEACTIVATE, group2);
+
+	group2->begin();
+	place("fn_fliplabel", TOGGLE_DEACTIVATE);
+	group2->end();
+	guientries["do_fliplabel"].cb_menu_i(); // make default active
 
 	tab1->end();
 
 	tab2->begin();
-	tab2->label("CTF");
+	tab2->label("Centering");
 	resetHeight();
 
-	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group2->end();
+	group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group3->end();
+	place("do_center_mask", TOGGLE_DEACTIVATE, group3, true);
 
-	place("do_ctf_correction", TOGGLE_DEACTIVATE, group2);
+	group3->begin();
 
-	group2->begin();
+	group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group4->end();
+	place("do_center_xyz", TOGGLE_DEACTIVATE, group4);
 
-	place("ctf_phase_flipped", TOGGLE_DEACTIVATE);
-	place("ctf_intact_first_peak", TOGGLE_DEACTIVATE);
+	group4->begin();
+	place3("center_x", "center_y", "center_z", "Center coordinate - X, Y, Z (pix):", TOGGLE_DEACTIVATE);
+	group4->end();
+	guientries["do_center_xyz"].cb_menu_i(); // To make default effective
 
-	group2->end();
-	guientries["do_ctf_correction"].cb_menu_i(); // To make default effective
+	group3->end();
+	guientries["do_center_mask"].cb_menu_i(); // To make default effective
+
+	current_y += STEPY/2;
+
+	place("new_box", TOGGLE_DEACTIVATE);
 
 	tab2->end();
 
