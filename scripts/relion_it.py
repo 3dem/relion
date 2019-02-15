@@ -1570,9 +1570,7 @@ def run_pipeline(opts):
 
 
         #### Set up the CtfFind job
-        star_name = 'corrected_micrographs.star' if opts.images_are_movies else 'micrographs.star'
-        ctffind_options = ['Input micrographs STAR file: == {}{}'.format(motioncorr_job, star_name),
-                           'Voltage (kV): == {}'.format(opts.voltage),
+        ctffind_options = ['Voltage (kV): == {}'.format(opts.voltage),
                            'Spherical aberration (mm): == {}'.format(opts.Cs),
                            'Amplitude contrast: == {}'.format(opts.ampl_contrast),
                            'Amount of astigmatism (A): == {}'.format(opts.ctffind_astigmatism),
@@ -1587,6 +1585,11 @@ def run_pipeline(opts):
                            'Which GPUs to use: == {}'.format(opts.gctf_gpu),
                            'CTFFIND-4.1 executable: == {}'.format(opts.ctffind4_exe),
                            'Number of MPI procs: == {}'.format(opts.ctffind_mpi)]
+
+	if opts.images_are_movies:
+		ctffind_options.append('Input micrographs STAR file: == {}{}'.format(motioncorr_job, 'corrected_micrographs.star'))
+	else:
+		ctffind_options.append('Input micrographs STAR file: == {}{}'.format(import_job, 'micrographs.star'))
 
         if opts.use_ctffind_instead:
             ctffind_options.append('Use CTFFIND-4.1? == Yes')
@@ -1613,7 +1616,10 @@ def run_pipeline(opts):
 
         ctffind_job, already_had_it  = addJob('CtfFind', 'ctffind_job', SETUP_CHECK_FILE, ctffind_options)
 
-        runjobs = [import_job, motioncorr_job, ctffind_job]
+        runjobs = [import_job]
+	if opts.images_are_movies:
+		runjobs.append(motioncorr_job)
+	runjobs.append(ctffind_job)
 
         # There is an option to stop on-the-fly processing after CTF estimation
         if not opts.stop_after_ctf_estimation:

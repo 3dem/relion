@@ -239,14 +239,10 @@ class Node
 // Helper function to get the outputnames of refine jobs
 std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, int dim, int nr_bodies=1);
 
-// Helper function for Jasenko's programs
-bool getFileNamesFromPostProcess(FileName fn_post, FileName &fn_half1, FileName &fn_half2, FileName &fn_mask);
-
 std::string prepareString(const std::string in);
 std::string restoreString(const std::string in);
 std::string prepareVectorString(const std::vector<std::string> in);
 std::vector<std::string> restoreVectorString(const std::string in);
-
 
 // One class to store any type of Option for a GUI entry
 class JobOption

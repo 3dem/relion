@@ -448,8 +448,8 @@ void Reconstructor::backprojectOneParticle(long int p)
 			ctf.readByGroup(DF, &obsModel, p);
 
 			ctf.getFftwImage(Fctf, mysize, mysize, angpix,
-				 ctf_phase_flipped, only_flip_phases,
-				 intact_ctf_first_peak, true);
+			                 ctf_phase_flipped, only_flip_phases,
+			                 intact_ctf_first_peak, true);
 
 			obsModel.demodulatePhase(DF, p, F2D);
 
@@ -568,8 +568,7 @@ void Reconstructor::backprojectOneParticle(long int p)
 			for (long int y = 0; y < Fctf.ydim; y++)
 			for (long int x = 0; x < Fctf.xdim; x++)
 			{
-				DIRECT_NZYX_ELEM(Fctf, n, z, y, x)
-						*= DIRECT_NZYX_ELEM(wgh(), n, z, y, x);
+				DIRECT_NZYX_ELEM(Fctf, n, z, y, x) *= DIRECT_NZYX_ELEM(wgh(), n, z, y, x);
 			}
 		}
 
@@ -609,7 +608,7 @@ void Reconstructor::reconstruct()
 			RFLOAT val;
 			MDfsc.getValue(EMDL_SPECTRAL_IDX, idx);
 			MDfsc.getValue(EMDL_MLMODEL_FSC_HALVES_REF, val);
-			fsc(idx) =	val;
+			fsc(idx) = val;
 		}
 	}
 
@@ -638,7 +637,7 @@ void Reconstructor::reconstruct()
 	}
 
 	backprojector.reconstruct(vol(), iter, do_map, 1., dummy, dummy, dummy, dummy,
-							  fsc, 1., do_use_fsc, true, 1, -1, false);
+	                          fsc, 1., do_use_fsc, true, 1, -1, false);
 
 
 	if (do_reconstruct_ctf)

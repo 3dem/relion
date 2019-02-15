@@ -140,6 +140,14 @@ void CtfRefiner::init()
 						 << "rlnAngleRot, rlnAngleTilt, rlnAnglePsi and rlnRandomSubset");
 	}
 	
+
+/* // TAKANORI: TODO Put it somewhere
+	if (Cs <= 0.1 && verb > 0)
+	{
+		std::cerr << "WARNING: Your Cs value is very small. Beam tilt refinement might be unnecessary. Sometimes it gives unrealistically large tilts." << std::endl;
+	}
+*/
+
 	// after all the necessary changes to mdt0 have been applied 
 	// in ObservationModel::loadSafely(), split it by micrograph
 	

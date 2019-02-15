@@ -1048,7 +1048,7 @@ void getAllSquaredDifferencesCoarse(
 				// However, corr_img[i]==0, so pix-diff in kernel==0.
 				// This is ok since originally, pix-diff==Img.real^2 + Img.imag^2,
 				// which is ori-indep, and we subtract min_diff form ALL orients.
-				if (op.local_Fctf[img_id].data[i]!=0)
+				if (op.local_Fctf[img_id].data[i]!=0) // TODO: investigate if this is numerically stable!
 					pixel_correction /= op.local_Fctf[img_id].data[i];
 			}
 			Fimg_real[i] = Fimg.data[i].real * pixel_correction;

@@ -29,7 +29,10 @@
 	#include <complex>
 #endif
 
-
+#include <string>
+#include <sstream>
+#include <vector>
+#include <iterator>
 #include "src/ml_model.h"
 #include "src/parallel.h"
 #include "src/exp_model.h"
@@ -410,6 +413,9 @@ public:
 
 	// Print the symmetry transformation matrices
 	bool do_print_symmetry_ops;
+
+    /** Name of the multiple symmetry groups */
+    std::vector<FileName> fn_multi_sym;
 
 	/* Flag whether to use the Adaptive approach as by Tagare et al (2010) J. Struc. Biol.
 	 * where two passes through the integrations are made: a first one with a coarse angular sampling and
