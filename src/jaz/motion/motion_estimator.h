@@ -55,6 +55,7 @@ class MotionEstimator
         void prepMicrograph(
             // in:
             const MetaDataTable& mdt, std::vector<ParFourierTransformer>& fts,
+			const std::vector<Image<RFLOAT>>& dmgWeight,
 			int ogmg,
             // out:
             std::vector<std::vector<Image<Complex>>>& movie,
@@ -103,7 +104,7 @@ class MotionEstimator
             bool paramsRead, ready;
 
             // read from cmd line
-            int maxEDs, maxIters, globOffMax;
+            int maxEDs, maxIters, globOffMax, group;
 
             bool unregGlob, globOff, cutoffOut,
                 diag, expKer, global_init, debugOpt,
@@ -122,7 +123,9 @@ class MotionEstimator
 			
 			double angpix_ref;
             std::vector<double> angpix;			
-            bool debug, no_whitening;
+            bool debug, no_whitening, all_groups;
+			
+			std::vector<std::vector<Image<RFLOAT>>> damageWeights;
 
             std::string outPath;
 

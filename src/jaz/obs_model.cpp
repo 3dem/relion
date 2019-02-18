@@ -413,6 +413,22 @@ bool ObservationModel::allPixelSizesIdentical() const
 	return out;
 }
 
+bool ObservationModel::allBoxSizesIdentical() const
+{
+	bool out = true;
+
+	for (int i = 1; i < boxSizes.size(); i++)
+	{
+		if (boxSizes[i] != boxSizes[0])
+		{
+			out = false;
+			break;
+		}
+	}
+
+	return out;
+}
+
 double ObservationModel::angToPix(double a, int s, int opticsGroup) const
 {
 	return s * angpix[opticsGroup] / a;
@@ -497,6 +513,13 @@ int ObservationModel::getOpticsGroup(const MetaDataTable &particlesMdt, long int
 	opticsGroup--;
 	
 	return opticsGroup;
+}
+
+std::string ObservationModel::getGroupName(int og)
+{
+	std::stringstream sts;
+	sts << (og+1);
+	return sts.str();
 }
 
 int ObservationModel::numberOfOpticsGroups() const

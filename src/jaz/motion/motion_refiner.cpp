@@ -310,13 +310,13 @@ void MotionRefiner::init()
 	
 	if (estimateParams)
 	{
-		REPORT_ERROR("Parameter estimation currently not supported");
-		/*
+		//REPORT_ERROR("Parameter estimation currently not supported");
+		
 		if (verb > 0) std::cout << " + Initializing motion parameter estimator ..." << std::endl;
 		
 		motionParamEstimator.init(
 			verb, nr_omp_threads, debug, outPath,
-			fc, chosenMdts, &motionEstimator, &reference, &obsModel);*/
+			fc, chosenMdts, &motionEstimator, &reference, &obsModel);
 	}
 }
 

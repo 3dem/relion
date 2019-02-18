@@ -120,9 +120,9 @@ class ObservationModel
 
 
 	// Bureaucracy //
-
-		// for now, the programs assume that all optics groups have the same pixel size
+		
 		bool allPixelSizesIdentical() const;
+		bool allBoxSizesIdentical() const;
 
         double angToPix(double a, int s, int opticsGroup) const;
         double pixToAng(double p, int s, int opticsGroup) const;
@@ -143,6 +143,8 @@ class ObservationModel
 		std::vector<Matrix2D<RFLOAT> > getMagMatrices() const;
 
 		int getOpticsGroup(const MetaDataTable &particlesMdt, long int particle) const;
+		
+		std::string getGroupName(int og);
 
 		/* duh */
 		int numberOfOpticsGroups() const;
