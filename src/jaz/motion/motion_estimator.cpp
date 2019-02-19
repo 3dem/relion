@@ -225,56 +225,21 @@ void MotionEstimator::process(const std::vector<MetaDataTable>& mdts, long g_sta
 		{
 			std::cout << g << "/" << g_end << " (" << pc << " particles)" << std::endl;
 		}
-		
-		bool selectedGroupPresent = all_groups;
-		
+				
 		// optics group representative of this micrograph 
 		// (only the pixel and box sizes have to be identical)
 		int ogmg = 0;
 		
-		// Make sure that all pixel and box sizes are identical within this micrograph:
+		if (!obsModel->allPixelAndBoxSizesIdentical(mdts[g]))
 		{
-			int og0 = obsModel->getOpticsGroup(mdts[g], 0);
-			ogmg = og0;
+			std::cerr << "WARNING: varying pixel or box sizes detected in "
+					  << MotionRefiner::getOutputFileNameRoot(outPath, mdts[g])
+					  << " - skipping micrograph." << std::endl;
 			
-			int boxSize0 = obsModel->getBoxSize(og0);
-			double angpix0 = obsModel->getPixelSize(og0);
-			
-			bool allGood = true;
-			
-			for (int p = 1; p < pc; p++)
-			{
-				int og = obsModel->getOpticsGroup(mdts[g], p);
-				
-				if (og == group)
-				{
-					selectedGroupPresent = true;
-				}
-				
-				int boxSize = obsModel->getBoxSize(og);
-				double angpix = obsModel->getPixelSize(og);
-				
-				if (boxSize != boxSize0 || angpix != angpix0)
-				{
-					allGood = false;
-					break;
-				}
-			}
-			
-			if (!allGood)
-			{
-				std::cerr << "WARNING: varying pixel or box sizes detected in "
-						  << MotionRefiner::getOutputFileNameRoot(outPath, mdts[g])
-						  << " - skipping micrograph." << std::endl;
-				
-				continue;
-			}
-			
-			if (!selectedGroupPresent)
-			{
-				continue;
-			}
+			continue;
 		}
+		
+		if (!all_groups && !obsModel->containsGroup(mdts[g], group)) continue;
 		
 		// Make sure output directory exists
 		FileName newdir = MotionRefiner::getOutputFileNameRoot(outPath, mdts[g]);

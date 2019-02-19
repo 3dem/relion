@@ -145,6 +145,9 @@ class ObservationModel
 		int getOpticsGroup(const MetaDataTable &particlesMdt, long int particle) const;
 		
 		std::string getGroupName(int og);
+		
+		bool allPixelAndBoxSizesIdentical(const MetaDataTable& mdt);
+		bool containsGroup(const MetaDataTable& mdt, int group);
 
 		/* duh */
 		int numberOfOpticsGroups() const;

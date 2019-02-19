@@ -41,8 +41,8 @@ void FrameRecombiner::read(IOParser& parser, int argc, char* argv[])
     parser.addSection("Combine frames options");
 
     doCombineFrames = parser.checkOption("--combine_frames", "Combine movie frames into polished particles.");
-	scale_arg = textToInteger(parser.getOption("--scale", "Re-scale the particles to this size (default is the size of the reference map)", "-1"));
-	box_arg = textToInteger(parser.getOption("--window", "Re-window the particles to this size (in movie-pixels; default is predicted from the size and pixel-size of the reference map)", "-1"));	
+	scale_arg = textToInteger(parser.getOption("--scale", "Re-scale the particles to this size (by default read from particles star file)", "-1"));
+	box_arg = textToInteger(parser.getOption("--window", "Re-window the particles to this size (in movie-pixels; by default read from particles star file)", "-1"));	
 	k0a = textToDouble(parser.getOption("--bfac_minfreq", "Min. frequency used in B-factor fit [Angst]", "20"));
     k1a = textToDouble(parser.getOption("--bfac_maxfreq", "Max. frequency used in B-factor fit [Angst]", "-1"));
     bfacFn = parser.getOption("--bfactors", "A .star file with external B/k-factors", "");
@@ -88,6 +88,8 @@ void FrameRecombiner::init(
 	this->maxFreq = maxFreq;
 	
 	/*
+	  OLD:
+	  
 		neither window nor scale provided:
 		
 			angpix_out = angpix_ref
@@ -108,52 +110,90 @@ void FrameRecombiner::init(
 		
 			angpix_out = angpix_mov * window / scale
 			s_out = scale
+			
+			
+	  NEW:
+	  
+		neither window nor scale provided:
+		
+			angpix_out = angpix(particle)
+			s_out = box_size(particle)
+			
+		only window provided:
+		
+			angpix_out = angpix(particle)
+			s_out = window * angpix_mov / angpix(particle)
+			
+		only scale provided:
+		
+			window_mov = box_size(particle) * angpix(particle) / angpix_mov
+			angpix_out = angpix_mov * window_mov / scale
+			s_out = scale
+			
+		both provided:
+		
+			angpix_out = angpix_mov * window / scale
+			s_out = scale
+			
+			
 	*/
 	
+	const int nog = obsModel->numberOfOpticsGroups();
+	
+	s_out.resize(nog);
+	sh_out.resize(nog);
+	angpix_out.resize(nog);			
+	freqWeights.resize(nog);
+	
 	const double angpix_mov = micrographHandler->movie_angpix;
-	int s_mov;
 	
-	if (box_arg > 0) s_mov = box_arg;
-	else s_mov = 2 * (int)(0.5 * s_ref * angpix_ref / angpix_mov + 0.5);
-	
-	if (scale_arg > 0) 
+	for (int og = 0; og < nog; og++)
 	{
-		s_out = scale_arg;		
-		angpix_out = angpix_mov * s_mov / (double) scale_arg;
-	}
-	else 
-	{
-		s_out = 2 * (int)(0.5 * s_mov * angpix_mov / angpix_ref + 0.5);
-		angpix_out = angpix_ref;
-	}
+		int s_mov;
+		
+		if (box_arg > 0) s_mov = box_arg;
+		else s_mov = 2 * (int)(0.5 * s_ref * angpix_ref / angpix_mov + 0.5);
+		
+		if (scale_arg > 0) 
+		{
+			s_out[og] = scale_arg;		
+			angpix_out[og] = angpix_mov * s_mov / (double) scale_arg;
+		}
+		else 
+		{
+			s_out[og] = 2 * (int)(0.5 * s_mov * angpix_mov / angpix_ref + 0.5);
+			angpix_out[og] = angpix_ref;
+		}
+		
+		sh_out[og] = s_out[og]/2 + 1;
+		
+		if (debug)
+		{
+			std::cout << "optics group " << og << "\n";
+			std::cout << "s_out: " << s_out[og] << "\n";
+			std::cout << "s_mov: " << s_mov << "\n";
+			std::cout << "angpix_out: " << angpix_out[og] << "\n";
+		}
+		
+		if (s_out[og] > s_mov)
+		{
+			REPORT_ERROR_STR("Images can only be scaled down, not up!\n"
+				<< "You are trying to extract squares of size " << s_mov << " px from the movies and "
+				<< "scale them up to " << s_out[og] << " px\n");
+		}
 	
-	sh_out = s_out/2 + 1;
+		// Either calculate weights from FCC or from user-provided B-factors
+		const bool hasBfacs = bfacFn != "";
 	
-	if (debug)
-	{
-		std::cout << "s_out: " << s_out << "\n";
-		std::cout << "s_mov: " << s_mov << "\n";
-		std::cout << "angpix_out: " << angpix_out << "\n";
+		if (!hasBfacs)
+		{
+			freqWeights[og] = weightsFromFCC(allMdts, s_out[og], angpix_out[og]);
+		}
+		else
+		{
+			freqWeights[og] = weightsFromBfacs(allMdts, s_out[og], angpix_out[og]);
+		}
 	}
-	
-	if (s_out > s_mov)
-	{
-		REPORT_ERROR_STR("Images can only be scaled down, not up!\n"
-			<< "You are trying to extract squares of size " << s_mov << " px from the movies and "
-			<< "scale them up to " << s_out << " px\n");
-	}
-
-    // Either calculate weights from FCC or from user-provided B-factors
-    const bool hasBfacs = bfacFn != "";
-
-    if (!hasBfacs)
-    {
-        freqWeights = weightsFromFCC(allMdts);
-    }
-    else
-    {
-        freqWeights = weightsFromBfacs();
-    }
 }
 
 void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_start, long g_end)
@@ -180,9 +220,23 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 
         pctot += pc;
 		
+		// optics group representative of this micrograph 
+		// (only the pixel and box sizes have to be identical)
+		int ogmg = obsModel->getOpticsGroup(mdts[g], 0);
+		
+		if (!obsModel->allPixelAndBoxSizesIdentical(mdts[g]))
+		{
+			std::cerr << "WARNING: varying pixel or box sizes detected in "
+					  << MotionRefiner::getOutputFileNameRoot(outPath, mdts[g])
+					  << " - skipping micrograph." << std::endl;
+			
+			continue;
+		}
+		
+		
 		FileName fn_root = MotionRefiner::getOutputFileNameRoot(outPath, mdts[g]);
         std::vector<std::vector<d2Vector>> shift0;
-        shift0 = MotionHelper::readTracksInPix(fn_root + "_tracks.star", angpix_out);
+        shift0 = MotionHelper::readTracksInPix(fn_root + "_tracks.star", angpix_out[ogmg]);
 	
 		std::vector<std::vector<d2Vector>> shift = shift0;
 		
@@ -190,37 +244,39 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 		
 		// loadMovie() will extract squares around the value of shift0 rounded in movie coords,
 		// and return the remainder in shift (in output coordinates)
-        movie = micrographHandler->loadMovie(mdts[g], s_out, angpix_out, fts, &shift0, &shift);
+        movie = micrographHandler->loadMovie(
+					mdts[g], s_out[ogmg], angpix_out[ogmg], fts, &shift0, &shift);
 
-        Image<RFLOAT> stack(s_out, s_out, 1, pc);
+        Image<RFLOAT> stack(s_out[ogmg], s_out[ogmg], 1, pc);
 
         #pragma omp parallel for num_threads(nr_omp_threads)
         for (int p = 0; p < pc; p++)
         {
 			int threadnum = omp_get_thread_num();
 
-            Image<Complex> sum(sh_out, s_out);
+            Image<Complex> sum(sh_out[ogmg], s_out[ogmg]);
             sum.data.initZeros();
 
-            Image<Complex> obs(sh_out, s_out);
+            Image<Complex> obs(sh_out[ogmg], s_out[ogmg]);
 
             for (int f = 0; f < fc; f++)
             {
-				shiftImageInFourierTransform(movie[p][f](), obs(), s_out, -shift[p][f].x, -shift[p][f].y);
+				shiftImageInFourierTransform(movie[p][f](), obs(), s_out[ogmg], 
+											 -shift[p][f].x, -shift[p][f].y);
 
-                for (int y = 0; y < s_out; y++)
-                for (int x = 0; x < sh_out; x++)
+                for (int y = 0; y < s_out[ogmg]; y++)
+                for (int x = 0; x < sh_out[ogmg]; x++)
                 {
-                    sum(y,x) += freqWeights[f](y,x) * obs(y,x);
+                    sum(y,x) += freqWeights[ogmg][f](y,x) * obs(y,x);
                 }
             }
 
-            Image<RFLOAT> real(s_out, s_out);
+            Image<RFLOAT> real(s_out[ogmg], s_out[ogmg]);
 
             fts[threadnum].inverseFourierTransform(sum(), real());
 
-            for (int y = 0; y < s_out; y++)
-            for (int x = 0; x < s_out; x++)
+            for (int y = 0; y < s_out[ogmg]; y++)
+            for (int x = 0; x < s_out[ogmg]; x++)
             {
                 DIRECT_NZYX_ELEM(stack(), p, 0, y, x) = real(y,x);
             }
@@ -230,8 +286,10 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 
         if (debug)
         {
-            VtkHelper::writeTomoVTK(stack, fn_root+"_shiny.vtk", false, 
-									angpix_out, -angpix_out * s_out * 0.5 * d3Vector(1,1,0));
+            VtkHelper::writeTomoVTK(
+				stack, fn_root+"_shiny.vtk", false, 
+				angpix_out[ogmg], 
+				-angpix_out[ogmg] * s_out[ogmg] * 0.5 * d3Vector(1,1,0));
         }
 
         MetaDataTable mdtOut = mdts[g];
@@ -244,7 +302,7 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 			
 			double mag;
 			mdtOut.getValue(EMDL_CTF_MAGNIFICATION, mag, p);			
-			mag *= angpix_ref / angpix_out;			
+			mag *= angpix_ref / angpix_out[ogmg];			
 			mdtOut.setValue(EMDL_CTF_MAGNIFICATION, mag, p);
         }
 
@@ -265,7 +323,8 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 }
 
 std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromFCC(
-        const std::vector<MetaDataTable>& allMdts)
+        const std::vector<MetaDataTable>& allMdts,
+		int s, double angpix)
 {
     if (debug && verb > 0)
     {
@@ -362,7 +421,7 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromFCC(
 	// rescale if a different box size is to be extracted
 	std::vector<d2Vector> bkFacsRescaled(fc);
 	
-	if (s_out == s_ref)
+	if (s == s_ref)
 	{
 		bkFacsRescaled = bkFacs.first;
 	}
@@ -370,13 +429,15 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromFCC(
 	{
 		for (int f = 0; f < fc; f++)
 		{
-			bkFacsRescaled[f].x = (s_out * angpix_out) * bkFacs.first[f].x / (double) (s_ref * angpix_ref); 
+			bkFacsRescaled[f].x = (s * angpix) * bkFacs.first[f].x / (double) (s_ref * angpix_ref); 
 			bkFacsRescaled[f].y = bkFacs.first[f].y;
 		}
 	}
 	
+	const int sh = s/2 + 1;
+	
     std::vector<Image<RFLOAT>> freqWeights;
-    freqWeights = DamageHelper::computeWeights(bkFacsRescaled, sh_out);
+    freqWeights = DamageHelper::computeWeights(bkFacsRescaled, sh);
 
     const double cf = 8.0 * angpix_ref * angpix_ref * sh_ref * sh_ref;
 
@@ -397,8 +458,8 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromFCC(
 
         for (int i = 0; i < fc; i++)
         {
-            double s = bkFacs.first[i].x;
-            double b = -cf/(s*s);
+            double sig = bkFacs.first[i].x;
+            double b = -cf/(sig*sig);
 
             bfacsDat << i << " " << b << std::endl;
             kfacsDat << i << " " << log(bkFacs.first[i].y) << std::endl;
@@ -413,8 +474,8 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromFCC(
 
     for (int f = 0; f < fc; f++ )
     {
-        double s = bkFacs.first[f].x;
-        double b = -cf/(s*s);
+        double sig = bkFacs.first[f].x;
+        double b = -cf/(sig*sig);
         double k = log(bkFacs.first[f].y);
 
         mdt.addObject();
@@ -447,8 +508,12 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromFCC(
     return freqWeights;
 }
 
-std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromBfacs()
+std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromBfacs(
+		const std::vector<MetaDataTable>& allMdts,
+		int s, double angpix)
 {
+	const int sh = s/2 + 1;
+	
     // initialization on the first line to avoid copying of return value
     std::vector<Image<RFLOAT>> freqWeights;
 
@@ -469,7 +534,7 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromBfacs()
         if (b > bfacOff) bfacOff = b;
     }
 	
-    const double cf = 8.0 * angpix_ref * angpix_ref * sh_out * sh_out;
+    const double cf = 8.0 * angpix_ref * angpix_ref * sh * sh;
 
     for (int f = 0; f < fc; f++)
     {
@@ -480,7 +545,7 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromBfacs()
 		bkFacs[f] = d2Vector(sqrt(-cf/(b-bfacOff-1)), exp(k));
     }
 
-    freqWeights = DamageHelper::computeWeights(bkFacs, sh_out);
+    freqWeights = DamageHelper::computeWeights(bkFacs, sh);
 
     if (bfac_diag)
     {
@@ -490,7 +555,7 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromBfacs()
         bkFacs2.first = bkFacs;
         bkFacs2.second = std::vector<double>(fc, 1.0);
 
-        Image<RFLOAT> bfacFitNoScale = DamageHelper::renderBkFit(bkFacs2, sh_out, fc, true);
+        Image<RFLOAT> bfacFitNoScale = DamageHelper::renderBkFit(bkFacs2, sh, fc, true);
 
         ImageLog::write(bfacFitNoScale, outPath + "/bfacs/glob_Bk-fit_noScale");
         ImageLog::write(freqWeights, outPath + "/bfacs/freqWeights");
@@ -500,8 +565,8 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromBfacs()
 
         for (int i = 0; i < fc; i++)
         {
-            double s = bkFacs[i].x;
-            double b = -cf/(s*s);
+            double sig = bkFacs[i].x;
+            double b = -cf/(sig*sig);
 
             bfacsDat << i << " " << b << std::endl;
             kfacsDat << i << " " << log(bkFacs[i].y) << std::endl;
@@ -544,14 +609,14 @@ std::vector<MetaDataTable> FrameRecombiner::findUnfinishedJobs(
 	return out;
 }
 
-double FrameRecombiner::getOutputPixelSize()
+double FrameRecombiner::getOutputPixelSize(int opticsGroup)
 {
-	return angpix_out;
+	return angpix_out[opticsGroup];
 }
 
-int FrameRecombiner::getOutputBoxSize()
+int FrameRecombiner::getOutputBoxSize(int opticsGroup)
 {
-	return s_out;
+	return s_out[opticsGroup];
 }
 
 bool FrameRecombiner::isJobFinished(std::string filenameRoot)

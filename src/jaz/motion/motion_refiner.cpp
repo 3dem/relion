@@ -411,8 +411,8 @@ void MotionRefiner::combineEPSAndSTARfiles()
 	{
 		for (int og = 0; og < obsModel.numberOfOpticsGroups(); og++)
 		{
-			obsModel.opticsMdt.setValue(EMDL_IMAGE_PIXEL_SIZE, frameRecombiner.getOutputPixelSize(), og);
-			obsModel.opticsMdt.setValue(EMDL_IMAGE_SIZE, frameRecombiner.getOutputBoxSize(), og);
+			obsModel.opticsMdt.setValue(EMDL_IMAGE_PIXEL_SIZE, frameRecombiner.getOutputPixelSize(og), og);
+			obsModel.opticsMdt.setValue(EMDL_IMAGE_SIZE, frameRecombiner.getOutputBoxSize(og), og);
 		}
 		
 		obsModel.save(mdtAll, outPath+"shiny.star");

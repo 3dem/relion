@@ -60,8 +60,8 @@ class FrameRecombiner
         static std::vector<MetaDataTable> findUnfinishedJobs(
                 const std::vector<MetaDataTable>& mdts, std::string path);
 		
-		double getOutputPixelSize();
-		int getOutputBoxSize();
+		double getOutputPixelSize(int opticsGroup);
+		int getOutputBoxSize(int opticsGroup);
 
 
     protected:
@@ -73,22 +73,29 @@ class FrameRecombiner
             std::string bfacFn;
 
             // set at init:
-            int s_ref, sh_ref, fc, s_out, sh_out;
+            int s_ref, sh_ref, fc;
+			std::vector<int> s_out, sh_out;
             int verb, nr_omp_threads;
             std::string outPath;
             bool debug;
-            double angpix_ref, angpix_out, maxFreq;
+            double angpix_ref, maxFreq;
+			std::vector<double> angpix_out;
 
 			ReferenceMap* reference;
             ObservationModel* obsModel;
             MicrographHandler* micrographHandler;
 
             // computed by weightsFromFCC or weightsFromBfacs:
-            std::vector<Image<RFLOAT>> freqWeights;
+            std::vector<std::vector<Image<RFLOAT>>> freqWeights;
 
 
-        std::vector<Image<RFLOAT>> weightsFromFCC(const std::vector<MetaDataTable>& allMdts);
-        std::vector<Image<RFLOAT>> weightsFromBfacs();
+        std::vector<Image<RFLOAT>> weightsFromFCC(
+				const std::vector<MetaDataTable>& allMdts,
+				int s, double angpix);
+		
+        std::vector<Image<RFLOAT>> weightsFromBfacs(
+				const std::vector<MetaDataTable>& allMdts,
+				int s, double angpix);
 
         static bool isJobFinished(std::string filenameRoot);
 };
