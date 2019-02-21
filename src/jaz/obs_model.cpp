@@ -170,7 +170,7 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 			      || opticsMdt.containsLabel(EMDL_IMAGE_MAG_MATRIX_10)
 			      || opticsMdt.containsLabel(EMDL_IMAGE_MAG_MATRIX_11);
 
-	if (hasMagMatrices) magMatrices.resize(opticsMdt.numberOfObjects());
+	magMatrices.resize(opticsMdt.numberOfObjects());
 
 	hasBoxSizes = opticsMdt.containsLabel(EMDL_IMAGE_SIZE);
 
@@ -210,12 +210,15 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 
 			TiltHelper::insertTilt(oddZernikeCoeffs[i], tx, ty, Cs[i], lambda[i]);
 		}
+		
+		// always keep a set of mag matrices
+		// if none are defined, keep a set of identity matrices
+		
+		magMatrices[i] = Matrix2D<RFLOAT>(3,3);
+		magMatrices[i].initIdentity();
 
 		if (hasMagMatrices)
 		{
-			magMatrices[i] = Matrix2D<RFLOAT>(3,3);
-			magMatrices[i].initIdentity();
-
 			// transpose the matrix, since the transpose is used in Projector::get2DFourierTransform
 			opticsMdt.getValue(EMDL_IMAGE_MAG_MATRIX_00, magMatrices[i](0,0), i);
 			opticsMdt.getValue(EMDL_IMAGE_MAG_MATRIX_01, magMatrices[i](0,1), i);
