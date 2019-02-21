@@ -54,7 +54,7 @@ class MotionParamEstimator
         int read(IOParser& parser, int argc, char *argv[]);
 
         void init(int verb, int nr_omp_threads, bool debug,
-                  std::string outPath, int s, int fc,
+                  std::string outPath, int fc,
                   const std::vector<MetaDataTable>& allMdts,
                   MotionEstimator* motionEstimator,
                   ReferenceMap* reference,
@@ -79,7 +79,7 @@ class MotionParamEstimator
 
             // read from cmd. line:
             bool estim2, estim3;
-            int minParticles, maxRange, maxIters, seed;
+            int minParticles, maxRange, maxIters, seed, group;
             double sV, sD, sA;
             double iniStep, conv;
 			double align_frac, eval_frac;
@@ -92,7 +92,9 @@ class MotionParamEstimator
             ObservationModel* obsModel;
             ReferenceMap* reference;
 
-            int fc, s, k_out, verb, nr_omp_threads;
+            int fc, k_out, verb, nr_omp_threads, s_ref, s, sh;
+			bool allGroups;
+			
             bool debug;
 			std::string outPath;
 

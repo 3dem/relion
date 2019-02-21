@@ -51,6 +51,8 @@ void MotionEstimator::read(IOParser& parser, int argc, char *argv[])
 	sig_acc = textToDouble(parser.getOption("--s_acc", "Acceleration sigma [Angst/dose]", "2.0"));
 	
 	paramsFn = parser.getOption("--params_file", "File containing s_vel, s_div and s_acc (overrides command line parameters)", "");
+	group = textToInteger(parser.getOption("--only_group", "Only align micrographs containing particles from this optics group (negative means off)", "-1")) - 1;
+	all_groups = group < 0;
 			
 	diag = parser.checkOption("--diag", "Write out diagnostic data");
 	
@@ -154,6 +156,30 @@ void MotionEstimator::init(
 	
 	if (debug) std::cout << "computing damage weights..." << std::endl;
 	
+	damageWeights.resize(obsModel->numberOfOpticsGroups());
+	
+	for (int g = 0; g < obsModel->numberOfOpticsGroups(); g++)
+	{
+		damageWeights[g] = computeDamageWeights(g);
+	
+		// @TODO: make filter flank width (around FSC=.143) a parameter (and greater than 3 pixels)
+		for (int f = 0; f < fc; f++)
+		{
+			damageWeights[g][f].data.xinit = 0;
+			damageWeights[g][f].data.yinit = 0;
+			
+			if (cutoffOut)
+			{
+				double conv_fact = (s[g] * angpix[g]) / (s_ref * angpix_ref);
+						
+				damageWeights[g][f] = FilterHelper::raisedCosEnvFreq2D(
+					damageWeights[g][f], 
+					conv_fact * (reference->k_out - 1), 
+					conv_fact * (reference->k_out + 1));
+			}
+		}
+	}
+	
 	ready = true;
 }
 
@@ -169,7 +195,7 @@ void MotionEstimator::process(const std::vector<MetaDataTable>& mdts, long g_sta
 	
 	if (verb > 0)
 	{
-		std::cout << " + Performing loop over all micrographs ... " << std::endl;
+		std::cout << " + Performing loop over micrographs " << g_start << " to " << g_end << "... " << std::endl;
 		if (!debug) init_progress_bar(my_nr_micrographs);
 	}
 	
@@ -199,44 +225,21 @@ void MotionEstimator::process(const std::vector<MetaDataTable>& mdts, long g_sta
 		{
 			std::cout << g << "/" << g_end << " (" << pc << " particles)" << std::endl;
 		}
-		
+				
 		// optics group representative of this micrograph 
 		// (only the pixel and box sizes have to be identical)
 		int ogmg = 0;
 		
-		// Make sure that all pixel and box sizes are identical within this micrograph:
+		if (!obsModel->allPixelAndBoxSizesIdentical(mdts[g]))
 		{
-			int og0 = obsModel->getOpticsGroup(mdts[g], 0);
-			ogmg = og0;
+			std::cerr << "WARNING: varying pixel or box sizes detected in "
+					  << MotionRefiner::getOutputFileNameRoot(outPath, mdts[g])
+					  << " - skipping micrograph." << std::endl;
 			
-			int boxSize0 = obsModel->getBoxSize(og0);
-			double angpix0 = obsModel->getPixelSize(og0);
-			
-			bool allGood = true;
-			
-			for (int p = 1; p < pc; p++)
-			{
-				int og = obsModel->getOpticsGroup(mdts[g], p);
-				
-				int boxSize = obsModel->getBoxSize(og);
-				double angpix = obsModel->getPixelSize(og);
-				
-				if (boxSize != boxSize0 || angpix != angpix0)
-				{
-					allGood = false;
-					break;
-				}
-			}
-			
-			if (!allGood)
-			{
-				std::cerr << "WARNING: varying pixel or box sizes detected in "
-						  << MotionRefiner::getOutputFileNameRoot(outPath, mdts[g])
-						  << " - skipping micrograph." << std::endl;
-				
-				continue;
-			}
+			continue;
 		}
+		
+		if (!all_groups && !obsModel->containsGroup(mdts[g], group)) continue;
 		
 		// Make sure output directory exists
 		FileName newdir = MotionRefiner::getOutputFileNameRoot(outPath, mdts[g]);
@@ -280,7 +283,7 @@ void MotionEstimator::process(const std::vector<MetaDataTable>& mdts, long g_sta
 		try
 		{
 			prepMicrograph(
-				mdts[g], fts, ogmg,
+				mdts[g], fts, damageWeights[ogmg], ogmg,
 				movie, movieCC, positions, initialTracks, globComp);
 		}
 		catch (RelionError e)
@@ -365,6 +368,7 @@ void MotionEstimator::process(const std::vector<MetaDataTable>& mdts, long g_sta
 
 void MotionEstimator::prepMicrograph(
 		const MetaDataTable &mdt, std::vector<ParFourierTransformer>& fts,
+		const std::vector<Image<RFLOAT>>& dmgWeight,
 		int ogmg,
 		std::vector<std::vector<Image<Complex>>>& movie,
 		std::vector<std::vector<Image<RFLOAT>>>& movieCC,
@@ -403,25 +407,6 @@ void MotionEstimator::prepMicrograph(
 			{
 				MotionHelper::noiseNormalize(movie[p][f], sigma2, movie[p][f]);
 			}
-		}
-	}
-	
-	std::vector<Image<RFLOAT>> dmgWeight = computeDamageWeights(ogmg);
-
-	// @TODO: make filter flank width (around FSC=.143) a parameter (and greater than 3 pixels)
-	for (int f = 0; f < fc; f++)
-	{
-		dmgWeight[f].data.xinit = 0;
-		dmgWeight[f].data.yinit = 0;
-		
-		if (cutoffOut)
-		{
-			double conv_fact = (s[ogmg] * angpix[ogmg]) / (s_ref * angpix_ref);
-					
-			dmgWeight[f] = FilterHelper::raisedCosEnvFreq2D(
-				dmgWeight[f], 
-				conv_fact * (reference->k_out - 1), 
-				conv_fact * (reference->k_out + 1));
 		}
 	}
 	

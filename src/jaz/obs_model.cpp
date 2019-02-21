@@ -459,6 +459,22 @@ bool ObservationModel::allPixelSizesIdentical() const
 	return out;
 }
 
+bool ObservationModel::allBoxSizesIdentical() const
+{
+	bool out = true;
+
+	for (int i = 1; i < boxSizes.size(); i++)
+	{
+		if (boxSizes[i] != boxSizes[0])
+		{
+			out = false;
+			break;
+		}
+	}
+
+	return out;
+}
+
 double ObservationModel::angToPix(double a, int s, int opticsGroup) const
 {
 	return s * angpix[opticsGroup] / a;
@@ -543,6 +559,61 @@ int ObservationModel::getOpticsGroup(const MetaDataTable &particlesMdt, long int
 	opticsGroup--;
 
 	return opticsGroup;
+}
+
+std::string ObservationModel::getGroupName(int og)
+{
+	std::stringstream sts;
+	sts << (og+1);
+	return sts.str();
+}
+
+bool ObservationModel::allPixelAndBoxSizesIdentical(const MetaDataTable &mdt)
+{
+	int og0 = getOpticsGroup(mdt, 0);
+	
+	int boxSize0 = getBoxSize(og0);
+	double angpix0 = getPixelSize(og0);
+	
+	bool allGood = true;
+	
+	const int pc = mdt.numberOfObjects();
+	
+	for (int p = 1; p < pc; p++)
+	{
+		int og = getOpticsGroup(mdt, p);
+		
+		if (og != og0)
+		{
+			int boxSize = getBoxSize(og);
+			double angpix = getPixelSize(og);
+			
+			if (boxSize != boxSize0 || angpix != angpix0)
+			{
+				allGood = false;
+				break;
+			}
+		}
+	}
+	
+	return allGood;
+}
+
+bool ObservationModel::containsGroup(const MetaDataTable &mdt, int group)
+{
+	const int pc = mdt.numberOfObjects();
+	
+	for (int p = 0; p < pc; p++)
+	{
+		int og = getOpticsGroup(mdt, p);
+		
+		if (og == group)
+		{
+			return true;
+		}
+	}
+	
+	return false;
 }
 
 int ObservationModel::numberOfOpticsGroups() const

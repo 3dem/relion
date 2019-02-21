@@ -294,7 +294,7 @@ bool MetaDataTable::getValueToString(EMDLabel label, std::string &value, long ob
 	return true;
 }
 
-size_t MetaDataTable::size()
+size_t MetaDataTable::size() const
 {
 	return objects.size();
 }

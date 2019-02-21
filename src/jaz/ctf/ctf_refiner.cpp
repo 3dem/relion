@@ -374,6 +374,12 @@ void CtfRefiner::finalise()
 	{
 		mdtOut = allMdts;
 	}
+
+	// ...and for the magnification fit
+	if (do_mag_fit)
+	{
+		magnificationEstimator.parametricFit(mdtOut, obsModel.opticsMdt);
+	}
 	
 	// Sum up the per-pixel beamtilt fits of all micrographs and fit a parametric model to them.
 	// Then, write the beamtilt parameters into obsModel.opticsMdt
@@ -386,12 +392,6 @@ void CtfRefiner::finalise()
 	if (do_aberr_fit)
 	{
 		aberrationEstimator.parametricFit(mdtOut, obsModel.opticsMdt);
-	}
-
-	// ...and for the magnification fit
-	if (do_mag_fit)
-	{
-		magnificationEstimator.parametricFit(mdtOut, obsModel.opticsMdt);
 	}
 
 	MetaDataTable mdtOutAll = StackHelper::merge(mdtOut);

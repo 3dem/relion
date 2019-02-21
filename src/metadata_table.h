@@ -139,7 +139,7 @@ public:
 
 	bool isEmpty() const;
 	size_t numberOfObjects() const;
-	size_t size(void); // @TODO: redundant
+	size_t size(void) const; // @TODO: redundant
 	void clear();
 
 	void setComment(const std::string Comment);

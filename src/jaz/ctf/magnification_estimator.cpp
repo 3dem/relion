@@ -188,7 +188,12 @@ void MagnificationEstimator::parametricFit(
 			}
 		}
 		
-		if (!groupPresent) continue;
+		if (!groupPresent) 
+		{
+			mat_by_optGroup[og] = Matrix2D<RFLOAT>(2,2);
+			mat_by_optGroup[og].initIdentity();
+			continue;
+		}
 		
 		Image<RFLOAT> flowx, flowy;
 		MagnificationHelper::solvePerPixel(magEqs, flowx, flowy);
