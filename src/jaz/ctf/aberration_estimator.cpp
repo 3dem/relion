@@ -295,7 +295,7 @@ void AberrationEstimator::parametricFit(
 		 
 		{
 			std::vector<double> Zernike_coeffs = TiltHelper::fitEvenZernike(
-						phase, wgh, angpix[og], aberr_n_max, &fit);
+				phase, wgh, angpix[og], obsModel->getMagMatrix(og), aberr_n_max, &fit);
 						
 			FftwHelper::decenterDouble2D(fit.data, fitFull.data);
 			
@@ -318,8 +318,9 @@ void AberrationEstimator::parametricFit(
 			}
 			
 			std::vector<double> Zernike_coeffs_opt = TiltHelper::optimiseEvenZernike(
-						optXY, wgh0, AxxSum, AxySum, AyySum, angpix[og], 
-						aberr_n_max, Zernike_coeffs, &fit);
+				optXY, wgh0, AxxSum, AxySum, AyySum, 
+				angpix[og], obsModel->getMagMatrix(og), 
+				aberr_n_max, Zernike_coeffs, &fit);
 				
 			FftwHelper::decenterDouble2D(fit.data, fitFull.data);
 			
