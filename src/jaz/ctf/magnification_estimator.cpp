@@ -230,24 +230,18 @@ void MagnificationEstimator::parametricFit(
 		
 		mat_by_optGroup[og] = mat;
 		
-		Matrix2D<RFLOAT> mat0(2,2);
-		mat0.initIdentity();
-		
-		if (hasMagMatrices)
-		{
-			optOut.getValue(EMDL_IMAGE_MAG_MATRIX_00, mat0(0,0), og);
-			optOut.getValue(EMDL_IMAGE_MAG_MATRIX_01, mat0(0,1), og);
-			optOut.getValue(EMDL_IMAGE_MAG_MATRIX_10, mat0(1,0), og);
-			optOut.getValue(EMDL_IMAGE_MAG_MATRIX_11, mat0(1,1), og);
-		}
-		
+		Matrix2D<RFLOAT> mat0 = obsModel->getMagMatrix(og);
 		Matrix2D<RFLOAT> mat1 = mat * mat0;
 		
 		optOut.setValue(EMDL_IMAGE_MAG_MATRIX_00, mat1(0,0), og);
 		optOut.setValue(EMDL_IMAGE_MAG_MATRIX_01, mat1(0,1), og);
 		optOut.setValue(EMDL_IMAGE_MAG_MATRIX_10, mat1(1,0), og);
-		optOut.setValue(EMDL_IMAGE_MAG_MATRIX_11, mat1(1,1), og);		
+		optOut.setValue(EMDL_IMAGE_MAG_MATRIX_11, mat1(1,1), og);
+
+		obsModel->setMagMatrix(og, mat1);
 	}
+	
+	obsModel->hasMagMatrices = true;
 	
 	if (adaptAstig)
 	{

@@ -214,12 +214,11 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 		// always keep a set of mag matrices
 		// if none are defined, keep a set of identity matrices
 		
-		magMatrices[i] = Matrix2D<RFLOAT>(3,3);
+		magMatrices[i] = Matrix2D<RFLOAT>(2,2);
 		magMatrices[i].initIdentity();
 
 		if (hasMagMatrices)
 		{
-			// transpose the matrix, since the transpose is used in Projector::get2DFourierTransform
 			opticsMdt.getValue(EMDL_IMAGE_MAG_MATRIX_00, magMatrices[i](0,0), i);
 			opticsMdt.getValue(EMDL_IMAGE_MAG_MATRIX_01, magMatrices[i](0,1), i);
 			opticsMdt.getValue(EMDL_IMAGE_MAG_MATRIX_10, magMatrices[i](1,0), i);
@@ -502,6 +501,11 @@ void ObservationModel::getBoxSizes(std::vector<int>& sDest, std::vector<int>& sh
 Matrix2D<double> ObservationModel::getMagMatrix(int opticsGroup) const
 {
 	return magMatrices[opticsGroup];
+}
+
+void ObservationModel::setMagMatrix(int opticsGroup, const Matrix2D<double> &M)
+{
+	magMatrices[opticsGroup] = M;
 }
 
 std::vector<Matrix2D<double> > ObservationModel::getMagMatrices() const
@@ -834,7 +838,15 @@ Matrix2D<RFLOAT> ObservationModel::applyAnisoMagTransp(
 
 	if (hasMagMatrices)
 	{
-		out = magMatrices[opticsGroup].transpose() * A3D_transp;
+		Matrix2D<RFLOAT> mag3D_transp(3,3);
+		mag3D_transp.initIdentity();
+		
+		mag3D_transp(0,0) = magMatrices[opticsGroup](0,0);
+		mag3D_transp(0,1) = magMatrices[opticsGroup](1,0);
+		mag3D_transp(1,0) = magMatrices[opticsGroup](0,1);
+		mag3D_transp(1,1) = magMatrices[opticsGroup](1,1);
+		
+		out = mag3D_transp * A3D_transp;
 	}
 	else
 	{
