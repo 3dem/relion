@@ -25,6 +25,7 @@
 #include <src/error.h>
 #include <src/euler.h>
 #include <src/time.h>
+#include <src/jaz/obs_model.h>
 
 class stack_create_parameters
 {
@@ -34,6 +35,7 @@ class stack_create_parameters
 	// I/O Parser
 	IOParser parser;
 	bool do_spider, do_split_per_micrograph, do_apply_trans, do_apply_trans_only;
+	ObservationModel obsModel;
 
 	void usage()
 	{
@@ -63,7 +65,8 @@ class stack_create_parameters
 
 	void run()
 	{
-		MD.read(fn_star);
+
+		ObservationModel::loadSafely(fn_star, obsModel, MD, "particles");
 
 		// Check for rlnImageName label
 		if (!MD.containsLabel(EMDL_IMAGE_NAME))
@@ -157,11 +160,17 @@ class stack_create_parameters
 			init_progress_bar(ndim);
 			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
 			{
+
 				FileName fn_mymic;
 				if (do_split_per_micrograph)
 					MD.getValue(EMDL_MICROGRAPH_NAME, fn_mymic);
 				else
 					fn_mymic="";
+
+				int optics_group;
+				MD.getValue(EMDL_IMAGE_OPTICS_GROUP, optics_group);
+				optics_group--;
+				RFLOAT angpix = obsModel.getPixelSize(optics_group);
 
 				if (fn_mymic == fn_mic)
 				{
@@ -174,9 +183,11 @@ class stack_create_parameters
 						RFLOAT xoff, ori_xoff;
 						RFLOAT yoff, ori_yoff;
 						RFLOAT psi, ori_psi;
-						MD.getValue(EMDL_ORIENT_ORIGIN_X, ori_xoff);
-						MD.getValue(EMDL_ORIENT_ORIGIN_Y, ori_yoff);
+						MD.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, ori_xoff);
+						MD.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, ori_yoff);
 						MD.getValue(EMDL_ORIENT_PSI, ori_psi);
+						ori_xoff /= angpix;
+						ori_yoff /= angpix;
 
 						if (do_apply_trans_only)
 						{
@@ -194,12 +205,12 @@ class stack_create_parameters
 						// Apply the actual transformation
 						Matrix2D<RFLOAT> A;
 						rotation2DMatrix(psi, A);
-						MAT_ELEM(A,0, 2) = xoff;
-						MAT_ELEM(A,1, 2) = yoff;
+						MAT_ELEM(A, 0, 2) = COSD(psi) * xoff - SIND(psi) * yoff;
+						MAT_ELEM(A, 1, 2) = COSD(psi) * yoff + SIND(psi) * xoff;
 						selfApplyGeometry(in(), A, IS_NOT_INV, DONT_WRAP);
 
-						MD.setValue(EMDL_ORIENT_ORIGIN_X, ori_xoff - xoff);
-						MD.setValue(EMDL_ORIENT_ORIGIN_Y, ori_yoff - yoff);
+						MD.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, (ori_xoff - xoff)*angpix);
+						MD.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, (ori_yoff - yoff)*angpix);
 						MD.setValue(EMDL_ORIENT_PSI, ori_psi - psi);
 						FileName fn_img;
 						fn_img.compose(n+1, fn_out);
@@ -219,7 +230,8 @@ class stack_create_parameters
 
 		}
 
-		MD.write(fn_root+".star");
+
+		obsModel.save(MD, fn_root+".star", "particles");
 		std::cout << "Written out: " << fn_root << ".star" << std::endl;
 		std::cout << "Done!" <<std::endl;
 
