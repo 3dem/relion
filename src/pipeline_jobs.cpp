@@ -371,7 +371,6 @@ void RelionJob::setOption(std::string setOptionLine)
 
 bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 {
-
 	// If fn is empty, use the hidden name
 	FileName myfilename = (fn=="") ? hidden_name : fn;
 
@@ -384,6 +383,7 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 		MDhead.read(myfilename+"job.star", "job");
 		MDhead.getValue(EMDL_JOB_TYPE, type);
 		MDhead.getValue(EMDL_JOB_IS_CONTINUE, is_continue);
+		_is_continue = is_continue;
 
 		if (do_initialise)
 			initialise(type);
@@ -397,7 +397,6 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 			MDvals.getValue(EMDL_JOBOPTION_VALUE, value);
 			joboptions[label].value = restoreString(value);
 		}
-
 	}
 	else // for backwards compatibility
 	{
@@ -463,7 +462,7 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 		type != PROC_CTFREFINE )
 		REPORT_ERROR("ERROR: cannot find correct job type in " + myfilename + "run.job, with type= " + integerToString(type));
 
-
+	return true;
 }
 
 void RelionJob::write(std::string fn)
