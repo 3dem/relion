@@ -546,7 +546,7 @@ void JobWindow::initialiseImportWindow()
 
 	// Always deactivate the queue option
 	guientries["do_queue"].deactivate_option = TOGGLE_ALWAYS_DEACTIVATE;
-
+	myjob.joboptions["do_queue"].setString("No");
 }
 
 void JobWindow::initialiseMotioncorrWindow()
@@ -717,8 +717,6 @@ void JobWindow::initialiseCtffindWindow()
 	guientries["use_gctf"].cb_menu_i(); // make default active
 
 	tab4->end();
-
-
 }
 
 void JobWindow::initialiseManualpickWindow()
@@ -774,8 +772,9 @@ void JobWindow::initialiseManualpickWindow()
 
 	// Always deactivate the queue option
 	guientries["do_queue"].deactivate_option = TOGGLE_ALWAYS_DEACTIVATE;
-
+	myjob.joboptions["do_queue"].setString("No");
 }
+
 void JobWindow::initialiseAutopickWindow()
 {
 	setupTabs(5);
@@ -1171,9 +1170,9 @@ void JobWindow::initialiseSelectWindow()
 
 	// Always deactivate the queue option
 	guientries["do_queue"].deactivate_option = TOGGLE_ALWAYS_DEACTIVATE;
-
-
+	myjob.joboptions["do_queue"].setString("No");
 }
+
 void JobWindow::initialiseClass2DWindow()
 {
 	setupTabs(6);
