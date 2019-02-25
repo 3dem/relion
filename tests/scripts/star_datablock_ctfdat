@@ -1,0 +1,24 @@
+#!/bin/bash
+if [ $# != 0 ]; then
+ while read line; do
+  # Get image name from first column
+  image=`echo $line | awk '{print $1}'`
+  # Get ctfparam name from second column
+  ctfparam=`echo $line | awk '{print $2}'`
+  # Strip directories from ctfparam and remove "_Periodogramavg.ctfparam" to get micrograph name
+  micro=`echo $ctfparam | awk -F"/" '{print $NF}' | sed 's|_Periodogramavg.ctfparam||'`
+  # Get metadata from the ctfparam, reverse sign for defocusU, defocusV and Q0
+  metadata=`awk '{if ($1~"defocus" || $1~"Q0") {printf "%s%s", -$2," "} else if ($1~"sampling" || $1~"K=") {} else {printf "%s%s", $2," "} } END {printf "\n"}' <$ctfparam `
+  echo $image $micro $metadata
+ done < $1
+else
+ echo " === Usage: === "
+ echo " ${0} <xmippctfdatfile> "
+ echo " "
+ echo " === Purpose: === "
+ echo " This (bash) script generates the STAR datablock for all images in an xmipp-format CTFDAT file"
+ echo " Note that the sign for XMIPP's defocusU, defocusV and Q0 values is reversed "
+ echo " "
+ echo " === Example: ==="
+ echo " ${0} all_images.ctfdat "
+fi

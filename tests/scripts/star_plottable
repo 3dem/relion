@@ -1,0 +1,29 @@
+#!/bin/bash
+if [ $# != 0 ]; then
+ echo " set title '${2}'" > gnuplot.plt
+ echo " set ylabel '${3}'" >> gnuplot.plt
+ if [ $# == 4 ]; then
+  relion_star_printtable ${1} ${2} ${4} ${3} > ${1}-${2}-${3}.dat
+  echo " set xlabel '${4}'" >> gnuplot.plt
+ else
+  relion_star_printtable ${1} ${2} ${3} > ${1}-${2}-${3}.dat
+  echo " set xlabel 'index'" >> gnuplot.plt
+ fi
+ echo " plot '${1}-${2}-${3}.dat' w l " >> gnuplot.plt
+ echo " ** Written datafile: " ${1}-${2}-${3}.dat
+ echo " ** Running: gnuplot -persist gnuplot.plt " 
+ echo " ** Alternatively, inside an interactive gnuplot session type: load \"gnuplot.plt\""
+ gnuplot -persist gnuplot.plt
+else
+ echo " === Usage: === "
+ echo " ${0} <starfile> <tablename> <yaxis-label> <xaxis-label>"
+ echo " "
+ echo " === Purpose: === "
+ echo " This (bash) script uses gnuplot to plot content from a datablock (with name <tablename>) in <starfile>"
+ echo " It will make a plot of the values given for <yaxis-label> against those of <xaxis-label>"
+ echo " If <xaxis-label> is not given, the values of <yaxis-label> will be plotted linearly"
+ echo " "
+ echo " === Example: ==="
+ echo " ${0} run3_it024_model.star run3_it024_model.star data_model_class_1 rlnSsnrMap rlnResolution"
+fi
+
