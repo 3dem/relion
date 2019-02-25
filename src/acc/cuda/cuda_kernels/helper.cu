@@ -115,11 +115,19 @@ __global__ void cuda_kernel_RNDnormalDitributionComplexWithPowerModulation2D( AC
                                y -= (xdim-1)*2;   		//assuming square input images (particles)
 
                        int ires = rintf(sqrtf(x*x + y*y));
+#if defined(ACC_DOUBLE_PRECISION)
+                       XFLOAT scale = 0.;
+                       if(ires<xdim)
+                               scale =  spectra[ires];
+
+                       Image[pixel] = (curand_normal2_double(&States[id]))*scale;
+#else
                        XFLOAT scale = 0.f;
                        if(ires<xdim)
                                scale =  spectra[ires];
 
                        Image[pixel] = (curand_normal2(&States[id]))*scale;
+#endif
                }
                pixel += RND_BLOCK_NUM*RND_BLOCK_SIZE;
        }
@@ -156,11 +164,19 @@ __global__ void cuda_kernel_RNDnormalDitributionComplexWithPowerModulation3D( AC
 
 
                        int ires = rintf(sqrtf(x*x + y*y + z*z));
+#if defined(ACC_DOUBLE_PRECISION)
+                       XFLOAT scale = 0.;
+                       if(ires<xdim)
+                               scale =  spectra[ires];
+
+                       Image[pixel] = (curand_normal2_double(&States[id]))*scale;
+#else
                        XFLOAT scale = 0.f;
                        if(ires<xdim)
                                scale =  spectra[ires];
 
                        Image[pixel] = (curand_normal2(&States[id]))*scale;
+#endif
                }
                pixel += RND_BLOCK_NUM*RND_BLOCK_SIZE;
        }

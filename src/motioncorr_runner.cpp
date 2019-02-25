@@ -276,7 +276,6 @@ void MotioncorrRunner::initialise()
 	{
 		bool ignore_this = false;
 		bool process_this = true;
-		std::cout << fn_mic_given_all[imic] << std::endl;
 
 		if (continue_old)
 		{
