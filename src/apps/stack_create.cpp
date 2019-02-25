@@ -194,8 +194,8 @@ class stack_create_parameters
 						// Apply the actual transformation
 						Matrix2D<RFLOAT> A;
 						rotation2DMatrix(psi, A);
-						MAT_ELEM(A,0, 2) = xoff;
-						MAT_ELEM(A,1, 2) = yoff;
+						MAT_ELEM(A, 0, 2) = COSD(psi) * xoff - SIND(psi) * yoff;
+						MAT_ELEM(A, 1, 2) = COSD(psi) * yoff + SIND(psi) * xoff;
 						selfApplyGeometry(in(), A, IS_NOT_INV, DONT_WRAP);
 
 						MD.setValue(EMDL_ORIENT_ORIGIN_X, ori_xoff - xoff);
