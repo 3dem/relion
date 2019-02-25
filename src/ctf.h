@@ -226,7 +226,16 @@ public:
         	retval = (retval < 0.) ? -1. : 1.;
         }
 
-        return scale * retval;
+        retval *= scale;
+
+        // SHWS 25-2-2019: testing a new idea to improve code stability
+        // Don't allow very small values of CTF to prevent division by zero in GPU code
+        if (fabs(retval) < 1e-8)
+        {
+        	retval = SGN(retval) * 1e-8;
+        }
+
+        return retval;
     }
 
     double getGamma(double X, double Y) const;
