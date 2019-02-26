@@ -269,7 +269,7 @@ void TiltEstimator::parametricFit(
 		if (aberr_n_max < 3)
 		{
 			TiltHelper::fitTiltShift(
-				phase, wgh, Cs, lambda, angpix[og],
+				phase, wgh, Cs, lambda, angpix[og], obsModel->getMagMatrix(og),
 				&shift_x, &shift_y, &tilt_x, &tilt_y, &fit);
 				
 			FftwHelper::decenterUnflip2D(fit.data, fitFull.data);
@@ -279,7 +279,8 @@ void TiltEstimator::parametricFit(
 				outPath + "beamtilt_delta-phase_lin-fit_optics-group_"+ogstr);
 						
 			TiltHelper::optimizeTilt(
-					xyNrm, wgh, Cs, lambda, angpix[og], false,
+					xyNrm, wgh, Cs, lambda, 
+					angpix[og], obsModel->getMagMatrix(og), false, 
 					shift_x, shift_y, tilt_x, tilt_y,
 					&shift_x, &shift_y, &tilt_x, &tilt_y, &fit);
 			
@@ -298,7 +299,7 @@ void TiltEstimator::parametricFit(
 			one.data.initConstant(1);
 			
 			std::vector<double> Zernike_coeffs = TiltHelper::fitOddZernike(
-						xyNrm, wgh, angpix[og], aberr_n_max, &fit);
+				xyNrm, wgh, angpix[og], obsModel->getMagMatrix(og), aberr_n_max, &fit);
 						
 			FftwHelper::decenterUnflip2D(fit.data, fitFull.data);
 			
@@ -323,7 +324,8 @@ void TiltEstimator::parametricFit(
 			}
 						
 			std::vector<double> Zernike_coeffs_opt = TiltHelper::optimiseOddZernike(
-						xyNrm, wgh, angpix[og], aberr_n_max, Zernike_coeffs, &fit);
+				xyNrm, wgh, angpix[og], obsModel->getMagMatrix(og), 
+				aberr_n_max, Zernike_coeffs, &fit);
 				
 			FftwHelper::decenterUnflip2D(fit.data, fitFull.data);
 			

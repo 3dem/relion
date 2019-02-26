@@ -195,7 +195,7 @@ void MotionEstimator::process(const std::vector<MetaDataTable>& mdts, long g_sta
 	
 	if (verb > 0)
 	{
-		std::cout << " + Performing loop over micrographs " << g_start << " to " << g_end << "... " << std::endl;
+		std::cout << " + Performing loop over micrographs ... " << std::endl;
 		if (!debug) init_progress_bar(my_nr_micrographs);
 	}
 	

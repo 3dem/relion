@@ -641,7 +641,6 @@ void JobWindow::initialiseCtffindWindow()
 	guientries["use_gctf"].cb_menu_i(); // make default active
 
 	tab3->end();
-
 }
 
 void JobWindow::initialiseManualpickWindow()
