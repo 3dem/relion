@@ -52,8 +52,11 @@ class stack_create_parameters
 		fn_root = parser.getOption("--o", "Output rootname","output");
 		do_spider  = parser.checkOption("--spider_format", "Write out in SPIDER stack format (by default MRC stack format)");
 		do_split_per_micrograph = parser.checkOption("--split_per_micrograph", "Write out separate stacks for each micrograph (needs rlnMicrographName in STAR file)");
-		do_apply_trans = parser.checkOption("--apply_transformation", "Apply the inplane-transformations (needs _rlnOriginX/Y and _rlnAnglePsi in STAR file)");
+		do_apply_trans = parser.checkOption("--apply_transformation", "Apply the inplane-transformations (needs _rlnOriginX/Y and _rlnAnglePsi in STAR file) by real space interpolation");
 		do_apply_trans_only = parser.checkOption("--apply_rounded_offsets_only", "Apply the rounded translations only (so-recentering without interpolation; needs _rlnOriginX/Y in STAR file)");
+
+		if (do_apply_trans)
+			std::cerr << "WARNING: --apply_transformation uses real space interpolation. It also invalidates CTF parameters (e.g. beam tilt & astigmatism). This can degrade the resolution. USE WITH CARE!!" << std::endl;
 
 		fn_ext = (do_spider) ? ".spi" : ".mrcs";
 

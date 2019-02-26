@@ -1061,10 +1061,10 @@ bool PipeLine::setAliasJob(int this_job, std::string alias, std::string &error_m
 	}
 	else if (alias.find("*") != std::string::npos || alias.find("?") != std::string::npos || alias.find("(") != std::string::npos || alias.find(")") != std::string::npos ||
 	         alias.find("/") != std::string::npos || alias.find("\"") != std::string::npos || alias.find("\\") != std::string::npos || alias.find("|") != std::string::npos ||
-		 alias.find("#") != std::string::npos || alias.find("<") != std::string::npos || alias.find(">") != std::string::npos || alias.find("&") != std::string::npos ||
-		 alias.find("%") != std::string::npos)
+		 alias.find("#") != std::string::npos || alias.find("<") != std::string::npos || alias.find(">") != std::string::npos || alias.find("&") != std::string::npos || 
+		 alias.find("%") != std::string::npos || alias.find("{") != std::string::npos || alias.find("}") != std::string::npos || alias.find("$") != std::string::npos)
 	{
-		error_message = "Alias cannot contain following symbols: *, ?, (, ), /, \", \\, |, #, <, >, &, %";
+		error_message = "Alias cannot contain following symbols: *, ?, (, ), /, \", \\, |, #, <, >, &, %, {, }, $";
 		return false;
 	}
 	else
@@ -1157,7 +1157,6 @@ bool PipeLine::makeFlowChart(long int current_job, bool do_display_pdf, std::str
 	}
 	std::string myviewer(default_pdf_viewer);
 
-
 	PipeLineFlowChart flowchart;
 	FileName fn_dir = processList[current_job].name;
 	FileName fn_out = "flowchart.tex";
@@ -1181,7 +1180,7 @@ bool PipeLine::makeFlowChart(long int current_job, bool do_display_pdf, std::str
 
 	write(DO_LOCK);
 
-
+	return true;
 }
 // Undelete a Job from the pipeline, move back from Trash and insert back into the graph
 void PipeLine::undeleteJob(FileName fn_undel)
@@ -2184,9 +2183,11 @@ std::string PipeLineFlowChart::getDownwardsArrowLabel(PipeLine &pipeline, long i
 }
 void PipeLineFlowChart::adaptNamesForTikZ(FileName &name)
 {
-	name.replaceAllSubstrings((std::string)"_", (std::string)"-");
+	name.replaceAllSubstrings((std::string)"_", (std::string)"\\_");
 	name.replaceAllSubstrings((std::string)".", (std::string)"-");
 	name.replaceAllSubstrings((std::string)",", (std::string)"-");
+	name.replaceAllSubstrings((std::string)"^", (std::string)"\\textasciicircum ");
+	name.replaceAllSubstrings((std::string)"~", (std::string)"\\textasciitilde ");
 }
 
 long int PipeLineFlowChart::addProcessToUpwardsFlowChart(std::ofstream &fh, PipeLine &pipeline,
@@ -2476,6 +2477,7 @@ void PipeLineFlowChart::makeAllUpwardsFlowCharts(FileName &fn_out, PipeLine &pip
 	FileName myorititle = (pipeline.processList[from_process].alias != "None") ?
 			pipeline.processList[from_process].alias : pipeline.processList[from_process].name;
 	myorititle=myorititle.beforeLastOf("/");
+	adaptNamesForTikZ(myorititle);
 	fh << "\\section*{Overview flowchart for " << myorititle << "}" << std::endl;
 	std::vector<long int> dummy;
 	makeOneUpwardsFlowChart(fh, pipeline, from_process, dummy, true);
