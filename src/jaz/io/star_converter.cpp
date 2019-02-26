@@ -110,6 +110,7 @@ void StarConverter::convert_3p0_particlesTo_3p1(
 	outOptics.setName("optics");
 	outOptics.setVersion(curVer);
 	outOptics.addLabel(EMDL_IMAGE_OPTICS_GROUP);
+	outOptics.addLabel(EMDL_IMAGE_OPTICS_GROUP_NAME);
 
 	for (int l = 0; l < opticsLabelCount_double; l++)
 	{
@@ -120,6 +121,8 @@ void StarConverter::convert_3p0_particlesTo_3p1(
 	{
 		outOptics.addObject();
 		outOptics.setValue(EMDL_IMAGE_OPTICS_GROUP, g + 1, g);
+		std::string mygroupname = "opticsGroup" + integerToString(g);
+		outOptics.setValue(EMDL_IMAGE_OPTICS_GROUP_NAME, mygroupname, g);
 
 		for (int l = 0; l < opticsLabelCount_double; l++)
 		{
@@ -131,7 +134,7 @@ void StarConverter::convert_3p0_particlesTo_3p1(
 	// This does not do anything if DETECTOR_PIXEL_SIZE or MAGNIFICATION are not in the input STAR file
 	unifyPixelSize(outOptics, tablename);
 
-	if (tablename == "particles")
+	if (tablename == "particles" || tablename == "")
 	{
 		// Make translations in Angstroms instead of in pixels
 		translateOffsets(outParticles, outOptics);
@@ -225,7 +228,7 @@ void StarConverter::unifyPixelSize(MetaDataTable& outOptics, std::string tablena
 
 			double angpix = 10000 * dstep / mag;
 
-			if (tablename == "particles")
+			if (tablename == "particles" || tablename == "")
 			{
 				outOptics.setValue(EMDL_IMAGE_PIXEL_SIZE, angpix, i);
 			}
