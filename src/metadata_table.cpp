@@ -1597,7 +1597,7 @@ MetaDataTable combineMetaDataTables(std::vector<MetaDataTable> &MDin)
 		std::vector<EMDLabel> labelsc;
 		std::vector<EMDLabel> labels1 = MDin[0].getActiveLabels();
 
-		// Loop over all labels
+		// Loop over all labels in first
 		for (size_t i = 0; i < labels1.size(); i++)
 		{
 			// Check their presence in each of the input files
@@ -1609,6 +1609,7 @@ MetaDataTable combineMetaDataTables(std::vector<MetaDataTable> &MDin)
 
 				if (!is_present)
 				{
+					std::cerr << " + WARNING: ignoring label " << EMDL::label2Str(labels1[i]) << " in " << j+1 << "th STAR file" << std::endl;
 					some_labels_missing = true;
 					break;
 				}
@@ -1620,40 +1621,26 @@ MetaDataTable combineMetaDataTables(std::vector<MetaDataTable> &MDin)
 			}
 		}
 
-		if (!some_labels_missing)
+		// Also disable any labels of any of the input tables that do not occur in all input tables
+		for (size_t j = 0; j < MDin.size(); j++)
 		{
-			// Just append entire tables
-			for (size_t j = 0; j < MDin.size(); j++)
+			std::vector<EMDLabel> labelsj = MDin[j].getActiveLabels();
+			for (size_t i = 0; i < labelsj.size(); i++)
 			{
-				MDc.append(MDin[j]);
-			}
-		}
-		else
-		{
-			// Select only the labels in common, do this per line!
-
-			for (size_t i = 0; i < labelsc.size(); i++)
-			{
-				MDc.addLabel(labelsc[i]);
-			}
-
-			long totalLines = 0;
-
-			for (size_t i = 0; i < MDin.size(); i++)
-			{
-				totalLines += MDin[i].numberOfObjects();
-			}
-
-			MDc.reserve(totalLines);
-
-			for (size_t i = 0; i < MDin.size(); i++)
-			{
-				for (size_t j = 0; j < MDin[i].numberOfObjects(); j++)
+				if (!vectorContainsLabel(labelsc, labelsj[i]))
 				{
-					MDc.addValuesOfDefinedLabels(MDin[i].getObject(j));
+					MDin[j].deactivateLabel(labelsj[i]);
+					std::cerr << " + WARNING: ignoring label " << EMDL::label2Str(labelsj[i]) << " in " << j+1 << "th STAR file" << std::endl;
 				}
 			}
 		}
+
+		// Then we can just append entire tables
+		for (size_t j = 0; j < MDin.size(); j++)
+		{
+			MDc.append(MDin[j]);
+		}
+
 	}
 
 	return MDc;

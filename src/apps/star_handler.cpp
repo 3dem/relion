@@ -331,15 +331,222 @@ class star_handler_parameters
 			fnt.globFiles(fns_in, false);
 		}
 
-		MetaDataTable MDout;
-		std::vector<MetaDataTable> MDsin;
-		for (int i = 0; i < fns_in.size(); i++)
+		MetaDataTable MDin, MDout;
+		std::vector<MetaDataTable> MDsin, MDoptics;
+		std::vector<ObservationModel> obsModels;
+		// Read the first table into the global obsModel
+		read_check_ignore_optics(MDin, fns_in[0]);
+		MDsin.push_back(MDin);
+		// Read all the rest of the tables into local obsModels
+		for (int i = 1; i < fns_in.size(); i++)
 		{
-			MetaDataTable MDin;
-			read_check_ignore_optics(MDin, fns_in[i]);
+			ObservationModel myobsModel;
+			if (do_ignore_optics) MDin.read(fns_in[i], tablename_in);
+			else ObservationModel::loadSafely(fns_in[i], myobsModel, MDin, "discover", 1);
 			MDsin.push_back(MDin);
+			obsModels.push_back(myobsModel);
 		}
 
+		// Combine optics groups with the same EMDL_IMAGE_OPTICS_GROUP_NAME, make new ones for those with a different name
+		if (!do_ignore_optics)
+		{
+			std::vector<std::string> optics_group_uniq_names;
+
+			// Initialise optics_group_uniq_names with the first table
+			FOR_ALL_OBJECTS_IN_METADATA_TABLE(obsModel.opticsMdt)
+			{
+				std::string myname;
+				obsModel.opticsMdt.getValue(EMDL_IMAGE_OPTICS_GROUP_NAME, myname);
+				optics_group_uniq_names.push_back(myname);
+			}
+
+			// Now check uniqueness of the other tables
+			for (int MDs_id = 1; MDs_id < fns_in.size(); MDs_id++)
+			{
+				const int obs_id = MDs_id - 1;
+
+				std::vector<int> new_optics_groups;
+				FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsin[MDs_id])
+				{
+					int tmp;
+					MDsin[MDs_id].getValue(EMDL_IMAGE_OPTICS_GROUP, tmp);
+					new_optics_groups.push_back(tmp);
+				}
+
+				FOR_ALL_OBJECTS_IN_METADATA_TABLE(obsModels[obs_id].opticsMdt)
+				{
+					std::string myname;
+					int my_optics_group;
+					obsModels[obs_id].opticsMdt.getValue(EMDL_IMAGE_OPTICS_GROUP_NAME, myname);
+					obsModels[obs_id].opticsMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, my_optics_group);
+
+					// Check whether this name is unique
+					bool is_uniq = true;
+					int new_group;
+					for (new_group = 0; new_group < optics_group_uniq_names.size(); new_group++)
+
+					{
+						if (optics_group_uniq_names[new_group] == myname)
+						{
+							is_uniq = false;
+							break;
+						}
+					}
+					new_group ++; // start counting of groups at 1, not 0!
+
+					if (is_uniq)
+					{
+						std::cerr << " + WARNING: adding new optics_group with name: " << myname << std::endl;
+
+						optics_group_uniq_names.push_back(myname);
+						// Add the line to the global obsModel
+						obsModels[obs_id].opticsMdt.setValue(EMDL_IMAGE_OPTICS_GROUP, new_group);
+					}
+					else
+					{
+						std::cerr << " + WARNING: joining optics_groups with the same name: " << myname << std::endl;
+					}
+
+					std::cerr << "   Renumbering this group from " << my_optics_group << " to " << new_group << std::endl;
+
+					// Update the optics_group entry for all particles in the MDsin
+					for (long int current_object2 = MDsin[MDs_id].firstObject();
+					     current_object2 < MDsin[MDs_id].numberOfObjects() && current_object2 >= 0;
+					     current_object2 = MDsin[MDs_id].nextObject())
+
+					{
+						int old_optics_group;
+						MDsin[MDs_id].getValue(EMDL_IMAGE_OPTICS_GROUP, old_optics_group, current_object2);
+						if (old_optics_group == my_optics_group)
+							new_optics_groups[current_object2] = new_group;
+					}
+				}
+
+				FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsin[MDs_id])
+				{
+					MDsin[MDs_id].setValue(EMDL_IMAGE_OPTICS_GROUP, new_optics_groups[current_object]);
+				}
+			}
+
+			// Make one vector for combination of the optics tables
+			MDoptics.push_back(obsModel.opticsMdt);
+			for (int i = 1; i < fns_in.size(); i++)
+			{
+				MDoptics.push_back(obsModels[i-1].opticsMdt);
+			}
+
+			// Check if anisotropic magnification and/or beam_tilt are present in some optics groups, but not in others.
+			// If so, initialise the others correctly
+			bool has_beamtilt = false, has_not_beamtilt = false;
+			bool has_anisomag = false, has_not_anisomag = false;
+			bool has_odd_zernike = false, has_not_odd_zernike = false;
+			bool has_even_zernike = false, has_not_even_zernike = false;
+			for (int i = 0; i < fns_in.size(); i++)
+			{
+				if (MDoptics[i].containsLabel(EMDL_IMAGE_BEAMTILT_X) ||
+					MDoptics[i].containsLabel(EMDL_IMAGE_BEAMTILT_Y))
+				{
+					has_beamtilt = true;
+				}
+				else
+				{
+					has_not_beamtilt = true;
+				}
+				if (MDoptics[i].containsLabel(EMDL_IMAGE_MAG_MATRIX_00) &&
+					MDoptics[i].containsLabel(EMDL_IMAGE_MAG_MATRIX_01) &&
+					MDoptics[i].containsLabel(EMDL_IMAGE_MAG_MATRIX_10) &&
+					MDoptics[i].containsLabel(EMDL_IMAGE_MAG_MATRIX_11))
+				{
+					has_anisomag = true;
+				}
+				else
+				{
+					has_not_anisomag = true;
+				}
+				if (MDoptics[i].containsLabel(EMDL_IMAGE_ODD_ZERNIKE_COEFFS))
+				{
+					has_odd_zernike = true;
+				}
+				else
+				{
+					has_not_odd_zernike = true;
+				}
+				if (MDoptics[i].containsLabel(EMDL_IMAGE_EVEN_ZERNIKE_COEFFS))
+				{
+					has_even_zernike = true;
+				}
+				else
+				{
+					has_not_even_zernike = true;
+				}
+			}
+
+			for (int i = 0; i < fns_in.size(); i++)
+			{
+				if (has_beamtilt && has_not_beamtilt)
+				{
+					if (!MDoptics[i].containsLabel(EMDL_IMAGE_BEAMTILT_X))
+					{
+						FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDoptics[i])
+						{
+							MDoptics[i].setValue(EMDL_IMAGE_BEAMTILT_X, 0.);
+						}
+					}
+					if (!MDoptics[i].containsLabel(EMDL_IMAGE_BEAMTILT_Y))
+					{
+						FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDoptics[i])
+						{
+							MDoptics[i].setValue(EMDL_IMAGE_BEAMTILT_Y, 0.);
+						}
+					}
+				}
+
+				if (has_anisomag && has_not_anisomag)
+				{
+					if (!(MDoptics[i].containsLabel(EMDL_IMAGE_MAG_MATRIX_00) &&
+						  MDoptics[i].containsLabel(EMDL_IMAGE_MAG_MATRIX_01) &&
+						  MDoptics[i].containsLabel(EMDL_IMAGE_MAG_MATRIX_10) &&
+						  MDoptics[i].containsLabel(EMDL_IMAGE_MAG_MATRIX_11)) )
+					{
+						FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDoptics[i])
+						{
+							MDoptics[i].setValue(EMDL_IMAGE_MAG_MATRIX_00, 1.);
+							MDoptics[i].setValue(EMDL_IMAGE_MAG_MATRIX_01, 0.);
+							MDoptics[i].setValue(EMDL_IMAGE_MAG_MATRIX_10, 0.);
+							MDoptics[i].setValue(EMDL_IMAGE_MAG_MATRIX_11, 1.);
+						}
+					}
+				}
+
+				if (has_odd_zernike && has_not_odd_zernike)
+				{
+					if (!MDoptics[i].containsLabel(EMDL_IMAGE_ODD_ZERNIKE_COEFFS))
+					{
+						FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDoptics[i])
+						{
+							MDoptics[i].setValue(EMDL_IMAGE_ODD_ZERNIKE_COEFFS, "[0,0,0,0,0,0]");
+						}
+					}
+				}
+
+				if (has_even_zernike && has_not_even_zernike)
+				{
+					if (!MDoptics[i].containsLabel(EMDL_IMAGE_EVEN_ZERNIKE_COEFFS))
+					{
+						FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDoptics[i])
+						{
+							MDoptics[i].setValue(EMDL_IMAGE_EVEN_ZERNIKE_COEFFS, "[0,0,0,0,0,0,0,0,0]");
+						}
+					}
+				}
+
+			}
+
+			// Now combine all optics tables into one
+			obsModel.opticsMdt = combineMetaDataTables(MDoptics);
+		}
+
+		// Combine the particles tables
 		MDout = combineMetaDataTables(MDsin);
 
 		if (fn_check != "")
@@ -375,7 +582,7 @@ class star_handler_parameters
 				std::cerr << " WARNING: Total number of duplicate "<< fn_check << " entries: " << nr_duplicates << std::endl;
 		}
 
-		write_check_ignore_optics(MDout, fn_out, MDsin[0].getName());
+		write_check_ignore_optics(MDout, fn_out, MDin.getName());
 		std::cout << " Written: " << fn_out << std::endl;
 
 	}
