@@ -469,14 +469,14 @@ bool Experiment::getImageNameOnScratch(long int part_id, int img_id, FileName &f
 		if (is_3D)
 		{
 			if (is_ctf_image)
-				fn_img = fn_scratch + "opticsgroup" + integerToString(optics_group+1, 3) + "_particle_ctf" + integerToString(my_id+1, 5)+".mrc";
+				fn_img = fn_scratch + "opticsgroup" + integerToString(optics_group+1) + "_particle_ctf" + integerToString(my_id+1)+".mrc";
 			else
-				fn_img = fn_scratch + "opticsgroup" + integerToString(optics_group+1, 3) + "_particle" + integerToString(my_id+1, 5)+".mrc";
+				fn_img = fn_scratch + "opticsgroup" + integerToString(optics_group+1) + "_particle" + integerToString(my_id+1)+".mrc";
 		}
 		else
 		{
 			// Write different optics groups into different stacks, as sizes might be different
-			FileName fn_tmp = fn_scratch + "opticsgroup" + integerToString(optics_group+1, 3) + "_particles.mrcs";
+			FileName fn_tmp = fn_scratch + "opticsgroup" + integerToString(optics_group+1) + "_particles.mrcs";
 			fn_img.compose(my_id+1, fn_tmp);
 		}
 		return true;
@@ -502,7 +502,7 @@ void Experiment::setScratchDirectory(FileName _fn_scratch, bool do_reuse_scratch
 		{
 			if (is_3D)
 			{
-				FileName fn_tmp = fn_scratch + "opticsgroup" + integerToString(optics_group+1, 3) + "_particle*.mrc";
+				FileName fn_tmp = fn_scratch + "opticsgroup" + integerToString(optics_group+1) + "_particle*.mrc";
 				std::vector<FileName> fn_all;
 				fn_tmp.globFiles(fn_all, true);
 				nr_parts_on_scratch[optics_group] = fn_all.size();
@@ -510,7 +510,7 @@ void Experiment::setScratchDirectory(FileName _fn_scratch, bool do_reuse_scratch
 			}
 			else
 			{
-				FileName fn_tmp = fn_scratch + "opticsgroup" + integerToString(optics_group+1, 3) + "_particles.mrcs";
+				FileName fn_tmp = fn_scratch + "opticsgroup" + integerToString(optics_group+1) + "_particles.mrcs";
 				Image<RFLOAT> Itmp;
 				Itmp.read(fn_tmp, false);
 				nr_parts_on_scratch[optics_group] = NSIZE(Itmp());
@@ -670,14 +670,14 @@ void Experiment::copyParticlesToScratch(int verb, bool do_copy, bool also_do_ctf
 			{
 				// For subtomograms, write individual .mrc files,possibly also CTF images
 				img.read(fn_img);
-				fn_new = fn_scratch + "opticsgroup" + integerToString(optics_group+1, 3) + "_particle" + integerToString(nr_parts_on_scratch[optics_group]+1, 5)+".mrc";
+				fn_new = fn_scratch + "opticsgroup" + integerToString(optics_group+1) + "_particle" + integerToString(nr_parts_on_scratch[optics_group]+1)+".mrc";
 				img.write(fn_new);
 				if (also_do_ctf_image)
 				{
 					FileName fn_ctf;
 					MDimg.getValue(EMDL_CTF_IMAGE, fn_ctf);
 					img.read(fn_ctf);
-					fn_new = fn_scratch + "opticsgroup" + integerToString(optics_group+1, 3) + "_particle_ctf" + integerToString(nr_parts_on_scratch[optics_group]+1, 5)+".mrc";
+					fn_new = fn_scratch + "opticsgroup" + integerToString(optics_group+1) + "_particle_ctf" + integerToString(nr_parts_on_scratch[optics_group]+1)+".mrc";
 					img.write(fn_new);
 				}
 			}
@@ -696,7 +696,7 @@ void Experiment::copyParticlesToScratch(int verb, bool do_copy, bool also_do_ctf
 				}
 				img.readFromOpenFile(fn_img, hFile, -1, false);
 
-				fn_new.compose(nr_parts_on_scratch[optics_group]+1, fn_scratch + "opticsgroup" + integerToString(optics_group+1, 3) + "_particles.mrcs");
+				fn_new.compose(nr_parts_on_scratch[optics_group]+1, fn_scratch + "opticsgroup" + integerToString(optics_group+1) + "_particles.mrcs");
 				if (nr_parts_on_scratch[optics_group] == 0)
 					img.write(fn_new, -1, false, WRITE_OVERWRITE);
 				else
@@ -718,7 +718,7 @@ void Experiment::copyParticlesToScratch(int verb, bool do_copy, bool also_do_ctf
 		progress_bar(nr_part);
 		for (int i = 0; i < nr_parts_on_scratch.size(); i++)
 		{
-			std::cout << " For optics_group " << i << ", there are " << nr_parts_on_scratch[i] << " particles on the scratch disk." << std::endl;
+			std::cout << " For optics_group " << (i + 1) << ", there are " << nr_parts_on_scratch[i] << " particles on the scratch disk." << std::endl;
 		}
 	}
 
