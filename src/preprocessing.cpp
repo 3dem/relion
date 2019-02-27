@@ -139,6 +139,20 @@ void Preprocessing::initialise()
 		if ( !MDmics.containsLabel(EMDL_MICROGRAPH_NAME) )
 			REPORT_ERROR("Preprocessing::initialise ERROR: Input micrograph STAR file has no rlnMicrographName column!");
 
+		// Get the dimensionality of the micrographs
+
+		// Read the header of the micrograph to see how many frames there are.
+		Image<RFLOAT> Imic;
+		FileName fn_mic;
+		int xdim, ydim, zdim;
+		long int ndim;
+		MDmics.goToObject(0);
+		MDmics.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
+		std::cerr << " fn_mic= " << fn_mic << std::endl;
+		Imic.read(fn_mic, false, -1, false); // readData = false, select_image = -1, mapData= false, is_2D = true);
+		Imic.getDimensions(xdim, ydim, zdim, ndim);
+		dimensionality = (zdim > 1) ? 3 : 2;
+
 		if ((do_phase_flip||do_premultiply_ctf) && !MDmics.containsLabel(EMDL_CTF_DEFOCUSU))
 			REPORT_ERROR("Preprocessing::initialise ERROR: No CTF information found in the input micrograph STAR-file");
 
@@ -350,8 +364,8 @@ void Preprocessing::joinAllStarFiles()
 			myOutObsModel->opticsMdt.setValue(EMDL_IMAGE_DIMENSIONALITY, dimensionality);
 
 			int igroup;
-			obsModelMic.opticsMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, igroup);
-			std::cout << " The pixel size of the extracted particles in optics group " << igroup+1 << " is " << output_angpix << " Angstrom/pixel." << std::endl;
+			myOutObsModel->opticsMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, igroup);
+			std::cout << " The pixel size of the extracted particles in optics group " << igroup << " is " << output_angpix << " Angstrom/pixel." << std::endl;
 		}
 
 		if (fn_data == "")
@@ -648,14 +662,6 @@ bool Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 			return(false);
 		}
 
-		// Read the header of the micrograph to see how many frames there are.
-		Image<RFLOAT> Imic;
-		Imic.read(fn_mic, false, -1, false); // readData = false, select_image = -1, mapData= false, is_2D = true);
-
-		int xdim, ydim, zdim;
-		long int ndim;
-		Imic.getDimensions(xdim, ydim, zdim, ndim);
-		dimensionality = (zdim > 1) ? 3 : 2;
 		if (dimensionality == 3)
 		{
 			do_ramp = false;
