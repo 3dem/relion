@@ -42,10 +42,11 @@ class MetaDataContainer
         std::vector<bool> bools;
 		std::vector<std::string> strings;
 		std::vector<std::vector<double> > doubleVectors;
+		std::vector<std::string> unknowns;
 
         MetaDataContainer();
         MetaDataContainer(MetaDataTable* table, long doubleCount, long intCount,
-                          long boolCount, long stringCount, long doubleVectorCount);
+                          long boolCount, long stringCount, long doubleVectorCount, long unknownCount);
         MetaDataContainer(MetaDataTable* table, MetaDataContainer* mdc);
 
         void getValue(long offset, double& dest) const;

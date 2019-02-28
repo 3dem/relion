@@ -65,11 +65,11 @@ void EMDL::printDefinitions(std::ostream& out)
 {
 	out << "+++ RELION MetaDataLabel (EMDL) definitions: +++" << std::endl;
 	std::map<std::string, std::string>::const_iterator strIt;
-	
+
 	for (strIt = definitions.begin(); strIt != definitions.end(); strIt++)
 	{
 		out << std::setw(30) <<strIt->first;
-		
+
 		if (EMDL::isInt(names[strIt->first]))
 		{
 			out << " (int)    ";
@@ -90,11 +90,15 @@ void EMDL::printDefinitions(std::ostream& out)
 		{
 			out << " (vector<double>) ";
 		}
+		else if (EMDL::isUnknown(names[strIt->first]))
+		{
+			out << " (string) ";
+		}
 		else
 		{
 			REPORT_ERROR("EMDL::printDefinitions: unrecognised type");
 		}
-		
+
 		out << ": " << strIt->second <<std::endl;
 	}
 }
@@ -141,6 +145,10 @@ bool EMDL::isDoubleVector(const EMDLabel &label)
 bool EMDL::isVector(const EMDLabel &label)
 {
     return (data[label].type == EMDL_DOUBLE_VECTOR);
+}
+bool EMDL::isUnknown(const EMDLabel &label)
+{
+    return (data[label].type == EMDL_UNKNOWN);
 }
 
 bool EMDL::isValidLabel(const EMDLabel &label)

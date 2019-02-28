@@ -126,27 +126,27 @@ enum EMDLabel
 	EMDL_IMAGE_MAG_MATRIX_10,
 	EMDL_IMAGE_MAG_MATRIX_11,
 
-        EMDL_IMAGE_COORD_X,
-        EMDL_IMAGE_COORD_Y,
-        EMDL_IMAGE_COORD_Z,
-        EMDL_IMAGE_FRAME_NR,
-        EMDL_IMAGE_MAGNIFICATION_CORRECTION,
-        EMDL_IMAGE_NORM_CORRECTION,
-        EMDL_IMAGE_SAMPLINGRATE,
-        EMDL_IMAGE_SAMPLINGRATE_X,
-        EMDL_IMAGE_SAMPLINGRATE_Y,
-        EMDL_IMAGE_SAMPLINGRATE_Z,
-        EMDL_IMAGE_SIZE,
-        EMDL_IMAGE_SIZE_X,
-        EMDL_IMAGE_SIZE_Y,
-        EMDL_IMAGE_SIZE_Z,
-        EMDL_IMAGE_STATS_MIN,
-        EMDL_IMAGE_STATS_MAX,
-        EMDL_IMAGE_STATS_AVG,
-        EMDL_IMAGE_STATS_STDDEV,
-        EMDL_IMAGE_STATS_SKEW,
-        EMDL_IMAGE_STATS_KURT,
-        EMDL_IMAGE_WEIGHT,
+	EMDL_IMAGE_COORD_X,
+	EMDL_IMAGE_COORD_Y,
+	EMDL_IMAGE_COORD_Z,
+	EMDL_IMAGE_FRAME_NR,
+	EMDL_IMAGE_MAGNIFICATION_CORRECTION,
+	EMDL_IMAGE_NORM_CORRECTION,
+	EMDL_IMAGE_SAMPLINGRATE,
+	EMDL_IMAGE_SAMPLINGRATE_X,
+	EMDL_IMAGE_SAMPLINGRATE_Y,
+	EMDL_IMAGE_SAMPLINGRATE_Z,
+	EMDL_IMAGE_SIZE,
+	EMDL_IMAGE_SIZE_X,
+	EMDL_IMAGE_SIZE_Y,
+	EMDL_IMAGE_SIZE_Z,
+	EMDL_IMAGE_STATS_MIN,
+	EMDL_IMAGE_STATS_MAX,
+	EMDL_IMAGE_STATS_AVG,
+	EMDL_IMAGE_STATS_STDDEV,
+	EMDL_IMAGE_STATS_SKEW,
+	EMDL_IMAGE_STATS_KURT,
+	EMDL_IMAGE_WEIGHT,
 
 	EMDL_JOB_IS_CONTINUE,
 	EMDL_JOB_TYPE,
@@ -165,15 +165,15 @@ enum EMDLabel
 	EMDL_JOBOPTION_DIRECTORY,
 	EMDL_JOBOPTION_MENUOPTIONS,
 
-        EMDL_MATRIX_1_1,
-        EMDL_MATRIX_1_2,
-        EMDL_MATRIX_1_3,
-        EMDL_MATRIX_2_1,
-        EMDL_MATRIX_2_2,
-        EMDL_MATRIX_2_3,
-        EMDL_MATRIX_3_1,
-        EMDL_MATRIX_3_2,
-        EMDL_MATRIX_3_3,
+	EMDL_MATRIX_1_1,
+	EMDL_MATRIX_1_2,
+	EMDL_MATRIX_1_3,
+	EMDL_MATRIX_2_1,
+	EMDL_MATRIX_2_2,
+	EMDL_MATRIX_2_3,
+	EMDL_MATRIX_3_1,
+	EMDL_MATRIX_3_2,
+	EMDL_MATRIX_3_3,
 
 	EMDL_MICROGRAPH_ACCUM_MOTION_TOTAL,
 	EMDL_MICROGRAPH_ACCUM_MOTION_EARLY,
@@ -465,13 +465,15 @@ enum EMDLabel
 	EMDL_RESOLUTION_INVPIXEL,
 	EMDL_SPECTRAL_IDX,
 
+	EMDL_UNKNOWN_LABEL,
+
 	EMDL_LAST_LABEL // **** NOTE ****: Do keep this label always at the end
 	// it is here for looping purposes
 };//close enum Label
 
 enum EMDLabelType
 {
-	EMDL_INT, EMDL_BOOL, EMDL_DOUBLE, EMDL_FLOAT, EMDL_STRING, EMDL_DOUBLE_VECTOR
+	EMDL_INT, EMDL_BOOL, EMDL_DOUBLE, EMDL_FLOAT, EMDL_STRING, EMDL_DOUBLE_VECTOR, EMDL_UNKNOWN
 };
 
 class EMDL
@@ -502,6 +504,7 @@ public:
 	static bool isNumber(const EMDLabel &label);
 	static bool isDoubleVector(const EMDLabel &label);
 	static bool isVector(const EMDLabel &label);
+	static bool isUnknown(const EMDLabel &label);
 
 	static bool isValidLabel(const EMDLabel &label);
 	static bool isValidLabel(const std::string &labelName);
@@ -947,6 +950,8 @@ private:
 		EMDL::addLabel(EMDL_RESOLUTION_ANGSTROM, EMDL_DOUBLE, "rlnAngstromResolution", "Resolution (in Angstroms)");
 		EMDL::addLabel(EMDL_RESOLUTION_INVPIXEL, EMDL_DOUBLE, "rlnResolutionInversePixel", "Resolution (in 1/pixel, Nyquist = 0.5)");
 		EMDL::addLabel(EMDL_SPECTRAL_IDX, EMDL_INT, "rlnSpectralIndex", "Spectral index (i.e. distance in pixels to the origin in Fourier space) ");
+
+		EMDL::addLabel(EMDL_UNKNOWN_LABEL, EMDL_UNKNOWN, "rlnUnknownLabel", "NON-RELION label: values will be ignored, yet maintained in the STAR file.");
 	 }
 
 	~StaticInitialization()

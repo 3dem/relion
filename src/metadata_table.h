@@ -88,11 +88,15 @@ class MetaDataTable
 	//	 objects[r]->strings[label2offset[EMDL_IMAGE_NAME]]
 	std::vector<long> label2offset;
 
+	//// TODO: add these to the clear, copy etc
+	std::vector<std::string> unknownLabelNames;
+	std::map<long, long> unknownLabelPosition2Offset;
+
 	// Current object id
 	long current_objectID;
 
 	// Number of labels of each type
-	long doubleLabels, intLabels, boolLabels, stringLabels, doubleVectorLabels;
+	long doubleLabels, intLabels, boolLabels, stringLabels, doubleVectorLabels, unknownLabels;
 
 	// Is this a 2D table or a 1D list?
 	bool isList;
@@ -165,6 +169,7 @@ public:
 	template<class T>
 	bool setValue(EMDLabel name, const T &value, long int objectID = -1);
 
+	bool setUnknownValue(int labelPosition, const std::string &value);
 	bool setValueFromString(EMDLabel label, const std::string &value, long int objectID = -1);
 
 
@@ -273,10 +278,10 @@ public:
 	long int read(const FileName &filename, const std::string &name = "", std::vector<EMDLabel> *labelsVector = NULL, std::string grep_pattern = "", bool do_only_count = false);
 
 	// Write a MetaDataTable in STAR format
-	void write(std::ostream& out = std::cout) const;
+	void write(std::ostream& out = std::cout);
 
 	// Write to a single file
-	void write(const FileName & fn_out) const;
+	void write(const FileName & fn_out);
 
 	// Make a histogram of a column
 	void columnHistogram(EMDLabel label, std::vector<RFLOAT> &histX, std::vector<RFLOAT> &histY, int verb = 0, CPlot2D * plot2D = NULL,
