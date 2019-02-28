@@ -1318,7 +1318,7 @@ void MlOptimiser::initialise()
 #endif
 }
 
-void MlOptimiser::checkMask(FileName &_fn_mask, int rank)
+void MlOptimiser::checkMask(FileName &_fn_mask, int solvent_nr, int rank)
 {
 	int ref_box_size = XSIZE(mymodel.Iref[0]);
 
@@ -1391,8 +1391,15 @@ void MlOptimiser::checkMask(FileName &_fn_mask, int rank)
 	if (need_new_mask)
 	{
 		// everyone should know about the new mask
-		_fn_mask = fn_out+"_solvent_mask.mrc";
-		if (rank = 0) Isolvent.write(_fn_mask)
+		if (solvent_nr == 1)
+		{
+			_fn_mask = fn_out + "_solvent_mask.mrc";
+		}
+		else
+		{
+			_fn_mask = fn_out + "_solvent" + integerToString(solvent_nr) + ".mrc";
+		}
+		if (rank = 0) Isolvent.write(_fn_mask);
 
 	}
 
@@ -1887,8 +1894,8 @@ void MlOptimiser::initialiseGeneral(int rank)
 	}
 
 	// Check mask angpix, boxsize and [0,1] compliance right away.
-	if (fn_mask != "None") checkMask(fn_mask, rank);
-	if (fn_mask2 != "None") checkMask(fn_mask2, rank);
+	if (fn_mask != "None") checkMask(fn_mask, 1, rank);
+	if (fn_mask2 != "None") checkMask(fn_mask2, 2, rank);
 
 	// Write out unmasked 2D class averages
 	do_write_unmasked_refs = (mymodel.ref_dim == 2);
