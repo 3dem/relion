@@ -144,7 +144,10 @@ class star_handler_parameters
 		if (duplicate_threshold > 0) c++;
 		if (c != 1)
 		{
-			REPORT_ERROR("ERROR: specify (only and at least) one of the following options: --compare, --select, --select_by_str, --combine, --split, --operate, --center, --remove_column, --add_column, --hist_column or --remove_duplicates.");
+			MetaDataTable MD;
+			read_check_ignore_optics(MD, fn_in);
+			write_check_ignore_optics(MD, fn_out, MD.getName());
+			//REPORT_ERROR("ERROR: specify (only and at least) one of the following options: --compare, --select, --select_by_str, --combine, --split, --operate, --center, --remove_column, --add_column, --hist_column or --remove_duplicates.");
 		}
 
 		if (fn_out == "" && hist_col_label == "")
@@ -175,7 +178,7 @@ class star_handler_parameters
 
 	void write_check_ignore_optics(MetaDataTable &MD, FileName fn, std::string tablename)
 	{
-		if (do_ignore_optics) MD.write(fn_in);
+		if (do_ignore_optics) MD.write(fn);
 		else obsModel.save(MD, fn, tablename);
 	}
 
@@ -769,8 +772,8 @@ class star_handler_parameters
 	{
 		MetaDataTable MD;
 		read_check_ignore_optics(MD, fn_in, "particles");
-		bool do_contains_xy = (MD.containsLabel(EMDL_ORIENT_ORIGIN_X) && MD.containsLabel(EMDL_ORIENT_ORIGIN_Y));
-		bool do_contains_z = (MD.containsLabel(EMDL_ORIENT_ORIGIN_Z));
+		bool do_contains_xy = (MD.containsLabel(EMDL_ORIENT_ORIGIN_X_ANGSTROM) && MD.containsLabel(EMDL_ORIENT_ORIGIN_Y_ANGSTROM));
+		bool do_contains_z = (MD.containsLabel(EMDL_ORIENT_ORIGIN_Z_ANGSTROM));
 
 		if (!do_contains_xy)
 		{
@@ -784,15 +787,22 @@ class star_handler_parameters
 
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
 		{
+			int optics_group;
 			Matrix1D<RFLOAT> my_projected_center(3);
 			Matrix2D<RFLOAT> A3D;
 			RFLOAT xoff, yoff, zoff, rot, tilt, psi;
 
-			MD.getValue(EMDL_ORIENT_ORIGIN_X, xoff);
-			MD.getValue(EMDL_ORIENT_ORIGIN_Y, yoff);
+			MD.getValue(EMDL_IMAGE_OPTICS_GROUP, optics_group);
+			optics_group--;
+			RFLOAT angpix = obsModel.getPixelSize(optics_group);
+			MD.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff);
+			MD.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff);
 			MD.getValue(EMDL_ORIENT_ROT, rot);
 			MD.getValue(EMDL_ORIENT_TILT, tilt);
 			MD.getValue(EMDL_ORIENT_PSI, psi);
+
+			xoff /= angpix;
+			yoff /= angpix;
 
 			// Project the center-coordinates
 			Euler_angles2matrix(rot, tilt, psi, A3D, false);
@@ -802,15 +812,16 @@ class star_handler_parameters
 			yoff -= YY(my_projected_center);
 
 			// Set back the new centers
-			MD.setValue(EMDL_ORIENT_ORIGIN_X, xoff);
-			MD.setValue(EMDL_ORIENT_ORIGIN_Y, yoff);
+			MD.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff*angpix);
+			MD.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff*angpix);
 
 			// also allow 3D data (subtomograms)
 			if (do_contains_z)
 			{
-				MD.getValue(EMDL_ORIENT_ORIGIN_Z, zoff);
+				MD.getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, zoff);
+				zoff /= angpix;
 				zoff -= ZZ(my_projected_center);
-				MD.setValue(EMDL_ORIENT_ORIGIN_Z, zoff);
+				MD.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, zoff*angpix);
 			}
 		}
 
