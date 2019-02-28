@@ -776,6 +776,9 @@ public:
 	// Initialise the whole optimiser
 	void initialise();
 
+	// Check the mask is thr ight size
+	void checkMask(FileName &_fn_mask, int rank);
+
 	// Some general stuff that is shared between MPI and sequential code
 	void initialiseGeneral(int rank = 0);
 

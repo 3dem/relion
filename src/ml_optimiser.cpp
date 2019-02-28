@@ -1318,6 +1318,88 @@ void MlOptimiser::initialise()
 #endif
 }
 
+void MlOptimiser::checkMask(FileName &_fn_mask, int rank)
+{
+	int ref_box_size = XSIZE(mymodel.Iref[0]);
+
+	Image<RFLOAT> Isolvent;
+	RFLOAT mask_pixel_size;
+	Isolvent.read(_fn_mask);
+	Isolvent().setXmippOrigin();
+	Isolvent.MDMainHeader.getValue(EMDL_IMAGE_SAMPLINGRATE_X, mask_pixel_size);
+
+	bool need_new_mask = false;
+	if (fabs(mask_pixel_size-mymodel.pixel_size) > 0.001)
+	{
+		need_new_mask = true;
+
+		if (verb > 0)
+		{
+			std::cerr << " + Warning: solvent mask pixel size: " << mask_pixel_size
+					<< " is not the same as the reference pixel size: " << mymodel.pixel_size << std::endl;
+			std::cerr << " + Warning: re-scaling the mask... " << std::endl;
+		}
+
+		if (rank == 0) // only master writes out the new mask
+		{
+			int rescale_size = ROUND( ref_box_size * (mymodel.pixel_size / mask_pixel_size));
+			rescale_size += rescale_size%2; //make even in case it is not already
+			resizeMap(Isolvent(), rescale_size);
+		}
+	}
+
+	if (XSIZE(Isolvent()) != ref_box_size)
+	{
+		need_new_mask = true;
+
+		if (verb > 0)
+		{
+			std::cerr << " + Warning: solvent mask box size: " << XSIZE(Isolvent())
+					<< " is not the same as the reference box size: " << ref_box_size << std::endl;
+			std::cerr << " + Warning: re-windowing the mask... " << std::endl;
+		}
+
+		if (rank == 0) // only master writes out the new mask
+		{
+			Isolvent().window(FIRST_XMIPP_INDEX(ref_box_size), FIRST_XMIPP_INDEX(ref_box_size), FIRST_XMIPP_INDEX(ref_box_size),
+								LAST_XMIPP_INDEX(ref_box_size), LAST_XMIPP_INDEX(ref_box_size),  LAST_XMIPP_INDEX(ref_box_size));
+		}
+
+	}
+
+	RFLOAT solv_min = Isolvent().computeMin();
+	RFLOAT solv_max = Isolvent().computeMax();
+	if (solv_min < 0. || solv_max > 1.)
+	{
+		need_new_mask = true;
+
+		if (verb > 0)
+		{
+			std::cerr << " + Warning: solvent mask minimum: " << solv_min
+					<< " or maximum: " << solv_max << " are outside the [0,1] range."<< std::endl;
+			std::cerr << " + Warning: thresholding the mask value to [0,1] range ... " << std::endl;
+		}
+
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Isolvent())
+		{
+
+			if (DIRECT_MULTIDIM_ELEM(Isolvent(),n) < 0.) DIRECT_MULTIDIM_ELEM(Isolvent(), n) = 0.;
+			else if (DIRECT_MULTIDIM_ELEM(Isolvent(),n) > 1.) DIRECT_MULTIDIM_ELEM(Isolvent(), n) = 1.;
+		}
+	}
+
+	if (need_new_mask)
+	{
+		// everyone should know about the new mask
+		_fn_mask = fn_out+"_solvent_mask.mrc";
+		if (rank = 0) Isolvent.write(_fn_mask)
+
+	}
+
+	return;
+
+}
+
 void MlOptimiser::initialiseGeneral(int rank)
 {
 
@@ -1804,34 +1886,9 @@ void MlOptimiser::initialiseGeneral(int rank)
 			REPORT_ERROR("ERROR: you cannot use --fast_subsets together with --auto_refine");
 	}
 
-	// Check first mask [0,1] compliance right away.
-	Image<RFLOAT> Isolvent;
-	Isolvent().resize(mymodel.Iref[0]);
-	bool mask1(false),mask2(false);
-	if(fn_mask != "None")
-	{
-			Isolvent.read(fn_mask);
-			if (Isolvent().computeMin() < 0. || Isolvent().computeMax() > 1.)
-				mask1=true;
-	}
-
-	// Check second mask [0,1] compliance right away.
-	if(fn_mask2 != "None")
-	{
-			Isolvent.read(fn_mask2);
-			if (Isolvent().computeMin() < 0. || Isolvent().computeMax() > 1.)
-				mask2=true;
-	}
-
-	std::string errstr = "MlOptimiser::initialiseGeneral: ERROR a solvent mask should contain values between 0 and 1 only. Fix the input for \n ";
-	if(mask1)
-		errstr += " \n\t --solvent_mask ";
-	if(mask2)
-		errstr += " \n\t --solvent_mask2 ";
-	errstr += ". You can use --threshold_above and --threshold_below in relion_image_handler to do so. \n";
-
-	if(mask1 || mask2)
-		REPORT_ERROR(errstr);
+	// Check mask angpix, boxsize and [0,1] compliance right away.
+	if (fn_mask != "None") checkMask(fn_mask, rank);
+	if (fn_mask2 != "None") checkMask(fn_mask2, rank);
 
 	// Write out unmasked 2D class averages
 	do_write_unmasked_refs = (mymodel.ref_dim == 2);
