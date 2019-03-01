@@ -1218,7 +1218,7 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 				outputNodes.push_back(node2);
 				command += " --do_halfmaps";
 			}
-			else if (mynodetype = NODE_PART_DATA)
+			else if (mynodetype == NODE_PART_DATA)
 			{
 				command += " --do_particles";
 				if (joboptions["optics_group_name"].getString().length() > 0)
