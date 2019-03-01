@@ -1097,6 +1097,7 @@ For the import of a particle, 2D references or micrograph STAR file or of a 3D r
 Note that due to a bug in a fltk library, you cannot import from directories that contain a substring  of the current directory, e.g. dont important from /home/betagal if your current directory is called /home/betagal_r2. In this case, just change one of the directory names.");
 
 	joboptions["node_type"] = JobOption("Node type:", job_nodetype_options, 0, "Select the type of Node this is.");
+	joboptions["optics_group_name"] = JobOption("Rename optics group for particles:", (std::string)"", "Only for the import of a particles STAR file with a single, or no, optics groups defined: rename the optics group for the imported particles to this string.");
 
 }
 
@@ -1170,8 +1171,6 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 			outputNodes.push_back(node);
 		}
 		else if (node_type == "Particles STAR file (.star)" ||
-				 node_type == "Movie-particles STAR file (.star)" ||
-				 node_type == "Micrographs STAR file (.star)" ||
 				 node_type == "2D references (.star or .mrcs)" ||
 				 node_type == "3D reference (.mrc)" ||
 				 node_type == "3D mask (.mrc)" ||
@@ -1183,8 +1182,6 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 			int mynodetype;
 			if (node_type == "Particles STAR file (.star)")
 				mynodetype = NODE_PART_DATA;
-			else if (node_type == "Micrographs STAR file (.star)")
-				mynodetype = NODE_MICS;
 			else if (node_type == "2D references (.star or .mrcs)")
 				mynodetype = NODE_2DREFS;
 			else if (node_type == "3D reference (.mrc)")
@@ -1220,6 +1217,14 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 				Node node2(outputname + fn_inb, mynodetype);
 				outputNodes.push_back(node2);
 				command += " --do_halfmaps";
+			}
+			else if (mynodetype = NODE_PART_DATA)
+			{
+				command += " --do_particles";
+				if (joboptions["optics_group_name"].getString().length() > 0)
+				{
+					command += " --particles_optics_group_name " + joboptions["optics_group_name"].getString();
+				}
 			}
 			else
 			{

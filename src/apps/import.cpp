@@ -19,16 +19,16 @@
  * author citations must be preserved.
  ***************************************************************************/
 
+#include <src/jaz/obs_model.h>
 #include <src/image.h>
 #include <src/metadata_table.h>
-#include <src/gui_entries.h>
 
 class import_parameters
 {
 	public:
    	FileName fn_in, fn_odir, fn_out;
-	bool do_write_types, do_continue, do_movies, do_micrographs, do_coordinates, do_halfmaps, do_other;
-   	std::string optics_group_name, node_type;
+	bool do_write_types, do_continue, do_movies, do_micrographs, do_coordinates, do_halfmaps, do_particles, do_other;
+   	std::string optics_group_name, node_type, particles_optics_group_name;
    	RFLOAT kV, Cs, Q0, beamtilt_x, beamtilt_y, pixel_size;
 
 	// I/O Parser
@@ -52,6 +52,8 @@ class import_parameters
 		do_micrographs = parser.checkOption("--do_micrographs", "Import micrographs");
 		do_coordinates = parser.checkOption("--do_coordinates", "Import coordinates");
 		do_halfmaps = parser.checkOption("--do_halfmaps", "Import unfiltered half maps");
+		do_particles = parser.checkOption("--do_particles", "Import particle STAR files");
+		particles_optics_group_name = parser.getOption("--particles_optics_group_name", "Rename optics group for all imported particles (e.g. \"opticsGroupLMBjan2019\"", "");
 		do_other = parser.checkOption("--do_other", "Import anything else");
 
 		int mic_section = parser.addSection("Specific options for movies or micrographs");
@@ -82,7 +84,7 @@ class import_parameters
 		if (do_movies) nr_count++;
 		if (do_micrographs) nr_count++;
 		if (do_coordinates) nr_count++;
-		if (do_other || do_halfmaps) nr_count++;
+		if (do_other || do_halfmaps || do_particles) nr_count++;
 		if (nr_count != 1)
 		{
 			REPORT_ERROR("ERROR: you can only use only one, and at least one, of the options --do_movies, --do_micrographs, --do_coordinates, do_halfmaps or --other_import_type");
@@ -231,6 +233,28 @@ class import_parameters
 			fh << fn_suffix2 << "*.mrc" << std::endl;
 			fh.close();
 
+		}
+		else if (do_particles)
+		{
+			ObservationModel obsModel;
+			MetaDataTable MD;
+			ObservationModel::loadSafely(fn_in, obsModel, MD);
+
+			// Make sure rlnOpticsGroupName is set to this value
+			// This is only a valid option if there was a single optics_group in the input file
+			if (particles_optics_group_name != "")
+			{
+				if (obsModel.opticsMdt.numberOfObjects() != 1)
+				{
+					obsModel.opticsMdt.write(std::cerr);
+					REPORT_ERROR(" ERROR: cannot rename particles optics groups when multiple ones are imported!");
+				}
+				obsModel.opticsMdt.setValue(EMDL_IMAGE_OPTICS_GROUP_NAME, particles_optics_group_name, 0);
+			}
+
+			FileName fnt = "/" + fn_in;
+			fnt = fn_odir + fnt.afterLastOf("/");
+			obsModel.save(MD, fnt, "particles");
 		}
 		else if (do_other || do_halfmaps)
 		{
