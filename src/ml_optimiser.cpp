@@ -1399,7 +1399,7 @@ void MlOptimiser::checkMask(FileName &_fn_mask, int solvent_nr, int rank)
 		{
 			_fn_mask = fn_out + "_solvent" + integerToString(solvent_nr) + ".mrc";
 		}
-		if (rank = 0) Isolvent.write(_fn_mask);
+		if (rank == 0) Isolvent.write(_fn_mask);
 
 	}
 
