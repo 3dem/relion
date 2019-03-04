@@ -627,6 +627,9 @@ public:
 	// Input & Output rootname
 	FileName fn_in;
 
+	// Ignore optics groups
+	bool do_ignore_optics;
+
 	// Filename for coordinates star file
 	FileName fn_coords;
 

@@ -2473,6 +2473,7 @@ void Displayer::read(int argc, char **argv)
 	else if (parser.checkOption("--colour_difference", "Show images in cyan-blue-black-red-yellow colour scheme (for difference images)?")) colour_scheme = CYANBLACKYELLOWSCALE;
 	else colour_scheme = GREYSCALE;
 	do_colourbar = parser.checkOption("--colour_bar", "Show colourbar image?");
+	do_ignore_optics = parser.checkOption("--ignore_optics", "Ignore information about optics groups in input STAR file?");
 
 	int disp_section  = parser.addSection("Multiviewer options");
 	ncol = textToInteger(parser.getOption("--col", "Number of columns", "5"));
@@ -2539,7 +2540,8 @@ void Displayer::initialise()
 		else
 			fn_data = fn_in.without("_model.star") + "_data.star";
 
-		ObservationModel::loadSafely(fn_data, obsModel, MDdata);
+		if (do_ignore_optics) MDdata.read(fn_data);
+		else ObservationModel::loadSafely(fn_data, obsModel, MDdata);
 
 		// If regrouping, also read the model_groups table into memory
 		if (nr_regroups > 0)
@@ -2577,6 +2579,13 @@ void Displayer::initialise()
 		if (fn_in.isStarFile())
 		{
 			// As of v3.1 the input STAR files should always store the pixel size, no more check necessary...
+			if (do_ignore_optics)
+			{
+				if (angpix > 0.)
+				{
+					obsModel.opticsMdt.setValue(EMDL_IMAGE_PIXEL_SIZE, angpix);
+				}
+			}
 		}
 		else
 		{
@@ -2665,7 +2674,8 @@ int Displayer::runGui()
 		}
 		else
 		{
-			ObservationModel::loadSafely(fn_in, obsModel, MD, "discover");
+			if (do_ignore_optics) MD.read(fn_in);
+			else ObservationModel::loadSafely(fn_in, obsModel, MD, "discover");
 		}
 
 		// Get which labels are stored in this metadatatable and generate choice menus for display and sorting
@@ -2761,7 +2771,8 @@ int Displayer::run()
 		}
 		else
 		{
-			ObservationModel::loadSafely(fn_in, obsModel, MDin, "discover");
+			if (do_ignore_optics) MDin.read(fn_in);
+			else ObservationModel::loadSafely(fn_in, obsModel, MDin, "discover");
 		}
 
 		// Check that label to display is present in the table
