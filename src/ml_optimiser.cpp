@@ -2076,6 +2076,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 				}
 			}
 
+
 			// Apply a similar softMask as below (assume zero translations)
 			if (do_zero_mask)
 			{
@@ -2086,42 +2087,51 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 							(helical_tube_outer_diameter / (2. * my_pixel_size)), width_mask_edge);
 				}
 				else
+				{
 					softMaskOutsideMap(img(), particle_diameter / (2. * my_pixel_size), width_mask_edge);
+				}
 			}
 
 			// Keep track of the average image (only to correct power spectra, no longer for initial references!)
 
 			// Rescale img() onto Mavg, as optics_groups may have different box sizes and pixel sizes...
+			// a) rescale to same pixel size
 			if (fabs(my_pixel_size - mymodel.pixel_size) > 0.0001)
 			{
 				int rescalesize = ROUND(XSIZE(img()) * (my_pixel_size/ mymodel.pixel_size));
-				rescalesize -= rescalesize%2; //make even in case it is not already
+				rescalesize += rescalesize%2; //make even in case it is not already
 				resizeMap(img(), rescalesize);
 			}
+			// b) window to same box size
 			img().setXmippOrigin();
-			if (fabs(mymodel.ori_size - my_image_size) > 0)
+			if (fabs(XSIZE(img()) - mymodel.ori_size) > 0)
 			{
-				img().window(FIRST_XMIPP_INDEX(mymodel.ori_size), FIRST_XMIPP_INDEX(mymodel.ori_size),
-											  LAST_XMIPP_INDEX(mymodel.ori_size),  LAST_XMIPP_INDEX(mymodel.ori_size));
+				if (mymodel.data_dim == 2)
+				{
+					img().window(FIRST_XMIPP_INDEX(mymodel.ori_size), FIRST_XMIPP_INDEX(mymodel.ori_size),
+												  LAST_XMIPP_INDEX(mymodel.ori_size), LAST_XMIPP_INDEX(mymodel.ori_size));
+				}
+				else if (mymodel.data_dim == 3)
+				{
+					img().window(FIRST_XMIPP_INDEX(mymodel.ori_size), FIRST_XMIPP_INDEX(mymodel.ori_size), FIRST_XMIPP_INDEX(mymodel.ori_size),
+												  LAST_XMIPP_INDEX(mymodel.ori_size), LAST_XMIPP_INDEX(mymodel.ori_size), LAST_XMIPP_INDEX(mymodel.ori_size));
+				}
 			}
 			Mavg += img();
 
 			// Calculate the power spectrum of this particle
 			CenterFFT(img(), true);
+
 			MultidimArray<RFLOAT> ind_spectrum, count;
 			int spectral_size = (mymodel.ori_size / 2) + 1;
 			ind_spectrum.initZeros(spectral_size);
 			count.initZeros(spectral_size);
 			// recycle the same transformer for all images
-			// But make sure the transformer is reset if the input image changes size, otherwise one can get horrible bugs with the transformer....
-			bool force_new_fftw_plans = (YSIZE(img()) != YSIZE(Faux));
-			transformer.FourierTransform(img(), Faux, false, force_new_fftw_plans);
+			transformer.FourierTransform(img(), Faux, false);
 
-			// remapping: divide by own pixe*boxsize, multiply with the new ones on which to map!!
-			RFLOAT remap_image_sizes = (mymodel.ori_size * mymodel.pixel_size) / (my_pixel_size * my_image_size);
 			FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Faux)
 			{
-				long int idx = ROUND(remap_image_sizes * sqrt(kp*kp + ip*ip + jp*jp));
+				long int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
 				if (idx < spectral_size)
 				{
 					ind_spectrum(idx) += norm(dAkij(Faux, k, i, j));
@@ -2162,8 +2172,10 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 				Matrix2D<RFLOAT> A;
 				Euler_angles2matrix(rot, tilt, psi, A, true);
 
-				A = mydata.obsModel.applyAnisoMagTransp(A, optics_group);
-				A = mydata.obsModel.applyScaleDifference(A, optics_group, mymodel.ori_size, mymodel.pixel_size);
+				// At this point anisotropic magnification shouldn't matter
+				// Also: dont applyScaleDifference, as img() was rescaled to mymodel.ori_size and mymodel.pixel_size
+				//A = mydata.obsModel.applyAnisoMagTransp(A, optics_group);
+				//A = mydata.obsModel.applyScaleDifference(A, optics_group, mymodel.ori_size, mymodel.pixel_size);
 				// Construct initial references from random subsets
 				windowFourierTransform(Faux, Fimg, wsum_model.current_size);
 				Fctf.resize(Fimg);
@@ -2174,7 +2186,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 				{
 					CTF ctf;
 					ctf.readByGroup(MDimg, &mydata.obsModel, 0); // This MDimg only contains one particle!
-					ctf.getFftwImage(Fctf, my_image_size, my_image_size, my_pixel_size,
+					ctf.getFftwImage(Fctf, mymodel.ori_size, mymodel.ori_size, mymodel.pixel_size,
 						ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);
 
 					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fimg)
@@ -2193,6 +2205,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 			progress_bar(nr_particles_done);
 
 	} // end loop part_id
+
 
 	// Clean up the fftw object completely
 	// This is something that needs to be done manually, as among multiple threads only one of them may actually do this
