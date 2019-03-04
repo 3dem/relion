@@ -385,7 +385,6 @@ class star_handler_parameters
 					bool is_uniq = true;
 					int new_group;
 					for (new_group = 0; new_group < optics_group_uniq_names.size(); new_group++)
-
 					{
 						if (optics_group_uniq_names[new_group] == myname)
 						{
@@ -414,7 +413,6 @@ class star_handler_parameters
 					for (long int current_object2 = MDsin[MDs_id].firstObject();
 					     current_object2 < MDsin[MDs_id].numberOfObjects() && current_object2 >= 0;
 					     current_object2 = MDsin[MDs_id].nextObject())
-
 					{
 						int old_optics_group;
 						MDsin[MDs_id].getValue(EMDL_IMAGE_OPTICS_GROUP, old_optics_group, current_object2);
@@ -426,6 +424,11 @@ class star_handler_parameters
 				FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsin[MDs_id])
 				{
 					MDsin[MDs_id].setValue(EMDL_IMAGE_OPTICS_GROUP, new_optics_groups[current_object]);
+					// Also rename the rlnGroupName to not have groups overlapping from different optics groups
+					std::string name;
+					MDsin[MDs_id].getValue(EMDL_MLMODEL_GROUP_NAME, name);
+					name = "optics"+integerToString(new_optics_groups[current_object])+"_"+name;
+					MDsin[MDs_id].setValue(EMDL_MLMODEL_GROUP_NAME, name);
 				}
 			}
 
@@ -549,6 +552,9 @@ class star_handler_parameters
 
 		// Combine the particles tables
 		MDout = combineMetaDataTables(MDsin);
+
+		//Deactivate the group_name column
+		MDout.deactivateLabel(EMDL_MLMODEL_GROUP_NO);
 
 		if (fn_check != "")
 		{
