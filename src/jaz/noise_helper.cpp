@@ -66,7 +66,7 @@ Image<RFLOAT> NoiseHelper::predictCCNoise(Projector &prj, double sigma2,
 
         spec.data.initZeros();
 
-        prj.get2DFourierTransform(spec.data, A3D, false);
+        prj.get2DFourierTransform(spec.data, A3D);
 
         double defocus = DistributionHelper::sampleGauss(defocusMu, defocusSigma);
 
@@ -486,7 +486,7 @@ std::vector<std::pair<double,double>> NoiseHelper::radialAverageAndStdDevFFTW(Im
             avg[i] /= wgh[i];
         }
     }
-	
+
 	for (int yy = 0; yy < h; yy++)
     for (int xx = 0; xx < w; xx++)
     {
@@ -495,7 +495,7 @@ std::vector<std::pair<double,double>> NoiseHelper::radialAverageAndStdDevFFTW(Im
         double rd = sqrt(x*x + y*y);
 
 		int r = (int)(rd+0.5);
-		
+
 		double mu = avg[r];
 		double v = DIRECT_A2D_ELEM(map.data, yy, xx) - mu;
 
@@ -504,7 +504,7 @@ std::vector<std::pair<double,double>> NoiseHelper::radialAverageAndStdDevFFTW(Im
             var[r] += v*v;
         }
     }
-	
+
 	for (int i = 0; i < b; i++)
     {
         if (wgh[i] > 1.0)
@@ -514,12 +514,12 @@ std::vector<std::pair<double,double>> NoiseHelper::radialAverageAndStdDevFFTW(Im
     }
 
 	std::vector<std::pair<double,double>> out(b);
-	
+
 	for (int i = 0; i < b; i++)
     {
 		out[i] = std::make_pair(avg[i], sqrt(var[i]));
 	}
-	
+
     return out;
 }
 

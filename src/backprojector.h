@@ -179,7 +179,7 @@ public:
 	* Depending on the dimension of the map, this will be a backprojection or a rotation operation
 	*/
 	void set2DFourierTransform(const MultidimArray<Complex > &img_in,
-							   const Matrix2D<RFLOAT> &A, bool inv,
+							   const Matrix2D<RFLOAT> &A,
 						       const MultidimArray<RFLOAT> *Mweight = NULL,
 							   RFLOAT r_ewald_sphere = -1.,
 							   bool is_positive_curvature = true,
@@ -190,23 +190,23 @@ public:
 		{
 			if (ref_dim != 3)
 				REPORT_ERROR("Backprojector::set3DFourierTransform%%ERROR: Dimension of the data array should be 3");
-			backrotate3D(img_in, A, inv, Mweight);
+			backrotate3D(img_in, A, Mweight);
 		}
 		else if (img_in.getDim() == 1)
 		{
 			if (ref_dim != 2)
 				REPORT_ERROR("Backprojector::set1DFourierTransform%%ERROR: Dimension of the data array should be 2");
-			backproject1Dto2D(img_in, A, inv, Mweight);
+			backproject1Dto2D(img_in, A, Mweight);
 		}
 		else
 		{
 			switch (ref_dim)
 			{
 			case 2:
-				backrotate2D(img_in, A, inv, Mweight, magMatrix);
+				backrotate2D(img_in, A, Mweight, magMatrix);
 				break;
 			case 3:
-				backproject2Dto3D(img_in, A, inv, Mweight, r_ewald_sphere, is_positive_curvature, magMatrix);
+				backproject2Dto3D(img_in, A, Mweight, r_ewald_sphere, is_positive_curvature, magMatrix);
 				break;
 			default:
 				REPORT_ERROR("Backprojector::set2DSlice%%ERROR: Dimension of the data array should be 2 or 3");
@@ -219,7 +219,7 @@ public:
 	* If a exp_Mweight is given, rather than adding 1 to all relevant pixels in the weight array, we use exp_Mweight
 	*/
 	void backrotate2D(const MultidimArray<Complex > &img_in,
-			          const Matrix2D<RFLOAT> &A, bool inv,
+			          const Matrix2D<RFLOAT> &A,
 			          const MultidimArray<RFLOAT> *Mweight = NULL,
 					  Matrix2D<RFLOAT>* magMatrix = 0);
 
@@ -228,7 +228,7 @@ public:
 	* If a exp_Mweight is given, rather than adding 1 to all relevant pixels in the weight array, we use exp_Mweight
 	*/
 	void backrotate3D(const MultidimArray<Complex > &img_in,
-			          const Matrix2D<RFLOAT> &A, bool inv,
+			          const Matrix2D<RFLOAT> &A,
 			          const MultidimArray<RFLOAT> *Mweight = NULL);
 
 	/*
@@ -236,7 +236,7 @@ public:
 	* If a exp_Mweight is given, rather than adding 1 to all relevant pixels in the weight array, we use exp_Mweight
 	*/
 	void backproject2Dto3D(const MultidimArray<Complex > &img_in,
-			         const Matrix2D<RFLOAT> &A, bool inv,
+			         const Matrix2D<RFLOAT> &A,
 			         const MultidimArray<RFLOAT> *Mweight = NULL,
 					 RFLOAT r_ewald_sphere = -1.,
 					 bool is_positive_curvature = true,
@@ -247,7 +247,7 @@ public:
 	* If a exp_Mweight is given, rather than adding 1 to all relevant pixels in the weight array, we use exp_Mweight
 	*/
 	void backproject1Dto2D(const MultidimArray<Complex > &img_in,
-			         const Matrix2D<RFLOAT> &A, bool inv,
+			         const Matrix2D<RFLOAT> &A,
 			         const MultidimArray<RFLOAT> *Mweight = NULL);
 
 	/*

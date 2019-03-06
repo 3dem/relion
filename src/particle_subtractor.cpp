@@ -486,7 +486,7 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, M
 			FTo.initZeros(Fimg);
 			// The following line gets the correct pointer to account for overlap in the bodies
 			int oobody = DIRECT_A2D_ELEM(opt.mymodel.pointer_body_overlap, subtract_body, obody);
-			opt.mymodel.PPref[oobody].get2DFourierTransform(FTo, Abody, IS_NOT_INV);
+			opt.mymodel.PPref[oobody].get2DFourierTransform(FTo, Abody);
 
 			// Body is centered at its own COM: move it back to its place in the original particle image
 
@@ -539,7 +539,9 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, M
 		// Normal 3D classification/refinement: get the projection in rot,tilt,psi for the corresponding class
 		Matrix2D<RFLOAT> A3D;
 		Euler_angles2matrix(rot, tilt, psi, A3D);
-		opt.mymodel.PPref[myclass].get2DFourierTransform(Fsubtract, A3D, IS_NOT_INV);
+
+		std::cerr << "TODO: insert anisoMag & scale difference!" << std::endl;
+		opt.mymodel.PPref[myclass].get2DFourierTransform(Fsubtract, A3D);
 
 		// Shift in opposite direction as offsets in the STAR file
 		shiftImageInFourierTransform(Fsubtract, Fsubtract, (RFLOAT)opt.mymodel.ori_size,

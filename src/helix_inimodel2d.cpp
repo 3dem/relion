@@ -654,7 +654,7 @@ void HelixAligner::initialiseClasses()
 
 			RFLOAT rot = (RFLOAT)j*360./(XSIZE(model.Aref[0]));
 	    	rotation2DMatrix(rot, A2D);
-	    	PP.get2DFourierTransform(myFline, A2D, IS_NOT_INV);
+	    	PP.get2DFourierTransform(myFline, A2D);
 	    	transformer.inverseFourierTransform(myFline,myline);
 	    	// Shift the image back to the center...
 	    	myline.setXmippOrigin();
@@ -948,7 +948,7 @@ void HelixAligner::reconstruct2D(int iclass)
     	Matrix2D<RFLOAT> A2D;
     	RFLOAT rot = (RFLOAT)j*360./(XSIZE(model.Aref[iclass]));
     	rotation2DMatrix(rot, A2D);
-    	BP.set2DFourierTransform(myFlines[j], A2D, IS_NOT_INV);
+    	BP.set2DFourierTransform(myFlines[j], A2D);
     }
     MultidimArray<RFLOAT> dummy;
     model.Arec[iclass].initZeros();
@@ -997,7 +997,7 @@ void HelixAligner::reconstruct2D(int iclass)
 		RFLOAT rot = (RFLOAT)j*360./(XSIZE(model.Aref[iclass]));
     	rotation2DMatrix(rot, A2D);
     	myFlines[j].initZeros();
-    	PP.get2DFourierTransform(myFlines[j], A2D, IS_NOT_INV);
+    	PP.get2DFourierTransform(myFlines[j], A2D);
     	transformer.inverseFourierTransform(myFlines[j],myline);
     	// Shift the image back to the center...
     	CenterFFT(myline, false);

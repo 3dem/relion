@@ -783,7 +783,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 					FTo.initZeros(Fimg);
 					// The following line gets the correct pointer to account for overlap in the bodies
 					int oobody = DIRECT_A2D_ELEM(baseMLO->mymodel.pointer_body_overlap, ibody, obody);
-					baseMLO->mymodel.PPref[oobody].get2DFourierTransform(FTo, Abody, IS_NOT_INV);
+					baseMLO->mymodel.PPref[oobody].get2DFourierTransform(FTo, Abody);
 
 					/********************************************************************************
 					 * Currently CPU-memory for projectors is not deallocated when doing multibody
@@ -1389,7 +1389,7 @@ void getAllSquaredDifferencesFine(
 
 				Matrix2D<RFLOAT> mag;
 				mag.initIdentity(3);
-				mag = baseMLO->mydata.obsModel.applyAnisoMagTransp(mag, optics_group);
+				mag = baseMLO->mydata.obsModel.applyAnisoMag(mag, optics_group);
 				mag = baseMLO->mydata.obsModel.applyScaleDifference(mag, optics_group, baseMLO->mymodel.ori_size, baseMLO->mymodel.pixel_size);
 
 				generateEulerMatrices(
@@ -2687,7 +2687,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			Matrix2D<RFLOAT> mag;
 			mag.initIdentity(3);
-			mag = baseMLO->mydata.obsModel.applyAnisoMagTransp(mag, optics_group);
+			mag = baseMLO->mydata.obsModel.applyAnisoMag(mag, optics_group);
 			mag = baseMLO->mydata.obsModel.applyScaleDifference(mag, optics_group, baseMLO->mymodel.ori_size, baseMLO->mymodel.pixel_size);
 
 			generateEulerMatrices(

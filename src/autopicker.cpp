@@ -486,7 +486,7 @@ void AutoPicker::initialise()
 
 				Euler_angles2matrix(rot, tilt, 0., A, false);
 				Fref.initZeros();
-				projector.get2DFourierTransform(Fref, A, IS_NOT_INV);
+				projector.get2DFourierTransform(Fref, A);
 				transformer.inverseFourierTransform();
 				// Shift the image back to the center...
 				CenterFFT(Mref, false);
@@ -3096,7 +3096,7 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 
 				// Now get the FT of the rotated (non-ctf-corrected) template
 				Faux.initZeros(downsize_mic, downsize_mic/2 + 1);
-				PPref[iref].get2DFourierTransform(Faux, A, IS_NOT_INV);
+				PPref[iref].get2DFourierTransform(Faux, A);
 
 #ifdef DEBUG
 				std::cerr << " psi= " << psi << std::endl;

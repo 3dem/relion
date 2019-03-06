@@ -2174,7 +2174,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 
 				// At this point anisotropic magnification shouldn't matter
 				// Also: dont applyScaleDifference, as img() was rescaled to mymodel.ori_size and mymodel.pixel_size
-				//A = mydata.obsModel.applyAnisoMagTransp(A, optics_group);
+				//A = mydata.obsModel.applyAnisoMag(A, optics_group);
 				//A = mydata.obsModel.applyScaleDifference(A, optics_group, mymodel.ori_size, mymodel.pixel_size);
 				// Construct initial references from random subsets
 				windowFourierTransform(Faux, Fimg, wsum_model.current_size);
@@ -2196,7 +2196,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 					}
 				}
 
-				wsum_model.BPref[iclass].set2DFourierTransform(Fimg, A, IS_NOT_INV, &Fctf);
+				wsum_model.BPref[iclass].set2DFourierTransform(Fimg, A, &Fctf);
 			}
 
 		} // end loop img_id
@@ -5393,7 +5393,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 					FTo.initZeros(Fimg);
 					// The following line gets the correct pointer to account for overlap in the bodies
 					int oobody = DIRECT_A2D_ELEM(mymodel.pointer_body_overlap, ibody, obody);
-					mymodel.PPref[oobody].get2DFourierTransform(FTo, Abody, IS_NOT_INV);
+					mymodel.PPref[oobody].get2DFourierTransform(FTo, Abody);
 
 #ifdef DEBUG_BODIES
 					if (part_id == ROUND(debug1))
@@ -5994,15 +5994,15 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 								if (mymodel.nr_bodies > 1)
 								{
 									Abody =  Aori * (mymodel.orient_bodies[ibody]).transpose() * A_rot90 * A * mymodel.orient_bodies[ibody];
-									Abody = mydata.obsModel.applyAnisoMagTransp(Abody, optics_group);
+									Abody = mydata.obsModel.applyAnisoMag(Abody, optics_group);
 									Abody = mydata.obsModel.applyScaleDifference(Abody, optics_group, mymodel.ori_size, mymodel.pixel_size);
-									(mymodel.PPref[ibody]).get2DFourierTransform(Fref, Abody, IS_NOT_INV);
+									(mymodel.PPref[ibody]).get2DFourierTransform(Fref, Abody);
 								}
 								else
 								{
-									A = mydata.obsModel.applyAnisoMagTransp(A, optics_group);
+									A = mydata.obsModel.applyAnisoMag(A, optics_group);
 									A = mydata.obsModel.applyScaleDifference(A, optics_group, mymodel.ori_size, mymodel.pixel_size);
-									(mymodel.PPref[exp_iclass]).get2DFourierTransform(Fref, A, IS_NOT_INV);
+									(mymodel.PPref[exp_iclass]).get2DFourierTransform(Fref, A);
 								}
 
 
@@ -6342,7 +6342,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 
 												std::cerr << " exp_iclass= " << exp_iclass << std::endl;
 												Fref.resize(exp_local_Minvsigma2[img_id]);
-												(mymodel.PPref[exp_iclass]).get2DFourierTransform(Fref, A, IS_NOT_INV);
+												(mymodel.PPref[exp_iclass]).get2DFourierTransform(Fref, A);
 												transformer3.inverseFourierTransform(Fref, tt());
 												CenterFFT(tt(),false);
 												tt.write("Fref2.spi");
@@ -7117,7 +7117,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 					sampling.getOrientations(idir, ipsi, adaptive_oversampling, oversampled_rot, oversampled_tilt, oversampled_psi,
 							exp_pointer_dir_nonzeroprior, exp_directions_prior, exp_pointer_psi_nonzeroprior, exp_psi_prior);
 
-					// The order of the looping here has changed for 3.1: different img_id have different optics_group and therefore different applyAnisoMagTransp....
+					// The order of the looping here has changed for 3.1: different img_id have different optics_group and therefore different applyAnisoMag....
 					for (int img_id = 0; img_id < exp_nr_images; img_id++)
 					{
 						int group_id = mydata.getGroupId(part_id, img_id);
@@ -7139,12 +7139,12 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 							if (mymodel.nr_bodies > 1)
 							{
 								Abody = Aori * (mymodel.orient_bodies[ibody]).transpose() * A_rot90 * A * mymodel.orient_bodies[ibody];
-								Abody = mydata.obsModel.applyAnisoMagTransp(Abody, optics_group);
+								Abody = mydata.obsModel.applyAnisoMag(Abody, optics_group);
 								Abody = mydata.obsModel.applyScaleDifference(Abody, optics_group, mymodel.ori_size, mymodel.pixel_size);
 							}
 							else
 							{
-								A = mydata.obsModel.applyAnisoMagTransp(A, optics_group);
+								A = mydata.obsModel.applyAnisoMag(A, optics_group);
 								A = mydata.obsModel.applyScaleDifference(A, optics_group, mymodel.ori_size, mymodel.pixel_size);
 							}
 
@@ -7158,11 +7158,11 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 							{
 								if (mymodel.nr_bodies > 1)
 								{
-									mymodel.PPref[ibody].get2DFourierTransform(Fref, Abody, IS_NOT_INV);
+									mymodel.PPref[ibody].get2DFourierTransform(Fref, Abody);
 								}
 								else
 								{
-									mymodel.PPref[exp_iclass].get2DFourierTransform(Fref, A, IS_NOT_INV);
+									mymodel.PPref[exp_iclass].get2DFourierTransform(Fref, A);
 								}
 							}
 #ifdef TIMING
@@ -7692,9 +7692,9 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 								int my_mutex = exp_iclass % NR_CLASS_MUTEXES;
 								pthread_mutex_lock(&global_mutex2[my_mutex]);
 								if (mymodel.nr_bodies > 1)
-									(wsum_model.BPref[ibody]).set2DFourierTransform(Fimg, Abody, IS_NOT_INV, &Fweight);
+									(wsum_model.BPref[ibody]).set2DFourierTransform(Fimg, Abody, &Fweight);
 								else
-									(wsum_model.BPref[exp_iclass]).set2DFourierTransform(Fimg, A, IS_NOT_INV, &Fweight);
+									(wsum_model.BPref[exp_iclass]).set2DFourierTransform(Fimg, A, &Fweight);
 								pthread_mutex_unlock(&global_mutex2[my_mutex]);
 	#ifdef TIMING
 								// Only time one thread, as I also only time one MPI process
@@ -8208,7 +8208,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 
 						// Get the FT of the first image
 						Euler_angles2matrix(rot1, tilt1, psi1, A1, false);
-						(mymodel.PPref[iclass]).get2DFourierTransform(F1, A1, IS_NOT_INV);
+						(mymodel.PPref[iclass]).get2DFourierTransform(F1, A1);
 
 						// Apply the angular or shift error
 						RFLOAT rot2 = rot1;
@@ -8268,7 +8268,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 						{
 							// Get new rotated version of reference
 							Euler_angles2matrix(rot2, tilt2, psi2, A2, false);
-							(mymodel.PPref[iclass]).get2DFourierTransform(F2, A2, IS_NOT_INV);
+							(mymodel.PPref[iclass]).get2DFourierTransform(F2, A2);
 						}
 						else
 						{
