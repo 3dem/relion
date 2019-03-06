@@ -160,7 +160,24 @@ public:
 				MDang.setValue(EMDL_ORIENT_PSI, psi);
 				MDang.setValue(EMDL_ORIENT_ORIGIN_X, xoff);
 				MDang.setValue(EMDL_ORIENT_ORIGIN_Y, yoff);
+				MDang.setValue(EMDL_IMAGE_OPTICS_GROUP, 1);
 			}
+
+			std::cout << " Setting default values for optics table, though CTFs are not used in the projections ... " << std::endl;
+			MetaDataTable MDopt;
+			MDopt.addObject();
+			MDopt.setValue(EMDL_IMAGE_OPTICS_GROUP, 1);
+			std::string name = "optics1";
+			MDopt.setValue(EMDL_IMAGE_OPTICS_GROUP_NAME, name);
+			MDopt.setValue(EMDL_CTF_VOLTAGE, 300.);
+			MDopt.setValue(EMDL_CTF_CS, 2.7);
+			vol.MDMainHeader.getValue(EMDL_IMAGE_SAMPLINGRATE_X, angpix);
+			MDopt.setValue(EMDL_IMAGE_PIXEL_SIZE, angpix);
+			MDopt.setValue(EMDL_IMAGE_SIZE, XSIZE(vol()));
+			int mydim = (do_3d_rot) ? 3 : 2;
+			MDopt.setValue(EMDL_IMAGE_DIMENSIONALITY, mydim);
+
+			obsModel = ObservationModel(MDopt);
 		}
 		else if (!do_only_one)
 		{
@@ -285,10 +302,14 @@ public:
 				MDang.getValue(EMDL_ORIENT_ROT, rot);
 				MDang.getValue(EMDL_ORIENT_TILT, tilt);
 				MDang.getValue(EMDL_ORIENT_PSI, psi);
-				MDang.getValue(EMDL_ORIENT_ORIGIN_X, xoff);
-				MDang.getValue(EMDL_ORIENT_ORIGIN_Y, yoff);
+				MDang.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff);
+				MDang.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff);
 				if (do_3d_rot)
-					MDang.getValue(EMDL_ORIENT_ORIGIN_Z, zoff);
+					MDang.getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, zoff);
+
+				xoff /= angpix;
+				yoff /= angpix;
+				zoff /= angpix;
 
 				Euler_rotation3DMatrix(rot, tilt, psi, A3D);
 				F2D.initZeros();
@@ -457,10 +478,14 @@ public:
 						MDang.getValue(EMDL_ORIENT_ROT, rot, random_imgno);
 						MDang.getValue(EMDL_ORIENT_TILT, tilt, random_imgno);
 						MDang.getValue(EMDL_ORIENT_PSI, psi, random_imgno);
-						MDang.getValue(EMDL_ORIENT_ORIGIN_X, xoff, random_imgno);
-						MDang.getValue(EMDL_ORIENT_ORIGIN_Y, yoff, random_imgno);
+						MDang.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff, random_imgno);
+						MDang.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff, random_imgno);
 						if (do_3d_rot)
-							MDang.getValue(EMDL_ORIENT_ORIGIN_Z, zoff, random_imgno);
+							MDang.getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, zoff, random_imgno);
+
+						xoff /= angpix;
+						yoff /= angpix;
+						zoff /= angpix;
 
 					}
 					else
@@ -469,10 +494,14 @@ public:
 						MDang_sim.getValue(EMDL_ORIENT_ROT, rot, imgno);
 						MDang_sim.getValue(EMDL_ORIENT_TILT, tilt, imgno);
 						MDang_sim.getValue(EMDL_ORIENT_PSI, psi, imgno);
-						MDang_sim.getValue(EMDL_ORIENT_ORIGIN_X, xoff, imgno);
-						MDang_sim.getValue(EMDL_ORIENT_ORIGIN_Y, yoff, imgno);
+						MDang_sim.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff, imgno);
+						MDang_sim.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff, imgno);
 						if (do_3d_rot)
-							MDang_sim.getValue(EMDL_ORIENT_ORIGIN_Z, zoff, imgno);
+							MDang_sim.getValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, zoff, imgno);
+
+						xoff /= angpix;
+						yoff /= angpix;
+						zoff /= angpix;
 
 					}
 
@@ -585,10 +614,10 @@ public:
 					DFo.setValue(EMDL_ORIENT_ROT, rot);
 					DFo.setValue(EMDL_ORIENT_TILT, tilt);
 					DFo.setValue(EMDL_ORIENT_PSI, psi);
-					DFo.setValue(EMDL_ORIENT_ORIGIN_X, xoff);
-					DFo.setValue(EMDL_ORIENT_ORIGIN_Y, yoff);
+					DFo.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff * angpix);
+					DFo.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff * angpix);
 					if (do_3d_rot)
-						DFo.setValue(EMDL_ORIENT_ORIGIN_Z, zoff);
+						DFo.setValue(EMDL_ORIENT_ORIGIN_Z_ANGSTROM, zoff * angpix);
 				}
 
 				if (imgno%60==0) progress_bar(imgno);
