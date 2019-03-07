@@ -45,11 +45,11 @@ void LegacyObservationModel::predictObservation(
 	{
 		dest.resize(s,sh);
 	}
-	
+
 	dest.initZeros();
 
-    proj.get2DFourierTransform(dest, A3D, false);
-	
+    proj.get2DFourierTransform(dest, A3D);
+
 	if (applyShift)
 	{
 		shiftImageInFourierTransform(dest, dest, s, s/2 - xoff, s/2 - yoff);
@@ -58,7 +58,7 @@ void LegacyObservationModel::predictObservation(
     if (applyCtf)
     {
         CTF ctf;
-        ctf.read(mdt, mdt, particle);        
+        ctf.read(mdt, mdt, particle);
 
         FilterHelper::modulate(dest, ctf, angpix);
     }
@@ -91,7 +91,7 @@ Image<Complex> LegacyObservationModel::predictObservation(
         bool applyCtf, bool applyTilt, bool applyShift) const
 {
     Image<Complex> pred;
-	
+
 	predictObservation(proj, mdt, particle, pred.data, applyCtf, applyTilt, applyShift);
     return pred;
 }
@@ -175,7 +175,7 @@ void LegacyObservationModel::insertObservation(const Image<Complex>& img, BackPr
         selfApplyBeamTilt(F2D, my_tilt_x, my_tilt_y, lambda, Cs, angpix, sh);
     }
 
-    bproj.set2DFourierTransform(F2D, A3D, IS_NOT_INV, &Fctf);
+    bproj.set2DFourierTransform(F2D, A3D, &Fctf);
 }
 
 void LegacyObservationModel::setAnisoTilt(double xx, double xy, double yy)

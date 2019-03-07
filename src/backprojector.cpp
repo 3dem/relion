@@ -53,7 +53,7 @@ void BackProjector::initZeros(int current_size)
 }
 
 void BackProjector::backproject2Dto3D(const MultidimArray<Complex > &f2d,
-		                        const Matrix2D<RFLOAT> &A, bool inv,
+		                        const Matrix2D<RFLOAT> &A,
 		                        const MultidimArray<RFLOAT> *Mweight,
 								RFLOAT r_ewald_sphere, bool is_positive_curvature,
 								Matrix2D<RFLOAT>* magMatrix)
@@ -79,15 +79,7 @@ void BackProjector::backproject2Dto3D(const MultidimArray<Complex > &f2d,
 	// (Don't! Anisotropy handling on the outside would fail  --Jaz)
 
 	Matrix2D<RFLOAT> Ainv;
-
-	if (inv)
-	{
-		Ainv = A;
-	}
-	else
-	{
-		Ainv = A.transpose();
-	}
+	Ainv = A.inv();
 
 	// Go from the 2D slice coordinates to the 3D coordinates
 	Ainv *= (RFLOAT)padding_factor;  // take scaling into account directly
@@ -366,50 +358,50 @@ void BackProjector::backproject2Dto3D(const MultidimArray<Complex > &f2d,
 }
 
 void BackProjector::backproject1Dto2D(const MultidimArray<Complex > &f1d,
-		                        const Matrix2D<RFLOAT> &A, bool inv,
+		                        const Matrix2D<RFLOAT> &A,
 		                        const MultidimArray<RFLOAT> *Mweight)
-{	
-	Matrix2D<RFLOAT> Ainv = inv? A : A.transpose();
+{
+	Matrix2D<RFLOAT> Ainv = A.inv();
 	Ainv *= (RFLOAT)padding_factor;  // take scaling into account directly
 
 	const int r_max_src = XSIZE(f1d) - 1;
-	
+
 	const int r_max_ref = r_max * padding_factor;
 	const int r_max_ref_2 = r_max_ref * r_max_ref;
-	
+
 	// currently not used for some reason
     //const int r_min_NN_ref_2 = r_min_nn * r_min_nn * padding_factor * padding_factor;
-	
+
 	for (int x = 0; x <= r_max_src; x++)
 	{
 		RFLOAT my_weight;
-		
+
 		if (Mweight != NULL)
 		{
 			my_weight = DIRECT_A1D_ELEM(*Mweight, x);
-			
+
 			if (my_weight <= 0.) continue;
 		}
 		else
 		{
 			my_weight = 1.;
 		}
-		
+
 		Complex my_val = DIRECT_A1D_ELEM(f1d, x);
-		
+
 		// Get logical coordinates in the 3D map
 		RFLOAT xp = Ainv(0,0) * x;
 		RFLOAT yp = Ainv(1,0) * x;
-		
+
 		const RFLOAT r_ref_2 = xp*xp + yp*yp;
-		
+
 		if (r_ref_2 > r_max_ref_2) continue;
 
 		if (interpolator == TRILINEAR /* && r_ref_2 < r_min_NN_ref_2*/)
 		{
 			// Only asymmetric half is stored
 			const bool is_neg_x = xp < 0;
-			
+
 			if (is_neg_x)
 			{
 				// Get complex conjugated hermitian symmetry pair
@@ -439,7 +431,7 @@ void BackProjector::backproject1Dto2D(const MultidimArray<Complex > &f1d,
 
 			if (is_neg_x)
 			{
-				my_val = conj(my_val);	
+				my_val = conj(my_val);
 			}
 
 			// Store slice in 3D weighted sum
@@ -459,7 +451,7 @@ void BackProjector::backproject1Dto2D(const MultidimArray<Complex > &f1d,
 		{
 			const int x0 = ROUND(xp);
 			const int y0 = ROUND(yp);
-			
+
 			if (x0 < 0)
 			{
 				A2D_ELEM(data, -y0, -x0) += conj(my_val);
@@ -480,11 +472,11 @@ void BackProjector::backproject1Dto2D(const MultidimArray<Complex > &f1d,
 }
 
 void BackProjector::backrotate2D(const MultidimArray<Complex > &f2d,
-		                         const Matrix2D<RFLOAT> &A, bool inv,
+		                         const Matrix2D<RFLOAT> &A,
 		                         const MultidimArray<RFLOAT> *Mweight,
 								 Matrix2D<RFLOAT>* magMatrix)
 {
-	Matrix2D<RFLOAT> Ainv = inv? A : A.transpose();
+	Matrix2D<RFLOAT> Ainv = A.inv();
 	Ainv *= (RFLOAT)padding_factor;  // take scaling into account directly
 
 	RFLOAT m00, m10, m01, m11;
@@ -503,10 +495,10 @@ void BackProjector::backrotate2D(const MultidimArray<Complex > &f2d,
 		m01 = 0.0;
 		m11 = 1.0;
 	}
-	
+
 	const int r_max_ref = r_max * padding_factor;
 	const int r_max_ref_2 = r_max_ref * r_max_ref;
-	
+
     int min_r2_nn = r_min_nn * r_min_nn * padding_factor * padding_factor;
 
 	// precalculated coefficients for ellipse determination (see further down)
@@ -583,11 +575,11 @@ void BackProjector::backrotate2D(const MultidimArray<Complex > &f2d,
 		for (int x = first_x; x <= last_x; x++)
 		{
 			RFLOAT my_weight;
-			
+
 			if (Mweight != NULL)
 			{
 				my_weight = DIRECT_A2D_ELEM(*Mweight, i, x);
-				
+
 				if (my_weight <= 0.f) continue;
 			}
 			else
@@ -597,14 +589,14 @@ void BackProjector::backrotate2D(const MultidimArray<Complex > &f2d,
 
 			// Get the relevant value in the input image
 			Complex my_val = DIRECT_A2D_ELEM(f2d, i, x);
-			
+
 			// Get logical coordinates in the 3D map
 			RFLOAT xu = m00 * x + m01 * y;
 			RFLOAT yu = m10 * x + m11 * y;
 
 			RFLOAT xp = Ainv(0,0) * xu + Ainv(0,1) * yu;
 			RFLOAT yp = Ainv(1,0) * xu + Ainv(1,1) * yu;
-			
+
 			RFLOAT r_ref_2 = xp * xp + yp * yp;
 
 			if (interpolator == TRILINEAR || r_ref_2 < min_r2_nn)
@@ -660,7 +652,7 @@ void BackProjector::backrotate2D(const MultidimArray<Complex > &f2d,
 			{
 				const int x0 = ROUND(xp);
 				const int y0 = ROUND(yp);
-				
+
 				if (x0 < 0)
 				{
 					A2D_ELEM(data, -y0, -x0) += conj(my_val);
@@ -681,23 +673,23 @@ void BackProjector::backrotate2D(const MultidimArray<Complex > &f2d,
 }
 
 void BackProjector::backrotate3D(const MultidimArray<Complex > &f3d,
-		                         const Matrix2D<RFLOAT> &A, bool inv,
+		                         const Matrix2D<RFLOAT> &A,
 		                         const MultidimArray<RFLOAT> *Mweight)
 {
 	// f3d should already be in the right size (ori_size,orihalfdim)
     // AND the points outside max_r should already be zero.
-	
-	Matrix2D<RFLOAT> Ainv = inv? A : A.transpose();
+
+	Matrix2D<RFLOAT> Ainv = A.inv();
 	Ainv *= (RFLOAT)padding_factor;  // take scaling into account directly
-	
+
 	const int r_max_src = XSIZE(f3d) - 1;
     const int r_max_src_2 = r_max_src * r_max_src;
-	
+
 	const int r_max_ref = r_max * padding_factor;
 	const int r_max_ref_2 = r_max_ref * r_max_ref;
-	
+
     const int r_min_NN_ref_2 = r_min_nn * r_min_nn * padding_factor * padding_factor;
-    
+
 //#define DEBUG_BACKROTATE
 #ifdef DEBUG_BACKROTATE
     std::cerr << " XSIZE(f3d)= "<< XSIZE(f3d) << std::endl;
@@ -714,7 +706,7 @@ void BackProjector::backrotate3D(const MultidimArray<Complex > &f3d,
     for (int k = 0; k < ZSIZE(f3d); k++)
 	{
 		int z, x_min;
-		
+
 		// Don't search beyond square with side max_r
 		if (k <= r_max_src)
 		{
@@ -730,28 +722,28 @@ void BackProjector::backrotate3D(const MultidimArray<Complex > &f3d,
 		}
 
 		int z2 = z * z;
-		
+
 		for (int i = 0; i < YSIZE(f3d); i++)
 		{
 			int y = (i <= r_max_src)? i : i - YSIZE(f3d);
 			int y2 = y * y;
-						
+
 			const RFLOAT yz2 = y2 + z2;
-			
+
 			// avoid negative square root
 			if (yz2 > r_max_src_2) continue;
-			
+
 			const int x_max = FLOOR(sqrt(r_max_src_2 - yz2));
-			
+
 			for (int x = x_min; x <= x_max; x++)
 			{
 				// Get logical coordinates in the 3D map
 				int xp = Ainv(0,0) * x + Ainv(0,1) * y + Ainv(0,2) * z;
 				int yp = Ainv(1,0) * x + Ainv(1,1) * y + Ainv(1,2) * z;
 				int zp = Ainv(2,0) * x + Ainv(2,1) * y + Ainv(2,2) * z;
-				
+
 				const int r_ref_2 = xp*xp + yp*yp + zp*zp;
-				
+
 				if (r_ref_2 > r_max_ref_2) continue;
 
 				RFLOAT my_weight;
@@ -760,21 +752,21 @@ void BackProjector::backrotate3D(const MultidimArray<Complex > &f3d,
 				if (Mweight != NULL)
 				{
 					my_weight = DIRECT_A3D_ELEM(*Mweight, k, i, x);
-					
+
 					if (my_weight <= 0.) continue;
 				}
 				else
 				{
 					my_weight = 1.;
 				}
-				
-				Complex my_val = DIRECT_A3D_ELEM(f3d, k, i, x);				
-				
+
+				Complex my_val = DIRECT_A3D_ELEM(f3d, k, i, x);
+
 				if (interpolator == TRILINEAR || r_ref_2 < r_min_NN_ref_2)
 				{
 					// Only asymmetric half is stored
 					bool is_neg_x = xp < 0;
-					
+
 					if (is_neg_x)
 					{
 						// Get complex conjugated hermitian symmetry pair
@@ -827,7 +819,7 @@ void BackProjector::backrotate3D(const MultidimArray<Complex > &f3d,
 					DIRECT_A3D_ELEM(data, z1, y0, x1) += dd101 * my_val;
 					DIRECT_A3D_ELEM(data, z1, y1, x0) += dd110 * my_val;
 					DIRECT_A3D_ELEM(data, z1, y1, x1) += dd111 * my_val;
-					
+
 					// Store corresponding weights
 					DIRECT_A3D_ELEM(weight, z0, y0, x0) += dd000 * my_weight;
 					DIRECT_A3D_ELEM(weight, z0, y0, x1) += dd001 * my_weight;

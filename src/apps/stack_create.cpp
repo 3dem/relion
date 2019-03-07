@@ -34,7 +34,7 @@ class stack_create_parameters
 	MetaDataTable MD;
 	// I/O Parser
 	IOParser parser;
-	bool do_spider, do_split_per_micrograph, do_apply_trans, do_apply_trans_only;
+	bool do_spider, do_split_per_micrograph, do_apply_trans, do_apply_trans_only, do_ignore_optics;
 	ObservationModel obsModel;
 
 	void usage()
@@ -54,6 +54,7 @@ class stack_create_parameters
 		do_split_per_micrograph = parser.checkOption("--split_per_micrograph", "Write out separate stacks for each micrograph (needs rlnMicrographName in STAR file)");
 		do_apply_trans = parser.checkOption("--apply_transformation", "Apply the inplane-transformations (needs _rlnOriginX/Y and _rlnAnglePsi in STAR file) by real space interpolation");
 		do_apply_trans_only = parser.checkOption("--apply_rounded_offsets_only", "Apply the rounded translations only (so-recentering without interpolation; needs _rlnOriginX/Y in STAR file)");
+		do_ignore_optics = parser.checkOption("--ignore_optics", "Ignore optics groups, run like in relion 3.0");
 
 		if (do_apply_trans)
 			std::cerr << "WARNING: --apply_transformation uses real space interpolation. It also invalidates CTF parameters (e.g. beam tilt & astigmatism). This can degrade the resolution. USE WITH CARE!!" << std::endl;
@@ -69,7 +70,11 @@ class stack_create_parameters
 	void run()
 	{
 
-		ObservationModel::loadSafely(fn_star, obsModel, MD, "particles");
+		if (do_ignore_optics && (do_apply_trans || do_apply_trans_only))
+			REPORT_ERROR("ERROR: you cannot ignore optics and apply transformations");
+
+		if (do_ignore_optics) MD.read(fn_star);
+		else ObservationModel::loadSafely(fn_star, obsModel, MD, "particles");
 
 		// Check for rlnImageName label
 		if (!MD.containsLabel(EMDL_IMAGE_NAME))
@@ -173,7 +178,9 @@ class stack_create_parameters
 				int optics_group;
 				MD.getValue(EMDL_IMAGE_OPTICS_GROUP, optics_group);
 				optics_group--;
-				RFLOAT angpix = obsModel.getPixelSize(optics_group);
+				RFLOAT angpix;
+				if (do_ignore_optics) angpix = 1.0;
+				else angpix = obsModel.getPixelSize(optics_group);
 
 				if (fn_mymic == fn_mic)
 				{
@@ -234,7 +241,8 @@ class stack_create_parameters
 		}
 
 
-		obsModel.save(MD, fn_root+".star", "particles");
+		if (do_ignore_optics) MD.write(fn_root+".star");
+		else obsModel.save(MD, fn_root+".star", "particles");
 		std::cout << "Written out: " << fn_root << ".star" << std::endl;
 		std::cout << "Done!" <<std::endl;
 

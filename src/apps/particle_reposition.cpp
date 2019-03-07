@@ -178,7 +178,7 @@ public:
 					Euler_angles2matrix(rot, tilt, psi, A, false);
 
 					// Get the 2D image (in its ori_size)
-					(optimiser.mymodel.PPref[iclass-1]).get2DFourierTransform(Fref_current_size, A, IS_NOT_INV);
+					(optimiser.mymodel.PPref[iclass-1]).get2DFourierTransform(Fref_current_size, A);
 					windowFourierTransform(Fref_current_size, Frefp, optimiser.mymodel.ori_size);
 
 					if (optimiser.mymodel.data_dim == 2)

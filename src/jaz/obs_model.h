@@ -111,19 +111,17 @@ class ObservationModel
 		// effect of symmetric aberration (cached)
 		const Image<RFLOAT>& getGammaOffset(int optGroup, int s);
 
-		Matrix2D<RFLOAT> applyAnisoMagTransp(
-				Matrix2D<RFLOAT> A3D_transp, int opticsGroup);
-
-		Matrix2D<RFLOAT> getMag3x3(int opticsGroup);
+		Matrix2D<RFLOAT> applyAnisoMag(
+				Matrix2D<RFLOAT> A3D, int opticsGroup);
 
 		Matrix2D<RFLOAT> applyScaleDifference(
-				Matrix2D<RFLOAT> A3D_transp, int opticsGroup,
+				Matrix2D<RFLOAT> A3D, int opticsGroup,
 				int s3D, double angpix3D);
 
 
 
 	// Bureaucracy //
-		
+
 		bool allPixelSizesIdentical() const;
 		bool allBoxSizesIdentical() const;
 
@@ -147,9 +145,9 @@ class ObservationModel
 		void setMagMatrix(int opticsGroup, const Matrix2D<RFLOAT>& M);
 
 		int getOpticsGroup(const MetaDataTable &particlesMdt, long int particle = -1) const;
-		
+
 		std::string getGroupName(int og);
-		
+
 		bool allPixelAndBoxSizesIdentical(const MetaDataTable& mdt);
 		bool containsGroup(const MetaDataTable& mdt, int group);
 

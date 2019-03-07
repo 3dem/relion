@@ -163,12 +163,12 @@ ObservationModel::ObservationModel()
 {
 }
 
-ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
-:	opticsMdt(opticsMdt),
-	angpix(opticsMdt.numberOfObjects()),
-	lambda(opticsMdt.numberOfObjects()),
-	Cs(opticsMdt.numberOfObjects()),
-	boxSizes(opticsMdt.numberOfObjects(), 0.0)
+ObservationModel::ObservationModel(const MetaDataTable &_opticsMdt)
+:	opticsMdt(_opticsMdt),
+	angpix(_opticsMdt.numberOfObjects()),
+	lambda(_opticsMdt.numberOfObjects()),
+	Cs(_opticsMdt.numberOfObjects()),
+	boxSizes(_opticsMdt.numberOfObjects(), 0.0)
 {
 	if (   !(opticsMdt.containsLabel(EMDL_IMAGE_PIXEL_SIZE) ||
 			opticsMdt.containsLabel(EMDL_MICROGRAPH_PIXEL_SIZE) ||
@@ -243,10 +243,10 @@ ObservationModel::ObservationModel(const MetaDataTable &opticsMdt)
 
 			TiltHelper::insertTilt(oddZernikeCoeffs[i], tx, ty, Cs[i], lambda[i]);
 		}
-		
+
 		// always keep a set of mag matrices
 		// if none are defined, keep a set of identity matrices
-		
+
 		magMatrices[i] = Matrix2D<RFLOAT>(2,2);
 		magMatrices[i].initIdentity();
 
@@ -299,7 +299,7 @@ void ObservationModel::predictObservation(
 
 	Euler_angles2matrix(rot, tilt, psi, A3D);
 
-	A3D = applyAnisoMagTransp(A3D, opticsGroup);
+	A3D = applyAnisoMag(A3D, opticsGroup);
 	A3D = applyScaleDifference(A3D, opticsGroup, s_ref, angpix_ref);
 
 	if (dest.xdim != sh_out || dest.ydim != s_out)
@@ -309,7 +309,7 @@ void ObservationModel::predictObservation(
 
 	dest.initZeros();
 
-	proj.get2DFourierTransform(dest, A3D, false);
+	proj.get2DFourierTransform(dest, A3D);
 
 	if (applyShift)
 	{
@@ -382,7 +382,7 @@ Volume<t2Vector<Complex>> ObservationModel::predictComplexGradient(
 
 	Euler_angles2matrix(rot, tilt, psi, A3D);
 
-	A3D = applyAnisoMagTransp(A3D, opticsGroup);
+	A3D = applyAnisoMag(A3D, opticsGroup);
 	A3D = applyScaleDifference(A3D, opticsGroup, s_ref, angpix_ref);
 
 	proj.projectGradient(out, A3D);
@@ -578,23 +578,23 @@ std::string ObservationModel::getGroupName(int og)
 bool ObservationModel::allPixelAndBoxSizesIdentical(const MetaDataTable &mdt)
 {
 	int og0 = getOpticsGroup(mdt, 0);
-	
+
 	int boxSize0 = getBoxSize(og0);
 	double angpix0 = getPixelSize(og0);
-	
+
 	bool allGood = true;
-	
+
 	const int pc = mdt.numberOfObjects();
-	
+
 	for (int p = 1; p < pc; p++)
 	{
 		int og = getOpticsGroup(mdt, p);
-		
+
 		if (og != og0)
 		{
 			int boxSize = getBoxSize(og);
 			double angpix = getPixelSize(og);
-			
+
 			if (boxSize != boxSize0 || angpix != angpix0)
 			{
 				allGood = false;
@@ -602,24 +602,24 @@ bool ObservationModel::allPixelAndBoxSizesIdentical(const MetaDataTable &mdt)
 			}
 		}
 	}
-	
+
 	return allGood;
 }
 
 bool ObservationModel::containsGroup(const MetaDataTable &mdt, int group)
 {
 	const int pc = mdt.numberOfObjects();
-	
+
 	for (int p = 0; p < pc; p++)
 	{
 		int og = getOpticsGroup(mdt, p);
-		
+
 		if (og == group)
 		{
 			return true;
 		}
 	}
-	
+
 	return false;
 }
 
@@ -876,56 +876,35 @@ const Image<RFLOAT>& ObservationModel::getGammaOffset(int optGroup, int s)
 	return gammaOffset[optGroup][s];
 }
 
-Matrix2D<RFLOAT> ObservationModel::applyAnisoMagTransp(
-		Matrix2D<RFLOAT> A3D_transp, int opticsGroup)
+Matrix2D<RFLOAT> ObservationModel::applyAnisoMag(
+		Matrix2D<RFLOAT> A3D, int opticsGroup)
 {
 	Matrix2D<RFLOAT> out;
 
 	if (hasMagMatrices)
 	{
-		Matrix2D<RFLOAT> mag3D_transp(3,3);
-		mag3D_transp.initIdentity();
-		
-		mag3D_transp(0,0) = magMatrices[opticsGroup](0,0);
-		mag3D_transp(0,1) = magMatrices[opticsGroup](1,0);
-		mag3D_transp(1,0) = magMatrices[opticsGroup](0,1);
-		mag3D_transp(1,1) = magMatrices[opticsGroup](1,1);
-		
-		out = mag3D_transp * A3D_transp;
+		Matrix2D<RFLOAT> mag3D(3,3);
+		mag3D.initIdentity();
+
+		mag3D(0,0) = magMatrices[opticsGroup](0,0);
+		mag3D(0,1) = magMatrices[opticsGroup](0,1);
+		mag3D(1,0) = magMatrices[opticsGroup](1,0);
+		mag3D(1,0) = magMatrices[opticsGroup](0,1);
+		out = mag3D.inv() * A3D;
+
 	}
 	else
 	{
-		out = A3D_transp;
+		out = A3D;
 	}
-
-	return out;
-}
-
-Matrix2D<RFLOAT> ObservationModel::getMag3x3(int opticsGroup)
-{
-	Matrix2D<RFLOAT> out(3,3);
-
-	for (int r = 0; r < 2; r++)
-	for (int c = 0; c < 2; c++)
-	{
-		out(r,c) = magMatrices[opticsGroup](r,c);
-	}
-
-	for (int i = 0; i < 2; i++)
-	{
-		out(i,0) = 0.0;
-		out(0,i) = 0.0;
-	}
-
-	out(2,2) = 1.0;
 
 	return out;
 }
 
 Matrix2D<RFLOAT> ObservationModel::applyScaleDifference(
-		Matrix2D<RFLOAT> A3D_transp, int opticsGroup, int s3D, double angpix3D)
+		Matrix2D<RFLOAT> A3D, int opticsGroup, int s3D, double angpix3D)
 {
-	Matrix2D<RFLOAT> out = A3D_transp;
+	Matrix2D<RFLOAT> out = A3D;
 
 	out *= (s3D * angpix3D) / (boxSizes[opticsGroup] * angpix[opticsGroup]);
 

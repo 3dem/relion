@@ -116,8 +116,7 @@ void Reconstructor::initialise()
 
 	randomize_random_generator();
 
-	//if (cl_beamtilt || do_ewald)
-		do_ctf = true;
+	if (do_ewald) do_ctf = true;
 
 	// Is this 2D or 3D data?
 	data_dim = (do_3d_rot) ? 3 : 2;
@@ -147,7 +146,7 @@ void Reconstructor::initialise()
 		if (do_ewald && newbox > 0)
 			mysize = newbox;
 	}
-	
+
 	if (!obsModel.allPixelSizesIdentical())
 	{
 		REPORT_ERROR("Reconstructor does not support varying pixel sizes yet.");
@@ -299,6 +298,17 @@ void Reconstructor::backprojectOneParticle(long int p)
 	}
 
 	Euler_angles2matrix(rot, tilt, psi, A3D);
+
+	// If we are considering Ewald sphere curvature, the mag. matrix
+	// has to be provided to the backprojector explicitly
+	// (to avoid creating an Ewald ellipsoid)
+	int opticsGroup = obsModel.getOpticsGroup(DF, p);
+	Matrix2D<RFLOAT> magMat;
+	if (!do_ewald)
+	{
+		A3D = obsModel.applyAnisoMag(A3D, opticsGroup);
+	}
+	A3D = obsModel.applyScaleDifference(A3D, opticsGroup, mysize, angpix);
 
 	// Translations (either through phase-shifts or in real space
 	trans.initZeros();
@@ -474,7 +484,7 @@ void Reconstructor::backprojectOneParticle(long int p)
 	if (fn_sub != "")
 	{
 		Fsub.resize(F2D);
-		projector.get2DFourierTransform(Fsub, A3D, IS_NOT_INV);
+		projector.get2DFourierTransform(Fsub, A3D);
 
 		// Apply CTF if necessary
 		if (do_ctf)
@@ -490,7 +500,7 @@ void Reconstructor::backprojectOneParticle(long int p)
 			DIRECT_MULTIDIM_ELEM(F2D, n) -= DIRECT_MULTIDIM_ELEM(Fsub, n);
 		}
 		// Back-project difference image
-		backprojector.set2DFourierTransform(F2D, A3D, IS_NOT_INV);
+		backprojector.set2DFourierTransform(F2D, A3D);
 	}
 	else
 	{
@@ -576,12 +586,24 @@ void Reconstructor::backprojectOneParticle(long int p)
 
 		if (do_ewald)
 		{
-			backprojector.set2DFourierTransform(F2DP, A3D, IS_NOT_INV, &Fctf, r_ewald_sphere, true);
-			backprojector.set2DFourierTransform(F2DQ, A3D, IS_NOT_INV, &Fctf, r_ewald_sphere, false);
+			Matrix2D<RFLOAT> magMat;
+
+			if (obsModel.hasMagMatrices)
+			{
+				magMat = obsModel.getMagMatrix(opticsGroup);
+			}
+			else
+			{
+				magMat = Matrix2D<RFLOAT>(2,2);
+				magMat.initIdentity();
+			}
+
+			backprojector.set2DFourierTransform(F2DP, A3D, &Fctf, r_ewald_sphere, true, &magMat);
+			backprojector.set2DFourierTransform(F2DQ, A3D, &Fctf, r_ewald_sphere, false, &magMat);
 		}
 		else
 		{
-			backprojector.set2DFourierTransform(F2D, A3D, IS_NOT_INV, &Fctf);
+			backprojector.set2DFourierTransform(F2D, A3D, &Fctf);
 		}
 	}
 

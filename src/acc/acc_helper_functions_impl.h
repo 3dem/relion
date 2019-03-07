@@ -230,11 +230,11 @@ void generateEulerMatrices(
 		if (doR)
 			A = A * R;
 
-		if(inverse)
-			A = A.transpose();
-
 		if (doMag)
-			A = A * MAG;
+			A = MAG * A;
+
+		if(inverse)
+			A = A.inv();
 
 		for (int m = 0; m < 3; m ++)
 			for (int n = 0; n < 3; n ++)
@@ -696,7 +696,7 @@ void runDiff2KernelCoarse(
 				{
 					if(data_is_3D)
 						AccUtilities::diff2_coarse<true,true, D2C_BLOCK_SIZE_DATA3D, D2C_EULERS_PER_BLOCK_DATA3D, 4>(
-							even_orientation_num/(unsigned long)D2C_EULERS_PER_BLOCK_DATA3D, 
+							even_orientation_num/(unsigned long)D2C_EULERS_PER_BLOCK_DATA3D,
 							D2C_BLOCK_SIZE_DATA3D,
 							d_eulers,
 							trans_x,
@@ -712,7 +712,7 @@ void runDiff2KernelCoarse(
 							stream);
 					else
 						AccUtilities::diff2_coarse<true,false, D2C_BLOCK_SIZE_REF3D, D2C_EULERS_PER_BLOCK_REF3D, 4>(
-							even_orientation_num/(unsigned long)D2C_EULERS_PER_BLOCK_REF3D, 
+							even_orientation_num/(unsigned long)D2C_EULERS_PER_BLOCK_REF3D,
 							D2C_BLOCK_SIZE_REF3D,
 							d_eulers,
 							trans_x,
