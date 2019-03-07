@@ -76,8 +76,6 @@ void BackProjector::backproject2Dto3D(const MultidimArray<Complex > &f2d,
 	}
 
 	// Use the inverse matrix
-	// (Don't! Anisotropy handling on the outside would fail  --Jaz)
-
 	Matrix2D<RFLOAT> Ainv;
 	Ainv = A.inv();
 
