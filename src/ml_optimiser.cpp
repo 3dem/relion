@@ -991,7 +991,7 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 			REPORT_ERROR( (std::string)"MlOptimiser::write: Cannot write file: " + fn_tmp);
 
 		// Write the command line as a comment in the header
-		fh << "# RELION optimiser; version " << RELION_VERSION <<std::endl;
+		fh << "# RELION optimiser; version " << g_RELION_VERSION <<std::endl;
 		fh << "# ";
 		parser.writeCommandLine(fh);
 

@@ -20,6 +20,7 @@ However, it does also contain pieces of code from the following packages:
 - libLBFGS http://www.chokkan.org/software/liblbfgs/
 - Numerical diagonalization of 3x3 matrices: https://www.mpi-hd.mpg.de/personalhomes/globes/3x3/index.html
 - Gravis: https://gravis.dmi.unibas.ch/index.html
+- cmake-modules: https://github.com/rpavlik/cmake-modules
 
 Original disclaimers in the code of these external packages have been maintained as much as possible.
 Please contact Sjors Scheres (scheres@mrc-lmb.cam.ac.uk) if you feel this has not been done correctly. 

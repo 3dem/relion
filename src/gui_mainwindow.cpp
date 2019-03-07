@@ -2065,7 +2065,7 @@ void GuiMainWindow::cb_about(Fl_Widget* o, void* v)
 void GuiMainWindow::cb_about_i()
 {
 
-#define HELPTEXT ("RELION " RELION_VERSION "\n \n \
+#define HELPTEXT ("RELION " RELION_SHORT_VERSION "\n \n \
 RELION is is developed in the groups of\n\n \
 Sjors H.W. Scheres at the MRC Laboratory of Molecular Biology\n \n \
 - Sjors H.W. Scheres\n \
