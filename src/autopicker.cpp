@@ -598,19 +598,18 @@ void AutoPicker::initialise()
 
 		if (particle_diameter > particle_size * angpix)
 		{
-			std::cerr << " particle_diameter (A): " << particle_diameter << " box_size (pix): " << particle_size << " pixel size (A): " << angpix << std::endl;
-			REPORT_ERROR("ERROR: the particle diameter is larger than the size of the box.");
+			std::cerr << " mask_diameter (A): " << particle_diameter << " box_size (pix): " << particle_size << " pixel size (A): " << angpix << std::endl;
+			REPORT_ERROR("ERROR: the particle mask diameter is larger than the size of the box.");
 		}
 
 
 		if ( (verb > 0) && (autopick_helical_segments))
 		{
 			std::cout << " + Helical tube diameter = " << helical_tube_diameter << " Angstroms " << std::endl;
-			std::cout << " + Helical tube diameter should be smaller than the particle (background) diameter" << std::endl;
 		}
 		if ( (autopick_helical_segments) && (helical_tube_diameter > particle_diameter) )
 		{
-			REPORT_ERROR("Error: Helical tube diameter should be smaller than the particle (background) diameter!");
+			REPORT_ERROR("Error: Helical tube diameter should be smaller than the particle mask diameter!");
 		}
 
 

@@ -259,7 +259,7 @@ bool IOParser::checkForErrors(int verb)
 
 	if(checkParameter(argc, argv, "--version"))
 	{
-		std::cout << "RELION version " << RELION_VERSION << std::endl;
+		std::cout << "RELION version " << g_RELION_VERSION << std::endl;
 		exit(0);
 	}
     if(argc==1 || (argc==2 && checkParameter(argc, argv, "--continue")) || checkParameter(argc, argv, "--help") || checkParameter(argc, argv, "-h"))

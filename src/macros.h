@@ -45,7 +45,8 @@
 #ifndef MACROS_H
 #define MACROS_H
 
-#define RELION_VERSION "3.1-devel-scheres"
+#define RELION_SHORT_VERSION "3.1-devel"
+extern const char *g_RELION_VERSION;
 
 #include <math.h>
 #include <signal.h>
@@ -405,7 +406,7 @@ static void SINCOSF(float x, float *s, float *c) { *s = sinf(x); *c = cosf(x); }
 
 static void PRINT_VERSION_INFO()
 {
-	std::cout << "RELION version: " << RELION_VERSION << " "
+	std::cout << "RELION version: " << g_RELION_VERSION << " "
 #if defined(DEBUG) || defined(DEBUG_CUDA)
 	<< "(debug-build) "
 #endif

@@ -1,0 +1,6 @@
+#include "src/macros.h"
+
+#define GIT_SHA1 "@GIT_SHA1@"
+#define RELION_LONG_VERSION (RELION_SHORT_VERSION "-commit-" GIT_SHA1)
+
+const char *g_RELION_VERSION = RELION_LONG_VERSION;

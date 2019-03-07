@@ -59,9 +59,8 @@ int main(int argc, char *argv[])
 		short_dir[i] = '\0';
 	}
 
-	char titletext[67];
-#define TITLE ("RELION-" RELION_VERSION)
-	strcpy (titletext,TITLE);
+	char titletext[256];
+	snprintf(titletext, 256, "RELION-%s", g_RELION_VERSION);
 #ifdef PACKAGE_VERSION
 	strcat(titletext,PACKAGE_VERSION);
 #endif

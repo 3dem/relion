@@ -654,7 +654,7 @@ void Postprocessing::writeOutput()
 		REPORT_ERROR( (std::string)"MlOptimiser::write: Cannot write file: " + fn_tmp);
 
 	// Write the command line as a comment in the header
-	fh << "# RELION postprocess; version " << RELION_VERSION << std::endl;
+	fh << "# RELION postprocess; version " << g_RELION_VERSION << std::endl;
 	fh << "# ";
 	parser.writeCommandLine(fh);
 

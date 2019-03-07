@@ -915,17 +915,24 @@ Note that the person who installed RELION should have made a custom script for y
 		char * extra_text = getenv ((std::string("RELION_QSUB_EXTRA")+i_str).c_str());
 		if (extra_text != NULL)
 		{
-			std::stringstream out;
-			out<<i;
-			const std::string i_str=out.str();
-			const std::string query=std::string("RELION_QSUB_EXTRA")+i_str+"_DEFAULT";
-			char * extra_default = getenv (query.c_str());
+			const std::string query_default=std::string("RELION_QSUB_EXTRA")+i_str+"_DEFAULT";
+			char *extra_default = getenv(query_default.c_str());
 			char emptychar[] = "";
 			if (extra_default == NULL)
 			{
 				extra_default=emptychar;
 			}
-			std::string txt=std::string("Extra option to pass to the qsub template script. Any occurrences of XXXextra")+i_str+"XXX will be changed by this value.";
+			const std::string query_help=std::string("RELION_QSUB_EXTRA")+i_str+"_HELP";
+			char *extra_help = getenv(query_help.c_str());
+			std::string txt;
+			if (extra_help == NULL)
+			{
+				txt = std::string("Extra option to pass to the qsub template script. Any occurrences of XXXextra")+i_str+"XXX will be changed by this value.";
+			}
+			else
+			{
+				txt=std::string(extra_help);
+			}
 			joboptions[std::string("qsub_extra")+i_str] = JobOption(std::string(extra_text), std::string(extra_default), txt.c_str());
                 }
 	}
