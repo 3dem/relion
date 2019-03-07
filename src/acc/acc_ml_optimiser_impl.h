@@ -930,6 +930,17 @@ void getAllSquaredDifferencesCoarse(
 					MBR = baseMLO->mymodel.orient_bodies[ibody];
 				}
 
+				int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, 0); // get optics group of first image for this particle...
+				Matrix2D<RFLOAT> mag;
+				mag.initIdentity(3);
+				mag = baseMLO->mydata.obsModel.applyAnisoMag(mag, optics_group);
+				mag = baseMLO->mydata.obsModel.applyScaleDifference(mag, optics_group, baseMLO->mymodel.ori_size, baseMLO->mymodel.pixel_size);
+				if (!mag.isIdentity())
+				{
+					if (MBL.mdimx == 3 && MBL.mdimx ==3) MBL = mag * MBL;
+					else MBL = mag;
+				}
+
 				projectorPlans[iclass].setup(
 						baseMLO->sampling,
 						op.directions_prior,
@@ -1391,14 +1402,18 @@ void getAllSquaredDifferencesFine(
 				mag.initIdentity(3);
 				mag = baseMLO->mydata.obsModel.applyAnisoMag(mag, optics_group);
 				mag = baseMLO->mydata.obsModel.applyScaleDifference(mag, optics_group, baseMLO->mymodel.ori_size, baseMLO->mymodel.pixel_size);
+				if (!mag.isIdentity())
+				{
+					if (MBL.mdimx == 3 && MBL.mdimx ==3) MBL = mag * MBL;
+					else MBL = mag;
+				}
 
 				generateEulerMatrices(
 						thisClassProjectionData,
 						&(eulers[exp_iclass-sp.iclass_min])[0],
 						true,
 						MBL,
-						MBR,
-						mag);
+						MBR);
 
 				AllEulers.pack(eulers[exp_iclass-sp.iclass_min]);
 
@@ -2689,14 +2704,18 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 			mag.initIdentity(3);
 			mag = baseMLO->mydata.obsModel.applyAnisoMag(mag, optics_group);
 			mag = baseMLO->mydata.obsModel.applyScaleDifference(mag, optics_group, baseMLO->mymodel.ori_size, baseMLO->mymodel.pixel_size);
+			if (!mag.isIdentity())
+			{
+				if (MBL.mdimx == 3 && MBL.mdimx ==3) MBL = mag * MBL;
+				else MBL = mag;
+			}
 
 			generateEulerMatrices(
 					thisClassProjectionData,
 					&eulers[iclass][0],
 					true,
 					MBL,
-					MBR,
-					mag);
+					MBR);
 
 			eulers[iclass].deviceAlloc();
 			eulers[iclass].cpToDevice();

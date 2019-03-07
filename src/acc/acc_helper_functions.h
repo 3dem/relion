@@ -27,8 +27,8 @@ long int makeJobsForDiff2Fine(
  * orientations into 'jobs' which are fed into the collect-kenrel, which reduces all translations
  * with computed differences into a reduced object to be back-projected.
  */
-long int  makeJobsForCollect(IndexedDataArray &FPW, 
-        IndexedDataArrayMask &dataMask, 
+long int  makeJobsForCollect(IndexedDataArray &FPW,
+        IndexedDataArrayMask &dataMask,
         unsigned long NewJobNum); // FPW=FinePassWeights
 
 /*
@@ -46,10 +46,10 @@ void mapWeights(
 		long unsigned *trans_idx,
 		unsigned long current_oversampling);
 
-void buildCorrImage(MlOptimiser *baseMLO, 
-		OptimisationParamters &op, 
-		AccPtr<XFLOAT> &corr_img, 
-		int img_id, 
+void buildCorrImage(MlOptimiser *baseMLO,
+		OptimisationParamters &op,
+		AccPtr<XFLOAT> &corr_img,
+		int img_id,
 		long int group_id);
 
 void generateEulerMatrices(
@@ -57,8 +57,7 @@ void generateEulerMatrices(
 		XFLOAT *eulers,
 		bool inverse,
 		Matrix2D<RFLOAT> &L,
-		Matrix2D<RFLOAT> &R,
-		Matrix2D<RFLOAT> &MAG);
+		Matrix2D<RFLOAT> &R);
 
 long unsigned generateProjectionSetupFine(
 		OptimisationParamters &op,
@@ -187,7 +186,7 @@ size_t findThresholdIdxInCumulativeSum(AccPtr<T> &data, T threshold)
 				~data,
 				threshold,
 				data.getSize()-1,
-				~idx, 
+				~idx,
 				FIND_IN_CUMULATIVE_BLOCK_SIZE);
 		idx.cpToHost();
 		DEBUG_HANDLE_ERROR(cudaStreamSynchronize(data.getStream()));
@@ -203,7 +202,7 @@ size_t findThresholdIdxInCumulativeSum(AccPtr<T> &data, T threshold)
 #endif
 	}
 }
-	
+
 void runDiff2KernelCoarse(
 		AccProjectorKernel &projector,
 		XFLOAT *trans_x,
@@ -595,7 +594,7 @@ void lowPassFilterMapGPU(
 	XFLOAT edge_high = XMIPP_MIN(Xdim, (ires_filter + filter_edge_halfwidth) / (RFLOAT)ori_size); // in 1/pix
 	XFLOAT edge_width = edge_high - edge_low;
 
-	int blocks = ceilf( (float)((size_t)Xdim*(size_t)Ydim*(size_t)Zdim) / 
+	int blocks = ceilf( (float)((size_t)Xdim*(size_t)Ydim*(size_t)Zdim) /
 		(float)(CFTT_BLOCK_SIZE) );
 	if (do_highpass)
 	{
