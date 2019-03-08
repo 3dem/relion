@@ -32,7 +32,7 @@ class image_handler_parameters
 {
 	public:
    	FileName fn_in, fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_mult, fn_div, fn_add, fn_subtract, fn_fsc, fn_adjust_power, fn_correct_ampl, fn_fourfilter, fn_cosDPhi;
-	int bin_avg, avg_first, avg_last, edge_x0, edge_xF, edge_y0, edge_yF, filter_edge_width, new_box, minr_ampl_corr;
+	int bin_avg, avg_first, avg_last, edge_x0, edge_xF, edge_y0, edge_yF, filter_edge_width, new_box, minr_ampl_corr, my_new_box_size = -1;
 	bool do_add_edge, do_invert_hand, do_flipXY, do_flipmXY, do_flipZ, do_flipX, do_flipY, do_shiftCOM, do_stats, do_calc_com, do_avg_ampl, do_avg_ampl2, do_avg_ampl2_ali, do_average, do_remove_nan, do_average_all_frames, do_power;
 	RFLOAT multiply_constant, divide_constant, add_constant, subtract_constant, threshold_above, threshold_below, angpix, new_angpix, lowpass, highpass, logfilter, bfactor, shift_x, shift_y, shift_z, replace_nan, randomize_at;
 	std::string directional;
@@ -481,7 +481,7 @@ class image_handler_parameters
 			int newsize = ROUND(oldsize * (angpix / new_angpix));
 			newsize -= newsize%2; //make even in case it is not already
 			resizeMap(Iout(), newsize);
-			new_box = newsize;
+			my_new_box_size = newsize;
 
 			if ( oldxsize != oldysize && Iout().getDim() == 2)
 			{
@@ -512,6 +512,7 @@ class image_handler_parameters
 				Iout().window(FIRST_XMIPP_INDEX(new_box), FIRST_XMIPP_INDEX(new_box), FIRST_XMIPP_INDEX(new_box),
 						   LAST_XMIPP_INDEX(new_box),  LAST_XMIPP_INDEX(new_box),  LAST_XMIPP_INDEX(new_box));
 			}
+			my_new_box_size = new_box;
 		}
 
 		if (fn_sym != "")
@@ -836,7 +837,7 @@ class image_handler_parameters
 							FileName fn_tmp;
 							my_fn_out.decompose(dummy, fn_tmp);
 							n_images[fn_tmp]++; // this is safe. see https://stackoverflow.com/questions/16177596/stdmapstring-int-default-initialization-of-value.
-							my_fn_out.compose(n_images[fn_tmp], fn_tmp); 
+							my_fn_out.compose(n_images[fn_tmp], fn_tmp);
 						}
 					}
 					else
@@ -870,11 +871,11 @@ class image_handler_parameters
 			FileName fn_md_out = fn_in.insertBeforeExtension("_" + fn_out);
 			std::cout << " Written out new STAR file: " << fn_md_out << std::endl;
 
-			if (new_box > 0)
+			if (my_new_box_size > 0)
 			{
 				FOR_ALL_OBJECTS_IN_METADATA_TABLE(obsModel.opticsMdt)
 				{
-					obsModel.opticsMdt.setValue(EMDL_IMAGE_SIZE, new_box);
+					obsModel.opticsMdt.setValue(EMDL_IMAGE_SIZE, my_new_box_size);
 				}
 			}
 			if (new_angpix > 0)
