@@ -889,9 +889,8 @@ Matrix2D<RFLOAT> ObservationModel::applyAnisoMag(
 		mag3D(0,0) = magMatrices[opticsGroup](0,0);
 		mag3D(0,1) = magMatrices[opticsGroup](0,1);
 		mag3D(1,0) = magMatrices[opticsGroup](1,0);
-		mag3D(1,0) = magMatrices[opticsGroup](0,1);
+		mag3D(1,1) = magMatrices[opticsGroup](1,1);
 		out = mag3D.inv() * A3D;
-
 	}
 	else
 	{
