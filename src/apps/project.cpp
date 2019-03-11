@@ -369,7 +369,7 @@ public:
 					}
 					else
 					{
-						ctf.read(MDang, MDang);
+						ctf.readByGroup(MDang, &obsModel); // This MDimg only contains one particle!
 						Fctf.resize(F2D);
 						ctf.getFftwImage(Fctf, XSIZE(vol()), XSIZE(vol()), angpix, ctf_phase_flipped, false,  do_ctf_intact_1st_peak, true);
 					}
