@@ -566,7 +566,6 @@ class image_handler_parameters
 		if (input_is_star)
 		{
 			ObservationModel::loadSafely(fn_in, obsModel, MD, "discover", verb);
-			MD.read(fn_in);
 			if (fn_out.getExtension() != "mrcs")
 				std::cout << "NOTE: the input (--i) is a STAR file but the output (--o) does not have .mrcs extension. The output is treated as a suffix, not a path." << std::endl;
 			input_is_stack = true;
