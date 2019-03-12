@@ -4884,36 +4884,38 @@ bool RelionJob::getCommandsCtfrefineJob(std::string &outputname, std::vector<std
 	command += " --f " + joboptions["fn_post"].getString();
 	command += " --o " + outputname;
 
-	if (joboptions["do_ctf"].getBoolean())
-	{
-		command += " --kmin_defocus " + joboptions["minres"].getString();
-		if (joboptions["do_defocus"].getBoolean())
-		{
-			command += " --fit_defocus";
-			command += " --range " + joboptions["range"].getString();
-		}
-		if (joboptions["do_astig"].getBoolean())
-		{
-			command += " --astig";
-		}
-		if (joboptions["do_glob_astig"].getBoolean())
-		{
-			command += " --glob_astig";
-		}
-		if (joboptions["do_phase"].getBoolean())
-		{
-			command += " --fit_phase";
-		}
-		Node node6(outputname+"logfile.pdf", NODE_PDF_LOGFILE);
-		outputNodes.push_back(node6);
-	}
-
+	// Always either do anisotropic magnification, or CTF,tilt-odd,even
 	if (joboptions["do_aniso_mag"].getBoolean())
 	{
 		command += " --fit_aniso";
+		command += " --kmin_mag " + joboptions["minres"].getString();
 	}
 	else
 	{
+		if (joboptions["do_ctf"].getBoolean())
+		{
+			command += " --kmin_defocus " + joboptions["minres"].getString();
+			if (joboptions["do_defocus"].getBoolean())
+			{
+				command += " --fit_defocus";
+				command += " --range " + joboptions["range"].getString();
+			}
+			if (joboptions["do_astig"].getBoolean())
+			{
+				command += " --astig";
+			}
+			if (joboptions["do_glob_astig"].getBoolean())
+			{
+				command += " --glob_astig";
+			}
+			if (joboptions["do_phase"].getBoolean())
+			{
+				command += " --fit_phase";
+			}
+			Node node6(outputname+"logfile.pdf", NODE_PDF_LOGFILE);
+			outputNodes.push_back(node6);
+		}
+
 		// do not allow anisotropic magnification to be done simultaneously with higher-order aberrations
 		if (joboptions["do_tilt"].getBoolean())
 		{

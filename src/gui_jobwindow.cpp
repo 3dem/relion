@@ -2115,11 +2115,14 @@ void JobWindow::initialiseCtfrefineWindow()
 	tab2->label("Fit");
 	resetHeight();
 
-	place("minres", TOGGLE_DEACTIVATE);
+	group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group3->end();
+	place("do_aniso_mag", TOGGLE_LEAVE_ACTIVE, group3, true); //true means: activating aniso_mag will deactive higher-order aberrations
 
 	current_y += STEPY /2 ;
 
-	// motion_fit
+	group3->begin();
+
 	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group1->end();
 	place("do_ctf", TOGGLE_LEAVE_ACTIVE, group1);
@@ -2143,14 +2146,6 @@ void JobWindow::initialiseCtfrefineWindow()
 
 	current_y += STEPY /2 ;
 
-	group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group3->end();
-	place("do_aniso_mag", TOGGLE_LEAVE_ACTIVE, group3, true); //true means: activating aniso_mag will deactive higher-order aberrations
-
-	group3->begin();
-
-	current_y += STEPY /2 ;
-
 	group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group4->end();
 	place("do_tilt", TOGGLE_LEAVE_ACTIVE, group4);
@@ -2162,10 +2157,17 @@ void JobWindow::initialiseCtfrefineWindow()
 	group4->end();
 	guientries["do_tilt"].cb_menu_i();
 
+	current_y += STEPY /2 ;
+
 	place("do_4thorder", TOGGLE_LEAVE_ACTIVE);
 
 	group3->end();
+
 	guientries["do_aniso_mag"].cb_menu_i();
+	current_y += STEPY /2 ;
+
+	place("minres", TOGGLE_DEACTIVATE);
+
 
 
 
