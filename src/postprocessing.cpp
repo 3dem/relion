@@ -30,6 +30,7 @@ void Postprocessing::read(int argc, char **argv)
 	fn_out = parser.getOption("--o", "Output rootname", "postprocess");
 	angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms"));
 	write_halfmaps = parser.checkOption("--half_maps", "Write post-processed half maps for validation");
+	n_threads = textToInteger(parser.getOption("--j", "Number of threads", "1"));
 
 	int mask_section = parser.addSection("Masking options");
 	do_auto_mask = parser.checkOption("--auto_mask", "Perform automated masking, based on a density threshold");
@@ -88,6 +89,7 @@ void Postprocessing::clear()
 	fn_I1 = fn_I2 = "";
 	fn_out="postprocess";
 	angpix = 1.;
+	n_threads = 1;
 	do_auto_mask = false;
 	ini_mask_density_threshold = 0.02;
 	width_soft_mask_edge = 6.;
@@ -167,7 +169,7 @@ void Postprocessing::getAutoMask()
 	// Store sum of both masks in Im
 	I1() += I2();
 	I1() /= 2.;
-	autoMask(I1(), Im(), ini_mask_density_threshold, extend_ini_mask, width_soft_mask_edge, true); // true sets verbosity
+	autoMask(I1(), Im(), ini_mask_density_threshold, extend_ini_mask, width_soft_mask_edge, true, n_threads); // true sets verbosity
 
 	// Re-read original I1 into memory
 	I1.read(fn_I1);

@@ -40,6 +40,9 @@ public:
 	// I/O Parser
 	IOParser parser;
 
+	//Number of threads
+	int n_threads;
+
 	// Verbosity
 	int verb;
 
