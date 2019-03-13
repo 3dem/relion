@@ -150,10 +150,12 @@ void CTF::setValues(RFLOAT _defU, RFLOAT _defV, RFLOAT _defAng, RFLOAT _voltage,
 }
 
 void CTF::setValuesByGroup(
-		ObservationModel *obs, int opticsGroup,
+		ObservationModel *obs, int _opticsGroup,
 		double _defU, double _defV, double _defAng,
 		double _Bfac, double _scale, double _phase_shift)
 {
+	opticsGroup     = _opticsGroup;
+
 	DeltafU         = _defU;
 	DeltafV         = _defV;
 	azimuthal_angle = _defAng;
