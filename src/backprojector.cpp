@@ -1288,8 +1288,8 @@ void BackProjector::externalReconstruct(MultidimArray<RFLOAT> &vol_out,
 	if (verb > 0) std::cout << std::endl << " + Making system call for external reconstruction: " << command << std::endl;
 
 	int res = system(command.c_str());
-
-	if (verb > 0) std::cout << " + External reconstruction returned result: " << res << std::endl;
+	if (res) REPORT_ERROR(" ERROR: there was something wrong with system call: " + command);
+	else if (verb > 0) std::cout << " + External reconstruction finished successfully, reading result back in ... " << std::endl;
 
 	// Read the resulting map back into memory
 	Iweight.read(fn_recons);
