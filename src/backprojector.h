@@ -28,10 +28,13 @@
 #ifndef BACKPROJECTOR_H_
 #define BACKPROJECTOR_H_
 
+#define DEFAULT_EXTERNAL_RECONSTRUCT "relion_external_reconstruct"
+
 #include "src/projector.h"
 #include "src/mask.h"
 #include "src/tabfuncs.h"
 #include "src/symmetries.h"
+#include "src/jaz/complex_io.h"
 
 class BackProjector: public Projector
 {
@@ -278,6 +281,29 @@ public:
                                                      const MultidimArray<Complex>& avg2,
                                                      MultidimArray<RFLOAT>& fsc) const;
 
+	void writeDataWeightAndTau2ToDisk(FileName fn_root,
+			MultidimArray<RFLOAT> &tau2,
+			bool update_tau2_with_fsc,
+			const MultidimArray<RFLOAT> &fsc);
+
+
+	void updateSSNRarrays(RFLOAT tau2_fudge,
+            MultidimArray<RFLOAT> &tau2_io,
+            MultidimArray<RFLOAT> &sigma2_out,
+            MultidimArray<RFLOAT> &evidence_vs_prior_out,
+            MultidimArray<RFLOAT> &fourier_coverage_out,
+            const MultidimArray<RFLOAT>& fsc,
+            bool update_tau2_with_fsc = false,
+            bool is_whole_instead_of_half = false);
+
+	/* Get the 3D reconstruction, but perform it through a system call outside relion_refine!
+	*/
+	void externalReconstruct(MultidimArray<RFLOAT> &vol_out,
+			FileName &fn_out,
+			const MultidimArray<RFLOAT> &tau2,
+			RFLOAT tau2_fudge = 1.,
+			int verb = 0);
+
 	/* Get the 3D reconstruction
          * If do_map is true, 1 will be added to all weights
          * alpha will contain the noise-reduction spectrum
@@ -285,21 +311,12 @@ public:
 	void reconstruct(MultidimArray<RFLOAT> &vol_out,
                      int max_iter_preweight,
                      bool do_map,
-                     RFLOAT tau2_fudge,
-                     MultidimArray<RFLOAT> &tau2_io,
-                     MultidimArray<RFLOAT> &sigma2_out,
-                     MultidimArray<RFLOAT> &evidence_vs_prior_out,
-                     MultidimArray<RFLOAT> &fourier_coverage_out,
-                     const MultidimArray<RFLOAT>& fsc,
+                     const MultidimArray<RFLOAT> &tau2,
+                     RFLOAT tau2_fudge = 1.,
                      RFLOAT normalise = 1.,
-                     bool update_tau2_with_fsc = false,
-                     bool is_whole_instead_of_half = false,
-                     int nr_threads = 1,
                      int minres_map = -1,
                      bool printTimes= false,
-					 bool do_fsc0999 = false,
 					 Image<RFLOAT>* weight_out = 0);
-
 
 	/*  Enforce Hermitian symmetry, apply helical symmetry as well as point-group symmetry
 	 */
@@ -323,12 +340,12 @@ public:
    /* Convolute in Fourier-space with the blob by multiplication in real-space
 	 * Note the convolution is done on the complex array inside the transformer object!!
 	 */
-    void convoluteBlobRealSpace(FourierTransformer &transformer, bool do_mask = false, int threads = 1);
+    void convoluteBlobRealSpace(FourierTransformer &transformer, bool do_mask = false);
 
 	/* Calculate the inverse FFT of Fin and windows the result to ori_size
 	 * Also pass the transformer, to prevent making and clearing a new one before clearing the one in reconstruct()
 	 */
-	void windowToOridimRealSpace(FourierTransformer &transformer, MultidimArray<RFLOAT> &Mout, int nr_threads = 1, bool printTimes = false);
+	void windowToOridimRealSpace(FourierTransformer &transformer, MultidimArray<RFLOAT> &Mout, bool printTimes = false);
 
    /*
 	* Go from the Projector-centered fourier transform back to FFTW-uncentered one

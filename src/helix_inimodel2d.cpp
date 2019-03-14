@@ -952,7 +952,7 @@ void HelixAligner::reconstruct2D(int iclass)
     }
     MultidimArray<RFLOAT> dummy;
     model.Arec[iclass].initZeros();
-    BP.reconstruct(model.Arec[iclass], 10, false, 1., dummy, dummy, dummy, dummy, dummy, 1., false, true, 1, -1);
+    BP.reconstruct(model.Arec[iclass], 10, false, dummy);
 
     if (symmetry > 1)
     {

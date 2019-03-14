@@ -658,9 +658,9 @@ void Reconstructor::reconstruct()
 		It.write(fn_tmp+"_weight.mrc");
 	}
 
-	backprojector.reconstruct(vol(), iter, do_map, 1., dummy, dummy, dummy, dummy,
-	                          fsc, 1., do_use_fsc, true, 1, -1, false);
-
+	MultidimArray<RFLOAT> tau2;
+	if (do_use_fsc) backprojector.updateSSNRarrays(1., tau2, dummy, dummy, dummy, fsc, do_use_fsc, true);
+	backprojector.reconstruct(vol(), iter, do_map, tau2);
 
 	if (do_reconstruct_ctf)
 	{

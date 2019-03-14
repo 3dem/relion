@@ -1043,22 +1043,268 @@ void BackProjector::calculateDownSampledFourierShellCorrelation(const MultidimAr
     fsc(0) = 1.;
 }
 
+void BackProjector::writeDataWeightAndTau2ToDisk(FileName fn_root,
+											 MultidimArray<RFLOAT> &tau2,
+											 bool update_tau2_with_fsc,
+											 const MultidimArray<RFLOAT> &fsc)
+{
+
+
+
+
+}
+
+void BackProjector::updateSSNRarrays(RFLOAT tau2_fudge,
+        MultidimArray<RFLOAT> &tau2_io,
+        MultidimArray<RFLOAT> &sigma2_out,
+        MultidimArray<RFLOAT> &data_vs_prior_out,
+        MultidimArray<RFLOAT> &fourier_coverage_out,
+        const MultidimArray<RFLOAT>& fsc,
+        bool update_tau2_with_fsc,
+        bool is_whole_instead_of_half)
+{
+    // never rely on references (handed to you from the outside) for computation:
+    // they could be the same (i.e. reconstruct(..., dummy, dummy, dummy, dummy, ...); )
+    MultidimArray<RFLOAT> sigma2, data_vs_prior, fourier_coverage;
+	MultidimArray<RFLOAT> tau2 = tau2_io;
+	MultidimArray<RFLOAT> counter;
+	int max_r2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
+	RFLOAT oversampling_correction = (ref_dim == 3) ? (padding_factor * padding_factor * padding_factor) : (padding_factor * padding_factor);
+
+	// First calculate the radial average of the (inverse of the) power of the noise in the reconstruction
+	// This is the left-hand side term in the nominator of the Wiener-filter-like update formula
+	// and it is stored inside the weight vector
+	// Then, if (do_map) add the inverse of tau2-spectrum values to the weight
+	sigma2.initZeros(ori_size/2 + 1);
+	counter.initZeros(ori_size/2 + 1);
+	FOR_ALL_ELEMENTS_IN_ARRAY3D(weight)
+	{
+		int r2 = k * k + i * i + j * j;
+		if (r2 < max_r2)
+		{
+			int ires = ROUND( sqrt((RFLOAT)r2) / padding_factor );
+			RFLOAT invw = oversampling_correction * A3D_ELEM(weight, k, i, j);
+			DIRECT_A1D_ELEM(sigma2, ires) += invw;
+			DIRECT_A1D_ELEM(counter, ires) += 1.;
+		}
+    }
+
+	// Average (inverse of) sigma2 in reconstruction
+	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(sigma2)
+	{
+        if (DIRECT_A1D_ELEM(sigma2, i) > 1e-10)
+            DIRECT_A1D_ELEM(sigma2, i) = DIRECT_A1D_ELEM(counter, i) / DIRECT_A1D_ELEM(sigma2, i);
+        else if (DIRECT_A1D_ELEM(sigma2, i) == 0)
+            DIRECT_A1D_ELEM(sigma2, i) = 0.;
+		else
+		{
+			std::cerr << " DIRECT_A1D_ELEM(sigma2, i)= " << DIRECT_A1D_ELEM(sigma2, i) << std::endl;
+			REPORT_ERROR("BackProjector::reconstruct: ERROR: unexpectedly small, yet non-zero sigma2 value, this should not happen...a");
+        }
+    }
+
+    tau2.reshape(ori_size/2 + 1);
+    data_vs_prior.initZeros(ori_size/2 + 1);
+	fourier_coverage.initZeros(ori_size/2 + 1);
+	counter.initZeros(ori_size/2 + 1);
+	if (update_tau2_with_fsc)
+    {
+		// Then calculate new tau2 values, based on the FSC
+		if (!fsc.sameShape(sigma2) || !fsc.sameShape(tau2))
+		{
+			fsc.printShape(std::cerr);
+			tau2.printShape(std::cerr);
+			sigma2.printShape(std::cerr);
+			REPORT_ERROR("ERROR BackProjector::reconstruct: sigma2, tau2 and fsc have different sizes");
+		}
+		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(sigma2)
+        {
+			// FSC cannot be negative or zero for conversion into tau2
+			RFLOAT myfsc = XMIPP_MAX(0.001, DIRECT_A1D_ELEM(fsc, i));
+			if (is_whole_instead_of_half)
+			{
+				// Factor two because of twice as many particles
+				// Sqrt-term to get 60-degree phase errors....
+				myfsc = sqrt(2. * myfsc / (myfsc + 1.));
+			}
+			myfsc = XMIPP_MIN(0.999, myfsc);
+			RFLOAT myssnr = myfsc / (1. - myfsc);
+			// Sjors 29nov2017 try tau2_fudge for pulling harder on Refine3D runs...
+            myssnr *= tau2_fudge;
+			RFLOAT fsc_based_tau = myssnr * DIRECT_A1D_ELEM(sigma2, i);
+			DIRECT_A1D_ELEM(tau2, i) = fsc_based_tau;
+			// data_vs_prior is merely for reporting: it is not used for anything in the reconstruction
+			DIRECT_A1D_ELEM(data_vs_prior, i) = myssnr;
+		}
+	}
+
+	// Now accumulate data_vs_prior if (!update_tau2_with_fsc)
+	// Also accumulate fourier_coverage
+	FOR_ALL_ELEMENTS_IN_ARRAY3D(weight)
+	{
+		int r2 = k * k + i * i + j * j;
+		if (r2 < max_r2)
+		{
+			int ires = ROUND( sqrt((RFLOAT)r2) / padding_factor );
+			RFLOAT invw = A3D_ELEM(weight, k, i, j);
+
+			RFLOAT invtau2;
+			if (DIRECT_A1D_ELEM(tau2, ires) > 0.)
+			{
+				// Calculate inverse of tau2
+				invtau2 = 1. / (oversampling_correction * tau2_fudge * DIRECT_A1D_ELEM(tau2, ires));
+			}
+			else if (DIRECT_A1D_ELEM(tau2, ires) == 0.)
+			{
+				// If tau2 is zero, use small value instead
+				invtau2 = 1./ ( 0.001 * invw);
+			}
+			else
+			{
+				std::cerr << " sigma2= " << sigma2 << std::endl;
+				std::cerr << " fsc= " << fsc << std::endl;
+				std::cerr << " tau2= " << tau2 << std::endl;
+				REPORT_ERROR("ERROR BackProjector::reconstruct: Negative or zero values encountered for tau2 spectrum!");
+			}
+
+			// Keep track of spectral evidence-to-prior ratio and remaining noise in the reconstruction
+			if (!update_tau2_with_fsc)
+			{
+				DIRECT_A1D_ELEM(data_vs_prior, ires) += invw / invtau2;
+			}
+
+			// Keep track of the coverage in Fourier space
+			if (invw / invtau2 >= 1.)
+			{
+				DIRECT_A1D_ELEM(fourier_coverage, ires) += 1.;
+			}
+
+			DIRECT_A1D_ELEM(counter, ires) += 1.;
+
+		}
+	}
+
+	// Average data_vs_prior
+	if (!update_tau2_with_fsc)
+	{
+		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(data_vs_prior)
+		{
+			if (i > r_max)
+				DIRECT_A1D_ELEM(data_vs_prior, i) = 0.;
+			else if (DIRECT_A1D_ELEM(counter, i) < 0.001)
+				DIRECT_A1D_ELEM(data_vs_prior, i) = 999.;
+			else
+				DIRECT_A1D_ELEM(data_vs_prior, i) /= DIRECT_A1D_ELEM(counter, i);
+		}
+	}
+
+	// Calculate Fourier coverage in each shell
+	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(fourier_coverage)
+	{
+		if (DIRECT_A1D_ELEM(counter, i) > 0.)
+			DIRECT_A1D_ELEM(fourier_coverage, i) /= DIRECT_A1D_ELEM(counter, i);
+	}
+
+	// Send back the output
+	tau2_io = tau2;
+    sigma2_out = sigma2;
+    data_vs_prior_out = data_vs_prior;
+    fourier_coverage_out = fourier_coverage;
+
+}
+
+void BackProjector::externalReconstruct(MultidimArray<RFLOAT> &vol_out,
+		FileName &fn_out,
+        const MultidimArray<RFLOAT> &tau2,
+        RFLOAT tau2_fudge,
+		int verb)
+{
+
+	FileName fn_recons = fn_out+"_external_reconstruct.mrc";
+	FileName fn_star = fn_out+"_external_reconstruct.star";
+
+	int max_r2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
+	int padoridim = ROUND(padding_factor * ori_size);
+
+	// Write out data array
+	Image<Complex> Idata;
+	if (ref_dim == 2) Idata().resize(pad_size, pad_size/2+1);
+    else Idata().resize(pad_size, pad_size, pad_size/2+1);
+	decenter(data, Idata(), max_r2);
+	windowFourierTransform(Idata(), padoridim);
+	ComplexIO::write(Idata(), fn_out+"_external_reconstruct_data", ".mrc");
+	Idata.clear();
+
+	// Write out weight array
+	Image<RFLOAT> Iweight;
+	if (ref_dim == 2) Iweight().resize(pad_size, pad_size/2+1);
+    else Iweight().resize(pad_size, pad_size, pad_size/2+1);
+	decenter(weight, Iweight(), max_r2);
+	windowFourierTransform(Iweight(), padoridim);
+	Iweight.write(fn_out+"_external_reconstruct_weight.mrc");
+	Iweight.clear();
+
+	// Write out STAR file for input to external reconstruction program
+	MetaDataTable MDlist, MDtau;
+
+	MDlist.setName("external_reconstruct_general");
+	MDlist.setIsList(true);
+	MDlist.addObject();
+	MDlist.setValue(EMDL_OPTIMISER_EXTERNAL_RECONS_DATA_REAL, fn_out+"_external_reconstruct_data_real.mrc");
+	MDlist.setValue(EMDL_OPTIMISER_EXTERNAL_RECONS_DATA_IMAG, fn_out+"_external_reconstruct_data_imag.mrc");
+	MDlist.setValue(EMDL_OPTIMISER_EXTERNAL_RECONS_WEIGHT, fn_out+"_external_reconstruct_weight.mrc");
+	MDlist.setValue(EMDL_OPTIMISER_EXTERNAL_RECONS_RESULT, fn_recons);
+	MDlist.setValue(EMDL_MLMODEL_TAU2_FUDGE_FACTOR, tau2_fudge);
+	MDlist.setValue(EMDL_MLMODEL_PADDING_FACTOR, padding_factor);
+	MDlist.setValue(EMDL_MLMODEL_DIMENSIONALITY, ref_dim);
+	MDlist.setValue(EMDL_MLMODEL_ORIGINAL_SIZE, ori_size);
+	MDlist.setValue(EMDL_MLMODEL_CURRENT_SIZE, 2*r_max);
+
+	MDtau.setName("external_reconstruct_tau2");
+	for (int ii = 0; ii < XSIZE(tau2); ii++)
+	{
+		MDtau.addObject();
+		MDtau.setValue(EMDL_SPECTRAL_IDX, ii);
+		MDtau.setValue(EMDL_MLMODEL_TAU2_REF, tau2(ii));
+	}
+
+	std::ofstream  fh;
+	fh.open((fn_star).c_str(), std::ios::out);
+	if (!fh) REPORT_ERROR( (std::string)"BackProjector::externalReconstruct: Cannot write file: " + fn_star);
+	MDlist.write(fh);
+	MDtau.write(fh);
+	fh.close();
+
+
+	// Make the system call: program name plus the STAR file for the external reconstruction program as its first argument
+	char *my_exec = getenv ("RELION_EXTERNAL_RECONSTRUCT_EXECUTABLE");
+	char default_exec[]=DEFAULT_EXTERNAL_RECONSTRUCT;
+	if (my_exec == NULL)
+	{
+		my_exec = default_exec;
+	}
+	std::string command = std::string(my_exec) + " " + fn_star;
+
+	if (verb > 0) std::cout << std::endl << " + Making system call for external reconstruction: " << command << std::endl;
+
+	int res = system(command.c_str());
+
+	if (verb > 0) std::cout << " + External reconstruction returned result: " << res << std::endl;
+
+	// Read the resulting map back into memory
+	Iweight.read(fn_recons);
+	vol_out = Iweight();
+
+}
+
 void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
                                 int max_iter_preweight,
                                 bool do_map,
+                                const MultidimArray<RFLOAT> &tau2,
                                 RFLOAT tau2_fudge,
-                                MultidimArray<RFLOAT> &tau2_io, // can be input/output
-                                MultidimArray<RFLOAT> &sigma2_out,
-                                MultidimArray<RFLOAT> &data_vs_prior_out,
-                                MultidimArray<RFLOAT> &fourier_coverage_out,
-                                const MultidimArray<RFLOAT> &fsc, // only input
                                 RFLOAT normalise,
-                                bool update_tau2_with_fsc,
-                                bool is_whole_instead_of_half,
-                                int nr_threads,
                                 int minres_map,
                                 bool printTimes,
-								bool do_fsc0999,
 								Image<RFLOAT>* weight_out)
 {
 
@@ -1091,11 +1337,6 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 	int ReconS_24 = ReconTimer.setNew(" RcS24_extra ");
 #endif
 
-    // never rely on references (handed to you from the outside) for computation:
-    // they could be the same (i.e. reconstruct(..., dummy, dummy, dummy, dummy, ...); )
-    MultidimArray<RFLOAT> sigma2, data_vs_prior, fourier_coverage;
-	MultidimArray<RFLOAT> tau2 = tau2_io;
-
 
     RCTIC(ReconTimer,ReconS_1);
     FourierTransformer transformer;
@@ -1104,6 +1345,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 	MultidimArray<double> Fnewweight;
 	MultidimArray<Complex>& Fconv = transformer.getFourierReference();
 	int max_r2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
+	RFLOAT oversampling_correction = (ref_dim == 3) ? (padding_factor * padding_factor * padding_factor) : (padding_factor * padding_factor);
 
 //#define DEBUG_RECONSTRUCT
 #ifdef DEBUG_RECONSTRUCT
@@ -1135,87 +1377,13 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 	// Go from projector-centered to FFTW-uncentered
 	decenter(weight, Fweight, max_r2);
 
-	// Take oversampling into account
-	RFLOAT oversampling_correction = (ref_dim == 3) ? (padding_factor * padding_factor * padding_factor) : (padding_factor * padding_factor);
-	MultidimArray<RFLOAT> counter;
-
-	// First calculate the radial average of the (inverse of the) power of the noise in the reconstruction
-	// This is the left-hand side term in the nominator of the Wiener-filter-like update formula
-	// and it is stored inside the weight vector
-	// Then, if (do_map) add the inverse of tau2-spectrum values to the weight
-	sigma2.initZeros(ori_size/2 + 1);
-	counter.initZeros(ori_size/2 + 1);
-	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fconv)
-	{
-		int r2 = kp * kp + ip * ip + jp * jp;
-		if (r2 < max_r2)
-		{
-			int ires = ROUND( sqrt((RFLOAT)r2) / padding_factor );
-			RFLOAT invw = oversampling_correction * DIRECT_A3D_ELEM(Fweight, k, i, j);
-			DIRECT_A1D_ELEM(sigma2, ires) += invw;
-			DIRECT_A1D_ELEM(counter, ires) += 1.;
-		}
-    }
-
-	// Average (inverse of) sigma2 in reconstruction
-	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(sigma2)
-	{
-        if (DIRECT_A1D_ELEM(sigma2, i) > 1e-10)
-            DIRECT_A1D_ELEM(sigma2, i) = DIRECT_A1D_ELEM(counter, i) / DIRECT_A1D_ELEM(sigma2, i);
-        else if (DIRECT_A1D_ELEM(sigma2, i) == 0)
-            DIRECT_A1D_ELEM(sigma2, i) = 0.;
-		else
-		{
-			std::cerr << " DIRECT_A1D_ELEM(sigma2, i)= " << DIRECT_A1D_ELEM(sigma2, i) << std::endl;
-			REPORT_ERROR("BackProjector::reconstruct: ERROR: unexpectedly small, yet non-zero sigma2 value, this should not happen...a");
-        }
-    }
-
-	if (update_tau2_with_fsc)
-    {
-        tau2.reshape(ori_size/2 + 1);
-        data_vs_prior.initZeros(ori_size/2 + 1);
-		// Then calculate new tau2 values, based on the FSC
-		if (!fsc.sameShape(sigma2) || !fsc.sameShape(tau2))
-		{
-			fsc.printShape(std::cerr);
-			tau2.printShape(std::cerr);
-			sigma2.printShape(std::cerr);
-			REPORT_ERROR("ERROR BackProjector::reconstruct: sigma2, tau2 and fsc have different sizes");
-		}
-		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(sigma2)
-        {
-			// FSC cannot be negative or zero for conversion into tau2
-			RFLOAT myfsc = XMIPP_MAX(0.001, DIRECT_A1D_ELEM(fsc, i));
-			if (is_whole_instead_of_half)
-			{
-				// Factor two because of twice as many particles
-				// Sqrt-term to get 60-degree phase errors....
-				myfsc = sqrt(2. * myfsc / (myfsc + 1.));
-			}
-			myfsc = XMIPP_MIN(0.999, myfsc);
-			RFLOAT myssnr = myfsc / (1. - myfsc);
-			// Sjors 29nov2017 try tau2_fudge for pulling harder on Refine3D runs...
-            myssnr *= tau2_fudge;
-			RFLOAT fsc_based_tau = myssnr * DIRECT_A1D_ELEM(sigma2, i);
-			DIRECT_A1D_ELEM(tau2, i) = fsc_based_tau;
-			// data_vs_prior is merely for reporting: it is not used for anything in the reconstruction
-			DIRECT_A1D_ELEM(data_vs_prior, i) = myssnr;
-		}
-	}
     RCTOC(ReconTimer,ReconS_2);
     RCTIC(ReconTimer,ReconS_2_5);
 	// Apply MAP-additional term to the Fnewweight array
 	// This will regularise the actual reconstruction
     if (do_map)
 	{
-
     	// Then, add the inverse of tau2-spectrum values to the weight
-		// and also calculate spherical average of data_vs_prior ratios
-		if (!update_tau2_with_fsc)
-			data_vs_prior.initZeros(ori_size/2 + 1);
-		fourier_coverage.initZeros(ori_size/2 + 1);
-		counter.initZeros(ori_size/2 + 1);
 		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fconv)
  		{
 			int r2 = kp * kp + ip * ip + jp * jp;
@@ -1237,21 +1405,9 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 				}
 				else
 				{
-					std::cerr << " sigma2= " << sigma2 << std::endl;
-					std::cerr << " fsc= " << fsc << std::endl;
 					std::cerr << " tau2= " << tau2 << std::endl;
 					REPORT_ERROR("ERROR BackProjector::reconstruct: Negative or zero values encountered for tau2 spectrum!");
 				}
-
-				// Keep track of spectral evidence-to-prior ratio and remaining noise in the reconstruction
-				if (!update_tau2_with_fsc)
-					DIRECT_A1D_ELEM(data_vs_prior, ires) += invw / invtau2;
-
-				// Keep track of the coverage in Fourier space
-				if (invw / invtau2 >= 1.)
-					DIRECT_A1D_ELEM(fourier_coverage, ires) += 1.;
-
-				DIRECT_A1D_ELEM(counter, ires) += 1.;
 
 				// Only for (ires >= minres_map) add Wiener-filter like term
 				if (ires >= minres_map)
@@ -1263,49 +1419,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 				}
 			}
 		}
-
-		// Average data_vs_prior
-		if (!update_tau2_with_fsc)
-		{
-			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(data_vs_prior)
-			{
-				if (i > r_max)
-					DIRECT_A1D_ELEM(data_vs_prior, i) = 0.;
-				else if (DIRECT_A1D_ELEM(counter, i) < 0.001)
-					DIRECT_A1D_ELEM(data_vs_prior, i) = 999.;
-				else
-					DIRECT_A1D_ELEM(data_vs_prior, i) /= DIRECT_A1D_ELEM(counter, i);
-			}
-		}
-
-		// Calculate Fourier coverage in each shell
-		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(fourier_coverage)
-		{
-			if (DIRECT_A1D_ELEM(counter, i) > 0.)
-				DIRECT_A1D_ELEM(fourier_coverage, i) /= DIRECT_A1D_ELEM(counter, i);
-		}
-
 	} //end if do_map
-    else if (do_fsc0999)
-    {
-
-     	// Sjors 9may2018: avoid numerical instabilities with unregularised reconstructions....
-        FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fconv)
-        {
-            int r2 = kp * kp + ip * ip + jp * jp;
-            if (r2 < max_r2)
-            {
-                int ires = ROUND( sqrt((RFLOAT)r2) / padding_factor );
-                if (ires >= minres_map)
-                {
-                    // add 1/1000th of the radially averaged sigma2 to the Fweight, to avoid having zeros there...
-                	DIRECT_A3D_ELEM(Fweight, k, i, j) += 1./(999. * DIRECT_A1D_ELEM(sigma2, ires));
-                }
-            }
-        }
-
-    }
-
 
     RCTOC(ReconTimer,ReconS_2_5);
 	if (skip_gridding)
@@ -1382,7 +1496,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 
 			// convolute through Fourier-transform (as both grids are rectangular)
 			// Note that convoluteRealSpace acts on the complex array inside the transformer
-            convoluteBlobRealSpace(transformer, false, nr_threads);
+            convoluteBlobRealSpace(transformer, false);
 
 			RFLOAT w, corr_min = LARGE_NUMBER, corr_max = -LARGE_NUMBER, corr_avg=0., corr_nn=0.;
 
@@ -1535,7 +1649,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 	// Pass the transformer to prevent making and clearing a new one before clearing the one declared above....
 	// The latter may give memory problems as detected by electric fence....
 	RCTIC(ReconTimer,ReconS_17);
-	windowToOridimRealSpace(transformer, vol_out, nr_threads, printTimes);
+	windowToOridimRealSpace(transformer, vol_out, printTimes);
 	RCTOC(ReconTimer,ReconS_17);
 
 #endif
@@ -1549,49 +1663,6 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 	RCTIC(ReconTimer,ReconS_18);
 	griddingCorrect(vol_out);
 	RCTOC(ReconTimer,ReconS_18);
-	// If the tau-values were calculated based on the FSC, then now re-calculate the power spectrum of the actual reconstruction
-	if (update_tau2_with_fsc)
-	{
-
-		// New tau2 will be the power spectrum of the new map
-		MultidimArray<RFLOAT> spectrum, count;
-
-		// Calculate this map's power spectrum
-		// Don't call getSpectrum() because we want to use the same transformer object to prevent memory trouble....
-		RCTIC(ReconTimer,ReconS_19);
-		spectrum.initZeros(XSIZE(vol_out));
-	    count.initZeros(XSIZE(vol_out));
-		RCTOC(ReconTimer,ReconS_19);
-		RCTIC(ReconTimer,ReconS_20);
-	    // recycle the same transformer for all images
-        transformer.setReal(vol_out);
-		RCTOC(ReconTimer,ReconS_20);
-		RCTIC(ReconTimer,ReconS_21);
-        transformer.FourierTransform();
-		RCTOC(ReconTimer,ReconS_21);
-		RCTIC(ReconTimer,ReconS_22);
-
-	    FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fconv)
-	    {
-	    	long int idx = ROUND(sqrt(kp*kp + ip*ip + jp*jp));
-	    	spectrum(idx) += norm(dAkij(Fconv, k, i, j));
-	        count(idx) += 1.;
-	    }
-
-	    spectrum /= count;
-
-		// Factor two because of two-dimensionality of the complex plane
-		// (just like sigma2_noise estimates, the power spectra should be divided by 2)
-		RFLOAT normfft = (ref_dim == 3 && data_dim == 2) ? (RFLOAT)(ori_size * ori_size) : 1.;
-		spectrum *= normfft / 2.;
-
-		// New SNR^MAP will be power spectrum divided by the noise in the reconstruction (i.e. sigma2)
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(data_vs_prior)
-		{
-			DIRECT_MULTIDIM_ELEM(tau2, n) =  tau2_fudge * DIRECT_MULTIDIM_ELEM(spectrum, n);
-		}
-		RCTOC(ReconTimer,ReconS_22);
-	}
 	RCTIC(ReconTimer,ReconS_23);
 	// Completely empty the transformer object
 	transformer.cleanup();
@@ -1608,11 +1679,6 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 #ifdef DEBUG_RECONSTRUCT
     std::cerr<<"done with reconstruct"<<std::endl;
 #endif
-
-	tau2_io = tau2;
-    sigma2_out = sigma2;
-    data_vs_prior_out = data_vs_prior;
-    fourier_coverage_out = fourier_coverage;
 
 	if (weight_out != 0)
 	{
@@ -2019,7 +2085,7 @@ void BackProjector::applyPointGroupSymmetry(int threads)
 
 }
 
-void BackProjector::convoluteBlobRealSpace(FourierTransformer &transformer, bool do_mask, int threads)
+void BackProjector::convoluteBlobRealSpace(FourierTransformer &transformer, bool do_mask)
 {
 
 	MultidimArray<RFLOAT> Mconv;
@@ -2067,7 +2133,7 @@ void BackProjector::convoluteBlobRealSpace(FourierTransformer &transformer, bool
 
 }
 
-void BackProjector::windowToOridimRealSpace(FourierTransformer &transformer, MultidimArray<RFLOAT> &Mout, int nr_threads, bool printTimes)
+void BackProjector::windowToOridimRealSpace(FourierTransformer &transformer, MultidimArray<RFLOAT> &Mout, bool printTimes)
 {
 
 #ifdef TIMING

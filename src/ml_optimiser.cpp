@@ -447,7 +447,6 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	asymmetric_padding = parser.checkOption("--asymmetric_padding", "", "false", true);
 	maximum_significants = textToInteger(parser.getOption("--maxsig", "", "0", true));
 	skip_gridding = parser.checkOption("--skip_gridding", "", "false", true);
-	do_fsc0999 = checkParameter(argc, argv, "--fsc0999");
 
 	do_print_metadata_labels = false;
 	do_print_symmetry_ops = false;
@@ -695,6 +694,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	do_phase_random_fsc = parser.checkOption("--solvent_correct_fsc", "Correct FSC curve for the effects of the solvent mask?");
 	do_skip_maximization = parser.checkOption("--skip_maximize", "Skip maximization step (only write out data.star file)?");
 	failsafe_threshold = textToInteger(parser.getOption("--failsafe_threshold", "Maximum number of particles permitted to be handled by fail-safe mode, due to zero sum of weights, before exiting with an error (GPU only).", "40"));
+	do_external_reconstruct = parser.checkOption("--external_reconstruct", "Perform the reconstruction step outside relion_refine, e.g. for learned priors?)");
 	///////////////// Special stuff for first iteration (only accessible via CL, not through readSTAR ////////////////////
 
 	// When reading from the CL: always start at iteration 1 and subset 1
@@ -752,7 +752,6 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	asymmetric_padding = parser.checkOption("--asymmetric_padding", "", "false", true);
 	maximum_significants = textToInteger(parser.getOption("--maxsig", "", "0", true));
 	skip_gridding = parser.checkOption("--skip_gridding", "", "false", true);
-	do_fsc0999 = checkParameter(argc, argv, "--fsc0999");
 
 #ifdef DEBUG_READ
 	std::cerr<<"MlOptimiser::parseInitial Done"<<std::endl;
@@ -898,6 +897,9 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 		do_phase_random_fsc = false;
 	if (!MD.getValue(EMDL_OPTIMISER_FAST_SUBSETS, do_fast_subsets))
 		do_fast_subsets = false;
+	if (!MD.getValue(EMDL_OPTIMISER_DO_EXTERNAL_RECONSTRUCT, do_external_reconstruct))
+		do_external_reconstruct = false;
+
 	// backward compatibility with relion-3.0
 	if (!MD.getValue(EMDL_OPTIMISER_ACCURACY_TRANS_ANGSTROM, acc_trans))
 	{
@@ -1044,6 +1046,7 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		MD.setValue(EMDL_OPTIMISER_INCR_SIZE, incr_size);
 		MD.setValue(EMDL_OPTIMISER_DO_MAP, do_map);
 		MD.setValue(EMDL_OPTIMISER_FAST_SUBSETS, do_fast_subsets);
+		MD.setValue(EMDL_OPTIMISER_DO_EXTERNAL_RECONSTRUCT, do_external_reconstruct);
 		MD.setValue(EMDL_OPTIMISER_DO_SGD, do_sgd);
 		MD.setValue(EMDL_OPTIMISER_DO_STOCHASTIC_EM, do_avoid_sgd);
 		MD.setValue(EMDL_OPTIMISER_SGD_INI_ITER, sgd_ini_iter);
@@ -1900,11 +1903,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 	// Write out unmasked 2D class averages
 	do_write_unmasked_refs = (mymodel.ref_dim == 2);
 
-	if (do_fsc0999 && verb > 0)
-	{
-		std::cerr << " Warning: performing unfil.mrc reconstructions with experimental do_fsc0999 option!" << std::endl;
-	}
-
 #ifdef DEBUG
 	std::cerr << "Leaving initialiseGeneral" << std::endl;
 #endif
@@ -2242,8 +2240,7 @@ void MlOptimiser::setSigmaNoiseEstimatesAndSetAverageImage(MultidimArray<RFLOAT>
 		{
 
 			MultidimArray<RFLOAT> dummy;
-			(wsum_model.BPref[iclass]).reconstruct(mymodel.Iref[iclass], gridding_nr_iter, false,
-					1., dummy, dummy, dummy, dummy, dummy);
+			(wsum_model.BPref[iclass]).reconstruct(mymodel.Iref[iclass], gridding_nr_iter, false, dummy);
 			// 2D projection data were CTF-corrected, subtomograms were not
 			refs_are_ctf_corrected = (mymodel.data_dim == 3) ? false : true;
 		}
@@ -3933,10 +3930,38 @@ void MlOptimiser::maximization()
 
 				if (do_sgd) Iref_old = mymodel.Iref[iclass];
 
-				(wsum_model.BPref[iclass]).reconstruct(mymodel.Iref[iclass], gridding_nr_iter, do_map,
-								mymodel.tau2_fudge_factor, mymodel.tau2_class[iclass], mymodel.sigma2_class[iclass],
-								mymodel.data_vs_prior_class[iclass], mymodel.fourier_coverage_class[iclass],
-								mymodel.fsc_halves_class[0], wsum_model.pdf_class[iclass], false, false, nr_threads, minres_map, (iclass==0), do_fsc0999);
+				(wsum_model.BPref[iclass]).updateSSNRarrays(mymodel.tau2_fudge_factor,
+						mymodel.tau2_class[iclass],
+						mymodel.sigma2_class[iclass],
+						mymodel.data_vs_prior_class[iclass],
+						mymodel.fourier_coverage_class[iclass],
+						mymodel.fsc_halves_class[0],
+						false,
+						false);
+
+				if (do_external_reconstruct)
+				{
+					FileName fn_ext_root;
+					if (iter > -1) fn_ext_root.compose(fn_out+"_it", iter, "", 3);
+					else fn_ext_root = fn_out;
+					fn_ext_root.compose(fn_ext_root+"_class", iclass+1, "", 3);
+					(wsum_model.BPref[iclass]).externalReconstruct(mymodel.Iref[iclass],
+							fn_ext_root,
+							mymodel.tau2_class[iclass],
+							mymodel.tau2_fudge_factor,
+							1); // verbose
+				}
+				else
+				{
+					(wsum_model.BPref[iclass]).reconstruct(mymodel.Iref[iclass],
+							gridding_nr_iter,
+							do_map,
+							mymodel.tau2_class[iclass],
+							mymodel.tau2_fudge_factor,
+							wsum_model.pdf_class[iclass],
+							minres_map,
+							(iclass==0));
+				}
 
 				if(do_sgd)
 				{
