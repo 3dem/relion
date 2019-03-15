@@ -1277,6 +1277,8 @@ def load_star(filename):
             line = line[:comment_pos]
 
         if line == "":
+            if in_loop == 2:
+                in_loop = 0
             continue
 
         if line.startswith("data_"):
