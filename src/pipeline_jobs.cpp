@@ -1104,7 +1104,7 @@ For the import of a particle, 2D references or micrograph STAR file or of a 3D r
 Note that due to a bug in a fltk library, you cannot import from directories that contain a substring  of the current directory, e.g. dont important from /home/betagal if your current directory is called /home/betagal_r2. In this case, just change one of the directory names.");
 
 	joboptions["node_type"] = JobOption("Node type:", job_nodetype_options, 0, "Select the type of Node this is.");
-	joboptions["optics_group_name"] = JobOption("Rename optics group for particles:", (std::string)"", "Only for the import of a particles STAR file with a single, or no, optics groups defined: rename the optics group for the imported particles to this string.");
+	joboptions["optics_group_particles"] = JobOption("Rename optics group for particles:", (std::string)"", "Only for the import of a particles STAR file with a single, or no, optics groups defined: rename the optics group for the imported particles to this string.");
 
 }
 
@@ -1152,7 +1152,20 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 			command += " --do_micrographs ";
 		}
 
-		command += " --optics_group_name " + joboptions["optics_group_name"].getString();
+		FileName optics_group = joboptions["optics_group_name"].getString();
+		if (optics_group == "")
+		{
+			error_message = "ERROR: please specify an optics group name.";
+			return false;
+		}
+
+		if (!optics_group.validateCharactersStrict())
+		{
+			error_message = "ERROR: an optics group name may contain only numbers, alphabets and hyphen(-).";
+			return false;
+		}
+
+		command += " --optics_group_name \"" + optics_group + "\"";
 		command += " --angpix " + joboptions["angpix"].getString();
 		command += " --kV " + joboptions["kV"].getString();
 		command += " --Cs " + joboptions["Cs"].getString();
@@ -1161,9 +1174,7 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 		command += " --beamtilt_y " + joboptions["beamtilt_y"].getString();
 
 	}
-
-
-	if (do_other)
+	else if (do_other)
 	{
 		fn_in = joboptions["fn_in_other"].getString();
 		std::string node_type = joboptions["node_type"].getString();
@@ -1228,9 +1239,15 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 			else if (mynodetype == NODE_PART_DATA)
 			{
 				command += " --do_particles";
-				if (joboptions["optics_group_name"].getString().length() > 0)
+				FileName optics_group = joboptions["optics_group_particles"].getString();
+				if (optics_group != "")
 				{
-					command += " --particles_optics_group_name " + joboptions["optics_group_name"].getString();
+					if (!optics_group.validateCharactersStrict())
+					{
+						error_message = "ERROR: an optics group name may contain only numbers, alphabets and hyphen(-).";
+						return false;
+					}
+					command += " --particles_optics_group_name \"" + optics_group + "\"";
 				}
 			}
 			else

@@ -478,7 +478,7 @@ void JobWindow::initialiseImportWindow()
 	place("node_type");
 	// Add a little spacer
 	current_y += STEPY/2;
-	place("optics_group_name");
+	place("optics_group_particles");
 	group2->end();
 
 	guientries["do_other"].cb_menu_i(); // make default active
