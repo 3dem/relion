@@ -290,8 +290,8 @@ Matrix2D<RFLOAT> MagnificationHelper::solveLinearlyFreq(
 	mat(1,0) = opt[2];
 	mat(1,1) = opt[3] + 1.0;
 	
-	std::cout << opt[0] << ", " << opt[1] << "\n" 
-	          << opt[2] << ", " << opt[3] << "\n";
+//	std::cout << opt[0] << ", " << opt[1] << "\n" 
+//	          << opt[2] << ", " << opt[3] << "\n";
 	
 	for (long yi = 0; yi < h; yi++)
 	for (long xi = 0; xi < w; xi++)
