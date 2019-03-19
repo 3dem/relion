@@ -530,6 +530,9 @@ void TiltHelper::extractTilt(
 	double& tilt_x, double& tilt_y, 
 	double Cs, double lambda)
 {
+	if (oddZernikeCoeffs.size() <= 5)
+		oddZernikeCoeffs.resize(5, 0);
+	
 	const double scale = Cs * 20000 * lambda * lambda * 3.141592654;
 	
 	const double Z3x = oddZernikeCoeffs[4];
@@ -554,6 +557,9 @@ void TiltHelper::insertTilt(
 	double tilt_x, double tilt_y, 
 	double Cs, double lambda)
 {
+	if (oddZernikeCoeffs.size() <= 5)
+		oddZernikeCoeffs.resize(5, 0);
+
 	const double scale = Cs * 20000 * lambda * lambda * 3.141592654;
 	const double Z3x = -scale * tilt_x / 3.0;
 	const double Z3y = -scale * tilt_y / 3.0;
