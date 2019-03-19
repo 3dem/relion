@@ -280,19 +280,26 @@ bool MetaDataTable::getValueToString(EMDLabel label, std::string &value, long ob
 			std::vector<double> v;
 			getValue(label, v, objectID);
 
-			std::stringstream sts;
-
-			sts << std::setprecision(12);
-			sts << '[';
-
-			for (int i = 0; i < v.size()-1; i++)
+			if (v.size() == 0)
 			{
-				sts << v[i] << ',';
+				value = "[]";
 			}
+			else
+			{
+				std::stringstream sts;
 
-			sts << v[v.size()-1] << ']';
+				sts << std::setprecision(12);
+				sts << '[';
 
-			value = sts.str();
+				for (int i = 0; i < v.size()-1; i++)
+				{
+					sts << v[i] << ',';
+				}
+
+				sts << v[v.size()-1] << ']';
+
+				value = sts.str();
+			}
 			return true;
 		}
 
