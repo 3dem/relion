@@ -5189,15 +5189,25 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 			Mnoise.resize(img());
 			transformer.setReal(Mnoise);
 			transformer.getFourierAlias(Fnoise);
-			// Map from model_size sigma2_noise array to my_image_size
+
+			// Remap mymodel.sigma2_noise[group_id] onto remapped_sigma2_noise for this images's size and angpix
+			MultidimArray<RFLOAT > remapped_sigma2_noise;
+			remapped_sigma2_noise.initZeros(XSIZE(Mnoise)/2+1);
 			RFLOAT remap_image_sizes = (my_image_size * my_pixel_size) / (mymodel.ori_size * mymodel.pixel_size);
+			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(mymodel.sigma2_noise[group_id])
+			{
+				int i_remap = ROUND(remap_image_sizes * i);
+				if (i_remap < XSIZE(remapped_sigma2_noise))
+					DIRECT_A1D_ELEM(remapped_sigma2_noise, i_remap) = DIRECT_A1D_ELEM(mymodel.sigma2_noise[group_id], i);
+			}
+
 			// Fill Fnoise with random numbers, use power spectrum of the noise for its variance
 			FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fnoise)
 			{
-				int ires = ROUND( remap_image_sizes * sqrt( (RFLOAT)(kp * kp + ip * ip + jp * jp) ) );
-				if (ires >= 0 && ires < XSIZE(mymodel.sigma2_noise[group_id]))
+				int ires = ROUND( sqrt( (RFLOAT)(kp * kp + ip * ip + jp * jp) ) );
+				if (ires >= 0)
 				{
-					RFLOAT sigma = sqrt(sigma2_fudge * DIRECT_A1D_ELEM(mymodel.sigma2_noise[group_id], ires));
+					RFLOAT sigma = sqrt(sigma2_fudge * DIRECT_A1D_ELEM(remapped_sigma2_noise, ires));
 					DIRECT_A3D_ELEM(Fnoise, k, i, j).real = rnd_gaus(0., sigma);
 					DIRECT_A3D_ELEM(Fnoise, k, i, j).imag = rnd_gaus(0., sigma);
 				}
@@ -5682,7 +5692,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 				exp_local_Minvsigma2[img_id].initZeros(YSIZE(Fimg), XSIZE(Fimg));
 
 			// Map from model_size sigma2_noise array to my_image_size
-			RFLOAT remap_image_sizes = (my_image_size * my_pixel_size) / (mymodel.ori_size * mymodel.pixel_size);
+			RFLOAT remap_image_sizes = (mymodel.ori_size * mymodel.pixel_size) / (my_image_size * my_pixel_size);
 			int *myMresol = (YSIZE(Fimg) == image_coarse_size[optics_group]) ? Mresol_coarse[optics_group].data : Mresol_fine[optics_group].data;
 			// With group_id and relevant size of Fimg, calculate inverse of sigma^2 for relevant parts of Mresol
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(exp_local_Minvsigma2[img_id])
