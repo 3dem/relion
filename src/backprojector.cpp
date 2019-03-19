@@ -1283,6 +1283,7 @@ void BackProjector::externalReconstruct(MultidimArray<RFLOAT> &vol_out,
 	// Read the resulting map back into memory
 	Iweight.read(fn_recons);
 	vol_out = Iweight();
+	vol_out.setXmippOrigin();
 
 }
 
@@ -1325,7 +1326,6 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 	int ReconS_23 = ReconTimer.setNew(" RcS23_tauShrinkToFit ");
 	int ReconS_24 = ReconTimer.setNew(" RcS24_extra ");
 #endif
-
 
     RCTIC(ReconTimer,ReconS_1);
     FourierTransformer transformer;
@@ -1387,10 +1387,11 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 					// Calculate inverse of tau2
 					invtau2 = 1. / (oversampling_correction * tau2_fudge * DIRECT_A1D_ELEM(tau2, ires));
 				}
-				else if (DIRECT_A1D_ELEM(tau2, ires) == 0.)
+				else if (DIRECT_A1D_ELEM(tau2, ires) < 1e-20)
 				{
 					// If tau2 is zero, use small value instead
-					invtau2 = 1./ ( 0.001 * invw);
+					if (invw > 1e-20) invtau2 = 1./ ( 0.001 * invw);
+					else invtau2 = 0.;
 				}
 				else
 				{
