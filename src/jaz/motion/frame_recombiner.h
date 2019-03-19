@@ -91,7 +91,7 @@ class FrameRecombiner
 
         std::vector<Image<RFLOAT>> weightsFromFCC(
 				const std::vector<MetaDataTable>& allMdts,
-				int s, double angpix);
+				int s, double angpix, std::string og_name);
 		
         std::vector<Image<RFLOAT>> weightsFromBfacs(
 				const std::vector<MetaDataTable>& allMdts,

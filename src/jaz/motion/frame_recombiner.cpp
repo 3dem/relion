@@ -137,16 +137,18 @@ void FrameRecombiner::init(
 			
 			
 	*/
-	
+
 	const int nog = obsModel->numberOfOpticsGroups();
-	
+
 	s_out.resize(nog);
 	sh_out.resize(nog);
 	angpix_out.resize(nog);			
 	freqWeights.resize(nog);
-	
+
 	const double angpix_mov = micrographHandler->movie_angpix;
-	
+
+	// The optics group is used only to account for different pixel sizes.
+	// Dose weighting uses information from all optics groups.
 	for (int og = 0; og < nog; og++)
 	{
 		int s_mov;
@@ -184,10 +186,12 @@ void FrameRecombiner::init(
 	
 		// Either calculate weights from FCC or from user-provided B-factors
 		const bool hasBfacs = bfacFn != "";
-	
+		std::stringstream sts;
+		sts << "optics-group-" << (og + 1);
+
 		if (!hasBfacs)
 		{
-			freqWeights[og] = weightsFromFCC(allMdts, s_out[og], angpix_out[og]);
+			freqWeights[og] = weightsFromFCC(allMdts, s_out[og], angpix_out[og], sts.str());
 		}
 		else
 		{
@@ -319,7 +323,7 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 
 std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromFCC(
         const std::vector<MetaDataTable>& allMdts,
-		int s, double angpix)
+		int s, double angpix, std::string og_name)
 {
     if (debug && verb > 0)
     {
@@ -405,7 +409,7 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromFCC(
 
     if (verb > 0)
     {
-        std::cout << " + Fitting B/k-factors between " << k0 << " and " << k1 << " pixels, or "
+        std::cout << " + Fitting B/k-factors for " << og_name << " using FCCs from all particles between " << k0 << " and " << k1 << " pixels, or "
                   << k0a << " and " << k1a << " Angstrom ..." << std::endl;
     }
 
