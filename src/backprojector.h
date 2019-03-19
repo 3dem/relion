@@ -281,12 +281,6 @@ public:
                                                      const MultidimArray<Complex>& avg2,
                                                      MultidimArray<RFLOAT>& fsc) const;
 
-	void writeDataWeightAndTau2ToDisk(FileName fn_root,
-			MultidimArray<RFLOAT> &tau2,
-			bool update_tau2_with_fsc,
-			const MultidimArray<RFLOAT> &fsc);
-
-
 	void updateSSNRarrays(RFLOAT tau2_fudge,
             MultidimArray<RFLOAT> &tau2_io,
             MultidimArray<RFLOAT> &sigma2_out,

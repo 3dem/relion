@@ -1043,17 +1043,6 @@ void BackProjector::calculateDownSampledFourierShellCorrelation(const MultidimAr
     fsc(0) = 1.;
 }
 
-void BackProjector::writeDataWeightAndTau2ToDisk(FileName fn_root,
-											 MultidimArray<RFLOAT> &tau2,
-											 bool update_tau2_with_fsc,
-											 const MultidimArray<RFLOAT> &fsc)
-{
-
-
-
-
-}
-
 void BackProjector::updateSSNRarrays(RFLOAT tau2_fudge,
         MultidimArray<RFLOAT> &tau2_io,
         MultidimArray<RFLOAT> &sigma2_out,
