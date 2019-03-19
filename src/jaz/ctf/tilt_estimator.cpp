@@ -138,7 +138,7 @@ void TiltEstimator::processMicrograph(
 		
 		Image<Complex> xyAccSum(sh[og], s[og]);
 		Image<RFLOAT> wAccSum(sh[og], s[og]);
-			
+
 		for (int threadnum = 0; threadnum < nr_omp_threads; threadnum++)
 		{
 			ImageOp::linearCombination(xyAccSum, xyAcc[threadnum], 1.0, 1.0, xyAccSum);
@@ -174,8 +174,9 @@ void TiltEstimator::parametricFit(
 	const int gc = mdts.size();	
 	const int ogc = obsModel->numberOfOpticsGroups();
 	
-	std::vector<bool> groupUsed(ogc,false);
+	std::vector<bool> groupUsed(ogc, false);
 	
+	#pragma omp parallel for num_threads(nr_omp_threads)
 	for (int og = 0; og < ogc; og++)
 	{	
 		double Cs = obsModel->getSphericalAberration(og);
@@ -289,9 +290,12 @@ void TiltEstimator::parametricFit(
 			ImageLog::write(fitFull, outPath+"beamtilt_delta-phase_iter-fit_optics-group_"+ogstr);
 			ColorHelper::writeAngleToPNG(fitFull, 
 				outPath + "beamtilt_delta-phase_iter-fit_optics-group_"+ogstr);
-			
-			optOut.setValue(EMDL_IMAGE_BEAMTILT_X, tilt_x, og);
-			optOut.setValue(EMDL_IMAGE_BEAMTILT_Y, tilt_y, og);
+
+			#pragma omp critical
+			{
+				optOut.setValue(EMDL_IMAGE_BEAMTILT_X, tilt_x, og);
+				optOut.setValue(EMDL_IMAGE_BEAMTILT_Y, tilt_y, og);
+			}
 		}
 		else
 		{
@@ -335,10 +339,13 @@ void TiltEstimator::parametricFit(
 				outPath + "beamtilt_delta-phase_iter-fit_optics-group_"+ogstr+"_N-"+sts.str());
 			
 			TiltHelper::extractTilt(Zernike_coeffs_opt, tilt_x, tilt_y, Cs, lambda);
-						
-			optOut.setValue(EMDL_IMAGE_BEAMTILT_X, tilt_x, og);
-			optOut.setValue(EMDL_IMAGE_BEAMTILT_Y, tilt_y, og);
-			optOut.setValue(EMDL_IMAGE_ODD_ZERNIKE_COEFFS, Zernike_coeffs_opt, og);
+			
+			#pragma omp critical
+			{			
+				optOut.setValue(EMDL_IMAGE_BEAMTILT_X, tilt_x, og);
+				optOut.setValue(EMDL_IMAGE_BEAMTILT_Y, tilt_y, og);
+				optOut.setValue(EMDL_IMAGE_ODD_ZERNIKE_COEFFS, Zernike_coeffs_opt, og);
+			}
 		}
 	}
 }

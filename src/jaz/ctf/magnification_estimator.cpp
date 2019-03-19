@@ -155,7 +155,8 @@ void MagnificationEstimator::parametricFit(
 	                   && optOut.labelExists(EMDL_IMAGE_MAG_MATRIX_11);
 			
 	std::vector<Matrix2D<RFLOAT>> mat_by_optGroup(ogc);
-	
+
+	#pragma omp parallel for num_threads(nr_omp_threads)	
 	for (int og = 0; og < ogc; og++)
 	{
 		Volume<Equation2x2> magEqs(sh[og],s[og],1), magEqsG(sh[og],s[og],1);
@@ -233,10 +234,13 @@ void MagnificationEstimator::parametricFit(
 		Matrix2D<RFLOAT> mat0 = obsModel->getMagMatrix(og);
 		Matrix2D<RFLOAT> mat1 = mat * mat0;
 		
-		optOut.setValue(EMDL_IMAGE_MAG_MATRIX_00, mat1(0,0), og);
-		optOut.setValue(EMDL_IMAGE_MAG_MATRIX_01, mat1(0,1), og);
-		optOut.setValue(EMDL_IMAGE_MAG_MATRIX_10, mat1(1,0), og);
-		optOut.setValue(EMDL_IMAGE_MAG_MATRIX_11, mat1(1,1), og);
+		#pragma omp critical
+		{
+			optOut.setValue(EMDL_IMAGE_MAG_MATRIX_00, mat1(0,0), og);
+			optOut.setValue(EMDL_IMAGE_MAG_MATRIX_01, mat1(0,1), og);
+			optOut.setValue(EMDL_IMAGE_MAG_MATRIX_10, mat1(1,0), og);
+			optOut.setValue(EMDL_IMAGE_MAG_MATRIX_11, mat1(1,1), og);
+		}
 
 		obsModel->setMagMatrix(og, mat1);
 	}

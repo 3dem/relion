@@ -176,7 +176,8 @@ void AberrationEstimator::parametricFit(
 	const int ogc = obsModel->numberOfOpticsGroups();
 		
 	std::vector<bool> groupUsed(ogc,false);
-	
+
+	#pragma omp parallel for num_threads(nr_omp_threads)
 	for (int og = 0; og < ogc; og++)
 	{	
 		std::stringstream sts;
@@ -330,8 +331,10 @@ void AberrationEstimator::parametricFit(
 							+ogstr+"_N-"+sts.str());
 			
 			// extract Q0, Cs, defocus and astigmatism?
-			
-			optOut.setValue(EMDL_IMAGE_EVEN_ZERNIKE_COEFFS, Zernike_coeffs_opt, og);
+			#pragma omp critical
+			{
+				optOut.setValue(EMDL_IMAGE_EVEN_ZERNIKE_COEFFS, Zernike_coeffs_opt, og);
+			}
 		}
 	}
 }
