@@ -1726,6 +1726,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		if (mymodel.tau2_fudge_factor > 1. && verb > 0)
 		{
 			std::cerr << " WARNING: Using tau2_fudge of " <<mymodel.tau2_fudge_factor << ", which will lead to inflated resolution estimates during refinement." << std::endl;
+			std::cerr << " WARNING: This option will most likely lead to overfitting and therefore difficult to interpret maps: proceed with caution and know the risks!" << std::endl;
 			std::cerr << " WARNING: You have to run postprocessing afterwards to get a reliable, gold-standard resolution estimate! " << std::endl;
 		}
 
@@ -4597,19 +4598,22 @@ void MlOptimiser::updateImageSizeAndResolutionPointers()
 	{
 
 		RFLOAT my_pixel_size = mydata.getOpticsPixelSize(optics_group);
+		int my_image_size = mydata.getOpticsImageSize(optics_group);
+		RFLOAT remap_sizes = (my_pixel_size * my_image_size) / (mymodel.pixel_size * mymodel.ori_size);
 
-		image_full_size[optics_group] = mydata.getOpticsImageSize(optics_group);
+		image_full_size[optics_group] = my_image_size;
+		// Remap from model size to mysize, and keep even!
+		image_current_size[optics_group] = 2 * CEIL(0.5 * remap_sizes * mymodel.current_size);
 		// Current size can never become bigger than original image size for this optics_group!
-		image_current_size[optics_group] = XMIPP_MIN(image_full_size[optics_group], ROUND((RFLOAT)(mymodel.current_size) * (mymodel.pixel_size / my_pixel_size)));
+		image_current_size[optics_group] = XMIPP_MIN(my_image_size, image_current_size[optics_group]);
 
-		// This is no longer the strictly the same resolution for all optics groups.... Not used much anyway...
-		int my_max_coarse_size = (max_coarse_size > 0) ?  max_coarse_size : image_full_size[optics_group];
+		int my_max_coarse_size = (max_coarse_size > 0) ?  remap_sizes * max_coarse_size : image_full_size[optics_group];
 
 		// Update coarse_size
 		if (strict_highres_exp > 0.)
 		{
 			// Strictly limit the coarse size to the one corresponding to strict_highres_exp
-			image_coarse_size[optics_group] = 2 * ROUND((RFLOAT)(image_full_size[optics_group]) * (my_pixel_size / strict_highres_exp));
+			image_coarse_size[optics_group] = 2 * ROUND((RFLOAT)(remap_sizes * mymodel.ori_size * mymodel.pixel_size / strict_highres_exp));
 		}
 		else if (adaptive_oversampling > 0.)
 		{
@@ -4618,7 +4622,7 @@ void MlOptimiser::updateImageSizeAndResolutionPointers()
 			RFLOAT keepsafe_factor = (mymodel.ref_dim == 3) ? 1.2 : 1.5;
 			RFLOAT coarse_resolution = rotated_distance / keepsafe_factor;
 			// Note coarse_size should be even-valued!
-			image_coarse_size[optics_group] = 2 * CEIL(my_pixel_size * (RFLOAT)(image_full_size[optics_group]) / coarse_resolution);
+			image_coarse_size[optics_group] = 2 * CEIL(remap_sizes * mymodel.pixel_size * mymodel.ori_size / coarse_resolution);
 			// Coarse size can never be larger than max_coarse_size
 			image_coarse_size[optics_group] = XMIPP_MIN(my_max_coarse_size, image_coarse_size[optics_group]);
 		}
@@ -4631,7 +4635,6 @@ void MlOptimiser::updateImageSizeAndResolutionPointers()
 		image_coarse_size[optics_group] = XMIPP_MIN(image_current_size[optics_group], image_coarse_size[optics_group]);
 
 		/// Also update the resolution pointers here
-
 		if (mymodel.data_dim == 3)
 			Mresol_fine[optics_group].resize(image_current_size[optics_group], image_current_size[optics_group], (image_current_size[optics_group] / 2 + 1));
 		else
@@ -6236,9 +6239,11 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 											// Store all diff2 in exp_Mweight
 											long int ihidden_over = sampling.getPositionOversampledSamplingPoint(ihidden, exp_current_oversampling,
 																											iover_rot, iover_trans);
+//#define DEBUG_GETALLDIFF2
 #ifdef DEBUG_GETALLDIFF2
 											pthread_mutex_lock(&global_mutex);
-											if (ibody==1 && part_id == 0 && exp_ipass==0 && ihidden_over == 40217)
+											if (itrans == exp_itrans_min && iover_trans == 0 && ipsi == exp_ipsi_min)
+											//if (ibody==1 && part_id == 0 && exp_ipass==0 && ihidden_over == 40217)
 											{
 												//std::cerr << " iover_rot= "<<iover_rot << "exp_nr_oversampled_rot= " << exp_nr_oversampled_rot << " oversampled_rot[iover_rot]= " << oversampled_rot[iover_rot]
 												//		  << " oversampled_tilt[iover_rot]= " << oversampled_tilt[iover_rot]
@@ -6252,10 +6257,10 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 														// non-oversampling correct only!!
 														<< " x= " << oversampled_translations_x[0] << " y=" << oversampled_translations_y[0];
 												//std::cerr << " A= " << A << std::endl;
-												Euler_matrix2angles(Abody, rrot,ttilt,ppsi);
-												std::cerr << " Brot= " << rrot
-														<< " Btilt= " << ttilt
-														<< " Bpsi= " << ppsi << std::endl;
+												//Euler_matrix2angles(Abody, rrot,ttilt,ppsi);
+												//std::cerr << " Brot= " << rrot
+												//		<< " Btilt= " << ttilt
+												//		<< " Bpsi= " << ppsi << std::endl;
 
 												FourierTransformer transformer;
 												MultidimArray<Complex> Fish;
@@ -6280,13 +6285,14 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 													tt().resize(exp_current_image_size, exp_current_image_size);
 												transformer.inverseFourierTransform(Fish, tt());
 												CenterFFT(tt(),false);
-												FileName fnt;
-												fnt.compose("Fimg_shift1_i", ihidden_over, "spi");
+												FileName fnt = "Fimg.spi";
+												//fnt.compose("Fimg_shift1_i", ihidden_over, "spi");
 												tt.write(fnt);
 
 												transformer.inverseFourierTransform(Frefctf, tt());
 												CenterFFT(tt(),false);
-												fnt.compose("Fref1_i", ihidden_over, "spi");
+												fnt="Fref.spi";
+												//fnt.compose("Fref1_i", ihidden_over, "spi");
 												tt.write(fnt);
 
 
@@ -6304,7 +6310,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 												//std::cerr << "Written Fimg_shift.spi and Fref.spi. Press any key to continue... part_id= " << part_id<< std::endl;
 												char c;
 												std::cin >> c;
-												exit(0);
+												//exit(0);
 											}
 											pthread_mutex_unlock(&global_mutex);
 
