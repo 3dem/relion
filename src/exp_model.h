@@ -376,7 +376,7 @@ public:
 	// Also checks how much free space there is on the scratch dir
 	bool prepareScratchDirectory(FileName _fn_scratch, FileName fn_lock = "");
 
-	void setScratchDirectory(FileName _fn_scratch, bool do_reuse_scratch);
+	void setScratchDirectory(FileName _fn_scratch, bool do_reuse_scratch, int verb=0);
 
 	// Wipe the generic scratch directory clean
 	void deleteDataOnScratch();

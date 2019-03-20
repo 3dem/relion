@@ -636,7 +636,7 @@ void MlOptimiserMpi::initialiseWorkLoad()
 	// Now copy particle stacks to scratch if needed
     if (fn_scratch != "" && !do_preread_images)
     {
-		mydata.setScratchDirectory(fn_scratch, do_reuse_scratch);
+		mydata.setScratchDirectory(fn_scratch, do_reuse_scratch, verb);
 
 		if (!do_reuse_scratch)
 		{

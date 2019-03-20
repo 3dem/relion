@@ -488,7 +488,7 @@ bool Experiment::getImageNameOnScratch(long int part_id, int img_id, FileName &f
 
 }
 
-void Experiment::setScratchDirectory(FileName _fn_scratch, bool do_reuse_scratch)
+void Experiment::setScratchDirectory(FileName _fn_scratch, bool do_reuse_scratch, int verb)
 {
 	// Make sure fn_scratch ends with a slash
 	if (_fn_scratch[_fn_scratch.length()-1] != '/')
@@ -511,10 +511,14 @@ void Experiment::setScratchDirectory(FileName _fn_scratch, bool do_reuse_scratch
 			else
 			{
 				FileName fn_tmp = fn_scratch + "opticsgroup" + integerToString(optics_group+1) + "_particles.mrcs";
-				Image<RFLOAT> Itmp;
-				Itmp.read(fn_tmp, false);
-				nr_parts_on_scratch[optics_group] = NSIZE(Itmp());
-				std::cerr << " optics_group= " << optics_group << " nr_parts_on_scratch[optics_group]= " << nr_parts_on_scratch[optics_group] << std::endl;
+				if (exists(fn_tmp))
+				{
+					Image<RFLOAT> Itmp;
+					Itmp.read(fn_tmp, false);
+					nr_parts_on_scratch[optics_group] = NSIZE(Itmp());
+				}
+				if (verb > 0)
+					std::cerr << " optics_group= " << (optics_group + 1) << " nr_parts_on_scratch[optics_group]= " << nr_parts_on_scratch[optics_group] << std::endl;
 			}
 		}
 	}
