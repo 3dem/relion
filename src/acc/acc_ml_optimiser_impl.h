@@ -332,10 +332,23 @@ void getFourierTransformsAndCtfs(long int part_id,
                 XFLOAT temp_sigmaFudgeFactor = baseMLO->sigma2_fudge;
                 int seed(baseMLO->random_seed + part_id);
 
+
+    			// Remap mymodel.sigma2_noise[group_id] onto remapped_sigma2_noise for this images's size and angpix
+    			MultidimArray<RFLOAT > remapped_sigma2_noise;
+    			remapped_sigma2_noise.initZeros(XSIZE(img())/2+1);
+    			RFLOAT remap_image_sizes = (baseMLO->image_full_size[optics_group] * my_pixel_size) / (baseMLO->mymodel.ori_size * baseMLO->mymodel.pixel_size);
+    			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(baseMLO->mymodel.sigma2_noise[group_id])
+    			{
+    				int i_remap = ROUND(remap_image_sizes * i);
+    				if (i_remap < XSIZE(remapped_sigma2_noise))
+    					DIRECT_A1D_ELEM(remapped_sigma2_noise, i_remap) = DIRECT_A1D_ELEM(baseMLO->mymodel.sigma2_noise[group_id], i);
+    			}
+
+
                 LAUNCH_PRIVATE_ERROR(cudaGetLastError(),accMLO->errorStatus);
                 // construct the noise-image
                 AccUtilities::makeNoiseImage<MlClass>(	temp_sigmaFudgeFactor,
-                								baseMLO->mymodel.sigma2_noise[group_id],
+                								remapped_sigma2_noise,
 												seed,
 												accMLO,
 												RandomImage,

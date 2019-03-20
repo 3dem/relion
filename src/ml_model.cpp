@@ -830,7 +830,9 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experimen
 
 	if (fn_ref != "None")
 	{
+		// SHWS 20mar19: the below is no longer necessary with the debugged code
 
+		/*
 		// The reference should be at the highest resolution of the input images
 		if (fabs(pixel_size - smallest_pixel_size) > 0.001)
 		{
@@ -892,6 +894,7 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experimen
 			}
 
 		}
+		*/
 
 	}
 	else

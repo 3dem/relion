@@ -672,10 +672,10 @@ class reconstruct_parameters
 
 				std::cout << " + Starting the reconstruction ..." << std::endl;
 
-				backprojector[j]->reconstruct(
-					vol(), grid_iters, do_map, 1., dummy, dummy, dummy, dummy,
-					fsc, 1., do_use_fsc, true, nr_omp_threads, -1, false, false,
-					writeWeights? &weightOut : 0);
+				MultidimArray<RFLOAT> tau2;
+				if (do_use_fsc) backprojector[j]->updateSSNRarrays(1., tau2, dummy, dummy, dummy, fsc, do_use_fsc, true);
+				backprojector[j]->reconstruct(vol(), grid_iters, do_map, tau2,
+						1., 1., -1, false, writeWeights? &weightOut : 0);
 
 				if (writeWeights)
 				{

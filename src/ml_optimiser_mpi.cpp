@@ -2027,18 +2027,52 @@ void MlOptimiserMpi::maximization()
 
 						if(do_sgd) Iref_old = mymodel.Iref[ith_recons];
 
+						(wsum_model.BPref[ith_recons]).updateSSNRarrays(mymodel.tau2_fudge_factor,
+								mymodel.tau2_class[ith_recons],
+								mymodel.sigma2_class[ith_recons],
+								mymodel.data_vs_prior_class[ith_recons],
+								mymodel.fourier_coverage_class[ith_recons],
+								mymodel.fsc_halves_class[ibody],
+								do_split_random_halves,
+								(do_join_random_halves || do_always_join_random_halves));
+
 #ifdef TIMING
-						(wsum_model.BPref[ith_recons]).reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
-								mymodel.tau2_fudge_factor, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
-								mymodel.data_vs_prior_class[ith_recons], mymodel.fourier_coverage_class[ith_recons],
-								mymodel.fsc_halves_class[ibody], wsum_model.pdf_class[iclass],
-								do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map, &timer, do_fsc0999);
+						(wsum_model.BPref[ith_recons]).reconstruct(mymodel.Iref[ith_recons],
+								gridding_nr_iter,
+								do_map,
+								mymodel.tau2_class[ith_recons],
+								mymodel.tau2_fudge_factor,
+								wsum_model.pdf_class[iclass],
+								minres_map,
+								false,
+								&timer);
 #else
-						(wsum_model.BPref[ith_recons]).reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
-								mymodel.tau2_fudge_factor, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
-								mymodel.data_vs_prior_class[ith_recons], mymodel.fourier_coverage_class[ith_recons],
-								mymodel.fsc_halves_class[ibody], wsum_model.pdf_class[iclass],
-								do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map, false, do_fsc0999);
+
+						if (do_external_reconstruct)
+						{
+							FileName fn_ext_root;
+							if (iter > -1) fn_ext_root.compose(fn_out+"_it", iter, "", 3);
+							else fn_ext_root = fn_out;
+							if (do_split_random_halves && !do_join_random_halves) fn_ext_root += "_half1";
+							if (mymodel.nr_bodies > 1) fn_ext_root.compose(fn_ext_root+"_body", ibody+1, "", 3);
+							else fn_ext_root.compose(fn_ext_root+"_class", iclass+1, "", 3);
+							(wsum_model.BPref[iclass]).externalReconstruct(mymodel.Iref[ith_recons],
+									fn_ext_root,
+									mymodel.tau2_class[ith_recons],
+									mymodel.tau2_fudge_factor,
+									node->rank==1); // only first slaves is verbose
+						}
+						else
+						{
+							(wsum_model.BPref[ith_recons]).reconstruct(mymodel.Iref[ith_recons],
+								gridding_nr_iter,
+								do_map,
+								mymodel.tau2_class[ith_recons],
+								mymodel.tau2_fudge_factor,
+								wsum_model.pdf_class[iclass],
+								minres_map,
+								false);
+						}
 #endif
 						if(do_sgd)
 						{
@@ -2152,11 +2186,40 @@ void MlOptimiserMpi::maximization()
 								Iref_old = mymodel.Iref[ith_recons];
 							}
 
-							(wsum_model.BPref[ith_recons]).reconstruct(mymodel.Iref[ith_recons], gridding_nr_iter, do_map,
-									mymodel.tau2_fudge_factor, mymodel.tau2_class[ith_recons], mymodel.sigma2_class[ith_recons],
-									mymodel.data_vs_prior_class[ith_recons], mymodel.fourier_coverage_class[ith_recons],
-									mymodel.fsc_halves_class[ibody], wsum_model.pdf_class[iclass],
-									do_split_random_halves, (do_join_random_halves || do_always_join_random_halves), nr_threads, minres_map, false, do_fsc0999);
+
+							(wsum_model.BPref[ith_recons]).updateSSNRarrays(mymodel.tau2_fudge_factor,
+									mymodel.tau2_class[ith_recons],
+									mymodel.sigma2_class[ith_recons],
+									mymodel.data_vs_prior_class[ith_recons],
+									mymodel.fourier_coverage_class[ith_recons],
+									mymodel.fsc_halves_class[ibody],
+									do_split_random_halves,
+									(do_join_random_halves || do_always_join_random_halves));
+
+							if (do_external_reconstruct)
+							{
+								FileName fn_ext_root;
+								if (iter > -1) fn_ext_root.compose(fn_out+"_it", iter, "", 3);
+								else fn_ext_root = fn_out;
+								if (do_split_random_halves && !do_join_random_halves) fn_ext_root += "_half2";
+								if (mymodel.nr_bodies > 1) fn_ext_root.compose(fn_ext_root+"_body", ibody+1, "", 3);
+								else fn_ext_root.compose(fn_ext_root+"_class", iclass+1, "", 3);
+								(wsum_model.BPref[iclass]).externalReconstruct(mymodel.Iref[ith_recons],
+										fn_ext_root,
+										mymodel.tau2_class[ith_recons],
+										mymodel.tau2_fudge_factor);
+							}
+							else
+							{
+								(wsum_model.BPref[ith_recons]).reconstruct(mymodel.Iref[ith_recons],
+										gridding_nr_iter,
+										do_map,
+										mymodel.tau2_class[ith_recons],
+										mymodel.tau2_fudge_factor,
+										wsum_model.pdf_class[iclass],
+										minres_map,
+										false);
+							}
 
 							if (do_sgd)
 							{
@@ -2597,7 +2660,7 @@ void MlOptimiserMpi::reconstructUnregularisedMapAndCalculateSolventCorrectedFSC(
 
 			BackProjector BPextra(wsum_model.BPref[ibody]);
 
-			BPextra.reconstruct(Iunreg(), gridding_nr_iter, false, 1., dummy, dummy, dummy, dummy, dummy, 1., false, true, nr_threads, -1, false, do_fsc0999);
+			BPextra.reconstruct(Iunreg(), gridding_nr_iter, false, dummy);
 
 			if (mymodel.nr_bodies > 1)
 			{
@@ -2853,7 +2916,7 @@ void MlOptimiserMpi::readTemporaryDataAndWeightArraysAndReconstruct(int iclass, 
 	}
 
 	// Now perform the unregularized reconstruction
-	wsum_model.BPref[iclass].reconstruct(Iunreg(), gridding_nr_iter, false, 1., dummy, dummy, dummy, dummy, dummy, 1., false, true, nr_threads, -1, false, do_fsc0999);
+	wsum_model.BPref[iclass].reconstruct(Iunreg(), gridding_nr_iter, false, dummy);
 
 	if (mymodel.nr_bodies > 1)
 	{

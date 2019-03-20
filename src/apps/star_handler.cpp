@@ -396,7 +396,7 @@ class star_handler_parameters
 
 					if (is_uniq)
 					{
-						std::cerr << " + WARNING: adding new optics_group with name: " << myname << std::endl;
+						std::cout << " + Adding new optics_group with name: " << myname << std::endl;
 
 						optics_group_uniq_names.push_back(myname);
 						// Add the line to the global obsModel
@@ -404,10 +404,15 @@ class star_handler_parameters
 					}
 					else
 					{
-						std::cerr << " + WARNING: joining optics_groups with the same name: " << myname << std::endl;
+						std::cout << " + Joining optics_groups with the same name: " << myname << std::endl;
+						std::cerr << " + WARNING: if these are different data sets, you might want to rename optics groups instead of joining them!" << std::endl;
+						std::cerr << " + WARNING: if so, manually edit the rlnOpticsGroupName column in the optics_groups table of your input STAR files." << std::endl;
 					}
 
-					std::cerr << "   Renumbering this group from " << my_optics_group << " to " << new_group << std::endl;
+					if (my_optics_group != new_group)
+					{
+						std::cout << " + Renumbering group " << myname << " from " << my_optics_group << " to " << new_group << std::endl;
+					}
 
 					// Update the optics_group entry for all particles in the MDsin
 					for (long int current_object2 = MDsin[MDs_id].firstObject();

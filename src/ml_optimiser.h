@@ -417,6 +417,9 @@ public:
     /** Name of the multiple symmetry groups */
     std::vector<FileName> fn_multi_sym;
 
+    /** Perform reconstruction outside of relion_refine, e.g. for learned priors */
+    bool do_external_reconstruct;
+
 	/* Flag whether to use the Adaptive approach as by Tagare et al (2010) J. Struc. Biol.
 	 * where two passes through the integrations are made: a first one with a coarse angular sampling and
 	 * smaller images and a second one with finer angular sampling and larger images
@@ -518,9 +521,6 @@ public:
 
 	// Skip gridding in reconstruction
 	bool skip_gridding;
-
-	// Use do_fsc0999 in reconstructions for unfil.mrc maps
-	bool do_fsc0999;
 
 	// Number of iterations for gridding preweighting reconstruction
 	int gridding_nr_iter;

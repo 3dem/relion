@@ -283,10 +283,15 @@ enum EMDLabel
 	EMDL_OPTIMISER_DO_CORRECT_MAGNIFICATION,
 	EMDL_OPTIMISER_DO_CORRECT_NORM,
 	EMDL_OPTIMISER_DO_CORRECT_SCALE,
+	EMDL_OPTIMISER_DO_EXTERNAL_RECONSTRUCT,
 	EMDL_OPTIMISER_DO_REALIGN_MOVIES,
 	EMDL_OPTIMISER_DO_MAP,
 	EMDL_OPTIMISER_DO_SGD,
 	EMDL_OPTIMISER_DO_STOCHASTIC_EM,
+	EMDL_OPTIMISER_EXTERNAL_RECONS_DATA_REAL,
+	EMDL_OPTIMISER_EXTERNAL_RECONS_DATA_IMAG,
+	EMDL_OPTIMISER_EXTERNAL_RECONS_WEIGHT,
+	EMDL_OPTIMISER_EXTERNAL_RECONS_RESULT,
 	EMDL_OPTIMISER_FAST_SUBSETS,
 	EMDL_OPTIMISER_SGD_INI_ITER,
 	EMDL_OPTIMISER_SGD_FIN_ITER,
@@ -768,10 +773,15 @@ private:
 		EMDL::addLabel(EMDL_OPTIMISER_DO_CORRECT_MAGNIFICATION, EMDL_BOOL, "rlnDoCorrectMagnification", "Flag to indicate that (per-group) magnification correction should be performed");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_CORRECT_NORM, EMDL_BOOL, "rlnDoCorrectNorm", "Flag to indicate that (per-image) normalisation-error correction should be performed");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_CORRECT_SCALE, EMDL_BOOL, "rlnDoCorrectScale", "Flag to indicate that internal (per-group) intensity-scale correction should be performed");
+		EMDL::addLabel(EMDL_OPTIMISER_DO_EXTERNAL_RECONSTRUCT, EMDL_BOOL, "rlnDoExternalReconstruct", "Flag to indicate that the reconstruction will be performed outside relion_refine, e.g. for learned priors");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_REALIGN_MOVIES, EMDL_BOOL, "rlnDoRealignMovies", "Flag to indicate that individual frames of movies are being re-aligned");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_MAP, EMDL_BOOL, "rlnDoMapEstimation", "Flag to indicate that MAP estimation should be performed (otherwise ML estimation)");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_SGD, EMDL_BOOL, "rlnDoStochasticGradientDescent", "Flag to indicate that SGD-optimisation should be performed (otherwise expectation maximisation)");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_STOCHASTIC_EM,EMDL_BOOL, "rlnDoStochasticEM", "Flag to indicate that stochastic EM-optimisation should be performed (an alternative to SGD)");
+		EMDL::addLabel(EMDL_OPTIMISER_EXTERNAL_RECONS_DATA_REAL, EMDL_STRING, "rlnExtReconsDataReal", "Name of the map with the real components of the input data array for the external reconstruction program");
+		EMDL::addLabel(EMDL_OPTIMISER_EXTERNAL_RECONS_DATA_IMAG, EMDL_STRING, "rlnExtReconsDataImag", "Name of the map with the imaginary components of the input data array for the external reconstruction program");
+		EMDL::addLabel(EMDL_OPTIMISER_EXTERNAL_RECONS_WEIGHT, EMDL_STRING, "rlnExtReconsWeight", "Name of the map with the input weight array for the external reconstruction program");
+		EMDL::addLabel(EMDL_OPTIMISER_EXTERNAL_RECONS_RESULT, EMDL_STRING, "rlnExtReconsResult", "Name of the output reconstruction from the external reconstruction program");
 		EMDL::addLabel(EMDL_OPTIMISER_FAST_SUBSETS, EMDL_BOOL, "rlnDoFastSubsetOptimisation", "Use subsets of the data in the earlier iterations to speed up convergence");
 		EMDL::addLabel(EMDL_OPTIMISER_SGD_INI_ITER, EMDL_INT, "rlnSgdInitialIterations", "Number of initial SGD iterations (at rlnSgdInitialResolution and with rlnSgdInitialSubsetSize)");
 		EMDL::addLabel(EMDL_OPTIMISER_SGD_FIN_ITER, EMDL_INT, "rlnSgdFinalIterations", "Number of final SGD iterations (at rlnSgdFinalResolution and with rlnSgdFinalSubsetSize)");
