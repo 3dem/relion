@@ -50,7 +50,7 @@ public:
 	Image<RFLOAT> I1, I2, Im;
 
 	// Pixel size in Angstroms
-	RFLOAT angpix;
+	RFLOAT angpix, mtf_angpix;
 
 	/////// Masking
 

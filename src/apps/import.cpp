@@ -26,7 +26,7 @@
 class import_parameters
 {
 	public:
-   	FileName fn_in, fn_odir, fn_out;
+   	FileName fn_in, fn_odir, fn_out, fn_mtf;
 	bool do_write_types, do_continue, do_movies, do_micrographs, do_coordinates, do_halfmaps, do_particles, do_other;
    	std::string optics_group_name, node_type, particles_optics_group_name;
    	RFLOAT kV, Cs, Q0, beamtilt_x, beamtilt_y, pixel_size;
@@ -58,6 +58,7 @@ class import_parameters
 
 		int mic_section = parser.addSection("Specific options for movies or micrographs");
 		optics_group_name = parser.getOption("--optics_group_name", "Name for this optics group", "opticsGroup1");
+		fn_mtf = parser.getOption("--optics_group_mtf", "Name for this optics group's MTF", "");
 		pixel_size = textToFloat(parser.getOption("--angpix", "Pixel size (Angstrom)", "1.0"));
 		kV = textToFloat(parser.getOption("--kV", "Voltage (kV)", "300"));
 		Cs = textToFloat(parser.getOption("--Cs", "Spherical aberration (mm)", "2.7"));
@@ -135,6 +136,7 @@ class import_parameters
 				MDopt.addObject();
 				MDopt.setValue(EMDL_IMAGE_OPTICS_GROUP_NAME, optics_group_name);
 				MDopt.setValue(EMDL_IMAGE_OPTICS_GROUP, optics_group_number);
+				if (fn_mtf != "") MDopt.setValue(EMDL_IMAGE_MTF_FILENAME, fn_mtf);
 				MDopt.setValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, pixel_size);
 				MDopt.setValue(EMDL_CTF_VOLTAGE, kV);
 				MDopt.setValue(EMDL_CTF_CS, Cs);

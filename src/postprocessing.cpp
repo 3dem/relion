@@ -30,6 +30,7 @@ void Postprocessing::read(int argc, char **argv)
 	fn_out = parser.getOption("--o", "Output rootname", "postprocess");
 	angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms"));
 	write_halfmaps = parser.checkOption("--half_maps", "Write post-processed half maps for validation");
+	mtf_angpix  = textToFloat(parser.getOption("--mtf_angpix", "Pixel size in the original micrographs/movies (in Angstroms)", "-1."));
 
 	int mask_section = parser.addSection("Masking options");
 	do_auto_mask = parser.checkOption("--auto_mask", "Perform automated masking, based on a density threshold");
@@ -88,6 +89,7 @@ void Postprocessing::clear()
 	fn_I1 = fn_I2 = "";
 	fn_out="postprocess";
 	angpix = 1.;
+	mtf_angpix = 1.;
 	do_auto_mask = false;
 	ini_mask_density_threshold = 0.02;
 	width_soft_mask_edge = 6.;
@@ -114,12 +116,20 @@ void Postprocessing::initialise()
 		if (!fn_I1.getTheOtherHalf(fn_I2))
 			REPORT_ERROR("The input filename does not contain 'half1' or 'half2'");
 	}
+
+	if (mtf_angpix < 0.)
+	{
+		if (verb > 0) std::cout << " + --mtf_angpix was not provided, assuming pixel size in raw micrographs is the same as in particles..." << std::endl;
+		mtf_angpix = angpix;
+	}
+
 	if (verb > 0)
 	{
 		std::cout <<"== Reading input half-reconstructions: " <<std::endl;
 		std::cout.width(35); std::cout << std::left <<"  + half1-map: "; std::cout << fn_I1 << std::endl;
 		std::cout.width(35); std::cout << std::left <<"  + half2-map: "; std::cout << fn_I2 << std::endl;
 	}
+
 
 	I1.read(fn_I1);
 	I2.read(fn_I2);
@@ -247,10 +257,12 @@ void Postprocessing::divideByMtf(MultidimArray<Complex > &FT)
 		mtf_resol.resize(MDmtf.numberOfObjects());
 		mtf_value.resize(mtf_resol);
 
+		RFLOAT resol_inv_pixel;
 		int i =0;
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDmtf)
 		{
-			MDmtf.getValue(EMDL_RESOLUTION_INVPIXEL, DIRECT_A1D_ELEM(mtf_resol, i) ); // resolution needs to be given in 1/pix
+			MDmtf.getValue(EMDL_RESOLUTION_INVPIXEL, resol_inv_pixel);
+			DIRECT_A1D_ELEM(mtf_resol, i) = resol_inv_pixel/mtf_angpix; // resolution needs to be given in 1/Ang
 			MDmtf.getValue(EMDL_POSTPROCESS_MTF_VALUE, DIRECT_A1D_ELEM(mtf_value, i) );
 			if (DIRECT_A1D_ELEM(mtf_value, i) < 1e-10)
 			{
@@ -260,12 +272,15 @@ void Postprocessing::divideByMtf(MultidimArray<Complex > &FT)
 			i++;
 		}
 
-		RFLOAT xsize = (RFLOAT)XSIZE(I1());
+
+
+
+		RFLOAT xsize_ang = angpix * XSIZE(I1());
 		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT)
 		{
 			int r2 = kp * kp + ip * ip + jp * jp;
-			RFLOAT res = sqrt((RFLOAT)r2)/xsize; // get resolution in 1/pixel
-			if (res < 0.5 )
+			RFLOAT res = sqrt((RFLOAT)r2)/xsize_ang; // get resolution in 1/Ang
+			if (res < 1./(2.*angpix) )
 			{
 				// Find the suitable MTF value
 				int i_0 = 0;
@@ -1195,7 +1210,7 @@ void Postprocessing::run()
 			{
 				std::cerr << " WARNING: the unmasked FSC extends beyond the solvent-corrected FSC." << std::endl;
 			}
-			else 
+			else
 			{
 				std::cerr << " WARNING: the unmasked FSC extends beyond the solvent-corrected FSC. Skip masking for now, but you may want to adjust you mask!" << std::endl;
 				std::cerr << "          You can force the mask by the '--force_mask' option." << std::endl;

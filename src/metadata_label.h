@@ -116,6 +116,7 @@ enum EMDLabel
 	EMDL_IMAGE_DIMENSIONALITY,
 	EMDL_IMAGE_BEAMTILT_X,
 	EMDL_IMAGE_BEAMTILT_Y,
+	EMDL_IMAGE_MTF_FILENAME,
 	EMDL_IMAGE_OPTICS_GROUP,
 	EMDL_IMAGE_OPTICS_GROUP_NAME,
 	EMDL_IMAGE_ODD_ZERNIKE_COEFFS,
@@ -608,6 +609,7 @@ private:
 		EMDL::addLabel(EMDL_IMAGE_DIMENSIONALITY, EMDL_INT, "rlnImageDimensionality", "Dimensionality of data stored in an image (i.e. 2 or 3)");
 		EMDL::addLabel(EMDL_IMAGE_BEAMTILT_X, EMDL_DOUBLE, "rlnBeamTiltX", "Beam tilt in the X-direction (in mrad)");
 		EMDL::addLabel(EMDL_IMAGE_BEAMTILT_Y, EMDL_DOUBLE, "rlnBeamTiltY", "Beam tilt in the Y-direction (in mrad)");
+		EMDL::addLabel(EMDL_IMAGE_MTF_FILENAME, EMDL_STRING, "rlnMtfFileName", "The filename of a STAR file with the MTF for this optics group or image");
 		EMDL::addLabel(EMDL_IMAGE_OPTICS_GROUP, EMDL_INT, "rlnOpticsGroup", "Group of particles with identical optical properties");
 		EMDL::addLabel(EMDL_IMAGE_OPTICS_GROUP_NAME, EMDL_STRING, "rlnOpticsGroupName", "The name of a group of particles with identical optical properties");
 		EMDL::addLabel(EMDL_IMAGE_ODD_ZERNIKE_COEFFS, EMDL_DOUBLE_VECTOR, "rlnOddZernike", "Coefficients for the antisymmetrical Zernike polynomials");
