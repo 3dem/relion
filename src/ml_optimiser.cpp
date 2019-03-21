@@ -8348,14 +8348,16 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 							}
 						}
 
+						RFLOAT remap_image_sizes = (mymodel.ori_size * mymodel.pixel_size) / (image_full_size[optics_group] * my_pixel_size);
 						MultidimArray<int> * myMresol = (YSIZE(F1) == image_coarse_size[optics_group]) ? &Mresol_coarse[optics_group] : &Mresol_fine[optics_group];
 						my_snr = 0.;
 						FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F1)
 						{
 							int ires = DIRECT_MULTIDIM_ELEM(*myMresol, n);
-							if (ires > 0)
+							int ires_remapped = ROUND(remap_image_sizes * ires);
+							if (ires > 0 && ires_remapped < XSIZE(mymodel.sigma2_noise[group_id]))
 							{
-								my_snr += norm(DIRECT_MULTIDIM_ELEM(F1, n) - DIRECT_MULTIDIM_ELEM(F2, n)) / (2 * sigma2_fudge * mymodel.sigma2_noise[group_id](ires) );
+								my_snr += norm(DIRECT_MULTIDIM_ELEM(F1, n) - DIRECT_MULTIDIM_ELEM(F2, n)) / (2 * sigma2_fudge * mymodel.sigma2_noise[group_id](ires_remapped) );
 							}
 						}
 
@@ -8365,9 +8367,10 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 							FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F1)
 							{
 								int ires = DIRECT_MULTIDIM_ELEM(*myMresol, n);
-								if (ires > 0)
+								int ires_remapped = ROUND(remap_image_sizes * ires);
+								if (ires > 0 && ires_remapped < XSIZE(mymodel.sigma2_noise[group_id]))
 									mymodel.orientability_contrib[iclass](ires) +=
-											norm(DIRECT_MULTIDIM_ELEM(F1, n) - DIRECT_MULTIDIM_ELEM(F2, n)) / ( (2 * sigma2_fudge * mymodel.sigma2_noise[group_id](ires) ) );
+											norm(DIRECT_MULTIDIM_ELEM(F1, n) - DIRECT_MULTIDIM_ELEM(F2, n)) / ( (2 * sigma2_fudge * mymodel.sigma2_noise[group_id](ires_remapped) ) );
 							}
 						}
 
