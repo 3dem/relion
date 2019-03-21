@@ -8249,6 +8249,8 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 
 						// Get the FT of the first image
 						Euler_angles2matrix(rot1, tilt1, psi1, A1, false);
+						A1 = mydata.obsModel.applyAnisoMag(A1, optics_group);
+						A1 = mydata.obsModel.applyScaleDifference(A1, optics_group, mymodel.ori_size, mymodel.pixel_size);
 						(mymodel.PPref[iclass]).get2DFourierTransform(F1, A1);
 
 						// Apply the angular or shift error
@@ -8309,6 +8311,8 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 						{
 							// Get new rotated version of reference
 							Euler_angles2matrix(rot2, tilt2, psi2, A2, false);
+							A2 = mydata.obsModel.applyAnisoMag(A2, optics_group);
+							A2 = mydata.obsModel.applyScaleDifference(A2, optics_group, mymodel.ori_size, mymodel.pixel_size);
 							(mymodel.PPref[iclass]).get2DFourierTransform(F2, A2);
 						}
 						else
