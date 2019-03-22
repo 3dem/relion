@@ -5172,6 +5172,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 
 		// Here apply the aberration corrections if necessary
 		mydata.obsModel.demodulatePhase(optics_group, Fimg);
+		mydata.obsModel.divideByMtf(optics_group, Fimg);
 		exp_Fimg_nomask[img_id] = Fimg;
 
 		MultidimArray<RFLOAT> Mnoise;
@@ -5292,6 +5293,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 
 		// Also perform aberration correction on the masked image (which will be used for alignment)
 		mydata.obsModel.demodulatePhase(optics_group, Fimg);
+		mydata.obsModel.divideByMtf(optics_group, Fimg);
 
 		exp_Fimg[img_id] = Fimg;
 

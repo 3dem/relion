@@ -180,6 +180,9 @@ ObservationModel::ObservationModel(const MetaDataTable &_opticsMdt)
 			<< "rlnPixelSize, rlnVoltage and rlnSphericalAberration. Make sure to import older STAR files anew in version-3.1.");
 	}
 
+
+
+
 	// symmetrical high-order aberrations:
 	hasEvenZernike = opticsMdt.containsLabel(EMDL_IMAGE_EVEN_ZERNIKE_COEFFS);
 	evenZernikeCoeffs = std::vector<std::vector<double> >(
@@ -205,11 +208,26 @@ ObservationModel::ObservationModel(const MetaDataTable &_opticsMdt)
 
 	hasBoxSizes = opticsMdt.containsLabel(EMDL_IMAGE_SIZE);
 
+
+	if (opticsMdt.containsLabel(EMDL_IMAGE_MTF_FILENAME))
+	{
+		fnMtfs.resize(opticsMdt.numberOfObjects());
+		mtfImage = std::vector<std::map<int,Image<RFLOAT> > >(opticsMdt.numberOfObjects());
+	}
+	if (opticsMdt.containsLabel(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE))
+	{
+		originalAngpix.resize(opticsMdt.numberOfObjects());
+	}
+
 	for (int i = 0; i < opticsMdt.numberOfObjects(); i++)
 	{
 		if (!opticsMdt.getValue(EMDL_IMAGE_PIXEL_SIZE, angpix[i], i))
 			if (!opticsMdt.getValue(EMDL_MICROGRAPH_PIXEL_SIZE, angpix[i], i))
-				opticsMdt.getValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, angpix[i], i);;
+				opticsMdt.getValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, angpix[i], i);
+		if (opticsMdt.containsLabel(EMDL_IMAGE_MTF_FILENAME))
+			opticsMdt.getValue(EMDL_IMAGE_MTF_FILENAME, fnMtfs[i], i);
+		if (opticsMdt.containsLabel(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE))
+			opticsMdt.getValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, originalAngpix[i], i);
 		opticsMdt.getValue(EMDL_IMAGE_SIZE, boxSizes[i], i);
 
 		double kV;
@@ -401,6 +419,47 @@ Volume<t2Vector<Complex>> ObservationModel::predictComplexGradient(
 	}
 
 	return out;
+}
+
+void ObservationModel::divideByMtf(
+		const MetaDataTable& partMdt, long particle, MultidimArray<Complex>& obsImage,
+		bool do_multiply_instead)
+{
+	int opticsGroup;
+	partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, particle);
+	opticsGroup--;
+
+	divideByMtf(opticsGroup, obsImage, do_multiply_instead);
+}
+
+void ObservationModel::divideByMtf(
+		int opticsGroup, MultidimArray<Complex>& obsImage,
+		bool do_multiply_instead)
+{
+	const int s = obsImage.ydim;
+	const int sh = obsImage.xdim;
+
+	if (fnMtfs.size() > opticsGroup)
+	{
+		const Image<RFLOAT>& mtf = getMtfImage(opticsGroup, s);
+
+		if (do_multiply_instead)
+		{
+			for (int y = 0; y < s;  y++)
+			for (int x = 0; x < sh; x++)
+			{
+				obsImage(y,x) *= mtf(y,x);
+			}
+		}
+		else
+		{
+			for (int y = 0; y < s;  y++)
+			for (int x = 0; x < sh; x++)
+			{
+				obsImage(y,x) /= mtf(y,x);
+			}
+		}
+	}
 }
 
 void ObservationModel::demodulatePhase(
@@ -790,6 +849,84 @@ std::vector<std::pair<int, std::vector<int>>> ObservationModel::splitParticlesBy
 	}
 
 	return out;
+}
+
+const Image<RFLOAT>& ObservationModel::getMtfImage(int optGroup, int s)
+{
+	#pragma omp critical
+	{
+		if (mtfImage[optGroup].find(s) == mtfImage[optGroup].end())
+		{
+			if (mtfImage[optGroup].size() > 100)
+			{
+				std::cerr << "Warning: " << (mtfImage[optGroup].size()+1)
+						  << " mtf images in cache for the same ObservationModel." << std::endl;
+			}
+
+			MetaDataTable MDmtf;
+			MultidimArray<RFLOAT> mtf_resol, mtf_value;
+			MDmtf.read(fnMtfs[optGroup]);
+			mtf_resol.resize(MDmtf.numberOfObjects());
+			mtf_value.resize(mtf_resol);
+
+			RFLOAT resol_inv_pixel;
+			int i = 0;
+			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDmtf)
+			{
+				MDmtf.getValue(EMDL_RESOLUTION_INVPIXEL, resol_inv_pixel);
+				DIRECT_A1D_ELEM(mtf_resol, i) = resol_inv_pixel/originalAngpix[optGroup]; // resolution needs to be given in 1/Ang
+				MDmtf.getValue(EMDL_POSTPROCESS_MTF_VALUE, DIRECT_A1D_ELEM(mtf_value, i) );
+				if (DIRECT_A1D_ELEM(mtf_value, i) < 1e-10)
+				{
+					std::cerr << " i= " << i <<  " mtf_value[i]= " << DIRECT_A1D_ELEM(mtf_value, i) << std::endl;
+					REPORT_ERROR("ERROR: zero or negative values encountered in MTF curve: " + fnMtfs[optGroup]);
+				}
+				i++;
+			}
+
+			// Calculate slope of resolution (in 1/A) per element in the MTF array, in order to interpolate below
+			RFLOAT res_per_elem = (DIRECT_A1D_ELEM(mtf_resol, i-1) - DIRECT_A1D_ELEM(mtf_resol, 0)) / (RFLOAT)(i);
+			if (res_per_elem < 1e-10) REPORT_ERROR(" ERROR: the resolution in the MTF star file does not go up....");
+
+			const int sh = s/2 + 1;
+			mtfImage[optGroup][s] = Image<RFLOAT>(sh,s);
+			Image<RFLOAT>& img = mtfImage[optGroup][s];
+			const double as = angpix[optGroup] * boxSizes[optGroup];
+
+			for (int y = 0; y < s;  y++)
+			for (int x = 0; x < sh; x++)
+			{
+				const double xx = x/as;  // logical X-coordinate in 1/A
+				const double yy = y < sh? y/as : (y-s)/as; // logical Y-coordinate in 1/A
+
+				RFLOAT res = sqrt(xx*xx + yy*yy); // get resolution in 1/Ang
+				int i_0 = FLOOR(res / res_per_elem);
+				RFLOAT mtf;
+				// check boundaries of the array
+				if (i_0 >= MULTIDIM_SIZE(mtf_value) - 1)
+				{
+					mtf = DIRECT_A1D_ELEM(mtf_value,  MULTIDIM_SIZE(mtf_value) - 1);
+				}
+				else if (i_0 <= 0)
+				{
+					mtf = DIRECT_A1D_ELEM(mtf_value, 0);
+				}
+				else
+				{
+					// linear interpolation:
+					RFLOAT x_0 = DIRECT_A1D_ELEM(mtf_resol, i_0);
+					RFLOAT y_0 = DIRECT_A1D_ELEM(mtf_value, i_0);
+					RFLOAT x_1 = DIRECT_A1D_ELEM(mtf_resol, i_0 + 1);
+					RFLOAT y_1 = DIRECT_A1D_ELEM(mtf_value, i_0 + 1);
+					mtf = y_0 + (y_1 - y_0)*(res - x_0)/(x_1 - x_0);
+				}
+				img(y,x) = mtf;
+			}
+		}
+	}
+
+	return mtfImage[optGroup][s];
+
 }
 
 const Image<Complex>& ObservationModel::getPhaseCorrection(int optGroup, int s)

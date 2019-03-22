@@ -478,6 +478,7 @@ class reconstruct_parameters
 						}
 
 						obsModel.demodulatePhase(mdts[g], p, F2D);
+						obsModel.divideByMtf(mdts[g], p, F2D);
 
 						if (do_ewald)
 						{

@@ -272,8 +272,9 @@ void Postprocessing::divideByMtf(MultidimArray<Complex > &FT)
 			i++;
 		}
 
-
-
+		// Calculate slope of resolution (in 1/A) per element in the MTF array, in order to interpolate below
+		RFLOAT res_per_elem = (DIRECT_A1D_ELEM(mtf_resol, i-1) - DIRECT_A1D_ELEM(mtf_resol, 0)) / (RFLOAT)(i);
+		if (res_per_elem < 1e-10) REPORT_ERROR(" ERROR: the resolution in the MTF star file does not go up....");
 
 		RFLOAT xsize_ang = angpix * XSIZE(I1());
 		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT)
@@ -282,23 +283,19 @@ void Postprocessing::divideByMtf(MultidimArray<Complex > &FT)
 			RFLOAT res = sqrt((RFLOAT)r2)/xsize_ang; // get resolution in 1/Ang
 			if (res < 1./(2.*angpix) )
 			{
-				// Find the suitable MTF value
-				int i_0 = 0;
-				for (int ii = 0; ii < XSIZE(mtf_resol); ii++)
-				{
-					if (DIRECT_A1D_ELEM(mtf_resol, ii) > res)
-						break;
-					i_0 = ii;
-				}
-				// linear interpolation: y = y_0 + (y_1 - y_0)*(x-x_0)/(x1_x0)
+				int i_0 = FLOOR(res / res_per_elem);
 				RFLOAT mtf;
-				RFLOAT x_0 = DIRECT_A1D_ELEM(mtf_resol, i_0);
-				if (i_0 == MULTIDIM_SIZE(mtf_resol) - 1 || i_0 == 0) // check boundaries of the array
-					mtf = DIRECT_A1D_ELEM(mtf_value, i_0);
+				// check boundaries of the array
+				if (i_0 >= MULTIDIM_SIZE(mtf_value) - 1)
+					mtf = DIRECT_A1D_ELEM(mtf_value,  MULTIDIM_SIZE(mtf_value) - 1);
+				else if (i_0 <= 0)
+					mtf = DIRECT_A1D_ELEM(mtf_value, 0);
 				else
 				{
-					RFLOAT x_1 = DIRECT_A1D_ELEM(mtf_resol, i_0 + 1);
+					// linear interpolation:
+					RFLOAT x_0 = DIRECT_A1D_ELEM(mtf_resol, i_0);
 					RFLOAT y_0 = DIRECT_A1D_ELEM(mtf_value, i_0);
+					RFLOAT x_1 = DIRECT_A1D_ELEM(mtf_resol, i_0 + 1);
 					RFLOAT y_1 = DIRECT_A1D_ELEM(mtf_value, i_0 + 1);
 					mtf = y_0 + (y_1 - y_0)*(res - x_0)/(x_1 - x_0);
 				}

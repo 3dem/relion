@@ -64,15 +64,16 @@ class ObservationModel
 
 			// cached values - protected to prevent users from accidentally changing them,
 			// expecting the changes to propagate into the optics star-file
-			std::vector<double> angpix, lambda, Cs;
+			std::vector<double> angpix, originalAngpix, lambda, Cs;
 			std::vector<int> boxSizes;
 			std::vector<std::vector<double> > evenZernikeCoeffs, oddZernikeCoeffs;
 			std::vector<Matrix2D<RFLOAT> > magMatrices;
+			std::vector<std::string> fnMtfs;
 
 			// cached aberration effects for a set of given image sizes
 			// e.g.: phaseCorr[opt. group][img. height](y,x)
 			std::vector<std::map<int,Image<Complex> > > phaseCorr;
-			std::vector<std::map<int,Image<RFLOAT> > > gammaOffset;
+			std::vector<std::map<int,Image<RFLOAT> > > gammaOffset, mtfImage;
 
 
 	public:
@@ -91,6 +92,18 @@ class ObservationModel
 
 
 	// Correction //
+
+		// divide by MTF of detector (using cache)
+		void divideByMtf(
+				const MetaDataTable& partMdt, long particle, MultidimArray<Complex>& obsImage,
+				bool do_multiply_instead = false);
+
+		void divideByMtf(
+				int opticsGroup, MultidimArray<Complex>& obsImage,
+				bool do_multiply_instead = false);
+
+		// 2D image with the MTF (cached)
+		const Image<RFLOAT>& getMtfImage(int optGroup, int s);
 
 		// apply effect of antisymmetric aberration (using cache)
 		void demodulatePhase(

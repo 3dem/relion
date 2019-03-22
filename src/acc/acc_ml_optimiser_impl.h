@@ -495,6 +495,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 
 		CTIC(accMLO->timer,"selfApplyBeamTilt");
 		baseMLO->mydata.obsModel.demodulatePhase(optics_group, Fimg);
+		baseMLO->mydata.obsModel.divideByMtf(optics_group, Fimg);
 		CTOC(accMLO->timer,"selfApplyBeamTilt");
 
 		op.Fimg_nomask.at(img_id) = Fimg;
@@ -758,6 +759,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 
 		CTIC(accMLO->timer,"selfApplyBeamTilt");
 		baseMLO->mydata.obsModel.demodulatePhase(optics_group, Fimg);
+		baseMLO->mydata.obsModel.divideByMtf(optics_group, Fimg);
 		CTOC(accMLO->timer,"selfApplyBeamTilt");
 
 		// Store Fimg and Fctf

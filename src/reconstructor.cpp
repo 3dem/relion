@@ -462,6 +462,7 @@ void Reconstructor::backprojectOneParticle(long int p)
 			                 intact_ctf_first_peak, true);
 
 			obsModel.demodulatePhase(DF, p, F2D);
+			obsModel.divideByMtf(DF, p, F2D);
 
 			// Ewald-sphere curvature correction
 			if (do_ewald)

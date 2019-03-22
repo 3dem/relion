@@ -236,10 +236,7 @@ void StarConverter::unifyPixelSize(MetaDataTable& outOptics, std::string tablena
 			{
 				outOptics.setValue(EMDL_MICROGRAPH_PIXEL_SIZE, angpix, i);
 			}
-			else if (tablename == "movies")
-			{
-				outOptics.setValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, angpix, i);
-			}
+			outOptics.setValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, angpix, i);
 		}
 
 		outOptics.deactivateLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE);

@@ -565,6 +565,7 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, M
 
 		// Also do phase modulation, for beam tilt correction and other asymmetric aberrations
 		opt.mydata.obsModel.demodulatePhase(opt.mydata.getOpticsGroup(part_id, 0), Fsubtract, true); // true means do_modulate_instead
+		opt.mydata.obsModel.divideByMtf(opt.mydata.getOpticsGroup(part_id, 0), Fsubtract, true); // true means do_multiply_instead
 	}
 
 	// Do the actual subtraction
