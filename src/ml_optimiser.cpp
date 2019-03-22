@@ -8324,7 +8324,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 						// Apply CTF to F1 and F2 if necessary
 						if (do_ctf_correction)
 						{
-	#ifdef DEBUG_CHECKSIZES
+#ifdef DEBUG_CHECKSIZES
 							if (!Fctf.sameShape(F1) || !Fctf.sameShape(F2))
 							{
 								std::cerr<<" Fctf: "; Fctf.printShape(std::cerr);
@@ -8332,7 +8332,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 								std::cerr<<" F2:   "; F2.printShape(std::cerr);
 								REPORT_ERROR("ERROR: Fctf has a different shape from F1 and F2");
 							}
-	#endif
+#endif
 							FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(F1)
 							{
 								DIRECT_MULTIDIM_ELEM(F1, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
@@ -8369,7 +8369,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 								int ires = DIRECT_MULTIDIM_ELEM(*myMresol, n);
 								int ires_remapped = ROUND(remap_image_sizes * ires);
 								if (ires > 0 && ires_remapped < XSIZE(mymodel.sigma2_noise[group_id]))
-									mymodel.orientability_contrib[iclass](ires) +=
+									mymodel.orientability_contrib[iclass](ires_remapped) +=
 											norm(DIRECT_MULTIDIM_ELEM(F1, n) - DIRECT_MULTIDIM_ELEM(F2, n)) / ( (2 * sigma2_fudge * mymodel.sigma2_noise[group_id](ires_remapped) ) );
 							}
 						}
