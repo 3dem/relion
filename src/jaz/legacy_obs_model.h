@@ -19,12 +19,12 @@ class LegacyObservationModel
             double angpix, lambda, Cs;
             double beamtilt_xx, beamtilt_xy, beamtilt_yy;
             bool anisoTilt;
-			
+
 		void predictObservation(
 				Projector &proj, const MetaDataTable &mdt, int particle,
 				MultidimArray<Complex>& dest,
 				bool applyCtf = true, bool applyTilt = true, bool applyShift = true) const;
-		
+
 		Image<Complex> predictObservation(
 				Projector &proj, const MetaDataTable &mdt, int particle,
 				bool applyCtf = true, bool applyTilt = true, bool applyShift = true) const;
@@ -43,8 +43,8 @@ class LegacyObservationModel
 
         double angToPix(double a, int s);
         double pixToAng(double p, int s);
-		
-		
+
+
 		static bool containsAllNeededColumns(const MetaDataTable& mdt);
 
 };

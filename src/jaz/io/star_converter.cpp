@@ -1,22 +1,37 @@
 #include "star_converter.h"
 
 void StarConverter::convert_3p0_particlesTo_3p1(
-		const MetaDataTable &in, MetaDataTable &outParticles, MetaDataTable &outOptics, std::string tablename)
+		const MetaDataTable &in, MetaDataTable &outParticles, MetaDataTable &outOptics,
+		std::string tablename, bool do_die_upon_error)
 {
 	int ver = in.getVersion();
 	int curVer = MetaDataTable::getCurrentVersion();
 
 	if (ver == curVer)
 	{
-		REPORT_ERROR_STR("StarConverter::convert_3p0_particlesTo_3p1: Star file is already at version "
-						 << curVer/10000.0);
+		if (do_die_upon_error)
+		{
+			REPORT_ERROR_STR("StarConverter::convert_3p0_particlesTo_3p1: Star file is already at version "
+					 << curVer/10000.0);
+		}
+		else
+		{
+			return;
+		}
 	}
 	else if (ver > curVer)
 	{
-		REPORT_ERROR_STR("StarConverter::convert_3p0_particlesTo_3p1: Star file is at version "
-			<< ver/10000.0 << " - this is beyond the current version of Relion ("
-			<< curVer/10000.0 << ")\n"
-			<< "You are either using an outdated copy of Relion, or the file is from the future.\n");
+		if (do_die_upon_error)
+		{
+			REPORT_ERROR_STR("StarConverter::convert_3p0_particlesTo_3p1: Star file is at version "
+				<< ver/10000.0 << " - this is beyond the current version of Relion ("
+				<< curVer/10000.0 << ")\n"
+				<< "You are either using an outdated copy of Relion, or the file is from the future.\n");
+		}
+		else
+		{
+			return;
+		}
 	}
 
 	const int particleCount = in.numberOfObjects();
@@ -156,7 +171,14 @@ void StarConverter::convert_3p0_particlesTo_3p1(
 
 				if (!outParticles.getValue(EMDL_IMAGE_NAME, fn_img, p))
 				{
-					REPORT_ERROR("BUG: cannot find name for particle...");
+					if (do_die_upon_error)
+					{
+						REPORT_ERROR("BUG: cannot find name for particle...");
+					}
+					else
+					{
+						return;
+					}
 				}
 
 				try
@@ -213,6 +235,8 @@ void StarConverter::convert_3p0_particlesTo_3p1(
 			//REPORT_ERROR("BUG: something went wrong with finding the optics groups...");
 		}
 	}
+
+	return;
 }
 
 void StarConverter::unifyPixelSize(MetaDataTable& outOptics, std::string tablename)

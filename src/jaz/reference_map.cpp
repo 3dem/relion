@@ -37,7 +37,7 @@ ReferenceMap::ReferenceMap()
 	reconFn1(""),
 	maskFn(""),
 	fscFn(""),
-	paddingFactor(2.0),	
+	paddingFactor(2.0),
 	hasMask(false)
 {
 }
@@ -84,27 +84,27 @@ void ReferenceMap::load(int verb, bool debug)
 	}
 
 	Image<RFLOAT> maps[2], powSpec[2];
-	
+
 	if (debug) std::cout << "reading: " << reconFn0 << "\n";
-	
-	maps[0].read(reconFn0);	
-	
+
+	maps[0].read(reconFn0);
+
 	if ( maps[0].data.xdim != maps[0].data.ydim
 	  || maps[0].data.ydim != maps[0].data.zdim)
 	{
 		REPORT_ERROR(reconFn0 + " is not cubical.\n");
 	}
-	
+
 	if (debug) std::cout << "reading: " << reconFn1 << "\n";
-	
+
 	maps[1].read(reconFn1);
-	
+
 	if ( maps[1].data.xdim != maps[1].data.ydim
 	  || maps[1].data.ydim != maps[1].data.zdim)
 	{
 		REPORT_ERROR(reconFn1 + " is not cubical.\n");
 	}
-	
+
 	if ( maps[0].data.xdim != maps[1].data.xdim
 	  || maps[0].data.ydim != maps[1].data.ydim
 	  || maps[0].data.zdim != maps[1].data.zdim)
@@ -119,49 +119,49 @@ void ReferenceMap::load(int verb, bool debug)
 	}
 	s = maps[0].data.ydim;
 	sh = s/2 + 1;
-	
+
 	if (maskFn != "")
 	{
 		if (verb > 0) std::cout << " + Masking references ...\n";
-		
+
 		Image<RFLOAT> maskedRef;
-		
+
 		mask.read(maskFn);
-		
+
 		ImageOp::multiply(mask, maps[0], maskedRef);
 		maps[0] = maskedRef;
-		
+
 		ImageOp::multiply(mask, maps[1], maskedRef);
 		maps[1] = maskedRef;
-		
+
 		hasMask = true;
 	}
-	
+
 	if (verb > 0) std::cout << " + Transforming references ...\n";
-	
+
 	projectors[0] = Projector(s, TRILINEAR, paddingFactor, 10, 2);
 	projectors[0].computeFourierTransformMap(maps[0].data, powSpec[0].data, maps[0].data.xdim);
-	
+
 	projectors[1] = Projector(s, TRILINEAR, paddingFactor, 10, 2);
 	projectors[1].computeFourierTransformMap(maps[1].data, powSpec[1].data, maps[1].data.xdim);
-		
+
 	if (fscFn != "")
 	{
 		MetaDataTable fscMdt;
 		fscMdt.read(fscFn, "fsc");
-		
+
 		if (!fscMdt.containsLabel(EMDL_SPECTRAL_IDX))
 		{
 			REPORT_ERROR(fscFn + " does not contain a value for "
 						 + EMDL::label2Str(EMDL_SPECTRAL_IDX));
 		}
-		
+
 		if (!fscMdt.containsLabel(EMDL_POSTPROCESS_FSC_TRUE))
 		{
 			REPORT_ERROR(fscFn + " does not contain a value for "
 						 + EMDL::label2Str(EMDL_POSTPROCESS_FSC_TRUE));
 		}
-		
+
 		RefinementHelper::drawFSC(&fscMdt, freqWeight1D, freqWeight);
 	}
 	else
@@ -169,10 +169,10 @@ void ReferenceMap::load(int verb, bool debug)
 		freqWeight1D = std::vector<double>(sh,1.0);
 		freqWeight = Image<RFLOAT>(sh,s);
 		freqWeight.data.initConstant(1.0);
-	}	
-	
+	}
+
 	k_out = sh;
-	
+
 	for (int i = 1; i < sh; i++)
 	{
 		if (freqWeight1D[i] <= 0.0)
@@ -187,29 +187,29 @@ Image<RFLOAT> ReferenceMap::getHollowWeight(
 		double kmin_ang, int s_out, double angpix_out)
 {
 	const int sh_out = s_out/2 + 1;
-	
+
 	Image<RFLOAT> out(sh_out, s_out);
-	
+
 	const double as_out = s_out * angpix_out;
 	const double as_ref = s * angpix;
-	
+
 	for (int y = 0; y < s_out; y++)
 	for (int x = 0; x < sh_out; x++)
 	{
 		const double x_out = x;
 		const double y_out = y <= sh_out? y : y - s_out;
-		
+
 		const double x_ang = x_out / as_out;
 		const double y_ang = y_out / as_out;
-		
+
 		const double x_ref = x_ang * as_ref;
 		const double y_ref = y_ang * as_ref;
-		
+
 		const int xx_ref = (int)(x_ref + 0.5);
 		const int yy_ref = y_ref >= 0.0? (int)(y_ref + 0.5) : (int)(y_ref + s + 0.5);
-		
+
 		double r = sqrt(x_ang * x_ang + y_ang * y_ang);
-		
+
 		if (r < 1.0 / kmin_ang || xx_ref >= sh || yy_ref < 0 || yy_ref >= s)
 		{
 			out(y,x) = 0.0;
@@ -219,7 +219,7 @@ Image<RFLOAT> ReferenceMap::getHollowWeight(
 			out(y,x) = freqWeight(yy_ref, xx_ref);
 		}
 	}
-	
+
 	return out;
 }
 
@@ -227,19 +227,19 @@ std::vector<Image<Complex>> ReferenceMap::predictAll(
 		const MetaDataTable& mdt,
 		ObservationModel& obs,
 		HalfSet hs, int threads,
-		bool applyCtf, bool applyTilt, bool applyShift)
+		bool applyCtf, bool applyTilt, bool applyShift, bool applyMtf)
 {
 	// declare on first line to prevent copying
 	std::vector<Image<Complex>> out(mdt.numberOfObjects());
-	
+
 	const int pc = mdt.numberOfObjects();
-	
+
 	#pragma omp parallel for num_threads(threads)
 	for (int p = 0; p < pc; p++)
 	{
-		out[p] = predict(mdt, p, obs, hs, applyCtf, applyTilt, applyShift);
+		out[p] = predict(mdt, p, obs, hs, applyCtf, applyTilt, applyShift, applyMtf);
 	}
-	
+
 	return out;
 }
 
@@ -247,58 +247,58 @@ Image<Complex> ReferenceMap::predict(
 		const MetaDataTable& mdt, int p,
 		ObservationModel& obs,
 		HalfSet hs,
-		bool applyCtf, bool applyTilt, bool applyShift)
+		bool applyCtf, bool applyTilt, bool applyShift, bool applyMtf)
 {
 	Image<Complex> pred;
-	
+
 	int randSubset;
 	mdt.getValue(EMDL_PARTICLE_RANDOM_SUBSET, randSubset, p);
 	randSubset -= 1;
-	
+
 	int pi = (hs == Own)? randSubset : 1 - randSubset;
-	
-	obs.predictObservation(projectors[pi], mdt, p, pred(), angpix, applyCtf, applyTilt, applyShift);
-	
+
+	obs.predictObservation(projectors[pi], mdt, p, pred(), angpix, applyCtf, applyTilt, applyShift, applyMtf);
+
 	return pred;
 }
 
 std::vector<Volume<gravis::t2Vector<Complex>>> ReferenceMap::predictAllComplexGradients(
-		const MetaDataTable &mdt, 
-		ObservationModel &obs, 
-		ReferenceMap::HalfSet hs, 
-		int threads, 
-		bool applyCtf, bool applyTilt, bool applyShift)
+		const MetaDataTable &mdt,
+		ObservationModel &obs,
+		ReferenceMap::HalfSet hs,
+		int threads,
+		bool applyCtf, bool applyTilt, bool applyShift, bool applyMtf)
 {
 	// declare on first line to prevent copying
 	std::vector<Volume<t2Vector<Complex>>> out(mdt.numberOfObjects());
-	
+
 	const int pc = mdt.numberOfObjects();
-	
+
 	#pragma omp parallel for num_threads(threads)
 	for (int p = 0; p < pc; p++)
 	{
-		out[p] = predictComplexGradient(mdt, p, obs, hs, applyCtf, applyTilt, applyShift);
+		out[p] = predictComplexGradient(mdt, p, obs, hs, applyCtf, applyTilt, applyShift, applyMtf);
 	}
-	
+
 	return out;
 }
 
 Volume<t2Vector<Complex>> ReferenceMap::predictComplexGradient(
-		const MetaDataTable &mdt, 
-		int p, ObservationModel &obs, 
-		ReferenceMap::HalfSet hs, 
-		bool applyCtf, bool applyTilt, bool applyShift)
+		const MetaDataTable &mdt,
+		int p, ObservationModel &obs,
+		ReferenceMap::HalfSet hs,
+		bool applyCtf, bool applyTilt, bool applyShift, bool applyMtf)
 {
 	Volume<t2Vector<Complex>> pred;
-	
+
 	int randSubset;
 	mdt.getValue(EMDL_PARTICLE_RANDOM_SUBSET, randSubset, p);
 	randSubset -= 1;
-	
+
 	int pi = (hs == Own)? randSubset : 1 - randSubset;
-	
-	pred = obs.predictComplexGradient(projectors[pi], mdt, p, angpix, applyCtf, applyTilt, applyShift);
-	
+
+	pred = obs.predictComplexGradient(projectors[pi], mdt, p, angpix, applyCtf, applyTilt, applyShift, applyMtf);
+
 	return pred;
 }
 
@@ -310,15 +310,15 @@ std::vector<Image<Complex>> ReferenceMap::predictAll(
 {
 	// declare on first line to prevent copying
 	std::vector<Image<Complex>> out(mdt.numberOfObjects());
-	
+
 	const int pc = mdt.numberOfObjects();
-	
+
 	#pragma omp parallel for num_threads(threads)
 	for (int p = 0; p < pc; p++)
 	{
 		out[p] = predict(mdt, p, obs, hs, applyCtf, applyTilt, applyShift);
 	}
-	
+
 	return out;
 }
 
@@ -329,15 +329,15 @@ Image<Complex> ReferenceMap::predict(
 		bool applyCtf, bool applyTilt, bool applyShift)
 {
 	Image<Complex> pred;
-	
+
 	int randSubset;
 	mdt.getValue(EMDL_PARTICLE_RANDOM_SUBSET, randSubset, p);
 	randSubset -= 1;
-	
+
 	int pi = (hs == Own)? randSubset : 1 - randSubset;
-	
+
 	pred = obs.predictObservation(projectors[pi], mdt, p, applyCtf, applyTilt, applyShift);
-	
+
 	return pred;
 }
 
@@ -358,17 +358,17 @@ double ReferenceMap::pixToAng(double p) const
 	{
 		occupancies[half] = Projector(s, TRILINEAR, 1.0, 10, 2);
 		occupancies[half].data = MultidimArray<Complex>(1,s,s,sh);
-		
+
 		const int pc
 		std::vector<CTF> ctfs(
-				
+
 		#pragma omp parallel for num_threads(threads)
 		for (int z = 0; z < s; z++)
 		{
 			for (int y = 0; y < s;  y++)
 			for (int x = 0; x < sh; x++)
 			{
-				
+
 			}
 		}
 	}

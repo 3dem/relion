@@ -37,7 +37,7 @@ using namespace gravis;
 void ObservationModel::loadSafely(
 	std::string filename,
 	ObservationModel& obsModel,
-	MetaDataTable& particlesMdt, std::string tablename, int verb)
+	MetaDataTable& particlesMdt, std::string tablename, int verb, bool do_die_upon_error)
 {
 	MetaDataTable opticsMdt;
 
@@ -65,7 +65,7 @@ void ObservationModel::loadSafely(
 	}
 	opticsMdt.read(filename, "optics");
 
-	if (particlesMdt.numberOfObjects() == 0 && particlesMdt.numberOfObjects() == 0)
+	if (particlesMdt.numberOfObjects() == 0 || opticsMdt.numberOfObjects() == 0)
 	{
 		if (verb > 0)
 		{
@@ -75,18 +75,12 @@ void ObservationModel::loadSafely(
 		MetaDataTable oldMdt;
 		oldMdt.read(filename);
 
-		StarConverter::convert_3p0_particlesTo_3p1(oldMdt, particlesMdt, opticsMdt, mytablename);
+		StarConverter::convert_3p0_particlesTo_3p1(oldMdt, particlesMdt, opticsMdt, mytablename, do_die_upon_error);
+		if (!do_die_upon_error && opticsMdt.numberOfObjects() == 0) return; // return an empty optics table is error was raised
 	}
 
-	obsModel = ObservationModel(opticsMdt);
-
-	// read pixel sizes (and make sure they are all the same)
-	/*
-	if (!obsModel.allPixelSizesIdentical())
-	{
-		REPORT_ERROR("ERROR: different pixel sizes detected. Please split your dataset by pixel size.");
-	}
-	*/
+	obsModel = ObservationModel(opticsMdt, do_die_upon_error);
+	if (!do_die_upon_error && obsModel.opticsMdt.numberOfObjects() == 0) return; // return an empty optics table is error was raised
 
 	// make sure all optics groups are defined
 
@@ -163,7 +157,7 @@ ObservationModel::ObservationModel()
 {
 }
 
-ObservationModel::ObservationModel(const MetaDataTable &_opticsMdt)
+ObservationModel::ObservationModel(const MetaDataTable &_opticsMdt, bool do_die_upon_error)
 :	opticsMdt(_opticsMdt),
 	angpix(_opticsMdt.numberOfObjects()),
 	lambda(_opticsMdt.numberOfObjects()),
@@ -176,12 +170,17 @@ ObservationModel::ObservationModel(const MetaDataTable &_opticsMdt)
 	    || !opticsMdt.containsLabel(EMDL_CTF_VOLTAGE)
 	    || !opticsMdt.containsLabel(EMDL_CTF_CS))
 	{
-		REPORT_ERROR_STR("ERROR: not all necessary variables defined in _optics.star file: "
-			<< "rlnPixelSize, rlnVoltage and rlnSphericalAberration. Make sure to import older STAR files anew in version-3.1.");
+		if (do_die_upon_error)
+		{
+			REPORT_ERROR_STR("ERROR: not all necessary variables defined in _optics.star file: "
+				<< "rlnPixelSize, rlnVoltage and rlnSphericalAberration. Make sure to import older STAR files anew in version-3.1.");
+		}
+		else
+		{
+			opticsMdt.clear();
+			return;
+		}
 	}
-
-
-
 
 	// symmetrical high-order aberrations:
 	hasEvenZernike = opticsMdt.containsLabel(EMDL_IMAGE_EVEN_ZERNIKE_COEFFS);
@@ -283,7 +282,7 @@ ObservationModel::ObservationModel(const MetaDataTable &_opticsMdt)
 void ObservationModel::predictObservation(
         Projector& proj, const MetaDataTable& partMdt, long int particle,
 		MultidimArray<Complex>& dest, double angpix_ref,
-        bool applyCtf, bool shiftPhases, bool applyShift)
+        bool applyCtf, bool shiftPhases, bool applyShift, bool applyMtf)
 {
 	const int s_ref = proj.ori_size;
 
@@ -360,11 +359,23 @@ void ObservationModel::predictObservation(
 			dest(y,x) *= corr(y,x);
 		}
 	}
+
+	if (applyMtf && fnMtfs.size() > opticsGroup)
+	{
+		const Image<RFLOAT>& mtf = getMtfImage(opticsGroup, s_out);
+
+		for (int y = 0; y < s_out;  y++)
+		for (int x = 0; x < sh_out; x++)
+		{
+			dest(y,x) *= mtf(y,x);
+		}
+	}
+
 }
 
 Volume<t2Vector<Complex>> ObservationModel::predictComplexGradient(
 		Projector &proj, const MetaDataTable &partMdt, long particle, double angpix_ref,
-		bool applyCtf, bool shiftPhases, bool applyShift)
+		bool applyCtf, bool shiftPhases, bool applyShift, bool applyMtf)
 {
 	if (applyCtf || applyShift)
 	{
@@ -415,6 +426,18 @@ Volume<t2Vector<Complex>> ObservationModel::predictComplexGradient(
 		{
 			out(x,y,0).x *= corr(y,x);
 			out(x,y,0).y *= corr(y,x);
+		}
+	}
+
+	if (applyMtf && fnMtfs.size() > opticsGroup)
+	{
+		const Image<RFLOAT>& mtf = getMtfImage(opticsGroup, s_out);
+
+		for (int y = 0; y < s_out;  y++)
+		for (int x = 0; x < sh_out; x++)
+		{
+			out(x,y,0).x *= mtf(y,x);
+			out(x,y,0).y *= mtf(y,x);
 		}
 	}
 

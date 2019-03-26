@@ -37,7 +37,7 @@ class ReferenceMap
         typedef enum {Own, Opposite} HalfSet;
 
         ReferenceMap();
-	
+
 			// input parameters:
             std::string reconFn0, reconFn1, maskFn, fscFn;
             double paddingFactor;
@@ -52,47 +52,51 @@ class ReferenceMap
 
         void read(IOParser& parser, int argc, char *argv[]);
         void load(int verb, bool debug);
-		
+
 		Image<RFLOAT> getHollowWeight(double kmin_ang, int s_out, double angpix_out);
-		
+
 		std::vector<Image<Complex>> predictAll(
 				const MetaDataTable& mdt,
                 ObservationModel& obs,
                 HalfSet hs, int threads,
                 bool applyCtf = true,
-                bool applyTilt = true, 
-				bool applyShift = true);
+                bool applyTilt = true,
+				bool applyShift = true,
+				bool applyMtf = true);
 
         Image<Complex> predict(
                 const MetaDataTable& mdt, int p,
                 ObservationModel& obs,
                 HalfSet hs,
                 bool applyCtf = true,
-                bool applyTilt = true, 
-				bool applyShift = true);
-		
+                bool applyTilt = true,
+				bool applyShift = true,
+				bool applyMtf = true);
+
 		std::vector<Volume<gravis::t2Vector<Complex> > > predictAllComplexGradients(
 				const MetaDataTable& mdt,
                 ObservationModel& obs,
                 HalfSet hs, int threads,
                 bool applyCtf = true,
-                bool applyTilt = true, 
-				bool applyShift = true);
-		
+                bool applyTilt = true,
+				bool applyShift = true,
+				bool applyMtf = true);
+
 		Volume<gravis::t2Vector<Complex>> predictComplexGradient(
                 const MetaDataTable& mdt, int p,
                 ObservationModel& obs,
                 HalfSet hs,
                 bool applyCtf = true,
-                bool applyTilt = true, 
-				bool applyShift = true);
-		
+                bool applyTilt = true,
+				bool applyShift = true,
+				bool applyMtf = true);
+
 		std::vector<Image<Complex>> predictAll(
 				const MetaDataTable& mdt,
                 const LegacyObservationModel& obs,
                 HalfSet hs, int threads,
                 bool applyCtf = true,
-                bool applyTilt = true, 
+                bool applyTilt = true,
 				bool applyShift = true);
 
         Image<Complex> predict(
@@ -100,9 +104,9 @@ class ReferenceMap
                 const LegacyObservationModel& obs,
                 HalfSet hs,
                 bool applyCtf = true,
-                bool applyTilt = true, 
+                bool applyTilt = true,
 				bool applyShift = true);
-		
+
 		double angToPix(double a) const;
         double pixToAng(double p) const;
 };

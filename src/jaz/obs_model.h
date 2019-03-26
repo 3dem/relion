@@ -39,7 +39,7 @@ class ObservationModel
 		static void loadSafely(
 				std::string filename,
 				ObservationModel& obsModel,
-				MetaDataTable& particlesMdt, std::string tablename = "particles", int verb = 0);
+				MetaDataTable& particlesMdt, std::string tablename = "particles", int verb = 0, bool do_die_upon_error = true);
 
 		static void saveNew(
 				MetaDataTable& particlesMdt,
@@ -54,7 +54,7 @@ class ObservationModel
 
 
         ObservationModel();
-        ObservationModel(const MetaDataTable &opticsMdt);
+        ObservationModel(const MetaDataTable &opticsMdt, bool do_die_upon_error = true);
 
 
 			MetaDataTable opticsMdt;
@@ -83,11 +83,11 @@ class ObservationModel
 		void predictObservation(
 				Projector &proj, const MetaDataTable &partMdt, long int particle,
 				MultidimArray<Complex>& dest, double angpix_ref,
-				bool applyCtf = true, bool shiftPhases = true, bool applyShift = true);
+				bool applyCtf = true, bool shiftPhases = true, bool applyShift = true, bool applyMtf = true);
 
 		Volume<gravis::t2Vector<Complex> > predictComplexGradient(
 				Projector &proj, const MetaDataTable &partMdt, long int particle, double angpix_ref,
-				bool applyCtf = true, bool shiftPhases = true, bool applyShift = true);
+				bool applyCtf = true, bool shiftPhases = true, bool applyShift = true, bool applyMtf = true);
 
 
 

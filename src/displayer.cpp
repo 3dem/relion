@@ -2675,7 +2675,9 @@ int Displayer::runGui()
 		else
 		{
 			if (do_ignore_optics) MD.read(fn_in);
-			else ObservationModel::loadSafely(fn_in, obsModel, MD, "discover");
+			else ObservationModel::loadSafely(fn_in, obsModel, MD, "discover", 0, false); //false means dont die upon error
+			// Check the MD was loaded successfully with obsModel, otherwise read as ignore_optics
+			if (obsModel.opticsMdt.numberOfObjects() == 0) MD.read(fn_in);
 		}
 
 		// Get which labels are stored in this metadatatable and generate choice menus for display and sorting
@@ -2772,7 +2774,9 @@ int Displayer::run()
 		else
 		{
 			if (do_ignore_optics) MDin.read(fn_in);
-			else ObservationModel::loadSafely(fn_in, obsModel, MDin, "discover");
+			else ObservationModel::loadSafely(fn_in, obsModel, MDin, "discover", 0, false); //false means dont die upon error
+			// Check the MD was loaded successfully with obsModel, otherwise read as ignore_optics
+			if (obsModel.opticsMdt.numberOfObjects() == 0) MDin.read(fn_in);
 		}
 
 		// Check that label to display is present in the table

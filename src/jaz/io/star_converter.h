@@ -11,7 +11,9 @@ class StarConverter
 		static void convert_3p0_particlesTo_3p1(
 						const MetaDataTable& in,
 						MetaDataTable& outParticles,
-						MetaDataTable& outOptics, std::string tablename = "particles");
+						MetaDataTable& outOptics,
+						std::string tablename = "particles",
+						bool do_die_upon_error = true);
 
 	protected:
 

@@ -36,45 +36,45 @@ using namespace gravis;
 
 MagnificationEstimator::MagnificationEstimator()
 {
-	
+
 }
 
 void MagnificationEstimator::read(
 		IOParser &parser, int argc, char *argv[])
 {
-	kmin = textToFloat(parser.getOption("--kmin_mag", 
+	kmin = textToFloat(parser.getOption("--kmin_mag",
 				"Inner freq. threshold for anisotropic magnification estimation [Angst]", "20.0"));
-	
+
 	adaptAstig = !parser.checkOption("--keep_astig", "Do not translate astigmatism into new coordinates");
 	perMgAstig = !parser.checkOption("--part_astig", "Allow astigmatism to vary among the particles of a micrograph");
 }
 
 void MagnificationEstimator::init(
-		int verb, int nr_omp_threads, 
-		bool debug, bool diag, 
-		std::string outPath, 
-		ReferenceMap* reference, 
+		int verb, int nr_omp_threads,
+		bool debug, bool diag,
+		std::string outPath,
+		ReferenceMap* reference,
 		ObservationModel* obsModel)
 {
 	this->verb = verb;
 	this->nr_omp_threads = nr_omp_threads;
-	
+
 	this->debug = debug;
 	this->diag = diag;
 	this->outPath = outPath;
-	
+
 	this->reference = reference;
 	this->obsModel = obsModel;
-	
+
 	angpix = obsModel->getPixelSizes();
 	obsModel->getBoxSizes(s, sh);
-	
+
 	ready = true;
 }
 
 void MagnificationEstimator::processMicrograph(
-		long g, MetaDataTable& mdt, 
-		const std::vector<Image<Complex>>& obs, 
+		long g, MetaDataTable& mdt,
+		const std::vector<Image<Complex>>& obs,
 		const std::vector<Image<Complex>>& pred,
 		const std::vector<Volume<t2Vector<Complex>>>& predGradient)
 {
@@ -83,52 +83,52 @@ void MagnificationEstimator::processMicrograph(
 		REPORT_ERROR_STR("ERROR: MagnificationEstimator::processMicrograph: "
 						 << "MagnificationEstimator not initialized.");
 	}
-	
-	std::vector<std::pair<int, std::vector<int>>> particlesByOpticsGroup 
+
+	std::vector<std::pair<int, std::vector<int>>> particlesByOpticsGroup
 			= obsModel->splitParticlesByOpticsGroup(mdt);
-	
+
 	for (int pog = 0; pog < particlesByOpticsGroup.size(); pog++)
-	{			
+	{
 		const int og = particlesByOpticsGroup[pog].first;
 		const std::vector<int>& partIndices = particlesByOpticsGroup[pog].second;
-		
+
 		const int pc = partIndices.size();
-		
+
 		std::vector<Volume<Equation2x2>> magEqs(nr_omp_threads);
-		
+
 		for (int i = 0; i < nr_omp_threads; i++)
 		{
 			magEqs[i] = Volume<Equation2x2>(sh[og],s[og],1);
 		}
-		
+
 		#pragma omp parallel for num_threads(nr_omp_threads)
 		for (long pp = 0; pp < pc; pp++)
 		{
 			const int p = partIndices[pp];
-			
+
 			CTF ctf;
 			ctf.readByGroup(mdt, obsModel, p);
-			
+
 			int threadnum = omp_get_thread_num();
-			
+
 			MagnificationHelper::updateScaleFreq(
 				pred[p], predGradient[p], obs[p], ctf, angpix[og], magEqs[threadnum]);
 		}
-		
+
 		Volume<Equation2x2> magEq(sh[og], s[og],1);
-				
+
 		for (int threadnum = 0; threadnum < nr_omp_threads; threadnum++)
 		{
 			magEq += magEqs[threadnum];
 		}
-		
+
 		std::string outRoot = CtfRefiner::getOutputFilenameRoot(mdt, outPath);
-		
+
 		std::stringstream sts;
 		sts << (og+1);
-		
+
 		MagnificationHelper::writeEQs(magEq, outRoot+"_mag_optics-group_" + sts.str());
-		
+
 	}
 }
 
@@ -140,38 +140,38 @@ void MagnificationEstimator::parametricFit(
 		REPORT_ERROR_STR("ERROR: MagnificationEstimator::parametricFit: "
 					 << "MagnificationEstimator not initialized.");
 	}
-	
+
 	if (verb > 0)
 	{
 		std::cout << " + Fitting anisotropic magnification ..." << std::endl;
 	}
-	
+
 	const int gc = mdts.size();
 	const int ogc = obsModel->numberOfOpticsGroups();
-	
+
 	bool hasMagMatrices = optOut.labelExists(EMDL_IMAGE_MAG_MATRIX_00)
 	                   && optOut.labelExists(EMDL_IMAGE_MAG_MATRIX_01)
 	                   && optOut.labelExists(EMDL_IMAGE_MAG_MATRIX_10)
 	                   && optOut.labelExists(EMDL_IMAGE_MAG_MATRIX_11);
-			
+
 	std::vector<Matrix2D<RFLOAT>> mat_by_optGroup(ogc);
 
-	#pragma omp parallel for num_threads(nr_omp_threads)	
+	#pragma omp parallel for num_threads(nr_omp_threads)
 	for (int og = 0; og < ogc; og++)
 	{
 		Volume<Equation2x2> magEqs(sh[og],s[og],1), magEqsG(sh[og],s[og],1);
-		
+
 		std::stringstream sts;
 		sts << (og+1);
-		
+
 		bool groupPresent = false;
-		
+
 		for (long g = 0; g < gc; g++)
 		{
 			std::string outRoot = CtfRefiner::getOutputFilenameRoot(mdts[g], outPath);
-			
+
 			std::string fn = outRoot + "_mag_optics-group_" + sts.str();
-			
+
 			if (exists(fn+"_Axx.mrc")
 			 || exists(fn+"_Axy.mrc")
 			 || exists(fn+"_Ayy.mrc")
@@ -185,55 +185,55 @@ void MagnificationEstimator::parametricFit(
 					groupPresent = true;
 				}
 				catch (RelionError e)
-				{}			
+				{}
 			}
 		}
-		
-		if (!groupPresent) 
+
+		if (!groupPresent)
 		{
 			mat_by_optGroup[og] = Matrix2D<RFLOAT>(2,2);
 			mat_by_optGroup[og].initIdentity();
 			continue;
 		}
-		
+
 		Image<RFLOAT> flowx, flowy;
 		MagnificationHelper::solvePerPixel(magEqs, flowx, flowy);
-			
+
 		Image<RFLOAT> flowxFull, flowyFull;
 		FftwHelper::decenterUnflip2D(flowx.data, flowxFull.data);
 		FftwHelper::decenterUnflip2D(flowy.data, flowyFull.data);
-		
+
 		ImageLog::write(flowxFull, outPath + "mag_disp_x_optics-group_" + sts.str());
 		ImageLog::write(flowyFull, outPath + "mag_disp_y_optics-group_" + sts.str());
-		ColorHelper::writeSignedToPNG(flowxFull, 
-			outPath + "mag_disp_x_optics-group_" + sts.str() + "_[-1,+1]");
-		ColorHelper::writeSignedToPNG(flowyFull, 
-			outPath + "mag_disp_y_optics-group_" + sts.str() + "_[-1,+1]");
-		
+		ColorHelper::writeSignedToPNG(flowxFull,
+			outPath + "mag_disp_x_optics-group_" + sts.str() + "_-1+1");
+		ColorHelper::writeSignedToPNG(flowyFull,
+			outPath + "mag_disp_y_optics-group_" + sts.str() + "_-1+1");
+
 		Image<RFLOAT> freqWght = reference->getHollowWeight(kmin, s[og], angpix[og]);
-		
+
 		Matrix2D<RFLOAT> mat = MagnificationHelper::solveLinearlyFreq(magEqs, freqWght, flowx, flowy);
-		
+
 		FftwHelper::decenterUnflip2D(flowx.data, flowxFull.data);
 		FftwHelper::decenterUnflip2D(flowy.data, flowyFull.data);
-		
+
 		ImageLog::write(flowxFull, outPath + "mag_disp_x_fit_optics-group_" + sts.str());
 		ImageLog::write(flowyFull, outPath + "mag_disp_y_fit_optics-group_" + sts.str());
-		ColorHelper::writeSignedToPNG(flowxFull, 
-			outPath + "mag_disp_x_fit_optics-group_" + sts.str() + "_[-1,+1]");
-		ColorHelper::writeSignedToPNG(flowyFull, 
-			outPath + "mag_disp_y_fit_optics-group_" + sts.str() + "_[-1,+1]");
-		
+		ColorHelper::writeSignedToPNG(flowxFull,
+			outPath + "mag_disp_x_fit_optics-group_" + sts.str() + "_-1+1");
+		ColorHelper::writeSignedToPNG(flowyFull,
+			outPath + "mag_disp_y_fit_optics-group_" + sts.str() + "_-1+1");
+
 		std::ofstream os(outPath + "mag_matrix_optics-group_" + sts.str() + ".txt");
 		os << mat(0,0) << " " << mat(0,1) << "\n";
 		os << mat(1,0) << " " << mat(1,1) << "\n";
 		os.close();
-		
+
 		mat_by_optGroup[og] = mat;
-		
+
 		Matrix2D<RFLOAT> mat0 = obsModel->getMagMatrix(og);
 		Matrix2D<RFLOAT> mat1 = mat * mat0;
-		
+
 		#pragma omp critical
 		{
 			optOut.setValue(EMDL_IMAGE_MAG_MATRIX_00, mat1(0,0), og);
@@ -244,9 +244,9 @@ void MagnificationEstimator::parametricFit(
 
 		obsModel->setMagMatrix(og, mat1);
 	}
-	
+
 	obsModel->hasMagMatrices = true;
-	
+
 	if (adaptAstig)
 	{
 		MagnificationHelper::adaptAstigmatism(mat_by_optGroup, mdts, !perMgAstig, obsModel);
@@ -260,21 +260,21 @@ bool MagnificationEstimator::isFinished(
 	{
 		REPORT_ERROR("ERROR: TiltEstimator::isFinished: DefocusEstimator not initialized.");
 	}
-	
+
 	std::string outRoot = CtfRefiner::getOutputFilenameRoot(mdt, outPath);
 
 	bool allThere = true;
-	
+
 	std::vector<int> ogp = obsModel->getOptGroupsPresent_zeroBased(mdt);
-	
+
 	for (int pog = 0; pog < ogp.size(); pog++)
 	{
 		const int og = ogp[pog];
-		
+
 		std::stringstream sts;
 		sts << (og+1);
 		std::string ogstr = sts.str();
-		
+
 		if(  !exists(outRoot+"_mag_optics-group_"+ogstr+"_Axx.mrc")
 		  || !exists(outRoot+"_mag_optics-group_"+ogstr+"_Axy.mrc")
 		  || !exists(outRoot+"_mag_optics-group_"+ogstr+"_Ayy.mrc")
@@ -285,6 +285,6 @@ bool MagnificationEstimator::isFinished(
 			break;
 		}
 	}
-	
+
 	return allThere;
 }
