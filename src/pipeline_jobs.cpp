@@ -1201,6 +1201,7 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 				 node_type == "2D references (.star or .mrcs)" ||
 				 node_type == "3D reference (.mrc)" ||
 				 node_type == "3D mask (.mrc)" ||
+				 node_type == "Micrographs STAR file (.star)" ||
 				 node_type == "Unfiltered half-map (unfil.mrc)")
 		{
 			fn_out = "/" + fn_in;
@@ -1215,6 +1216,8 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 				mynodetype = NODE_3DREF;
 			else if (node_type == "3D mask (.mrc)")
 				mynodetype = NODE_MASK;
+			else if (node_type == "Micrographs STAR file (.star)")
+				mynodetype = NODE_MICS;
 			else if (node_type == "Unfiltered half-map (unfil.mrc)")
 				mynodetype = NODE_HALFMAP;
 			else
@@ -4909,6 +4912,9 @@ bool RelionJob::getCommandsCtfrefineJob(std::string &outputname, std::vector<std
 	Node node2(joboptions["fn_post"].getString(), joboptions["fn_post"].node_type);
 	inputNodes.push_back(node);
 
+	Node node6(outputname+"logfile.pdf", NODE_PDF_LOGFILE);
+	outputNodes.push_back(node6);
+
 	command += " --i " + joboptions["fn_data"].getString();
 	command += " --f " + joboptions["fn_post"].getString();
 	command += " --o " + outputname;
@@ -4941,8 +4947,6 @@ bool RelionJob::getCommandsCtfrefineJob(std::string &outputname, std::vector<std
 			{
 				command += " --fit_phase";
 			}
-			Node node6(outputname+"logfile.pdf", NODE_PDF_LOGFILE);
-			outputNodes.push_back(node6);
 		}
 
 		// do not allow anisotropic magnification to be done simultaneously with higher-order aberrations

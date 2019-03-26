@@ -159,7 +159,7 @@ void TiltEstimator::processMicrograph(
 
 void TiltEstimator::parametricFit(
 		const std::vector<MetaDataTable>& mdts,
-		MetaDataTable& optOut)
+		MetaDataTable& optOut, std::vector <FileName> &fn_eps)
 {
 	if (!ready)
 	{
@@ -262,10 +262,22 @@ void TiltEstimator::parametricFit(
 		FftwHelper::decenterUnflip2D(phase.data, phaseFull.data);
 
 		ImageLog::write(phaseFull, outPath + "beamtilt_delta-phase_per-pixel_optics-group_"+ogstr);
-		ColorHelper::writeAngleToPNG(phaseFull,
-			outPath + "beamtilt_delta-phase_per-pixel_optics-group_"+ogstr);
-		ColorHelper::writeAngleToEPS(phaseFull,
-			outPath + "beamtilt_delta-phase_per-pixel_optics-group_"+ogstr);
+
+		std::vector<Image<RFLOAT> > imgs_for_eps;
+		std::vector<double> scales;
+		std::vector<std::string> labels;
+
+		imgs_for_eps.push_back(phaseFull);
+		scales.push_back(1.);
+		labels.push_back("Asymm. obs [-1, 1] " +obsModel->getGroupName(og));
+		imgs_for_eps.push_back(phaseFull);
+		scales.push_back(PI);
+		labels.push_back("Asymm. obs [-pi, pi] " +obsModel->getGroupName(og));
+
+		//ColorHelper::writeAngleToPNG(phaseFull,
+		//	outPath + "beamtilt_delta-phase_per-pixel_optics-group_"+ogstr);
+		//ColorHelper::writeAngleToEPS(phaseFull,
+		//	outPath + "beamtilt_delta-phase_per-pixel_optics-group_"+ogstr);
 
 		double shift_x(0), shift_y(0), tilt_x(0), tilt_y(0);
 
@@ -278,8 +290,6 @@ void TiltEstimator::parametricFit(
 			FftwHelper::decenterUnflip2D(fit.data, fitFull.data);
 
 			ImageLog::write(fitFull, outPath + "beamtilt_delta-phase_lin-fit_optics-group_"+ogstr);
-			ColorHelper::writeAngleToPNG(fitFull,
-				outPath + "beamtilt_delta-phase_lin-fit_optics-group_"+ogstr);
 
 			TiltHelper::optimizeTilt(
 					xyNrm, wgh, Cs, lambda,
@@ -290,8 +300,13 @@ void TiltEstimator::parametricFit(
 			FftwHelper::decenterUnflip2D(fit.data, fitFull.data);
 
 			ImageLog::write(fitFull, outPath+"beamtilt_delta-phase_iter-fit_optics-group_"+ogstr);
-			ColorHelper::writeAngleToPNG(fitFull,
-				outPath + "beamtilt_delta-phase_iter-fit_optics-group_"+ogstr);
+
+			imgs_for_eps.push_back(fitFull);
+			scales.push_back(1.);
+			labels.push_back("Beamtilt-only fit [-1, 1] " +obsModel->getGroupName(og));
+			imgs_for_eps.push_back(fitFull);
+			scales.push_back(PI);
+			labels.push_back("Beamtilt-only fit [-pi, pi] " +obsModel->getGroupName(og));
 
 			#pragma omp critical
 			{
@@ -314,17 +329,12 @@ void TiltEstimator::parametricFit(
 
 			ImageLog::write(fitFull,
 				outPath + "beamtilt_delta-phase_lin-fit_optics-group_"+ogstr+"_N-"+sts.str());
-			ColorHelper::writeAngleToPNG(fitFull,
-				outPath + "beamtilt_delta-phase_lin-fit_optics-group_"+ogstr+"_N-"+sts.str());
 
 			{
 				Image<RFLOAT> residual;
 				residual.data = phaseFull.data - fitFull.data;
 
 				ImageLog::write(residual,
-					outPath + "beamtilt_delta-phase_lin-fit_optics-group_"
-						+ogstr+"_N-"+sts.str()+"_residual");
-				ColorHelper::writeAngleToPNG(residual,
 					outPath + "beamtilt_delta-phase_lin-fit_optics-group_"
 						+ogstr+"_N-"+sts.str()+"_residual");
 			}
@@ -337,8 +347,13 @@ void TiltEstimator::parametricFit(
 
 			ImageLog::write(fitFull, outPath + "beamtilt_delta-phase_iter-fit_optics-group_"
 				+ogstr+"_N-"+sts.str());
-			ColorHelper::writeAngleToPNG(fitFull,
-				outPath + "beamtilt_delta-phase_iter-fit_optics-group_"+ogstr+"_N-"+sts.str());
+
+			imgs_for_eps.push_back(fitFull);
+			scales.push_back(1.);
+			labels.push_back("Asymm. fit (N="+sts.str()+") fit [-1, 1] " +obsModel->getGroupName(og));
+			imgs_for_eps.push_back(fitFull);
+			scales.push_back(PI);
+			labels.push_back("Asymm. fit (N="+sts.str()+") fit [-pi, pi] " +obsModel->getGroupName(og));
 
 			TiltHelper::extractTilt(Zernike_coeffs_opt, tilt_x, tilt_y, Cs, lambda);
 
@@ -349,6 +364,11 @@ void TiltEstimator::parametricFit(
 				optOut.setValue(EMDL_IMAGE_ODD_ZERNIKE_COEFFS, Zernike_coeffs_opt, og);
 			}
 		}
+
+		FileName fn_root = outPath + "asymmetric_aberrations_optics-group_"+ ogstr;
+		ColorHelper::writeSignedToEPS(fn_root, 2, imgs_for_eps, scales, labels);
+		fn_eps.push_back(fn_root+".eps");
+
 	}
 }
 

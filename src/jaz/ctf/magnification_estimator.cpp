@@ -133,7 +133,7 @@ void MagnificationEstimator::processMicrograph(
 }
 
 void MagnificationEstimator::parametricFit(
-		std::vector<MetaDataTable> &mdts, MetaDataTable &optOut)
+		std::vector<MetaDataTable> &mdts, MetaDataTable &optOut, std::vector<FileName> &fn_eps)
 {
 	if (!ready)
 	{
@@ -196,6 +196,10 @@ void MagnificationEstimator::parametricFit(
 			continue;
 		}
 
+		std::vector<Image<RFLOAT> > imgs_for_eps;
+		std::vector<double> scales;
+		std::vector<std::string> labels;
+
 		Image<RFLOAT> flowx, flowy;
 		MagnificationHelper::solvePerPixel(magEqs, flowx, flowy);
 
@@ -205,10 +209,15 @@ void MagnificationEstimator::parametricFit(
 
 		ImageLog::write(flowxFull, outPath + "mag_disp_x_optics-group_" + sts.str());
 		ImageLog::write(flowyFull, outPath + "mag_disp_y_optics-group_" + sts.str());
-		ColorHelper::writeSignedToPNG(flowxFull,
-			outPath + "mag_disp_x_optics-group_" + sts.str() + "_-1+1");
-		ColorHelper::writeSignedToPNG(flowyFull,
-			outPath + "mag_disp_y_optics-group_" + sts.str() + "_-1+1");
+
+		imgs_for_eps.push_back(flowxFull);
+		scales.push_back(1.);
+		labels.push_back("X-disp obs [-1,+1] "+obsModel->getGroupName(og));
+
+		imgs_for_eps.push_back(flowyFull);
+		scales.push_back(1.);
+		labels.push_back("Y-disp obs [-1,+1] "+obsModel->getGroupName(og));
+
 
 		Image<RFLOAT> freqWght = reference->getHollowWeight(kmin, s[og], angpix[og]);
 
@@ -219,10 +228,15 @@ void MagnificationEstimator::parametricFit(
 
 		ImageLog::write(flowxFull, outPath + "mag_disp_x_fit_optics-group_" + sts.str());
 		ImageLog::write(flowyFull, outPath + "mag_disp_y_fit_optics-group_" + sts.str());
-		ColorHelper::writeSignedToPNG(flowxFull,
-			outPath + "mag_disp_x_fit_optics-group_" + sts.str() + "_-1+1");
-		ColorHelper::writeSignedToPNG(flowyFull,
-			outPath + "mag_disp_y_fit_optics-group_" + sts.str() + "_-1+1");
+
+
+		imgs_for_eps.push_back(flowxFull);
+		scales.push_back(1.);
+		labels.push_back("X-disp fit [-1,+1] "+obsModel->getGroupName(og));
+
+		imgs_for_eps.push_back(flowyFull);
+		scales.push_back(1.);
+		labels.push_back("Y-disp fit [-1,+1] "+obsModel->getGroupName(og));
 
 		std::ofstream os(outPath + "mag_matrix_optics-group_" + sts.str() + ".txt");
 		os << mat(0,0) << " " << mat(0,1) << "\n";
@@ -243,6 +257,10 @@ void MagnificationEstimator::parametricFit(
 		}
 
 		obsModel->setMagMatrix(og, mat1);
+
+		FileName fn_root = outPath + "mag_disp_optics-group_"+ sts.str();
+		ColorHelper::writeSignedToEPS(fn_root, 2, imgs_for_eps, scales, labels);
+		fn_eps.push_back(fn_root+".eps");
 	}
 
 	obsModel->hasMagMatrices = true;
