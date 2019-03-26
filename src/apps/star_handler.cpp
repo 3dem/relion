@@ -172,8 +172,20 @@ class star_handler_parameters
 
 	void read_check_ignore_optics(MetaDataTable &MD, FileName fn, std::string tablename = "discover")
 	{
-		if (do_ignore_optics) MD.read(fn, tablename_in);
-		else ObservationModel::loadSafely(fn, obsModel, MD, tablename, 1);
+		if (do_ignore_optics)
+		{
+			MD.read(fn, tablename_in);
+		}
+		else
+		{
+			ObservationModel::loadSafely(fn, obsModel, MD, tablename, 1, false);
+			if (obsModel.opticsMdt.numberOfObjects() == 0)
+			{
+				std::cerr << " + WARNGING: could not read optics groups table, proceeding without it ..." << std::endl;
+				MD.read(fn, tablename_in);
+				do_ignore_optics = true;
+			}
+		}
 	}
 
 	void write_check_ignore_optics(MetaDataTable &MD, FileName fn, std::string tablename)
