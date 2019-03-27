@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+
+<html>
+
+<header>
+<title>CTF calculator</title>
+<script type="text/javascript">
+
+function electron_wavelength(U) { // U in [V], returns in [Angstrom]
+   var h =  6.626E-34 // Planck constant [Js] = [kgm^2/s]
+   var e =  1.602E-19 // electron charge [C]; note that [CV] = [J]
+   var c =  3.000E8   // speed of light [m/s]
+   var m0 = 9.109E-31 // electron rest mass [kg]
+
+   return h / Math.sqrt(2 * m0 * e * U) / Math.sqrt(1 + e * U / (2 * m0 * c * c)) * 1E10
+}
+
+function draw() {
+   var apix = parseFloat(document.getElementById("angpix").value);
+   var boxsize = parseInt(document.getElementById("boxsize").value);
+   var defocus = parseFloat(document.getElementById("defocus").value); // (U + V) / 2
+   var astigmatism = parseFloat(document.getElementById("astigmatism").value); // (U - V) / 2
+   var astig_angle = parseFloat(document.getElementById("angle").value) / 180.0 * Math.PI;
+   var cs = 1E7 * parseFloat(document.getElementById("cs").value);
+   var ht = 1E3 * parseFloat(document.getElementById("energy").value);
+   var ac = parseFloat(document.getElementById("ac").value);
+   var phase_shift = parseFloat(document.getElementById("phase").value) / 180.0 * Math.PI;
+   var ring1 = parseFloat(document.getElementById("ring1").value);
+
+   var power_spectrum = false;
+
+   var canvas = document.getElementById("ctf2d");
+   var ctx = canvas.getContext("2d");
+
+   var nx = boxsize, ny = boxsize;
+   canvas.width = canvas.height = boxsize;
+
+   var wavelength = electron_wavelength(ht);
+   var wavelength3 = wavelength * wavelength *wavelength;
+   var pc = Math.sqrt(1 - ac * ac);
+   var K1 = Math.PI / 2 * cs * wavelength3;
+   var K2 = Math.PI * wavelength;
+
+   var img_data = ctx.createImageData(ny, nx);
+
+   var idx = 0;
+   for (var i = 0; i < ny; i++) {
+      var sy = (i - ny / 2.0) / ny / apix;
+      var sy2 = sy * sy;
+      for (var j = 0; j < nx; j++) {
+         var sx = (j - nx / 2) / nx / apix;
+         var angle = Math.atan2(sy, sx) - astig_angle;
+         var local_defocus = defocus + astigmatism * Math.cos(2 * angle);
+
+         var s2 = sy2 + sx * sx;
+         var gamma = K1 * s2 * s2 - K2 * s2 * local_defocus - phase_shift;
+         var ctf = -pc * Math.sin(gamma) + ac * Math.cos(gamma);
+
+         var color = 0;
+         if (power_spectrum) {
+            ctf = ctf * ctf;
+            color = ctf * 256;
+         } else {
+            color = (ctf + 1) * 128;
+         }
+         if (color < 0) color = 0;
+         if (color > 255) color = 255;
+
+         img_data.data[idx    ] = color; // R
+         img_data.data[idx + 1] = color; // G
+         img_data.data[idx + 2] = color; // B
+         img_data.data[idx + 3] = 255;   // A
+
+         if (s2 > 0) {
+            var resol = Math.sqrt(1.0 / s2);
+            if (Math.abs(resol - ring1) < 0.02) {
+               img_data.data[idx    ] = 255;
+               img_data.data[idx + 1] = 0;
+               img_data.data[idx + 2] = 0;
+            }
+         }
+
+         idx += 4;
+      }
+   }
+
+   ctx.putImageData(img_data, 0, 0);
+}
+</script>
+</header>
+
+<body>
+
+<h1>CTF calculator</h1>
+<p>This interactive page allows you to calculate the contrast transfer function. The CTF model is compatible with that of RELION.</p>
+
+<form>
+<label>Box size (in pix): <input id="boxsize" min="2" max="1024" value="300"></label><br>
+<label>Pixel size (in &#8491; / pix): <input id="angpix" min="0" max="3" value="1.0"></label><br>
+<label>Defocus ((U+V)/2 in &#8491;): <input id="defocus" min="0" max="100000" value="10000"></label><br>
+<label>Astigmatism ((U-V)/2 in &#8491;): <input id="astigmatism" min="0" max="2000" value="200"></label><br>
+<label>Astigmatism angle (in deg): <input id="angle" min="0" max="360" value="90"></label><br>
+<label>Cs (in mm): <input id="cs" min="0" max="4" step="0.01" value="2.7"></label><br>
+<label>Energy (in kV): <input id="energy" min="0" max="1000" step="10" value="300"></label><br>
+<label>Amplitude contrast: <input id="ac" min="0" max="1" value="0.1"></label><br>
+<label>Phase shift (in deg): <input id="phase" min="-360" max="360" step="1" value="0"></label><br>
+<label>Draw ring at (in &#8491;): <input id="ring1" min="999" max="0.5" value="2.5"></label><br>
+<button type="button" value="Draw" onClick="draw()">Draw</button>
+</form>
+<canvas id="ctf2d" width=512 height=512 style="border:1px solid black">
+</canvas>
+
+<footer>
+<p>This page is written by Takanori Nakane at MRC-LMB. This page uses Javascript for calculation.</p>
+</footer>
+</body>
+</html>
