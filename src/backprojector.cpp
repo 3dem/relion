@@ -1328,11 +1328,6 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 #endif
 
     RCTIC(ReconTimer,ReconS_1);
-    FourierTransformer transformer;
-	MultidimArray<RFLOAT> Fweight;
-	// Fnewweight can become too large for a float: always keep this one in double-precision
-	MultidimArray<double> Fnewweight;
-	MultidimArray<Complex>& Fconv = transformer.getFourierReference();
 	int max_r2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
 	RFLOAT oversampling_correction = (ref_dim == 3) ? (padding_factor * padding_factor * padding_factor) : (padding_factor * padding_factor);
 
@@ -1345,7 +1340,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 	std::cerr << " pad_size= " << pad_size << " padding_factor= " << padding_factor << " max_r2= " << max_r2 << std::endl;
 #endif
 
-    // Set Fweight, Fnewweight and Fconv to the right size
+    // Set Fconv to the right size
     if (ref_dim == 2)
         vol_out.setDimensions(pad_size, pad_size, 1, 1);
     else
@@ -1353,22 +1348,22 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
         // Trick transformer with the right dimensions
         vol_out.setDimensions(pad_size, pad_size, pad_size, 1);
 
+    FourierTransformer transformer;
     transformer.setReal(vol_out); // Fake set real. 1. Allocate space for Fconv 2. calculate plans.
+	MultidimArray<Complex>& Fconv = transformer.getFourierReference();
     vol_out.clear(); // Reset dimensions to 0
 
     RCTOC(ReconTimer,ReconS_1);
     RCTIC(ReconTimer,ReconS_2);
 
-    Fweight.reshape(Fconv);
-    if (!skip_gridding)
-    	Fnewweight.reshape(Fconv);
-
 	// Go from projector-centered to FFTW-uncentered
+	MultidimArray<RFLOAT> Fweight;
+    Fweight.reshape(Fconv);
 	decenter(weight, Fweight, max_r2);
 
     RCTOC(ReconTimer,ReconS_2);
     RCTIC(ReconTimer,ReconS_2_5);
-	// Apply MAP-additional term to the Fnewweight array
+	// Apply MAP-additional term to the Fweight array
 	// This will regularise the actual reconstruction
     if (do_map)
 	{
@@ -1414,38 +1409,72 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
     RCTOC(ReconTimer,ReconS_2_5);
 	if (skip_gridding)
 	{
-	    RCTIC(ReconTimer,ReconS_3);
-		std::cerr << "Skipping gridding!" << std::endl;
+
+		std::cerr << "Skipping gridding - new implementation ..." << std::endl;
+
+		RCTIC(ReconTimer,ReconS_3);
 		Fconv.initZeros(); // to remove any stuff from the input volume
 		decenter(data, Fconv, max_r2);
 
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fconv)
+		// Prevent divisions by zero: set Fweight to at least 1/1000th of the radially averaged weight at that resolution
+		// beyond r_max, set Fweight to at least 1/1000th of the radially averaged weight at r_max;
+		MultidimArray<RFLOAT> radavg_weight(r_max), counter(r_max);
+		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fweight)
 		{
-			if (DIRECT_MULTIDIM_ELEM(Fweight, n) > 0.)
-				DIRECT_MULTIDIM_ELEM(Fconv, n) /= DIRECT_MULTIDIM_ELEM(Fweight, n);
+			int r2 = kp * kp + ip * ip + jp * jp;
+			if (r2 < max_r2)
+			{
+				int ires = FLOOR( sqrt((RFLOAT)r2) / padding_factor );
+				if (ires >= XSIZE(radavg_weight))
+				{
+					std::cerr << " k= " << k << " i= " << i << " j= " << j << std::endl;
+					std::cerr << " ires= " << ires << " XSIZE(radavg_weight)= " << XSIZE(radavg_weight) << std::endl;
+					REPORT_ERROR("BUG: ires >=XSIZE(radavg_weight) ");
+				}
+				DIRECT_A1D_ELEM(radavg_weight, ires) += DIRECT_A3D_ELEM(weight, k, i, j);
+				DIRECT_A1D_ELEM(counter, ires) += 1.;
+			}
 		}
-		RCTOC(ReconTimer,ReconS_3);
-#ifdef DEBUG_RECONSTRUCT
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fconv)
+
+		// Calculate 1/1000th of radial averaged weight
+		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(radavg_weight)
 		{
-			DIRECT_MULTIDIM_ELEM(ttt(), n) = DIRECT_MULTIDIM_ELEM(Fweight, n);
+			if (DIRECT_A1D_ELEM(counter, i) > 0. || DIRECT_A1D_ELEM(radavg_weight, i) > 0.)
+			{
+				DIRECT_A1D_ELEM(radavg_weight, i) /= 1000.* DIRECT_A1D_ELEM(counter, i);
+			}
+			else
+			{
+				std::cerr << " counter= " << counter << std::endl;
+				std::cerr << " radavg_weight= " << radavg_weight << std::endl;
+				REPORT_ERROR("BUG: zeros in counter or radavg_weight!");
+			}
 		}
-		ttt.write("reconstruct_skipgridding_correction_term.spi");
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fconv)
+
+		// perform XMIPP_MAX on all weight elements, and do division of data/weight
+		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fweight)
 		{
-			if (DIRECT_MULTIDIM_ELEM(Fweight, n) > 0.)
-				DIRECT_MULTIDIM_ELEM(ttt(), n) = 1./DIRECT_MULTIDIM_ELEM(Fweight, n);
+			int r2 = kp * kp + ip * ip + jp * jp;
+			int ires = FLOOR( sqrt((RFLOAT)r2) / padding_factor );
+			if (ires < r_max)
+			{
+				DIRECT_A3D_ELEM(Fconv, k, i, j) /= XMIPP_MAX(DIRECT_A3D_ELEM(Fweight, k, i, j), DIRECT_A1D_ELEM(radavg_weight, ires));
+			}
+			else
+			{
+				DIRECT_A3D_ELEM(Fconv, k, i, j) /= XMIPP_MAX(DIRECT_A3D_ELEM(Fweight, k, i, j), DIRECT_A1D_ELEM(radavg_weight, r_max-1));
+			}
 		}
-		ttt.write("reconstruct_skipgridding_correction_term_inverse.spi");
-#endif
+
 	}
 	else
 	{
 		RCTIC(ReconTimer,ReconS_4);
+
 		// Divide both data and Fweight by normalisation factor to prevent FFT's with very large values....
-	#ifdef DEBUG_RECONSTRUCT
+#ifdef DEBUG_RECONSTRUCT
 		std::cerr << " normalise= " << normalise << std::endl;
-	#endif
+#endif
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fweight)
 		{
 			DIRECT_MULTIDIM_ELEM(Fweight, n) /= normalise;
@@ -1454,9 +1483,11 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 		{
 			DIRECT_MULTIDIM_ELEM(data, n) /= normalise;
 		}
+
 		RCTOC(ReconTimer,ReconS_4);
 		RCTIC(ReconTimer,ReconS_5);
-        // Initialise Fnewweight with 1's and 0's. (also see comments below)
+
+		// Initialise Fnewweight with 1's and 0's. (also see comments below)
 		FOR_ALL_ELEMENTS_IN_ARRAY3D(weight)
 		{
 			if (k * k + i * i + j * j < max_r2)
@@ -1464,7 +1495,11 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 			else
 				A3D_ELEM(weight, k, i, j) = 0.;
 		}
+		// Fnewweight can become too large for a float: always keep this one in double-precision
+		MultidimArray<double> Fnewweight;
+    	Fnewweight.reshape(Fconv);
 		decenter(weight, Fnewweight, max_r2);
+
 		RCTOC(ReconTimer,ReconS_5);
 		// Iterative algorithm as in  Eq. [14] in Pipe & Menon (1999)
 		// or Eq. (4) in Matej (2001)
@@ -1506,18 +1541,21 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 					DIRECT_A3D_ELEM(Fnewweight, k, i, j) /= w;
 				}
 			}
-			RCTOC(ReconTimer,ReconS_6);
-	#ifdef DEBUG_RECONSTRUCT
+
+            RCTOC(ReconTimer,ReconS_6);
+
+#ifdef DEBUG_RECONSTRUCT
 			std::cerr << " PREWEIGHTING ITERATION: "<< iter + 1 << " OF " << max_iter_preweight << std::endl;
 			// report of maximum and minimum values of current conv_weight
 			std::cerr << " corr_avg= " << corr_avg / corr_nn << std::endl;
 			std::cerr << " corr_min= " << corr_min << std::endl;
 			std::cerr << " corr_max= " << corr_max << std::endl;
-	#endif
+#endif
 		}
 
 		RCTIC(ReconTimer,ReconS_7);
-	#ifdef DEBUG_RECONSTRUCT
+
+#ifdef DEBUG_RECONSTRUCT
 		Image<double> tttt;
 		tttt()=Fnewweight;
 		tttt.write("reconstruct_gridding_weight.spi");
@@ -1526,7 +1564,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 			DIRECT_MULTIDIM_ELEM(ttt(), n) = abs(DIRECT_MULTIDIM_ELEM(Fconv, n));
 		}
 		ttt.write("reconstruct_gridding_correction_term.spi");
-	#endif
+#endif
 
 
 		// Clear memory
@@ -1550,8 +1588,9 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 
 		// Clear memory
 		Fnewweight.clear();
+
 		RCTOC(ReconTimer,ReconS_7);
-	} // end if skip_gridding
+	} // end if !skip_gridding
 
 // Gridding theory says one now has to interpolate the fine grid onto the coarse one using a blob kernel
 // and then do the inverse transform and divide by the FT of the blob (i.e. do the gridding correction)
@@ -1651,15 +1690,19 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 
 	// Correct for the linear/nearest-neighbour interpolation that led to the data array
 	RCTIC(ReconTimer,ReconS_18);
+
 	griddingCorrect(vol_out);
+
 	RCTOC(ReconTimer,ReconS_18);
 	RCTIC(ReconTimer,ReconS_23);
+
 	// Completely empty the transformer object
 	transformer.cleanup();
     // Now can use extra mem to move data into smaller array space
     vol_out.shrinkToFit();
 
 	RCTOC(ReconTimer,ReconS_23);
+
 #ifdef TIMING
     if(printTimes)
     	ReconTimer.printTimes(true);
@@ -1721,6 +1764,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 			}
 		}
 	}
+
 }
 
 void BackProjector::symmetrise(int nr_helical_asu, RFLOAT helical_twist, RFLOAT helical_rise, int threads)
