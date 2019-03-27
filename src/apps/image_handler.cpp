@@ -33,7 +33,7 @@ class image_handler_parameters
 	public:
    	FileName fn_in, fn_out, fn_sel, fn_img, fn_sym, fn_sub, fn_mult, fn_div, fn_add, fn_subtract, fn_fsc, fn_adjust_power, fn_correct_ampl, fn_fourfilter, fn_cosDPhi;
 	int bin_avg, avg_first, avg_last, edge_x0, edge_xF, edge_y0, edge_yF, filter_edge_width, new_box, minr_ampl_corr, my_new_box_size = -1;
-	bool do_add_edge, do_invert_hand, do_flipXY, do_flipmXY, do_flipZ, do_flipX, do_flipY, do_shiftCOM, do_stats, do_calc_com, do_avg_ampl, do_avg_ampl2, do_avg_ampl2_ali, do_average, do_remove_nan, do_average_all_frames, do_power;
+	bool do_add_edge, do_invert_hand, do_flipXY, do_flipmXY, do_flipZ, do_flipX, do_flipY, do_shiftCOM, do_stats, do_calc_com, do_avg_ampl, do_avg_ampl2, do_avg_ampl2_ali, do_average, do_remove_nan, do_average_all_frames, do_power, do_ignore_optics;
 	RFLOAT multiply_constant, divide_constant, add_constant, subtract_constant, threshold_above, threshold_below, angpix, new_angpix, lowpass, highpass, logfilter, bfactor, shift_x, shift_y, shift_z, replace_nan, randomize_at;
 	std::string directional;
    	int verb;
@@ -565,7 +565,14 @@ class image_handler_parameters
 		// Get a MetaDataTable
 		if (input_is_star)
 		{
-			ObservationModel::loadSafely(fn_in, obsModel, MD, "discover", verb);
+			do_ignore_optics = false;
+			ObservationModel::loadSafely(fn_in, obsModel, MD, "discover", verb, false); // false means don't die upon failure
+			if (obsModel.opticsMdt.numberOfObjects() == 0)
+			{
+				do_ignore_optics = true;
+				std::cout << " + WARNING: reading input STAR file without optics groups ..." << std::endl;
+				MD.read(fn_in);
+			}
 			if (fn_out.getExtension() != "mrcs")
 				std::cout << "NOTE: the input (--i) is a STAR file but the output (--o) does not have .mrcs extension. The output is treated as a suffix, not a path." << std::endl;
 			input_is_stack = true;
@@ -868,24 +875,31 @@ class image_handler_parameters
 		if (do_md_out && fn_in.getExtension() == "star")
 		{
 			FileName fn_md_out = fn_in.insertBeforeExtension("_" + fn_out);
+
+			if (do_ignore_optics)
+			{
+				MD.write(fn_md_out);
+			}
+			else
+			{
+				if (my_new_box_size > 0)
+				{
+					FOR_ALL_OBJECTS_IN_METADATA_TABLE(obsModel.opticsMdt)
+					{
+						obsModel.opticsMdt.setValue(EMDL_IMAGE_SIZE, my_new_box_size);
+					}
+				}
+				if (new_angpix > 0)
+				{
+					FOR_ALL_OBJECTS_IN_METADATA_TABLE(obsModel.opticsMdt)
+					{
+						obsModel.opticsMdt.setValue(EMDL_IMAGE_PIXEL_SIZE, new_angpix);
+					}
+				}
+				obsModel.save(MD, fn_md_out);
+			}
+
 			std::cout << " Written out new STAR file: " << fn_md_out << std::endl;
-
-			if (my_new_box_size > 0)
-			{
-				FOR_ALL_OBJECTS_IN_METADATA_TABLE(obsModel.opticsMdt)
-				{
-					obsModel.opticsMdt.setValue(EMDL_IMAGE_SIZE, my_new_box_size);
-				}
-			}
-			if (new_angpix > 0)
-			{
-				FOR_ALL_OBJECTS_IN_METADATA_TABLE(obsModel.opticsMdt)
-				{
-					obsModel.opticsMdt.setValue(EMDL_IMAGE_PIXEL_SIZE, new_angpix);
-				}
-			}
-
-			obsModel.save(MD, fn_md_out);
 		}
 
 	}
