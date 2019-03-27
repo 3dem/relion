@@ -31,6 +31,7 @@ void Reconstructor::read(int argc, char **argv)
 	padding_factor = textToFloat(parser.getOption("--pad", "Padding factor", "2"));
 	image_path = parser.getOption("--img", "Optional: image path prefix", "");
 	subset = textToInteger(parser.getOption("--subset", "Subset of images to consider (1: only reconstruct half1; 2: only half2; other: reconstruct all)", "-1"));
+	angpix  = textToFloat(parser.getOption("--angpix", "Pixel size in the reconstruction (take from first optics group by default)", "-1"));
 
 	int ctf_section = parser.addSection("CTF options");
 	do_ctf = parser.checkOption("--ctf", "Apply CTF correction");
@@ -147,12 +148,11 @@ void Reconstructor::initialise()
 			mysize = newbox;
 	}
 
-	if (!obsModel.allPixelSizesIdentical())
+	if (angpix < 0.)
 	{
-		REPORT_ERROR("Reconstructor does not support varying pixel sizes yet.");
+		angpix = obsModel.getPixelSize(0);
+		std::cout << " + Taking angpix from the first optics group: " << angpix << std::endl;
 	}
-
-	angpix = obsModel.getPixelSize(0);
 
 	if (maxres < 0.)
 		r_max = -1;
