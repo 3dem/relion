@@ -68,7 +68,7 @@ class ObservationModel
 			std::vector<int> boxSizes;
 			std::vector<std::vector<double> > evenZernikeCoeffs, oddZernikeCoeffs;
 			std::vector<Matrix2D<RFLOAT> > magMatrices;
-			std::vector<std::string> fnMtfs;
+			std::vector<std::string> fnMtfs, groupNames;
 
 			// cached aberration effects for a set of given image sizes
 			// e.g.: phaseCorr[opt. group][img. height](y,x)

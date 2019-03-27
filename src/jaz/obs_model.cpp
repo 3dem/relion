@@ -207,6 +207,10 @@ ObservationModel::ObservationModel(const MetaDataTable &_opticsMdt, bool do_die_
 
 	hasBoxSizes = opticsMdt.containsLabel(EMDL_IMAGE_SIZE);
 
+	if (opticsMdt.containsLabel(EMDL_IMAGE_OPTICS_GROUP_NAME))
+	{
+		groupNames.resize(opticsMdt.numberOfObjects());
+	}
 
 	if (opticsMdt.containsLabel(EMDL_IMAGE_MTF_FILENAME))
 	{
@@ -223,6 +227,8 @@ ObservationModel::ObservationModel(const MetaDataTable &_opticsMdt, bool do_die_
 		if (!opticsMdt.getValue(EMDL_IMAGE_PIXEL_SIZE, angpix[i], i))
 			if (!opticsMdt.getValue(EMDL_MICROGRAPH_PIXEL_SIZE, angpix[i], i))
 				opticsMdt.getValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, angpix[i], i);
+		if (opticsMdt.containsLabel(EMDL_IMAGE_OPTICS_GROUP_NAME))
+			opticsMdt.getValue(EMDL_IMAGE_OPTICS_GROUP_NAME, groupNames[i], i);
 		if (opticsMdt.containsLabel(EMDL_IMAGE_MTF_FILENAME))
 			opticsMdt.getValue(EMDL_IMAGE_MTF_FILENAME, fnMtfs[i], i);
 		if (opticsMdt.containsLabel(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE))
@@ -652,9 +658,16 @@ int ObservationModel::getOpticsGroup(const MetaDataTable &particlesMdt, long int
 
 std::string ObservationModel::getGroupName(int og)
 {
-	std::stringstream sts;
-	sts << (og+1);
-	return sts.str();
+	if (og < groupNames.size())
+	{
+		return groupNames[og];
+	}
+	else
+	{
+		std::stringstream sts;
+		sts << (og+1);
+		return sts.str();
+	}
 }
 
 bool ObservationModel::allPixelAndBoxSizesIdentical(const MetaDataTable &mdt)
