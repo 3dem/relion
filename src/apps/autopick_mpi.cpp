@@ -48,6 +48,7 @@ int main(int argc, char *argv[])
 			prm.run();
 		}
 
+		MPI_Barrier(MPI_COMM_WORLD);
 		if (prm.getRank() == 0)
 			prm.generatePDFLogfile();
 	}
