@@ -40,11 +40,12 @@ class ext_recons_parameters
    	float padding_factor;
    	int ori_size, current_size, ref_dim;
    	int verb;
+   	bool skip_gridding, do_map;
 
 
 	void read(int argc, char **argv)
 	{
-		if (argc != 2)
+		if (argc < 2)
 		{
 			REPORT_ERROR("  Usage: relion_external_reconstruct input.star");
 		}
@@ -53,6 +54,8 @@ class ext_recons_parameters
 		{
 			REPORT_ERROR(" ERROR: input argument does not have a .star extension.");
 		}
+		skip_gridding  = checkParameter(argc, argv, "--skip_gridding");
+		do_map = !checkParameter(argc, argv, "--no_map");
 
 		MetaDataTable MDlist, MDtau;
 		MDlist.read(fn_star, "external_reconstruct_general");
@@ -85,6 +88,8 @@ class ext_recons_parameters
 		BackProjector BP(ori_size, ref_dim, "C1", TRILINEAR, padding_factor);
 		BP.initZeros(current_size);
 
+		if (skip_gridding) BP.skip_gridding = skip_gridding;
+
 		Image<Complex> Idata;
 		Image<RFLOAT> Iweight;
 		std::string fn_ext = "."+fn_data_real.getExtension();
@@ -103,7 +108,7 @@ class ext_recons_parameters
 			}
 		}
 
-		BP.reconstruct(Iweight(), 10, true, tau2, tau2_fudge);
+		BP.reconstruct(Iweight(), 10, do_map, tau2, tau2_fudge);
 		Iweight.write(fn_recons);
 	}
 
