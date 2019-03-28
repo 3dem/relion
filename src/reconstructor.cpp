@@ -104,10 +104,16 @@ void Reconstructor::initialise()
 	if (do_reconstruct_ctf)
 		do_ctf = false;
 
+	do_ignore_optics = false;
 	// Read MetaData file, which should have the image names and their angles!
 	if (fn_debug == "")
 	{
-		ObservationModel::loadSafely(fn_sel, obsModel, DF);
+		ObservationModel::loadSafely(fn_sel, obsModel, DF, "particles", 0, false);
+		if (obsModel.opticsMdt.numberOfObjects() == 0)
+		{
+			do_ignore_optics = true;
+			DF.read(fn_sel);
+		}
 	}
 
 	if (verb > 0 && (subset == 1 || subset == 2) && !DF.containsLabel(EMDL_PARTICLE_RANDOM_SUBSET))
@@ -150,8 +156,27 @@ void Reconstructor::initialise()
 
 	if (angpix < 0.)
 	{
-		angpix = obsModel.getPixelSize(0);
-		std::cout << " + Taking angpix from the first optics group: " << angpix << std::endl;
+		if (do_ignore_optics)
+		{
+	        if (DF.containsLabel(EMDL_CTF_MAGNIFICATION) && DF.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
+	        {
+	                RFLOAT mag, dstep;
+	                DF.getValue(EMDL_CTF_MAGNIFICATION, mag);
+	                DF.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
+	                angpix = 10000. * dstep / mag;
+	                if (verb > 0)
+	                        std::cout << " + Using pixel size calculated from magnification and detector pixel size in the input STAR file: " << angpix << std::endl;
+	        }
+	        else
+	        {
+	        	REPORT_ERROR("ERROR: cannot find pixel size in input STAR file, provide it using --angpix");
+	        }
+		}
+		else
+		{
+			angpix = obsModel.getPixelSize(0);
+			std::cout << " + Taking angpix from the first optics group: " << angpix << std::endl;
+		}
 	}
 
 	if (maxres < 0.)
@@ -302,13 +327,17 @@ void Reconstructor::backprojectOneParticle(long int p)
 	// If we are considering Ewald sphere curvature, the mag. matrix
 	// has to be provided to the backprojector explicitly
 	// (to avoid creating an Ewald ellipsoid)
-	int opticsGroup = obsModel.getOpticsGroup(DF, p);
-	Matrix2D<RFLOAT> magMat;
-	if (!do_ewald)
+	int opticsGroup;
+	if (!do_ignore_optics)
 	{
-		A3D = obsModel.applyAnisoMag(A3D, opticsGroup);
+		opticsGroup = obsModel.getOpticsGroup(DF, p);
+		Matrix2D<RFLOAT> magMat;
+		if (!do_ewald)
+		{
+			A3D = obsModel.applyAnisoMag(A3D, opticsGroup);
+		}
+		A3D = obsModel.applyScaleDifference(A3D, opticsGroup, mysize, angpix);
 	}
-	A3D = obsModel.applyScaleDifference(A3D, opticsGroup, mysize, angpix);
 
 	// Translations (either through phase-shifts or in real space
 	trans.initZeros();
@@ -455,14 +484,20 @@ void Reconstructor::backprojectOneParticle(long int p)
 		else
 		{
 			CTF ctf;
-			ctf.readByGroup(DF, &obsModel, p);
+			if (do_ignore_optics)
+				ctf.read(DF, DF, p);
+			else
+				ctf.readByGroup(DF, &obsModel, p);
 
 			ctf.getFftwImage(Fctf, mysize, mysize, angpix,
 			                 ctf_phase_flipped, only_flip_phases,
 			                 intact_ctf_first_peak, true);
 
-			obsModel.demodulatePhase(DF, p, F2D);
-			obsModel.divideByMtf(DF, p, F2D);
+			if (!do_ignore_optics)
+			{
+				obsModel.demodulatePhase(DF, p, F2D);
+				obsModel.divideByMtf(DF, p, F2D);
+			}
 
 			// Ewald-sphere curvature correction
 			if (do_ewald)
@@ -589,7 +624,7 @@ void Reconstructor::backprojectOneParticle(long int p)
 		{
 			Matrix2D<RFLOAT> magMat;
 
-			if (obsModel.hasMagMatrices)
+			if (!do_ignore_optics && obsModel.hasMagMatrices)
 			{
 				magMat = obsModel.getMagMatrix(opticsGroup);
 			}
