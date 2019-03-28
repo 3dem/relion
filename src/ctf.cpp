@@ -312,53 +312,140 @@ t2Vector<RFLOAT> CTF::getGammaGrad(double X, double Y) const
 
 /* Generate a complete CTF Image ------------------------------------------------------ */
 void CTF::getFftwImage(MultidimArray<RFLOAT> &result, int orixdim, int oriydim, RFLOAT angpix,
-		    		bool do_abs, bool do_only_flip_phases, bool do_intact_until_first_peak, bool do_damping)
+		    		bool do_abs, bool do_only_flip_phases, bool do_intact_until_first_peak,
+					bool do_damping, bool do_ctf_padding)
 {
-	RFLOAT xs = (RFLOAT)orixdim * angpix;
-	RFLOAT ys = (RFLOAT)oriydim * angpix;
 
-	if (obsModel != 0 && obsModel->hasEvenZernike)
+	// Boxing the particle in a small box from the whole micrograph leads to loss of delocalised information (or aliaising in the CTF)
+	// Here, calculate the CTF in a 2x larger box to support finer oscillations,
+	// and then rescale the large CTF to simulate the effect of the windowing operation
+	if (do_ctf_padding)
 	{
-		if (orixdim != oriydim)
+
+		bool ctf_premultiplied=false;
+		if (obsModel != 0)
 		{
-			REPORT_ERROR_STR("CTF::getFftwImage: symmetric aberrations are currently only "
-			              << "supported for square images.\n");
+			ctf_premultiplied = obsModel->getCtfPremultiplied(opticsGroup);
 		}
 
-		const Image<RFLOAT>& gammaOffset = obsModel->getGammaOffset(opticsGroup, oriydim);
-
-		if (   gammaOffset.data.xdim < result.xdim
-		    || gammaOffset.data.ydim < result.ydim)
+		// two-fold padding, increased to 4-fold padding for pre-multiplied CTFs
+		int orixdim_pad = 2 * orixdim;
+		int oriydim_pad = 2 * oriydim;
+		// TODO: Such a big box may not be really necessary.....
+		if (ctf_premultiplied)
 		{
-			REPORT_ERROR_STR("CTF::getFftwImage: requested output image is larger than the original: "
-				<< gammaOffset.data.xdim << "x" << gammaOffset.data.ydim << " available, "
-				<< result.xdim << "x" << result.ydim << " requested\n");
+			orixdim_pad *= 2;
+			oriydim_pad *= 2;
 		}
 
-		for (int y1 = 0; y1 < result.ydim; y1++)
-		for (int x1 = 0; x1 < result.xdim; x1++)
+		MultidimArray<RFLOAT> Fctf(oriydim_pad, orixdim_pad/2 + 1);
+
+		getFftwImage(Fctf, orixdim_pad, oriydim_pad, angpix, do_abs,
+				do_only_flip_phases, do_intact_until_first_peak, do_damping, false);
+
+		// From half to whole
+		MultidimArray<RFLOAT> Mctf(oriydim_pad, orixdim_pad);
+		Mctf.setXmippOrigin();
+		for (int i = 0 ; i<YSIZE(Fctf); i++)
 		{
-			RFLOAT x = x1 / xs;
-			RFLOAT y = y1 <= result.ydim/2? y1 / ys : (y1 - result.ydim) / ys;
+			// Don't take the middle row of the half-transform
+			if (i != YSIZE(Fctf)/2)
+			{
+				int ip = (i < XSIZE(Fctf)) ? i : i - YSIZE(Fctf);
+				// Don't take the last column from the half-transform
+				for (int j = 0; j<XSIZE(Fctf)-1; j++)
+				{
+					if (ctf_premultiplied)
+					{
+						A2D_ELEM(Mctf, ip, j) = DIRECT_A2D_ELEM(Fctf, i, j) * DIRECT_A2D_ELEM(Fctf, i, j);
+						A2D_ELEM(Mctf, -ip, -j) = DIRECT_A2D_ELEM(Fctf, i, j) * DIRECT_A2D_ELEM(Fctf, i, j);
+					}
+					else
+					{
+						A2D_ELEM(Mctf, ip, j) = DIRECT_A2D_ELEM(Fctf, i, j);
+						A2D_ELEM(Mctf, -ip, -j) = DIRECT_A2D_ELEM(Fctf, i, j);
+					}
+				}
+			}
+		}
 
-			const int x0 = x1;
-			const int y0 = y1 <= result.ydim/2? y1 : gammaOffset.data.ydim + y1 - result.ydim;
+		resizeMap(Mctf, orixdim);
+		Mctf.setXmippOrigin();
 
-			DIRECT_A2D_ELEM(result, y1, x1) =
-				getCTF(x, y, do_abs, do_only_flip_phases,
-					   do_intact_until_first_peak, do_damping, gammaOffset(y0,x0));
+		// From whole to half
+		for (int i = 0 ; i<YSIZE(result); i++)
+		{
+			// Don't take the middle row of the half-transform
+			if (i != YSIZE(result)/2)
+			{
+				int ip = (i < XSIZE(result)) ? i : i - YSIZE(result);
+				// Don't take the last column from the half-transform
+				for (int j = 0; j<XSIZE(result)-1; j++)
+				{
+					if (ctf_premultiplied)
+					{
+						if (A2D_ELEM(Mctf, ip, j) < 0.)
+							DIRECT_A2D_ELEM(result, i, j) = 0.;
+						else if (A2D_ELEM(Mctf, ip, j) > 1.)
+							DIRECT_A2D_ELEM(result, i, j) = 1.;
+						else
+							DIRECT_A2D_ELEM(result, i, j) = sqrt(A2D_ELEM(Mctf, ip, j));
+					}
+					else
+						DIRECT_A2D_ELEM(result, i, j) = A2D_ELEM(Mctf, ip, j);
+				}
+			}
 		}
 	}
 	else
 	{
-		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(result)
-		{
-			RFLOAT x = (RFLOAT)jp / xs;
-			RFLOAT y = (RFLOAT)ip / ys;
 
-			DIRECT_A2D_ELEM(result, i, j) =
-				getCTF(x, y, do_abs, do_only_flip_phases,
-					   do_intact_until_first_peak, do_damping);
+		RFLOAT xs = (RFLOAT)orixdim * angpix;
+		RFLOAT ys = (RFLOAT)oriydim * angpix;
+
+		if (obsModel != 0 && obsModel->hasEvenZernike)
+		{
+			if (orixdim != oriydim)
+			{
+				REPORT_ERROR_STR("CTF::getFftwImage: symmetric aberrations are currently only "
+							  << "supported for square images.\n");
+			}
+
+			const Image<RFLOAT>& gammaOffset = obsModel->getGammaOffset(opticsGroup, oriydim);
+
+			if (   gammaOffset.data.xdim < result.xdim
+				|| gammaOffset.data.ydim < result.ydim)
+			{
+				REPORT_ERROR_STR("CTF::getFftwImage: requested output image is larger than the original: "
+					<< gammaOffset.data.xdim << "x" << gammaOffset.data.ydim << " available, "
+					<< result.xdim << "x" << result.ydim << " requested\n");
+			}
+
+			for (int y1 = 0; y1 < result.ydim; y1++)
+			for (int x1 = 0; x1 < result.xdim; x1++)
+			{
+				RFLOAT x = x1 / xs;
+				RFLOAT y = y1 <= result.ydim/2? y1 / ys : (y1 - result.ydim) / ys;
+
+				const int x0 = x1;
+				const int y0 = y1 <= result.ydim/2? y1 : gammaOffset.data.ydim + y1 - result.ydim;
+
+				DIRECT_A2D_ELEM(result, y1, x1) =
+					getCTF(x, y, do_abs, do_only_flip_phases,
+						   do_intact_until_first_peak, do_damping, gammaOffset(y0,x0));
+			}
+		}
+		else
+		{
+			FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(result)
+			{
+				RFLOAT x = (RFLOAT)jp / xs;
+				RFLOAT y = (RFLOAT)ip / ys;
+
+				DIRECT_A2D_ELEM(result, i, j) =
+					getCTF(x, y, do_abs, do_only_flip_phases,
+						   do_intact_until_first_peak, do_damping);
+			}
 		}
 	}
 }
