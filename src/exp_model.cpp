@@ -55,6 +55,14 @@ int Experiment::numberOfOpticsGroups()
 	return obsModel.numberOfOpticsGroups();
 }
 
+bool Experiment::hasCtfPremultiplied()
+{
+	for (int og = 0; og < numberOfOpticsGroups(); og++)
+		if (obsModel.getCtfPremultiplied(og)) return true;
+
+	return false;
+}
+
 RFLOAT Experiment::getOpticsPixelSize(int optics_group)
 {
 	return obsModel.getPixelSize(optics_group);

@@ -66,6 +66,7 @@ class ObservationModel
 			// expecting the changes to propagate into the optics star-file
 			std::vector<double> angpix, originalAngpix, lambda, Cs;
 			std::vector<int> boxSizes;
+			std::vector<bool> CtfPremultiplied;
 			std::vector<std::vector<double> > evenZernikeCoeffs, oddZernikeCoeffs;
 			std::vector<Matrix2D<RFLOAT> > magMatrices;
 			std::vector<std::string> fnMtfs, groupNames;
@@ -158,6 +159,9 @@ class ObservationModel
 		void setMagMatrix(int opticsGroup, const Matrix2D<RFLOAT>& M);
 
 		int getOpticsGroup(const MetaDataTable &particlesMdt, long int particle = -1) const;
+
+		bool getCtfPremultiplied(int og) const;
+		void setCtfPremultiplied(int og, bool val);
 
 		std::string getGroupName(int og);
 

@@ -147,8 +147,10 @@ void buildCorrImage(MlOptimiser *baseMLO,
 		OptimisationParamters &op,
 		AccPtr<XFLOAT> &corr_img,
 		int img_id,
-		long int group_id)
+		long int group_id,
+		bool ctf_premultiplied)
 {
+
 	// CC or not
 	if((baseMLO->iter == 1 && baseMLO->do_firstiter_cc) || baseMLO->do_always_cc)
 		for(size_t i = 0; i < corr_img.getSize(); i++)
@@ -165,7 +167,7 @@ void buildCorrImage(MlOptimiser *baseMLO,
 		if (baseMLO->refs_are_ctf_corrected)
 			for(size_t i = 0; i < corr_img.getSize(); i++)
 				corr_img[i] *= DIRECT_MULTIDIM_ELEM(op.local_Fctf[img_id], i)*DIRECT_MULTIDIM_ELEM(op.local_Fctf[img_id], i);
-		if (baseMLO->ctf_premultiplied)
+		if (ctf_premultiplied)
 			for(size_t i = 0; i < corr_img.getSize(); i++)
 				corr_img[i] *= DIRECT_MULTIDIM_ELEM(op.local_Fctf[img_id], i)*DIRECT_MULTIDIM_ELEM(op.local_Fctf[img_id], i);
 	}

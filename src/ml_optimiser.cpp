@@ -604,7 +604,6 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	intact_ctf_first_peak = parser.checkOption("--ctf_intact_first_peak", "Ignore CTFs until their first peak?");
 	refs_are_ctf_corrected = parser.checkOption("--ctf_corrected_ref", "Have the input references been CTF-amplitude corrected?");
 	ctf_phase_flipped = parser.checkOption("--ctf_phase_flipped", "Have the data been CTF phase-flipped?");
-	ctf_premultiplied = parser.checkOption("--ctf_multiplied", "Have the data been premultiplied with their CTF?");
 	only_flip_phases = parser.checkOption("--only_flip_phases", "Only perform CTF phase-flipping? (default is full amplitude-correction)");
 	do_norm_correction = parser.checkOption("--norm", "Perform normalisation-error correction?");
 	do_scale_correction = parser.checkOption("--scale", "Perform intensity-scale corrections on image groups?");
@@ -856,8 +855,6 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 		helical_sigma_distance = -1.;
 	if (!MD.getValue(EMDL_OPTIMISER_HELICAL_KEEP_TILT_PRIOR_FIXED, helical_keep_tilt_prior_fixed))
     		helical_keep_tilt_prior_fixed = false;
-	if (!MD.getValue(EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED, ctf_premultiplied))
-		ctf_premultiplied = false;
 	// New SGD (13Feb2018)
 	if (!MD.getValue(EMDL_OPTIMISER_DO_SGD, do_sgd))
 		do_sgd = false;
@@ -1097,7 +1094,6 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		MD.setValue(EMDL_OPTIMISER_DO_CORRECT_CTF, do_ctf_correction);
 		MD.setValue(EMDL_OPTIMISER_IGNORE_CTF_UNTIL_FIRST_PEAK, intact_ctf_first_peak);
 		MD.setValue(EMDL_OPTIMISER_DATA_ARE_CTF_PHASE_FLIPPED, ctf_phase_flipped);
-		MD.setValue(EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED, ctf_premultiplied);
 		MD.setValue(EMDL_OPTIMISER_DO_ONLY_FLIP_CTF_PHASES, only_flip_phases);
 		MD.setValue(EMDL_OPTIMISER_REFS_ARE_CTF_CORRECTED, refs_are_ctf_corrected);
 		MD.setValue(EMDL_OPTIMISER_FIX_SIGMA_NOISE, fix_sigma_noise);
@@ -4208,7 +4204,7 @@ void MlOptimiser::maximizationOtherParameters()
 							(1. - mu) * DIRECT_MULTIDIM_ELEM(wsum_model.sigma2_noise[igroup], n ) /
 								(2. * wsum_model.sumw_group[igroup] * DIRECT_MULTIDIM_ELEM(Npix_per_shell, n));
 					// Watch out for all-zero sigma2 in case of CTF-premultiplication!
-					if (ctf_premultiplied)
+					if (mydata.hasCtfPremultiplied())
 						DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n) = XMIPP_MAX(DIRECT_MULTIDIM_ELEM(mymodel.sigma2_noise[igroup], n), 1e-15);
 
 					// With unequal box sizes and pixel sizes in optics groups, some pixels in the 1D-spectra may contain zeros:
@@ -6016,6 +6012,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 								int my_metadata_offset = metadata_offset + img_id;
 								RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id, img_id);
 								int optics_group = mydata.getOpticsGroup(part_id, img_id);
+								bool ctf_premultiplied = mydata.obsModel.getCtfPremultiplied(optics_group);
 
 								// Get the Euler matrix
 								Euler_angles2matrix(oversampled_rot[iover_rot],
@@ -7167,6 +7164,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 						const int optics_group = mydata.getOpticsGroup(part_id, img_id);
 						int my_metadata_offset = metadata_offset + img_id;
 						RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id, img_id);
+						bool ctf_premultiplied = mydata.obsModel.getCtfPremultiplied(optics_group);
 
 						// Loop over all oversampled orientations (only a single one in the first pass)
 						for (long int iover_rot = 0; iover_rot < exp_nr_oversampled_rot; iover_rot++)
@@ -8110,6 +8108,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 				int group_id = mydata.getGroupId(part_id, img_id);
 				RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id, img_id);
 				const int optics_group = mydata.getOpticsGroup(part_id, img_id);
+				bool ctf_premultiplied = mydata.obsModel.getCtfPremultiplied(optics_group);
 
 				// Set current_image_size to the coarse_size to calculate expected angular errors
 				int current_image_size;

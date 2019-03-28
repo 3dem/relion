@@ -205,9 +205,6 @@ public:
 	// Images have been CTF phase flipped al;ready
 	bool ctf_phase_flipped;
 
-	// Images have been premultiplied with the CTF
-	bool ctf_premultiplied;
-
 	// Flag whether current references are ctf corrected
 	bool refs_are_ctf_corrected;
 

@@ -1010,6 +1010,7 @@ void getAllSquaredDifferencesCoarse(
 		RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id, img_id);
 		int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, img_id);
 		unsigned long image_size = op.local_Minvsigma2[img_id].nzyxdim;
+		bool ctf_premultiplied = baseMLO->mydata.obsModel.getCtfPremultiplied(optics_group);
 
 		/*====================================
 				Generate Translations
@@ -1079,7 +1080,7 @@ void getAllSquaredDifferencesCoarse(
 				{
 					pixel_correction /= op.local_Fctf[img_id].data[i];
 				}
-				if (baseMLO->ctf_premultiplied)
+				if (ctf_premultiplied)
 				{
 					pixel_correction /= op.local_Fctf[img_id].data[i];
 				}
@@ -1105,7 +1106,7 @@ void getAllSquaredDifferencesCoarse(
 
 		corr_img.allAlloc();
 
-		buildCorrImage(baseMLO,op,corr_img,img_id,group_id);
+		buildCorrImage(baseMLO,op,corr_img,img_id,group_id, ctf_premultiplied);
 		corr_img.cpToDevice();
 
 		deviceInitValue<XFLOAT>(allWeights, (XFLOAT) (op.highres_Xi2_img[img_id] / 2.));
@@ -1228,6 +1229,8 @@ void getAllSquaredDifferencesFine(
 		RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id, img_id);
 		int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, img_id);
 		unsigned long image_size = op.local_Minvsigma2[img_id].nzyxdim;
+		bool ctf_premultiplied = baseMLO->mydata.obsModel.getCtfPremultiplied(optics_group);
+
 		MultidimArray<Complex > Fref;
 		Fref.resize(op.local_Minvsigma2[img_id]);
 
@@ -1303,7 +1306,7 @@ void getAllSquaredDifferencesFine(
 				{
 					pixel_correction /= op.local_Fctf[img_id].data[i];
 				}
-				if (baseMLO->ctf_premultiplied)
+				if (ctf_premultiplied)
 				{
 					pixel_correction /= op.local_Fctf[img_id].data[i];
 				}
@@ -1321,7 +1324,7 @@ void getAllSquaredDifferencesFine(
 		AccPtr<XFLOAT> corr_img = ptrFactory.make<XFLOAT>((size_t)image_size);
 
 		corr_img.allAlloc();
-		buildCorrImage(baseMLO,op,corr_img,img_id,group_id);
+		buildCorrImage(baseMLO,op,corr_img,img_id,group_id, ctf_premultiplied);
 
 		trans_x.cpToDevice();
 		trans_y.cpToDevice();
@@ -2505,6 +2508,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		const int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, img_id);
 		RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id, img_id);
 		unsigned long image_size = op.Fimg[img_id].nzyxdim;
+		bool ctf_premultiplied = baseMLO->mydata.obsModel.getCtfPremultiplied(optics_group);
 
 
 		/*======================================================
@@ -2820,7 +2824,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					iclass,
 					part_scale,
 					baseMLO->refs_are_ctf_corrected,
-					baseMLO->ctf_premultiplied,
+					ctf_premultiplied,
 					accMLO->dataIs3D,
 					accMLO->classStreams[iclass]);
 
@@ -2856,7 +2860,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				orientation_num,
 				accMLO->dataIs3D,
 				(baseMLO->do_sgd && !baseMLO->do_avoid_sgd),
-				(baseMLO->ctf_premultiplied),
+				ctf_premultiplied,
 				accMLO->classStreams[iclass]);
 
 			CTOC(accMLO->timer,"backproject");

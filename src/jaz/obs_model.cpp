@@ -162,7 +162,8 @@ ObservationModel::ObservationModel(const MetaDataTable &_opticsMdt, bool do_die_
 	angpix(_opticsMdt.numberOfObjects()),
 	lambda(_opticsMdt.numberOfObjects()),
 	Cs(_opticsMdt.numberOfObjects()),
-	boxSizes(_opticsMdt.numberOfObjects(), 0.0)
+	boxSizes(_opticsMdt.numberOfObjects(), 0.0),
+	CtfPremultiplied(_opticsMdt.numberOfObjects(), false)
 {
 	if (   !(opticsMdt.containsLabel(EMDL_IMAGE_PIXEL_SIZE) ||
 			opticsMdt.containsLabel(EMDL_MICROGRAPH_PIXEL_SIZE) ||
@@ -233,6 +234,12 @@ ObservationModel::ObservationModel(const MetaDataTable &_opticsMdt, bool do_die_
 			opticsMdt.getValue(EMDL_IMAGE_MTF_FILENAME, fnMtfs[i], i);
 		if (opticsMdt.containsLabel(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE))
 			opticsMdt.getValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, originalAngpix[i], i);
+		if (opticsMdt.containsLabel(EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED))
+		{
+			bool val;
+			opticsMdt.getValue(EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED, val, i);
+			CtfPremultiplied[i] = val;
+		}
 		opticsMdt.getValue(EMDL_IMAGE_SIZE, boxSizes[i], i);
 
 		double kV;
@@ -654,6 +661,23 @@ int ObservationModel::getOpticsGroup(const MetaDataTable &particlesMdt, long int
 	opticsGroup--;
 
 	return opticsGroup;
+}
+
+bool ObservationModel::getCtfPremultiplied(int og) const
+{
+	if (og < CtfPremultiplied.size())
+	{
+		return CtfPremultiplied[og];
+	}
+	else
+	{
+		return false;
+	}
+}
+
+void ObservationModel::setCtfPremultiplied(int og, bool val)
+{
+	CtfPremultiplied[og] = val;
 }
 
 std::string ObservationModel::getGroupName(int og)

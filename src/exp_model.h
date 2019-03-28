@@ -311,6 +311,9 @@ public:
 	// Calculate the total number of optics groups in this experiment
 	int numberOfOpticsGroups();
 
+	// Is any of the optics groups CTF-premultiplied?
+	bool hasCtfPremultiplied();
+
 	// Get the pixel size for this optics group
 	RFLOAT getOpticsPixelSize(int optics_group);
 

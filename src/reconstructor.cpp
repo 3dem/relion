@@ -38,7 +38,6 @@ void Reconstructor::read(int argc, char **argv)
 	intact_ctf_first_peak = parser.checkOption("--ctf_intact_first_peak", "Leave CTFs intact until first peak");
 	ctf_phase_flipped = parser.checkOption("--ctf_phase_flipped", "Images have been phase flipped");
 	only_flip_phases = parser.checkOption("--only_flip_phases", "Do not correct CTF-amplitudes, only flip phases");
-	ctf_premultiplied = parser.checkOption("--ctf_multiplied", "Have the data been premultiplied with their CTF?");
 
 	int ewald_section = parser.addSection("Ewald-sphere correction options");
 	do_ewald = parser.checkOption("--ewald", "Correct for Ewald-sphere curvature (developmental)");
@@ -328,9 +327,11 @@ void Reconstructor::backprojectOneParticle(long int p)
 	// has to be provided to the backprojector explicitly
 	// (to avoid creating an Ewald ellipsoid)
 	int opticsGroup;
+	bool ctf_premultiplied = false;
 	if (!do_ignore_optics)
 	{
 		opticsGroup = obsModel.getOpticsGroup(DF, p);
+		ctf_premultiplied = obsModel.getCtfPremultiplied(opticsGroup);
 		Matrix2D<RFLOAT> magMat;
 		if (!do_ewald)
 		{
