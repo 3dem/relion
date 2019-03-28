@@ -9,6 +9,11 @@
 namespace CpuKernels
 {
 
+// 2019Mar28: Takanori defined CPU_BP_INITIALIZE here to avoid template instantiation
+// problems with CTF_PREMULTIPLIED.
+// The result looks OK; I don't know why this is here in the first place.
+#define CPU_BP_INITIALIZE
+
 #ifndef CPU_BP_INITIALIZE //TODO Clean this up
 template < bool CTF_PREMULTIPLIED >
 	void backproject2D(
