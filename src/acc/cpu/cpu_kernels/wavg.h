@@ -13,13 +13,13 @@
 namespace CpuKernels
 {
 
-// sincos lookup table optimization. Function translatePixel calls 
-// sincos(x*tx + y*ty). We precompute 2D lookup tables for x and y directions. 
+// sincos lookup table optimization. Function translatePixel calls
+// sincos(x*tx + y*ty). We precompute 2D lookup tables for x and y directions.
 // The first dimension is x or y pixel index, and the second dimension is x or y
-// translation index. Since sin(a+B) = sin(A) * cos(B) + cos(A) * sin(B), and 
-// cos(A+B) = cos(A) * cos(B) - sin(A) * sin(B), we can use lookup table to 
-// compute sin(x*tx + y*ty) and cos(x*tx + y*ty). 
-template<bool REFCTF, bool REF3D>
+// translation index. Since sin(a+B) = sin(A) * cos(B) + cos(A) * sin(B), and
+// cos(A+B) = cos(A) * cos(B) - sin(A) * sin(B), we can use lookup table to
+// compute sin(x*tx + y*ty) and cos(x*tx + y*ty).
+template<bool CTFPREMULTIPLIED, bool REFCTF, bool REF3D>
 void wavg_ref3D(
 		XFLOAT * RESTRICT   g_eulers,
 		AccProjectorKernel &projector,
@@ -28,7 +28,7 @@ void wavg_ref3D(
 #ifdef DEBUG_CUDA
 		XFLOAT * RESTRICT   _g_img_real,
 #else
-		XFLOAT * RESTRICT   g_img_real,	
+		XFLOAT * RESTRICT   g_img_real,
 #endif
 		XFLOAT * RESTRICT   g_img_imag,
 		XFLOAT * RESTRICT   g_trans_x,
@@ -56,7 +56,7 @@ void wavg_ref3D(
 		int offset = bid * 9;
 		XFLOAT e0 = g_eulers[offset  ], e1 = g_eulers[offset+1];
 		XFLOAT e3 = g_eulers[offset+3], e4 = g_eulers[offset+4];
-		XFLOAT e6 = g_eulers[offset+6], e7 = g_eulers[offset+7];                    
+		XFLOAT e6 = g_eulers[offset+6], e7 = g_eulers[offset+7];
 
 		// pre-compute sin and cos for x and y direction
 		int xSize = projector.imgX;
@@ -65,7 +65,7 @@ void wavg_ref3D(
 		XFLOAT sin_y[trans_num][ySize], cos_y[trans_num][ySize];
 
 		computeSincosLookupTable2D(trans_num, g_trans_x, g_trans_y, xSize, ySize,
-								  &sin_x[0][0], &cos_x[0][0], 
+								  &sin_x[0][0], &cos_x[0][0],
 								  &sin_y[0][0], &cos_y[0][0]);
 
 		XFLOAT weight_norm_inverse = (XFLOAT) 1.0 / weight_norm;
@@ -89,14 +89,23 @@ void wavg_ref3D(
 			#pragma omp simd
 			for(int x = xstart; x < xend; x++) {
 				if(REF3D)
-					projector.project3Dmodel(x, y, e0, e1, e3, e4, e6, e7, 
-											ref_real[x], ref_imag[x]);                 
+					projector.project3Dmodel(x, y, e0, e1, e3, e4, e6, e7,
+											ref_real[x], ref_imag[x]);
 				else
-					projector.project2Dmodel(x, y, e0, e1, e3, e4, 
-											ref_real[x], ref_imag[x]);                 			
-				if (REFCTF)	{
-					ref_real[x] *= g_ctfs[pixel + x];
-					ref_imag[x] *= g_ctfs[pixel + x];
+					projector.project2Dmodel(x, y, e0, e1, e3, e4,
+											ref_real[x], ref_imag[x]);
+				if (REFCTF)
+				{
+					if(CTFPREMULTIPLIED)
+					{
+						ref_real[x] *= g_ctfs[pixel + x] * g_ctfs[pixel + x];
+						ref_imag[x] *= g_ctfs[pixel + x] * g_ctfs[pixel + x];
+					}
+					else
+					{
+						ref_real[x] *= g_ctfs[pixel + x];
+						ref_imag[x] *= g_ctfs[pixel + x];
+					}
 				}
 				else {
 					ref_real[x] *= part_scale;
@@ -116,7 +125,7 @@ void wavg_ref3D(
 				XFLOAT trans_cos_y, trans_sin_y;
 				if ( y < 0) {
 					trans_cos_y =  cos_y[itrans][-y];
-					trans_sin_y = -sin_y[itrans][-y];            
+					trans_sin_y = -sin_y[itrans][-y];
 				}
 				else {
 					trans_cos_y = cos_y[itrans][y];
@@ -124,7 +133,7 @@ void wavg_ref3D(
 				}
 
 				XFLOAT *trans_cos_x = &cos_x[itrans][0];
-				XFLOAT *trans_sin_x = &sin_x[itrans][0];     
+				XFLOAT *trans_sin_x = &sin_x[itrans][0];
 
 				for(int x = xstart; x < xend; x++) {
 
@@ -135,7 +144,7 @@ void wavg_ref3D(
 					XFLOAT trans_imag = cc * img_imag[x] + ss * img_real[x];
 					/*
 					XFLOAT trans_real, trans_imag;
-					translatePixel(x, y,  g_trans_x[itrans], g_trans_y[itrans], 
+					translatePixel(x, y,  g_trans_x[itrans], g_trans_y[itrans],
 								   img_real[x], img_imag[x], trans_real, trans_imag);
 					*/
 					XFLOAT diff_real = ref_real[x] - trans_real;
@@ -144,7 +153,7 @@ void wavg_ref3D(
 					g_wdiff2s_parts[pixel + x] += weight * (diff_real    * diff_real   + diff_imag    * diff_imag);
 					g_wdiff2s_XA   [pixel + x] += weight * (ref_real[x]  * trans_real  + ref_imag[x]  * trans_imag);
 					g_wdiff2s_AA   [pixel + x] += weight * (ref_real[x]  * ref_real[x] + ref_imag[x]  * ref_imag[x] );
-				} 
+				}
 			}  // for itrans
 
 			pixel += (unsigned long)xSize;
@@ -152,7 +161,7 @@ void wavg_ref3D(
 	} // bid
 }
 
-template<bool REFCTF>
+template<bool CTFPREMULTIPLIED, bool REFCTF>
 void wavg_3D(
 		XFLOAT * RESTRICT   g_eulers,
 		AccProjectorKernel &projector,
@@ -161,7 +170,7 @@ void wavg_3D(
 #ifdef DEBUG_CUDA
 		XFLOAT * RESTRICT   _g_img_real,
 #else
-		XFLOAT * RESTRICT   g_img_real,	
+		XFLOAT * RESTRICT   g_img_real,
 #endif
 		XFLOAT * RESTRICT   g_img_imag,
 		XFLOAT * RESTRICT   g_trans_x,
@@ -189,7 +198,7 @@ void wavg_3D(
 		XFLOAT e0 = g_eulers[offset  ], e1 = g_eulers[offset+1];
 		XFLOAT e2 = g_eulers[offset+2], e3 = g_eulers[offset+3];
 		XFLOAT e4 = g_eulers[offset+4], e5 = g_eulers[offset+5];
-		XFLOAT e6 = g_eulers[offset+6], e7 = g_eulers[offset+7];                    
+		XFLOAT e6 = g_eulers[offset+6], e7 = g_eulers[offset+7];
 		XFLOAT e8 = g_eulers[offset+8];
 
 		// pre-compute sin and cos for x and y direction
@@ -198,11 +207,11 @@ void wavg_3D(
 		int zSize = projector.imgZ;
 		XFLOAT sin_x[trans_num][xSize], cos_x[trans_num][xSize];
 		XFLOAT sin_y[trans_num][ySize], cos_y[trans_num][ySize];
-		XFLOAT sin_z[trans_num][zSize], cos_z[trans_num][zSize];	
+		XFLOAT sin_z[trans_num][zSize], cos_z[trans_num][zSize];
 
 		computeSincosLookupTable3D(trans_num, g_trans_x, g_trans_y, g_trans_z,
 								   xSize, ySize, zSize,
-								  &sin_x[0][0], &cos_x[0][0], 
+								  &sin_x[0][0], &cos_x[0][0],
 								  &sin_y[0][0], &cos_y[0][0],
 								  &sin_z[0][0], &cos_z[0][0]);
 
@@ -238,10 +247,19 @@ void wavg_3D(
 				#pragma omp simd
 				for(int x = xstart_y; x < xend_y; x++) {
 					projector.project3Dmodel(x, y, z, e0, e1, e2, e3, e4, e5, e6, e7, e8,
-											 ref_real[x], ref_imag[x]);                    
-					if (REFCTF)	{
-						ref_real[x] *= g_ctfs[pixel + x];
-						ref_imag[x] *= g_ctfs[pixel + x];
+											 ref_real[x], ref_imag[x]);
+					if (REFCTF)
+					{
+						if(CTFPREMULTIPLIED)
+						{
+							ref_real[x] *= g_ctfs[pixel + x] * g_ctfs[pixel + x];
+							ref_imag[x] *= g_ctfs[pixel + x] * g_ctfs[pixel + x];
+						}
+						else
+						{
+							ref_real[x] *= g_ctfs[pixel + x];
+							ref_imag[x] *= g_ctfs[pixel + x];
+						}
 					}
 					else {
 						ref_real[x] *= part_scale;
@@ -261,7 +279,7 @@ void wavg_3D(
 					XFLOAT trans_cos_z, trans_sin_z;
 					if ( z < 0) {
 						trans_cos_z =  cos_z[itrans][-z];
-						trans_sin_z = -sin_z[itrans][-z];            
+						trans_sin_z = -sin_z[itrans][-z];
 					}
 					else {
 						trans_cos_z = cos_z[itrans][z];
@@ -271,7 +289,7 @@ void wavg_3D(
 					XFLOAT trans_cos_y, trans_sin_y;
 					if ( y < 0) {
 						trans_cos_y =  cos_y[itrans][-y];
-						trans_sin_y = -sin_y[itrans][-y];            
+						trans_sin_y = -sin_y[itrans][-y];
 					}
 					else {
 						trans_cos_y = cos_y[itrans][y];
@@ -279,7 +297,7 @@ void wavg_3D(
 					}
 
 					XFLOAT *trans_cos_x = &cos_x[itrans][0];
-					XFLOAT *trans_sin_x = &sin_x[itrans][0];     
+					XFLOAT *trans_sin_x = &sin_x[itrans][0];
 
 					for(int x = xstart_y; x < xend_y; x++) {
 						// TODO check the math
@@ -287,13 +305,13 @@ void wavg_3D(
 						XFLOAT c  = trans_cos_x[x] * trans_cos_y - trans_sin_x[x] * trans_sin_y;
 
 						XFLOAT ss = s * trans_cos_z + c * trans_sin_z;
-						XFLOAT cc = c * trans_cos_z - s * trans_sin_z;				
+						XFLOAT cc = c * trans_cos_z - s * trans_sin_z;
 
 						XFLOAT trans_real = cc * img_real[x] - ss * img_imag[x];
 						XFLOAT trans_imag = cc * img_imag[x] + ss * img_real[x];
 						/*
 						XFLOAT trans_real, trans_imag;
-						translatePixel(x, y,  g_trans_x[itrans], g_trans_y[itrans], 
+						translatePixel(x, y,  g_trans_x[itrans], g_trans_y[itrans],
 									   img_real[x], img_imag[x], trans_real, trans_imag);
 
 						where translatePixel is:
@@ -307,7 +325,7 @@ void wavg_3D(
 						g_wdiff2s_parts[pixel + x] += weight * (diff_real    * diff_real   + diff_imag    * diff_imag);
 						g_wdiff2s_XA   [pixel + x] += weight * (ref_real[x]  * trans_real  + ref_imag[x]  * trans_imag);
 						g_wdiff2s_AA   [pixel + x] += weight * (ref_real[x]  * ref_real[x] + ref_imag[x]  * ref_imag[x] );
-					} 
+					}
 				}  // for itrans
 
 				pixel += (unsigned long)xSize;

@@ -15,6 +15,7 @@
  *   	BP KERNELS
  */
 
+template < bool CTF_PREMULTIPLIED >
 __global__ void cuda_kernel_backproject2D(
 		XFLOAT *g_img_real,
 		XFLOAT *g_img_imag,
@@ -94,8 +95,16 @@ __global__ void cuda_kernel_backproject2D(
 
 			if (weight >= significant_weight)
 			{
-				weight = (weight / weight_norm) * ctf * minvsigma2;
-				Fweight += weight * ctf;
+				if(CTF_PREMULTIPLIED)
+				{
+					weight = (weight / weight_norm) * minvsigma2;
+					Fweight += weight * ctf * ctf;
+				}
+				else
+				{
+					weight = (weight / weight_norm) * ctf * minvsigma2;
+					Fweight += weight * ctf;
+				}
 
 				translatePixel(x, y, g_trans_x[itrans], g_trans_y[itrans], img_real, img_imag, temp_real, temp_imag);
 
@@ -162,7 +171,7 @@ __global__ void cuda_kernel_backproject2D(
 	}
 }
 
-template < bool DATA3D >
+template < bool DATA3D, bool CTF_PREMULTIPLIED >
 __global__ void cuda_kernel_backproject3D(
 		XFLOAT *g_img_real,
 		XFLOAT *g_img_imag,
@@ -268,9 +277,17 @@ __global__ void cuda_kernel_backproject3D(
 
 			if (weight >= significant_weight)
 			{
-				weight = (weight / weight_norm) * ctf * minvsigma2;
-				Fweight += weight * ctf;
-
+				if(CTF_PREMULTIPLIED)
+				{
+					weight = (weight / weight_norm) * minvsigma2;
+					Fweight += weight * ctf * ctf;
+				}
+				else
+				{
+					weight = (weight / weight_norm) * ctf * minvsigma2;
+					Fweight += weight * ctf;
+				}
+				
 				if(DATA3D)
 					translatePixel(x, y, z, g_trans_x[itrans], g_trans_y[itrans], g_trans_z[itrans], img_real, img_imag, temp_real, temp_imag);
 				else
@@ -386,7 +403,7 @@ __global__ void cuda_kernel_backproject3D(
 }
 
 
-template < bool DATA3D >
+template < bool DATA3D, bool CTF_PREMULTIPLIED >
 __global__ void cuda_kernel_backprojectSGD(
 		AccProjectorKernel projector,
 		XFLOAT *g_img_real,
@@ -513,9 +530,16 @@ __global__ void cuda_kernel_backprojectSGD(
 
 			if (weight >= significant_weight)
 			{
-				weight = (weight / weight_norm) * ctf * minvsigma2;
-				Fweight += weight * ctf;
-
+				if(CTF_PREMULTIPLIED)
+				{
+					weight = (weight / weight_norm) * minvsigma2;
+					Fweight += weight * ctf * ctf;
+				}
+				else
+				{
+					weight = (weight / weight_norm) * ctf * minvsigma2;
+					Fweight += weight * ctf;
+				}
 				if(DATA3D)
 					translatePixel(x, y, z, g_trans_x[itrans], g_trans_y[itrans], g_trans_z[itrans], img_real, img_imag, temp_real, temp_imag);
 				else

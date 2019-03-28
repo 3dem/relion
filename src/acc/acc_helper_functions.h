@@ -88,6 +88,7 @@ void runWavgKernel(
 		int exp_iclass,
 		XFLOAT part_scale,
 		bool refs_are_ctf_corrected,
+		bool ctf_premultiplied,
 		bool data_is_3D,
 		cudaStream_t stream);
 
@@ -112,6 +113,7 @@ void runBackProjectKernel(
 		unsigned long imageCount,
 		bool data_is_3D,
 		bool do_sgd,
+		bool ctf_premultiplied,
 		cudaStream_t optStream);
 
 template< typename T>

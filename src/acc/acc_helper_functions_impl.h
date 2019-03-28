@@ -160,9 +160,16 @@ void buildCorrImage(MlOptimiser *baseMLO,
 	// ctf-correction or not ( NOTE this is not were the difference metric is ctf-corrected, but
 	// rather where we apply the additional correction to make the GPU-specific arithmetic equal
 	// to the CPU method)
-	if (baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected)
-		for(size_t i = 0; i < corr_img.getSize(); i++)
-			corr_img[i] *= DIRECT_MULTIDIM_ELEM(op.local_Fctf[img_id], i)*DIRECT_MULTIDIM_ELEM(op.local_Fctf[img_id], i);
+	if (baseMLO->do_ctf_correction)
+	{
+		if (baseMLO->refs_are_ctf_corrected)
+			for(size_t i = 0; i < corr_img.getSize(); i++)
+				corr_img[i] *= DIRECT_MULTIDIM_ELEM(op.local_Fctf[img_id], i)*DIRECT_MULTIDIM_ELEM(op.local_Fctf[img_id], i);
+		if (baseMLO->ctf_premultiplied)
+			for(size_t i = 0; i < corr_img.getSize(); i++)
+				corr_img[i] *= DIRECT_MULTIDIM_ELEM(op.local_Fctf[img_id], i)*DIRECT_MULTIDIM_ELEM(op.local_Fctf[img_id], i);
+	}
+
 	// scale-correction or not ( NOTE this is not were the difference metric is scale-corrected, but
 	// rather where we apply the additional correction to make the GPU-specific arithmetic equal
 	// to the CPU method)
@@ -312,148 +319,293 @@ void runWavgKernel(
 		int exp_iclass,
 		XFLOAT part_scale,
 		bool refs_are_ctf_corrected,
+		bool ctf_premultiplied,
 		bool data_is_3D,
 		cudaStream_t stream)
 {
 	//cudaFuncSetCacheConfig(cuda_kernel_wavg_fast, cudaFuncCachePreferShared);
 
-	if (refs_are_ctf_corrected)
+	if (ctf_premultiplied)
 	{
-		if(data_is_3D)
-			AccUtilities::kernel_wavg<true,true,true,WAVG_BLOCK_SIZE_DATA3D>(
-				eulers,
-				projector,
-				image_size,
-				orientation_num,
-				Fimg_real,
-				Fimg_imag,
-				trans_x,
-				trans_y,
-				trans_z,
-				sorted_weights,
-				ctfs,
-				wdiff2s_parts,
-				wdiff2s_AA,
-				wdiff2s_XA,
-				translation_num,
-				(XFLOAT) op.sum_weight[img_id],
-				(XFLOAT) op.significant_weight[img_id],
-				part_scale,
-				stream
-				);
-		else if (projector.mdlZ!=0)
-			AccUtilities::kernel_wavg<true,true,false,WAVG_BLOCK_SIZE>(
-				eulers,
-				projector,
-				image_size,
-				orientation_num,
-				Fimg_real,
-				Fimg_imag,
-				trans_x,
-				trans_y,
-				trans_z,
-				sorted_weights,
-				ctfs,
-				wdiff2s_parts,
-				wdiff2s_AA,
-				wdiff2s_XA,
-				translation_num,
-				(XFLOAT) op.sum_weight[img_id],
-				(XFLOAT) op.significant_weight[img_id],
-				part_scale,
-				stream
-				);
+		if (refs_are_ctf_corrected)
+		{
+			if(data_is_3D)
+				AccUtilities::kernel_wavg<true,true,true,true,WAVG_BLOCK_SIZE_DATA3D>(
+					eulers,
+					projector,
+					image_size,
+					orientation_num,
+					Fimg_real,
+					Fimg_imag,
+					trans_x,
+					trans_y,
+					trans_z,
+					sorted_weights,
+					ctfs,
+					wdiff2s_parts,
+					wdiff2s_AA,
+					wdiff2s_XA,
+					translation_num,
+					(XFLOAT) op.sum_weight[img_id],
+					(XFLOAT) op.significant_weight[img_id],
+					part_scale,
+					stream
+					);
+			else if (projector.mdlZ!=0)
+				AccUtilities::kernel_wavg<true,true,true,false,WAVG_BLOCK_SIZE>(
+					eulers,
+					projector,
+					image_size,
+					orientation_num,
+					Fimg_real,
+					Fimg_imag,
+					trans_x,
+					trans_y,
+					trans_z,
+					sorted_weights,
+					ctfs,
+					wdiff2s_parts,
+					wdiff2s_AA,
+					wdiff2s_XA,
+					translation_num,
+					(XFLOAT) op.sum_weight[img_id],
+					(XFLOAT) op.significant_weight[img_id],
+					part_scale,
+					stream
+					);
+			else
+				AccUtilities::kernel_wavg<true,true,false,false,WAVG_BLOCK_SIZE>(
+					eulers,
+					projector,
+					image_size,
+					orientation_num,
+					Fimg_real,
+					Fimg_imag,
+					trans_x,
+					trans_y,
+					trans_z,
+					sorted_weights,
+					ctfs,
+					wdiff2s_parts,
+					wdiff2s_AA,
+					wdiff2s_XA,
+					translation_num,
+					(XFLOAT) op.sum_weight[img_id],
+					(XFLOAT) op.significant_weight[img_id],
+					part_scale,
+					stream
+					);
+		}
 		else
-			AccUtilities::kernel_wavg<true,false,false,WAVG_BLOCK_SIZE>(
-				eulers,
-				projector,
-				image_size,
-				orientation_num,
-				Fimg_real,
-				Fimg_imag,
-				trans_x,
-				trans_y,
-				trans_z,
-				sorted_weights,
-				ctfs,
-				wdiff2s_parts,
-				wdiff2s_AA,
-				wdiff2s_XA,
-				translation_num,
-				(XFLOAT) op.sum_weight[img_id],
-				(XFLOAT) op.significant_weight[img_id],
-				part_scale,
-				stream
-				);
+		{
+			if(data_is_3D)
+				AccUtilities::kernel_wavg<true,false,true,true,WAVG_BLOCK_SIZE_DATA3D>(
+					eulers,
+					projector,
+					image_size,
+					orientation_num,
+					Fimg_real,
+					Fimg_imag,
+					trans_x,
+					trans_y,
+					trans_z,
+					sorted_weights,
+					ctfs,
+					wdiff2s_parts,
+					wdiff2s_AA,
+					wdiff2s_XA,
+					translation_num,
+					(XFLOAT) op.sum_weight[img_id],
+					(XFLOAT) op.significant_weight[img_id],
+					part_scale,
+					stream
+					);
+			else if (projector.mdlZ!=0)
+				AccUtilities::kernel_wavg<true,false,true,false,WAVG_BLOCK_SIZE>(
+					eulers,
+					projector,
+					image_size,
+					orientation_num,
+					Fimg_real,
+					Fimg_imag,
+					trans_x,
+					trans_y,
+					trans_z,
+					sorted_weights,
+					ctfs,
+					wdiff2s_parts,
+					wdiff2s_AA,
+					wdiff2s_XA,
+					translation_num,
+					(XFLOAT) op.sum_weight[img_id],
+					(XFLOAT) op.significant_weight[img_id],
+					part_scale,
+					stream
+					);
+			else
+				AccUtilities::kernel_wavg<true,false,false,false,WAVG_BLOCK_SIZE>(
+					eulers,
+					projector,
+					image_size,
+					orientation_num,
+					Fimg_real,
+					Fimg_imag,
+					trans_x,
+					trans_y,
+					trans_z,
+					sorted_weights,
+					ctfs,
+					wdiff2s_parts,
+					wdiff2s_AA,
+					wdiff2s_XA,
+					translation_num,
+					(XFLOAT) op.sum_weight[img_id],
+					(XFLOAT) op.significant_weight[img_id],
+					part_scale,
+					stream
+					);
+		}
 	}
-	else
+	else // not ctf_premultiplied
 	{
-		if(data_is_3D)
-			AccUtilities::kernel_wavg<false,true,true,WAVG_BLOCK_SIZE_DATA3D>(
-				eulers,
-				projector,
-				image_size,
-				orientation_num,
-				Fimg_real,
-				Fimg_imag,
-				trans_x,
-				trans_y,
-				trans_z,
-				sorted_weights,
-				ctfs,
-				wdiff2s_parts,
-				wdiff2s_AA,
-				wdiff2s_XA,
-				translation_num,
-				(XFLOAT) op.sum_weight[img_id],
-				(XFLOAT) op.significant_weight[img_id],
-				part_scale,
-				stream
-				);
-		else if (projector.mdlZ!=0)
-			AccUtilities::kernel_wavg<false,true,false,WAVG_BLOCK_SIZE>(
-				eulers,
-				projector,
-				image_size,
-				orientation_num,
-				Fimg_real,
-				Fimg_imag,
-				trans_x,
-				trans_y,
-				trans_z,
-				sorted_weights,
-				ctfs,
-				wdiff2s_parts,
-				wdiff2s_AA,
-				wdiff2s_XA,
-				translation_num,
-				(XFLOAT) op.sum_weight[img_id],
-				(XFLOAT) op.significant_weight[img_id],
-				part_scale,
-				stream
-				);
+		if (refs_are_ctf_corrected)
+		{
+			if(data_is_3D)
+				AccUtilities::kernel_wavg<false,true,true,true,WAVG_BLOCK_SIZE_DATA3D>(
+					eulers,
+					projector,
+					image_size,
+					orientation_num,
+					Fimg_real,
+					Fimg_imag,
+					trans_x,
+					trans_y,
+					trans_z,
+					sorted_weights,
+					ctfs,
+					wdiff2s_parts,
+					wdiff2s_AA,
+					wdiff2s_XA,
+					translation_num,
+					(XFLOAT) op.sum_weight[img_id],
+					(XFLOAT) op.significant_weight[img_id],
+					part_scale,
+					stream
+					);
+			else if (projector.mdlZ!=0)
+				AccUtilities::kernel_wavg<false,true,true,false,WAVG_BLOCK_SIZE>(
+					eulers,
+					projector,
+					image_size,
+					orientation_num,
+					Fimg_real,
+					Fimg_imag,
+					trans_x,
+					trans_y,
+					trans_z,
+					sorted_weights,
+					ctfs,
+					wdiff2s_parts,
+					wdiff2s_AA,
+					wdiff2s_XA,
+					translation_num,
+					(XFLOAT) op.sum_weight[img_id],
+					(XFLOAT) op.significant_weight[img_id],
+					part_scale,
+					stream
+					);
+			else
+				AccUtilities::kernel_wavg<false,true,false,false,WAVG_BLOCK_SIZE>(
+					eulers,
+					projector,
+					image_size,
+					orientation_num,
+					Fimg_real,
+					Fimg_imag,
+					trans_x,
+					trans_y,
+					trans_z,
+					sorted_weights,
+					ctfs,
+					wdiff2s_parts,
+					wdiff2s_AA,
+					wdiff2s_XA,
+					translation_num,
+					(XFLOAT) op.sum_weight[img_id],
+					(XFLOAT) op.significant_weight[img_id],
+					part_scale,
+					stream
+					);
+		}
 		else
-			AccUtilities::kernel_wavg<false,false,false,WAVG_BLOCK_SIZE>(
-				eulers,
-				projector,
-				image_size,
-				orientation_num,
-				Fimg_real,
-				Fimg_imag,
-				trans_x,
-				trans_y,
-				trans_z,
-				sorted_weights,
-				ctfs,
-				wdiff2s_parts,
-				wdiff2s_AA,
-				wdiff2s_XA,
-				translation_num,
-				(XFLOAT) op.sum_weight[img_id],
-				(XFLOAT) op.significant_weight[img_id],
-				part_scale,
-				stream
-				);
+		{
+			if(data_is_3D)
+				AccUtilities::kernel_wavg<false,false,true,true,WAVG_BLOCK_SIZE_DATA3D>(
+					eulers,
+					projector,
+					image_size,
+					orientation_num,
+					Fimg_real,
+					Fimg_imag,
+					trans_x,
+					trans_y,
+					trans_z,
+					sorted_weights,
+					ctfs,
+					wdiff2s_parts,
+					wdiff2s_AA,
+					wdiff2s_XA,
+					translation_num,
+					(XFLOAT) op.sum_weight[img_id],
+					(XFLOAT) op.significant_weight[img_id],
+					part_scale,
+					stream
+					);
+			else if (projector.mdlZ!=0)
+				AccUtilities::kernel_wavg<false,false,true,false,WAVG_BLOCK_SIZE>(
+					eulers,
+					projector,
+					image_size,
+					orientation_num,
+					Fimg_real,
+					Fimg_imag,
+					trans_x,
+					trans_y,
+					trans_z,
+					sorted_weights,
+					ctfs,
+					wdiff2s_parts,
+					wdiff2s_AA,
+					wdiff2s_XA,
+					translation_num,
+					(XFLOAT) op.sum_weight[img_id],
+					(XFLOAT) op.significant_weight[img_id],
+					part_scale,
+					stream
+					);
+			else
+				AccUtilities::kernel_wavg<false,false,false,false,WAVG_BLOCK_SIZE>(
+					eulers,
+					projector,
+					image_size,
+					orientation_num,
+					Fimg_real,
+					Fimg_imag,
+					trans_x,
+					trans_y,
+					trans_z,
+					sorted_weights,
+					ctfs,
+					wdiff2s_parts,
+					wdiff2s_AA,
+					wdiff2s_XA,
+					translation_num,
+					(XFLOAT) op.sum_weight[img_id],
+					(XFLOAT) op.significant_weight[img_id],
+					part_scale,
+					stream
+					);
+		}
 	}
 	LAUNCH_HANDLE_ERROR(cudaGetLastError());
 }
@@ -479,13 +631,25 @@ void runBackProjectKernel(
 		unsigned long imageCount,
 		bool data_is_3D,
 		bool do_sgd,
+		bool ctf_premultiplied,
 		cudaStream_t optStream)
 {
 
 	if(BP.mdlZ==1)
 	{
 #ifdef CUDA
-		cuda_kernel_backproject2D<<<imageCount,BP_2D_BLOCK_SIZE,0,optStream>>>(
+		if(ctf_premultiplied)
+			cuda_kernel_backproject2D<true><<<imageCount,BP_2D_BLOCK_SIZE,0,optStream>>>(
+				d_img_real, d_img_imag,
+				trans_x, trans_y,
+				d_weights, d_Minvsigma2s, d_ctfs,
+				translation_num, significant_weight, weight_norm, d_eulers,
+				BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
+				BP.maxR, BP.maxR2, BP.padding_factor,
+				imgX, imgY, imgX*imgY,
+				BP.mdlX, BP.mdlInitY);
+		else
+			cuda_kernel_backproject2D<false><<<imageCount,BP_2D_BLOCK_SIZE,0,optStream>>>(
 				d_img_real, d_img_imag,
 				trans_x, trans_y,
 				d_weights, d_Minvsigma2s, d_ctfs,
@@ -496,7 +660,18 @@ void runBackProjectKernel(
 				BP.mdlX, BP.mdlInitY);
 		LAUNCH_HANDLE_ERROR(cudaGetLastError());
 #else
-	CpuKernels::backproject2D(imageCount, BP_2D_BLOCK_SIZE,
+	if(ctf_premultiplied)
+		CpuKernels::backproject2D<true>(imageCount, BP_2D_BLOCK_SIZE,
+				d_img_real, d_img_imag,
+				trans_x, trans_y,
+				d_weights, d_Minvsigma2s, d_ctfs,
+				translation_num, significant_weight, weight_norm, d_eulers,
+				BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
+				BP.maxR, BP.maxR2, (XFLOAT)BP.padding_factor,
+				(unsigned)imgX, (unsigned)imgY, (unsigned)imgX*imgY,
+				(unsigned)BP.mdlX, BP.mdlInitY, BP.mutexes);
+	else
+		CpuKernels::backproject2D<false>(imageCount, BP_2D_BLOCK_SIZE,
 				d_img_real, d_img_imag,
 				trans_x, trans_y,
 				d_weights, d_Minvsigma2s, d_ctfs,
@@ -513,87 +688,170 @@ void runBackProjectKernel(
 		{
 			if(data_is_3D)
 #ifdef CUDA
-				cuda_kernel_backprojectSGD<true><<<imageCount,BP_DATA3D_BLOCK_SIZE,0,optStream>>>(
-					projector, d_img_real, d_img_imag,
-					trans_x, trans_y, trans_z,
-					d_weights, d_Minvsigma2s, d_ctfs,
-					translation_num, significant_weight, weight_norm, d_eulers,
-					BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
-					BP.maxR, BP.maxR2, BP.padding_factor,
-					imgX, imgY, imgZ, imgX*imgY*imgZ,
-					BP.mdlX, BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ);
+				if(ctf_premultiplied)
+					cuda_kernel_backprojectSGD<true, true><<<imageCount,BP_DATA3D_BLOCK_SIZE,0,optStream>>>(
+						projector, d_img_real, d_img_imag,
+						trans_x, trans_y, trans_z,
+						d_weights, d_Minvsigma2s, d_ctfs,
+						translation_num, significant_weight, weight_norm, d_eulers,
+						BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
+						BP.maxR, BP.maxR2, BP.padding_factor,
+						imgX, imgY, imgZ, imgX*imgY*imgZ,
+						BP.mdlX, BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ);
+				else
+					cuda_kernel_backprojectSGD<true, false><<<imageCount,BP_DATA3D_BLOCK_SIZE,0,optStream>>>(
+						projector, d_img_real, d_img_imag,
+						trans_x, trans_y, trans_z,
+						d_weights, d_Minvsigma2s, d_ctfs,
+						translation_num, significant_weight, weight_norm, d_eulers,
+						BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
+						BP.maxR, BP.maxR2, BP.padding_factor,
+						imgX, imgY, imgZ, imgX*imgY*imgZ,
+						BP.mdlX, BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ);
 #else
-				CpuKernels::backprojectSGD<true>(imageCount, BP_DATA3D_BLOCK_SIZE,
-					projector, d_img_real, d_img_imag,
-					trans_x, trans_y, trans_z,
-					d_weights, d_Minvsigma2s, d_ctfs,
-					translation_num, significant_weight, weight_norm, d_eulers,
-					BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
-					BP.maxR, BP.maxR2, BP.padding_factor,
-					imgX, imgY, imgZ, (size_t)imgX*(size_t)imgY*(size_t)imgZ,
-					BP.mdlX, BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ, BP.mutexes);
+				if(ctf_premultiplied)
+					CpuKernels::backprojectSGD<true, true>(imageCount, BP_DATA3D_BLOCK_SIZE,
+						projector, d_img_real, d_img_imag,
+						trans_x, trans_y, trans_z,
+						d_weights, d_Minvsigma2s, d_ctfs,
+						translation_num, significant_weight, weight_norm, d_eulers,
+						BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
+						BP.maxR, BP.maxR2, BP.padding_factor,
+						imgX, imgY, imgZ, (size_t)imgX*(size_t)imgY*(size_t)imgZ,
+						BP.mdlX, BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ, BP.mutexes);
+				else
+					CpuKernels::backprojectSGD<true, false>(imageCount, BP_DATA3D_BLOCK_SIZE,
+						projector, d_img_real, d_img_imag,
+						trans_x, trans_y, trans_z,
+						d_weights, d_Minvsigma2s, d_ctfs,
+						translation_num, significant_weight, weight_norm, d_eulers,
+						BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
+						BP.maxR, BP.maxR2, BP.padding_factor,
+						imgX, imgY, imgZ, (size_t)imgX*(size_t)imgY*(size_t)imgZ,
+						BP.mdlX, BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ, BP.mutexes);
+
 #endif
 			else
 #ifdef CUDA
-				cuda_kernel_backprojectSGD<false><<<imageCount,BP_REF3D_BLOCK_SIZE,0,optStream>>>(
-					projector, d_img_real, d_img_imag,
-					trans_x, trans_y, trans_z,
-					d_weights, d_Minvsigma2s, d_ctfs,
-					translation_num, significant_weight, weight_norm, d_eulers,
-					BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
-					BP.maxR, BP.maxR2, BP.padding_factor,
-					imgX, imgY, imgZ, imgX*imgY*imgZ,
-					BP.mdlX, BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ);
+				if(ctf_premultiplied)
+					cuda_kernel_backprojectSGD<false, true><<<imageCount,BP_REF3D_BLOCK_SIZE,0,optStream>>>(
+						projector, d_img_real, d_img_imag,
+						trans_x, trans_y, trans_z,
+						d_weights, d_Minvsigma2s, d_ctfs,
+						translation_num, significant_weight, weight_norm, d_eulers,
+						BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
+						BP.maxR, BP.maxR2, BP.padding_factor,
+						imgX, imgY, imgZ, imgX*imgY*imgZ,
+						BP.mdlX, BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ);
+				else
+					cuda_kernel_backprojectSGD<false, false><<<imageCount,BP_REF3D_BLOCK_SIZE,0,optStream>>>(
+						projector, d_img_real, d_img_imag,
+						trans_x, trans_y, trans_z,
+						d_weights, d_Minvsigma2s, d_ctfs,
+						translation_num, significant_weight, weight_norm, d_eulers,
+						BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
+						BP.maxR, BP.maxR2, BP.padding_factor,
+						imgX, imgY, imgZ, imgX*imgY*imgZ,
+						BP.mdlX, BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ);
+
 #else
-				CpuKernels::backprojectSGD<false>(imageCount, BP_REF3D_BLOCK_SIZE,
-					projector, d_img_real, d_img_imag,
-					trans_x, trans_y, trans_z,
-					d_weights, d_Minvsigma2s, d_ctfs,
-					translation_num, significant_weight, weight_norm, d_eulers,
-					BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
-					BP.maxR, BP.maxR2, (XFLOAT)BP.padding_factor,
-					(unsigned)imgX, (unsigned)imgY, (unsigned)imgZ, (size_t)imgX*(size_t)imgY*(size_t)imgZ,
-					(unsigned)BP.mdlX, (unsigned)BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ, BP.mutexes);
+				if(ctf_premultiplied)
+					CpuKernels::backprojectSGD<false, true>(imageCount, BP_REF3D_BLOCK_SIZE,
+						projector, d_img_real, d_img_imag,
+						trans_x, trans_y, trans_z,
+						d_weights, d_Minvsigma2s, d_ctfs,
+						translation_num, significant_weight, weight_norm, d_eulers,
+						BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
+						BP.maxR, BP.maxR2, (XFLOAT)BP.padding_factor,
+						(unsigned)imgX, (unsigned)imgY, (unsigned)imgZ, (size_t)imgX*(size_t)imgY*(size_t)imgZ,
+						(unsigned)BP.mdlX, (unsigned)BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ, BP.mutexes);
+				else
+					CpuKernels::backprojectSGD<false, false>(imageCount, BP_REF3D_BLOCK_SIZE,
+						projector, d_img_real, d_img_imag,
+						trans_x, trans_y, trans_z,
+						d_weights, d_Minvsigma2s, d_ctfs,
+						translation_num, significant_weight, weight_norm, d_eulers,
+						BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
+						BP.maxR, BP.maxR2, (XFLOAT)BP.padding_factor,
+						(unsigned)imgX, (unsigned)imgY, (unsigned)imgZ, (size_t)imgX*(size_t)imgY*(size_t)imgZ,
+						(unsigned)BP.mdlX, (unsigned)BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ, BP.mutexes);
 #endif
 		}
 		else
 		{
 			if(data_is_3D)
 #ifdef CUDA
-				cuda_kernel_backproject3D<true><<<imageCount,BP_DATA3D_BLOCK_SIZE,0,optStream>>>(
-					d_img_real, d_img_imag,
-					trans_x, trans_y, trans_z,
-					d_weights, d_Minvsigma2s, d_ctfs,
-					translation_num, significant_weight, weight_norm, d_eulers,
-					BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
-					BP.maxR, BP.maxR2, BP.padding_factor,
-					imgX, imgY, imgZ, imgX*imgY*imgZ,
-					BP.mdlX, BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ);
+				if(ctf_premultiplied)
+					cuda_kernel_backproject3D<true, true><<<imageCount,BP_DATA3D_BLOCK_SIZE,0,optStream>>>(
+						d_img_real, d_img_imag,
+						trans_x, trans_y, trans_z,
+						d_weights, d_Minvsigma2s, d_ctfs,
+						translation_num, significant_weight, weight_norm, d_eulers,
+						BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
+						BP.maxR, BP.maxR2, BP.padding_factor,
+						imgX, imgY, imgZ, imgX*imgY*imgZ,
+						BP.mdlX, BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ);
+				else
+					cuda_kernel_backproject3D<true, false><<<imageCount,BP_DATA3D_BLOCK_SIZE,0,optStream>>>(
+						d_img_real, d_img_imag,
+						trans_x, trans_y, trans_z,
+						d_weights, d_Minvsigma2s, d_ctfs,
+						translation_num, significant_weight, weight_norm, d_eulers,
+						BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
+						BP.maxR, BP.maxR2, BP.padding_factor,
+						imgX, imgY, imgZ, imgX*imgY*imgZ,
+						BP.mdlX, BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ);
+
 #else
-				CpuKernels::backproject3D<true>(imageCount,BP_DATA3D_BLOCK_SIZE,
-					d_img_real, d_img_imag,
-					trans_x, trans_y, trans_z,
-					d_weights, d_Minvsigma2s, d_ctfs,
-					translation_num, significant_weight, weight_norm, d_eulers,
-					BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
-					BP.maxR, BP.maxR2, (XFLOAT)BP.padding_factor,
-					(unsigned)imgX, (unsigned)imgY, (unsigned)imgZ, (size_t)imgX*(size_t)imgY*(size_t)imgZ,
-					(unsigned)BP.mdlX, (unsigned)BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ, BP.mutexes);
+			    if(ctf_premultiplied)
+					CpuKernels::backproject3D<true, true>(imageCount,BP_DATA3D_BLOCK_SIZE,
+						d_img_real, d_img_imag,
+						trans_x, trans_y, trans_z,
+						d_weights, d_Minvsigma2s, d_ctfs,
+						translation_num, significant_weight, weight_norm, d_eulers,
+						BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
+						BP.maxR, BP.maxR2, (XFLOAT)BP.padding_factor,
+						(unsigned)imgX, (unsigned)imgY, (unsigned)imgZ, (size_t)imgX*(size_t)imgY*(size_t)imgZ,
+						(unsigned)BP.mdlX, (unsigned)BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ, BP.mutexes);
+			    else
+					CpuKernels::backproject3D<true, false>(imageCount,BP_DATA3D_BLOCK_SIZE,
+						d_img_real, d_img_imag,
+						trans_x, trans_y, trans_z,
+						d_weights, d_Minvsigma2s, d_ctfs,
+						translation_num, significant_weight, weight_norm, d_eulers,
+						BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
+						BP.maxR, BP.maxR2, (XFLOAT)BP.padding_factor,
+						(unsigned)imgX, (unsigned)imgY, (unsigned)imgZ, (size_t)imgX*(size_t)imgY*(size_t)imgZ,
+						(unsigned)BP.mdlX, (unsigned)BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ, BP.mutexes);
+
 #endif
 			else
 #ifdef CUDA
-				cuda_kernel_backproject3D<false><<<imageCount,BP_REF3D_BLOCK_SIZE,0,optStream>>>(
-					d_img_real, d_img_imag,
-					trans_x, trans_y, trans_z,
-					d_weights, d_Minvsigma2s, d_ctfs,
-					translation_num, significant_weight, weight_norm, d_eulers,
-					BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
-					BP.maxR, BP.maxR2, BP.padding_factor,
-					imgX, imgY, imgZ, imgX*imgY*imgZ,
-					BP.mdlX, BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ);
+			    if(ctf_premultiplied)
+					cuda_kernel_backproject3D<false, true><<<imageCount,BP_REF3D_BLOCK_SIZE,0,optStream>>>(
+						d_img_real, d_img_imag,
+						trans_x, trans_y, trans_z,
+						d_weights, d_Minvsigma2s, d_ctfs,
+						translation_num, significant_weight, weight_norm, d_eulers,
+						BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
+						BP.maxR, BP.maxR2, BP.padding_factor,
+						imgX, imgY, imgZ, imgX*imgY*imgZ,
+						BP.mdlX, BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ);
+			    else
+					cuda_kernel_backproject3D<false, false><<<imageCount,BP_REF3D_BLOCK_SIZE,0,optStream>>>(
+						d_img_real, d_img_imag,
+						trans_x, trans_y, trans_z,
+						d_weights, d_Minvsigma2s, d_ctfs,
+						translation_num, significant_weight, weight_norm, d_eulers,
+						BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
+						BP.maxR, BP.maxR2, BP.padding_factor,
+						imgX, imgY, imgZ, imgX*imgY*imgZ,
+						BP.mdlX, BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ);
+
 #else
 #if 1 //TODO Clean this up
-				CpuKernels::backprojectRef3D(imageCount,
+			if(ctf_premultiplied)
+				CpuKernels::backprojectRef3D<true>(imageCount,
 					d_img_real, d_img_imag,
 					trans_x, trans_y,
 					d_weights, d_Minvsigma2s, d_ctfs,
@@ -602,16 +860,38 @@ void runBackProjectKernel(
 					BP.maxR, BP.maxR2, (XFLOAT)BP.padding_factor,
 					(unsigned)imgX, (unsigned)imgY, (unsigned)imgZ, (size_t)imgX*(size_t)imgY*(size_t)imgZ,
 					(unsigned)BP.mdlX, (unsigned)BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ, BP.mutexes);
-#else
-				CpuKernels::backproject3D<false>(imageCount,BP_REF3D_BLOCK_SIZE,
+			else
+				CpuKernels::backprojectRef3D<false>(imageCount,
 					d_img_real, d_img_imag,
-					trans_x, trans_y, trans_z,
+					trans_x, trans_y,
 					d_weights, d_Minvsigma2s, d_ctfs,
 					translation_num, significant_weight, weight_norm, d_eulers,
 					BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
 					BP.maxR, BP.maxR2, (XFLOAT)BP.padding_factor,
 					(unsigned)imgX, (unsigned)imgY, (unsigned)imgZ, (size_t)imgX*(size_t)imgY*(size_t)imgZ,
 					(unsigned)BP.mdlX, (unsigned)BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ, BP.mutexes);
+
+#else
+				if(ctf_premultiplied)
+					CpuKernels::backproject3D<false, true>(imageCount,BP_REF3D_BLOCK_SIZE,
+						d_img_real, d_img_imag,
+						trans_x, trans_y, trans_z,
+						d_weights, d_Minvsigma2s, d_ctfs,
+						translation_num, significant_weight, weight_norm, d_eulers,
+						BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
+						BP.maxR, BP.maxR2, (XFLOAT)BP.padding_factor,
+						(unsigned)imgX, (unsigned)imgY, (unsigned)imgZ, (size_t)imgX*(size_t)imgY*(size_t)imgZ,
+						(unsigned)BP.mdlX, (unsigned)BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ, BP.mutexes);
+				else
+					CpuKernels::backproject3D<false, false>(imageCount,BP_REF3D_BLOCK_SIZE,
+						d_img_real, d_img_imag,
+						trans_x, trans_y, trans_z,
+						d_weights, d_Minvsigma2s, d_ctfs,
+						translation_num, significant_weight, weight_norm, d_eulers,
+						BP.d_mdlReal, BP.d_mdlImag, BP.d_mdlWeight,
+						BP.maxR, BP.maxR2, (XFLOAT)BP.padding_factor,
+						(unsigned)imgX, (unsigned)imgY, (unsigned)imgZ, (size_t)imgX*(size_t)imgY*(size_t)imgZ,
+						(unsigned)BP.mdlX, (unsigned)BP.mdlY, BP.mdlInitY, 	BP.mdlInitZ, BP.mutexes);
 #endif
 #endif
 		} // do_sgd is false

@@ -10,6 +10,7 @@ namespace CpuKernels
 {
 
 #ifndef CPU_BP_INITIALIZE //TODO Clean this up
+template < bool CTF_PREMULTIPLIED >
 	void backproject2D(
 		unsigned long imageCount,
 		int     block_size,
@@ -37,6 +38,7 @@ namespace CpuKernels
 		int mdl_inity,
 		tbb::spin_mutex *mutexes);
 #else
+template < bool CTF_PREMULTIPLIED >
 void backproject2D(
 		unsigned long imageCount,
 		int     block_size,
@@ -65,16 +67,16 @@ void backproject2D(
 		tbb::spin_mutex *mutexes)
 {
 	int img_y_half = img_y / 2;
-	
+
 	int max_r2_out = max_r2 * padding_factor * padding_factor;
-	
+
 	for (unsigned long img=0; img<imageCount; img++) {
 		XFLOAT s_eulers[4];
 
 		s_eulers[0] = g_eulers[img*9+0] * padding_factor;
 		s_eulers[1] = g_eulers[img*9+1] * padding_factor;
 		s_eulers[2] = g_eulers[img*9+3] * padding_factor;
-		s_eulers[3] = g_eulers[img*9+4] * padding_factor;     
+		s_eulers[3] = g_eulers[img*9+4] * padding_factor;
 
 		XFLOAT weight_norm_inverse = (XFLOAT) 1.0 / weight_norm;
 		XFLOAT inv_minsigma_ctf;
@@ -108,7 +110,10 @@ void backproject2D(
 				Fweight = (XFLOAT) 0.0;
 				real = (XFLOAT) 0.0;
 				imag = (XFLOAT) 0.0;
-				inv_minsigma_ctf = weight_norm_inverse * ctf * minvsigma2;
+				if(CTF_PREMULTIPLIED)
+					inv_minsigma_ctf = weight_norm_inverse * minvsigma2;
+				else
+					inv_minsigma_ctf = weight_norm_inverse * ctf * minvsigma2;
 
 				XFLOAT temp_real, temp_imag;
 				for (unsigned long itrans = 0; itrans < translation_num; itrans++)
@@ -118,7 +123,11 @@ void backproject2D(
 					if (weight >= significant_weight)
 					{
 						weight = weight * inv_minsigma_ctf;
-						Fweight += weight * ctf;
+						if(CTF_PREMULTIPLIED)
+							Fweight += weight * ctf * ctf;
+						else
+							Fweight += weight * ctf;
+
 
 					CpuKernels::translatePixel(x, y, g_trans_x[itrans], g_trans_y[itrans], img_real, img_imag, temp_real, temp_imag);
 
@@ -133,9 +142,9 @@ void backproject2D(
 					// Get logical coordinates in the 3D map
 					XFLOAT xp = (s_eulers[0] * x + s_eulers[1] * y );
 					XFLOAT yp = (s_eulers[2] * x + s_eulers[3] * y );
-					
+
 					// Only consider pixels that are projected inside the allowed circle in output coordinates.
-					//     --JZ, Nov. 26th 2018			
+					//     --JZ, Nov. 26th 2018
 					if ( ( xp * xp + yp * yp ) > max_r2_out)
 						continue;
 
@@ -194,7 +203,7 @@ void backproject2D(
 }
 #endif // CPU_BP_INITIALIZE
 
-template < bool DATA3D >
+template < bool DATA3D, bool CTF_PREMULTIPLIED >
 void backproject3D(
 		unsigned long imageCount,
 		int     block_size,
@@ -228,9 +237,9 @@ void backproject3D(
 {
 	int img_y_half = img_y / 2;
 	int img_z_half = img_z / 2;
-	
+
 	int max_r2_vol = max_r2 * padding_factor * padding_factor;
-	
+
 	for (unsigned long img=0; img<imageCount; img++) {
 		XFLOAT s_eulers[9];
 
@@ -257,7 +266,7 @@ void backproject3D(
 			for(int tid=0; tid<block_size; tid++)
 			{
 				int ok_for_next(1);  // This flag avoids continues, helping the vectorizer
-				
+
 				size_t pixel(0);
 				if(DATA3D)
 					pixel = ((size_t)pass * (size_t)block_size) + (size_t)tid;
@@ -276,13 +285,13 @@ void backproject3D(
 					xy = pixel % (img_x*img_y);
 					x =             xy  % img_x;
 					y = CpuKernels::floorfracf( xy,   (size_t)img_x);
-					
+
 					if (z > img_z_half)
 					{
 						z = z - img_z;
 
 						if(x==0)
-							ok_for_next=0;	
+							ok_for_next=0;
 					}
 				}
 				else
@@ -308,9 +317,9 @@ void backproject3D(
 					yp[tid] = (s_eulers[3] * x + s_eulers[4] * y ) * padding_factor;
 					zp[tid] = (s_eulers[6] * x + s_eulers[7] * y ) * padding_factor;
 				}
-				
+
 				// Only consider pixels that are projected inside the sphere in output coordinates.
-				//     --JZ, Nov. 26th 2018			
+				//     --JZ, Nov. 26th 2018
 				if ( ( xp[tid] * xp[tid] + yp[tid] * yp[tid] + zp[tid] * zp[tid] ) > max_r2_vol)
 				{
 					ok_for_next = 0;
@@ -326,10 +335,14 @@ void backproject3D(
 					Fweight[tid] = (XFLOAT) 0.0;
 					real[tid] = (XFLOAT) 0.0;
 					imag[tid] = (XFLOAT) 0.0;
-					XFLOAT inv_minsigma_ctf = weight_norm_inverse * ctf * minvsigma2;
+					XFLOAT inv_minsigma_ctf;
+					if(CTF_PREMULTIPLIED)
+						inv_minsigma_ctf = weight_norm_inverse * minvsigma2;
+					else
+						inv_minsigma_ctf = weight_norm_inverse * ctf * minvsigma2;
 
 					XFLOAT temp_real, temp_imag;
-					
+
 					for (unsigned long itrans = 0; itrans < translation_num; itrans++)
 					{
 						weight = g_weights[img * translation_num + itrans];
@@ -337,7 +350,11 @@ void backproject3D(
 						if (weight >= significant_weight)
 						{
 							weight = weight * inv_minsigma_ctf;
-							Fweight[tid] += weight * ctf;
+							if(CTF_PREMULTIPLIED)
+								Fweight[tid] += weight * ctf * ctf;
+							else
+								Fweight[tid] += weight * ctf;
+
 							if(DATA3D)
 								CpuKernels::translatePixel(x, y, z, g_trans_x[itrans], g_trans_y[itrans], g_trans_z[itrans], img_real, img_imag, temp_real, temp_imag);
 							else
@@ -351,7 +368,7 @@ void backproject3D(
 					//BP
 					if (Fweight[tid] > (XFLOAT) 0.0)
 					{
-						
+
 						// Only asymmetric half is stored
 
 						if (xp[tid] < (XFLOAT) 0.0)
@@ -391,7 +408,7 @@ void backproject3D(
 					// Locking necessary since all threads share the same back projector
 					XFLOAT dd000 = mfz * mfy * mfx;
 					XFLOAT dd001 = mfz * mfy *  fx;
-					
+
 					size_t z0MdlxMdly = (size_t)z0 * (size_t)mdl_x * (size_t)mdl_y;
 
 					{
@@ -425,7 +442,7 @@ void backproject3D(
 					XFLOAT dd101 =  fz * mfy *  fx;
 
 					size_t z1MdlxMdly = (size_t)z1 * (size_t)mdl_x * (size_t)mdl_y;
-					
+
 					{
 						tbb::spin_mutex::scoped_lock lock(mutexes[z1 * mdl_y + y0]);
 
@@ -458,13 +475,14 @@ void backproject3D(
 	} // for img
 }
 
-// sincos lookup table optimization. Function translatePixel calls 
-// sincos(x*tx + y*ty). We precompute 2D lookup tables for x and y directions. 
+// sincos lookup table optimization. Function translatePixel calls
+// sincos(x*tx + y*ty). We precompute 2D lookup tables for x and y directions.
 // The first dimension is x or y pixel index, and the second dimension is x or y
-// translation index. Since sin(a+B) = sin(A) * cos(B) + cos(A) * sin(B), and 
-// cos(A+B) = cos(A) * cos(B) - sin(A) * sin(B), we can use lookup table to 
-// compute sin(x*tx + y*ty) and cos(x*tx + y*ty). 
+// translation index. Since sin(a+B) = sin(A) * cos(B) + cos(A) * sin(B), and
+// cos(A+B) = cos(A) * cos(B) - sin(A) * sin(B), we can use lookup table to
+// compute sin(x*tx + y*ty) and cos(x*tx + y*ty).
 #ifndef CPU_BP_INITIALIZE //TODO Clean this up
+template < bool CTF_PREMULTIPLIED >
 void backprojectRef3D(
 		unsigned long imageCount,
 		XFLOAT *g_img_real,
@@ -494,6 +512,7 @@ void backprojectRef3D(
 		int      mdl_initz,
 		tbb::spin_mutex *mutexes);
 #else
+template < bool CTF_PREMULTIPLIED >
 void backprojectRef3D(
 		unsigned long imageCount,
 		XFLOAT *g_img_real,
@@ -526,12 +545,12 @@ void backprojectRef3D(
 	int img_y_half = img_y / 2;
 	int img_y_half_2 = img_y_half * img_y_half;
 	int img_z_half = img_z / 2;
-	
+
 	int max_r2_vol = max_r2 * padding_factor * padding_factor;
-	
+
 	for (unsigned long img=0; img<imageCount; img++) {
 		XFLOAT s_eulers[9];
-		
+
 		for(int i = 0; i < 9; i++)
 			s_eulers[i] = g_eulers[img*9+i];
 
@@ -539,8 +558,8 @@ void backprojectRef3D(
 		XFLOAT sin_y[trans_num][img_y], cos_y[trans_num][img_y];
 
 		CpuKernels::computeSincosLookupTable2D(trans_num, g_trans_x, g_trans_y, img_x, img_y,
-								   &sin_x[0][0], &cos_x[0][0], 
-								   &sin_y[0][0], &cos_y[0][0]);	
+								   &sin_x[0][0], &cos_x[0][0],
+								   &sin_y[0][0], &cos_y[0][0]);
 
 		XFLOAT weight_norm_inverse = (XFLOAT) 1.0 / weight_norm;
 
@@ -565,13 +584,13 @@ void backprojectRef3D(
 			for (unsigned long itrans = 0; itrans < trans_num; itrans++)
 			{
 				XFLOAT weight = g_weights[img * trans_num + itrans];
-				if (weight < significant_weight) 
+				if (weight < significant_weight)
 					continue;
 
 				XFLOAT trans_cos_y, trans_sin_y;
 				if ( y < 0) {
 					trans_cos_y =  cos_y[itrans][-y];
-					trans_sin_y = -sin_y[itrans][-y];            
+					trans_sin_y = -sin_y[itrans][-y];
 				}
 				else {
 					trans_cos_y = cos_y[itrans][y];
@@ -579,15 +598,26 @@ void backprojectRef3D(
 				}
 
 				XFLOAT *trans_cos_x = &cos_x[itrans][0];
-				XFLOAT *trans_sin_x = &sin_x[itrans][0];     
+				XFLOAT *trans_sin_x = &sin_x[itrans][0];
 
 				#pragma omp simd
 				for(int x=0; x<xmax; x++) {
 					XFLOAT minvsigma2 = g_Minvsigma2s[pixel + x];
 					XFLOAT ctf        = g_ctfs       [pixel + x];
-					XFLOAT inv_minsigma_ctf = weight_norm_inverse * ctf * minvsigma2;
-					XFLOAT my_weight = weight * inv_minsigma_ctf;
-					Fweight[x] += my_weight  * ctf;
+					XFLOAT inv_minsigma_ctf;
+					XFLOAT my_weight;
+					if(CTF_PREMULTIPLIED)
+					{
+						inv_minsigma_ctf = weight_norm_inverse * minvsigma2;
+						my_weight = weight * inv_minsigma_ctf;
+						Fweight[x] += my_weight  * ctf * ctf;
+					}
+					else
+					{
+						inv_minsigma_ctf = weight_norm_inverse * ctf * minvsigma2;
+						my_weight = weight * inv_minsigma_ctf;
+						Fweight[x] += my_weight  * ctf;
+					}
 
 					XFLOAT img_real   = g_img_real   [pixel + x];
 					XFLOAT img_imag   = g_img_imag   [pixel + x];
@@ -599,7 +629,7 @@ void backprojectRef3D(
 					XFLOAT shifted_imag = cc * img_imag + ss * img_real;
 					/*
 					XFLOAT shifted_real, shifted_imag;
-					CpuKernels::translatePixel(x, y,  g_trans_x[itrans], g_trans_y[itrans], 
+					CpuKernels::translatePixel(x, y,  g_trans_x[itrans], g_trans_y[itrans],
 								   img_real, img_imag, shifted_real, shifted_imag);
 					*/
 					real[x] += shifted_real * my_weight;
@@ -608,21 +638,21 @@ void backprojectRef3D(
 			}
 
 			#pragma omp simd
-			for(int x=0; x<img_x; x++) {		
+			for(int x=0; x<img_x; x++) {
 				// Get logical coordinates in the 3D map
 				xp[x] = (s_eulers[0] * x + s_eulers[1] * y ) * padding_factor;
 				yp[x] = (s_eulers[3] * x + s_eulers[4] * y ) * padding_factor;
 				zp[x] = (s_eulers[6] * x + s_eulers[7] * y ) * padding_factor;
-				
+
 				// Use Fweight to discard pixels that project outside the sphere
 				// (pixels with Fweight <= 0 will be skipped further down)
-				//     --JZ, Nov. 26th 2018		
+				//     --JZ, Nov. 26th 2018
 				if (xp[x]*xp[x] + yp[x]*yp[x] + zp[x]*zp[x] > max_r2_vol)
 				{
 					Fweight[x] = (XFLOAT) 0.0;
 				}
 
-				// Only asymmetric half is stored            
+				// Only asymmetric half is stored
 				if (xp[x] < (XFLOAT) 0.0) {
 					// Get complex conjugated hermitian symmetry pair
 					xp[x]   = -xp[x];
@@ -732,7 +762,7 @@ void backprojectRef3D(
 }
 #endif
 
-template < bool DATA3D >
+template < bool DATA3D, bool CTF_PREMULTIPLIED >
 void backprojectSGD(
 		unsigned long imageCount,
 		int     block_size,
@@ -767,15 +797,15 @@ void backprojectSGD(
 {
 	int img_y_half = img_y / 2;
 	int img_z_half = img_z / 2;
-	
+
 	int max_r2_vol = max_r2 * padding_factor * padding_factor;
-	
+
 	for (unsigned long img=0; img<imageCount; img++) {
 		XFLOAT s_eulers[9];
 
 		for (int i = 0; i < 9; i++)
 			s_eulers[i] = g_eulers[img*9+i];
-		
+
 		XFLOAT weight_norm_inverse = (XFLOAT) 1.0 / weight_norm;
 
 		int pixel_pass_num(0);
@@ -783,7 +813,7 @@ void backprojectSGD(
 			pixel_pass_num = (ceilf((float)img_xyz/(float)block_size));
 		else
 			pixel_pass_num = (ceilf((float)img_xyz/(float)block_size));
-		
+
 		// TODO - does this really help with the call to the projector in here?
 		//
 		// We collect block_size number of values before storing the results to
@@ -797,7 +827,7 @@ void backprojectSGD(
 //			#pragma omp simd
 			for(int tid=0; tid<block_size; tid++) {
 				int ok_for_next(1);  // This flag avoids continues, helping the vectorizer
-				
+
 				size_t pixel(0);
 				if(DATA3D)
 					pixel = ((size_t)pass * (size_t)block_size) + (size_t)tid;
@@ -816,7 +846,7 @@ void backprojectSGD(
 					xy = pixel % (img_x*img_y);
 					x =             xy  % img_x;
 					y = CpuKernels::floorfracf( xy,   (size_t)img_x);
-					
+
 					if (z > img_z_half)
 					{
 						z = z - img_z;
@@ -848,14 +878,14 @@ void backprojectSGD(
 					yp[tid] = (s_eulers[3] * x + s_eulers[4] * y ) * padding_factor;
 					zp[tid] = (s_eulers[6] * x + s_eulers[7] * y ) * padding_factor;
 				}
-				
+
 				if (xp[tid]*xp[tid] + yp[tid]*yp[tid] + zp[tid]*zp[tid] > max_r2_vol)
 				{
 					ok_for_next = 0;
 				}
 
 				if(ok_for_next)
-				{	
+				{
 					ref_real[tid] = (XFLOAT) 0.0;
 					ref_imag[tid] = (XFLOAT) 0.0;
 
@@ -884,7 +914,12 @@ void backprojectSGD(
 					imag[tid] = (XFLOAT) 0.0;
 					ref_real[tid] *= ctf;
 					ref_imag[tid] *= ctf;
-					XFLOAT inv_minsigma_ctf = weight_norm_inverse * ctf * minvsigma2;
+					XFLOAT inv_minsigma_ctf;
+
+					if(CTF_PREMULTIPLIED)
+						inv_minsigma_ctf = weight_norm_inverse * minvsigma2;
+					else
+						inv_minsigma_ctf = weight_norm_inverse * ctf * minvsigma2;
 
 					XFLOAT temp_real, temp_imag;
 
@@ -895,7 +930,10 @@ void backprojectSGD(
 						if (weight >= significant_weight)
 						{
 							weight = weight * inv_minsigma_ctf;
-							Fweight[tid] += weight * ctf;
+							if(CTF_PREMULTIPLIED)
+								Fweight[tid] += weight * ctf * ctf;
+							else
+								Fweight[tid] += weight * ctf;
 
 							if(DATA3D)
 								CpuKernels::translatePixel(x, y, z, g_trans_x[itrans], g_trans_y[itrans], g_trans_z[itrans], img_real, img_imag, temp_real, temp_imag);
@@ -922,7 +960,7 @@ void backprojectSGD(
 					} // if (Fweight[tid] > (XFLOAT) 0.0)
 				} //if(ok_for_next)
 			} // for tid
-			
+
 			for(int tid=0; tid<block_size; tid++)
 			{
 				if (Fweight[tid] > (XFLOAT) 0.0)
@@ -947,7 +985,7 @@ void backprojectSGD(
 
 					XFLOAT dd000 = mfz * mfy * mfx;
 					XFLOAT dd001 = mfz * mfy *  fx;
-					
+
 					size_t z0MdlxMdly = (size_t)z0 * (size_t)mdl_x * (size_t)mdl_y;
 
 					{
@@ -979,7 +1017,7 @@ void backprojectSGD(
 
 					XFLOAT dd100 =  fz * mfy * mfx;
 					XFLOAT dd101 =  fz * mfy *  fx;
-					
+
 					size_t z1MdlxMdly = (size_t)z1 * (size_t)mdl_x * (size_t)mdl_y;
 
 					{

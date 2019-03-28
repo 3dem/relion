@@ -1068,14 +1068,21 @@ void getAllSquaredDifferencesCoarse(
 		for (unsigned long i = 0; i < image_size; i ++)
 		{
 			XFLOAT pixel_correction = 1.0/scale_correction;
-			if (baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected)
+			if (baseMLO->do_ctf_correction && fabs(op.local_Fctf[img_id].data[i]) > 1e-8)
 			{
 				// if ctf[i]==0, pix_corr[i] becomes NaN.
 				// However, corr_img[i]==0, so pix-diff in kernel==0.
 				// This is ok since originally, pix-diff==Img.real^2 + Img.imag^2,
 				// which is ori-indep, and we subtract min_diff form ALL orients.
-				if (op.local_Fctf[img_id].data[i]!=0) // TODO: investigate if this is numerically stable!
+
+				if (baseMLO->refs_are_ctf_corrected)
+				{
 					pixel_correction /= op.local_Fctf[img_id].data[i];
+				}
+				if (baseMLO->ctf_premultiplied)
+				{
+					pixel_correction /= op.local_Fctf[img_id].data[i];
+				}
 			}
 			Fimg_real[i] = Fimg.data[i].real * pixel_correction;
 			Fimg_imag[i] = Fimg.data[i].imag * pixel_correction;
@@ -1285,14 +1292,21 @@ void getAllSquaredDifferencesFine(
 		for (unsigned long i = 0; i < image_size; i ++)
 		{
 			XFLOAT pixel_correction = 1.0/scale_correction;
-			if (baseMLO->do_ctf_correction && baseMLO->refs_are_ctf_corrected)
+			if (baseMLO->do_ctf_correction && fabs(op.local_Fctf[img_id].data[i]) > 1e-8)
 			{
 				// if ctf[i]==0, pix_corr[i] becomes NaN.
 				// However, corr_img[i]==0, so pix-diff in kernel==0.
 				// This is ok since originally, pix-diff==Img.real^2 + Img.imag^2,
 				// which is ori-indep, and we subtract min_diff form ALL orients.
-				if (op.local_Fctf[img_id].data[i]!=0)
+
+				if (baseMLO->refs_are_ctf_corrected)
+				{
 					pixel_correction /= op.local_Fctf[img_id].data[i];
+				}
+				if (baseMLO->ctf_premultiplied)
+				{
+					pixel_correction /= op.local_Fctf[img_id].data[i];
+				}
 			}
 
 			Fimg_real[i] = Fimg.data[i].real * pixel_correction;
@@ -2806,6 +2820,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 					iclass,
 					part_scale,
 					baseMLO->refs_are_ctf_corrected,
+					baseMLO->ctf_premultiplied,
 					accMLO->dataIs3D,
 					accMLO->classStreams[iclass]);
 
@@ -2841,6 +2856,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 				orientation_num,
 				accMLO->dataIs3D,
 				(baseMLO->do_sgd && !baseMLO->do_avoid_sgd),
+				(baseMLO->ctf_premultiplied),
 				accMLO->classStreams[iclass]);
 
 			CTOC(accMLO->timer,"backproject");

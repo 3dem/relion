@@ -29,7 +29,7 @@ void dump_triple_array(char *name, double *ptr, double *ptr2, double *ptr3, size
 
 namespace AccUtilities
 {
-	
+
 template <typename T>
 static void multiply(int block_size, AccDataTypes::Image<T> &ptr, T value)
 {
@@ -46,7 +46,7 @@ static void multiply(int block_size, AccDataTypes::Image<T> &ptr, T value)
 	ptr.getSize());
 #endif
 }
-	
+
 template <typename T>
 static void multiply(int MultiBsize, int block_size, cudaStream_t stream, T *array, T value, size_t size)
 {
@@ -127,8 +127,8 @@ else
 }
 #endif
 }
-	
-	
+
+
 template <typename T>
 static T getSumOnDevice(AccPtr<T> &ptr)
 {
@@ -268,7 +268,7 @@ static void scanOnDevice(AccPtr<T> &in, AccPtr<T> &out)
 #else
 	T sum = 0.0;
 	size_t arr_size = in.getSize();
-	for(size_t i=0; i<arr_size; i++) 
+	for(size_t i=0; i<arr_size; i++)
 	{
 		sum += in[i];
 		out[i] = sum;
@@ -285,7 +285,7 @@ static void TranslateAndNormCorrect(MultidimArray<RFLOAT > &img_in,
 		bool DATA3D);
 
 static void softMaskBackgroundValue(
-		int inblock_dim, 
+		int inblock_dim,
 		int inblock_size,
 		XFLOAT *vol,
 		Image<RFLOAT> &img,
@@ -297,7 +297,7 @@ static void softMaskBackgroundValue(
 
 
 static void cosineFilter(
-		int inblock_dim, 
+		int inblock_dim,
 		int inblock_size,
 		XFLOAT *vol,
 		long int vol_size,
@@ -404,7 +404,7 @@ void acc_make_eulers_3D(int grid_size, int block_size,
 
 #ifdef CUDA
 	#define INIT_VALUE_BLOCK_SIZE 512
-#endif 
+#endif
 
 template< typename T>
 void InitComplexValue(AccPtr<T> &data, XFLOAT value)
@@ -531,7 +531,7 @@ void frequencyPass(int grid_size, int block_size,
 #endif
 }
 
-template<bool REFCTF, bool REF3D, bool DATA3D, int block_sz>
+template<bool CTFPREMULTIPLIED, bool REFCTF, bool REF3D, bool DATA3D, int block_sz>
 void kernel_wavg(
 		XFLOAT *g_eulers,
 		AccProjectorKernel &projector,
@@ -557,8 +557,8 @@ void kernel_wavg(
 	//We only want as many blocks as there are chunks of orientations to be treated
 	//within the same block (this is done to reduce memory loads in the kernel).
 	dim3 block_dim = orientation_num;//ceil((float)orientation_num/(float)REF_GROUP_SIZE);
-	
-	cuda_kernel_wavg<REFCTF,REF3D,DATA3D,block_sz><<<block_dim,block_sz,(3*block_sz+9)*sizeof(XFLOAT),stream>>>(
+
+	cuda_kernel_wavg<CTFPREMULTIPLIED, REFCTF,REF3D,DATA3D,block_sz><<<block_dim,block_sz,(3*block_sz+9)*sizeof(XFLOAT),stream>>>(
 		g_eulers,
 		projector,
 		image_size,
@@ -580,7 +580,7 @@ void kernel_wavg(
 #else
 	if (DATA3D)
 	{
-		CpuKernels::wavg_3D<REFCTF>(
+		CpuKernels::wavg_3D<CTFPREMULTIPLIED, REFCTF>(
 			g_eulers,
 			projector,
 			image_size,
@@ -602,7 +602,7 @@ void kernel_wavg(
 	}
 	else
 	{
-		CpuKernels::wavg_ref3D<REFCTF,REF3D>(
+		CpuKernels::wavg_ref3D<CTFPREMULTIPLIED, REFCTF,REF3D>(
 			g_eulers,
 			projector,
 			image_size,
@@ -627,7 +627,7 @@ void kernel_wavg(
 
 template<bool REF3D, bool DATA3D, int block_sz, int eulers_per_block, int prefetch_fraction>
 void diff2_coarse(
-		unsigned long grid_size, 
+		unsigned long grid_size,
 		int block_size,
 		XFLOAT *g_eulers,
 		XFLOAT *trans_x,
@@ -708,7 +708,7 @@ void diff2_coarse(
 
 template<bool REF3D, bool DATA3D, int block_sz>
 void diff2_CC_coarse(
-		unsigned long grid_size, 
+		unsigned long grid_size,
 		int block_size,
 		XFLOAT *g_eulers,
 		XFLOAT *g_imgs_real,
@@ -770,13 +770,13 @@ void diff2_CC_coarse(
 			g_diff2s,
 			translation_num,
 			image_size,
-			exp_local_sqrtXi2);	
-#endif	
+			exp_local_sqrtXi2);
+#endif
 }
 
 template<bool REF3D, bool DATA3D, int block_sz, int chunk_sz>
 void diff2_fine(
-		unsigned long grid_size, 
+		unsigned long grid_size,
 		int block_size,
 		XFLOAT *g_eulers,
 		XFLOAT *g_imgs_real,
@@ -865,7 +865,7 @@ void diff2_fine(
 
 template<bool REF3D, bool DATA3D, int block_sz,int chunk_sz>
 void diff2_CC_fine(
-		unsigned long grid_size, 
+		unsigned long grid_size,
 		int block_size,
 		XFLOAT *g_eulers,
 		XFLOAT *g_imgs_real,
@@ -1011,7 +1011,7 @@ void kernel_exponentiate(
 #endif
 }
 
-void kernel_exponentiate_weights_fine(	int grid_size, 
+void kernel_exponentiate_weights_fine(	int grid_size,
 										int block_size,
 										XFLOAT *g_pdf_orientation,
 										XFLOAT *g_pdf_offset,
