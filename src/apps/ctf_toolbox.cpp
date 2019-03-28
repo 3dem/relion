@@ -42,7 +42,7 @@ class ctf_toolbox_parameters
 	ObservationModel obsModel;
 
 	// Image size
-	int xdim, ydim, zdim, sim_box;
+	int xdim, ydim, zdim, sim_box, sim_box_large;
 	long int ndim;
 
 	void usage()
@@ -74,6 +74,7 @@ class ctf_toolbox_parameters
 		fn_sim = parser.getOption("--simulate", "Output name for simulated CTF image","");
 		sim_angpix = textToFloat(parser.getOption("--angpix", "Pixel size (A)", "1."));
 		sim_box = textToInteger(parser.getOption("--box", "Box size (pix)", "256"));
+		sim_box_large = textToInteger(parser.getOption("--large_box", "Firts simulate in large box, then  downscale (pix)", "-1"));
 		kV = textToFloat(parser.getOption("--kV", "Voltage (kV)", "300"));
 		Q0 = textToFloat(parser.getOption("--Q0", "Amplitude contrast", "0.1"));
 		Cs = textToFloat(parser.getOption("--Cs", "Spherical aberration (mm)", "2.7"));
@@ -178,7 +179,8 @@ class ctf_toolbox_parameters
 		// CTF Simulation of a single image
 		if (fn_sim != "")
 		{
-			Image<RFLOAT> Ictf(sim_box, sim_box);
+			if (sim_box_large < 0) sim_box_large = sim_box;
+			Image<RFLOAT> Ictf(sim_box_large, sim_box_large);
 			CTF ctf;
 			std::cout << " + Input values: " << std::endl;
 			std::cout << " +  kV= " << kV << std::endl;
@@ -190,12 +192,13 @@ class ctf_toolbox_parameters
 			std::cout << " +  phase_shift = " << phase_shift << std::endl;
 			std::cout << " +  angpix= " << sim_angpix<< std::endl;
 			std::cout << " +  box= " << sim_box<< std::endl;
+			std::cout << " +  large_box= " << sim_box_large << std::endl;
 			std::cout << " + " << std::endl;
 			ctf.setValues(defU, defV, defAng, kV, Cs, Q0, 0., 1., phase_shift);
 
 			Ictf().setXmippOrigin();
-			RFLOAT xs = (RFLOAT)sim_box * sim_angpix;
-			RFLOAT ys = (RFLOAT)sim_box * sim_angpix;
+			RFLOAT xs = (RFLOAT)sim_box_large * sim_angpix;
+			RFLOAT ys = (RFLOAT)sim_box_large * sim_angpix;
 			FOR_ALL_ELEMENTS_IN_ARRAY2D(Ictf())
 			{
 				RFLOAT x = (RFLOAT)j / xs;
@@ -203,6 +206,8 @@ class ctf_toolbox_parameters
 
 				A2D_ELEM(Ictf(), i, j) = ctf.getCTF(x, y);
 			}
+
+			resizeMap(Ictf(), sim_box);
 
 			Ictf.write(fn_sim);
 			std::cout << " + Done! written: " << fn_sim << std::endl;
