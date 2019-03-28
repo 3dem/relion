@@ -2929,6 +2929,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		int my_metadata_offset = op.metadata_offset + img_id;
 		int group_id = baseMLO->mydata.getGroupId(op.part_id, img_id);
 		const int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, img_id);
+		RFLOAT my_pixel_size = baseMLO->mydata.getOpticsPixelSize(optics_group);
+		int my_image_size = baseMLO->mydata.getOpticsImageSize(optics_group);
 
 		// If the current images were smaller than the original size, fill the rest of wsum_model.sigma2_noise with the power_class spectrum of the images
 		for (unsigned long ires = baseMLO->image_current_size[optics_group]/2 + 1; ires < baseMLO->image_full_size[optics_group]/2 + 1; ires++)
@@ -2976,13 +2978,15 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 		// Calculate DLL for each particle
 		RFLOAT logsigma2 = 0.;
+		RFLOAT remap_image_sizes = (baseMLO->mymodel.ori_size * baseMLO->mymodel.pixel_size) / (my_image_size * my_pixel_size);
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(baseMLO->Mresol_fine[optics_group])
 		{
 			int ires = DIRECT_MULTIDIM_ELEM(baseMLO->Mresol_fine[optics_group], n);
+			int ires_remapped = ROUND(remap_image_sizes * ires);
 			// Note there is no sqrt in the normalisation term because of the 2-dimensionality of the complex-plane
 			// Also exclude origin from logsigma2, as this will not be considered in the P-calculations
-			if (ires > 0)
-				logsigma2 += log( 2. * PI * DIRECT_A1D_ELEM(baseMLO->mymodel.sigma2_noise[group_id], ires));
+			if (ires > 0 && ires_remapped < XSIZE(baseMLO->mymodel.sigma2_noise[group_id]))
+				logsigma2 += log( 2. * PI * DIRECT_A1D_ELEM(baseMLO->mymodel.sigma2_noise[group_id], ires_remapped));
 		}
 		RFLOAT dLL;
 
