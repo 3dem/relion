@@ -69,7 +69,7 @@ class CtfRefiner
 
 		// Whether to estimate defoci, B-factors, antisymmetric aberrations (incl. beam tilt),
 		// symmetric aberrations and anisotropic magnification, respectively
-		bool do_defocus_fit, do_bfac_fit, do_tilt_fit, do_aberr_fit, do_mag_fit;
+		bool do_defocus_fit, do_bfac_fit, do_tilt_fit, do_aberr_fit, do_mag_fit, do_ctf_padding;
 
 
 		bool debug,     // write out debugging info

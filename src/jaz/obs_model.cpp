@@ -295,7 +295,7 @@ ObservationModel::ObservationModel(const MetaDataTable &_opticsMdt, bool do_die_
 void ObservationModel::predictObservation(
         Projector& proj, const MetaDataTable& partMdt, long int particle,
 		MultidimArray<Complex>& dest, double angpix_ref,
-        bool applyCtf, bool shiftPhases, bool applyShift, bool applyMtf)
+        bool applyCtf, bool shiftPhases, bool applyShift, bool applyMtf, bool applyCtfPadding)
 {
 	const int s_ref = proj.ori_size;
 
@@ -352,12 +352,25 @@ void ObservationModel::predictObservation(
 		ctf.readByGroup(partMdt, this, particle);
 
 		Image<RFLOAT> ctfImg(sh_out,s_out);
-		ctf.getFftwImage(ctfImg(), s_out, s_out, angpix[opticsGroup]);
+		ctf.getFftwImage(ctfImg(), s_out, s_out, angpix[opticsGroup],
+				false, false, false, true, applyCtfPadding);
 
-		for (int y = 0; y < s_out;  y++)
-		for (int x = 0; x < sh_out; x++)
+		if (getCtfPremultiplied(opticsGroup))
 		{
-			dest(y,x) *= ctfImg(y,x);
+			for (int y = 0; y < s_out;  y++)
+			for (int x = 0; x < sh_out; x++)
+			{
+				dest(y,x) *= ctfImg(y,x) * ctfImg(y,x);
+			}
+
+		}
+		else
+		{
+			for (int y = 0; y < s_out;  y++)
+			for (int x = 0; x < sh_out; x++)
+			{
+				dest(y,x) *= ctfImg(y,x);
+			}
 		}
 	}
 
@@ -388,12 +401,12 @@ void ObservationModel::predictObservation(
 
 Volume<t2Vector<Complex>> ObservationModel::predictComplexGradient(
 		Projector &proj, const MetaDataTable &partMdt, long particle, double angpix_ref,
-		bool applyCtf, bool shiftPhases, bool applyShift, bool applyMtf)
+		bool applyCtf, bool shiftPhases, bool applyShift, bool applyMtf, bool applyCtfPadding)
 {
-	if (applyCtf || applyShift)
+	if (applyCtf || applyShift || applyCtfPadding)
 	{
 		REPORT_ERROR_STR("ObservationModel::predictComplexGradient: "
-						 << "applyCtf and applyShift are currently not supported\n");
+						 << "applyCtf and applyShift and applyCtfPadding are currently not supported\n");
 	}
 
 	const int s_ref = proj.ori_size;

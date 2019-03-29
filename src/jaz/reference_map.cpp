@@ -227,7 +227,7 @@ std::vector<Image<Complex>> ReferenceMap::predictAll(
 		const MetaDataTable& mdt,
 		ObservationModel& obs,
 		HalfSet hs, int threads,
-		bool applyCtf, bool applyTilt, bool applyShift, bool applyMtf)
+		bool applyCtf, bool applyTilt, bool applyShift, bool applyMtf, bool applyCtfPadding)
 {
 	// declare on first line to prevent copying
 	std::vector<Image<Complex>> out(mdt.numberOfObjects());
@@ -237,7 +237,7 @@ std::vector<Image<Complex>> ReferenceMap::predictAll(
 	#pragma omp parallel for num_threads(threads)
 	for (int p = 0; p < pc; p++)
 	{
-		out[p] = predict(mdt, p, obs, hs, applyCtf, applyTilt, applyShift, applyMtf);
+		out[p] = predict(mdt, p, obs, hs, applyCtf, applyTilt, applyShift, applyMtf, applyCtfPadding);
 	}
 
 	return out;
@@ -247,7 +247,7 @@ Image<Complex> ReferenceMap::predict(
 		const MetaDataTable& mdt, int p,
 		ObservationModel& obs,
 		HalfSet hs,
-		bool applyCtf, bool applyTilt, bool applyShift, bool applyMtf)
+		bool applyCtf, bool applyTilt, bool applyShift, bool applyMtf, bool applyCtfPadding)
 {
 	Image<Complex> pred;
 
@@ -257,7 +257,7 @@ Image<Complex> ReferenceMap::predict(
 
 	int pi = (hs == Own)? randSubset : 1 - randSubset;
 
-	obs.predictObservation(projectors[pi], mdt, p, pred(), angpix, applyCtf, applyTilt, applyShift, applyMtf);
+	obs.predictObservation(projectors[pi], mdt, p, pred(), angpix, applyCtf, applyTilt, applyShift, applyMtf, applyCtfPadding);
 
 	return pred;
 }
@@ -267,7 +267,7 @@ std::vector<Volume<gravis::t2Vector<Complex>>> ReferenceMap::predictAllComplexGr
 		ObservationModel &obs,
 		ReferenceMap::HalfSet hs,
 		int threads,
-		bool applyCtf, bool applyTilt, bool applyShift, bool applyMtf)
+		bool applyCtf, bool applyTilt, bool applyShift, bool applyMtf, bool applyCtfPadding)
 {
 	// declare on first line to prevent copying
 	std::vector<Volume<t2Vector<Complex>>> out(mdt.numberOfObjects());
@@ -277,7 +277,7 @@ std::vector<Volume<gravis::t2Vector<Complex>>> ReferenceMap::predictAllComplexGr
 	#pragma omp parallel for num_threads(threads)
 	for (int p = 0; p < pc; p++)
 	{
-		out[p] = predictComplexGradient(mdt, p, obs, hs, applyCtf, applyTilt, applyShift, applyMtf);
+		out[p] = predictComplexGradient(mdt, p, obs, hs, applyCtf, applyTilt, applyShift, applyMtf, applyCtfPadding);
 	}
 
 	return out;
@@ -287,7 +287,7 @@ Volume<t2Vector<Complex>> ReferenceMap::predictComplexGradient(
 		const MetaDataTable &mdt,
 		int p, ObservationModel &obs,
 		ReferenceMap::HalfSet hs,
-		bool applyCtf, bool applyTilt, bool applyShift, bool applyMtf)
+		bool applyCtf, bool applyTilt, bool applyShift, bool applyMtf, bool applyCtfPadding)
 {
 	Volume<t2Vector<Complex>> pred;
 
@@ -297,7 +297,7 @@ Volume<t2Vector<Complex>> ReferenceMap::predictComplexGradient(
 
 	int pi = (hs == Own)? randSubset : 1 - randSubset;
 
-	pred = obs.predictComplexGradient(projectors[pi], mdt, p, angpix, applyCtf, applyTilt, applyShift, applyMtf);
+	pred = obs.predictComplexGradient(projectors[pi], mdt, p, angpix, applyCtf, applyTilt, applyShift, applyMtf, applyCtfPadding);
 
 	return pred;
 }

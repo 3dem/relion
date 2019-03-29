@@ -104,6 +104,10 @@ void TiltEstimator::processMicrograph(
 		const int og = particlesByOpticsGroup[pog].first;
 		const std::vector<int>& partIndices = particlesByOpticsGroup[pog].second;
 
+		// TODO: SHWS 29mar2018: when data is CTF-premultiplied: do we need to change updateTiltShift??
+		if (obsModel->getCtfPremultiplied(og))
+			std::cerr << "TODO: check tilt estimation with CTF-premultiplied data!!" << std::endl;
+
 		const int pc = partIndices.size();
 
 		std::vector<Image<Complex>> xyAcc(nr_omp_threads);

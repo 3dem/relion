@@ -80,6 +80,10 @@ void AberrationEstimator::processMicrograph(
 		const int og = particlesByOpticsGroup[pog].first;
 		const std::vector<int>& partIndices = particlesByOpticsGroup[pog].second;
 
+		// TODO: SHWS 29mar2018: when data is CTF-premultiplied: do we need to change below??
+		if (obsModel->getCtfPremultiplied(og))
+			std::cerr << "TODO: check aberration estimation with CTF-premultiplied data!!" << std::endl;
+
 		const int pc = partIndices.size();
 
 		std::vector<Image<RFLOAT>>

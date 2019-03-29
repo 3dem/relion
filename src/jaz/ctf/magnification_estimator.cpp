@@ -92,6 +92,10 @@ void MagnificationEstimator::processMicrograph(
 		const int og = particlesByOpticsGroup[pog].first;
 		const std::vector<int>& partIndices = particlesByOpticsGroup[pog].second;
 
+		// TODO: SHWS 29mar2018: when data is CTF-premultiplied: do we need to change updateScaleFreq??
+		if (obsModel->getCtfPremultiplied(og))
+			std::cerr << "TODO: check magnification correction with CTF-premultiplied data!!" << std::endl;
+
 		const int pc = partIndices.size();
 
 		std::vector<Volume<Equation2x2>> magEqs(nr_omp_threads);

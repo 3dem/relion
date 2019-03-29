@@ -76,7 +76,7 @@ void DefocusEstimator::init(
 	obsModel->getBoxSizes(s, sh);
 
 	freqWeights.resize(angpix.size());
-	
+
 	for (int i = 0; i < angpix.size(); i++)
 	{
 		freqWeights[i] = reference->getHollowWeight(kmin, s[i], angpix[i]);
@@ -103,7 +103,7 @@ void DefocusEstimator::processMicrograph(
 	if (!noGlobAstig)
 	{
 		REPORT_ERROR("Per-micrograph CTF-refinement temporarily disabled.");
-		
+
 		/*CTF ctf0;
 		ctf0.readByGroup(mdt, obsModel, 0);
 
@@ -231,7 +231,10 @@ void DefocusEstimator::processMicrograph(
 		for (long p = 0; p < pc; p++)
 		{
 			const int og = obsModel->getOpticsGroup(mdt, p);
-			
+
+			if (obsModel->getCtfPremultiplied(og))
+				REPORT_ERROR("ERROR: you cannot perform defocus estimation on CTF-premultiplied images...");
+
 			CTF ctf0;
 			ctf0.readByGroup(mdt, obsModel, p);
 
@@ -264,7 +267,7 @@ void DefocusEstimator::processMicrograph(
 	for (long p = 0; p < pc; p++)
 	{
 		const int og = obsModel->getOpticsGroup(mdt, p);
-		
+
 		std::stringstream stsp;
 		stsp << p;
 

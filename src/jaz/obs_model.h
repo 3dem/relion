@@ -84,15 +84,15 @@ class ObservationModel
 		void predictObservation(
 				Projector &proj, const MetaDataTable &partMdt, long int particle,
 				MultidimArray<Complex>& dest, double angpix_ref,
-				bool applyCtf = true, bool shiftPhases = true, bool applyShift = true, bool applyMtf = true);
+				bool applyCtf = true, bool shiftPhases = true, bool applyShift = true, bool applyMtf = true,
+				bool applyCtfPadding = false);
 
 		Volume<gravis::t2Vector<Complex> > predictComplexGradient(
 				Projector &proj, const MetaDataTable &partMdt, long int particle, double angpix_ref,
-				bool applyCtf = true, bool shiftPhases = true, bool applyShift = true, bool applyMtf = true);
+				bool applyCtf = true, bool shiftPhases = true, bool applyShift = true, bool applyMtf = true,
+				bool applyCtfPadding = false);
 
-
-
-	// Correction //
+		// Correction //
 
 		// divide by MTF of detector (using cache)
 		void divideByMtf(

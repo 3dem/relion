@@ -62,7 +62,8 @@ class ReferenceMap
                 bool applyCtf = true,
                 bool applyTilt = true,
 				bool applyShift = true,
-				bool applyMtf = true);
+				bool applyMtf = true,
+				bool applyCtfPadding = false);
 
         Image<Complex> predict(
                 const MetaDataTable& mdt, int p,
@@ -71,7 +72,8 @@ class ReferenceMap
                 bool applyCtf = true,
                 bool applyTilt = true,
 				bool applyShift = true,
-				bool applyMtf = true);
+				bool applyMtf = true,
+				bool applyCtfPadding = false);
 
 		std::vector<Volume<gravis::t2Vector<Complex> > > predictAllComplexGradients(
 				const MetaDataTable& mdt,
@@ -80,7 +82,8 @@ class ReferenceMap
                 bool applyCtf = true,
                 bool applyTilt = true,
 				bool applyShift = true,
-				bool applyMtf = true);
+				bool applyMtf = true,
+				bool applyCtfPadding = false);
 
 		Volume<gravis::t2Vector<Complex>> predictComplexGradient(
                 const MetaDataTable& mdt, int p,
@@ -89,7 +92,8 @@ class ReferenceMap
                 bool applyCtf = true,
                 bool applyTilt = true,
 				bool applyShift = true,
-				bool applyMtf = true);
+				bool applyMtf = true,
+				bool applyCtfPadding = false);
 
 		std::vector<Image<Complex>> predictAll(
 				const MetaDataTable& mdt,

@@ -59,6 +59,7 @@ void CtfRefiner::read(int argc, char **argv)
 	only_do_unfinished = parser.checkOption("--only_do_unfinished",
 		"Skip those steps for which output files already exist.");
 
+	do_ctf_padding = parser.checkOption("--ctf_pad", "Use larger box to calculate CTF and then downscale to mimic boxing operation in real space");
 	diag = parser.checkOption("--diag", "Write out diagnostic data (slower)");
 
 	int fit_section = parser.addSection("Defocus fit options");
@@ -283,7 +284,7 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 		{
 			predSameT = reference.predictAll(
 				unfinishedMdts[g], obsModel, ReferenceMap::Own, nr_omp_threads,
-				false, true, false, true);
+				false, true, false, true, do_ctf_padding);
 		}
 
 		// use predictions from opposite half-set otherwise:
@@ -291,14 +292,14 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 		{
 			predOppNT = reference.predictAll(
 				unfinishedMdts[g], obsModel, ReferenceMap::Opposite, nr_omp_threads,
-				false, false, false, true);
+				false, false, false, true, do_ctf_padding);
 		}
 
 		if (do_aberr_fit || do_mag_fit)
 		{
 			predOppT = reference.predictAll(
 				unfinishedMdts[g], obsModel, ReferenceMap::Opposite, nr_omp_threads,
-				false, true, false, true);
+				false, true, false, true, do_ctf_padding);
 		}
 
 		if (do_defocus_fit)
