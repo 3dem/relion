@@ -199,6 +199,9 @@ public:
 	// Do not correct CTFs until after the first peak
 	bool intact_ctf_first_peak;
 
+	// Calculate CTF in 2x larger window, and then rescale it to mimic PSF of boxing out small particles (this deals with CTF aliaising)
+	bool do_ctf_padding;
+
 	// Pnly perform phase-flipping CTF correction
 	bool only_flip_phases;
 

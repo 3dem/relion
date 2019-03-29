@@ -357,11 +357,12 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	else
 		do_bimodal_psi = false;
 
-
-
 	do_skip_maximization = parser.checkOption("--skip_maximize", "Skip maximization step (only write out data.star file)?");
 
 	int corrections_section = parser.addSection("Corrections");
+
+	if (parser.checkOption("--pad_ctf", "Perform CTF padding to treat CTF aliaising better?"))
+		do_ctf_padding =true;
 
 	// Can also switch the following option OFF
 	if (parser.checkOption("--scale", "Switch on intensity-scale corrections on image groups", "OLD"))
@@ -601,6 +602,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	// CTF, norm, scale, bfactor correction etc.
 	int corrections_section = parser.addSection("Corrections");
 	do_ctf_correction = parser.checkOption("--ctf", "Perform CTF correction?");
+	do_ctf_padding = parser.checkOption("--pad_ctf", "Perform CTF padding to treat CTF aliaising better?");
 	intact_ctf_first_peak = parser.checkOption("--ctf_intact_first_peak", "Ignore CTFs until their first peak?");
 	refs_are_ctf_corrected = parser.checkOption("--ctf_corrected_ref", "Have the input references been CTF-amplitude corrected?");
 	ctf_phase_flipped = parser.checkOption("--ctf_phase_flipped", "Have the data been CTF phase-flipped?");
@@ -2182,7 +2184,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 					CTF ctf;
 					ctf.readByGroup(MDimg, &mydata.obsModel, 0); // This MDimg only contains one particle!
 					ctf.getFftwImage(Fctf, mymodel.ori_size, mymodel.ori_size, mymodel.pixel_size,
-						ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);
+						ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true, do_ctf_padding);
 
 					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fimg)
 					{
@@ -5362,7 +5364,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 					DIRECT_A2D_ELEM(exp_metadata, my_metadata_offset, METADATA_CTF_PHASE_SHIFT));
 
 				ctf.getFftwImage(Fctf, image_full_size[optics_group], image_full_size[optics_group], my_pixel_size,
-						ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);
+						ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true, do_ctf_padding);
 
 			}
 
@@ -8181,7 +8183,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 							DIRECT_A2D_ELEM(exp_metadata, metadata_offset, METADATA_CTF_PHASE_SHIFT));
 
 						ctf.getFftwImage(Fctf, image_full_size[optics_group], image_full_size[optics_group], my_pixel_size,
-								ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true);
+								ctf_phase_flipped, only_flip_phases, intact_ctf_first_peak, true, do_ctf_padding);
 					}
 				}
 
