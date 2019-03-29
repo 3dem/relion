@@ -1176,7 +1176,7 @@ Note that multiple MotionCor2 processes should not share a GPU; otherwise, it ca
 	joboptions["other_motioncor2_args"] = JobOption("Other MOTIONCOR2 arguments", std::string(""), "Additional arguments that need to be passed to MOTIONCOR2.");
 
 	// Dose-weight
-	joboptions["do_dose_weighting"] = JobOption("Do dose-weighting?", false ,"If set to Yes, the averaged micrographs will be dose-weighted.");
+	joboptions["do_dose_weighting"] = JobOption("Do dose-weighting?", true ,"If set to Yes, the averaged micrographs will be dose-weighted.");
 	joboptions["save_noDW"] = JobOption("Save non-dose weighted as well?", false, "Aligned but non-dose weighted images are sometimes useful in CTF estimation, although there is no difference in most cases. Whichever the choice, CTF refinement job is always done on dose-weighted particles.");
 	joboptions["voltage"] = JobOption("Voltage (kV):", 300, 80, 300, 20, "Acceleration voltage in kV.");
 	joboptions["dose_per_frame"] = JobOption("Dose per frame (e/A2):", 1, 0, 5, 0.2, "Dose per movie frame (in electrons per squared Angstrom).");
