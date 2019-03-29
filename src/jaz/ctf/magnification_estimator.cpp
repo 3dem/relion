@@ -76,7 +76,8 @@ void MagnificationEstimator::processMicrograph(
 		long g, MetaDataTable& mdt,
 		const std::vector<Image<Complex>>& obs,
 		const std::vector<Image<Complex>>& pred,
-		const std::vector<Volume<t2Vector<Complex>>>& predGradient)
+		const std::vector<Volume<t2Vector<Complex>>>& predGradient,
+		bool do_ctf_padding)
 {
 	if (!ready)
 	{
@@ -116,7 +117,7 @@ void MagnificationEstimator::processMicrograph(
 			int threadnum = omp_get_thread_num();
 
 			MagnificationHelper::updateScaleFreq(
-				pred[p], predGradient[p], obs[p], ctf, angpix[og], magEqs[threadnum]);
+				pred[p], predGradient[p], obs[p], ctf, angpix[og], magEqs[threadnum], do_ctf_padding);
 		}
 
 		Volume<Equation2x2> magEq(sh[og], s[og],1);

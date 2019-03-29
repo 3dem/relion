@@ -89,7 +89,8 @@ void TiltEstimator::init(
 void TiltEstimator::processMicrograph(
 		long g, MetaDataTable& mdt,
 		const std::vector<Image<Complex>>& obs,
-		const std::vector<Image<Complex>>& pred)
+		const std::vector<Image<Complex>>& pred,
+		bool do_ctf_padding)
 {
 	if (!ready)
 	{
@@ -134,7 +135,7 @@ void TiltEstimator::processMicrograph(
 
 			TiltHelper::updateTiltShift(
 				pred[p], obs[p], ctf, angpix[og],
-				xyAcc[threadnum], wAcc[threadnum]);
+				xyAcc[threadnum], wAcc[threadnum], do_ctf_padding);
 		}
 
 		// Combine the accumulated weights from all threads for this subset,
