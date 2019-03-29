@@ -57,12 +57,12 @@ class FrameRecombiner
 		bool outerFreqKnown();
 
 
-        static std::vector<MetaDataTable> findUnfinishedJobs(
+        std::vector<MetaDataTable> findUnfinishedJobs(
                 const std::vector<MetaDataTable>& mdts, std::string path);
 		
 		double getOutputPixelSize(int opticsGroup);
 		int getOutputBoxSize(int opticsGroup);
-
+		std::string getOutputSuffix();
 
     protected:
 
@@ -70,7 +70,7 @@ class FrameRecombiner
             bool doCombineFrames, bfac_diag;
             int k0, k1, box_arg, scale_arg;
             double k0a, k1a;
-            std::string bfacFn;
+            std::string bfacFn, suffix;
 
             // set at init:
             int s_ref, sh_ref, fc;
@@ -97,7 +97,7 @@ class FrameRecombiner
 				const std::vector<MetaDataTable>& allMdts,
 				int s, double angpix);
 
-        static bool isJobFinished(std::string filenameRoot);
+        bool isJobFinished(std::string filenameRoot);
 };
 
 #endif

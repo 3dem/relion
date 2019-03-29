@@ -47,6 +47,7 @@ void FrameRecombiner::read(IOParser& parser, int argc, char* argv[])
     k1a = textToDouble(parser.getOption("--bfac_maxfreq", "Max. frequency used in B-factor fit [Angst]", "-1"));
     bfacFn = parser.getOption("--bfactors", "A .star file with external B/k-factors", "");
     bfac_diag = parser.checkOption("--diag_bfactor", "Write out B/k-factor diagnostic data");
+	suffix = parser.getOption("--suffix", "Add this suffix to shiny MRCS and STAR files", "");
 	
 	if (box_arg > 0 || scale_arg > 0)
 	{
@@ -277,8 +278,10 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 
             Image<RFLOAT> real(s_out[ogmg], s_out[ogmg]);
 
+            // TODO: Premultiply by CTF
             fts[threadnum].inverseFourierTransform(sum(), real());
 
+            // TODO: Crop
             for (int y = 0; y < s_out[ogmg]; y++)
             for (int x = 0; x < s_out[ogmg]; x++)
             {
@@ -286,7 +289,7 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
             }
         }
 
-        stack.write(fn_root+"_shiny.mrcs");
+        stack.write(fn_root+"_shiny" + suffix + ".mrcs");
 
         if (debug)
         {
@@ -302,10 +305,10 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
         {
             std::stringstream sts;
             sts << (p+1);
-            mdtOut.setValue(EMDL_IMAGE_NAME, sts.str() + "@" + fn_root+"_shiny.mrcs", p);
+            mdtOut.setValue(EMDL_IMAGE_NAME, sts.str() + "@" + fn_root+"_shiny" + suffix + ".mrcs", p);
         }
 
-        mdtOut.write(fn_root+"_shiny.star");
+        mdtOut.write(fn_root+"_shiny" + suffix + ".star");
 
         nr_done++;
 
@@ -618,8 +621,14 @@ int FrameRecombiner::getOutputBoxSize(int opticsGroup)
 	return s_out[opticsGroup];
 }
 
+
+std::string FrameRecombiner::getOutputSuffix()
+{
+	return suffix;
+}
+
 bool FrameRecombiner::isJobFinished(std::string filenameRoot)
 {
-    return exists(filenameRoot+"_shiny.mrcs")
-            && exists(filenameRoot+"_shiny.star");
+    return exists(filenameRoot+"_shiny" + suffix + ".mrcs")
+            && exists(filenameRoot+"_shiny" + suffix + ".star");
 }
