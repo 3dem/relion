@@ -307,7 +307,10 @@ void JobWindow::updateMyJob()
 	for (std::map<std::string,JobOption>::iterator it=myjob.joboptions.begin(); it!=myjob.joboptions.end(); ++it)
 	{
 		if (guientries.find(it->first) == guientries.end())
-			std::cerr << "WARNING: cannot find " << it->first << " in the defined joboptions!" <<std::endl;
+		{
+			std::cerr << "ERROR: cannot find " << it->first << " in the defined joboptions!" <<std::endl;
+			REPORT_ERROR("Stopping now...");
+		}
 
 		it->second.value = std::string(((guientries[it->first]).inp)->value());
 	}
@@ -1085,7 +1088,6 @@ void JobWindow::initialiseClass2DWindow()
 	place("do_ctf_correction", TOGGLE_DEACTIVATE, group1);
 
 	group1->begin();
-	place("ctf_phase_flipped", TOGGLE_DEACTIVATE);
 	place("ctf_intact_first_peak", TOGGLE_DEACTIVATE);
 	group1->end();
 
@@ -1222,7 +1224,6 @@ void JobWindow::initialiseInimodelWindow()
 	place("do_ctf_correction", TOGGLE_DEACTIVATE, group1);
 
 	group1->begin();
-	place("ctf_phase_flipped", TOGGLE_DEACTIVATE);
 	place("ctf_intact_first_peak", TOGGLE_DEACTIVATE);
 	group1->end();
 
@@ -1357,7 +1358,6 @@ void JobWindow::initialiseClass3DWindow()
 	group1->begin();
 
 	place("ctf_corrected_ref", TOGGLE_DEACTIVATE);
-	place("ctf_phase_flipped", TOGGLE_DEACTIVATE);
 	place("ctf_intact_first_peak", TOGGLE_DEACTIVATE);
 
 	group1->end();
@@ -1536,7 +1536,6 @@ void JobWindow::initialiseAutorefineWindow()
 	group1->begin();
 
 	place("ctf_corrected_ref", TOGGLE_DEACTIVATE);
-	place("ctf_phase_flipped", TOGGLE_DEACTIVATE);
 	place("ctf_intact_first_peak", TOGGLE_DEACTIVATE);
 
 	group1->end();

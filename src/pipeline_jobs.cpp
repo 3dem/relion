@@ -395,7 +395,14 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 
 			MDvals.getValue(EMDL_JOBOPTION_VARIABLE, label);
 			MDvals.getValue(EMDL_JOBOPTION_VALUE, value);
-			joboptions[label].value = restoreString(value);
+			if (joboptions.find(label) == joboptions.end())
+			{
+				std::cerr << "WARNING: cannot find " << label << " in the defined joboptions. Ignoring it ..." <<std::endl;
+			}
+			else
+			{
+				joboptions[label].value = restoreString(value);
+			}
 		}
 	}
 	else // for backwards compatibility
@@ -2528,11 +2535,6 @@ The resulting algorithm intrinsically implements the optimal linear, or Wiener f
 Note that CTF parameters for all images need to be given in the input STAR file. \
 The command 'relion_refine --print_metadata_labels' will print a list of all possible metadata labels for that STAR file. \
 See the RELION Wiki for more details.\n\n Also make sure that the correct pixel size (in Angstrom) is given above!)");
-	joboptions["ctf_phase_flipped"] = JobOption("Have data been phase-flipped?", false, "Set this to Yes if the images have been \
-ctf-phase corrected during the pre-processing steps. \
-Note that CTF-phase flipping is NOT a necessary pre-processing step for MAP-refinement in RELION, \
-as this can be done inside the internal CTF-correction. \
-However, if the phases have been flipped, you should tell the program about it by setting this option to Yes.");
 	joboptions["ctf_intact_first_peak"] = JobOption("Ignore CTFs until first peak?", false, "If set to Yes, then CTF-amplitude correction will \
 only be performed from the first peak of each CTF onward. This can be useful if the CTF model is inadequate at the lowest resolution. \
 Still, in general using higher amplitude contrast on the CTFs (e.g. 10-20%) often yields better results. \
@@ -2680,8 +2682,6 @@ bool RelionJob::getCommandsClass2DJob(std::string &outputname, std::vector<std::
 		if (joboptions["do_ctf_correction"].getBoolean())
 		{
 			command += " --ctf ";
-			if (joboptions["ctf_phase_flipped"].getBoolean())
-				command += " --ctf_phase_flipped ";
 			if (joboptions["ctf_intact_first_peak"].getBoolean())
 				command += " --ctf_intact_first_peak ";
 		}
@@ -2817,11 +2817,6 @@ The resulting algorithm intrinsically implements the optimal linear, or Wiener f
 Note that CTF parameters for all images need to be given in the input STAR file. \
 The command 'relion_refine --print_metadata_labels' will print a list of all possible metadata labels for that STAR file. \
 See the RELION Wiki for more details.\n\n Also make sure that the correct pixel size (in Angstrom) is given above!)");
-	joboptions["ctf_phase_flipped"] = JobOption("Have data been phase-flipped?", false, "Set this to Yes if the images have been \
-ctf-phase corrected during the pre-processing steps. \
-Note that CTF-phase flipping is NOT a necessary pre-processing step for MAP-refinement in RELION, \
-as this can be done inside the internal CTF-correction. \
-However, if the phases have been flipped, you should tell the program about it by setting this option to Yes.");
 	joboptions["ctf_intact_first_peak"] = JobOption("Ignore CTFs until first peak?", false, "If set to Yes, then CTF-amplitude correction will \
 only be performed from the first peak of each CTF onward. This can be useful if the CTF model is inadequate at the lowest resolution. \
 Still, in general using higher amplitude contrast on the CTFs (e.g. 10-20%) often yields better results. \
@@ -2931,8 +2926,6 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 		if (joboptions["do_ctf_correction"].getBoolean())
 		{
 			command += " --ctf";
-			if (joboptions["ctf_phase_flipped"].getBoolean())
-				command += " --ctf_phase_flipped";
 			if (joboptions["ctf_intact_first_peak"].getBoolean())
 				command += " --ctf_intact_first_peak";
 		}
@@ -3057,11 +3050,6 @@ See the RELION Wiki for more details.\n\n Also make sure that the correct pixel 
 	joboptions["ctf_corrected_ref"] = JobOption("Has reference been CTF-corrected?", false, "Set this option to Yes if the reference map \
 represents density that is unaffected by CTF phases and amplitudes, e.g. it was created using CTF correction (Wiener filtering) inside RELION or from a PDB. \n\n\
 If set to No, then in the first iteration, the Fourier transforms of the reference projections are not multiplied by the CTFs.");
-	joboptions["ctf_phase_flipped"] = JobOption("Have data been phase-flipped?", false, "Set this to Yes if the images have been \
-ctf-phase corrected during the pre-processing steps. \
-Note that CTF-phase flipping is NOT a necessary pre-processing step for MAP-refinement in RELION, \
-as this can be done inside the internal CTF-correction. \
-However, if the phases have been flipped, you should tell the program about it by setting this option to Yes.");
 	joboptions["ctf_intact_first_peak"] = JobOption("Ignore CTFs until first peak?", false, "If set to Yes, then CTF-amplitude correction will \
 only be performed from the first peak of each CTF onward. This can be useful if the CTF model is inadequate at the lowest resolution. \
 Still, in general using higher amplitude contrast on the CTFs (e.g. 10-20%) often yields better results. \
@@ -3283,8 +3271,6 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 			command += " --ctf";
 			if (joboptions["ctf_corrected_ref"].getBoolean())
 				command += " --ctf_corrected_ref";
-			if (joboptions["ctf_phase_flipped"].getBoolean())
-				command += " --ctf_phase_flipped";
 			if (joboptions["ctf_intact_first_peak"].getBoolean())
 				command += " --ctf_intact_first_peak";
 		}
@@ -3470,11 +3456,6 @@ Therefore, look at the XMIPP Wiki for more details:  http://xmipp.cnb.csic.es/tw
 	joboptions["ctf_corrected_ref"] = JobOption("Has reference been CTF-corrected?", false, "Set this option to Yes if the reference map \
 represents density that is unaffected by CTF phases and amplitudes, e.g. it was created using CTF correction (Wiener filtering) inside RELION or from a PDB. \n\n\
 If set to No, then in the first iteration, the Fourier transforms of the reference projections are not multiplied by the CTFs.");
-	joboptions["ctf_phase_flipped"] = JobOption("Have data been phase-flipped?", false, "Set this to Yes if the images have been \
-ctf-phase corrected during the pre-processing steps. \
-Note that CTF-phase flipping is NOT a necessary pre-processing step for MAP-refinement in RELION, \
-as this can be done inside the internal CTF-correction. \
-However, if the phases have been flipped, you should tell the program about it by setting this option to Yes.");
 	joboptions["ctf_intact_first_peak"] = JobOption("Ignore CTFs until first peak?", false, "If set to Yes, then CTF-amplitude correction will \
 only be performed from the first peak of each CTF onward. This can be useful if the CTF model is inadequate at the lowest resolution. \
 Still, in general using higher amplitude contrast on the CTFs (e.g. 10-20%) often yields better results. \
@@ -3673,8 +3654,6 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 			command += " --ctf";
 			if (joboptions["ctf_corrected_ref"].getBoolean())
 				command += " --ctf_corrected_ref";
-			if (joboptions["ctf_phase_flipped"].getBoolean())
-				command += " --ctf_phase_flipped";
 			if (joboptions["ctf_intact_first_peak"].getBoolean())
 				command += " --ctf_intact_first_peak";
 		}
