@@ -47,7 +47,7 @@ class TiltOptimization : public Optimization
 
         const Image<Complex>& xy;
         const Image<RFLOAT>& weight;
-		
+
         const double angpix;
 		const Matrix2D<double>& mag;
         const bool L1, anisotropic;
@@ -64,8 +64,8 @@ class BasisOptimisation : public Optimization
                 bool L1 = false);
 
         double f(const std::vector<double>& x, void* tempStorage) const;
-		
-		void* allocateTempStorage() const;		
+
+		void* allocateTempStorage() const;
 		void deallocateTempStorage(void* ts);
 
     private:
@@ -91,8 +91,8 @@ class AnisoBasisOptimisation : public Optimization
                 bool L1 = false);
 
         double f(const std::vector<double>& x, void* tempStorage) const;
-		
-		void* allocateTempStorage() const;		
+
+		void* allocateTempStorage() const;
 		void deallocateTempStorage(void* ts);
 
     private:
@@ -113,18 +113,20 @@ class TiltHelper
                 const Image<Complex>& observation,
                 CTF& ctf, double angpix,
                 Image<Complex>& xyDest,
-                Image<RFLOAT>& wDest);
+                Image<RFLOAT>& wDest,
+				bool do_ctf_padding = false);
 
         static void updateTiltShiftPar(const Image<Complex>& prediction,
                 const Image<Complex>& observation,
                 CTF &ctf, double angpix,
                 Image<Complex>& xyDest,
-                Image<RFLOAT>& wDest);
+                Image<RFLOAT>& wDest,
+				bool do_ctf_padding = false);
 
         static void fitTiltShift(
                 const Image<RFLOAT>& phase,
                 const Image<RFLOAT>& weight,
-                double Cs, double lambda, 
+                double Cs, double lambda,
 				double angpix, const Matrix2D<double>& mag,
                 double* shift_x, double* shift_y,
                 double* tilt_x, double* tilt_y,
@@ -133,7 +135,7 @@ class TiltHelper
         static void optimizeTilt(
                 const Image<Complex>& xy,
                 const Image<RFLOAT>& weight,
-                double Cs, double lambda, 
+                double Cs, double lambda,
 				double angpix, const Matrix2D<double>& mag,
                 bool L1,
                 double shift0_x, double shift0_y,
@@ -141,15 +143,15 @@ class TiltHelper
                 double* shift_x, double* shift_y,
                 double* tilt_x, double* tilt_y,
                 Image<RFLOAT>* fit);
-		
-		
+
+
 		static std::vector<double> fitOddZernike(
 				const Image<Complex>& xy,
                 const Image<RFLOAT>& weight,
 				double angpix, const Matrix2D<double>& mag,
-				int n_max, 
+				int n_max,
 				Image<RFLOAT>* fit = 0);
-		
+
 		static std::vector<double> optimiseOddZernike(
                 const Image<Complex>& xy,
                 const Image<RFLOAT>& weight,
@@ -157,27 +159,27 @@ class TiltHelper
 				int n_max,
                 const std::vector<double>& coeffs,
                 Image<RFLOAT>* fit);
-		
+
 		static std::vector<Image<RFLOAT>> computeOddZernike(
-				int s, double angpix, const Matrix2D<double>& mag, int n_max);		
-		
+				int s, double angpix, const Matrix2D<double>& mag, int n_max);
+
 		static Image<RFLOAT> plotOddZernike(
-				const std::vector<double>& coeffs, int s, 
+				const std::vector<double>& coeffs, int s,
 				double angpix, const Matrix2D<double>& mag);
-		
+
 		static Image<RFLOAT> plotTilt(
-				double tx, double ty, int s, 
-				double angpix, const Matrix2D<double>& mag, 
+				double tx, double ty, int s,
+				double angpix, const Matrix2D<double>& mag,
 				double Cs, double lambda);
-		
-		
-		
+
+
+
 		static std::vector<double> fitEvenZernike(
 				const Image<RFLOAT>& phase,
                 const Image<RFLOAT>& weight,
 				double angpix, const Matrix2D<double>& mag,
 				int n_max, Image<RFLOAT>* fit = 0);
-		
+
 		static std::vector<double> optimiseEvenZernike(
                 const Image<Complex>& xy,
                 const Image<RFLOAT>& weight,
@@ -185,7 +187,7 @@ class TiltHelper
 				int n_max,
                 const std::vector<double>& coeffs,
                 Image<RFLOAT>* fit);
-		
+
 		static std::vector<double> optimiseEvenZernike(
                 const Image<Complex>& xy,
 				const Image<RFLOAT>& weight0,
@@ -196,41 +198,41 @@ class TiltHelper
 				int n_max,
                 const std::vector<double>& coeffs,
                 Image<RFLOAT>* fit);
-		
+
 		static std::vector<Image<RFLOAT>> computeEvenZernike(
-				int s, 
+				int s,
 				double angpix, const Matrix2D<double>& mag,
 				int n_max);
-		
-		
-		
+
+
+
 		static void extractTilt(
 				std::vector<double>& oddZernikeCoeffs,
-				double& tilt_x, double& tilt_y, 
+				double& tilt_x, double& tilt_y,
 				double Cs, double lambda);
-		
+
 		static void insertTilt(
 				std::vector<double>& oddZernikeCoeffs,
-				double tilt_x, double tilt_y, 
+				double tilt_x, double tilt_y,
 				double Cs, double lambda);
-		
-		
+
+
 		static std::vector<double> fitBasisLin(
 				const Image<Complex>& xy,
                 const Image<RFLOAT>& weight,
 				const std::vector<Image<RFLOAT>>& basis);
-		
+
 		static std::vector<double> fitBasisLin(
 				const Image<RFLOAT>& phase,
                 const Image<RFLOAT>& weight,
 				const std::vector<Image<RFLOAT>>& basis);
-		
+
 		static std::vector<double> optimiseBasis(
 				const Image<Complex>& xy,
                 const Image<RFLOAT>& weight,
 				const std::vector<Image<RFLOAT>>& basis,
 				const std::vector<double>& initial);
-		
+
 		static std::vector<double> optimiseBasis(
 				const Image<Complex>& xy,
 				const Image<RFLOAT>& weight0,
@@ -243,7 +245,7 @@ class TiltHelper
         static void optimizeAnisoTilt(
                 const Image<Complex>& xy,
                 const Image<RFLOAT>& weight,
-                double Cs, double lambda, 
+                double Cs, double lambda,
 				double angpix, const Matrix2D<double>& mag,
                 bool L1,
                 double shift0_x, double shift0_y,

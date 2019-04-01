@@ -311,12 +311,12 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 		// The prediction is *not* CTF-weighted, so an up-to-date CTF can be used internally
 		if (do_bfac_fit)
 		{
-			bfactorEstimator.processMicrograph(g, unfinishedMdts[g], obs, predSameT);
+			bfactorEstimator.processMicrograph(g, unfinishedMdts[g], obs, predSameT, do_ctf_padding);
 		}
 
 		if (do_tilt_fit)
 		{
-			tiltEstimator.processMicrograph(g, unfinishedMdts[g], obs, predOppNT);
+			tiltEstimator.processMicrograph(g, unfinishedMdts[g], obs, predOppNT, do_ctf_padding);
 		}
 
 		if (do_aberr_fit)
@@ -329,9 +329,9 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 			std::vector<Volume<t2Vector<Complex>>> predGradient =
 				reference.predictAllComplexGradients(
 					unfinishedMdts[g], obsModel, ReferenceMap::Opposite, nr_omp_threads,
-					false, true, false, true);
+					false, true, false, true, do_ctf_padding);
 
-			magnificationEstimator.processMicrograph(g, unfinishedMdts[g], obs, predOppT, predGradient);
+			magnificationEstimator.processMicrograph(g, unfinishedMdts[g], obs, predOppT, predGradient, do_ctf_padding);
 		}
 
 		nr_done++;

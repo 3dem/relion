@@ -1431,7 +1431,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 					std::cerr << " ires= " << ires << " XSIZE(radavg_weight)= " << XSIZE(radavg_weight) << std::endl;
 					REPORT_ERROR("BUG: ires >=XSIZE(radavg_weight) ");
 				}
-				DIRECT_A1D_ELEM(radavg_weight, ires) += DIRECT_A3D_ELEM(weight, k, i, j);
+				DIRECT_A1D_ELEM(radavg_weight, ires) += DIRECT_A3D_ELEM(Fweight, k, i, j);
 				DIRECT_A1D_ELEM(counter, ires) += 1.;
 			}
 		}
