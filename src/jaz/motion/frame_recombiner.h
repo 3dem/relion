@@ -32,72 +32,67 @@ class ReferenceMap;
 
 class FrameRecombiner
 {
-    public:
+	public:
 
-        FrameRecombiner();
+		FrameRecombiner();
 
+		void read(IOParser& parser, int argc, char *argv[]);
 
-        void read(IOParser& parser, int argc, char *argv[]);
+		void init(const std::vector<MetaDataTable>& allMdts,
+		          int verb, int s_ref, int fc, 
+		          double maxFreq, double angpix_ref,
+		          int nr_omp_threads,
+		          std::string outPath, bool debug,
+		          ReferenceMap* reference,
+		          ObservationModel* obsModel,
+		          MicrographHandler* micrographHandler);
 
-        void init(const std::vector<MetaDataTable>& allMdts,
-                  int verb, int s_ref, int fc, 
-				  double maxFreq, double angpix_ref,
-				  int nr_omp_threads,
-                  std::string outPath, bool debug,
-				  ReferenceMap* reference,
-                  ObservationModel* obsModel,
-                  MicrographHandler* micrographHandler);
+		void process(const std::vector<MetaDataTable>& mdts, long g_start, long g_end);
 
-        void process(const std::vector<MetaDataTable>& mdts, long g_start, long g_end);
-
-
-        bool doingRecombination();
+		bool doingRecombination();
 		
 		// has a max. freq. parameter been supplied?
 		bool outerFreqKnown();
 
-
-        std::vector<MetaDataTable> findUnfinishedJobs(
-                const std::vector<MetaDataTable>& mdts, std::string path);
+		std::vector<MetaDataTable> findUnfinishedJobs(const std::vector<MetaDataTable>& mdts,
+		                                              std::string path);
 		
 		double getOutputPixelSize(int opticsGroup);
 		int getOutputBoxSize(int opticsGroup);
 		std::string getOutputSuffix();
+		bool isCtfMultiplied(int opticsGroup);
 
-    protected:
+	protected:
 
-            // read from cmd. line:
-            bool doCombineFrames, bfac_diag;
-            int k0, k1, box_arg, scale_arg;
-            double k0a, k1a;
-            std::string bfacFn, suffix;
+		// read from cmd. line:
+		bool doCombineFrames, bfac_diag, do_ctf_multiply;
+		int k0, k1, box_arg, scale_arg, crop_arg;
+		double k0a, k1a;
+		std::string bfacFn, suffix;
 
-            // set at init:
-            int s_ref, sh_ref, fc;
-			std::vector<int> s_out, sh_out;
-            int verb, nr_omp_threads;
-            std::string outPath;
-            bool debug;
-            double angpix_ref, maxFreq;
-			std::vector<double> angpix_out;
+		// set at init:
+		int s_ref, sh_ref, fc;
+		std::vector<int> s_mov, s_out, sh_out;
+		int verb, nr_omp_threads;
+		std::string outPath;
+		bool debug;
+		double angpix_ref, maxFreq;
+		std::vector<double> angpix_out;
 
-			ReferenceMap* reference;
-            ObservationModel* obsModel;
-            MicrographHandler* micrographHandler;
+		ReferenceMap* reference;
+		ObservationModel* obsModel;
+		MicrographHandler* micrographHandler;
 
-            // computed by weightsFromFCC or weightsFromBfacs:
-            std::vector<std::vector<Image<RFLOAT>>> freqWeights;
+		// computed by weightsFromFCC or weightsFromBfacs:
+		std::vector<std::vector<Image<RFLOAT>>> freqWeights;
 
-
-        std::vector<Image<RFLOAT>> weightsFromFCC(
-				const std::vector<MetaDataTable>& allMdts,
-				int s, double angpix, std::string og_name);
+		std::vector<Image<RFLOAT>> weightsFromFCC(const std::vector<MetaDataTable>& allMdts,
+		                                          int s, double angpix, std::string og_name);
 		
-        std::vector<Image<RFLOAT>> weightsFromBfacs(
-				const std::vector<MetaDataTable>& allMdts,
-				int s, double angpix);
+		std::vector<Image<RFLOAT>> weightsFromBfacs(const std::vector<MetaDataTable>& allMdts,
+		                                            int s, double angpix);
 
-        bool isJobFinished(std::string filenameRoot);
+		bool isJobFinished(std::string filenameRoot);
 };
 
 #endif
