@@ -227,7 +227,7 @@ void MotionRefiner::init()
 		recombMdts.clear();
 		
 		motionMdts = MotionEstimator::findUnfinishedJobs(chosenMdts, outPath);
-		recombMdts = FrameRecombiner::findUnfinishedJobs(chosenMdts, outPath);
+		recombMdts = frameRecombiner.findUnfinishedJobs(chosenMdts, outPath);
 		
 		if (verb > 0)
 		{
@@ -394,10 +394,10 @@ void MotionRefiner::combineEPSAndSTARfiles()
 			fn_eps.push_back(fn_root+"_tracks.eps");
 		}
 		
-		if (frameRecombiner.doingRecombination() && exists(fn_root+"_shiny.star"))
+		if (frameRecombiner.doingRecombination() && exists(fn_root+"_shiny" + frameRecombiner.getOutputSuffix() + ".star"))
 		{
 			MetaDataTable mdt;
-			mdt.read(fn_root+"_shiny.star");
+			mdt.read(fn_root+"_shiny" + frameRecombiner.getOutputSuffix() + ".star");
 			mdtAll.append(mdt);
 		}
 	}
@@ -413,9 +413,10 @@ void MotionRefiner::combineEPSAndSTARfiles()
 		{
 			obsModel.opticsMdt.setValue(EMDL_IMAGE_PIXEL_SIZE, frameRecombiner.getOutputPixelSize(og), og);
 			obsModel.opticsMdt.setValue(EMDL_IMAGE_SIZE, frameRecombiner.getOutputBoxSize(og), og);
+			obsModel.opticsMdt.setValue(EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED, frameRecombiner.isCtfMultiplied(og), og);
 		}
 		
-		obsModel.save(mdtAll, outPath+"shiny.star");
+		obsModel.save(mdtAll, outPath+"shiny" + frameRecombiner.getOutputSuffix() + ".star");
 	}
 	
 	if (verb > 0)
@@ -426,7 +427,7 @@ void MotionRefiner::combineEPSAndSTARfiles()
 		if (frameRecombiner.doingRecombination())
 		{
 			std::cout << " + Written new particle STAR file in "
-					  << outPath << "shiny.star" << std::endl;
+					  << outPath << "shiny" + frameRecombiner.getOutputSuffix() + ".star" << std::endl;
 		}
 	}
 }

@@ -76,7 +76,6 @@ class ObservationModel
 			std::vector<std::map<int,Image<Complex> > > phaseCorr;
 			std::vector<std::map<int,Image<RFLOAT> > > gammaOffset, mtfImage;
 
-
 	public:
 
 	// Prediction //
@@ -152,6 +151,7 @@ class ObservationModel
 		std::vector<double> getSphericalAberrations() const;
 
 		int getBoxSize(int opticsGroup) const;
+		void setBoxSize(int opticsGroup, int newBoxSize);
 		void getBoxSizes(std::vector<int>& sDest, std::vector<int>& shDest) const;
 
 		Matrix2D<RFLOAT> getMagMatrix(int opticsGroup) const;

@@ -76,11 +76,11 @@ void ObservationModel::loadSafely(
 		oldMdt.read(filename);
 
 		StarConverter::convert_3p0_particlesTo_3p1(oldMdt, particlesMdt, opticsMdt, mytablename, do_die_upon_error);
-		if (!do_die_upon_error && opticsMdt.numberOfObjects() == 0) return; // return an empty optics table is error was raised
+		if (!do_die_upon_error && opticsMdt.numberOfObjects() == 0) return; // return an empty optics table if error was raised
 	}
 
 	obsModel = ObservationModel(opticsMdt, do_die_upon_error);
-	if (!do_die_upon_error && obsModel.opticsMdt.numberOfObjects() == 0) return; // return an empty optics table is error was raised
+	if (!do_die_upon_error && obsModel.opticsMdt.numberOfObjects() == 0) return; // return an empty optics table if error was raised
 
 	// make sure all optics groups are defined
 
@@ -623,6 +623,20 @@ double ObservationModel::getSphericalAberration(int opticsGroup) const
 std::vector<double> ObservationModel::getSphericalAberrations() const
 {
 	return Cs;
+}
+
+void ObservationModel::setBoxSize(int opticsGroup, int newBoxSize)
+{
+	if (opticsGroup < 0 || opticsGroup >= boxSizes.size())
+	{
+		REPORT_ERROR("ObservationModel::setBoxSize: wrong opticsGroup");
+	}
+
+	boxSizes[opticsGroup] = newBoxSize;
+
+	phaseCorr.clear();
+	gammaOffset.clear();
+	mtfImage.clear();
 }
 
 int ObservationModel::getBoxSize(int opticsGroup) const
