@@ -101,7 +101,10 @@ void Reconstructor::initialise()
 {
 	do_reconstruct_ctf = (ctf_dim > 0);
 	if (do_reconstruct_ctf)
+	{
 		do_ctf = false;
+		padding_factor = 1.;
+	}
 
 	do_ignore_optics = false;
 	// Read MetaData file, which should have the image names and their angles!
@@ -673,70 +676,69 @@ void Reconstructor::reconstruct()
 
 	if (verb > 0)
 		std::cout << " + Starting the reconstruction ..." << std::endl;
+
 	backprojector.symmetrise(nr_helical_asu, helical_twist, helical_rise/angpix);
-
-
-	if (do_debug)
-	{
-		Image<RFLOAT> It;
-		FileName fn_tmp = fn_out.withoutExtension();
-		It().resize(backprojector.data);
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(It())
-		{
-			DIRECT_MULTIDIM_ELEM(It(), n) = (DIRECT_MULTIDIM_ELEM(backprojector.data, n)).real;
-		}
-		It.write(fn_tmp+"_data_real.mrc");
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(It())
-		{
-			DIRECT_MULTIDIM_ELEM(It(), n) = (DIRECT_MULTIDIM_ELEM(backprojector.data, n)).imag;
-		}
-		It.write(fn_tmp+"_data_imag.mrc");
-		It()=backprojector.weight;
-		It.write(fn_tmp+"_weight.mrc");
-	}
-
-	MultidimArray<RFLOAT> tau2;
-	if (do_use_fsc) backprojector.updateSSNRarrays(1., tau2, dummy, dummy, dummy, fsc, do_use_fsc, true);
-	backprojector.reconstruct(vol(), iter, do_map, tau2);
 
 	if (do_reconstruct_ctf)
 	{
-		MultidimArray<Complex> F2D;
-		FourierTransformer transformer;
 
-		F2D.clear();
-		transformer.FourierTransform(vol(), F2D);
-
-		// CenterOriginFFT: Set the center of the FFT in the FFTW origin
-		Matrix1D<RFLOAT> shift(3);
-		XX(shift)=-(RFLOAT)(int)(ctf_dim / 2);
-		YY(shift)=-(RFLOAT)(int)(ctf_dim / 2);
-		ZZ(shift)=-(RFLOAT)(int)(ctf_dim / 2);
-		shiftImageInFourierTransform(F2D, F2D, (RFLOAT)ctf_dim, XX(shift), YY(shift), ZZ(shift));
+		vol().initZeros(ctf_dim, ctf_dim, ctf_dim);
 		vol().setXmippOrigin();
-		vol().initZeros();
-		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(F2D)
-		{
-			// Take care of kp==dim/2, as XmippOrigin lies just right off center of image...
-			if ( kp > FINISHINGZ(vol()) || ip > FINISHINGY(vol()) || jp > FINISHINGX(vol()))
-				continue;
-			A3D_ELEM(vol(), kp, ip, jp)    = FFTW_ELEM(F2D, kp, ip, jp).real;
-			A3D_ELEM(vol(), -kp, -ip, -jp) = FFTW_ELEM(F2D, kp, ip, jp).real;
-		}
-		vol() *= (RFLOAT)ctf_dim;
 
-		// Take sqrt(CTF^2)
-		if (do_reconstruct_ctf2)
+		FOR_ALL_ELEMENTS_IN_ARRAY3D(vol())
 		{
-			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(vol())
+			int jp = j;
+			int ip = i;
+			int kp = k;
+
+			// for negative j's: use inverse
+			if (j < 0)
 			{
-				if (DIRECT_MULTIDIM_ELEM(vol(), n) > 0.)
-					DIRECT_MULTIDIM_ELEM(vol(), n) = sqrt(DIRECT_MULTIDIM_ELEM(vol(), n));
-				else
-					DIRECT_MULTIDIM_ELEM(vol(), n) = 0.;
+				jp = -j;
+				ip = -i;
+				kp = -k;
+			}
+
+			if (jp >= STARTINGX(backprojector.data) && jp <= FINISHINGX(backprojector.data) &&
+					ip >= STARTINGY(backprojector.data) && ip <= FINISHINGY(backprojector.data) &&
+					kp >= STARTINGZ(backprojector.data) && kp <= FINISHINGZ(backprojector.data))
+			{
+				if (A3D_ELEM(backprojector.weight, kp, ip, jp) > 0.)
+				{
+					A3D_ELEM(vol(), k, i, j) = A3D_ELEM(backprojector.data, kp, ip, jp) / A3D_ELEM(backprojector.weight, kp, ip, jp);
+					if (do_reconstruct_ctf2)
+						A3D_ELEM(vol(), k, i, j) = sqrt(A3D_ELEM(vol(), k, i, j));
+				}
 			}
 		}
 	}
+	else
+	{
+
+		if (do_debug)
+		{
+			Image<RFLOAT> It;
+			FileName fn_tmp = fn_out.withoutExtension();
+			It().resize(backprojector.data);
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(It())
+			{
+				DIRECT_MULTIDIM_ELEM(It(), n) = (DIRECT_MULTIDIM_ELEM(backprojector.data, n)).real;
+			}
+			It.write(fn_tmp+"_data_real.mrc");
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(It())
+			{
+				DIRECT_MULTIDIM_ELEM(It(), n) = (DIRECT_MULTIDIM_ELEM(backprojector.data, n)).imag;
+			}
+			It.write(fn_tmp+"_data_imag.mrc");
+			It()=backprojector.weight;
+			It.write(fn_tmp+"_weight.mrc");
+		}
+
+		MultidimArray<RFLOAT> tau2;
+		if (do_use_fsc) backprojector.updateSSNRarrays(1., tau2, dummy, dummy, dummy, fsc, do_use_fsc, true);
+		backprojector.reconstruct(vol(), iter, do_map, tau2);
+	}
+
 
 	vol.setSamplingRateInHeader(angpix);
 	vol.write(fn_out);
