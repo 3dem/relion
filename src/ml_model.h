@@ -68,7 +68,7 @@ public:
 	std::vector<long int> nr_particles_group;
 
 	// Number of directions (size of pdf_direction);
-	int nr_directions;
+	long long int nr_directions;
 
 	// Log-likelihood target value
 	RFLOAT LL;

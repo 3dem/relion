@@ -836,7 +836,7 @@ void MlModel::initialisePdfDirection(int newsize)
 	// If they were still empty, or if the size changes, then initialise them with an even distribution
 	for (int iclass = 0; iclass < nr_classes * nr_bodies; iclass++)
 	{
-		int oldsize = MULTIDIM_SIZE(pdf_direction[iclass]);
+		long long int oldsize = MULTIDIM_SIZE(pdf_direction[iclass]);
 		if (oldsize == 0 || oldsize != newsize)
 		{
 			pdf_direction[iclass].resize(newsize);
