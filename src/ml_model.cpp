@@ -847,7 +847,7 @@ void MlModel::initialisePdfDirection(int newsize)
 
 }
 
-void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool also_initialise_rest)
+void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool also_initialise_rest, int rank)
 {
 	MetaDataTable MD;
 	MD.read(fn_masks);
@@ -953,7 +953,8 @@ void MlModel::initialiseBodies(FileName fn_masks, FileName fn_root_out, bool als
 		fn_mask.compose(fn_root_out + "_body", nr_bodies + 1, "", 3); // body number from 1 to K!
 		fn_mask += "_mask.mrc";
 
-		Imask.write(fn_mask);
+		if (rank == 0)
+			Imask.write(fn_mask);
 
 		// update counter at the end!
 		nr_bodies++;
