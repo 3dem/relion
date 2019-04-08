@@ -103,6 +103,9 @@ void HelixAligner::parseInitial(int argc, char **argv)
     max_smear = textToInteger(parser.getOption("--smear", "Smear out each image along X to ensure continuity", "0"));
     random_seed = textToInteger(parser.getOption("--random_seed", "Random seed (default is with clock)", "-1"));
     search_size = textToInteger(parser.getOption("--search_size", "Search this many pixels up/down of the target downscaled size to fit best crossover distance", "5"));
+    mask_diameter = textToFloat(parser.getOption("--mask_diameter", "The diameter (A) of a mask to be aplpied to the 2D reconstruction", "-1"));
+    nr_threads = textToInteger(parser.getOption("--j", "Number of (openMP) threads", "1"));
+
     verb = 1;
 
     if (parser.checkForErrors(verb))
@@ -810,47 +813,49 @@ void HelixAligner::expectationOneParticleNoFFT(long int ipart)
 	if (maxccf < -1.)
 		REPORT_ERROR("BUG: not found maxccf!");
 
-	std::cerr << " best_class= " << best_class  << " best_k_rot= " << best_k_rot<< " best_i_offset= " << best_i_offset << " best_j_offset= " << best_j_offset<< std::endl;
 
 	// Now add the image to that class reference
 	// To ensure continuity in the reference: smear out every image along X
-	for (int j_smear = -max_smear; j_smear <= max_smear; j_smear++)
+	#pragma omp critical
 	{
-
-		double smearw = (max_smear< XMIPP_EQUAL_ACCURACY) ? 1 : gaussian1D((double)j_smear, (double)max_smear/3);
-		FOR_ALL_ELEMENTS_IN_ARRAY2D(Xrects[ipart][best_k_rot])
+		std::cerr << " best_class= " << best_class  << " best_k_rot= " << best_k_rot<< " best_i_offset= " << best_i_offset << " best_j_offset= " << best_j_offset<< std::endl;
+		for (int j_smear = -max_smear; j_smear <= max_smear; j_smear++)
 		{
 
-			int jp = j + best_j_offset + j_smear;
-			while (jp < STARTINGX(model.Aref[best_class]))
-				jp += xrect;
-			while (jp > FINISHINGX(model.Aref[best_class]))
-				jp -= xrect;
-
-			int ip = i + best_i_offset;
-			while (ip < STARTINGY(model.Aref[best_class]))
-				ip += yrect;
-			while (ip > FINISHINGY(model.Aref[best_class]))
-				ip -= yrect;
-
-			// this places the original image in the offset-translated center of the rectangle
-			A2D_ELEM(model.Asum[best_class], ip, jp) += smearw * A2D_ELEM(Xrects[ipart][best_k_rot], i, j);
-			A2D_ELEM(model.Asumw[best_class], ip, jp) += smearw;
-
-			// This places the Y-flipped image at half a cross-over distance from the first one
-			int ipp = -ip;
-			if (ipp >= STARTINGY(Xrects[ipart][best_k_rot]) && ipp <= FINISHINGY(Xrects[ipart][best_k_rot]))
+			double smearw = (max_smear< XMIPP_EQUAL_ACCURACY) ? 1 : gaussian1D((double)j_smear, (double)max_smear/3);
+			FOR_ALL_ELEMENTS_IN_ARRAY2D(Xrects[ipart][best_k_rot])
 			{
-				int jpp = jp + xrect/2;
-				while (jpp > FINISHINGX(model.Aref[best_class]))
-					jpp -= xrect;
-				A2D_ELEM(model.Asum[best_class], ipp, jpp) += smearw * A2D_ELEM(Xrects[ipart][best_k_rot], i, j);
-				A2D_ELEM(model.Asumw[best_class], ipp, jpp) += smearw;
+
+				int jp = j + best_j_offset + j_smear;
+				while (jp < STARTINGX(model.Aref[best_class]))
+					jp += xrect;
+				while (jp > FINISHINGX(model.Aref[best_class]))
+					jp -= xrect;
+
+				int ip = i + best_i_offset;
+				while (ip < STARTINGY(model.Aref[best_class]))
+					ip += yrect;
+				while (ip > FINISHINGY(model.Aref[best_class]))
+					ip -= yrect;
+
+				// this places the original image in the offset-translated center of the rectangle
+				A2D_ELEM(model.Asum[best_class], ip, jp) += smearw * A2D_ELEM(Xrects[ipart][best_k_rot], i, j);
+				A2D_ELEM(model.Asumw[best_class], ip, jp) += smearw;
+
+				// This places the Y-flipped image at half a cross-over distance from the first one
+				int ipp = -ip;
+				if (ipp >= STARTINGY(Xrects[ipart][best_k_rot]) && ipp <= FINISHINGY(Xrects[ipart][best_k_rot]))
+				{
+					int jpp = jp + xrect/2;
+					while (jpp > FINISHINGX(model.Aref[best_class]))
+						jpp -= xrect;
+					A2D_ELEM(model.Asum[best_class], ipp, jpp) += smearw * A2D_ELEM(Xrects[ipart][best_k_rot], i, j);
+					A2D_ELEM(model.Asumw[best_class], ipp, jpp) += smearw;
+				}
 			}
 		}
+		model.pdf[best_class] += 1.;
 	}
-	model.pdf[best_class] += 1.;
-
 
 }
 
@@ -866,12 +871,13 @@ void HelixAligner::expectation()
 		init_progress_bar(Xrects.size());
 	}
 
+	#pragma omp parallel for num_threads(nr_threads)
 	for (long int ipart = 0; ipart < Xrects.size(); ipart++)
 	{
 
 		expectationOneParticleNoFFT(ipart);
 
-		if (ipart%1==0)
+		if (ipart%nr_threads==0)
 			progress_bar(ipart);
 	}
 
@@ -975,6 +981,13 @@ void HelixAligner::reconstruct2D(int iclass)
 		}
 		model.Arec[iclass] = Asum / (RFLOAT)symmetry;
     }
+
+    if (mask_diameter > 0.)
+    {
+    	RFLOAT pixel_radius = mask_diameter/(2.*angpix);
+    	softMaskOutsideMap(model.Arec[iclass], pixel_radius, 0.);
+    }
+
 
 #ifdef DEBUGREC2D
 	It()=model.Arec[iclass];

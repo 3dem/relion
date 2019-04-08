@@ -141,6 +141,8 @@ public:
 	// Symmetry order (Cn)
 	int symmetry;
 
+	// Number of openMP threads
+	int nr_threads;
 
 private:
 
