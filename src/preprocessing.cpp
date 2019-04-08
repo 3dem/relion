@@ -363,6 +363,9 @@ void Preprocessing::joinAllStarFiles()
 
 			myOutObsModel->opticsMdt.setValue(EMDL_IMAGE_DIMENSIONALITY, dimensionality);
 
+			if (do_premultiply_ctf)
+				myOutObsModel->opticsMdt.setValue(EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED, true);
+
 			int igroup;
 			myOutObsModel->opticsMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, igroup);
 			std::cout << " The pixel size of the extracted particles in optics group " << igroup << " is " << output_angpix << " Angstrom/pixel." << std::endl;
@@ -794,6 +797,7 @@ void Preprocessing::extractParticlesFromOneMicrograph(MetaDataTable &MD,
 				RFLOAT x = (RFLOAT)jp / xs;
 				RFLOAT y = (RFLOAT)ip / ys;
 				DIRECT_A2D_ELEM(FT, i, j) *= ctf.getCTF(x, y, false, do_phase_flip, do_ctf_intact_first_peak, false);
+				// TODO: BUG: This ignores symmetrical aberration !!!
 			}
 
 			transformer.inverseFourierTransform(FT, Ipart());
