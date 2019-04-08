@@ -448,6 +448,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	asymmetric_padding = parser.checkOption("--asymmetric_padding", "", "false", true);
 	maximum_significants = textToInteger(parser.getOption("--maxsig", "", "0", true));
 	skip_gridding = parser.checkOption("--skip_gridding", "", "false", true);
+	nr_iter_max = textToInteger(parser.getOption("--auto_iter_max", "In auto-refinement, stop at this iteration.", "999"));
 
 	do_print_metadata_labels = false;
 	do_print_symmetry_ops = false;
@@ -696,6 +697,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	do_skip_maximization = parser.checkOption("--skip_maximize", "Skip maximization step (only write out data.star file)?");
 	failsafe_threshold = textToInteger(parser.getOption("--failsafe_threshold", "Maximum number of particles permitted to be handled by fail-safe mode, due to zero sum of weights, before exiting with an error (GPU only).", "40"));
 	do_external_reconstruct = parser.checkOption("--external_reconstruct", "Perform the reconstruction step outside relion_refine, e.g. for learned priors?)");
+	nr_iter_max = textToInteger(parser.getOption("--auto_iter_max", "In auto-refinement, stop at this iteration.", "999"));
 	///////////////// Special stuff for first iteration (only accessible via CL, not through readSTAR ////////////////////
 
 	// When reading from the CL: always start at iteration 1 and subset 1
@@ -1717,7 +1719,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 	if (do_auto_refine)
 	{
-		nr_iter = 999;
+		nr_iter = nr_iter_max;
 		has_fine_enough_angular_sampling = false;
 		has_converged = false;
 

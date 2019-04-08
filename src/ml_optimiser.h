@@ -173,7 +173,7 @@ public:
 	long int my_first_particle_id, my_last_particle_id;
 
 	// Total number iterations and current iteration
-	int iter, nr_iter;
+	int iter, nr_iter, nr_iter_max;
 
 	// Flag whether to split data from the beginning into two random halves
 	bool do_split_random_halves;
