@@ -14,13 +14,17 @@ and Erik Lindahl at Stockholm University.
 
 However, it does also contain pieces of code from the following packages:
 
-- XMIPP: http:/xmipp.cnb.csic.es
-- BSOFT: http://lsbr.niams.nih.gov/bsoft/
-- HEALPIX: http://healpix.jpl.nasa.gov/
-- libLBFGS http://www.chokkan.org/software/liblbfgs/
-- Numerical diagonalization of 3x3 matrices: https://www.mpi-hd.mpg.de/personalhomes/globes/3x3/index.html
-- Gravis: https://gravis.dmi.unibas.ch/index.html
-- cmake-modules: https://github.com/rpavlik/cmake-modules
+- XMIPP by COS Sorzano et al: http:/xmipp.cnb.csic.es
+- BSOFT by Heymann JB et al: http://lsbr.niams.nih.gov/bsoft/
+- HEALPIX by NASA Jet Propulsion Laboratory: http://healpix.jpl.nasa.gov/
+- libLBFGS by Naoaki Okazaki: http://www.chokkan.org/software/liblbfgs/
+- Numerical diagonalization of 3x3 matrices by Joachim Kopp: https://www.mpi-hd.mpg.de/personalhomes/globes/3x3/index.html
+- Gravis by Graphics and Vision Research Group at University of Basel: https://gravis.dmi.unibas.ch/index.html
+- CPlot2D by Attila Michael Zsaki: http://www.amzsaki.com/?page_id=2073
+- cmake-modules by Ryan A. Pavlik: https://github.com/rpavlik/cmake-modules
 
 Original disclaimers in the code of these external packages have been maintained as much as possible.
-Please contact Sjors Scheres (scheres@mrc-lmb.cam.ac.uk) if you feel this has not been done correctly. 
+Please contact Sjors Scheres (scheres@mrc-lmb.cam.ac.uk) if you feel this has not been done correctly.
+
+We also thank those who reported bugs and suggested fixes. They are acknowledged in the Git commit messages.
+
