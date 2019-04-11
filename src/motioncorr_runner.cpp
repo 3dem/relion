@@ -1634,7 +1634,7 @@ skip_fitting:
 		// Final output
                 Iref.setSamplingRateInHeader(output_angpix, output_angpix);
 		Iref.write(!do_dose_weighting ? fn_avg : fn_avg_noDW);
-		logfile << "Written aligned but non-dose weighted sum to " << fn_avg_noDW << std::endl;
+		logfile << "Written aligned but non-dose weighted sum to " << (!do_dose_weighting ? fn_avg : fn_avg_noDW) << std::endl;
 	}
 
 	// Dose weighting
