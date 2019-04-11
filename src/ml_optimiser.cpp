@@ -952,7 +952,7 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 	// Set up the bodies in the model, if this is a continuation of a multibody refinement (otherwise this is done in initialiseGeneral)
 	if (fn_body_masks != "None")
 	{
-		mymodel.initialiseBodies(fn_body_masks, fn_out);
+		mymodel.initialiseBodies(fn_body_masks, fn_out, false, rank); // also_initialise_rest = false
 
 		if (mymodel.nr_bodies != mydata.nr_bodies)
 			REPORT_ERROR("ERROR: Unequal number of bodies in model.star and data.star files!");
@@ -1595,7 +1595,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 			REPORT_ERROR("ERROR: One has to use split random halves with multi-body refinement!");
 
 		// This reads the masks, calculates com_bodies and orient_bodies
-		mymodel.initialiseBodies(fn_body_masks, fn_out, true);
+		mymodel.initialiseBodies(fn_body_masks, fn_out, true, rank);
 		mymodel.writeBildFileBodies(fn_out + "_bodies.bild");
 
 		// For multi-body refinement: expand the MetaDataTables with orientations for all bodies
