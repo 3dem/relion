@@ -222,10 +222,10 @@ class stack_create_parameters
 						MD.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, (ori_xoff - xoff)*angpix);
 						MD.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, (ori_yoff - yoff)*angpix);
 						MD.setValue(EMDL_ORIENT_PSI, ori_psi - psi);
-						FileName fn_img;
-						fn_img.compose(n+1, fn_out);
-						MD.setValue(EMDL_IMAGE_NAME, fn_img);
 					}
+					FileName fn_img;
+					fn_img.compose(n+1, fn_out);
+					MD.setValue(EMDL_IMAGE_NAME, fn_img);
 
 					out().setImage(n, in());
 					n++;
