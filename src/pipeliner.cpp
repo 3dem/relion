@@ -1711,7 +1711,10 @@ void PipeLine::read(bool do_lock, std::string lock_message)
 		std::cerr <<  " A status= " << status << std::endl;
 #endif
 		while (!status == 0)
-		{
+		{		
+			if (errno == EACCES) // interestingly, not EACCESS!
+				REPORT_ERROR("ERROR: PipeLine::read cannot create a lock directory " + dir_lock + ". You don't have write permission to this project. If you want to look at other's project directory (but run nothing there), please start RELION with --readonly.");
+
 			// If the lock exists: wait 3 seconds and try again
 			// First time round, print a warning message
 			if (iwait == 0)
