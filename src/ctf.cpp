@@ -313,7 +313,7 @@ t2Vector<RFLOAT> CTF::getGammaGrad(double X, double Y) const
 /* Generate a complete CTF Image ------------------------------------------------------ */
 void CTF::getFftwImage(MultidimArray<RFLOAT> &result, int orixdim, int oriydim, RFLOAT angpix,
 		    		bool do_abs, bool do_only_flip_phases, bool do_intact_until_first_peak,
-					bool do_damping, bool do_ctf_padding)
+					bool do_damping, bool do_ctf_padding, bool do_intact_after_first_peak) const
 {
 
 	// Boxing the particle in a small box from the whole micrograph leads to loss of delocalised information (or aliaising in the CTF)
@@ -341,7 +341,7 @@ void CTF::getFftwImage(MultidimArray<RFLOAT> &result, int orixdim, int oriydim, 
 		MultidimArray<RFLOAT> Fctf(oriydim_pad, orixdim_pad/2 + 1);
 
 		getFftwImage(Fctf, orixdim_pad, oriydim_pad, angpix, do_abs,
-				do_only_flip_phases, do_intact_until_first_peak, do_damping, false);
+				do_only_flip_phases, do_intact_until_first_peak, do_damping, false, do_intact_after_first_peak);
 
 		// From half to whole
 		MultidimArray<RFLOAT> Mctf(oriydim_pad, orixdim_pad);
@@ -432,7 +432,7 @@ void CTF::getFftwImage(MultidimArray<RFLOAT> &result, int orixdim, int oriydim, 
 
 				DIRECT_A2D_ELEM(result, y1, x1) =
 					getCTF(x, y, do_abs, do_only_flip_phases,
-						   do_intact_until_first_peak, do_damping, gammaOffset(y0,x0));
+						   do_intact_until_first_peak, do_damping, gammaOffset(y0,x0), do_intact_after_first_peak);
 			}
 		}
 		else
@@ -444,7 +444,7 @@ void CTF::getFftwImage(MultidimArray<RFLOAT> &result, int orixdim, int oriydim, 
 
 				DIRECT_A2D_ELEM(result, i, j) =
 					getCTF(x, y, do_abs, do_only_flip_phases,
-						   do_intact_until_first_peak, do_damping);
+						   do_intact_until_first_peak, do_damping, 0.0, do_intact_after_first_peak);
 			}
 		}
 	}
@@ -501,7 +501,7 @@ void CTF::getCTFPImage(MultidimArray<Complex> &result, int orixdim, int oriydim,
 }
 
 void CTF::getCenteredImage(MultidimArray<RFLOAT> &result, RFLOAT Tm,
-		    		bool do_abs, bool do_only_flip_phases, bool do_intact_until_first_peak, bool do_damping)
+		    		bool do_abs, bool do_only_flip_phases, bool do_intact_until_first_peak, bool do_damping, bool do_intact_after_first_peak)
 {
 	result.setXmippOrigin();
 	RFLOAT xs = (RFLOAT)XSIZE(result) * Tm;
@@ -511,13 +511,13 @@ void CTF::getCenteredImage(MultidimArray<RFLOAT> &result, RFLOAT Tm,
 	{
 		RFLOAT x = (RFLOAT)j / xs;
 		RFLOAT y = (RFLOAT)i / ys;
-		A2D_ELEM(result, i, j) = getCTF(x, y, do_abs, do_only_flip_phases, do_intact_until_first_peak, do_damping);
+		A2D_ELEM(result, i, j) = getCTF(x, y, do_abs, do_only_flip_phases, do_intact_until_first_peak, do_damping, 0.0, do_intact_after_first_peak);
 	}
 
 }
 
 void CTF::get1DProfile(MultidimArray < RFLOAT > &result, RFLOAT angle, RFLOAT Tm,
-		bool do_abs, bool do_only_flip_phases, bool do_intact_until_first_peak, bool do_damping)
+		bool do_abs, bool do_only_flip_phases, bool do_intact_until_first_peak, bool do_damping, bool do_intact_after_first_peak)
 {
 
 	result.setXmippOrigin();
@@ -527,7 +527,7 @@ void CTF::get1DProfile(MultidimArray < RFLOAT > &result, RFLOAT angle, RFLOAT Tm
 	{
 		RFLOAT x = (COSD(angle) * (RFLOAT)i) / xs;
 		RFLOAT y = (SIND(angle) * (RFLOAT)i) / xs;
-		A1D_ELEM(result, i) = getCTF(x, y, do_abs, do_only_flip_phases, do_intact_until_first_peak, do_damping);
+		A1D_ELEM(result, i) = getCTF(x, y, do_abs, do_only_flip_phases, do_intact_until_first_peak, do_damping, 0.0, do_intact_after_first_peak);
 	}
 }
 
