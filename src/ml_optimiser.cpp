@@ -5209,7 +5209,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 			FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fnoise)
 			{
 				int ires = ROUND( sqrt( (RFLOAT)(kp * kp + ip * ip + jp * jp) ) );
-				if (ires >= 0)
+				if (ires >= 0 && ires < XSIZE(remapped_sigma2_noise))
 				{
 					RFLOAT sigma = sqrt(sigma2_fudge * DIRECT_A1D_ELEM(remapped_sigma2_noise, ires));
 					DIRECT_A3D_ELEM(Fnoise, k, i, j).real = rnd_gaus(0., sigma);
