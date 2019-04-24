@@ -948,7 +948,7 @@ void AutoPicker::generatePDFLogfile()
 	}
 
 	MetaDataTable MDresult;
-	RFLOAT total_nr_picked = 0;
+	long total_nr_picked = 0;
 	for (long int imic = 0; imic < fn_ori_micrographs.size(); imic++)
 	{
 		MetaDataTable MD;
@@ -956,7 +956,7 @@ void AutoPicker::generatePDFLogfile()
 		if (exists(fn_pick))
 		{
 			MD.read(fn_pick);
-			long nr_pick = (RFLOAT) MD.numberOfObjects();
+			long nr_pick = MD.numberOfObjects();
 			total_nr_picked += nr_pick;
 			if (MD.containsLabel(EMDL_PARTICLE_AUTOPICK_FOM))
 			{
@@ -984,7 +984,7 @@ void AutoPicker::generatePDFLogfile()
 		progress_bar(fn_ori_micrographs.size());
 		std::cout << " Total number of particles from " << fn_ori_micrographs.size() << " micrographs is " << total_nr_picked << std::endl;
 		long avg = 0;
-		if (fn_ori_micrographs.size() > 0) avg = ROUND(total_nr_picked/fn_ori_micrographs.size());
+		if (fn_ori_micrographs.size() > 0) avg = ROUND((RFLOAT)total_nr_picked/fn_ori_micrographs.size());
 		std::cout << " i.e. on average there were " << avg << " particles per micrograph" << std::endl;
 	}
 
