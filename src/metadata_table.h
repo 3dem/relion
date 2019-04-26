@@ -158,7 +158,7 @@ public:
 	static int getCurrentVersion();
 
 
-	//	getValue: returns true if the label exists
+	// getValue: returns true if the label exists
 	template<class T>
 	bool getValue(EMDLabel label, T& value, long objectID = -1) const;
 

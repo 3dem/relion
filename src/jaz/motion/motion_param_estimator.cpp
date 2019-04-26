@@ -40,18 +40,18 @@ MotionParamEstimator::MotionParamEstimator()
 {
 }
 
-int MotionParamEstimator::read(IOParser& parser, int argc, char *argv[])
+void MotionParamEstimator::read(IOParser& parser, int argc, char *argv[])
 {
     parser.addSection("Parameter estimation");
 
     estim2 = parser.checkOption("--params2", "Estimate 2 parameters instead of motion");
     estim3 = parser.checkOption("--params3", "Estimate 3 parameters instead of motion");
 	
-	align_frac = textToDouble(parser.getOption("--align_frac", "Fraction of pixels to be used for alignment", "0.5"));
-	eval_frac = textToDouble(parser.getOption("--eval_frac", "Fraction of pixels to be used for evaluation", "0.5"));
+    align_frac = textToDouble(parser.getOption("--align_frac", "Fraction of pixels to be used for alignment", "0.5"));
+    eval_frac = textToDouble(parser.getOption("--eval_frac", "Fraction of pixels to be used for evaluation", "0.5"));
 	
-	minParticles = textToInteger(parser.getOption("--min_p", "Minimum number of particles on which to estimate the parameters", "1000"));
-	group = textToInteger(parser.getOption("--par_group", "Estimate parameters for this optics group only (negative means all)", "-1")) - 1;
+    minParticles = textToInteger(parser.getOption("--min_p", "Minimum number of particles on which to estimate the parameters", "1000"));
+    group = textToInteger(parser.getOption("--par_group", "Estimate parameters for this optics group only (negative means all)", "-1")) - 1;
     sV = textToDouble(parser.getOption("--s_vel_0", "Initial s_vel", "0.6"));
     sD = textToDouble(parser.getOption("--s_div_0", "Initial s_div", "10000"));
     sA = textToDouble(parser.getOption("--s_acc_0", "Initial s_acc", "3"));

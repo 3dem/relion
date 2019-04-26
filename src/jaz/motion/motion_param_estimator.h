@@ -51,7 +51,7 @@ class MotionParamEstimator
         MotionParamEstimator();
 
 
-        int read(IOParser& parser, int argc, char *argv[]);
+        void read(IOParser& parser, int argc, char *argv[]);
 
         void init(int verb, int nr_omp_threads, bool debug,
                   std::string outPath, int fc,

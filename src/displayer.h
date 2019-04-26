@@ -185,7 +185,7 @@ public:
 	DisplayBox(int X, int Y, int W, int H, const char *L=0) : Fl_Box(X,Y,W,H,L) { img_data = NULL; img_label = ""; MDimg.clear(); }
 
 	void setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, int ipos, RFLOAT minval, RFLOAT maxval,
-			RFLOAT _scale, bool do_relion_scale = false);
+	             RFLOAT _scale, bool do_relion_scale = false);
 
 
 	// Destructor
@@ -218,15 +218,15 @@ public:
 	basisViewerWindow(int W, int H, const char* title=0): Fl_Window(W, H, title){}
 
 	int fillCanvas(int viewer_type, MetaDataTable &MDin, ObservationModel *obsModel, EMDLabel display_label, EMDLabel text_label, bool _do_read_whole_stacks, bool _do_apply_orient,
-			RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast,
-			RFLOAT _scale, RFLOAT _ori_scale, int _ncol, long int max_nr_images = -1, RFLOAT lowpass = -1.0 , RFLOAT highpass = -1.0,
-			bool do_class = false, MetaDataTable *MDdata = NULL,
-			int _nr_regroup = -1, bool do_recenter = false, bool _is_data = false, MetaDataTable *MDgroups = NULL,
-			bool do_allow_save = false, FileName fn_selected_imgs="", FileName fn_selected_parts="", int max_nr_parts_per_class = -1);
+	               RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast,
+	               RFLOAT _scale, RFLOAT _ori_scale, int _ncol, long int max_nr_images = -1, RFLOAT lowpass = -1.0 , RFLOAT highpass = -1.0,
+	               bool do_class = false, MetaDataTable *MDdata = NULL,
+	               int _nr_regroup = -1, bool do_recenter = false, bool _is_data = false, MetaDataTable *MDgroups = NULL,
+	               bool do_allow_save = false, FileName fn_selected_imgs="", FileName fn_selected_parts="", int max_nr_parts_per_class = -1);
 	int fillSingleViewerCanvas(MultidimArray<RFLOAT> image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale);
 	int fillPickerViewerCanvas(MultidimArray<RFLOAT> image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale,
-			int _particle_radius, bool do_startend = false, FileName _fn_coords = "",
-			FileName _fn_color = "", FileName _fn_mic= "", FileName _color_label = "", RFLOAT _color_blue_value = 0., RFLOAT _color_red_value = 1.);
+	                           int _particle_radius, bool do_startend = false, FileName _fn_coords = "",
+	                           FileName _fn_color = "", FileName _fn_mic= "", FileName _color_label = "", RFLOAT _color_blue_value = 0., RFLOAT _color_red_value = 1.);
 
 
 };
@@ -261,10 +261,10 @@ public:
 
 	void SetScroll(Fl_Scroll *val) { scroll = val; }
 
-	int fill(MetaDataTable &MDin, ObservationModel *obsModel, EMDLabel display_label, EMDLabel text_label, bool _do_apply_orient, RFLOAT _minval, RFLOAT _maxval,
-			RFLOAT _sigma_contrast, RFLOAT _scale, int _ncol, bool do_recenter = false, long int max_images = -1,
-			RFLOAT lowpass = -1.0, RFLOAT highpass = -1.0);
-	int fill(MultidimArray<RFLOAT> &image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale = 1.);
+	void fill(MetaDataTable &MDin, ObservationModel *obsModel, EMDLabel display_label, EMDLabel text_label, bool _do_apply_orient, RFLOAT _minval, RFLOAT _maxval,
+	          RFLOAT _sigma_contrast, RFLOAT _scale, int _ncol, bool do_recenter = false, long int max_images = -1,
+	          RFLOAT lowpass = -1.0, RFLOAT highpass = -1.0);
+	void fill(MultidimArray<RFLOAT> &image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale = 1.);
 
 private:
 	void getImageContrast(MultidimArray<RFLOAT> &image, RFLOAT &minval, RFLOAT &maxval, RFLOAT &sigma_contrast);
@@ -379,7 +379,7 @@ public:
 	static void cb_set(Fl_Widget* o, void* v)
 	{
 		popupSelectionTypeWindow* T=(popupSelectionTypeWindow*)v;
-	    T->cb_set_i();
+		T->cb_set_i();
 	}
 	inline void cb_set_i()
 	{
@@ -390,7 +390,7 @@ public:
 	static void cb_close(Fl_Widget* o, void* v)
 	{
 		popupSelectionTypeWindow* T=(popupSelectionTypeWindow*)v;
-	    T->hide();
+		T->hide();
 	}
 
 };
@@ -433,7 +433,7 @@ public:
 	static void cb_set(Fl_Widget* o, void* v)
 	{
 		popupSelectionTypeWindow* T=(popupSelectionTypeWindow*)v;
-	    T->cb_set_i();
+		T->cb_set_i();
 	}
 	inline void cb_set_i()
 	{
@@ -447,7 +447,7 @@ public:
 	static void cb_close(Fl_Widget* o, void* v)
 	{
 		popupSetContrastWindow* T=(popupSetContrastWindow*)v;
-	    T->hide();
+		T->hide();
 	}
 
 };
@@ -723,7 +723,7 @@ public:
 	void initialise();
 
 	// Decide what to do
-	int run();
+	void run();
 
 	// run the GUI
 	int runGui();
