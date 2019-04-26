@@ -40,17 +40,17 @@ MotionParamEstimator::MotionParamEstimator()
 {
 }
 
-int MotionParamEstimator::read(IOParser& parser, int argc, char *argv[])
+void MotionParamEstimator::read(IOParser& parser, int argc, char *argv[])
 {
     parser.addSection("Parameter estimation");
 
     estim2 = parser.checkOption("--params2", "Estimate 2 parameters instead of motion");
     estim3 = parser.checkOption("--params3", "Estimate 3 parameters instead of motion");
 	
-	align_frac = textToDouble(parser.getOption("--align_frac", "Fraction of pixels to be used for alignment", "0.5"));
-	eval_frac = textToDouble(parser.getOption("--eval_frac", "Fraction of pixels to be used for evaluation", "0.5"));
+    align_frac = textToDouble(parser.getOption("--align_frac", "Fraction of pixels to be used for alignment", "0.5"));
+    eval_frac = textToDouble(parser.getOption("--eval_frac", "Fraction of pixels to be used for evaluation", "0.5"));
 	
-	/*k_cutoff = textToDouble(parser.getOption("--k_cut", "Freq. cutoff for parameter estimation [Pixels]", "-1.0"));
+/*  k_cutoff = textToDouble(parser.getOption("--k_cut", "Freq. cutoff for parameter estimation [Pixels]", "-1.0"));
     k_cutoff_Angst = textToDouble(parser.getOption("--k_cut_A", "Freq. cutoff for parameter estimation [Angstrom]", "-1.0"));
     k_eval = textToDouble(parser.getOption("--k_eval", "Threshold freq. for parameter evaluation [Pixels]", "-1.0"));
     k_eval_Angst = textToDouble(parser.getOption("--k_eval_A", "Threshold freq. for parameter evaluation [Angstrom]", "-1.0"));*/

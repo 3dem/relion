@@ -194,7 +194,7 @@ bool MetaDataTable::getValueToString(EMDLabel label, std::string &value, long ob
 
 	if (EMDL::isString(label))
 	{
-		getValue(label, value, objectID);
+		return getValue(label, value, objectID);
 	}
 	else
 	{
@@ -202,7 +202,7 @@ bool MetaDataTable::getValueToString(EMDLabel label, std::string &value, long ob
 		if (EMDL::isDouble(label))
 		{
 			double v;
-			getValue(label, v, objectID);
+			if(!getValue(label, v, objectID)) return false;
 
 			if ((ABS(v) > 0. && ABS(v) < 0.001) || ABS(v) > 100000.)
 			{
@@ -226,25 +226,25 @@ bool MetaDataTable::getValueToString(EMDLabel label, std::string &value, long ob
 					snprintf(buffer,13, "%12.6f", v);
 				}
 			}
-
 		}
 		else if (EMDL::isInt(label))
 		{
 			long v;
-			getValue(label, v, objectID);
+			if (!getValue(label, v, objectID)) return false;
 			snprintf(buffer,13, "%12ld", v);
 		}
 		else if (EMDL::isBool(label))
 		{
 			bool v;
-			getValue(label, v, objectID);
+			if (!getValue(label, v, objectID)) return false;
 			snprintf(buffer,13, "%12d", (int)v);
 		}
 
 		std::string tt(buffer);
 		value = tt;
-	}
 
+		return true;
+	}
 }
 
 size_t MetaDataTable::size()
@@ -282,6 +282,9 @@ bool MetaDataTable::setValueFromString(EMDLabel label, const std::string &value,
 			return setValue(label, v, objectID);
 		}
 	}
+
+	REPORT_ERROR("Logic error: should not happen");
+	return false;
 }
 
 	// comparators used for sorting
