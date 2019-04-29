@@ -31,6 +31,8 @@
 #include <src/jaz/image_log.h>
 #include <src/jaz/img_proc/filter_helper.h>
 #include <src/jaz/gravis/t2Vector.h>
+#include <src/jaz/ctf/modular_ctf_optimisation.h>
+#include <src/jaz/optimization/lbfgs.h>
 
 using namespace gravis;
 
@@ -100,10 +102,10 @@ void DefocusEstimator::processMicrograph(
 	std::stringstream stsg;
 	stsg << g;
 
-	if (!noGlobAstig)
-	{
-		REPORT_ERROR("Per-micrograph CTF-refinement temporarily disabled.");
-		
+	/*if (!noGlobAstig)
+	{*/
+		//REPORT_ERROR("Per-micrograph CTF-refinement temporarily disabled.");
+				
 		/*CTF ctf0;
 		ctf0.readByGroup(mdt, obsModel, 0);
 
@@ -219,81 +221,89 @@ void DefocusEstimator::processMicrograph(
 			Image<RFLOAT> vis = FilterHelper::sectorBlend(dataVis, ctfFit, 12);
 			ImageLog::write(vis, outPath+"diag_m"+stsg.str()+"_global_CTF-vis_final");
 		}*/
-	}
+	//}
 
-	if (globOnly) return;
-
-	if (diag)
+	if (!globOnly)
 	{
-		std::ofstream ofst(outPath+"diag_m"+stsg.str()+"_defocus_cost.dat");
-		std::ofstream ofsto(outPath+"diag_m"+stsg.str()+"_defocus_opt.dat");
-
+		if (diag)
+		{
+			std::ofstream ofst(outPath+"diag_m"+stsg.str()+"_defocus_cost.dat");
+			std::ofstream ofsto(outPath+"diag_m"+stsg.str()+"_defocus_opt.dat");
+	
+			for (long p = 0; p < pc; p++)
+			{
+				const int og = obsModel->getOpticsGroup(mdt, p);
+				
+				CTF ctf0;
+				ctf0.readByGroup(mdt, obsModel, p);
+	
+				std::vector<d2Vector> cost = DefocusHelper::diagnoseDefocus(
+					pred[p], obs[p], freqWeights[og],
+					ctf0, angpix[og], defocusRange, 100, nr_omp_threads);
+	
+				double cMin = cost[0][1];
+				double dOpt = cost[0][0];
+	
+				for (int i = 0; i < cost.size(); i++)
+				{
+					ofst << cost[i][0] << " " << cost[i][1] << "\n";
+	
+					if (cost[i][1] < cMin)
+					{
+						cMin = cost[i][1];
+						dOpt = cost[i][0];
+					}
+				}
+	
+				ofsto << dOpt << " " << cMin << "\n";
+	
+				ofst << "\n";
+			}
+		}
+	
+		// Parallel loop over all particles in this micrograph
+		#pragma omp parallel for num_threads(nr_omp_threads)
 		for (long p = 0; p < pc; p++)
 		{
 			const int og = obsModel->getOpticsGroup(mdt, p);
 			
+			std::stringstream stsp;
+			stsp << p;
+	
 			CTF ctf0;
 			ctf0.readByGroup(mdt, obsModel, p);
-
-			std::vector<d2Vector> cost = DefocusHelper::diagnoseDefocus(
-				pred[p], obs[p], freqWeights[og],
-				ctf0, angpix[og], defocusRange, 100, nr_omp_threads);
-
-			double cMin = cost[0][1];
-			double dOpt = cost[0][0];
-
-			for (int i = 0; i < cost.size(); i++)
+	
+			if (fitAstigmatism)
 			{
-				ofst << cost[i][0] << " " << cost[i][1] << "\n";
-
-				if (cost[i][1] < cMin)
-				{
-					cMin = cost[i][1];
-					dOpt = cost[i][0];
-				}
+				double u, v, phi;
+				DefocusHelper::findAstigmatismNM(
+					pred[p], obs[p], freqWeights[og], ctf0,
+					angpix[og], &u, &v, &phi);
+	
+				mdt.setValue(EMDL_CTF_DEFOCUSU, u, p);
+				mdt.setValue(EMDL_CTF_DEFOCUSV, v, p);
+				mdt.setValue(EMDL_CTF_DEFOCUS_ANGLE, phi, p);
 			}
-
-			ofsto << dOpt << " " << cMin << "\n";
-
-			ofst << "\n";
+			else
+			{
+				double u, v;
+				DefocusHelper::findDefocus1D(
+					pred[p], obs[p], freqWeights[og], ctf0,
+					angpix[og], &u, &v, defocusRange);
+	
+				mdt.setValue(EMDL_CTF_DEFOCUSU, u, p);
+				mdt.setValue(EMDL_CTF_DEFOCUSV, v, p);
+			}
+	
 		}
 	}
-
-	// Parallel loop over all particles in this micrograph
-	#pragma omp parallel for num_threads(nr_omp_threads)
-	for (long p = 0; p < pc; p++)
-	{
-		const int og = obsModel->getOpticsGroup(mdt, p);
-		
-		std::stringstream stsp;
-		stsp << p;
-
-		CTF ctf0;
-		ctf0.readByGroup(mdt, obsModel, p);
-
-		if (fitAstigmatism)
-		{
-			double u, v, phi;
-			DefocusHelper::findAstigmatismNM(
-				pred[p], obs[p], freqWeights[og], ctf0,
-				angpix[og], &u, &v, &phi);
-
-			mdt.setValue(EMDL_CTF_DEFOCUSU, u, p);
-			mdt.setValue(EMDL_CTF_DEFOCUSV, v, p);
-			mdt.setValue(EMDL_CTF_DEFOCUS_ANGLE, phi, p);
-		}
-		else
-		{
-			double u, v;
-			DefocusHelper::findDefocus1D(
-				pred[p], obs[p], freqWeights[og], ctf0,
-				angpix[og], &u, &v, defocusRange);
-
-			mdt.setValue(EMDL_CTF_DEFOCUSU, u, p);
-			mdt.setValue(EMDL_CTF_DEFOCUSV, v, p);
-		}
-
-	}
+	
+	ModularCtfOptimisation mco(mdt, obsModel, obs, pred, freqWeights, "fpmf");
+	std::vector<double> x0 = mco.encodeInitial();
+	
+	LBFGS::optimize(x0, mco, true, 300, 1e-12);
+	
+	mco.writeToTable(x0);
 
 	// Output a diagnostic Postscript file
 	writeEPS(mdt);
