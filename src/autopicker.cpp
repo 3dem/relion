@@ -3158,11 +3158,11 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 					transformer.inverseFourierTransform(Faux2, Maux);
 					CenterFFT(Maux, false);
 					Maux.setXmippOrigin();
-//#ifdef DEBUG
+#ifdef DEBUG
 					Image<RFLOAT> ttt;
 					ttt()=Maux;
 					ttt.write("Maux.spi");
-//#endif
+#endif
 					sum_ref_under_circ_mask = 0.;
 					sum_ref2_under_circ_mask = 0.;
 					RFLOAT suma2 = 0.;
