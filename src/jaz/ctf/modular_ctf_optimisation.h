@@ -7,7 +7,6 @@
 #include <src/jaz/obs_model.h>
 #include <vector>
 
-
 class ModularCtfOptimisation : public DifferentiableOptimization
 {
 	public:
@@ -42,30 +41,38 @@ class ModularCtfOptimisation : public DifferentiableOptimization
 			const std::vector<Image<Complex>>& obs,
 			const std::vector<Image<Complex>>& pred,
 			const std::vector<Image<RFLOAT>>& frqWghByGroup,
-			std::string modeStr); // <- five characters (from {p,m,f}) indicating whether 
-			                      //    the phase, defocus, astigmatism, Cs and B/k (in this order)
+			std::string modeStr,  // <- five characters (from {p,m,f}) indicating whether 
+			int num_treads);      //    the phase, defocus, astigmatism, Cs and B/k (in this order)
 			                      //    are to be estimated per [p]article, per [m]icrograph or
 			                      //    to be kept [f]ixed.
-		  
+		
+		double f(const std::vector<double> &x) const;
 		double f(const std::vector<double> &x, void *tempStorage) const;
+		
+		void grad(const std::vector<double> &x, std::vector<double> &gradDest) const;
 		void grad(const std::vector<double> &x, std::vector<double> &gradDest, void *tempStorage) const;
+		
+		void* allocateTempStorage() const;
+		void deallocateTempStorage(void* ts) const;
 		
 		std::vector<double> encodeInitial();
 		void writeToTable(const std::vector<double> &x);
 		
 		static bool validateModeString(std::string mode);
+		static std::vector<Mode> decodeModes(std::string s);	
 		
 		
 		
 		
 	protected:
 
+		
 			MetaDataTable& mdt;
 			ObservationModel* obsModel;
 			const std::vector<Image<Complex>>& obs;
 			const std::vector<Image<Complex>>& pred;
 			
-			int particle_count, param_count;
+			int particle_count, param_count, num_treads;
 			
 			std::vector<Mode> modes;
 			double paramScale[CtfParamCount];
@@ -75,8 +82,8 @@ class ModularCtfOptimisation : public DifferentiableOptimization
 			
 			std::vector<Image<double>> aberrationByGroup;
 			const std::vector<Image<RFLOAT>>& frqWghByGroup;
-				
-		std::vector<Mode> decodeModes(std::string s);		
+			
+					
 		inline double readParam(CtfParam param, const std::vector<double> &x, int p) const;
 };
 

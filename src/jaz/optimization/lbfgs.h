@@ -22,6 +22,7 @@
 #define LBFGS_OPT_H
 
 #include <vector>
+#include <string>
 #include "optimization.h"
 #include <src/jaz/lbfgs/lbfgs.h>
 
@@ -39,6 +40,8 @@ class LBFGS
         static void test();
 
     protected:
+		
+		static std::string translateError(int ret);
 
         static lbfgsfloatval_t evaluate(
             void *instance,

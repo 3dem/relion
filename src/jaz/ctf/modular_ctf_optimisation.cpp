@@ -1,9 +1,12 @@
 #include "modular_ctf_optimisation.h"
 #include <src/jaz/ctf/magnification_helper.h>
 #include <src/ctf.h>
+#include <omp.h>
 
 using namespace gravis;
 
+
+#define DATA_PAD 512
 
 
 ModularCtfOptimisation::ModularCtfOptimisation(
@@ -12,13 +15,15 @@ ModularCtfOptimisation::ModularCtfOptimisation(
 	const std::vector<Image<Complex>>& obs, 
 	const std::vector<Image<Complex>>& pred, 
 	const std::vector<Image<RFLOAT>>& frqWghByGroup,
-	std::string modeStr)
+	std::string modeStr,
+	int num_treads)
 	:
 	mdt(mdt),
 	obsModel(obsModel),
 	obs(obs),
 	pred(pred),
 	particle_count(mdt.numberOfObjects()),
+	num_treads(num_treads),
 	frqWghByGroup(frqWghByGroup)
 {
 	initialValues.resize(CtfParamCount * particle_count);
@@ -34,22 +39,17 @@ ModularCtfOptimisation::ModularCtfOptimisation(
 		const double Axy = K[1] * ctf.getAxy();
 		const double Ayy = K[1] * ctf.getAyy();
 				
-		const double dz = (Axx + Ayy) / 2.0;
+		const double avgDz = (Axx + Ayy) / 2.0;
 		const double bfac = ctf.Bfac;
 		const double kfac = ctf.scale;
 				
 		initialValues[CtfParamCount * p + Phase]               = -K[5] - K[3];
-		initialValues[CtfParamCount * p + Defocus]             = dz;
-		initialValues[CtfParamCount * p + Astigmatism1]        = Axx - dz;
+		initialValues[CtfParamCount * p + Defocus]             = avgDz;
+		initialValues[CtfParamCount * p + Astigmatism1]        = Axx - avgDz;
 		initialValues[CtfParamCount * p + Astigmatism2]        = Axy;
 		initialValues[CtfParamCount * p + SphericalAberration] = K[2];
 		initialValues[CtfParamCount * p + BFactor]             = bfac;
 		initialValues[CtfParamCount * p + ScaleFactor]         = kfac;
-		
-		/*if (p == 0)
-		{
-			std::cout << "p0_1: " << ctf.DeltafU << " " << ctf.DeltafV << " " << ctf.azimuthal_angle << "\n";
-		}*/
 	}
 	
 	modes = decodeModes(modeStr);
@@ -108,7 +108,7 @@ ModularCtfOptimisation::ModularCtfOptimisation(
 	}
 }
 
-double ModularCtfOptimisation::f(const std::vector<double> &x, void *tempStorage) const
+double ModularCtfOptimisation::f(const std::vector<double> &x) const
 {
 	double out = 0.0;
 	
@@ -128,13 +128,13 @@ double ModularCtfOptimisation::f(const std::vector<double> &x, void *tempStorage
 		const int og = obsModel->getOpticsGroup(mdt, p);
 		const double as = s * angpix[og];
 		
-		for (int y = 0; y < s;  y++)
-		for (int x = 0; x < sh; x++)
+		for (int yi = 0; yi < s;  yi++)
+		for (int xi = 0; xi < sh; xi++)
 		{
-			const double wght = (x == 0)? 1.0 : 2.0;
+			const double wght = (xi == 0)? 1.0 : 2.0;
 			
-			const double xx = x/as;
-			const double yy = (y <= s/2)? y/as : (y - s)/as;
+			const double xx = xi/as;
+			const double yy = (yi <= s/2)? yi/as : (yi - s)/as;
 			
 			double xu, yu;
 			
@@ -154,26 +154,106 @@ double ModularCtfOptimisation::f(const std::vector<double> &x, void *tempStorage
 			const double u2 = xu * xu + yu * yu;
 			const double u4 = u2 * u2;
 			
-			const double gammaOffset = obsModel->hasEvenZernike? aberrationByGroup[og](y,x) : 0.0;
-			const double freqWgh = frqWghByGroup[og](y,x);
+			const double gammaOffset = obsModel->hasEvenZernike? aberrationByGroup[og](yi,xi) : 0.0;
+			const double freqWgh = frqWghByGroup[og](yi,xi);
 	
 			const double gamma = ph 
 					+ (dz + a1) * xu * xu + 2.0 * a2 * xu * yu + (dz - a1) * yu * yu 
 					+ cs * u4 + gammaOffset;
 			
-			const double ctfVal = -kf * exp(-bf * u2 / 4.0) * sin(gamma);
+			const double ctfVal = kf * exp(-bf * u2 / 4.0) * (-sin(gamma));
 			
-			out += freqWgh * wght * ( obs[p](y,x) - ctfVal * pred[p](y,x) ).norm();
+			out += freqWgh * wght * ( obs[p](yi,xi) - ctfVal * pred[p](yi,xi) ).norm();
 		}
 	}
 	
 	return out;
 }
 
+double ModularCtfOptimisation::f(const std::vector<double> &x, void *tempStorage) const
+{
+	if (tempStorage == 0) return f(x);
+	
+	std::vector<double>* out = (std::vector<double>*) tempStorage;
+	const int stride = param_count + DATA_PAD;
+	
+	#pragma omp parallel for num_threads(num_treads)
+	for (int t = 0; t < num_treads; t++)
+	{
+		(*out)[t*stride] = 0.0;
+	}
+	
+	#pragma omp parallel for num_threads(num_treads)
+	for (int p = 0; p < particle_count; p++)
+	{
+		int t = omp_get_thread_num();
+		
+		const double ph = readParam(Phase, x, p);
+		const double dz = readParam(Defocus, x, p);
+		const double a1 = readParam(Astigmatism1, x, p);
+		const double a2 = readParam(Astigmatism2, x, p);
+		const double cs = readParam(SphericalAberration, x, p);
+		const double bf = readParam(BFactor, x, p);
+		const double kf = readParam(ScaleFactor, x, p);
+		
+		const int s = obs[p].data.ydim;
+		const int sh = s/2 + 1;
+		
+		const int og = obsModel->getOpticsGroup(mdt, p);
+		const double as = s * angpix[og];
+		
+		for (int yi = 0; yi < s;  yi++)
+		for (int xi = 0; xi < sh; xi++)
+		{
+			const double wght = (xi == 0)? 1.0 : 2.0;
+			
+			const double xx = xi/as;
+			const double yy = (yi <= s/2)? yi/as : (yi - s)/as;
+			
+			double xu, yu;
+			
+			if (obsModel->hasMagMatrices)
+			{
+				const Matrix2D<RFLOAT>& M = obsModel->getMagMatrix(og);
+				
+				xu = M(0,0) * xx + M(0,1) * yy;
+				yu = M(1,0) * xx + M(1,1) * yy;
+			}
+			else
+			{
+				xu = xx;
+				yu = yy;
+			}
+			
+			const double u2 = xu * xu + yu * yu;
+			const double u4 = u2 * u2;
+			
+			const double gammaOffset = obsModel->hasEvenZernike? aberrationByGroup[og](yi,xi) : 0.0;
+			const double freqWgh = frqWghByGroup[og](yi,xi);
+	
+			const double gamma = ph 
+					+ (dz + a1) * xu * xu + 2.0 * a2 * xu * yu + (dz - a1) * yu * yu 
+					+ cs * u4 + gammaOffset;
+			
+			const double ctfVal = kf * exp(-bf * u2 / 4.0) * (-sin(gamma));
+			
+			(*out)[t*stride] += freqWgh * wght * ( obs[p](yi,xi) - ctfVal * pred[p](yi,xi) ).norm();
+		}
+	}
+	
+	double out2 = 0.0;
+	
+	for (int t = 0; t < num_treads; t++)
+	{
+		out2 += (*out)[t*stride];
+	}
+	
+	return out2;
+}
+
 void ModularCtfOptimisation::grad(
 		const std::vector<double> &x, 
-		std::vector<double> &gradDest, 
-		void *tempStorage) const
+		std::vector<double> &gradDest) const
 {
 	for (int i = 0; i < gradDest.size(); i++)
 	{
@@ -196,13 +276,13 @@ void ModularCtfOptimisation::grad(
 		const int og = obsModel->getOpticsGroup(mdt, p);
 		const double as = s * angpix[og];
 		
-		for (int y = 0; y < s;  y++)
-		for (int x = 0; x < sh; x++)
+		for (int yi = 0; yi < s;  yi++)
+		for (int xi = 0; xi < sh; xi++)
 		{
-			const double wght = (x == 0)? 1.0 : 2.0;
+			const double wght = (xi == 0)? 1.0 : 2.0;
 			
-			const double xx = x/as;
-			const double yy = (y <= s/2)? y/as : (y - s)/as;
+			const double xx = xi/as;
+			const double yy = (yi <= s/2)? yi/as : (yi - s)/as;
 			
 			double xu, yu;
 			
@@ -222,8 +302,8 @@ void ModularCtfOptimisation::grad(
 			const double u2 = xu * xu + yu * yu;
 			const double u4 = u2 * u2;
 			
-			const double gammaOffset = obsModel->hasEvenZernike? aberrationByGroup[og](y,x) : 0.0;
-			const double freqWgh = frqWghByGroup[og](y,x);
+			const double gammaOffset = obsModel->hasEvenZernike? aberrationByGroup[og](yi,xi) : 0.0;
+			const double freqWgh = frqWghByGroup[og](yi,xi);
 	
 			const double gamma = ph 
 					+ (dz + a1) * xu * xu + 2.0 * a2 * xu * yu + (dz - a1) * yu * yu 
@@ -233,8 +313,8 @@ void ModularCtfOptimisation::grad(
 			const double wave = -sin(gamma);
 			const double ctfVal = kf * env * wave;
 			
-			const Complex z_obs = obs[p](y,x);
-			const Complex z_pred = pred[p](y,x);
+			const Complex z_obs = obs[p](yi,xi);
+			const Complex z_pred = pred[p](yi,xi);
 			const Complex z_err = ctfVal * z_pred - z_obs;
 			
 			const double dE_dCtfVal = 2.0 * freqWgh * wght * (
@@ -245,11 +325,11 @@ void ModularCtfOptimisation::grad(
 			const double dE_dPh = dE_dGamma;
 			const double dE_dDz = dE_dGamma * (xu * xu + yu * yu);
 			const double dE_dA1 = dE_dGamma * (xu * xu - yu * yu);
-			const double dE_dA2 = dE_dGamma * 2.0 * a2 * xu * yu;
+			const double dE_dA2 = dE_dGamma * 2.0 * xu * yu;
 			const double dE_dCs = dE_dGamma * u4;
 			const double dE_dBf = dE_dCtfVal * kf * wave * exp(-bf * u2 / 4.0) * (-u2/4.0);	
 			const double dE_dKf = dE_dCtfVal * env * wave;
-			
+						
 			if (modes[Phase] != Fixed)
 			{
 				gradDest[paramOffset[Phase] + p * paramParticleStep[Phase]] += dE_dPh;
@@ -286,6 +366,164 @@ void ModularCtfOptimisation::grad(
 			}
 		}
 	}
+}
+void ModularCtfOptimisation::grad(
+		const std::vector<double> &x, 
+		std::vector<double> &gradDest, 
+		void *tempStorage) const
+{
+	if (tempStorage == 0) 
+	{
+		grad(x, gradDest);
+		return;
+	}
+	
+	std::vector<double>* out = (std::vector<double>*) tempStorage;
+	const int stride = param_count + DATA_PAD;
+	
+	#pragma omp parallel for num_threads(num_treads)
+	for (int t = 0; t < num_treads; t++)
+	for (int i = 0; i < param_count; i++)
+	{
+		(*out)[t*stride + i] = 0.0;
+	}
+	
+	#pragma omp parallel for num_threads(num_treads)
+	for (int p = 0; p < particle_count; p++)
+	{
+		int t = omp_get_thread_num();
+		
+		const double ph = readParam(Phase, x, p);
+		const double dz = readParam(Defocus, x, p);
+		const double a1 = readParam(Astigmatism1, x, p);
+		const double a2 = readParam(Astigmatism2, x, p);
+		const double cs = readParam(SphericalAberration, x, p);
+		const double bf = readParam(BFactor, x, p);
+		const double kf = readParam(ScaleFactor, x, p);
+		
+		const int s = obs[p].data.ydim;
+		const int sh = s/2 + 1;
+		
+		const int og = obsModel->getOpticsGroup(mdt, p);
+		const double as = s * angpix[og];
+		
+		for (int yi = 0; yi < s;  yi++)
+		for (int xi = 0; xi < sh; xi++)
+		{
+			const double wght = (xi == 0)? 1.0 : 2.0;
+			
+			const double xx = xi/as;
+			const double yy = (yi <= s/2)? yi/as : (yi - s)/as;
+			
+			double xu, yu;
+			
+			if (obsModel->hasMagMatrices)
+			{
+				const Matrix2D<RFLOAT>& M = obsModel->getMagMatrix(og);
+				
+				xu = M(0,0) * xx + M(0,1) * yy;
+				yu = M(1,0) * xx + M(1,1) * yy;
+			}
+			else
+			{
+				xu = xx;
+				yu = yy;
+			}
+			
+			const double u2 = xu * xu + yu * yu;
+			const double u4 = u2 * u2;
+			
+			const double gammaOffset = obsModel->hasEvenZernike? aberrationByGroup[og](yi,xi) : 0.0;
+			const double freqWgh = frqWghByGroup[og](yi,xi);
+	
+			const double gamma = ph 
+					+ (dz + a1) * xu * xu + 2.0 * a2 * xu * yu + (dz - a1) * yu * yu 
+					+ cs * u4 + gammaOffset;
+			
+			const double env = exp(-bf * u2 / 4.0);
+			const double wave = -sin(gamma);
+			const double ctfVal = kf * env * wave;
+			
+			const Complex z_obs = obs[p](yi,xi);
+			const Complex z_pred = pred[p](yi,xi);
+			const Complex z_err = ctfVal * z_pred - z_obs;
+			
+			const double dE_dCtfVal = 2.0 * freqWgh * wght * (
+						z_err.real * z_pred.real + z_err.imag * z_pred.imag);
+			
+			const double dE_dGamma = dE_dCtfVal * kf * env * (-cos(gamma));
+			
+			const double dE_dPh = dE_dGamma;
+			const double dE_dDz = dE_dGamma * (xu * xu + yu * yu);
+			const double dE_dA1 = dE_dGamma * (xu * xu - yu * yu);
+			const double dE_dA2 = dE_dGamma * 2.0 * xu * yu;
+			const double dE_dCs = dE_dGamma * u4;
+			const double dE_dBf = dE_dCtfVal * kf * wave * env * (-u2/4.0);	
+			const double dE_dKf = dE_dCtfVal * env * wave;
+			
+			
+			if (modes[Phase] != Fixed)
+			{
+				(*out)[t*stride + paramOffset[Phase] + p * paramParticleStep[Phase]] += dE_dPh;
+			}
+			
+			if (modes[Defocus] != Fixed)
+			{
+				(*out)[t*stride + paramOffset[Defocus] 
+						+ p * paramParticleStep[Defocus]] += dE_dDz;
+			}
+			
+			if (modes[Astigmatism1] != Fixed)
+			{
+				(*out)[t*stride + paramOffset[Astigmatism1] 
+						+ p * paramParticleStep[Astigmatism1]] += dE_dA1;
+			}
+			
+			if (modes[Astigmatism2] != Fixed)
+			{
+				(*out)[t*stride + paramOffset[Astigmatism2] 
+						+ p * paramParticleStep[Astigmatism2]] += dE_dA2;
+			}
+			
+			if (modes[SphericalAberration] != Fixed)
+			{
+				(*out)[t*stride + paramOffset[SphericalAberration] 
+						+ p * paramParticleStep[SphericalAberration]] += dE_dCs;
+			}
+			
+			if (modes[BFactor] != Fixed)
+			{
+				(*out)[t*stride + paramOffset[BFactor] 
+						+ p * paramParticleStep[BFactor]] += dE_dBf;
+			}
+			
+			if (modes[ScaleFactor] != Fixed)
+			{
+				(*out)[t*stride + paramOffset[ScaleFactor] 
+						+ p * paramParticleStep[ScaleFactor]] += dE_dKf;
+			}
+		}
+	}
+	
+	for (int i = 0; i < param_count; i++)
+	{	
+		gradDest[i] = 0.0;
+		
+		for (int t = 0; t < num_treads; t++)
+		{
+			gradDest[i] += (*out)[t*stride + i];
+		}
+	}
+}
+
+void *ModularCtfOptimisation::allocateTempStorage() const
+{
+	return new std::vector<double>((param_count + DATA_PAD) * num_treads);
+}
+
+void ModularCtfOptimisation::deallocateTempStorage(void *ts) const
+{
+	delete (std::vector<double>*) ts;
 }
 
 std::vector<double> ModularCtfOptimisation::encodeInitial()
@@ -348,11 +586,6 @@ void ModularCtfOptimisation::writeToTable(const std::vector<double> &x)
 		
 		RFLOAT local_kV = ctf.kV * 1e3;		
 		const double lambda = 12.2643247 / sqrt(local_kV * (1. + local_kV * 0.978466e-6));
-				
-		/*if (p == 0)
-		{
-			std::cout << "p0_1: " << defocusU << " " << defocusV << " " << angleDeg << "\n";
-		}*/
 		
 		// ph = -K[5] - K[3] = -DEG2RAD(phase_shift) - atan(Q0/sqrt(1-Q0*Q0));
 		// => phase_shift = RAD2DEG(-ph - K[3])
