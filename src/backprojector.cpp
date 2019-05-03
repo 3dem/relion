@@ -736,9 +736,9 @@ void BackProjector::backrotate3D(const MultidimArray<Complex > &f3d,
 			for (int x = x_min; x <= x_max; x++)
 			{
 				// Get logical coordinates in the 3D map
-				int xp = Ainv(0,0) * x + Ainv(0,1) * y + Ainv(0,2) * z;
-				int yp = Ainv(1,0) * x + Ainv(1,1) * y + Ainv(1,2) * z;
-				int zp = Ainv(2,0) * x + Ainv(2,1) * y + Ainv(2,2) * z;
+				RFLOAT xp = Ainv(0,0) * x + Ainv(0,1) * y + Ainv(0,2) * z;
+				RFLOAT yp = Ainv(1,0) * x + Ainv(1,1) * y + Ainv(1,2) * z;
+				RFLOAT zp = Ainv(2,0) * x + Ainv(2,1) * y + Ainv(2,2) * z;
 
 				const int r_ref_2 = xp*xp + yp*yp + zp*zp;
 
