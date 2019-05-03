@@ -626,5 +626,26 @@ void CTF::applyWeightEwaldSphereCurvature_noAniso(MultidimArray < RFLOAT > &resu
 		DIRECT_A2D_ELEM(result, i, j) *= 0.5;
 
 	}
+	
+}
 
+std::vector<double> CTF::getK()
+{
+	// offset by one to maintain indices (K[1] = K1)
+	return std::vector<double>{0, K1, K2, K3, K4, K5};
+}
+
+double CTF::getAxx()
+{
+	return Axx;
+}
+
+double CTF::getAxy()
+{
+	return Axy;
+}
+
+double CTF::getAyy()
+{
+	return Ayy;
 }

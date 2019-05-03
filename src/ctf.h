@@ -354,6 +354,9 @@ public:
 	// Calculate weight W for Ewald-sphere curvature correction: apply this to the result from getFftwImage
 	void applyWeightEwaldSphereCurvature_noAniso(MultidimArray < RFLOAT > &result, int orixdim, int oriydim, RFLOAT angpix, RFLOAT particle_diameter);
 
+	std::vector<double> getK();
+	double getAxx();
+	double getAxy();
+	double getAyy();
 };
-//@}
 #endif

@@ -346,7 +346,7 @@ public:
 
  	// Add an image to the given particle
 	int addImageToParticle(long int part_id, std::string img_name, long int ori_img_id, long int group_id, long int micrograph_id,
-			 int optics_group);
+	                       int optics_group, bool unique);
 
 	// Add a group
 	long int addGroup(std::string mic_name, int optics_group);

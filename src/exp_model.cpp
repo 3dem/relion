@@ -126,7 +126,7 @@ long int Experiment::addParticle(std::string part_name, int random_subset)
 }
 
 int Experiment::addImageToParticle(long int part_id, std::string img_name, long int ori_img_id, long int group_id, long int micrograph_id,
-		 int optics_group)
+                                   int optics_group, bool unique)
 {
 	if (group_id >= groups.size())
 		REPORT_ERROR("Experiment::addImageToParticle: group_id out of range");
@@ -144,8 +144,12 @@ int Experiment::addImageToParticle(long int part_id, std::string img_name, long 
 	img.group_id = group_id;
 	img.micrograph_id = micrograph_id;
 	img.optics_group = optics_group;
-	img.optics_group_id = nr_images_per_optics_group[optics_group];
-	nr_images_per_optics_group[optics_group]++;
+	if (unique)
+		nr_images_per_optics_group[optics_group]++;
+	img.optics_group_id = nr_images_per_optics_group[optics_group] - 1;
+
+	if (img.optics_group_id < 0)
+		REPORT_ERROR("Logic error in Experiment::addImageToParticle.");
 
 	// Push back this particle in the particles vector
 	particles[part_id].images.push_back(img);
@@ -407,7 +411,7 @@ void Experiment::randomiseParticlesOrder(int seed, bool do_split_random_halves, 
 			std::stable_sort(particle_list1.begin(), particle_list1.end(), compareOpticsGroupsParticles);
 			std::stable_sort(particle_list2.begin(), particle_list2.end(), compareOpticsGroupsParticles);
 
-            // First fill new_ori_particles with the first subset, then with the second
+			// First fill new_ori_particles with the first subset, then with the second
 			particles = particle_list1;
 			particles.insert(particles.end(), particle_list2.begin(), particle_list2.end());
 
@@ -420,7 +424,6 @@ void Experiment::randomiseParticlesOrder(int seed, bool do_split_random_halves, 
 			// Make sure the particles are sorted on their optics_group.
 			// Otherwise CudaFFT re-calculation of plans every time image size changes slows down things a lot!
  			std::stable_sort(particles.begin(), particles.end(), compareOpticsGroupsParticles);
-
 		}
 
 		randomised = true;
@@ -469,9 +472,9 @@ void Experiment::initialiseBodies(int _nr_bodies)
 
 bool Experiment::getImageNameOnScratch(long int part_id, int img_id, FileName &fn_img, bool is_ctf_image)
 {
-
 	int optics_group = getOpticsGroup(part_id, img_id);
 	long int my_id = particles[part_id].images[img_id].optics_group_id;
+
 	if (fn_scratch != "" && my_id < nr_parts_on_scratch[optics_group])
 	{
 		if (is_3D)
@@ -487,13 +490,16 @@ bool Experiment::getImageNameOnScratch(long int part_id, int img_id, FileName &f
 			FileName fn_tmp = fn_scratch + "opticsgroup" + integerToString(optics_group+1) + "_particles.mrcs";
 			fn_img.compose(my_id+1, fn_tmp);
 		}
+
+#ifdef DEBUG_SCRATCH
+		std::cerr << "getImageNameOnScratch: " << particles[part_id].name << " is cached at " << fn_img << std::endl;
+#endif
 		return true;
 	}
 	else
 	{
 		return false;
 	}
-
 }
 
 void Experiment::setScratchDirectory(FileName _fn_scratch, bool do_reuse_scratch, int verb)
@@ -631,12 +637,16 @@ void Experiment::copyParticlesToScratch(int verb, bool do_copy, bool also_do_ctf
 	fImageHandler hFile;
 	long int total_nr_parts_on_scratch = 0;
 	nr_parts_on_scratch.resize(numberOfOpticsGroups(), 0);
+
+	FileName prev_img_name = "/Unlikely$filename$?*!";
+	int prev_optics_group = -999;
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDimg)
 	{
 		long int imgno;
 		FileName fn_img, fn_ctf, fn_stack, fn_new;
 		Image<RFLOAT> img;
 		MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
+
 		int optics_group = 0;
 		if (MDimg.getValue(EMDL_IMAGE_OPTICS_GROUP, optics_group))
 		{
@@ -662,8 +672,9 @@ void Experiment::copyParticlesToScratch(int verb, bool do_copy, bool also_do_ctf
 			}
 		}
 
+		bool is_duplicate = (prev_img_name == fn_img && prev_optics_group == optics_group);
 		// Read in the particle image, and write out on scratch
-		if (do_copy)
+		if (do_copy && !is_duplicate)
 		{
 			// Now we have the particle in memory
 			// See how much space it occupies
@@ -713,16 +724,23 @@ void Experiment::copyParticlesToScratch(int verb, bool do_copy, bool also_do_ctf
 					img.write(fn_new, -1, false, WRITE_OVERWRITE);
 				else
 					img.write(fn_new, -1, true, WRITE_APPEND);
+
+#ifdef DEBUG_SCRATCH
+				std::cerr << "Cached " << fn_img << " to " << fn_new << std::endl;
+#endif
 			}
 		}
 
 		// Update the counter and progress bar
-		nr_parts_on_scratch[optics_group]++;
+		if (!is_duplicate)
+			nr_parts_on_scratch[optics_group]++;
 		total_nr_parts_on_scratch++;
+
+		prev_img_name = fn_img;
+		prev_optics_group = optics_group;
 
 		if (verb > 0 && total_nr_parts_on_scratch % barstep == 0)
 			progress_bar(total_nr_parts_on_scratch);
-
 	}
 
 	if (verb)
@@ -744,11 +762,8 @@ void Experiment::copyParticlesToScratch(int verb, bool do_copy, bool also_do_ctf
 }
 
 // Read from file
-void Experiment::read(
-		FileName fn_exp,
-		bool do_ignore_particle_name,
-		bool do_ignore_group_name, bool do_preread_images,
-		bool need_tiltpsipriors_for_helical_refine, int verb)
+void Experiment::read(FileName fn_exp, bool do_ignore_particle_name, bool do_ignore_group_name, bool do_preread_images,
+                      bool need_tiltpsipriors_for_helical_refine, int verb)
 {
 
 //#define DEBUG_READ
@@ -803,7 +818,7 @@ void Experiment::read(
 			// Add the particle to my_area = 0
 			part_id = addParticle(fn_img, 0);
 			// Just add a single image per particle
-			addImageToParticle(part_id, fn_img, n, 0, 0, 0);
+			addImageToParticle(part_id, fn_img, n, 0, 0, 0, true);
 
 			MDimg.addObject();
 
@@ -871,11 +886,11 @@ void Experiment::read(
 			mic_id = addMicrograph("micrograph");
 		}
 #ifdef DEBUG_READ
-	std::cerr << "Done sorting MDimg" << std::endl;
-	std::cerr << " MDimg.numberOfObjects()= " << MDimg.numberOfObjects() << std::endl;
-	timer.toc(tsort);
-	timer.tic(tfill);
-	long nr_read = 0;
+		std::cerr << "Done sorting MDimg" << std::endl;
+		std::cerr << " MDimg.numberOfObjects()= " << MDimg.numberOfObjects() << std::endl;
+		timer.toc(tsort);
+		timer.tic(tfill);
+		long nr_read = 0;
 #endif
 		// allocate 1 block of memory
 		particles.reserve(MDimg.numberOfObjects());
@@ -883,6 +898,9 @@ void Experiment::read(
 		// Now Loop over all objects in the metadata file and fill the logical tree of the experiment
 		long int last_part_id = -1;
 
+
+		FileName prev_img_name = "/Unlikely$filename$?*!";
+		int prev_optics_group = -999;
 		//FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDimg)
 		for (long int ori_img_id = 0; ori_img_id < MDimg.numberOfObjects(); ori_img_id++)
 		{
@@ -1007,7 +1025,15 @@ void Experiment::read(
 			// Create a new image in this particle
 			FileName img_name;
 			MDimg.getValue(EMDL_IMAGE_NAME, img_name, ori_img_id);
-			int img_id = addImageToParticle(part_id, img_name, ori_img_id, group_id, mic_id, optics_group);
+
+			bool do_cache = (prev_img_name != img_name || prev_optics_group != optics_group);
+#ifdef DEBUG_SCRATCH
+			std::cerr << "prev_img_name = " << prev_img_name << " img_name = " << img_name << " prev_optics_group = " << prev_optics_group << " optics_group = " << optics_group << " do_cache = " << do_cache << std::endl;
+#endif
+			prev_img_name = img_name;
+			prev_optics_group = optics_group;
+
+			int img_id = addImageToParticle(part_id, img_name, ori_img_id, group_id, mic_id, optics_group, do_cache);
 
 			// The group number is only set upon reading: it is not read from the STAR file itself,
 			// there the only thing that matters is the order of the micrograph_names
@@ -1155,7 +1181,6 @@ void Experiment::read(
 // Write to file
 void Experiment::write(FileName fn_root)
 {
-
 	std::ofstream  fh;
 	FileName fn_tmp = fn_root+"_data.star";
 	fh.open((fn_tmp).c_str(), std::ios::out);
@@ -1178,5 +1203,4 @@ void Experiment::write(FileName fn_root)
 	}
 
 	fh.close();
-
 }
