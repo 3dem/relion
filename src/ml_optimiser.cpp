@@ -2507,12 +2507,14 @@ void MlOptimiser::iterate()
 			if ( (!do_skip_align) && (!do_skip_rotate) )
 			{
 				int nr_same_polarity = 0, nr_opposite_polarity = 0;
+				int nr_same_rot = 0, nr_opposite_rot = 0;	// KThurber
 				RFLOAT opposite_percentage = 0.;
+				RFLOAT rot_opposite_percent = 0.;		// KThurber
 				bool do_auto_refine_local_searches = (do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches);
 				bool do_classification_local_searches = (!do_auto_refine) && (mymodel.orientational_prior_mode == PRIOR_ROTTILT_PSI)
 						&& (mymodel.sigma2_rot > 0.) && (mymodel.sigma2_tilt > 0.) && (mymodel.sigma2_psi > 0.);
 				bool do_local_angular_searches = (do_auto_refine_local_searches) || (do_classification_local_searches);
-
+				std::cerr << " do_auto_refine_local_searches= " << do_auto_refine_local_searches << " do_classification_local_searches= " << do_classification_local_searches << " do_local_angular_searches= " << do_local_angular_searches << std::endl;
 				if (helical_sigma_distance < 0.)
 					updateAngularPriorsForHelicalReconstruction(mydata.MDimg, helical_keep_tilt_prior_fixed);
 				else
@@ -2520,7 +2522,10 @@ void MlOptimiser::iterate()
 					updatePriorsForHelicalReconstruction(
 							mydata.MDimg,
 							nr_opposite_polarity,
+							nr_opposite_rot,	// KThurber
 							helical_sigma_distance * ((RFLOAT)(mymodel.ori_size)),
+							mymodel.helical_rise,
+							mymodel.helical_twist,
 							(mymodel.data_dim == 3),
 							do_auto_refine,
 							do_local_angular_searches,
@@ -2531,12 +2536,13 @@ void MlOptimiser::iterate()
 							helical_keep_tilt_prior_fixed);
 
 					nr_same_polarity = ((int)(mydata.MDimg.numberOfObjects())) - nr_opposite_polarity;
+					nr_same_rot = ((int)(mydata.MDimg.numberOfObjects())) - nr_opposite_rot;  // KThurber
 					opposite_percentage = (100.) * ((RFLOAT)(nr_opposite_polarity)) / ((RFLOAT)(mydata.MDimg.numberOfObjects()));
+					rot_opposite_percent = (100.) * ((RFLOAT)(nr_opposite_rot)) / ((RFLOAT)(mydata.MDimg.numberOfObjects()));  // KThurber
 					if ( (verb > 0) && (!do_local_angular_searches) )
 					{
-						//std::cout << " DEBUG: auto_refine, healpix_order, min_for_local = " << do_auto_refine << ", " << sampling.healpix_order << ", " << autosampling_hporder_local_searches << std::endl;
-						//std::cout << " DEBUG: orient_prior_mode = " << PRIOR_ROTTILT_PSI << ", sigma_ang2 = " << mymodel.sigma2_rot << ", " << mymodel.sigma2_tilt << ", " << mymodel.sigma2_psi << ", sigma_offset2 = " << mymodel.sigma2_offset << std::endl;
 						std::cout << " Number of helical segments with psi angles similar/opposite to their priors: " << nr_same_polarity << " / " << nr_opposite_polarity << " (" << opposite_percentage << "%)" << std::endl;
+						std::cout << " Number of helical segments with rot angles similar/opposite to their priors: " << nr_same_rot << " / " << nr_opposite_rot << " (" << rot_opposite_percent << "%)" << std::endl;  // KThurber
 					}
 				}
 			}
@@ -4846,6 +4852,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 			RFLOAT prior_tilt = DIRECT_A2D_ELEM(exp_metadata, my_metadata_offset, METADATA_TILT_PRIOR);
 			RFLOAT prior_psi =  DIRECT_A2D_ELEM(exp_metadata, my_metadata_offset, METADATA_PSI_PRIOR);
 			RFLOAT prior_psi_flip_ratio = DIRECT_A2D_ELEM(exp_metadata, my_metadata_offset, METADATA_PSI_PRIOR_FLIP_RATIO);
+			RFLOAT prior_rot_flip_ratio = DIRECT_A2D_ELEM(exp_metadata, my_metadata_offset, METADATA_ROT_PRIOR_FLIP_RATIO);  // Kthurber
 
 			bool do_auto_refine_local_searches = (do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches);
 			bool do_classification_local_searches = (!do_auto_refine) && (mymodel.orientational_prior_mode == PRIOR_ROTTILT_PSI)
@@ -4863,7 +4870,10 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 				prior_psi = DIRECT_A2D_ELEM(exp_metadata, my_metadata_offset, METADATA_PSI);
 			if (prior_psi_flip_ratio > 998.99 && prior_psi_flip_ratio < 999.01)
 				prior_psi_flip_ratio = 0.5;
+			if (prior_rot_flip_ratio > 998.99 && prior_rot_flip_ratio < 999.01) // Kthurber
+				prior_rot_flip_ratio = 0.5; // Kthurber
 
+			std::cerr << " prior_rot= " << prior_rot << " prior_rot_flip_ratio= " << prior_rot_flip_ratio << " prior_psi= " << prior_psi << " prior_psi_flip_ratio= " << prior_psi_flip_ratio<< std::endl;
 			// Select only those orientations that have non-zero prior probability
 			// Jun04,2015 - Shaoda & Sjors, bimodal psi searches for helices
 			if (do_helical_refine)
@@ -4871,7 +4881,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 				sampling.selectOrientationsWithNonZeroPriorProbabilityFor3DHelicalReconstruction(prior_rot, prior_tilt, prior_psi,
 										sqrt(mymodel.sigma2_rot), sqrt(mymodel.sigma2_tilt), sqrt(mymodel.sigma2_psi),
 										exp_pointer_dir_nonzeroprior, exp_directions_prior, exp_pointer_psi_nonzeroprior, exp_psi_prior,
-										do_local_angular_searches, prior_psi_flip_ratio);
+										do_local_angular_searches, prior_psi_flip_ratio, prior_rot_flip_ratio);
 			}
 			else
 			{
