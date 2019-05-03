@@ -27,6 +27,8 @@
 #include <src/time.h>
 #include <src/jaz/obs_model.h>
 
+// TODO: set pixel sizes in the outputs
+
 class stack_create_parameters
 {
 	public:
@@ -34,7 +36,7 @@ class stack_create_parameters
 	MetaDataTable MD;
 	// I/O Parser
 	IOParser parser;
-	bool do_spider, do_split_per_micrograph, do_apply_trans, do_apply_trans_only, do_ignore_optics;
+	bool do_spider, do_split_per_micrograph, do_apply_trans, do_apply_trans_only, do_ignore_optics, do_one_by_one;
 	ObservationModel obsModel;
 
 	void usage()
@@ -44,7 +46,6 @@ class stack_create_parameters
 
 	void read(int argc, char **argv)
 	{
-
 		parser.setCommandLine(argc, argv);
 
 		int general_section = parser.addSection("General options");
@@ -55,6 +56,7 @@ class stack_create_parameters
 		do_apply_trans = parser.checkOption("--apply_transformation", "Apply the inplane-transformations (needs _rlnOriginX/Y and _rlnAnglePsi in STAR file) by real space interpolation");
 		do_apply_trans_only = parser.checkOption("--apply_rounded_offsets_only", "Apply the rounded translations only (so-recentering without interpolation; needs _rlnOriginX/Y in STAR file)");
 		do_ignore_optics = parser.checkOption("--ignore_optics", "Ignore optics groups, run like in relion 3.0");
+		do_one_by_one = parser.checkOption("--one_by_one", "Write particles one by one. This saves memory but can be slower.");
 
 		if (do_apply_trans)
 			std::cerr << "WARNING: --apply_transformation uses real space interpolation. It also invalidates CTF parameters (e.g. beam tilt & astigmatism). This can degrade the resolution. USE WITH CARE!!" << std::endl;
@@ -66,10 +68,8 @@ class stack_create_parameters
     			REPORT_ERROR("Errors encountered on the command line, exiting...");
 	}
 
-
 	void run()
 	{
-
 		if (do_ignore_optics && (do_apply_trans || do_apply_trans_only))
 			REPORT_ERROR("ERROR: you cannot ignore optics and apply transformations");
 
@@ -126,7 +126,6 @@ class stack_create_parameters
 			ndim++;
 		}
 
-
 		// If not splitting, just fill fn_mics and mics_ndim with one entry (to re-use loop below)
 		if (!do_split_per_micrograph)
 		{
@@ -134,18 +133,24 @@ class stack_create_parameters
 			mics_ndims.push_back(ndim);
 		}
 
-
 		// Loop over all micrographs
 		for (int m = 0; m < fn_mics.size(); m++)
 		{
 			ndim = mics_ndims[m];
 			fn_mic = fn_mics[m];
 
-			// Resize the output image
-			std::cout << "Resizing the output stack to "<< ndim<<" images of size: "<<xdim<<"x"<<ydim<<"x"<<zdim << std::endl;
-			RFLOAT Gb = (RFLOAT)ndim * zdim * ydim * xdim * sizeof(RFLOAT) / (1024. * 1024. * 1024.);
-			std::cout << "This will require " << Gb << "Gb of memory...."<< std::endl;
-			Image<RFLOAT> out(xdim, ydim, zdim, ndim);
+			Image<RFLOAT> out;
+
+			if (!do_one_by_one)
+			{
+				// Resize the output image
+				std::cout << "Resizing the output stack to "<< ndim<<" images of size: "<<xdim<<"x"<<ydim<<"x"<<zdim << std::endl;
+				RFLOAT Gb = (RFLOAT)ndim * zdim * ydim * xdim * sizeof(RFLOAT) / (1024. * 1024. * 1024.);
+				std::cout << "This will require " << Gb << "Gb of memory...." << std::endl;
+				std::cout << "If this runs out of memory, please try --one_by_one." << std::endl;
+				out().reshape(ndim, zdim, ydim, xdim);
+				// NOTE: MultidimArray::reshape takes NZYX, while Image constructor takes XYZN !!
+			}
 
 			FileName fn_out;
 			if (do_split_per_micrograph)
@@ -168,7 +173,6 @@ class stack_create_parameters
 			init_progress_bar(ndim);
 			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
 			{
-
 				FileName fn_mymic;
 				if (do_split_per_micrograph)
 					MD.getValue(EMDL_MICROGRAPH_NAME, fn_mymic);
@@ -227,27 +231,36 @@ class stack_create_parameters
 					fn_img.compose(n+1, fn_out);
 					MD.setValue(EMDL_IMAGE_NAME, fn_img);
 
-					out().setImage(n, in());
+					if (!do_one_by_one)
+					{
+						out().printShape();
+						in().printShape();
+						out().setImage(n, in());
+					}
+					else
+					{
+						if (n == 0)
+							in.write(fn_img, -1, false, WRITE_OVERWRITE);
+						else
+							in.write(fn_img, -1, true, WRITE_APPEND);
+					}
+
 					n++;
 					if (n%100==0) progress_bar(n);
-
 				}
 			}
 			progress_bar(ndim);
 
-			out.write(fn_out);
+			if (!do_one_by_one)
+				out.write(fn_out);
 			std::cout << "Written out: " << fn_out << std::endl;
-
 		}
-
 
 		if (do_ignore_optics) MD.write(fn_root+".star");
 		else obsModel.save(MD, fn_root+".star", "particles");
 		std::cout << "Written out: " << fn_root << ".star" << std::endl;
 		std::cout << "Done!" <<std::endl;
-
 	}
-
 };
 
 
@@ -256,19 +269,16 @@ int main(int argc, char *argv[])
 	stack_create_parameters prm;
 
 	try
-    {
-
+	{
 		prm.read(argc, argv);
-
 		prm.run();
-
-    }
-    catch (RelionError XE)
-    {
-        std::cerr << XE;
-        //prm.usage();
-        exit(1);
-    }
-    return 0;
+	}
+	catch (RelionError XE)
+	{
+		std::cerr << XE;
+		//prm.usage();
+		exit(1);
+	}
+	return 0;
 }
 
