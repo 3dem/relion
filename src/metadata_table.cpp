@@ -184,7 +184,7 @@ std::string MetaDataTable::getName() const
 	return name;
 }
 
-bool MetaDataTable::getValueToString(EMDLabel label, std::string &value, long objectID) const
+void MetaDataTable::getValueToString(EMDLabel label, std::string &value, long objectID) const
 {
 
 	// SHWS 18jul2018: this function previously had a stringstream, but it greatly slowed down writing of large STAR files in
@@ -282,6 +282,7 @@ bool MetaDataTable::setValueFromString(EMDLabel label, const std::string &value,
 			return setValue(label, v, objectID);
 		}
 	}
+        return false;
 }
 
 	// comparators used for sorting

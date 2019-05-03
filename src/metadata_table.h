@@ -149,7 +149,7 @@ public:
 	template<class T>
 	bool getValue(EMDLabel label, T& value, long objectID = -1) const;
 
-	bool getValueToString(EMDLabel label, std::string &value, long int objectID = -1) const;
+	void getValueToString(EMDLabel label, std::string &value, long int objectID = -1) const;
 
 	// Set the value of label for a specified object.
 	// If no objectID is given, the internal iterator 'current_objectID' is used

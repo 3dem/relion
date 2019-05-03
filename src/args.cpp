@@ -102,6 +102,7 @@ IOParser::IOParser(const IOParser &in)
 IOParser& IOParser::operator= (const IOParser &in)
 {
 	copy(in);
+	return *this;
 }
 
 IOParser::~IOParser()

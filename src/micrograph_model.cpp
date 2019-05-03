@@ -43,6 +43,7 @@ int ThirdOrderPolynomialModel::getShiftAt(RFLOAT z, RFLOAT x, RFLOAT y, RFLOAT &
 	       + (coeffY(9)  * z + coeffY(10) * z2 + coeffY(11) * z3) * y
 	       + (coeffY(12) * z + coeffY(13) * z2 + coeffY(14) * z3) * y2
 	       + (coeffY(15) * z + coeffY(16) * z2 + coeffY(17) * z3) * xy;
+	return 0;
 }
 
 MotionModel* ThirdOrderPolynomialModel::clone() const
