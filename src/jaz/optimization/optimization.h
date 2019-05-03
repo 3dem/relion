@@ -39,6 +39,8 @@ class DifferentiableOptimization : public Optimization
     public:
 
     virtual void grad(const std::vector<double>& x, std::vector<double>& gradDest, void* tempStorage) const = 0;
+		
+	void testGradient(const std::vector<double>& x, double eps = 1e-9);
 };
 
 class RosenbrockBanana : public DifferentiableOptimization
