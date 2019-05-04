@@ -270,7 +270,7 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 		movie = micrographHandler->loadMovie(mdts[g], s_out[ogmg], angpix_out[ogmg], fts, &shift0, &shift);
 
 		const int out_size = crop_arg > 0 ? crop_arg : s_out[ogmg];	
-		Image<RFLOAT> stack(crop_arg, crop_arg, 1, pc);
+		Image<RFLOAT> stack(out_size, out_size, 1, pc);
 
 		#pragma omp parallel for num_threads(nr_omp_threads)
 		for (int p = 0; p < pc; p++)
