@@ -1941,13 +1941,13 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 {
 
 #ifdef DEBUG_INI
-    std::cerr<<"MlOptimiser::calculateSumOfPowerSpectraAndAverageImage Entering"<<std::endl;
+	std::cerr<<"MlOptimiser::calculateSumOfPowerSpectraAndAverageImage Entering"<<std::endl;
 #endif
 
-    int barstep, my_nr_particles = my_last_particle_id - my_first_particle_id + 1;
+	int barstep, my_nr_particles = my_last_particle_id - my_first_particle_id + 1;
 
 	// Initialise Mavg
-    if (mydata.is_3D)
+	if (mydata.is_3D)
 	{
 		Mavg.initZeros(mymodel.ori_size, mymodel.ori_size, mymodel.ori_size);
 	}
@@ -1959,9 +1959,9 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 
 	if (my_nr_particles < 1)
 	{
-    	// Master doesn't do anything here...
-    	// But still set Mavg the right size for AllReduce later on
-    	return;
+	    	// Master doesn't do anything here...
+	    	// But still set Mavg the right size for AllReduce later on
+    		return;
 	}
 
 	if (myverb > 0)
@@ -2017,7 +2017,17 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 			else
 			{
 				if (!mydata.getImageNameOnScratch(part_id, img_id, fn_img))
+				{
 					MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
+				}
+				else if (!do_parallel_disc_io)
+				{
+					// When not doing parallel disk IO,
+					// only those MPI processes running on the same node as the master have scratch.
+					fn_img.decompose(dump, fn_stack);
+					if (!exists(fn_stack))
+						MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
+				}
 
 				fn_img.decompose(dump, fn_stack);
 				if (fn_stack != fn_open_stack)
