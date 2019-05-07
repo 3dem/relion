@@ -45,7 +45,7 @@
 #ifndef MACROS_H
 #define MACROS_H
 
-#define RELION_VERSION "3.0.4"
+#define RELION_VERSION "3.0.5"
 
 #include <math.h>
 #include <signal.h>

@@ -2058,7 +2058,6 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 
 			if (!mydata.getImageNameOnScratch(part_id, fn_img))
 			{
-				std::cerr << " no scratch " << fn_img << std::endl;
 				MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
 			}
 			else if (!do_parallel_disc_io)
