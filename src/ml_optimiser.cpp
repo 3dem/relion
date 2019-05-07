@@ -901,7 +901,6 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 		do_fast_subsets = false;
 	if (!MD.getValue(EMDL_OPTIMISER_DO_EXTERNAL_RECONSTRUCT, do_external_reconstruct))
 		do_external_reconstruct = false;
-
 	// backward compatibility with relion-3.0
 	if (!MD.getValue(EMDL_OPTIMISER_ACCURACY_TRANS_ANGSTROM, acc_trans))
 	{
@@ -912,6 +911,8 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 	if (do_split_random_halves &&
 	    !MD.getValue(EMDL_OPTIMISER_MODEL_STARFILE2, fn_model2))
 	    	REPORT_ERROR("MlOptimiser::readStar: splitting data into two random halves, but rlnModelStarFile2 not found in optimiser_general table");
+	if (!MD.getValue(EMDL_OPTIMISER_LOWRES_LIMIT_EXP, strict_lowres_exp))
+		strict_lowres_exp = -1.;
 
 	// Initialise some stuff for first-iteration only (not relevant here...)
 	do_calculate_initial_sigma_noise = false;
@@ -1045,6 +1046,7 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		MD.setValue(EMDL_OPTIMISER_TAU_SPECTRUM_NAME, fn_tau);
 		MD.setValue(EMDL_OPTIMISER_MAX_COARSE_SIZE, max_coarse_size);
 		MD.setValue(EMDL_OPTIMISER_HIGHRES_LIMIT_EXP, strict_highres_exp);
+		MD.setValue(EMDL_OPTIMISER_LOWRES_LIMIT_EXP, strict_lowres_exp);
 		MD.setValue(EMDL_OPTIMISER_INCR_SIZE, incr_size);
 		MD.setValue(EMDL_OPTIMISER_DO_MAP, do_map);
 		MD.setValue(EMDL_OPTIMISER_FAST_SUBSETS, do_fast_subsets);
@@ -5180,32 +5182,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 		CenterFFT(img_aux, true);
 		transformer.FourierTransform(img_aux, Faux);
 		windowFourierTransform(Faux, Fimg, image_current_size[optics_group]);
-/*
-		// Apply high pass filter
-		if (strict_lowres_exp > 0)
-		{
-			FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fimg)
-			{
-				int ires = kp*kp + ip*ip + jp*jp;
-				RFLOAT res = 99999;
-				if (ires > 0)
-					res = my_image_size * my_pixel_size / sqrt(ires);
-				//if (kp == 0 && ip == 0)
-				//	std::cerr << "jp = " << jp << " pixel_size = " << my_pixel_size << " image_size = " << my_image_size << " res = " << res << std::endl;
-				if (res > strict_lowres_exp)
-					DIRECT_A3D_ELEM(Fimg, k, i, j) = 0;
-			}
-		}
-*/
 
-/*
-		FourierTransformer ft;
-		Image<RFLOAT> tt2(image_current_size[optics_group], image_current_size[optics_group]);
-		ft.inverseFourierTransform(Fimg, tt2());
-		CenterFFT(tt2(), false);
-		tt2.write("Fimg_lowres.spi");
-		std::cerr << "written Fimg_lowres.spi" << std::endl;
-*/
 		// Here apply the aberration corrections if necessary
 		mydata.obsModel.demodulatePhase(optics_group, Fimg);
 		mydata.obsModel.divideByMtf(optics_group, Fimg);
@@ -5327,33 +5304,6 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 		// So resize the Fourier transforms
 		windowFourierTransform(Faux, Fimg, image_current_size[optics_group]);
 
-		// Apply high pass filter
-		if (strict_lowres_exp > 0)
-		{
-			FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fimg)
-			{
-				int ires = kp*kp + ip*ip + jp*jp;
-				RFLOAT res = 99999;
-				if (ires > 0)
-					res = my_image_size * my_pixel_size / sqrt(ires);
-				if (res > strict_lowres_exp)
-				{
-					FFTW_ELEM(Fimg, k, i, j) = 0;
-					if (kp == 0 && ip == 0)
-						std::cerr << "jp = " << jp << " pixel_size = " << my_pixel_size << " image_size = " << my_image_size << " res = " << res << std::endl;
-				}
-			}
-		}
-
-/*
-		FourierTransformer ft2;
-		Image<RFLOAT> tt3(image_current_size[optics_group], image_current_size[optics_group]);
-		ft2.inverseFourierTransform(Fimg, tt3());
-		CenterFFT(tt3(), false);
-		tt3.write("Fexp_img_lowres.spi");
-		std::cerr << "written Fexp_img_lowres.spi" << std::endl;
-		REPORT_ERROR("STOP");
-*/
 		// Also perform aberration correction on the masked image (which will be used for alignment)
 		mydata.obsModel.demodulatePhase(optics_group, Fimg);
 		mydata.obsModel.divideByMtf(optics_group, Fimg);

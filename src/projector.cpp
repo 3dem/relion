@@ -208,22 +208,6 @@ void Projector::computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, Multid
 		min_r2 = ROUND(min_ires * padding_factor) * ROUND(min_ires * padding_factor);
 	}
 
-	std::cout << "Projector::computeFourierTransformMap: min_r2 = " << min_r2 << " padding_factor = " << padding_factor << std::endl;
-	std::cout << "Projector::computeFourierTransformMap: max_r2 = " << max_r2 << " padding_factor = " << padding_factor << std::endl;
-
-/*	FourierTransformer ft;
-	Image<RFLOAT> tt(YSIZE(Faux), YSIZE(Faux));
-	ft.inverseFourierTransform(Faux, tt());
-	CenterFFT(tt(), false);
-	tt.write("Faux_proj.spi");
-	std::cerr << "written Faux_proj.spi" << std::endl;
-
-	std::cerr << "Shape of Faux: ";
-	Faux.printShape(std::cerr);
-	std::cerr << "Shape of data: ";
-	data.printShape(std::cerr);
-*/
-
 	if(do_heavy)
 	{
 		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Faux) // This will also work for 2D
@@ -248,14 +232,21 @@ void Projector::computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, Multid
 		}
 	}
 	TIMING_TOC(TIMING_FAUX);
-/*
+
+	/*
 	FourierTransformer ft2;
-	Image<RFLOAT> tt2(YSIZE(data), YSIZE(data));
-	ft2.inverseFourierTransform(data, tt2());
+	MultidimArray<Complex> Faux2(padding_factor * ori_size, (padding_factor * ori_size)/2+1);
+	Image<RFLOAT> tt2(padding_factor * ori_size, padding_factor * ori_size);
+	decenter(data, Faux2, max_r2);
+	windowFourierTransform(Faux2, padding_factor * ori_size);
+	ft2.inverseFourierTransform(Faux2, tt2());
 	CenterFFT(tt2(), true);
+	tt2().setXmippOrigin();
+	tt2().window(FIRST_XMIPP_INDEX(ori_size), FIRST_XMIPP_INDEX(ori_size), LAST_XMIPP_INDEX(ori_size), LAST_XMIPP_INDEX(ori_size));
 	tt2.write("Fdata_proj.spi");
 	std::cerr << "written Fdata_proj.spi" << std::endl;
-	REPORT_ERROR("STOP");*/
+	REPORT_ERROR("STOP");
+	*/
 
 	TIMING_TIC(TIMING_POW);
 	// Calculate radial average of power spectrum
