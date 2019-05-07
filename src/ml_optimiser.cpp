@@ -690,7 +690,8 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	incr_size = textToInteger(parser.getOption("--incr_size", "Number of Fourier shells beyond the current resolution to be included in refinement", "10"));
 	do_print_metadata_labels = parser.checkOption("--print_metadata_labels", "Print a table with definitions of all metadata labels, and exit");
 	do_print_symmetry_ops = parser.checkOption("--print_symmetry_ops", "Print all symmetry transformation matrices, and exit");
-	strict_highres_exp = textToFloat(parser.getOption("--strict_highres_exp", "Resolution limit (in Angstrom) to restrict probability calculations in the expectation step", "-1"));
+	strict_highres_exp = textToFloat(parser.getOption("--strict_highres_exp", "High resolution limit (in Angstrom) to restrict probability calculations in the expectation step", "-1"));
+	strict_lowres_exp = textToFloat(parser.getOption("--strict_lowres_exp", "Low resolution limit (in Angstrom) to restrict probability calculations in the expectation step", "-1"));
 	dont_raise_norm_error = parser.checkOption("--dont_check_norm", "Skip the check whether the images are normalised correctly");
 	do_always_cc  = parser.checkOption("--always_cc", "Perform CC-calculation in all iterations (useful for faster denovo model generation?)");
 	do_phase_random_fsc = parser.checkOption("--solvent_correct_fsc", "Correct FSC curve for the effects of the solvent mask?");
@@ -2983,8 +2984,8 @@ void MlOptimiser::expectationSetup()
 	// Reset the random perturbation for this sampling
 	sampling.resetRandomlyPerturbedSampling();
 
-    // Initialise Projectors and fill vector with power_spectra for all classes
-	mymodel.setFourierTransformMaps(!fix_tau, nr_threads, do_gpu);
+	// Initialise Projectors and fill vector with power_spectra for all classes
+	mymodel.setFourierTransformMaps(!fix_tau, nr_threads, strict_lowres_exp);
 
 	// Initialise all weighted sums to zero
 	wsum_model.initZeros();
@@ -4720,7 +4721,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 		std::vector<RFLOAT> &exp_psi_prior)
 {
 
-    FourierTransformer transformer;
+	FourierTransformer transformer;
 	for (int img_id = 0; img_id < mydata.numberOfImagesInParticle(part_id); img_id++)
 	{
 		Image<RFLOAT> img, rec_img;
@@ -5170,7 +5171,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 		tt.write("Fimg_unmasked.spi");
 		std::cerr << "written Fimg_unmasked.spi; press any key to continue..." << std::endl;
 		char c;
-		std::cin >> c;
+//		std::cin >> c;
 #endif
 
 		// Always store FT of image without mask (to be used for the reconstruction)
@@ -5179,7 +5180,32 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 		CenterFFT(img_aux, true);
 		transformer.FourierTransform(img_aux, Faux);
 		windowFourierTransform(Faux, Fimg, image_current_size[optics_group]);
+/*
+		// Apply high pass filter
+		if (strict_lowres_exp > 0)
+		{
+			FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fimg)
+			{
+				int ires = kp*kp + ip*ip + jp*jp;
+				RFLOAT res = 99999;
+				if (ires > 0)
+					res = my_image_size * my_pixel_size / sqrt(ires);
+				//if (kp == 0 && ip == 0)
+				//	std::cerr << "jp = " << jp << " pixel_size = " << my_pixel_size << " image_size = " << my_image_size << " res = " << res << std::endl;
+				if (res > strict_lowres_exp)
+					DIRECT_A3D_ELEM(Fimg, k, i, j) = 0;
+			}
+		}
+*/
 
+/*
+		FourierTransformer ft;
+		Image<RFLOAT> tt2(image_current_size[optics_group], image_current_size[optics_group]);
+		ft.inverseFourierTransform(Fimg, tt2());
+		CenterFFT(tt2(), false);
+		tt2.write("Fimg_lowres.spi");
+		std::cerr << "written Fimg_lowres.spi" << std::endl;
+*/
 		// Here apply the aberration corrections if necessary
 		mydata.obsModel.demodulatePhase(optics_group, Fimg);
 		mydata.obsModel.divideByMtf(optics_group, Fimg);
@@ -5258,7 +5284,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 		tt()=img();
 		tt.write("Fimg_masked.spi");
 		std::cerr << "written Fimg_masked.spi; dying now..." << std::endl;
-		exit(0);
+//		exit(0);
 #endif
 
 		// Inside Projector and Backprojector the origin of the Fourier Transform is centered!
@@ -5301,6 +5327,33 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 		// So resize the Fourier transforms
 		windowFourierTransform(Faux, Fimg, image_current_size[optics_group]);
 
+		// Apply high pass filter
+		if (strict_lowres_exp > 0)
+		{
+			FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fimg)
+			{
+				int ires = kp*kp + ip*ip + jp*jp;
+				RFLOAT res = 99999;
+				if (ires > 0)
+					res = my_image_size * my_pixel_size / sqrt(ires);
+				if (res > strict_lowres_exp)
+				{
+					FFTW_ELEM(Fimg, k, i, j) = 0;
+					if (kp == 0 && ip == 0)
+						std::cerr << "jp = " << jp << " pixel_size = " << my_pixel_size << " image_size = " << my_image_size << " res = " << res << std::endl;
+				}
+			}
+		}
+
+/*
+		FourierTransformer ft2;
+		Image<RFLOAT> tt3(image_current_size[optics_group], image_current_size[optics_group]);
+		ft2.inverseFourierTransform(Fimg, tt3());
+		CenterFFT(tt3(), false);
+		tt3.write("Fexp_img_lowres.spi");
+		std::cerr << "written Fexp_img_lowres.spi" << std::endl;
+		REPORT_ERROR("STOP");
+*/
 		// Also perform aberration correction on the masked image (which will be used for alignment)
 		mydata.obsModel.demodulatePhase(optics_group, Fimg);
 		mydata.obsModel.divideByMtf(optics_group, Fimg);
@@ -5632,8 +5685,6 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 	int exp_nr_images = mydata.numberOfImagesInParticle(part_id);
 	int nr_shifts = (do_shifts_onthefly || do_skip_align) ? exp_nr_images : exp_nr_images * sampling.NrTranslationalSamplings(exp_current_oversampling);
 	// Don't re-do if nothing has changed....
-
-
 
 	// Use pre-sized vectors instead of push_backs!!
 	// NO! Use .reserve()!!!  --JZ
