@@ -4829,11 +4829,10 @@ This gives higher resolution estimates, as it disregards ill-defined regions nea
 
 	// Defocus fit
 	joboptions["do_ctf"] = JobOption("Perform CTF parameter fitting?", true, "If set to Yes, then relion_ctf_refine will be used to estimate the selected parameters below.");
-	joboptions["do_defocus"] = JobOption("Fit per-particle defocus?", true, "If set to Yes, then relion_ctf_refine will estimate a per-particle defocus.");
-	joboptions["range"] = JobOption("Range for defocus fit (A): ", 2000, 500, 5000, 100, "The initial defocus value given in the input STAR file +/- this value (in Angstrom) will be the search range for each particle.");
-	joboptions["do_glob_astig"] = JobOption("Fit per-micrograph astigmatism?", false, "If set to Yes, ctf_refine will try to refine astigamtism on a per-micrograph basis. This will require many particles and good signal-to-noise ratios per micrograph.");
-	joboptions["do_astig"] = JobOption("Fit per-particle astigmatism?", false, "If set to Yes, astigmatism will be estimated on a per-particle basis. This requires very strong data, i.e. very large particles with excellent signal-to-noise ratios.");
-	joboptions["do_phase"] = JobOption("Fit per-micrograph phase-shift?", false, "If set to Yes, ctf_refine will try to refine a phase-shift (amplitude contrast) on a per-micrograph basis. This may be useful for Volta-phase plate data, but will require many particles and good signal-to-noise ratios per micrograph.");
+	joboptions["do_defocus"] = JobOption("Fit defocus?", job_ctffit_options, 0, "If set to per-particle or per-micrograph, then relion_ctf_refine will estimate defocus values.");
+	joboptions["do_astig"] = JobOption("Fit astigmatism?", job_ctffit_options, 0, "If set to per-particle or per-micrograph, then relion_ctf_refine will estimate astigmatism.");
+	joboptions["do_bfactor"] = JobOption("Fit B-factor?", job_ctffit_options, 0, "If set to per-particle or per-micrograph, then relion_ctf_refine will estimate B-factors that describe the signal falloff.");
+	joboptions["do_phase"] = JobOption("Fit phase-shift?", job_ctffit_options, 0, "If set to per-particle or per-micrograph, then relion_ctf_refine will estimate (VPP?) phase shift values.");
 
 	// aberrations
 	joboptions["do_aniso_mag"] = JobOption("Estimate (anisotropic) magnification?", false, "If set to Yes, then relion_ctf_refine will also estimate the (anisotropic) magnification per optics group. \
@@ -4872,14 +4871,22 @@ bool RelionJob::getCommandsCtfrefineJob(std::string &outputname, std::vector<std
 		return false;
 	}
 
-	if (joboptions["do_astig"].getBoolean() && joboptions["do_glob_astig"].getBoolean())
+	if (!joboptions["do_ctf"].getBoolean() &&
+			!joboptions["do_aniso_mag"].getBoolean() &&
+			!joboptions["do_tilt"].getBoolean() &&
+			!joboptions["do_4thorder"].getBoolean())
 	{
-		error_message = "ERROR: you cannot perform both per-micrograph and per-particle astigmatism estimation. Choose one option.";
+		error_message = "ERROR: you haven't selected to fit anything...";
 		return false;
 	}
 
-	if (joboptions["do_ctf"].getBoolean() && !(joboptions["do_defocus"].getBoolean()
-			|| joboptions["do_astig"].getBoolean() || joboptions["do_glob_astig"].getBoolean() || joboptions["do_phase"].getBoolean() ))
+
+
+	if (joboptions["do_ctf"].getBoolean() &&
+			joboptions["do_defocus"].getString() == job_ctffit_options[0] &&
+			joboptions["do_astig"].getString() == job_ctffit_options[0] &&
+			joboptions["do_bfactor"].getString() == job_ctffit_options[0] &&
+			joboptions["do_phase"].getString() == job_ctffit_options[0])
 	{
 		error_message = "ERROR: you did not select any CTF parameter to fit. Either switch off CTF parameter fitting, or select one to fit.";
 		return false;
@@ -4908,24 +4915,16 @@ bool RelionJob::getCommandsCtfrefineJob(std::string &outputname, std::vector<std
 	{
 		if (joboptions["do_ctf"].getBoolean())
 		{
-			command += " --kmin_defocus " + joboptions["minres"].getString();
-			if (joboptions["do_defocus"].getBoolean())
-			{
-				command += " --fit_defocus";
-				command += " --range " + joboptions["range"].getString();
-			}
-			if (joboptions["do_astig"].getBoolean())
-			{
-				command += " --astig";
-			}
-			if (joboptions["do_glob_astig"].getBoolean())
-			{
-				command += " --glob_astig";
-			}
-			if (joboptions["do_phase"].getBoolean())
-			{
-				command += " --fit_phase";
-			}
+			command += " --fit_defocus --kmin_defocus " + joboptions["minres"].getString();
+			std::string fit_options = "";
+
+			fit_options += getStringFitOption(joboptions["do_phase"].getString());
+			fit_options += getStringFitOption(joboptions["do_defocus"].getString());
+			fit_options += getStringFitOption(joboptions["do_astig"].getString());
+			fit_options += "f"; // always have Cs refinement switched off
+			fit_options += getStringFitOption(joboptions["do_bfactor"].getString());
+
+			command += " --fit_mode " + fit_options;
 		}
 
 		// do not allow anisotropic magnification to be done simultaneously with higher-order aberrations
