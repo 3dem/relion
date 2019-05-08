@@ -135,6 +135,7 @@ void AutoPicker::read(int argc, char **argv)
 	LoG_max_diameter = textToFloat(parser.getOption("--LoG_diam_max", "Largest particle diameter (in Angstroms) for blob-detection by Laplacian-of-Gaussian filter", "-1"));
 	LoG_invert = parser.checkOption("--Log_invert", "Use this option if the particles are white instead of black");
 	LoG_adjust_threshold = textToFloat(parser.getOption("--LoG_adjust_threshold", "Use this option to adjust the picking threshold: positive for less particles, negative for more", "0."));
+	LoG_upper_limit = textToFloat(parser.getOption("--LoG_upper_threshold", "Use this option to set the upper limit of the picking threshold", "99999"));
 
 	if (do_gpu && do_LoG)
 	{
@@ -2725,15 +2726,15 @@ void AutoPicker::autoPickLoGOneMicrograph(FileName &fn_mic, long int imic)
 	//float my_threshold =  sum_fom_low + LoG_adjust_threshold * sqrt(sum2_fom_low);
 	//Sjors 25May2018: better have threshold only depend on fom_ok, as in some cases fom_low/high are on very different scale...
 	float my_threshold =  sum_fom_ok + LoG_adjust_threshold * sqrt(sum2_fom_ok);
+	float my_upper_limit = sum_fom_ok + LoG_upper_limit * sqrt(sum2_fom_ok);
 
-	if (verb > 1)
-	{
+#ifdef DEBUG_LOG
 		std::cerr << " avg_fom_low= " << sum_fom_low << " stddev_fom_low= " << sqrt(sum2_fom_low) << " N= "<< count_low << std::endl;
 		std::cerr << " avg_fom_high= " << sum_fom_high<< " stddev_fom_high= " << sqrt(sum2_fom_high) << " N= "<< count_high << std::endl;
 		std::cerr << " avg_fom_ok= " << sum_fom_ok<< " stddev_fom_ok= " << sqrt(sum2_fom_ok) << " N= "<< count_ok<< std::endl;
 		std::cerr << " avg_fom_outside= " << sum_fom_outside << std::endl;
 		std::cerr << " my_threshold= " << my_threshold << " LoG_adjust_threshold= "<< LoG_adjust_threshold << std::endl;
-	}
+#endif
 
 	// Threshold the best_fom map
 	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mbest_fom)
@@ -2756,14 +2757,18 @@ void AutoPicker::autoPickLoGOneMicrograph(FileName &fn_mic, long int imic)
 	long int imax, jmax;
 	while (Mbest_fom.maxIndex(imax, jmax) > 0.)
 	{
-		MDout.addObject();
-		long int xx = jmax - FIRST_XMIPP_INDEX((int)((float)micrograph_xsize*scale));
-		long int yy = imax - FIRST_XMIPP_INDEX((int)((float)micrograph_ysize*scale));
-		MDout.setValue(EMDL_IMAGE_COORD_X, (RFLOAT)(xx) / scale);
-		MDout.setValue(EMDL_IMAGE_COORD_Y, (RFLOAT)(yy) / scale);
-		MDout.setValue(EMDL_PARTICLE_AUTOPICK_FOM, A2D_ELEM(Mbest_fom, imax, jmax));
-		MDout.setValue(EMDL_PARTICLE_CLASS, 0); // Dummy values to avoid problems in JoinStar
-		MDout.setValue(EMDL_ORIENT_PSI, 0.0);
+		RFLOAT fom_here = A2D_ELEM(Mbest_fom, imax, jmax);
+		if (fom_here < my_upper_limit)
+		{
+			MDout.addObject();
+			long int xx = jmax - FIRST_XMIPP_INDEX((int)((float)micrograph_xsize*scale));
+			long int yy = imax - FIRST_XMIPP_INDEX((int)((float)micrograph_ysize*scale));
+			MDout.setValue(EMDL_IMAGE_COORD_X, (RFLOAT)(xx) / scale);
+			MDout.setValue(EMDL_IMAGE_COORD_Y, (RFLOAT)(yy) / scale);
+			MDout.setValue(EMDL_PARTICLE_AUTOPICK_FOM, A2D_ELEM(Mbest_fom, imax, jmax));
+			MDout.setValue(EMDL_PARTICLE_CLASS, 0); // Dummy values to avoid problems in JoinStar
+			MDout.setValue(EMDL_ORIENT_PSI, 0.0);
+		}
 
 		// Now set all pixels of Mbest_fom within a distance of 0.5* the corresponding Mbest_size to zero
 		// Exclude a bit more radius, such that no very close neighbours are allowed: 20% more
