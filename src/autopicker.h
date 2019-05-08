@@ -156,7 +156,7 @@ public:
 	RFLOAT LoG_max_search;
 
 	// How many sigma to adjust the FOM threshold?
-	RFLOAT LoG_adjust_threshold;
+	RFLOAT LoG_adjust_threshold, LoG_upper_limit;
 
 	// Input signal is white
 	bool LoG_invert;
