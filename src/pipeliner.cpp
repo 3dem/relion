@@ -469,6 +469,14 @@ bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, boo
 	// Also save a copy of the GUI settings with the current output name
 	_job.write(_job.outputName);
 
+
+	// Remove run.out and run.err when overwriting a job
+	if (do_overwrite_current)
+	{
+		remove((_job.outputName+"run.out").c_str());
+		remove((_job.outputName+"run.err").c_str());
+	}
+
 	// If this is a continuation job, check whether output files exist and move away!
 	// This is to ensure that the continuation job goes OK and will show up as 'running' in the GUI
 	bool do_move_output_nodes_to_old = false;
@@ -1061,7 +1069,7 @@ bool PipeLine::setAliasJob(int this_job, std::string alias, std::string &error_m
 	}
 	else if (alias.find("*") != std::string::npos || alias.find("?") != std::string::npos || alias.find("(") != std::string::npos || alias.find(")") != std::string::npos ||
 	         alias.find("/") != std::string::npos || alias.find("\"") != std::string::npos || alias.find("\\") != std::string::npos || alias.find("|") != std::string::npos ||
-		 alias.find("#") != std::string::npos || alias.find("<") != std::string::npos || alias.find(">") != std::string::npos || alias.find("&") != std::string::npos || 
+		 alias.find("#") != std::string::npos || alias.find("<") != std::string::npos || alias.find(">") != std::string::npos || alias.find("&") != std::string::npos ||
 		 alias.find("%") != std::string::npos || alias.find("{") != std::string::npos || alias.find("}") != std::string::npos || alias.find("$") != std::string::npos)
 	{
 		error_message = "Alias cannot contain following symbols: *, ?, (, ), /, \", \\, |, #, <, >, &, %, {, }, $";
@@ -1711,7 +1719,7 @@ void PipeLine::read(bool do_lock, std::string lock_message)
 		std::cerr <<  " A status= " << status << std::endl;
 #endif
 		while (!status == 0)
-		{		
+		{
 			if (errno == EACCES) // interestingly, not EACCESS!
 				REPORT_ERROR("ERROR: PipeLine::read cannot create a lock directory " + dir_lock + ". You don't have write permission to this project. If you want to look at other's project directory (but run nothing there), please start RELION with --readonly.");
 
