@@ -2325,19 +2325,17 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 				nr_split = joboptions["nr_split"].getNumber();
 				command += " --nr_split " + joboptions["nr_split"].getString();
 			}
-			if (joboptions["split_size"].getNumber() > 0)
+			else if (joboptions["split_size"].getNumber() > 0)
 			{
 				command += " --size_split " + joboptions["split_size"].getString();
 
-				if (joboptions["nr_split"].getNumber() <= 0)
-				{
-					// Calculate nr_split from number of entries in input STAR file
-					MetaDataTable MDtmp;
-					FileName fnt = (joboptions["fn_mic"].getString() != "") ? joboptions["fn_mic"].getString() : joboptions["fn_data"].getString();
-					long int n_obj = (exists(fnt)) ? MDtmp.read(fnt, "", NULL, "", true) : 0; // true means do_only_count
-					long int size_split = joboptions["split_size"].getNumber();
-					nr_split = n_obj / size_split;
-				}
+				// Calculate nr_split from number of entries in input STAR file (for output nodes)
+				MetaDataTable MDtmp;
+				FileName fnt = (joboptions["fn_mic"].getString() != "") ? joboptions["fn_mic"].getString() : joboptions["fn_data"].getString();
+				long int n_obj = (exists(fnt)) ? MDtmp.read(fnt, "", NULL, "", true) : 0; // true means do_only_count
+				long int size_split = joboptions["split_size"].getNumber();
+				nr_split = n_obj / size_split;
+
 			}
 
 			for (int isplit = 0; isplit < nr_split; isplit++)
