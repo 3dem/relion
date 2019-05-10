@@ -862,7 +862,8 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 	}
 
 	// Write out STAR files at the end
-	// In the opticsMdt, replace EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE by EMDL_MICROGRAPH_PIXEL_SIZE (i.e. possibly binned pixel size)
+	// In the opticsMdt, set EMDL_MICROGRAPH_PIXEL_SIZE (i.e. possibly binned pixel size).
+	// Keep EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE for MTF correction
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(obsModel.opticsMdt)
 	{
 		RFLOAT my_angpix;
@@ -870,7 +871,6 @@ void MotioncorrRunner::generateLogFilePDFAndWriteStarFiles()
 		my_angpix *= bin_factor;
 		obsModel.opticsMdt.setValue(EMDL_MICROGRAPH_PIXEL_SIZE, my_angpix);
 	}
-	obsModel.opticsMdt.deactivateLabel(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE);
 	obsModel.save(MDavg, fn_out + "corrected_micrographs.star", "micrographs");
 
 	// Now generate EPS plot with histograms and combine all EPS into a logfile.pdf
