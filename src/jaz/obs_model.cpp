@@ -947,8 +947,11 @@ const Image<RFLOAT>& ObservationModel::getMtfImage(int optGroup, int s)
 			if (mtfImage[optGroup].size() > 100)
 			{
 				std::cerr << "Warning: " << (mtfImage[optGroup].size()+1)
-						  << " mtf images in cache for the same ObservationModel." << std::endl;
+				          << " mtf images in cache for the same ObservationModel." << std::endl;
 			}
+
+			if (optGroup >= originalAngpix.size())
+				REPORT_ERROR("For MTF correction, the rlnMicrographOriginalPixelSize column is necessary in the optics table.");
 
 			MetaDataTable MDmtf;
 			MultidimArray<RFLOAT> mtf_resol, mtf_value;
