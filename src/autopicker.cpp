@@ -229,7 +229,7 @@ void AutoPicker::initialise()
         if (MDmic.containsLabel(EMDL_CTF_MAGNIFICATION) && MDmic.containsLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE))
         {
 			MDmic.goToObject(0);
-        	MDmic.getValue(EMDL_CTF_MAGNIFICATION, mag);
+	        	MDmic.getValue(EMDL_CTF_MAGNIFICATION, mag);
 			MDmic.getValue(EMDL_CTF_DETECTOR_PIXEL_SIZE, dstep);
 			angpix = 10000. * dstep / mag;
 			if (verb > 0)
@@ -282,7 +282,7 @@ void AutoPicker::initialise()
 
 	if (verb > 0)
 	{
-		if((fn_micrographs.size()>30 && do_write_fom_maps) && !no_fom_limit)
+		if((fn_micrographs.size() > 30 && do_write_fom_maps) && !no_fom_limit)
 		{
 			REPORT_ERROR("\n If you really want to write this many (" + integerToString(fn_micrographs.size()) + ") FOM-maps, add --no_fom_limit");
 		}
@@ -952,7 +952,7 @@ void AutoPicker::generatePDFLogfile()
 	}
 
 	MetaDataTable MDresult;
-	RFLOAT total_nr_picked = 0;
+	long total_nr_picked = 0;
 	for (long int imic = 0; imic < fn_ori_micrographs.size(); imic++)
 	{
 		MetaDataTable MD;
@@ -973,6 +973,7 @@ void AutoPicker::generatePDFLogfile()
 				avg_fom /= nr_pick;
 				// mis-use MetadataTable to conveniently make histograms and value-plots
 				MDresult.addObject();
+				MDresult.setValue(EMDL_MICROGRAPH_NAME, fn_ori_micrographs[imic]);
 				MDresult.setValue(EMDL_PARTICLE_AUTOPICK_FOM, avg_fom);
 				MDresult.setValue(EMDL_MLMODEL_GROUP_NR_PARTICLES, nr_pick);
 			}
@@ -988,7 +989,7 @@ void AutoPicker::generatePDFLogfile()
 		progress_bar(fn_ori_micrographs.size());
 		std::cout << " Total number of particles from " << fn_ori_micrographs.size() << " micrographs is " << total_nr_picked << std::endl;
 		long avg = 0;
-		if (fn_ori_micrographs.size() > 0) avg = ROUND(total_nr_picked/fn_ori_micrographs.size());
+		if (fn_ori_micrographs.size() > 0) avg = ROUND((RFLOAT)total_nr_picked/fn_ori_micrographs.size());
 		std::cout << " i.e. on average there were " << avg << " particles per micrograph" << std::endl;
 	}
 
@@ -997,6 +998,7 @@ void AutoPicker::generatePDFLogfile()
 	std::vector<FileName> all_fn_eps;
 	std::vector<RFLOAT> histX, histY;
 
+	MDresult.write(fn_odir + "summary.star");
 	CPlot2D *plot2Db=new CPlot2D("Nr of picked particles for all micrographs");
 	MDresult.addToCPlot2D(plot2Db, EMDL_UNDEFINED, EMDL_MLMODEL_GROUP_NR_PARTICLES, 1.);
 	plot2Db->SetDrawLegend(false);

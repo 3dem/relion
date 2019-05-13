@@ -1131,7 +1131,8 @@ void MetaDataTable::columnHistogram(EMDLabel label, std::vector<RFLOAT> &histX, 
 	}
 
 	RFLOAT iqr = values[n_row * 3 / 4] - values[n_row / 2];
-	RFLOAT bin_width = 1, bin_size = 1;
+	RFLOAT bin_width = 1;
+	unsigned int bin_size = 1;
 
 	// change bin parameters only when there are many values
 	if (iqr != 0)
@@ -1141,7 +1142,7 @@ void MetaDataTable::columnHistogram(EMDLabel label, std::vector<RFLOAT> &histX, 
 			hist_min = values[0];
 			hist_max = values[n_row - 1];
 			bin_width = 2 * iqr / std::pow(n_row, 1.0 / 3); // Freedman-Diaconis rule
-			bin_size = int(std::ceil((hist_max - hist_min) / bin_width));
+			bin_size = (unsigned int)(std::ceil((hist_max - hist_min) / bin_width));
 			if (bin_size > 5000) bin_size = 5000; // FIXME: Ad hoc upper limit to avoid using too much memory
 		}
 		else
