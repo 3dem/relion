@@ -226,7 +226,7 @@ void AutoPicker::initialise()
 			fn_micrographs.push_back(fn_mic);
 		}
 
-        // Check all optics groups have the same pixel size (check for same micrograph size is performed while running through all of them)
+        	// Check all optics groups have the same pixel size (check for same micrograph size is performed while running through all of them)
 		obsModel.opticsMdt.getValue(EMDL_MICROGRAPH_PIXEL_SIZE, angpix, 0);
 		for (int optics_group = 1; optics_group < obsModel.numberOfOpticsGroups(); optics_group++)
 		{
@@ -279,7 +279,7 @@ void AutoPicker::initialise()
 
 	if (verb > 0)
 	{
-		if((fn_micrographs.size()>30 && do_write_fom_maps) && !no_fom_limit)
+		if((fn_micrographs.size() > 30 && do_write_fom_maps) && !no_fom_limit)
 		{
 			REPORT_ERROR("\n If you really want to write this many (" + integerToString(fn_micrographs.size()) + ") FOM-maps, add --no_fom_limit");
 		}
@@ -970,6 +970,7 @@ void AutoPicker::generatePDFLogfile()
 				avg_fom /= nr_pick;
 				// mis-use MetadataTable to conveniently make histograms and value-plots
 				MDresult.addObject();
+				MDresult.setValue(EMDL_MICROGRAPH_NAME, fn_ori_micrographs[imic]);
 				MDresult.setValue(EMDL_PARTICLE_AUTOPICK_FOM, avg_fom);
 				MDresult.setValue(EMDL_MLMODEL_GROUP_NR_PARTICLES, nr_pick);
 			}
@@ -994,6 +995,7 @@ void AutoPicker::generatePDFLogfile()
 	std::vector<FileName> all_fn_eps;
 	std::vector<RFLOAT> histX, histY;
 
+	MDresult.write(fn_odir + "summary.star");
 	CPlot2D *plot2Db=new CPlot2D("Nr of picked particles for all micrographs");
 	MDresult.addToCPlot2D(plot2Db, EMDL_UNDEFINED, EMDL_MLMODEL_GROUP_NR_PARTICLES, 1.);
 	plot2Db->SetDrawLegend(false);
