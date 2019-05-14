@@ -233,7 +233,7 @@ class star_handler_parameters
 		MDout = subsetMetaDataTable(MDin, EMDL::str2Label(select_label), select_minval, select_maxval);
 
 		write_check_ignore_optics(MDout, fn_out, MDin.getName());
-		std::cout << " Written: " << fn_out << std::endl;
+		std::cout << " Written: " << fn_out << " with " << MDout.numberOfObjects() << " item(s)" << std::endl;
 
 	}
 
