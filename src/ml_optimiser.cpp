@@ -599,6 +599,8 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 		SWAP(mymodel.helical_rise_min, mymodel.helical_rise_max, tmp_RFLOAT);
 	if (mymodel.helical_twist_min > mymodel.helical_twist_max)
 		SWAP(mymodel.helical_twist_min, mymodel.helical_twist_max, tmp_RFLOAT);
+	helical_fourier_mask_resols = parser.getOption("--helical_exclude_resols", "Resolutions (in A) along helical axis to exclude from refinement (comma-separated pairs, e.g. 50-5)", "");
+	fn_fourier_mask = parser.getOption("--fourier_mask", "Originally-sized, FFTW-centred image with Fourier mask for Projector", "");
 
 	// CTF, norm, scale, bfactor correction etc.
 	int corrections_section = parser.addSection("Corrections");
@@ -907,6 +909,8 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 		if (!MD.getValue(EMDL_OPTIMISER_ACCURACY_TRANS, acc_trans))
 			REPORT_ERROR("MlOptimiser::readStar::ERROR no accuracy of translations defined!");
 	}
+	if (!MD.getValue(EMDL_OPTIMISER_FOURIER_MASK, fn_fourier_mask))
+		fn_fourier_mask = "";
 
 	if (do_split_random_halves &&
 	    !MD.getValue(EMDL_OPTIMISER_MODEL_STARFILE2, fn_model2))
@@ -1082,6 +1086,7 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		MD.setValue(EMDL_OPTIMISER_LOCAL_SYMMETRY_FILENAME, fn_local_symmetry);
 		MD.setValue(EMDL_OPTIMISER_DO_HELICAL_REFINE, do_helical_refine);
 		MD.setValue(EMDL_OPTIMISER_IGNORE_HELICAL_SYMMETRY, ignore_helical_symmetry);
+		MD.setValue(EMDL_OPTIMISER_FOURIER_MASK, fn_fourier_mask);
 		MD.setValue(EMDL_OPTIMISER_HELICAL_TWIST_INITIAL, helical_twist_initial);
 		MD.setValue(EMDL_OPTIMISER_HELICAL_RISE_INITIAL, helical_rise_initial);
 		MD.setValue(EMDL_OPTIMISER_HELICAL_Z_PERCENTAGE, helical_z_percentage);
@@ -1644,11 +1649,48 @@ void MlOptimiser::initialiseGeneral(int rank)
 		A_rot90T = A_rot90.transpose();
 	}
 
+	if (fn_fourier_mask != "")
+	{
+		// Used also for continuations...
+		Image<RFLOAT> Itmp;
+		Itmp.read(fn_fourier_mask);
+		helical_fourier_mask = Itmp();
+	}
+
 	// Jun09, 2015 - Shaoda, Helical refinement
 	if (do_helical_refine)
 	{
-		if (mymodel.ref_dim != 3)
-			REPORT_ERROR("ERROR: cannot do 2D helical refinement!");
+		if (fn_fourier_mask == "" && helical_fourier_mask_resols != "")
+		{
+			std::vector<std::string> resols;
+			std::vector<RFLOAT> resols_end, resols_start;
+
+			int nresols = splitString(helical_fourier_mask_resols, ",", resols);
+			if (resols.size()%2 == 1) REPORT_ERROR("Provide an even number of start-end resolutions for --fourier_exclude_resols");
+			for (int nshell = 0; nshell < resols.size()/2; nshell++)
+			{
+				resols_start.push_back(textToFloat(resols[2*nshell]));
+				resols_end.push_back(textToFloat(resols[2*nshell+1]));
+			}
+
+			MultidimArray<RFLOAT> tmpmsk;
+			tmpmsk.resize(ZSIZE(mymodel.Iref[0]), YSIZE(mymodel.Iref[0]), XSIZE(mymodel.Iref[0])/2+1);
+			generateBinaryHelicalFourierMask(tmpmsk, resols_start, resols_end, mymodel.pixel_size);
+			// make a 2-pixel soft edge of fourier mask
+			autoMask(tmpmsk, helical_fourier_mask, 0.5, 0.0, 2.0, false, nr_threads);
+
+			// Save the mask to the output directory
+			fn_fourier_mask = fn_out + "fourier_mask.mrc";
+			if (verb > 0)
+			{
+				Image<RFLOAT> Itmp;
+				Itmp() = helical_fourier_mask;
+				// use this also for continuation
+				Itmp.write(fn_fourier_mask);
+			}
+
+		}
+
 
 		if (mymodel.nr_bodies != 1)
 			REPORT_ERROR("ERROR: cannot do multi-body refinement for helices!");
@@ -2500,7 +2542,7 @@ void MlOptimiser::iterate()
 #endif
 		// Shaoda Jul26,2015
 		// Helical symmetry refinement and imposition of real space helical symmetry.
-		if (do_helical_refine)
+		if (do_helical_refine && mymodel.ref_dim == 3)
 		{
 			if (!ignore_helical_symmetry)
 				makeGoodHelixForEachRef();
@@ -2979,8 +3021,9 @@ void MlOptimiser::expectationSetup()
 	// Reset the random perturbation for this sampling
 	sampling.resetRandomlyPerturbedSampling();
 
-    // Initialise Projectors and fill vector with power_spectra for all classes
-	mymodel.setFourierTransformMaps(!fix_tau, nr_threads, do_gpu);
+	// Initialise Projectors and fill vector with power_spectra for all classes
+	MultidimArray<RFLOAT> *my_fourier_mask = (XSIZE(helical_fourier_mask) > 0) ? &helical_fourier_mask : NULL;
+	mymodel.setFourierTransformMaps(!fix_tau, nr_threads, do_gpu, my_fourier_mask);
 
 	// Initialise all weighted sums to zero
 	wsum_model.initZeros();
@@ -3020,7 +3063,7 @@ void MlOptimiser::expectationSetupCheckMemory(int myverb)
 		}
 		// Calculate local searches for these angles
 		// Jun04,2015 - Shaoda & Sjors, bimodal psi searches for helices
-		if (do_helical_refine)
+		if (do_helical_refine && mymodel.ref_dim == 3)
 		{
 			bool do_auto_refine_local_searches = (do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches);
 			bool do_classification_local_searches = (!do_auto_refine) && (mymodel.orientational_prior_mode == PRIOR_ROTTILT_PSI)
@@ -3849,7 +3892,7 @@ void MlOptimiser::applyLocalSymmetryForEachRef()
 
 void MlOptimiser::makeGoodHelixForEachRef()
 {
-	if ( (!do_helical_refine) || (ignore_helical_symmetry) )
+	if ( (!do_helical_refine) || (ignore_helical_symmetry) || (mymodel.ref_dim == 2) )
 		return;
 
 	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
@@ -4328,7 +4371,7 @@ void MlOptimiser::solventFlatten()
 	{
 		// Jun09,2015 - Shaoda, Helical refinement
 		// Solvent flatten for helices has already been done in 'makeHelicalReferenceInRealSpace()'
-		if (do_helical_refine)
+		if (do_helical_refine && mymodel.ref_dim == 3)
 		{
 			if (ignore_helical_symmetry)
 			{
@@ -4873,10 +4916,9 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 			if (prior_rot_flip_ratio > 998.99 && prior_rot_flip_ratio < 999.01) // Kthurber
 				prior_rot_flip_ratio = 0.5; // Kthurber
 
-			std::cerr << " prior_rot= " << prior_rot << " prior_rot_flip_ratio= " << prior_rot_flip_ratio << " prior_psi= " << prior_psi << " prior_psi_flip_ratio= " << prior_psi_flip_ratio<< std::endl;
 			// Select only those orientations that have non-zero prior probability
 			// Jun04,2015 - Shaoda & Sjors, bimodal psi searches for helices
-			if (do_helical_refine)
+			if (do_helical_refine && mymodel.ref_dim == 3)
 			{
 				sampling.selectOrientationsWithNonZeroPriorProbabilityFor3DHelicalReconstruction(prior_rot, prior_tilt, prior_psi,
 										sqrt(mymodel.sigma2_rot), sqrt(mymodel.sigma2_tilt), sqrt(mymodel.sigma2_psi),
@@ -5079,7 +5121,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 			// We do NOT want to accumulate the offsets in the direction along the helix (which is X in the helical coordinate system!)
 			// However, when doing helical local searches, we accumulate offsets
 			// Do NOT accumulate offsets in 3D classification of helices
-			if ( (mymodel.ref_dim == 3) && (!do_skip_align) && (!do_skip_rotate) )
+			if ( (!do_skip_align) && (!do_skip_rotate) )
 			{
 				// TODO: check whether the following lines make sense
 				bool do_auto_refine_local_searches = (do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches);
@@ -6595,7 +6637,7 @@ void MlOptimiser::convertAllSquaredDifferencesToWeights(long int part_id, int ib
 				{
 					myprior_x = myprior_y = myprior_z = 0.;
 				}
-				else if (mymodel.ref_dim == 2)
+				else if (mymodel.ref_dim == 2 && !do_helical_refine)
 				{
 					myprior_x = XX(mymodel.prior_offset_class[exp_iclass]);
 					myprior_y = YY(mymodel.prior_offset_class[exp_iclass]);

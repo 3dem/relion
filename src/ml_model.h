@@ -420,7 +420,8 @@ public:
 
 	// Set FourierTransforms in Projector of each class
 	// current_size will determine the size of the transform (in number of Fourier shells) to be held in the projector ( thisClass == -1  => do all classes this call)
-	void setFourierTransformMaps(bool update_tau2_spectra, int nr_threads = 1, bool do_gpu = false);
+	void setFourierTransformMaps(bool update_tau2_spectra, int nr_threads = 1, bool do_gpu = false,
+			   const MultidimArray<RFLOAT> *fourier_mask = NULL );
 
 	// current_size will determine the size of the transform (in number of Fourier shells) to be held in the projector ( thisClass == -1  => do all classes this call)
 	void setFourierTransformMaps(bool update_tau2_spectra, std::vector<bool> ListCheapSetup, int nr_threads = 1, bool do_gpu = false);

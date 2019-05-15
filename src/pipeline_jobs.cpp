@@ -2594,6 +2594,9 @@ Set to No if the 3D helix looks the same when rotated upside down. If it is set 
 within +/- the given amount (in degrees) from the psi priors estimated through helical segment picking. \
 A range of 15 degrees is the same as sigma = 5 degrees. Note that the ranges of angular searches should be much larger than the sampling.\
 \n\nThis option will be invalid if you choose not to perform image alignment on 'Sampling' tab.");
+	joboptions["do_restrict_xoff"] = JobOption("Restrict helical offsets to rise:", true, "Set to Yes if you want to restrict the translational offsets along the helices to the rise of the helix given below. Set to No to allow free (conventional) translational offsets.");
+	joboptions["helical_rise"] = JobOption("Helical rise (A):", 4.75, -1, 100, 1, "The helical rise (in Angstroms). Translational offsets along the helical axis will be limited from -rise/2 to +rise/2, with a flat prior.");
+
 
 	joboptions["nr_pool"] = JobOption("Number of pooled particles:", 3, 1, 16, 1, "Particles are processed in individual batches by MPI slaves. During each batch, a stack of particle images is only opened and closed once to improve disk access times. \
 All particle images of a single batch are read into memory together. The size of these batches is at least one particle per thread used. The nr_pooled_particles parameter controls how many particles are read together for each thread. If it is set to 3 and one uses 8 threads, batches of 3x8=24 particles will be read together. \
@@ -2737,6 +2740,11 @@ bool RelionJob::getCommandsClass2DJob(std::string &outputname, std::vector<std::
 			val = (val < 0.) ? (0.) : (val);
 			val = (val > 90.) ? (90.) : (val);
 			command += " --sigma_psi " + floatToString(val / 3.);
+
+			if (joboptions["do_restrict_xoff"].getBoolean())
+			{
+				command += " --helix --helical_rise_initial " + joboptions["helical_rise"].getString();
+			}
 		}
 	}
 
@@ -3114,18 +3122,25 @@ particle mask for each segment. If the psi priors of the extracted segments are 
 	joboptions["helical_tube_outer_diameter"] = JobOption("Tube diameter - outer (A):", std::string("-1"),"Inner and outer diameter (in Angstroms) of the reconstructed helix spanning across Z axis. \
 Set the inner diameter to negative value if the helix is not hollow in the center. The outer diameter should be slightly larger than the actual width of helical tubes because it also decides the shape of 2D \
 particle mask for each segment. If the psi priors of the extracted segments are not accurate enough due to high noise level or flexibility of the structure, then set the outer diameter to a large value.");
+	joboptions["range_rot"] = JobOption("Angular search range - rot (deg):", std::string("-1"), "Local angular searches will be performed \
+within +/- of the given amount (in degrees) from the optimal orientation in the previous iteration. The default negative value means that no local searches will be performed. \
+A Gaussian prior will be applied, so that orientations closer to the optimal orientation \
+in the previous iteration will get higher weights than those further away.\n\nThese ranges will only be applied to the \
+rot, tilt and psi angles in the first few iterations (global searches for orientations) in 3D helical reconstruction. \
+Values of 9 or 15 degrees are commonly used. Higher values are recommended for more flexible structures and more memory and computation time will be used. \
+A range of 15 degrees means sigma = 5 degrees.\n\nThese options will be invalid if you choose to perform local angular searches or not to perform image alignment on 'Sampling' tab.");
 	joboptions["range_tilt"] = JobOption("Angular search range - tilt (deg):", std::string("15"), "Local angular searches will be performed \
 within +/- the given amount (in degrees) from the optimal orientation in the previous iteration. \
 A Gaussian prior (also see previous option) will be applied, so that orientations closer to the optimal orientation \
 in the previous iteration will get higher weights than those further away.\n\nThese ranges will only be applied to the \
-tilt and psi angles in the first few iterations (global searches for orientations) in 3D helical reconstruction. \
+rot, tilt and psi angles in the first few iterations (global searches for orientations) in 3D helical reconstruction. \
 Values of 9 or 15 degrees are commonly used. Higher values are recommended for more flexible structures and more memory and computation time will be used. \
 A range of 15 degrees means sigma = 5 degrees.\n\nThese options will be invalid if you choose to perform local angular searches or not to perform image alignment on 'Sampling' tab.");
 	joboptions["range_psi"] = JobOption("Angular search range - psi (deg):", std::string("10"), "Local angular searches will be performed \
 within +/- the given amount (in degrees) from the optimal orientation in the previous iteration. \
 A Gaussian prior (also see previous option) will be applied, so that orientations closer to the optimal orientation \
 in the previous iteration will get higher weights than those further away.\n\nThese ranges will only be applied to the \
-tilt and psi angles in the first few iterations (global searches for orientations) in 3D helical reconstruction. \
+rot, tilt and psi angles in the first few iterations (global searches for orientations) in 3D helical reconstruction. \
 Values of 9 or 15 degrees are commonly used. Higher values are recommended for more flexible structures and more memory and computation time will be used. \
 A range of 15 degrees means sigma = 5 degrees.\n\nThese options will be invalid if you choose to perform local angular searches or not to perform image alignment on 'Sampling' tab.");
 	joboptions["do_apply_helical_symmetry"] = JobOption("Apply helical symmetry?", true, "If set to Yes, helical symmetry will be applied in every iteration. Set to No if you have just started a project, helical symmetry is unknown or not yet estimated.");
@@ -3373,6 +3388,10 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 			val = (val < 0.) ? (0.) : (val);
 			val = (val > 90.) ? (90.) : (val);
 			command += " --sigma_psi " + floatToString(val / 3.);
+			val = textToFloat(joboptions["range_rot"].getString());
+			val = (val < 0.) ? (0.) : (val);
+			val = (val > 90.) ? (90.) : (val);
+			command += " --sigma_rot " + floatToString(val / 3.);
 			if (joboptions["helical_range_distance"].getNumber() > 0.)
 				command += " --helical_sigma_distance " + floatToString(joboptions["helical_range_distance"].getNumber() / 3.);
 		}
@@ -3498,18 +3517,25 @@ particle mask for each segment. If the psi priors of the extracted segments are 
 	joboptions["helical_tube_outer_diameter"] = JobOption("Tube diameter - outer (A):", std::string("-1"),"Inner and outer diameter (in Angstroms) of the reconstructed helix spanning across Z axis. \
 Set the inner diameter to negative value if the helix is not hollow in the center. The outer diameter should be slightly larger than the actual width of helical tubes because it also decides the shape of 2D \
 particle mask for each segment. If the psi priors of the extracted segments are not accurate enough due to high noise level or flexibility of the structure, then set the outer diameter to a large value.");
+	joboptions["range_rot"] = JobOption("Angular search range - rot (deg):", std::string("-1"), "Local angular searches will be performed \
+within +/- of the given amount (in degrees) from the optimal orientation in the previous iteration. The default negative value means that no local searches will be performed. \
+A Gaussian prior will be applied, so that orientations closer to the optimal orientation \
+in the previous iteration will get higher weights than those further away.\n\nThese ranges will only be applied to the \
+rot, tilt and psi angles in the first few iterations (global searches for orientations) in 3D helical reconstruction. \
+Values of 9 or 15 degrees are commonly used. Higher values are recommended for more flexible structures and more memory and computation time will be used. \
+A range of 15 degrees means sigma = 5 degrees.\n\nThese options will be invalid if you choose to perform local angular searches or not to perform image alignment on 'Sampling' tab.");
 	joboptions["range_tilt"] = JobOption("Angular search range - tilt (deg):", std::string("15"), "Local angular searches will be performed \
 within +/- the given amount (in degrees) from the optimal orientation in the previous iteration. \
 A Gaussian prior (also see previous option) will be applied, so that orientations closer to the optimal orientation \
 in the previous iteration will get higher weights than those further away.\n\nThese ranges will only be applied to the \
-tilt and psi angles in the first few iterations (global searches for orientations) in 3D helical reconstruction. \
+rot, tilt and psi angles in the first few iterations (global searches for orientations) in 3D helical reconstruction. \
 Values of 9 or 15 degrees are commonly used. Higher values are recommended for more flexible structures and more memory and computation time will be used. \
 A range of 15 degrees means sigma = 5 degrees.\n\nThese options will be invalid if you choose to perform local angular searches or not to perform image alignment on 'Sampling' tab.");
 	joboptions["range_psi"] = JobOption("Angular search range - psi (deg):", std::string("10"), "Local angular searches will be performed \
 within +/- the given amount (in degrees) from the optimal orientation in the previous iteration. \
 A Gaussian prior (also see previous option) will be applied, so that orientations closer to the optimal orientation \
 in the previous iteration will get higher weights than those further away.\n\nThese ranges will only be applied to the \
-tilt and psi angles in the first few iterations (global searches for orientations) in 3D helical reconstruction. \
+rot, tilt and psi angles in the first few iterations (global searches for orientations) in 3D helical reconstruction. \
 Values of 9 or 15 degrees are commonly used. Higher values are recommended for more flexible structures and more memory and computation time will be used. \
 A range of 15 degrees means sigma = 5 degrees.\n\nThese options will be invalid if you choose to perform local angular searches or not to perform image alignment on 'Sampling' tab.");
 	joboptions["do_apply_helical_symmetry"] = JobOption("Apply helical symmetry?", true, "If set to Yes, helical symmetry will be applied in every iteration. Set to No if you have just started a project, helical symmetry is unknown or not yet estimated.");
@@ -3749,6 +3775,10 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 			val = (val < 0.) ? (0.) : (val);
 			val = (val > 90.) ? (90.) : (val);
 			command += " --sigma_psi " + floatToString(val / 3.);
+			val = textToFloat(joboptions["range_rot"].getString());
+			val = (val < 0.) ? (0.) : (val);
+			val = (val > 90.) ? (90.) : (val);
+			command += " --sigma_rot " + floatToString(val / 3.);
 			if (joboptions["helical_range_distance"].getNumber() > 0.)
 				command += " --helical_sigma_distance " + floatToString(joboptions["helical_range_distance"].getNumber() / 3.);
 			if (joboptions["keep_tilt_prior_fixed"].getBoolean())

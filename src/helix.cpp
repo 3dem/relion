@@ -4504,7 +4504,6 @@ void updatePriorsForHelicalReconstruction(
 		if (MD.containsLabel(EMDL_ORIENT_ROT_PRIOR)) MD.getValue(EMDL_ORIENT_ROT_PRIOR, segment.rot_prior_deg);  	// KThurber
 		//else segment.rot_prior_deg = 0.;
 		else segment.rot_prior_deg = segment.rot_deg;  // SHWS, modified from KThurber!
-		std::cerr << " segment.rot_prior_deg= " << segment.rot_prior_deg << std::endl;
 		MD.getValue(EMDL_ORIENT_ROT_PRIOR_FLIP_RATIO, segment.rot_flip_ratio);	// KThurber
 		MD.getValue(EMDL_ORIENT_TILT, segment.tilt_deg);
 		MD.getValue(EMDL_ORIENT_TILT_PRIOR, segment.tilt_prior_deg);
@@ -4569,7 +4568,6 @@ void updatePriorsForHelicalReconstruction(
 				MD.setValue(EMDL_ORIENT_TILT_PRIOR, list[id].tilt_prior_deg, list[id].MDobjectID);
 			MD.setValue(EMDL_ORIENT_PSI_PRIOR, list[id].psi_prior_deg, list[id].MDobjectID);
 			MD.setValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, list[id].psi_flip_ratio, list[id].MDobjectID);
-			std::cerr << " is_3D= " << is_3D << " list[id].rot_flip_ratio= " << list[id].rot_flip_ratio << " list[id].rot_prior_deg= " << list[id].rot_prior_deg << std::endl;
 			MD.setValue(EMDL_ORIENT_ROT_PRIOR_FLIP_RATIO, list[id].rot_flip_ratio, list[id].MDobjectID);	// KThurber
 			MD.setValue(EMDL_ORIENT_ROT_PRIOR, list[id].rot_prior_deg, list[id].MDobjectID); // KThurber
 			MD.setValue(EMDL_ORIENT_PSI_PRIOR_FLIP, list[id].psi_prior_flip, list[id].MDobjectID);  // KThurber

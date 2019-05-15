@@ -323,6 +323,7 @@ enum EMDLabel
 	EMDL_OPTIMISER_HAS_LARGE_INCR_SIZE_ITER_AGO,
 	EMDL_OPTIMISER_DO_HELICAL_REFINE,
 	EMDL_OPTIMISER_IGNORE_HELICAL_SYMMETRY,
+	EMDL_OPTIMISER_FOURIER_MASK,
 	EMDL_OPTIMISER_HELICAL_TWIST_INITIAL,
 	EMDL_OPTIMISER_HELICAL_RISE_INITIAL,
 	EMDL_OPTIMISER_HELICAL_Z_PERCENTAGE,
@@ -818,6 +819,7 @@ private:
 		EMDL::addLabel(EMDL_OPTIMISER_HAS_LARGE_INCR_SIZE_ITER_AGO, EMDL_INT, "rlnHasLargeSizeIncreaseIterationsAgo", "How many iterations have passed since the last large increase in image size");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_HELICAL_REFINE, EMDL_BOOL, "rlnDoHelicalRefine", "Flag to indicate that helical refinement should be performed");
 		EMDL::addLabel(EMDL_OPTIMISER_IGNORE_HELICAL_SYMMETRY, EMDL_BOOL, "rlnIgnoreHelicalSymmetry", "Flag to indicate that helical symmetry is ignored in 3D reconstruction");
+		EMDL::addLabel(EMDL_OPTIMISER_FOURIER_MASK, EMDL_STRING, "rlnFourierMask", "Name of an FFTW-centred Fourier mask to be applied to the Projector for refinement.");
 		EMDL::addLabel(EMDL_OPTIMISER_HELICAL_TWIST_INITIAL, EMDL_DOUBLE, "rlnHelicalTwistInitial", "The intial helical twist (rotation per subunit) in degrees before refinement");
 		EMDL::addLabel(EMDL_OPTIMISER_HELICAL_RISE_INITIAL, EMDL_DOUBLE, "rlnHelicalRiseInitial", "The initial helical rise (translation per subunit) in Angstroms before refinement");
 		EMDL::addLabel(EMDL_OPTIMISER_HELICAL_Z_PERCENTAGE, EMDL_DOUBLE, "rlnHelicalCentralProportion", "Only expand this central fraction of the Z axis when imposing real-space helical symmetry");

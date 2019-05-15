@@ -515,8 +515,10 @@ public:
 	// Keep helical tilt priors fixed (at 90 degrees) in global angular searches?
 	bool helical_keep_tilt_prior_fixed;
 
-	// Apply directional filter (with this many Angstroms in X) to the references, this can sometimes help in 2D classification of amyloids
-	//RFLOAT directional_lowpass;
+	// Apply fourier_mask for helical refinements
+	std::string helical_fourier_mask_resols;
+	FileName fn_fourier_mask;
+	MultidimArray<RFLOAT> helical_fourier_mask;
 
 	///////// Hidden stuff, does not work with read/write: only via command-line ////////////////
 

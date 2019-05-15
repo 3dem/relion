@@ -1301,7 +1301,8 @@ void MlModel::writeBildFileBodies(FileName fn_bild)
 }
 
 
-void MlModel::setFourierTransformMaps(bool update_tau2_spectra, int nr_threads, bool do_gpu)
+void MlModel::setFourierTransformMaps(bool update_tau2_spectra, int nr_threads, bool do_gpu,
+		   const MultidimArray<RFLOAT> *fourier_mask)
 {
 
 	bool do_heavy(true);
@@ -1331,12 +1332,12 @@ void MlModel::setFourierTransformMaps(bool update_tau2_spectra, int nr_threads, 
 
 		if (update_tau2_spectra && iclass < nr_classes * nr_bodies)
 		{
-			PPref[iclass].computeFourierTransformMap(Irefp, tau2_class[iclass], current_size, nr_threads, true, do_heavy);
+			PPref[iclass].computeFourierTransformMap(Irefp, tau2_class[iclass], current_size, nr_threads, true, do_heavy, fourier_mask);
 		}
 		else
 		{
 			MultidimArray<RFLOAT> dummy;
-			PPref[iclass].computeFourierTransformMap(Irefp, dummy, current_size, nr_threads, true, do_heavy);
+			PPref[iclass].computeFourierTransformMap(Irefp, dummy, current_size, nr_threads, true, do_heavy, fourier_mask);
 		}
 	}
 

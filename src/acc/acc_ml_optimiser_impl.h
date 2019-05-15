@@ -382,7 +382,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 			// We do NOT want to accumulate the offsets in the direction along the helix (which is X in the helical coordinate system!)
 			// However, when doing helical local searches, we accumulate offsets
 			// Do NOT accumulate offsets in 3D classification of helices
-			if ( (baseMLO->mymodel.ref_dim == 3) && (! baseMLO->do_skip_align) && (! baseMLO->do_skip_rotate) )
+			if ( (! baseMLO->do_skip_align) && (! baseMLO->do_skip_rotate) )
 			{
 				// TODO: check whether the following lines make sense
 				bool do_auto_refine_local_searches = (baseMLO->do_auto_refine) && (baseMLO->sampling.healpix_order >= baseMLO->autosampling_hporder_local_searches);
@@ -1718,7 +1718,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 				{
 					myprior_x = myprior_y = myprior_z = 0.;
 				}
-				else if (baseMLO->mymodel.ref_dim == 2)
+				else if (baseMLO->mymodel.ref_dim == 2 && !baseMLO->do_helical_refine)
 				{
 					myprior_x = XX(baseMLO->mymodel.prior_offset_class[exp_iclass]);
 					myprior_y = YY(baseMLO->mymodel.prior_offset_class[exp_iclass]);

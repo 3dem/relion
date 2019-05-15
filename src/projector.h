@@ -94,6 +94,8 @@ public:
     Projector(int _ori_size, int _interpolator = TRILINEAR, float _padding_factor_3d = 2., int _r_min_nn = 10, int _data_dim = 2)
     {
 
+    	clear();
+
     	// Store original dimension
     	ori_size = _ori_size;
 
@@ -108,6 +110,7 @@ public:
 
     	// Dimension of the projections
     	data_dim = _data_dim;
+
     }
 
     /** Copy constructor
@@ -193,17 +196,14 @@ public:
     * 3. It sets values beyond Nyquist for images of current_size to zero in the transform and windows the transform at max_r+1
     * Depending on whether 2D or 3D Fourier Transforms will be extracted, the map is normalized internally in a different manner
     *
+    * If fourier_mask!= NULL: then apply this oriinally-size, FFTw-centered Fourier mask, also in power_spectrum calculations!
+    *
     */
    void computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in,
 								   MultidimArray<RFLOAT> &power_spectrum,
 								   int current_size = -1, int nr_threads = 1,
-								   bool do_gridding = true, bool do_heavy = true);
-
-   /* This is experimental: apply a mask in Fourier-space to focus refinements on certain Fourier components
-    * mask_r_min and mask_r_max are the radii of the lowest and highest frequencies (only keep crown inside)
-    * mask_ang is the opening angle along z (only really useful for helices, I guess)
-    */
-   void applyFourierMask(int mask_r_min = 0, int mask_r_max = -1, RFLOAT mask_ang = 0.);
+								   bool do_gridding = true, bool do_heavy = true,
+								   const MultidimArray<RFLOAT> *fourier_mask = NULL);
 
    /* Because we interpolate in Fourier space to make projections and/or reconstructions, we have to correct
     * the real-space maps by dividing them by the Fourier Transform of the interpolator
