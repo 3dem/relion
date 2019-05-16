@@ -183,6 +183,8 @@ public:
 	// Write out final STAR file
 	void writeSTAR();
 
+	// Read fn_defect (same format as UCSF MotionCor2; x y w h) and fill bBad.
+	static void fillDefectMask(MultidimArray<bool> &bBad, FileName fn_defect);
 private:
 	// shiftx, shifty is relative to the (real space) image size
 	void shiftNonSquareImageInFourierTransform(MultidimArray<fComplex> &frame, RFLOAT shiftx, RFLOAT shifty);

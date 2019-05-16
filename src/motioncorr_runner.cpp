@@ -1072,23 +1072,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 		bBad.initZeros();
 		if (fn_defect != "")
 		{
-			std::ifstream f_defect(fn_defect);
-			// TODO: error handling !!
-			while (!f_defect.eof()) {
-				int x, y, w, h;
-				f_defect >> x >> y >> w >> h;
-				for (int iy = y, ylim = y + h; iy < ylim; iy++)
-				{
-					if (iy < 0 || iy >= ny) continue;
-					for (int ix = x, xlim = x + w; ix < xlim; ix++)
-					{
-						if (ix < 0 || ix >= nx) continue;
-						DIRECT_A2D_ELEM(bBad, iy, ix) = true;
-					}
-				}
-			}
-			f_defect.close();
-
+			fillDefectMask(bBad, fn_defect);
 #ifdef DEBUG_HOTPIXELS
 			Image<RFLOAT> tmp(nx, ny);
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(tmp())
@@ -1096,6 +1080,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 			tmp.write("defect.mrc");
 #endif
 		}
+
 		int n_bad = 0;
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Isum) {
 			if (DIRECT_MULTIDIM_ELEM(Isum, n) > threshold) {
@@ -2116,4 +2101,26 @@ void MotioncorrRunner::binNonSquareImage(Image<float> &Iwork, RFLOAT bin_factor)
 
 	Iwork().reshape(new_ny, new_nx);
 	NewFFT::inverseFourierTransform(Fbinned, Iwork());
+}
+
+void MotioncorrRunner::fillDefectMask(MultidimArray<bool> &bBad, FileName fn_defect) {
+	const int ny = YSIZE(bBad), nx = XSIZE(bBad);
+	std::ifstream f_defect(fn_defect);
+
+	// TODO: error handling !!
+	while (!f_defect.eof()) {
+		int x, y, w, h;
+		f_defect >> x >> y >> w >> h;
+		for (int iy = y, ylim = y + h; iy < ylim; iy++)
+		{
+			if (iy < 0 || iy >= ny) continue;
+			for (int ix = x, xlim = x + w; ix < xlim; ix++)
+			{
+				if (ix < 0 || ix >= nx) continue;
+				DIRECT_A2D_ELEM(bBad, iy, ix) = true;
+			}
+		}
+	}
+
+	f_defect.close();
 }
