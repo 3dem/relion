@@ -39,6 +39,7 @@
 	int TIMING_APPLY_GAIN = timer.setNew("apply gain");
 	int TIMING_INITIAL_SUM = timer.setNew("initial sum");
 	int TIMING_DETECT_HOT = timer.setNew("detect hot pixels");
+	int TIMING_FIX_DEFECT = timer.setNew("fix defects");
 	int TIMING_GLOBAL_FFT = timer.setNew("global FFT");
 	int TIMING_POWER_SPECTRUM = timer.setNew("power spectrum");
 	int TIMING_POWER_SPECTRUM_SUM = timer.setNew("power - sum");
@@ -144,10 +145,6 @@ void MotioncorrRunner::initialise()
 
 	if (do_motioncor2)
 	{
-		if (fn_defect != "") {
-			std::cerr << "WARNING: Although the defect file will be used by MotionCor2, Bayesian Polishing will work on uncorrected raw movies and ignore the defect file." << std::endl;
-		}
-
 		// Get the MOTIONCOR2 executable
 		if (fn_motioncor2_exe == "")
 		{
@@ -173,9 +170,6 @@ void MotioncorrRunner::initialise()
 	}
 	else if (do_own)
 	{
-		if (fn_defect != "") {
-			std::cerr << "WARNING: Our own implementation of motion correction detects hot pixels by itself. The defect file is not used." << std::endl;
-		}
 		if (patch_x <= 0 || patch_y <= 0) {
 			REPORT_ERROR("The number of patches must be a positive integer.");
 		}
@@ -1076,17 +1070,46 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 
 		MultidimArray<bool> bBad(ny, nx);
 		bBad.initZeros();
+		if (fn_defect != "")
+		{
+			std::ifstream f_defect(fn_defect);
+			// TODO: error handling !!
+			while (!f_defect.eof()) {
+				int x, y, w, h;
+				f_defect >> x >> y >> w >> h;
+				for (int iy = y, ylim = y + h; iy < ylim; iy++)
+				{
+					if (iy < 0 || iy >= ny) continue;
+					for (int ix = x, xlim = x + w; ix < xlim; ix++)
+					{
+						if (ix < 0 || ix >= nx) continue;
+						DIRECT_A2D_ELEM(bBad, iy, ix) = true;
+					}
+				}
+			}
+			f_defect.close();
+
+#ifdef DEBUG_HOTPIXELS
+			Image<RFLOAT> tmp(nx, ny);
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(tmp())
+				DIRECT_MULTIDIM_ELEM(tmp(), n) = DIRECT_MULTIDIM_ELEM(bBad, n);
+			tmp.write("defect.mrc");
+#endif
+		}
 		int n_bad = 0;
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Isum) {
 			if (DIRECT_MULTIDIM_ELEM(Isum, n) > threshold) {
 				DIRECT_MULTIDIM_ELEM(bBad, n) = true;
 				n_bad++;
+				mic.hotpixelX.push_back(n % nx);
+				mic.hotpixelY.push_back(n / nx);
 			}
 		}
 		logfile << "Detected " << n_bad << " hot pixels to be corrected." << std::endl;
 		Isum.clear();
 		RCTOC(TIMING_DETECT_HOT);
 
+		RCTIC(TIMING_FIX_DEFECT);
 		const RFLOAT frame_mean = mean / n_frames;
 		const RFLOAT frame_std = std / n_frames;
 
@@ -1121,6 +1144,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 				else DIRECT_A2D_ELEM(Iframes[iframe](), i, j) = rnd_gaus(frame_mean, frame_std);
 			}
 		}
+		RCTOC(TIMING_FIX_DEFECT);
 		logfile << "Fixed hot pixels." << std::endl;
 	} // !skip_defect
 

@@ -1386,15 +1386,15 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 		command += " --use_motioncor2 ";
 		command += " --motioncor2_exe " + joboptions["fn_motioncor2_exe"].getString();
 
-		if ((joboptions["fn_defect"].getString()).length() > 0)
-			command += " --defect_file " + joboptions["fn_defect"].getString();
-
 		if ((joboptions["other_motioncor2_args"].getString()).length() > 0)
 			command += " --other_motioncor2_args \" " + joboptions["other_motioncor2_args"].getString() + " \"";
 
 		// Which GPUs to use?
 		command += " --gpu \"" + joboptions["gpu_ids"].getString() + "\"";
 	}
+
+	if ((joboptions["fn_defect"].getString()).length() > 0)
+		command += " --defect_file " + joboptions["fn_defect"].getString();
 
 	command += " --bin_factor " + joboptions["bin_factor"].getString();
 	command += " --bfactor " + joboptions["bfactor"].getString();
