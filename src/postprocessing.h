@@ -159,9 +159,6 @@ public:
 	// Returns true if masking needs to be done, false otherwise
 	bool getMask();
 
-	// Make a mask automatically based on initial density threshold
-	void getAutoMask();
-
 	// Divide by MTF and perform FSC-weighted B-factor sharpening, as in Rosenthal and Henderson, 2003
 	// Returns the applied filter resolution
 	RFLOAT sharpenMap();

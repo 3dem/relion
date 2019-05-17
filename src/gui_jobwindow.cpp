@@ -2147,16 +2147,9 @@ void JobWindow::initialiseCtfrefineWindow()
 
 	group1->begin();
 
-	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group2->end();
-	place("do_defocus", TOGGLE_LEAVE_ACTIVE, group2);
-	group2->begin();
-	place("range", TOGGLE_DEACTIVATE);
-	group2->end();
-	guientries["do_defocus"].cb_menu_i();
-
-	place("do_glob_astig", TOGGLE_DEACTIVATE);
+	place("do_defocus", TOGGLE_LEAVE_ACTIVE);
 	place("do_astig", TOGGLE_DEACTIVATE);
+	place("do_bfactor", TOGGLE_DEACTIVATE);
 	place("do_phase", TOGGLE_DEACTIVATE);
 
 	group1->end();

@@ -30,7 +30,7 @@ class ctf_toolbox_parameters
 {
 	public:
 	FileName fn_in, fn_out, fn_sim;
-	bool do_intact_ctf_first_peak, do_ctf_pad;
+	bool do_intact_ctf_until_first_peak, do_intact_ctf_after_first_peak, do_ctf_pad;
 	RFLOAT profile_angle, sim_angpix, kV, Q0, Cs, defU, defV, defAng, phase_shift;
 	int verb;
 
@@ -72,7 +72,8 @@ class ctf_toolbox_parameters
 		phase_shift  = textToFloat(parser.getOption("--phase_shift", "Phase shift (deg)", "0."));
 
 		int cst_section = parser.addSection("Shared options");
-		do_intact_ctf_first_peak = parser.checkOption("--ctf_intact_first_peak", "Leave CTFs intact until first peak");
+		do_intact_ctf_until_first_peak = parser.checkOption("--ctf_intact_first_peak", "Leave CTFs intact until first peak");
+		do_intact_ctf_after_first_peak = parser.checkOption("--ctf_intact_after_first_peak", "Leave CTFs intact after first peak");
 		do_ctf_pad = parser.checkOption("--ctf_pad", "Pre-multiply with a 2x finer-sampled CTF that is then downscaled");
 
 		// Check for errors in the command-line option
@@ -116,7 +117,7 @@ class ctf_toolbox_parameters
 				RFLOAT x = (RFLOAT)j / xs;
 				RFLOAT y = (RFLOAT)i / ys;
 
-				A2D_ELEM(Ictf(), i, j) = ctf.getCTF(x, y, false, false, do_intact_ctf_first_peak);
+				A2D_ELEM(Ictf(), i, j) = ctf.getCTF(x, y, false, false, do_intact_ctf_until_first_peak, true, 0.0, do_intact_ctf_after_first_peak);
 			}
 
 			resizeMap(Ictf(), sim_box);
@@ -165,10 +166,16 @@ class ctf_toolbox_parameters
 				transformer.FourierTransform(img(), Fimg, false);
 
 				Fctf.resize(YSIZE(Fimg), XSIZE(Fimg));
-				ctf.getFftwImage(Fctf, XSIZE(img()), YSIZE(img()), angpix, false, false, do_intact_ctf_first_peak, false, do_ctf_pad);
+				ctf.getFftwImage(Fctf, XSIZE(img()), YSIZE(img()), angpix, false, false, do_intact_ctf_until_first_peak, false, do_ctf_pad, do_intact_ctf_after_first_peak);
 				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fimg)
 				{
-					DIRECT_MULTIDIM_ELEM(Fimg, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
+					if (!do_intact_ctf_after_first_peak)
+						DIRECT_MULTIDIM_ELEM(Fimg, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
+					else
+					{
+						// this is safe because getCTF does not return 0.
+						DIRECT_MULTIDIM_ELEM(Fimg, n) /= DIRECT_MULTIDIM_ELEM(Fctf, n);
+					}
 				}
 
 				transformer.inverseFourierTransform(Fimg, img());
@@ -207,7 +214,6 @@ class ctf_toolbox_parameters
 	}
 };
 
-
 int main(int argc, char *argv[])
 {
 	ctf_toolbox_parameters prm;
@@ -225,6 +231,3 @@ int main(int argc, char *argv[])
 	}
 	return 0;
 }
-
-
-

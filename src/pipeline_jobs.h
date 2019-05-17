@@ -120,6 +120,20 @@ static const std::vector<std::string> job_gain_flip_options{
 	"Flip left to right (2)"
 };
 
+static const std::vector<std::string> job_ctffit_options{
+	"No",
+	"Per-micrograph",
+	"Per-particle"
+};
+
+static std::string getStringFitOption(std::string option)
+{
+	if (option == job_ctffit_options[0]) return "f";
+	if (option == job_ctffit_options[1]) return "m";
+	if (option == job_ctffit_options[2]) return "p";
+	REPORT_ERROR("ERROR: unrecognised fit_mode for ctf_refine");
+}
+
 // To have a line on the GUI to change the minimum number of dedicated in a job
 static bool do_allow_change_minimum_dedicated;
 
@@ -320,7 +334,6 @@ public:
 	// Write value to an ostream
 	void writeValue(std::ostream& out);
 };
-
 
 class RelionJob
 {

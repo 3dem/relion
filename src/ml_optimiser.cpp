@@ -692,7 +692,8 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	incr_size = textToInteger(parser.getOption("--incr_size", "Number of Fourier shells beyond the current resolution to be included in refinement", "10"));
 	do_print_metadata_labels = parser.checkOption("--print_metadata_labels", "Print a table with definitions of all metadata labels, and exit");
 	do_print_symmetry_ops = parser.checkOption("--print_symmetry_ops", "Print all symmetry transformation matrices, and exit");
-	strict_highres_exp = textToFloat(parser.getOption("--strict_highres_exp", "Resolution limit (in Angstrom) to restrict probability calculations in the expectation step", "-1"));
+	strict_highres_exp = textToFloat(parser.getOption("--strict_highres_exp", "High resolution limit (in Angstrom) to restrict probability calculations in the expectation step", "-1"));
+	strict_lowres_exp = textToFloat(parser.getOption("--strict_lowres_exp", "Low resolution limit (in Angstrom) to restrict probability calculations in the expectation step", "-1"));
 	dont_raise_norm_error = parser.checkOption("--dont_check_norm", "Skip the check whether the images are normalised correctly");
 	do_always_cc  = parser.checkOption("--always_cc", "Perform CC-calculation in all iterations (useful for faster denovo model generation?)");
 	do_phase_random_fsc = parser.checkOption("--solvent_correct_fsc", "Correct FSC curve for the effects of the solvent mask?");
@@ -902,7 +903,6 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 		do_fast_subsets = false;
 	if (!MD.getValue(EMDL_OPTIMISER_DO_EXTERNAL_RECONSTRUCT, do_external_reconstruct))
 		do_external_reconstruct = false;
-
 	// backward compatibility with relion-3.0
 	if (!MD.getValue(EMDL_OPTIMISER_ACCURACY_TRANS_ANGSTROM, acc_trans))
 	{
@@ -915,6 +915,8 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 	if (do_split_random_halves &&
 	    !MD.getValue(EMDL_OPTIMISER_MODEL_STARFILE2, fn_model2))
 	    	REPORT_ERROR("MlOptimiser::readStar: splitting data into two random halves, but rlnModelStarFile2 not found in optimiser_general table");
+	if (!MD.getValue(EMDL_OPTIMISER_LOWRES_LIMIT_EXP, strict_lowres_exp))
+		strict_lowres_exp = -1.;
 
 	// Initialise some stuff for first-iteration only (not relevant here...)
 	do_calculate_initial_sigma_noise = false;
@@ -1048,6 +1050,7 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		MD.setValue(EMDL_OPTIMISER_TAU_SPECTRUM_NAME, fn_tau);
 		MD.setValue(EMDL_OPTIMISER_MAX_COARSE_SIZE, max_coarse_size);
 		MD.setValue(EMDL_OPTIMISER_HIGHRES_LIMIT_EXP, strict_highres_exp);
+		MD.setValue(EMDL_OPTIMISER_LOWRES_LIMIT_EXP, strict_lowres_exp);
 		MD.setValue(EMDL_OPTIMISER_INCR_SIZE, incr_size);
 		MD.setValue(EMDL_OPTIMISER_DO_MAP, do_map);
 		MD.setValue(EMDL_OPTIMISER_FAST_SUBSETS, do_fast_subsets);
@@ -1983,13 +1986,13 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 {
 
 #ifdef DEBUG_INI
-    std::cerr<<"MlOptimiser::calculateSumOfPowerSpectraAndAverageImage Entering"<<std::endl;
+	std::cerr<<"MlOptimiser::calculateSumOfPowerSpectraAndAverageImage Entering"<<std::endl;
 #endif
 
-    int barstep, my_nr_particles = my_last_particle_id - my_first_particle_id + 1;
+	int barstep, my_nr_particles = my_last_particle_id - my_first_particle_id + 1;
 
 	// Initialise Mavg
-    if (mydata.is_3D)
+	if (mydata.is_3D)
 	{
 		Mavg.initZeros(mymodel.ori_size, mymodel.ori_size, mymodel.ori_size);
 	}
@@ -2001,9 +2004,9 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 
 	if (my_nr_particles < 1)
 	{
-    	// Master doesn't do anything here...
-    	// But still set Mavg the right size for AllReduce later on
-    	return;
+	    	// Master doesn't do anything here...
+	    	// But still set Mavg the right size for AllReduce later on
+    		return;
 	}
 
 	if (myverb > 0)
@@ -2059,7 +2062,17 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 			else
 			{
 				if (!mydata.getImageNameOnScratch(part_id, img_id, fn_img))
+				{
 					MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
+				}
+				else if (!do_parallel_disc_io)
+				{
+					// When not doing parallel disk IO,
+					// only those MPI processes running on the same node as the master have scratch.
+					fn_img.decompose(dump, fn_stack);
+					if (!exists(fn_stack))
+						MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
+				}
 
 				fn_img.decompose(dump, fn_stack);
 				if (fn_stack != fn_open_stack)
@@ -3023,7 +3036,7 @@ void MlOptimiser::expectationSetup()
 
 	// Initialise Projectors and fill vector with power_spectra for all classes
 	MultidimArray<RFLOAT> *my_fourier_mask = (XSIZE(helical_fourier_mask) > 0) ? &helical_fourier_mask : NULL;
-	mymodel.setFourierTransformMaps(!fix_tau, nr_threads, do_gpu, my_fourier_mask);
+	mymodel.setFourierTransformMaps(!fix_tau, nr_threads, strict_lowres_exp, my_fourier_mask);
 
 	// Initialise all weighted sums to zero
 	wsum_model.initZeros();
@@ -4759,7 +4772,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 		std::vector<RFLOAT> &exp_psi_prior)
 {
 
-    FourierTransformer transformer;
+	FourierTransformer transformer;
 	for (int img_id = 0; img_id < mydata.numberOfImagesInParticle(part_id); img_id++)
 	{
 		Image<RFLOAT> img, rec_img;
@@ -5212,7 +5225,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 		tt.write("Fimg_unmasked.spi");
 		std::cerr << "written Fimg_unmasked.spi; press any key to continue..." << std::endl;
 		char c;
-		std::cin >> c;
+//		std::cin >> c;
 #endif
 
 		// Always store FT of image without mask (to be used for the reconstruction)
@@ -5300,7 +5313,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 		tt()=img();
 		tt.write("Fimg_masked.spi");
 		std::cerr << "written Fimg_masked.spi; dying now..." << std::endl;
-		exit(0);
+//		exit(0);
 #endif
 
 		// Inside Projector and Backprojector the origin of the Fourier Transform is centered!
@@ -5674,8 +5687,6 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 	int exp_nr_images = mydata.numberOfImagesInParticle(part_id);
 	int nr_shifts = (do_shifts_onthefly || do_skip_align) ? exp_nr_images : exp_nr_images * sampling.NrTranslationalSamplings(exp_current_oversampling);
 	// Don't re-do if nothing has changed....
-
-
 
 	// Use pre-sized vectors instead of push_backs!!
 	// NO! Use .reserve()!!!  --JZ

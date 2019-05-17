@@ -1062,9 +1062,10 @@ void getAllSquaredDifferencesCoarse(
 
 		XFLOAT scale_correction = baseMLO->do_scale_correction ? baseMLO->mymodel.scale_correction[group_id] : 1;
 
+		int exp_current_image_size = (baseMLO->strict_highres_exp > 0.|| baseMLO->adaptive_oversampling > 0) ?
+				baseMLO->image_coarse_size[optics_group] : baseMLO->image_current_size[optics_group];
 		MultidimArray<Complex > Fimg;
-		// Size could be coarse_size, or perhaps current_size?
-		windowFourierTransform(op.Fimg[img_id], Fimg, baseMLO->image_coarse_size[optics_group]);
+		windowFourierTransform(op.Fimg[img_id], Fimg, exp_current_image_size);
 
 		for (unsigned long i = 0; i < image_size; i ++)
 		{
@@ -1088,8 +1089,6 @@ void getAllSquaredDifferencesCoarse(
 			Fimg_real[i] = Fimg.data[i].real * pixel_correction;
 			Fimg_imag[i] = Fimg.data[i].imag * pixel_correction;
 		}
-		//std::cerr << " Fimg_real[100]= " << Fimg_real[100] << " Fimg_imag[100]= " << Fimg_imag[100] << "image_size" <<image_size << " xsize(Fimg)= "<< XSIZE(Fimg)
-		//		<< " baseMLO->image_current_size[optics_group]="<< baseMLO->image_current_size[optics_group]<< " baseMLO->image_coarse_size[optics_group]="<< baseMLO->image_coarse_size[optics_group]<<" baseMLO->mymodel.current_size= " << baseMLO->mymodel.current_size<< std::endl;
 
 		trans_x.cpToDevice();
 		trans_y.cpToDevice();
@@ -1289,8 +1288,9 @@ void getAllSquaredDifferencesFine(
 
 		XFLOAT scale_correction = baseMLO->do_scale_correction ? baseMLO->mymodel.scale_correction[group_id] : 1;
 
+		int exp_current_image_size = (baseMLO->strict_highres_exp > 0.) ? baseMLO->image_coarse_size[optics_group] : baseMLO->image_current_size[optics_group];
 		MultidimArray<Complex > Fimg, Fimg_nomask;
-		windowFourierTransform(op.Fimg[img_id], Fimg, baseMLO->image_current_size[optics_group]); //TODO PO isen't this already done in getFourierTransformsAndCtfs?
+		windowFourierTransform(op.Fimg[img_id], Fimg, exp_current_image_size);
 
 		for (unsigned long i = 0; i < image_size; i ++)
 		{
@@ -2198,8 +2198,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 	for (int img_id = 0; img_id < sp.nr_images; img_id++)
 	{
-		unsigned long image_size = op.Fimg[img_id].nzyxdim;
-
 		// Allocate space for all classes, so that we can pre-calculate data for all classes, copy in one operation, call kenrels on all classes, and copy back in one operation
 		AccPtr<XFLOAT>          oo_otrans_x = ptrFactory.make<XFLOAT>((size_t)nr_fake_classes*nr_transes); // old_offset_oversampled_trans_x
 		AccPtr<XFLOAT>          oo_otrans_y = ptrFactory.make<XFLOAT>((size_t)nr_fake_classes*nr_transes);
@@ -2325,7 +2323,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		p_thr_wsum_sigma2_offset.allAlloc();
 		CTOC(accMLO->timer,"collect_data_2_pre_kernel");
 		int partial_pos=0;
-
 
 		for (long int exp_iclass = sp.iclass_min; exp_iclass <= sp.iclass_max; exp_iclass++)
 		{
@@ -2507,9 +2504,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		int group_id = baseMLO->mydata.getGroupId(op.part_id, img_id);
 		const int optics_group = baseMLO->mydata.getOpticsGroup(op.part_id, img_id);
 		RFLOAT my_pixel_size = baseMLO->mydata.getImagePixelSize(op.part_id, img_id);
-		unsigned long image_size = op.Fimg[img_id].nzyxdim;
 		bool ctf_premultiplied = baseMLO->mydata.obsModel.getCtfPremultiplied(optics_group);
-
 
 		/*======================================================
 		                     TRANSLATIONS
@@ -2570,6 +2565,12 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 		CTIC(accMLO->timer,"translation_3");
 
+		int exp_current_image_size = (baseMLO->strict_highres_exp > 0.) ? baseMLO->image_coarse_size[optics_group] : baseMLO->image_current_size[optics_group];
+		MultidimArray<Complex > Fimg, Fimg_nonmask;
+		windowFourierTransform(op.Fimg[img_id], Fimg, exp_current_image_size); //TODO PO isen't this already done in getFourierTransformsAndCtfs?
+		windowFourierTransform(op.Fimg_nomask[img_id], Fimg_nonmask, exp_current_image_size);
+		unsigned long image_size = Fimg.nzyxdim;
+
 		AccPtr<XFLOAT> Fimgs_real = ptrFactory.make<XFLOAT>((size_t)image_size);
 		AccPtr<XFLOAT> Fimgs_imag = ptrFactory.make<XFLOAT>((size_t)image_size);
 		AccPtr<XFLOAT> Fimgs_nomask_real = ptrFactory.make<XFLOAT>((size_t)image_size);
@@ -2579,10 +2580,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		Fimgs_imag.allAlloc();
 		Fimgs_nomask_real.allAlloc();
 		Fimgs_nomask_imag.allAlloc();
-
-		MultidimArray<Complex > Fimg, Fimg_nonmask;
-		windowFourierTransform(op.Fimg[img_id], Fimg, baseMLO->image_current_size[optics_group]); //TODO PO isen't this already done in getFourierTransformsAndCtfs?
-		windowFourierTransform(op.Fimg_nomask[img_id], Fimg_nonmask, baseMLO->image_current_size[optics_group]);
 
 		for (unsigned long i = 0; i < image_size; i ++)
 		{
@@ -2755,7 +2752,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 			CTOC(accMLO->timer,"generateEulerMatricesProjector");
 
-
 			/*======================================================
 								 MAP WEIGHTS
 			======================================================*/
@@ -2838,7 +2834,6 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 #endif
 
 			CTIC(accMLO->timer,"backproject");
-
 			runBackProjectKernel(
 				accMLO->bundle->backprojectors[iproj],
 				projKernel,
@@ -2937,7 +2932,8 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		int my_image_size = baseMLO->mydata.getOpticsImageSize(optics_group);
 
 		// If the current images were smaller than the original size, fill the rest of wsum_model.sigma2_noise with the power_class spectrum of the images
-		for (unsigned long ires = baseMLO->image_current_size[optics_group]/2 + 1; ires < baseMLO->image_full_size[optics_group]/2 + 1; ires++)
+		int exp_current_image_size = (baseMLO->strict_highres_exp > 0.) ? baseMLO->image_coarse_size[optics_group] : baseMLO->image_current_size[optics_group];
+		for (unsigned long ires = exp_current_image_size/2 + 1; ires < baseMLO->image_full_size[optics_group]/2 + 1; ires++)
 		{
 			DIRECT_A1D_ELEM(thr_wsum_sigma2_noise[img_id], ires) += DIRECT_A1D_ELEM(op.power_img[img_id], ires);
 			// Also extend the weighted sum of the norm_correction

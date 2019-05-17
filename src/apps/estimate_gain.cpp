@@ -125,7 +125,7 @@ class estimate_gain {
 		}
 
 		Isums[0].write(fn_out);
-		std::cout << "Written the estimated gain to " << fn_out;
+		std::cout << "Written the estimated gain to " << fn_out << std::endl;
 	}
 };
 

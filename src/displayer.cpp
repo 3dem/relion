@@ -2706,8 +2706,6 @@ int Displayer::runGui()
 			win.display_labels.push_back(EMDL::label2Str(EMDL_MICROGRAPH_NAME));
 		if (MD.containsLabel(EMDL_MICROGRAPH_MOVIE_NAME))
 			win.display_labels.push_back(EMDL::label2Str(EMDL_MICROGRAPH_MOVIE_NAME));
-
-
 	}
 	else
 	{

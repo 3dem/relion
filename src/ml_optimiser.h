@@ -250,8 +250,8 @@ public:
 	// Number of iterations without a decrease in OffsetChanges
 	int nr_iter_wo_large_hidden_variable_changes;
 
-	// Strict high-res limit in the expectation step
-	RFLOAT strict_highres_exp;
+	// Strict resolution limits in the expectation step
+	RFLOAT strict_highres_exp, strict_lowres_exp;
 
 	// Flag to indicate to estimate angular accuracy until current_size (and not coarse_size) when restricting high-res limit in the expectation step
 	// This is used for testing purposes only

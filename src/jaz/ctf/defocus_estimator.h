@@ -62,7 +62,9 @@ class DefocusEstimator
 		
 		// cmd. line options (see read()):
 		double defocusRange, kmin;	
-		bool fitAstigmatism, noGlobAstig, fitPhase, fitCs, globOnly;
+		int max_iters;
+		bool fitAstigmatism, bruteForcePre, bruteForcePost, bruteForceOnly;
+		std::string fittingMode;
 		
 		// set at init:
 		int verb, nr_omp_threads;
@@ -77,6 +79,14 @@ class DefocusEstimator
 		ObservationModel* obsModel;
 		
 		bool ready;
+		
+		
+		void bruteForceFit(
+				long g, MetaDataTable& mdt, 
+				const std::vector<Image<Complex>>& obs,
+				const std::vector<Image<Complex>>& pred,
+				std::string tag);
+		
 };
 
 #endif

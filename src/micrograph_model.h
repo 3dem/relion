@@ -85,8 +85,9 @@ public:
 	int first_frame; // First frame for local motion model. 1-indexed.
 	MotionModel *model;
 
-	// Local trajectories (not written, not read from STAR files)
+	// Local trajectories (not read from STAR files)
 	std::vector<RFLOAT> localShiftX, localShiftY, localFitX, localFitY, patchX, patchY, patchZ, patchW, patchH;
+	std::vector<int> hotpixelX, hotpixelY;
 
 	// Default constructor
 	Micrograph();
@@ -139,7 +140,7 @@ private:
 	std::vector<RFLOAT> globalShiftX, globalShiftY;
 
 	// Read micrograph model from a STAR file
-	void read(FileName filename);
+	void read(FileName filename, bool read_hotpixels=true);
 
 	// Set target movie file
 	void setMovie(FileName fnMovie, FileName fnGain="", RFLOAT binning=1.0);

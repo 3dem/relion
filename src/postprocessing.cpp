@@ -156,45 +156,17 @@ void Postprocessing::initialise()
 			REPORT_ERROR("Postprocessing::initialise ERROR: for --locres, you cannot do --auto_bfac, use --adhoc_bfac instead!");
 	}
 
-	if (do_auto_mask && fn_mask != "")
-		REPORT_ERROR("Postprocessing::initialise ERROR: provide either --auto_mask OR --mask, but not both!");
+	if (do_auto_mask)
+		REPORT_ERROR("Postprocessing:: --auto_mask has been removed. Please make a mask with relion_mask_create beforehand.");
 
 	if (do_auto_bfac && ABS(adhoc_bfac) > 0.)
 		REPORT_ERROR("Postprocessing::initialise ERROR: provide either --auto_bfac OR --adhoc_bfac, but not both!");
 }
 
-void Postprocessing::getAutoMask()
-{
-
-	if (verb > 0)
-	{
-		std::cout << "== Perform auto-masking ..." << std::endl;
-		std::cout.width(35); std::cout << std::left  << "  + density threshold: "; std::cout  << ini_mask_density_threshold << std::endl;
-		std::cout.width(35); std::cout << std::left  << "  + extend ini mask: "; std::cout  << extend_ini_mask << " pixels" << std::endl;
-		std::cout.width(35); std::cout << std::left  << "  + width soft edge: "; std::cout  << width_soft_mask_edge << " pixels" << std::endl;
-	}
-
-	// Store sum of both masks in Im
-	I1() += I2();
-	I1() /= 2.;
-	autoMask(I1(), Im(), ini_mask_density_threshold, extend_ini_mask, width_soft_mask_edge, true); // true sets verbosity
-
-	// Re-read original I1 into memory
-	I1.read(fn_I1);
-	I1().setXmippOrigin();
-
-}
-
 bool Postprocessing::getMask()
 {
 
-	// A. Check whether a user-provided mask is to be used
-	if (do_auto_mask)
-	{
-		getAutoMask();
-
-	}
-	else if (fn_mask != "")
+	if (fn_mask != "")
 	{
 		if (verb > 0)
 		{
@@ -641,18 +613,7 @@ void Postprocessing::writeOutput()
 	}
 
 	writeMaps(fn_out);
-	// Also write mask
-	if (do_auto_mask)
-	{
-		fn_tmp = fn_out + "_automask.mrc";
-		Im.setStatisticsInHeader();
-		Im.setSamplingRateInHeader(angpix);
-		Im.write(fn_tmp);
-		if (verb > 0)
-		{
-			std::cout.width(35); std::cout << std::left   <<"  + Auto-mask: "; std::cout << fn_tmp<< std::endl;
-		}
-	}
+
 	// Write an output STAR file with FSC curves, Guinier plots etc
 	std::ofstream  fh;
 	fn_tmp = fn_out + ".star";
@@ -828,7 +789,7 @@ void Postprocessing::writeMaps(FileName fn_root) {
 	}
 
 	// Also write the masked postprocessed map
-	if (do_auto_mask || fn_mask != "")
+	if (fn_mask != "")
 	{
 		fn_tmp = fn_out + "_masked.mrc";
 		I1() *= Im();
