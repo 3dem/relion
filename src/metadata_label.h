@@ -323,6 +323,7 @@ enum EMDLabel
 	EMDL_OPTIMISER_HAS_LARGE_INCR_SIZE_ITER_AGO,
 	EMDL_OPTIMISER_DO_HELICAL_REFINE,
 	EMDL_OPTIMISER_IGNORE_HELICAL_SYMMETRY,
+	EMDL_OPTIMISER_FOURIER_MASK,
 	EMDL_OPTIMISER_HELICAL_TWIST_INITIAL,
 	EMDL_OPTIMISER_HELICAL_RISE_INITIAL,
 	EMDL_OPTIMISER_HELICAL_Z_PERCENTAGE,
@@ -381,11 +382,13 @@ enum EMDLabel
 	EMDL_ORIENT_ORIGIN_Z_PRIOR_ANGSTROM,
 	EMDL_ORIENT_ROT,
 	EMDL_ORIENT_ROT_PRIOR,
+	EMDL_ORIENT_ROT_PRIOR_FLIP_RATIO,	// KThurber
 	EMDL_ORIENT_TILT,
 	EMDL_ORIENT_TILT_PRIOR,
 	EMDL_ORIENT_PSI,
 	EMDL_ORIENT_PSI_PRIOR,
 	EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO,
+	EMDL_ORIENT_PSI_PRIOR_FLIP,  // KThurber
 
 	EMDL_PARTICLE_AUTOPICK_FOM,
 	EMDL_PARTICLE_HELICAL_TUBE_ID,
@@ -817,6 +820,7 @@ private:
 		EMDL::addLabel(EMDL_OPTIMISER_HAS_LARGE_INCR_SIZE_ITER_AGO, EMDL_INT, "rlnHasLargeSizeIncreaseIterationsAgo", "How many iterations have passed since the last large increase in image size");
 		EMDL::addLabel(EMDL_OPTIMISER_DO_HELICAL_REFINE, EMDL_BOOL, "rlnDoHelicalRefine", "Flag to indicate that helical refinement should be performed");
 		EMDL::addLabel(EMDL_OPTIMISER_IGNORE_HELICAL_SYMMETRY, EMDL_BOOL, "rlnIgnoreHelicalSymmetry", "Flag to indicate that helical symmetry is ignored in 3D reconstruction");
+		EMDL::addLabel(EMDL_OPTIMISER_FOURIER_MASK, EMDL_STRING, "rlnFourierMask", "Name of an FFTW-centred Fourier mask to be applied to the Projector for refinement.");
 		EMDL::addLabel(EMDL_OPTIMISER_HELICAL_TWIST_INITIAL, EMDL_DOUBLE, "rlnHelicalTwistInitial", "The intial helical twist (rotation per subunit) in degrees before refinement");
 		EMDL::addLabel(EMDL_OPTIMISER_HELICAL_RISE_INITIAL, EMDL_DOUBLE, "rlnHelicalRiseInitial", "The initial helical rise (translation per subunit) in Angstroms before refinement");
 		EMDL::addLabel(EMDL_OPTIMISER_HELICAL_Z_PERCENTAGE, EMDL_DOUBLE, "rlnHelicalCentralProportion", "Only expand this central fraction of the Z axis when imposing real-space helical symmetry");
@@ -877,11 +881,13 @@ private:
 
 		EMDL::addLabel(EMDL_ORIENT_ROT, EMDL_DOUBLE, "rlnAngleRot", "First Euler angle (rot, in degrees)");
 		EMDL::addLabel(EMDL_ORIENT_ROT_PRIOR, EMDL_DOUBLE, "rlnAngleRotPrior", "Center of the prior (in degrees) on the first Euler angle (rot)");
+		EMDL::addLabel(EMDL_ORIENT_ROT_PRIOR_FLIP_RATIO, EMDL_DOUBLE, "rlnAngleRotFlipRatio", "Flip ratio of bimodal rot prior (0~0.5, 0 means an ordinary prior, 0.5 means a perfect bimodal prior)");   // KThurber
 		EMDL::addLabel(EMDL_ORIENT_TILT, EMDL_DOUBLE, "rlnAngleTilt", "Second Euler angle (tilt, in degrees)");
 		EMDL::addLabel(EMDL_ORIENT_TILT_PRIOR, EMDL_DOUBLE, "rlnAngleTiltPrior", "Center of the prior (in degrees) on the second Euler angle (tilt)");
 		EMDL::addLabel(EMDL_ORIENT_PSI, EMDL_DOUBLE, "rlnAnglePsi", "Third Euler, or in-plane angle (psi, in degrees)");
 		EMDL::addLabel(EMDL_ORIENT_PSI_PRIOR, EMDL_DOUBLE, "rlnAnglePsiPrior", "Center of the prior (in degrees) on the third Euler angle (psi)");
 		EMDL::addLabel(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, EMDL_DOUBLE, "rlnAnglePsiFlipRatio", "Flip ratio of bimodal psi prior (0~0.5, 0 means an ordinary prior, 0.5 means a perfect bimodal prior)");
+		EMDL::addLabel(EMDL_ORIENT_PSI_PRIOR_FLIP, EMDL_BOOL, "rlnAnglePsiFlip", "Flag to indicate that psi prior angle has been flipped");  // KThurber
 
 		EMDL::addLabel(EMDL_PARTICLE_AUTOPICK_FOM, EMDL_DOUBLE, "rlnAutopickFigureOfMerit", "Autopicking FOM for a particle");
 		EMDL::addLabel(EMDL_PARTICLE_HELICAL_TUBE_ID, EMDL_INT, "rlnHelicalTubeID", "Helical tube ID for a helical segment");

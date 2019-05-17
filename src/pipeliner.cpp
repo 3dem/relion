@@ -508,6 +508,14 @@ bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, boo
 	// Also save a copy of the GUI settings with the current output name
 	_job.write(_job.outputName);
 
+
+	// Remove run.out and run.err when overwriting a job
+	if (do_overwrite_current)
+	{
+		remove((_job.outputName+"run.out").c_str());
+		remove((_job.outputName+"run.err").c_str());
+	}
+
 	// If this is a continuation job, check whether output files exist and move away!
 	// This is to ensure that the continuation job goes OK and will show up as 'running' in the GUI
 	bool do_move_output_nodes_to_old = false;

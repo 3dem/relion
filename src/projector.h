@@ -70,55 +70,58 @@ public:
 
 public:
 
-	/** Empty constructor
-	 *
-	 * A default Projector is created.
-	 *
-	 * @code
-	 * Projector PPref;
-	 * @endcode
-	 */
-	Projector()
-	{
-		clear();
-	}
+    /** Empty constructor
+     *
+     * A default Projector is created.
+     *
+     * @code
+     * Projector PPref;
+     * @endcode
+     */
+    Projector()
+    {
+    	clear();
+    }
 
-	/** Constructor with parameters
-	 *
-	 * A default Projector is created.
-	 *
-	 * @code
-	 * Projector PPref(ori_size, NEAREST_NEIGHBOUR);
-	 * @endcode
-	 */
-	Projector(int _ori_size, int _interpolator = TRILINEAR, float _padding_factor_3d = 2., int _r_min_nn = 10, int _data_dim = 2)
-	{
+   /** Constructor with parameters
+     *
+     * A default Projector is created.
+     *
+     * @code
+     * Projector PPref(ori_size, NEAREST_NEIGHBOUR);
+     * @endcode
+     */
+    Projector(int _ori_size, int _interpolator = TRILINEAR, float _padding_factor_3d = 2., int _r_min_nn = 10, int _data_dim = 2)
+    {
 
-		// Store original dimension
-		ori_size = _ori_size;
+    	clear();
 
-		// Padding factor for the map
-		padding_factor = _padding_factor_3d;
+    	// Store original dimension
+    	ori_size = _ori_size;
 
-		// Interpolation scheme
-		interpolator = _interpolator;
+    	// Padding factor for the map
+    	padding_factor = _padding_factor_3d;
 
-		// Minimum radius for NN interpolation
-		r_min_nn = _r_min_nn;
+    	// Interpolation scheme
+    	interpolator = _interpolator;
 
-		// Dimension of the projections
-		data_dim = _data_dim;
-	}
+    	// Minimum radius for NN interpolation
+    	r_min_nn = _r_min_nn;
 
-	/** Copy constructor
-	 *
-	 * The created Projector is a perfect copy of the input array but with a
-	 * different memory assignment.
-	 *
-	 * @code
-	 * Projector V2(V1);
-	 * @endcode
-	 */
+    	// Dimension of the projections
+    	data_dim = _data_dim;
+
+    }
+
+    /** Copy constructor
+     *
+     * The created Projector is a perfect copy of the input array but with a
+     * different memory assignment.
+     *
+     * @code
+     * Projector V2(V1);
+     * @endcode
+     */
 	Projector(const Projector& op)
 	{
 		clear();
@@ -148,69 +151,66 @@ public:
 	}
 
 	/** Destructor
-	  *
-	  * Clears everything
-	  *
-	  * @code
-	  * FourierInterpolator fourint;
-	  * @endcode
-	  */
-	 ~Projector()
-	 {
-		 clear();
-	 }
+      *
+      * Clears everything
+      *
+      * @code
+      * FourierInterpolator fourint;
+      * @endcode
+      */
+     ~Projector()
+     {
+         clear();
+     }
 
-	/** Clear.
-	 * Initialize everything to back to default and empty arrays
-	 */
-	void clear()
-	{
-		data.clear();
-		r_max = r_min_nn = interpolator = ref_dim = data_dim = pad_size = 0;
-		padding_factor = 0.;
-	}
+   /** Clear.
+     * Initialize everything to back to default and empty arrays
+     */
+    void clear()
+    {
+    	data.clear();
+    	r_max = r_min_nn = interpolator = ref_dim = data_dim = pad_size = 0;
+    	padding_factor = 0.;
+    }
 
-	/*
-	 * Resize data array to the given size
-	 */
-	void initialiseData(int current_size = -1);
+    /*
+     * Resize data array to the given size
+     */
+    void initialiseData(int current_size = -1);
 
-	/*
-	 * Initialise data array to all zeros
-	 */
-	void initZeros(int current_size = -1);
+    /*
+     * Initialise data array to all zeros
+     */
+    void initZeros(int current_size = -1);
 
-	/*
-	 *	Only get the size of the data array
-	 */
-	long int getSize();
+    /*
+     *  Only get the size of the data array
+     */
+    long int getSize();
 
-	/* ** Prepares a 3D map for taking slices in its 3D Fourier Transform
-	*
-	* This routine does the following:
-	* 1. It pads the input map with zeros to obtain oversampling in the Fourier transform
-	* 2. It does the Fourier transform
-	* 3. It sets values beyond Nyquist for images of current_size to zero in the transform and windows the transform at max_r+1
-	* Depending on whether 2D or 3D Fourier Transforms will be extracted, the map is normalized internally in a different manner
-	*
-	*/
-	void computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in,
-	                                MultidimArray<RFLOAT> &power_spectrum,
-	                                int current_size = -1, int nr_threads = 1,
-	                                bool do_gridding = true, bool do_heavy = true,
-	                                int min_ires = -1);
+    /* ** Prepares a 3D map for taking slices in its 3D Fourier Transform
+    *
+    * This routine does the following:
+    * 1. It pads the input map with zeros to obtain oversampling in the Fourier transform
+    * 2. It does the Fourier transform
+    * 3. It sets values beyond Nyquist for images of current_size to zero in the transform and windows the transform at max_r+1
+    * Depending on whether 2D or 3D Fourier Transforms will be extracted, the map is normalized internally in a different manner
+    *
+    * If fourier_mask!= NULL: then apply this oriinally-size, FFTw-centered Fourier mask, also in power_spectrum calculations!
+    *
+    */
+   void computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in,
+								   MultidimArray<RFLOAT> &power_spectrum,
+								   int current_size = -1, int nr_threads = 1,
+								   bool do_gridding = true, bool do_heavy = true,
+								   int min_ires = -1,
+								   const MultidimArray<RFLOAT> *fourier_mask = NULL);
 
-	/* This is experimental: apply a mask in Fourier-space to focus refinements on certain Fourier components
-	* mask_r_min and mask_r_max are the radii of the lowest and highest frequencies (only keep crown inside)
-	* mask_ang is the opening angle along z (only really useful for helices, I guess)
-	*/
-	void applyFourierMask(int mask_r_min = 0, int mask_r_max = -1, RFLOAT mask_ang = 0.);
-
-	/* Because we interpolate in Fourier space to make projections and/or reconstructions, we have to correct
-	* the real-space maps by dividing them by the Fourier Transform of the interpolator
-	* Note these corrections are made on the not-oversampled, i.e. originally sized real-space map
-	*/
-	void griddingCorrect(MultidimArray<RFLOAT> &vol_in);
+   /* Because we interpolate in Fourier space to make projections and/or reconstructions, we have to correct
+    * the real-space maps by dividing them by the Fourier Transform of the interpolator
+    * Note these corrections are made on the not-oversampled, i.e. originally sized real-space map
+    */
+   void griddingCorrect(MultidimArray<RFLOAT> &vol_in);
 
    /*
 	* Go from the Projector-centered fourier transform back to FFTW-uncentered one

@@ -796,12 +796,12 @@ void shiftImageInFourierTransformWithTabSincos(MultidimArray<Complex > &in,
 
 			a = tabcos(dotp);
 			b = tabsin(dotp);
-			c = FFTW2D_ELEM(in, ip, jp).real;
-			d = FFTW2D_ELEM(in, ip, jp).imag;
+			c = DIRECT_A2D_ELEM(in, i, j).real;
+			d = DIRECT_A2D_ELEM(in, i, j).imag;
 			ac = a * c;
 			bd = b * d;
 			ab_cd = (a + b) * (c + d);
-			FFTW2D_ELEM(out, ip, jp) = Complex(ac - bd, ab_cd - ac - bd);
+			DIRECT_A2D_ELEM(out, i, j) = Complex(ac - bd, ab_cd - ac - bd);
 		}
 	}
 	else if (in.getDim() == 3)
@@ -821,12 +821,12 @@ void shiftImageInFourierTransformWithTabSincos(MultidimArray<Complex > &in,
 
 			a = tabcos(dotp);
 			b = tabsin(dotp);
-			c = FFTW_ELEM(in, kp, ip, jp).real;
-			d = FFTW_ELEM(in, kp, ip, jp).imag;
+			c = DIRECT_A3D_ELEM(in, k, i, j).real;
+			d = DIRECT_A3D_ELEM(in, k, i, j).imag;
 			ac = a * c;
 			bd = b * d;
 			ab_cd = (a + b) * (c + d);
-			FFTW_ELEM(out, kp, ip, jp) = Complex(ac - bd, ab_cd - ac - bd);
+			DIRECT_A3D_ELEM(out, k, i, j) = Complex(ac - bd, ab_cd - ac - bd);
 		}
 	}
 }
@@ -1734,4 +1734,25 @@ void helicalLayerLineProfile(const MultidimArray<RFLOAT > &v, std::string title,
 	plot2D->AddDataSet(dataSetAmpr);
 	plot2D->OutputPostScriptPlot(fn_eps);
 	delete plot2D;
+}
+
+void generateBinaryHelicalFourierMask(MultidimArray<RFLOAT> &mask, std::vector<RFLOAT> exclude_begin, std::vector<RFLOAT> exclude_end, RFLOAT angpix)
+{
+	if (exclude_begin.size() != exclude_end.size()) REPORT_ERROR("BUG: generateHelicalFourierMask: provide start-end resolutions for each shell.");
+
+	mask.initConstant(1.);
+
+	bool is_2d = (mask.getDim() == 2);
+	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(mask)
+	{
+		RFLOAT res;
+		if (is_2d) res = (jp == 0) ? 999. : YSIZE(mask) * angpix / fabs(jp); // helical axis along X-axis, so only jp matters!
+		else res = (kp == 0) ? 999. : ZSIZE(mask) * angpix / fabs(kp); // helical axis along Z-axis, so only kp matters!
+
+		for (int ishell = 0; ishell < exclude_begin.size(); ishell++)
+		{
+			if (res <= exclude_begin[ishell] && res >= exclude_end[ishell]) DIRECT_A3D_ELEM(mask, k, i, j) = 0.;
+		}
+	}
+
 }

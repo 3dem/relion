@@ -672,6 +672,8 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 				RFLOAT diffang = ACOSD( dotProduct(best_direction, prior_direction) );
 				if (diffang > 180.)
 					diffang = ABS(diffang - 360.);
+				if (do_bimodal_search_psi && (diffang > 90.))  // KThurber
+					diffang = ABS(diffang - 180.);	// KThurber
 
 				// Only consider differences within sigma_cutoff * sigma_rot
 				// TODO: If sigma_rot and sigma_tilt are not the same (NOT for helices)?
@@ -972,6 +974,7 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbabilityFor3DHelicalR
 		std::vector<int> &pointer_psi_nonzeroprior, std::vector<RFLOAT> &psi_prior,
 		bool do_auto_refine_local_searches,
 		RFLOAT prior_psi_flip_ratio,
+		RFLOAT prior_rot_flip_ratio,  // KThurber
 		RFLOAT sigma_cutoff)
 {
 	// Helical references are always along Z axis in 3D helical reconstructions
@@ -986,6 +989,7 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbabilityFor3DHelicalR
 	// It also saves time when sigma_rot is much larger than sigma_tilt (during local searches in 3D auto-refine)
 
 	RFLOAT prior_psi_flip_ratio_thres_min = 0.01;
+	RFLOAT prior_rot_flip_ratio_thres_min = 0.01; 	// KThurber
 
 	pointer_dir_nonzeroprior.clear();
 	directions_prior.clear();
@@ -1035,7 +1039,8 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbabilityFor3DHelicalR
 				{
 					// Assume tilt = (0, +180)
 					// TODO: Check if "(tilt_angles[idir] > 0.01) && (tilt_angles[idir] < 179.99)" is needed
-					if (prior_psi_flip_ratio > prior_psi_flip_ratio_thres_min)
+					//if (prior_psi_flip_ratio > prior_psi_flip_ratio_thres_min)
+					if (prior_psi_flip_ratio > -1.)		// KThurber above line changed to primarily dummy if
 					{
 						Matrix1D<RFLOAT> my_direction2, sym_direction2, best_direction2;
 
@@ -1070,6 +1075,19 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbabilityFor3DHelicalR
 				diff_rot = ABS(sym_rot - prior_rot);
 				if (diff_rot > 180.)
 					diff_rot = ABS(diff_rot - 360.);
+
+				// KThurber begin add
+				bool is_rot_flipped = false;
+				if (!do_auto_refine_local_searches)
+				{
+					if (diff_rot > 90.)
+					{
+						diff_rot = ABS(diff_rot - 180.);
+						is_rot_flipped = true;
+					}
+				}
+				// KThurber end add
+
 				diff_tilt = ABS(sym_tilt - prior_tilt);
 				if (diff_tilt > 180.)
 					diff_tilt = ABS(diff_tilt - 360.);
@@ -1078,6 +1096,15 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbabilityFor3DHelicalR
 				{
 					// TODO!!! If tilt is zero then any rot will be OK!!!!!
 					RFLOAT prior = gaussian2D(diff_rot, diff_tilt, sigma_rot, sigma_tilt, 0.);
+					// KThurber begin add
+					if (!do_auto_refine_local_searches)
+					{
+						if (is_rot_flipped)
+							prior *= prior_rot_flip_ratio;
+						else
+							prior *= (1. - prior_rot_flip_ratio);
+					}
+					// KThurber end add
 					pointer_dir_nonzeroprior.push_back(idir);
 					directions_prior.push_back(prior);
 					sumprior += prior;
@@ -1134,7 +1161,8 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbabilityFor3DHelicalR
 				{
 					// Assume tilt = (0, +180)
 					// TODO: Check if "(tilt_angles[idir] > 0.01) && (tilt_angles[idir] < 179.99)" is needed
-					if (prior_psi_flip_ratio > prior_psi_flip_ratio_thres_min)
+					//if (prior_psi_flip_ratio > prior_psi_flip_ratio_thres_min)
+					if (prior_psi_flip_ratio > -1.)		// KThurber above line changed to primarily dummy if
 					{
 						Matrix1D<RFLOAT> my_direction2, sym_direction2;
 

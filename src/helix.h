@@ -3,6 +3,8 @@
  * Author: "Shaoda He"
  * MRC Laboratory of Molecular Biology
  *
+ * Kent Thurber from the NIH provided code for rot-angle priors (indicated with // KThurber comments)
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -409,12 +411,13 @@ public:
 	RFLOAT rot_deg, psi_deg, tilt_deg;
 	RFLOAT dx_A, dy_A, dz_A;
 	RFLOAT track_pos_A;
-	bool has_wrong_polarity;
+	bool has_wrong_polarity, has_wrong_rot;	// KThurber
 	int subset, classID;
 
-	RFLOAT psi_prior_deg, tilt_prior_deg;
+	RFLOAT rot_prior_deg, psi_prior_deg, tilt_prior_deg;  // KThurber
 	RFLOAT dx_prior_A, dy_prior_A, dz_prior_A;
-	RFLOAT psi_flip_ratio;
+	RFLOAT psi_flip_ratio, rot_flip_ratio;	// KThurber
+	bool psi_prior_flip;	// KThurber
 
 	void clear();
 
@@ -433,16 +436,48 @@ void flipPsiTiltForHelicalSegment(
 		RFLOAT& new_psi,
 		RFLOAT& new_tilt);
 
+// KThurber add this function
+void flipRotPsiTiltForHelicalSegment(
+		RFLOAT old_rot,
+		RFLOAT old_psi,
+		RFLOAT old_tilt,
+		RFLOAT& new_rot,
+		RFLOAT& new_psi,
+		RFLOAT& new_tilt);
+
+// KThurber add this function
+void flipRotPsiTiltPriorsForHelicalSegment(
+		RFLOAT old_rot,
+		RFLOAT old_psi,
+		RFLOAT old_tilt,
+		RFLOAT old_pitch,
+		bool old_psi_prior_flip,
+		RFLOAT& new_rot,
+		RFLOAT& new_psi,
+		RFLOAT& new_tilt,
+		RFLOAT& new_pitch,
+		bool& new_psi_prior_flip);
+
+// KThurber add this function
+void flipRotForHelicalSegment(
+		RFLOAT old_rot,
+		RFLOAT& new_rot);
+
 void updatePriorsForOneHelicalTube(
 		std::vector<HelicalSegmentPriorInfoEntry>& list,
 		int sid,
 		int eid,
 		int& nr_wrong_polarity,
+		int& nr_wrong_rot,	// KThurber
 		RFLOAT sigma_segment_dist,
+		std::vector<RFLOAT> helical_rise,
+		std::vector<RFLOAT> helical_twist,
 		bool is_3D,
 		bool do_auto_refine,
 		bool do_local_angular_searches,
 		bool do_exclude_out_of_range_trans,
+		bool psi_prior_flip,     // KThurber
+		RFLOAT sigma2_rot,       // KThurber
 		RFLOAT sigma2_tilt,
 		RFLOAT sigma2_psi,
 		RFLOAT sigma2_offset,
@@ -451,7 +486,10 @@ void updatePriorsForOneHelicalTube(
 void updatePriorsForHelicalReconstruction(
 		MetaDataTable& MD,
 		int& total_opposite_polarity,
+		int& total_opposite_rot,	// KThurber
 		RFLOAT sigma_segment_dist,
+		std::vector<RFLOAT> helical_rise,
+		std::vector<RFLOAT> helical_twist,
 		bool is_3D,
 		bool do_auto_refine,
 		bool do_local_angular_searches,
@@ -470,6 +508,8 @@ void updateAngularPriorsForHelicalReconstruction(
 void testDataFileTransformXY(MetaDataTable& MD);
 
 void setPsiFlipRatioInStarFile(MetaDataTable& MD, RFLOAT ratio = 0.);
+
+void setRotFlipRatioInStarFile(MetaDataTable& MD, RFLOAT ratio = 0.);	// KThurber
 
 void plotLatticePoints(MetaDataTable& MD,
 		int x1, int y1, int x2, int y2);

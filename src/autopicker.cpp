@@ -1390,6 +1390,7 @@ void AutoPicker::pickAmyloids(
 	MDout.addLabel(EMDL_ORIENT_PSI_PRIOR);
 	MDout.addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM);
 	MDout.addLabel(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO);
+	MDout.addLabel(EMDL_ORIENT_ROT_PRIOR_FLIP_RATIO);	// KThurber
 
 
 	float interbox_dist = (min_particle_distance / angpix);
@@ -1434,6 +1435,7 @@ void AutoPicker::pickAmyloids(
 				MDout.setValue(EMDL_ORIENT_PSI_PRIOR, myang);
 				MDout.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM, angpix * tube_length);
 				MDout.setValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, 0.5);
+				MDout.setValue(EMDL_ORIENT_ROT_PRIOR_FLIP_RATIO, 0.5);	// KThurber
 
 				leftover_dist = interbox_dist + (distnex - position);
 				tube_length += interbox_dist;
@@ -2456,6 +2458,7 @@ void AutoPicker::exportHelicalTubes(
 	MDout.addLabel(EMDL_ORIENT_PSI_PRIOR);
 	MDout.addLabel(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM);
 	MDout.addLabel(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO);
+	MDout.addLabel(EMDL_ORIENT_ROT_PRIOR_FLIP_RATIO);  //KThurber
 
 	helical_tube_id = 0;
 	for (int itube = 0; itube < tube_coord_list.size(); itube++)
@@ -2508,6 +2511,7 @@ void AutoPicker::exportHelicalTubes(
 			MDout.setValue(EMDL_ORIENT_PSI_PRIOR, (-1.) * (tube_coord_list[itube][icoord].psi)); // Beware! Multiplied by -1!
 			MDout.setValue(EMDL_PARTICLE_HELICAL_TRACK_LENGTH_ANGSTROM, angpix * helical_tube_len);
 			MDout.setValue(EMDL_ORIENT_PSI_PRIOR_FLIP_RATIO, BIMODAL_PSI_PRIOR_FLIP_RATIO);
+			MDout.setValue(EMDL_ORIENT_ROT_PRIOR_FLIP_RATIO, BIMODAL_PSI_PRIOR_FLIP_RATIO);	// KThurber
 		}
 	}
 

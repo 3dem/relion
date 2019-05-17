@@ -2132,7 +2132,7 @@ void MlOptimiserMpi::maximization()
 						applyLocalSymmetry(mymodel.Iref[ith_recons], fn_local_symmetry_masks, fn_local_symmetry_operators);
 
 					// Shaoda Jul26,2015 - Helical symmetry local refinement
-					if ( (iter > 1) && (do_helical_refine) && (!ignore_helical_symmetry) && (do_helical_symmetry_local_refinement) )
+					if ( (iter > 1) && (do_helical_refine) && (!ignore_helical_symmetry) && (do_helical_symmetry_local_refinement) && mymodel.ref_dim != 2)
 					{
 						localSearchHelicalSymmetry(
 								mymodel.Iref[ith_recons],
@@ -2151,7 +2151,7 @@ void MlOptimiserMpi::maximization()
 								mymodel.helical_twist[ith_recons]);
 					}
 					// Sjors & Shaoda Apr 2015 - Apply real space helical symmetry and real space Z axis expansion.
-					if ( (do_helical_refine) && (!ignore_helical_symmetry) && (!has_converged) )
+					if ( (do_helical_refine) && (!ignore_helical_symmetry) && (!has_converged) && mymodel.ref_dim != 2)
 					{
 						imposeHelicalSymmetryInRealSpace(
 								mymodel.Iref[ith_recons],
@@ -2274,7 +2274,7 @@ void MlOptimiserMpi::maximization()
 								applyLocalSymmetry(mymodel.Iref[ith_recons], fn_local_symmetry_masks, fn_local_symmetry_operators);
 
 							// Shaoda Jul26,2015 - Helical symmetry local refinement
-							if ( (iter > 1) && (do_helical_refine) && (!ignore_helical_symmetry) && (do_helical_symmetry_local_refinement) )
+							if ( (iter > 1) && (do_helical_refine) && (!ignore_helical_symmetry) && (do_helical_symmetry_local_refinement) && mymodel.ref_dim != 2 )
 							{
 								localSearchHelicalSymmetry(
 										mymodel.Iref[ith_recons],
@@ -2293,7 +2293,7 @@ void MlOptimiserMpi::maximization()
 										mymodel.helical_twist[ith_recons]);
 							}
 							// Sjors & Shaoda Apr 2015 - Apply real space helical symmetry and real space Z axis expansion.
-							if( (do_helical_refine) && (!ignore_helical_symmetry) && (!has_converged) )
+							if( (do_helical_refine) && (!ignore_helical_symmetry) && (!has_converged) && mymodel.ref_dim != 2 )
 							{
 								imposeHelicalSymmetryInRealSpace(
 										mymodel.Iref[ith_recons],
@@ -2490,7 +2490,7 @@ void MlOptimiserMpi::maximization()
 	if (verb > 0)
 		progress_bar(mymodel.nr_classes);
 
-	if ( (verb > 0) && (do_helical_refine) && (!ignore_helical_symmetry) )
+	if ( (verb > 0) && (do_helical_refine) && (!ignore_helical_symmetry) && mymodel.ref_dim != 2 )
 	{
 		outputHelicalSymmetryStatus(
 				iter,
@@ -3123,7 +3123,7 @@ void MlOptimiserMpi::iterate()
 		// DEBUG
 		if ( (verb > 0) && (node->isMaster()) )
 		{
-			if ( (do_helical_refine) && (!ignore_helical_symmetry) )
+			if ( (do_helical_refine) && (!ignore_helical_symmetry) && mymodel.ref_dim != 2 )
 			{
 				if (mymodel.helical_nr_asu > 1)
 					std::cout << " Applying helical symmetry from the last iteration for all asymmetrical units in Fourier space..." << std::endl;
@@ -3248,10 +3248,12 @@ void MlOptimiserMpi::iterate()
 #endif
 		if (node->isMaster())
 		{
-			if ( (do_helical_refine) && (!do_skip_align) && (!do_skip_rotate) )
+			if ( (do_helical_refine) && (!do_skip_align) && (!do_skip_rotate) && mymodel.ref_dim == 3)
 			{
 				int nr_same_polarity = 0, nr_opposite_polarity = 0;
+				int nr_same_rot = 0, nr_opposite_rot = 0;	// KThurber
 				RFLOAT opposite_percentage = 0.;
+				RFLOAT rot_opposite_percent = 0.;	// KThurber
 				bool do_auto_refine_local_searches = (do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches);
 				bool do_classification_local_searches = (!do_auto_refine) && (mymodel.orientational_prior_mode == PRIOR_ROTTILT_PSI)
 						&& (mymodel.sigma2_rot > 0.) && (mymodel.sigma2_tilt > 0.) && (mymodel.sigma2_psi > 0.);
@@ -3264,7 +3266,10 @@ void MlOptimiserMpi::iterate()
 					updatePriorsForHelicalReconstruction(
 							mydata.MDimg,
 							nr_opposite_polarity,
+							nr_opposite_rot,	// KThurber
 							helical_sigma_distance * ((RFLOAT)(mymodel.ori_size)),
+							mymodel.helical_rise,
+							mymodel.helical_twist,
 							(mymodel.data_dim == 3),
 							do_auto_refine,
 							do_local_angular_searches,
@@ -3276,11 +3281,12 @@ void MlOptimiserMpi::iterate()
 
 					nr_same_polarity = ((int)(mydata.MDimg.numberOfObjects())) - nr_opposite_polarity;
 					opposite_percentage = (100.) * ((RFLOAT)(nr_opposite_polarity)) / ((RFLOAT)(mydata.MDimg.numberOfObjects()));
+					nr_same_rot = ((int)(mydata.MDimg.numberOfObjects())) - nr_opposite_rot; // KThurber
+					rot_opposite_percent = (100.) * ((RFLOAT)(nr_opposite_rot)) / ((RFLOAT)(mydata.MDimg.numberOfObjects())); // KThurber
 					if ( (verb > 0) && (!do_local_angular_searches) )
 					{
-						//std::cout << " DEBUG: auto_refine, healpix_order, min_for_local = " << do_auto_refine << ", " << sampling.healpix_order << ", " << autosampling_hporder_local_searches << std::endl;
-						//std::cout << " DEBUG: orient_prior_mode = " << PRIOR_ROTTILT_PSI << ", sigma_ang2 = " << mymodel.sigma2_rot << ", " << mymodel.sigma2_tilt << ", " << mymodel.sigma2_psi << ", sigma_offset2 = " << mymodel.sigma2_offset << std::endl;
 						std::cout << " Number of helical segments with psi angles similar/opposite to their priors: " << nr_same_polarity << " / " << nr_opposite_polarity << " (" << opposite_percentage << "%)" << std::endl;
+						std::cout << " Number of helical segments with rot angles similar/opposite to their priors: " << nr_same_rot << " / " << nr_opposite_rot << " (" << rot_opposite_percent << "%)" << std::endl; // KThurber
 					}
 				}
 			}

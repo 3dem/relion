@@ -1163,6 +1163,16 @@ void JobWindow::initialiseClass2DWindow()
 	place("do_bimodal_psi");
 	place("range_psi");
 
+	group7 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group7->end();
+	place("do_restrict_xoff", TOGGLE_LEAVE_ACTIVE, group7);
+
+	group7->begin();
+	place("helical_rise", TOGGLE_LEAVE_ACTIVE);
+	group7->end();
+
+	guientries["do_restrict_xoff"].cb_menu_i();
+
 	group4->end();
 	guientries["do_helix"].cb_menu_i(); // to make default effective
 
@@ -1438,9 +1448,9 @@ void JobWindow::initialiseClass3DWindow()
 
 	group5->begin();
 	place2("helical_tube_inner_diameter", "helical_tube_outer_diameter", "Tube diameter - inner, outer (A):", TOGGLE_DEACTIVATE);
-	place2("range_tilt", "range_psi", "Angular search range - tilt, psi (deg):", TOGGLE_DEACTIVATE);
-	place("keep_tilt_prior_fixed", TOGGLE_DEACTIVATE);
+	place3("range_rot", "range_tilt", "range_psi", "Angular search range - rot, tilt, psi (deg):", TOGGLE_DEACTIVATE);
 	place("helical_range_distance", TOGGLE_DEACTIVATE);
+	place("keep_tilt_prior_fixed", TOGGLE_DEACTIVATE);
 
 	// Add a little spacer
 	current_y += STEPY/2;
@@ -1577,9 +1587,9 @@ void JobWindow::initialiseAutorefineWindow()
 	place("do_helix", TOGGLE_DEACTIVATE, group2);
 	group2->begin();
 	place2("helical_tube_inner_diameter", "helical_tube_outer_diameter", "Tube diameter - inner, outer (A):",TOGGLE_DEACTIVATE);
-	place2("range_tilt", "range_psi", "Angular search range - tilt, psi (deg):", TOGGLE_DEACTIVATE);
-	place("keep_tilt_prior_fixed", TOGGLE_DEACTIVATE);
+	place3("range_rot", "range_tilt", "range_psi", "Angular search range - rot, tilt, psi (deg):", TOGGLE_DEACTIVATE);
 	place("helical_range_distance", TOGGLE_DEACTIVATE);
+	place("keep_tilt_prior_fixed", TOGGLE_DEACTIVATE);
 
 	// Add a little spacer
 	current_y += STEPY/2;
