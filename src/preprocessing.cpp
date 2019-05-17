@@ -400,6 +400,11 @@ void Preprocessing::runExtractParticles()
 	bool micIsUsed;
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDmics)
 	{
+
+		// Abort through the pipeline_control system
+		if (pipeline_control_check_abort_job())
+			exit(RELION_EXIT_ABORTED);
+
 		MDmics.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
 		int optics_group = obsModelMic.getOpticsGroup(MDmics);
 

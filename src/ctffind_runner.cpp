@@ -118,7 +118,7 @@ void CtffindRunner::initialise()
 	char *shell_name;
 	shell_name = getenv("RELION_SHELL");
 	if (shell_name != NULL)
-		fn_shell = (std::string)shell_name;	
+		fn_shell = (std::string)shell_name;
 
 	if (do_use_gctf && ctf_win>0)
 		REPORT_ERROR("ERROR: Running Gctf together with --ctfWin is not implemented, please use CTFFIND instead.");
@@ -383,6 +383,10 @@ void CtffindRunner::run()
 		std::vector<std::string> allmicnames;
 		for (long int imic = 0; imic < fn_micrographs.size(); imic++)
 		{
+
+			// Abort through the pipeline_control system
+			if (pipeline_control_check_abort_job())
+				exit(RELION_EXIT_ABORTED);
 
 			// Get angpix and voltage from the optics groups:
 			obsModel.opticsMdt.getValue(EMDL_CTF_CS, Cs, optics_group_micrographs[imic]-1);

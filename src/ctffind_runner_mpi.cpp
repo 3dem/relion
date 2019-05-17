@@ -62,6 +62,10 @@ void CtffindRunnerMpi::run()
 		for (long int imic = my_first_micrograph; imic <= my_last_micrograph; imic++)
 		{
 
+			// Abort through the pipeline_control system
+			if (pipeline_control_check_abort_job())
+				MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
+
 			// Get angpix and voltage from the optics groups:
 			obsModel.opticsMdt.getValue(EMDL_CTF_CS, Cs, optics_group_micrographs[imic]-1);
 			obsModel.opticsMdt.getValue(EMDL_CTF_VOLTAGE, Voltage, optics_group_micrographs[imic]-1);

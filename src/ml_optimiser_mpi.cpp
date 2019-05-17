@@ -1266,7 +1266,7 @@ void MlOptimiserMpi::expectation()
         catch (RelionError XE)
         {
             std::cerr << "master encountered error: " << XE;
-            MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+            MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_FAILURE);
         }
 #ifdef TIMING
 		timer.toc(TIMING_EXP_5);
@@ -1545,7 +1545,7 @@ void MlOptimiserMpi::expectation()
         catch (RelionError XE)
         {
             std::cerr << "slave "<< node->rank << " encountered error: " << XE;
-            MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+            MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_FAILURE);
         }
 #ifdef TIMING
 		timer.toc(TIMING_EXP_6);

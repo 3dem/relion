@@ -95,7 +95,12 @@ void AutoPickerMpi::run()
 	FileName fn_olddir="";
 	for (long int imic = my_first_micrograph; imic <= my_last_micrograph; imic++)
     {
-    	if (verb > 0 && imic % barstep == 0)
+
+		// Abort through the pipeline_control system
+		if (pipeline_control_check_abort_job())
+			MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
+
+		if (verb > 0 && imic % barstep == 0)
 			progress_bar(imic);
 
 		// Check new-style outputdirectory exists and make it if not!

@@ -63,6 +63,10 @@ void MotioncorrRunnerMpi::run()
 		if (verb > 0 && imic % barstep == 0)
 			progress_bar(imic);
 
+		// Abort through the pipeline_control system
+		if (pipeline_control_check_abort_job())
+			MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
+
 		Micrograph mic(fn_micrographs[imic], fn_gain_reference, bin_factor);
 
 		// Get angpix and voltage from the optics groups:

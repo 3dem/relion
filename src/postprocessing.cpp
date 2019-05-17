@@ -912,6 +912,11 @@ void Postprocessing::run_locres(int rank, int size)
 		for (long int ii=((I1()).yinit); ii<=((I1()).yinit + (I1()).ydim - 1); ii+= step_size)
 			for (long int jj=((I1()).xinit); jj<=((I1()).xinit + (I1()).xdim - 1); jj+= step_size)
 			{
+
+				// Abort through the pipeline_control system, TODO: check how this goes with MPI....
+				if (pipeline_control_check_abort_job())
+					exit(RELION_EXIT_ABORTED);
+
 				// Only calculate local-resolution inside a spherical mask with radius less than half-box-size minus maskrad_pix
 				float rad = sqrt(kk*kk + ii*ii + jj*jj);
 				if (rad < myrad)
