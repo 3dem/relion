@@ -134,5 +134,5 @@ int main(int argc, char **argv) {
 	app.read(argc, argv);
 	app.run();
 //	timer.printTimes(false);
-	return 0;
+	return RELION_EXIT_SUCCESS;
 }

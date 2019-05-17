@@ -173,7 +173,7 @@ class ctf_toolbox_parameters
 						DIRECT_MULTIDIM_ELEM(Fimg, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
 					else
 					{
-						// this is safe because getCTF does not return 0.
+						// this is safe because getCTF does not return RELION_EXIT_SUCCESS.
 						DIRECT_MULTIDIM_ELEM(Fimg, n) /= DIRECT_MULTIDIM_ELEM(Fctf, n);
 					}
 				}
@@ -227,7 +227,7 @@ int main(int argc, char *argv[])
 	{
 		prm.usage();
 		std::cerr << XE;
-		exit(1);
+		return RELION_EXIT_FAILURE;
 	}
-	return 0;
+	return RELION_EXIT_SUCCESS;
 }

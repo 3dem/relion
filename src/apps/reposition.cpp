@@ -146,5 +146,5 @@ int main(int argc, char *argv[])
 	
 	outMdt.write(outFn+"repositioned.star");
 	
-	return 0;
+	return RELION_EXIT_SUCCESS;
 }

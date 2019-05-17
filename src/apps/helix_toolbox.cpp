@@ -1507,8 +1507,8 @@ int main(int argc, char *argv[])
 	{
 		prm.usage();
 		std::cout << XE;
-		exit(1);
+		return RELION_EXIT_FAILURE;
 	}
 
-	return 0;
+	return RELION_EXIT_SUCCESS;
 }

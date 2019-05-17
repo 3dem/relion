@@ -60,9 +60,9 @@ int main(int argc, char *argv[])
 		std::cerr << XE;
 		MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
 
-		return EXIT_FAILURE;
+		return RELION_EXIT_FAILURE;
 	}
 
-	return EXIT_SUCCESS;
+	return RELION_EXIT_SUCCESS;
 }
 

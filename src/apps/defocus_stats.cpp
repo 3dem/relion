@@ -14,7 +14,7 @@ int main(int argc, char *argv[])
 	parser.addSection("General options");
 	starFn = parser.getOption("--i", "Input STAR file with a list of particles");
 	
-	if (parser.checkForErrors()) return 1;
+	if (parser.checkForErrors()) return RELION_EXIT_FAILURE;
 
 	MetaDataTable mdt0;
 	mdt0.read(starFn);
@@ -54,5 +54,5 @@ int main(int argc, char *argv[])
 	
 	std::cout << "sigma: " << sqrt(var) << "\n";
 	
-	return 0;
+	return RELION_EXIT_SUCCESS;
 }

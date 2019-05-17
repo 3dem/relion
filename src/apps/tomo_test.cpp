@@ -160,7 +160,7 @@ int main(int argc, char *argv[])
 		spacing, 
 		spacing);
 	
-	return 0;
+	return RELION_EXIT_SUCCESS;
 }
 
 void drawPoint(Volume<RFLOAT>& dest, d3Vector p, RFLOAT val)

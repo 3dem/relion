@@ -41,6 +41,6 @@ int main(int argc, char *argv[])
 		MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
 	}
 
-	return 0;
+	return RELION_EXIT_SUCCESS;
 }
 

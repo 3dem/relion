@@ -4,5 +4,5 @@ int main(int argc, char *argv[])
 {
 	Interpolation::test2D();
 
-	return 0;	
+	return RELION_EXIT_SUCCESS;	
 }

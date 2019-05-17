@@ -56,7 +56,7 @@ int main(int argc, char *argv[])
     {
         parser.writeUsage(std::cout);
         std::cerr << XE;
-        exit(1);
+        return RELION_EXIT_FAILURE;
     }
 
 	ObservationModel obsModel;	
@@ -129,5 +129,5 @@ int main(int argc, char *argv[])
 		}
 	}		
 
-	return 0;
+	return RELION_EXIT_SUCCESS;
 }

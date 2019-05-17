@@ -71,12 +71,12 @@ int CsFit::readMoreOptions(IOParser& parser, int argc, char *argv[])
 	samples = textToInteger(parser.getOption("--n", "Number of C_s samples", "31"));
 	defocusRange = textToFloat(parser.getOption("--range", "Defocus scan range (in A)", "500."));
 
-	return 0;
+	return RELION_EXIT_SUCCESS;
 }
 
 int CsFit::_init()
 {
-	return 0;
+	return RELION_EXIT_SUCCESS;
 }
 
 int CsFit::_run()
@@ -211,5 +211,5 @@ int CsFit::_run()
 
 	std::cout << "elapsed: " << (t1 - t0) << "s \n";
 
-	return 0;
+	return RELION_EXIT_SUCCESS;
 }

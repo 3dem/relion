@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
     {
         parser.writeUsage(std::cout);
         std::cerr << XE;
-        exit(1);
+        return RELION_EXIT_FAILURE;
     }
 
 	ObservationModel obsModel;	
@@ -149,7 +149,7 @@ int main(int argc, char *argv[])
 	if (first < 0)
 	{
 		std::cerr << "No data found!\n";
-		return -1;
+		return RELION_EXIT_FAILURE;
 	}
 	
 	
@@ -222,5 +222,5 @@ int main(int argc, char *argv[])
 	
 	plot2D.OutputPostScriptPlot(outPath+".eps");
 	
-	return 0;
+	return RELION_EXIT_SUCCESS;
 }
