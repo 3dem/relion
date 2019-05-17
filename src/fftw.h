@@ -1002,6 +1002,9 @@ void amplitudeOrPhaseMap(const MultidimArray<RFLOAT> &v, MultidimArray<RFLOAT> &
 
 void helicalLayerLineProfile(const MultidimArray<RFLOAT> &v, std::string title, std::string fn_eps);
 
+void generateBinaryHelicalFourierMask(MultidimArray<RFLOAT> &mask, std::vector<RFLOAT> exclude_begin, std::vector<RFLOAT> exclude_end, RFLOAT angpix);
+
+
 template <class T>
 void cropInFourierSpace(MultidimArray<T> &Fref, MultidimArray<T> &Fbinned) {
 	const int nfx = XSIZE(Fref), nfy = YSIZE(Fref);

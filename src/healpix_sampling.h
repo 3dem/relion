@@ -243,6 +243,7 @@ public:
     		std::vector<int> &pointer_psi_nonzeroprior, std::vector<RFLOAT> &psi_prior,
     		bool do_auto_refine_local_searches,
     		RFLOAT prior_psi_flip_ratio = 0.5,
+			RFLOAT prior_rot_flip_ratio = 0.5,  // KThurber
     		RFLOAT sigma_cutoff = 3.);
 
     /** Get the symmetry group of this sampling object

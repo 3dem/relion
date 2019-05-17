@@ -98,9 +98,12 @@ long int Projector::getSize()
 
 }
 
+
 // Fill data array with oversampled Fourier transform, and calculate its power spectrum
-void Projector::computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, MultidimArray<RFLOAT> &power_spectrum,
-                                           int current_size, int nr_threads, bool do_gridding, bool do_heavy, int min_ires)
+void Projector::computeFourierTransformMap(
+		MultidimArray<RFLOAT> &vol_in, MultidimArray<RFLOAT> &power_spectrum,
+		int current_size, int nr_threads, bool do_gridding, bool do_heavy, int min_ires,
+		const MultidimArray<RFLOAT>* fourier_mask)
 {
 	TIMING_TIC(TIMING_TOP);
 
@@ -119,6 +122,8 @@ void Projector::computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, Multid
 
 	// Initialize data array of the oversampled transform
 	ref_dim = vol_in.getDim();
+
+	bool do_fourier_mask = (fourier_mask != NULL);
 
 	// Make Mpad
 	switch (ref_dim)
@@ -210,6 +215,7 @@ void Projector::computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, Multid
 
 	if(do_heavy)
 	{
+		RFLOAT weight = 1.;
 		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Faux) // This will also work for 2D
 		{
 			int r2 = kp*kp + ip*ip + jp*jp;
@@ -217,13 +223,15 @@ void Projector::computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, Multid
 			// Set data array
 			if (r2 <= max_r2)
 			{
-				A3D_ELEM(data, kp, ip, jp) = DIRECT_A3D_ELEM(Faux, k, i, j) * normfft;
+				if (do_fourier_mask) weight = FFTW_ELEM(*fourier_mask, ROUND(kp/padding_factor), ROUND(ip/padding_factor), ROUND(jp/padding_factor));
+				// Set data array
+				A3D_ELEM(data, kp, ip, jp) = weight * DIRECT_A3D_ELEM(Faux, k, i, j) * normfft;
 
 				// Calculate power spectrum
 				int ires = ROUND( sqrt((RFLOAT)r2) / padding_factor );
 				// Factor two because of two-dimensionality of the complex plane
 				DIRECT_A1D_ELEM(power_spectrum, ires) += norm(A3D_ELEM(data, kp, ip, jp)) / 2.;
-				DIRECT_A1D_ELEM(counter, ires) += 1.;
+				DIRECT_A1D_ELEM(counter, ires) += weight;
 
 				// Apply high pass filter of the reference only after calculating the power spectrum
 				if (r2 <= min_r2)
@@ -266,49 +274,6 @@ void Projector::computeFourierTransformMap(MultidimArray<RFLOAT> &vol_in, Multid
 
 #ifdef PROJ_TIMING
 	proj_timer.printTimes(false);
-#endif
-
-}
-
-void Projector::applyFourierMask(int mask_r_min, int mask_r_max, RFLOAT mask_ang)
-{
-
-	if (mask_r_max < 0)
-		mask_r_max = r_max;
-	int mask_r_min2 = ROUND(mask_r_min * padding_factor) * ROUND(mask_r_min * padding_factor);
-	int mask_r_max2 = ROUND(mask_r_max * padding_factor) * ROUND(mask_r_max * padding_factor);
-	float mask_ang_rad = DEG2RAD(mask_ang);
-
-	FOR_ALL_ELEMENTS_IN_ARRAY3D(data)
-	{
-		int myr2 = k*k + i*i + j*j;
-
-		// Select resolutions
-		if (myr2 < mask_r_min2 || myr2 > mask_r_max2)
-			A3D_ELEM(data, k, i, j) = 0.;
-
-		// Select opening angle along z
-		if (mask_ang > 0.)
-		{
-			float myang = atan(sqrt((float)(i*i+j*j))/fabs((float)(k)));
-			if (myang > mask_ang_rad)
-				A3D_ELEM(data, k, i, j) = 0.;
-		}
-	}
-
-//#define DEBUG_MASK
-#ifdef DEBUG_MASK
-	Image<RFLOAT> ttt;
-	ttt().resize(data);
-	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(ttt())
-	{
-		if (abs(DIRECT_MULTIDIM_ELEM(data, n)) > 0.)
-			DIRECT_MULTIDIM_ELEM(ttt(), n) = 1.;
-		else
-			DIRECT_MULTIDIM_ELEM(ttt(), n) = 0.;
-	}
-	ttt.write("fourier_mask.spi");
-	std::cerr << " written out fourier_mask.spi" << std::endl;
 #endif
 
 }

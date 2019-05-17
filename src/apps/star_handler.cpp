@@ -38,7 +38,7 @@ class star_handler_parameters
 	RFLOAT eps, select_minval, select_maxval, multiply_by, add_to, center_X, center_Y, center_Z, hist_min, hist_max;
 	bool do_ignore_optics, do_combine, do_split, do_center, do_random_order, show_frac, show_cumulative, do_discard;
 	long int nr_split, size_split, nr_bin;
-	RFLOAT discard_sigma, duplicate_threshold, extract_angpix;
+	RFLOAT discard_sigma, duplicate_threshold, extract_angpix, cl_angpix;
 	ObservationModel obsModel;
 	// I/O Parser
 	IOParser parser;
@@ -58,6 +58,7 @@ class star_handler_parameters
 		fn_in = parser.getOption("--i", "Input STAR file");
 		fn_out = parser.getOption("--o", "Output STAR file", "out.star");
 		do_ignore_optics = parser.checkOption("--ignore_optics", "Provide this option for relion-3.0 functionality, without optics groups");
+		cl_angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstrom, for when ignoring the optics groups in the input star file", "1."));
 		tablename_in = parser.getOption("--i_tablename", "If ignoring optics, then read table with this name", "");
 
 		int compare_section = parser.addSection("Compare options");
@@ -811,11 +812,19 @@ class star_handler_parameters
 			int optics_group;
 			Matrix1D<RFLOAT> my_projected_center(3);
 			Matrix2D<RFLOAT> A3D;
-			RFLOAT xoff, yoff, zoff, rot, tilt, psi;
+			RFLOAT xoff, yoff, zoff, rot, tilt, psi, angpix;
 
-			MD.getValue(EMDL_IMAGE_OPTICS_GROUP, optics_group);
-			optics_group--;
-			RFLOAT angpix = obsModel.getPixelSize(optics_group);
+			if (do_ignore_optics)
+			{
+				angpix = cl_angpix;
+			}
+			else
+			{
+				MD.getValue(EMDL_IMAGE_OPTICS_GROUP, optics_group);
+				optics_group--;
+				angpix = obsModel.getPixelSize(optics_group);
+			}
+
 			MD.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff);
 			MD.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff);
 			MD.getValue(EMDL_ORIENT_ROT, rot);
