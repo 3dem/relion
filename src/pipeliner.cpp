@@ -487,15 +487,24 @@ bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, boo
 		bool is_scheduled, bool do_overwrite_current, std::string &error_message)
 {
 
-	if (do_overwrite_current) is_main_continue = false;
-
 	std::vector<std::string> commands;
 	std::string final_command;
+
+	// Remove run.out and run.err when overwriting a job
+	if (do_overwrite_current) is_main_continue = false;
 
 	// true means makedir
 	if (!getCommandLineJob(_job, current_job, is_main_continue, is_scheduled, true, do_overwrite_current, commands, final_command, error_message))
 	{
 		return false;
+	}
+
+	// Remove run.out and run.err when overwriting a job
+	if (do_overwrite_current)
+	{
+		// Completely empty the output directory, NOTE that  _job.outputName+ is not defined until AFTER calling getCommandLineJob!!!
+		std::string command = " rm -rf " + _job.outputName+"*";
+		int res = system(command.c_str());
 	}
 
 	// Read in the latest version of the pipeline, just in case anyone else made a change meanwhile...
@@ -508,14 +517,14 @@ bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, boo
 	// Also save a copy of the GUI settings with the current output name
 	_job.write(_job.outputName);
 
+	// Make sure none of the exit or abort files from the pipeline_control system are here from before
+	std::remove((_job.outputName+RELION_JOB_ABORT_NOW).c_str());
+	std::remove((_job.outputName+RELION_JOB_EXIT_ABORTED).c_str());
+	std::remove((_job.outputName+RELION_JOB_EXIT_SUCCESS).c_str());
+	std::remove((_job.outputName+RELION_JOB_EXIT_FAILURE).c_str());
 
-	// Remove run.out and run.err when overwriting a job
-	if (do_overwrite_current)
-	{
-		remove((_job.outputName+"run.out").c_str());
-		remove((_job.outputName+"run.err").c_str());
-	}
 
+	/*
 	// If this is a continuation job, check whether output files exist and move away!
 	// This is to ensure that the continuation job goes OK and will show up as 'running' in the GUI
 	bool do_move_output_nodes_to_old = false;
@@ -578,6 +587,39 @@ bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, boo
 			}
 		}
 	}
+	*/
+
+	// For continuation of relion_refine jobs, remove the original output nodes from the list
+	if (!only_schedule && is_main_continue)
+	{
+		if (processList[current_job].type == PROC_2DCLASS ||
+		    processList[current_job].type == PROC_3DCLASS ||
+		    processList[current_job].type == PROC_3DAUTO ||
+		    processList[current_job].type == PROC_MULTIBODY ||
+		    processList[current_job].type == PROC_INIMODEL)
+		{
+
+			std::vector<bool> deleteNodes, deleteProcesses;
+			deleteNodes.resize(nodeList.size(), false);
+			deleteProcesses.resize(processList.size(), false);
+
+			for (long int inode = 0; inode < (processList[current_job]).outputNodeList.size(); inode++)
+			{
+				long int mynode = (processList[current_job]).outputNodeList[inode];
+				if(!exists(nodeList[mynode].name))
+					deleteNodes[mynode] = true;
+			}
+
+			FileName fn_del = "tmp";
+			write(DO_LOCK, fn_del, deleteNodes, deleteProcesses);
+			std::remove("tmpdeleted_pipeline.star");
+
+			// Read the updated pipeline back in again
+			lock_message += " part 2";
+			read(DO_LOCK, lock_message);
+
+		}
+	} // end if !only_schedule && is_main_continue
 
 	// Now save the job (and its status) to the PipeLine
 	int mynewstatus;
@@ -1351,8 +1393,8 @@ bool PipeLine::cleanupJob(int this_job, bool do_harsh, std::string &error_messag
 	FileName fn_pattern;
 
 	// In all jobs cleanup the .old files (from continuation runs)
-	fn_pattern = processList[this_job].name + "*.old";
-	fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
+	//fn_pattern = processList[this_job].name + "*.old";
+	//fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
 
 	////////// Now see which jobs needs cleaning up
 	if (processList[this_job].type == PROC_MOTIONCORR)
@@ -1368,7 +1410,7 @@ bool PipeLine::cleanupJob(int this_job, bool do_harsh, std::string &error_messag
 			else
 			{
 				fn_pattern = processList[this_job].name + fns_subdir[idir] + "*.com";
-				fn_pattern.globFiles(fns_del, false);
+				fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
 				fn_pattern = processList[this_job].name + fns_subdir[idir] + "*.err";
 				fn_pattern.globFiles(fns_del, false);
 				fn_pattern = processList[this_job].name + fns_subdir[idir] + "*.out";

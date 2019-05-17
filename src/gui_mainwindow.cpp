@@ -1496,7 +1496,7 @@ void GuiMainWindow::cb_delete_i(bool do_ask, bool do_recursive)
 				ask += " - " + name + "\n";
 			}
 		}
-		proceed =  fl_choice("%s", "Don't move", "Move", NULL, ask.c_str());
+		proceed =  fl_choice("%s", "Cancel", "Move", NULL, ask.c_str());
 	}
 	else
 	{
@@ -1565,7 +1565,7 @@ e.g. by using \"touch Polish/job045/NO_HARSH_CLEAN\". Below is a list of current
 		ask = "Are you sure you want to gently clean up intermediate files from the entire pipeline?";
 	}
 
-	proceed = fl_choice("%s", "Don't clean up", "Clean up", NULL, ask.c_str());
+	proceed = fl_choice("%s", "Cancel", "Clean up", NULL, ask.c_str());
 	if (proceed)
 	{
 		std::string how = (do_harsh) ? "Harshly" : "Gently";
@@ -1603,7 +1603,7 @@ void GuiMainWindow::cb_cleanup_i(int myjob, bool do_verb, bool do_harsh)
 	{
 		std::string ask;
 		ask = "Are you sure you want to clean up intermediate files from " + pipeline.processList[current_job].name + "?";
-		proceed = fl_choice("%s", "Don't clean up", "Clean up", NULL, ask.c_str());
+		proceed = fl_choice("%s", "Cancel", "Clean up", NULL, ask.c_str());
 	}
 
 	if (proceed)
@@ -1925,7 +1925,7 @@ void GuiMainWindow::cb_empty_trash(Fl_Widget* o, void* v)
 void GuiMainWindow::cb_empty_trash_i()
 {
 	std::string ask = "Are you sure you want to remove the entire Trash folder?";
-	int proceed =  fl_choice("%s", "Don't empty trash", "Empty Trash", NULL, ask.c_str());
+	int proceed =  fl_choice("%s", "Cancel", "Empty Trash", NULL, ask.c_str());
 	if (proceed)
 	{
 		std::string command = "rm -rf Trash";
