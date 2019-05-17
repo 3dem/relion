@@ -1284,6 +1284,10 @@ void MlOptimiser::initialise()
 		// Calculate initial sigma noise model from power_class spectra of the individual images
 		calculateSumOfPowerSpectraAndAverageImage(Mavg);
 
+		// Abort through the pipeline_control system
+		if (pipeline_control_check_abort_job())
+			exit(RELION_EXIT_ABORTED);
+
 		// Set sigma2_noise and Iref from averaged poser spectra and Mavg
 		setSigmaNoiseEstimatesAndSetAverageImage(Mavg);
 	}
@@ -2214,7 +2218,12 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 		} // end loop img_id
 
 		if (myverb > 0 && nr_particles_done % barstep == 0)
+		{
 			progress_bar(nr_particles_done);
+			// Abort through the pipeline_control system
+			if (pipeline_control_check_abort_job())
+				break;
+		}
 
 	} // end loop part_id
 
@@ -2814,6 +2823,10 @@ void MlOptimiser::expectation()
 		timer.toc(TIMING_EXP_METADATA);
 #endif
 
+		// Abort through the pipeline_control system
+		if (pipeline_control_check_abort_job())
+			exit(RELION_EXIT_ABORTED);
+
 		// perform the actual expectation step on several particles
 		expectationSomeParticles(my_pool_first_part_id, my_pool_last_part_id);
 
@@ -3216,7 +3229,7 @@ void MlOptimiser::expectationSomeParticles(long int my_first_part_id, long int m
 	std::cerr << "Entering expectationSomeParticles..." << std::endl;
 #endif
 
-    // Use global variables for thread visibility (before there were local ones for similar call in MPI version!)
+	// Use global variables for thread visibility (before there were local ones for similar call in MPI version!)
 	exp_my_first_part_id = my_first_part_id;
     exp_my_last_part_id = my_last_part_id;
 

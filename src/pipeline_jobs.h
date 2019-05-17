@@ -211,9 +211,11 @@ static bool do_allow_change_minimum_dedicated;
 #define NR_BROWSE_TABS      19
 
 // Status a Process may have
-#define PROC_RUNNING   0
-#define PROC_SCHEDULED 1
-#define PROC_FINISHED  2
+#define PROC_RUNNING          0 // (hopefully) running
+#define PROC_SCHEDULED        1 // scheduled for future execution
+#define PROC_FINISHED_SUCCESS 2 // successfully finished
+#define PROC_FINISHED_FAILURE 3 // reported an error
+#define PROC_FINISHED_ABORTED 4 // aborted by the user
 
 struct gui_layout
 {

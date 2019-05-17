@@ -638,10 +638,17 @@ void Experiment::copyParticlesToScratch(int verb, bool do_copy, bool also_do_ctf
 	long int total_nr_parts_on_scratch = 0;
 	nr_parts_on_scratch.resize(numberOfOpticsGroups(), 0);
 
+	const int check_abort_frequency=100;
+
 	FileName prev_img_name = "/Unlikely$filename$?*!";
 	int prev_optics_group = -999;
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDimg)
 	{
+
+		// TODO: think about MPI_Abort here....
+		if (current_object % check_abort_frequency == 0 && pipeline_control_check_abort_job())
+			exit(RELION_EXIT_ABORTED);
+
 		long int imgno;
 		FileName fn_img, fn_ctf, fn_stack, fn_new;
 		Image<RFLOAT> img;

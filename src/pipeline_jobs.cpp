@@ -693,6 +693,14 @@ bool RelionJob::prepareFinalCommand(std::string &outputname, std::vector<std::st
 		}
 	}
 
+	// Add the --pipeline_control argument to all relion_ programs
+	for (int icom = 0; icom < commands.size(); icom++)
+	{
+		if ((commands[icom]).find("relion_") != std::string::npos)
+			commands[icom] += " --pipeline_control " + outputname;
+
+	}
+
 	// Prepare full mpi commands or save jobsubmission script to disc
 	if (joboptions["do_queue"].getBoolean() && do_makedir)
 	{

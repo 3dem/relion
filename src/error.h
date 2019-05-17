@@ -49,6 +49,8 @@
 
 #include <string>
 #include <iostream>
+#include <fstream>
+#include "src/macros.h"
 
 /** Show message and throw exception
  * @ingroup ErrorHandling

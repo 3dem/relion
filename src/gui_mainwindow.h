@@ -281,6 +281,9 @@ private:
     static void cb_set_alias(Fl_Widget*, void*);
     inline void cb_set_alias_i(std::string newalias = "");
 
+    static void cb_abort(Fl_Widget*, void*);
+    inline void cb_abort_i(std::string newalias = "");
+
     static void cb_mark_as_finished(Fl_Widget*, void*);
     inline void cb_mark_as_finished_i();
 

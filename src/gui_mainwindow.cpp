@@ -547,6 +547,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 		if (!maingui_do_read_only)
 		{
 			menubar2->add("Job actions/Alias", 0, cb_set_alias, this);
+			menubar2->add("Job actions/Abort running", 0, cb_abort, this);
 			menubar2->add("Job actions/Mark as finished", 0, cb_mark_as_finished, this);
 			menubar2->add("Job actions/Make flowchart", 0, cb_make_flowchart, this);
 			menubar2->add("Job actions/Gentle clean", 0, cb_gentle_cleanup, this);
@@ -758,7 +759,9 @@ void GuiMainWindow::fillRunningJobLists()
 		for (long int ip = 0; ip < vp.size(); ip++)
 		{
 			long int i = vp[ip].second;
-			if (pipeline.processList[i].status == PROC_FINISHED)
+			if (pipeline.processList[i].status == PROC_FINISHED_SUCCESS ||
+				pipeline.processList[i].status == PROC_FINISHED_FAILURE ||
+				pipeline.processList[i].status == PROC_FINISHED_ABORTED)
 			{
 				finished_processes.push_back(i);
 				finished_job_browser->add(vp[ip].first.c_str());
@@ -770,7 +773,9 @@ void GuiMainWindow::fillRunningJobLists()
 		// For finished jobs search backwards, so that last jobs are at the top
 		for (long int i = pipeline.processList.size() -1; i >= 0; i--)
 		{
-			if (pipeline.processList[i].status == PROC_FINISHED)
+			if (pipeline.processList[i].status == PROC_FINISHED_SUCCESS ||
+				pipeline.processList[i].status == PROC_FINISHED_FAILURE ||
+				pipeline.processList[i].status == PROC_FINISHED_ABORTED)
 			{
 				finished_processes.push_back(i);
 				finished_job_browser->add((getJobNameForDisplay(pipeline.processList[i])).c_str());
@@ -1061,6 +1066,7 @@ void GuiMainWindow::cb_select_browsegroup_i(bool show_initial_screen)
 	updateJobLists();
 
     is_main_continue = false;
+    do_overwrite_continue = false;
 
 	// If the GUI got changed, put that change into the joboption now
     gui_jobwindows[iwin]->updateMyJob();
@@ -1544,7 +1550,7 @@ e.g. by using \"touch Polish/job045/NO_HARSH_CLEAN\". Below is a list of current
 
 		for (int myjob = 0; myjob < pipeline.processList.size(); myjob++)
 		{
-			if (pipeline.processList[myjob].status == PROC_FINISHED &&
+			if (pipeline.processList[myjob].status == PROC_FINISHED_SUCCESS &&
 					(pipeline.processList[myjob].type == PROC_MOTIONCORR ||
 					pipeline.processList[myjob].type == PROC_EXTRACT ||
 					pipeline.processList[myjob].type == PROC_SUBTRACT) )
@@ -1660,6 +1666,32 @@ void GuiMainWindow::cb_set_alias_i(std::string alias)
 		}
 	}
 
+}
+
+// Run button call-back functions
+void GuiMainWindow::cb_abort(Fl_Widget* o, void* v) {
+
+    GuiMainWindow* T=(GuiMainWindow*)v;
+    T->cb_abort_i();
+}
+
+void GuiMainWindow::cb_abort_i(std::string alias)
+{
+
+	if (pipeline.processList[current_job].status != PROC_RUNNING)
+	{
+		std::string error_message = "You can only abort running jobs ... ";
+		fl_message("%s",error_message.c_str());
+	}
+	else
+	{
+		std::string ask = "Are you sure you want to abort job: " + pipeline.processList[current_job].name + " ?";
+		int proceed =  fl_choice("%s", "Cancel", "Abort!", NULL, ask.c_str());
+		if (proceed)
+		{
+			touch(pipeline.processList[current_job].name + RELION_JOB_ABORT_NOW);
+		}
+	}
 }
 
 

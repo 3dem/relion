@@ -50,6 +50,7 @@ extern const char *g_RELION_VERSION;
 
 #include <math.h>
 #include <signal.h>
+#include "src/pipeline_control.h"
 #include "src/error.h"
 
 #ifndef _CYGWIN
