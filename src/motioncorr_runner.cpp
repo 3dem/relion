@@ -1511,16 +1511,18 @@ skip_fitting:
 	// Dose weighting
 	if (do_dose_weighting) {
 		RCTIC(TIMING_DOSE_WEIGHTING);
-		if (std::abs(voltage - 300) > 2 && std::abs(voltage - 200) > 2) {
-			REPORT_ERROR("Sorry, dose weighting is supported only for 300 kV or 200 kV");
+		if (std::abs(voltage - 300) > 2 && std::abs(voltage - 200) > 2 && std::abs(voltage - 100) > 2) {
+			REPORT_ERROR("Sorry, dose weighting is supported only for 300, 200 or 100 kV");
 		}
 
 		std::vector <RFLOAT> doses(n_frames);
 		for (int iframe = 0; iframe < n_frames; iframe++) {
 			// dose AFTER each frame.
 			doses[iframe] = pre_exposure + dose_per_frame * (frames[iframe] + 1);
-			if (std::abs(voltage - 200) <= 5) {
+			if (std::abs(voltage - 200) <= 2) {
 				doses[iframe] /= 0.8; // 200 kV electron is more damaging.
+			} else if (std::abs(voltage - 100) <= 2) {
+				doses[iframe] /= 0.64; // 100 kV electron is much more damaging.
 			}
 		}
 
