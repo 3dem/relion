@@ -153,8 +153,8 @@ public:
 	// Use Laplacian-of-Gaussian filters instead of template-based picking
 	bool do_LoG;
 
-	// Minimum diameter for features to be detected by the LoG filter
-	RFLOAT LoG_min_diameter, LoG_max_diameter;
+	// Diameter for features to be detected by the LoG filter
+	RFLOAT LoG_min_diameter, LoG_max_diameter, LoG_neighbour_fudge;
 
 	// How many times the LoG_max_diameter is searched?
 	RFLOAT LoG_max_search;
@@ -163,7 +163,7 @@ public:
 	RFLOAT LoG_adjust_threshold, LoG_upper_limit;
 
 	// Input signal is white
-	bool LoG_invert;
+	bool LoG_invert, LoG_use_ctf;
 
 	// Vector with all LoG filter FFTs
 	std::vector<MultidimArray<Complex> > FT_LoGs;

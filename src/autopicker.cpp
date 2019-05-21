@@ -133,9 +133,12 @@ void AutoPicker::read(int argc, char **argv)
 	do_LoG = parser.checkOption("--LoG", "Use Laplacian-of-Gaussian filter-based picking, instead of template matching");
 	LoG_min_diameter = textToFloat(parser.getOption("--LoG_diam_min", "Smallest particle diameter (in Angstroms) for blob-detection by Laplacian-of-Gaussian filter", "-1"));
 	LoG_max_diameter = textToFloat(parser.getOption("--LoG_diam_max", "Largest particle diameter (in Angstroms) for blob-detection by Laplacian-of-Gaussian filter", "-1"));
+	LoG_neighbour_fudge = textToFloat(parser.getOption("--LoG_neighbour", "Avoid neighbouring particles within (the detected diameter + the minimum diameter) times this percent", "150"));
+	LoG_neighbour_fudge /= 100.0;
 	LoG_invert = parser.checkOption("--Log_invert", "Use this option if the particles are white instead of black");
 	LoG_adjust_threshold = textToFloat(parser.getOption("--LoG_adjust_threshold", "Use this option to adjust the picking threshold: positive for less particles, negative for more", "0."));
 	LoG_upper_limit = textToFloat(parser.getOption("--LoG_upper_threshold", "Use this option to set the upper limit of the picking threshold", "99999"));
+	LoG_use_ctf = parser.checkOption("--LoG_use_ctf", "Use CTF until the first peak in Laplacian-of-Gaussian picker");
 
 	if (do_gpu && do_LoG)
 	{
@@ -462,8 +465,8 @@ void AutoPicker::initialise()
 			if (verb > 0)
 			{
 				std::cout << " Projecting a 3D reference with " << symmetry << " symmetry, using angular sampling rate of "
-						<< sampling.getAngularSampling() << " degrees, i.e. in " << sampling.NrDirections() << " directions ... "
-						<< std::endl;
+				          << sampling.getAngularSampling() << " degrees, i.e. in " << sampling.NrDirections() << " directions ... "
+				          << std::endl;
 			}
 
 			int my_ori_size = XSIZE(Istk());
@@ -526,7 +529,6 @@ void AutoPicker::initialise()
 
 	if (!do_LoG)
 	{
-
 		// Re-scale references if necessary
 		if (angpix_ref < 0)
 			angpix_ref = angpix;
@@ -933,10 +935,7 @@ void AutoPicker::run()
 
 	if (verb > 0)
 		progress_bar(fn_micrographs.size());
-
-
 }
-
 
 void AutoPicker::generatePDFLogfile()
 {
@@ -2596,7 +2595,39 @@ void AutoPicker::autoPickLoGOneMicrograph(FileName &fn_mic, long int imic)
 		// Use downsized FFTs
 		windowFourierTransform(Faux, Fmic, workSize);
 
+		if (LoG_use_ctf)
+		{
+			MultidimArray<RFLOAT> Fctf(YSIZE(Fmic), XSIZE(Fmic));
+			CTF ctf;
+
+			// Search for this micrograph in the metadata table
+			bool found = false;
+			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDmic)
+			{
+				FileName fn_tmp;
+				MDmic.getValue(EMDL_MICROGRAPH_NAME, fn_tmp);
+				if (fn_tmp == fn_mic)
+				{
+					ctf.readByGroup(MDmic, &obsModel);
+					found = true;
+					break;
+				}
+			}
+			if (!found) REPORT_ERROR("Logic error: failed to find CTF information for " + fn_mic);
+
+			ctf.getFftwImage(Fctf, micrograph_size, micrograph_size, angpix, false, false, false, false, false, true);
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fmic)
+			{
+				// this is safe because getCTF does not return 0.
+				DIRECT_MULTIDIM_ELEM(Fmic, n) /= DIRECT_MULTIDIM_ELEM(Fctf, n);
+			}
+		}
+
 		Image<RFLOAT> Maux(workSize, workSize);
+		
+//		transformer.inverseFourierTransform(Fmic, Maux());
+//		Maux.write("LoG-ctf-filtered.mrc");
+//		REPORT_ERROR("stop");
 
 		// Make the diameter of the LoG filter larger in steps of LoG_incr_search (=1.5)
 		// Search sizes from LoG_min_diameter to LoG_max_search (=5) * LoG_max_diameter
@@ -2646,7 +2677,6 @@ void AutoPicker::autoPickLoGOneMicrograph(FileName &fn_mic, long int imic)
 					DIRECT_MULTIDIM_ELEM(Mbest_size, n) = myd;
 				}
 			}
-
 		}
 	}
 
@@ -2691,24 +2721,24 @@ void AutoPicker::autoPickLoGOneMicrograph(FileName &fn_mic, long int imic)
 	RFLOAT count_ok = 0.;
 	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Mbest_size)
 	{
-		if (DIRECT_MULTIDIM_ELEM(Mbest_size, n) > LoG_max_diameter )
+		if (DIRECT_MULTIDIM_ELEM(Mbest_size, n) > LoG_max_diameter)
 		{
 			sum_fom_high += DIRECT_MULTIDIM_ELEM(Mbest_fom, n);
-			sum2_fom_high += DIRECT_MULTIDIM_ELEM(Mbest_fom, n)*DIRECT_MULTIDIM_ELEM(Mbest_fom, n);
+			sum2_fom_high += DIRECT_MULTIDIM_ELEM(Mbest_fom, n) * DIRECT_MULTIDIM_ELEM(Mbest_fom, n);
 			count_high += 1.;
 			DIRECT_MULTIDIM_ELEM(Mbest_fom, n) = 0.;
 		}
 		else if (DIRECT_MULTIDIM_ELEM(Mbest_size, n) < LoG_min_diameter)
 		{
 			sum_fom_low += DIRECT_MULTIDIM_ELEM(Mbest_fom, n);
-			sum2_fom_low += DIRECT_MULTIDIM_ELEM(Mbest_fom, n)*DIRECT_MULTIDIM_ELEM(Mbest_fom, n);
+			sum2_fom_low += DIRECT_MULTIDIM_ELEM(Mbest_fom, n) * DIRECT_MULTIDIM_ELEM(Mbest_fom, n);
 			count_low += 1.;
 			DIRECT_MULTIDIM_ELEM(Mbest_fom, n) = 0.;
 		}
 		else
 		{
 			sum_fom_ok += DIRECT_MULTIDIM_ELEM(Mbest_fom, n);
-			sum2_fom_ok += DIRECT_MULTIDIM_ELEM(Mbest_fom, n)*DIRECT_MULTIDIM_ELEM(Mbest_fom, n);
+			sum2_fom_ok += DIRECT_MULTIDIM_ELEM(Mbest_fom, n) * DIRECT_MULTIDIM_ELEM(Mbest_fom, n);
 			count_ok += 1.;
 		}
 	}
@@ -2777,38 +2807,30 @@ void AutoPicker::autoPickLoGOneMicrograph(FileName &fn_mic, long int imic)
 		}
 
 		// Now set all pixels of Mbest_fom within a distance of 0.5* the corresponding Mbest_size to zero
-		// Exclude a bit more radius, such that no very close neighbours are allowed: 20% more
-		long int myrad = ROUND(scale * 1.2 * A2D_ELEM(Mbest_size, imax, jmax) / 2.);
+		// Exclude a bit more radius, such that no very close neighbours are allowed
+		long int myrad = ROUND(scale * (A2D_ELEM(Mbest_size, imax, jmax) + LoG_min_diameter) * LoG_neighbour_fudge / 2 / angpix);
 		long int myrad2 = myrad * myrad;
+//		std::cout << "scale = " << scale << " Mbest_size = " << A2D_ELEM(Mbest_size, imax, jmax) << " myrad " << myrad << std::endl;
 		for (long int ii = imax - myrad; ii <= imax + myrad; ii++)
 		{
 			for (long int jj = jmax - myrad; jj <= jmax + myrad; jj++)
 			{
-				long int r2 = (imax - ii)*(imax - ii) + (jmax - jj)*(jmax - jj);
+				long int r2 = (imax - ii) * (imax - ii) + (jmax - jj) * (jmax - jj);
 				if (r2 < myrad2 && ii >= STARTINGY(Mbest_fom) && jj >= STARTINGX(Mbest_fom) &&
-						ii <= FINISHINGY(Mbest_fom) && jj <= FINISHINGX(Mbest_fom))
+				    ii <= FINISHINGY(Mbest_fom) && jj <= FINISHINGX(Mbest_fom))
 					A2D_ELEM(Mbest_fom, ii, jj) = 0.;
 			}
 		}
-
 	}
 
 	if (verb > 1)
 		std::cerr << "Picked " << MDout.numberOfObjects() << " of particles " << std::endl;
 	fn_tmp = getOutputRootName(fn_mic) + "_" + fn_out + ".star";
 	MDout.write(fn_tmp);
-
-
 }
-
-
-
-
-
 
 void AutoPicker::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 {
-
 	Image<RFLOAT> Imic;
 	MultidimArray<Complex > Faux, Faux2, Fmic;
 	MultidimArray<RFLOAT> Maux, Mstddev, Mmean, Mstddev2, Mavg, Mdiff2, MsumX2, Mccf_best, Mpsi_best, Fctf, Mccf_best_combined, Mpsi_best_combined;
@@ -2856,7 +2878,7 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 	timer.tic(TIMING_A7);
 #endif
 	// Set mean to zero and stddev to 1 to prevent numerical problems with one-sweep stddev calculations....
-    RFLOAT avg0, stddev0, minval0, maxval0;
+	RFLOAT avg0, stddev0, minval0, maxval0;
 	Imic().computeStats(avg0, stddev0, minval0, maxval0);
 	FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Imic())
 	{
@@ -2892,6 +2914,7 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 	if (do_ctf)
 	{
 		// Search for this micrograph in the metadata table
+		bool found = false;
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDmic)
 		{
 			FileName fn_tmp;
@@ -2901,9 +2924,12 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 				ctf.readByGroup(MDmic, &obsModel);
 				Fctf.resize(downsize_mic, downsize_mic/2 + 1);
 				ctf.getFftwImage(Fctf, micrograph_size, micrograph_size, angpix, false, false, intact_ctf_first_peak, true);
+				found = true;
 				break;
 			}
 		}
+		if (!found) REPORT_ERROR("Logic error: failed to find CTF information for " + fn_mic);
+
 #ifdef DEBUG
 		std::cerr << " Read CTF info from" << fn_mic.withoutExtension()<<"_ctf.star" << std::endl;
 		Image<RFLOAT> Ictf;
@@ -2970,10 +2996,10 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 		transformer.FourierTransform(Imic(), Fmic);
 
 		if (highpass > 0.)
-        {
+		{
 			lowPassFilterMap(Fmic, micrograph_size, highpass, angpix, 2, true); // true means highpass instead of lowpass!
-        	transformer.inverseFourierTransform(Fmic, Imic()); // also calculate inverse transform again for squared calculation below
-        }
+			transformer.inverseFourierTransform(Fmic, Imic()); // also calculate inverse transform again for squared calculation below
+		}
 
 		// Also calculate the FFT of the squared micrograph
 		Maux.resize(micrograph_size,micrograph_size);
@@ -3207,12 +3233,12 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 					// Maux goes back to the workSize
 					Maux.resize(workSize, workSize);
 #ifdef TIMING
-	timer.toc(TIMING_B5);
+					timer.toc(TIMING_B5);
 #endif
 				}
 
 #ifdef TIMING
-	timer.tic(TIMING_B6);
+				timer.tic(TIMING_B6);
 #endif
 				// Now multiply template and micrograph to calculate the cross-correlation
 				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Faux)
@@ -3294,11 +3320,11 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 //				exit(0);
 			} // end if do_write_fom_maps
 #ifdef TIMING
-	timer.toc(TIMING_B7);
+			timer.toc(TIMING_B7);
 #endif
 		} // end if do_read_fom_maps
 #ifdef TIMING
-	timer.tic(TIMING_B8);
+		timer.tic(TIMING_B8);
 #endif
 		if (autopick_helical_segments)
 		{
@@ -3440,11 +3466,9 @@ void AutoPicker::autoPickOneMicrograph(FileName &fn_mic, long int imic)
 
 FileName AutoPicker::getOutputRootName(FileName fn_mic)
 {
-
 	FileName fn_pre, fn_jobnr, fn_post;
 	decomposePipelineFileName(fn_mic, fn_pre, fn_jobnr, fn_post);
 	return fn_odir + fn_post.withoutExtension();
-
 }
 
 void AutoPicker::calculateStddevAndMeanUnderMask(const MultidimArray<Complex > &_Fmic, const MultidimArray<Complex > &_Fmic2,
