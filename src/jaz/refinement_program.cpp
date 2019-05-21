@@ -503,11 +503,7 @@ void RefinementProgram::loadInitialMovieValues()
         }
         else
         {
-            std::vector<std::vector<Image<Complex>>> movie = StackHelper::extractMovieStackFS(
-                &mdts[0], meta_path, imgPath, movie_ending, coords_angpix, angpix, movie_angpix, s,
-                nr_omp_threads, false, firstFrame, lastFrame, hotCutoff, debugMov);
-
-            fc = movie[0].size();
+            REPORT_ERROR("You can no longer use this program without micrograph metadata STAR files.");
         }
     }
 }
@@ -577,10 +573,7 @@ std::vector<std::vector<Image<Complex>>> RefinementProgram::loadMovie(
         }
         else
         {
-            movie = StackHelper::extractMovieStackFS(
-                &mdts[g], meta_path, imgPath, movie_ending,
-                angpix, coords_angpix, movie_angpix, s,
-                nr_omp_threads, true, firstFrame, lastFrame, hotCutoff, debugMov);
+            REPORT_ERROR("You can no longer use this program without micrograph metadata STAR files.");
         }
 
         #pragma omp parallel for num_threads(nr_omp_threads)
