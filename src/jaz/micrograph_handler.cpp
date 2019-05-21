@@ -98,7 +98,7 @@ std::vector<MetaDataTable> MicrographHandler::cullMissingMovies(
 {
 	if (!ready)
 	{
-		REPORT_ERROR("ERROR: MicrographHandler::loadMovie - MicrographHandler not initialized.");
+		REPORT_ERROR("ERROR: MicrographHandler::cullMissingMovies - MicrographHandler not initialized.");
 	}
 
 	std::vector<MetaDataTable> good(0);
@@ -143,7 +143,7 @@ void MicrographHandler::findLowestFrameCount(
 {
 	if (!ready)
 	{
-		REPORT_ERROR("ERROR: MicrographHandler::loadMovie - MicrographHandler not initialized.");
+		REPORT_ERROR("ERROR: MicrographHandler::findLowestFrameCount - MicrographHandler not initialized.");
 	}
 
 	int fcmin = std::numeric_limits<int>::max();
@@ -181,7 +181,7 @@ std::vector<MetaDataTable> MicrographHandler::findLongEnoughMovies(
 {
 	if (!ready)
 	{
-		REPORT_ERROR("ERROR: MicrographHandler::loadMovie - MicrographHandler not initialized.");
+		REPORT_ERROR("ERROR: MicrographHandler::findLongEnoughMovies - MicrographHandler not initialized.");
 	}
 
 	std::vector<MetaDataTable> good(0);
@@ -398,6 +398,11 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 
 		std::string mgFn = micrograph.getMovieFilename();
 		std::string gainFn = micrograph.getGainFilename();
+		MultidimArray<bool> defectMask;
+
+		bool hasDefect = (micrograph.fnDefect != "" || micrograph.hotpixelX.size() != 0);
+		if (hasDefect)
+			micrograph.fillDefectAndHotpixels(defectMask);
 
 		if (debug)
 		{
@@ -421,18 +426,14 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 		}
 
 		movie = StackHelper::extractMovieStackFS(
-					&mdt, mgHasGain? &lastGainRef : 0,
+					&mdt, mgHasGain? &lastGainRef : 0, hasDefect ? &defectMask : 0,
 					mgFn, angpix, coords_angpix, movie_angpix, s,
 					nr_omp_threads, true, firstFrame, lastFrame,
 					hotCutoff, debug, saveMem, offsets_in, offsets_out);
 	}
 	else
 	{
-		movie = StackHelper::extractMovieStackFS(
-					&mdt, 0,
-					fn_post, angpix, coords_angpix, movie_angpix, s,
-					nr_omp_threads, true, firstFrame, lastFrame,
-					hotCutoff, debug, saveMem, offsets_in, offsets_out);
+		REPORT_ERROR("You can no longer use this program without micrograph metadata STAR files.");
 	}
 
 	const int pc = movie.size();

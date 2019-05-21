@@ -566,8 +566,14 @@ std::vector<std::vector<Image<Complex>>> RefinementProgram::loadMovie(
                 mgHasGain = true;
             }
 
+            MultidimArray<bool> defectMask;
+
+            bool hasDefect = (micrograph.fnDefect != "" || micrograph.hotpixelX.size() != 0);
+            if (hasDefect)
+                micrograph.fillDefectAndHotpixels(defectMask);
+
             movie = StackHelper::extractMovieStackFS(
-                &mdts[g], mgHasGain? &lastGainRef : 0,
+                &mdts[g], mgHasGain? &lastGainRef : 0, hasDefect ? &defectMask : 0,
                 mgFn, angpix, coords_angpix, movie_angpix, s,
                 nr_omp_threads, true, firstFrame, lastFrame, hotCutoff, debugMov, saveMem);
         }

@@ -377,7 +377,7 @@ std::vector<std::vector<Image<Complex>>> StackHelper::loadMovieStackFS(
 
 std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 		const MetaDataTable* mdt,
-		Image<RFLOAT>* gainRef, std::string movieFn,
+		Image<RFLOAT>* gainRef, MultidimArray<bool>* defectMask, std::string movieFn,
 		double outPs, double coordsPs, double moviePs,
 		int squareSize, int threads,
 		bool loadData, int firstFrame, int lastFrame,
