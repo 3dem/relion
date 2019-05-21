@@ -23,6 +23,7 @@
 #include <vector>
 #include "src/filename.h"
 #include "src/matrix1d.h"
+#include "src/multidim_array.h"
 
 enum MotionModelVersion {
 	MOTION_MODEL_NULL = 0,
@@ -129,6 +130,9 @@ public:
 	// Set global shift for frame; frame is 1-indexed
 	// (shiftx, shifty) is UNBINNED pixels in the original movie
 	void setGlobalShift(int frame, RFLOAT shiftx, RFLOAT shifty);
+
+	// Fills a pixel mask where defect and hot pixels are true
+	void fillDefectAndHotpixels(MultidimArray<bool> &mask) const;
 
 private:
 
