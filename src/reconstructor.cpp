@@ -367,7 +367,6 @@ void Reconstructor::backprojectOneParticle(long int p)
 
 	// As of v3.1, shifts are in Angstroms in the STAR files, convert back to pixels here
 	trans/= angpix;
-	std::cerr << " trans= " << trans << std::endl;
 
 	if (do_fom_weighting)
 	{
@@ -384,7 +383,6 @@ void Reconstructor::backprojectOneParticle(long int p)
 	if (!do_reconstruct_ctf && fn_noise == "")
 	{
 		DF.getValue(EMDL_IMAGE_NAME, fn_img, p);
-		std::cerr << " fn_img= " << fn_img << std::endl;
 		img.read(fn_img);
 		img().setXmippOrigin();
 		CenterFFT(img(), true);
@@ -394,7 +392,6 @@ void Reconstructor::backprojectOneParticle(long int p)
 		{
 			if (ABS(XX(trans)) > 0. || ABS(YY(trans)) > 0. || ABS(ZZ(trans)) > 0. )
 			{
-				std::cerr << " XX(trans)= " << XX(trans) << " YY(trans)= " << YY(trans) << " ZZ(trans)= " << ZZ(trans) << std::endl;
 				shiftImageInFourierTransform(F2D, F2D,
 				                             XSIZE(img()), XX(trans), YY(trans), ZZ(trans));
 			}
@@ -646,7 +643,6 @@ void Reconstructor::backprojectOneParticle(long int p)
 		}
 		else
 		{
-			std::cerr << " A3D= " << A3D << std::endl;
 			backprojector.set2DFourierTransform(F2D, A3D, &Fctf);
 		}
 	}
