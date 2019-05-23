@@ -419,9 +419,11 @@ class star_handler_parameters
 		// We have to write split001 the last. Otherwise the pipeliner might think
 		// the split job has finished while we are still writing subsequent files.
 		FileName fnt0;
+		fnt0 = integerToString(nr_split);
+		const int n_digits = fnt0.length();
 		for (int isplit = 0; isplit < nr_split; isplit ++)
 		{
-			FileName fnt = fn_out.insertBeforeExtension("_split"+integerToString(isplit+1,3));
+			FileName fnt = fn_out.insertBeforeExtension("_split"+integerToString(isplit + 1, n_digits));
 			if (isplit == 0)
 			{
 				fnt0 = fnt;
