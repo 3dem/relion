@@ -133,7 +133,7 @@ void AutoPicker::read(int argc, char **argv)
 	do_LoG = parser.checkOption("--LoG", "Use Laplacian-of-Gaussian filter-based picking, instead of template matching");
 	LoG_min_diameter = textToFloat(parser.getOption("--LoG_diam_min", "Smallest particle diameter (in Angstroms) for blob-detection by Laplacian-of-Gaussian filter", "-1"));
 	LoG_max_diameter = textToFloat(parser.getOption("--LoG_diam_max", "Largest particle diameter (in Angstroms) for blob-detection by Laplacian-of-Gaussian filter", "-1"));
-	LoG_neighbour_fudge = textToFloat(parser.getOption("--LoG_neighbour", "Avoid neighbouring particles within (the detected diameter + the minimum diameter) times this percent", "150"));
+	LoG_neighbour_fudge = textToFloat(parser.getOption("--LoG_neighbour", "Avoid neighbouring particles within (the detected diameter + the minimum diameter) times this percent", "100"));
 	LoG_neighbour_fudge /= 100.0;
 	LoG_invert = parser.checkOption("--Log_invert", "Use this option if the particles are white instead of black");
 	LoG_adjust_threshold = textToFloat(parser.getOption("--LoG_adjust_threshold", "Use this option to adjust the picking threshold: positive for less particles, negative for more", "0."));
