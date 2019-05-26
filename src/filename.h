@@ -493,6 +493,9 @@ void touch(const FileName& fn);
 /** Copy a file */
 void copy(const FileName &fn_src, const FileName &fn_dest);
 
+/** Move a file */
+void move(const FileName &fn_src, const FileName &fn_dest);
+
 /** Make a directory tree*/
 int mktree(const FileName &fn_dir, mode_t mode = 0777);
 

@@ -29,6 +29,7 @@
 #include <dirent.h>
 #include "src/metadata_table.h"
 #include "src/pipeline_jobs.h"
+#include "src/scheduler.h"
 #define DEFAULTPDFVIEWER "evince"
 
 class Process
@@ -159,6 +160,17 @@ class PipeLine
 
 	// Adds a scheduled job to the pipeline from the command line (with integer job type)
 	int addScheduledJob(int job_type, std::string fn_options);
+
+	// Add this RelionJob as scheduled to the pipeline
+	int addScheduledJob(RelionJob &job);
+
+	void waitForJobToFinish(int current_job, bool &is_failure, bool &is_abort);
+
+	// Abort execution of a running Schedule
+	void abortSchedule(FileName fn_schedule);
+
+	// Execute a Schedule
+	void runSchedule(FileName fn_schedule);
 
 	// Runs a series of scheduled jobs, possibly in a loop, from the command line
 	void runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_repeat,

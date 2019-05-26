@@ -482,6 +482,12 @@ void copy(const FileName &fn_src, const FileName &fn_dest)
 
 }
 
+void move(const FileName &fn_src, const FileName &fn_dest)
+{
+	copy(fn_src, fn_dest);
+	delete(fn_src.c_str());
+}
+
 int mktree(const FileName &fn_dir, mode_t mode)
 {
 	std::string s = fn_dir;
@@ -577,7 +583,7 @@ bool decomposePipelineSymlinkName(FileName fn_in, FileName &fn_pre, FileName &fn
 	{
 			// This is a symbolic link!
 		if (linkname[len - 1] == '/')
-			linkname[len - 1] = '\0'; // remove trailing '/'	
+			linkname[len - 1] = '\0'; // remove trailing '/'
 			linkname[len] = '\0';
 			FileName fn_link = std::string(linkname);
 			// TODO: FIXME: This condition is still not perfect. For example,
