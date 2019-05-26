@@ -812,7 +812,6 @@ void PipeLine::runSchedule(FileName fn_schedule)
     bool job_has_started;
     while (schedule.gotoNextJob(job_name, original_job_name, mode, job_has_started))
     {
-    	std::cerr << " job_name= " << job_name << " mode= " << mode << " original_job_name= " << original_job_name << std::endl;
         RelionJob myjob;
         bool is_continue, do_overwrite_current, dummy;
     	int current_job;
@@ -864,13 +863,17 @@ void PipeLine::runSchedule(FileName fn_schedule)
 		waitForJobToFinish(current_job, is_failure, is_aborted);
 		if (is_failure)
 		{
-			std::cerr << " + Stopping schedule due to job " << job_name << " failing with an error ..." << std::endl;
+			std::string message = " Stopping schedule due to job " + job_name + " failing with an error ...";
+			schedule.sendEmail(message);
+			std::cerr << message << std::endl;
 			break;
 		}
 		else if (is_aborted)
 		{
-				std::cerr  << " + Stopping schedule due to user abort of job " << job_name << " ..." << std::endl;
-				break;
+			std::string message = " Stopping schedule due to user abort of job " + job_name + " ...";
+			schedule.sendEmail(message);
+			std::cerr << message << std::endl;
+			break;
 		}
 		else
 		{

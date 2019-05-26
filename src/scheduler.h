@@ -94,46 +94,52 @@ class SchedulerBooleanOperator
 	{
 		if (type == SCHEDULE_BOOLEAN_OPERATOR_AND)
 		{
-			output-> value = (input1->value && input2->value);
+			output->value = (input1->value && input2->value);
 		}
 		else if (type == SCHEDULE_BOOLEAN_OPERATOR_OR)
 		{
-			output-> value = (input1->value || input2->value);
+			output->value = (input1->value || input2->value);
 		}
 		else if (type == SCHEDULE_BOOLEAN_OPERATOR_NOT)
 		{
-			output-> value = (!(input1->value));
+			output->value = (!(input1->value));
 		}
 		else if (type == SCHEDULE_BOOLEAN_OPERATOR_GT_VAR)
 		{
-			output-> value = (float1->value > float2->value);
+			output->value = (float1->value > float2->value);
 		}
 		else if (type == SCHEDULE_BOOLEAN_OPERATOR_LT_VAR)
 		{
-			output-> value = (float1->value < float2->value);
+			output->value = (float1->value < float2->value);
 		}
 		else if (type == SCHEDULE_BOOLEAN_OPERATOR_EQ_VAR)
 		{
-			output-> value = (fabs(float1->value - float2->value) < 1E-8);
+			output->value = (fabs(float1->value - float2->value) < 1E-8);
 		}
 		else if (type == SCHEDULE_BOOLEAN_OPERATOR_GT_CONST)
 		{
-			output-> value = (float1->value > myconstant);
+			output->value = (float1->value > myconstant);
 		}
 		else if (type == SCHEDULE_BOOLEAN_OPERATOR_LT_CONST)
 		{
-			output-> value = (float1->value < myconstant);
+			output->value = (float1->value < myconstant);
 		}
 		else if (type == SCHEDULE_BOOLEAN_OPERATOR_EQ_CONST)
 		{
-			output-> value = (fabs(float1->value - myconstant) < 1E-8);
+			output->value = (fabs(float1->value - myconstant) < 1E-8);
 		}
 		else if (type == SCHEDULE_BOOLEAN_OPERATOR_FILE_EXISTS)
 		{
-			output-> value = (exists(file->value));
+			output->value = (exists(file->value));
 		}
 		else
 			REPORT_ERROR("ERROR: undefined boolean operator type");
+
+		if (output->value)
+			std::cout << " Setting Boolean variable " << output->name << " to: True " << std::endl;
+		else
+			std::cout << " Setting Boolean variable " << output->name << " to: False " << std::endl;
+
 	}
 
 	SchedulerBooleanOperator(std::string _type, SchedulerBooleanVariable *_input1,
@@ -301,6 +307,8 @@ class SchedulerFloatOperator
 		{
 			REPORT_ERROR("BUG: unrecognised float operator type... ");
 		}
+
+		std::cout << " Setting Float variable " << output->name << " to: " << output->value << std::endl;
 	}
 
 	SchedulerFloatOperator(std::string _type, SchedulerFloatVariable *_input1,
@@ -369,18 +377,22 @@ class SchedulerStringOperator
 	{
 		if (type == SCHEDULE_STRING_OPERATOR_TOUCH_FILE)
 		{
+			std::cout << " Touching file " << input->value << std::endl;
 			touch(input->value);
 		}
 		if (type == SCHEDULE_STRING_OPERATOR_COPY_FILE)
 		{
+			std::cout << " Copying file " << input->value << " to " << output->value << std::endl;
 			copy(input->value, output->value);
 		}
 		if (type == SCHEDULE_STRING_OPERATOR_MOVE_FILE)
 		{
+			std::cout << " Moving file from " << input->value << " to " << output->value << std::endl;
 			move(input->value, output->value);
 		}
 		if (type == SCHEDULE_STRING_OPERATOR_DELETE_FILE)
 		{
+			std::cout << " Deleting file " << input->value << std::endl;
 			delete((input->value).c_str());
 		}
 		else

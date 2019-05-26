@@ -109,7 +109,9 @@ bool SchedulerNode::performOperation()
 		else
 		{
 			RFLOAT elapsed = elapsed_time(global_timestamp);
+			std::cout << " Now waiting for another " << wait_seconds-elapsed << " seconds ..." << std::endl;
 			sleep(wait_seconds-elapsed);
+			std::cout << " Finished waiting!" << std::endl;
 			annotate_time(&global_timestamp);
 			has_annotated_time =true;
 			return true;
@@ -736,7 +738,6 @@ bool Schedule::gotoNextJob(FileName &job_name, FileName &original_name, std::str
     // This loops through the next Nodes until encountering a JOB
     while (gotoNextNode())
     {
-		std::cout << " Current node: " << current_node->name << std::endl;
     	// If this node is an operator, perform its operation, else get the Job
 		if (current_node->performOperation())
 		{
@@ -748,7 +749,8 @@ bool Schedule::gotoNextJob(FileName &job_name, FileName &original_name, std::str
 		}
 		else // this is a job, get its name and options
 		{
-            job_name = current_node->name;
+            std::cout << " Now preparing Job: " << current_node->name << std::endl;
+			job_name = current_node->name;
             original_name = current_node->original_name;
             mode = current_node->mode;
             has_started = current_node->job_has_started;
@@ -761,14 +763,14 @@ bool Schedule::gotoNextJob(FileName &job_name, FileName &original_name, std::str
 
 bool Schedule::isBooleanVariable(std::string _name)
 {
-	for (int i = 0; i < strings.size(); i++)
+	for (int i = 0; i < bools.size(); i++)
 		if (bools[i].name == _name) return true;
 	return false;
 }
 
 bool Schedule::isFloatVariable(std::string _name)
 {
-	for (int i = 0; i < strings.size(); i++)
+	for (int i = 0; i < floats.size(); i++)
 		if (floats[i].name == _name) return true;
 	return false;
 }
@@ -790,9 +792,7 @@ bool Schedule::isNode(std::string _name)
 bool Schedule::isJob(std::string _name)
 {
 	for (int i = 0; i < nodes.size(); i++)
-	{
 		if (nodes[i].name == _name) return (nodes[i].type == SCHEDULE_NODE_TYPE_JOB);
-	}
 	return false;
 }
 
@@ -932,7 +932,8 @@ void Schedule::sendEmail(std::string message)
 {
 	if (email_address != "")
 	{
-		std::string command = " mail -s \"Schedule: " + name + " reports: " + message + "\" " + email_address;
+		std::string mysubject = "Schedule: " + name;
+		std::string command = "echo \"" + message + "\" | mail -s \"" + mysubject + "\" -r RELION " + email_address;
 		int res = system(command.c_str());
 	}
 }
