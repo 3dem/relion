@@ -5725,3 +5725,91 @@ void select3DsubtomoFrom2Dproj(
 	}
 	//std::cout << std::endl;
 }
+
+void averageAsymmetricUnits2D(
+		ObservationModel& obsModel,
+		MetaDataTable &MDimgs,
+		FileName fn_o_root,
+		int nr_asu,
+		RFLOAT rise)
+{
+
+	if (nr_asu == 1)
+	{
+		std::cout << " WARNING: averageAsymmetricUnits2D nr_asu=1, so not doing anything ...";
+		return;
+	}
+
+	int nr_asu_half = nr_asu / 2;
+	RFLOAT angpix;
+
+	FourierTransformer transformer;
+	MultidimArray<Complex> Fimg, Faux, Fsum;
+
+
+	long int imgno = 0;
+	init_progress_bar(MDimgs.numberOfObjects());
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDimgs)
+	{
+
+		FileName fn_img;
+		Matrix1D<RFLOAT> in(2), out(2);
+		Image<RFLOAT> img;
+		RFLOAT psi, angpix;
+		int optics_group;
+
+		MDimgs.getValue(EMDL_IMAGE_NAME, fn_img);
+		MDimgs.getValue(EMDL_ORIENT_PSI, psi);
+		MDimgs.getValue(EMDL_IMAGE_OPTICS_GROUP, optics_group);
+		optics_group--;
+		angpix = obsModel.getPixelSize(optics_group);
+
+		img.read(fn_img);
+		transformer.FourierTransform(img(), Fimg, false);
+		Fsum = Fimg; // original image
+
+		//std::cerr << " imgno= " << imgno << " fn_img= " << fn_img << " psi= " << psi << " rise= " << rise  << " angpix= " << angpix << " nr_asu= " << nr_asu << " xsize= " << XSIZE(img()) << std::endl;
+
+		for (int i = 2; i <= nr_asu; i++)
+		{
+			// one way
+			if (i%2 == 0)
+			{
+				XX(in) = rise * (i/2) / angpix;
+			}
+			// the other way
+			else
+			{
+				XX(in) = -1. * rise * (i/2) / angpix;
+			}
+			YY(in) = 0.;
+
+			transformCartesianAndHelicalCoords(in, out, 0., 0., psi, HELICAL_TO_CART_COORDS);
+			//std::cerr << " i= " << i << " XX(in)= " << XX(in) << " YY(in)= " << YY(in) << " XX(out)= " << XX(out) << " YY(out)= " << YY(out)   << std::endl;
+			shiftImageInFourierTransform(Fimg, Faux, XSIZE(img()), XX(out), YY(out));
+			Fsum += Faux;
+		}
+
+
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fimg)
+		{
+			DIRECT_MULTIDIM_ELEM(Fimg, n) = DIRECT_MULTIDIM_ELEM(Fsum, n) / (RFLOAT)nr_asu;
+		}
+		transformer.inverseFourierTransform();
+
+		// Write this particle to the stack on disc
+		// First particle: write stack in overwrite mode, from then on just append to it
+		MDimgs.setValue(EMDL_IMAGE_ORI_NAME, fn_img);
+		fn_img.compose(imgno+1, fn_o_root + "particles.mrcs");
+		if (imgno == 0)
+			img.write(fn_img, -1, false, WRITE_OVERWRITE);
+		else
+			img.write(fn_img, -1, false, WRITE_APPEND);
+		MDimgs.setValue(EMDL_IMAGE_NAME, fn_img);
+
+		if (imgno%60==0) progress_bar(imgno);
+		imgno++;
+	}
+	progress_bar(MDimgs.numberOfObjects());
+
+}

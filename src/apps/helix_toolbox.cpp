@@ -74,6 +74,7 @@ public:
 	bool do_normalise_segments;
 	bool do_interpo_3D_curve;
 	bool do_select_3D_subtomo_from_2D_proj;
+	bool do_average_au_2d;
 	bool do_debug;
 	// ----------------------------------------
 
@@ -217,6 +218,7 @@ public:
 		do_normalise_segments = false;
 		do_interpo_3D_curve = false;
 		do_select_3D_subtomo_from_2D_proj = false;
+		do_average_au_2d = false;
 		do_debug = false;
 	};
 
@@ -274,6 +276,7 @@ public:
 		do_simulate_helical_segments_2D = parser.checkOption("--simulate_segments", "Simulate helical segments using a STAR file");
 		do_sort_datastar_tubeID = parser.checkOption("--sort_tube_id", "Sort segments in _data.star file according to helical tube IDs");
 		do_apply_spherical_mask_3D = parser.checkOption("--spherical_mask", "Apply soft spherical mask to 3D helical reference");
+		do_average_au_2d = parser.checkOption("--average_au_2d", "Average multiple asymmetrical units in 2D along the helical axis?");
 
 		int options_old_section = parser.addSection("List of functions which can be called in Relion GUI");
 		do_combine_GCTF_results = parser.checkOption("--combine_gctf", "Combine Autopicker priors (tilt and psi) with Gctf local search results");
@@ -401,6 +404,7 @@ public:
 		valid_options += (do_normalise_segments) ? (1) : (0);
 		valid_options += (do_interpo_3D_curve) ? (1) : (0);
 		valid_options += (do_select_3D_subtomo_from_2D_proj) ? (1) : (0);
+		valid_options += (do_average_au_2d) ? (1) : (0);
 		valid_options += (do_debug) ? (1) : (0);
 
 		if (valid_options <= 0)
@@ -1027,6 +1031,26 @@ public:
 			select3DsubtomoFrom2Dproj(MD_2d, MD_3d, MD_out);
 			MD_out.write(fn_out);
 			std::cout << " Done! " << MD_out.numberOfObjects() << " out of " << MD_3d.numberOfObjects() << " subtomograms have been selected." << std::endl;
+		}
+		else if (do_average_au_2d)
+		{
+			if (show_usage_for_an_option)
+			{
+				displayEmptyLine();
+				std::cout << " Average asymmertic units in 2D along helical axis" << std::endl;
+				std::cout << "  USAGE: --average_au_2d --i input_particles.star --o_root NewParticles/average3au --nr_asu 3 --rise 4.75 " << std::endl;
+				displayEmptyLine();
+				return;
+			}
+			if (fn_in.getExtension() != "star")
+				REPORT_ERROR("Input file (--i) should be in .star format!");
+
+			ObservationModel obsModel;
+			MetaDataTable MDimgs;
+			ObservationModel::loadSafely(fn_in, obsModel, MDimgs, "particles");
+			averageAsymmetricUnits2D(obsModel, MDimgs, fn_out_root, nr_asu, rise_A);
+			obsModel.save(MDimgs, fn_out_root+"particles.star", "particles");
+			std::cout << " Done! " << std::endl;
 		}
 		else if (do_debug)
 		{
