@@ -60,9 +60,6 @@ public:
 		add_type = parser.getOption("--addJob", "Add a job of this type to the pipeline","");
 		fn_options = parser.getOption("--addJobOptions", "Options for this job","");
 		fn_alias = parser.getOption("--setJobAlias", "Set an alias to this job", "");
-		int schedule_section = parser.addSection("Schedule options");
-		run_schedule = parser.getOption("--run_schedule", "Execute this scheduler", "");
-		abort_schedule = parser.getOption("--abort_schedule", "Abort this scheduler", "");
 		int run_section = parser.addSection("Run scheduled jobs options");
 		fn_jobids  = parser.getOption("--RunJobs", "Run these jobs", "");
 		fn_sched = parser.getOption("--schedule", "Name of the scheduler for running the scheduled jobs", "");
@@ -100,14 +97,6 @@ public:
 				}
 			}
 
-		}
-		else if (run_schedule != "")
-		{
-			pipeline.runSchedule(run_schedule);
-		}
-		else if (abort_schedule != "")
-		{
-			pipeline.abortSchedule(abort_schedule);
 		}
 		else if (nr_repeat > 0)
 		{

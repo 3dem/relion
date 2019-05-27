@@ -384,7 +384,6 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 		MDhead.getValue(EMDL_JOB_TYPE, type);
 		MDhead.getValue(EMDL_JOB_IS_CONTINUE, is_continue);
 		_is_continue = is_continue;
-
 		if (do_initialise)
 			initialise(type);
 

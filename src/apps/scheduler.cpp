@@ -28,8 +28,9 @@ class scheduler_parameters
 public:
 	FileName mydir;
 	float myconstant;
-	bool do_reset;
+	bool do_reset, do_run;
 	std::string add, set_var, set_mode, start_node, current_node, email, type, name, value, mode, input, input2, output, output2, boolvar;
+	std::string run_pipeline;
 
 	// The actual pipeline
 	Schedule schedule;
@@ -53,7 +54,7 @@ public:
 		std::cerr << "    --schedule Schedules/test --add operator --type " << SCHEDULE_BOOLEAN_OPERATOR_GT_CONST << " --i iter --i2 10 --o is_finished" << std::endl;
 		std::cerr << "    --schedule Schedules/test --add operator --type " << SCHEDULE_BOOLEAN_OPERATOR_FILE_EXISTS << " --i initial_model --o is_finished" << std::endl;
 		std::cerr << std::endl << " ++ Add a job node: " << std::endl;
-		std::cerr << "    --schedule Schedules/test --add job --i Import/job001/ --mode continue/new/overwrite" << std::endl;
+		std::cerr << "    --schedule Schedules/test --add job --i my_import --mode continue/new/overwrite" << std::endl;
 		std::cerr << "    --schedule Schedules/test --add job --i exit" << std::endl;
 		std::cerr << std::endl << " ++ Add an edge: " << std::endl;
 		std::cerr << "    --schedule Schedules/test --add edge --i inputnodename --o outputnodename" << std::endl;
@@ -90,6 +91,9 @@ public:
 		current_node = parser.getOption("--set_current_node", "Name of a node to which to set current_node", "");
 		start_node = parser.getOption("--set_start_node", "Name of a node to which to set original_start_node", "");
 		email = parser.getOption("--set_email", "Email address to send messages about Scheduler status", "");
+		int run_section = parser.addSection("Run the scheduler within a pipeline");
+		do_run = parser.checkOption("--run", "Run the scheduler");
+		run_pipeline = parser.getOption("--run_pipeline", "Name of the pipeline in which to run this schedule", "default");
 
 		// Check for errors in the command-line option
 		if (argc==1)
@@ -111,14 +115,22 @@ public:
 		}
 
 		// read in schedule if it exists
+		schedule.setName(mydir);
 		if (exists(mydir + "schedule.star"))
 		{
-			schedule.read(mydir + "schedule.star");
-			schedule.write(mydir + "schedule.star.old"); // just save another copy of the starfile ...
+			schedule.read();
+			schedule.write(mydir + "schedule.star.bck"); // just save another copy of the starfile ...
 		}
-		else schedule.name = mydir;
 
-		if (add != "")
+		if (do_run)
+		{
+			PipeLine pipeline;
+			pipeline.setName(run_pipeline);
+			pipeline.read(DO_LOCK);
+			pipeline.write(DO_LOCK);
+			schedule.run(pipeline);
+		}
+		else if (add != "")
 		{
 			if (add == "variable")
 			{
@@ -213,7 +225,7 @@ public:
 		else
 			REPORT_ERROR(" ERROR: nothing to do!");
 
-		schedule.write(mydir + "schedule.star");
+		schedule.write();
 	}
 };
 

@@ -159,7 +159,7 @@ FileName FileName::afterFirstOf(const std::string& str) const
 {
 	int point = find(str);
 	if (point > -1)
-		return substr(point + 1);
+		return substr(point + str.length());
 	else
 		return *this;
 }
@@ -169,7 +169,7 @@ FileName FileName::afterLastOf(const std::string& str) const
 {
 	int point = rfind(str);
 	if (point > -1)
-		return substr(point + 1);
+		return substr(point + str.length());
 	else
 		return *this;
 }

@@ -451,8 +451,9 @@ bool PipeLine::getCommandLineJob(RelionJob &thisjob, int current_job, bool is_ma
 
 
 // Adds thisjob to the pipeline and returns the id of the newprocess
-long int PipeLine::addJob(RelionJob &thisjob, int as_status, bool do_overwrite)
+long int PipeLine::addJob(RelionJob &thisjob, int as_status, bool do_overwrite, bool do_write_minipipeline)
 {
+
 	// Also write a mini-pipeline in the output directory
 	PipeLine mini_pipeline;
 	mini_pipeline.setName(thisjob.outputName+"job");
@@ -475,8 +476,11 @@ long int PipeLine::addJob(RelionJob &thisjob, int as_status, bool do_overwrite)
 		mini_pipeline.addNewOutputEdge(0, thisjob.outputNodes[i]);
 	}
 
-	// Write the mini-pipeline to an updated STAR file
-	mini_pipeline.write();
+	if (do_write_minipipeline)
+	{
+		// Write the mini-pipeline to an updated STAR file
+		mini_pipeline.write();
+	}
 	// Writing of the overall pipeline is done in the function calling addToPipeLine
 
 	return myProcess;
@@ -730,7 +734,7 @@ int PipeLine::addScheduledJob(int job_type, std::string fn_options)
 	return current_job;
 }
 
-// Adds a scheduled job to the pipeline
+// Adds a scheduled job to the pipeline from the command line
 int PipeLine::addScheduledJob(RelionJob &job)
 {
 	std::string error_message;
@@ -772,119 +776,6 @@ void PipeLine::waitForJobToFinish(int current_job, bool &is_failure, bool &is_ab
 
 
 }
-
-void PipeLine::abortSchedule(FileName fn_schedule)
-{
-    // Abort by aborting the current job
-
-	Schedule schedule;
-    schedule.read(fn_schedule);
-
-    FileName job_name, original_job_name, mode;
-    bool has_done = false, has_started = false;
-    while (schedule.gotoNextJob(job_name, original_job_name, mode, has_started))
-    {
-        int current_job = findProcessByName(job_name);
-        if (processList[current_job].status == PROC_RUNNING)
-        {
-            has_done = true;
-        	touch(processList[current_job].name + RELION_JOB_ABORT_NOW);
-            std::cout << " Marking job " << processList[current_job].name << " for abortion; schedule should abort too ... " << std::endl;
-        }
-    }
-
-    if (!has_done)
-    	std::cout << " This schedule seems to have finished already ..." << std::endl;
-
-}
-
-
-void PipeLine::runSchedule(FileName fn_schedule)
-{
-	Schedule schedule;
-    schedule.read(fn_schedule);
-
-    // Make a copy of the Schedule, just in case ...
-    copy(fn_schedule, fn_schedule+".bck");
-
-    // go through all nodes
-    FileName job_name, original_job_name, mode;
-    bool job_has_started;
-    while (schedule.gotoNextJob(job_name, original_job_name, mode, job_has_started))
-    {
-        RelionJob myjob;
-        bool is_continue, do_overwrite_current, dummy;
-    	int current_job;
-    	//if (!job_has_started || mode == SCHEDULE_NODE_JOB_MODE_NEW)
-    	if (mode == SCHEDULE_NODE_JOB_MODE_NEW)
-    	{
-    		// Spawn a new job from the ones inside the Schedule
-        	myjob.read(original_job_name, is_continue, true); // true means initialise the job
-        	current_job = addScheduledJob(myjob);
-        	is_continue = false;
-        	do_overwrite_current = false;
-
-        	// TODO: check dependencies on subsequent jobs when spawning new ones...
-
-    	}
-    	else if (mode == SCHEDULE_NODE_JOB_MODE_CONTINUE || mode == SCHEDULE_NODE_JOB_MODE_OVERWRITE)
-    	{
-    		is_continue = (mode == SCHEDULE_NODE_JOB_MODE_CONTINUE);
-    		do_overwrite_current = (mode == SCHEDULE_NODE_JOB_MODE_OVERWRITE);
-
-    		current_job = findProcessByName(job_name);
-    		if (current_job < 0)
-				REPORT_ERROR("ERROR: RunSchedule cannot find process with name: " + job_name);
-	        if (!myjob.read(processList[current_job].name, dummy, true)) // true means also initialise the job
-					REPORT_ERROR("There was an error reading job: " + processList[current_job].name);
-    	}
-    	else
-    		REPORT_ERROR("ERROR: unrecognised mode for running a new process: " + mode);
-
-        // Check whether the input nodes are there, before executing the job
-		for (long int inode = 0; inode < processList[current_job].inputNodeList.size(); inode++)
-		{
-			long int mynode = processList[current_job].inputNodeList[inode];
-			while (!exists(nodeList[mynode].name))
-			{
-				std::cerr << " + -- Warning " << nodeList[mynode].name << " does not exist. Waiting 10 seconds ... " << std::endl;
-				sleep(10);
-			}
-		}
-
-		std::string error_message;
-		if (!runJob(myjob, current_job, false, is_continue, true, do_overwrite_current, error_message))
-			REPORT_ERROR(error_message);
-
-
-		// Wait for job to finish
-		bool is_failure = false;
-		bool is_aborted = false;
-		waitForJobToFinish(current_job, is_failure, is_aborted);
-		if (is_failure)
-		{
-			std::string message = " Stopping schedule due to job " + job_name + " failing with an error ...";
-			schedule.sendEmail(message);
-			std::cerr << message << std::endl;
-			break;
-		}
-		else if (is_aborted)
-		{
-			std::string message = " Stopping schedule due to user abort of job " + job_name + " ...";
-			schedule.sendEmail(message);
-			std::cerr << message << std::endl;
-			break;
-		}
-		else
-		{
-			// job finished successfully, write out the updated scheduler file
-			schedule.write(fn_schedule);
-		}
-    } // end while !schedule.isFinished
-
-    std::cout << " Scheduler " << schedule.name << " has finished now... " << std::endl;
-}
-
 
 void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_repeat,
 		long int minutes_wait, long int minutes_wait_before, long int seconds_wait_after, bool do_overwrite_current)

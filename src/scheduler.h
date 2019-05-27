@@ -471,8 +471,7 @@ class SchedulerNode
 	SchedulerNode(SchedulerBooleanOperator* _mybooloperator)
 	{
 		type = SCHEDULE_NODE_TYPE_BOOL_OPERATOR;
-		name = _mybooloperator->name;
-		original_name = mode = "undefined";
+		name = original_name = _mybooloperator->name;
 		myBooleanOperator = _mybooloperator;
 		myFloatOperator = NULL;
 		myStringOperator = NULL;
@@ -483,8 +482,7 @@ class SchedulerNode
 	SchedulerNode(SchedulerFloatOperator* _myfloatoperator)
 	{
 		type = SCHEDULE_NODE_TYPE_FLOAT_OPERATOR;
-		name = _myfloatoperator->name;
-		original_name = mode = "undefined";
+		name = original_name = _myfloatoperator->name;
 		myFloatOperator = _myfloatoperator;
 		myBooleanOperator = NULL;
 		myStringOperator = NULL;
@@ -495,8 +493,8 @@ class SchedulerNode
 	SchedulerNode(SchedulerStringOperator* _mystringoperator)
 	{
 		type = SCHEDULE_NODE_TYPE_STRING_OPERATOR;
-		name = _mystringoperator->name;
-		original_name = mode = "undefined";
+		name = original_name = _mystringoperator->name;
+		mode = "undefined";
 		myStringOperator = _mystringoperator;
 		myBooleanOperator = NULL;
 		myFloatOperator = NULL;
@@ -507,9 +505,9 @@ class SchedulerNode
 	SchedulerNode(RFLOAT _wait_seconds)
 	{
 		type = SCHEDULE_NODE_TYPE_TIMER_WAIT;
-		name = "TIMER_WAIT_" + floatToString( _wait_seconds);
+		name = original_name = "WAIT_" + floatToString( _wait_seconds);
 		wait_seconds =  _wait_seconds;
-		original_name = mode = "undefined";
+		mode = "undefined";
 		myFloatOperator = NULL;
 		myBooleanOperator = NULL;
 		myStringOperator = NULL;
@@ -519,9 +517,9 @@ class SchedulerNode
 	SchedulerNode()
 	{
 		type = SCHEDULE_NODE_TYPE_EXIT;
-		name = "EXIT";
+		name = original_name = "exit";
 		wait_seconds =  0.;
-		original_name = mode = "undefined";
+		mode = "undefined";
 		myFloatOperator = NULL;
 		myBooleanOperator = NULL;
 		myStringOperator = NULL;
@@ -587,6 +585,8 @@ class Schedule
 	std::vector<SchedulerNode> nodes;
 	std::vector<SchedulerEdge> edges;
 
+	PipeLine schedule_pipeline;
+
 public:
 
 	Schedule()
@@ -598,8 +598,8 @@ public:
 	{
 		current_node = NULL;
 		original_start_node = NULL;
-		name = "";
-		email_address = "";
+		name = "undefined";
+		email_address = "undefined";
 		bools.clear();
 		floats.clear();
 		strings.clear();
@@ -610,9 +610,15 @@ public:
 		string_ops.clear();
 	}
 
-	void read(FileName fn);
+	void setName(std::string _name)
+	{
+		name = _name;
+		schedule_pipeline.setName(_name + "schedule");
+	}
 
-	void write(FileName fn);
+	void read(FileName fn = "");
+
+	void write(FileName fn = "");
 
     void reset();
 
@@ -636,6 +642,7 @@ public:
 	SchedulerFloatOperator* findFloatOperator(std::string name);
 	SchedulerStringOperator* findStringOperator(std::string name);
 	SchedulerNode* findNode(std::string name);
+	SchedulerNode* findNodeByOriginalName(std::string name);
 
     // Build a new Schedule
     // Add variables
@@ -659,6 +666,18 @@ public:
 
     // Test integrity of the Schedule. Warn for unused variables, nodes, etc.
     bool isValid();
+
+    // This function fixes the dependency of newly generated jobs, as determined by the pipeline_schedule
+    RelionJob copyNewJobFromSchedulePipeline(FileName original_job_name);
+
+    // Modify a job to set variables from the Scheduler
+    void setVariablesInJob(RelionJob &job, FileName original_job_name);
+
+    // Run the Schedule
+    void run(PipeLine &pipeline);
+
+    // Abort a running schedule
+    void abort();
 
 };
 

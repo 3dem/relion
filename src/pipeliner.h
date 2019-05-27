@@ -29,7 +29,6 @@
 #include <dirent.h>
 #include "src/metadata_table.h"
 #include "src/pipeline_jobs.h"
-#include "src/scheduler.h"
 #define DEFAULTPDFVIEWER "evince"
 
 class Process
@@ -149,7 +148,7 @@ class PipeLine
 			std::vector<std::string> &commands, std::string &final_command, std::string &error_message);
 
 	// Adds _job to the pipeline and return the id of the newprocess
-	long int addJob(RelionJob &_job, int as_status, bool do_overwrite);
+	long int addJob(RelionJob &_job, int as_status, bool do_overwrite, bool do_write_minipipeline = true);
 
 	// Runs a job and adds it to the pipeline
 	bool runJob(RelionJob &_job, int &current_job, bool only_schedule, bool is_main_continue,
@@ -165,12 +164,6 @@ class PipeLine
 	int addScheduledJob(RelionJob &job);
 
 	void waitForJobToFinish(int current_job, bool &is_failure, bool &is_abort);
-
-	// Abort execution of a running Schedule
-	void abortSchedule(FileName fn_schedule);
-
-	// Execute a Schedule
-	void runSchedule(FileName fn_schedule);
 
 	// Runs a series of scheduled jobs, possibly in a loop, from the command line
 	void runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_repeat,

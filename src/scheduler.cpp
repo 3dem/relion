@@ -83,6 +83,16 @@ SchedulerNode* Schedule::findNode(std::string _name)
 	return NULL;
 }
 
+SchedulerNode* Schedule::findNodeByOriginalName(std::string _name)
+{
+	for (int i = 0; i < nodes.size(); i++)
+	{
+		if (nodes[i].original_name == _name) return &nodes[i];
+	}
+	REPORT_ERROR("ERROR: cannot find node: " + _name);
+	return NULL;
+}
+
 bool SchedulerNode::performOperation()
 {
 	if (type == SCHEDULE_NODE_TYPE_BOOL_OPERATOR)
@@ -133,6 +143,8 @@ bool SchedulerNode::performOperation()
 
 void Schedule::read(FileName fn)
 {
+	if (fn == "") fn = name + "schedule.star";
+
 	// Clear current model
 	clear();
 
@@ -384,12 +396,16 @@ void Schedule::read(FileName fn)
 	// Close file handler
 	in.close();
 
+	// Also read in the schedule_pipeline (no need to lock now?)
+	schedule_pipeline.read();
 
 }
 
 
 void Schedule::write(FileName fn)
 {
+
+	if (fn == "") fn = name + "schedule.star";
 
 	// B. Write STAR file with the entire schedule
 	std::ofstream  fh;
@@ -625,7 +641,12 @@ void Schedule::write(FileName fn)
 			MD.setValue(EMDL_SCHEDULE_NODE_NAME, nodes[i].name);
 			MD.setValue(EMDL_SCHEDULE_NODE_TYPE, nodes[i].type);
 
-			if (type == SCHEDULE_NODE_TYPE_JOB)
+
+			if (type == SCHEDULE_NODE_TYPE_EXIT)
+			{
+				MD.setValue(EMDL_SCHEDULE_NODE_ORI_NAME, nodes[i].original_name);
+			}
+			else if (type == SCHEDULE_NODE_TYPE_JOB)
 			{
 				MD.setValue(EMDL_SCHEDULE_NODE_ORI_NAME, nodes[i].original_name);
 				MD.setValue(EMDL_SCHEDULE_NODE_JOB_MODE, nodes[i].mode);
@@ -679,6 +700,9 @@ void Schedule::write(FileName fn)
 	// Close the file handler
 	fh.close();
 
+	// Also write out the schedule_pipeline (no need to lock now?)
+	schedule_pipeline.write();
+
 }
 
 // Reset all variables to their original value
@@ -694,7 +718,13 @@ void Schedule::reset()
     for (int i = 0; i < strings.size(); i++)
         strings[i].value = strings[i].original_value;
 
-    current_node == original_start_node;
+    for (int i = 0; i < nodes.size(); i++)
+    {
+    	nodes[i].name = nodes[i].original_name;
+    	nodes[i].job_has_started = false;
+    }
+
+    current_node = NULL;
 }
 
 void Schedule::setCurrentNode(std::string _name)
@@ -907,16 +937,31 @@ void Schedule::addOperatorNode(std::string type, std::string input_name, std::st
 
 void Schedule::addJobNode(FileName jobname, std::string mode)
 {
-
-	// Make sure jobname is a directory, i.e. ends with a slash
-	if (jobname[jobname.length()-1] != '/') jobname += "/";
-
-	// Copy the jobfile into a file called jobname
+	// Check whether the jobname is unique
 	if (isNode(jobname))
 		REPORT_ERROR("ERROR: trying to add a JobNode that already exists...");
 
-	if (!exists(jobname+"job.star"))
-		REPORT_ERROR("ERROR: trying to add a Job with a jobname that does not have a job.star file ...");
+	// Copy the input job.star file into the Schedule directory as jobname + "job.star"
+	copy(jobname + "job.star", name + jobname + "job.star");
+
+	// And add this file to the internal schedule_pipeline
+	RelionJob job;
+	bool dummy;
+	job.read(jobname, dummy, true);
+
+	// Now add this job to the local schedule_pipeline
+	std::string error_message;
+	std::vector<std::string> commands;
+	std::string final_command;
+	std::string output_name = name + jobname + '/';
+
+	if (!job.getCommands(output_name, commands, final_command, false, schedule_pipeline.job_counter, error_message))
+		REPORT_ERROR("ERROR in getting commands for scheduled job: " + error_message);
+
+	int current_job = schedule_pipeline.addJob(job, PROC_SCHEDULED, false, false); // 1st false is do_overwrite, 2nd false is do_write_minipipeline
+
+	if (current_job < 0)
+		REPORT_ERROR("ERROR: current job should not be negative now ...");
 
 	SchedulerNode mynode(jobname, jobname, mode);
 	nodes.push_back(mynode);
@@ -930,7 +975,7 @@ void Schedule::addExitNode()
 
 void Schedule::sendEmail(std::string message)
 {
-	if (email_address != "")
+	if (email_address != "undefined")
 	{
 		std::string mysubject = "Schedule: " + name;
 		std::string command = "echo \"" + message + "\" | mail -s \"" + mysubject + "\" -r RELION " + email_address;
@@ -959,3 +1004,224 @@ bool Schedule::isValid()
 	// Check Scheduler ends with an exit
 
 }
+
+RelionJob Schedule::copyNewJobFromSchedulePipeline(FileName original_job_name)
+{
+
+
+	RelionJob job;
+	bool dummy;
+	job.read(name + original_job_name, dummy, true); // true means initialise the job
+
+	// Check where this job gets its input from: change names from local scheduler ones to the current pipeline
+	int local_process = schedule_pipeline.findProcessByName(name + original_job_name + '/');
+	// Loop over all input nodes to this job
+	for (int inode = 0; inode <  schedule_pipeline.processList[local_process].inputNodeList.size(); inode++)
+	{
+		int mynode = schedule_pipeline.processList[local_process].inputNodeList[inode];
+		// find from which pipeline_scheduler job this jobs gets its input nodes
+		std::cerr << " schedule_pipeline.nodeList[mynode].name= " << schedule_pipeline.nodeList[mynode].name << std::endl;
+		int output_from_process =  schedule_pipeline.nodeList[mynode].outputFromProcess;
+		if (output_from_process < 0)
+			REPORT_ERROR("ERROR: cannot find outputProcess of node: " +  schedule_pipeline.nodeList[mynode].name);
+		// Get the original name in the pipeline_scheduler of this job
+		FileName my_ori_name = schedule_pipeline.processList[output_from_process].name;
+		// Remove leading directory and tailing slash to get the process name in the pipeline_scheduler
+		FileName my_process_name = (my_ori_name.afterFirstOf(name)).beforeLastOf("/");
+		// find that process in the nodes, and get its current name
+		std::string my_current_name =findNodeByOriginalName(my_process_name)->name;
+		// Change all instances of the my_ori_name to my_current_name in the joboptions of this job
+		for (std::map<std::string,JobOption>::iterator it=job.joboptions.begin(); it!=job.joboptions.end(); ++it)
+		{
+			FileName mystring = (it->second).value;
+			mystring.replaceAllSubstrings(my_ori_name, my_current_name);
+			(it->second).value = mystring;
+		}
+	}
+
+	return job;
+}
+
+// Modify a job to set variables from the Scheduler
+void Schedule::setVariablesInJob(RelionJob &job, FileName original_job_name)
+{
+
+	RelionJob ori_job;
+	bool dummy;
+	ori_job.read(name + original_job_name, dummy, true);
+
+	// Check whether there are any options with a value containing &&, which is the sign for inserting Scheduler variables
+	for (std::map<std::string,JobOption>::iterator it=ori_job.joboptions.begin(); it!=ori_job.joboptions.end(); ++it)
+	{
+		FileName mystring = (it->second).value;
+		if (mystring.contains("$$"))
+		{
+			mystring = mystring.afterFirstOf("$$");
+
+			// Found an option that needs replacement! Now find which variable to insert
+			std::string my_value;
+			if (isBooleanVariable(mystring))
+			{
+				if (job.joboptions[it->first].joboption_type != JOBOPTION_BOOLEAN)
+					REPORT_ERROR(" ERROR: trying to set a BooleanVariable: " + mystring + " into a non-boolean option: " + it->first);
+
+				my_value = (findBooleanVariable(mystring)->value) ? "Yes" : "No";
+			}
+			else if (isFloatVariable(mystring))
+			{
+				if (job.joboptions[it->first].joboption_type == JOBOPTION_BOOLEAN)
+					REPORT_ERROR(" ERROR: trying to set FloatVariable: " + mystring + " into a boolean option: " + it->first);
+
+				my_value = floatToString(findFloatVariable(mystring)->value);
+			}
+			else if (isStringVariable(mystring))
+			{
+				if (job.joboptions[it->first].joboption_type == JOBOPTION_BOOLEAN)
+					REPORT_ERROR(" ERROR: trying to set StringVariable: " + mystring + " into a boolean option: " + it->first);
+				if (job.joboptions[it->first].joboption_type == JOBOPTION_SLIDER)
+					REPORT_ERROR(" ERROR: trying to set StringVariable: " + mystring + " into a slider option: " + it->first);
+
+				my_value = findStringVariable(mystring)->value;
+			}
+			else
+				REPORT_ERROR(" ERROR: variable in job is not part of this Schedule: " + mystring);
+
+			job.joboptions[it->first].value = my_value;
+			std::cout << " Setting joboption " << it->first << " to " << my_value << " based on variable: " << mystring << std::endl;
+		}
+	}
+
+}
+
+void Schedule::run(PipeLine &pipeline)
+{
+    // go through all nodes
+    FileName job_name, original_job_name, mode;
+    bool job_has_started;
+    while (gotoNextJob(job_name, original_job_name, mode, job_has_started))
+    {
+        RelionJob myjob;
+        bool is_continue, do_overwrite_current, dummy;
+    	int current_job;
+    	if (!job_has_started || mode == SCHEDULE_NODE_JOB_MODE_NEW)
+    	{
+
+    		// Copy the job inside the schedule_pipeline to a new job inside the pipeline we are actually running in
+    		// This function also takes care of fixing the names of the inputNodes
+    		myjob = copyNewJobFromSchedulePipeline(original_job_name);
+
+        	// Now add this job to the pipeline we will actually be running in
+        	current_job = pipeline.addScheduledJob(myjob);
+        	is_continue = false;
+        	do_overwrite_current = false;
+
+        	// Set the name of the current node now
+        	current_node->name = pipeline.processList[current_job].name;
+
+    	}
+    	else if (mode == SCHEDULE_NODE_JOB_MODE_CONTINUE || mode == SCHEDULE_NODE_JOB_MODE_OVERWRITE)
+    	{
+    		is_continue = (mode == SCHEDULE_NODE_JOB_MODE_CONTINUE);
+    		do_overwrite_current = (mode == SCHEDULE_NODE_JOB_MODE_OVERWRITE);
+
+    		current_job = pipeline.findProcessByName(job_name);
+    		if (current_job < 0)
+				REPORT_ERROR("ERROR: RunSchedule cannot find process with name: " + job_name);
+
+    		// Read the job from the pipeline we are running in
+    		if (!myjob.read(pipeline.processList[current_job].name, dummy, true)) // true means also initialise the job
+					REPORT_ERROR("There was an error reading job: " + pipeline.processList[current_job].name);
+
+    	}
+    	else
+    		REPORT_ERROR("ERROR: unrecognised mode for running a new process: " + mode);
+
+
+    	// This function replaces variable calls starting with a '&&' from the original_job into the current_job
+    	setVariablesInJob(myjob, original_job_name);
+
+    	// Check whether the input nodes are there, before executing the job
+		for (long int inode = 0; inode < pipeline.processList[current_job].inputNodeList.size(); inode++)
+		{
+			long int mynode = pipeline.processList[current_job].inputNodeList[inode];
+			while (!exists(pipeline.nodeList[mynode].name))
+			{
+				std::cerr << " + -- Warning " << pipeline.nodeList[mynode].name << " does not exist. Waiting 10 seconds ... " << std::endl;
+				sleep(10);
+			}
+		}
+
+		// Now actually run the Scheduled job
+		std::string error_message;
+		if (!pipeline.runJob(myjob, current_job, false, is_continue, true, do_overwrite_current, error_message))
+			REPORT_ERROR(error_message);
+
+
+		// Wait for job to finish
+		bool is_failure = false;
+		bool is_aborted = false;
+		pipeline.waitForJobToFinish(current_job, is_failure, is_aborted);
+
+		std::string message = "";
+		if (is_failure) message = " Stopping schedule due to job " + job_name + " failing with an error ...";
+		else if (is_aborted) message = " Stopping schedule due to user abort of job " + job_name + " ...";
+		if (message != "")
+		{
+			sendEmail(message);
+			std::cerr << message << std::endl;
+			break;
+		}
+		else
+		{
+			// job finished successfully, write out the updated scheduler file
+			current_node->job_has_started = true;
+			write();
+		}
+    } // end while gotoNextJob
+
+    std::cout << " Scheduler " << name << " has finished now... " << std::endl;
+}
+
+void Schedule::abort()
+{
+    // TODO: make an abort mechanism with a touch file, specific for the Scheduler!!
+
+	// TODO: also make a mechanism that the same scheduler cannot be run twice simultaneously!
+
+
+
+
+    /*
+	// Abort by aborting the current job
+	FileName job_name, original_job_name, mode;
+    bool has_done = false, has_started = false;
+
+    // Go to the next job in the Schedule (starting from current_job)
+    // Place an abort in each of the Jobs directories
+    gotoNextJob(job_name, original_job_name, mode, has_started);
+    int current_job = pipeline.findProcessByName(job_name);
+    if (pipeline.processList[current_job].status == PROC_RUNNING)
+    {
+        has_done = true;
+    	touch(processList[current_job].name + RELION_JOB_ABORT_NOW);
+        std::cout << " Marking job " << processList[current_job].name << " for abortion; schedule should abort too ... " << std::endl;
+    }
+
+
+    while ()
+    {
+        int current_job = findProcessByName(job_name);
+        if (processList[current_job].status == PROC_RUNNING)
+        {
+            has_done = true;
+        	touch(processList[current_job].name + RELION_JOB_ABORT_NOW);
+            std::cout << " Marking job " << processList[current_job].name << " for abortion; schedule should abort too ... " << std::endl;
+        }
+    }
+
+    if (!has_done)
+    	std::cout << " This schedule seems to have finished already ..." << std::endl;
+	*/
+
+}
+
