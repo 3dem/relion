@@ -124,6 +124,7 @@ private:
 	void initialiseLocresWindow();
 	void initialiseMotionrefineWindow();
 	void initialiseCtfrefineWindow();
+	void initialiseExternalWindow();
 
 };
 

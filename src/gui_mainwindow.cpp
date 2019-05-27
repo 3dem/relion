@@ -398,6 +398,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
     }
 	// Fill browser in the right order
 	browser = new Fl_Hold_Browser(10,MENUHEIGHT+5,WCOL0-20,h-MENUHEIGHT-60);
+    browser->textsize(RLN_FONTSIZE-1);
     current_job = -1;
 
     int i = 0;
@@ -532,9 +533,15 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	gui_jobwindows[i] = new JobWindow();
 	gui_jobwindows[i]->initialise(PROC_RESMAP, maingui_do_old_style);
     browse_grp[i]->end();
+    i++;
+
+    browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+	browser->add("External");
+	gui_jobwindows[i] = new JobWindow();
+	gui_jobwindows[i]->initialise(PROC_EXTERNAL, maingui_do_old_style);
+    browse_grp[i]->end();
 
     browser->callback(cb_select_browsegroup);
-    browser->textsize(RLN_FONTSIZE);
     browser->end();
     browser->select(1); // just start from the beginning
 
@@ -606,11 +613,11 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 		scheduled_job_browser->callback(cb_select_scheduled_job);
 		input_job_browser->callback(cb_select_input_job);
 		output_job_browser->callback(cb_select_output_job);
-		finished_job_browser->textsize(RLN_FONTSIZE);
-		running_job_browser->textsize(RLN_FONTSIZE);
-		scheduled_job_browser->textsize(RLN_FONTSIZE);
-		input_job_browser->textsize(RLN_FONTSIZE);
-		output_job_browser->textsize(RLN_FONTSIZE);
+		finished_job_browser->textsize(RLN_FONTSIZE-1);
+		running_job_browser->textsize(RLN_FONTSIZE-1);
+		scheduled_job_browser->textsize(RLN_FONTSIZE-1);
+		input_job_browser->textsize(RLN_FONTSIZE-1);
+		output_job_browser->textsize(RLN_FONTSIZE-1);
 
 		finished_job_browser->end();
 		running_job_browser->end();

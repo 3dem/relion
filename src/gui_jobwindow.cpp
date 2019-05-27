@@ -416,6 +416,11 @@ void JobWindow::initialise(int my_job_type, bool _do_oldstyle)
 		myjob.initialise(my_job_type);
 		initialiseCtfrefineWindow();
 	}
+	else if (my_job_type == PROC_EXTERNAL)
+	{
+		myjob.initialise(my_job_type);
+		initialiseExternalWindow();
+	}
 	else
 	{
 		REPORT_ERROR("ERROR: unrecognised job-type to add to the GUI");
@@ -2179,10 +2184,58 @@ void JobWindow::initialiseCtfrefineWindow()
 
 	place("minres", TOGGLE_DEACTIVATE);
 
+	tab2->end();
+
+}
 
 
+void JobWindow::initialiseExternalWindow()
+{
+	setupTabs(3);
+
+	tab1->begin();
+	tab1->label("Input");
+	resetHeight();
+
+	// I/O
+	place("fn_exe", TOGGLE_DEACTIVATE);
+
+	current_y += STEPY /2 ;
+	place("in_mov", TOGGLE_DEACTIVATE);
+	place("in_mic", TOGGLE_DEACTIVATE);
+	place("in_part", TOGGLE_DEACTIVATE);
+	place("in_coords", TOGGLE_DEACTIVATE);
+	place("in_3dref", TOGGLE_DEACTIVATE);
+	place("in_mask", TOGGLE_DEACTIVATE);
+
+
+	tab1->end();
+
+	tab2->begin();
+	tab2->label("Output");
+	resetHeight();
+
+	place("out_mov", TOGGLE_DEACTIVATE);
+	place("out_mic", TOGGLE_DEACTIVATE);
+	place("out_part", TOGGLE_DEACTIVATE);
+	place("out_coords", TOGGLE_DEACTIVATE);
+	place("out_3dref", TOGGLE_DEACTIVATE);
+	place("out_mask", TOGGLE_DEACTIVATE);
 
 	tab2->end();
+	tab2->begin();
+
+	tab3->begin();
+	tab3->label("Params");
+	resetHeight();
+
+	place2("param1_label", "param1_value", "Param1 label, value::", TOGGLE_LEAVE_ACTIVE);
+	place2("param2_label", "param2_value", "Param2 label, value::", TOGGLE_LEAVE_ACTIVE);
+	place2("param3_label", "param3_value", "Param3 label, value::", TOGGLE_LEAVE_ACTIVE);
+	place2("param4_label", "param4_value", "Param4 label, value::", TOGGLE_LEAVE_ACTIVE);
+	place2("param5_label", "param5_value", "Param5 label, value::", TOGGLE_LEAVE_ACTIVE);
+
+	tab3->end();
 
 }
 

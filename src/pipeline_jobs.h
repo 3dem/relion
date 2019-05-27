@@ -185,6 +185,7 @@ static bool do_allow_change_minimum_dedicated;
 #define PROC_MULTIBODY_NAME		"MultiBody"    // Multi-body refinement
 #define PROC_MOTIONREFINE_NAME  "Polish"       // Jasenko's motion fitting program for Bayesian polishing (to replace MovieRefine?)
 #define PROC_CTFREFINE_NAME     "CtfRefine"    // Jasenko's program for defocus and beamtilt optimisation
+#define PROC_EXTERNAL_NAME      "External"     // For running non-relion programs
 
 #define PROC_IMPORT         0 // Import any file as a Node of a given type
 #define PROC_MOTIONCORR 	1 // Import any file as a Node of a given type
@@ -208,7 +209,8 @@ static bool do_allow_change_minimum_dedicated;
 #define PROC_MULTIBODY      19// Multi-body refinement
 #define PROC_MOTIONREFINE   20// Jasenko's motion_refine
 #define PROC_CTFREFINE      21// Jasenko's ctf_refine
-#define NR_BROWSE_TABS      19
+#define PROC_EXTERNAL       99// External scripts
+#define NR_BROWSE_TABS      20
 
 // Status a Process may have
 #define PROC_RUNNING          0 // (hopefully) running
@@ -488,6 +490,10 @@ public:
 
 	void initialiseCtfrefineJob();
 	bool getCommandsCtfrefineJob(std::string &outputname, std::vector<std::string> &commands,
+			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
+
+	void initialiseExternalJob();
+	bool getCommandsExternalJob(std::string &outputname, std::vector<std::string> &commands,
 			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
 
 };
