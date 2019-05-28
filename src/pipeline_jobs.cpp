@@ -286,7 +286,12 @@ float JobOption::getNumber()
 		REPORT_ERROR("ERROR: this jobOption does not return a number: " + label);
 	}
 	else
-	    return textToFloat(value);
+	{
+		if (value.substr(0, 2) == "$$")
+			return 0;
+		else
+			return textToFloat(value);
+	}
 }
 
 // Get a boolean value

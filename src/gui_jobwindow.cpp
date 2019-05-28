@@ -197,7 +197,7 @@ void JobWindow::place(std::string key, int deactivate_option, Fl_Group * deactiv
 	if (myjob.joboptions.find(key) == myjob.joboptions.end())
 		std::cerr << "WARNING: cannot find " << key << " in the defined joboptions of jobtype= " << myjob.type << std::endl;
 
-	guientries[key].place(myjob.joboptions[key], current_y, deactivate_option, deactivate_this_group, actually_activate, do_oldstyle);
+	guientries[key].place(myjob.joboptions[key], current_y, deactivate_option, deactivate_this_group, actually_activate);
 }
 
 void JobWindow::place2(std::string key1, std::string key2, std::string label, int deactivate_option)
@@ -210,10 +210,10 @@ void JobWindow::place2(std::string key1, std::string key2, std::string label, in
 	myjob.joboptions[key1].label_gui = label;
 	myjob.joboptions[key2].label_gui = "";
 	int old_y = current_y;
-	guientries[key1].place(myjob.joboptions[key1], current_y, deactivate_option, NULL, false, do_oldstyle,
+	guientries[key1].place(myjob.joboptions[key1], current_y, deactivate_option, NULL, false,
 			XCOL2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
 	current_y = old_y;
-	guientries[key2].place(myjob.joboptions[key2], current_y, deactivate_option, NULL, false, do_oldstyle,
+	guientries[key2].place(myjob.joboptions[key2], current_y, deactivate_option, NULL, false,
 			XCOL2 + (WCOL2 + COLUMN_SEPARATION) / 2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
 }
 
@@ -230,13 +230,13 @@ void JobWindow::place3(std::string key1, std::string key2, std::string key3, std
 	myjob.joboptions[key2].label_gui = "";
 	myjob.joboptions[key3].label_gui = "";
 	int old_y = current_y;
-	guientries[key1].place(myjob.joboptions[key1], current_y, deactivate_option, NULL, false, do_oldstyle,
+	guientries[key1].place(myjob.joboptions[key1], current_y, deactivate_option, NULL, false,
 			XCOL2, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
 	current_y = old_y;
-	guientries[key2].place(myjob.joboptions[key2], current_y, deactivate_option, NULL, false, do_oldstyle,
+	guientries[key2].place(myjob.joboptions[key2], current_y, deactivate_option, NULL, false,
 			XCOL2 + 1 + (WCOL2 + COLUMN_SEPARATION) / 3, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
 	current_y = old_y;
-	guientries[key3].place(myjob.joboptions[key3], current_y, deactivate_option, NULL, false, do_oldstyle,
+	guientries[key3].place(myjob.joboptions[key3], current_y, deactivate_option, NULL, false,
 			XCOL2 + 1 + 2 * (WCOL2 + COLUMN_SEPARATION) / 3, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
 
 }
@@ -317,10 +317,9 @@ void JobWindow::updateMyJob()
 
 }
 
-void JobWindow::initialise(int my_job_type, bool _do_oldstyle)
+void JobWindow::initialise(int my_job_type)
 {
 
-	do_oldstyle = _do_oldstyle;
 	if (my_job_type == PROC_IMPORT)
 	{
 		myjob.initialise(my_job_type);

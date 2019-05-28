@@ -160,7 +160,12 @@ public:
 				if (input == "exit")
 					schedule.addExitNode();
 				else
-					schedule.addJobNode(input, mode);
+				{
+					RelionJob myjob;
+					bool dummy;
+					myjob.read(input, dummy, true);
+					schedule.addJobNode(myjob, input, mode);
+				}
 			}
 			else if (add == "edge")
 			{

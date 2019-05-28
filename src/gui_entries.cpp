@@ -26,9 +26,14 @@ float fltkTextToFloat(const char* str)
 	float result = -999.;
 	if (str == NULL)
 		fl_message("ERROR: NULL entry for TextToFloat conversion. Check your inputs!");
-	else if (!sscanf(str, "%f", &result))
-		fl_message("ERROR: Invalid (non-numerical?) entry for TextToFloat conversion. Check your inputs!");
-
+	else
+	{
+		std::string mystring = std::string(str);
+		if (mystring.substr(0,2) == "$$")
+			return 0;
+		else if (!sscanf(str, "%f", &result))
+			fl_message("ERROR: Invalid (non-numerical?) entry for TextToFloat conversion. Check your inputs!");
+	}
 	return result;
 }
 
@@ -186,7 +191,7 @@ void GuiEntry::initialise(int x, int y, Fl_Group * deactivate_this_group, bool _
 		slider->value(textToDouble(joboption.default_value));
 	}
 }
-void GuiEntry::place(JobOption &_joboption, int &y, int _deactivate_option, Fl_Group * deactivate_this_group, bool actually_activate, bool _do_oldstyle, int x, int h, int wcol2, int wcol3 )
+void GuiEntry::place(JobOption &_joboption, int &y, int _deactivate_option, Fl_Group * deactivate_this_group, bool actually_activate, int x, int h, int wcol2, int wcol3 )
 {
 
 	// Clear if existing
@@ -196,8 +201,6 @@ void GuiEntry::place(JobOption &_joboption, int &y, int _deactivate_option, Fl_G
 	deactivate_option = _deactivate_option;
 
 	joboption = _joboption;
-
-	do_oldstyle = _do_oldstyle;
 
 	// Add the entry to the window
 	initialise(x, y, deactivate_this_group, actually_activate, h, wcol2, wcol3);
@@ -327,7 +330,7 @@ void GuiEntry::cb_browse_node_i() {
 	Fl::scheme("gtk+");
 	Fl_File_Chooser * G_chooser = new Fl_File_Chooser("", joboption.pattern.c_str(), Fl_File_Chooser::SINGLE, "");
 
-	std::string fn_dir = (do_oldstyle) ? "." : ".Nodes/" + integerToString(joboption.node_type);
+	std::string fn_dir = ".Nodes/" + integerToString(joboption.node_type);
 	G_chooser->directory(fn_dir.c_str());
 	G_chooser->color(GUI_BACKGROUND_COLOR);
 	G_chooser->show();
@@ -349,23 +352,16 @@ void GuiEntry::cb_browse_node_i() {
 	fl_filename_relative(relname,sizeof(relname),G_chooser->value());
 
 	// Get rid of the .Nodes/type/ directory-name again
-	if (do_oldstyle)
-	{
-		inp->value(relname);
-	}
-	else
-	{
-    		std::string replace = std::string(relname);
-	    	std::string replace2 = (std::string::npos == replace.find(fn_dir.c_str())) ? replace : replace.substr(fn_dir.length()+1, replace.length());
-    		char relname2[FL_PATH_MAX];
-	    	strcpy(relname2, replace2.c_str());
+	std::string replace = std::string(relname);
+	std::string replace2 = (std::string::npos == replace.find(fn_dir.c_str())) ? replace : replace.substr(fn_dir.length()+1, replace.length());
+	char relname2[FL_PATH_MAX];
+	strcpy(relname2, replace2.c_str());
 
-	    	FileName fn_pre, fn_jobnr, fn_post, fn_out;
-        	decomposePipelineSymlinkName(replace2, fn_pre, fn_jobnr, fn_post);
-        	fn_out = fn_pre + fn_jobnr + fn_post;
+	FileName fn_pre, fn_jobnr, fn_post, fn_out;
+	decomposePipelineSymlinkName(replace2, fn_pre, fn_jobnr, fn_post);
+	fn_out = fn_pre + fn_jobnr + fn_post;
 
-	        inp->value(fn_out.c_str());
-	}
+	inp->value(fn_out.c_str());
 }
 
 void GuiEntry::cb_menu(Fl_Widget* o, void* v) {

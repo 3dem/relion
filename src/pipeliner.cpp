@@ -1869,7 +1869,8 @@ void PipeLine::read(bool do_lock, std::string lock_message)
 #ifdef DEBUG_LOCK
 	std::cerr << "entering read lock_message=" << lock_message << std::endl;
 #endif
-	FileName dir_lock=".relion_lock", fn_lock=".relion_lock/lock_" + name + "_pipeline.star";;
+	FileName name_wo_dir = name;
+	FileName dir_lock=".relion_lock", fn_lock=".relion_lock/lock_" + name_wo_dir.afterLastOf("/") + "_pipeline.star";;
 	if (do_lock && !do_read_only)
 	{
 		int iwait =0;
@@ -2053,7 +2054,8 @@ void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode
 	if (do_read_only)
 		return;
 
-	FileName dir_lock=".relion_lock", fn_lock=".relion_lock/lock_" + name + "_pipeline.star";;
+	FileName name_wo_dir = name;
+	FileName dir_lock=".relion_lock", fn_lock=".relion_lock/lock_" + name_wo_dir.afterLastOf("/") + "_pipeline.star";;
 	if (do_lock)
 	{
 

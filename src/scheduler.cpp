@@ -935,19 +935,12 @@ void Schedule::addOperatorNode(std::string type, std::string input_name, std::st
 
 }
 
-void Schedule::addJobNode(FileName jobname, std::string mode)
+void Schedule::addJobNode(RelionJob &myjob, std::string jobname, std::string mode)
 {
+
 	// Check whether the jobname is unique
 	if (isNode(jobname))
 		REPORT_ERROR("ERROR: trying to add a JobNode that already exists...");
-
-	// Copy the input job.star file into the Schedule directory as jobname + "job.star"
-	copy(jobname + "job.star", name + jobname + "job.star");
-
-	// And add this file to the internal schedule_pipeline
-	RelionJob job;
-	bool dummy;
-	job.read(jobname, dummy, true);
 
 	// Now add this job to the local schedule_pipeline
 	std::string error_message;
@@ -955,10 +948,16 @@ void Schedule::addJobNode(FileName jobname, std::string mode)
 	std::string final_command;
 	std::string output_name = name + jobname + '/';
 
-	if (!job.getCommands(output_name, commands, final_command, false, schedule_pipeline.job_counter, error_message))
+	// Save a copy of the job in the Schedules directory
+	std::string command = "mkdir -p " + name + jobname;
+	int res = system(command.c_str());
+
+	myjob.write(output_name);
+
+	if (!myjob.getCommands(output_name, commands, final_command, false, schedule_pipeline.job_counter, error_message))
 		REPORT_ERROR("ERROR in getting commands for scheduled job: " + error_message);
 
-	int current_job = schedule_pipeline.addJob(job, PROC_SCHEDULED, false, false); // 1st false is do_overwrite, 2nd false is do_write_minipipeline
+	int current_job = schedule_pipeline.addJob(myjob, PROC_SCHEDULED, false, false); // 1st false is do_overwrite, 2nd false is do_write_minipipeline
 
 	if (current_job < 0)
 		REPORT_ERROR("ERROR: current job should not be negative now ...");
@@ -1011,7 +1010,7 @@ RelionJob Schedule::copyNewJobFromSchedulePipeline(FileName original_job_name)
 
 	RelionJob job;
 	bool dummy;
-	job.read(name + original_job_name, dummy, true); // true means initialise the job
+	job.read(name + original_job_name + '/', dummy, true); // true means initialise the job
 
 	// Check where this job gets its input from: change names from local scheduler ones to the current pipeline
 	int local_process = schedule_pipeline.findProcessByName(name + original_job_name + '/');
@@ -1020,7 +1019,6 @@ RelionJob Schedule::copyNewJobFromSchedulePipeline(FileName original_job_name)
 	{
 		int mynode = schedule_pipeline.processList[local_process].inputNodeList[inode];
 		// find from which pipeline_scheduler job this jobs gets its input nodes
-		std::cerr << " schedule_pipeline.nodeList[mynode].name= " << schedule_pipeline.nodeList[mynode].name << std::endl;
 		int output_from_process =  schedule_pipeline.nodeList[mynode].outputFromProcess;
 		if (output_from_process < 0)
 			REPORT_ERROR("ERROR: cannot find outputProcess of node: " +  schedule_pipeline.nodeList[mynode].name);
@@ -1048,7 +1046,7 @@ void Schedule::setVariablesInJob(RelionJob &job, FileName original_job_name)
 
 	RelionJob ori_job;
 	bool dummy;
-	ori_job.read(name + original_job_name, dummy, true);
+	ori_job.read(name + original_job_name + '/', dummy, true);
 
 	// Check whether there are any options with a value containing &&, which is the sign for inserting Scheduler variables
 	for (std::map<std::string,JobOption>::iterator it=ori_job.joboptions.begin(); it!=ori_job.joboptions.end(); ++it)
@@ -1109,7 +1107,6 @@ void Schedule::run(PipeLine &pipeline)
     		// Copy the job inside the schedule_pipeline to a new job inside the pipeline we are actually running in
     		// This function also takes care of fixing the names of the inputNodes
     		myjob = copyNewJobFromSchedulePipeline(original_job_name);
-
         	// Now add this job to the pipeline we will actually be running in
         	current_job = pipeline.addScheduledJob(myjob);
         	is_continue = false;
@@ -1155,7 +1152,6 @@ void Schedule::run(PipeLine &pipeline)
 		std::string error_message;
 		if (!pipeline.runJob(myjob, current_job, false, is_continue, true, do_overwrite_current, error_message))
 			REPORT_ERROR(error_message);
-
 
 		// Wait for job to finish
 		bool is_failure = false;

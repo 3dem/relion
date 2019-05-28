@@ -23,6 +23,8 @@
 #include <FL/Fl_Scroll.H>
 #include "src/gui_jobwindow.h"
 #include "src/pipeliner.h"
+#include "src/scheduler.h"
+
 
 #include <time.h>
 #include <signal.h>
@@ -62,6 +64,8 @@
 static Fl_Hold_Browser *browser;
 static Fl_Group *browse_grp[NR_BROWSE_TABS];
 static Fl_Group *background_grp;
+static Fl_Group *pipeliner_grp;
+static Fl_Group *scheduler_grp;
 static Fl_Choice *display_io_node;
 static Fl_Select_Browser *finished_job_browser, *running_job_browser, *scheduled_job_browser, *input_job_browser, *output_job_browser;
 static Fl_Box *image_box;
@@ -80,6 +84,21 @@ static Fl_Button *print_CL_button;
 static Fl_Button *schedule_button;
 static Fl_Input *alias_current_job;
 
+// Sjors 27May2019: scheduler
+static Fl_Input *scheduler_job_name;
+static Fl_Button *add_job_button;
+static Fl_Choice *job_mode;
+static Fl_Menu_Item job_mode_options[] = {
+			      {"new"},
+			      {"continue"},
+			      {"overwrite"},
+			      {0} // this should be the last entry
+			      };
+static Fl_Select_Browser *scheduler_job_browser, *scheduler_input_job_browser, *scheduler_output_job_browser;
+
+
+
+
 static Fl_Text_Buffer *textbuff_stdout;
 static Fl_Text_Buffer *textbuff_stderr;
 
@@ -87,11 +106,15 @@ static void Gui_Timer_CB(void *userdata);
 
 // Read-only GUI?
 static bool maingui_do_read_only;
-// Old-style GUI?
-static bool maingui_do_old_style;
+// Show the scheduler view
+static bool show_scheduler;
 
-// Store all the history
+// The pipeline this GUI is acting on
 static PipeLine pipeline;
+
+// The current Scheduler
+static Schedule schedule;
+
 // Which is the current job being displayed?
 static int current_job;
 static FileName global_outputname;
@@ -186,7 +209,7 @@ public:
     std::vector<std::string> commands;
 
     // Constructor with w x h size of the window and a title
-	GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, int _update_every_sec, int _exit_after_sec, bool _do_read_only = false, bool _do_oldstyle= false);
+	GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, FileName fn_sched, int _update_every_sec, int _exit_after_sec, bool _do_read_only = false);
 
     // Destructor
     ~GuiMainWindow(){ clear(); };
@@ -258,14 +281,14 @@ private:
     static void cb_display(Fl_Widget*, void*);
     inline void cb_display_i();
 
-    static void cb_toggle_continue_oldstyle(Fl_Widget*, void*);
-    inline void cb_toggle_continue_oldstyle_i();
-
     inline void cb_toggle_continue_i();
 
     static void cb_run(Fl_Widget*, void*);
     static void cb_schedule(Fl_Widget*, void*);
     inline void cb_run_i(bool only_schedule = false, bool do_open_edit = true);
+
+    static void cb_scheduler_add_job(Fl_Widget*, void*);
+    inline void cb_scheduler_add_job_i();
 
     static void cb_delete(Fl_Widget*, void*);
     inline void cb_delete_i(bool do_ask = true, bool do_recursive = true);
@@ -335,6 +358,9 @@ private:
 
     static void cb_show_initial_screen(Fl_Widget*, void*);
     inline void cb_show_initial_screen_i();
+
+    static void cb_toggle_pipeliner_scheduler(Fl_Widget*, void*);
+    inline void cb_toggle_pipeliner_scheduler_i();
 
     static void cb_start_pipeliner(Fl_Widget*, void*);
     inline void cb_start_pipeliner_i();

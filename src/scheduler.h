@@ -654,7 +654,7 @@ public:
     void addOperatorNode(std::string type, std::string input_name, std::string input2_name, std::string output_name);
 
     // Add a new job, also adds its corresponding node
-    void addJobNode(FileName jobname, std::string mode);
+    void addJobNode(RelionJob &myjob, std::string jobname, std::string mode);
 
     void addExitNode();
 
