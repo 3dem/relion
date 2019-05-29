@@ -383,7 +383,7 @@ void MotionRefiner::combineEPSAndSTARfiles()
 		}
 	}
 	
-	for (long g = 0; g < 2 /*allMdts.size()*/; g++)
+	for (long g = 0; g < allMdts.size(); g++)
 	{
 		FileName fn_root = getOutputFileNameRoot(outPath, allMdts[g]);
 		
