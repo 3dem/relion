@@ -1311,8 +1311,8 @@ void MlModel::setFourierTransformMaps(bool update_tau2_spectra, int nr_threads, 
 	if (strict_lowres_exp > 0)
 	{
 		min_ires = ROUND(pixel_size * ori_size / strict_lowres_exp);
-		std::cout << "MlModel::setFourierTransformMaps: strict_lowres_exp = " << strict_lowres_exp
-		          << " pixel_size = " << pixel_size << " ori_size = " << ori_size << " min_ires = " << min_ires << std::endl;;
+//		std::cout << "MlModel::setFourierTransformMaps: strict_lowres_exp = " << strict_lowres_exp
+//		          << " pixel_size = " << pixel_size << " ori_size = " << ori_size << " min_ires = " << min_ires << std::endl;;
 	}
 
 	// Note that PPref.size() can be bigger than nr_bodies in multi-body refinement, due to extra PPrefs needed for overlapping bodies
