@@ -479,25 +479,11 @@ enum EMDLabel
 	EMDL_SCHEDULE_NODE_JOB_HAS_STARTED,
 	EMDL_SCHEDULE_NODE_TYPE,
 	EMDL_SCHEDULE_NODE_WAIT_TIME,
-	EMDL_SCHEDULE_OPERATOR_BOOL_NAME,
-	EMDL_SCHEDULE_OPERATOR_BOOL_TYPE,
-	EMDL_SCHEDULE_OPERATOR_BOOL_INPUT1,
-	EMDL_SCHEDULE_OPERATOR_BOOL_INPUT2,
-	EMDL_SCHEDULE_OPERATOR_BOOL_FLOAT1,
-	EMDL_SCHEDULE_OPERATOR_BOOL_FLOAT2,
-	EMDL_SCHEDULE_OPERATOR_BOOL_CONST,
-	EMDL_SCHEDULE_OPERATOR_BOOL_FILE,
-	EMDL_SCHEDULE_OPERATOR_BOOL_OUTPUT,
-	EMDL_SCHEDULE_OPERATOR_FLOAT_NAME,
-	EMDL_SCHEDULE_OPERATOR_FLOAT_TYPE,
-	EMDL_SCHEDULE_OPERATOR_FLOAT_INPUT1,
-	EMDL_SCHEDULE_OPERATOR_FLOAT_CONSTANT,
-	EMDL_SCHEDULE_OPERATOR_FLOAT_INPUT2,
-	EMDL_SCHEDULE_OPERATOR_FLOAT_OUTPUT,
-	EMDL_SCHEDULE_OPERATOR_STRING_NAME,
-	EMDL_SCHEDULE_OPERATOR_STRING_TYPE,
-	EMDL_SCHEDULE_OPERATOR_STRING_INPUT,
-	EMDL_SCHEDULE_OPERATOR_STRING_OUTPUT,
+	EMDL_SCHEDULE_OPERATOR_NAME,
+	EMDL_SCHEDULE_OPERATOR_TYPE,
+	EMDL_SCHEDULE_OPERATOR_INPUT1,
+	EMDL_SCHEDULE_OPERATOR_INPUT2,
+	EMDL_SCHEDULE_OPERATOR_OUTPUT,
 	EMDL_SCHEDULE_VAR_BOOL_NAME,
 	EMDL_SCHEDULE_VAR_BOOL_VALUE,
 	EMDL_SCHEDULE_VAR_BOOL_ORI_VALUE,
@@ -1021,25 +1007,11 @@ private:
 		EMDL::addLabel(EMDL_SCHEDULE_NODE_JOB_HAS_STARTED, EMDL_BOOL, "rlnScheduleNodeJobHasStarted", "Flag to indicate whether a job has started already in the execution of the Schedule");
 		EMDL::addLabel(EMDL_SCHEDULE_NODE_TYPE, EMDL_STRING, "rlnScheduleNodeType", "What type is this Node (job, float_op, bool_op, file_op or wait ");
 		EMDL::addLabel(EMDL_SCHEDULE_NODE_WAIT_TIME, EMDL_DOUBLE, "rlnScheduleNodeWaitTime", "Time (in seconds) for this Node to wait (since the last time it was executed)");
-		EMDL::addLabel(EMDL_SCHEDULE_OPERATOR_BOOL_NAME, EMDL_STRING, "rlnScheduleBooleanOperatorName", "Name of a Boolean operator in the Schedule");
-		EMDL::addLabel(EMDL_SCHEDULE_OPERATOR_BOOL_TYPE, EMDL_STRING, "rlnScheduleBooleanOperatorType", "Type of a Boolean operator in the Schedule");
-		EMDL::addLabel(EMDL_SCHEDULE_OPERATOR_BOOL_INPUT1, EMDL_STRING, "rlnScheduleBooleanOperatorInputBoolean1", "Name of the 1st input Boolean variable to this Boolean operator");
-		EMDL::addLabel(EMDL_SCHEDULE_OPERATOR_BOOL_INPUT2, EMDL_STRING, "rlnScheduleBooleanOperatorInputBoolean2", "Name of the 2nd input Boolean variable to this Boolean operator");
-		EMDL::addLabel(EMDL_SCHEDULE_OPERATOR_BOOL_FLOAT1, EMDL_STRING, "rlnScheduleBooleanOperatorInputFloat1", "Name of the 1st input Float variable to this Boolean operator");
-		EMDL::addLabel(EMDL_SCHEDULE_OPERATOR_BOOL_FLOAT2, EMDL_STRING, "rlnScheduleBooleanOperatorInputFloat2", "Name of the 2nd input Float variable to this Boolean operator");
-		EMDL::addLabel(EMDL_SCHEDULE_OPERATOR_BOOL_CONST, EMDL_DOUBLE, "rlnScheduleBooleanOperatorInputConstant", "Value of the constant input to this Boolean operator");
-		EMDL::addLabel(EMDL_SCHEDULE_OPERATOR_BOOL_FILE, EMDL_STRING, "rlnScheduleBooleanOperatorInputFile", "Name of the input File variable to this Boolean operator");
-		EMDL::addLabel(EMDL_SCHEDULE_OPERATOR_BOOL_OUTPUT, EMDL_STRING, "rlnScheduleBooleanOperatorOutput", "Name of the output Boolean variable on which this Boolean operator acts");
-		EMDL::addLabel(EMDL_SCHEDULE_OPERATOR_FLOAT_NAME, EMDL_STRING, "rlnScheduleFloatOperatorName", "Name of a Float operator in the Schedule");
-		EMDL::addLabel(EMDL_SCHEDULE_OPERATOR_FLOAT_TYPE, EMDL_STRING, "rlnScheduleFloatOperatorType", "Type of a Boolean operator in the schedule");
-		EMDL::addLabel(EMDL_SCHEDULE_OPERATOR_FLOAT_INPUT1, EMDL_STRING, "rlnScheduleFloatOperatorInputFloat1", "Name of the 1st input Float variable to this Float operator");
-		EMDL::addLabel(EMDL_SCHEDULE_OPERATOR_FLOAT_INPUT2, EMDL_STRING, "rlnScheduleFloatOperatorInputFloat2", "Name of the 2nd input Float variable to this Float operator");
-		EMDL::addLabel(EMDL_SCHEDULE_OPERATOR_FLOAT_CONSTANT, EMDL_DOUBLE, "rlnScheduleFloatOperatorInputConstant", "Value of the constant input to this Float operator");
-		EMDL::addLabel(EMDL_SCHEDULE_OPERATOR_FLOAT_OUTPUT, EMDL_STRING, "rlnScheduleFloatOperatorOutput", "Name of the output Float variable on which this Float operator acts");
-		EMDL::addLabel(EMDL_SCHEDULE_OPERATOR_STRING_NAME, EMDL_STRING, "rlnScheduleStringOperatorName", "Name of a String operator in the Schedule");
-		EMDL::addLabel(EMDL_SCHEDULE_OPERATOR_STRING_TYPE, EMDL_STRING, "rlnScheduleStringOperatorType", "Type of a String operator in the Schedule");
-		EMDL::addLabel(EMDL_SCHEDULE_OPERATOR_STRING_INPUT, EMDL_STRING, "rlnScheduleStringOperatorInputString", "Name of the input String variable to this String operator");
-		EMDL::addLabel(EMDL_SCHEDULE_OPERATOR_STRING_OUTPUT, EMDL_STRING, "rlnScheduleStringOperatorOutput", "Name of the output String variable on which this String operator acts");
+		EMDL::addLabel(EMDL_SCHEDULE_OPERATOR_NAME, EMDL_STRING, "rlnScheduleOperatorName", "Name of a Boolean operator in the Schedule");
+		EMDL::addLabel(EMDL_SCHEDULE_OPERATOR_TYPE, EMDL_STRING, "rlnScheduleOperatorType", "Type of an operator in the Schedule");
+		EMDL::addLabel(EMDL_SCHEDULE_OPERATOR_INPUT1, EMDL_STRING, "rlnScheduleOperatorInput1", "Name of the 1st input to the operator");
+		EMDL::addLabel(EMDL_SCHEDULE_OPERATOR_INPUT2, EMDL_STRING, "rlnScheduleOperatorInput2", "Name of the 2nd input to the operator");
+		EMDL::addLabel(EMDL_SCHEDULE_OPERATOR_OUTPUT, EMDL_STRING, "rlnScheduleOperatorOutput", "Name of the output variable on which this operator acts");
 		EMDL::addLabel(EMDL_SCHEDULE_VAR_BOOL_NAME, EMDL_STRING, "rlnScheduleBooleanVariableName", "Name of a Boolean variable in the Schedule");
 		EMDL::addLabel(EMDL_SCHEDULE_VAR_BOOL_VALUE, EMDL_BOOL, "rlnScheduleBooleanVariableValue", "Value of a Boolean variable in the Schedule");
 		EMDL::addLabel(EMDL_SCHEDULE_VAR_BOOL_ORI_VALUE, EMDL_BOOL, "rlnScheduleBooleanVariableResetValue", "Value which a Boolean variable will take upon a reset");

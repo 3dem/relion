@@ -22,7 +22,6 @@
 #include <src/args.h>
 #include "src/strings.h"
 
-
 class scheduler_parameters
 {
 public:
@@ -134,22 +133,7 @@ public:
 		{
 			if (add == "variable")
 			{
-
-				float floatval;
-				if (sscanf(value.c_str(), "%f", &floatval)) // is this a number?
-				{
-					std::cerr << " floatval= " << floatval << std::endl;
-					schedule.addFloatVariable(name, floatval);
-				}
-				else if (value == "true" || value == "True" || value == "false" || value == "False") // or a boolean?
-				{
-					bool myval = (value == "true" || value == "True");
-					schedule.addBooleanVariable(name, myval);
-				}
-				else // or a string?
-				{
-					schedule.addStringVariable(name, value);
-				}
+				schedule.addVariable(name, value);
 			}
 			else if (add == "operator")
 			{
@@ -182,23 +166,24 @@ public:
 		}
 		else if (set_var != "")
 		{
-			if (schedule.isBooleanVariable(set_var))
+			//std::cerr << "TODO: make function calls in class!" << std::endl;
+			if (isBooleanVariable(set_var))
 			{
 				if (!(value == "true" || value == "True" || value == "false" || value == "False"))
 					REPORT_ERROR("ERROR: invalid value for Boolean variable for --value: " + value);
 				bool myval = (value == "true" || value == "True");
-				schedule.findBooleanVariable(set_var)->value = myval;
+				scheduler_bools[set_var].value = myval;
 			}
-			else if (schedule.isFloatVariable(set_var))
+			else if (isFloatVariable(set_var))
 			{
 				float floatval;
 				if (!sscanf(value.c_str(), "%f", &floatval)) // is this a number?
 					REPORT_ERROR("ERROR: invalid value for Float variable for --value: " + value);
-				schedule.findFloatVariable(set_var)->value = floatval;
+				scheduler_floats[set_var].value = floatval;
 			}
-			else if (schedule.isStringVariable(set_var))
+			else if (isStringVariable(set_var))
 			{
-				schedule.findStringVariable(set_var)->value = value;
+				scheduler_strings[set_var].value = value;
 			}
 			else
 				REPORT_ERROR("ERROR: unrecognised variable whose value to set: " + set_var);
@@ -209,7 +194,7 @@ public:
 			{
 				if (!(value == SCHEDULE_NODE_JOB_MODE_NEW || value == SCHEDULE_NODE_JOB_MODE_CONTINUE || value == SCHEDULE_NODE_JOB_MODE_OVERWRITE))
 					REPORT_ERROR("ERROR: unvalid option for job mode: " + value);
-				schedule.findNode(set_mode)->mode = value;
+				schedule.nodes[set_mode].mode = value;
 			}
 			else
 				REPORT_ERROR("ERROR: invalid jobname to set mode: " + set_mode);
@@ -217,11 +202,11 @@ public:
 		}
 		else if (current_node != "")
 		{
-			schedule.setCurrentNode(current_node);
+			schedule.current_node = current_node;
 		}
 		else if (start_node != "")
 		{
-			schedule.setOriginalStartNode(start_node);
+			schedule.original_start_node = start_node;
 		}
 		else if (email != "")
 		{
