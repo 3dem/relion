@@ -280,17 +280,15 @@ void MotionRefiner::init()
 	
 	estimateParams = motionParamEstimator.anythingToDo();
 	estimateMotion = motionMdts.size() > 0;
-	recombineFrames = frameRecombiner.doingRecombination() && (recombMdts.size() > 0);
+	recombineFrames = frameRecombiner.doingRecombination() && 
+	                  (recombMdts.size() > 0 || !exists(outPath + "shiny" + frameRecombiner.getOutputSuffix() + ".star"));
 	generateStar = frameRecombiner.doingRecombination();
-	
 	
 	bool doAnything = estimateParams || estimateMotion || recombineFrames;
 	bool needsReference = doAnything;
-	
+
 	if (!doAnything) 
-	{
-		REPORT_ERROR("Nothing to do");
-	}
+		exit(0); //TODO: To be replaced with RELION_EXIT_SUCCESS	
 	
 	if (needsReference)
 	{
@@ -385,7 +383,7 @@ void MotionRefiner::combineEPSAndSTARfiles()
 		}
 	}
 	
-	for (long g = 0; g < allMdts.size(); g++)
+	for (long g = 0; g < 2 /*allMdts.size()*/; g++)
 	{
 		FileName fn_root = getOutputFileNameRoot(outPath, allMdts[g]);
 		
@@ -414,6 +412,7 @@ void MotionRefiner::combineEPSAndSTARfiles()
 			obsModel.opticsMdt.setValue(EMDL_IMAGE_PIXEL_SIZE, frameRecombiner.getOutputPixelSize(og), og);
 			obsModel.opticsMdt.setValue(EMDL_IMAGE_SIZE, frameRecombiner.getOutputBoxSize(og), og);
 			obsModel.opticsMdt.setValue(EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED, frameRecombiner.isCtfMultiplied(og), og);
+			std::cout << " + Pixel size for optics group " << (og + 1) << ": " << frameRecombiner.getOutputPixelSize(og) << std::endl;
 		}
 		
 		obsModel.save(mdtAll, outPath+"shiny" + frameRecombiner.getOutputSuffix() + ".star");
