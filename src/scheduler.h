@@ -23,6 +23,7 @@
 
 #include "src/time.h"
 #include "src/pipeliner.h"
+#include "src/jaz/obs_model.h"
 
 class SchedulerFloatVariable
 {
@@ -74,26 +75,30 @@ bool isOperator(std::string name);
 #define SCHEDULE_BOOLEAN_OPERATOR_AND "bool_op_and"
 #define SCHEDULE_BOOLEAN_OPERATOR_OR  "bool_op_or"
 #define SCHEDULE_BOOLEAN_OPERATOR_NOT "bool_op_not"
-#define SCHEDULE_BOOLEAN_OPERATOR_GT_VAR "bool_op_gt_var"
-#define SCHEDULE_BOOLEAN_OPERATOR_LT_VAR "bool_op_lt_var"
-#define SCHEDULE_BOOLEAN_OPERATOR_EQ_VAR "bool_op_eq_var"
-#define SCHEDULE_BOOLEAN_OPERATOR_GT_CONST "bool_op_gt_const"
-#define SCHEDULE_BOOLEAN_OPERATOR_LT_CONST "bool_op_lt_const"
-#define SCHEDULE_BOOLEAN_OPERATOR_EQ_CONST "bool_op_eq_const"
+#define SCHEDULE_BOOLEAN_OPERATOR_GT "bool_op_gt"
+#define SCHEDULE_BOOLEAN_OPERATOR_LT "bool_op_lt"
+#define SCHEDULE_BOOLEAN_OPERATOR_EQ "bool_op_eq"
 #define SCHEDULE_BOOLEAN_OPERATOR_FILE_EXISTS "bool_op_file_exists"
-#define SCHEDULE_FLOAT_OPERATOR_PLUS_VAR "float_op_plus_float"
-#define SCHEDULE_FLOAT_OPERATOR_MINUS_VAR "float_op_minus_float"
-#define SCHEDULE_FLOAT_OPERATOR_MULT_VAR "float_op_mult_float"
-#define SCHEDULE_FLOAT_OPERATOR_DIVIDE_VAR "float_op_divide_float"
-#define SCHEDULE_FLOAT_OPERATOR_PLUS_CONST "float_op_plus_const"
-#define SCHEDULE_FLOAT_OPERATOR_MINUS_CONST "float_op_minus_const"
-#define SCHEDULE_FLOAT_OPERATOR_MULT_CONST "float_op_mult_const"
-#define SCHEDULE_FLOAT_OPERATOR_DIVIDE_CONST "float_op_div_by_const"
-#define SCHEDULE_FLOAT_OPERATOR_DIVIDE_CONST_INV "float_op_div_const_by"
+#define SCHEDULE_BOOLEAN_OPERATOR_READ_STAR "bool_op_read_star"
+#define SCHEDULE_FLOAT_OPERATOR_PLUS "float_op_plus"
+#define SCHEDULE_FLOAT_OPERATOR_MINUS "float_op_minus"
+#define SCHEDULE_FLOAT_OPERATOR_MULT "float_op_mult"
+#define SCHEDULE_FLOAT_OPERATOR_DIVIDE "float_op_divide"
+#define SCHEDULE_FLOAT_OPERATOR_INVDIV "float_op_invdiv"
+#define SCHEDULE_FLOAT_OPERATOR_COUNT_IMAGES "float_op_count_images"
+#define SCHEDULE_FLOAT_OPERATOR_READ_STAR "float_op_star"
+#define SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX "float_op_star_table_max"
+#define SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN "float_op_star_table_min"
+#define SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_AVG "float_op_star_table_avg"
+#define SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX_IDX "float_op_star_table_max_idx"
+#define SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN_IDX "float_op_star_table_min_idx"
+#define SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_IDX "float_op_star_table_idx"
+#define SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_SORT_IDX "float_op_star_table_sort_idx"
 #define SCHEDULE_STRING_OPERATOR_TOUCH_FILE "string_op_touch_file"
 #define SCHEDULE_STRING_OPERATOR_COPY_FILE "string_op_copy_file"
 #define SCHEDULE_STRING_OPERATOR_MOVE_FILE "string_op_move_file"
 #define SCHEDULE_STRING_OPERATOR_DELETE_FILE "string_op_delete_file"
+#define SCHEDULE_STRING_OPERATOR_READ_STAR "string_op_read_star"
 #define SCHEDULE_WAIT_OPERATOR_SINCE_LAST_TIME "wait_since_last_time"
 #define SCHEDULE_EXIT_OPERATOR "exit"
 
@@ -105,14 +110,20 @@ class SchedulerOperator
 
 	public:
 
-	bool performOperation() const;
 
 	SchedulerOperator() {};
 
 	SchedulerOperator(std::string _type, std::string _input1="undefined", std::string _input2="undefined", std::string _output="undefined");
 
+	std::string initialise(std::string _type, std::string _input1="undefined", std::string _input2="undefined", std::string _output="undefined");
+
 	// Generate a meaningful current_name for the operator
 	std::string getName();
+
+	// Read a specific value from a STAR file
+	void readFromStarFile() const;
+
+	bool performOperation() const;
 
 };
 
@@ -253,7 +264,7 @@ public:
     void addStringVariable(std::string name, FileName value);
 
     // Add operators (of any kind), also adds its corresponding node
-    void addOperator(std::string type, std::string input_name, std::string input2_name, std::string output_name);
+    std::string addOperator(std::string type, std::string input_name, std::string input2_name, std::string output_name);
 
     // Add a new job, also adds its corresponding node
     void addJob(RelionJob &myjob, std::string jobname, std::string mode);

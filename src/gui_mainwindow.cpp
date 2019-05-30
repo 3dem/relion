@@ -770,7 +770,6 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	job_mode  = new Fl_Choice(GUIWIDTH - 220 , h-90, 100, 32);
 	job_mode->label("");
 	job_mode->color(GUI_RUNBUTTON_COLOR);
-	//job_mode->callback(cb_display_io_node, this);
 	job_mode->menu(job_mode_options);
 	// TODO: fill options for this choice!
 
@@ -783,13 +782,13 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	// Add browsers for variable and nodes
 	Fl_Text_Buffer *textbuffvar = new Fl_Text_Buffer();
 	textbuffvar->text("Variables");
-	Fl_Text_Display* textdispvar = new Fl_Text_Display(XJOBCOL1, GUIHEIGHT_EXT_START, JOBCOLWIDTH, 25);
+	Fl_Text_Display* textdispvar = new Fl_Text_Display(XJOBCOL1, GUIHEIGHT_EXT_START, JOBCOLWIDTH-105, 25);
 	textdispvar->buffer(textbuffvar);
 	textdispvar->color(GUI_BACKGROUND_COLOR);
-	scheduler_set_variable_name = new Fl_Input(XJOBCOL1, GUIHEIGHT_EXT_START+25, JOBCOLWIDTH/2, 25);
-    scheduler_set_variable_name->color(GUI_INPUT_COLOR);
-    scheduler_set_variable_value = new Fl_Input(XJOBCOL1+JOBCOLWIDTH/2, GUIHEIGHT_EXT_START+25, JOBCOLWIDTH/2, 25);
-    scheduler_set_variable_value->color(GUI_INPUT_COLOR);
+	scheduler_variable_name = new Fl_Input(XJOBCOL1, GUIHEIGHT_EXT_START+25, JOBCOLWIDTH*0.4, 25);
+    scheduler_variable_name->color(GUI_INPUT_COLOR);
+    scheduler_variable_value = new Fl_Input(XJOBCOL1+JOBCOLWIDTH*0.4, GUIHEIGHT_EXT_START+25, JOBCOLWIDTH*0.6, 25);
+    scheduler_variable_value->color(GUI_INPUT_COLOR);
 	delete_scheduler_variable_button = new Fl_Button(XJOBCOL1+JOBCOLWIDTH-105, GUIHEIGHT_EXT_START, 50, 25);
 	delete_scheduler_variable_button->color(GUI_RUNBUTTON_COLOR);
 	delete_scheduler_variable_button->labelfont(FL_ITALIC);
@@ -809,9 +808,21 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 
 	Fl_Text_Buffer *textbuffnode = new Fl_Text_Buffer();
 	textbuffnode->text("Operators");
-	Fl_Text_Display* textdispnode = new Fl_Text_Display(XJOBCOL2, GUIHEIGHT_EXT_START, JOBCOLWIDTH, 25);
+	Fl_Text_Display* textdispnode = new Fl_Text_Display(XJOBCOL2, GUIHEIGHT_EXT_START, JOBCOLWIDTH-105, 25);
 	textdispnode->buffer(textbuffnode);
 	textdispnode->color(GUI_BACKGROUND_COLOR);
+	scheduler_operator_type = new Fl_Choice(XJOBCOL2, GUIHEIGHT_EXT_START+25, JOBCOLWIDTH/2 + 10, 25);
+    scheduler_operator_type->color(GUI_INPUT_COLOR);
+	scheduler_operator_type->menu(operator_type_options);
+	scheduler_operator_output = new Fl_Choice(XJOBCOL2 + 34 + JOBCOLWIDTH/2, GUIHEIGHT_EXT_START+25, JOBCOLWIDTH/2-34, 25);
+	scheduler_operator_output->label("->");
+	scheduler_operator_output->color(GUI_INPUT_COLOR);
+	scheduler_operator_input1 = new Fl_Choice(XJOBCOL2 + 20, GUIHEIGHT_EXT_START+50, JOBCOLWIDTH/2-20, 25);
+	scheduler_operator_input1->label("i1:");
+	scheduler_operator_input1->color(GUI_INPUT_COLOR);
+	scheduler_operator_input2 = new Fl_Input(XJOBCOL2 + 34 + JOBCOLWIDTH/2, GUIHEIGHT_EXT_START+50, JOBCOLWIDTH/2-34, 25);
+	scheduler_operator_input2->label("i2:");
+	scheduler_operator_input2->color(GUI_INPUT_COLOR);
 	delete_scheduler_operator_button = new Fl_Button(XJOBCOL2+JOBCOLWIDTH-105, GUIHEIGHT_EXT_START, 50, 25);
 	delete_scheduler_operator_button->color(GUI_RUNBUTTON_COLOR);
 	delete_scheduler_operator_button->labelfont(FL_ITALIC);
@@ -824,7 +835,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	set_scheduler_operator_button->labelsize(RLN_FONTSIZE);
 	set_scheduler_operator_button->label("Set");
 	set_scheduler_operator_button->callback( cb_set_scheduler_operator, this);
-	scheduler_operator_browser  = new Fl_Hold_Browser(XJOBCOL2, GUIHEIGHT_EXT_START + 25, JOBCOLWIDTH, JOBHEIGHT-16);
+	scheduler_operator_browser  = new Fl_Hold_Browser(XJOBCOL2, GUIHEIGHT_EXT_START + 75, JOBCOLWIDTH, JOBHEIGHT-16);
 	scheduler_operator_browser->callback(cb_select_scheduler_node);
 	scheduler_operator_browser->textsize(RLN_FONTSIZE-1);
 	scheduler_operator_browser->end();
@@ -1110,10 +1121,8 @@ void GuiMainWindow::fillSchedulerNodesAndVariables()
     // Clear whatever was in there
 	scheduler_variable_browser->clear();
 	scheduler_operator_browser->clear();
-	scheduler_floats_var_browser_idx.clear();
-	scheduler_bools_var_browser_idx.clear();
-	scheduler_strings_var_browser_idx.clear();
-	scheduler_operator_browser_idx.clear();
+	scheduler_operator_output->clear();
+	scheduler_operator_input1->clear();
 
 	// Fill variables browser
 	{
@@ -1126,9 +1135,6 @@ void GuiMainWindow::fillSchedulerNodesAndVariables()
 					" = " + floatToString(it->second.value) +
 					" (" + floatToString(it->second.original_value) + ")";
 			scheduler_variable_browser->add(mylabel.c_str());
-			scheduler_floats_var_browser_idx.push_back(i);
-			scheduler_bools_var_browser_idx.push_back(-1);
-			scheduler_strings_var_browser_idx.push_back(-1);
 			i++;
 		}
 	}
@@ -1145,10 +1151,7 @@ void GuiMainWindow::fillSchedulerNodesAndVariables()
 			std::string mylabel = it->first +
 					" = " + myval +
 					" (" + myorival + ")";
-			scheduler_floats_var_browser_idx.push_back(-1);
 			scheduler_variable_browser->add(mylabel.c_str());
-			scheduler_bools_var_browser_idx.push_back(i);
-			scheduler_strings_var_browser_idx.push_back(-1);
 			i++;
 		}
 	}
@@ -1163,9 +1166,6 @@ void GuiMainWindow::fillSchedulerNodesAndVariables()
 					" = " + it->second.value +
 					" (" + it->second.original_value + ")";
 			scheduler_variable_browser->add(mylabel.c_str());
-			scheduler_floats_var_browser_idx.push_back(-1);
-			scheduler_bools_var_browser_idx.push_back(-i);
-			scheduler_strings_var_browser_idx.push_back(i);
 			i++;
 		}
 	}
@@ -1180,7 +1180,6 @@ void GuiMainWindow::fillSchedulerNodesAndVariables()
 			std::string mylabel = it->first +
 					" -> " + it->second.output;
 			scheduler_operator_browser->add(mylabel.c_str());
-			scheduler_operator_browser_idx.push_back(i);
 			i++;
 		}
 	}
@@ -1608,7 +1607,13 @@ void GuiMainWindow::cb_set_scheduler_variable(Fl_Widget* o, void*v)
 
 void GuiMainWindow::cb_set_scheduler_variable_i()
 {
-	schedule.setVariable(scheduler_set_variable_name->value(), scheduler_set_variable_value->value());
+	std::string myname = scheduler_variable_name->value();
+	std::string myval = scheduler_variable_value->value();
+
+	if (myname == "" ||  myval == "")
+		return;
+
+	schedule.setVariable(myname, myval);
 	fillSchedulerNodesAndVariables();
 	schedule.write();
 
@@ -1622,6 +1627,10 @@ void GuiMainWindow::cb_delete_scheduler_variable(Fl_Widget* o, void*v)
 
 void GuiMainWindow::cb_delete_scheduler_variable_i()
 {
+	std::string myname = scheduler_variable_name->value();
+	if (myname == "")
+		return;
+
 	std::string ask = "Are you sure you want to delete this variable?";
 	int proceed =  fl_choice("%s", "Cancel", "Delete!", NULL, ask.c_str());
 	if (!proceed)
@@ -1630,7 +1639,7 @@ void GuiMainWindow::cb_delete_scheduler_variable_i()
 		return;
 	}
 
-	schedule.removeVariable(scheduler_set_variable_name->value());
+	schedule.removeVariable(myname);
 	fillSchedulerNodesAndVariables();
 	schedule.write();
 }
@@ -1662,7 +1671,7 @@ void GuiMainWindow::cb_delete_scheduler_operator_i()
 		return;
 	}
 
-	schedule.removeOperator(scheduler_set_variable_name->value());
+	schedule.removeOperator(scheduler_variable_name->value());
 	fillSchedulerNodesAndVariables();
 	schedule.write();
 }
@@ -1681,10 +1690,8 @@ void GuiMainWindow::cb_select_scheduler_variable_i()
 	FileName myname = mytext.beforeFirstOf(" = ");
 	FileName myval = mytext.afterFirstOf(" = ");
 	myval = myval.beforeFirstOf(" (");
-	std::cerr << scheduler_variable_browser->text(idx) << std::endl;
-	std::cerr << scheduler_variable_browser->selected(idx) << std::endl;
-	scheduler_set_variable_name->value(myname.c_str());
-	scheduler_set_variable_value->value(myval.c_str());
+	scheduler_variable_name->value(myname.c_str());
+	scheduler_variable_value->value(myval.c_str());
 
 }
 

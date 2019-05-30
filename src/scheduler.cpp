@@ -51,77 +51,220 @@ bool isOperator(std::string _name)
 
 SchedulerOperator::SchedulerOperator(std::string _type, std::string _input1, std::string _input2, std::string _output)
 {
+	std::string myerror = initialise(_type, _input1, _input2, _output);
+	if (myerror != "") REPORT_ERROR(myerror);
+}
+
+std::string SchedulerOperator::initialise(std::string _type, std::string _input1, std::string _input2, std::string _output)
+{
 
 	type = _type;
 
 	// Check output
-	if ((type == SCHEDULE_BOOLEAN_OPERATOR_GT_CONST || type == SCHEDULE_BOOLEAN_OPERATOR_GT_VAR ||
-		type == SCHEDULE_BOOLEAN_OPERATOR_LT_CONST || type == SCHEDULE_BOOLEAN_OPERATOR_LT_VAR ||
-		type == SCHEDULE_BOOLEAN_OPERATOR_EQ_CONST || type == SCHEDULE_BOOLEAN_OPERATOR_EQ_VAR ||
-		type == SCHEDULE_BOOLEAN_OPERATOR_AND || type == SCHEDULE_BOOLEAN_OPERATOR_OR ||
-		type == SCHEDULE_BOOLEAN_OPERATOR_FILE_EXISTS) && !isBooleanVariable(_output))
-		REPORT_ERROR("ERROR: boolean operator does not have valid boolean output: " + _output);
-	if ((type == SCHEDULE_FLOAT_OPERATOR_PLUS_VAR || type == SCHEDULE_FLOAT_OPERATOR_PLUS_CONST ||
-		 type == SCHEDULE_FLOAT_OPERATOR_MINUS_VAR || type == SCHEDULE_FLOAT_OPERATOR_MINUS_CONST ||
-		 type == SCHEDULE_FLOAT_OPERATOR_MULT_VAR || type == SCHEDULE_FLOAT_OPERATOR_MULT_CONST ||
-		 type == SCHEDULE_FLOAT_OPERATOR_DIVIDE_VAR || type == SCHEDULE_FLOAT_OPERATOR_DIVIDE_CONST ||
-		 type == SCHEDULE_FLOAT_OPERATOR_DIVIDE_CONST_INV) && !isFloatVariable(_output))
-		REPORT_ERROR("ERROR: float operator does not have valid float output: " + _output);
+	if ((type == SCHEDULE_BOOLEAN_OPERATOR_GT ||
+		 type == SCHEDULE_BOOLEAN_OPERATOR_LT ||
+		 type == SCHEDULE_BOOLEAN_OPERATOR_EQ ||
+		 type == SCHEDULE_BOOLEAN_OPERATOR_AND ||
+		 type == SCHEDULE_BOOLEAN_OPERATOR_OR ||
+		 type == SCHEDULE_BOOLEAN_OPERATOR_FILE_EXISTS ||
+		 type == SCHEDULE_BOOLEAN_OPERATOR_READ_STAR
+		) && !isBooleanVariable(_output))
+		return "ERROR: boolean operator does not have valid boolean output: " + _output;
+	if ((type == SCHEDULE_FLOAT_OPERATOR_PLUS ||
+		 type == SCHEDULE_FLOAT_OPERATOR_MINUS ||
+		 type == SCHEDULE_FLOAT_OPERATOR_MULT ||
+		 type == SCHEDULE_FLOAT_OPERATOR_DIVIDE ||
+		 type == SCHEDULE_FLOAT_OPERATOR_INVDIV ||
+		 type == SCHEDULE_FLOAT_OPERATOR_COUNT_IMAGES ||
+		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR ||
+		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX ||
+		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN ||
+		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_AVG ||
+		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX_IDX ||
+		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN_IDX ||
+		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_IDX ||
+		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_SORT_IDX
+		 ) && !isFloatVariable(_output))
+		return "ERROR: float operator does not have valid float output: " + _output;
 	if ((type == SCHEDULE_STRING_OPERATOR_TOUCH_FILE ||
 		 type == SCHEDULE_STRING_OPERATOR_COPY_FILE ||
 		 type == SCHEDULE_STRING_OPERATOR_MOVE_FILE ||
-		 type == SCHEDULE_STRING_OPERATOR_DELETE_FILE)	&& ! isStringVariable(_output))
-		REPORT_ERROR("ERROR: string operator does not have valid string output: " + _output);
+		 type == SCHEDULE_STRING_OPERATOR_DELETE_FILE ||
+		 type == SCHEDULE_STRING_OPERATOR_READ_STAR
+		 )	&& ! isStringVariable(_output))
+		return "ERROR: string operator does not have valid string output: " + _output;
 
 	// Check input1
 	if ((type == SCHEDULE_BOOLEAN_OPERATOR_AND ||
 		type == SCHEDULE_BOOLEAN_OPERATOR_OR )  && !isBooleanVariable(_input1))
-		REPORT_ERROR("ERROR: boolean operator does not have valid boolean input1: " + _input1);
-	if ((type == SCHEDULE_FLOAT_OPERATOR_PLUS_VAR || type == SCHEDULE_FLOAT_OPERATOR_PLUS_CONST ||
-		 type == SCHEDULE_FLOAT_OPERATOR_MINUS_VAR || type == SCHEDULE_FLOAT_OPERATOR_MINUS_CONST ||
-		 type == SCHEDULE_FLOAT_OPERATOR_MULT_VAR || type == SCHEDULE_FLOAT_OPERATOR_MULT_CONST ||
-		 type == SCHEDULE_FLOAT_OPERATOR_DIVIDE_VAR || type == SCHEDULE_FLOAT_OPERATOR_DIVIDE_CONST ||
-		 type == SCHEDULE_FLOAT_OPERATOR_DIVIDE_CONST_INV ||
-		 type == SCHEDULE_BOOLEAN_OPERATOR_GT_CONST ||
-		 type == SCHEDULE_BOOLEAN_OPERATOR_GT_VAR ||
-		 type == SCHEDULE_BOOLEAN_OPERATOR_LT_CONST ||
-		 type == SCHEDULE_BOOLEAN_OPERATOR_LT_VAR) && !isFloatVariable(_input1))
-		REPORT_ERROR("ERROR: float operator does not have valid float input1: " + _input1);
+		return "ERROR: boolean operator does not have valid boolean input1: " + _input1;
+	if ((type == SCHEDULE_FLOAT_OPERATOR_PLUS ||
+		 type == SCHEDULE_FLOAT_OPERATOR_MINUS ||
+		 type == SCHEDULE_FLOAT_OPERATOR_MULT ||
+		 type == SCHEDULE_FLOAT_OPERATOR_DIVIDE ||
+		 type == SCHEDULE_FLOAT_OPERATOR_INVDIV
+		 ) && !isFloatVariable(_input1))
+		return "ERROR: float operator does not have valid float input1: " + _input1;
 	if ((type == SCHEDULE_BOOLEAN_OPERATOR_FILE_EXISTS ||
 		 type == SCHEDULE_STRING_OPERATOR_COPY_FILE ||
-		 type == SCHEDULE_STRING_OPERATOR_MOVE_FILE) && ! isStringVariable(_input1))
-		REPORT_ERROR("ERROR: operator does not have valid string input1: " + _input1);
+		 type == SCHEDULE_STRING_OPERATOR_MOVE_FILE ||
+		 type == SCHEDULE_FLOAT_OPERATOR_COUNT_IMAGES ||
+		 type == SCHEDULE_BOOLEAN_OPERATOR_READ_STAR ||
+		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR ||
+		 type == SCHEDULE_STRING_OPERATOR_READ_STAR ||
+		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX ||
+		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN ||
+		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_AVG ||
+		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX_IDX ||
+		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN_IDX ||
+		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_IDX ||
+		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_SORT_IDX
+		 ) && ! isStringVariable(_input1))
+		return "ERROR: operator does not have valid string input1: " + _input1;
 
 	// Check input2
 	if ((type == SCHEDULE_BOOLEAN_OPERATOR_AND ||
-		 type == SCHEDULE_BOOLEAN_OPERATOR_OR) && !isBooleanVariable(_input2))
-		REPORT_ERROR("ERROR: boolean operator does not have valid boolean input2: " + _input2);
-	if ((type == SCHEDULE_BOOLEAN_OPERATOR_GT_VAR ||
-		 type == SCHEDULE_BOOLEAN_OPERATOR_LT_VAR ||
-		 type == SCHEDULE_BOOLEAN_OPERATOR_EQ_VAR ||
-		 type == SCHEDULE_FLOAT_OPERATOR_PLUS_VAR ||
-		 type == SCHEDULE_FLOAT_OPERATOR_MINUS_VAR ||
-		 type == SCHEDULE_FLOAT_OPERATOR_MULT_VAR ||
-		 type == SCHEDULE_FLOAT_OPERATOR_DIVIDE_VAR) && !isFloatVariable(_input2))
-		REPORT_ERROR("ERROR: operator does not have valid float input2: " + _input2);
-	float floatval;
-	if ((type == SCHEDULE_BOOLEAN_OPERATOR_GT_CONST ||
-		 type == SCHEDULE_BOOLEAN_OPERATOR_LT_CONST ||
-		 type == SCHEDULE_BOOLEAN_OPERATOR_EQ_CONST ||
-		 type == SCHEDULE_FLOAT_OPERATOR_PLUS_CONST ||
-		 type == SCHEDULE_FLOAT_OPERATOR_MINUS_CONST ||
-		 type == SCHEDULE_FLOAT_OPERATOR_MULT_CONST ||
-		 type == SCHEDULE_FLOAT_OPERATOR_DIVIDE_CONST ||
-		 type == SCHEDULE_FLOAT_OPERATOR_DIVIDE_CONST_INV) && !sscanf(_input2.c_str(), "%f", &floatval))
-		REPORT_ERROR("ERROR: operator does not have valid number input2: " + _input2);
+		 type == SCHEDULE_BOOLEAN_OPERATOR_OR
+		 ) && !isBooleanVariable(_input2))
+		return "ERROR: boolean operator does not have valid boolean input2: " + _input2;
+	if ((type == SCHEDULE_BOOLEAN_OPERATOR_GT ||
+		 type == SCHEDULE_BOOLEAN_OPERATOR_LT ||
+		 type == SCHEDULE_BOOLEAN_OPERATOR_EQ ||
+		 type == SCHEDULE_FLOAT_OPERATOR_PLUS ||
+		 type == SCHEDULE_FLOAT_OPERATOR_MINUS ||
+		 type == SCHEDULE_FLOAT_OPERATOR_MULT ||
+		 type == SCHEDULE_FLOAT_OPERATOR_DIVIDE ||
+		 type == SCHEDULE_FLOAT_OPERATOR_INVDIV ||
+		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_IDX ||
+		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_SORT_IDX
+		 ) && !(isFloatVariable(_input2) || isNumber(_input2)))
+		return "ERROR: operator does not have valid number (float variable or text) input2: " + _input2;
 
 	input1 = _input1;
 	input2 = _input2;
 	output = _output;
+
+	return "";
 }
+
+// Separate comma-separated labels for table, input and output
+void  SchedulerOperator::readFromStarFile() const
+{
+	MetaDataTable MD;
+	std::string mystring, mystarfile, mytable, myoutput;
+	EMDLabel mylabel;
+
+	// The localtion is always in input1
+	mystring = scheduler_global_strings[input1].value;
+	std::vector< std::string > splits;
+	int nr_splits = splitString(mystring, ",", splits);
+	if (nr_splits < 3) REPORT_ERROR("Need at least three comma-separated values for starfilename, tablename and labelname");
+	mystarfile = splits[0];
+	mytable = splits[1];
+	mylabel = EMDL::str2Label(splits[2]);
+	if (nr_splits>3) myoutput = splits[3];
+
+	// Read the correct table from the STAR file
+	MD.read(mystarfile, mytable);
+
+	int ival;
+	long idxmin, idxmax;
+	RFLOAT mymin=99.e99;
+	RFLOAT mymax = -mymin;
+	RFLOAT mysum = 0.;
+	RFLOAT myval;
+	long ii = 0;
+	MultidimArray<RFLOAT> for_sorting(MD.numberOfObjects());
+
+	long stop_at_idx;
+	bool do_stop_at_idx = false;;
+	if (type == SCHEDULE_BOOLEAN_OPERATOR_READ_STAR ||
+		type == SCHEDULE_FLOAT_OPERATOR_READ_STAR ||
+		type == SCHEDULE_STRING_OPERATOR_READ_STAR)
+	{
+		float floatval;
+		if (isFloatVariable(input2))
+			stop_at_idx = ROUND(scheduler_global_floats[input2].value);
+		else if (isNumber(input2))
+			stop_at_idx = ROUND(textToFloat(input2));
+		else
+			stop_at_idx = 0;
+	}
+
+
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
+	{
+		if (EMDL::isDouble(mylabel))
+		{
+			RFLOAT fval;
+			MD.getValue(mylabel, fval);
+			myval = fval;
+		}
+		else if (EMDL::isInt(mylabel))
+		{
+			int ival;
+			MD.getValue(mylabel, ival);
+			myval = ival;
+		}
+		else
+			REPORT_ERROR("ERROR: metadata label " + EMDL::label2Str(mylabel) + " is not of a number type!");
+
+		if (do_stop_at_idx && ii == stop_at_idx)
+		{
+			scheduler_global_floats[output].value = myval;
+			return;
+		}
+
+		DIRECT_MULTIDIM_ELEM(for_sorting, ii) = myval;
+
+		if (myval < mymin)
+		{
+			mymin = myval;
+			idxmin = ii;
+		}
+		if (myval >mymax)
+		{
+			mymax = myval;
+			idxmin = ii;
+		}
+		mymax = XMIPP_MAX(myval, mymax);
+		mysum += myval;
+		ii++;
+	}
+	if (ii > 0)
+		mysum /= (RFLOAT)ii;
+	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX) scheduler_global_floats[output].value = mymax;
+	else if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN) scheduler_global_floats[output].value = mymin;
+	else if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_AVG) scheduler_global_floats[output].value = mysum;
+	else if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX_IDX) scheduler_global_floats[output].value = idxmax;
+	else if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN_IDX) scheduler_global_floats[output].value = idxmin;
+	else if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_SORT_IDX)
+	{
+		long my_idx = (isFloatVariable(input2)) ? ROUND(scheduler_global_floats[input2].value) : ROUND(textToFloat(input2));
+		if (my_idx == 0) REPORT_ERROR("Give a positive or a negative value for input2 in sorted_idx: 1 is largest, -1 is smallest value");
+		if (my_idx < 0) my_idx = ii + my_idx; // smallest value is numberOfObjects - 1
+		else my_idx--; // now start counting at 0
+		MultidimArray<long> idx;
+		for_sorting.sorted_index(idx);
+		scheduler_global_floats[output].value = DIRECT_MULTIDIM_ELEM(idx, my_idx);
+	}
+}
+
+
 
 bool SchedulerOperator::performOperation() const
 {
+
+	RFLOAT val2;
+	if (isFloatVariable(input2))
+	{
+		val2 = scheduler_global_floats[input2].value;
+	}
+	else
+	{
+		int res = sscanf(input2.c_str(), "%f", &val2);
+	}
+
 	if (type == SCHEDULE_BOOLEAN_OPERATOR_AND)
 	{
 		scheduler_global_bools[output].value = (scheduler_global_bools[input1].value && scheduler_global_bools[input2].value);
@@ -134,69 +277,63 @@ bool SchedulerOperator::performOperation() const
 	{
 		scheduler_global_bools[output].value = (!(scheduler_global_bools[input1].value));
 	}
-	else if (type == SCHEDULE_BOOLEAN_OPERATOR_GT_VAR)
+	else if (type == SCHEDULE_BOOLEAN_OPERATOR_GT)
 	{
-		scheduler_global_bools[output].value = (scheduler_global_floats[input1].value > scheduler_global_floats[input2].value);
+		scheduler_global_bools[output].value = (scheduler_global_floats[input1].value > val2);
 	}
-	else if (type == SCHEDULE_BOOLEAN_OPERATOR_LT_VAR)
+	else if (type == SCHEDULE_BOOLEAN_OPERATOR_LT)
 	{
-		scheduler_global_bools[output].value = (scheduler_global_floats[input1].value < scheduler_global_floats[input2].value);
+		scheduler_global_bools[output].value = (scheduler_global_floats[input1].value < val2);
 	}
-	else if (type == SCHEDULE_BOOLEAN_OPERATOR_EQ_VAR)
+	else if (type == SCHEDULE_BOOLEAN_OPERATOR_EQ)
 	{
-		scheduler_global_bools[output].value = (fabs(scheduler_global_floats[input1].value - scheduler_global_floats[input2].value) < 1E-8);
-	}
-	else if (type == SCHEDULE_BOOLEAN_OPERATOR_GT_CONST)
-	{
-		scheduler_global_bools[output].value = (scheduler_global_floats[input1].value > textToFloat(input2));
-	}
-	else if (type == SCHEDULE_BOOLEAN_OPERATOR_LT_CONST)
-	{
-		scheduler_global_bools[output].value = (scheduler_global_floats[input1].value < textToFloat(input2));
-	}
-	else if (type == SCHEDULE_BOOLEAN_OPERATOR_EQ_CONST)
-	{
-		scheduler_global_bools[output].value = (fabs(scheduler_global_floats[input1].value - textToFloat(input2)) < 1E-8);
+		scheduler_global_bools[output].value = (fabs(scheduler_global_floats[input1].value - val2) < 1E-8);
 	}
 	else if (type == SCHEDULE_BOOLEAN_OPERATOR_FILE_EXISTS)
 	{
 		scheduler_global_bools[output].value = (exists(scheduler_global_strings[input1].value));
 	}
-	else if (type == SCHEDULE_FLOAT_OPERATOR_PLUS_VAR)
+	else if (type == SCHEDULE_BOOLEAN_OPERATOR_READ_STAR ||
+			 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR ||
+			 type == SCHEDULE_STRING_OPERATOR_READ_STAR ||
+			 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX ||
+			 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN ||
+			 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_AVG ||
+			 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX_IDX ||
+			 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN_IDX ||
+			 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_IDX ||
+			 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_SORT_IDX
+			 )
 	{
-		scheduler_global_floats[output].value = scheduler_global_floats[input1].value + scheduler_global_floats[input2].value;
+		readFromStarFile();
 	}
-	else if (type ==SCHEDULE_FLOAT_OPERATOR_MINUS_VAR)
+	else if (type == SCHEDULE_FLOAT_OPERATOR_PLUS)
 	{
-		scheduler_global_floats[output].value = scheduler_global_floats[input1].value - scheduler_global_floats[input2].value;
+		scheduler_global_floats[output].value = scheduler_global_floats[input1].value + val2;
 	}
-	else if (type == SCHEDULE_FLOAT_OPERATOR_MULT_VAR)
+	else if (type ==SCHEDULE_FLOAT_OPERATOR_MINUS)
 	{
-		scheduler_global_floats[output].value = scheduler_global_floats[input1].value * scheduler_global_floats[input2].value;
+		scheduler_global_floats[output].value = scheduler_global_floats[input1].value - val2;
 	}
-	else if (type == SCHEDULE_FLOAT_OPERATOR_DIVIDE_VAR)
+	else if (type == SCHEDULE_FLOAT_OPERATOR_MULT)
 	{
-		scheduler_global_floats[output].value = scheduler_global_floats[input1].value / scheduler_global_floats[input2].value;
+		scheduler_global_floats[output].value = scheduler_global_floats[input1].value * val2;
 	}
-	else if (type == SCHEDULE_FLOAT_OPERATOR_PLUS_CONST)
+	else if (type == SCHEDULE_FLOAT_OPERATOR_DIVIDE)
 	{
-		scheduler_global_floats[output].value = scheduler_global_floats[input1].value + textToFloat(input2);
+		scheduler_global_floats[output].value = scheduler_global_floats[input1].value / val2;
 	}
-	else if (type == SCHEDULE_FLOAT_OPERATOR_MINUS_CONST)
+	else if (type == SCHEDULE_FLOAT_OPERATOR_INVDIV)
 	{
-		scheduler_global_floats[output].value = scheduler_global_floats[input1].value - textToFloat(input2);
+		scheduler_global_floats[output].value = val2 / scheduler_global_floats[input1].value;
 	}
-	else if (type == SCHEDULE_FLOAT_OPERATOR_MULT_CONST)
+	else if (type == SCHEDULE_FLOAT_OPERATOR_COUNT_IMAGES)
 	{
-		scheduler_global_floats[output].value = scheduler_global_floats[input1].value * textToFloat(input2);
-	}
-	else if (type == SCHEDULE_FLOAT_OPERATOR_DIVIDE_CONST)
-	{
-		scheduler_global_floats[output].value = scheduler_global_floats[input1].value / textToFloat(input2);
-	}
-	else if (type == SCHEDULE_FLOAT_OPERATOR_DIVIDE_CONST_INV)
-	{
-		scheduler_global_floats[output].value = textToFloat(input2) / scheduler_global_floats[input1].value;
+		ObservationModel obsmodel;
+		MetaDataTable MDimg;
+		std::string mytablename = (isStringVariable(input2)) ? "particles" : scheduler_global_strings[input2].value;
+		ObservationModel::loadSafely(scheduler_global_strings[input1].value, obsmodel, MDimg, mytablename);
+		scheduler_global_floats[output].value = MDimg.numberOfObjects();
 	}
 	else if (type == SCHEDULE_STRING_OPERATOR_TOUCH_FILE)
 	{
@@ -245,25 +382,37 @@ bool SchedulerOperator::performOperation() const
 
 std::string SchedulerOperator::getName()
 {
-	if (type == SCHEDULE_BOOLEAN_OPERATOR_GT_CONST || type == SCHEDULE_BOOLEAN_OPERATOR_GT_VAR) return input1 + "_GT_" + input2;
-	if (type == SCHEDULE_BOOLEAN_OPERATOR_LT_CONST || type == SCHEDULE_BOOLEAN_OPERATOR_LT_VAR) return input1 + "_LT_" + input2;
-	if (type == SCHEDULE_BOOLEAN_OPERATOR_EQ_CONST || type == SCHEDULE_BOOLEAN_OPERATOR_EQ_VAR) return input1 + "_EQ_" + input2;
+	if (type == SCHEDULE_BOOLEAN_OPERATOR_GT) return input1 + "_GT_" + input2;
+	if (type == SCHEDULE_BOOLEAN_OPERATOR_LT) return input1 + "_LT_" + input2;
+	if (type == SCHEDULE_BOOLEAN_OPERATOR_EQ) return input1 + "_EQ_" + input2;
 	if (type == SCHEDULE_BOOLEAN_OPERATOR_AND) return input1 + "_AND_" + input2;
 	if (type == SCHEDULE_BOOLEAN_OPERATOR_OR) return input1 + "_OR_" + input2;
 	if (type == SCHEDULE_BOOLEAN_OPERATOR_NOT) return "NOT_" + input1;
 	if (type == SCHEDULE_BOOLEAN_OPERATOR_FILE_EXISTS) return "EXISTS_" + input1;
-	if (type == SCHEDULE_FLOAT_OPERATOR_PLUS_VAR || type == SCHEDULE_FLOAT_OPERATOR_PLUS_CONST) return input1 + "_PLUS_" + input2;
-	if (type == SCHEDULE_FLOAT_OPERATOR_MINUS_VAR || type == SCHEDULE_FLOAT_OPERATOR_MINUS_CONST) return input1 + "_MINUS_" + input2;
-	if (type == SCHEDULE_FLOAT_OPERATOR_MULT_VAR || type == SCHEDULE_FLOAT_OPERATOR_MULT_CONST) return input1 + "_MULT_" + input2;
-	if (type == SCHEDULE_FLOAT_OPERATOR_DIVIDE_VAR || type == SCHEDULE_FLOAT_OPERATOR_DIVIDE_CONST) return input1 + "_DIV_" + input2;
-	if (type == SCHEDULE_FLOAT_OPERATOR_DIVIDE_CONST_INV) return input2 + "_DIV_" + input1;
+	if (type == SCHEDULE_BOOLEAN_OPERATOR_READ_STAR) return "STAR_" + input1 + "_" + input2;
+	if (type == SCHEDULE_FLOAT_OPERATOR_PLUS) return input1 + "_PLUS_" + input2;
+	if (type == SCHEDULE_FLOAT_OPERATOR_MINUS) return input1 + "_MINUS_" + input2;
+	if (type == SCHEDULE_FLOAT_OPERATOR_MULT) return input1 + "_MULT_" + input2;
+	if (type == SCHEDULE_FLOAT_OPERATOR_DIVIDE) return input1 + "_DIV_" + input2;
+	if (type == SCHEDULE_FLOAT_OPERATOR_INVDIV) return input2 + "_DIV_" + input1;
+	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR) return "STAR_" + input1 + "_" + input2;
+	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX) return "STAR_GET_MAX_" + input1;
+	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN) return "STAR_GET_MIN_" + input1;
+	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_AVG) return "STAR_GET_AVG_" + input1;
+	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX_IDX) return "STAR_GET_IDX_MAX" + input1;
+	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN_IDX) return "STAR_GET_IDX_MIN" + input1;
+	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_IDX) return "STAR_GET_FROM_IDX" + input1 + "_" + input2;
+	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_SORT_IDX) return "STAR_GET_SORTED_IDX" + input1 + "_" + input2;
 	if (type == SCHEDULE_STRING_OPERATOR_TOUCH_FILE) return "TOUCH_" + input1;
 	if (type == SCHEDULE_STRING_OPERATOR_COPY_FILE) return "COPY_" + input1 + "_" + input2;
 	if (type == SCHEDULE_STRING_OPERATOR_MOVE_FILE) return "MOVE_" + input1 + "_" + input2;
 	if (type == SCHEDULE_STRING_OPERATOR_DELETE_FILE) return "DELETE_" + input1;
+	if (type == SCHEDULE_STRING_OPERATOR_READ_STAR) return "STAR_" + input1 + "_" + input2;
+	if (type == SCHEDULE_WAIT_OPERATOR_SINCE_LAST_TIME) return "WAIT_" + input1;
 	if (type == SCHEDULE_EXIT_OPERATOR) return "EXIT";
 	else
 		REPORT_ERROR("ERROR: unrecognised Operator type:" + type);
+
 }
 
 std::string SchedulerEdge::getOutputNode() const
@@ -806,11 +955,12 @@ std::map<std::string, SchedulerOperator> Schedule::getCurrentOperators()
 	return scheduler_global_operators;
 }
 
-void Schedule::addOperator(std::string type, std::string input_name, std::string input2_name, std::string output_name)
+std::string Schedule::addOperator(std::string type, std::string input_name, std::string input2_name, std::string output_name)
 {
 	SchedulerOperator myop(type, input_name, input2_name, output_name);
 	std::string myname = myop.getName();
 	scheduler_global_operators[myname] = myop;
+	return "";
 }
 
 void Schedule::addJob(RelionJob &myjob, std::string jobname, std::string mode)

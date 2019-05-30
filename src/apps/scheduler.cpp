@@ -47,10 +47,10 @@ public:
 		std::cerr << "    --schedule Schedules/test --add variable --name is_finished --value False" << std::endl;
 		std::cerr << "    --schedule Schedules/test --add variable --name initial_model --value map.mrc" << std::endl;
 		std::cerr << std::endl << " ++ Add an operator node (of type float, bool or file): " << std::endl;
-		std::cerr << "    --schedule Schedules/test --add operator --type " << SCHEDULE_FLOAT_OPERATOR_PLUS_VAR << " --i iter --i2 iter_step --o iter" << std::endl;
-		std::cerr << "    --schedule Schedules/test --add operator --type " << SCHEDULE_FLOAT_OPERATOR_PLUS_CONST << " --i iter --i2 1 --o iter" << std::endl;
+		std::cerr << "    --schedule Schedules/test --add operator --type " << SCHEDULE_FLOAT_OPERATOR_PLUS << " --i iter --i2 iter_step --o iter" << std::endl;
+		std::cerr << "    --schedule Schedules/test --add operator --type " << SCHEDULE_FLOAT_OPERATOR_PLUS << " --i iter --i2 1 --o iter" << std::endl;
 		std::cerr << "    --schedule Schedules/test --add operator --type " << SCHEDULE_STRING_OPERATOR_TOUCH_FILE << " --i initial_model" << std::endl;
-		std::cerr << "    --schedule Schedules/test --add operator --type " << SCHEDULE_BOOLEAN_OPERATOR_GT_CONST << " --i iter --i2 10 --o is_finished" << std::endl;
+		std::cerr << "    --schedule Schedules/test --add operator --type " << SCHEDULE_BOOLEAN_OPERATOR_GT << " --i iter --i2 10 --o is_finished" << std::endl;
 		std::cerr << "    --schedule Schedules/test --add operator --type " << SCHEDULE_BOOLEAN_OPERATOR_FILE_EXISTS << " --i initial_model --o is_finished" << std::endl;
 		std::cerr << std::endl << " ++ Add a job node: " << std::endl;
 		std::cerr << "    --schedule Schedules/test --add job --i my_import --mode continue/new/overwrite" << std::endl;
@@ -137,7 +137,9 @@ public:
 			}
 			else if (add == "operator")
 			{
-				schedule.addOperator(type, input, input2, output);
+				std::string error = schedule.addOperator(type, input, input2, output);
+				if (error != "")
+					REPORT_ERROR(error);
 			}
 			else if (add == "job")
 			{

@@ -20,8 +20,10 @@
 
 #ifndef SRC_GUI_MAINWINDOW_H_
 #define SRC_GUI_MAINWINDOW_H_
+#define Complex tmpComplex
 #include <FL/Fl_Scroll.H>
 #include "src/gui_jobwindow.h"
+#undef Complex
 #include "src/pipeliner.h"
 #include "src/scheduler.h"
 
@@ -98,9 +100,43 @@ static Fl_Select_Browser *scheduler_job_browser, *scheduler_input_job_browser, *
 static Fl_Hold_Browser *scheduler_variable_browser, *scheduler_operator_browser;
 static Fl_Button *set_scheduler_variable_button, *set_scheduler_operator_button;
 static Fl_Button *delete_scheduler_variable_button, *delete_scheduler_operator_button;
-static std::vector<long int> scheduler_floats_var_browser_idx, scheduler_bools_var_browser_idx, scheduler_strings_var_browser_idx;
-static std::vector<long int> scheduler_operator_browser_idx;
-static Fl_Input *scheduler_set_variable_name, *scheduler_set_variable_value;
+static Fl_Input *scheduler_variable_name, *scheduler_variable_value;
+static Fl_Menu_Item operator_type_options[] = {
+	   {SCHEDULE_BOOLEAN_OPERATOR_AND},
+	   {SCHEDULE_BOOLEAN_OPERATOR_OR},
+	   {SCHEDULE_BOOLEAN_OPERATOR_NOT},
+	   {SCHEDULE_BOOLEAN_OPERATOR_GT},
+	   {SCHEDULE_BOOLEAN_OPERATOR_LT},
+	   {SCHEDULE_BOOLEAN_OPERATOR_EQ},
+	   {SCHEDULE_BOOLEAN_OPERATOR_FILE_EXISTS},
+	   {SCHEDULE_BOOLEAN_OPERATOR_READ_STAR},
+	   {SCHEDULE_FLOAT_OPERATOR_PLUS},
+	   {SCHEDULE_FLOAT_OPERATOR_MINUS},
+	   {SCHEDULE_FLOAT_OPERATOR_MULT},
+	   {SCHEDULE_FLOAT_OPERATOR_DIVIDE},
+	   {SCHEDULE_FLOAT_OPERATOR_INVDIV},
+	   {SCHEDULE_FLOAT_OPERATOR_COUNT_IMAGES},
+	   {SCHEDULE_FLOAT_OPERATOR_READ_STAR},
+	   {SCHEDULE_STRING_OPERATOR_TOUCH_FILE},
+	   {SCHEDULE_STRING_OPERATOR_COPY_FILE},
+	   {SCHEDULE_STRING_OPERATOR_MOVE_FILE},
+	   {SCHEDULE_STRING_OPERATOR_DELETE_FILE},
+	   {SCHEDULE_STRING_OPERATOR_READ_STAR},
+	   {SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX},
+	   {SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN},
+	   {SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_AVG},
+	   {SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX_IDX},
+	   {SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN_IDX},
+	   {SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_IDX},
+	   {SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_SORT_IDX},
+	   {SCHEDULE_WAIT_OPERATOR_SINCE_LAST_TIME},
+	   {SCHEDULE_EXIT_OPERATOR},
+	   {0} // this should be the last entry
+	   };
+
+static Fl_Choice *scheduler_operator_type, *scheduler_operator_output, *scheduler_operator_input1;
+static Fl_Input *scheduler_operator_input2;
+
 
 static Fl_Text_Buffer *textbuff_stdout;
 static Fl_Text_Buffer *textbuff_stderr;
