@@ -66,11 +66,6 @@ class SchedulerStringVariable
 	}
 };
 
-// Global variables ... //TODO: ask Takanori whether I need extern or static?
-extern std::map<std::string, SchedulerBooleanVariable> scheduler_bools;
-extern std::map<std::string, SchedulerFloatVariable> scheduler_floats;
-extern std::map<std::string, SchedulerStringVariable> scheduler_strings;
-
 bool isBooleanVariable(std::string name);
 bool isFloatVariable(std::string name);
 bool isStringVariable(std::string name);
@@ -100,6 +95,7 @@ bool isOperator(std::string name);
 #define SCHEDULE_STRING_OPERATOR_MOVE_FILE "string_op_move_file"
 #define SCHEDULE_STRING_OPERATOR_DELETE_FILE "string_op_delete_file"
 #define SCHEDULE_WAIT_OPERATOR_SINCE_LAST_TIME "wait_since_last_time"
+#define SCHEDULE_EXIT_OPERATOR "exit"
 
 // A class that performs operators on variables
 class SchedulerOperator
@@ -109,62 +105,36 @@ class SchedulerOperator
 
 	public:
 
-	void performOperation() const;
+	bool performOperation() const;
 
 	SchedulerOperator() {};
 
-	SchedulerOperator(std::string _type, std::string _input1, std::string _input2, std::string _output);
+	SchedulerOperator(std::string _type, std::string _input1="undefined", std::string _input2="undefined", std::string _output="undefined");
 
 	// Generate a meaningful current_name for the operator
 	std::string getName();
 
 };
 
-// Global variable TODO: ask Takanori about extern/static
-extern std::map<std::string, SchedulerOperator> operators;
-
-
-#define SCHEDULE_NODE_TYPE_JOB "job"
-#define SCHEDULE_NODE_TYPE_OPERATOR "operator"
-#define SCHEDULE_NODE_TYPE_EXIT "exit"
-
 #define SCHEDULE_NODE_JOB_MODE_NEW "new"
 #define SCHEDULE_NODE_JOB_MODE_CONTINUE "continue"
 #define SCHEDULE_NODE_JOB_MODE_OVERWRITE "overwrite"
 
-class SchedulerNode
+class SchedulerJob
 {
 	public:
-	std::string type, current_name, mode;
+	std::string current_name, mode;
 	bool job_has_started;
-	std::string myOperator;
 
 	public:
 
-	SchedulerNode(std::string _name, std::string _type, std::string _mode_or_operator, bool _has_started = false)
-	{
-		type = _type;
-		current_name = _name;
-		if (type == SCHEDULE_NODE_TYPE_JOB)
-		{
-			mode = _mode_or_operator;
-			myOperator = "undefined";
-		}
-		else
-		{
-			mode = "undefined";
-			myOperator = _mode_or_operator;
-		}
-		job_has_started = _has_started;
-	}
+	SchedulerJob() {};
 
-	SchedulerNode()
+	SchedulerJob(std::string _name, std::string _mode, bool _has_started = false)
 	{
-		type = SCHEDULE_NODE_TYPE_EXIT;
-		current_name = "exit";
-		mode = "undefined";
-		myOperator = "undefined";
-		job_has_started = false;
+		current_name = _name;
+		mode = _mode;
+		job_has_started = _has_started;
 	}
 
 	// Perform operation and return TRUE if not a JOB; just return FALSE if a JOB
@@ -212,7 +182,7 @@ public:
 	std::string current_node, original_start_node;
 	std::string name, email_address;
 
-	std::map<std::string, SchedulerNode> nodes;
+	std::map<std::string, SchedulerJob> jobs;
 	std::vector<SchedulerEdge> edges;
 
 	PipeLine schedule_pipeline;
@@ -242,28 +212,59 @@ public:
     void setOriginalStartNode(std::string _name);
 
     bool gotoNextNode();
-
-    bool gotoNextJob(FileName &job_name, FileName &original_name, std::string &mode, bool &has_started);
+    bool gotoNextJob();
 
 	bool isNode(std::string name);
 	bool isJob(std::string name);
 
-	std::string findNodeByCurrentName(std::string name);
+	std::string findJobByCurrentName(std::string name);
 
-    // Build a new Schedule
+    // Get/set Variables and Operators(scheduler_floats is only visible in this file!)
+    float getFloatVariableValue(std::string name);
+    float getFloatOriginalVariableValue(std::string name);
+    void setFloatVariableValue(std::string name, RFLOAT val);
+    void setFloatOriginalVariableValue(std::string name, RFLOAT val);
+
+    bool getBooleanVariableValue(std::string name);
+    bool getBooleanOriginalVariableValue(std::string name);
+    void setBooleanVariableValue(std::string name, bool val);
+    void setBooleanOriginalVariableValue(std::string name, bool val);
+
+    std::string getStringVariableValue(std::string name);
+    std::string getStringOriginalVariableValue(std::string name);
+    void setStringVariableValue(std::string name, std::string val);
+    void setStringOriginalVariableValue(std::string name, std::string val);
+
+    void setOperatorParameters(std::string name, std::string type, std::string input1, std::string input2, std::string output);
+    void getOperatorParameters(std::string name, std::string &type, std::string &input1, std::string &input2, std::string &output);
+
+    // Get vectors with current Variables / Operators
+    std::map<std::string, SchedulerFloatVariable> getCurrentFloatVariables();
+    std::map<std::string, SchedulerBooleanVariable> getCurrentBooleanVariables();
+    std::map<std::string, SchedulerStringVariable> getCurrentStringVariables();
+    std::map<std::string, SchedulerOperator> getCurrentOperators();
+
+    // Get/set operators
+
     // Add variables
-    void addVariable(std::string name, FileName value);
+    void setVariable(std::string name, FileName value); // (Add new one if exists, otherwise set value)
 	void addFloatVariable(std::string name, RFLOAT value);
     void addBooleanVariable(std::string name, bool value);
     void addStringVariable(std::string name, FileName value);
 
     // Add operators (of any kind), also adds its corresponding node
-    void addOperatorNode(std::string type, std::string input_name, std::string input2_name, std::string output_name);
+    void addOperator(std::string type, std::string input_name, std::string input2_name, std::string output_name);
 
     // Add a new job, also adds its corresponding node
-    void addJobNode(RelionJob &myjob, std::string jobname, std::string mode);
+    void addJob(RelionJob &myjob, std::string jobname, std::string mode);
 
     void addExitNode();
+
+    // Remove variables/operators/jobs
+    void removeVariable(std::string name);
+    void removeOperator(std::string name);
+    void removeJob(std::string name);
+
 
     void sendEmail(std::string message);
 

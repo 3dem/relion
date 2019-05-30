@@ -97,7 +97,7 @@ static Fl_Menu_Item job_mode_options[] = {
 static Fl_Select_Browser *scheduler_job_browser, *scheduler_input_job_browser, *scheduler_output_job_browser;
 static Fl_Hold_Browser *scheduler_variable_browser, *scheduler_operator_browser;
 static Fl_Button *set_scheduler_variable_button, *set_scheduler_operator_button;
-static Fl_Button *add_scheduler_variable_button, *add_scheduler_operator_button;
+static Fl_Button *delete_scheduler_variable_button, *delete_scheduler_operator_button;
 static std::vector<long int> scheduler_floats_var_browser_idx, scheduler_bools_var_browser_idx, scheduler_strings_var_browser_idx;
 static std::vector<long int> scheduler_operator_browser_idx;
 static Fl_Input *scheduler_set_variable_name, *scheduler_set_variable_value;
@@ -311,14 +311,14 @@ private:
     static void cb_set_scheduler_variable(Fl_Widget*, void*);
     inline void cb_set_scheduler_variable_i();
 
-    static void cb_add_scheduler_variable(Fl_Widget*, void*);
-    inline void cb_add_scheduler_variable_i();
+    static void cb_delete_scheduler_variable(Fl_Widget*, void*);
+    inline void cb_delete_scheduler_variable_i();
 
     static void cb_set_scheduler_operator(Fl_Widget*, void*);
     inline void cb_set_scheduler_operator_i();
 
-    static void cb_add_scheduler_operator(Fl_Widget*, void*);
-    inline void cb_add_scheduler_operator_i();
+    static void cb_delete_scheduler_operator(Fl_Widget*, void*);
+    inline void cb_delete_scheduler_operator_i();
 
     static void cb_select_scheduler_variable(Fl_Widget*, void*);
     inline void cb_select_scheduler_variable_i();

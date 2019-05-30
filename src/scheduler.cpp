@@ -23,29 +23,30 @@
 TimeStamp global_timestamp;
 bool has_annotated_time = false;
 
-std::map<std::string, SchedulerBooleanVariable> scheduler_bools;
-std::map<std::string, SchedulerFloatVariable> scheduler_floats;
-std::map<std::string, SchedulerStringVariable> scheduler_strings;
-std::map<std::string, SchedulerOperator> operators;
+// Global variables, but only with reach within this file!
+std::map<std::string, SchedulerBooleanVariable> scheduler_global_bools;
+std::map<std::string, SchedulerFloatVariable> scheduler_global_floats;
+std::map<std::string, SchedulerStringVariable> scheduler_global_strings;
+std::map<std::string, SchedulerOperator> scheduler_global_operators;
 
 bool isBooleanVariable(std::string _name)
 {
-	return (scheduler_bools.find(_name) != scheduler_bools.end());
+	return (scheduler_global_bools.find(_name) != scheduler_global_bools.end());
 }
 
 bool isFloatVariable(std::string _name)
 {
-	return (scheduler_floats.find(_name) != scheduler_floats.end());
+	return (scheduler_global_floats.find(_name) != scheduler_global_floats.end());
 }
 
 bool isStringVariable(std::string _name)
 {
-	return (scheduler_strings.find(_name) != scheduler_strings.end());
+	return (scheduler_global_strings.find(_name) != scheduler_global_strings.end());
 }
 
 bool isOperator(std::string _name)
 {
-	return (operators.find(_name) != operators.end());
+	return (scheduler_global_operators.find(_name) != scheduler_global_operators.end());
 }
 
 SchedulerOperator::SchedulerOperator(std::string _type, std::string _input1, std::string _input2, std::string _output)
@@ -119,103 +120,103 @@ SchedulerOperator::SchedulerOperator(std::string _type, std::string _input1, std
 	output = _output;
 }
 
-void SchedulerOperator::performOperation() const
+bool SchedulerOperator::performOperation() const
 {
 	if (type == SCHEDULE_BOOLEAN_OPERATOR_AND)
 	{
-		scheduler_bools[output].value = (scheduler_bools[input1].value && scheduler_bools[input2].value);
+		scheduler_global_bools[output].value = (scheduler_global_bools[input1].value && scheduler_global_bools[input2].value);
 	}
 	else if (type == SCHEDULE_BOOLEAN_OPERATOR_OR)
 	{
-		scheduler_bools[output].value = (scheduler_bools[input1].value || scheduler_bools[input2].value);
+		scheduler_global_bools[output].value = (scheduler_global_bools[input1].value || scheduler_global_bools[input2].value);
 	}
 	else if (type == SCHEDULE_BOOLEAN_OPERATOR_NOT)
 	{
-		scheduler_bools[output].value = (!(scheduler_bools[input1].value));
+		scheduler_global_bools[output].value = (!(scheduler_global_bools[input1].value));
 	}
 	else if (type == SCHEDULE_BOOLEAN_OPERATOR_GT_VAR)
 	{
-		scheduler_bools[output].value = (scheduler_floats[input1].value > scheduler_floats[input2].value);
+		scheduler_global_bools[output].value = (scheduler_global_floats[input1].value > scheduler_global_floats[input2].value);
 	}
 	else if (type == SCHEDULE_BOOLEAN_OPERATOR_LT_VAR)
 	{
-		scheduler_bools[output].value = (scheduler_floats[input1].value < scheduler_floats[input2].value);
+		scheduler_global_bools[output].value = (scheduler_global_floats[input1].value < scheduler_global_floats[input2].value);
 	}
 	else if (type == SCHEDULE_BOOLEAN_OPERATOR_EQ_VAR)
 	{
-		scheduler_bools[output].value = (fabs(scheduler_floats[input1].value - scheduler_floats[input2].value) < 1E-8);
+		scheduler_global_bools[output].value = (fabs(scheduler_global_floats[input1].value - scheduler_global_floats[input2].value) < 1E-8);
 	}
 	else if (type == SCHEDULE_BOOLEAN_OPERATOR_GT_CONST)
 	{
-		scheduler_bools[output].value = (scheduler_floats[input1].value > textToFloat(input2));
+		scheduler_global_bools[output].value = (scheduler_global_floats[input1].value > textToFloat(input2));
 	}
 	else if (type == SCHEDULE_BOOLEAN_OPERATOR_LT_CONST)
 	{
-		scheduler_bools[output].value = (scheduler_floats[input1].value < textToFloat(input2));
+		scheduler_global_bools[output].value = (scheduler_global_floats[input1].value < textToFloat(input2));
 	}
 	else if (type == SCHEDULE_BOOLEAN_OPERATOR_EQ_CONST)
 	{
-		scheduler_bools[output].value = (fabs(scheduler_floats[input1].value - textToFloat(input2)) < 1E-8);
+		scheduler_global_bools[output].value = (fabs(scheduler_global_floats[input1].value - textToFloat(input2)) < 1E-8);
 	}
 	else if (type == SCHEDULE_BOOLEAN_OPERATOR_FILE_EXISTS)
 	{
-		scheduler_bools[output].value = (exists(scheduler_strings[input1].value));
+		scheduler_global_bools[output].value = (exists(scheduler_global_strings[input1].value));
 	}
 	else if (type == SCHEDULE_FLOAT_OPERATOR_PLUS_VAR)
 	{
-		scheduler_floats[output].value = scheduler_floats[input1].value + scheduler_floats[input2].value;
+		scheduler_global_floats[output].value = scheduler_global_floats[input1].value + scheduler_global_floats[input2].value;
 	}
 	else if (type ==SCHEDULE_FLOAT_OPERATOR_MINUS_VAR)
 	{
-		scheduler_floats[output].value = scheduler_floats[input1].value - scheduler_floats[input2].value;
+		scheduler_global_floats[output].value = scheduler_global_floats[input1].value - scheduler_global_floats[input2].value;
 	}
 	else if (type == SCHEDULE_FLOAT_OPERATOR_MULT_VAR)
 	{
-		scheduler_floats[output].value = scheduler_floats[input1].value * scheduler_floats[input2].value;
+		scheduler_global_floats[output].value = scheduler_global_floats[input1].value * scheduler_global_floats[input2].value;
 	}
 	else if (type == SCHEDULE_FLOAT_OPERATOR_DIVIDE_VAR)
 	{
-		scheduler_floats[output].value = scheduler_floats[input1].value / scheduler_floats[input2].value;
+		scheduler_global_floats[output].value = scheduler_global_floats[input1].value / scheduler_global_floats[input2].value;
 	}
 	else if (type == SCHEDULE_FLOAT_OPERATOR_PLUS_CONST)
 	{
-		scheduler_floats[output].value = scheduler_floats[input1].value + textToFloat(input2);
+		scheduler_global_floats[output].value = scheduler_global_floats[input1].value + textToFloat(input2);
 	}
 	else if (type == SCHEDULE_FLOAT_OPERATOR_MINUS_CONST)
 	{
-		scheduler_floats[output].value = scheduler_floats[input1].value - textToFloat(input2);
+		scheduler_global_floats[output].value = scheduler_global_floats[input1].value - textToFloat(input2);
 	}
 	else if (type == SCHEDULE_FLOAT_OPERATOR_MULT_CONST)
 	{
-		scheduler_floats[output].value = scheduler_floats[input1].value * textToFloat(input2);
+		scheduler_global_floats[output].value = scheduler_global_floats[input1].value * textToFloat(input2);
 	}
 	else if (type == SCHEDULE_FLOAT_OPERATOR_DIVIDE_CONST)
 	{
-		scheduler_floats[output].value = scheduler_floats[input1].value / textToFloat(input2);
+		scheduler_global_floats[output].value = scheduler_global_floats[input1].value / textToFloat(input2);
 	}
 	else if (type == SCHEDULE_FLOAT_OPERATOR_DIVIDE_CONST_INV)
 	{
-		scheduler_floats[output].value = textToFloat(input2) / scheduler_floats[input1].value;
+		scheduler_global_floats[output].value = textToFloat(input2) / scheduler_global_floats[input1].value;
 	}
 	else if (type == SCHEDULE_STRING_OPERATOR_TOUCH_FILE)
 	{
-		std::cout << " Touching file " << scheduler_strings[output].value << std::endl;
-		touch(scheduler_strings[output].value);
+		std::cout << " Touching file " << scheduler_global_strings[output].value << std::endl;
+		touch(scheduler_global_strings[output].value);
 	}
 	else if (type == SCHEDULE_STRING_OPERATOR_COPY_FILE)
 	{
-		std::cout << " Copying file " << scheduler_strings[input1].value << " to " << scheduler_strings[output].value << std::endl;
-		copy(scheduler_strings[input1].value, scheduler_strings[output].value);
+		std::cout << " Copying file " << scheduler_global_strings[input1].value << " to " << scheduler_global_strings[output].value << std::endl;
+		copy(scheduler_global_strings[input1].value, scheduler_global_strings[output].value);
 	}
 	else if (type == SCHEDULE_STRING_OPERATOR_MOVE_FILE)
 	{
-		std::cout << " Moving file " << scheduler_strings[input1].value << " to " << scheduler_strings[output].value << std::endl;
-		move(scheduler_strings[input1].value, scheduler_strings[output].value);
+		std::cout << " Moving file " << scheduler_global_strings[input1].value << " to " << scheduler_global_strings[output].value << std::endl;
+		move(scheduler_global_strings[input1].value, scheduler_global_strings[output].value);
 	}
 	else if (type == SCHEDULE_STRING_OPERATOR_DELETE_FILE)
 	{
-		std::cout << " Deleting file " << scheduler_strings[output].value << std::endl;
-		delete(scheduler_strings[output].value.c_str());
+		std::cout << " Deleting file " << scheduler_global_strings[output].value << std::endl;
+		delete(scheduler_global_strings[output].value.c_str());
 	}
 	else if (type == SCHEDULE_WAIT_OPERATOR_SINCE_LAST_TIME)
 	{
@@ -230,9 +231,15 @@ void SchedulerOperator::performOperation() const
 			has_annotated_time =true;
 		}
 	}
+	else if (type == SCHEDULE_EXIT_OPERATOR)
+	{
+		std::cout << " The schedule has reached an exit point, stopping now ...";
+		return false; // to exit the schedule
+	}
 	else
 		REPORT_ERROR("ERROR: unrecognised Operator type:" + type);
 
+	return true;
 }
 
 
@@ -254,13 +261,14 @@ std::string SchedulerOperator::getName()
 	if (type == SCHEDULE_STRING_OPERATOR_COPY_FILE) return "COPY_" + input1 + "_" + input2;
 	if (type == SCHEDULE_STRING_OPERATOR_MOVE_FILE) return "MOVE_" + input1 + "_" + input2;
 	if (type == SCHEDULE_STRING_OPERATOR_DELETE_FILE) return "DELETE_" + input1;
+	if (type == SCHEDULE_EXIT_OPERATOR) return "EXIT";
 	else
 		REPORT_ERROR("ERROR: unrecognised Operator type:" + type);
 }
 
 std::string SchedulerEdge::getOutputNode() const
 {
-	if (is_fork) return (scheduler_bools[myBooleanVariable].value) ?  outputNode : outputNodeFalse;
+	if (is_fork) return (scheduler_global_bools[myBooleanVariable].value) ?  outputNode : outputNodeFalse;
 	else return outputNode;
 }
 
@@ -270,46 +278,25 @@ void Schedule::clear()
 	original_start_node = "undefined";
 	name = "undefined";
 	email_address = "undefined";
-	scheduler_bools.clear();
-	scheduler_floats.clear();
-	scheduler_strings.clear();
-	nodes.clear();
+	scheduler_global_bools.clear();
+	scheduler_global_floats.clear();
+	scheduler_global_strings.clear();
+	jobs.clear();
 	edges.clear();
-	operators.clear();
+	scheduler_global_operators.clear();
 }
 
-std::string Schedule::findNodeByCurrentName(std::string _name)
+std::string Schedule::findJobByCurrentName(std::string _name)
 {
-	std::map<std::string, SchedulerNode>::iterator it;
+	std::map<std::string, SchedulerJob>::iterator it;
 
-	for ( it = nodes.begin(); it != nodes.end(); it++ )
+	for ( it = jobs.begin(); it != jobs.end(); it++ )
 	{
 	    if (it->second.current_name == _name)
 	    	return it->second.current_name;
 	}
-	REPORT_ERROR("ERROR: cannot find node: " + _name);
+	REPORT_ERROR("ERROR: cannot find job: " + _name);
 	return "";
-}
-
-bool SchedulerNode::performOperation()
-{
-	if (type == SCHEDULE_NODE_TYPE_OPERATOR)
-	{
-		operators[myOperator].performOperation();
-		return true;
-	}
-	else if (type == SCHEDULE_NODE_TYPE_EXIT)
-	{
-		std::cout << " Reached an exit of the Schedule ..." << std::endl;
-		return true;
-	}
-    else if (type == SCHEDULE_NODE_TYPE_JOB)
-    {
-		return false;
-	}
-    else
-    	REPORT_ERROR("ERROR: unrecognised node type: " + type);
-
 }
 
 void Schedule::read(FileName fn)
@@ -344,7 +331,7 @@ void Schedule::read(FileName fn)
 		MD.getValue(EMDL_SCHEDULE_VAR_FLOAT_VALUE, value);
 		MD.getValue(EMDL_SCHEDULE_VAR_FLOAT_ORI_VALUE, original_value);
 		SchedulerFloatVariable myval(value, original_value);
-		scheduler_floats[name] = myval;
+		scheduler_global_floats[name] = myval;
 	}
 	MD.clear();
 
@@ -357,7 +344,7 @@ void Schedule::read(FileName fn)
 		MD.getValue(EMDL_SCHEDULE_VAR_BOOL_VALUE, value);
 		MD.getValue(EMDL_SCHEDULE_VAR_BOOL_ORI_VALUE, original_value);
 		SchedulerBooleanVariable myval(value, original_value);
-		scheduler_bools[name] = myval;
+		scheduler_global_bools[name] = myval;
 	}
 	MD.clear();
 
@@ -370,7 +357,7 @@ void Schedule::read(FileName fn)
 		MD.getValue(EMDL_SCHEDULE_VAR_STRING_VALUE, value);
 		MD.getValue(EMDL_SCHEDULE_VAR_STRING_ORI_VALUE, original_value);
 		SchedulerStringVariable myval(value, original_value);
-		scheduler_strings[name] = myval;
+		scheduler_global_strings[name] = myval;
 	}
 	MD.clear();
 
@@ -386,24 +373,23 @@ void Schedule::read(FileName fn)
 		MD.getValue(EMDL_SCHEDULE_OPERATOR_INPUT2, input2);
 		MD.getValue(EMDL_SCHEDULE_OPERATOR_OUTPUT, output);
 		SchedulerOperator myval(type, input1, input2, output);
-		operators[name] = myval;
+		scheduler_global_operators[name] = myval;
 	}
 	MD.clear();
 
-	MD.readStar(in, "schedule_nodes");
+	MD.readStar(in, "schedule_jobs");
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
 	{
 		std::string name, ori_name, mode, type;
 		bool has_started;
 
-		MD.getValue(EMDL_SCHEDULE_NODE_NAME, name);
-		MD.getValue(EMDL_SCHEDULE_NODE_ORI_NAME, ori_name);
-		MD.getValue(EMDL_SCHEDULE_NODE_JOB_MODE, mode);
-		MD.getValue(EMDL_SCHEDULE_NODE_JOB_HAS_STARTED, has_started);
-		MD.getValue(EMDL_SCHEDULE_NODE_TYPE, type);
+		MD.getValue(EMDL_SCHEDULE_JOB_NAME, name);
+		MD.getValue(EMDL_SCHEDULE_JOB_ORI_NAME, ori_name);
+		MD.getValue(EMDL_SCHEDULE_JOB_MODE, mode);
+		MD.getValue(EMDL_SCHEDULE_JOB_HAS_STARTED, has_started);
 
-		SchedulerNode myval(name, type, mode, has_started);
-		nodes[ori_name] = myval;
+		SchedulerJob myval(name, mode, has_started);
+		jobs[ori_name] = myval;
 	}
 	MD.clear();
 
@@ -461,12 +447,12 @@ void Schedule::write(FileName fn)
 	MDgeneral.setValue(EMDL_SCHEDULE_GENERAL_EMAIL, email_address);
 	MDgeneral.write(fh);
 
-	if (scheduler_floats.size() > 0)
+	if (scheduler_global_floats.size() > 0)
 	{
 		MetaDataTable MD;
 		MD.setName("schedule_floats");
 		std::map<std::string, SchedulerFloatVariable>::iterator it;
-		for ( it = scheduler_floats.begin(); it != scheduler_floats.end(); it++ )
+		for ( it = scheduler_global_floats.begin(); it != scheduler_global_floats.end(); it++ )
 		{
 			MD.addObject();
 			MD.setValue(EMDL_SCHEDULE_VAR_FLOAT_NAME, it->first);
@@ -476,12 +462,12 @@ void Schedule::write(FileName fn)
 		MD.write(fh);
 	}
 
-	if (scheduler_bools.size() > 0)
+	if (scheduler_global_bools.size() > 0)
 	{
 		MetaDataTable MD;
 		MD.setName("schedule_bools");
 		std::map<std::string, SchedulerBooleanVariable>::iterator it;
-		for ( it = scheduler_bools.begin(); it != scheduler_bools.end(); it++ )
+		for ( it = scheduler_global_bools.begin(); it != scheduler_global_bools.end(); it++ )
 		{
 			MD.addObject();
 			MD.setValue(EMDL_SCHEDULE_VAR_BOOL_NAME, it->first);
@@ -491,12 +477,12 @@ void Schedule::write(FileName fn)
 		MD.write(fh);
 	}
 
-	if (scheduler_strings.size() > 0)
+	if (scheduler_global_strings.size() > 0)
 	{
 		MetaDataTable MD;
 		MD.setName("schedule_strings");
 		std::map<std::string, SchedulerStringVariable>::iterator it;
-		for ( it = scheduler_strings.begin(); it != scheduler_strings.end(); it++ )
+		for ( it = scheduler_global_strings.begin(); it != scheduler_global_strings.end(); it++ )
 		{
 			MD.addObject();
 			MD.setValue(EMDL_SCHEDULE_VAR_STRING_NAME, it->first);
@@ -506,12 +492,12 @@ void Schedule::write(FileName fn)
 		MD.write(fh);
 	}
 
-	if (operators.size() > 0)
+	if (scheduler_global_operators.size() > 0)
 	{
 		MetaDataTable MD;
 		MD.setName("schedule_operators");
 		std::map<std::string, SchedulerOperator>::iterator it;
-		for ( it = operators.begin(); it != operators.end(); it++ )
+		for ( it = scheduler_global_operators.begin(); it != scheduler_global_operators.end(); it++ )
 		{
 			MD.addObject();
 			MD.setValue(EMDL_SCHEDULE_OPERATOR_NAME, it->first);
@@ -523,19 +509,18 @@ void Schedule::write(FileName fn)
 		MD.write(fh);
 	}
 
-	if (nodes.size() > 0)
+	if (jobs.size() > 0)
 	{
 		MetaDataTable MD;
-		MD.setName("schedule_nodes");
-		std::map<std::string, SchedulerNode>::iterator it;
-		for ( it = nodes.begin(); it != nodes.end(); it++ )
+		MD.setName("schedule_jobs");
+		std::map<std::string, SchedulerJob>::iterator it;
+		for ( it = jobs.begin(); it != jobs.end(); it++ )
 		{
 			MD.addObject();
-			MD.setValue(EMDL_SCHEDULE_NODE_ORI_NAME, it->first);
-			MD.setValue(EMDL_SCHEDULE_NODE_TYPE, it->second.type);
-			MD.setValue(EMDL_SCHEDULE_NODE_NAME, it->second.current_name);
-			MD.setValue(EMDL_SCHEDULE_NODE_JOB_MODE, it->second.mode);
-			MD.setValue(EMDL_SCHEDULE_NODE_JOB_HAS_STARTED, it->second.job_has_started);
+			MD.setValue(EMDL_SCHEDULE_JOB_ORI_NAME, it->first);
+			MD.setValue(EMDL_SCHEDULE_JOB_NAME, it->second.current_name);
+			MD.setValue(EMDL_SCHEDULE_JOB_MODE, it->second.mode);
+			MD.setValue(EMDL_SCHEDULE_JOB_HAS_STARTED, it->second.job_has_started);
 		}
 		MD.write(fh);
 	}
@@ -580,25 +565,25 @@ void Schedule::reset()
 
 	{
 		std::map<std::string, SchedulerFloatVariable>::iterator it;
-		for ( it = scheduler_floats.begin(); it != scheduler_floats.end(); it++ )
+		for ( it = scheduler_global_floats.begin(); it != scheduler_global_floats.end(); it++ )
 			it->second.value = it->second.original_value;
 	}
 
 	{
 		std::map<std::string, SchedulerBooleanVariable>::iterator it;
-		for ( it = scheduler_bools.begin(); it != scheduler_bools.end(); it++ )
+		for ( it = scheduler_global_bools.begin(); it != scheduler_global_bools.end(); it++ )
 	        it->second.value = it->second.original_value;
 	}
 
 	{
 		std::map<std::string, SchedulerStringVariable>::iterator it;
-		for ( it = scheduler_strings.begin(); it != scheduler_strings.end(); it++ )
+		for ( it = scheduler_global_strings.begin(); it != scheduler_global_strings.end(); it++ )
 	        it->second.value = it->second.original_value;
 	}
 
 	{
-		std::map<std::string, SchedulerNode>::iterator it;
-		for ( it = nodes.begin(); it != nodes.end(); it++ )
+		std::map<std::string, SchedulerJob>::iterator it;
+		for ( it = jobs.begin(); it != jobs.end(); it++ )
 		{
 			it->second.current_name = it->first;
 			it->second.job_has_started = false;
@@ -631,28 +616,19 @@ bool Schedule::gotoNextNode()
     return false;
 }
 
-bool Schedule::gotoNextJob(FileName &job_name, FileName &original_name, std::string &mode, bool &has_started)
+bool Schedule::gotoNextJob()
 {
 
     // This loops through the next Nodes until encountering a JOB
     while (gotoNextNode())
     {
-    	// If this node is an operator, perform its operation, else get the Job
-		if (nodes[current_node].performOperation())
-		{
-			if (nodes[current_node].type == SCHEDULE_NODE_TYPE_EXIT)
-			{
-				sendEmail("Finished successfully!");
-				return false;
-			}
+
+    	if (isOperator(current_node))
+    	{
+    		return scheduler_global_operators[current_node].performOperation();
 		}
 		else // this is a job, get its current_name and options
 		{
-            std::cout << " Now preparing Job: " << nodes[current_node].current_name << std::endl;
-			job_name = nodes[current_node].current_name;
-            original_name = current_node;
-            mode = nodes[current_node].mode;
-            has_started = nodes[current_node].job_has_started;
             return true;
         }
     }
@@ -662,36 +638,34 @@ bool Schedule::gotoNextJob(FileName &job_name, FileName &original_name, std::str
 
 bool Schedule::isNode(std::string _name)
 {
-	return (nodes.find(_name) != nodes.end());
+	// is this either an operator or a job?
+	return (jobs.find(_name) != jobs.end() || scheduler_global_operators.find(_name) != scheduler_global_operators.end());
 }
 
 
 bool Schedule::isJob(std::string _name)
 {
-	if (isNode(_name))
-		return (nodes[_name].type == SCHEDULE_NODE_TYPE_JOB);
-	return false;
+	return (jobs.find(_name) != jobs.end());
 }
 
-void Schedule::addVariable(std::string name, FileName value)
+void Schedule::setVariable(std::string name, FileName value)
 {
-	if (value == "true" || value == "True" || value == "false" || value == "False") // or a boolean?
+	float floatval;
+	if (sscanf(value.c_str(), "%f", &floatval)) // is this a number?
+	{
+		if (isFloatVariable(name)) setFloatVariableValue(name, floatval);
+		else addFloatVariable(name, floatval);
+	}
+	else if (value == "true" || value == "True" || value == "false" || value == "False") // or a boolean?
 	{
 		bool myval = (value == "true" || value == "True");
-		addBooleanVariable(name, myval);
+		if (isBooleanVariable(name)) setBooleanVariableValue(name, myval);
+		else addBooleanVariable(name, myval);
 	}
 	else
 	{
-		float floatval;
-		if (sscanf(value.c_str(), "%f", &floatval)) // is this a number?
-		{
-			std::cerr << name << " = " << floatval << std::endl;
-			addFloatVariable(name, floatval);
-		}
-		else
-		{
-			addStringVariable(name, value);
-		}
+		if (isStringVariable(name)) setStringVariableValue(name, value);
+		else addStringVariable(name, value);
 	}
 }
 
@@ -701,7 +675,7 @@ void Schedule::addFloatVariable(std::string name, RFLOAT value)
 		REPORT_ERROR("ERROR: trying to add a float variable with a name that already exists: " + name);
 
 	SchedulerFloatVariable myvar(value, value);
-	scheduler_floats[name] = myvar;
+	scheduler_global_floats[name] = myvar;
 }
 
 void Schedule::addBooleanVariable(std::string name, bool value)
@@ -710,7 +684,7 @@ void Schedule::addBooleanVariable(std::string name, bool value)
 		REPORT_ERROR("ERROR: trying to add a boolean variable with a name that already exists: " + name);
 
 	SchedulerBooleanVariable myvar(value, value);
-	scheduler_bools[name] = myvar;
+	scheduler_global_bools[name] = myvar;
 }
 
 void Schedule::addStringVariable(std::string name, FileName value)
@@ -719,18 +693,127 @@ void Schedule::addStringVariable(std::string name, FileName value)
 		REPORT_ERROR("ERROR: trying to add a string variable with a name that already exists: " + name);
 
 	SchedulerStringVariable myvar(value, value);
-	scheduler_strings[name] = myvar;
+	scheduler_global_strings[name] = myvar;
 }
 
-void Schedule::addOperatorNode(std::string type, std::string input_name, std::string input2_name, std::string output_name)
+float Schedule::getFloatVariableValue(std::string name)
+{
+	if (!isFloatVariable(name))
+		REPORT_ERROR("ERROR: cannot find float variable with name:" + name);
+	return scheduler_global_floats[name].value;
+}
+float Schedule::getFloatOriginalVariableValue(std::string name)
+{
+	if (!isFloatVariable(name))
+		REPORT_ERROR("ERROR: cannot find float variable with name:" + name);
+	return scheduler_global_floats[name].original_value;
+}
+void Schedule::setFloatVariableValue(std::string name, RFLOAT val)
+{
+	if (!isFloatVariable(name))
+		REPORT_ERROR("ERROR: cannot find float variable with name:" + name);
+	scheduler_global_floats[name].value = val;
+}
+void Schedule::setFloatOriginalVariableValue(std::string name, RFLOAT val)
+{
+	if (!isFloatVariable(name))
+		REPORT_ERROR("ERROR: cannot find float variable with name:" + name);
+	scheduler_global_floats[name].original_value = val;
+}
+bool Schedule::getBooleanVariableValue(std::string name)
+{
+	if (!isBooleanVariable(name))
+		REPORT_ERROR("ERROR: cannot find boolean variable with name:" + name);
+	return scheduler_global_bools[name].value;
+}
+bool Schedule::getBooleanOriginalVariableValue(std::string name)
+{
+	if (!isBooleanVariable(name))
+		REPORT_ERROR("ERROR: cannot find boolean variable with name:" + name);
+	return scheduler_global_bools[name].original_value;
+}
+void Schedule::setBooleanVariableValue(std::string name, bool val)
+{
+	if (!isBooleanVariable(name))
+		REPORT_ERROR("ERROR: cannot find boolean variable with name:" + name);
+	scheduler_global_bools[name].value = val;
+}
+void Schedule::setBooleanOriginalVariableValue(std::string name, bool val)
+{
+	if (!isBooleanVariable(name))
+		REPORT_ERROR("ERROR: cannot find boolean variable with name:" + name);
+	scheduler_global_bools[name].original_value = val;
+}
+std::string Schedule::getStringVariableValue(std::string name)
+{
+	if (!isStringVariable(name))
+		REPORT_ERROR("ERROR: cannot find string variable with name:" + name);
+	return scheduler_global_strings[name].value;
+}
+std::string Schedule::getStringOriginalVariableValue(std::string name)
+{
+	if (!isStringVariable(name))
+		REPORT_ERROR("ERROR: cannot find string variable with name:" + name);
+	return scheduler_global_strings[name].original_value;
+}
+void Schedule::setStringVariableValue(std::string name, std::string val)
+{
+	if (!isStringVariable(name))
+		REPORT_ERROR("ERROR: cannot find string variable with name:" + name);
+	scheduler_global_strings[name].value = val;
+}
+void Schedule::setStringOriginalVariableValue(std::string name, std::string val)
+{
+	if (!isStringVariable(name))
+		REPORT_ERROR("ERROR: cannot find string variable with name:" + name);
+	scheduler_global_strings[name].original_value = val;
+}
+
+
+void Schedule::setOperatorParameters(std::string name, std::string _type, std::string _input1, std::string _input2, std::string _output)
+{
+	if (!isOperator(name))
+		REPORT_ERROR("ERROR: cannot find operator with name:" + name);
+	// Just make a new one, so all the check are done automatically...
+	SchedulerOperator myop(_type, _input1, _input2, _output);
+	scheduler_global_operators[name] = myop;
+}
+void Schedule::getOperatorParameters(std::string name, std::string &_type, std::string &_input1, std::string &_input2, std::string &_output)
+{
+	if (!isOperator(name))
+		REPORT_ERROR("ERROR: cannot find operator with name:" + name);
+	_type = scheduler_global_operators[name].type;
+	_input1 = scheduler_global_operators[name].input1;
+	_input2 = scheduler_global_operators[name].input2;
+	_output = scheduler_global_operators[name].output;
+}
+
+
+std::map<std::string, SchedulerFloatVariable> Schedule::getCurrentFloatVariables()
+{
+	return scheduler_global_floats;
+}
+std::map<std::string, SchedulerBooleanVariable> Schedule::getCurrentBooleanVariables()
+{
+	return scheduler_global_bools;
+}
+std::map<std::string, SchedulerStringVariable> Schedule::getCurrentStringVariables()
+{
+	return scheduler_global_strings;
+}
+std::map<std::string, SchedulerOperator> Schedule::getCurrentOperators()
+{
+	return scheduler_global_operators;
+}
+
+void Schedule::addOperator(std::string type, std::string input_name, std::string input2_name, std::string output_name)
 {
 	SchedulerOperator myop(type, input_name, input2_name, output_name);
 	std::string myname = myop.getName();
-	operators[myname] = myop;
-	SchedulerNode mynode(myname, SCHEDULE_NODE_TYPE_OPERATOR, type);
+	scheduler_global_operators[myname] = myop;
 }
 
-void Schedule::addJobNode(RelionJob &myjob, std::string jobname, std::string mode)
+void Schedule::addJob(RelionJob &myjob, std::string jobname, std::string mode)
 {
 
 	// Check whether the jobname is unique
@@ -757,15 +840,28 @@ void Schedule::addJobNode(RelionJob &myjob, std::string jobname, std::string mod
 	if (current_job < 0)
 		REPORT_ERROR("ERROR: current job should not be negative now ...");
 
-	SchedulerNode mynode(jobname, SCHEDULE_NODE_TYPE_JOB, mode, false);
-	nodes[jobname] = mynode;
+	SchedulerJob mynode(jobname, mode, false);
+	jobs[jobname] = mynode;
 }
 
-void Schedule::addExitNode()
+void Schedule::removeVariable(std::string name)
 {
-	SchedulerNode mynode;
-	nodes["exit"] = mynode;
+	if (isBooleanVariable(name)) scheduler_global_bools.erase(name);
+	else if (isFloatVariable(name)) scheduler_global_floats.erase(name);
+	else if (isStringVariable(name)) scheduler_global_strings.erase(name);
+	else REPORT_ERROR("ERROR: cannot find variable to erase: " + name);
 }
+
+void Schedule::removeOperator(std::string name)
+{
+	if (isOperator(name)) scheduler_global_operators.erase(name);
+	else REPORT_ERROR("ERROR: cannot find operator to erase: " + name);
+}
+
+void Schedule::removeJob(std::string name)
+{
+}
+
 
 void Schedule::sendEmail(std::string message)
 {
@@ -791,7 +887,7 @@ void Schedule::addFork(std::string inputnode_name, std::string mybool_name, std:
 
 bool Schedule::isValid()
 {
-	// TODO: check if duplicate edges, forks or operators exist....
+	// TODO: check if duplicate edges, forks or scheduler_global_operators exist....
 
 	// Check original_start node was set
 
@@ -822,7 +918,7 @@ RelionJob Schedule::copyNewJobFromSchedulePipeline(FileName original_job_name)
 		// Remove leading directory and tailing slash to get the process current_name in the pipeline_scheduler
 		FileName my_process_name = (my_ori_name.afterFirstOf(name)).beforeLastOf("/");
 		// find that process in the nodes, and get its current current_name
-		std::string my_current_name =nodes[my_process_name].current_name;
+		std::string my_current_name =jobs[my_process_name].current_name;
 		// Change all instances of the my_ori_name to my_current_name in the joboptions of this job
 		for (std::map<std::string,JobOption>::iterator it=job.joboptions.begin(); it!=job.joboptions.end(); ++it)
 		{
@@ -858,14 +954,14 @@ void Schedule::setVariablesInJob(RelionJob &job, FileName original_job_name)
 				if (job.joboptions[it->first].joboption_type != JOBOPTION_BOOLEAN)
 					REPORT_ERROR(" ERROR: trying to set a BooleanVariable: " + mystring + " into a non-boolean option: " + it->first);
 
-				my_value = (scheduler_bools[mystring].value) ? "Yes" : "No";
+				my_value = (scheduler_global_bools[mystring].value) ? "Yes" : "No";
 			}
 			else if (isFloatVariable(mystring))
 			{
 				if (job.joboptions[it->first].joboption_type == JOBOPTION_BOOLEAN)
 					REPORT_ERROR(" ERROR: trying to set FloatVariable: " + mystring + " into a boolean option: " + it->first);
 
-				my_value = floatToString(scheduler_floats[mystring].value);
+				my_value = floatToString(scheduler_global_floats[mystring].value);
 			}
 			else if (isStringVariable(mystring))
 			{
@@ -874,7 +970,7 @@ void Schedule::setVariablesInJob(RelionJob &job, FileName original_job_name)
 				if (job.joboptions[it->first].joboption_type == JOBOPTION_SLIDER)
 					REPORT_ERROR(" ERROR: trying to set StringVariable: " + mystring + " into a slider option: " + it->first);
 
-				my_value = scheduler_strings[mystring].value;
+				my_value = scheduler_global_strings[mystring].value;
 			}
 			else
 				REPORT_ERROR(" ERROR: variable in job is not part of this Schedule: " + mystring);
@@ -889,35 +985,33 @@ void Schedule::setVariablesInJob(RelionJob &job, FileName original_job_name)
 void Schedule::run(PipeLine &pipeline)
 {
     // go through all nodes
-    FileName job_name, original_job_name, mode;
-    bool job_has_started;
-    while (gotoNextJob(job_name, original_job_name, mode, job_has_started))
+    while (gotoNextJob())
     {
         RelionJob myjob;
         bool is_continue, do_overwrite_current, dummy;
     	int current_job;
-    	if (!job_has_started || mode == SCHEDULE_NODE_JOB_MODE_NEW)
+    	if (!jobs[current_node].job_has_started || jobs[current_node].mode == SCHEDULE_NODE_JOB_MODE_NEW)
     	{
 
     		// Copy the job inside the schedule_pipeline to a new job inside the pipeline we are actually running in
     		// This function also takes care of fixing the names of the inputNodes
-    		myjob = copyNewJobFromSchedulePipeline(original_job_name);
+    		myjob = copyNewJobFromSchedulePipeline(current_node);
         	// Now add this job to the pipeline we will actually be running in
         	current_job = pipeline.addScheduledJob(myjob);
         	is_continue = false;
         	do_overwrite_current = false;
 
         	// Set the current_name of the current node now
-        	nodes[current_node].current_name = pipeline.processList[current_job].name;
+        	jobs[current_node].current_name = pipeline.processList[current_job].name;
     	}
-    	else if (mode == SCHEDULE_NODE_JOB_MODE_CONTINUE || mode == SCHEDULE_NODE_JOB_MODE_OVERWRITE)
+    	else if (jobs[current_node].mode == SCHEDULE_NODE_JOB_MODE_CONTINUE || jobs[current_node].mode == SCHEDULE_NODE_JOB_MODE_OVERWRITE)
     	{
-    		is_continue = (mode == SCHEDULE_NODE_JOB_MODE_CONTINUE);
-    		do_overwrite_current = (mode == SCHEDULE_NODE_JOB_MODE_OVERWRITE);
+    		is_continue = (jobs[current_node].mode == SCHEDULE_NODE_JOB_MODE_CONTINUE);
+    		do_overwrite_current = (jobs[current_node].mode == SCHEDULE_NODE_JOB_MODE_OVERWRITE);
 
-    		current_job = pipeline.findProcessByName(job_name);
+    		current_job = pipeline.findProcessByName(jobs[current_node].current_name);
     		if (current_job < 0)
-				REPORT_ERROR("ERROR: RunSchedule cannot find process with name: " + job_name);
+				REPORT_ERROR("ERROR: RunSchedule cannot find process with name: " + jobs[current_node].current_name);
 
     		// Read the job from the pipeline we are running in
     		if (!myjob.read(pipeline.processList[current_job].name, dummy, true)) // true means also initialise the job
@@ -925,11 +1019,11 @@ void Schedule::run(PipeLine &pipeline)
 
     	}
     	else
-    		REPORT_ERROR("ERROR: unrecognised mode for running a new process: " + mode);
+    		REPORT_ERROR("ERROR: unrecognised mode for running a new process: " + jobs[current_node].mode);
 
 
     	// This function replaces variable calls starting with a '&&' from the original_job into the current_job
-    	setVariablesInJob(myjob, original_job_name);
+    	setVariablesInJob(myjob, current_node);
 
     	// Check whether the input nodes are there, before executing the job
 		for (long int inode = 0; inode < pipeline.processList[current_job].inputNodeList.size(); inode++)
@@ -953,8 +1047,8 @@ void Schedule::run(PipeLine &pipeline)
 		pipeline.waitForJobToFinish(current_job, is_failure, is_aborted);
 
 		std::string message = "";
-		if (is_failure) message = " Stopping schedule due to job " + job_name + " failing with an error ...";
-		else if (is_aborted) message = " Stopping schedule due to user abort of job " + job_name + " ...";
+		if (is_failure) message = " Stopping schedule due to job " + jobs[current_node].current_name + " failing with an error ...";
+		else if (is_aborted) message = " Stopping schedule due to user abort of job " + jobs[current_node].current_name + " ...";
 		if (message != "")
 		{
 			sendEmail(message);
@@ -964,11 +1058,12 @@ void Schedule::run(PipeLine &pipeline)
 		else
 		{
 			// job finished successfully, write out the updated scheduler file
-			nodes[current_node].job_has_started = true;
+			jobs[current_node].job_has_started = true;
 			write();
 		}
     } // end while gotoNextJob
 
+    sendEmail("Finished successfully!");
     std::cout << " Scheduler " << name << " has finished now... " << std::endl;
 }
 

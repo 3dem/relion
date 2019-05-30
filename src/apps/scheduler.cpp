@@ -133,23 +133,18 @@ public:
 		{
 			if (add == "variable")
 			{
-				schedule.addVariable(name, value);
+				schedule.setVariable(name, value);
 			}
 			else if (add == "operator")
 			{
-				schedule.addOperatorNode(type, input, input2, output);
+				schedule.addOperator(type, input, input2, output);
 			}
 			else if (add == "job")
 			{
-				if (input == "exit")
-					schedule.addExitNode();
-				else
-				{
-					RelionJob myjob;
-					bool dummy;
-					myjob.read(input, dummy, true);
-					schedule.addJobNode(myjob, input, mode);
-				}
+				RelionJob myjob;
+				bool dummy;
+				myjob.read(input, dummy, true);
+				schedule.addJob(myjob, input, mode);
 			}
 			else if (add == "edge")
 			{
@@ -166,24 +161,23 @@ public:
 		}
 		else if (set_var != "")
 		{
-			//std::cerr << "TODO: make function calls in class!" << std::endl;
 			if (isBooleanVariable(set_var))
 			{
 				if (!(value == "true" || value == "True" || value == "false" || value == "False"))
 					REPORT_ERROR("ERROR: invalid value for Boolean variable for --value: " + value);
 				bool myval = (value == "true" || value == "True");
-				scheduler_bools[set_var].value = myval;
+				schedule.setBooleanVariableValue(set_var, myval);
 			}
 			else if (isFloatVariable(set_var))
 			{
 				float floatval;
 				if (!sscanf(value.c_str(), "%f", &floatval)) // is this a number?
 					REPORT_ERROR("ERROR: invalid value for Float variable for --value: " + value);
-				scheduler_floats[set_var].value = floatval;
+				schedule.setFloatVariableValue(set_var, floatval);
 			}
 			else if (isStringVariable(set_var))
 			{
-				scheduler_strings[set_var].value = value;
+				schedule.setStringVariableValue(set_var, value);
 			}
 			else
 				REPORT_ERROR("ERROR: unrecognised variable whose value to set: " + set_var);
@@ -194,7 +188,7 @@ public:
 			{
 				if (!(value == SCHEDULE_NODE_JOB_MODE_NEW || value == SCHEDULE_NODE_JOB_MODE_CONTINUE || value == SCHEDULE_NODE_JOB_MODE_OVERWRITE))
 					REPORT_ERROR("ERROR: unvalid option for job mode: " + value);
-				schedule.nodes[set_mode].mode = value;
+				schedule.jobs[set_mode].mode = value;
 			}
 			else
 				REPORT_ERROR("ERROR: invalid jobname to set mode: " + set_mode);

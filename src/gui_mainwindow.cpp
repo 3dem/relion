@@ -226,7 +226,7 @@ int SchedulerAddVariableOperatorWindow::fill(bool is_variable, bool is_add)
     }
     else
     {
-    	std::cerr << "todo: set/add operators" << std::endl;
+    	std::cerr << "todo: set/add scheduler_operators" << std::endl;
     }
 
 	// Button to execute
@@ -790,12 +790,12 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
     scheduler_set_variable_name->color(GUI_INPUT_COLOR);
     scheduler_set_variable_value = new Fl_Input(XJOBCOL1+JOBCOLWIDTH/2, GUIHEIGHT_EXT_START+25, JOBCOLWIDTH/2, 25);
     scheduler_set_variable_value->color(GUI_INPUT_COLOR);
-	add_scheduler_variable_button = new Fl_Button(XJOBCOL1+JOBCOLWIDTH-105, GUIHEIGHT_EXT_START, 50, 25);
-	add_scheduler_variable_button->color(GUI_RUNBUTTON_COLOR);
-	add_scheduler_variable_button->labelfont(FL_ITALIC);
-	add_scheduler_variable_button->labelsize(RLN_FONTSIZE);
-	add_scheduler_variable_button->label("Add");
-	add_scheduler_variable_button->callback(cb_add_scheduler_variable, this);
+	delete_scheduler_variable_button = new Fl_Button(XJOBCOL1+JOBCOLWIDTH-105, GUIHEIGHT_EXT_START, 50, 25);
+	delete_scheduler_variable_button->color(GUI_RUNBUTTON_COLOR);
+	delete_scheduler_variable_button->labelfont(FL_ITALIC);
+	delete_scheduler_variable_button->labelsize(RLN_FONTSIZE);
+	delete_scheduler_variable_button->label("Del");
+	delete_scheduler_variable_button->callback(cb_delete_scheduler_variable, this);
 	set_scheduler_variable_button = new Fl_Button(XJOBCOL1+JOBCOLWIDTH-50, GUIHEIGHT_EXT_START, 50, 25);
 	set_scheduler_variable_button->color(GUI_RUNBUTTON_COLOR);
 	set_scheduler_variable_button->labelfont(FL_ITALIC);
@@ -812,12 +812,12 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	Fl_Text_Display* textdispnode = new Fl_Text_Display(XJOBCOL2, GUIHEIGHT_EXT_START, JOBCOLWIDTH, 25);
 	textdispnode->buffer(textbuffnode);
 	textdispnode->color(GUI_BACKGROUND_COLOR);
-	add_scheduler_operator_button = new Fl_Button(XJOBCOL2+JOBCOLWIDTH-105, GUIHEIGHT_EXT_START, 50, 25);
-	add_scheduler_operator_button->color(GUI_RUNBUTTON_COLOR);
-	add_scheduler_operator_button->labelfont(FL_ITALIC);
-	add_scheduler_operator_button->labelsize(RLN_FONTSIZE);
-	add_scheduler_operator_button->label("Add");
-	add_scheduler_operator_button->callback( cb_add_scheduler_operator, this);
+	delete_scheduler_operator_button = new Fl_Button(XJOBCOL2+JOBCOLWIDTH-105, GUIHEIGHT_EXT_START, 50, 25);
+	delete_scheduler_operator_button->color(GUI_RUNBUTTON_COLOR);
+	delete_scheduler_operator_button->labelfont(FL_ITALIC);
+	delete_scheduler_operator_button->labelsize(RLN_FONTSIZE);
+	delete_scheduler_operator_button->label("Del");
+	delete_scheduler_operator_button->callback( cb_delete_scheduler_operator, this);
 	set_scheduler_operator_button = new Fl_Button(XJOBCOL2+JOBCOLWIDTH-50, GUIHEIGHT_EXT_START, 50, 25);
 	set_scheduler_operator_button->color(GUI_RUNBUTTON_COLOR);
 	set_scheduler_operator_button->labelfont(FL_ITALIC);
@@ -1117,6 +1117,7 @@ void GuiMainWindow::fillSchedulerNodesAndVariables()
 
 	// Fill variables browser
 	{
+		std::map<std::string, SchedulerFloatVariable> scheduler_floats = schedule.getCurrentFloatVariables();
 		std::map<std::string, SchedulerFloatVariable>::iterator it;
 		int i = 0;
 		for ( it = scheduler_floats.begin(); it != scheduler_floats.end(); it++ )
@@ -1133,6 +1134,7 @@ void GuiMainWindow::fillSchedulerNodesAndVariables()
 	}
 
 	{
+		std::map<std::string, SchedulerBooleanVariable> scheduler_bools = schedule.getCurrentBooleanVariables();
 		std::map<std::string, SchedulerBooleanVariable>::iterator it;
 		int i = 0;
 		for ( it = scheduler_bools.begin(); it != scheduler_bools.end(); it++ )
@@ -1152,6 +1154,7 @@ void GuiMainWindow::fillSchedulerNodesAndVariables()
 	}
 
 	{
+		std::map<std::string, SchedulerStringVariable> scheduler_strings = schedule.getCurrentStringVariables();
 		std::map<std::string, SchedulerStringVariable>::iterator it;
 		int i = 0;
 		for ( it = scheduler_strings.begin(); it != scheduler_strings.end(); it++ )
@@ -1169,9 +1172,10 @@ void GuiMainWindow::fillSchedulerNodesAndVariables()
 
 	// Fill operator browser
 	{
+		std::map<std::string, SchedulerOperator> scheduler_operators = schedule.getCurrentOperators();
 		std::map<std::string, SchedulerOperator>::iterator it;
 		int i = 0;
-		for ( it = operators.begin(); it != operators.end(); it++ )
+		for ( it = scheduler_operators.begin(); it != scheduler_operators.end(); it++ )
 		{
 			std::string mylabel = it->first +
 					" -> " + it->second.output;
@@ -1441,7 +1445,7 @@ void GuiMainWindow::cb_select_scheduled_job_i()
 		bool found = false;
 		for (int i = 0; i < 3; i++)
 		{
-			if (schedule.nodes[jobname].mode == job_mode_options[i].label())
+			if (schedule.jobs[jobname].mode == job_mode_options[i].label())
 			{
 				found = true;
 				job_mode->picked(&job_mode_options[i]);
@@ -1604,22 +1608,31 @@ void GuiMainWindow::cb_set_scheduler_variable(Fl_Widget* o, void*v)
 
 void GuiMainWindow::cb_set_scheduler_variable_i()
 {
-
-}
-
-void GuiMainWindow::cb_add_scheduler_variable(Fl_Widget* o, void*v)
-{
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_add_scheduler_variable_i();
-}
-
-void GuiMainWindow::cb_add_scheduler_variable_i()
-{
-
-	schedule.addVariable(scheduler_set_variable_name->value(), scheduler_set_variable_value->value());
+	schedule.setVariable(scheduler_set_variable_name->value(), scheduler_set_variable_value->value());
 	fillSchedulerNodesAndVariables();
 	schedule.write();
 
+}
+
+void GuiMainWindow::cb_delete_scheduler_variable(Fl_Widget* o, void*v)
+{
+    GuiMainWindow* T=(GuiMainWindow*)v;
+    T->cb_delete_scheduler_variable_i();
+}
+
+void GuiMainWindow::cb_delete_scheduler_variable_i()
+{
+	std::string ask = "Are you sure you want to delete this variable?";
+	int proceed =  fl_choice("%s", "Cancel", "Delete!", NULL, ask.c_str());
+	if (!proceed)
+	{
+		do_overwrite_continue = false;
+		return;
+	}
+
+	schedule.removeVariable(scheduler_set_variable_name->value());
+	fillSchedulerNodesAndVariables();
+	schedule.write();
 }
 
 void GuiMainWindow::cb_set_scheduler_operator(Fl_Widget* o, void*v)
@@ -1633,15 +1646,25 @@ void GuiMainWindow::cb_set_scheduler_operator_i()
 
 }
 
-void GuiMainWindow::cb_add_scheduler_operator(Fl_Widget* o, void*v)
+void GuiMainWindow::cb_delete_scheduler_operator(Fl_Widget* o, void*v)
 {
     GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_add_scheduler_operator_i();
+    T->cb_delete_scheduler_operator_i();
 }
 
-void GuiMainWindow::cb_add_scheduler_operator_i()
+void GuiMainWindow::cb_delete_scheduler_operator_i()
 {
+	std::string ask = "Are you sure you want to delete this operator?";
+	int proceed =  fl_choice("%s", "Cancel", "Delete!", NULL, ask.c_str());
+	if (!proceed)
+	{
+		do_overwrite_continue = false;
+		return;
+	}
 
+	schedule.removeOperator(scheduler_set_variable_name->value());
+	fillSchedulerNodesAndVariables();
+	schedule.write();
 }
 
 void GuiMainWindow::cb_select_scheduler_variable(Fl_Widget* o, void*v)
@@ -1652,6 +1675,16 @@ void GuiMainWindow::cb_select_scheduler_variable(Fl_Widget* o, void*v)
 
 void GuiMainWindow::cb_select_scheduler_variable_i()
 {
+	// Get position of the browser:
+	int idx = scheduler_variable_browser->value();
+	FileName mytext = scheduler_variable_browser->text(idx);
+	FileName myname = mytext.beforeFirstOf(" = ");
+	FileName myval = mytext.afterFirstOf(" = ");
+	myval = myval.beforeFirstOf(" (");
+	std::cerr << scheduler_variable_browser->text(idx) << std::endl;
+	std::cerr << scheduler_variable_browser->selected(idx) << std::endl;
+	scheduler_set_variable_name->value(myname.c_str());
+	scheduler_set_variable_value->value(myval.c_str());
 
 }
 
@@ -1841,7 +1874,7 @@ void GuiMainWindow::cb_scheduler_add_job_i()
 
 		// Also write the possibly updated job_mode
 		std::string mode = job_mode_options[job_mode->value()].label();
-		schedule.nodes[jobname].mode = mode;
+		schedule.jobs[jobname].mode = mode;
 		schedule.write();
 
 		std::cerr << "TODO: write has_started variable as well, add button to edit this!" << std::endl;
@@ -1857,7 +1890,7 @@ void GuiMainWindow::cb_scheduler_add_job_i()
 			return;
 		}
 
-		schedule.addJobNode(gui_jobwindows[iwin]->myjob, jobname, mode);
+		schedule.addJob(gui_jobwindows[iwin]->myjob, jobname, mode);
 
 		scheduler_job_name->value("");
 		schedule.write();

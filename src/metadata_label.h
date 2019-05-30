@@ -473,12 +473,10 @@ enum EMDLabel
 	EMDL_SCHEDULE_GENERAL_ORIGINAL_START_NODE,
 	EMDL_SCHEDULE_GENERAL_EMAIL,
 	EMDL_SCHEDULE_GENERAL_NAME,
-	EMDL_SCHEDULE_NODE_NAME,
-	EMDL_SCHEDULE_NODE_ORI_NAME,
-	EMDL_SCHEDULE_NODE_JOB_MODE,
-	EMDL_SCHEDULE_NODE_JOB_HAS_STARTED,
-	EMDL_SCHEDULE_NODE_TYPE,
-	EMDL_SCHEDULE_NODE_WAIT_TIME,
+	EMDL_SCHEDULE_JOB_NAME,
+	EMDL_SCHEDULE_JOB_ORI_NAME,
+	EMDL_SCHEDULE_JOB_MODE,
+	EMDL_SCHEDULE_JOB_HAS_STARTED,
 	EMDL_SCHEDULE_OPERATOR_NAME,
 	EMDL_SCHEDULE_OPERATOR_TYPE,
 	EMDL_SCHEDULE_OPERATOR_INPUT1,
@@ -1001,12 +999,10 @@ private:
 		EMDL::addLabel(EMDL_SCHEDULE_GENERAL_ORIGINAL_START_NODE, EMDL_STRING, "rlnScheduleOriginalStartNodeName", "Name of the original starting Node for this Schedule");
 		EMDL::addLabel(EMDL_SCHEDULE_GENERAL_EMAIL, EMDL_STRING, "rlnScheduleEmailAddress", "Email address to send message when Schedule finishes");
 		EMDL::addLabel(EMDL_SCHEDULE_GENERAL_NAME, EMDL_STRING, "rlnScheduleName", "Name for this Schedule");
-		EMDL::addLabel(EMDL_SCHEDULE_NODE_NAME, EMDL_STRING, "rlnScheduleNodeName", "Name of a Node in a Schedule");
-		EMDL::addLabel(EMDL_SCHEDULE_NODE_ORI_NAME, EMDL_STRING, "rlnScheduleNodeNameOriginal", "Original name of a Node in a Schedule");
-		EMDL::addLabel(EMDL_SCHEDULE_NODE_JOB_MODE, EMDL_STRING, "rlnScheduleNodeJobMode", "Mode on how to execute a Node if it is a Job");
-		EMDL::addLabel(EMDL_SCHEDULE_NODE_JOB_HAS_STARTED, EMDL_BOOL, "rlnScheduleNodeJobHasStarted", "Flag to indicate whether a job has started already in the execution of the Schedule");
-		EMDL::addLabel(EMDL_SCHEDULE_NODE_TYPE, EMDL_STRING, "rlnScheduleNodeType", "What type is this Node (job, float_op, bool_op, file_op or wait ");
-		EMDL::addLabel(EMDL_SCHEDULE_NODE_WAIT_TIME, EMDL_DOUBLE, "rlnScheduleNodeWaitTime", "Time (in seconds) for this Node to wait (since the last time it was executed)");
+		EMDL::addLabel(EMDL_SCHEDULE_JOB_NAME, EMDL_STRING, "rlnScheduleJobName", "Name of a Job in a Schedule");
+		EMDL::addLabel(EMDL_SCHEDULE_JOB_ORI_NAME, EMDL_STRING, "rlnScheduleJobNameOriginal", "Original name of a Job in a Schedule");
+		EMDL::addLabel(EMDL_SCHEDULE_JOB_MODE, EMDL_STRING, "rlnScheduleJobMode", "Mode on how to execute a Job");
+		EMDL::addLabel(EMDL_SCHEDULE_JOB_HAS_STARTED, EMDL_BOOL, "rlnScheduleJobHasStarted", "Flag to indicate whether a Job has started already in the execution of the Schedule");
 		EMDL::addLabel(EMDL_SCHEDULE_OPERATOR_NAME, EMDL_STRING, "rlnScheduleOperatorName", "Name of a Boolean operator in the Schedule");
 		EMDL::addLabel(EMDL_SCHEDULE_OPERATOR_TYPE, EMDL_STRING, "rlnScheduleOperatorType", "Type of an operator in the Schedule");
 		EMDL::addLabel(EMDL_SCHEDULE_OPERATOR_INPUT1, EMDL_STRING, "rlnScheduleOperatorInput1", "Name of the 1st input to the operator");
