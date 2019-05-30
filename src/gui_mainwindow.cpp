@@ -808,7 +808,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 
 	Fl_Text_Buffer *textbuffnode = new Fl_Text_Buffer();
 	textbuffnode->text("Operators");
-	Fl_Text_Display* textdispnode = new Fl_Text_Display(XJOBCOL2, GUIHEIGHT_EXT_START, JOBCOLWIDTH-105, 25);
+	Fl_Text_Display* textdispnode = new Fl_Text_Display(XJOBCOL2, GUIHEIGHT_EXT_START, JOBCOLWIDTH-160, 25);
 	textdispnode->buffer(textbuffnode);
 	textdispnode->color(GUI_BACKGROUND_COLOR);
 	scheduler_operator_type = new Fl_Choice(XJOBCOL2, GUIHEIGHT_EXT_START+25, JOBCOLWIDTH/2 + 10, 25);
@@ -829,14 +829,14 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	delete_scheduler_operator_button->labelsize(RLN_FONTSIZE);
 	delete_scheduler_operator_button->label("Del");
 	delete_scheduler_operator_button->callback( cb_delete_scheduler_operator, this);
-	set_scheduler_operator_button = new Fl_Button(XJOBCOL2+JOBCOLWIDTH-50, GUIHEIGHT_EXT_START, 50, 25);
-	set_scheduler_operator_button->color(GUI_RUNBUTTON_COLOR);
-	set_scheduler_operator_button->labelfont(FL_ITALIC);
-	set_scheduler_operator_button->labelsize(RLN_FONTSIZE);
-	set_scheduler_operator_button->label("Set");
-	set_scheduler_operator_button->callback( cb_set_scheduler_operator, this);
+	add_scheduler_operator_button = new Fl_Button(XJOBCOL2+JOBCOLWIDTH-50, GUIHEIGHT_EXT_START, 50, 25);
+	add_scheduler_operator_button->color(GUI_RUNBUTTON_COLOR);
+	add_scheduler_operator_button->labelfont(FL_ITALIC);
+	add_scheduler_operator_button->labelsize(RLN_FONTSIZE);
+	add_scheduler_operator_button->label("Add");
+	add_scheduler_operator_button->callback( cb_add_scheduler_operator, this);
 	scheduler_operator_browser  = new Fl_Hold_Browser(XJOBCOL2, GUIHEIGHT_EXT_START + 75, JOBCOLWIDTH, JOBHEIGHT-16);
-	scheduler_operator_browser->callback(cb_select_scheduler_node);
+	scheduler_operator_browser->callback(cb_select_scheduler_operator);
 	scheduler_operator_browser->textsize(RLN_FONTSIZE-1);
 	scheduler_operator_browser->end();
 
@@ -1124,7 +1124,7 @@ void GuiMainWindow::fillSchedulerNodesAndVariables()
 	scheduler_operator_output->clear();
 	scheduler_operator_input1->clear();
 
-	// Fill variables browser
+	// Fill variables browser, and pull-down menus for operator input/output
 	{
 		std::map<std::string, SchedulerFloatVariable> scheduler_floats = schedule.getCurrentFloatVariables();
 		std::map<std::string, SchedulerFloatVariable>::iterator it;
@@ -1135,6 +1135,8 @@ void GuiMainWindow::fillSchedulerNodesAndVariables()
 					" = " + floatToString(it->second.value) +
 					" (" + floatToString(it->second.original_value) + ")";
 			scheduler_variable_browser->add(mylabel.c_str());
+			scheduler_operator_output->add(it->first.c_str());
+			scheduler_operator_input1->add(it->first.c_str());
 			i++;
 		}
 	}
@@ -1152,6 +1154,8 @@ void GuiMainWindow::fillSchedulerNodesAndVariables()
 					" = " + myval +
 					" (" + myorival + ")";
 			scheduler_variable_browser->add(mylabel.c_str());
+			scheduler_operator_output->add(it->first.c_str());
+			scheduler_operator_input1->add(it->first.c_str());
 			i++;
 		}
 	}
@@ -1166,6 +1170,8 @@ void GuiMainWindow::fillSchedulerNodesAndVariables()
 					" = " + it->second.value +
 					" (" + it->second.original_value + ")";
 			scheduler_variable_browser->add(mylabel.c_str());
+			scheduler_operator_output->add(it->first.c_str());
+			scheduler_operator_input1->add(it->first.c_str());
 			i++;
 		}
 	}
@@ -1644,14 +1650,23 @@ void GuiMainWindow::cb_delete_scheduler_variable_i()
 	schedule.write();
 }
 
-void GuiMainWindow::cb_set_scheduler_operator(Fl_Widget* o, void*v)
+void GuiMainWindow::cb_add_scheduler_operator(Fl_Widget* o, void*v)
 {
     GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_set_scheduler_operator_i();
+    T->cb_add_scheduler_operator_i();
 }
 
-void GuiMainWindow::cb_set_scheduler_operator_i()
+void GuiMainWindow::cb_add_scheduler_operator_i()
 {
+	std::string type = scheduler_operator_type->text(scheduler_operator_type->value());
+	std::string output = scheduler_operator_output->text(scheduler_operator_output->value());
+	std::string input1 = scheduler_operator_input1->text(scheduler_operator_input1->value());
+	std::string input2 = scheduler_operator_input2->value();
+
+	schedule.addOperator(type, input1, input2, output);
+
+	fillSchedulerNodesAndVariables();
+	schedule.write();
 
 }
 
@@ -1671,7 +1686,14 @@ void GuiMainWindow::cb_delete_scheduler_operator_i()
 		return;
 	}
 
-	schedule.removeOperator(scheduler_variable_name->value());
+	std::string type = scheduler_operator_type->text(scheduler_operator_type->value());
+	std::string output = scheduler_operator_output->text(scheduler_operator_output->value());
+	std::string input1 = scheduler_operator_input1->text(scheduler_operator_input1->value());
+	std::string input2 = scheduler_operator_input2->value();
+	std::string name = schedule.getOperatorName(type, input1, input2, output);
+
+	schedule.removeOperator(name);
+
 	fillSchedulerNodesAndVariables();
 	schedule.write();
 }
@@ -1695,16 +1717,26 @@ void GuiMainWindow::cb_select_scheduler_variable_i()
 
 }
 
-void GuiMainWindow::cb_select_scheduler_node(Fl_Widget *o, void* v)
+void GuiMainWindow::cb_select_scheduler_operator(Fl_Widget *o, void* v)
 {
     GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_select_scheduler_node_i();
+    T->cb_select_scheduler_operator_i();
 
 }
 
-void GuiMainWindow::cb_select_scheduler_node_i()
+void GuiMainWindow::cb_select_scheduler_operator_i()
 {
+	// Get position of the browser:
+	int idx = scheduler_operator_browser->value();
+	FileName mytext = scheduler_operator_browser->text(idx);
+	FileName myname = mytext.beforeFirstOf(" -> ");
+	std::string type, input1, input2, output;
+	schedule.getOperatorParameters(myname, type, input1, input2, output);
 
+	scheduler_operator_type->value(scheduler_operator_type->find_item(type.c_str()));
+	scheduler_operator_output->value(scheduler_operator_output->find_item(output.c_str()));
+	scheduler_operator_input1->value(scheduler_operator_input1->find_item(input1.c_str()));
+	scheduler_operator_input2->value(input2.c_str());
 }
 
 

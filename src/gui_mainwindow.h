@@ -98,10 +98,24 @@ static Fl_Menu_Item job_mode_options[] = {
 			      };
 static Fl_Select_Browser *scheduler_job_browser, *scheduler_input_job_browser, *scheduler_output_job_browser;
 static Fl_Hold_Browser *scheduler_variable_browser, *scheduler_operator_browser;
-static Fl_Button *set_scheduler_variable_button, *set_scheduler_operator_button;
+static Fl_Button *set_scheduler_variable_button, *add_scheduler_operator_button;
 static Fl_Button *delete_scheduler_variable_button, *delete_scheduler_operator_button;
 static Fl_Input *scheduler_variable_name, *scheduler_variable_value;
 static Fl_Menu_Item operator_type_options[] = {
+	   {SCHEDULE_FLOAT_OPERATOR_PLUS},
+	   {SCHEDULE_FLOAT_OPERATOR_MINUS},
+	   {SCHEDULE_FLOAT_OPERATOR_MULT},
+	   {SCHEDULE_FLOAT_OPERATOR_DIVIDE},
+	   {SCHEDULE_FLOAT_OPERATOR_INVDIV},
+	   {SCHEDULE_FLOAT_OPERATOR_COUNT_IMAGES},
+	   {SCHEDULE_FLOAT_OPERATOR_READ_STAR},
+	   {SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX},
+	   {SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN},
+	   {SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_AVG},
+	   {SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX_IDX},
+	   {SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN_IDX},
+	   {SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_IDX},
+	   {SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_SORT_IDX},
 	   {SCHEDULE_BOOLEAN_OPERATOR_AND},
 	   {SCHEDULE_BOOLEAN_OPERATOR_OR},
 	   {SCHEDULE_BOOLEAN_OPERATOR_NOT},
@@ -110,25 +124,11 @@ static Fl_Menu_Item operator_type_options[] = {
 	   {SCHEDULE_BOOLEAN_OPERATOR_EQ},
 	   {SCHEDULE_BOOLEAN_OPERATOR_FILE_EXISTS},
 	   {SCHEDULE_BOOLEAN_OPERATOR_READ_STAR},
-	   {SCHEDULE_FLOAT_OPERATOR_PLUS},
-	   {SCHEDULE_FLOAT_OPERATOR_MINUS},
-	   {SCHEDULE_FLOAT_OPERATOR_MULT},
-	   {SCHEDULE_FLOAT_OPERATOR_DIVIDE},
-	   {SCHEDULE_FLOAT_OPERATOR_INVDIV},
-	   {SCHEDULE_FLOAT_OPERATOR_COUNT_IMAGES},
-	   {SCHEDULE_FLOAT_OPERATOR_READ_STAR},
 	   {SCHEDULE_STRING_OPERATOR_TOUCH_FILE},
 	   {SCHEDULE_STRING_OPERATOR_COPY_FILE},
 	   {SCHEDULE_STRING_OPERATOR_MOVE_FILE},
 	   {SCHEDULE_STRING_OPERATOR_DELETE_FILE},
 	   {SCHEDULE_STRING_OPERATOR_READ_STAR},
-	   {SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX},
-	   {SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN},
-	   {SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_AVG},
-	   {SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX_IDX},
-	   {SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN_IDX},
-	   {SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_IDX},
-	   {SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_SORT_IDX},
 	   {SCHEDULE_WAIT_OPERATOR_SINCE_LAST_TIME},
 	   {SCHEDULE_EXIT_OPERATOR},
 	   {0} // this should be the last entry
@@ -136,7 +136,7 @@ static Fl_Menu_Item operator_type_options[] = {
 
 static Fl_Choice *scheduler_operator_type, *scheduler_operator_output, *scheduler_operator_input1;
 static Fl_Input *scheduler_operator_input2;
-
+static std::vector<long int> scheduler_operator_type_idx, scheduler_operator_output_idx, scheduler_operator_input1_idx;
 
 static Fl_Text_Buffer *textbuff_stdout;
 static Fl_Text_Buffer *textbuff_stderr;
@@ -350,8 +350,8 @@ private:
     static void cb_delete_scheduler_variable(Fl_Widget*, void*);
     inline void cb_delete_scheduler_variable_i();
 
-    static void cb_set_scheduler_operator(Fl_Widget*, void*);
-    inline void cb_set_scheduler_operator_i();
+    static void cb_add_scheduler_operator(Fl_Widget*, void*);
+    inline void cb_add_scheduler_operator_i();
 
     static void cb_delete_scheduler_operator(Fl_Widget*, void*);
     inline void cb_delete_scheduler_operator_i();
@@ -359,8 +359,8 @@ private:
     static void cb_select_scheduler_variable(Fl_Widget*, void*);
     inline void cb_select_scheduler_variable_i();
 
-    static void cb_select_scheduler_node(Fl_Widget*, void*);
-    inline void cb_select_scheduler_node_i();
+    static void cb_select_scheduler_operator(Fl_Widget*, void*);
+    inline void cb_select_scheduler_operator_i();
 
     static void cb_display(Fl_Widget*, void*);
     inline void cb_display_i();

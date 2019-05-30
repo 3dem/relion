@@ -380,38 +380,38 @@ bool SchedulerOperator::performOperation() const
 }
 
 
-std::string SchedulerOperator::getName()
+std::string SchedulerOperator::getName(std::string _type, std::string _input1, std::string _input2, std::string _output)
 {
-	if (type == SCHEDULE_BOOLEAN_OPERATOR_GT) return input1 + "_GT_" + input2;
-	if (type == SCHEDULE_BOOLEAN_OPERATOR_LT) return input1 + "_LT_" + input2;
-	if (type == SCHEDULE_BOOLEAN_OPERATOR_EQ) return input1 + "_EQ_" + input2;
-	if (type == SCHEDULE_BOOLEAN_OPERATOR_AND) return input1 + "_AND_" + input2;
-	if (type == SCHEDULE_BOOLEAN_OPERATOR_OR) return input1 + "_OR_" + input2;
-	if (type == SCHEDULE_BOOLEAN_OPERATOR_NOT) return "NOT_" + input1;
-	if (type == SCHEDULE_BOOLEAN_OPERATOR_FILE_EXISTS) return "EXISTS_" + input1;
-	if (type == SCHEDULE_BOOLEAN_OPERATOR_READ_STAR) return "STAR_" + input1 + "_" + input2;
-	if (type == SCHEDULE_FLOAT_OPERATOR_PLUS) return input1 + "_PLUS_" + input2;
-	if (type == SCHEDULE_FLOAT_OPERATOR_MINUS) return input1 + "_MINUS_" + input2;
-	if (type == SCHEDULE_FLOAT_OPERATOR_MULT) return input1 + "_MULT_" + input2;
-	if (type == SCHEDULE_FLOAT_OPERATOR_DIVIDE) return input1 + "_DIV_" + input2;
-	if (type == SCHEDULE_FLOAT_OPERATOR_INVDIV) return input2 + "_DIV_" + input1;
-	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR) return "STAR_" + input1 + "_" + input2;
-	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX) return "STAR_GET_MAX_" + input1;
-	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN) return "STAR_GET_MIN_" + input1;
-	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_AVG) return "STAR_GET_AVG_" + input1;
-	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX_IDX) return "STAR_GET_IDX_MAX" + input1;
-	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN_IDX) return "STAR_GET_IDX_MIN" + input1;
-	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_IDX) return "STAR_GET_FROM_IDX" + input1 + "_" + input2;
-	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_SORT_IDX) return "STAR_GET_SORTED_IDX" + input1 + "_" + input2;
-	if (type == SCHEDULE_STRING_OPERATOR_TOUCH_FILE) return "TOUCH_" + input1;
-	if (type == SCHEDULE_STRING_OPERATOR_COPY_FILE) return "COPY_" + input1 + "_" + input2;
-	if (type == SCHEDULE_STRING_OPERATOR_MOVE_FILE) return "MOVE_" + input1 + "_" + input2;
-	if (type == SCHEDULE_STRING_OPERATOR_DELETE_FILE) return "DELETE_" + input1;
-	if (type == SCHEDULE_STRING_OPERATOR_READ_STAR) return "STAR_" + input1 + "_" + input2;
-	if (type == SCHEDULE_WAIT_OPERATOR_SINCE_LAST_TIME) return "WAIT_" + input1;
-	if (type == SCHEDULE_EXIT_OPERATOR) return "EXIT";
+	if (_type == SCHEDULE_BOOLEAN_OPERATOR_GT) return _input1 + "_GT_" + _input2;
+	if (_type == SCHEDULE_BOOLEAN_OPERATOR_LT) return _input1 + "_LT_" + _input2;
+	if (_type == SCHEDULE_BOOLEAN_OPERATOR_EQ) return _input1 + "_EQ_" + _input2;
+	if (_type == SCHEDULE_BOOLEAN_OPERATOR_AND) return _input1 + "_AND_" + _input2;
+	if (_type == SCHEDULE_BOOLEAN_OPERATOR_OR) return _input1 + "_OR_" + _input2;
+	if (_type == SCHEDULE_BOOLEAN_OPERATOR_NOT) return "NOT_" + _input1;
+	if (_type == SCHEDULE_BOOLEAN_OPERATOR_FILE_EXISTS) return "EXISTS_" + _input1;
+	if (_type == SCHEDULE_BOOLEAN_OPERATOR_READ_STAR) return "STAR_" + _input1 + "_" + _input2;
+	if (_type == SCHEDULE_FLOAT_OPERATOR_PLUS) return _input1 + "_PLUS_" + _input2;
+	if (_type == SCHEDULE_FLOAT_OPERATOR_MINUS) return _input1 + "_MINUS_" + _input2;
+	if (_type == SCHEDULE_FLOAT_OPERATOR_MULT) return _input1 + "_MULT_" + _input2;
+	if (_type == SCHEDULE_FLOAT_OPERATOR_DIVIDE) return _input1 + "_DIV_" + _input2;
+	if (_type == SCHEDULE_FLOAT_OPERATOR_INVDIV) return _input2 + "_DIV_" + _input1;
+	if (_type == SCHEDULE_FLOAT_OPERATOR_READ_STAR) return "STAR_" + _input1 + "_" + _input2;
+	if (_type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX) return "STAR_GET_MAX_" + _input1;
+	if (_type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN) return "STAR_GET_MIN_" + _input1;
+	if (_type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_AVG) return "STAR_GET_AVG_" + _input1;
+	if (_type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX_IDX) return "STAR_GET_IDX_MAX" + _input1;
+	if (_type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN_IDX) return "STAR_GET_IDX_MIN" + _input1;
+	if (_type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_IDX) return "STAR_GET_FROM_IDX" + _input1 + "_" + _input2;
+	if (_type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_SORT_IDX) return "STAR_GET_SORTED_IDX" + _input1 + "_" + _input2;
+	if (_type == SCHEDULE_STRING_OPERATOR_TOUCH_FILE) return "TOUCH_" + _input1;
+	if (_type == SCHEDULE_STRING_OPERATOR_COPY_FILE) return "COPY_" + _input1 + "_" + _input2;
+	if (_type == SCHEDULE_STRING_OPERATOR_MOVE_FILE) return "MOVE_" + _input1 + "_" + _input2;
+	if (_type == SCHEDULE_STRING_OPERATOR_DELETE_FILE) return "DELETE_" + _input1;
+	if (_type == SCHEDULE_STRING_OPERATOR_READ_STAR) return "STAR_" + _input1 + "_" + _input2;
+	if (_type == SCHEDULE_WAIT_OPERATOR_SINCE_LAST_TIME) return "WAIT_" + _input1;
+	if (_type == SCHEDULE_EXIT_OPERATOR) return "EXIT";
 	else
-		REPORT_ERROR("ERROR: unrecognised Operator type:" + type);
+		REPORT_ERROR("ERROR: unrecognised Operator type:" + _type);
 
 }
 
@@ -958,7 +958,7 @@ std::map<std::string, SchedulerOperator> Schedule::getCurrentOperators()
 std::string Schedule::addOperator(std::string type, std::string input_name, std::string input2_name, std::string output_name)
 {
 	SchedulerOperator myop(type, input_name, input2_name, output_name);
-	std::string myname = myop.getName();
+	std::string myname = myop.getName(type, input_name, input2_name, output_name);
 	scheduler_global_operators[myname] = myop;
 	return "";
 }

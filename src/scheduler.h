@@ -118,7 +118,7 @@ class SchedulerOperator
 	std::string initialise(std::string _type, std::string _input1="undefined", std::string _input2="undefined", std::string _output="undefined");
 
 	// Generate a meaningful current_name for the operator
-	std::string getName();
+	std::string getName(std::string _type, std::string _input1="undefined", std::string _input2="undefined", std::string _output="undefined");
 
 	// Read a specific value from a STAR file
 	void readFromStarFile() const;
@@ -246,6 +246,11 @@ public:
     void setStringVariableValue(std::string name, std::string val);
     void setStringOriginalVariableValue(std::string name, std::string val);
 
+    std::string getOperatorName(std::string type, std::string input1, std::string input2, std::string output)
+    {
+    	SchedulerOperator op;
+    	return op.getName(type, input1, input2, output);
+    }
     void setOperatorParameters(std::string name, std::string type, std::string input1, std::string input2, std::string output);
     void getOperatorParameters(std::string name, std::string &type, std::string &input1, std::string &input2, std::string &output);
 
