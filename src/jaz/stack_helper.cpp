@@ -418,6 +418,12 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 		REPORT_ERROR("StackHelper::extractMovieStackFS: incompatible gain reference - size is different from "+movieFn);
 	}
 
+	const bool fixDefect = defectMask != 0;
+	if (fixDefect && (w0 != defectMask->xdim || h0 != defectMask->ydim))
+	{
+		REPORT_ERROR("StackHelper::extractMovieStackFS: incompatible defect mask - size is different from "+movieFn);
+	}
+
 	if (verbose)
 	{
 		if (dataInZ) std::cout << "data in Z\n";
@@ -473,6 +479,69 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 		if (verbose) std::cout << (f+1) << "/" << fc << "\n";
 
 		#pragma omp parallel for num_threads(threads_p)
+		for (long int y = 0; y < h0; y++)
+		for (long int x = 0; x < w0; x++)
+		{
+			RFLOAT val = DIRECT_NZYX_ELEM(muGraph.data, 0, 0, y, x);
+			RFLOAT gain = 1.0;
+
+			if (useGain) gain = DIRECT_NZYX_ELEM(gainRef->data, 0, 0, y, x);
+			if (hot > 0.0 && val > hot) val = hot;
+
+			 DIRECT_NZYX_ELEM(muGraph.data, 0, 0, y, x) = -gain * val;
+		}
+
+		if (fixDefect)
+		{
+			RFLOAT frame_mean = 0, frame_std = 0;
+			long long n_valid = 0;
+
+			#pragma omp parallel for reduction(+:frame_mean, n_valid) num_threads(threads_p)
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(muGraph.data) {
+				if (!DIRECT_MULTIDIM_ELEM(*defectMask, n)) continue;
+				frame_mean += DIRECT_MULTIDIM_ELEM(muGraph.data, n);
+				n_valid ++;
+			}
+			frame_mean /=  n_valid;
+
+			#pragma omp parallel for reduction(+:frame_std) num_threads(threads_p)
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(muGraph.data) {
+				if (!DIRECT_MULTIDIM_ELEM(*defectMask, n)) continue;
+				RFLOAT d = (DIRECT_MULTIDIM_ELEM(muGraph.data, n) - frame_mean);
+				frame_std += d * d;
+			}
+			frame_std = std::sqrt(frame_std / n_valid);
+
+			// 25 neighbours; should be enough even for super-resolution images.
+			const int NUM_MIN_OK = 6;
+			const int D_MAX = 2;
+			#pragma omp parallel for num_threads(threads_p)
+			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(muGraph.data)
+			{
+				if (!DIRECT_A2D_ELEM(*defectMask, i, j)) continue;
+
+				int n_ok = 0;
+				RFLOAT val = 0;
+				for (int dy= -D_MAX; dy <= D_MAX; dy++)
+				{
+					int y = i + dy;
+					if (y < 0 || y >= h0) continue;
+					for (int dx = -D_MAX; dx <= D_MAX; dx++)
+					{
+						int x = j + dx;
+						if (x < 0 || x >= w0) continue;
+						if (DIRECT_A2D_ELEM(*defectMask, y, x)) continue;
+
+						n_ok++;
+						val += DIRECT_A2D_ELEM(muGraph.data, y, x);
+					}
+				}
+				if (n_ok > NUM_MIN_OK) DIRECT_A2D_ELEM(muGraph.data, i, j) = val / n_ok;
+				else DIRECT_A2D_ELEM(muGraph.data, i, j) = rnd_gaus(frame_mean, frame_std);
+			}
+		}
+
+		#pragma omp parallel for num_threads(threads_p)
 		for (long p = 0; p < pc; p++)
 		{
 			int tp = omp_get_thread_num();
@@ -521,14 +590,7 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 				if (yy < 0) yy = 0;
 				else if (yy >= h0) yy = h0 - 1;
 
-				RFLOAT val = DIRECT_NZYX_ELEM(muGraph.data, 0, 0, yy, xx);
-				RFLOAT gain = 1.0;
-
-				if (useGain) gain = DIRECT_NZYX_ELEM(gainRef->data, 0, 0, yy, xx);
-
-				if (hot > 0.0 && val > hot) val = hot;
-
-				DIRECT_NZYX_ELEM(aux0[t].data, 0, 0, y, x) = -gain * val;
+				DIRECT_NZYX_ELEM(aux0[t].data, 0, 0, y, x) = DIRECT_NZYX_ELEM(muGraph.data, 0, 0, yy, xx);
 			}
 
 			if (outPs == moviePs)
