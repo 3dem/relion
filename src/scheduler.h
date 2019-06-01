@@ -24,6 +24,7 @@
 #include "src/time.h"
 #include "src/pipeliner.h"
 #include "src/jaz/obs_model.h"
+#define SCHEDULE_HAS_CHANGED ".schedule_has_changed";
 
 class SchedulerFloatVariable
 {
@@ -94,6 +95,11 @@ bool isOperator(std::string name);
 #define SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN_IDX "float_op_star_table_min_idx"
 #define SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_IDX "float_op_star_table_idx"
 #define SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_SORT_IDX "float_op_star_table_sort_idx"
+#define SCHEDULE_STRING_OPERATOR_JOIN "string_op_join"
+#define SCHEDULE_STRING_OPERATOR_BEFORE_FIRST "string_op_before_first"
+#define SCHEDULE_STRING_OPERATOR_AFTER_FIRST "string_op_after_first"
+#define SCHEDULE_STRING_OPERATOR_BEFORE_LAST "string_op_before_last"
+#define SCHEDULE_STRING_OPERATOR_AFTER_LAST "string_op_after_last"
 #define SCHEDULE_STRING_OPERATOR_TOUCH_FILE "string_op_touch_file"
 #define SCHEDULE_STRING_OPERATOR_COPY_FILE "string_op_copy_file"
 #define SCHEDULE_STRING_OPERATOR_MOVE_FILE "string_op_move_file"
@@ -118,7 +124,7 @@ class SchedulerOperator
 	std::string initialise(std::string _type, std::string _input1="undefined", std::string _input2="undefined", std::string _output="undefined");
 
 	// Generate a meaningful current_name for the operator
-	std::string getName(std::string _type, std::string _input1="undefined", std::string _input2="undefined", std::string _output="undefined");
+	std::string getName();
 
 	// Read a specific value from a STAR file
 	void readFromStarFile() const;
@@ -158,18 +164,18 @@ class SchedulerJob
 class SchedulerEdge
 {
 	public:
-	std::string inputNode, outputNode, outputNodeFalse;
+	std::string inputNode, outputNode, outputNodeTrue;
 	std::string myBooleanVariable;
 	bool is_fork;
 
 	std::string getOutputNode() const;
 
-	SchedulerEdge(std::string _input, std::string _output, bool _is_fork, std::string _mybool, std::string _output_if_false)
+	SchedulerEdge(std::string _input, std::string _output, bool _is_fork, std::string _mybool, std::string _output_if_true)
 	{
 		inputNode = _input;
 		outputNode= _output;
 		is_fork = _is_fork;
-		outputNodeFalse = _output_if_false;
+		outputNodeTrue = _output_if_true;
 		myBooleanVariable = _mybool;
 	}
 
@@ -178,7 +184,7 @@ class SchedulerEdge
 		inputNode = _input;
 		outputNode= _output;
 		is_fork = false;
-		outputNodeFalse = "undefined";
+		outputNodeTrue = "undefined";
 		myBooleanVariable = "undefined";
 	}
 
@@ -190,8 +196,8 @@ class Schedule
 
 public:
 
-	std::string current_node, original_start_node;
-	std::string name, email_address;
+	std::string name, current_node, original_start_node, email_address, previous_node;
+	bool do_read_only;
 
 	std::map<std::string, SchedulerJob> jobs;
 	std::vector<SchedulerEdge> edges;
@@ -213,17 +219,16 @@ public:
 		schedule_pipeline.setName(_name + "schedule");
 	}
 
-	void read(FileName fn = "");
 
-	void write(FileName fn = "");
+	void read(bool do_lock = false, FileName fn = "");
+
+	bool isWriteLocked();
+	void write(bool do_lock = false, FileName fn = "");
 
     void reset();
 
     void setCurrentNode(std::string _name);
     void setOriginalStartNode(std::string _name);
-
-    bool gotoNextNode();
-    bool gotoNextJob();
 
 	bool isNode(std::string name);
 	bool isJob(std::string name);
@@ -248,8 +253,8 @@ public:
 
     std::string getOperatorName(std::string type, std::string input1, std::string input2, std::string output)
     {
-    	SchedulerOperator op;
-    	return op.getName(type, input1, input2, output);
+    	SchedulerOperator op(type, input1, input2, output);
+    	return op.getName();
     }
     void setOperatorParameters(std::string name, std::string type, std::string input1, std::string input2, std::string output);
     void getOperatorParameters(std::string name, std::string &type, std::string &input1, std::string &input2, std::string &output);
@@ -269,7 +274,9 @@ public:
     void addStringVariable(std::string name, FileName value);
 
     // Add operators (of any kind), also adds its corresponding node
-    std::string addOperator(std::string type, std::string input_name, std::string input2_name, std::string output_name);
+    SchedulerOperator initialiseOperator(std::string type, std::string input_name, std::string input2_name,
+    		std::string output_name, std::string &error_message);
+    void addOperator(SchedulerOperator &op);
 
     // Add a new job, also adds its corresponding node
     void addJob(RelionJob &myjob, std::string jobname, std::string mode);
@@ -280,6 +287,7 @@ public:
     void removeVariable(std::string name);
     void removeOperator(std::string name);
     void removeJob(std::string name);
+    void removeEdge(int idx);
 
 
     void sendEmail(std::string message);
@@ -290,6 +298,9 @@ public:
 
     // Test integrity of the Schedule. Warn for unused variables, nodes, etc.
     bool isValid();
+
+    bool gotoNextNode();
+    bool gotoNextJob();
 
     // This function fixes the dependency of newly generated jobs, as determined by the pipeline_schedule
     RelionJob copyNewJobFromSchedulePipeline(FileName original_job_name);

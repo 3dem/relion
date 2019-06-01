@@ -90,7 +90,12 @@ std::string SchedulerOperator::initialise(std::string _type, std::string _input1
 		 type == SCHEDULE_STRING_OPERATOR_COPY_FILE ||
 		 type == SCHEDULE_STRING_OPERATOR_MOVE_FILE ||
 		 type == SCHEDULE_STRING_OPERATOR_DELETE_FILE ||
-		 type == SCHEDULE_STRING_OPERATOR_READ_STAR
+		 type == SCHEDULE_STRING_OPERATOR_READ_STAR ||
+		 type == SCHEDULE_STRING_OPERATOR_JOIN ||
+		 type == SCHEDULE_STRING_OPERATOR_BEFORE_FIRST ||
+		 type == SCHEDULE_STRING_OPERATOR_AFTER_FIRST ||
+		 type == SCHEDULE_STRING_OPERATOR_BEFORE_LAST ||
+		 type == SCHEDULE_STRING_OPERATOR_AFTER_LAST
 		 )	&& ! isStringVariable(_output))
 		return "ERROR: string operator does not have valid string output: " + _output;
 
@@ -105,20 +110,25 @@ std::string SchedulerOperator::initialise(std::string _type, std::string _input1
 		 type == SCHEDULE_FLOAT_OPERATOR_INVDIV
 		 ) && !isFloatVariable(_input1))
 		return "ERROR: float operator does not have valid float input1: " + _input1;
-	if ((type == SCHEDULE_BOOLEAN_OPERATOR_FILE_EXISTS ||
-		 type == SCHEDULE_STRING_OPERATOR_COPY_FILE ||
-		 type == SCHEDULE_STRING_OPERATOR_MOVE_FILE ||
+	if ((type == SCHEDULE_BOOLEAN_OPERATOR_READ_STAR ||
+		 type == SCHEDULE_BOOLEAN_OPERATOR_FILE_EXISTS ||
 		 type == SCHEDULE_FLOAT_OPERATOR_COUNT_IMAGES ||
-		 type == SCHEDULE_BOOLEAN_OPERATOR_READ_STAR ||
 		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR ||
-		 type == SCHEDULE_STRING_OPERATOR_READ_STAR ||
 		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX ||
 		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN ||
 		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_AVG ||
 		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX_IDX ||
 		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN_IDX ||
 		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_IDX ||
-		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_SORT_IDX
+		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_SORT_IDX ||
+		 type == SCHEDULE_STRING_OPERATOR_COPY_FILE ||
+		 type == SCHEDULE_STRING_OPERATOR_MOVE_FILE ||
+		 type == SCHEDULE_STRING_OPERATOR_READ_STAR ||
+		 type == SCHEDULE_STRING_OPERATOR_JOIN ||
+		 type == SCHEDULE_STRING_OPERATOR_BEFORE_FIRST ||
+		 type == SCHEDULE_STRING_OPERATOR_AFTER_FIRST ||
+		 type == SCHEDULE_STRING_OPERATOR_BEFORE_LAST ||
+		 type == SCHEDULE_STRING_OPERATOR_AFTER_LAST
 		 ) && ! isStringVariable(_input1))
 		return "ERROR: operator does not have valid string input1: " + _input1;
 
@@ -254,16 +264,11 @@ void  SchedulerOperator::readFromStarFile() const
 
 bool SchedulerOperator::performOperation() const
 {
-
 	RFLOAT val2;
 	if (isFloatVariable(input2))
-	{
 		val2 = scheduler_global_floats[input2].value;
-	}
-	else
-	{
-		int res = sscanf(input2.c_str(), "%f", &val2);
-	}
+	else if (isNumber(input2))
+		val2 = textToFloat(input2);
 
 	if (type == SCHEDULE_BOOLEAN_OPERATOR_AND)
 	{
@@ -335,6 +340,31 @@ bool SchedulerOperator::performOperation() const
 		ObservationModel::loadSafely(scheduler_global_strings[input1].value, obsmodel, MDimg, mytablename);
 		scheduler_global_floats[output].value = MDimg.numberOfObjects();
 	}
+	else if (type == SCHEDULE_STRING_OPERATOR_JOIN)
+	{
+		std::string myval2 = (isStringVariable(input2)) ? scheduler_global_strings[input2].value : input2;
+		scheduler_global_strings[output].value = scheduler_global_strings[input1].value + myval2;
+	}
+	else if (type == SCHEDULE_STRING_OPERATOR_BEFORE_FIRST)
+	{
+		std::string myval2 = (isStringVariable(input2)) ? scheduler_global_strings[input2].value : input2;
+		scheduler_global_strings[output].value = scheduler_global_strings[input1].value.beforeFirstOf(myval2);
+	}
+	else if (type == SCHEDULE_STRING_OPERATOR_AFTER_FIRST)
+	{
+		std::string myval2 = (isStringVariable(input2)) ? scheduler_global_strings[input2].value : input2;
+		scheduler_global_strings[output].value = scheduler_global_strings[input1].value.afterFirstOf(myval2);
+	}
+	else if (type == SCHEDULE_STRING_OPERATOR_BEFORE_LAST)
+	{
+		std::string myval2 = (isStringVariable(input2)) ? scheduler_global_strings[input2].value : input2;
+		scheduler_global_strings[output].value = scheduler_global_strings[input1].value.beforeLastOf(myval2);
+	}
+	else if (type == SCHEDULE_STRING_OPERATOR_AFTER_LAST)
+	{
+		std::string myval2 = (isStringVariable(input2)) ? scheduler_global_strings[input2].value : input2;
+		scheduler_global_strings[output].value = scheduler_global_strings[input1].value.afterLastOf(myval2);
+	}
 	else if (type == SCHEDULE_STRING_OPERATOR_TOUCH_FILE)
 	{
 		std::cout << " Touching file " << scheduler_global_strings[output].value << std::endl;
@@ -370,7 +400,7 @@ bool SchedulerOperator::performOperation() const
 	}
 	else if (type == SCHEDULE_EXIT_OPERATOR)
 	{
-		std::cout << " The schedule has reached an exit point, stopping now ...";
+		std::cout << " The schedule has reached an exit point ..." << std::endl;
 		return false; // to exit the schedule
 	}
 	else
@@ -380,53 +410,60 @@ bool SchedulerOperator::performOperation() const
 }
 
 
-std::string SchedulerOperator::getName(std::string _type, std::string _input1, std::string _input2, std::string _output)
+std::string SchedulerOperator::getName()
 {
-	if (_type == SCHEDULE_BOOLEAN_OPERATOR_GT) return _input1 + "_GT_" + _input2;
-	if (_type == SCHEDULE_BOOLEAN_OPERATOR_LT) return _input1 + "_LT_" + _input2;
-	if (_type == SCHEDULE_BOOLEAN_OPERATOR_EQ) return _input1 + "_EQ_" + _input2;
-	if (_type == SCHEDULE_BOOLEAN_OPERATOR_AND) return _input1 + "_AND_" + _input2;
-	if (_type == SCHEDULE_BOOLEAN_OPERATOR_OR) return _input1 + "_OR_" + _input2;
-	if (_type == SCHEDULE_BOOLEAN_OPERATOR_NOT) return "NOT_" + _input1;
-	if (_type == SCHEDULE_BOOLEAN_OPERATOR_FILE_EXISTS) return "EXISTS_" + _input1;
-	if (_type == SCHEDULE_BOOLEAN_OPERATOR_READ_STAR) return "STAR_" + _input1 + "_" + _input2;
-	if (_type == SCHEDULE_FLOAT_OPERATOR_PLUS) return _input1 + "_PLUS_" + _input2;
-	if (_type == SCHEDULE_FLOAT_OPERATOR_MINUS) return _input1 + "_MINUS_" + _input2;
-	if (_type == SCHEDULE_FLOAT_OPERATOR_MULT) return _input1 + "_MULT_" + _input2;
-	if (_type == SCHEDULE_FLOAT_OPERATOR_DIVIDE) return _input1 + "_DIV_" + _input2;
-	if (_type == SCHEDULE_FLOAT_OPERATOR_INVDIV) return _input2 + "_DIV_" + _input1;
-	if (_type == SCHEDULE_FLOAT_OPERATOR_READ_STAR) return "STAR_" + _input1 + "_" + _input2;
-	if (_type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX) return "STAR_GET_MAX_" + _input1;
-	if (_type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN) return "STAR_GET_MIN_" + _input1;
-	if (_type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_AVG) return "STAR_GET_AVG_" + _input1;
-	if (_type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX_IDX) return "STAR_GET_IDX_MAX" + _input1;
-	if (_type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN_IDX) return "STAR_GET_IDX_MIN" + _input1;
-	if (_type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_IDX) return "STAR_GET_FROM_IDX" + _input1 + "_" + _input2;
-	if (_type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_SORT_IDX) return "STAR_GET_SORTED_IDX" + _input1 + "_" + _input2;
-	if (_type == SCHEDULE_STRING_OPERATOR_TOUCH_FILE) return "TOUCH_" + _input1;
-	if (_type == SCHEDULE_STRING_OPERATOR_COPY_FILE) return "COPY_" + _input1 + "_" + _input2;
-	if (_type == SCHEDULE_STRING_OPERATOR_MOVE_FILE) return "MOVE_" + _input1 + "_" + _input2;
-	if (_type == SCHEDULE_STRING_OPERATOR_DELETE_FILE) return "DELETE_" + _input1;
-	if (_type == SCHEDULE_STRING_OPERATOR_READ_STAR) return "STAR_" + _input1 + "_" + _input2;
-	if (_type == SCHEDULE_WAIT_OPERATOR_SINCE_LAST_TIME) return "WAIT_" + _input1;
-	if (_type == SCHEDULE_EXIT_OPERATOR) return "EXIT";
+	if (type == SCHEDULE_BOOLEAN_OPERATOR_GT) return input1 + "_GT_" + input2;
+	if (type == SCHEDULE_BOOLEAN_OPERATOR_LT) return input1 + "_LT_" + input2;
+	if (type == SCHEDULE_BOOLEAN_OPERATOR_EQ) return input1 + "_EQ_" + input2;
+	if (type == SCHEDULE_BOOLEAN_OPERATOR_AND) return input1 + "_AND_" + input2;
+	if (type == SCHEDULE_BOOLEAN_OPERATOR_OR) return input1 + "_OR_" + input2;
+	if (type == SCHEDULE_BOOLEAN_OPERATOR_NOT) return "NOT_" + input1;
+	if (type == SCHEDULE_BOOLEAN_OPERATOR_FILE_EXISTS) return "EXISTS_" + input1;
+	if (type == SCHEDULE_BOOLEAN_OPERATOR_READ_STAR) return "STAR_" + input1 + "_" + input2;
+	if (type == SCHEDULE_FLOAT_OPERATOR_PLUS) return input1 + "_PLUS_" + input2;
+	if (type == SCHEDULE_FLOAT_OPERATOR_MINUS) return input1 + "_MINUS_" + input2;
+	if (type == SCHEDULE_FLOAT_OPERATOR_MULT) return input1 + "_MULT_" + input2;
+	if (type == SCHEDULE_FLOAT_OPERATOR_DIVIDE) return input1 + "_DIV_" + input2;
+	if (type == SCHEDULE_FLOAT_OPERATOR_INVDIV) return input2 + "_DIV_" + input1;
+	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR) return "STAR_" + input1 + "_" + input2;
+	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX) return "STAR_GET_MAX_" + input1;
+	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN) return "STAR_GET_MIN_" + input1;
+	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_AVG) return "STAR_GET_AVG_" + input1;
+	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX_IDX) return "STAR_GET_IDX_MAX" + input1;
+	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN_IDX) return "STAR_GET_IDX_MIN" + input1;
+	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_IDX) return "STAR_GET_FROM_IDX" + input1 + "_" + input2;
+	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_SORT_IDX) return "STAR_GET_SORTED_IDX" + input1 + "_" + input2;
+	if (type == SCHEDULE_STRING_OPERATOR_JOIN) return "JOIN_" + input1 + "_" + input2;
+	if (type == SCHEDULE_STRING_OPERATOR_BEFORE_FIRST) return "BEF_FIRST_" + input1 + "_" + input2;
+	if (type == SCHEDULE_STRING_OPERATOR_AFTER_FIRST) return "AFT_FIRST_" + input1 + "_" + input2;
+	if (type == SCHEDULE_STRING_OPERATOR_BEFORE_LAST) return "BEF_LAST_" + input1 + "_" + input2;
+	if (type == SCHEDULE_STRING_OPERATOR_AFTER_LAST) return "AFT_LAST_" + input1 + "_" + input2;
+	if (type == SCHEDULE_STRING_OPERATOR_TOUCH_FILE) return "TOUCH_" + input1;
+	if (type == SCHEDULE_STRING_OPERATOR_COPY_FILE) return "COPY_" + input1 + "_" + input2;
+	if (type == SCHEDULE_STRING_OPERATOR_MOVE_FILE) return "MOVE_" + input1 + "_" + input2;
+	if (type == SCHEDULE_STRING_OPERATOR_DELETE_FILE) return "DELETE_" + input1;
+	if (type == SCHEDULE_STRING_OPERATOR_READ_STAR) return "STAR_" + input1 + "_" + input2;
+	if (type == SCHEDULE_WAIT_OPERATOR_SINCE_LAST_TIME) return "WAIT_" + input1;
+	if (type == SCHEDULE_EXIT_OPERATOR) return "EXIT";
 	else
-		REPORT_ERROR("ERROR: unrecognised Operator type:" + _type);
+		REPORT_ERROR("ERROR: unrecognised Operator type:" + type);
 
 }
 
 std::string SchedulerEdge::getOutputNode() const
 {
-	if (is_fork) return (scheduler_global_bools[myBooleanVariable].value) ?  outputNode : outputNodeFalse;
+	if (is_fork) return (scheduler_global_bools[myBooleanVariable].value) ?  outputNodeTrue : outputNode;
 	else return outputNode;
 }
 
 void Schedule::clear()
 {
 	current_node = "undefined";
+	previous_node = "undefined";
 	original_start_node = "undefined";
 	name = "undefined";
 	email_address = "undefined";
+	do_read_only = false;
 	scheduler_global_bools.clear();
 	scheduler_global_floats.clear();
 	scheduler_global_strings.clear();
@@ -448,8 +485,58 @@ std::string Schedule::findJobByCurrentName(std::string _name)
 	return "";
 }
 
-void Schedule::read(FileName fn)
+void Schedule::read(bool do_lock, FileName fn)
 {
+
+#ifdef DEBUG_LOCK
+	std::cerr << "entering read lock_message=" << lock_message << std::endl;
+#endif
+	FileName name_wo_dir = name;
+	name_wo_dir = name_wo_dir.beforeLastOf("/");
+	FileName dir_lock=".relion_lock_schedule_" + name_wo_dir.afterLastOf("/"), fn_lock=dir_lock + "/lock_schedule";;
+	if (do_lock && !do_read_only)
+	{
+		int iwait =0;
+		int status = mkdir(dir_lock.c_str(), S_IRWXU);
+
+#ifdef DEBUG_LOCK
+		std::cerr <<  " A status= " << status << std::endl;
+#endif
+		while (!status == 0)
+		{
+			if (errno == EACCES) // interestingly, not EACCESS!
+				REPORT_ERROR("ERROR: Schedule::read cannot create a lock directory " + dir_lock + ". You don't have write permission to this project. If you want to look at other's project directory (but run nothing there), please start RELION with --readonly.");
+
+			// If the lock exists: wait 3 seconds and try again
+			// First time round, print a warning message
+			if (iwait == 0)
+			{
+				std::cout << " WARNING: trying to read schedule.star, but directory " << dir_lock << " exists (which protects against simultaneous writing)" << std::endl;
+			}
+			sleep(3);
+			status =  mkdir(dir_lock.c_str(), S_IRWXU);
+#ifdef DEBUG_LOCK
+			std::cerr <<  " B status= " << status << std::endl;
+#endif
+
+			iwait++;
+			if (iwait > 40)
+			{
+
+				REPORT_ERROR("ERROR: Schedule::read has waited for 2 minutes for lock directory to disappear. Make sure this scheduler is not running, and then manually remove the file: " + fn_lock);
+			}
+
+		}
+		// Generate the lock file
+		std::ofstream  fh;
+	    fh.open(fn_lock.c_str(), std::ios::out);
+	    if (!fh)
+	        REPORT_ERROR( (std::string)"ERROR: Cannot open file: " + fn_lock);
+	    std::string lock_message = "lock mechanism from Scheduler";
+	    fh << lock_message << std::endl;
+	    fh.close();
+	}
+
 	if (fn == "") fn = name + "schedule.star";
 
 	// Clear current model
@@ -463,12 +550,10 @@ void Schedule::read(FileName fn)
 	// For reading: do the nodes before the general table, in order to set current_node and original_start_node
 	MetaDataTable MD;
 	MD.readStar(in, "schedule_general");
-	std::string current_node_name, original_start_node_name;
 	MD.getValue(EMDL_SCHEDULE_GENERAL_NAME, name);
 	MD.getValue(EMDL_SCHEDULE_GENERAL_CURRENT_NODE, current_node);
 	MD.getValue(EMDL_SCHEDULE_GENERAL_ORIGINAL_START_NODE, original_start_node);
 	MD.getValue(EMDL_SCHEDULE_GENERAL_EMAIL, email_address);
-
 	MD.clear();
 
 	MD.readStar(in, "schedule_floats");
@@ -547,16 +632,16 @@ void Schedule::read(FileName fn)
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
 	{
 		int number;
-		std::string inputname, outputname, outputname_false, bool_name;
+		std::string inputname, outputname, outputname_true, bool_name;
 		bool is_fork;
 
 		MD.getValue(EMDL_SCHEDULE_EDGE_NUMBER, number);
 		MD.getValue(EMDL_SCHEDULE_EDGE_INPUT, inputname);
 		MD.getValue(EMDL_SCHEDULE_EDGE_OUTPUT, outputname);
 		MD.getValue(EMDL_SCHEDULE_EDGE_IS_FORK, is_fork);
-		MD.getValue(EMDL_SCHEDULE_EDGE_OUTPUT_FALSE, outputname_false);
+		MD.getValue(EMDL_SCHEDULE_EDGE_OUTPUT_TRUE, outputname_true);
 		MD.getValue(EMDL_SCHEDULE_EDGE_BOOLEAN, bool_name);
-		SchedulerEdge myval(inputname, outputname, is_fork, bool_name, outputname_false);
+		SchedulerEdge myval(inputname, outputname, is_fork, bool_name, outputname_true);
 		edges.push_back(myval);
 	}
 	MD.clear();
@@ -569,9 +654,50 @@ void Schedule::read(FileName fn)
 
 }
 
-
-void Schedule::write(FileName fn)
+bool Schedule::isWriteLocked()
 {
+	FileName name_wo_dir = name;
+	name_wo_dir = name_wo_dir.beforeLastOf("/");
+	FileName dir_lock=".relion_lock_schedule_" + name_wo_dir.afterLastOf("/"), fn_lock=dir_lock + "/lock_schedule";;
+	return exists(dir_lock);
+}
+
+void Schedule::write(bool do_lock, FileName fn)
+{
+
+	if (do_read_only)
+		return;
+
+	FileName name_wo_dir = name;
+	name_wo_dir = name_wo_dir.beforeLastOf("/");
+	FileName dir_lock=".relion_lock_schedule_" + name_wo_dir.afterLastOf("/"), fn_lock=dir_lock + "/lock_schedule";;
+	if (do_lock)
+	{
+
+#ifdef DEBUG_LOCK
+		if (exists(fn_lock))
+		{
+			std::cerr << "writing pipeline: " << fn_lock << " exists as expected" << std::endl;
+		}
+#endif
+
+		int iwait =0;
+		while( !exists(fn_lock) )
+		{
+			// If the lock exists: wait 3 seconds and try again
+			// First time round, print a warning message
+			if (iwait == 0)
+			{
+				std::cerr << " WARNING: was expecting a file called "+fn_lock+ " but it isn't there. Will wait for 1 minute to see whether it appears" << std::endl;
+			}
+			sleep(3);
+			iwait++;
+			if (iwait > 40)
+			{
+				REPORT_ERROR("ERROR: PipeLine::write has waited for 2 minutes for lock file to appear, but it doesn't....");
+			}
+		}
+	}
 
 	if (fn == "") fn = name + "schedule.star";
 
@@ -685,17 +811,8 @@ void Schedule::write(FileName fn)
 			MD.setValue(EMDL_SCHEDULE_EDGE_INPUT, edges[i].inputNode);
 			MD.setValue(EMDL_SCHEDULE_EDGE_OUTPUT, edges[i].outputNode);
 			MD.setValue(EMDL_SCHEDULE_EDGE_IS_FORK, edges[i].is_fork);
-
-			if (edges[i].is_fork)
-			{
-				MD.setValue(EMDL_SCHEDULE_EDGE_OUTPUT_FALSE, edges[i].outputNodeFalse);
-				MD.setValue(EMDL_SCHEDULE_EDGE_BOOLEAN, edges[i].myBooleanVariable);
-			}
-			else
-			{
-				MD.setValue(EMDL_SCHEDULE_EDGE_OUTPUT_FALSE, str_aux);
-				MD.setValue(EMDL_SCHEDULE_EDGE_BOOLEAN, str_aux);
-			}
+			MD.setValue(EMDL_SCHEDULE_EDGE_OUTPUT_TRUE, edges[i].outputNodeTrue);
+			MD.setValue(EMDL_SCHEDULE_EDGE_BOOLEAN, edges[i].myBooleanVariable);
 		}
 		MD.write(fh);
 	}
@@ -705,6 +822,26 @@ void Schedule::write(FileName fn)
 
 	// Also write out the schedule_pipeline (no need to lock now?)
 	schedule_pipeline.write();
+
+	if (do_lock)
+	{
+
+#ifdef DEBUG_LOCK
+		std::cerr << " write schedule: now deleting " << fn_lock << std::endl;
+#endif
+
+		if (!exists(fn_lock))
+			REPORT_ERROR("ERROR: Schedule::write was expecting a file called "+fn_lock+ " but it is no longer there.");
+		if (std::remove(fn_lock.c_str()))
+			REPORT_ERROR("ERROR: Schedule::write reported error in removing file "+fn_lock);
+		if (rmdir(dir_lock.c_str()))
+			REPORT_ERROR("ERROR: Schedule::write reported error in removing directory "+dir_lock);
+	}
+
+	// Touch a file to indicate to the GUI that the pipeline has just changed
+	FileName mychanged = name+SCHEDULE_HAS_CHANGED;
+	touch(mychanged);
+
 
 }
 
@@ -740,49 +877,6 @@ void Schedule::reset()
     }
 
     current_node = "undefined";
-}
-
-bool Schedule::gotoNextNode()
-{
-    if (current_node == "undefined")
-    {
-        if (original_start_node == "undefined")
-        	REPORT_ERROR("ERROR: the starting node was not defined...");
-    	current_node = original_start_node; // go to first node in the list
-        std::cout << " Setting current_node to original_start_node: " << original_start_node << std::endl;
-    	return true;
-    }
-
-    for (int i = 0; i < edges.size(); i++)
-    {
-        if (edges[i].inputNode == current_node)
-        {
-            current_node = edges[i].getOutputNode();
-            return (current_node == "undefined") ? false : true;
-        }
-    }
-
-    return false;
-}
-
-bool Schedule::gotoNextJob()
-{
-
-    // This loops through the next Nodes until encountering a JOB
-    while (gotoNextNode())
-    {
-
-    	if (isOperator(current_node))
-    	{
-    		return scheduler_global_operators[current_node].performOperation();
-		}
-		else // this is a job, get its current_name and options
-		{
-            return true;
-        }
-    }
-
-    return false;
 }
 
 bool Schedule::isNode(std::string _name)
@@ -955,12 +1049,19 @@ std::map<std::string, SchedulerOperator> Schedule::getCurrentOperators()
 	return scheduler_global_operators;
 }
 
-std::string Schedule::addOperator(std::string type, std::string input_name, std::string input2_name, std::string output_name)
+SchedulerOperator Schedule::initialiseOperator(std::string type, std::string input_name, std::string input2_name,
+		std::string output_name, std::string &error_message)
 {
-	SchedulerOperator myop(type, input_name, input2_name, output_name);
-	std::string myname = myop.getName(type, input_name, input2_name, output_name);
+	SchedulerOperator myop;
+	error_message = myop.initialise(type, input_name, input2_name, output_name);
+	return myop;
+}
+
+
+void Schedule::addOperator(SchedulerOperator &myop)
+{
+	std::string myname = myop.getName();
 	scheduler_global_operators[myname] = myop;
-	return "";
 }
 
 void Schedule::addJob(RelionJob &myjob, std::string jobname, std::string mode)
@@ -1012,6 +1113,10 @@ void Schedule::removeJob(std::string name)
 {
 }
 
+void Schedule::removeEdge(int idx)
+{
+	edges.erase(edges.begin()+idx);
+}
 
 void Schedule::sendEmail(std::string message)
 {
@@ -1029,9 +1134,9 @@ void Schedule::addEdge(std::string inputnode_name, std::string outputnode_name)
 	edges.push_back(myval);
 }
 
-void Schedule::addFork(std::string inputnode_name, std::string mybool_name, std::string outputnode_name, std::string outputnode_name_if_false)
+void Schedule::addFork(std::string inputnode_name, std::string mybool_name, std::string outputnode_name_if_true, std::string outputnode_name)
 {
-	SchedulerEdge myval(inputnode_name, outputnode_name, true, mybool_name, outputnode_name_if_false);
+	SchedulerEdge myval(inputnode_name, outputnode_name, true, mybool_name, outputnode_name_if_true);
 	edges.push_back(myval);
 }
 
@@ -1043,6 +1148,64 @@ bool Schedule::isValid()
 
 	// Check Scheduler ends with an exit
 
+}
+
+bool Schedule::gotoNextNode()
+{
+    if (current_node == "undefined")
+    {
+        if (original_start_node == "undefined")
+               REPORT_ERROR("ERROR: the starting node was not defined...");
+        current_node = original_start_node; // go to first node in the list
+        std::cout << " Setting current_node to original_start_node: " << original_start_node << std::endl;
+        // Write out current status
+    	write();
+        return true;
+    }
+
+    for (int i = 0; i < edges.size(); i++)
+    {
+        if (edges[i].inputNode == current_node)
+        {
+            previous_node = current_node; // save previous node for abort mechanism: step one node back!
+        	current_node = edges[i].getOutputNode();
+            std::cout << " Setting current node to: " << current_node << std::endl;
+            // Write out current status, but maintain lock on the directory with immediate read!
+        	write();
+            return (current_node == "undefined") ? false : true;
+        }
+    }
+
+    return false;
+}
+
+bool Schedule::gotoNextJob()
+{
+
+	// This loops through the next Nodes until encountering a JOB
+    while (gotoNextNode())
+    {
+
+		if (pipeline_control_check_abort_job())
+		{
+			// Set the current node one step back to re-start this process where it was aborted
+			current_node = previous_node;
+			write(DO_LOCK);
+			exit(RELION_EXIT_ABORTED);
+		}
+
+    	if (isOperator(current_node))
+    	{
+    		bool op_success = scheduler_global_operators[current_node].performOperation();
+    		if (!op_success) return false;
+		}
+		else // this is a job, get its current_name and options
+		{
+            return true;
+        }
+    }
+
+    return false;
 }
 
 RelionJob Schedule::copyNewJobFromSchedulePipeline(FileName original_job_name)
@@ -1135,7 +1298,8 @@ void Schedule::setVariablesInJob(RelionJob &job, FileName original_job_name)
 void Schedule::run(PipeLine &pipeline)
 {
     // go through all nodes
-    while (gotoNextJob())
+    bool is_ok = true;
+	while (gotoNextJob())
     {
         RelionJob myjob;
         bool is_continue, do_overwrite_current, dummy;
@@ -1153,6 +1317,7 @@ void Schedule::run(PipeLine &pipeline)
 
         	// Set the current_name of the current node now
         	jobs[current_node].current_name = pipeline.processList[current_job].name;
+    		std::cout << " Creating new Job: " << jobs[current_node].current_name << " from node " << current_node << std::endl;
     	}
     	else if (jobs[current_node].mode == SCHEDULE_NODE_JOB_MODE_CONTINUE || jobs[current_node].mode == SCHEDULE_NODE_JOB_MODE_OVERWRITE)
     	{
@@ -1188,6 +1353,7 @@ void Schedule::run(PipeLine &pipeline)
 
 		// Now actually run the Scheduled job
 		std::string error_message;
+		std::cout << " Executing Job: " << jobs[current_node].current_name << std::endl;
 		if (!pipeline.runJob(myjob, current_job, false, is_continue, true, do_overwrite_current, error_message))
 			REPORT_ERROR(error_message);
 
@@ -1196,67 +1362,35 @@ void Schedule::run(PipeLine &pipeline)
 		bool is_aborted = false;
 		pipeline.waitForJobToFinish(current_job, is_failure, is_aborted);
 
+
 		std::string message = "";
 		if (is_failure) message = " Stopping schedule due to job " + jobs[current_node].current_name + " failing with an error ...";
 		else if (is_aborted) message = " Stopping schedule due to user abort of job " + jobs[current_node].current_name + " ...";
 		if (message != "")
 		{
+			// Step one step back
+			current_node = previous_node;
 			sendEmail(message);
 			std::cerr << message << std::endl;
+			is_ok = false;
 			break;
 		}
 		else
 		{
 			// job finished successfully, write out the updated scheduler file
 			jobs[current_node].job_has_started = true;
-			write();
 		}
     } // end while gotoNextJob
 
-    sendEmail("Finished successfully!");
-    std::cout << " Scheduler " << name << " has finished now... " << std::endl;
+    if (is_ok) sendEmail("Finished successfully!");
+    std::cout << " Scheduler " << name << " stops now... " << std::endl;
+
 }
 
 void Schedule::abort()
 {
-    // TODO: make an abort mechanism with a touch file, specific for the Scheduler!!
-
-	// TODO: also make a mechanism that the same scheduler cannot be run twice simultaneously!
-
-
-
-
-    /*
-	// Abort by aborting the current job
-	FileName job_name, original_job_name, mode;
-    bool has_done = false, has_started = false;
-
-    // Go to the next job in the Schedule (starting from current_job)
-    // Place an abort in each of the Jobs directories
-    gotoNextJob(job_name, original_job_name, mode, has_started);
-    int current_job = pipeline.findProcessByName(job_name);
-    if (pipeline.processList[current_job].status == PROC_RUNNING)
-    {
-        has_done = true;
-    	touch(processList[current_job].current_name + RELION_JOB_ABORT_NOW);
-        std::cout << " Marking job " << processList[current_job].current_name << " for abortion; schedule should abort too ... " << std::endl;
-    }
-
-
-    while ()
-    {
-        int current_job = findProcessByName(job_name);
-        if (processList[current_job].status == PROC_RUNNING)
-        {
-            has_done = true;
-        	touch(processList[current_job].current_name + RELION_JOB_ABORT_NOW);
-            std::cout << " Marking job " << processList[current_job].current_name << " for abortion; schedule should abort too ... " << std::endl;
-        }
-    }
-
-    if (!has_done)
-    	std::cout << " This schedule seems to have finished already ..." << std::endl;
-	*/
-
+	std::cerr << " Aborting schedule while at: " << current_node << std::endl;
+	if (isJob(current_node)) touch(jobs[current_node].current_name + RELION_JOB_ABORT_NOW);
+	touch(name + RELION_JOB_ABORT_NOW);
 }
 

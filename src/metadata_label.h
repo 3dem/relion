@@ -467,7 +467,7 @@ enum EMDLabel
 	EMDL_SCHEDULE_EDGE_INPUT,
 	EMDL_SCHEDULE_EDGE_OUTPUT,
 	EMDL_SCHEDULE_EDGE_IS_FORK,
-	EMDL_SCHEDULE_EDGE_OUTPUT_FALSE,
+	EMDL_SCHEDULE_EDGE_OUTPUT_TRUE,
 	EMDL_SCHEDULE_EDGE_BOOLEAN,
 	EMDL_SCHEDULE_GENERAL_CURRENT_NODE,
 	EMDL_SCHEDULE_GENERAL_ORIGINAL_START_NODE,
@@ -993,7 +993,7 @@ private:
 		EMDL::addLabel(EMDL_SCHEDULE_EDGE_INPUT, EMDL_STRING, "rlnScheduleEdgeInputNodeName" , "Name of the input Node for a schedule Edge");
 		EMDL::addLabel(EMDL_SCHEDULE_EDGE_OUTPUT, EMDL_STRING, "rlnScheduleEdgeOutputNodeName", "Name of the output Node for a schedule Edge");
 		EMDL::addLabel(EMDL_SCHEDULE_EDGE_IS_FORK, EMDL_BOOL, "rlnScheduleEdgeIsFork", "Flag to indicate that this Edge is a Fork, dependent on a Boolean Schedule variable");
-		EMDL::addLabel(EMDL_SCHEDULE_EDGE_OUTPUT_FALSE, EMDL_STRING, "rlnScheduleEdgeOutputNodeNameIfFalse", "Name of the output Node for a schedule Fork if the associated Boolean is false");
+		EMDL::addLabel(EMDL_SCHEDULE_EDGE_OUTPUT_TRUE, EMDL_STRING, "rlnScheduleEdgeOutputNodeNameIfTrue", "Name of the output Node for a schedule Fork if the associated Boolean is True");
 		EMDL::addLabel(EMDL_SCHEDULE_EDGE_BOOLEAN, EMDL_STRING, "rlnScheduleEdgeBooleanVariable", "Name of the associated Boolean variable if this Edge is a Fork");
 		EMDL::addLabel(EMDL_SCHEDULE_GENERAL_CURRENT_NODE, EMDL_STRING, "rlnScheduleCurrentNodeName", "Name of the current Node for this Schedule");
 		EMDL::addLabel(EMDL_SCHEDULE_GENERAL_ORIGINAL_START_NODE, EMDL_STRING, "rlnScheduleOriginalStartNodeName", "Name of the original starting Node for this Schedule");

@@ -106,6 +106,26 @@ public:
 
 		// Make sure mydir ends with a slash, and that it exists
 		if (mydir[mydir.length()-1] != '/') mydir += "/";
+		schedule.setName(mydir);
+		schedule.do_read_only = false;
+
+		if (do_run)
+		{
+			// Remove the abort signal if it exists
+			FileName myabort = schedule.name + RELION_JOB_ABORT_NOW;
+			if (exists(myabort)) std::remove(myabort.c_str());
+
+			PipeLine pipeline;
+			pipeline.setName(run_pipeline);
+			pipeline.read(DO_LOCK);
+			pipeline.write(DO_LOCK);
+			schedule.read(DO_LOCK); // lock for the entire duration of the run!!
+			schedule.run(pipeline);
+		    schedule.write(DO_LOCK);
+
+			return; // exit now
+		}
+
 		if (!exists(mydir))
 		{
 			std::string command = "mkdir -p " + mydir;
@@ -113,23 +133,15 @@ public:
 
 		}
 
+
 		// read in schedule if it exists
-		schedule.setName(mydir);
 		if (exists(mydir + "schedule.star"))
 		{
-			schedule.read();
-			schedule.write(mydir + "schedule.star.bck"); // just save another copy of the starfile ...
+			schedule.read(DO_LOCK);
+			schedule.write(DONT_LOCK, mydir + "schedule.star.bck"); // just save another copy of the starfile ...
 		}
 
-		if (do_run)
-		{
-			PipeLine pipeline;
-			pipeline.setName(run_pipeline);
-			pipeline.read(DO_LOCK);
-			pipeline.write(DO_LOCK);
-			schedule.run(pipeline);
-		}
-		else if (add != "")
+		if (add != "")
 		{
 			if (add == "variable")
 			{
@@ -137,9 +149,10 @@ public:
 			}
 			else if (add == "operator")
 			{
-				std::string error = schedule.addOperator(type, input, input2, output);
-				if (error != "")
-					REPORT_ERROR(error);
+				std::string error;
+				SchedulerOperator myop = schedule.initialiseOperator(type, input, input2, output, error);
+				if (error != "") REPORT_ERROR(error);
+				else schedule.addOperator(myop);
 			}
 			else if (add == "job")
 			{
@@ -211,7 +224,7 @@ public:
 		else
 			REPORT_ERROR(" ERROR: nothing to do!");
 
-		schedule.write();
+		schedule.write(exists(mydir + "schedule.star")); // only LOCK if the file already existed
 	}
 };
 
