@@ -196,7 +196,7 @@ void CtfRefiner::init()
 
 	tiltEstimator.init(verb, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
 	aberrationEstimator.init(verb, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
-	defocusEstimator.init(verb, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
+	defocusEstimator.init(verb && do_defocus_fit, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
 	bfactorEstimator.init(verb, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
 	magnificationEstimator.init(verb, nr_omp_threads, debug, diag, outPath, &reference, &obsModel);
 
