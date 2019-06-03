@@ -65,7 +65,7 @@ void ObservationModel::loadSafely(
 	}
 	opticsMdt.read(filename, "optics");
 
-	if (particlesMdt.numberOfObjects() == 0 || opticsMdt.numberOfObjects() == 0)
+	if (opticsMdt.numberOfObjects() == 0)
 	{
 		if (verb > 0)
 		{
