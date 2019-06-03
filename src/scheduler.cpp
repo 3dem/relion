@@ -459,7 +459,6 @@ std::string SchedulerEdge::getOutputNode() const
 void Schedule::clear()
 {
 	current_node = "undefined";
-	previous_node = "undefined";
 	original_start_node = "undefined";
 	name = "undefined";
 	email_address = "undefined";
@@ -1097,20 +1096,62 @@ void Schedule::addJob(RelionJob &myjob, std::string jobname, std::string mode)
 
 void Schedule::removeVariable(std::string name)
 {
-	if (isBooleanVariable(name)) scheduler_global_bools.erase(name);
+	// Remove any operators with this variable in it
+	removeOperatorsWithThisInputOrOutput(name);
+
+	if (isBooleanVariable(name))
+	{
+		scheduler_global_bools.erase(name);
+		// Also remove forks with this boolean variable
+		removeEdgesWithThisInputOutputOrBoolean(name);
+	}
 	else if (isFloatVariable(name)) scheduler_global_floats.erase(name);
 	else if (isStringVariable(name)) scheduler_global_strings.erase(name);
 	else REPORT_ERROR("ERROR: cannot find variable to erase: " + name);
 }
 
+void Schedule::removeEdgesWithThisInputOutputOrBoolean(std::string name)
+{
+
+	std::vector<SchedulerEdge> new_edges;
+	for (int i = 0; i < edges.size(); i++)
+	{
+		if (edges[i].inputNode != name && edges[i].outputNode != name &&
+			edges[i].outputNodeTrue != name && edges[i].myBooleanVariable != name)
+		{
+			new_edges.push_back(edges[i]);
+		}
+	}
+	edges= new_edges;
+}
+
+
 void Schedule::removeOperator(std::string name)
 {
 	if (isOperator(name)) scheduler_global_operators.erase(name);
 	else REPORT_ERROR("ERROR: cannot find operator to erase: " + name);
+
+	// Also remove any edges that input/output with this operator
+	removeEdgesWithThisInputOutputOrBoolean(name);
+
+}
+
+void Schedule::removeOperatorsWithThisInputOrOutput(std::string name)
+{
+
+	std::map<std::string, SchedulerOperator>::iterator it;
+	for ( it = scheduler_global_operators.begin(); it != scheduler_global_operators.end(); it++ )
+		if (it->second.input1 == name || it->second.input2 == name ||  it->second.output == name)
+			scheduler_global_operators.erase(it->first);
 }
 
 void Schedule::removeJob(std::string name)
 {
+	if (isJob(name)) jobs.erase(name);
+	else REPORT_ERROR("ERROR: cannot find job to erase: " + name);
+
+	// Also remove any edges that input/output with this job
+	removeEdgesWithThisInputOutputOrBoolean(name);
 }
 
 void Schedule::removeEdge(int idx)
@@ -1150,33 +1191,54 @@ bool Schedule::isValid()
 
 }
 
+std::string Schedule::getNextNode()
+{
+    std::string result= "undefined";
+	if (current_node == "undefined")
+    {
+    	if (original_start_node == "undefined")
+               REPORT_ERROR("ERROR: the starting node was not defined...");
+        result = original_start_node; // go to first node in the list
+    }
+	else
+	{
+		for (int i = 0; i < edges.size(); i++)
+		{
+			if (edges[i].inputNode == current_node)
+			{
+				result = edges[i].getOutputNode();
+			}
+		}
+	}
+    return result;
+}
+
+std::string Schedule::getPreviousNode()
+{
+    std::string result= "undefined";
+	if (current_node == "undefined" || current_node == original_start_node)
+		REPORT_ERROR("ERROR: cannot return previous node, as the current node is undefined or equal to the original start node...");
+
+	for (int i = 0; i < edges.size(); i++)
+	{
+		if (edges[i].getOutputNode() == current_node)
+		{
+			result = edges[i].inputNode;
+			return result;
+		}
+	}
+    return result;
+}
+
 bool Schedule::gotoNextNode()
 {
-    if (current_node == "undefined")
-    {
-        if (original_start_node == "undefined")
-               REPORT_ERROR("ERROR: the starting node was not defined...");
-        current_node = original_start_node; // go to first node in the list
-        std::cout << " Setting current_node to original_start_node: " << original_start_node << std::endl;
-        // Write out current status
-    	write();
-        return true;
-    }
+	current_node = getNextNode();
+    std::cout << " Setting current node to: " << current_node << std::endl;
 
-    for (int i = 0; i < edges.size(); i++)
-    {
-        if (edges[i].inputNode == current_node)
-        {
-            previous_node = current_node; // save previous node for abort mechanism: step one node back!
-        	current_node = edges[i].getOutputNode();
-            std::cout << " Setting current node to: " << current_node << std::endl;
-            // Write out current status, but maintain lock on the directory with immediate read!
-        	write();
-            return (current_node == "undefined") ? false : true;
-        }
-    }
+	// Write out current status, but maintain lock on the directory!
+	write();
 
-    return false;
+	return (current_node == "undefined") ? false : true;
 }
 
 bool Schedule::gotoNextJob()
@@ -1189,7 +1251,7 @@ bool Schedule::gotoNextJob()
 		if (pipeline_control_check_abort_job())
 		{
 			// Set the current node one step back to re-start this process where it was aborted
-			current_node = previous_node;
+			current_node = getPreviousNode();
 			write(DO_LOCK);
 			exit(RELION_EXIT_ABORTED);
 		}
@@ -1354,6 +1416,7 @@ void Schedule::run(PipeLine &pipeline)
 		// Now actually run the Scheduled job
 		std::string error_message;
 		std::cout << " Executing Job: " << jobs[current_node].current_name << std::endl;
+		jobs[current_node].job_has_started = true;
 		if (!pipeline.runJob(myjob, current_job, false, is_continue, true, do_overwrite_current, error_message))
 			REPORT_ERROR(error_message);
 
@@ -1369,16 +1432,11 @@ void Schedule::run(PipeLine &pipeline)
 		if (message != "")
 		{
 			// Step one step back
-			current_node = previous_node;
+			current_node = getPreviousNode();
 			sendEmail(message);
 			std::cerr << message << std::endl;
 			is_ok = false;
 			break;
-		}
-		else
-		{
-			// job finished successfully, write out the updated scheduler file
-			jobs[current_node].job_has_started = true;
 		}
     } // end while gotoNextJob
 

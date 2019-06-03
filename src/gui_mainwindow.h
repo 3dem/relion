@@ -102,7 +102,6 @@ static Fl_Menu_Item job_has_started_options[] = {
 			      {"has not started"},
 			      {0} // this should be the last entry
 			      };
-static Fl_Select_Browser *scheduler_job_browser, *scheduler_input_job_browser, *scheduler_output_job_browser;
 // Scheduler variables
 static Fl_Hold_Browser *scheduler_variable_browser;
 static Fl_Button *set_scheduler_variable_button, *add_scheduler_operator_button;
@@ -149,13 +148,17 @@ static Fl_Menu_Item operator_type_options[] = {
 	   };
 static Fl_Choice *scheduler_operator_type, *scheduler_operator_output, *scheduler_operator_input1;
 static Fl_Input *scheduler_operator_input2;
+// Scheduler jobs
+static Fl_Hold_Browser *scheduler_job_browser, *scheduler_input_job_browser, *scheduler_output_job_browser;
+static Fl_Button *scheduler_delete_job_button;
+
 //Scheduler Edges
 static Fl_Choice *scheduler_edge_input, *scheduler_edge_output, *scheduler_edge_boolean, *scheduler_edge_outputtrue;
 static Fl_Hold_Browser *scheduler_edge_browser;
 static Fl_Button *delete_scheduler_edge_button, *add_scheduler_edge_button;
 // Scheduler current state
 static Fl_Choice *scheduler_current_node;
-static Fl_Button *scheduler_run_button, *scheduler_reset_button, *scheduler_set_current_button, *scheduler_next_button, *scheduler_abort_button;
+static Fl_Button *scheduler_run_button, *scheduler_reset_button, *scheduler_set_current_button, *scheduler_next_button, *scheduler_prev_button, *scheduler_abort_button;
 
 static Fl_Text_Buffer *textbuff_stdout;
 static Fl_Text_Buffer *textbuff_stderr;
@@ -390,6 +393,9 @@ private:
     static void cb_select_scheduler_operator(Fl_Widget*, void*);
     inline void cb_select_scheduler_operator_i();
 
+    static void cb_delete_scheduler_job(Fl_Widget*, void*);
+    inline void cb_delete_scheduler_job_i();
+
     static void cb_scheduler_add_job(Fl_Widget*, void*);
     inline void cb_scheduler_add_job_i();
 
@@ -398,6 +404,9 @@ private:
 
     static void cb_scheduler_next(Fl_Widget*, void*);
     inline void cb_scheduler_next_i();
+
+    static void cb_scheduler_prev(Fl_Widget*, void*);
+    inline void cb_scheduler_prev_i();
 
     static void cb_scheduler_abort(Fl_Widget*, void*);
     inline void cb_scheduler_abort_i();

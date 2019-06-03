@@ -196,7 +196,7 @@ class Schedule
 
 public:
 
-	std::string name, current_node, original_start_node, email_address, previous_node;
+	std::string name, current_node, original_start_node, email_address;
 	bool do_read_only;
 
 	std::map<std::string, SchedulerJob> jobs;
@@ -285,7 +285,9 @@ public:
 
     // Remove variables/operators/jobs
     void removeVariable(std::string name);
+    void removeEdgesWithThisInputOutputOrBoolean(std::string name);
     void removeOperator(std::string name);
+    void removeOperatorsWithThisInputOrOutput(std::string name);
     void removeJob(std::string name);
     void removeEdge(int idx);
 
@@ -298,6 +300,9 @@ public:
 
     // Test integrity of the Schedule. Warn for unused variables, nodes, etc.
     bool isValid();
+
+    std::string getNextNode();
+    std::string getPreviousNode();
 
     bool gotoNextNode();
     bool gotoNextJob();
