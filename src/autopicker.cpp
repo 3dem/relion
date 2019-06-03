@@ -138,7 +138,7 @@ void AutoPicker::read(int argc, char **argv)
 	LoG_invert = parser.checkOption("--Log_invert", "Use this option if the particles are white instead of black");
 	LoG_adjust_threshold = textToFloat(parser.getOption("--LoG_adjust_threshold", "Use this option to adjust the picking threshold: positive for less particles, negative for more", "0."));
 	LoG_upper_limit = textToFloat(parser.getOption("--LoG_upper_threshold", "Use this option to set the upper limit of the picking threshold", "99999"));
-	LoG_use_ctf = parser.checkOption("--LoG_use_ctf", "Use CTF until the first peak in Laplacian-of-Gaussian picker");
+//	LoG_use_ctf = parser.checkOption("--LoG_use_ctf", "Use CTF until the first peak in Laplacian-of-Gaussian picker");
 
 	if (do_gpu && do_LoG)
 	{
@@ -2594,7 +2594,7 @@ void AutoPicker::autoPickLoGOneMicrograph(FileName &fn_mic, long int imic)
 
 		// Use downsized FFTs
 		windowFourierTransform(Faux, Fmic, workSize);
-
+/*
 		if (LoG_use_ctf)
 		{
 			MultidimArray<RFLOAT> Fctf(YSIZE(Fmic), XSIZE(Fmic));
@@ -2622,7 +2622,7 @@ void AutoPicker::autoPickLoGOneMicrograph(FileName &fn_mic, long int imic)
 				DIRECT_MULTIDIM_ELEM(Fmic, n) /= DIRECT_MULTIDIM_ELEM(Fctf, n);
 			}
 		}
-
+*/
 		Image<RFLOAT> Maux(workSize, workSize);
 		
 //		transformer.inverseFourierTransform(Fmic, Maux());
