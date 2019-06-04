@@ -1252,13 +1252,10 @@ bool Schedule::gotoNextJob()
 {
 
 	// This loops through the next Nodes until encountering a JOB
-    while (gotoNextNode())
+	while (gotoNextNode())
     {
-
 		if (pipeline_control_check_abort_job())
 		{
-			// Set the current node one step back to re-start this process where it was aborted
-			current_node = getPreviousNode();
 			write(DO_LOCK);
 			exit(RELION_EXIT_ABORTED);
 		}
@@ -1366,9 +1363,23 @@ void Schedule::setVariablesInJob(RelionJob &job, FileName original_job_name)
 
 void Schedule::run(PipeLine &pipeline)
 {
-    // go through all nodes
-    bool is_ok = true;
-	while (gotoNextJob())
+    if (current_node == "undefined")
+    	current_node = original_start_node;
+
+    std::cout << " Starting execution of schedule at: " << current_node << std::endl;
+
+    // If we start from operators instead of jobs, then execute the operator and proceed until the next Job
+    if (isOperator(current_node))
+    {
+		bool op_success = scheduler_global_operators[current_node].performOperation();
+		if (!op_success) REPORT_ERROR("ERROR: something went wrong with execution of the initial operator...");
+    	gotoNextJob();
+    }
+
+	// go through all nodes
+	bool is_ok = true;
+	bool has_more_jobs = true;
+    while (has_more_jobs)
     {
         RelionJob myjob;
         bool is_continue, do_overwrite_current, dummy;
@@ -1438,14 +1449,15 @@ void Schedule::run(PipeLine &pipeline)
 		else if (is_aborted) message = " Stopping schedule due to user abort of job " + jobs[current_node].current_name + " ...";
 		if (message != "")
 		{
-			// Step one step back
-			current_node = getPreviousNode();
 			sendEmail(message);
 			std::cerr << message << std::endl;
 			is_ok = false;
 			break;
 		}
-    } // end while gotoNextJob
+
+
+		has_more_jobs = gotoNextJob();
+    } // end while has_more_jobs
 
     if (is_ok) sendEmail("Finished successfully!");
     std::cout << " Scheduler " << name << " stops now... " << std::endl;
