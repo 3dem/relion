@@ -71,7 +71,7 @@ class SchedulerStringVariable
 bool isBooleanVariable(std::string name);
 bool isFloatVariable(std::string name);
 bool isStringVariable(std::string name);
-bool isOperator(std::string name);
+bool isScheduleOperator(std::string name);
 
 #define SCHEDULE_BOOLEAN_OPERATOR_AND "bool_op_and"
 #define SCHEDULE_BOOLEAN_OPERATOR_OR  "bool_op_or"
@@ -232,6 +232,7 @@ public:
 
 	bool isNode(std::string name);
 	bool isJob(std::string name);
+	bool isOperator(std::string name);
 
 	std::string findJobByCurrentName(std::string name);
 

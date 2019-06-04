@@ -44,7 +44,7 @@ bool isStringVariable(std::string _name)
 	return (scheduler_global_strings.find(_name) != scheduler_global_strings.end());
 }
 
-bool isOperator(std::string _name)
+bool isScheduleOperator(std::string _name)
 {
 	return (scheduler_global_operators.find(_name) != scheduler_global_operators.end());
 }
@@ -149,6 +149,7 @@ std::string SchedulerOperator::initialise(std::string _type, std::string _input1
 		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_SORT_IDX
 		 ) && !(isFloatVariable(_input2) || isNumber(_input2)))
 		return "ERROR: operator does not have valid number (float variable or text) input2: " + _input2;
+
 
 	input1 = _input1;
 	input2 = _input2;
@@ -889,6 +890,12 @@ bool Schedule::isJob(std::string _name)
 {
 	return (jobs.find(_name) != jobs.end());
 }
+
+bool Schedule::isOperator(std::string _name)
+{
+	return isScheduleOperator(_name);
+}
+
 
 void Schedule::setVariable(std::string name, FileName value)
 {

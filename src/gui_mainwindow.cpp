@@ -1016,11 +1016,12 @@ static void Gui_Timer_CB(void *userdata)
 	if (show_scheduler)
 	{
     	FileName mychanged = schedule.name + SCHEDULE_HAS_CHANGED;
-		if (exists(mychanged))
+    	if (exists(mychanged))
     	{	// Update the stdout and stderr windows if we're currently pointing at a running job
     	   	o->fillStdOutAndErr();
     	   	schedule.read(DONT_LOCK);
     	   	o->fillSchedulerNodesAndVariables();
+    	   	std::remove(mychanged.c_str());
     	}
 	}
 	else
@@ -1262,11 +1263,12 @@ void GuiMainWindow::fillToAndFromJobLists()
 void GuiMainWindow::fillSchedulerNodesAndVariables()
 {
 	// Go back to the same positions in the vertical scroll bars of the job lists after updating...
-	int mypos_scheduler_variable = scheduler_variable_browser->position();
-	int mypos_scheduler_operator = scheduler_operator_browser->position();
-	int mypos_scheduler_edge = scheduler_edge_browser->position();
+	int mypos_scheduler_variable = scheduler_variable_browser->value();
+	int mypos_scheduler_operator = scheduler_operator_browser->value();
+	int mypos_scheduler_edge = scheduler_edge_browser->value();
+	int mypos_scheduler_job = scheduler_job_browser->value();
 
-    // Clear whatever was in there
+	// Clear whatever was in there
 	scheduler_variable_browser->clear();
 	scheduler_operator_browser->clear();
 	scheduler_operator_output->clear();
@@ -1278,6 +1280,8 @@ void GuiMainWindow::fillSchedulerNodesAndVariables()
 	scheduler_edge_outputtrue->clear();
 	scheduler_job_browser->clear();
 	scheduled_processes.clear();
+	scheduler_current_node->clear();
+	operators_list.clear();
 
 	// Fill jobs browser
 	for (long int i = 0; i < pipeline.processList.size(); i++)
@@ -1364,6 +1368,7 @@ void GuiMainWindow::fillSchedulerNodesAndVariables()
 			std::string mylabel = it->first +
 					" -> " + it->second.output;
 			scheduler_operator_browser->add(mylabel.c_str());
+			operators_list.push_back(it->first);
 			scheduler_edge_input->add(it->first.c_str());
 			scheduler_edge_output->add(it->first.c_str());
 			scheduler_edge_outputtrue->add(it->first.c_str());
@@ -1400,9 +1405,13 @@ void GuiMainWindow::fillSchedulerNodesAndVariables()
 	scheduler_edge_outputtrue->add(" ");
 	scheduler_edge_boolean->add(" ");
 
-	scheduler_variable_browser->position(mypos_scheduler_variable);
-	scheduler_operator_browser->position(mypos_scheduler_operator);
-	scheduler_edge_browser->position(mypos_scheduler_edge);
+	scheduler_variable_browser->value(mypos_scheduler_variable);
+	cb_select_scheduler_variable_i();
+	scheduler_operator_browser->value(mypos_scheduler_operator);
+	cb_select_scheduler_operator_i();
+	scheduler_edge_browser->value(mypos_scheduler_edge);
+	cb_select_scheduler_edge_i();
+	scheduler_job_browser->value(mypos_scheduler_job);
 
 }
 
@@ -1699,10 +1708,8 @@ void GuiMainWindow::cb_select_input_job_i()
 
 	// Show the 'selected' group, hide the others
     int idx = (show_scheduler) ? scheduler_input_job_browser->value() - 1 : input_job_browser->value() - 1;
-    std::cerr << " idx= " << idx << " scheduler_input_job_browser->value()= " << scheduler_input_job_browser->value() << " input_job_browser->value()= " << input_job_browser->value() << std::endl;
     if (idx >= 0) // only if a non-empty line was selected
     {
-    	std::cerr << " idx= " << idx << " input_processes[idx]= " << input_processes[idx] << std::endl;
     	loadJobFromPipeline(input_processes[idx]);
     }
 
@@ -2008,6 +2015,12 @@ void GuiMainWindow::cb_add_scheduler_operator_i()
 	}
 	else
 	{
+		std::string newname = myop.getName();
+		if (schedule.isOperator(newname))
+		{
+			fl_message("ERROR: this operator already exists...");
+			return;
+		}
 		schedule.read(DO_LOCK);
 		schedule.addOperator(myop);
 		schedule.write(DO_LOCK);
@@ -2016,8 +2029,8 @@ void GuiMainWindow::cb_add_scheduler_operator_i()
 		scheduler_operator_output->value(-1);
 		scheduler_operator_input1->value(-1);
 		scheduler_operator_input2->value("");
+		fillSchedulerNodesAndVariables();
 	}
-	fillSchedulerNodesAndVariables();
 
 }
 
@@ -2128,9 +2141,16 @@ void GuiMainWindow::cb_scheduler_set_current(Fl_Widget *o, void* v)
 
 void GuiMainWindow::cb_scheduler_set_current_i()
 {
+	if (scheduler_current_node->value() < 0)
+	{
+		std::cerr << " ERROR: scheduler_current_node->value()= " << scheduler_current_node->value() << std::endl;
+		return;
+	}
+
 	schedule.read(DO_LOCK);
 	schedule.current_node= std::string(scheduler_current_node->text(scheduler_current_node->value()));
 	schedule.write(DO_LOCK);
+
 	// If a schedule has finished: activate the GUI again
 	if (schedule.current_node == "EXIT")
 	{
@@ -2139,13 +2159,40 @@ void GuiMainWindow::cb_scheduler_set_current_i()
 	if (schedule.isJob(schedule.current_node))
 	{
 
-		//scheduled_job_browser->value(scheduled_job_browser->find_item(schedule.current_node.c_str()));
-		//cb_select_scheduled_job_i();
+		for (long int ii = 0; ii < scheduled_processes.size(); ii++)
+		{
+			long int id = scheduled_processes[ii];
+			if (schedule.current_node == getJobNameForDisplay(pipeline.processList[id]))
+			{
+				scheduler_job_browser->value(id+1);
+				cb_select_scheduled_job_i();
+			}
+		}
 	}
 	else
 	{
-		// Select operator
+
+		for (int i =0; i < operators_list.size(); i++)
+		{
+			if (schedule.current_node == operators_list[i])
+			{
+				scheduler_operator_browser->value(i+1);
+				cb_select_scheduler_operator_i();
+
+			}
+		}
 	}
+
+	// Also set the edge from this node to the next one!
+	for (int i = 0; i < schedule.edges.size(); i++ )
+	{
+		if (schedule.edges[i].inputNode == schedule.current_node)
+		{
+			scheduler_edge_browser->value(i+1);
+			cb_select_scheduler_edge_i();
+		}
+	}
+
 }
 
 void GuiMainWindow::cb_scheduler_next(Fl_Widget *o, void* v)
@@ -2174,10 +2221,11 @@ void GuiMainWindow::cb_scheduler_next_i()
     		{
     			nextnode = schedule.edges[i].outputNode;
     		}
-    		schedule.read(DO_LOCK);
-    		schedule.current_node= nextnode;
-    		schedule.write(DO_LOCK);
+    		//schedule.read(DO_LOCK);
+    		//schedule.current_node= nextnode;
+    		//schedule.write(DO_LOCK);
     		scheduler_current_node->value(scheduler_current_node->find_item(nextnode.c_str()));
+    		cb_scheduler_set_current_i();
     		return;
         }
     }
@@ -2203,10 +2251,11 @@ void GuiMainWindow::cb_scheduler_prev_i()
 	}
 	else
 	{
-		schedule.read(DO_LOCK);
-		schedule.current_node= myprev;
-		schedule.write(DO_LOCK);
+		//schedule.read(DO_LOCK);
+		//schedule.current_node= myprev;
+		//schedule.write(DO_LOCK);
 		scheduler_current_node->value(scheduler_current_node->find_item(myprev.c_str()));
+		cb_scheduler_set_current_i();
     }
 	return;
 }
@@ -2227,6 +2276,7 @@ void GuiMainWindow::cb_scheduler_reset_i()
 		schedule.reset();
 		schedule.write(DO_LOCK);
 		fillSchedulerNodesAndVariables();
+		cb_scheduler_set_current_i();
 	}
 
 }

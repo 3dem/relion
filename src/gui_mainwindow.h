@@ -109,6 +109,7 @@ static Fl_Button *delete_scheduler_variable_button, *delete_scheduler_operator_b
 static Fl_Input *scheduler_variable_name, *scheduler_variable_value;
 //Scheduler Operators
 static Fl_Hold_Browser *scheduler_operator_browser;
+static std::vector<std::string> operators_list;
 static Fl_Menu_Item operator_type_options[] = {
 	   {SCHEDULE_FLOAT_OPERATOR_PLUS},
 	   {SCHEDULE_FLOAT_OPERATOR_MINUS},
