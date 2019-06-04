@@ -421,7 +421,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 		// Read in the pipeline STAR file if it exists
 		pipeline.name = fn_pipe;
 	}
-	if (exists(fn_pipe + "_pipeline.star"))
+	if (exists(pipeline.name + "_pipeline.star"))
 	{
 		std::string lock_message = "mainGUI constructor";
 		pipeline.read(DO_LOCK, lock_message);
