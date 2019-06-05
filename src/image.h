@@ -99,6 +99,103 @@ typedef enum
 	WRITE_READONLY	 //only can read the file
 } WriteMode;
 
+#ifdef HAVE_TIFF
+extern "C" {
+	typedef struct TiffInMemory
+	{
+		unsigned char *buf;
+		tsize_t size;
+		toff_t pos;
+	} TiffInMemory;
+
+	static tsize_t TiffInMemoryReadProc(thandle_t handle, tdata_t buf, tsize_t read_size)
+	{
+		TiffInMemory *tiff_handle = (TiffInMemory*)handle;
+#ifdef TIFF_DEBUG
+		std::cout << "TiffInMemoryReadProc: read_size = " << read_size << " cur_pos = " << tiff_handle->pos << " buf_size = " << tiff_handle->size << std::endl;
+#endif
+		if (tiff_handle->pos + read_size >= tiff_handle->size)
+			REPORT_ERROR("TiffInMemoryReadProc: seeking beyond the end of the buffer.");
+
+		memcpy(buf, tiff_handle->buf + tiff_handle->pos, read_size);
+		tiff_handle->pos += read_size;
+
+		return read_size;
+	}
+
+	static tsize_t TiffInMemoryWriteProc(thandle_t handle, tdata_t buf, tsize_t write_size)
+	{
+#ifdef TIFF_DEBUG
+		REPORT_ERROR("TiffInMemoryWriteProc: Not implemented.");
+#endif
+
+		return -1;
+	}
+
+	static toff_t TiffInMemorySeekProc(thandle_t handle, toff_t offset, int whence)
+	{
+		TiffInMemory *tiff_handle = (TiffInMemory*)handle;
+#ifdef TIFF_DEBUG
+		std::cout << "TiffInMemorySeekProc: offset = " << offset << " cur_pos = " << tiff_handle->pos << " buf_size = " << tiff_handle->size << std::endl;
+#endif
+		switch (whence)
+		{
+			case SEEK_SET:
+				tiff_handle->pos = 0;
+				break;
+			case SEEK_CUR:
+				tiff_handle->pos += offset;
+				break;
+			case SEEK_END:
+				REPORT_ERROR("TIFFInMemorySeekProc: SEEK_END is not supported.");
+				break;
+		}
+
+		if (tiff_handle->pos >= tiff_handle->size)
+			REPORT_ERROR("TIFFInMemorySeekProc: seeking beyond the end of the buffer.");
+
+		return 0;
+	}
+
+	static int TiffInMemoryCloseProc(thandle_t handle)
+	{
+#ifdef TIFF_DEBUG
+		std::cout << "TiffInMemoryCloseProc" << std::endl;
+#endif
+		return 0;
+	}
+
+	static toff_t TiffInMemorySizeProc(thandle_t handle)
+	{
+#ifdef TIFF_DEBUG
+		std::cout << "TiffInMemorySizeProc" << std::endl;
+#endif
+		return ((TiffInMemory*)handle)->size;
+	}
+
+	static int TiffInMemoryMapFileProc(thandle_t handle, tdata_t *base, toff_t *size)
+	{
+		TiffInMemory *tiff_handle = (TiffInMemory*)handle;
+#ifdef TIFF_DEBUG
+		std::cout << "TiffInMemoryMapFileProc" << std::endl;
+#endif
+
+		*base = tiff_handle->buf;
+		*size = tiff_handle->size;
+
+		return 1;
+	}
+
+	static void TiffInMemoryUnmapFileProc(thandle_t handle, tdata_t base, toff_t size)
+ 	{
+#ifdef TIFF_DEBUG
+		std::cout << "TiffInMemoryUnmapFileProc" << std::endl;
+#endif
+
+		return;
+	}
+}
+#endif
 
 /** File handler class
  * This struct is used to share the File handlers with Image Collection class
@@ -1197,110 +1294,37 @@ public:
 		(*this)()+=aux();
 	}
 
-	/** Open file function
-	  * Open the image file and returns its file hander.
-	fImageHandler* openFile(const FileName &name, int mode = WRITE_READONLY)
+	int readTiffInMemory(void* buf, size_t size, bool readdata=true, long int select_img = -1,
+	                     bool mapData = false, bool is_2D = false)
 	{
-		fImageHandler* hFile = new fImageHandler;
-		FileName fileName, headName = "";
-		FileName ext_name = name.getFileFormat();
+		int err = 0;
 
-		long int dump;
-		name.decompose(dump, fileName);
-		// Subtract 1 to have numbering 0...N-1 instead of 1...N
-		if (dump > 0)
-			dump--;
+		TiffInMemory handle;
+		handle.buf = (unsigned char*)buf;
+		handle.size = size;
+		handle.pos = 0;
+		// Check whether to read the data or only the header
+		dataflag = ( readdata ) ? 1 : -1;
 
-		fileName = fileName.removeFileFormat();
+		// Check whether to map the data or not
+		mmapOn = mapData;
 
-		size_t found = fileName.find_first_of("%");
-		if (found!=std::string::npos)
-		  fileName = fileName.substr(0, found) ;
+		//Just clear the header before reading
+		MDMainHeader.clear();
+		MDMainHeader.addObject();
 
-		hFile->exist = exists(fileName);
-
-		std::string wmChar;
-
-		switch (mode)
-		{
-		case WRITE_READONLY:
-			if (!hFile->exist)
-				REPORT_ERROR((std::string) "Cannot read file " + fileName + " It does not exist" );
-			wmChar = "r";
-			break;
-		case WRITE_OVERWRITE:
-			wmChar = "w";
-			break;
-		case WRITE_APPEND:
-			if (exists(fileName))
-			{
-				_exists = true;
-				wmChar = "r+";
-			}
-			else
-				wmChar = "w+";
-			break;
-		case WRITE_REPLACE:
-			wmChar = "r+";
-			break;
-		}
-
-
-		if (ext_name.contains("img") || ext_name.contains("hed"))
-		{
-			fileName = fileName.withoutExtension();
-			headName = fileName.addExtension("hed");
-			fileName = fileName.addExtension("img");
-		}
-
-		// Open image file
-		if ( ( hFile->fimg = fopen(fileName.c_str(), wmChar.c_str()) ) == NULL )
-			REPORT_ERROR((std::string)"Image::openFile cannot open: " + name);
-
-		if (headName != "")
-		{
-			if ( ( hFile->fhed = fopen(headName.c_str(), wmChar.c_str()) ) == NULL )
-				REPORT_ERROR((std::string)"Image::openFile cannot open: " + headName);
-		}
-		else
-			hFile->fhed = NULL;
-
-		hFile->ext_name =ext_name;
-
-		return hFile;
+#ifdef HAVE_TIFF
+		TIFF* ftiff = TIFFClientOpen("in-memory-tiff", "r", (thandle_t)&handle,
+		                             TiffInMemoryReadProc, TiffInMemoryWriteProc, TiffInMemorySeekProc,
+		                             TiffInMemoryCloseProc, TiffInMemorySizeProc, TiffInMemoryMapFileProc,
+		                             TiffInMemoryUnmapFileProc);
+		err = readTIFF(ftiff, select_img, readdata, true, "in-memory-tiff");
+		TIFFClose(ftiff);
+#else
+		REPORT_ERROR("TIFF support was not enabled during compilation");
+#endif
+		return err;
 	}
-	  */
-
-	/** Close file function.
-	  * Close the image file according to its name and file handler.
-	void closeFile(fImageHandler* hFile = NULL)
-	{
-		FileName ext_name;
-		FILE* fimg, *fhed;
-
-		if (hFile != NULL)
-		{
-			ext_name = hFile->ext_name;
-			fimg = hFile->fimg;
-			fhed = hFile->fhed;
-		}
-		else
-		{
-			ext_name = filename.getFileFormat();
-			fimg = this->fimg;
-			fhed = this->fhed;
-		}
-
-		if (fclose(fimg) != 0 )
-			REPORT_ERROR((std::string)"Can not close image file "+ filename);
-
-		if (fhed != NULL &&  fclose(fhed) != 0 )
-			REPORT_ERROR((std::string)"Can not close header file of "
-						 + filename);
-
-		delete hFile;
-	}
-	 */
 
 private:
 	int _read(const FileName &name, fImageHandler &hFile, bool readdata=true, long int select_img = -1,
@@ -1329,7 +1353,7 @@ private:
 			select_img = dump;
 
 #undef DEBUG
-		//#define DEBUG
+//#define DEBUG
 #ifdef DEBUG
 
 		std::cerr << "READ\n" <<
