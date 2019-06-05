@@ -93,7 +93,7 @@ public:
 		email = parser.getOption("--set_email", "Email address to send messages about Scheduler status", "");
 		int run_section = parser.addSection("Run the scheduler within a pipeline");
 		do_run = parser.checkOption("--run", "Run the scheduler");
-		verb = textToInteger(parser.getOption("--verb", "Running verbosity: 0, 1 or 2)", "1"));
+		verb = textToInteger(parser.getOption("--verb", "Running verbosity: 0, 1, 2 or 3)", "1"));
 		run_pipeline = parser.getOption("--run_pipeline", "Name of the pipeline in which to run this schedule", "default");
 
 		// Check for errors in the command-line option

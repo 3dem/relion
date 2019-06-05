@@ -1017,6 +1017,12 @@ void Schedule::setStringOriginalVariableValue(std::string name, std::string val)
 	scheduler_global_strings[name].original_value = val;
 }
 
+std::string Schedule::getVariableValueAsString(std::string name)
+{
+	if (isStringVariable(name)) return scheduler_global_strings[name].value;
+	else if (isBooleanVariable(name)) return (scheduler_global_bools[name].value) ? "True" : "False";
+	else if (isFloatVariable(name)) return floatToString(scheduler_global_floats[name].value);
+}
 
 void Schedule::setOperatorParameters(std::string name, std::string _type, std::string _input1, std::string _input2, std::string _output)
 {
@@ -1273,6 +1279,12 @@ bool Schedule::gotoNextJob()
     	if (isOperator(current_node))
     	{
     		bool op_success = scheduler_global_operators[current_node].performOperation();
+    		if (verb > 0 && op_success)
+    		{
+    			std::cout << " Setting: " << scheduler_global_operators[current_node].output
+    					<< " = " <<getVariableValueAsString(scheduler_global_operators[current_node].output) << std::endl;
+    		}
+
     		if (!op_success) return false;
 		}
 		else // this is a job, get its current_name and options
@@ -1388,7 +1400,7 @@ void Schedule::setVariablesInJob(RelionJob &job, FileName original_job_name, boo
 			std::string myvarsstr = "";
 			for (int i = 0; i < myvars.size(); i++)
 				myvarsstr+= myvars[i]+ " ";
-			if (verb > 1) std::cout << " Setting joboption " << it->first << " to " << mystring << " based on variable(s): " << myvarsstr<< std::endl;
+			if (verb > 2) std::cout << " Setting joboption " << it->first << " to " << mystring << " based on variable(s): " << myvarsstr<< std::endl;
 		}
 
 	}

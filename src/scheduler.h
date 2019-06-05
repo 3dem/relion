@@ -253,6 +253,8 @@ public:
     void setStringVariableValue(std::string name, std::string val);
     void setStringOriginalVariableValue(std::string name, std::string val);
 
+    std::string getVariableValueAsString(std::string name);
+
     std::string getOperatorName(std::string type, std::string input1, std::string input2, std::string output)
     {
     	SchedulerOperator op(type, input1, input2, output);
