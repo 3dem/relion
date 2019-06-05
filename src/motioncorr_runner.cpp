@@ -80,7 +80,6 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	fn_out = parser.getOption("--o", "Name for the output directory", "MotionCorr");
 	n_threads = textToInteger(parser.getOption("--j", "Number of threads per movie (= process)", "1"));
 	max_io_threads = textToInteger(parser.getOption("--max_io_threads", "Limit the number of IO threads.", "-1"));
-	fn_movie = parser.getOption("--movie", "Rootname to identify movies", "movie");
 	continue_old = parser.checkOption("--only_do_unfinished", "Only run motion correction for those micrographs for which there is not yet an output micrograph.");
 	do_at_most = textToInteger(parser.getOption("--do_at_most", "Only process at most this number of (unprocessed) micrographs.", "-1"));
 	grouping_for_ps = textToInteger(parser.getOption("--grouping_for_ps", "Group this number of frames and write summed power spectrum. -1 == do not write", "-1"));
@@ -317,7 +316,7 @@ void MotioncorrRunner::initialise()
 	FileName prevdir="";
 	for (size_t i = 0; i < fn_micrographs.size(); i++)
 	{
-		FileName newdir = fn_out + fn_micrographs[i];
+		FileName newdir = getOutputFileNames(fn_micrographs[i]);
 		if (!newdir.contains("/")) continue;
 		newdir = newdir.beforeLastOf("/");
 
@@ -393,8 +392,6 @@ FileName MotioncorrRunner::getOutputFileNames(FileName fn_mic)
 {
 	// If there are any dots in the filename, replace them by underscores
 	FileName fn_root = fn_mic.withoutExtension();
-	// If fn_root already contains "_movie", then remove that from fn_root
-	fn_root = fn_root.without("_"+fn_movie);
 
 	size_t pos = 0;
 	while (true)
