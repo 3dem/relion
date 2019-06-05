@@ -47,7 +47,7 @@ class SchedulerBooleanVariable
 
 	SchedulerBooleanVariable() {};
 
-	SchedulerBooleanVariable(RFLOAT _value, RFLOAT _original_value)
+	SchedulerBooleanVariable(bool _value, bool _original_value)
 	{
 		value = _value;
 		original_value = _original_value;
@@ -63,8 +63,8 @@ class SchedulerStringVariable
 
 	SchedulerStringVariable(FileName _value, FileName _original_value)
 	{
-		value = _value;
-		original_value = _original_value;
+		value = (_value == "") ? "undefined" : _value;
+		original_value = (_original_value == "") ? "undefined" : _original_value;
 	}
 };
 
@@ -198,6 +198,7 @@ public:
 
 	std::string name, current_node, original_start_node, email_address;
 	bool do_read_only;
+	int verb;
 
 	std::map<std::string, SchedulerJob> jobs;
 	std::vector<SchedulerEdge> edges;
@@ -308,11 +309,9 @@ public:
     bool gotoNextNode();
     bool gotoNextJob();
 
-    // This function fixes the dependency of newly generated jobs, as determined by the pipeline_schedule
-    RelionJob copyNewJobFromSchedulePipeline(FileName original_job_name);
 
-    // Modify a job to set variables from the Scheduler
-    void setVariablesInJob(RelionJob &job, FileName original_job_name);
+    // Modify a job to set variables and input nodes from the Scheduler
+    void setVariablesInJob(RelionJob &job, FileName original_job_name, bool &needs_a_restart);
 
     // Run the Schedule
     void run(PipeLine &pipeline);

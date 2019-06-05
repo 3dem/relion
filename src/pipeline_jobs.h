@@ -317,6 +317,9 @@ public:
 	// Set values of label, value, default_value and helptext (common for all types)
 	void initialise(std::string _label, std::string _default_value, std::string _helptext);
 
+	// Contains $$ for SchedulerVariable
+	bool isSchedulerVariable();
+
 	// Get a string value
 	std::string getString();
 

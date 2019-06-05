@@ -158,8 +158,8 @@ static Fl_Choice *scheduler_edge_input, *scheduler_edge_output, *scheduler_edge_
 static Fl_Hold_Browser *scheduler_edge_browser;
 static Fl_Button *delete_scheduler_edge_button, *add_scheduler_edge_button;
 // Scheduler current state
-static Fl_Choice *scheduler_current_node;
-static Fl_Button *scheduler_run_button, *scheduler_reset_button, *scheduler_set_current_button, *scheduler_next_button, *scheduler_prev_button, *scheduler_abort_button;
+static Fl_Choice *scheduler_current_node, *scheduler_start_node;
+static Fl_Button *scheduler_run_button, *scheduler_reset_button, *scheduler_set_current_button, *scheduler_set_start_button, *scheduler_next_button, *scheduler_prev_button, *scheduler_abort_button;
 
 static Fl_Text_Buffer *textbuff_stdout;
 static Fl_Text_Buffer *textbuff_stderr;
@@ -169,7 +169,7 @@ static void Gui_Timer_CB(void *userdata);
 // Read-only GUI?
 static bool maingui_do_read_only;
 // Show the scheduler view
-static bool show_scheduler;
+//static bool show_scheduler;
 
 // The pipeline this GUI is acting on
 static PipeLine pipeline;
@@ -399,6 +399,9 @@ private:
 
     static void cb_scheduler_add_job(Fl_Widget*, void*);
     inline void cb_scheduler_add_job_i();
+
+    static void cb_scheduler_set_start(Fl_Widget*, void*);
+    inline void cb_scheduler_set_start_i();
 
     static void cb_scheduler_set_current(Fl_Widget*, void*);
     inline void cb_scheduler_set_current_i();

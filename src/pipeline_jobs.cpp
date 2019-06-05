@@ -265,6 +265,12 @@ void JobOption::initialise(std::string _label, std::string _default_value, std::
 	helptext = _helptext;
 }
 
+bool JobOption::isSchedulerVariable()
+{
+	std::string pat="$$";
+	return (value.find(pat) != std::string::npos);
+}
+
 // Get a string value
 std::string JobOption::getString()
 {
@@ -2332,13 +2338,16 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 		else if (joboptions["do_split"].getBoolean())
 		{
 
-			int nr_split;
+			int nr_split=0;
 			command += " --split ";
 			if (joboptions["do_random"].getBoolean())
 			{
 				command += " --random_order ";
 			}
-			if (joboptions["nr_split"].getNumber() <= 0 && joboptions["split_size"].getNumber() <= 0)
+
+
+			if (joboptions["nr_split"].getNumber() <= 0 && joboptions["split_size"].getNumber() <= 0
+					&& !joboptions["nr_split"].isSchedulerVariable() && !joboptions["split_size"].isSchedulerVariable())
 			{
 				error_message = "ERROR: When splitting the input STAR file into subsets, set nr_split and/or split_size to a positive value";
 				return false;
@@ -2348,7 +2357,7 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 				nr_split = joboptions["nr_split"].getNumber();
 				command += " --nr_split " + joboptions["nr_split"].getString();
 			}
-			else if (joboptions["split_size"].getNumber() > 0)
+			else if (joboptions["split_size"].getNumber() > 0 && !joboptions["split_size"].isSchedulerVariable())
 			{
 				command += " --size_split " + joboptions["split_size"].getString();
 
@@ -4778,7 +4787,8 @@ bool RelionJob::getCommandsMotionrefineJob(std::string &outputname, std::vector<
 		return false;
 	}
 
-	if (joboptions["eval_frac"].getNumber() <= 0.1 || joboptions["eval_frac"].getNumber() > 0.9)
+	if ((joboptions["eval_frac"].getNumber() <= 0.1 || joboptions["eval_frac"].getNumber() > 0.9 )
+			&& !joboptions["eval_frac"].isSchedulerVariable() )
 	{
 		error_message = "ERROR: the fraction of Fourier pixels used for evaluation should be between 0.1 and 0.9.";
 		return false;

@@ -148,7 +148,6 @@ void Preprocessing::initialise()
 		long int ndim;
 		MDmics.goToObject(0);
 		MDmics.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
-		std::cerr << " fn_mic= " << fn_mic << std::endl;
 		Imic.read(fn_mic, false, -1, false); // readData = false, select_image = -1, mapData= false, is_2D = true);
 		Imic.getDimensions(xdim, ydim, zdim, ndim);
 		dimensionality = (zdim > 1) ? 3 : 2;
@@ -241,22 +240,6 @@ void Preprocessing::run()
 
 	if (do_extract)
 	{
-
-		if (only_extract_unfinished)
-		{
-			bool do_work = false;
-			if (fn_part_star != "" && !exists(fn_part_star))
-				do_work = true;
-			if (fn_list_star != "" && !exists(fn_list_star))
-				do_work = true;
-
-			if (!do_work)
-			{
-				std::cout << " Output STAR file(s) " << fn_part_star << " "<< fn_list_star << " already exist. Skipping extraction..." << std::endl;
-				return;
-			}
-		}
-
 		runExtractParticles();
 	}
 	else if (fn_operate_in != "")

@@ -28,6 +28,7 @@ public:
 	FileName mydir;
 	float myconstant;
 	bool do_reset, do_run;
+	int verb;
 	std::string add, set_var, set_mode, start_node, current_node, email, type, name, value, mode, input, input2, output, output2, boolvar;
 	std::string run_pipeline;
 
@@ -92,6 +93,7 @@ public:
 		email = parser.getOption("--set_email", "Email address to send messages about Scheduler status", "");
 		int run_section = parser.addSection("Run the scheduler within a pipeline");
 		do_run = parser.checkOption("--run", "Run the scheduler");
+		verb = textToInteger(parser.getOption("--verb", "Running verbosity: 0, 1 or 2)", "1"));
 		run_pipeline = parser.getOption("--run_pipeline", "Name of the pipeline in which to run this schedule", "default");
 
 		// Check for errors in the command-line option
@@ -117,9 +119,20 @@ public:
 
 			PipeLine pipeline;
 			pipeline.setName(run_pipeline);
-			pipeline.read(DO_LOCK);
-			pipeline.write(DO_LOCK);
+
+			if (exists(pipeline.name + "_pipeline.star"))
+			{
+				std::string lock_message = "mainGUI constructor";
+				pipeline.read(DO_LOCK, lock_message);
+				// With the locking system, each read needs to be followed soon with a write
+				pipeline.write(DO_LOCK);
+			}
+			else
+			{
+				pipeline.write();
+			}
 			schedule.read(DO_LOCK); // lock for the entire duration of the run!!
+			schedule.verb = verb;
 			schedule.run(pipeline);
 		    schedule.write(DO_LOCK);
 

@@ -67,6 +67,9 @@
 // forward declaration current_browse_directory, which allows CURRENT_ODIR browse buttons
 extern std::string current_browse_directory;
 
+// Show the scheduler view
+extern bool show_scheduler;
+
 
 // Gui layout
 //#define XCOL1 10

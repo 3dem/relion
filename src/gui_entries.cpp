@@ -99,6 +99,8 @@ void GuiEntry::clear()
 	*/
 
 }
+bool show_scheduler;
+
 void GuiEntry::initialise(int x, int y, Fl_Group * deactivate_this_group, bool _actually_activate, int height, int wcol2, int wcol3)
 {
 
@@ -139,37 +141,40 @@ void GuiEntry::initialise(int x, int y, Fl_Group * deactivate_this_group, bool _
 	else if (joboption.joboption_type == JOBOPTION_RADIO || joboption.joboption_type == JOBOPTION_BOOLEAN)
 	{
 
-		choice = new Fl_Choice(XCOL2, y, WCOL2, height);
-		if (joboption.joboption_type == JOBOPTION_RADIO)
+		if (!show_scheduler)
 		{
-			// Add all items to the menu
-			for (int i = 0; i < joboption.radio_options.size(); i++)
+			choice = new Fl_Choice(XCOL2, y, WCOL2, height);
+			if (joboption.joboption_type == JOBOPTION_RADIO)
 			{
 				// Add all items to the menu
-				choice->add(joboption.radio_options[i].c_str());
-				if (joboption.radio_options[i] == joboption.default_value) choice->picked(choice->mvalue());
+				for (int i = 0; i < joboption.radio_options.size(); i++)
+				{
+					// Add all items to the menu
+					choice->add(joboption.radio_options[i].c_str());
+					if (joboption.radio_options[i] == joboption.default_value) choice->picked(choice->mvalue());
+				}
 			}
-		}
-		else // boolean
-		{
-			if (deactivate_this_group != NULL) {
-				my_deactivate_group = deactivate_this_group;
-				actually_activate = _actually_activate;
+			else // boolean
+			{
+				if (deactivate_this_group != NULL) {
+					my_deactivate_group = deactivate_this_group;
+					actually_activate = _actually_activate;
+				}
+
+				choice->menu(bool_options);
+				if (joboption.default_value=="Yes")
+					choice->picked(&bool_options[0]);
+				else
+					choice->picked(&bool_options[1]);
 			}
+			choice->callback(cb_menu, this);
+			choice->textsize(ENTRY_FONTSIZE);
 
-			choice->menu(bool_options);
-			if (joboption.default_value=="Yes")
-				choice->picked(&bool_options[0]);
-			else
-				choice->picked(&bool_options[1]);
+			menu = choice;
+			//menu->color(GUI_BACKGROUND_COLOR);
+			menu->color(GUI_INPUT_COLOR);
+			menu->textsize(ENTRY_FONTSIZE);
 		}
-		choice->callback(cb_menu, this);
-		choice->textsize(ENTRY_FONTSIZE);
-
-		menu = choice;
-		//menu->color(GUI_BACKGROUND_COLOR);
-		menu->color(GUI_INPUT_COLOR);
-		menu->textsize(ENTRY_FONTSIZE);
 	}
 	else if (joboption.joboption_type == JOBOPTION_SLIDER)
 	{
@@ -372,19 +377,21 @@ void GuiEntry::cb_menu(Fl_Widget* o, void* v) {
 
 void GuiEntry::cb_menu_i()
 {
-	const Fl_Menu_Item* m = menu->mvalue();
-	// Set my own value
-	inp->value(m->label());
-	// In case this was a boolean that deactivates a group, do so:
-	if (my_deactivate_group != NULL)
+	if (!show_scheduler)
 	{
-		if ( actually_activate && (strcmp(inp->value(), "Yes") == 0) ||
-		    !actually_activate && (strcmp(inp->value(), "No") == 0))
-			my_deactivate_group->deactivate();
-		else
-			my_deactivate_group->activate();
+		const Fl_Menu_Item* m = menu->mvalue();
+		// Set my own value
+		inp->value(m->label());
+		// In case this was a boolean that deactivates a group, do so:
+		if (my_deactivate_group != NULL)
+		{
+			if ( actually_activate && (strcmp(inp->value(), "Yes") == 0) ||
+				!actually_activate && (strcmp(inp->value(), "No") == 0))
+				my_deactivate_group->deactivate();
+			else
+				my_deactivate_group->activate();
+		}
 	}
-
 }
 
 void GuiEntry::cb_slider(Fl_Widget* o, void* v) {
@@ -419,7 +426,8 @@ void GuiEntry::cb_input_i() {
 		return;
 	} else {
 		recurse = 1;
-		slider->value(fltkTextToFloat(inp->value()));         // pass input's value to slider
+
+		if (!show_scheduler) slider->value(fltkTextToFloat(inp->value()));         // pass input's value to slider
 		recurse = 0;
 	}
 }
