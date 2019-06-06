@@ -394,7 +394,7 @@ bool SchedulerOperator::performOperation() const
 			RFLOAT wait_seconds =  textToFloat(input1)-elapsed;
 			std::cout << " Waiting for " << wait_seconds << " seconds ..." << std::endl;
 			sleep(wait_seconds);
-			std::cout << " Finished waiting!" << std::endl;
+			std::cout << " Finished waiting." << std::endl;
 			annotate_time(&global_timestamp);
 			has_annotated_time =true;
 		}
@@ -1281,8 +1281,11 @@ bool Schedule::gotoNextJob()
     		bool op_success = scheduler_global_operators[current_node].performOperation();
     		if (verb > 0 && op_success)
     		{
-    			std::cout << " Setting: " << scheduler_global_operators[current_node].output
-    					<< " = " <<getVariableValueAsString(scheduler_global_operators[current_node].output) << std::endl;
+    			if (scheduler_global_operators[current_node].output != "undefined")
+    			{
+    				std::cout << " Setting: " << scheduler_global_operators[current_node].output
+					          << " = " <<getVariableValueAsString(scheduler_global_operators[current_node].output) << std::endl;
+    			}
     		}
 
     		if (!op_success) return false;
