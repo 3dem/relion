@@ -600,7 +600,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	if (mymodel.helical_twist_min > mymodel.helical_twist_max)
 		SWAP(mymodel.helical_twist_min, mymodel.helical_twist_max, tmp_RFLOAT);
 	helical_fourier_mask_resols = parser.getOption("--helical_exclude_resols", "Resolutions (in A) along helical axis to exclude from refinement (comma-separated pairs, e.g. 50-5)", "");
-	fn_fourier_mask = parser.getOption("--fourier_mask", "Originally-sized, FFTW-centred image with Fourier mask for Projector", "");
+	fn_fourier_mask = parser.getOption("--fourier_mask", "Originally-sized, FFTW-centred image with Fourier mask for Projector", "None");
 
 	// CTF, norm, scale, bfactor correction etc.
 	int corrections_section = parser.addSection("Corrections");
@@ -910,7 +910,7 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 			REPORT_ERROR("MlOptimiser::readStar::ERROR no accuracy of translations defined!");
 	}
 	if (!MD.getValue(EMDL_OPTIMISER_FOURIER_MASK, fn_fourier_mask))
-		fn_fourier_mask = "";
+		fn_fourier_mask = "None";
 
 	if (do_split_random_halves &&
 	    !MD.getValue(EMDL_OPTIMISER_MODEL_STARFILE2, fn_model2))
@@ -1656,7 +1656,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		A_rot90T = A_rot90.transpose();
 	}
 
-	if (fn_fourier_mask != "")
+	if (fn_fourier_mask != "None")
 	{
 		// Used also for continuations...
 		Image<RFLOAT> Itmp;
@@ -1667,7 +1667,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 	// Jun09, 2015 - Shaoda, Helical refinement
 	if (do_helical_refine)
 	{
-		if (fn_fourier_mask == "" && helical_fourier_mask_resols != "")
+		if (fn_fourier_mask == "None" && helical_fourier_mask_resols != "")
 		{
 			std::vector<std::string> resols;
 			std::vector<RFLOAT> resols_end, resols_start;
@@ -5673,7 +5673,7 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 
 }
 
-void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmasked,
+void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmasked, bool is_for_store_wsums,
 		long int part_id, int exp_current_oversampling, int metadata_offset,
 		int exp_itrans_min, int exp_itrans_max,
 		std::vector<MultidimArray<Complex > > &exp_Fimg,
@@ -5722,17 +5722,27 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 		int my_metadata_offset = metadata_offset + img_id;
 
 		int exp_current_image_size;
-		if (strict_highres_exp > 0.)
+		if (is_for_store_wsums)
+		{
+			// Always use full size of images for weighted sums in reconstruction!
+			exp_current_image_size = image_current_size[optics_group];
+		}
+		else if (strict_highres_exp > 0.)
+		{
 			// Use smaller images in both passes and keep a maximum on coarse_size, just like in FREALIGN
 			exp_current_image_size = image_coarse_size[optics_group];
+		}
 		else if (adaptive_oversampling > 0)
+		{
 			// Use smaller images in the first pass, larger ones in the second pass
 			exp_current_image_size = (exp_current_oversampling == 0) ? image_coarse_size[optics_group] : image_current_size[optics_group];
+		}
 		else
+		{
 			exp_current_image_size = image_current_size[optics_group];
+		}
 		bool do_ctf_invsig = (exp_local_Fctf.size() > 0) ? YSIZE(exp_local_Fctf[0])  != exp_current_image_size : true; // size has changed
 		bool do_masked_shifts = (do_ctf_invsig || nr_shifts != exp_local_Fimgs_shifted[img_id].size()); // size or nr_shifts has changed
-
 
 		if (do_masked_shifts)
 		{
@@ -5893,7 +5903,7 @@ void MlOptimiser::precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmask
 									<< YSIZE(exp_local_Fimgs_shifted_nomask[img_id][my_trans_image]) << ", "
 									<< XSIZE(exp_local_Fimgs_shifted_nomask[img_id][my_trans_image]) << std::endl;
 							std::cerr << " mymodel.ori_size = " << mymodel.ori_size << std::endl;
-							MultidimArray<Complex> Faux, Fo;
+							copMultidimArray<Complex> Faux, Fo;
 							Image<RFLOAT> tt;
 							FourierTransformer transformer;
 							tt().resize((mymodel.data_dim == 3) ? (mymodel.ori_size) : (1), mymodel.ori_size, mymodel.ori_size);
@@ -6006,7 +6016,7 @@ void MlOptimiser::getAllSquaredDifferences(long int part_id, int ibody,
 	std::vector<MultidimArray<Complex > > dummy;
 	std::vector<std::vector<MultidimArray<Complex > > > dummy2;
 
-	precalculateShiftedImagesCtfsAndInvSigma2s(false, part_id, exp_current_oversampling, metadata_offset,
+	precalculateShiftedImagesCtfsAndInvSigma2s(false, false, part_id, exp_current_oversampling, metadata_offset,
 			exp_itrans_min, exp_itrans_max, exp_Fimg, dummy, exp_Fctf, exp_local_Fimgs_shifted, dummy2,
 			exp_local_Fctf, exp_local_sqrtXi2, exp_local_Minvsigma2);
 
@@ -7112,7 +7122,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 	long int exp_nr_oversampled_trans = sampling.oversamplingFactorTranslations(exp_current_oversampling);
 
 	// Re-do below because now also want unmasked images AND if (stricht_highres_exp >0.) then may need to resize
-	precalculateShiftedImagesCtfsAndInvSigma2s(true, part_id, exp_current_oversampling, metadata_offset,
+	precalculateShiftedImagesCtfsAndInvSigma2s(true, true, part_id, exp_current_oversampling, metadata_offset,
 			exp_itrans_min, exp_itrans_max, exp_Fimg, exp_Fimg_nomask, exp_Fctf, exp_local_Fimgs_shifted, exp_local_Fimgs_shifted_nomask,
 			exp_local_Fctf, exp_local_sqrtXi2, exp_local_Minvsigma2);
 
