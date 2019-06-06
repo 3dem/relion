@@ -185,6 +185,7 @@ static bool do_allow_change_minimum_dedicated;
 #define PROC_MULTIBODY_NAME		"MultiBody"    // Multi-body refinement
 #define PROC_MOTIONREFINE_NAME  "Polish"       // Jasenko's motion fitting program for Bayesian polishing (to replace MovieRefine?)
 #define PROC_CTFREFINE_NAME     "CtfRefine"    // Jasenko's program for defocus and beamtilt optimisation
+#define PROC_EXTERNAL_NAME      "External"     // For running non-relion programs
 
 #define PROC_IMPORT         0 // Import any file as a Node of a given type
 #define PROC_MOTIONCORR 	1 // Import any file as a Node of a given type
@@ -208,12 +209,15 @@ static bool do_allow_change_minimum_dedicated;
 #define PROC_MULTIBODY      19// Multi-body refinement
 #define PROC_MOTIONREFINE   20// Jasenko's motion_refine
 #define PROC_CTFREFINE      21// Jasenko's ctf_refine
-#define NR_BROWSE_TABS      19
+#define PROC_EXTERNAL       99// External scripts
+#define NR_BROWSE_TABS      20
 
 // Status a Process may have
-#define PROC_RUNNING   0
-#define PROC_SCHEDULED 1
-#define PROC_FINISHED  2
+#define PROC_RUNNING          0 // (hopefully) running
+#define PROC_SCHEDULED        1 // scheduled for future execution
+#define PROC_FINISHED_SUCCESS 2 // successfully finished
+#define PROC_FINISHED_FAILURE 3 // reported an error
+#define PROC_FINISHED_ABORTED 4 // aborted by the user
 
 struct gui_layout
 {
@@ -312,6 +316,9 @@ public:
 
 	// Set values of label, value, default_value and helptext (common for all types)
 	void initialise(std::string _label, std::string _default_value, std::string _helptext);
+
+	// Contains $$ for SchedulerVariable
+	bool isSchedulerVariable();
 
 	// Get a string value
 	std::string getString();
@@ -486,6 +493,10 @@ public:
 
 	void initialiseCtfrefineJob();
 	bool getCommandsCtfrefineJob(std::string &outputname, std::vector<std::string> &commands,
+			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
+
+	void initialiseExternalJob();
+	bool getCommandsExternalJob(std::string &outputname, std::vector<std::string> &commands,
 			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
 
 };

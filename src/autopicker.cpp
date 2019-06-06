@@ -914,6 +914,11 @@ void AutoPicker::run()
 	FileName fn_olddir="";
 	for (long int imic = 0; imic < fn_micrographs.size(); imic++)
 	{
+
+		// Abort through the pipeline_control system
+		if (pipeline_control_check_abort_job())
+			exit(RELION_EXIT_ABORTED);
+
 		if (verb > 0 && imic % barstep == 0)
 			progress_bar(imic);
 

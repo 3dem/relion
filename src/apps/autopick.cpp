@@ -60,9 +60,9 @@ int main(int argc, char *argv[])
 		//prm.usage();
 		std::cerr << XE;
 
-		return EXIT_FAILURE;
+		return RELION_EXIT_FAILURE;
 	}
 
-	return EXIT_SUCCESS;
+	return RELION_EXIT_SUCCESS;
 }
 

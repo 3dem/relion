@@ -82,13 +82,13 @@ int AberrationPlot::readMoreOptions(IOParser& parser, int argc, char *argv[])
 		allGood = false;
 	}
 
-	if (!allGood) return 13;
-	else return 0;
+	if (!allGood) return RELION_EXIT_FAILURE;
+	else return RELION_EXIT_SUCCESS;
 }
 
 int AberrationPlot::_init()
 {
-	return 0;
+	return RELION_EXIT_SUCCESS;
 }
 
 int AberrationPlot::_run()
@@ -347,5 +347,5 @@ int AberrationPlot::_run()
 
 	std::cout << "elapsed: " << (t1 - t0) << "s \n";
 
-	return 0;
+	return RELION_EXIT_SUCCESS;
 }

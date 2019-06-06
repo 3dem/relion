@@ -65,6 +65,7 @@ class Process
 // Forward definition
 class PipeLineFlowChart;
 
+
 #define PIPELINE_HAS_CHANGED ".pipeline_has_changed"
 class PipeLine
 {
@@ -147,7 +148,7 @@ class PipeLine
 			std::vector<std::string> &commands, std::string &final_command, std::string &error_message);
 
 	// Adds _job to the pipeline and return the id of the newprocess
-	long int addJob(RelionJob &_job, int as_status, bool do_overwrite);
+	long int addJob(RelionJob &_job, int as_status, bool do_overwrite, bool do_write_minipipeline = true);
 
 	// Runs a job and adds it to the pipeline
 	bool runJob(RelionJob &_job, int &current_job, bool only_schedule, bool is_main_continue,
@@ -158,6 +159,11 @@ class PipeLine
 
 	// Adds a scheduled job to the pipeline from the command line (with integer job type)
 	int addScheduledJob(int job_type, std::string fn_options);
+
+	// Add this RelionJob as scheduled to the pipeline
+	int addScheduledJob(RelionJob &job);
+
+	void waitForJobToFinish(int current_job, bool &is_failure, bool &is_abort);
 
 	// Runs a series of scheduled jobs, possibly in a loop, from the command line
 	void runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_repeat,

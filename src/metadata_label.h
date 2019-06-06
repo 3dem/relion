@@ -463,6 +463,36 @@ enum EMDLabel
 	EMDL_SAMPLING_SIGMA_PSI,
 	EMDL_SAMPLING_SYMMETRY,
 
+	EMDL_SCHEDULE_EDGE_NUMBER,
+	EMDL_SCHEDULE_EDGE_INPUT,
+	EMDL_SCHEDULE_EDGE_OUTPUT,
+	EMDL_SCHEDULE_EDGE_IS_FORK,
+	EMDL_SCHEDULE_EDGE_OUTPUT_TRUE,
+	EMDL_SCHEDULE_EDGE_BOOLEAN,
+	EMDL_SCHEDULE_GENERAL_CURRENT_NODE,
+	EMDL_SCHEDULE_GENERAL_ORIGINAL_START_NODE,
+	EMDL_SCHEDULE_GENERAL_EMAIL,
+	EMDL_SCHEDULE_GENERAL_NAME,
+	EMDL_SCHEDULE_JOB_NAME,
+	EMDL_SCHEDULE_JOB_ORI_NAME,
+	EMDL_SCHEDULE_JOB_MODE,
+	EMDL_SCHEDULE_JOB_HAS_STARTED,
+	EMDL_SCHEDULE_OPERATOR_NAME,
+	EMDL_SCHEDULE_OPERATOR_TYPE,
+	EMDL_SCHEDULE_OPERATOR_INPUT1,
+	EMDL_SCHEDULE_OPERATOR_INPUT2,
+	EMDL_SCHEDULE_OPERATOR_OUTPUT,
+	EMDL_SCHEDULE_VAR_BOOL_NAME,
+	EMDL_SCHEDULE_VAR_BOOL_VALUE,
+	EMDL_SCHEDULE_VAR_BOOL_ORI_VALUE,
+	EMDL_SCHEDULE_VAR_FLOAT_NAME,
+	EMDL_SCHEDULE_VAR_FLOAT_VALUE,
+	EMDL_SCHEDULE_VAR_FLOAT_ORI_VALUE,
+	EMDL_SCHEDULE_VAR_STRING_NAME,
+	EMDL_SCHEDULE_VAR_STRING_VALUE,
+	EMDL_SCHEDULE_VAR_STRING_ORI_VALUE,
+
+
 	EMDL_SELECTED,
 	EMDL_SELECT_PARTICLES_ZSCORE,
 	EMDL_SORTED_IDX,
@@ -645,13 +675,13 @@ private:
 		EMDL::addLabel(EMDL_IMAGE_STATS_SKEW, EMDL_DOUBLE, "rlnSkewnessValue", "Skewness (3rd moment) for the pixel values in an image");
 		EMDL::addLabel(EMDL_IMAGE_STATS_KURT, EMDL_DOUBLE, "rlnKurtosisExcessValue", "Kurtosis excess (4th moment - 3) for the pixel values in an image");
 		EMDL::addLabel(EMDL_IMAGE_WEIGHT, EMDL_DOUBLE, "rlnImageWeight", "Relative weight of an image");
-		
+
 		EMDL::addLabel(EMDL_MASK_NAME, EMDL_STRING, "rlnMaskName", "Name of an image that contains a [0,1] mask");
-		
+
 		EMDL::addLabel(EMDL_JOB_IS_CONTINUE, EMDL_BOOL, "rlnJobIsContinue", "Is tthis a continuation job?");
 		EMDL::addLabel(EMDL_JOB_TYPE, EMDL_INT, "rlnJobType", "Which type of job is this?");
 		EMDL::addLabel(EMDL_JOB_TYPE_NAME, EMDL_STRING, "rlnJobTypeName", "The name for this type of job (also name of main directory for output jobs)");
-		
+
 		EMDL::addLabel(EMDL_JOBOPTION_TYPE, EMDL_INT, "rlnJoboptionType", "Which type of joboption is this?");
 		EMDL::addLabel(EMDL_JOBOPTION_VARIABLE, EMDL_STRING, "rlnJobOptionVariable", "Name of the joboption variable");
 		EMDL::addLabel(EMDL_JOBOPTION_VALUE, EMDL_STRING, "rlnJobOptionValue", "Value of a joboption");
@@ -664,7 +694,7 @@ private:
 		EMDL::addLabel(EMDL_JOBOPTION_PATTERN, EMDL_STRING, "rlnJobOptionFilePattern", "Pattern for file browser of a joboption");
 		EMDL::addLabel(EMDL_JOBOPTION_DIRECTORY, EMDL_STRING, "rlnJobOptionDirectoryDefault", "Default directory for file browser of a joboption");
 		EMDL::addLabel(EMDL_JOBOPTION_MENUOPTIONS, EMDL_STRING, "rlnJobOptionMenuOptions", "Options for pull-down menu");
-		
+
 		EMDL::addLabel(EMDL_MATRIX_1_1, EMDL_DOUBLE, "rlnMatrix_1_1", "Matrix element (1,1) of a 3x3 matrix");
 		EMDL::addLabel(EMDL_MATRIX_1_2, EMDL_DOUBLE, "rlnMatrix_1_2", "Matrix element (1,2) of a 3x3 matrix");
 		EMDL::addLabel(EMDL_MATRIX_1_3, EMDL_DOUBLE, "rlnMatrix_1_3", "Matrix element (1,3) of a 3x3 matrix");
@@ -674,7 +704,7 @@ private:
 		EMDL::addLabel(EMDL_MATRIX_3_1, EMDL_DOUBLE, "rlnMatrix_3_1", "Matrix element (3,1) of a 3x3 matrix");
 		EMDL::addLabel(EMDL_MATRIX_3_2, EMDL_DOUBLE, "rlnMatrix_3_2", "Matrix element (3,1) of a 3x3 matrix");
 		EMDL::addLabel(EMDL_MATRIX_3_3, EMDL_DOUBLE, "rlnMatrix_3_3", "Matrix element (3,1) of a 3x3 matrix");
-		
+
 		EMDL::addLabel(EMDL_MICROGRAPH_ACCUM_MOTION_TOTAL, EMDL_DOUBLE, "rlnAccumMotionTotal","Accumulated global motion during the entire movie (in A)");
 		EMDL::addLabel(EMDL_MICROGRAPH_ACCUM_MOTION_EARLY, EMDL_DOUBLE, "rlnAccumMotionEarly","Accumulated global motion during the first frames of the movie (in A)");
 		EMDL::addLabel(EMDL_MICROGRAPH_ACCUM_MOTION_LATE, EMDL_DOUBLE, "rlnAccumMotionLate","Accumulated global motion during the last frames of the movie (in A)");
@@ -701,7 +731,7 @@ private:
 		EMDL::addLabel(EMDL_MICROGRAPH_SHIFT_Y, EMDL_DOUBLE, "rlnMicrographShiftY", "Y shift of a (patch of) micrograph");
 		EMDL::addLabel(EMDL_MICROGRAPH_MOTION_COEFFS_IDX, EMDL_INT, "rlnMotionModelCoeffsIdx", "Index of a coefficient of a motion model");
 		EMDL::addLabel(EMDL_MICROGRAPH_MOTION_COEFF, EMDL_DOUBLE, "rlnMotionModelCoeff", "A coefficient of a motion model");
-		
+
 		EMDL::addLabel(EMDL_MLMODEL_ACCURACY_ROT, EMDL_DOUBLE, "rlnAccuracyRotations", "Estimated accuracy (in degrees) with which rotations can be assigned");
 		EMDL::addLabel(EMDL_MLMODEL_ACCURACY_TRANS, EMDL_DOUBLE, "rlnAccuracyTranslations", "Estimated accuracy (in pixels) with which translations can be assigned");
 		EMDL::addLabel(EMDL_MLMODEL_ACCURACY_TRANS_ANGSTROM, EMDL_DOUBLE, "rlnAccuracyTranslationsAngst", "Estimated accuracy (in Angstroms) with which translations can be assigned");
@@ -759,7 +789,7 @@ private:
 		EMDL::addLabel(EMDL_MLMODEL_SSNR_REF, EMDL_DOUBLE, "rlnSignalToNoiseRatio", "Spectral signal-to-noise ratio for a reference");
 		EMDL::addLabel(EMDL_MLMODEL_TAU2_FUDGE_FACTOR, EMDL_DOUBLE, "rlnTau2FudgeFactor", "Regularisation parameter with which estimates for the power in the references will be multiplied (T in original paper)");
 		EMDL::addLabel(EMDL_MLMODEL_TAU2_REF, EMDL_DOUBLE, "rlnReferenceTau2", "Spherical average of the estimated power in the signal of a reference");
-		
+
 		EMDL::addLabel(EMDL_OPTIMISER_ACCURACY_ROT, EMDL_DOUBLE, "rlnOverallAccuracyRotations", "Overall accuracy of the rotational assignments (in degrees)");
 		EMDL::addLabel(EMDL_OPTIMISER_ACCURACY_TRANS, EMDL_DOUBLE, "rlnOverallAccuracyTranslations", "Overall accuracy of the translational assignments (in pixels)");
 		EMDL::addLabel(EMDL_OPTIMISER_ACCURACY_TRANS_ANGSTROM, EMDL_DOUBLE, "rlnOverallAccuracyTranslationsAngst", "Overall accuracy of the translational assignments (in Angstroms)");
@@ -958,6 +988,35 @@ private:
 		EMDL::addLabel(EMDL_SAMPLING_PERTURBATION_FACTOR, EMDL_DOUBLE, "rlnSamplingPerturbFactor", "Factor for random perturbation on the orientational sampling (between 0 no perturbation and 1 very strong perturbation)");
 		EMDL::addLabel(EMDL_SAMPLING_PSI_STEP, EMDL_DOUBLE, "rlnPsiStep", "Step size (in degrees) for the sampling of the in-plane rotation angle (psi)");
 		EMDL::addLabel(EMDL_SAMPLING_SYMMETRY, EMDL_STRING, "rlnSymmetryGroup", "Symmetry group (e.g., C1, D7, I2, I5, etc.)");
+
+		EMDL::addLabel(EMDL_SCHEDULE_EDGE_NUMBER, EMDL_INT, "rlnScheduleEdgeNumber", "Numbered index of an edge inside a Schedule");
+		EMDL::addLabel(EMDL_SCHEDULE_EDGE_INPUT, EMDL_STRING, "rlnScheduleEdgeInputNodeName" , "Name of the input Node for a schedule Edge");
+		EMDL::addLabel(EMDL_SCHEDULE_EDGE_OUTPUT, EMDL_STRING, "rlnScheduleEdgeOutputNodeName", "Name of the output Node for a schedule Edge");
+		EMDL::addLabel(EMDL_SCHEDULE_EDGE_IS_FORK, EMDL_BOOL, "rlnScheduleEdgeIsFork", "Flag to indicate that this Edge is a Fork, dependent on a Boolean Schedule variable");
+		EMDL::addLabel(EMDL_SCHEDULE_EDGE_OUTPUT_TRUE, EMDL_STRING, "rlnScheduleEdgeOutputNodeNameIfTrue", "Name of the output Node for a schedule Fork if the associated Boolean is True");
+		EMDL::addLabel(EMDL_SCHEDULE_EDGE_BOOLEAN, EMDL_STRING, "rlnScheduleEdgeBooleanVariable", "Name of the associated Boolean variable if this Edge is a Fork");
+		EMDL::addLabel(EMDL_SCHEDULE_GENERAL_CURRENT_NODE, EMDL_STRING, "rlnScheduleCurrentNodeName", "Name of the current Node for this Schedule");
+		EMDL::addLabel(EMDL_SCHEDULE_GENERAL_ORIGINAL_START_NODE, EMDL_STRING, "rlnScheduleOriginalStartNodeName", "Name of the original starting Node for this Schedule");
+		EMDL::addLabel(EMDL_SCHEDULE_GENERAL_EMAIL, EMDL_STRING, "rlnScheduleEmailAddress", "Email address to send message when Schedule finishes");
+		EMDL::addLabel(EMDL_SCHEDULE_GENERAL_NAME, EMDL_STRING, "rlnScheduleName", "Name for this Schedule");
+		EMDL::addLabel(EMDL_SCHEDULE_JOB_NAME, EMDL_STRING, "rlnScheduleJobName", "Name of a Job in a Schedule");
+		EMDL::addLabel(EMDL_SCHEDULE_JOB_ORI_NAME, EMDL_STRING, "rlnScheduleJobNameOriginal", "Original name of a Job in a Schedule");
+		EMDL::addLabel(EMDL_SCHEDULE_JOB_MODE, EMDL_STRING, "rlnScheduleJobMode", "Mode on how to execute a Job");
+		EMDL::addLabel(EMDL_SCHEDULE_JOB_HAS_STARTED, EMDL_BOOL, "rlnScheduleJobHasStarted", "Flag to indicate whether a Job has started already in the execution of the Schedule");
+		EMDL::addLabel(EMDL_SCHEDULE_OPERATOR_NAME, EMDL_STRING, "rlnScheduleOperatorName", "Name of a Boolean operator in the Schedule");
+		EMDL::addLabel(EMDL_SCHEDULE_OPERATOR_TYPE, EMDL_STRING, "rlnScheduleOperatorType", "Type of an operator in the Schedule");
+		EMDL::addLabel(EMDL_SCHEDULE_OPERATOR_INPUT1, EMDL_STRING, "rlnScheduleOperatorInput1", "Name of the 1st input to the operator");
+		EMDL::addLabel(EMDL_SCHEDULE_OPERATOR_INPUT2, EMDL_STRING, "rlnScheduleOperatorInput2", "Name of the 2nd input to the operator");
+		EMDL::addLabel(EMDL_SCHEDULE_OPERATOR_OUTPUT, EMDL_STRING, "rlnScheduleOperatorOutput", "Name of the output variable on which this operator acts");
+		EMDL::addLabel(EMDL_SCHEDULE_VAR_BOOL_NAME, EMDL_STRING, "rlnScheduleBooleanVariableName", "Name of a Boolean variable in the Schedule");
+		EMDL::addLabel(EMDL_SCHEDULE_VAR_BOOL_VALUE, EMDL_BOOL, "rlnScheduleBooleanVariableValue", "Value of a Boolean variable in the Schedule");
+		EMDL::addLabel(EMDL_SCHEDULE_VAR_BOOL_ORI_VALUE, EMDL_BOOL, "rlnScheduleBooleanVariableResetValue", "Value which a Boolean variable will take upon a reset");
+		EMDL::addLabel(EMDL_SCHEDULE_VAR_FLOAT_NAME, EMDL_STRING, "rlnScheduleFloatVariableName", "Name of a Float variable in the Schedule");
+		EMDL::addLabel(EMDL_SCHEDULE_VAR_FLOAT_VALUE, EMDL_DOUBLE, "rlnScheduleFloatVariableValue", "Value of a Float variable in the Schedule");
+		EMDL::addLabel(EMDL_SCHEDULE_VAR_FLOAT_ORI_VALUE, EMDL_DOUBLE, "rlnScheduleFloatVariableResetValue", "Value which a Float variable will take upon a reset");
+		EMDL::addLabel(EMDL_SCHEDULE_VAR_STRING_NAME, EMDL_STRING, "rlnScheduleStringVariableName", "Name of a String variable in the Schedule");
+		EMDL::addLabel(EMDL_SCHEDULE_VAR_STRING_VALUE, EMDL_STRING, "rlnScheduleStringVariableValue", "Value of a String variable in the Schedule");
+		EMDL::addLabel(EMDL_SCHEDULE_VAR_STRING_ORI_VALUE, EMDL_STRING, "rlnScheduleStringVariableResetValue", "Value which a String variable will take upon a reset");
 
 		EMDL::addLabel(EMDL_SELECTED, EMDL_INT, "rlnSelected", "Flag whether an entry in a metadatatable is selected (1) in the viewer or not (0)");
 		EMDL::addLabel(EMDL_SELECT_PARTICLES_ZSCORE, EMDL_DOUBLE, "rlnParticleSelectZScore", "Sum of Z-scores from particle_select. High Z-scores are likely to be outliers.");

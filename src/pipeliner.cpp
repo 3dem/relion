@@ -23,6 +23,7 @@
 
 //#define DEBUG
 
+
 long int PipeLine::addNode(Node &_Node, bool touch_if_not_exist)
 {
 
@@ -324,45 +325,83 @@ bool PipeLine::checkProcessCompletion()
 	if (do_read_only)
 		return false;
 
-	std::vector<long int> finished_processes;
+	std::vector<long int> finished_success_processes;
+	std::vector<long int> finished_failure_processes;
+	std::vector<long int> finished_aborted_processes;
+
 	for (long int i=0; i < processList.size(); i++)
 	{
 		// Only check running processes for file existence
 		if (processList[i].status == PROC_RUNNING)
 		{
-			bool all_exist = true;
-			for (long int j = 0; j < processList[i].outputNodeList.size(); j++)
-			{
-				int myNode = (processList[i]).outputNodeList[j];
-				if (myNode < 0 || myNode >= nodeList.size())
-					REPORT_ERROR("pipeline checkProcessCompletion ERROR: " + integerToString(j) + "th output node of " + processList[i].name + " is invalid: " + integerToString(myNode));
-				if (!touchTemporaryNodeFile(nodeList[myNode]))
-				{
-					all_exist = false;
-					break;
-				}
-			}
-			if (all_exist)
-			{
-				// Store this one to be set below during the read/write cycle
-				finished_processes.push_back(i);
-			}
+
+			if (exists(processList[i].name + RELION_JOB_EXIT_SUCCESS))
+				finished_success_processes.push_back(i);
+			else if (exists(processList[i].name + RELION_JOB_EXIT_FAILURE))
+				finished_failure_processes.push_back(i);
+			else if (exists(processList[i].name + RELION_JOB_EXIT_ABORTED))
+				finished_aborted_processes.push_back(i);
+
 		}
 	}
 
 	// Only do read/write cycle in case a process was finished, otherwise the GUI slows down too much
-	if (finished_processes.size() > 0 || exists(PIPELINE_HAS_CHANGED))
+	if (finished_success_processes.size() > 0 ||
+		finished_failure_processes.size() > 0 ||
+		finished_aborted_processes.size() > 0 ||
+		exists(PIPELINE_HAS_CHANGED) )
 	{
 		// Read in the latest version of the pipeline, just in case anyone else made a change meanwhile...
-		std::string lock_message = "checkProcessCompletion: the following jobs have finished: ";
-		for (long int i = 0; i < finished_processes.size(); i++)
-			lock_message += " " + processList[finished_processes[i]].name;
+		std::string lock_message = "";
+		if (finished_success_processes.size() > 0)
+		{
+			lock_message += "checkProcessCompletion: the following jobs have successfully finished: ";
+			for (long int i = 0; i < finished_success_processes.size(); i++)
+				lock_message += " " + processList[finished_success_processes[i]].name;
+			lock_message += "\n";
+		}
+		if (finished_failure_processes.size() > 0)
+		{
+			lock_message += "checkProcessCompletion: the following jobs have failed with an error: ";
+			for (long int i = 0; i < finished_failure_processes.size(); i++)
+				lock_message += " " + processList[finished_failure_processes[i]].name;
+			lock_message += "\n";
+		}
+		if (finished_aborted_processes.size() > 0)
+		{
+			lock_message += "checkProcessCompletion: the following jobs have been aborted: ";
+			for (long int i = 0; i < finished_aborted_processes.size(); i++)
+				lock_message += " " + processList[finished_aborted_processes[i]].name;
+			lock_message += "\n";
+		}
 
 		read(DO_LOCK, lock_message);
 
 		// Set the new status of all the finished processes
-		for (int i=0; i < finished_processes.size(); i++)
-			processList[finished_processes[i]].status = PROC_FINISHED;
+		for (int i=0; i < finished_success_processes.size(); i++)
+		{
+			int myproc = finished_success_processes[i];
+			processList[myproc].status = PROC_FINISHED_SUCCESS;
+
+			// Also touch the outputNodes in the .Nodes directory
+			for (long int j = 0; j < processList[myproc].outputNodeList.size(); j++)
+			{
+				int myNode = (processList[myproc]).outputNodeList[j];
+				if (myNode < 0 || myNode >= nodeList.size())
+					REPORT_ERROR("pipeline checkProcessCompletion ERROR: " + integerToString(j) + "th output node of " + processList[myproc].name + " is invalid: " + integerToString(myNode));
+				if (!touchTemporaryNodeFile(nodeList[myNode]))
+					REPORT_ERROR("ERROR: output node " + nodeList[myNode].name + " does not exist, while job " + processList[myproc].name +" has finished successfully...");
+			}
+
+		}
+		for (int i=0; i < finished_failure_processes.size(); i++)
+		{
+			processList[finished_failure_processes[i]].status = PROC_FINISHED_FAILURE;
+		}
+		for (int i=0; i < finished_aborted_processes.size(); i++)
+		{
+			processList[finished_aborted_processes[i]].status = PROC_FINISHED_ABORTED;
+		}
 
 		// Always couple read/write with DO_LOCK
 		// This is to make sure two different windows do not get out-of-sync
@@ -412,8 +451,9 @@ bool PipeLine::getCommandLineJob(RelionJob &thisjob, int current_job, bool is_ma
 
 
 // Adds thisjob to the pipeline and returns the id of the newprocess
-long int PipeLine::addJob(RelionJob &thisjob, int as_status, bool do_overwrite)
+long int PipeLine::addJob(RelionJob &thisjob, int as_status, bool do_overwrite, bool do_write_minipipeline)
 {
+
 	// Also write a mini-pipeline in the output directory
 	PipeLine mini_pipeline;
 	mini_pipeline.setName(thisjob.outputName+"job");
@@ -436,8 +476,11 @@ long int PipeLine::addJob(RelionJob &thisjob, int as_status, bool do_overwrite)
 		mini_pipeline.addNewOutputEdge(0, thisjob.outputNodes[i]);
 	}
 
-	// Write the mini-pipeline to an updated STAR file
-	mini_pipeline.write();
+	if (do_write_minipipeline)
+	{
+		// Write the mini-pipeline to an updated STAR file
+		mini_pipeline.write();
+	}
 	// Writing of the overall pipeline is done in the function calling addToPipeLine
 
 	return myProcess;
@@ -448,15 +491,24 @@ bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, boo
 		bool is_scheduled, bool do_overwrite_current, std::string &error_message)
 {
 
-	if (do_overwrite_current) is_main_continue = false;
-
 	std::vector<std::string> commands;
 	std::string final_command;
+
+	// Remove run.out and run.err when overwriting a job
+	if (do_overwrite_current) is_main_continue = false;
 
 	// true means makedir
 	if (!getCommandLineJob(_job, current_job, is_main_continue, is_scheduled, true, do_overwrite_current, commands, final_command, error_message))
 	{
 		return false;
+	}
+
+	// Remove run.out and run.err when overwriting a job
+	if (do_overwrite_current)
+	{
+		// Completely empty the output directory, NOTE that  _job.outputName+ is not defined until AFTER calling getCommandLineJob!!!
+		std::string command = " rm -rf " + _job.outputName+"*";
+		int res = system(command.c_str());
 	}
 
 	// Read in the latest version of the pipeline, just in case anyone else made a change meanwhile...
@@ -469,14 +521,14 @@ bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, boo
 	// Also save a copy of the GUI settings with the current output name
 	_job.write(_job.outputName);
 
+	// Make sure none of the exit or abort files from the pipeline_control system are here from before
+	std::remove((_job.outputName+RELION_JOB_ABORT_NOW).c_str());
+	std::remove((_job.outputName+RELION_JOB_EXIT_ABORTED).c_str());
+	std::remove((_job.outputName+RELION_JOB_EXIT_SUCCESS).c_str());
+	std::remove((_job.outputName+RELION_JOB_EXIT_FAILURE).c_str());
 
-	// Remove run.out and run.err when overwriting a job
-	if (do_overwrite_current)
-	{
-		remove((_job.outputName+"run.out").c_str());
-		remove((_job.outputName+"run.err").c_str());
-	}
 
+	/*
 	// If this is a continuation job, check whether output files exist and move away!
 	// This is to ensure that the continuation job goes OK and will show up as 'running' in the GUI
 	bool do_move_output_nodes_to_old = false;
@@ -539,6 +591,39 @@ bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, boo
 			}
 		}
 	}
+	*/
+
+	// For continuation of relion_refine jobs, remove the original output nodes from the list
+	if (!only_schedule && is_main_continue)
+	{
+		if (processList[current_job].type == PROC_2DCLASS ||
+		    processList[current_job].type == PROC_3DCLASS ||
+		    processList[current_job].type == PROC_3DAUTO ||
+		    processList[current_job].type == PROC_MULTIBODY ||
+		    processList[current_job].type == PROC_INIMODEL)
+		{
+
+			std::vector<bool> deleteNodes, deleteProcesses;
+			deleteNodes.resize(nodeList.size(), false);
+			deleteProcesses.resize(processList.size(), false);
+
+			for (long int inode = 0; inode < (processList[current_job]).outputNodeList.size(); inode++)
+			{
+				long int mynode = (processList[current_job]).outputNodeList[inode];
+				if(!exists(nodeList[mynode].name))
+					deleteNodes[mynode] = true;
+			}
+
+			FileName fn_del = "tmp";
+			write(DO_LOCK, fn_del, deleteNodes, deleteProcesses);
+			std::remove("tmpdeleted_pipeline.star");
+
+			// Read the updated pipeline back in again
+			lock_message += " part 2";
+			read(DO_LOCK, lock_message);
+
+		}
+	} // end if !only_schedule && is_main_continue
 
 	// Now save the job (and its status) to the PipeLine
 	int mynewstatus;
@@ -649,6 +734,49 @@ int PipeLine::addScheduledJob(int job_type, std::string fn_options)
 	return current_job;
 }
 
+// Adds a scheduled job to the pipeline from the command line
+int PipeLine::addScheduledJob(RelionJob &job)
+{
+	std::string error_message;
+	int current_job = processList.size();
+	if (!runJob(job, current_job, true, job.is_continue, false, false, error_message)) // true is only_schedule, false means !is_scheduled, 2nd false means dont overwrite current
+		REPORT_ERROR(error_message.c_str());
+
+	return current_job;
+}
+
+void PipeLine::waitForJobToFinish(int current_job, bool &is_failure, bool &is_aborted)
+{
+
+	while (true)
+    {
+        sleep(10);
+        checkProcessCompletion();
+        if (processList[current_job].status == PROC_FINISHED_SUCCESS ||
+            processList[current_job].status == PROC_FINISHED_ABORTED ||
+            processList[current_job].status == PROC_FINISHED_FAILURE)
+        {
+            // Prepare a string for a more informative .lock file
+            std::string lock_message = " pipeliner noticed that " + processList[current_job].name + " finished and is trying to update the pipeline";
+
+            // Read in existing pipeline, in case some other window had changed something else
+            read(DO_LOCK, lock_message);
+
+            if (processList[current_job].status == PROC_FINISHED_FAILURE)
+                is_failure = true;
+            else if (processList[current_job].status == PROC_FINISHED_ABORTED)
+                is_aborted = true;
+
+            // Write out the modified pipeline with the new status of current_job
+            write(DO_LOCK);
+            break;
+
+        } // endif something has happened
+    } // while true, waiting for job to finish
+
+
+}
+
 void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_repeat,
 		long int minutes_wait, long int minutes_wait_before, long int seconds_wait_after, bool do_overwrite_current)
 {
@@ -703,6 +831,9 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 	// Wait this many minutes before starting the repeat cycle...
 	if (minutes_wait_before > 0)
 		sleep(minutes_wait_before * 60);
+
+	bool is_failure = false;
+	bool is_aborted = false;
 
 	int repeat = 0;
 	time_t now = time(0);
@@ -760,7 +891,9 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 
 				sleep(seconds_wait_after);
 				checkProcessCompletion();
-				if (processList[current_job].status == PROC_FINISHED)
+				if (processList[current_job].status == PROC_FINISHED_SUCCESS ||
+					processList[current_job].status == PROC_FINISHED_ABORTED ||
+					processList[current_job].status == PROC_FINISHED_FAILURE)
 				{
 					// Prepare a string for a more informative .lock file
 					std::string lock_message = " Scheduler " + fn_sched + " noticed that " + processList[current_job].name +
@@ -769,23 +902,34 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 					// Read in existing pipeline, in case some other window had changed something else
 					read(DO_LOCK, lock_message);
 
-					// Will we do another repeat?
-					if (repeat + 1 != nr_repeat)
+					if (processList[current_job].status == PROC_FINISHED_SUCCESS)
 					{
-						int mytype = processList[current_job].type;
-						// The following jobtypes have functionality to only do the unfinished part of the job
-						if (mytype == PROC_MOTIONCORR || mytype == PROC_CTFFIND || mytype == PROC_AUTOPICK || mytype == PROC_EXTRACT
-								|| mytype == PROC_CLASSSELECT )
+						// Will we go on to do another repeat?
+						if (repeat + 1 != nr_repeat)
 						{
-							myjob.is_continue = true;
-							// Write the job again, now with the updated is_continue status
-							myjob.write(processList[current_job].name);
+							int mytype = processList[current_job].type;
+							// The following jobtypes have functionality to only do the unfinished part of the job
+							if (mytype == PROC_MOTIONCORR || mytype == PROC_CTFFIND || mytype == PROC_AUTOPICK || mytype == PROC_EXTRACT
+									|| mytype == PROC_CLASSSELECT )
+							{
+								myjob.is_continue = true;
+								// Write the job again, now with the updated is_continue status
+								myjob.write(processList[current_job].name);
+							}
+							processList[current_job].status = PROC_SCHEDULED;
 						}
-						processList[current_job].status = PROC_SCHEDULED;
+						else
+						{
+							processList[current_job].status = PROC_FINISHED_SUCCESS;
+						}
 					}
-					else
+					else if (processList[current_job].status == PROC_FINISHED_FAILURE)
 					{
-						processList[current_job].status = PROC_FINISHED;
+						is_failure = true;
+					}
+					else if (processList[current_job].status == PROC_FINISHED_ABORTED)
+					{
+						is_aborted = true;
 					}
 
 					// Write out the modified pipeline with the new status of current_job
@@ -794,13 +938,21 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 				}
 			}
 
+			// break out of scheduled processes loop
+			if (is_failure || is_aborted)
+				break;
+
 			if (nr_repeat > 1 && !fn_check_exists)
 				break;
 
 		} //end loop my_scheduled_processes
 
 
+		// break out of repeat loop
 		if (nr_repeat > 1 && !fn_check_exists)
+			break;
+
+		if (is_failure || is_aborted)
 			break;
 
 		// Wait at least until 'minutes_wait' minutes have passed from the beginning of the repeat cycle
@@ -815,7 +967,15 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 
 	}
 
-	if (repeat == nr_repeat)
+	if (is_failure)
+	{
+		fh << " + Stopping pipeliner due to a job that failed with an error ..." << std::endl;
+	}
+	else if (is_aborted)
+	{
+		fh << " + Stopping pipeliner due to user abort .. " << std::endl;
+	}
+	else if (repeat == nr_repeat)
 	{
 		if (nr_repeat > 1)
 		{
@@ -834,7 +994,7 @@ void PipeLine::runScheduledJobs(FileName fn_sched, FileName fn_jobids, int nr_re
 		for (long int i = 0; i < my_scheduled_processes.size(); i++)
 		{
 			int current_job = findProcessByName(my_scheduled_processes[i]);
-			processList[current_job].status = PROC_FINISHED;
+			processList[current_job].status = PROC_FINISHED_SUCCESS;
 		}
 
 		// Write the pipeline to an updated STAR file
@@ -962,7 +1122,7 @@ bool PipeLine::markAsFinishedJob(int this_job, std::string &error_message)
 	std::string lock_message = "markAsFinishedJob";
 	read(DO_LOCK, lock_message);
 
-	processList[this_job].status = PROC_FINISHED;
+	processList[this_job].status = PROC_FINISHED_SUCCESS;
 
 	// For relion_refine jobs, add last iteration optimiser.star, data.star, model.star and class???.mrc to the pipeline
 	if (processList[this_job].type == PROC_2DCLASS ||
@@ -1234,7 +1394,7 @@ void PipeLine::undeleteJob(FileName fn_undel)
 bool PipeLine::cleanupJob(int this_job, bool do_harsh, std::string &error_message)
 {
 
-	if (this_job < 0 || processList[this_job].status != PROC_FINISHED)
+	if (this_job < 0 || processList[this_job].status != PROC_FINISHED_SUCCESS)
 	{
 		error_message =" You can only clean up finished jobs ... ";
 		return false;
@@ -1280,8 +1440,8 @@ bool PipeLine::cleanupJob(int this_job, bool do_harsh, std::string &error_messag
 	FileName fn_pattern;
 
 	// In all jobs cleanup the .old files (from continuation runs)
-	fn_pattern = processList[this_job].name + "*.old";
-	fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
+	//fn_pattern = processList[this_job].name + "*.old";
+	//fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
 
 	////////// Now see which jobs needs cleaning up
 	if (processList[this_job].type == PROC_MOTIONCORR)
@@ -1297,7 +1457,7 @@ bool PipeLine::cleanupJob(int this_job, bool do_harsh, std::string &error_messag
 			else
 			{
 				fn_pattern = processList[this_job].name + fns_subdir[idir] + "*.com";
-				fn_pattern.globFiles(fns_del, false);
+				fn_pattern.globFiles(fns_del, false); // false means do not clear fns_del
 				fn_pattern = processList[this_job].name + fns_subdir[idir] + "*.err";
 				fn_pattern.globFiles(fns_del, false);
 				fn_pattern = processList[this_job].name + fns_subdir[idir] + "*.out";
@@ -1484,7 +1644,7 @@ bool PipeLine::cleanupAllJobs(bool do_harsh, std::string &error_message)
 
 	for (int myjob = 0; myjob < processList.size(); myjob++)
 	{
-		if (processList[myjob].status == PROC_FINISHED)
+		if (processList[myjob].status == PROC_FINISHED_SUCCESS)
 		{
 			if (do_harsh && exists(processList[myjob].name + "NO_HARSH_CLEAN"))
 				continue;
@@ -1709,7 +1869,8 @@ void PipeLine::read(bool do_lock, std::string lock_message)
 #ifdef DEBUG_LOCK
 	std::cerr << "entering read lock_message=" << lock_message << std::endl;
 #endif
-	FileName dir_lock=".relion_lock", fn_lock=".relion_lock/lock_" + name + "_pipeline.star";;
+	FileName name_wo_dir = name;
+	FileName dir_lock=".relion_lock", fn_lock=".relion_lock/lock_" + name_wo_dir.afterLastOf("/") + "_pipeline.star";;
 	if (do_lock && !do_read_only)
 	{
 		int iwait =0;
@@ -1893,7 +2054,8 @@ void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode
 	if (do_read_only)
 		return;
 
-	FileName dir_lock=".relion_lock", fn_lock=".relion_lock/lock_" + name + "_pipeline.star";;
+	FileName name_wo_dir = name;
+	FileName dir_lock=".relion_lock", fn_lock=".relion_lock/lock_" + name_wo_dir.afterLastOf("/") + "_pipeline.star";;
 	if (do_lock)
 	{
 

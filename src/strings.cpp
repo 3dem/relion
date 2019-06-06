@@ -212,7 +212,7 @@ bool textToBool(const char* str, int _errno, std::string errmsg)
 	(strcasecmp(str, "yes") == 0))
     {
 	retval = true;
-    } 
+    }
     else if ((strcasecmp(str, "false") == 0) ||
              (strcasecmp(str, "no") == 0))
     {
@@ -223,7 +223,7 @@ bool textToBool(const char* str, int _errno, std::string errmsg)
 	REPORT_ERROR( errmsg);
 	return false;
     }
-    
+
     return retval;
 }
 
@@ -270,6 +270,12 @@ int bestPrecision(float F, int _width)
         advised_prec = -1; // Choose exponential format
 
     return advised_prec;
+}
+
+bool isNumber(std::string _input)
+{
+	float floatval;
+	return sscanf(_input.c_str(), "%f", &floatval);
 }
 
 std::string floatToString(float F, int _width, int _prec)

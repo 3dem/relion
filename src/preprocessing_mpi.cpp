@@ -72,6 +72,11 @@ void PreprocessingMpi::runExtractParticles()
 		{
 			if (imic >= my_first_mic && imic <= my_last_mic)
 			{
+
+				// Abort through the pipeline_control system
+				if (pipeline_control_check_abort_job())
+					MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
+
 				MDmics.getValue(EMDL_MICROGRAPH_NAME, fn_mic);
 				int optics_group = obsModelMic.getOpticsGroup(MDmics);
 

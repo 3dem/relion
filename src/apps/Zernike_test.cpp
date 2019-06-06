@@ -27,5 +27,5 @@ int main(int argc, char *argv[])
 
 	VtkHelper::writeVTK(out, "Zernike-odd-test.vtk");
 	
-	return 0;
+	return RELION_EXIT_SUCCESS;
 }

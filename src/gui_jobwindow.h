@@ -68,7 +68,7 @@ public:
 	// set up the tabs
 	void setupTabs(int nr_tabs);
 
-	void initialise(int my_job_type, bool _do_oldstyle = false);
+	void initialise(int my_job_type);
 
 	void resetHeight();
 
@@ -124,6 +124,7 @@ private:
 	void initialiseLocresWindow();
 	void initialiseMotionrefineWindow();
 	void initialiseCtfrefineWindow();
+	void initialiseExternalWindow();
 
 };
 

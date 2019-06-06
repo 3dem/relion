@@ -197,7 +197,7 @@ void JobWindow::place(std::string key, int deactivate_option, Fl_Group * deactiv
 	if (myjob.joboptions.find(key) == myjob.joboptions.end())
 		std::cerr << "WARNING: cannot find " << key << " in the defined joboptions of jobtype= " << myjob.type << std::endl;
 
-	guientries[key].place(myjob.joboptions[key], current_y, deactivate_option, deactivate_this_group, actually_activate, do_oldstyle);
+	guientries[key].place(myjob.joboptions[key], current_y, deactivate_option, deactivate_this_group, actually_activate);
 }
 
 void JobWindow::place2(std::string key1, std::string key2, std::string label, int deactivate_option)
@@ -210,10 +210,10 @@ void JobWindow::place2(std::string key1, std::string key2, std::string label, in
 	myjob.joboptions[key1].label_gui = label;
 	myjob.joboptions[key2].label_gui = "";
 	int old_y = current_y;
-	guientries[key1].place(myjob.joboptions[key1], current_y, deactivate_option, NULL, false, do_oldstyle,
+	guientries[key1].place(myjob.joboptions[key1], current_y, deactivate_option, NULL, false,
 			XCOL2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
 	current_y = old_y;
-	guientries[key2].place(myjob.joboptions[key2], current_y, deactivate_option, NULL, false, do_oldstyle,
+	guientries[key2].place(myjob.joboptions[key2], current_y, deactivate_option, NULL, false,
 			XCOL2 + (WCOL2 + COLUMN_SEPARATION) / 2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
 }
 
@@ -230,13 +230,13 @@ void JobWindow::place3(std::string key1, std::string key2, std::string key3, std
 	myjob.joboptions[key2].label_gui = "";
 	myjob.joboptions[key3].label_gui = "";
 	int old_y = current_y;
-	guientries[key1].place(myjob.joboptions[key1], current_y, deactivate_option, NULL, false, do_oldstyle,
+	guientries[key1].place(myjob.joboptions[key1], current_y, deactivate_option, NULL, false,
 			XCOL2, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
 	current_y = old_y;
-	guientries[key2].place(myjob.joboptions[key2], current_y, deactivate_option, NULL, false, do_oldstyle,
+	guientries[key2].place(myjob.joboptions[key2], current_y, deactivate_option, NULL, false,
 			XCOL2 + 1 + (WCOL2 + COLUMN_SEPARATION) / 3, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
 	current_y = old_y;
-	guientries[key3].place(myjob.joboptions[key3], current_y, deactivate_option, NULL, false, do_oldstyle,
+	guientries[key3].place(myjob.joboptions[key3], current_y, deactivate_option, NULL, false,
 			XCOL2 + 1 + 2 * (WCOL2 + COLUMN_SEPARATION) / 3, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
 
 }
@@ -317,10 +317,9 @@ void JobWindow::updateMyJob()
 
 }
 
-void JobWindow::initialise(int my_job_type, bool _do_oldstyle)
+void JobWindow::initialise(int my_job_type)
 {
 
-	do_oldstyle = _do_oldstyle;
 	if (my_job_type == PROC_IMPORT)
 	{
 		myjob.initialise(my_job_type);
@@ -415,6 +414,11 @@ void JobWindow::initialise(int my_job_type, bool _do_oldstyle)
 	{
 		myjob.initialise(my_job_type);
 		initialiseCtfrefineWindow();
+	}
+	else if (my_job_type == PROC_EXTERNAL)
+	{
+		myjob.initialise(my_job_type);
+		initialiseExternalWindow();
 	}
 	else
 	{
@@ -2179,10 +2183,58 @@ void JobWindow::initialiseCtfrefineWindow()
 
 	place("minres", TOGGLE_DEACTIVATE);
 
+	tab2->end();
+
+}
 
 
+void JobWindow::initialiseExternalWindow()
+{
+	setupTabs(3);
+
+	tab1->begin();
+	tab1->label("Input");
+	resetHeight();
+
+	// I/O
+	place("fn_exe", TOGGLE_DEACTIVATE);
+
+	current_y += STEPY /2 ;
+	place("in_mov", TOGGLE_DEACTIVATE);
+	place("in_mic", TOGGLE_DEACTIVATE);
+	place("in_part", TOGGLE_DEACTIVATE);
+	place("in_coords", TOGGLE_DEACTIVATE);
+	place("in_3dref", TOGGLE_DEACTIVATE);
+	place("in_mask", TOGGLE_DEACTIVATE);
+
+
+	tab1->end();
+
+	tab2->begin();
+	tab2->label("Output");
+	resetHeight();
+
+	place("out_mov", TOGGLE_DEACTIVATE);
+	place("out_mic", TOGGLE_DEACTIVATE);
+	place("out_part", TOGGLE_DEACTIVATE);
+	place("out_coords", TOGGLE_DEACTIVATE);
+	place("out_3dref", TOGGLE_DEACTIVATE);
+	place("out_mask", TOGGLE_DEACTIVATE);
 
 	tab2->end();
+	tab2->begin();
+
+	tab3->begin();
+	tab3->label("Params");
+	resetHeight();
+
+	place2("param1_label", "param1_value", "Param1 label, value::", TOGGLE_LEAVE_ACTIVE);
+	place2("param2_label", "param2_value", "Param2 label, value::", TOGGLE_LEAVE_ACTIVE);
+	place2("param3_label", "param3_value", "Param3 label, value::", TOGGLE_LEAVE_ACTIVE);
+	place2("param4_label", "param4_value", "Param4 label, value::", TOGGLE_LEAVE_ACTIVE);
+	place2("param5_label", "param5_value", "Param5 label, value::", TOGGLE_LEAVE_ACTIVE);
+
+	tab3->end();
 
 }
 

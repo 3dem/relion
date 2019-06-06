@@ -50,19 +50,19 @@ void FrameRecombiner::read(IOParser& parser, int argc, char* argv[])
 	bfacFn = parser.getOption("--bfactors", "A .star file with external B/k-factors", "");
 	bfac_diag = parser.checkOption("--diag_bfactor", "Write out B/k-factor diagnostic data");
 	suffix = parser.getOption("--suffix", "Add this suffix to shiny MRCS and STAR files", "");
-	
+
 	if (box_arg > 0 || scale_arg > 0)
 	{
 		std::cerr << "WARNING: Changing the box size (--window and/or --scale) might "
 		          << "invalidate the current particle offsets.\nPlease remember to "
 		          << "run relion_refine again." << std::endl;
 	}
-	
+
 	if (box_arg > 0 && box_arg % 2 != 0)
 	{
 		REPORT_ERROR_STR("The window size (--window) has to be an even number.\n");
 	}
-	
+
 	if (scale_arg > 0 && scale_arg % 2 != 0)
 	{
 		REPORT_ERROR_STR("The rescaled window size (--scale) has to be an even number.\n");
@@ -109,51 +109,51 @@ void FrameRecombiner::init(
 	this->micrographHandler = micrographHandler;
 	this->angpix_ref = angpix_ref;
 	this->maxFreq = maxFreq;
-	
+
 	/*
 	  OLD:
-	  
+
 		neither window nor scale provided:
-		
+
 			angpix_out = angpix_ref
 			s_out = s_ref
-			
+
 		only window provided:
-		
+
 			angpix_out = angpix_ref
 			s_out = window * angpix_mov / angpix_ref
-			
+
 		only scale provided:
-		
+
 			window = s_ref * angpix_mov / angpix_ref
 			angpix_out = angpix_mov * window / scale
 			s_out = scale
-			
+
 		both provided:
-		
+
 			angpix_out = angpix_mov * window / scale
 			s_out = scale
-			
+
 	  NEW:
-	  
+
 		neither window nor scale provided:
-		
+
 			angpix_out = angpix(particle)
 			s_out = box_size(particle)
-			
+
 		only window provided:
-		
+
 			angpix_out = angpix(particle)
 			s_out = window * angpix_mov / angpix(particle)
-			
+
 		only scale provided:
-		
+
 			window_mov = box_size(particle) * angpix(particle) / angpix_mov
 			angpix_out = angpix_mov * window_mov / scale
 			s_out = scale
-			
+
 		both provided:
-		
+
 			angpix_out = angpix_mov * window / scale
 			s_out = scale
 	*/
@@ -163,7 +163,7 @@ void FrameRecombiner::init(
 	s_mov.resize(nog);
 	s_out.resize(nog);
 	sh_out.resize(nog);
-	angpix_out.resize(nog);			
+	angpix_out.resize(nog);
 	freqWeights.resize(nog);
 
 	const double angpix_mov = micrographHandler->movie_angpix; // TODO: make sure the movie_angpix is the same for all micrographs
@@ -174,18 +174,18 @@ void FrameRecombiner::init(
 	{
 		if (box_arg > 0) s_mov[og] = box_arg;
 		else s_mov[og] = 2 * (int)(0.5 * s_ref * angpix_ref / angpix_mov + 0.5);
-		
-		if (scale_arg > 0) 
+
+		if (scale_arg > 0)
 		{
-			s_out[og] = scale_arg;		
+			s_out[og] = scale_arg;
 			angpix_out[og] = angpix_mov * s_mov[og] / (double) scale_arg;
 		}
-		else 
+		else
 		{
 			s_out[og] = 2 * (int)(0.5 * s_mov[og] * angpix_mov / angpix_ref + 0.5);
 			angpix_out[og] = angpix_ref;
 		}
-		
+
 		sh_out[og] = s_out[og]/2 + 1;
 
 		if (debug)
@@ -195,14 +195,14 @@ void FrameRecombiner::init(
 			std::cout << "s_mov: " << s_mov[og] << "\n";
 			std::cout << "angpix_out: " << angpix_out[og] << "\n";
 		}
-		
+
 		if (s_out[og] > s_mov[og])
 		{
 			REPORT_ERROR_STR("Images can only be scaled down, not up!\n"
 			                 << "You are trying to extract squares of size " << s_mov[og] << " px from the movies and "
 			                 << "scale them up to " << s_out[og] << " px\n");
 		}
-	
+
 		// Either calculate weights from FCC or from user-provided B-factors
 		const bool hasBfacs = bfacFn != "";
 		std::stringstream sts;
@@ -235,18 +235,22 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 
 	int pctot = 0;
 	long nr_done = 0;
-	
+
 	for (long g = g_start; g <= g_end; g++)
 	{
+		// Abort through the pipeline_control system, TODO: check how this goes with MPI....
+		if (pipeline_control_check_abort_job())
+			exit(RELION_EXIT_ABORTED);
+
 		const int pc = mdts[g].numberOfObjects();
 		if (pc == 0) continue;
 
 		pctot += pc;
-		
-		// optics group representative of this micrograph 
+
+		// optics group representative of this micrograph
 		// (only the pixel and box sizes have to be identical)
 		int ogmg = obsModel->getOpticsGroup(mdts[g], 0);
-		
+
 		if (!obsModel->allPixelAndBoxSizesIdentical(mdts[g]))
 		{
 			std::cerr << "WARNING: varying pixel or box sizes detected in "
@@ -255,21 +259,21 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 
 			continue;
 		}
-		
-		
+
+
 		FileName fn_root = MotionRefiner::getOutputFileNameRoot(outPath, mdts[g]);
 		std::vector<std::vector<d2Vector>> shift0;
 		shift0 = MotionHelper::readTracksInPix(fn_root + "_tracks.star", angpix_out[ogmg]);
-	
+
 		std::vector<std::vector<d2Vector>> shift = shift0;
-		
+
 		std::vector<std::vector<Image<Complex>>> movie;
-		
+
 		// loadMovie() will extract squares around the value of shift0 rounded in movie coords,
 		// and return the remainder in shift (in output coordinates)
 		movie = micrographHandler->loadMovie(mdts[g], s_out[ogmg], angpix_out[ogmg], fts, &shift0, &shift);
 
-		const int out_size = crop_arg > 0 ? crop_arg : s_out[ogmg];	
+		const int out_size = crop_arg > 0 ? crop_arg : s_out[ogmg];
 		Image<RFLOAT> stack(out_size, out_size, 1, pc);
 
 		#pragma omp parallel for num_threads(nr_omp_threads)
@@ -284,7 +288,7 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 
 			for (int f = 0; f < fc; f++)
 			{
-				shiftImageInFourierTransform(movie[p][f](), obs(), s_out[ogmg], 
+				shiftImageInFourierTransform(movie[p][f](), obs(), s_out[ogmg],
 				                             -shift[p][f].x, -shift[p][f].y);
 
 				for (int y = 0; y < s_out[ogmg]; y++)
@@ -332,8 +336,8 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 		if (debug)
 		{
 			VtkHelper::writeTomoVTK(
-				stack, fn_root+"_shiny" + suffix + ".vtk", false, 
-				angpix_out[ogmg], 
+				stack, fn_root+"_shiny" + suffix + ".vtk", false,
+				angpix_out[ogmg],
 				-angpix_out[ogmg] * s_out[ogmg] * 0.5 * d3Vector(1,1,0));
 		}
 
@@ -397,7 +401,7 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromFCC(
 		{
 			sh_ref = fccDataMg.data.xdim;
 			s_ref = 2 * (sh_ref-1);
-			
+
 			fc = fccDataMg.data.ydim;
 
 			fccData = Image<RFLOAT>(sh_ref,fc);
@@ -445,7 +449,7 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromFCC(
 	{
 		k1a = maxFreq;
 	}
-	
+
 	k1 = (int) reference->angToPix(k1a);
 
 	if (verb > 0)
@@ -455,11 +459,11 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromFCC(
 	}
 
 	std::pair<std::vector<d2Vector>,std::vector<double>> bkFacs = DamageHelper::fitBkFactors(fcc, k0, k1);
-	
+
 	// sigmas (bkFacs[f].x) are given in pixels;
 	// rescale if a different box size is to be extracted
 	std::vector<d2Vector> bkFacsRescaled(fc);
-	
+
 	if (s == s_ref)
 	{
 		bkFacsRescaled = bkFacs.first;
@@ -468,13 +472,13 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromFCC(
 	{
 		for (int f = 0; f < fc; f++)
 		{
-			bkFacsRescaled[f].x = (s * angpix) * bkFacs.first[f].x / (double) (s_ref * angpix_ref); 
+			bkFacsRescaled[f].x = (s * angpix) * bkFacs.first[f].x / (double) (s_ref * angpix_ref);
 			bkFacsRescaled[f].y = bkFacs.first[f].y;
 		}
 	}
-	
+
 	const int sh = s/2 + 1;
-	
+
 	std::vector<Image<RFLOAT>> freqWeights;
 	freqWeights = DamageHelper::computeWeights(bkFacsRescaled, sh);
 
@@ -534,7 +538,7 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromFCC(
 	plot2D.SetYAxisTitle("B-factor");
 	mdt.addToCPlot2D(&plot2D, EMDL_IMAGE_FRAME_NR, EMDL_POSTPROCESS_BFACTOR);
 	plot2D.OutputPostScriptPlot(outPath + "bfactors.eps");
-	
+
 	CPlot2D plot2Db("Polishing scale-factors");
 	plot2Db.SetXAxisSize(600);
 	plot2Db.SetYAxisSize(400);
@@ -543,7 +547,7 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromFCC(
 	plot2Db.SetYAxisTitle("Scale-factor");
 	mdt.addToCPlot2D(&plot2Db, EMDL_IMAGE_FRAME_NR, EMDL_POSTPROCESS_GUINIER_FIT_INTERCEPT);
 	plot2Db.OutputPostScriptPlot(outPath + "scalefactors.eps");
-	
+
 	return freqWeights;
 }
 
@@ -552,7 +556,7 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromBfacs(
 		int s, double angpix)
 {
 	const int sh = s/2 + 1;
-	
+
 	// initialization on the first line to avoid copying of return value
 	std::vector<Image<RFLOAT>> freqWeights;
 
@@ -562,9 +566,9 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromBfacs(
 	fc = mdt.numberOfObjects();
 
 	std::vector<d2Vector> bkFacs(fc);
-	
+
 	double bfacOff = 0.0;
-	
+
 	for (int f = 0; f < fc; f++)
 	{
 		double b;
@@ -572,7 +576,7 @@ std::vector<Image<RFLOAT>> FrameRecombiner::weightsFromBfacs(
 
 		if (b > bfacOff) bfacOff = b;
 	}
-	
+
 	const double cf = 8.0 * angpix_ref * angpix_ref * sh * sh;
 
 	for (int f = 0; f < fc; f++)

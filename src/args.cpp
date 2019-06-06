@@ -152,6 +152,11 @@ void IOParser::setCommandLine(int _argc, char** _argv)
 		PRINT_VERSION_INFO();
 		exit(0);
 	}
+	// Dirty hack to get pipeline control for all programs...
+    if (checkParameter(argc, argv, "--pipeline_control"))
+    	pipeline_control_outputname = getParameter(argc, argv, "--pipeline_control");
+    else
+    	pipeline_control_outputname = "";
 
 }
 
@@ -268,7 +273,8 @@ bool IOParser::checkForErrors(int verb)
 		writeUsage(std::cout);
 	 	exit(0);
 	}
-	// First check the command line for unknown arguments
+
+    // First check the command line for unknown arguments
 	checkForUnknownArguments();
 
 	// First print warning messages
@@ -294,7 +300,9 @@ bool IOParser::checkForErrors(int verb)
 		return true;
 	}
 	else
+	{
 		return false;
+	}
 
 }
 
@@ -306,7 +314,7 @@ void IOParser::checkForUnknownArguments()
 		bool is_ok = true;
 		if (strncmp("--", argv[i], 2) == 0)
 		{
-			if (!optionExists((std::string)argv[i]))
+			if (!optionExists((std::string)argv[i]) && !(strncmp("--pipeline_control", argv[i], 18) == 0) )
 			{
 				is_ok = false;
 			}

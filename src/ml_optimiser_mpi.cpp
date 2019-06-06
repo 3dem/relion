@@ -713,6 +713,9 @@ void MlOptimiserMpi::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFL
 	// First calculate the sum of all individual power spectra on each subset
 	MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(Mavg, node->rank == 1);
 
+	if (pipeline_control_check_abort_job())
+		MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
+
 	// Now combine all weighted sums
 	// Leave the option of both for a while. Then, if there are no problems with the system via files keep that one and remove the MPI version from the code
 	if (combine_weights_thru_disc)
@@ -1130,6 +1133,8 @@ void MlOptimiserMpi::expectation()
 			while (nr_slaves_done < node->size - 1)
 			{
 
+				pipeline_control_check_abort_job();
+
 				// Receive a job request from a slave
 				node->relion_MPI_Recv(MULTIDIM_ARRAY(first_last_nr_images), MULTIDIM_SIZE(first_last_nr_images), MPI_LONG, MPI_ANY_SOURCE, MPITAG_JOB_REQUEST, MPI_COMM_WORLD, status);
 				// Which slave sent this request?
@@ -1261,7 +1266,7 @@ void MlOptimiserMpi::expectation()
         catch (RelionError XE)
         {
             std::cerr << "master encountered error: " << XE;
-            MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+            MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_FAILURE);
         }
 #ifdef TIMING
 		timer.toc(TIMING_EXP_5);
@@ -1380,6 +1385,9 @@ void MlOptimiserMpi::expectation()
 						}
 						node->relion_MPI_Recv(MULTIDIM_ARRAY(exp_imagedata), MULTIDIM_SIZE(exp_imagedata), MY_MPI_DOUBLE, 0, MPITAG_IMAGE, MPI_COMM_WORLD, status);
 					}
+
+					if (pipeline_control_check_abort_job())
+						MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_ABORTED);
 
 					// Now process these images
 #ifdef DEBUG_MPIEXP
@@ -1537,7 +1545,7 @@ void MlOptimiserMpi::expectation()
         catch (RelionError XE)
         {
             std::cerr << "slave "<< node->rank << " encountered error: " << XE;
-            MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+            MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_FAILURE);
         }
 #ifdef TIMING
 		timer.toc(TIMING_EXP_6);

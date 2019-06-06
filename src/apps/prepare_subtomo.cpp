@@ -254,7 +254,7 @@ public:
 					//if ( (additional_gctf_options[0] != '\"') || (additional_gctf_options[additional_gctf_options.length() - 1] != '\"') )
 					//	REPORT_ERROR("Additional gctf options should come with double quotes outside! (e.g. \"--refine_local_astm\")");
 				}
-				exit(1);
+				return RELION_EXIT_FAILURE;
 #endif
 				std::cout << " Pixel size used in Gctf = " << angpix << " Angstrom(s)" << std::endl;
 				RFLOAT ratio = angpix / calc_angpix; // calc_angpix >= 0.001, no need to check again
@@ -1108,7 +1108,7 @@ int main(int argc, char *argv[])
 		prm.read(argc, argv);
 		prm.showMessages();
 		if (prm.show_usage)
-			return 0;
+			return RELION_EXIT_SUCCESS;
 		if (!prm.dont_check_input_files)
 			prm.initialChecks();
 		prm.run();
@@ -1117,8 +1117,8 @@ int main(int argc, char *argv[])
 	{
 		//prm.usage();
 		std::cout << XE;
-		exit(1);
+		return RELION_EXIT_FAILURE;
 	}
 
-	return 0;
+	return RELION_EXIT_SUCCESS;
 }

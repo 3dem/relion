@@ -313,8 +313,8 @@ int main(int argc, char *argv[])
 	{
 		std::cerr << XE;
 		//prm.usage();
-		exit(1);
+		return RELION_EXIT_FAILURE;
 	}
-	return 0;
+	return RELION_EXIT_SUCCESS;
 }
 

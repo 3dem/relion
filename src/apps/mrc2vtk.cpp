@@ -5,8 +5,8 @@ int main(int argc, char *argv[])
 {
 	if (argc < 2)
 	{
-		std::cout << "usage: relion_mrc2vtk X.(mrc/mrcs/tiff/spi)\n -> X.vtk\n";
-		return 666;
+		std::cerr << "usage: relion_mrc2vtk X.(mrc/mrcs/tiff/spi)\n -> X.vtk\n";
+		return RELION_EXIT_FAILURE;
 	}
 
 	std::string fn(argv[1]), fn2;

@@ -1,4 +1,3 @@
-
 /***************************************************************************
  *
  * Author: "Sjors H.W. Scheres"
@@ -19,25 +18,29 @@
  * author citations must be preserved.
  ***************************************************************************/
 
-#include "../helix_inimodel2d.h"
+#ifndef PIPELINE_CONTROL_H_
+#define PIPELINE_CONTROL_H_
 
-int main(int argc, char *argv[])
-{
-	HelixAligner prm;
+#include <string>
+#include <iostream>
+#include <fstream>
+#include <sys/stat.h>
+#include "src/macros.h"
 
-	try
-	{
-		prm.parseInitial(argc, argv);
+// pipeliner
+extern std::string pipeline_control_outputname;
+#define RELION_JOB_EXIT_SUCCESS "RELION_JOB_EXIT_SUCCESS"
+#define RELION_JOB_EXIT_FAILURE "RELION_JOB_EXIT_FAILURE"
+#define RELION_JOB_EXIT_ABORTED "RELION_JOB_EXIT_ABORTED"
+#define RELION_JOB_ABORT_NOW    "RELION_JOB_ABORT_NOW"
 
-		prm.initialise();
-		prm.run();
-	}
-	catch (RelionError XE)
-	{
-		prm.usage();
-		std::cerr << XE;
-		return RELION_EXIT_FAILURE;
-	}
+#define RELION_EXIT_SUCCESS pipeline_control_relion_exit(0)
+#define RELION_EXIT_FAILURE pipeline_control_relion_exit(1)
+#define RELION_EXIT_ABORTED pipeline_control_relion_exit(2)
 
-	return RELION_EXIT_SUCCESS;
-}
+int pipeline_control_relion_exit(int mode);
+
+bool pipeline_control_check_abort_job();
+
+
+#endif /* PIPELINE_CONTROL_H_ */

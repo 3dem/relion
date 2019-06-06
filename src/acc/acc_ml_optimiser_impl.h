@@ -911,7 +911,7 @@ void getAllSquaredDifferencesCoarse(
 
 	std::vector<MultidimArray<Complex > > dummy;
 	std::vector<std::vector<MultidimArray<Complex > > > dummy2;
-	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, op.part_id, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
+	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, false, op.part_id, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
 			sp.itrans_min, sp.itrans_max, op.Fimg, dummy, op.Fctf, dummy2, dummy2,
 			op.local_Fctf, op.local_sqrtXi2, op.local_Minvsigma2);
 
@@ -1207,7 +1207,7 @@ void getAllSquaredDifferencesFine(
 	CTIC(accMLO->timer,"precalculateShiftedImagesCtfsAndInvSigma2s");
 	std::vector<MultidimArray<Complex > > dummy;
 	std::vector<std::vector<MultidimArray<Complex > > > dummy2;
-	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, op.part_id, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
+	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, false, op.part_id, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
 			sp.itrans_min, sp.itrans_max, op.Fimg, dummy, op.Fctf, dummy2, dummy2,
 			op.local_Fctf, op.local_sqrtXi2, op.local_Minvsigma2);
 	CTOC(accMLO->timer,"precalculateShiftedImagesCtfsAndInvSigma2s");
@@ -2116,7 +2116,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 	// Re-do below because now also want unmasked images AND if (stricht_highres_exp >0.) then may need to resize
 	std::vector<MultidimArray<Complex > > dummy;
 	std::vector<std::vector<MultidimArray<Complex > > > dummy2;
-	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, op.part_id, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
+	baseMLO->precalculateShiftedImagesCtfsAndInvSigma2s(false, true, op.part_id, sp.current_oversampling, op.metadata_offset, // inserted SHWS 12112015
 			sp.itrans_min, sp.itrans_max, op.Fimg, op.Fimg_nomask, op.Fctf, dummy2, dummy2,
 			op.local_Fctf, op.local_sqrtXi2, op.local_Minvsigma2);
 
@@ -2565,10 +2565,9 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 
 		CTIC(accMLO->timer,"translation_3");
 
-		int exp_current_image_size = (baseMLO->strict_highres_exp > 0.) ? baseMLO->image_coarse_size[optics_group] : baseMLO->image_current_size[optics_group];
 		MultidimArray<Complex > Fimg, Fimg_nonmask;
-		windowFourierTransform(op.Fimg[img_id], Fimg, exp_current_image_size); //TODO PO isen't this already done in getFourierTransformsAndCtfs?
-		windowFourierTransform(op.Fimg_nomask[img_id], Fimg_nonmask, exp_current_image_size);
+		windowFourierTransform(op.Fimg[img_id], Fimg, baseMLO->image_current_size[optics_group]); //TODO PO isen't this already done in getFourierTransformsAndCtfs?
+		windowFourierTransform(op.Fimg_nomask[img_id], Fimg_nonmask, baseMLO->image_current_size[optics_group]);
 		unsigned long image_size = Fimg.nzyxdim;
 
 		AccPtr<XFLOAT> Fimgs_real = ptrFactory.make<XFLOAT>((size_t)image_size);
@@ -2932,8 +2931,7 @@ void storeWeightedSums(OptimisationParamters &op, SamplingParameters &sp,
 		int my_image_size = baseMLO->mydata.getOpticsImageSize(optics_group);
 
 		// If the current images were smaller than the original size, fill the rest of wsum_model.sigma2_noise with the power_class spectrum of the images
-		int exp_current_image_size = (baseMLO->strict_highres_exp > 0.) ? baseMLO->image_coarse_size[optics_group] : baseMLO->image_current_size[optics_group];
-		for (unsigned long ires = exp_current_image_size/2 + 1; ires < baseMLO->image_full_size[optics_group]/2 + 1; ires++)
+		for (unsigned long ires = baseMLO->image_current_size[optics_group]/2 + 1; ires < baseMLO->image_full_size[optics_group]/2 + 1; ires++)
 		{
 			DIRECT_A1D_ELEM(thr_wsum_sigma2_noise[img_id], ires) += DIRECT_A1D_ELEM(op.power_img[img_id], ires);
 			// Also extend the weighted sum of the norm_correction
@@ -3301,7 +3299,8 @@ baseMLO->timer.tic(baseMLO->TIMING_ESP_DIFF2_E);
 #endif
 
 		// For the reconstruction step use mymodel.current_size!
-		// as of 3.1, no longer necessary? sp.current_image_size = baseMLO->mymodel.current_size;
+		// as of 3.1, no longer necessary?
+		sp.current_image_size = baseMLO->mymodel.current_size;
 
 	for (unsigned long img_id = 0; img_id < sp.nr_images; img_id++)
 	{

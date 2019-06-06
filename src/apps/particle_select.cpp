@@ -175,5 +175,5 @@ int main(int argc, char *argv[])
 	out.write(outFn);
 	
 		
-	return 0;	
+	return RELION_EXIT_SUCCESS;	
 }

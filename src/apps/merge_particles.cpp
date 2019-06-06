@@ -7,7 +7,7 @@ int main(int argc, char *argv[])
 	if (argc < 4)
 	{
 		std::cerr << "usage: relion_merge_particles <input1> <input2> ... <inputN> <output>\n";
-		return -1;
+		return RELION_EXIT_FAILURE;
 	}
 	
 	const int srcCount = argc - 2;
@@ -68,5 +68,5 @@ int main(int argc, char *argv[])
 	
 	ObservationModel::saveNew(particleOut, opticsOut, destFn);
 	
-	return 0;
+	return RELION_EXIT_SUCCESS;
 }

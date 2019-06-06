@@ -20,5 +20,5 @@ int main(int argc, char *argv[])
 	optOut.write(of);
 	mdtOut.write(of);
 			
-	return 0;
+	return RELION_EXIT_SUCCESS;
 }

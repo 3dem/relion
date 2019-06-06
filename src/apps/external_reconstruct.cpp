@@ -128,8 +128,8 @@ int main(int argc, char *argv[])
 	catch (RelionError XE)
 	{
 		std::cerr << XE;
-		exit(1);
+		return RELION_EXIT_FAILURE;
 	}
 
-	return 0;
+	return RELION_EXIT_SUCCESS;
 }

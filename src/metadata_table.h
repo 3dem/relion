@@ -138,6 +138,10 @@ public:
 	~MetaDataTable();
 
 
+	bool isAList()
+	{
+		return isList;
+	}
 
 	void setIsList(bool is_list);
 

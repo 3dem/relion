@@ -87,5 +87,5 @@ int main(int argc, char *argv[])
 	avgOut << "\n" << imaxA << " " << vmaxA << "\n";
 	avgOut << "\n" << maxAvg.x << " " << maxAvg.y << "\n";
 	
-	return 0;	
+	return RELION_EXIT_SUCCESS;	
 }

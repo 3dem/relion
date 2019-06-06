@@ -251,6 +251,14 @@ void ParticleSubtractor::run()
 
 	for (long int part_id = my_first_part_id, imgno = 0; part_id <= my_last_part_id; part_id++, imgno++)
 	{
+
+		// Abort through the pipeline_control system, TODO: check how this goes with MPI....
+		if (imgno % barstep == 0)
+		{
+			if (pipeline_control_check_abort_job())
+				exit(RELION_EXIT_ABORTED);
+		}
+
 		subtractOneParticle(part_id, imgno, orients);
 
 		if (imgno % barstep == 0 && verb > 0) progress_bar(imgno);

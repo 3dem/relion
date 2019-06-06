@@ -907,7 +907,7 @@ public:
 	/* Store all shifted FourierTransforms in a vector
 	 * also store precalculated 2D matrices with 1/sigma2_noise
 	 */
-	void precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmasked, long int my_particle,
+	void precalculateShiftedImagesCtfsAndInvSigma2s(bool do_also_unmasked, bool is_for_store_wsums, long int my_particle,
 			int exp_current_oversampling, int metadata_offset,
 			int exp_itrans_min, int exp_itrans_max,
 			std::vector<MultidimArray<Complex > > &exp_Fimg,

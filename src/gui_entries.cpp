@@ -26,9 +26,14 @@ float fltkTextToFloat(const char* str)
 	float result = -999.;
 	if (str == NULL)
 		fl_message("ERROR: NULL entry for TextToFloat conversion. Check your inputs!");
-	else if (!sscanf(str, "%f", &result))
-		fl_message("ERROR: Invalid (non-numerical?) entry for TextToFloat conversion. Check your inputs!");
-
+	else
+	{
+		std::string mystring = std::string(str);
+		if (mystring.substr(0,2) == "$$")
+			return 0;
+		else if (!sscanf(str, "%f", &result))
+			fl_message("ERROR: Invalid (non-numerical?) entry for TextToFloat conversion. Check your inputs!");
+	}
 	return result;
 }
 
@@ -94,6 +99,8 @@ void GuiEntry::clear()
 	*/
 
 }
+bool show_scheduler;
+
 void GuiEntry::initialise(int x, int y, Fl_Group * deactivate_this_group, bool _actually_activate, int height, int wcol2, int wcol3)
 {
 
@@ -134,37 +141,40 @@ void GuiEntry::initialise(int x, int y, Fl_Group * deactivate_this_group, bool _
 	else if (joboption.joboption_type == JOBOPTION_RADIO || joboption.joboption_type == JOBOPTION_BOOLEAN)
 	{
 
-		choice = new Fl_Choice(XCOL2, y, WCOL2, height);
-		if (joboption.joboption_type == JOBOPTION_RADIO)
+		if (!show_scheduler)
 		{
-			// Add all items to the menu
-			for (int i = 0; i < joboption.radio_options.size(); i++)
+			choice = new Fl_Choice(XCOL2, y, WCOL2, height);
+			if (joboption.joboption_type == JOBOPTION_RADIO)
 			{
 				// Add all items to the menu
-				choice->add(joboption.radio_options[i].c_str());
-				if (joboption.radio_options[i] == joboption.default_value) choice->picked(choice->mvalue());
+				for (int i = 0; i < joboption.radio_options.size(); i++)
+				{
+					// Add all items to the menu
+					choice->add(joboption.radio_options[i].c_str());
+					if (joboption.radio_options[i] == joboption.default_value) choice->picked(choice->mvalue());
+				}
 			}
-		}
-		else // boolean
-		{
-			if (deactivate_this_group != NULL) {
-				my_deactivate_group = deactivate_this_group;
-				actually_activate = _actually_activate;
+			else // boolean
+			{
+				if (deactivate_this_group != NULL) {
+					my_deactivate_group = deactivate_this_group;
+					actually_activate = _actually_activate;
+				}
+
+				choice->menu(bool_options);
+				if (joboption.default_value=="Yes")
+					choice->picked(&bool_options[0]);
+				else
+					choice->picked(&bool_options[1]);
 			}
+			choice->callback(cb_menu, this);
+			choice->textsize(ENTRY_FONTSIZE);
 
-			choice->menu(bool_options);
-			if (joboption.default_value=="Yes")
-				choice->picked(&bool_options[0]);
-			else
-				choice->picked(&bool_options[1]);
+			menu = choice;
+			//menu->color(GUI_BACKGROUND_COLOR);
+			menu->color(GUI_INPUT_COLOR);
+			menu->textsize(ENTRY_FONTSIZE);
 		}
-		choice->callback(cb_menu, this);
-		choice->textsize(ENTRY_FONTSIZE);
-
-		menu = choice;
-		//menu->color(GUI_BACKGROUND_COLOR);
-		menu->color(GUI_INPUT_COLOR);
-		menu->textsize(ENTRY_FONTSIZE);
 	}
 	else if (joboption.joboption_type == JOBOPTION_SLIDER)
 	{
@@ -186,7 +196,7 @@ void GuiEntry::initialise(int x, int y, Fl_Group * deactivate_this_group, bool _
 		slider->value(textToDouble(joboption.default_value));
 	}
 }
-void GuiEntry::place(JobOption &_joboption, int &y, int _deactivate_option, Fl_Group * deactivate_this_group, bool actually_activate, bool _do_oldstyle, int x, int h, int wcol2, int wcol3 )
+void GuiEntry::place(JobOption &_joboption, int &y, int _deactivate_option, Fl_Group * deactivate_this_group, bool actually_activate, int x, int h, int wcol2, int wcol3 )
 {
 
 	// Clear if existing
@@ -196,8 +206,6 @@ void GuiEntry::place(JobOption &_joboption, int &y, int _deactivate_option, Fl_G
 	deactivate_option = _deactivate_option;
 
 	joboption = _joboption;
-
-	do_oldstyle = _do_oldstyle;
 
 	// Add the entry to the window
 	initialise(x, y, deactivate_this_group, actually_activate, h, wcol2, wcol3);
@@ -327,7 +335,7 @@ void GuiEntry::cb_browse_node_i() {
 	Fl::scheme("gtk+");
 	Fl_File_Chooser * G_chooser = new Fl_File_Chooser("", joboption.pattern.c_str(), Fl_File_Chooser::SINGLE, "");
 
-	std::string fn_dir = (do_oldstyle) ? "." : ".Nodes/" + integerToString(joboption.node_type);
+	std::string fn_dir = ".Nodes/" + integerToString(joboption.node_type);
 	G_chooser->directory(fn_dir.c_str());
 	G_chooser->color(GUI_BACKGROUND_COLOR);
 	G_chooser->show();
@@ -349,23 +357,16 @@ void GuiEntry::cb_browse_node_i() {
 	fl_filename_relative(relname,sizeof(relname),G_chooser->value());
 
 	// Get rid of the .Nodes/type/ directory-name again
-	if (do_oldstyle)
-	{
-		inp->value(relname);
-	}
-	else
-	{
-    		std::string replace = std::string(relname);
-	    	std::string replace2 = (std::string::npos == replace.find(fn_dir.c_str())) ? replace : replace.substr(fn_dir.length()+1, replace.length());
-    		char relname2[FL_PATH_MAX];
-	    	strcpy(relname2, replace2.c_str());
+	std::string replace = std::string(relname);
+	std::string replace2 = (std::string::npos == replace.find(fn_dir.c_str())) ? replace : replace.substr(fn_dir.length()+1, replace.length());
+	char relname2[FL_PATH_MAX];
+	strcpy(relname2, replace2.c_str());
 
-	    	FileName fn_pre, fn_jobnr, fn_post, fn_out;
-        	decomposePipelineSymlinkName(replace2, fn_pre, fn_jobnr, fn_post);
-        	fn_out = fn_pre + fn_jobnr + fn_post;
+	FileName fn_pre, fn_jobnr, fn_post, fn_out;
+	decomposePipelineSymlinkName(replace2, fn_pre, fn_jobnr, fn_post);
+	fn_out = fn_pre + fn_jobnr + fn_post;
 
-	        inp->value(fn_out.c_str());
-	}
+	inp->value(fn_out.c_str());
 }
 
 void GuiEntry::cb_menu(Fl_Widget* o, void* v) {
@@ -376,19 +377,21 @@ void GuiEntry::cb_menu(Fl_Widget* o, void* v) {
 
 void GuiEntry::cb_menu_i()
 {
-	const Fl_Menu_Item* m = menu->mvalue();
-	// Set my own value
-	inp->value(m->label());
-	// In case this was a boolean that deactivates a group, do so:
-	if (my_deactivate_group != NULL)
+	if (!show_scheduler)
 	{
-		if ( actually_activate && (strcmp(inp->value(), "Yes") == 0) ||
-		    !actually_activate && (strcmp(inp->value(), "No") == 0))
-			my_deactivate_group->deactivate();
-		else
-			my_deactivate_group->activate();
+		const Fl_Menu_Item* m = menu->mvalue();
+		// Set my own value
+		inp->value(m->label());
+		// In case this was a boolean that deactivates a group, do so:
+		if (my_deactivate_group != NULL)
+		{
+			if ( actually_activate && (strcmp(inp->value(), "Yes") == 0) ||
+				!actually_activate && (strcmp(inp->value(), "No") == 0))
+				my_deactivate_group->deactivate();
+			else
+				my_deactivate_group->activate();
+		}
 	}
-
 }
 
 void GuiEntry::cb_slider(Fl_Widget* o, void* v) {
@@ -423,7 +426,8 @@ void GuiEntry::cb_input_i() {
 		return;
 	} else {
 		recurse = 1;
-		slider->value(fltkTextToFloat(inp->value()));         // pass input's value to slider
+
+		if (!show_scheduler) slider->value(fltkTextToFloat(inp->value()));         // pass input's value to slider
 		recurse = 0;
 	}
 }

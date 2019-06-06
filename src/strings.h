@@ -106,6 +106,8 @@ std::string unescape( const std::string& str );
  */
 int bestPrecision(float F, int _width);
 
+bool isNumber(std::string);
+
 /** String (char*) to double conversion.
  *
  * @code

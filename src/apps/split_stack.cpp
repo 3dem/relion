@@ -37,5 +37,5 @@ int main(int argc, char *argv[])
 		img1.write(inPath+"frames/"+inName+"_f"+fn+".mrc");
 	}
 
-	return 0;
+	return RELION_EXIT_SUCCESS;
 }

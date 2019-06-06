@@ -25,13 +25,13 @@ int main(int argc, char *argv[])
 		r31 = parser.checkOption("--r31", "Write output in Relion-3.1 format");
 		outPath = parser.getOption("--out", "Output path");
 		
-		if (parser.checkForErrors()) return 1;		
+		if (parser.checkForErrors()) return RELION_EXIT_FAILURE;		
 	}
 	catch (RelionError XE)
     {
         parser.writeUsage(std::cout);
         std::cerr << XE;
-        exit(1);
+        return RELION_EXIT_FAILURE;
     }
 	
 	if (outPath[outPath.length()-1] != '/')
@@ -151,5 +151,5 @@ int main(int argc, char *argv[])
 	
 	std::cout << "output written into " << (outPath+"demodulated_particles.star") << "\n";
 			
-	return 0;
+	return RELION_EXIT_SUCCESS;
 }

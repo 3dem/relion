@@ -202,7 +202,7 @@ void MotioncorrRunner::initialise()
 	}
 #endif
 
-	// Set up which micrograph movies to process 
+	// Set up which micrograph movies to process
 	if (fn_in.isStarFile())
 	{
 		MetaDataTable MDin;
@@ -273,7 +273,7 @@ void MotioncorrRunner::initialise()
 		if (continue_old)
 		{
 			FileName fn_avg = getOutputFileNames(fn_mic_given_all[imic]);
-			if (exists(fn_avg) && exists(fn_avg.withoutExtension() + ".star") && 
+			if (exists(fn_avg) && exists(fn_avg.withoutExtension() + ".star") &&
                             (grouping_for_ps <= 0 || exists(fn_avg.withoutExtension() + "_PS.mrc")))
 			{
 				process_this = false; // already done
@@ -428,6 +428,9 @@ void MotioncorrRunner::run()
 		if (verb > 0 && imic % barstep == 0)
 			progress_bar(imic);
 
+		// Abort through the pipeline_control system
+		if (pipeline_control_check_abort_job())
+			exit(RELION_EXIT_ABORTED);
 
 		Micrograph mic(fn_micrographs[imic], fn_gain_reference, bin_factor);
 
@@ -1218,8 +1221,8 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 		RCTIC(TIMING_POWER_SPECTRUM_CROP);
 		RFLOAT ps_angpix = (!early_binning) ? angpix : angpix * bin_factor;
 		int nx_needed = XSIZE(PS_sum());
-		if (ps_angpix < target_pixel_size) 
-		{	
+		if (ps_angpix < target_pixel_size)
+		{
 			nx_needed = CEIL(nx * ps_angpix / target_pixel_size);
 			nx_needed += nx_needed % 2;
 			ps_angpix = XSIZE(PS_sum()) * ps_angpix / nx_needed;
@@ -1229,7 +1232,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 		PS_sum_cropped().setXmippOrigin();
 		FOR_ALL_ELEMENTS_IN_ARRAY2D(PS_sum_cropped())
 			A2D_ELEM(PS_sum_cropped(), i, j) = A2D_ELEM(PS_sum(), i, j);
-		
+
 #ifdef DEBUG_PS
 		std::cout << "size of PS_sum_cropped: NX = " << XSIZE(PS_sum_cropped()) << " NY = " << YSIZE(PS_sum_cropped()) << std::endl;
 		std::cout << "nx_needed = " << nx_needed << std::endl;
@@ -1238,7 +1241,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 #endif
 		RCTOC(TIMING_POWER_SPECTRUM_CROP);
 
-		// 3. Downsample 
+		// 3. Downsample
 		RCTIC(TIMING_POWER_SPECTRUM_RESIZE);
 		F_ps_small.reshape(ps_size, ps_size / 2 + 1);
 		F_ps_small.initZeros();

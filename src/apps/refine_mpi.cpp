@@ -38,11 +38,11 @@ int main(int argc, char **argv)
 	catch (RelionError XE)
 	{
 		std::cerr << XE;
-		MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+		MPI_Abort(MPI_COMM_WORLD, RELION_EXIT_FAILURE);
 
-		return EXIT_FAILURE;
+		return RELION_EXIT_FAILURE;
 	}
 
-	return EXIT_SUCCESS;
+	return RELION_EXIT_SUCCESS;
 }
 
