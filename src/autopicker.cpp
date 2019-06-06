@@ -449,6 +449,11 @@ void AutoPicker::initialise()
 
 		if (ZSIZE(Istk()) > 1)
 		{
+			if (autopick_helical_segments)
+			{
+				REPORT_ERROR("Filament picker (--helix) does not support 3D references. Please use 2D class averages instead.");
+			}
+
 			// Re-scale references if necessary
 			if (angpix_ref < 0)
 				angpix_ref = angpix;

@@ -791,7 +791,7 @@ void Postprocessing::writeMaps(FileName fn_root) {
 	// Also write the masked postprocessed map
 	if (fn_mask != "")
 	{
-		fn_tmp = fn_out + "_masked.mrc";
+		fn_tmp = fn_root + "_masked.mrc";
 		I1() *= Im();
 		I1.setStatisticsInHeader();
 		I1.write(fn_tmp);
