@@ -1218,7 +1218,11 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	// Setup grouping
 	logfile << "Frame grouping: n_frames = " << n_frames << ", requested group size = " << group << std::endl;
 	const int n_groups = n_frames / group;
-	if (n_groups < 3) REPORT_ERROR("Too few frames (< 3) after grouping.");
+	if (n_groups < 3) 
+	{
+		std::cerr << "Skipped " << fn_mic << ": too few frames (" << n_groups << " < 3) after grouping . Probably the movie is truncated or you made a mistake in frame grouping." << std::endl;
+		return false;
+	}
 	int n_remaining = n_frames % group;
 	std::vector<int> group_start(n_groups, 0), group_size(n_groups, group);
 	while (n_remaining > 0) {
