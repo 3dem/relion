@@ -148,7 +148,7 @@ extern "C" {
 				break;
 			case SEEK_END:
 				REPORT_ERROR("TIFFInMemorySeekProc: SEEK_END is not supported.");
-				break;
+				// break; // intentional to suppress compiler warnings.
 		}
 
 		if (tiff_handle->pos >= tiff_handle->size)
