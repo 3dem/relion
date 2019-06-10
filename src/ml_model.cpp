@@ -267,8 +267,8 @@ void MlModel::read(FileName fn_in)
 			REPORT_ERROR("MlModel::readStar: incorrect model_groups table");
 		}
 		//Start counting of groups at 1, not at 0....
-		if (!MDgroup.getValue(EMDL_MLMODEL_GROUP_SCALE_CORRECTION, scale_correction[igroup-1]) ||
-		    !MDgroup.getValue(EMDL_MLMODEL_GROUP_NR_PARTICLES, nr_particles_per_group[igroup-1]) ||
+		if (!MDgroup.getValue(EMDL_MLMODEL_GROUP_SCALE_CORRECTION, scale_correction[igroup - 1]) ||
+		    !MDgroup.getValue(EMDL_MLMODEL_GROUP_NR_PARTICLES, nr_particles_per_group[igroup - 1]) ||
 		    !MDgroup.getValue(EMDL_MLMODEL_GROUP_NAME, group_names[igroup-1]))
 			REPORT_ERROR("MlModel::readStar: incorrect model_groups table");
 	}
@@ -284,12 +284,12 @@ void MlModel::read(FileName fn_in)
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsigma)
 		{
 			if (!MDsigma.getValue(EMDL_SPECTRAL_IDX, idx))
-				REPORT_ERROR("MlModel::readStar: incorrect table model_class/body_"+integerToString(iclass));
+				REPORT_ERROR("MlModel::readStar: incorrect table model_class/body_"+integerToString(iclass + 1));
 			if (!MDsigma.getValue(EMDL_MLMODEL_DATA_VS_PRIOR_REF, data_vs_prior_class[iclass](idx)) ||
 			    !MDsigma.getValue(EMDL_MLMODEL_TAU2_REF, tau2_class[iclass](idx)) ||
 			    !MDsigma.getValue(EMDL_MLMODEL_FSC_HALVES_REF, fsc_halves_class[iclass](idx)) ||
 			    !MDsigma.getValue(EMDL_MLMODEL_SIGMA2_REF, sigma2_class[iclass](idx)))
-				REPORT_ERROR("MlModel::readStar: incorrect table model_class/body_"+integerToString(iclass));
+				REPORT_ERROR("MlModel::readStar: incorrect table model_class/body_"+integerToString(iclass + 1));
 			// backwards compatible with STAR files without Fourier coverage
 			if (!MDsigma.getValue(EMDL_MLMODEL_FOURIER_COVERAGE_REF, fourier_coverage_class[iclass](idx)))
 				fourier_coverage_class[iclass](idx) = 0.;
@@ -299,18 +299,28 @@ void MlModel::read(FileName fn_in)
 	// Read sigma models for each group
 	for (int igroup = 0; igroup < nr_groups; igroup++)
 	{
-		MDsigma.readStar(in, "model_group_" + integerToString(igroup + 1));
 		// Allow sigma2_noise with different sizes!
 		sigma2_noise[igroup].resize(ori_size/2 + 1);
-		int idx;
-		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsigma)
-		{
-			if (!MDsigma.getValue(EMDL_SPECTRAL_IDX, idx))
-				REPORT_ERROR("MlModel::readStar: incorrect table model_group_"+integerToString(igroup));
-			if (!MDsigma.getValue(EMDL_MLMODEL_SIGMA2_NOISE, sigma2_noise[igroup](idx)))
-				REPORT_ERROR("MlModel::readStar: incorrect table model_group_"+integerToString(igroup));
-		}
 
+		if (nr_particles_per_group[igroup] > 0)
+		{
+			MDsigma.readStar(in, "model_group_" + integerToString(igroup + 1));
+			int idx;
+			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsigma)
+			{
+				if (!MDsigma.getValue(EMDL_SPECTRAL_IDX, idx))
+					REPORT_ERROR("MlModel::readStar: incorrect table model_group_" + integerToString(igroup + 1));
+				if (!MDsigma.getValue(EMDL_MLMODEL_SIGMA2_NOISE, sigma2_noise[igroup](idx)))
+					REPORT_ERROR("MlModel::readStar: incorrect table model_group_" + integerToString(igroup + 1));
+			}
+		}
+		else
+		{
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(sigma2_noise[igroup])
+			{
+				DIRECT_MULTIDIM_ELEM(sigma2_noise[igroup], n) = 0.;
+			}
+		}
 	}
 
 	// Read pdf_direction models for each class
@@ -329,7 +339,7 @@ void MlModel::read(FileName fn_in)
 			FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDclass)
 			{
 				if (!MDclass.getValue(EMDL_MLMODEL_PDF_ORIENT, aux))
-					REPORT_ERROR("MlModel::readStar: incorrect table model_pdf_orient_class_"+integerToString(iclass+1));
+					REPORT_ERROR("MlModel::readStar: incorrect table model_pdf_orient_class_" + integerToString(iclass + 1));
 				vaux.push_back(aux);
 			}
 			pdf_direction[iclass].resize(vaux.size());
