@@ -1022,6 +1022,7 @@ std::string Schedule::getVariableValueAsString(std::string name)
 	if (isStringVariable(name)) return scheduler_global_strings[name].value;
 	else if (isBooleanVariable(name)) return (scheduler_global_bools[name].value) ? "True" : "False";
 	else if (isFloatVariable(name)) return floatToString(scheduler_global_floats[name].value);
+	else REPORT_ERROR("Schedule::getVariableValueAsString: no variable named " + name);
 }
 
 void Schedule::setOperatorParameters(std::string name, std::string _type, std::string _input1, std::string _input2, std::string _output)
@@ -1212,6 +1213,7 @@ bool Schedule::isValid()
 
 	// Check Scheduler ends with an exit
 
+	return false; // to be implemented
 }
 
 std::string Schedule::getNextNode()
