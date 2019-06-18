@@ -87,6 +87,7 @@ bool isScheduleOperator(std::string name);
 #define SCHEDULE_FLOAT_OPERATOR_DIVIDE "float_op_divide"
 #define SCHEDULE_FLOAT_OPERATOR_INVDIV "float_op_invdiv"
 #define SCHEDULE_FLOAT_OPERATOR_COUNT_IMAGES "float_op_count_images"
+#define SCHEDULE_FLOAT_OPERATOR_COUNT_WORDS "float_op_count_words"
 #define SCHEDULE_FLOAT_OPERATOR_READ_STAR "float_op_star"
 #define SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX "float_op_star_table_max"
 #define SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN "float_op_star_table_min"
@@ -105,6 +106,8 @@ bool isScheduleOperator(std::string name);
 #define SCHEDULE_STRING_OPERATOR_MOVE_FILE "string_op_move_file"
 #define SCHEDULE_STRING_OPERATOR_DELETE_FILE "string_op_delete_file"
 #define SCHEDULE_STRING_OPERATOR_READ_STAR "string_op_read_star"
+#define SCHEDULE_STRING_OPERATOR_GLOB "string_op_glob"
+#define SCHEDULE_STRING_OPERATOR_NTH_WORD "string_op_nth_word"
 #define SCHEDULE_WAIT_OPERATOR_SINCE_LAST_TIME "wait_since_last_time"
 #define SCHEDULE_EXIT_OPERATOR "exit"
 
@@ -296,6 +299,10 @@ public:
     void removeEdge(int idx);
 
 
+    // Rename this scheduler into a new directory
+    void copy(FileName newname);
+
+    // Send an email
     void sendEmail(std::string message);
 
     // Add edges and forks in between the nodes

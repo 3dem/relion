@@ -25,7 +25,7 @@
 class scheduler_parameters
 {
 public:
-	FileName mydir;
+	FileName mydir, newname;
 	float myconstant;
 	bool do_reset, do_run;
 	int verb;
@@ -73,6 +73,7 @@ public:
 		// Fill the window, but don't show it!
 		int gen_section = parser.addSection("General options");
 		mydir = parser.getOption("--schedule", "Directory name of the schedule");
+		newname = parser.getOption("--copy", "Make a copy of the schedule into this directory");
 		int add_section = parser.addSection("Add elements to the schedule");
 		add = parser.getOption("--add", "Specify category of element to add to the schedule (variable, operator, job, edge or fork)", "");
 		type = parser.getOption("--type", "Specify type of that element to add to the schedule", "");
@@ -154,7 +155,12 @@ public:
 			schedule.write(DONT_LOCK, mydir + "schedule.star.bck"); // just save another copy of the starfile ...
 		}
 
-		if (add != "")
+		if (newname != "")
+		{
+			schedule.copy(newname);
+			return;
+		}
+		else if (add != "")
 		{
 			if (add == "variable")
 			{

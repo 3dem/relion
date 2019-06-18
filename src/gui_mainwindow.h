@@ -117,6 +117,7 @@ static Fl_Menu_Item operator_type_options[] = {
 	   {SCHEDULE_FLOAT_OPERATOR_DIVIDE},
 	   {SCHEDULE_FLOAT_OPERATOR_INVDIV},
 	   {SCHEDULE_FLOAT_OPERATOR_COUNT_IMAGES},
+	   {SCHEDULE_FLOAT_OPERATOR_COUNT_WORDS},
 	   {SCHEDULE_FLOAT_OPERATOR_READ_STAR},
 	   {SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX},
 	   {SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN},
@@ -143,12 +144,13 @@ static Fl_Menu_Item operator_type_options[] = {
 	   {SCHEDULE_STRING_OPERATOR_MOVE_FILE},
 	   {SCHEDULE_STRING_OPERATOR_DELETE_FILE},
 	   {SCHEDULE_STRING_OPERATOR_READ_STAR},
+	   {SCHEDULE_STRING_OPERATOR_GLOB},
+	   {SCHEDULE_STRING_OPERATOR_NTH_WORD},
 	   {SCHEDULE_WAIT_OPERATOR_SINCE_LAST_TIME},
 	   {SCHEDULE_EXIT_OPERATOR},
 	   {0} // this should be the last entry
 	   };
-static Fl_Choice *scheduler_operator_type, *scheduler_operator_output, *scheduler_operator_input1;
-static Fl_Input *scheduler_operator_input2;
+static Fl_Choice *scheduler_operator_type, *scheduler_operator_output, *scheduler_operator_input1, *scheduler_operator_input2;
 // Scheduler jobs
 static Fl_Hold_Browser *scheduler_job_browser, *scheduler_input_job_browser, *scheduler_output_job_browser;
 static Fl_Button *scheduler_delete_job_button;
