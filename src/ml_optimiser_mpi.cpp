@@ -794,6 +794,9 @@ void MlOptimiserMpi::expectation()
 
 				int sender = (i)%(node->size - 1); // which rank did the heavy lifting? -> sender of information
 				{
+#ifdef MPI_DEBUG
+					std::cout << "relion_MPI_Bcast debug: rank = " << node->rank << " i = " << i << " MULTIDIM_SIZE(mymodel.PPref[i].data) = " << MULTIDIM_SIZE(mymodel.PPref[i].data) << " sender = " << sender << " slaveC = " << node->slaveC << std::endl;
+#endif
 					// Communicating over all slaves means we don't have to allocate on the master.
 					node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.PPref[i].data),
 							MULTIDIM_SIZE(mymodel.PPref[0].data), MY_MPI_COMPLEX, sender, node->slaveC);

@@ -18,10 +18,10 @@
  * author citations must be preserved.
  ***************************************************************************/
 /***************************************************************************
- * Authors:     J.M. de la Rosa Trevin (jmdelarosa@cnb.csic.es)
+ * Authors: J.M. de la Rosa Trevin (jmdelarosa@cnb.csic.es)
  *
  *
- * Unidad de  Bioinformatica of Centro Nacional de Biotecnologia , CSIC
+ * Unidad de Bioinformatica of Centro Nacional de Biotecnologia , CSIC
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -38,8 +38,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
  * 02111-1307  USA
  *
- *  All comments concerning this program package may be sent to the
- *  e-mail address 'xmipp@cnb.csic.es'
+ * All comments concerning this program package may be sent to the
+ * e-mail address 'xmipp@cnb.csic.es'
  ***************************************************************************/
 
 #ifndef MPI_H_
@@ -63,50 +63,48 @@
 #define MPITAG_IDENTIFIER 8
 #define MPITAG_BCAST 9
 
- /** Class to wrapp some MPI common calls in an work node.
- *
- */
+/** Class to wrapp some MPI common calls in an work node.
+*
+*/
 class MpiNode
 {
 
 public:
-    int rank, size;
+	int rank, size;
 
-    MPI_Group worldG, slaveG; // groups of ranks (in practice only used to create communicators)
-	MPI_Comm worldC, slaveC;  // communicators
-	int slaveRank;			  // index of slave within the slave-group (and communicator)
+	MPI_Group worldG, slaveG; // groups of ranks (in practice only used to create communicators)
+	MPI_Comm worldC, slaveC; // communicators
+	int slaveRank; // index of slave within the slave-group (and communicator)
 
-    MpiNode(int &argc, char ** argv);
+	MpiNode(int &argc, char ** argv);
 
-    ~MpiNode();
+	~MpiNode();
 
-    // Only true if rank == 0
-    bool isMaster() const;
+	// Only true if rank == 0
+	bool isMaster() const;
 
-    // Prints the random subset for this rank
-    int myRandomSubset() const;
+	// Prints the random subset for this rank
+	int myRandomSubset() const;
 
-    // Returns the name of the host this rank is running on
-    std::string getHostName() const;
+	// Returns the name of the host this rank is running on
+	std::string getHostName() const;
 
-    /** Wait on a barrier for the other MPI nodes */
-    void barrierWait();
+	/** Wait on a barrier for the other MPI nodes */
+	void barrierWait();
 
-    /** Build in some better error handling and (hopefully better) robustness to communication failures in the MPI_Send/MPI_Recv pairs....
-     */
-    int relion_MPI_Send(void *buf, std::ptrdiff_t count, MPI_Datatype datatype, int dest, int tag, MPI_Comm comm);
+	/** Build in some better error handling and (hopefully better) robustness to communication failures in the MPI_Send/MPI_Recv pairs....
+	 */
+	int relion_MPI_Send(void *buf, std::ptrdiff_t count, MPI_Datatype datatype, int dest, int tag, MPI_Comm comm);
 
-    int relion_MPI_Recv(void *buf, std::ptrdiff_t count, MPI_Datatype datatype, int source, int tag, MPI_Comm comm, MPI_Status &status);
+	int relion_MPI_Recv(void *buf, std::ptrdiff_t count, MPI_Datatype datatype, int source, int tag, MPI_Comm comm, MPI_Status &status);
 
-    int relion_MPI_Bcast(void *buffer, long int count, MPI_Datatype datatype, int root, MPI_Comm comm);
+	int relion_MPI_Bcast(void *buffer, long int count, MPI_Datatype datatype, int root, MPI_Comm comm);
 
-    /* Better error handling of MPI error messages */
-    void report_MPI_ERROR(int error_code);
+	/* Better error handling of MPI error messages */
+	void report_MPI_ERROR(int error_code);
 
 };
 
 // General function to print machinenames on all MPI nodes
 void printMpiNodesMachineNames(MpiNode &node, int nthreads = 1);
-
-
 #endif /* MPI_H_ */

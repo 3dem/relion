@@ -681,6 +681,7 @@ class star_handler_parameters
 		if (nr_split > 0)
 		{
 			std::rename((fnt0 + ".tmp").c_str(), fnt0.c_str());
+			std::cout << " Renamed " << (fnt0 + ".tmp") << " to " << fnt0 << std::endl;
 		}
 	}
 
