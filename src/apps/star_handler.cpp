@@ -436,7 +436,10 @@ class star_handler_parameters
 		if (nr_split > 0)
 		{
 			std::rename((fnt0 + ".tmp").c_str(), fnt0.c_str());
+			std::cout << " Renamed " << (fnt0 + ".tmp") << " to " << fnt0 << std::endl;
 		}
+
+		std::cout << " NOTE: The split job has finished successfully. If the GUI does not detect it (a known problem to be fixed in 3.1), please 'Mark as finished' from the 'Job actions' menu." << std::endl;
 	}
 
 	void operate()

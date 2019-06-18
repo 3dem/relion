@@ -2295,7 +2295,8 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 
 			for (int isplit = 0; isplit < nr_split; isplit++)
 			{
-				FileName fn_split = fn_out.insertBeforeExtension("_split"+integerToString(isplit+1,3));
+				// FIXME: This is not perfect. The real fix will be in 3.1.
+				FileName fn_split = fn_out.insertBeforeExtension("_split"+integerToString(isplit + 1));
 
 				if (joboptions["fn_mic"].getString() != "")
 				{
