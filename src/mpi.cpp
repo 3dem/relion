@@ -19,10 +19,10 @@
  ***************************************************************************/
 
 /***************************************************************************
- * Authors:     J.M. de la Rosa Trevin (jmdelarosa@cnb.csic.es)
+ * Authors: J.M. de la Rosa Trevin (jmdelarosa@cnb.csic.es)
  *
  *
- * Unidad de  Bioinformatica of Centro Nacional de Biotecnologia , CSIC
+ * Unidad de Bioinformatica of Centro Nacional de Biotecnologia , CSIC
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -37,44 +37,48 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
- * 02111-1307  USA
+ * 02111-1307 USA
  *
- *  All comments concerning this program package may be sent to the
- *  e-mail address 'xmipp@cnb.csic.es'
+ * All comments concerning this program package may be sent to the
+ * e-mail address 'xmipp@cnb.csic.es'
  ***************************************************************************/
 
 #include "src/mpi.h"
+//#define MPI_DEBUG
 
 //------------ MPI ---------------------------
 MpiNode::MpiNode(int &argc, char ** argv)
 {
-    //MPI Initialization
-    MPI_Init(&argc, &argv);
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
-    // Handle errors
-    MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
+	//MPI Initialization
+	MPI_Init(&argc, &argv);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	MPI_Comm_size(MPI_COMM_WORLD, &size);
+	// Handle errors
+	MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
 
-    // Set up Slave communicator -----------------------------------------
-    MPI_Comm_group(MPI_COMM_WORLD, &worldG);
-    int mstr[1]  = {0};
-    MPI_Group_excl( worldG, 1, mstr, &slaveG ); // exclude master
-    MPI_Comm_create(MPI_COMM_WORLD, slaveG, &slaveC);
-    if(rank!=0)
-    	MPI_Group_rank(slaveG, &slaveRank);
-    else
-    	slaveRank = -1;
-    // -------------------------------------------------------------------
+	// Set up Slave communicator -----------------------------------------
+	MPI_Comm_group(MPI_COMM_WORLD, &worldG);
+	int mstr[1] = {0};
+	MPI_Group_excl(worldG, 1, mstr, &slaveG); // exclude master
+	MPI_Comm_create(MPI_COMM_WORLD, slaveG, &slaveC);
+	if (rank != 0)
+	{
+		MPI_Group_rank(slaveG, &slaveRank);
+	}
+	else
+	{
+		slaveRank = -1;
+	}
 }
 
 MpiNode::~MpiNode()
 {
-    MPI_Finalize();
+	MPI_Finalize();
 }
 
 bool MpiNode::isMaster() const
 {
-    return rank == 0;
+	return rank == 0;
 }
 
 int MpiNode::myRandomSubset() const
@@ -87,10 +91,10 @@ int MpiNode::myRandomSubset() const
 
 std::string MpiNode::getHostName() const
 {
-    char nodename[64] = "undefined";
-    gethostname(nodename,sizeof(nodename));
-    std::string result(nodename);
-    return result;
+	char nodename[64] = "undefined";
+	gethostname(nodename,sizeof(nodename));
+	std::string result(nodename);
+	return result;
 
 }
 
@@ -102,195 +106,180 @@ void MpiNode::barrierWait()
 // MPI_TEST will be executed every this many seconds: so this determines the minimum time taken for every send operation!!
 //#define VERBOSE_MPISENDRECV
 int MpiNode::relion_MPI_Send(void *buf, std::ptrdiff_t count, MPI_Datatype datatype, int dest, int tag, MPI_Comm comm) {
-
-    int result(0);
-    RFLOAT start_time = MPI_Wtime();
+	int result(0);
+	RFLOAT start_time = MPI_Wtime();
 
 //#define ONLY_NORMAL_SEND
 //#ifdef ONLY_NORMAL_SEND
-    int unitsize(0);
-    MPI_Type_size(datatype, &unitsize);
-    const std::ptrdiff_t blocksize(512*1024*1024);
-    const std::ptrdiff_t totalsize(count*unitsize);
-    if (totalsize <= blocksize ) {
-        result = MPI_Send(buf, count, datatype, dest, tag, comm);
-        if (result != MPI_SUCCESS) {
-            report_MPI_ERROR(result);
-        }
-    } else {
-        char * const buffer(reinterpret_cast<char*>(buf));
-        const std::ptrdiff_t ntimes(totalsize/blocksize);
-        const std::ptrdiff_t nremain(totalsize%blocksize);
-        std::ptrdiff_t i(0);
-        for(; i<ntimes; ++i) {
-            result = MPI_Send(buffer+i*blocksize, blocksize, MPI_CHAR, dest, tag, comm);
-            if (result != MPI_SUCCESS) {
-                report_MPI_ERROR(result);
-            }
-        }
-        if(nremain>0) {
-            result = MPI_Send(buffer+i*blocksize, nremain, MPI_CHAR, dest, tag, comm);
-            if (result != MPI_SUCCESS) {
-                report_MPI_ERROR(result);
-            }
-        }
-    }
-/*
-#else
-        // Only use Bsend for larger messages, otherwise use normal send
-        if (count > 100) {
-                int size;
-                MPI_Pack_size( count, datatype, comm, &size );
-                char *membuff;
-
-                // Allocate memory for the package to be sent
-                int attach_result = MPI_Buffer_attach( malloc(size + MPI_BSEND_OVERHEAD ), size + MPI_BSEND_OVERHEAD );
-                if (attach_result != MPI_SUCCESS)
-                {
-                        report_MPI_ERROR(result);
-                }
-
-                // Actually start sending the message
-                result = MPI_Bsend(buf, count, datatype, dest, tag, comm);
-                if (result != MPI_SUCCESS)
-                {
-                        report_MPI_ERROR(result);
-                }
-
-                // The following will only complete once the message has been successfully sent (i.e. also received on the other side)
-                int deattach_result = MPI_Buffer_detach( &membuff, &size);
-                if (deattach_result != MPI_SUCCESS)
-                {
-                        report_MPI_ERROR(result);
-                }
-        } else {
-                result = MPI_Send(buf, count, datatype, dest, tag, comm);
-                if (result != MPI_SUCCESS)
-                {
-                        report_MPI_ERROR(result);
-                }
-        }
+	int unitsize(0);
+	MPI_Type_size(datatype, &unitsize);
+	const std::ptrdiff_t blocksize(512 * 1024 * 1024);
+	const std::ptrdiff_t totalsize(count * unitsize);
+	if (totalsize <= blocksize )
+	{
+#ifdef MPI_DEBUG
+		std::cout << "relion_MPI_Send: rank = " << rank << " count = " << count << " dest = " << dest << " tag = " << tag << " comm = " << comm << std::endl;
 #endif
-*/
+		result = MPI_Send(buf, count, datatype, dest, tag, comm);
+		if (result != MPI_SUCCESS)
+			report_MPI_ERROR(result);
+	}
+	else
+	{
+		char* const buffer(reinterpret_cast<char*>(buf));
+		const std::ptrdiff_t ntimes(totalsize/blocksize);
+		const std::ptrdiff_t nremain(totalsize%blocksize);
+		std::ptrdiff_t i(0);
+		for(; i < ntimes; ++i)
+		{
+#ifdef MPI_DEBUG
+			std::cout << "relion_MPI_Send: rank = " << rank << " blocksize = " << blocksize << " dest = " << dest << " tag = " << tag << " comm = " << comm << std::endl;
+#endif
+			result = MPI_Send(buffer + i * blocksize, blocksize, MPI_CHAR, dest, tag, comm);
+			if (result != MPI_SUCCESS)
+				report_MPI_ERROR(result);
+		}
+		if(nremain > 0)
+		{
+#ifdef MPI_DEBUG
+			std::cout << "relion_MPI_Send: rank = " << rank << " nremain = " << nremain << " dest = " << dest << " tag = " << tag << " comm = " << comm << std::endl;
+#endif
+			result = MPI_Send(buffer + i * blocksize, nremain, MPI_CHAR, dest, tag, comm);
+			if (result != MPI_SUCCESS)
+				report_MPI_ERROR(result);
+		}
+	}
 
 #ifdef VERBOSE_MPISENDRECV
-        if (count > 100)
-                std::cerr <<" relion_MPI_Send: message to " << dest << " of size "<< count << " arrived in " << MPI_Wtime() - start_time << " seconds" << std::endl;
+	if (count > 100)
+		std::cerr <<" relion_MPI_Send: message to " << dest << " of size "<< count << " arrived in " << MPI_Wtime() - start_time << " seconds" << std::endl;
 #endif
-        return result;
-
+	return result;
 }
 
 int MpiNode::relion_MPI_Recv(void *buf, std::ptrdiff_t count, MPI_Datatype datatype, int source, int tag, MPI_Comm comm, MPI_Status &status) {
-    int result;
-    MPI_Request request;
-    RFLOAT current_time = MPI_Wtime();
-    RFLOAT start_time = current_time;
+	int result;
+	MPI_Request request;
+	RFLOAT current_time = MPI_Wtime();
+	RFLOAT start_time = current_time;
 
-    int unitsize(0);
-    MPI_Type_size(datatype, &unitsize);
-    const std::ptrdiff_t blocksize(512*1024*1024);
-    const std::ptrdiff_t totalsize(count*unitsize);
-    if (totalsize <= blocksize ) {
-        int result_irecv = MPI_Irecv(buf, count, datatype, source, tag, comm, &request);
-        if (result_irecv != MPI_SUCCESS) {
-            report_MPI_ERROR(result_irecv);
-        }
-
-        result = MPI_Wait(&request, &status);
-        if (result != MPI_SUCCESS) {
-            report_MPI_ERROR(result);
-        }
-    } else {
-        char * const buffer(reinterpret_cast<char*>(buf));
-        const std::ptrdiff_t ntimes(totalsize/blocksize);
-        const std::ptrdiff_t nremain(totalsize%blocksize);
-        std::ptrdiff_t i(0);
-        for(; i<ntimes; ++i) {
-            int result_irecv = MPI_Irecv(buffer+i*blocksize, blocksize, MPI_CHAR, source, tag, comm, &request);
-            if (result_irecv != MPI_SUCCESS) {
-                report_MPI_ERROR(result_irecv);
-            }
-
-            result = MPI_Wait(&request, &status);
-            if (result != MPI_SUCCESS) {
-                report_MPI_ERROR(result);
-            }
-        }
-        if(nremain>0) {
-            int result_irecv = MPI_Irecv(buffer+i*blocksize, nremain, MPI_CHAR, source, tag, comm, &request);
-            if (result_irecv != MPI_SUCCESS) {
-                report_MPI_ERROR(result_irecv);
-            }
-
-            result = MPI_Wait(&request, &status);
-            if (result != MPI_SUCCESS) {
-                report_MPI_ERROR(result);
-            }
-        }
-    }
-/*
-        // First make a non-blocking receive
-        int result_irecv = MPI_Irecv(buf, count, datatype, source, tag, comm, &request);
-        if (result_irecv != MPI_SUCCESS)
-        {
-                report_MPI_ERROR(result_irecv);
-        }
-
-        // I could do something in between. If not, Irecv == Recv
-        // Wait for it to finish (MPI_Irecv + MPI_Wait == MPI_Recv)
-        result = MPI_Wait(&request, &status);
-        if (result != MPI_SUCCESS)
-        {
-                report_MPI_ERROR(result);
-        }
-*/
-#ifdef VERBOSE_MPISENDRECV
-        if (count > 100)
-                std::cerr <<" relion_MPI_Recv: message from "<<source << " of size "<< count <<" arrived in " << MPI_Wtime() - start_time << " seconds" << std::endl;
+	int unitsize(0);
+	MPI_Type_size(datatype, &unitsize);
+	const std::ptrdiff_t blocksize(512 * 1024 * 1024);
+	const std::ptrdiff_t totalsize(count * unitsize);
+	if (totalsize <= blocksize)
+	{
+#ifdef MPI_DEBUG
+		std::cout << "relion_MPI_Recv: rank = " << rank << " count = " << count << " source = " << source << " tag = " << tag << " comm = " << comm << std::endl;
 #endif
-        return result;
+		int result_irecv = MPI_Irecv(buf, count, datatype, source, tag, comm, &request);
+		if (result_irecv != MPI_SUCCESS)
+			report_MPI_ERROR(result_irecv);
 
+		result = MPI_Wait(&request, &status);
+		if (result != MPI_SUCCESS)
+			report_MPI_ERROR(result);
+	}
+	else
+	{
+		char* const buffer(reinterpret_cast<char*>(buf));
+		const std::ptrdiff_t ntimes(totalsize / blocksize);
+		const std::ptrdiff_t nremain(totalsize % blocksize);
+		std::ptrdiff_t i(0);
+		for(; i < ntimes; ++i)
+		{
+#ifdef MPI_DEBUG
+			std::cout << "relion_MPI_Recv: rank = " << rank << " blocksize = " << blocksize << " source = " << source << " tag = " << tag << " comm = " << comm << std::endl;
+#endif
+			int result_irecv = MPI_Irecv(buffer + i * blocksize, blocksize, MPI_CHAR, source, tag, comm, &request);
+			if (result_irecv != MPI_SUCCESS)
+				report_MPI_ERROR(result_irecv);
+
+			result = MPI_Wait(&request, &status);
+			if (result != MPI_SUCCESS)
+				report_MPI_ERROR(result);
+		}
+		if (nremain > 0)
+		{
+#ifdef MPI_DEBUG
+			std::cout << "relion_MPI_Recv: rank = " << rank << " nremain = " << nremain << " source = " << source << " tag = " << tag << " comm = " << comm << std::endl;
+#endif
+			int result_irecv = MPI_Irecv(buffer + i * blocksize, nremain, MPI_CHAR, source, tag, comm, &request);
+			if (result_irecv != MPI_SUCCESS)
+				report_MPI_ERROR(result_irecv);
+
+			result = MPI_Wait(&request, &status);
+			if (result != MPI_SUCCESS)
+				report_MPI_ERROR(result);
+		}
+	}
+
+#ifdef VERBOSE_MPISENDRECV
+	if (count > 100)
+		std::cerr <<" relion_MPI_Recv: message from "<<source << " of size "<< count <<" arrived in " << MPI_Wtime() - start_time << " seconds" << std::endl;
+#endif
+		return result;
 }
 
 
 int MpiNode::relion_MPI_Bcast(void *buffer, long int count, MPI_Datatype datatype, int root, MPI_Comm comm)
 {
 	int result;
-    int unitsize(0);
-    MPI_Type_size(datatype, &unitsize);
-    const long blocksize(1 * 1024 * 1024 * 1024);
-    const long totalsize(count * unitsize);
+	int unitsize(0);
+	MPI_Type_size(datatype, &unitsize);
 
-    if (count < 0) report_MPI_ERROR(MPI_ERR_COUNT);  // overflow
-    if (totalsize <= blocksize) {
-        // maximum amount of data can be sent by MPI_Bcast
-        // 2 * 1024 * 1024 * 1024 - 1 = 2^31 - 1 = 2147483647 bytes
-        result = MPI_Bcast(buffer, static_cast<int>(count), datatype, root, comm);
-        if (result != MPI_SUCCESS) {
-            report_MPI_ERROR(result);
-        }
-    } else {
-        if (rank == root) {
-            for (int dest = 0; dest < size; dest++) {   
-                if (dest != root) {
-                    result = relion_MPI_Send(buffer, count, datatype, dest, MPITAG_BCAST, comm);
-                    if (result != MPI_SUCCESS) {
-                        report_MPI_ERROR(result);
-                    }
-                }
-            }
-        } else {
-            MPI_Status status;
-            result = relion_MPI_Recv(buffer, count, datatype, root, MPITAG_BCAST, comm, status);
-            if (result != MPI_SUCCESS) {
-                report_MPI_ERROR(result);
-            }
-        }
-    }
+	// maximum amount of data can be sent by MPI_Bcast
+	// 2 * 1024 * 1024 * 1024 - 1 = 2^31 - 1 = 2147483647 bytes
+	const long blocksize(1 * 1024 * 1024 * 1024);
+	const long totalsize(count * unitsize);
+
+#ifdef MPI_DEBUG
+	std::cout << "relion_MPI_Bcast: rank = " << rank << " count = " << count << " root = " << root << " comm = " << comm << std::endl;
+#endif
+	if (count < 0)
+		report_MPI_ERROR(MPI_ERR_COUNT);  // overflow
+	if (totalsize <= blocksize)
+	{
+		result = MPI_Bcast(buffer, static_cast<int>(count), datatype, root, comm);
+		if (result != MPI_SUCCESS)
+			report_MPI_ERROR(result);
+	}
+	else
+	{
+		int rank_in_group = rank, size_of_group = size;
+		if (comm != MPI_COMM_WORLD)
+		{
+			MPI_Group group_of_comm;
+			MPI_Comm_group(comm, &group_of_comm);
+			MPI_Group_rank(group_of_comm, &rank_in_group);
+			MPI_Group_size(group_of_comm, &size_of_group);
+		}
+
+#ifdef MPI_DEBUG
+		std::cout << "relion_MPI_Bcast: global_rank = " << rank << " rank_in_comm = " << rank_in_group << " size_of_group = " << size_of_group << std::endl;
+#endif
+		if (rank_in_group == root)
+		{
+			for (int dest = 0; dest < size_of_group; dest++)
+			{
+				if (dest != root)
+				{
+					result = relion_MPI_Send(buffer, count, datatype, dest, MPITAG_BCAST, comm);
+					if (result != MPI_SUCCESS)
+						report_MPI_ERROR(result);
+				}
+			}
+		}
+		else
+		{
+			MPI_Status status;
+			result = relion_MPI_Recv(buffer, count, datatype, root, MPITAG_BCAST, comm, status);
+			if (result != MPI_SUCCESS)
+				report_MPI_ERROR(result);
+		}
+	}
 
 	return result;
-
 }
 
 void MpiNode::report_MPI_ERROR(int error_code)
@@ -305,51 +294,44 @@ void MpiNode::report_MPI_ERROR(int error_code)
 
 	std::cerr.flush();
 	REPORT_ERROR("Encountered an MPI-related error, see above. Now exiting...");
-
 }
-
-
 
 void printMpiNodesMachineNames(MpiNode &node, int nthreads)
 {
-
-
-    if (node.isMaster())
-    {
-    	std::cout << " === RELION MPI setup ===" << std::endl;
-    	std::cout << " + Number of MPI processes             = " << node.size << std::endl;
-    	if (nthreads > 1)
-    	{
-    		std::cout << " + Number of threads per MPI process  = " << nthreads << std::endl;
-    		std::cout << " + Total number of threads therefore  = " << nthreads * node.size << std::endl;
+	if (node.isMaster())
+	{
+		std::cout << " === RELION MPI setup ===" << std::endl;
+		std::cout << " + Number of MPI processes             = " << node.size << std::endl;
+		if (nthreads > 1)
+		{
+			std::cout << " + Number of threads per MPI process   = " << nthreads << std::endl;
+		std::cout << " + Total number of threads therefore   = " << nthreads * node.size << std::endl;
 		}
-    	std::cout << " + Master  (0) runs on host            = " << node.getHostName() << std::endl;
-    	std::cout.flush();
-    }
-    node.barrierWait();
+		std::cout << " + Master  (0) runs on host            = " << node.getHostName() << std::endl;
+		std::cout.flush();
+	}
+	node.barrierWait();
 
-    for (int slave = 1; slave < node.size; slave++)
-    {
-    	if (slave == node.rank)
-    	{
-    		std::cout << " + Slave ";
-    		std::cout.width(5);
-    		std::cout << slave;
-    		std::cout << " runs on host            = " << node.getHostName() << std::endl;
-    		std::cout.flush();
+	for (int slave = 1; slave < node.size; slave++)
+	{
+		if (slave == node.rank)
+		{
+			std::cout << " + Slave ";
+			std::cout.width(5);
+			std::cout << slave;
+			std::cout << " runs on host            = " << node.getHostName() << std::endl;
+			std::cout.flush();
 		}
-    	node.barrierWait();
-    }
+		node.barrierWait();
+	}
 
-    if (node.isMaster())
-    {
-            std::cout << " =================" << std::endl;
-    }
-    std::cout.flush();
+	if (node.isMaster())
+	{
+		std::cout << " =================" << std::endl;
+	}
+	std::cout.flush();
 
-    // Try to flush all std::cout of all MPI processes before proceeding...
-    sleep(1);
-    node.barrierWait();
-
+	// Try to flush all std::cout of all MPI processes before proceeding...
+	sleep(1);
+	node.barrierWait();
 }
-
