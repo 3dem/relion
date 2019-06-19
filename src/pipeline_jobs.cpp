@@ -2003,7 +2003,7 @@ void RelionJob::initialiseExtractJob()
 	joboptions["do_reextract"] = JobOption("OR re-extract refined particles? ", false, "If set to Yes, the input Coordinates above will be ignored. Instead, one uses a _data.star file from a previous 2D or 3D refinement to re-extract the particles in that refinement, possibly re-centered with their refined origin offsets. This is particularly useful when going from binned to unbinned particles.");
 	joboptions["fndata_reextract"] = JobOption("Refined particles STAR file: ", NODE_PART_DATA, "", "Input STAR file (*.{star})", "Filename of the STAR file with the refined particle coordinates, e.g. from a previous 2D or 3D classification or auto-refine run.");
 	joboptions["do_reset_offsets"] = JobOption("Reset the refined offsets to zero? ", false, "If set to Yes, the input origin offsets will be reset to zero. This may be useful after 2D classification of helical segments, where one does not want neighbouring segments to be translated on top of each other for a subsequent 3D refinement or classification.");
-	joboptions["do_recenter"] = JobOption("OR: re-center refined coordinates? ", false, "If set to Yes, the input coordinates will be re-centered according to the refined origin offsets in the provided _data.star file .");
+	joboptions["do_recenter"] = JobOption("OR: re-center refined coordinates? ", false, "If set to Yes, the input coordinates will be re-centered according to the refined origin offsets in the provided _data.star file. The unit is pixel, not angstrom. The origin is at the center of the box, not at the corner.");
 	joboptions["recenter_x"] = JobOption("Re-center on X-coordinate (in pix): ", std::string("0"), "Re-extract particles centered on this X-coordinate (in pixels in the reference)");
 	joboptions["recenter_y"] = JobOption("Re-center on Y-coordinate (in pix): ", std::string("0"), "Re-extract particles centered on this Y-coordinate (in pixels in the reference)");
 	joboptions["recenter_z"] = JobOption("Re-center on Z-coordinate (in pix): ", std::string("0"), "Re-extract particles centered on this Z-coordinate (in pixels in the reference)");
@@ -4368,7 +4368,7 @@ which you want to use for subtraction. It will use the maps from this run for th
 	joboptions["fn_fliplabel"] = JobOption("revert this particle star file:", NODE_PART_DATA, "", "particle STAR file (*.star)", "The particle STAR files with particles that will be used for label reversion.");
 
 	joboptions["do_center_mask"] = JobOption("Do center subtracted images on mask?", true, "If set to Yes, the subtracted particles will be centered on projections of the center-of-mass of the input mask.");
-	joboptions["do_center_xyz"] = JobOption("Do center on my coordinates?", false, "If set to Yes, the subtracted particles will be centered on projections of the x,y,z coordinates below.");
+	joboptions["do_center_xyz"] = JobOption("Do center on my coordinates?", false, "If set to Yes, the subtracted particles will be centered on projections of the x,y,z coordinates below. The unit is pixel, not angstrom. The origin is at the center of the box, not at the corner.");
 	joboptions["center_x"] = JobOption("Center coordinate (pix) - X:", std::string("0"), "X-coordinate of the 3D center (in pixels).");
 	joboptions["center_y"] = JobOption("Center coordinate (pix) - Y:", std::string("0"), "Y-coordinate of the 3D center (in pixels).");
 	joboptions["center_z"] = JobOption("Center coordinate (pix) - Z:", std::string("0"), "Z-coordinate of the 3D center (in pixels).");
