@@ -1514,6 +1514,7 @@ void Schedule::setVariablesInJob(RelionJob &job, FileName original_job_name, boo
 				// If any of the input nodes are not the same as my_current_name (from continuation jobs) or my_ori_name (from new jobs)
 				if (myval != my_current_name && myval != my_ori_name)
 				{
+					std::cerr << "restart needed!" << std::endl;
 					needs_a_restart = true;
 				}
 				job.joboptions[it->first].value = mystring;
@@ -1521,7 +1522,7 @@ void Schedule::setVariablesInJob(RelionJob &job, FileName original_job_name, boo
 		}
 	}
 
-	// Check whether there are any options with a value containing &&, which is the sign for inserting Scheduler variables
+	// Check whether there are any options with a value containing $$, which is the sign for inserting Scheduler variables
 	for (std::map<std::string,JobOption>::iterator it=ori_job.joboptions.begin(); it!=ori_job.joboptions.end(); ++it)
 	{
 		FileName mystring = (it->second).value;
@@ -1609,7 +1610,14 @@ void Schedule::run(PipeLine &pipeline)
 	bool has_more_jobs = true;
     while (has_more_jobs)
     {
-        RelionJob myjob;
+		// Abort mechanism
+    	if (exists(name + RELION_JOB_ABORT_NOW))
+		{
+			is_ok = false;
+			break;
+		}
+
+		RelionJob myjob;
         bool is_continue, do_overwrite_current, dummy;
     	int current_job;
     	if (!jobs[current_node].job_has_started || jobs[current_node].mode == SCHEDULE_NODE_JOB_MODE_NEW)
@@ -1674,6 +1682,11 @@ void Schedule::run(PipeLine &pipeline)
 			while (!exists(pipeline.nodeList[mynode].name))
 			{
 				std::cerr << " + -- Warning " << pipeline.nodeList[mynode].name << " does not exist. Waiting 10 seconds ... " << std::endl;
+				if (exists(name + RELION_JOB_ABORT_NOW))
+				{
+					is_ok = false;
+					break;
+				}
 				sleep(10);
 			}
 		}
@@ -1709,6 +1722,8 @@ void Schedule::run(PipeLine &pipeline)
     if (is_ok) sendEmail("Finished successfully!");
     if (verb > 0)
     {
+    	if (exists(name + RELION_JOB_ABORT_NOW))
+    		std::cout << " Found an ABORT signal... " << std::endl;
     	std::cout << " Scheduler " << name << " stops now... " << std::endl;
     	std::cout << "+++++++++++++++++++++++++++++++++++++++++++++++++"  << std::endl << std::endl;
     }

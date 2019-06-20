@@ -105,7 +105,7 @@ void GuiEntry::initialise(int x, int y, Fl_Group * deactivate_this_group, bool _
 {
 
 	// The input field
-	int mywidth = (joboption.joboption_type == JOBOPTION_SLIDER) ? 50 : wcol2;
+	int mywidth = (joboption.joboption_type == JOBOPTION_SLIDER && !show_scheduler) ? 50 : wcol2;
 	inp = new Fl_Input(x, y, mywidth, height, joboption.label_gui.c_str());
 	inp->color(GUI_INPUT_COLOR);
 	inp->textsize(ENTRY_FONTSIZE);
@@ -178,22 +178,25 @@ void GuiEntry::initialise(int x, int y, Fl_Group * deactivate_this_group, bool _
 	}
 	else if (joboption.joboption_type == JOBOPTION_SLIDER)
 	{
-		int floatwidth = 50;
-		// Slider is shorter than wcol2, so that underlying input field becomes visible
-		slider = new Fl_Slider(XCOL2 + floatwidth, y, wcol2 - floatwidth, height);
-		slider->type(1);
-		slider->callback(cb_slider, this);
-		slider->minimum(joboption.min_value);
-		slider->maximum(joboption.max_value);
-		slider->step(joboption.step_value);
-		slider->type(FL_HOR_NICE_SLIDER);
-		slider->color(GUI_BACKGROUND_COLOR);
-		inp->callback(cb_input, this);
-		inp->when(FL_WHEN_ENTER_KEY|FL_WHEN_NOT_CHANGED);
+		if (!show_scheduler)
+		{
+			int floatwidth = 50;
+			// Slider is shorter than wcol2, so that underlying input field becomes visible
+			slider = new Fl_Slider(XCOL2 + floatwidth, y, wcol2 - floatwidth, height);
+			slider->type(1);
+			slider->callback(cb_slider, this);
+			slider->minimum(joboption.min_value);
+			slider->maximum(joboption.max_value);
+			slider->step(joboption.step_value);
+			slider->type(FL_HOR_NICE_SLIDER);
+			slider->color(GUI_BACKGROUND_COLOR);
+			inp->callback(cb_input, this);
+			inp->when(FL_WHEN_ENTER_KEY|FL_WHEN_NOT_CHANGED);
 
-		// Set the default in the input and the slider:
-		inp->value(joboption.default_value.c_str());
-		slider->value(textToDouble(joboption.default_value));
+			// Set the default in the input and the slider:
+			inp->value(joboption.default_value.c_str());
+			slider->value(textToDouble(joboption.default_value));
+		}
 	}
 }
 void GuiEntry::place(JobOption &_joboption, int &y, int _deactivate_option, Fl_Group * deactivate_this_group, bool actually_activate, int x, int h, int wcol2, int wcol3 )

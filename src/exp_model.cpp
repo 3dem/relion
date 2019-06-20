@@ -976,6 +976,7 @@ void Experiment::read(FileName fn_exp, bool do_ignore_particle_name, bool do_ign
 					}
 					if (group_id < 0)
 					{
+						std::cerr << " adding group: = " << group_name << " id= " << group_id <<std::endl;
 						group_id = addGroup(group_name, optics_group);
 					}
 				}
