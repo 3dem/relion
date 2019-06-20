@@ -1197,6 +1197,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 					A2D_ELEM(PS_sum(), i, j) += abs(FFTW2D_ELEM(F_sum, -i, -j));
 			}
 		}
+//#define DEBUG_PS
 #ifdef DEBUG_PS
 		std::cout << "size of Fframes: NX = " << XSIZE(Fframes[0]) << " NY = " << YSIZE(Fframes[0]) << std::endl;
 		std::cout << "size of PS_sum: NX = " << XSIZE(PS_sum()) << " NY = " << YSIZE(PS_sum()) << std::endl;
@@ -1205,9 +1206,9 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 
 		// 1. Make it square
 		RCTIC(TIMING_POWER_SPECTRUM_SQUARE);
+		int ps_size_square = XMIPP_MIN(nx, ny);
 		if (nx != ny)
 		{
-			int ps_size_square = XMIPP_MIN(nx, ny);
 			F_ps_small.resize(ps_size_square, ps_size_square / 2 + 1);
 			NewFFT::FourierTransform(PS_sum(), F_ps);
 			cropInFourierSpace(F_ps, F_ps_small);
@@ -1227,7 +1228,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 		int nx_needed = XSIZE(PS_sum());
 		if (ps_angpix < target_pixel_size)
 		{
-			nx_needed = CEIL(nx * ps_angpix / target_pixel_size);
+			nx_needed = CEIL(ps_size_square * ps_angpix / target_pixel_size);
 			nx_needed += nx_needed % 2;
 			ps_angpix = XSIZE(PS_sum()) * ps_angpix / nx_needed;
 		}
