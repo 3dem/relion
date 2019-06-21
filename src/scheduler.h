@@ -78,14 +78,18 @@ bool isScheduleOperator(std::string name);
 #define SCHEDULE_BOOLEAN_OPERATOR_NOT "bool_op_not"
 #define SCHEDULE_BOOLEAN_OPERATOR_GT "bool_op_gt"
 #define SCHEDULE_BOOLEAN_OPERATOR_LT "bool_op_lt"
+#define SCHEDULE_BOOLEAN_OPERATOR_GE "bool_op_ge"
+#define SCHEDULE_BOOLEAN_OPERATOR_LE "bool_op_le"
 #define SCHEDULE_BOOLEAN_OPERATOR_EQ "bool_op_eq"
 #define SCHEDULE_BOOLEAN_OPERATOR_FILE_EXISTS "bool_op_file_exists"
 #define SCHEDULE_BOOLEAN_OPERATOR_READ_STAR "bool_op_read_star"
+#define SCHEDULE_FLOAT_OPERATOR_SET "float_op_set"
 #define SCHEDULE_FLOAT_OPERATOR_PLUS "float_op_plus"
 #define SCHEDULE_FLOAT_OPERATOR_MINUS "float_op_minus"
 #define SCHEDULE_FLOAT_OPERATOR_MULT "float_op_mult"
 #define SCHEDULE_FLOAT_OPERATOR_DIVIDE "float_op_divide"
 #define SCHEDULE_FLOAT_OPERATOR_INVDIV "float_op_invdiv"
+#define SCHEDULE_FLOAT_OPERATOR_ROUND "float_op_round"
 #define SCHEDULE_FLOAT_OPERATOR_COUNT_IMAGES "float_op_count_images"
 #define SCHEDULE_FLOAT_OPERATOR_COUNT_WORDS "float_op_count_words"
 #define SCHEDULE_FLOAT_OPERATOR_READ_STAR "float_op_star"
@@ -276,6 +280,7 @@ public:
 
     // Add variables
     void setVariable(std::string name, FileName value); // (Add new one if exists, otherwise set value)
+    void setOriginalVariable(std::string name, FileName value); // (Add new one if exists, otherwise set original_value)
 	void addFloatVariable(std::string name, RFLOAT value);
     void addBooleanVariable(std::string name, bool value);
     void addStringVariable(std::string name, FileName value);
@@ -324,6 +329,9 @@ public:
 
     // Run the Schedule
     void run(PipeLine &pipeline);
+
+    // Remove the lock file for read/write protection
+    void unlock();
 
     // Abort a running schedule
     void abort();
