@@ -2360,32 +2360,9 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 			else if (joboptions["split_size"].getNumber() > 0 && !joboptions["split_size"].isSchedulerVariable())
 			{
 				command += " --size_split " + joboptions["split_size"].getString();
-
-				// Calculate nr_split from number of entries in input STAR file (for output nodes)
-				MetaDataTable MDtmp;
-				FileName fnt = (joboptions["fn_mic"].getString() != "") ? joboptions["fn_mic"].getString() : joboptions["fn_data"].getString();
-				long int n_obj = (exists(fnt)) ? MDtmp.read(fnt, "", NULL, "", true) : 0; // true means do_only_count
-				long int size_split = joboptions["split_size"].getNumber();
-				nr_split = n_obj / size_split;
-
 			}
 
-			for (int isplit = 0; isplit < nr_split; isplit++)
-			{
-				// FIXME: This is not perfect. The real fix will be in 3.1.
-				FileName fn_split = fn_out.insertBeforeExtension("_split"+integerToString(isplit + 1));
-
-				if (joboptions["fn_mic"].getString() != "")
-				{
-					Node node2(fn_split, NODE_MICS);
-					outputNodes.push_back(node2);
-				}
-				else if (joboptions["fn_data"].getString() != "")
-				{
-					Node node2(fn_split, NODE_PART_DATA);
-					outputNodes.push_back(node2);
-				}
-			}
+			// As of relion-3.1, star_handler will write out a star file with the output nodes, which will be read by the pipeliner
 		}
 
 	}
@@ -5040,15 +5017,6 @@ void RelionJob::initialiseExternalJob()
 	joboptions["in_3dref"] = JobOption("Input 3D reference: ", NODE_3DREF, "", "MRC files (*.mrc)", "Input 3D reference map. This will be passed with a --in_ref3d argument to the executable.");
 	joboptions["in_mask"] = JobOption("Input 3D mask: ", NODE_MASK, "", "MRC files (*.mrc)", "Input 3D mask. This will be passed with a --in_mask argument to the executable.");
 
-	// Optional output nodes
-	joboptions["out_mov"] = JobOption("Output movies: ", NODE_MOVIES, "", "movie STAR file (*.star)", "Output movies. This will be passed with a --out_movies argument to the executable.");
-	joboptions["out_mic"] = JobOption("Output micrographs: ", NODE_MICS, "", "micrographs STAR file (*.star)", "Output micrographs. This will be passed with a --out_mics argument to the executable.");
-	joboptions["out_part"] = JobOption("Output particles: ", NODE_PART_DATA, "", "particles STAR file (*.star)", "Output particles. This will be passed with a --out_parts argument to the executable.");
-	joboptions["out_coords"] = JobOption("Output coordinates: ", NODE_MIC_COORDS, "", "STAR files (coords_suffix*.star)", "Output coordinates. This will be passed with a --out_coords argument to the executable.");
-	joboptions["out_3dref"] = JobOption("Output 3D reference: ", NODE_3DREF, "", "MRC files (*.mrc)", "Output 3D reference map. This will be passed with a --out_ref3d argument to the executable.");
-	joboptions["out_mask"] = JobOption("Output 3D mask: ", NODE_MASK, "", "MRC files (*.mrc)", "Output 3D mask. This will be passed with a --out_mask argument to the executable.");
-	joboptions["fn_exe"] = JobOption("External executable:", "", "", ".", "Location of the script that will launch the external program.");
-
 	// Optional parameters
 	joboptions["param1_label"] = JobOption("Param1 - label:", std::string(""), "Define label and value for optional parameters to the script. These will be passed as an argument --label value");
 	joboptions["param1_value"] = JobOption("Param1 - value:" , std::string(""), "Define label and value for optional parameters to the script. These will be passed as an argument --label value");
@@ -5060,6 +5028,16 @@ void RelionJob::initialiseExternalJob()
 	joboptions["param4_value"] = JobOption("Param4 - value:" , std::string(""), "Define label and value for optional parameters to the script. These will be passed as an argument --label value");
 	joboptions["param5_label"] = JobOption("Param5 - label:", std::string(""), "Define label and value for optional parameters to the script. These will be passed as an argument --label value");
 	joboptions["param5_value"] = JobOption("Param5 - value:" , std::string(""), "Define label and value for optional parameters to the script. These will be passed as an argument --label value");
+	joboptions["param6_label"] = JobOption("Param6 - label:", std::string(""), "Define label and value for optional parameters to the script. These will be passed as an argument --label value");
+	joboptions["param6_value"] = JobOption("Param6 - value:" , std::string(""), "Define label and value for optional parameters to the script. These will be passed as an argument --label value");
+	joboptions["param7_label"] = JobOption("Param7 - label:", std::string(""), "Define label and value for optional parameters to the script. These will be passed as an argument --label value");
+	joboptions["param7_value"] = JobOption("Param7 - value:" , std::string(""), "Define label and value for optional parameters to the script. These will be passed as an argument --label value");
+	joboptions["param8_label"] = JobOption("Param8 - label:", std::string(""), "Define label and value for optional parameters to the script. These will be passed as an argument --label value");
+	joboptions["param8_value"] = JobOption("Param8 - value:" , std::string(""), "Define label and value for optional parameters to the script. These will be passed as an argument --label value");
+	joboptions["param9_label"] = JobOption("Param9 - label:", std::string(""), "Define label and value for optional parameters to the script. These will be passed as an argument --label value");
+	joboptions["param9_value"] = JobOption("Param9 - value:" , std::string(""), "Define label and value for optional parameters to the script. These will be passed as an argument --label value");
+	joboptions["param10_label"] = JobOption("Param10 - label:", std::string(""), "Define label and value for optional parameters to the script. These will be passed as an argument --label value");
+	joboptions["param10_value"] = JobOption("Param10 - value:" , std::string(""), "Define label and value for optional parameters to the script. These will be passed as an argument --label value");
 
 
 }
@@ -5119,44 +5097,6 @@ bool RelionJob::getCommandsExternalJob(std::string &outputname, std::vector<std:
 		command += " --in_mask " + joboptions["in_mask"].getString();
 	}
 
-	// Optional output nodes
-	if (joboptions["out_mov"].getString() != "")
-	{
-		Node node(joboptions["out_mov"].getString(), joboptions["out_mov"].node_type);
-		outputNodes.push_back(node);
-		command += " --out_movies " + joboptions["out_mov"].getString();
-	}
-	if (joboptions["out_mic"].getString() != "")
-	{
-		Node node(joboptions["out_mic"].getString(), joboptions["out_mic"].node_type);
-		outputNodes.push_back(node);
-		command += " --out_mics " + joboptions["out_mic"].getString();
-	}
-	if (joboptions["out_part"].getString() != "")
-	{
-		Node node(joboptions["out_part"].getString(), joboptions["out_part"].node_type);
-		outputNodes.push_back(node);
-		command += " --out_parts " + joboptions["out_part"].getString();
-	}
-	if (joboptions["out_coords"].getString() != "")
-	{
-		Node node(joboptions["out_coords"].getString(), joboptions["out_coords"].node_type);
-		outputNodes.push_back(node);
-		command += " --out_coords " + joboptions["out_coords"].getString();
-	}
-	if (joboptions["out_3dref"].getString() != "")
-	{
-		Node node(joboptions["out_3dref"].getString(), joboptions["out_3dref"].node_type);
-		outputNodes.push_back(node);
-		command += " --out_3dref " + joboptions["out_3dref"].getString();
-	}
-	if (joboptions["out_mask"].getString() != "")
-	{
-		Node node(joboptions["out_mask"].getString(), joboptions["out_mask"].node_type);
-		outputNodes.push_back(node);
-		command += " --out_mask " + joboptions["out_mask"].getString();
-	}
-
 	// Optional arguments
 	if (joboptions["param1_label"].getString() != "")
 	{
@@ -5177,6 +5117,26 @@ bool RelionJob::getCommandsExternalJob(std::string &outputname, std::vector<std:
 	if (joboptions["param5_label"].getString() != "")
 	{
 		command += " --" + joboptions["param5_label"].getString() + " " + joboptions["param5_value"].getString();
+	}
+	if (joboptions["param6_label"].getString() != "")
+	{
+		command += " --" + joboptions["param6_label"].getString() + " " + joboptions["param6_value"].getString();
+	}
+	if (joboptions["param7_label"].getString() != "")
+	{
+		command += " --" + joboptions["param7_label"].getString() + " " + joboptions["param7_value"].getString();
+	}
+	if (joboptions["param8_label"].getString() != "")
+	{
+		command += " --" + joboptions["param8_label"].getString() + " " + joboptions["param8_value"].getString();
+	}
+	if (joboptions["param9_label"].getString() != "")
+	{
+		command += " --" + joboptions["param9_label"].getString() + " " + joboptions["param9_value"].getString();
+	}
+	if (joboptions["param10_label"].getString() != "")
+	{
+		command += " --" + joboptions["param10_label"].getString() + " " + joboptions["param10_value"].getString();
 	}
 
 	// Running stuff

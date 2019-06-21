@@ -175,6 +175,9 @@ class PipeLine
 	// Given the lists of which Nodes and Processes to delete, now do the actual deleting
 	void deleteNodesAndProcesses(std::vector<bool> &deleteNodes, std::vector<bool> &deleteProcesses);
 
+	// Check the presence of a file called RELION_OUTPUT_NODES.star, and add the nodes in that STAR file as output nodes for this job
+	void getOutputNodesFromStarFile(int this_job);
+
 	// Changes the status of this_job to finished in the pipeline, returns false is job hadn't started yet
 	bool markAsFinishedJob(int this_job, std::string &error_message);
 

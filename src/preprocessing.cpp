@@ -211,12 +211,18 @@ void Preprocessing::initialise()
 		// Check whether to do re-scaling
 		do_rescale = (scale > 0);
 		if (do_rescale && scale%2 != 0)
-			REPORT_ERROR("ERROR: only re-scaling to even-sized images is allowed in RELION...");
+		{
+			scale++;
+			std::cerr << " Warning: only re-scaling to even-sized images is allowed in RELION, setting scale to: " << scale << std::endl;
+		}
 
 		// Check whether to do re-windowing
 		do_rewindow = (window > 0);
 		if (do_rewindow && window%2 != 0)
-			REPORT_ERROR("ERROR: only re-windowing to even-sized images is allowed in RELION...");
+		{
+			window++;
+			std::cerr << " Warning: only re-windowing to even-sized images is allowed in RELION, setting window to: " << window << std::endl;
+		}
 
 		// Check for bg_radius in case of normalisation
 		if (do_normalise && bg_radius < 0)

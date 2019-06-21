@@ -822,7 +822,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	scheduler_operator_input1->label("i1:");
 	scheduler_operator_input1->color(GUI_INPUT_COLOR);
 	scheduler_operator_input1->textsize(RLN_FONTSIZE-1);
-	scheduler_operator_input2 = new Fl_Input(XJOBCOL1 + 34 + JOBCOLWIDTH/2, GUIHEIGHT_EXT_START+50 + height_var, JOBCOLWIDTH/2-34, 25);
+	scheduler_operator_input2 = new Fl_Choice(XJOBCOL1 + 34 + JOBCOLWIDTH/2, GUIHEIGHT_EXT_START+50 + height_var, JOBCOLWIDTH/2-34, 25);
 	scheduler_operator_input2->label("i2:");
 	scheduler_operator_input2->textsize(RLN_FONTSIZE-1);
 	scheduler_operator_input2->color(GUI_INPUT_COLOR);
@@ -954,6 +954,13 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	scheduler_reset_button->color(GUI_BUTTON_COLOR);
 	scheduler_reset_button->callback( cb_scheduler_reset, this);
 	scheduler_run_grp->end();
+
+	scheduler_unlock_button = new Fl_Button(GUIWIDTH - 256, GUIHEIGHT_EXT_START + height_ops-5, 80, 30);
+	scheduler_unlock_button->label("Unlock");
+	scheduler_unlock_button->labelfont(FL_ITALIC);
+	scheduler_unlock_button->labelsize(14);
+	scheduler_unlock_button->color(GUI_RUNBUTTON_COLOR);
+	scheduler_unlock_button->callback( cb_scheduler_unlock, this);
 
 	// Don't allow any changes on the GUI while a Schedule is running, i.e. it's directory is locked for writing
 	scheduler_abort_button = new Fl_Button(GUIWIDTH - 173, GUIHEIGHT_EXT_START + height_ops-5, 80, 30);
@@ -1282,6 +1289,7 @@ void GuiMainWindow::fillSchedulerNodesAndVariables()
 	scheduler_operator_browser->clear();
 	scheduler_operator_output->clear();
 	scheduler_operator_input1->clear();
+	scheduler_operator_input2->clear();
 	scheduler_edge_browser->clear();
 	scheduler_edge_input->clear();
 	scheduler_edge_output->clear();
@@ -1328,6 +1336,7 @@ void GuiMainWindow::fillSchedulerNodesAndVariables()
 			scheduler_variable_browser->add(mylabel.c_str());
 			scheduler_operator_output->add(it->first.c_str());
 			scheduler_operator_input1->add(it->first.c_str());
+			scheduler_operator_input2->add(it->first.c_str());
 			i++;
 		}
 	}
@@ -1347,6 +1356,7 @@ void GuiMainWindow::fillSchedulerNodesAndVariables()
 			scheduler_variable_browser->add(mylabel.c_str());
 			scheduler_operator_output->add(it->first.c_str());
 			scheduler_operator_input1->add(it->first.c_str());
+			scheduler_operator_input2->add(it->first.c_str());
 			scheduler_edge_boolean->add(it->first.c_str());
 			i++;
 		}
@@ -1364,6 +1374,7 @@ void GuiMainWindow::fillSchedulerNodesAndVariables()
 			scheduler_variable_browser->add(mylabel.c_str());
 			scheduler_operator_output->add(it->first.c_str());
 			scheduler_operator_input1->add(it->first.c_str());
+			scheduler_operator_input2->add(it->first.c_str());
 			i++;
 		}
 	}
@@ -1375,8 +1386,7 @@ void GuiMainWindow::fillSchedulerNodesAndVariables()
 		int i = 0;
 		for ( it = scheduler_operators.begin(); it != scheduler_operators.end(); it++ )
 		{
-			std::string mylabel = it->first +
-					" -> " + it->second.output;
+			std::string mylabel = it->first;
 			scheduler_operator_browser->add(mylabel.c_str());
 			operators_list.push_back(it->first);
 			scheduler_edge_input->add(it->first.c_str());
@@ -1419,6 +1429,7 @@ void GuiMainWindow::fillSchedulerNodesAndVariables()
 
 	scheduler_operator_output->add("");
 	scheduler_operator_input1->add("");
+	scheduler_operator_input2->add("");
 	scheduler_edge_outputtrue->add("");
 	scheduler_edge_boolean->add("");
 
@@ -1636,7 +1647,7 @@ void GuiMainWindow::cb_select_browsegroup_i(bool show_initial_screen)
 	scheduler_job_name->value("");
 	scheduler_job_name->activate();
 	scheduler_job_has_started->deactivate();
-	scheduler_job_has_started->picked(&job_has_started_options[1]);
+	scheduler_job_has_started->picked(&job_has_started_options[1]); // initialise to has_not_started
 
 
 	textbuff_stdout->text("stdout will go here; double-click this window to open stdout in a separate window");
@@ -1701,7 +1712,7 @@ void GuiMainWindow::cb_select_scheduled_job_i()
     if (show_scheduler)
     {
 		FileName jobname = getJobNameForDisplay(pipeline.processList[current_job]);
-    	scheduler_job_name->value(jobname.c_str());
+		scheduler_job_name->value(jobname.c_str());
 		scheduler_job_name->deactivate();
 		bool found = false;
 		for (int i = 0; i < 3; i++)
@@ -1709,14 +1720,13 @@ void GuiMainWindow::cb_select_scheduled_job_i()
 			if (schedule.jobs[jobname].mode == job_mode_options[i].label())
 			{
 				found = true;
-				scheduler_job_mode->picked(&job_mode_options[i]);
-				job_mode_options[scheduler_job_mode->value()].label();
+				scheduler_job_mode->value(i);
 			}
 		}
 		if (schedule.jobs[jobname].job_has_started)
-			scheduler_job_has_started->picked(&job_has_started_options[0]);
+			scheduler_job_has_started->value(0);
 		else
-			scheduler_job_has_started->picked(&job_has_started_options[1]);
+			scheduler_job_has_started->value(1);
 		scheduler_job_has_started->activate();
 
 		if (!found) REPORT_ERROR("ERROR: unrecognised job_mode ...");
@@ -1878,8 +1888,25 @@ void GuiMainWindow::cb_add_scheduler_edge(Fl_Widget* o, void*v)
 void GuiMainWindow::cb_add_scheduler_edge_i()
 {
 
-	std::string input = scheduler_edge_input->text(scheduler_edge_input->value());
-	std::string output = scheduler_edge_output->text(scheduler_edge_output->value());
+	std::string input, output;
+	if (scheduler_edge_input->value() < 0)
+	{
+		std::cerr << " Error getting input from scheduler edge window, please try again ..." << std::endl;
+		return;
+	}
+	else
+	{
+		input = scheduler_edge_input->text(scheduler_edge_input->value());
+	}
+	if (scheduler_edge_output->value() < 0)
+	{
+		std::cerr << " Error getting output from scheduler edge window, please try again ..." << std::endl;
+		return;
+	}
+	else
+	{
+		output = scheduler_edge_output->text(scheduler_edge_output->value());
+	}
 	schedule.read(DO_LOCK);
 	if (scheduler_edge_boolean->value() >= 0)
 	{
@@ -1892,7 +1919,6 @@ void GuiMainWindow::cb_add_scheduler_edge_i()
 		schedule.addEdge(input, output);
 	}
 	schedule.write(DO_LOCK);
-	scheduler_edge_browser->value(-1);
 	fillSchedulerNodesAndVariables();
 }
 
@@ -1987,6 +2013,7 @@ void GuiMainWindow::cb_set_scheduler_variable_i()
 
 	schedule.read(DO_LOCK);
 	schedule.setVariable(myname, myval);
+	schedule.setOriginalVariable(myname, myval);
 	// Also reset entry fields
 	scheduler_variable_name->value("");
 	scheduler_variable_value->value("");
@@ -2035,7 +2062,7 @@ void GuiMainWindow::cb_add_scheduler_operator_i()
 	std::string type = scheduler_operator_type->text(scheduler_operator_type->value());
 	std::string output = (scheduler_operator_output->value() < 0) ? "" : scheduler_operator_output->text(scheduler_operator_output->value());
 	std::string input1 = (scheduler_operator_input1->value() < 0) ? "" : scheduler_operator_input1->text(scheduler_operator_input1->value());
-	std::string input2 = scheduler_operator_input2->value();
+	std::string input2 = (scheduler_operator_input2->value() < 0) ? "" : scheduler_operator_input2->text(scheduler_operator_input2->value());
 	std::string error_message;
 	SchedulerOperator myop = schedule.initialiseOperator(type, input1, input2, output, error_message);
 	if (error_message != "")
@@ -2058,7 +2085,7 @@ void GuiMainWindow::cb_add_scheduler_operator_i()
 		scheduler_operator_type->value(-1);
 		scheduler_operator_output->value(-1);
 		scheduler_operator_input1->value(-1);
-		scheduler_operator_input2->value("");
+		scheduler_operator_input2->value(-1);
 		fillSchedulerNodesAndVariables();
 	}
 
@@ -2083,7 +2110,7 @@ void GuiMainWindow::cb_delete_scheduler_operator_i()
 	std::string type = scheduler_operator_type->text(scheduler_operator_type->value());
 	std::string output = scheduler_operator_output->text(scheduler_operator_output->value());
 	std::string input1 = scheduler_operator_input1->text(scheduler_operator_input1->value());
-	std::string input2 = scheduler_operator_input2->value();
+	std::string input2 = scheduler_operator_input2->text(scheduler_operator_input2->value());
 	std::string name = schedule.getOperatorName(type, input1, input2, output);
 
 	schedule.read(DO_LOCK);
@@ -2094,7 +2121,7 @@ void GuiMainWindow::cb_delete_scheduler_operator_i()
 	scheduler_operator_type->value(-1);
 	scheduler_operator_output->value(-1);
 	scheduler_operator_input1->value(-1);
-	scheduler_operator_input2->value("");
+	scheduler_operator_input2->value(-1);
 
 	fillSchedulerNodesAndVariables();
 }
@@ -2138,8 +2165,7 @@ void GuiMainWindow::cb_select_scheduler_operator_i()
 	int idx = scheduler_operator_browser->value();
 	if (idx >= 1)
 	{
-		FileName mytext = scheduler_operator_browser->text(idx);
-		FileName myname = mytext.beforeFirstOf(" -> ");
+		FileName myname = scheduler_operator_browser->text(idx);
 		std::string type, input1, input2, output;
 		schedule.getOperatorParameters(myname, type, input1, input2, output);
 
@@ -2152,14 +2178,17 @@ void GuiMainWindow::cb_select_scheduler_operator_i()
 			scheduler_operator_input1->value(scheduler_operator_input1->find_item(input1.c_str()));
 		else
 			scheduler_operator_input1->value(scheduler_operator_input1->find_item(""));
-		scheduler_operator_input2->value(input2.c_str());
+		if (scheduler_operator_input2->find_item(input2.c_str()))
+			scheduler_operator_input2->value(scheduler_operator_input2->find_item(input2.c_str()));
+		else
+			scheduler_operator_input2->value(scheduler_operator_input2->find_item(""));
 	}
 	else
 	{
 		scheduler_operator_type->value(-1);
 		scheduler_operator_output->value(-1);
 		scheduler_operator_input1->value(-1);
-		scheduler_operator_input2->value("");
+		scheduler_operator_input2->value(-1);
 	}
 }
 void GuiMainWindow::cb_scheduler_set_start(Fl_Widget *o, void* v)
@@ -2329,6 +2358,20 @@ void GuiMainWindow::cb_scheduler_reset_i()
 	}
 
 }
+
+void GuiMainWindow::cb_scheduler_unlock(Fl_Widget *o, void* v)
+{
+    GuiMainWindow* T=(GuiMainWindow*)v;
+    T->cb_scheduler_unlock_i();
+}
+
+void GuiMainWindow::cb_scheduler_unlock_i()
+{
+	schedule.unlock();
+	scheduler_run_grp->activate();
+	return;
+}
+
 
 void GuiMainWindow::cb_scheduler_abort(Fl_Widget *o, void* v)
 {

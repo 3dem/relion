@@ -383,6 +383,9 @@ bool PipeLine::checkProcessCompletion()
 			int myproc = finished_success_processes[i];
 			processList[myproc].status = PROC_FINISHED_SUCCESS;
 
+			// Also see whether there was an output nodes starfile
+			getOutputNodesFromStarFile(myproc);
+
 			// Also touch the outputNodes in the .Nodes directory
 			for (long int j = 0; j < processList[myproc].outputNodeList.size(); j++)
 			{
@@ -1115,6 +1118,36 @@ void PipeLine::deleteNodesAndProcesses(std::vector<bool> &deleteNodes, std::vect
 
 }
 
+void PipeLine::getOutputNodesFromStarFile(int this_job)
+{
+
+	// See if a STAR file called RELION_OUTPUT_NODES.star exists, and if so, read in which output nodes were created
+	FileName outnodes = processList[this_job].name + "RELION_OUTPUT_NODES.star";
+	if (exists(outnodes))
+	{
+
+		MetaDataTable MDnodes;
+		MDnodes.read(outnodes, "output_nodes");
+
+		FileName nodename;
+		int nodetype;
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDnodes)
+		{
+			MDnodes.getValue(EMDL_PIPELINE_NODE_NAME, nodename);
+			MDnodes.getValue(EMDL_PIPELINE_NODE_TYPE, nodetype);
+
+			// if this node does not exist yet, then add it to the pipeline
+			if (findNodeByName(nodename) < 0 )
+			{
+				Node node(nodename, nodetype);
+				addNewOutputEdge(this_job, node);
+			}
+		}
+
+	}
+
+}
+
 bool PipeLine::markAsFinishedJob(int this_job, std::string &error_message)
 {
 
@@ -1179,6 +1212,9 @@ bool PipeLine::markAsFinishedJob(int this_job, std::string &error_message)
 			return false;
 		}
 	}
+
+	// Also see whether there is an output nodes star file...
+	getOutputNodesFromStarFile(this_job);
 
 	// Remove any of the expected output nodes from the pipeline if the corresponding file doesn't already exist
 	std::vector<bool> deleteNodes, deleteProcesses;

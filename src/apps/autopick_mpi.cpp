@@ -63,6 +63,7 @@ int main(int argc, char *argv[])
 		return RELION_EXIT_FAILURE;
 	}
 
+        MPI_Barrier(MPI_COMM_WORLD);
 	return RELION_EXIT_SUCCESS;
 }
 

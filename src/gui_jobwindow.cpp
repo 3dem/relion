@@ -2190,7 +2190,7 @@ void JobWindow::initialiseCtfrefineWindow()
 
 void JobWindow::initialiseExternalWindow()
 {
-	setupTabs(3);
+	setupTabs(2);
 
 	tab1->begin();
 	tab1->label("Input");
@@ -2211,30 +2211,21 @@ void JobWindow::initialiseExternalWindow()
 	tab1->end();
 
 	tab2->begin();
-	tab2->label("Output");
+	tab2->label("Params");
 	resetHeight();
 
-	place("out_mov", TOGGLE_DEACTIVATE);
-	place("out_mic", TOGGLE_DEACTIVATE);
-	place("out_part", TOGGLE_DEACTIVATE);
-	place("out_coords", TOGGLE_DEACTIVATE);
-	place("out_3dref", TOGGLE_DEACTIVATE);
-	place("out_mask", TOGGLE_DEACTIVATE);
+	place2("param1_label", "param1_value", "Param1 label, value:", TOGGLE_LEAVE_ACTIVE);
+	place2("param2_label", "param2_value", "Param2 label, value:", TOGGLE_LEAVE_ACTIVE);
+	place2("param3_label", "param3_value", "Param3 label, value:", TOGGLE_LEAVE_ACTIVE);
+	place2("param4_label", "param4_value", "Param4 label, value:", TOGGLE_LEAVE_ACTIVE);
+	place2("param5_label", "param5_value", "Param5 label, value:", TOGGLE_LEAVE_ACTIVE);
+	place2("param6_label", "param6_value", "Param6 label, value:", TOGGLE_LEAVE_ACTIVE);
+	place2("param7_label", "param7_value", "Param7 label, value:", TOGGLE_LEAVE_ACTIVE);
+	place2("param8_label", "param8_value", "Param8 label, value:", TOGGLE_LEAVE_ACTIVE);
+	place2("param9_label", "param9_value", "Param9 label, value:", TOGGLE_LEAVE_ACTIVE);
+	place2("param10_label", "param10_value", "Param10 label, value:", TOGGLE_LEAVE_ACTIVE);
 
 	tab2->end();
-	tab2->begin();
-
-	tab3->begin();
-	tab3->label("Params");
-	resetHeight();
-
-	place2("param1_label", "param1_value", "Param1 label, value::", TOGGLE_LEAVE_ACTIVE);
-	place2("param2_label", "param2_value", "Param2 label, value::", TOGGLE_LEAVE_ACTIVE);
-	place2("param3_label", "param3_value", "Param3 label, value::", TOGGLE_LEAVE_ACTIVE);
-	place2("param4_label", "param4_value", "Param4 label, value::", TOGGLE_LEAVE_ACTIVE);
-	place2("param5_label", "param5_value", "Param5 label, value::", TOGGLE_LEAVE_ACTIVE);
-
-	tab3->end();
 
 }
 

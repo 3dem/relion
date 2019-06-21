@@ -137,6 +137,9 @@ static std::string getStringFitOption(std::string option)
 // To have a line on the GUI to change the minimum number of dedicated in a job
 static bool do_allow_change_minimum_dedicated;
 
+// Optional output file for any jobtype that explicitly defines the output nodes
+#define RELION_OUTPUT_NODES "RELION_OUTPUT_NODES.star"
+
 /*
  * The Node class represents data and metadata that are either input to or output from Processes
  * Nodes are connected to each by Edges:
@@ -145,7 +148,6 @@ static bool do_allow_change_minimum_dedicated;
  *
  * Nodes could be of the following types:
  */
-
 #define NODE_MOVIES			0 // 2D micrograph movie(s), e.g. Falcon001_movie.mrcs or micrograph_movies.star
 #define NODE_MICS			1 // 2D micrograph(s), possibly with CTF information as well, e.g. Falcon001.mrc or micrographs.star
 #define NODE_MIC_COORDS		2 // Suffix for particle coordinates in micrographs (e.g. autopick.star or .box)

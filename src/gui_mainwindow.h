@@ -111,12 +111,15 @@ static Fl_Input *scheduler_variable_name, *scheduler_variable_value;
 static Fl_Hold_Browser *scheduler_operator_browser;
 static std::vector<std::string> operators_list;
 static Fl_Menu_Item operator_type_options[] = {
+	   {SCHEDULE_FLOAT_OPERATOR_SET},
 	   {SCHEDULE_FLOAT_OPERATOR_PLUS},
 	   {SCHEDULE_FLOAT_OPERATOR_MINUS},
 	   {SCHEDULE_FLOAT_OPERATOR_MULT},
 	   {SCHEDULE_FLOAT_OPERATOR_DIVIDE},
 	   {SCHEDULE_FLOAT_OPERATOR_INVDIV},
+	   {SCHEDULE_FLOAT_OPERATOR_ROUND},
 	   {SCHEDULE_FLOAT_OPERATOR_COUNT_IMAGES},
+	   {SCHEDULE_FLOAT_OPERATOR_COUNT_WORDS},
 	   {SCHEDULE_FLOAT_OPERATOR_READ_STAR},
 	   {SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX},
 	   {SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN},
@@ -131,6 +134,8 @@ static Fl_Menu_Item operator_type_options[] = {
 	   {SCHEDULE_BOOLEAN_OPERATOR_GT},
 	   {SCHEDULE_BOOLEAN_OPERATOR_LT},
 	   {SCHEDULE_BOOLEAN_OPERATOR_EQ},
+	   {SCHEDULE_BOOLEAN_OPERATOR_GE},
+	   {SCHEDULE_BOOLEAN_OPERATOR_LE},
 	   {SCHEDULE_BOOLEAN_OPERATOR_FILE_EXISTS},
 	   {SCHEDULE_BOOLEAN_OPERATOR_READ_STAR},
 	   {SCHEDULE_STRING_OPERATOR_JOIN},
@@ -143,12 +148,13 @@ static Fl_Menu_Item operator_type_options[] = {
 	   {SCHEDULE_STRING_OPERATOR_MOVE_FILE},
 	   {SCHEDULE_STRING_OPERATOR_DELETE_FILE},
 	   {SCHEDULE_STRING_OPERATOR_READ_STAR},
+	   {SCHEDULE_STRING_OPERATOR_GLOB},
+	   {SCHEDULE_STRING_OPERATOR_NTH_WORD},
 	   {SCHEDULE_WAIT_OPERATOR_SINCE_LAST_TIME},
 	   {SCHEDULE_EXIT_OPERATOR},
 	   {0} // this should be the last entry
 	   };
-static Fl_Choice *scheduler_operator_type, *scheduler_operator_output, *scheduler_operator_input1;
-static Fl_Input *scheduler_operator_input2;
+static Fl_Choice *scheduler_operator_type, *scheduler_operator_output, *scheduler_operator_input1, *scheduler_operator_input2;
 // Scheduler jobs
 static Fl_Hold_Browser *scheduler_job_browser, *scheduler_input_job_browser, *scheduler_output_job_browser;
 static Fl_Button *scheduler_delete_job_button;
@@ -159,7 +165,9 @@ static Fl_Hold_Browser *scheduler_edge_browser;
 static Fl_Button *delete_scheduler_edge_button, *add_scheduler_edge_button;
 // Scheduler current state
 static Fl_Choice *scheduler_current_node, *scheduler_start_node;
-static Fl_Button *scheduler_run_button, *scheduler_reset_button, *scheduler_set_current_button, *scheduler_set_start_button, *scheduler_next_button, *scheduler_prev_button, *scheduler_abort_button;
+static Fl_Button *scheduler_run_button, *scheduler_reset_button, *scheduler_set_current_button;
+static Fl_Button *scheduler_set_start_button, *scheduler_next_button, *scheduler_prev_button;
+static Fl_Button *scheduler_abort_button, *scheduler_unlock_button;
 
 static Fl_Text_Buffer *textbuff_stdout;
 static Fl_Text_Buffer *textbuff_stderr;
@@ -411,6 +419,9 @@ private:
 
     static void cb_scheduler_prev(Fl_Widget*, void*);
     inline void cb_scheduler_prev_i();
+
+    static void cb_scheduler_unlock(Fl_Widget*, void*);
+    inline void cb_scheduler_unlock_i();
 
     static void cb_scheduler_abort(Fl_Widget*, void*);
     inline void cb_scheduler_abort_i();
