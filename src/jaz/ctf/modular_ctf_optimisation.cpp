@@ -589,20 +589,23 @@ void ModularCtfOptimisation::writeToTable(const std::vector<double> &x)
 		
 		// ph = -K[5] - K[3] = -DEG2RAD(phase_shift) - atan(Q0/sqrt(1-Q0*Q0));
 		// => phase_shift = RAD2DEG(-ph - K[3])
-		
-		mdt.setValue(EMDL_CTF_PHASESHIFT, RAD2DEG(-ph - K[3]), p);	
+		if (modes[Phase] != Fixed)	
+			mdt.setValue(EMDL_CTF_PHASESHIFT, RAD2DEG(-ph - K[3]), p);	
 		
 		mdt.setValue(EMDL_CTF_DEFOCUSU, defocusU, p);
 		mdt.setValue(EMDL_CTF_DEFOCUSV, defocusV, p);
 		mdt.setValue(EMDL_CTF_DEFOCUS_ANGLE, angleDeg, p);
 		
 		// cs = K[2] = (PI / 2) * C_s * 1e7 * lambda^3
-		// => C_s = cs * (2/PI) / (1e7 / lambda^3)
-		
-		mdt.setValue(EMDL_CTF_CS, 2 * cs / (1e7 * PI * lambda*lambda*lambda), p);
-		
-		mdt.setValue(EMDL_CTF_BFACTOR, bf, p);
-		mdt.setValue(EMDL_CTF_SCALEFACTOR, kf, p);
+		// => C_s = cs * (2/PI) / (1e7 / lambda^3)	
+		if (modes[SphericalAberration] != Fixed)
+			mdt.setValue(EMDL_CTF_CS, 2 * cs / (1e7 * PI * lambda*lambda*lambda), p);
+
+		if (modes[BFactor] != Fixed)
+			mdt.setValue(EMDL_CTF_BFACTOR, bf, p);
+
+		if (modes[ScaleFactor] != Fixed)
+			mdt.setValue(EMDL_CTF_SCALEFACTOR, kf, p);
 	}
 }
 
