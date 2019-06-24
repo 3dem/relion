@@ -2479,10 +2479,13 @@ void GuiMainWindow::cb_print_cl_i()
 	{
 		std::string command= "", mesg = " The command is: ";
 		for (int icom = 0; icom < commands.size(); icom++)
-			command += commands[icom] + "\n";
+		{
+			if (icom > 0) command += " && ";
+			command += commands[icom];
+		}
 		const char* tt = fl_input("%s", command.c_str(), mesg.c_str());
+		free((void*)tt);
 	}
-
 }
 
 // Run button call-back functions
