@@ -1122,7 +1122,7 @@ void GuiMainWindow::fillRunningJobLists()
 	if (do_order_alphabetically)
 	{
 		// Only re-order the finished jobs!
-        std::vector<std::pair<std::string,long int> > vp;
+		std::vector<std::pair<std::string,long int> > vp;
 		for (long int i = pipeline.processList.size() -1; i >= 0; i--)
 		{
 			if (pipeline.processList[i].alias != "None")
@@ -1130,18 +1130,23 @@ void GuiMainWindow::fillRunningJobLists()
 			else
 				vp.push_back(std::make_pair(pipeline.processList[i].name, i));
 		}
-        // Sort on the first elements of the pairs
-        std::sort(vp.begin(), vp.end());
+	        // Sort on the first elements of the pairs
+	        std::sort(vp.begin(), vp.end());
 
 		for (long int ip = 0; ip < vp.size(); ip++)
 		{
 			long int i = vp[ip].second;
 			if (pipeline.processList[i].status == PROC_FINISHED_SUCCESS ||
-				pipeline.processList[i].status == PROC_FINISHED_FAILURE ||
-				pipeline.processList[i].status == PROC_FINISHED_ABORTED)
+			    pipeline.processList[i].status == PROC_FINISHED_FAILURE ||
+			    pipeline.processList[i].status == PROC_FINISHED_ABORTED)
 			{
 				finished_processes.push_back(i);
-				finished_job_browser->add(vp[ip].first.c_str());
+				if (pipeline.processList[i].status == PROC_FINISHED_SUCCESS)
+					finished_job_browser->add(vp[ip].first.c_str());
+				else if (pipeline.processList[i].status == PROC_FINISHED_ABORTED)
+					finished_job_browser->add(("@C1@-@." + vp[ip].first).c_str());
+				else
+					finished_job_browser->add(("@C1@." + vp[ip].first).c_str());
 			}
 		}
 	}
@@ -1151,11 +1156,16 @@ void GuiMainWindow::fillRunningJobLists()
 		for (long int i = pipeline.processList.size() -1; i >= 0; i--)
 		{
 			if (pipeline.processList[i].status == PROC_FINISHED_SUCCESS ||
-				pipeline.processList[i].status == PROC_FINISHED_FAILURE ||
-				pipeline.processList[i].status == PROC_FINISHED_ABORTED)
+			    pipeline.processList[i].status == PROC_FINISHED_FAILURE ||
+			    pipeline.processList[i].status == PROC_FINISHED_ABORTED)
 			{
 				finished_processes.push_back(i);
-				finished_job_browser->add((getJobNameForDisplay(pipeline.processList[i])).c_str());
+				if (pipeline.processList[i].status == PROC_FINISHED_SUCCESS)
+					finished_job_browser->add((getJobNameForDisplay(pipeline.processList[i])).c_str());
+				else if (pipeline.processList[i].status == PROC_FINISHED_ABORTED)
+					finished_job_browser->add(("@C1@-@." + getJobNameForDisplay(pipeline.processList[i])).c_str());
+				else
+					finished_job_browser->add(("@C1@." + getJobNameForDisplay(pipeline.processList[i])).c_str());
 			}
 		}
 	}
