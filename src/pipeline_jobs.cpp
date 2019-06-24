@@ -4408,7 +4408,7 @@ bool RelionJob::getCommandsSubtractJob(std::string &outputname, std::vector<std:
 			inputNodes.push_back(node3);
 		}
 
-		command += " --o " + outputname + "run";
+		command += " --o " + outputname;
 		Node node4(outputname + "subtracted.star", NODE_PART_DATA);
 		outputNodes.push_back(node4);
 
