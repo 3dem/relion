@@ -529,7 +529,13 @@ void JobWindow::initialiseMotioncorrWindow()
 	group1->end();
 
 	guientries["do_dose_weighting"].cb_menu_i(); // make default active
-
+	
+	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
+	group2->end();
+	place("save_ps", TOGGLE_DEACTIVATE, group2);
+	group2->begin();
+	place("group_for_ps", TOGGLE_DEACTIVATE);
+	group2->end();
 	tab1->end();
 
 	tab2->begin();
