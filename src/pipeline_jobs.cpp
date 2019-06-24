@@ -1505,7 +1505,7 @@ void RelionJob::initialiseCtffindJob()
 
 	// Check for environment variable RELION_CTFFIND_EXECUTABLE
 	joboptions["use_ctffind4"] = JobOption("Use CTFFIND-4.1?", false, "If set to Yes, the wrapper will use CTFFIND4 (version 4.1) for CTF estimation. This includes thread-support, calculation of Thon rings from movie frames and phase-shift estimation for phase-plate data.");
-
+	joboptions["use_given_ps"] = JobOption("Use power spectra from MotionCorr job?", false, "If set to Yes, the CTF estimation will be done using power spectra calculated during motion correction.");
 	default_location = getenv ("RELION_CTFFIND_EXECUTABLE");
 	char mydefault[]=DEFAULTCTFFINDLOCATION;
 	if (default_location == NULL)
@@ -1624,6 +1624,10 @@ bool RelionJob::getCommandsCtffindJob(std::string &outputname, std::vector<std::
 		if (!joboptions["slow_search"].getBoolean())
 		{
 			command += " --fast_search ";
+		}
+		if (joboptions["use_given_ps"].getBoolean())
+		{
+			command += " --use_given_ps ";
 		}
 	}
 	else

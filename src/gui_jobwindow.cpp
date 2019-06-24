@@ -605,6 +605,7 @@ void JobWindow::initialiseCtffindWindow()
 	group2->begin();
 
 	place("fn_ctffind_exe", TOGGLE_DEACTIVATE);
+	place("use_given_ps", TOGGLE_DEACTIVATE);
 	place("slow_search", TOGGLE_DEACTIVATE);
 
 	place("ctf_win", TOGGLE_DEACTIVATE);
