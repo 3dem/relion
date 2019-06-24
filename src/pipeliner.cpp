@@ -419,8 +419,8 @@ bool PipeLine::checkProcessCompletion()
 }
 
 bool PipeLine::getCommandLineJob(RelionJob &thisjob, int current_job, bool is_main_continue,
-		bool is_scheduled, bool do_makedir, bool do_overwrite_current,
-		std::vector<std::string> &commands, std::string &final_command, std::string &error_message)
+                                 bool is_scheduled, bool do_makedir, bool do_overwrite_current,
+                                 std::vector<std::string> &commands, std::string &final_command, std::string &error_message)
 {
 
 	if (do_overwrite_current) is_main_continue = false;
@@ -449,9 +449,7 @@ bool PipeLine::getCommandLineJob(RelionJob &thisjob, int current_job, bool is_ma
 	}
 
 	return result;
-
 }
-
 
 // Adds thisjob to the pipeline and returns the id of the newprocess
 long int PipeLine::addJob(RelionJob &thisjob, int as_status, bool do_overwrite, bool do_write_minipipeline)
@@ -491,7 +489,7 @@ long int PipeLine::addJob(RelionJob &thisjob, int as_status, bool do_overwrite, 
 }
 
 bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, bool is_main_continue,
-		bool is_scheduled, bool do_overwrite_current, std::string &error_message)
+                      bool is_scheduled, bool do_overwrite_current, std::string &error_message)
 {
 
 	std::vector<std::string> commands;
@@ -510,8 +508,12 @@ bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, boo
 	if (do_overwrite_current)
 	{
 		// Completely empty the output directory, NOTE that  _job.outputName+ is not defined until AFTER calling getCommandLineJob!!!
-		std::string command = " rm -rf " + _job.outputName+"*";
+		std::string command = " rm -rf " + _job.outputName + "*";
 		int res = system(command.c_str());
+
+		// Above deletes run_submit.script too, so we have to call this again ...
+		if (!getCommandLineJob(_job, current_job, is_main_continue, is_scheduled, true, do_overwrite_current, commands, final_command, error_message))
+			return false;
 	}
 
 	// Read in the latest version of the pipeline, just in case anyone else made a change meanwhile...

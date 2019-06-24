@@ -1571,13 +1571,13 @@ void GuiMainWindow::loadJobFromPipeline(int this_job)
 
 	// If a finished or running job was loaded from the pipeline: set this to be a continuation job
 	// If a scheduled job was loaded, only set is_main_continue to true when it is PROC_SCHEDULED
-    //if (pipeline.processList[current_job].status == PROC_SCHEDULED && !gui_jobwindows[iwin]->myjob.is_continue)
-    //	is_main_continue = false;
-    //else
-    //	is_main_continue = true;
+	//if (pipeline.processList[current_job].status == PROC_SCHEDULED && !gui_jobwindows[iwin]->myjob.is_continue)
+	//	is_main_continue = false;
+	//else
+	//	is_main_continue = true;
 
-    // Any job loaded from the pipeline will initially be set as a continuation job
-    // but for show-scheduler, no job should be a continuation
+	// Any job loaded from the pipeline will initially be set as a continuation job
+	// but for show-scheduler, no job should be a continuation
 	if (show_scheduler)
 	{
 		is_main_continue = false;
@@ -1587,10 +1587,10 @@ void GuiMainWindow::loadJobFromPipeline(int this_job)
 	{
 		is_main_continue = true;
 	}
-    cb_toggle_continue_i();
+	cb_toggle_continue_i();
 
-    // Set the alias in the window
-    alias_current_job->value((getJobNameForDisplay(pipeline.processList[current_job])).c_str());
+	// Set the alias in the window
+	alias_current_job->value((getJobNameForDisplay(pipeline.processList[current_job])).c_str());
 
 	// Update all job lists in the main GUI
 	updateJobLists();
@@ -1643,11 +1643,11 @@ void GuiMainWindow::cb_select_browsegroup_i(bool show_initial_screen)
 	// Update all job lists in the main GUI
 	updateJobLists();
 
-    is_main_continue = false;
-    do_overwrite_continue = false;
+	is_main_continue = false;
+	do_overwrite_continue = false;
 
 	// If the GUI got changed, put that change into the joboption now
-    gui_jobwindows[iwin]->updateMyJob();
+	gui_jobwindows[iwin]->updateMyJob();
 
 	// toggle the continue status of this job
 	cb_toggle_continue_i();
@@ -2501,7 +2501,7 @@ void GuiMainWindow::cb_print_cl_i()
 // Run button call-back functions
 void GuiMainWindow::cb_run(Fl_Widget* o, void* v) {
 
-    GuiMainWindow* T=(GuiMainWindow*)v;
+	GuiMainWindow* T=(GuiMainWindow*)v;
 	// Deactivate Run button to prevent the user from accidentally submitting many jobs
 	run_button->deactivate();
 	// Run the job
@@ -2540,7 +2540,7 @@ void GuiMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 	std::string error_message;
 	if (!pipeline.runJob(gui_jobwindows[iwin]->myjob, current_job, only_schedule, is_main_continue, false, do_overwrite_continue, error_message))
 	{
-		fl_message("%s",error_message.c_str());
+		fl_message("%s", error_message.c_str());
 		// Allow the user to fix the error and submit this job again
 		run_button->activate();
 		return;
@@ -2568,7 +2568,6 @@ void GuiMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 
 	// Select this job now
 	loadJobFromPipeline(current_job);
-
 }
 void GuiMainWindow::cb_delete_scheduler_job(Fl_Widget* o, void* v)
 {

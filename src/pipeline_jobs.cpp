@@ -688,7 +688,7 @@ void RelionJob::initialisePipeline(std::string &outputname, std::string defaultn
 }
 
 bool RelionJob::prepareFinalCommand(std::string &outputname, std::vector<std::string> &commands,
-		std::string &final_command, bool do_makedir, std::string &error_message)
+                                    std::string &final_command, bool do_makedir, std::string &error_message)
 {
 	int nr_mpi;
 
@@ -717,6 +717,7 @@ bool RelionJob::prepareFinalCommand(std::string &outputname, std::vector<std::st
 	{
 		// Make the submission script and write it to disc
 		std::string output_script = outputname + "run_submit.script";
+
 		if (!saveJobSubmissionScript(output_script, outputname, commands, error_message))
 			return false;
 		final_command = joboptions["qsub"].getString() + " " + output_script + " &";
@@ -1108,9 +1109,7 @@ bool RelionJob::getCommands(std::string &outputname, std::vector<std::string> &c
 	}
 
 	return result;
-
 }
-
 
 void RelionJob::initialiseImportJob()
 {
@@ -1318,9 +1317,6 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 	commands.push_back(command);
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
-
-
-
 }
 
 void RelionJob::initialiseMotioncorrJob()
@@ -2205,7 +2201,6 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 	}
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
-
 }
 
 
@@ -2546,7 +2541,6 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 	commands.push_back(command);
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
-
 }
 
 void RelionJob::initialiseClass2DJob()
@@ -2798,7 +2792,6 @@ bool RelionJob::getCommandsClass2DJob(std::string &outputname, std::vector<std::
 
 	commands.push_back(command);
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
-
 }
 
 // Constructor for initial model job
@@ -3027,9 +3020,7 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 
 	commands.push_back(command);
 
-
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
-
 }
 
 void RelionJob::initialiseClass3DJob()
@@ -3449,7 +3440,6 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 	commands.push_back(command);
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
-
 }
 
 void RelionJob::initialiseAutorefineJob()
@@ -3833,8 +3823,6 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 	commands.push_back(command);
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
-
-
 }
 
 void RelionJob::initialiseMultiBodyJob()
@@ -4113,8 +4101,6 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 	}
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
-
-
 }
 
 void RelionJob::initialiseMaskcreateJob()
@@ -4187,8 +4173,6 @@ bool RelionJob::getCommandsMaskcreateJob(std::string &outputname, std::vector<st
 	commands.push_back(command);
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
-
-
 }
 
 void RelionJob::initialiseJoinstarJob()
@@ -4355,7 +4339,6 @@ bool RelionJob::getCommandsJoinstarJob(std::string &outputname, std::vector<std:
 	commands.push_back(command);
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
-
 }
 
 void RelionJob::initialiseSubtractJob()
@@ -4570,7 +4553,6 @@ bool RelionJob::getCommandsPostprocessJob(std::string &outputname, std::vector<s
 
 	commands.push_back(command);
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
-
 }
 
 void RelionJob::initialiseLocalresJob()
@@ -4717,7 +4699,6 @@ bool RelionJob::getCommandsLocalresJob(std::string &outputname, std::vector<std:
 
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
-
 }
 
 void RelionJob::initialiseMotionrefineJob()
@@ -4873,7 +4854,6 @@ bool RelionJob::getCommandsMotionrefineJob(std::string &outputname, std::vector<
 	commands.push_back(command);
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
-
 }
 
 
@@ -5026,7 +5006,6 @@ bool RelionJob::getCommandsCtfrefineJob(std::string &outputname, std::vector<std
 	commands.push_back(command);
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
-
 }
 
 void RelionJob::initialiseExternalJob()
@@ -5175,5 +5154,4 @@ bool RelionJob::getCommandsExternalJob(std::string &outputname, std::vector<std:
 	commands.push_back(command);
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
-
 }
