@@ -634,9 +634,12 @@ void ObservationModel::setBoxSize(int opticsGroup, int newBoxSize)
 
 	boxSizes[opticsGroup] = newBoxSize;
 
-	phaseCorr.clear();
-	gammaOffset.clear();
-	mtfImage.clear();
+	phaseCorr[opticsGroup].clear();
+	gammaOffset[opticsGroup].clear();
+
+	// mtfImage can be empty
+	if (mtfImage.size() > 0)
+		mtfImage[opticsGroup].clear();
 }
 
 int ObservationModel::getBoxSize(int opticsGroup) const
