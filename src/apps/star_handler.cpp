@@ -30,9 +30,9 @@ class star_handler_parameters
 	public:
 
 	FileName fn_in, tablename_in, fn_out, fn_compare, tablename_compare,
-		     fn_label1, fn_label2, fn_label3,
-			 select_label, select_str_label, discard_label,
-			 fn_check, fn_operate, fn_operate2, fn_operate3, fn_set;
+	         fn_label1, fn_label2, fn_label3,
+	         select_label, select_str_label, discard_label,
+	         fn_check, fn_operate, fn_operate2, fn_operate3, fn_set;
 
 	std::string remove_col_label, add_col_label, add_col_value, add_col_from, hist_col_label, select_include_str, select_exclude_str;
 	RFLOAT eps, select_minval, select_maxval, multiply_by, add_to, center_X, center_Y, center_Z, hist_min, hist_max;
@@ -42,7 +42,6 @@ class star_handler_parameters
 	ObservationModel obsModel;
 	// I/O Parser
 	IOParser parser;
-
 
 	void usage()
 	{
@@ -124,8 +123,6 @@ class star_handler_parameters
 		// Check for errors in the command-line option
 		if (parser.checkForErrors())
 			REPORT_ERROR("Errors encountered on the command line, exiting...");
-
-
 	}
 
 	void run()
@@ -153,7 +150,6 @@ class star_handler_parameters
 
 		if (fn_out == "" && hist_col_label == "")
 			REPORT_ERROR("ERROR: specify the output file name (--o)");
-
 
 		if (fn_compare != "") compare();
 		if (select_label != "") select();
@@ -195,8 +191,6 @@ class star_handler_parameters
 		else obsModel.save(MD, fn, tablename);
 	}
 
-
-
 	void compare()
 	{
 	   	MetaDataTable MD1, MD2, MDonly1, MDonly2, MDboth;
@@ -226,7 +220,6 @@ class star_handler_parameters
 
 	void select()
 	{
-
 		MetaDataTable MDin, MDout;
 
 		read_check_ignore_optics(MDin, fn_in);
@@ -235,12 +228,10 @@ class star_handler_parameters
 
 		write_check_ignore_optics(MDout, fn_out, MDin.getName());
 		std::cout << " Written: " << fn_out << " with " << MDout.numberOfObjects() << " item(s)" << std::endl;
-
 	}
 
 	void select_by_str()
 	{
-
 		int c = 0;
 		if (select_include_str != "") c++;
 		if (select_exclude_str != "") c++;
@@ -263,7 +254,6 @@ class star_handler_parameters
 
 	void discard_on_image_stats()
 	{
-
 		MetaDataTable MDin, MDout;
 		read_check_ignore_optics(MDin, fn_in);
 
@@ -313,9 +303,9 @@ class star_handler_parameters
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDin)
 		{
 			if (avgs[i] > sum_avg - discard_sigma * sum2_avg &&
-				avgs[i] < sum_avg + discard_sigma * sum2_avg &&
-				stddevs[i] > sum_stddev - discard_sigma * sum2_stddev &&
-				stddevs[i] < sum_stddev + discard_sigma * sum2_stddev)
+			    avgs[i] < sum_avg + discard_sigma * sum2_avg &&
+			    stddevs[i] > sum_stddev - discard_sigma * sum2_stddev &&
+			    stddevs[i] < sum_stddev + discard_sigma * sum2_stddev)
 			{
 				MDout.addObject(MDin.getObject(current_object));
 			}
@@ -330,7 +320,6 @@ class star_handler_parameters
 
 		write_check_ignore_optics(MDout, fn_out, MDin.getName());
 		std::cout << " Written: " << fn_out << std::endl;
-
 	}
 
 	void combine()
@@ -387,6 +376,9 @@ class star_handler_parameters
 					new_optics_groups.push_back(tmp);
 				}
 
+				MetaDataTable unique_opticsMdt;
+				unique_opticsMdt.addMissingLabels(&obsModels[obs_id].opticsMdt);
+
 				FOR_ALL_OBJECTS_IN_METADATA_TABLE(obsModels[obs_id].opticsMdt)
 				{
 					std::string myname;
@@ -414,6 +406,9 @@ class star_handler_parameters
 						optics_group_uniq_names.push_back(myname);
 						// Add the line to the global obsModel
 						obsModels[obs_id].opticsMdt.setValue(EMDL_IMAGE_OPTICS_GROUP, new_group);
+
+						unique_opticsMdt.addObject();
+						unique_opticsMdt.setObject(obsModels[obs_id].opticsMdt.getObject());
 					}
 					else
 					{
@@ -438,6 +433,8 @@ class star_handler_parameters
 							new_optics_groups[current_object2] = new_group;
 					}
 				}
+
+				obsModels[obs_id].opticsMdt = unique_opticsMdt;
 
 				FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsin[MDs_id])
 				{
@@ -475,9 +472,9 @@ class star_handler_parameters
 					has_not_beamtilt = true;
 				}
 				if (MDoptics[i].containsLabel(EMDL_IMAGE_MAG_MATRIX_00) &&
-					MDoptics[i].containsLabel(EMDL_IMAGE_MAG_MATRIX_01) &&
-					MDoptics[i].containsLabel(EMDL_IMAGE_MAG_MATRIX_10) &&
-					MDoptics[i].containsLabel(EMDL_IMAGE_MAG_MATRIX_11))
+				    MDoptics[i].containsLabel(EMDL_IMAGE_MAG_MATRIX_01) &&
+				    MDoptics[i].containsLabel(EMDL_IMAGE_MAG_MATRIX_10) &&
+				    MDoptics[i].containsLabel(EMDL_IMAGE_MAG_MATRIX_11))
 				{
 					has_anisomag = true;
 				}
@@ -526,9 +523,9 @@ class star_handler_parameters
 				if (has_anisomag && has_not_anisomag)
 				{
 					if (!(MDoptics[i].containsLabel(EMDL_IMAGE_MAG_MATRIX_00) &&
-						  MDoptics[i].containsLabel(EMDL_IMAGE_MAG_MATRIX_01) &&
-						  MDoptics[i].containsLabel(EMDL_IMAGE_MAG_MATRIX_10) &&
-						  MDoptics[i].containsLabel(EMDL_IMAGE_MAG_MATRIX_11)) )
+					      MDoptics[i].containsLabel(EMDL_IMAGE_MAG_MATRIX_01) &&
+					      MDoptics[i].containsLabel(EMDL_IMAGE_MAG_MATRIX_10) &&
+					      MDoptics[i].containsLabel(EMDL_IMAGE_MAG_MATRIX_11)) )
 					{
 						FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDoptics[i])
 						{
@@ -609,12 +606,10 @@ class star_handler_parameters
 
 		write_check_ignore_optics(MDout, fn_out, MDin.getName());
 		std::cout << " Written: " << fn_out << std::endl;
-
 	}
 
 	void split()
 	{
-
 		MetaDataTable MD;
 		read_check_ignore_optics(MD, fn_in);
 
@@ -703,7 +698,6 @@ class star_handler_parameters
 
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
 		{
-
 			if (EMDL::isDouble(label1))
 			{
 				RFLOAT val;
@@ -790,7 +784,6 @@ class star_handler_parameters
 
 		write_check_ignore_optics(MD, fn_out, MD.getName());
 		std::cout << " Written: " << fn_out << std::endl;
-
 	}
 
 	void center()
