@@ -42,8 +42,6 @@ int main(int argc, char *argv[])
 			prm.run_locres(rank, size);
 		else
 			prm.run();
-
-		MPI_Finalize();
 	}
 	catch (RelionError XE)
 	{
@@ -53,5 +51,7 @@ int main(int argc, char *argv[])
 	}
 
         MPI_Barrier(MPI_COMM_WORLD);
+	MPI_Finalize();
+
 	return RELION_EXIT_SUCCESS;
 }
