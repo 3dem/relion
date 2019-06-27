@@ -660,9 +660,12 @@ class star_handler_parameters
 		// Sjors 19jun2019: write out a star file with the output nodes
 		MetaDataTable MDnodes;
 		MDnodes.setName("output_nodes");
+		FileName fnt0;
+		fnt0 = integerToString(nr_split);
+		const int n_digits = fnt0.length();
 		for (int isplit = 0; isplit < nr_split; isplit ++)
 		{
-			FileName fnt = fn_out.insertBeforeExtension("_split"+integerToString(isplit+1,3));
+			FileName fnt = fn_out.insertBeforeExtension("_split"+integerToString(isplit+1, n_digits));
 			write_check_ignore_optics(MDouts[isplit], fnt, MD.getName());
 			std::cout << " Written: " <<fnt << " with " << MDouts[isplit].numberOfObjects() << " objects." << std::endl;
 
