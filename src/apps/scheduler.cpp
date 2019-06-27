@@ -27,7 +27,7 @@ class scheduler_parameters
 public:
 	FileName mydir, newname;
 	float myconstant;
-	bool do_reset, do_run;
+	bool do_reset, do_run, do_abort;
 	int verb;
 	std::string add, set_var, set_mode, start_node, current_node, email, type, name, value, mode, input, input2, output, output2, boolvar;
 	std::string run_pipeline;
@@ -87,6 +87,7 @@ public:
 		mode = parser.getOption("--mode", "Mode (for jobs): new, overwrite or continue","");
 		int set_section = parser.addSection("Set values of variables in the schedule");
 		do_reset = parser.checkOption("--reset", "Reset all variables to their original values");
+		do_abort = parser.checkOption("--abort", "Abort a schedule that is running");
 		set_var = parser.getOption("--set_var", "Name of a variable to set (using also the --value argument)", "");
 		set_mode = parser.getOption("--set_job_mode", "Name of a job whose mode to set (using also the --value argument)", "");
 		current_node = parser.getOption("--set_current_node", "Name of a node to which to set current_node", "");
@@ -146,7 +147,12 @@ public:
 			int res = system(command.c_str());
 
 		}
-
+		if (do_abort)
+		{
+			schedule.read();
+			schedule.abort();
+			return;
+		}
 
 		// read in schedule if it exists
 		if (exists(mydir + "schedule.star"))

@@ -77,7 +77,6 @@ std::string SchedulerOperator::initialise(std::string _type, std::string _input1
 		 type == SCHEDULE_FLOAT_OPERATOR_MINUS ||
 		 type == SCHEDULE_FLOAT_OPERATOR_MULT ||
 		 type == SCHEDULE_FLOAT_OPERATOR_DIVIDE ||
-		 type == SCHEDULE_FLOAT_OPERATOR_INVDIV ||
 		 type == SCHEDULE_FLOAT_OPERATOR_ROUND ||
 		 type == SCHEDULE_FLOAT_OPERATOR_COUNT_IMAGES ||
 		 type == SCHEDULE_FLOAT_OPERATOR_COUNT_WORDS ||
@@ -87,7 +86,6 @@ std::string SchedulerOperator::initialise(std::string _type, std::string _input1
 		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_AVG ||
 		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX_IDX ||
 		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN_IDX ||
-		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_IDX ||
 		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_SORT_IDX
 		 ) && !isFloatVariable(_output))
 		return "ERROR: float operator does not have valid float output: " + _output;
@@ -111,7 +109,6 @@ std::string SchedulerOperator::initialise(std::string _type, std::string _input1
 		 type == SCHEDULE_FLOAT_OPERATOR_MINUS ||
 		 type == SCHEDULE_FLOAT_OPERATOR_MULT ||
 		 type == SCHEDULE_FLOAT_OPERATOR_DIVIDE ||
-		 type == SCHEDULE_FLOAT_OPERATOR_INVDIV ||
 		 type == SCHEDULE_FLOAT_OPERATOR_ROUND
 		 ) && !isFloatVariable(_input1))
 		return "ERROR: float operator does not have valid float input1: " + _input1;
@@ -125,7 +122,6 @@ std::string SchedulerOperator::initialise(std::string _type, std::string _input1
 		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_AVG ||
 		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX_IDX ||
 		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN_IDX ||
-		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_IDX ||
 		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_SORT_IDX ||
 		 type == SCHEDULE_STRING_OPERATOR_TOUCH_FILE ||
 		 type == SCHEDULE_STRING_OPERATOR_COPY_FILE ||
@@ -156,8 +152,6 @@ std::string SchedulerOperator::initialise(std::string _type, std::string _input1
 		 type == SCHEDULE_FLOAT_OPERATOR_MINUS ||
 		 type == SCHEDULE_FLOAT_OPERATOR_MULT ||
 		 type == SCHEDULE_FLOAT_OPERATOR_DIVIDE ||
-		 type == SCHEDULE_FLOAT_OPERATOR_INVDIV ||
-		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_IDX ||
 		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_SORT_IDX ||
 		 type == SCHEDULE_STRING_OPERATOR_NTH_WORD
 		 ) && !(isFloatVariable(_input2) || isNumber(_input2)))
@@ -178,7 +172,7 @@ std::string SchedulerOperator::initialise(std::string _type, std::string _input1
 void  SchedulerOperator::readFromStarFile() const
 {
 	MetaDataTable MD;
-	std::string mystring, mystarfile, mytable, myoutput;
+	std::string mystring, mystarfile, mytable;
 	EMDLabel mylabel;
 
 	// The localtion is always in input1
@@ -189,7 +183,6 @@ void  SchedulerOperator::readFromStarFile() const
 	mystarfile = splits[0];
 	mytable = splits[1];
 	mylabel = EMDL::str2Label(splits[2]);
-	if (splits.size()>3) myoutput = splits[3];
 
 	// Read the correct table from the STAR file
 	MD.read(mystarfile, mytable);
@@ -203,77 +196,95 @@ void  SchedulerOperator::readFromStarFile() const
 	long ii = 0;
 	MultidimArray<RFLOAT> for_sorting(MD.numberOfObjects());
 
-	long stop_at_idx;
-	bool do_stop_at_idx = false;;
+	long idx = (isFloatVariable(input2)) ? ROUND(scheduler_global_floats[input2].value) : 0;
 	if (type == SCHEDULE_BOOLEAN_OPERATOR_READ_STAR ||
 		type == SCHEDULE_FLOAT_OPERATOR_READ_STAR ||
 		type == SCHEDULE_STRING_OPERATOR_READ_STAR)
 	{
-		float floatval;
-		if (isFloatVariable(input2))
-			stop_at_idx = ROUND(scheduler_global_floats[input2].value);
-		else if (isNumber(input2))
-			stop_at_idx = ROUND(textToFloat(input2));
-		else
-			stop_at_idx = 0;
-	}
 
-
-	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
-	{
 		if (EMDL::isDouble(mylabel))
 		{
 			RFLOAT fval;
-			MD.getValue(mylabel, fval);
-			myval = fval;
+			MD.getValue(mylabel, fval, idx);
+			scheduler_global_floats[output].value = fval;
 		}
 		else if (EMDL::isInt(mylabel))
 		{
 			int ival;
-			MD.getValue(mylabel, ival);
-			myval = ival;
+			MD.getValue(mylabel, ival, idx);
+			scheduler_global_floats[output].value = ROUND(ival);
 		}
-		else
-			REPORT_ERROR("ERROR: metadata label " + EMDL::label2Str(mylabel) + " is not of a number type!");
-
-		if (do_stop_at_idx && ii == stop_at_idx)
+		else if (EMDL::isString(mylabel))
 		{
-			scheduler_global_floats[output].value = myval;
-			return;
+			std::string val;
+			MD.getValue(mylabel, val, idx);
+			scheduler_global_strings[output].value = val;
 		}
-
-		DIRECT_MULTIDIM_ELEM(for_sorting, ii) = myval;
-
-		if (myval < mymin)
+		else if (EMDL::isBool(mylabel))
 		{
-			mymin = myval;
-			idxmin = ii;
+			bool val;
+			MD.getValue(mylabel, val, idx);
+			scheduler_global_bools[output].value = val;
 		}
-		if (myval >mymax)
-		{
-			mymax = myval;
-			idxmin = ii;
-		}
-		mymax = XMIPP_MAX(myval, mymax);
-		mysum += myval;
-		ii++;
 	}
-	if (ii > 0)
-		mysum /= (RFLOAT)ii;
-	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX) scheduler_global_floats[output].value = mymax;
-	else if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN) scheduler_global_floats[output].value = mymin;
-	else if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_AVG) scheduler_global_floats[output].value = mysum;
-	else if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX_IDX) scheduler_global_floats[output].value = idxmax;
-	else if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN_IDX) scheduler_global_floats[output].value = idxmin;
-	else if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_SORT_IDX)
+	else if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX ||
+			type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN ||
+			type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_AVG ||
+			type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX_IDX ||
+			type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN_IDX ||
+			type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_SORT_IDX)
 	{
-		long my_idx = (isFloatVariable(input2)) ? ROUND(scheduler_global_floats[input2].value) : ROUND(textToFloat(input2));
-		if (my_idx == 0) REPORT_ERROR("Give a positive or a negative value for input2 in sorted_idx: 1 is largest, -1 is smallest value");
-		if (my_idx < 0) my_idx = ii + my_idx; // smallest value is numberOfObjects - 1
-		else my_idx--; // now start counting at 0
-		MultidimArray<long> idx;
-		for_sorting.sorted_index(idx);
-		scheduler_global_floats[output].value = DIRECT_MULTIDIM_ELEM(idx, my_idx);
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
+		{
+			if (EMDL::isDouble(mylabel))
+			{
+				RFLOAT fval;
+				MD.getValue(mylabel, fval);
+				myval = fval;
+			}
+			else if (EMDL::isInt(mylabel))
+			{
+				int ival;
+				MD.getValue(mylabel, ival);
+				myval = ival;
+			}
+			else
+				REPORT_ERROR("ERROR: metadata label " + EMDL::label2Str(mylabel) + " is not of a number type!");
+
+			DIRECT_MULTIDIM_ELEM(for_sorting, ii) = myval;
+
+			if (myval < mymin)
+			{
+				mymin = myval;
+				idxmin = ii;
+			}
+			if (myval > mymax)
+			{
+				mymax = myval;
+				idxmax = ii;
+			}
+			mymax = XMIPP_MAX(myval, mymax);
+			mysum += myval;
+			ii++;
+		}
+
+		if (ii > 0)
+			mysum /= (RFLOAT)ii;
+
+		if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX) scheduler_global_floats[output].value = mymax;
+		else if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN) scheduler_global_floats[output].value = mymin;
+		else if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_AVG) scheduler_global_floats[output].value = mysum;
+		else if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX_IDX) scheduler_global_floats[output].value = idxmax;
+		else if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN_IDX) scheduler_global_floats[output].value = idxmin;
+		else if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_SORT_IDX)
+		{
+			if (idx == 0) REPORT_ERROR("Give a positive or a negative value for input2 in sorted_idx: 1 is largest, -1 is smallest value");
+			if (idx < 0) idx = ii + idx; // smallest value is numberOfObjects - 1
+			else idx--; // now start counting at 0
+			MultidimArray<long> sorted_idx;
+			for_sorting.sorted_index(sorted_idx);
+			scheduler_global_floats[output].value = DIRECT_MULTIDIM_ELEM(sorted_idx, idx);
+		}
 	}
 }
 
@@ -281,11 +292,7 @@ void  SchedulerOperator::readFromStarFile() const
 
 bool SchedulerOperator::performOperation() const
 {
-	RFLOAT val2;
-	if (isFloatVariable(input2))
-		val2 = scheduler_global_floats[input2].value;
-	else if (isNumber(input2))
-		val2 = textToFloat(input2);
+	RFLOAT val2 = (isFloatVariable(input2)) ? scheduler_global_floats[input2].value : 0;
 
 	if (type == SCHEDULE_BOOLEAN_OPERATOR_AND)
 	{
@@ -331,7 +338,6 @@ bool SchedulerOperator::performOperation() const
 			 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_AVG ||
 			 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX_IDX ||
 			 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN_IDX ||
-			 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_IDX ||
 			 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_SORT_IDX
 			 )
 	{
@@ -356,10 +362,6 @@ bool SchedulerOperator::performOperation() const
 	else if (type == SCHEDULE_FLOAT_OPERATOR_DIVIDE)
 	{
 		scheduler_global_floats[output].value = scheduler_global_floats[input1].value / val2;
-	}
-	else if (type == SCHEDULE_FLOAT_OPERATOR_INVDIV)
-	{
-		scheduler_global_floats[output].value = val2 / scheduler_global_floats[input1].value;
 	}
 	else if (type == SCHEDULE_FLOAT_OPERATOR_ROUND)
 	{
@@ -414,7 +416,7 @@ bool SchedulerOperator::performOperation() const
 	}
 	else if (type == SCHEDULE_STRING_OPERATOR_TOUCH_FILE)
 	{
-		std::cout << " Touching file " << scheduler_global_strings[input1].value << std::endl;
+		std::cout << " + Touching file " << scheduler_global_strings[input1].value << std::endl;
 		touch(scheduler_global_strings[input1].value);
 	}
 	else if (type == SCHEDULE_STRING_OPERATOR_COPY_FILE || type == SCHEDULE_STRING_OPERATOR_MOVE_FILE)
@@ -422,12 +424,12 @@ bool SchedulerOperator::performOperation() const
 		std::string mycommand;
 		if (type == SCHEDULE_STRING_OPERATOR_COPY_FILE)
 		{
-			std::cout << " Copying " << scheduler_global_strings[input1].value << " to " << scheduler_global_strings[input2].value << std::endl;
+			std::cout << " + Copying " << scheduler_global_strings[input1].value << " to " << scheduler_global_strings[input2].value << std::endl;
 			mycommand = "cp ";
 		}
 		else
 		{
-			std::cout << " Moving " << scheduler_global_strings[input1].value << " to " << scheduler_global_strings[input2].value << std::endl;
+			std::cout << " + Moving " << scheduler_global_strings[input1].value << " to " << scheduler_global_strings[input2].value << std::endl;
 			mycommand = "mv ";
 		}
 		// Make output directory if it doesn't exist
@@ -443,7 +445,7 @@ bool SchedulerOperator::performOperation() const
 	}
 	else if (type == SCHEDULE_STRING_OPERATOR_DELETE_FILE)
 	{
-		std::cout << " Deleting file " << scheduler_global_strings[input1].value << std::endl;
+		std::cout << " + Deleting file " << scheduler_global_strings[input1].value << std::endl;
 		delete(scheduler_global_strings[input1].value.c_str());
 	}
 	else if (type == SCHEDULE_STRING_OPERATOR_GLOB)
@@ -492,9 +494,9 @@ bool SchedulerOperator::performOperation() const
 			RFLOAT wait_seconds =  scheduler_global_floats[input1].value - elapsed;
 			if (wait_seconds > 0)
 			{
-				std::cout << " Waiting for " << wait_seconds << " seconds ..." << std::endl;
+				std::cout << " + Waiting for " << wait_seconds << " seconds ..." << std::endl;
 				sleep(wait_seconds);
-				std::cout << " Finished waiting." << std::endl;
+				std::cout << " + Finished waiting." << std::endl;
 			}
 		}
 		annotated_time = time(NULL);
@@ -502,7 +504,7 @@ bool SchedulerOperator::performOperation() const
 	}
 	else if (type == SCHEDULE_EXIT_OPERATOR)
 	{
-		std::cout << " The schedule has reached an exit point ..." << std::endl;
+		std::cout << " + The schedule has reached an exit point ..." << std::endl;
 		return false; // to exit the schedule
 	}
 	else
@@ -529,18 +531,16 @@ std::string SchedulerOperator::getName()
 	if (type == SCHEDULE_FLOAT_OPERATOR_MINUS) return output + "=" + input1 + "_MINUS_" + input2;
 	if (type == SCHEDULE_FLOAT_OPERATOR_MULT) return output + "=" + input1 + "_MULT_" + input2;
 	if (type == SCHEDULE_FLOAT_OPERATOR_DIVIDE) return output + "=" + input1 + "_DIV_" + input2;
-	if (type == SCHEDULE_FLOAT_OPERATOR_INVDIV) return output + "=" + input2 + "_DIV_" + input1;
 	if (type == SCHEDULE_FLOAT_OPERATOR_ROUND) return output + "=" + "ROUND_" + input1;
 	if (type == SCHEDULE_FLOAT_OPERATOR_COUNT_IMAGES) return output + "=" + "COUNT_IMGS_" + input1 + "_" + input2;
 	if (type == SCHEDULE_FLOAT_OPERATOR_COUNT_WORDS) return output + "=" + "COUNT_WORDS_" + input1;
 	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR) return output + "=" + "STAR_" + input1 + "_" + input2;
-	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX) return output + "=" + "STAR_GET_MAX_" + input1;
-	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN) return output + "=" + "STAR_GET_MIN_" + input1;
-	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_AVG) return output + "=" + "STAR_GET_AVG_" + input1;
-	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX_IDX) return output + "=" + "STAR_GET_IDX_MAX" + input1;
-	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN_IDX) return output + "=" + "STAR_GET_IDX_MIN" + input1;
-	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_IDX) return output + "=" + "STAR_GET_FROM_IDX" + input1 + "_" + input2;
-	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_SORT_IDX) return output + "=" + "STAR_GET_SORTED_IDX" + input1 + "_" + input2;
+	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX) return output + "=" + "STAR_MAX_" + input1;
+	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN) return output + "=" + "STAR_MIN_" + input1;
+	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_AVG) return output + "=" + "STAR_AVG_" + input1;
+	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX_IDX) return output + "=" + "STAR_IDX_MAX_" + input1;
+	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN_IDX) return output + "=" + "STAR_IDX_MIN_" + input1;
+	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_SORT_IDX) return output + "=" + "STAR_SORT_IDX_" + input1 + "_" + input2;
 	if (type == SCHEDULE_STRING_OPERATOR_JOIN) return output + "=" + "JOIN_" + input1 + "_" + input2;
 	if (type == SCHEDULE_STRING_OPERATOR_BEFORE_FIRST) return output + "=" + "BEF_FIRST_" + input1 + "_" + input2;
 	if (type == SCHEDULE_STRING_OPERATOR_AFTER_FIRST) return output + "=" + "AFT_FIRST_" + input1 + "_" + input2;
@@ -1452,7 +1452,7 @@ std::string Schedule::getPreviousNode()
 bool Schedule::gotoNextNode()
 {
 	current_node = getNextNode();
-    if (verb > 1) std::cout << " Setting current node to: " << current_node << std::endl;
+    if (verb > 1) std::cout << " ++ Setting current node to: " << current_node << std::endl;
 
 	// Write out current status, but maintain lock on the directory!
 	write();
@@ -1519,8 +1519,7 @@ bool Schedule::gotoNextJob()
     		{
     			if (scheduler_global_operators[current_node].output != "undefined")
     			{
-    				std::cout << " Setting: " << scheduler_global_operators[current_node].output
-					          << " = " <<getVariableValueAsString(scheduler_global_operators[current_node].output) << std::endl;
+    				std::cout << " + " << current_node << " => " <<getVariableValueAsString(scheduler_global_operators[current_node].output) << std::endl;
     			}
     		}
 
@@ -1644,7 +1643,7 @@ void Schedule::setVariablesInJob(RelionJob &job, FileName original_job_name, boo
 			std::string myvarsstr = "";
 			for (int i = 0; i < myvars.size(); i++)
 				myvarsstr+= myvars[i]+ " ";
-			if (verb > 2) std::cout << " Setting joboption " << it->first << " to " << mystring << " based on variable(s): " << myvarsstr<< std::endl;
+			if (verb > 2) std::cout << " +++ Setting joboption " << it->first << " to " << mystring << " based on variable(s): " << myvarsstr<< std::endl;
 		}
 
 	}
@@ -1670,24 +1669,33 @@ void Schedule::run(PipeLine &pipeline)
 
     if (verb > 0)
     {
-    	std::cout << "+++++++++++++++++++++++++++++++++++++++++++++++++"  << std::endl << std::endl;
-    	std::cout << " Starting execution of schedule at: " << current_node << std::endl;
+    	std::cout << "+++++++++++++++++++++++++++++++++++++++++++++++++"  << std::endl;
+    	std::cout << " + Starting execution of schedule at: " << current_node << std::endl;
     }
 
     // If we start from operators instead of jobs, then execute the operator and proceed until the next Job
+	bool has_more_jobs = true;
     if (isOperator(current_node))
     {
 		bool op_success = scheduler_global_operators[current_node].performOperation();
-		if (!op_success) REPORT_ERROR("ERROR: something went wrong with execution of the initial operator...");
-    	gotoNextJob();
+		if (op_success)
+		{
+			if (scheduler_global_operators[current_node].output != "undefined" && verb > 0)
+				std::cout << " + " << current_node << " => " <<getVariableValueAsString(scheduler_global_operators[current_node].output) << std::endl;
+		}
+		else
+		{
+			REPORT_ERROR("ERROR: something went wrong with execution of the initial operator...");
+		}
+
+		has_more_jobs = gotoNextJob();
     }
 
 	// go through all nodes
 	bool is_ok = true;
-	bool has_more_jobs = true;
     while (has_more_jobs)
     {
-		// Abort mechanism
+    	// Abort mechanism
 		if (pipeline_control_check_abort_job())
 		{
 			write(DO_LOCK);
@@ -1715,7 +1723,7 @@ void Schedule::run(PipeLine &pipeline)
 
         	// Set the current_name of the current node now
         	jobs[current_node].current_name = pipeline.processList[current_job].name;
-    		if (verb > 0) std::cout << " Creating new Job: " << jobs[current_node].current_name << " from node " << current_node << std::endl;
+    		if (verb > 0) std::cout << " + Creating new Job: " << jobs[current_node].current_name << " from node " << current_node << std::endl;
     	}
     	else if (jobs[current_node].mode == SCHEDULE_NODE_JOB_MODE_CONTINUE || jobs[current_node].mode == SCHEDULE_NODE_JOB_MODE_OVERWRITE)
     	{
@@ -1745,7 +1753,7 @@ void Schedule::run(PipeLine &pipeline)
 
             	// Set the current_name of the current node now
             	jobs[current_node].current_name = pipeline.processList[current_job].name;
-        		if (verb > 0) std::cout << " Creating new Job: " << jobs[current_node].current_name << " from node " << current_node << std::endl;
+        		if (verb > 0) std::cout << " + Creating new Job: " << jobs[current_node].current_name << " from node " << current_node << std::endl;
     		}
 
     	}
@@ -1773,10 +1781,14 @@ void Schedule::run(PipeLine &pipeline)
 
 		// Now actually run the Scheduled job
 		std::string error_message;
-		if (verb > 0) std::cout << " Executing Job: " << jobs[current_node].current_name << std::endl;
+		if (verb > 0) std::cout << " + Executing Job: " << jobs[current_node].current_name << std::endl;
 		jobs[current_node].job_has_started = true;
+
 		if (!pipeline.runJob(myjob, current_job, false, is_continue, true, do_overwrite_current, error_message))
 			REPORT_ERROR(error_message);
+
+		// Write out current status, but maintain lock on the directory!
+		write();
 
 		// Wait for job to finish
 		bool is_failure = false;
@@ -1785,8 +1797,8 @@ void Schedule::run(PipeLine &pipeline)
 
 
 		std::string message = "";
-		if (is_failure) message = " Stopping schedule due to job " + jobs[current_node].current_name + " failing with an error ...";
-		else if (is_aborted) message = " Stopping schedule due to user abort of job " + jobs[current_node].current_name + " ...";
+		if (is_failure) message = " + Stopping schedule due to job " + jobs[current_node].current_name + " failing with an error ...";
+		else if (is_aborted) message = " + Stopping schedule due to user abort of job " + jobs[current_node].current_name + " ...";
 		if (message != "")
 		{
 			sendEmail(message);
@@ -1803,8 +1815,8 @@ void Schedule::run(PipeLine &pipeline)
     if (verb > 0)
     {
     	if (exists(name + RELION_JOB_ABORT_NOW))
-    		std::cout << " Found an ABORT signal... " << std::endl;
-    	std::cout << " Scheduler " << name << " stops now... " << std::endl;
+    		std::cout << " + Found an ABORT signal... " << std::endl;
+    	std::cout << " + Scheduler " << name << " stops now... " << std::endl;
     	std::cout << "+++++++++++++++++++++++++++++++++++++++++++++++++"  << std::endl << std::endl;
     }
 
@@ -1832,10 +1844,10 @@ void Schedule::abort()
 	if (isJob(current_node))
 	{
 		touch(jobs[current_node].current_name + RELION_JOB_ABORT_NOW);
-		std::cerr << " Touched: " << jobs[current_node].current_name << RELION_JOB_ABORT_NOW << std::endl;
+		std::cerr << " Touched file: " << jobs[current_node].current_name << RELION_JOB_ABORT_NOW << std::endl;
 	}
 	touch(name + RELION_JOB_ABORT_NOW);
-	std::cerr << " Tocuhed: " << name << RELION_JOB_ABORT_NOW << std::endl;
-
+	std::cerr << " Touched file: " << name << RELION_JOB_ABORT_NOW << std::endl;
+	std::cerr << " Now wait for the job and the scheduler to abort ..." << std::endl;
 }
 

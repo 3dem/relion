@@ -1899,36 +1899,54 @@ void GuiMainWindow::cb_add_scheduler_edge_i()
 {
 
 	std::string input, output;
-	if (scheduler_edge_input->value() < 0)
+	int idx;
+	idx = scheduler_edge_input->value();
+	if (idx < 0 || idx >= scheduler_edge_input->size())
 	{
 		std::cerr << " Error getting input from scheduler edge window, please try again ..." << std::endl;
 		return;
 	}
 	else
 	{
-		input = scheduler_edge_input->text(scheduler_edge_input->value());
+		input = scheduler_edge_input->text(idx);
 	}
-	if (scheduler_edge_output->value() < 0)
+
+	idx = scheduler_edge_output->value();
+	if (idx < 0 || idx >= scheduler_edge_output->size())
 	{
 		std::cerr << " Error getting output from scheduler edge window, please try again ..." << std::endl;
 		return;
 	}
 	else
 	{
-		output = scheduler_edge_output->text(scheduler_edge_output->value());
+		output = scheduler_edge_output->text(idx);
 	}
-	schedule.read(DO_LOCK);
-	if (scheduler_edge_boolean->value() >= 0)
+
+
+	idx = scheduler_edge_boolean->value();
+	if (idx >= 0)
 	{
-		std::string mybool = scheduler_edge_boolean->text(scheduler_edge_boolean->value());
-		std::string outputtrue = scheduler_edge_outputtrue->text(scheduler_edge_outputtrue->value());
-		schedule.addFork(input, mybool, outputtrue, output);
+		std::string mybool = scheduler_edge_boolean->text(idx);
+		int idx2= scheduler_edge_outputtrue->value();
+		if (idx2 < 0 || idx2 >= scheduler_edge_outputtrue->size())
+		{
+			std::cerr << " Error getting outputtrue from scheduler edge window, please try again ..." << std::endl;
+			return;
+		}
+		else
+		{
+			std::string outputtrue = scheduler_edge_outputtrue->text(idx2);
+			schedule.read(DO_LOCK);
+			schedule.addFork(input, mybool, outputtrue, output);
+			schedule.write(DO_LOCK);
+		}
 	}
 	else
 	{
+		schedule.read(DO_LOCK);
 		schedule.addEdge(input, output);
+		schedule.write(DO_LOCK);
 	}
-	schedule.write(DO_LOCK);
 	fillSchedulerNodesAndVariables();
 }
 
@@ -2069,10 +2087,19 @@ void GuiMainWindow::cb_add_scheduler_operator(Fl_Widget* o, void*v)
 
 void GuiMainWindow::cb_add_scheduler_operator_i()
 {
-	std::string type = scheduler_operator_type->text(scheduler_operator_type->value());
-	std::string output = (scheduler_operator_output->value() < 0) ? "" : scheduler_operator_output->text(scheduler_operator_output->value());
-	std::string input1 = (scheduler_operator_input1->value() < 0) ? "" : scheduler_operator_input1->text(scheduler_operator_input1->value());
-	std::string input2 = (scheduler_operator_input2->value() < 0) ? "" : scheduler_operator_input2->text(scheduler_operator_input2->value());
+	int idx = scheduler_operator_type->value();
+	if (idx < 0)
+	{
+		std::cerr << "ERROR: select an operator type, try again... " << std::endl;
+		return;
+	}
+	std::string type = scheduler_operator_type->text(idx);
+	idx = scheduler_operator_output->value();
+	std::string output = (idx < 0 || idx >= scheduler_operator_output->size()) ? "" : scheduler_operator_output->text(idx);
+	idx = scheduler_operator_input1->value();
+	std::string input1 = (idx < 0 || idx >= scheduler_operator_input1->size()) ? "" : scheduler_operator_input1->text(idx);
+	idx = scheduler_operator_input2->value();
+	std::string input2 = (idx < 0 || idx >= scheduler_operator_input2->size()) ? "" : scheduler_operator_input2->text(idx);
 	std::string error_message;
 	SchedulerOperator myop = schedule.initialiseOperator(type, input1, input2, output, error_message);
 	if (error_message != "")
