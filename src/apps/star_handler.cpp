@@ -23,6 +23,7 @@
 #include <src/filename.h>
 #include <src/time.h>
 #include <src/jaz/obs_model.h>
+#include <src/pipeline_jobs.h>
 #include <cmath>
 
 class star_handler_parameters
@@ -656,28 +657,40 @@ class star_handler_parameters
 			n++;
 		}
 
-		// We have to write split001 the last. Otherwise the pipeliner might think
-		// the split job has finished while we are still writing subsequent files.
-		FileName fnt0;
-		fnt0 = integerToString(nr_split);
-		const int n_digits = fnt0.length();
+		// Sjors 19jun2019: write out a star file with the output nodes
+		MetaDataTable MDnodes;
+		MDnodes.setName("output_nodes");
 		for (int isplit = 0; isplit < nr_split; isplit ++)
 		{
-			FileName fnt = fn_out.insertBeforeExtension("_split"+integerToString(isplit + 1, n_digits));
-			if (isplit == 0)
-			{
-				fnt0 = fnt;
-				fnt = fnt + ".tmp";
-			}
+			FileName fnt = fn_out.insertBeforeExtension("_split"+integerToString(isplit+1,3));
 			write_check_ignore_optics(MDouts[isplit], fnt, MD.getName());
 			std::cout << " Written: " <<fnt << " with " << MDouts[isplit].numberOfObjects() << " objects." << std::endl;
+
+			MDnodes.addObject();
+			MDnodes.setValue(EMDL_PIPELINE_NODE_NAME, fnt);
+			int type;
+			if (MD.getName() == "micrographs")
+			{
+				type == NODE_MICS;
+			}
+			else if (MD.getName() == "movies")
+			{
+				type == NODE_MOVIES;
+			}
+			else
+			{
+				// just assume these are particles
+				type = NODE_PART_DATA;
+			}
+
+			MDnodes.setValue(EMDL_PIPELINE_NODE_TYPE, type);
 		}
 
-		if (nr_split > 0)
-		{
-			std::rename((fnt0 + ".tmp").c_str(), fnt0.c_str());
-			std::cout << " Renamed " << (fnt0 + ".tmp") << " to " << fnt0 << std::endl;
-		}
+		// write out the star file with the output nodes
+		FileName mydir = fn_out.beforeLastOf("/");
+		if (mydir == "") mydir = ".";
+		MDnodes.write(mydir + "/" + RELION_OUTPUT_NODES);
+
 	}
 
 	void operate()
