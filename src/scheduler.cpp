@@ -416,7 +416,7 @@ bool SchedulerOperator::performOperation() const
 	}
 	else if (type == SCHEDULE_STRING_OPERATOR_TOUCH_FILE)
 	{
-		std::cout << " + Touching file " << scheduler_global_strings[input1].value << std::endl;
+		std::cout << " + Touching: " << scheduler_global_strings[input1].value << std::endl;
 		touch(scheduler_global_strings[input1].value);
 	}
 	else if (type == SCHEDULE_STRING_OPERATOR_COPY_FILE || type == SCHEDULE_STRING_OPERATOR_MOVE_FILE)
@@ -424,12 +424,12 @@ bool SchedulerOperator::performOperation() const
 		std::string mycommand;
 		if (type == SCHEDULE_STRING_OPERATOR_COPY_FILE)
 		{
-			std::cout << " + Copying " << scheduler_global_strings[input1].value << " to " << scheduler_global_strings[input2].value << std::endl;
+			std::cout << " + Copying: " << scheduler_global_strings[input1].value << " to " << scheduler_global_strings[input2].value << std::endl;
 			mycommand = "cp ";
 		}
 		else
 		{
-			std::cout << " + Moving " << scheduler_global_strings[input1].value << " to " << scheduler_global_strings[input2].value << std::endl;
+			std::cout << " + Moving: " << scheduler_global_strings[input1].value << " to " << scheduler_global_strings[input2].value << std::endl;
 			mycommand = "mv ";
 		}
 		// Make output directory if it doesn't exist
@@ -446,7 +446,7 @@ bool SchedulerOperator::performOperation() const
 	else if (type == SCHEDULE_STRING_OPERATOR_DELETE_FILE)
 	{
 		std::string mycommand = "rm -f " + scheduler_global_strings[input1].value;
-		std::cout << " + Deleting file " << scheduler_global_strings[input1].value << std::endl;
+		std::cout << " + Deleting: " << scheduler_global_strings[input1].value << std::endl;
 		int res = system(mycommand.c_str());
 	}
 	else if (type == SCHEDULE_STRING_OPERATOR_GLOB)
@@ -1660,6 +1660,9 @@ void Schedule::setVariablesInJob(RelionJob &job, FileName original_job_name, boo
 void Schedule::run(PipeLine &pipeline)
 {
 	time_config();
+
+	pipeline_control_delete_exit_files();
+
 
 	if (current_node == "undefined")
     {

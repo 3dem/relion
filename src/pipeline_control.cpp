@@ -67,7 +67,7 @@ bool pipeline_control_check_abort_job()
     	return false;
 
 	struct stat buffer;
-	if (stat ((pipeline_control_outputname+RELION_JOB_ABORT_NOW).c_str(), &buffer) == 0)
+	if (stat((pipeline_control_outputname+RELION_JOB_ABORT_NOW).c_str(), &buffer) == 0)
 	{
 		return true;
 	}
@@ -76,4 +76,23 @@ bool pipeline_control_check_abort_job()
 		return false;
 	}
 
+}
+
+void pipeline_control_delete_exit_files()
+{
+	struct stat buffer;
+	if (stat((pipeline_control_outputname+RELION_JOB_EXIT_SUCCESS).c_str(), &buffer) == 0)
+	{
+		remove((pipeline_control_outputname+RELION_JOB_EXIT_SUCCESS).c_str());
+	}
+
+	if (stat((pipeline_control_outputname+RELION_JOB_EXIT_FAILURE).c_str(), &buffer) == 0)
+	{
+		remove((pipeline_control_outputname+RELION_JOB_EXIT_FAILURE).c_str());
+	}
+
+	if (stat((pipeline_control_outputname+RELION_JOB_EXIT_ABORTED).c_str(), &buffer) == 0)
+	{
+		remove((pipeline_control_outputname+RELION_JOB_EXIT_ABORTED).c_str());
+	}
 }

@@ -179,7 +179,7 @@ class PipeLine
 	void getOutputNodesFromStarFile(int this_job);
 
 	// Changes the status of this_job to finished in the pipeline, returns false is job hadn't started yet
-	bool markAsFinishedJob(int this_job, std::string &error_message);
+	bool markAsFinishedJob(int this_job, std::string &error_message, bool is_failed = false);
 
 	// Set the alias for a job, return true for success, false otherwise
 	bool setAliasJob(int this_job, std::string alias, std::string &error_message);

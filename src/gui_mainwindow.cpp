@@ -348,7 +348,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	menubar->add("File/Re-read pipeline",  FL_ALT+'r', cb_reread_pipeline, this);
 	menubar->add("File/Edit project note",  FL_ALT+'e', cb_edit_project_note, this);
 	if (!maingui_do_read_only)
-		menubar->add("File/Print all notes",  FL_ALT+'p', cb_print_notes, this);
+		menubar->add("File/Print all notes",  0, cb_print_notes, this);
 	if (!maingui_do_read_only)
 		menubar->add("File/Remake .Nodes\\/",  FL_ALT+'n', cb_remake_nodesdir, this);
 	menubar->add("File/Display",  FL_ALT+'d', cb_display, this);
@@ -598,6 +598,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 		menubar2->add("Job actions/Alias", 0, cb_set_alias, this);
 		menubar2->add("Job actions/Abort running", 0, cb_abort, this);
 		menubar2->add("Job actions/Mark as finished", 0, cb_mark_as_finished, this);
+		menubar2->add("Job actions/Mark as failed", 0, cb_mark_as_failed, this);
 		menubar2->add("Job actions/Make flowchart", 0, cb_make_flowchart, this);
 		menubar2->add("Job actions/Gentle clean", 0, cb_gentle_cleanup, this);
 		menubar2->add("Job actions/Harsh clean", 0, cb_harsh_cleanup, this);
@@ -2841,7 +2842,14 @@ void GuiMainWindow::cb_mark_as_finished(Fl_Widget* o, void* v) {
     T->cb_mark_as_finished_i();
 }
 
-void GuiMainWindow::cb_mark_as_finished_i()
+// Run button call-back functions
+void GuiMainWindow::cb_mark_as_failed(Fl_Widget* o, void* v) {
+
+    GuiMainWindow* T=(GuiMainWindow*)v;
+    T->cb_mark_as_finished_i(true);
+}
+
+void GuiMainWindow::cb_mark_as_finished_i(bool is_failed)
 {
 
 	if (current_job < 0)
@@ -2851,7 +2859,7 @@ void GuiMainWindow::cb_mark_as_finished_i()
 	}
 
 	std::string error_message;
-	if (!pipeline.markAsFinishedJob(current_job, error_message))
+	if (!pipeline.markAsFinishedJob(current_job, error_message, is_failed))
 		fl_message("%s",error_message.c_str());
 	else
 		updateJobLists();

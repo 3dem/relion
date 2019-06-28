@@ -1150,14 +1150,14 @@ void PipeLine::getOutputNodesFromStarFile(int this_job)
 
 }
 
-bool PipeLine::markAsFinishedJob(int this_job, std::string &error_message)
+bool PipeLine::markAsFinishedJob(int this_job, std::string &error_message, bool is_failed)
 {
 
 	// Read in existing pipeline, in case some other window had changed it
 	std::string lock_message = "markAsFinishedJob";
 	read(DO_LOCK, lock_message);
 
-	processList[this_job].status = PROC_FINISHED_SUCCESS;
+	processList[this_job].status = (is_failed) ? PROC_FINISHED_FAILURE : PROC_FINISHED_SUCCESS;
 
 	// For relion_refine jobs, add last iteration optimiser.star, data.star, model.star and class???.mrc to the pipeline
 	if (processList[this_job].type == PROC_2DCLASS ||

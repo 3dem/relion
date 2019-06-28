@@ -42,5 +42,6 @@ int pipeline_control_relion_exit(int mode);
 
 bool pipeline_control_check_abort_job();
 
+void pipeline_control_delete_exit_files();
 
 #endif /* PIPELINE_CONTROL_H_ */

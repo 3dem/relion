@@ -454,7 +454,8 @@ private:
     inline void cb_abort_i(std::string newalias = "");
 
     static void cb_mark_as_finished(Fl_Widget*, void*);
-    inline void cb_mark_as_finished_i();
+    static void cb_mark_as_failed(Fl_Widget*, void*);
+    inline void cb_mark_as_finished_i(bool is_failed = false);
 
     static void cb_make_flowchart(Fl_Widget*, void*);
     inline void cb_make_flowchart_i();
