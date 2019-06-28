@@ -1199,7 +1199,7 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 			return false;
 		}
 
-		if (!optics_group.validateCharactersStrict())
+		if (!optics_group.validateCharactersStrict(true)) // true means: do_allow_double_dollar (for scheduler)
 		{
 			error_message = "ERROR: an optics group name may contain only numbers, alphabets and hyphen(-).";
 			return false;
@@ -1489,7 +1489,7 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 		if (grouping_for_ps == 0)
 			grouping_for_ps = 1;
 
-		command += " --grouping_for_ps " + integerToString(grouping_for_ps) + " ";	
+		command += " --grouping_for_ps " + integerToString(grouping_for_ps) + " ";
 	}
 
 	if (is_continue)

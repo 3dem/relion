@@ -91,7 +91,6 @@ public:
 		set_var = parser.getOption("--set_var", "Name of a variable to set (using also the --value argument)", "");
 		set_mode = parser.getOption("--set_job_mode", "Name of a job whose mode to set (using also the --value argument)", "");
 		current_node = parser.getOption("--set_current_node", "Name of a node to which to set current_node", "");
-		start_node = parser.getOption("--set_start_node", "Name of a node to which to set original_start_node", "");
 		email = parser.getOption("--set_email", "Email address to send messages about Scheduler status", "");
 		int run_section = parser.addSection("Run the scheduler within a pipeline");
 		do_run = parser.checkOption("--run", "Run the scheduler");
@@ -237,10 +236,6 @@ public:
 		else if (current_node != "")
 		{
 			schedule.current_node = current_node;
-		}
-		else if (start_node != "")
-		{
-			schedule.original_start_node = start_node;
 		}
 		else if (email != "")
 		{

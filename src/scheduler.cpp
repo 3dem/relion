@@ -157,7 +157,12 @@ std::string SchedulerOperator::initialise(std::string _type, std::string _input1
 		 ) && !(isFloatVariable(_input2) || isNumber(_input2)))
 		return "ERROR: operator does not have valid number (float variable or text) input2: " + _input2;
 	if ((type == SCHEDULE_STRING_OPERATOR_TOUCH_FILE ||
-		 type == SCHEDULE_STRING_OPERATOR_COPY_FILE
+		 type == SCHEDULE_STRING_OPERATOR_COPY_FILE ||
+		 type == SCHEDULE_STRING_OPERATOR_BEFORE_FIRST ||
+		 type == SCHEDULE_STRING_OPERATOR_AFTER_FIRST ||
+		 type == SCHEDULE_STRING_OPERATOR_BEFORE_LAST ||
+		 type == SCHEDULE_STRING_OPERATOR_AFTER_LAST ||
+		 type == SCHEDULE_STRING_OPERATOR_JOIN
 	 ) && ! isStringVariable(_input2))
 	return "ERROR: operator does not have valid string input2: " + _input2;
 
@@ -371,7 +376,7 @@ bool SchedulerOperator::performOperation() const
 	{
 		ObservationModel obsmodel;
 		MetaDataTable MDimg;
-		std::string mytablename = (isStringVariable(input2)) ? "particles" : scheduler_global_strings[input2].value;
+		std::string mytablename = (isStringVariable(input2)) ? scheduler_global_strings[input2].value : "particles";
 		ObservationModel::loadSafely(scheduler_global_strings[input1].value, obsmodel, MDimg, mytablename);
 		scheduler_global_floats[output].value = MDimg.numberOfObjects();
 	}
@@ -391,28 +396,23 @@ bool SchedulerOperator::performOperation() const
 	}
 	else if (type == SCHEDULE_STRING_OPERATOR_JOIN)
 	{
-		std::string myval2 = (isStringVariable(input2)) ? scheduler_global_strings[input2].value : input2;
-		scheduler_global_strings[output].value = scheduler_global_strings[input1].value + myval2;
+		scheduler_global_strings[output].value = scheduler_global_strings[input1].value + scheduler_global_strings[input2].value;
 	}
 	else if (type == SCHEDULE_STRING_OPERATOR_BEFORE_FIRST)
 	{
-		std::string myval2 = (isStringVariable(input2)) ? scheduler_global_strings[input2].value : input2;
-		scheduler_global_strings[output].value = scheduler_global_strings[input1].value.beforeFirstOf(myval2);
+		scheduler_global_strings[output].value = scheduler_global_strings[input1].value.beforeFirstOf(scheduler_global_strings[input2].value);
 	}
 	else if (type == SCHEDULE_STRING_OPERATOR_AFTER_FIRST)
 	{
-		std::string myval2 = (isStringVariable(input2)) ? scheduler_global_strings[input2].value : input2;
-		scheduler_global_strings[output].value = scheduler_global_strings[input1].value.afterFirstOf(myval2);
+		scheduler_global_strings[output].value = scheduler_global_strings[input1].value.afterFirstOf(scheduler_global_strings[input2].value);
 	}
 	else if (type == SCHEDULE_STRING_OPERATOR_BEFORE_LAST)
 	{
-		std::string myval2 = (isStringVariable(input2)) ? scheduler_global_strings[input2].value : input2;
-		scheduler_global_strings[output].value = scheduler_global_strings[input1].value.beforeLastOf(myval2);
+		scheduler_global_strings[output].value = scheduler_global_strings[input1].value.beforeLastOf(scheduler_global_strings[input2].value);
 	}
 	else if (type == SCHEDULE_STRING_OPERATOR_AFTER_LAST)
 	{
-		std::string myval2 = (isStringVariable(input2)) ? scheduler_global_strings[input2].value : input2;
-		scheduler_global_strings[output].value = scheduler_global_strings[input1].value.afterLastOf(myval2);
+		scheduler_global_strings[output].value = scheduler_global_strings[input1].value.afterLastOf(scheduler_global_strings[input2].value);
 	}
 	else if (type == SCHEDULE_STRING_OPERATOR_TOUCH_FILE)
 	{
@@ -445,8 +445,9 @@ bool SchedulerOperator::performOperation() const
 	}
 	else if (type == SCHEDULE_STRING_OPERATOR_DELETE_FILE)
 	{
+		std::string mycommand = "rm -f " + scheduler_global_strings[input1].value;
 		std::cout << " + Deleting file " << scheduler_global_strings[input1].value << std::endl;
-		delete(scheduler_global_strings[input1].value.c_str());
+		int res = system(mycommand.c_str());
 	}
 	else if (type == SCHEDULE_STRING_OPERATOR_GLOB)
 	{
@@ -497,6 +498,10 @@ bool SchedulerOperator::performOperation() const
 				std::cout << " + Waiting for " << wait_seconds << " seconds ..." << std::endl;
 				sleep(wait_seconds);
 				std::cout << " + Finished waiting." << std::endl;
+			}
+			else
+			{
+				std::cout << " + Not waiting, as more than " << scheduler_global_floats[input1].value << " seconds have passed." << std::endl;
 			}
 		}
 		annotated_time = time(NULL);
@@ -570,7 +575,6 @@ void Schedule::clear()
 {
 	verb = 1;
 	current_node = "undefined";
-	original_start_node = "undefined";
 	name = "undefined";
 	email_address = "undefined";
 	do_read_only = false;
@@ -657,12 +661,11 @@ void Schedule::read(bool do_lock, FileName fn)
 	if (in.fail())
 		REPORT_ERROR( (std::string) "Schedule::read: File " + fn + " cannot be read." );
 
-	// For reading: do the nodes before the general table, in order to set current_node and original_start_node
+	// For reading: do the nodes before the general table, in order to set current_node
 	MetaDataTable MD;
 	MD.readStar(in, "schedule_general");
 	MD.getValue(EMDL_SCHEDULE_GENERAL_NAME, name);
 	MD.getValue(EMDL_SCHEDULE_GENERAL_CURRENT_NODE, current_node);
-	MD.getValue(EMDL_SCHEDULE_GENERAL_ORIGINAL_START_NODE, original_start_node);
 	MD.getValue(EMDL_SCHEDULE_GENERAL_EMAIL, email_address);
 	MD.clear();
 
@@ -755,6 +758,12 @@ void Schedule::read(bool do_lock, FileName fn)
 	}
 	MD.clear();
 
+	// Never let current_node be undefined...
+	if (current_node == "undefined" && edges.size() > 0)
+	{
+		current_node = edges[0].inputNode;
+	}
+
 	// Close file handler
 	in.close();
 
@@ -827,7 +836,6 @@ void Schedule::write(bool do_lock, FileName fn)
 	MDgeneral.addObject();
 	MDgeneral.setValue(EMDL_SCHEDULE_GENERAL_NAME, name);
 	MDgeneral.setValue(EMDL_SCHEDULE_GENERAL_CURRENT_NODE, current_node);
-	MDgeneral.setValue(EMDL_SCHEDULE_GENERAL_ORIGINAL_START_NODE, original_start_node);
 	MDgeneral.setValue(EMDL_SCHEDULE_GENERAL_EMAIL, email_address);
 	MDgeneral.write(fh);
 
@@ -981,7 +989,10 @@ void Schedule::reset()
 		}
     }
 
-    current_node = "undefined";
+    if (edges.size() > 0)
+    	current_node = edges[0].inputNode;
+    else
+    	current_node = "undefined";
 }
 
 bool Schedule::isNode(std::string _name)
@@ -1403,8 +1414,6 @@ bool Schedule::isValid()
 {
 	// TODO: check if duplicate edges, forks or scheduler_global_operators exist....
 
-	// Check original_start node was set
-
 	// Check Scheduler ends with an exit
 
 	return false; // to be implemented
@@ -1415,9 +1424,7 @@ std::string Schedule::getNextNode()
     std::string result= "undefined";
 	if (current_node == "undefined")
     {
-    	if (original_start_node == "undefined")
-               REPORT_ERROR("ERROR: the starting node was not defined...");
-        result = original_start_node; // go to first node in the list
+		REPORT_ERROR("ERROR: the current_node is not defined...");
     }
 	else
 	{
@@ -1435,7 +1442,7 @@ std::string Schedule::getNextNode()
 std::string Schedule::getPreviousNode()
 {
     std::string result= "undefined";
-	if (current_node == "undefined" || current_node == original_start_node)
+	if (current_node == "undefined")
 		REPORT_ERROR("ERROR: cannot return previous node, as the current node is undefined or equal to the original start node...");
 
 	for (int i = 0; i < edges.size(); i++)
@@ -1656,14 +1663,10 @@ void Schedule::run(PipeLine &pipeline)
 
 	if (current_node == "undefined")
     {
-    	if (original_start_node == "undefined")
-    	{
-    		if (edges.size() > 0)
-    			original_start_node = edges[0].inputNode;
-    		else
-    			REPORT_ERROR("No edges defined yet...");
-    	}
-    	current_node = original_start_node;
+		if (edges.size() > 0)
+			current_node = edges[0].inputNode;
+    	else
+    		REPORT_ERROR("No edges defined yet...");
     }
 
 

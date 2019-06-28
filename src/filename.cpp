@@ -441,9 +441,14 @@ bool FileName::getTheOtherHalf(FileName &fn_out) const
 	return true;
 }
 
-bool FileName::validateCharactersStrict() const
+bool FileName::validateCharactersStrict(bool do_allow_double_dollar) const
 {
-	std::string myname = *this;
+
+	FileName myname = *this;
+	if (do_allow_double_dollar)
+	{
+		myname.replaceAllSubstrings("$$","");
+	}
 	for (int p = 0, len = myname.size(); p < len; p++)
 	{
 		char c = myname[p];

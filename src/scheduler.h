@@ -201,7 +201,7 @@ class Schedule
 
 public:
 
-	std::string name, current_node, original_start_node, email_address;
+	std::string name, current_node, email_address;
 	bool do_read_only;
 	int verb;
 

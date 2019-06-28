@@ -162,9 +162,9 @@ static Fl_Choice *scheduler_edge_input, *scheduler_edge_output, *scheduler_edge_
 static Fl_Hold_Browser *scheduler_edge_browser;
 static Fl_Button *delete_scheduler_edge_button, *add_scheduler_edge_button;
 // Scheduler current state
-static Fl_Choice *scheduler_current_node, *scheduler_start_node;
+static Fl_Choice *scheduler_current_node;
 static Fl_Button *scheduler_run_button, *scheduler_reset_button, *scheduler_set_current_button;
-static Fl_Button *scheduler_set_start_button, *scheduler_next_button, *scheduler_prev_button;
+static Fl_Button *scheduler_next_button, *scheduler_prev_button;
 static Fl_Button *scheduler_abort_button, *scheduler_unlock_button;
 
 static Fl_Text_Buffer *textbuff_stdout;
@@ -406,9 +406,6 @@ private:
     static void cb_scheduler_add_job(Fl_Widget*, void*);
     inline void cb_scheduler_add_job_i();
 
-    static void cb_scheduler_set_start(Fl_Widget*, void*);
-    inline void cb_scheduler_set_start_i();
-
     static void cb_scheduler_set_current(Fl_Widget*, void*);
     inline void cb_scheduler_set_current_i();
 
@@ -510,6 +507,12 @@ private:
 
     static void cb_toggle_pipeliner_scheduler(Fl_Widget*, void*);
     inline void cb_toggle_pipeliner_scheduler_i();
+
+    static void cb_copy_schedule(Fl_Widget*, void*);
+    static void cb_toggle_schedule(Fl_Widget*, void*);
+    static void cb_toggle_pipeline(Fl_Widget*, void*);
+    static void cb_create_schedule(Fl_Widget*, void*);
+    inline void cb_toggle_schedule_i(bool do_pipeline, FileName fn_new_schedule = "");
 
     static void cb_start_pipeliner(Fl_Widget*, void*);
     inline void cb_start_pipeliner_i();

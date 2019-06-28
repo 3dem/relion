@@ -437,7 +437,7 @@ public:
 	// Get the other half map by swapping half1 and half2
 	bool getTheOtherHalf(FileName &fn_out) const;
 
-	bool validateCharactersStrict() const;
+	bool validateCharactersStrict(bool do_allow_double_dollar = false) const;
 
 	/** From a wild-card containing filename get a vector with all existing filenames,
 	 * return number of existing filenames
