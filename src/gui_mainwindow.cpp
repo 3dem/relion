@@ -810,18 +810,18 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	textdispedge->color(GUI_BACKGROUND_COLOR);
 	scheduler_edge_input= new Fl_Choice(XJOBCOL3, GUIHEIGHT_EXT_START+23, JOBCOLWIDTH/2 + 10, 21);
 	scheduler_edge_input->color(GUI_INPUT_COLOR);
-	scheduler_edge_input->textsize(RLN_FONTSIZE-1);
+	scheduler_edge_input->textsize(RLN_FONTSIZE-2);
 	scheduler_edge_output = new Fl_Choice(XJOBCOL3 + 34 + JOBCOLWIDTH/2, GUIHEIGHT_EXT_START+23, JOBCOLWIDTH/2-34, 21);
 	scheduler_edge_output->label("->");
 	scheduler_edge_output->color(GUI_INPUT_COLOR);
-	scheduler_edge_output->textsize(RLN_FONTSIZE-1);
+	scheduler_edge_output->textsize(RLN_FONTSIZE-2);
 	scheduler_edge_boolean = new Fl_Choice(XJOBCOL3 + 20, GUIHEIGHT_EXT_START+44, JOBCOLWIDTH/2-20, 21);
 	scheduler_edge_boolean->label("if:");
 	scheduler_edge_boolean->color(GUI_INPUT_COLOR);
-	scheduler_edge_boolean->textsize(RLN_FONTSIZE-1);
+	scheduler_edge_boolean->textsize(RLN_FONTSIZE-2);
 	scheduler_edge_outputtrue = new Fl_Choice(XJOBCOL3 + 34 + JOBCOLWIDTH/2, GUIHEIGHT_EXT_START+44, JOBCOLWIDTH/2-34, 21);
 	scheduler_edge_outputtrue->label(":");
-	scheduler_edge_outputtrue->textsize(RLN_FONTSIZE-1);
+	scheduler_edge_outputtrue->textsize(RLN_FONTSIZE-2);
 	scheduler_edge_outputtrue->color(GUI_INPUT_COLOR);
 	delete_scheduler_edge_button = new Fl_Button(XJOBCOL3+JOBCOLWIDTH-105, GUIHEIGHT_EXT_START, 50, 23);
 	delete_scheduler_edge_button->color(GUI_BUTTON_COLOR);
@@ -865,6 +865,14 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	scheduler_reset_button->label("Reset");
 	scheduler_reset_button->color(GUI_BUTTON_COLOR);
 	scheduler_reset_button->callback( cb_scheduler_reset, this);
+
+	scheduler_run_button = new Fl_Button(GUIWIDTH - 90, GUIHEIGHT_EXT_START + height_ops-2, 80, 25);
+	scheduler_run_button->label("Run!");
+	scheduler_run_button->color(GUI_RUNBUTTON_COLOR);
+	scheduler_run_button->labelfont(FL_ITALIC);
+	scheduler_run_button->labelsize(14);
+	scheduler_run_button->callback( cb_scheduler_run, this);
+
 	scheduler_run_grp->end();
 
 	scheduler_unlock_button = new Fl_Button(GUIWIDTH - 256, GUIHEIGHT_EXT_START + height_ops-2, 80, 25);
@@ -881,14 +889,6 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	scheduler_abort_button->labelsize(14);
 	scheduler_abort_button->color(GUI_RUNBUTTON_COLOR);
 	scheduler_abort_button->callback( cb_scheduler_abort, this);
-
-	scheduler_run_button = new Fl_Button(GUIWIDTH - 90, GUIHEIGHT_EXT_START + height_ops-2, 80, 25);
-	scheduler_run_button->label("Run!");
-	scheduler_run_button->color(GUI_RUNBUTTON_COLOR);
-	scheduler_run_button->labelfont(FL_ITALIC);
-	scheduler_run_button->labelsize(14);
-	scheduler_run_button->callback( cb_scheduler_run, this);
-
 
 	scheduler_grp->end();
 
@@ -1365,6 +1365,16 @@ void GuiMainWindow::fillSchedulerNodesAndVariables()
 		scheduler_job_browser->value(mypos_scheduler_job);
 	}
 
+	if (schedule.isWriteLocked())
+	{
+		scheduler_run_grp->deactivate();
+	}
+	else
+	{
+		scheduler_run_grp->activate();
+	}
+
+
 }
 
 
@@ -1623,7 +1633,7 @@ void GuiMainWindow::cb_select_scheduled_job_i()
 
     if (show_scheduler)
     {
-		FileName jobname = getJobNameForDisplay(pipeline.processList[current_job]);
+    	FileName jobname = getJobNameForDisplay(pipeline.processList[current_job]);
 		scheduler_job_name->value(jobname.c_str());
 		scheduler_job_name->deactivate();
 		bool found = false;
@@ -2322,7 +2332,6 @@ void GuiMainWindow::cb_scheduler_abort_i()
 	if (proceed)
 	{
 		schedule.abort();
-		scheduler_run_grp->activate();
 		return;
 	}
 }

@@ -1787,7 +1787,12 @@ void Schedule::run(PipeLine &pipeline)
 
 		// Now actually run the Scheduled job
 		std::string error_message;
-		if (verb > 0) std::cout << " + Executing Job: " << jobs[current_node].current_name << std::endl;
+		if (verb > 0)
+		{
+			time_t my_time = time(NULL);
+			printf("%s%s", " + ", ctime(&my_time));
+			std::cout << " + Executing Job: " << jobs[current_node].current_name << std::endl;
+		}
 		jobs[current_node].job_has_started = true;
 
 		if (!pipeline.runJob(myjob, current_job, false, is_continue, true, do_overwrite_current, error_message))
@@ -1825,7 +1830,6 @@ void Schedule::run(PipeLine &pipeline)
     	std::cout << " + Scheduler " << name << " stops now... " << std::endl;
     	std::cout << "+++++++++++++++++++++++++++++++++++++++++++++++++"  << std::endl << std::endl;
     }
-
 }
 
 void Schedule::unlock()
