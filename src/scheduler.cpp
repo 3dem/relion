@@ -1813,7 +1813,7 @@ void Schedule::run(PipeLine &pipeline)
 		if (message != "")
 		{
 			sendEmail(message);
-			std::cerr << message << std::endl;
+			std::cout << message << std::endl;
 			is_ok = false;
 			break;
 		}
