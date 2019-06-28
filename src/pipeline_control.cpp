@@ -63,7 +63,6 @@ int pipeline_control_relion_exit(int mode)
 
 bool pipeline_control_check_abort_job()
 {
-	std::cerr << " pipeline_control_outputname= " << pipeline_control_outputname << std::endl;
 	if (pipeline_control_outputname == "")
     	return false;
 
