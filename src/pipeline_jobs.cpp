@@ -2293,10 +2293,15 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 				}
 			}
 
+			FileName fnt0;
+			fnt0 = integerToString(nr_split);
+			int n_digits = fnt0.length();
+			if (n_digits < 3) n_digits = 3;
+
 			for (int isplit = 0; isplit < nr_split; isplit++)
 			{
 				// FIXME: This is not perfect. The real fix will be in 3.1.
-				FileName fn_split = fn_out.insertBeforeExtension("_split"+integerToString(isplit + 1));
+				FileName fn_split = fn_out.insertBeforeExtension("_split"+integerToString(isplit + 1, n_digits));
 
 				if (joboptions["fn_mic"].getString() != "")
 				{

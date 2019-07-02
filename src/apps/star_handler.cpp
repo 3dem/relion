@@ -420,7 +420,8 @@ class star_handler_parameters
 		// the split job has finished while we are still writing subsequent files.
 		FileName fnt0;
 		fnt0 = integerToString(nr_split);
-		const int n_digits = fnt0.length();
+		int n_digits = fnt0.length();
+		if (n_digits < 3) n_digits = 3;
 		for (int isplit = 0; isplit < nr_split; isplit ++)
 		{
 			FileName fnt = fn_out.insertBeforeExtension("_split"+integerToString(isplit + 1, n_digits));
