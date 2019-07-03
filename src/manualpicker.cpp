@@ -270,8 +270,8 @@ int manualpickerGuiWindow::fill()
 		int ystep2 = (fn_mic.length() > MWCOL1/12) ? ystep - 5 : ystep - 10;
 		Fl_Text_Display* mydisp = new Fl_Text_Display(MXCOL0, current_y, MWCOL1, ystep2);
 		mydisp->scrollbar_width(5);
-		mydisp->scroll(0,MWCOL1);
 		mydisp->buffer(textbuff);
+		mydisp->scroll(0, 9999);
 		mydisp->color(GUI_INPUT_COLOR, GUI_INPUT_COLOR);
 		text_displays.push_back(mydisp);
 
