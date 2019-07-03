@@ -222,17 +222,28 @@ void GuiEntry::setValue(std::string _value)
 {
 	joboption.value = _value;
 	inp->value(_value.c_str());
+
 	// Also update menu or slider if necessary
 	if (menu != NULL)
 	{
-		const Fl_Menu_Item *p = menu->find_item(inp->value());
-		if ( p ) menu->picked(p);
-		// if we cant find the menu option, just pick first menu entry
-		else menu->picked(&menu->menu()[0]);
+		if (_value.substr(0,2) == "$$")
+		{
+			menu->add(_value.c_str());
+			const Fl_Menu_Item *p = menu->find_item(_value.c_str());
+			menu->picked(p);
+		}
+		else
+		{
+			const Fl_Menu_Item *p = menu->find_item(inp->value());
+			if ( p ) menu->picked(p);
+			// if we cant find the menu option, just pick first menu entry
+			else menu->picked(&menu->menu()[0]);
+		}
 	}
 	if (slider != NULL)
 	{
-		slider->value(fltkTextToFloat(inp->value()));
+		if (_value.substr(0,2) != "$$")
+			slider->value(fltkTextToFloat(inp->value()));
 	}
 }
 
@@ -388,7 +399,10 @@ void GuiEntry::cb_menu_i()
 		// In case this was a boolean that deactivates a group, do so:
 		if (my_deactivate_group != NULL)
 		{
-			if ( actually_activate && (strcmp(inp->value(), "Yes") == 0) ||
+			std::string myval = std::string(inp->value());
+			if (myval.substr(0,2) == "$$")
+				my_deactivate_group->activate();
+			else if ( actually_activate && (strcmp(inp->value(), "Yes") == 0) ||
 				!actually_activate && (strcmp(inp->value(), "No") == 0))
 				my_deactivate_group->deactivate();
 			else
