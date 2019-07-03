@@ -73,44 +73,45 @@ bool isFloatVariable(std::string name);
 bool isStringVariable(std::string name);
 bool isScheduleOperator(std::string name);
 
-#define SCHEDULE_BOOLEAN_OPERATOR_AND "bool_op_and"
-#define SCHEDULE_BOOLEAN_OPERATOR_OR  "bool_op_or"
-#define SCHEDULE_BOOLEAN_OPERATOR_NOT "bool_op_not"
-#define SCHEDULE_BOOLEAN_OPERATOR_GT "bool_op_gt"
-#define SCHEDULE_BOOLEAN_OPERATOR_LT "bool_op_lt"
-#define SCHEDULE_BOOLEAN_OPERATOR_GE "bool_op_ge"
-#define SCHEDULE_BOOLEAN_OPERATOR_LE "bool_op_le"
-#define SCHEDULE_BOOLEAN_OPERATOR_EQ "bool_op_eq"
-#define SCHEDULE_BOOLEAN_OPERATOR_FILE_EXISTS "bool_op_file_exists"
-#define SCHEDULE_BOOLEAN_OPERATOR_READ_STAR "bool_op_read_star"
-#define SCHEDULE_FLOAT_OPERATOR_SET "float_op_set"
-#define SCHEDULE_FLOAT_OPERATOR_PLUS "float_op_plus"
-#define SCHEDULE_FLOAT_OPERATOR_MINUS "float_op_minus"
-#define SCHEDULE_FLOAT_OPERATOR_MULT "float_op_mult"
-#define SCHEDULE_FLOAT_OPERATOR_DIVIDE "float_op_divide"
-#define SCHEDULE_FLOAT_OPERATOR_ROUND "float_op_round"
-#define SCHEDULE_FLOAT_OPERATOR_COUNT_IMAGES "float_op_count_images"
-#define SCHEDULE_FLOAT_OPERATOR_COUNT_WORDS "float_op_count_words"
-#define SCHEDULE_FLOAT_OPERATOR_READ_STAR "float_op_star"
-#define SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX "float_op_star_table_max"
-#define SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN "float_op_star_table_min"
-#define SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_AVG "float_op_star_table_avg"
-#define SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX_IDX "float_op_star_table_max_idx"
-#define SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN_IDX "float_op_star_table_min_idx"
-#define SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_SORT_IDX "float_op_star_table_sort_idx"
-#define SCHEDULE_STRING_OPERATOR_JOIN "string_op_join"
-#define SCHEDULE_STRING_OPERATOR_BEFORE_FIRST "string_op_before_first"
-#define SCHEDULE_STRING_OPERATOR_AFTER_FIRST "string_op_after_first"
-#define SCHEDULE_STRING_OPERATOR_BEFORE_LAST "string_op_before_last"
-#define SCHEDULE_STRING_OPERATOR_AFTER_LAST "string_op_after_last"
-#define SCHEDULE_STRING_OPERATOR_TOUCH_FILE "string_op_touch_file"
-#define SCHEDULE_STRING_OPERATOR_COPY_FILE "string_op_copy_file"
-#define SCHEDULE_STRING_OPERATOR_MOVE_FILE "string_op_move_file"
-#define SCHEDULE_STRING_OPERATOR_DELETE_FILE "string_op_delete_file"
-#define SCHEDULE_STRING_OPERATOR_READ_STAR "string_op_read_star"
-#define SCHEDULE_STRING_OPERATOR_GLOB "string_op_glob"
-#define SCHEDULE_STRING_OPERATOR_NTH_WORD "string_op_nth_word"
-#define SCHEDULE_WAIT_OPERATOR_SINCE_LAST_TIME "wait_since_last_time"
+#define SCHEDULE_BOOLEAN_OPERATOR_AND "bool=and"
+#define SCHEDULE_BOOLEAN_OPERATOR_OR  "bool=or"
+#define SCHEDULE_BOOLEAN_OPERATOR_NOT "bool=not"
+#define SCHEDULE_BOOLEAN_OPERATOR_GT "bool=gt"
+#define SCHEDULE_BOOLEAN_OPERATOR_LT "bool=lt"
+#define SCHEDULE_BOOLEAN_OPERATOR_GE "bool=ge"
+#define SCHEDULE_BOOLEAN_OPERATOR_LE "bool=le"
+#define SCHEDULE_BOOLEAN_OPERATOR_EQ "bool=eq"
+#define SCHEDULE_BOOLEAN_OPERATOR_FILE_EXISTS "bool=file_exists"
+#define SCHEDULE_BOOLEAN_OPERATOR_READ_STAR "bool=read_star"
+#define SCHEDULE_FLOAT_OPERATOR_SET "float=set"
+#define SCHEDULE_FLOAT_OPERATOR_PLUS "float=plus"
+#define SCHEDULE_FLOAT_OPERATOR_MINUS "float=minus"
+#define SCHEDULE_FLOAT_OPERATOR_MULT "float=mult"
+#define SCHEDULE_FLOAT_OPERATOR_DIVIDE "float=divide"
+#define SCHEDULE_FLOAT_OPERATOR_ROUND "float=round"
+#define SCHEDULE_FLOAT_OPERATOR_COUNT_IMAGES "float=count_images"
+#define SCHEDULE_FLOAT_OPERATOR_COUNT_WORDS "float=count_words"
+#define SCHEDULE_FLOAT_OPERATOR_READ_STAR "float=read_star"
+#define SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX "float=star_table_max"
+#define SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN "float=star_table_min"
+#define SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_AVG "float=star_table_avg"
+#define SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX_IDX "float=star_table_max_idx"
+#define SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN_IDX "float=star_table_min_idx"
+#define SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_SORT_IDX "float=star_table_sort_idx"
+#define SCHEDULE_STRING_OPERATOR_JOIN "string=join"
+#define SCHEDULE_STRING_OPERATOR_BEFORE_FIRST "string=before_first"
+#define SCHEDULE_STRING_OPERATOR_AFTER_FIRST "string=after_first"
+#define SCHEDULE_STRING_OPERATOR_BEFORE_LAST "string=before_last"
+#define SCHEDULE_STRING_OPERATOR_AFTER_LAST "string=after_last"
+#define SCHEDULE_STRING_OPERATOR_READ_STAR "string=read_star"
+#define SCHEDULE_STRING_OPERATOR_GLOB "string=glob"
+#define SCHEDULE_STRING_OPERATOR_NTH_WORD "string=nth_word"
+#define SCHEDULE_OPERATOR_TOUCH_FILE "touch_file"
+#define SCHEDULE_OPERATOR_COPY_FILE "copy_file"
+#define SCHEDULE_OPERATOR_MOVE_FILE "move_file"
+#define SCHEDULE_OPERATOR_DELETE_FILE "delete_file"
+#define SCHEDULE_WAIT_OPERATOR_SINCE_LAST_TIME "wait"
+#define SCHEDULE_EMAIL_OPERATOR "email"
 #define SCHEDULE_EXIT_OPERATOR "exit"
 
 // A class that performs operators on variables
@@ -161,7 +162,12 @@ class SchedulerJob
 
 	// Perform operation and return TRUE if not a JOB; just return FALSE if a JOB
 	bool performOperation();
+
+
 };
+
+// Send an email
+void schedulerSendEmail(std::string message, std::string subject = "Scheduler");
 
 
 // A class that defines the edges between a graph that defines execution order, where the nodes are individual JOB instances
@@ -195,13 +201,12 @@ class SchedulerEdge
 
 };
 
-
 class Schedule
 {
 
 public:
 
-	std::string name, current_node, email_address;
+	std::string name, current_node;
 	bool do_read_only;
 	int verb;
 
@@ -304,9 +309,6 @@ public:
 
     // Rename this scheduler into a new directory
     void copy(FileName newname);
-
-    // Send an email
-    void sendEmail(std::string message);
 
     // Add edges and forks in between the nodes
     void addEdge(std::string inputnode_name, std::string outputnode_name);

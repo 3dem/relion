@@ -50,7 +50,7 @@ public:
 		std::cerr << std::endl << " ++ Add an operator node (of type float, bool or file): " << std::endl;
 		std::cerr << "    --schedule Schedules/test --add operator --type " << SCHEDULE_FLOAT_OPERATOR_PLUS << " --i iter --i2 iter_step --o iter" << std::endl;
 		std::cerr << "    --schedule Schedules/test --add operator --type " << SCHEDULE_FLOAT_OPERATOR_PLUS << " --i iter --i2 1 --o iter" << std::endl;
-		std::cerr << "    --schedule Schedules/test --add operator --type " << SCHEDULE_STRING_OPERATOR_TOUCH_FILE << " --i initial_model" << std::endl;
+		std::cerr << "    --schedule Schedules/test --add operator --type " << SCHEDULE_OPERATOR_TOUCH_FILE << " --i initial_model" << std::endl;
 		std::cerr << "    --schedule Schedules/test --add operator --type " << SCHEDULE_BOOLEAN_OPERATOR_GT << " --i iter --i2 10 --o is_finished" << std::endl;
 		std::cerr << "    --schedule Schedules/test --add operator --type " << SCHEDULE_BOOLEAN_OPERATOR_FILE_EXISTS << " --i initial_model --o is_finished" << std::endl;
 		std::cerr << std::endl << " ++ Add a job node: " << std::endl;
@@ -91,7 +91,6 @@ public:
 		set_var = parser.getOption("--set_var", "Name of a variable to set (using also the --value argument)", "");
 		set_mode = parser.getOption("--set_job_mode", "Name of a job whose mode to set (using also the --value argument)", "");
 		current_node = parser.getOption("--set_current_node", "Name of a node to which to set current_node", "");
-		email = parser.getOption("--set_email", "Email address to send messages about Scheduler status", "");
 		int run_section = parser.addSection("Run the scheduler within a pipeline");
 		do_run = parser.checkOption("--run", "Run the scheduler");
 		verb = textToInteger(parser.getOption("--verb", "Running verbosity: 0, 1, 2 or 3)", "1"));
@@ -236,10 +235,6 @@ public:
 		else if (current_node != "")
 		{
 			schedule.current_node = current_node;
-		}
-		else if (email != "")
-		{
-			schedule.email_address = email;
 		}
 		else
 			REPORT_ERROR(" ERROR: nothing to do!");

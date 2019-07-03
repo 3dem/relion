@@ -3243,7 +3243,7 @@ void GuiMainWindow::cb_copy_schedule(Fl_Widget* o, void* v)
 	FileName fn_copy = std::string(name);
 	if (fn_copy.length() > 0)
 	{
-		schedule.copy(fn_copy);
+		schedule.copy("Schedules/" + fn_copy);
 		T->cb_toggle_schedule_i(false, fn_copy);
 	}
 }

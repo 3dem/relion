@@ -123,10 +123,6 @@ std::string SchedulerOperator::initialise(std::string _type, std::string _input1
 		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX_IDX ||
 		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN_IDX ||
 		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_SORT_IDX ||
-		 type == SCHEDULE_STRING_OPERATOR_TOUCH_FILE ||
-		 type == SCHEDULE_STRING_OPERATOR_COPY_FILE ||
-		 type == SCHEDULE_STRING_OPERATOR_MOVE_FILE ||
-		 type == SCHEDULE_STRING_OPERATOR_DELETE_FILE ||
 		 type == SCHEDULE_STRING_OPERATOR_READ_STAR ||
 		 type == SCHEDULE_STRING_OPERATOR_JOIN ||
 		 type == SCHEDULE_STRING_OPERATOR_BEFORE_FIRST ||
@@ -134,7 +130,11 @@ std::string SchedulerOperator::initialise(std::string _type, std::string _input1
 		 type == SCHEDULE_STRING_OPERATOR_BEFORE_LAST ||
 		 type == SCHEDULE_STRING_OPERATOR_AFTER_LAST ||
 		 type == SCHEDULE_STRING_OPERATOR_GLOB ||
-		 type == SCHEDULE_STRING_OPERATOR_NTH_WORD
+		 type == SCHEDULE_STRING_OPERATOR_NTH_WORD ||
+		 type == SCHEDULE_OPERATOR_TOUCH_FILE ||
+		 type == SCHEDULE_OPERATOR_COPY_FILE ||
+		 type == SCHEDULE_OPERATOR_MOVE_FILE ||
+		 type == SCHEDULE_OPERATOR_DELETE_FILE
 		 ) && ! isStringVariable(_input1))
 		return "ERROR: operator does not have valid string input1: " + _input1;
 
@@ -156,8 +156,8 @@ std::string SchedulerOperator::initialise(std::string _type, std::string _input1
 		 type == SCHEDULE_STRING_OPERATOR_NTH_WORD
 		 ) && !(isFloatVariable(_input2) || isNumber(_input2)))
 		return "ERROR: operator does not have valid number (float variable or text) input2: " + _input2;
-	if ((type == SCHEDULE_STRING_OPERATOR_TOUCH_FILE ||
-		 type == SCHEDULE_STRING_OPERATOR_COPY_FILE ||
+	if ((type == SCHEDULE_OPERATOR_COPY_FILE ||
+		 type == SCHEDULE_OPERATOR_MOVE_FILE ||
 		 type == SCHEDULE_STRING_OPERATOR_BEFORE_FIRST ||
 		 type == SCHEDULE_STRING_OPERATOR_AFTER_FIRST ||
 		 type == SCHEDULE_STRING_OPERATOR_BEFORE_LAST ||
@@ -414,41 +414,6 @@ bool SchedulerOperator::performOperation() const
 	{
 		scheduler_global_strings[output].value = scheduler_global_strings[input1].value.afterLastOf(scheduler_global_strings[input2].value);
 	}
-	else if (type == SCHEDULE_STRING_OPERATOR_TOUCH_FILE)
-	{
-		std::cout << " + Touching: " << scheduler_global_strings[input1].value << std::endl;
-		touch(scheduler_global_strings[input1].value);
-	}
-	else if (type == SCHEDULE_STRING_OPERATOR_COPY_FILE || type == SCHEDULE_STRING_OPERATOR_MOVE_FILE)
-	{
-		std::string mycommand;
-		if (type == SCHEDULE_STRING_OPERATOR_COPY_FILE)
-		{
-			std::cout << " + Copying: " << scheduler_global_strings[input1].value << " to " << scheduler_global_strings[input2].value << std::endl;
-			mycommand = "cp ";
-		}
-		else
-		{
-			std::cout << " + Moving: " << scheduler_global_strings[input1].value << " to " << scheduler_global_strings[input2].value << std::endl;
-			mycommand = "mv ";
-		}
-		// Make output directory if it doesn't exist
-		if (scheduler_global_strings[input2].value.contains("/"))
-		{
-			FileName mydirs = scheduler_global_strings[input2].value.beforeLastOf("/");
-			std::string mycommand = "mkdir -p " + mydirs;
- 			int res = system(mycommand.c_str());
-		}
-		// Execute the command
-		mycommand += scheduler_global_strings[input1].value + " " + scheduler_global_strings[input2].value;
-		int res = system(mycommand.c_str());
-	}
-	else if (type == SCHEDULE_STRING_OPERATOR_DELETE_FILE)
-	{
-		std::string mycommand = "rm -f " + scheduler_global_strings[input1].value;
-		std::cout << " + Deleting: " << scheduler_global_strings[input1].value << std::endl;
-		int res = system(mycommand.c_str());
-	}
 	else if (type == SCHEDULE_STRING_OPERATOR_GLOB)
 	{
 		FileName input=scheduler_global_strings[input1].value;
@@ -486,12 +451,49 @@ bool SchedulerOperator::performOperation() const
 			scheduler_global_strings[output].value = splits[mypos];
 		}
 	}
+	else if (type == SCHEDULE_OPERATOR_TOUCH_FILE)
+	{
+		std::cout << " + Touching: " << scheduler_global_strings[input1].value << std::endl;
+		touch(scheduler_global_strings[input1].value);
+	}
+	else if (type == SCHEDULE_OPERATOR_COPY_FILE || type == SCHEDULE_OPERATOR_MOVE_FILE)
+	{
+		std::string mycommand;
+		if (type == SCHEDULE_OPERATOR_COPY_FILE)
+		{
+			std::cout << " + Copying: " << scheduler_global_strings[input1].value << " to " << scheduler_global_strings[input2].value << std::endl;
+			mycommand = "cp ";
+		}
+		else
+		{
+			std::cout << " + Moving: " << scheduler_global_strings[input1].value << " to " << scheduler_global_strings[input2].value << std::endl;
+			mycommand = "mv ";
+		}
+		// Make output directory if it doesn't exist
+		if (scheduler_global_strings[input2].value.contains("/"))
+		{
+			FileName mydirs = scheduler_global_strings[input2].value.beforeLastOf("/");
+			std::string mycommand = "mkdir -p " + mydirs;
+ 			int res = system(mycommand.c_str());
+		}
+		// Execute the command
+		mycommand += scheduler_global_strings[input1].value + " " + scheduler_global_strings[input2].value;
+		int res = system(mycommand.c_str());
+	}
+	else if (type == SCHEDULE_OPERATOR_DELETE_FILE)
+	{
+		std::string mycommand = "rm -f " + scheduler_global_strings[input1].value;
+		std::cout << " + Deleting: " << scheduler_global_strings[input1].value << std::endl;
+		int res = system(mycommand.c_str());
+	}
 	else if (type == SCHEDULE_WAIT_OPERATOR_SINCE_LAST_TIME)
 	{
 		if (has_annotated_time)
 		{
 			time_t current_time = time(NULL);
 			RFLOAT elapsed = current_time - annotated_time;
+			// Also set output to elapsed seconds if it is a floatVariable
+			if (isFloatVariable(output)) scheduler_global_floats[output].value = elapsed;
 			RFLOAT wait_seconds =  scheduler_global_floats[input1].value - elapsed;
 			if (wait_seconds > 0)
 			{
@@ -506,6 +508,26 @@ bool SchedulerOperator::performOperation() const
 		}
 		annotated_time = time(NULL);
 		has_annotated_time =true;
+	}
+	else if (type == SCHEDULE_EMAIL_OPERATOR)
+	{
+
+		time_t my_time = time(NULL);
+		std::string mymessage = std::string(ctime(&my_time)) + "\n";
+		mymessage += "input1: " + input1 + " = ";
+		if (isStringVariable(input1)) mymessage += scheduler_global_strings[input1].value + "\n";
+		else if (isBooleanVariable(input1)) mymessage += (scheduler_global_bools[input1].value) ? "True \n" : "False \n";
+		else if (isFloatVariable(input1)) mymessage += floatToString(scheduler_global_floats[input1].value) + "\n";
+		if (isBooleanVariable(input2) || isFloatVariable(input2) || isStringVariable(input2))
+		{
+			mymessage += "input2: " + input2 + " = ";
+			if (isStringVariable(input2)) mymessage += scheduler_global_strings[input2].value + "\n";
+			else if (isBooleanVariable(input2)) mymessage += (scheduler_global_bools[input2].value) ? "True \n" : "False \n";
+			else if (isFloatVariable(input2)) mymessage += floatToString(scheduler_global_floats[input2].value) + "\n";
+		}
+		std::cout << " + Sending e-mail." << std::endl;
+
+		schedulerSendEmail(mymessage);
 	}
 	else if (type == SCHEDULE_EXIT_OPERATOR)
 	{
@@ -551,14 +573,15 @@ std::string SchedulerOperator::getName()
 	if (type == SCHEDULE_STRING_OPERATOR_AFTER_FIRST) return output + "=" + "AFT_FIRST_" + input1 + "_" + input2;
 	if (type == SCHEDULE_STRING_OPERATOR_BEFORE_LAST) return output + "=" + "BEF_LAST_" + input1 + "_" + input2;
 	if (type == SCHEDULE_STRING_OPERATOR_AFTER_LAST) return output + "=" + "AFT_LAST_" + input1 + "_" + input2;
-	if (type == SCHEDULE_STRING_OPERATOR_TOUCH_FILE) return "TOUCH_" + input1;
-	if (type == SCHEDULE_STRING_OPERATOR_COPY_FILE) return "COPY_" + input1 + "_TO_" + input2;
-	if (type == SCHEDULE_STRING_OPERATOR_MOVE_FILE) return "MOVE_" + input1 + "_TO_" + input2;
-	if (type == SCHEDULE_STRING_OPERATOR_DELETE_FILE) return "DELETE_" + input1;
 	if (type == SCHEDULE_STRING_OPERATOR_READ_STAR) return output + "=" + "STAR_" + input1 + "_" + input2;
 	if (type == SCHEDULE_STRING_OPERATOR_GLOB) return output + "=" + "GLOB_" + input1;
 	if (type == SCHEDULE_STRING_OPERATOR_NTH_WORD) return output + "=" + "NTH_WORD_" + input1 + "_" + input2;
+	if (type == SCHEDULE_OPERATOR_TOUCH_FILE) return "TOUCH_" + input1;
+	if (type == SCHEDULE_OPERATOR_COPY_FILE) return "COPY_" + input1 + "_TO_" + input2;
+	if (type == SCHEDULE_OPERATOR_MOVE_FILE) return "MOVE_" + input1 + "_TO_" + input2;
+	if (type == SCHEDULE_OPERATOR_DELETE_FILE) return "DELETE_" + input1;
 	if (type == SCHEDULE_WAIT_OPERATOR_SINCE_LAST_TIME) return "WAIT_" + input1;
+	if (type == SCHEDULE_EMAIL_OPERATOR) return "EMAIL_" + input1 + "_" + input2;
 	if (type == SCHEDULE_EXIT_OPERATOR) return "EXIT";
 	else
 		REPORT_ERROR("ERROR: unrecognised Operator type:" + type);
@@ -576,7 +599,6 @@ void Schedule::clear()
 	verb = 1;
 	current_node = "undefined";
 	name = "undefined";
-	email_address = "undefined";
 	do_read_only = false;
 	scheduler_global_bools.clear();
 	scheduler_global_floats.clear();
@@ -666,7 +688,6 @@ void Schedule::read(bool do_lock, FileName fn)
 	MD.readStar(in, "schedule_general");
 	MD.getValue(EMDL_SCHEDULE_GENERAL_NAME, name);
 	MD.getValue(EMDL_SCHEDULE_GENERAL_CURRENT_NODE, current_node);
-	MD.getValue(EMDL_SCHEDULE_GENERAL_EMAIL, email_address);
 	MD.clear();
 
 	MD.readStar(in, "schedule_floats");
@@ -836,7 +857,6 @@ void Schedule::write(bool do_lock, FileName fn)
 	MDgeneral.addObject();
 	MDgeneral.setValue(EMDL_SCHEDULE_GENERAL_NAME, name);
 	MDgeneral.setValue(EMDL_SCHEDULE_GENERAL_CURRENT_NODE, current_node);
-	MDgeneral.setValue(EMDL_SCHEDULE_GENERAL_EMAIL, email_address);
 	MDgeneral.write(fh);
 
 	if (scheduler_global_floats.size() > 0)
@@ -1362,7 +1382,6 @@ void Schedule::copy(FileName newname)
 		if (!myjob.read(name + it->first + '/', dummy, true))
 			REPORT_ERROR("There was an error reading job: " + it->first);
 
-
 		for (std::map<std::string,JobOption>::iterator it2 = myjob.joboptions.begin(); it2 != myjob.joboptions.end(); ++it2)
 		{
 			FileName mystring = (it2->second).value;
@@ -1388,12 +1407,11 @@ void Schedule::copy(FileName newname)
 
 }
 
-void Schedule::sendEmail(std::string message)
+void schedulerSendEmail(std::string message, std::string subject)
 {
-	if (email_address != "undefined")
+	if (isStringVariable("email"))
 	{
-		std::string mysubject = "Schedule: " + name;
-		std::string command = "echo \"" + message + "\" | mail -s \"" + mysubject + "\" -r RELION " + email_address;
+		std::string command = "echo \"" + message + "\" | mail -s \"" + subject + "\" -r RELION " + scheduler_global_strings["email"].value;
 		int res = system(command.c_str());
 	}
 }
@@ -1812,7 +1830,7 @@ void Schedule::run(PipeLine &pipeline)
 		else if (is_aborted) message = " + Stopping schedule due to user abort of job " + jobs[current_node].current_name + " ...";
 		if (message != "")
 		{
-			sendEmail(message);
+			schedulerSendEmail(message, "Schedule: " + name);
 			std::cout << message << std::endl;
 			is_ok = false;
 			break;
@@ -1822,7 +1840,8 @@ void Schedule::run(PipeLine &pipeline)
 		has_more_jobs = gotoNextJob();
     } // end while has_more_jobs
 
-    if (is_ok) sendEmail("Finished successfully!");
+    if (is_ok) schedulerSendEmail("Finished successfully!", "Schedule: " + name);
+
     if (verb > 0)
     {
     	if (exists(name + RELION_JOB_ABORT_NOW))
