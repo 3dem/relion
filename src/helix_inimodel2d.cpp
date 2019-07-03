@@ -105,6 +105,7 @@ void HelixAligner::parseInitial(int argc, char **argv)
     search_size = textToInteger(parser.getOption("--search_size", "Search this many pixels up/down of the target downscaled size to fit best crossover distance", "5"));
     mask_diameter = textToFloat(parser.getOption("--mask_diameter", "The diameter (A) of a mask to be aplpied to the 2D reconstruction", "-1"));
     nr_threads = textToInteger(parser.getOption("--j", "Number of (openMP) threads", "1"));
+    do_only_make_3d = parser.checkOption("--only_make_3d", "Take the iniref image, and create a 3D model from that without any alignment of the input images");
 
     verb = 1;
 
@@ -124,7 +125,7 @@ void HelixAligner::initialise()
     // Also randomize random-number-generator for perturbations on the angles
     init_random_generator(random_seed);
 
-	if (fn_mics== "")
+	if (fn_imgs!= "")
 	{
 		// Get the image size
 		MetaDataTable MD;
@@ -157,7 +158,7 @@ void HelixAligner::initialise()
 		}
 
 	}
-	else
+	else if (fn_mics != "")
 	{
 		// Read in the micrographs STAR file
 		MDmics.read(fn_mics);
@@ -192,6 +193,43 @@ void HelixAligner::initialise()
 		}
 
 		ori_size = extract_width;
+	}
+	else if (do_only_make_3d && fn_inimodel != "")
+	{
+		Image<RFLOAT> img;
+		img.read(fn_inimodel);
+		img().setXmippOrigin();
+		if (angpix < 0.)
+		{
+			img.MDMainHeader.getValue(EMDL_IMAGE_SAMPLINGRATE_X, angpix);
+			std::cout << " Using pixel size from the input file header: " << angpix << std::endl;
+		}
+		ori_size = XSIZE(img());
+
+		// The 3D reconstruction
+		float deg_per_pixel = 180. * angpix / (crossover_distance);
+		Image<RFLOAT> vol;
+		vol().resize(ori_size, ori_size, ori_size);
+		for (int k = 0; k < ZSIZE(vol()); k++)
+		{
+			float ang = deg_per_pixel * k;
+			Matrix2D<RFLOAT> Arot;
+			rotation2DMatrix(ang, Arot);
+
+			MultidimArray<RFLOAT> Mrot;
+			Mrot.initZeros(img());
+			applyGeometry(img(), Mrot, Arot, true, false);
+			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(Mrot)
+				DIRECT_A3D_ELEM(vol(), k, i, j) = DIRECT_A2D_ELEM(Mrot, i, j);
+		}
+		vol.setSamplingRateInHeader(angpix);
+		vol.write(fn_out + ".mrc");
+		std::cout << " * Written " << fn_out << ".mrc" << std::endl;
+		exit(RELION_EXIT_SUCCESS);
+	}
+	else
+	{
+		REPORT_ERROR("ERROR: provide --i, -mic, or --only_make_3d and --iniref");
 	}
 
 	if (angpix < 0.)

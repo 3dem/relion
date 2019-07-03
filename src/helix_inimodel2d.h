@@ -139,6 +139,9 @@ public:
 	// Filename of initial 2D reconstruction for model
 	FileName fn_inimodel;
 
+	// Only make 3d
+	bool do_only_make_3d;
+
 	// Symmetry order (Cn)
 	int symmetry;
 
