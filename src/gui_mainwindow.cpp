@@ -24,6 +24,7 @@
 
 #define STR_HELPER(x) #x
 #define STR(x) STR_HELPER(x)
+bool show_scheduler;
 
 // The StdOutDisplay allows looking at the entire stdout or stderr file
 int StdOutDisplay::handle(int ev)
@@ -311,6 +312,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	if (fn_sched != "")
 	{
 		show_scheduler = true;
+		create_scheduler_gui = true;
 		schedule.do_read_only = _do_read_only;
 		schedule.setName(fn_sched+"/");
 		pipeline.name = fn_sched+"/schedule";
@@ -328,6 +330,8 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	}
 	else
 	{
+		show_scheduler = false;
+		create_scheduler_gui = false;
 		// Read in the pipeline STAR file if it exists
 		pipeline.name = fn_pipe;
 	}

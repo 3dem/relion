@@ -176,7 +176,7 @@ static void Gui_Timer_CB(void *userdata);
 // Read-only GUI?
 static bool maingui_do_read_only;
 // Show the scheduler view
-//static bool show_scheduler;
+extern bool show_scheduler;
 
 // The pipeline this GUI is acting on
 static PipeLine pipeline;

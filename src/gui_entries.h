@@ -67,8 +67,8 @@
 // forward declaration current_browse_directory, which allows CURRENT_ODIR browse buttons
 extern std::string current_browse_directory;
 
-// Show the scheduler view
-extern bool show_scheduler;
+// Create the scheduler GUI: without sliders or pull-down menus
+extern bool create_scheduler_gui;
 
 
 // Gui layout

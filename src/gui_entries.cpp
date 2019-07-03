@@ -99,13 +99,13 @@ void GuiEntry::clear()
 	*/
 
 }
-bool show_scheduler;
+bool create_scheduler_gui;
 
 void GuiEntry::initialise(int x, int y, Fl_Group * deactivate_this_group, bool _actually_activate, int height, int wcol2, int wcol3)
 {
 
 	// The input field
-	int mywidth = (joboption.joboption_type == JOBOPTION_SLIDER && !show_scheduler) ? 50 : wcol2;
+	int mywidth = (joboption.joboption_type == JOBOPTION_SLIDER && !create_scheduler_gui) ? 50 : wcol2;
 	inp = new Fl_Input(x, y, mywidth, height, joboption.label_gui.c_str());
 	inp->color(GUI_INPUT_COLOR);
 	inp->textsize(ENTRY_FONTSIZE);
@@ -141,7 +141,7 @@ void GuiEntry::initialise(int x, int y, Fl_Group * deactivate_this_group, bool _
 	else if (joboption.joboption_type == JOBOPTION_RADIO || joboption.joboption_type == JOBOPTION_BOOLEAN)
 	{
 
-		if (!show_scheduler)
+		if (!create_scheduler_gui)
 		{
 			choice = new Fl_Choice(XCOL2, y, WCOL2, height);
 			if (joboption.joboption_type == JOBOPTION_RADIO)
@@ -178,7 +178,7 @@ void GuiEntry::initialise(int x, int y, Fl_Group * deactivate_this_group, bool _
 	}
 	else if (joboption.joboption_type == JOBOPTION_SLIDER)
 	{
-		if (!show_scheduler)
+		if (!create_scheduler_gui)
 		{
 			int floatwidth = 50;
 			// Slider is shorter than wcol2, so that underlying input field becomes visible
@@ -380,7 +380,7 @@ void GuiEntry::cb_menu(Fl_Widget* o, void* v) {
 
 void GuiEntry::cb_menu_i()
 {
-	if (!show_scheduler)
+	if (!create_scheduler_gui)
 	{
 		const Fl_Menu_Item* m = menu->mvalue();
 		// Set my own value
@@ -430,7 +430,7 @@ void GuiEntry::cb_input_i() {
 	} else {
 		recurse = 1;
 
-		if (!show_scheduler) slider->value(fltkTextToFloat(inp->value()));         // pass input's value to slider
+		if (!create_scheduler_gui) slider->value(fltkTextToFloat(inp->value()));         // pass input's value to slider
 		recurse = 0;
 	}
 }

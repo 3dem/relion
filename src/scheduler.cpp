@@ -1808,8 +1808,7 @@ void Schedule::run(PipeLine &pipeline)
 		if (verb > 0)
 		{
 			time_t my_time = time(NULL);
-			printf("%s%s", " + ", ctime(&my_time));
-			std::cout << " + Executing Job: " << jobs[current_node].current_name << std::endl;
+			std::cout << " + Executing Job: " << jobs[current_node].current_name << " at " << ctime(&my_time);
 		}
 		jobs[current_node].job_has_started = true;
 
