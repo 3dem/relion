@@ -385,7 +385,6 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 			menubar->add(mylabel.c_str(), 0, cb_toggle_schedule, this);
 		}
 		menubar->add("Scheduling/Copy schedule", 0, cb_copy_schedule, this);
-		menubar->add("Scheduling/_New schedule", 0, cb_create_schedule, this);
 		menubar->add("Scheduling/_Show pipeline",  FL_ALT+'p', cb_toggle_pipeline, this);
 		menubar->add("Scheduling/Run scheduled jobs", 0, cb_start_pipeliner, this);
 		menubar->add("Scheduling/Stop running scheduled jobs", 0, cb_stop_pipeliner, this);
@@ -3283,7 +3282,7 @@ void GuiMainWindow::cb_toggle_schedule_i(bool do_pipeline, FileName fn_new_sched
 		{
 			fn_sched = "Schedules/" + fn_new_schedule;
 			// Also add entry to the menu
-			std::string mylabel = "Scheduling/" + fn_new_schedule;
+			std::string mylabel = "Scheduling/Schedules/" + fn_new_schedule;
 			menubar->add(mylabel.c_str(), 0, cb_toggle_schedule, this);
 		}
 		else
