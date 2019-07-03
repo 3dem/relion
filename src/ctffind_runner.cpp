@@ -251,7 +251,7 @@ void CtffindRunner::initialise()
 
 		if (continue_old)
 		{
-			FileName fn_microot = fn_mic_given_all[imic].without(".mrc");
+			FileName fn_microot = fn_mic_ctf_given_all[imic].without(".mrc");
 			RFLOAT defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep, maxres=-1., valscore = -1., phaseshift = 0.;
 			if (getCtffindResults(fn_microot, defU, defV, defAng, CC,
 			     HT, CS, AmpCnst, XMAG, DStep, maxres, valscore, phaseshift, false)) // false: dont warn if not found Final values
@@ -949,7 +949,6 @@ bool CtffindRunner::getCtffind4Results(FileName fn_microot, RFLOAT &defU, RFLOAT
 
 	FileName fn_root = getOutputFileWithNewUniqueDate(fn_microot, fn_out);
 	FileName fn_log = fn_root + "_ctffind4.log";
-
 	std::ifstream in(fn_log.data(), std::ios_base::in);
 	if (in.fail())
     		return false;
