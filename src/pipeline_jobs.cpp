@@ -2182,7 +2182,7 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 	}
 
 	if (is_continue)
-		command += " --only_extract_unfinished ";
+		command += " --only_do_unfinished ";
 
 
 	// Other arguments for extraction
