@@ -1747,7 +1747,7 @@ void Schedule::run(PipeLine &pipeline)
 
         	// Set the current_name of the current node now
         	jobs[current_node].current_name = pipeline.processList[current_job].name;
-    		if (verb > 0) std::cout << " + Creating new Job: " << jobs[current_node].current_name << " from node " << current_node << std::endl;
+    		if (verb > 0) std::cout << " + Creating new Job: " << jobs[current_node].current_name << " from Node: " << current_node << std::endl;
     	}
     	else if (jobs[current_node].mode == SCHEDULE_NODE_JOB_MODE_CONTINUE || jobs[current_node].mode == SCHEDULE_NODE_JOB_MODE_OVERWRITE)
     	{
