@@ -586,7 +586,7 @@ bool RelionJob::prepareFinalCommand(std::string &outputname, std::vector<std::st
 					(commands[icom]).find("_mpi`") != std::string::npos &&
 					(commands[icom]).find("relion_") != std::string::npos)
 			{
-				
+
 				const char *default_mpirun = getenv("RELION_MPIRUN");
 				if (default_mpirun == NULL)
 				{
@@ -2880,6 +2880,7 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 		inputNodes.push_back(node);
 
 		// CTF stuff
+#ifndef USE_WITHOUT_STRUCTURA_LICENSE
 		if (joboptions["do_ctf_correction"].getBoolean())
 		{
 			command += " --ctf";
@@ -2888,6 +2889,7 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 			if (joboptions["ctf_intact_first_peak"].getBoolean())
 				command += " --ctf_intact_first_peak";
 		}
+#endif
 
 		command += " --K " + joboptions["nr_classes"].getString();
 		command += " --sym " + joboptions["sym_name"].getString();

@@ -1330,6 +1330,25 @@ void JobWindow::initialiseInimodelWindow()
 	group1->end();
 
 	resetHeight();
+
+#ifdef USE_WITHOUT_STRUCTURA_LICENSE
+
+	Fl_Text_Buffer *textbuff1 = new Fl_Text_Buffer();
+	textbuff1->text("CTF-correction is disabled to allow use without Structura license");
+	Fl_Text_Display* textdisp1 = new Fl_Text_Display(XCOL1, current_y, WCOL1+WCOL2+WCOL3, STEPY*1.2);
+	textdisp1->buffer(textbuff1);
+	textdisp1->color(GUI_BACKGROUND_COLOR);
+	current_y += STEPY*1.5;
+
+	place("do_ctf_correction", TOGGLE_ALWAYS_DEACTIVATE);
+
+	group1->begin();
+	place("ctf_phase_flipped", TOGGLE_ALWAYS_DEACTIVATE);
+	place("ctf_intact_first_peak", TOGGLE_ALWAYS_DEACTIVATE);
+	group1->end();
+
+#else
+
 	place("do_ctf_correction", TOGGLE_DEACTIVATE, group1);
 
 	group1->begin();
@@ -1338,6 +1357,8 @@ void JobWindow::initialiseInimodelWindow()
 	group1->end();
 
 	guientries["do_ctf_correction"].cb_menu_i(); // To make default effective
+
+#endif
 
 	tab2->end();
 

@@ -1905,6 +1905,16 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 	if (do_sgd)
 	{
+
+#ifdef USE_WITHOUT_STRUCTURA_LICENSE
+		do_ctf_correction = false;
+		if (verb > 0)
+		{
+			std::cerr << " + Skipping CTF correction in SGD initial model generation to allow use without Structura license." << std::endl;
+			std::cerr << " + Note that the output map will not be CTF-corrrected, and this should be specified for subsequent refinement." << std::endl;
+		}
+#endif
+
 		sgd_inires_pix = mymodel.getPixelFromResolution(1./sgd_ini_resol);
 		sgd_finres_pix = mymodel.getPixelFromResolution(1./sgd_fin_resol);
 		// for continuation jobs (iter>0): could do some more iterations as specified by nr_iter
@@ -2742,7 +2752,7 @@ void MlOptimiser::expectation()
 			catch (std::bad_alloc& ba)
 			{
 				CRITICAL(RAMERR);
-			}			
+			}
 
 			std::complex<XFLOAT> *pData = mdlClassComplex[iclass];
 
@@ -8209,7 +8219,7 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_ori_particle,
 								getline(split, fn_ctf);
 						}
 						Ictf.read(fn_ctf);
-						
+
 						// If there is a redundant half, get rid of it
 						if (XSIZE(Ictf()) == YSIZE(Ictf()))
 						{

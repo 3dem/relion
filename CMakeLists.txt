@@ -79,6 +79,7 @@ endif(NOT DEFINED CUDA_ARCH)
     
 # -------------------------------------------------------------------FURTHER OPTIONS--
 
+
 # CUDA on by default, so check for CPU-accelration request and possible conflicting dual-request
 option(ALTCPU "Enable Accelerated CPU version" OFF)
 if(ALTCPU)
@@ -94,6 +95,14 @@ option(DoublePrec_CPU "DoublePrec_CPU" ON)
 option(DoublePrec_ACC "Accelerated Code use double-precision" OFF)
 option(MKLFFT "Use MKL rather than FFTW for FFT" OFF)
 option(CudaTexture "CudaTexture" ON)
+# Special flag for commercial use of RELION: switch off CTF-correction to circumvent SGD patent
+option(USE_WITHOUT_STRUCTURA_LICENSE "Enable version that does not need Structura license for commercial use" OFF)
+
+if(USE_WITHOUT_STRUCTURA_LICENSE)
+    message(STATUS "USE_WITHOUT_STRUCTURA_LICENSE enabled - This build of RELION can be used for commercial use without the need for a Structura license")
+else()
+    message(STATUS "USE_WITHOUT_STRUCTURA_LICENSE disabled - This build of RELION cannot be used for commercial use without a Structura license")
+endif()
 
 if(ALTCPU)
     message(STATUS "ALTCPU enabled - Building CPU-accelerated version of RELION")
@@ -253,6 +262,10 @@ if(ALTCPU)
     add_definitions(-DALTCPU)
 endif()
 
+if(USE_WITHOUT_STRUCTURA_LICENSE)
+    add_definitions(-DUSE_WITHOUT_STRUCTURA_LICENSE)
+endif()
+
 # ---------------------------------------------------------------USE TEXTURES OR NOT--
 if(NOT CudaTexture OR ALTCPU)
     add_definitions(-DPROJECTOR_NO_TEXTURES)
@@ -373,6 +386,7 @@ ADD_SUBDIRECTORY(src/apps)
 
 #message(STATUS "CUDA option = ${CUDA}")
 #message(STATUS "ALTCPU option = ${ALTCPU}")
+#message(STATUS "USE_WITHOUT_STRUCTURA_LICENSE option = ${USE_WITHOUT_STRUCTURA_LICENSE}")
 #message(STATUS "DoublePrec_CPU option = ${DoublePrec_CPU}")
 #message(STATUS "DoublePrec_ACC option = ${DoublePrec_ACC}")
 #message(STATUS "MKLFFT option = ${MKLFFT}")
