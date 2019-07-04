@@ -529,7 +529,7 @@ void JobWindow::initialiseMotioncorrWindow()
 	group1->end();
 
 	guientries["do_dose_weighting"].cb_menu_i(); // make default active
-	
+
 	group2 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group2->end();
 	place("save_ps", TOGGLE_DEACTIVATE, group2);
@@ -1299,12 +1299,6 @@ void JobWindow::initialiseInimodelWindow()
 	current_y += STEPY/2;
 
 	place("sgd_sigma2fudge_halflife", TOGGLE_DEACTIVATE);
-
-	// Add a little spacer
-	current_y += STEPY/2;
-
-	place("sem_instead_of_sgd", TOGGLE_DEACTIVATE);
-
 
 	tab4->end();
 
