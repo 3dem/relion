@@ -2881,15 +2881,13 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 		inputNodes.push_back(node);
 
 		// CTF stuff
-#ifndef USE_WITHOUT_STRUCTURA_LICENSE
-		if (joboptions["do_ctf_correction"].getBoolean())
-		{
-			command += " --ctf";
-			if (joboptions["ctf_phase_flipped"].getBoolean())
-				command += " --ctf_phase_flipped";
-			if (joboptions["ctf_intact_first_peak"].getBoolean())
-				command += " --ctf_intact_first_peak";
-		}
+#ifdef ALLOW_CTF_IN_SGD
+                if (joboptions["do_ctf_correction"].getBoolean())
+                {
+                        command += " --ctf";
+                        if (joboptions["ctf_intact_first_peak"].getBoolean())
+                                command += " --ctf_intact_first_peak";
+                }
 #endif
 
 		command += " --K " + joboptions["nr_classes"].getString();

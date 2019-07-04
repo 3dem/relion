@@ -95,13 +95,12 @@ option(DoublePrec_CPU "DoublePrec_CPU" ON)
 option(DoublePrec_ACC "Accelerated Code use double-precision" OFF)
 option(MKLFFT "Use MKL rather than FFTW for FFT" OFF)
 option(CudaTexture "CudaTexture" ON)
-# Special flag for commercial use of RELION: switch off CTF-correction to circumvent SGD patent
-option(USE_WITHOUT_STRUCTURA_LICENSE "Enable version that does not need Structura license for commercial use" OFF)
+option(ALLOW_CTF_IN_SGD "Allow CTF-modulation in SGD, as specified in Claim 1 of patent US10,282,513B2" ON)
 
-if(USE_WITHOUT_STRUCTURA_LICENSE)
-    message(STATUS "USE_WITHOUT_STRUCTURA_LICENSE enabled - This build of RELION can be used for commercial use without the need for a Structura license")
+if(ALLOW_CTF_IN_SGD)
+    message(STATUS "ALLOW_CTF_IN_SGD enabled - This build of RELION allows modulation of particle images by a contrast transfer function, as specified in Claim 1 of patent US10,282,513B2")
 else()
-    message(STATUS "USE_WITHOUT_STRUCTURA_LICENSE disabled - This build of RELION cannot be used for commercial use without a Structura license")
+    message(STATUS "ALLOW_CTF_IN_SGD disabled - This build of RELION does not allow modulation of particle images by a contrast transfer function, as specified in Claim 1 of patent US10,282,513B2")
 endif()
 
 if(ALTCPU)
@@ -269,8 +268,8 @@ if(ALTCPU)
     add_definitions(-DALTCPU)
 endif()
 
-if(USE_WITHOUT_STRUCTURA_LICENSE)
-    add_definitions(-DUSE_WITHOUT_STRUCTURA_LICENSE)
+if(ALLOW_CTF_IN_SGD)
+    add_definitions(-DALLOW_CTF_IN_SGD)
 endif()
 
 # ---------------------------------------------------------------USE TEXTURES OR NOT--
@@ -379,8 +378,7 @@ if(INSTALL_OWN_FLTK)
 endif()
 
 # -----------------------------------------------------------------RELION COMPONENTS--
-option(BUILD_SHARED_LIBS "BUILD_SHARED_LIBS" ON)
-set(BUILD_SHARED_LIBS OFF)
+option(BUILD_SHARED_LIBS "BUILD_SHARED_LIBS" OFF)
 message("BUILD_SHARED_LIBS = ${BUILD_SHARED_LIBS}")
 if(BUILD_SHARED_LIBS)
     message(STATUS "Building shared libs (smaller build size and binaries)")
@@ -393,7 +391,7 @@ ADD_SUBDIRECTORY(src/apps)
 
 #message(STATUS "CUDA option = ${CUDA}")
 #message(STATUS "ALTCPU option = ${ALTCPU}")
-#message(STATUS "USE_WITHOUT_STRUCTURA_LICENSE option = ${USE_WITHOUT_STRUCTURA_LICENSE}")
+#message(STATUS "ALLOW_CTF_IN_SGD option = ${ALLOW_CTF_IN_SGD}")
 #message(STATUS "DoublePrec_CPU option = ${DoublePrec_CPU}")
 #message(STATUS "DoublePrec_ACC option = ${DoublePrec_ACC}")
 #message(STATUS "MKLFFT option = ${MKLFFT}")

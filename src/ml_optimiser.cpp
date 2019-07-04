@@ -1906,11 +1906,11 @@ void MlOptimiser::initialiseGeneral(int rank)
 	if (do_sgd)
 	{
 
-#ifdef USE_WITHOUT_STRUCTURA_LICENSE
+#ifndef ALLOW_CTF_IN_SGD
 		do_ctf_correction = false;
 		if (verb > 0)
 		{
-			std::cerr << " + Skipping CTF correction in SGD initial model generation to allow use without Structura license." << std::endl;
+			std::cerr << " + Skipping CTF-modulation in SGD, as mentioned in Claim 1 of patent US10,282,513B2." << std::endl;
 			std::cerr << " + Note that the output map will not be CTF-corrrected, and this should be specified for subsequent refinement." << std::endl;
 		}
 #endif
