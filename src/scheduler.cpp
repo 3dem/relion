@@ -84,8 +84,6 @@ std::string SchedulerOperator::initialise(std::string _type, std::string _input1
 		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX ||
 		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN ||
 		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_AVG ||
-		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX_IDX ||
-		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN_IDX ||
 		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_SORT_IDX
 		 ) && !isFloatVariable(_output))
 		return "ERROR: float operator does not have valid float output: " + _output;
@@ -120,8 +118,6 @@ std::string SchedulerOperator::initialise(std::string _type, std::string _input1
 		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX ||
 		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN ||
 		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_AVG ||
-		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX_IDX ||
-		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN_IDX ||
 		 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_SORT_IDX ||
 		 type == SCHEDULE_STRING_OPERATOR_READ_STAR ||
 		 type == SCHEDULE_STRING_OPERATOR_JOIN ||
@@ -235,8 +231,6 @@ void  SchedulerOperator::readFromStarFile() const
 	else if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX ||
 			type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN ||
 			type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_AVG ||
-			type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX_IDX ||
-			type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN_IDX ||
 			type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_SORT_IDX)
 	{
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
@@ -279,8 +273,6 @@ void  SchedulerOperator::readFromStarFile() const
 		if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX) scheduler_global_floats[output].value = mymax;
 		else if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN) scheduler_global_floats[output].value = mymin;
 		else if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_AVG) scheduler_global_floats[output].value = mysum;
-		else if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX_IDX) scheduler_global_floats[output].value = idxmax;
-		else if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN_IDX) scheduler_global_floats[output].value = idxmin;
 		else if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_SORT_IDX)
 		{
 			if (idx == 0) REPORT_ERROR("Give a positive or a negative value for input2 in sorted_idx: 1 is largest, -1 is smallest value");
@@ -341,8 +333,6 @@ bool SchedulerOperator::performOperation() const
 			 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX ||
 			 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN ||
 			 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_AVG ||
-			 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX_IDX ||
-			 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN_IDX ||
 			 type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_SORT_IDX
 			 )
 	{
@@ -565,8 +555,6 @@ std::string SchedulerOperator::getName()
 	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX) return output + "=" + "STAR_MAX_" + input1;
 	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN) return output + "=" + "STAR_MIN_" + input1;
 	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_AVG) return output + "=" + "STAR_AVG_" + input1;
-	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MAX_IDX) return output + "=" + "STAR_IDX_MAX_" + input1;
-	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_MIN_IDX) return output + "=" + "STAR_IDX_MIN_" + input1;
 	if (type == SCHEDULE_FLOAT_OPERATOR_READ_STAR_TABLE_SORT_IDX) return output + "=" + "STAR_SORT_IDX_" + input1 + "_" + input2;
 	if (type == SCHEDULE_STRING_OPERATOR_JOIN) return output + "=" + "JOIN_" + input1 + "_" + input2;
 	if (type == SCHEDULE_STRING_OPERATOR_BEFORE_FIRST) return output + "=" + "BEF_FIRST_" + input1 + "_" + input2;
