@@ -1404,6 +1404,14 @@ def WaitForJob(wait_for_this_job, seconds_wait):
             CheckForExit()
             time.sleep(seconds_wait)
 
+def find_split_job_output(prefix, n, max_digits=6):
+    import os.path
+    for i in xrange(max_digits):
+        filename = prefix + str(n).rjust(i, '0') + '.star'
+        if os.path.isfile(filename):
+            return filename
+    return None
+
 def writeManualPickingGuiFile(my_part_diam):
     if not os.path.isfile('.gui_manualpickrun.job'):
         with open('.gui_manualpickrun.job', 'w') as g:
@@ -1776,9 +1784,10 @@ def run_pipeline(opts):
             
             # It could be that this is a restart, so check previous_batch1_size in the output directory.
             # Also check the presence of class2d_job_batch_001 in case the first job was not submitted yet.
+            first_split_file = find_split_job_output(split_job + 'particles_split', 1)
             if getJobName("class2d_job_batch_001", SETUP_CHECK_FILE) is not None and \
-               os.path.isfile(split_job + 'particles_split001.star'):
-                batch1 = safe_load_star(split_job + 'particles_split001.star', expected=['', 'rlnMicrographName'])
+               first_split_file is not None:
+                batch1 = safe_load_star(first_split_file, expected=['', 'rlnMicrographName'])
                 previous_batch1_size = len(batch1['']['rlnMicrographName'])
             else:
                 previous_batch1_size = 0
@@ -1790,7 +1799,7 @@ def run_pipeline(opts):
                 nr_batches = len(glob.glob(split_job + "particles_split*.star"))
                 for ibatch  in range(0, nr_batches):
                     iibatch = ibatch + 1
-                    batch_name = split_job + 'particles_split%03d.star' % iibatch
+                    batch_name = find_split_job_output(split_job + "particles_split", iibatch)
 
                     batch = safe_load_star(batch_name, expected=['', 'rlnMicrographName'])
                     batch_size = len(batch['']['rlnMicrographName'])

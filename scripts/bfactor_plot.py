@@ -253,6 +253,14 @@ def WaitForJob(wait_for_this_job, seconds_wait):
             CheckForExit()
             time.sleep(seconds_wait)
 
+def find_split_job_output(prefix, n, max_digits=6):
+    import os.path
+    for i in xrange(max_digits):
+        filename = prefix + str(n).rjust(i, '0') + '.star'
+        if os.path.isfile(filename):
+            return filename
+    return None
+
 def line_fit(xs, ys):
     n = len(xs)
     assert n == len(ys)
@@ -343,7 +351,9 @@ def run_pipeline(opts):
             WaitForJob(split_job, 30)
 
         # B. Run Refine3D
-        refine_options = ['Input images STAR file: == {}particles_split001.star'.format(split_job),
+        split_filename = find_split_job_output('{}particles_split'.format(split_job), 1)
+        assert split_filename is not None
+        refine_options = ['Input images STAR file: == {}'.format(split_filename),
                           'Number of pooled particles: == {}'.format(opts.refine_nr_pool),
                           'Which GPUs to use: == {}'.format(opts.refine_gpu),
                           'Number of MPI procs: == {}'.format(opts.refine_mpi),
