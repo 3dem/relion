@@ -406,22 +406,22 @@ void MlOptimiserMpi::initialise()
 		{
 			if (!node->isMaster())
 			{
-				size_t boxLim (10000);
+				unsigned long long boxLim (10000);
 				for (int i = 0; i < cudaDevices.size(); i ++)
 				{
 					MlDeviceBundle b(this);
 					b.setDevice(cudaDevices[i]);
-					size_t t = b.checkFixedSizedObjects(cudaDeviceShares[i]);
+					unsigned long long t = b.checkFixedSizedObjects(cudaDeviceShares[i]);
 					boxLim = ((t < boxLim) ? t : boxLim );
 				}
-				node->relion_MPI_Send(&boxLim, sizeof(size_t), MPI_INT, 0, MPITAG_INT, MPI_COMM_WORLD);
+				node->relion_MPI_Send(&boxLim, 1, MPI_UNSIGNED_LONG_LONG, 0, MPITAG_INT, MPI_COMM_WORLD);
 			}
 			else
 			{
-				size_t boxLim, LowBoxLim(10000);
+				unsigned long long boxLim, LowBoxLim(10000);
 				for(int slave = 1; slave < node->size; slave++)
 				{
-					node->relion_MPI_Recv(&boxLim, sizeof(size_t), MPI_INT, slave, MPITAG_INT, MPI_COMM_WORLD, status);
+					node->relion_MPI_Recv(&boxLim, 1, MPI_UNSIGNED_LONG_LONG, slave, MPITAG_INT, MPI_COMM_WORLD, status);
 					LowBoxLim = (boxLim < LowBoxLim ? boxLim : LowBoxLim );
 				}
 
@@ -805,6 +805,9 @@ void MlOptimiserMpi::expectation()
 
 				int sender = (i)%(node->size - 1); // which rank did the heavy lifting? -> sender of information
 				{
+#ifdef MPI_DEBUG
+					std::cout << "relion_MPI_Bcast debug: rank = " << node->rank << " i = " << i << " MULTIDIM_SIZE(mymodel.PPref[i].data) = " << MULTIDIM_SIZE(mymodel.PPref[i].data) << " sender = " << sender << " slaveC = " << node->slaveC << std::endl;
+#endif
 					// Communicating over all slaves means we don't have to allocate on the master.
 					node->relion_MPI_Bcast(MULTIDIM_ARRAY(mymodel.PPref[i].data),
 							MULTIDIM_SIZE(mymodel.PPref[0].data), MY_MPI_COMPLEX, sender, node->slaveC);

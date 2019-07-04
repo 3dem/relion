@@ -783,7 +783,7 @@ void Experiment::copyParticlesToScratch(int verb, bool do_copy, bool also_do_ctf
 
 	if (do_copy && nr_parts_on_scratch>1)
 	{
-		std::string command = " chmod 777 " + fn_scratch + "particle*";
+		std::string command = " chmod -R 777 " + fn_scratch + "/";
 		if (system(command.c_str()))
 			REPORT_ERROR("ERROR in executing: " + command);
 	}

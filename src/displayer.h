@@ -185,10 +185,10 @@ public:
 
 	void SetScroll(Fl_Scroll *val) { scroll = val; }
 
-	int fill(MetaDataTable &MDin, EMDLabel display_label, bool _do_apply_orient, RFLOAT _minval, RFLOAT _maxval,
+	void fill(MetaDataTable &MDin, EMDLabel display_label, bool _do_apply_orient, RFLOAT _minval, RFLOAT _maxval,
 			RFLOAT _sigma_contrast, RFLOAT _scale, int _ncol, bool do_recenter = false, long int max_images = -1,
 			RFLOAT lowpass = -1.0, RFLOAT highpass = -1.0);
-	int fill(MultidimArray<RFLOAT> &image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale = 1.);
+	void fill(MultidimArray<RFLOAT> &image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale = 1.);
 
 private:
 	void getImageContrast(MultidimArray<RFLOAT> &image, RFLOAT &minval, RFLOAT &maxval, RFLOAT &sigma_contrast);
@@ -628,7 +628,7 @@ public:
 	void initialise();
 
 	// Decide what to do
-	int run();
+	void run();
 
 	// run the GUI
 	int runGui();

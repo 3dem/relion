@@ -10,7 +10,7 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  *
  * This complete copyright notice must be included in any revised version of the
@@ -87,10 +87,10 @@
  * // Part to be measured
  * for (int i=0; i<60; i++)
  * {
- *     ...
- *     // Compute the time to go with the fraction of work already done
- *     to_go = time_to_go(t0, (float) (i + 1) / 60);
- *     std::cout << "I think you will be here " << to_go << "seconds more\n";
+ *	   ...
+ *	   // Compute the time to go with the fraction of work already done
+ *	   to_go = time_to_go(t0, (float) (i + 1) / 60);
+ *	   std::cout << "I think you will be here " << to_go << "seconds more\n";
  * }
  * @endcode
  *
@@ -108,8 +108,8 @@
  * // Part to be measured
  * for (int i=0; i<60; i++)
  * {
- *     ...
- *     progress_bar(i+1);
+ *	   ...
+ *	   progress_bar(i+1);
  * }
  *
  * // In this case the following call is useless since it has been
@@ -242,42 +242,42 @@ void progress_bar(long act_time);
 class Timer
 {
 public:
-    ///Start times for all individual timers
-    std::vector<timeval> start_times;
+	///Start times for all individual timers
+	std::vector<timeval> start_times;
 
-    // General end time
-    timeval end_time;
+	// General end time
+	timeval end_time;
 
-    // How many times has each tic/toc been called.
-    std::vector<int> counts;
+	// How many times has each tic/toc been called.
+	std::vector<int> counts;
 
-    // Total number of microseconds
-    std::vector< long int> times;
+	// Total number of microseconds
+	std::vector< long int> times;
 
-    // Labels
-    std::vector<std::string> tags;
+	// Labels
+	std::vector<std::string> tags;
 
-    Timer()
-    {
-        clear();
-    }
+	Timer()
+	{
+		clear();
+	}
 
-    ~Timer()
-    {
-        clear();
-    }
+	~Timer()
+	{
+		clear();
+	}
 
-    void clear();
+	void clear();
 
-    void initZero();
+	void initZero();
 
-    int setNew(const std::string tag);
+	int setNew(const std::string tag);
 
-    void tic(int timer);
+	void tic(int timer);
 
-    int toc(int timer);
+	void toc(int timer);
 
-    void printTimes(bool doClear);
+	void printTimes(bool doClear);
 };
 
 

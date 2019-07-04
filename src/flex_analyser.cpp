@@ -686,10 +686,12 @@ void FlexAnalyser::subtractOneParticle(long int ori_particle, long int imgno, in
 		normalise(img, bg_radius, -1, -1, false);
 	}
 
+	// Set the original image name
+	DFo.setValue(EMDL_IMAGE_ORI_NAME, fn_img);
 	// Now write it all out
 	if (model.data_dim == 3)
 	{
-		fn_img.compose(fn_out, imgno+1,"mrc");
+		fn_img.compose(fn_out, imgno + 1, "mrc");
 		img.write(fn_img);
 	}
 	else
@@ -703,13 +705,13 @@ void FlexAnalyser::subtractOneParticle(long int ori_particle, long int imgno, in
 		} else {
 			fn_stack = fn_out + "_subtracted.mrcs";
 		}
-		fn_img.compose(imgno+1,fn_stack);
+		fn_img.compose(imgno + 1, fn_stack);
 		if (imgno == 0)
 			img.write(fn_img, -1, false, WRITE_OVERWRITE);
 		else
 			img.write(fn_img, -1, false, WRITE_APPEND);
 	}
-	DFo.setValue(EMDL_IMAGE_NAME,fn_img);
+	DFo.setValue(EMDL_IMAGE_NAME, fn_img);
 }
 
 void FlexAnalyser::make3DModelOneParticle(long int ori_particle, long int imgno, std::vector<double> &datarow, int rank, int size)

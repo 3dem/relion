@@ -157,7 +157,7 @@ class NewFFT
 		}
 		
 		template<class T>
-		static bool resizeRealToMatch(
+		static void resizeRealToMatch(
 				MultidimArray<T>& real,
 				const MultidimArray<tComplex<T>>& complex)
 		{
@@ -165,7 +165,7 @@ class NewFFT
 		}
 		
 		template<class T>
-		static bool resizeComplexToMatch(
+		static void resizeComplexToMatch(
 				const MultidimArray<T>& real,
 				MultidimArray<tComplex<T>>& complex)
 		{

@@ -419,9 +419,11 @@ class star_handler_parameters
 		// We have to write split001 the last. Otherwise the pipeliner might think
 		// the split job has finished while we are still writing subsequent files.
 		FileName fnt0;
+		fnt0 = integerToString(nr_split);
+		const int n_digits = fnt0.length();
 		for (int isplit = 0; isplit < nr_split; isplit ++)
 		{
-			FileName fnt = fn_out.insertBeforeExtension("_split"+integerToString(isplit+1,3));
+			FileName fnt = fn_out.insertBeforeExtension("_split"+integerToString(isplit + 1, n_digits));
 			if (isplit == 0)
 			{
 				fnt0 = fnt;
@@ -434,7 +436,10 @@ class star_handler_parameters
 		if (nr_split > 0)
 		{
 			std::rename((fnt0 + ".tmp").c_str(), fnt0.c_str());
+			std::cout << " Renamed " << (fnt0 + ".tmp") << " to " << fnt0 << std::endl;
 		}
+
+		std::cout << " NOTE: The split job has finished successfully. If the GUI does not detect it (a known problem to be fixed in 3.1), please 'Mark as finished' from the 'Job actions' menu." << std::endl;
 	}
 
 	void operate()

@@ -950,7 +950,7 @@ void MlOptimiser::read(FileName fn_in, int rank)
 	// Set up the bodies in the model, if this is a continuation of a multibody refinement (otherwise this is done in initialiseGeneral)
     if (fn_body_masks != "None")
     {
-    	mymodel.initialiseBodies(fn_body_masks, fn_out);
+    	mymodel.initialiseBodies(fn_body_masks, fn_out, false, rank); // also_initialise_rest = false
 
     	if (mymodel.nr_bodies != mydata.nr_bodies)
     		REPORT_ERROR("ERROR: Unequal number of bodies in model.star and data.star files!");
@@ -1610,7 +1610,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 			REPORT_ERROR("ERROR: One has to use split random halves with multi-body refinement!");
 
 		// This reads the masks, calculates com_bodies and orient_bodies
-		mymodel.initialiseBodies(fn_body_masks, fn_out, true);
+		mymodel.initialiseBodies(fn_body_masks, fn_out, true, rank);
 		mymodel.writeBildFileBodies(fn_out + "_bodies.bild");
 
 		// For multi-body refinement: expand the MetaDataTables with orientations for all bodies
@@ -2008,30 +2008,30 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 {
 
 #ifdef DEBUG_INI
-    std::cerr<<"MlOptimiser::calculateSumOfPowerSpectraAndAverageImage Entering"<<std::endl;
+	std::cerr<<"MlOptimiser::calculateSumOfPowerSpectraAndAverageImage Entering"<<std::endl;
 #endif
 
-    int barstep, my_nr_ori_particles = my_last_ori_particle_id - my_first_ori_particle_id + 1;
-    if (my_nr_ori_particles < 1)
-    {
-    	// Master doesn't do anything here...
-    	// But still set Mavg the right size for AllReduce later on
-    	FileName fn_img;
-    	mydata.MDimg.getValue(EMDL_IMAGE_NAME, fn_img, 0);
-    	Image<RFLOAT> img;
-    	img.read(fn_img, false); // don't read data
-    	Mavg.initZeros(img());
-    	return;
-    }
+	int barstep, my_nr_ori_particles = my_last_ori_particle_id - my_first_ori_particle_id + 1;
+	if (my_nr_ori_particles < 1)
+	{
+		// Master doesn't do anything here...
+		// But still set Mavg the right size for AllReduce later on
+		FileName fn_img;
+		mydata.MDimg.getValue(EMDL_IMAGE_NAME, fn_img, 0);
+		Image<RFLOAT> img;
+		img.read(fn_img, false); // don't read data
+		Mavg.initZeros(img());
+		return;
+	}
 
-    if (myverb > 0)
+	if (myverb > 0)
 	{
 		std::cout << " Estimating initial noise spectra " << std::endl;
 		init_progress_bar(my_nr_ori_particles);
 		barstep = XMIPP_MAX(1, my_nr_ori_particles / 60);
 	}
 
-    // Only open stacks once and then read multiple images
+	// Only open stacks once and then read multiple images
 	fImageHandler hFile;
 	long int dump;
 	FileName fn_open_stack="";
@@ -2041,7 +2041,7 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 	FileName fn_img, fn_stack;
 	// For spectrum calculation: recycle the transformer (so do not call getSpectrum all the time)
 	MultidimArray<Complex > Faux;
-    FourierTransformer transformer;
+	FourierTransformer transformer;
 	MetaDataTable MDimg;
 
 	// Start reconstructions at ini_high or 0.07 digital frequencies....
@@ -2067,8 +2067,18 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 			MDimg = mydata.getMetaDataImage(part_id);
 
 			if (!mydata.getImageNameOnScratch(part_id, fn_img))
+			{
 				MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
-
+			}
+			else if (!do_parallel_disc_io)
+			{
+				// When not doing parallel disk IO,
+				// only those MPI processes running on the same node as the master have scratch.
+				fn_img.decompose(dump, fn_stack);
+				if (!exists(fn_stack))
+					MDimg.getValue(EMDL_IMAGE_NAME, fn_img);
+			}
+			
 			// May24,2015 - Shaoda & Sjors, Helical refinement
 			if (is_helical_segment)
 			{
@@ -2085,17 +2095,17 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 			}
 
 			// Read image from disc
-            Image<RFLOAT> img;
+			Image<RFLOAT> img;
 			if (do_preread_images && do_parallel_disc_io)
-            {
-                img().reshape(mydata.particles[part_id].img);
+			{
+ 				img().reshape(mydata.particles[part_id].img);
 				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mydata.particles[part_id].img)
 				{
-                	DIRECT_MULTIDIM_ELEM(img(), n) = (RFLOAT)DIRECT_MULTIDIM_ELEM(mydata.particles[part_id].img, n);
+				 	DIRECT_MULTIDIM_ELEM(img(), n) = (RFLOAT)DIRECT_MULTIDIM_ELEM(mydata.particles[part_id].img, n);
 				}
-            }
-            else
-            {
+			}
+			else
+			{
 				fn_img.decompose(dump, fn_stack);
 				if (fn_stack != fn_open_stack)
 				{
@@ -2103,8 +2113,8 @@ void MlOptimiser::calculateSumOfPowerSpectraAndAverageImage(MultidimArray<RFLOAT
 					fn_open_stack = fn_stack;
 				}
 				img.readFromOpenFile(fn_img, hFile, -1, false);
-                img().setXmippOrigin();
-            }
+				img().setXmippOrigin();
+			}
 
 			// May24,2015 - Shaoda & Sjors, Helical refinement
 			// Check that the average in the noise area is approximately zero and the stddev is one

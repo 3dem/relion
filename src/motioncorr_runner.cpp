@@ -1218,7 +1218,11 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	// Setup grouping
 	logfile << "Frame grouping: n_frames = " << n_frames << ", requested group size = " << group << std::endl;
 	const int n_groups = n_frames / group;
-	if (n_groups < 3) REPORT_ERROR("Too few frames (< 3) after grouping.");
+	if (n_groups < 3) 
+	{
+		std::cerr << "Skipped " << fn_mic << ": too few frames (" << n_groups << " < 3) after grouping . Probably the movie is truncated or you made a mistake in frame grouping." << std::endl;
+		return false;
+	}
 	int n_remaining = n_frames % group;
 	std::vector<int> group_start(n_groups, 0), group_size(n_groups, group);
 	while (n_remaining > 0) {
@@ -1634,22 +1638,24 @@ skip_fitting:
 		// Final output
                 Iref.setSamplingRateInHeader(output_angpix, output_angpix);
 		Iref.write(!do_dose_weighting ? fn_avg : fn_avg_noDW);
-		logfile << "Written aligned but non-dose weighted sum to " << fn_avg_noDW << std::endl;
+		logfile << "Written aligned but non-dose weighted sum to " << (!do_dose_weighting ? fn_avg : fn_avg_noDW) << std::endl;
 	}
 
 	// Dose weighting
 	if (do_dose_weighting) {
 		RCTIC(TIMING_DOSE_WEIGHTING);
-		if (std::abs(voltage - 300) > 2 && std::abs(voltage - 200) > 2) {
-			REPORT_ERROR("Sorry, dose weighting is supported only for 300 kV or 200 kV");
+		if (std::abs(voltage - 300) > 2 && std::abs(voltage - 200) > 2 && std::abs(voltage - 100) > 2) {
+			REPORT_ERROR("Sorry, dose weighting is supported only for 300, 200 or 100 kV");
 		}
 
 		std::vector <RFLOAT> doses(n_frames);
 		for (int iframe = 0; iframe < n_frames; iframe++) {
 			// dose AFTER each frame.
 			doses[iframe] = pre_exposure + dose_per_frame * (frames[iframe] + 1);
-			if (std::abs(voltage - 200) <= 5) {
+			if (std::abs(voltage - 200) <= 2) {
 				doses[iframe] /= 0.8; // 200 kV electron is more damaging.
+			} else if (std::abs(voltage - 100) <= 2) {
+				doses[iframe] /= 0.64; // 100 kV electron is much more damaging.
 			}
 		}
 

@@ -96,7 +96,7 @@ class RefinementProgram
         int init(int argc, char *argv[]);
         int run();
 
-        virtual int readMoreOptions(IOParser& parser, int argc, char *argv[]) {}
+        virtual int readMoreOptions(IOParser& parser, int argc, char *argv[]) {return 0;}
         virtual int _init(){return 0;}
         virtual int _run() = 0;
 
