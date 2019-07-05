@@ -82,6 +82,7 @@ void Reconstructor::read(int argc, char **argv)
 	fn_noise = parser.getOption("--reconstruct_noise","Reconstruct noise using sigma2 values in this model STAR file", "");
 	read_weights = parser.checkOption("--read_weights", "Developmental: read freq. weight files");
 	do_debug = parser.checkOption("--write_debug_output", "Write out arrays with data and weight terms prior to reconstruct");
+	do_external_reconstruct = parser.checkOption("--external_reconstruct", "Write out BP denominator and numerator for external_reconstruct program");
 	verb = textToInteger(parser.getOption("--verb", "Verbosity", "1"));
 
 	// Hidden
@@ -736,7 +737,17 @@ void Reconstructor::reconstruct()
 
 		MultidimArray<RFLOAT> tau2;
 		if (do_use_fsc) backprojector.updateSSNRarrays(1., tau2, dummy, dummy, dummy, fsc, do_use_fsc, true);
-		backprojector.reconstruct(vol(), iter, do_map, tau2);
+
+		if (do_external_reconstruct)
+		{
+			backprojector.externalReconstruct(vol(),
+					fn_out.withoutExtension(),
+					tau2, 1., 1);
+		}
+		else
+		{
+			backprojector.reconstruct(vol(), iter, do_map, tau2);
+		}
 	}
 
 
