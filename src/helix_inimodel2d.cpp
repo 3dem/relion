@@ -864,7 +864,8 @@ void HelixAligner::expectationOneParticleNoFFT(long int ipart)
 	// Now set the optimal Y-translations and rotations in the output STAR file
 	RFLOAT yoff, psi;
 	psi = ori_psis[ipart] + psis[best_k_rot];
-	yoff = ori_yoffs[ipart] -best_i_offset * down_angpix;
+	yoff = ori_yoffs[ipart] + best_i_offset * down_angpix;
+
 	MD.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff, ipart);
 	MD.setValue(EMDL_ORIENT_PSI, psi, ipart);
 
