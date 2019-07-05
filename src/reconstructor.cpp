@@ -740,8 +740,9 @@ void Reconstructor::reconstruct()
 
 		if (do_external_reconstruct)
 		{
+			FileName fn_root = fn_out.withoutExtension();
 			backprojector.externalReconstruct(vol(),
-					fn_out.withoutExtension(),
+					fn_root,
 					tau2, 1., 1);
 		}
 		else
