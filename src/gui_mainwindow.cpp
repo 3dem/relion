@@ -703,6 +703,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	textbuffvar->text("Variables");
 	Fl_Text_Display* textdispvar = new Fl_Text_Display(XJOBCOL1, GUIHEIGHT_EXT_START, JOBCOLWIDTH-105, 23);
 	textdispvar->buffer(textbuffvar);
+	textdispvar->textsize(12);
 	textdispvar->color(GUI_BACKGROUND_COLOR);
 	scheduler_variable_name = new Fl_Input(XJOBCOL1, GUIHEIGHT_EXT_START+23, JOBCOLWIDTH*0.4, 21);
     scheduler_variable_name->color(GUI_INPUT_COLOR);
@@ -734,6 +735,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	textbuffnode->text("Operators");
 	Fl_Text_Display* textdispnode = new Fl_Text_Display(XJOBCOL1, GUIHEIGHT_EXT_START + height_var, JOBCOLWIDTH-105, 23);
 	textdispnode->buffer(textbuffnode);
+	textdispnode->textsize(12);
 	textdispnode->color(GUI_BACKGROUND_COLOR);
 	scheduler_operator_type = new Fl_Choice(XJOBCOL1, GUIHEIGHT_EXT_START+23 + height_var, JOBCOLWIDTH/2 + 10, 21);
     scheduler_operator_type->color(GUI_INPUT_COLOR);
@@ -774,18 +776,21 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	textbuff3s->text("Jobs");
 	Fl_Text_Display* textdisp3s = new Fl_Text_Display(XJOBCOL2, GUIHEIGHT_EXT_START, JOBCOLWIDTH-50, 23);
 	textdisp3s->buffer(textbuff3s);
+	textdisp3s->textsize(12);
 	textdisp3s->color(GUI_BACKGROUND_COLOR);
 
 	Fl_Text_Buffer *textbuff4s = new Fl_Text_Buffer();
 	textbuff4s->text("Input to this job");
 	Fl_Text_Display* textdisp4s = new Fl_Text_Display(XJOBCOL2, GUIHEIGHT_EXT_START + 123, JOBCOLWIDTH, 23);
 	textdisp4s->buffer(textbuff4s);
+	textdisp4s->textsize(12);
 	textdisp4s->color(GUI_BACKGROUND_COLOR);
 
 	Fl_Text_Buffer *textbuff5s = new Fl_Text_Buffer();
 	textbuff5s->text("Output from this job");
 	Fl_Text_Display* textdisp5s = new Fl_Text_Display(XJOBCOL2, GUIHEIGHT_EXT_START + 181, JOBCOLWIDTH, 23);
 	textdisp5s->buffer(textbuff5s);
+	textdisp5s->textsize(12);
 	textdisp5s->color(GUI_BACKGROUND_COLOR);
 	scheduler_job_browser = new Fl_Hold_Browser(XJOBCOL2, GUIHEIGHT_EXT_START + 23 , JOBCOLWIDTH, 100);
 	scheduler_job_browser->callback(cb_select_scheduled_job);
@@ -810,6 +815,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	textbuffedge->text("Edges");
 	Fl_Text_Display* textdispedge = new Fl_Text_Display(XJOBCOL3, GUIHEIGHT_EXT_START, JOBCOLWIDTH-105, 23);
 	textdispedge->buffer(textbuffedge);
+	textdispedge->textsize(12);
 	textdispedge->color(GUI_BACKGROUND_COLOR);
 	scheduler_edge_input= new Fl_Choice(XJOBCOL3, GUIHEIGHT_EXT_START+23, JOBCOLWIDTH/2 + 10, 21);
 	scheduler_edge_input->color(GUI_INPUT_COLOR);
