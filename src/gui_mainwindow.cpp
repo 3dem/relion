@@ -953,11 +953,12 @@ static void Gui_Timer_CB(void *userdata)
 
 	if (show_scheduler)
 	{
-    	FileName mychanged = schedule.name + SCHEDULE_HAS_CHANGED;
+		// Always refill the stdout and stderr windows for scheduler
+		o->fillStdOutAndErr();
+		FileName mychanged = schedule.name + SCHEDULE_HAS_CHANGED;
     	if (exists(mychanged))
-    	{	// Update the stdout and stderr windows if we're currently pointing at a running job
-    	   	o->fillStdOutAndErr();
-    	   	schedule.read(DONT_LOCK);
+    	{
+    		schedule.read(DONT_LOCK);
     	   	o->fillSchedulerNodesAndVariables();
     	   	std::remove(mychanged.c_str());
     	}
