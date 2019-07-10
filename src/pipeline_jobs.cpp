@@ -4414,7 +4414,7 @@ bool RelionJob::getCommandsSubtractJob(std::string &outputname, std::vector<std:
 		}
 
 		command += " --o " + outputname;
-		Node node4(outputname + "subtracted.star", NODE_PART_DATA);
+		Node node4(outputname + "particles_subtracted.star", NODE_PART_DATA);
 		outputNodes.push_back(node4);
 
 		if (joboptions["do_center_mask"].getBoolean())
