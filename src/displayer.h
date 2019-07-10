@@ -538,6 +538,9 @@ public:
 	// Recenter images?
 	bool do_recenter;
 
+	// Pipeline control
+	std::string pipeline_control;
+
 	// Maximum number of images to show
 	long int max_nr_images;
 

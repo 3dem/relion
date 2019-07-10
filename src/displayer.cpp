@@ -795,9 +795,15 @@ int multiViewerCanvas::handle(int ev)
 						saveBackupSelection();
 						saveSelected(current_selection_type);
 						saveSelectedParticles(current_selection_type);
+						// save the exit_success file after saving already,
+						// as many users close the window through the operating system's cross symbol on the window, instead of a proper exit
+						RELION_EXIT_SUCCESS;
 					}
 					else if ( strcmp(m->label(), "Quit") == 0 )
-						exit(0);
+					{
+						//clean exit
+						exit(RELION_EXIT_SUCCESS);
+					}
 				}
 				else
 				{
@@ -863,6 +869,10 @@ int multiViewerCanvas::handle(int ev)
 					{
 						saveBackupSelection();
 						saveSelected(SELECTED);
+						// save the exit_success file after saving already,
+						// as many users close the window through the operating system's cross symbol on the window, instead of a proper exit
+						std::cerr << "hello!" << std::endl;
+						RELION_EXIT_SUCCESS;
 					}
 
 					else if ( strcmp(m->label(), "Quit") == 0 )
@@ -2441,6 +2451,10 @@ void displayerGuiWindow::cb_display_i()
 		cl += " --recenter";
 	}
 
+	if (pipeline_control != "")
+	{
+		cl += " --pipeline_control " + pipeline_control;
+	}
 
 	// send job in the background
 	cl += " &";
@@ -2660,6 +2674,10 @@ int Displayer::runGui()
 	win.do_recenter = do_recenter;
 	win.fn_imgs = fn_selected_imgs;
 	win.fn_parts = fn_selected_parts;
+	win.pipeline_control = pipeline_control_outputname;
+
+	// this GUI can never create the output itself, so disable pipeline_control
+	pipeline_control_outputname = "";
 
 	// If this is a STAR file, decide what to do
 	if (fn_in.isStarFile())
