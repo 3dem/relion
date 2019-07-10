@@ -393,7 +393,7 @@ bool PipeLine::checkProcessCompletion()
 				if (myNode < 0 || myNode >= nodeList.size())
 					REPORT_ERROR("pipeline checkProcessCompletion ERROR: " + integerToString(j) + "th output node of " + processList[myproc].name + " is invalid: " + integerToString(myNode));
 				if (!touchTemporaryNodeFile(nodeList[myNode]))
-					REPORT_ERROR("ERROR: output node " + nodeList[myNode].name + " does not exist, while job " + processList[myproc].name +" has finished successfully...");
+					std::cerr << "WARNING: output node " + nodeList[myNode].name + " does not exist, while job " + processList[myproc].name +" should have finished successfully. You can manually mark this job as failed to suppress this message." << std::endl;
 			}
 
 		}
