@@ -362,7 +362,9 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	int corrections_section = parser.addSection("Corrections");
 
 	if (parser.checkOption("--pad_ctf", "Perform CTF padding to treat CTF aliaising better?"))
-		do_ctf_padding =true;
+		do_ctf_padding = true;
+	else
+		do_ctf_padding = false;
 
 	// Can also switch the following option OFF
 	if (parser.checkOption("--scale", "Switch on intensity-scale corrections on image groups", "OLD"))
