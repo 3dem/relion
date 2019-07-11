@@ -871,7 +871,6 @@ int multiViewerCanvas::handle(int ev)
 						saveSelected(SELECTED);
 						// save the exit_success file after saving already,
 						// as many users close the window through the operating system's cross symbol on the window, instead of a proper exit
-						std::cerr << "hello!" << std::endl;
 						RELION_EXIT_SUCCESS;
 					}
 
