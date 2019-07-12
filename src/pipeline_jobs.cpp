@@ -1615,7 +1615,6 @@ bool RelionJob::getCommandsCtffindJob(std::string &outputname, std::vector<std::
 	if (joboptions["use_gctf"].getBoolean())
 	{
 		command += " --use_gctf --gctf_exe " + joboptions["fn_gctf_exe"].getString();
-		command += " --angpix " + joboptions["angpix"].getString();
 		if (joboptions["do_ignore_ctffind_params"].getBoolean())
 			command += " --ignore_ctffind_params";
 		if (joboptions["do_EPA"].getBoolean())
@@ -1664,7 +1663,6 @@ bool RelionJob::getCommandsCtffindJob(std::string &outputname, std::vector<std::
 	commands.push_back(command);
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
-
 }
 
 void RelionJob::initialiseManualpickJob()
