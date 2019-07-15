@@ -160,6 +160,11 @@ void MotioncorrRunner::initialise()
 			REPORT_ERROR("You supplied -RotGain and/or -FlipGain to MotionCor2. Please use --gain_rot and--gain_flip instead.");
 		}
 
+		if (grouping_for_ps > 0)
+		{
+			REPORT_ERROR("Save sum of power spectra (--grouping_for_ps) is not available with UCSF MotionCor2.");
+		}
+
 		if (verb > 0 && fn_other_motioncor2_args.contains("Mag"))
 		{
 			std::cerr << "WARNING: You are applying anisotropic magnification correction (-Mag) in MotionCor2." << std::endl;
@@ -1621,7 +1626,6 @@ void MotioncorrRunner::realSpaceInterpolation(Image <float> &Isum, std::vector<I
 				DIRECT_MULTIDIM_ELEM(Isum(), n) += DIRECT_MULTIDIM_ELEM(Iframes[iframe](), n);
 			}
 		}
-
 	} else if (model_version == MOTION_MODEL_THIRD_ORDER_POLYNOMIAL) { // Optimised code
 		ThirdOrderPolynomialModel *polynomial_model = (ThirdOrderPolynomialModel*)model;
 		realSpaceInterpolation_ThirdOrderPolynomial(Isum, Iframes, *polynomial_model, logfile);
@@ -1987,6 +1991,7 @@ int MotioncorrRunner::findGoodSize(int request) {
 	}
 	return request; // return as it is
 }
+
 // dose is equivalent dose at 300 kV at the END of the frame.
 // This implements the model by Timothy Grant & Nikolaus Grigorieff on eLife, 2015
 // doi: 10.7554/eLife.06980

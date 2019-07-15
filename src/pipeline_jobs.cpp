@@ -1365,7 +1365,7 @@ Note that multiple MotionCor2 processes should not share a GPU; otherwise, it ca
 	joboptions["dose_per_frame"] = JobOption("Dose per frame (e/A2):", 1, 0, 5, 0.2, "Dose per movie frame (in electrons per squared Angstrom).");
 	joboptions["pre_exposure"] = JobOption("Pre-exposure (e/A2):", 0, 0, 5, 0.5, "Pre-exposure dose (in electrons per squared Angstrom).");
 
-	joboptions["save_ps"] = JobOption("Save sum of power spectra?", false, "Sum of non-dose weighted power spectra provides better signal for CTF estimation. The power spectra can be used by CTFFIND4 but not by GCTF.");
+	joboptions["save_ps"] = JobOption("Save sum of power spectra?", false, "Sum of non-dose weighted power spectra provides better signal for CTF estimation. The power spectra can be used by CTFFIND4 but not by GCTF. This option is not available for UCSF MotionCor2.");
 	joboptions["group_for_ps"] = JobOption("Sum power spectra every e/A2:", 4, 0, 10, 0.5, "McMullan et al (Ultramicroscopy, 2015) sugggest summing power spectra every 4.0 e/A2 gives optimal Thon rings");
 }
 
@@ -1472,6 +1472,12 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 
 	if (joboptions["save_ps"].getBoolean())
 	{
+		if (!joboptions["do_own_motioncor"].getBoolean())
+		{
+			error_message = "'Save sum of power spectra' is not available with UCSF MotionCor2.";
+			return false;
+		}
+
 		float dose_for_ps = textToFloat(joboptions["group_for_ps"].getString());
 		float dose_rate = textToFloat(joboptions["dose_per_frame"].getString());
 		if (dose_rate <= 0)
