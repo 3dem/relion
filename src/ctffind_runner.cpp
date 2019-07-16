@@ -396,7 +396,6 @@ void CtffindRunner::run()
 
 			if (do_use_gctf)
 			{
-				//addToGctfJobList(imic, allmicnames);
 				executeGctf(imic, allmicnames, imic+1==fn_micrographs.size());
 			}
 			else if (is_ctffind4)
@@ -538,12 +537,12 @@ void CtffindRunner::executeGctf(long int imic, std::vector<std::string> &allmicn
 
 	// Always add the new micrograph to the TODO list
 	Image<double> Itmp;
-	FileName outputfile = getOutputFileWithNewUniqueDate(fn_micrographs[imic], fn_out);
+	FileName outputfile = getOutputFileWithNewUniqueDate(fn_micrographs_ctf[imic], fn_out);
 	Itmp.read(outputfile, false); // false means only read header!
 	if (XSIZE(Itmp()) != xdim || YSIZE(Itmp()) != ydim)
-		REPORT_ERROR("CtffindRunner::executeGctf ERROR: Micrographs do not all have the same size! " + fn_micrographs[imic] + " is different from the first micrograph!");
+		REPORT_ERROR("CtffindRunner::executeGctf ERROR: Micrographs do not all have the same size! " + fn_micrographs_ctf[imic] + " is different from the first micrograph!");
 	if (ZSIZE(Itmp()) > 1 || NSIZE(Itmp()) > 1)
-		REPORT_ERROR("CtffindRunner::executeGctf ERROR: No movies or volumes allowed for " + fn_micrographs[imic]);
+		REPORT_ERROR("CtffindRunner::executeGctf ERROR: No movies or volumes allowed for " + fn_micrographs_ctf[imic]);
 
 	allmicnames.push_back(outputfile);
 
@@ -605,21 +604,15 @@ void CtffindRunner::executeGctf(long int imic, std::vector<std::string> &allmicn
 		//std::cerr << " command= " << command << std::endl;
 		int res = system(command.c_str());
 
-		// Cleanup all the symbolic links again
-		//for (size_t i = 0; i < allmicnames.size(); i++)
-		//	remove(allmicnames[i].c_str());
-
 		// Re-set the allmicnames vector
 		allmicnames.clear();
 	}
-
-
 }
 
 void CtffindRunner::executeCtffind3(long int imic)
 {
 
-	FileName fn_mic = getOutputFileWithNewUniqueDate(fn_micrographs[imic], fn_out);
+	FileName fn_mic = getOutputFileWithNewUniqueDate(fn_micrographs_ctf[imic], fn_out);
 	FileName fn_root = fn_mic.withoutExtension();
 	FileName fn_script = fn_root + "_ctffind3.com";
 	FileName fn_log = fn_root + "_ctffind3.log";
