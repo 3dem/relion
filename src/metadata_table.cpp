@@ -59,8 +59,7 @@ MetaDataTable::MetaDataTable()
 	name(""),
 	comment(""),
 	version(CURRENT_MDT_VERSION),
-	activeLabels(0),
-	ignoreLabels(0)
+	activeLabels(0)
 {
 }
 
@@ -80,8 +79,7 @@ MetaDataTable::MetaDataTable(const MetaDataTable &MD)
 	name(MD.name),
 	comment(MD.comment),
 	version(MD.version),
-	activeLabels(MD.activeLabels),
-	ignoreLabels(MD.ignoreLabels)
+	activeLabels(MD.activeLabels)
 {
 	for (size_t idx = 0; idx < MD.objects.size(); idx++)
 	{
@@ -114,7 +112,6 @@ MetaDataTable& MetaDataTable::operator = (const MetaDataTable &MD)
 		version = MD.version;
 
 		activeLabels = MD.activeLabels;
-		ignoreLabels = MD.ignoreLabels;
 
 		for (long int idx = 0; idx < MD.objects.size(); idx++)
 		{
@@ -173,7 +170,6 @@ void MetaDataTable::clear()
 	version = CURRENT_MDT_VERSION;
 
 	activeLabels.clear();
-	ignoreLabels.clear();
 }
 
 void MetaDataTable::setComment(const std::string newComment)
@@ -916,6 +912,7 @@ long int MetaDataTable::readStarLoop(std::ifstream& in, std::vector<EMDLabel> *d
 	// Then fill the table (dont read another line until the one from above has been handled)
 	bool is_first = true;
 	long int nr_objects = 0;
+	const int num_labels = activeLabels.size();
 
 	while (is_first || getline(in, line, '\n'))
 	{
@@ -938,27 +935,30 @@ long int MetaDataTable::readStarLoop(std::ifstream& in, std::vector<EMDLabel> *d
 				std::stringstream os2(line);
 				std::string value;
 				labelPosition = 0;
-				int counterIgnored = 0;
 				while (os2 >> value)
 				{
 					// TODO: handle comments here...
-					if (std::find(ignoreLabels.begin(), ignoreLabels.end(), labelPosition) != ignoreLabels.end())
+
+					if (labelPosition >= num_labels)
 					{
-						// Ignore this column
-						counterIgnored++;
-						labelPosition++;
-						continue;
+						std::cerr << "Error in line: " << line << std::endl;
+						REPORT_ERROR("A line in the STAR file contains more columns than the number of labels.");
 					}
 					// Check whether this is an unknown label
-					if (activeLabels[labelPosition - counterIgnored] == EMDL_UNKNOWN_LABEL)
+					if (activeLabels[labelPosition] == EMDL_UNKNOWN_LABEL)
 					{
 						setUnknownValue(labelPosition, value);
 					}
 					else
 					{
-						setValueFromString(activeLabels[labelPosition - counterIgnored], value);
+						setValueFromString(activeLabels[labelPosition], value);
 					}
 					labelPosition++;
+				}
+				if (labelPosition < num_labels)
+				{
+					std::cerr << "Error in line: " << line << std::endl;
+					REPORT_ERROR("A line in the STAR file contains fewer columns than the number of labels.");
 				}
 			}
 		} // end if grep_pattern
