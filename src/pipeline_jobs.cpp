@@ -2729,6 +2729,7 @@ bool RelionJob::getCommandsClass2DJob(std::string &outputname, std::vector<std::
 	{
 		if (joboptions["do_fast_subsets"].getBoolean())
 			command += " --fast_subsets ";
+
 		command += " --K " + joboptions["nr_classes"].getString();
 		// Always flatten the solvent
 		command += " --flatten_solvent ";
@@ -3314,12 +3315,13 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 
 	// Optimisation
 	command += " --iter " + joboptions["nr_iter"].getString();
-	if (joboptions["do_fast_subsets"].getBoolean())
-		command += " --fast_subsets ";
 	command += " --tau2_fudge " + joboptions["tau_fudge"].getString();
         command += " --particle_diameter " + joboptions["particle_diameter"].getString();
 	if (!is_continue)
 	{
+		if (joboptions["do_fast_subsets"].getBoolean())
+			command += " --fast_subsets ";
+
 		command += " --K " + joboptions["nr_classes"].getString();
 		// Always flatten the solvent
 		command += " --flatten_solvent";
