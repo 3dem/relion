@@ -938,6 +938,8 @@ long int MetaDataTable::readStarLoop(std::ifstream& in, std::vector<EMDLabel> *d
 				while (os2 >> value)
 				{
 					// TODO: handle comments here...
+					if (value == "\"\"")
+						value = "";
 
 					if (labelPosition >= num_labels)
 					{
@@ -955,8 +957,9 @@ long int MetaDataTable::readStarLoop(std::ifstream& in, std::vector<EMDLabel> *d
 					}
 					labelPosition++;
 				}
-				if (labelPosition < num_labels)
+				if (labelPosition < num_labels && num_labels > 2)
 				{
+					// For backward-compatibility for cases like "fn_mtf <empty>", don't die if num_labels == 2.
 					std::cerr << "Error in line: " << line << std::endl;
 					REPORT_ERROR("A line in the STAR file contains fewer columns than the number of labels.");
 				}
@@ -1192,6 +1195,8 @@ void MetaDataTable::write(std::ostream& out)
 					out.width(10);
 					std::string val;
 					getValueToString(l, val, idx);
+					if (val == "")
+						val = "\"\"";
 					out << val << " ";
 				}
 				if (l == EMDL_COMMENT)
