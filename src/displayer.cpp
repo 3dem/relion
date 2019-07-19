@@ -354,6 +354,7 @@ int basisViewerWindow::fillCanvas(int viewer_type, MetaDataTable &MDin, Observat
 		canvas.do_apply_orient = _do_apply_orient;
 		canvas.obsModel = obsModel;
 		canvas.text_label = text_label;
+		canvas.metadata_table_name = MDin.getName();
 		if (canvas.nr_regroups > 0)
 			canvas.MDgroups = _MDgroups;
 		if (_do_class)
@@ -1544,13 +1545,28 @@ void multiViewerCanvas::saveSelected(int save_selected)
 
 		if (obsModel->opticsMdt.numberOfObjects() > 0 && !do_class)
 		{
-			obsModel->save(MDout, fn_selected_imgs, "particles");
+			if (metadata_table_name == "micrographs")
+			{
+				obsModel->save(MDout, fn_selected_imgs, "micrographs");
+				std::cout << "Saved "<< fn_selected_imgs << " with " << nsel << " selected micrographs." << std::endl;
+			}
+			else if (metadata_table_name == "movies")
+			{
+				obsModel->save(MDout, fn_selected_imgs, "movies");
+				std::cout << "Saved "<< fn_selected_imgs << " with " << nsel << " selected movies." << std::endl;
+
+			}
+			else
+			{
+				obsModel->save(MDout, fn_selected_imgs, "particles");
+				std::cout << "Saved "<< fn_selected_imgs << " with " << nsel << " selected particles." << std::endl;
+			}
 		}
 		else
 		{
 			MDout.write(fn_selected_imgs);
+			std::cout << "Saved "<< fn_selected_imgs << " with " << nsel << " selected images." << std::endl;
 		}
-		std::cout << "Saved "<< fn_selected_imgs << " with " << nsel << " selected images." << std::endl;
 	}
 	else
 		std::cout <<" No images to save...." << std::endl;

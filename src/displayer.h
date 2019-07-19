@@ -330,6 +330,9 @@ public:
 	// Limit number of images to be shown
 	long int multi_max_nr_images;
 
+	// Name of the metadata table
+	std::string metadata_table_name;
+
 	// Constructor with w x h size of the window and a title
 	multiViewerCanvas(int X,int Y, int W, int H, const char* title=0): basisViewerCanvas(X,Y,W, H, title)
 	{
