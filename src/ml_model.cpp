@@ -152,8 +152,6 @@ void MlModel::read(FileName fn_in)
 	{
 		if (nr_bodies != 1)
 			REPORT_ERROR("MlModel::readStar: incorrect nr_bodies for helix");
-		if (ref_dim == 2)
-			REPORT_ERROR("MlModel::readStar: incorrect ref_dim for helix");
 	}
 	if (!MDlog.getValue(EMDL_MLMODEL_HELICAL_NR_ASU, helical_nr_asu))
 		helical_nr_asu = 1;
