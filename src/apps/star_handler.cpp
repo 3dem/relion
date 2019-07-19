@@ -172,7 +172,7 @@ class star_handler_parameters
 	{
 		if (do_ignore_optics)
 		{
-			MD.read(fn, tablename_in);
+			MD.read(fn, tablename);
 		}
 		else
 		{
@@ -180,7 +180,7 @@ class star_handler_parameters
 			if (obsModel.opticsMdt.numberOfObjects() == 0)
 			{
 				std::cerr << " + WARNGING: could not read optics groups table, proceeding without it ..." << std::endl;
-				MD.read(fn, tablename_in);
+				MD.read(fn, tablename);
 				do_ignore_optics = true;
 			}
 		}
