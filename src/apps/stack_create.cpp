@@ -166,7 +166,7 @@ class stack_create_parameters
 			{
 				FileName path = fn_out.beforeLastOf("/");
 				std::string command = " mkdir -p " + path;
-				system(command.c_str());
+				int res = system(command.c_str());
 			}
 
 			int n = 0;
