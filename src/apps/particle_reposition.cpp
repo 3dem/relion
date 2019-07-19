@@ -20,6 +20,7 @@
 
 #include <src/args.h>
 #include <src/ml_optimiser.h>
+#include <src/jaz/obs_model.h>
 #include <stdlib.h>
 
 class particle_reposition_parameters
@@ -30,6 +31,7 @@ public:
 
 	RFLOAT micrograph_background;
 	bool do_invert;
+    ObservationModel obsModel;
 
 	// I/O Parser
 	IOParser parser;
@@ -62,7 +64,7 @@ public:
 	{
 		int xdim, ydim, radius;
 		MetaDataTable DFi, DFopt;
-		DFi.read(fn_in);
+                ObservationModel::loadSafely(fn_in, obsModel, DFi, "micrographs");
 
 		MlOptimiser optimiser;
 		optimiser.do_preread_images = false;
@@ -75,6 +77,7 @@ public:
 		// Use a user-provided subset of particles instead of all of them?
 		if (fn_dat != "")
 		{
+                    std::cerr <<"Reading data ..." << std::endl;
 			MetaDataTable MDdata;
 			MDdata.read(fn_dat);
 			optimiser.mydata.MDimg = MDdata;
