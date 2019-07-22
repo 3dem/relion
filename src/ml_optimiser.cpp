@@ -1732,7 +1732,9 @@ void MlOptimiser::initialiseGeneral(int rank)
 			mymodel.helical_rise_min = mymodel.helical_rise_max = helical_rise_initial;
 		}
 
-		checkParametersFor3DHelicalReconstruction(
+		if (mymodel.ref_dim == 3)
+		{
+			checkParametersFor3DHelicalReconstruction(
 				ignore_helical_symmetry,
 				do_helical_symmetry_local_refinement,
 				mymodel.helical_nr_asu,
@@ -1748,6 +1750,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 				particle_diameter,
 				helical_tube_inner_diameter,
 				helical_tube_outer_diameter);
+		}
 	}
 	else
 	{
