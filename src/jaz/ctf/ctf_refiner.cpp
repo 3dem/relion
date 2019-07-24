@@ -283,6 +283,7 @@ void CtfRefiner::processSubsetMicrographs(long g_start, long g_end)
 				predOppT;  // phase-demodulated (mag and aberr)
 		// applyMtf is always true
 
+		// Four booleans in predictAll are applyCtf, applyTilt, applyShift, applyMtf.
 		// use prediction from same half-set for defocus estimation (overfitting danger):
 		if (do_defocus_fit || do_bfac_fit)
 		{
