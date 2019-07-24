@@ -2524,7 +2524,7 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 			}
 
 			// Other arguments for extraction
-			command += " " + manualpickjob.joboptions["other_args"].getString() + " &";
+			command += " " + manualpickjob.joboptions["other_args"].getString();
 		}
 	}
 
@@ -5155,3 +5155,4 @@ bool RelionJob::getCommandsExternalJob(std::string &outputname, std::vector<std:
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 }
+                                                    

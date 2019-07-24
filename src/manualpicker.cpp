@@ -422,6 +422,7 @@ void manualpickerGuiWindow::cb_menubar_save_i()
 {
 	writeOutputStarfile();
 	std::cout << " Saved " << fn_sel << std::endl;
+	RELION_EXIT_SUCCESS;
 }
 
 void manualpickerGuiWindow::cb_menubar_invert_selection(Fl_Widget* w, void* v)
