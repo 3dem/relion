@@ -21,6 +21,7 @@
 #include "src/micrograph_model.h"
 #include "src/metadata_table.h"
 #include "src/image.h"
+#include "src/motioncorr_runner.h"
 
 // TODO: Think about first frame for local model
 
@@ -281,6 +282,23 @@ int Micrograph::getHeight() const {
 
 int Micrograph::getNframes() const {
 	return n_frames;
+}
+
+void Micrograph::fillDefectAndHotpixels(MultidimArray<bool> &mask) const
+{
+	checkReadyFlag("getShiftAt");
+
+	mask.initZeros(height, width);
+	if (fnDefect != "")
+		MotioncorrRunner::fillDefectMask(mask, fnDefect);
+
+	if (hotpixelX.size() != hotpixelY.size())
+		REPORT_ERROR("Logic error: hotpixelX.size() != hotpixelY.size()");
+
+	for (int i = 0, ilim = hotpixelX.size(); i < ilim; i++)
+	{
+		DIRECT_A2D_ELEM(mask, hotpixelY[i], hotpixelX[i]) = true;
+	}
 }
 
 int Micrograph::getShiftAt(RFLOAT frame, RFLOAT x, RFLOAT y, RFLOAT &shiftx, RFLOAT &shifty, bool use_local, bool normalise) const
