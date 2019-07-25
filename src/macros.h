@@ -72,12 +72,12 @@ extern const char *g_RELION_VERSION;
 #define RFLOAT float
 #define LARGE_NUMBER 99e36
 #define MY_MPI_DOUBLE  MPI_FLOAT
-#define MY_MPI_COMPLEX MPI_COMPLEX
+#define MY_MPI_COMPLEX MPI_C_COMPLEX
 #else
 #define RFLOAT double
 #define LARGE_NUMBER 99e99
 #define MY_MPI_DOUBLE  MPI_DOUBLE
-#define MY_MPI_COMPLEX MPI_DOUBLE_COMPLEX
+#define MY_MPI_COMPLEX MPI_C_DOUBLE_COMPLEX
 #endif
 
 #if defined CUDA and DEBUG_CUDA
