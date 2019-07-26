@@ -2604,11 +2604,11 @@ This requires that the optimal orientations of all particles are already stored 
 	joboptions["psi_sampling"] = JobOption("In-plane angular sampling:", 6., 0.5, 20, 0.5, "The sampling rate for the in-plane rotation angle (psi) in degrees. \
 Using fine values will slow down the program. Recommended value for most 2D refinements: 5 degrees.\n\n \
 If auto-sampling is used, this will be the value for the first iteration(s) only, and the sampling rate will be increased automatically after that.");
-	joboptions["offset_range"] = JobOption("Offset search range (A):", 5, 0, 30, 1, "Probabilities will be calculated only for translations \
+	joboptions["offset_range"] = JobOption("Offset search range (pix):", 5, 0, 30, 1, "Probabilities will be calculated only for translations \
 in a circle with this radius (in pixels). The center of this circle changes at every iteration and is placed at the optimal translation \
 for each image in the previous iteration.\n\n \
 If auto-sampling is used, this will be the value for the first iteration(s) only, and the sampling rate will be increased automatically after that.");
-	joboptions["offset_step"] = JobOption("Offset search step (A):", 1, 0.1, 5, 0.1, "Translations will be sampled with this step-size (in pixels).\
+	joboptions["offset_step"] = JobOption("Offset search step (pix):", 1, 0.1, 5, 0.1, "Translations will be sampled with this step-size (in pixels).\
 Translational sampling is also done using the adaptive approach. \
 Therefore, if adaptive=1, the translations will first be evaluated on a 2x coarser grid.\n\n \
 If auto-sampling is used, this will be the value for the first iteration(s) only, and the sampling rate will be increased automatically after that.");
@@ -2861,10 +2861,10 @@ Therefore, this option is not generally recommended: try increasing amplitude co
 	joboptions["sampling"] = JobOption("Initial angular sampling:", job_sampling_options, 1, "There are only a few discrete \
 angular samplings possible because we use the HealPix library to generate the sampling of the first two Euler angles on the sphere. \
 The samplings are approximate numbers and vary slightly over the sphere.\n\n For initial model generation at low resolutions, coarser angular samplings can often be used than in normal 3D classifications/refinements, e.g. 15 degrees. During the inbetween and final SGD iterations, the sampling will be adjusted to the resolution, given the particle size.");
-	joboptions["offset_range"] = JobOption("Offset search range (A):", 6, 0, 30, 1, "Probabilities will be calculated only for translations \
+	joboptions["offset_range"] = JobOption("Offset search range (pix):", 6, 0, 30, 1, "Probabilities will be calculated only for translations \
 in a circle with this radius (in pixels). The center of this circle changes at every iteration and is placed at the optimal translation \
 for each image in the previous iteration.\n\n");
-	joboptions["offset_step"] = JobOption("Offset search step (A):", 2, 0.1, 5, 0.1, "Translations will be sampled with this step-size (in pixels).\
+	joboptions["offset_step"] = JobOption("Offset search step (pix):", 2, 0.1, 5, 0.1, "Translations will be sampled with this step-size (in pixels).\
 Translational sampling is also done using the adaptive approach. \
 Therefore, if adaptive=1, the translations will first be evaluated on a 2x coarser grid.\n\n ");
 
@@ -3120,11 +3120,11 @@ This requires that the optimal orientations of all particles are already stored 
 angular samplings possible because we use the HealPix library to generate the sampling of the first two Euler angles on the sphere. \
 The samplings are approximate numbers and vary slightly over the sphere.\n\n \
 If auto-sampling is used, this will be the value for the first iteration(s) only, and the sampling rate will be increased automatically after that.");
-	joboptions["offset_range"] = JobOption("Offset search range (A):", 5, 0, 30, 1, "Probabilities will be calculated only for translations \
+	joboptions["offset_range"] = JobOption("Offset search range (pix):", 5, 0, 30, 1, "Probabilities will be calculated only for translations \
 in a circle with this radius (in pixels). The center of this circle changes at every iteration and is placed at the optimal translation \
 for each image in the previous iteration.\n\n \
 If auto-sampling is used, this will be the value for the first iteration(s) only, and the sampling rate will be increased automatically after that.");
-	joboptions["offset_step"] = JobOption("Offset search step (A):", 1, 0.1, 5, 0.1, "Translations will be sampled with this step-size (in pixels).\
+	joboptions["offset_step"] = JobOption("Offset search step (pix):", 1, 0.1, 5, 0.1, "Translations will be sampled with this step-size (in pixels).\
 Translational sampling is also done using the adaptive approach. \
 Therefore, if adaptive=1, the translations will first be evaluated on a 2x coarser grid.\n\n \
 If auto-sampling is used, this will be the value for the first iteration(s) only, and the sampling rate will be increased automatically after that.");
@@ -3519,11 +3519,11 @@ This may yield higher-resolution maps, especially when the mask contains only a 
 angular samplings possible because we use the HealPix library to generate the sampling of the first two Euler angles on the sphere. \
 The samplings are approximate numbers and vary slightly over the sphere.\n\n \
 Note that this will only be the value for the first few iteration(s): the sampling rate will be increased automatically after that.");
-	joboptions["offset_range"] = JobOption("Initial offset range (A):", 5, 0, 30, 1, "Probabilities will be calculated only for translations \
+	joboptions["offset_range"] = JobOption("Initial offset range (pix):", 5, 0, 30, 1, "Probabilities will be calculated only for translations \
 in a circle with this radius (in pixels). The center of this circle changes at every iteration and is placed at the optimal translation \
 for each image in the previous iteration.\n\n \
 Note that this will only be the value for the first few iteration(s): the sampling rate will be increased automatically after that.");
-	joboptions["offset_step"] = JobOption("Initial offset step (A):", 1, 0.1, 5, 0.1, "Translations will be sampled with this step-size (in pixels).\
+	joboptions["offset_step"] = JobOption("Initial offset step (pix):", 1, 0.1, 5, 0.1, "Translations will be sampled with this step-size (in pixels).\
 Translational sampling is also done using the adaptive approach. \
 Therefore, if adaptive=1, the translations will first be evaluated on a 2x coarser grid.\n\n \
 Note that this will only be the value for the first few iteration(s): the sampling rate will be increased automatically after that.");
@@ -3868,11 +3868,11 @@ useful insights about how well the subtraction worked. If set to No, the origina
 angular samplings possible because we use the HealPix library to generate the sampling of the first two Euler angles on the sphere. \
 The samplings are approximate numbers and vary slightly over the sphere.\n\n \
 Note that this will only be the value for the first few iteration(s): the sampling rate will be increased automatically after that.");
-	joboptions["offset_range"] = JobOption("Initial offset range (A):", 3, 0, 30, 1, "Probabilities will be calculated only for translations \
+	joboptions["offset_range"] = JobOption("Initial offset range (pix):", 3, 0, 30, 1, "Probabilities will be calculated only for translations \
 in a circle with this radius (in pixels). The center of this circle changes at every iteration and is placed at the optimal translation \
 for each image in the previous iteration.\n\n \
 Note that this will only be the value for the first few iteration(s): the sampling rate will be increased automatically after that.");
-	joboptions["offset_step"] = JobOption("Initial offset step (A):", 0.75, 0.1, 5, 0.1, "Translations will be sampled with this step-size (in pixels).\
+	joboptions["offset_step"] = JobOption("Initial offset step (pix):", 0.75, 0.1, 5, 0.1, "Translations will be sampled with this step-size (in pixels).\
 Translational sampling is also done using the adaptive approach. \
 Therefore, if adaptive=1, the translations will first be evaluated on a 2x coarser grid.\n\n \
 Note that this will only be the value for the first few iteration(s): the sampling rate will be increased automatically after that.");

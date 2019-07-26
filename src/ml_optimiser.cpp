@@ -283,11 +283,17 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 
 		fnt = parser.getOption("--offset_range", "Search range for origin offsets (in pixels)", "OLD");
 		if (fnt != "OLD")
+		{
 			sampling.offset_range = textToFloat(fnt);
+			sampling.offset_range *= mymodel.pixel_size; // sampling.offset_range is in Angstroms, but command line in pixels!
+		}
 
 		fnt = parser.getOption("--offset_step", "Sampling rate for origin offsets (in pixels)", "OLD");
 		if (fnt != "OLD")
+		{
 			sampling.offset_step = textToFloat(fnt);
+			sampling.offset_step *= mymodel.pixel_size; // sampling.offset_step is in Angstroms, but command line in pixels!
+		}
 	}
 
 	fnt = parser.getOption("--auto_local_healpix_order", "Minimum healpix order (before oversampling) from which auto-refine procedure will use local searches", "OLD");
@@ -1811,6 +1817,15 @@ void MlOptimiser::initialiseGeneral(int rank)
 	// Initialise the sampling object (sets prior mode and fills translations and rotations inside sampling object)
 	// May06,2015 - Shaoda & Sjors, initialise for helical translations
 	bool do_local_searches = ((do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches));
+
+	if (iter == 0)
+	{
+		// Sjors 26Jul2019: the sampling.offset_step and range are in Angstroms, but inputs from command line are in pixels!
+		// For continuation runs, this is done in parseContinue, but for new refinements this still needs to be done.
+		// Use the pixel size from the model for this!
+		sampling.offset_range *= mymodel.pixel_size;
+		sampling.offset_step *= mymodel.pixel_size;
+	}
 	sampling.initialise(mymodel.orientational_prior_mode, mymodel.ref_dim, (mymodel.data_dim == 3), do_gpu, (verb>0),
 			do_local_searches, (do_helical_refine) && (!ignore_helical_symmetry),
 			helical_rise_initial, helical_twist_initial);
