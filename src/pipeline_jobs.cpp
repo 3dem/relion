@@ -5155,4 +5155,3 @@ bool RelionJob::getCommandsExternalJob(std::string &outputname, std::vector<std:
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 }
-                                                    
