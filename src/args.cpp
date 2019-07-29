@@ -50,43 +50,56 @@
 // Get parameters from the command line ====================================
 std::string getParameter(int argc, char **argv, const std::string param, const std::string option)
 {
-    int i = 0;
+	int i = 0;
+	int i_found = -1;
 
-    while ((i < argc) && (strcmp(param.c_str(), argv[i])))
-        i++;
-    if (i < argc - 1)
-    {
-        return(argv[i+1]);
-    }
-    else
-    {
-    	if (option != "NULL")
-    	{
-    		return (std::string)option;
-    	}
-    	else
-        {
-            std::string auxstr;
-            auxstr = (std::string)"Argument " + param + " not found or invalid argument";
-            REPORT_ERROR(auxstr);
-        }
-    }
+	while (i < argc)
+	{
+//		std::cout << i << " " << i_found << " " << argv[i] << " looking for " << param << std::endl;
+		if (strcmp(param.c_str(), argv[i]) == 0)
+		{
+			if (i_found != -1)
+			{
+				std::cerr << "WARNING: Command-line option " << param << 
+					     " was specified more than once. The value specified the last is used." << std::endl;
+			}
+			i_found = i;
+		}
+		i++;
+	}
+
+	if (i_found > 0 && i_found < argc - 1)
+	{
+		return argv[i_found + 1];
+	}
+	else
+	{
+		if (option != "NULL")
+		{
+			return (std::string)option;
+		}
+		else
+		{
+			std::string auxstr;
+			auxstr = (std::string)"Argument " + param + " not found or invalid argument";
+			REPORT_ERROR(auxstr);
+		}
+	}
 }
 
 // Checks if a boolean parameter was included the command line =============
 bool checkParameter(int argc, char **argv, std::string param)
 {
-    int i = 0;
+	int i = 0;
 
-    while ((i < argc) && (strcmp(param.c_str(), argv[i]) != 0))
-        i++;
+	while ((i < argc) && (strcmp(param.c_str(), argv[i]) != 0))
+		i++;
 
-    if (i < argc)
-        return(true);
-    else
-        return(false);
+	if (i < argc)
+		return(true);
+	else
+		return(false);
 }
-
 
 IOParser::IOParser()
 {
@@ -153,17 +166,18 @@ void IOParser::setCommandLine(int _argc, char** _argv)
 		exit(0);
 	}
 	// Dirty hack to get pipeline control for all programs...
-    if (checkParameter(argc, argv, "--pipeline_control"))
-    	pipeline_control_outputname = getParameter(argc, argv, "--pipeline_control");
-    else
-    	pipeline_control_outputname = "";
-
+	if (checkParameter(argc, argv, "--pipeline_control"))
+		pipeline_control_outputname = getParameter(argc, argv, "--pipeline_control");
+	else
+		pipeline_control_outputname = "";
 }
 
 void IOParser::addOption(std::string option, std::string usage, std::string defaultvalue, bool hidden)
 {
 	if (hidden)
+	{
 		hiddenOptions.push_back(option);
+	}
 	else
 	{
 		if (section_names.size() == 0)
@@ -208,7 +222,6 @@ bool IOParser::optionExists(std::string option)
 			return true;
 
 	return false;
-
 }
 
 std::string IOParser::getOption(std::string option, std::string usage, std::string defaultvalue, bool hidden)
@@ -218,30 +231,43 @@ std::string IOParser::getOption(std::string option, std::string usage, std::stri
 	if (!optionExists(option))
 		addOption(option, usage, defaultvalue, hidden);
 
-    int i = 0;
+	int i = 0;
+	int i_found = -1;
 
-    while ((i < argc) && (strcmp(option.c_str(), argv[i])))
-        i++;
-    if (i < argc - 1)
-    {
-        return(argv[i+1]);
-    }
-    else
-    {
-    	if (defaultvalue != "NULL")
-    	{
-    		return (std::string)defaultvalue;
-    	}
-    	else
-        {
-            std::string auxstr;
-            auxstr = (std::string)"ERROR: Argument " + option + " not found or invalid argument";
-            error_messages.push_back(auxstr);
-            return "";
-        }
-    }
+	while (i < argc)
+	{
+		if (strcmp(option.c_str(), argv[i]) == 0)
+		{
+			if (i_found != -1)
+			{
+				std::cerr << "WARNING: Command-line option " << option << 
+					     " was specified more than once. The value specified the last is used." << std::endl;
+			}
+			i_found = i;
+		}
+		i++;
+	}
 
+	if (i_found > 0 && i_found < argc - 1)
+	{
+		return argv[i_found + 1];
+	}
+	else
+	{
+		if (defaultvalue != "NULL")
+		{
+			return (std::string)defaultvalue;
+		}
+		else
+		{
+			std::string auxstr;
+			auxstr = (std::string)"ERROR: Argument " + option + " not found or invalid argument";
+			error_messages.push_back(auxstr);
+			return "";
+		}
+	}
 }
+
 // Checks if a boolean parameter was included the command line =============
 bool IOParser::checkOption(std::string option, std::string usage, std::string defaultvalue, bool hidden)
 {
@@ -268,13 +294,13 @@ bool IOParser::checkForErrors(int verb)
 		std::cout << "RELION version " << g_RELION_VERSION << std::endl;
 		exit(0);
 	}
-    if(argc==1 || (argc==2 && checkParameter(argc, argv, "--continue")) || checkParameter(argc, argv, "--help") || checkParameter(argc, argv, "-h"))
+	if(argc==1 || (argc==2 && checkParameter(argc, argv, "--continue")) || checkParameter(argc, argv, "--help") || checkParameter(argc, argv, "-h"))
 	{
 		writeUsage(std::cout);
 	 	exit(0);
 	}
 
-    // First check the command line for unknown arguments
+	// First check the command line for unknown arguments
 	checkForUnknownArguments();
 
 	// First print warning messages
@@ -326,14 +352,14 @@ void IOParser::checkForUnknownArguments()
 			float testval;
 			// test whether this is a number
 			int is_a_number = sscanf(argv[i], "%f", &testval);
-		    if (is_a_number)
-		    {
-		    	// check whether  argv[i-1] is a valid option
-		    	if (!optionExists(argv[i-1]))
-		    		is_ok = false;
-		    }
-		    else
-		    	is_ok = false;
+			if (is_a_number)
+			{
+			// check whether  argv[i-1] is a valid option
+			if (!optionExists(argv[i-1]))
+				is_ok = false;
+		 	}
+			else
+				is_ok = false;
 		}
 
 		if (!is_ok)
@@ -343,8 +369,6 @@ void IOParser::checkForUnknownArguments()
 
 			warning_messages.push_back(auxstr);
 		}
-
-
 	}
 }
 
@@ -384,12 +408,10 @@ void IOParser::writeUsageOneSection(int section, std::ostream &out)
 		if (optionals[i] && section_numbers[i] == section)
 			writeUsageOneLine(i, out);
 	}
-
 }
 
 void IOParser::writeUsage(std::ostream &out)
 {
-
 	out << "+++ RELION: command line arguments (with defaults for optional ones between parantheses) +++"<<std::endl;
 
 	for (int section = 0; section < section_names.size(); section++)
@@ -399,7 +421,6 @@ void IOParser::writeUsage(std::ostream &out)
 	}
 	out << std::setw(35) << "--version";
 	out << " : Print RELION version and exit" << std::endl;
-
 }
 
 void untangleDeviceIDs(std::string &tangled, std::vector < std::vector < std::string > > &untangled)
@@ -412,7 +433,7 @@ void untangleDeviceIDs(std::string &tangled, std::vector < std::vector < std::st
 	while ((pos = tangled.find(delim)) != std::string::npos)
 	{
 		thisRankIDs = tangled.substr(0, pos);
-//		    std::cout << "in loop " << thisRankIDs << std::endl;
+//		std::cout << "in loop " << thisRankIDs << std::endl;
 		tangled.erase(0, pos + delim.length());
 		allRankIDs.push_back(thisRankIDs);
 	}
@@ -424,11 +445,11 @@ void untangleDeviceIDs(std::string &tangled, std::vector < std::vector < std::st
 	{
 		pos=0;
 		delim = ",";
-//			std::cout  << "in 2nd loop "<< allRankIDs[i] << std::endl;
+//		std::cout  << "in 2nd loop "<< allRankIDs[i] << std::endl;
 		while ((pos = allRankIDs[i].find(delim)) != std::string::npos)
 		{
 			thisThreadID = allRankIDs[i].substr(0, pos);
-//				std::cout << "in 3rd loop " << thisThreadID << std::endl;
+//			std::cout << "in 3rd loop " << thisThreadID << std::endl;
 			allRankIDs[i].erase(0, pos + delim.length());
 			untangled[i].push_back(thisThreadID);
 		}
