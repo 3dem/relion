@@ -41,7 +41,6 @@ class import_parameters
 
 	void read(int argc, char **argv)
 	{
-
 		parser.setCommandLine(argc, argv);
 
 		int general_section = parser.addSection("General options");
@@ -74,7 +73,6 @@ class import_parameters
 
 	void run()
 	{
-
 		std::string command;
 		MetaDataTable MDout, MDopt;
 		std::vector<FileName> fns_in;
@@ -91,12 +89,10 @@ class import_parameters
 			REPORT_ERROR("ERROR: you can only use only one, and at least one, of the options --do_movies, --do_micrographs, --do_coordinates, do_halfmaps or --other_import_type");
 		}
 
-
 		std::cout << " importing..." << std::endl;
 		// For micrographs or movies
 		if (do_movies || do_micrographs)
 		{
-
 			std::string tablename = (do_movies) ? "movies" : "micrographs";
 			bool do_new_optics_group = true;
 			int old_optics_group_number, optics_group_number = 1;
@@ -104,7 +100,7 @@ class import_parameters
 			fn_out = (do_movies) ? "movies.star" : "micrographs.star";
 
 			// When continuing old jobs in the pipeliner, the old names are moved out of the way. Read it in anyway!
-			FileName old_fn_out = fn_odir + fn_out + ".old";
+			FileName old_fn_out = fn_odir + fn_out;
 			if (do_continue && exists(old_fn_out))
 			{
 				MDopt.read(old_fn_out, "optics");
@@ -125,9 +121,7 @@ class import_parameters
 				{
 					optics_group_number = MDopt.numberOfObjects() + 1;
 				}
-
 			}
-
 
 			if (do_new_optics_group)
 			{
@@ -189,10 +183,12 @@ class import_parameters
 			MDopt.write(fh);
 			MDout.write(fh);
 			fh.close();
+
+			long nr_new_files = MDout.numberOfObjects();
+			std::cout << " Written " << (fn_odir + fn_out) << " with " << nr_new_files << " items (" << (nr_new_files - old_nr_files) << " new items)" << std::endl;
 		}
 		else if (do_coordinates)
 		{
-
 			// Make the same directory structure of the coordinates
 			// Copy all coordinate files into the same subdirectory in the Import directory
 			// But remove directory structure from pipeline if that exists
@@ -234,7 +230,6 @@ class import_parameters
 
 			fh << fn_suffix2 << "*.mrc" << std::endl;
 			fh.close();
-
 		}
 		else if (do_particles)
 		{
@@ -297,10 +292,8 @@ class import_parameters
 			}
 		}
 		std::cout << " done!" << std::endl;
-
 	}
 };
-
 
 int main(int argc, char *argv[])
 {
@@ -321,6 +314,3 @@ int main(int argc, char *argv[])
 	}
 	return RELION_EXIT_SUCCESS;
 }
-
-
-
