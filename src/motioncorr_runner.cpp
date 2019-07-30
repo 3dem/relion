@@ -121,7 +121,7 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	interpolate_shifts = parser.checkOption("--interpolate_shifts", "(EXPERIMENTAL) Interpolate shifts");
 	ccf_downsample = textToFloat(parser.getOption("--ccf_downsample", "(EXPERT) Downsampling rate of CC map. default = 0 = automatic based on B factor", "0"));
 	if (parser.checkOption("--early_binning", "Do binning before alignment to reduce memory usage. This might dampen signal near Nyquist. (ON by default)"))
-		std::cerr << "Since RELION 3.1, --early_binning is on by default. Use --early_binning to disable it" << std::endl;
+		std::cerr << "Since RELION 3.1, --early_binning is on by default. Use --early_binning to disable it." << std::endl;
 
 	early_binning = !parser.checkOption("--no_early_binning", "Disable --early_binning");
 	if (fabs(bin_factor - 1) < 0.01)
@@ -536,7 +536,12 @@ bool MotioncorrRunner::executeMotioncor2(Micrograph &mic, int rank)
 	}
 
 	if (fn_defect != "")
-		command += " -DefectFile " + fn_defect;
+	{
+		if (fn_defect.getExtension() == "txt")
+			command += " -DefectFile " + fn_defect;
+		else
+			command += " -DefectMap " + fn_defect;
+	}
 
 	if (fn_archive != "")
 		command += " -ArcDir " + fn_archive;
@@ -2120,22 +2125,42 @@ void MotioncorrRunner::binNonSquareImage(Image<float> &Iwork, RFLOAT bin_factor)
 
 void MotioncorrRunner::fillDefectMask(MultidimArray<bool> &bBad, FileName fn_defect) {
 	const int ny = YSIZE(bBad), nx = XSIZE(bBad);
-	std::ifstream f_defect(fn_defect);
 
-	// TODO: error handling !!
-	while (!f_defect.eof()) {
-		int x, y, w, h;
-		f_defect >> x >> y >> w >> h;
-		for (int iy = y, ylim = y + h; iy < ylim; iy++)
-		{
-			if (iy < 0 || iy >= ny) continue;
-			for (int ix = x, xlim = x + w; ix < xlim; ix++)
+	FileName ext = fn_defect.getExtension();
+	if (ext == "txt")
+	{
+		// UCSF MotionCor2 style defect file (x y w h)
+		std::ifstream f_defect(fn_defect);
+
+		// TODO: error handling !!
+		while (!f_defect.eof()) {
+			int x, y, w, h;
+			f_defect >> x >> y >> w >> h;
+			for (int iy = y, ylim = y + h; iy < ylim; iy++)
 			{
-				if (ix < 0 || ix >= nx) continue;
-				DIRECT_A2D_ELEM(bBad, iy, ix) = true;
+				if (iy < 0 || iy >= ny) continue;
+				for (int ix = x, xlim = x + w; ix < xlim; ix++)
+				{
+					if (ix < 0 || ix >= nx) continue;
+					DIRECT_A2D_ELEM(bBad, iy, ix) = true;
+				}
 			}
 		}
-	}
 
-	f_defect.close();
+		f_defect.close();
+	}
+	else
+	{
+		// Defect map
+		Image<float> Idefect;
+		Idefect.read(fn_defect);
+		if (ny != YSIZE(Idefect()) || nx != XSIZE(Idefect()))
+			REPORT_ERROR("The size of the defect map is not the same as that of the movie.");
+
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(bBad)
+		{
+			if (DIRECT_MULTIDIM_ELEM(Idefect(), n) != 0)
+				DIRECT_MULTIDIM_ELEM(bBad, n) = true;
+		}
+	}
 }
