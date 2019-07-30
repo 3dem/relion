@@ -73,7 +73,6 @@
 
 void MotioncorrRunner::read(int argc, char **argv, int rank)
 {
-
 	parser.setCommandLine(argc, argv);
 	int gen_section = parser.addSection("General options");
 	fn_in = parser.getOption("--i", "STAR file with all input micrographs, or a Linux wildcard with all micrographs to operate on");
@@ -115,13 +114,19 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	parser.addSection("Own motion correction options");
 	do_own = parser.checkOption("--use_own", "Use our own implementation of motion correction");
 	skip_defect = parser.checkOption("--skip_defect", "Skip hot pixel detection");
-	save_noDW = parser.checkOption("--save_noDW", "Save aligned but non dose weighted micrograph.");
+	save_noDW = parser.checkOption("--save_noDW", "Save aligned but non dose weighted micrograph");
 	max_iter = textToInteger(parser.getOption("--max_iter", "Maximum number of iterations for alignment. Only valid with --use_own", "5"));
 	if (max_iter != 5 && !do_own)
 		REPORT_ERROR("--max_iter is valid only with --do_own");
 	interpolate_shifts = parser.checkOption("--interpolate_shifts", "(EXPERIMENTAL) Interpolate shifts");
 	ccf_downsample = textToFloat(parser.getOption("--ccf_downsample", "(EXPERT) Downsampling rate of CC map. default = 0 = automatic based on B factor", "0"));
-	early_binning = parser.checkOption("--early_binning", "(EXPERT) Do binning before alignment to reduce memory usage. This might dampen signal near Nyquist.");
+	if (parser.checkOption("--early_binning", "Do binning before alignment to reduce memory usage. This might dampen signal near Nyquist. (ON by default)"))
+		std::cerr << "Since RELION 3.1, --early_binning is on by default. Use --early_binning to disable it" << std::endl;
+
+	early_binning = !parser.checkOption("--no_early_binning", "Disable --early_binning");
+	if (fabs(bin_factor - 1) < 0.01)
+		early_binning = false;
+
 	dose_motionstats_cutoff = textToFloat(parser.getOption("--dose_motionstats_cutoff", "Electron dose (in electrons/A2) at which to distinguish early/late global accumulated motion in output statistics", "4."));
 	if (ccf_downsample > 1) REPORT_ERROR("--ccf_downsample cannot exceed 1.");
 	if (skip_defect && !do_own) REPORT_ERROR("--skip_decet is valid only for --use_own");
@@ -131,7 +136,6 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	// Check for errors in the command-line option
 	if (parser.checkForErrors())
 		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
-
 }
 
 void MotioncorrRunner::usage()
@@ -141,7 +145,6 @@ void MotioncorrRunner::usage()
 
 void MotioncorrRunner::initialise()
 {
-
 	if (do_motioncor2)
 	{
 		// Get the MOTIONCOR2 executable
