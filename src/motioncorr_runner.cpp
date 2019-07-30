@@ -99,7 +99,7 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	patch_x = textToInteger(parser.getOption("--patch_x", "Patching in X-direction for MOTIONCOR2", "1"));
 	patch_y = textToInteger(parser.getOption("--patch_y", "Patching in Y-direction for MOTIONCOR2", "1"));
 	group = textToInteger(parser.getOption("--group_frames", "Average together this many frames before calculating the beam-induced shifts", "1"));
-	fn_defect = parser.getOption("--defect_file","Location of a MOTIONCOR2-style detector defect file", "");
+	fn_defect = parser.getOption("--defect_file","Location of a MOTIONCOR2-style detector defect file (x y w h) or a defect map (1 means bad)", "");
 	fn_archive = parser.getOption("--archive","Location of the directory for archiving movies in 4-byte MRC format","");
 	fn_other_motioncor2_args = parser.getOption("--other_motioncor2_args", "Additional arguments to MOTIONCOR2", "");
 	gpu_ids = parser.getOption("--gpu", "Device ids for each MPI-thread, e.g 0:1:2:3", "");
@@ -145,6 +145,14 @@ void MotioncorrRunner::usage()
 
 void MotioncorrRunner::initialise()
 {
+	if (fn_defect.getExtension() == "txt" && detectSerialEMDefectText(fn_defect))
+	{
+		std::cerr << "ERROR: The defect file seems to be a SerialEM's defect file. This format is different from the MotionCor2's format (x y w h)." << std::endl;
+		std::cerr << "       You can convert it to a defect map by IMOD utilities e.g. \"clip defect -D defect.txt -f tif movie.mrc defect_map.tif\"." << std::endl; 
+		std::cerr << "       See explanations in the SerialEM manual." << std::endl;
+		REPORT_ERROR("The defect file is in the SerialEM format, not MotionCor2's format (x y w h). See above for details.");
+	}
+
 	if (do_motioncor2)
 	{
 		// Get the MOTIONCOR2 executable
@@ -1089,7 +1097,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 		bBad.initZeros();
 		if (fn_defect != "")
 		{
-			fillDefectMask(bBad, fn_defect);
+			fillDefectMask(bBad, fn_defect, n_threads);
 #ifdef DEBUG_HOTPIXELS
 			Image<RFLOAT> tmp(nx, ny);
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(tmp())
@@ -2123,7 +2131,30 @@ void MotioncorrRunner::binNonSquareImage(Image<float> &Iwork, RFLOAT bin_factor)
 	NewFFT::inverseFourierTransform(Fbinned, Iwork());
 }
 
-void MotioncorrRunner::fillDefectMask(MultidimArray<bool> &bBad, FileName fn_defect) {
+bool MotioncorrRunner::detectSerialEMDefectText(FileName fn_defect)
+{
+	std::ifstream f_defect(fn_defect);
+	std::string line;
+	bool ret = false;
+
+	while (std::getline(f_defect, line))
+	{
+		if (line.find("CameraSize") != std::string::npos ||
+		    line.find("RotationAndFlip") != std::string::npos ||
+		    line.find("K2Type") != std::string::npos ||
+		    line.find("Bad") != std::string::npos)
+		{
+			ret = true;
+			break;
+		}
+	}
+
+	f_defect.close();
+	return ret;
+}
+
+void MotioncorrRunner::fillDefectMask(MultidimArray<bool> &bBad, FileName fn_defect, int n_threads)
+{
 	const int ny = YSIZE(bBad), nx = XSIZE(bBad);
 
 	FileName ext = fn_defect.getExtension();
@@ -2157,6 +2188,7 @@ void MotioncorrRunner::fillDefectMask(MultidimArray<bool> &bBad, FileName fn_def
 		if (ny != YSIZE(Idefect()) || nx != XSIZE(Idefect()))
 			REPORT_ERROR("The size of the defect map is not the same as that of the movie.");
 
+		#pragma omp parallel for num_threads(n_threads)
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(bBad)
 		{
 			if (DIRECT_MULTIDIM_ELEM(Idefect(), n) != 0)

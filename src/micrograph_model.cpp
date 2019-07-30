@@ -289,7 +289,15 @@ void Micrograph::fillDefectAndHotpixels(MultidimArray<bool> &mask) const
 	checkReadyFlag("getShiftAt");
 
 	mask.initZeros(height, width);
-	if (fnDefect != "")
+
+	bool fix_defect = (fnDefect != "");
+	if (fnDefect.getExtension() == "txt" && MotioncorrRunner::detectSerialEMDefectText(fnDefect))
+	{	
+                std::cerr << "WARNING: The defect file specified in the micrograph metadata STAR file seems to be a SerialEM's defect file and not in the MotionCor2's format (x y w h). The defect file is ignored." << std::endl;
+		fix_defect = false;
+        }
+
+	if (fix_defect)
 		MotioncorrRunner::fillDefectMask(mask, fnDefect);
 
 	if (hotpixelX.size() != hotpixelY.size())

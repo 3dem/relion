@@ -184,7 +184,10 @@ public:
 	void writeSTAR();
 
 	// Read fn_defect (defect map, where 1 is bad, or defect text in the UCSF MotionCor2 format, x y w h) and fill bBad.
-	static void fillDefectMask(MultidimArray<bool> &bBad, FileName fn_defect);
+	static void fillDefectMask(MultidimArray<bool> &bBad, FileName fn_defect, int n_threads=1);
+
+	// Check if fn_defect is Serial EM's defect file
+	static bool detectSerialEMDefectText(FileName fn_defect);
 
 private:
 	// shiftx, shifty is relative to the (real space) image size
