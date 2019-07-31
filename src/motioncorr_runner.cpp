@@ -17,6 +17,8 @@
  * source code. Additional authorship citations may be added, but existing
  * author citations must be preserved.
  ***************************************************************************/
+#include <omp.h>
+
 #include "src/motioncorr_runner.h"
 #ifdef CUDA
 #include "src/acc/cuda/cuda_mem_utils.h"
@@ -26,7 +28,7 @@
 #include "src/matrix1d.h"
 #include "src/jaz/img_proc/image_op.h"
 #include "src/funcs.h"
-#include <omp.h>
+#include "src/renderEER.h"
 
 //#define TIMING
 #ifdef TIMING
@@ -953,6 +955,12 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	std::ofstream logfile;
 	logfile.open(fn_log);
 
+	// EER related things
+	// TODO: will be refactored
+	EERRenderer renderer;
+	const bool isEER = (mic.getMovieFilename().getExtension() == "ecc");
+	const int EER_grouping = 40;
+
 	int n_io_threads = n_threads;
 	logfile << "Working on " << fn_mic << " with " << n_threads << " thread(s)." << std::endl << std::endl;
 	if (max_io_threads > 0 && n_io_threads > max_io_threads)
@@ -971,10 +979,20 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 
 	const int hotpixel_sigma = 6;
 	const int fit_rmsd_threshold = 10; // px
+	int nx, ny, nn;
 
 	// Check image size
-	Ihead.read(fn_mic, false, -1, false, true); // select_img -1, mmap false, is_2D true
-	int nx = XSIZE(Ihead()), ny = YSIZE(Ihead()), nn = NSIZE(Ihead());
+	if (!isEER)
+	{
+		Ihead.read(fn_mic, false, -1, false, true); // select_img -1, mmap false, is_2D true
+		nx = XSIZE(Ihead()); ny = YSIZE(Ihead()); nn = NSIZE(Ihead());
+	}
+	else
+	{
+		renderer.read(fn_mic);
+		nx = renderer.getWidth(); ny = renderer.getHeight();
+		nn = renderer.getNFrames() / EER_grouping; // remaining frames are truncated
+	}
 
 	// Which frame to use?
 	logfile << "Movie size: X = " << nx << " Y = " << ny << " N = " << nn << std::endl;
@@ -1046,7 +1064,10 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	RCTIC(TIMING_READ_MOVIE);
 	#pragma omp parallel for num_threads(n_io_threads)
 	for (int iframe = 0; iframe < n_frames; iframe++) {
-		Iframes[iframe].read(fn_mic, true, frames[iframe], false, true); // mmap false, is_2D true
+		if (!isEER)
+			Iframes[iframe].read(fn_mic, true, frames[iframe], false, true); // mmap false, is_2D true
+		else
+			renderer.renderFrames(frames[iframe] * EER_grouping + 1, (frames[iframe] + 1) * EER_grouping, Iframes[iframe]());
 	}
 	RCTOC(TIMING_READ_MOVIE);
 

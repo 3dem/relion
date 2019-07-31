@@ -12,7 +12,7 @@
 
 //#define DEBUG_EER
 
-#define TIMING
+//#define TIMING
 #ifdef TIMING
 	#define RCTIC(label) (timer.tic(label))
 	#define RCTOC(label) (timer.toc(label))
@@ -43,7 +43,17 @@ void EERRenderer::render8K(MultidimArray<T> &image, std::vector<unsigned int> &p
 	}
 }
 
+EERRenderer::EERRenderer()
+{
+	ready = false;
+}
+
 EERRenderer::EERRenderer(FileName fn_movie)
+{
+	read(fn_movie);
+}
+
+void EERRenderer::read(FileName fn_movie)
 {
 	/* Check file size and load everything */
 	RCTIC(TIMING_READ_EER);
@@ -108,12 +118,26 @@ int EERRenderer::getNFrames()
 	return frame_sizes.size();
 }
 
+int EERRenderer::getWidth()
+{
+	if (!ready)
+		REPORT_ERROR("EERRenderer::getNFrames called before ready.");
+
+	return 8192; // TODO: allow other size
+}
+
+int EERRenderer::getHeight()
+{
+	if (!ready)
+		REPORT_ERROR("EERRenderer::getNFrames called before ready.");
+
+	return getWidth();
+}
+
 long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArray<float> &image)
 {
 	if (!ready)
 		REPORT_ERROR("EERRenderer::renderNFrames called before ready.");
-
-	const int outsize = 8192; // TODO
 
 	if (frame_start <= 0 || frame_start > getNFrames() ||
 	    frame_end < frame_start || frame_end > getNFrames())
@@ -127,7 +151,7 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 
 	std::vector<unsigned int> positions;
 	std::vector<unsigned char> symbols;
-	image.initZeros(outsize, outsize);
+	image.initZeros(getHeight(), getWidth());
 
 	for (int iframe = frame_start; iframe <= frame_end; iframe++)
 	{
@@ -178,7 +202,7 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 				n_pix++;
 			}
 
-#ifdef DEBUG_EER
+#ifdef DEBUG_EER_DETAIL
 			printf("%d: %u %u, %u %u %d\n", pos, p1, s1, p2, s2, n_pix);
 #endif
 			pos += 3;

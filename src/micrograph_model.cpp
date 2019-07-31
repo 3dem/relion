@@ -22,6 +22,7 @@
 #include "src/metadata_table.h"
 #include "src/image.h"
 #include "src/motioncorr_runner.h"
+#include "src/renderEER.h"
 
 // TODO: Think about first frame for local model
 
@@ -135,9 +136,12 @@ Micrograph::Micrograph(FileName filename, FileName fnGain, RFLOAT binning)
 {
 	clearFields();
 
-	if (filename.getExtension() == "star" && fnGain == "") {
+	if (filename.getExtension() == "star" && fnGain == "")
+	{
 		read(filename);
-	} else {
+	}
+	else
+	{
 		setMovie(filename, fnGain, binning);
 	}
 
@@ -479,12 +483,23 @@ void Micrograph::read(FileName fn_in, bool read_hotpixels)
 
 void Micrograph::setMovie(FileName fnMovie, FileName fnGain, RFLOAT binning)
 {
-	Image<RFLOAT> Ihead;
-	Ihead.read(fnMovie, false, -1, false, true); // select_img -1, mmap false, is_2D true
+	if (fnMovie.getExtension() == "ecc")
+	{
+		const int EER_grouping = 40; // TODO WIP: Get this from the caller!
+		EERRenderer renderer(fnMovie); // TODO WIP: This reads whole movie, which is too expensive!
+		width = renderer.getWidth();
+		height = renderer.getHeight();
+		n_frames = renderer.getNFrames() / EER_grouping;
+	}
+	else
+	{
+		Image<RFLOAT> Ihead;
+		Ihead.read(fnMovie, false, -1, false, true); // select_img -1, mmap false, is_2D true
 
-	width = XSIZE(Ihead());
-	height = YSIZE(Ihead());
-	n_frames = NSIZE(Ihead());
+		width = XSIZE(Ihead());
+		height = YSIZE(Ihead());
+		n_frames = NSIZE(Ihead());
+	}
 
 	this->binning = binning;
 

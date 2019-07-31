@@ -1387,6 +1387,8 @@ private:
 			err = readIMAGIC(select_img);//imagic is always an stack
 		else if (ext_name.contains("dm"))
 			REPORT_ERROR("The Digital Micrograph format (DM3, DM4) is not supported. You can convert it to MRC by other programs, for example, dm2mrc in IMOD.");
+		else if (ext_name.contains("ecc"))
+			REPORT_ERROR("BUG: EER movies should be handled by EERRenderer, not by Image.");
 		else
 			err = readSPIDER(select_img);
 

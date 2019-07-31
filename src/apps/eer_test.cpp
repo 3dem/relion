@@ -33,7 +33,8 @@ class eer_test {
 	}
 
 	void run() {
-		EERRenderer renderer(fn_movie);
+		EERRenderer renderer;
+		renderer.read(fn_movie);
 		Image<float> image;
 
 		int frames_to_read = renderer.getNFrames();

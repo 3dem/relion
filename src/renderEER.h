@@ -28,6 +28,7 @@ class EERRenderer {
 
 	public:
 
+	EERRenderer();
 	EERRenderer(FileName fn_movie);
 	~EERRenderer();
 
@@ -41,8 +42,12 @@ class EERRenderer {
 	{
 		REPORT_ERROR("Copy assignment operator for EERRenderer not implemented yet.");
 	}
+
+	void read(FileName fn_movie);
 	
 	int getNFrames();
+	int getWidth();
+	int getHeight();
 
 	// Frame indices are 1-indexed.
 	// image is cleared.
