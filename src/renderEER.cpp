@@ -167,7 +167,7 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 
 		// unpack every two symbols = 12 bit * 2 = 24 bit = 3 byte
 		//  |bbbbBBBB|BBBBaaaa|AAAAAAAA|
-		// With SIMD intrinsics at the SSSE3 level, we can unpack 10 symbols (120 bits) simultaneouosly.
+		// With SIMD intrinsics at the SSSE3 level, we can unpack 10 symbols (120 bits) simultaneously.
 		unsigned char p1, p2, s1, s2;
 
 		// Because there is a footer, it is safe to go beyond the limit by two bytes.
@@ -222,11 +222,37 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 		printf("Decoded %lld electrons / %d pixels from frame %5d.\n", n_electron, n_pix, iframe);
 #endif
 	}
+#ifdef DEBUG_EER
 	printf("Decoded %lld electrons in total.\n", total_n_electron);
+#endif
 
 #ifdef TIMING
 	timer.printTimes(false);
 #endif
 
 	return total_n_electron;
+}
+
+void EERRenderer::upsampleEERGain(MultidimArray<float> &gain)
+{
+	const long long size = 4096 * 2; // TODO
+	MultidimArray<float> original = gain;
+
+	gain.resize(size, size);
+	RFLOAT sum = 0;
+	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(gain)
+	{
+		DIRECT_A2D_ELEM(gain, i, j) = DIRECT_A2D_ELEM(original, i / 2, j / 2);
+		sum += DIRECT_A2D_ELEM(gain, i, j);
+	}
+	sum /= size * size;
+
+	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(gain)
+	{
+		if (DIRECT_A2D_ELEM(gain, i, j) != 0)
+		{
+			DIRECT_A2D_ELEM(gain, i, j) = sum / DIRECT_A2D_ELEM(gain, i, j);
+		}
+		// TODO: cold pixels should be patched later...
+	}
 }

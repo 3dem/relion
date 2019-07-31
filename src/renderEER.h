@@ -53,4 +53,6 @@ class EERRenderer {
 	// image is cleared.
 	// This function is thread-safe (except for timing).
 	long long renderFrames(int frame_start, int frame_end, MultidimArray<float> &image);
+
+	static void upsampleEERGain(MultidimArray<float> &gain);
 };

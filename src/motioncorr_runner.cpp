@@ -1053,6 +1053,12 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	RCTIC(TIMING_READ_GAIN);
 	if (fn_gain_reference != "") {
 		Igain.read(fn_gain_reference);
+
+		// TODO: recycle! (should be done in the same way as rotation)
+		if (isEER)
+			EERRenderer::upsampleEERGain(Igain());
+		Igain.write("DEBUG-gain_ref.mrc");
+
 		if (XSIZE(Igain()) != nx || YSIZE(Igain()) != ny) {
 			std::cerr << "fn_mic: " << fn_mic << std::endl;
 			REPORT_ERROR("The size of the image and the size of the gain reference do not match. Make sure the gain reference has been rotated if necessary.");
@@ -1125,6 +1131,16 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 				DIRECT_MULTIDIM_ELEM(tmp(), n) = DIRECT_MULTIDIM_ELEM(bBad, n);
 			tmp.write("defect.mrc");
 #endif
+		}
+
+		// TODO: This should be done earlier and merged with badmap
+		if (isEER && fn_gain_reference != "")
+		{
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Igain())
+			{
+				if (DIRECT_MULTIDIM_ELEM(Igain(), n) == 0) // || DIRECT_MULTIDIM_ELEM(Igain(), n) > 2.0)
+					DIRECT_MULTIDIM_ELEM(bBad, n) = true;
+			}
 		}
 
 		int n_bad = 0;
