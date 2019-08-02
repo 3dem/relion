@@ -54,7 +54,8 @@ void MicrographHandler::init(
 	{
 		MetaDataTable corrMic;
 		ObservationModel obsModel;
-		ObservationModel::loadSafely(corrMicFn, obsModel, corrMic, "micrographs", verb);
+		// Don't die even if conversion failed. Polishing does not use obsModel from a motion correction STAR file
+		ObservationModel::loadSafely(corrMicFn, obsModel, corrMic, "micrographs", verb, false);
 		mic2meta.clear();
 
 		std::string micName, metaName;
