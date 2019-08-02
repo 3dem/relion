@@ -1108,7 +1108,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 
 		int n_bad = 0;
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Isum) {
-			if (DIRECT_MULTIDIM_ELEM(Isum, n) > threshold) {
+			if (DIRECT_MULTIDIM_ELEM(Isum, n) > threshold && !DIRECT_MULTIDIM_ELEM(bBad, n)) {
 				DIRECT_MULTIDIM_ELEM(bBad, n) = true;
 				n_bad++;
 				mic.hotpixelX.push_back(n % nx);
