@@ -367,10 +367,9 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 
 	int corrections_section = parser.addSection("Corrections");
 
-	if (parser.checkOption("--pad_ctf", "Perform CTF padding to treat CTF aliaising better?"))
-		do_ctf_padding = true;
-	else
-		do_ctf_padding = false;
+	do_ctf_padding = parser.checkOption("--pad_ctf", "Perform CTF padding to treat CTF aliaising better?");
+	if (do_ctf_padding)
+		REPORT_ERROR("--pad_ctf currently disabled.");
 
 	// Can also switch the following option OFF
 	if (parser.checkOption("--scale", "Switch on intensity-scale corrections on image groups", "OLD"))
@@ -614,6 +613,8 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	int corrections_section = parser.addSection("Corrections");
 	do_ctf_correction = parser.checkOption("--ctf", "Perform CTF correction?");
 	do_ctf_padding = parser.checkOption("--pad_ctf", "Perform CTF padding to treat CTF aliaising better?");
+	if (do_ctf_padding)
+		REPORT_ERROR("--pad_ctf currently disabled.");
 	intact_ctf_first_peak = parser.checkOption("--ctf_intact_first_peak", "Ignore CTFs until their first peak?");
 	refs_are_ctf_corrected = parser.checkOption("--ctf_corrected_ref", "Have the input references been CTF-amplitude corrected?");
 	ctf_phase_flipped = parser.checkOption("--ctf_phase_flipped", "Have the data been CTF phase-flipped?");
