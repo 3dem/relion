@@ -20,6 +20,7 @@
 
 #include <src/args.h>
 #include <src/metadata_table.h>
+#include <src/micrograph_model.h>
 #include <src/jaz/io/star_converter.h>
 
 class star_converter
@@ -28,6 +29,7 @@ public:
 
 	FileName fn_in, fn_out;
 	IOParser parser;
+	RFLOAT Cs, Q0;
 
 	void usage()
 	{
@@ -41,6 +43,8 @@ public:
 		int general_section = parser.addSection("Options");
 		fn_in = parser.getOption("--i", "Input STAR file to be converted", "None");
 		fn_out = parser.getOption("--o", "Output STAR file to be written", "None");
+		Cs = textToFloat(parser.getOption("--Cs", "Spherical aberration (mm)", "-1"));
+		Q0 = textToFloat(parser.getOption("--Q0", "Amplitude contrast", "-1"));
 
 		if (fn_in == "None" || fn_out == "None")
 		{
@@ -52,16 +56,62 @@ public:
 	void run()
 	{
 		MetaDataTable mdt;
-		mdt.read(fn_in);
-	
 		MetaDataTable mdtOut, optOut;
-		StarConverter::convert_3p0_particlesTo_3p1(mdt, mdtOut, optOut);
+		mdt.read(fn_in);
+		const bool isMotionCorrSTAR = mdt.containsLabel(EMDL_MICROGRAPH_METADATA_NAME);
+		StarConverter::convert_3p0_particlesTo_3p1(mdt, mdtOut, optOut, "", false); // don't die
+
+		if (mdt.containsLabel(EMDL_IMAGE_NAME))
+		{
+			std::cout << "The input is a particle STAR file" << std::endl;
+			mdtOut.setName("particles");
+		}
+		else if (isMotionCorrSTAR)
+		{
+			std::cout << "The input is a STAR file from a MotionCorr job." << std::endl;
+			std::cout << "The (binned) pixel size and the voltage are taken from the first metadata STAR file." << std::endl;
+			FileName fn_meta;
+			if (!mdtOut.getValue(EMDL_MICROGRAPH_METADATA_NAME, fn_meta, 0))
+				REPORT_ERROR("Failed to find the metadata STAR file");
+
+			Micrograph mic(fn_meta);
+			std::cout << "- voltage: " << mic.voltage << std::endl;
+			optOut.setValue(EMDL_CTF_VOLTAGE, mic.voltage);
+
+			std::cout << "- unbinned pixel size: " << mic.angpix << std::endl;
+			std::cout << "- binning factor: " << mic.getBinningFactor() << std::endl;
+			const RFLOAT angpix = mic.angpix * mic.getBinningFactor();
+			std::cout << "- binned pixel size: " << angpix << std::endl;
+			optOut.setValue(EMDL_IMAGE_PIXEL_SIZE, angpix);
+
+			std::cout << "\nThe other microscope parameters must be specified in the command line." << std::endl;
+			if (Cs < 0)
+				REPORT_ERROR("Please specify the spherical aberration (mm) in the --Cs option.");
+			std::cout << "- spherical aberration: " << Cs << std::endl;
+			optOut.setValue(EMDL_CTF_CS, Cs);
+			if (Q0 < 0)
+				REPORT_ERROR("Please specify the amplitude contrast in the --Q0 option");
+			std::cout << "- amplitude contrast: " << Q0 << std::endl;
+			optOut.setValue(EMDL_CTF_Q0, Q0);
+
+			std::cout << "\nAll necessary information is ready." << std::endl;
+
+			mdtOut.setName("micrographs");
+		}
+		else
+		{
+			std::cout << "The input is a micrograph STAR file with CTF information." << std::endl;
+			mdtOut.setName("micrographs");
+		}
 	
 		std::ofstream of(fn_out);
 
 		optOut.write(of);
 		mdtOut.write(of);
 		of.close();
+
+		std::cout << "\nWritten " << fn_out << std::endl;
+		std::cout << "Please carefully examine the optics group table at the beginning of the output to make sure the information is correct." << std::endl;
 	}
 };
 
