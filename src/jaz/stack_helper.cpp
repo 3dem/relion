@@ -286,95 +286,6 @@ std::vector<std::vector<Image<RFLOAT> > > StackHelper::loadMovieStack(const Meta
 	return out;
 }
 
-std::vector<std::vector<Image<Complex>>> StackHelper::loadMovieStackFS(
-		const MetaDataTable* mdt,
-		std::string moviePath,
-		bool center, int threads,
-		std::vector<ParFourierTransformer> *fts,
-		int firstFrame, int lastFrame, bool verbose)
-{
-	std::vector<std::vector<Image<Complex> > > out(mdt->numberOfObjects());
-	const long pc = mdt->numberOfObjects();
-
-	std::string name, fullName, movieName;
-	mdt->getValue(EMDL_IMAGE_NAME, fullName, 0);
-	mdt->getValue(EMDL_MICROGRAPH_NAME, movieName, 0);
-	name = fullName.substr(fullName.find("@")+1);
-
-	std::string finName;
-
-	if (moviePath == "")
-	{
-		finName = name;
-	}
-	else
-	{
-		finName = moviePath + "/" + movieName.substr(movieName.find_last_of("/")+1);
-	}
-
-	if (verbose)
-		std::cout << "loading " << finName << "\n";
-
-	Image<RFLOAT> in;
-	in.read(finName);
-
-	if (verbose)
-	{
-		std::cout << "size = " << in.data.xdim << "x" << in.data.ydim << "x" << in.data.zdim << "x" << in.data.ndim << "\n";
-		std::cout << "pc = " << pc << "\n";
-	}
-
-	const int fcMov = in.data.ndim / pc;
-
-	if (fcMov < lastFrame+1)
-	{
-		std::stringstream sts;
-		sts << "StackHelper::loadMovieStackFS: unable to load " << (lastFrame - firstFrame + 1) << " frames.";
-		sts << "Only " << fcMov << " frames present in " << finName << ".\n";
-		REPORT_ERROR(sts.str());
-	}
-
-	const int lfAct = lastFrame > 0? lastFrame : fcMov - 1;
-	const int fc = lfAct - firstFrame + 1;
-
-	const int w = in.data.xdim;
-	const int h = in.data.ydim;
-
-	for (long p = 0; p < pc; p++)
-	{
-		out[p] = std::vector<Image<Complex> >(fc);
-
-		if (threads > 1)
-		{
-			#pragma omp parallel for num_threads(threads)
-			for (long f = 0; f < fc; f++)
-			{
-				int threadnum = omp_get_thread_num();
-
-				Image<RFLOAT> aux(w,h);
-
-				SliceHelper::extractStackSlice(in, aux, (f+firstFrame)*pc + p);
-				if (center) CenterFFT(aux(), true);
-				(*fts)[threadnum].FourierTransform(aux(), out[p][f]());
-			}
-		}
-		else
-		{
-			Image<RFLOAT> aux(w,h);
-			FourierTransformer ft;
-
-			for (long f = 0; f < fc; f++)
-			{
-				SliceHelper::extractStackSlice(in, aux, (f+firstFrame)*pc + p);
-				if (center) CenterFFT(aux(), true);
-				ft.FourierTransform(aux(), out[p][f]());
-			}
-		}
-	}
-
-	return out;
-}
-
 std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 		const MetaDataTable* mdt,
 		Image<RFLOAT>* gainRef, MultidimArray<bool>* defectMask, std::string movieFn,
@@ -540,6 +451,8 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 				else DIRECT_A2D_ELEM(muGraph.data, i, j) = rnd_gaus(frame_mean, frame_std);
 			}
 		}
+
+		// TODO: TAKANORI: Cache muGraph HERE
 
 		#pragma omp parallel for num_threads(threads_p)
 		for (long p = 0; p < pc; p++)

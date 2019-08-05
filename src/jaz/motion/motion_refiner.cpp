@@ -122,7 +122,7 @@ void MotionRefiner::init()
 	adaptMovieNames();
 	
 	allMdts = StackHelper::splitByMicrographName(mdt0);
-	
+
 	if (minMG >= allMdts.size())
 	{
 		std::stringstream sts0, sts1;
@@ -179,11 +179,12 @@ void MotionRefiner::init()
 	{
 		std::string metaFn = ""; // the first meta-star filename
 		double fractDose = 0.0; // the dose in the first meta-star (@TODO: support variable dose)
+		// => we don't need variable dose support as long as different motioncorr jobs are processed separatedly
 		int fc0; // the frame count in the first movie
 		
 		// initialise corrected/uncorrected micrograph dictionary, then load the header
 		// of the first movie (or read corrected_micrographs.star) to obtain:
-		//  frame count, micrograph size and the fractional dose
+		// frame count, micrograph size and the fractional dose
 		micrographHandler.init(
 			chosenMdts[0], reference.angpix, verb, nr_omp_threads, // in
 			fc0, fractDose, metaFn); // out
@@ -330,11 +331,16 @@ void MotionRefiner::run()
 	
 	// The subsets will be used in openMPI parallelisation: instead of over g0->gc,
 	// they will be over smaller subsets
+	
+	// TODO: TAKANORI: first, estimate FCC on only a subset of movies here
 	if (estimateMotion)
 	{
 		motionEstimator.process(motionMdts, 0, motionMdts.size()-1);
 	}
 	
+	// TODO: TAKANORI: then process all movies, simultaneously estimating tracks and recombining.
+	//                 micrograph handler can cache movie frames to avoid reading movies twice.
+	//                 (if --sbs, don't cache to save memory)
 	if (recombineFrames)
 	{
 		double k_out_A = reference.pixToAng(reference.k_out);
@@ -382,7 +388,9 @@ void MotionRefiner::combineEPSAndSTARfiles()
 			fn_eps.push_back(outPath+"scalefactors.eps");
 		}
 	}
-	
+
+	std::vector<bool> isOgPresent(obsModel.numberOfOpticsGroups(), false);
+	std::vector<bool> isOgAbsent(obsModel.numberOfOpticsGroups(), false);
 	for (long g = 0; g < allMdts.size(); g++)
 	{
 		FileName fn_root = getOutputFileNameRoot(outPath, allMdts[g]);
@@ -397,6 +405,22 @@ void MotionRefiner::combineEPSAndSTARfiles()
 			MetaDataTable mdt;
 			mdt.read(fn_root+"_shiny" + frameRecombiner.getOutputSuffix() + ".star");
 			mdtAll.append(mdt);
+
+			FOR_ALL_OBJECTS_IN_METADATA_TABLE(mdt)
+			{
+				isOgPresent[obsModel.getOpticsGroup(mdt)] = true;
+			}
+		}
+		else
+		{
+			// Non-processed particles belonging to micrographs not present in the MotionCorr STAR file
+			// Leave them as they are
+			mdtAll.append(allMdts[g]);
+
+			FOR_ALL_OBJECTS_IN_METADATA_TABLE(allMdts[g])
+			{
+				isOgAbsent[obsModel.getOpticsGroup(allMdts[g])] = true;
+			}
 		}
 	}
 	
@@ -409,6 +433,19 @@ void MotionRefiner::combineEPSAndSTARfiles()
 	{
 		for (int og = 0; og < obsModel.numberOfOpticsGroups(); og++)
 		{
+			// If this optics group was not processed, don't change anything
+			if (!isOgPresent[og])
+			{
+				std::cout << " + optics group " << (og + 1) << " was not processed because no particles belong to the movies in the input MotionCorr STAR file." << std::endl;
+				continue;
+			}
+
+			if (isOgAbsent[og])
+			{
+				std::cerr << "WARNING: Not all particles in the optics group " << (og + 1) << " were processed." << std::endl;
+				std::cerr << "WARNING: Metadata in the optics group table can be inconsistent now if you changed the pixel size, box size or CTF pre-multiplication." << std::endl;
+			}
+
 			obsModel.opticsMdt.setValue(EMDL_IMAGE_PIXEL_SIZE, frameRecombiner.getOutputPixelSize(og), og);
 			obsModel.opticsMdt.setValue(EMDL_IMAGE_SIZE, frameRecombiner.getOutputBoxSize(og), og);
 			obsModel.opticsMdt.setValue(EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED, frameRecombiner.isCtfMultiplied(og), og);
@@ -476,5 +513,3 @@ void MotionRefiner::adaptMovieNames()
 		}
 	}
 }
-
-

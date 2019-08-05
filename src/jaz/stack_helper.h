@@ -57,13 +57,8 @@ class StackHelper
 		
 		static std::vector<std::vector<Image<RFLOAT>>> loadMovieStack(
 				const MetaDataTable* mdt, std::string moviePath);
-		
-		static std::vector<std::vector<Image<Complex>>> loadMovieStackFS(
-				const MetaDataTable* mdt, std::string moviePath,
-				bool center = false, int threads = 1,
-				std::vector<ParFourierTransformer>* fts = 0,
-				int firstFrame = 0, int lastFrame = -1, bool verbose = false);
-		
+	
+		// For movies
 		static std::vector<std::vector<Image<Complex>>> extractMovieStackFS(
 				const MetaDataTable* mdt,
 				Image<RFLOAT>* gainRef, MultidimArray<bool>* defectMask, std::string movieFn,
