@@ -1198,6 +1198,7 @@ void BackProjector::updateSSNRarrays(RFLOAT tau2_fudge,
 
 void BackProjector::externalReconstruct(MultidimArray<RFLOAT> &vol_out,
                                         FileName &fn_out,
+                                        const MultidimArray<RFLOAT> &fsc_halves,
                                         const MultidimArray<RFLOAT> &tau2,
                                         RFLOAT tau2_fudge,
                                         int verb)
@@ -1249,6 +1250,7 @@ void BackProjector::externalReconstruct(MultidimArray<RFLOAT> &vol_out,
 		MDtau.addObject();
 		MDtau.setValue(EMDL_SPECTRAL_IDX, ii);
 		MDtau.setValue(EMDL_MLMODEL_TAU2_REF, tau2(ii));
+		MDtau.setValue(EMDL_MLMODEL_FSC_HALVES_REF, fsc_halves(ii));
 	}
 
 	std::ofstream  fh;

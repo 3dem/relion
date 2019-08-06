@@ -294,6 +294,7 @@ public:
 	*/
 	void externalReconstruct(MultidimArray<RFLOAT> &vol_out,
 			FileName &fn_out,
+            const MultidimArray<RFLOAT> &fsc_halves,
 			const MultidimArray<RFLOAT> &tau2,
 			RFLOAT tau2_fudge = 1.,
 			int verb = 0);

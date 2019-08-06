@@ -2069,6 +2069,7 @@ void MlOptimiserMpi::maximization()
 							else fn_ext_root.compose(fn_ext_root+"_class", iclass+1, "", 3);
 							(wsum_model.BPref[iclass]).externalReconstruct(mymodel.Iref[ith_recons],
 									fn_ext_root,
+									mymodel.fsc_halves_class[ith_recons],
 									mymodel.tau2_class[ith_recons],
 									mymodel.tau2_fudge_factor,
 									node->rank==1); // only first slaves is verbose
@@ -2217,6 +2218,7 @@ void MlOptimiserMpi::maximization()
 								else fn_ext_root.compose(fn_ext_root+"_class", iclass+1, "", 3);
 								(wsum_model.BPref[iclass]).externalReconstruct(mymodel.Iref[ith_recons],
 										fn_ext_root,
+										mymodel.fsc_halves_class[ith_recons],
 										mymodel.tau2_class[ith_recons],
 										mymodel.tau2_fudge_factor);
 							}

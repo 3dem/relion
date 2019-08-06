@@ -4054,6 +4054,7 @@ void MlOptimiser::maximization()
 					fn_ext_root.compose(fn_ext_root+"_class", iclass+1, "", 3);
 					(wsum_model.BPref[iclass]).externalReconstruct(mymodel.Iref[iclass],
 							fn_ext_root,
+							mymodel.fsc_halves_class[iclass],
 							mymodel.tau2_class[iclass],
 							mymodel.tau2_fudge_factor,
 							1); // verbose
