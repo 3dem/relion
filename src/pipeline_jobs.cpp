@@ -1204,15 +1204,14 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 	{
 		fn_in = joboptions["fn_in_other"].getString();
 		std::string node_type = joboptions["node_type"].getString();
-
-		if (node_type == "2D/3D particle coordinates (*.box, *_pick.star)")
+		if (node_type == "Particle coordinates (*.box, *_pick.star)")
 		{
-
 			// Make a suffix file, which contains the actual suffix as a suffix
 			// Get the coordinate-file suffix
 			fn_out = "coords_suffix" + fn_in.afterLastOf("*");
 			Node node(outputname + fn_out, NODE_MIC_COORDS);
 			outputNodes.push_back(node);
+			command += " --do_coordinates ";
 		}
 		else if (node_type == "Particles STAR file (.star)" ||
 				 node_type == "2D references (.star or .mrcs)" ||
