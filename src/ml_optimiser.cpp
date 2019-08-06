@@ -4526,7 +4526,7 @@ void MlOptimiser::updateCurrentResolution()
 	std::cerr << "Entering MlOptimiser::updateCurrentResolution" << std::endl;
 #endif
 
-	if (do_sgd)
+	if (do_sgd && !do_split_random_halves)
 	{
 		// Do initial iterations with completely identical K references, 100-particle batch size, enforce non-negativity and 35A resolution limit
 		if (iter < sgd_ini_iter)

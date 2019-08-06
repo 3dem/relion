@@ -1098,14 +1098,24 @@ void MlOptimiserMpi::expectation()
         try
         {
 
-        	long int progress_bar_step_size = XMIPP_MAX(1, my_nr_particles / 60);
-            long int prev_barstep = 0;
-        	long int my_first_particle = 0.;
-        	long int my_last_particle = my_nr_particles - 1;
-        	long int my_first_particle_halfset1 = 0;
-        	long int my_last_particle_halfset1 = mydata.numberOfParticles(1) - 1;
-        	long int my_first_particle_halfset2 = mydata.numberOfParticles(1);
-        	long int my_last_particle_halfset2 = mydata.numberOfParticles() - 1;
+			long int progress_bar_step_size = XMIPP_MAX(1, my_nr_particles / 60);
+			long int prev_barstep = 0;
+			long int my_first_particle = 0.;
+			long int my_last_particle = my_nr_particles - 1;
+			long int my_first_particle_halfset1 = 0;
+			long int my_last_particle_halfset1 = mydata.numberOfParticles(1) - 1;
+			long int my_first_particle_halfset2 = mydata.numberOfParticles(1);
+			long int my_last_particle_halfset2 = mydata.numberOfParticles() - 1;
+
+			if (subset_size > 0)
+			{
+				my_last_particle_halfset1 = my_nr_particles;
+				my_last_particle_halfset2 = mydata.numberOfParticles(1) + my_nr_particles;
+
+				if (do_split_random_halves)
+					progress_bar_step_size = XMIPP_MAX(1, my_nr_particles * 2 / 60);
+			}
+
         	if (verb > 0)
         	{
         		if (do_sgd)
@@ -2967,9 +2977,6 @@ void MlOptimiserMpi::compareTwoHalves()
 
 	if (mymodel.nr_classes > 1)
 		REPORT_ERROR("ERROR: you should not be in MlOptimiserMpi::compareTwoHalves if mymodel.nr_classes > 1");
-
-	if (do_sgd)
-		REPORT_ERROR("ERROR: you should not be in MlOptimiserMpi::compareTwoHalves if doing SGD");
 
 	// Only do gold-standard FSC comparisons for single-class refinements
 	// TODO: Rank 0 and 1 do all bodies sequentially here... That parallelisation could be improved...
