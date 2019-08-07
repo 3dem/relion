@@ -584,10 +584,15 @@ will still yield good performance and possibly a more stable execution. \n" << s
 void MlOptimiserMpi::initialiseWorkLoad()
 {
 
-    if (do_split_random_halves && node->size <= 2)
-    	REPORT_ERROR("MlOptimiserMpi::initialiseWorkLoad: at least 3 MPI processes are required when splitting data into random halves");
-    else if(node->size <= 1)
-    	REPORT_ERROR("MlOptimiserMpi::initialiseWorkLoad: at least 2 MPI processes are required, otherwise use the sequential program");
+	if (do_split_random_halves)
+	{
+		if (node->size <= 2)
+			REPORT_ERROR("MlOptimiserMpi::initialiseWorkLoad: at least 3 MPI processes are required when splitting data into random halves");
+		if (node->size % 2 == 0)
+			REPORT_ERROR("MlOptimiserMpi::initialiseWorkLoad: the number of MPI processes must be an odd number when gold-standard seperation is applied.");
+	}
+	else if (node->size <= 1)
+		REPORT_ERROR("MlOptimiserMpi::initialiseWorkLoad: at least 2 MPI processes are required, otherwise use the sequential program");
 
 	// Get the same random number generator seed for all mpi nodes
 	if (random_seed == -1)
