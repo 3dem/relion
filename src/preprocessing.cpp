@@ -135,8 +135,11 @@ void Preprocessing::initialise()
 		// Read in the micrographs STAR file
 		ObservationModel::loadSafely(fn_star_in, obsModelMic, MDmics, "micrographs", verb);
 
-		if ( !MDmics.containsLabel(EMDL_MICROGRAPH_NAME) )
+		if (!MDmics.containsLabel(EMDL_MICROGRAPH_NAME))
 			REPORT_ERROR("Preprocessing::initialise ERROR: Input micrograph STAR file has no rlnMicrographName column!");
+
+		if (!obsModelMic.opticsMdt.containsLabel(EMDL_MICROGRAPH_PIXEL_SIZE))
+			REPORT_ERROR("Preprocessing::initialise ERROR: Input micrograph STAR file has no rlnMicrographPixelSize column!");
 
 		// Get the dimensionality of the micrographs
 
