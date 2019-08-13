@@ -1288,7 +1288,7 @@ void MetaDataTable::write(const FileName &fn_out)
 }
 
 void MetaDataTable::columnHistogram(EMDLabel label, std::vector<RFLOAT> &histX, std::vector<RFLOAT> &histY,
-		int verb, CPlot2D * plot2D,
+		int verb, CPlot2D *plot2D,
 		long int nr_bin, RFLOAT hist_min, RFLOAT hist_max,
 		bool do_fractional_instead, bool do_cumulative_instead)
 {
@@ -1296,7 +1296,6 @@ void MetaDataTable::columnHistogram(EMDLabel label, std::vector<RFLOAT> &histX, 
 		REPORT_ERROR("ERROR: The column specified is not present in the MetaDataTable.");
 
 	std::vector<RFLOAT> values;
-	double sum = 0, sumsq = 0;
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(*this)
 	{
 		RFLOAT val;
@@ -1320,10 +1319,25 @@ void MetaDataTable::columnHistogram(EMDLabel label, std::vector<RFLOAT> &histX, 
 		{
 			REPORT_ERROR("Cannot use --stat_column for this type of column");
 		}
-
 		values.push_back(val);
-		sum += val;
-		sumsq += val * val;
+	}
+
+	
+	std::string title = EMDL::label2Str(label);
+	histogram(values, histX, histY, verb, title, plot2D, nr_bin, hist_min, hist_max, do_fractional_instead, do_cumulative_instead);
+}
+
+void MetaDataTable::histogram(std::vector<RFLOAT> &values, std::vector<RFLOAT> &histX, std::vector<RFLOAT> &histY,
+                              int verb, std::string title, CPlot2D *plot2D,
+                              long int nr_bin, RFLOAT hist_min, RFLOAT hist_max,
+                              bool do_fractional_instead, bool do_cumulative_instead)
+{
+	double sum = 0, sumsq = 0;
+	for (size_t i = 0, ilim = values.size(); i < ilim; i++)
+	{
+		RFLOAT value = values[i];
+		sum += value;
+		sumsq += value * value;
 	}
 
 	long long n_row = values.size();
@@ -1423,17 +1437,13 @@ void MetaDataTable::columnHistogram(EMDLabel label, std::vector<RFLOAT> &histX, 
 
 	if (plot2D != NULL)
 	{
-		std::string title = " Histogram of " + EMDL::label2Str(label);
-		plot2D->SetTitle(title);
+		plot2D->SetTitle(" Histogram of " + title);
 		plot2D->SetDrawLegend(false);
-		plot2D->AddDataSet(histX,histY);
-		plot2D->SetXAxisTitle(EMDL::label2Str(label));
+		plot2D->AddDataSet(histX, histY);
+		plot2D->SetXAxisTitle(title);
 		plot2D->SetYAxisTitle("# entries");
 	}
-
 }
-
-
 
 void MetaDataTable::addToCPlot2D(CPlot2D *plot2D, EMDLabel xaxis, EMDLabel yaxis,
 		double red, double green, double blue, double linewidth, std::string marker)
