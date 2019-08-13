@@ -150,8 +150,8 @@ void Postprocessing::initialise()
 		if (locres_edgwidth < 0.0)
 			locres_edgwidth = locres_sampling;
 
-		if (fn_mask != "")
-			std::cerr << " WARNING: --mask will be ignored for --locres calculation!" << std::endl;
+		if (fn_mask != "" && verb > 0)
+			std::cerr << " WARNING: --mask is used only to make a histogram of local resolutions; it is not used for local resolution calculation itself." << std::endl;
 		if (do_auto_bfac)
 			REPORT_ERROR("Postprocessing::initialise ERROR: for --locres, you cannot do --auto_bfac, use --adhoc_bfac instead!");
 	}
@@ -909,10 +909,11 @@ void Postprocessing::run_locres(int rank, int size)
 
 	long int nn = 0;
 	for (long int kk=((I1()).zinit); kk<=((I1()).zinit + (I1()).zdim - 1); kk+= step_size)
+	{
 		for (long int ii=((I1()).yinit); ii<=((I1()).yinit + (I1()).ydim - 1); ii+= step_size)
+		{
 			for (long int jj=((I1()).xinit); jj<=((I1()).xinit + (I1()).xdim - 1); jj+= step_size)
 			{
-
 				// Abort through the pipeline_control system, TODO: check how this goes with MPI....
 				if (pipeline_control_check_abort_job())
 					exit(RELION_EXIT_ABORTED);
@@ -921,7 +922,6 @@ void Postprocessing::run_locres(int rank, int size)
 				float rad = sqrt(kk*kk + ii*ii + jj*jj);
 				if (rad < myrad)
 				{
-
 					if (nn%size == rank)
 					{
 						// Make a spherical mask around (k,i,j), diameter is step_size pixels, soft-edge width is edgewidth_pix
@@ -993,9 +993,10 @@ void Postprocessing::run_locres(int rank, int size)
 					nn++;
 					if (verb > 0 && nn <= nr_samplings)
 						progress_bar(nn);
-
 				}
 			}
+		}
+	}
 
 	fh.close();
 	if (verb > 0)
@@ -1038,11 +1039,35 @@ void Postprocessing::run_locres(int rank, int size)
 		fn_tmp = fn_out + "_locres_filtered.mrc";
 		I2.setSamplingRateInHeader(angpix);
 		I2.write(fn_tmp);
+		
+#ifdef DEBUG
+		I1() = Isumw;
+		fn_tmp = fn_out + "_locres_sumw.mrc";
+		I1.write(fn_tmp);
+#endif
 
-		// for debugging
-		//I1() = Isumw;
-		//fn_tmp = fn_out + "_locres_sumw.mrc";
-		//I1.write(fn_tmp);
+		if (fn_mask != "")
+		{
+			std::cout << "Calculating a histogram of local resolutions within the mask." << std::endl;
+
+			std::vector<RFLOAT> values;
+			Image<RFLOAT> Imask;
+			Imask.read(fn_mask);
+
+			if (!I1().sameShape(Imask(), true))
+				REPORT_ERROR("The shape of the input half maps and the mask is not the same.");
+
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Imask())
+				if (DIRECT_MULTIDIM_ELEM(Imask(), n) > 0.5)
+					values.push_back(DIRECT_MULTIDIM_ELEM(I1(), n));
+			
+			std::vector <RFLOAT> histX, histY;
+			CPlot2D *plot2D=new CPlot2D("");
+                	FileName fn_eps = fn_out + "_histogram.eps";
+			MetaDataTable::histogram(values, histX, histY, verb, "local resolution", plot2D);
+			plot2D->OutputPostScriptPlot(fn_eps);
+			std::cout << "Written the histogram to " << fn_eps << std::endl;
+		}
 	}
 
 	if (verb > 0)
@@ -1050,9 +1075,7 @@ void Postprocessing::run_locres(int rank, int size)
 
 	if (size > 1)
 		MPI_Barrier(MPI_COMM_WORLD);
-
 }
-
 
 void Postprocessing::run()
 {
