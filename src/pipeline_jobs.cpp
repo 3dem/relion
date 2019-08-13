@@ -82,7 +82,6 @@ std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, 
 	}
 
 	return result;
-
 }
 
 // Any constructor
@@ -376,8 +375,6 @@ void RelionJob::setOption(std::string setOptionLine)
 	{
 		REPORT_ERROR(" ERROR: Job does not contain label: " + label);
 	}
-
-
 }
 
 bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
@@ -544,13 +541,10 @@ void RelionJob::write(std::string fn)
 	MDopts.write(fh);
 
 	fh.close();
-
-
 }
 
 bool RelionJob::saveJobSubmissionScript(std::string newfilename, std::string outputname, std::vector<std::string> commands, std::string &error_message)
 {
-
 	// Open the standard job submission file
 	FileName fn_qsub = joboptions["qsubscript"].getString();
 
@@ -612,11 +606,9 @@ bool RelionJob::saveJobSubmissionScript(std::string newfilename, std::string out
 
 		while (getline(fh, line, '\n'))
 		{
-
 			// Replace all entries in the replacing map
 			for (std::map<std::string,std::string>::iterator it=replacing.begin(); it!=replacing.end(); ++it)
 			{
-
 				std::string from = it->first;
 				std::string to = it->second;
 
@@ -656,7 +648,6 @@ bool RelionJob::saveJobSubmissionScript(std::string newfilename, std::string out
 					}
 				}
 			}
-
 		}
 
 		fo << std::endl;
@@ -666,12 +657,10 @@ bool RelionJob::saveJobSubmissionScript(std::string newfilename, std::string out
 	}
 
 	return true;
-
 }
 
 void RelionJob::initialisePipeline(std::string &outputname, std::string defaultname, int job_counter)
 {
-
 	outputNodes.clear();
 	inputNodes.clear();
 
@@ -684,7 +673,6 @@ void RelionJob::initialisePipeline(std::string &outputname, std::string defaultn
 	}
 
 	outputName = outputname;
-
 }
 
 bool RelionJob::prepareFinalCommand(std::string &outputname, std::vector<std::string> &commands,
@@ -772,7 +760,6 @@ bool RelionJob::prepareFinalCommand(std::string &outputname, std::vector<std::st
 		return true;
 	}
 }
-
 
 // Initialise
 void RelionJob::initialise(int _job_type)
@@ -1013,14 +1000,12 @@ To print a list of possible options, run the corresponding program from the comm
 	{
 	    (it->second).variable = it->first;
 	}
-
 }
 
 
 bool RelionJob::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
-
 	bool result = false;
 
 	if (type == PROC_IMPORT)
@@ -1113,7 +1098,6 @@ bool RelionJob::getCommands(std::string &outputname, std::vector<std::string> &c
 
 void RelionJob::initialiseImportJob()
 {
-
 	hidden_name = ".gui_import";
 
 	joboptions["do_raw"] = JobOption("Import raw movies/micrographs?", true, "Set this to Yes if you plan to import raw movies or micrographs");
@@ -1145,14 +1129,12 @@ Note that due to a bug in a fltk library, you cannot import from directories tha
 
 	joboptions["node_type"] = JobOption("Node type:", job_nodetype_options, 0, "Select the type of Node this is.");
 	joboptions["optics_group_particles"] = JobOption("Rename optics group for particles:", (std::string)"", "Only for the import of a particles STAR file with a single, or no, optics groups defined: rename the optics group for the imported particles to this string.");
-
 }
 
 // Generate the correct commands
 bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
-
 	commands.clear();
 	initialisePipeline(outputname, PROC_IMPORT_NAME, job_counter);
 
@@ -1222,15 +1204,14 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 	{
 		fn_in = joboptions["fn_in_other"].getString();
 		std::string node_type = joboptions["node_type"].getString();
-
-		if (node_type == "2D/3D particle coordinates (*.box, *_pick.star)")
+		if (node_type == "Particle coordinates (*.box, *_pick.star)")
 		{
-
 			// Make a suffix file, which contains the actual suffix as a suffix
 			// Get the coordinate-file suffix
 			fn_out = "coords_suffix" + fn_in.afterLastOf("*");
 			Node node(outputname + fn_out, NODE_MIC_COORDS);
 			outputNodes.push_back(node);
+			command += " --do_coordinates ";
 		}
 		else if (node_type == "Particles STAR file (.star)" ||
 				 node_type == "2D references (.star or .mrcs)" ||
@@ -1301,9 +1282,7 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 			{
 				command += " --do_other";
 			}
-
 		}
-
 	}
 
 	// Now finish the command call to relion_import program, which does the actual copying
@@ -1321,7 +1300,6 @@ bool RelionJob::getCommandsImportJob(std::string &outputname, std::vector<std::s
 
 void RelionJob::initialiseMotioncorrJob()
 {
-
 	hidden_name = ".gui_motioncorr";
 
 	joboptions["input_star_mics"] = JobOption("Input movies STAR file:", NODE_MOVIES, "", "STAR files (*.star)", "A STAR file with all micrographs to run MOTIONCORR on");
@@ -1506,12 +1484,10 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 	commands.push_back(command);
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
-
 }
 
 void RelionJob::initialiseCtffindJob()
 {
-
 	hidden_name = ".gui_ctffind";
 
 	char *default_location;
@@ -1563,12 +1539,11 @@ void RelionJob::initialiseCtffindJob()
 	joboptions["do_EPA"] = JobOption("Perform equi-phase averaging?", false, "If set to Yes, equi-phase averaging is used in the defocus refinement, otherwise basic rotational averaging will be performed.");
 	joboptions["other_gctf_args"] = JobOption("Other Gctf options:", std::string(""), "Provide additional gctf options here.");
 	joboptions["gpu_ids"] = JobOption("Which GPUs to use:", std::string(""), "This argument is not necessary. If left empty, the job itself will try to allocate available GPU resources. You can override the default allocation by providing a list of which GPUs (0,1,2,3, etc) to use. MPI-processes are separated by ':', threads by ','. ");
-
 }
+
 bool RelionJob::getCommandsCtffindJob(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
-
 	commands.clear();
 	initialisePipeline(outputname, PROC_CTFFIND_NAME, job_counter);
 	std::string command;
@@ -1672,7 +1647,6 @@ bool RelionJob::getCommandsCtffindJob(std::string &outputname, std::vector<std::
 
 void RelionJob::initialiseManualpickJob()
 {
-
 	hidden_name = ".gui_manualpick";
 
 	joboptions["fn_in"] = JobOption("Input micrographs:", NODE_MICS, "", "Input micrographs (*.{star,mrc})", "Input STAR file (with or without CTF information), OR a unix-type wildcard with all micrographs in MRC format (in this case no CTFs can be used).");
@@ -1700,13 +1674,11 @@ rlnParticleSelectZScore \n rlnClassNumber \n rlnAutopickFigureOfMerit \n rlnAngl
 Particles that are not in this STAR file, but present in the picked coordinates file will be colored green. If this field is left empty, then the color label (e.g. rlnAutopickFigureOfMerit) should be present in the coordinates STAR file.");
 	joboptions["blue_value"] = JobOption("Blue value: ", 0., 0., 4., 0.1, "The value of this entry will be blue. There will be a linear scale from blue to red, according to this value and the one given below.");
 	joboptions["red_value"] = JobOption("Red value: ", 2., 0., 4., 0.1, "The value of this entry will be red. There will be a linear scale from blue to red, according to this value and the one given above.");
-
-
 }
+
 bool RelionJob::getCommandsManualpickJob(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
-
 	commands.clear();
 	initialisePipeline(outputname, PROC_MANUALPICK_NAME, job_counter);
 	std::string command;
@@ -1779,12 +1751,10 @@ bool RelionJob::getCommandsManualpickJob(std::string &outputname, std::vector<st
 	commands.push_back(command);
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
-
 }
 
 void RelionJob::initialiseAutopickJob()
 {
-
 	hidden_name = ".gui_autopick";
 
 	joboptions["fn_input_autopick"] = JobOption("Input micrographs for autopick:", NODE_MICS, "", "Input micrographs (*.{star})", "Input STAR file (preferably with CTF information) with all micrographs to pick from.");
@@ -1844,13 +1814,11 @@ Kappa = 0.3 means that the curvature of the picked helical tubes should not be l
 Kappa ~ 0.05 is recommended for long and straight tubes (e.g. TMV, VipA/VipB and AChR tubes) while 0.20 ~ 0.40 seems suitable for flexible ones (e.g. ParM and MAVS-CARD filaments).");
 	joboptions["helical_tube_length_min"] = JobOption("Minimum length (A): ", -1, 100, 1000, 10, "Minimum length (in Angstroms) of helical tubes for auto-picking. \
 Helical tubes with shorter lengths will not be picked. Note that a long helical tube seen by human eye might be treated as short broken pieces due to low FOM values or high picking threshold.");
-
 }
 
 bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
-
 	commands.clear();
 	initialisePipeline(outputname, PROC_AUTOPICK_NAME, job_counter);
 	std::string command;
@@ -1898,7 +1866,6 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 	}
 	else
 	{
-
 		if (joboptions["do_ref3d"].getBoolean())
 		{
 
@@ -1923,11 +1890,9 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 					break;
 				}
 			}
-
 		}
 		else
 		{
-
 			if (joboptions["fn_refs_autopick"].getString() == "")
 			{
 				error_message ="ERROR: empty field for references...";
@@ -1937,7 +1902,6 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 			command += " --ref " + joboptions["fn_refs_autopick"].getString();
 			Node node2(joboptions["fn_refs_autopick"].getString(), NODE_2DREFS);
 			inputNodes.push_back(node2);
-
 		}
 
 		if (joboptions["do_invert_refs"].getBoolean())
@@ -2016,13 +1980,10 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 	commands.push_back(command.c_str());
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
-
-
 }
 
 void RelionJob::initialiseExtractJob()
 {
-
 	hidden_name = ".gui_extract";
 
     joboptions["star_mics"]= JobOption("micrograph STAR file: ", NODE_MICS, "", "Input STAR file (*.{star})", "Filename of the STAR file that contains all micrographs from which to extract particles.");
@@ -2063,10 +2024,10 @@ The optimal inter-box distance might also depend on the box size, the helical ri
 	joboptions["helical_rise"] = JobOption("Helical rise (A):", 1, 0, 100, 0.01, "Helical rise in Angstroms. (Please click '?' next to the option above for details about how the inter-box distance is calculated.)");
 
 }
+
 bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
-
 	commands.clear();
 	initialisePipeline(outputname, PROC_EXTRACT_NAME, job_counter);
 	std::string command;
@@ -2206,10 +2167,8 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 }
 
-
 void RelionJob::initialiseSelectJob()
 {
-
 	hidden_name = ".gui_select";
 
 	joboptions["fn_model"] = JobOption("Select classes from model.star:", NODE_MODEL, "", "STAR files (*.star)", "A _model.star file from a previous 2D or 3D classification run to select classes from.");
@@ -2238,13 +2197,11 @@ void RelionJob::initialiseSelectJob()
 	joboptions["do_remove_duplicates"] = JobOption("OR: remove duplicates?", false, "If set to Yes, duplicated particles that are within a given distance are removed leaving only one. Duplicated particles are sometimes generated when particles drift into the same position during alignment. They inflate and invalidate gold-standard FSC calculation.");
 	joboptions["duplicate_threshold"] = JobOption("Minimum inter-particle distance (A)", 30, 0, 1000, 1, "Particles within this distance are removed leaving only one.");
 	joboptions["image_angpix"] = JobOption("Pixel size before extraction (A)", -1, -1, 10, 0.01, "The pixel size of particles (relevant to rlnOriginX/Y) is read from the STAR file. When the pixel size of the original micrograph used for auto-picking and extraction (relevant to rlnCoordinateX/Y) is different, specify it here. In other words, this is the pixel size after binning during motion correction, but before down-sampling during extraction.");
-
 }
 
 bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
-
 	commands.clear();
 	initialisePipeline(outputname, PROC_CLASSSELECT_NAME, job_counter);
 	std::string command;
@@ -2312,7 +2269,6 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 		FileName fn_out;
 		if (joboptions["fn_mic"].getString() != "")
 		{
-
 			Node node(joboptions["fn_mic"].getString(), joboptions["fn_mic"].node_type);
 			inputNodes.push_back(node);
 			command += " --i " + joboptions["fn_mic"].getString();
@@ -2321,7 +2277,6 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 		}
 		else if (joboptions["fn_data"].getString() != "")
 		{
-
 			Node node(joboptions["fn_data"].getString(), joboptions["fn_data"].node_type);
 			inputNodes.push_back(node);
 			command += " --i " + joboptions["fn_data"].getString();
@@ -2334,17 +2289,13 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 
 			if (joboptions["fn_mic"].getString() != "")
 			{
-
 				Node node2(fn_out, NODE_MICS);
 				outputNodes.push_back(node2);
-
 			}
 			else if (joboptions["fn_data"].getString() != "")
 			{
-
 				Node node2(fn_out, NODE_PART_DATA);
 				outputNodes.push_back(node2);
-
 			}
 
 			if (joboptions["do_select_values"].getBoolean())
@@ -2363,14 +2314,12 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 		}
 		else if (joboptions["do_split"].getBoolean())
 		{
-
 			int nr_split=0;
 			command += " --split ";
 			if (joboptions["do_random"].getBoolean())
 			{
 				command += " --random_order ";
 			}
-
 
 			if (joboptions["nr_split"].getNumber() <= 0 && joboptions["split_size"].getNumber() <= 0
 					&& !joboptions["nr_split"].isSchedulerVariable() && !joboptions["split_size"].isSchedulerVariable())
@@ -2390,7 +2339,6 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 
 			// As of relion-3.1, star_handler will write out a star file with the output nodes, which will be read by the pipeliner
 		}
-
 	}
 	else
 	{
@@ -2548,7 +2496,6 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 
 void RelionJob::initialiseClass2DJob()
 {
-
 	hidden_name = ".gui_class2d";
 
 	joboptions["fn_img"] = JobOption("Input images STAR file:", NODE_PART_DATA, "", "STAR files (*.star) \t Image stacks (not recommended, read help!) (*.{spi,mrcs})", "A STAR file with all images (and their metadata). \n \n Alternatively, you may give a Spider/MRC stack of 2D images, but in that case NO metadata can be included and thus NO CTF correction can be performed, \
@@ -2643,13 +2590,11 @@ This will affect the time it takes between the progress-bar in the expectation s
 
 	joboptions["use_gpu"] = JobOption("Use GPU acceleration?", false, "If set to Yes, the job will try to use GPU acceleration.");
 	joboptions["gpu_ids"] = JobOption("Which GPUs to use:", std::string(""), "This argument is not necessary. If left empty, the job itself will try to allocate available GPU resources. You can override the default allocation by providing a list of which GPUs (0,1,2,3, etc) to use. MPI-processes are separated by ':', threads by ','. For example: '0,0:1,1:0,0:1,1'");
-
 }
 
 bool RelionJob::getCommandsClass2DJob(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
-
 	commands.clear();
 	initialisePipeline(outputname, PROC_2DCLASS_NAME, job_counter);
 	std::string command;
@@ -2710,7 +2655,6 @@ bool RelionJob::getCommandsClass2DJob(std::string &outputname, std::vector<std::
 	// CTF stuff
 	if (!is_continue)
 	{
-
 		if (joboptions["do_ctf_correction"].getBoolean())
 		{
 			command += " --ctf ";
@@ -2801,7 +2745,6 @@ bool RelionJob::getCommandsClass2DJob(std::string &outputname, std::vector<std::
 // Constructor for initial model job
 void RelionJob::initialiseInimodelJob()
 {
-
 	hidden_name = ".gui_inimodel";
 
 	joboptions["fn_img"] = JobOption("Input images STAR file:", NODE_PART_DATA, "", "STAR files (*.star) \t Image stacks (not recommended, read help!) (*.{spi,mrcs})", "A STAR file with all images (and their metadata). \
@@ -2884,13 +2827,11 @@ This will affect the time it takes between the progress-bar in the expectation s
 
 	joboptions["use_gpu"] = JobOption("Use GPU acceleration?", false, "If set to Yes, the job will try to use GPU acceleration.");
 	joboptions["gpu_ids"] = JobOption("Which GPUs to use:", std::string(""), "This argument is not necessary. If left empty, the job itself will try to allocate available GPU resources. You can override the default allocation by providing a list of which GPUs (0,1,2,3, etc) to use. MPI-processes are separated by ':', threads by ','. For example: '0,0:1,1:0,0:1,1'");
-
 }
 
 bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
-
 	commands.clear();
 
 	initialisePipeline(outputname, PROC_INIMODEL_NAME, job_counter);
@@ -2919,8 +2860,6 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 	}
 
 	command += " --o " + outputname + fn_run;
-
-
 
 	int total_nr_iter = joboptions["sgd_ini_iter"].getNumber();
 	total_nr_iter += joboptions["sgd_inbetween_iter"].getNumber();
@@ -3023,7 +2962,6 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 
 void RelionJob::initialiseClass3DJob()
 {
-
 	hidden_name = ".gui_class3d";
 
 	joboptions["fn_img"] = JobOption("Input images STAR file:", NODE_PART_DATA, "", "STAR files (*.star) \t Image stacks (not recommended, read help!) (*.{spi,mrcs})", "A STAR file with all images (and their metadata). \n \n Alternatively, you may give a Spider/MRC stack of 2D images, but in that case NO metadata can be included and thus NO CTF correction can be performed, \
@@ -3216,13 +3154,11 @@ This will affect the time it takes between the progress-bar in the expectation s
 
 	joboptions["use_gpu"] = JobOption("Use GPU acceleration?", false, "If set to Yes, the job will try to use GPU acceleration.");
 	joboptions["gpu_ids"] = JobOption("Which GPUs to use:", std::string(""), "This argument is not necessary. If left empty, the job itself will try to allocate available GPU resources. You can override the default allocation by providing a list of which GPUs (0,1,2,3, etc) to use. MPI-processes are separated by ':', threads by ','.  For example: '0,0:1,1:0,0:1,1'");
-
 }
 
 bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
-
 	commands.clear();
 	initialisePipeline(outputname, PROC_3DCLASS_NAME, job_counter);
 	std::string command;
@@ -3530,7 +3466,6 @@ Note that this will only be the value for the first few iteration(s): the sampli
 increase the angular samplings, local angular searches of -6/+6 times the sampling rate will be used from this angular sampling rate onwards. For most \
 lower-symmetric particles a value of 1.8 degrees will be sufficient. Perhaps icosahedral symmetries may benefit from a smaller value such as 0.9 degrees.");
 
-
 	joboptions["do_helix"] = JobOption("Do helical reconstruction?", false, "If set to Yes, then perform 3D helical reconstruction.");
 	joboptions["helical_tube_inner_diameter"] = JobOption("Tube diameter - inner (A):", std::string("-1"),"Inner and outer diameter (in Angstroms) of the reconstructed helix spanning across Z axis. \
 Set the inner diameter to negative value if the helix is not hollow in the center. The outer diameter should be slightly larger than the actual width of helical tubes because it also decides the shape of 2D \
@@ -3610,14 +3545,11 @@ All MPI salves will then read in the combined results. This reduces heavy load o
 This will affect the time it takes between the progress-bar in the expectation step reaching its end (the mouse gets to the cheese) and the start of the ensuing maximisation step. It will depend on your system setup which is most efficient.");
 	joboptions["use_gpu"] = JobOption("Use GPU acceleration?", false, "If set to Yes, the job will try to use GPU acceleration.");
 	joboptions["gpu_ids"] = JobOption("Which GPUs to use:", std::string(""), "This argument is not necessary. If left empty, the job itself will try to allocate available GPU resources. You can override the default allocation by providing a list of which GPUs (0,1,2,3, etc) to use. MPI-processes are separated by ':', threads by ','.  For example: '0,0:1,1:0,0:1,1'");
-
-
 }
 
 bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
-
 	commands.clear();
 	initialisePipeline(outputname, PROC_3DAUTO_NAME, job_counter);
 	std::string command;
@@ -3695,7 +3627,6 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 	// CTF stuff
 	if (!is_continue)
 	{
-
 		if (joboptions["do_ctf_correction"].getBoolean())
 		{
 			command += " --ctf";
@@ -3900,14 +3831,11 @@ All MPI salves will then read in the combined results. This reduces heavy load o
 This will affect the time it takes between the progress-bar in the expectation step reaching its end (the mouse gets to the cheese) and the start of the ensuing maximisation step. It will depend on your system setup which is most efficient.");
 	joboptions["use_gpu"] = JobOption("Use GPU acceleration?", false, "If set to Yes, the job will try to use GPU acceleration.");
 	joboptions["gpu_ids"] = JobOption("Which GPUs to use:", std::string(""), "This argument is not necessary. If left empty, the job itself will try to allocate available GPU resources. You can override the default allocation by providing a list of which GPUs (0,1,2,3, etc) to use. MPI-processes are separated by ':', threads by ','.  For example: '0,0:1,1:0,0:1,1'");
-
-
 }
 
 bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
-
 	commands.clear();
 	initialisePipeline(outputname, PROC_MULTIBODY_NAME, job_counter);
 	std::string command;
@@ -3983,7 +3911,6 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 			command += " --offset_range " + joboptions["offset_range"].getString();
 			// The sampling given in the GUI will be the oversampled one!
 			command += " --offset_step " + floatToString(joboptions["offset_step"].getNumber() * pow(2., iover));
-
 		}
 
 		// Always do compute stuff
@@ -4065,7 +3992,6 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 		// Selection
 		if (joboptions["do_select"].getBoolean())
 		{
-
 			if (joboptions["eigenval_min"].getNumber() >= joboptions["eigenval_max"].getNumber())
 			{
 				error_message = "ERROR: the maximum eigenvalue should be larger than the minimum one!";
@@ -4096,7 +4022,6 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 		outputNodes.push_back(node3);
 
 		commands.push_back(command);
-
 	}
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
@@ -4119,13 +4044,11 @@ If you don't know what value to use, display one of the unfiltered half-maps in 
 	joboptions["do_helix"] = JobOption("Mask a 3D helix?", false, "Generate a mask for 3D helix which spans across Z axis of the box.");
 	joboptions["helical_z_percentage"] = JobOption("Central Z length (%):", 30., 5., 80., 1., "Reconstructed helix suffers from inaccuracies of orientation searches. \
 The central part of the box contains more reliable information compared to the top and bottom parts along Z axis. Set this value (%) to the central part length along Z axis divided by the box size. Values around 30% are commonly used but you may want to try different lengths.");
-
 }
 
 bool RelionJob::getCommandsMaskcreateJob(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
-
 	commands.clear();
 	initialisePipeline(outputname, PROC_MASKCREATE_NAME, job_counter);
 	std::string command;
@@ -4176,7 +4099,6 @@ bool RelionJob::getCommandsMaskcreateJob(std::string &outputname, std::vector<st
 
 void RelionJob::initialiseJoinstarJob()
 {
-
 	hidden_name = ".gui_joinstar";
 
 	joboptions["do_part"] = JobOption("Combine particle STAR files?", false, "");
@@ -4196,13 +4118,11 @@ void RelionJob::initialiseJoinstarJob()
 	joboptions["fn_mov2"] = JobOption("Movie STAR file 2: ", NODE_MOVIES, "", "movie STAR file (*.star)", "The second of the micrograph movie STAR files to be combined.");
 	joboptions["fn_mov3"] = JobOption("Movie STAR file 3: ", NODE_MOVIES, "", "movie STAR file (*.star)", "The third of the micrograph movie STAR files to be combined. Leave empty if there are only two files to be combined.");
 	joboptions["fn_mov4"] = JobOption("Movie STAR file 4: ", NODE_MOVIES, "", "movie STAR file (*.star)", "The fourth of the micrograph movie STAR files to be combined. Leave empty if there are only two or three files to be combined.");
-
 }
 
 bool RelionJob::getCommandsJoinstarJob(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
-
 	commands.clear();
 	initialisePipeline(outputname, PROC_JOINSTAR_NAME, job_counter);
 	std::string command;
@@ -4329,7 +4249,6 @@ bool RelionJob::getCommandsJoinstarJob(std::string &outputname, std::vector<std:
 		command += " --o " + outputname + "join_movies.star";
 		Node node5(outputname + "join_movies.star", joboptions["fn_mov1"].node_type);
 		outputNodes.push_back(node5);
-
 	}
 
 	// Other arguments
@@ -4342,7 +4261,6 @@ bool RelionJob::getCommandsJoinstarJob(std::string &outputname, std::vector<std:
 
 void RelionJob::initialiseSubtractJob()
 {
-
 	hidden_name = ".gui_subtract";
 
 	joboptions["fn_opt"] = JobOption("Input optimiser.star: ", std::string(""), "STAR Files (*_optimiser.star)", "./", "Select the *_optimiser.star file for the iteration of the 3D refinement/classification \
@@ -4361,7 +4279,6 @@ which you want to use for subtraction. It will use the maps from this run for th
 	joboptions["center_z"] = JobOption("Center coordinate (pix) - Z:", std::string("0"), "Z-coordinate of the 3D center (in pixels).");
 
 	joboptions["new_box"] = JobOption("New box size:", -1, 64, 512, 32, "Provide a non-negative value to re-window the subtracted particles in a smaller box size." );
-
 }
 
 bool RelionJob::getCommandsSubtractJob(std::string &outputname, std::vector<std::string> &commands,
@@ -4446,7 +4363,6 @@ bool RelionJob::getCommandsSubtractJob(std::string &outputname, std::vector<std:
 
 void RelionJob::initialisePostprocessJob()
 {
-
 	hidden_name = ".gui_post";
 
 	joboptions["fn_in"] = JobOption("One of the 2 unfiltered half-maps:", NODE_HALFMAP, "", "MRC map files (*half1_*_unfil.mrc)",  "Provide one of the two unfiltered half-reconstructions that were output upon convergence of a 3D auto-refine run.");
@@ -4470,13 +4386,11 @@ Although that is probably slightly less accurate, the overall quality of your ma
 Sometimes, it is also useful to provide an ad-hoc low-pass filter (option below), as due to local resolution variations some parts of the map may be better and other parts may be worse than the overall resolution as measured by the FSC. \
 In such cases, set this option to Yes and provide an ad-hoc filter as described below.");
 	joboptions["low_pass"] = JobOption("Ad-hoc low-pass filter (A):",5,1,40,1,"This option allows one to low-pass filter the map at a user-provided frequency (in Angstroms). When using a resolution that is higher than the gold-standard FSC-reported resolution, take care not to interpret noise in the map for signal...");
-
 }
 
 bool RelionJob::getCommandsPostprocessJob(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
-
 	commands.clear();
 	initialisePipeline(outputname, PROC_POST_NAME, job_counter);
 	std::string command;
@@ -4556,7 +4470,6 @@ bool RelionJob::getCommandsPostprocessJob(std::string &outputname, std::vector<s
 
 void RelionJob::initialiseLocalresJob()
 {
-
 	hidden_name = ".gui_localres";
 
 	joboptions["fn_in"] = JobOption("One of the 2 unfiltered half-maps:", NODE_HALFMAP, "", "MRC map files (*_unfil.mrc)",  "Provide one of the two unfiltered half-reconstructions that were output upon convergence of a 3D auto-refine run.");
@@ -4586,13 +4499,11 @@ This is a developmental feature in need of further testing, but initial results 
 	//joboptions["randomize_at"] = JobOption("Frequency for phase-randomisation (A): ", 10., 5, 20., 1, "From this frequency onwards, the phases for the mask-corrected FSC-calculation will be randomized. Make sure this is a lower resolution (i.e. a higher number) than the local resolutions you are after in your map.");
 	joboptions["adhoc_bfac"] = JobOption("User-provided B-factor:", -100, -500, 0, -25, "Probably, the overall B-factor as was estimated in the postprocess is a useful value for here. Use negative values for sharpening. Be careful: if you over-sharpen your map, you may end up interpreting noise for signal!");
 	joboptions["fn_mtf"] = JobOption("MTF of the detector (STAR file)", "", "STAR Files (*.star)", ".", "The MTF of the detector is used to complement the user-provided B-factor in the sharpening. If you don't have this curve, you can leave this field empty.");
-
 }
 
 bool RelionJob::getCommandsLocalresJob(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
-
 	commands.clear();
 	initialisePipeline(outputname, PROC_RESMAP_NAME, job_counter);
 	std::string command;
@@ -4689,20 +4600,17 @@ bool RelionJob::getCommandsLocalresJob(std::string &outputname, std::vector<std:
 		outputNodes.push_back(node1);
 		Node node2(outputname+"relion_locres.mrc", NODE_RESMAP);
 		outputNodes.push_back(node2);
-
 	}
 
 	// Other arguments for extraction
 	command += " " + joboptions["other_args"].getString();
 	commands.push_back(command);
 
-
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 }
 
 void RelionJob::initialiseMotionrefineJob()
 {
-
 	hidden_name = ".gui_bayespolish";
 
 	// I/O
@@ -4714,6 +4622,9 @@ The mask used for this postprocessing will be applied to the unfiltered half-map
 	// Frame range
 	joboptions["first_frame"] = JobOption("First movie frame: ", 1., 1., 10., 1, "First movie frame to take into account in motion fit and combination step");
 	joboptions["last_frame"] = JobOption("Last movie frame: ", -1., 5., 50., 1, "Last movie frame to take into account in motion fit and combination step. Values equal to or smaller than 0 mean 'use all frames'.");
+
+	joboptions["extract_size"] = JobOption("Extraction size (pix in unbinned movie):", -1, 64, 1024, 8, "Size of the extracted particles in the unbinned original movie(in pixels). This should be an even number.");
+	joboptions["rescale"] = JobOption("Re-scaled size (pixels): ", -1, 64, 1024, 8, "The re-scaled value needs to be an even number.");
 
 	// Parameter optimisation
 	joboptions["do_param_optim"] = JobOption("Train optimal parameters?", false, "If set to Yes, then relion_motion_refine will estimate optimal parameter values for the three sigma values above on a subset of the data (determined by the minimum number of particles to be used below).");
@@ -4731,13 +4642,11 @@ The mask used for this postprocessing will be applied to the unfiltered half-map
 	//combine_frames
 	joboptions["minres"] = JobOption("Minimum resolution for B-factor fit (A): ", 20, 8, 40, 1, "The minimum spatial frequency (in Angstrom) used in the B-factor fit.");
 	joboptions["maxres"] = JobOption("Maximum resolution for B-factor fit (A): ", -1, -1, 15, 1, "The maximum spatial frequency (in Angstrom) used in the B-factor fit. If a negative value is given, the maximum is determined from the input FSC curve.");
-
 }
 
 bool RelionJob::getCommandsMotionrefineJob(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
-
 	commands.clear();
 	initialisePipeline(outputname, PROC_MOTIONREFINE_NAME, job_counter);
 	std::string command;
@@ -4791,7 +4700,6 @@ bool RelionJob::getCommandsMotionrefineJob(std::string &outputname, std::vector<
 
 	if (joboptions["do_param_optim"].getBoolean())
 	{
-
 		// Estimate meta-parameters
 		RFLOAT align_frac = 1.0 - joboptions["eval_frac"].getNumber();
 		command += " --min_p " + joboptions["optim_min_part"].getString();
@@ -4833,12 +4741,42 @@ bool RelionJob::getCommandsMotionrefineJob(std::string &outputname, std::vector<
 		command += " --bfac_minfreq " + joboptions["minres"].getString();
 		command += " --bfac_maxfreq " + joboptions["maxres"].getString();
 
+		const int window = textToInteger(joboptions["extract_size"].getString());
+		const int scale = textToInteger(joboptions["rescale"].getString());
+		if (window * scale <= 0)
+		{
+			error_message = "ERROR: Please specify both the extraction box size and the downsampled size, or leave both the default (-1)";
+			return false;
+		}
+
+		if (window > 0 && scale > 0)
+		{
+			if (window % 2 != 0)
+			{
+				error_message = "ERROR: The extraction box size must be an even number";
+				return false;
+			}
+			command += " --window " + joboptions["extract_size"].getString();
+
+			if (scale % 2 != 0)
+			{
+				error_message = "ERROR: The downsampled box size must be an even number.";
+				return false;
+			}
+
+			if (scale > window)
+			{
+				error_message = "ERROR: The downsampled box size cannot be larger than the extraction size.";
+				return false;
+			}
+			command += " --scale " + joboptions["rescale"].getString();
+		}
+
 		Node node6(outputname+"logfile.pdf", NODE_PDF_LOGFILE);
 		outputNodes.push_back(node6);
 
 		Node node7(outputname+"shiny.star", NODE_PART_DATA);
 		outputNodes.push_back(node7);
-
 	}
 
 	// If this is a continue job, then only process unfinished micrographs
@@ -4855,10 +4793,8 @@ bool RelionJob::getCommandsMotionrefineJob(std::string &outputname, std::vector<
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 }
 
-
 void RelionJob::initialiseCtfrefineJob()
 {
-
 	hidden_name = ".gui_ctfrefine";
 
 	// I/O
@@ -4884,14 +4820,11 @@ This option cannot be done simultaneously with higher-order aberration estimatio
 	joboptions["do_trefoil"] = JobOption("Also estimate trefoil?", false, "If set to Yes, then relion_ctf_refine will also estimate the trefoil (3-fold astigmatism) per optics group. This option is only recommended for data sets that extend beyond 3.5 Angstrom resolution.");
 
 	joboptions["do_4thorder"] = JobOption("Estimate 4th order aberrations?", false, "If set to Yes, then relion_ctf_refine will also estimate the Cs and the tetrafoil (4-fold astigmatism) per optics group. This option is only recommended for data sets that extend beyond 3 Angstrom resolution.");
-
-
 }
 
 bool RelionJob::getCommandsCtfrefineJob(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
-
 	commands.clear();
 	initialisePipeline(outputname, PROC_CTFREFINE_NAME, job_counter);
 	std::string command;
@@ -4981,7 +4914,6 @@ bool RelionJob::getCommandsCtfrefineJob(std::string &outputname, std::vector<std
 			}
 		}
 
-
 		if (joboptions["do_4thorder"].getBoolean())
 		{
 			command += " --fit_aberr";
@@ -5009,7 +4941,6 @@ bool RelionJob::getCommandsCtfrefineJob(std::string &outputname, std::vector<std
 
 void RelionJob::initialiseExternalJob()
 {
-
 	hidden_name = ".gui_external";
 
 	// I/O
@@ -5044,14 +4975,11 @@ void RelionJob::initialiseExternalJob()
 	joboptions["param9_value"] = JobOption("Param9 - value:" , std::string(""), "Define label and value for optional parameters to the script. These will be passed as an argument --label value");
 	joboptions["param10_label"] = JobOption("Param10 - label:", std::string(""), "Define label and value for optional parameters to the script. These will be passed as an argument --label value");
 	joboptions["param10_value"] = JobOption("Param10 - value:" , std::string(""), "Define label and value for optional parameters to the script. These will be passed as an argument --label value");
-
-
 }
 
 bool RelionJob::getCommandsExternalJob(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
 {
-
 	commands.clear();
 	initialisePipeline(outputname, PROC_EXTERNAL_NAME, job_counter);
 	std::string command;

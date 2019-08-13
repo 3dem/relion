@@ -279,9 +279,14 @@ public:
 	void write(const FileName & fn_out);
 
 	// Make a histogram of a column
-	void columnHistogram(EMDLabel label, std::vector<RFLOAT> &histX, std::vector<RFLOAT> &histY, int verb = 0, CPlot2D * plot2D = NULL,
+	void columnHistogram(EMDLabel label, std::vector<RFLOAT> &histX, std::vector<RFLOAT> &histY, int verb = 0, CPlot2D *plot2D = NULL,
 	                     long int nr_bin = -1, RFLOAT hist_min = -LARGE_NUMBER, RFLOAT hist_max = LARGE_NUMBER,
 	                     bool do_fractional_instead = false, bool do_cumulative_instead = false);
+
+	static void histogram(std::vector<RFLOAT> &values, std::vector<RFLOAT> &histX, std::vector<RFLOAT> &histY, int verb = 0,
+	                      std::string title="Histogram", CPlot2D *plot2D = NULL,
+	                      long int nr_bin = -1, RFLOAT hist_min = -LARGE_NUMBER, RFLOAT hist_max = LARGE_NUMBER,
+	                      bool do_fractional_instead = false, bool do_cumulative_instead = false);
 
 	void addToCPlot2D(CPlot2D *plot2D, EMDLabel xaxis, EMDLabel yaxis,
 	                  double red=0., double green=0., double blue=0., double linewidth = 1.0, std::string marker="");

@@ -1969,6 +1969,8 @@ void PipeLine::read(bool do_lock, std::string lock_message)
 	if (MDgen.readStar(in, "pipeline_general"))
 	{
 		MDgen.getValue(EMDL_PIPELINE_JOB_COUNTER, job_counter);
+		if (job_counter < 0)
+			REPORT_ERROR("PipeLine::read: rlnPipeLineJobCounter must not be negative!");
 	}
 
 	MDnode.readStar(in, "pipeline_nodes");

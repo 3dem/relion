@@ -54,7 +54,8 @@ void MicrographHandler::init(
 	{
 		MetaDataTable corrMic;
 		ObservationModel obsModel;
-		ObservationModel::loadSafely(corrMicFn, obsModel, corrMic, "micrographs", verb);
+		// Don't die even if conversion failed. Polishing does not use obsModel from a motion correction STAR file
+		ObservationModel::loadSafely(corrMicFn, obsModel, corrMic, "micrographs", verb, false);
 		mic2meta.clear();
 
 		std::string micName, metaName;
@@ -86,9 +87,7 @@ void MicrographHandler::init(
 		hasCorrMic = false;
 	}
 
-	loadInitial(
-				mdt, angpix, verb,
-				fc, dosePerFrame, metaFn);
+	loadInitial(mdt, angpix, verb, fc, dosePerFrame, metaFn);
 
 	ready = true;
 }
@@ -108,13 +107,15 @@ std::vector<MetaDataTable> MicrographHandler::cullMissingMovies(
 
 	for (int m = 0; m < mc; m++)
 	{
-		if (isMoviePresent(mdts[m]))
+		if (isMoviePresent(mdts[m], false))
 		{
 			good.push_back(mdts[m]);
 		}
 		else
 		{
-			bad.push_back(getMovieFilename(mdts[m]));
+			FileName fn_movie;
+			mdts[m].getValueToString(EMDL_MICROGRAPH_NAME, fn_movie, 0);
+			bad.push_back(fn_movie);
 		}
 	}
 
@@ -122,11 +123,11 @@ std::vector<MetaDataTable> MicrographHandler::cullMissingMovies(
 	{
 		if (bad.size() == 1)
 		{
-			std::cerr << " - The following micrograph is missing:\n";
+			std::cerr << " - The movie for the following micrograph is missing:\n";
 		}
 		else
 		{
-			std::cerr << " - The following micrographs are missing:\n";
+			std::cerr << " - Movies for the following micrographs are missing:\n";
 		}
 
 		for (int i = 0; i < bad.size(); i++)
@@ -231,6 +232,10 @@ std::vector<MetaDataTable> MicrographHandler::findLongEnoughMovies(
 	return good;
 }
 
+// This reads pixel sizes from a single metadata star file.
+// For multi optics group scenarios, we should process only micrographs
+// in the given MotionCorr STAR file. Then we can safely assume all pixel sizes are the same.
+// TODO: TAKANORI: make sure in MotionCorr runner and Polish
 void MicrographHandler::loadInitial(
 		const MetaDataTable& mdt, double angpix, bool verb,
 		int& fc, double& dosePerFrame, std::string& metaFn)
@@ -521,14 +526,17 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 	return out;
 }
 
-std::string MicrographHandler::getMetaName(std::string micName)
+std::string MicrographHandler::getMetaName(std::string micName, bool die_on_error)
 {
 	std::map<std::string, std::string>::iterator it = mic2meta.find(micName);
 
 	if (it == mic2meta.end())
 	{
-		REPORT_ERROR("ERROR: MicrographHandler::getMetaName: no metadata star-file for "
-					 +micName+" found in "+corrMicFn+".");
+		if (die_on_error)
+			REPORT_ERROR("ERROR: MicrographHandler::getMetaName: no metadata star-file for "
+			              +micName+" found in "+corrMicFn+".");
+		else
+			return "";
 	}
 	else
 	{
@@ -574,7 +582,7 @@ int MicrographHandler::determineFrameCount(const MetaDataTable &mdt)
 	return fc;
 }
 
-bool MicrographHandler::isMoviePresent(const MetaDataTable &mdt)
+bool MicrographHandler::isMoviePresent(const MetaDataTable &mdt, bool die_on_error)
 {
 	std::string mgFn;
 	mdt.getValueToString(EMDL_MICROGRAPH_NAME, mgFn, 0);
@@ -584,7 +592,7 @@ bool MicrographHandler::isMoviePresent(const MetaDataTable &mdt)
 
 	if (hasCorrMic)
 	{
-		std::string metaFn = getMetaName(fn_post);
+		std::string metaFn = getMetaName(fn_post, die_on_error);
 
 		if (exists(metaFn))
 		{
@@ -603,7 +611,7 @@ bool MicrographHandler::isMoviePresent(const MetaDataTable &mdt)
 	}
 }
 
-std::string MicrographHandler::getMovieFilename(const MetaDataTable& mdt)
+std::string MicrographHandler::getMovieFilename(const MetaDataTable& mdt, bool die_on_error)
 {
 	std::string mgFn;
 	mdt.getValueToString(EMDL_MICROGRAPH_NAME, mgFn, 0);
@@ -613,7 +621,7 @@ std::string MicrographHandler::getMovieFilename(const MetaDataTable& mdt)
 
 	if (hasCorrMic)
 	{
-		std::string metaFn = getMetaName(fn_post);
+		std::string metaFn = getMetaName(fn_post, die_on_error);
 
 		if (exists(metaFn))
 		{

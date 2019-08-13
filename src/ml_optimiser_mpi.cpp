@@ -567,10 +567,15 @@ will still yield good performance and possibly a more stable execution. \n" << s
 void MlOptimiserMpi::initialiseWorkLoad()
 {
 
-    if (do_split_random_halves && node->size <= 2)
-    	REPORT_ERROR("MlOptimiserMpi::initialiseWorkLoad: at least 3 MPI processes are required when splitting data into random halves");
-    else if(node->size <= 1)
-    	REPORT_ERROR("MlOptimiserMpi::initialiseWorkLoad: at least 2 MPI processes are required, otherwise use the sequential program");
+	if (do_split_random_halves)
+	{
+		if (node->size <= 2)
+			REPORT_ERROR("MlOptimiserMpi::initialiseWorkLoad: at least 3 MPI processes are required when splitting data into random halves");
+		if (node->size % 2 == 0)
+			REPORT_ERROR("MlOptimiserMpi::initialiseWorkLoad: the number of MPI processes must be an odd number when gold-standard seperation is applied.");
+	}
+	else if (node->size <= 1)
+		REPORT_ERROR("MlOptimiserMpi::initialiseWorkLoad: at least 2 MPI processes are required, otherwise use the sequential program");
 
 	// Get the same random number generator seed for all mpi nodes
 	if (random_seed == -1)
@@ -1098,14 +1103,24 @@ void MlOptimiserMpi::expectation()
         try
         {
 
-        	long int progress_bar_step_size = XMIPP_MAX(1, my_nr_particles / 60);
-            long int prev_barstep = 0;
-        	long int my_first_particle = 0.;
-        	long int my_last_particle = my_nr_particles - 1;
-        	long int my_first_particle_halfset1 = 0;
-        	long int my_last_particle_halfset1 = mydata.numberOfParticles(1) - 1;
-        	long int my_first_particle_halfset2 = mydata.numberOfParticles(1);
-        	long int my_last_particle_halfset2 = mydata.numberOfParticles() - 1;
+			long int progress_bar_step_size = XMIPP_MAX(1, my_nr_particles / 60);
+			long int prev_barstep = 0;
+			long int my_first_particle = 0.;
+			long int my_last_particle = my_nr_particles - 1;
+			long int my_first_particle_halfset1 = 0;
+			long int my_last_particle_halfset1 = mydata.numberOfParticles(1) - 1;
+			long int my_first_particle_halfset2 = mydata.numberOfParticles(1);
+			long int my_last_particle_halfset2 = mydata.numberOfParticles() - 1;
+
+			if (subset_size > 0)
+			{
+				my_last_particle_halfset1 = my_nr_particles;
+				my_last_particle_halfset2 = mydata.numberOfParticles(1) + my_nr_particles;
+
+				if (do_split_random_halves)
+					progress_bar_step_size = XMIPP_MAX(1, my_nr_particles * 2 / 60);
+			}
+
         	if (verb > 0)
         	{
         		if (do_sgd)
@@ -2069,6 +2084,7 @@ void MlOptimiserMpi::maximization()
 							else fn_ext_root.compose(fn_ext_root+"_class", iclass+1, "", 3);
 							(wsum_model.BPref[iclass]).externalReconstruct(mymodel.Iref[ith_recons],
 									fn_ext_root,
+									mymodel.fsc_halves_class[ith_recons],
 									mymodel.tau2_class[ith_recons],
 									mymodel.tau2_fudge_factor,
 									node->rank==1); // only first slaves is verbose
@@ -2217,6 +2233,7 @@ void MlOptimiserMpi::maximization()
 								else fn_ext_root.compose(fn_ext_root+"_class", iclass+1, "", 3);
 								(wsum_model.BPref[iclass]).externalReconstruct(mymodel.Iref[ith_recons],
 										fn_ext_root,
+										mymodel.fsc_halves_class[ith_recons],
 										mymodel.tau2_class[ith_recons],
 										mymodel.tau2_fudge_factor);
 							}
@@ -2965,9 +2982,6 @@ void MlOptimiserMpi::compareTwoHalves()
 
 	if (mymodel.nr_classes > 1)
 		REPORT_ERROR("ERROR: you should not be in MlOptimiserMpi::compareTwoHalves if mymodel.nr_classes > 1");
-
-	if (do_sgd)
-		REPORT_ERROR("ERROR: you should not be in MlOptimiserMpi::compareTwoHalves if doing SGD");
 
 	// Only do gold-standard FSC comparisons for single-class refinements
 	// TODO: Rank 0 and 1 do all bodies sequentially here... That parallelisation could be improved...

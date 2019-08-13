@@ -21,7 +21,7 @@
 
 //#define PREP_TIMING
 #ifdef PREP_TIMING
-    Timer timer;
+	Timer timer;
 	int TIMING_TOP = timer.setNew("extractParticlesFromFieldOfView");
 	int TIMING_READ_COORD = timer.setNew("readInCoordinateFile");
 	int TIMING_BIAS_CORRECT = timer.setNew("biasCorrect");
@@ -44,7 +44,6 @@
 
 void Preprocessing::read(int argc, char **argv, int rank)
 {
-
 	parser.setCommandLine(argc, argv);
 	int gen_section = parser.addSection("General options");
 	fn_star_in = parser.getOption("--i", "The STAR file with all (selected) micrographs to extract particles from","");
@@ -67,6 +66,8 @@ void Preprocessing::read(int argc, char **argv, int rank)
 	extract_size = textToInteger(parser.getOption("--extract_size", "Size of the box to extract the particles in (in pixels)", "-1"));
 	do_premultiply_ctf = parser.checkOption("--premultiply_ctf", "Premultiply the micrograph/frame with its CTF prior to particle extraction");
 	premultiply_ctf_extract_size = textToInteger(parser.getOption("--premultiply_extract_size", "Size of the box to extract the particles in (in pixels) before CTF premultiplication", "-1"));
+	if (premultiply_ctf_extract_size < 0)
+		premultiply_ctf_extract_size = extract_size;
 	do_ctf_intact_first_peak = parser.checkOption("--ctf_intact_first_peak", "When premultiplying with the CTF, leave frequencies intact until the first peak");
 	do_phase_flip = parser.checkOption("--phase_flip", "Flip CTF-phases in the micrograph/frame prior to particle extraction");
 	extract_bias_x  = textToInteger(parser.getOption("--extract_bias_x", "Bias in X-direction of picked particles (this value in pixels will be added to the coords)", "0"));
@@ -96,7 +97,6 @@ void Preprocessing::read(int argc, char **argv, int rank)
 	helical_cut_into_segments = parser.checkOption("--helical_cut_into_segments", "Cut helical tubes into segments");
 	// Initialise verb for non-parallel execution
 	verb = 1;
-
 }
 
 void Preprocessing::usage()
@@ -106,7 +106,6 @@ void Preprocessing::usage()
 
 void Preprocessing::initialise()
 {
-
 	// Check for errors in the command-line option
 	if (parser.checkForErrors())
 		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
@@ -136,8 +135,11 @@ void Preprocessing::initialise()
 		// Read in the micrographs STAR file
 		ObservationModel::loadSafely(fn_star_in, obsModelMic, MDmics, "micrographs", verb);
 
-		if ( !MDmics.containsLabel(EMDL_MICROGRAPH_NAME) )
+		if (!MDmics.containsLabel(EMDL_MICROGRAPH_NAME))
 			REPORT_ERROR("Preprocessing::initialise ERROR: Input micrograph STAR file has no rlnMicrographName column!");
+
+		if (!obsModelMic.opticsMdt.containsLabel(EMDL_MICROGRAPH_PIXEL_SIZE))
+			REPORT_ERROR("Preprocessing::initialise ERROR: Input micrograph STAR file has no rlnMicrographPixelSize column!");
 
 		// Get the dimensionality of the micrographs
 
@@ -195,15 +197,11 @@ void Preprocessing::initialise()
 
 		if (do_phase_flip || do_premultiply_ctf)
 		{
-
-			if (premultiply_ctf_extract_size < 0) premultiply_ctf_extract_size = extract_size;
-
 			if (!(mic_star_has_ctf  || data_star_has_ctf))
 			{
 				REPORT_ERROR("Preprocessing:: ERROR: cannot phase flip or premultiply CTF without input CTF parameters in the micrograph or data STAR file");
 			}
 		}
-
 	}
 
 	if (do_extract || fn_operate_in != "")
@@ -236,14 +234,11 @@ void Preprocessing::initialise()
 			if ((do_normalise) && (helical_tube_outer_diameter < 0))
 				REPORT_ERROR("ERROR: please provide a tube radius that defines the background area when normalising helical segments...");
 		}
-
 	}
-
 }
 
 void Preprocessing::run()
 {
-
 	if (do_extract)
 	{
 		runExtractParticles();
@@ -264,7 +259,6 @@ void Preprocessing::run()
 
 void Preprocessing::joinAllStarFiles()
 {
-
 	FileName fn_ostar;
 
 	std::cout << " Joining metadata of all particles from " << MDmics.numberOfObjects() << " micrographs in one STAR file..." << std::endl;
@@ -296,11 +290,9 @@ void Preprocessing::joinAllStarFiles()
 
 	} // end loop over all micrographs
 
-
 	// Write out the joined star files
 	if (fn_part_star != "")
 	{
-
 		// Get pixel size in original micrograph from obsModelMic, as this may no longer be present in obsModelPart
 		std::map<std::string, RFLOAT> optics_group_mic_angpix;
 		if (fn_data != "")
@@ -323,7 +315,6 @@ void Preprocessing::joinAllStarFiles()
 		// Set the (possibly rescale output_angpix and the output image size in the opticsMdt
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(myOutObsModel->opticsMdt)
 		{
-
 			// Find the pixel size for the original micrograph
 			if (fn_data == "")
 			{
@@ -368,12 +359,10 @@ void Preprocessing::joinAllStarFiles()
 		ObservationModel::saveNew(MDout, myOutObsModel->opticsMdt, fn_part_star, "particles");
 		std::cout << " Written out STAR file with " << MDout.numberOfObjects() << " particles in " << fn_part_star<< std::endl;
 	}
-
 }
 
 void Preprocessing::runExtractParticles()
 {
-
 	long int nr_mics = MDmics.numberOfObjects();
 
 	int barstep;
@@ -389,7 +378,6 @@ void Preprocessing::runExtractParticles()
 	bool micIsUsed;
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDmics)
 	{
-
 		// Abort through the pipeline_control system
 		if (pipeline_control_check_abort_job())
 			exit(RELION_EXIT_ABORTED);
@@ -433,7 +421,6 @@ void Preprocessing::runExtractParticles()
 
 	// Now combine all metadata in a single STAR file
 	joinAllStarFiles();
-
 }
 
 
@@ -589,7 +576,6 @@ void Preprocessing::readHelicalCoordinates(FileName fn_mic, FileName fn_coord, M
 
 bool Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int imic)
 {
-
 	// Name of the output particle stack
 
 	FileName fn_pre, fn_jobnr, fn_post;
@@ -692,7 +678,6 @@ bool Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 		std::cerr << " WARNING: no particles on micrograph: " << fn_mic << std::endl;
 		return(false);
 	}
-
 }
 
 // Actually extract particles. This can be from one micrograph
@@ -701,12 +686,13 @@ void Preprocessing::extractParticlesFromOneMicrograph(MetaDataTable &MD,
 		FileName fn_output_img_root, FileName fn_oristack, long int &my_current_nr_images, long int my_total_nr_images,
 		RFLOAT &all_avg, RFLOAT &all_stddev, RFLOAT &all_minval, RFLOAT &all_maxval)
 {
-
 	Image<RFLOAT> Ipart, Imic, Itmp;
 
 	bool MDin_has_beamtilt = (MD.containsLabel(EMDL_IMAGE_BEAMTILT_X) || MD.containsLabel(EMDL_IMAGE_BEAMTILT_Y));
 	bool MDin_has_ctf = MD.containsLabel(EMDL_CTF_DEFOCUSU);
 	bool MDin_has_tiltgroup = MD.containsLabel(EMDL_PARTICLE_BEAM_TILT_CLASS);
+	int my_extract_size = (do_phase_flip || do_premultiply_ctf) ? premultiply_ctf_extract_size : extract_size;
+	RFLOAT my_angpix;
 
 	TIMING_TIC(TIMING_READ_IMG);
 
@@ -718,9 +704,15 @@ void Preprocessing::extractParticlesFromOneMicrograph(MetaDataTable &MD,
 	TIMING_TOC(TIMING_READ_IMG);
 
 	CTF ctf;
+	int optics_group;
 	if (mic_star_has_ctf || keep_ctf_from_micrographs)
 	{
 		ctf.readByGroup(MDmics, &obsModelMic, imic);
+		optics_group = obsModelMic.getOpticsGroup(MDmics, imic);
+
+		// Micrograph STAR file might not have a box size
+		obsModelMic.setBoxSize(optics_group, my_extract_size);
+		obsModelMic.opticsMdt.getValue(EMDL_MICROGRAPH_PIXEL_SIZE, my_angpix, optics_group);
 	}
 
 	// Now window all particles from the micrograph
@@ -738,7 +730,6 @@ void Preprocessing::extractParticlesFromOneMicrograph(MetaDataTable &MD,
 		xpos = (long int)dxpos;
 		ypos = (long int)dypos;
 
-		int my_extract_size = (do_phase_flip || do_premultiply_ctf) ? premultiply_ctf_extract_size : extract_size;
 		x0 = xpos + FIRST_XMIPP_INDEX(my_extract_size);
 		xF = xpos + LAST_XMIPP_INDEX(my_extract_size);
 		y0 = ypos + FIRST_XMIPP_INDEX(my_extract_size);
@@ -767,6 +758,10 @@ void Preprocessing::extractParticlesFromOneMicrograph(MetaDataTable &MD,
 		if (MDin_has_ctf && !keep_ctf_from_micrographs)
 		{
 			ctf.readByGroup(MD, &obsModelPart);
+			optics_group = obsModelPart.getOpticsGroup(MD);
+			if (obsModelPart.getBoxSize(optics_group) != my_extract_size)
+				obsModelPart.setBoxSize(optics_group, my_extract_size);
+			obsModelPart.opticsMdt.getValue(EMDL_MICROGRAPH_PIXEL_SIZE, my_angpix, optics_group);
 		}
 
 		TIMING_TIC(TIMING_WINDOW);
@@ -781,17 +776,17 @@ void Preprocessing::extractParticlesFromOneMicrograph(MetaDataTable &MD,
 		// Premultiply the CTF of each particle, possibly in a bigger box (premultiply_ctf_extract_size)
 		if (do_phase_flip || do_premultiply_ctf)
 		{
-
 			transformer.FourierTransform(Ipart(), FT, false);
 
-			RFLOAT xs = (RFLOAT)XSIZE(Ipart()) * angpix;
-			RFLOAT ys = (RFLOAT)YSIZE(Ipart()) * angpix;
-			FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM2D(FT)
+			MultidimArray<RFLOAT> Fctf;
+			Fctf.resize(YSIZE(FT), XSIZE(FT));
+			// do_abs, phase_flip, intact_first_peak, damping, padding
+			// 190802 TAKANORI: The original code using getCTF was do_damping=false, but for consistency with Polishing, I changed it.
+			ctf.getFftwImage(Fctf, my_extract_size, my_extract_size, my_angpix, false, do_phase_flip, do_ctf_intact_first_peak, true, false);
+
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(FT)
 			{
-				RFLOAT x = (RFLOAT)jp / xs;
-				RFLOAT y = (RFLOAT)ip / ys;
-				DIRECT_A2D_ELEM(FT, i, j) *= ctf.getCTF(x, y, false, do_phase_flip, do_ctf_intact_first_peak, false);
-				// TODO: BUG: This ignores symmetrical aberration !!!
+				DIRECT_MULTIDIM_ELEM(FT, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
 			}
 
 			transformer.inverseFourierTransform(FT, Ipart());
@@ -802,7 +797,6 @@ void Preprocessing::extractParticlesFromOneMicrograph(MetaDataTable &MD,
 						LAST_XMIPP_INDEX(extract_size),  LAST_XMIPP_INDEX(extract_size));
 			}
 		}
-
 
 		TIMING_TIC(TIMING_BOUNDARY);
 		// Check boundaries: fill pixels outside the boundary with the nearest ones inside
@@ -874,10 +868,8 @@ void Preprocessing::extractParticlesFromOneMicrograph(MetaDataTable &MD,
 
 		TIMING_TIC(TIMING_PRE_IMG_OPS);
 		performPerImageOperations(Ipart, fn_output_img_root, my_current_nr_images + ipos, my_total_nr_images,
-				tilt_deg, psi_deg,
-				all_avg, all_stddev, all_minval, all_maxval);
+		                          tilt_deg, psi_deg, all_avg, all_stddev, all_minval, all_maxval);
 		TIMING_TOC(TIMING_PRE_IMG_OPS);
-
 
 		TIMING_TIC(TIMING_REST);
 		// Also store all the particles information in the STAR file
@@ -946,8 +938,6 @@ void Preprocessing::extractParticlesFromOneMicrograph(MetaDataTable &MD,
 
 		ipos++;
 	}
-
-
 }
 
 
@@ -1116,7 +1106,6 @@ void Preprocessing::performPerImageOperations(
 			Ipart.write(fn_output_img_root+".mrcs", -1, false, WRITE_APPEND);
 		TIMING_TOC(TIMING_PER_IMG_OP_WRITE);
 	}
-
 }
 
 // Get the coordinate file from a given micrograph filename from MDdata
@@ -1253,7 +1242,6 @@ MetaDataTable Preprocessing::getCoordinateMetaDataTable(FileName fn_mic)
 // Get the coordinate filename from the micrograph filename
 FileName Preprocessing::getCoordinateFileName(FileName fn_mic)
 {
-
 	FileName fn_pre, fn_jobnr, fn_post;
 	decomposePipelineFileName(fn_mic, fn_pre, fn_jobnr, fn_post);
 	FileName fn_coord = fn_coord_dir + fn_post.withoutExtension() + fn_coord_suffix;
@@ -1263,7 +1251,6 @@ FileName Preprocessing::getCoordinateFileName(FileName fn_mic)
 // Get the coordinate filename from the micrograph filename
 FileName Preprocessing::getOutputFileNameRoot(FileName fn_mic)
 {
-
 	FileName fn_pre, fn_jobnr, fn_post;
 	decomposePipelineFileName(fn_mic, fn_pre, fn_jobnr, fn_post);
 	FileName fn_part = fn_part_dir + fn_post.withoutExtension();

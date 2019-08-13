@@ -1545,12 +1545,12 @@ void multiViewerCanvas::saveSelected(int save_selected)
 
 		if (obsModel->opticsMdt.numberOfObjects() > 0 && !do_class)
 		{
-			if (metadata_table_name == "micrographs")
+			if (metadata_table_name == "micrographs" || (!MDout.containsLabel(EMDL_IMAGE_NAME) && !MDout.containsLabel(EMDL_MICROGRAPH_MOVIE_NAME)))
 			{
 				obsModel->save(MDout, fn_selected_imgs, "micrographs");
 				std::cout << "Saved "<< fn_selected_imgs << " with " << nsel << " selected micrographs." << std::endl;
 			}
-			else if (metadata_table_name == "movies")
+			else if (metadata_table_name == "movies" || (!MDout.containsLabel(EMDL_IMAGE_NAME) && MDout.containsLabel(EMDL_MICROGRAPH_MOVIE_NAME)))
 			{
 				obsModel->save(MDout, fn_selected_imgs, "movies");
 				std::cout << "Saved "<< fn_selected_imgs << " with " << nsel << " selected movies." << std::endl;

@@ -34,7 +34,6 @@ std::vector<Fl_Check_Button*> check_buttons;
 int last_pick_viewed;
 int last_ctf_viewed;
 
-
 bool   global_has_ctf;
 bool   global_pick_startend;
 RFLOAT global_angpix;
@@ -58,7 +57,6 @@ bool global_do_color;
 
 void cb_viewmic(Fl_Widget* w, void* data)
 {
-
 	// Get my own number back
 	int *iptr = (int*)data;
 	int imic = *iptr;
@@ -86,7 +84,6 @@ void cb_viewmic(Fl_Widget* w, void* data)
 		count_displays[last_pick_viewed]->buffer(textbuff2);
 		count_displays[last_pick_viewed]->redraw();
 	}
-
 
 	FileName fn_pre, fn_jobnr, fn_post;
 	decomposePipelineSymlinkName(global_fn_mics[imic], fn_pre, fn_jobnr, fn_post);
@@ -131,13 +128,10 @@ void cb_viewmic(Fl_Widget* w, void* data)
 			viewmic_buttons[i]->color(GUI_BUTTON_COLOR, GUI_BUTTON_COLOR);
 		}
 	}
-
-
 }
 
 void cb_viewctf(Fl_Widget* w, void* data)
 {
-
 	// Get my own number back
 	int *iptr = (int*)data;
 	int imic = *iptr;
@@ -161,13 +155,10 @@ void cb_viewctf(Fl_Widget* w, void* data)
 			viewctf_buttons[i]->color(GUI_BUTTON_COLOR, GUI_BUTTON_COLOR);
 		}
 	}
-
-
 }
 
 void cb_selectmic(Fl_Widget* w, void* data)
 {
-
 	// Get my own number back
 	int *iptr = (int*)data;
 	int imic = *iptr;
@@ -206,28 +197,26 @@ void cb_selectmic(Fl_Widget* w, void* data)
 			defocus_displays[imic]->deactivate();
 		}
 	}
-
 }
 
 int manualpickerGuiWindow::fill()
 {
-
 	color(GUI_BACKGROUND_COLOR);
 
 
 	Fl_Menu_Bar *menubar = new Fl_Menu_Bar(0, 0, w(), 25);
-    if (do_allow_save)
-    {
-    	menubar->add("File/Save selection",  FL_ALT+'s', cb_menubar_save, this);
-    	menubar->add("File/Invert selection",  FL_ALT+'i', cb_menubar_invert_selection, this);
-    }
-    menubar->add("File/Recount picked particles",  FL_ALT+'c', cb_menubar_recount, this);
-    menubar->add("File/Quit", FL_ALT+'q', cb_menubar_quit, this);
-    int current_y = 25;
+	if (do_allow_save)
+	{
+		menubar->add("File/Save selection",  FL_ALT+'s', cb_menubar_save, this);
+		menubar->add("File/Invert selection",  FL_ALT+'i', cb_menubar_invert_selection, this);
+	}
+	menubar->add("File/Recount picked particles",  FL_ALT+'c', cb_menubar_recount, this);
+	menubar->add("File/Quit", FL_ALT+'q', cb_menubar_quit, this);
+	int current_y = 25;
 
-    // Scroll bars
-    Fl_Scroll scroll(0, current_y, w(), h()-current_y);
-    scroll.type(Fl_Scroll::VERTICAL);
+	// Scroll bars
+	Fl_Scroll scroll(0, current_y, w(), h()-current_y);
+	scroll.type(Fl_Scroll::VERTICAL);
 
 	selected.clear();
 	number_picked.clear();
@@ -334,12 +323,10 @@ int manualpickerGuiWindow::fill()
 	resizable(*this);
 	show();
 	return Fl::run();
-
 }
 
 void manualpickerGuiWindow::readOutputStarfile()
 {
-
 	if (exists(fn_sel))
 	{
 		for (int imic = 0; imic < selected.size(); imic++)
@@ -389,7 +376,6 @@ void manualpickerGuiWindow::readOutputStarfile()
 	}
 }
 
-
 void manualpickerGuiWindow::writeOutputStarfile()
 {
 	MetaDataTable MDout;
@@ -409,13 +395,11 @@ void manualpickerGuiWindow::writeOutputStarfile()
 	{
 		MDout.write(fn_sel);
 	}
-
 }
 void manualpickerGuiWindow::cb_menubar_save(Fl_Widget* w, void* v)
 {
 	manualpickerGuiWindow* T=(manualpickerGuiWindow*)v;
-    T->cb_menubar_save_i();
-
+	T->cb_menubar_save_i();
 }
 
 void manualpickerGuiWindow::cb_menubar_save_i()
@@ -428,8 +412,7 @@ void manualpickerGuiWindow::cb_menubar_save_i()
 void manualpickerGuiWindow::cb_menubar_invert_selection(Fl_Widget* w, void* v)
 {
 	manualpickerGuiWindow* T=(manualpickerGuiWindow*)v;
-    T->cb_menubar_invert_selection_i();
-
+	T->cb_menubar_invert_selection_i();
 }
 
 void manualpickerGuiWindow::cb_menubar_invert_selection_i()
@@ -460,15 +443,14 @@ void manualpickerGuiWindow::cb_menubar_invert_selection_i()
 				viewctf_buttons[imic]->deactivate();
 		}
 	}
-
 }
 
 void manualpickerGuiWindow::cb_menubar_quit(Fl_Widget* w, void* v)
 {
 	manualpickerGuiWindow* T=(manualpickerGuiWindow*)v;
-    T->cb_menubar_quit_i();
-
+	T->cb_menubar_quit_i();
 }
+
 void manualpickerGuiWindow::cb_menubar_quit_i()
 {
 	cb_menubar_save_i();
@@ -478,8 +460,7 @@ void manualpickerGuiWindow::cb_menubar_quit_i()
 void manualpickerGuiWindow::cb_menubar_recount(Fl_Widget* w, void* v)
 {
 	manualpickerGuiWindow* T=(manualpickerGuiWindow*)v;
-    T->cb_menubar_recount_i();
-
+	T->cb_menubar_recount_i();
 }
 void manualpickerGuiWindow::cb_menubar_recount_i()
 {
@@ -519,7 +500,6 @@ void manualpickerGuiWindow::cb_menubar_recount_i()
 		number_picked[imic] = my_nr_picked;
 	}
 	std::cout << " Total number of picked particles: " << global_total_count << " from " << nr_sel_mic << " selected micrographs." << std::endl;
-
 }
 
 
@@ -568,7 +548,6 @@ void ManualPicker::usage()
 
 void ManualPicker::initialise()
 {
-
 	if (fn_in.isStarFile())
 	{
 		ObservationModel::loadSafely(fn_in, obsModel, MDin, "micrographs");
@@ -615,7 +594,6 @@ void ManualPicker::initialise()
 			global_lowpass = new_nyquist;
 		std::cout << " Set low-pass filter to " << global_lowpass << " due to downscaling of " << global_micscale << std::endl;
 	}
-
 }
 
 void ManualPicker::run()
@@ -631,5 +609,4 @@ void ManualPicker::run()
 	win.do_allow_save = do_allow_save;
 	win.do_fast_save = do_fast_save;
 	win.fill();
-
 }

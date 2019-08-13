@@ -2085,6 +2085,11 @@ void JobWindow::initialiseMotionrefineWindow()
 	place("first_frame", TOGGLE_DEACTIVATE);
 	place("last_frame", TOGGLE_DEACTIVATE);
 
+	current_y += STEPY /2 ;
+
+	place("extract_size", TOGGLE_DEACTIVATE);
+	place("rescale", TOGGLE_DEACTIVATE);
+
 	tab1->end();
 
 	tab2->begin();

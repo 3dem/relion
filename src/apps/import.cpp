@@ -86,7 +86,7 @@ class import_parameters
 		if (do_other || do_halfmaps || do_particles) nr_count++;
 		if (nr_count != 1)
 		{
-			REPORT_ERROR("ERROR: you can only use only one, and at least one, of the options --do_movies, --do_micrographs, --do_coordinates, do_halfmaps or --other_import_type");
+			REPORT_ERROR("ERROR: you can only use only one, and at least one, of the options --do_movies, --do_micrographs, --do_coordinates, --do_halfmaps or --do_other");
 		}
 
 		std::cout << " importing..." << std::endl;
@@ -226,7 +226,7 @@ class import_parameters
 			FileName fn_suffix2 = fn_in.beforeLastOf("*");
 			fh.open((fn_odir + fn_out).c_str(), std::ios::out);
 			if (!fh)
-				REPORT_ERROR( (std::string)"MlModel::write: Cannot write file: " + fn_odir + fn_out);
+				REPORT_ERROR( (std::string)"Import: Cannot write file: " + fn_odir + fn_out);
 
 			fh << fn_suffix2 << "*.mrc" << std::endl;
 			fh.close();

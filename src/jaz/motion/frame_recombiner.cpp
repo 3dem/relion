@@ -166,7 +166,7 @@ void FrameRecombiner::init(
 	angpix_out.resize(nog);
 	freqWeights.resize(nog);
 
-	const double angpix_mov = micrographHandler->movie_angpix; // TODO: make sure the movie_angpix is the same for all micrographs
+	const double angpix_mov = micrographHandler->movie_angpix; // TODO: TAKANORI: make sure the movie_angpix is the same for all micrographs
 
 	// The optics group is used only to account for different pixel sizes.
 	// Dose weighting uses information from all optics groups.
@@ -667,7 +667,6 @@ int FrameRecombiner::getOutputBoxSize(int opticsGroup)
 
 bool FrameRecombiner::isCtfMultiplied(int opticsGroup)
 {
-	std::cerr << "FIXME: TODO: currently FrameRecombiner::isCtfMultiplied assumes that all optics groups are processed." << std::endl;
 	return do_ctf_multiply;
 }
 

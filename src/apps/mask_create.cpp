@@ -145,6 +145,8 @@ class mask_create_parameters
 			lowPassFilterMap(Iin(), lowpass, angpix);
 		}
 
+		Iin().setXmippOrigin();
+
 		if (fn_and != "")
 		{
 			Ip.read(fn_and);

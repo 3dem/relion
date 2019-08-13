@@ -1528,15 +1528,17 @@ public:
      * than the argument
      */
     template <typename T1>
-    inline bool sameShape(const MultidimArray<T1>& op) const
+    inline bool sameShape(const MultidimArray<T1>& op, bool ignore_origin=false) const
     {
-        return (NSIZE(*this) == NSIZE(op) &&
-                XSIZE(*this) == XSIZE(op) &&
-                YSIZE(*this) == YSIZE(op) &&
-                ZSIZE(*this) == ZSIZE(op) &&
-                STARTINGX(*this) == STARTINGX(op) &&
-                STARTINGY(*this) == STARTINGY(op) &&
-                STARTINGZ(*this) == STARTINGZ(op));
+	bool size_ok = (NSIZE(*this) == NSIZE(op) &&
+                        XSIZE(*this) == XSIZE(op) &&
+                        YSIZE(*this) == YSIZE(op) &&
+                        ZSIZE(*this) == ZSIZE(op));
+        bool origin_ok = ignore_origin || (STARTINGX(*this) == STARTINGX(op) &&
+                                           STARTINGY(*this) == STARTINGY(op) &&
+                                           STARTINGZ(*this) == STARTINGZ(op));
+
+        return size_ok && origin_ok;
     }
 
 
