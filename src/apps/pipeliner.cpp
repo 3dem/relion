@@ -34,7 +34,7 @@ public:
 	FileName fn_sched, fn_jobids, fn_options, fn_alias, run_schedule, abort_schedule;
 	int nr_repeat;
 	bool do_check_complete, do_overwrite_current;
-	long int minutes_wait, minutes_wait_before, seconds_wait_after;
+	long int minutes_wait, minutes_wait_before, seconds_wait_after, gentle_clean;
 	std::string add_type;
 
 	// The actual pipeline
@@ -50,7 +50,6 @@ public:
 
 	void read(int argc, char **argv)
 	{
-
 		parser.setCommandLine(argc, argv);
 
 		// Fill the window, but don't show it!
@@ -70,6 +69,7 @@ public:
 		seconds_wait_after = textToInteger(parser.getOption("--sec_wait_after", "Wait this many seconds after a process finishes (workaround for slow IO)", "10"));
 		int expert_section = parser.addSection("Expert options");
 		pipeline.name = parser.getOption("--pipeline", "Name of the pipeline", "default");
+		gentle_clean = textToInteger(parser.getOption("--gentle_clean", "Gentle clean this job", "-1"));
 
 		// Check for errors in the command-line option
 		if (parser.checkForErrors())
@@ -78,7 +78,6 @@ public:
 
 	void run()
 	{
-
 		pipeline.read(DO_LOCK);
 		pipeline.write(DO_LOCK);
 		if (do_check_complete)
@@ -98,6 +97,33 @@ public:
 			}
 
 		}
+		else if (gentle_clean > 0)
+		{
+			bool found = false;
+			for (int i = 0, ilim = pipeline.processList.size(); i < ilim; i++)
+			{
+//				std::cout << i << " " << pipeline.processList[i].name << std::endl;
+				FileName fn_pre, fn_jobnr, fn_post;
+				if (!decomposePipelineFileName(pipeline.processList[i].name, fn_pre, fn_jobnr, fn_post))
+					continue;
+
+				int job_nr = textToInteger(fn_jobnr.afterFirstOf("job").beforeLastOf("/"));
+				if (job_nr != gentle_clean)
+					continue;
+
+				found = true;
+//				std::cout << "Gentle clean " << pipeline.processList[i].name << std::endl;
+				std::string error_message;
+				if (!pipeline.cleanupJob(i, false, error_message))
+				{
+					std::cerr << "Failed to clean!" << std::endl;
+					REPORT_ERROR(error_message);
+				}
+				break;
+			}
+			if (!found)
+				std::cerr << "Could not find job " << gentle_clean << std::endl;
+		}
 		else if (nr_repeat > 0)
 		{
 			pipeline.runScheduledJobs(fn_sched, fn_jobids, nr_repeat, minutes_wait, minutes_wait_before, seconds_wait_after, do_overwrite_current);
@@ -107,7 +133,6 @@ public:
 
 int main(int argc, char *argv[])
 {
-
 	pipeliner_parameters prm;
 
 	try
