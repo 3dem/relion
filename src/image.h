@@ -690,8 +690,10 @@ public:
 				{
 					// Here we are assuming the fill-order is LSB2MSB according to IMOD's
 					// iiProcessReadLine() in libiimod/mrcsec.c.
-					// However, the default is MSB2LSB for TIFF.
-					ptrDest[i * 2] = (T)(page[i] & 15); // 1111 = 1+2+4+8 = 15
+					// The default fill-order in the TIFF specification is MSB2LSB
+					// but IMOD assumes LSB2MSB even for TIFF.
+					// See IMOD's iiTIFFCheck() in libiimod/iitif.c.
+					ptrDest[i * 2 ] = (T)(page[i] & 15); // 1111 = 1+2+4+8 = 15
 					ptrDest[i * 2 + 1] = (T)((page[i] >> 4) & 15);
 				}
 				break;

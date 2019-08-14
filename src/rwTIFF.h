@@ -39,8 +39,8 @@ int readTIFF(TIFF* ftiff, long int img_select, bool readdata=false, bool isStack
 	long int _xDim,_yDim,_zDim;
 	long int _nDim;
 
-	// libtiff's types
-	uint32 width, length;
+	// These are libtiff's types.
+	uint32 width, length; // apparent dimensions in the file
 	uint16 sampleFormat, bitsPerSample;
 	
 	if (TIFFGetField(ftiff, TIFFTAG_IMAGEWIDTH, &width) != 1 ||
@@ -48,6 +48,8 @@ int readTIFF(TIFF* ftiff, long int img_select, bool readdata=false, bool isStack
 	{
 		REPORT_ERROR("The input TIFF file does not have the width or height field.");
 	}
+
+	// true image dimensions
 	_xDim = width;
 	_yDim = length;
 	_zDim = 1;
@@ -66,16 +68,47 @@ int readTIFF(TIFF* ftiff, long int img_select, bool readdata=false, bool isStack
 #endif
 
 	// Reject 4-bit packed TIFFs. This is IMOD's own extension.
-	// It is not easy to detect this format. See IMOD's libiimod/iitif.c and libiimod/mrcfiles.c.
+	// It is not easy to detect this format. Here we check only the image size.
+	// See IMOD's iiTIFFCheck() in libiimod/iitif.c and sizeCanBe4BitK2SuperRes() in libiimod/mrcfiles.c.
 	bool packed_4bit = false;
 	if (bitsPerSample == 8 && ((width == 5760 && length == 8184)  || (width == 8184  && length == 5760) || // K3 SR: 11520 x 8184
 	                           (width == 4092 && length == 11520) || (width == 11520 && length == 4092) ||
 	                           (width == 3710 && length == 7676)  || (width == 7676  && length == 3710) || // K2 SR: 7676 x 7420
 	                           (width == 3838 && length == 7420)  || (width == 7420  && length == 3838)))
+	{
 		packed_4bit = true;
+        	_xDim *= 2;
+	}
+
+	DataType datatype;
 
 	if (packed_4bit)
-		REPORT_ERROR("Sorry, a 4-bit packed TIFF from SerialEM is not supported. Please run IMOD's mrc2tif command to re-compress it into a 8-bit unpacked TIFF.");
+	{
+		datatype = UHalf;
+	}
+	else if (bitsPerSample == 8 && sampleFormat == 1)
+	{
+		datatype = UChar;
+	}
+	else if (bitsPerSample == 16 && sampleFormat == 1)
+	{
+		datatype = UShort;
+	}
+	else if (bitsPerSample == 16 && sampleFormat == 2)
+	{
+		datatype = Short;
+	}
+	else if (bitsPerSample == 32 && sampleFormat == 3)
+	{
+		datatype = Float;
+	}
+	else
+	{
+		std::cerr << "Unsupported TIFF format in " << name << ": sample format = " << sampleFormat << ", bits per sample = " << bitsPerSample << std::endl;
+		REPORT_ERROR("Unsupported TIFF format.\n");
+	}
+	
+	MDMainHeader.setValue(EMDL_IMAGE_DATATYPE,(int)datatype);
 
 	// TODO: TIFF is always a stack, isn't it?
 	if (isStack)
@@ -103,23 +136,6 @@ int readTIFF(TIFF* ftiff, long int img_select, bool readdata=false, bool isStack
 	data.setDimensions(_xDim, _yDim, _zDim, _nDim);
 	data.coreAllocateReuse();
 	
-	DataType datatype;
-	
-	if (bitsPerSample == 8 && sampleFormat == 1) {
-		datatype = UChar;
-	} else if (bitsPerSample == 16 && sampleFormat == 1) {
-		datatype = UShort;
-	} else if (bitsPerSample == 16 && sampleFormat == 2) {
-		datatype = Short;
-	} else if (bitsPerSample == 32 && sampleFormat == 3) {
-		datatype = Float;
-	} else {
-		std::cerr << "Unsupported TIFF format in " << name << ": sample format = " << sampleFormat << ", bits per sample = " << bitsPerSample << std::endl;
-		REPORT_ERROR("Unsupported TIFF format.\n");
-	}
-	
-	MDMainHeader.setValue(EMDL_IMAGE_DATATYPE,(int)datatype);
-
 	/*
 	if ( header->mx && header->a!=0)//ux
 		MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X,(RFLOAT)header->a/header->mx);
@@ -129,11 +145,13 @@ int readTIFF(TIFF* ftiff, long int img_select, bool readdata=false, bool isStack
 		MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Z,(RFLOAT)header->c/header->mz);
 	*/
 
-	if (readdata) {
+	if (readdata)
+	{
 		if (img_select == -1) img_select = 0; // img_select starts from 0
 
 		size_t haveread_n = 0;
-		for (int i = 0; i < _nDim; i++) {
+		for (int i = 0; i < _nDim; i++)
+		{
 			TIFFSetDirectory(ftiff, img_select);
 
 			// Make sure image property is consistent for all frames
@@ -148,7 +166,8 @@ int readTIFF(TIFF* ftiff, long int img_select, bool readdata=false, bool isStack
 			TIFFGetFieldDefaulted(ftiff, TIFFTAG_BITSPERSAMPLE, &cur_bitsPerSample);
 			TIFFGetFieldDefaulted(ftiff, TIFFTAG_SAMPLEFORMAT, &cur_sampleFormat);
 			if ((cur_width != width) || (cur_length != length) || (cur_bitsPerSample != bitsPerSample) ||
-			    (cur_sampleFormat != sampleFormat)) {
+			    (cur_sampleFormat != sampleFormat))
+			{
 				REPORT_ERROR(name + ": All frames in a TIFF should have same width, height and pixel format.\n");
 			}
 
@@ -159,7 +178,8 @@ int readTIFF(TIFF* ftiff, long int img_select, bool readdata=false, bool isStack
 			size_t readsize_n = stripSize * 8 / bitsPerSample;
 			std::cout << "TIFF stripSize=" << stripSize << " numberOfStrips=" << numberOfStrips << " readsize_n=" << readsize_n << std::endl;
 #endif
-			for (tstrip_t strip = 0; strip < numberOfStrips; strip++) {
+			for (tstrip_t strip = 0; strip < numberOfStrips; strip++)
+			{
 				tsize_t actually_read = TIFFReadEncodedStrip(ftiff, strip, buf, stripSize);
 				if (actually_read == -1)
 					REPORT_ERROR((std::string)"Failed to read an image data from " + name);
@@ -167,6 +187,8 @@ int readTIFF(TIFF* ftiff, long int img_select, bool readdata=false, bool isStack
 #ifdef DEBUG_TIFF
 				std::cout << "Reading strip: " << strip << "actually read byte:" << actually_read << std::endl;
 #endif
+				if (packed_4bit)
+					actually_read_n *= 2; // convert physical size to logical size
 				castPage2T((char*)buf, MULTIDIM_ARRAY(data) + haveread_n, datatype, actually_read_n);
 				haveread_n += actually_read_n;
 			}
@@ -193,10 +215,14 @@ int readTIFF(TIFF* ftiff, long int img_select, bool readdata=false, bool isStack
 
 		T tmp;
 		const int ylim = _yDim / 2, z = 0;
-		for (int n = 0; n < _nDim; n++) {
-			for (int y1 = 0; y1 < ylim; y1++) {
+		for (int n = 0; n < _nDim; n++)
+			{
+			for (int y1 = 0; y1 < ylim; y1++)
+			{
 				const int y2 = _yDim - 1 - y1;
-				for (int x = 0; x < _xDim; x++) { // TODO: memcpy or pointer arithmetic is probably faster
+				for (int x = 0; x < _xDim; x++)
+				{
+					 // TODO: memcpy or pointer arithmetic is probably faster
 					tmp = DIRECT_NZYX_ELEM(data, n, z, y1, x);
 					DIRECT_NZYX_ELEM(data, n, z, y1, x) = DIRECT_NZYX_ELEM(data, n, z, y2, x);
 					DIRECT_NZYX_ELEM(data, n, z, y2, x) = tmp;
