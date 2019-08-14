@@ -689,7 +689,7 @@ public:
 				for(size_t i = 0, ilim = pageSize / 2; i < ilim; i++)
 				{
 					// Here we are assuming the fill-order is LSB2MSB according to IMOD's
-					//	iiProcessReadLine() in libiimod/mrcsec.c.
+					// iiProcessReadLine() in libiimod/mrcsec.c.
 					// However, the default is MSB2LSB for TIFF.
 					ptrDest[i * 2] = (T)(page[i] & 15); // 1111 = 1+2+4+8 = 15
 					ptrDest[i * 2 + 1] = (T)((page[i] >> 4) & 15);

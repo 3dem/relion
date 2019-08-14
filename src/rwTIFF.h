@@ -65,8 +65,20 @@ int readTIFF(TIFF* ftiff, long int img_select, bool readdata=false, bool isStack
 	       width, length, _nDim, sampleFormat, bitsPerSample);
 #endif
 
+	// Reject 4-bit packed TIFFs. This is IMOD's own extension.
+	// It is not easy to detect this format. See IMOD's libiimod/iitif.c and libiimod/mrcfiles.c.
+	bool packed_4bit = false;
+	if (bitsPerSample == 8 && ((width == 5760 && length == 8184)  || (width == 8184  && length == 5760) || // K3 SR: 11520 x 8184
+	                           (width == 4092 && length == 11520) || (width == 11520 && length == 4092) ||
+	                           (width == 3710 && length == 7676)  || (width == 7676  && length == 3710) || // K2 SR: 7676 x 7420
+	                           (width == 3838 && length == 7420)  || (width == 7420  && length == 3838)))
+		packed_4bit = true;
+
+	if (packed_4bit)
+		REPORT_ERROR("Sorry, a 4-bit packed TIFF from SerialEM is not supported. Please run IMOD's mrc2tif command to re-compress it into a 8-bit unpacked TIFF.");
+
 	// TODO: TIFF is always a stack, isn't it?
-	if(isStack)
+	if (isStack)
 	{
 		_zDim = 1;
 		replaceNsize=_nDim;
