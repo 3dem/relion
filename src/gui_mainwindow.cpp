@@ -82,61 +82,61 @@ int StdOutDisplay::handle(int ev)
 int SchedulerWindow::fill(FileName _pipeline_name, std::vector<FileName> _scheduled_jobs)
 {
 	//color(GUI_BACKGROUND_COLOR);
-    int current_y = 2, max_y = 2;
-    int ystep = 35;
+	int current_y = 2, max_y = 2;
+	int ystep = 35;
+	int xcol = w()-120;
 
-    int xcol = w()-120;
+	// Scroll bars
+	Fl_Scroll scroll(0, current_y, w(), h());
+	scroll.type(Fl_Scroll::VERTICAL);
 
-    // Scroll bars
-    Fl_Scroll scroll(0, current_y, w(), h());
-    scroll.type(Fl_Scroll::VERTICAL);
-
-    my_jobs.clear();
-    pipeline_name = _pipeline_name;
-    for (int ijob = 0; ijob < _scheduled_jobs.size(); ijob++)
-    {
-    	my_jobs.push_back(_scheduled_jobs[ijob]);
-    	int xcoor = (ijob < 1+_scheduled_jobs.size()/2) ? 20 : w()-170;
-    	if (ijob == 1+_scheduled_jobs.size()/2)
-    		current_y = 2;
-    	Fl_Check_Button *mycheck = new Fl_Check_Button(xcoor, current_y, ystep-8, ystep-8, _scheduled_jobs[ijob].c_str());
-    	mycheck->labelsize(ENTRY_FONTSIZE);
-    	check_buttons.push_back(mycheck);
+	my_jobs.clear();
+	pipeline_name = _pipeline_name;
+	for (int ijob = 0; ijob < _scheduled_jobs.size(); ijob++)
+	{
+		my_jobs.push_back(_scheduled_jobs[ijob]);
+		int xcoor = (ijob < 1+_scheduled_jobs.size()/2) ? 20 : w()-170;
+		if (ijob == 1+_scheduled_jobs.size()/2)
+			current_y = 2;
+		Fl_Check_Button *mycheck = new Fl_Check_Button(xcoor, current_y, ystep-8, ystep-8, _scheduled_jobs[ijob].c_str());
+		mycheck->labelsize(ENTRY_FONTSIZE);
+		check_buttons.push_back(mycheck);
 		mycheck->value(1);
 		current_y += ystep;
 		if (current_y > max_y)
 			max_y = current_y;
-    }
-    current_y = max_y;
-    schedule_name = new Fl_Input(xcol, current_y, 100, ystep-8, "Provide a name for this schedule: ");
-    current_y += ystep;
-    wait_before = new Fl_Input(xcol, current_y, 100, ystep-8, "Wait this many minutes before starting?");
-    current_y += ystep;
-    repeat = new Fl_Input(xcol, current_y, 100, ystep-8, "Run the jobs how many times?");
-    current_y += ystep;
-    wait = new Fl_Input(xcol, current_y, 100, ystep-8, "Wait at least in between (in minutes)?");
-    current_y += ystep;
-    wait_after = new Fl_Input(xcol, current_y, 100, ystep-8, "Wait at least after each job (in seconds)?");
-    current_y += ystep;
+	}
 
-    // Set the input value
-    schedule_name->value("schedule1");
+	current_y = max_y;
+	schedule_name = new Fl_Input(xcol, current_y, 100, ystep-8, "Provide a name for this schedule: ");
+	current_y += ystep;
+	wait_before = new Fl_Input(xcol, current_y, 100, ystep-8, "Wait this many minutes before starting?");
+	current_y += ystep;
+	repeat = new Fl_Input(xcol, current_y, 100, ystep-8, "Run the jobs how many times?");
+	current_y += ystep;
+	wait = new Fl_Input(xcol, current_y, 100, ystep-8, "Wait at least in between (in minutes)?");
+	current_y += ystep;
+	wait_after = new Fl_Input(xcol, current_y, 100, ystep-8, "Wait at least after each job (in seconds)?");
+	current_y += ystep;
+
+	// Set the input value
+	schedule_name->value("schedule1");
 	schedule_name->color(GUI_INPUT_COLOR);
 	schedule_name->textsize(ENTRY_FONTSIZE);
 	schedule_name->labelsize(ENTRY_FONTSIZE);
-    repeat->value("1");
+	repeat->value("1");
 	repeat->color(GUI_INPUT_COLOR);
 	repeat->textsize(ENTRY_FONTSIZE);
 	repeat->labelsize(ENTRY_FONTSIZE);
-    wait->value("15");
+	wait->value("15");
 	wait->color(GUI_INPUT_COLOR);
 	wait->textsize(ENTRY_FONTSIZE);
 	wait->labelsize(ENTRY_FONTSIZE);
-    wait_before->value("0");
+	wait_before->value("0");
 	wait_before->color(GUI_INPUT_COLOR);
 	wait_before->textsize(ENTRY_FONTSIZE);
 	wait_before->labelsize(ENTRY_FONTSIZE);
-    wait_after->value("10");
+	wait_after->value("10");
 	wait_after->color(GUI_INPUT_COLOR);
 	wait_after->textsize(ENTRY_FONTSIZE);
 	wait_after->labelsize(ENTRY_FONTSIZE);
@@ -157,20 +157,19 @@ int SchedulerWindow::fill(FileName _pipeline_name, std::vector<FileName> _schedu
 	show();
 
 	return Fl::run();
-
 }
 
 void SchedulerWindow::cb_cancel(Fl_Widget*, void* v)
 {
-    SchedulerWindow* T=(SchedulerWindow*)v;
-    T->hide();
+	SchedulerWindow* T=(SchedulerWindow*)v;
+	T->hide();
 }
 
 void SchedulerWindow::cb_execute(Fl_Widget*, void* v)
 {
-    SchedulerWindow* T=(SchedulerWindow*)v;
-    T->cb_execute_i();
-    T->hide();
+	SchedulerWindow* T=(SchedulerWindow*)v;
+	T->cb_execute_i();
+	T->hide();
 }
 
 void SchedulerWindow::cb_execute_i()
@@ -210,16 +209,14 @@ void SchedulerWindow::cb_execute_i()
 		int res = system(command.c_str());
 		std::cout << " Launching: " << command << std::endl;
 		std::cout << " Stop execution of this set of scheduled jobs by deleting file: " << fn_check << std::endl;
-
 	}
-
 }
 
 NoteEditorWindow::NoteEditorWindow(int w, int h, const char* title, FileName _fn_note, bool _allow_save):Fl_Window(w,h,title)
 {
 	allow_save = _allow_save;
 	editor = new Fl_Text_Editor(0, 0, w, h-50);
-    editor->wrap_mode(Fl_Text_Display::WRAP_AT_BOUNDS,10);
+	editor->wrap_mode(Fl_Text_Display::WRAP_AT_BOUNDS,10);
 	textbuff_note = new Fl_Text_Buffer;
 	editor->buffer(textbuff_note);
 	textbuff_note->transcoding_warning_action=NULL;
@@ -246,20 +243,19 @@ NoteEditorWindow::NoteEditorWindow(int w, int h, const char* title, FileName _fn
 	cancel_button->labelsize(12);
 	cancel_button->callback( cb_cancel, this);
 	resizable(*this);
-
 }
 
 void NoteEditorWindow::cb_cancel(Fl_Widget*, void* v)
 {
-    NoteEditorWindow* T=(NoteEditorWindow*)v;
-    T->hide();
+	NoteEditorWindow* T=(NoteEditorWindow*)v;
+	T->hide();
 }
 
 void NoteEditorWindow::cb_save(Fl_Widget*, void* v)
 {
-    NoteEditorWindow* T=(NoteEditorWindow*)v;
-    T->cb_save_i();
-    T->hide();
+	NoteEditorWindow* T=(NoteEditorWindow*)v;
+	T->cb_save_i();
+	T->hide();
 }
 
 void NoteEditorWindow::cb_save_i()
@@ -269,7 +265,6 @@ void NoteEditorWindow::cb_save_i()
 
 GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, FileName fn_sched, int _update_every_sec, int _exit_after_sec, bool _do_read_only):Fl_Window(w,h,title)
 {
-
 	// Set initial Timer
 	tickTimeLastChanged();
 
@@ -292,7 +287,6 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 			exit(0);
 		}
 	}
-
 
 	// First setup the old part of the GUI
 	h = GUIHEIGHT_OLD;
@@ -348,7 +342,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	}
 
  	color(GUI_BACKGROUND_COLOR);
-    menubar = new Fl_Menu_Bar(-3, 0, WCOL0-7, MENUHEIGHT);
+	menubar = new Fl_Menu_Bar(-3, 0, WCOL0-7, MENUHEIGHT);
 	menubar->add("File/Re-read pipeline",  FL_ALT+'r', cb_reread_pipeline, this);
 	menubar->add("File/Edit project note",  FL_ALT+'e', cb_edit_project_note, this);
 	if (!maingui_do_read_only)
@@ -360,8 +354,8 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	menubar->add("File/_Show initial screen",  FL_ALT+'z', cb_show_initial_screen, this);
 	if (!maingui_do_read_only)
 		menubar->add("File/_Empty trash",  FL_ALT+'t', cb_empty_trash, this);
-    menubar->add("File/About", 0, cb_about, this);
-    menubar->add("File/Quit", FL_ALT+'q', cb_quit, this);
+	menubar->add("File/About", 0, cb_about, this);
+	menubar->add("File/Quit", FL_ALT+'q', cb_quit, this);
 	if (!maingui_do_read_only)
 	{	menubar->add("Jobs/Save job settings",  FL_ALT+'s', cb_save, this);
 		menubar->add("Jobs/_Load job settings",  FL_ALT+'l', cb_load, this);
@@ -389,85 +383,85 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 		menubar->add("Scheduling/Run scheduled jobs", 0, cb_start_pipeliner, this);
 		menubar->add("Scheduling/Stop running scheduled jobs", 0, cb_stop_pipeliner, this);
 	}
-    current_y = MENUHEIGHT + 10;
+	current_y = MENUHEIGHT + 10;
 
 	// Fill browser in the right order
 	browser = new Fl_Hold_Browser(10,MENUHEIGHT+5,WCOL0-20,h-MENUHEIGHT-60);
-    browser->textsize(RLN_FONTSIZE-1);
-    current_job = -1;
+	browser->textsize(RLN_FONTSIZE-1);
+	current_job = -1;
 
-    int i = 0;
-    browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-    browser->add("Import");
-    gui_jobwindows[i] = new JobWindow();
-    gui_jobwindows[i]->initialise(PROC_IMPORT);
-    browse_grp[i]->end();
-    i++;
+	int i = 0;
+	browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+	browser->add("Import");
+	gui_jobwindows[i] = new JobWindow();
+	gui_jobwindows[i]->initialise(PROC_IMPORT);
+	browse_grp[i]->end();
+	i++;
 
-    browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-    browser->add("Motion correction");
+	browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+	browser->add("Motion correction");
 	gui_jobwindows[i] = new JobWindow();
 	gui_jobwindows[i]->initialise(PROC_MOTIONCORR);
-    browse_grp[i]->end();
-    i++;
+	browse_grp[i]->end();
+	i++;
 
-    browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
-    browser->add("CTF estimation");
+	browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+	browser->add("CTF estimation");
 	gui_jobwindows[i] = new JobWindow();
 	gui_jobwindows[i]->initialise(PROC_CTFFIND);
-    browse_grp[i]->end();
-    i++;
+	browse_grp[i]->end();
+	i++;
 
-    browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+	browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("Manual picking");
 	gui_jobwindows[i] = new JobWindow();
 	gui_jobwindows[i]->initialise(PROC_MANUALPICK);
 	browse_grp[i]->end();
 	i++;
 
-    browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+	browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("Auto-picking");
 	gui_jobwindows[i] = new JobWindow();
 	gui_jobwindows[i]->initialise(PROC_AUTOPICK);
-    browse_grp[i]->end();
-    i++;
+	browse_grp[i]->end();
+	i++;
 
-    browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+	browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("Particle extraction");
 	gui_jobwindows[i] = new JobWindow();
 	gui_jobwindows[i]->initialise(PROC_EXTRACT);
-    browse_grp[i]->end();
-    i++;
+	browse_grp[i]->end();
+	i++;
 
-    browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+	browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("Subset selection");
 	gui_jobwindows[i] = new JobWindow();
 	gui_jobwindows[i]->initialise(PROC_CLASSSELECT);
-    browse_grp[i]->end();
-    i++;
+	browse_grp[i]->end();
+	i++;
 
-    browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+	browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("2D classification");
 	gui_jobwindows[i] = new JobWindow();
 	gui_jobwindows[i]->initialise(PROC_2DCLASS);
-    browse_grp[i]->end();
-    i++;
+	browse_grp[i]->end();
+	i++;
 
-    browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+	browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("3D initial model");
 	gui_jobwindows[i] = new JobWindow();
 	gui_jobwindows[i]->initialise(PROC_INIMODEL);
-    browse_grp[i]->end();
-    i++;
+	browse_grp[i]->end();
+	i++;
 
-    browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+	browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("3D classification");
 	gui_jobwindows[i] = new JobWindow();
 	gui_jobwindows[i]->initialise(PROC_3DCLASS);
-    browse_grp[i]->end();
-    i++;
+	browse_grp[i]->end();
+	i++;
 
-    browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+	browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("3D auto-refine");
 	gui_jobwindows[i] = new JobWindow();
 	gui_jobwindows[i]->initialise(PROC_3DAUTO);
@@ -478,72 +472,69 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	browser->add("3D multi-body");
 	gui_jobwindows[i] = new JobWindow();
 	gui_jobwindows[i]->initialise(PROC_MULTIBODY);
-    browse_grp[i]->end();
-    i++;
+	browse_grp[i]->end();
+	i++;
 
-    browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+	browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("CTF refinement");
 	gui_jobwindows[i] = new JobWindow();
 	gui_jobwindows[i]->initialise(PROC_CTFREFINE);
-    browse_grp[i]->end();
-    i++;
+	browse_grp[i]->end();
+	i++;
 
-    browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+	browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("Bayesian polishing");
 	gui_jobwindows[i] = new JobWindow();
 	gui_jobwindows[i]->initialise(PROC_MOTIONREFINE);
-    browse_grp[i]->end();
-    i++;
+	browse_grp[i]->end();
+	i++;
 
-    browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+	browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("Mask creation");
 	gui_jobwindows[i] = new JobWindow();
 	gui_jobwindows[i]->initialise(PROC_MASKCREATE);
-    browse_grp[i]->end();
-    i++;
+	browse_grp[i]->end();
+	i++;
 
-    browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+	browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("Join star files");
 	gui_jobwindows[i] = new JobWindow();
 	gui_jobwindows[i]->initialise(PROC_JOINSTAR);
-    browse_grp[i]->end();
-    i++;
+	browse_grp[i]->end();
+	i++;
 
-    browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+	browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("Particle subtraction");
 	gui_jobwindows[i] = new JobWindow();
 	gui_jobwindows[i]->initialise(PROC_SUBTRACT);
-    browse_grp[i]->end();
-    i++;
+	browse_grp[i]->end();
+	i++;
 
-    browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+	browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("Post-processing");
 	gui_jobwindows[i] = new JobWindow();
 	gui_jobwindows[i]->initialise(PROC_POST);
-    browse_grp[i]->end();
-    i++;
+	browse_grp[i]->end();
+	i++;
 
-    browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+	browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("Local resolution");
 	gui_jobwindows[i] = new JobWindow();
 	gui_jobwindows[i]->initialise(PROC_RESMAP);
-    browse_grp[i]->end();
-    i++;
+	browse_grp[i]->end();
+	i++;
 
-    browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+	browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("External");
 	gui_jobwindows[i] = new JobWindow();
 	gui_jobwindows[i]->initialise(PROC_EXTERNAL);
-    browse_grp[i]->end();
+	browse_grp[i]->end();
 
-    browser->callback(cb_select_browsegroup);
-    browser->end();
-    browser->select(1); // just start from the beginning
+	browser->callback(cb_select_browsegroup);
+	browser->end();
+	browser->select(1); // just start from the beginning
 
-
-
-
-    // Add run buttons on the menubar as well
+	// Add run buttons on the menubar as well
 
 	print_CL_button = new Fl_Button(GUIWIDTH - 215, h-90, 100, 32, "Check command");
 	print_CL_button->color(GUI_RUNBUTTON_COLOR);
@@ -706,11 +697,11 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	textdispvar->textsize(12);
 	textdispvar->color(GUI_BACKGROUND_COLOR);
 	scheduler_variable_name = new Fl_Input(XJOBCOL1, GUIHEIGHT_EXT_START+23, JOBCOLWIDTH*0.4, 21);
-    scheduler_variable_name->color(GUI_INPUT_COLOR);
-    scheduler_variable_name->textsize(RLN_FONTSIZE-2);
-    scheduler_variable_value = new Fl_Input(XJOBCOL1+JOBCOLWIDTH*0.4, GUIHEIGHT_EXT_START+23, JOBCOLWIDTH*0.6, 21);
-    scheduler_variable_value->color(GUI_INPUT_COLOR);
-    scheduler_variable_value->textsize(RLN_FONTSIZE-2);
+	scheduler_variable_name->color(GUI_INPUT_COLOR);
+	scheduler_variable_name->textsize(RLN_FONTSIZE-2);
+	scheduler_variable_value = new Fl_Input(XJOBCOL1+JOBCOLWIDTH*0.4, GUIHEIGHT_EXT_START+23, JOBCOLWIDTH*0.6, 21);
+	scheduler_variable_value->color(GUI_INPUT_COLOR);
+	scheduler_variable_value->textsize(RLN_FONTSIZE-2);
 	delete_scheduler_variable_button = new Fl_Button(XJOBCOL1+JOBCOLWIDTH-105, GUIHEIGHT_EXT_START, 50, 23);
 	delete_scheduler_variable_button->color(GUI_BUTTON_COLOR);
 	delete_scheduler_variable_button->labelfont(FL_ITALIC);
@@ -738,7 +729,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	textdispnode->textsize(12);
 	textdispnode->color(GUI_BACKGROUND_COLOR);
 	scheduler_operator_type = new Fl_Choice(XJOBCOL1, GUIHEIGHT_EXT_START+23 + height_var, JOBCOLWIDTH/2 + 10, 21);
-    scheduler_operator_type->color(GUI_INPUT_COLOR);
+	scheduler_operator_type->color(GUI_INPUT_COLOR);
 	scheduler_operator_type->menu(operator_type_options);
 	scheduler_operator_type->textsize(RLN_FONTSIZE-2);
 	scheduler_operator_output = new Fl_Choice(XJOBCOL1 + 34 + JOBCOLWIDTH/2, GUIHEIGHT_EXT_START+23 + height_var, JOBCOLWIDTH/2-34, 21);
@@ -928,12 +919,11 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	if (update_every_sec > 0)
 		Fl::add_timeout(update_every_sec, Gui_Timer_CB, (void*)this);
 
-    cb_show_initial_screen_i();
+	cb_show_initial_screen_i();
 
-    // Set and activate current selection from side-browser
+	// Set and activate current selection from side-browser
 	cb_select_browsegroup_i(true); // make default active; true is used to show_initial_screen
 	is_main_continue = false; // default is a new run
-
 }
 
 static void Gui_Timer_CB(void *userdata)
@@ -944,28 +934,27 @@ static void Gui_Timer_CB(void *userdata)
 	time (&now);
 
 	double dif = difftime (now, time_last_change);
-    // If the GUI has been idle for too long, then exit
+	// If the GUI has been idle for too long, then exit
 	if (dif > o->exit_after_sec)
-    {
+	{
 		std::cout << " The relion GUI has been idle for more than " << o->exit_after_sec << " seconds, exiting now... " << std::endl;
-		exit(0);
-    }
+	exit(0);
+	}
 
 	if (show_scheduler)
 	{
 		// Always refill the stdout and stderr windows for scheduler
 		o->fillStdOutAndErr();
 		FileName mychanged = schedule.name + SCHEDULE_HAS_CHANGED;
-    	if (exists(mychanged))
-    	{
-    		schedule.read(DONT_LOCK);
-    	   	o->fillSchedulerNodesAndVariables();
-    	   	std::remove(mychanged.c_str());
-    	}
+		if (exists(mychanged))
+		{
+			schedule.read(DONT_LOCK);
+		   	o->fillSchedulerNodesAndVariables();
+		   	std::remove(mychanged.c_str());
+		}
 	}
 	else
 	{
-
 		// Update the stdout and stderr windows if we're currently pointing at a running job
 		if (current_job >= 0 && pipeline.processList[current_job].status == PROC_RUNNING)
 			o->fillStdOutAndErr();
@@ -976,8 +965,8 @@ static void Gui_Timer_CB(void *userdata)
 			o->updateJobLists();
 	}
 
-    // Refresh every so many seconds
-    Fl::repeat_timeout(o->update_every_sec, Gui_Timer_CB, userdata);
+	// Refresh every so many seconds
+	Fl::repeat_timeout(o->update_every_sec, Gui_Timer_CB, userdata);
 }
 
 void GuiMainWindow::clear()
@@ -1021,7 +1010,6 @@ std::string GuiMainWindow::getJobNameForDisplay(Process &job)
 	return result;
 }
 
-
 // Update the content of the finished, running and scheduled job lists
 void GuiMainWindow::fillRunningJobLists()
 {
@@ -1033,7 +1021,7 @@ void GuiMainWindow::fillRunningJobLists()
 	int myhpos_scheduled = scheduled_job_browser->hposition();
 	int myhpos_finished = finished_job_browser->hposition();
 
-    // Clear whatever was in there
+	// Clear whatever was in there
 	finished_job_browser->clear();
 	finished_processes.clear();
 	running_job_browser->clear();
@@ -1383,14 +1371,10 @@ void GuiMainWindow::fillSchedulerNodesAndVariables()
 	{
 		scheduler_run_grp->activate();
 	}
-
-
 }
-
 
 void GuiMainWindow::fillStdOutAndErr()
 {
-
 	FileName fn_out = "";
 	FileName fn_err = "";
 	FileName fn_outtail, fn_errtail;
@@ -1449,7 +1433,6 @@ void GuiMainWindow::fillStdOutAndErr()
 	}
 	else
 		textbuff_stderr->text("stderr will go here; double-click this window to open stderr in a separate window");
-
 }
 
 void GuiMainWindow::tickTimeLastChanged()
@@ -1466,7 +1449,6 @@ void GuiMainWindow::updateJobLists()
 		fillRunningJobLists();
 	fillToAndFromJobLists();
 }
-
 
 void GuiMainWindow::loadJobFromPipeline(int this_job)
 {
@@ -1519,24 +1501,20 @@ void GuiMainWindow::loadJobFromPipeline(int this_job)
 
 	// File the out and err windows
 	fillStdOutAndErr();
-
 }
 
 void GuiMainWindow::cb_select_browsegroup(Fl_Widget* o, void* v)
 {
-
 	GuiMainWindow* T=(GuiMainWindow*)v;
 
 	// When clicking the job browser on the left: reset current_job to -1 (i.e. a new job, not yet in the pipeline)
 	current_job = -1;
 	T->cb_select_browsegroup_i();
 	run_button->activate();
-
 }
 
 void GuiMainWindow::cb_select_browsegroup_i(bool show_initial_screen)
 {
-
 	// Update timer
 	tickTimeLastChanged();
 
@@ -1550,17 +1528,17 @@ void GuiMainWindow::cb_select_browsegroup_i(bool show_initial_screen)
 	if (iwin < 0 || iwin >= NR_BROWSE_TABS) return;
 	// Show the 'selected' group, hide the others
 	for ( int t=0; t<NR_BROWSE_TABS; t++ )
-    {
-    	// During the initial screen: show a nice picture with some explanations
-    	if ( t == iwin && !show_initial_screen) // browser starts counting at 1...
-        {
-    		browse_grp[t]->show();
-        }
-        else
-        {
-        	browse_grp[t]->hide();
-        }
-    }
+	{
+		// During the initial screen: show a nice picture with some explanations
+		if ( t == iwin && !show_initial_screen) // browser starts counting at 1...
+		{
+			browse_grp[t]->show();
+		}
+		else
+		{
+			browse_grp[t]->hide();
+		}
+	}
 
 	// Update all job lists in the main GUI
 	updateJobLists();
@@ -1581,10 +1559,8 @@ void GuiMainWindow::cb_select_browsegroup_i(bool show_initial_screen)
 	scheduler_job_has_started->deactivate();
 	scheduler_job_has_started->picked(&job_has_started_options[1]); // initialise to has_not_started
 
-
 	textbuff_stdout->text("stdout will go here; double-click this window to open stdout in a separate window");
 	textbuff_stderr->text("stderr will go here; double-click this window to open stderr in a separate window");
-
 }
 
 void GuiMainWindow::cb_select_finished_job(Fl_Widget* o, void* v)
@@ -1600,8 +1576,8 @@ void GuiMainWindow::cb_select_finished_job_i()
 	tickTimeLastChanged();
 
 	// Show the 'selected' group, hide the others
-    int idx = finished_job_browser->value() - 1;
-    if (idx >= 0) // only if a non-empty line was selected
+	int idx = finished_job_browser->value() - 1;
+	if (idx >= 0) // only if a non-empty line was selected
 		loadJobFromPipeline(finished_processes[idx]);
 }
 
@@ -1618,14 +1594,16 @@ void GuiMainWindow::cb_select_running_job_i()
 	tickTimeLastChanged();
 
 	// Show the 'selected' group, hide the others
-    int idx = running_job_browser->value() - 1;
-    if (idx >= 0) // only if a non-empty line was selected
-    	loadJobFromPipeline(running_processes[idx]);
+	int idx = running_job_browser->value() - 1;
+	if (idx >= 0) // only if a non-empty line was selected
+		loadJobFromPipeline(running_processes[idx]);
 
 }
 
 void GuiMainWindow::cb_select_scheduled_job(Fl_Widget* o, void* v)
 {
+	if (v == NULL) return;
+
 	GuiMainWindow* T=(GuiMainWindow*)v;
 	T->cb_select_scheduled_job_i();
 	run_button->activate();
@@ -1637,13 +1615,13 @@ void GuiMainWindow::cb_select_scheduled_job_i()
 	tickTimeLastChanged();
 
 	// Show the 'selected' group, hide the others
-    int idx = (show_scheduler) ? scheduler_job_browser->value() - 1 : scheduled_job_browser->value() - 1;
-    if (idx >= 0) // only if a non-empty line was selected
+	int idx = (show_scheduler) ? scheduler_job_browser->value() - 1 : scheduled_job_browser->value() - 1;
+	if (idx >= 0) // only if a non-empty line was selected
 		loadJobFromPipeline(scheduled_processes[idx]);
 
-    if (show_scheduler)
-    {
-    	FileName jobname = getJobNameForDisplay(pipeline.processList[current_job]);
+	if (show_scheduler)
+	{
+		FileName jobname = getJobNameForDisplay(pipeline.processList[current_job]);
 		scheduler_job_name->value(jobname.c_str());
 		scheduler_job_name->deactivate();
 		bool found = false;
@@ -1662,7 +1640,7 @@ void GuiMainWindow::cb_select_scheduled_job_i()
 		scheduler_job_has_started->activate();
 
 		if (!found) REPORT_ERROR("ERROR: unrecognised job_mode ...");
-    }
+	}
 }
 
 void GuiMainWindow::cb_select_input_job(Fl_Widget* o, void* v)
@@ -1678,12 +1656,11 @@ void GuiMainWindow::cb_select_input_job_i()
 	tickTimeLastChanged();
 
 	// Show the 'selected' group, hide the others
-    int idx = (show_scheduler) ? scheduler_input_job_browser->value() - 1 : input_job_browser->value() - 1;
-    if (idx >= 0) // only if a non-empty line was selected
-    {
-    	loadJobFromPipeline(input_processes[idx]);
-    }
-
+	int idx = (show_scheduler) ? scheduler_input_job_browser->value() - 1 : input_job_browser->value() - 1;
+	if (idx >= 0) // only if a non-empty line was selected
+	{
+		loadJobFromPipeline(input_processes[idx]);
+	}
 }
 
 void GuiMainWindow::cb_select_output_job(Fl_Widget* o, void* v)
@@ -1699,10 +1676,9 @@ void GuiMainWindow::cb_select_output_job_i()
 	tickTimeLastChanged();
 
 	// Show the 'selected' group, hide the others
-    int idx = (show_scheduler) ? scheduler_output_job_browser->value() - 1 : output_job_browser->value() - 1;
-    if (idx >= 0) // only if a non-empty line was selected
+	int idx = (show_scheduler) ? scheduler_output_job_browser->value() - 1 : output_job_browser->value() - 1;
+	if (idx >= 0) // only if a non-empty line was selected
 		loadJobFromPipeline(output_processes[idx]);
-
 }
 
 void GuiMainWindow::cb_display_io_node(Fl_Widget* o, void* v)
@@ -1714,7 +1690,6 @@ void GuiMainWindow::cb_display_io_node(Fl_Widget* o, void* v)
 
 void GuiMainWindow::cb_display_io_node_i()
 {
-
 	// Run relion_display on the output node
 	int idx = display_io_node->value();
 	long int mynode = io_nodes[idx];
@@ -1808,18 +1783,16 @@ void GuiMainWindow::cb_display_io_node_i()
 	}
 	//std::cerr << " command= " << command << std::endl;
 	int res= system(command.c_str());
-
 }
 
 void GuiMainWindow::cb_add_scheduler_edge(Fl_Widget* o, void*v)
 {
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_add_scheduler_edge_i();
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_add_scheduler_edge_i();
 }
 
 void GuiMainWindow::cb_add_scheduler_edge_i()
 {
-
 	std::string input, output;
 	int idx;
 	idx = scheduler_edge_input->value();
@@ -1874,8 +1847,8 @@ void GuiMainWindow::cb_add_scheduler_edge_i()
 
 void GuiMainWindow::cb_delete_scheduler_edge(Fl_Widget* o, void*v)
 {
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_delete_scheduler_edge_i();
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_delete_scheduler_edge_i();
 }
 
 void GuiMainWindow::cb_delete_scheduler_edge_i()
@@ -1902,14 +1875,12 @@ void GuiMainWindow::cb_delete_scheduler_edge_i()
 	scheduler_edge_boolean->value(-1);
 	scheduler_edge_browser->value(-1);
 	fillSchedulerNodesAndVariables();
-
 }
 
 void GuiMainWindow::cb_select_scheduler_edge(Fl_Widget *o, void* v)
 {
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_select_scheduler_edge_i();
-
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_select_scheduler_edge_i();
 }
 
 void GuiMainWindow::cb_select_scheduler_edge_i()
@@ -1946,11 +1917,10 @@ void GuiMainWindow::cb_select_scheduler_edge_i()
 	}
 }
 
-
 void GuiMainWindow::cb_set_scheduler_variable(Fl_Widget* o, void*v)
 {
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_set_scheduler_variable_i();
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_set_scheduler_variable_i();
 }
 
 void GuiMainWindow::cb_set_scheduler_variable_i()
@@ -1969,13 +1939,12 @@ void GuiMainWindow::cb_set_scheduler_variable_i()
 	scheduler_variable_value->value("");
 	fillSchedulerNodesAndVariables();
 	schedule.write(DO_LOCK);
-
 }
 
 void GuiMainWindow::cb_delete_scheduler_variable(Fl_Widget* o, void*v)
 {
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_delete_scheduler_variable_i();
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_delete_scheduler_variable_i();
 }
 
 void GuiMainWindow::cb_delete_scheduler_variable_i()
@@ -2003,8 +1972,8 @@ void GuiMainWindow::cb_delete_scheduler_variable_i()
 
 void GuiMainWindow::cb_add_scheduler_operator(Fl_Widget* o, void*v)
 {
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_add_scheduler_operator_i();
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_add_scheduler_operator_i();
 }
 
 void GuiMainWindow::cb_add_scheduler_operator_i()
@@ -2047,13 +2016,12 @@ void GuiMainWindow::cb_add_scheduler_operator_i()
 		scheduler_operator_input2->value(-1);
 		fillSchedulerNodesAndVariables();
 	}
-
 }
 
 void GuiMainWindow::cb_delete_scheduler_operator(Fl_Widget* o, void*v)
 {
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_delete_scheduler_operator_i();
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_delete_scheduler_operator_i();
 }
 
 void GuiMainWindow::cb_delete_scheduler_operator_i()
@@ -2087,8 +2055,8 @@ void GuiMainWindow::cb_delete_scheduler_operator_i()
 
 void GuiMainWindow::cb_select_scheduler_variable(Fl_Widget* o, void*v)
 {
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_select_scheduler_variable_i();
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_select_scheduler_variable_i();
 }
 
 void GuiMainWindow::cb_select_scheduler_variable_i()
@@ -2113,9 +2081,8 @@ void GuiMainWindow::cb_select_scheduler_variable_i()
 
 void GuiMainWindow::cb_select_scheduler_operator(Fl_Widget *o, void* v)
 {
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_select_scheduler_operator_i();
-
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_select_scheduler_operator_i();
 }
 
 void GuiMainWindow::cb_select_scheduler_operator_i()
@@ -2153,8 +2120,8 @@ void GuiMainWindow::cb_select_scheduler_operator_i()
 
 void GuiMainWindow::cb_scheduler_set_current(Fl_Widget *o, void* v)
 {
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_scheduler_set_current_i();
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_scheduler_set_current_i();
 }
 
 void GuiMainWindow::cb_scheduler_set_current_i()
@@ -2215,13 +2182,12 @@ void GuiMainWindow::cb_scheduler_set_current_i()
 
 void GuiMainWindow::cb_scheduler_next(Fl_Widget *o, void* v)
 {
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_scheduler_next_i();
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_scheduler_next_i();
 }
 
 void GuiMainWindow::cb_scheduler_next_i()
 {
-
 	std::string mycurrent, nextnode;
 	mycurrent = schedule.current_node;
 	if (schedule.current_node == "undefined")
@@ -2239,44 +2205,43 @@ void GuiMainWindow::cb_scheduler_next_i()
 		}
 	}
 	for (int i = 0; i < schedule.edges.size(); i++)
-    {
+	{
 		if (schedule.edges[i].inputNode == mycurrent)
-        {
-    		if (schedule.edges[i].is_fork)
-    		{
+		{
+			if (schedule.edges[i].is_fork)
+			{
 
-    			std::string ask = "Fork on " + schedule.edges[i].myBooleanVariable + ". Do you want this to be True or False?";
-    			int is_true =  fl_choice("%s", "False", "True", NULL, ask.c_str());
-    			nextnode = (is_true) ? schedule.edges[i].outputNodeTrue : schedule.edges[i].outputNode;
-    		}
-    		else
-    		{
-    			nextnode = schedule.edges[i].outputNode;
-    		}
-    		const Fl_Menu_Item *myitem = scheduler_current_node->find_item(nextnode.c_str());
-    		if (myitem == NULL)
-    		{
-    			fl_message("ERROR: next node is undefined");
-    		}
-    		else
-    		{
-    			scheduler_current_node->value(myitem);
-        		cb_scheduler_set_current_i();
-    		}
-    		return;
-        }
-    }
+				std::string ask = "Fork on " + schedule.edges[i].myBooleanVariable + ". Do you want this to be True or False?";
+				int is_true =  fl_choice("%s", "False", "True", NULL, ask.c_str());
+				nextnode = (is_true) ? schedule.edges[i].outputNodeTrue : schedule.edges[i].outputNode;
+			}
+			else
+			{
+				nextnode = schedule.edges[i].outputNode;
+			}
+			const Fl_Menu_Item *myitem = scheduler_current_node->find_item(nextnode.c_str());
+			if (myitem == NULL)
+			{
+				fl_message("ERROR: next node is undefined");
+			}
+			else
+			{
+				scheduler_current_node->value(myitem);
+			cb_scheduler_set_current_i();
+			}
+			return;
+		}
+	}
 }
 
 void GuiMainWindow::cb_scheduler_prev(Fl_Widget *o, void* v)
 {
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_scheduler_prev_i();
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_scheduler_prev_i();
 }
 
 void GuiMainWindow::cb_scheduler_prev_i()
 {
-
 	// If already at the beginning, just return
 	if (schedule.current_node == "undefined") return;
 
@@ -2296,8 +2261,8 @@ void GuiMainWindow::cb_scheduler_prev_i()
 
 void GuiMainWindow::cb_scheduler_reset(Fl_Widget *o, void* v)
 {
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_scheduler_reset_i();
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_scheduler_reset_i();
 }
 
 void GuiMainWindow::cb_scheduler_reset_i()
@@ -2312,13 +2277,12 @@ void GuiMainWindow::cb_scheduler_reset_i()
 		fillSchedulerNodesAndVariables();
 		cb_scheduler_set_current_i();
 	}
-
 }
 
 void GuiMainWindow::cb_scheduler_unlock(Fl_Widget *o, void* v)
 {
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_scheduler_unlock_i();
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_scheduler_unlock_i();
 }
 
 void GuiMainWindow::cb_scheduler_unlock_i()
@@ -2328,11 +2292,10 @@ void GuiMainWindow::cb_scheduler_unlock_i()
 	return;
 }
 
-
 void GuiMainWindow::cb_scheduler_abort(Fl_Widget *o, void* v)
 {
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_scheduler_abort_i();
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_scheduler_abort_i();
 }
 
 void GuiMainWindow::cb_scheduler_abort_i()
@@ -2348,8 +2311,8 @@ void GuiMainWindow::cb_scheduler_abort_i()
 
 void GuiMainWindow::cb_scheduler_run(Fl_Widget *o, void* v)
 {
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_scheduler_run_i();
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_scheduler_run_i();
 }
 
 void GuiMainWindow::cb_scheduler_run_i()
@@ -2360,13 +2323,11 @@ void GuiMainWindow::cb_scheduler_run_i()
 	scheduler_run_grp->deactivate();
 }
 
-
-void GuiMainWindow::cb_display(Fl_Widget* o, void* v) {
-
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_display_i();
+void GuiMainWindow::cb_display(Fl_Widget* o, void* v)
+{
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_display_i();
 }
-
 
 void GuiMainWindow::cb_display_i()
 {
@@ -2407,19 +2368,16 @@ void GuiMainWindow::cb_toggle_continue_i()
 
 	int my_window = (browser->value() - 1);
 	gui_jobwindows[my_window]->toggle_new_continue(is_main_continue && !do_overwrite_continue);
-
 }
 
-
-void GuiMainWindow::cb_print_cl(Fl_Widget* o, void* v) {
-
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_print_cl_i();
+void GuiMainWindow::cb_print_cl(Fl_Widget* o, void* v)
+{
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_print_cl_i();
 }
 
 void GuiMainWindow::cb_print_cl_i()
 {
-
 	int iwin = browser->value() - 1;
 	// And update the job inside it
 	gui_jobwindows[iwin]->updateMyJob();
@@ -2444,8 +2402,8 @@ void GuiMainWindow::cb_print_cl_i()
 }
 
 // Run button call-back functions
-void GuiMainWindow::cb_run(Fl_Widget* o, void* v) {
-
+void GuiMainWindow::cb_run(Fl_Widget* o, void* v)
+{
 	GuiMainWindow* T=(GuiMainWindow*)v;
 	// Deactivate Run button to prevent the user from accidentally submitting many jobs
 	run_button->deactivate();
@@ -2454,15 +2412,14 @@ void GuiMainWindow::cb_run(Fl_Widget* o, void* v) {
 }
 
 // Run button call-back functions
-void GuiMainWindow::cb_schedule(Fl_Widget* o, void* v) {
-
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_run_i(true, false); // 1st true means only_schedule, do not run, 2nd false means dont open the note editor window
+void GuiMainWindow::cb_schedule(Fl_Widget* o, void* v)
+{
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_run_i(true, false); // 1st true means only_schedule, do not run, 2nd false means dont open the note editor window
 }
 
 void GuiMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 {
-
 	if (do_overwrite_continue)
 	{
 		std::string ask = "Are you sure you want to overwrite this job?";
@@ -2514,15 +2471,15 @@ void GuiMainWindow::cb_run_i(bool only_schedule, bool do_open_edit)
 	// Select this job now
 	loadJobFromPipeline(current_job);
 }
+
 void GuiMainWindow::cb_delete_scheduler_job(Fl_Widget* o, void* v)
 {
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_delete_scheduler_job_i();
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_delete_scheduler_job_i();
 }
 
 void GuiMainWindow::cb_delete_scheduler_job_i()
 {
-
 	std::vector<bool> deleteProcesses, deleteNodes;
 	pipeline.deleteJobGetNodesAndProcesses(current_job, true, deleteNodes, deleteProcesses);
 
@@ -2560,18 +2517,16 @@ void GuiMainWindow::cb_delete_scheduler_job_i()
 	}
 
 	std::string jobname = scheduler_job_name->value();
-
 }
 
 void GuiMainWindow::cb_scheduler_add_job(Fl_Widget* o, void* v)
 {
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_scheduler_add_job_i();
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_scheduler_add_job_i();
 }
 
 void GuiMainWindow::cb_scheduler_add_job_i()
 {
-
 	// Get which jobtype the GUI is on now
 	int iwin = browser->value() - 1;
 	// And update the job inside it
@@ -2618,19 +2573,17 @@ void GuiMainWindow::cb_scheduler_add_job_i()
 		scheduler_job_name->value("");
 		updateJobLists();
 	}
-
 }
 
 // Run button call-back functions
-void GuiMainWindow::cb_delete(Fl_Widget* o, void* v) {
-
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_delete_i();
+void GuiMainWindow::cb_delete(Fl_Widget* o, void* v)
+{
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_delete_i();
 }
 
 void GuiMainWindow::cb_delete_i(bool do_ask, bool do_recursive)
 {
-
 	if (current_job < 0)
 	{
 		std::cout << " You can only delete existing jobs ... " << std::endl;
@@ -2672,29 +2625,25 @@ void GuiMainWindow::cb_delete_i(bool do_ask, bool do_recursive)
 
 		// Update all job lists in the main GUI
 		updateJobLists();
-
 	}
-
 }
 
 // Run button call-back functions
-void GuiMainWindow::cb_gently_clean_all_jobs(Fl_Widget* o, void* v) {
-
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_clean_all_jobs_i(false);
+void GuiMainWindow::cb_gently_clean_all_jobs(Fl_Widget* o, void* v)
+{
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_clean_all_jobs_i(false);
 }
 
 // Run button call-back functions
-void GuiMainWindow::cb_harshly_clean_all_jobs(Fl_Widget* o, void* v) {
-
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_clean_all_jobs_i(true);
+void GuiMainWindow::cb_harshly_clean_all_jobs(Fl_Widget* o, void* v)
+{
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_clean_all_jobs_i(true);
 }
 
 void GuiMainWindow::cb_clean_all_jobs_i(bool do_harsh)
 {
-
-
 	int proceed = 1;
 	std::string ask;
 	if (do_harsh)
@@ -2738,16 +2687,16 @@ e.g. by using \"touch Polish/job045/NO_HARSH_CLEAN\". Below is a list of current
 }
 
 // Run button call-back functions
-void GuiMainWindow::cb_gentle_cleanup(Fl_Widget* o, void* v) {
-
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_cleanup_i(-1, true, false);
+void GuiMainWindow::cb_gentle_cleanup(Fl_Widget* o, void* v)
+{
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_cleanup_i(-1, true, false);
 }
 
-void GuiMainWindow::cb_harsh_cleanup(Fl_Widget* o, void* v) {
-
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_cleanup_i(-1, true, true);
+void GuiMainWindow::cb_harsh_cleanup(Fl_Widget* o, void* v)
+{
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_cleanup_i(-1, true, true);
 }
 
 void GuiMainWindow::cb_cleanup_i(int myjob, bool do_verb, bool do_harsh)
@@ -2770,20 +2719,17 @@ void GuiMainWindow::cb_cleanup_i(int myjob, bool do_verb, bool do_harsh)
 		if (!pipeline.cleanupJob(myjob, do_harsh, error_message))
 			fl_message("%s",error_message.c_str());
 	}
-
 }
 
-
 // Run button call-back functions
-void GuiMainWindow::cb_set_alias(Fl_Widget* o, void* v) {
-
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_set_alias_i();
+void GuiMainWindow::cb_set_alias(Fl_Widget* o, void* v)
+{
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_set_alias_i();
 }
 
 void GuiMainWindow::cb_set_alias_i(std::string alias)
 {
-
 	FileName fn_pre, fn_jobnr, fn_post, fn_dummy, default_ask;
 	if (!decomposePipelineFileName(pipeline.processList[current_job].name, fn_pre, fn_jobnr, fn_post))
 		REPORT_ERROR("GuiMainWindow::cb_set_alias_i ERROR: invalid pipeline process name: " + pipeline.processList[current_job].name);
@@ -2823,19 +2769,17 @@ void GuiMainWindow::cb_set_alias_i(std::string alias)
 			fl_message("%s",error_message.c_str());
 		}
 	}
-
 }
 
 // Run button call-back functions
-void GuiMainWindow::cb_abort(Fl_Widget* o, void* v) {
-
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_abort_i();
+void GuiMainWindow::cb_abort(Fl_Widget* o, void* v)
+{
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_abort_i();
 }
 
 void GuiMainWindow::cb_abort_i(std::string alias)
 {
-
 	if (pipeline.processList[current_job].status != PROC_RUNNING)
 	{
 		std::string error_message = "You can only abort running jobs ... ";
@@ -2852,25 +2796,22 @@ void GuiMainWindow::cb_abort_i(std::string alias)
 	}
 }
 
-
-
 // Run button call-back functions
-void GuiMainWindow::cb_mark_as_finished(Fl_Widget* o, void* v) {
-
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_mark_as_finished_i();
+void GuiMainWindow::cb_mark_as_finished(Fl_Widget* o, void* v)
+{
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_mark_as_finished_i();
 }
 
 // Run button call-back functions
-void GuiMainWindow::cb_mark_as_failed(Fl_Widget* o, void* v) {
-
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_mark_as_finished_i(true);
+void GuiMainWindow::cb_mark_as_failed(Fl_Widget* o, void* v)
+{
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_mark_as_finished_i(true);
 }
 
 void GuiMainWindow::cb_mark_as_finished_i(bool is_failed)
 {
-
 	if (current_job < 0)
 	{
 		fl_message("You can only mark existing jobs as finished!");
@@ -2886,39 +2827,35 @@ void GuiMainWindow::cb_mark_as_finished_i(bool is_failed)
 }
 
 // Run button call-back functions
-void GuiMainWindow::cb_make_flowchart(Fl_Widget* o, void* v) {
-
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_make_flowchart_i();
+void GuiMainWindow::cb_make_flowchart(Fl_Widget* o, void* v)
+{
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_make_flowchart_i();
 }
 
 void GuiMainWindow::cb_make_flowchart_i()
 {
-
 	std::string error_message;
 	if (!pipeline.makeFlowChart(current_job, true, error_message))
 		fl_message("%s",error_message.c_str());
 	else
 		updateJobLists();
-
 }
 
 void GuiMainWindow::cb_edit_note(Fl_Widget*, void* v)
 {
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_edit_note_i();
-
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_edit_note_i();
 }
 
 void GuiMainWindow::cb_edit_project_note(Fl_Widget*, void* v)
 {
   	GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_edit_note_i(true); // true means is_project_note
+	T->cb_edit_note_i(true); // true means is_project_note
 }
 
 void GuiMainWindow::cb_edit_note_i(bool is_project_note)
 {
-
 	FileName fn_note;
 	std::string title;
 	if (is_project_note)
@@ -2941,12 +2878,11 @@ void GuiMainWindow::cb_edit_note_i(bool is_project_note)
 
 }
 
-
 // Save button call-back function
 void GuiMainWindow::cb_save(Fl_Widget* o, void* v)
 {
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_save_i();
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_save_i();
 }
 
 void GuiMainWindow::cb_save_i()
@@ -2968,8 +2904,8 @@ void GuiMainWindow::cb_save_i()
 // Load button call-back function
 void GuiMainWindow::cb_load(Fl_Widget* o, void* v)
 {
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_load_i();
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_load_i();
 }
 
 void GuiMainWindow::cb_load_i()
@@ -2986,13 +2922,12 @@ void GuiMainWindow::cb_load_i()
 // Load button call-back function
 void GuiMainWindow::cb_undelete_job(Fl_Widget* o, void* v)
 {
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_undelete_job_i();
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_undelete_job_i();
 }
 
 void GuiMainWindow::cb_undelete_job_i()
 {
-
 	std::string fn_dir = "./Trash/.";
 	std::string fn_filter = "Pipeline STAR files (job_pipeline.star)";
 	Fl_File_Chooser chooser(fn_dir.c_str(),  fn_filter.c_str(), Fl_File_Chooser::SINGLE, "Choose pipeline STAR file to import");
@@ -3010,18 +2945,16 @@ void GuiMainWindow::cb_undelete_job_i()
 	FileName fn_pipe(relname);
 
 	pipeline.undeleteJob(fn_pipe);
-
 }
 
 void GuiMainWindow::cb_export_jobs(Fl_Widget* o, void* v)
 {
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_export_jobs_i();
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_export_jobs_i();
 }
 
 void GuiMainWindow::cb_export_jobs_i()
 {
-
 	// Get the name of this block of exported jobs and make the corresponding directory
 	const char * answer;
 	std::string default_answer="export1";
@@ -3031,19 +2964,16 @@ void GuiMainWindow::cb_export_jobs_i()
 	std::string error_message;
 	if (!pipeline.exportAllScheduledJobs(mydir, error_message))
 		fl_message("%s",error_message.c_str());
-
 }
 
 void GuiMainWindow::cb_import_jobs(Fl_Widget* o, void* v)
 {
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_import_jobs_i();
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_import_jobs_i();
 }
-
 
 void GuiMainWindow::cb_import_jobs_i()
 {
-
 	// Get the directory with the Exported jobs
 	std::string fn_dir = ".";
 	std::string fn_filter = "Export STAR file (exported.star)";
@@ -3067,24 +2997,24 @@ void GuiMainWindow::cb_import_jobs_i()
 // Re-order running and finished job lists
 void GuiMainWindow::cb_order_jobs_alphabetically(Fl_Widget* o, void* v)
 {
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    do_order_alphabetically = true;
-    T->fillRunningJobLists();
-}
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	do_order_alphabetically = true;
+	T->fillRunningJobLists();
+	}
 
 // Re-order running and finished job lists
 void GuiMainWindow::cb_order_jobs_chronologically(Fl_Widget* o, void* v)
 {
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    do_order_alphabetically = false;
-    T->fillRunningJobLists();
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	do_order_alphabetically = false;
+	T->fillRunningJobLists();
 }
 
 // Empty-trash button call-back function
 void GuiMainWindow::cb_empty_trash(Fl_Widget* o, void* v)
 {
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_empty_trash_i();
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_empty_trash_i();
 }
 
 void GuiMainWindow::cb_empty_trash_i()
@@ -3102,7 +3032,7 @@ void GuiMainWindow::cb_empty_trash_i()
 void GuiMainWindow::cb_print_notes(Fl_Widget*, void* v)
 {
   	 GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_print_notes_i();
+	T->cb_print_notes_i();
 }
 
 void GuiMainWindow::cb_print_notes_i()
@@ -3136,13 +3066,12 @@ void GuiMainWindow::cb_print_notes_i()
 	fh.close();
 
 	fl_message("Done writing all notes into file: %s" , fn_tmp.c_str());
-
 }
 
 void GuiMainWindow::cb_remake_nodesdir(Fl_Widget*, void* v)
 {
-  	 GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_remake_nodesdir_i();
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_remake_nodesdir_i();
 }
 
 void GuiMainWindow::cb_remake_nodesdir_i()
@@ -3152,8 +3081,8 @@ void GuiMainWindow::cb_remake_nodesdir_i()
 
 void GuiMainWindow::cb_reread_pipeline(Fl_Widget*, void* v)
 {
-  	 GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_reread_pipeline_i();
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_reread_pipeline_i();
 }
 
 void GuiMainWindow::cb_reread_pipeline_i()
@@ -3167,9 +3096,8 @@ void GuiMainWindow::cb_reread_pipeline_i()
 
 void GuiMainWindow::cb_reactivate_runbutton(Fl_Widget* o, void* v)
 {
-
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_reactivate_runbutton_i();
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_reactivate_runbutton_i();
 }
 
 void GuiMainWindow::cb_reactivate_runbutton_i()
@@ -3179,36 +3107,32 @@ void GuiMainWindow::cb_reactivate_runbutton_i()
 
 void GuiMainWindow::cb_toggle_overwrite_continue(Fl_Widget* o, void* v)
 {
-
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_toggle_overwrite_continue_i();
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_toggle_overwrite_continue_i();
 }
 
 void GuiMainWindow::cb_toggle_overwrite_continue_i()
 {
-    do_overwrite_continue = !do_overwrite_continue;
-
+	do_overwrite_continue = !do_overwrite_continue;
 	cb_toggle_continue_i();
 }
 
 void GuiMainWindow::cb_show_initial_screen(Fl_Widget* o, void* v)
 {
-
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_show_initial_screen_i();
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_show_initial_screen_i();
 }
 
 void GuiMainWindow::cb_show_initial_screen_i()
 {
-    run_button->deactivate();
-
+	run_button->deactivate();
 	cb_select_browsegroup_i(true);
 }
 
 void GuiMainWindow::cb_toggle_pipeliner_scheduler(Fl_Widget* o, void* v)
 {
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_toggle_pipeliner_scheduler_i();
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_toggle_pipeliner_scheduler_i();
 }
 
 void GuiMainWindow::cb_toggle_pipeliner_scheduler_i()
@@ -3227,7 +3151,6 @@ void GuiMainWindow::cb_toggle_pipeliner_scheduler_i()
 
 void GuiMainWindow::cb_create_schedule(Fl_Widget* o, void* v)
 {
-
     GuiMainWindow* T=(GuiMainWindow*)v;
 
     if (!show_scheduler) return;
@@ -3243,12 +3166,11 @@ void GuiMainWindow::cb_create_schedule(Fl_Widget* o, void* v)
 
 void GuiMainWindow::cb_copy_schedule(Fl_Widget* o, void* v)
 {
-
-    GuiMainWindow* T=(GuiMainWindow*)v;
+	GuiMainWindow* T=(GuiMainWindow*)v;
 
 	if (!show_scheduler) return;
 
-    std::string mesg = " Name of the copy schedule: ";
+	std::string mesg = " Name of the copy schedule: ";
 	const char* name = fl_input("%s", "", mesg.c_str());
 	FileName fn_copy = std::string(name);
 	if (fn_copy.length() > 0)
@@ -3258,23 +3180,19 @@ void GuiMainWindow::cb_copy_schedule(Fl_Widget* o, void* v)
 	}
 }
 
-
 void GuiMainWindow::cb_toggle_schedule(Fl_Widget* o, void* v)
 {
-
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_toggle_schedule_i(false);
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_toggle_schedule_i(false);
 }
 void GuiMainWindow::cb_toggle_pipeline(Fl_Widget* o, void* v)
 {
-
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_toggle_schedule_i(true);
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_toggle_schedule_i(true);
 }
 
 void GuiMainWindow::cb_toggle_schedule_i(bool do_pipeline, FileName fn_new_schedule)
 {
-
 	if (do_pipeline)
 	{
 		// Read in the pipeline STAR file if it exists
@@ -3329,19 +3247,16 @@ void GuiMainWindow::cb_toggle_schedule_i(bool do_pipeline, FileName fn_new_sched
 	cb_toggle_pipeliner_scheduler_i();
 
 	updateJobLists();
-
 }
 
 void GuiMainWindow::cb_start_pipeliner(Fl_Widget* o, void* v)
 {
-
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_start_pipeliner_i();
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_start_pipeliner_i();
 }
 
 void GuiMainWindow::cb_start_pipeliner_i()
 {
-
 	std::vector<FileName> job_names;
 
 	for (long int ii =0; ii < scheduled_processes.size(); ii++)
@@ -3356,9 +3271,8 @@ void GuiMainWindow::cb_start_pipeliner_i()
 
 void GuiMainWindow::cb_stop_pipeliner(Fl_Widget* o, void* v)
 {
-
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_stop_pipeliner_i();
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_stop_pipeliner_i();
 }
 
 void GuiMainWindow::cb_stop_pipeliner_i()
@@ -3381,14 +3295,12 @@ void GuiMainWindow::cb_stop_pipeliner_i()
 
 void GuiMainWindow::cb_about(Fl_Widget* o, void* v)
 {
-
-    GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_about_i();
+	GuiMainWindow* T=(GuiMainWindow*)v;
+	T->cb_about_i();
 }
 
 void GuiMainWindow::cb_about_i()
 {
-
 #define HELPTEXT ("RELION " RELION_SHORT_VERSION "\n \n \
 RELION is is developed in the groups of\n\n \
 Sjors H.W. Scheres at the MRC Laboratory of Molecular Biology\n \n \
@@ -3443,12 +3355,10 @@ Please also cite the following EXTERNAL programs: \n \n \
 	ShowHelpText *help = new ShowHelpText(HELPTEXT);
 }
 
-
-
 void GuiMainWindow::cb_quit(Fl_Widget* o, void* v)
 {
 	GuiMainWindow* T=(GuiMainWindow*)v;
-    T->cb_quit_i();
+	T->cb_quit_i();
 }
 
 void GuiMainWindow::cb_quit_i()
