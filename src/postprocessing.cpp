@@ -76,7 +76,6 @@ void Postprocessing::read(int argc, char **argv)
 	// Check for errors in the command-line option
 	if (parser.checkForErrors())
 		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
-
 }
 
 void Postprocessing::usage()
@@ -123,13 +122,15 @@ void Postprocessing::initialise()
 		mtf_angpix = angpix;
 	}
 
+	if (angpix <= 0)
+		REPORT_ERROR("The pixel size must be positive.");
+
 	if (verb > 0)
 	{
 		std::cout <<"== Reading input half-reconstructions: " <<std::endl;
 		std::cout.width(35); std::cout << std::left <<"  + half1-map: "; std::cout << fn_I1 << std::endl;
 		std::cout.width(35); std::cout << std::left <<"  + half2-map: "; std::cout << fn_I2 << std::endl;
 	}
-
 
 	I1.read(fn_I1);
 	I2.read(fn_I2);
