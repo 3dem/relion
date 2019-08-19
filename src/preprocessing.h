@@ -47,7 +47,7 @@ public:
 	int verb;
 
 	// Name for directory of output Particle stacks and Particle STAR file
-	FileName fn_part_dir, fn_part_star, fn_list_star;
+	FileName fn_part_dir, fn_part_star;
 
 	// Does the input micrograph STAR file or the input data STAR file have CTF information?
 	bool mic_star_has_ctf, data_star_has_ctf;

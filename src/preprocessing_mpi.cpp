@@ -37,13 +37,10 @@ void PreprocessingMpi::read(int argc, char **argv)
 
 	// Print out MPI info
 	printMpiNodesMachineNames(*node);
-
 }
-
 
 void PreprocessingMpi::runExtractParticles()
 {
-
 	// Total number of nodes is limited to max_mpi_nodes
 	long int my_nr_mics;
 	if (node->rank < max_mpi_nodes)
@@ -115,36 +112,14 @@ void PreprocessingMpi::runExtractParticles()
 			progress_bar(my_nr_mics);
 		Preprocessing::joinAllStarFiles();
 	}
-
 }
-
-
 
 void PreprocessingMpi::run()
 {
-
 	// Extract and operate on particles in parallel
 	if (do_extract)
 	{
-
-		if (only_extract_unfinished)
-		{
-			bool do_work = false;
-			if (fn_part_star != "" && !exists(fn_part_star))
-				do_work = true;
-			if (fn_list_star != "" && !exists(fn_list_star))
-				do_work = true;
-
-			if (!do_work)
-			{
-				if (verb > 0)
-					std::cout << " Output STAR file(s) " << fn_part_star << " "<< fn_list_star << " already exist. Skipping extraction..." << std::endl;
-				return;
-			}
-		}
-
 		runExtractParticles();
-
 	}
 	// The following has not been parallelised....
 	else if (fn_operate_in != "" && node->isMaster())
@@ -152,5 +127,4 @@ void PreprocessingMpi::run()
 
 	if (verb > 0)
 		std::cout << " Done preprocessing!" <<std::endl;
-
 }
