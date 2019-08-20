@@ -1602,8 +1602,7 @@ void GuiMainWindow::cb_select_running_job_i()
 
 void GuiMainWindow::cb_select_scheduled_job(Fl_Widget* o, void* v)
 {
-	if (v == NULL) return;
-
+//	std::cout << "v = " << v << std::endl;
 	GuiMainWindow* T=(GuiMainWindow*)v;
 	T->cb_select_scheduled_job_i();
 	run_button->activate();
@@ -1616,8 +1615,10 @@ void GuiMainWindow::cb_select_scheduled_job_i()
 
 	// Show the 'selected' group, hide the others
 	int idx = (show_scheduler) ? scheduler_job_browser->value() - 1 : scheduled_job_browser->value() - 1;
-	if (idx >= 0) // only if a non-empty line was selected
-		loadJobFromPipeline(scheduled_processes[idx]);
+	if (idx < 0) return;
+
+	// only if a non-empty line was selected
+	loadJobFromPipeline(scheduled_processes[idx]);
 
 	if (show_scheduler)
 	{
