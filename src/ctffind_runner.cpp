@@ -148,10 +148,10 @@ void CtffindRunner::initialise()
 		MetaDataTable MDin;
 		ObservationModel::loadSafely(fn_in, obsModel, MDin, "micrographs", verb);
 
-		if (do_use_without_doseweighting && !MDin.containsLabel(EMDL_MICROGRAPH_NAME_WODOSE))
+		if (do_use_without_doseweighting && MDin.numberOfObjects() > 0 && !MDin.containsLabel(EMDL_MICROGRAPH_NAME_WODOSE))
 			REPORT_ERROR("ERROR: You are using --use_noDW, but there is no rlnMicrographNameNoDW label in the input micrograph STAR file.");
 
-		if (use_given_ps && !MDin.containsLabel(EMDL_CTF_POWER_SPECTRUM))
+		if (use_given_ps && MDin.numberOfObjects() > 0 && !MDin.containsLabel(EMDL_CTF_POWER_SPECTRUM))
 			REPORT_ERROR("ERROR: You are using --use_given_ps, but there is no rlnCtfPowerSpectrum label in the input micrograph STAR file.");
 
 		fn_micrographs_all.clear();

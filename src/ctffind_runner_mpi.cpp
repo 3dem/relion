@@ -34,12 +34,10 @@ void CtffindRunnerMpi::read(int argc, char **argv)
 
 	// Print out MPI info
 	printMpiNodesMachineNames(*node);
-
-
 }
+
 void CtffindRunnerMpi::run()
 {
-
 	if (!do_only_join_results)
 	{
 		// Each node does part of the work
@@ -105,6 +103,4 @@ void CtffindRunnerMpi::run()
 	{
 		joinCtffindResults();
 	}
-
 }
-
