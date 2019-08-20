@@ -28,7 +28,7 @@ void Postprocessing::read(int argc, char **argv)
 	fn_I1 = parser.getOption("--i", "Input name of half1, e.g. run_half1_class001_unfil.mrc");
 	fn_I2 = parser.getOption("--i2", "Input name of half2, (default replaces half1 from --i with half2)", "");
 	fn_out = parser.getOption("--o", "Output rootname", "postprocess");
-	angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms"));
+	angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms", "-1"));
 	write_halfmaps = parser.checkOption("--half_maps", "Write post-processed half maps for validation");
 	mtf_angpix  = textToFloat(parser.getOption("--mtf_angpix", "Pixel size in the original micrographs/movies (in Angstroms)", "-1."));
 
@@ -116,14 +116,6 @@ void Postprocessing::initialise()
 			REPORT_ERROR("The input filename does not contain 'half1' or 'half2'");
 	}
 
-	if (mtf_angpix < 0.)
-	{
-		if (verb > 0) std::cout << " + --mtf_angpix was not provided, assuming pixel size in raw micrographs is the same as in particles..." << std::endl;
-		mtf_angpix = angpix;
-	}
-
-	if (angpix <= 0)
-		REPORT_ERROR("The pixel size must be positive.");
 
 	if (verb > 0)
 	{
@@ -136,6 +128,18 @@ void Postprocessing::initialise()
 	I2.read(fn_I2);
 	I1().setXmippOrigin();
 	I2().setXmippOrigin();
+
+	if (angpix <= 0)
+	{
+		angpix = I1.samplingRateX();
+		std::cerr << "WARNING: You did not specify --angpix. The pixel size in the image header, " << angpix << " A/px, is used." << std::endl;
+	}
+
+	if (mtf_angpix < 0.)
+	{
+		if (verb > 0) std::cout << " + --mtf_angpix was not provided, assuming pixel size in raw micrographs is the same as in particles, " << angpix << " A/px." << std::endl;
+		mtf_angpix = angpix;
+	}
 
 	if (!I1().sameShape(I2()))
 	{
