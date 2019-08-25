@@ -38,7 +38,7 @@ MicrographHandler::MicrographHandler()
 
 void MicrographHandler::init(
 		// in:
-		const MetaDataTable& mdt,
+		const std::vector<MetaDataTable>& mdts,
 		double angpix, bool verb,
 		int nr_omp_threads,
 		// out:
@@ -77,6 +77,7 @@ void MicrographHandler::init(
 			FileName fn_pre, fn_jobnr, fn_post;
 			decomposePipelineFileName(micName, fn_pre, fn_jobnr, fn_post);
 
+//			std::cout << fn_post << " => " << metaName << std::endl;
 			mic2meta[fn_post] = metaName;
 		}
 
@@ -87,7 +88,7 @@ void MicrographHandler::init(
 		hasCorrMic = false;
 	}
 
-	loadInitial(mdt, angpix, verb, fc, dosePerFrame, metaFn);
+	loadInitial(mdts, angpix, verb, fc, dosePerFrame, metaFn);
 
 	ready = true;
 }
@@ -97,7 +98,7 @@ std::vector<MetaDataTable> MicrographHandler::cullMissingMovies(
 {
 	if (!ready)
 	{
-		REPORT_ERROR("ERROR: MicrographHandler::cullMissingMovies - MicrographHandler not initialized.");
+//		REPORT_ERROR("ERROR: MicrographHandler::cullMissingMovies - MicrographHandler not initialized.");
 	}
 
 	std::vector<MetaDataTable> good(0);
@@ -237,19 +238,27 @@ std::vector<MetaDataTable> MicrographHandler::findLongEnoughMovies(
 // in the given MotionCorr STAR file. Then we can safely assume all pixel sizes are the same.
 // TODO: TAKANORI: make sure in MotionCorr runner and Polish
 void MicrographHandler::loadInitial(
-		const MetaDataTable& mdt, double angpix, bool verb,
+		const std::vector<MetaDataTable>& mdts, double angpix, bool verb,
 		int& fc, double& dosePerFrame, std::string& metaFn)
 {
 	if (hasCorrMic)
 	{
 		std::string mgFn;
-		mdt.getValueToString(EMDL_MICROGRAPH_NAME, mgFn, 0);
-
-		// remove the pipeline job prefix
 		FileName fn_pre, fn_jobnr, fn_post;
-		decomposePipelineFileName(mgFn, fn_pre, fn_jobnr, fn_post);
 
-		metaFn = getMetaName(fn_post);
+		for (int i = 0, ilim = mdts.size(); i < ilim; i++)
+		{
+			mdts[i].getValueToString(EMDL_MICROGRAPH_NAME, mgFn, 0);
+
+			// remove the pipeline job prefix
+			decomposePipelineFileName(mgFn, fn_pre, fn_jobnr, fn_post);
+
+			metaFn = getMetaName(fn_post, false);
+			if (metaFn != "") break;
+		}
+
+		if (metaFn == "")
+			REPORT_ERROR("There is no movie metadata STAR file for any micrographs!");
 
 		if (debug)
 		{
@@ -321,7 +330,7 @@ void MicrographHandler::loadInitial(
 	else
 	{
 		std::string mgFn0;
-		mdt.getValueToString(EMDL_MICROGRAPH_NAME, mgFn0, 0);
+		mdts[0].getValueToString(EMDL_MICROGRAPH_NAME, mgFn0, 0);
 		FileName fn_pre, fn_jobnr, fn_post;
 		decomposePipelineFileName(mgFn0, fn_pre, fn_jobnr, fn_post);
 
@@ -528,6 +537,7 @@ std::vector<std::vector<Image<Complex>>> MicrographHandler::loadMovie(
 
 std::string MicrographHandler::getMetaName(std::string micName, bool die_on_error)
 {
+//	std::cout << "MicrographHandler::getMetaName " << micName << std::endl;
 	std::map<std::string, std::string>::iterator it = mic2meta.find(micName);
 
 	if (it == mic2meta.end())
@@ -585,15 +595,13 @@ int MicrographHandler::determineFrameCount(const MetaDataTable &mdt)
 bool MicrographHandler::isMoviePresent(const MetaDataTable &mdt, bool die_on_error)
 {
 	std::string mgFn;
-	mdt.getValueToString(EMDL_MICROGRAPH_NAME, mgFn, 0);
-
 	FileName fn_pre, fn_jobnr, fn_post;
+	mdt.getValueToString(EMDL_MICROGRAPH_NAME, mgFn, 0);
 	decomposePipelineFileName(mgFn, fn_pre, fn_jobnr, fn_post);
 
 	if (hasCorrMic)
 	{
 		std::string metaFn = getMetaName(fn_post, die_on_error);
-
 		if (exists(metaFn))
 		{
 			micrograph = Micrograph(metaFn);
