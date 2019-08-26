@@ -3346,7 +3346,7 @@ Please also cite the following EXTERNAL programs: \n \n \
 * CTFFIND4 for CTF-estimation: \n \
     Rohou & Grigorieff (2015) J. Struct. Biol. (PMID: 26278980) \n \n\
 * Gctf for CTF-estimation: \n \
-    Zhang (2016) J. Struct. Biol. (PMID: 2659270) \n \n\
+    Zhang (2016) J. Struct. Biol. (PMID: 26592709) \n \n\
 * Stochastic Gradient Descent initial model generation:  \n\
     Punjani et al. (2017) Nat. Meth. (PMID: 28165473) \n \n\
 * ResMap for local-resolution estimation:  \n\
