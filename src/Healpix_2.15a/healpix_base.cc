@@ -773,6 +773,11 @@ void Healpix_Base::get_interpol (const pointing &ptg, fix_arr<int,4> &pix,
       pix[m] = ring2nest(pix[m]);
   }
 
+int Healpix_Base::get_npix() const
+{
+	return npix_;
+}
+
 double Healpix_Base::max_pixrad() const
   {
   vec3 va,vb;

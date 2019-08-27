@@ -249,7 +249,8 @@ class Healpix_Base
           considerably faster in the RING scheme. */
     void get_interpol (const pointing &ptg, fix_arr<int,4> &pix,
                        fix_arr<double,4> &wgt) const;
-
+    /*! return npix_ private member. */
+    int get_npix() const;
     /*! Returns the order parameter of the object. */
     int Order() const { return order_; }
     /*! Returns the \a N_side parameter of the object. */

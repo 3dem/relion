@@ -73,13 +73,17 @@ public:
 
     /** Name of the Symmetry group */
     FileName fn_sym;
+    FileName fn_sym_relax;
 
     /** List of symmetry operators */
     std::vector <Matrix2D<RFLOAT> > R_repository, L_repository;
+    std::vector <Matrix2D<RFLOAT> > R_repository_relax, L_repository_relax;
 
     /** Two numbers that describe the symmetry group */
     int pgGroup;
     int pgOrder;
+    int pgGroupRelaxSym;
+    int pgOrderRelaxSym;
 
     /** Limited tilt angle range */
     RFLOAT limit_tilt;
@@ -105,6 +109,7 @@ public:
 		offset_step(0),
 		is_3d_trans(false),
 		pgGroup(0),
+		pgGroupRelaxSym(0),
 		perturbation_factor(0),
 		is_3D(false),
 		random_perturbation(0),
@@ -112,7 +117,8 @@ public:
 		psi_step(0),
 		limit_tilt(0),
 		healpix_order(0),
-		pgOrder(0)
+		pgOrder(0),
+		pgOrderRelaxSym(0)
     {}
 
     // Destructor
@@ -165,6 +171,11 @@ public:
 			bool do_helical_refine = false,
 			RFLOAT rise_pix  = 0.,
 			RFLOAT twist_deg = 0.);
+
+    // Initialize the symmetry matrices
+    void initialiseSymMats(FileName fn_sym_, int & pgGroup_,
+    		int & pgOrder_, std::vector <Matrix2D<RFLOAT> > & R_repository,
+			std::vector <Matrix2D<RFLOAT> > & L_repository);
 
     // Reset the random perturbation
     void resetRandomlyPerturbedSampling();
@@ -244,6 +255,12 @@ public:
     		bool do_auto_refine_local_searches,
     		RFLOAT prior_psi_flip_ratio = 0.5,
     		RFLOAT sigma_cutoff = 3.);
+
+    // Find the symmetry mate by searching the Healpix library
+    void findSymmetryMate(long int idir_, RFLOAT prior_,
+    		std::vector<int> &pointer_dir_nonzeroprior,
+			std::vector<RFLOAT> &directions_prior,
+			std::vector<bool> &idir_flag);
 
     /** Get the symmetry group of this sampling object
      */

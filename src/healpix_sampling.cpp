@@ -26,6 +26,7 @@ void HealpixSampling::clear()
 {
 	is_3D = false;
 	fn_sym = "C1";
+	fn_sym_relax = "C1";
 	limit_tilt = psi_step = offset_range = offset_step = 0.;
 	random_perturbation = perturbation_factor = 0.;
 	// Jun19,2015 - Shaoda, Helical refinement
@@ -40,7 +41,10 @@ void HealpixSampling::clear()
 	translations_z.clear();
 	L_repository.clear();
 	R_repository.clear();
+	L_repository_relax.clear();
+	R_repository_relax.clear();
 	pgGroup = pgOrder = 0;
+	pgGroupRelaxSym = pgOrderRelaxSym = 0;
 
 }
 
@@ -82,25 +86,16 @@ void HealpixSampling::initialise(
 		healpix_base.Set(healpix_order, NEST);
 
 		// Set up symmetry
-		SymList SL;
-		SL.isSymmetryGroup(fn_sym, pgGroup, pgOrder);
-		SL.read_sym_file(fn_sym);
-
-		// Precalculate (3x3) symmetry matrices
-		Matrix2D<RFLOAT>  L(4, 4), R(4, 4);
-		Matrix2D<RFLOAT>  Identity(3,3);
-		Identity.initIdentity();
 		R_repository.clear();
 		L_repository.clear();
-		R_repository.push_back(Identity);
-		L_repository.push_back(Identity);
-		for (int isym = 0; isym < SL.SymsNo(); isym++)
+		initialiseSymMats(fn_sym, pgGroup, pgOrder, R_repository, L_repository);
+
+		// Set up symmetry matrices for relaxing symmetry
+		if (fn_sym_relax != "")
 		{
-			SL.get_matrices(isym, L, R);
-			R.resize(3, 3);
-			L.resize(3, 3);
-			R_repository.push_back(R);
-			L_repository.push_back(L);
+			R_repository_relax.clear();
+			L_repository_relax.clear();
+			initialiseSymMats(fn_sym_relax, pgGroupRelaxSym, pgOrderRelaxSym, R_repository_relax, L_repository_relax);
 		}
 	}
 	else
@@ -130,6 +125,34 @@ void HealpixSampling::initialise(
 
 	// Random perturbation and filling of the directions, psi_angles and translations vectors
 	resetRandomlyPerturbedSampling();
+
+}
+
+void HealpixSampling::initialiseSymMats(FileName fn_sym_, int & pgGroup_,
+    		int & pgOrder_, std::vector <Matrix2D<RFLOAT> > & R_repository_,
+			std::vector <Matrix2D<RFLOAT> > & L_repository_)
+{
+	// Set up symmetry
+	SymList SL;
+	SL.isSymmetryGroup(fn_sym_, pgGroup_, pgOrder_);
+	SL.read_sym_file(fn_sym_);
+
+	// Precalculate (3x3) symmetry matrices
+	Matrix2D<RFLOAT>  L(4, 4), R(4, 4);
+	Matrix2D<RFLOAT>  Identity(3,3);
+	Identity.initIdentity();
+	R_repository_.clear();
+	L_repository_.clear();
+	R_repository_.push_back(Identity);
+	L_repository_.push_back(Identity);
+	for (int isym = 0; isym < SL.SymsNo(); isym++)
+	{
+		SL.get_matrices(isym, L, R);
+		R.resize(3, 3);
+		L.resize(3, 3);
+		R_repository_.push_back(R);
+		L_repository_.push_back(L);
+	}
 
 }
 
@@ -629,9 +652,13 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 {
 	pointer_dir_nonzeroprior.clear();
 	directions_prior.clear();
+	// Do not check the mates again
+	std::vector<bool> idir_flag(rot_angles.size(), false);
+	bool isRelax = fn_sym_relax == "" ? false : true;
 
 	if (is_3D)
 	{
+		std::cerr<<"sigma_rot "<<sigma_rot<<" sigma_tilt "<<sigma_tilt<<std::endl;
 		Matrix1D<RFLOAT> prior90_direction;
 		if (sigma_tilt_from_ninety > 0.)
 		{
@@ -645,8 +672,13 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 		// Keep track of the closest distance to prevent 0 orientations
 		RFLOAT best_ang = 9999.;
 		long int best_idir = -999;
+
 		for (long int idir = 0; idir < rot_angles.size(); idir++)
 		{
+			// Check if it is met before as symmetry mate
+			if (idir_flag[idir] == true)
+					continue;
+
 			bool is_nonzero_pdf = false;
 
 			// Any prior involving BOTH rot and tilt.
@@ -684,12 +716,26 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 				if (diffang < sigma_cutoff * biggest_sigma)
 				{
 					// TODO!!! If tilt is zero then any rot will be OK!!!!!
-					RFLOAT prior = gaussian1D(diffang, biggest_sigma, 0.);
+					//std::cerr<<"Best direction index: "<<idir<<std::endl;
 					pointer_dir_nonzeroprior.push_back(idir);
-					directions_prior.push_back(prior);
-					sumprior += prior;
+					if (isRelax)
+					{
+						idir_flag[idir] = true;
+						RFLOAT prior = 1./R_repository_relax.size();
+						directions_prior.push_back(prior);
+						findSymmetryMate(idir, prior, pointer_dir_nonzeroprior, directions_prior, idir_flag);
+						// Add prior for the rest of the symmetry mates to sumprior
+						sumprior += prior* (R_repository.size());
+					}
+					else
+					{
+						RFLOAT prior = gaussian1D(diffang, biggest_sigma, 0.);
+						directions_prior.push_back(prior);
+						sumprior += prior;
+					}
 					is_nonzero_pdf = true;
 				}
+
 
 				// Keep track of the nearest direction
 				if (diffang < best_ang)
@@ -826,7 +872,7 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 					sumprior_withsigmafromzero += directions_prior[mypos];
 				}
 			}
-
+			// Here add the code for relax symmetry to find the symmetry mates
 
 		} // end for idir
 
@@ -842,10 +888,19 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 		// If there were no directions at all, just select the single nearest one:
 		if (directions_prior.size() == 0)
 		{
+			pointer_dir_nonzeroprior.push_back(best_idir);
+			std::cerr<<"No direction has been found"<<std::endl;
 			if (best_idir < 0)
 				REPORT_ERROR("HealpixSampling::selectOrientationsWithNonZeroPriorProbability BUG: best_idir < 0");
-			pointer_dir_nonzeroprior.push_back(best_idir);
-			directions_prior.push_back(1.);
+			if (isRelax)
+			{
+				idir_flag[best_idir] = true;
+				RFLOAT prior = 1./R_repository_relax.size();
+				directions_prior.push_back(prior);
+				findSymmetryMate(best_idir, prior, pointer_dir_nonzeroprior, directions_prior, idir_flag);
+			}
+			else
+				directions_prior.push_back(1.);
 		}
 
 #ifdef  DEBUG_SAMPLING
@@ -968,6 +1023,64 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 	std::cerr << " psi_prior.size()= " << psi_prior.size() << " pointer_psi_nonzeroprior.size()= " << pointer_psi_nonzeroprior.size() << " sumprior= " << sumprior << std::endl;
 #endif
 	return;
+}
+
+void HealpixSampling::findSymmetryMate(long int idir_, RFLOAT prior_,
+    		std::vector<int> &pointer_dir_nonzeroprior,
+			std::vector<RFLOAT> &directions_prior, std::vector<bool> &idir_flag)
+{
+
+	Matrix1D<RFLOAT> my_direction, sym_direction;
+	RFLOAT angular_sampling = DEG2RAD(360. / (6 * ROUND(std::pow(2., healpix_order)))) * 2; // Calculate the search radius
+	// Direction for the best-matched Healpix index
+	Euler_angles2direction(rot_angles[idir_], tilt_angles[idir_], my_direction);
+	//std::cerr<<"This is the entered parameters : "<<rot_angles[idir_]<<" "<<tilt_angles[idir_]<<std::endl;
+
+	// Find the best symmetry mates in the HealPix library
+	for (int i = 1; i < R_repository_relax.size(); i++)
+	{
+		//std::cerr<<"Current symmetery index is : "<<i<<std::endl;
+		int best_direction_index;
+		std::vector<int> listpix; // Array with the list of indices for the neighbors
+		RFLOAT alpha;  // For Rot
+		RFLOAT beta;   // For Theta
+
+		sym_direction =  L_repository_relax[i] * (my_direction.transpose() * R_repository_relax[i]).transpose();
+		Euler_direction2angles(sym_direction, alpha, beta);
+		//std::cerr<<"Parameters after applying sym"<<"alpha is "<<alpha<<"beta is "<<beta<<std::endl;
+		alpha = DEG2RAD(alpha);
+		beta  = DEG2RAD(beta);
+		pointing prior_direction_pointing(beta, alpha); // Object required by healpix function
+     	healpix_base.query_disc(prior_direction_pointing, angular_sampling, listpix); // Search healpix for closest indices
+     	best_direction_index = listpix[0];
+     	// If there are more than one neighbors then check for the best
+		if (listpix.size() > 1)
+     	{
+			Matrix1D<RFLOAT> current_direction;
+			Euler_angles2direction(rot_angles[best_direction_index], tilt_angles[best_direction_index], current_direction);
+     		RFLOAT best_dotProduct = dotProduct(sym_direction, current_direction);
+     		for (long int j = 1; j < listpix.size(); j++)
+     		{
+     			//std::cerr<<"******"<<rot_angles[listpix[j]]<<"########"<<tilt_angles[listpix[j]]<<std::endl;
+     			int current_index = listpix[j];
+     			// Assuming sigma_tilt and sigma_rot are set
+     			// Get the current direction
+     			Euler_angles2direction(rot_angles[current_index], tilt_angles[current_index], current_direction);
+     			RFLOAT my_dotProduct = dotProduct(sym_direction, current_direction);
+     			if (my_dotProduct > best_dotProduct && 	idir_flag[current_index] != true)
+     			{
+     				best_direction_index = current_index;
+     				best_dotProduct = my_dotProduct;
+     			}
+     		}
+     	}
+
+		// Now we have the best symmetry mate index
+     	//std::cerr<<"Best angle parmeter is : "<<rot_angles[best_direction_index]<<" "<<tilt_angles[best_direction_index]<<std::endl;
+     	pointer_dir_nonzeroprior.push_back(best_direction_index);
+		directions_prior.push_back(prior_);
+		idir_flag[best_direction_index] = true;
+	}
 }
 
 void HealpixSampling::selectOrientationsWithNonZeroPriorProbabilityFor3DHelicalReconstruction(
