@@ -46,10 +46,10 @@ void MotionParamEstimator::read(IOParser& parser, int argc, char *argv[])
 
     estim2 = parser.checkOption("--params2", "Estimate 2 parameters instead of motion");
     estim3 = parser.checkOption("--params3", "Estimate 3 parameters instead of motion");
-	
+
     align_frac = textToDouble(parser.getOption("--align_frac", "Fraction of pixels to be used for alignment", "0.5"));
     eval_frac = textToDouble(parser.getOption("--eval_frac", "Fraction of pixels to be used for evaluation", "0.5"));
-	
+
     minParticles = textToInteger(parser.getOption("--min_p", "Minimum number of particles on which to estimate the parameters", "1000"));
     group = textToInteger(parser.getOption("--par_group", "Estimate parameters for this optics group only (negative means all)", "-1")) - 1;
     sV = textToDouble(parser.getOption("--s_vel_0", "Initial s_vel", "0.6"));
@@ -85,32 +85,32 @@ void MotionParamEstimator::init(
     this->motionEstimator = motionEstimator;
     this->obsModel = obsModel;
     this->reference = reference;
-	
+
 	this->s_ref = reference->s;
-	
+
 	std::vector<int> allS, allSh;
 	obsModel->getBoxSizes(allS, allSh);
-	
+
 	if (group < 0)
 	{
-		if (!obsModel->allPixelSizesIdentical() 
+		if (!obsModel->allPixelSizesIdentical()
 		 || !obsModel->allBoxSizesIdentical())
 		{
 			REPORT_ERROR_STR("MotionParamEstimator::init: unable to estimate motion parameters for all \n"
 						 << "optics groups simultaneously due to varying pixel and box sizes.\n"
 						 << "Please estimate them separately for each optics group (--par_group).");
 		}
-		
+
 		s = allS[0];
 		sh = allSh[0];
-		
+
 		group = 0;
-		
+
 		allGroups = true;
-		
+
 		if (verb > 0)
 		{
-			std::cout << " + estimating motion parameters for all optics groups simultaneously ..." 
+			std::cout << " + estimating motion parameters for all optics groups simultaneously ..."
 					  << std::endl;
 		}
 	}
@@ -118,16 +118,16 @@ void MotionParamEstimator::init(
 	{
 		s = allS[group];
 		sh = allSh[group];
-		
+
 		allGroups = false;
-		
+
 		if (verb > 0)
 		{
-			std::cout << " + estimating motion parameters for optics group " 
+			std::cout << " + estimating motion parameters for optics group "
 					  << obsModel->getGroupName(group) << " ..." << std::endl;
 		}
 	}
-			
+
     if (!motionEstimator->isReady())
     {
         REPORT_ERROR("ERROR: MotionParamEstimator initialized before MotionEstimator.");
@@ -143,17 +143,17 @@ void MotionParamEstimator::init(
     {
         REPORT_ERROR("ERROR: Only 2 or 3 parameters can be estimated (--params2 or --params3), not both.");
     }
-	
+
 	k_out = reference->k_out;
-	
+
 	k_cutoff = (int)(k_out * sqrt(align_frac) + 0.5);
 	k_eval = (int)(k_out * sqrt(1.0 - eval_frac) + 0.5);
-			
+
     if (verb > 0)
     {
 		double k_cutoff_Angst = reference->angToPix(k_cutoff);
-		double k_eval_Angst = reference->angToPix(k_eval); 
-		
+		double k_eval_Angst = reference->angToPix(k_eval);
+
         std::cout << " + maximum frequency to consider for alignment: "
             << k_cutoff_Angst << " A (" << k_cutoff << " ref. px)" << std::endl;
 
@@ -200,7 +200,7 @@ void MotionParamEstimator::init(
 		else
 		{
 			MetaDataTable rightGroup;
-					
+
 			for (int p = 0; p < pcm; p++)
 			{
 				if (obsModel->getOpticsGroup(allMdts[m], p) == group)
@@ -208,7 +208,7 @@ void MotionParamEstimator::init(
 					rightGroup.addObject(allMdts[m].getObject(p));
 				}
 			}
-			
+
 			mdts.push_back(rightGroup);
 			pc += rightGroup.numberOfObjects();
 		}
@@ -305,13 +305,13 @@ void MotionParamEstimator::run()
               << " --s_vel " << rnd[0]
               << " --s_div " << rnd[1]
               << " --s_acc " << rnd[2] << "\n\n";
-	
+
 	FileName newdir = FileName(outPath).beforeLastOf("/");
 	std::string command = " mkdir -p " + newdir;
 	int ret = system(command.c_str());
-	
+
 	std::string paramFn;
-	
+
 	if (allGroups)
 	{
 		paramFn = "opt_params_all_groups.txt";
@@ -320,13 +320,13 @@ void MotionParamEstimator::run()
 	{
 		paramFn = "opt_params_group_" + obsModel->getGroupName(group) + ".txt";
 	}
-			
+
 	std::ofstream ofs(outPath+paramFn);
 	ofs << rnd[0] << " ";
 	ofs << rnd[1] << " ";
 	ofs << rnd[2] << std::endl;
 	ofs.close();
-	
+
 	std::cout << "written to " << (outPath+paramFn) << std::endl;
 
     #ifdef TIMING
@@ -433,23 +433,24 @@ void MotionParamEstimator::evaluateParams(
                     alignmentSet.initialTracks[g],
                     sig_v_vals_px[i], sig_a_vals_px[i], sig_d_vals_px[i],
                     alignmentSet.positions[g], alignmentSet.globComp[g]);
-			
-			{
+
+			if (debug)
+            {
 				std::stringstream sts;
 				sts << "debug-track_" << sig_vals[i][0] << "_" << sig_vals[i][1] << "_" << sig_vals[i][2] << ".dat";
-				
+
 				std::ofstream debugStr(sts.str());
-				
+
 				for (int p = 0; p < pc; p++)
-				{			
+				{
 					for (int f = 0; f < fc; f++)
 					{
 						debugStr << tracks[p][f] << std::endl;
 					}
-					
+
 					debugStr << std::endl;
 				}
-				
+
 				debugStr.close();
 			}
 
@@ -539,9 +540,9 @@ void MotionParamEstimator::prepAlignment()
             std::cerr << "warning: unable to load micrograph #" << (g+1) << std::endl;
             continue;
         }
-		
+
 		const int maxRangeP = 2 * motionEstimator->getCCPad() * maxRange;
-		
+
         #pragma omp parallel for num_threads(nr_omp_threads)
         for (int p = 0; p < pc; p++)
         {
