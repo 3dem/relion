@@ -131,7 +131,10 @@ class import_parameters
 				MDopt.setValue(EMDL_IMAGE_OPTICS_GROUP_NAME, optics_group_name);
 				MDopt.setValue(EMDL_IMAGE_OPTICS_GROUP, optics_group_number);
 				if (fn_mtf != "") MDopt.setValue(EMDL_IMAGE_MTF_FILENAME, fn_mtf);
-				MDopt.setValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, pixel_size);
+				if (do_micrographs)
+					MDopt.setValue(EMDL_MICROGRAPH_PIXEL_SIZE, pixel_size);
+				else
+					MDopt.setValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, pixel_size);
 				MDopt.setValue(EMDL_CTF_VOLTAGE, kV);
 				MDopt.setValue(EMDL_CTF_CS, Cs);
 				MDopt.setValue(EMDL_CTF_Q0, Q0);
