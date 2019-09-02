@@ -658,7 +658,7 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 
 	if (is_3D)
 	{
-		std::cerr<<"sigma_rot "<<sigma_rot<<" sigma_tilt "<<sigma_tilt<<std::endl;
+		//std::cerr<<"sigma_rot "<<sigma_rot<<" sigma_tilt "<<sigma_tilt<<std::endl;
 		Matrix1D<RFLOAT> prior90_direction;
 		if (sigma_tilt_from_ninety > 0.)
 		{
