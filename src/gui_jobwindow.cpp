@@ -757,6 +757,7 @@ void JobWindow::initialiseAutopickWindow()
 	current_y += STEPY/2;
 	place("log_maxres", TOGGLE_DEACTIVATE);
 	place("log_adjust_thr");
+	place("log_upper_thr");
 
 	tab2->end();
 	tab3->begin();
