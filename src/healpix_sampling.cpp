@@ -889,7 +889,7 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 		if (directions_prior.size() == 0)
 		{
 			pointer_dir_nonzeroprior.push_back(best_idir);
-			std::cerr<<"No direction has been found"<<std::endl;
+			//std::cerr<<"No direction has been found"<<std::endl;
 			if (best_idir < 0)
 				REPORT_ERROR("HealpixSampling::selectOrientationsWithNonZeroPriorProbability BUG: best_idir < 0");
 			if (isRelax)
