@@ -248,6 +248,12 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	if (fnt != "OLD")
 		write_every_sgd_iter = textToInteger(fnt);
 
+	fnt = parser.getOption("--relax_symmetry", "The symmetry to be relaxed", "OLD");
+	if (fnt != "OLD")
+	{
+		sampling.fn_sym_relax = fnt;
+	}
+
 	do_join_random_halves = parser.checkOption("--join_random_halves", "Join previously split random halves again (typically to perform a final reconstruction).");
 
 	// Re-align movie frames
