@@ -3351,7 +3351,14 @@ Please also cite the following EXTERNAL programs: \n \n \
     Punjani et al. (2017) Nat. Meth. (PMID: 28165473) \n \n\
 * ResMap for local-resolution estimation:  \n\
     Kucukelbir et al. (2014) Nat. Meth. (PMID: 24213166) \n \n\
-* Postscript plots are made using CPlot2D from  www.amzsaki.com\n ")
+* Postscript plots are made using CPlot2D from  www.amzsaki.com\n\n\
+\
+About the start up screen:\n\n\
+The map shown is the cryo-EM map of mouse heavy-chain apoferritin\n\
+at 1.54 A (EMDB-9865). This is the highest resolution single particle\n\
+reconstruction map deposited to EMDB as of August 2019. The raw dataset\n\
+is also available at EMPIAR-10248.\
+ ")
 
 	ShowHelpText *help = new ShowHelpText(HELPTEXT);
 }
