@@ -2195,7 +2195,7 @@ void RelionJob::initialiseSelectJob()
 	joboptions["do_split"] = JobOption("OR: split into subsets?", false, "If set to Yes, the job will be non-interactive and the star file will be split into subsets as defined below.");
 	joboptions["do_random"] = JobOption("Randomise order before making subsets?:", false, "If set to Yes, the input STAR file order will be randomised. If set to No, the original order in the input STAR file will be maintained.");
 	joboptions["split_size"] = JobOption("Subset size: ", 100, 100, 10000, 100, "The number of lines in each of the output subsets. When this is -1, items are divided into a number of subsets specified in the next option.");
-	joboptions["nr_split"] = JobOption("OR: number of subsets: ", -1, 1, 50, 1, "Give a positive integer to specify into how many equal-sized subsets the data will be divided. When the subset size is also specified, only this number of subsets, each with the specified size, will be written, possibly missing some items.");
+	joboptions["nr_split"] = JobOption("OR: number of subsets: ", -1, 1, 50, 1, "Give a positive integer to specify into how many equal-sized subsets the data will be divided. When the subset size is also specified, only this number of subsets, each with the specified size, will be written, possibly missing some items. When this is -1, all items are used, generating as many subsets as necessary.");
 
 	joboptions["do_remove_duplicates"] = JobOption("OR: remove duplicates?", false, "If set to Yes, duplicated particles that are within a given distance are removed leaving only one. Duplicated particles are sometimes generated when particles drift into the same position during alignment. They inflate and invalidate gold-standard FSC calculation.");
 	joboptions["duplicate_threshold"] = JobOption("Minimum inter-particle distance (A)", 30, 0, 1000, 1, "Particles within this distance are removed leaving only one.");
@@ -2330,12 +2330,12 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 				error_message = "ERROR: When splitting the input STAR file into subsets, set nr_split and/or split_size to a positive value";
 				return false;
 			}
-			if (joboptions["nr_split"].getNumber() > 0)
+			if (joboptions["nr_split"].getNumber() > 0 && !joboptions["nr_split"].isSchedulerVariable())
 			{
 				nr_split = joboptions["nr_split"].getNumber();
 				command += " --nr_split " + joboptions["nr_split"].getString();
 			}
-			else if (joboptions["split_size"].getNumber() > 0 && !joboptions["split_size"].isSchedulerVariable())
+			if (joboptions["split_size"].getNumber() > 0 && !joboptions["split_size"].isSchedulerVariable())
 			{
 				command += " --size_split " + joboptions["split_size"].getString();
 			}
