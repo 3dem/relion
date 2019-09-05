@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python
 """
 bfactor_plot
 ---------
@@ -14,6 +14,8 @@ file for an example.
 Usage:
     /path/to/relion_it.py [options_file...]
 """
+
+from __future__ import print_function
 
 import collections
 import os
@@ -42,7 +44,11 @@ class RelionItOptions(object):
     # job prefix
     prefix = 'BFACTOR_PLOT_'
 
+    # If program crahses saying "'utf-8' codec can't decode byte 0xXX in position YY",
+    # most likely run.job file in the job directory contains garbage bytes.
+
     # Refine3D job with all particles
+    # This must be a job from RELION 3.1, not 3.0.
     input_refine3d_job = 'Refine3D/job040/'
     # PostProcess job for resolution assessment
     input_postprocess_job = 'PostProcess/job083/'
@@ -101,7 +107,7 @@ class RelionItOptions(object):
                 if hasattr(self, key):
                     setattr(self, key, value)
                 else:
-                    print 'Unrecognised option {}'.format(key)
+                    print('Unrecognised option {}'.format(key))
 
 def load_star(filename):
     from collections import OrderedDict
@@ -157,7 +163,6 @@ def load_star(filename):
     return datasets
 
 def appendJobOptionsFromRunJobFile(filename, job_options):
-
     f = open(filename,'r')
     for line in f: 
         label = line.split(' == ')[0]
@@ -182,7 +187,7 @@ def getJobName(name_in_script, done_file):
             if len(elems) < 3: continue 
             if elems[0] == name_in_script:
                 jobname = elems[2]
-		break
+                break
         f.close()
 
     return jobname
@@ -200,8 +205,8 @@ def addJob(jobtype, name_in_script, done_file, options, alias=None):
             optionstring += opt + ';'
 
         command = 'relion_pipeliner --addJob ' + jobtype + ' --addJobOptions "' + optionstring + '"'
-	if alias is not None:
-		command += ' --setJobAlias "' + alias + '"'
+        if alias is not None:
+            command += ' --setJobAlias "' + alias + '"'
 
         os.system(command)
 
@@ -228,12 +233,12 @@ def RunJobs(jobs, repeat, wait, schedulename):
 
 def CheckForExit():
     if not os.path.isfile(RUNNING_FILE):
-        print " RELION_IT:", RUNNING_FILE, "file no longer exists, exiting now ..."
+        print(" RELION_IT:", RUNNING_FILE, "file no longer exists, exiting now ...")
         exit(0)
 
 def WaitForJob(wait_for_this_job, seconds_wait):
     time.sleep(seconds_wait)
-    print " RELION_IT: waiting for job to finish in", wait_for_this_job
+    print(" RELION_IT: waiting for job to finish in", wait_for_this_job)
     while True:
         pipeline = load_star(PIPELINE_STAR)
         myjobnr = -1
@@ -242,12 +247,12 @@ def WaitForJob(wait_for_this_job, seconds_wait):
             if jobname == wait_for_this_job:
                 myjobnr = jobnr
         if myjobnr < 0:
-            print " ERROR: cannot find ", wait_for_this_job, " in ", PIPELINE_STAR
+            print(" ERROR: cannot find ", wait_for_this_job, " in ", PIPELINE_STAR)
             exit(1)
 
         status = int(pipeline['pipeline_processes']['rlnPipeLineProcessStatus'][myjobnr])
         if status == 2:
-            print " RELION_IT: job in", wait_for_this_job, "has finished now"
+            print(" RELION_IT: job in", wait_for_this_job, "has finished now")
             return
         else:
             CheckForExit()
@@ -255,7 +260,7 @@ def WaitForJob(wait_for_this_job, seconds_wait):
 
 def find_split_job_output(prefix, n, max_digits=6):
     import os.path
-    for i in xrange(max_digits):
+    for i in range(max_digits):
         filename = prefix + str(n).rjust(i, '0') + '.star'
         if os.path.isfile(filename):
             return filename
@@ -310,7 +315,6 @@ def run_pipeline(opts):
                      'Standard submission script: == {}'.format(opts.queue_submission_template),
                      'Minimum dedicated cores per node: == {}'.format(opts.queue_minimum_dedicated)]
 
-    
     # Get the original STAR file
     refine3d_run_file = opts.input_refine3d_job+'run.job'
     f = open(refine3d_run_file,'r')
@@ -320,7 +324,7 @@ def run_pipeline(opts):
             all_particles_star_file = line.split(' == ')[1].replace('\n','')
             break
     if (all_particles_star_file == ''):
-        print ' ERROR: cannot find input STAR file in', refine3d_run_file
+        print(' ERROR: cannot find input STAR file in', refine3d_run_file)
         exit(1)
 
     all_particles = load_star(all_particles_star_file)
@@ -344,7 +348,7 @@ def run_pipeline(opts):
                          'OR: number of subsets:  == 1']
 
         split_job_name = 'split_job_' + str(current_nr_particles)
-	split_alias = opts.prefix + 'split_' + str(current_nr_particles)
+        split_alias = opts.prefix + 'split_' + str(current_nr_particles)
         split_job, already_had_it = addJob('Select', split_job_name, SETUP_CHECK_FILE, split_options, split_alias)
         if not already_had_it:
             RunJobs([split_job], 1, 0, schedule_name)
@@ -390,40 +394,40 @@ def run_pipeline(opts):
             RunJobs([refine_job], 1, 0, schedule_name)
             WaitForJob(refine_job, 30)
 
-	halfmap_filename = None
-	try:
-		job_star = load_star(refine_job + "job_pipeline.star")
-		for output_file in job_star["pipeline_output_edges"]['rlnPipeLineEdgeToNode']:
-			if output_file.endswith("half1_class001_unfil.mrc"):
-				halfmap_filename = output_file
-				break
-		assert halfmap_filename != None
-	except:
-		print " RELION_IT: Refinement job " + refine_job + " does not contain expected output maps."
-		print " RELION_IT: This job should have finished, but you may continue it from the GUI. "
-		print " RELION_IT: For now, making the plot without this job."
+        halfmap_filename = None
+        try:
+            job_star = load_star(refine_job + "job_pipeline.star")
+            for output_file in job_star["pipeline_output_edges"]['rlnPipeLineEdgeToNode']:
+                if output_file.endswith("half1_class001_unfil.mrc"):
+                    halfmap_filename = output_file
+                    break
+            assert halfmap_filename != None
+        except:
+            print(" RELION_IT: Refinement job " + refine_job + " does not contain expected output maps.")
+            print(" RELION_IT: This job should have finished, but you may continue it from the GUI.")
+            print(" RELION_IT: For now, making the plot without this job.")
 
-	if halfmap_filename is not None:
-	        # C. Run PostProcess
-	        postprocess_run_file = opts.input_postprocess_job+'run.job'
-	        post_options = ['One of the 2 unfiltered half-maps: == {}'.format(halfmap_filename)]
-	        appendJobOptionsFromRunJobFile(postprocess_run_file, post_options)
-	        post_job_name = 'post_job_' + str(current_nr_particles)
-                post_alias = opts.prefix + str(current_nr_particles)
-	        post_job, already_had_it = addJob('PostProcess', post_job_name, SETUP_CHECK_FILE, post_options, post_alias)
-	        if not already_had_it:
-	            RunJobs([post_job], 1, 0, schedule_name)
-	            WaitForJob(post_job, 30)
+        if halfmap_filename is not None:
+            # C. Run PostProcess
+            postprocess_run_file = opts.input_postprocess_job+'run.job'
+            post_options = ['One of the 2 unfiltered half-maps: == {}'.format(halfmap_filename)]
+            appendJobOptionsFromRunJobFile(postprocess_run_file, post_options)
+            post_job_name = 'post_job_' + str(current_nr_particles)
+            post_alias = opts.prefix + str(current_nr_particles)
+            post_job, already_had_it = addJob('PostProcess', post_job_name, SETUP_CHECK_FILE, post_options, post_alias)
+            if not already_had_it:
+                RunJobs([post_job], 1, 0, schedule_name)
+                WaitForJob(post_job, 30)
         
-	        # Get resolution from
-	        post_star = post_job + 'postprocess.star'
-        	try:
-	            resolution, pp_bfactor = get_postprocess_result(post_star)
-	            nr_particles.append(current_nr_particles)
-	            resolutions.append(resolution)
-                    pp_bfactors.append(pp_bfactor)
-	        except:
-	            print ' RELION_IT: WARNING: Failed to get post-processed resolution for {} particles'.format(current_nr_particles)
+            # Get resolution from
+            post_star = post_job + 'postprocess.star'
+            try:
+                resolution, pp_bfactor = get_postprocess_result(post_star)
+                nr_particles.append(current_nr_particles)
+                resolutions.append(resolution)
+                pp_bfactors.append(pp_bfactor)
+            except:
+                print(' RELION_IT: WARNING: Failed to get post-processed resolution for {} particles'.format(current_nr_particles))
 
         # Update the current number of particles
         current_nr_particles = 2 * current_nr_particles
@@ -435,31 +439,31 @@ def run_pipeline(opts):
         pp_bfactors.append(all_particles_bfactor)
 
     # Now already make preliminary plots here, e.g
-    print
-    print 'NrParticles Ln(NrParticles) Resolution(A) 1/Resolution^2 PostProcessBfactor'
+    print()
+    print('NrParticles Ln(NrParticles) Resolution(A) 1/Resolution^2 PostProcessBfactor')
     xs = []
     ys = []
     for n_particles, resolution, pp_bfactor in zip(nr_particles, resolutions, pp_bfactors):
         log_n_particles = log(n_particles)
         inv_d2 = 1.0 / (resolution * resolution)
-        print '{0:11d} {1:15.3f} {2:13.2f} {3:14.4f} {4:18.2f}'.format(n_particles,log_n_particles, resolution, inv_d2, -pp_bfactor)
+        print('{0:11d} {1:15.3f} {2:13.2f} {3:14.4f} {4:18.2f}'.format(n_particles,log_n_particles, resolution, inv_d2, -pp_bfactor))
         xs.append(log_n_particles)
         ys.append(inv_d2)
     slope, intercept = line_fit(xs, ys)
     b_factor = 2.0 / slope
-    print
-    print " RELION_IT: ESTIMATED B-FACTOR from {0:d} points is {1:.2f}".format(len(xs), b_factor)
-    print " RELION_IT: The fitted line is: Resolution = 1 / Sqrt(2 / {0:.3f} * Log_e(#Particles) + {1:.3f})".format(b_factor, intercept)
-    print " RELION_IT: IF this trend holds, you will get:"
+    print()
+    print(" RELION_IT: ESTIMATED B-FACTOR from {0:d} points is {1:.2f}".format(len(xs), b_factor))
+    print(" RELION_IT: The fitted line is: Resolution = 1 / Sqrt(2 / {0:.3f} * Log_e(#Particles) + {1:.3f})".format(b_factor, intercept))
+    print(" RELION_IT: IF this trend holds, you will get:")
     for x in (1.5, 2, 4, 8):
         current_nr_particles = int(all_nr_particles * x)
         resolution = 1 / sqrt(slope * log(current_nr_particles) + intercept)
-        print " RELION_IT:   {0:.2f} A from {1:d} particles ({2:d} % of the current number of particles)".format(resolution, current_nr_particles, int(x * 100))
+        print(" RELION_IT:   {0:.2f} A from {1:d} particles ({2:d} % of the current number of particles)".format(resolution, current_nr_particles, int(x * 100)))
     if True:#try: # Try plotting
         import matplotlib as mpl
         mpl.use('pdf')
         import matplotlib.pyplot as plt
-	import numpy as np
+        import numpy as np
         fitted = []
         for x in xs:
             fitted.append(x * slope + intercept)
@@ -485,8 +489,8 @@ def run_pipeline(opts):
         ax3.set_ylim(ax1.get_ylim())
         ax3.yaxis.set_ticks_position("right")
         ax3.yaxis.set_label_position("right")
-	yticks = ax1.get_yticks()
-	yticks[yticks <= 0] = 1.0 / (999 * 999) # to avoid zero division and negative sqrt
+        yticks = ax1.get_yticks()
+        yticks[yticks <= 0] = 1.0 / (999 * 999) # to avoid zero division and negative sqrt
         ndigits = 1
         if np.max(yticks) > 0.25:
             ndigits = 2
@@ -494,14 +498,14 @@ def run_pipeline(opts):
 
         output_name = opts.prefix + "rosenthal-henderson-plot.pdf"
         plt.savefig(output_name, bbox_inches='tight')
-        print " RELION_IT: Plot written to " + output_name
+        print(" RELION_IT: Plot written to " + output_name)
     else:#except:
-        print 'WARNING: Failed to plot. Probably matplotlib and/or numpy is missing.'
+        print('WARNING: Failed to plot. Probably matplotlib and/or numpy is missing.')
 
     if os.path.isfile(RUNNING_FILE):
         os.remove(RUNNING_FILE)
 
-    print ' RELION_IT: exiting now... '
+    print(' RELION_IT: exiting now... ')
 
 def main():
     """
@@ -516,7 +520,7 @@ def main():
 
     opts = RelionItOptions()
     for user_opt_file in sys.argv[1:]:
-        print ' RELION_IT: reading options from {}'.format(user_opt_file)
+        print(' RELION_IT: reading options from {}'.format(user_opt_file))
         user_opts = runpy.run_path(user_opt_file)
         opts.update_from(user_opts)
 
@@ -525,29 +529,23 @@ def main():
 
     # Make sure no other version of this script are running...
     if os.path.isfile(RUNNING_FILE):
-        print " RELION_IT: ERROR:", RUNNING_FILE, "is already present: delete this file and make sure no other copy of this script is running. Exiting now ..."
+        print(" RELION_IT: ERROR:", RUNNING_FILE, "is already present: delete this file and make sure no other copy of this script is running. Exiting now ...")
         exit(0)
 
-    print ' RELION_IT: -------------------------------------------------------------------------------------------------------------------'
-    print ' RELION_IT: script for automated bfactor-plot generation in RELION (>= 3.0-alpha-5)'
-    print ' RELION_IT: authors: Sjors H.W. Scheres & Takanori Nakane'
-    print ' RELION_IT: '
-    print ' RELION_IT: usage: ./bfactor_plot.py [extra_options.py ...]'
-    print ' RELION_IT: '
-    print ' RELION_IT: this script keeps track of already submitted jobs in a filed called',SETUP_CHECK_FILE
-    print ' RELION_IT:   upon a restart, jobs present in this file will be ignored'
-    print ' RELION_IT: if you would like to re-do a specific job from scratch (e.g. because you changed its parameters)' 
-    print ' RELION_IT:   remove that job, and those that depend on it, from the',SETUP_CHECK_FILE
-    print ' RELION_IT: -------------------------------------------------------------------------------------------------------------------'
-    print ' RELION_IT: '
+    print(' RELION_IT: -------------------------------------------------------------------------------------------------------------------')
+    print(' RELION_IT: Script for automated Bfactor-plot generation in RELION (>= 3.1)')
+    print(' RELION_IT: Authors: Sjors H.W. Scheres & Takanori Nakane')
+    print(' RELION_IT: ')
+    print(' RELION_IT: Usage: ./bfactor_plot.py [extra_options.py ...]')
+    print(' RELION_IT: ')
+    print(' RELION_IT: This script keeps track of already submitted jobs in a filed called', SETUP_CHECK_FILE)
+    print(' RELION_IT:   upon a restart, jobs present in this file will be ignored.')
+    print(' RELION_IT: If you would like to re-do a specific job from scratch (e.g. because you changed its parameters)')
+    print(' RELION_IT:   remove that job, and those that depend on it, from the', SETUP_CHECK_FILE)
+    print(' RELION_IT: -------------------------------------------------------------------------------------------------------------------')
+    print(' RELION_IT: ')
     
     run_pipeline(opts)
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
