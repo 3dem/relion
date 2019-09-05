@@ -389,8 +389,8 @@ void MotionRefiner::combineEPSAndSTARfiles()
 		}
 	}
 
-	std::vector<bool> isOgPresent(obsModel.numberOfOpticsGroups(), false);
-	std::vector<bool> isOgAbsent(obsModel.numberOfOpticsGroups(), false);
+	std::vector<int> n_OgPresent(obsModel.numberOfOpticsGroups(), 0);
+	std::vector<int> n_OgAbsent(obsModel.numberOfOpticsGroups(), 0);
 	for (long g = 0; g < allMdts.size(); g++)
 	{
 		FileName fn_root = getOutputFileNameRoot(outPath, allMdts[g]);
@@ -408,18 +408,17 @@ void MotionRefiner::combineEPSAndSTARfiles()
 
 			FOR_ALL_OBJECTS_IN_METADATA_TABLE(mdt)
 			{
-				isOgPresent[obsModel.getOpticsGroup(mdt)] = true;
+				n_OgPresent[obsModel.getOpticsGroup(mdt)]++;
 			}
 		}
 		else
 		{
 			// Non-processed particles belonging to micrographs not present in the MotionCorr STAR file
-			// Leave them as they are
-			mdtAll.append(allMdts[g]);
+			// Remove them from the output
 
 			FOR_ALL_OBJECTS_IN_METADATA_TABLE(allMdts[g])
 			{
-				isOgAbsent[obsModel.getOpticsGroup(allMdts[g])] = true;
+				n_OgAbsent[obsModel.getOpticsGroup(allMdts[g])]++;
 			}
 		}
 	}
@@ -434,16 +433,17 @@ void MotionRefiner::combineEPSAndSTARfiles()
 		for (int og = 0; og < obsModel.numberOfOpticsGroups(); og++)
 		{
 			// If this optics group was not processed, don't change anything
-			if (!isOgPresent[og])
+			if (n_OgPresent[og] == 0)
 			{
-				std::cout << " + optics group " << (og + 1) << " was not processed because no particles belong to the movies in the input MotionCorr STAR file." << std::endl;
+				std::cerr << "WARNING: All " << n_OgAbsent[og] << " particles in the optics group " << (og + 1) << " were removed because no particles belong to the movies in the input MotionCorr STAR file." << std::endl;
+
+				obsModel.opticsMdt.setValue(EMDL_IMAGE_PIXEL_SIZE, -1.0, og); // mark for deletion
 				continue;
 			}
 
-			if (isOgAbsent[og])
+			if (n_OgAbsent[og] > 0)
 			{
-				std::cerr << "WARNING: Not all particles in the optics group " << (og + 1) << " were processed." << std::endl;
-				std::cerr << "WARNING: Metadata in the optics group table can be inconsistent now if you changed the pixel size, box size or CTF pre-multiplication." << std::endl;
+				std::cerr << "WARNING: " << n_OgAbsent[og] << " particles in the optics group " << (og + 1) << " were removed." << std::endl;
 			}
 
 			obsModel.opticsMdt.setValue(EMDL_IMAGE_PIXEL_SIZE, frameRecombiner.getOutputPixelSize(og), og);
@@ -451,8 +451,24 @@ void MotionRefiner::combineEPSAndSTARfiles()
 			obsModel.opticsMdt.setValue(EMDL_OPTIMISER_DATA_ARE_CTF_PREMULTIPLIED, frameRecombiner.isCtfMultiplied(og), og);
 			std::cout << " + Pixel size for optics group " << (og + 1) << ": " << frameRecombiner.getOutputPixelSize(og) << std::endl;
 		}
-		
-		obsModel.save(mdtAll, outPath+"shiny" + frameRecombiner.getOutputSuffix() + ".star");
+
+		// Remove absent optics groups; After this, NOTHING should be done except for saving. obsModel's internal data structure is now corrupted!
+		int og = 0;
+		while (og < obsModel.opticsMdt.numberOfObjects())
+		{
+			RFLOAT og_angpix;
+			obsModel.opticsMdt.getValue(EMDL_IMAGE_PIXEL_SIZE, og_angpix, og);
+			if (og_angpix < 0)
+			{
+				obsModel.opticsMdt.removeObject(og);
+			}
+			else
+			{
+				og++;
+			}
+		}
+
+		obsModel.save(mdtAll, outPath + "shiny" + frameRecombiner.getOutputSuffix() + ".star");
 	}
 	
 	if (verb > 0)
