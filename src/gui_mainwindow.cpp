@@ -145,13 +145,13 @@ int SchedulerWindow::fill(FileName _pipeline_name, std::vector<FileName> _schedu
 	Fl_Button *execute_button = new Fl_Button(w()-200, current_y, 80, 30, "Execute");
 	execute_button->color(GUI_RUNBUTTON_COLOR);
 	execute_button->labelsize(12);
-	execute_button->callback( cb_execute, this);
+	execute_button->callback(cb_execute, this);
 
 	// Button to cancel
 	Fl_Button *cancel_button = new Fl_Button(w()-100, current_y, 80, 30, "Cancel");
 	cancel_button->color(GUI_RUNBUTTON_COLOR);
 	cancel_button->labelsize(12);
-	cancel_button->callback( cb_cancel, this);
+	cancel_button->callback(cb_cancel, this);
 
 	resizable(*this);
 	show();
@@ -234,14 +234,14 @@ NoteEditorWindow::NoteEditorWindow(int w, int h, const char* title, FileName _fn
 		Fl_Button *save_button = new Fl_Button(w-200, h-40, 80, 30, "Save");
 		save_button->color(GUI_RUNBUTTON_COLOR);
 		save_button->labelsize(12);
-		save_button->callback( cb_save, this);
+		save_button->callback(cb_save, this);
 	}
 
 	// Button to exit
 	Fl_Button *cancel_button = new Fl_Button(w-100, h-40, 80, 30, "Cancel");
 	cancel_button->color(GUI_RUNBUTTON_COLOR);
 	cancel_button->labelsize(12);
-	cancel_button->callback( cb_cancel, this);
+	cancel_button->callback(cb_cancel, this);
 	resizable(*this);
 }
 
@@ -465,10 +465,10 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	browser->add("3D auto-refine");
 	gui_jobwindows[i] = new JobWindow();
 	gui_jobwindows[i]->initialise(PROC_3DAUTO);
-    browse_grp[i]->end();
-    i++;
+	browse_grp[i]->end();
+	i++;
 
-    browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
+	browse_grp[i] = new Fl_Group(WCOL0, 2, 550, 615-MENUHEIGHT);
 	browser->add("3D multi-body");
 	gui_jobwindows[i] = new JobWindow();
 	gui_jobwindows[i]->initialise(PROC_MULTIBODY);
@@ -530,7 +530,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	gui_jobwindows[i]->initialise(PROC_EXTERNAL);
 	browse_grp[i]->end();
 
-	browser->callback(cb_select_browsegroup);
+	browser->callback(cb_select_browsegroup, this);
 	browser->end();
 	browser->select(1); // just start from the beginning
 
@@ -539,7 +539,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	print_CL_button = new Fl_Button(GUIWIDTH - 215, h-90, 100, 32, "Check command");
 	print_CL_button->color(GUI_RUNBUTTON_COLOR);
 	print_CL_button->labelsize(11);
-	print_CL_button->callback( cb_print_cl, this);
+	print_CL_button->callback(cb_print_cl, this);
 
 	// Display stdout and stderr of jobs
 	textbuff_stdout = new Fl_Text_Buffer();
@@ -571,7 +571,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	run_button->color(GUI_RUNBUTTON_COLOR);
 	run_button->labelfont(FL_ITALIC);
 	run_button->labelsize(14);
-	run_button->callback( cb_run, this);
+	run_button->callback(cb_run, this);
 	if (maingui_do_read_only)
 		run_button->deactivate();
 
@@ -579,7 +579,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	schedule_button->color(GUI_RUNBUTTON_COLOR);
 	schedule_button->labelfont(FL_ITALIC);
 	schedule_button->labelsize(14);
-	schedule_button->callback( cb_schedule, this);
+	schedule_button->callback(cb_schedule, this);
 	if (maingui_do_read_only)
 		schedule_button->deactivate();
 
@@ -615,7 +615,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	textdisp1->buffer(textbuff1);
 	textdisp1->color(GUI_BACKGROUND_COLOR);
 	finished_job_browser  = new Fl_Select_Browser(XJOBCOL1, GUIHEIGHT_EXT_START2 + 25, JOBCOLWIDTH, JOBHEIGHT+25);
-	finished_job_browser->callback(cb_select_finished_job);
+	finished_job_browser->callback(cb_select_finished_job, this);
 	finished_job_browser->textsize(RLN_FONTSIZE-1);
 	finished_job_browser->end();
 
@@ -625,7 +625,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	textdisp2->buffer(textbuff2);
 	textdisp2->color(GUI_BACKGROUND_COLOR);
 	running_job_browser   = new Fl_Select_Browser(XJOBCOL2, GUIHEIGHT_EXT_START2 + 25, JOBCOLWIDTH, JOBHALFHEIGHT);
-	running_job_browser->callback(cb_select_running_job);
+	running_job_browser->callback(cb_select_running_job, this);
 	running_job_browser->textsize(RLN_FONTSIZE-1);
 	running_job_browser->end();
 
@@ -635,7 +635,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	textdisp3->buffer(textbuff3);
 	textdisp3->color(GUI_BACKGROUND_COLOR);
 	scheduled_job_browser = new Fl_Select_Browser(XJOBCOL2, GUIHEIGHT_EXT_START2 + 25 + JOBHALFHEIGHT + 25, JOBCOLWIDTH, JOBHALFHEIGHT);
-	scheduled_job_browser->callback(cb_select_scheduled_job);
+	scheduled_job_browser->callback(cb_select_scheduled_job, this);
 	scheduled_job_browser->textsize(RLN_FONTSIZE-1);
 
 	Fl_Text_Buffer *textbuff4 = new Fl_Text_Buffer();
@@ -644,7 +644,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	textdisp4->buffer(textbuff4);
 	textdisp4->color(GUI_BACKGROUND_COLOR);
 	input_job_browser    = new Fl_Select_Browser(XJOBCOL3,  GUIHEIGHT_EXT_START2 + 25, JOBCOLWIDTH, JOBHALFHEIGHT);
-	input_job_browser->callback(cb_select_input_job);
+	input_job_browser->callback(cb_select_input_job, this);
 	input_job_browser->textsize(RLN_FONTSIZE-1);
 
 	Fl_Text_Buffer *textbuff5 = new Fl_Text_Buffer();
@@ -653,7 +653,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	textdisp5->buffer(textbuff5);
 	textdisp5->color(GUI_BACKGROUND_COLOR);
 	output_job_browser   = new Fl_Select_Browser(XJOBCOL3,  GUIHEIGHT_EXT_START2 + 25 + JOBHALFHEIGHT + 25, JOBCOLWIDTH, JOBHALFHEIGHT);
-	output_job_browser->callback(cb_select_output_job);
+	output_job_browser->callback(cb_select_output_job, this);
 	output_job_browser->textsize(RLN_FONTSIZE-1);
 
 
@@ -673,7 +673,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	add_job_button->color(GUI_RUNBUTTON_COLOR);
 	add_job_button->labelfont(FL_ITALIC);
 	add_job_button->labelsize(14);
-	add_job_button->callback( cb_scheduler_add_job, this);
+	add_job_button->callback(cb_scheduler_add_job, this);
 
 	// Select one of three modes for adding a new job
 	scheduler_job_mode  = new Fl_Choice(GUIWIDTH - 400 , h-83, 80, 25);
@@ -716,7 +716,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	set_scheduler_variable_button->callback(cb_set_scheduler_variable, this);
 
 	scheduler_variable_browser  = new Fl_Hold_Browser(XJOBCOL1, GUIHEIGHT_EXT_START + 44, JOBCOLWIDTH, 61);
-	scheduler_variable_browser->callback(cb_select_scheduler_variable);
+	scheduler_variable_browser->callback(cb_select_scheduler_variable, this);
 	scheduler_variable_browser->textsize(RLN_FONTSIZE-2);
 	scheduler_variable_browser->end();
 	int height_var = 105;
@@ -749,15 +749,15 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	delete_scheduler_operator_button->labelfont(FL_ITALIC);
 	delete_scheduler_operator_button->labelsize(RLN_FONTSIZE);
 	delete_scheduler_operator_button->label("Del");
-	delete_scheduler_operator_button->callback( cb_delete_scheduler_operator, this);
+	delete_scheduler_operator_button->callback(cb_delete_scheduler_operator, this);
 	add_scheduler_operator_button = new Fl_Button(XJOBCOL1+JOBCOLWIDTH-50, GUIHEIGHT_EXT_START + height_var, 50, 23);
 	add_scheduler_operator_button->color(GUI_BUTTON_COLOR);
 	add_scheduler_operator_button->labelfont(FL_ITALIC);
 	add_scheduler_operator_button->labelsize(RLN_FONTSIZE);
 	add_scheduler_operator_button->label("Add");
-	add_scheduler_operator_button->callback( cb_add_scheduler_operator, this);
+	add_scheduler_operator_button->callback(cb_add_scheduler_operator, this);
 	scheduler_operator_browser  = new Fl_Hold_Browser(XJOBCOL1, GUIHEIGHT_EXT_START + height_var + 65, JOBCOLWIDTH, 67);
-	scheduler_operator_browser->callback(cb_select_scheduler_operator);
+	scheduler_operator_browser->callback(cb_select_scheduler_operator, this);
 	scheduler_operator_browser->textsize(RLN_FONTSIZE-2);
 	scheduler_operator_browser->end();
 	int height_ops = height_var + 134;
@@ -784,13 +784,13 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	textdisp5s->textsize(12);
 	textdisp5s->color(GUI_BACKGROUND_COLOR);
 	scheduler_job_browser = new Fl_Hold_Browser(XJOBCOL2, GUIHEIGHT_EXT_START + 23 , JOBCOLWIDTH, 100);
-	scheduler_job_browser->callback(cb_select_scheduled_job);
+	scheduler_job_browser->callback(cb_select_scheduled_job, this);
 	scheduler_job_browser->textsize(RLN_FONTSIZE-1);
 	scheduler_input_job_browser     = new Fl_Hold_Browser(XJOBCOL2, GUIHEIGHT_EXT_START + 146, JOBCOLWIDTH, 35);
-	scheduler_input_job_browser->callback(cb_select_input_job);
+	scheduler_input_job_browser->callback(cb_select_input_job, this);
 	scheduler_input_job_browser->textsize(RLN_FONTSIZE-1);
 	scheduler_output_job_browser    = new Fl_Hold_Browser(XJOBCOL2, GUIHEIGHT_EXT_START + 203, JOBCOLWIDTH, 34);
-	scheduler_output_job_browser->callback(cb_select_output_job);
+	scheduler_output_job_browser->callback(cb_select_output_job, this);
 	scheduler_output_job_browser->textsize(RLN_FONTSIZE-1);
 
 	scheduler_delete_job_button = new Fl_Button(XJOBCOL2+JOBCOLWIDTH-50, GUIHEIGHT_EXT_START, 50, 23);
@@ -798,7 +798,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	scheduler_delete_job_button->labelfont(FL_ITALIC);
 	scheduler_delete_job_button->labelsize(RLN_FONTSIZE);
 	scheduler_delete_job_button->label("Del");
-	scheduler_delete_job_button->callback( cb_delete_scheduler_job, this);
+	scheduler_delete_job_button->callback(cb_delete_scheduler_job, this);
 
 
 	// Scheduler edges
@@ -828,15 +828,15 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	delete_scheduler_edge_button->labelfont(FL_ITALIC);
 	delete_scheduler_edge_button->labelsize(RLN_FONTSIZE);
 	delete_scheduler_edge_button->label("Del");
-	delete_scheduler_edge_button->callback( cb_delete_scheduler_edge, this);
+	delete_scheduler_edge_button->callback(cb_delete_scheduler_edge, this);
 	add_scheduler_edge_button = new Fl_Button(XJOBCOL3+JOBCOLWIDTH-50, GUIHEIGHT_EXT_START, 50, 23);
 	add_scheduler_edge_button->color(GUI_BUTTON_COLOR);
 	add_scheduler_edge_button->labelfont(FL_ITALIC);
 	add_scheduler_edge_button->labelsize(RLN_FONTSIZE);
 	add_scheduler_edge_button->label("Add");
-	add_scheduler_edge_button->callback( cb_add_scheduler_edge, this);
+	add_scheduler_edge_button->callback(cb_add_scheduler_edge, this);
 	scheduler_edge_browser  = new Fl_Hold_Browser(XJOBCOL3, GUIHEIGHT_EXT_START + 65, JOBCOLWIDTH, 170);
-	scheduler_edge_browser->callback(cb_select_scheduler_edge);
+	scheduler_edge_browser->callback(cb_select_scheduler_edge, this);
 	scheduler_edge_browser->textsize(RLN_FONTSIZE-2);
 	scheduler_edge_browser->end();
 
@@ -849,29 +849,29 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	scheduler_set_current_button = new Fl_Button(XJOBCOL1+210, GUIHEIGHT_EXT_START + height_ops, 50, 23);
 	scheduler_set_current_button->label("Set");
 	scheduler_set_current_button->color(GUI_BUTTON_COLOR);
-	scheduler_set_current_button->callback( cb_scheduler_set_current, this);
+	scheduler_set_current_button->callback(cb_scheduler_set_current, this);
 
 	scheduler_prev_button = new Fl_Button(XJOBCOL1+210+55, GUIHEIGHT_EXT_START + height_ops, 50, 23);
 	scheduler_prev_button->label("Prev");
 	scheduler_prev_button->color(GUI_BUTTON_COLOR);
-	scheduler_prev_button->callback( cb_scheduler_prev, this);
+	scheduler_prev_button->callback(cb_scheduler_prev, this);
 
 	scheduler_next_button = new Fl_Button(XJOBCOL1+210+2*55, GUIHEIGHT_EXT_START + height_ops, 50, 23);
 	scheduler_next_button->label("Next");
 	scheduler_next_button->color(GUI_BUTTON_COLOR);
-	scheduler_next_button->callback( cb_scheduler_next, this);
+	scheduler_next_button->callback(cb_scheduler_next, this);
 
 	scheduler_reset_button = new Fl_Button(XJOBCOL1+210+3*55, GUIHEIGHT_EXT_START + height_ops, 50, 23);
 	scheduler_reset_button->label("Reset");
 	scheduler_reset_button->color(GUI_BUTTON_COLOR);
-	scheduler_reset_button->callback( cb_scheduler_reset, this);
+	scheduler_reset_button->callback(cb_scheduler_reset, this);
 
 	scheduler_run_button = new Fl_Button(GUIWIDTH - 90, GUIHEIGHT_EXT_START + height_ops-2, 80, 25);
 	scheduler_run_button->label("Run!");
 	scheduler_run_button->color(GUI_RUNBUTTON_COLOR);
 	scheduler_run_button->labelfont(FL_ITALIC);
 	scheduler_run_button->labelsize(14);
-	scheduler_run_button->callback( cb_scheduler_run, this);
+	scheduler_run_button->callback(cb_scheduler_run, this);
 
 	scheduler_run_grp->end();
 
@@ -880,7 +880,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	scheduler_unlock_button->labelfont(FL_ITALIC);
 	scheduler_unlock_button->labelsize(14);
 	scheduler_unlock_button->color(GUI_RUNBUTTON_COLOR);
-	scheduler_unlock_button->callback( cb_scheduler_unlock, this);
+	scheduler_unlock_button->callback(cb_scheduler_unlock, this);
 
 	// Don't allow any changes on the GUI while a Schedule is running, i.e. it's directory is locked for writing
 	scheduler_abort_button = new Fl_Button(GUIWIDTH - 173, GUIHEIGHT_EXT_START + height_ops-2, 80, 25);
@@ -888,7 +888,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	scheduler_abort_button->labelfont(FL_ITALIC);
 	scheduler_abort_button->labelsize(14);
 	scheduler_abort_button->color(GUI_RUNBUTTON_COLOR);
-	scheduler_abort_button->callback( cb_scheduler_abort, this);
+	scheduler_abort_button->callback(cb_scheduler_abort, this);
 
 	scheduler_grp->end();
 
