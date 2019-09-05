@@ -2184,7 +2184,7 @@ void RelionJob::initialiseSelectJob()
 	joboptions["nr_groups"] = JobOption("Approximate nr of groups: ", 1, 50, 20, 1, "It is normal that the actual number of groups may deviate a little from this number. ");
 
 	joboptions["do_select_values"] = JobOption("Select based on metadata values?", false, "If set to Yes, the job will be non-interactive and the selected star file will be based only on the value of the corresponding metadata label. Note that this option is only valid for micrographs or particles STAR files.");
-	joboptions["select_label"] = JobOption("Metadata label for subset selection:", (std::string)"rlnCtfFigureOfMerit", "This column from the input STAR file will be used for the subset selection.");
+	joboptions["select_label"] = JobOption("Metadata label for subset selection:", (std::string)"rlnCtfMaxResolution", "This column from the input STAR file will be used for the subset selection.");
 	joboptions["select_minval"] = JobOption("Minimum metadata value:",  (std::string)"-9999.", "Only lines in the input STAR file with the corresponding metadata value larger than this value will be included in the subset.");
 	joboptions["select_maxval"] = JobOption("Maximum metadata value:",  (std::string)"9999.", "Only lines in the input STAR file with the corresponding metadata value smaller than this value will be included in the subset.");
 
@@ -2194,8 +2194,8 @@ void RelionJob::initialiseSelectJob()
 
 	joboptions["do_split"] = JobOption("OR: split into subsets?", false, "If set to Yes, the job will be non-interactive and the star file will be split into subsets as defined below.");
 	joboptions["do_random"] = JobOption("Randomise order before making subsets?:", false, "If set to Yes, the input STAR file order will be randomised. If set to No, the original order in the input STAR file will be maintained.");
-	joboptions["split_size"] = JobOption("Subset size: ", 100, 100, 10000, 100, "The number of lines in each of the output subsets. This line will be ignored when the number of subsets is specified on the next line.");
-	joboptions["nr_split"] = JobOption("OR: number of subsets: ", -1, 1, 50, 1, "Give a positive integer to specify into how many equal-sized subsets the data will be divided");
+	joboptions["split_size"] = JobOption("Subset size: ", 100, 100, 10000, 100, "The number of lines in each of the output subsets. When this is -1, items are divided into a number of subsets specified in the next option.");
+	joboptions["nr_split"] = JobOption("OR: number of subsets: ", -1, 1, 50, 1, "Give a positive integer to specify into how many equal-sized subsets the data will be divided. When the subset size is also specified, only this number of subsets, each with the specified size, will be written, possibly missing some items.");
 
 	joboptions["do_remove_duplicates"] = JobOption("OR: remove duplicates?", false, "If set to Yes, duplicated particles that are within a given distance are removed leaving only one. Duplicated particles are sometimes generated when particles drift into the same position during alignment. They inflate and invalidate gold-standard FSC calculation.");
 	joboptions["duplicate_threshold"] = JobOption("Minimum inter-particle distance (A)", 30, 0, 1000, 1, "Particles within this distance are removed leaving only one.");
