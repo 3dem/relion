@@ -84,11 +84,14 @@ void HelixAligner::parseInitial(int argc, char **argv)
 
     fn_out = parser.getOption("--o", "Output rootname","");
 	fn_imgs = parser.getOption("--i", " STAR file with the input images and orientation parameters","");
-    fn_mics = parser.getOption("--mic", "OR: STAR file with the input micrographs","");
+    // deactivate fn_mics approach: never really worked...
+	fn_mics = "";
+	/*
+	fn_mics = parser.getOption("--mic", "OR: STAR file with the input micrographs","");
 	fn_coord_suffix = parser.getOption("--coord_suffix", "The suffix for the start-end coordinate files, e.g. \"_picked.star\" or \".box\"","");
 	fn_coord_dir = parser.getOption("--coord_dir", "The directory where the coordinate files are (default is same as micrographs)", "ASINPUT");
 	extract_width = textToInteger(parser.getOption("--extract_width", "Width (in pixels) of the images for the helices to be extracted ", "100"));
-
+	*/
     int param_section = parser.addSection("Parameters");
     crossover_distance = textToFloat(parser.getOption("--crossover_distance", "Distance in Angstroms between 2 cross-overs",""));
     nr_iter = textToInteger(parser.getOption("--iter", "Maximum number of iterations to perform", "10"));
@@ -681,7 +684,7 @@ void HelixAligner::initialiseClasses()
 		std::cerr << " model.Arec.size()= " << model.Arec.size() << std::endl;
 		model.Arec[0] = Iref();
 	    // Now project the reconstruction back out into the model.Aref[iclass]
-	    Projector PP(YSIZE(model.Aref[0]), TRILINEAR, 1, 1, 1);
+	    Projector PP(YSIZE(model.Aref[0]), TRILINEAR, 2, 1, 1);
 	    // Set the FT of img inside the Projector
 	    MultidimArray<RFLOAT> dummy;
 	    PP.computeFourierTransformMap(Iref(), dummy, YSIZE(model.Aref[0]), 1);
@@ -999,7 +1002,7 @@ void HelixAligner::reconstruct2D(int iclass)
 	}
 
 	// Then reconstruct
-    BackProjector BP(YSIZE(model.Aref[iclass]), 2, "C1", TRILINEAR, 1, 1, 0, 1.9, 15, 1, false);
+    BackProjector BP(YSIZE(model.Aref[iclass]), 2, "C1", TRILINEAR, 2, 1, 0, 1.9, 15, 1, false);
 	BP.initialiseDataAndWeight(YSIZE(model.Aref[iclass]));
 
     for (int j = 0; j < myFlines.size(); j++)
