@@ -1124,7 +1124,7 @@ void RelionJob::initialiseImportJob()
 	hidden_name = ".gui_import";
 
 	joboptions["do_raw"] = JobOption("Import raw movies/micrographs?", true, "Set this to Yes if you plan to import raw movies or micrographs");
-    joboptions["fn_in_raw"] = JobOption("Raw input files:", (std::string)"Micrographs/*.mrcs", "Provide a Linux wildcard that selects all raw movies or micrographs to be imported.");
+	joboptions["fn_in_raw"] = JobOption("Raw input files:", (std::string)"Micrographs/*.mrcs", "Provide a Linux wildcard that selects all raw movies or micrographs to be imported.");
 	joboptions["is_multiframe"] = JobOption("Are these multi-frame movies?", true, "Set to Yes for multi-frame movies, set to No for single-frame micrographs.");
 
 	joboptions["optics_group_name"] = JobOption("Optics group name:", (std::string)"opticsGroup1", "Name of this optics group. Each group of movies/micrographs with different optics characteristics for CTF refinement should have a unique name.");

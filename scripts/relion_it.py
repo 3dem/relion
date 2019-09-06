@@ -422,18 +422,18 @@ class RelionItOptions(object):
 
     ### MotionCorrection parameters
     # Use RELION's own implementation of motion-correction (CPU-only) instead of the UCSF implementation?
-    motioncor_do_own = False
+    motioncor_do_own = True
     # The number of threads (only for RELION's own implementation) is optimal when nr_movie_frames/nr_threads = integer
-    motioncor_threads = 12
+    motioncor_threads = 6
     # Exectutable of UCSF MotionCor2
     motioncor_exe = '/public/EM/MOTIONCOR2/MotionCor2'
     # On which GPU(s) to execute UCSF MotionCor2
     motioncor_gpu = '0'
     # How many MPI processes to use for running motion correction?
-    motioncor_mpi = 1
+    motioncor_mpi = 4
     # Local motion-estimation patches for MotionCor2
-    motioncor_patches_x = 5
-    motioncor_patches_y = 5
+    motioncor_patches_x = 4
+    motioncor_patches_y = 4
     # B-factor in A^2 for downweighting of high-spatial frequencies
     motioncor_bfactor = 150
     # Use binning=2 for super-resolution K2 movies
@@ -471,11 +471,11 @@ class RelionItOptions(object):
     # On which GPU(s) to execute Gctf
     gctf_gpu = '0'
     # Use Alexis Rohou's CTFFIND4 (CPU-only) instead?
-    use_ctffind_instead = False
+    use_ctffind_instead = True
     # Executable for Alexis Rohou's CTFFIND4
     ctffind4_exe = '/public/EM/ctffind/ctffind.exe'
     # How many MPI processes to use for running CTF estimation?
-    ctffind_mpi = 1
+    ctffind_mpi = 8
     # Submit CTF estimation job to the cluster?
     ctffind_submit_to_queue = False
 
@@ -549,12 +549,11 @@ class RelionItOptions(object):
     # Submit jobs to the cluster?
     refine_submit_to_queue = False
     # Use fast subsets in 2D/3D classification when batch_size is bigger than this
-    refine_batchsize_for_fast_subsets = 100000
-
+    refine_batchsize_for_fast_subsets = 10000
 
     ### 2D classification parameters
     # Wait with the first 2D classification batch until at least this many particles are extracted
-    minimum_batch_size = 1000
+    minimum_batch_size = 10000
     # Number of iterations to perform in 2D classification
     class2d_nr_iter = 20
     # Rotational search step (in degrees)
@@ -1244,7 +1243,7 @@ class RelionItGui(object):
 
 
 def safe_load_star(filename, max_try=5, wait=10, expected=[]):
-    for _ in xrange(max_try):
+    for _ in range(max_try):
         try:
             star = load_star(filename)
             entry = star
@@ -1406,7 +1405,7 @@ def WaitForJob(wait_for_this_job, seconds_wait):
 
 def find_split_job_output(prefix, n, max_digits=6):
     import os.path
-    for i in xrange(max_digits):
+    for i in range(max_digits):
         filename = prefix + str(n).rjust(i, '0') + '.star'
         if os.path.isfile(filename):
             return filename
@@ -1538,12 +1537,17 @@ def run_pipeline(opts):
 
 
         #### Set up the Import job
-        import_options = ['Input files: == {}'.format(opts.import_images)]
+        import_options = ['Raw input files: == {}'.format(opts.import_images),
+                          'Import raw movies/micrographs? == Yes',
+	                  'Pixel size (Angstrom): == {}'.format(opts.angpix),
+	                  'Voltage (kV): == {}'.format(opts.voltage),
+                          'Spherical aberration (mm): == {}'.format(opts.Cs),
+                          'Amplitude contrast: == {}'.format(opts.ampl_contrast)]
 
         if opts.images_are_movies:
-            import_options.append('Node type: == 2D micrograph movies (*.mrcs)')
+            import_options.append('Are these multi-frame movies? == Yes')
         else:
-            import_options.append('Node type: == 2D micrographs/tomograms (*.mrc)')
+            import_options.append('Are these multi-frame movies? == No')
 
         import_job, already_had_it  = addJob('Import','import_job', SETUP_CHECK_FILE, import_options)
 
@@ -1556,9 +1560,7 @@ def run_pipeline(opts):
                                   'Gain flip: == {}'.format(opts.motioncor_gainflip),
                                   'Gain rotation: == {}'.format(opts.motioncor_gainrot),
                                   'Do dose-weighting? == Yes',
-                                  'Voltage (kV): == {}'.format(opts.voltage),
                                   'Dose per frame (e/A2): == {}'.format(opts.motioncor_doseperframe),
-                                  'Pixel size (A): == {}'.format(opts.angpix),
                                   'Number of patches X: ==  {}'.format(opts.motioncor_patches_x),
                                   'Number of patches Y: == {}'.format(opts.motioncor_patches_y),
                                   'Bfactor: ==  {}'.format(opts.motioncor_bfactor),
@@ -1570,6 +1572,10 @@ def run_pipeline(opts):
 
             if (opts.motioncor_do_own):
                 motioncorr_options.append('Use RELION\'s own implementation? == Yes')
+                if opts.use_ctffind_instead:
+                    motioncorr_options.append('Save sum of power spectra? == Yes')
+                else:
+                    motioncorr_options.append('Save sum of power spectra? == No')
             else:
                 motioncorr_options.append('Use RELION\'s own implementation? == No')
 
@@ -1580,15 +1586,11 @@ def run_pipeline(opts):
 
 
         #### Set up the CtfFind job
-        ctffind_options = ['Voltage (kV): == {}'.format(opts.voltage),
-                           'Spherical aberration (mm): == {}'.format(opts.Cs),
-                           'Amplitude contrast: == {}'.format(opts.ampl_contrast),
-                           'Amount of astigmatism (A): == {}'.format(opts.ctffind_astigmatism),
+        ctffind_options = ['Amount of astigmatism (A): == {}'.format(opts.ctffind_astigmatism),
                            'FFT box size (pix): == {}'.format(opts.ctffind_boxsize),
                            'Maximum defocus value (A): == {}'.format(opts.ctffind_defocus_max),
                            'Minimum defocus value (A): == {}'.format(opts.ctffind_defocus_min),
                            'Defocus step size (A): == {}'.format(opts.ctffind_defocus_step),
-                           'Magnified pixel size (Angstrom): == {}'.format(opts.angpix * opts.motioncor_binning),
                            'Maximum resolution (A): == {}'.format(opts.ctffind_maxres),
                            'Minimum resolution (A): == {}'.format(opts.ctffind_minres),
                            'Gctf executable: == {}'.format(opts.gctf_exe),
@@ -1604,9 +1606,11 @@ def run_pipeline(opts):
         if opts.use_ctffind_instead:
             ctffind_options.append('Use CTFFIND-4.1? == Yes')
             ctffind_options.append('Use Gctf instead? == No')
+            ctffind_options.append('Use power spectra from MotionCorr job? == Yes')
         else:
             ctffind_options.append('Use CTFFIND-4.1? == No')
             ctffind_options.append('Use Gctf instead? == Yes')
+            ctffind_options.append('Use power spectra from MotionCorr job? == No')
             if (opts.ctffind_do_ignore_search_params):
                 ctffind_options.append('Ignore \'Searches\' parameters? == Yes')
             else:
@@ -1787,8 +1791,8 @@ def run_pipeline(opts):
             first_split_file = find_split_job_output(split_job + 'particles_split', 1)
             if getJobName("class2d_job_batch_001", SETUP_CHECK_FILE) is not None and \
                first_split_file is not None:
-                batch1 = safe_load_star(first_split_file, expected=['', 'rlnMicrographName'])
-                previous_batch1_size = len(batch1['']['rlnMicrographName'])
+                batch1 = safe_load_star(first_split_file, expected=['particles', 'rlnMicrographName'])
+                previous_batch1_size = len(batch1['particles']['rlnMicrographName'])
             else:
                 previous_batch1_size = 0
 
@@ -1801,8 +1805,8 @@ def run_pipeline(opts):
                     iibatch = ibatch + 1
                     batch_name = find_split_job_output(split_job + "particles_split", iibatch)
 
-                    batch = safe_load_star(batch_name, expected=['', 'rlnMicrographName'])
-                    batch_size = len(batch['']['rlnMicrographName'])
+                    batch = safe_load_star(batch_name, expected=['particles', 'rlnMicrographName'])
+                    batch_size = len(batch['particles']['rlnMicrographName'])
                     rerun_batch1 = False
                     if ( iibatch == 1 and batch_size > previous_batch1_size and batch_size > opts.minimum_batch_size ):
                         previous_batch1_size = batch_size
