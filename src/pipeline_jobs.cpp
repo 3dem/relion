@@ -283,19 +283,34 @@ void JobOption::setString(std::string set_to)
 }
 
 // Get a numbered value
-float JobOption::getNumber()
+float JobOption::getNumber(std::string &errmsg)
 {
-	if (joboption_type != JOBOPTION_SLIDER)
+	errmsg = "";
+	if (value.substr(0, 2) == "$$")
 	{
-		std::cerr << " joboption_type= " << joboption_type << " label= " << label << " value= " << value << std::endl;
-		REPORT_ERROR("ERROR: this jobOption does not return a number: " + label);
+		return 0;
 	}
 	else
 	{
-		if (value.substr(0, 2) == "$$")
-			return 0;
+
+		if (&value == NULL)
+		{
+			errmsg = "Error in textToFloat of " + value;
+			return 0.;
+		}
+
+		float retval;
+		int ok = sscanf(value.c_str(), "%f", &retval);
+
+		if (ok)
+		{
+			return retval;
+		}
 		else
-			return textToFloat(value);
+		{
+			errmsg = "Error in textToFloat of " + value;
+			return 0.;
+		}
 	}
 }
 
@@ -565,10 +580,16 @@ bool RelionJob::saveJobSubmissionScript(std::string newfilename, std::string out
 	}
 	else
 	{
-		int nmpi = (joboptions.find("nr_mpi") != joboptions.end()) ? joboptions["nr_mpi"].getNumber() : 1;
-		int nthr = (joboptions.find("nr_threads") != joboptions.end()) ? joboptions["nr_threads"].getNumber() : 1;
+		int nmpi = (joboptions.find("nr_mpi") != joboptions.end()) ? joboptions["nr_mpi"].getNumber(error_message) : 1;
+		if (error_message != "") return false;
+
+		int nthr = (joboptions.find("nr_threads") != joboptions.end()) ? joboptions["nr_threads"].getNumber(error_message) : 1;
+		if (error_message != "") return false;
+
 		int ncores = nmpi * nthr;
-		int ndedi = joboptions["min_dedicated"].getNumber();
+		int ndedi = joboptions["min_dedicated"].getNumber(error_message);
+		if (error_message != "") return false;
+
 		float fnodes = (float)ncores / (float)ndedi;
 		int nnodes = CEIL(fnodes);
 		if (fmod(fnodes, 1) > 0)
@@ -719,7 +740,9 @@ bool RelionJob::prepareFinalCommand(std::string &outputname, std::vector<std::st
 		for (size_t icom = 0; icom < commands.size(); icom++)
 		{
 			// Is this a relion mpi program?
-			nr_mpi = (joboptions.find("nr_mpi") != joboptions.end()) ? joboptions["nr_mpi"].getNumber() : 1;
+			nr_mpi = (joboptions.find("nr_mpi") != joboptions.end()) ? joboptions["nr_mpi"].getNumber(error_message) : 1;
+			if (error_message != "") return false;
+
 			if (nr_mpi > 1 &&
 					(commands[icom]).find("_mpi`") != std::string::npos &&
 					(commands[icom]).find("relion_") != std::string::npos)
@@ -1353,10 +1376,11 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 	initialisePipeline(outputname, PROC_MOTIONCORR_NAME, job_counter);
 
 	std::string command;
-	if (joboptions["nr_mpi"].getNumber() > 1)
+	if (joboptions["nr_mpi"].getNumber(error_message) > 1)
 		command="`which relion_run_motioncorr_mpi`";
 	else
 		command="`which relion_run_motioncorr`";
+	if (error_message != "") return false;
 
 	// I/O
 
@@ -1406,8 +1430,11 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 	command += " --preexposure " + joboptions["pre_exposure"].getString();
 	command += " --patch_x " + joboptions["patch_x"].getString();
 	command += " --patch_y " + joboptions["patch_y"].getString();
-	if (joboptions["group_frames"].getNumber() > 1.)
+
+	if (joboptions["group_frames"].getNumber(error_message) > 1.)
 		command += " --group_frames " + joboptions["group_frames"].getString();
+	if (error_message != "") return false;
+
 	if ((joboptions["fn_gain_ref"].getString()).length() > 0)
 	{
 
@@ -1455,8 +1482,10 @@ bool RelionJob::getCommandsMotioncorrJob(std::string &outputname, std::vector<st
 			return false;
 		}
 
-		float dose_for_ps = textToFloat(joboptions["group_for_ps"].getString());
-		float dose_rate = textToFloat(joboptions["dose_per_frame"].getString());
+		float dose_for_ps = joboptions["group_for_ps"].getNumber(error_message);
+		if (error_message != "") return false;
+		float dose_rate = joboptions["dose_per_frame"].getNumber(error_message);
+		if (error_message != "") return false;
 		if (dose_rate <= 0)
 		{
 			error_message = "Please specify the dose rate to calculate the grouping for power spectra.";
@@ -1566,10 +1595,11 @@ bool RelionJob::getCommandsCtffindJob(std::string &outputname, std::vector<std::
 	Node node2(joboptions["input_star_mics"].getString(), joboptions["input_star_mics"].node_type);
 	inputNodes.push_back(node2);
 
-	if (joboptions["nr_mpi"].getNumber() > 1)
+	if (joboptions["nr_mpi"].getNumber(error_message) > 1)
 		command="`which relion_run_ctffind_mpi`";
 	else
 		command="`which relion_run_ctffind`";
+	if (error_message != "") return false;
 
 	command += " --i " + joboptions["input_star_mics"].getString();
 	command += " --o " + outputname;
@@ -1713,12 +1743,17 @@ bool RelionJob::getCommandsManualpickJob(std::string &outputname, std::vector<st
 	command += " --black " + joboptions["black_val"].getString();
 	command += " --white " + joboptions["white_val"].getString();
 
-	if (joboptions["lowpass"].getNumber() > 0.)
+	if (joboptions["lowpass"].getNumber(error_message) > 0.)
 		command += " --lowpass " + joboptions["lowpass"].getString();
-	if (joboptions["highpass"].getNumber() > 0.)
+	if (error_message != "") return false;
+
+	if (joboptions["highpass"].getNumber(error_message) > 0.)
 		command += " --highpass " + joboptions["highpass"].getString();
-	if (joboptions["angpix"].getNumber() > 0.)
+	if (error_message != "") return false;
+
+	if (joboptions["angpix"].getNumber(error_message) > 0.)
 		command += " --angpix " + joboptions["angpix"].getString();
+	if (error_message != "") return false;
 
 	command += " --ctf_scale " + joboptions["ctfscale"].getString();
 
@@ -1823,10 +1858,11 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 	commands.clear();
 	initialisePipeline(outputname, PROC_AUTOPICK_NAME, job_counter);
 	std::string command;
-	if (joboptions["nr_mpi"].getNumber() > 1)
+	if (joboptions["nr_mpi"].getNumber(error_message) > 1)
 		command="`which relion_autopick_mpi`";
 	else
 		command="`which relion_autopick`";
+	if (error_message != "") return false;
 
 	// Input
 	if (joboptions["fn_input_autopick"].getString() == "")
@@ -1862,8 +1898,10 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 		command += " --LoG_diam_max " + joboptions["log_diam_max"].getString();
 		command += " --shrink 0 --lowpass " + joboptions["log_maxres"].getString();
 		command += " --LoG_adjust_threshold " + joboptions["log_adjust_thr"].getString();
-		if (joboptions["log_upper_thr"].getNumber() < 999.)
+		if (joboptions["log_upper_thr"].getNumber(error_message) < 999.)
 			command += " --LoG_upper_threshold " + joboptions["log_upper_thr"].getString();
+		if (error_message != "") return false;
+
 		if (joboptions["log_invert"].getBoolean())
 			command += " --Log_invert ";
 	}
@@ -1919,25 +1957,37 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 		command += " --ang " + joboptions["psi_sampling_autopick"].getString();
 
 		command += " --shrink " + joboptions["shrink"].getString();
-		if (joboptions["lowpass"].getNumber() > 0.)
+		if (joboptions["lowpass"].getNumber(error_message) > 0.)
 			command += " --lowpass " + joboptions["lowpass"].getString();
-		if (joboptions["highpass"].getNumber() > 0.)
+		if (error_message != "") return false;
+
+		if (joboptions["highpass"].getNumber(error_message) > 0.)
 			command += " --highpass " + joboptions["highpass"].getString();
-		if (joboptions["angpix"].getNumber() > 0.)
+		if (error_message != "") return false;
+
+		if (joboptions["angpix"].getNumber(error_message) > 0.)
 			command += " --angpix " + joboptions["angpix"].getString();
-		if (joboptions["angpix_ref"].getNumber() > 0.)
+		if (error_message != "") return false;
+
+		if (joboptions["angpix_ref"].getNumber(error_message) > 0.)
 			command += " --angpix_ref " + joboptions["angpix_ref"].getString();
-		if (joboptions["particle_diameter"].getNumber() > 0.)
+		if (error_message != "") return false;
+
+		if (joboptions["particle_diameter"].getNumber(error_message) > 0.)
 			command += " --particle_diameter " + joboptions["particle_diameter"].getString();
+		if (error_message != "") return false;
 
 		command += " --threshold " + joboptions["threshold_autopick"].getString();
 		if (joboptions["do_pick_helical_segments"].getBoolean())
-			command += " --min_distance " + floatToString(joboptions["helical_nr_asu"].getNumber() * joboptions["helical_rise"].getNumber());
+			command += " --min_distance " + floatToString(joboptions["helical_nr_asu"].getNumber(error_message) * joboptions["helical_rise"].getNumber(error_message));
 		else
 			command += " --min_distance " + joboptions["mindist_autopick"].getString();
+		if (error_message != "") return false;
+
 		command += " --max_stddev_noise " + joboptions["maxstddevnoise_autopick"].getString();
-		if (joboptions["minavgnoise_autopick"].getNumber() > -900.)
+		if (joboptions["minavgnoise_autopick"].getNumber(error_message) > -900.)
 			command += " --min_avg_noise " + joboptions["minavgnoise_autopick"].getString();
+		if (error_message != "") return false;
 
 		// Helix
 		if (joboptions["do_pick_helical_segments"].getBoolean())
@@ -2034,10 +2084,11 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 	commands.clear();
 	initialisePipeline(outputname, PROC_EXTRACT_NAME, job_counter);
 	std::string command;
-	if (joboptions["nr_mpi"].getNumber() > 1)
+	if (joboptions["nr_mpi"].getNumber(error_message) > 1)
 		command="`which relion_preprocess_mpi`";
 	else
 		command="`which relion_preprocess`";
+	if (error_message != "") return false;
 
 	// Input
 	if (joboptions["star_mics"].getString() == "")
@@ -2104,12 +2155,18 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 
 	// Operate stuff
 	// Get an integer number for the bg_radius
-	RFLOAT bg_radius = (joboptions["bg_diameter"].getNumber() < 0.) ? 0.75 * joboptions["extract_size"].getNumber() : joboptions["bg_diameter"].getNumber();
+	RFLOAT bg_radius = (joboptions["bg_diameter"].getNumber(error_message) < 0.) ? 0.75 * joboptions["extract_size"].getNumber(error_message) : joboptions["bg_diameter"].getNumber(error_message);
+	if (error_message != "") return false;
+
 	bg_radius /= 2.; // Go from diameter to radius
 	if (joboptions["do_rescale"].getBoolean())
 	{
 		command += " --scale " + joboptions["rescale"].getString();
-		bg_radius *= joboptions["rescale"].getNumber() / joboptions["extract_size"].getNumber();
+		bg_radius *= joboptions["rescale"].getNumber(error_message);
+		if (error_message != "") return false;
+
+		bg_radius /= joboptions["extract_size"].getNumber(error_message);
+		if (error_message != "") return false;
 	}
 	if (joboptions["do_norm"].getBoolean())
 	{
@@ -2255,8 +2312,10 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 		command += " --o " + fn_out;
 
 		command += " --remove_duplicates " + joboptions["duplicate_threshold"].getString();
-		if (joboptions["image_angpix"].getNumber() > 0)
+		if (joboptions["image_angpix"].getNumber(error_message) > 0)
 			command += " --image_angpix " + joboptions["image_angpix"].getString();
+		if (error_message != "") return false;
+
 	}
 	else if (joboptions["do_select_values"].getBoolean() || joboptions["do_discard"].getBoolean() || joboptions["do_split"].getBoolean())
 	{
@@ -2324,19 +2383,24 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 				command += " --random_order ";
 			}
 
-			if (joboptions["nr_split"].getNumber() <= 0 && joboptions["split_size"].getNumber() <= 0
+			if (joboptions["nr_split"].getNumber(error_message) <= 0 && joboptions["split_size"].getNumber(error_message) <= 0
 					&& !joboptions["nr_split"].isSchedulerVariable() && !joboptions["split_size"].isSchedulerVariable())
 			{
 				error_message = "ERROR: When splitting the input STAR file into subsets, set nr_split and/or split_size to a positive value";
 				return false;
 			}
-			if (joboptions["nr_split"].getNumber() > 0 && !joboptions["nr_split"].isSchedulerVariable())
+
+			if (joboptions["nr_split"].getNumber(error_message) > 0 && !joboptions["nr_split"].isSchedulerVariable())
 			{
-				nr_split = joboptions["nr_split"].getNumber();
+				if (error_message != "") return false;
+
+				nr_split = joboptions["nr_split"].getNumber(error_message);
 				command += " --nr_split " + joboptions["nr_split"].getString();
 			}
-			if (joboptions["split_size"].getNumber() > 0 && !joboptions["split_size"].isSchedulerVariable())
+			if (joboptions["split_size"].getNumber(error_message) > 0 && !joboptions["split_size"].isSchedulerVariable())
 			{
+				if (error_message != "") return false;
+
 				command += " --size_split " + joboptions["split_size"].getString();
 			}
 
@@ -2452,12 +2516,18 @@ bool RelionJob::getCommandsSelectJob(std::string &outputname, std::vector<std::s
 			command += " --black " + manualpickjob.joboptions["black_val"].getString();
 			command += " --white " + manualpickjob.joboptions["white_val"].getString();
 
-			if (manualpickjob.joboptions["lowpass"].getNumber() > 0.)
+			if (manualpickjob.joboptions["lowpass"].getNumber(error_message) > 0.)
 				command += " --lowpass " + manualpickjob.joboptions["lowpass"].getString();
-			if (manualpickjob.joboptions["highpass"].getNumber() > 0.)
+			if (error_message != "") return false;
+
+			if (manualpickjob.joboptions["highpass"].getNumber(error_message) > 0.)
 				command += " --highpass " + manualpickjob.joboptions["highpass"].getString();
-			if (manualpickjob.joboptions["angpix"].getNumber() > 0.)
+			if (error_message != "") return false;
+
+			if (manualpickjob.joboptions["angpix"].getNumber(error_message) > 0.)
 				command += " --angpix " + manualpickjob.joboptions["angpix"].getString();
+			if (error_message != "") return false;
+
 
 			command += " --ctf_scale " + manualpickjob.joboptions["ctfscale"].getString();
 
@@ -2602,10 +2672,11 @@ bool RelionJob::getCommandsClass2DJob(std::string &outputname, std::vector<std::
 	initialisePipeline(outputname, PROC_2DCLASS_NAME, job_counter);
 	std::string command;
 
-	if (joboptions["nr_mpi"].getNumber() > 1)
+	if (joboptions["nr_mpi"].getNumber(error_message) > 1)
 		command="`which relion_refine_mpi`";
 	else
 		command="`which relion_refine`";
+	if (error_message != "") return false;
 
 	FileName fn_run = "run";
 	if (is_continue)
@@ -2628,7 +2699,13 @@ bool RelionJob::getCommandsClass2DJob(std::string &outputname, std::vector<std::
 	}
 
 	command += " --o " + outputname + fn_run;
-	outputNodes = getOutputNodesRefine(outputname + fn_run, (int)joboptions["nr_iter"].getNumber(), (int)joboptions["nr_classes"].getNumber(), 2, 1);
+	int my_iter = (int)joboptions["nr_iter"].getNumber(error_message);
+	if (error_message != "") return false;
+
+	int my_classes = (int)joboptions["nr_classes"].getNumber(error_message);
+	if (error_message != "") return false;
+
+	outputNodes = getOutputNodesRefine(outputname + fn_run, my_iter, my_classes, 2, 1);
 
 	if (!is_continue)
 	{
@@ -2681,8 +2758,10 @@ bool RelionJob::getCommandsClass2DJob(std::string &outputname, std::vector<std::
 		command += " --flatten_solvent ";
 		if (joboptions["do_zero_mask"].getBoolean())
 			command += " --zero_mask ";
-		if (joboptions["highres_limit"].getNumber() > 0)
+		if (joboptions["highres_limit"].getNumber(error_message) > 0)
 			command += " --strict_highres_exp " + joboptions["highres_limit"].getString();
+		if (error_message != "") return false;
+
 	}
 
 	// Sampling
@@ -2696,11 +2775,15 @@ bool RelionJob::getCommandsClass2DJob(std::string &outputname, std::vector<std::
 	else
 	{
 		// The sampling given in the GUI will be the oversampled one!
-		command += " --psi_step " + floatToString(joboptions["psi_sampling"].getNumber() * pow(2., iover));
+		command += " --psi_step " + floatToString(joboptions["psi_sampling"].getNumber(error_message) * pow(2., iover));
+		if (error_message != "") return false;
+
 		// Offset range
 		command += " --offset_range " + joboptions["offset_range"].getString();
 		// The sampling given in the GUI will be the oversampled one!
-		command += " --offset_step " + floatToString(joboptions["offset_step"].getNumber() * pow(2., iover));
+		command += " --offset_step " + floatToString(joboptions["offset_step"].getNumber(error_message) * pow(2., iover));
+		if (error_message != "") return false;
+
 	}
 
 	// Helix
@@ -2713,7 +2796,9 @@ bool RelionJob::getCommandsClass2DJob(std::string &outputname, std::vector<std::
 			if (joboptions["do_bimodal_psi"].getBoolean())
 				command += " --bimodal_psi";
 
-			RFLOAT val = joboptions["range_psi"].getNumber();
+			RFLOAT val = joboptions["range_psi"].getNumber(error_message);
+			if (error_message != "") return false;
+
 			val = (val < 0.) ? (0.) : (val);
 			val = (val > 90.) ? (90.) : (val);
 			command += " --sigma_psi " + floatToString(val / 3.);
@@ -2840,10 +2925,11 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 	initialisePipeline(outputname, PROC_INIMODEL_NAME, job_counter);
 
 	std::string command;
-	if (joboptions["nr_mpi"].getNumber() > 1)
+	if (joboptions["nr_mpi"].getNumber(error_message) > 1)
 		command="`which relion_refine_mpi`";
 	else
 		command="`which relion_refine`";
+	if (error_message != "") return false;
 
 	FileName fn_run = "run";
 	if (is_continue)
@@ -2864,10 +2950,17 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 
 	command += " --o " + outputname + fn_run;
 
-	int total_nr_iter = joboptions["sgd_ini_iter"].getNumber();
-	total_nr_iter += joboptions["sgd_inbetween_iter"].getNumber();
-	total_nr_iter += joboptions["sgd_fin_iter"].getNumber();
-	int nr_classes = joboptions["nr_classes"].getNumber();
+	int total_nr_iter = joboptions["sgd_ini_iter"].getNumber(error_message);
+	if (error_message != "") return false;
+
+	total_nr_iter += joboptions["sgd_inbetween_iter"].getNumber(error_message);
+	if (error_message != "") return false;
+
+	total_nr_iter += joboptions["sgd_fin_iter"].getNumber(error_message);
+	if (error_message != "") return false;
+
+	int nr_classes = joboptions["nr_classes"].getNumber(error_message);
+	if (error_message != "") return false;
 
 	outputNodes = getOutputNodesRefine(outputname + fn_run, total_nr_iter, nr_classes, 3, 1);
 
@@ -2944,7 +3037,8 @@ bool RelionJob::getCommandsInimodelJob(std::string &outputname, std::vector<std:
 	// Offset range
 	command += " --offset_range " + joboptions["offset_range"].getString();
 	// The sampling given in the GUI will be the oversampled one!
-	command += " --offset_step " + floatToString(joboptions["offset_step"].getNumber() * pow(2., iover));
+	command += " --offset_step " + floatToString(joboptions["offset_step"].getNumber(error_message) * pow(2., iover));
+	if (error_message != "") return false;
 
 	// Running stuff
 	command += " --j " + joboptions["nr_threads"].getString();
@@ -3166,10 +3260,11 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 	initialisePipeline(outputname, PROC_3DCLASS_NAME, job_counter);
 	std::string command;
 
-	if (joboptions["nr_mpi"].getNumber() > 1)
+	if (joboptions["nr_mpi"].getNumber(error_message) > 1)
 		command="`which relion_refine_mpi`";
 	else
 		command="`which relion_refine`";
+	if (error_message != "") return false;
 
 	FileName fn_run = "run";
 	if (is_continue)
@@ -3189,7 +3284,14 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 	}
 
 	command += " --o " + outputname + fn_run;
-	outputNodes = getOutputNodesRefine(outputname + fn_run, (int)joboptions["nr_iter"].getNumber(), (int)joboptions["nr_classes"].getNumber(), 3, 1);
+
+	int my_iter = (int)joboptions["nr_iter"].getNumber(error_message);
+	if (error_message != "") return false;
+
+	int my_classes = (int)joboptions["nr_classes"].getNumber(error_message);
+	if (error_message != "") return false;
+
+	outputNodes = getOutputNodesRefine(outputname + fn_run, my_iter, my_classes, 3, 1);
 
 	if (!is_continue)
 	{
@@ -3218,8 +3320,10 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 				command += " --firstiter_cc";
 		}
 
-		if (joboptions["ini_high"].getNumber() > 0.)
+		if (joboptions["ini_high"].getNumber(error_message) > 0.)
 			command += " --ini_high " + joboptions["ini_high"].getString();
+		if (error_message != "") return false;
+
 	}
 
 	// Always do compute stuff
@@ -3265,8 +3369,10 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 		command += " --flatten_solvent";
 		if (joboptions["do_zero_mask"].getBoolean())
 			command += " --zero_mask";
-		if (joboptions["highres_limit"].getNumber() > 0)
+		if (joboptions["highres_limit"].getNumber(error_message) > 0)
 			command += " --strict_highres_exp " + joboptions["highres_limit"].getString();
+		if (error_message != "") return false;
+
 	}
 	if (joboptions["fn_mask"].getString().length() > 0)
 	{
@@ -3295,12 +3401,17 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 		}
 		// Manually input local angular searches
 		if (joboptions["do_local_ang_searches"].getBoolean())
-			command += " --sigma_ang " + floatToString(joboptions["sigma_angles"].getNumber() / 3.);
+		{
+			command += " --sigma_ang " + floatToString(joboptions["sigma_angles"].getNumber(error_message) / 3.);
+			if (error_message != "") return false;
+		}
 
 		// Offset range
 		command += " --offset_range " + joboptions["offset_range"].getString();
 		// The sampling given in the GUI will be the oversampled one!
-		command += " --offset_step " +  floatToString(joboptions["offset_step"].getNumber() * pow(2., iover));
+		command += " --offset_step " +  floatToString(joboptions["offset_step"].getNumber(error_message) * pow(2., iover));
+		if (error_message != "") return false;
+
 	}
 
 	// Provide symmetry, and always do norm and scale correction
@@ -3313,25 +3424,40 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 	if ( (!is_continue) && (joboptions["do_helix"].getBoolean()) )
 	{
 		command += " --helix";
-		if (textToFloat(joboptions["helical_tube_inner_diameter"].getString()) > 0.)
+
+		float inner_diam = joboptions["helical_tube_inner_diameter"].getNumber(error_message);
+		if (error_message != "") return false;
+		if (inner_diam > 0.)
 			command += " --helical_inner_diameter " + joboptions["helical_tube_inner_diameter"].getString();
+
 		command += " --helical_outer_diameter " + joboptions["helical_tube_outer_diameter"].getString();
 		if (joboptions["do_apply_helical_symmetry"].getBoolean())
 		{
 			command += " --helical_nr_asu " + joboptions["helical_nr_asu"].getString();
 			command += " --helical_twist_initial " + joboptions["helical_twist_initial"].getString();
 			command += " --helical_rise_initial " + joboptions["helical_rise_initial"].getString();
-			command += " --helical_z_percentage " + floatToString(joboptions["helical_z_percentage"].getNumber() / 100.);
+
+			float myz = joboptions["helical_z_percentage"].getNumber(error_message) / 100.;
+			if (error_message != "") return false;
+			command += " --helical_z_percentage " + floatToString(myz);
+
 			if (joboptions["do_local_search_helical_symmetry"].getBoolean())
 			{
 				command += " --helical_symmetry_search";
 				command += " --helical_twist_min " + joboptions["helical_twist_min"].getString();
 				command += " --helical_twist_max " + joboptions["helical_twist_max"].getString();
-				if (textToFloat(joboptions["helical_twist_inistep"].getString()) > 0.)
+
+				float twist_inistep = joboptions["helical_twist_inistep"].getNumber(error_message);
+				if (error_message != "") return false;
+				if (twist_inistep > 0.)
 					command += " --helical_twist_inistep " + joboptions["helical_twist_inistep"].getString();
+
 				command += " --helical_rise_min " + joboptions["helical_rise_min"].getString();
 				command += " --helical_rise_max " + joboptions["helical_rise_max"].getString();
-				if (textToFloat(joboptions["helical_rise_inistep"].getString()) > 0.)
+
+				float rise_inistep = joboptions["helical_rise_inistep"].getNumber(error_message);
+				if (error_message != "") return false;
+				if (rise_inistep > 0.)
 					command += " --helical_rise_inistep " + joboptions["helical_rise_inistep"].getString();
 			}
 		}
@@ -3341,20 +3467,28 @@ bool RelionJob::getCommandsClass3DJob(std::string &outputname, std::vector<std::
 			command += " --helical_keep_tilt_prior_fixed";
 		if ( (joboptions["dont_skip_align"].getBoolean()) && (!joboptions["do_local_ang_searches"].getBoolean()) )
 		{
-			RFLOAT val = textToFloat(joboptions["range_tilt"].getString());
+			float val = joboptions["range_tilt"].getNumber(error_message);
+			if (error_message != "") return false;
 			val = (val < 0.) ? (0.) : (val);
 			val = (val > 90.) ? (90.) : (val);
 			command += " --sigma_tilt " + floatToString(val / 3.);
-			val = textToFloat(joboptions["range_psi"].getString());
+
+			val = joboptions["range_psi"].getNumber(error_message);
+			if (error_message != "") return false;
 			val = (val < 0.) ? (0.) : (val);
 			val = (val > 90.) ? (90.) : (val);
 			command += " --sigma_psi " + floatToString(val / 3.);
-			val = textToFloat(joboptions["range_rot"].getString());
+
+			val = joboptions["range_rot"].getNumber(error_message);
+			if (error_message != "") return false;
 			val = (val < 0.) ? (0.) : (val);
 			val = (val > 90.) ? (90.) : (val);
 			command += " --sigma_rot " + floatToString(val / 3.);
-			if (joboptions["helical_range_distance"].getNumber() > 0.)
-				command += " --helical_sigma_distance " + floatToString(joboptions["helical_range_distance"].getNumber() / 3.);
+
+			val = joboptions["helical_range_distance"].getNumber(error_message);
+			if (error_message != "") return false;
+			if (val > 0.)
+				command += " --helical_sigma_distance " + floatToString(val / 3.);
 		}
 	}
 
@@ -3557,10 +3691,11 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 	initialisePipeline(outputname, PROC_3DAUTO_NAME, job_counter);
 	std::string command;
 
-	if (joboptions["nr_mpi"].getNumber() > 1)
+	if (joboptions["nr_mpi"].getNumber(error_message) > 1)
 		command="`which relion_refine_mpi`";
 	else
 		command="`which relion_refine`";
+	if (error_message != "") return false;
 
 	FileName fn_run = "run";
 	if (is_continue)
@@ -3607,8 +3742,11 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 			if (!joboptions["ref_correct_greyscale"].getBoolean())
 				command += " --firstiter_cc";
 		}
-		if (joboptions["ini_high"].getNumber() > 0.)
+		if (joboptions["ini_high"].getNumber(error_message) > 0.)
+		{
+			if (error_message != "") return false;
 			command += " --ini_high " + joboptions["ini_high"].getString();
+		}
 
 	}
 
@@ -3687,7 +3825,8 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 		// Offset range
 		command += " --offset_range " + joboptions["offset_range"].getString();
 		// The sampling given in the GUI will be the oversampled one!
-		command += " --offset_step " + floatToString(joboptions["offset_step"].getNumber() * pow(2., iover));
+		command += " --offset_step " + floatToString(joboptions["offset_step"].getNumber(error_message) * pow(2., iover));
+		if (error_message != "") return false;
 
 		command += " --sym " + joboptions["sym_name"].getString();
 		// Always join low-res data, as some D&I point group refinements may fall into different hands!
@@ -3698,44 +3837,70 @@ bool RelionJob::getCommandsAutorefineJob(std::string &outputname, std::vector<st
 		if (joboptions["do_helix"].getBoolean())
 		{
 			command += " --helix";
-			if (textToFloat(joboptions["helical_tube_inner_diameter"].getString()) > 0.)
+
+			float inner_diam = joboptions["helical_tube_inner_diameter"].getNumber(error_message);
+			if (error_message != "") return false;
+			if (inner_diam > 0.)
 				command += " --helical_inner_diameter " + joboptions["helical_tube_inner_diameter"].getString();
+
 			command += " --helical_outer_diameter " + joboptions["helical_tube_outer_diameter"].getString();
 			if (joboptions["do_apply_helical_symmetry"].getBoolean())
 			{
 				command += " --helical_nr_asu " + joboptions["helical_nr_asu"].getString();
 				command += " --helical_twist_initial " + joboptions["helical_twist_initial"].getString();
 				command += " --helical_rise_initial " + joboptions["helical_rise_initial"].getString();
-				command += " --helical_z_percentage " + floatToString(joboptions["helical_z_percentage"].getNumber() / 100.);
+
+				float myz = joboptions["helical_z_percentage"].getNumber(error_message) / 100.;
+				if (error_message != "") return false;
+				command += " --helical_z_percentage " + floatToString(myz);
+
 				if (joboptions["do_local_search_helical_symmetry"].getBoolean())
 				{
 					command += " --helical_symmetry_search";
 					command += " --helical_twist_min " + joboptions["helical_twist_min"].getString();
 					command += " --helical_twist_max " + joboptions["helical_twist_max"].getString();
-					if (textToFloat(joboptions["helical_twist_inistep"].getString()) > 0.)
+
+					float twist_inistep = joboptions["helical_twist_inistep"].getNumber(error_message);
+					if (error_message != "") return false;
+					if (twist_inistep > 0.)
 						command += " --helical_twist_inistep " + joboptions["helical_twist_inistep"].getString();
+
 					command += " --helical_rise_min " + joboptions["helical_rise_min"].getString();
 					command += " --helical_rise_max " + joboptions["helical_rise_max"].getString();
-					if (textToFloat(joboptions["helical_rise_inistep"].getString()) > 0.)
+
+					float rise_inistep = joboptions["helical_rise_inistep"].getNumber(error_message);
+					if (error_message != "") return false;
+					if (rise_inistep > 0.)
 						command += " --helical_rise_inistep " + joboptions["helical_rise_inistep"].getString();
 				}
 			}
 			else
 				command += " --ignore_helical_symmetry";
-			RFLOAT val = textToFloat(joboptions["range_tilt"].getString());
+
+			float val = joboptions["range_tilt"].getNumber(error_message);
+			if (error_message != "") return false;
 			val = (val < 0.) ? (0.) : (val);
 			val = (val > 90.) ? (90.) : (val);
 			command += " --sigma_tilt " + floatToString(val / 3.);
-			val = textToFloat(joboptions["range_psi"].getString());
+
+			val = joboptions["range_psi"].getNumber(error_message);
+			if (error_message != "") return false;
 			val = (val < 0.) ? (0.) : (val);
 			val = (val > 90.) ? (90.) : (val);
 			command += " --sigma_psi " + floatToString(val / 3.);
-			val = textToFloat(joboptions["range_rot"].getString());
+
+			val = joboptions["range_rot"].getNumber(error_message);
+			if (error_message != "") return false;
 			val = (val < 0.) ? (0.) : (val);
 			val = (val > 90.) ? (90.) : (val);
 			command += " --sigma_rot " + floatToString(val / 3.);
-			if (joboptions["helical_range_distance"].getNumber() > 0.)
-				command += " --helical_sigma_distance " + floatToString(joboptions["helical_range_distance"].getNumber() / 3.);
+
+
+			val = joboptions["helical_range_distance"].getNumber(error_message);
+			if (error_message != "") return false;
+			if (val > 0.)
+				command += " --helical_sigma_distance " + floatToString(val / 3.);
+
 			if (joboptions["keep_tilt_prior_fixed"].getBoolean())
 				command += " --helical_keep_tilt_prior_fixed";
 		}
@@ -3859,10 +4024,11 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 	if (!is_continue || (is_continue && joboptions["fn_cont"].getString() != ""))
 	{
 
-		if (joboptions["nr_mpi"].getNumber() > 1)
+		if (joboptions["nr_mpi"].getNumber(error_message) > 1)
 			command="`which relion_refine_mpi`";
 		else
 			command="`which relion_refine`";
+		if (error_message != "") return false;
 
 		MetaDataTable MD;
 		MD.read(joboptions["fn_bodies"].getString());
@@ -3910,7 +4076,8 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 			// Offset range
 			command += " --offset_range " + joboptions["offset_range"].getString();
 			// The sampling given in the GUI will be the oversampled one!
-			command += " --offset_step " + floatToString(joboptions["offset_step"].getNumber() * pow(2., iover));
+			command += " --offset_step " + floatToString(joboptions["offset_step"].getNumber(error_message) * pow(2., iover));
+			if (error_message != "") return false;
 		}
 
 		if (joboptions["do_subtracted_bodies"].getBoolean())
@@ -3986,16 +4153,23 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 		command += " --o " + outputname + "analyse";
 
 		// Eigenvector movie maps
-		if (joboptions["nr_movies"].getNumber() > 0)
+		if (joboptions["nr_movies"].getNumber(error_message) > 0)
 		{
 			command += " --do_maps ";
 			command += " --k " + joboptions["nr_movies"].getString();
 		}
+		if (error_message != "") return false;
 
 		// Selection
 		if (joboptions["do_select"].getBoolean())
 		{
-			if (joboptions["eigenval_min"].getNumber() >= joboptions["eigenval_max"].getNumber())
+			float minval = joboptions["eigenval_min"].getNumber(error_message);
+			if (error_message != "") return false;
+
+			float maxval = joboptions["eigenval_max"].getNumber(error_message);
+			if (error_message != "") return false;
+
+			if ( minval >= maxval)
 			{
 				error_message = "ERROR: the maximum eigenvalue should be larger than the minimum one!";
 				return false;
@@ -4006,9 +4180,14 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 			command += " --select_eigenvalue_max " + joboptions["eigenval_max"].getString();
 
 			// Add output node: selected particles star file
-			FileName fnt = outputname + "analyse_eval"+integerToString(joboptions["select_eigenval"].getNumber(),3)+"_select";
-			int min = ROUND(joboptions["eigenval_min"].getNumber());
-			int max = ROUND(joboptions["eigenval_max"].getNumber());
+			FileName fnt = outputname + "analyse_eval"+integerToString(joboptions["select_eigenval"].getNumber(error_message),3)+"_select";
+			if (error_message != "") return false;
+
+			int min = ROUND(joboptions["eigenval_min"].getNumber(error_message));
+			if (error_message != "") return false;
+
+			int max = ROUND(joboptions["eigenval_max"].getNumber(error_message));
+			if (error_message != "") return false;
 
 			if (min > -99998)
 				fnt += "_min"+integerToString(min);
@@ -4072,21 +4251,26 @@ bool RelionJob::getCommandsMaskcreateJob(std::string &outputname, std::vector<st
 	Node node2(outputname + "mask.mrc", NODE_MASK);
 	outputNodes.push_back(node2);
 
-	if (joboptions["lowpass_filter"].getNumber() > 0)
+	if (joboptions["lowpass_filter"].getNumber(error_message) > 0)
 	{
 		command += " --lowpass " + joboptions["lowpass_filter"].getString();
 	}
-	if (joboptions["angpix"].getNumber() > 0)
+	if (error_message != "") return false;
+
+	if (joboptions["angpix"].getNumber(error_message) > 0)
 	{
 		command += " --angpix " + joboptions["angpix"].getString();
 	}
+	if (error_message != "") return false;
+
 	command += " --ini_threshold " + joboptions["inimask_threshold"].getString();
 	command += " --extend_inimask " + joboptions["extend_inimask"].getString();
 	command += " --width_soft_edge " + joboptions["width_mask_edge"].getString();
 
 	if (joboptions["do_helix"].getBoolean())
 	{
-		command += " --helix --z_percentage " + floatToString(joboptions["helical_z_percentage"].getNumber() / 100.);
+		command += " --helix --z_percentage " + floatToString(joboptions["helical_z_percentage"].getNumber(error_message) / 100.);
+		if (error_message != "") return false;
 	}
 
 	// Running stuff
@@ -4304,11 +4488,11 @@ bool RelionJob::getCommandsSubtractJob(std::string &outputname, std::vector<std:
 	}
 	else
 	{
-		if (joboptions["nr_mpi"].getNumber() > 1)
+		if (joboptions["nr_mpi"].getNumber(error_message) > 1)
 			command="`which relion_particle_subtract_mpi`";
 		else
 			command="`which relion_particle_subtract`";
-
+		if (error_message != "") return false;
 
 		// I/O
 		if (joboptions["fn_opt"].getString() == "")
@@ -4353,10 +4537,12 @@ bool RelionJob::getCommandsSubtractJob(std::string &outputname, std::vector<std:
 			command += " --center_z " + joboptions["center_z"].getString();
 		}
 
-		if (joboptions["new_box"].getNumber() > 0)
+		if (joboptions["new_box"].getNumber(error_message) > 0)
 		{
 			command += " --new_box " + joboptions["new_box"].getString();
 		}
+		if (error_message != "") return false;
+
 	}
 
 	commands.push_back(command);
@@ -4556,11 +4742,13 @@ bool RelionJob::getCommandsLocalresJob(std::string &outputname, std::vector<std:
 			return false;
 		}
 
-		if (joboptions["nr_mpi"].getNumber() > 1)
+		if (joboptions["nr_mpi"].getNumber(error_message) > 1)
 		{
 			error_message = "You cannot use more than 1 MPI processor for the ResMap wrapper...";
 			return false;
 		}
+		if (error_message != "") return false;
+
 		// Make symbolic links to the half-maps in the output directory
 		commands.push_back("ln -s ../../" + fn_half1 + " " + outputname + "half1.mrc");
 		commands.push_back("ln -s ../../" + fn_half2 + " " + outputname + "half2.mrc");
@@ -4585,10 +4773,11 @@ bool RelionJob::getCommandsLocalresJob(std::string &outputname, std::vector<std:
 	{
 		// Relion postprocessing
 
-		if (joboptions["nr_mpi"].getNumber() > 1)
+		if (joboptions["nr_mpi"].getNumber(error_message) > 1)
 			command="`which relion_postprocess_mpi`";
 		else
 			command="`which relion_postprocess`";
+		if (error_message != "") return false;
 
 		command += " --locres --i " + joboptions["fn_in"].getString();
 		command += " --o " + outputname + "relion";
@@ -4654,10 +4843,11 @@ bool RelionJob::getCommandsMotionrefineJob(std::string &outputname, std::vector<
 	initialisePipeline(outputname, PROC_MOTIONREFINE_NAME, job_counter);
 	std::string command;
 
-	if (joboptions["nr_mpi"].getNumber() > 1)
+	if (joboptions["nr_mpi"].getNumber(error_message) > 1)
 		command="`which relion_motion_refine_mpi`";
 	else
 		command="`which relion_motion_refine`";
+	if (error_message != "") return false;
 
 	if (joboptions["fn_data"].getString() == "")
 	{
@@ -4681,12 +4871,13 @@ bool RelionJob::getCommandsMotionrefineJob(std::string &outputname, std::vector<
 		return false;
 	}
 
-	if ((joboptions["eval_frac"].getNumber() <= 0.1 || joboptions["eval_frac"].getNumber() > 0.9 )
+	if ((joboptions["eval_frac"].getNumber(error_message) <= 0.1 || joboptions["eval_frac"].getNumber(error_message) > 0.9 )
 			&& !joboptions["eval_frac"].isSchedulerVariable() )
 	{
 		error_message = "ERROR: the fraction of Fourier pixels used for evaluation should be between 0.1 and 0.9.";
 		return false;
 	}
+	if (error_message != "") return false;
 
 	Node node(joboptions["fn_data"].getString(), joboptions["fn_data"].node_type);
 	inputNodes.push_back(node);
@@ -4704,12 +4895,13 @@ bool RelionJob::getCommandsMotionrefineJob(std::string &outputname, std::vector<
 	if (joboptions["do_param_optim"].getBoolean())
 	{
 		// Estimate meta-parameters
-		RFLOAT align_frac = 1.0 - joboptions["eval_frac"].getNumber();
+		RFLOAT align_frac = 1.0 - joboptions["eval_frac"].getNumber(error_message);
+		if (error_message != "") return false;
 		command += " --min_p " + joboptions["optim_min_part"].getString();
 		command += " --eval_frac " + joboptions["eval_frac"].getString();
 		command += " --align_frac " + floatToString(align_frac);
 
-		if (joboptions["sigma_acc"].getNumber() < 0)
+		if (joboptions["sigma_acc"].getNumber(error_message) < 0)
 		{
 			command += " --params2 ";
 		}
@@ -4717,6 +4909,7 @@ bool RelionJob::getCommandsMotionrefineJob(std::string &outputname, std::vector<
 		{
 			command += " --params3 ";
 		}
+		if (error_message != "") return false;
 
 		Node node5(outputname+"opt_params.txt", NODE_POLISH_PARAMS);
 		outputNodes.push_back(node5);
@@ -4744,8 +4937,12 @@ bool RelionJob::getCommandsMotionrefineJob(std::string &outputname, std::vector<
 		command += " --bfac_minfreq " + joboptions["minres"].getString();
 		command += " --bfac_maxfreq " + joboptions["maxres"].getString();
 
-		const int window = textToInteger(joboptions["extract_size"].getString());
-		const int scale = textToInteger(joboptions["rescale"].getString());
+		const int window = ROUND(joboptions["extract_size"].getNumber(error_message));
+		if (error_message != "") return false;
+
+		const int scale = ROUND(joboptions["rescale"].getNumber(error_message));
+		if (error_message != "") return false;
+
 		if (window * scale <= 0)
 		{
 			error_message = "ERROR: Please specify both the extraction box size and the downsampled size, or leave both the default (-1)";
@@ -4833,10 +5030,11 @@ bool RelionJob::getCommandsCtfrefineJob(std::string &outputname, std::vector<std
 	std::string command;
 
 
-	if (joboptions["nr_mpi"].getNumber() > 1)
+	if (joboptions["nr_mpi"].getNumber(error_message) > 1)
 		command="`which relion_ctf_refine_mpi`";
 	else
 		command="`which relion_ctf_refine`";
+	if (error_message != "") return false;
 
 	if (joboptions["fn_data"].getString() == "")
 	{

@@ -1734,11 +1734,20 @@ void GuiMainWindow::cb_display_io_node_i()
 				command += " --black " + manualpickjob.joboptions["black_val"].getString();
 				command += " --white " + manualpickjob.joboptions["white_val"].getString();
 
-				if (manualpickjob.joboptions["lowpass"].getNumber() > 0.)
+				std::string error_message = "";
+				float mylowpass = manualpickjob.joboptions["lowpass"].getNumber(error_message);
+				if (error_message != "") {fl_message(error_message.c_str()); return;}
+				if (mylowpass > 0.)
 					command += " --lowpass " + manualpickjob.joboptions["lowpass"].getString();
-				if (manualpickjob.joboptions["highpass"].getNumber() > 0.)
+
+				float myhighpass = manualpickjob.joboptions["highpass"].getNumber(error_message);
+				if (error_message != "") {fl_message(error_message.c_str()); return;}
+				if (myhighpass > 0.)
 					command += " --highpass " + manualpickjob.joboptions["highpass"].getString();
-				if (manualpickjob.joboptions["angpix"].getNumber() > 0.)
+
+				float myangpix = manualpickjob.joboptions["angpix"].getNumber(error_message);
+				if (error_message != "") {fl_message(error_message.c_str()); return;}
+				if (myangpix > 0.)
 					command += " --angpix " + manualpickjob.joboptions["angpix"].getString();
 
 				command += " --ctf_scale " + manualpickjob.joboptions["ctfscale"].getString();

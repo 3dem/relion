@@ -332,7 +332,7 @@ public:
 	Node getNode();
 
 	// Get a numbered value
-	float getNumber();
+	float getNumber(std::string &errmsg);
 
 	// Get a boolean value
 	bool getBoolean();
