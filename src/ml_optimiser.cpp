@@ -453,8 +453,8 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	minimum_angular_sampling = textToFloat(getParameter(argc, argv, "--minimum_angular_sampling", "0"));
 	maximum_angular_sampling = textToFloat(getParameter(argc, argv, "--maximum_angular_sampling", "0"));
 	asymmetric_padding = parser.checkOption("--asymmetric_padding", "", "false", true);
-	maximum_significants = textToInteger(parser.getOption("--maxsig", "", "0", true));
-	skip_gridding = parser.checkOption("--skip_gridding", "", "false", true);
+	maximum_significants = textToInteger(parser.getOption("--maxsig", "Maximum number of poses & translations to consider", "-1"));
+	skip_gridding = parser.checkOption("--skip_gridding", "Skip gridding in the M step");
 	nr_iter_max = textToInteger(parser.getOption("--auto_iter_max", "In auto-refinement, stop at this iteration.", "999"));
 
 	do_print_metadata_labels = false;
@@ -765,15 +765,13 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	minimum_angular_sampling = textToFloat(getParameter(argc, argv, "--minimum_angular_sampling", "0"));
 	maximum_angular_sampling = textToFloat(getParameter(argc, argv, "--maximum_angular_sampling", "0"));
 	asymmetric_padding = parser.checkOption("--asymmetric_padding", "", "false", true);
-	maximum_significants = textToInteger(parser.getOption("--maxsig", "", "0", true));
-	skip_gridding = parser.checkOption("--skip_gridding", "", "false", true);
+	maximum_significants = textToInteger(parser.getOption("--maxsig", "Maximum number of poses & translations to consider", "-1"));
+	skip_gridding = parser.checkOption("--skip_gridding", "Skip gridding in the M step");
 
 #ifdef DEBUG_READ
 	std::cerr<<"MlOptimiser::parseInitial Done"<<std::endl;
 #endif
-
 }
-
 
 void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 {

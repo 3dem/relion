@@ -601,7 +601,7 @@ public:
 	bool asymmetric_padding;
 
 	//Maximum number of significant weights in coarse pass of expectation
-	unsigned maximum_significants;
+	int maximum_significants;
 
 	// Tabulated sine and cosine values (for 3D helical sub-tomogram averaging with on-the-fly shifts)
 	TabSine tab_sin;
@@ -742,7 +742,7 @@ public:
 		helical_keep_tilt_prior_fixed(0),
 		//directional_lowpass(0),
 		asymmetric_padding(false),
-		maximum_significants(0),
+		maximum_significants(-1),
 		threadException(NULL),
 #ifdef ALTCPU
 		tbbSchedulerInit(tbb::task_scheduler_init::deferred ),
