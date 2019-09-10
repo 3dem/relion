@@ -114,6 +114,7 @@ void escapeStringForSTAR(std::string& value)
 		}
 
 		escaped += "\"";
+		// std::cout << "ESCAPED '" << value << "' TO: " << escaped << std::endl;
 		value = escaped;
 	}
 }
@@ -579,7 +580,7 @@ std::string nextToken(const std::string &str, int &i)
 	int k = str.find_first_of(" \t\n", j + 1);
 	if (k == -1)
 		k = str.length();
-	retval = str.substr(j, k - j + 1);
+	retval = str.substr(j, k - j + 1); // TAKANORI: CHECKME: TODO: I think this is a bug...
 	i = k + 1;
 	return retval;
 }
@@ -638,6 +639,7 @@ bool nextTokenInSTAR(const std::string &str, int &i, std::string &retval)
 			REPORT_ERROR("nextTokenForSTAR:: Could not find closing quote in a STAR file. i = " + integerToString(i) + " pos = " + integerToString(pos) + " line:\n" + str);
 
 		i = pos + 1;
+//		std::cout << "QUOTED string: " << str << std::endl;
 	}
 	else // Non-quoted string; faster code path
 	{
@@ -645,7 +647,8 @@ bool nextTokenInSTAR(const std::string &str, int &i, std::string &retval)
 		if (end == -1)
 			end = len;
 
-		retval = str.substr(start, end - start + 1);
+		retval = str.substr(start, end - start);
+//		std::cout << "NON-QUOTED string: '" << retval << "' in '" << str << "' given_i= " << i << std::endl;
 		i = end + 1;
 	}
 
