@@ -95,7 +95,7 @@ void escapeStringForSTAR(std::string& value)
 	}
 
 	if (value[0] == '"' || value[0] == '\'' || // starts with quote
-	    value.find_first_not_of(" \t") != -1) // contains whitespace
+	    value.find_first_of(" \t") != -1) // contains whitespace
 	{
 		std::string escaped = "\"";
 
@@ -114,7 +114,7 @@ void escapeStringForSTAR(std::string& value)
 		}
 
 		escaped += "\"";
-		// std::cout << "ESCAPED '" << value << "' TO: " << escaped << std::endl;
+		//std::cout << "ESCAPED '" << value << "' TO: " << escaped << std::endl;
 		value = escaped;
 	}
 }
