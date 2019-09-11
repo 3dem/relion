@@ -331,6 +331,7 @@ class RelionItOptions(object):
     autopick_LoG_diam_max = 180
     # Use positive values (0-1) to pick fewer particles; use negative values (-1-0) to pick more particles
     autopick_LoG_adjust_threshold = 0.0
+    autopick_LoG_upper_threshold = 999.0
     #
     # OR:
     #
@@ -1358,6 +1359,7 @@ def addJob(jobtype, name_in_script, done_file, options, alias=None):
         command = 'relion_pipeliner --addJob ' + jobtype + ' --addJobOptions "' + optionstring + '"'
         if alias is not None:
                 command += ' --setJobAlias "' + alias + '"'
+        #print("DEBUG: Running " + command)
         os.system(command)
 
         pipeline = safe_load_star(PIPELINE_STAR, expected=['pipeline_processes', 'rlnPipeLineProcessName'])
@@ -1641,7 +1643,8 @@ def run_pipeline(opts):
                                 'Min. diameter for LoG filter (A) == {}'.format(opts.autopick_LoG_diam_min),
                                 'Max. diameter for LoG filter (A) == {}'.format(opts.autopick_LoG_diam_max),
                                 'Maximum resolution to consider (A) == {}'.format(opts.autopick_lowpass),
-                                'Adjust default threshold == {}'.format(opts.autopick_LoG_adjust_threshold),
+                                'Adjust default threshold (stddev): == {}'.format(opts.autopick_LoG_adjust_threshold),
+                                'Upper threshold (stddev): == {}'.format(opts.autopick_LoG_upper_threshold),
                                 '2D references: == {}'.format(opts.autopick_2dreferences),
                                 '3D reference: == {}'.format(opts.autopick_3dreference),
                                 'Symmetry: == {}'.format(opts.autopick_3dref_symmetry),
