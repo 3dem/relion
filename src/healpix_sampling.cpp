@@ -492,7 +492,9 @@ void HealpixSampling::setOrientations(int _order, RFLOAT _psi_step)
 #endif
 		// Now remove symmetry-related pixels
 		// TODO check size of healpix_base.max_pixrad
-		removeSymmetryEquivalentPoints(0.5 * RAD2DEG(healpix_base.max_pixrad()));
+		bool isRelax = fn_sym_relax == "" ? false : true;
+		if (!isRelax)
+			removeSymmetryEquivalentPoints(0.5 * RAD2DEG(healpix_base.max_pixrad()));
 
 #ifdef  DEBUG_SAMPLING
 		writeAllOrientationsToBild("orients_sym.bild", "0 1 0 ", 0.021);
@@ -690,18 +692,21 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 
 				// Get the current direction in the loop
 				Euler_angles2direction(rot_angles[idir], tilt_angles[idir], my_direction);
-
-				// Loop over all symmetry operators to find the operator that brings this direction nearest to the prior
-				RFLOAT best_dotProduct = dotProduct(prior_direction, my_direction);
 				best_direction = my_direction;
-				for (int j = 0; j < R_repository.size(); j++)
+
+				// Loop over all symmetry operators to find the operator that brings this direction nearest to the prior if no relax
+				if (!isRelax)
 				{
-					sym_direction =  L_repository[j] * (my_direction.transpose() * R_repository[j]).transpose();
-					RFLOAT my_dotProduct = dotProduct(prior_direction, sym_direction);
-					if (my_dotProduct > best_dotProduct)
+					RFLOAT best_dotProduct = dotProduct(prior_direction, my_direction);
+					for (int j = 0; j < R_repository.size(); j++)
 					{
-						best_direction = sym_direction;
-						best_dotProduct = my_dotProduct;
+						sym_direction =  L_repository[j] * (my_direction.transpose() * R_repository[j]).transpose();
+						RFLOAT my_dotProduct = dotProduct(prior_direction, sym_direction);
+						if (my_dotProduct > best_dotProduct)
+						{
+							best_direction = sym_direction;
+							best_dotProduct = my_dotProduct;
+						}
 					}
 				}
 
@@ -718,21 +723,17 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 					// TODO!!! If tilt is zero then any rot will be OK!!!!!
 					//std::cerr<<"Best direction index: "<<idir<<std::endl;
 					pointer_dir_nonzeroprior.push_back(idir);
+					RFLOAT prior = gaussian1D(diffang, biggest_sigma, 0.);
+					sumprior += prior;
 					if (isRelax)
 					{
 						idir_flag[idir] = true;
-						RFLOAT prior = 1./R_repository_relax.size();
-						directions_prior.push_back(prior);
-						findSymmetryMate(idir, prior, pointer_dir_nonzeroprior, directions_prior, idir_flag);
-						// Add prior for the rest of the symmetry mates to sumprior
-						sumprior += prior* (R_repository.size());
+						RFLOAT my_prior = prior / R_repository_relax.size();
+						directions_prior.push_back(my_prior);
+						findSymmetryMate(idir, my_prior, pointer_dir_nonzeroprior, directions_prior, idir_flag);
 					}
 					else
-					{
-						RFLOAT prior = gaussian1D(diffang, biggest_sigma, 0.);
 						directions_prior.push_back(prior);
-						sumprior += prior;
-					}
 					is_nonzero_pdf = true;
 				}
 
@@ -895,9 +896,9 @@ void HealpixSampling::selectOrientationsWithNonZeroPriorProbability(
 			if (isRelax)
 			{
 				idir_flag[best_idir] = true;
-				RFLOAT prior = 1./R_repository_relax.size();
-				directions_prior.push_back(prior);
-				findSymmetryMate(best_idir, prior, pointer_dir_nonzeroprior, directions_prior, idir_flag);
+				RFLOAT my_prior = 1./R_repository_relax.size();
+				directions_prior.push_back(my_prior);
+				findSymmetryMate(best_idir, my_prior, pointer_dir_nonzeroprior, directions_prior, idir_flag);
 			}
 			else
 				directions_prior.push_back(1.);
@@ -1052,6 +1053,7 @@ void HealpixSampling::findSymmetryMate(long int idir_, RFLOAT prior_,
 		beta  = DEG2RAD(beta);
 		pointing prior_direction_pointing(beta, alpha); // Object required by healpix function
      	healpix_base.query_disc(prior_direction_pointing, angular_sampling, listpix); // Search healpix for closest indices
+     	//std::cerr<<listpix.size()<<std::endl;
      	best_direction_index = listpix[0];
      	// If there are more than one neighbors then check for the best
 		if (listpix.size() > 1)

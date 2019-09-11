@@ -248,7 +248,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	if (fnt != "OLD")
 		write_every_sgd_iter = textToInteger(fnt);
 
-	fnt = parser.getOption("--relax_symmetry", "The symmetry to be relaxed", "OLD");
+	fnt = parser.getOption("--relax_sym", "The symmetry to be relaxed", "OLD");
 	if (fnt != "OLD")
 	{
 		sampling.fn_sym_relax = fnt;
