@@ -1929,7 +1929,7 @@ def run_pipeline(opts):
                                                 'Final resolution (A): == {}'.format(opts.inimodel_resol_final), 
                                                 'Initial mini-batch size: == {}'.format(opts.inimodel_batchsize_ini), 
                                                 'Final mini-batch size: == {}'.format(opts.inimodel_batchsize_final), 
-                                                'SGD increased noise variance half-life: == {}'.format(opts.inimodel_sigmafudge_halflife), 
+                                                'Increased noise variance half-life: == {}'.format(opts.inimodel_sigmafudge_halflife), 
                                                 'Number of pooled particles: == 1',
                                                 'Which GPUs to use: == {}'.format(opts.refine_gpu),
                                                 'Number of MPI procs: == {}'.format(opts.refine_mpi),
