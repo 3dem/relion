@@ -580,49 +580,6 @@ Image<RFLOAT> StackHelper::toSingleImage(const std::vector<Image<RFLOAT>> stack)
 	return out;
 }
 
-std::vector<Image<Complex> > StackHelper::applyBeamTilt(std::vector<Image<Complex> > &stack,
-														RFLOAT Cs, RFLOAT lambda, RFLOAT angpix,
-														RFLOAT tilt_x, RFLOAT tilt_y,
-														RFLOAT tilt_xx, RFLOAT tilt_xy, RFLOAT tilt_yy)
-{
-	std::vector<Image<Complex> > out(stack.size());
-	const long ic = stack.size();
-
-	for (long i = 0; i < ic; i++)
-	{
-		out[i] = stack[i];
-		selfApplyBeamTilt(
-					out[i].data, tilt_x, tilt_y,
-					tilt_xx, tilt_xy, tilt_yy,
-					lambda, Cs, angpix, stack[i].data.ydim);
-	}
-
-	return out;
-
-}
-
-std::vector<Image<Complex> > StackHelper::applyBeamTiltPar(std::vector<Image<Complex> > &stack,
-														   RFLOAT Cs, RFLOAT lambda, RFLOAT angpix,
-														   RFLOAT tilt_x, RFLOAT tilt_y,
-														   RFLOAT tilt_xx, RFLOAT tilt_xy, RFLOAT tilt_yy, int numThreads)
-{
-	std::vector<Image<Complex> > out(stack.size());
-	const long ic = stack.size();
-
-	#pragma omp parallel for num_threads(numThreads)
-	for (long i = 0; i < ic; i++)
-	{
-		out[i] = stack[i];
-		selfApplyBeamTilt(
-					out[i].data, tilt_x, tilt_y,
-					tilt_xx, tilt_xy, tilt_yy,
-					lambda, Cs, angpix, stack[i].data.ydim);
-	}
-
-	return out;
-
-}
-
 void StackHelper::varianceNormalize(std::vector<Image<Complex>>& movie, bool circleCropped)
 {
 	const int fc = movie.size();
