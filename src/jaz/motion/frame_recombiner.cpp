@@ -51,6 +51,11 @@ void FrameRecombiner::read(IOParser& parser, int argc, char* argv[])
 	bfac_diag = parser.checkOption("--diag_bfactor", "Write out B/k-factor diagnostic data");
 	suffix = parser.getOption("--suffix", "Add this suffix to shiny MRCS and STAR files", "");
 
+	do_recenter = parser.checkOption("--recenter", "Re-center particle according to rlnOriginX/Y in --reextract_data_star STAR file");
+	recenter_x = textToFloat(parser.getOption("--recenter_x", "X-coordinate (in pixel inside the reference) to recenter re-extracted data on", "0."));
+	recenter_y = textToFloat(parser.getOption("--recenter_y", "Y-coordinate (in pixel inside the reference) to recenter re-extracted data on", "0."));
+	recenter_z = textToFloat(parser.getOption("--recenter_z", "Z-coordinate (in pixel inside the reference) to recenter re-extracted data on", "0."));
+
 	if (box_arg > 0 || scale_arg > 0)
 	{
 		std::cerr << "WARNING: Changing the box size (--window and/or --scale) might "
@@ -223,7 +228,10 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 {
 	int barstep;
 	int my_nr_micrographs = g_end - g_start + 1;
+	const RFLOAT ref_angpix = reference->angpix;
+	const RFLOAT coords_angpix = micrographHandler->coords_angpix;
 
+	std::cout << "ref_angpix = " << ref_angpix << " coords_angpix = " << coords_angpix << std::endl;
 	if (verb > 0)
 	{
 		std::cout << " + Combining frames for all micrographs ... " << std::endl;
@@ -247,31 +255,82 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 
 		pctot += pc;
 
+		MetaDataTable mdtOut = mdts[g];
+
 		// optics group representative of this micrograph
 		// (only the pixel and box sizes have to be identical)
-		int ogmg = obsModel->getOpticsGroup(mdts[g], 0);
+		int ogmg = obsModel->getOpticsGroup(mdtOut, 0);
 
-		if (!obsModel->allPixelAndBoxSizesIdentical(mdts[g]))
+		if (!obsModel->allPixelAndBoxSizesIdentical(mdtOut))
 		{
 			std::cerr << "WARNING: varying pixel or box sizes detected in "
-			          << MotionRefiner::getOutputFileNameRoot(outPath, mdts[g])
+			          << MotionRefiner::getOutputFileNameRoot(outPath, mdtOut)
 			          << " - skipping micrograph." << std::endl;
 
 			continue;
 		}
 
 
-		FileName fn_root = MotionRefiner::getOutputFileNameRoot(outPath, mdts[g]);
+		FileName fn_root = MotionRefiner::getOutputFileNameRoot(outPath, mdtOut);
 		std::vector<std::vector<d2Vector>> shift0;
 		shift0 = MotionHelper::readTracksInPix(fn_root + "_tracks.star", angpix_out[ogmg]);
 
 		std::vector<std::vector<d2Vector>> shift = shift0;
-
 		std::vector<std::vector<Image<Complex>>> movie;
+
+		for (int p = 0; do_recenter && p < pc; p++)
+		{
+			// FIXME: code duplication from preprocess.cpp
+			RFLOAT xoff, yoff, xcoord, ycoord;
+			Matrix1D<RFLOAT> my_projected_center(3);
+			my_projected_center.initZeros();
+
+			mdtOut.getValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, xoff, p); // in A
+			mdtOut.getValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, yoff, p);
+//			std::cout << "IN  xoff = " << xoff << " yoff = " << yoff;
+			xoff /= ref_angpix; // Now in reference pixels
+			yoff /= ref_angpix;
+
+			if (fabs(recenter_x) > 0. || fabs(recenter_y) > 0. || fabs(recenter_z) > 0.)
+			{
+				RFLOAT rot, tilt, psi;
+				mdtOut.getValue(EMDL_ORIENT_ROT, rot, p);
+				mdtOut.getValue(EMDL_ORIENT_TILT, tilt, p);
+				mdtOut.getValue(EMDL_ORIENT_PSI, psi, p);
+
+				// Project the center-coordinates
+				Matrix1D<RFLOAT> my_center(3);
+				Matrix2D<RFLOAT> A3D;
+				XX(my_center) = recenter_x; // in reference pixels
+				YY(my_center) = recenter_y;
+				ZZ(my_center) = recenter_z;
+				Euler_angles2matrix(rot, tilt, psi, A3D, false);
+				my_projected_center = A3D * my_center;
+			}
+
+			xoff -= XX(my_projected_center);
+			yoff -= YY(my_projected_center);
+			xoff /= coords_angpix; // Now in (possibly binned) micrograph's pixel
+			yoff /= coords_angpix;
+
+			mdtOut.getValue(EMDL_IMAGE_COORD_X, xcoord, p);
+			mdtOut.getValue(EMDL_IMAGE_COORD_Y, ycoord, p);
+//			std::cout << " xcoord = " << xcoord << " ycoord = " << ycoord << std::endl;;
+			xcoord -= ROUND(xoff);
+			ycoord -= ROUND(yoff);
+			xoff -= ROUND(xoff);
+			yoff -= ROUND(yoff);
+			mdtOut.setValue(EMDL_IMAGE_COORD_X, xcoord, p);
+			mdtOut.setValue(EMDL_IMAGE_COORD_Y, ycoord, p);
+
+			mdtOut.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, coords_angpix * xoff, p);
+			mdtOut.setValue(EMDL_ORIENT_ORIGIN_Y_ANGSTROM, coords_angpix * yoff, p);
+//			std::cout << "OUT xoff = " << xoff << " yoff = " << yoff << " xcoord = " << xcoord << " ycoord = " << ycoord << std::endl;;
+		}
 
 		// loadMovie() will extract squares around the value of shift0 rounded in movie coords,
 		// and return the remainder in shift (in output coordinates)
-		movie = micrographHandler->loadMovie(mdts[g], s_out[ogmg], angpix_out[ogmg], fts, &shift0, &shift);
+		movie = micrographHandler->loadMovie(mdtOut, s_out[ogmg], angpix_out[ogmg], fts, &shift0, &shift);
 
 		const int out_size = crop_arg > 0 ? crop_arg : s_out[ogmg];
 		Image<RFLOAT> stack(out_size, out_size, 1, pc);
@@ -304,8 +363,8 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 			if (do_ctf_multiply)
 			{
 				CTF ctf;
-				ctf.readByGroup(mdts[g], obsModel, p);
-				int og = obsModel->getOpticsGroup(mdts[g], p);
+				ctf.readByGroup(mdtOut, obsModel, p);
+				int og = obsModel->getOpticsGroup(mdtOut, p);
 	 			if (obsModel->getBoxSize(og) != s_out[og])
 				{
 					obsModel->setBoxSize(og, s_out[og]);
@@ -340,8 +399,6 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 				angpix_out[ogmg],
 				-angpix_out[ogmg] * s_out[ogmg] * 0.5 * d3Vector(1,1,0));
 		}
-
-		MetaDataTable mdtOut = mdts[g];
 
 		for (int p = 0; p < pc; p++)
 		{
