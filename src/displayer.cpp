@@ -2733,10 +2733,10 @@ int Displayer::runGui()
 			win.display_labels.push_back(EMDL::label2Str(EMDL_MLMODEL_REF_IMAGE));
 		if (MD.containsLabel(EMDL_CTF_IMAGE))
 			win.display_labels.push_back(EMDL::label2Str(EMDL_CTF_IMAGE));
-		if (MD.containsLabel(EMDL_CTF_POWER_SPECTRUM))
-			win.display_labels.push_back(EMDL::label2Str(EMDL_CTF_POWER_SPECTRUM));
 		if (MD.containsLabel(EMDL_MICROGRAPH_NAME))
 			win.display_labels.push_back(EMDL::label2Str(EMDL_MICROGRAPH_NAME));
+		if (MD.containsLabel(EMDL_CTF_POWER_SPECTRUM))
+			win.display_labels.push_back(EMDL::label2Str(EMDL_CTF_POWER_SPECTRUM));
 		if (MD.containsLabel(EMDL_MICROGRAPH_MOVIE_NAME))
 			win.display_labels.push_back(EMDL::label2Str(EMDL_MICROGRAPH_MOVIE_NAME));
 	}
