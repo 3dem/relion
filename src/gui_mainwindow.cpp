@@ -76,7 +76,7 @@ int StdOutDisplay::handle(int ev)
 		} // end if double click
 	} // end if FL_PUSH
 
-	return 0;
+	return 1;
 }
 
 int SchedulerWindow::fill(FileName _pipeline_name, std::vector<FileName> _scheduled_jobs)
@@ -364,6 +364,8 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	menubar->add("Jobs/_Order chronologically",  FL_ALT+'c', cb_order_jobs_chronologically, this);
 	if (!maingui_do_read_only)
 	{	menubar->add("Jobs/_Undelete job(s)",  FL_ALT+'u', cb_undelete_job, this);
+		menubar->add("Jobs/Run scheduled jobs", 0, cb_start_pipeliner, this);
+		menubar->add("Jobs/Stop running scheduled jobs", 0, cb_stop_pipeliner, this);
 		menubar->add("Jobs/Export scheduled job(s)",  FL_ALT+'x', cb_export_jobs, this);
 		menubar->add("Jobs/_Import scheduled job(s)",  FL_ALT+'i', cb_import_jobs, this);
 		menubar->add("Jobs/Gently clean all jobs",  FL_ALT+'g', cb_gently_clean_all_jobs, this);
@@ -375,13 +377,11 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 		schedule_wildcard.globFiles(schedules);
 		for (int i = 0; i < schedules.size(); i++)
 		{
-			std::string mylabel = "Scheduling/" + schedules[i];
+			std::string mylabel = "Schedules/" + schedules[i];
 			menubar->add(mylabel.c_str(), 0, cb_toggle_schedule, this);
 		}
-		menubar->add("Scheduling/_Copy schedule", 0, cb_copy_schedule, this);
-		menubar->add("Scheduling/_Show pipeline",  FL_ALT+'p', cb_toggle_pipeline, this);
-		menubar->add("Scheduling/Run scheduled jobs", 0, cb_start_pipeliner, this);
-		menubar->add("Scheduling/Stop running scheduled jobs", 0, cb_stop_pipeliner, this);
+		menubar->add("Schedules/_Copy schedule", 0, cb_copy_schedule, this);
+		menubar->add("Schedules/_Show pipeline",  FL_ALT+'p', cb_toggle_pipeline, this);
 	}
 	current_y = MENUHEIGHT + 10;
 
@@ -600,7 +600,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	}
 
 	// Fl_input with the alias of the new job (or the name of an existing one)
-	alias_current_job = new Fl_Input(XJOBCOL2-50 , GUIHEIGHT_EXT_START+3, JOBCOLWIDTH, MENUHEIGHT-6, "Current job:");
+	alias_current_job = new Fl_Input(XJOBCOL2-50 , GUIHEIGHT_EXT_START+3, JOBCOLWIDTH, MENUHEIGHT-6, "Current:");
 
 	// Left-hand side browsers for input/output nodes and processes
 	display_io_node  = new Fl_Choice(XJOBCOL3, GUIHEIGHT_EXT_START+3, 250, MENUHEIGHT-6);
@@ -692,7 +692,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	// Scheduler variables
 	Fl_Text_Buffer *textbuffvar = new Fl_Text_Buffer();
 	textbuffvar->text("Variables");
-	Fl_Text_Display* textdispvar = new Fl_Text_Display(XJOBCOL1, GUIHEIGHT_EXT_START, JOBCOLWIDTH-105, 23);
+	Fl_Text_Display* textdispvar = new Fl_Text_Display(XJOBCOL1, GUIHEIGHT_EXT_START, JOBCOLWIDTH-105, 24);
 	textdispvar->buffer(textbuffvar);
 	textdispvar->textsize(12);
 	textdispvar->color(GUI_BACKGROUND_COLOR);
@@ -724,7 +724,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	// Scheduler operators
 	Fl_Text_Buffer *textbuffnode = new Fl_Text_Buffer();
 	textbuffnode->text("Operators");
-	Fl_Text_Display* textdispnode = new Fl_Text_Display(XJOBCOL1, GUIHEIGHT_EXT_START + height_var, JOBCOLWIDTH-105, 23);
+	Fl_Text_Display* textdispnode = new Fl_Text_Display(XJOBCOL1, GUIHEIGHT_EXT_START + height_var, JOBCOLWIDTH-105, 24);
 	textdispnode->buffer(textbuffnode);
 	textdispnode->textsize(12);
 	textdispnode->color(GUI_BACKGROUND_COLOR);
@@ -765,21 +765,21 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	// Scheduler jobs
 	Fl_Text_Buffer *textbuff3s = new Fl_Text_Buffer();
 	textbuff3s->text("Jobs");
-	Fl_Text_Display* textdisp3s = new Fl_Text_Display(XJOBCOL2, GUIHEIGHT_EXT_START, JOBCOLWIDTH-50, 23);
+	Fl_Text_Display* textdisp3s = new Fl_Text_Display(XJOBCOL2, GUIHEIGHT_EXT_START, JOBCOLWIDTH-50, 24);
 	textdisp3s->buffer(textbuff3s);
 	textdisp3s->textsize(12);
 	textdisp3s->color(GUI_BACKGROUND_COLOR);
 
 	Fl_Text_Buffer *textbuff4s = new Fl_Text_Buffer();
 	textbuff4s->text("Input to this job");
-	Fl_Text_Display* textdisp4s = new Fl_Text_Display(XJOBCOL2, GUIHEIGHT_EXT_START + 123, JOBCOLWIDTH, 23);
+	Fl_Text_Display* textdisp4s = new Fl_Text_Display(XJOBCOL2, GUIHEIGHT_EXT_START + 123, JOBCOLWIDTH, 24);
 	textdisp4s->buffer(textbuff4s);
 	textdisp4s->textsize(12);
 	textdisp4s->color(GUI_BACKGROUND_COLOR);
 
 	Fl_Text_Buffer *textbuff5s = new Fl_Text_Buffer();
 	textbuff5s->text("Output from this job");
-	Fl_Text_Display* textdisp5s = new Fl_Text_Display(XJOBCOL2, GUIHEIGHT_EXT_START + 181, JOBCOLWIDTH, 23);
+	Fl_Text_Display* textdisp5s = new Fl_Text_Display(XJOBCOL2, GUIHEIGHT_EXT_START + 181, JOBCOLWIDTH, 24);
 	textdisp5s->buffer(textbuff5s);
 	textdisp5s->textsize(12);
 	textdisp5s->color(GUI_BACKGROUND_COLOR);
@@ -804,7 +804,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	// Scheduler edges
 	Fl_Text_Buffer *textbuffedge = new Fl_Text_Buffer();
 	textbuffedge->text("Edges");
-	Fl_Text_Display* textdispedge = new Fl_Text_Display(XJOBCOL3, GUIHEIGHT_EXT_START, JOBCOLWIDTH-105, 23);
+	Fl_Text_Display* textdispedge = new Fl_Text_Display(XJOBCOL3, GUIHEIGHT_EXT_START, JOBCOLWIDTH-105, 24);
 	textdispedge->buffer(textbuffedge);
 	textdispedge->textsize(12);
 	textdispedge->color(GUI_BACKGROUND_COLOR);
@@ -1396,7 +1396,7 @@ void GuiMainWindow::fillStdOutAndErr()
 		else
 		{
 			// Remove annoying carriage returns
-			std::string command = "tail -n 6 < " + fn_out + " | awk -F\"\r\" '{if (NF>1) {print $NF} else {print}}' > " + fn_outtail;
+			std::string command = "tail -n 20 < " + fn_out + " | awk -F\"\r\" '{if (NF>1) {print $NF} else {print}}' > " + fn_outtail;
 			int res = system(command.c_str());
 			std::ifstream in(fn_outtail.c_str(), std::ios_base::in);
 			if (in.fail())
@@ -1419,7 +1419,7 @@ void GuiMainWindow::fillStdOutAndErr()
 		}
 		else
 		{
-			std::string command = "tail -3 " + fn_err + " > " + fn_errtail;
+			std::string command = "tail -20 " + fn_err + " > " + fn_errtail;
 			int res = system(command.c_str());
 			std::ifstream in(fn_errtail.c_str(), std::ios_base::in);
 			if (in.fail())
@@ -3217,7 +3217,7 @@ void GuiMainWindow::cb_toggle_schedule_i(bool do_pipeline, FileName fn_new_sched
 		{
 			fn_sched = "Schedules/" + fn_new_schedule;
 			// Also add entry to the menu
-			std::string mylabel = "Scheduling/Schedules/" + fn_new_schedule;
+			std::string mylabel = "Schedules/Schedules/" + fn_new_schedule;
 			menubar->add(mylabel.c_str(), 0, cb_toggle_schedule, this);
 		}
 		else
