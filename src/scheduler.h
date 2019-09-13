@@ -63,8 +63,8 @@ class SchedulerStringVariable
 
 	SchedulerStringVariable(FileName _value, FileName _original_value)
 	{
-		value = (_value == "") ? "undefined" : _value;
-		original_value = (_original_value == "") ? "undefined" : _original_value;
+		value = _value;
+		original_value = _original_value;
 	}
 };
 
