@@ -80,11 +80,12 @@ int main(int argc, char *argv[])
 		else if (checkParameter(argc, argv, "--version"))
 		{
 			// Although our parser checks for --version, we do it here. Otherwise GuiMainWindow asks for a new project directory.
-			PRINT_VERSION_INFO();	
+			PRINT_VERSION_INFO();
 			exit(0);
 		}
 		FileName fn_pipe = getParameter(argc, argv, "--pipeline", "default");
 		FileName fn_sched = getParameter(argc, argv, "--schedule", "");
+		if (fn_sched != "") fn_sched = "Schedules/" + fn_sched;
 		int _update_every_sec = textToInteger(getParameter(argc, argv, "--refresh", "2"));
 		int _exit_after_sec = textToInteger(getParameter(argc, argv, "--idle", "3600"));
 		bool _do_read_only = checkParameter(argc, argv, "--readonly");

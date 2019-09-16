@@ -826,11 +826,6 @@ void Schedule::write(bool do_lock, FileName fn)
 	if (!fh)
 		REPORT_ERROR( (std::string)"Schedule::write: Cannot write file: " + fn);
 
-	// For undefined values
-	std::string str_aux="undefined";
-	RFLOAT float_aux=0.;
-	bool bool_aux=false;
-
 	MetaDataTable MDgeneral;
 	MDgeneral.setName("schedule_general");
 	MDgeneral.setIsList(true);
@@ -1011,7 +1006,7 @@ bool Schedule::isOperator(std::string _name)
 void Schedule::setVariable(std::string name, FileName value)
 {
 	float floatval;
-	if (sscanf(value.c_str(), "%f", &floatval)) // is this a number?
+	if (value != "" && sscanf(value.c_str(), "%f", &floatval)) // is this a number?
 	{
 		if (isFloatVariable(name)) setFloatVariableValue(name, floatval);
 		else addFloatVariable(name, floatval);
@@ -1032,7 +1027,7 @@ void Schedule::setVariable(std::string name, FileName value)
 void Schedule::setOriginalVariable(std::string name, FileName value)
 {
 	float floatval;
-	if (sscanf(value.c_str(), "%f", &floatval)) // is this a number?
+	if (value != "" && sscanf(value.c_str(), "%f", &floatval)) // is this a number?
 	{
 		if (isFloatVariable(name)) setFloatOriginalVariableValue(name, floatval);
 		else addFloatVariable(name, floatval);
@@ -1532,7 +1527,7 @@ bool Schedule::gotoNextJob()
 			if (!op_success) return false;
 		}
 		else // this is a job, get its current_name and options
-		{	
+		{
 			return true;
 		}
 	}
