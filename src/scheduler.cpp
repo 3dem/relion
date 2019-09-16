@@ -675,70 +675,70 @@ void Schedule::read(bool do_lock, FileName fn)
 	MD.readStar(in, "schedule_floats");
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
 	{
-		std::string name;
+		std::string myname;
 		RFLOAT value, original_value;
-		MD.getValue(EMDL_SCHEDULE_VAR_FLOAT_NAME, name);
+		MD.getValue(EMDL_SCHEDULE_VAR_FLOAT_NAME, myname);
 		MD.getValue(EMDL_SCHEDULE_VAR_FLOAT_VALUE, value);
 		MD.getValue(EMDL_SCHEDULE_VAR_FLOAT_ORI_VALUE, original_value);
 		SchedulerFloatVariable myval(value, original_value);
-		scheduler_global_floats[name] = myval;
+		scheduler_global_floats[myname] = myval;
 	}
 	MD.clear();
 
 	MD.readStar(in, "schedule_bools");
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
 	{
-		std::string name;
+		std::string myname;
 		bool value, original_value;
-		MD.getValue(EMDL_SCHEDULE_VAR_BOOL_NAME, name);
+		MD.getValue(EMDL_SCHEDULE_VAR_BOOL_NAME, myname);
 		MD.getValue(EMDL_SCHEDULE_VAR_BOOL_VALUE, value);
 		MD.getValue(EMDL_SCHEDULE_VAR_BOOL_ORI_VALUE, original_value);
 		SchedulerBooleanVariable myval(value, original_value);
-		scheduler_global_bools[name] = myval;
+		scheduler_global_bools[myname] = myval;
 	}
 	MD.clear();
 
 	MD.readStar(in, "schedule_strings");
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
 	{
-		std::string name;
+		std::string myname;
 		FileName value, original_value;
-		MD.getValue(EMDL_SCHEDULE_VAR_STRING_NAME, name);
+		MD.getValue(EMDL_SCHEDULE_VAR_STRING_NAME, myname);
 		MD.getValue(EMDL_SCHEDULE_VAR_STRING_VALUE, value);
 		MD.getValue(EMDL_SCHEDULE_VAR_STRING_ORI_VALUE, original_value);
 		SchedulerStringVariable myval(value, original_value);
-		scheduler_global_strings[name] = myval;
+		scheduler_global_strings[myname] = myval;
 	}
 	MD.clear();
 
 	MD.readStar(in, "schedule_operators");
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
 	{
-		std::string name, type, input1, input2, output;
+		std::string myname, type, input1, input2, output;
 		RFLOAT constant;
 
-		MD.getValue(EMDL_SCHEDULE_OPERATOR_NAME, name);
+		MD.getValue(EMDL_SCHEDULE_OPERATOR_NAME, myname);
 		MD.getValue(EMDL_SCHEDULE_OPERATOR_TYPE, type);
 		MD.getValue(EMDL_SCHEDULE_OPERATOR_INPUT1, input1);
 		MD.getValue(EMDL_SCHEDULE_OPERATOR_INPUT2, input2);
 		MD.getValue(EMDL_SCHEDULE_OPERATOR_OUTPUT, output);
 		SchedulerOperator myval(type, input1, input2, output);
-		scheduler_global_operators[name] = myval;
+		scheduler_global_operators[myname] = myval;
 	}
 	MD.clear();
 
 	MD.readStar(in, "schedule_jobs");
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
 	{
-		std::string name, ori_name, mode, type;
+		std::string myname, ori_name, mode, type;
 		bool has_started;
 
-		MD.getValue(EMDL_SCHEDULE_JOB_NAME, name);
+		MD.getValue(EMDL_SCHEDULE_JOB_NAME, myname);
 		MD.getValue(EMDL_SCHEDULE_JOB_ORI_NAME, ori_name);
 		MD.getValue(EMDL_SCHEDULE_JOB_MODE, mode);
 		MD.getValue(EMDL_SCHEDULE_JOB_HAS_STARTED, has_started);
 
-		SchedulerJob myval(name, mode, has_started);
+		SchedulerJob myval(myname, mode, has_started);
 		jobs[ori_name] = myval;
 	}
 	MD.clear();
@@ -772,6 +772,7 @@ void Schedule::read(bool do_lock, FileName fn)
 
 	// Also read in the schedule_pipeline (no need to lock now?)
 	schedule_pipeline.read();
+
 }
 
 bool Schedule::isWriteLocked()
