@@ -19,7 +19,7 @@ public:
 	int mdlX, mdlY, mdlZ,
 	    mdlInitY, mdlInitZ,
 	    maxR, maxR2;
-	XFLOAT padding_factor
+	XFLOAT padding_factor;
 	size_t mdlXYZ;
 
 #ifndef CUDA
