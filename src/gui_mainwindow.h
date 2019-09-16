@@ -89,7 +89,6 @@ static Fl_Button *run_button;
 static Fl_Button *print_CL_button;
 static Fl_Button *schedule_button;
 static Fl_Button *expand_stdout_button;
-static Fl_Button *expand_stdout2_button;
 static Fl_Input *alias_current_job;
 
 // Sjors 27May2019: scheduler

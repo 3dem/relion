@@ -544,6 +544,10 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 	print_CL_button->labelsize(11);
 	print_CL_button->callback(cb_print_cl, this);
 
+	expand_stdout_button = new Fl_Button(XJOBCOL1, GUIHEIGHT_EXT_START , 85, MENUHEIGHT, "I/O view");
+	expand_stdout_button->color(GUI_BUTTON_COLOR);
+	expand_stdout_button->callback(cb_toggle_expand_stdout, this);
+
 
 	// A) Pipeliner part of the GUI
 	pipeliner_grp = new Fl_Group(0, 0, 2*w, 2*h);
@@ -566,7 +570,7 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 		schedule_button->deactivate();
 
 
-	menubar2 = new Fl_Menu_Bar(XJOBCOL1, GUIHEIGHT_EXT_START, 95, MENUHEIGHT);
+	menubar2 = new Fl_Menu_Bar(XJOBCOL1+87, GUIHEIGHT_EXT_START, 95, MENUHEIGHT);
 	menubar2->color(GUI_BUTTON_COLOR);
 	menubar2->add("Job actions/Edit Note", 0, cb_edit_note, this);
 	if (!maingui_do_read_only)
@@ -580,10 +584,6 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 		menubar2->add("Job actions/Harsh clean", 0, cb_harsh_cleanup, this);
 		menubar2->add("Job actions/Delete", 0, cb_delete, this);
 	}
-
-	expand_stdout_button = new Fl_Button(XJOBCOL1 + 97, GUIHEIGHT_EXT_START , 85, MENUHEIGHT, "I/O view");
-	expand_stdout_button->color(GUI_BUTTON_COLOR);
-	expand_stdout_button->callback(cb_toggle_expand_stdout, this);
 
 	// Fl_input with the alias of the new job (or the name of an existing one)
 	alias_current_job = new Fl_Input(XJOBCOL2 , GUIHEIGHT_EXT_START+3, JOBCOLWIDTH, MENUHEIGHT-6, "Current:");
@@ -676,11 +676,6 @@ GuiMainWindow::GuiMainWindow(int w, int h, const char* title, FileName fn_pipe, 
 
 	scheduler_run_grp = new Fl_Group(0, 0, 4*w, 4*h);
 	scheduler_run_grp->begin();
-
-	// I/O or Jobs view
-	expand_stdout2_button = new Fl_Button(XJOBCOL1, GUIHEIGHT_EXT_START +1 , 85, 25, "I/O view");
-	expand_stdout2_button->color(GUI_BUTTON_COLOR);
-	expand_stdout2_button->callback(cb_toggle_expand_stdout, this);
 
 	// Buttons for current_node and running/aborting the schedule
 	scheduler_current_node = new Fl_Choice(XJOBCOL1+90+65, GUIHEIGHT_EXT_START + 3, 140, 23);
@@ -1546,6 +1541,7 @@ void GuiMainWindow::loadJobFromPipeline(int this_job)
 
 	// Set the alias in the window
 	alias_current_job->value((getJobNameForDisplay(pipeline.processList[current_job])).c_str());
+	alias_current_job->position(0); //left-centered text in box
 
 	// Update all job lists in the main GUI
 	updateJobLists();
@@ -2380,7 +2376,9 @@ void GuiMainWindow::cb_scheduler_run(Fl_Widget *o, void* v)
 
 void GuiMainWindow::cb_scheduler_run_i()
 {
-	std::string command = " relion_scheduler --schedule " + schedule.name + " --run --pipeline_control " + schedule.name + " >> "
+	FileName name_wo_dir = schedule.name;
+
+	std::string command = " relion_scheduler --schedule " + name_wo_dir.afterFirstOf("Schedules/") + " --run --pipeline_control " + schedule.name + " >> "
 			 + schedule.name + "run.out 2>> " + schedule.name + "run.err &";
 	int res = system(command.c_str());
 	scheduler_run_grp->deactivate();
@@ -3207,11 +3205,19 @@ void GuiMainWindow::cb_toggle_pipeliner_scheduler_i()
 	{
 		pipeliner_grp->hide();
 		scheduler_grp->show();
+
+		// If this schedule is running, then use the I/O viewer, otherwise use Jobs viewer
+		show_expand_stdout = !schedule.isWriteLocked();
+		cb_toggle_expand_stdout_i();
+
 	}
 	else
 	{
 		scheduler_grp->hide();
 		pipeliner_grp->show();
+		// After toggling, always go back to non-expanded view
+		show_expand_stdout = true;
+		cb_toggle_expand_stdout_i();
 	}
 }
 
@@ -3379,7 +3385,6 @@ void GuiMainWindow::cb_toggle_expand_stdout_i()
 			pipeliner_jobs_grp->show();
 		}
 		expand_stdout_button->label("I/O view");
-		expand_stdout2_button->label("I/O view");
 		show_expand_stdout = false;
 	}
 	else
@@ -3394,7 +3399,6 @@ void GuiMainWindow::cb_toggle_expand_stdout_i()
 			pipeliner_jobs_grp->hide();
 		}
 		expand_stdout_button->label("Job view");
-		expand_stdout2_button->label("Job view");
 		show_expand_stdout = true;
 	}
 
