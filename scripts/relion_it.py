@@ -556,6 +556,7 @@ class RelionItOptions(object):
     # Wait with the first 2D classification batch until at least this many particles are extracted
     minimum_batch_size = 10000
     # Number of iterations to perform in 2D classification
+    # Must be at least 20 for fast subsets
     class2d_nr_iter = 20
     # Rotational search step (in degrees)
     class2d_angle_step = 6
@@ -571,6 +572,7 @@ class RelionItOptions(object):
 
     ### 3D classification parameters
     # Number of iterations to perform in 3D classification
+    # Must be at least 20 for fast subsets
     class3d_nr_iter = 20
     # Reference mask
     class3d_reference_mask = ''
