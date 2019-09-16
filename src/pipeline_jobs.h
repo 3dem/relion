@@ -259,10 +259,6 @@ class Node
 // Helper function to get the outputnames of refine jobs
 std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, int dim, int nr_bodies=1);
 
-// Sjors 16 sep 2019: remove in the future!
-// This is to keep backwards compatibility with functionality that briefly present in relion-3.1-beta
-std::string restoreString(const std::string in);
-
 // One class to store any type of Option for a GUI entry
 class JobOption
 {

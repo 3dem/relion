@@ -145,27 +145,6 @@ JobOption::JobOption(std::string _label, float _default_value, float _min_value,
 	step_value = _step_value;
 }
 
-std::string restoreString(const std::string instring)
-{
-	std::string outstring = instring;
-	size_t index = 0;
-	// Also replace __ by spaces
-	index = 0;
-	while (true)
-	{
-		/* Locate the substring to replace. */
-		index = outstring.find("__", index);
-		if (index == std::string::npos) break;
-
-		/* Make the replacement. */
-		outstring.replace(index, 2, " ");
-
-		/* Advance index forward so the next iteration doesn't pick it up as well. */
-		index += 1;
-	}
-	return outstring;
-}
-
 void JobOption::writeToMetaDataTable(MetaDataTable& MD) const
 {
 
@@ -325,37 +304,8 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 	// If fn is empty, use the hidden name
 	FileName myfilename = (fn=="") ? hidden_name : fn;
 
-	if (exists(myfilename+"job.star"))
-	{
-		// Read from STAR
-		MetaDataTable MDhead;
-		MetaDataTable MDvals;
-
-		MDhead.read(myfilename+"job.star", "job");
-		MDhead.getValue(EMDL_JOB_TYPE, type);
-		MDhead.getValue(EMDL_JOB_IS_CONTINUE, is_continue);
-		_is_continue = is_continue;
-		if (do_initialise)
-			initialise(type);
-
-		MDvals.read(myfilename+"job.star", "joboptions_values");
-		std::string label, value;
-		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDvals)
-		{
-
-			MDvals.getValue(EMDL_JOBOPTION_VARIABLE, label);
-			MDvals.getValue(EMDL_JOBOPTION_VALUE, value);
-			if (joboptions.find(label) == joboptions.end())
-			{
-				std::cerr << "WARNING: cannot find " << label << " in the defined joboptions. Ignoring it ..." <<std::endl;
-			}
-			else
-			{
-				joboptions[label].value = restoreString(value);
-			}
-		}
-	}
-	else // for backwards compatibility
+	// For backwards compatibility
+	if (exists(myfilename+"run.job"))
 	{
 		std::ifstream fh;
 		fh.open((myfilename+"run.job").c_str(), std::ios_base::in);
@@ -390,11 +340,39 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 				if (!(it->second).readValue(fh))
 					read_all = false;
 			}
-
-			return read_all;
 		}
 
 		fh.close();
+	}
+	else
+	{
+		// Read from STAR
+		MetaDataTable MDhead;
+		MetaDataTable MDvals;
+
+		MDhead.read(myfilename+"job.star", "job");
+		MDhead.getValue(EMDL_JOB_TYPE, type);
+		MDhead.getValue(EMDL_JOB_IS_CONTINUE, is_continue);
+		_is_continue = is_continue;
+		if (do_initialise)
+			initialise(type);
+
+		MDvals.read(myfilename+"job.star", "joboptions_values");
+		std::string label, value;
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDvals)
+		{
+
+			MDvals.getValue(EMDL_JOBOPTION_VARIABLE, label);
+			MDvals.getValue(EMDL_JOBOPTION_VALUE, value);
+			if (joboptions.find(label) == joboptions.end())
+			{
+				std::cerr << "WARNING: cannot find " << label << " in the defined joboptions. Ignoring it ..." <<std::endl;
+			}
+			else
+			{
+				joboptions[label].value = value;
+			}
+		}
 	}
 
 	// Just check that went OK
@@ -428,6 +406,8 @@ void RelionJob::write(std::string fn)
 	// If fn is empty, use the hidden name
 	FileName myfilename = (fn=="") ? hidden_name : fn;
 
+	/* In 3.1, no longer write run.job, just keep reading run,job for backwards compatibility
+	 *
 	std::ofstream fh;
 	fh.open((myfilename+"run.job").c_str(), std::ios::out);
 	if (!fh)
@@ -448,9 +428,10 @@ void RelionJob::write(std::string fn)
 	}
 
 	fh.close();
-
+	 */
 
 	// Also write 3.1-style STAR file
+	std::ofstream fh;
 	fh.open((myfilename+"job.star").c_str(), std::ios::out);
 	if (!fh)
 		REPORT_ERROR("ERROR: Cannot write to file: " + myfilename + "job.star");
