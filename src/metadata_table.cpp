@@ -988,7 +988,7 @@ bool MetaDataTable::readStarList(std::ifstream& in, std::vector<EMDLabel> *desir
 	{
 		int pos = 0;
 		// Ignore empty lines
-		if (nextTokenInSTAR(line, pos, firstword))
+		if (!nextTokenInSTAR(line, pos, firstword))
 			continue;
 
 		// Get label-value pairs
@@ -996,7 +996,7 @@ bool MetaDataTable::readStarList(std::ifstream& in, std::vector<EMDLabel> *desir
 		{
 			std::string token = firstword.substr(1); // get rid of leading underscore
 			EMDLabel label = EMDL::str2Label(token);
-			if (nextTokenInSTAR(line, pos, value))
+			if (!nextTokenInSTAR(line, pos, value))
 				REPORT_ERROR("MetaDataTable::readStarList: did not encounter a single word after "+firstword);
 
 			if (desiredLabels != NULL && !vectorContainsLabel(*desiredLabels, label))
@@ -1317,7 +1317,7 @@ void MetaDataTable::columnHistogram(EMDLabel label, std::vector<RFLOAT> &histX, 
 		values.push_back(val);
 	}
 
-	
+
 	std::string title = EMDL::label2Str(label);
 	histogram(values, histX, histY, verb, title, plot2D, nr_bin, hist_min, hist_max, do_fractional_instead, do_cumulative_instead);
 }
