@@ -145,56 +145,11 @@ JobOption::JobOption(std::string _label, float _default_value, float _min_value,
 	step_value = _step_value;
 }
 
-std::string prepareString(const std::string instring)
-{
-	std::string outstring = instring;
-	size_t index = 0;
-	while (true)
-	{
-		/* Locate the substring to replace. */
-		index = outstring.find("\n", index);
-		if (index == std::string::npos) break;
-
-		/* Make the replacement. */
-		outstring.replace(index, 2, "&&");
-
-		/* Advance index forward so the next iteration doesn't pick it up as well. */
-		index += 2;
-	}
-	// Also replace spaces by __
-	index = 0;
-	while (true)
-	{
-		/* Locate the substring to replace. */
-		index = outstring.find(" ", index);
-		if (index == std::string::npos) break;
-
-		/* Make the replacement. */
-		outstring.replace(index, 1, "__");
-
-		/* Advance index forward so the next iteration doesn't pick it up as well. */
-		index += 1;
-	}
-	return outstring;
-}
-
 std::string restoreString(const std::string instring)
 {
 	std::string outstring = instring;
 	size_t index = 0;
-	while (true)
-	{
-		/* Locate the substring to replace. */
-		index = outstring.find("&&", index);
-		if (index == std::string::npos) break;
-
-		/* Make the replacement. */
-		outstring.replace(index, 2, "\n");
-
-		/* Advance index forward so the next iteration doesn't pick it up as well. */
-		index += 2;
-	}
-	// Also replace spaces by __
+	// Also replace __ by spaces
 	index = 0;
 	while (true)
 	{
@@ -211,39 +166,12 @@ std::string restoreString(const std::string instring)
 	return outstring;
 }
 
-std::string prepareVectorString(const std::vector<std::string> in)
-{
-	std::string outstring="++" + prepareString(in[0]);
-	for (int i = 1; i < in.size(); i++)
-	{
-		outstring += "++" + prepareString(in[i]);
-	}
-	outstring += "++";
-	return outstring;
-}
-
-void JobOption::writeToMetaDataTable(MetaDataTable& MD, bool do_full) const
+void JobOption::writeToMetaDataTable(MetaDataTable& MD) const
 {
 
 	MD.addObject();
 	MD.setValue(EMDL_JOBOPTION_VARIABLE, variable);
-	if (!do_full)
-	{
-		MD.setValue(EMDL_JOBOPTION_VALUE, prepareString(value));
-	}
-	else
-	{
-		MD.setValue(EMDL_JOBOPTION_LABEL, prepareString(label));
-		MD.setValue(EMDL_JOBOPTION_TYPE, joboption_type);
-		MD.setValue(EMDL_JOBOPTION_DEFAULT_VALUE, prepareString(default_value));
-		MD.setValue(EMDL_JOBOPTION_MINVAL, min_value);
-		MD.setValue(EMDL_JOBOPTION_MAXVAL, max_value);
-		MD.setValue(EMDL_JOBOPTION_STEPVAL, step_value);
-		MD.setValue(EMDL_JOBOPTION_PATTERN, prepareString(pattern));
-		MD.setValue(EMDL_JOBOPTION_DIRECTORY, prepareString(directory));
-		MD.setValue(EMDL_JOBOPTION_HELPTEXT, prepareString(helptext));
-		MD.setValue(EMDL_JOBOPTION_MENUOPTIONS, prepareVectorString(radio_options));
-	}
+	MD.setValue(EMDL_JOBOPTION_VALUE, value);
 
 	return;
 }
@@ -542,18 +470,10 @@ void RelionJob::write(std::string fn)
 	// Now make a table with all the values
 	for (std::map<std::string,JobOption>::iterator it=joboptions.begin(); it!=joboptions.end(); ++it)
 	{
-		(it->second).writeToMetaDataTable(MDvals, false);
+		(it->second).writeToMetaDataTable(MDvals);
 	}
 	MDvals.setName("joboptions_values");
 	MDvals.write(fh);
-
-	// Now make a table with all the options
-	for (std::map<std::string,JobOption>::iterator it=joboptions.begin(); it!=joboptions.end(); ++it)
-	{
-		(it->second).writeToMetaDataTable(MDopts, true);
-	}
-	MDopts.setName("joboptions_full_definition");
-	MDopts.write(fh);
 
 	fh.close();
 }

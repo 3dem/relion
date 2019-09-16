@@ -259,10 +259,9 @@ class Node
 // Helper function to get the outputnames of refine jobs
 std::vector<Node> getOutputNodesRefine(std::string outputname, int iter, int K, int dim, int nr_bodies=1);
 
-std::string prepareString(const std::string in);
+// Sjors 16 sep 2019: remove in the future!
+// This is to keep backwards compatibility with functionality that briefly present in relion-3.1-beta
 std::string restoreString(const std::string in);
-std::string prepareVectorString(const std::vector<std::string> in);
-std::vector<std::string> restoreVectorString(const std::string in);
 
 // One class to store any type of Option for a GUI entry
 class JobOption
@@ -304,9 +303,8 @@ public:
 	// Slider constructor
 	JobOption(std::string _label, float _default_value, float _min_value, float _max_value, float _step_value, std::string _helptext);
 
-
 	// Write to a STAR file
-	void writeToMetaDataTable(MetaDataTable& MD, bool do_full = false) const;
+	void writeToMetaDataTable(MetaDataTable& MD) const;
 
 	// Empty constructor
 	JobOption()	{ clear(); }
