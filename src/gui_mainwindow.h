@@ -66,9 +66,12 @@
 static Fl_Hold_Browser *browser;
 static Fl_Group *browse_grp[NR_BROWSE_TABS];
 static Fl_Group *background_grp;
+static Fl_Group *pipeliner_jobs_grp;
 static Fl_Group *pipeliner_grp;
 static Fl_Group *scheduler_grp;
 static Fl_Group *scheduler_run_grp;
+static Fl_Group *scheduler_jobs_grp;
+static Fl_Group *expand_stdout_grp;
 static Fl_Choice *display_io_node;
 static Fl_Select_Browser *finished_job_browser, *running_job_browser, *scheduled_job_browser, *input_job_browser, *output_job_browser;
 static Fl_Box *image_box;
@@ -85,6 +88,8 @@ static JobWindow *gui_jobwindows[NR_BROWSE_TABS];
 static Fl_Button *run_button;
 static Fl_Button *print_CL_button;
 static Fl_Button *schedule_button;
+static Fl_Button *expand_stdout_button;
+static Fl_Button *expand_stdout2_button;
 static Fl_Input *alias_current_job;
 
 // Sjors 27May2019: scheduler
@@ -175,6 +180,8 @@ static void Gui_Timer_CB(void *userdata);
 static bool maingui_do_read_only;
 // Show the scheduler view
 extern bool show_scheduler;
+// Show expand stdout view
+extern bool show_expand_stdout;
 
 // The pipeline this GUI is acting on
 static PipeLine pipeline;
@@ -202,8 +209,8 @@ public:
 	int handle(int ev);
 };
 
-static StdOutDisplay *disp_stdout;
-static StdOutDisplay *disp_stderr;
+static StdOutDisplay *disp_stdout, *disp_expand_stdout;
+static StdOutDisplay *disp_stderr, *disp_expand_stderr;
 
 class NoteEditorWindow : public Fl_Window
 {
@@ -519,6 +526,9 @@ private:
 
     static void cb_stop_pipeliner(Fl_Widget*, void*);
     inline void cb_stop_pipeliner_i();
+
+    static void cb_toggle_expand_stdout(Fl_Widget*, void*);
+    inline void cb_toggle_expand_stdout_i();
 
     static void cb_about(Fl_Widget*, void*);
     inline void cb_about_i();
