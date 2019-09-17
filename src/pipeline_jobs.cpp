@@ -303,6 +303,7 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 {
 	// If fn is empty, use the hidden name
 	FileName myfilename = (fn=="") ? hidden_name : fn;
+	bool have_read = false;
 
 	// For backwards compatibility
 	if (exists(myfilename+"run.job"))
@@ -310,7 +311,9 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 		std::ifstream fh;
 		fh.open((myfilename+"run.job").c_str(), std::ios_base::in);
 		if (fh.fail())
-			return false;
+		{
+			REPORT_ERROR("ERROR reading file: " + myfilename + "run.job");
+		}
 		else
 		{
 			std::string line;
@@ -340,11 +343,13 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 				if (!(it->second).readValue(fh))
 					read_all = false;
 			}
+			have_read = true;
 		}
 
 		fh.close();
+
 	}
-	else
+	else if (exists(myfilename+"job.star"))
 	{
 		// Read from STAR
 		MetaDataTable MDhead;
@@ -373,32 +378,41 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 				joboptions[label].value = value;
 			}
 		}
+		have_read = true;
 	}
 
-	// Just check that went OK
-	if (type != PROC_IMPORT &&
-		type != PROC_MOTIONCORR &&
-		type != PROC_CTFFIND &&
-		type != PROC_MANUALPICK &&
-		type != PROC_AUTOPICK &&
-		type != PROC_EXTRACT &&
-		type != PROC_CLASSSELECT &&
-		type != PROC_2DCLASS &&
-		type != PROC_3DCLASS &&
-		type != PROC_3DAUTO &&
-		type != PROC_MULTIBODY &&
-		type != PROC_MASKCREATE &&
-		type != PROC_JOINSTAR &&
-		type != PROC_SUBTRACT &&
-		type != PROC_POST &&
-		type != PROC_RESMAP &&
-		type != PROC_INIMODEL &&
-		type != PROC_MOTIONREFINE &&
-		type != PROC_CTFREFINE &&
-		type != PROC_EXTERNAL)
-		REPORT_ERROR("ERROR: cannot find correct job type in " + myfilename + "run.job, with type= " + integerToString(type));
+	if (have_read)
+	{
 
-	return true;
+		// Just check that went OK
+		if (type != PROC_IMPORT &&
+			type != PROC_MOTIONCORR &&
+			type != PROC_CTFFIND &&
+			type != PROC_MANUALPICK &&
+			type != PROC_AUTOPICK &&
+			type != PROC_EXTRACT &&
+			type != PROC_CLASSSELECT &&
+			type != PROC_2DCLASS &&
+			type != PROC_3DCLASS &&
+			type != PROC_3DAUTO &&
+			type != PROC_MULTIBODY &&
+			type != PROC_MASKCREATE &&
+			type != PROC_JOINSTAR &&
+			type != PROC_SUBTRACT &&
+			type != PROC_POST &&
+			type != PROC_RESMAP &&
+			type != PROC_INIMODEL &&
+			type != PROC_MOTIONREFINE &&
+			type != PROC_CTFREFINE &&
+			type != PROC_EXTERNAL)
+			REPORT_ERROR("ERROR: cannot find correct job type in " + myfilename + "run.job, with type= " + integerToString(type));
+
+		return true;
+	}
+	else
+	{
+		return false;
+	}
 }
 
 void RelionJob::write(std::string fn)
