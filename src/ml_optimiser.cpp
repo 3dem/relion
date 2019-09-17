@@ -558,8 +558,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	RFLOAT _sigma_rot = textToFloat(parser.getOption("--sigma_rot", "Stddev on the first Euler angle for local angular searches (of +/- 3 stddev)", "-1"));
 	RFLOAT _sigma_tilt = textToFloat(parser.getOption("--sigma_tilt", "Stddev on the second Euler angle for local angular searches (of +/- 3 stddev)", "-1"));
 	RFLOAT _sigma_psi = textToFloat(parser.getOption("--sigma_psi", "Stddev on the in-plane angle for local angular searches (of +/- 3 stddev)", "-1"));
-	// Very small to force the algorithm to take the current orientation
-	if (sym_relax_ != "") _sigma_ang = 0.0033;
+
 	if (_sigma_ang > 0.)
 	{
 		mymodel.orientational_prior_mode = PRIOR_ROTTILT_PSI;
@@ -577,8 +576,18 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	else
 	{
 		//default
-		mymodel.orientational_prior_mode = NOPRIOR;
-		mymodel.sigma2_rot = mymodel.sigma2_tilt = mymodel.sigma2_psi = 0.;
+		// Very small to force the algorithm to take the current orientation
+		if (sym_relax_ != "")
+		{
+			mymodel.orientational_prior_mode = PRIOR_ROTTILT_PSI;
+			_sigma_ang = 0.0033;
+			mymodel.sigma2_rot = mymodel.sigma2_tilt = mymodel.sigma2_psi = _sigma_ang * _sigma_ang;
+		}
+		else
+		{
+			mymodel.orientational_prior_mode = NOPRIOR;
+			mymodel.sigma2_rot = mymodel.sigma2_tilt = mymodel.sigma2_psi = 0.;
+		}
 	}
 	do_skip_align = parser.checkOption("--skip_align", "Skip orientational assignment (only classify)?");
 	do_skip_rotate = parser.checkOption("--skip_rotate", "Skip rotational assignment (only translate and classify)?");
