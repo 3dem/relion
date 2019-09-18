@@ -359,7 +359,7 @@ void Experiment::divideParticlesInRandomHalves(int seed, bool do_helical_refine)
 	particles.insert(particles.end(), new_particles_set2.begin(), new_particles_set2.end());
 
 	if (nr_particles_subset2 == 0 || nr_particles_subset1 == 0)
-		REPORT_ERROR("ERROR: one of your half sets has no segments. Helical half-sets are always per-filament. Provide at least 2 filaments.");
+		REPORT_ERROR("ERROR: one of your half sets has no segments. Is rlnRandomSubset set to 1 or 2 in your particles STAR file? Or in case you're doing helical, half-sets are always per-filament, so provide at least 2 filaments.");
 
 
 }
