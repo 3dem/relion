@@ -4963,8 +4963,6 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 				prior_rot = DIRECT_A2D_ELEM(exp_metadata, my_metadata_offset, METADATA_ROT);
 			if (prior_tilt > 998.99 && prior_tilt < 999.01)
 				prior_tilt = DIRECT_A2D_ELEM(exp_metadata, my_metadata_offset, METADATA_TILT);
-			if ( (do_helical_refine) && (helical_keep_tilt_prior_fixed) && (do_local_angular_searches) )
-				prior_tilt = DIRECT_A2D_ELEM(exp_metadata, my_metadata_offset, METADATA_TILT);
 			if (prior_psi > 998.99 && prior_psi < 999.01)
 				prior_psi = DIRECT_A2D_ELEM(exp_metadata, my_metadata_offset, METADATA_PSI);
 			if (prior_psi_flip_ratio > 998.99 && prior_psi_flip_ratio < 999.01)
@@ -8728,7 +8726,9 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 					// Switch ON local angular searches
 					mymodel.orientational_prior_mode = PRIOR_ROTTILT_PSI;
 					sampling.orientational_prior_mode = PRIOR_ROTTILT_PSI;
-					mymodel.sigma2_rot = mymodel.sigma2_tilt = mymodel.sigma2_psi = 2. * 2. * new_rottilt_step * new_rottilt_step;
+					mymodel.sigma2_rot = mymodel.sigma2_psi = 2. * 2. * new_rottilt_step * new_rottilt_step;
+					if (!(do_helical_refine && helical_keep_tilt_prior_fixed))
+						mymodel.sigma2_tilt = mymodel.sigma2_rot;
 
 					// Aug20,2015 - Shaoda, Helical refinement
 					if ( (do_helical_refine) && (!ignore_helical_symmetry) )

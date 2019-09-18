@@ -168,8 +168,6 @@ void getFourierTransformsAndCtfs(long int part_id,
 				prior_rot = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_ROT);
 			if (prior_tilt > 998.99 && prior_tilt < 999.01)
 				prior_tilt = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_TILT);
-			if ( (baseMLO->do_helical_refine) && (baseMLO->helical_keep_tilt_prior_fixed) && (do_local_angular_searches) )
-				prior_tilt = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_TILT);
 			if (prior_psi > 998.99 && prior_psi < 999.01)
 				prior_psi = DIRECT_A2D_ELEM(baseMLO->exp_metadata, my_metadata_offset, METADATA_PSI);
 			if (prior_psi_flip_ratio > 998.99 && prior_psi_flip_ratio < 999.01)
@@ -178,7 +176,7 @@ void getFourierTransformsAndCtfs(long int part_id,
 			////////// How does this work now: each particle has a different sampling object?!!!
 			// Select only those orientations that have non-zero prior probability
 
-			if (baseMLO->do_helical_refine)
+			if (baseMLO->do_helical_refine && baseMLO->mymodel.ref_dim == 3)
 			{
 				baseMLO->sampling.selectOrientationsWithNonZeroPriorProbabilityFor3DHelicalReconstruction(prior_rot, prior_tilt, prior_psi,
 										sqrt(baseMLO->mymodel.sigma2_rot), sqrt(baseMLO->mymodel.sigma2_tilt), sqrt(baseMLO->mymodel.sigma2_psi),
