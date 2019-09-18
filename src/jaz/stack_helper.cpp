@@ -188,7 +188,7 @@ std::vector<Image<Complex> > StackHelper::loadStackFS(
 
 	const int s = dummy.data.xdim;
 
-	NewFFT::DoublePlan plan(s,s,1);
+	NewFFTPlan<RFLOAT>::type plan(s,s,1);
 
 	#pragma omp parallel for num_threads(threads)
 	for (long i = 0; i < ic; i++)

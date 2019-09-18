@@ -136,9 +136,9 @@ inline void greyToRGB(const unsigned char grey, unsigned char &red, unsigned cha
 
 		const RFLOAT d_rb = 3. * (grey - 128);
 		const RFLOAT d_g = 3. * (std::abs(grey - 128) - 42);
-		red   = (unsigned char)(FLOOR(std::min(255., std::max(0.0,  d_rb))));
-		green = (unsigned char)(FLOOR(std::min(255., std::max(0.0,  d_g))));
-		blue  = (unsigned char)(FLOOR(std::min(255., std::max(0.0, -d_rb))));
+		red   = (unsigned char)(FLOOR(XMIPP_MIN(255., XMIPP_MAX(0.0,  d_rb))));
+		green = (unsigned char)(FLOOR(XMIPP_MIN(255., XMIPP_MAX(0.0,  d_g))));
+		blue  = (unsigned char)(FLOOR(XMIPP_MIN(255., XMIPP_MAX(0.0, -d_rb))));
 
 		break;
 	}

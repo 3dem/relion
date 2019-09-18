@@ -8618,8 +8618,8 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 			// Old rottilt step is already below 75% of estimated accuracy: have to stop refinement?
 			// If a minimum_angular_sampling is given and we're not there yet, also just continue
 			if (all_bodies_are_done
-					|| (maximum_angular_sampling > 0. && old_rottilt_step < maximum_angular_sampling)
-					|| (old_rottilt_step < 0.75 * acc_rot && !(minimum_angular_sampling > 0. && old_rottilt_step > minimum_angular_sampling)))
+			    || (maximum_angular_sampling > 0. && old_rottilt_step < maximum_angular_sampling)
+			    || (old_rottilt_step < 0.75 * acc_rot && !(minimum_angular_sampling > 0. && old_rottilt_step > minimum_angular_sampling)))
 			{
 				// don't change angular sampling, as it is already fine enough
 				has_fine_enough_angular_sampling = true;
