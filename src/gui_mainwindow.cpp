@@ -77,7 +77,7 @@ int StdOutDisplay::handle(int ev)
 		} // end if double click
 	} // end if FL_PUSH
 
-	return 1;
+	return 0;
 }
 
 int SchedulerWindow::fill(FileName _pipeline_name, std::vector<FileName> _scheduled_jobs)
