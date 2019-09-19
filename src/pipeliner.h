@@ -33,8 +33,8 @@
 
 class Process
 {
+public:
 
-	public:
 	std::string name;
 	std::string alias;
 	int type;
@@ -69,8 +69,8 @@ class PipeLineFlowChart;
 #define PIPELINE_HAS_CHANGED ".pipeline_has_changed"
 class PipeLine
 {
+public:
 
-	public:
 	int job_counter;
 	bool do_read_only;
 
@@ -214,10 +214,7 @@ class PipeLine
 
 	// Read in the pipeline from a STAR file
 	void read(bool do_lock = false, std::string lock_message = "Undefined lock message");
-
 };
-
-
 
 class PipeLineFlowChart
 {
@@ -265,8 +262,6 @@ public:
 	void openFlowChartFile(FileName &fn_out, std::ofstream &fh);
 
 	void closeFlowChartFile(std::ofstream &fh);
-
-
 };
 
 #endif /* PIPELINER_H_ */

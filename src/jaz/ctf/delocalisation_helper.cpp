@@ -14,7 +14,7 @@ void DelocalisationHelper::maskOutsideBox(
 	const double r2 = radius * radius;
 	const double as = angpix * s;
 	
-	const d2Vector origin(offsetx, offsety);
+	const t2Vector<RFLOAT> origin(offsetx, offsety);
 			
 	for (int y = 0; y < s; y++)
 	for (int x = 0; x < sh; x++)
@@ -22,14 +22,14 @@ void DelocalisationHelper::maskOutsideBox(
 		const double xx = x/as;
 		const double yy = y < sh? y/as : (y - s)/as;
 		
-		d2Vector delocCent = (1.0 / (2 * angpix * PI)) * ctf.getGammaGrad(xx,yy);
+		t2Vector<RFLOAT> delocCent = RFLOAT(1.0 / (2 * angpix * PI)) * ctf.getGammaGrad(xx,yy);
 		
 		double out = 0.0;
 		double cnt = 0.0;
 		
-		for (double sign = (x == 0? 1.0 : -1.0); sign <= 1.0; sign += 2.0)
+		for (RFLOAT sign = (x == 0? 1.0 : -1.0); sign <= 1.0; sign += 2.0)
 		{
-			d2Vector p = origin + sign * delocCent;
+			t2Vector<RFLOAT> p = origin + sign * delocCent;
 			
 			double dx, dy;
 			
@@ -75,7 +75,7 @@ Image<RFLOAT> DelocalisationHelper::plotDelocalisation(
 		double xx = x < sh? x/as : (x - s)/as;
 		double yy = y < sh? y/as : (y - s)/as;
 		
-		d2Vector delocCent = (1.0 / (2 * angpix * PI)) * ctf.getGammaGrad(xx,yy);
+		t2Vector<RFLOAT> delocCent = RFLOAT(1.0 / (2 * angpix * PI)) * ctf.getGammaGrad(xx,yy);
 		
 		if (delocCent.x > -sh && delocCent.x < sh 
 		 && delocCent.y > -sh && delocCent.y < sh)

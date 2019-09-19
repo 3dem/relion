@@ -670,17 +670,17 @@ void ObservationModel::getBoxSizes(std::vector<int>& sDest, std::vector<int>& sh
 	}
 }
 
-Matrix2D<double> ObservationModel::getMagMatrix(int opticsGroup) const
+Matrix2D<RFLOAT> ObservationModel::getMagMatrix(int opticsGroup) const
 {
 	return magMatrices[opticsGroup];
 }
 
-void ObservationModel::setMagMatrix(int opticsGroup, const Matrix2D<double> &M)
+void ObservationModel::setMagMatrix(int opticsGroup, const Matrix2D<RFLOAT> &M)
 {
 	magMatrices[opticsGroup] = M;
 }
 
-std::vector<Matrix2D<double> > ObservationModel::getMagMatrices() const
+std::vector<Matrix2D<RFLOAT> > ObservationModel::getMagMatrices() const
 {
 	return magMatrices;
 }

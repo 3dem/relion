@@ -80,7 +80,7 @@ class ModularCtfOptimisation : public DifferentiableOptimization
 			std::vector<double> initialValues, angpix;
 			int paramOffset[CtfParamCount], paramParticleStep[CtfParamCount];
 			
-			std::vector<Image<double>> aberrationByGroup;
+			std::vector<Image<RFLOAT>> aberrationByGroup;
 			const std::vector<Image<RFLOAT>>& frqWghByGroup;
 			
 					

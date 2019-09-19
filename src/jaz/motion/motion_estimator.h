@@ -80,7 +80,7 @@ class MotionEstimator
             const std::vector<gravis::d2Vector>& positions,
             const std::vector<gravis::d2Vector>& globComp) const;
 
-		std::vector<Image<RFLOAT>> computeDamageWeights(int opticsGroup);
+	std::vector<Image<RFLOAT>> computeDamageWeights(int opticsGroup);
 		
         bool isReady();
 

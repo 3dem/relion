@@ -5,7 +5,7 @@
 bool AccProjector::setMdlDim(
 		int xdim, int ydim, int zdim,
 		int inity, int initz,
-		int maxr, int paddingFactor)
+		int maxr, XFLOAT paddingFactor)
 {
 	if(zdim == 1) zdim = 0;
 
@@ -164,7 +164,7 @@ void AccProjector::initMdl(XFLOAT *real, XFLOAT *imag)
 	std::complex<XFLOAT> *pData = mdlComplex;
     for(size_t i=0; i<mdlXYZ; i++) {
 		std::complex<XFLOAT> arrayval(*real ++, *imag ++);
-		pData[i] = arrayval;		        
+		pData[i] = arrayval;
     }
 #endif
 #endif

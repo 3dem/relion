@@ -22,13 +22,12 @@
 
 void Postprocessing::read(int argc, char **argv)
 {
-
 	parser.setCommandLine(argc, argv);
 	int gen_section = parser.addSection("General options");
 	fn_I1 = parser.getOption("--i", "Input name of half1, e.g. run_half1_class001_unfil.mrc");
 	fn_I2 = parser.getOption("--i2", "Input name of half2, (default replaces half1 from --i with half2)", "");
 	fn_out = parser.getOption("--o", "Output rootname", "postprocess");
-	angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms"));
+	angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms", "-1"));
 	write_halfmaps = parser.checkOption("--half_maps", "Write post-processed half maps for validation");
 	mtf_angpix  = textToFloat(parser.getOption("--mtf_angpix", "Pixel size in the original micrographs/movies (in Angstroms)", "-1."));
 
@@ -50,7 +49,7 @@ void Postprocessing::read(int argc, char **argv)
 	int filter_section = parser.addSection("Filtering options");
 	do_fsc_weighting = !parser.checkOption("--skip_fsc_weighting", "Do not use FSC-weighting (Rosenthal and Henderson, 2003) in the sharpening process");
 	// include low-pass filter option in the program? This could be useful for structurally heterogeneous reconstructions (instead of FSC-weighting)
-	low_pass_freq = textToFloat(parser.getOption("--low_pass", "Resolution (in Angstroms) at which to low-pass filter the final map (by default at final resolution)", "0."));
+	low_pass_freq = textToFloat(parser.getOption("--low_pass", "Resolution (in Angstroms) at which to low-pass filter the final map (0: disable, negative: resolution at FSC=0.143)", "0"));
 
 	int locres_section = parser.addSection("Local-resolution options");
 	do_locres = parser.checkOption("--locres", "Perform local resolution estimation");
@@ -76,7 +75,6 @@ void Postprocessing::read(int argc, char **argv)
 	// Check for errors in the command-line option
 	if (parser.checkForErrors())
 		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
-
 }
 
 void Postprocessing::usage()
@@ -117,11 +115,6 @@ void Postprocessing::initialise()
 			REPORT_ERROR("The input filename does not contain 'half1' or 'half2'");
 	}
 
-	if (mtf_angpix < 0.)
-	{
-		if (verb > 0) std::cout << " + --mtf_angpix was not provided, assuming pixel size in raw micrographs is the same as in particles..." << std::endl;
-		mtf_angpix = angpix;
-	}
 
 	if (verb > 0)
 	{
@@ -130,11 +123,22 @@ void Postprocessing::initialise()
 		std::cout.width(35); std::cout << std::left <<"  + half2-map: "; std::cout << fn_I2 << std::endl;
 	}
 
-
 	I1.read(fn_I1);
 	I2.read(fn_I2);
 	I1().setXmippOrigin();
 	I2().setXmippOrigin();
+
+	if (angpix <= 0)
+	{
+		angpix = I1.samplingRateX();
+		std::cerr << "WARNING: You did not specify --angpix. The pixel size in the image header, " << angpix << " A/px, is used." << std::endl;
+	}
+
+	if (mtf_angpix < 0.)
+	{
+		if (verb > 0) std::cout << " + --mtf_angpix was not provided, assuming pixel size in raw micrographs is the same as in particles, " << angpix << " A/px." << std::endl;
+		mtf_angpix = angpix;
+	}
 
 	if (!I1().sameShape(I2()))
 	{
@@ -165,7 +169,6 @@ void Postprocessing::initialise()
 
 bool Postprocessing::getMask()
 {
-
 	if (fn_mask != "")
 	{
 		if (verb > 0)
@@ -210,7 +213,6 @@ bool Postprocessing::getMask()
 
 void Postprocessing::divideByMtf(MultidimArray<Complex > &FT)
 {
-
 	if (fn_mtf != "")
 	{
 		if (verb > 0)
@@ -283,7 +285,6 @@ bool Postprocessing::findSurfacePixel(int idx, int kp, int ip, int jp,
 		int &best_kpp, int &best_ipp, int &best_jpp,
 		int myradius_count, int search)
 {
-
 	// bring kp, ip, jp onto the sphere
 	RFLOAT frac = (RFLOAT)(myradius_count)/(RFLOAT)idx;
 	int kpp = ROUND(frac*kp);
@@ -299,31 +300,29 @@ bool Postprocessing::findSurfacePixel(int idx, int kp, int ip, int jp,
 	for (int kppp = kpp-search; kppp <= kpp+search; kppp++)
 	{
 		for (int ippp = ipp-search; ippp <= ipp+search; ippp++)
-    	{
-	        for (int jppp = jpp-search; jppp <= jpp+search; jppp++)
-	        {
-	        	// Distance to surface on the sphere
-	        	int dist = ABS(ROUND(sqrt((RFLOAT)(kppp*kppp + ippp*ippp + jppp*jppp))) - myradius_count);
-	        	int reldist2 = (kppp-kpp)*(kppp-kpp) + (ippp-ipp)*(ippp-ipp) + (jppp-jpp)*(jppp-jpp);
-	        	if (dist < 0.5 && reldist2 < best_dist)
-	        	{
-	        		best_kpp=kppp;
-	        		best_ipp=ippp;
-	        		best_jpp=jppp;
-	        		best_dist=reldist2;
-	        		found=true;
-	        	}
-        	}
-    	}
+		{
+			for (int jppp = jpp-search; jppp <= jpp+search; jppp++)
+	 		{
+				// Distance to surface on the sphere
+				int dist = ABS(ROUND(sqrt((RFLOAT)(kppp*kppp + ippp*ippp + jppp*jppp))) - myradius_count);
+				int reldist2 = (kppp-kpp)*(kppp-kpp) + (ippp-ipp)*(ippp-ipp) + (jppp-jpp)*(jppp-jpp);
+				if (dist < 0.5 && reldist2 < best_dist)
+				{
+					best_kpp=kppp;
+					best_ipp=ippp;
+					best_jpp=jppp;
+					best_dist=reldist2;
+					found=true;
+				}
+			}
+    		}
 	}
+
 	return found;
-
 }
-
 
 void Postprocessing::correctRadialAmplitudeDistribution(MultidimArray<RFLOAT > &I)
 {
-
 	MultidimArray<Complex > FT;
 	FourierTransformer transformer;
 	transformer.FourierTransform(I, FT, false);
@@ -408,10 +407,8 @@ void Postprocessing::correctRadialAmplitudeDistribution(MultidimArray<RFLOAT > &
 	transformer.inverseFourierTransform(FT, I);
 }
 
-
 RFLOAT Postprocessing::sharpenMap()
 {
-
 	MultidimArray<Complex > FT;
 	FourierTransformer transformer;
 	transformer.FourierTransform(I1(), FT, true);
@@ -475,16 +472,20 @@ RFLOAT Postprocessing::sharpenMap()
 
 	makeGuinierPlot(FT, guiniersharpen);
 
-	if (verb > 0)
+	RFLOAT applied_filter = low_pass_freq;
+	if (low_pass_freq != 0)
 	{
-		std::cout << "== Low-pass filtering final map ... " << std::endl;
+		if (low_pass_freq < 0)
+			applied_filter = global_resol;
+
+		if (verb > 0)
+		{
+			std::cout << "== Low-pass filtering final map ... " << std::endl;
+			std::cout.width(35); std::cout << std::left  <<"  + filter frequency: "; std::cout << applied_filter << std::endl;
+		}
+
+		lowPassFilterMap(FT, XSIZE(I1()), applied_filter, angpix, filter_edge_width);
 	}
-	RFLOAT applied_filter = (low_pass_freq > 0.) ? low_pass_freq : global_resol;
-	if (verb > 0)
-	{
-		std::cout.width(35); std::cout << std::left  <<"  + filter frequency: "; std::cout << applied_filter << std::endl;
-	}
-	lowPassFilterMap(FT, XSIZE(I1()), applied_filter, angpix, filter_edge_width);
 
 	transformer.inverseFourierTransform(FT, I1());
 
@@ -526,47 +527,46 @@ void Postprocessing::applyFscWeighting(MultidimArray<Complex > &FT, MultidimArra
 	// Find resolution where fsc_true drops below zero for the first time
 	// Set all weights to zero beyond that resolution
 	int ires_max = 0 ;
+
 	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(my_fsc)
 	{
 		if (DIRECT_A1D_ELEM(my_fsc, i) < 0.0001)
 			break;
 		ires_max = i;
 	}
+
 	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT)
 	{
-    	int ires = ROUND(sqrt((RFLOAT)kp * kp + ip * ip + jp * jp));
+		int ires = ROUND(sqrt((RFLOAT)kp * kp + ip * ip + jp * jp));
 		if (ires <= ires_max)
 		{
-	        RFLOAT fsc = DIRECT_A1D_ELEM(my_fsc, ires);
-	        if (fsc > 0.)
-	        	DIRECT_A3D_ELEM(FT, k, i, j) *= sqrt((2 * fsc) / (1 + fsc));
-	        else
-	        	DIRECT_A3D_ELEM(FT, k, i, j) *= 0.;
+			RFLOAT fsc = DIRECT_A1D_ELEM(my_fsc, ires);
+			if (fsc > 0.)
+				DIRECT_A3D_ELEM(FT, k, i, j) *= sqrt((2 * fsc) / (1 + fsc));
+			else
+				DIRECT_A3D_ELEM(FT, k, i, j) *= 0.;
 		}
 		else
 		{
 			DIRECT_A3D_ELEM(FT, k, i, j) = 0.;
 		}
 	}
-
 }
 
 void Postprocessing::makeGuinierPlot(MultidimArray<Complex > &FT, std::vector<fit_point2D> &guinier)
 {
-
 	MultidimArray<int> radial_count(XSIZE(FT));
 	MultidimArray<RFLOAT> lnF(XSIZE(FT));
 	fit_point2D      onepoint;
 
 	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(FT)
 	{
-    	int r2 = kp * kp + ip * ip + jp * jp;
-    	int ires = ROUND(sqrt((RFLOAT)r2));
+		int r2 = kp * kp + ip * ip + jp * jp;
+		int ires = ROUND(sqrt((RFLOAT)r2));
 		if (ires < XSIZE(radial_count))
 		{
-
-	        lnF(ires) += abs(DIRECT_A3D_ELEM(FT, k, i, j));
-	        radial_count(ires)++;
+		        lnF(ires) += abs(DIRECT_A3D_ELEM(FT, k, i, j));
+		        radial_count(ires)++;
 		}
 	}
 
@@ -577,30 +577,29 @@ void Postprocessing::makeGuinierPlot(MultidimArray<Complex > &FT, std::vector<fi
 
 		RFLOAT res = (xsize * angpix)/(RFLOAT)i; // resolution in Angstrom
 		if (res >= angpix * 2.) // Apply B-factor sharpening until Nyquist, then low-pass filter later on (with a soft edge)
-        {
-            onepoint.x = 1. / (res * res);
-            if (DIRECT_A1D_ELEM(lnF, i) > 0.)
-            {
-                onepoint.y = log ( DIRECT_A1D_ELEM(lnF, i) / DIRECT_A1D_ELEM(radial_count, i) );
-                if (res <= fit_minres && res >= fit_maxres)
-                {
-                    onepoint.w = 1.;
-                }
-                else
-                {
-                    onepoint.w = 0.;
-                }
-            }
-            else
-            {
-                onepoint.y = -99.;
-                onepoint.w = 0.;
-            }
-            //std::cerr << " onepoint.x= " << onepoint.x << " onepoint.y= " << onepoint.y << " onepoint.w= " << onepoint.w << std::endl;
-            guinier.push_back(onepoint);
-        }
+		{
+			onepoint.x = 1. / (res * res);
+			if (DIRECT_A1D_ELEM(lnF, i) > 0.)
+			{
+				onepoint.y = log ( DIRECT_A1D_ELEM(lnF, i) / DIRECT_A1D_ELEM(radial_count, i) );
+				if (res <= fit_minres && res >= fit_maxres)
+				{
+					onepoint.w = 1.;
+				}
+				else
+				{
+					onepoint.w = 0.;
+				}
+			}
+			else
+			{
+				onepoint.y = -99.;
+				onepoint.w = 0.;
+			}
+			//std::cerr << " onepoint.x= " << onepoint.x << " onepoint.y= " << onepoint.y << " onepoint.w= " << onepoint.w << std::endl;
+			guinier.push_back(onepoint);
+		}
 	}
-
 }
 
 void Postprocessing::writeOutput()
@@ -653,7 +652,6 @@ void Postprocessing::writeOutput()
 		MDlist.setValue(EMDL_POSTPROCESS_GUINIER_FIT_CORRELATION, global_corr_coeff);
 	}
 	MDlist.write(fh);
-
 
 	MDfsc.setName("fsc");
 	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(fsc_true)
@@ -773,7 +771,6 @@ void Postprocessing::writeOutput()
 	{
 		std::cout.width(35); std::cout << std::left   <<"  + FINAL RESOLUTION: "; std::cout << global_resol<< std::endl;
 	}
-
 }
 
 // This masks I1!
@@ -861,7 +858,6 @@ void Postprocessing::run_locres(int rank, int size)
 	transformer.FourierTransform(Isum, FTsum, true);
 	divideByMtf(FTsum);
 	applyBFactorToMap(FTsum, XSIZE(Isum), adhoc_bfac, angpix);
-
 
 	// Step size of locres-sampling in pixels
 	int step_size = ROUND(locres_sampling / angpix);
@@ -1079,10 +1075,8 @@ void Postprocessing::run_locres(int rank, int size)
 
 void Postprocessing::run()
 {
-
 	// Read input maps and perform some checks
 	initialise();
-
 
 	// For amplitude correlation curves: first do radial amplitude correction for non-uniform angular distributions
 	if (do_ampl_corr)

@@ -453,8 +453,8 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	minimum_angular_sampling = textToFloat(getParameter(argc, argv, "--minimum_angular_sampling", "0"));
 	maximum_angular_sampling = textToFloat(getParameter(argc, argv, "--maximum_angular_sampling", "0"));
 	asymmetric_padding = parser.checkOption("--asymmetric_padding", "", "false", true);
-	maximum_significants = textToInteger(parser.getOption("--maxsig", "", "0", true));
-	skip_gridding = parser.checkOption("--skip_gridding", "", "false", true);
+	maximum_significants = textToInteger(parser.getOption("--maxsig", "Maximum number of poses & translations to consider", "-1"));
+	skip_gridding = parser.checkOption("--skip_gridding", "Skip gridding in the M step");
 	nr_iter_max = textToInteger(parser.getOption("--auto_iter_max", "In auto-refinement, stop at this iteration.", "999"));
 
 	do_print_metadata_labels = false;
@@ -765,15 +765,13 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	minimum_angular_sampling = textToFloat(getParameter(argc, argv, "--minimum_angular_sampling", "0"));
 	maximum_angular_sampling = textToFloat(getParameter(argc, argv, "--maximum_angular_sampling", "0"));
 	asymmetric_padding = parser.checkOption("--asymmetric_padding", "", "false", true);
-	maximum_significants = textToInteger(parser.getOption("--maxsig", "", "0", true));
-	skip_gridding = parser.checkOption("--skip_gridding", "", "false", true);
+	maximum_significants = textToInteger(parser.getOption("--maxsig", "Maximum number of poses & translations to consider", "-1"));
+	skip_gridding = parser.checkOption("--skip_gridding", "Skip gridding in the M step");
 
 #ifdef DEBUG_READ
 	std::cerr<<"MlOptimiser::parseInitial Done"<<std::endl;
 #endif
-
 }
-
 
 void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 {
@@ -4965,8 +4963,6 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 				prior_rot = DIRECT_A2D_ELEM(exp_metadata, my_metadata_offset, METADATA_ROT);
 			if (prior_tilt > 998.99 && prior_tilt < 999.01)
 				prior_tilt = DIRECT_A2D_ELEM(exp_metadata, my_metadata_offset, METADATA_TILT);
-			if ( (do_helical_refine) && (helical_keep_tilt_prior_fixed) && (do_local_angular_searches) )
-				prior_tilt = DIRECT_A2D_ELEM(exp_metadata, my_metadata_offset, METADATA_TILT);
 			if (prior_psi > 998.99 && prior_psi < 999.01)
 				prior_psi = DIRECT_A2D_ELEM(exp_metadata, my_metadata_offset, METADATA_PSI);
 			if (prior_psi_flip_ratio > 998.99 && prior_psi_flip_ratio < 999.01)
@@ -8622,8 +8618,8 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 			// Old rottilt step is already below 75% of estimated accuracy: have to stop refinement?
 			// If a minimum_angular_sampling is given and we're not there yet, also just continue
 			if (all_bodies_are_done
-					|| (maximum_angular_sampling > 0. && old_rottilt_step < maximum_angular_sampling)
-					|| (old_rottilt_step < 0.75 * acc_rot && !(minimum_angular_sampling > 0. && old_rottilt_step > minimum_angular_sampling)))
+			    || (maximum_angular_sampling > 0. && old_rottilt_step < maximum_angular_sampling)
+			    || (old_rottilt_step < 0.75 * acc_rot && !(minimum_angular_sampling > 0. && old_rottilt_step > minimum_angular_sampling)))
 			{
 				// don't change angular sampling, as it is already fine enough
 				has_fine_enough_angular_sampling = true;
@@ -8730,7 +8726,9 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 					// Switch ON local angular searches
 					mymodel.orientational_prior_mode = PRIOR_ROTTILT_PSI;
 					sampling.orientational_prior_mode = PRIOR_ROTTILT_PSI;
-					mymodel.sigma2_rot = mymodel.sigma2_tilt = mymodel.sigma2_psi = 2. * 2. * new_rottilt_step * new_rottilt_step;
+					mymodel.sigma2_rot = mymodel.sigma2_psi = 2. * 2. * new_rottilt_step * new_rottilt_step;
+					if (!(do_helical_refine && helical_keep_tilt_prior_fixed))
+						mymodel.sigma2_tilt = mymodel.sigma2_rot;
 
 					// Aug20,2015 - Shaoda, Helical refinement
 					if ( (do_helical_refine) && (!ignore_helical_symmetry) )

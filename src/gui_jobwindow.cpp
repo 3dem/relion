@@ -36,12 +36,13 @@ void JobWindow::clear()
 
 void JobWindow::setupTabs(int nr_tabs)
 {
-
 	current_y = y; // top of the GUI
 
 	char * my_allow_change_dedicated = getenv ("RELION_ALLOW_CHANGE_MINIMUM_DEDICATED");
 	if (my_allow_change_dedicated == NULL)
+	{
 		do_allow_change_minimum_dedicated = DEFAULTMININIMUMDEDICATED;
+	}
 	else
 	{
 		int check_allow =  textToInteger(my_allow_change_dedicated);
@@ -60,7 +61,6 @@ void JobWindow::setupTabs(int nr_tabs)
 		tab1->selection_color(GUI_BACKGROUND_COLOR2);
 		if (nr_tabs >= 2)
 		{
-
 			tab2 = new Fl_Group(x, current_y , w, h - MENUHEIGHT, "");
 			tab2->end();
 			tab2->color(GUI_BACKGROUND_COLOR);
@@ -118,9 +118,7 @@ void JobWindow::setupTabs(int nr_tabs)
 		runtab->selection_color(GUI_BACKGROUND_COLOR2);
 
 		tabs->end();
-
 	}
-
 }
 
 void JobWindow::setupRunTab()
@@ -140,7 +138,7 @@ void JobWindow::setupRunTab()
 	if (myjob.joboptions.find("nr_threads") != myjob.joboptions.end())
 	{
 		place("nr_threads", TOGGLE_LEAVE_ACTIVE);
-    	has_parallel = true;
+		has_parallel = true;
 	}
 
 	// Add a little spacer
@@ -183,13 +181,12 @@ void JobWindow::setupRunTab()
 	queue_group->end();
 	guientries["do_queue"].cb_menu_i(); // This is to make the default effective
 
-    // Add a little spacer
-    current_y += STEPY/4;
+	// Add a little spacer
+	current_y += STEPY/4;
 
-    place("other_args");
+	place("other_args");
 
-    runtab->end();
-
+	runtab->end();
 }
 
 void JobWindow::place(std::string key, int deactivate_option, Fl_Group * deactivate_this_group, bool actually_activate)
@@ -211,10 +208,10 @@ void JobWindow::place2(std::string key1, std::string key2, std::string label, in
 	myjob.joboptions[key2].label_gui = "";
 	int old_y = current_y;
 	guientries[key1].place(myjob.joboptions[key1], current_y, deactivate_option, NULL, false,
-			XCOL2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
+	                       XCOL2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
 	current_y = old_y;
 	guientries[key2].place(myjob.joboptions[key2], current_y, deactivate_option, NULL, false,
-			XCOL2 + (WCOL2 + COLUMN_SEPARATION) / 2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
+	                       XCOL2 + (WCOL2 + COLUMN_SEPARATION) / 2, STEPY, (WCOL2 - COLUMN_SEPARATION) / 2);
 }
 
 void JobWindow::place3(std::string key1, std::string key2, std::string key3, std::string label, int deactivate_option)
@@ -231,25 +228,22 @@ void JobWindow::place3(std::string key1, std::string key2, std::string key3, std
 	myjob.joboptions[key3].label_gui = "";
 	int old_y = current_y;
 	guientries[key1].place(myjob.joboptions[key1], current_y, deactivate_option, NULL, false,
-			XCOL2, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
+	                       XCOL2, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
 	current_y = old_y;
 	guientries[key2].place(myjob.joboptions[key2], current_y, deactivate_option, NULL, false,
-			XCOL2 + 1 + (WCOL2 + COLUMN_SEPARATION) / 3, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
+	                       XCOL2 + 1 + (WCOL2 + COLUMN_SEPARATION) / 3, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
 	current_y = old_y;
 	guientries[key3].place(myjob.joboptions[key3], current_y, deactivate_option, NULL, false,
-			XCOL2 + 1 + 2 * (WCOL2 + COLUMN_SEPARATION) / 3, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
-
+	                       XCOL2 + 1 + 2 * (WCOL2 + COLUMN_SEPARATION) / 3, STEPY, (WCOL2 - COLUMN_SEPARATION * 2) / 3);
 }
 
 void JobWindow::toggle_new_continue(bool _is_continue)
 {
-
 	is_continue = _is_continue;
 	myjob.is_continue = _is_continue;
 
 	for (std::map<std::string,GuiEntry>::iterator it=guientries.begin(); it!=guientries.end(); ++it)
 	{
-
 		int my_option = (it->second).deactivate_option;
 		switch (my_option)
 		{
@@ -278,9 +272,7 @@ void JobWindow::toggle_new_continue(bool _is_continue)
 			REPORT_ERROR("ERROR: unrecognised deactivate-option for GUI entry " + it->first);
 		}
 		}
-
 	}
-
 }
 
 void JobWindow::resetHeight()
@@ -314,12 +306,10 @@ void JobWindow::updateMyJob()
 
 		it->second.value = std::string(((guientries[it->first]).inp)->value());
 	}
-
 }
 
 void JobWindow::initialise(int my_job_type)
 {
-
 	if (my_job_type == PROC_IMPORT)
 	{
 		myjob.initialise(my_job_type);
@@ -430,22 +420,18 @@ void JobWindow::initialise(int my_job_type)
 
 	// update the window
 	updateMyGui();
-
 }
 
 void JobWindow::initialiseImportWindow()
 {
-
 	setupTabs(2);
 
 	tab1->begin();
 	tab1->label("Movies/mics");
 	resetHeight();
 
-
 	group1 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group1->end();
-
 
 	place("do_raw", TOGGLE_DEACTIVATE, group1, false);
 
@@ -491,7 +477,6 @@ void JobWindow::initialiseImportWindow()
 
 	guientries["do_other"].cb_menu_i(); // make default active
 
-
 	tab2->end();
 
 	// Always deactivate the queue option
@@ -501,7 +486,6 @@ void JobWindow::initialiseImportWindow()
 
 void JobWindow::initialiseMotioncorrWindow()
 {
-
 	setupTabs(2);
 
 	tab1->begin();
@@ -564,12 +548,10 @@ void JobWindow::initialiseMotioncorrWindow()
 	guientries["do_own_motioncor"].cb_menu_i(); // make default active
 
 	tab2->end();
-
 }
 
 void JobWindow::initialiseCtffindWindow()
 {
-
 	setupTabs(3);
 
 	tab1->begin();
@@ -631,7 +613,6 @@ void JobWindow::initialiseCtffindWindow()
 
 	tab2->end();
 
-
 	tab3->begin();
 	tab3->label("Gctf");
 	resetHeight();
@@ -653,7 +634,6 @@ void JobWindow::initialiseCtffindWindow()
 	// Add a little spacer
 	current_y += STEPY/2;
 	place("gpu_ids", TOGGLE_LEAVE_ACTIVE);
-
 
 	group4->end();
 	guientries["use_gctf"].cb_menu_i(); // make default active
@@ -757,6 +737,7 @@ void JobWindow::initialiseAutopickWindow()
 	current_y += STEPY/2;
 	place("log_maxres", TOGGLE_DEACTIVATE);
 	place("log_adjust_thr");
+	place("log_upper_thr");
 
 	tab2->end();
 	tab3->begin();
@@ -811,7 +792,6 @@ void JobWindow::initialiseAutopickWindow()
 	// Set up queue groups for running tab
 	place("shrink", TOGGLE_DEACTIVATE);
 
-
 	group3 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group3->end();
 	place("use_gpu", TOGGLE_LEAVE_ACTIVE, group3);
@@ -852,8 +832,8 @@ void JobWindow::initialiseAutopickWindow()
 	guientries["do_pick_helical_segments"].cb_menu_i();
 
 	tab5->end();
-
 }
+
 void JobWindow::initialiseExtractWindow()
 {
 	setupTabs(3);
@@ -919,7 +899,6 @@ void JobWindow::initialiseExtractWindow()
 
 	group3->begin();
 
-
 	place("bg_diameter", TOGGLE_DEACTIVATE); //(current_y, "Diameter background circle (pix): ", -1, -1, 600, 10, "Particles will be normalized to a mean value of zero and a standard-deviation of one for all pixels in the background area.\
 The background area is defined as all pixels outside a circle with this given diameter in pixels (before rescaling). When specifying a negative value, a default value of 75% of the Particle box size will be used.");
 
@@ -981,7 +960,6 @@ Pixels values higher than this many times the image stddev will be replaced with
 	guientries["do_extract_helix"].cb_menu_i();
 
 	tab3->end();
-
 }
 
 void JobWindow::initialiseSelectWindow()
@@ -1219,10 +1197,8 @@ void JobWindow::initialiseClass2DWindow()
 	guientries["use_gpu"].cb_menu_i();
 
 	tab6->end();
-
-
-
 }
+
 void JobWindow::initialiseInimodelWindow()
 {
 	setupTabs(5);
@@ -1330,6 +1306,7 @@ void JobWindow::initialiseInimodelWindow()
 	place("do_parallel_discio");
 	place("nr_pool");
 	place("do_pad1");
+	place("skip_gridding");
 	group5 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group5->end();
 	place("do_preread_images", TOGGLE_LEAVE_ACTIVE, group5, true);
@@ -1353,10 +1330,9 @@ void JobWindow::initialiseInimodelWindow()
 
 	guientries["use_gpu"].cb_menu_i();
 
-
 	tab5->end();
-
 }
+
 void JobWindow::initialiseClass3DWindow()
 {
 	setupTabs(7);
@@ -1514,6 +1490,7 @@ void JobWindow::initialiseClass3DWindow()
 	place("do_parallel_discio");
 	place("nr_pool");
 	place("do_pad1");
+	place("skip_gridding");
 	group7 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group7->end();
 	place("do_preread_images", TOGGLE_LEAVE_ACTIVE, group7, true);
@@ -1534,8 +1511,8 @@ void JobWindow::initialiseClass3DWindow()
 	guientries["use_gpu"].cb_menu_i(); // This is to make the default effective
 
 	tab7->end();
-
 }
+
 void JobWindow::initialiseAutorefineWindow()
 {
 	setupTabs(7);
@@ -1654,6 +1631,7 @@ void JobWindow::initialiseAutorefineWindow()
 	place("do_parallel_discio");
 	place("nr_pool");
 	place("do_pad1");
+	place("skip_gridding");
 	group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group4->end();
 	place("do_preread_images", TOGGLE_LEAVE_ACTIVE, group4, true);
@@ -1675,7 +1653,6 @@ void JobWindow::initialiseAutorefineWindow()
 	guientries["use_gpu"].cb_menu_i(); // This is to make the default effective
 
 	tab7->end();
-
 }
 
 void JobWindow::initialiseMultiBodyWindow()
@@ -1702,7 +1679,6 @@ void JobWindow::initialiseMultiBodyWindow()
 	place("sampling", TOGGLE_DEACTIVATE);
 	place("offset_range", TOGGLE_DEACTIVATE);
 	place("offset_step", TOGGLE_DEACTIVATE);
-
 
 	tab2->end();
 
@@ -1742,6 +1718,7 @@ void JobWindow::initialiseMultiBodyWindow()
 	place("do_parallel_discio");
 	place("nr_pool");
 	place("do_pad1");
+	place("skip_gridding");
 	group7 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
 	group7->end();
 	place("do_preread_images", TOGGLE_LEAVE_ACTIVE, group7, true);
@@ -1763,10 +1740,7 @@ void JobWindow::initialiseMultiBodyWindow()
 	guientries["use_gpu"].cb_menu_i(); // This is to make the default effective
 
 	tab4->end();
-
-
 }
-
 
 void JobWindow::initialiseMaskcreateWindow()
 {
@@ -1810,7 +1784,6 @@ void JobWindow::initialiseMaskcreateWindow()
 	guientries["do_helix"].cb_menu_i(); // to make default effective
 
 	tab3->end();
-
 }
 
 
@@ -1851,7 +1824,6 @@ void JobWindow::initialiseJoinstarWindow()
 
 	tab2->end();
 
-
 	tab3->begin();
 	tab3->label("movies");
 	resetHeight();
@@ -1868,8 +1840,8 @@ void JobWindow::initialiseJoinstarWindow()
 	guientries["do_mov"].cb_menu_i(); // make default active
 
 	tab3->end();
-
 }
+
 void JobWindow::initialiseSubtractWindow()
 {
 	setupTabs(2);
@@ -1929,8 +1901,8 @@ void JobWindow::initialiseSubtractWindow()
 	place("new_box", TOGGLE_DEACTIVATE);
 
 	tab2->end();
-
 }
+
 void JobWindow::initialisePostprocessWindow()
 {
 	setupTabs(3);
@@ -1996,8 +1968,8 @@ void JobWindow::initialisePostprocessWindow()
 	guientries["do_skip_fsc_weighting"].cb_menu_i();
 
 	tab3->end();
-
 }
+
 void JobWindow::initialiseLocresWindow()
 {
 	setupTabs(3);
@@ -2064,7 +2036,6 @@ void JobWindow::initialiseLocresWindow()
 	guientries["do_relion_locres"].cb_menu_i();
 
 	tab3->end();
-
 }
 
 void JobWindow::initialiseMotionrefineWindow()
@@ -2143,7 +2114,6 @@ void JobWindow::initialiseMotionrefineWindow()
 	place("maxres", TOGGLE_DEACTIVATE);
 
 	tab3->end();
-
 }
 
 void JobWindow::initialiseCtfrefineWindow()
@@ -2211,9 +2181,7 @@ void JobWindow::initialiseCtfrefineWindow()
 	place("minres", TOGGLE_DEACTIVATE);
 
 	tab2->end();
-
 }
-
 
 void JobWindow::initialiseExternalWindow()
 {
@@ -2234,7 +2202,6 @@ void JobWindow::initialiseExternalWindow()
 	place("in_3dref", TOGGLE_DEACTIVATE);
 	place("in_mask", TOGGLE_DEACTIVATE);
 
-
 	tab1->end();
 
 	tab2->begin();
@@ -2253,7 +2220,4 @@ void JobWindow::initialiseExternalWindow()
 	place2("param10_label", "param10_value", "Param10 label, value:", TOGGLE_LEAVE_ACTIVE);
 
 	tab2->end();
-
 }
-
-

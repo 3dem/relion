@@ -83,8 +83,8 @@ void BackProjector::backproject2Dto3D(const MultidimArray<Complex > &f2d,
 	Ainv *= (RFLOAT)padding_factor;  // take scaling into account directly
 
 	// max_r2 and min_r2_nn are defined in 3D-space
-	int max_r2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
-	int min_r2_nn = ROUND(r_min_nn * padding_factor) * ROUND(r_min_nn * padding_factor);
+	const int max_r2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
+	const int min_r2_nn = ROUND(r_min_nn * padding_factor) * ROUND(r_min_nn * padding_factor);
 
 	// precalculated coefficients for ellipse determination (see further down)
 
@@ -111,7 +111,7 @@ void BackProjector::backproject2Dto3D(const MultidimArray<Complex > &f2d,
 	std::cerr << " STARTINGX(data)= "<< STARTINGX(data) << std::endl;
 	std::cerr << " STARTINGY(data)= "<< STARTINGY(data) << std::endl;
 	std::cerr << " STARTINGZ(data)= "<< STARTINGZ(data) << std::endl;
-	std::cerr << " max_r= "<< r_max << std::endl;
+	std::cerr << " r_max= "<< r_max << std::endl;
 	std::cerr << " Ainv= " << Ainv << std::endl;
 #endif
 
@@ -153,7 +153,7 @@ void BackProjector::backproject2Dto3D(const MultidimArray<Complex > &f2d,
 		// where: q := -AtA_xy y / AtA_xx,
 		//        d := sqrt((AtA_xy y)^2 - AtA_xx (AtA_yy y^2 - R^2)) / AtA_xx
 
-		RFLOAT discr = AtA_xy2 * y*y - AtA_xx * (AtA_yy * y*y - max_r2);
+		RFLOAT discr = AtA_xy2 * y * y - AtA_xx * (AtA_yy * y * y - max_r2);
 
 		if (discr < 0.0) continue; // no points inside ellipse for this y
 
@@ -857,8 +857,8 @@ void BackProjector::getLowResDataAndWeight(MultidimArray<Complex > &lowres_data,
                                            int lowres_r_max)
 {
 
-	int lowres_r2_max = ROUND(padding_factor * lowres_r_max) * ROUND(padding_factor * lowres_r_max);
-	int lowres_pad_size = 2 * (ROUND(padding_factor * lowres_r_max) + 1) + 1;
+	const int lowres_r2_max = ROUND(padding_factor * lowres_r_max) * ROUND(padding_factor * lowres_r_max);
+	const int lowres_pad_size = 2 * (ROUND(padding_factor * lowres_r_max) + 1) + 1;
 
 	// Check lowres_r_max is not too big
 	if (lowres_r_max > r_max)
@@ -898,8 +898,8 @@ void BackProjector::setLowResDataAndWeight(MultidimArray<Complex > &lowres_data,
                                            int lowres_r_max)
 {
 
-	int lowres_r2_max = ROUND(padding_factor * lowres_r_max) * ROUND(padding_factor * lowres_r_max);
-	int lowres_pad_size = 2 * (ROUND(padding_factor * lowres_r_max) + 1) + 1;
+	const int lowres_r2_max = ROUND(padding_factor * lowres_r_max) * ROUND(padding_factor * lowres_r_max);
+	const int lowres_pad_size = 2 * (ROUND(padding_factor * lowres_r_max) + 1) + 1;
 
 	// Check lowres_r_max is not too big
 	if (lowres_r_max > r_max)
@@ -935,7 +935,7 @@ void BackProjector::getDownsampledAverage(MultidimArray<Complex>& avg, bool divi
 	MultidimArray<RFLOAT> down_weight;
 
 	// Pre-set down_data and down_weight sizes
-	int down_size = 2 * (r_max + 1) + 1;
+	const int down_size = 2 * (r_max + 1) + 1;
 
 	// Short side of data array
 	switch (ref_dim)
@@ -1007,7 +1007,7 @@ void BackProjector::calculateDownSampledFourierShellCorrelation(const MultidimAr
 
 	FOR_ALL_ELEMENTS_IN_ARRAY3D(avg1)
 	{
-		RFLOAT R = sqrt(k*k + i*i + j*j);
+		const RFLOAT R = sqrt(k*k + i*i + j*j);
 
 		if (R > r_max) continue;
 
@@ -1052,7 +1052,7 @@ void BackProjector::updateSSNRarrays(RFLOAT tau2_fudge,
 	MultidimArray<RFLOAT> sigma2, data_vs_prior, fourier_coverage;
 	MultidimArray<RFLOAT> tau2 = tau2_io;
 	MultidimArray<RFLOAT> counter;
-	int max_r2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
+	const int max_r2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
 	RFLOAT oversampling_correction = (ref_dim == 3) ? (padding_factor * padding_factor * padding_factor) : (padding_factor * padding_factor);
 
 	// First calculate the radial average of the (inverse of the) power of the noise in the reconstruction
@@ -1063,7 +1063,7 @@ void BackProjector::updateSSNRarrays(RFLOAT tau2_fudge,
 	counter.initZeros(ori_size/2 + 1);
 	FOR_ALL_ELEMENTS_IN_ARRAY3D(weight)
 	{
-		int r2 = k * k + i * i + j * j;
+		const int r2 = k * k + i * i + j * j;
 		if (r2 < max_r2)
 		{
 			int ires = ROUND(sqrt((RFLOAT)r2) / padding_factor);
@@ -1207,14 +1207,14 @@ void BackProjector::externalReconstruct(MultidimArray<RFLOAT> &vol_out,
 	FileName fn_recons = fn_out+"_external_reconstruct.mrc";
 	FileName fn_star = fn_out+"_external_reconstruct.star";
 
-	int max_r2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
+	const int max_r2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
 	int padoridim = ROUND(padding_factor * ori_size);
 
 	// Write out data array
 	Image<Complex> Idata;
 	if (ref_dim == 2) Idata().resize(pad_size, pad_size/2+1);
 	else Idata().resize(pad_size, pad_size, pad_size/2+1);
-	decenter(data, Idata(), max_r2);
+	Projector::decenter(data, Idata(), max_r2);
 	windowFourierTransform(Idata(), padoridim);
 	ComplexIO::write(Idata(), fn_out+"_external_reconstruct_data", ".mrc");
 	Idata.clear();
@@ -1223,7 +1223,7 @@ void BackProjector::externalReconstruct(MultidimArray<RFLOAT> &vol_out,
 	Image<RFLOAT> Iweight;
 	if (ref_dim == 2) Iweight().resize(pad_size, pad_size/2+1);
 	else Iweight().resize(pad_size, pad_size, pad_size/2+1);
-	decenter(weight, Iweight(), max_r2);
+	Projector::decenter(weight, Iweight(), max_r2);
 	windowFourierTransform(Iweight(), padoridim);
 	Iweight.write(fn_out+"_external_reconstruct_weight.mrc");
 	Iweight.clear();
@@ -1293,7 +1293,6 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
                                 bool printTimes,
                                 Image<RFLOAT>* weight_out)
 {
-
 #ifdef TIMING
 	Timer ReconTimer;
 	int ReconS_1 = ReconTimer.setNew(" RcS1_Init ");
@@ -1324,7 +1323,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 #endif
 
 	RCTIC(ReconTimer,ReconS_1);
-	int max_r2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
+	const int max_r2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
 	RFLOAT oversampling_correction = (ref_dim == 3) ? (padding_factor * padding_factor * padding_factor) : (padding_factor * padding_factor);
 
 //#define DEBUG_RECONSTRUCT
@@ -1355,7 +1354,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 	// Go from projector-centered to FFTW-uncentered
 	MultidimArray<RFLOAT> Fweight;
 	Fweight.reshape(Fconv);
-	decenter(weight, Fweight, max_r2);
+	Projector::decenter(weight, Fweight, max_r2);
 
 	RCTOC(ReconTimer,ReconS_2);
 	RCTIC(ReconTimer,ReconS_2_5);
@@ -1363,13 +1362,13 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 	// This will regularise the actual reconstruction
 	if (do_map)
 	{
-    	// Then, add the inverse of tau2-spectrum values to the weight
+		// Then, add the inverse of tau2-spectrum values to the weight
 		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fconv)
  		{
 			int r2 = kp * kp + ip * ip + jp * jp;
 			if (r2 < max_r2)
 			{
-				int ires = ROUND( sqrt((RFLOAT)r2) / padding_factor );
+				int ires = ROUND(sqrt((RFLOAT)r2) / padding_factor);
 				RFLOAT invw = DIRECT_A3D_ELEM(Fweight, k, i, j);
 
 				RFLOAT invtau2;
@@ -1405,22 +1404,25 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 	RCTOC(ReconTimer,ReconS_2_5);
 	if (skip_gridding)
 	{
-
-		std::cerr << "Skipping gridding - new implementation ..." << std::endl;
-
 		RCTIC(ReconTimer,ReconS_3);
 		Fconv.initZeros(); // to remove any stuff from the input volume
-		decenter(data, Fconv, max_r2);
+		Projector::decenter(data, Fconv, max_r2);
 
 		// Prevent divisions by zero: set Fweight to at least 1/1000th of the radially averaged weight at that resolution
 		// beyond r_max, set Fweight to at least 1/1000th of the radially averaged weight at r_max;
+//		std::cerr << " max_r2 = " << max_r2 << " r_max = " << r_max << " padding_factor = " << padding_factor 
+//	                  << " ROUND(sqrt(max_r2)) = " << ROUND(sqrt(max_r2)) << " ROUND(r_max * padding_factor) = " << ROUND(r_max * padding_factor) << std::endl;
 		MultidimArray<RFLOAT> radavg_weight(r_max), counter(r_max);
+		const int round_max_r2 = ROUND(r_max * padding_factor * r_max * padding_factor);
 		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fweight)
 		{
-			int r2 = kp * kp + ip * ip + jp * jp;
-			if (r2 < max_r2)
+			const int r2 = kp * kp + ip * ip + jp * jp;
+			// Note that (r < ires) != (r2 < max_r2), because max_r2 = ROUND(r_max * padding_factor)^2.
+			// We have to use round_max_r2 = ROUND((r_max * padding_factor)^2).
+			// e.g. k = 0, i = 7, j = 28, max_r2 = 841, r_max = 16, padding_factor = 18.
+			if (r2 < round_max_r2)
 			{
-				int ires = FLOOR( sqrt((RFLOAT)r2) / padding_factor );
+				const int ires = FLOOR(sqrt((RFLOAT)r2) / padding_factor);
 				if (ires >= XSIZE(radavg_weight))
 				{
 					std::cerr << " k= " << k << " i= " << i << " j= " << j << std::endl;
@@ -1435,6 +1437,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 		// Calculate 1/1000th of radial averaged weight
 		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(radavg_weight)
 		{
+//			std::cerr << " i = " << i << " radavg_weight = " << DIRECT_A1D_ELEM(radavg_weight, i) << " counter =" << DIRECT_A1D_ELEM(counter, i) << std::endl;
 			if (DIRECT_A1D_ELEM(counter, i) > 0. || DIRECT_A1D_ELEM(radavg_weight, i) > 0.)
 			{
 				DIRECT_A1D_ELEM(radavg_weight, i) /= 1000.* DIRECT_A1D_ELEM(counter, i);
@@ -1447,21 +1450,28 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 			}
 		}
 
+		bool have_warned = false;
 		// perform XMIPP_MAX on all weight elements, and do division of data/weight
 		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fweight)
 		{
-			int r2 = kp * kp + ip * ip + jp * jp;
-			int ires = FLOOR( sqrt((RFLOAT)r2) / padding_factor );
-			if (ires < r_max)
+			const int r2 = kp * kp + ip * ip + jp * jp;
+			const int ires = FLOOR(sqrt((RFLOAT)r2) / padding_factor);
+			const RFLOAT weight =  XMIPP_MAX(DIRECT_A3D_ELEM(Fweight, k, i, j), DIRECT_A1D_ELEM(radavg_weight, (ires < r_max) ? ires : (r_max - 1)));
+			if (weight == 0)
 			{
-				DIRECT_A3D_ELEM(Fconv, k, i, j) /= XMIPP_MAX(DIRECT_A3D_ELEM(Fweight, k, i, j), DIRECT_A1D_ELEM(radavg_weight, ires));
+				if (!have_warned)
+				{
+					std::cerr << " WARNING: ignoring divide by zero in skip_gridding: ires = " << ires << " kp = " << kp << " ip = " << ip << " jp = " << jp << std::endl;
+					std::cerr << " max_r2 = " << max_r2 << " r_max = " << r_max << " padding_factor = " << padding_factor 
+					           << " ROUND(sqrt(max_r2)) = " << ROUND(sqrt(max_r2)) << " ROUND(r_max * padding_factor) = " << ROUND(r_max * padding_factor) << std::endl;
+					have_warned = true;
+				}
 			}
 			else
 			{
-				DIRECT_A3D_ELEM(Fconv, k, i, j) /= XMIPP_MAX(DIRECT_A3D_ELEM(Fweight, k, i, j), DIRECT_A1D_ELEM(radavg_weight, r_max-1));
+				DIRECT_A3D_ELEM(Fconv, k, i, j) /= weight;
 			}
 		}
-
 	}
 	else
 	{
@@ -1571,7 +1581,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 		// Now do the actual reconstruction with the data array
 		// Apply the iteratively determined weight
 		Fconv.initZeros(); // to remove any stuff from the input volume
-		decenter(data, Fconv, max_r2);
+		Projector::decenter(data, Fconv, max_r2);
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fconv)
 		{
 #ifdef  RELION_SINGLE_PRECISION

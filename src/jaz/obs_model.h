@@ -133,13 +133,13 @@ class ObservationModel
 
 
 
-	// Bureaucracy //
+	// Bureaucracy
 
 		bool allPixelSizesIdentical() const;
 		bool allBoxSizesIdentical() const;
 
-        double angToPix(double a, int s, int opticsGroup) const;
-        double pixToAng(double p, int s, int opticsGroup) const;
+		double angToPix(double a, int s, int opticsGroup) const;
+		double pixToAng(double p, int s, int opticsGroup) const;
 
 		double getPixelSize(int opticsGroup) const;
 		std::vector<double> getPixelSizes() const;

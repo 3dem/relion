@@ -32,87 +32,87 @@ class LegacyObservationModel;
 
 class ReferenceMap
 {
-    public:
+	public:
 
-        typedef enum {Own, Opposite} HalfSet;
+		typedef enum {Own, Opposite} HalfSet;
 
-        ReferenceMap();
+		ReferenceMap();
 
-			// input parameters:
-            std::string reconFn0, reconFn1, maskFn, fscFn;
-            double paddingFactor;
+		// input parameters:
+		std::string reconFn0, reconFn1, maskFn, fscFn;
+		double paddingFactor;
 
-            // data:
-            Image<RFLOAT> freqWeight, mask;
-            std::vector<double> freqWeight1D;
-			Projector projectors[2];
-            int k_out, s, sh;
-			bool hasMask;
-			double angpix;
+		// data:
+		Image<RFLOAT> freqWeight, mask;
+		std::vector<double> freqWeight1D;
+		Projector projectors[2];
+		int k_out, s, sh;
+		bool hasMask;
+		double angpix;
 
-        void read(IOParser& parser, int argc, char *argv[]);
-        void load(int verb, bool debug);
+		void read(IOParser& parser, int argc, char *argv[]);
+		void load(int verb, bool debug);
 
 		Image<RFLOAT> getHollowWeight(double kmin_ang, int s_out, double angpix_out);
 
 		std::vector<Image<Complex>> predictAll(
 				const MetaDataTable& mdt,
-                ObservationModel& obs,
-                HalfSet hs, int threads,
-                bool applyCtf = true,
-                bool applyTilt = true,
+				ObservationModel& obs,
+				HalfSet hs, int threads,
+				bool applyCtf = true,
+				bool applyTilt = true,
 				bool applyShift = true,
 				bool applyMtf = true,
 				bool applyCtfPadding = false);
 
-        Image<Complex> predict(
-                const MetaDataTable& mdt, int p,
-                ObservationModel& obs,
-                HalfSet hs,
-                bool applyCtf = true,
-                bool applyTilt = true,
+		Image<Complex> predict(
+				const MetaDataTable& mdt, int p,
+				ObservationModel& obs,
+				HalfSet hs,
+				bool applyCtf = true,
+				bool applyTilt = true,
 				bool applyShift = true,
 				bool applyMtf = true,
 				bool applyCtfPadding = false);
 
 		std::vector<Volume<gravis::t2Vector<Complex> > > predictAllComplexGradients(
 				const MetaDataTable& mdt,
-                ObservationModel& obs,
-                HalfSet hs, int threads,
-                bool applyCtf = true,
-                bool applyTilt = true,
+				ObservationModel& obs,
+				HalfSet hs, int threads,
+				bool applyCtf = true,
+				bool applyTilt = true,
 				bool applyShift = true,
 				bool applyMtf = true,
 				bool applyCtfPadding = false);
 
 		Volume<gravis::t2Vector<Complex>> predictComplexGradient(
-                const MetaDataTable& mdt, int p,
-                ObservationModel& obs,
-                HalfSet hs,
-                bool applyCtf = true,
-                bool applyTilt = true,
+				const MetaDataTable& mdt, int p,
+				ObservationModel& obs,
+				HalfSet hs,
+				bool applyCtf = true,
+				bool applyTilt = true,
 				bool applyShift = true,
 				bool applyMtf = true,
 				bool applyCtfPadding = false);
 
 		std::vector<Image<Complex>> predictAll(
 				const MetaDataTable& mdt,
-                const LegacyObservationModel& obs,
-                HalfSet hs, int threads,
-                bool applyCtf = true,
-                bool applyTilt = true,
+				const LegacyObservationModel& obs,
+				HalfSet hs, int threads,
+				bool applyCtf = true,
+				bool applyTilt = true,
 				bool applyShift = true);
 
-        Image<Complex> predict(
-                const MetaDataTable& mdt, int p,
-                const LegacyObservationModel& obs,
-                HalfSet hs,
-                bool applyCtf = true,
-                bool applyTilt = true,
+		Image<Complex> predict(
+				const MetaDataTable& mdt, int p,
+				const LegacyObservationModel& obs,
+				HalfSet hs,
+				bool applyCtf = true,
+				bool applyTilt = true,
 				bool applyShift = true);
 
 		double angToPix(double a) const;
-        double pixToAng(double p) const;
+		double pixToAng(double p) const;
 };
 
 #endif

@@ -483,7 +483,7 @@ void Projector::project(MultidimArray<Complex > &f2d, Matrix2D<RFLOAT> &A)
 #endif
 }
 
-void Projector::projectGradient(Volume<t2Vector<Complex>>& img_out, Matrix2D<double>& At)
+void Projector::projectGradient(Volume<t2Vector<Complex>>& img_out, Matrix2D<RFLOAT>& At)
 {
 	const int s = img_out.dimy;
 	const int sh = img_out.dimx;

@@ -1769,7 +1769,7 @@ void convertAllSquaredDifferencesToWeights(unsigned exp_ipass,
 						CRITICAL(ERRNOSIGNIFS); // "my_nr_significant_coarse_samples == 0"
 					}
 
-					if (baseMLO->maximum_significants != 0 &&
+					if (baseMLO->maximum_significants > 0 &&
 							my_nr_significant_coarse_samples > baseMLO->maximum_significants)
 					{
 						my_nr_significant_coarse_samples = baseMLO->maximum_significants;

@@ -23,7 +23,6 @@
 
 //#define DEBUG
 
-
 long int PipeLine::addNode(Node &_Node, bool touch_if_not_exist)
 {
 
@@ -1426,12 +1425,11 @@ void PipeLine::undeleteJob(FileName fn_undel)
 
 	// Write the new pipeline to disk and reread it back in again
 	write(DO_LOCK);
-
 }
 
 bool PipeLine::cleanupJob(int this_job, bool do_harsh, std::string &error_message)
 {
-
+	std::cout << "Cleaning up " << processList[this_job].name << std::endl;
 	if (this_job < 0 || processList[this_job].status != PROC_FINISHED_SUCCESS)
 	{
 		error_message =" You can only clean up finished jobs ... ";
@@ -1440,11 +1438,11 @@ bool PipeLine::cleanupJob(int this_job, bool do_harsh, std::string &error_messag
 
 	// These job types do not have cleanup:
 	if (processList[this_job].type == PROC_IMPORT ||
-		processList[this_job].type == PROC_MANUALPICK ||
-		processList[this_job].type == PROC_CLASSSELECT ||
-		processList[this_job].type == PROC_MASKCREATE ||
-		processList[this_job].type == PROC_JOINSTAR ||
-		processList[this_job].type == PROC_RESMAP)
+	    processList[this_job].type == PROC_MANUALPICK ||
+	    processList[this_job].type == PROC_CLASSSELECT ||
+	    processList[this_job].type == PROC_MASKCREATE ||
+	    processList[this_job].type == PROC_JOINSTAR ||
+	    processList[this_job].type == PROC_RESMAP)
 		return true;
 
 	// Find any subdirectories
@@ -1551,10 +1549,10 @@ bool PipeLine::cleanupJob(int this_job, bool do_harsh, std::string &error_messag
 
 	} // end if extract
 	else if (processList[this_job].type == PROC_2DCLASS ||
-			 processList[this_job].type == PROC_3DCLASS ||
-			 processList[this_job].type == PROC_3DAUTO ||
-			 processList[this_job].type == PROC_INIMODEL ||
-			 processList[this_job].type == PROC_MULTIBODY)
+	         processList[this_job].type == PROC_3DCLASS ||
+	         processList[this_job].type == PROC_3DAUTO ||
+	         processList[this_job].type == PROC_INIMODEL ||
+	         processList[this_job].type == PROC_MULTIBODY)
 	{
 
 		// First find the _data.star from each iteration
@@ -1673,7 +1671,6 @@ bool PipeLine::cleanupJob(int this_job, bool do_harsh, std::string &error_messag
 	} // end loop over all files to be deleted
 
 	return true;
-
 }
 
 // Clean upintermediate files from all jobs in the pipeline
@@ -1692,7 +1689,6 @@ bool PipeLine::cleanupAllJobs(bool do_harsh, std::string &error_message)
 	}
 
 	return true;
-
 }
 
 void PipeLine::replaceFilesForImportExportOfScheduledJobs(FileName fn_in_dir, FileName fn_out_dir, std::vector<std::string> &find_pattern, std::vector<std::string> &replace_pattern)
@@ -1730,12 +1726,10 @@ void PipeLine::replaceFilesForImportExportOfScheduledJobs(FileName fn_in_dir, Fi
 			}
 		}
 	}
-
 }
 
 bool PipeLine::exportAllScheduledJobs(std::string mydir, std::string &error_message)
 {
-
 	// Make sure the directory name ends with a slash
 	mydir += "/";
 	std::string command = "mkdir -p ExportJobs/" + mydir;
@@ -1773,7 +1767,6 @@ bool PipeLine::exportAllScheduledJobs(std::string mydir, std::string &error_mess
 
 	MDexported.write("ExportJobs/" + mydir + "exported.star");
 	return true;
-
 }
 
 void PipeLine::importJobs(FileName fn_export)
@@ -1807,13 +1800,11 @@ void PipeLine::importJobs(FileName fn_export)
 
 	// Write the new pipeline to disk
 	write(DO_LOCK);
-
 }
 
 // Import a job into the pipeline
 bool PipeLine::importPipeline(std::string _name)
 {
-
 	if (_name == name)
 	{
 		std::cerr << " importPipeline WARNING: ignoring request to import myself! "<<std::endl;
@@ -1897,7 +1888,6 @@ bool PipeLine::importPipeline(std::string _name)
 	}
 
 	return imported;
-
 }
 
 // Read pipeline from STAR file
@@ -1944,14 +1934,12 @@ void PipeLine::read(bool do_lock, std::string lock_message)
 		}
 		// Generate the lock file
 		std::ofstream  fh;
-	    fh.open(fn_lock.c_str(), std::ios::out);
-	    if (!fh)
-	        REPORT_ERROR( (std::string)"ERROR: Cannot open file: " + fn_lock);
-	    fh << lock_message << std::endl;
-	    fh.close();
-
+		fh.open(fn_lock.c_str(), std::ios::out);
+		if (!fh)
+			REPORT_ERROR( (std::string)"ERROR: Cannot open file: " + fn_lock);
+		fh << lock_message << std::endl;
+		fh.close();
 	}
-
 
 	// Start from scratch
 	clear();
@@ -2086,7 +2074,6 @@ void PipeLine::read(bool do_lock, std::string lock_message)
 
 	// Close file handler
 	in.close();
-
 }
 
 void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode, std::vector<bool> deleteProcess)
@@ -2125,159 +2112,159 @@ void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode
 	}
 
 	std::ofstream  fh, fh_del;
-    FileName fn = name + "_pipeline.star";
-    fh.open(fn.c_str(), std::ios::out);
+	FileName fn = name + "_pipeline.star";
+	fh.open(fn.c_str(), std::ios::out);
 	if (fh.fail())
 		REPORT_ERROR("ERROR: cannot write to pipeline file: " + fn);
 
-    if (fn_del != "")
-    {
-        FileName fnt = fn_del + "deleted_pipeline.star";
-        fh_del.open(fnt.c_str(), std::ios::out);
-        if (deleteNode.size() != nodeList.size())
-        	REPORT_ERROR("PipeLine::write BUG: not enough entries in deleteNode vector!");
-        if (deleteProcess.size() != processList.size())
-        	REPORT_ERROR("PipeLine::write BUG: not enough entries in deleteProcess vector!");
-    }
+	if (fn_del != "")
+	{
+		FileName fnt = fn_del + "deleted_pipeline.star";
+		fh_del.open(fnt.c_str(), std::ios::out);
+		if (deleteNode.size() != nodeList.size())
+			REPORT_ERROR("PipeLine::write BUG: not enough entries in deleteNode vector!");
+		if (deleteProcess.size() != processList.size())
+			REPORT_ERROR("PipeLine::write BUG: not enough entries in deleteProcess vector!");
+	}
 
-    MetaDataTable MDgen, MDnode, MDproc, MDedge1, MDedge2;
-    MetaDataTable MDgen_del, MDnode_del, MDproc_del, MDedge1_del, MDedge2_del;
+	MetaDataTable MDgen, MDnode, MDproc, MDedge1, MDedge2;
+	MetaDataTable MDgen_del, MDnode_del, MDproc_del, MDedge1_del, MDedge2_del;
 
 #ifdef DEBUG
     std::cerr << " writing pipeline as " << fn << std::endl;
 #endif
 
-    MDgen.setName("pipeline_general");
-    MDgen.setIsList(true);
-    MDgen.addObject();
-    MDgen.setValue(EMDL_PIPELINE_JOB_COUNTER, job_counter);
-    MDgen.write(fh);
+	MDgen.setName("pipeline_general");
+	MDgen.setIsList(true);
+	MDgen.addObject();
+	MDgen.setValue(EMDL_PIPELINE_JOB_COUNTER, job_counter);
+	MDgen.write(fh);
 
-    if (fn_del != "")
-    {
-		MDgen_del.setName("pipeline_general");
-		MDgen_del.setIsList(true);
-		MDgen_del.addObject();
-		MDgen_del.setValue(EMDL_PIPELINE_JOB_COUNTER, job_counter);
-		MDgen_del.write(fh_del);
-    }
+	if (fn_del != "")
+	{
+	    	MDgen_del.setName("pipeline_general");
+	    	MDgen_del.setIsList(true);
+	    	MDgen_del.addObject();
+	    	MDgen_del.setValue(EMDL_PIPELINE_JOB_COUNTER, job_counter);
+	    	MDgen_del.write(fh_del);
+	}
 
-    MDproc.setName("pipeline_processes");
-    MDproc_del.setName("pipeline_processes");
-    for(long int i=0 ; i < processList.size() ; i++)
-    {
-    	if (fn_del == "" || !deleteProcess[i])
-    	{
+	MDproc.setName("pipeline_processes");
+	MDproc_del.setName("pipeline_processes");
+	for(long int i=0 ; i < processList.size() ; i++)
+	{
+		if (fn_del == "" || !deleteProcess[i])
+		{
 			MDproc.addObject();
 			MDproc.setValue(EMDL_PIPELINE_PROCESS_NAME, processList[i].name);
 			MDproc.setValue(EMDL_PIPELINE_PROCESS_ALIAS, processList[i].alias);
 			MDproc.setValue(EMDL_PIPELINE_PROCESS_TYPE, processList[i].type);
 			MDproc.setValue(EMDL_PIPELINE_PROCESS_STATUS, processList[i].status);
-    	}
-    	else
-    	{
+		}
+		else
+		{
 			MDproc_del.addObject();
 			MDproc_del.setValue(EMDL_PIPELINE_PROCESS_NAME, processList[i].name);
 			MDproc_del.setValue(EMDL_PIPELINE_PROCESS_ALIAS, processList[i].alias);
 			MDproc_del.setValue(EMDL_PIPELINE_PROCESS_TYPE, processList[i].type);
 			MDproc_del.setValue(EMDL_PIPELINE_PROCESS_STATUS, processList[i].status);
-    	}
+		}
 
-    }
+	}
 #ifdef DEBUG
-    MDproc.write(std::cerr);
+	MDproc.write(std::cerr);
 #endif
-    MDproc.write(fh);
-    if (fn_del != "")
-    	MDproc_del.write(fh_del);
+	MDproc.write(fh);
+	if (fn_del != "")
+		MDproc_del.write(fh_del);
 
-    MDnode.setName("pipeline_nodes");
-    MDnode_del.setName("pipeline_nodes");
-    for(long int i=0 ; i < nodeList.size() ; i++)
-    {
-    	if (fn_del == "" || !deleteNode[i])
-    	{
+	MDnode.setName("pipeline_nodes");
+	MDnode_del.setName("pipeline_nodes");
+	for(long int i=0 ; i < nodeList.size() ; i++)
+	{
+		if (fn_del == "" || !deleteNode[i])
+		{
 			MDnode.addObject();
 			MDnode.setValue(EMDL_PIPELINE_NODE_NAME, nodeList[i].name);
 			MDnode.setValue(EMDL_PIPELINE_NODE_TYPE, nodeList[i].type);
-    	}
-    	else
-    	{
+		}
+		else
+		{
 			MDnode_del.addObject();
 			MDnode_del.setValue(EMDL_PIPELINE_NODE_NAME, nodeList[i].name);
 			MDnode_del.setValue(EMDL_PIPELINE_NODE_TYPE, nodeList[i].type);
 
-    	}
-    }
+		}
+	}
 #ifdef DEBUG
-    MDnode.write(std::cerr);
+	MDnode.write(std::cerr);
 #endif
-    MDnode.write(fh);
-    if (fn_del != "")
-    	MDnode_del.write(fh_del);
+	MDnode.write(fh);
+	if (fn_del != "")
+		MDnode_del.write(fh_del);
 
-    // Also write all (Node->Process) edges to a single table
-    MDedge1.setName("pipeline_input_edges");
-    MDedge1_del.setName("pipeline_input_edges");
-    for(long int i=0 ; i < processList.size() ; i++)
-    {
+	// Also write all (Node->Process) edges to a single table
+	MDedge1.setName("pipeline_input_edges");
+	MDedge1_del.setName("pipeline_input_edges");
+	for(long int i=0 ; i < processList.size() ; i++)
+	{
 		for (long int j=0; j < ((processList[i]).inputNodeList).size(); j++)
 		{
 			long int inputNode = ((processList[i]).inputNodeList)[j];
-	    	if (fn_del == "" || (!deleteProcess[i] && !deleteNode[inputNode]) )
-	    	{
+			if (fn_del == "" || (!deleteProcess[i] && !deleteNode[inputNode]) )
+			{
 				MDedge1.addObject();
 				MDedge1.setValue(EMDL_PIPELINE_EDGE_FROM, nodeList[inputNode].name);
 				MDedge1.setValue(EMDL_PIPELINE_EDGE_PROCESS, processList[i].name);
-	    	}
-	    	else
-	    	{
+			}
+			else
+			{
 				MDedge1_del.addObject();
 				MDedge1_del.setValue(EMDL_PIPELINE_EDGE_FROM, nodeList[inputNode].name);
 				MDedge1_del.setValue(EMDL_PIPELINE_EDGE_PROCESS, processList[i].name);
-	    	}
-    	}
-    }
+			}
+		}
+	}
 #ifdef DEBUG
-    MDedge1.write(std::cerr);
+	MDedge1.write(std::cerr);
 #endif
-    MDedge1.write(fh);
-    if (fn_del != "")
-        MDedge1_del.write(fh_del);
+	MDedge1.write(fh);
+	if (fn_del != "")
+		MDedge1_del.write(fh_del);
 
-    // Also write all (Process->Node) edges to a single table
-    MDedge2.setName("pipeline_output_edges");
-    MDedge2_del.setName("pipeline_output_edges");
-    for(long int i=0 ; i < processList.size() ; i++)
-    {
-    	for (long int j=0; j < ((processList[i]).outputNodeList).size(); j++)
-    	{
-    		long int outputNode = ((processList[i]).outputNodeList)[j];
-	    	if (fn_del == "" || (!deleteProcess[i] && !deleteNode[outputNode]) )
-	    	{
+	// Also write all (Process->Node) edges to a single table
+	MDedge2.setName("pipeline_output_edges");
+	MDedge2_del.setName("pipeline_output_edges");
+	for(long int i=0 ; i < processList.size() ; i++)
+	{
+		for (long int j=0; j < ((processList[i]).outputNodeList).size(); j++)
+		{
+			long int outputNode = ((processList[i]).outputNodeList)[j];
+			if (fn_del == "" || (!deleteProcess[i] && !deleteNode[outputNode]) )
+			{
 				MDedge2.addObject();
 				MDedge2.setValue(EMDL_PIPELINE_EDGE_PROCESS,  processList[i].name);
 				MDedge2.setValue(EMDL_PIPELINE_EDGE_TO, nodeList[outputNode].name);
-	    	}
-	    	else
-	    	{
+			}
+			else
+			{
 				MDedge2_del.addObject();
 				MDedge2_del.setValue(EMDL_PIPELINE_EDGE_PROCESS,  processList[i].name);
 				MDedge2_del.setValue(EMDL_PIPELINE_EDGE_TO, nodeList[outputNode].name);
-	    	}
-    	}
-    }
-    MDedge2.write(fh);
-    if (fn_del != "")
-        MDedge2_del.write(fh_del);
+			}
+		}
+	}
+	MDedge2.write(fh);
+	if (fn_del != "")
+		MDedge2_del.write(fh_del);
 
 #ifdef DEBUG
-    MDedge2.write(std::cerr);
+	MDedge2.write(std::cerr);
 #endif
 
-    fh.close();
-    if (fn_del != "")
-    	fh_del.close();
+	fh.close();
+	if (fn_del != "")
+		fh_del.close();
 
 	if (do_lock)
 	{
@@ -2296,7 +2283,6 @@ void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode
 
 	// Touch a file to indicate to the GUI that the pipeline has just changed
 	touch(PIPELINE_HAS_CHANGED);
-
 }
 
 std::string PipeLineFlowChart::getDownwardsArrowLabel(PipeLine &pipeline, long int lower_process, long int upper_process)
@@ -2392,8 +2378,8 @@ std::string PipeLineFlowChart::getDownwardsArrowLabel(PipeLine &pipeline, long i
 	}
 
 	return mylabel;
-
 }
+
 void PipeLineFlowChart::adaptNamesForTikZ(FileName &name)
 {
 	name.replaceAllSubstrings((std::string)"_", (std::string)"\\_");
@@ -2406,8 +2392,6 @@ void PipeLineFlowChart::adaptNamesForTikZ(FileName &name)
 long int PipeLineFlowChart::addProcessToUpwardsFlowChart(std::ofstream &fh, PipeLine &pipeline,
 		long int lower_process, long int new_process, std::vector<long int> &branched_procs)
 {
-
-
 	branched_procs.clear();
 	FileName procname;
 	if (pipeline.processList[new_process].alias != "None")
@@ -2612,14 +2596,11 @@ long int PipeLineFlowChart::addProcessToUpwardsFlowChart(std::ofstream &fh, Pipe
 		long int inputnode = pipeline.processList[new_process].inputNodeList[0];
 		return pipeline.nodeList[inputnode].outputFromProcess;
 	}
-
-
 }
 
 void PipeLineFlowChart::makeOneUpwardsFlowChart(std::ofstream &fh, PipeLine &pipeline, long int from_process,
 		std::vector<long int> &all_branches, bool is_main_flow)
 {
-
 	openTikZPicture(fh, is_main_flow);
 	long int prev_process = -1;
 	long int current_process = from_process;
@@ -2677,8 +2658,8 @@ void PipeLineFlowChart::makeOneUpwardsFlowChart(std::ofstream &fh, PipeLine &pip
 
 	}
 	closeTikZPicture(fh, is_main_flow);
-
 }
+
 void PipeLineFlowChart::makeAllUpwardsFlowCharts(FileName &fn_out, PipeLine &pipeline, long int from_process)
 {
 	std::ofstream fh;
@@ -2725,7 +2706,6 @@ void PipeLineFlowChart::makeAllUpwardsFlowCharts(FileName &fn_out, PipeLine &pip
 
 
 	closeFlowChartFile(fh);
-
 }
 
 void PipeLineFlowChart::openTikZPicture(std::ofstream &fh, bool is_main_flow)

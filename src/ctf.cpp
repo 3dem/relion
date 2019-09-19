@@ -79,7 +79,7 @@ void CTF::readByGroup(const MetaDataTable &partMdt, ObservationModel* obs, long 
 }
 
 void CTF::readValue(EMDLabel label, RFLOAT& dest, RFLOAT defaultVal, long int particle, int opticsGroup,
-					const MetaDataTable& partMdt, const ObservationModel* obs)
+                    const MetaDataTable& partMdt, const ObservationModel* obs)
 {
 	if (!partMdt.getValue(label, dest, particle))
 	{
@@ -92,49 +92,47 @@ void CTF::readValue(EMDLabel label, RFLOAT& dest, RFLOAT defaultVal, long int pa
 
 void CTF::read(const MetaDataTable &MD1, const MetaDataTable &MD2, long int objectID)
 {
-
 	if (!MD1.getValue(EMDL_CTF_VOLTAGE, kV, objectID))
 		if (!MD2.getValue(EMDL_CTF_VOLTAGE, kV, objectID))
-			kV=200;
+			kV = 200;
 
 	if (!MD1.getValue(EMDL_CTF_DEFOCUSU, DeltafU, objectID))
 		if (!MD2.getValue(EMDL_CTF_DEFOCUSU, DeltafU, objectID))
-			DeltafU=0;
+			DeltafU = 0;
 
 	if (!MD1.getValue(EMDL_CTF_DEFOCUSV, DeltafV, objectID))
 		if (!MD2.getValue(EMDL_CTF_DEFOCUSV, DeltafV, objectID))
-			DeltafV=DeltafU;
+			DeltafV = DeltafU;
 
 	if (!MD1.getValue(EMDL_CTF_DEFOCUS_ANGLE, azimuthal_angle, objectID))
 		if (!MD2.getValue(EMDL_CTF_DEFOCUS_ANGLE, azimuthal_angle, objectID))
-			azimuthal_angle=0;
+			azimuthal_angle = 0;
 
 	if (!MD1.getValue(EMDL_CTF_CS, Cs, objectID))
 		if (!MD2.getValue(EMDL_CTF_CS, Cs, objectID))
-			Cs=0;
+			Cs = 0;
 
 	if (!MD1.getValue(EMDL_CTF_BFACTOR, Bfac, objectID))
 		if (!MD2.getValue(EMDL_CTF_BFACTOR, Bfac, objectID))
-			Bfac=0;
+			Bfac = 0;
 
 	if (!MD1.getValue(EMDL_CTF_SCALEFACTOR, scale, objectID))
 		if (!MD2.getValue(EMDL_CTF_SCALEFACTOR, scale, objectID))
-			scale=1;
+			scale = 1;
 
 	if (!MD1.getValue(EMDL_CTF_Q0, Q0, objectID))
 		if (!MD2.getValue(EMDL_CTF_Q0, Q0, objectID))
-			Q0=0;
+			Q0 = 0;
 
 	if (!MD1.getValue(EMDL_CTF_PHASESHIFT, phase_shift, objectID))
 		if (!MD2.getValue(EMDL_CTF_PHASESHIFT, phase_shift, objectID))
-			phase_shift=0;
+			phase_shift = 0;
 
 	initialise();
-
 }
 
 void CTF::setValues(RFLOAT _defU, RFLOAT _defV, RFLOAT _defAng, RFLOAT _voltage,
-		RFLOAT _Cs, RFLOAT _Q0, RFLOAT _Bfac, RFLOAT _scale, RFLOAT _phase_shift)
+                    RFLOAT _Cs, RFLOAT _Q0, RFLOAT _Bfac, RFLOAT _scale, RFLOAT _phase_shift)
 {
 	kV              = _voltage;
 	DeltafU         = _defU;
@@ -149,10 +147,9 @@ void CTF::setValues(RFLOAT _defU, RFLOAT _defV, RFLOAT _defAng, RFLOAT _voltage,
 	initialise();
 }
 
-void CTF::setValuesByGroup(
-		ObservationModel *obs, int _opticsGroup,
-		double _defU, double _defV, double _defAng,
-		double _Bfac, double _scale, double _phase_shift)
+void CTF::setValuesByGroup(ObservationModel *obs, int _opticsGroup,
+                           RFLOAT _defU, RFLOAT _defV, RFLOAT _defAng,
+                           RFLOAT _Bfac, RFLOAT _scale, RFLOAT _phase_shift)
 {
 	opticsGroup     = _opticsGroup;
 
@@ -184,64 +181,63 @@ void CTF::read(const MetaDataTable &MD)
 /** Write to an existing object in a MetaDataTable. */
 void CTF::write(MetaDataTable &MD)
 {
-    // From version-3.1 onwards: store kV, Cs, Q0 in optics table
+	// From version-3.1 onwards: store kV, Cs, Q0 in optics table
 	//MD.setValue(EMDL_CTF_VOLTAGE, kV);
-    MD.setValue(EMDL_CTF_DEFOCUSU, DeltafU);
-    MD.setValue(EMDL_CTF_DEFOCUSV, DeltafV);
-    MD.setValue(EMDL_CTF_DEFOCUS_ANGLE, azimuthal_angle);
-    //MD.setValue(EMDL_CTF_CS, Cs);
-    MD.setValue(EMDL_CTF_BFACTOR, Bfac);
-    MD.setValue(EMDL_CTF_SCALEFACTOR, scale);
-    MD.setValue(EMDL_CTF_PHASESHIFT, phase_shift);
-    //MD.setValue(EMDL_CTF_Q0, Q0);
+	MD.setValue(EMDL_CTF_DEFOCUSU, DeltafU);
+	MD.setValue(EMDL_CTF_DEFOCUSV, DeltafV);
+	MD.setValue(EMDL_CTF_DEFOCUS_ANGLE, azimuthal_angle);
+	//MD.setValue(EMDL_CTF_CS, Cs);
+	MD.setValue(EMDL_CTF_BFACTOR, Bfac);
+	MD.setValue(EMDL_CTF_SCALEFACTOR, scale);
+	MD.setValue(EMDL_CTF_PHASESHIFT, phase_shift);
+	//MD.setValue(EMDL_CTF_Q0, Q0);
 }
 
 /* Write ------------------------------------------------------------------- */
 void CTF::write(std::ostream &out)
 {
-    MetaDataTable MD;
+	MetaDataTable MD;
 	MD.addObject();
-    write(MD);
-    MD.write(out);
+	write(MD);
+	MD.write(out);
 }
 
 /* Initialise the CTF ------------------------------------------------------ */
 void CTF::initialise()
 {
 	// Change units
-    RFLOAT local_Cs = Cs * 1e7;
-    RFLOAT local_kV = kV * 1e3;
-    rad_azimuth = DEG2RAD(azimuthal_angle);
+	RFLOAT local_Cs = Cs * 1e7;
+	RFLOAT local_kV = kV * 1e3;
+	rad_azimuth = DEG2RAD(azimuthal_angle);
 
-    // Average focus and deviation
-    defocus_average   = -(DeltafU + DeltafV) * 0.5;
-    defocus_deviation = -(DeltafU - DeltafV) * 0.5;
+	// Average focus and deviation
+	defocus_average   = -(DeltafU + DeltafV) * 0.5;
+	defocus_deviation = -(DeltafU - DeltafV) * 0.5;
 
-    // lambda=h/sqrt(2*m*e*kV)
-    //    h: Planck constant
-    //    m: electron mass
-    //    e: electron charge
-    // lambda=0.387832/sqrt(kV*(1.+0.000978466*kV)); // Hewz: Angstroms
-    // lambda=h/sqrt(2*m*e*kV)
-    lambda=12.2643247 / sqrt(local_kV * (1. + local_kV * 0.978466e-6)); // See http://en.wikipedia.org/wiki/Electron_diffraction
+	// lambda=h/sqrt(2*m*e*kV)
+	//    h: Planck constant
+	//    m: electron mass
+	//    e: electron charge
+	// lambda=0.387832/sqrt(kV*(1.+0.000978466*kV)); // Hewz: Angstroms
+	// lambda=h/sqrt(2*m*e*kV)
+	lambda=12.2643247 / sqrt(local_kV * (1. + local_kV * 0.978466e-6)); // See http://en.wikipedia.org/wiki/Electron_diffraction
 
-    // Helpful constants
-    // ICE: X(u)=-PI/2*deltaf(u)*lambda*u^2+PI/2*Cs*lambda^3*u^4
-    //          = K1*deltaf(u)*u^2         +K2*u^4
-    K1 = PI / 2 * 2 * lambda;
-    K2 = PI / 2 * local_Cs * lambda * lambda * lambda;
-    K3 = atan(Q0/sqrt(1-Q0*Q0));
+	// Helpful constants
+	// ICE: X(u)=-PI/2*deltaf(u)*lambda*u^2+PI/2*Cs*lambda^3*u^4
+	//          = K1*deltaf(u)*u^2         +K2*u^4
+	K1 = PI / 2 * 2 * lambda;
+	K2 = PI / 2 * local_Cs * lambda * lambda * lambda;
+	K3 = atan(Q0/sqrt(1-Q0*Q0));
+	K4 = -Bfac / 4.;
 
-    K4 = -Bfac / 4.;
+	// Phase shift in radian
+	K5 = DEG2RAD(phase_shift);
 
-    // Phase shift in radian
-    K5 = DEG2RAD(phase_shift);
+	if (Q0 < 0. || Q0 > 1.)
+		REPORT_ERROR("CTF::initialise ERROR: AmplitudeContrast Q0 cannot be smaller than zero or larger than one!");
 
-    if (Q0 < 0. || Q0 > 1.)
-    	REPORT_ERROR("CTF::initialise ERROR: AmplitudeContrast Q0 cannot be smaller than zero or larger than one!");
-
-    if (ABS(DeltafU) < 1e-6 && ABS(DeltafV) < 1e-6 && ABS(Q0) < 1e-6 && ABS(Cs) < 1e-6)
-    	REPORT_ERROR("CTF::initialise: ERROR: CTF initialises to all-zero values. Was a correct STAR file provided?");
+	if (ABS(DeltafU) < 1e-6 && ABS(DeltafV) < 1e-6 && ABS(Q0) < 1e-6 && ABS(Cs) < 1e-6)
+		REPORT_ERROR("CTF::initialise: ERROR: CTF initialises to all-zero values. Was a correct STAR file provided?");
 
 	// express astigmatism as a bilinear form:
 
@@ -259,7 +255,7 @@ void CTF::initialise()
 	Ayy = A(1,1);
 }
 
-double CTF::getGamma(double X, double Y) const
+RFLOAT CTF::getGamma(RFLOAT X, RFLOAT Y) const
 {
 	if (obsModel != 0 && obsModel->hasMagMatrices)
 	{
@@ -271,23 +267,23 @@ double CTF::getGamma(double X, double Y) const
 		Y = YY;
 	}
 
-    RFLOAT u2 = X * X + Y * Y;
-    RFLOAT u4 = u2 * u2;
+	RFLOAT u2 = X * X + Y * Y;
+	RFLOAT u4 = u2 * u2;
 
-    return K1 * (Axx*X*X + 2.0*Axy*X*Y + Ayy*Y*Y) + K2 * u4 - K5 - K3;
+	return K1 * (Axx * X * X + 2.0 * Axy * X * Y + Ayy * Y * Y) + K2 * u4 - K5 - K3;
 }
 
 RFLOAT CTF::getCtfFreq(RFLOAT X, RFLOAT Y)
 {
 	RFLOAT u2 = X * X + Y * Y;
-    RFLOAT u = sqrt(u2);
+	RFLOAT u = sqrt(u2);
 
-    RFLOAT deltaf = getDeltaF(X, Y);
+	RFLOAT deltaf = getDeltaF(X, Y);
 
 	return 2.0 * K1 * deltaf * u + 4.0 * K2 * u * u * u;
 }
 
-t2Vector<RFLOAT> CTF::getGammaGrad(double X, double Y) const
+t2Vector<RFLOAT> CTF::getGammaGrad(RFLOAT X, RFLOAT Y) const
 {
 	if (obsModel != 0 && obsModel->hasMagMatrices)
 	{
@@ -299,29 +295,26 @@ t2Vector<RFLOAT> CTF::getGammaGrad(double X, double Y) const
 		Y = YY;
 	}
 
-    RFLOAT u2 = X * X + Y * Y;
-    //RFLOAT u4 = u2 * u2;
+	RFLOAT u2 = X * X + Y * Y;
+	//RFLOAT u4 = u2 * u2;
 
 	// u4 = (X² + Y²)²
 	// du4/dx = 2 (X² + Y²) 2 X = 4 (X³ + XY²) = 4 u2 X
 
-	return t2Vector<RFLOAT>(
-		2.0 * K1 * Axx * X + 2.0 * K1 * Axy * Y + 4.0 * K2 * u2 * X,
-		2.0 * K1 * Ayy * Y + 2.0 * K1 * Axy * X + 4.0 * K2 * u2 * Y);
+	return t2Vector<RFLOAT>(2.0 * K1 * Axx * X + 2.0 * K1 * Axy * Y + 4.0 * K2 * u2 * X,
+	                        2.0 * K1 * Ayy * Y + 2.0 * K1 * Axy * X + 4.0 * K2 * u2 * Y);
 }
 
 /* Generate a complete CTF Image ------------------------------------------------------ */
 void CTF::getFftwImage(MultidimArray<RFLOAT> &result, int orixdim, int oriydim, RFLOAT angpix,
-		    		bool do_abs, bool do_only_flip_phases, bool do_intact_until_first_peak,
-					bool do_damping, bool do_ctf_padding, bool do_intact_after_first_peak) const
+                       bool do_abs, bool do_only_flip_phases, bool do_intact_until_first_peak,
+                       bool do_damping, bool do_ctf_padding, bool do_intact_after_first_peak) const
 {
-
 	// Boxing the particle in a small box from the whole micrograph leads to loss of delocalised information (or aliaising in the CTF)
 	// Here, calculate the CTF in a 2x larger box to support finer oscillations,
 	// and then rescale the large CTF to simulate the effect of the windowing operation
 	if (do_ctf_padding)
 	{
-
 		bool ctf_premultiplied=false;
 		if (obsModel != 0)
 		{
@@ -341,7 +334,7 @@ void CTF::getFftwImage(MultidimArray<RFLOAT> &result, int orixdim, int oriydim, 
 		MultidimArray<RFLOAT> Fctf(oriydim_pad, orixdim_pad/2 + 1);
 
 		getFftwImage(Fctf, orixdim_pad, oriydim_pad, angpix, do_abs,
-				do_only_flip_phases, do_intact_until_first_peak, do_damping, false, do_intact_after_first_peak);
+		             do_only_flip_phases, do_intact_until_first_peak, do_damping, false, do_intact_after_first_peak);
 
 		// From half to whole
 		MultidimArray<RFLOAT> Mctf(oriydim_pad, orixdim_pad);
@@ -399,7 +392,6 @@ void CTF::getFftwImage(MultidimArray<RFLOAT> &result, int orixdim, int oriydim, 
 	}
 	else
 	{
-
 		RFLOAT xs = (RFLOAT)orixdim * angpix;
 		RFLOAT ys = (RFLOAT)oriydim * angpix;
 
@@ -408,7 +400,7 @@ void CTF::getFftwImage(MultidimArray<RFLOAT> &result, int orixdim, int oriydim, 
 			if (orixdim != oriydim)
 			{
 				REPORT_ERROR_STR("CTF::getFftwImage: symmetric aberrations are currently only "
-							  << "supported for square images.\n");
+				                 << "supported for square images.\n");
 			}
 
 			const Image<RFLOAT>& gammaOffset = obsModel->getGammaOffset(opticsGroup, oriydim);
@@ -417,8 +409,8 @@ void CTF::getFftwImage(MultidimArray<RFLOAT> &result, int orixdim, int oriydim, 
 				|| gammaOffset.data.ydim < result.ydim)
 			{
 				REPORT_ERROR_STR("CTF::getFftwImage: requested output image is larger than the original: "
-					<< gammaOffset.data.xdim << "x" << gammaOffset.data.ydim << " available, "
-					<< result.xdim << "x" << result.ydim << " requested\n");
+				                 << gammaOffset.data.xdim << "x" << gammaOffset.data.ydim << " available, "
+				                 << result.xdim << "x" << result.ydim << " requested\n");
 			}
 
 			for (int y1 = 0; y1 < result.ydim; y1++)
@@ -430,9 +422,8 @@ void CTF::getFftwImage(MultidimArray<RFLOAT> &result, int orixdim, int oriydim, 
 				const int x0 = x1;
 				const int y0 = y1 <= result.ydim/2? y1 : gammaOffset.data.ydim + y1 - result.ydim;
 
-				DIRECT_A2D_ELEM(result, y1, x1) =
-					getCTF(x, y, do_abs, do_only_flip_phases,
-						   do_intact_until_first_peak, do_damping, gammaOffset(y0,x0), do_intact_after_first_peak);
+				DIRECT_A2D_ELEM(result, y1, x1) = getCTF(x, y, do_abs, do_only_flip_phases,
+				                                         do_intact_until_first_peak, do_damping, gammaOffset(y0,x0), do_intact_after_first_peak);
 			}
 		}
 		else
@@ -442,9 +433,8 @@ void CTF::getFftwImage(MultidimArray<RFLOAT> &result, int orixdim, int oriydim, 
 				RFLOAT x = (RFLOAT)jp / xs;
 				RFLOAT y = (RFLOAT)ip / ys;
 
-				DIRECT_A2D_ELEM(result, i, j) =
-					getCTF(x, y, do_abs, do_only_flip_phases,
-						   do_intact_until_first_peak, do_damping, 0.0, do_intact_after_first_peak);
+				DIRECT_A2D_ELEM(result, i, j) = getCTF(x, y, do_abs, do_only_flip_phases,
+				                                       do_intact_until_first_peak, do_damping, 0.0, do_intact_after_first_peak);
 			}
 		}
 	}
@@ -452,7 +442,7 @@ void CTF::getFftwImage(MultidimArray<RFLOAT> &result, int orixdim, int oriydim, 
 
 /* Generate a complete CTFP (complex) image (with sector along angle) ------------------------------------------------------ */
 void CTF::getCTFPImage(MultidimArray<Complex> &result, int orixdim, int oriydim, RFLOAT angpix,
-					bool is_positive, float angle)
+                       bool is_positive, float angle)
 {
 	if (angle < 0 || angle >= 360.)
 	{
@@ -475,7 +465,7 @@ void CTF::getCTFPImage(MultidimArray<Complex> &result, int orixdim, int oriydim,
 	{
 		RFLOAT x = (RFLOAT)jp / xs;
 		RFLOAT y = (RFLOAT)ip / ys;
-		RFLOAT myangle = (x*x+y*y > 0) ? acos(y/sqrt(x*x+y*y)) : 0; // dot-product with Y-axis: (0,1)
+		RFLOAT myangle = (x * x + y * y > 0) ? acos(y / sqrt(x * x + y * y)) : 0; // dot-product with Y-axis: (0,1)
 
 		if (myangle >= anglerad)
 		{
@@ -501,7 +491,7 @@ void CTF::getCTFPImage(MultidimArray<Complex> &result, int orixdim, int oriydim,
 }
 
 void CTF::getCenteredImage(MultidimArray<RFLOAT> &result, RFLOAT Tm,
-		    		bool do_abs, bool do_only_flip_phases, bool do_intact_until_first_peak, bool do_damping, bool do_intact_after_first_peak)
+                           bool do_abs, bool do_only_flip_phases, bool do_intact_until_first_peak, bool do_damping, bool do_intact_after_first_peak)
 {
 	result.setXmippOrigin();
 	RFLOAT xs = (RFLOAT)XSIZE(result) * Tm;
@@ -513,11 +503,10 @@ void CTF::getCenteredImage(MultidimArray<RFLOAT> &result, RFLOAT Tm,
 		RFLOAT y = (RFLOAT)i / ys;
 		A2D_ELEM(result, i, j) = getCTF(x, y, do_abs, do_only_flip_phases, do_intact_until_first_peak, do_damping, 0.0, do_intact_after_first_peak);
 	}
-
 }
 
 void CTF::get1DProfile(MultidimArray < RFLOAT > &result, RFLOAT angle, RFLOAT Tm,
-		bool do_abs, bool do_only_flip_phases, bool do_intact_until_first_peak, bool do_damping, bool do_intact_after_first_peak)
+                       bool do_abs, bool do_only_flip_phases, bool do_intact_until_first_peak, bool do_damping, bool do_intact_after_first_peak)
 {
 
 	result.setXmippOrigin();
@@ -531,9 +520,8 @@ void CTF::get1DProfile(MultidimArray < RFLOAT > &result, RFLOAT angle, RFLOAT Tm
 	}
 }
 
-void CTF::applyWeightEwaldSphereCurvature(
-		MultidimArray<RFLOAT>& result, int orixdim, int oriydim,
-		RFLOAT angpix, RFLOAT particle_diameter)
+void CTF::applyWeightEwaldSphereCurvature(MultidimArray<RFLOAT>& result, int orixdim, int oriydim,
+                                          RFLOAT angpix, RFLOAT particle_diameter)
 {
 	RFLOAT xs = (RFLOAT)orixdim * angpix;
 	RFLOAT ys = (RFLOAT)oriydim * angpix;
@@ -557,9 +545,9 @@ void CTF::applyWeightEwaldSphereCurvature(
 		RFLOAT x = M(0,0) * xu + M(0,1) * yu;
 		RFLOAT y = M(1,0) * xu + M(1,1) * yu;
 
-		const RFLOAT astigDefocus = Axx*x*x + 2.0*Axy*x*y + Ayy*y*y;
+		const RFLOAT astigDefocus = Axx * x * x + 2.0 * Axy * x * y + Ayy * y * y;
 		RFLOAT u2 = x * x + y * y;
-        RFLOAT u4 = u2 * u2;
+		RFLOAT u4 = u2 * u2;
 		RFLOAT gamma = K1 * astigDefocus + K2 * u4 - K5 - K3;
 
 		RFLOAT deltaf = u2 > 0.0? std::abs(astigDefocus / u2) : 0.0;
@@ -573,9 +561,8 @@ void CTF::applyWeightEwaldSphereCurvature(
 	}
 }
 
-void CTF::applyWeightEwaldSphereCurvature_new(
-		MultidimArray<RFLOAT>& result, int orixdim, int oriydim,
-		RFLOAT angpix, RFLOAT particle_diameter)
+void CTF::applyWeightEwaldSphereCurvature_new(MultidimArray<RFLOAT>& result, int orixdim, int oriydim,
+                                              RFLOAT angpix, RFLOAT particle_diameter)
 {
 	const int s = oriydim;
 	const int sh = s/2 + 1;
@@ -589,7 +576,7 @@ void CTF::applyWeightEwaldSphereCurvature_new(
 		const double y = yi < sh? yi / as : (yi - s) / as;
 
 		// shift of this frequency resulting from CTF:
-		const d2Vector shift2D = (1.0 / (2 * angpix * PI)) * getGammaGrad(x,y);
+		const t2Vector<RFLOAT> shift2D = RFLOAT(1.0 / (2 * angpix * PI)) * getGammaGrad(x, y);
 		const double shift1D = 2.0 * shift2D.length();
 
 		// angle between the intersection points of the two circles and the center
@@ -608,8 +595,8 @@ void CTF::applyWeightEwaldSphereCurvature_new(
 	}
 }
 
-void CTF::applyWeightEwaldSphereCurvature_noAniso(MultidimArray < RFLOAT > &result, int orixdim, int oriydim,
-		RFLOAT angpix, RFLOAT particle_diameter)
+void CTF::applyWeightEwaldSphereCurvature_noAniso(MultidimArray <RFLOAT> &result, int orixdim, int oriydim,
+                                                  RFLOAT angpix, RFLOAT particle_diameter)
 {
 	RFLOAT xs = (RFLOAT)orixdim * angpix;
 	RFLOAT ys = (RFLOAT)oriydim * angpix;
@@ -618,15 +605,13 @@ void CTF::applyWeightEwaldSphereCurvature_noAniso(MultidimArray < RFLOAT > &resu
 		RFLOAT x = (RFLOAT)jp / xs;
 		RFLOAT y = (RFLOAT)ip / ys;
 		RFLOAT deltaf = fabs(getDeltaF(x, y));
-		RFLOAT inv_d = sqrt(x*x + y*y);
-		RFLOAT aux = (2.*deltaf*lambda*inv_d)/(particle_diameter);
-		RFLOAT A = (aux > 1.) ? 0. : (2./PI) * (acos(aux) - aux * sin(acos(aux)));
+		RFLOAT inv_d = sqrt(x * x + y * y);
+		RFLOAT aux = (2. * deltaf * lambda * inv_d) / (particle_diameter);
+		RFLOAT A = (aux > 1.) ? 0. : (2. / PI) * (acos(aux) - aux * sin(acos(aux)));
 		DIRECT_A2D_ELEM(result, i, j) = 1. + A * (2.*fabs(getCTF(x, y)) - 1.);
 		// Keep everything on the same scale inside RELION, where we use sin(chi), not 2sin(chi)
 		DIRECT_A2D_ELEM(result, i, j) *= 0.5;
-
 	}
-	
 }
 
 std::vector<double> CTF::getK()

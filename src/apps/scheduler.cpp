@@ -27,9 +27,9 @@ class scheduler_parameters
 public:
 	FileName mydir, newname;
 	float myconstant;
-	bool do_reset, do_run, do_abort;
+	bool do_reset, do_run, do_abort, has_ori_value;
 	int verb;
-	std::string add, set_var, set_mode, start_node, current_node, email, type, name, value, mode, input, input2, output, output2, boolvar;
+	std::string add, set_var, set_mode, start_node, current_node, email, type, name, value, ori_value, mode, input, input2, output, output2, boolvar;
 	std::string run_pipeline;
 
 	// The actual pipeline
@@ -44,22 +44,22 @@ public:
 		std::cerr << std::endl;
 		std::cerr << " Different ways of using this program: " << std::endl;
 		std::cerr << std::endl << " ++ Add a variable (of type float, bool or file): " << std::endl;
-		std::cerr << "    --schedule Schedules/test --add variable --name iter --value 0" << std::endl;
-		std::cerr << "    --schedule Schedules/test --add variable --name is_finished --value False" << std::endl;
-		std::cerr << "    --schedule Schedules/test --add variable --name initial_model --value map.mrc" << std::endl;
+		std::cerr << "    --schedule test --add variable --name iter --value 0" << std::endl;
+		std::cerr << "    --schedule test --add variable --name is_finished --value False" << std::endl;
+		std::cerr << "    --schedule test --add variable --name initial_model --value map.mrc" << std::endl;
 		std::cerr << std::endl << " ++ Add an operator node (of type float, bool or file): " << std::endl;
-		std::cerr << "    --schedule Schedules/test --add operator --type " << SCHEDULE_FLOAT_OPERATOR_PLUS << " --i iter --i2 iter_step --o iter" << std::endl;
-		std::cerr << "    --schedule Schedules/test --add operator --type " << SCHEDULE_FLOAT_OPERATOR_PLUS << " --i iter --i2 1 --o iter" << std::endl;
-		std::cerr << "    --schedule Schedules/test --add operator --type " << SCHEDULE_OPERATOR_TOUCH_FILE << " --i initial_model" << std::endl;
-		std::cerr << "    --schedule Schedules/test --add operator --type " << SCHEDULE_BOOLEAN_OPERATOR_GT << " --i iter --i2 10 --o is_finished" << std::endl;
-		std::cerr << "    --schedule Schedules/test --add operator --type " << SCHEDULE_BOOLEAN_OPERATOR_FILE_EXISTS << " --i initial_model --o is_finished" << std::endl;
+		std::cerr << "    --schedule test --add operator --type " << SCHEDULE_FLOAT_OPERATOR_PLUS << " --i iter --i2 iter_step --o iter" << std::endl;
+		std::cerr << "    --schedule test --add operator --type " << SCHEDULE_FLOAT_OPERATOR_PLUS << " --i iter --i2 1 --o iter" << std::endl;
+		std::cerr << "    --schedule test --add operator --type " << SCHEDULE_OPERATOR_TOUCH_FILE << " --i initial_model" << std::endl;
+		std::cerr << "    --schedule test --add operator --type " << SCHEDULE_BOOLEAN_OPERATOR_GT << " --i iter --i2 10 --o is_finished" << std::endl;
+		std::cerr << "    --schedule test --add operator --type " << SCHEDULE_BOOLEAN_OPERATOR_FILE_EXISTS << " --i initial_model --o is_finished" << std::endl;
 		std::cerr << std::endl << " ++ Add a job node: " << std::endl;
-		std::cerr << "    --schedule Schedules/test --add job --i my_import --mode continue/new/overwrite" << std::endl;
-		std::cerr << "    --schedule Schedules/test --add job --i exit" << std::endl;
+		std::cerr << "    --schedule test --add job --i my_import --mode continue/new/overwrite" << std::endl;
+		std::cerr << "    --schedule test --add job --i exit" << std::endl;
 		std::cerr << std::endl << " ++ Add an edge: " << std::endl;
-		std::cerr << "    --schedule Schedules/test --add edge --i inputnodename --o outputnodename" << std::endl;
+		std::cerr << "    --schedule test --add edge --i inputnodename --o outputnodename" << std::endl;
 		std::cerr << std::endl << " ++ Add a fork: " << std::endl;
-		std::cerr << "    --schedule Schedules/test --add fork --i inputnodename --bool boolvar --o outputnodename --o2 outputnodename_if_false" << std::endl;
+		std::cerr << "    --schedule test --add fork --i inputnodename --bool boolvar --o outputnodename --o2 outputnodename_if_false" << std::endl;
 		std::cerr << "TODO: add information about setting variables etc too!" << std::endl;
 		std::cerr << std::endl;
 		exit(1);
@@ -73,6 +73,7 @@ public:
 		// Fill the window, but don't show it!
 		int gen_section = parser.addSection("General options");
 		mydir = parser.getOption("--schedule", "Directory name of the schedule");
+		mydir = "Schedules/" + mydir;
 		newname = parser.getOption("--copy", "Make a copy of the schedule into this directory", "");
 		int add_section = parser.addSection("Add elements to the schedule");
 		add = parser.getOption("--add", "Specify category of element to add to the schedule (variable, operator, job, edge or fork)", "");
@@ -84,6 +85,7 @@ public:
 		output2 = parser.getOption("--o2", "Specify 2nd output of the element ", "");
 		name = parser.getOption("--name", "Name of the variable or job to be added","");
 		value = parser.getOption("--value", "Value of the variable to be added","");
+		ori_value = parser.getOption("--original_value", "Original value of the variable to be added","");
 		mode = parser.getOption("--mode", "Mode (for jobs): new, overwrite or continue","");
 		int set_section = parser.addSection("Set values of variables in the schedule");
 		do_reset = parser.checkOption("--reset", "Reset all variables to their original values");
@@ -95,6 +97,9 @@ public:
 		do_run = parser.checkOption("--run", "Run the scheduler");
 		verb = textToInteger(parser.getOption("--verb", "Running verbosity: 0, 1, 2 or 3)", "1"));
 		run_pipeline = parser.getOption("--run_pipeline", "Name of the pipeline in which to run this schedule", "default");
+
+		// Someone could give an empty-string ori_value....
+		has_ori_value = checkParameter(argc, argv, "--original_value");
 
 		// Check for errors in the command-line option
 		if (argc==1)
@@ -169,6 +174,7 @@ public:
 			if (add == "variable")
 			{
 				schedule.setVariable(name, value);
+				if (has_ori_value) schedule.setOriginalVariable(name, ori_value);
 			}
 			else if (add == "operator")
 			{
@@ -205,6 +211,14 @@ public:
 					REPORT_ERROR("ERROR: invalid value for Boolean variable for --value: " + value);
 				bool myval = (value == "true" || value == "True");
 				schedule.setBooleanVariableValue(set_var, myval);
+
+				if (has_ori_value)
+				{
+					if (!(ori_value == "true" || ori_value == "True" || ori_value == "false" || ori_value == "False"))
+						REPORT_ERROR("ERROR: invalid value for Boolean variable for --original_value: " + ori_value);
+					myval = (ori_value == "true" || ori_value == "True");
+					schedule.setBooleanOriginalVariableValue(set_var, myval);
+				}
 			}
 			else if (isFloatVariable(set_var))
 			{
@@ -212,10 +226,18 @@ public:
 				if (!sscanf(value.c_str(), "%f", &floatval)) // is this a number?
 					REPORT_ERROR("ERROR: invalid value for Float variable for --value: " + value);
 				schedule.setFloatVariableValue(set_var, floatval);
+
+				if (has_ori_value)
+				{
+					if (!sscanf(ori_value.c_str(), "%f", &floatval)) // is this a number?
+						REPORT_ERROR("ERROR: invalid value for Float variable for --original_value: " + ori_value);
+					schedule.setFloatOriginalVariableValue(set_var, floatval);
+				}
 			}
 			else if (isStringVariable(set_var))
 			{
 				schedule.setStringVariableValue(set_var, value);
+				if (has_ori_value) schedule.setStringOriginalVariableValue(set_var, ori_value);
 			}
 			else
 				REPORT_ERROR("ERROR: unrecognised variable whose value to set: " + set_var);

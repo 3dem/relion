@@ -8,7 +8,7 @@
 size_t AccBackprojector::setMdlDim(
 			int xdim, int ydim, int zdim,
 			int inity, int initz,
-			int max_r, int paddingFactor)
+			int max_r, XFLOAT paddingFactor)
 {
 	if (xdim != mdlX ||
 		ydim != mdlY ||
@@ -131,7 +131,7 @@ void AccBackprojector::clear()
 		free(d_mdlImag);
 		free(d_mdlWeight);
 		delete [] mutexes;
-#endif 
+#endif
 
 		d_mdlReal = d_mdlImag = d_mdlWeight = NULL;
 	}

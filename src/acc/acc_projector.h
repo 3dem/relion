@@ -16,9 +16,9 @@ class AccProjector
 	friend class AccProjectorKernel;
 
 	int mdlX, mdlY, mdlZ, mdlMaxR,
-	    mdlInitY, mdlInitZ,
-	    padding_factor;
-		size_t mdlXYZ;
+	    mdlInitY, mdlInitZ;
+	XFLOAT padding_factor;
+	size_t mdlXYZ;
 
 	size_t allocaton_size;
 
@@ -69,7 +69,7 @@ public:
 	bool setMdlDim(
 			int xdim, int ydim, int zdim,
 			int inity, int initz,
-			int maxr, int paddingFactor);
+			int maxr, XFLOAT paddingFactor);
 
 	void initMdl(XFLOAT *real, XFLOAT *imag);
 	void initMdl(Complex *data);

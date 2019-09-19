@@ -255,6 +255,7 @@ important logic is in the `run_pipeline()' function so that's a good place to st
 
 """
 
+from __future__ import print_function
 from __future__ import division  # always use float division
 
 import argparse
@@ -330,6 +331,7 @@ class RelionItOptions(object):
     autopick_LoG_diam_max = 180
     # Use positive values (0-1) to pick fewer particles; use negative values (-1-0) to pick more particles
     autopick_LoG_adjust_threshold = 0.0
+    autopick_LoG_upper_threshold = 999.0
     #
     # OR:
     #
@@ -421,18 +423,18 @@ class RelionItOptions(object):
 
     ### MotionCorrection parameters
     # Use RELION's own implementation of motion-correction (CPU-only) instead of the UCSF implementation?
-    motioncor_do_own = False
+    motioncor_do_own = True
     # The number of threads (only for RELION's own implementation) is optimal when nr_movie_frames/nr_threads = integer
-    motioncor_threads = 12
+    motioncor_threads = 6
     # Exectutable of UCSF MotionCor2
     motioncor_exe = '/public/EM/MOTIONCOR2/MotionCor2'
     # On which GPU(s) to execute UCSF MotionCor2
     motioncor_gpu = '0'
     # How many MPI processes to use for running motion correction?
-    motioncor_mpi = 1
+    motioncor_mpi = 4
     # Local motion-estimation patches for MotionCor2
-    motioncor_patches_x = 5
-    motioncor_patches_y = 5
+    motioncor_patches_x = 4
+    motioncor_patches_y = 4
     # B-factor in A^2 for downweighting of high-spatial frequencies
     motioncor_bfactor = 150
     # Use binning=2 for super-resolution K2 movies
@@ -470,11 +472,11 @@ class RelionItOptions(object):
     # On which GPU(s) to execute Gctf
     gctf_gpu = '0'
     # Use Alexis Rohou's CTFFIND4 (CPU-only) instead?
-    use_ctffind_instead = False
+    use_ctffind_instead = True
     # Executable for Alexis Rohou's CTFFIND4
     ctffind4_exe = '/public/EM/ctffind/ctffind.exe'
     # How many MPI processes to use for running CTF estimation?
-    ctffind_mpi = 1
+    ctffind_mpi = 8
     # Submit CTF estimation job to the cluster?
     ctffind_submit_to_queue = False
 
@@ -548,13 +550,13 @@ class RelionItOptions(object):
     # Submit jobs to the cluster?
     refine_submit_to_queue = False
     # Use fast subsets in 2D/3D classification when batch_size is bigger than this
-    refine_batchsize_for_fast_subsets = 100000
-
+    refine_batchsize_for_fast_subsets = 10000
 
     ### 2D classification parameters
     # Wait with the first 2D classification batch until at least this many particles are extracted
-    minimum_batch_size = 1000
+    minimum_batch_size = 10000
     # Number of iterations to perform in 2D classification
+    # Must be at least 20 for fast subsets
     class2d_nr_iter = 20
     # Rotational search step (in degrees)
     class2d_angle_step = 6
@@ -570,6 +572,7 @@ class RelionItOptions(object):
 
     ### 3D classification parameters
     # Number of iterations to perform in 3D classification
+    # Must be at least 20 for fast subsets
     class3d_nr_iter = 20
     # Reference mask
     class3d_reference_mask = ''
@@ -652,7 +655,7 @@ class RelionItOptions(object):
                 if hasattr(self, key):
                     setattr(self, key, value)
                 else:
-                    print " RELION_IT: Unrecognised option '{}'".format(key)
+                    print(" RELION_IT: Unrecognised option '{}'".format(key))
     
     def print_options(self, out_file=None):
         """
@@ -669,8 +672,7 @@ class RelionItOptions(object):
         Raises:
             ValueError: If there is a problem printing the options.
         """
-        print >>out_file, "# Options file for relion_it.py"
-        print >>out_file
+        out_file.write("# Options file for relion_it.py\n\n")
         seen_start = False
         option_names = [key for key in dir(self) if (not (key.startswith('__') and key.endswith('__'))
                                                      and not callable(getattr(self, key)))]
@@ -688,14 +690,14 @@ class RelionItOptions(object):
                 break
             if line.startswith('#') or len(line) == 0:
                 # Print comments or blank lines as-is
-                print >>out_file, line
+                out_file.write(line + "\n");
             else:
                 # Assume all other lines define an option name and value. Replace with new value.
                 equals_index = line.find('=')
                 if equals_index > 0:
                     option_name = line[:equals_index].strip()
                     if option_name in option_names:
-                        print >>out_file, '{} = {}'.format(option_name, repr(getattr(self, option_name)))
+                        out_file.write('{} = {}\n'.format(option_name, repr(getattr(self, option_name))))
                         option_names.remove(option_name)
                     else:
                         # This error should not occur. If it does, there is probably a programming error.
@@ -1222,9 +1224,9 @@ class RelionItGui(object):
             if len(warnings) == 0 or tkMessageBox.askokcancel("Warning", "\n".join(warnings), icon='warning',
                                                               default=tkMessageBox.CANCEL):
                 self.calculate_full_options()
-                print " RELION_IT: Writing all options to {}".format(OPTIONS_FILE)
+                print(" RELION_IT: Writing all options to {}".format(OPTIONS_FILE))
                 if os.path.isfile(OPTIONS_FILE):
-                    print " RELION_IT: File {0} already exists; renaming old copy to {0}~".format(OPTIONS_FILE)
+                    print(" RELION_IT: File {0} already exists; renaming old copy to {0}~".format(OPTIONS_FILE))
                     os.rename(OPTIONS_FILE, OPTIONS_FILE + '~')
                 with open(OPTIONS_FILE, 'w') as optfile:
                     self.options.print_options(optfile)
@@ -1244,7 +1246,7 @@ class RelionItGui(object):
 
 
 def safe_load_star(filename, max_try=5, wait=10, expected=[]):
-    for _ in xrange(max_try):
+    for _ in range(max_try):
         try:
             star = load_star(filename)
             entry = star
@@ -1254,7 +1256,7 @@ def safe_load_star(filename, max_try=5, wait=10, expected=[]):
                entry = entry[key]
             return star
         except:
-            print "safe_load_star is retrying to read: ", filename, ", expected key:", expected
+            print("safe_load_star is retrying to read: ", filename, ", expected key:", expected)
             import time
             time.sleep(wait)
     assert False, "Failed to read a star file: " + filename
@@ -1316,7 +1318,7 @@ def load_star(filename):
 # Don't get stuck in infinite while True loops....
 def CheckForExit():
     if not os.path.isfile(RUNNING_FILE):
-        print " RELION_IT:", RUNNING_FILE, "file no longer exists, exiting now ..."
+        print(" RELION_IT:", RUNNING_FILE, "file no longer exists, exiting now ...")
         exit(0)
 
 # Allow direct progressing to the second pass
@@ -1359,6 +1361,7 @@ def addJob(jobtype, name_in_script, done_file, options, alias=None):
         command = 'relion_pipeliner --addJob ' + jobtype + ' --addJobOptions "' + optionstring + '"'
         if alias is not None:
                 command += ' --setJobAlias "' + alias + '"'
+        #print("DEBUG: Running " + command)
         os.system(command)
 
         pipeline = safe_load_star(PIPELINE_STAR, expected=['pipeline_processes', 'rlnPipeLineProcessName'])
@@ -1384,7 +1387,7 @@ def RunJobs(jobs, repeat, wait, schedulename):
 
 def WaitForJob(wait_for_this_job, seconds_wait):
     time.sleep(seconds_wait)
-    print " RELION_IT: waiting for job to finish in", wait_for_this_job
+    print(" RELION_IT: waiting for job to finish in", wait_for_this_job)
     while True:
         pipeline = safe_load_star(PIPELINE_STAR, expected=['pipeline_processes', 'rlnPipeLineProcessName'])
         myjobnr = -1
@@ -1393,12 +1396,12 @@ def WaitForJob(wait_for_this_job, seconds_wait):
             if jobname == wait_for_this_job:
                 myjobnr = jobnr
         if myjobnr < 0:
-            print " ERROR: cannot find ", wait_for_this_job, " in ", PIPELINE_STAR
+            print(" ERROR: cannot find ", wait_for_this_job, " in ", PIPELINE_STAR)
             exit(1)
 
         status = int(pipeline['pipeline_processes']['rlnPipeLineProcessStatus'][myjobnr])
         if status == 2:
-            print " RELION_IT: job in", wait_for_this_job, "has finished now"
+            print(" RELION_IT: job in", wait_for_this_job, "has finished now")
             return
         else:
             CheckForExit()
@@ -1406,7 +1409,7 @@ def WaitForJob(wait_for_this_job, seconds_wait):
 
 def find_split_job_output(prefix, n, max_digits=6):
     import os.path
-    for i in xrange(max_digits):
+    for i in range(max_digits):
         filename = prefix + str(n).rjust(i, '0') + '.star'
         if os.path.isfile(filename):
             return filename
@@ -1448,7 +1451,7 @@ def findBestClass(model_star_file, use_resol=True):
             best_class = model_star['model_classes']['rlnReferenceImage'][iclass]
             best_resol = myresol
 
-    print " RELION_IT: found best class:",best_class,"with class size of",best_size,"and resolution of",best_resol
+    print(" RELION_IT: found best class:",best_class,"with class size of",best_size,"and resolution of",best_resol)
     return best_class, best_resol, model_star['model_general']['rlnPixelSize']
 
 def findOutputModelStar(job_dir):
@@ -1517,13 +1520,13 @@ def run_pipeline(opts):
     if opts.do_second_pass:
         secondpass_ref3d, secondpass_ref3d_angpix = getSecondPassReference()
         if not secondpass_ref3d == '':
-            print ' RELION_IT: found', secondpass_ref3d,'with angpix=',secondpass_ref3d_angpix,'as a 3D reference for second pass in file',SECONDPASS_REF3D_FILE
-            print ' RELION_IT: if the automatic selection of the reference turned out to be unsatisfactory,'
-            print ' RELION_IT: you can re-run the second pass with another reference by:'
-            print ' RELION_IT:  stopping the pipeline by deleting RUNNING_*'
-            print ' RELION_IT:  updating the reference filename in',SECONDPASS_REF3D_FILE
-            print ' RELION_IT:  deleting relevant jobs (autopick2_job and followings) in',SETUP_CHECK_FILE
-            print ' RELION_IT:  and restarting the pipeline.'
+            print(' RELION_IT: found', secondpass_ref3d,'with angpix=',secondpass_ref3d_angpix,'as a 3D reference for second pass in file',SECONDPASS_REF3D_FILE)
+            print(' RELION_IT: if the automatic selection of the reference turned out to be unsatisfactory,')
+            print(' RELION_IT: you can re-run the second pass with another reference by:')
+            print(' RELION_IT:  stopping the pipeline by deleting RUNNING_*')
+            print(' RELION_IT:  updating the reference filename in',SECONDPASS_REF3D_FILE)
+            print(' RELION_IT:  deleting relevant jobs (autopick2_job and followings) in',SETUP_CHECK_FILE)
+            print(' RELION_IT:  and restarting the pipeline.')
             first_pass = 1
             opts.autopick_3dreference = secondpass_ref3d
             opts.autopick_ref_angpix = secondpass_ref3d_angpix
@@ -1538,12 +1541,17 @@ def run_pipeline(opts):
 
 
         #### Set up the Import job
-        import_options = ['Input files: == {}'.format(opts.import_images)]
+        import_options = ['Raw input files: == {}'.format(opts.import_images),
+                          'Import raw movies/micrographs? == Yes',
+	                  'Pixel size (Angstrom): == {}'.format(opts.angpix),
+	                  'Voltage (kV): == {}'.format(opts.voltage),
+                          'Spherical aberration (mm): == {}'.format(opts.Cs),
+                          'Amplitude contrast: == {}'.format(opts.ampl_contrast)]
 
         if opts.images_are_movies:
-            import_options.append('Node type: == 2D micrograph movies (*.mrcs)')
+            import_options.append('Are these multi-frame movies? == Yes')
         else:
-            import_options.append('Node type: == 2D micrographs/tomograms (*.mrc)')
+            import_options.append('Are these multi-frame movies? == No')
 
         import_job, already_had_it  = addJob('Import','import_job', SETUP_CHECK_FILE, import_options)
 
@@ -1556,9 +1564,7 @@ def run_pipeline(opts):
                                   'Gain flip: == {}'.format(opts.motioncor_gainflip),
                                   'Gain rotation: == {}'.format(opts.motioncor_gainrot),
                                   'Do dose-weighting? == Yes',
-                                  'Voltage (kV): == {}'.format(opts.voltage),
                                   'Dose per frame (e/A2): == {}'.format(opts.motioncor_doseperframe),
-                                  'Pixel size (A): == {}'.format(opts.angpix),
                                   'Number of patches X: ==  {}'.format(opts.motioncor_patches_x),
                                   'Number of patches Y: == {}'.format(opts.motioncor_patches_y),
                                   'Bfactor: ==  {}'.format(opts.motioncor_bfactor),
@@ -1570,6 +1576,10 @@ def run_pipeline(opts):
 
             if (opts.motioncor_do_own):
                 motioncorr_options.append('Use RELION\'s own implementation? == Yes')
+                if opts.use_ctffind_instead:
+                    motioncorr_options.append('Save sum of power spectra? == Yes')
+                else:
+                    motioncorr_options.append('Save sum of power spectra? == No')
             else:
                 motioncorr_options.append('Use RELION\'s own implementation? == No')
 
@@ -1580,15 +1590,11 @@ def run_pipeline(opts):
 
 
         #### Set up the CtfFind job
-        ctffind_options = ['Voltage (kV): == {}'.format(opts.voltage),
-                           'Spherical aberration (mm): == {}'.format(opts.Cs),
-                           'Amplitude contrast: == {}'.format(opts.ampl_contrast),
-                           'Amount of astigmatism (A): == {}'.format(opts.ctffind_astigmatism),
+        ctffind_options = ['Amount of astigmatism (A): == {}'.format(opts.ctffind_astigmatism),
                            'FFT box size (pix): == {}'.format(opts.ctffind_boxsize),
                            'Maximum defocus value (A): == {}'.format(opts.ctffind_defocus_max),
                            'Minimum defocus value (A): == {}'.format(opts.ctffind_defocus_min),
                            'Defocus step size (A): == {}'.format(opts.ctffind_defocus_step),
-                           'Magnified pixel size (Angstrom): == {}'.format(opts.angpix * opts.motioncor_binning),
                            'Maximum resolution (A): == {}'.format(opts.ctffind_maxres),
                            'Minimum resolution (A): == {}'.format(opts.ctffind_minres),
                            'Gctf executable: == {}'.format(opts.gctf_exe),
@@ -1596,17 +1602,19 @@ def run_pipeline(opts):
                            'CTFFIND-4.1 executable: == {}'.format(opts.ctffind4_exe),
                            'Number of MPI procs: == {}'.format(opts.ctffind_mpi)]
 
-	if opts.images_are_movies:
-		ctffind_options.append('Input micrographs STAR file: == {}{}'.format(motioncorr_job, 'corrected_micrographs.star'))
-	else:
-		ctffind_options.append('Input micrographs STAR file: == {}{}'.format(import_job, 'micrographs.star'))
+        if opts.images_are_movies:
+            ctffind_options.append('Input micrographs STAR file: == {}{}'.format(motioncorr_job, 'corrected_micrographs.star'))
+        else:
+            ctffind_options.append('Input micrographs STAR file: == {}{}'.format(import_job, 'micrographs.star'))
 
         if opts.use_ctffind_instead:
             ctffind_options.append('Use CTFFIND-4.1? == Yes')
             ctffind_options.append('Use Gctf instead? == No')
+            ctffind_options.append('Use power spectra from MotionCorr job? == Yes')
         else:
             ctffind_options.append('Use CTFFIND-4.1? == No')
             ctffind_options.append('Use Gctf instead? == Yes')
+            ctffind_options.append('Use power spectra from MotionCorr job? == No')
             if (opts.ctffind_do_ignore_search_params):
                 ctffind_options.append('Ignore \'Searches\' parameters? == Yes')
             else:
@@ -1627,9 +1635,9 @@ def run_pipeline(opts):
         ctffind_job, already_had_it  = addJob('CtfFind', 'ctffind_job', SETUP_CHECK_FILE, ctffind_options)
 
         runjobs = [import_job]
-	if opts.images_are_movies:
-		runjobs.append(motioncorr_job)
-	runjobs.append(ctffind_job)
+        if opts.images_are_movies:
+            runjobs.append(motioncorr_job)
+        runjobs.append(ctffind_job)
 
         # There is an option to stop on-the-fly processing after CTF estimation
         if not opts.stop_after_ctf_estimation:
@@ -1637,7 +1645,8 @@ def run_pipeline(opts):
                                 'Min. diameter for LoG filter (A) == {}'.format(opts.autopick_LoG_diam_min),
                                 'Max. diameter for LoG filter (A) == {}'.format(opts.autopick_LoG_diam_max),
                                 'Maximum resolution to consider (A) == {}'.format(opts.autopick_lowpass),
-                                'Adjust default threshold == {}'.format(opts.autopick_LoG_adjust_threshold),
+                                'Adjust default threshold (stddev): == {}'.format(opts.autopick_LoG_adjust_threshold),
+                                'Upper threshold (stddev): == {}'.format(opts.autopick_LoG_upper_threshold),
                                 '2D references: == {}'.format(opts.autopick_2dreferences),
                                 '3D reference: == {}'.format(opts.autopick_3dreference),
                                 'Symmetry: == {}'.format(opts.autopick_3dref_symmetry),
@@ -1752,8 +1761,8 @@ def run_pipeline(opts):
         else:
             preprocess_schedule_name = PREPROCESS_SCHEDULE_PASS2
         RunJobs(runjobs, opts.preprocess_repeat_times, opts.preprocess_repeat_wait, preprocess_schedule_name)
-        print ' RELION_IT: submitted',preprocess_schedule_name,'pipeliner with', opts.preprocess_repeat_times,'repeats of the preprocessing jobs'
-        print ' RELION_IT: this pipeliner will run in the background of your shell. You can stop it by deleting the file RUNNING_PIPELINER_'+preprocess_schedule_name
+        print(' RELION_IT: submitted',preprocess_schedule_name,'pipeliner with', opts.preprocess_repeat_times,'repeats of the preprocessing jobs')
+        print(' RELION_IT: this pipeliner will run in the background of your shell. You can stop it by deleting the file RUNNING_PIPELINER_'+preprocess_schedule_name)
 
 
         ########## From now on, process extracted particles in batches for 2D or 3D classification, only perform SGD inimodel for first batch and if no 3D reference is available
@@ -1775,20 +1784,20 @@ def run_pipeline(opts):
                 if abs(float(particles_angpix) - float(opts.autopick_ref_angpix)) > 0.01:
                     # Now rescale the reference for 3D classification
                     opts.class3d_reference = opts.autopick_3dreference.replace('.mrc','_rescaled.mrc')
-                    print ' RELION_IT: rescaling the 3D reference from pixel size',opts.autopick_ref_angpix,'to',particles_angpix,'and saving the new reference as',opts.class3d_reference
-                    command = 'relion_image_handler --i ' + opts.autopick_3dreference + ' --o ' + opts.class3d_reference + ' --angpix ' + str(opts.autopick_ref_angpix) + ' --rescale_angpix ' + str(particles_angpix) + ' --new_box ' + str(particles_boxsize) 
+                    print(' RELION_IT: rescaling the 3D reference from pixel size',opts.autopick_ref_angpix,'to',particles_angpix,'and saving the new reference as',opts.class3d_reference)
+                    command = 'relion_image_handler --i ' + opts.autopick_3dreference + ' --o ' + opts.class3d_reference + ' --angpix ' + str(opts.autopick_ref_angpix) + ' --rescale_angpix ' + str(particles_angpix) + ' --new_box ' + str(particles_boxsize)
                     os.system(command)
 
 
-            print ' RELION_IT: now entering an infinite loop for batch-processing of particles. You can stop this loop by deleting the file', RUNNING_FILE
+            print(' RELION_IT: now entering an infinite loop for batch-processing of particles. You can stop this loop by deleting the file', RUNNING_FILE)
             
             # It could be that this is a restart, so check previous_batch1_size in the output directory.
             # Also check the presence of class2d_job_batch_001 in case the first job was not submitted yet.
             first_split_file = find_split_job_output(split_job + 'particles_split', 1)
             if getJobName("class2d_job_batch_001", SETUP_CHECK_FILE) is not None and \
                first_split_file is not None:
-                batch1 = safe_load_star(first_split_file, expected=['', 'rlnMicrographName'])
-                previous_batch1_size = len(batch1['']['rlnMicrographName'])
+                batch1 = safe_load_star(first_split_file, expected=['particles', 'rlnMicrographName'])
+                previous_batch1_size = len(batch1['particles']['rlnMicrographName'])
             else:
                 previous_batch1_size = 0
 
@@ -1801,8 +1810,8 @@ def run_pipeline(opts):
                     iibatch = ibatch + 1
                     batch_name = find_split_job_output(split_job + "particles_split", iibatch)
 
-                    batch = safe_load_star(batch_name, expected=['', 'rlnMicrographName'])
-                    batch_size = len(batch['']['rlnMicrographName'])
+                    batch = safe_load_star(batch_name, expected=['particles', 'rlnMicrographName'])
+                    batch_size = len(batch['particles']['rlnMicrographName'])
                     rerun_batch1 = False
                     if ( iibatch == 1 and batch_size > previous_batch1_size and batch_size > opts.minimum_batch_size ):
                         previous_batch1_size = batch_size
@@ -1836,7 +1845,7 @@ def run_pipeline(opts):
                             if ((not already_had_it) or rerun_batch1):
                                 have_new_batch = True
                                 RunJobs([discard_job], 1, 1, 'DISCARD')
-                                print " RELION_IT: submitted job to discard based on image statistics for", batch_size ,"particles in", batch_name
+                                print(" RELION_IT: submitted job to discard based on image statistics for", batch_size ,"particles in", batch_name)
 
                                 # Wait here until this Discard job is finished. Check every thirty seconds
                                 WaitForJob(discard_job, 30)
@@ -1896,7 +1905,7 @@ def run_pipeline(opts):
                             if ((not already_had_it) or rerun_batch1):
                                 have_new_batch = True
                                 RunJobs([class2d_job], 1, 1, 'CLASS2D')
-                                print " RELION_IT: submitted 2D classification with", batch_size ,"particles in", class2d_job
+                                print(" RELION_IT: submitted 2D classification with", batch_size ,"particles in", class2d_job)
 
                                 # Wait here until this Class2D job is finished. Check every thirty seconds
                                 WaitForJob(class2d_job, 30)
@@ -1922,7 +1931,7 @@ def run_pipeline(opts):
                                                 'Final resolution (A): == {}'.format(opts.inimodel_resol_final), 
                                                 'Initial mini-batch size: == {}'.format(opts.inimodel_batchsize_ini), 
                                                 'Final mini-batch size: == {}'.format(opts.inimodel_batchsize_final), 
-                                                'SGD increased noise variance half-life: == {}'.format(opts.inimodel_sigmafudge_halflife), 
+                                                'Increased noise variance half-life: == {}'.format(opts.inimodel_sigmafudge_halflife), 
                                                 'Number of pooled particles: == 1',
                                                 'Which GPUs to use: == {}'.format(opts.refine_gpu),
                                                 'Number of MPI procs: == {}'.format(opts.refine_mpi),
@@ -1963,15 +1972,15 @@ def run_pipeline(opts):
                             if (not already_had_it):
                                 have_new_batch = True
                                 RunJobs([inimodel_job], 1, 1, 'INIMODEL')
-                                print " RELION_IT: submitted initial model generation with", batch_size ,"particles in", inimodel_job
+                                print(" RELION_IT: submitted initial model generation with", batch_size ,"particles in", inimodel_job)
 
                                 # Wait here until this inimodel job is finished. Check every thirty seconds
                                 WaitForJob(inimodel_job, 30)
 
                             sgd_model_star = findOutputModelStar(inimodel_job)
                             if sgd_model_star is None:
-                                print " RELION_IT: Initial model generation " + inimodel_job + " does not contain expected output maps."
-                                print " RELION_IT: This job should have finished, but you may continue it from the GUI. "
+                                print(" RELION_IT: Initial model generation " + inimodel_job + " does not contain expected output maps.")
+                                print(" RELION_IT: This job should have finished, but you may continue it from the GUI.")
                                 raise Exception("ERROR!! quitting the pipeline.") # TODO: MAKE MORE ROBUST
 
                             # Use the model of the largest class for the 3D classification below
@@ -2054,15 +2063,15 @@ def run_pipeline(opts):
                             if ((not already_had_it) or rerun_batch1):
                                 have_new_batch = True
                                 RunJobs([class3d_job], 1, 1, 'CLASS3D')
-                                print ' RELION_IT: submitted 3D classification with', batch_size ,'particles in', class3d_job
+                                print(' RELION_IT: submitted 3D classification with', batch_size ,'particles in', class3d_job)
 
                                 # Wait here until this Class2D job is finished. Check every thirty seconds
                                 WaitForJob(class3d_job, 30)
 
                             class3d_model_star = findOutputModelStar(class3d_job)
                             if class3d_model_star is None:
-                                print " RELION_IT: 3D Classification " + class3d_job + " does not contain expected output maps."
-                                print " RELION_IT: This job should have finished, but you may continue it from the GUI."
+                                print(" RELION_IT: 3D Classification " + class3d_job + " does not contain expected output maps.")
+                                print(" RELION_IT: This job should have finished, but you may continue it from the GUI.")
                                 raise Exception("ERROR!! quitting the pipeline.") # TODO: MAKE MORE ROBUST
 
                             best_class3d_class, best_class3d_resol, best_class3d_angpix = findBestClass(class3d_model_star, use_resol=True)
@@ -2080,7 +2089,7 @@ def run_pipeline(opts):
                                 # Stop the PREPROCESS pipeliner of the first pass by removing its RUNNING file
                                 filename_to_remove = 'RUNNING_PIPELINER_'+preprocess_schedule_name
                                 if os.path.isfile(filename_to_remove):
-                                    print ' RELION_IT: removing file',filename_to_remove,'to stop the pipeliner from the first pass'
+                                    print(' RELION_IT: removing file',filename_to_remove,'to stop the pipeliner from the first pass')
                                     os.remove(filename_to_remove)
 
                                 # Generate a file to indicate we're in the second pass, so that restarts of the python script will be smooth
@@ -2091,7 +2100,7 @@ def run_pipeline(opts):
                                 # Move out of this ipass of the passes loop....
                                 ibatch = nr_batches+1
                                 continue_this_pass = False
-                                print ' RELION_IT: moving on to the second pass using',opts.autopick_3dreference,'for template-based autopicking'
+                                print(' RELION_IT: moving on to the second pass using',opts.autopick_3dreference,'for template-based autopicking')
                                 # break out of the for-loop over the batches
                                 break
 
@@ -2119,44 +2128,44 @@ def main():
                         help="continue a previous run by loading options from ./relion_it_options.py")
     args = parser.parse_args()
 
-    print ' RELION_IT: -------------------------------------------------------------------------------------------------------------------'
-    print ' RELION_IT: script for automated, on-the-fly single-particle analysis in RELION (>= 3.0-alpha-5)'
-    print ' RELION_IT: authors: Sjors H.W. Scheres, Takanori Nakane & Colin M. Palmer'
-    print ' RELION_IT: '
-    print ' RELION_IT: usage: ./relion_it.py [extra_options.py [extra_options2.py ....] ] [--gui] [--continue]'
-    print ' RELION_IT: '
-    print ' RELION_IT: this script will check whether processes are still running using files with names starting with RUNNING' 
-    print ' RELION_IT:   you can restart this script after stopping previous processes by deleting all RUNNING files'
-    print ' RELION_IT: this script keeps track of already submitted jobs in a filed called',SETUP_CHECK_FILE
-    print ' RELION_IT:   upon a restart, jobs present in this file will be continued (for preprocessing), or ignored when already finished'
-    print ' RELION_IT: if you would like to re-do a specific job from scratch (e.g. because you changed its parameters)' 
-    print ' RELION_IT:   remove that job, and those that depend on it, from the',SETUP_CHECK_FILE
-    print ' RELION_IT: -------------------------------------------------------------------------------------------------------------------'
-    print ' RELION_IT: '
+    print(' RELION_IT: -------------------------------------------------------------------------------------------------------------------')
+    print(' RELION_IT: script for automated, on-the-fly single-particle analysis in RELION (>= 3.1)')
+    print(' RELION_IT: authors: Sjors H.W. Scheres, Takanori Nakane & Colin M. Palmer')
+    print(' RELION_IT: ')
+    print(' RELION_IT: usage: ./relion_it.py [extra_options.py [extra_options2.py ....] ] [--gui] [--continue]')
+    print(' RELION_IT: ')
+    print(' RELION_IT: this script will check whether processes are still running using files with names starting with RUNNING')
+    print(' RELION_IT:   you can restart this script after stopping previous processes by deleting all RUNNING files')
+    print(' RELION_IT: this script keeps track of already submitted jobs in a filed called',SETUP_CHECK_FILE)
+    print(' RELION_IT:   upon a restart, jobs present in this file will be continued (for preprocessing), or ignored when already finished')
+    print(' RELION_IT: if you would like to re-do a specific job from scratch (e.g. because you changed its parameters)')
+    print(' RELION_IT:   remove that job, and those that depend on it, from the',SETUP_CHECK_FILE)
+    print(' RELION_IT: -------------------------------------------------------------------------------------------------------------------')
+    print(' RELION_IT: ')
     
     # Make sure no other version of this script are running...
     if os.path.isfile(RUNNING_FILE):
-        print " RELION_IT: ERROR:", RUNNING_FILE, "is already present: delete this file and make sure no other copy of this script is running. Exiting now ..."
+        print(" RELION_IT: ERROR:", RUNNING_FILE, "is already present: delete this file and make sure no other copy of this script is running. Exiting now ...")
         exit(0)
 
     # Also make sure the preprocessing pipeliners are stopped before re-starting this script
     for checkfile in ('RUNNING_PIPELINER_'+PREPROCESS_SCHEDULE_PASS1, 'RUNNING_PIPELINER_'+PREPROCESS_SCHEDULE_PASS2):
         if os.path.isfile(checkfile):
-            print " RELION_IT: ERROR:", checkfile, "is already present: delete this file and make sure no relion_pipeliner job is still running. Exiting now ..."
+            print(" RELION_IT: ERROR:", checkfile, "is already present: delete this file and make sure no relion_pipeliner job is still running. Exiting now ...")
             exit(0)
 
     if args.continue_:
-        print ' RELION_IT: continuing a previous run. Options will be loaded from ./relion_it_options.py'
+        print(' RELION_IT: continuing a previous run. Options will be loaded from ./relion_it_options.py')
         args.extra_options.append(OPTIONS_FILE)
 
     opts = RelionItOptions()
     for user_opt_file in args.extra_options:
-        print ' RELION_IT: reading options from {}'.format(user_opt_file)
+        print(' RELION_IT: reading options from {}'.format(user_opt_file))
         user_opts = runpy.run_path(user_opt_file)
         opts.update_from(user_opts)
 
     if args.gui:
-        print ' RELION_IT: launching GUI...'
+        print(' RELION_IT: launching GUI...')
         tk_root = tk.Tk()
         tk_root.title("relion_it.py setup")
         RelionItGui(tk_root, opts)
