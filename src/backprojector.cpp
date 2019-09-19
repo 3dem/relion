@@ -1214,7 +1214,7 @@ void BackProjector::externalReconstruct(MultidimArray<RFLOAT> &vol_out,
 	Image<Complex> Idata;
 	if (ref_dim == 2) Idata().resize(pad_size, pad_size/2+1);
 	else Idata().resize(pad_size, pad_size, pad_size/2+1);
-	decenter(data, Idata(), max_r2);
+	Projector::decenter(data, Idata(), max_r2);
 	windowFourierTransform(Idata(), padoridim);
 	ComplexIO::write(Idata(), fn_out+"_external_reconstruct_data", ".mrc");
 	Idata.clear();
@@ -1223,7 +1223,7 @@ void BackProjector::externalReconstruct(MultidimArray<RFLOAT> &vol_out,
 	Image<RFLOAT> Iweight;
 	if (ref_dim == 2) Iweight().resize(pad_size, pad_size/2+1);
 	else Iweight().resize(pad_size, pad_size, pad_size/2+1);
-	decenter(weight, Iweight(), max_r2);
+	Projector::decenter(weight, Iweight(), max_r2);
 	windowFourierTransform(Iweight(), padoridim);
 	Iweight.write(fn_out+"_external_reconstruct_weight.mrc");
 	Iweight.clear();
@@ -1354,7 +1354,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 	// Go from projector-centered to FFTW-uncentered
 	MultidimArray<RFLOAT> Fweight;
 	Fweight.reshape(Fconv);
-	decenter(weight, Fweight, max_r2);
+	Projector::decenter(weight, Fweight, max_r2);
 
 	RCTOC(ReconTimer,ReconS_2);
 	RCTIC(ReconTimer,ReconS_2_5);
@@ -1406,7 +1406,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 	{
 		RCTIC(ReconTimer,ReconS_3);
 		Fconv.initZeros(); // to remove any stuff from the input volume
-		decenter(data, Fconv, max_r2);
+		Projector::decenter(data, Fconv, max_r2);
 
 		// Prevent divisions by zero: set Fweight to at least 1/1000th of the radially averaged weight at that resolution
 		// beyond r_max, set Fweight to at least 1/1000th of the radially averaged weight at r_max;
@@ -1581,7 +1581,7 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 		// Now do the actual reconstruction with the data array
 		// Apply the iteratively determined weight
 		Fconv.initZeros(); // to remove any stuff from the input volume
-		decenter(data, Fconv, max_r2);
+		Projector::decenter(data, Fconv, max_r2);
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Fconv)
 		{
 #ifdef  RELION_SINGLE_PRECISION

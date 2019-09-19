@@ -452,7 +452,7 @@ void MagnificationHelper::adaptAstigmatism(
 
 				d2Matrix A2 = Mit[og] * A[p] * Mi[og];
 
-				double deltafU_neg, deltafV_neg, phiDeg;
+				RFLOAT deltafU_neg, deltafV_neg, phiDeg;
 				matrixToPolar(A2, deltafU_neg, deltafV_neg, phiDeg);
 
 				partMdts[m].setValue(EMDL_CTF_DEFOCUSU, -deltafU_neg, p);
@@ -524,7 +524,7 @@ void MagnificationHelper::adaptAstigmatism(
 
 						d2Matrix Apa2 = Qt2 * Dp2 * Q2;
 
-						double deltafU_pa_neg, deltafV_pa_neg, phiDeg;
+						RFLOAT deltafU_pa_neg, deltafV_pa_neg, phiDeg;
 						matrixToPolar(Apa2, deltafU_pa_neg, deltafV_pa_neg, phiDeg);
 
 						partMdts[m].setValue(EMDL_CTF_DEFOCUSU, -deltafU_pa_neg, p);

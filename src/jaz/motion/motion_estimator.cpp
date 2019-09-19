@@ -575,7 +575,7 @@ std::vector<std::vector<d2Vector>> MotionEstimator::optimize(
 	return optimize(CCd, inTracks, sig_vel_px, sig_acc_px, sig_div_px, positions, globComp);
 }
 
-std::vector<Image<double>> MotionEstimator::computeDamageWeights(int opticsGroup)
+std::vector<Image<RFLOAT>> MotionEstimator::computeDamageWeights(int opticsGroup)
 {
 	return DamageHelper::damageWeights(
 		s[opticsGroup], angpix[opticsGroup], micrographHandler->firstFrame, fc,
