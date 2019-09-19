@@ -59,7 +59,7 @@ void EERRenderer::read(FileName fn_movie)
 	RCTIC(TIMING_READ_EER);
 	FILE *fh = fopen(fn_movie.c_str(), "r");
 	if (fh == NULL)
-		REPORT_ERROR("Failed to open the EER file.");
+		REPORT_ERROR("Failed to open the EER file: " + fn_movie);
 
 	fseek(fh, 0, SEEK_END);
 	long long file_size = ftell(fh);
