@@ -1747,11 +1747,11 @@ void GuiMainWindow::cb_display_io_node_i()
 	{
 		// A manualpicker jobwindow for display of micrographs....
 		RelionJob manualpickjob;
-		FileName fn_job = ".gui_manualpickrun.job";
+		FileName fn_job = ".gui_manualpick";
 		bool iscont=false;
-		if (exists(fn_job))
+		if (exists(fn_job+"job.star") || exists(fn_job+"run.job"))
 		{
-			manualpickjob.read(fn_job.beforeLastOf("run.job").c_str(), iscont, true); // true means do initialise
+			manualpickjob.read(fn_job.c_str(), iscont, true); // true means do initialise
 		}
 		else
 		{
