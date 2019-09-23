@@ -23,6 +23,7 @@
 #include <src/symmetries.h>
 #include <src/euler.h>
 #include <src/time.h>
+#include <src/jaz/obs_model.h>
 
 class particle_symmetry_expand_parameters
 {
@@ -31,10 +32,11 @@ public:
 	FileName fn_sym, fn_in, fn_out;
 
 	// Helical symmetry
-	bool do_helix;
+	bool do_helix, do_ignore_optics;
 	RFLOAT twist, rise, angpix;
 	int nr_asu, frac_sampling;
 	RFLOAT frac_range;
+    ObservationModel obsModel;
 
 	// I/O Parser
 	IOParser parser;
@@ -64,8 +66,9 @@ public:
 		nr_asu = textToFloat(parser.getOption("--asu", "Number of asymmetrical units to expand", "1"));
 		frac_sampling = textToFloat(parser.getOption("--frac_sampling", "Number of samplings in between a single asymmetrical unit", "1"));
 		frac_range = textToFloat(parser.getOption("--frac_range", "Range of the rise [-0.5, 0.5> to be sampled", "0.5"));
+        do_ignore_optics = parser.checkOption("--ignore_optics", "Provide this option for relion-3.0 functionality, without optics groups");
 
-		// Check for errors in the command-line option
+        // Check for errors in the command-line option
 		if (parser.checkForErrors())
 			REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 
@@ -116,8 +119,22 @@ public:
 				REPORT_ERROR("ERROR Nothing to do. Provide a point group with symmetry!");
 		}
 
-		DFi.read(fn_in);
-		int barstep = XMIPP_MAX(1, DFi.numberOfObjects()/ 60);
+        if (do_ignore_optics)
+        {
+        	DFi.read(fn_in);
+        }
+        else
+        {
+            ObservationModel::loadSafely(fn_in, obsModel, DFi, "particles", 1, false);
+            if (obsModel.opticsMdt.numberOfObjects() == 0)
+            {
+            	std::cerr << " + WARNGING: could not read optics groups table, proceeding without it ..." << std::endl;
+            	DFi.read(fn_in);
+            	do_ignore_optics = true;
+            }
+        }
+
+        int barstep = XMIPP_MAX(1, DFi.numberOfObjects()/ 60);
 		init_progress_bar(DFi.numberOfObjects());
 		DFo.clear();
 
@@ -180,7 +197,15 @@ public:
 		} // end loop over input MetadataTable
 		progress_bar(DFi.numberOfObjects());
 
-		DFo.write(fn_out);
+
+		if (do_ignore_optics)
+		{
+			DFo.write(fn_out);
+		}
+		else
+		{
+			obsModel.save(DFo, fn_out, "particles");
+		}
 		std::cout << " Done! Written: " << fn_out << " with the expanded particle set." << std::endl;
 
 	}// end run function
