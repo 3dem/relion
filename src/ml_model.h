@@ -68,7 +68,7 @@ public:
 	std::vector<long int> nr_particles_group;
 
 	// Number of directions (size of pdf_direction);
-	int nr_directions;
+	long long int nr_directions;
 
 	// Log-likelihood target value
 	RFLOAT LL;
@@ -417,7 +417,7 @@ public:
 	void initialisePdfDirection(int newsize);
 
 	/** Read in the binary masks provided by the user and then make a soft edge on those */
-	void initialiseBodies(FileName fn_masks, FileName fn_root_out, bool also_initialise_rest = false);
+	void initialiseBodies(FileName fn_masks, FileName fn_root_out, bool also_initialise_rest = false, int rank = 0);
 
 	/** Write out a Bild file with the COMs and directions or rotation for each body */
 	void writeBildFileBodies(FileName fn_bild);

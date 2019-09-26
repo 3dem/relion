@@ -156,4 +156,6 @@ int LBFGS::LibLbfgsAdapter::progress(
     {
         std::cout << k << ": " << fx << "\n";
     }
+
+    return 0;
 }

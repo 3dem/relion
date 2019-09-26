@@ -64,7 +64,7 @@ void DisplayBox::draw()
 }
 
 void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, int _ipos,
-		RFLOAT _minval, RFLOAT _maxval, RFLOAT _scale, bool do_relion_scale)
+                         RFLOAT _minval, RFLOAT _maxval, RFLOAT _scale, bool do_relion_scale)
 {
 
 	scale = _scale;
@@ -182,9 +182,9 @@ int DisplayBox::unSelect()
 }
 
 int basisViewerWindow::fillCanvas(int viewer_type, MetaDataTable &MDin, EMDLabel display_label, bool _do_read_whole_stacks, bool _do_apply_orient,
-		RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale, RFLOAT _ori_scale, int _ncol, long int max_nr_images, RFLOAT lowpass, RFLOAT highpass, bool _do_class,
-		MetaDataTable *_MDdata, int _nr_regroup, bool _do_recenter,  bool _is_data, MetaDataTable *_MDgroups,
-		bool do_allow_save, FileName fn_selected_imgs, FileName fn_selected_parts, int max_nr_parts_per_class)
+                                  RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale, RFLOAT _ori_scale, int _ncol, long int max_nr_images, RFLOAT lowpass, RFLOAT highpass, bool _do_class,
+                                  MetaDataTable *_MDdata, int _nr_regroup, bool _do_recenter,  bool _is_data, MetaDataTable *_MDgroups,
+                                  bool do_allow_save, FileName fn_selected_imgs, FileName fn_selected_parts, int max_nr_parts_per_class)
 {
 	// Scroll bars
 	Fl_Scroll scroll(0, 0, w(), h());
@@ -258,11 +258,14 @@ int basisViewerWindow::fillCanvas(int viewer_type, MetaDataTable &MDin, EMDLabel
 		show();
 		return Fl::run();
 	}
+
+	REPORT_ERROR("Logic error: should not come here");
+	return -1;
 }
 
 int basisViewerWindow::fillPickerViewerCanvas(MultidimArray<RFLOAT> image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast,
-		RFLOAT _scale, int _particle_radius, bool _do_startend, FileName _fn_coords,
-		FileName _fn_color, FileName _fn_mic, FileName _color_label, RFLOAT _color_blue_value, RFLOAT _color_red_value)
+                                              RFLOAT _scale, int _particle_radius, bool _do_startend, FileName _fn_coords,
+                                              FileName _fn_color, FileName _fn_mic, FileName _color_label, RFLOAT _color_blue_value, RFLOAT _color_red_value)
 {
 	// Scroll bars
 	Fl_Scroll scroll(0, 0, w(), h());
@@ -309,8 +312,9 @@ int basisViewerWindow::fillSingleViewerCanvas(MultidimArray<RFLOAT> image, RFLOA
 	return Fl::run();
 
 }
-int basisViewerCanvas::fill(MetaDataTable &MDin, EMDLabel display_label, bool _do_apply_orient, RFLOAT _minval, RFLOAT _maxval,
-		RFLOAT _sigma_contrast, RFLOAT _scale, int _ncol, bool _do_recenter, long int max_images, RFLOAT lowpass, RFLOAT highpass)
+
+void basisViewerCanvas::fill(MetaDataTable &MDin, EMDLabel display_label, bool _do_apply_orient, RFLOAT _minval, RFLOAT _maxval,
+                             RFLOAT _sigma_contrast, RFLOAT _scale, int _ncol, bool _do_recenter, long int max_images, RFLOAT lowpass, RFLOAT highpass)
 {
 
 	ncol = _ncol;
@@ -475,7 +479,7 @@ int basisViewerCanvas::fill(MetaDataTable &MDin, EMDLabel display_label, bool _d
 		progress_bar(nr_imgs);
 
 }
-int basisViewerCanvas::fill(MultidimArray<RFLOAT> &image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale)
+void basisViewerCanvas::fill(MultidimArray<RFLOAT> &image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale)
 {
 	xoff = yoff = 0;
 	nrow = ncol = 1;
@@ -925,7 +929,6 @@ void multiViewerCanvas::showAverage(bool selected, bool show_stddev)
 
 void multiViewerCanvas::showOriginalImage(int ipos)
 {
-
 	// Make system call because otherwise the green drawing for distance measurements doesn't work....
 	FileName fn_img;
 	boxes[ipos]->MDimg.getValue(display_label, fn_img);
@@ -957,7 +960,6 @@ void multiViewerCanvas::showOriginalImage(int ipos)
 
 void multiViewerCanvas::showFourierAmplitudes(int ipos)
 {
-
 	// Make system call because otherwise the green drawing for distance measurements doesn't work....
 	FileName fn_img;
 	Image<RFLOAT> img;
@@ -981,7 +983,6 @@ void multiViewerCanvas::showFourierAmplitudes(int ipos)
 
 void multiViewerCanvas::showFourierPhaseAngles(int ipos)
 {
-
 	// Make system call because otherwise the green drawing for distance measurements doesn't work....
 	FileName fn_img;
 	Image<RFLOAT> img;
@@ -1003,7 +1004,6 @@ void multiViewerCanvas::showFourierPhaseAngles(int ipos)
 
 void multiViewerCanvas::showHelicalLayerLineProfile(int ipos)
 {
-
 	const char * default_pdf_viewer = getenv ("RELION_PDFVIEWER_EXECUTABLE");
 	char hardcoded_pdf_viewer[]=DEFAULTPDFVIEWER;
 	if (default_pdf_viewer == NULL)
@@ -2446,8 +2446,6 @@ int Displayer::runGui()
 			win.display_labels.push_back(EMDL::label2Str(EMDL_MICROGRAPH_NAME));
 		if (MD.containsLabel(EMDL_MICROGRAPH_MOVIE_NAME))
 			win.display_labels.push_back(EMDL::label2Str(EMDL_MICROGRAPH_MOVIE_NAME));
-
-
 	}
 	else
 	{
@@ -2457,11 +2455,11 @@ int Displayer::runGui()
 		win.is_multi = (ZSIZE(img()) * NSIZE(img()) > 1);
 	}
 
-	win.fill(fn_in);
+	return win.fill(fn_in);
 }
 
 
-int Displayer::run()
+void Displayer::run()
 {
 	if (do_gui)
 	{

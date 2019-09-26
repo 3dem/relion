@@ -194,7 +194,7 @@ bool MetaDataTable::getValueToString(EMDLabel label, std::string &value, long ob
 
 	if (EMDL::isString(label))
 	{
-		getValue(label, value, objectID);
+		return getValue(label, value, objectID);
 	}
 	else
 	{
@@ -202,7 +202,7 @@ bool MetaDataTable::getValueToString(EMDLabel label, std::string &value, long ob
 		if (EMDL::isDouble(label))
 		{
 			double v;
-			getValue(label, v, objectID);
+			if(!getValue(label, v, objectID)) return false;
 
 			if ((ABS(v) > 0. && ABS(v) < 0.001) || ABS(v) > 100000.)
 			{
@@ -226,25 +226,25 @@ bool MetaDataTable::getValueToString(EMDLabel label, std::string &value, long ob
 					snprintf(buffer,13, "%12.6f", v);
 				}
 			}
-
 		}
 		else if (EMDL::isInt(label))
 		{
 			long v;
-			getValue(label, v, objectID);
+			if (!getValue(label, v, objectID)) return false;
 			snprintf(buffer,13, "%12ld", v);
 		}
 		else if (EMDL::isBool(label))
 		{
 			bool v;
-			getValue(label, v, objectID);
+			if (!getValue(label, v, objectID)) return false;
 			snprintf(buffer,13, "%12d", (int)v);
 		}
 
 		std::string tt(buffer);
 		value = tt;
-	}
 
+		return true;
+	}
 }
 
 size_t MetaDataTable::size()
@@ -282,6 +282,9 @@ bool MetaDataTable::setValueFromString(EMDLabel label, const std::string &value,
 			return setValue(label, v, objectID);
 		}
 	}
+
+	REPORT_ERROR("Logic error: should not happen");
+	return false;
 }
 
 	// comparators used for sorting
@@ -1128,7 +1131,8 @@ void MetaDataTable::columnHistogram(EMDLabel label, std::vector<RFLOAT> &histX, 
 	}
 
 	RFLOAT iqr = values[n_row * 3 / 4] - values[n_row / 2];
-	RFLOAT bin_width = 1, bin_size = 1;
+	RFLOAT bin_width = 1;
+	unsigned int bin_size = 1;
 
 	// change bin parameters only when there are many values
 	if (iqr != 0)
@@ -1138,7 +1142,7 @@ void MetaDataTable::columnHistogram(EMDLabel label, std::vector<RFLOAT> &histX, 
 			hist_min = values[0];
 			hist_max = values[n_row - 1];
 			bin_width = 2 * iqr / std::pow(n_row, 1.0 / 3); // Freedman-Diaconis rule
-			bin_size = int(std::ceil((hist_max - hist_min) / bin_width));
+			bin_size = (unsigned int)(std::ceil((hist_max - hist_min) / bin_width));
 			if (bin_size > 5000) bin_size = 5000; // FIXME: Ad hoc upper limit to avoid using too much memory
 		}
 		else

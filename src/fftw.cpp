@@ -1199,9 +1199,9 @@ void applyBFactorToMap(MultidimArray<RFLOAT > &img, RFLOAT bfactor, RFLOAT angpi
 void LoGFilterMap(MultidimArray<Complex > &FT, int ori_size, RFLOAT sigma, RFLOAT angpix)
 {
 
-	// Calculation sigma in reciprocal pixels (input is in Angstroms) and pre-calculate its square
+	// Calculate sigma in reciprocal pixels (input is in Angstroms) and pre-calculate its square
 	// Factor of 1/2 because input is diameter, and filter uses radius
-	RFLOAT isigma2 = (0.5*ori_size * angpix)/sigma;
+	RFLOAT isigma2 = (0.5 * ori_size * angpix) / sigma;
 	isigma2 *= isigma2;
 
 	// Gunn Pattern Recognition 32 (1999) 1463-1472

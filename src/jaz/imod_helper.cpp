@@ -60,6 +60,8 @@ std::vector<d4Matrix> ImodHelper::readTiltTransforms(std::string fn, d4Matrix vo
 
 std::vector<d4Matrix> ImodHelper::readAffineTransforms(std::string fn)
 {
+    std::vector<d4Matrix> vol2img;
+
     /*std::ifstream mapFile(fn.c_str());
 
     if (!mapFile.is_open())
@@ -68,7 +70,6 @@ std::vector<d4Matrix> ImodHelper::readAffineTransforms(std::string fn)
     }
 
     std::vector<double> angles;
-    std::vector<d4Matrix> vol2img;
 
     while (anglesFile.good())
     {
@@ -88,6 +89,7 @@ std::vector<d4Matrix> ImodHelper::readAffineTransforms(std::string fn)
 
         vol2img.push_back(w2i * vol2world);
     }
+*/
 
-    return vol2img;*/
+    return vol2img;
 }
