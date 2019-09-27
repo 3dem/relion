@@ -1222,6 +1222,12 @@ void Schedule::addOperator(SchedulerOperator &myop)
 void Schedule::addJob(RelionJob &myjob, std::string jobname, std::string mode)
 {
 
+	//remove spaces from jobname
+	for (int i = 0; i < jobname.length(); i++)
+	{
+		if (jobname[i] == ' ') jobname[i] = '_';
+	}
+
 	// Check whether the jobname is unique
 	if (isNode(jobname))
 		REPORT_ERROR("ERROR: trying to add a JobNode that already exists: " + jobname);
