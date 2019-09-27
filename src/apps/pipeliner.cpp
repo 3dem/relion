@@ -34,7 +34,7 @@ public:
 	FileName fn_sched, fn_jobids, fn_options, fn_alias, run_schedule, abort_schedule;
 	int nr_repeat;
 	bool do_check_complete, do_overwrite_current;
-	long int minutes_wait, minutes_wait_before, seconds_wait_after, gentle_clean;
+	long int minutes_wait, minutes_wait_before, seconds_wait_after, gentle_clean, harsh_clean;
 	std::string add_type;
 
 	// The actual pipeline
@@ -70,6 +70,7 @@ public:
 		int expert_section = parser.addSection("Expert options");
 		pipeline.name = parser.getOption("--pipeline", "Name of the pipeline", "default");
 		gentle_clean = textToInteger(parser.getOption("--gentle_clean", "Gentle clean this job", "-1"));
+		harsh_clean  = textToInteger(parser.getOption("--harsh_clean", "Harsh clean this job", "-1"));
 
 		// Check for errors in the command-line option
 		if (parser.checkForErrors())
@@ -97,7 +98,7 @@ public:
 			}
 
 		}
-		else if (gentle_clean > 0)
+		else if (gentle_clean > 0 || harsh_clean > 0)
 		{
 			bool found = false;
 			for (int i = 0, ilim = pipeline.processList.size(); i < ilim; i++)
@@ -108,13 +109,13 @@ public:
 					continue;
 
 				int job_nr = textToInteger(fn_jobnr.afterFirstOf("job").beforeLastOf("/"));
-				if (job_nr != gentle_clean)
+				if (!(job_nr == gentle_clean || job_nr == harsh_clean))
 					continue;
 
 				found = true;
 //				std::cout << "Gentle clean " << pipeline.processList[i].name << std::endl;
 				std::string error_message;
-				if (!pipeline.cleanupJob(i, false, error_message))
+				if (!pipeline.cleanupJob(i, (job_nr == harsh_clean), error_message))
 				{
 					std::cerr << "Failed to clean!" << std::endl;
 					REPORT_ERROR(error_message);
@@ -122,7 +123,12 @@ public:
 				break;
 			}
 			if (!found)
-				std::cerr << "Could not find job " << gentle_clean << std::endl;
+			{
+				if (gentle_clean > 0)
+					std::cerr << "Could not find job to gentle clean: " << gentle_clean << std::endl;
+				else
+					std::cerr << "Could not find job harsh clean: " << harsh_clean << std::endl;
+			}
 		}
 		else if (nr_repeat > 0)
 		{
