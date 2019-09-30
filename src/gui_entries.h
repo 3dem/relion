@@ -81,7 +81,7 @@ extern bool create_scheduler_gui;
 //environment variable RELION_QSUB_EXTRA_COUNT
 #define GUIEXTRA \
 	( (getenv ("RELION_QSUB_EXTRA_COUNT"))? \
-	((atoi(getenv ("RELION_QSUB_EXTRA_COUNT"))-4)*STEPY) : 0 )
+	(std::max(0,(atoi(getenv ("RELION_QSUB_EXTRA_COUNT"))-4))*STEPY) : 0 )
 #define MENUHEIGHT 30
 #define TABHEIGHT 25
 #define GUIWIDTH 800

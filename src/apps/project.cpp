@@ -67,7 +67,7 @@ public:
 		angpix = textToFloat(parser.getOption("--angpix", "Pixel size (in Angstroms)", "-1"));
 		fn_mask = parser.getOption("--mask", "Mask that will be applied to the input map prior to making projections", "");
 		fn_ang = parser.getOption("--ang", "STAR file with orientations for multiple projections (if None, assume single projection)","None");
-		nr_uniform = textToInteger(parser.getOption("--nr_uniform", " OR get this many samples from a uniform angular distribution", "-1"));
+		nr_uniform = textToInteger(parser.getOption("--nr_uniform", " OR get this many random samples from a uniform angular distribution", "-1"));
 		sigma_offset = textToFloat(parser.getOption("--sigma_offset", "Apply Gaussian errors with this stddev to the XY-offsets", "0"));
 		rot = textToFloat(parser.getOption("--rot", "First Euler angle (for a single projection)", "0"));
 		tilt = textToFloat(parser.getOption("--tilt", "Second Euler angle (for a single projection)", "0"));

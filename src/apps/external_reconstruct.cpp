@@ -98,7 +98,8 @@ class ext_recons_parameters
 		Iweight.read(fn_weight);
 
 		// Could there be a 1-pixel different in size? use FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM to be safe
-		int r_max2 = current_size*current_size/4;
+		const int r_max = current_size / 2;
+		const int r_max2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
 		FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Idata())
 		{
 			if (kp*kp + ip*ip + jp*jp < r_max2)
