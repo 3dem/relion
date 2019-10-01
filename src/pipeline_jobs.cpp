@@ -4601,7 +4601,7 @@ void RelionJob::initialiseLocalresJob()
 
 	joboptions["do_resmap_locres"] = JobOption("Use ResMap?", true, "If set to Yes, then ResMap will be used for local resolution estimation.");
 	joboptions["fn_resmap"] = JobOption("ResMap executable:", std::string(default_location), "ResMap*", ".", "Location of the ResMap executable. You can control the default of this field by setting environment variable RELION_RESMAP_EXECUTABLE, or by editing the first few lines in src/gui_jobwindow.h and recompile the code. \n \n Note that the ResMap wrapper cannot use MPI.");
-	joboptions["fn_mask"] = JobOption("User-provided solvent mask:", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide a mask with values between 0 and 1 around all domains of the complex.");
+	joboptions["fn_mask"] = JobOption("User-provided solvent mask:", NODE_MASK, "", "Image Files (*.{spi,vol,msk,mrc})", "Provide a mask with values between 0 and 1 around all domains of the complex. ResMap uses this mask for local resolution calculation. RELION does NOT use this mask for calculation, but makes a histogram of local resolution within this mask.");
 	joboptions["pval"] = JobOption("P-value:", 0.05, 0., 1., 0.01, "This value is typically left at 0.05. If you change it, report the modified value in your paper!");
 	joboptions["minres"] = JobOption("Highest resolution (A): ", 0., 0., 10., 0.1, "ResMaps minRes parameter. By default (0), the program will start at just above 2x the pixel size");
 	joboptions["maxres"] = JobOption("Lowest resolution (A): ", 0., 0., 10., 0.1, "ResMaps maxRes parameter. By default (0), the program will stop at 4x the pixel size");
@@ -4714,6 +4714,13 @@ bool RelionJob::getCommandsLocalresJob(std::string &outputname, std::vector<std:
 		command += " --adhoc_bfac " + joboptions["adhoc_bfac"].getString();
 		if (joboptions["fn_mtf"].getString() != "")
 			command += " --mtf " + joboptions["fn_mtf"].getString();
+
+		if (joboptions["fn_mask"].getString() != "")
+		{
+			command += " --mask " + joboptions["fn_mask"].getString();
+			Node node0(outputname+"histogram.pdf", NODE_PDF_LOGFILE);
+			outputNodes.push_back(node0);
+		}
 
 		Node node1(outputname+"relion_locres_filtered.mrc", NODE_FINALMAP);
 		outputNodes.push_back(node1);

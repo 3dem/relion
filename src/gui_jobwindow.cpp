@@ -1979,6 +1979,7 @@ void JobWindow::initialiseLocresWindow()
 	resetHeight();
 
 	place("fn_in", TOGGLE_DEACTIVATE);
+	place("fn_mask");
 
 	current_y += STEPY/2;
 
@@ -1998,10 +1999,6 @@ void JobWindow::initialiseLocresWindow()
 	group1->begin();
 
 	place("fn_resmap", TOGGLE_DEACTIVATE);
-
-	current_y += STEPY /2 ;
-
-	place("fn_mask");
 
 	current_y += STEPY /2 ;
 

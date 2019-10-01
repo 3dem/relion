@@ -1062,7 +1062,11 @@ void Postprocessing::run_locres(int rank, int size)
                 	FileName fn_eps = fn_out + "_histogram.eps";
 			MetaDataTable::histogram(values, histX, histY, verb, "local resolution", plot2D);
 			plot2D->OutputPostScriptPlot(fn_eps);
-			std::cout << "Written the histogram to " << fn_eps << std::endl;
+			FileName fn_log = fn_out.beforeLastOf("/") + "/histogram.pdf";
+			std::vector<FileName> to_convert;
+			to_convert.push_back(fn_eps);
+			joinMultipleEPSIntoSinglePDF(fn_log, to_convert);
+			std::cout << "Written the histogram to " << fn_log << std::endl;
 		}
 	}
 
