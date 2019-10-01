@@ -1042,8 +1042,8 @@ void Preprocessing::extractParticlesFromOneFrame(MetaDataTable &MD,
 			// If the image was re-scaled, then also rescale the rlnOriginX/Y/Z
 			if (do_rescale)
 			{
-				RFLOAT xoff, yoff, zoff=0.;
-				RFLOAT rescale_factor = (RFLOAT)scale/(RFLOAT)extract_size;
+				RFLOAT xoff = 0, yoff = 0, zoff = 0;
+				RFLOAT rescale_factor = (RFLOAT)scale / (RFLOAT)extract_size;
 
 				MD.getValue(EMDL_ORIENT_ORIGIN_X, xoff);
 				MD.getValue(EMDL_ORIENT_ORIGIN_Y, yoff);
