@@ -1357,9 +1357,9 @@ void MlOptimiser::checkMask(FileName &_fn_mask, int solvent_nr, int rank)
 
 		if (verb > 0)
 		{
-			std::cerr << " + Warning: solvent mask pixel size: " << mask_pixel_size
+			std::cerr << " + WARNING: solvent mask pixel size: " << mask_pixel_size
 					<< " is not the same as the reference pixel size: " << mymodel.pixel_size << std::endl;
-			std::cerr << " + Warning: re-scaling the mask... " << std::endl;
+			std::cerr << " + WARNING: re-scaling the mask... " << std::endl;
 		}
 
 		if (rank == 0) // only master writes out the new mask
@@ -1376,9 +1376,9 @@ void MlOptimiser::checkMask(FileName &_fn_mask, int solvent_nr, int rank)
 
 		if (verb > 0)
 		{
-			std::cerr << " + Warning: solvent mask box size: " << XSIZE(Isolvent())
+			std::cerr << " + WARNING: solvent mask box size: " << XSIZE(Isolvent())
 					<< " is not the same as the reference box size: " << ref_box_size << std::endl;
-			std::cerr << " + Warning: re-windowing the mask... " << std::endl;
+			std::cerr << " + WARNING: re-windowing the mask... " << std::endl;
 		}
 
 		if (rank == 0) // only master writes out the new mask
@@ -1397,9 +1397,9 @@ void MlOptimiser::checkMask(FileName &_fn_mask, int solvent_nr, int rank)
 
 		if (verb > 0)
 		{
-			std::cerr << " + Warning: solvent mask minimum: " << solv_min
+			std::cerr << " + WARNING: solvent mask minimum: " << solv_min
 					<< " or maximum: " << solv_max << " are outside the [0,1] range."<< std::endl;
-			std::cerr << " + Warning: thresholding the mask value to [0,1] range ... " << std::endl;
+			std::cerr << " + WARNING: thresholding the mask value to [0,1] range ... " << std::endl;
 		}
 
 		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Isolvent())
