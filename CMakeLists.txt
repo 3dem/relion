@@ -95,7 +95,7 @@ option(DoublePrec_CPU "DoublePrec_CPU" ON)
 option(DoublePrec_ACC "Accelerated Code use double-precision" OFF)
 option(MKLFFT "Use MKL rather than FFTW for FFT" OFF)
 option(CudaTexture "CudaTexture" ON)
-option(ALLOW_CTF_IN_SGD "Allow CTF-modulation in SGD, as specified in Claim 1 of patent US10,282,513B2" ON)
+option(ALLOW_CTF_IN_SGD "Allow CTF-modulation in SGD, as specified in Claim 1 of patent US10,282,513B2" OFF)
 
 if(ALLOW_CTF_IN_SGD)
     message(STATUS "ALLOW_CTF_IN_SGD enabled - This build of RELION allows modulation of particle images by a contrast transfer function inside stochastic gradient descent, as specified in Claim 1 of patent US10,282,513B2")
