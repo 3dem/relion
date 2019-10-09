@@ -840,14 +840,14 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experimen
 	{
 		// SHWS 20mar19: the rescaling and rewindowing is no longer necessary with the debugged code,
 		// but do warn the user the reference isn't as high-resolution/large box as some of the optics groups
-		if (fabs(pixel_size - smallest_pixel_size) > 0.001)
+		if (pixel_size > 0.001 + smallest_pixel_size)
 		{
 			std::cerr << " WARNING: The reference pixel size is " << pixel_size
 					<< " A, but the smallest pixel size in the data is " << smallest_pixel_size << " A!" << std::endl;
 		}
-		if (XSIZE(Iref[0])*pixel_size < largest_box)
+		if (XSIZE(Iref[0])*pixel_size + 0.001 < largest_box)
 		{
-			std::cerr << " WARNING: The reference box size is " << XSIZE(Iref[0])
+			std::cerr << " WARNING: The reference box size is " << XSIZE(Iref[0])*pixel_size
 					<< " A, but the largest box size in the data is " << largest_box << " A!" << std::endl;
 		}
 
