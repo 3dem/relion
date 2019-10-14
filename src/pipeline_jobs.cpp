@@ -3891,9 +3891,6 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 			Node node(joboptions["fn_in"].getString(), joboptions["fn_in"].node_type);
 			inputNodes.push_back(node);
 
-			if (joboptions["do_subtracted_bodies"].getBoolean())
-				command += " --reconstruct_subtracted_bodies ";
-
 			// Sampling
 			int iover = 1;
 			command += " --oversampling " + floatToString((float)iover);
@@ -3915,6 +3912,9 @@ bool RelionJob::getCommandsMultiBodyJob(std::string &outputname, std::vector<std
 			command += " --offset_step " + floatToString(joboptions["offset_step"].getNumber() * pow(2., iover));
 
 		}
+
+		if (joboptions["do_subtracted_bodies"].getBoolean())
+			command += " --reconstruct_subtracted_bodies ";
 
 		// Always do compute stuff
 		if (!joboptions["do_combine_thru_disc"].getBoolean())
