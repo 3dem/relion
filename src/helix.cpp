@@ -128,8 +128,9 @@ bool calcCCofHelicalSymmetry(
 {
 	// TODO: go through every line to find bugs!!!
 	int rec_len, r_max_XY, startZ, finishZ;
-	RFLOAT dist_r_pix, sum_pw1, sum_pw2;
-	std::vector<RFLOAT> sin_rec, cos_rec, dev_voxel, dev_chunk;
+	double dist_r_pix, sum_pw1, sum_pw2, sum_n, sum_chunk = 0., sum_chunk_n = 0.;
+	//std::vector<RFLOAT> sin_rec, cos_rec, dev_voxel, dev_chunk;
+	std::vector<RFLOAT> sin_rec, cos_rec;
 
 	if ( (STARTINGZ(v) != FIRST_XMIPP_INDEX(ZSIZE(v))) || (STARTINGY(v) != FIRST_XMIPP_INDEX(YSIZE(v))) || (STARTINGX(v) != FIRST_XMIPP_INDEX(XSIZE(v))) )
 		REPORT_ERROR("helix.cpp::calcCCofHelicalSymmetry(): The origin of input 3D MultidimArray is not at the center (use v.setXmippOrigin() before calling this function)!");
@@ -162,7 +163,7 @@ bool calcCCofHelicalSymmetry(
 	rise_pix = fabs(rise_pix);
 
 	// Test a chunk of Z length = rise
-	dev_chunk.clear();
+	//dev_chunk.clear();
 	// Iterate through all coordinates on Z, Y and then X axes
 	FOR_ALL_ELEMENTS_IN_ARRAY3D(v)
 	{
@@ -178,12 +179,15 @@ bool calcCCofHelicalSymmetry(
 			continue;
 
 		// Pick a voxel in the chunk
-		dev_voxel.clear();
-		dev_voxel.push_back(A3D_ELEM(v, k, i, j));
+		//dev_voxel.clear();
+		//dev_voxel.push_back(A3D_ELEM(v, k, i, j));
 
 		// Pick other voxels according to this voxel and helical symmetry
 		zp = k;
 		int rot_id = 0;
+		sum_pw1 = A3D_ELEM(v, k, i, j);
+		sum_pw2 = A3D_ELEM(v, k, i, j)*A3D_ELEM(v, k, i, j);
+		sum_n = 1.;
 		while (1)
 		{
 			// Rise
@@ -230,9 +234,21 @@ bool calcCCofHelicalSymmetry(
 			ddd = LIN_INTERP(fz, dxy0, dxy1);
 
 			// Record this voxel
-			dev_voxel.push_back(ddd);
+			sum_pw1 += ddd;
+			sum_pw2 += ddd * ddd;
+			sum_n += 1.;
+
+			// dev_voxel.push_back(ddd);
 		}
 
+		sum_pw1 /= sum_n;
+		sum_pw2 /= sum_n;
+		//dev_chunk.push_back(sum_pw2 - sum_pw1 * sum_pw1);
+		// Sum_chunk
+		sum_chunk += sum_pw2 - sum_pw1 * sum_pw1;
+		sum_chunk_n += 1.;
+
+		/*
 		// Calc dev of this voxel in the chunk
 		if (dev_voxel.size() > 1)
 		{
@@ -248,10 +264,11 @@ bool calcCCofHelicalSymmetry(
 			dev_chunk.push_back(sum_pw2 - sum_pw1 * sum_pw1);
 		}
 		dev_voxel.clear();
+		*/
 	}
 
 	// Calc avg of all voxels' devs in this chunk (for a specific helical symmetry)
-	if (dev_chunk.size() < 1)
+	if (sum_chunk_n < 1)
 	{
 		cc = (1e10);
 		nr_asym_voxels = 0;
@@ -259,13 +276,10 @@ bool calcCCofHelicalSymmetry(
 	}
 	else
 	{
-		sum_pw1 = 0.;
-		for (int id = 0; id < dev_chunk.size(); id++)
-			sum_pw1 += dev_chunk[id];
-		cc = (sum_pw1 / dev_chunk.size());
+		cc = (sum_chunk / sum_chunk_n);
 	}
-	nr_asym_voxels = dev_chunk.size();
-	dev_chunk.clear();
+	nr_asym_voxels = sum_chunk_n;
+	//dev_chunk.clear();
 
 	return true;
 };
