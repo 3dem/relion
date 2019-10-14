@@ -31,6 +31,7 @@ void Reconstructor::read(int argc, char **argv)
 	padding_factor = textToFloat(parser.getOption("--pad", "Padding factor", "2"));
 	image_path = parser.getOption("--img", "Optional: image path prefix", "");
 	subset = textToInteger(parser.getOption("--subset", "Subset of images to consider (1: only reconstruct half1; 2: only half2; other: reconstruct all)", "-1"));
+	chosen_class = textToInteger(parser.getOption("--class", "Consider only this class (-1: use all classes)", "-1"));
 	angpix  = textToFloat(parser.getOption("--angpix", "Pixel size in the reconstruction (take from first optics group by default)", "-1"));
 
 	int ctf_section = parser.addSection("CTF options");
@@ -122,6 +123,11 @@ void Reconstructor::initialise()
 	if (verb > 0 && (subset == 1 || subset == 2) && !DF.containsLabel(EMDL_PARTICLE_RANDOM_SUBSET))
 	{
 		REPORT_ERROR("The rlnRandomSubset column is missing in the input STAR file.");
+	}
+
+	if (verb > 0 && (chosen_class >= 0) && !DF.containsLabel(EMDL_PARTICLE_CLASS))
+	{
+		REPORT_ERROR("The rlnClassNumber column is missing in the input STAR file.");
 	}
 
 	randomize_random_generator();
@@ -297,10 +303,14 @@ void Reconstructor::backprojectOneParticle(long int p)
 	Matrix1D<RFLOAT> trans(2);
 	FourierTransformer transformer;
 
-	int randSubset = 0;
+	int randSubset = 0, classid = 0;
 	DF.getValue(EMDL_PARTICLE_RANDOM_SUBSET, randSubset, p);
+	DF.getValue(EMDL_PARTICLE_CLASS, classid, p);
 
 	if (subset >= 1 && subset <= 2 && randSubset != subset)
+		return;
+
+	if (chosen_class >= 0 && chosen_class != classid)
 		return;
 
 	// Rotations
