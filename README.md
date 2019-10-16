@@ -41,7 +41,7 @@ make install
 Instead of running "make install" to copy binaries into somewhere else, you may 
 directly use programs compiled in "build/bin". In any case, you have to make sure
 your PATH environmental variable points to the directory containing relion binaries.
-Launching RELION as "/path/to/relion" is NOT a right way; this startsthe right
+Launching RELION as "/path/to/relion" is NOT a right way; this starts the right
 GUI, but the GUI might invoke other versions of RELION in the PATH.
 
 These steps will download the source-code, create a build-directory,
@@ -56,6 +56,8 @@ RELION requires libtiff to read TIFF movies. Most Linux distributions have packa
 to read BigTIFF files. If you installed libtiff in a non-standard location, specify the location by
 `-DTIFF_INCLUDE_DIR=/path/to/include -DTIFF_LIBRARY=/path/to/libtiff.so.5`.
 
+See [our wiki](http://www2.mrc-lmb.cam.ac.uk/relion/index.php/Download_%26_install) for more
+options and useful environmental variables (especially in HPC clusters).
 
 ## Updating
 
