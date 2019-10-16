@@ -5534,6 +5534,10 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 					// The real orientation to be applied is the obody transformation applied and the original one
 					Abody = Aori * (mymodel.orient_bodies[obody]).transpose() * A_rot90 * Aresi * mymodel.orient_bodies[obody];
 
+					// Apply anisotropic mag and scaling
+					Abody = mydata.obsModel.applyAnisoMag(Abody, optics_group);
+					Abody = mydata.obsModel.applyScaleDifference(Abody, optics_group, mymodel.ori_size, mymodel.pixel_size);
+
 					// Get the FT of the projection in the right direction
 					MultidimArray<Complex> FTo;
 					FTo.initZeros(Fimg);
@@ -5620,6 +5624,10 @@ void MlOptimiser::getFourierTransformsAndCtfs(
 				{
 					DIRECT_MULTIDIM_ELEM(Fsum_obody, n) *= DIRECT_MULTIDIM_ELEM(Fctf, n);
 				}
+
+				// Also do phase modulation, for beam tilt correction and other asymmetric aberrations
+				mydata.obsModel.demodulatePhase(optics_group, Fsum_obody, true); // true means do_modulate_instead
+				mydata.obsModel.divideByMtf(optics_group, Fsum_obody, true); // true means do_multiply_instead
 			}
 
 			// Subtract the other-body FT from the current image FT
