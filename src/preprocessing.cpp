@@ -83,8 +83,8 @@ void Preprocessing::read(int argc, char **argv, int rank)
 	white_dust_stddev = textToFloat(parser.getOption("--white_dust", "Sigma-values above which white dust will be removed (negative value means no dust removal)","-1"));
 	black_dust_stddev = textToFloat(parser.getOption("--black_dust", "Sigma-values above which black dust will be removed (negative value means no dust removal)","-1"));
 	do_invert_contrast = parser.checkOption("--invert_contrast", "Invert the contrast in the input images");
-	fn_operate_in = parser.getOption("--operate_on", "Use this option to operate on an input stack/STAR file", "");
-	fn_operate_out = parser.getOption("--operate_out", "Output rootname when operating on an input stack/STAR file", "preprocessed");
+	fn_operate_in = parser.getOption("--operate_on", "Use this option to operate on an input image stack ", "");
+	fn_operate_out = parser.getOption("--operate_out", "Output name when operating on an input image stack", "preprocessed.mrcs");
 
 	int helix_section = parser.addSection("Helix extraction");
 	do_extract_helix = parser.checkOption("--helix", "Extract helical segments");
@@ -946,19 +946,9 @@ void Preprocessing::runOperateOnInputFile()
 	MetaDataTable MD;
 	long int Nimg;
 
-	FileName fn_stack = fn_operate_out.withoutExtension()+".mrcs";
-	FileName fn_star = fn_operate_out.withoutExtension()+".star";
-
 	if (fn_operate_in.isStarFile())
 	{
-		// Readt STAR file and get total number of images
-		MD.read(fn_operate_in);
-		Nimg = 0;
-		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
-		{
-			Nimg++;
-		}
-		MD.firstObject(); // reset pointer to the first object in the table
+		REPORT_ERROR("ERROR: this functionality is no longer supported on STAR files. You can still operate on image stacks.");
 	}
 	else
 	{
@@ -979,25 +969,12 @@ void Preprocessing::runOperateOnInputFile()
 
 		// Read in individual miages from the stack
 		Ipart.clear();
-		if (fn_operate_in.isStarFile())
-		{
-			MD.getValue(EMDL_IMAGE_NAME, fn_tmp);
-			Ipart.read(fn_tmp);
+		Ipart.read(fn_operate_in, true, i);
 
-			// Set the new name at this point in the MDtable, e.g. as 000001@out.mrcs
-			fn_tmp.compose(i+1,fn_stack);
-			MD.setValue(EMDL_IMAGE_NAME, fn_tmp);
-			if (i < (Nimg - 1))
-				MD.nextObject();
-		}
-		else
-		{
-			Ipart.read(fn_operate_in, true, i);
-			// Set the new name at this point in the MDtable, e.g. as 000001@out.mrcs
-			fn_tmp.compose(i+1,fn_stack);
-			MD.addObject();
-			MD.setValue(EMDL_IMAGE_NAME, fn_tmp);
-		}
+		// Set the new name at this point in the MDtable, e.g. as 000001@out.mrcs
+		fn_tmp.compose(i+1,fn_operate_out);
+		MD.addObject();
+		MD.setValue(EMDL_IMAGE_NAME, fn_tmp);
 
 		RFLOAT tilt_deg, psi_deg;
 		tilt_deg = psi_deg = 0.;
@@ -1012,7 +989,7 @@ void Preprocessing::runOperateOnInputFile()
 	progress_bar(Nimg);
 
 	std::cout << " Done writing to " << fn_stack << std::endl;
-	MD.setName("images");
+	MD.setName("particles");
 	MD.write(fn_star);
 	std::cout << " Also written a STAR file with the image names as " << fn_star << std::endl;
 }
