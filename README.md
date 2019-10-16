@@ -1,5 +1,5 @@
-RELION
-======
+RELION 3.1 beta
+===============
 
 
 RELION (for REgularised LIkelihood OptimisatioN) is a stand-alone computer
@@ -14,7 +14,6 @@ The underlying theory of MAP refinement is given in a [scientific publication](h
 The more comprehensive documentation of RELION is stored on the [Wiki](http://www2.mrc-lmb.cam.ac.uk/relion)
 
 ## Installation
-
 
 More extensive options and configurations are available [here](http://www2.mrc-lmb.cam.ac.uk/relion/index.php/Download_%26_install), but the outlines to clone and install relion for typical use are made easy through [cmake](https://en.wikipedia.org/wiki/CMake).
 
@@ -36,6 +35,7 @@ Once git and cmake are installed, relion can be easily installed through
 ```
 git clone https://github.com/3dem/relion.git
 cd relion
+git checkout ver3.1
 mkdir build
 cd build
 cmake -DCMAKE_INSTALL_PREFIX=/where/to/install/ ..
