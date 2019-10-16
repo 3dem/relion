@@ -83,8 +83,8 @@ void Preprocessing::read(int argc, char **argv, int rank)
 	white_dust_stddev = textToFloat(parser.getOption("--white_dust", "Sigma-values above which white dust will be removed (negative value means no dust removal)","-1"));
 	black_dust_stddev = textToFloat(parser.getOption("--black_dust", "Sigma-values above which black dust will be removed (negative value means no dust removal)","-1"));
 	do_invert_contrast = parser.checkOption("--invert_contrast", "Invert the contrast in the input images");
-	fn_operate_in = parser.getOption("--operate_on", "Use this option to operate on an input stack/STAR file", "");
-	fn_operate_out = parser.getOption("--operate_out", "Output rootname when operating on an input stack/STAR file", "preprocessed");
+	fn_operate_in = parser.getOption("--operate_on", "Use this option to operate on an input image stack ", "");
+	fn_operate_out = parser.getOption("--operate_out", "Output name when operating on an input image stack", "preprocessed.mrcs");
 
 	int helix_section = parser.addSection("Helix extraction");
 	do_extract_helix = parser.checkOption("--helix", "Extract helical segments");
@@ -255,11 +255,10 @@ void Preprocessing::run()
 #endif
 }
 
-
 void Preprocessing::joinAllStarFiles()
 {
 	FileName fn_ostar;
-
+	int og;
 	std::cout << " Joining metadata of all particles from " << MDmics.numberOfObjects() << " micrographs in one STAR file..." << std::endl;
 
 	long int imic = 0, ibatch = 0;
@@ -286,7 +285,6 @@ void Preprocessing::joinAllStarFiles()
 		}
 
 		imic++;
-
 	} // end loop over all micrographs
 
 	// Write out the joined star files
@@ -311,6 +309,15 @@ void Preprocessing::joinAllStarFiles()
 		myOutObsModel = (fn_data == "") ? &obsModelMic : &obsModelPart;
 		RFLOAT my_angpix;
 		std::string optgroup_name;
+
+		std::set<std::string> isOgPresent;
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDout)
+		{
+			og = myOutObsModel->getOpticsGroup(MDout);
+			myOutObsModel->opticsMdt.getValue(EMDL_IMAGE_OPTICS_GROUP_NAME, optgroup_name, og);
+			isOgPresent.insert(optgroup_name);
+		}
+
 		// Set the (possibly rescale output_angpix and the output image size in the opticsMdt
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(myOutObsModel->opticsMdt)
 		{
@@ -324,7 +331,14 @@ void Preprocessing::joinAllStarFiles()
 				myOutObsModel->opticsMdt.getValue(EMDL_IMAGE_OPTICS_GROUP_NAME, optgroup_name);
 				if (optics_group_mic_angpix.count(optgroup_name) == 0)
 				{
-					REPORT_ERROR("ERROR: optics group name " + optgroup_name + " does not exist in micrograph STAR file...");
+					if (isOgPresent.count(optgroup_name) != 0)
+					{
+						REPORT_ERROR("ERROR: optics group \"" + optgroup_name + "\" does not exist in micrograph STAR file...");
+					}
+					else
+					{
+						my_angpix = -1; // mark for deletion
+					}
 				}
 				else
 				{
@@ -347,12 +361,31 @@ void Preprocessing::joinAllStarFiles()
 
 			int igroup;
 			myOutObsModel->opticsMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, igroup);
-			std::cout << " The pixel size of the extracted particles in optics group " << igroup << " is " << output_angpix << " Angstrom/pixel." << std::endl;
+			if (my_angpix < 0)
+				std::cerr << "optics group \"" + optgroup_name + "\" will be removed because no extracted particle belong to it." << std::endl;
+			else
+				std::cout << " The pixel size of the extracted particles in optics group " << igroup << " is " << my_angpix << " Angstrom/pixel." << std::endl;
 		}
 
 		if (fn_data == "")
 		{
 			myOutObsModel->opticsMdt.deactivateLabel(EMDL_MICROGRAPH_PIXEL_SIZE);
+		}
+
+		// Remove absent optics groups; After this, NOTHING should be done except for saving. obsModel's internal data structure is now corrupted!
+		og = 0;
+		while (og < myOutObsModel->opticsMdt.numberOfObjects())
+		{
+			RFLOAT og_angpix;
+			myOutObsModel->opticsMdt.getValue(EMDL_IMAGE_PIXEL_SIZE, og_angpix, og);
+			if (og_angpix < 0)
+			{
+				myOutObsModel->opticsMdt.removeObject(og);
+			}
+			else
+			{
+				og++;
+			}
 		}
 
 		ObservationModel::saveNew(MDout, myOutObsModel->opticsMdt, fn_part_star, "particles");
@@ -421,7 +454,6 @@ void Preprocessing::runExtractParticles()
 	// Now combine all metadata in a single STAR file
 	joinAllStarFiles();
 }
-
 
 void Preprocessing::readCoordinates(FileName fn_coord, MetaDataTable &MD)
 {
@@ -596,7 +628,7 @@ bool Preprocessing::extractParticlesFromFieldOfView(FileName fn_mic, long int im
 	if (fn_data != "")
 	{
 		// Search for this micrograph in the MDdata table
-		MDin=getCoordinateMetaDataTable(fn_mic);
+		MDin = getCoordinateMetaDataTable(fn_mic);
 	}
 	else
 	{
@@ -687,6 +719,7 @@ void Preprocessing::extractParticlesFromOneMicrograph(MetaDataTable &MD,
 {
 	Image<RFLOAT> Ipart, Imic, Itmp;
 
+	bool MDin_has_optics_group = MD.containsLabel(EMDL_IMAGE_OPTICS_GROUP); // i.e. re-extracting
 	bool MDin_has_beamtilt = (MD.containsLabel(EMDL_IMAGE_BEAMTILT_X) || MD.containsLabel(EMDL_IMAGE_BEAMTILT_Y));
 	bool MDin_has_ctf = MD.containsLabel(EMDL_CTF_DEFOCUSU);
 	bool MDin_has_tiltgroup = MD.containsLabel(EMDL_PARTICLE_BEAM_TILT_CLASS);
@@ -750,7 +783,7 @@ void Preprocessing::extractParticlesFromOneMicrograph(MetaDataTable &MD,
 			if (dimensionality == 3)
 				std::cerr << " , " << zpos;
 			std::cerr << std::endl;
-					REPORT_ERROR("Preprocessing::extractParticlesFromOneFrame ERROR: particle" + integerToString(ipos+1) + " lies completely outside micrograph " + fn_mic);
+			REPORT_ERROR("Preprocessing::extractParticlesFromOneFrame ERROR: particle" + integerToString(ipos+1) + " lies completely outside micrograph " + fn_mic);
 		}
 
 		// Read per-particle CTF
@@ -881,14 +914,16 @@ void Preprocessing::extractParticlesFromOneMicrograph(MetaDataTable &MD,
 		MD.setValue(EMDL_MICROGRAPH_NAME, fn_mic);
 
 		// Set the optics group for this particle to the one from the micrograph
-		int optics_group;
-		MDmics.getValue(EMDL_IMAGE_OPTICS_GROUP, optics_group, imic);
-		MD.setValue(EMDL_IMAGE_OPTICS_GROUP, optics_group);
+		if (!MDin_has_optics_group)
+		{
+			int optics_group;
+			MDmics.getValue(EMDL_IMAGE_OPTICS_GROUP, optics_group, imic);
+			MD.setValue(EMDL_IMAGE_OPTICS_GROUP, optics_group);
+		}
 
 		// Also fill in the per-particle CTF parameters
 		if (mic_star_has_ctf)
 		{
-
 			// Only set CTF parameters from the micrographs STAR file if the input STAR file did not contain it!
 			if (!MDin_has_ctf || keep_ctf_from_micrographs)
 			{
@@ -939,26 +974,14 @@ void Preprocessing::extractParticlesFromOneMicrograph(MetaDataTable &MD,
 	}
 }
 
-
 void Preprocessing::runOperateOnInputFile()
 {
 	Image<RFLOAT> Ipart, Iout;
-	MetaDataTable MD;
 	long int Nimg;
-
-	FileName fn_stack = fn_operate_out.withoutExtension()+".mrcs";
-	FileName fn_star = fn_operate_out.withoutExtension()+".star";
 
 	if (fn_operate_in.isStarFile())
 	{
-		// Readt STAR file and get total number of images
-		MD.read(fn_operate_in);
-		Nimg = 0;
-		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
-		{
-			Nimg++;
-		}
-		MD.firstObject(); // reset pointer to the first object in the table
+		REPORT_ERROR("ERROR: this functionality is no longer supported on STAR files. You can still operate on image stacks.");
 	}
 	else
 	{
@@ -979,25 +1002,7 @@ void Preprocessing::runOperateOnInputFile()
 
 		// Read in individual miages from the stack
 		Ipart.clear();
-		if (fn_operate_in.isStarFile())
-		{
-			MD.getValue(EMDL_IMAGE_NAME, fn_tmp);
-			Ipart.read(fn_tmp);
-
-			// Set the new name at this point in the MDtable, e.g. as 000001@out.mrcs
-			fn_tmp.compose(i+1,fn_stack);
-			MD.setValue(EMDL_IMAGE_NAME, fn_tmp);
-			if (i < (Nimg - 1))
-				MD.nextObject();
-		}
-		else
-		{
-			Ipart.read(fn_operate_in, true, i);
-			// Set the new name at this point in the MDtable, e.g. as 000001@out.mrcs
-			fn_tmp.compose(i+1,fn_stack);
-			MD.addObject();
-			MD.setValue(EMDL_IMAGE_NAME, fn_tmp);
-		}
+		Ipart.read(fn_operate_in, true, i);
 
 		RFLOAT tilt_deg, psi_deg;
 		tilt_deg = psi_deg = 0.;
@@ -1011,10 +1016,7 @@ void Preprocessing::runOperateOnInputFile()
 	}
 	progress_bar(Nimg);
 
-	std::cout << " Done writing to " << fn_stack << std::endl;
-	MD.setName("images");
-	MD.write(fn_star);
-	std::cout << " Also written a STAR file with the image names as " << fn_star << std::endl;
+	std::cout << " Done writing to " << fn_operate_out << std::endl;
 }
 
 void Preprocessing::performPerImageOperations(
@@ -1074,7 +1076,6 @@ void Preprocessing::performPerImageOperations(
 		fn_img.compose(fn_output_img_root, image_nr + 1, "mrc");
 		Ipart.write(fn_img);
 		TIMING_TOC(TIMING_PER_IMG_OP_WRITE);
-
 	}
 	else
 	{
@@ -1255,4 +1256,3 @@ FileName Preprocessing::getOutputFileNameRoot(FileName fn_mic)
 	FileName fn_part = fn_part_dir + fn_post.withoutExtension();
 	return fn_part;
 }
-

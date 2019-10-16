@@ -158,6 +158,7 @@ class ObservationModel
 		std::vector<Matrix2D<RFLOAT> > getMagMatrices() const;
 		void setMagMatrix(int opticsGroup, const Matrix2D<RFLOAT>& M);
 
+		// 0-indexed
 		int getOpticsGroup(const MetaDataTable &particlesMdt, long int particle = -1) const;
 
 		bool getCtfPremultiplied(int og) const;
