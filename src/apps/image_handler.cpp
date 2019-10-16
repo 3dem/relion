@@ -144,8 +144,6 @@ class image_handler_parameters
 			REPORT_ERROR("Please specify the output file name with --o.");
 	}
 
-
-
 	void perImageOperations(Image<RFLOAT> &Iin, FileName &my_fn_out, RFLOAT psi = 0.)
 	{
 		Image<RFLOAT> Iout;
@@ -552,7 +550,6 @@ class image_handler_parameters
 		}
 		else
 			Iout.write(my_fn_out);
-
 	}
 
 	void run()
@@ -705,7 +702,6 @@ class image_handler_parameters
 				}
 
 			}
-
 
 			if (do_stats) // only write statistics to screen
 			{
@@ -902,12 +898,8 @@ class image_handler_parameters
 
 			std::cout << " Written out new STAR file: " << fn_md_out << std::endl;
 		}
-
 	}
-
-
 };
-
 
 int main(int argc, char *argv[])
 {
@@ -928,6 +920,3 @@ int main(int argc, char *argv[])
 	}
 	return RELION_EXIT_SUCCESS;
 }
-
-
-
