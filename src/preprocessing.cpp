@@ -977,7 +977,6 @@ void Preprocessing::extractParticlesFromOneMicrograph(MetaDataTable &MD,
 void Preprocessing::runOperateOnInputFile()
 {
 	Image<RFLOAT> Ipart, Iout;
-	MetaDataTable MD;
 	long int Nimg;
 
 	if (fn_operate_in.isStarFile())
@@ -1005,11 +1004,6 @@ void Preprocessing::runOperateOnInputFile()
 		Ipart.clear();
 		Ipart.read(fn_operate_in, true, i);
 
-		// Set the new name at this point in the MDtable, e.g. as 000001@out.mrcs
-		fn_tmp.compose(i+1,fn_operate_out);
-		MD.addObject();
-		MD.setValue(EMDL_IMAGE_NAME, fn_tmp);
-
 		RFLOAT tilt_deg, psi_deg;
 		tilt_deg = psi_deg = 0.;
 		performPerImageOperations(Ipart, fn_operate_out.withoutExtension(), i, Nimg,
@@ -1022,10 +1016,7 @@ void Preprocessing::runOperateOnInputFile()
 	}
 	progress_bar(Nimg);
 
-	std::cout << " Done writing to " << fn_stack << std::endl;
-	MD.setName("particles");
-	MD.write(fn_star);
-	std::cout << " Also written a STAR file with the image names as " << fn_star << std::endl;
+	std::cout << " Done writing to " << fn_operate_out << std::endl;
 }
 
 void Preprocessing::performPerImageOperations(
