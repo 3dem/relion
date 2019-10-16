@@ -1035,12 +1035,10 @@ void HealpixSampling::findSymmetryMate(long int idir_, RFLOAT prior_,
 	RFLOAT angular_sampling = DEG2RAD(360. / (6 * ROUND(std::pow(2., healpix_order)))) * 2; // Calculate the search radius
 	// Direction for the best-matched Healpix index
 	Euler_angles2direction(rot_angles[idir_], tilt_angles[idir_], my_direction);
-	//std::cerr<<"This is the entered parameters : "<<rot_angles[idir_]<<" "<<tilt_angles[idir_]<<std::endl;
 
 	// Find the best symmetry mates in the HealPix library
 	for (int i = 1; i < R_repository_relax.size(); i++)
 	{
-		//std::cerr<<"Current symmetery index is : "<<i<<std::endl;
 		int best_direction_index;
 		std::vector<int> listpix; // Array with the list of indices for the neighbors
 		RFLOAT alpha;  // For Rot
@@ -1048,12 +1046,11 @@ void HealpixSampling::findSymmetryMate(long int idir_, RFLOAT prior_,
 
 		sym_direction =  L_repository_relax[i] * (my_direction.transpose() * R_repository_relax[i]).transpose();
 		Euler_direction2angles(sym_direction, alpha, beta);
-		//std::cerr<<"Parameters after applying sym"<<"alpha is "<<alpha<<"beta is "<<beta<<std::endl;
+		
 		alpha = DEG2RAD(alpha);
 		beta  = DEG2RAD(beta);
 		pointing prior_direction_pointing(beta, alpha); // Object required by healpix function
      	healpix_base.query_disc(prior_direction_pointing, angular_sampling, listpix); // Search healpix for closest indices
-     	//std::cerr<<listpix.size()<<std::endl;
      	best_direction_index = listpix[0];
      	// If there are more than one neighbors then check for the best
 		if (listpix.size() > 1)
@@ -1063,7 +1060,6 @@ void HealpixSampling::findSymmetryMate(long int idir_, RFLOAT prior_,
      		RFLOAT best_dotProduct = dotProduct(sym_direction, current_direction);
      		for (long int j = 1; j < listpix.size(); j++)
      		{
-     			//std::cerr<<"******"<<rot_angles[listpix[j]]<<"########"<<tilt_angles[listpix[j]]<<std::endl;
      			int current_index = listpix[j];
      			// Assuming sigma_tilt and sigma_rot are set
      			// Get the current direction
@@ -1078,7 +1074,6 @@ void HealpixSampling::findSymmetryMate(long int idir_, RFLOAT prior_,
      	}
 
 		// Now we have the best symmetry mate index
-     	//std::cerr<<"Best angle parmeter is : "<<rot_angles[best_direction_index]<<" "<<tilt_angles[best_direction_index]<<std::endl;
      	pointer_dir_nonzeroprior.push_back(best_direction_index);
 		directions_prior.push_back(prior_);
 		idir_flag[best_direction_index] = true;
