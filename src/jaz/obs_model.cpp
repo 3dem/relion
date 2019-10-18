@@ -687,8 +687,9 @@ std::vector<Matrix2D<RFLOAT> > ObservationModel::getMagMatrices() const
 
 int ObservationModel::getOpticsGroup(const MetaDataTable &particlesMdt, long int particle) const
 {
-	int opticsGroup;
-	particlesMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, particle);
+	int opticsGroup = -1;
+	if (!particlesMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, particle))
+		REPORT_ERROR("ObservationModel::getOpticsGroup: Failed to get optics group for particle #" + particle);
 	opticsGroup--;
 
 	return opticsGroup;

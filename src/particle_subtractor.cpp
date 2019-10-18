@@ -219,8 +219,6 @@ void ParticleSubtractor::initialise(int _rank, int _size)
 	if (boxsize > 0)
 		boxsize -= boxsize%2;
 
-	// TODO: check box size does not go outside the box of the original particles...
-
 }
 
 
@@ -252,7 +250,6 @@ void ParticleSubtractor::run()
 	for (long int part_id = my_first_part_id, imgno = 0; part_id <= my_last_part_id; part_id++, imgno++)
 	{
 
-		// Abort through the pipeline_control system, TODO: check how this goes with MPI....
 		if (imgno % barstep == 0)
 		{
 			if (pipeline_control_check_abort_job())
@@ -360,6 +357,7 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, M
 	opt.mydata.MDimg.getValue(EMDL_IMAGE_NAME, fn_img, part_id);
 	img.read(fn_img);
 	img().setXmippOrigin();
+	int optics_group = opt.mydata.getOpticsGroup(part_id, 0);
 
 	// Get the consensus class, orientational parameters and norm (if present)
 	RFLOAT my_pixel_size = opt.mydata.getImagePixelSize(part_id, 0);
@@ -488,6 +486,9 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, M
 			if (obody == subtract_body) Aresi_subtract = Aresi;
 			// The real orientation to be applied is the obody transformation applied and the original one
 			Abody = Aori * (opt.mymodel.orient_bodies[obody]).transpose() * A_rot90 * Aresi * opt.mymodel.orient_bodies[obody];
+			// Apply anisotropic mag and scaling
+			Abody = opt.mydata.obsModel.applyAnisoMag(Abody, optics_group);
+			Abody = opt.mydata.obsModel.applyScaleDifference(Abody, optics_group, opt.mymodel.ori_size, opt.mymodel.pixel_size);
 
 			// Get the FT of the projection in the right direction
 			MultidimArray<Complex> FTo;
@@ -548,7 +549,9 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, M
 		Matrix2D<RFLOAT> A3D;
 		Euler_angles2matrix(rot, tilt, psi, A3D);
 
-		std::cerr << "TODO: insert anisoMag & scale difference!" << std::endl;
+		// Apply anisotropic mag and scaling
+		A3D = opt.mydata.obsModel.applyAnisoMag(A3D, optics_group);
+		A3D = opt.mydata.obsModel.applyScaleDifference(A3D, optics_group, opt.mymodel.ori_size, opt.mymodel.pixel_size);
 		opt.mymodel.PPref[myclass].get2DFourierTransform(Fsubtract, A3D);
 
 		// Shift in opposite direction as offsets in the STAR file
@@ -572,8 +575,8 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, M
 		}
 
 		// Also do phase modulation, for beam tilt correction and other asymmetric aberrations
-		opt.mydata.obsModel.demodulatePhase(opt.mydata.getOpticsGroup(part_id, 0), Fsubtract, true); // true means do_modulate_instead
-		opt.mydata.obsModel.divideByMtf(opt.mydata.getOpticsGroup(part_id, 0), Fsubtract, true); // true means do_multiply_instead
+		opt.mydata.obsModel.demodulatePhase(optics_group, Fsubtract, true); // true means do_modulate_instead
+		opt.mydata.obsModel.divideByMtf(optics_group, Fsubtract, true); // true means do_multiply_instead
 	}
 
 	// Do the actual subtraction

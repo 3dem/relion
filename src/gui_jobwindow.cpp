@@ -1231,13 +1231,13 @@ void JobWindow::initialiseInimodelWindow()
 #else
 
 	Fl_Text_Buffer *textbuff1 = new Fl_Text_Buffer();
-	textbuff1->text("CTF-modulation, as mentioned in claim 1 of patent US10,282,513B2, is disabled");
-	Fl_Text_Display* textdisp1 = new Fl_Text_Display(XCOL1, current_y, WCOL1+WCOL2+WCOL3+10, STEPY*1.5);
+	textbuff1->text("CTF-modulation, as mentioned in claim 1 of patent US10,282,513B2, is disabled\nYou can enable it by rebuilding, using -DALLOW_CTF_IN_SGD=ON in cmake.");
+	Fl_Text_Display* textdisp1 = new Fl_Text_Display(XCOL1, current_y, WCOL1+WCOL2+WCOL3+10, STEPY*1.8);
 	textdisp1->textsize(11);
 	textdisp1->color(GUI_BACKGROUND_COLOR);
 	textdisp1->buffer(textbuff1);
 
-	current_y += STEPY*2;
+	current_y += STEPY*2.5;
 
 	place("do_ctf_correction", TOGGLE_ALWAYS_DEACTIVATE);
 

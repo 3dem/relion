@@ -243,22 +243,36 @@ void MagnificationEstimator::parametricFit(
 		scales.push_back(1.);
 		labels.push_back("Y-disp fit [-1,+1] "+obsModel->getGroupName(og));
 
+#ifdef DEBUG
 		std::ofstream os(outPath + "mag_matrix_optics-group_" + sts.str() + ".txt");
 		os << mat(0,0) << " " << mat(0,1) << "\n";
 		os << mat(1,0) << " " << mat(1,1) << "\n";
 		os.close();
-
+#endif
 		mat_by_optGroup[og] = mat;
 
 		Matrix2D<RFLOAT> mat0 = obsModel->getMagMatrix(og);
 		Matrix2D<RFLOAT> mat1 = mat * mat0;
 
+		Matrix2D<RFLOAT> u, vh;
+		Matrix1D<RFLOAT> eig;
+		svdcmp(mat1, u, eig, vh);
+		const RFLOAT mean_mag = (eig(0) + eig(1)) / 2;
+		const RFLOAT aniso_mag = fabs(eig(0) - eig(1));// / mean_mag;
+		
 		#pragma omp critical
 		{
 			optOut.setValue(EMDL_IMAGE_MAG_MATRIX_00, mat1(0,0), og);
 			optOut.setValue(EMDL_IMAGE_MAG_MATRIX_01, mat1(0,1), og);
 			optOut.setValue(EMDL_IMAGE_MAG_MATRIX_10, mat1(1,0), og);
 			optOut.setValue(EMDL_IMAGE_MAG_MATRIX_11, mat1(1,1), og);
+
+			std::cout << "   - Magnification anisotropy of optics group #" << (og + 1) << " named '" << obsModel->getGroupName(og) << "': " << (aniso_mag * 100.0) <<  " %" << std::endl;
+			if (fabs(mean_mag - 1) > 0.005)
+			{
+				std::cerr << "WARNING: Overall magnification of optics group #" << (og + 1) << " (" << obsModel->getGroupName(og) << ") differs from the nominal pixel size by " << ((mean_mag - 1) * 100) << " %.\n";
+				std::cerr << "WARNING: This overall difference changes the actual pixel size of the reconstruction!" << std::endl;
+			}
 		}
 
 		obsModel->setMagMatrix(og, mat1);

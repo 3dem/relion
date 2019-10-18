@@ -180,7 +180,7 @@ void SchedulerWindow::cb_execute_i()
 	if (exists(fn_check))
 	{
 		std::string msg =  "ERROR: a file called " + fn_check + " already exists. \n This implies another set of scheduled jobs with this name is already running. \n Cancelling job execution...";
-		fl_message("%s",msg.c_str());
+		fl_message("%s", msg.c_str());
 	}
 	else
 	{
@@ -1783,17 +1783,17 @@ void GuiMainWindow::cb_display_io_node_i()
 
 				std::string error_message = "";
 				float mylowpass = manualpickjob.joboptions["lowpass"].getNumber(error_message);
-				if (error_message != "") {fl_message(error_message.c_str()); return;}
+				if (error_message != "") {fl_message("%s", error_message.c_str()); return;}
 				if (mylowpass > 0.)
 					command += " --lowpass " + manualpickjob.joboptions["lowpass"].getString();
 
 				float myhighpass = manualpickjob.joboptions["highpass"].getNumber(error_message);
-				if (error_message != "") {fl_message(error_message.c_str()); return;}
+				if (error_message != "") {fl_message("%s", error_message.c_str()); return;}
 				if (myhighpass > 0.)
 					command += " --highpass " + manualpickjob.joboptions["highpass"].getString();
 
 				float myangpix = manualpickjob.joboptions["angpix"].getNumber(error_message);
-				if (error_message != "") {fl_message(error_message.c_str()); return;}
+				if (error_message != "") {fl_message("%s", error_message.c_str()); return;}
 				if (myangpix > 0.)
 					command += " --angpix " + manualpickjob.joboptions["angpix"].getString();
 
@@ -2052,7 +2052,7 @@ void GuiMainWindow::cb_add_scheduler_operator_i()
 	SchedulerOperator myop = schedule.initialiseOperator(type, input1, input2, output, error_message);
 	if (error_message != "")
 	{
-		fl_message(error_message.c_str());
+		fl_message("%s", error_message.c_str());
 		return;
 	}
 	else
@@ -2626,7 +2626,7 @@ void GuiMainWindow::cb_scheduler_add_job_i()
 		std::string error_message, dummy;
 		if (!gui_jobwindows[iwin]->myjob.getCommands(dummy, commands, final_command, false, 1, error_message))
 		{
-			fl_message(error_message.c_str());
+			fl_message("%s", error_message.c_str());
 			return;
 		}
 

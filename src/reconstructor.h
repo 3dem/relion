@@ -33,7 +33,6 @@
 class Reconstructor
 {
 public:
-
 	// I/O Parser
 	IOParser parser;
 
@@ -45,7 +44,7 @@ public:
 
 	int r_max, r_min_nn, blob_order, ref_dim, interpolator, iter,
 	    debug_ori_size, debug_size,
-	    ctf_dim, nr_helical_asu, newbox, width_mask_edge, nr_sectors, subset,
+	    ctf_dim, nr_helical_asu, newbox, width_mask_edge, nr_sectors, subset, chosen_class,
 	    data_dim, mysize, verb;
 
 	RFLOAT blob_radius, blob_alpha, angular_error, shift_error, angpix, maxres,
@@ -65,7 +64,6 @@ public:
 	Projector projector;
 
 public:
-
 	/** Empty constructor
 	 *
 	 * A default Projector is created.
@@ -102,8 +100,6 @@ public:
 
 	void applyCTFPandCTFQ(MultidimArray<Complex> &Fin, CTF &ctf, FourierTransformer &transformer,
 	                      MultidimArray<Complex> &outP, MultidimArray<Complex> &outQ, bool skip_mask=false);
-
 };
-
 
 #endif /* SRC_RECONSTRUCTOR_H_ */
