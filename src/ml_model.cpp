@@ -796,6 +796,11 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experimen
 			{
 				RFLOAT header_pixel_size;
 				img.MDMainHeader.getValue(EMDL_IMAGE_SAMPLINGRATE_X, header_pixel_size);
+				if (header_pixel_size <= 0)
+				{
+					std::cerr << " header_pixel_size = " << header_pixel_size << std::endl;
+					REPORT_ERROR("MlModel::initialiseFromImages: Pixel size of reference image is not set!");
+				}
 				pixel_size = header_pixel_size;
 			}
 			ori_size = XSIZE(img());
