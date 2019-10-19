@@ -485,7 +485,6 @@ void Micrograph::setMovie(FileName fnMovie, FileName fnGain, RFLOAT binning)
 {
 	if (fnMovie.getExtension() == "ecc")
 	{
-		const int EER_grouping = 40; // TODO WIP: Get this from the caller!
 		EERRenderer renderer(fnMovie); // TODO WIP: This reads whole movie, which is too expensive!
 		width = renderer.getWidth();
 		height = renderer.getHeight();

@@ -7,6 +7,8 @@
 
 #include <src/image.h>
 
+const int EER_grouping = 40; // TODO: TAKANORI: Make this a command-line argument
+
 class EERRenderer {
 	private:
 
@@ -54,5 +56,27 @@ class EERRenderer {
 	// This function is thread-safe (except for timing).
 	long long renderFrames(int frame_start, int frame_end, MultidimArray<float> &image);
 
-	static void upsampleEERGain(MultidimArray<float> &gain);
+	template <typename T>
+	static void upsampleEERGain(MultidimArray<T> &gain)
+	{
+		const long long size = 4096 * 2; // TODO
+		MultidimArray<T> original = gain;
+
+		gain.resize(size, size);
+		RFLOAT sum = 0;
+		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(gain)
+		{
+			DIRECT_A2D_ELEM(gain, i, j) = DIRECT_A2D_ELEM(original, i / 2, j / 2);
+			sum += DIRECT_A2D_ELEM(gain, i, j);
+		}
+		sum /= size * size;
+
+		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(gain)
+		{
+			if (DIRECT_A2D_ELEM(gain, i, j) != 0)
+			{
+				DIRECT_A2D_ELEM(gain, i, j) = sum / DIRECT_A2D_ELEM(gain, i, j);
+			}
+		}
+	}
 };

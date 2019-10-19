@@ -959,7 +959,6 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	// TODO: will be refactored
 	EERRenderer renderer;
 	const bool isEER = (mic.getMovieFilename().getExtension() == "ecc");
-	const int EER_grouping = 40;
 
 	int n_io_threads = n_threads;
 	logfile << "Working on " << fn_mic << " with " << n_threads << " thread(s)." << std::endl << std::endl;
@@ -972,7 +971,7 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 	Image<float> Ihead, Igain, Iref;
 	std::vector<MultidimArray<fComplex> > Fframes;
 	std::vector<Image<float> > Iframes;
-	std::vector<int> frames;
+	std::vector<int> frames; // 0-indexed
 
 	RFLOAT output_angpix = angpix * bin_factor;
 	RFLOAT prescaling = 1;
@@ -1057,7 +1056,6 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 		// TODO: recycle! (should be done in the same way as rotation)
 		if (isEER)
 			EERRenderer::upsampleEERGain(Igain());
-		Igain.write("DEBUG-gain_ref.mrc");
 
 		if (XSIZE(Igain()) != nx || YSIZE(Igain()) != ny) {
 			std::cerr << "fn_mic: " << fn_mic << std::endl;
@@ -1194,6 +1192,15 @@ bool MotioncorrRunner::executeOwnMotionCorrection(Micrograph &mic) {
 		RCTOC(TIMING_FIX_DEFECT);
 		logfile << "Fixed hot pixels." << std::endl;
 	} // !skip_defect
+
+#ifdef WRITE_FRAMES
+	// Debug output
+	for (int iframe = 0; iframe < n_frames; iframe++)
+	{
+		Iframes[iframe].write(fn_avg.withoutExtension() + "_frames.mrcs", iframe, 
+		                      true, (iframe == 0) ? WRITE_OVERWRITE : WRITE_APPEND);
+	}
+#endif
 
 	if (early_binning) {
 		nx /= bin_factor; ny /= bin_factor;

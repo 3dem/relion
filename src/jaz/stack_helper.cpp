@@ -316,6 +316,7 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 	const int w0 = mgStack.data.xdim;
 	const int h0 = mgStack.data.ydim;
 	const int fcM = dataInZ? mgStack.data.zdim : mgStack.data.ndim;
+	// lastFrame and firstFrame is 0 indexed, while fcM is 1-indexed
 	const int fc = lastFrame > 0? lastFrame - firstFrame + 1 : fcM - firstFrame;
 
 	if (fcM <= lastFrame)
@@ -329,7 +330,7 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 		REPORT_ERROR("StackHelper::extractMovieStackFS: incompatible gain reference - size is different from "+movieFn);
 	}
 
-	const bool fixDefect = defectMask != 0;
+	const bool fixDefect = false; // TAKANORI DEBUG: defectMask != 0;
 	if (fixDefect && (w0 != defectMask->xdim || h0 != defectMask->ydim))
 	{
 		REPORT_ERROR("StackHelper::extractMovieStackFS: incompatible defect mask - size is different from "+movieFn);
@@ -523,6 +524,133 @@ std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
 	return out;
 }
 
+// TAKANORI: TODO: Code duplication with above will be sorted out later!
+std::vector<std::vector<Image<Complex>>> StackHelper::extractMovieStackFS(
+		const MetaDataTable* mdt, std::vector<MultidimArray<float> > &Iframes,
+		double outPs, double coordsPs, double moviePs,
+		int squareSize, int threads,
+		bool loadData,
+		bool verbose,
+		const std::vector<std::vector<gravis::d2Vector>>* offsets_in,
+		std::vector<std::vector<gravis::d2Vector>>* offsets_out)
+{
+	std::vector<std::vector<Image<Complex>>> out(mdt->numberOfObjects());
+	const long pc = mdt->numberOfObjects();
+
+	const int fc = Iframes.size();
+	if (fc == 0)
+		REPORT_ERROR("Empty Iframes passed to StackHelper::extractMovieStackFS");
+	const int w0 = Iframes[0].xdim;
+	const int h0 = Iframes[0].ydim;
+
+	if (verbose)
+	{
+		std::cout << "pc, fc = " << pc << ", " << fc << "\n";
+		std::cout << "size: x = " << w0 << " y = " << h0 << "\n";
+	}
+
+	for (long p = 0; p < pc; p++)
+	{
+		out[p] = std::vector<Image<Complex>>(fc);
+	}
+
+	if (!loadData) return out;
+
+	const int sqMg = 2*(int)(0.5 * squareSize * outPs / moviePs + 0.5);
+
+	if (verbose)
+	{
+		std::cout << "square size in micrograph: " << sqMg << "\n";
+	}
+
+	std::vector<ParFourierTransformer> fts(threads);
+
+	std::vector<Image<RFLOAT>> aux0(threads);
+	std::vector<Image<Complex>> aux1(threads);
+
+	for (int t = 0; t < threads; t++)
+	{
+		aux0[t] = Image<RFLOAT>(sqMg, sqMg);
+
+		if (outPs != moviePs)
+		{
+			aux1[t] = Image<Complex>(sqMg/2+1,sqMg);
+		}
+	}
+
+	#pragma omp parallel for num_threads(threads)
+	for (long f = 0; f < fc; f++)
+	{
+		int tf = omp_get_thread_num();
+
+		if (verbose) std::cout << (f+1) << "/" << fc << "\n";
+
+		for (long p = 0; p < pc; p++)
+		{
+			int t = tf;
+
+			out[p][f] = Image<Complex>(sqMg,sqMg);
+
+			double xpC, ypC;
+
+			mdt->getValue(EMDL_IMAGE_COORD_X, xpC, p);
+			mdt->getValue(EMDL_IMAGE_COORD_Y, ypC, p);
+
+			const double xpO = (int)(coordsPs * xpC / outPs) - squareSize/2;
+			const double ypO = (int)(coordsPs * ypC / outPs) - squareSize/2;
+
+			int x0 = (int)round(xpO * outPs / moviePs);
+			int y0 = (int)round(ypO * outPs / moviePs);
+
+			if (offsets_in != 0 && offsets_out != 0)
+			{
+				double dxM = (*offsets_in)[p][f].x * outPs / moviePs;
+				double dyM = (*offsets_in)[p][f].y * outPs / moviePs;
+
+				int dxI = (int)round(dxM);
+				int dyI = (int)round(dyM);
+
+				x0 += dxI;
+				y0 += dyI;
+
+				double dxR = (dxM - dxI) * moviePs / outPs;
+				double dyR = (dyM - dyI) * moviePs / outPs;
+
+				(*offsets_out)[p][f] = d2Vector(dxR, dyR);
+			}
+
+			for (long int y = 0; y < sqMg; y++)
+			for (long int x = 0; x < sqMg; x++)
+			{
+				int xx = x0 + x;
+				int yy = y0 + y;
+
+				if (xx < 0) xx = 0;
+				else if (xx >= w0) xx = w0 - 1;
+
+				if (yy < 0) yy = 0;
+				else if (yy >= h0) yy = h0 - 1;
+
+				// Note the MINUS here!!!
+				DIRECT_NZYX_ELEM(aux0[t].data, 0, 0, y, x) = -DIRECT_A2D_ELEM(Iframes[f], yy, xx);
+			}
+
+			if (outPs == moviePs)
+			{
+				fts[t].FourierTransform(aux0[t](), out[p][f]());
+			}
+			else
+			{
+				fts[t].FourierTransform(aux0[t](), aux1[t]());
+				out[p][f] = FilterHelper::cropCorner2D(aux1[t], squareSize/2+1, squareSize);
+			}
+
+			out[p][f](0,0) = Complex(0.0,0.0);
+		}
+	}
+
+	return out;
+}
 std::vector<Image<Complex> > StackHelper::FourierTransform(std::vector<Image<RFLOAT> >& stack)
 {
 	std::vector<Image<Complex> > out(stack.size());

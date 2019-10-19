@@ -58,7 +58,7 @@ class StackHelper
 		static std::vector<std::vector<Image<RFLOAT>>> loadMovieStack(
 				const MetaDataTable* mdt, std::string moviePath);
 	
-		// For movies
+		// For movies in file
 		static std::vector<std::vector<Image<Complex>>> extractMovieStackFS(
 				const MetaDataTable* mdt,
 				Image<RFLOAT>* gainRef, MultidimArray<bool>* defectMask, std::string movieFn,
@@ -69,6 +69,16 @@ class StackHelper
 				const std::vector<std::vector<gravis::d2Vector>>* offsets_in = 0,
 				std::vector<std::vector<gravis::d2Vector>>* offsets_out = 0);
 				
+		// For movies in memory
+		static std::vector<std::vector<Image<Complex>>> extractMovieStackFS(
+				const MetaDataTable* mdt, std::vector<MultidimArray<float> > &mgStack,
+				double outPs, double coordsPs, double moviePs,
+				int squareSize, int threads,
+				bool loadData = true, 
+				bool verbose = false, 
+				const std::vector<std::vector<gravis::d2Vector>>* offsets_in = 0,
+				std::vector<std::vector<gravis::d2Vector>>* offsets_out = 0);
+
 		static std::vector<Image<Complex>> FourierTransform(std::vector<Image<RFLOAT> >& stack);
 		
 		static std::vector<Image<RFLOAT>> inverseFourierTransform(std::vector<Image<Complex> >& stack);

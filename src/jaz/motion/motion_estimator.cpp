@@ -399,7 +399,7 @@ void MotionEstimator::prepMicrograph(
 
 	std::vector<Image<Complex>> preds = reference->predictAll(
 				mdt, *obsModel, ReferenceMap::Own, nr_omp_threads);
-
+//	std::cout << "motion estimator preds size = " << XSIZE(preds[0]()) << "x" << YSIZE(preds[0]()) << std::endl;
 	if (!no_whitening)
 	{
 		std::vector<double> sigma2 = StackHelper::powerSpectrum(movie);

@@ -232,27 +232,3 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 
 	return total_n_electron;
 }
-
-void EERRenderer::upsampleEERGain(MultidimArray<float> &gain)
-{
-	const long long size = 4096 * 2; // TODO
-	MultidimArray<float> original = gain;
-
-	gain.resize(size, size);
-	RFLOAT sum = 0;
-	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(gain)
-	{
-		DIRECT_A2D_ELEM(gain, i, j) = DIRECT_A2D_ELEM(original, i / 2, j / 2);
-		sum += DIRECT_A2D_ELEM(gain, i, j);
-	}
-	sum /= size * size;
-
-	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(gain)
-	{
-		if (DIRECT_A2D_ELEM(gain, i, j) != 0)
-		{
-			DIRECT_A2D_ELEM(gain, i, j) = sum / DIRECT_A2D_ELEM(gain, i, j);
-		}
-		// TODO: cold pixels should be patched later...
-	}
-}
