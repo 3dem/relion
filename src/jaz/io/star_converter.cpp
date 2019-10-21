@@ -228,8 +228,10 @@ void StarConverter::convert_3p0_particlesTo_3p1(
 
 		if (nr_optics_groups_found != nr_optics_groups)
 		{
-			std::cerr << "Warning: not all image files could be found.\n";
-			std::cerr << "         Image sizes and dimensionalities will be missing from the star file.\n";
+			std::cerr << "Warning: Not all image files could be found.\n";
+			std::cerr << "  Image sizes and dimensionalities will be missing from the star file.\n";
+			std::cerr << "  Later steps (e.g. re-extraction, CtfRefine) can fail!!\n";
+			std::cerr << "  Repeat this job after fixing the image paths.\n";
 
 			//REPORT_ERROR("BUG: something went wrong with finding the optics groups...");
 		}
