@@ -121,7 +121,6 @@ void StarConverter::convert_3p0_particlesTo_3p1(
 	outParticles.setName(tablename);
 	outParticles.setVersion(curVer);
 
-
 	outOptics.setName("optics");
 	outOptics.setVersion(curVer);
 	outOptics.addLabel(EMDL_IMAGE_OPTICS_GROUP);
