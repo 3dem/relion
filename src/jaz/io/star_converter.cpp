@@ -135,7 +135,7 @@ void StarConverter::convert_3p0_particlesTo_3p1(
 	{
 		outOptics.addObject();
 		outOptics.setValue(EMDL_IMAGE_OPTICS_GROUP, g + 1, g);
-		std::string mygroupname = "opticsGroup" + integerToString(g);
+		std::string mygroupname = "opticsGroup" + integerToString(g + 1);
 		outOptics.setValue(EMDL_IMAGE_OPTICS_GROUP_NAME, mygroupname, g);
 
 		for (int l = 0; l < opticsLabelCount_double; l++)
