@@ -81,7 +81,7 @@ public:
 		optics_group = copy.optics_group;
 		img = copy.img;
 
-    }
+	}
 
 	// Define assignment operator in terms of the copy constructor
 	ExpImage& operator=(ExpImage const& copy)
@@ -96,7 +96,6 @@ public:
 		img = copy.img;
 		return *this;
 	}
-
 };
 
 class ExpParticle
@@ -124,7 +123,7 @@ public:
 		name = copy.name;
 		random_subset = copy.random_subset;
 		images = copy.images;
-    }
+	}
 
 	// Define assignment operator in terms of the copy constructor
 	ExpParticle& operator=(ExpParticle const& copy)
@@ -140,7 +139,6 @@ public:
 		return images.size();
 	}
 };
-
 
 class ExpMicrograph
 {
@@ -177,8 +175,6 @@ public:
 		image_ids = copy.image_ids;
 		return *this;
 	}
-
-
 };
 
 class ExpGroup
@@ -215,7 +211,6 @@ public:
 		name = copy.name;
 		return *this;
 	}
-
 };
 
 // for sorting particles based on the optics_group of their first image;
@@ -240,31 +235,31 @@ public:
 	std::vector<long int> nr_images_per_optics_group;
 
 	// One large MetaDataTable for all images
-    MetaDataTable MDimg;
+	MetaDataTable MDimg;
 
-    // Number of bodies in multi-body refinement
-    int nr_bodies;
+	// Number of bodies in multi-body refinement
+	int nr_bodies;
 
-    // Vector with MetaDataTables for orientations of different bodies in the multi-body refinement
-    std::vector<MetaDataTable> MDbodies;
+	// Vector with MetaDataTables for orientations of different bodies in the multi-body refinement
+	std::vector<MetaDataTable> MDbodies;
 
-    // Removed: One large MetaDataTable for all micrographs
-    // MetaDataTable MDmic;
+	// Removed: One large MetaDataTable for all micrographs
+	// MetaDataTable MDmic;
 
 	// Observation model holding the data for all optics groups
 	ObservationModel obsModel;
 
-    // Directory on scratch disk to copy particles to
-    FileName fn_scratch;
+	// Directory on scratch disk to copy particles to
+	FileName fn_scratch;
 
-    // Number of particles saved on the scratchdir, one for each optics_group
-    std::vector<long int> nr_parts_on_scratch;
+	// Number of particles saved on the scratchdir, one for each optics_group
+	std::vector<long int> nr_parts_on_scratch;
 
-    // Number of Gb on scratch disk before copying particles
-    long int free_space_Gb;
+	// Number of Gb on scratch disk before copying particles
+	long int free_space_Gb;
 
-    // Is this sub-tomograms?
-    bool is_3D;
+	// Is this sub-tomograms?
+	bool is_3D;
 
 	// Empty Constructor
 	Experiment()
@@ -398,9 +393,6 @@ public:
 
 	// Write
 	void write(FileName fn_root);
-
-
-
 };
 
 #endif /* METADATA_MODEL_H_ */

@@ -303,10 +303,10 @@ public:
 	void writeToMetaDataTable(MetaDataTable& MD) const;
 
 	// Empty constructor
-	JobOption()	{ clear(); }
+	JobOption() { clear(); }
 
 	// Empty destructor
-	~JobOption() {	clear(); }
+	~JobOption() { clear(); }
 
 	void clear();
 
@@ -494,9 +494,6 @@ public:
 	void initialiseExternalJob();
 	bool getCommandsExternalJob(std::string &outputname, std::vector<std::string> &commands,
 			std::string &final_command, bool do_makedir, int job_counter, std::string &error_message);
-
 };
-
-
 
 #endif /* SRC_PIPELINE_JOBS_H_ */
