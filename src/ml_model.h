@@ -220,6 +220,9 @@ public:
 	// Normalize overlapping regions in multibody masks
 	bool norm_body_mask_overlap;
 
+	// Store filenames of references for Liyi's class feature program
+	std::vector<FileName> ref_names;
+
 public:
 
 	// Constructor
@@ -335,6 +338,7 @@ public:
 			orientability_contrib = MD.orientability_contrib;
 			helical_twist = MD.helical_twist;
 			helical_rise = MD.helical_rise;
+			ref_names = MD.ref_names;
 	        }
         	return *this;
 	}
@@ -378,6 +382,7 @@ public:
 		orientability_contrib.clear();
 		helical_twist.clear();
 		helical_rise.clear();
+		ref_names.clear();
 		do_sgd=false;
 	}
 

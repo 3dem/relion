@@ -90,6 +90,7 @@ void MlModel::initialise(bool _do_sgd)
 	if (do_sgd)
 		Igrad.resize(nr_classes);
 
+	ref_names.resize(nr_classes);
 }
 
 // Reading from a file
@@ -186,7 +187,6 @@ void MlModel::read(FileName fn_in)
 	initialise();
 
 	// Read classes
-	FileName fn_tmp, fn_tmp2;
 	Image<RFLOAT> img;
 	if (nr_bodies > 1)
 		MDclass.readStar(in, "model_bodies");
@@ -209,7 +209,7 @@ void MlModel::read(FileName fn_in)
 			}
 		}
 
-		if (!MDclass.getValue(EMDL_MLMODEL_REF_IMAGE, fn_tmp) ||
+		if (!MDclass.getValue(EMDL_MLMODEL_REF_IMAGE, ref_names[iclass]) ||
 		    !MDclass.getValue(EMDL_MLMODEL_ACCURACY_ROT, acc_rot[iclass]) )
 			REPORT_ERROR("MlModel::readStar: incorrect model_classes/bodies table: no ref_image or acc_rot");
 		// backwards compatible
@@ -239,11 +239,12 @@ void MlModel::read(FileName fn_in)
 		}
 
 		// Read in actual reference image
-		img.read(fn_tmp);
+		img.read(ref_names[iclass]);
 		img().setXmippOrigin();
 		Iref[iclass] = img();
 
 		// Check to see whether there is a SGD-gradient entry as well
+		FileName fn_tmp;
 		if (MDclass.getValue(EMDL_MLMODEL_SGD_GRADIENT_IMAGE, fn_tmp))
 		{
 			do_sgd=true;
