@@ -80,6 +80,46 @@ enum EMDLabel
 	EMDL_BODY_SIGMA_PSI,
 	EMDL_BODY_STAR_FILE,
 
+	EMDL_CLASS_FEAT_CLASS_INDEX,
+	EMDL_CLASS_FEAT_PARTICLE_NR,
+	EMDL_CLASS_FEAT_IS_SELECTED, ///whether a class is selected
+	EMDL_CLASS_FEAT_CIRCLEMASKED_MEAN, ///moments of the circular area within mask diameter specified in 2D classification
+	EMDL_CLASS_FEAT_CIRCLEMASKED_STDDEV,
+	EMDL_CLASS_FEAT_CIRCLEMASKED_SKEW,
+	EMDL_CLASS_FEAT_CIRCLEMASKED_KURT,
+	EMDL_CLASS_FEAT_RING_MEAN, ///moments of the ring area specified by inner & outer radius / inner & outer radius ratio
+	EMDL_CLASS_FEAT_RING_STDDEV,
+	EMDL_CLASS_FEAT_RING_SKEW,
+	EMDL_CLASS_FEAT_RING_KURT,
+	EMDL_CLASS_FEAT_INNERCIRCLE_MEAN, /// moments of the smaller circular area specified by inner / outer radius
+	EMDL_CLASS_FEAT_INNERCIRCLE_STDDEV,
+	EMDL_CLASS_FEAT_INNERCIRCLE_SKEW,
+	EMDL_CLASS_FEAT_INNERCIRCLE_KURT,
+	EMDL_CLASS_FEAT_CLASS_SCORE,
+	EMDL_CLASS_FEAT_JOB_SCORE,
+	EMDL_CLASS_FEAT_FFT_MEAN, /// moments in Fourier space
+	EMDL_CLASS_FEAT_FFT_STDDEV,
+	EMDL_CLASS_FEAT_FFT_SKEW,
+	EMDL_CLASS_FEAT_FFT_KURT,
+	EMDL_CLASS_FEAT_PROTEIN_MEAN,        /// Moments in
+	EMDL_CLASS_FEAT_PROTEIN_STDDEV,
+	EMDL_CLASS_FEAT_PROTEIN_SKEW,
+	EMDL_CLASS_FEAT_PROTEIN_KURT,
+	EMDL_CLASS_FEAT_SOLVENT_MEAN,
+	EMDL_CLASS_FEAT_SOLVENT_STDDEV,
+	EMDL_CLASS_FEAT_SOLVENT_SKEW,
+	EMDL_CLASS_FEAT_SOLVENT_KURT,
+	EMDL_CLASS_FEAT_SCATTERED_SIGNAL,
+	EMDL_CLASS_FEAT_EDGE_SIGNAL,
+	EMDL_CLASS_FEAT_WEIGHTED_RESOLUTION,
+	EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MAX,
+	EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MIN,
+	EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MEAN,
+	EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_STDDEV,
+	EMDL_CLASS_FEAT_LBP,
+	EMDL_CLASS_FEAT_PROTEIN_LBP,
+	EMDL_CLASS_FEAT_SOLVENT_LBP,
+
 	EMDL_CTF_ASTIGMATISM,
 	EMDL_CTF_BFACTOR, ///< B-factor
 	EMDL_CTF_MAXRES, ///< Maximum resolution with Thon rings
@@ -607,6 +647,46 @@ private:
 		EMDL::addLabel(EMDL_BODY_SIGMA_TILT, EMDL_DOUBLE, "rlnBodySigmaTilt", "Width of prior on tilt angles of a body in multibody refinement (in degrees)");
 		EMDL::addLabel(EMDL_BODY_SIGMA_PSI, EMDL_DOUBLE, "rlnBodySigmaPsi", "Width of prior on psi angles of a body in multibody refinement (in degrees)");
 		EMDL::addLabel(EMDL_BODY_STAR_FILE, EMDL_STRING, "rlnBodyStarFile", "Name of STAR file with body masks and metadata");
+
+        EMDL::addLabel(EMDL_CLASS_FEAT_CLASS_INDEX, EMDL_INT, "rlnClassIndex", "Class number of each class from the model STAR file of 2D classification");
+        EMDL::addLabel(EMDL_CLASS_FEAT_PARTICLE_NR, EMDL_DOUBLE, "rlnParticleNr", "Number of particles in this class");
+        EMDL::addLabel(EMDL_CLASS_FEAT_IS_SELECTED, EMDL_INT, "rlnIsSelected", "Whether this class is selected");
+        EMDL::addLabel(EMDL_CLASS_FEAT_CIRCLEMASKED_MEAN,EMDL_DOUBLE, "rlnCircleMaskedMean", "Average value for the pixels in the circularly masked area of this class average image");
+        EMDL::addLabel(EMDL_CLASS_FEAT_CIRCLEMASKED_STDDEV,EMDL_DOUBLE, "rlnCircleMaskedStddev", "Standard deviation for the pixel values in the circularly masked area of this class average image");
+        EMDL::addLabel(EMDL_CLASS_FEAT_CIRCLEMASKED_SKEW,EMDL_DOUBLE, "rlnCircleMaskedSkew", "Skewness (3rd moment) for the pixel values in the circularly masked area of this class average image");
+        EMDL::addLabel(EMDL_CLASS_FEAT_CIRCLEMASKED_KURT,EMDL_DOUBLE, "rlnCircleMaskedKurt", "Kurtosis (4th moment) for the pixel values in the circularly masked area of this class average image");
+        EMDL::addLabel(EMDL_CLASS_FEAT_RING_MEAN,EMDL_DOUBLE, "rlnRingMean", "Average value for the pixels in the area of this class average image specified by inner and outer radius");
+        EMDL::addLabel(EMDL_CLASS_FEAT_RING_STDDEV,EMDL_DOUBLE, "rlnRingStddev", "Standard deviation for the pixel values in the area of this class average image specified by inner and outer radius");
+        EMDL::addLabel(EMDL_CLASS_FEAT_RING_SKEW,EMDL_DOUBLE, "rlnRingSkew", "Skewness (3rd moment) for the pixel values in the area of this class average image specified by inner and outer radius");
+        EMDL::addLabel(EMDL_CLASS_FEAT_RING_KURT,EMDL_DOUBLE, "rlnRingKurt", "Kurtosis (4th moment) for the pixel values in the area of this class average image specified by inner and outer radius");
+        EMDL::addLabel(EMDL_CLASS_FEAT_INNERCIRCLE_MEAN, EMDL_DOUBLE, "rlnInnerCircleMean", "Average pixel value of the smaller circular area specified by inner / outer radius");
+        EMDL::addLabel(EMDL_CLASS_FEAT_INNERCIRCLE_STDDEV, EMDL_DOUBLE, "rlnInnerCircleStddev", "Pixel value standard deviation of the smaller circular area specified by inner / outer radius");
+        EMDL::addLabel(EMDL_CLASS_FEAT_INNERCIRCLE_SKEW, EMDL_DOUBLE, "rlnInnerCircleSkew", "Pixel value skewness (3rd moment) of the smaller circular area specified by inner / outer radius");
+        EMDL::addLabel(EMDL_CLASS_FEAT_INNERCIRCLE_KURT, EMDL_DOUBLE, "rlnInnerCircleKurt", "Pixel value kurtosis (4th moment) of the smaller circular area specified by inner / outer radius");
+        EMDL::addLabel(EMDL_CLASS_FEAT_CLASS_SCORE, EMDL_DOUBLE, "rlnClassScore", "Class score calculated based on estimated resolution and selection label");
+        EMDL::addLabel(EMDL_CLASS_FEAT_JOB_SCORE, EMDL_DOUBLE, "rlnJobScore", "Overall score of this 2D classification job, read from the job score file.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_FFT_MEAN, EMDL_DOUBLE, "rlnFftMean", "Mean of Fourier components (amplitude only) up to resolution limit.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_FFT_STDDEV, EMDL_DOUBLE, "rlnFftStddev", "Standard deviation of Fourier components (amplitude only) up to resolution limit.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_FFT_SKEW, EMDL_DOUBLE, "rlnFftSkew", "Skewness of Fourier components (amplitude only) up to resolution limit.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_FFT_KURT, EMDL_DOUBLE, "rlnFftKurt", "Kurtosis of Fourier components (amplitude only) up to resolution limit.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_PROTEIN_MEAN, EMDL_DOUBLE, "rlnProteinMean", "Mean of protein region.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_PROTEIN_STDDEV, EMDL_DOUBLE, "rlnProteinStddev", "Standard deviation of protein region.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_PROTEIN_SKEW, EMDL_DOUBLE, "rlnProteinSkew", "Skewness of protein region.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_PROTEIN_KURT, EMDL_DOUBLE, "rlnProteinKurt", "Kurtosis of protein region.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_SOLVENT_MEAN, EMDL_DOUBLE, "rlnSolventMean", "Mean of solvent region.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_SOLVENT_STDDEV, EMDL_DOUBLE, "rlnSolventStddev", "Standard deviation of solvent region.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_SOLVENT_SKEW, EMDL_DOUBLE, "rlnSolventSkew", "Skewness of solvent region.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_SOLVENT_KURT, EMDL_DOUBLE, "rlnSolventKurt", "Kurtosis of solvent region.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_SCATTERED_SIGNAL, EMDL_DOUBLE, "rlnScatteredSignal", "Ratio of excluded white pixels when making the protein mask.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_EDGE_SIGNAL, EMDL_DOUBLE, "rlnEdgeSignal", "Ratio of white pixels on the edge in the protein mask.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_WEIGHTED_RESOLUTION, EMDL_DOUBLE, "rlnWeightedResolution", "Estimated resolution weighted by the number of particles in the class.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MAX, EMDL_DOUBLE, "rlnLowpassFilteredImageMax", "Maximum pixel value of the lowpass filtered image.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MIN, EMDL_DOUBLE, "rlnLowpassFilteredImageMin", "Minimum pixel value of the lowpass filtered image.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MEAN, EMDL_DOUBLE, "rlnLowpassFilteredImageMean", "Mean pixel value of the lowpass filtered image.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_STDDEV, EMDL_DOUBLE, "rlnLowpassFilteredImageStddev", "Standard deviation of pixel values of the lowpass filtered image.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_LBP, EMDL_DOUBLE_VECTOR, "rlnLBP", "Histogram of the local binary pattern of the image.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_PROTEIN_LBP, EMDL_DOUBLE_VECTOR, "rlnProteinLBP", "Histogram of the local binary pattern of the protein area.");
+        EMDL::addLabel(EMDL_CLASS_FEAT_SOLVENT_LBP, EMDL_DOUBLE_VECTOR, "rlnSolventLBP", "Histogram of the local binary pattern of the solvent area.");
 
 		EMDL::addLabel(EMDL_CTF_ASTIGMATISM, EMDL_DOUBLE, "rlnCtfAstigmatism", "Absolute value of the difference between defocus in U- and V-direction (in A)");
 		EMDL::addLabel(EMDL_CTF_BFACTOR, EMDL_DOUBLE, "rlnCtfBfactor", "B-factor (in A^2) that describes CTF power spectrum fall-off");
