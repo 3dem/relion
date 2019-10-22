@@ -69,6 +69,7 @@ void ObservationModel::loadSafely(std::string filename, ObservationModel& obsMod
 		if (verb > 0)
 		{
 			std::cerr << "WARNING: " << filename << " seems to be from a previous version of Relion. Attempting conversion...\n";
+			std::cerr << "         You should make sure metadata in the optics group table after conversion is correct.\n";
 		}
 
 		MetaDataTable oldMdt;
