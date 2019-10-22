@@ -34,10 +34,9 @@
 
 using namespace gravis;
 
-void ObservationModel::loadSafely(
-	std::string filename,
-	ObservationModel& obsModel,
-	MetaDataTable& particlesMdt, std::string tablename, int verb, bool do_die_upon_error)
+void ObservationModel::loadSafely(std::string filename, ObservationModel& obsModel,
+                                  MetaDataTable& particlesMdt, std::string tablename,
+                                  int verb, bool do_die_upon_error)
 {
 	MetaDataTable opticsMdt;
 
@@ -111,7 +110,7 @@ void ObservationModel::loadSafely(
 		}
 
 		REPORT_ERROR("ERROR: The following optics groups were not defined in "+
-					 filename+": "+sts.str());
+		             filename + ": " + sts.str());
 	}
 
 	// make sure the optics groups appear in the right order (and rename them if necessary)
@@ -120,7 +119,7 @@ void ObservationModel::loadSafely(
 		if (verb > 0)
 		{
 			std::cerr << "   - Warning: the optics groups in " << filename
-					  << " are not in the right order - renaming them now" << std::endl;
+			          << " are not in the right order - renaming them now" << std::endl;
 		}
 
 		obsModel.sortOpticsGroups(particlesMdt);
@@ -145,10 +144,7 @@ void ObservationModel::saveNew(
 	std::rename(tmpfilename.c_str(), filename.c_str());
 }
 
-void ObservationModel::save(
-		MetaDataTable &particlesMdt,
-		std::string filename,
-		std::string tablename)
+void ObservationModel::save(MetaDataTable &particlesMdt, std::string filename, std::string tablename)
 {
 	std::string tmpfilename = filename + ".tmp";
 	std::ofstream of(tmpfilename);
@@ -174,17 +170,17 @@ ObservationModel::ObservationModel(const MetaDataTable &_opticsMdt, bool do_die_
 	boxSizes(_opticsMdt.numberOfObjects(), 0.0),
 	CtfPremultiplied(_opticsMdt.numberOfObjects(), false)
 {
-	if (   !(opticsMdt.containsLabel(EMDL_IMAGE_PIXEL_SIZE) ||
-			opticsMdt.containsLabel(EMDL_MICROGRAPH_PIXEL_SIZE) ||
-			opticsMdt.containsLabel(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE) )
-	    || !opticsMdt.containsLabel(EMDL_CTF_VOLTAGE)
-	    || !opticsMdt.containsLabel(EMDL_CTF_CS))
+	if (!(opticsMdt.containsLabel(EMDL_IMAGE_PIXEL_SIZE) ||
+	      opticsMdt.containsLabel(EMDL_MICROGRAPH_PIXEL_SIZE) ||
+	      opticsMdt.containsLabel(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE))
+	 || !opticsMdt.containsLabel(EMDL_CTF_VOLTAGE)
+	 || !opticsMdt.containsLabel(EMDL_CTF_CS))
 	{
 		if (do_die_upon_error)
 		{
 			REPORT_ERROR_STR("ERROR: not all necessary variables defined in _optics.star file: "
-				<< "rlnPixelSize, rlnVoltage and rlnSphericalAberration. Make sure to convert older STAR files anew in version-3.1, "
-				<< "with relion_convert_star.");
+			              << "rlnPixelSize, rlnVoltage and rlnSphericalAberration. Make sure to convert older STAR files anew in version-3.1, "
+			              << "with relion_convert_star.");
 		}
 		else
 		{
@@ -195,14 +191,12 @@ ObservationModel::ObservationModel(const MetaDataTable &_opticsMdt, bool do_die_
 
 	// symmetrical high-order aberrations:
 	hasEvenZernike = opticsMdt.containsLabel(EMDL_IMAGE_EVEN_ZERNIKE_COEFFS);
-	evenZernikeCoeffs = std::vector<std::vector<double> >(
-			opticsMdt.numberOfObjects(), std::vector<double>(0));
+	evenZernikeCoeffs = std::vector<std::vector<double> >(opticsMdt.numberOfObjects(), std::vector<double>(0));
 	gammaOffset = std::vector<std::map<int,Image<RFLOAT> > >(opticsMdt.numberOfObjects());
 
 	// antisymmetrical high-order aberrations:
 	hasOddZernike = opticsMdt.containsLabel(EMDL_IMAGE_ODD_ZERNIKE_COEFFS);
-	oddZernikeCoeffs = std::vector<std::vector<double> >(
-			opticsMdt.numberOfObjects(), std::vector<double>(0));
+	oddZernikeCoeffs = std::vector<std::vector<double> >(opticsMdt.numberOfObjects(), std::vector<double>(0));
 	phaseCorr = std::vector<std::map<int,Image<Complex> > >(opticsMdt.numberOfObjects());
 
 	const bool hasTilt = opticsMdt.containsLabel(EMDL_IMAGE_BEAMTILT_X)
@@ -210,9 +204,9 @@ ObservationModel::ObservationModel(const MetaDataTable &_opticsMdt, bool do_die_
 
 	// anisotropic magnification:
 	hasMagMatrices = opticsMdt.containsLabel(EMDL_IMAGE_MAG_MATRIX_00)
-			      || opticsMdt.containsLabel(EMDL_IMAGE_MAG_MATRIX_01)
-			      || opticsMdt.containsLabel(EMDL_IMAGE_MAG_MATRIX_10)
-			      || opticsMdt.containsLabel(EMDL_IMAGE_MAG_MATRIX_11);
+	              || opticsMdt.containsLabel(EMDL_IMAGE_MAG_MATRIX_01)
+	              || opticsMdt.containsLabel(EMDL_IMAGE_MAG_MATRIX_10)
+	              || opticsMdt.containsLabel(EMDL_IMAGE_MAG_MATRIX_11);
 
 	magMatrices.resize(opticsMdt.numberOfObjects());
 
@@ -302,10 +296,9 @@ ObservationModel::ObservationModel(const MetaDataTable &_opticsMdt, bool do_die_
 	if (hasTilt) hasOddZernike = true;
 }
 
-void ObservationModel::predictObservation(
-        Projector& proj, const MetaDataTable& partMdt, long int particle,
-		MultidimArray<Complex>& dest, double angpix_ref,
-        bool applyCtf, bool shiftPhases, bool applyShift, bool applyMtf, bool applyCtfPadding)
+void ObservationModel::predictObservation(Projector& proj, const MetaDataTable& partMdt, long int particle,
+	                                  MultidimArray<Complex>& dest, double angpix_ref,
+                                          bool applyCtf, bool shiftPhases, bool applyShift, bool applyMtf, bool applyCtfPadding)
 {
 	const int s_ref = proj.ori_size;
 
@@ -315,8 +308,7 @@ void ObservationModel::predictObservation(
 
 	if (!hasBoxSizes)
 	{
-		REPORT_ERROR_STR("ObservationModel::predictObservation: Unable to make a prediction "
-						 << "without knowing the box size.\n");
+		REPORT_ERROR_STR("ObservationModel::predictObservation: Unable to make a prediction without knowing the box size.\n");
 	}
 
 	const int s_out = boxSizes[opticsGroup];
@@ -406,17 +398,17 @@ void ObservationModel::predictObservation(
 			dest(y,x) *= mtf(y,x);
 		}
 	}
-
 }
 
-Volume<t2Vector<Complex>> ObservationModel::predictComplexGradient(
-		Projector &proj, const MetaDataTable &partMdt, long particle, double angpix_ref,
-		bool applyCtf, bool shiftPhases, bool applyShift, bool applyMtf, bool applyCtfPadding)
+Volume<t2Vector<Complex>> ObservationModel::predictComplexGradient(Projector &proj, const MetaDataTable &partMdt,
+                                                                   long particle, double angpix_ref,
+                                                                   bool applyCtf, bool shiftPhases, bool applyShift,
+                                                                   bool applyMtf, bool applyCtfPadding)
 {
 	if (applyCtf || applyShift || applyCtfPadding)
 	{
 		REPORT_ERROR_STR("ObservationModel::predictComplexGradient: "
-						 << "applyCtf and applyShift and applyCtfPadding are currently not supported\n");
+		              << "applyCtf and applyShift and applyCtfPadding are currently not supported\n");
 	}
 
 	const int s_ref = proj.ori_size;
@@ -480,9 +472,8 @@ Volume<t2Vector<Complex>> ObservationModel::predictComplexGradient(
 	return out;
 }
 
-void ObservationModel::divideByMtf(
-		const MetaDataTable& partMdt, long particle, MultidimArray<Complex>& obsImage,
-		bool do_multiply_instead)
+void ObservationModel::divideByMtf(const MetaDataTable& partMdt, long particle, MultidimArray<Complex>& obsImage,
+                                   bool do_multiply_instead)
 {
 	int opticsGroup;
 	partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, particle);
@@ -491,9 +482,8 @@ void ObservationModel::divideByMtf(
 	divideByMtf(opticsGroup, obsImage, do_multiply_instead);
 }
 
-void ObservationModel::divideByMtf(
-		int opticsGroup, MultidimArray<Complex>& obsImage,
-		bool do_multiply_instead)
+void ObservationModel::divideByMtf(int opticsGroup, MultidimArray<Complex>& obsImage,
+                                   bool do_multiply_instead)
 {
 	const int s = obsImage.ydim;
 	const int sh = obsImage.xdim;
@@ -521,9 +511,8 @@ void ObservationModel::divideByMtf(
 	}
 }
 
-void ObservationModel::demodulatePhase(
-		const MetaDataTable& partMdt, long particle, MultidimArray<Complex>& obsImage,
-		bool do_modulate_instead)
+void ObservationModel::demodulatePhase(const MetaDataTable& partMdt, long particle, MultidimArray<Complex>& obsImage,
+                                       bool do_modulate_instead)
 {
 	int opticsGroup;
 	partMdt.getValue(EMDL_IMAGE_OPTICS_GROUP, opticsGroup, particle);
@@ -532,9 +521,8 @@ void ObservationModel::demodulatePhase(
 	demodulatePhase(opticsGroup, obsImage, do_modulate_instead);
 }
 
-void ObservationModel::demodulatePhase(
-		int opticsGroup, MultidimArray<Complex>& obsImage,
-		bool do_modulate_instead)
+void ObservationModel::demodulatePhase(int opticsGroup, MultidimArray<Complex>& obsImage,
+                                       bool do_modulate_instead)
 {
 	const int s = obsImage.ydim;
 	const int sh = obsImage.xdim;
@@ -656,7 +644,7 @@ int ObservationModel::getBoxSize(int opticsGroup) const
 {
 	if (!hasBoxSizes)
 	{
-		REPORT_ERROR("ObservationModel::getBoxSize: box sizes not available\n");
+		REPORT_ERROR("ObservationModel::getBoxSize: box sizes not available. Make sure particle images are available before converting/importing STAR files from earlier versions of RELION.\n");
 	}
 
 	return boxSizes[opticsGroup];
@@ -666,7 +654,7 @@ void ObservationModel::getBoxSizes(std::vector<int>& sDest, std::vector<int>& sh
 {
 	if (!hasBoxSizes)
 	{
-		REPORT_ERROR("ObservationModel::getBoxSizes: box sizes not available\n");
+		REPORT_ERROR("ObservationModel::getBoxSizes: box sizes not available. Make sure particle images are available before converting/importing STAR files from earlier versions of RELION.\n");
 	}
 
 	sDest.resize(boxSizes.size());
@@ -913,8 +901,7 @@ std::vector<int> ObservationModel::getOptGroupsPresent_zeroBased(const MetaDataT
 	return out;
 }
 
-std::vector<std::pair<int, std::vector<int>>> ObservationModel::splitParticlesByOpticsGroup(
-		const MetaDataTable &partMdt) const
+std::vector<std::pair<int, std::vector<int>>> ObservationModel::splitParticlesByOpticsGroup(const MetaDataTable &partMdt) const
 {
 	std::vector<int> presentGroups = ObservationModel::getOptGroupsPresent_zeroBased(partMdt);
 
@@ -1030,7 +1017,6 @@ const Image<RFLOAT>& ObservationModel::getMtfImage(int optGroup, int s)
 	}
 
 	return mtfImage[optGroup][s];
-
 }
 
 const Image<Complex>& ObservationModel::getPhaseCorrection(int optGroup, int s)
@@ -1042,7 +1028,7 @@ const Image<Complex>& ObservationModel::getPhaseCorrection(int optGroup, int s)
 			if (phaseCorr[optGroup].size() > 100)
 			{
 				std::cerr << "Warning: " << (phaseCorr[optGroup].size()+1)
-						  << " phase shift images in cache for the same ObservationModel." << std::endl;
+				          << " phase shift images in cache for the same ObservationModel." << std::endl;
 			}
 
 			const int sh = s/2 + 1;
@@ -1084,7 +1070,7 @@ const Image<RFLOAT>& ObservationModel::getGammaOffset(int optGroup, int s)
 			if (gammaOffset[optGroup].size() > 100)
 			{
 				std::cerr << "Warning: " << (gammaOffset[optGroup].size()+1)
-						  << " gamma offset images in cache for the same ObservationModel." << std::endl;
+				          << " gamma offset images in cache for the same ObservationModel." << std::endl;
 			}
 
 			const int sh = s/2 + 1;
@@ -1117,8 +1103,7 @@ const Image<RFLOAT>& ObservationModel::getGammaOffset(int optGroup, int s)
 	return gammaOffset[optGroup][s];
 }
 
-Matrix2D<RFLOAT> ObservationModel::applyAnisoMag(
-		Matrix2D<RFLOAT> A3D, int opticsGroup)
+Matrix2D<RFLOAT> ObservationModel::applyAnisoMag(Matrix2D<RFLOAT> A3D, int opticsGroup)
 {
 	Matrix2D<RFLOAT> out;
 
@@ -1141,8 +1126,7 @@ Matrix2D<RFLOAT> ObservationModel::applyAnisoMag(
 	return out;
 }
 
-Matrix2D<RFLOAT> ObservationModel::applyScaleDifference(
-		Matrix2D<RFLOAT> A3D, int opticsGroup, int s3D, double angpix3D)
+Matrix2D<RFLOAT> ObservationModel::applyScaleDifference(Matrix2D<RFLOAT> A3D, int opticsGroup, int s3D, double angpix3D)
 {
 	Matrix2D<RFLOAT> out = A3D;
 
