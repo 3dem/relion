@@ -129,11 +129,11 @@ public:
 
     // Save some time by limting calculations
 	int only_use_this_class;
-	bool do_skip_angular_errors, do_skip_protein_vs_solvent, do_skip_LBP;
+	bool do_skip_angular_errors;
 
 	MlOptimiser myopt;
 	MetaDataTable MD_optimiser, MD_select;
-	std::vector<class_features> features_all_classes;
+	std::vector<class_features> features_all_classes, preread_features_all_classes;
 
 	bool do_save_masks, save_masks_only;
 
@@ -161,8 +161,6 @@ public:
 			fn_cf = parser.getOption("--cf_file", "Input class feature star file", "");
 	    	only_use_this_class = textToInteger(parser.getOption("--only_class_nr", "Class number of the class of interest", "-1"));
 	    	do_skip_angular_errors = parser.checkOption("--skip_angular_errors", "Skip angular error calculation");
-	    	do_skip_protein_vs_solvent = parser.checkOption("--skip_pvs", "Skip protein-solvent mask calculation");
-	    	do_skip_LBP = parser.checkOption("--skip_lbp", "Skip LBP calculation");
 
 	    	int expert_section = parser.addSection("Expert options");
 	    	radius_ratio = textToFloat(parser.getOption("--radius_ratio", "Ratio of inner radius of the interested ring area in proportion to the current circular mask radius", "0.95"));
@@ -183,7 +181,7 @@ public:
 
 	void initialise(){
 
-		if (do_skip_angular_errors || do_skip_LBP || do_skip_protein_vs_solvent)
+		if (do_skip_angular_errors)
 		{
 			if (fn_cf == "") REPORT_ERROR("ERROR: you need to provide a class feature input file if you wish to skip some calculations!");
 		}
@@ -1000,6 +998,7 @@ public:
 			end_class = only_use_this_class;
 
 		}
+		int ith_nonzero_class = 0;
 		for (int iclass = start_class; iclass < end_class; iclass++)
 		{
 			if (debug>0) std::cerr << " dealing with class: " << iclass+1 << std::endl;
@@ -1067,7 +1066,12 @@ public:
 					minRes = features_this_class.estimated_resolution;
 				}
 
-				if (!do_skip_angular_errors)
+				if (do_skip_angular_errors)
+				{
+					features_this_class.accuracy_rotation = preread_features_all_classes[ith_nonzero_class].accuracy_rotation;
+					features_this_class.accuracy_translation = preread_features_all_classes[ith_nonzero_class].accuracy_translation;
+				}
+				else
 				{
 					// Get class accuracy rotation and translation from model.star if present
 					features_this_class.accuracy_rotation = myopt.mymodel.acc_rot[iclass];
@@ -1080,21 +1084,16 @@ public:
 					if (debug > 0) std::cerr << " done with angular errors" << std::endl;
 				}
 
-				if (!do_skip_protein_vs_solvent)
-				{
-					// Calculate protein and solvent region moments
-					proteinVsSolventFeatures(features_this_class);
-					if (debug > 0) std::cerr << " done with pvs" << std::endl;
-				}
+				// Calculate protein and solvent region moments
+				proteinVsSolventFeatures(features_this_class);
+				if (debug > 0) std::cerr << " done with pvs" << std::endl;
 
-				if (!do_skip_LBP)
-				{
-					// Calculate whole image LBP and protein and solvent area LBP
-					calculatePvsLBP(features_this_class.img(), features_this_class.lbp, features_this_class.lbp_p, features_this_class.lbp_s);
-					if (debug > 0) std::cerr << " done with lbp" << std::endl;
-				}
+				// Calculate whole image LBP and protein and solvent area LBP
+				calculatePvsLBP(features_this_class.img(), features_this_class.lbp, features_this_class.lbp_p, features_this_class.lbp_s);
+				if (debug > 0) std::cerr << " done with lbp" << std::endl;
 
 				features_all_classes.push_back(features_this_class);
+				ith_nonzero_class++;
 			}
 
 		} // end iterating all classes
@@ -1107,23 +1106,28 @@ public:
 	// TODO: Liyi: make a read
 	void readClassFeatures()
 	{
+
 		if (fn_cf == "") return;
 
 		MetaDataTable MD_class_features;
 		MD_class_features.read(fn_cf);
-		features_all_classes.resize(MD_class_features.numberOfObjects());
-		for (int i=0; i<features_all_classes.size();i++)
+
+		preread_features_all_classes.clear();
+		int i =0;
+		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD_class_features)
 		{
 
-			MD_class_features.getValue(EMDL_MLMODEL_REF_IMAGE, features_all_classes[i].name);
-			MD_class_features.getValue(EMDL_CLASS_FEAT_CLASS_INDEX, features_all_classes[i].class_index);
-			MD_class_features.getValue(EMDL_CLASS_FEAT_IS_SELECTED,features_all_classes[i].is_selected);
-			MD_class_features.getValue(EMDL_MLMODEL_PDF_CLASS, features_all_classes[i].class_distribution);
-			MD_class_features.getValue(EMDL_MLMODEL_ACCURACY_ROT, features_all_classes[i].accuracy_rotation);
-			MD_class_features.getValue(EMDL_MLMODEL_ACCURACY_TRANS, features_all_classes[i].accuracy_translation);
-			MD_class_features.getValue(EMDL_MLMODEL_ESTIM_RESOL_REF, features_all_classes[i].estimated_resolution);
-			MD_class_features.getValue(EMDL_CLASS_FEAT_WEIGHTED_RESOLUTION, features_all_classes[i].weighted_resolution);
-			MD_class_features.getValue(EMDL_CLASS_FEAT_PARTICLE_NR, features_all_classes[i].particle_nr);
+			class_features this_class_feature;
+
+			MD_class_features.getValue(EMDL_MLMODEL_REF_IMAGE, this_class_feature.name);
+			MD_class_features.getValue(EMDL_CLASS_FEAT_CLASS_INDEX, this_class_feature.class_index);
+			MD_class_features.getValue(EMDL_CLASS_FEAT_IS_SELECTED,this_class_feature.is_selected);
+			MD_class_features.getValue(EMDL_MLMODEL_PDF_CLASS, this_class_feature.class_distribution);
+			MD_class_features.getValue(EMDL_MLMODEL_ACCURACY_ROT, this_class_feature.accuracy_rotation);
+			MD_class_features.getValue(EMDL_MLMODEL_ACCURACY_TRANS, this_class_feature.accuracy_translation);
+			MD_class_features.getValue(EMDL_MLMODEL_ESTIM_RESOL_REF, this_class_feature.estimated_resolution);
+			MD_class_features.getValue(EMDL_CLASS_FEAT_WEIGHTED_RESOLUTION, this_class_feature.weighted_resolution);
+			MD_class_features.getValue(EMDL_CLASS_FEAT_PARTICLE_NR, this_class_feature.particle_nr);
 
 			// Job-wise features
 			MD_class_features.getValue(EMDL_MLMODEL_PIXEL_SIZE, myopt.mymodel.pixel_size);
@@ -1139,29 +1143,31 @@ public:
 			MD_class_features.getValue(EMDL_CLASS_FEAT_JOB_SCORE, job_score);
 
 			// Class score
-			MD_class_features.getValue(EMDL_CLASS_FEAT_CLASS_SCORE, features_all_classes[i].class_score);
+			MD_class_features.getValue(EMDL_CLASS_FEAT_CLASS_SCORE, this_class_feature.class_score);
 
 			// Moments for the ring, inner circle, and outer circle
 			if (radius > 0)
 			{
-				MD_class_features.getValue(EMDL_CLASS_FEAT_RING_MEAN, features_all_classes[i].ring_moments.mean);
-				MD_class_features.getValue(EMDL_CLASS_FEAT_RING_STDDEV, features_all_classes[i].ring_moments.stddev);
-				MD_class_features.getValue(EMDL_CLASS_FEAT_RING_SKEW, features_all_classes[i].ring_moments.skew);
-				MD_class_features.getValue(EMDL_CLASS_FEAT_RING_KURT, features_all_classes[i].ring_moments.kurt);
+				MD_class_features.getValue(EMDL_CLASS_FEAT_RING_MEAN, this_class_feature.ring_moments.mean);
+				MD_class_features.getValue(EMDL_CLASS_FEAT_RING_STDDEV, this_class_feature.ring_moments.stddev);
+				MD_class_features.getValue(EMDL_CLASS_FEAT_RING_SKEW, this_class_feature.ring_moments.skew);
+				MD_class_features.getValue(EMDL_CLASS_FEAT_RING_KURT, this_class_feature.ring_moments.kurt);
 			}
 
 			// Protein and solvent region moments
-			MD_class_features.getValue(EMDL_CLASS_FEAT_PROTEIN_MEAN, features_all_classes[i].protein_moments.mean);
-			MD_class_features.getValue(EMDL_CLASS_FEAT_PROTEIN_STDDEV, features_all_classes[i].protein_moments.stddev);
-			MD_class_features.getValue(EMDL_CLASS_FEAT_PROTEIN_SKEW, features_all_classes[i].protein_moments.skew);
-			MD_class_features.getValue(EMDL_CLASS_FEAT_PROTEIN_KURT, features_all_classes[i].protein_moments.kurt);
-			MD_class_features.getValue(EMDL_CLASS_FEAT_SOLVENT_MEAN, features_all_classes[i].solvent_moments.mean);
-			MD_class_features.getValue(EMDL_CLASS_FEAT_SOLVENT_STDDEV, features_all_classes[i].solvent_moments.stddev);
-			MD_class_features.getValue(EMDL_CLASS_FEAT_SOLVENT_SKEW, features_all_classes[i].solvent_moments.skew);
-			MD_class_features.getValue(EMDL_CLASS_FEAT_SOLVENT_KURT, features_all_classes[i].solvent_moments.kurt);
-			MD_class_features.getValue(EMDL_CLASS_FEAT_SCATTERED_SIGNAL, features_all_classes[i].scattered_signal);
-			MD_class_features.getValue(EMDL_CLASS_FEAT_EDGE_SIGNAL, features_all_classes[i].edge_signal);
+			MD_class_features.getValue(EMDL_CLASS_FEAT_PROTEIN_MEAN, this_class_feature.protein_moments.mean);
+			MD_class_features.getValue(EMDL_CLASS_FEAT_PROTEIN_STDDEV, this_class_feature.protein_moments.stddev);
+			MD_class_features.getValue(EMDL_CLASS_FEAT_PROTEIN_SKEW, this_class_feature.protein_moments.skew);
+			MD_class_features.getValue(EMDL_CLASS_FEAT_PROTEIN_KURT, this_class_feature.protein_moments.kurt);
+			MD_class_features.getValue(EMDL_CLASS_FEAT_SOLVENT_MEAN, this_class_feature.solvent_moments.mean);
+			MD_class_features.getValue(EMDL_CLASS_FEAT_SOLVENT_STDDEV, this_class_feature.solvent_moments.stddev);
+			MD_class_features.getValue(EMDL_CLASS_FEAT_SOLVENT_SKEW, this_class_feature.solvent_moments.skew);
+			MD_class_features.getValue(EMDL_CLASS_FEAT_SOLVENT_KURT, this_class_feature.solvent_moments.kurt);
+			MD_class_features.getValue(EMDL_CLASS_FEAT_SCATTERED_SIGNAL, this_class_feature.scattered_signal);
+			MD_class_features.getValue(EMDL_CLASS_FEAT_EDGE_SIGNAL, this_class_feature.edge_signal);
 
+			preread_features_all_classes.push_back(this_class_feature);
+			i++;
 		}
 
 	}

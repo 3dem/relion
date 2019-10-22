@@ -731,6 +731,7 @@ public:
 		do_gpu(0),
 		anticipate_oom(0),
 		do_helical_refine(0),
+		do_preread_images(0),
 		ignore_helical_symmetry(0),
 		helical_twist_initial(0),
 		helical_rise_initial(0),
