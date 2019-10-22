@@ -186,7 +186,7 @@ void MotionRefiner::init()
 		// of the first movie (or read corrected_micrographs.star) to obtain:
 		// frame count, micrograph size and the fractional dose
 		micrographHandler.init(
-			chosenMdts, reference.angpix, verb, nr_omp_threads, // in
+			chosenMdts, verb, nr_omp_threads, // in
 			fc0, fractDose, metaFn); // out
 		
 		chosenMdts = micrographHandler.cullMissingMovies(chosenMdts, verb);
@@ -297,6 +297,8 @@ void MotionRefiner::init()
 		
 		reference.load(verb, debug);
 	}
+
+	micrographHandler.validatePixelSize(reference.angpix);
 	
 	if (estimateMotion || estimateParams)
 	{

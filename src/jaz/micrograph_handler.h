@@ -53,13 +53,15 @@ class MicrographHandler
 	void init(
 		// in:
 		const std::vector<MetaDataTable>& mdts,
-		double angpix, bool verb,
+		bool verb,
 		int nr_omp_threads,
 		// out:
 		int& fc,
 		double& dosePerFrame,
 		std::string& metaFn);
-		
+
+	void validatePixelSize(RFLOAT angpix) const;
+
 	// remove movies from the list for which either the meta-star or the movie itself is missing
 	std::vector<MetaDataTable> 
 		cullMissingMovies(const std::vector<MetaDataTable>& mdts, int verb);
@@ -99,7 +101,7 @@ class MicrographHandler
 	std::map<std::string, std::string> mic2meta;
 
 	void loadInitial(
-		const std::vector<MetaDataTable>& mdts, double angpix, bool verb,
+		const std::vector<MetaDataTable>& mdts, bool verb,
 		int& fc, double& dosePerFrame, std::string& metaFn);
 	std::string getMetaName(std::string micName, bool die_on_error=true);
 	int determineFrameCount(const MetaDataTable& mdt);
