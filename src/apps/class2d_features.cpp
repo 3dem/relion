@@ -51,6 +51,7 @@
 #include <src/fftw.h>
 #include <src/time.h>
 #include <src/ml_model.h>
+#include <src/ml_optimiser.h>
 #include <src/exp_model.h>
 #include <src/ctf.h>
 #include <stdio.h>
@@ -75,7 +76,7 @@ public:
     int is_selected, resol_limit;
     RFLOAT class_distribution, accuracy_rotation, accuracy_translation, estimated_resolution, particle_nr;
     RFLOAT class_score, edge_signal, scattered_signal, weighted_resolution;
-    RFLOAT lowpass_filtered_img_avg, lowpass_filtered_img_stddev, lowpass_filtered_img_minval, lowpass_filtered_img_maxval
+    RFLOAT lowpass_filtered_img_avg, lowpass_filtered_img_stddev, lowpass_filtered_img_minval, lowpass_filtered_img_maxval;
     std::vector<RFLOAT> resolutions, lbp, lbp_p, lbp_s;
     moments circular_mask_moments, ring_moments, inner_circle_moments, fft_moments, protein_moments, solvent_moments;
 
@@ -105,7 +106,6 @@ public:
 			resol_limit(-1),
 			edge_signal(-1.),
 			scattered_signal(-1.),
-    		weighted_resolution(0.),
 			lowpass_filtered_img_avg(0),
 			lowpass_filtered_img_stddev(0),
 			lowpass_filtered_img_minval(0),
@@ -125,8 +125,9 @@ public:
 	RFLOAT radius_ratio, radius;
 	RFLOAT circular_mask_radius, uniform_angpix = 4.0;
 	RFLOAT binary_threshold, lowpass;
+    int debug;
 
-	// Save some time by limting calculations
+    // Save some time by limting calculations
 	int only_use_this_class;
 	bool do_skip_angular_errors, do_skip_protein_vs_solvent, do_skip_LBP;
 
@@ -151,10 +152,10 @@ public:
 
 			// TODO: optional input files, eg. job score file
 	    	int general_section = parser.addSection("General options");
-	    	fn_optimiser = parser.getOption("--optimiser", "Input optimiser.star file", "");
+	    	fn_optimiser = parser.getOption("--opt", "Input optimiser.star file", "");
 			fn_out = parser.getOption("--o", "Name for output class features", "cf_lbp_rescaled.star");
-	    	fn_select = parser.getOption("--selection", "Input class_averages.star from the Selection job or backup_selection.star", "backup_selection.star");
-	    	fn_job_score = parser.getOption("--job_score_file", "Input job score file", "job_score.txt");
+	    	fn_select = parser.getOption("--select", "Input class_averages.star from the Selection job or backup_selection.star", "");
+	    	fn_job_score = parser.getOption("--fn_score", "Input job score file", "");
 
 	    	int part_section = parser.addSection("Partial calculations");
 			fn_cf = parser.getOption("--cf_file", "Input class feature star file", "");
@@ -169,6 +170,7 @@ public:
 			binary_threshold = textToFloat(parser.getOption("--binary_threshold", "Threshold for generating binary masks.", "0."));
 			lowpass = textToFloat(parser.getOption("--lowpass", "Low-pass filter frequency (in A)", "25."));
 			do_save_masks = parser.checkOption("--save_masks", "Save the protein and solvent masks ");
+		    debug = textToInteger(parser.getOption("--debug", "Debug level", "0"));
 
 	    	// Check for errors in the command-line option
 	    	if (radius > 0 && radius < 1)
@@ -189,7 +191,8 @@ public:
 		// Read in the MD_optimiser table from the STAR file, get model.star and data.star
 		if (fn_optimiser != "")
 		{
-			myopt.read(fn_optimiser);
+			myopt.read(fn_optimiser); // true means skip_groups_and_pdf_direction from mlmodel; only read 1000 particles...
+			if (debug>0) std::cerr << "Done with reading optimiser ..." << std::endl;
 
 			// A bit ugly, but we need fn_model...
 			MetaDataTable MDopt;
@@ -198,16 +201,10 @@ public:
 
 			if (myopt.intact_ctf_first_peak)
 			{
-				// calculate average CTF
-				CTF avgctf;
-				RFLOAT def_u, def_v, voltage, cs, q0;
-				RFLOAT def_avg = 0;
-
-				myopt.mydata.MDimg.getValue(EMDL_CTF_VOLTAGE, voltage, 0);
-				myopt.mydata.MDimg.getValue(EMDL_CTF_CS, cs, 0);
-				myopt.mydata.MDimg.getValue(EMDL_CTF_Q0, q0, 0);
+				if (debug>0) std::cerr << "Doing first peak CTF correction ..." << std::endl;
 
 				// Calculate avg. defocus
+				RFLOAT def_avg = 0, def_u, def_v;
 				for (long int part_id = 0; part_id < myopt.mydata.MDimg.numberOfObjects(); part_id++)
 				{
 					myopt.mydata.MDimg.getValue(EMDL_CTF_DEFOCUSU, def_u, part_id);
@@ -217,8 +214,9 @@ public:
 				def_avg /= (2. * myopt.mydata.MDimg.numberOfObjects());
 
 				// some people may have used a too small , or even zero amplitude contrast, lets forbid that...
-				q0 = XMIPP_MAX(q0, 0.07);
-				avgctf.setValues(def_avg, def_avg, 0., voltage, cs, q0, 0., 1., 0.);
+				//q0 = XMIPP_MAX(q0, 0.07);
+				CTF avgctf;
+				avgctf.setValuesByGroup(&myopt.mydata.obsModel, 0, def_u, def_v, 0.);
 
 				// Loop over all classes in myopt.mymodel.Iref
 				for (long iref =0; iref < myopt.mymodel.Iref.size(); iref++)
@@ -234,7 +232,10 @@ public:
 		}
 
 		// Open selected_class table
-		MD_select.read(fn_select);
+		if (fn_select != "")
+		{
+			MD_select.read(fn_select);
+		}
 
 		// Read in class features from a previous run if fn_cf is provided
 		readClassFeatures();
@@ -249,6 +250,10 @@ public:
 		    job_score = textToFloat(line);
 //		    std::cout << " Read job score = " << job_score << std::endl;
 		    in.close();
+		}
+		else
+		{
+			job_score = -1.;
 		}
 
 		if (radius_ratio > 0 && radius > 0)
@@ -354,7 +359,7 @@ public:
 		RFLOAT pvalue = 4.60517;
 
 		// Randomise particle orders only the first time
-		if (iclass == 0) myopt.mydata.randomiseParticlesOrder(0, false, false);
+		//if (iclass == 0) myopt.mydata.randomiseParticlesOrder(0, false, false);
 
 		// calculate acc rot and trans for large classes (particle number > 100)
 		// for small classes, set acc rot to 5 degrees and acc trans to 8 pixels
@@ -375,6 +380,7 @@ public:
 				int group_id = myopt.mydata.getGroupId(part_id, 0);
 				RFLOAT my_pixel_size = myopt.mydata.getImagePixelSize(part_id, 0);
 				const int optics_group = myopt.mydata.getOpticsGroup(part_id, 0);
+				int my_image_size = myopt.mydata.getOpticsImageSize(optics_group);
 				bool ctf_premultiplied = myopt.mydata.obsModel.getCtfPremultiplied(optics_group);
 
 				MultidimArray<RFLOAT> Fctf;
@@ -385,19 +391,14 @@ public:
 
 					// Get parameters that change per-particle from the exp_metadata
 					CTF ctf;
-					RFLOAT def_u, def_v, def_angle, voltage, cs, q0, bfac, kfac, phase_shift;
+					RFLOAT def_u, def_v, def_angle, voltage, cs, q0;
 					myopt.mydata.MDimg.getValue(EMDL_CTF_DEFOCUSU, def_u, part_id);                 //??
 					myopt.mydata.MDimg.getValue(EMDL_CTF_DEFOCUSV, def_v, part_id);
 					myopt.mydata.MDimg.getValue(EMDL_CTF_DEFOCUS_ANGLE, def_angle, part_id);
-					myopt.mydata.MDimg.getValue(EMDL_CTF_BFACTOR, bfac, part_id);
-					myopt.mydata.MDimg.getValue(EMDL_CTF_SCALEFACTOR, kfac, part_id);
-					myopt.mydata.MDimg.getValue(EMDL_CTF_PHASESHIFT, phase_shift, part_id);
-					ctf.setValuesByGroup(&myopt.mydata.obsModel, optics_group, def_u, def_v, def_angle, bfac, kfac, phase_shift);
-
-					ctf.getFftwImage(Fctf, myopt.image_full_size[optics_group], myopt.image_full_size[optics_group], myopt.mymodel.pixel_size,
+					ctf.setValuesByGroup(&myopt.mydata.obsModel, optics_group, def_u, def_v, def_angle);
+					ctf.getFftwImage(Fctf, my_image_size, my_image_size, myopt.mymodel.pixel_size,
 							myopt.ctf_phase_flipped, myopt.only_flip_phases, myopt.intact_ctf_first_peak, true, myopt.do_ctf_padding);
 				}
-
 				// Search 2 times: ang and off
 				for (int imode = 0; imode < 2; imode++)
 				{
@@ -445,7 +446,6 @@ public:
 						if ( (imode == 0 && ang_error > 30.) || (imode == 1 && sh_error > 10.) )
 						  break;
 
-
 						MultidimArray<Complex > F1, F2;
 						Matrix2D<RFLOAT> A1, A2;
 
@@ -460,7 +460,6 @@ public:
 						myopt.mydata.MDimg.getValue(EMDL_ORIENT_TILT, tilt1, part_id);
 						myopt.mydata.MDimg.getValue(EMDL_ORIENT_PSI, psi1, part_id);
 
-
 						F1.initZeros(current_image_size, current_image_size/ 2 + 1);
 
 						// Get the FT of the first image
@@ -468,7 +467,6 @@ public:
 						A1 = myopt.mydata.obsModel.applyAnisoMag(A1, optics_group);
 						A1 = myopt.mydata.obsModel.applyScaleDifference(A1, optics_group, myopt.mymodel.ori_size, myopt.mymodel.pixel_size);
 						(myopt.mymodel.PPref[iclass]).get2DFourierTransform(F1, A1);    //?
-
 						// Apply the angular or shift error
 						RFLOAT rot2 = rot1;
 						RFLOAT tilt2 = tilt1;
@@ -770,10 +768,10 @@ public:
 			p_out() = p_mask;
 			s_out() = s_mask;
 
-			flpf_out = filtered_mask_folder+"/class"+cf.class_index+"_lowpassfiltered.mrc";
-			fp_out = filtered_mask_folder+"/class"+cf.class_index+"_p_mask.mrc";
-			fs_out = filtered_mask_folder+"/class"+cf.class_index+"_s_mask.mrc";
-			f_original = filtered_mask_folder+"/class"+cf.class_index+"_original.mrc";
+			flpf_out = filtered_mask_folder+"/class"+integerToString(cf.class_index)+"_lowpassfiltered.mrc";
+			fp_out = filtered_mask_folder+"/class"+integerToString(cf.class_index)+"_p_mask.mrc";
+			fs_out = filtered_mask_folder+"/class"+integerToString(cf.class_index)+"_s_mask.mrc";
+			f_original = filtered_mask_folder+"/class"+integerToString(cf.class_index)+"_original.mrc";
 
 			lpf_out.write(flpf_out);
 			p_out.write(fp_out);
@@ -1004,7 +1002,7 @@ public:
 		}
 		for (int iclass = start_class; iclass < end_class; iclass++)
 		{
-
+			if (debug>0) std::cerr << " dealing with class: " << iclass+1 << std::endl;
 			class_features features_this_class;
 
 			// Get class distribution and excluding empty classes
@@ -1013,10 +1011,7 @@ public:
 			{
 
 				features_this_class.name = myopt.mymodel.ref_names[iclass];
-
-				// Read in class average image by class name, set origins, and get image radius
-				features_this_class.img.read(features_this_class.name);
-				(features_this_class.img()).setXmippOrigin();
+				features_this_class.img() = myopt.mymodel.Iref[iclass];
 
 				// Get class indexes from reference image name
 				// TODO: why do we need this? remove?
@@ -1025,9 +1020,18 @@ public:
 
 				// Get number of particles in the class from data.star file
 				features_this_class.particle_nr = features_this_class.class_distribution * myopt.mydata.numberOfParticles(0);
+				if (debug > 0) std::cerr << " features_this_class.particle_nr= " << features_this_class.particle_nr << std::endl;
 
-				// Get selection label
-				MD_select.getValue(EMDL_SELECTED, features_this_class.is_selected, iclass);
+				// Get selection label (if training data)
+				if (MD_select.numberOfObjects() > 0)
+				{
+					MD_select.getValue(EMDL_SELECTED, features_this_class.is_selected, iclass);
+				}
+				else
+				{
+					features_this_class.is_selected = 1;
+				}
+				if (debug > 0) std::cerr << " features_this_class.is_selected= " << features_this_class.is_selected << std::endl;
 
 				// Get estimated resolution (regardless of whether it is already in model_classes table or not)
 				if (myopt.mymodel.estimated_resolution[iclass] > 0.)
@@ -1039,9 +1043,11 @@ public:
 					// TODO: this still relies on mlmodel!!!
 					findResolution(features_this_class);
 				}
+				if (debug > 0) std::cerr << " features_this_class.estimated_resolution= " << features_this_class.estimated_resolution << std::endl;
 
 				// Calculate particle number-weighted resolution
 				features_this_class.weighted_resolution = (1. / (features_this_class.estimated_resolution*features_this_class.estimated_resolution)) / log(features_this_class.particle_nr);
+				if (debug > 0) std::cerr << " features_this_class.weighted_resolution= " << features_this_class.weighted_resolution << std::endl;
 
 				// Calculate moments for class average image
 				RFLOAT image_radius = XSIZE(features_this_class.img())/2.;
@@ -1053,6 +1059,7 @@ public:
 					meanMomentsCalculator(features_this_class.img(), radius, circular_mask_radius, features_this_class.ring_moments);
 					meanMomentsCalculator(features_this_class.img(), 0, radius, features_this_class.inner_circle_moments);
 				}
+				if (debug > 0) std::cerr << " done with moments" << std::endl;
 
 				// Find job-wise best resolution among selected (red) classes in preparation for class score calculation called in the write_output function
 				if (features_this_class.is_selected == 1 && features_this_class.estimated_resolution < minRes)
@@ -1065,22 +1072,26 @@ public:
 					// Get class accuracy rotation and translation from model.star if present
 					features_this_class.accuracy_rotation = myopt.mymodel.acc_rot[iclass];
 					features_this_class.accuracy_translation = myopt.mymodel.acc_trans[iclass];
+					if (debug>0) std::cerr << " myopt.mymodel.acc_rot[iclass]= " << myopt.mymodel.acc_rot[iclass] << " myopt.mymodel.acc_trans[iclass]= " << myopt.mymodel.acc_trans[iclass] << std::endl;
 					if (features_this_class.accuracy_rotation > 99. || features_this_class.accuracy_translation > 99.)
 					{
 						calculateExpectedAngularErrors(iclass, features_this_class);
 					}
+					if (debug > 0) std::cerr << " done with angular errors" << std::endl;
 				}
 
 				if (!do_skip_protein_vs_solvent)
 				{
 					// Calculate protein and solvent region moments
 					proteinVsSolventFeatures(features_this_class);
+					if (debug > 0) std::cerr << " done with pvs" << std::endl;
 				}
 
 				if (!do_skip_LBP)
 				{
 					// Calculate whole image LBP and protein and solvent area LBP
 					calculatePvsLBP(features_this_class.img(), features_this_class.lbp, features_this_class.lbp_p, features_this_class.lbp_s);
+					if (debug > 0) std::cerr << " done with lbp" << std::endl;
 				}
 
 				features_all_classes.push_back(features_this_class);
