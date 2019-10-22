@@ -4841,7 +4841,7 @@ bool RelionJob::getCommandsMotionrefineJob(std::string &outputname, std::vector<
 		}
 		if (error_message != "") return false;
 
-		Node node5(outputname+"opt_params.txt", NODE_POLISH_PARAMS);
+		Node node5(outputname+"opt_params_all_groups.txt", NODE_POLISH_PARAMS);
 		outputNodes.push_back(node5);
 	}
 	else if (joboptions["do_polish"].getBoolean())
