@@ -77,6 +77,16 @@ void ObservationModel::loadSafely(
 
 		StarConverter::convert_3p0_particlesTo_3p1(oldMdt, particlesMdt, opticsMdt, mytablename, do_die_upon_error);
 		if (!do_die_upon_error && opticsMdt.numberOfObjects() == 0) return; // return an empty optics table if error was raised
+
+		if (mytablename == "" || mytablename == "discover")
+		{
+			if (particlesMdt.containsLabel(EMDL_IMAGE_NAME))
+				particlesMdt.setName("particles");
+			else if (particlesMdt.containsLabel(EMDL_MICROGRAPH_MOVIE_NAME))
+				particlesMdt.setName("movies");
+			else
+				particlesMdt.setName("micrographs");
+		}
 	}
 
 	obsModel = ObservationModel(opticsMdt, do_die_upon_error);
@@ -105,7 +115,6 @@ void ObservationModel::loadSafely(
 	}
 
 	// make sure the optics groups appear in the right order (and rename them if necessary)
-
 	if (!obsModel.opticsGroupsSorted())
 	{
 		if (verb > 0)

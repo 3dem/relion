@@ -121,7 +121,6 @@ void StarConverter::convert_3p0_particlesTo_3p1(
 	outParticles.setName(tablename);
 	outParticles.setVersion(curVer);
 
-
 	outOptics.setName("optics");
 	outOptics.setVersion(curVer);
 	outOptics.addLabel(EMDL_IMAGE_OPTICS_GROUP);
@@ -136,7 +135,7 @@ void StarConverter::convert_3p0_particlesTo_3p1(
 	{
 		outOptics.addObject();
 		outOptics.setValue(EMDL_IMAGE_OPTICS_GROUP, g + 1, g);
-		std::string mygroupname = "opticsGroup" + integerToString(g);
+		std::string mygroupname = "opticsGroup" + integerToString(g + 1);
 		outOptics.setValue(EMDL_IMAGE_OPTICS_GROUP_NAME, mygroupname, g);
 
 		for (int l = 0; l < opticsLabelCount_double; l++)
@@ -229,8 +228,10 @@ void StarConverter::convert_3p0_particlesTo_3p1(
 
 		if (nr_optics_groups_found != nr_optics_groups)
 		{
-			std::cerr << "Warning: not all image files could be found.\n";
-			std::cerr << "         Image sizes and dimensionalities will be missing from the star file.\n";
+			std::cerr << "Warning: Not all image files could be found.\n";
+			std::cerr << "  Image sizes and dimensionalities will be missing from the star file.\n";
+			std::cerr << "  Later steps (e.g. re-extraction, CtfRefine) can fail!!\n";
+			std::cerr << "  Repeat this job after fixing the image paths.\n";
 
 			//REPORT_ERROR("BUG: something went wrong with finding the optics groups...");
 		}

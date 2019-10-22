@@ -26,7 +26,6 @@
 
 void CtffindRunner::read(int argc, char **argv, int rank)
 {
-
 	parser.setCommandLine(argc, argv);
 	int gen_section = parser.addSection("General options");
 	int ctf_section = parser.addSection("CTF estimation");
@@ -87,7 +86,6 @@ void CtffindRunner::read(int argc, char **argv, int rank)
 	// Check for errors in the command-line option
 	if (parser.checkForErrors())
 		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
-
 }
 
 void CtffindRunner::usage()
@@ -416,12 +414,10 @@ void CtffindRunner::run()
 	}
 
 	joinCtffindResults();
-
 }
 
 void CtffindRunner::joinCtffindResults()
 {
-
 	long int barstep = XMIPP_MAX(1, fn_micrographs_all.size() / 60);
 	if (verb > 0)
 	{
@@ -528,13 +524,10 @@ void CtffindRunner::joinCtffindResults()
 		if (exists(fn_gctf_junk))
 			remove(fn_gctf_junk.c_str());
 	}
-
-
 }
 
 void CtffindRunner::executeGctf(long int imic, std::vector<std::string> &allmicnames, bool is_last, int rank)
 {
-
 	// Always add the new micrograph to the TODO list
 	Image<double> Itmp;
 	FileName outputfile = getOutputFileWithNewUniqueDate(fn_micrographs_ctf[imic], fn_out);
@@ -611,7 +604,6 @@ void CtffindRunner::executeGctf(long int imic, std::vector<std::string> &allmicn
 
 void CtffindRunner::executeCtffind3(long int imic)
 {
-
 	FileName fn_mic = getOutputFileWithNewUniqueDate(fn_micrographs_ctf[imic], fn_out);
 	FileName fn_root = fn_mic.withoutExtension();
 	FileName fn_script = fn_root + "_ctffind3.com";
@@ -645,7 +637,6 @@ void CtffindRunner::executeCtffind3(long int imic)
 	}
 	else
 		fn_mic_win = fn_mic;
-
 
 	std::string ctffind4_options = (is_ctffind4) ? " --omp-num-threads " + integerToString(nr_threads) + " --old-school-input-ctffind4 " : "";
 
@@ -690,12 +681,10 @@ void CtffindRunner::executeCtffind3(long int imic)
 		if( remove( fn_mic_win.c_str() ) != 0 )
 			std::cerr << "WARNING: there was an error deleting windowed micrograph file " << fn_mic_win << std::endl;
 	}
-
 }
 
 void CtffindRunner::executeCtffind4(long int imic)
 {
-
 	FileName fn_mic = getOutputFileWithNewUniqueDate(fn_micrographs_ctf[imic], fn_out);
 	FileName fn_root = fn_mic.withoutExtension();
 	FileName fn_script = fn_root + "_ctffind4.com";
@@ -729,7 +718,6 @@ void CtffindRunner::executeCtffind4(long int imic)
 	}
 	else
 		fn_mic_win = fn_mic;
-
 
 	int ctf_boxsize = box_size;
 	RFLOAT ctf_angpix = angpix;
@@ -814,14 +802,12 @@ void CtffindRunner::executeCtffind4(long int imic)
 		if( remove( fn_mic_win.c_str() ) != 0 )
 			std::cerr << "WARNING: there was an error deleting windowed micrograph file " << fn_mic_win << std::endl;
 	}
-
 }
 
 bool CtffindRunner::getCtffindResults(FileName fn_microot, RFLOAT &defU, RFLOAT &defV, RFLOAT &defAng, RFLOAT &CC,
 		RFLOAT &HT, RFLOAT &CS, RFLOAT &AmpCnst, RFLOAT &XMAG, RFLOAT &DStep,
 		RFLOAT &maxres, RFLOAT &valscore, RFLOAT &phaseshift, bool do_warn)
 {
-
 	if (is_ctffind4)
 	{
 		return getCtffind4Results(fn_microot, defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep,
@@ -832,15 +818,12 @@ bool CtffindRunner::getCtffindResults(FileName fn_microot, RFLOAT &defU, RFLOAT 
 		return getCtffind3Results(fn_microot, defU, defV, defAng, CC, HT, CS, AmpCnst, XMAG, DStep,
 		                          maxres, phaseshift, valscore, do_warn);
 	}
-
-
 }
 
 bool CtffindRunner::getCtffind3Results(FileName fn_microot, RFLOAT &defU, RFLOAT &defV, RFLOAT &defAng, RFLOAT &CC,
 		RFLOAT &HT, RFLOAT &CS, RFLOAT &AmpCnst, RFLOAT &XMAG, RFLOAT &DStep,
 		RFLOAT &maxres, RFLOAT &phaseshift, RFLOAT &valscore, bool do_warn)
 {
-
 	FileName fn_root = getOutputFileWithNewUniqueDate(fn_microot, fn_out);
 	FileName fn_log = fn_root + "_ctffind3.log";
 	if (do_use_gctf)
@@ -931,7 +914,6 @@ bool CtffindRunner::getCtffind3Results(FileName fn_microot, RFLOAT &defU, RFLOAT
 	in.close();
 
 	return Final_is_found;
-
 }
 
 
@@ -939,7 +921,6 @@ bool CtffindRunner::getCtffind4Results(FileName fn_microot, RFLOAT &defU, RFLOAT
 		RFLOAT &HT, RFLOAT &CS, RFLOAT &AmpCnst, RFLOAT &XMAG, RFLOAT &DStep,
 		RFLOAT &maxres, RFLOAT &phaseshift, bool do_warn)
 {
-
 	FileName fn_root = getOutputFileWithNewUniqueDate(fn_microot, fn_out);
 	FileName fn_log = fn_root + "_ctffind4.log";
 	std::ifstream in(fn_log.data(), std::ios_base::in);
@@ -1025,5 +1006,3 @@ bool CtffindRunner::getCtffind4Results(FileName fn_microot, RFLOAT &defU, RFLOAT
 
 	return Final_is_found;
 }
-
-
