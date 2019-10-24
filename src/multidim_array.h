@@ -2469,7 +2469,7 @@ public:
      *
      * As RFLOATs.
      */
-    void computeDoubleMinMax(RFLOAT& minval, RFLOAT& maxval) const
+    void computeDoubleMinMax(RFLOAT& minval, RFLOAT& maxval, MultidimArray<int> *mask = NULL) const
     {
         if (NZYXSIZE(*this) <= 0)
             return;
@@ -2480,11 +2480,14 @@ public:
         long int n;
         FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(*this,n,ptr)
         {
-            T val=*ptr;
-            if (val < minval)
-                minval = static_cast< RFLOAT >(val);
-            else if (val > maxval)
-                maxval = static_cast< RFLOAT >(val);
+        	if ((mask == NULL) || (DIRECT_MULTIDIM_ELEM(*mask,n) > 0) )
+        	{
+				T val=*ptr;
+				if (val < minval)
+					minval = static_cast< RFLOAT >(val);
+				else if (val > maxval)
+					maxval = static_cast< RFLOAT >(val);
+        	}
         }
     }
 
@@ -3992,6 +3995,54 @@ public:
         FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(*this,n,ptr)
         *ptr = static_cast< T >(log10(static_cast< RFLOAT >(*ptr)));
     }
+
+    /** Calculate entropy */
+    double entropy(MultidimArray<int> *mask = NULL)
+    {
+
+    	if (mask != NULL)
+    		if (!sameShape(*mask)) REPORT_ERROR("ERROR: mask is of incorrect size");
+
+    	double minval, maxval;
+    	computeDoubleMinMax(minval, maxval, mask);
+    	double range = maxval - minval;
+
+    	if (range < 1e-20)
+    		return 0.;
+
+    	double hist[128] = {};
+        double sum = 0.;
+        T* ptr=NULL;
+        long int n;
+        FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(*this,n,ptr)
+    	{
+    		if (mask == NULL || DIRECT_MULTIDIM_ELEM(*mask, n) > 0)
+    		{
+				int norm = floor(((static_cast<double>(DIRECT_MULTIDIM_ELEM(*this, n)) - minval) * 127.0) / range);
+				hist[norm]+= 1.;
+				sum += 1.;
+    		}
+    	}
+
+        // Make minimum histogram value one to avoid log(0), and calculate total sum
+        for (int i = 0; i < 128; i++)
+        	if (hist[i] < 1.)
+        	{
+        		sum += 1.;
+        		hist[i] += 1.;
+        	}
+
+        // Then calculate entropy
+        double entropy = 0;
+        for (int i = 0; i < 128; i++)
+        {
+        	double p = hist[i] / sum;
+        	entropy -= p * log2(p);
+        }
+        return entropy;
+
+    }
+
 
     /** Reverse matrix values over X axis, keep in this object.
      *
