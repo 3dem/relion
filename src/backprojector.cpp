@@ -1201,6 +1201,7 @@ void BackProjector::externalReconstruct(MultidimArray<RFLOAT> &vol_out,
                                         const MultidimArray<RFLOAT> &fsc_halves,
                                         const MultidimArray<RFLOAT> &tau2,
                                         RFLOAT tau2_fudge,
+			                RFLOAT sgd_stepsize,
                                         int verb)
 {
 
@@ -1243,6 +1244,7 @@ void BackProjector::externalReconstruct(MultidimArray<RFLOAT> &vol_out,
 	MDlist.setValue(EMDL_MLMODEL_DIMENSIONALITY, ref_dim);
 	MDlist.setValue(EMDL_MLMODEL_ORIGINAL_SIZE, ori_size);
 	MDlist.setValue(EMDL_MLMODEL_CURRENT_SIZE, 2*r_max);
+	MDlist.setValue(EMDL_OPTIMISER_SGD_STEPSIZE, sgd_stepsize);
 
 	MDtau.setName("external_reconstruct_tau2");
 	for (int ii = 0; ii < XSIZE(tau2); ii++)
@@ -1771,6 +1773,95 @@ void BackProjector::reconstruct(MultidimArray<RFLOAT> &vol_out,
 		}
 	}
 
+}
+
+void BackProjector::sgd_step(
+		MultidimArray<Complex > &Fprev,
+		MultidimArray<Complex > &Fgrad)
+{
+	const int max_r2 = ROUND(r_max * padding_factor) * ROUND(r_max * padding_factor);
+
+	MultidimArray<RFLOAT> Fweight;
+	Fweight.reshape(Fprev);
+	Projector::decenter(weight, Fweight, max_r2);
+
+	MultidimArray<Complex> Fdata;
+	Fdata.reshape(Fprev);
+	Projector::decenter(data, Fdata, max_r2);
+
+	for (int i = 0; i < Fprev.zyxdim; i ++)
+	{
+		Fprev.data[i] *= Fprev.zdim*Fprev.zdim*Fprev.zdim;
+		Fdata.data[i] *= Fprev.zdim*Fprev.zdim;
+	}
+
+	Fgrad.reshape(Fprev);
+	Fgrad.initZeros();
+
+	MultidimArray<RFLOAT> tau2;
+	tau2.initZeros(ori_size / 2 + 1);
+	MultidimArray<RFLOAT> counter(tau2), tau2_decay(tau2);
+	counter.initZeros();
+	tau2_decay.initZeros();
+
+	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fprev)
+	{
+		int r2 = kp*kp + ip*ip + jp*jp;
+		if (r2 <= max_r2)
+		{
+			int r = ROUND( sqrt((RFLOAT)r2) );
+			DIRECT_A1D_ELEM(tau2, r) += norm(DIRECT_A3D_ELEM(Fprev, k, i, j)) / 2.;
+			DIRECT_A1D_ELEM(counter, r) += 1;
+		}
+	}
+
+	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(tau2)
+	{
+		if (DIRECT_A1D_ELEM(counter, i) < 1.)
+			DIRECT_A1D_ELEM(tau2, i) = 0.;
+		else
+			DIRECT_A1D_ELEM(tau2, i) /= DIRECT_A1D_ELEM(counter, i);
+	}
+
+	RFLOAT m = DIRECT_A1D_ELEM(tau2, 0);
+	DIRECT_A1D_ELEM(tau2_decay, 0) = m;
+	for (long int i=1; i<tau2.xdim; i++)
+	{
+		m *= 0.9;
+		if (DIRECT_A1D_ELEM(tau2, i) == 0)
+			m = XMIPP_MIN(m, 1.0e-15);
+		else
+			m = XMIPP_MIN(m, DIRECT_A1D_ELEM(tau2, i));
+		DIRECT_A1D_ELEM(tau2_decay, i) = m;
+	}
+
+	std::cout << tau2 << std::endl;
+	std::cout << tau2_decay << std::endl;
+
+	FOR_ALL_ELEMENTS_IN_FFTW_TRANSFORM(Fweight)
+	{
+		int r2 = kp*kp + ip*ip + jp*jp;
+		if (r2 <= max_r2)
+		{
+			int r = ROUND( sqrt((RFLOAT)r2) );
+			if (DIRECT_A1D_ELEM(tau2_decay, r) > 1.0e-20)
+			{
+				RFLOAT invtau2 = 1. / DIRECT_A1D_ELEM(tau2_decay, r);
+
+				DIRECT_A3D_ELEM(Fgrad, k, i, j) =
+						( DIRECT_A3D_ELEM(Fdata, k, i, j) - DIRECT_A3D_ELEM(Fprev, k, i, j) * invtau2 ) /
+						( DIRECT_A3D_ELEM(Fweight, k, i, j) + invtau2 );
+			}
+			else //If tau2 is too small we take the limit of our gradient expression
+				DIRECT_A3D_ELEM(Fgrad, k, i, j) -= DIRECT_A3D_ELEM(Fprev, k, i, j);
+		}
+	}
+
+	for (int i = 0; i < Fprev.zyxdim; i ++)
+	{
+		Fprev.data[i] /= Fprev.zdim*Fprev.zdim*Fprev.zdim;
+		Fgrad.data[i] /= Fprev.zdim*Fprev.zdim*Fprev.zdim;
+	}
 }
 
 void BackProjector::symmetrise(int nr_helical_asu, RFLOAT helical_twist, RFLOAT helical_rise, int threads)

@@ -291,6 +291,7 @@ public:
 	                         const MultidimArray<RFLOAT> &fsc_halves,
 	                         const MultidimArray<RFLOAT> &tau2,
 	                         RFLOAT tau2_fudge = 1.,
+	                         RFLOAT sgd_stepsize = 0.5,
 	                         int verb = 0);
 
 	/* Get the 3D reconstruction
@@ -306,6 +307,9 @@ public:
 	                 int minres_map = -1,
 	                 bool printTimes= false,
 	                 Image<RFLOAT>* weight_out = 0);
+
+	void sgd_step(MultidimArray<Complex > &Fprev,
+		      MultidimArray<Complex > &Fgrad);
 
 	/*	Enforce Hermitian symmetry, apply helical symmetry as well as point-group symmetry
 	 */

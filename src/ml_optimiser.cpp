@@ -630,9 +630,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	// SGD stuff
 	int sgd_section = parser.addSection("Stochastic Gradient Descent");
 	do_sgd = parser.checkOption("--sgd", "Perform stochastic gradient descent instead of default expectation-maximization");
-	do_avoid_sgd = parser.checkOption("--stochastic_em", "Perform stochastic EM instead of SGD to avoid patent problems for initial model generation by commercial users");
 	// Stochastic EM is implemented as a variant of SGD, though it is really a different algorithm!
-	if (do_avoid_sgd) do_sgd = true;
 	sgd_ini_iter = textToInteger(parser.getOption("--sgd_ini_iter", "Number of initial SGD iterations", "50"));
 	sgd_fin_iter = textToInteger(parser.getOption("--sgd_fin_iter", "Number of final SGD iterations", "50"));
 	sgd_inbetween_iter = textToInteger(parser.getOption("--sgd_inbetween_iter", "Number of SGD iterations between the initial and final ones", "200"));
@@ -872,8 +870,6 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 	// New SGD (13Feb2018)
 	if (!MD.getValue(EMDL_OPTIMISER_DO_SGD, do_sgd))
 		do_sgd = false;
-	if (!MD.getValue(EMDL_OPTIMISER_DO_STOCHASTIC_EM, do_avoid_sgd))
-		do_avoid_sgd = false;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_INI_ITER, sgd_ini_iter))
 		sgd_ini_iter = 50;
 	if (!MD.getValue(EMDL_OPTIMISER_SGD_FIN_ITER, sgd_fin_iter))
@@ -1063,7 +1059,6 @@ void MlOptimiser::write(bool do_write_sampling, bool do_write_data, bool do_writ
 		MD.setValue(EMDL_OPTIMISER_FAST_SUBSETS, do_fast_subsets);
 		MD.setValue(EMDL_OPTIMISER_DO_EXTERNAL_RECONSTRUCT, do_external_reconstruct);
 		MD.setValue(EMDL_OPTIMISER_DO_SGD, do_sgd);
-		MD.setValue(EMDL_OPTIMISER_DO_STOCHASTIC_EM, do_avoid_sgd);
 		MD.setValue(EMDL_OPTIMISER_SGD_INI_ITER, sgd_ini_iter);
 		MD.setValue(EMDL_OPTIMISER_SGD_FIN_ITER, sgd_fin_iter);
 		MD.setValue(EMDL_OPTIMISER_SGD_INBETWEEN_ITER, sgd_inbetween_iter);
@@ -1946,16 +1941,6 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 	if (do_sgd)
 	{
-
-#ifndef ALLOW_CTF_IN_SGD
-		do_ctf_correction = false;
-		if (verb > 0)
-		{
-			std::cerr << " + Skipping CTF-modulation in SGD, as mentioned in Claim 1 of patent US10,282,513B2." << std::endl;
-			std::cerr << " + Note that the output map will not be CTF-corrrected, and this should be specified for subsequent refinement." << std::endl;
-		}
-#endif
-
 		sgd_inires_pix = mymodel.getPixelFromResolution(1./sgd_ini_resol);
 		sgd_finres_pix = mymodel.getPixelFromResolution(1./sgd_fin_resol);
 		// for continuation jobs (iter>0): could do some more iterations as specified by nr_iter
@@ -2868,8 +2853,9 @@ void MlOptimiser::expectation()
 	{
 		if (do_sgd)
 		{
-			if(do_avoid_sgd) std::cout << " Stochastic Expectation Maximisation iteration " << iter << " of " << nr_iter;
-			else std::cout << " Stochastic Gradient Descent iteration " << iter << " of " << nr_iter;
+			std::cout << " Stochastic Gradient Descent iteration " << iter << " of " << nr_iter;
+			if (my_nr_particles < mydata.numberOfParticles())
+				std::cout << " (with " << my_nr_particles << " particles)";
 		}
 		else
 		{
@@ -3082,16 +3068,6 @@ void MlOptimiser::expectationSetup()
 
 	// Initialise all weighted sums to zero
 	wsum_model.initZeros();
-
-	// If we're doing SGD with gradual decrease of sigma2_fudge: calculate current fudge-factor here
-	if (do_sgd && sgd_sigma2fudge_halflife > 0)
-	{
-		RFLOAT NN = (RFLOAT)(iter * subset_size);
-		RFLOAT f = NN / (NN + sgd_sigma2fudge_halflife);
-		// new sigma2_fudge = f * 1.0  +  (1 - f) * sgd_ini_sigma2fudge
-		sigma2_fudge = f + (1. - f) * sgd_sigma2fudge_ini;
-	}
-
 }
 
 void MlOptimiser::expectationSetupCheckMemory(int myverb)
@@ -4033,8 +4009,6 @@ void MlOptimiser::maximization()
 			{
 				MultidimArray<RFLOAT> Iref_old;
 
-				if (do_sgd) Iref_old = mymodel.Iref[iclass];
-
 				(wsum_model.BPref[iclass]).updateSSNRarrays(mymodel.tau2_fudge_factor,
 						mymodel.tau2_class[iclass],
 						mymodel.sigma2_class[iclass],
@@ -4055,58 +4029,37 @@ void MlOptimiser::maximization()
 							mymodel.fsc_halves_class[iclass],
 							mymodel.tau2_class[iclass],
 							mymodel.tau2_fudge_factor,
+							sgd_stepsize,
 							1); // verbose
 				}
 				else
 				{
-					(wsum_model.BPref[iclass]).reconstruct(mymodel.Iref[iclass],
-							gridding_nr_iter,
-							do_map,
-							mymodel.tau2_class[iclass],
-							mymodel.tau2_fudge_factor,
-							wsum_model.pdf_class[iclass],
-							minres_map,
-							(iclass==0));
-				}
-
-				if(do_sgd)
-				{
-					// Use stochastic expectation maximisation, instead of SGD.
-					if(do_avoid_sgd)
+					if(do_sgd)
 					{
-						if (iter < sgd_ini_iter)
-						{
-							FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.Iref[iclass])
-							{
-								DIRECT_MULTIDIM_ELEM(mymodel.Iref[iclass], n) = XMIPP_MAX(0., DIRECT_MULTIDIM_ELEM(mymodel.Iref[iclass], n));
-							}
-						}
-						mymodel.Iref[iclass] = mymodel.Iref[iclass] - Iref_old;
+						FourierTransformer transformer;
+						MultidimArray<Complex > Fprev, Fgrad;
+
+						CenterFFT(mymodel.Iref[iclass], true);
+						transformer.FourierTransform(mymodel.Iref[iclass], Fprev);
+						windowFourierTransform(Fprev, wsum_model.BPref[iclass].data.zdim);
+
+						//Should we normalise with pdf_class?
+						wsum_model.BPref[iclass].sgd_step(Fprev, Fgrad);
+						Fprev += sgd_stepsize * Fgrad;
+
+						windowFourierTransform(Fprev, mymodel.ori_size);
+						transformer.inverseFourierTransform(Fprev, mymodel.Iref[iclass]);
+						CenterFFT(mymodel.Iref[iclass], false);
 					}
-
-					// Now update formula: dV_kl^(n) = (mu) * dV_kl^(n-1) + (1-mu)*step_size*G_kl^(n)
-					// where G_kl^(n) is now in mymodel.Iref[iclass]!!!
-					FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.Igrad[iclass])
-						DIRECT_MULTIDIM_ELEM(mymodel.Igrad[iclass], n) = mu * DIRECT_MULTIDIM_ELEM(mymodel.Igrad[iclass], n) +
-						(1. - mu) * sgd_stepsize * DIRECT_MULTIDIM_ELEM(mymodel.Iref[iclass], n);
-
-					// update formula: V_kl^(n+1) = V_kl^(n) + dV_kl^(n)
-					mymodel.Iref[iclass] = Iref_old + mymodel.Igrad[iclass];
-
-//#define DEBUG_SGD
-#ifdef DEBUG_SGD
-					FileName fn_tmp="grad_class"+integerToString(iclass)+".spi";
-					Image<RFLOAT> It;
-					It()=mymodel.Igrad[iclass];
-					It.write(fn_tmp);
-					fn_tmp="ref_class"+integerToString(iclass)+".spi";
-					It()=mymodel.Iref[iclass];
-					It.write(fn_tmp);
-#endif
-					// Enforce positivity?
-					// Low-pass filter according to current resolution??
-					// Some sort of regularisation may be necessary....?
-
+					else
+						(wsum_model.BPref[iclass]).reconstruct(mymodel.Iref[iclass],
+								gridding_nr_iter,
+								do_map,
+								mymodel.tau2_class[iclass],
+								mymodel.tau2_fudge_factor,
+								wsum_model.pdf_class[iclass],
+								minres_map,
+								(iclass==0));
 				}
 			}
 		}
@@ -4157,25 +4110,25 @@ void MlOptimiser::maximizationOtherParameters()
 
 
 	// Annealing of multiple-references in SGD
-	if (do_sgd && !do_sgd_skip_anneal && mymodel.nr_classes > 1 && iter < sgd_ini_iter + sgd_inbetween_iter)
-	{
-		MultidimArray<RFLOAT> Iavg;
-		Iavg.initZeros(mymodel.Iref[0]);
-		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
-			Iavg += mymodel.Iref[iclass];
-		Iavg /= (RFLOAT)mymodel.nr_classes;
-
-		int diffiter = iter - sgd_ini_iter;
-		RFLOAT frac = RFLOAT(iter - sgd_ini_iter)/RFLOAT(sgd_inbetween_iter);
-		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
-		{
-			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iavg)
-			{
-				DIRECT_MULTIDIM_ELEM(mymodel.Iref[iclass], n) *= frac;
-				DIRECT_MULTIDIM_ELEM(mymodel.Iref[iclass], n) += (1.-frac)*DIRECT_MULTIDIM_ELEM(Iavg, n);
-			}
-		}
-	}
+//	if (do_sgd && !do_sgd_skip_anneal && mymodel.nr_classes > 1 && iter < sgd_ini_iter + sgd_inbetween_iter)
+//	{
+//		MultidimArray<RFLOAT> Iavg;
+//		Iavg.initZeros(mymodel.Iref[0]);
+//		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
+//			Iavg += mymodel.Iref[iclass];
+//		Iavg /= (RFLOAT)mymodel.nr_classes;
+//
+//		int diffiter = iter - sgd_ini_iter;
+//		RFLOAT frac = RFLOAT(iter - sgd_ini_iter)/RFLOAT(sgd_inbetween_iter);
+//		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
+//		{
+//			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Iavg)
+//			{
+//				DIRECT_MULTIDIM_ELEM(mymodel.Iref[iclass], n) *= frac;
+//				DIRECT_MULTIDIM_ELEM(mymodel.Iref[iclass], n) += (1.-frac)*DIRECT_MULTIDIM_ELEM(Iavg, n);
+//			}
+//		}
+//	}
 
 	// Update average norm_correction, don't update norm corrections anymore for multi-body refinements!
 	if (do_norm_correction  && mymodel.nr_bodies == 1)
@@ -7230,7 +7183,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 		Fimg_otfshift.resize(Frefctf);
 		Fimg_otfshift_nomask.resize(Frefctf);
 	}
-	if (do_sgd && ! do_avoid_sgd)
+	if (do_sgd)
 	{
 		Fimg_store_sgd.resize(Frefctf);
 	}
@@ -7640,7 +7593,7 @@ void MlOptimiser::storeWeightedSums(long int part_id, int ibody,
 #endif
 
 											Complex *Fimg_store;
-											if (do_sgd && !do_avoid_sgd)
+											if (do_sgd)
 											{
 												FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(Frefctf)
 												{
