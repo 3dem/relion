@@ -2517,12 +2517,12 @@ public:
      * The returned value is always RFLOAT, independently of the type of the
      * array.
      */
-    RFLOAT computeStddev() const
+    void computeAvgStddev(RFLOAT &avg, RFLOAT &stddev) const
     {
         if (NZYXSIZE(*this) <= 1)
-            return 0;
+            return;
 
-        RFLOAT avg = 0, stddev = 0;
+        avg = 0, stddev = 0;
 
         T* ptr=NULL;
         long int n;
@@ -2579,7 +2579,7 @@ public:
             stddev = 0;
 #endif
 
-        return stddev;
+        return;
     }
 
     /** Compute statistics.

@@ -1,21 +1,27 @@
-/*
- * class2D_features.cpp
+/***************************************************************************
  *
- *  Created on: 20 Oct 2019
- *      Author: ldong
- */
-
-/*
- * fourier_features.cpp
+ * Author: "Liyi Dong & Sjors H.W. Scheres"
+ * MRC Laboratory of Molecular Biology
  *
- *  Created on: 24 Jul 2018
- *      Author: ldong
- */
-/*
- * calculatePvsLBP() comes from Xmipp source code,
- * https://github.com/I2PC/xmipp/blob/devel/libraries/reconstruction/classify_extract_features.cpp
- * following is the license.
- */
+ * The Haralick feature code was adapted from code written by Antonio Augusto Abello
+ * as hosted on: https://github.com/Abello966
+ *
+ * The LBP code was adapted from Scipion, written by Tomas Majtner, see license below
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * This complete copyright notice must be included in any revised version of the
+ * source code. Additional authorship citations may be added, but existing
+ * author citations must be preserved.
+ ***************************************************************************/
 /***************************************************************************
  *
  * Authors:    Tomas Majtner            tmajtner@cnb.csic.es (2017)
@@ -77,8 +83,9 @@ public:
     RFLOAT class_distribution, accuracy_rotation, accuracy_translation, estimated_resolution, particle_nr;
     RFLOAT class_score, edge_signal, scattered_signal, weighted_resolution;
     RFLOAT lowpass_filtered_img_avg, lowpass_filtered_img_stddev, lowpass_filtered_img_minval, lowpass_filtered_img_maxval;
-    std::vector<RFLOAT> resolutions, lbp, lbp_p, lbp_s;
+    std::vector<RFLOAT> resolutions, lbp, lbp_p, lbp_s, haralick_p, haralick_s;
     moments circular_mask_moments, ring_moments, inner_circle_moments, fft_moments, protein_moments, solvent_moments;
+    double total_entropy, protein_entropy, solvent_entropy;
 
     // Job-wise features
     RFLOAT PixelSize, SigmaOffSets, AveragePmax, ParticleDiameter, HighresLimitExpectation, job_score;
@@ -109,10 +116,265 @@ public:
 			lowpass_filtered_img_avg(0),
 			lowpass_filtered_img_stddev(0),
 			lowpass_filtered_img_minval(0),
-			lowpass_filtered_img_maxval(0)
+			lowpass_filtered_img_maxval(0),
+			total_entropy(0.),
+			protein_entropy(0.),
+			solvent_entropy(0.)
     {
     }
 };
+
+#define EPS 1e-6
+class HaralickExtractor
+{
+    private:
+        MultidimArray<double> matcooc; //GLCM
+        MultidimArray<double> margprobx;
+        MultidimArray<double> margproby;
+        MultidimArray<double> probsum; //sum probability
+        MultidimArray<double> probdiff; //diff probability
+        double hx, hy; //entropy of margprobx and y
+        double meanx, meany, stddevx, stddevy;
+        bool initial=false; //marks if above variables are set
+
+        double Entropy(MultidimArray<double> arr)
+        {
+            double result = 0.0;
+            FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(arr)
+            {
+            	result += DIRECT_MULTIDIM_ELEM(arr, n) * std::log(DIRECT_MULTIDIM_ELEM(arr, n) + EPS);
+            }
+            return -1 * result;
+        }
+
+        /*calculates probsum, probdiff, margprobx and y at once*/
+        void fast_init()
+        {
+            if (NZYXSIZE(matcooc) == 0) return;
+
+            margprobx.initZeros(XSIZE(matcooc));
+            margproby.initZeros(YSIZE(matcooc));
+            probsum.initZeros(2*XSIZE(matcooc));
+            probdiff.initZeros(XSIZE(matcooc));
+
+            double local;
+            FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(matcooc)
+            {
+            	local = DIRECT_A2D_ELEM(matcooc, i, j);
+            	DIRECT_A1D_ELEM(margprobx, j) += local;
+            	DIRECT_A1D_ELEM(margproby, i) += local;
+            	DIRECT_A1D_ELEM(probsum, i + j) += local;
+            	DIRECT_A1D_ELEM(probdiff, abs(i - j)) += local;
+
+            }
+            hx = Entropy(margprobx);
+            hy = Entropy(margproby);
+            margprobx.computeAvgStddev(meanx, stddevx);
+            margproby.computeAvgStddev(meany, stddevy);
+            //Everything set up
+            initial = true;
+        }
+
+        /*0 => energy, 1 => entropy, 2=> inverse difference */
+        /*3 => correlation, 4=> info measure 1, 5 => info measure 2*/
+        std::vector<double> cooc_feats()
+        {
+            std::vector<double> ans(7, 0.0);
+            double hxy1 = 0.0;
+            double hxy2 = 0.0;
+            double local, xy;
+            FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(matcooc)
+            {
+            	local = DIRECT_A2D_ELEM(matcooc, i, j);
+                ans[0] += local * local;
+                ans[1] -= local * log(local + EPS);
+                ans[2] += local * (1 / (1 + (i - j) * (i - j)));
+                ans[3] += (i * j * local) - (meanx * meany);
+                ans[6] += (i-meany)*(j-meanx)*local;
+                xy = DIRECT_A1D_ELEM(margprobx, j) * DIRECT_A1D_ELEM(margproby, i);
+                hxy1 -= local * log(xy + EPS);
+                hxy2 -= xy * log(xy + EPS);
+            }
+
+            ans[3] = ans[3] / (stddevx * stddevy);
+            ans[4] = (ans[1] - hxy1) / std::max(hx, hy);
+            //std::cerr << " hxy1= " << hxy1 << " hxy2= " << hxy2 << " ans[1]= " << ans[1] << "  exp(-2 *(hxy2 - ans[1]))= " <<  exp(-2 *(hxy2 - ans[1])) << " arg= " << -2 *(hxy2 - ans[1]) << std::endl;
+            double arg = -2. * (hxy1 - ans[1]);
+            ans[5] = (arg < 0. && arg > -50.) ? sqrt(1 - exp(arg)) : 0.;
+            return ans;
+        }
+
+        /*0 => contrast, 1 => diff entropy, 2 => diffvariance */
+        /*3 => sum average, 4 => sum entropy, 5 => sum variance */
+        std::vector<double> margprobs_feats()
+        {
+        	std::vector<double> ans(6, 0.0);
+        	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(probdiff)
+            {
+                ans[0] += i * i * DIRECT_A1D_ELEM(probdiff, i);
+                ans[1] += -1 * DIRECT_A1D_ELEM(probdiff, i) * log(DIRECT_A1D_ELEM(probdiff, i) + EPS);
+            }
+        	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(probdiff)
+        	{
+                ans[2] += (i - ans[1]) * (i - ans[1]) * DIRECT_A1D_ELEM(probdiff, i);
+        	}
+
+        	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(probsum)
+        	{
+                ans[3] += i *  DIRECT_A1D_ELEM(probsum, i);
+                ans[4] += -1 * DIRECT_A1D_ELEM(probsum, i) * log(DIRECT_A1D_ELEM(probsum, i) + EPS);
+            }
+        	FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY1D(probsum)
+        	{
+                ans[5] += (i - ans[4]) * (i - ans[4]) * DIRECT_A1D_ELEM(probsum, i);
+        	}
+            return ans;
+        }
+
+
+
+    public:
+        std::vector<double> fast_feats(bool verbose=false)
+		{
+            std::vector<double> result(13, 0.0);
+            if (NZYXSIZE(matcooc) ==0) return result;
+            if (!initial) fast_init();
+            std::vector<double> margfeats = margprobs_feats();
+            std::vector<double> coocfeats = cooc_feats();
+            for (int i = 0; i < 7; i++)
+            {
+                result[i] = coocfeats[i];
+            }
+            for (int i = 0; i < 6; i++)
+            {
+            	result[7 + i] = margfeats[i];
+            }
+            return result;
+        }
+
+        MultidimArray<RFLOAT> MatCooc(MultidimArray<int> img, int N, int deltax, int deltay, MultidimArray<int> *mask=NULL)
+        {
+            int target, next;
+            int newi, newj;
+            MultidimArray<RFLOAT> ans;
+            ans.initZeros(N + 1, N + 1);
+            RFLOAT counts = 0.;
+            FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(img)
+            {
+
+            	if (mask == NULL || DIRECT_A2D_ELEM(*mask, i, j) > 0)
+            	{
+					newi = i + deltay;
+					newj = j + deltax;
+
+					// Stay inside the image
+					if (newi < YSIZE(img) && newj < XSIZE(img) && newj >= 0 && newi >= 0 &&
+							(mask == NULL || DIRECT_A2D_ELEM(*mask, i, j) > 0) 	)
+					{
+						target = DIRECT_A2D_ELEM(img, i, j);
+						next  = DIRECT_A2D_ELEM(img, newi, newj);
+						DIRECT_A2D_ELEM(ans, target, next) += 1.0;
+						// this is not in original code from Abello, but that's how I understand it should be done...
+						DIRECT_A2D_ELEM(ans, next, target) += 1.0;
+						counts += 2.;
+					}
+            	}
+            }
+
+            ans /= counts;
+
+            return ans;
+        }
+
+        MultidimArray<RFLOAT> MatCoocAdd(MultidimArray<int> img, int N, std::vector<int> deltax, std::vector<int> deltay, MultidimArray<int> *mask=NULL)
+        {
+        	MultidimArray<RFLOAT> ans, nextans;
+        	// This code is different from the original one! made also loop over deltay, and excluded (0,0) calculation
+        	ans.initZeros(N + 1, N + 1);
+        	for (int i = 0; i < deltay.size(); i++)
+            {
+                for (int j = 0; j < deltax.size(); j++)
+                {
+                   	/*
+                    	x o o
+            			x o o
+            			x o o
+            			o o o
+            			o o o
+            		*/
+                	if ( !(j==0 && i <= 0) )
+                	{
+                		nextans = MatCooc(img, N, deltax[j], deltay[i], mask);
+                		ans += nextans;
+                	}
+                }
+            }
+            return ans;
+        }
+
+        std::vector<double> getFeaturesFromImage(MultidimArray<RFLOAT> img, MultidimArray<int> *mask=NULL, bool verbose=false)
+        {
+        	std::vector<double> ans;
+        	ans.resize(13, 0.);
+
+
+        	/*
+        	x o o
+			x o o
+			x o o
+			o o o
+			o o o
+			*/
+        	std::vector<int> deltax{0,1,2};
+        	std::vector<int> deltay{-2,-1,0,1,2};
+
+        	// Convert greyscale image to integer image with much fewer (32) grey-scale values
+        	MultidimArray<int> imgint;
+        	imgint.resize(img);
+        	double minval, maxval, range;
+            img.computeDoubleMinMax(minval, maxval, mask);
+            range = maxval -minval;
+            if (range > 0.)
+            {
+				FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(img)
+				{
+					if (mask == NULL || DIRECT_MULTIDIM_ELEM(*mask, n) > 0)
+					{
+						DIRECT_MULTIDIM_ELEM(imgint, n) = floor( ((DIRECT_MULTIDIM_ELEM(img, n) - minval) * 31.0) / range);
+					}
+				}
+
+				matcooc = MatCoocAdd(imgint, 31, deltax, deltay, mask);
+				fast_init(); //initialize internal variables
+				ans = fast_feats();
+				if (verbose)
+				{
+					std::cout << " - Energy: " << ans[0] << std::endl;
+					std::cout << " - Entropy: " << ans[1] << std::endl;
+					std::cout << " - Inverse Difference Moment: " << ans[2] << std::endl;
+					std::cout << " - Correlation: " << ans[3] << std::endl;
+					std::cout << " - Info Measure of Correlation 1: " << ans[4] << std::endl;
+					std::cout << " - Info Measure of Correlation 2: " << ans[5] << std::endl;
+					std::cout << " - Sum of squares variance: " << ans[6] << std::endl;
+					std::cout << " - Contrast: " << ans[7] << std::endl;
+					std::cout << " - Difference Entropy: " << ans[8] << std::endl;
+					std::cout << " - Difference Variance: " << ans[9] << std::endl;
+					std::cout << " - Sum Average: " << ans[10] << std::endl;
+					std::cout << " - Sum Entropy: " << ans[11] << std::endl;
+					std::cout << " - Sum Variance: " << ans[12] << std::endl;
+				}
+            }
+
+            return ans;
+
+        }
+
+        //Constructor for use on various images
+        HaralickExtractor() {};
+};
+
+
+
 
 
 class liyi_class_features {
@@ -121,11 +383,13 @@ public:
 	IOParser parser;
 	FileName fn_out, fn_optimiser, fn_model, fn_select, fn_job_score, fn_cf;
 
+	HaralickExtractor haralick_extractor;
+
 	RFLOAT minRes, job_score;
 	RFLOAT radius_ratio, radius;
 	RFLOAT circular_mask_radius, uniform_angpix = 4.0;
 	RFLOAT binary_threshold, lowpass;
-    int debug;
+    int debug, verb;
 
     // Save some time by limting calculations
 	int only_use_this_class;
@@ -139,7 +403,9 @@ public:
 
 
 	liyi_class_features(): job_score(-1),
-		minRes(-1)
+		minRes(-1),
+		debug(0),
+		verb(1)
 	{
 	}
 
@@ -169,6 +435,7 @@ public:
 			lowpass = textToFloat(parser.getOption("--lowpass", "Low-pass filter frequency (in A)", "25."));
 			do_save_masks = parser.checkOption("--save_masks", "Save the protein and solvent masks ");
 		    debug = textToInteger(parser.getOption("--debug", "Debug level", "0"));
+		    verb = textToInteger(parser.getOption("--verb", "Verbosity level", "1"));
 
 	    	// Check for errors in the command-line option
 	    	if (radius > 0 && radius < 1)
@@ -263,7 +530,7 @@ public:
 	/** ========================== Moments Calculators ===========================  */
 
 	// Calculate moments for one class
-	void meanMomentsCalculator (MultidimArray<RFLOAT> &img, RFLOAT inner_radius, RFLOAT outer_radius, moments &mmts){
+	void meanMomentsCalculator (MultidimArray<RFLOAT> &img, RFLOAT inner_radius, RFLOAT outer_radius, moments &mmts, MultidimArray<int> *mask = NULL){
 		int pix_num = 0;
 		RFLOAT inner_radius_square, outer_radius_square;
 
@@ -276,7 +543,7 @@ public:
 		{
 			for (long int j= STARTINGX(img) ; j <= FINISHINGX(img); j++)
 			{
-				if (i*i+j*j >= inner_radius_square && i*i+j*j <= outer_radius_square)
+				if (i*i+j*j >= inner_radius_square && i*i+j*j <= outer_radius_square && ((mask == NULL) || (A2D_ELEM(*mask, i, j) > 0) ) )
 				{
 					pix_num++;
 					sum += A2D_ELEM(img, i, j);
@@ -291,7 +558,7 @@ public:
 		{
 			for (long int j= STARTINGX(img) ; j <= FINISHINGX(img); j++)
 			{
-				if (i*i+j*j >= inner_radius_square && i*i+j*j <= outer_radius_square)
+				if (i*i+j*j >= inner_radius_square && i*i+j*j <= outer_radius_square && ((mask == NULL) || (A2D_ELEM(*mask, i, j) > 0) ) )
 				{
 					square_sum += pow((A2D_ELEM(img, i, j)-mmts.mean), 2);
 					cube_sum += pow((A2D_ELEM(img, i, j)- mmts.mean), 3);
@@ -378,7 +645,7 @@ public:
 				int group_id = myopt.mydata.getGroupId(part_id, 0);
 				RFLOAT my_pixel_size = myopt.mydata.getImagePixelSize(part_id, 0);
 				const int optics_group = myopt.mydata.getOpticsGroup(part_id, 0);
-				int my_image_size = myopt.mydata.getOpticsImageSize(optics_group);
+				int my_image_size = (myopt.mydata.obsModel.hasBoxSizes) ? myopt.mydata.getOpticsImageSize(optics_group) : myopt.mymodel.ori_size;
 				bool ctf_premultiplied = myopt.mydata.obsModel.getCtfPremultiplied(optics_group);
 
 				MultidimArray<RFLOAT> Fctf;
@@ -462,8 +729,12 @@ public:
 
 						// Get the FT of the first image
 						Euler_angles2matrix(rot1, tilt1, psi1, A1, false);
-						A1 = myopt.mydata.obsModel.applyAnisoMag(A1, optics_group);
-						A1 = myopt.mydata.obsModel.applyScaleDifference(A1, optics_group, myopt.mymodel.ori_size, myopt.mymodel.pixel_size);
+						// Older versions of RELION dont have the metadata to do this, so disable then
+						if (myopt.mydata.obsModel.hasBoxSizes)
+						{
+							A1 = myopt.mydata.obsModel.applyAnisoMag(A1, optics_group);
+							A1 = myopt.mydata.obsModel.applyScaleDifference(A1, optics_group, myopt.mymodel.ori_size, myopt.mymodel.pixel_size);
+						}
 						(myopt.mymodel.PPref[iclass]).get2DFourierTransform(F1, A1);    //?
 						// Apply the angular or shift error
 						RFLOAT rot2 = rot1;
@@ -524,8 +795,12 @@ public:
 						{
 							// Get new rotated version of reference
 							Euler_angles2matrix(rot2, tilt2, psi2, A2, false);
-							A2 = myopt.mydata.obsModel.applyAnisoMag(A2, optics_group);
-							A2 = myopt.mydata.obsModel.applyScaleDifference(A2, optics_group, myopt.mymodel.ori_size, myopt.mymodel.pixel_size);
+							// Older versions of RELION dont have the metadata to do this, so disable then
+							if (myopt.mydata.obsModel.hasBoxSizes)
+							{
+								A2 = myopt.mydata.obsModel.applyAnisoMag(A2, optics_group);
+								A2 = myopt.mydata.obsModel.applyScaleDifference(A2, optics_group, myopt.mymodel.ori_size, myopt.mymodel.pixel_size);
+							}
 							(myopt.mymodel.PPref[iclass]).get2DFourierTransform(F2, A2);    //??
 						}
 						else
@@ -625,7 +900,7 @@ public:
 	}
 
 
-	void makeFilteredMasks(MultidimArray<RFLOAT> img, MultidimArray<RFLOAT> &lpf, MultidimArray<RFLOAT> &p_mask, MultidimArray<RFLOAT> &s_mask,
+	void makeFilteredMasks(MultidimArray<RFLOAT> img, MultidimArray<RFLOAT> &lpf, MultidimArray<int> &p_mask, MultidimArray<int> &s_mask,
 			RFLOAT &scattered_signal, long &protein_area, long &solvent_area)
 	{
 		MultidimArray<bool> visited;
@@ -640,10 +915,10 @@ public:
 		visited.clear();
 		visited.resize(lpf);
 		visited.initConstant(false);
-		p_mask.setXmippOrigin();
-		s_mask.setXmippOrigin();
 		p_mask.initZeros(lpf);
 		s_mask.initZeros(lpf);
+		p_mask.setXmippOrigin();
+		s_mask.setXmippOrigin();
 		protein_area = 0;
 		long circular_area = 0;
 
@@ -651,7 +926,7 @@ public:
 		//		RFLOAT sq_ctr_r = 0.49*circular_mask_radius*circular_mask_radius;
 		//		RFLOAT central_area = 3.14*0.49*circular_mask_radius*circular_mask_radius;
 
-		lowPassFilterMap(lpf, lowpass, myopt.mymodel.pixel_size);
+		lowPassFilterMap(lpf, lowpass, uniform_angpix);
 
 		for (long int i= STARTINGY(lpf) ; i <= FINISHINGY(lpf); i++)
 		{
@@ -732,165 +1007,59 @@ public:
 			{
 				long int i = all_islands[p][q].first;
 				long int j = all_islands[p][q].second;
-				A2D_ELEM(p_mask, i, j) = 1.;
-				A2D_ELEM(s_mask, i, j) = 0.;
+				A2D_ELEM(p_mask, i, j) = 1;
+				A2D_ELEM(s_mask, i, j) = 0;
 			}
 		}
 	}
 
-	// protein mask filtered by DFS
-	void proteinVsSolventFeatures(class_features &cf)
+
+	void saveMasks(MultidimArray<RFLOAT> &lpf, MultidimArray<int> &p_mask, MultidimArray<int> &s_mask, class_features &cf)
 	{
+
+		// Create folders to save protein and solvent region masks
+		char foldername[256];
+		snprintf(foldername, 255, "pvs_masks_lp%.0fth%.3f", lowpass, binary_threshold);
+		FileName filtered_mask_folder = foldername;
+		if (!exists(filtered_mask_folder))
+		{
+			std::string filtered_mask_fn_command = "mkdir -p " + filtered_mask_folder;
+			system(filtered_mask_fn_command.c_str());
+		}
+
+		Image<RFLOAT> p_out, s_out, lpf_out;
+		lpf_out() = lpf;
+		p_out().resize(YSIZE(p_mask), XSIZE(p_mask));
+		s_out().resize(YSIZE(p_mask), XSIZE(p_mask));
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(p_mask)
+		{
+			DIRECT_MULTIDIM_ELEM(p_out(), n) = (double)DIRECT_MULTIDIM_ELEM(p_mask, n);
+			DIRECT_MULTIDIM_ELEM(s_out(), n) = (double)DIRECT_MULTIDIM_ELEM(s_mask, n);
+		}
+
 		FileName fp_out, fs_out, flpf_out, f_original;
+		flpf_out = filtered_mask_folder+"/class"+integerToString(cf.class_index)+"_lowpassfiltered.mrc";
+		fp_out = filtered_mask_folder+"/class"+integerToString(cf.class_index)+"_p_mask.mrc";
+		fs_out = filtered_mask_folder+"/class"+integerToString(cf.class_index)+"_s_mask.mrc";
+		f_original = filtered_mask_folder+"/class"+integerToString(cf.class_index)+"_original.mrc";
 
-		MultidimArray<RFLOAT> lpf, p_mask, s_mask;
+		lpf_out.write(flpf_out);
+		p_out.write(fp_out);
+		s_out.write(fs_out);
+		cf.img.write(f_original);
 
-		// Make filtered masks and collect the class feature "scattered_signal"
-		long protein_area, solvent_area;
-		makeFilteredMasks(cf.img(), lpf, p_mask, s_mask, cf.scattered_signal, protein_area, solvent_area);
-
-		if (do_save_masks)
-		{
-			// Create folders to save protein and solvent region masks
-			char foldername[256];
-			snprintf(foldername, 255, "pvs_masks_lp%.0fth%.3f", lowpass, binary_threshold);
-			FileName filtered_mask_folder = foldername;
-			if (!exists(filtered_mask_folder))
-			{
-				std::string filtered_mask_fn_command = "mkdir -p " + filtered_mask_folder;
-				system(filtered_mask_fn_command.c_str());
-			}
-
-			Image<RFLOAT> p_out, s_out, lpf_out;
-			lpf_out() = lpf;
-			p_out() = p_mask;
-			s_out() = s_mask;
-
-			flpf_out = filtered_mask_folder+"/class"+integerToString(cf.class_index)+"_lowpassfiltered.mrc";
-			fp_out = filtered_mask_folder+"/class"+integerToString(cf.class_index)+"_p_mask.mrc";
-			fs_out = filtered_mask_folder+"/class"+integerToString(cf.class_index)+"_s_mask.mrc";
-			f_original = filtered_mask_folder+"/class"+integerToString(cf.class_index)+"_original.mrc";
-
-			lpf_out.write(flpf_out);
-			p_out.write(fp_out);
-			s_out.write(fs_out);
-			cf.img.write(f_original);
-		}
-
-		// Store the mean, stddev, minval and maxval of the lowpassed image as features
-		lpf.computeStats(cf.lowpass_filtered_img_avg, cf.lowpass_filtered_img_stddev,
-				cf.lowpass_filtered_img_minval, cf.lowpass_filtered_img_maxval);
-
-		// Apply masks and calculate features
-		RFLOAT p_sum = 0, s_sum = 0;
-		RFLOAT p_mean = 0, s_mean = 0;
-		// Mean
-		for (long int n = 0; n< YXSIZE(p_mask); n++)
-		{
-			if (p_mask.data[n] > 0.5)
-			{
-				p_sum += cf.img().data[n];
-			}
-			else if (s_mask.data[n] > 0.5)
-			{
-				s_sum += cf.img().data[n];
-			}
-		}
-		p_mean = p_sum / protein_area;
-		s_mean = s_sum / solvent_area;
-		cf.protein_moments.mean = p_mean;
-		cf.solvent_moments.mean = s_mean;
-
-		// Moments
-		RFLOAT p_square_sum = 0, p_cube_sum = 0, p_quad_sum = 0;
-		RFLOAT s_square_sum = 0, s_cube_sum = 0, s_quad_sum = 0;
-		for (long int n = 0; n< YXSIZE(p_mask); n++)
-		{
-			if (p_mask.data[n] > 0.5)
-			{
-				p_square_sum += pow((cf.img().data[n] - p_mean), 2);
-				p_cube_sum += pow((cf.img().data[n] - p_mean), 3);
-				p_quad_sum += pow((cf.img().data[n] - p_mean), 4);
-			}
-			else if (s_mask.data[n] > 0.5)
-			{
-				s_square_sum += pow((cf.img().data[n]- s_mean), 2);
-				s_cube_sum += pow((cf.img().data[n] - s_mean), 3);
-				s_quad_sum += pow((cf.img().data[n] - s_mean), 4);
-			}
-//			std::cout << cf.img().data[n] << "\t" << p_mean << std::endl;
-		}
-
-		cf.protein_moments.stddev = sqrt(p_square_sum / protein_area);
-		cf.solvent_moments.stddev = sqrt(s_square_sum / solvent_area);
-		if (p_square_sum == 0)
-		{
-			cf.protein_moments.skew = 0;
-			cf.protein_moments.kurt = 0;
-		}
-		else
-		{
-			cf.protein_moments.skew = (p_cube_sum * sqrt (protein_area))/(pow(p_square_sum, 1.5));
-			cf.protein_moments.kurt = (p_quad_sum * protein_area)/pow(p_square_sum, 2);
-		}
-		if (s_square_sum == 0)
-		{
-			cf.solvent_moments.skew = 0;
-			cf.solvent_moments.kurt = 0;
-		}
-		else
-		{
-			cf.solvent_moments.skew = (s_cube_sum * sqrt (solvent_area))/(pow(s_square_sum, 1.5));
-			cf.solvent_moments.kurt = (s_quad_sum * solvent_area)/pow(s_square_sum, 2);
-		}
-
-		// Edge signal
-		long int edge_pix = 0, edge_white = 0;
-		for (long int i= STARTINGY(p_mask) ; i <= FINISHINGY(p_mask); i++)
-		{
-			for (long int j= STARTINGX(p_mask) ; j <= FINISHINGX(p_mask); j++)
-			{
-//				long int r = round(sqrt((RFLOAT)(i * i + j * j)));
-				if (round(sqrt((RFLOAT)(i * i + j * j))) == round(circular_mask_radius))
-				{
-					edge_pix++;
-					if (A2D_ELEM(p_mask, i, j) > 0)
-					{
-						edge_white++;
-					}
-				}
-			}
-		}
-		cf.edge_signal = RFLOAT(edge_white) / RFLOAT(edge_pix);
 
 	}
 
-	void calculatePvsLBP(MultidimArray<RFLOAT> Iin, std::vector<double> &lbp, std::vector<double> &lbp_p, std::vector<double> &lbp_s)
+	void calculatePvsLBP(MultidimArray<RFLOAT> I, MultidimArray<int> &p_mask, MultidimArray<int> &s_mask, class_features &cf)
 	{
-		FileName img_name;
-		MultidimArray<RFLOAT> I, lpf, p_mask, s_mask;
-		std::vector<double> min_idxs, min_idxs_sort;
-
-		// Re-scale the image to have uniform pixel size of 4 angstrom
-		int newsize = ROUND(XSIZE(Iin) * (myopt.mymodel.pixel_size / uniform_angpix));
-		newsize -= newsize%2; //make even in case it is not already
-		I = Iin;
-		resizeMap(I, newsize);
-
-		// Reset pixel_size and mask diameter for the mask making
-		//pixel_size = uniform_angpix;
-		circular_mask_radius = myopt.particle_diameter / uniform_angpix * 0.5;
-
-		// Make filtered masks
-		RFLOAT dummy;
-		long idummy;
-		makeFilteredMasks(I, lpf, p_mask, s_mask, dummy, idummy, idummy);
 
 		unsigned char code;
 		double center;
 		double lbp_hist[256] = {}, lbp_hist_p[256] = {}, lbp_hist_s[256] = {};
 
 		// Make the map from 256 possible original rotation-variant LBP values to 36 rotation-invariant LBP values
+		std::vector<double> min_idxs, min_idxs_sort;
 		for (int i = 0; i < 256; i++)
 		{
 			code = i;
@@ -950,9 +1119,9 @@ public:
 			if (sum>0.) lbp_hist[idx] /= sum;
 			if (sum_p>0.) lbp_hist_p[idx] /= sum_p;
 			if (sum_s>0.) lbp_hist_s[idx] /= sum_s;
-			lbp.push_back(lbp_hist[idx]);
-			lbp_p.push_back(lbp_hist_p[idx]);
-			lbp_s.push_back(lbp_hist_s[idx]);
+			cf.lbp.push_back(lbp_hist[idx]);
+			cf.lbp_p.push_back(lbp_hist_p[idx]);
+			cf.lbp_s.push_back(lbp_hist_s[idx]);
 		}
 	}
 
@@ -988,6 +1157,7 @@ public:
 
 		minRes = 999.0;
 		features_all_classes.clear();
+		features_all_classes.reserve(myopt.mymodel.nr_classes);
 
 		// Collect other features for one class
 		int start_class = 0;
@@ -996,8 +1166,15 @@ public:
 		{
 			start_class = only_use_this_class-1;
 			end_class = only_use_this_class;
-
 		}
+
+		if (verb > 0)
+		{
+			std::cout << " Calculating features for each class ..." << std::endl;
+			init_progress_bar(end_class-start_class);
+		}
+
+
 		int ith_nonzero_class = 0;
 		for (int iclass = start_class; iclass < end_class; iclass++)
 		{
@@ -1019,7 +1196,6 @@ public:
 
 				// Get number of particles in the class from data.star file
 				features_this_class.particle_nr = features_this_class.class_distribution * myopt.mydata.numberOfParticles(0);
-				if (debug > 0) std::cerr << " features_this_class.particle_nr= " << features_this_class.particle_nr << std::endl;
 
 				// Get selection label (if training data)
 				if (MD_select.numberOfObjects() > 0)
@@ -1030,7 +1206,6 @@ public:
 				{
 					features_this_class.is_selected = 1;
 				}
-				if (debug > 0) std::cerr << " features_this_class.is_selected= " << features_this_class.is_selected << std::endl;
 
 				// Get estimated resolution (regardless of whether it is already in model_classes table or not)
 				if (myopt.mymodel.estimated_resolution[iclass] > 0.)
@@ -1042,24 +1217,11 @@ public:
 					// TODO: this still relies on mlmodel!!!
 					findResolution(features_this_class);
 				}
-				if (debug > 0) std::cerr << " features_this_class.estimated_resolution= " << features_this_class.estimated_resolution << std::endl;
 
 				// Calculate particle number-weighted resolution
 				features_this_class.weighted_resolution = (1. / (features_this_class.estimated_resolution*features_this_class.estimated_resolution)) / log(features_this_class.particle_nr);
-				if (debug > 0) std::cerr << " features_this_class.weighted_resolution= " << features_this_class.weighted_resolution << std::endl;
 
 				// Calculate moments for class average image
-				RFLOAT image_radius = XSIZE(features_this_class.img())/2.;
-				circular_mask_radius = std::min(image_radius, myopt.particle_diameter / (myopt.mymodel.pixel_size*2));
-				// Determining radius to use
-				if (radius_ratio > 0 && radius <= 0) radius = radius_ratio * circular_mask_radius;
-				if (radius > 0)
-				{
-					meanMomentsCalculator(features_this_class.img(), radius, circular_mask_radius, features_this_class.ring_moments);
-					meanMomentsCalculator(features_this_class.img(), 0, radius, features_this_class.inner_circle_moments);
-				}
-				if (debug > 0) std::cerr << " done with moments" << std::endl;
-
 				// Find job-wise best resolution among selected (red) classes in preparation for class score calculation called in the write_output function
 				if (features_this_class.is_selected == 1 && features_this_class.estimated_resolution < minRes)
 				{
@@ -1084,19 +1246,80 @@ public:
 					if (debug > 0) std::cerr << " done with angular errors" << std::endl;
 				}
 
-				// Calculate protein and solvent region moments
-				proteinVsSolventFeatures(features_this_class);
-				if (debug > 0) std::cerr << " done with pvs" << std::endl;
+				// Now that we are going to calculate image-based features,
+				// re-scale the image to have uniform pixel size of 4 angstrom
+				int newsize = ROUND(XSIZE(features_this_class.img()) * (myopt.mymodel.pixel_size / uniform_angpix));
+				newsize -= newsize%2; //make even in case it is not already
+				resizeMap(features_this_class.img(), newsize);
+				features_this_class.img().setXmippOrigin();
+
+				// Determining radius to use
+				circular_mask_radius = myopt.particle_diameter / (uniform_angpix * 2.);
+				circular_mask_radius = std::min( (XSIZE(features_this_class.img())/2.) , circular_mask_radius);
+				if (radius_ratio > 0 && radius <= 0) radius = radius_ratio * circular_mask_radius;
+				if (radius > 0)
+				{
+					meanMomentsCalculator(features_this_class.img(), radius, circular_mask_radius, features_this_class.ring_moments);
+					meanMomentsCalculator(features_this_class.img(), 0, radius, features_this_class.inner_circle_moments);
+				}
+				if (debug > 0) std::cerr << " done with ring moments" << std::endl;
+
+				// Make filtered masks
+				MultidimArray<RFLOAT> lpf;
+				MultidimArray<int> p_mask, s_mask;
+				long protein_area, solvent_area;
+				makeFilteredMasks(features_this_class.img(), lpf, p_mask, s_mask, features_this_class.scattered_signal, protein_area, solvent_area);
+				if (do_save_masks) saveMasks(lpf, p_mask, s_mask, features_this_class);
+
+				// Store entropy features on overall, protein and solvent region
+				features_this_class.solvent_entropy = features_this_class.img().entropy(&s_mask);
+				features_this_class.protein_entropy = features_this_class.img().entropy(&p_mask);
+				features_this_class.total_entropy = features_this_class.img().entropy();
+
+				// Store the mean, stddev, minval and maxval of the lowpassed image as features
+				lpf.computeStats(features_this_class.lowpass_filtered_img_avg, features_this_class.lowpass_filtered_img_stddev,
+						features_this_class.lowpass_filtered_img_minval, features_this_class.lowpass_filtered_img_maxval);
+
+				// Moments for the protein and solvent area
+				meanMomentsCalculator(features_this_class.img(), 0., circular_mask_radius, features_this_class.protein_moments, &p_mask);
+				meanMomentsCalculator(features_this_class.img(), 0., circular_mask_radius, features_this_class.solvent_moments, &s_mask);
+
+				// Fraction of white pixels of the protein mask against the circular_mask_radius
+				long int edge_pix = 0, edge_white = 0;
+				FOR_ALL_ELEMENTS_IN_ARRAY2D(p_mask)
+				{
+					if (round(sqrt((RFLOAT)(i * i + j * j))) == round(circular_mask_radius))
+					{
+						edge_pix++;
+						if (A2D_ELEM(p_mask, i, j) == 1) edge_white++;
+					}
+				}
+				features_this_class.edge_signal = RFLOAT(edge_white) / RFLOAT(edge_pix);
+				if (debug > 0) std::cerr << " done with edge signal" << std::endl;
 
 				// Calculate whole image LBP and protein and solvent area LBP
-				calculatePvsLBP(features_this_class.img(), features_this_class.lbp, features_this_class.lbp_p, features_this_class.lbp_s);
+				calculatePvsLBP(features_this_class.img(), p_mask, s_mask, features_this_class);
 				if (debug > 0) std::cerr << " done with lbp" << std::endl;
+
+				// Calculate Haralick features
+				if (debug>0) std::cerr << "Haralick features for protein area:" << std::endl;
+				features_this_class.haralick_p = haralick_extractor.getFeaturesFromImage(features_this_class.img(), &p_mask, debug>0);
+				if (debug>0) std::cerr << "Haralick features for solvent area:" << std::endl;
+				features_this_class.haralick_s = haralick_extractor.getFeaturesFromImage(features_this_class.img(), &s_mask, debug>0);
+				if (debug > 0) std::cerr << " done with haralick" << std::endl;
 
 				features_all_classes.push_back(features_this_class);
 				ith_nonzero_class++;
-			}
+
+				if (verb > 0)
+					progress_bar(iclass-start_class+1);
+
+			} // end if non-zero class
 
 		} // end iterating all classes
+
+		if (verb > 0)
+			progress_bar(end_class-start_class);
 
 	}
 
@@ -1166,7 +1389,28 @@ public:
 			MD_class_features.getValue(EMDL_CLASS_FEAT_SCATTERED_SIGNAL, this_class_feature.scattered_signal);
 			MD_class_features.getValue(EMDL_CLASS_FEAT_EDGE_SIGNAL, this_class_feature.edge_signal);
 
-			preread_features_all_classes.push_back(this_class_feature);
+            MD_class_features.getValue(EMDL_CLASS_FEAT_PARTICLE_NR, features_all_classes[i].particle_nr);
+
+            // Lowpass filtered image features
+            MD_class_features.getValue(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MEAN, features_all_classes[i].lowpass_filtered_img_avg);
+            MD_class_features.getValue(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_STDDEV, features_all_classes[i].lowpass_filtered_img_stddev);
+            MD_class_features.getValue(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MIN, features_all_classes[i].lowpass_filtered_img_minval);
+            MD_class_features.getValue(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MAX, features_all_classes[i].lowpass_filtered_img_maxval);
+
+            // Protein and solvent region LBP's
+            MD_class_features.getValue(EMDL_CLASS_FEAT_LBP, features_all_classes[i].lbp);
+            MD_class_features.getValue(EMDL_CLASS_FEAT_PROTEIN_LBP, features_all_classes[i].lbp_p);
+            MD_class_features.getValue(EMDL_CLASS_FEAT_SOLVENT_LBP, features_all_classes[i].lbp_s);
+
+            // Protein and solvent region entropy
+            MD_class_features.getValue(EMDL_CLASS_FEAT_TOTAL_ENTROPY, features_all_classes[i].total_entropy);
+            MD_class_features.getValue(EMDL_CLASS_FEAT_PROTEIN_ENTROPY, features_all_classes[i].protein_entropy);
+            MD_class_features.getValue(EMDL_CLASS_FEAT_SOLVENT_ENTROPY, features_all_classes[i].solvent_entropy);
+
+            MD_class_features.getValue(EMDL_CLASS_FEAT_PROTEIN_HARALICK, features_all_classes[i].haralick_p);
+            MD_class_features.getValue(EMDL_CLASS_FEAT_SOLVENT_HARALICK, features_all_classes[i].haralick_s);
+
+            preread_features_all_classes.push_back(this_class_feature);
 			i++;
 		}
 
@@ -1232,6 +1476,26 @@ public:
 			MD_class_features.setValue(EMDL_CLASS_FEAT_SCATTERED_SIGNAL, features_all_classes[i].scattered_signal);
 			MD_class_features.setValue(EMDL_CLASS_FEAT_EDGE_SIGNAL, features_all_classes[i].edge_signal);
 
+            MD_class_features.setValue(EMDL_CLASS_FEAT_PARTICLE_NR, features_all_classes[i].particle_nr);
+
+            // Lowpass filtered image features
+            MD_class_features.setValue(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MEAN, features_all_classes[i].lowpass_filtered_img_avg);
+            MD_class_features.setValue(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_STDDEV, features_all_classes[i].lowpass_filtered_img_stddev);
+            MD_class_features.setValue(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MIN, features_all_classes[i].lowpass_filtered_img_minval);
+            MD_class_features.setValue(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MAX, features_all_classes[i].lowpass_filtered_img_maxval);
+
+			// Protein and solvent region LBP's
+			MD_class_features.setValue(EMDL_CLASS_FEAT_LBP, features_all_classes[i].lbp);
+			MD_class_features.setValue(EMDL_CLASS_FEAT_PROTEIN_LBP, features_all_classes[i].lbp_p);
+			MD_class_features.setValue(EMDL_CLASS_FEAT_SOLVENT_LBP, features_all_classes[i].lbp_s);
+
+            // Protein and solvent region entropy
+            MD_class_features.setValue(EMDL_CLASS_FEAT_TOTAL_ENTROPY, features_all_classes[i].total_entropy);
+            MD_class_features.setValue(EMDL_CLASS_FEAT_PROTEIN_ENTROPY, features_all_classes[i].protein_entropy);
+            MD_class_features.setValue(EMDL_CLASS_FEAT_SOLVENT_ENTROPY, features_all_classes[i].solvent_entropy);
+
+            MD_class_features.setValue(EMDL_CLASS_FEAT_PROTEIN_HARALICK, features_all_classes[i].haralick_p);
+            MD_class_features.setValue(EMDL_CLASS_FEAT_SOLVENT_HARALICK, features_all_classes[i].haralick_s);
 
 		}
 		MD_class_features.write(fn_out);

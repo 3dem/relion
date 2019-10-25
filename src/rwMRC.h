@@ -214,7 +214,7 @@ int readMRC(long int img_select, bool isStack=false, const FileName &name="")
             REPORT_ERROR("Currently we support 4-bit MRC (mode 101) only when nx * ny is an even number.");
         datatype = UHalf;
     }
-    else 
+    else
     {
         switch (header->mode%5)
         {
@@ -359,7 +359,11 @@ int writeMRC(long int img_select, bool isStack=false, int mode=WRITE_OVERWRITE)
 
     if (!MDMainHeader.isEmpty())
     {
-        if(MDMainHeader.getValue(EMDL_IMAGE_STATS_MIN, aux))
+
+    	RFLOAT avg, stddev;
+    	data.computeAvgStddev(avg, stddev);
+
+    	if(MDMainHeader.getValue(EMDL_IMAGE_STATS_MIN, aux))
             header->amin  = (float)aux;
         else
         	header->amin  = (float)data.computeMin();
@@ -372,12 +376,12 @@ int writeMRC(long int img_select, bool isStack=false, int mode=WRITE_OVERWRITE)
         if(MDMainHeader.getValue(EMDL_IMAGE_STATS_AVG, aux))
             header->amean = (float)aux;
         else
-        	header->amean = (float)data.computeAvg();
+        	header->amean = (float)avg;
 
         if(MDMainHeader.getValue(EMDL_IMAGE_STATS_STDDEV, aux))
             header->arms  = (float)aux;
         else
-        	header->arms  = (float)data.computeStddev();
+        	header->arms  = (float)stddev;
 
         //if(MDMainHeader.getValue(EMDL_ORIENT_ORIGIN_X, aux))
         //	SAFESET(header->nxStart,(int)(aux-0.5));
