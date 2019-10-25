@@ -200,7 +200,12 @@ class HaralickExtractor
             ans[4] = (ans[1] - hxy1) / std::max(hx, hy);
             //std::cerr << " hxy1= " << hxy1 << " hxy2= " << hxy2 << " ans[1]= " << ans[1] << "  exp(-2 *(hxy2 - ans[1]))= " <<  exp(-2 *(hxy2 - ans[1])) << " arg= " << -2 *(hxy2 - ans[1]) << std::endl;
             double arg = -2. * (hxy1 - ans[1]);
-            ans[5] = (arg < 0. && arg > -50.) ? sqrt(1 - exp(arg)) : 0.;
+            if (arg >= 0.)
+            	ans[5] = 0.;
+            else if (arg < -50.)
+            	ans[5] = 1.;
+            else
+            	ans[5] = sqrt(1 - exp(arg));
             return ans;
         }
 
