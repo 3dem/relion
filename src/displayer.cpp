@@ -2856,6 +2856,7 @@ void Displayer::run()
 				fn_tmp.compose(n+1,fn_in);
 				MDin.addObject();
 				MDin.setValue(EMDL_IMAGE_NAME, fn_tmp);
+				MDin.setValue(EMDL_IMAGE_OPTICS_GROUP, 1);
 			}
 			basisViewerWindow win(MULTIVIEW_WINDOW_WIDTH, MULTIVIEW_WINDOW_HEIGHT, fn_in.c_str());
 			win.fillCanvas(MULTIVIEWER, MDin, &obsModel, EMDL_IMAGE_NAME, text_label, true, false, minval, maxval, sigma_contrast, scale, ori_scale, ncol, max_nr_images, lowpass, highpass);
@@ -2884,6 +2885,7 @@ void Displayer::run()
 				fn_tmp += ":mrcs";
 				MDin.addObject();
 				MDin.setValue(EMDL_IMAGE_NAME, fn_tmp);
+				MDin.setValue(EMDL_IMAGE_OPTICS_GROUP, 1);
 			}
 
 			basisViewerWindow win(MULTIVIEW_WINDOW_WIDTH, MULTIVIEW_WINDOW_HEIGHT, fn_in.c_str());
@@ -2900,6 +2902,7 @@ void Displayer::run()
 
 			MDin.addObject();
 			MDin.setValue(EMDL_IMAGE_NAME, fn_in);
+			MDin.setValue(EMDL_IMAGE_OPTICS_GROUP, 1);
 			RFLOAT new_scale = scale;
 			if (show_fourier_amplitudes || show_fourier_phase_angles)
 				new_scale *= 2.;

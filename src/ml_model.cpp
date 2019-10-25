@@ -703,7 +703,15 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experimen
 
 
 	// Data dimensionality
-	_mydata.obsModel.opticsMdt.getValue(EMDL_IMAGE_DIMENSIONALITY, data_dim, 0);
+	if (!_mydata.obsModel.opticsMdt.containsLabel(EMDL_IMAGE_DIMENSIONALITY))
+	{
+		if (verb > 0) std::cerr << " WARNING: input particles STAR file does not have a column for image dimensionality, assuming 2D images ..." << std::endl;
+		data_dim = 2;
+	}
+	else
+	{
+		_mydata.obsModel.opticsMdt.getValue(EMDL_IMAGE_DIMENSIONALITY, data_dim, 0);
+	}
 
 	// Make sure that the model has a bigger box (in Angstroms) than the optics_group with largest images in mydata
 	// Also make sure it has the smallest pixel size

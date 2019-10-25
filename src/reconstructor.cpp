@@ -135,7 +135,7 @@ void Reconstructor::initialise()
 	if (do_ewald) do_ctf = true;
 
 	// Is this 2D or 3D data?
-	data_dim = (do_3d_rot) ? 3 : 2;
+	data_dim = 2; // Initial default value
 
 	if (fn_noise != "")
 		model.read(fn_noise);
@@ -161,6 +161,22 @@ void Reconstructor::initialise()
 		// When doing Ewald-curvature correction: allow reconstructing smaller box than the input images (which should have large boxes!!)
 		if (do_ewald && newbox > 0)
 			mysize = newbox;
+
+		if (do_3d_rot)
+			data_dim = 3;
+		else // If not specifically provided, we autodetect it
+		{
+            if (do_ignore_optics)
+			{
+				data_dim = img0().getDim();
+				std::cout << " + Taking data dimensions from the first image: " << data_dim << std::endl;
+			}
+			else
+            {
+                obsModel.opticsMdt.getValue(EMDL_IMAGE_DIMENSIONALITY, data_dim, 0);
+                std::cout << " + Taking data dimensions from the first optics group: " << data_dim << std::endl;
+            }
+        }
 	}
 
 	if (angpix < 0.)
@@ -214,7 +230,11 @@ void Reconstructor::readDebugArrays()
 {
 	if (verb > 0)
 		std::cout << " + Reading in the debug arrays ... " << std::endl;
-	data_dim = (do_3d_rot) ? 3 : 2;
+
+	// We first read the image to set the data_dim automatically from backprojector data
+	Image<RFLOAT> It;
+	It.read(fn_debug+"_data_real.mrc");
+	data_dim = It().getDim();
 
 	backprojector = BackProjector(debug_ori_size, 3, fn_sym, interpolator, padding_factor, r_min_nn, blob_order, blob_radius, blob_alpha, data_dim, skip_gridding);
 
@@ -226,8 +246,7 @@ void Reconstructor::readDebugArrays()
 		std::cout << " Size of weight array: " ;
 		backprojector.weight.printShape();
 	}
-	Image<RFLOAT> It;
-	It.read(fn_debug+"_data_real.mrc");
+
 	It().setXmippOrigin();
 	It().xinit=0;
 
@@ -365,7 +384,7 @@ void Reconstructor::backprojectOneParticle(long int p)
 		YY(trans) += rnd_gaus(0., shift_error);
 	}
 
-	if (do_3d_rot)
+	if (data_dim == 3)
 	{
 		trans.resize(3);
 		DF.getValue( EMDL_ORIENT_ORIGIN_Z_ANGSTROM, ZZ(trans), p);
@@ -399,21 +418,10 @@ void Reconstructor::backprojectOneParticle(long int p)
 		CenterFFT(img(), true);
 		transformer.FourierTransform(img(), F2D);
 
-		if (do_3d_rot)
+		if (ABS(XX(trans)) > 0. || ABS(YY(trans)) > 0. || ABS(ZZ(trans)) > 0. ) // ZZ(trans) is 0 in case data_dim=2
 		{
-			if (ABS(XX(trans)) > 0. || ABS(YY(trans)) > 0. || ABS(ZZ(trans)) > 0. )
-			{
-				shiftImageInFourierTransform(F2D, F2D,
-				                             XSIZE(img()), XX(trans), YY(trans), ZZ(trans));
-			}
-		}
-		else
-		{
-			if (ABS(XX(trans)) > 0. || ABS(YY(trans)) > 0.)
-			{
-				shiftImageInFourierTransform(F2D, F2D,
-				                             XSIZE(img()), XX(trans), YY(trans));
-			}
+			shiftImageInFourierTransform(F2D, F2D,
+										 XSIZE(img()), XX(trans), YY(trans), ZZ(trans));
 		}
 	}
 	else

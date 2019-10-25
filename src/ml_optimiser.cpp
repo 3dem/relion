@@ -918,6 +918,8 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 	if (do_split_random_halves &&
 	    !MD.getValue(EMDL_OPTIMISER_MODEL_STARFILE2, fn_model2))
 	    	REPORT_ERROR("MlOptimiser::readStar: splitting data into two random halves, but rlnModelStarFile2 not found in optimiser_general table");
+	if (do_split_random_halves && fn_model2 == "")
+		REPORT_ERROR("MlOptimiser::readStar: splitting data into two random halves, but rlnModelStarFile2 is empty. Probably you specified an optimiser STAR file generated with --force_converge. You cannot perform continuation or subtraction from this file. Please use one from the previous iteration.");
 	if (!MD.getValue(EMDL_OPTIMISER_LOWRES_LIMIT_EXP, strict_lowres_exp))
 		strict_lowres_exp = -1.;
 
@@ -8550,6 +8552,11 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 		// Only change the sampling if the resolution has not improved during the last 2 iterations
 		// AND the hidden variables have not changed during the last 2 iterations
 		RFLOAT old_rottilt_step = sampling.getAngularSampling(adaptive_oversampling);
+
+		// Takanori: TODO: Turbo mode
+		// If the angular accuracy and the necessary angular step for the current resolution is finer
+		// than the curent angular step, make it finer.
+		// But don't go to local search until it stabilises or look at change in angles?
 
 		// Only use a finer angular sampling if the angular accuracy is still above 75% of the estimated accuracy
 		// If it is already below, nothing will change and eventually nr_iter_wo_resol_gain or nr_iter_wo_large_hidden_variable_changes will go above MAX_NR_ITER_WO_RESOL_GAIN

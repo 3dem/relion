@@ -963,6 +963,9 @@ void HelixAligner::maximisation()
 					DIRECT_A2D_ELEM(model.Aref[iclass], i, j) =  DIRECT_A2D_ELEM(model.Asum[iclass], i, j) / DIRECT_A2D_ELEM(model.Asumw[iclass], i, j);
 				else
 					DIRECT_A2D_ELEM(model.Aref[iclass], i, j) = 0.;
+
+				// Also store  sum of classes in Asum for writeOut
+				DIRECT_A2D_ELEM(model.Asum[iclass], i, j)  = DIRECT_A2D_ELEM(model.Aref[iclass], i, j);
 			}
 		}
 		allsum += model.pdf[iclass];
@@ -1052,7 +1055,7 @@ void HelixAligner::reconstruct2D(int iclass)
 #endif
 
     // Now project the reconstruction back out into the model.Aref[iclass]
-    Projector PP(YSIZE(model.Aref[iclass]), TRILINEAR, 1, 1, 1);
+    Projector PP(YSIZE(model.Aref[iclass]), TRILINEAR, 2, 1, 1);
     // Set the FT of img inside the Projector
     PP.computeFourierTransformMap(model.Arec[iclass], dummy, YSIZE(model.Aref[iclass]), 1);
 
@@ -1107,6 +1110,7 @@ void HelixAligner::writeOut(int iter)
 	FileName fn_iter = fn_out + "_it" + integerToString(iter, 3);
 	MD.write(fn_iter+".star");
 	Image<RFLOAT> Aimg(xrect, yrect, 1, nr_classes);
+
 	for (int iclass = 0; iclass < nr_classes; iclass++)
 	{
 		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(model.Aref[iclass])
@@ -1114,7 +1118,17 @@ void HelixAligner::writeOut(int iter)
 			DIRECT_NZYX_ELEM(Aimg(), iclass, 0, i, j) = DIRECT_A2D_ELEM(model.Aref[iclass], i, j);
 		}
     }
+	Aimg.write(fn_iter + "_reprojections.mrcs");
+
+	for (int iclass = 0; iclass < nr_classes; iclass++)
+	{
+		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(model.Asum[iclass])
+		{
+			DIRECT_NZYX_ELEM(Aimg(), iclass, 0, i, j) = DIRECT_A2D_ELEM(model.Asum[iclass], i, j);
+		}
+    }
 	Aimg.write(fn_iter + "_summed_classes.mrcs");
+
 	Image<RFLOAT> Aimg2(yrect, yrect, 1, nr_classes);
 	for (int iclass = 0; iclass < nr_classes; iclass++)
 	{

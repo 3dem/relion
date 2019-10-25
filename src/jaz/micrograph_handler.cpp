@@ -39,7 +39,7 @@ MicrographHandler::MicrographHandler()
 void MicrographHandler::init(
 		// in:
 		const std::vector<MetaDataTable>& mdts,
-		double angpix, bool verb,
+		bool verb,
 		int nr_omp_threads,
 		// out:
 		int& fc,
@@ -88,7 +88,7 @@ void MicrographHandler::init(
 		hasCorrMic = false;
 	}
 
-	loadInitial(mdts, angpix, verb, fc, dosePerFrame, metaFn);
+	loadInitial(mdts, verb, fc, dosePerFrame, metaFn);
 
 	ready = true;
 }
@@ -238,7 +238,7 @@ std::vector<MetaDataTable> MicrographHandler::findLongEnoughMovies(
 // in the given MotionCorr STAR file. Then we can safely assume all pixel sizes are the same.
 // TODO: TAKANORI: make sure in MotionCorr runner and Polish
 void MicrographHandler::loadInitial(
-		const std::vector<MetaDataTable>& mdts, double angpix, bool verb,
+		const std::vector<MetaDataTable>& mdts, bool verb,
 		int& fc, double& dosePerFrame, std::string& metaFn)
 {
 	if (hasCorrMic)
@@ -359,10 +359,15 @@ void MicrographHandler::loadInitial(
 			}
 		}
 	}
+}
+
+void MicrographHandler::validatePixelSize(RFLOAT angpix) const
+{
+//	std::cout << "angpix = " << angpix << " coords_angpix = " << coords_angpix << " movie_angpix = " << movie_angpix << std::endl;
 
 	if (angpix < coords_angpix - 1e-9)
 	{
-		std::cerr << "WARNING: pixel size (--angpix) is greater than the AutoPick pixel size (--coords_angpix)\n";
+		std::cerr << "WARNING: pixel size (--angpix) is smaller than the AutoPick pixel size (--coords_angpix)\n";
 
 		if (coords_angpix < angpix + 0.01)
 		{
@@ -374,7 +379,7 @@ void MicrographHandler::loadInitial(
 
 	if (angpix < movie_angpix - 1e-9)
 	{
-		std::cerr << "WARNING: pixel size (--angpix) is greater than the movie pixel size (--movie_angpix)\n";
+		std::cerr << "WARNING: pixel size (--angpix) is smaller than the movie pixel size (--movie_angpix)\n";
 
 		if (movie_angpix < angpix + 0.01)
 		{
