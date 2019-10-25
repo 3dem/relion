@@ -211,6 +211,11 @@ void ParticleSubtractor::initialise(int _rank, int _size)
 
 	}
 
+	if (verb > 0)
+	{
+		std::cout << " + Calculating Fourier transforms of the maps ..." << std::endl;
+	}
+
 
 	// Now set up the Projectors inside the model
 	opt.mymodel.setFourierTransformMaps(false); // false means ignore tau2_class
@@ -407,8 +412,7 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, M
 	MultidimArray<RFLOAT> Fctf;
 	FourierTransformer transformer;
 	CenterFFT(img(), true);
-	transformer.FourierTransform(img(), Faux);
-	windowFourierTransform(Faux, Fimg, opt.mymodel.current_size);
+	transformer.FourierTransform(img(), Fimg);
 	Fctf.resize(Fimg);
 
 	if (opt.do_ctf_correction)
@@ -583,8 +587,7 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, M
 	Fimg -= Fsubtract;
 
 	// And go finally back to real-space
-	windowFourierTransform(Fimg, Faux, opt.mymodel.ori_size);
-	transformer.inverseFourierTransform(Faux, img());
+	transformer.inverseFourierTransform(Fimg, img());
 	CenterFFT(img(), false);
 
 	if (do_center || opt.fn_body_masks != "None")
