@@ -2091,11 +2091,18 @@ void GuiMainWindow::cb_delete_scheduler_operator_i()
 		return;
 	}
 
-	std::string type = scheduler_operator_type->text(scheduler_operator_type->value());
-	std::string output = scheduler_operator_output->text(scheduler_operator_output->value());
-	std::string input1 = scheduler_operator_input1->text(scheduler_operator_input1->value());
-	std::string input2 = scheduler_operator_input2->text(scheduler_operator_input2->value());
-	std::string name = schedule.getOperatorName(type, input1, input2, output);
+	const std::string type = scheduler_operator_type->text(scheduler_operator_type->value());
+	std::string output = "", input1 = "", input2 = "";
+
+	// Some operators do not have these arguments.
+	if (scheduler_operator_output->value() >= 0)
+		output = scheduler_operator_output->text(scheduler_operator_output->value());
+	if (scheduler_operator_input1->value() >= 0)
+		input1 = scheduler_operator_input1->text(scheduler_operator_input1->value());
+	if (scheduler_operator_input2->value() >= 0)
+		input2 = scheduler_operator_input2->text(scheduler_operator_input2->value());
+
+	const std::string name = schedule.getOperatorName(type, input1, input2, output);
 
 	schedule.read(DO_LOCK);
 	schedule.removeOperator(name);

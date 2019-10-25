@@ -922,6 +922,8 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 	if (do_split_random_halves &&
 	    !MD.getValue(EMDL_OPTIMISER_MODEL_STARFILE2, fn_model2))
 	    	REPORT_ERROR("MlOptimiser::readStar: splitting data into two random halves, but rlnModelStarFile2 not found in optimiser_general table");
+	if (do_split_random_halves && fn_model2 == "")
+		REPORT_ERROR("MlOptimiser::readStar: splitting data into two random halves, but rlnModelStarFile2 is empty. Probably you specified an optimiser STAR file generated with --force_converge. You cannot perform continuation or subtraction from this file. Please use one from the previous iteration.");
 	if (!MD.getValue(EMDL_OPTIMISER_LOWRES_LIMIT_EXP, strict_lowres_exp))
 		strict_lowres_exp = -1.;
 
