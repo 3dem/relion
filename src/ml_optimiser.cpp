@@ -1593,6 +1593,10 @@ void MlOptimiser::initialiseGeneral(int rank)
 	if (do_join_random_halves && !do_split_random_halves)
 		REPORT_ERROR("ERROR: cannot join random halves because they were not split in the previous run");
 
+	// Check all images have the same image_size, otherwise disable non-parallel disc I/O
+	if (mydata.obsModel.allBoxSizesIdentical() && !do_parallel_disc_io)
+		REPORT_ERROR("ERROR: non-parallel disc I/O is not implemented when multiple different box sizes are present in the data set. Sorry....");
+
 	// Local symmetry operators
 	fn_local_symmetry_masks.clear();
 	fn_local_symmetry_operators.clear();
@@ -8977,6 +8981,10 @@ void MlOptimiser::getMetaAndImageDataSubset(long int first_part_id, long int las
 	}
 	exp_metadata.initZeros(nr_images, METADATA_LINE_LENGTH_BEFORE_BODIES + (mymodel.nr_bodies) * METADATA_NR_BODY_PARAMS);
 
+	// This assumes all images in first_part_id to last_part_id have the same image_size
+	// If not, then do_also_imagedata will not work! Also warn during intialiseGeneral!
+	int common_image_size = mydata.getOpticsImageSize(mydata.getOpticsGroup(first_part_id, 0));
+
 	if (do_also_imagedata)
 	{
 		if (mymodel.data_dim == 3)
@@ -8987,24 +8995,24 @@ void MlOptimiser::getMetaAndImageDataSubset(long int first_part_id, long int las
 			if (do_ctf_correction)
 			{
 				if (has_converged && do_use_reconstruct_images)
-					exp_imagedata.resize(3*mymodel.ori_size, mymodel.ori_size, mymodel.ori_size);
+					exp_imagedata.resize(3*common_image_size, common_image_size, common_image_size);
 				else
-					exp_imagedata.resize(2*mymodel.ori_size, mymodel.ori_size, mymodel.ori_size);
+					exp_imagedata.resize(2*common_image_size, common_image_size, common_image_size);
 			}
 			else
 			{
 				if (has_converged && do_use_reconstruct_images)
-					exp_imagedata.resize(2*mymodel.ori_size, mymodel.ori_size, mymodel.ori_size);
+					exp_imagedata.resize(2*common_image_size, common_image_size, common_image_size);
 				else
-					exp_imagedata.resize(mymodel.ori_size, mymodel.ori_size, mymodel.ori_size);
+					exp_imagedata.resize(common_image_size, common_image_size, common_image_size);
 			}
 		}
 		else
 		{
 			if (has_converged && do_use_reconstruct_images)
-				exp_imagedata.resize(2*nr_images, mymodel.ori_size, mymodel.ori_size);
+				exp_imagedata.resize(2*nr_images, common_image_size, common_image_size);
 			else
-				exp_imagedata.resize(nr_images, mymodel.ori_size, mymodel.ori_size);
+				exp_imagedata.resize(nr_images, common_image_size, common_image_size);
 		}
 	}
 
@@ -9016,6 +9024,7 @@ void MlOptimiser::getMetaAndImageDataSubset(long int first_part_id, long int las
 
 			long int ori_img_id = mydata.particles[part_id].images[img_id].id;
 			RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id, img_id);
+			int my_image_size = mydata.getOpticsImageSize(mydata.getOpticsGroup(part_id, img_id));
 
 			// Get the image names from the MDimg table
 			FileName fn_img="", fn_rec_img="", fn_ctf="";
@@ -9037,6 +9046,9 @@ void MlOptimiser::getMetaAndImageDataSubset(long int first_part_id, long int las
 
 			if (do_also_imagedata)
 			{
+				if (my_image_size != common_image_size)
+					REPORT_ERROR("ERROR: non-parallel disc I/O is not supported when images with different box sizes are present in the data set.");
+
 				// First read the image from disc or get it from the preread images in the mydata structure
 				Image<RFLOAT> img, rec_img;
 				if (do_preread_images)
@@ -9087,13 +9099,13 @@ void MlOptimiser::getMetaAndImageDataSubset(long int first_part_id, long int las
 						img.read(fn_ctf);
 						FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(img())
 						{
-							DIRECT_A3D_ELEM(exp_imagedata, mymodel.ori_size + k, i, j) = DIRECT_A3D_ELEM(img(), k, i, j);
+							DIRECT_A3D_ELEM(exp_imagedata, my_image_size + k, i, j) = DIRECT_A3D_ELEM(img(), k, i, j);
 						}
 					}
 
 					if (has_converged && do_use_reconstruct_images)
 					{
-						int offset = (do_ctf_correction) ? 2 * mymodel.ori_size : mymodel.ori_size;
+						int offset = (do_ctf_correction) ? 2 * my_image_size : my_image_size;
 						FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(img())
 						{
 							DIRECT_A3D_ELEM(exp_imagedata, offset + k, i, j) = DIRECT_A3D_ELEM(rec_img(), k, i, j);

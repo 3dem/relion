@@ -1260,6 +1260,10 @@ void MlOptimiserMpi::expectation()
 					}
 					else
 					{
+						// new in 3.1: first send the image_size of these particles (as no longer necessarily the same as mymodel.ori_size...)
+						int my_image_size = mydata.getOpticsImageSize(mydata.getOpticsGroup(JOB_FIRST, 0));
+						node->relion_MPI_Send(&my_image_size, 1, MPI_INT, this_slave, MPITAG_IMAGE_SIZE, MPI_COMM_WORLD);
+
 						// Send imagedata to the slaves
 						node->relion_MPI_Send(MULTIDIM_ARRAY(exp_imagedata), MULTIDIM_SIZE(exp_imagedata), MY_MPI_DOUBLE, this_slave, MPITAG_IMAGE, MPI_COMM_WORLD);
 					}
@@ -1375,6 +1379,8 @@ void MlOptimiserMpi::expectation()
 					}
 					else
 					{
+						int mysize;
+						node->relion_MPI_Recv(&mysize, 1, MPI_INT, 0, MPITAG_IMAGE_SIZE, MPI_COMM_WORLD, status);
 						// resize the exp_imagedata array
 						if (mymodel.data_dim == 3)
 						{
@@ -1382,24 +1388,24 @@ void MlOptimiserMpi::expectation()
 							if (do_ctf_correction)
 							{
 								if (has_converged && do_use_reconstruct_images)
-									exp_imagedata.resize(3*mymodel.ori_size, mymodel.ori_size, mymodel.ori_size);
+									exp_imagedata.resize(3*mysize, mysize, mysize);
 								else
-									exp_imagedata.resize(2*mymodel.ori_size, mymodel.ori_size, mymodel.ori_size);
+									exp_imagedata.resize(2*mysize, mysize, mysize);
 							}
 							else
 							{
 								if (has_converged && do_use_reconstruct_images)
-									exp_imagedata.resize(2*mymodel.ori_size, mymodel.ori_size, mymodel.ori_size);
+									exp_imagedata.resize(2*mysize, mysize, mysize);
 								else
-									exp_imagedata.resize(mymodel.ori_size, mymodel.ori_size, mymodel.ori_size);
+									exp_imagedata.resize(mysize, mysize, mysize);
 							}
 						}
 						else
 						{
 							if (has_converged && do_use_reconstruct_images)
-								exp_imagedata.resize(2*JOB_NIMG, mymodel.ori_size, mymodel.ori_size);
+								exp_imagedata.resize(2*JOB_NIMG, mysize, mysize);
 							else
-								exp_imagedata.resize(JOB_NIMG, mymodel.ori_size, mymodel.ori_size);
+								exp_imagedata.resize(JOB_NIMG, mysize, mysize);
 						}
 						node->relion_MPI_Recv(MULTIDIM_ARRAY(exp_imagedata), MULTIDIM_SIZE(exp_imagedata), MY_MPI_DOUBLE, 0, MPITAG_IMAGE, MPI_COMM_WORLD, status);
 					}
