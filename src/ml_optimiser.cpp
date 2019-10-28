@@ -392,7 +392,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	do_shifts_onthefly = parser.checkOption("--onthefly_shifts", "Calculate shifted images on-the-fly, do not store precalculated ones in memory");
 	do_preread_images  = parser.checkOption("--preread_images", "Use this to let the master process read all particles into memory. Be careful you have enough RAM for large data sets!");
 	fn_scratch = parser.getOption("--scratch_dir", "If provided, particle stacks will be copied to this local scratch disk prior to refinement.", "");
-	keep_free_scratch_Gb = textToInteger(parser.getOption("--keep_free_scratch", "Space available for copying particle stacks (in Gb)", "10"));
+	keep_free_scratch_Gb = textToFloat(parser.getOption("--keep_free_scratch", "Space available for copying particle stacks (in Gb)", "10"));
 	do_reuse_scratch = parser.checkOption("--reuse_scratch", "Re-use data on scratchdir, instead of wiping it and re-copying all data. This works only when ALL particles have already been cached.");
 	keep_scratch = parser.checkOption("--keep_scratch", "Don't remove scratch after convergence. Following jobs that use EXACTLY the same particles should use --reuse_scratch.");
 
@@ -657,7 +657,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	do_parallel_disc_io = !parser.checkOption("--no_parallel_disc_io", "Do NOT let parallel (MPI) processes access the disc simultaneously (use this option with NFS)");
 	do_preread_images  = parser.checkOption("--preread_images", "Use this to let the master process read all particles into memory. Be careful you have enough RAM for large data sets!");
 	fn_scratch = parser.getOption("--scratch_dir", "If provided, particle stacks will be copied to this local scratch disk prior to refinement.", "");
-	keep_free_scratch_Gb = textToInteger(parser.getOption("--keep_free_scratch", "Space available for copying particle stacks (in Gb)", "10"));
+	keep_free_scratch_Gb = textToFloat(parser.getOption("--keep_free_scratch", "Space available for copying particle stacks (in Gb)", "10"));
 	do_reuse_scratch = parser.checkOption("--reuse_scratch", "Re-use data on scratchdir, instead of wiping it and re-copying all data.");
 	keep_scratch = parser.checkOption("--keep_scratch", "Don't remove scratch after convergence. Following jobs that use EXACTLY the same particles should use --reuse_scratch.");
 	do_fast_subsets = parser.checkOption("--fast_subsets", "Use faster optimisation by using subsets of the data in the first 15 iterations");

@@ -404,7 +404,7 @@ public:
 	FileName fn_scratch;
 
 	// Amount of scratch space to be left free (in Gb)
-	int keep_free_scratch_Gb;
+	RFLOAT keep_free_scratch_Gb;
 
 	// Re-use data on scratch dir, i.e. dont delete data already there and copy again
 	bool do_reuse_scratch;
@@ -415,11 +415,11 @@ public:
 	// Print the symmetry transformation matrices
 	bool do_print_symmetry_ops;
 
-    /** Name of the multiple symmetry groups */
-    std::vector<FileName> fn_multi_sym;
+	/** Name of the multiple symmetry groups */
+	std::vector<FileName> fn_multi_sym;
 
-    /** Perform reconstruction outside of relion_refine, e.g. for learned priors */
-    bool do_external_reconstruct;
+	/** Perform reconstruction outside of relion_refine, e.g. for learned priors */
+	bool do_external_reconstruct;
 
 	/* Flag whether to use the Adaptive approach as by Tagare et al (2010) J. Struc. Biol.
 	 * where two passes through the integrations are made: a first one with a coarse angular sampling and
