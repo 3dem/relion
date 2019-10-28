@@ -634,8 +634,8 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	sgd_ini_iter = textToInteger(parser.getOption("--sgd_ini_iter", "Number of initial SGD iterations", "50"));
 	sgd_fin_iter = textToInteger(parser.getOption("--sgd_fin_iter", "Number of final SGD iterations", "50"));
 	sgd_inbetween_iter = textToInteger(parser.getOption("--sgd_inbetween_iter", "Number of SGD iterations between the initial and final ones", "200"));
-	sgd_ini_resol = textToInteger(parser.getOption("--sgd_ini_resol", "Resolution cutoff during the initial SGD iterations (A)", "35"));
-	sgd_fin_resol = textToInteger(parser.getOption("--sgd_fin_resol", "Resolution cutoff during the final SGD iterations (A)", "15"));
+	sgd_ini_resol = textToInteger(parser.getOption("--sgd_ini_resol", "Resolution cutoff during the initial SGD iterations (A)", "-1"));
+	sgd_fin_resol = textToInteger(parser.getOption("--sgd_fin_resol", "Resolution cutoff during the final SGD iterations (A)", "-1"));
 	sgd_ini_subset_size = textToInteger(parser.getOption("--sgd_ini_subset", "Mini-batch size during the initial SGD iterations", "100"));
 	sgd_fin_subset_size = textToInteger(parser.getOption("--sgd_fin_subset", "Mini-batch size during the final SGD iterations", "500"));
 	mu = textToFloat(parser.getOption("--mu", "Momentum parameter for SGD updates", "0.9"));
@@ -2708,7 +2708,7 @@ void MlOptimiser::expectation()
 	}
 
 	// D. Update the angular sampling (all nodes except master)
-	if ( (do_auto_refine || do_sgd) && iter > 1 )
+	if ( do_auto_refine && iter > 1 )
 		updateAngularSampling();
 
 	// E. Check whether everything fits into memory
@@ -3041,8 +3041,9 @@ void MlOptimiser::expectation()
 #endif
 
 	// Clean up some memory
-	for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
-		mymodel.PPref[iclass].data.clear();
+	if (!do_sgd)
+		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
+			mymodel.PPref[iclass].data.clear();
 
 #ifdef DEBUG_EXP
 	std::cerr << "Expectation: done " << std::endl;
@@ -4041,17 +4042,26 @@ void MlOptimiser::maximization()
 						FourierTransformer transformer;
 						MultidimArray<Complex > Fprev, Fgrad;
 
+//						mymodel.PPref[iclass].decenter(Fprev);
+
 						CenterFFT(mymodel.Iref[iclass], true);
 						transformer.FourierTransform(mymodel.Iref[iclass], Fprev);
+
 						windowFourierTransform(Fprev, wsum_model.BPref[iclass].data.zdim);
 
 						//Should we normalise with pdf_class?
-						wsum_model.BPref[iclass].sgd_step(Fprev, Fgrad);
+						wsum_model.BPref[iclass].sgd_step(
+								Fprev,
+								mymodel.tau2_class[iclass],
+								Fgrad);
+
 						Fprev += sgd_stepsize * Fgrad;
 
 						windowFourierTransform(Fprev, mymodel.ori_size);
 						transformer.inverseFourierTransform(Fprev, mymodel.Iref[iclass]);
 						CenterFFT(mymodel.Iref[iclass], false);
+
+						mymodel.PPref[iclass].data.clear();
 					}
 					else
 						(wsum_model.BPref[iclass]).reconstruct(mymodel.Iref[iclass],
@@ -4070,9 +4080,6 @@ void MlOptimiser::maximization()
 			// When not doing SGD, initialise to zero, but when doing SGD just keep the previous reference
 			if (!do_sgd)
 				mymodel.Iref[iclass].initZeros();
-			// When doing SGD also re-initialise the gradient to zero
-			if (do_sgd)
-				mymodel.Igrad[iclass].initZeros();
 		}
 		RCTOC(timer,RCT_1);
 		if (verb > 0)
@@ -4361,17 +4368,17 @@ void MlOptimiser::solventFlatten()
 		return;
 
 
-	// If we're doing SGD: enforce non-negativity during the first sgd_ini_iter iterations
-	if (do_sgd && iter < sgd_ini_iter)
-	{
-		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
-		{
-			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.Iref[iclass])
-			{
-				DIRECT_MULTIDIM_ELEM(mymodel.Iref[iclass], n) = XMIPP_MAX(0., DIRECT_MULTIDIM_ELEM(mymodel.Iref[iclass], n));
-			}
-		}
-	}
+	// If we're doing SGD: enforce non-negativity (positivity) during the first sgd_ini_iter iterations
+//	if (do_sgd && iter < sgd_ini_iter)
+//	{
+//		for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
+//		{
+//			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(mymodel.Iref[iclass])
+//			{
+//				DIRECT_MULTIDIM_ELEM(mymodel.Iref[iclass], n) = XMIPP_MAX(0., DIRECT_MULTIDIM_ELEM(mymodel.Iref[iclass], n));
+//			}
+//		}
+//	}
 
 	// First read solvent mask from disc, or pre-calculate it
 	Image<RFLOAT> Isolvent, Isolvent2, Ilowpass;
@@ -4479,119 +4486,117 @@ void MlOptimiser::updateCurrentResolution()
 	std::cerr << "Entering MlOptimiser::updateCurrentResolution" << std::endl;
 #endif
 
-	if (do_sgd && !do_split_random_halves)
+	if (do_sgd)
 	{
-		// Do initial iterations with completely identical K references, 100-particle batch size, enforce non-negativity and 35A resolution limit
-		if (iter < sgd_ini_iter)
+		if (iter < sgd_ini_iter && sgd_ini_resol > 0)
 		{
 			mymodel.current_resolution = 1./sgd_ini_resol;
+			return;
 		}
-		else if (iter < sgd_ini_iter + sgd_inbetween_iter)
+		else if (iter < sgd_ini_iter + sgd_inbetween_iter && sgd_ini_resol > 0 && sgd_fin_resol > 0)
 		{
 			int newpixres = sgd_inires_pix + ROUND((RFLOAT(iter - sgd_ini_iter)/RFLOAT(sgd_inbetween_iter))*(sgd_finres_pix - sgd_inires_pix));
 			mymodel.current_resolution = mymodel.getResolution(newpixres);
+			return;
+		}
+		else if (sgd_fin_resol > 0)
+		{
+			mymodel.current_resolution = 1./sgd_fin_resol;
+			return;
+		}
+	}
+
+	RFLOAT best_current_resolution = 0.;
+	int nr_iter_wo_resol_gain_sum_bodies = 0;
+	for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
+	{
+
+		int maxres = 0;
+		if (do_map)
+		{
+			// Set current resolution
+			if (ini_high > 0. && (iter == 0 || (iter == 1 && do_firstiter_cc)))
+			{
+				maxres = ROUND(mymodel.ori_size * mymodel.pixel_size / ini_high);
+			}
+			else
+			{
+				// Calculate at which resolution shell the data_vs_prior drops below 1
+				int ires;
+				for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
+				{
+					int iclass_body = (mymodel.nr_bodies > 1) ? ibody: iclass;
+					for (ires = 1; ires < mymodel.ori_size/2; ires++)
+					{
+						if (DIRECT_A1D_ELEM(mymodel.data_vs_prior_class[iclass_body], ires) < 1.)
+							break;
+					}
+					// Subtract one shell to be back on the safe side
+					ires--;
+
+					if (do_split_random_halves && do_auto_refine)
+					{
+						// Let's also try and check from the high-res side. Sometimes phase-randomisation gives artefacts
+						int ires2;
+						for (ires2 = mymodel.ori_size/2-1; ires2 >= ires; ires2--)
+						{
+							if (DIRECT_A1D_ELEM(mymodel.data_vs_prior_class[iclass_body], ires2) > 1.)
+								break;
+						}
+						if (ires2 > ires + 3)
+						{
+							if (verb > 0)
+							{
+								float higher = mymodel.getResolutionAngstrom(ires2);
+								float lower  = mymodel.getResolutionAngstrom(ires);
+								if (mymodel.nr_bodies > 1)
+								{
+									std::cerr << " WARNING: For the " << ibody+1 << "th body:" << std::endl;
+									std::cerr << " WARNING: FSC dipped below 0.5 and rose again. Using higher resolution of "
+											  << higher << " A, instead of " << lower << " A." << std::endl;
+									std::cerr << "          This is not necessarily a bad thing. Often it is caused by too tight masks." << std::endl;
+								}
+							}
+							ires = ires2;
+						}
+					}
+
+					if (ires > maxres)
+						maxres = ires;
+				}
+
+				// Never allow smaller maxres than minres_map
+				maxres = XMIPP_MAX(maxres, minres_map);
+			}
 		}
 		else
 		{
-			mymodel.current_resolution = 1./sgd_fin_resol;
+			// If we are not doing MAP-estimation, set maxres to Nyquist
+			maxres = mymodel.ori_size/2;
 		}
-	}
-	else
-	{
+		RFLOAT newres = mymodel.getResolution(maxres);
 
+		// best resolution over all bodies
+		best_current_resolution = XMIPP_MAX(best_current_resolution, newres);
 
-		RFLOAT best_current_resolution = 0.;
-		int nr_iter_wo_resol_gain_sum_bodies = 0;
-		for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
-		{
+		// Check whether resolution improved, if not increase nr_iter_wo_resol_gain
+		//if (newres <= best_resol_thus_far)
+		if (newres <= mymodel.current_resolution+0.0001) // Add 0.0001 to avoid problems due to rounding error
+			nr_iter_wo_resol_gain_sum_bodies++;
+		else
+			nr_iter_wo_resol_gain = 0;
 
-			int maxres = 0;
-			if (do_map)
-			{
-				// Set current resolution
-				if (ini_high > 0. && (iter == 0 || (iter == 1 && do_firstiter_cc)))
-				{
-					maxres = ROUND(mymodel.ori_size * mymodel.pixel_size / ini_high);
-				}
-				else
-				{
-					// Calculate at which resolution shell the data_vs_prior drops below 1
-					int ires;
-					for (int iclass = 0; iclass < mymodel.nr_classes; iclass++)
-					{
-						int iclass_body = (mymodel.nr_bodies > 1) ? ibody: iclass;
-						for (ires = 1; ires < mymodel.ori_size/2; ires++)
-						{
-							if (DIRECT_A1D_ELEM(mymodel.data_vs_prior_class[iclass_body], ires) < 1.)
-								break;
-						}
-						// Subtract one shell to be back on the safe side
-						ires--;
+		// Store best resolution thus far (but no longer do anything with it anymore...)
+		if (newres > best_resol_thus_far)
+			best_resol_thus_far = newres;
 
-						if (do_split_random_halves && do_auto_refine)
-						{
-							// Let's also try and check from the high-res side. Sometimes phase-randomisation gives artefacts
-							int ires2;
-							for (ires2 = mymodel.ori_size/2-1; ires2 >= ires; ires2--)
-							{
-								if (DIRECT_A1D_ELEM(mymodel.data_vs_prior_class[iclass_body], ires2) > 1.)
-									break;
-							}
-							if (ires2 > ires + 3)
-							{
-								if (verb > 0)
-								{
-									float higher = mymodel.getResolutionAngstrom(ires2);
-									float lower  = mymodel.getResolutionAngstrom(ires);
-									if (mymodel.nr_bodies > 1)
-									{
-										std::cerr << " WARNING: For the " << ibody+1 << "th body:" << std::endl;
-										std::cerr << " WARNING: FSC dipped below 0.5 and rose again. Using higher resolution of "
-												  << higher << " A, instead of " << lower << " A." << std::endl;
-										std::cerr << "          This is not necessarily a bad thing. Often it is caused by too tight masks." << std::endl;
-									}
-								}
-								ires = ires2;
-							}
-						}
+	} // end for ibody
 
-						if (ires > maxres)
-							maxres = ires;
-					}
+	// Set the new resolution to be the highest resolution over all bodies
+	mymodel.current_resolution = best_current_resolution;
 
-					// Never allow smaller maxres than minres_map
-					maxres = XMIPP_MAX(maxres, minres_map);
-				}
-			}
-			else
-			{
-				// If we are not doing MAP-estimation, set maxres to Nyquist
-				maxres = mymodel.ori_size/2;
-			}
-			RFLOAT newres = mymodel.getResolution(maxres);
-
-			// best resolution over all bodies
-			best_current_resolution = XMIPP_MAX(best_current_resolution, newres);
-
-			// Check whether resolution improved, if not increase nr_iter_wo_resol_gain
-			//if (newres <= best_resol_thus_far)
-			if (newres <= mymodel.current_resolution+0.0001) // Add 0.0001 to avoid problems due to rounding error
-				nr_iter_wo_resol_gain_sum_bodies++;
-			else
-				nr_iter_wo_resol_gain = 0;
-
-			// Store best resolution thus far (but no longer do anything with it anymore...)
-			if (newres > best_resol_thus_far)
-				best_resol_thus_far = newres;
-
-		} // end for ibody
-
-		// Set the new resolution to be the highest resolution over all bodies
-		mymodel.current_resolution = best_current_resolution;
-
-		if (nr_iter_wo_resol_gain_sum_bodies == mymodel.nr_bodies)
-			nr_iter_wo_resol_gain++;
-	}
+	if (nr_iter_wo_resol_gain_sum_bodies == mymodel.nr_bodies)
+		nr_iter_wo_resol_gain++;
 
 #ifdef DEBUG
 	std::cerr << "Leaving MlOptimiser::updateCurrentResolution" << std::endl;
@@ -8510,23 +8515,111 @@ void MlOptimiser::calculateExpectedAngularErrors(long int my_first_part_id, long
 
 void MlOptimiser::updateAngularSampling(bool myverb)
 {
+	if (!do_split_random_halves)
+		REPORT_ERROR("MlOptimiser::updateAngularSampling: BUG! updating of angular sampling should only happen for gold-standard (auto-) refinements.");
 
-	// For SGD: onyl update initial angular sampling after the sgd_ini_iter have passed
-	if (do_sgd)
+	if (do_skip_rotate)
+		REPORT_ERROR("ERROR: --skip_rotate can only be used in movie-frame refinement ...");
+
+	// Only change the sampling if the resolution has not improved during the last 2 iterations
+	// AND the hidden variables have not changed during the last 2 iterations
+	RFLOAT old_rottilt_step = sampling.getAngularSampling(adaptive_oversampling);
+
+	// Takanori: TODO: Turbo mode
+	// If the angular accuracy and the necessary angular step for the current resolution is finer
+	// than the curent angular step, make it finer.
+	// But don't go to local search until it stabilises or look at change in angles?
+
+	// Only use a finer angular sampling if the angular accuracy is still above 75% of the estimated accuracy
+	// If it is already below, nothing will change and eventually nr_iter_wo_resol_gain or nr_iter_wo_large_hidden_variable_changes will go above MAX_NR_ITER_WO_RESOL_GAIN
+	if (nr_iter_wo_resol_gain >= MAX_NR_ITER_WO_RESOL_GAIN && nr_iter_wo_large_hidden_variable_changes >= MAX_NR_ITER_WO_LARGE_HIDDEN_VARIABLE_CHANGES)
 	{
-		if (iter > sgd_ini_iter)
-		{
-			RFLOAT min_sampling =  360. / CEIL(PI * particle_diameter * mymodel.current_resolution);
-			RFLOAT old_rottilt_step = sampling.getAngularSampling(adaptive_oversampling);
-			if (old_rottilt_step > min_sampling)
-			{
-				has_fine_enough_angular_sampling = false;
 
-				int new_hp_order = sampling.healpix_order + 1;
-				RFLOAT new_rottilt_step = 360. / (6 * ROUND(std::pow(2., new_hp_order + adaptive_oversampling)));
+		bool all_bodies_are_done = false;
+		// For multi-body refinement: switch off those bodies that don't have high enough angular accuracy
+		if (mymodel.nr_bodies > 1)
+		{
+			all_bodies_are_done = true;
+			for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
+			{
+				// Stop multi-body refinements a bit earlier than normal ones: no 75%, but 90% of accuracy
+				// if has_converged: in the final iteration include all bodies again!
+				if (old_rottilt_step < 0.90 * mymodel.acc_rot[ibody] && !has_converged)
+				{
+					if (myverb)
+						std::cout << " Body: " <<ibody << " with rotational accuracy of " << mymodel.acc_rot[ibody] << " will be kept fixed " << std::endl;
+					mymodel.keep_fixed_bodies[ibody] = 1;
+				}
+				else
+					all_bodies_are_done = false;
+			}
+		}
+
+		// Old rottilt step is already below 75% of estimated accuracy: have to stop refinement?
+		// If a minimum_angular_sampling is given and we're not there yet, also just continue
+		if (all_bodies_are_done
+			|| (maximum_angular_sampling > 0. && old_rottilt_step < maximum_angular_sampling)
+			|| (old_rottilt_step < 0.75 * acc_rot && !(minimum_angular_sampling > 0. && old_rottilt_step > minimum_angular_sampling)))
+		{
+			// don't change angular sampling, as it is already fine enough
+			has_fine_enough_angular_sampling = true;
+		}
+		else
+		{
+			has_fine_enough_angular_sampling = false;
+
+			// A. Use translational sampling as suggested by acc_trans
+
+			// Prevent very coarse translational samplings: max 1.5
+			// Also stay a bit on the safe side with the translational sampling: 75% of estimated accuracy
+			RFLOAT new_step = XMIPP_MIN(1.5, 0.75 * acc_trans) * std::pow(2., adaptive_oversampling);
+
+			// For subtomogram averaging: use at least half times previous step size
+			if (mymodel.data_dim == 3) // TODO: check: this might just as well work for 2D data...
+				new_step = XMIPP_MAX(sampling.offset_step / 2., new_step);
+
+			// Search ranges are five times the last observed changes in offsets
+			// Only 3x for subtomogram averaging....
+			RFLOAT new_range = (mymodel.data_dim == 2) ? 5. * current_changes_optimal_offsets : 3 * current_changes_optimal_offsets;
+
+			// New range can only become 30% bigger than the previous range (to prevent very slow iterations in the beginning)
+			new_range = XMIPP_MIN(1.3*sampling.offset_range, new_range);
+
+			// Prevent too narrow searches: always at least 3x3 pixels in the coarse search
+			new_range= XMIPP_MAX(new_range, 1.5 * new_step);
+
+			// Also prevent too wide searches: that will lead to memory problems:
+			// If steps size < 1/4th of search range, then decrease search range by 50%
+			if (new_range > 4. * new_step)
+				new_range /= 2.;
+
+			// If even that was not enough: use coarser step size and hope things will settle down later...
+			if (new_range > 4. * new_step)
+				new_step = new_range / 4.;
+
+			// Jun08,2015 Shaoda & Sjors, Helical refinement
+			RFLOAT new_helical_offset_step = sampling.helical_offset_step;
+			if (mymodel.ref_dim == 3)
+			{
+				// Jun08,2015 Shaoda & Sjors, Helical refinement
+				//new_helical_offset_step /= 2.;
+
+				// AFTER AUG17,2015
+				// ??? new_step ~= 1/4 * helical_offset_step ??? still divide helical_offset_step by 2 ! That is reasonable... Because it cannot happen (see above)
+				if (new_step < new_helical_offset_step)
+					new_helical_offset_step /= 2.;
+			}
+
+			// B. Use twice as fine angular sampling
+			int new_hp_order;
+			RFLOAT new_rottilt_step, new_psi_step;
+			if (mymodel.ref_dim == 3)
+			{
+				new_hp_order = sampling.healpix_order + 1;
+				new_rottilt_step = new_psi_step = 360. / (6 * ROUND(std::pow(2., new_hp_order + adaptive_oversampling)));
 
 				// Set the new sampling in the sampling-object
-				sampling.setOrientations(new_hp_order, new_rottilt_step * std::pow(2., adaptive_oversampling));
+				sampling.setOrientations(new_hp_order, new_psi_step * std::pow(2., adaptive_oversampling));
 
 				// Resize the pdf_direction arrays to the correct size and fill with an even distribution
 				mymodel.initialisePdfDirection(sampling.NrDirections());
@@ -8537,196 +8630,74 @@ void MlOptimiser::updateAngularSampling(bool myverb)
 				// Also resize and initialise wsum_model.pdf_direction for each class!
 				for (int iclass=0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++)
 					wsum_model.pdf_direction[iclass].initZeros(mymodel.nr_directions);
+
+			}
+			else if (mymodel.ref_dim == 2)
+			{
+				sampling.psi_step /= 2.;
+			}
+			else
+				REPORT_ERROR("MlOptimiser::autoAdjustAngularSampling BUG: ref_dim should be two or three");
+
+			// Jun08,2015 Shaoda & Sjors, Helical refinement
+			bool do_local_searches = ((do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches));
+
+			// Don't go to coarse angular samplings. Then just keep doing as it was
+			if (new_step > sampling.offset_step)
+			{
+				new_step = sampling.offset_step;
+				new_range = sampling.offset_range;
+			}
+
+			sampling.setTranslations(new_step, new_range, do_local_searches, (do_helical_refine) && (!ignore_helical_symmetry), new_helical_offset_step, helical_rise_initial, helical_twist_initial);
+
+			// Reset iteration counters
+			nr_iter_wo_resol_gain = 0;
+			nr_iter_wo_large_hidden_variable_changes = 0;
+
+			// Reset smallest changes hidden variables
+			smallest_changes_optimal_classes = 9999999;
+			smallest_changes_optimal_offsets = 999.;
+			smallest_changes_optimal_orientations = 999.;
+
+			// If the angular sampling is smaller than autosampling_hporder_local_searches, then use local searches of +/- 6 times the angular sampling
+			if (mymodel.ref_dim == 3 && new_hp_order >= autosampling_hporder_local_searches)
+			{
+				// Switch ON local angular searches
+				mymodel.orientational_prior_mode = PRIOR_ROTTILT_PSI;
+				sampling.orientational_prior_mode = PRIOR_ROTTILT_PSI;
+				mymodel.sigma2_rot = mymodel.sigma2_psi = 2. * 2. * new_rottilt_step * new_rottilt_step;
+				if (!(do_helical_refine && helical_keep_tilt_prior_fixed))
+					mymodel.sigma2_tilt = mymodel.sigma2_rot;
+
+				// Aug20,2015 - Shaoda, Helical refinement
+				if ( (do_helical_refine) && (!ignore_helical_symmetry) )
+					mymodel.sigma2_rot = getHelicalSigma2Rot(helical_rise_initial, helical_twist_initial, sampling.helical_offset_step, new_rottilt_step, mymodel.sigma2_rot);
 			}
 		}
 	}
-	else
+
+	// Print to screen
+	if (myverb)
 	{
-
-		if (!do_split_random_halves)
-			REPORT_ERROR("MlOptimiser::updateAngularSampling: BUG! updating of angular sampling should only happen for gold-standard (auto-) refinements.");
-
-		if (do_skip_rotate)
-			REPORT_ERROR("ERROR: --skip_rotate can only be used in movie-frame refinement ...");
-
-		// Only change the sampling if the resolution has not improved during the last 2 iterations
-		// AND the hidden variables have not changed during the last 2 iterations
-		RFLOAT old_rottilt_step = sampling.getAngularSampling(adaptive_oversampling);
-
-		// Takanori: TODO: Turbo mode
-		// If the angular accuracy and the necessary angular step for the current resolution is finer
-		// than the curent angular step, make it finer.
-		// But don't go to local search until it stabilises or look at change in angles?
-
-		// Only use a finer angular sampling if the angular accuracy is still above 75% of the estimated accuracy
-		// If it is already below, nothing will change and eventually nr_iter_wo_resol_gain or nr_iter_wo_large_hidden_variable_changes will go above MAX_NR_ITER_WO_RESOL_GAIN
-		if (nr_iter_wo_resol_gain >= MAX_NR_ITER_WO_RESOL_GAIN && nr_iter_wo_large_hidden_variable_changes >= MAX_NR_ITER_WO_LARGE_HIDDEN_VARIABLE_CHANGES)
+		std::cout << " Auto-refine: Angular step= " << sampling.getAngularSampling(adaptive_oversampling) << " degrees; local searches= ";
+		if (sampling.orientational_prior_mode == NOPRIOR)
+			std:: cout << "false" << std::endl;
+		else
+			std:: cout << "true" << std::endl;
+		// Jun08,2015 Shaoda & Sjors, Helical refine
+		if ( (do_helical_refine) && (!ignore_helical_symmetry) )
 		{
-
-			bool all_bodies_are_done = false;
-			// For multi-body refinement: switch off those bodies that don't have high enough angular accuracy
-			if (mymodel.nr_bodies > 1)
-			{
-				all_bodies_are_done = true;
-				for (int ibody = 0; ibody < mymodel.nr_bodies; ibody++)
-				{
-					// Stop multi-body refinements a bit earlier than normal ones: no 75%, but 90% of accuracy
-					// if has_converged: in the final iteration include all bodies again!
-					if (old_rottilt_step < 0.90 * mymodel.acc_rot[ibody] && !has_converged)
-					{
-						if (myverb)
-							std::cout << " Body: " <<ibody << " with rotational accuracy of " << mymodel.acc_rot[ibody] << " will be kept fixed " << std::endl;
-						mymodel.keep_fixed_bodies[ibody] = 1;
-					}
-					else
-						all_bodies_are_done = false;
-				}
-			}
-
-			// Old rottilt step is already below 75% of estimated accuracy: have to stop refinement?
-			// If a minimum_angular_sampling is given and we're not there yet, also just continue
-			if (all_bodies_are_done
-			    || (maximum_angular_sampling > 0. && old_rottilt_step < maximum_angular_sampling)
-			    || (old_rottilt_step < 0.75 * acc_rot && !(minimum_angular_sampling > 0. && old_rottilt_step > minimum_angular_sampling)))
-			{
-				// don't change angular sampling, as it is already fine enough
-				has_fine_enough_angular_sampling = true;
-			}
-			else
-			{
-				has_fine_enough_angular_sampling = false;
-
-				// A. Use translational sampling as suggested by acc_trans
-
-				// Prevent very coarse translational samplings: max 1.5
-				// Also stay a bit on the safe side with the translational sampling: 75% of estimated accuracy
-				RFLOAT new_step = XMIPP_MIN(1.5, 0.75 * acc_trans) * std::pow(2., adaptive_oversampling);
-
-				// For subtomogram averaging: use at least half times previous step size
-				if (mymodel.data_dim == 3) // TODO: check: this might just as well work for 2D data...
-					new_step = XMIPP_MAX(sampling.offset_step / 2., new_step);
-
-				// Search ranges are five times the last observed changes in offsets
-				// Only 3x for subtomogram averaging....
-				RFLOAT new_range = (mymodel.data_dim == 2) ? 5. * current_changes_optimal_offsets : 3 * current_changes_optimal_offsets;
-
-				// New range can only become 30% bigger than the previous range (to prevent very slow iterations in the beginning)
-				new_range = XMIPP_MIN(1.3*sampling.offset_range, new_range);
-
-				// Prevent too narrow searches: always at least 3x3 pixels in the coarse search
-				new_range= XMIPP_MAX(new_range, 1.5 * new_step);
-
-				// Also prevent too wide searches: that will lead to memory problems:
-				// If steps size < 1/4th of search range, then decrease search range by 50%
-				if (new_range > 4. * new_step)
-					new_range /= 2.;
-
-				// If even that was not enough: use coarser step size and hope things will settle down later...
-				if (new_range > 4. * new_step)
-					new_step = new_range / 4.;
-
-				// Jun08,2015 Shaoda & Sjors, Helical refinement
-				RFLOAT new_helical_offset_step = sampling.helical_offset_step;
-				if (mymodel.ref_dim == 3)
-				{
-					// Jun08,2015 Shaoda & Sjors, Helical refinement
-					//new_helical_offset_step /= 2.;
-
-					// AFTER AUG17,2015
-					// ??? new_step ~= 1/4 * helical_offset_step ??? still divide helical_offset_step by 2 ! That is reasonable... Because it cannot happen (see above)
-					if (new_step < new_helical_offset_step)
-						new_helical_offset_step /= 2.;
-				}
-
-				// B. Use twice as fine angular sampling
-				int new_hp_order;
-				RFLOAT new_rottilt_step, new_psi_step;
-				if (mymodel.ref_dim == 3)
-				{
-					new_hp_order = sampling.healpix_order + 1;
-					new_rottilt_step = new_psi_step = 360. / (6 * ROUND(std::pow(2., new_hp_order + adaptive_oversampling)));
-
-					// Set the new sampling in the sampling-object
-					sampling.setOrientations(new_hp_order, new_psi_step * std::pow(2., adaptive_oversampling));
-
-					// Resize the pdf_direction arrays to the correct size and fill with an even distribution
-					mymodel.initialisePdfDirection(sampling.NrDirections());
-
-					// Also reset the nr_directions in wsum_model
-					wsum_model.nr_directions = mymodel.nr_directions;
-
-					// Also resize and initialise wsum_model.pdf_direction for each class!
-					for (int iclass=0; iclass < mymodel.nr_classes * mymodel.nr_bodies; iclass++)
-						wsum_model.pdf_direction[iclass].initZeros(mymodel.nr_directions);
-
-				}
-				else if (mymodel.ref_dim == 2)
-				{
-					sampling.psi_step /= 2.;
-				}
-				else
-					REPORT_ERROR("MlOptimiser::autoAdjustAngularSampling BUG: ref_dim should be two or three");
-
-				// Jun08,2015 Shaoda & Sjors, Helical refinement
-				bool do_local_searches = ((do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches));
-
-				// Don't go to coarse angular samplings. Then just keep doing as it was
-				if (new_step > sampling.offset_step)
-				{
-					new_step = sampling.offset_step;
-					new_range = sampling.offset_range;
-				}
-
-				sampling.setTranslations(new_step, new_range, do_local_searches, (do_helical_refine) && (!ignore_helical_symmetry), new_helical_offset_step, helical_rise_initial, helical_twist_initial);
-
-				// Reset iteration counters
-				nr_iter_wo_resol_gain = 0;
-				nr_iter_wo_large_hidden_variable_changes = 0;
-
-				// Reset smallest changes hidden variables
-				smallest_changes_optimal_classes = 9999999;
-				smallest_changes_optimal_offsets = 999.;
-				smallest_changes_optimal_orientations = 999.;
-
-				// If the angular sampling is smaller than autosampling_hporder_local_searches, then use local searches of +/- 6 times the angular sampling
-				if (mymodel.ref_dim == 3 && new_hp_order >= autosampling_hporder_local_searches)
-				{
-					// Switch ON local angular searches
-					mymodel.orientational_prior_mode = PRIOR_ROTTILT_PSI;
-					sampling.orientational_prior_mode = PRIOR_ROTTILT_PSI;
-					mymodel.sigma2_rot = mymodel.sigma2_psi = 2. * 2. * new_rottilt_step * new_rottilt_step;
-					if (!(do_helical_refine && helical_keep_tilt_prior_fixed))
-						mymodel.sigma2_tilt = mymodel.sigma2_rot;
-
-					// Aug20,2015 - Shaoda, Helical refinement
-					if ( (do_helical_refine) && (!ignore_helical_symmetry) )
-						mymodel.sigma2_rot = getHelicalSigma2Rot(helical_rise_initial, helical_twist_initial, sampling.helical_offset_step, new_rottilt_step, mymodel.sigma2_rot);
-				}
-			}
-		}
-
-		// Print to screen
-		if (myverb)
-		{
-			std::cout << " Auto-refine: Angular step= " << sampling.getAngularSampling(adaptive_oversampling) << " degrees; local searches= ";
-			if (sampling.orientational_prior_mode == NOPRIOR)
-				std:: cout << "false" << std::endl;
-			else
+			std::cout << " Auto-refine: Helical refinement... Local translational searches along helical axis= ";
+			if ( (mymodel.ref_dim == 3) && (do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches) )
 				std:: cout << "true" << std::endl;
-			// Jun08,2015 Shaoda & Sjors, Helical refine
-			if ( (do_helical_refine) && (!ignore_helical_symmetry) )
-			{
-				std::cout << " Auto-refine: Helical refinement... Local translational searches along helical axis= ";
-				if ( (mymodel.ref_dim == 3) && (do_auto_refine) && (sampling.healpix_order >= autosampling_hporder_local_searches) )
-					std:: cout << "true" << std::endl;
-				else
-					std:: cout << "false" << std::endl;
-			}
-			std::cout << " Auto-refine: Offset search range= " << sampling.offset_range << " pixels; offset step= " << sampling.getTranslationalSampling(adaptive_oversampling) << " Anstroms";
-			if ( (do_helical_refine) && (!ignore_helical_symmetry) )
-				std::cout << "; offset step along helical axis= " << sampling.getHelicalTranslationalSampling(adaptive_oversampling) << " pixels";
-			std::cout << std::endl;
+			else
+				std:: cout << "false" << std::endl;
 		}
+		std::cout << " Auto-refine: Offset search range= " << sampling.offset_range << " pixels; offset step= " << sampling.getTranslationalSampling(adaptive_oversampling) << " Anstroms";
+		if ( (do_helical_refine) && (!ignore_helical_symmetry) )
+			std::cout << "; offset step along helical axis= " << sampling.getHelicalTranslationalSampling(adaptive_oversampling) << " pixels";
+		std::cout << std::endl;
 	}
 
 }
