@@ -31,7 +31,6 @@
 class ParticleSubtractor
 {
 public:
-
 	// I/O Parser
 	IOParser parser;
 
@@ -39,7 +38,7 @@ public:
 	MlOptimiser opt;
 
 	// FileName for the optimiser.star file, a possibly more restricted particle subset, mask and output files
-	FileName fn_opt, fn_sel, fn_msk, fn_out;
+	FileName fn_opt, fn_sel, fn_msk, fn_out, fn_revert;
 
 	// For conventional 3D classifications/ refinements: center the subtracted particles?
 	bool do_center;
@@ -49,7 +48,6 @@ public:
 
 	// Array with new orientations
 	MultidimArray<RFLOAT> orients;
-
 
 public:
 	// Read command line arguments
@@ -67,6 +65,9 @@ public:
 	// Run over my subset of particles
 	void run();
 
+	// Revert particle subtraction
+	void revert();
+
 	//Set the metatdata into the final STAR file
 	void setLinesInStarFile(int myrank = 0);
 
@@ -78,8 +79,6 @@ public:
 
 	// subtract one particle
 	void subtractOneParticle(long int part_id, long int imgno, MultidimArray<RFLOAT> &orients);
-
-
 
 private:
 	// Pre-calculated rotation matrix for (0,90,0) rotation, and its transpose, for multi-body orientations
@@ -103,7 +102,5 @@ private:
 	// For MPI parallelisation
 	int rank, size;
 };
-
-
 
 #endif /* PARTICLE_SUBTRACTOR_H_ */

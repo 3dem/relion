@@ -30,9 +30,17 @@ int main(int argc, char *argv[])
 		prm.read(argc, argv);
 
 		prm.initialise();
-		prm.run();
-		prm.setLinesInStarFile();
-		prm.saveStarFile();
+
+		if (prm.fn_revert != "")
+		{
+			prm.revert();
+		}
+		else
+		{
+			prm.run();
+			prm.setLinesInStarFile();
+			prm.saveStarFile();
+		}
 
 	}
 	catch (RelionError XE)

@@ -237,13 +237,17 @@ bool JobOption::readValue(std::ifstream& in)
 {
 	if (label != "")
 	{
+		std::string search_for = label;
+		if (label == "Estimate beamtilt?") // 3.0 compatibility
+			search_for = "Perform beamtilt estimation?";
+
 		// Start reading the ifstream at the top
 		in.clear(); // reset eof if happened...
 		in.seekg(0, std::ios::beg);
 		std::string line;
 		while (getline(in, line, '\n'))
 		{
-			if (line.rfind(label) == 0)
+			if (line.rfind(search_for) == 0)
 			{
 				// found my label
 				int equalsigns = line.rfind("==");
@@ -259,8 +263,6 @@ void JobOption::writeValue(std::ostream& out)
 {
 	out << label << " == " << value << std::endl;
 }
-
-
 
 bool RelionJob::containsLabel(std::string _label, std::string &option)
 {
@@ -347,7 +349,6 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 		}
 
 		fh.close();
-
 	}
 	else if (exists(myfilename+"job.star"))
 	{
@@ -366,7 +367,6 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 		std::string label, value;
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDvals)
 		{
-
 			MDvals.getValue(EMDL_JOBOPTION_VARIABLE, label);
 			MDvals.getValue(EMDL_JOBOPTION_VALUE, value);
 			if (joboptions.find(label) == joboptions.end())
@@ -383,7 +383,6 @@ bool RelionJob::read(std::string fn, bool &_is_continue, bool do_initialise)
 
 	if (have_read)
 	{
-
 		// Just check that went OK
 		if (type != PROC_IMPORT &&
 			type != PROC_MOTIONCORR &&
@@ -834,7 +833,6 @@ void RelionJob::initialise(int _job_type)
 When set to 1, no multi-threading will be used. The maximum can be set through the environment variable RELION_THREAD_MAX.");
 	}
 
-
 	const char * use_queue_input = getenv("RELION_QUEUE_USE");
 	bool use_queue = (use_queue_input == NULL) ? DEFAULTQUEUEUSE : textToBool(use_queue_input);
 	joboptions["do_queue"] = JobOption("Submit to queue?", use_queue, "If set to Yes, the job will be submit to a queue, otherwise \
@@ -860,7 +858,6 @@ the job will be executed locally. Note that only MPI jobs may be sent to a queue
 	joboptions["qsub"] = JobOption("Queue submit command:", std::string(default_command), "Name of the command used to submit scripts to the queue, e.g. qsub or bsub.\n\n\
 Note that the person who installed RELION should have made a custom script for your cluster/queue setup. Check this is the case \
 (or create your own script following the RELION Wiki) if you have trouble submitting jobs. The default command can be set through the environment variable RELION_QSUB_COMMAND.");
-
 
 	// additional options that may be set through environment variables RELION_QSUB_EXTRAi and RELION_QSUB_EXTRAi (for more flexibility)
 	char * extra_count_text = getenv ("RELION_QSUB_EXTRA_COUNT");
@@ -939,7 +936,6 @@ To print a list of possible options, run the corresponding program from the comm
 	    (it->second).variable = it->first;
 	}
 }
-
 
 bool RelionJob::getCommands(std::string &outputname, std::vector<std::string> &commands,
 		std::string &final_command, bool do_makedir, int job_counter, std::string &error_message)
@@ -2566,7 +2562,7 @@ A range of 15 degrees is the same as sigma = 5 degrees. Note that the ranges of 
 All particle images of a single batch are read into memory together. The size of these batches is at least one particle per thread used. The nr_pooled_particles parameter controls how many particles are read together for each thread. If it is set to 3 and one uses 8 threads, batches of 3x8=24 particles will be read together. \
 This may improve performance on systems where disk access, and particularly metadata handling of disk access, is a problem. It has a modest cost of increased RAM usage.");
 	joboptions["do_parallel_discio"] = JobOption("Use parallel disc I/O?", true, "If set to Yes, all MPI slaves will read images from disc. \
-Otherwise, only the master will read images and send them through the network to the slaves. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many slaves reading in parallel.");
+Otherwise, only the master will read images and send them through the network to the slaves. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many slaves reading in parallel. If your datasets contain particles with different box sizes, you have to say Yes.");
 	joboptions["do_preread_images"] = JobOption("Pre-read all particles into RAM?", false, "If set to Yes, all particle images will be read into computer memory, which will greatly speed up calculations on systems with slow disk access. However, one should of course be careful with the amount of RAM available. \
 Because particles are read in float-precision, it will take ( N * box_size * box_size * 4 / (1024 * 1024 * 1024) ) Giga-bytes to read N particles into RAM. For 100 thousand 200x200 images, that becomes 15Gb, or 60 Gb for the same number of 400x400 particles. \
 Remember that running a single MPI slave on each node that runs as many threads as available cores will have access to all available RAM. \n \n If parallel disc I/O is set to No, then only the master reads all particles into RAM and sends those particles through the network to the MPI slaves during the refinement iterations.");
@@ -2814,7 +2810,7 @@ Translational sampling is also done using the adaptive approach. \
 Therefore, if adaptive=1, the translations will first be evaluated on a 2x coarser grid.\n\n ");
 
 	joboptions["do_parallel_discio"] = JobOption("Use parallel disc I/O?", true, "If set to Yes, all MPI slaves will read their own images from disc. \
-Otherwise, only the master will read images and send them through the network to the slaves. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many slaves reading in parallel.");
+Otherwise, only the master will read images and send them through the network to the slaves. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many slaves reading in parallel. If your datasets contain particles with different box sizes, you have to say Yes.");
 	joboptions["nr_pool"] = JobOption("Number of pooled particles:", 3, 1, 16, 1, "Particles are processed in individual batches by MPI slaves. During each batch, a stack of particle images is only opened and closed once to improve disk access times. \
 All particle images of a single batch are read into memory together. The size of these batches is at least one particle per thread used. The nr_pooled_particles parameter controls how many particles are read together for each thread. If it is set to 3 and one uses 8 threads, batches of 3x8=24 particles will be read together. \
 This may improve performance on systems where disk access, and particularly metadata handling of disk access, is a problem. It has a modest cost of increased RAM usage.");
@@ -3153,7 +3149,7 @@ Values of ~ 2.0 are recommended for flexible structures such as MAVS-CARD filame
 	joboptions["keep_tilt_prior_fixed"] = JobOption("Keep tilt-prior fixed:", true, "If set to yes, the tilt prior will not change during the optimisation. If set to No, at each iteration the tilt prior will move to the optimal tilt value for that segment from the previous iteration.");
 
 	joboptions["do_parallel_discio"] = JobOption("Use parallel disc I/O?", true, "If set to Yes, all MPI slaves will read their own images from disc. \
-Otherwise, only the master will read images and send them through the network to the slaves. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many slaves reading in parallel.");
+Otherwise, only the master will read images and send them through the network to the slaves. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many slaves reading in parallel. If your datasets contain particles with different box sizes, you have to say Yes.");
 	joboptions["nr_pool"] = JobOption("Number of pooled particles:", 3, 1, 16, 1, "Particles are processed in individual batches by MPI slaves. During each batch, a stack of particle images is only opened and closed once to improve disk access times. \
 All particle images of a single batch are read into memory together. The size of these batches is at least one particle per thread used. The nr_pooled_particles parameter controls how many particles are read together for each thread. If it is set to 3 and one uses 8 threads, batches of 3x8=24 particles will be read together. \
 This may improve performance on systems where disk access, and particularly metadata handling of disk access, is a problem. It has a modest cost of increased RAM usage.");
@@ -3588,7 +3584,7 @@ Values of ~ 2.0 are recommended for flexible structures such as MAVS-CARD filame
 	joboptions["keep_tilt_prior_fixed"] = JobOption("Keep tilt-prior fixed:", true, "If set to yes, the tilt prior will not change during the optimisation. If set to No, at each iteration the tilt prior will move to the optimal tilt value for that segment from the previous iteration.");
 
 	joboptions["do_parallel_discio"] = JobOption("Use parallel disc I/O?", true, "If set to Yes, all MPI slaves will read their own images from disc. \
-Otherwise, only the master will read images and send them through the network to the slaves. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many slaves reading in parallel.");
+Otherwise, only the master will read images and send them through the network to the slaves. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many slaves reading in parallel. If your datasets contain particles with different box sizes, you have to say Yes.");
 	joboptions["nr_pool"] = JobOption("Number of pooled particles:", 3, 1, 16, 1, "Particles are processed in individual batches by MPI slaves. During each batch, a stack of particle images is only opened and closed once to improve disk access times. \
 All particle images of a single batch are read into memory together. The size of these batches is at least one particle per thread used. The nr_pooled_particles parameter controls how many particles are read together for each thread. If it is set to 3 and one uses 8 threads, batches of 3x8=24 particles will be read together. \
 This may improve performance on systems where disk access, and particularly metadata handling of disk access, is a problem. It has a modest cost of increased RAM usage.");
@@ -3908,7 +3904,7 @@ Note that this will only be the value for the first few iteration(s): the sampli
 	joboptions["eigenval_max"] = JobOption("Maximum eigenvalue:", 999., -50, 50, 1, "This is the maximum value for the selected eigenvalue; only particles with the selected eigenvalue less than this value will be included in the output particles.star file");
 
 	joboptions["do_parallel_discio"] = JobOption("Use parallel disc I/O?", true, "If set to Yes, all MPI slaves will read their own images from disc. \
-Otherwise, only the master will read images and send them through the network to the slaves. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many slaves reading in parallel.");
+Otherwise, only the master will read images and send them through the network to the slaves. Parallel file systems like gluster of fhgfs are good at parallel disc I/O. NFS may break with many slaves reading in parallel. If your datasets contain particles with different box sizes, you have to say Yes.");
 	joboptions["nr_pool"] = JobOption("Number of pooled particles:", 3, 1, 16, 1, "Particles are processed in individual batches by MPI slaves. During each batch, a stack of particle images is only opened and closed once to improve disk access times. \
 All particle images of a single batch are read into memory together. The size of these batches is at least one particle per thread used. The nr_pooled_particles parameter controls how many particles are read together for each thread. If it is set to 3 and one uses 8 threads, batches of 3x8=24 particles will be read together. \
 This may improve performance on systems where disk access, and particularly metadata handling of disk access, is a problem. It has a modest cost of increased RAM usage.");
@@ -4404,14 +4400,20 @@ bool RelionJob::getCommandsSubtractJob(std::string &outputname, std::vector<std:
 
 	if (joboptions["do_fliplabel"].getBoolean())
 	{
+		if (joboptions["nr_mpi"].getNumber(error_message) > 1)
+		{
+			error_message = "You cannot use MPI parallelization to revert particle labels.";
+			return false;
+		}
+
 		Node node(joboptions["fn_fliplabel"].getString(), joboptions["fn_fliplabel"].node_type);
 		inputNodes.push_back(node);
 
 		Node node2(outputname + "original.star", NODE_PART_DATA);
 		outputNodes.push_back(node2);
 
-		command = "awk '{if  ($1==\"_rlnImageName\") {$1=\"_rlnImageOriginalName\"} else if ($1==\"_rlnImageOriginalName\") {$1=\"_rlnImageName\"}; print }' < ";
-		command += joboptions["fn_fliplabel"].getString() + " > " + outputname + "original.star";
+		command = "`which relion_particle_subtract`";
+		command += " --revert " + joboptions["fn_fliplabel"].getString() + " --o " + outputname;
 	}
 	else
 	{
@@ -4845,7 +4847,7 @@ bool RelionJob::getCommandsMotionrefineJob(std::string &outputname, std::vector<
 		}
 		if (error_message != "") return false;
 
-		Node node5(outputname+"opt_params.txt", NODE_POLISH_PARAMS);
+		Node node5(outputname+"opt_params_all_groups.txt", NODE_POLISH_PARAMS);
 		outputNodes.push_back(node5);
 	}
 	else if (joboptions["do_polish"].getBoolean())
@@ -4981,22 +4983,20 @@ bool RelionJob::getCommandsCtfrefineJob(std::string &outputname, std::vector<std
 		return false;
 	}
 
-	if (!joboptions["do_ctf"].getBoolean() &&
-			!joboptions["do_aniso_mag"].getBoolean() &&
-			!joboptions["do_tilt"].getBoolean() &&
-			!joboptions["do_4thorder"].getBoolean())
+	if (!joboptions["do_aniso_mag"].getBoolean() &&
+	    !joboptions["do_ctf"].getBoolean() &&
+	    !joboptions["do_tilt"].getBoolean() &&
+	    !joboptions["do_4thorder"].getBoolean())
 	{
 		error_message = "ERROR: you haven't selected to fit anything...";
 		return false;
 	}
 
-
-
-	if (joboptions["do_ctf"].getBoolean() &&
-			joboptions["do_defocus"].getString() == job_ctffit_options[0] &&
-			joboptions["do_astig"].getString() == job_ctffit_options[0] &&
-			joboptions["do_bfactor"].getString() == job_ctffit_options[0] &&
-			joboptions["do_phase"].getString() == job_ctffit_options[0])
+	if (!joboptions["do_aniso_mag"].getBoolean() && joboptions["do_ctf"].getBoolean() &&
+	    joboptions["do_defocus"].getString() == job_ctffit_options[0] &&
+	    joboptions["do_astig"].getString() == job_ctffit_options[0] &&
+	    joboptions["do_bfactor"].getString() == job_ctffit_options[0] &&
+	    joboptions["do_phase"].getString() == job_ctffit_options[0])
 	{
 		error_message = "ERROR: you did not select any CTF parameter to fit. Either switch off CTF parameter fitting, or select one to fit.";
 		return false;

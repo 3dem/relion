@@ -18,19 +18,17 @@
  * author citations must be preserved.
  ***************************************************************************/
 
-
-
 #include "src/particle_subtractor.h"
 
 void ParticleSubtractor::read(int argc, char **argv)
 {
-
 	parser.setCommandLine(argc, argv);
 	int gen_section = parser.addSection("General options");
-	fn_opt = parser.getOption("--i", "Name of optimiser.star file from refinement/classification to use for subtraction");
+	fn_opt = parser.getOption("--i", "Name of optimiser.star file from refinement/classification to use for subtraction", "");
 	fn_out = parser.getOption("--o", "Output directory name", "Subtract/");
 	fn_msk = parser.getOption("--mask", "Name of the 3D mask with all density that should be kept, i.e. not subtracted", "");
 	fn_sel = parser.getOption("--data", "Name of particle STAR file, in case not all particles from optimiser are to be used", "");
+	fn_revert = parser.getOption("--revert", "Name of particle STAR file to revert. When this is provided, all other options are ignored.", "");
 
 	int center_section = parser.addSection("Centering options");
 	do_recenter_on_mask = parser.checkOption("--recenter_on_mask", "Use this flag to center the subtracted particles on projections of the centre-of-mass of the input mask");
@@ -45,6 +43,8 @@ void ParticleSubtractor::read(int argc, char **argv)
 	if (parser.checkForErrors())
 		REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 
+	if ((fn_opt == "" && fn_revert == "") || (fn_opt != "" && fn_revert != ""))
+		REPORT_ERROR("Please specify only one of --i OR --revert");
 }
 
 void ParticleSubtractor::usage()
@@ -52,10 +52,8 @@ void ParticleSubtractor::usage()
 	parser.writeUsage(std::cout);
 }
 
-
 void ParticleSubtractor::divideLabour(int _rank, int _size, long int &my_first, long int &my_last)
 {
-
 	if (opt.do_split_random_halves)
 	{
 		if (size < 2) REPORT_ERROR("You need to run this program with at least 2 MPI processes for subtraction of 3D auto-refine jobs");
@@ -75,17 +73,18 @@ void ParticleSubtractor::divideLabour(int _rank, int _size, long int &my_first, 
 		divide_equally(opt.mydata.numberOfParticles(), _size, _rank, my_first, my_last);
 	}
 	// std::cerr << "_size= " <<_size << " _rank= " << _rank << " my_first= " << my_first << " my_last= " << my_last << std::endl;
-
 }
 
 // Initialise some stuff after reading
 void ParticleSubtractor::initialise(int _rank, int _size)
 {
-
 	rank = _rank;
 	size = _size;
 
 	if (rank > 0) verb = 0;
+
+	if (fn_revert != "")
+		return;
 
 	// Make directory for output particles
 	if (fn_out[fn_out.length()-1] != '/') fn_out += "/";
@@ -141,7 +140,6 @@ void ParticleSubtractor::initialise(int _rank, int _size)
 
 	if (opt.fn_body_masks != "None")
 	{
-
 		if (verb > 0)
 		{
 			std::cout << " + Initialising multi-body subtraction ..." << std::endl;
@@ -187,15 +185,12 @@ void ParticleSubtractor::initialise(int _rank, int _size)
 				DIRECT_MULTIDIM_ELEM(opt.mymodel.masks_bodies[ii], n) *= (1. - DIRECT_MULTIDIM_ELEM(Imask(), n));
 			}
 		}
-
 	}
 	else
 	{
-
 		// For normal refinement/classification: just apply the inverse of keepmask to the references
 		for (int iclass = 0; iclass < opt.mymodel.nr_classes; iclass++)
 		{
-
 			if (!Imask().sameShape(opt.mymodel.Iref[iclass]))
 			{
 				Imask().printShape();
@@ -208,9 +203,12 @@ void ParticleSubtractor::initialise(int _rank, int _size)
 				DIRECT_MULTIDIM_ELEM(opt.mymodel.Iref[iclass], n) *= (1. - DIRECT_MULTIDIM_ELEM(Imask(), n));
 			}
 		}
-
 	}
 
+	if (verb > 0)
+	{
+		std::cout << " + Calculating Fourier transforms of the maps ..." << std::endl;
+	}
 
 	// Now set up the Projectors inside the model
 	opt.mymodel.setFourierTransformMaps(false); // false means ignore tau2_class
@@ -218,14 +216,72 @@ void ParticleSubtractor::initialise(int _rank, int _size)
 	// ensure even boxsize of subtracted images
 	if (boxsize > 0)
 		boxsize -= boxsize%2;
-
 }
 
+
+void ParticleSubtractor::revert()
+{
+	ObservationModel obsModel;
+	MetaDataTable MD;
+
+	ObservationModel::loadSafely(fn_revert, obsModel, MD);
+
+	if (!MD.containsLabel(EMDL_IMAGE_ORI_NAME))
+		REPORT_ERROR("The input STAR file does not contain the rlnImageOriginalName column.");
+
+	if (!MD.containsLabel(EMDL_IMAGE_NAME))
+		REPORT_ERROR("The input STAR file does not contain the rlnImageName column");
+
+	// Swap image names
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
+	{
+		FileName f1, f2;
+		MD.getValue(EMDL_IMAGE_ORI_NAME, f1);
+		MD.getValue(EMDL_IMAGE_NAME, f2);
+		MD.setValue(EMDL_IMAGE_ORI_NAME, f2);
+		MD.setValue(EMDL_IMAGE_NAME, f1);
+	}
+
+	// Fix box size
+	std::vector<bool> fixed_box_size(obsModel.numberOfOpticsGroups(), false);
+	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
+	{
+		const int og = obsModel.getOpticsGroup(MD);
+		if (fixed_box_size[og])
+			continue;
+
+		FileName img_name, fn_img;
+		long int dummy;
+		MD.getValue(EMDL_IMAGE_NAME, img_name);
+		img_name.decompose(dummy, fn_img);
+
+		if (!exists(fn_img))
+			REPORT_ERROR("Failed to read " + fn_img + " to determine the box size.");
+		Image<RFLOAT> Ihead;
+		Ihead.read(img_name, false, -1, false, true);
+		if (XSIZE(Ihead()) != YSIZE(Ihead()))
+			REPORT_ERROR("Particle " + img_name + " is not square.");
+		obsModel.setBoxSize(og, XSIZE(Ihead()));
+		obsModel.opticsMdt.setValue(EMDL_IMAGE_SIZE, XSIZE(Ihead()), og);
+
+		fixed_box_size[og] = true;
+	}
+
+	for (int i = 0; i < obsModel.numberOfOpticsGroups(); i++)
+	{
+		if (!fixed_box_size[i])
+			std::cerr << "WARNING: could not determine the box size of optics group " << obsModel.getGroupName(i) << std::endl;
+		else
+			std::cout << "The box size of the optics group " << obsModel.getGroupName(i) << " was updated to " << obsModel.getBoxSize(i) << " px" << std::endl;
+	}
+
+	obsModel.save(MD, fn_out + "original.star");
+	std::cout << "Writen " << (fn_out + "original.star") << std::endl;
+}
 
 void ParticleSubtractor::run()
 {
 	int my_halfset = 0;
-
 
 	long int nr_parts = my_last_part_id - my_first_part_id + 1;
 	long int barstep = XMIPP_MAX(1, nr_parts/120);
@@ -264,17 +320,14 @@ void ParticleSubtractor::run()
 	if (verb > 0) progress_bar(nr_parts);
 }
 
-
 void ParticleSubtractor::setLinesInStarFile(int myrank)
 {
-
 	long int my_first, my_last;
 	divideLabour(myrank, size, my_first, my_last);
 
 	long int imgno = 0;
 	for (long int part_id = my_first; part_id <= my_last; part_id++)
 	{
-
 		if (do_center || opt.fn_body_masks != "None")
 		{
 			opt.mydata.MDimg.setValue(EMDL_ORIENT_ORIGIN_X_ANGSTROM, DIRECT_A2D_ELEM(orients, imgno, 0), part_id);
@@ -310,7 +363,6 @@ void ParticleSubtractor::setLinesInStarFile(int myrank)
 			opt.mydata.MDimg.deactivateLabel(EMDL_ORIENT_ORIGIN_Y_PRIOR_ANGSTROM);
 		}
 	}
-
 }
 
 void ParticleSubtractor::saveStarFile()
@@ -350,7 +402,6 @@ FileName ParticleSubtractor::getParticleName(long int imgno, int myrank)
 
 void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, MultidimArray<RFLOAT> &orients)
 {
-
 	// Read the particle image
 	Image<RFLOAT> img;
 	FileName fn_img;
@@ -407,8 +458,7 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, M
 	MultidimArray<RFLOAT> Fctf;
 	FourierTransformer transformer;
 	CenterFFT(img(), true);
-	transformer.FourierTransform(img(), Faux);
-	windowFourierTransform(Faux, Fimg, opt.mymodel.current_size);
+	transformer.FourierTransform(img(), Fimg);
 	Fctf.resize(Fimg);
 
 	if (opt.do_ctf_correction)
@@ -583,8 +633,7 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, M
 	Fimg -= Fsubtract;
 
 	// And go finally back to real-space
-	windowFourierTransform(Fimg, Faux, opt.mymodel.ori_size);
-	transformer.inverseFourierTransform(Faux, img());
+	transformer.inverseFourierTransform(Fimg, img());
 	CenterFFT(img(), false);
 
 	if (do_center || opt.fn_body_masks != "None")
@@ -629,7 +678,4 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, M
 		else
 			img.write(fn_img, -1, false, WRITE_APPEND);
 	}
-
 }
-
-

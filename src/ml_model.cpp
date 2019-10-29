@@ -703,7 +703,15 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experimen
 
 
 	// Data dimensionality
-	_mydata.obsModel.opticsMdt.getValue(EMDL_IMAGE_DIMENSIONALITY, data_dim, 0);
+	if (!_mydata.obsModel.opticsMdt.containsLabel(EMDL_IMAGE_DIMENSIONALITY))
+	{
+		if (verb > 0) std::cerr << " WARNING: input particles STAR file does not have a column for image dimensionality, assuming 2D images ..." << std::endl;
+		data_dim = 2;
+	}
+	else
+	{
+		_mydata.obsModel.opticsMdt.getValue(EMDL_IMAGE_DIMENSIONALITY, data_dim, 0);
+	}
 
 	// Make sure that the model has a bigger box (in Angstroms) than the optics_group with largest images in mydata
 	// Also make sure it has the smallest pixel size
@@ -796,6 +804,11 @@ void MlModel::initialiseFromImages(FileName fn_ref, bool _is_3d_model, Experimen
 			{
 				RFLOAT header_pixel_size;
 				img.MDMainHeader.getValue(EMDL_IMAGE_SAMPLINGRATE_X, header_pixel_size);
+				if (header_pixel_size <= 0)
+				{
+					std::cerr << " header_pixel_size = " << header_pixel_size << std::endl;
+					REPORT_ERROR("MlModel::initialiseFromImages: Pixel size of reference image is not set!");
+				}
 				pixel_size = header_pixel_size;
 			}
 			ori_size = XSIZE(img());

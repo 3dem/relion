@@ -392,7 +392,7 @@ void MlOptimiser::parseContinue(int argc, char **argv)
 	do_shifts_onthefly = parser.checkOption("--onthefly_shifts", "Calculate shifted images on-the-fly, do not store precalculated ones in memory");
 	do_preread_images  = parser.checkOption("--preread_images", "Use this to let the master process read all particles into memory. Be careful you have enough RAM for large data sets!");
 	fn_scratch = parser.getOption("--scratch_dir", "If provided, particle stacks will be copied to this local scratch disk prior to refinement.", "");
-	keep_free_scratch_Gb = textToInteger(parser.getOption("--keep_free_scratch", "Space available for copying particle stacks (in Gb)", "10"));
+	keep_free_scratch_Gb = textToFloat(parser.getOption("--keep_free_scratch", "Space available for copying particle stacks (in Gb)", "10"));
 	do_reuse_scratch = parser.checkOption("--reuse_scratch", "Re-use data on scratchdir, instead of wiping it and re-copying all data. This works only when ALL particles have already been cached.");
 	keep_scratch = parser.checkOption("--keep_scratch", "Don't remove scratch after convergence. Following jobs that use EXACTLY the same particles should use --reuse_scratch.");
 
@@ -657,7 +657,7 @@ void MlOptimiser::parseInitial(int argc, char **argv)
 	do_parallel_disc_io = !parser.checkOption("--no_parallel_disc_io", "Do NOT let parallel (MPI) processes access the disc simultaneously (use this option with NFS)");
 	do_preread_images  = parser.checkOption("--preread_images", "Use this to let the master process read all particles into memory. Be careful you have enough RAM for large data sets!");
 	fn_scratch = parser.getOption("--scratch_dir", "If provided, particle stacks will be copied to this local scratch disk prior to refinement.", "");
-	keep_free_scratch_Gb = textToInteger(parser.getOption("--keep_free_scratch", "Space available for copying particle stacks (in Gb)", "10"));
+	keep_free_scratch_Gb = textToFloat(parser.getOption("--keep_free_scratch", "Space available for copying particle stacks (in Gb)", "10"));
 	do_reuse_scratch = parser.checkOption("--reuse_scratch", "Re-use data on scratchdir, instead of wiping it and re-copying all data.");
 	keep_scratch = parser.checkOption("--keep_scratch", "Don't remove scratch after convergence. Following jobs that use EXACTLY the same particles should use --reuse_scratch.");
 	do_fast_subsets = parser.checkOption("--fast_subsets", "Use faster optimisation by using subsets of the data in the first 15 iterations");
@@ -922,6 +922,8 @@ void MlOptimiser::read(FileName fn_in, int rank, bool do_prevent_preread)
 	if (do_split_random_halves &&
 	    !MD.getValue(EMDL_OPTIMISER_MODEL_STARFILE2, fn_model2))
 	    	REPORT_ERROR("MlOptimiser::readStar: splitting data into two random halves, but rlnModelStarFile2 not found in optimiser_general table");
+	if (do_split_random_halves && fn_model2 == "")
+		REPORT_ERROR("MlOptimiser::readStar: splitting data into two random halves, but rlnModelStarFile2 is empty. Probably you specified an optimiser STAR file generated with --force_converge. You cannot perform continuation or subtraction from this file. Please use one from the previous iteration.");
 	if (!MD.getValue(EMDL_OPTIMISER_LOWRES_LIMIT_EXP, strict_lowres_exp))
 		strict_lowres_exp = -1.;
 
@@ -1590,6 +1592,10 @@ void MlOptimiser::initialiseGeneral(int rank)
 
 	if (do_join_random_halves && !do_split_random_halves)
 		REPORT_ERROR("ERROR: cannot join random halves because they were not split in the previous run");
+
+	// Check all images have the same image_size, otherwise disable non-parallel disc I/O
+	if (mydata.obsModel.allBoxSizesIdentical() && !do_parallel_disc_io)
+		REPORT_ERROR("ERROR: non-parallel disc I/O is not implemented when multiple different box sizes are present in the data set. Sorry....");
 
 	// Local symmetry operators
 	fn_local_symmetry_masks.clear();
@@ -8975,6 +8981,10 @@ void MlOptimiser::getMetaAndImageDataSubset(long int first_part_id, long int las
 	}
 	exp_metadata.initZeros(nr_images, METADATA_LINE_LENGTH_BEFORE_BODIES + (mymodel.nr_bodies) * METADATA_NR_BODY_PARAMS);
 
+	// This assumes all images in first_part_id to last_part_id have the same image_size
+	// If not, then do_also_imagedata will not work! Also warn during intialiseGeneral!
+	int common_image_size = mydata.getOpticsImageSize(mydata.getOpticsGroup(first_part_id, 0));
+
 	if (do_also_imagedata)
 	{
 		if (mymodel.data_dim == 3)
@@ -8985,24 +8995,24 @@ void MlOptimiser::getMetaAndImageDataSubset(long int first_part_id, long int las
 			if (do_ctf_correction)
 			{
 				if (has_converged && do_use_reconstruct_images)
-					exp_imagedata.resize(3*mymodel.ori_size, mymodel.ori_size, mymodel.ori_size);
+					exp_imagedata.resize(3*common_image_size, common_image_size, common_image_size);
 				else
-					exp_imagedata.resize(2*mymodel.ori_size, mymodel.ori_size, mymodel.ori_size);
+					exp_imagedata.resize(2*common_image_size, common_image_size, common_image_size);
 			}
 			else
 			{
 				if (has_converged && do_use_reconstruct_images)
-					exp_imagedata.resize(2*mymodel.ori_size, mymodel.ori_size, mymodel.ori_size);
+					exp_imagedata.resize(2*common_image_size, common_image_size, common_image_size);
 				else
-					exp_imagedata.resize(mymodel.ori_size, mymodel.ori_size, mymodel.ori_size);
+					exp_imagedata.resize(common_image_size, common_image_size, common_image_size);
 			}
 		}
 		else
 		{
 			if (has_converged && do_use_reconstruct_images)
-				exp_imagedata.resize(2*nr_images, mymodel.ori_size, mymodel.ori_size);
+				exp_imagedata.resize(2*nr_images, common_image_size, common_image_size);
 			else
-				exp_imagedata.resize(nr_images, mymodel.ori_size, mymodel.ori_size);
+				exp_imagedata.resize(nr_images, common_image_size, common_image_size);
 		}
 	}
 
@@ -9014,6 +9024,7 @@ void MlOptimiser::getMetaAndImageDataSubset(long int first_part_id, long int las
 
 			long int ori_img_id = mydata.particles[part_id].images[img_id].id;
 			RFLOAT my_pixel_size = mydata.getImagePixelSize(part_id, img_id);
+			int my_image_size = mydata.getOpticsImageSize(mydata.getOpticsGroup(part_id, img_id));
 
 			// Get the image names from the MDimg table
 			FileName fn_img="", fn_rec_img="", fn_ctf="";
@@ -9035,6 +9046,9 @@ void MlOptimiser::getMetaAndImageDataSubset(long int first_part_id, long int las
 
 			if (do_also_imagedata)
 			{
+				if (my_image_size != common_image_size)
+					REPORT_ERROR("ERROR: non-parallel disc I/O is not supported when images with different box sizes are present in the data set.");
+
 				// First read the image from disc or get it from the preread images in the mydata structure
 				Image<RFLOAT> img, rec_img;
 				if (do_preread_images)
@@ -9085,13 +9099,13 @@ void MlOptimiser::getMetaAndImageDataSubset(long int first_part_id, long int las
 						img.read(fn_ctf);
 						FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(img())
 						{
-							DIRECT_A3D_ELEM(exp_imagedata, mymodel.ori_size + k, i, j) = DIRECT_A3D_ELEM(img(), k, i, j);
+							DIRECT_A3D_ELEM(exp_imagedata, my_image_size + k, i, j) = DIRECT_A3D_ELEM(img(), k, i, j);
 						}
 					}
 
 					if (has_converged && do_use_reconstruct_images)
 					{
-						int offset = (do_ctf_correction) ? 2 * mymodel.ori_size : mymodel.ori_size;
+						int offset = (do_ctf_correction) ? 2 * my_image_size : my_image_size;
 						FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY3D(img())
 						{
 							DIRECT_A3D_ELEM(exp_imagedata, offset + k, i, j) = DIRECT_A3D_ELEM(rec_img(), k, i, j);

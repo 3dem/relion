@@ -69,6 +69,12 @@ class import_parameters
 		// Check for errors in the command-line option
 		if (parser.checkForErrors())
 			REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
+
+		if (pixel_size <= 0)
+			REPORT_ERROR("Pixel size must be positive!");
+
+		if (kV <= 0)
+			REPORT_ERROR("Acceleration voltage must be positive!");
 	}
 
 	void run()

@@ -2146,9 +2146,9 @@ void JobWindow::initialiseCtfrefineWindow()
 	group1->begin();
 
 	place("do_defocus", TOGGLE_LEAVE_ACTIVE);
-	place("do_astig", TOGGLE_DEACTIVATE);
-	place("do_bfactor", TOGGLE_DEACTIVATE);
-	place("do_phase", TOGGLE_DEACTIVATE);
+	place("do_astig", TOGGLE_LEAVE_ACTIVE);
+	place("do_bfactor", TOGGLE_LEAVE_ACTIVE);
+	place("do_phase", TOGGLE_LEAVE_ACTIVE);
 
 	group1->end();
 	guientries["do_ctf"].cb_menu_i();
