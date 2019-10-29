@@ -40,6 +40,10 @@ int main(int argc, char *argv[])
 		prm.read(argc, argv);
 
 		prm.initialise(rank, size);
+
+		if (prm.fn_revert != "")
+			REPORT_ERROR("You cannot use MPI for reverting subtraction.");
+
 		prm.run();
 		for (int myrank = 0; myrank < size; myrank++)
 		{

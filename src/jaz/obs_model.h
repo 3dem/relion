@@ -126,8 +126,11 @@ class ObservationModel
 		std::vector<double> getSphericalAberrations() const;
 
 		int getBoxSize(int opticsGroup) const;
-		void setBoxSize(int opticsGroup, int newBoxSize);
 		void getBoxSizes(std::vector<int>& sDest, std::vector<int>& shDest) const;
+
+		// This does NOT update the metadata table!
+		// This is only to change prediction etc.
+		void setBoxSize(int opticsGroup, int newBoxSize);
 
 		Matrix2D<RFLOAT> getMagMatrix(int opticsGroup) const;
 		std::vector<Matrix2D<RFLOAT> > getMagMatrices() const;

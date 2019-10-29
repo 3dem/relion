@@ -4400,14 +4400,20 @@ bool RelionJob::getCommandsSubtractJob(std::string &outputname, std::vector<std:
 
 	if (joboptions["do_fliplabel"].getBoolean())
 	{
+		if (joboptions["nr_mpi"].getNumber(error_message) > 1)
+		{
+			error_message = "You cannot use MPI parallelization to revert particle labels.";
+			return false;
+		}
+
 		Node node(joboptions["fn_fliplabel"].getString(), joboptions["fn_fliplabel"].node_type);
 		inputNodes.push_back(node);
 
 		Node node2(outputname + "original.star", NODE_PART_DATA);
 		outputNodes.push_back(node2);
 
-		command = "awk '{if  ($1==\"_rlnImageName\") {$1=\"_rlnImageOriginalName\"} else if ($1==\"_rlnImageOriginalName\") {$1=\"_rlnImageName\"}; print }' < ";
-		command += joboptions["fn_fliplabel"].getString() + " > " + outputname + "original.star";
+		command = "`which relion_particle_subtract`";
+		command += " --revert " + joboptions["fn_fliplabel"].getString() + " --o " + outputname;
 	}
 	else
 	{
