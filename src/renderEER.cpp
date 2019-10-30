@@ -27,6 +27,8 @@
 	#define RCTOC(label)
 #endif
 
+int EER_grouping = 40;
+
 const char EERRenderer::EER_FOOTER_OK[]  = "ThermoFisherECComprOK000";
 const char EERRenderer::EER_FOOTER_ERR[] = "ThermoFisherECComprERR00";
 const int EERRenderer::EER_IMAGE_PIXELS = 4096 * 4096;

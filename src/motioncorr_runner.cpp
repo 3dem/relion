@@ -89,6 +89,9 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	first_frame_sum =  textToInteger(parser.getOption("--first_frame_sum", "First movie frame used in output sum (start at 1)", "1"));
 	if (first_frame_sum < 1) first_frame_sum = 1;
 	last_frame_sum =  textToInteger(parser.getOption("--last_frame_sum", "Last movie frame used in output sum (0 or negative: use all)", "-1"));
+	int my_eer_grouping = textToInteger(parser.getOption("--eer_grouping", "EER grouping", "-1"));
+	if (my_eer_grouping > 0)
+		EER_grouping = my_eer_grouping;
 
 	int motioncor2_section = parser.addSection("MOTIONCOR2 options");
 	do_motioncor2 = parser.checkOption("--use_motioncor2", "Use Shawn Zheng's MOTIONCOR2.");

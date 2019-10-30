@@ -7,7 +7,7 @@
 
 #include <src/image.h>
 
-const int EER_grouping = 40; // TODO: TAKANORI: Make this a command-line argument
+extern int EER_grouping; // TODO: TAKANORI: Make this a command-line argument
 
 class EERRenderer {
 	private:

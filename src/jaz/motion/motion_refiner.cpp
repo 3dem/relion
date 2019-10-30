@@ -33,6 +33,7 @@
 #include <src/jaz/fsc_helper.h>
 #include <src/jaz/img_proc/image_op.h>
 #include <src/jaz/parallel_ft.h>
+#include <src/renderEER.h>
 
 #include "gp_motion_fit.h"
 #include "motion_helper.h"
@@ -89,6 +90,10 @@ void MotionRefiner::read(int argc, char **argv)
 	
 	movie_toReplace = parser.getOption("--mov_toReplace", "Replace this string in micrograph names...", "");
 	movie_replaceBy = parser.getOption("--mov_replaceBy", "..by this one", "");
+
+	int my_eer_grouping = textToInteger(parser.getOption("--eer_grouping", "EER grouping", "-1"));
+	if (my_eer_grouping > 0)
+		EER_grouping = my_eer_grouping;
 			
 	// Check for errors in the command-line option
 	if (parser.checkForErrors())
