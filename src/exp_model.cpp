@@ -351,7 +351,7 @@ void Experiment::divideParticlesInRandomHalves(int seed, bool do_helical_refine)
 }
 
 // for sorting particles, based on the optics group of their first image
-bool compareOpticsGroupsParticles(ExpParticle a, ExpParticle b)
+bool compareOpticsGroupsParticles(const ExpParticle &a, const ExpParticle &b)
 {
 	return (a.images[0].optics_group < b.images[0].optics_group);
 }
