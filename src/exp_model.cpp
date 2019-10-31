@@ -366,6 +366,8 @@ void Experiment::randomiseParticlesOrder(int seed, bool do_split_random_halves, 
 
 		if (do_split_random_halves)
 		{
+			// TODO: FIXME: This is very inefficient in terms of memory when images are pre-read.
+			//              Images are duplicated in particle_list1/2.
 			std::vector<ExpParticle> particle_list1, particle_list2;
 			particle_list1.clear();
 			particle_list2.clear();
@@ -399,7 +401,6 @@ void Experiment::randomiseParticlesOrder(int seed, bool do_split_random_halves, 
 			// First fill new_ori_particles with the first subset, then with the second
 			particles = particle_list1;
 			particles.insert(particles.end(), particle_list2.begin(), particle_list2.end());
-
 		}
 		else
 		{
@@ -518,8 +519,10 @@ void Experiment::setScratchDirectory(FileName _fn_scratch, bool do_reuse_scratch
 					Itmp.read(fn_tmp, false);
 					nr_parts_on_scratch[optics_group] = NSIZE(Itmp());
 				}
+#ifdef DEBUG_SCRATCH
 				if (verb > 0)
 					std::cerr << " optics_group= " << (optics_group + 1) << " nr_parts_on_scratch[optics_group]= " << nr_parts_on_scratch[optics_group] << std::endl;
+#endif
 			}
 		}
 	}
