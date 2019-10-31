@@ -256,12 +256,13 @@ void StarConverter::unifyPixelSize(MetaDataTable& outOptics, std::string tablena
 			if (tablename == "particles" || tablename == "")
 			{
 				outOptics.setValue(EMDL_IMAGE_PIXEL_SIZE, angpix, i);
+				// Do not set EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, because particles might have been down-sampled.
 			}
 			else if (tablename == "micrographs")
 			{
 				outOptics.setValue(EMDL_MICROGRAPH_PIXEL_SIZE, angpix, i);
+		 		outOptics.setValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, angpix, i);
 			}
-			outOptics.setValue(EMDL_MICROGRAPH_ORIGINAL_PIXEL_SIZE, angpix, i);
 		}
 
 		outOptics.deactivateLabel(EMDL_CTF_DETECTOR_PIXEL_SIZE);
