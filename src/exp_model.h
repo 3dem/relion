@@ -214,7 +214,10 @@ public:
 };
 
 // for sorting particles based on the optics_group of their first image;
-bool compareOpticsGroupsParticles(ExpParticle a, ExpParticle b);
+bool compareOpticsGroupsParticles(const ExpParticle &a, const ExpParticle &b);
+
+// for sorting particles based on the random subset
+bool compareRandomSubsetParticles(const ExpParticle &a, const ExpParticle &b);
 
 class Experiment
 {

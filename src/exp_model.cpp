@@ -330,30 +330,22 @@ void Experiment::divideParticlesInRandomHalves(int seed, bool do_helical_refine)
 		}
 	}
 
-	// Now re-order such that half1 is in first half, and half2 is in second half of the particle list (for MPI_parallelisattion)
-	std::vector<ExpParticle> new_particles_set1, new_particles_set2;
-	for (long int i = 0; i < particles.size(); i++)
-	{
-		int random_subset = particles[i].random_subset;
-		if (random_subset == 1)
-			new_particles_set1.push_back(particles[i]);
-		else if (random_subset == 2)
-			new_particles_set2.push_back(particles[i]);
-		else
-			REPORT_ERROR("ERROR: invalid number for random subset (i.e. not 1 or 2): " + integerToString(random_subset));
-	}
-	particles.clear();
-	particles.insert(particles.end(), new_particles_set1.begin(), new_particles_set1.end());
-	particles.insert(particles.end(), new_particles_set2.begin(), new_particles_set2.end());
-
 	if (nr_particles_subset2 == 0 || nr_particles_subset1 == 0)
 		REPORT_ERROR("ERROR: one of your half sets has no segments. Is rlnRandomSubset set to 1 or 2 in your particles STAR file? Or in case you're doing helical, half-sets are always per-filament, so provide at least 2 filaments.");
+
+	std::stable_sort(particles.begin(), particles.end(), compareRandomSubsetParticles);
 }
 
 // for sorting particles, based on the optics group of their first image
-bool compareOpticsGroupsParticles(ExpParticle a, ExpParticle b)
+bool compareOpticsGroupsParticles(const ExpParticle &a, const ExpParticle &b)
 {
 	return (a.images[0].optics_group < b.images[0].optics_group);
+}
+
+// for sorting particles, based on the random subset
+bool compareRandomSubsetParticles(const ExpParticle &a, const ExpParticle &b)
+{
+	return (a.random_subset < b.random_subset);
 }
 
 void Experiment::randomiseParticlesOrder(int seed, bool do_split_random_halves, bool do_subsets)
@@ -366,40 +358,34 @@ void Experiment::randomiseParticlesOrder(int seed, bool do_split_random_halves, 
 
 		if (do_split_random_halves)
 		{
-			std::vector<ExpParticle> particle_list1, particle_list2;
-			particle_list1.clear();
-			particle_list2.clear();
-			// Fill the two particle lists
+			std::stable_sort(particles.begin(), particles.end(), compareRandomSubsetParticles);
+
+			// sanity check
+			long int nr_half1 = 0, nr_half2 = 0;
 			for (long int i = 0; i < particles.size(); i++)
 			{
-				int random_subset = particles[i].random_subset;
+				const int random_subset = particles[i].random_subset;
 				if (random_subset == 1)
-					particle_list1.push_back(particles[i]);
+					nr_half1++;
 				else if (random_subset == 2)
-					particle_list2.push_back(particles[i]);
+					nr_half2++;
 				else
 					REPORT_ERROR("ERROR Experiment::randomiseParticlesOrder: invalid number for random subset (i.e. not 1 or 2): " + integerToString(random_subset));
 			}
 
-			// Just a silly check for the sizes of the ori_particle_lists (to be sure)
-			if (particle_list1.size() != nr_particles_subset1)
-				REPORT_ERROR("ERROR Experiment::randomiseParticlesOrder: invalid particle_list1 size:" + integerToString(particle_list1.size()) + " != " + integerToString(nr_particles_subset1));
-			if (particle_list2.size() != nr_particles_subset2)
-				REPORT_ERROR("ERROR Experiment::randomiseParticlesOrder: invalid particle_list2 size:" + integerToString(particle_list2.size()) + " != " + integerToString(nr_particles_subset2));
+			if (nr_half1 != nr_particles_subset1)
+				REPORT_ERROR("ERROR Experiment::randomiseParticlesOrder: invalid half1 size:" + integerToString(nr_half1) + " != " + integerToString(nr_particles_subset1));
+			if (nr_half2 != nr_particles_subset2)
+				REPORT_ERROR("ERROR Experiment::randomiseParticlesOrder: invalid half2 size:" + integerToString(nr_half2) + " != " + integerToString(nr_particles_subset2));
 
 			// Randomise the two particle lists
-			std::random_shuffle(particle_list1.begin(), particle_list1.end());
-			std::random_shuffle(particle_list2.begin(), particle_list2.end());
+			std::random_shuffle(particles.begin(), particles.begin() + nr_half1);
+			std::random_shuffle(particles.begin() + nr_half1, particles.end());
 
 			// Make sure the particles are sorted on their optics_group.
 			// Otherwise CudaFFT re-calculation of plans every time image size changes slows down things a lot!
-			std::stable_sort(particle_list1.begin(), particle_list1.end(), compareOpticsGroupsParticles);
-			std::stable_sort(particle_list2.begin(), particle_list2.end(), compareOpticsGroupsParticles);
-
-			// First fill new_ori_particles with the first subset, then with the second
-			particles = particle_list1;
-			particles.insert(particles.end(), particle_list2.begin(), particle_list2.end());
-
+			std::stable_sort(particles.begin(), particles.begin() + nr_half1, compareOpticsGroupsParticles);
+			std::stable_sort(particles.begin() + nr_half1, particles.end(), compareOpticsGroupsParticles);
 		}
 		else
 		{
@@ -518,8 +504,10 @@ void Experiment::setScratchDirectory(FileName _fn_scratch, bool do_reuse_scratch
 					Itmp.read(fn_tmp, false);
 					nr_parts_on_scratch[optics_group] = NSIZE(Itmp());
 				}
+#ifdef DEBUG_SCRATCH
 				if (verb > 0)
 					std::cerr << " optics_group= " << (optics_group + 1) << " nr_parts_on_scratch[optics_group]= " << nr_parts_on_scratch[optics_group] << std::endl;
+#endif
 			}
 		}
 	}

@@ -1760,9 +1760,9 @@ void GuiMainWindow::cb_display_io_node_i()
 		}
 
 		// Get the name of the micrograph STAR file from reading the suffix file
-	    FileName fn_suffix = pipeline.nodeList[mynode].name;
-	    if (fn_suffix.getExtension() == "star")
-	    {
+		FileName fn_suffix = pipeline.nodeList[mynode].name;
+		if (fn_suffix.getExtension() == "star")
+		{
 			std::ifstream in(fn_suffix.data(), std::ios_base::in);
 			FileName fn_star;
 			in >> fn_star ;
@@ -1817,11 +1817,11 @@ void GuiMainWindow::cb_display_io_node_i()
 			{
 				fl_message("Only coordinates in .star format, generated in the pipeline, can be displayed here.");
 			}
-	    }
-	    else
-	    {
-	    	fl_message("Only coordinates in .star format, generated in the pipeline, can be displayed here.");
-	    }
+		}
+		else
+		{
+			fl_message("Only coordinates in .star format, generated in the pipeline, can be displayed here.");
+		}
 	}
 	else if (pipeline.nodeList[mynode].type == NODE_PDF_LOGFILE)
 	{
@@ -1833,6 +1833,10 @@ void GuiMainWindow::cb_display_io_node_i()
 		}
 		std::string myviewer(default_pdf_viewer);
 		command = myviewer + " " + pipeline.nodeList[mynode].name + "&";
+	}
+	else if (pipeline.nodeList[mynode].type == NODE_POLISH_PARAMS)
+	{
+		command = "cat " + pipeline.nodeList[mynode].name;
 	}
 	else if (pipeline.nodeList[mynode].type != NODE_POST)
 	{
@@ -1873,7 +1877,6 @@ void GuiMainWindow::cb_add_scheduler_edge_i()
 	{
 		output = scheduler_edge_output->text(idx);
 	}
-
 
 	idx = scheduler_edge_boolean->value();
 	if (idx >= 0)
@@ -1942,7 +1945,6 @@ void GuiMainWindow::cb_select_scheduler_edge(Fl_Widget *o, void* v)
 
 void GuiMainWindow::cb_select_scheduler_edge_i()
 {
-
 	// Get position of the browser:
 	int idx = scheduler_edge_browser->value();
 	if (idx >= 1)
@@ -2946,7 +2948,6 @@ void GuiMainWindow::cb_edit_note_i(bool is_project_note)
 	}
 	NoteEditorWindow* w = new NoteEditorWindow(660, 400, title.c_str(), fn_note, !maingui_do_read_only);
 	w->show();
-
 }
 
 // Save button call-back function
@@ -2969,7 +2970,6 @@ void GuiMainWindow::cb_save_i()
 	}
 	// Write the hidden file
 	gui_jobwindows[iwin]->myjob.write("");
-
 }
 
 // Load button call-back function
@@ -3345,7 +3345,6 @@ void GuiMainWindow::cb_start_pipeliner_i()
 	}
 	SchedulerWindow* w = new SchedulerWindow(400, 300, "Select which jobs to execute");
 	w->fill(pipeline.name, job_names);
-
 }
 
 void GuiMainWindow::cb_stop_pipeliner(Fl_Widget* o, void* v)
@@ -3408,7 +3407,6 @@ void GuiMainWindow::cb_toggle_expand_stdout_i()
 		expand_stdout_button->label("Job view");
 		show_expand_stdout = true;
 	}
-
 }
 
 void GuiMainWindow::cb_about(Fl_Widget* o, void* v)
@@ -3490,4 +3488,3 @@ void GuiMainWindow::cb_quit_i()
 {
 	exit(0);
 }
-
