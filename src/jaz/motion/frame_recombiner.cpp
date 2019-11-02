@@ -231,7 +231,7 @@ void FrameRecombiner::process(const std::vector<MetaDataTable>& mdts, long g_sta
 	const RFLOAT ref_angpix = reference->angpix;
 	const RFLOAT coords_angpix = micrographHandler->coords_angpix;
 
-	std::cout << "ref_angpix = " << ref_angpix << " coords_angpix = " << coords_angpix << std::endl;
+//	std::cout << "ref_angpix = " << ref_angpix << " coords_angpix = " << coords_angpix << std::endl;
 	if (verb > 0)
 	{
 		std::cout << " + Combining frames for all micrographs ... " << std::endl;
