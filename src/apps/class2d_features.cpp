@@ -461,13 +461,21 @@ public:
 		// Read in the MD_optimiser table from the STAR file, get model.star and data.star
 		if (fn_optimiser != "")
 		{
-			myopt.read(fn_optimiser); // true means skip_groups_and_pdf_direction from mlmodel; only read 1000 particles...
-			if (debug>0) std::cerr << "Done with reading optimiser ..." << std::endl;
-
 			// A bit ugly, but we need fn_model...
 			MetaDataTable MDopt;
-			MDopt.read(fn_optimiser);
+			MDopt.read(fn_optimiser, "optimiser_general");
 			MDopt.getValue(EMDL_OPTIMISER_MODEL_STARFILE, fn_model);
+
+			bool do_ctf;
+			MDopt.getValue(EMDL_OPTIMISER_DO_CORRECT_CTF, do_ctf);
+			if (!do_ctf)
+			{
+				std::cerr << " Skipping this job because it hasn't done CTF correction ..." << std::endl;
+				exit(1);
+			}
+
+			myopt.read(fn_optimiser); // true means skip_groups_and_pdf_direction from mlmodel; only read 1000 particles...
+			if (debug>0) std::cerr << "Done with reading optimiser ..." << std::endl;
 
 			if (myopt.intact_ctf_first_peak)
 			{
@@ -1355,7 +1363,6 @@ public:
 			MD_class_features.getValue(EMDL_MLMODEL_ACCURACY_TRANS, this_class_feature.accuracy_translation);
 			MD_class_features.getValue(EMDL_MLMODEL_ESTIM_RESOL_REF, this_class_feature.estimated_resolution);
 			MD_class_features.getValue(EMDL_CLASS_FEAT_WEIGHTED_RESOLUTION, this_class_feature.weighted_resolution);
-			MD_class_features.getValue(EMDL_CLASS_FEAT_PARTICLE_NR, this_class_feature.particle_nr);
 
 			// Job-wise features
 			MD_class_features.getValue(EMDL_MLMODEL_PIXEL_SIZE, myopt.mymodel.pixel_size);
@@ -1444,6 +1451,7 @@ public:
 			MD_class_features.setValue(EMDL_CLASS_FEAT_WEIGHTED_RESOLUTION, features_all_classes[i].weighted_resolution);
 			MD_class_features.setValue(EMDL_CLASS_FEAT_PARTICLE_NR, features_all_classes[i].particle_nr);
 
+
 			// Job-wise features
 			MD_class_features.setValue(EMDL_MLMODEL_PIXEL_SIZE, myopt.mymodel.pixel_size);
 			MD_class_features.setValue(EMDL_MLMODEL_ORIGINAL_SIZE, myopt.mymodel.ori_size);//??
@@ -1480,8 +1488,6 @@ public:
 			MD_class_features.setValue(EMDL_CLASS_FEAT_SOLVENT_KURT, features_all_classes[i].solvent_moments.kurt);
 			MD_class_features.setValue(EMDL_CLASS_FEAT_SCATTERED_SIGNAL, features_all_classes[i].scattered_signal);
 			MD_class_features.setValue(EMDL_CLASS_FEAT_EDGE_SIGNAL, features_all_classes[i].edge_signal);
-
-            MD_class_features.setValue(EMDL_CLASS_FEAT_PARTICLE_NR, features_all_classes[i].particle_nr);
 
             // Lowpass filtered image features
             MD_class_features.setValue(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MEAN, features_all_classes[i].lowpass_filtered_img_avg);
