@@ -83,7 +83,7 @@ public:
     RFLOAT class_distribution, accuracy_rotation, accuracy_translation, estimated_resolution, particle_nr;
     RFLOAT class_score, edge_signal, scattered_signal, weighted_resolution;
     RFLOAT lowpass_filtered_img_avg, lowpass_filtered_img_stddev, lowpass_filtered_img_minval, lowpass_filtered_img_maxval;
-    std::vector<RFLOAT> resolutions, lbp, lbp_p, lbp_s, haralick_p, haralick_s;
+    std::vector<RFLOAT> resolutions, lbp, lbp_p, lbp_s, haralick_p, haralick_s, zernike_moments;
     moments circular_mask_moments, ring_moments, inner_circle_moments, fft_moments, protein_moments, solvent_moments;
     double total_entropy, protein_entropy, solvent_entropy;
 
@@ -123,6 +123,144 @@ public:
     {
     }
 };
+
+class ZernikeMomentsExtractor
+{
+	// Code modified from: http://murphylab.web.cmu.edu/publications/boland/boland_node85.html
+public:
+	//
+	// Calculates n! (uses double arithmetic to avoid overflow)
+	//
+	double factorial(long n)
+	{
+		if(n < 0)
+			return(0.0) ;
+		if(n == 0)
+			return(1.0) ;
+		else
+			return(n * factorial(n-1)) ;
+	}
+
+	//
+	// Equations for Zernike moments from Prokop and Reeves, CVGIP: Graphical
+	//   Models and Image Processing, v 54 n 5, Sep 92, pp 438-460.
+	//
+
+	// Function to calculate the Zernike polynomial Rnl(r).
+	//  Note: 0 <= r <= 1
+	double zernikeR(int n, int l, double r)
+	{
+		int m ;
+		double sum = 0.0 ;
+
+		if( ((n-l) % 2) != 0 )
+	    {
+			std::cerr << "zernikeR(): improper values of n,l\n" ;
+			return(0) ;
+	    }
+
+		for(m = 0; m <= (n-l)/2; m++)
+		{
+			sum += (pow((double)-1.0,(double)m)) * ( factorial(n-m) ) /
+					( factorial(m) * (factorial((n - 2*m + l) / 2)) *
+						(factorial((n - 2*m - l) / 2)) ) *
+						( pow((double)r, (double)(n - 2*m)) );
+		}
+
+		return(sum) ;
+	}
+
+	Complex zernikeZ(MultidimArray<double> img, int n, int l, double r_max)
+	{
+	  double rho ;		// radius of pixel from COM
+	  double theta ;    // angle of pixel
+	  Complex integral(0.,0.) ;
+
+	  FOR_ALL_ELEMENTS_IN_ARRAY2D(img)
+	  {
+
+		  if(r_max > 0.0)
+	    	  rho = sqrt((double)(i*i + j*j)) / r_max;
+	      else
+	    	  rho = 0.0;
+
+	      if(rho <= 1.0)
+	      {
+	    	  theta = (i == 0 && j == 0) ? 0.0 :  atan2(i, j);
+	    	  Complex aux(cos(l*theta), sin(l*theta));
+	    	  integral += zernikeR(n,l,rho) * A2D_ELEM(img, i, j) * rho * conj(aux);
+	      }
+
+	  }
+
+	  return(integral * (n+1)/PI) ;
+
+	}
+
+
+	std::vector<double> zernike(MultidimArray<double> img, long z_order, double radius, bool verb)
+	{
+		if (z_order > 20 || z_order < 0)
+			REPORT_ERROR("BUG: zernike(): You choice of z_order is invalid; choose a value between 0 and 20");
+
+
+		std::vector<double> zfeatures;
+
+		// Normalise images to be intensity from [0,1]
+		double minval, maxval, range;
+       	MultidimArray<int> mask;
+       	mask.resize(img);
+       	mask.setXmippOrigin();
+       	FOR_ALL_ELEMENTS_IN_ARRAY2D(mask)
+       	{
+       		if ((double)(i*i+j*j) <= radius*radius)
+       			A2D_ELEM(mask, i, j) = 1;
+       		else
+       			A2D_ELEM(mask, i, j) = 0;
+       	}
+       	img.computeDoubleMinMax(minval, maxval, &mask);
+        range = maxval -minval;
+        if (range > 0.)
+        {
+        	img = img - minval;
+        	img /= range;
+        }
+        else
+        {
+    		long   z_num_features = (long)( ((z_order + 4) *
+    					   (z_order + 1) - 2 *
+    					   (long)(((long)z_order + 1) / (long)2) ) / 4 ) ;
+        	zfeatures.resize(z_num_features, 0.);
+        	return zfeatures;
+        }
+
+		// Calculate Zernike moments
+		for (int n = 0; n <= z_order; n++)
+		{
+			for (int l = 0; l <= n; l++)
+			{
+				if ((n-l) % 2 == 0)
+				{
+					zfeatures.push_back(abs(zernikeZ(img, n, l, radius))) ;
+				}
+			}
+		}
+
+		if (verb)
+		{
+			for (int i=0; i < zfeatures.size(); i++)
+			{
+				std::cerr << " i= " << i << " zfeatures[i]= " << zfeatures[i] << std::endl;
+			}
+		}
+
+		return zfeatures;
+	}
+
+};
+
+
+
 
 #define EPS 1e-6
 class HaralickExtractor
@@ -359,8 +497,6 @@ class HaralickExtractor
 
         }
 
-        //Constructor for use on various images
-        HaralickExtractor() {};
 };
 
 
@@ -374,6 +510,7 @@ public:
 	FileName fn_out, fn_optimiser, fn_model, fn_select, fn_job_score, fn_cf;
 
 	HaralickExtractor haralick_extractor;
+	ZernikeMomentsExtractor zernike_extractor;
 
 	RFLOAT minRes, job_score;
 	RFLOAT radius_ratio, radius;
@@ -1306,6 +1443,10 @@ public:
 				features_this_class.haralick_s = haralick_extractor.getFeaturesFromImage(features_this_class.img(), &s_mask, debug>0);
 				if (debug > 0) std::cerr << " done with haralick" << std::endl;
 
+				// Calculate Zernike moments
+				features_this_class.zernike_moments = zernike_extractor.zernike(features_this_class.img(), 7, circular_mask_radius, debug>0);
+				if (debug> 0 ) std::cerr << " done with Zernike moments" << std::endl;
+
 				features_all_classes.push_back(features_this_class);
 				ith_nonzero_class++;
 
@@ -1407,6 +1548,10 @@ public:
             MD_class_features.getValue(EMDL_CLASS_FEAT_PROTEIN_HARALICK, features_all_classes[i].haralick_p);
             MD_class_features.getValue(EMDL_CLASS_FEAT_SOLVENT_HARALICK, features_all_classes[i].haralick_s);
 
+            // Zernike moments
+            MD_class_features.getValue(EMDL_CLASS_FEAT_ZERNIKE_MOMENTS, features_all_classes[i].zernike_moments);
+
+
             preread_features_all_classes.push_back(this_class_feature);
 			i++;
 		}
@@ -1492,6 +1637,9 @@ public:
 
             MD_class_features.setValue(EMDL_CLASS_FEAT_PROTEIN_HARALICK, features_all_classes[i].haralick_p);
             MD_class_features.setValue(EMDL_CLASS_FEAT_SOLVENT_HARALICK, features_all_classes[i].haralick_s);
+
+            // Zernike moments
+            MD_class_features.setValue(EMDL_CLASS_FEAT_ZERNIKE_MOMENTS, features_all_classes[i].zernike_moments);
 
 		}
 		MD_class_features.write(fn_out);

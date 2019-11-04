@@ -124,6 +124,7 @@ enum EMDLabel
 	EMDL_CLASS_FEAT_SOLVENT_ENTROPY,
 	EMDL_CLASS_FEAT_PROTEIN_HARALICK,
 	EMDL_CLASS_FEAT_SOLVENT_HARALICK,
+	EMDL_CLASS_FEAT_ZERNIKE_MOMENTS,
 
 	EMDL_CTF_ASTIGMATISM,
 	EMDL_CTF_BFACTOR, ///< B-factor
@@ -697,7 +698,7 @@ private:
         EMDL::addLabel(EMDL_CLASS_FEAT_SOLVENT_ENTROPY, EMDL_DOUBLE, "rlnSolventEntropy", "Entropy of the solvent area.");
         EMDL::addLabel(EMDL_CLASS_FEAT_PROTEIN_HARALICK, EMDL_DOUBLE_VECTOR, "rlnProteinHaralick", "Haralick features of the protein area.");
         EMDL::addLabel(EMDL_CLASS_FEAT_SOLVENT_HARALICK, EMDL_DOUBLE_VECTOR, "rlnSolventHaralick", "Haralick features of the solvent area.");
-
+        EMDL::addLabel(EMDL_CLASS_FEAT_ZERNIKE_MOMENTS, EMDL_DOUBLE_VECTOR, "rlnZernikeMoments", "Zernike moments of the image.");
 
 		EMDL::addLabel(EMDL_CTF_ASTIGMATISM, EMDL_DOUBLE, "rlnCtfAstigmatism", "Absolute value of the difference between defocus in U- and V-direction (in A)");
 		EMDL::addLabel(EMDL_CTF_BFACTOR, EMDL_DOUBLE, "rlnCtfBfactor", "B-factor (in A^2) that describes CTF power spectrum fall-off");
