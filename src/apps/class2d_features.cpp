@@ -239,20 +239,21 @@ class HaralickExtractor
 
 
     public:
-        std::vector<double> fast_feats(bool verbose=false)
+        MultidimArray<double> fast_feats(bool verbose=false)
 		{
-            std::vector<double> result(13, 0.0);
+            MultidimArray<double> result;
+            result.initZeros(13);
             if (NZYXSIZE(matcooc) ==0) return result;
             if (!initial) fast_init();
             std::vector<double> margfeats = margprobs_feats();
             std::vector<double> coocfeats = cooc_feats();
             for (int i = 0; i < 7; i++)
             {
-                result[i] = coocfeats[i];
+                result(i) = coocfeats[i];
             }
             for (int i = 0; i < 6; i++)
             {
-            	result[7 + i] = margfeats[i];
+            	result(7 + i) = margfeats[i];
             }
             return result;
         }
@@ -291,47 +292,13 @@ class HaralickExtractor
             return ans;
         }
 
-        MultidimArray<RFLOAT> MatCoocAdd(MultidimArray<int> img, int N, std::vector<int> deltax, std::vector<int> deltay, MultidimArray<int> *mask=NULL)
-        {
-        	MultidimArray<RFLOAT> ans, nextans;
-        	// This code is different from the original one! made also loop over deltay, and excluded (0,0) calculation
-        	ans.initZeros(N + 1, N + 1);
-        	for (int i = 0; i < deltay.size(); i++)
-            {
-                for (int j = 0; j < deltax.size(); j++)
-                {
-                   	/*
-                    	x o o
-            			x o o
-            			x o o
-            			o o o
-            			o o o
-            		*/
-                	if ( !(j==0 && i <= 0) )
-                	{
-                		nextans = MatCooc(img, N, deltax[j], deltay[i], mask);
-                		ans += nextans;
-                	}
-                }
-            }
-            return ans;
-        }
-
         std::vector<double> getFeaturesFromImage(MultidimArray<RFLOAT> img, MultidimArray<int> *mask=NULL, bool verbose=false)
         {
         	std::vector<double> ans;
         	ans.resize(13, 0.);
 
-
-        	/*
-        	x o o
-			x o o
-			x o o
-			o o o
-			o o o
-			*/
-        	std::vector<int> deltax{0,1,2};
-        	std::vector<int> deltay{-2,-1,0,1,2};
+        	MultidimArray<double> avg;
+        	avg.initZeros(13);
 
         	// Convert greyscale image to integer image with much fewer (32) grey-scale values
         	MultidimArray<int> imgint;
@@ -349,9 +316,27 @@ class HaralickExtractor
 					}
 				}
 
-				matcooc = MatCoocAdd(imgint, 31, deltax, deltay, mask);
+				// Average over Haralick features in horizontal, vertical, and 2 diagonal directions
+	        	/*
+	        	x o
+				O o
+				o o
+				*/
+				matcooc = MatCooc(imgint, 31, 0, 1, mask);
 				fast_init(); //initialize internal variables
-				ans = fast_feats();
+				avg += fast_feats();
+				matcooc = MatCooc(imgint, 31, 1, 0, mask);
+				fast_init(); //initialize internal variables
+				avg += fast_feats();
+				matcooc = MatCooc(imgint, 31, 1, 1, mask);
+				fast_init(); //initialize internal variables
+				avg += fast_feats();
+				matcooc = MatCooc(imgint, 31, 1, -1, mask);
+				fast_init(); //initialize internal variables
+				avg += fast_feats();
+
+				for (int i = 0; i < ans.size(); i++) ans[i] = avg(i) / 4.;
+
 				if (verbose)
 				{
 					std::cout << " - Energy: " << ans[0] << std::endl;
