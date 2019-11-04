@@ -28,6 +28,7 @@
 #endif
 
 int EER_grouping = 40;
+int EER_upsample = 2;
 
 const char EERRenderer::EER_FOOTER_OK[]  = "ThermoFisherECComprOK000";
 const char EERRenderer::EER_FOOTER_ERR[] = "ThermoFisherECComprERR00";
@@ -41,6 +42,17 @@ void EERRenderer::render8K(MultidimArray<T> &image, std::vector<unsigned int> &p
 	{
 		int x = ((positions[i] & 4095) << 1) | ((symbols[i] & 2) >> 1); // 4095 = 111111111111b, 3 = 00000010b
 		int y = ((positions[i] >> 12) << 1) | ((symbols[i] & 8) >> 3); //  4096 = 2^12, 8 = 00001000b
+			DIRECT_A2D_ELEM(image, y, x)++;
+	}
+}
+
+template <typename T>
+void EERRenderer::render4K(MultidimArray<T> &image, std::vector<unsigned int> &positions, std::vector<unsigned char> &symbols, int n_electrons)
+{
+	for (int i = 0; i < n_electrons; i++)
+	{
+		int x = positions[i] & 4095; // 4095 = 111111111111b
+		int y = positions[i] >> 12; //  4096 = 2^12
 			DIRECT_A2D_ELEM(image, y, x)++;
 	}
 }
@@ -125,7 +137,7 @@ int EERRenderer::getWidth()
 	if (!ready)
 		REPORT_ERROR("EERRenderer::getNFrames called before ready.");
 
-	return 8192; // TODO: allow other size
+	return 4096 * EER_upsample;
 }
 
 int EERRenderer::getHeight()
@@ -216,7 +228,12 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 		RCTOC(TIMING_UNPACK_RLE);
 
 		RCTIC(TIMING_RENDER_ELECTRONS);
-		render8K(image, positions, symbols, n_electron);
+		if (EER_upsample == 2)
+			render8K(image, positions, symbols, n_electron);
+		else if (EER_upsample == 1)
+			render4K(image, positions, symbols, n_electron);
+		else
+			REPORT_ERROR("Invalid EER upsamle");
 		RCTOC(TIMING_RENDER_ELECTRONS);
 
 		total_n_electron += n_electron;

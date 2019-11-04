@@ -92,6 +92,7 @@ void MotioncorrRunner::read(int argc, char **argv, int rank)
 	int my_eer_grouping = textToInteger(parser.getOption("--eer_grouping", "EER grouping", "-1"));
 	if (my_eer_grouping > 0)
 		EER_grouping = my_eer_grouping;
+	EER_upsample = textToInteger(parser.getOption("--eer_upsampling", "EER upsampling (1 or 2)", "2"));
 
 	int motioncor2_section = parser.addSection("MOTIONCOR2 options");
 	do_motioncor2 = parser.checkOption("--use_motioncor2", "Use Shawn Zheng's MOTIONCOR2.");

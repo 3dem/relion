@@ -94,7 +94,8 @@ void MotionRefiner::read(int argc, char **argv)
 	int my_eer_grouping = textToInteger(parser.getOption("--eer_grouping", "EER grouping", "-1"));
 	if (my_eer_grouping > 0)
 		EER_grouping = my_eer_grouping;
-			
+	EER_upsample = textToInteger(parser.getOption("--eer_upsampling", "EER upsampling (1 or 2)", "2"));
+
 	// Check for errors in the command-line option
 	if (parser.checkForErrors())
 	{

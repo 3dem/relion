@@ -8,6 +8,7 @@
 #include <src/image.h>
 
 extern int EER_grouping; // TODO: TAKANORI: Make this a command-line argument
+extern int EER_upsample;
 
 class EERRenderer {
 	private:
@@ -27,6 +28,9 @@ class EERRenderer {
 
 	template <typename T>
 	void render8K(MultidimArray<T> &image, std::vector<unsigned int> &positions, std::vector<unsigned char> &symbols, int n_electrons);
+
+	template <typename T>
+	void render4K(MultidimArray<T> &image, std::vector<unsigned int> &positions, std::vector<unsigned char> &symbols, int n_electrons);
 
 	public:
 
@@ -59,24 +63,31 @@ class EERRenderer {
 	template <typename T>
 	static void upsampleEERGain(MultidimArray<T> &gain)
 	{
-		const long long size = 4096 * 2; // TODO
-		MultidimArray<T> original = gain;
-
-		gain.resize(size, size);
-		RFLOAT sum = 0;
-		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(gain)
+		if (EER_upsample == 2)
 		{
-			DIRECT_A2D_ELEM(gain, i, j) = DIRECT_A2D_ELEM(original, i / 2, j / 2);
-			sum += DIRECT_A2D_ELEM(gain, i, j);
-		}
-		sum /= size * size;
+			const long long size = 4096 * EER_upsample;
+			MultidimArray<T> original = gain;
 
-		FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(gain)
-		{
-			if (DIRECT_A2D_ELEM(gain, i, j) != 0)
+			gain.resize(size, size);
+			RFLOAT sum = 0;
+			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(gain)
 			{
-				DIRECT_A2D_ELEM(gain, i, j) = sum / DIRECT_A2D_ELEM(gain, i, j);
+				DIRECT_A2D_ELEM(gain, i, j) = DIRECT_A2D_ELEM(original, i / 2, j / 2);
+				sum += DIRECT_A2D_ELEM(gain, i, j);
+			}
+			sum /= size * size;
+
+			FOR_ALL_DIRECT_ELEMENTS_IN_ARRAY2D(gain)
+			{
+				if (DIRECT_A2D_ELEM(gain, i, j) != 0)
+				{
+					DIRECT_A2D_ELEM(gain, i, j) = sum / DIRECT_A2D_ELEM(gain, i, j);
+				}
 			}
 		}
+		else if (EER_upsample == 1)
+			return;
+		else
+			REPORT_ERROR("Invalid EER_upsample");
 	}
 };
