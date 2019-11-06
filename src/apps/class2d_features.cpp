@@ -630,7 +630,10 @@ public:
 		}
 
 		// Read in class features from a previous run if fn_cf is provided
-		readClassFeatures();
+		if (fn_cf != "")
+		{
+			readClassFeatures();
+		}
 
 		// Get job score
 		if (fn_job_score != "")
@@ -1461,12 +1464,26 @@ public:
 	void readClassFeatures()
 	{
 
+		preread_features_all_classes.clear();
+
 		if (fn_cf == "") return;
 
 		MetaDataTable MD_class_features;
 		MD_class_features.read(fn_cf);
 
-		preread_features_all_classes.clear();
+		// Job-wise features, only read from the first line of the table
+		MD_class_features.getValue(EMDL_MLMODEL_PIXEL_SIZE, myopt.mymodel.pixel_size, 0);
+		MD_class_features.getValue(EMDL_MLMODEL_ORIGINAL_SIZE, myopt.mymodel.ori_size, 0);//??
+		MD_class_features.getValue(EMDL_MLMODEL_NR_CLASSES, myopt.mymodel.nr_classes, 0);
+		MD_class_features.getValue(EMDL_MLMODEL_SIGMA_OFFSET, myopt.mymodel.sigma2_offset, 0);
+		MD_class_features.getValue(EMDL_MLMODEL_AVE_PMAX, myopt.mymodel.ave_Pmax, 0);
+		MD_class_features.getValue(EMDL_OPTIMISER_DO_CORRECT_CTF, myopt.do_ctf_correction, 0);
+		MD_class_features.getValue(EMDL_OPTIMISER_IGNORE_CTF_UNTIL_FIRST_PEAK, myopt.intact_ctf_first_peak, 0);
+		MD_class_features.getValue(EMDL_OPTIMISER_ITERATION_NO, myopt.iter, 0); //??
+		MD_class_features.getValue(EMDL_OPTIMISER_PARTICLE_DIAMETER, myopt.particle_diameter, 0);
+		MD_class_features.getValue(EMDL_OPTIMISER_HIGHRES_LIMIT_EXP, myopt.strict_highres_exp, 0);//??
+		MD_class_features.getValue(EMDL_CLASS_FEAT_JOB_SCORE, job_score, 0);
+
 		int i =0;
 		FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD_class_features)
 		{
@@ -1482,19 +1499,6 @@ public:
 			MD_class_features.getValue(EMDL_MLMODEL_ESTIM_RESOL_REF, this_class_feature.estimated_resolution);
 			MD_class_features.getValue(EMDL_CLASS_FEAT_WEIGHTED_RESOLUTION, this_class_feature.weighted_resolution);
 			MD_class_features.getValue(EMDL_CLASS_FEAT_PARTICLE_NR, this_class_feature.particle_nr);
-
-			// Job-wise features
-			MD_class_features.getValue(EMDL_MLMODEL_PIXEL_SIZE, myopt.mymodel.pixel_size);
-			MD_class_features.getValue(EMDL_MLMODEL_ORIGINAL_SIZE, myopt.mymodel.ori_size);//??
-			MD_class_features.getValue(EMDL_MLMODEL_NR_CLASSES, myopt.mymodel.nr_classes);
-			MD_class_features.getValue(EMDL_MLMODEL_SIGMA_OFFSET, myopt.mymodel.sigma2_offset);
-			MD_class_features.getValue(EMDL_MLMODEL_AVE_PMAX, myopt.mymodel.ave_Pmax);
-			MD_class_features.getValue(EMDL_OPTIMISER_DO_CORRECT_CTF, myopt.do_ctf_correction);
-			MD_class_features.getValue(EMDL_OPTIMISER_IGNORE_CTF_UNTIL_FIRST_PEAK, myopt.intact_ctf_first_peak);
-			MD_class_features.getValue(EMDL_OPTIMISER_ITERATION_NO, myopt.iter); //??
-			MD_class_features.getValue(EMDL_OPTIMISER_PARTICLE_DIAMETER, myopt.particle_diameter);
-			MD_class_features.getValue(EMDL_OPTIMISER_HIGHRES_LIMIT_EXP, myopt.strict_highres_exp);//??
-			MD_class_features.getValue(EMDL_CLASS_FEAT_JOB_SCORE, job_score);
 
 			// Class score
 			MD_class_features.getValue(EMDL_CLASS_FEAT_CLASS_SCORE, this_class_feature.class_score);
@@ -1520,29 +1524,27 @@ public:
 			MD_class_features.getValue(EMDL_CLASS_FEAT_SCATTERED_SIGNAL, this_class_feature.scattered_signal);
 			MD_class_features.getValue(EMDL_CLASS_FEAT_EDGE_SIGNAL, this_class_feature.edge_signal);
 
-            MD_class_features.getValue(EMDL_CLASS_FEAT_PARTICLE_NR, features_all_classes[i].particle_nr);
-
             // Lowpass filtered image features
-            MD_class_features.getValue(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MEAN, features_all_classes[i].lowpass_filtered_img_avg);
-            MD_class_features.getValue(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_STDDEV, features_all_classes[i].lowpass_filtered_img_stddev);
-            MD_class_features.getValue(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MIN, features_all_classes[i].lowpass_filtered_img_minval);
-            MD_class_features.getValue(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MAX, features_all_classes[i].lowpass_filtered_img_maxval);
+            MD_class_features.getValue(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MEAN, this_class_feature.lowpass_filtered_img_avg);
+            MD_class_features.getValue(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_STDDEV, this_class_feature.lowpass_filtered_img_stddev);
+            MD_class_features.getValue(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MIN, this_class_feature.lowpass_filtered_img_minval);
+            MD_class_features.getValue(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MAX, this_class_feature.lowpass_filtered_img_maxval);
 
             // Protein and solvent region LBP's
-            MD_class_features.getValue(EMDL_CLASS_FEAT_LBP, features_all_classes[i].lbp);
-            MD_class_features.getValue(EMDL_CLASS_FEAT_PROTEIN_LBP, features_all_classes[i].lbp_p);
-            MD_class_features.getValue(EMDL_CLASS_FEAT_SOLVENT_LBP, features_all_classes[i].lbp_s);
+            MD_class_features.getValue(EMDL_CLASS_FEAT_LBP, this_class_feature.lbp);
+            MD_class_features.getValue(EMDL_CLASS_FEAT_PROTEIN_LBP, this_class_feature.lbp_p);
+            MD_class_features.getValue(EMDL_CLASS_FEAT_SOLVENT_LBP, this_class_feature.lbp_s);
 
             // Protein and solvent region entropy
-            MD_class_features.getValue(EMDL_CLASS_FEAT_TOTAL_ENTROPY, features_all_classes[i].total_entropy);
-            MD_class_features.getValue(EMDL_CLASS_FEAT_PROTEIN_ENTROPY, features_all_classes[i].protein_entropy);
-            MD_class_features.getValue(EMDL_CLASS_FEAT_SOLVENT_ENTROPY, features_all_classes[i].solvent_entropy);
+            MD_class_features.getValue(EMDL_CLASS_FEAT_TOTAL_ENTROPY, this_class_feature.total_entropy);
+            MD_class_features.getValue(EMDL_CLASS_FEAT_PROTEIN_ENTROPY, this_class_feature.protein_entropy);
+            MD_class_features.getValue(EMDL_CLASS_FEAT_SOLVENT_ENTROPY, this_class_feature.solvent_entropy);
 
-            MD_class_features.getValue(EMDL_CLASS_FEAT_PROTEIN_HARALICK, features_all_classes[i].haralick_p);
-            MD_class_features.getValue(EMDL_CLASS_FEAT_SOLVENT_HARALICK, features_all_classes[i].haralick_s);
+            MD_class_features.getValue(EMDL_CLASS_FEAT_PROTEIN_HARALICK, this_class_feature.haralick_p);
+            MD_class_features.getValue(EMDL_CLASS_FEAT_SOLVENT_HARALICK, this_class_feature.haralick_s);
 
             // Zernike moments
-            MD_class_features.getValue(EMDL_CLASS_FEAT_ZERNIKE_MOMENTS, features_all_classes[i].zernike_moments);
+            MD_class_features.getValue(EMDL_CLASS_FEAT_ZERNIKE_MOMENTS, this_class_feature.zernike_moments);
 
 
             preread_features_all_classes.push_back(this_class_feature);
@@ -1610,8 +1612,6 @@ public:
 			MD_class_features.setValue(EMDL_CLASS_FEAT_SOLVENT_KURT, features_all_classes[i].solvent_moments.kurt);
 			MD_class_features.setValue(EMDL_CLASS_FEAT_SCATTERED_SIGNAL, features_all_classes[i].scattered_signal);
 			MD_class_features.setValue(EMDL_CLASS_FEAT_EDGE_SIGNAL, features_all_classes[i].edge_signal);
-
-            MD_class_features.setValue(EMDL_CLASS_FEAT_PARTICLE_NR, features_all_classes[i].particle_nr);
 
             // Lowpass filtered image features
             MD_class_features.setValue(EMDL_CLASS_FEAT_LOWPASS_FILTERED_IMAGE_MEAN, features_all_classes[i].lowpass_filtered_img_avg);
