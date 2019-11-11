@@ -1943,15 +1943,8 @@ void JobWindow::initialisePostprocessWindow()
 
 	current_y += STEPY/2;
 
-	group4 = new Fl_Group(WCOL0,  MENUHEIGHT, 550, 600-MENUHEIGHT, "");
-	group4->end();
-	place("do_mtf", TOGGLE_LEAVE_ACTIVE, group4);
-
-	group4->begin();
 	place("fn_mtf");
 	place("mtf_angpix");
-	group4->end();
-	guientries["do_mtf"].cb_menu_i();
 
 	tab2->end();
 	tab3->begin();
