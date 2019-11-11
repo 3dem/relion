@@ -243,6 +243,7 @@ void ParticleSubtractor::revert()
 	}
 
 	// Fix box size
+	// TODO: BUG: What happens if the input particles have several box sizes?
 	std::vector<bool> fixed_box_size(obsModel.numberOfOpticsGroups(), false);
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
 	{
@@ -378,7 +379,7 @@ void ParticleSubtractor::saveStarFile()
 
 	opt.mydata.obsModel.save(opt.mydata.MDimg, fn_out + "particles_subtracted.star");
 	std::cout << " + Saved STAR file with " << opt.mydata.MDimg.numberOfObjects()
-			<< " subtracted particles in " << fn_out <<"particles_subtracted.star" << std::endl;
+	          << " subtracted particles in " << fn_out <<"particles_subtracted.star" << std::endl;
 }
 
 FileName ParticleSubtractor::getParticleName(long int imgno, int myrank)
@@ -667,6 +668,7 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, M
 
 	// Now write out the image
 	fn_img = getParticleName(imgno, rank);
+	img.setSamplingRateInHeader(my_pixel_size);
 	if (opt.mymodel.data_dim == 3)
 	{
 		img.write(fn_img);
