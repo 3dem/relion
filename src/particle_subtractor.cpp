@@ -451,7 +451,7 @@ FileName ParticleSubtractor::getParticleName(long int imgno, int myrank, int opt
 	else
 	{
 
-		fn_img.compose(nr_particles_in_optics_group[optics_group] + 1, fn_stack + "_opticsgroup" + integerToString(optics_group + 1) + ".mrcs");
+		fn_img.compose(nr_particles_in_optics_group[optics_group], fn_stack + "_opticsgroup" + integerToString(optics_group + 1) + ".mrcs");
 	}
 
 	imgno_to_filename[imgno] = fn_img;
