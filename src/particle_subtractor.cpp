@@ -60,8 +60,8 @@ void ParticleSubtractor::divideLabour(int _rank, int _size, long int &my_first, 
 		opt.mydata.divideParticlesInRandomHalves(0, opt.do_helical_refine);
 
 		int my_halfset = (_rank % 2 == 1) ? 1 : 2;
-		int mysize = (my_halfset == 1) ? _size/2 : _size/2 + _size%2;
-		divide_equally(opt.mydata.numberOfParticles(my_halfset), mysize, _rank/2, my_first, my_last);
+		int mysize = (my_halfset == 1) ? _size / 2 : _size / 2 + _size % 2;
+		divide_equally(opt.mydata.numberOfParticles(my_halfset), mysize, _rank / 2, my_first, my_last);
 		if (my_halfset == 2)
 		{
     		my_first += opt.mydata.numberOfParticles(1);
@@ -94,6 +94,7 @@ void ParticleSubtractor::initialise(int _rank, int _size)
 	}
 
 	opt.read(fn_opt, rank, true); // true means: prevent prereading all particle images
+	nr_particles_in_optics_group.resize(opt.mydata.obsModel.opticsMdt.numberOfObjects(), 0);
 
 	// Overwrite the particles STAR file with a smaller subset
 	if (fn_sel != "")
@@ -135,7 +136,8 @@ void ParticleSubtractor::initialise(int _rank, int _size)
 
 	if (verb > 0 && (do_center || opt.fn_body_masks != "None"))
 	{
-		std::cout << " + The subtracted particles will be re-centred on projections of 3D-coordinate: (" << new_center(0) << " , " << new_center(1) << " , " << new_center(2) << ")" << std::endl;
+		std::cout << " + The subtracted particles will be re-centred on projections of 3D-coordinate: (" 
+		          << new_center(0) << " , " << new_center(1) << " , " << new_center(2) << ")" << std::endl;
 	}
 
 	if (opt.fn_body_masks != "None")
@@ -218,7 +220,6 @@ void ParticleSubtractor::initialise(int _rank, int _size)
 		boxsize -= boxsize%2;
 }
 
-
 void ParticleSubtractor::revert()
 {
 	ObservationModel obsModel;
@@ -243,7 +244,6 @@ void ParticleSubtractor::revert()
 	}
 
 	// Fix box size
-	// TODO: BUG: What happens if the input particles have several box sizes?
 	std::vector<bool> fixed_box_size(obsModel.numberOfOpticsGroups(), false);
 	FOR_ALL_OBJECTS_IN_METADATA_TABLE(MD)
 	{
@@ -366,7 +366,7 @@ void ParticleSubtractor::setLinesInStarFile(int myrank)
 	}
 }
 
-void ParticleSubtractor::saveStarFile()
+void ParticleSubtractor::saveStarFile(int myrank)
 {
 	// Reset image size in optics table, if the images were rewindowed in a different box
 	if (boxsize > 0)
@@ -377,27 +377,87 @@ void ParticleSubtractor::saveStarFile()
 		}
 	}
 
-	opt.mydata.obsModel.save(opt.mydata.MDimg, fn_out + "particles_subtracted.star");
-	std::cout << " + Saved STAR file with " << opt.mydata.MDimg.numberOfObjects()
+	// Write only processed particles
+	MetaDataTable MD;
+	long int my_first, my_last;
+	divideLabour(myrank, size, my_first, my_last);
+	for (long int part_id = my_first; part_id <= my_last; part_id++)
+	{
+		MD.addObject();
+		MD.setObject(opt.mydata.MDimg.getObject(part_id));
+	}
+	
+	FileName fn_star;
+	if (size == 0)
+		fn_star = fn_out + "particles_subtracted.star";
+	else
+		fn_star.compose(fn_out + "Particles/subtracted_", myrank + 1, "star");
+	opt.mydata.obsModel.save(MD, fn_star);
+
+#ifdef DEBUG
+	std::cout << "myrank = " << myrank << " size = " << size << " my_first = " << my_first << " my_last = " << my_last << " num_items = " << MD.numberOfObjects() << " writing to " << fn_star << std::endl;
+#endif DEBUG
+}
+
+void ParticleSubtractor::combineStarFile()
+{
+	ObservationModel obsModel, obsModel2;
+	MetaDataTable MD, MD2;
+
+	for (int i = 0; i < size; i++)
+	{
+		FileName fn_star;
+		fn_star.compose(fn_out + "Particles/subtracted_", i + 1, "star");
+		
+		if (i == 0)
+		{
+			ObservationModel::loadSafely(fn_star, obsModel, MD);
+		}
+		else
+		{
+			ObservationModel::loadSafely(fn_star, obsModel2, MD2);
+			MD.append(MD2);	
+		}
+	}
+
+	obsModel.save(MD, fn_out + "particles_subtracted.star");
+	std::cout << " + Saved STAR file with " << MD.numberOfObjects()
 	          << " subtracted particles in " << fn_out <<"particles_subtracted.star" << std::endl;
 }
 
-FileName ParticleSubtractor::getParticleName(long int imgno, int myrank)
+FileName ParticleSubtractor::getParticleName(long int imgno, int myrank, int optics_group)
 {
+	if (imgno_to_filename.find(imgno) != imgno_to_filename.end())
+		return imgno_to_filename[imgno];
+
+	if (optics_group == -1)
+	{
+		std::cerr << "rank = " << rank << " imgno = " << imgno << std::endl;
+		REPORT_ERROR("Logic error: optics group must be specified to register a new entry");
+	}
+
+	nr_particles_in_optics_group[optics_group]++;
+
 	// Now write out the image
 	FileName fn_img;
+	FileName fn_stack = fn_out + "Particles/subtracted";
+	if (size > 1)
+		fn_stack += "_" + integerToString(myrank + 1);
+
 	if (opt.mymodel.data_dim == 3)
 	{
-		fn_img.compose(fn_out+"Particles/subtracted", imgno+1,"mrc");
+		fn_img.compose(fn_stack, imgno + 1, "mrc");
 	}
 	else
 	{
-		FileName fn_stack;
-		if (size > 1)  fn_stack.compose(fn_out+"Particles/subtracted_", myrank + 1, "mrcs");
-		else fn_stack = fn_out+"Particles/subtracted.mrcs";
-		fn_img.compose(imgno+1,fn_stack);
+
+		fn_img.compose(nr_particles_in_optics_group[optics_group] + 1, fn_stack + "_opticsgroup" + integerToString(optics_group + 1) + ".mrcs");
 	}
 
+	imgno_to_filename[imgno] = fn_img;
+#ifdef DEBUG
+	std::cout << "rank = " << rank << " imgno = " << imgno << " fn_img = " << fn_img << std::endl;
+#endif
 	return fn_img;
 }
 
@@ -667,7 +727,7 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, M
 	}
 
 	// Now write out the image
-	fn_img = getParticleName(imgno, rank);
+	fn_img = getParticleName(imgno, rank, optics_group);
 	img.setSamplingRateInHeader(my_pixel_size);
 	if (opt.mymodel.data_dim == 3)
 	{
@@ -675,7 +735,7 @@ void ParticleSubtractor::subtractOneParticle(long int part_id, long int imgno, M
 	}
 	else
 	{
-		if (imgno == 0)
+		if (nr_particles_in_optics_group[optics_group] == 0)
 			img.write(fn_img, -1, false, WRITE_OVERWRITE);
 		else
 			img.write(fn_img, -1, false, WRITE_APPEND);
