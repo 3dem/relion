@@ -529,17 +529,22 @@ void basisViewerCanvas::fill(MetaDataTable &MDin, ObservationModel *obsModel, EM
 					img.readFromOpenFile(fn_my_stack, hFile, numbers_in_stack[inum]);
 				long int my_ipos = my_stack_first_ipos + inum;
 
-				RFLOAT angpix;
+				bool have_optics_group = false;
+				RFLOAT angpix = 0.;
 
 				if (_do_apply_orient || lowpass > 0. || highpass > 0.)
 				{
-					int optics_group;
-					MDin.getValue(EMDL_IMAGE_OPTICS_GROUP, optics_group, my_ipos);
-					optics_group--;
-					obsModel->opticsMdt.getValue(EMDL_IMAGE_PIXEL_SIZE, angpix, optics_group);
+					if (MDin.containsLabel(EMDL_IMAGE_OPTICS_GROUP))
+					{
+						int optics_group;
+						MDin.getValue(EMDL_IMAGE_OPTICS_GROUP, optics_group, my_ipos);
+						optics_group--;
+						obsModel->opticsMdt.getValue(EMDL_IMAGE_PIXEL_SIZE, angpix, optics_group);
+						have_optics_group = true;
+					}
 				}
 
-				if (_do_apply_orient)
+				if (_do_apply_orient && have_optics_group)
 				{
 					RFLOAT psi,rot,tilt;
 					Matrix1D<RFLOAT> offset(3);
@@ -573,9 +578,9 @@ void basisViewerCanvas::fill(MetaDataTable &MDin, ObservationModel *obsModel, EM
 					selfTranslateCenterOfMassToCenter(img());
 				}
 
-				if (lowpass > 0.)
+				if (lowpass > 0. && have_optics_group)
 					lowPassFilterMap(img(), lowpass, angpix);
-				if (highpass > 0.)
+				if (highpass > 0. && have_optics_group)
 					highPassFilterMap(img(), highpass, angpix);
 
 				// Dont change the user-provided _minval and _maxval in the getImageContrast routine!
