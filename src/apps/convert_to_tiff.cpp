@@ -41,7 +41,7 @@ class convert_to_tiff
 public:
 	FileName fn_in, fn_out, fn_gain, fn_defects, fn_gain_out, fn_defects_out, fn_compression;
 	bool do_estimate, input_type, lossy, dont_die_on_error, line_by_line;
-	int deflate_level;
+	int deflate_level, thresh_reliable, nr_threads;
 	IOParser parser;
 
 	Image<short> defects;
@@ -72,7 +72,8 @@ public:
 		do_estimate = parser.checkOption("--estimate_gain", "Estimate gain");
 		fn_gain_out = parser.getOption("--gain_out", "Estimated gain reference (written)", "gain.mrc");
 		fn_defects_out = parser.getOption("--defect_out", "Estimated unreliable pixels (written)", "defects.mrc");
-
+		thresh_reliable = textToInteger(parser.getOption("--thresh", "Number of success needed to consider a pixel reliable", "10"));
+		nr_threads = textToInteger(parser.getOption("--j", "Number of threads (More than 2 is not effective)", "1"));
 		if (parser.checkForErrors())
 			REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 	}
@@ -134,6 +135,7 @@ public:
 			
 			frame.read(fn_movie, true, iframe, false, true);
 
+			#pragma omp parallel for num_threads(nr_threads) reduction(+:error, changed, negative)
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(frame())
 			{
 				const float val = DIRECT_MULTIDIM_ELEM(frame(), n);
@@ -181,14 +183,15 @@ public:
 
 			}
 
+			#pragma omp parallel for num_threads(nr_threads) reduction(+:stable)
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(defects())
 			{
 				short val = DIRECT_MULTIDIM_ELEM(defects(), n);
-				if (val > 10)
+				if (val >= thresh_reliable)
 					stable++;
 			}
 
-			printf("Frame %02d #Changed %10d #Mismatch %10d, #Negative %10d, #Unstable %10d / %10d\n",
+			printf("Frame %02d #Changed %10d #Mismatch %10d, #Negative %10d, #Unreliable %10d / %10d\n",
 			       iframe, changed, error, negative, ny * nx - stable, ny * nx);
 		}
 	}
@@ -223,34 +226,68 @@ public:
 
 		Image<float> frame;
 		MultidimArray<T> buf(ny, nx);
-
+		char msg[256];
+	
 		for (int iframe = 0; iframe < nn; iframe++)
 		{
 			int error = 0;
 			
 			frame.read(fn_in, true, iframe, false, true);
 
+			#pragma omp parallel for num_threads(nr_threads) reduction(+:error)
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(frame())
 			{
 				const float val = DIRECT_MULTIDIM_ELEM(frame(), n);
 				const float gain_here = DIRECT_MULTIDIM_ELEM(gain(), n);
-				bool is_bad = DIRECT_MULTIDIM_ELEM(defects(), n);
+				bool is_bad = DIRECT_MULTIDIM_ELEM(defects(), n) < thresh_reliable;
 				
-				const int ival = (int)round(val / gain_here);
+				if (is_bad)
+				{
+					// TODO: implement other strategy
+					DIRECT_MULTIDIM_ELEM(buf, n) = val;
+					continue;
+				}
+
+				int ival = (int)round(val / gain_here);
 				const float expected = gain_here * ival;
 				if (fabs(expected - val) > 0.0001)
 				{
-					printf(" mismatch: frame %2d pos %4d %4d obs % 8.4f expected % 8.4f gain %.4f\n",
-					       iframe, n / nx, n % ny, (double)val,
+					snprintf(msg, 255, " mismatch: frame %2d pos %4d %4d status %5d obs % 8.4f expected % 8.4f gain %.4f\n",
+					       iframe, n / nx, n % ny, (double)val, DIRECT_MULTIDIM_ELEM(defects(), n),
 					       (double)expected, (double)gain_here);
-					is_bad = true;
+					std::cerr << "mismatch" << msg << std::endl;
+					if (!dont_die_on_error)
+						REPORT_ERROR("Unexpected pixel value in a pixel that was considered reliable");
 					error++;
 				}
 
-				// TODO: do magic
+				if (false) // TODO: for integer output
+				{
+					if (ival < 0)
+					{
+						ival = 0;
+						error++;
+						
+						printf(" negative: frame %2d pos %4d %4d obs % 8.4f expected % 8.4f gain %.4f\n",
+					               iframe, n / nx, n % ny, (double)val,
+					               (double)expected, (double)gain_here);
+					}
+					else if (ival > 127) // TOOD: Use proper limit
+					{
+						ival = 127;
+						error++;
+
+						printf(" overflow: frame %2d pos %4d %4d obs % 8.4f expected % 8.4f gain %.4f\n",
+					               iframe, n / nx, n % ny, (double)val,
+					               (double)expected, (double)gain_here);
+					}
+				}
+				
+				DIRECT_MULTIDIM_ELEM(buf, n) = ival;
 			}
 
 			write_tiff_one_page(tif, buf, decide_filter(nx), deflate_level);
+			printf("Frame %3d / %3d\n", iframe + 1, nn);
 		}
 
 		TIFFClose(tif);
@@ -343,9 +380,13 @@ public:
 		}
 		else
 		{
-			// TODO: modify gain according to the strategy
+			// TODO: other strategy
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(gain())
+				if (DIRECT_MULTIDIM_ELEM(defects(), n) < thresh_reliable)
+					DIRECT_MULTIDIM_ELEM(gain(), n) = 1.0;
 
 			gain.write(fn_gain_out);
+
 			unnormalise<float>();
 		}
 	}
