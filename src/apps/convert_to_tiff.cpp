@@ -24,9 +24,6 @@
 #include <src/image.h>
 #include <src/metadata_table.h>
 
-// TODO: MPI parallelization
-// TODO: STAR input
-
 #ifndef HAVE_TIFF
 int main(int argc, char *argv[])
 {
@@ -39,14 +36,15 @@ int main(int argc, char *argv[])
 class convert_to_tiff
 {
 public:
-	FileName fn_in, fn_out, fn_gain, fn_defects, fn_gain_out, fn_defects_out, fn_compression;
-	bool do_estimate, input_type, lossy, dont_die_on_error, line_by_line;
+	FileName fn_in, fn_out, fn_gain, fn_compression;
+	bool do_estimate, input_type, lossy, dont_die_on_error, line_by_line, only_do_unfinished;
 	int deflate_level, thresh_reliable, nr_threads;
 	IOParser parser;
 
+	MetaDataTable MD;
 	Image<short> defects;
 	Image<float> gain;
-	int nn, ny, nx;
+	int nn, ny, nx, mrc_mode;
 
 	void usage()
 	{
@@ -57,23 +55,22 @@ public:
 	{
 		parser.setCommandLine(argc, argv);
 
-		int general_section = parser.addSection("Options");
-		fn_in = parser.getOption("--i", "Input movie to be compressed");
-		fn_out = parser.getOption("--o", "Rootname for output projections", "TIFF");
-		fn_gain = parser.getOption("--gain", "Estimated gain reference to read (read)", "");
-		fn_defects = parser.getOption("--defect", "Estimated unreliable pixels (read)", "");
+		int general_section = parser.addSection("General Options");
+		fn_in = parser.getOption("--i", "Input movie to be compressed (a MRC file or a STAR file)");
+		fn_out = parser.getOption("--o", "Rootname for output TIFF files", "");
+		fn_gain = parser.getOption("--gain", "Estimated gain map and its reliablity map (read)", "");
+		nr_threads = textToInteger(parser.getOption("--j", "Number of threads (More than 2 is not effective)", "1"));
+		only_do_unfinished = parser.checkOption("--only_do_unfinished", "Only process non-converted movies.");
+		thresh_reliable = textToInteger(parser.getOption("--thresh", "Number of success needed to consider a pixel reliable", "20"));
+		do_estimate = parser.checkOption("--estimate_gain", "Estimate gain");
 
+		int tiff_section = parser.addSection("TIFF options");
 		fn_compression = parser.getOption("--compression", "compression type (none, auto, deflate (= zip), lzw)", "auto");
 		deflate_level = textToInteger(parser.getOption("--deflate_level", "deflate level. 1 (fast) to 9 (slowest but best compression)", "6"));
-		lossy = parser.checkOption("--lossy", "Allow slightly lossy but better compression on defect pixels");
+		//lossy = parser.checkOption("--lossy", "Allow slightly lossy but better compression on defect pixels");
 		dont_die_on_error = parser.checkOption("--ignore_error", "Don't die on un-expected defect pixels (can be dangerous)");
 		line_by_line = parser.checkOption("--line_by_line", "Use one strip per row");
 
-		do_estimate = parser.checkOption("--estimate_gain", "Estimate gain");
-		fn_gain_out = parser.getOption("--gain_out", "Estimated gain reference (written)", "gain.mrc");
-		fn_defects_out = parser.getOption("--defect_out", "Estimated unreliable pixels (written)", "defects.mrc");
-		thresh_reliable = textToInteger(parser.getOption("--thresh", "Number of success needed to consider a pixel reliable", "10"));
-		nr_threads = textToInteger(parser.getOption("--j", "Number of threads (More than 2 is not effective)", "1"));
 		if (parser.checkForErrors())
 			REPORT_ERROR("Errors encountered on the command line (see above), exiting...");
 	}
@@ -191,7 +188,7 @@ public:
 					stable++;
 			}
 
-			printf("Frame %02d #Changed %10d #Mismatch %10d, #Negative %10d, #Unreliable %10d / %10d\n",
+			printf(" Frame %03d #Changed %10d #Mismatch %10d, #Negative %10d, #Unreliable %10d / %10d\n",
 			       iframe, changed, error, negative, ny * nx - stable, ny * nx);
 		}
 	}
@@ -218,9 +215,10 @@ public:
 	}
 
 	template <typename T>
-	void unnormalise()
+	void unnormalise(FileName fn_movie, FileName fn_tiff)
 	{
-		TIFF *tif = TIFFOpen(fn_out.c_str(), "w");
+		FileName fn_tmp = fn_tiff + ".tmp";
+		TIFF *tif = TIFFOpen(fn_tmp.c_str(), "w");
 		if (tif == NULL)
 			REPORT_ERROR("Failed to open the output TIFF file.");
 
@@ -232,7 +230,7 @@ public:
 		{
 			int error = 0;
 			
-			frame.read(fn_in, true, iframe, false, true);
+			frame.read(fn_movie, true, iframe, false, true);
 
 			#pragma omp parallel for num_threads(nr_threads) reduction(+:error)
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(frame())
@@ -261,20 +259,23 @@ public:
 					error++;
 				}
 
-				if (false) // TODO: for integer output
+				if (!std::is_same<T, float>::value)
 				{
-					if (ival < 0)
+					const int overflow = std::is_same<T, short>::value ? 32767: 127;
+					const int underflow = std::is_same<T, short>::value ? -32768: 0;
+
+					if (ival < underflow)
 					{
-						ival = 0;
+						ival = underflow;
 						error++;
 						
-						printf(" negative: frame %2d pos %4d %4d obs % 8.4f expected % 8.4f gain %.4f\n",
+						printf(" underflow: frame %2d pos %4d %4d obs % 8.4f expected % 8.4f gain %.4f\n",
 					               iframe, n / nx, n % ny, (double)val,
 					               (double)expected, (double)gain_here);
 					}
-					else if (ival > 127) // TOOD: Use proper limit
+					else if (ival > overflow)
 					{
-						ival = 127;
+						ival = overflow;
 						error++;
 
 						printf(" overflow: frame %2d pos %4d %4d obs % 8.4f expected % 8.4f gain %.4f\n",
@@ -287,107 +288,180 @@ public:
 			}
 
 			write_tiff_one_page(tif, buf, decide_filter(nx), deflate_level);
-			printf("Frame %3d / %3d\n", iframe + 1, nn);
+			printf(" Frame %3d / %3d #Error %10d\n", iframe + 1, nn, error);
 		}
 
 		TIFFClose(tif);
+		std::rename(fn_tmp.c_str(), fn_tiff.c_str());
 	}
 
 	template <typename T>
-	void only_compress()
+	void only_compress(FileName fn_movie, FileName fn_tiff)
 	{
-		TIFF *tif = TIFFOpen(fn_out.c_str(), "w");
+		FileName fn_tmp = fn_tiff + ".tmp";
+		TIFF *tif = TIFFOpen(fn_tiff.c_str(), "w");
 		if (tif == NULL)
 			REPORT_ERROR("Failed to open the output TIFF file.");
 
 		Image<T> frame;
 		for (int iframe = 0; iframe < nn; iframe++)
 		{
-			frame.read(fn_in, true, iframe, false, true);
+			frame.read(fn_movie, true, iframe, false, true);
 			write_tiff_one_page(tif, frame(), decide_filter(nx), deflate_level);
-			printf("Frame %3d / %3d\n", iframe + 1, nn);
+			printf(" Frame %3d / %3d\n", iframe + 1, nn);
 		}
 
 		TIFFClose(tif);
+		std::rename(fn_tmp.c_str(), fn_tiff.c_str());
 	}
 
-	void run()
+	int checkMRCtype(FileName fn_movie)
 	{
+		// Check data type; Unfortunately I cannot do this through Image object.
+		FILE *mrcin = fopen(fn_movie.c_str(), "r");
+		int headers[25];
+		fread(headers, sizeof(int), 24, mrcin);
+		fclose(mrcin);
+
+		return headers[3];
+	}
+
+	void initialise()
+	{
+		FileName fn_first;
+
+		if (fn_in.getExtension() == "star")
+		{
+			MD.read(fn_in, "movie");
+
+			// Support non-optics group STAR files
+			if (MD.numberOfObjects() == 0)
+				MD.read(fn_in, "");
+
+			if (!MD.getValue(EMDL_MICROGRAPH_MOVIE_NAME, fn_first, 0))
+				REPORT_ERROR("The input STAR file does not contain the rlnMicrographMovieName column");
+
+			std::cout << "The number of movies in the input: " << MD.numberOfObjects() << std::endl;
+		}
+		else
+		{
+			MD.addObject();
+			MD.setValue(EMDL_MICROGRAPH_MOVIE_NAME, fn_in);
+			fn_first = fn_in;
+		}
+		
+		// Check type and mode of the input
 		Image<RFLOAT> Ihead;
-		Ihead.read(fn_in, false, -1, false, true); // select_img -1, mmap false, is_2D true
+		Ihead.read(fn_first, false, -1, false, true); // select_img -1, mmap false, is_2D true
 		nn = NSIZE(Ihead());
 		ny = YSIZE(Ihead());
 		nx = XSIZE(Ihead());
-
-		// Check data type; Unfortunately I cannot do this through Image object.
-		FILE *mrcin = fopen(fn_in.c_str(), "r");
-		int headers[25];
-		fread(headers, sizeof(int), 24, mrcin);
-		int input_type = headers[3];
-		fclose(mrcin);
-
-		printf("Input (NX, NY, NN) = (%d, %d, %d), MODE = %d\n", nx, ny, nn, input_type);
-
-		if (input_type == 1 || input_type == 6)
-		{
-			only_compress<short>();
-			return;
-		}
-		else if (input_type == 0 || input_type == 101)
-		{
-			only_compress<char>();
-			return;
-		}
-		else if (input_type != 2)
-		{
-			REPORT_ERROR("Input MRC file must be in mode 0 (BYTE), 1 (SHORT), 2 (FLOAT) or 101 (4-bit)"); 
-		}
+		mrc_mode = checkMRCtype(fn_first);
+		printf("Input (NX, NY, NN) = (%d, %d, %d), MODE = %d\n\n", nx, ny, nn, mrc_mode);
 
 		if (fn_gain != "")
 		{
-			gain.read(fn_gain);
-			std::cout << "Read " << fn_gain << std::endl;
-			if (XSIZE(gain()) != nx || YSIZE(gain()) != ny)
-				REPORT_ERROR("The input gain has a wrong size.");
+			if (mrc_mode != 2)
+			{
+				std::cerr << "The input movie is not in mode 2. A gain reference is irrelavant." << std::endl;
+			}
+			else
+			{
+				gain.read(fn_gain + ":mrc");
+				std::cout << "Read " << fn_gain << std::endl;
+				if (XSIZE(gain()) != nx || YSIZE(gain()) != ny)
+					REPORT_ERROR("The input gain has a wrong size.");
+
+				FileName fn_defects = fn_gain.withoutExtension() + "_reliablity." + fn_gain.getExtension();
+				defects.read(fn_defects + ":mrc");
+				std::cout << "Read " << fn_defects << "\n" << std::endl;
+				if (XSIZE(defects()) != nx || YSIZE(defects()) != ny)
+					REPORT_ERROR("The input reliability map has a wrong size.");
+			}
 		}
-		else
+		else if (mrc_mode == 2)
 		{
 			gain().reshape(ny, nx);
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(gain())
 				DIRECT_MULTIDIM_ELEM(gain(), n) = 999.9;
-		}
-
-		if (fn_defects != "")
-		{
-			defects.read(fn_defects);
-			std::cout << "Read " << fn_defects << std::endl;
-			if (XSIZE(defects()) != nx || YSIZE(defects()) != ny)
-				REPORT_ERROR("The input defect map has a wrong size.");
-		}
-		else
-		{
 			defects().reshape(ny, nx);
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(defects())
 				DIRECT_MULTIDIM_ELEM(defects(), n) = -1;
 		}
 
-		if (do_estimate)
-		{
-			estimate(fn_in);
+		if (fn_out.contains("/"))
+			system(("mkdir -p " + fn_out.beforeLastOf("/")).c_str());
 
-			defects.write(fn_defects_out);
-			gain.write(fn_gain_out);
-		}
-		else
+		if (!do_estimate && mrc_mode == 2)
 		{
 			// TODO: other strategy
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(gain())
 				if (DIRECT_MULTIDIM_ELEM(defects(), n) < thresh_reliable)
 					DIRECT_MULTIDIM_ELEM(gain(), n) = 1.0;
 
-			gain.write(fn_gain_out);
+			gain.write(fn_out + "gain-reference.mrc");
+			std::cout << "Written " + fn_out + "gain-reference.mrc. Please use this file as a gain reference when processing the converted movies.\n" << std::endl; 
+		}
+	}
 
-			unnormalise<float>();
+	void processOneMovie(FileName fn_movie, FileName fn_tiff)
+	{
+		// Check type and mode of the input
+		Image<RFLOAT> Ihead;
+		Ihead.read(fn_movie, false, -1, false, true); // select_img -1, mmap false, is_2D true
+		if (ny != YSIZE(Ihead()) || nx != XSIZE(Ihead()) || mrc_mode != checkMRCtype(fn_movie))
+			REPORT_ERROR("A movie " + fn_movie + " has a different size and/or mode from other movies.");
+
+		if (mrc_mode == 1 || mrc_mode == 6)
+		{
+			only_compress<short>(fn_movie, fn_tiff);
+		}
+		else if (mrc_mode == 0 || mrc_mode == 101)
+		{
+			only_compress<char>(fn_movie, fn_tiff);
+		}
+
+		if (do_estimate)
+		{
+			estimate(fn_in);
+
+			// Write for each movie so that one can stop anytime
+			gain.write(fn_out + "gain_estimate.bin:mrc"); // .bin to prevent people from using this by mistake
+			defects.write(fn_out + "gain_estimate_reliablity.bin:mrc");
+
+			std::cout << "\nUpdated " + fn_out + "gain_estimate.bin and " + fn_out + "gain_estimate_reliablity.bin\n" << std::endl;
+		}
+		else
+		{
+			if (only_do_unfinished && exists(fn_tiff))
+				return;
+
+			unnormalise<float>(fn_movie, fn_tiff);
+		}
+	}
+
+	void run()
+	{
+		initialise();
+
+		long int my_first = 0, my_last = MD.numberOfObjects() - 1; // ?
+		// divide_equally(MD.numberOfParticles(), size, rank, my_first, my_last); // MPI parallelization
+
+		for (long i = my_first; i <= my_last; i++)
+		{
+			FileName fn_movie, fn_tiff;
+			MD.getValue(EMDL_MICROGRAPH_MOVIE_NAME, fn_movie, i);
+
+			fn_tiff = fn_out + fn_movie.withoutExtension() + ".tif";
+			std::cout << "Processing " << fn_movie;
+			if (!do_estimate)
+				std::cout  << " into " << fn_tiff;
+			std::cout << std::endl;
+
+			if (fn_tiff.contains("/"))
+				system(("mkdir -p " + fn_tiff.beforeLastOf("/")).c_str());
+
+			processOneMovie(fn_movie, fn_tiff);
 		}
 	}
 };
