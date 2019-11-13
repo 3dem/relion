@@ -281,7 +281,7 @@ template <typename T>
 void TIFFConverter::only_compress(FileName fn_movie, FileName fn_tiff)
 {
 	FileName fn_tmp = fn_tiff + ".tmp";
-	TIFF *tif = TIFFOpen(fn_tiff.c_str(), "w");
+	TIFF *tif = TIFFOpen(fn_tmp.c_str(), "w");
 	if (tif == NULL)
 		REPORT_ERROR("Failed to open the output TIFF file.");
 
@@ -290,7 +290,7 @@ void TIFFConverter::only_compress(FileName fn_movie, FileName fn_tiff)
 	{
 		frame.read(fn_movie, true, iframe, false, true);
 		write_tiff_one_page(tif, frame(), decide_filter(nx), deflate_level);
-		printf(" Frame %3d / %3d\n", iframe + 1, nn);
+		printf(" %s Frame %3d / %3d\n", fn_movie.c_str(), iframe + 1, nn);
 	}
 
 	TIFFClose(tif);
@@ -350,6 +350,9 @@ void TIFFConverter::initialise(int _rank, int _total_ranks)
 	mrc_mode = checkMRCtype(fn_first);
 	if (rank == 0)
 		printf("Input (NX, NY, NN) = (%d, %d, %d), MODE = %d\n\n", nx, ny, nn, mrc_mode);
+
+	if (mrc_mode != 2 && do_estimate)
+		REPORT_ERROR("The input movie is not in mode 2. Gain estimation does not make sense.");
 
 	if (fn_gain != "")
 	{
@@ -446,7 +449,7 @@ void TIFFConverter::run()
 		fn_tiff = fn_out + fn_movie.withoutExtension() + ".tif";
 		if (only_do_unfinished && !do_estimate && exists(fn_tiff))
 		{			
-			std::cout << "Skipping already processed " << fn_movie;
+			std::cout << "Skipping already processed " << fn_movie << std::endl;
 			continue;
 		}
 
