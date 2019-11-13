@@ -59,9 +59,9 @@ public:
 		fn_in = parser.getOption("--i", "Input movie to be compressed (a MRC file or a STAR file)");
 		fn_out = parser.getOption("--o", "Rootname for output TIFF files", "");
 		fn_gain = parser.getOption("--gain", "Estimated gain map and its reliablity map (read)", "");
-		nr_threads = textToInteger(parser.getOption("--j", "Number of threads (More than 2 is not effective)", "1"));
+		nr_threads = textToInteger(parser.getOption("--j", "Number of threads (useful only for --estimate_gain)", "1"));
 		only_do_unfinished = parser.checkOption("--only_do_unfinished", "Only process non-converted movies.");
-		thresh_reliable = textToInteger(parser.getOption("--thresh", "Number of success needed to consider a pixel reliable", "20"));
+		thresh_reliable = textToInteger(parser.getOption("--thresh", "Number of success needed to consider a pixel reliable", "50"));
 		do_estimate = parser.checkOption("--estimate_gain", "Estimate gain");
 
 		int tiff_section = parser.addSection("TIFF options");
@@ -349,7 +349,10 @@ public:
 			MD.setValue(EMDL_MICROGRAPH_MOVIE_NAME, fn_in);
 			fn_first = fn_in;
 		}
-		
+	
+		if (do_estimate)
+			MD.randomiseOrder();	
+	
 		// Check type and mode of the input
 		Image<RFLOAT> Ihead;
 		Ihead.read(fn_first, false, -1, false, true); // select_img -1, mmap false, is_2D true
@@ -423,7 +426,7 @@ public:
 
 		if (do_estimate)
 		{
-			estimate(fn_in);
+			estimate(fn_movie);
 
 			// Write for each movie so that one can stop anytime
 			gain.write(fn_out + "gain_estimate.bin:mrc"); // .bin to prevent people from using this by mistake
@@ -433,9 +436,6 @@ public:
 		}
 		else
 		{
-			if (only_do_unfinished && exists(fn_tiff))
-				return;
-
 			unnormalise<float>(fn_movie, fn_tiff);
 		}
 	}
@@ -444,7 +444,7 @@ public:
 	{
 		initialise();
 
-		long int my_first = 0, my_last = MD.numberOfObjects() - 1; // ?
+		long int my_first = 0, my_last = MD.numberOfObjects() - 1; 
 		// divide_equally(MD.numberOfParticles(), size, rank, my_first, my_last); // MPI parallelization
 
 		for (long i = my_first; i <= my_last; i++)
@@ -453,6 +453,12 @@ public:
 			MD.getValue(EMDL_MICROGRAPH_MOVIE_NAME, fn_movie, i);
 
 			fn_tiff = fn_out + fn_movie.withoutExtension() + ".tif";
+			if (only_do_unfinished && !do_estimate && exists(fn_tiff))
+			{			
+				std::cout << "Skipping already processed " << fn_movie;
+				continue;
+			}
+
 			std::cout << "Processing " << fn_movie;
 			if (!do_estimate)
 				std::cout  << " into " << fn_tiff;
