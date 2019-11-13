@@ -35,6 +35,9 @@ int main(int argc, char *argv[])
 
 class convert_to_tiff
 {
+private:
+	int rank, total_ranks;
+
 public:
 	FileName fn_in, fn_out, fn_gain, fn_compression;
 	bool do_estimate, input_type, lossy, dont_die_on_error, line_by_line, only_do_unfinished;
@@ -146,8 +149,8 @@ public:
 				{
 //#define DEBUG
 #ifdef DEBUG
-					printf(" negative: frame %2d pos %4d %4d obs % 8.4f gain %.4f\n", 
-					       iframe, n / nx, n % ny, (double)val, (double)gain_here);
+					printf(" negative: %s frame %2d pos %4d %4d obs % 8.4f gain %.4f\n", 
+					       fn_movie.c_str(), iframe, n / nx, n % ny, (double)val, (double)gain_here);
 #endif
 					negative++;
 					DIRECT_MULTIDIM_ELEM(defects(), n) = -1;
@@ -165,8 +168,8 @@ public:
 					if (fabs(expected - val) > 0.0001)
 					{
 #ifdef DEBUG
-						printf(" mismatch: frame %2d pos %4d %4d obs % 8.4f expected % 8.4f gain %.4f\n",
-						       iframe, n / nx, n % ny, (double)val,
+						printf(" mismatch: %s frame %2d pos %4d %4d obs % 8.4f expected % 8.4f gain %.4f\n",
+						       fn_movie.c_str(), iframe, n / nx, n % ny, (double)val,
 						       (double)expected, (double)gain_here);
 #endif
 						error++;
@@ -188,8 +191,8 @@ public:
 					stable++;
 			}
 
-			printf(" Frame %03d #Changed %10d #Mismatch %10d, #Negative %10d, #Unreliable %10d / %10d\n",
-			       iframe, changed, error, negative, ny * nx - stable, ny * nx);
+			printf(" %s Frame %03d #Changed %10d #Mismatch %10d, #Negative %10d, #Unreliable %10d / %10d\n",
+			       fn_movie.c_str(), iframe, changed, error, negative, ny * nx - stable, ny * nx);
 		}
 	}
 
@@ -220,7 +223,7 @@ public:
 		FileName fn_tmp = fn_tiff + ".tmp";
 		TIFF *tif = TIFFOpen(fn_tmp.c_str(), "w");
 		if (tif == NULL)
-			REPORT_ERROR("Failed to open the output TIFF file.");
+			REPORT_ERROR("Failed to open the output TIFF file: " + fn_tiff);
 
 		Image<float> frame;
 		MultidimArray<T> buf(ny, nx);
@@ -250,10 +253,10 @@ public:
 				const float expected = gain_here * ival;
 				if (fabs(expected - val) > 0.0001)
 				{
-					snprintf(msg, 255, " mismatch: frame %2d pos %4d %4d status %5d obs % 8.4f expected % 8.4f gain %.4f\n",
-					       iframe, n / nx, n % ny, (double)val, DIRECT_MULTIDIM_ELEM(defects(), n),
-					       (double)expected, (double)gain_here);
-					std::cerr << "mismatch" << msg << std::endl;
+					snprintf(msg, 255, " mismatch: %s frame %2d pos %4d %4d status %5d obs % 8.4f expected % 8.4f gain %.4f\n",
+					         fn_movie.c_str(), iframe, n / nx, n % ny, (double)val, DIRECT_MULTIDIM_ELEM(defects(), n),
+					         (double)expected, (double)gain_here);
+					std::cerr << msg << std::endl;
 					if (!dont_die_on_error)
 						REPORT_ERROR("Unexpected pixel value in a pixel that was considered reliable");
 					error++;
@@ -269,8 +272,8 @@ public:
 						ival = underflow;
 						error++;
 						
-						printf(" underflow: frame %2d pos %4d %4d obs % 8.4f expected % 8.4f gain %.4f\n",
-					               iframe, n / nx, n % ny, (double)val,
+						printf(" underflow: %s frame %2d pos %4d %4d obs % 8.4f expected % 8.4f gain %.4f\n",
+					               fn_movie.c_str(), iframe, n / nx, n % ny, (double)val,
 					               (double)expected, (double)gain_here);
 					}
 					else if (ival > overflow)
@@ -278,8 +281,8 @@ public:
 						ival = overflow;
 						error++;
 
-						printf(" overflow: frame %2d pos %4d %4d obs % 8.4f expected % 8.4f gain %.4f\n",
-					               iframe, n / nx, n % ny, (double)val,
+						printf(" overflow: %s frame %2d pos %4d %4d obs % 8.4f expected % 8.4f gain %.4f\n",
+					               fn_movie.c_str(), iframe, n / nx, n % ny, (double)val,
 					               (double)expected, (double)gain_here);
 					}
 				}
@@ -288,7 +291,7 @@ public:
 			}
 
 			write_tiff_one_page(tif, buf, decide_filter(nx), deflate_level);
-			printf(" Frame %3d / %3d #Error %10d\n", iframe + 1, nn, error);
+			printf(" %s Frame %3d / %3d #Error %10d\n", fn_movie.c_str(), iframe + 1, nn, error);
 		}
 
 		TIFFClose(tif);
@@ -326,8 +329,14 @@ public:
 		return headers[3];
 	}
 
-	void initialise()
+	void initialise(int _rank, int _total_ranks)
 	{
+		rank = _rank;
+		total_ranks = _total_ranks;
+
+		if (do_estimate && total_ranks != 1)
+			REPORT_ERROR("MPI parallelisation is not avaialble for --estimate_gain");
+
 		FileName fn_first;
 
 		if (fn_in.getExtension() == "star")
@@ -360,7 +369,8 @@ public:
 		ny = YSIZE(Ihead());
 		nx = XSIZE(Ihead());
 		mrc_mode = checkMRCtype(fn_first);
-		printf("Input (NX, NY, NN) = (%d, %d, %d), MODE = %d\n\n", nx, ny, nn, mrc_mode);
+		if (rank == 0)
+			printf("Input (NX, NY, NN) = (%d, %d, %d), MODE = %d\n\n", nx, ny, nn, mrc_mode);
 
 		if (fn_gain != "")
 		{
@@ -371,13 +381,15 @@ public:
 			else
 			{
 				gain.read(fn_gain + ":mrc");
-				std::cout << "Read " << fn_gain << std::endl;
+				if (rank == 0)
+					std::cout << "Read " << fn_gain << std::endl;
 				if (XSIZE(gain()) != nx || YSIZE(gain()) != ny)
 					REPORT_ERROR("The input gain has a wrong size.");
 
 				FileName fn_defects = fn_gain.withoutExtension() + "_reliablity." + fn_gain.getExtension();
 				defects.read(fn_defects + ":mrc");
-				std::cout << "Read " << fn_defects << "\n" << std::endl;
+				if (rank == 0)
+					std::cout << "Read " << fn_defects << "\n" << std::endl;
 				if (XSIZE(defects()) != nx || YSIZE(defects()) != ny)
 					REPORT_ERROR("The input reliability map has a wrong size.");
 			}
@@ -402,8 +414,11 @@ public:
 				if (DIRECT_MULTIDIM_ELEM(defects(), n) < thresh_reliable)
 					DIRECT_MULTIDIM_ELEM(gain(), n) = 1.0;
 
-			gain.write(fn_out + "gain-reference.mrc");
-			std::cout << "Written " + fn_out + "gain-reference.mrc. Please use this file as a gain reference when processing the converted movies.\n" << std::endl; 
+			if (rank == 0)
+			{
+				gain.write(fn_out + "gain-reference.mrc");
+				std::cout << "Written " + fn_out + "gain-reference.mrc. Please use this file as a gain reference when processing the converted movies.\n" << std::endl; 	
+			}
 		}
 	}
 
@@ -423,8 +438,7 @@ public:
 		{
 			only_compress<char>(fn_movie, fn_tiff);
 		}
-
-		if (do_estimate)
+		else if (do_estimate)
 		{
 			estimate(fn_movie);
 
@@ -442,7 +456,7 @@ public:
 
 	void run()
 	{
-		initialise();
+		initialise(0, 0);
 
 		long int my_first = 0, my_last = MD.numberOfObjects() - 1; 
 		// divide_equally(MD.numberOfParticles(), size, rank, my_first, my_last); // MPI parallelization
