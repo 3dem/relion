@@ -67,7 +67,7 @@ int readTIFF(TIFF* ftiff, long int img_select, bool readdata=false, bool isStack
 	       width, length, _nDim, sampleFormat, bitsPerSample);
 #endif
 
-	// Reject 4-bit packed TIFFs. This is IMOD's own extension.
+	// Detect 4-bit packed TIFFs. This is IMOD's own extension.
 	// It is not easy to detect this format. Here we check only the image size.
 	// See IMOD's iiTIFFCheck() in libiimod/iitif.c and sizeCanBe4BitK2SuperRes() in libiimod/mrcfiles.c.
 	bool packed_4bit = false;
@@ -108,7 +108,7 @@ int readTIFF(TIFF* ftiff, long int img_select, bool readdata=false, bool isStack
 		REPORT_ERROR("Unsupported TIFF format.\n");
 	}
 	
-	MDMainHeader.setValue(EMDL_IMAGE_DATATYPE,(int)datatype);
+	MDMainHeader.setValue(EMDL_IMAGE_DATATYPE, (int)datatype);
 
 	// TODO: TIFF is always a stack, isn't it?
 	if (isStack)
