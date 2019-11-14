@@ -1067,15 +1067,14 @@ const Image<RFLOAT>& ObservationModel::getAverageMtfImage(int s)
 
 		if (avgMtfImage.find(s) == avgMtfImage.end())
 		{
-
-			if (mtfImage[0].find(s) == mtfImage[0].end())
-				REPORT_ERROR("BUG: mtfImage hasn't been filled for this boxsize yet...");
-			avgMtfImage[s] = mtfImage[0][s];
-
+			// get first mtfImage
+			avgMtfImage[s] = getMtfImage(0, s);
+			// Then add rest of optics groups
 			for (int i = 1; i < mtfImage.size(); i++)
 			{
-				avgMtfImage[s]() += mtfImage[i][s]();
+				avgMtfImage[s].data += getMtfImage(i, s).data;
 			}
+			avgMtfImage[s].data /= (RFLOAT)mtfImage.size();
 		}
 
 	}
