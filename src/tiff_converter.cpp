@@ -26,6 +26,8 @@
 #include <src/tiff_converter.h>
 #include <src/parallel.h>
 
+// TODO: Set the pixel size in the output
+
 #ifdef HAVE_TIFF
 
 void TIFFConverter::usage()
@@ -73,10 +75,15 @@ void TIFFConverter::write_tiff_one_page(TIFF *tif, MultidimArray<T> buf, const i
 		TIFFSetField(tif, TIFFTAG_BITSPERSAMPLE, 32);
 		TIFFSetField(tif, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_IEEEFP);
 	}
-	else if (std::is_same<T, short>::value)
+	else if (std::is_same<T, unsigned short>::value)
 	{
 		TIFFSetField(tif, TIFFTAG_BITSPERSAMPLE, 16);
 		TIFFSetField(tif, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_UINT);
+	}
+	else if (std::is_same<T, short>::value)
+	{
+		TIFFSetField(tif, TIFFTAG_BITSPERSAMPLE, 16);
+		TIFFSetField(tif, TIFFTAG_SAMPLEFORMAT, SAMPLEFORMAT_INT);
 	}
 	else if (std::is_same<T, char>::value || std::is_same<T, unsigned char>::value )
 	{
@@ -412,9 +419,13 @@ void TIFFConverter::processOneMovie(FileName fn_movie, FileName fn_tiff)
 	if (ny != YSIZE(Ihead()) || nx != XSIZE(Ihead()) || mrc_mode != checkMRCtype(fn_movie))
 		REPORT_ERROR("A movie " + fn_movie + " has a different size and/or mode from other movies.");
 
-	if (mrc_mode == 1 || mrc_mode == 6)
+	if (mrc_mode == 1)
 	{
 		only_compress<short>(fn_movie, fn_tiff);
+	}
+	else if (mrc_mode == 6)
+	{
+		only_compress<unsigned short>(fn_movie, fn_tiff);
 	}
 	else if (mrc_mode == 0 || mrc_mode == 101)
 	{
