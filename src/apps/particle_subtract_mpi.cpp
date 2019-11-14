@@ -51,7 +51,7 @@ int main(int argc, char *argv[])
 			{
 				if (rank == myrank)
 				{
-					// First send how large orients is to the masker
+					// First send how large orients is to the master
 					long int my_ysize = YSIZE(prm.orients);
 					MPI_Send(&my_ysize, 1, MPI_LONG, 0, MPITAG_INT, MPI_COMM_WORLD);
 					MPI_Send(MULTIDIM_ARRAY(prm.orients), my_ysize*XSIZE(prm.orients), MY_MPI_DOUBLE, 0, MPITAG_METADATA, MPI_COMM_WORLD);
@@ -65,13 +65,18 @@ int main(int argc, char *argv[])
 				}
 			}
 			MPI_Barrier(MPI_COMM_WORLD);
-
-			if (rank == 0) prm.setLinesInStarFile(myrank);
 		}
 
-		if (rank == 0) prm.saveStarFile();
 		MPI_Barrier(MPI_COMM_WORLD);
 
+		prm.setLinesInStarFile(rank);
+		prm.saveStarFile(rank);
+
+		MPI_Barrier(MPI_COMM_WORLD);
+
+		if (rank == 0) prm.combineStarFile();
+
+		MPI_Barrier(MPI_COMM_WORLD);
 	}
 	catch (RelionError XE)
 	{

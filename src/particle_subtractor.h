@@ -69,13 +69,16 @@ public:
 	void revert();
 
 	//Set the metatdata into the final STAR file
-	void setLinesInStarFile(int myrank = 0);
+	void setLinesInStarFile(int myrank=0);
+
+	// Write out a STAR file for this rank
+	void saveStarFile(int myrank=0);
 
 	// Write out the final STAR file
-	void saveStarFile();
+	void combineStarFile();
 
 	// Get name of a single subtracted particle
-	FileName getParticleName(long int imgno, int myrank);
+	FileName getParticleName(long int imgno, int myrank, int optics_group=-1);
 
 	// subtract one particle
 	void subtractOneParticle(long int part_id, long int imgno, MultidimArray<RFLOAT> &orients);
@@ -101,6 +104,10 @@ private:
 
 	// For MPI parallelisation
 	int rank, size;
+
+	// image to particle mapping
+	std::vector<long int> nr_particles_in_optics_group;
+	std::map<long int, FileName> imgno_to_filename;
 };
 
 #endif /* PARTICLE_SUBTRACTOR_H_ */
