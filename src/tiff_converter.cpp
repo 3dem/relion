@@ -114,8 +114,10 @@ void TIFFConverter::write_tiff_one_page(TIFF *tif, MultidimArray<T> buf, const i
 void TIFFConverter::estimate(FileName fn_movie)
 {
 	Image<float> frame;
+	frame.read(fn_movie, false, -1, false, true); // select_img -1, mmap false, is_2D true
+	const int nframes = NSIZE(frame());
 
-	for (int iframe = 0; iframe < nn; iframe++)
+	for (int iframe = 0; iframe < nframes; iframe++)
 	{
 		int error = 0, changed = 0, stable = 0, negative = 0;
 		
@@ -215,7 +217,10 @@ void TIFFConverter::unnormalise(FileName fn_movie, FileName fn_tiff)
 	MultidimArray<T> buf(ny, nx);
 	char msg[256];
 
-	for (int iframe = 0; iframe < nn; iframe++)
+	frame.read(fn_movie, false, -1, false, true); // select_img -1, mmap false, is_2D true
+	const int nframes = NSIZE(frame());
+
+	for (int iframe = 0; iframe < nframes; iframe++)
 	{
 		int error = 0;
 		
@@ -277,7 +282,7 @@ void TIFFConverter::unnormalise(FileName fn_movie, FileName fn_tiff)
 		}
 
 		write_tiff_one_page(tif, buf, decide_filter(nx), deflate_level);
-		printf(" %s Frame %3d / %3d #Error %10d\n", fn_movie.c_str(), iframe + 1, nn, error);
+		printf(" %s Frame %3d / %3d #Error %10d\n", fn_movie.c_str(), iframe + 1, nframes, error);
 	}
 
 	TIFFClose(tif);
@@ -293,11 +298,14 @@ void TIFFConverter::only_compress(FileName fn_movie, FileName fn_tiff)
 		REPORT_ERROR("Failed to open the output TIFF file.");
 
 	Image<T> frame;
-	for (int iframe = 0; iframe < nn; iframe++)
+	frame.read(fn_movie, false, -1, false, true); // select_img -1, mmap false, is_2D true
+	const int nframes = NSIZE(frame());
+	
+	for (int iframe = 0; iframe < nframes; iframe++)
 	{
 		frame.read(fn_movie, true, iframe, false, true);
 		write_tiff_one_page(tif, frame(), decide_filter(nx), deflate_level);
-		printf(" %s Frame %3d / %3d\n", fn_movie.c_str(), iframe + 1, nn);
+		printf(" %s Frame %3d / %3d\n", fn_movie.c_str(), iframe + 1, nframes);
 	}
 
 	TIFFClose(tif);
