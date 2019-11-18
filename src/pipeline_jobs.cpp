@@ -4556,8 +4556,11 @@ bool RelionJob::getCommandsPostprocessJob(std::string &outputname, std::vector<s
 	outputNodes.push_back(node2c);
 
 	// Sharpening
-	command += " --mtf " + joboptions["fn_mtf"].getString();
-	command += " --mtf_angpix " + joboptions["mtf_angpix"].getString();
+	if (joboptions["fn_mtf"].getString().length() > 0)
+	{
+		command += " --mtf " + joboptions["fn_mtf"].getString();
+		command += " --mtf_angpix " + joboptions["mtf_angpix"].getString();
+	}
 	if (joboptions["do_auto_bfac"].getBoolean())
 	{
 		command += " --auto_bfac ";
