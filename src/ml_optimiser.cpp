@@ -1594,7 +1594,7 @@ void MlOptimiser::initialiseGeneral(int rank)
 		REPORT_ERROR("ERROR: cannot join random halves because they were not split in the previous run");
 
 	// Check all images have the same image_size, otherwise disable non-parallel disc I/O
-	if (mydata.obsModel.allBoxSizesIdentical() && !do_parallel_disc_io)
+	if (!mydata.obsModel.allBoxSizesIdentical() && !do_parallel_disc_io)
 		REPORT_ERROR("ERROR: non-parallel disc I/O is not implemented when multiple different box sizes are present in the data set. Sorry....");
 
 	// Local symmetry operators

@@ -49,7 +49,7 @@ class ObservationModel
 	        ObservationModel(const MetaDataTable &opticsMdt, bool do_die_upon_error = true);
 
 		MetaDataTable opticsMdt;
-		bool hasEvenZernike, hasOddZernike, hasMagMatrices, hasBoxSizes;
+		bool hasEvenZernike, hasOddZernike, hasMagMatrices, hasBoxSizes, hasMultipleMtfs;
 
 	protected:
 		// cached values - protected to prevent users from accidentally changing them,
@@ -65,6 +65,7 @@ class ObservationModel
 		// e.g.: phaseCorr[opt. group][img. height](y,x)
 		std::vector<std::map<int,Image<Complex> > > phaseCorr;
 		std::vector<std::map<int,Image<RFLOAT> > > gammaOffset, mtfImage;
+		std::map<int,Image<RFLOAT> > avgMtfImage;
 
 	public:
 
@@ -83,13 +84,16 @@ class ObservationModel
 
 		// divide by MTF of detector (using cache)
 		void divideByMtf(const MetaDataTable& partMdt, long particle, MultidimArray<Complex>& obsImage,
-		                 bool do_multiply_instead = false);
+		                 bool do_multiply_instead = false, bool do_correct_average_mtf = true);
 
 		void divideByMtf(int opticsGroup, MultidimArray<Complex>& obsImage,
-		                 bool do_multiply_instead = false);
+		                 bool do_multiply_instead = false, bool do_correct_average_mtf = true);
 
 		// 2D image with the MTF (cached)
 		const Image<RFLOAT>& getMtfImage(int optGroup, int s);
+
+		// 2D image with the average MTF (cached)
+		const Image<RFLOAT>& getAverageMtfImage(int s);
 
 		// apply effect of antisymmetric aberration (using cache)
 		void demodulatePhase(int optGroup, MultidimArray<Complex>& obsImage, bool do_modulate_instead = false);

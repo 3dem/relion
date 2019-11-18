@@ -428,15 +428,15 @@ class MultidimArray;
 
 template<typename T>
 void coreArrayByScalar(const MultidimArray<T>& op1, const T& op2,
-                       MultidimArray<T>& result, char operation);
+                       MultidimArray<T>& result, const char operation);
 
 template<typename T>
 void coreScalarByArray(const T& op1, const MultidimArray<T>& op2,
-                       MultidimArray<T>& result, char operation);
+                       MultidimArray<T>& result, const char operation);
 
 template<typename T>
 void coreArrayByArray(const MultidimArray<T>& op1, const MultidimArray<T>& op2,
-                      MultidimArray<T>& result, char operation);
+                      MultidimArray<T>& result, const char operation);
 
 /** Template class for Xmipp arrays.
   * This class provides physical and logical access.
@@ -2866,7 +2866,7 @@ public:
      */
     inline friend void coreArrayByArray(const MultidimArray<T>& op1,
                                         const MultidimArray<T>& op2, MultidimArray<T>& result,
-                                        char operation)
+                                        const char operation)
     {
         T* ptrResult=NULL;
         T* ptrOp1=NULL;
@@ -3002,7 +3002,7 @@ public:
     inline friend void coreArrayByScalar(const MultidimArray<T>& op1,
                                          const T& op2,
                                          MultidimArray<T>& result,
-                                         char operation)
+                                         const char operation)
     {
         T* ptrResult=NULL;
         T* ptrOp1=NULL;
@@ -3141,7 +3141,7 @@ public:
     inline friend void coreScalarByArray(const T& op1,
                                          const MultidimArray<T>& op2,
                                          MultidimArray<T>& result,
-                                         char operation)
+                                         const char operation)
     {
         T* ptrResult=NULL;
         T* ptrOp2=NULL;

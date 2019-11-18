@@ -4494,7 +4494,6 @@ Note that your map must extend well beyond the lowest resolution included in the
 This option is useful if your map does not extend beyond the 10A needed for the automated procedure, or when the automated procedure does not give a suitable value (e.g. in more disordered parts of the map).");
 	joboptions["adhoc_bfac"] = JobOption("User-provided B-factor:", -1000, -2000, 0, -50, "Use negative values for sharpening. Be careful: if you over-sharpen your map, you may end up interpreting noise for signal!");
 
-	joboptions["do_mtf"] = JobOption("Perform MTF correction?", false, "From release-3.1, the MTF will be corrected during refinement, and does not need to be repeated here. Set to option Yes only if you have not yet performed MTF correction using optics groups.");
 	joboptions["fn_mtf"] = JobOption("MTF of the detector (STAR file)", "", "STAR Files (*.star)", ".", "If you know the MTF of your detector, provide it here. Curves for some well-known detectors may be downloaded from the RELION Wiki. Also see there for the exact format \
 \n If you do not know the MTF of your detector and do not want to measure it, then by leaving this entry empty, you include the MTF of your detector in your overall estimated B-factor upon sharpening the map.\
 Although that is probably slightly less accurate, the overall quality of your map will probably not suffer very much.");
@@ -4557,11 +4556,8 @@ bool RelionJob::getCommandsPostprocessJob(std::string &outputname, std::vector<s
 	outputNodes.push_back(node2c);
 
 	// Sharpening
-	if (joboptions["do_mtf"].getBoolean())
-	{
-		command += " --mtf " + joboptions["fn_mtf"].getString();
-		command += " --mtf_angpix " + joboptions["mtf_angpix"].getString();
-	}
+	command += " --mtf " + joboptions["fn_mtf"].getString();
+	command += " --mtf_angpix " + joboptions["mtf_angpix"].getString();
 	if (joboptions["do_auto_bfac"].getBoolean())
 	{
 		command += " --auto_bfac ";
@@ -5086,7 +5082,7 @@ void RelionJob::initialiseExternalJob()
 	joboptions["in_mic"] = JobOption("Input micrographs: ", NODE_MICS, "", "micrographs STAR file (*.star)", "Input micrographs. This will be passed with a --in_mics argument to the executable.");
 	joboptions["in_part"] = JobOption("Input particles: ", NODE_PART_DATA, "", "particles STAR file (*.star)", "Input particles. This will be passed with a --in_parts argument to the executable.");
 	joboptions["in_coords"] = JobOption("Input coordinates: ", NODE_MIC_COORDS, "", "STAR files (coords_suffix*.star)", "Input coordinates. This will be passed with a --in_coords argument to the executable.");
-	joboptions["in_3dref"] = JobOption("Input 3D reference: ", NODE_3DREF, "", "MRC files (*.mrc)", "Input 3D reference map. This will be passed with a --in_ref3d argument to the executable.");
+	joboptions["in_3dref"] = JobOption("Input 3D reference: ", NODE_3DREF, "", "MRC files (*.mrc)", "Input 3D reference map. This will be passed with a --in_3dref argument to the executable.");
 	joboptions["in_mask"] = JobOption("Input 3D mask: ", NODE_MASK, "", "MRC files (*.mrc)", "Input 3D mask. This will be passed with a --in_mask argument to the executable.");
 
 	// Optional parameters
