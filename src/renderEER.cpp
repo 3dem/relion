@@ -148,7 +148,8 @@ int EERRenderer::getHeight()
 	return getWidth();
 }
 
-long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArray<float> &image)
+template <typename T>
+long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArray<T> &image)
 {
 	if (!ready)
 		REPORT_ERROR("EERRenderer::renderNFrames called before ready.");
@@ -251,3 +252,8 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 
 	return total_n_electron;
 }
+
+// Instantiate for Polishing
+template long long EERRenderer::renderFrames<float>(int frame_start, int frame_end, MultidimArray<float> &image);
+template long long EERRenderer::renderFrames<signed short>(int frame_start, int frame_end, MultidimArray<signed short> &image);
+template long long EERRenderer::renderFrames<char>(int frame_start, int frame_end, MultidimArray<char> &image);

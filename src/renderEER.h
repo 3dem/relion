@@ -58,7 +58,9 @@ class EERRenderer {
 	// Frame indices are 1-indexed.
 	// image is cleared.
 	// This function is thread-safe (except for timing).
-	long long renderFrames(int frame_start, int frame_end, MultidimArray<float> &image);
+	// It is caller's responsibility to make sure type T does not overflow.
+	template <typename T>
+	long long renderFrames(int frame_start, int frame_end, MultidimArray<T> &image);
 
 	template <typename T>
 	static void upsampleEERGain(MultidimArray<T> &gain)
