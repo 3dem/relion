@@ -156,7 +156,10 @@ long long EERRenderer::renderFrames(int frame_start, int frame_end, MultidimArra
 
 	if (frame_start <= 0 || frame_start > getNFrames() ||
 	    frame_end < frame_start || frame_end > getNFrames())
+	{
+		std::cerr << "EERRenderer::renderFrames(frame_start = " << frame_start << ", frame_end = " << frame_end << "),  NFrames = " << getNFrames() << std::endl;
 		REPORT_ERROR("Invalid frame range was requested.");
+	}
 
 	// Make this 0-indexed
 	frame_start--;
