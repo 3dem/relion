@@ -219,10 +219,10 @@ int readMRC(long int img_select, bool isStack=false, const FileName &name="")
 	}
 	else 
 	{
-		switch (header->mode%5)
+		switch (header->mode % 5)
 		{
 		case 0:
-			datatype = UChar; // The image2010 web page says map-mode 0 is signed, but Jude's code interpretes the data as unsigned
+			datatype = SChar; // Changed to SIGNED in RELION 3.1 to be compatible with the official speficifation and SerialEM 
 			break;
 		case 1:
 			datatype = Short;
@@ -235,7 +235,7 @@ int readMRC(long int img_select, bool isStack=false, const FileName &name="")
 		case 4:
 			REPORT_ERROR("readMRC: only real-space images may be read into RELION.");
 		default:
-			datatype = UChar;
+			datatype = SChar;
 			break;
 		}
 	}
@@ -313,7 +313,7 @@ int writeMRC(long int img_select, bool isStack=false, int mode=WRITE_OVERWRITE)
 		imgStart = img_select;
 		imgEnd = img_select + 1;
 	}
-	if (mode == WRITE_APPEND || mode==WRITE_REPLACE)
+	if (mode == WRITE_APPEND || mode == WRITE_REPLACE)
 	{
 		imgStart = 0;
 		imgEnd = 1;

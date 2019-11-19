@@ -86,19 +86,23 @@ int readTIFF(TIFF* ftiff, long int img_select, bool readdata=false, bool isStack
 	{
 		datatype = UHalf;
 	}
-	else if (bitsPerSample == 8 && sampleFormat == 1)
+	else if (bitsPerSample == 8 && sampleFormat == SAMPLEFORMAT_UINT)
 	{
 		datatype = UChar;
 	}
-	else if (bitsPerSample == 16 && sampleFormat == 1)
+	else if (bitsPerSample == 8 && sampleFormat == SAMPLEFORMAT_INT)
+	{
+		datatype = SChar;
+	}
+	else if (bitsPerSample == 16 && sampleFormat == SAMPLEFORMAT_UINT)
 	{
 		datatype = UShort;
 	}
-	else if (bitsPerSample == 16 && sampleFormat == 2)
+	else if (bitsPerSample == 16 && sampleFormat == SAMPLEFORMAT_INT)
 	{
 		datatype = Short;
 	}
-	else if (bitsPerSample == 32 && sampleFormat == 3)
+	else if (bitsPerSample == 32 && sampleFormat == SAMPLEFORMAT_IEEEFP)
 	{
 		datatype = Float;
 	}
