@@ -49,7 +49,7 @@ private:
 	int nn, ny, nx, mrc_mode;
 
 	template <typename T>
-	void write_tiff_one_page(TIFF *tif, MultidimArray<T> buf, const int filter=COMPRESSION_LZW, const int level=6);
+	void write_tiff_one_page(TIFF *tif, MultidimArray<T> buf, const int filter=COMPRESSION_LZW, const int level=6, const float pixel_size=-1);
 	void estimate(FileName fn_movie);
 	int decide_filter(int nx);
 

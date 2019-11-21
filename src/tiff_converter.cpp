@@ -26,7 +26,7 @@
 #include <src/tiff_converter.h>
 #include <src/parallel.h>
 
-// TODO: Set the pixel size in the output
+// TODO: Make less verbose
 
 #ifdef HAVE_TIFF
 
@@ -41,7 +41,7 @@ void TIFFConverter::read(int argc, char **argv)
 
 	int general_section = parser.addSection("General Options");
 	fn_in = parser.getOption("--i", "Input movie to be compressed (a MRC file or a STAR file)");
-	fn_out = parser.getOption("--o", "Rootname for output TIFF files", "");
+	fn_out = parser.getOption("--o", "Directory for output TIFF files", "./");
 	fn_gain = parser.getOption("--gain", "Estimated gain map and its reliablity map (read)", "");
 	nr_threads = textToInteger(parser.getOption("--j", "Number of threads (useful only for --estimate_gain)", "1"));
 	only_do_unfinished = parser.checkOption("--only_do_unfinished", "Only process non-converted movies.");
@@ -60,7 +60,7 @@ void TIFFConverter::read(int argc, char **argv)
 }
 
 template <typename T>
-void TIFFConverter::write_tiff_one_page(TIFF *tif, MultidimArray<T> buf, const int filter, const int level)
+void TIFFConverter::write_tiff_one_page(TIFF *tif, MultidimArray<T> buf, const int filter, const int level, const float pixel_size)
 {
 	TIFFSetField(tif, TIFFTAG_SOFTWARE, "relion_convert_to_tiff");
 	TIFFSetField(tif, TIFFTAG_IMAGEWIDTH, XSIZE(buf));
@@ -102,6 +102,13 @@ void TIFFConverter::write_tiff_one_page(TIFF *tif, MultidimArray<T> buf, const i
 		if (level <= 0 || level > 9)
 			REPORT_ERROR("Deflate level must be 1, 2, ..., 9");
 		TIFFSetField(tif, TIFFTAG_ZIPQUALITY, level);
+	}
+
+	if (pixel_size > 0)
+	{
+		TIFFSetField(tif, TIFFTAG_RESOLUTIONUNIT, RESUNIT_CENTIMETER); // 1 cm = 1E8 A
+		TIFFSetField(tif, TIFFTAG_XRESOLUTION, 1E8 / pixel_size); // pixels / 1 cm
+		TIFFSetField(tif, TIFFTAG_YRESOLUTION, 1E8 / pixel_size);
 	}
 
 	// Have to flip the Y axis
@@ -219,6 +226,7 @@ void TIFFConverter::unnormalise(FileName fn_movie, FileName fn_tiff)
 
 	frame.read(fn_movie, false, -1, false, true); // select_img -1, mmap false, is_2D true
 	const int nframes = NSIZE(frame());
+	const float angpix = frame.samplingRateX();
 
 	for (int iframe = 0; iframe < nframes; iframe++)
 	{
@@ -281,7 +289,7 @@ void TIFFConverter::unnormalise(FileName fn_movie, FileName fn_tiff)
 			DIRECT_MULTIDIM_ELEM(buf, n) = ival;
 		}
 
-		write_tiff_one_page(tif, buf, decide_filter(nx), deflate_level);
+		write_tiff_one_page(tif, buf, decide_filter(nx), deflate_level, angpix);
 		printf(" %s Frame %3d / %3d #Error %10d\n", fn_movie.c_str(), iframe + 1, nframes, error);
 	}
 
@@ -300,11 +308,12 @@ void TIFFConverter::only_compress(FileName fn_movie, FileName fn_tiff)
 	Image<T> frame;
 	frame.read(fn_movie, false, -1, false, true); // select_img -1, mmap false, is_2D true
 	const int nframes = NSIZE(frame());
+	const float angpix = frame.samplingRateX();
 	
 	for (int iframe = 0; iframe < nframes; iframe++)
 	{
 		frame.read(fn_movie, true, iframe, false, true);
-		write_tiff_one_page(tif, frame(), decide_filter(nx), deflate_level);
+		write_tiff_one_page(tif, frame(), decide_filter(nx), deflate_level, angpix);
 		printf(" %s Frame %3d / %3d\n", fn_movie.c_str(), iframe + 1, nframes);
 	}
 
@@ -331,9 +340,13 @@ void TIFFConverter::initialise(int _rank, int _total_ranks)
 	if (do_estimate && total_ranks != 1)
 		REPORT_ERROR("MPI parallelisation is not avaialble for --estimate_gain");
 
-	FileName fn_first;
+	if (fn_out.back() != '/')
+		fn_out += "/";
 
-	if (fn_in.getExtension() == "star")
+	FileName fn_first;
+	FileName fn_in_ext = fn_in.getExtension();
+
+	if (fn_in_ext == "star")
 	{
 		MD.read(fn_in, "movie");
 
@@ -346,12 +359,19 @@ void TIFFConverter::initialise(int _rank, int _total_ranks)
 
 		std::cout << "The number of movies in the input: " << MD.numberOfObjects() << std::endl;
 	}
-	else
+	else if (fn_in_ext == "lst") // treat as a simple list
+	{
+		// TODO:
+	}
+	else 
 	{
 		MD.addObject();
 		MD.setValue(EMDL_MICROGRAPH_MOVIE_NAME, fn_in);
 		fn_first = fn_in;
 	}
+
+	if (fn_first.getExtension() != "mrc" && fn_first.getExtension() != "mrcs")
+		REPORT_ERROR(fn_first + ": the input must be MRC or MRCS files");
 
 	if (do_estimate)
 		MD.randomiseOrder();	
@@ -393,12 +413,19 @@ void TIFFConverter::initialise(int _rank, int _total_ranks)
 	}
 	else if (mrc_mode == 2)
 	{
-		gain().reshape(ny, nx);
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(gain())
-			DIRECT_MULTIDIM_ELEM(gain(), n) = 999.9;
-		defects().reshape(ny, nx);
-		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(defects())
-			DIRECT_MULTIDIM_ELEM(defects(), n) = -1;
+		if (do_estimate)
+		{
+			gain().reshape(ny, nx);
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(gain())
+				DIRECT_MULTIDIM_ELEM(gain(), n) = 999.9;
+			defects().reshape(ny, nx);
+			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(defects())
+				DIRECT_MULTIDIM_ELEM(defects(), n) = -1;
+		}
+		else
+		{
+			std::cerr << "To efficiently compress mode 2 MRC file, you should first estimate the gain with --estimate_gain." << std::endl;
+		}
 	}
 
 	if (fn_out.contains("/"))
@@ -411,7 +438,7 @@ void TIFFConverter::initialise(int _rank, int _total_ranks)
 			if (DIRECT_MULTIDIM_ELEM(defects(), n) < thresh_reliable)
 				DIRECT_MULTIDIM_ELEM(gain(), n) = 1.0;
 
-		if (rank == 0)
+		if (rank == 0 && fn_gain != "")
 		{
 			gain.write(fn_out + "gain-reference.mrc");
 			std::cout << "Written " + fn_out + "gain-reference.mrc. Please use this file as a gain reference when processing the converted movies.\n" << std::endl; 	
@@ -421,6 +448,11 @@ void TIFFConverter::initialise(int _rank, int _total_ranks)
 
 void TIFFConverter::processOneMovie(FileName fn_movie, FileName fn_tiff)
 {
+	if (fn_movie.getExtension() != "mrc" && fn_movie.getExtension() != "mrcs")
+	{
+		std::cerr << fn_movie <<  " is not MRC or MRCS file. Skipped." << std::cerr;
+	}
+
 	// Check type and mode of the input
 	Image<RFLOAT> Ihead;
 	Ihead.read(fn_movie, false, -1, false, true); // select_img -1, mmap false, is_2D true
