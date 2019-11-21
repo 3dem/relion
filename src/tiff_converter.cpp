@@ -27,6 +27,7 @@
 #include <src/parallel.h>
 
 // TODO: Make less verbose
+//       Lossy strategy
 
 #ifdef HAVE_TIFF
 
@@ -40,7 +41,7 @@ void TIFFConverter::read(int argc, char **argv)
 	parser.setCommandLine(argc, argv);
 
 	int general_section = parser.addSection("General Options");
-	fn_in = parser.getOption("--i", "Input movie to be compressed (a MRC file or a STAR file)");
+	fn_in = parser.getOption("--i", "Input movie to be compressed (an MRC/MRCS file or a list of movies as .star or .lst)");
 	fn_out = parser.getOption("--o", "Directory for output TIFF files", "./");
 	fn_gain = parser.getOption("--gain", "Estimated gain map and its reliablity map (read)", "");
 	nr_threads = textToInteger(parser.getOption("--j", "Number of threads (useful only for --estimate_gain)", "1"));
@@ -361,7 +362,17 @@ void TIFFConverter::initialise(int _rank, int _total_ranks)
 	}
 	else if (fn_in_ext == "lst") // treat as a simple list
 	{
-		// TODO:
+		std::ifstream f;
+		std::string line;
+		f.open(fn_in);
+		while (std::getline(f, line))
+		{
+			MD.addObject();
+			MD.setValue(EMDL_MICROGRAPH_MOVIE_NAME, line);
+		}
+		f.close();
+
+		MD.getValue(EMDL_MICROGRAPH_MOVIE_NAME, fn_first, 0);		
 	}
 	else 
 	{
@@ -413,19 +424,15 @@ void TIFFConverter::initialise(int _rank, int _total_ranks)
 	}
 	else if (mrc_mode == 2)
 	{
-		if (do_estimate)
-		{
-			gain().reshape(ny, nx);
-			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(gain())
-				DIRECT_MULTIDIM_ELEM(gain(), n) = 999.9;
-			defects().reshape(ny, nx);
-			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(defects())
-				DIRECT_MULTIDIM_ELEM(defects(), n) = -1;
-		}
-		else
-		{
-			std::cerr << "To efficiently compress mode 2 MRC file, you should first estimate the gain with --estimate_gain." << std::endl;
-		}
+		gain().reshape(ny, nx);
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(gain())
+			DIRECT_MULTIDIM_ELEM(gain(), n) = 999.9;
+		defects().reshape(ny, nx);
+		FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY(defects())
+			DIRECT_MULTIDIM_ELEM(defects(), n) = -1;
+
+		if (!do_estimate)
+			std::cerr << "WARNING: To effectively compress mode 2 MRC files, you should first estimate the gain with --estimate_gain." << std::endl;
 	}
 
 	if (fn_out.contains("/"))
