@@ -437,14 +437,17 @@ class star_handler_parameters
 
 				obsModels[obs_id].opticsMdt = unique_opticsMdt;
 
-				FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsin[MDs_id])
+				if (MDsin[MDs_id].containsLabel(EMDL_MLMODEL_GROUP_NAME))
 				{
-					MDsin[MDs_id].setValue(EMDL_IMAGE_OPTICS_GROUP, new_optics_groups[current_object]);
-					// Also rename the rlnGroupName to not have groups overlapping from different optics groups
-					std::string name;
-					MDsin[MDs_id].getValue(EMDL_MLMODEL_GROUP_NAME, name);
-					name = "optics"+integerToString(new_optics_groups[current_object])+"_"+name;
-					MDsin[MDs_id].setValue(EMDL_MLMODEL_GROUP_NAME, name);
+					FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsin[MDs_id])
+					{
+						MDsin[MDs_id].setValue(EMDL_IMAGE_OPTICS_GROUP, new_optics_groups[current_object]);
+						// Also rename the rlnGroupName to not have groups overlapping from different optics groups
+						std::string name;
+						MDsin[MDs_id].getValue(EMDL_MLMODEL_GROUP_NAME, name);
+						name = "optics"+integerToString(new_optics_groups[current_object])+"_"+name;
+						MDsin[MDs_id].setValue(EMDL_MLMODEL_GROUP_NAME, name);
+					}
 				}
 			}
 
