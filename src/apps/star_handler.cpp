@@ -676,11 +676,11 @@ class star_handler_parameters
 			int type;
 			if (MD.getName() == "micrographs")
 			{
-				type == NODE_MICS;
+				type = NODE_MICS;
 			}
 			else if (MD.getName() == "movies")
 			{
-				type == NODE_MOVIES;
+				type = NODE_MOVIES;
 			}
 			else
 			{
