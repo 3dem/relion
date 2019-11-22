@@ -457,7 +457,7 @@ void TIFFConverter::processOneMovie(FileName fn_movie, FileName fn_tiff)
 {
 	if (fn_movie.getExtension() != "mrc" && fn_movie.getExtension() != "mrcs")
 	{
-		std::cerr << fn_movie <<  " is not MRC or MRCS file. Skipped." << std::cerr;
+		std::cerr << fn_movie <<  " is not MRC or MRCS file. Skipped." << std::endl;
 	}
 
 	// Check type and mode of the input
