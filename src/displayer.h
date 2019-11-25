@@ -224,7 +224,7 @@ public:
 	               int _nr_regroup = -1, bool do_recenter = false, bool _is_data = false, MetaDataTable *MDgroups = NULL,
 	               bool do_allow_save = false, FileName fn_selected_imgs="", FileName fn_selected_parts="", int max_nr_parts_per_class = -1);
 	int fillSingleViewerCanvas(MultidimArray<RFLOAT> image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale);
-	int fillPickerViewerCanvas(MultidimArray<RFLOAT> image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale,
+	int fillPickerViewerCanvas(MultidimArray<RFLOAT> image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale, RFLOAT _coord_scale,
 	                           int _particle_radius, bool do_startend = false, FileName _fn_coords = "",
 	                           FileName _fn_color = "", FileName _fn_mic= "", FileName _color_label = "", RFLOAT _color_blue_value = 0., RFLOAT _color_red_value = 1.);
 
@@ -470,6 +470,9 @@ public:
 
 	int particle_radius;
 
+	// Scale for rlnCoordinateX/Y
+	RFLOAT coord_scale;
+
 	// Filename of the picked coordinate files
 	FileName fn_coords;
 
@@ -629,6 +632,9 @@ public:
 
 	// Particle diameter
 	int particle_radius;
+
+	// Scale for rlnCoordinateX/Y
+	RFLOAT coord_scale;
 
 	// Input & Output rootname
 	FileName fn_in;
