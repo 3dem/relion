@@ -70,8 +70,8 @@ class star_handler_parameters
 
 		int subset_section = parser.addSection("Select options");
 		select_label = parser.getOption("--select", "Metadata label (number) to base output selection on (e.g. rlnCtfFigureOfMerit)", "");
-		select_minval = textToFloat(parser.getOption("--minval", "Minimum acceptable value for this label", "-99999999."));
-		select_maxval = textToFloat(parser.getOption("--maxval", "Maximum acceptable value for this label", "99999999."));
+		select_minval = textToFloat(parser.getOption("--minval", "Minimum acceptable value for this label (inclusive)", "-99999999."));
+		select_maxval = textToFloat(parser.getOption("--maxval", "Maximum acceptable value for this label (inclusive)", "99999999."));
 		select_str_label = parser.getOption("--select_by_str", "Metadata label (string) to base output selection on (e.g. rlnMicrographname)", "");
 		select_include_str = parser.getOption("--select_include", "select rows that contains this string in --select_by_str ", "");
 		select_exclude_str = parser.getOption("--select_exclude", "exclude rows that contains this string in --select_by_str ", "");

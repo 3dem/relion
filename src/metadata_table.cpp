@@ -1785,13 +1785,13 @@ MetaDataTable subsetMetaDataTable(MetaDataTable &MDin, EMDLabel label, RFLOAT mi
 		{
 			long val;
 			MDin.getValue(label, val);
-			do_include = ((RFLOAT)val < max_value && (RFLOAT)val > min_value);
+			do_include = ((RFLOAT)val <= max_value && (RFLOAT)val >= min_value);
 		}
 		else
 		{
 			RFLOAT val;
 			MDin.getValue(label, val);
-			do_include = ((RFLOAT)val < max_value && (RFLOAT)val > min_value);
+			do_include = ((RFLOAT)val <= max_value && (RFLOAT)val >= min_value);
 		}
 
 		if (do_include)
