@@ -73,6 +73,7 @@
 #define DEFAULTNRTHREADS 1
 #define DEFAULTTHREADMAX 16
 #define DEFAULTMPIRUN "mpirun"
+#define DEFAULTSCRATCHDIR ""
 
 static const std::vector<std::string> job_undefined_options{
 	"undefined"

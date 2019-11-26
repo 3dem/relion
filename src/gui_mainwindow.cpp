@@ -2457,7 +2457,7 @@ void GuiMainWindow::cb_print_cl_i()
 
 	std::string error_message;
 	if (!pipeline.getCommandLineJob(gui_jobwindows[iwin]->myjob, current_job, is_main_continue, false,
-			DONT_MKDIR, do_overwrite_continue, commands, final_command, error_message))
+	                                DONT_MKDIR, do_overwrite_continue, commands, final_command, error_message))
 	{
 		fl_message("%s",error_message.c_str());
 	}
@@ -2469,8 +2469,9 @@ void GuiMainWindow::cb_print_cl_i()
 			if (icom > 0) command += " && ";
 			command += commands[icom];
 		}
-		const char* tt = fl_input("%s", command.c_str(), mesg.c_str());
-		free((void*)tt);
+		fl_input("%s", command.c_str(), mesg.c_str());
+		// Don't free the returned string! It comes from Fl_Input::value(), which returns
+		// "pointer to an internal buffer - do not free() this".
 	}
 }
 

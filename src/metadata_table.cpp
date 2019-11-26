@@ -1696,7 +1696,6 @@ MetaDataTable combineMetaDataTables(std::vector<MetaDataTable> &MDin)
 	}
 	else
 	{
-		bool some_labels_missing = false;
 		// Find which labels occur in all input tables
 		std::vector<EMDLabel> labelsc;
 		std::vector<EMDLabel> labels1 = MDin[0].getActiveLabels();
@@ -1714,7 +1713,6 @@ MetaDataTable combineMetaDataTables(std::vector<MetaDataTable> &MDin)
 				if (!is_present)
 				{
 					std::cerr << " + WARNING: ignoring label " << EMDL::label2Str(labels1[i]) << " in " << j+1 << "th STAR file" << std::endl;
-					some_labels_missing = true;
 					break;
 				}
 			}
@@ -1787,13 +1785,13 @@ MetaDataTable subsetMetaDataTable(MetaDataTable &MDin, EMDLabel label, RFLOAT mi
 		{
 			long val;
 			MDin.getValue(label, val);
-			do_include = ((RFLOAT)val < max_value && (RFLOAT)val > min_value);
+			do_include = ((RFLOAT)val <= max_value && (RFLOAT)val >= min_value);
 		}
 		else
 		{
 			RFLOAT val;
 			MDin.getValue(label, val);
-			do_include = ((RFLOAT)val < max_value && (RFLOAT)val > min_value);
+			do_include = ((RFLOAT)val <= max_value && (RFLOAT)val >= min_value);
 		}
 
 		if (do_include)

@@ -70,8 +70,8 @@ class star_handler_parameters
 
 		int subset_section = parser.addSection("Select options");
 		select_label = parser.getOption("--select", "Metadata label (number) to base output selection on (e.g. rlnCtfFigureOfMerit)", "");
-		select_minval = textToFloat(parser.getOption("--minval", "Minimum acceptable value for this label", "-99999999."));
-		select_maxval = textToFloat(parser.getOption("--maxval", "Maximum acceptable value for this label", "99999999."));
+		select_minval = textToFloat(parser.getOption("--minval", "Minimum acceptable value for this label (inclusive)", "-99999999."));
+		select_maxval = textToFloat(parser.getOption("--maxval", "Maximum acceptable value for this label (inclusive)", "99999999."));
 		select_str_label = parser.getOption("--select_by_str", "Metadata label (string) to base output selection on (e.g. rlnMicrographname)", "");
 		select_include_str = parser.getOption("--select_include", "select rows that contains this string in --select_by_str ", "");
 		select_exclude_str = parser.getOption("--select_exclude", "exclude rows that contains this string in --select_by_str ", "");
@@ -437,14 +437,17 @@ class star_handler_parameters
 
 				obsModels[obs_id].opticsMdt = unique_opticsMdt;
 
-				FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsin[MDs_id])
+				if (MDsin[MDs_id].containsLabel(EMDL_MLMODEL_GROUP_NAME))
 				{
-					MDsin[MDs_id].setValue(EMDL_IMAGE_OPTICS_GROUP, new_optics_groups[current_object]);
-					// Also rename the rlnGroupName to not have groups overlapping from different optics groups
-					std::string name;
-					MDsin[MDs_id].getValue(EMDL_MLMODEL_GROUP_NAME, name);
-					name = "optics"+integerToString(new_optics_groups[current_object])+"_"+name;
-					MDsin[MDs_id].setValue(EMDL_MLMODEL_GROUP_NAME, name);
+					FOR_ALL_OBJECTS_IN_METADATA_TABLE(MDsin[MDs_id])
+					{
+						MDsin[MDs_id].setValue(EMDL_IMAGE_OPTICS_GROUP, new_optics_groups[current_object]);
+						// Also rename the rlnGroupName to not have groups overlapping from different optics groups
+						std::string name;
+						MDsin[MDs_id].getValue(EMDL_MLMODEL_GROUP_NAME, name);
+						name = "optics"+integerToString(new_optics_groups[current_object])+"_"+name;
+						MDsin[MDs_id].setValue(EMDL_MLMODEL_GROUP_NAME, name);
+					}
 				}
 			}
 
@@ -673,11 +676,11 @@ class star_handler_parameters
 			int type;
 			if (MD.getName() == "micrographs")
 			{
-				type == NODE_MICS;
+				type = NODE_MICS;
 			}
 			else if (MD.getName() == "movies")
 			{
-				type == NODE_MOVIES;
+				type = NODE_MOVIES;
 			}
 			else
 			{

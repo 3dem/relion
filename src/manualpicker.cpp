@@ -37,6 +37,7 @@ int last_ctf_viewed;
 bool   global_has_ctf;
 bool   global_pick_startend;
 RFLOAT global_angpix;
+RFLOAT global_coord_scale;
 RFLOAT global_lowpass;
 RFLOAT global_highpass;
 RFLOAT global_particle_diameter;
@@ -94,6 +95,7 @@ void cb_viewmic(Fl_Widget* w, void* data)
 	command =  "relion_display --pick  --i " + global_fn_mics[imic];
 	command += "  --coords " + fn_coord;
 	command += " --scale " + floatToString(global_micscale);
+	command += " --coord_scale " + floatToString(global_coord_scale);
 	command += " --black "  + floatToString(global_black_val);
 	command += " --white "  + floatToString(global_white_val);
 	command += " --sigma_contrast "  + floatToString(global_sigma_contrast);
@@ -514,6 +516,7 @@ void ManualPicker::read(int argc, char **argv)
 	fn_sel = parser.getOption("--selection", "STAR file with selected micrographs", "micrographs_selected.star");
 	global_pickname = parser.getOption("--pickname", "Rootname for the picked coordinate files", "manualpick");
 	global_angpix = textToFloat(parser.getOption("--angpix", "Pixel size in Angstroms", "-1."));
+	global_coord_scale = textToFloat(parser.getOption("--coord_scale", "Scale coordinates before display", "1.0"));
 	global_particle_diameter = textToFloat(parser.getOption("--particle_diameter", "Diameter of the circles that will be drawn around each picked particle (in Angstroms)"));
 	global_pick_startend = parser.checkOption("--pick_start_end", "Pick start-end coordinates of helices");
 	do_allow_save = parser.checkOption("--allow_save", "Allow saving of the selected micrographs");

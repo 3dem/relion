@@ -41,7 +41,8 @@ int readTIFF(TIFF* ftiff, long int img_select, bool readdata=false, bool isStack
 
 	// These are libtiff's types.
 	uint32 width, length; // apparent dimensions in the file
-	uint16 sampleFormat, bitsPerSample;
+	uint16 sampleFormat, bitsPerSample, resolutionUnit;
+	float xResolution;
 	
 	if (TIFFGetField(ftiff, TIFFTAG_IMAGEWIDTH, &width) != 1 ||
 	    TIFFGetField(ftiff, TIFFTAG_IMAGELENGTH, &length) != 1)
@@ -67,7 +68,7 @@ int readTIFF(TIFF* ftiff, long int img_select, bool readdata=false, bool isStack
 	       width, length, _nDim, sampleFormat, bitsPerSample);
 #endif
 
-	// Reject 4-bit packed TIFFs. This is IMOD's own extension.
+	// Detect 4-bit packed TIFFs. This is IMOD's own extension.
 	// It is not easy to detect this format. Here we check only the image size.
 	// See IMOD's iiTIFFCheck() in libiimod/iitif.c and sizeCanBe4BitK2SuperRes() in libiimod/mrcfiles.c.
 	bool packed_4bit = false;
@@ -86,19 +87,23 @@ int readTIFF(TIFF* ftiff, long int img_select, bool readdata=false, bool isStack
 	{
 		datatype = UHalf;
 	}
-	else if (bitsPerSample == 8 && sampleFormat == 1)
+	else if (bitsPerSample == 8 && sampleFormat == SAMPLEFORMAT_UINT)
 	{
 		datatype = UChar;
 	}
-	else if (bitsPerSample == 16 && sampleFormat == 1)
+	else if (bitsPerSample == 8 && sampleFormat == SAMPLEFORMAT_INT)
+	{
+		datatype = SChar;
+	}
+	else if (bitsPerSample == 16 && sampleFormat == SAMPLEFORMAT_UINT)
 	{
 		datatype = UShort;
 	}
-	else if (bitsPerSample == 16 && sampleFormat == 2)
+	else if (bitsPerSample == 16 && sampleFormat == SAMPLEFORMAT_INT)
 	{
 		datatype = Short;
 	}
-	else if (bitsPerSample == 32 && sampleFormat == 3)
+	else if (bitsPerSample == 32 && sampleFormat == SAMPLEFORMAT_IEEEFP)
 	{
 		datatype = Float;
 	}
@@ -108,7 +113,29 @@ int readTIFF(TIFF* ftiff, long int img_select, bool readdata=false, bool isStack
 		REPORT_ERROR("Unsupported TIFF format.\n");
 	}
 	
-	MDMainHeader.setValue(EMDL_IMAGE_DATATYPE,(int)datatype);
+	MDMainHeader.setValue(EMDL_IMAGE_DATATYPE, (int)datatype);
+
+	if (TIFFGetField(ftiff, TIFFTAG_RESOLUTIONUNIT, &resolutionUnit) == 1 &&
+	    TIFFGetField(ftiff, TIFFTAG_XRESOLUTION, &xResolution) == 1)
+	{
+		// We don't support anistropic pixel size
+		if (resolutionUnit == RESUNIT_INCH)
+		{
+			MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X, RFLOAT(2.54E8 / xResolution)); // 1 inch = 2.54 cm
+			MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y, RFLOAT(2.54E8 / xResolution));
+		}
+		else if (resolutionUnit == RESUNIT_CENTIMETER)
+		{
+			MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_X, RFLOAT(1.00E8 / xResolution));
+			MDMainHeader.setValue(EMDL_IMAGE_SAMPLINGRATE_Y, RFLOAT(1.00E8 / xResolution));
+		}
+#ifdef DEBUG_TIFF
+		std::cout << "resolutionUnit = " << resolutionUnit << " xResolution = " << xResolution << std::endl;
+		RFLOAT angpix;
+		MDMainHeader.getValue(EMDL_IMAGE_SAMPLINGRATE_X, angpix);
+		std::cout << "pixel size = " << angpix << std::endl;
+#endif
+	}
 
 	// TODO: TIFF is always a stack, isn't it?
 	if (isStack)
