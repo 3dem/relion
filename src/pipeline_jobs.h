@@ -46,7 +46,6 @@
 #define TOGGLE_ALWAYS_DEACTIVATE 2
 #define TOGGLE_LEAVE_ACTIVE 3
 
-
 #define HAS_MPI true
 #define HAS_NOT_MPI false
 #define HAS_THREAD true
@@ -165,29 +164,81 @@ static bool do_allow_change_minimum_dedicated;
 #define NODE_POST           14// Postprocess STAR file (with FSC curve, unfil half-maps, masks etc in it: used by Jasenko's programs
 #define NODE_POLISH_PARAMS  15// Txt file with optimal parameters for Bayesian polishing
 
+#define NODE_MOVIES_LABEL   	 "rlnMovieStar"
+#define NODE_MICS_LABEL			 "rlnMicrographStar"
+#define NODE_MIC_COORDS_LABEL	 "rlnCoordinateStar"
+#define NODE_PART_DATA_LABEL	 "rlnParticleStar"
+//#define NODE_MOVIE_DATA_LABEL
+#define NODE_2DREFS_LABEL        "rlnReferenceStar"
+#define NODE_3DREF_LABEL       	 "rlnReferenceMap"
+#define NODE_MASK_LABEL			 "rlnMask"
+#define NODE_MODEL_LABEL		 "rlnModelStar"
+#define NODE_OPTIMISER_LABEL	 "rlnOptimiserStar"
+#define NODE_HALFMAP_LABEL		 "rlnHalfMap"
+#define NODE_FINALMAP_LABEL		 "rlnFinalMap"
+#define NODE_RESMAP_LABEL		 "rlnLocalResolutionMap"
+#define NODE_PDF_LOGFILE_LABEL   "rlnPdfLogfile"
+#define NODE_POST_LABEL          "rlnPostprocessStar"
+#define NODE_POLISH_PARAMS_LABEL "rlnPolishParams"
+
+static std::map<int, std::string> node_type2label = {{NODE_MOVIES, NODE_MOVIES_LABEL},
+		{NODE_MICS, NODE_MICS_LABEL},
+		{NODE_MIC_COORDS, NODE_MIC_COORDS_LABEL},
+		{NODE_PART_DATA, NODE_PART_DATA_LABEL},
+		{NODE_2DREFS, NODE_2DREFS_LABEL},
+		{NODE_3DREF, NODE_3DREF_LABEL},
+		{NODE_MASK, NODE_MASK_LABEL},
+		{NODE_MODEL, NODE_MODEL_LABEL},
+		{NODE_OPTIMISER, NODE_OPTIMISER_LABEL},
+		{NODE_HALFMAP, NODE_HALFMAP_LABEL},
+		{NODE_FINALMAP, NODE_FINALMAP_LABEL},
+		{NODE_RESMAP, NODE_RESMAP_LABEL},
+		{NODE_PDF_LOGFILE, NODE_PDF_LOGFILE_LABEL},
+		{NODE_POST, NODE_POST_LABEL},
+		{NODE_POLISH_PARAMS, NODE_POLISH_PARAMS_LABEL}};
+
+static std::map<std::string, int> node_label2type = {{NODE_MOVIES_LABEL, NODE_MOVIES},
+		{NODE_MICS_LABEL, NODE_MICS},
+		{NODE_MIC_COORDS_LABEL, NODE_MIC_COORDS},
+		{NODE_PART_DATA_LABEL, NODE_PART_DATA},
+		{NODE_2DREFS_LABEL, NODE_2DREFS},
+		{NODE_3DREF_LABEL, NODE_3DREF},
+		{NODE_MASK_LABEL, NODE_MASK},
+		{NODE_MODEL_LABEL, NODE_MODEL},
+		{NODE_OPTIMISER_LABEL, NODE_OPTIMISER},
+		{NODE_HALFMAP_LABEL, NODE_HALFMAP},
+		{NODE_FINALMAP_LABEL, NODE_FINALMAP},
+		{NODE_RESMAP_LABEL, NODE_RESMAP},
+		{NODE_PDF_LOGFILE_LABEL, NODE_PDF_LOGFILE},
+		{NODE_POST_LABEL, NODE_POST},
+		{NODE_POLISH_PARAMS_LABEL, NODE_POLISH_PARAMS}};
+
+
+
 // All the directory names of the different types of jobs defined inside the pipeline
-#define PROC_IMPORT_NAME        "Import"       // Import any file as a Node of a given type
-#define PROC_MOTIONCORR_NAME 	"MotionCorr"   // Import any file as a Node of a given type
-#define PROC_CTFFIND_NAME	    "CtfFind"  	   // Estimate CTF parameters from micrographs for either entire micrographs and/or particles
-#define PROC_MANUALPICK_NAME    "ManualPick"   // Manually pick particle coordinates from micrographs
-#define PROC_AUTOPICK_NAME		"AutoPick"     // Automatically pick particle coordinates from micrographs, their CTF and 2D references
-#define PROC_EXTRACT_NAME		"Extract"      // Window particles, normalize, downsize etc from micrographs (also combine CTF into metadata file)
-#define PROC_CLASSSELECT_NAME   "Select" 	   // Read in model.star file, and let user interactively select classes through the display (later: auto-selection as well)
-#define PROC_2DCLASS_NAME 		"Class2D"      // 2D classification (from input particles)
-#define PROC_3DCLASS_NAME		"Class3D"      // 3D classification (from input 2D/3D particles, an input 3D-reference, and possibly a 3D mask)
-#define PROC_3DAUTO_NAME        "Refine3D"     // 3D auto-refine (from input particles, an input 3Dreference, and possibly a 3D mask)
-//#define PROC_POLISH_NAME	    "Polish"       // Particle-polishing (from movie-particles)
-#define PROC_MASKCREATE_NAME    "MaskCreate"   // Process to create masks from input maps
-#define PROC_JOINSTAR_NAME      "JoinStar"     // Process to create masks from input maps
-#define PROC_SUBTRACT_NAME      "Subtract"     // Process to subtract projections of parts of the reference from experimental images
-#define PROC_POST_NAME			"PostProcess"  // Post-processing (from unfiltered half-maps and a possibly a 3D mask)
-#define PROC_RESMAP_NAME  	    "LocalRes"     // Local resolution estimation (from unfiltered half-maps and a 3D mask)
-//#define PROC_MOVIEREFINE_NAME   "MovieRefine"  // Movie-particle extraction and refinement combined
-#define PROC_INIMODEL_NAME		"InitialModel" // De-novo generation of 3D initial model (using SGD)
-#define PROC_MULTIBODY_NAME		"MultiBody"    // Multi-body refinement
-#define PROC_MOTIONREFINE_NAME  "Polish"       // Jasenko's motion fitting program for Bayesian polishing (to replace MovieRefine?)
-#define PROC_CTFREFINE_NAME     "CtfRefine"    // Jasenko's program for defocus and beamtilt optimisation
-#define PROC_EXTERNAL_NAME      "External"     // For running non-relion programs
+#define PROC_IMPORT_LABEL        "Import"       // Import any file as a Node of a given type
+#define PROC_MOTIONCORR_LABEL 	 "MotionCorr"   // Import any file as a Node of a given type
+#define PROC_CTFFIND_LABEL	     "CtfFind"  	   // Estimate CTF parameters from micrographs for either entire micrographs and/or particles
+#define PROC_MANUALPICK_LABEL    "ManualPick"   // Manually pick particle coordinates from micrographs
+#define PROC_AUTOPICK_LABEL		 "AutoPick"     // Automatically pick particle coordinates from micrographs, their CTF and 2D references
+#define PROC_EXTRACT_LABEL		 "Extract"      // Window particles, normalize, downsize etc from micrographs (also combine CTF into metadata file)
+#define PROC_CLASSSELECT_LABEL   "Select" 	   // Read in model.star file, and let user interactively select classes through the display (later: auto-selection as well)
+#define PROC_2DCLASS_LABEL 		 "Class2D"      // 2D classification (from input particles)
+#define PROC_3DCLASS_LABEL		 "Class3D"      // 3D classification (from input 2D/3D particles, an input 3D-reference, and possibly a 3D mask)
+#define PROC_3DAUTO_LABEL        "Refine3D"     // 3D auto-refine (from input particles, an input 3Dreference, and possibly a 3D mask)
+//#define PROC_POLISH_NAME	     "Polish"       // Particle-polishing (from movie-particles)
+#define PROC_MASKCREATE_LABEL    "MaskCreate"   // Process to create masks from input maps
+#define PROC_JOINSTAR_LABEL      "JoinStar"     // Process to create masks from input maps
+#define PROC_SUBTRACT_LABEL      "Subtract"     // Process to subtract projections of parts of the reference from experimental images
+#define PROC_POST_LABEL			 "PostProcess"  // Post-processing (from unfiltered half-maps and a possibly a 3D mask)
+#define PROC_RESMAP_LABEL  	     "LocalRes"     // Local resolution estimation (from unfiltered half-maps and a 3D mask)
+//#define PROC_MOVIEREFINE_NAME  "MovieRefine"  // Movie-particle extraction and refinement combined
+#define PROC_INIMODEL_LABEL		 "InitialModel" // De-novo generation of 3D initial model (using SGD)
+#define PROC_MULTIBODY_LABEL	 "MultiBody"    // Multi-body refinement
+#define PROC_MOTIONREFINE_LABEL  "Polish"       // Jasenko's motion fitting program for Bayesian polishing (to replace MovieRefine?)
+#define PROC_CTFREFINE_LABEL     "CtfRefine"    // Jasenko's program for defocus and beamtilt optimisation
+#define PROC_EXTERNAL_LABEL      "External"     // For running non-relion programs
+
 
 #define PROC_IMPORT         0 // Import any file as a Node of a given type
 #define PROC_MOTIONCORR 	1 // Import any file as a Node of a given type
@@ -214,12 +265,69 @@ static bool do_allow_change_minimum_dedicated;
 #define PROC_EXTERNAL       99// External scripts
 #define NR_BROWSE_TABS      20
 
+static std::map<int, std::string> proc_type2label = {{PROC_IMPORT, PROC_IMPORT_LABEL},
+		{PROC_MOTIONCORR, PROC_MOTIONCORR_LABEL},
+		{PROC_CTFFIND, PROC_CTFFIND_LABEL},
+		{PROC_MANUALPICK, PROC_MANUALPICK_LABEL},
+		{PROC_AUTOPICK, PROC_AUTOPICK_LABEL},
+		{PROC_EXTRACT, PROC_EXTRACT_LABEL},
+		{PROC_CLASSSELECT, PROC_CLASSSELECT_LABEL},
+		{PROC_2DCLASS, PROC_2DCLASS_LABEL},
+		{PROC_3DCLASS, PROC_3DCLASS_LABEL},
+		{PROC_3DAUTO, PROC_3DAUTO_LABEL},
+		{PROC_MASKCREATE, PROC_MASKCREATE_LABEL},
+		{PROC_JOINSTAR, PROC_JOINSTAR_LABEL},
+		{PROC_SUBTRACT, PROC_SUBTRACT_LABEL},
+		{PROC_POST, PROC_POST_LABEL},
+		{PROC_RESMAP, PROC_RESMAP_LABEL},
+		{PROC_INIMODEL, PROC_INIMODEL_LABEL},
+		{PROC_MULTIBODY, PROC_MULTIBODY_LABEL},
+		{PROC_MOTIONREFINE, PROC_MOTIONREFINE_LABEL},
+		{PROC_CTFREFINE, PROC_CTFREFINE_LABEL},
+		{PROC_EXTERNAL, PROC_EXTERNAL_LABEL}};
+
+static std::map<std::string, int> proc_label2type = {{PROC_IMPORT_LABEL, PROC_IMPORT},
+		{PROC_MOTIONCORR_LABEL, PROC_MOTIONCORR},
+		{PROC_CTFFIND_LABEL, PROC_CTFFIND},
+		{PROC_MANUALPICK_LABEL, PROC_MANUALPICK},
+		{PROC_AUTOPICK_LABEL, PROC_AUTOPICK},
+		{PROC_EXTRACT_LABEL, PROC_EXTRACT},
+		{PROC_CLASSSELECT_LABEL, PROC_CLASSSELECT},
+		{PROC_2DCLASS_LABEL, PROC_2DCLASS},
+		{PROC_3DCLASS_LABEL, PROC_3DCLASS},
+		{PROC_3DAUTO_LABEL, PROC_3DAUTO},
+		{PROC_MASKCREATE_LABEL, PROC_MASKCREATE},
+		{PROC_JOINSTAR_LABEL, PROC_JOINSTAR},
+		{PROC_SUBTRACT_LABEL, PROC_SUBTRACT},
+		{PROC_POST_LABEL, PROC_POST},
+		{PROC_RESMAP_LABEL, PROC_RESMAP},
+		{PROC_INIMODEL_LABEL, PROC_INIMODEL},
+		{PROC_MULTIBODY_LABEL, PROC_MULTIBODY},
+		{PROC_MOTIONREFINE_LABEL, PROC_MOTIONREFINE},
+		{PROC_CTFREFINE_LABEL, PROC_CTFREFINE},
+		{PROC_EXTERNAL_LABEL, PROC_EXTERNAL}};
+
 // Status a Process may have
 #define PROC_RUNNING          0 // (hopefully) running
 #define PROC_SCHEDULED        1 // scheduled for future execution
 #define PROC_FINISHED_SUCCESS 2 // successfully finished
 #define PROC_FINISHED_FAILURE 3 // reported an error
 #define PROC_FINISHED_ABORTED 4 // aborted by the user
+
+static std::map<std::string, int> procstatus_label2type = {
+		{"Running", PROC_RUNNING},
+		{"Scheduled", PROC_SCHEDULED},
+		{"Succeeded", PROC_FINISHED_SUCCESS},
+		{"Failed", PROC_FINISHED_FAILURE},
+		{"Aborted", PROC_FINISHED_ABORTED}};
+
+static std::map<int, std::string> procstatus_type2label = {
+		{PROC_RUNNING, "Running", },
+		{PROC_SCHEDULED, "Scheduled", },
+		{PROC_FINISHED_SUCCESS, "Succeeded"},
+		{PROC_FINISHED_FAILURE, "Failed"},
+		{PROC_FINISHED_ABORTED, "Aborted"}};
+
 
 struct gui_layout
 {
@@ -366,7 +474,6 @@ public:
 
 	// All the options to this job
 	std::map<std::string, JobOption > joboptions;
-
 
 public:
 	// Constructor

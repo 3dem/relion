@@ -151,7 +151,7 @@ enum EMDLabel
 
 	EMDL_JOB_IS_CONTINUE,
 	EMDL_JOB_TYPE,
-	EMDL_JOB_TYPE_NAME,
+	EMDL_JOB_TYPE_LABEL,
 
 	EMDL_JOBOPTION_TYPE,
 	EMDL_JOBOPTION_VARIABLE,
@@ -414,10 +414,13 @@ enum EMDLabel
 	EMDL_PIPELINE_JOB_COUNTER,
 	EMDL_PIPELINE_NODE_NAME,
 	EMDL_PIPELINE_NODE_TYPE,
+	EMDL_PIPELINE_NODE_TYPE_LABEL,
 	EMDL_PIPELINE_PROCESS_ALIAS,
 	EMDL_PIPELINE_PROCESS_NAME,
 	EMDL_PIPELINE_PROCESS_TYPE,
+	EMDL_PIPELINE_PROCESS_TYPE_LABEL,
 	EMDL_PIPELINE_PROCESS_STATUS,
+	EMDL_PIPELINE_PROCESS_STATUS_LABEL,
 	EMDL_PIPELINE_EDGE_FROM,
 	EMDL_PIPELINE_EDGE_TO,
 	EMDL_PIPELINE_EDGE_PROCESS,
@@ -680,7 +683,7 @@ private:
 
 		EMDL::addLabel(EMDL_JOB_IS_CONTINUE, EMDL_BOOL, "rlnJobIsContinue", "Is tthis a continuation job?");
 		EMDL::addLabel(EMDL_JOB_TYPE, EMDL_INT, "rlnJobType", "Which type of job is this?");
-		EMDL::addLabel(EMDL_JOB_TYPE_NAME, EMDL_STRING, "rlnJobTypeName", "The name for this type of job (also name of main directory for output jobs)");
+		EMDL::addLabel(EMDL_JOB_TYPE_LABEL, EMDL_STRING, "rlnJobTypeLabel", "The name for this type of job (also name of main directory for output jobs)");
 
 		EMDL::addLabel(EMDL_JOBOPTION_TYPE, EMDL_INT, "rlnJoboptionType", "Which type of joboption is this?");
 		EMDL::addLabel(EMDL_JOBOPTION_VARIABLE, EMDL_STRING, "rlnJobOptionVariable", "Name of the joboption variable");
@@ -944,10 +947,13 @@ private:
 		EMDL::addLabel(EMDL_PIPELINE_JOB_COUNTER, EMDL_INT, "rlnPipeLineJobCounter", "Number of the last job in the pipeline");
 		EMDL::addLabel(EMDL_PIPELINE_NODE_NAME, EMDL_STRING , "rlnPipeLineNodeName", "Name of a Node in the pipeline");
 		EMDL::addLabel(EMDL_PIPELINE_NODE_TYPE, EMDL_INT, "rlnPipeLineNodeType", "Type of a Node in the pipeline");
+		EMDL::addLabel(EMDL_PIPELINE_NODE_TYPE_LABEL, EMDL_STRING, "rlnPipeLineNodeTypeLabel", "Name for the Node Type in the pipeline");
 		EMDL::addLabel(EMDL_PIPELINE_PROCESS_ALIAS, EMDL_STRING , "rlnPipeLineProcessAlias", "Alias of a Process in the pipeline");
 		EMDL::addLabel(EMDL_PIPELINE_PROCESS_NAME, EMDL_STRING , "rlnPipeLineProcessName", "Name of a Process in the pipeline");
 		EMDL::addLabel(EMDL_PIPELINE_PROCESS_TYPE, EMDL_INT, "rlnPipeLineProcessType", "Type of a Process in the pipeline");
-		EMDL::addLabel(EMDL_PIPELINE_PROCESS_STATUS, EMDL_INT, "rlnPipeLineProcessStatus", "Status of a Process in the pipeline (running, scheduled, finished or cancelled)");
+		EMDL::addLabel(EMDL_PIPELINE_PROCESS_TYPE_LABEL, EMDL_STRING, "rlnPipeLineProcessTypeLabel", "Name for the Process type in the pipeline");
+		EMDL::addLabel(EMDL_PIPELINE_PROCESS_STATUS, EMDL_INT, "rlnPipeLineProcessStatus", "Status of a Process in the pipeline (integer for running, scheduled, finished or cancelled)");
+		EMDL::addLabel(EMDL_PIPELINE_PROCESS_STATUS_LABEL, EMDL_STRING, "rlnPipeLineProcessStatusLabel", "Name for the status of a Process in the pipeline (running, scheduled, finished or cancelled)");
 		EMDL::addLabel(EMDL_PIPELINE_EDGE_FROM, EMDL_STRING , "rlnPipeLineEdgeFromNode", "Name of the origin of an edge");
 		EMDL::addLabel(EMDL_PIPELINE_EDGE_TO, EMDL_STRING ,"rlnPipeLineEdgeToNode", "Name of the to-Node in an edge");
 		EMDL::addLabel(EMDL_PIPELINE_EDGE_PROCESS, EMDL_STRING ,"rlnPipeLineEdgeProcess", "Name of the destination of an edge");

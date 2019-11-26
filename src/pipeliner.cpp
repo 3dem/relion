@@ -676,43 +676,7 @@ bool PipeLine::runJob(RelionJob &_job, int &current_job, bool only_schedule, boo
 int PipeLine::addScheduledJob(std::string typestring, std::string fn_options)
 {
 
-	int type;
-	if (typestring == PROC_IMPORT_NAME)
-		type = PROC_IMPORT;
-	else if (typestring == PROC_MOTIONCORR_NAME)
-		type = PROC_MOTIONCORR;
-	else if (typestring == PROC_CTFFIND_NAME)
-		type = PROC_CTFFIND;
-	else if (typestring == PROC_MANUALPICK_NAME)
-		type = PROC_MANUALPICK;
-	else if (typestring == PROC_AUTOPICK_NAME)
-		type = PROC_AUTOPICK;
-	else if (typestring == PROC_EXTRACT_NAME)
-		type = PROC_EXTRACT;
-	else if (typestring == PROC_CLASSSELECT_NAME)
-		type = PROC_CLASSSELECT;
-	else if (typestring == PROC_2DCLASS_NAME)
-		type = PROC_2DCLASS;
-	else if (typestring == PROC_3DCLASS_NAME)
-		type = PROC_3DCLASS;
-	else if (typestring == PROC_3DAUTO_NAME)
-		type = PROC_3DAUTO;
-	else if (typestring == PROC_MASKCREATE_NAME)
-		typestring = PROC_MASKCREATE;
-	else if (typestring == PROC_JOINSTAR_NAME)
-		type = PROC_JOINSTAR;
-	else if (typestring == PROC_SUBTRACT_NAME)
-		type = PROC_SUBTRACT;
-	else if (typestring == PROC_POST_NAME)
-		type = PROC_POST;
-	else if (typestring == PROC_RESMAP_NAME)
-		type = PROC_RESMAP;
-	else if (typestring == PROC_INIMODEL_NAME)
-		type = PROC_INIMODEL;
-	else
-		REPORT_ERROR("ERROR: unrecognised string for job type: " + typestring);
-
-	return addScheduledJob(type, fn_options);
+	return addScheduledJob(proc_label2type.at(typestring), fn_options);
 
 }
 
@@ -1966,9 +1930,19 @@ void PipeLine::read(bool do_lock, std::string lock_message)
 	{
 		std::string name;
 		int type;
-		if (!MDnode.getValue(EMDL_PIPELINE_NODE_NAME, name) ||
-			!MDnode.getValue(EMDL_PIPELINE_NODE_TYPE, type)	)
-			REPORT_ERROR("PipeLine::read: cannot find name or type in pipeline_nodes table");
+		if (!MDnode.getValue(EMDL_PIPELINE_NODE_NAME, name) )
+			REPORT_ERROR("PipeLine::read: cannot find name in pipeline_nodes table");
+
+		if (MDnode.containsLabel(EMDL_PIPELINE_NODE_TYPE_LABEL))
+		{
+			std::string label;
+			MDnode.getValue(EMDL_PIPELINE_NODE_TYPE_LABEL, label);
+			type = node_label2type.at(label);
+		}
+		else if (!MDnode.getValue(EMDL_PIPELINE_NODE_TYPE, type))
+		{
+			REPORT_ERROR("PipeLine::read: cannot find type in pipeline_nodes table");
+		}
 
 		Node newNode(name, type);
 		nodeList.push_back(newNode);
@@ -1980,10 +1954,23 @@ void PipeLine::read(bool do_lock, std::string lock_message)
 		std::string name, alias;
 		int type, status;
 		if (!MDproc.getValue(EMDL_PIPELINE_PROCESS_NAME, name) ||
-			!MDproc.getValue(EMDL_PIPELINE_PROCESS_ALIAS, alias) ||
-			!MDproc.getValue(EMDL_PIPELINE_PROCESS_TYPE, type) ||
+			!MDproc.getValue(EMDL_PIPELINE_PROCESS_ALIAS, alias) )
+			REPORT_ERROR("PipeLine::read: cannot find name or alias in pipeline_processes table");
+
+		if (MDproc.containsLabel(EMDL_PIPELINE_PROCESS_TYPE_LABEL) &&
+				MDproc.containsLabel(EMDL_PIPELINE_PROCESS_STATUS_LABEL))
+		{
+			std::string label;
+			MDproc.getValue(EMDL_PIPELINE_PROCESS_TYPE_LABEL, label);
+			type = proc_label2type.at(label);
+			MDproc.getValue(EMDL_PIPELINE_PROCESS_STATUS_LABEL, label);
+			status = procstatus_label2type.at(label);
+		}
+		else if (!MDproc.getValue(EMDL_PIPELINE_PROCESS_TYPE, type) ||
 			!MDproc.getValue(EMDL_PIPELINE_PROCESS_STATUS, status)	)
-			REPORT_ERROR("PipeLine::read: cannot find name or type in pipeline_processes table");
+		{
+			REPORT_ERROR("PipeLine::read: cannot find type or status in pipeline_processes table");
+		}
 
 		Process newProcess(name, type, status, alias);
 		processList.push_back(newProcess);
@@ -2158,16 +2145,20 @@ void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode
 			MDproc.addObject();
 			MDproc.setValue(EMDL_PIPELINE_PROCESS_NAME, processList[i].name);
 			MDproc.setValue(EMDL_PIPELINE_PROCESS_ALIAS, processList[i].alias);
-			MDproc.setValue(EMDL_PIPELINE_PROCESS_TYPE, processList[i].type);
-			MDproc.setValue(EMDL_PIPELINE_PROCESS_STATUS, processList[i].status);
+			//MDproc.setValue(EMDL_PIPELINE_PROCESS_TYPE, processList[i].type);
+			//MDproc.setValue(EMDL_PIPELINE_PROCESS_STATUS, processList[i].status);
+			MDproc.setValue(EMDL_PIPELINE_PROCESS_TYPE_LABEL, proc_type2label.at(processList[i].type));
+			MDproc.setValue(EMDL_PIPELINE_PROCESS_STATUS_LABEL, procstatus_type2label.at(processList[i].status));
 		}
 		else
 		{
 			MDproc_del.addObject();
 			MDproc_del.setValue(EMDL_PIPELINE_PROCESS_NAME, processList[i].name);
 			MDproc_del.setValue(EMDL_PIPELINE_PROCESS_ALIAS, processList[i].alias);
-			MDproc_del.setValue(EMDL_PIPELINE_PROCESS_TYPE, processList[i].type);
-			MDproc_del.setValue(EMDL_PIPELINE_PROCESS_STATUS, processList[i].status);
+			//MDproc_del.setValue(EMDL_PIPELINE_PROCESS_TYPE, processList[i].type);
+			//MDproc_del.setValue(EMDL_PIPELINE_PROCESS_STATUS, processList[i].status);
+			MDproc_del.setValue(EMDL_PIPELINE_PROCESS_TYPE_LABEL, proc_type2label.at(processList[i].type));
+			MDproc_del.setValue(EMDL_PIPELINE_PROCESS_STATUS_LABEL, procstatus_type2label.at(processList[i].status));
 		}
 
 	}
@@ -2186,13 +2177,15 @@ void PipeLine::write(bool do_lock, FileName fn_del, std::vector<bool> deleteNode
 		{
 			MDnode.addObject();
 			MDnode.setValue(EMDL_PIPELINE_NODE_NAME, nodeList[i].name);
-			MDnode.setValue(EMDL_PIPELINE_NODE_TYPE, nodeList[i].type);
+			//MDnode.setValue(EMDL_PIPELINE_NODE_TYPE, nodeList[i].type);
+			MDnode.setValue(EMDL_PIPELINE_NODE_TYPE_LABEL, node_type2label.at(nodeList[i].type));
 		}
 		else
 		{
 			MDnode_del.addObject();
 			MDnode_del.setValue(EMDL_PIPELINE_NODE_NAME, nodeList[i].name);
-			MDnode_del.setValue(EMDL_PIPELINE_NODE_TYPE, nodeList[i].type);
+			//MDnode_del.setValue(EMDL_PIPELINE_NODE_TYPE, nodeList[i].type);
+			MDnode_del.setValue(EMDL_PIPELINE_NODE_TYPE_LABEL, node_type2label.at(nodeList[i].type));
 
 		}
 	}
