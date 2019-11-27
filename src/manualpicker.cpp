@@ -382,6 +382,7 @@ void manualpickerGuiWindow::writeOutputStarfiles(bool verb)
 {
 	MDcoords.clear();
 	MetaDataTable MDmics;
+	int c = 0;
 	for (int imic = 0; imic < selected.size(); imic++)
 	{
 		if (selected[imic])
@@ -395,6 +396,7 @@ void manualpickerGuiWindow::writeOutputStarfiles(bool verb)
 				MDcoords.addObject();
 				MDcoords.setValue(EMDL_MICROGRAPH_NAME, global_fn_mics[imic]);
 				MDcoords.setValue(EMDL_MICROGRAPH_COORDINATES, fn_coord);
+				c++;
 			}
 		}
 	}
@@ -411,7 +413,7 @@ void manualpickerGuiWindow::writeOutputStarfiles(bool verb)
 
 	FileName fn_coords = global_fn_odir + global_pickname + ".star";
 	MDcoords.write(fn_coords);
-	if (verb) std::cout << " Saved list of coordinate files in: " << fn_coords << std::endl;
+	if (verb) std::cout << " Saved list with " << c << " coordinate files in: " << fn_coords << std::endl;
 
 }
 void manualpickerGuiWindow::cb_menubar_save(Fl_Widget* w, void* v)

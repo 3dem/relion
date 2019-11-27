@@ -1651,8 +1651,8 @@ bool RelionJob::getCommandsManualpickJob(std::string &outputname, std::vector<st
 	command += " --odir " + outputname;
 	command += " --pickname manualpick";
 
-	FileName fn_suffix = outputname + "coords_suffix_manualpick.star";
-	Node node2(fn_suffix, NODE_MIC_COORDS);
+	// new version: no longer save coords_suffix nodetype, but 2-column list of micrographs and coordinate files
+	Node node2(outputname + "manualpick.star", NODE_MIC_COORDS);
 	outputNodes.push_back(node2);
 
 	// Allow saving, and always save default selection file upon launching the program
@@ -1699,13 +1699,6 @@ bool RelionJob::getCommandsManualpickJob(std::string &outputname, std::vector<st
 	// Other arguments for extraction
 	command += " " + joboptions["other_args"].getString();
 
-	commands.push_back(command);
-
-	// Also make the suffix file (do this after previous command was pushed back!)
-	// Inside it, store the name of the micrograph STAR file, so we can display these later
-	FileName fn_pre, fn_jobnr, fn_post;
-	decomposePipelineSymlinkName(joboptions["fn_in"].getString(), fn_pre, fn_jobnr, fn_post);
-	command = "echo " + fn_pre + fn_jobnr + fn_post + " > " + fn_suffix;
 	commands.push_back(command);
 
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
@@ -1797,8 +1790,8 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 	Node node(joboptions["fn_input_autopick"].getString(), joboptions["fn_input_autopick"].node_type);
 	inputNodes.push_back(node);
 
-	// Output
-	Node node3(outputname + "coords_suffix_autopick.star", NODE_MIC_COORDS);
+	// Output new version: no longer save coords_suffix nodetype, but 2-column list of micrographs and coordinate files
+	Node node3(outputname + "autopick.star", NODE_MIC_COORDS);
 	outputNodes.push_back(node3);
 
 	// PDF with histograms of the eigenvalues
@@ -1948,13 +1941,6 @@ bool RelionJob::getCommandsAutopickJob(std::string &outputname, std::vector<std:
 
 	commands.push_back(command);
 
-	// Also touch the suffix file. Do this after the first command had completed
-	// Instead of the symlink from the alias, use the original jobnr filename
-	FileName fn_pre, fn_jobnr, fn_post;
-	decomposePipelineSymlinkName(joboptions["fn_input_autopick"].getString(), fn_pre, fn_jobnr, fn_post);
-	command = "echo " + fn_pre + fn_jobnr + fn_post + " > " +  outputname + "coords_suffix_autopick.star";
-	commands.push_back(command.c_str());
-
 	return prepareFinalCommand(outputname, commands, final_command, do_makedir, error_message);
 }
 
@@ -1963,7 +1949,7 @@ void RelionJob::initialiseExtractJob()
 	hidden_name = ".gui_extract";
 
     joboptions["star_mics"]= JobOption("micrograph STAR file: ", NODE_MICS, "", "Input STAR file (*.{star})", "Filename of the STAR file that contains all micrographs from which to extract particles.");
-	joboptions["coords_suffix"] = JobOption("Input coordinates: ", NODE_MIC_COORDS, "", "Input coords_suffix file ({coords_suffix}*)", "Filename of the coords_suffix file with the directory structure and the suffix of all coordinate files.");
+	joboptions["coords_suffix"] = JobOption("Input coordinates: ", NODE_MIC_COORDS, "", "Input coordinates list file (*.star)", "Starfile with a 2-column list of micrograph names and corresponding coordinate filenames (in .star, .box or as 2 or 3-column free text format)");
 	joboptions["do_reextract"] = JobOption("OR re-extract refined particles? ", false, "If set to Yes, the input Coordinates above will be ignored. Instead, one uses a _data.star file from a previous 2D or 3D refinement to re-extract the particles in that refinement, possibly re-centered with their refined origin offsets. This is particularly useful when going from binned to unbinned particles.");
 	joboptions["fndata_reextract"] = JobOption("Refined particles STAR file: ", NODE_PART_DATA, "", "Input STAR file (*.{star})", "Filename of the STAR file with the refined particle coordinates, e.g. from a previous 2D or 3D classification or auto-refine run.");
 	joboptions["do_reset_offsets"] = JobOption("Reset the refined offsets to zero? ", false, "If set to Yes, the input origin offsets will be reset to zero. This may be useful after 2D classification of helical segments, where one does not want neighbouring segments to be translated on top of each other for a subsequent 3D refinement or classification.");
@@ -2054,15 +2040,23 @@ bool RelionJob::getCommandsExtractJob(std::string &outputname, std::vector<std::
 	}
 	else
 	{
-		FileName mysuffix = joboptions["coords_suffix"].getString();
-		if (mysuffix == "")
+		FileName mylist = joboptions["coords_suffix"].getString();
+		if (mylist == "")
 		{
 			error_message = "ERROR: empty field for coordinate STAR file...";
 			return false;
 		}
-		command += " --coord_dir " + mysuffix.beforeLastOf("/") + "/";
-		command += " --coord_suffix " + (mysuffix.afterLastOf("/")).without("coords_suffix");
-		Node node2(joboptions["coords_suffix"].getString(), joboptions["coords_suffix"].node_type);
+		// Attempt at backwards compatibility
+		if (mylist.contains("coords_suffix"))
+		{
+			command += " --coord_dir " + mylist.beforeLastOf("/") + "/";
+			command += " --coord_suffix " + (mylist.afterLastOf("/")).without("coords_suffix");
+		}
+		else
+		{
+			command += " --coord_list " + mylist;
+		}
+		Node node2(mylist, joboptions["coords_suffix"].node_type);
 		inputNodes.push_back(node2);
 	}
 
