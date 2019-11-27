@@ -25,6 +25,18 @@
 #include <src/jaz/gravis/tImage.h>
 #endif
 
+const Fl_Menu_Item color_choices[] =
+{
+	// text, shortcut, callback, user_data, flags, type, font, size, color
+	{"Red (1)",     0, (Fl_Callback*)0, (void*)1, 0, 0, 0, 0, FL_RED},
+	{"Green (2)",   0, (Fl_Callback*)0, (void*)2, 0, 0, 0, 0, FL_GREEN},
+	{"Blue (3)",    0, (Fl_Callback*)0, (void*)3, 0, 0, 0, 0, FL_BLUE},
+	{"Cyan (4)",    0, (Fl_Callback*)0, (void*)4, 0, 0, 0, 0, FL_CYAN},
+	{"Magenta (5)", 0, (Fl_Callback*)0, (void*)5, 0, 0, 0, 0, FL_MAGENTA},
+	{"Yellow (6)",  0, (Fl_Callback*)0, (void*)6, 0, 0, 0, 0, FL_YELLOW},
+	{0} // sentinel
+};
+
 /************************************************************************/
 void DisplayBox::draw()
 {
@@ -45,18 +57,8 @@ void DisplayBox::draw()
 		fl_draw(img_label.c_str(), xpos, ypos + fl_height());
 	}
 	/* Draw a red rectangle around the particle if it is selected */
-	if (selected == 1)
-		fl_color(FL_RED);
-	else if (selected == 2)
-		fl_color(FL_GREEN);
-	else if (selected == 3)
-		fl_color(FL_BLUE);
-	else if (selected == 4)
-		fl_color(FL_CYAN);
-	else if (selected == 5)
-		fl_color(FL_MAGENTA);
-	else if (selected == 6)
-		fl_color(FL_YELLOW);
+	if (selected >= 1 && selected <= 6)
+		fl_color(color_choices[selected - 1].labelcolor_);
 	else
 		fl_color(FL_BLACK);
 
@@ -72,13 +74,13 @@ void DisplayBox::draw()
 
 	//fl_pop_clip();
 }
+
 unsigned char rgbToGrey(const unsigned char red, const unsigned char green, const unsigned char blue)
 {
 	switch (colour_scheme)
 	{
 	case (BLACKGREYREDSCALE):
 	{
-
 		if (red == 255) return FLOOR((RFLOAT)(255. - blue/2.));
 		else return FLOOR((RFLOAT)(red/2.));
 		break;
@@ -91,7 +93,6 @@ unsigned char rgbToGrey(const unsigned char red, const unsigned char green, cons
 	}
 	case (BLUEGREYREDSCALE):
 	{
-
 		unsigned char Y;
 		int X;
 		if (red == 0) { Y = 255-blue; X = 0; }
@@ -102,7 +103,6 @@ unsigned char rgbToGrey(const unsigned char red, const unsigned char green, cons
 	}
 	case (RAINBOWSCALE):
 	{
-
 		unsigned char Y;
 		int X;
 		if (red > 0)
@@ -122,7 +122,6 @@ unsigned char rgbToGrey(const unsigned char red, const unsigned char green, cons
 	}
 	case (CYANBLACKYELLOWSCALE):
 	{
-
 		if (red >0)
 		{
 			if (red < 255) return (unsigned char)FLOOR((RFLOAT)red / 3. + 128);
@@ -141,11 +140,9 @@ unsigned char rgbToGrey(const unsigned char red, const unsigned char green, cons
 	return 0;
 }
 
-
 void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, int _ipos,
                          RFLOAT _minval, RFLOAT _maxval, RFLOAT _scale, bool do_relion_scale)
 {
-
 	scale = _scale;
 	minval = _minval;
 	maxval = _maxval;
@@ -227,7 +224,6 @@ void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, i
 		}
 		else
 		{
-
 			// scale the image using a nearest-neighbor algorithm...
 			for (dy = ysize_data, sy = 0, yerr = ysize_data, n = 0; dy > 0; dy --)
 			{
@@ -252,13 +248,10 @@ void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, i
 					sy ++;
 				}
 			}
-
-
 		}
 	}
 	else
 	{
-
 		if (colour_scheme == GREYSCALE)
 		{
 			FOR_ALL_DIRECT_ELEMENTS_IN_MULTIDIMARRAY_ptr(img, n, old_ptr)
@@ -274,15 +267,11 @@ void DisplayBox::setData(MultidimArray<RFLOAT> &img, MetaDataContainer *MDCin, i
 				greyToRGB(val, img_data[3*n], img_data[3*n+1], img_data[3*n+2]);
 			}
 		}
-
 	}
 }
 
-
-
 int DisplayBox::toggleSelect(int set_selected)
 {
-
 	if (selected > 0)
 		selected = 0;
 	else if (selected == 0)
@@ -293,7 +282,6 @@ int DisplayBox::toggleSelect(int set_selected)
 
 void DisplayBox::setSelect(int value)
 {
-
 	selected = value;
 	redraw();
 }
@@ -308,7 +296,6 @@ int DisplayBox::select()
 
 int DisplayBox::unSelect()
 {
-
 	selected = NOTSELECTED;
 	redraw();
 	return selected;
@@ -617,7 +604,6 @@ void basisViewerCanvas::fill(MetaDataTable &MDin, ObservationModel *obsModel, EM
 				boxes[my_sorted_ipos] = my_box;//boxes.push_back(my_box);
 			}
 
-
 			// 2. Reset numbers_in_stack and my_stack_first_ipos for next stack
 			numbers_in_stack.clear();
 			my_stack_first_ipos = ipos + 1;
@@ -634,8 +620,8 @@ void basisViewerCanvas::fill(MetaDataTable &MDin, ObservationModel *obsModel, EM
 
 	if (nr_imgs > 1)
 		progress_bar(nr_imgs);
-
 }
+
 void basisViewerCanvas::fill(MultidimArray<RFLOAT> &image, RFLOAT _minval, RFLOAT _maxval, RFLOAT _sigma_contrast, RFLOAT _scale)
 {
 	xoff = yoff = 0;
@@ -651,7 +637,6 @@ void basisViewerCanvas::fill(MultidimArray<RFLOAT> &image, RFLOAT _minval, RFLOA
 	my_box->setData(image, MDtmp.getObject(), 0, _minval, _maxval, _scale, true);
 	my_box->redraw();
 	boxes.push_back(my_box);
-
 }
 
 void basisViewerCanvas::getImageContrast(MultidimArray<RFLOAT> &image, RFLOAT &minval, RFLOAT &maxval, RFLOAT &sigma_contrast)
@@ -1577,7 +1562,7 @@ void multiViewerCanvas::saveSelected(int save_selected)
 		std::cout <<" No images to save...." << std::endl;
 }
 
-void multiViewerCanvas::setSelectionType()
+void basisViewerCanvas::setSelectionType()
 {
 	popupSelectionTypeWindow win(250, 50, "Set selection type");
 	win.fill();
@@ -1588,21 +1573,16 @@ int popupSelectionTypeWindow::fill()
 	color(GUI_BACKGROUND_COLOR);
 	choice = new Fl_Choice(50, 10, 130, 30, "type: ") ;
 
-	choice->add("Red (1)", 0, 0,0, FL_MENU_VALUE);
-	choice->add("Green (2)", 0, 0,0, FL_MENU_VALUE);
-	choice->add("Blue (3)", 0, 0,0, FL_MENU_VALUE);
-	choice->add("Cyan (4)", 0, 0,0, FL_MENU_VALUE);
-	choice->add("Magenta (5)", 0, 0,0, FL_MENU_VALUE);
-	choice->add("Yellow (6)", 0, 0,0, FL_MENU_VALUE);
+	choice->menu(color_choices);
 	choice->color(GUI_INPUT_COLOR);
 
-	choice->value(current_selection_type-1);
+	choice->value(current_selection_type - 1);
 
 	choice->callback(cb_set, this);
 
 	Fl_Button * closebutton = new Fl_Button(190, 10, 50, 30, "Close");
 	closebutton->color(GUI_RUNBUTTON_COLOR);
-	closebutton->callback( cb_close, this);
+	closebutton->callback(cb_close, this);
 
 	show();
 
@@ -1912,6 +1892,7 @@ int pickerViewerCanvas::handle(int ev)
 				{ "Load coordinates" },
 				{ "Reload coordinates" },
 				{ "Clear coordinates" },
+				{ "Set selection type" },
 				{ "Help" },
 				{ "Quit" },
 				{ 0 }
@@ -1929,12 +1910,14 @@ int pickerViewerCanvas::handle(int ev)
 				loadCoordinates(false);
 			else if ( strcmp(m->label(), "Clear coordinates") == 0 )
 				clearCoordinates();
+			else if ( strcmp(m->label(), "Set selection type") == 0)
+				setSelectionType();
 			else if ( strcmp(m->label(), "Help") == 0 )
 				printHelp();
 			else if ( strcmp(m->label(), "Quit") == 0 )
 				exit(0);
 			redraw();
-			return(1);          // (tells caller we handled this event)
+			return 1; // (tells caller we handled this event)
 		}
 		return 0;
 	}
@@ -1945,18 +1928,10 @@ int pickerViewerCanvas::handle(int ev)
 		return 1;
 	}
 	return 0;
-
 }
+
 void pickerViewerCanvas::saveCoordinates(bool ask_filename)
 {
-
-	// Allow saving empty coordinate files, in case user decides to delete all particles!
-	//if (MDcoords.numberOfObjects() < 1)
-	//{
-	//	std::cout <<" No coordinates to save. Use left-mouse clicks to pick coordinates first..." << std::endl;
-	//	return;
-	//}
-
 	FileName fn_out;
 	if (ask_filename)
 	{
@@ -1990,8 +1965,6 @@ void pickerViewerCanvas::saveCoordinates(bool ask_filename)
 		MDcoords.write(fn_out);
 	}
 	std::cout << "Saved "<<fn_out << " with " << MDcoords.numberOfObjects() << " selected coordinates." << std::endl;
-	return;
-
 }
 
 void pickerViewerCanvas::loadCoordinates(bool ask_filename)
@@ -2017,12 +1990,10 @@ void pickerViewerCanvas::loadCoordinates(bool ask_filename)
 	{
 		findColorColumnForCoordinates();
 	}
-
 }
 
 void pickerViewerCanvas::findColorColumnForCoordinates()
 {
-
 	MetaDataTable MDcolor, MDcolormic;
 	MDcolor.read(fn_color);
 
@@ -2094,7 +2065,6 @@ void pickerViewerCanvas::findColorColumnForCoordinates()
 			}
 		}
 	}
-
 }
 
 void pickerViewerCanvas::clearCoordinates()
@@ -2330,9 +2300,8 @@ void displayerGuiWindow::readLastSettings()
 	}
 
 	in.close();
-
-
 }
+
 void displayerGuiWindow::writeLastSettings()
 {
 	std::ofstream  fh;
@@ -2373,7 +2342,6 @@ void displayerGuiWindow::cb_display(Fl_Widget* o, void* v) {
 
 void displayerGuiWindow::cb_display_i()
 {
-
 	// Save last settings, so we don't need to change settings every time...
 	writeLastSettings();
 
@@ -2481,9 +2449,7 @@ void displayerGuiWindow::cb_display_i()
 	cl += " &";
 	//std::cout << "Executing: " << cl << std::endl;
 	int res = system(cl.c_str());
-
 }
-
 
 void Displayer::read(int argc, char **argv)
 {
@@ -2558,7 +2524,6 @@ void Displayer::usage()
 
 void Displayer::initialise()
 {
-
 	if (!do_gui && fn_in=="")
 		REPORT_ERROR("Displayer::initialise ERROR: either provide --i or --gui");
 	Fl::visual(FL_RGB);
